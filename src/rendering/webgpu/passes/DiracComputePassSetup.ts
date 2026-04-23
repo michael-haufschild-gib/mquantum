@@ -69,59 +69,131 @@ import type {
  * @param helpers - Base-class helper methods for shader/pipeline creation
  * @returns All pipelines and their associated bind group layouts
  */
+// --- Pure WGSL composers (Phase 2b) ---
+const diracPrelude = (): string => diracUniformsBlock + freeScalarNDIndexBlock
+
+/** Pure WGSL for the Dirac init compute shader. */
+export function composeDiracInitShader(): string {
+  return diracPrelude() + diracInitBlock
+}
+
+/** Pure WGSL for the Dirac potential-fill compute shader. */
+export function composeDiracPotentialShader(): string {
+  return diracPrelude() + diracPotentialBlock
+}
+
+/** Pure WGSL for the Dirac potential half-step compute shader. */
+export function composeDiracPotentialHalfShader(): string {
+  return diracPrelude() + diracPotentialHalfBlock
+}
+
+/** Pure WGSL for the Dirac absorber (post-FFT) compute shader. */
+export function composeDiracAbsorberShader(): string {
+  return diracPrelude() + pmlProfileBlock + diracAbsorberBlock
+}
+
+/** Pure WGSL for the Dirac renormalization compute shader. */
+export function composeDiracRenormalizeShader(): string {
+  return renormalizeBlock
+}
+
+/** Pure WGSL for the Dirac pack compute shader. */
+export function composeDiracPackShader(): string {
+  return assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexPackShaderBlock]).wgsl
+}
+
+/** Pure WGSL for the Dirac unpack compute shader. */
+export function composeDiracUnpackShader(): string {
+  return assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexUnpackShaderBlock]).wgsl
+}
+
+/** Pure WGSL for the Dirac Stockham FFT stage compute shader. */
+export function composeDiracFftStageShader(): string {
+  return tdseFFTStageUniformsBlock + tdseStockhamFFTBlock
+}
+
+/** Pure WGSL for the Dirac shared-memory per-axis FFT compute shader. */
+export function composeDiracFftSharedMemShader(): string {
+  return fftAxisUniformsBlock + tdseSharedMemFFTBlock
+}
+
+/** Pure WGSL for the Dirac kinetic propagator compute shader. */
+export function composeDiracKineticShader(): string {
+  return diracPrelude() + diracKineticBlock
+}
+
+/** Pure WGSL for the Dirac write-grid compute shader. */
+export function composeDiracWriteGridShader(): string {
+  return diracPrelude() + diracWriteGridBlock
+}
+
+/** Pure WGSL for the Dirac diagnostics norm-reduce compute shader. */
+export function composeDiracDiagReduceShader(): string {
+  return diracDiagNormReduceBlock
+}
+
+/** Pure WGSL for the Dirac diagnostics norm-finalize compute shader. */
+export function composeDiracDiagFinalizeShader(): string {
+  return diracDiagNormFinalizeBlock
+}
+
+/**
+ * Compile every Dirac compute pipeline and return them with their bind
+ * group layouts. One-time setup per device; safe to memoize at the pass
+ * level.
+ */
 export function buildDiracPipelines(
   device: GPUDevice,
   helpers: DiracPassHelpers
 ): DiracPipelineResult {
-  const unifAndIndex = diracUniformsBlock + freeScalarNDIndexBlock
-
   // Init: uniforms + spinorRe + spinorIm
-  const initBGL = createComputeBGL(device, 'dirac-init-bgl', ['uniform', 'storage', 'storage'])
+  // Binding 0 (DiracUniforms) is `read-only-storage` because the struct embeds
+  // scalar arrays (spec-forbidden in uniform address space). See
+  // `diracInit.wgsl.ts` for the matching `var<storage, read>` declaration.
+  const initBGL = createComputeBGL(device, 'dirac-init-bgl', [
+    'read-only-storage',
+    'storage',
+    'storage',
+  ])
   const initPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(device, unifAndIndex + diracInitBlock, 'dirac-init'),
+    helpers.createShaderModule(device, composeDiracInitShader(), 'dirac-init'),
     [initBGL],
     'dirac-init'
   )
 
   // Potential fill: uniforms + potential
-  const potentialBGL = createComputeBGL(device, 'dirac-potential-bgl', ['uniform', 'storage'])
+  // Binding 0 (DiracUniforms) — see init BGL comment.
+  const potentialBGL = createComputeBGL(device, 'dirac-potential-bgl', [
+    'read-only-storage',
+    'storage',
+  ])
   const potentialPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(device, unifAndIndex + diracPotentialBlock, 'dirac-potential'),
+    helpers.createShaderModule(device, composeDiracPotentialShader(), 'dirac-potential'),
     [potentialBGL],
     'dirac-potential'
   )
 
-  // Potential half-step: uniforms + spinorRe + spinorIm + potential(read)
+  // Potential half-step: uniforms + spinorRe + spinorIm + potential(read).
+  // Binding 0 (DiracUniforms) — see init BGL comment.
   const potentialHalfBGL = createComputeBGL(device, 'dirac-potential-half-bgl', [
-    'uniform',
+    'read-only-storage',
     'storage',
     'storage',
     'read-only-storage',
   ])
   const potentialHalfPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(
-      device,
-      unifAndIndex + diracPotentialHalfBlock,
-      'dirac-potential-half'
-    ),
+    helpers.createShaderModule(device, composeDiracPotentialHalfShader(), 'dirac-potential-half'),
     [potentialHalfBGL],
     'dirac-potential-half'
   )
 
-  // Absorber (separate pass after Strang step — NOT merged into potential half-step).
-  // Running absorption after the FFT kinetic step prevents the FFT from scattering
-  // the spatially-modulated absorber profile across k-space.
-  // Reuses initBGL layout (uniform + spinorRe + spinorIm).
+  // Absorber — reuses initBGL layout.
   const absorberPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(
-      device,
-      unifAndIndex + pmlProfileBlock + diracAbsorberBlock,
-      'dirac-absorber'
-    ),
+    helpers.createShaderModule(device, composeDiracAbsorberShader(), 'dirac-absorber'),
     [initBGL],
     'dirac-absorber'
   )
@@ -137,7 +209,10 @@ export function buildDiracPipelines(
     label: 'dirac-renormalize-pipeline',
     layout: device.createPipelineLayout({ bindGroupLayouts: [renormalizeBGL] }),
     compute: {
-      module: device.createShaderModule({ label: 'dirac-renormalize', code: renormalizeBlock }),
+      module: device.createShaderModule({
+        label: 'dirac-renormalize',
+        code: composeDiracRenormalizeShader(),
+      }),
       entryPoint: 'main',
     },
   })
@@ -152,11 +227,7 @@ export function buildDiracPipelines(
   ])
   const packPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(
-      device,
-      assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexPackShaderBlock]).wgsl,
-      'dirac-pack'
-    ),
+    helpers.createShaderModule(device, composeDiracPackShader(), 'dirac-pack'),
     [packBGL],
     'dirac-pack'
   )
@@ -169,11 +240,7 @@ export function buildDiracPipelines(
   ])
   const unpackPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(
-      device,
-      assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexUnpackShaderBlock]).wgsl,
-      'dirac-unpack'
-    ),
+    helpers.createShaderModule(device, composeDiracUnpackShader(), 'dirac-unpack'),
     [unpackBGL],
     'dirac-unpack'
   )
@@ -186,48 +253,41 @@ export function buildDiracPipelines(
   ])
   const fftStagePipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(
-      device,
-      tdseFFTStageUniformsBlock + tdseStockhamFFTBlock,
-      'dirac-fft-stage'
-    ),
+    helpers.createShaderModule(device, composeDiracFftStageShader(), 'dirac-fft-stage'),
     [fftStageBGL],
     'dirac-fft-stage'
   )
 
-  // Shared-memory FFT: one dispatch per axis (all stages in workgroup shared memory)
+  // Shared-memory FFT: one dispatch per axis
   const fftSharedMemBGL = createComputeBGL(device, 'dirac-fft-shared-mem-bgl', [
     'uniform',
     'storage',
   ])
   const fftSharedMemPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(
-      device,
-      fftAxisUniformsBlock + tdseSharedMemFFTBlock,
-      'dirac-fft-shared-mem'
-    ),
+    helpers.createShaderModule(device, composeDiracFftSharedMemShader(), 'dirac-fft-shared-mem'),
     [fftSharedMemBGL],
     'dirac-fft-shared-mem'
   )
 
-  // Kinetic propagator: uniforms + spinorRe + spinorIm + gammaMatrices(read)
+  // Kinetic propagator: uniforms + spinorRe + spinorIm + gammaMatrices(read).
+  // Binding 0 (DiracUniforms) — see init BGL comment.
   const kineticBGL = createComputeBGL(device, 'dirac-kinetic-bgl', [
-    'uniform',
+    'read-only-storage',
     'storage',
     'storage',
     'read-only-storage',
   ])
   const kineticPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(device, unifAndIndex + diracKineticBlock, 'dirac-kinetic'),
+    helpers.createShaderModule(device, composeDiracKineticShader(), 'dirac-kinetic'),
     [kineticBGL],
     'dirac-kinetic'
   )
 
-  // Write grid: uniforms + spinorRe + spinorIm + potential + gamma + outputTex
+  // Write grid. Binding 0 (DiracUniforms) — see init BGL comment.
   const writeGridBGL = createComputeBGL(device, 'dirac-write-grid-bgl', [
-    'uniform',
+    'read-only-storage',
     'read-only-storage',
     'read-only-storage',
     'read-only-storage',
@@ -236,7 +296,7 @@ export function buildDiracPipelines(
   ])
   const writeGridPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(device, unifAndIndex + diracWriteGridBlock, 'dirac-write-grid'),
+    helpers.createShaderModule(device, composeDiracWriteGridShader(), 'dirac-write-grid'),
     [writeGridBGL],
     'dirac-write-grid'
   )
@@ -253,7 +313,7 @@ export function buildDiracPipelines(
   ])
   const diagReducePipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(device, diracDiagNormReduceBlock, 'dirac-diag-reduce'),
+    helpers.createShaderModule(device, composeDiracDiagReduceShader(), 'dirac-diag-reduce'),
     [diagReduceBGL],
     'dirac-diag-reduce'
   )
@@ -269,7 +329,7 @@ export function buildDiracPipelines(
   ])
   const diagFinalizePipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(device, diracDiagNormFinalizeBlock, 'dirac-diag-finalize'),
+    helpers.createShaderModule(device, composeDiracDiagFinalizeShader(), 'dirac-diag-finalize'),
     [diagFinalizeBGL],
     'dirac-diag-finalize'
   )

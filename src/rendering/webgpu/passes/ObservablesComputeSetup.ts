@@ -69,10 +69,13 @@ export function createObservablesBuffers(
     device.createBuffer({ label, size: Math.max(size, 4), usage })
 
   return {
+    // ObsReduceUniforms binds as STORAGE (not UNIFORM) because the struct embeds
+    // scalar arrays that are spec-forbidden in uniform address space. See
+    // observablesPositionReduce.wgsl.ts for the matching `var<storage, read>`.
     posUniformBuffer: makeBuffer(
       'obs-pos-uniform',
       uniformSize,
-      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+      GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
     ),
     posPartialBuffer: makeBuffer('obs-pos-partials', posPartialSize, GPUBufferUsage.STORAGE),
     posResultBuffer: makeBuffer(
@@ -85,10 +88,11 @@ export function createObservablesBuffers(
       resultSize,
       GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST
     ),
+    // ObsMomReduceUniforms — see posUniformBuffer comment.
     momUniformBuffer: makeBuffer(
       'obs-mom-uniform',
       uniformSize,
-      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+      GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
     ),
     momPartialBuffer: makeBuffer('obs-mom-partials', momPartialSize, GPUBufferUsage.STORAGE),
     momResultBuffer: makeBuffer(
@@ -104,11 +108,12 @@ export function createObservablesBuffers(
     numWorkgroups: wgCount,
     posNumChannels,
     momNumChannels,
-    // Energy spectrum buffers
+    // Energy spectrum buffers.
+    // EnergySpectrumUniforms — see posUniformBuffer comment.
     esUniformBuffer: makeBuffer(
       'energy-spectrum-uniform',
       176, // EnergySpectrumUniforms: 8 scalars + 3 arrays of 12 = 44 u32s = 176 bytes
-      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+      GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
     ),
     esBinsBuffer: makeBuffer(
       'energy-spectrum-bins',

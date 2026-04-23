@@ -444,7 +444,11 @@ export function buildVolumeBlocks(opts: {
     },
     {
       name: 'Density Grid Sampling',
-      condition: !opts.is2D,
+      // Emitted in every mode (including 2D) — `emission.wgsl.ts` color algorithms 27
+      // and 28 call `computeQuantumPotentialFromGrid` / `computeVortexDensityFromGrid`
+      // unconditionally, so the symbols must always resolve. `buildShaderConfig`
+      // forces `useDensityGrid=false` whenever `is2D=true`, so the 2D path falls
+      // into the stub branch.
       content: opts.useDensityGrid
         ? densityGridSamplingBlock
         : [

@@ -23,6 +23,36 @@ import {
 } from '../shaders/schroedinger/compute/qwWriteGrid.wgsl'
 import { createComputeBGL } from '../utils/computeBindGroupLayout'
 
+// --- Pure WGSL composers (Phase 2b) ---
+
+/** Pure WGSL for the quantum-walk coin compute shader (no prelude needed). */
+export function composeQwCoinShader(): string {
+  return quantumWalkCoinBlock
+}
+
+/** Pure WGSL for the quantum-walk shift compute shader. */
+export function composeQwShiftShader(): string {
+  return freeScalarNDIndexBlock + '\n' + quantumWalkShiftBlock
+}
+
+/** Pure WGSL for the quantum-walk write-grid compute shader. */
+export function composeQwWriteGridShader(): string {
+  return freeScalarNDIndexBlock + '\n' + qwWriteGridUniformsBlock + '\n' + qwWriteGridBlock
+}
+
+/** Pure WGSL for the quantum-walk absorber compute shader. */
+export function composeQwAbsorberShader(): string {
+  return (
+    freeScalarNDIndexBlock +
+    '\n' +
+    qwAbsorberUniformsBlock +
+    '\n' +
+    pmlProfileBlock +
+    '\n' +
+    quantumWalkAbsorberBlock
+  )
+}
+
 /** All GPU resources created by the pipeline factory. */
 export interface QwPipelineResult {
   coinPipeline: GPUComputePipeline
@@ -46,26 +76,19 @@ export interface QwPipelineResult {
 export function createQwPipelines(device: GPUDevice): QwPipelineResult {
   const coinModule = device.createShaderModule({
     label: 'qw-coin',
-    code: quantumWalkCoinBlock,
+    code: composeQwCoinShader(),
   })
   const shiftModule = device.createShaderModule({
     label: 'qw-shift',
-    code: freeScalarNDIndexBlock + '\n' + quantumWalkShiftBlock,
+    code: composeQwShiftShader(),
   })
   const writeGridModule = device.createShaderModule({
     label: 'qw-write-grid',
-    code: freeScalarNDIndexBlock + '\n' + qwWriteGridUniformsBlock + '\n' + qwWriteGridBlock,
+    code: composeQwWriteGridShader(),
   })
   const absorberModule = device.createShaderModule({
     label: 'qw-absorber',
-    code:
-      freeScalarNDIndexBlock +
-      '\n' +
-      qwAbsorberUniformsBlock +
-      '\n' +
-      pmlProfileBlock +
-      '\n' +
-      quantumWalkAbsorberBlock,
+    code: composeQwAbsorberShader(),
   })
 
   const coinBGL = createComputeBGL(device, 'qw-coin-bgl', [
@@ -73,18 +96,21 @@ export function createQwPipelines(device: GPUDevice): QwPipelineResult {
     'read-only-storage',
     'storage',
   ])
+  // Binding 0 for shift/writeGrid/absorber is `read-only-storage` because the
+  // respective Uniforms structs embed scalar arrays with 4-byte stride —
+  // spec-forbidden in uniform address space. See matching shader declarations.
   const shiftBGL = createComputeBGL(device, 'qw-shift-bgl', [
-    'uniform',
+    'read-only-storage',
     'read-only-storage',
     'storage',
   ])
   const writeGridBGL = createComputeBGL(device, 'qw-write-grid-bgl', [
-    'uniform',
+    'read-only-storage',
     'read-only-storage',
     { storageTexture: { format: 'rgba16float', viewDimension: '3d' } },
     'storage',
   ])
-  const absorberBGL = createComputeBGL(device, 'qw-absorber-bgl', ['uniform', 'storage'])
+  const absorberBGL = createComputeBGL(device, 'qw-absorber-bgl', ['read-only-storage', 'storage'])
 
   return {
     coinPipeline: device.createComputePipeline({
@@ -112,20 +138,23 @@ export function createQwPipelines(device: GPUDevice): QwPipelineResult {
       size: 16,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     }),
+    // Shift/WriteGrid/Absorber params bind as STORAGE because their structs
+    // embed scalar arrays that are spec-forbidden in uniform address space.
+    // See matching shader declarations in quantumWalk*.wgsl.ts.
     shiftUniformBuffer: device.createBuffer({
       label: 'qw-shift-uniform',
       size: 16 + 12 * 4 * 2,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     }),
     writeGridUniformBuffer: device.createBuffer({
       label: 'qw-write-grid-uniform',
       size: QW_WRITE_GRID_UNIFORMS_SIZE,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     }),
     absorberUniformBuffer: device.createBuffer({
       label: 'qw-absorber-uniform',
       size: QW_ABSORBER_UNIFORMS_SIZE,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     }),
     maxDensityAtomicBuffer: device.createBuffer({
       label: 'qw-max-density-atomic',

@@ -119,12 +119,16 @@ export function rebuildFsfFieldBuffers(
   // Create k-space and diagnostics staging buffers
   kSpace.createBuffers(device, bufferSize)
 
-  // Create uniform buffer
-  const uniformBuffer = helpers.createUniformBuffer(
-    device,
-    FSF_UNIFORM_SIZE,
-    'free-scalar-uniforms'
-  )
+  // Create params buffer as STORAGE (not UNIFORM) because `FreeScalarUniforms`
+  // embeds scalar arrays that are spec-forbidden in uniform address space.
+  // See `freeScalarInit.wgsl.ts` for the full rationale and matching binding
+  // decl. Labelled "uniforms" to preserve the existing name.
+  const uniformBuffer = device.createBuffer({
+    label: 'free-scalar-uniforms',
+    size: FSF_UNIFORM_SIZE,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  })
+  void helpers // retained for callsite symmetry; buffer is created inline here.
 
   const configHash = computeFsfConfigHash(config)
 

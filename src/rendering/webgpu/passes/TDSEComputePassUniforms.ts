@@ -7,7 +7,7 @@
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { buildCompactDimsMask, computeEffectiveSpacing } from '@/lib/physics/compactification'
-import { computePMLSigmaMaxND, PML_GRADING_EXPONENT } from '@/lib/physics/pml/profile'
+import { sigmaMaxFromPmlConfig } from '@/lib/physics/pml/profile'
 import type { MetricKind } from '@/lib/physics/tdse/metrics/types'
 import {
   MAX_ADS_RADIUS,
@@ -27,10 +27,10 @@ import {
 } from '@/lib/physics/tdse/metrics/types'
 
 import {
-  assertPow2Log2,
-  FFT_UNIFORM_SIZE,
   MAX_DIM,
-  MAX_SLICE_POSITIONS_WRITE_COUNT,
+  packFFTAxisUniforms,
+  packFFTStageUniforms,
+  writeSlicePositionsToF32,
 } from './computePassUtils'
 
 /** Parameters for writing TDSEUniforms to a GPU buffer. */
@@ -251,16 +251,7 @@ export function writeTdseUniforms(
   // Absorber + drive (320-351, indices 80-87)
   // absorberWidth is PML fraction; absorberStrength is σ_max computed from PML target reflection
   f32[80] = config.absorberWidth
-  f32[81] = config.absorberEnabled
-    ? computePMLSigmaMaxND(
-        config.pmlTargetReflection ?? 1e-6,
-        config.absorberWidth,
-        config.gridSize,
-        config.dt,
-        PML_GRADING_EXPONENT,
-        config.latticeDim
-      )
-    : 0
+  f32[81] = sigmaMaxFromPmlConfig(config)
   u32[82] = config.driveEnabled ? 1 : 0
   u32[83] = WAVEFORM_MAP[config.driveWaveform] ?? 0
   f32[84] = config.driveFrequency
@@ -272,10 +263,7 @@ export function writeTdseUniforms(
   f32[87] = config.autoScale ? Math.max(maxDensity, densityFloor) : 1.0
 
   // slicePositions (offset 352, indices 88-99, WGSL array<f32, 12>).
-  // Clamped to MAX_SLICE_POSITIONS_WRITE_COUNT so an oversized store array
-  // cannot overflow past the slicePositions region into basisX at f32[100+].
-  const tdseSliceN = Math.min(config.slicePositions.length, MAX_SLICE_POSITIONS_WRITE_COUNT)
-  for (let i = 0; i < tdseSliceN; i++) f32[88 + 3 + i] = config.slicePositions[i]!
+  writeSlicePositionsToF32(f32, 88, config.slicePositions)
 
   // Basis vectors (400-543, indices 100-135)
   const writeBasis = (offset: number, b?: Float32Array) => {
@@ -503,39 +491,7 @@ export function writeTdseUniforms(
  * @returns Pre-computed FFT staging data as an ArrayBuffer
  */
 export function buildTdseFFTStagingData(config: TdseConfig, totalSites: number): ArrayBuffer {
-  let totalSlots = 0
-  for (let d = 0; d < config.latticeDim; d++) {
-    totalSlots += assertPow2Log2(config.gridSize[d]!)
-  }
-  totalSlots *= 2 // forward + inverse
-
-  const data = new ArrayBuffer(totalSlots * FFT_UNIFORM_SIZE)
-  let slotIdx = 0
-
-  for (const direction of [1.0, -1.0]) {
-    let axisStride = 1
-    for (let d = config.latticeDim - 1; d >= 0; d--) {
-      const axisDim = config.gridSize[d]!
-      const stages = assertPow2Log2(axisDim)
-
-      for (let s = 0; s < stages; s++) {
-        const offset = slotIdx * FFT_UNIFORM_SIZE
-        const view = new DataView(data, offset, FFT_UNIFORM_SIZE)
-        view.setUint32(0, axisDim, true)
-        view.setUint32(4, s, true)
-        view.setFloat32(8, direction, true)
-        view.setUint32(12, totalSites, true)
-        view.setUint32(16, axisStride, true)
-        view.setUint32(20, totalSites / axisDim, true)
-        view.setFloat32(24, 1.0 / axisDim, true)
-        view.setUint32(28, 0, true)
-        slotIdx++
-      }
-      axisStride *= axisDim
-    }
-  }
-
-  return data
+  return packFFTStageUniforms(config, totalSites)
 }
 
 /**
@@ -550,31 +506,5 @@ export function buildTdseFFTStagingData(config: TdseConfig, totalSites: number):
  * @returns Pre-computed axis staging data as an ArrayBuffer
  */
 export function buildTdseFFTAxisStagingData(config: TdseConfig, totalSites: number): ArrayBuffer {
-  const slotCount = config.latticeDim * 2 // forward + inverse
-  const data = new ArrayBuffer(slotCount * FFT_UNIFORM_SIZE)
-  let slotIdx = 0
-
-  for (const direction of [1.0, -1.0]) {
-    let axisStride = 1
-    for (let d = config.latticeDim - 1; d >= 0; d--) {
-      const axisDim = config.gridSize[d]!
-      const log2N = assertPow2Log2(axisDim)
-
-      const offset = slotIdx * FFT_UNIFORM_SIZE
-      const view = new DataView(data, offset, FFT_UNIFORM_SIZE)
-      view.setUint32(0, axisDim, true) // axisDim
-      view.setFloat32(4, direction, true) // direction
-      view.setUint32(8, totalSites, true) // totalElements
-      view.setUint32(12, axisStride, true) // axisStride
-      view.setUint32(16, log2N, true) // log2N
-      view.setUint32(20, 0, true) // _pad0
-      view.setUint32(24, 0, true) // _pad1
-      view.setUint32(28, 0, true) // _pad2
-      slotIdx++
-
-      axisStride *= axisDim
-    }
-  }
-
-  return data
+  return packFFTAxisUniforms(config, totalSites)
 }

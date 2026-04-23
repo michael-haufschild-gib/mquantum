@@ -68,10 +68,24 @@ export function buildHawkingInjectPipeline(
   ) => GPUComputePipeline
 ): void {
   if (state.pipeline) return
-  state.bgl = createComputeBGL(device, 'bec-hawking-inject-bgl', ['uniform', 'storage', 'storage'])
-  const code = tdseUniformsBlock + freeScalarNDIndexBlock + becHawkingInjectBlock
-  const sm = createShaderModule(device, code, 'bec-hawking-inject')
+  // Binding 0 (TDSEUniforms) is `read-only-storage` — see tdseInit.wgsl.ts /
+  // TDSEComputePassSetup init BGL comment for the spec-noncompliance rationale.
+  state.bgl = createComputeBGL(device, 'bec-hawking-inject-bgl', [
+    'read-only-storage',
+    'storage',
+    'storage',
+  ])
+  const sm = createShaderModule(device, composeBecHawkingInjectShader(), 'bec-hawking-inject')
   state.pipeline = createComputePipeline(device, sm, [state.bgl], 'bec-hawking-inject')
+}
+
+/**
+ * Pure WGSL composition for the analog-Hawking pair-injection compute shader.
+ * Exposed so WGSL validation enumerators can import and validate it without
+ * needing a GPU device.
+ */
+export function composeBecHawkingInjectShader(): string {
+  return tdseUniformsBlock + freeScalarNDIndexBlock + becHawkingInjectBlock
 }
 
 /**

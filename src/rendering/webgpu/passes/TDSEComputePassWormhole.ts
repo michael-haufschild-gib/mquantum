@@ -29,6 +29,15 @@ import { createComputeBGL } from '../utils/computeBindGroupLayout'
 /** Workgroup size — must match `@workgroup_size` in `tdseWormholeCouple.wgsl.ts`. */
 export const TDSE_WORMHOLE_WORKGROUP_SIZE = 64
 
+/**
+ * Pure WGSL composition for the wormhole-coupling compute shader. Exported
+ * so WGSL validation enumerators can import and validate the assembled
+ * source without a live `GPUDevice`.
+ */
+export function composeTdseWormholeCoupleShader(): string {
+  return tdseUniformsBlock + freeScalarNDIndexBlock + tdseWormholeCoupleBlock
+}
+
 /** Resources returned by {@link createWormholePipeline}. */
 export interface WormholePipelineResources {
   pipeline: GPUComputePipeline
@@ -60,13 +69,18 @@ export function createWormholePipeline(
   createShaderModule: CreateShaderModule,
   createComputePipeline: CreateComputePipeline
 ): WormholePipelineResources {
+  // Binding 0 (TDSEUniforms) is `read-only-storage` — see tdseInit.wgsl.ts /
+  // TDSEComputePassSetup init BGL comment for the spec-noncompliance rationale.
   const bgl = createComputeBGL(device, 'tdse-wormhole-couple-bgl', [
-    'uniform',
+    'read-only-storage',
     'storage',
     'storage',
   ])
-  const code = tdseUniformsBlock + freeScalarNDIndexBlock + tdseWormholeCoupleBlock
-  const module = createShaderModule(device, code, 'tdse-wormhole-couple')
+  const module = createShaderModule(
+    device,
+    composeTdseWormholeCoupleShader(),
+    'tdse-wormhole-couple'
+  )
   const pipeline = createComputePipeline(device, module, [bgl], 'tdse-wormhole-couple')
   return { pipeline, bgl }
 }

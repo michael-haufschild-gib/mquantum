@@ -83,10 +83,10 @@ import {
   estimateVacuumMaxPi,
   type VacuumDispersion,
 } from '@/lib/physics/freeScalar/vacuumSpectrum'
-import { computePMLSigmaMaxND, PML_GRADING_EXPONENT } from '@/lib/physics/pml/profile'
+import { sigmaMaxFromPmlConfig } from '@/lib/physics/pml/profile'
 import type { FsfDiagnosticsSnapshot } from '@/stores/diagnostics/types'
 
-import { computeStridesPadded, MAX_DIM, MAX_SLICE_POSITIONS_WRITE_COUNT } from './computePassUtils'
+import { computeStridesPadded, MAX_DIM, writeSlicePositionsToF32 } from './computePassUtils'
 
 // PERF: WeakMap-backed typed array view cache. Avoids creating 3 new
 // TypedArray views per frame (180/sec at 60 FPS). The views share the
@@ -317,15 +317,7 @@ export function writeFsfUniforms(
   }
 
   // slicePositions: array<f32, 12> (offset 288, indices 72-83)
-  // Store slicePositions[i] maps to extra dims i=0,1,... (dim 3,4,...).
-  // WGSL reads slicePositions[d] where d is the full dimension index (d >= 3),
-  // so write at index 72 + 3 + i to align with WGSL array indexing.
-  // Clamped to MAX_SLICE_POSITIONS_WRITE_COUNT so an oversized store array
-  // cannot overflow past the slicePositions region into basisX at f32[84+].
-  const fsfSliceN = Math.min(config.slicePositions.length, MAX_SLICE_POSITIONS_WRITE_COUNT)
-  for (let i = 0; i < fsfSliceN; i++) {
-    f32[72 + 3 + i] = config.slicePositions[i]!
-  }
+  writeSlicePositionsToF32(f32, 72, config.slicePositions)
 
   // basisX: array<f32, 12> (offset 336, indices 84-95)
   if (basisX) {
@@ -373,18 +365,15 @@ export function writeFsfUniforms(
     config.selfInteractionEnabled
   u32[123] = config.absorberEnabled ? (useKinkAwarePml ? 2 : 1) : 0 // offset 492
 
-  // PML absorber parameters (offset 496-511, indices 124-127)
-  f32[124] = config.absorberWidth ?? 0.2 // offset 496
-  f32[125] = config.absorberEnabled // offset 500 (sigma_max)
-    ? computePMLSigmaMaxND(
-        config.pmlTargetReflection ?? 1e-6,
-        config.absorberWidth ?? 0.2,
-        config.gridSize,
-        config.dt,
-        PML_GRADING_EXPONENT,
-        config.latticeDim
-      )
-    : 0
+  // PML absorber parameters (offset 496-511, indices 124-127).
+  // `absorberWidth` is typed non-optional but FSF historically carried a
+  // `?? 0.2` belt-and-braces default — preserve it on the uniform write
+  // so migrated presets missing the field still get a usable width, and
+  // feed the resolved value into sigmaMaxFromPmlConfig so both writes
+  // agree bit-for-bit with the legacy ternary block.
+  const effectiveAbsorberWidth = config.absorberWidth ?? 0.2
+  f32[124] = effectiveAbsorberWidth // offset 496
+  f32[125] = sigmaMaxFromPmlConfig({ ...config, absorberWidth: effectiveAbsorberWidth }) // offset 500 (sigma_max)
 
   // Cosmology coefficients at the current conformal time. Under Minkowski
   // or cosmology-disabled configs these collapse to (1, 1, 1), so the

@@ -49,6 +49,21 @@ const STOCHASTIC_UNIFORM_SIZE = 1568
 /** Size of the expectation finalize uniform buffer (16 bytes). */
 const EXPECT_FINALIZE_UNIFORM_SIZE = 16
 
+/** Pure WGSL composition for the stochastic-localization apply-kick compute shader. */
+export function composeTdseStochasticLocShader(): string {
+  return tdseUniformsBlock + freeScalarNDIndexBlock + tdseStochasticLocBlock
+}
+
+/** Pure WGSL composition for the 2-channel expect-reduce compute shader. */
+export function composeTdseStochasticExpectReduceShader(): string {
+  return tdseUniformsBlock + freeScalarNDIndexBlock + tdseStochasticExpectReduceBlock
+}
+
+/** Pure WGSL composition for the expect-finalize compute shader (pre-composed block). */
+export function composeTdseStochasticExpectFinalizeShader(): string {
+  return tdseStochasticExpectFinalizeBlock
+}
+
 /** Mutable state for the stochastic localization pass. */
 export interface StochasticLocState {
   uniformBuffer: GPUBuffer | null
@@ -115,17 +130,18 @@ export function buildStochasticLocPipeline(
     label: string
   ) => GPUComputePipeline
 ): void {
-  // Localization pipeline: uniform, storage×2, uniform, read-only-storage
+  // Localization pipeline: TDSEUniforms(storage), storage×2, StochasticParams(uniform),
+  // read-only-storage. Binding 0 (TDSEUniforms) — see tdseInit.wgsl.ts for the
+  // spec-noncompliance rationale.
   state.bgl = createComputeBGL(device, 'tdse-stochastic-loc-bgl', [
-    'uniform',
+    'read-only-storage',
     'storage',
     'storage',
     'uniform',
     'read-only-storage',
   ])
 
-  const shaderCode = tdseUniformsBlock + freeScalarNDIndexBlock + tdseStochasticLocBlock
-  const sm = createShaderModule(device, shaderCode, 'tdse-stochastic-loc')
+  const sm = createShaderModule(device, composeTdseStochasticLocShader(), 'tdse-stochastic-loc')
   state.pipeline = createComputePipeline(device, sm, [state.bgl], 'tdse-stochastic-loc')
 
   state.uniformBuffer?.destroy()
@@ -144,16 +160,21 @@ export function buildStochasticLocPipeline(
   })
   device.queue.writeBuffer(state.expectResultBuffer, 0, new Float32Array(EXPECT_CHANNELS))
 
-  // Expectation reduction pipelines (2-channel: Σ|ψ|²W + Σ|ψ|²)
+  // Expectation reduction pipelines (2-channel: Σ|ψ|²W + Σ|ψ|²).
+  // Binding 0 (TDSEUniforms) — see loc BGL comment; binding 3 (StochasticParams)
+  // stays uniform.
   state.expectReduceBGL = createComputeBGL(device, 'tdse-stochastic-expect-reduce-bgl', [
-    'uniform',
+    'read-only-storage',
     'read-only-storage',
     'read-only-storage',
     'uniform',
     'storage',
   ])
-  const reduceCode = tdseUniformsBlock + freeScalarNDIndexBlock + tdseStochasticExpectReduceBlock
-  const reduceSm = createShaderModule(device, reduceCode, 'tdse-stochastic-expect-reduce')
+  const reduceSm = createShaderModule(
+    device,
+    composeTdseStochasticExpectReduceShader(),
+    'tdse-stochastic-expect-reduce'
+  )
   state.expectReducePipeline = createComputePipeline(
     device,
     reduceSm,
@@ -166,8 +187,11 @@ export function buildStochasticLocPipeline(
     'read-only-storage',
     'storage',
   ])
-  const finalizeCode = tdseStochasticExpectFinalizeBlock
-  const finalizeSm = createShaderModule(device, finalizeCode, 'tdse-stochastic-expect-finalize')
+  const finalizeSm = createShaderModule(
+    device,
+    composeTdseStochasticExpectFinalizeShader(),
+    'tdse-stochastic-expect-finalize'
+  )
   state.expectFinalizePipeline = createComputePipeline(
     device,
     finalizeSm,

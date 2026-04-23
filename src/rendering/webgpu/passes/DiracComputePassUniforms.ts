@@ -6,14 +6,9 @@
  */
 
 import type { DiracConfig } from '@/lib/geometry/extended/dirac'
-import { computePMLSigmaMaxND, PML_GRADING_EXPONENT } from '@/lib/physics/pml/profile'
+import { sigmaMaxFromPmlConfig } from '@/lib/physics/pml/profile'
 
-import {
-  assertPow2Log2,
-  FFT_UNIFORM_SIZE,
-  MAX_DIM,
-  MAX_SLICE_POSITIONS_WRITE_COUNT,
-} from './computePassUtils'
+import { MAX_DIM, packFFTStageUniforms, writeSlicePositionsToF32 } from './computePassUtils'
 
 /** Parameters for writing DiracUniforms to a GPU buffer. */
 export interface DiracUniformParams {
@@ -122,24 +117,10 @@ export function writeDiracUniforms(
   // PML absorber (offset 320, indices 80-81)
   f32[80] = config.absorberWidth
   // Auto-compute sigma_max from PML target reflection coefficient
-  f32[81] = config.absorberEnabled
-    ? computePMLSigmaMaxND(
-        config.pmlTargetReflection ?? 1e-6,
-        config.absorberWidth,
-        config.gridSize,
-        config.dt,
-        PML_GRADING_EXPONENT,
-        config.latticeDim
-      )
-    : 0
+  f32[81] = sigmaMaxFromPmlConfig(config)
 
-  // slicePositions (offset 328, indices 82-93, WGSL array<f32, 12>)
-  // Store array is 0-indexed (i=0 -> dim 3), WGSL reads slicePositions[d]
-  // where d >= 3. Clamp to MAX_SLICE_POSITIONS_WRITE_COUNT so an oversized
-  // store array (e.g. a stale default or migrated preset) cannot overflow
-  // into basisX at f32[94..96]. See computePassUtils.ts for the contract.
-  const diracSliceN = Math.min(config.slicePositions.length, MAX_SLICE_POSITIONS_WRITE_COUNT)
-  for (let i = 0; i < diracSliceN; i++) f32[82 + 3 + i] = config.slicePositions[i]!
+  // slicePositions (offset 328, indices 82-93, WGSL array<f32, 12>).
+  writeSlicePositionsToF32(f32, 82, config.slicePositions)
 
   // Basis vectors (offset 376, indices 94-105, 106-117, 118-129)
   const writeBasis = (offset: number, b?: Float32Array) => {
@@ -175,37 +156,5 @@ export function writeDiracUniforms(
  * @returns ArrayBuffer containing packed FFT stage uniforms
  */
 export function buildDiracFFTStagingData(config: DiracConfig, totalSites: number): ArrayBuffer {
-  let totalSlots = 0
-  for (let d = 0; d < config.latticeDim; d++) {
-    totalSlots += assertPow2Log2(config.gridSize[d]!)
-  }
-  totalSlots *= 2
-
-  const data = new ArrayBuffer(totalSlots * FFT_UNIFORM_SIZE)
-  let slotIdx = 0
-
-  for (const direction of [1.0, -1.0]) {
-    let axisStride = 1
-    for (let d = config.latticeDim - 1; d >= 0; d--) {
-      const axisDim = config.gridSize[d]!
-      const stages = assertPow2Log2(axisDim)
-
-      for (let s = 0; s < stages; s++) {
-        const offset = slotIdx * FFT_UNIFORM_SIZE
-        const view = new DataView(data, offset, FFT_UNIFORM_SIZE)
-        view.setUint32(0, axisDim, true)
-        view.setUint32(4, s, true)
-        view.setFloat32(8, direction, true)
-        view.setUint32(12, totalSites, true)
-        view.setUint32(16, axisStride, true)
-        view.setUint32(20, totalSites / axisDim, true)
-        view.setFloat32(24, 1.0 / axisDim, true)
-        view.setUint32(28, 0, true)
-        slotIdx++
-      }
-      axisStride *= axisDim
-    }
-  }
-
-  return data
+  return packFFTStageUniforms(config, totalSites)
 }

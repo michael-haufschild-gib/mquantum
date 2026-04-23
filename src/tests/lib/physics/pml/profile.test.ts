@@ -4,6 +4,7 @@ import {
   computePMLSigmaMax,
   computePMLSigmaMaxND,
   PML_GRADING_EXPONENT,
+  sigmaMaxFromPmlConfig,
 } from '@/lib/physics/pml/profile'
 
 describe('computePMLSigmaMax (legacy per-step formula)', () => {
@@ -163,5 +164,38 @@ describe('CAP physics properties', () => {
     const origNorm = re * re + im * im
     const newNorm = newRe * newRe + newIm * newIm
     expect(newNorm).toBeCloseTo(origNorm * Math.exp(-2 * halfSigmaDt), 10)
+  })
+})
+
+describe('sigmaMaxFromPmlConfig (compute-pass wrapper)', () => {
+  const baseCfg = {
+    absorberEnabled: true,
+    pmlTargetReflection: 1e-6,
+    absorberWidth: 0.2,
+    gridSize: [64, 64, 64],
+    dt: 0.005,
+    latticeDim: 3,
+  }
+
+  it('returns 0 when absorberEnabled is false (short-circuits before compute)', () => {
+    expect(sigmaMaxFromPmlConfig({ ...baseCfg, absorberEnabled: false })).toBe(0)
+  })
+
+  it('matches computePMLSigmaMaxND with PML_GRADING_EXPONENT when enabled', () => {
+    const expected = computePMLSigmaMaxND(
+      baseCfg.pmlTargetReflection,
+      baseCfg.absorberWidth,
+      baseCfg.gridSize,
+      baseCfg.dt,
+      PML_GRADING_EXPONENT,
+      baseCfg.latticeDim
+    )
+    expect(sigmaMaxFromPmlConfig(baseCfg)).toBe(expected)
+  })
+
+  it('defaults undefined pmlTargetReflection to 1e-6', () => {
+    const withDefault = sigmaMaxFromPmlConfig({ ...baseCfg, pmlTargetReflection: undefined })
+    const explicit = sigmaMaxFromPmlConfig({ ...baseCfg, pmlTargetReflection: 1e-6 })
+    expect(withDefault).toBe(explicit)
   })
 })
