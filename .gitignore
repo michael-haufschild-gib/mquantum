@@ -65,6 +65,9 @@ safari-test/
 # Investigation/audit reports (local-only)
 docs/reports/
 
+# WGSL naga validation temp output (see docs/physics/wgsl-validation.md)
+.spike-out/
+
 # Screenshots and test artifacts
 screenshots/
 scripts/playwright/videos/

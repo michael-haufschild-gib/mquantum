@@ -30,7 +30,7 @@ struct ObsMomReduceUniforms {
   kGridScale: array<f32, 12>,   // 2*pi/(N*a) per dimension
 }
 
-@group(0) @binding(0) var<uniform> obsParams: ObsMomReduceUniforms;
+@group(0) @binding(0) var<storage, read> obsParams: ObsMomReduceUniforms;
 @group(0) @binding(1) var<storage, read> complexBuf: array<f32>;
 @group(0) @binding(2) var<storage, read_write> partials: array<f32>;
 
@@ -115,7 +115,7 @@ struct ObsMomReduceUniforms {
   kGridScale: array<f32, 12>,
 }
 
-@group(0) @binding(0) var<uniform> obsParams: ObsMomReduceUniforms;
+@group(0) @binding(0) var<storage, read> obsParams: ObsMomReduceUniforms;
 @group(0) @binding(1) var<storage, read> partials: array<f32>;
 @group(0) @binding(2) var<storage, read_write> result: array<f32>;
 

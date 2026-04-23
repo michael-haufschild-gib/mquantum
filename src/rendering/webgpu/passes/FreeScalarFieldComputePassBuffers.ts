@@ -41,14 +41,6 @@ export function createDtStagingBuffer(
 }
 
 /**
- * Helper callbacks that bridge to the base class's protected methods
- * for uniform buffer creation.
- */
-export interface FsfBufferHelpers {
-  createUniformBuffer: (device: GPUDevice, size: number, label: string) => GPUBuffer
-}
-
-/**
  * Result of rebuilding the FSF field buffers. All GPU resources are
  * non-null after a successful call.
  */
@@ -77,7 +69,6 @@ export interface FsfDestroyableBuffers {
  * @param device - GPU device
  * @param config - Current free scalar config
  * @param old - Old buffers to destroy
- * @param helpers - Base-class helper for uniform buffer creation
  * @param kSpace - K-space manager whose staging buffers must be rebuilt
  * @returns Newly created buffers and derived state
  */
@@ -85,7 +76,6 @@ export function rebuildFsfFieldBuffers(
   device: GPUDevice,
   config: FreeScalarConfig,
   old: FsfDestroyableBuffers,
-  helpers: FsfBufferHelpers,
   kSpace: FsfKSpaceManager
 ): FsfBufferResult {
   // Destroy old k-space staging buffers and invalidate in-flight jobs
@@ -119,12 +109,15 @@ export function rebuildFsfFieldBuffers(
   // Create k-space and diagnostics staging buffers
   kSpace.createBuffers(device, bufferSize)
 
-  // Create uniform buffer
-  const uniformBuffer = helpers.createUniformBuffer(
-    device,
-    FSF_UNIFORM_SIZE,
-    'free-scalar-uniforms'
-  )
+  // Create params buffer as STORAGE (not UNIFORM) because `FreeScalarUniforms`
+  // embeds scalar arrays that are spec-forbidden in uniform address space.
+  // See `freeScalarInit.wgsl.ts` for the full rationale and matching binding
+  // decl. Labelled "uniforms" to preserve the existing name.
+  const uniformBuffer = device.createBuffer({
+    label: 'free-scalar-uniforms',
+    size: FSF_UNIFORM_SIZE,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  })
 
   const configHash = computeFsfConfigHash(config)
 

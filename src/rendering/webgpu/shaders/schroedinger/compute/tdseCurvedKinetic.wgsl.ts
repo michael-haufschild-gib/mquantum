@@ -317,7 +317,7 @@ ${curvedHelpers}
 
 struct CurvedStageIndex { value: u32, _p0: u32, _p1: u32, _p2: u32 }
 
-@group(0) @binding(0) var<uniform> params: TDSEUniforms;
+@group(0) @binding(0) var<storage, read> params: TDSEUniforms;
 @group(0) @binding(1) var<storage, read> curvedKinPsiRe: array<f32>;
 @group(0) @binding(2) var<storage, read> curvedKinPsiIm: array<f32>;
 @group(0) @binding(3) var<storage, read_write> curvedKinOutRe: array<f32>;
@@ -416,7 +416,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
  *   ∂_t ψ_im = −(1/ℏ) · (Tψ + V·ψ)_re
  */
 export const tdseCurvedBuildKBlock = /* wgsl */ `
-@group(0) @binding(0) var<uniform> params: TDSEUniforms;
+@group(0) @binding(0) var<storage, read> params: TDSEUniforms;
 @group(0) @binding(1) var<storage, read> curvedBkTRe: array<f32>;
 @group(0) @binding(2) var<storage, read> curvedBkTIm: array<f32>;
 @group(0) @binding(3) var<storage, read> curvedBkStageRe: array<f32>;
@@ -459,7 +459,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 export const tdseCurvedStageBlock = /* wgsl */ `
 struct CurvedScalarUniform { value: f32, _p0: f32, _p1: f32, _p2: f32 }
 
-@group(0) @binding(0) var<uniform> curvedStageParams: TDSEUniforms;
+@group(0) @binding(0) var<storage, read> curvedStageParams: TDSEUniforms;
 @group(0) @binding(1) var<storage, read> curvedStagePsiRe: array<f32>;
 @group(0) @binding(2) var<storage, read> curvedStagePsiIm: array<f32>;
 @group(0) @binding(3) var<storage, read> curvedStageKRe: array<f32>;
@@ -486,7 +486,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 export const tdseCurvedAccumulateBlock = /* wgsl */ `
 struct CurvedScalarUniform { value: f32, _p0: f32, _p1: f32, _p2: f32 }
 
-@group(0) @binding(0) var<uniform> curvedAccParams: TDSEUniforms;
+@group(0) @binding(0) var<storage, read> curvedAccParams: TDSEUniforms;
 @group(0) @binding(1) var<storage, read_write> curvedAccPsiRe: array<f32>;
 @group(0) @binding(2) var<storage, read_write> curvedAccPsiIm: array<f32>;
 @group(0) @binding(3) var<storage, read> curvedAccKRe: array<f32>;

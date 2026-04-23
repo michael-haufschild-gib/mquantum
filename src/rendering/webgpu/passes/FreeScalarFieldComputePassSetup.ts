@@ -91,83 +91,99 @@ export interface FsfBindGroupInputs {
  * @param helpers - Base-class helper methods for shader/pipeline creation
  * @returns All pipelines and their associated bind group layouts
  */
-export function buildFsfPipelines(device: GPUDevice, helpers: FsfPassHelpers): FsfPipelineResult {
-  const uniformsAndIndex = freeScalarUniformsBlock + freeScalarNDIndexBlock
+// --- Pure WGSL composers (Phase 2b) ---
+const fsfPrelude = (): string => freeScalarUniformsBlock + freeScalarNDIndexBlock
 
-  // === Init pipeline (phi + pi read_write) ===
-  // Composed via `assembleShaderBlocks()` per the shader styleguide. The
-  // sibling free-scalar compute pipelines (absorber, update phi/pi, write
-  // grid) still use the legacy raw-string concatenation below; migrating
-  // them is out of scope for this PR and tracked as a follow-up.
-  const initBGL = createComputeBGL(device, 'free-scalar-init-bgl', [
-    'uniform',
-    'storage',
-    'storage',
-  ])
-  const initWgsl = assembleShaderBlocks([
+/** Pure WGSL for the free-scalar-field init compute shader. */
+export function composeFsfInitShader(): string {
+  return assembleShaderBlocks([
     freeScalarUniformsShaderBlock,
     freeScalarNDIndexShaderBlock,
     freeScalarInitShaderBlock,
   ]).wgsl
+}
+
+/** Pure WGSL for the free-scalar-field PML absorber compute shader. */
+export function composeFsfAbsorberShader(): string {
+  return fsfPrelude() + pmlProfileBlock + freeScalarAbsorberBlock
+}
+
+/** Pure WGSL for the free-scalar-field update-π compute shader. */
+export function composeFsfUpdatePiShader(): string {
+  return fsfPrelude() + freeScalarUpdatePiBlock
+}
+
+/** Pure WGSL for the free-scalar-field update-φ compute shader. */
+export function composeFsfUpdatePhiShader(): string {
+  return freeScalarUniformsBlock + freeScalarUpdatePhiBlock
+}
+
+/** Pure WGSL for the free-scalar-field write-grid compute shader. */
+export function composeFsfWriteGridShader(): string {
+  return fsfPrelude() + freeScalarWriteGridBlock
+}
+
+/**
+ * Compile every free-scalar-field compute pipeline and return them with
+ * their bind group layouts. One-time setup per device.
+ */
+export function buildFsfPipelines(device: GPUDevice, helpers: FsfPassHelpers): FsfPipelineResult {
+  // === Init pipeline (phi + pi read_write) ===
+  // Binding 0 is `read-only-storage` (not `uniform`) because `FreeScalarUniforms`
+  // embeds scalar arrays (spec-forbidden in uniform address space). See the
+  // matching `var<storage, read>` declaration in `freeScalarInit.wgsl.ts`.
+  const initBGL = createComputeBGL(device, 'free-scalar-init-bgl', [
+    'read-only-storage',
+    'storage',
+    'storage',
+  ])
   const initPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(device, initWgsl, 'free-scalar-init'),
+    helpers.createShaderModule(device, composeFsfInitShader(), 'free-scalar-init'),
     [initBGL],
     'free-scalar-init'
   )
 
-  // === PML absorber pipeline (reuses init bind group layout: uniform + phi + pi) ===
+  // === PML absorber pipeline (reuses init bind group layout) ===
   const absorberPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(
-      device,
-      uniformsAndIndex + pmlProfileBlock + freeScalarAbsorberBlock,
-      'free-scalar-absorber'
-    ),
+    helpers.createShaderModule(device, composeFsfAbsorberShader(), 'free-scalar-absorber'),
     [initBGL],
     'free-scalar-absorber'
   )
 
-  // === Update Pi pipeline (phi read-only, pi read_write) ===
+  // === Update Pi pipeline ===
   const updatePiBGL = createComputeBGL(device, 'free-scalar-update-pi-bgl', [
-    'uniform',
+    'read-only-storage', // params — see init BGL comment.
     'read-only-storage',
     'storage',
   ])
   const updatePiPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(
-      device,
-      uniformsAndIndex + freeScalarUpdatePiBlock,
-      'free-scalar-update-pi'
-    ),
+    helpers.createShaderModule(device, composeFsfUpdatePiShader(), 'free-scalar-update-pi'),
     [updatePiBGL],
     'free-scalar-update-pi'
   )
 
-  // === Update Phi pipeline (phi read_write, pi read-only) ===
+  // === Update Phi pipeline ===
   const updatePhiBGL = createComputeBGL(device, 'free-scalar-update-phi-bgl', [
-    'uniform',
+    'read-only-storage', // params — see init BGL comment.
     'storage',
     'read-only-storage',
   ])
   const updatePhiPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(
-      device,
-      freeScalarUniformsBlock + freeScalarUpdatePhiBlock,
-      'free-scalar-update-phi'
-    ),
+    helpers.createShaderModule(device, composeFsfUpdatePhiShader(), 'free-scalar-update-phi'),
     [updatePhiBGL],
     'free-scalar-update-phi'
   )
 
-  // === Write Grid pipeline (phi + pi read-only, texture write) ===
+  // === Write Grid pipeline ===
   const tex3dEntry = {
     storageTexture: { format: 'rgba16float' as const, viewDimension: '3d' as const },
   }
   const writeGridBGL = createComputeBGL(device, 'free-scalar-write-grid-bgl', [
-    'uniform',
+    'read-only-storage', // params — see init BGL comment.
     'read-only-storage',
     'read-only-storage',
     tex3dEntry,
@@ -175,11 +191,7 @@ export function buildFsfPipelines(device: GPUDevice, helpers: FsfPassHelpers): F
   ])
   const writeGridPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(
-      device,
-      uniformsAndIndex + freeScalarWriteGridBlock,
-      'free-scalar-write-grid'
-    ),
+    helpers.createShaderModule(device, composeFsfWriteGridShader(), 'free-scalar-write-grid'),
     [writeGridBGL],
     'free-scalar-write-grid'
   )

@@ -140,7 +140,8 @@ fn roughnessNoise(p: vec2f, octaves: i32) -> f32 {
       mix(randomG(w.zy), randomG(w.zw), f.y),
       f.x
     );
-    o += 0.2 / exp(2.0 * abs(sin(0.2 * pos.x + 0.5 * pos.y)));
+    // 0.2 / exp(y) ≡ 0.2 * exp(-y) — replace divide with multiply (GPU div is ~3x slower)
+    o += 0.2 * exp(-2.0 * abs(sin(0.2 * pos.x + 0.5 * pos.y)));
     pos *= 2.1;
   }
   return o / 3.0;
@@ -197,7 +198,11 @@ fn fiberNoise(uv: vec2f, seedOffset: vec2f, octaves: i32) -> f32 {
 // Crumple Pattern
 // ============================================================================
 
-fn crumpledNoise(t: vec2f, pw: f32) -> f32 {
+// crumpledNoise specialized by exponent to avoid pow(x, 16.0) and pow(x, 2.0).
+// pow(x, 16) compiles to exp2(16*log2(x)) = 1 log + 1 mul + 1 exp; 4 squarings is strictly cheaper.
+// pow(x, 2)  compiles similarly; 1 multiply is strictly cheaper.
+// Per pixel with crumples enabled: crumplesShape runs twice (finite-diff) → saves ~36 pow() calls.
+fn crumpledNoise16(t: vec2f) -> f32 {
   let p = floor(t);
   var wsum = 0.0;
   var cl = 0.0;
@@ -209,18 +214,51 @@ fn crumpledNoise(t: vec2f, pw: f32) -> f32 {
       let q2 = q - floor(q / 8.0) * 8.0;
       let c = q + randomGB(q2);
       let r = c - t;
-      let w = pow(smoothstep(0.0, 1.0, 1.0 - abs(r.x)), pw) *
-              pow(smoothstep(0.0, 1.0, 1.0 - abs(r.y)), pw);
+      let sx = smoothstep(0.0, 1.0, 1.0 - abs(r.x));
+      let sy = smoothstep(0.0, 1.0, 1.0 - abs(r.y));
+      // x^16 via 4 squarings
+      let sx2 = sx * sx;
+      let sx4 = sx2 * sx2;
+      let sx8 = sx4 * sx4;
+      let sx16 = sx8 * sx8;
+      let sy2 = sy * sy;
+      let sy4 = sy2 * sy2;
+      let sy8 = sy4 * sy4;
+      let sy16 = sy8 * sy8;
+      let w = sx16 * sy16;
       cl += (0.5 + 0.5 * sin((q2.x + q2.y * 5.0) * 8.0)) * w;
       wsum += w;
     }
   }
   let result = select(0.0, cl / wsum, wsum != 0.0);
-  return pow(result, 0.5) * 2.0;
+  return sqrt(result) * 2.0;
+}
+
+fn crumpledNoise2(t: vec2f) -> f32 {
+  let p = floor(t);
+  var wsum = 0.0;
+  var cl = 0.0;
+
+  for (var y = -1; y < 2; y++) {
+    for (var x = -1; x < 2; x++) {
+      let b = vec2f(f32(x), f32(y));
+      let q = b + p;
+      let q2 = q - floor(q / 8.0) * 8.0;
+      let c = q + randomGB(q2);
+      let r = c - t;
+      let sx = smoothstep(0.0, 1.0, 1.0 - abs(r.x));
+      let sy = smoothstep(0.0, 1.0, 1.0 - abs(r.y));
+      let w = (sx * sx) * (sy * sy);
+      cl += (0.5 + 0.5 * sin((q2.x + q2.y * 5.0) * 8.0)) * w;
+      wsum += w;
+    }
+  }
+  let result = select(0.0, cl / wsum, wsum != 0.0);
+  return sqrt(result) * 2.0;
 }
 
 fn crumplesShape(uv: vec2f) -> f32 {
-  return crumpledNoise(uv * 0.25, 16.0) * crumpledNoise(uv * 0.5, 2.0);
+  return crumpledNoise16(uv * 0.25) * crumpledNoise2(uv * 0.5);
 }
 
 // ============================================================================
@@ -375,10 +413,11 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   normalImage += 0.2 * fiber;
 
   // ========== Lighting calculation ==========
-  let lightPos = vec3f(1.0, 2.0, 1.0);
+  // Precomputed normalize(vec3f(1,2,1)) = (1,2,1) / sqrt(6). Saves 1 normalize/pixel.
+  const lightDirN = vec3f(0.40824829, 0.81649658, 0.40824829);
   let res = dot(
     normalize(vec3f(normal, 9.5 - 9.0 * pow(uniforms.contrast, 0.1))),
-    normalize(lightPos)
+    lightDirN
   );
 
   // ========== Color blending ==========

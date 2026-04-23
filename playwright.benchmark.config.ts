@@ -15,6 +15,7 @@ export default defineConfig({
   // Only run benchmark/profiling specs
   testMatch: [
     '**/perf-benchmark.spec.ts',
+    '**/perf-baseline.spec.ts',
     '**/compute-mode-profiling.spec.ts',
     '**/dirac-batch-ab.spec.ts',
     '**/shader-ab-profiling.spec.ts',

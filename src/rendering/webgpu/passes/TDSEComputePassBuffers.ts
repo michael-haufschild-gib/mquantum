@@ -224,7 +224,14 @@ export function rebuildTdseBuffers(
     size: complexBytes,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
   })
-  const uniformBuffer = helpers.createUniformBuffer(device, UNIFORM_SIZE, 'tdse-uniforms')
+  // TDSEUniforms embeds scalar arrays (array<u32, 12>, array<f32, 12>) that
+  // are spec-forbidden in uniform address space — bind as storage instead.
+  // See freeScalarInit.wgsl.ts for the rationale. writeBuffer works the same.
+  const uniformBuffer = device.createBuffer({
+    label: 'tdse-uniforms',
+    size: UNIFORM_SIZE,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+  })
   const fftUniformBuffer = helpers.createUniformBuffer(
     device,
     FFT_UNIFORM_SIZE,

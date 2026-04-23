@@ -16,28 +16,7 @@ import { showConditionalMsgBox, useConditionalMsgBox } from '@/hooks/useConditio
 import { DismissedDialogsState, useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
 import { useMsgBoxStore } from '@/stores/msgBoxStore'
 
-// Mock localStorage
-const localStorageMock = (() => {
-  let store: Record<string, string> = {}
-  return {
-    getItem: vi.fn((key: string) => store[key] ?? null),
-    setItem: vi.fn((key: string, value: string) => {
-      store[key] = value
-    }),
-    removeItem: vi.fn((key: string) => {
-      delete store[key]
-    }),
-    clear: vi.fn(() => {
-      store = {}
-    }),
-    get length() {
-      return Object.keys(store).length
-    },
-    key: vi.fn((index: number) => Object.keys(store)[index] ?? null),
-  }
-})()
-
-Object.defineProperty(window, 'localStorage', { value: localStorageMock })
+// localStorage is provided globally by installDOMMocks() in src/tests/setup.ts.
 
 describe('useConditionalMsgBox', () => {
   beforeEach(() => {
@@ -54,7 +33,7 @@ describe('useConditionalMsgBox', () => {
       dismissible: false,
       dismissId: null,
     })
-    localStorageMock.clear()
+    localStorage.clear()
     vi.clearAllMocks()
   })
 
@@ -167,7 +146,7 @@ describe('showConditionalMsgBox (utility function)', () => {
       dismissible: false,
       dismissId: null,
     })
-    localStorageMock.clear()
+    localStorage.clear()
   })
 
   it('showConditionalMsgBox_notDismissed_showsDialogAndReturnsTrue', () => {
@@ -238,7 +217,7 @@ describe('Hydration timing', () => {
       dismissible: false,
       dismissId: null,
     })
-    localStorageMock.clear()
+    localStorage.clear()
   })
 
   it('showConditionalMsgBox_beforeHydration_defersShowUntilHydrated', () => {

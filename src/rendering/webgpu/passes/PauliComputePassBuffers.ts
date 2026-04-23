@@ -6,7 +6,7 @@
  */
 
 import type { PauliConfig } from '@/lib/geometry/extended/types'
-import { computePMLSigmaMaxND, PML_GRADING_EXPONENT } from '@/lib/physics/pml/profile'
+import { sigmaMaxFromPmlConfig } from '@/lib/physics/pml/profile'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import {
@@ -14,6 +14,7 @@ import {
   MAX_DIM,
   MAX_SLICE_POSITIONS_WRITE_COUNT,
   PACK_UNIFORM_SIZE,
+  packFFTStageUniforms,
 } from './computePassUtils'
 
 /** PauliUniforms struct size in bytes (592 = 148 indices × 4) */
@@ -120,11 +121,13 @@ export function rebuildPauliBuffers(
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
   })
 
-  // Uniform buffer
+  // PauliUniforms params buffer is STORAGE (not UNIFORM) because the struct
+  // embeds scalar arrays that are spec-forbidden in uniform address space.
+  // See pauliInit.wgsl.ts for the matching `var<storage, read>` declaration.
   const uniformBuffer = device.createBuffer({
     label: 'pauli-uniforms',
     size: UNIFORM_SIZE,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   })
 
   // FFT stage uniforms — sum(log2(N_d)) per direction, not max(log2(N))*dim
@@ -235,41 +238,10 @@ function buildPauliFFTStagingData(
   config: PauliConfig,
   totalSites: number
 ): GPUBuffer {
-  let totalSlots = 0
-  for (let d = 0; d < config.latticeDim; d++) {
-    totalSlots += Math.round(Math.log2(config.gridSize[d]!))
-  }
-  totalSlots *= 2 // forward + inverse
-
-  const data = new ArrayBuffer(totalSlots * FFT_UNIFORM_SIZE)
-  let slotIdx = 0
-
-  for (const direction of [1.0, -1.0]) {
-    let axisStride = 1
-    for (let d = config.latticeDim - 1; d >= 0; d--) {
-      const axisDim = config.gridSize[d]!
-      const stages = Math.round(Math.log2(axisDim))
-
-      for (let s = 0; s < stages; s++) {
-        const offset = slotIdx * FFT_UNIFORM_SIZE
-        const view = new DataView(data, offset, FFT_UNIFORM_SIZE)
-        view.setUint32(0, axisDim, true) // axisDim: u32
-        view.setUint32(4, s, true) // stage: u32
-        view.setFloat32(8, direction, true) // direction: f32
-        view.setUint32(12, totalSites, true) // totalElements: u32
-        view.setUint32(16, axisStride, true) // axisStride: u32
-        view.setUint32(20, totalSites / axisDim, true) // batchCount: u32
-        view.setFloat32(24, 1.0 / axisDim, true) // invN: f32
-        view.setUint32(28, 0, true) // _pad0: u32
-        slotIdx++
-      }
-      axisStride *= axisDim
-    }
-  }
-
+  const data = packFFTStageUniforms(config, totalSites)
   const buf = device.createBuffer({
     label: 'pauli-fft-staging',
-    size: Math.max(32, totalSlots * FFT_UNIFORM_SIZE),
+    size: Math.max(32, data.byteLength),
     usage: GPUBufferUsage.COPY_SRC,
     mappedAtCreation: true,
   })
@@ -398,16 +370,7 @@ export function writePauliUniforms(
   u32[o++] = config.absorberEnabled ? 1 : 0
   f32[o++] = config.absorberWidth
   // Auto-compute σ_max from PML target reflection coefficient
-  f32[o] = config.absorberEnabled
-    ? computePMLSigmaMaxND(
-        config.pmlTargetReflection ?? 1e-6,
-        config.absorberWidth,
-        config.gridSize,
-        config.dt,
-        PML_GRADING_EXPONENT,
-        config.latticeDim
-      )
-    : 0
+  f32[o] = sigmaMaxFromPmlConfig(config)
   // o+1 would be pad slot; skipped since next section uses absolute offset
 
   // Display (offset 76*4 = 304)

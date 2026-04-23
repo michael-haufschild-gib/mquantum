@@ -71,6 +71,22 @@ export function createVortexDetectState(): VortexDetectState {
 
 const VD_UNIFORM_SIZE = 32 // 8 × u32/f32
 
+/** Pure WGSL composition for the vortex-detect reduce compute shader. */
+export function composeVortexDetectReduceShader(): string {
+  return assembleShaderBlocks([
+    { name: 'tdseUniforms', content: tdseUniformsBlock },
+    { name: 'ndIndex', content: freeScalarNDIndexBlock },
+    { name: 'vortexDetectReduce', content: vortexDetectReduceBlock },
+  ]).wgsl
+}
+
+/** Pure WGSL composition for the vortex-detect finalize compute shader. */
+export function composeVortexDetectFinalizeShader(): string {
+  return assembleShaderBlocks([
+    { name: 'vortexDetectFinalize', content: vortexDetectFinalizeBlock },
+  ]).wgsl
+}
+
 /**
  * Build vortex detection pipelines and allocate buffers.
  */
@@ -123,21 +139,20 @@ export function initVortexDetect(
   })
 
   // Build reduce pipeline
-  const { wgsl: reduceCode } = assembleShaderBlocks([
-    { name: 'tdseUniforms', content: tdseUniformsBlock },
-    { name: 'ndIndex', content: freeScalarNDIndexBlock },
-    { name: 'vortexDetectReduce', content: vortexDetectReduceBlock },
-  ])
   const reduceModule = device.createShaderModule({
     label: 'vortex-detect-reduce',
-    code: reduceCode,
+    code: composeVortexDetectReduceShader(),
   })
 
+  // Binding 0 = VortexDetectUniforms (uniform). Binding 3 = TDSEUniforms which
+  // binds as `read-only-storage` because the struct embeds scalar arrays that
+  // are spec-forbidden in uniform address space. See tdseInit.wgsl.ts for the
+  // spec-noncompliance rationale.
   const reduceLayout = createComputeBGL(device, 'vortex-detect-reduce-layout', [
     'uniform',
     'read-only-storage',
     'read-only-storage',
-    'uniform',
+    'read-only-storage',
     'storage',
     'storage',
     'storage',
@@ -164,12 +179,9 @@ export function initVortexDetect(
   })
 
   // Build finalize pipeline
-  const { wgsl: finalizeCode } = assembleShaderBlocks([
-    { name: 'vortexDetectFinalize', content: vortexDetectFinalizeBlock },
-  ])
   const finalizeModule = device.createShaderModule({
     label: 'vortex-detect-finalize',
-    code: finalizeCode,
+    code: composeVortexDetectFinalizeShader(),
   })
 
   const finalizeLayout = createComputeBGL(device, 'vortex-detect-finalize-layout', [

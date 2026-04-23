@@ -41,7 +41,49 @@ export function readRingBuffer(
 // ─── CSV exporters ────────────────────────────────────────────────────────
 
 /**
+ * One named time-series column sourced from a ring buffer.
+ *
+ * Used by {@link ringBufferTimeSeriesToCSV} so diagnostic CSV exporters
+ * can list `(header, buffer)` pairs declaratively rather than hand-rolling
+ * the header string and the per-row `${a},${b}` template together.
+ */
+interface RingBufferColumn {
+  name: string
+  buffer: Float32Array | Float64Array
+}
+
+/**
+ * Serialise a ring-buffered time-series to CSV with a leading `frame`
+ * column followed by `columns`, one row per entry in chronological order.
+ * Returns '' when `count === 0` (matches the pre-helper guard the six
+ * diagnostic exporters each used to hand-roll).
+ *
+ * The helper deliberately omits RFC-4180 escaping: every caller feeds
+ * machine-generated finite numbers. If you add non-numeric columns,
+ * thread through the `csvCell` escape in srmtSweepHelpers first.
+ */
+function ringBufferTimeSeriesToCSV(
+  head: number,
+  count: number,
+  columns: RingBufferColumn[]
+): string {
+  if (count === 0) return ''
+  const series = columns.map((c) => readRingBuffer(c.buffer, head, count))
+  const lines: string[] = [`frame,${columns.map((c) => c.name).join(',')}`]
+  for (let i = 0; i < count; i++) {
+    let row = String(i)
+    for (let c = 0; c < series.length; c++) row += `,${series[c]![i]}`
+    lines.push(row)
+  }
+  return lines.join('\n')
+}
+
+/**
  * Export TDSE diagnostics time-series as CSV.
+ *
+ * Not expressed via {@link ringBufferTimeSeriesToCSV} because TDSE emits a
+ * `simTime` lead column before the frame index — the only exporter that
+ * breaks the `frame`-first convention.
  *
  * @returns CSV string with columns: simTime, frame, norm, R, T
  */
@@ -69,20 +111,12 @@ export function exportTdseDiagnosticsCSV(): string {
  * @returns CSV string with columns: frame, norm, chemicalPotential, healingLength
  */
 export function exportBecDiagnosticsCSV(): string {
-  const state = useDiagnosticsStore.getState().bec
-  const { historyHead: head, historyCount: count } = state
-
-  if (count === 0) return ''
-
-  const norm = readRingBuffer(state.historyNorm, head, count)
-  const chemPot = readRingBuffer(state.historyChemPot, head, count)
-  const healingLen = readRingBuffer(state.historyHealingLen, head, count)
-
-  const lines = ['frame,norm,chemicalPotential,healingLength']
-  for (let i = 0; i < count; i++) {
-    lines.push(`${i},${norm[i]},${chemPot[i]},${healingLen[i]}`)
-  }
-  return lines.join('\n')
+  const s = useDiagnosticsStore.getState().bec
+  return ringBufferTimeSeriesToCSV(s.historyHead, s.historyCount, [
+    { name: 'norm', buffer: s.historyNorm },
+    { name: 'chemicalPotential', buffer: s.historyChemPot },
+    { name: 'healingLength', buffer: s.historyHealingLen },
+  ])
 }
 
 /**
@@ -91,19 +125,11 @@ export function exportBecDiagnosticsCSV(): string {
  * @returns CSV string with columns: frame, energy, norm
  */
 export function exportFsfDiagnosticsCSV(): string {
-  const state = useDiagnosticsStore.getState().fsf
-  const { historyHead: head, historyCount: count } = state
-
-  if (count === 0) return ''
-
-  const energy = readRingBuffer(state.historyEnergy, head, count)
-  const norm = readRingBuffer(state.historyNorm, head, count)
-
-  const lines = ['frame,energy,norm']
-  for (let i = 0; i < count; i++) {
-    lines.push(`${i},${energy[i]},${norm[i]}`)
-  }
-  return lines.join('\n')
+  const s = useDiagnosticsStore.getState().fsf
+  return ringBufferTimeSeriesToCSV(s.historyHead, s.historyCount, [
+    { name: 'energy', buffer: s.historyEnergy },
+    { name: 'norm', buffer: s.historyNorm },
+  ])
 }
 
 /**
@@ -147,20 +173,12 @@ export function exportObservablesDiagnosticsCSV(): string {
  * @returns CSV string with columns: frame, purity, vonNeumannEntropy, coherence
  */
 export function exportOpenQuantumDiagnosticsCSV(): string {
-  const state = useDiagnosticsStore.getState().openQuantum
-  const { historyHead: head, historyCount: count } = state
-
-  if (count === 0) return ''
-
-  const purity = readRingBuffer(state.historyPurity, head, count)
-  const entropy = readRingBuffer(state.historyEntropy, head, count)
-  const coherence = readRingBuffer(state.historyCoherence, head, count)
-
-  const lines = ['frame,purity,vonNeumannEntropy,coherence']
-  for (let i = 0; i < count; i++) {
-    lines.push(`${i},${purity[i]},${entropy[i]},${coherence[i]}`)
-  }
-  return lines.join('\n')
+  const s = useDiagnosticsStore.getState().openQuantum
+  return ringBufferTimeSeriesToCSV(s.historyHead, s.historyCount, [
+    { name: 'purity', buffer: s.historyPurity },
+    { name: 'vonNeumannEntropy', buffer: s.historyEntropy },
+    { name: 'coherence', buffer: s.historyCoherence },
+  ])
 }
 
 /**
@@ -169,20 +187,12 @@ export function exportOpenQuantumDiagnosticsCSV(): string {
  * @returns CSV string with columns: frame, norm, particleFraction, antiparticleFraction
  */
 export function exportDiracDiagnosticsCSV(): string {
-  const state = useDiagnosticsStore.getState().dirac
-  const { historyHead: head, historyCount: count } = state
-
-  if (count === 0) return ''
-
-  const norm = readRingBuffer(state.historyNorm, head, count)
-  const particleFrac = readRingBuffer(state.historyParticleFrac, head, count)
-  const antiparticleFrac = readRingBuffer(state.historyAntiparticleFrac, head, count)
-
-  const lines = ['frame,norm,particleFraction,antiparticleFraction']
-  for (let i = 0; i < count; i++) {
-    lines.push(`${i},${norm[i]},${particleFrac[i]},${antiparticleFrac[i]}`)
-  }
-  return lines.join('\n')
+  const s = useDiagnosticsStore.getState().dirac
+  return ringBufferTimeSeriesToCSV(s.historyHead, s.historyCount, [
+    { name: 'norm', buffer: s.historyNorm },
+    { name: 'particleFraction', buffer: s.historyParticleFrac },
+    { name: 'antiparticleFraction', buffer: s.historyAntiparticleFrac },
+  ])
 }
 
 /**
@@ -191,20 +201,12 @@ export function exportDiracDiagnosticsCSV(): string {
  * @returns CSV string with columns: frame, norm, spinUpFraction, spinExpectationZ
  */
 export function exportPauliDiagnosticsCSV(): string {
-  const state = useDiagnosticsStore.getState().pauli
-  const { historyHead: head, historyCount: count } = state
-
-  if (count === 0) return ''
-
-  const norm = readRingBuffer(state.historyNorm, head, count)
-  const spinUp = readRingBuffer(state.historySpinUpFrac, head, count)
-  const spinExpZ = readRingBuffer(state.historySpinExpZ, head, count)
-
-  const lines = ['frame,norm,spinUpFraction,spinExpectationZ']
-  for (let i = 0; i < count; i++) {
-    lines.push(`${i},${norm[i]},${spinUp[i]},${spinExpZ[i]}`)
-  }
-  return lines.join('\n')
+  const s = useDiagnosticsStore.getState().pauli
+  return ringBufferTimeSeriesToCSV(s.historyHead, s.historyCount, [
+    { name: 'norm', buffer: s.historyNorm },
+    { name: 'spinUpFraction', buffer: s.historySpinUpFrac },
+    { name: 'spinExpectationZ', buffer: s.historySpinExpZ },
+  ])
 }
 
 /**

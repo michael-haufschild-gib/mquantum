@@ -186,6 +186,31 @@ export function createCurvedIntegratorState(): CurvedIntegratorState {
   return { pipelines: null, scratch: null, bindGroups: null }
 }
 
+// --- Pure WGSL composers (Phase 2b) ---
+// All four compose functions share the same prelude (`tdseUniformsBlock +
+// freeScalarNDIndexBlock`); each appends its specific kernel block.
+const curvedPrelude = (): string => tdseUniformsBlock + freeScalarNDIndexBlock
+
+/** Pure WGSL for the curved-kinetic half-step compute shader. */
+export function composeTdseCurvedKineticShader(): string {
+  return curvedPrelude() + tdseCurvedKineticBlock
+}
+
+/** Pure WGSL for the curved RK4 buildK compute shader. */
+export function composeTdseCurvedBuildKShader(): string {
+  return curvedPrelude() + tdseCurvedBuildKBlock
+}
+
+/** Pure WGSL for the curved RK4 stage compute shader. */
+export function composeTdseCurvedStageShader(): string {
+  return curvedPrelude() + tdseCurvedStageBlock
+}
+
+/** Pure WGSL for the curved RK4 accumulate compute shader. */
+export function composeTdseCurvedAccumulateShader(): string {
+  return curvedPrelude() + tdseCurvedAccumulateBlock
+}
+
 /**
  * Compile all curved-integrator pipelines. Call once per device lifetime;
  * safe to call lazily on first curved dispatch so that flat-only sessions
@@ -196,13 +221,12 @@ export function buildCurvedPipelines(
   createShaderModule: CreateShaderModule,
   createComputePipeline: CreateComputePipeline
 ): CurvedIntegratorPipelines {
-  const unifAndIndex = tdseUniformsBlock + freeScalarNDIndexBlock
-
-  // Kinetic: group 0 = uniform + 2 read-only storage (psi) + 2 storage (tmp out).
+  // Kinetic: group 0 = TDSEUniforms(storage) + 2 read-only storage (psi) + 2 storage (tmp out).
   // Group 1 = 16-byte RK4 stage-index uniform, rebound per k_m so the shader
   // can select the right stageTimeK{1..4} for time-dependent metrics.
+  // Binding 0 (TDSEUniforms) — see tdseInit.wgsl.ts for the spec-noncompliance rationale.
   const kineticBGL = createComputeBGL(device, 'tdse-curved-kinetic-bgl', [
-    'uniform',
+    'read-only-storage',
     'read-only-storage',
     'read-only-storage',
     'storage',
@@ -211,14 +235,15 @@ export function buildCurvedPipelines(
   const kineticStageBGL = createComputeBGL(device, 'tdse-curved-kinetic-stage-bgl', ['uniform'])
   const kineticPipeline = createComputePipeline(
     device,
-    createShaderModule(device, unifAndIndex + tdseCurvedKineticBlock, 'tdse-curved-kinetic'),
+    createShaderModule(device, composeTdseCurvedKineticShader(), 'tdse-curved-kinetic'),
     [kineticBGL, kineticStageBGL],
     'tdse-curved-kinetic'
   )
 
-  // buildK: uniform + T(re,im) + stageIn(re,im) + potential + k(re,im).
+  // buildK: TDSEUniforms(storage) + T(re,im) + stageIn(re,im) + potential + k(re,im).
+  // Binding 0 (TDSEUniforms) — see kinetic BGL comment.
   const buildKBGL = createComputeBGL(device, 'tdse-curved-buildk-bgl', [
-    'uniform',
+    'read-only-storage',
     'read-only-storage',
     'read-only-storage',
     'read-only-storage',
@@ -229,14 +254,15 @@ export function buildCurvedPipelines(
   ])
   const buildKPipeline = createComputePipeline(
     device,
-    createShaderModule(device, unifAndIndex + tdseCurvedBuildKBlock, 'tdse-curved-buildk'),
+    createShaderModule(device, composeTdseCurvedBuildKShader(), 'tdse-curved-buildk'),
     [buildKBGL],
     'tdse-curved-buildk'
   )
 
-  // stage: two bind groups. G0: uniform + psi + k + staged-out. G1: α uniform.
+  // stage: two bind groups. G0: TDSEUniforms(storage) + psi + k + staged-out. G1: α uniform.
+  // Binding 0 (TDSEUniforms) — see kinetic BGL comment.
   const stageDataBGL = createComputeBGL(device, 'tdse-curved-stage-data-bgl', [
-    'uniform',
+    'read-only-storage',
     'read-only-storage',
     'read-only-storage',
     'read-only-storage',
@@ -247,14 +273,15 @@ export function buildCurvedPipelines(
   const stageScalarBGL = createComputeBGL(device, 'tdse-curved-stage-scalar-bgl', ['uniform'])
   const stagePipeline = createComputePipeline(
     device,
-    createShaderModule(device, unifAndIndex + tdseCurvedStageBlock, 'tdse-curved-stage'),
+    createShaderModule(device, composeTdseCurvedStageShader(), 'tdse-curved-stage'),
     [stageDataBGL, stageScalarBGL],
     'tdse-curved-stage'
   )
 
-  // accumulate: G0: uniform + psi(rw) + k(r). G1: coef uniform.
+  // accumulate: G0: TDSEUniforms(storage) + psi(rw) + k(r). G1: coef uniform.
+  // Binding 0 (TDSEUniforms) — see kinetic BGL comment.
   const accumulateDataBGL = createComputeBGL(device, 'tdse-curved-accumulate-data-bgl', [
-    'uniform',
+    'read-only-storage',
     'storage',
     'storage',
     'read-only-storage',
@@ -265,7 +292,7 @@ export function buildCurvedPipelines(
   ])
   const accumulatePipeline = createComputePipeline(
     device,
-    createShaderModule(device, unifAndIndex + tdseCurvedAccumulateBlock, 'tdse-curved-accumulate'),
+    createShaderModule(device, composeTdseCurvedAccumulateShader(), 'tdse-curved-accumulate'),
     [accumulateDataBGL, accumulateScalarBGL],
     'tdse-curved-accumulate'
   )

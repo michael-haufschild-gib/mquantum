@@ -72,8 +72,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let gradRho = vec3f(gx, gy, gz);
     let center = textureLoad(densityGrid, coord, 0);
     let rhoTotal = center.r + center.g;
-    // Convert ∇ρ → ∇log(ρ) = ∇ρ/(ρ+ε)
-    grad = gradRho / max(rhoTotal + 1e-8, 1e-8);
+    // Convert ∇ρ → ∇log(ρ) = ∇ρ/(ρ+ε). 1 scalar div + 3 muls beats 3 vec3 divs.
+    let invRho = 1.0 / max(rhoTotal + 1e-8, 1e-8);
+    grad = gradRho * invRho;
   } else if (HAS_LOG_DENSITY != 0u) {
     // rgba16float: logRho in G channel — central difference directly on log-density
     grad = vec3f(
@@ -89,14 +90,19 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       zp.r - zn.r
     );
     let center = textureLoad(densityGrid, coord, 0);
-    grad = gradRho / max(center.r + 1e-8, 1e-8);
+    let invRho = 1.0 / max(center.r + 1e-8, 1e-8);
+    grad = gradRho * invRho;
   }
 
   // Normalize for lighting normal. Store magnitude in alpha for fallback detection.
-  let gradLen = length(grad);
+  // PERF: compute invLen = 1/length via inverseSqrt (1 rsqrt) then gradLen = dot*invLen.
+  //       Replaces (sqrt + 3 vec3-by-scalar divs) with (rsqrt + 4 muls) — strictly faster.
+  let gradDot = dot(grad, grad);
+  let invLen = inverseSqrt(max(gradDot, 1e-16));
+  let gradLen = gradDot * invLen;  // sqrt(dot) ≡ dot * invSqrt(dot)
   var normal = vec3f(0.0, 1.0, 0.0); // fallback: up-normal at density peaks
   if (gradLen > 1e-4) {
-    normal = grad / gradLen;
+    normal = grad * invLen;
   }
 
   // Pack into rgba8snorm: xyz = normal direction [-1,1], w = clamped magnitude indicator

@@ -31,7 +31,7 @@ struct ObsReduceUniforms {
   spacing: array<f32, 12>,
 }
 
-@group(0) @binding(0) var<uniform> obsParams: ObsReduceUniforms;
+@group(0) @binding(0) var<storage, read> obsParams: ObsReduceUniforms;
 @group(0) @binding(1) var<storage, read> psiRe: array<f32>;
 @group(0) @binding(2) var<storage, read> psiIm: array<f32>;
 @group(0) @binding(3) var<storage, read_write> partials: array<f32>;
@@ -129,7 +129,7 @@ struct ObsReduceUniforms {
   spacing: array<f32, 12>,
 }
 
-@group(0) @binding(0) var<uniform> obsParams: ObsReduceUniforms;
+@group(0) @binding(0) var<storage, read> obsParams: ObsReduceUniforms;
 @group(0) @binding(1) var<storage, read> partials: array<f32>;
 @group(0) @binding(2) var<storage, read_write> result: array<f32>;
 

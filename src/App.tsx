@@ -9,13 +9,10 @@ import { Analytics } from '@vercel/analytics/react'
 import { domMax, LazyMotion, MotionConfig } from 'motion/react'
 import React, { Suspense, useCallback, useMemo, useState } from 'react'
 
-import { QuantumCarpetPanel } from '@/components/canvas/QuantumCarpetPanel'
 import { RefinementIndicator } from '@/components/canvas/RefinementIndicator'
 import { EditorLayout } from '@/components/layout/EditorLayout'
-import { HawkingPageCurvePanel } from '@/components/overlays/HawkingPageCurvePanel'
 import { MsgBox } from '@/components/overlays/MsgBox'
 import { ShaderCompilationOverlay } from '@/components/overlays/ShaderCompilationOverlay'
-import { WormholeCoherencePanel } from '@/components/overlays/WormholeCoherencePanel'
 
 // Lazy-load components not needed on first render
 const PerformanceMonitor = React.lazy(() =>
@@ -23,6 +20,23 @@ const PerformanceMonitor = React.lazy(() =>
 )
 const ScreenshotModal = React.lazy(() =>
   import('@/components/overlays/ScreenshotModal').then((m) => ({ default: m.ScreenshotModal }))
+)
+// Lazy-load opt-in HUD panels (off by default). Each panel's own store flag
+// drives a parent gate (usePageCurveStore / useCarpetStore /
+// wormholeCoherenceHudEnabled), so when the flag is off the lazy chunk is
+// never fetched.
+const QuantumCarpetPanel = React.lazy(() =>
+  import('@/components/canvas/QuantumCarpetPanel').then((m) => ({ default: m.QuantumCarpetPanel }))
+)
+const HawkingPageCurvePanel = React.lazy(() =>
+  import('@/components/overlays/HawkingPageCurvePanel').then((m) => ({
+    default: m.HawkingPageCurvePanel,
+  }))
+)
+const WormholeCoherencePanel = React.lazy(() =>
+  import('@/components/overlays/WormholeCoherencePanel').then((m) => ({
+    default: m.WormholeCoherencePanel,
+  }))
 )
 import { Button } from '@/components/ui/Button'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
@@ -35,8 +49,11 @@ import { useUrlState } from '@/hooks/useUrlState'
 import { useWebGPUSupport } from '@/hooks/useWebGPUSupport'
 import { logger } from '@/lib/logger'
 import { WebGPUCanvas, WebGPUScene } from '@/rendering/webgpu'
+import { useCarpetStore } from '@/stores/carpetStore'
 import { useEnvironmentStore } from '@/stores/environmentStore'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
+import { usePageCurveStore } from '@/stores/pageCurveStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
 import { useUIStore } from '@/stores/uiStore'
 
@@ -120,6 +137,14 @@ function AppContent() {
   // Get performance monitor state
   const showPerfMonitor = useUIStore((state) => state.showPerfMonitor)
   const renderResolutionScale = usePerformanceStore((state) => state.renderResolutionScale)
+
+  // Opt-in HUD panel gates — reading the flag here lets React.lazy defer the
+  // panel chunk until a user enables the HUD.
+  const carpetEnabled = useCarpetStore((s) => s.enabled)
+  const pageCurveHudEnabled = usePageCurveStore((s) => s.pageCurveHudEnabled)
+  const wormholeHudEnabled = useExtendedObjectStore(
+    (s) => !!s.schroedinger?.tdse?.wormholeCoherenceHudEnabled
+  )
 
   const baseDpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio
   const scaledDpr = baseDpr * renderResolutionScale
@@ -259,14 +284,26 @@ function AppContent() {
           </Suspense>
         )}
 
-        {/* Quantum Carpet Panel */}
-        <QuantumCarpetPanel />
+        {/* Quantum Carpet Panel (off by default; lazy-loaded when user enables HUD) */}
+        {carpetEnabled && (
+          <Suspense fallback={null}>
+            <QuantumCarpetPanel />
+          </Suspense>
+        )}
 
-        {/* Analog Hawking Page Curve Panel (gated by pageCurveHudEnabled) */}
-        <HawkingPageCurvePanel />
+        {/* Analog Hawking Page Curve Panel (off by default; lazy-loaded) */}
+        {pageCurveHudEnabled && (
+          <Suspense fallback={null}>
+            <HawkingPageCurvePanel />
+          </Suspense>
+        )}
 
-        {/* ER=EPR Wormhole Coherence Panel (gated by TDSE HUD toggle) */}
-        <WormholeCoherencePanel />
+        {/* ER=EPR Wormhole Coherence Panel (off by default; lazy-loaded) */}
+        {wormholeHudEnabled && (
+          <Suspense fallback={null}>
+            <WormholeCoherencePanel />
+          </Suspense>
+        )}
 
         {/* Screenshot Preview Modal */}
         <Suspense fallback={null}>

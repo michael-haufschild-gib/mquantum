@@ -19,9 +19,27 @@
  * @module lib/physics/tdse/metrics/curvedKineticRef
  */
 
-import { sampleMetric } from './evaluator'
-import type { MetricConfig } from './types'
+import { sampleMetricInto } from './evaluator'
+import type { MetricConfig, MetricSample } from './types'
 import { hasPeriodicBoundary } from './types'
+
+/** Maximum supported spatial lattice dimension (1–3 at the moment). */
+const MAX_LATTICE_DIM = 3
+
+/**
+ * Allocate a reusable coordinates buffer of length `MAX_LATTICE_DIM`. The
+ * staggered kinetic operator samples at the cell center and at two
+ * half-points per axis, so three buffers suffice per call.
+ */
+function makeCoordsBuffer(): number[] {
+  const a = new Array<number>(MAX_LATTICE_DIM)
+  for (let i = 0; i < MAX_LATTICE_DIM; i++) a[i] = 0
+  return a
+}
+
+function makeSample(): MetricSample {
+  return { gInverseDiag: new Array<number>(MAX_LATTICE_DIM).fill(1), sqrtDet: 1 }
+}
 
 /**
  * Parameters for the curved-space kinetic operator.
@@ -172,14 +190,16 @@ function fetchPsi(
 }
 
 /**
- * World coordinates for the half-point between cell (i,j,k) and its +1 neighbor
- * along axis `axis`. Only `axis` gets a half-step; other coords use the cell center.
+ * Write the world coordinates for the half-point between cell (i,j,k) and
+ * its +1 neighbor along `axis` into the pre-allocated `out`. Only `axis`
+ * gets a half-step; other coords use the cell center.
  *
  * Integer arguments are un-wrapped on purpose: per spec, a periodic wraparound
  * edge samples the metric at world-coord + dx/2 from the originating cell's
  * perspective (not at the wrapped neighbor's position).
  */
-function halfPointCoords(
+function halfPointCoordsInto(
+  out: number[],
   i: number,
   j: number,
   k: number,
@@ -187,29 +207,26 @@ function halfPointCoords(
   gridSize: readonly number[],
   spacing: readonly number[],
   latticeDim: number
-): number[] {
-  const coords = new Array<number>(latticeDim)
-  coords[0] = worldCoord(i, gridSize[0] as number, spacing[0] as number)
-  if (latticeDim >= 2) coords[1] = worldCoord(j, gridSize[1] as number, spacing[1] as number)
-  if (latticeDim >= 3) coords[2] = worldCoord(k, gridSize[2] as number, spacing[2] as number)
-  coords[axis] = (coords[axis] as number) + 0.5 * (spacing[axis] as number)
-  return coords
+): void {
+  out[0] = worldCoord(i, gridSize[0] as number, spacing[0] as number)
+  if (latticeDim >= 2) out[1] = worldCoord(j, gridSize[1] as number, spacing[1] as number)
+  if (latticeDim >= 3) out[2] = worldCoord(k, gridSize[2] as number, spacing[2] as number)
+  out[axis] = (out[axis] as number) + 0.5 * (spacing[axis] as number)
 }
 
-/** World coordinates at the center of cell (i,j,k). */
-function cellCoords(
+/** Write the cell-center world coordinates into the pre-allocated `out`. */
+function cellCoordsInto(
+  out: number[],
   i: number,
   j: number,
   k: number,
   gridSize: readonly number[],
   spacing: readonly number[],
   latticeDim: number
-): number[] {
-  const coords = new Array<number>(latticeDim)
-  coords[0] = worldCoord(i, gridSize[0] as number, spacing[0] as number)
-  if (latticeDim >= 2) coords[1] = worldCoord(j, gridSize[1] as number, spacing[1] as number)
-  if (latticeDim >= 3) coords[2] = worldCoord(k, gridSize[2] as number, spacing[2] as number)
-  return coords
+): void {
+  out[0] = worldCoord(i, gridSize[0] as number, spacing[0] as number)
+  if (latticeDim >= 2) out[1] = worldCoord(j, gridSize[1] as number, spacing[1] as number)
+  if (latticeDim >= 3) out[2] = worldCoord(k, gridSize[2] as number, spacing[2] as number)
 }
 
 /**
@@ -230,7 +247,10 @@ function cellCoords(
  *         integer, any `spacing[i]` is not a positive finite number, or
  *         `psiRe`/`psiIm` length does not equal the total site count.
  */
-export function applyCurvedKineticRef(params: CurvedKineticParams): {
+export function applyCurvedKineticRef(
+  params: CurvedKineticParams,
+  outBuffers?: { re: Float32Array; im: Float32Array }
+): {
   re: Float32Array
   im: Float32Array
 } {
@@ -242,8 +262,10 @@ export function applyCurvedKineticRef(params: CurvedKineticParams): {
   const total = totalSites(gridSize, latticeDim)
   validateFieldLength('applyCurvedKineticRef', 'psiRe', psiRe.length, total)
   validateFieldLength('applyCurvedKineticRef', 'psiIm', psiIm.length, total)
-  const outRe = new Float32Array(total)
-  const outIm = new Float32Array(total)
+  // Caller-supplied scratch lets hot callers (RK4 integrator) amortise the
+  // 2×total-length Float32Array allocation across all four stages.
+  const outRe = outBuffers?.re?.length === total ? outBuffers.re : new Float32Array(total)
+  const outIm = outBuffers?.im?.length === total ? outBuffers.im : new Float32Array(total)
   const prefactor = -(hbar * hbar) / (2 * mass)
   const isPeriodic = hasPeriodicBoundary(metric.kind)
 
@@ -251,20 +273,36 @@ export function applyCurvedKineticRef(params: CurvedKineticParams): {
   const jMax = latticeDim >= 2 ? (N[1] as number) : 1
   const kMax = latticeDim >= 3 ? (N[2] as number) : 1
 
+  // Hoist per-axis constants out of the voxel loop. `spacing` and `1/spacing`
+  // don't depend on (i,j,k), so recomputing them per cell is pure overhead.
+  const invDxPerAxis = new Array<number>(latticeDim)
+  for (let d = 0; d < latticeDim; d++) invDxPerAxis[d] = 1 / (spacing[d] as number)
+
+  // Reusable scratch: three coord buffers + three metric samples. Allocating
+  // these per cell (as the previous implementation did) dominated runtime on
+  // larger grids: a 32³ flat-metric run performed ~5 × N³ = 160k Array allocs
+  // and MetricSample { gInverseDiag: new Array, sqrtDet } objects, entirely
+  // for values we immediately discard.
+  const centerCoords = makeCoordsBuffer()
+  const coordsPlus = makeCoordsBuffer()
+  const coordsMinus = makeCoordsBuffer()
+  const centerSample = makeSample()
+  const samplePlus = makeSample()
+  const sampleMinus = makeSample()
+
   for (let i = 0; i < iMax; i++) {
     for (let j = 0; j < jMax; j++) {
       for (let k = 0; k < kMax; k++) {
         const idx = flatIndex(i, j, k, N, latticeDim)
-        const centerCoords = cellCoords(i, j, k, gridSize, spacing, latticeDim)
-        const centerSample = sampleMetric(metric, centerCoords, latticeDim, time)
+        cellCoordsInto(centerCoords, i, j, k, gridSize, spacing, latticeDim)
+        sampleMetricInto(metric, centerCoords, latticeDim, time, centerSample)
         const invSqrtDet = 1 / centerSample.sqrtDet
 
         let divFluxRe = 0
         let divFluxIm = 0
 
         for (let axis = 0; axis < latticeDim; axis++) {
-          const dx = spacing[axis] as number
-          const invDx = 1 / dx
+          const invDx = invDxPerAxis[axis] as number
 
           // Neighbors along this axis (un-wrapped; fetchPsi handles wrap/Dirichlet).
           const iPlus = axis === 0 ? i + 1 : i
@@ -284,8 +322,9 @@ export function applyCurvedKineticRef(params: CurvedKineticParams): {
           // Half-point metric samples along this axis. Integer args are un-wrapped
           // on purpose — the world coord of the half-point is derived from the
           // originating cell index even at a periodic seam.
-          const coordsPlus = halfPointCoords(i, j, k, axis, gridSize, spacing, latticeDim)
-          const coordsMinus = halfPointCoords(
+          halfPointCoordsInto(coordsPlus, i, j, k, axis, gridSize, spacing, latticeDim)
+          halfPointCoordsInto(
+            coordsMinus,
             axis === 0 ? i - 1 : i,
             axis === 1 ? j - 1 : j,
             axis === 2 ? k - 1 : k,
@@ -294,8 +333,8 @@ export function applyCurvedKineticRef(params: CurvedKineticParams): {
             spacing,
             latticeDim
           )
-          const samplePlus = sampleMetric(metric, coordsPlus, latticeDim, time)
-          const sampleMinus = sampleMetric(metric, coordsMinus, latticeDim, time)
+          sampleMetricInto(metric, coordsPlus, latticeDim, time, samplePlus)
+          sampleMetricInto(metric, coordsMinus, latticeDim, time, sampleMinus)
 
           const aPlus = samplePlus.sqrtDet * (samplePlus.gInverseDiag[axis] as number)
           const aMinus = sampleMinus.sqrtDet * (sampleMinus.gInverseDiag[axis] as number)
@@ -360,13 +399,16 @@ export function computeProperNorm(
   const jMax = latticeDim >= 2 ? (N[1] as number) : 1
   const kMax = latticeDim >= 3 ? (N[2] as number) : 1
 
+  const coords = makeCoordsBuffer()
+  const sample = makeSample()
+
   let sum = 0
   for (let i = 0; i < iMax; i++) {
     for (let j = 0; j < jMax; j++) {
       for (let k = 0; k < kMax; k++) {
         const idx = flatIndex(i, j, k, N, latticeDim)
-        const coords = cellCoords(i, j, k, gridSize, spacing, latticeDim)
-        const sample = sampleMetric(metric, coords, latticeDim, time)
+        cellCoordsInto(coords, i, j, k, gridSize, spacing, latticeDim)
+        sampleMetricInto(metric, coords, latticeDim, time, sample)
         const re = psiRe[idx] as number
         const im = psiIm[idx] as number
         sum += (re * re + im * im) * sample.sqrtDet
@@ -425,14 +467,17 @@ export function computeInnerProduct(
   const jMax = latticeDim >= 2 ? (N[1] as number) : 1
   const kMax = latticeDim >= 3 ? (N[2] as number) : 1
 
+  const coords = makeCoordsBuffer()
+  const sample = makeSample()
+
   let sumRe = 0
   let sumIm = 0
   for (let i = 0; i < iMax; i++) {
     for (let j = 0; j < jMax; j++) {
       for (let k = 0; k < kMax; k++) {
         const idx = flatIndex(i, j, k, N, latticeDim)
-        const coords = cellCoords(i, j, k, gridSize, spacing, latticeDim)
-        const sample = sampleMetric(metric, coords, latticeDim, time)
+        cellCoordsInto(coords, i, j, k, gridSize, spacing, latticeDim)
+        sampleMetricInto(metric, coords, latticeDim, time, sample)
         const phiR = phiRe[idx] as number
         const phiI = phiIm[idx] as number
         const psiR = psiRe[idx] as number

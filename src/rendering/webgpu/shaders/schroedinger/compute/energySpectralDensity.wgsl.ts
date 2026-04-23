@@ -35,7 +35,7 @@ struct EnergySpectrumUniforms {
 `
 
 export const energySpectralDensityBlock = /* wgsl */ `
-@group(0) @binding(0) var<uniform> esParams: EnergySpectrumUniforms;
+@group(0) @binding(0) var<storage, read> esParams: EnergySpectrumUniforms;
 @group(0) @binding(1) var<storage, read> complexBuf: array<f32>;
 @group(0) @binding(2) var<storage, read_write> bins: array<atomic<u32>>;
 

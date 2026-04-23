@@ -22,6 +22,9 @@
 | `pnpm exec vitest run -t "pattern"` | Run tests matching pattern |
 | `pnpm exec playwright test` | Run all E2E tests |
 | `pnpm exec playwright test scripts/playwright/spec.spec.ts` | Run specific E2E test |
+| `pnpm test:shaders` | Validate every composed WGSL shader via `naga` — see `docs/physics/wgsl-validation.md` |
+| `pnpm test:shaders:fast` | WGSL smoke run capped at 2000 shaders |
+| `pnpm test:shaders:tint` | Run the curated WGSL subset through Chrome/Tint via Playwright |
 
 ## Test Placement
 

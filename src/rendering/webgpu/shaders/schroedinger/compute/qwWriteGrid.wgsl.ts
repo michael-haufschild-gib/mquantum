@@ -54,7 +54,10 @@ struct QWWriteGridUniforms {
 export const QW_WRITE_GRID_UNIFORMS_SIZE = 368 // 320 + 48
 
 export const qwWriteGridBlock = /* wgsl */ `
-@group(0) @binding(0) var<uniform> params: QWWriteGridUniforms;
+// QWWriteGridUniforms binds as storage because the struct embeds scalar arrays
+// (array<u32/f32, 12>) with 4-byte stride — spec-forbidden in uniform address
+// space. Chrome/Tint accepts it; naga rejects.
+@group(0) @binding(0) var<storage, read> params: QWWriteGridUniforms;
 @group(0) @binding(1) var<storage, read> coinState: array<f32>;
 @group(0) @binding(2) var outputTex: texture_storage_3d<rgba16float, write>;
 @group(0) @binding(3) var<storage, read_write> maxDensityAtomic: atomic<u32>;

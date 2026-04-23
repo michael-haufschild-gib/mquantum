@@ -91,11 +91,15 @@ const SOURCE_CHUNKS: [string, string][] = [
   ['/components/sections/', 'components-panels'],
   // Lazy-loaded overlays — deferred until user action
   ['/components/canvas/PerformanceMonitor', 'components-deferred'],
+  ['/components/canvas/QuantumCarpetPanel', 'components-deferred'],
   ['/components/overlays/ScreenshotModal', 'components-deferred'],
   ['/components/overlays/ExportModal', 'components-deferred'],
   ['/components/overlays/export/', 'components-deferred'],
   ['/components/overlays/CropEditor', 'components-deferred'],
   ['/components/overlays/CropBox', 'components-deferred'],
+  ['/components/overlays/HawkingPageCurvePanel', 'components-deferred'],
+  ['/components/overlays/WormholeCoherencePanel', 'components-deferred'],
+  ['/components/overlays/pageCurve/', 'components-deferred'],
   ['/components/presets/', 'components-deferred'],
   ['/components/', 'components'],
 ]

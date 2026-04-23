@@ -13,6 +13,23 @@ export interface SchroedingerCommonActions {
 }
 
 /**
+ * Shared shape for every per-mode controls component in the
+ * Schroedinger panel: current config, current simulation dimension, and
+ * the mode-specific `actions` surface. Each mode's `XControlsProps` is a
+ * thin type alias over this generic — the only thing that varies between
+ * modes is which `Actions` interface is wired in.
+ *
+ * Keeping the shape in one place prevents drift (e.g. a future field
+ * like `quantumMode` only needs to be added here, not in nine siblings)
+ * and makes the component-family contract explicit.
+ */
+export interface SchroedingerModeControlsProps<A> {
+  config: SchroedingerConfig
+  dimension: number
+  actions: A
+}
+
+/**
  * Actions for Harmonic Oscillator mode
  */
 export interface HarmonicOscillatorActions {
@@ -56,11 +73,7 @@ export interface HydrogenNDCoupledActions {
 /**
  * Props for Hydrogen ND Coupled Controls
  */
-export interface HydrogenNDCoupledControlsProps {
-  config: SchroedingerConfig
-  dimension: number
-  actions: HydrogenNDCoupledActions
-}
+export type HydrogenNDCoupledControlsProps = SchroedingerModeControlsProps<HydrogenNDCoupledActions>
 
 /**
  * Actions for Wigner phase-space controls
@@ -94,38 +107,24 @@ export interface SecondQuantizationActions {
 /**
  * Props for Second Quantization Section
  */
-export interface SecondQuantizationSectionProps {
-  config: SchroedingerConfig
-  dimension: number
-  actions: SecondQuantizationActions
-}
+export type SecondQuantizationSectionProps =
+  SchroedingerModeControlsProps<SecondQuantizationActions>
 
 /**
  * Props for Harmonic Oscillator Controls
  */
-export interface HarmonicOscillatorControlsProps {
-  config: SchroedingerConfig
-  dimension: number
-  actions: HarmonicOscillatorActions
-}
+export type HarmonicOscillatorControlsProps =
+  SchroedingerModeControlsProps<HarmonicOscillatorActions>
 
 /**
  * Props for Hydrogen ND Controls
  */
-export interface HydrogenNDControlsProps {
-  config: SchroedingerConfig
-  dimension: number
-  actions: HydrogenNDActions
-}
+export type HydrogenNDControlsProps = SchroedingerModeControlsProps<HydrogenNDActions>
 
 /**
  * Props for Wigner Phase-Space Controls
  */
-export interface WignerControlsProps {
-  config: SchroedingerConfig
-  dimension: number
-  actions: WignerActions
-}
+export type WignerControlsProps = SchroedingerModeControlsProps<WignerActions>
 
 /**
  * Actions for Free Scalar Field mode
@@ -167,11 +166,7 @@ export interface FreeScalarFieldActions {
 /**
  * Props for Free Scalar Field Controls
  */
-export interface FreeScalarFieldControlsProps {
-  config: SchroedingerConfig
-  dimension: number
-  actions: FreeScalarFieldActions
-}
+export type FreeScalarFieldControlsProps = SchroedingerModeControlsProps<FreeScalarFieldActions>
 
 /**
  * Actions for TDSE Dynamics mode
@@ -236,11 +231,7 @@ export interface TdseActions {
 /**
  * Props for TDSE Controls
  */
-export interface TdseControlsProps {
-  config: SchroedingerConfig
-  dimension: number
-  actions: TdseActions
-}
+export type TdseControlsProps = SchroedingerModeControlsProps<TdseActions>
 
 /**
  * Actions interface for BEC controls (maps store setters to shorter names)
@@ -285,11 +276,7 @@ export interface BecActions {
 /**
  * Props for BEC Controls
  */
-export interface BecControlsProps {
-  config: SchroedingerConfig
-  dimension: number
-  actions: BecActions
-}
+export type BecControlsProps = SchroedingerModeControlsProps<BecActions>
 
 /**
  * Actions interface for Dirac controls
@@ -326,8 +313,4 @@ export interface DiracActions {
 /**
  * Props for Dirac Controls
  */
-export interface DiracControlsProps {
-  config: SchroedingerConfig
-  dimension: number
-  actions: DiracActions
-}
+export type DiracControlsProps = SchroedingerModeControlsProps<DiracActions>

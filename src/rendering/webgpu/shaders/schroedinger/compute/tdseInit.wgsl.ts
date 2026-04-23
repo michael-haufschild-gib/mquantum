@@ -14,7 +14,7 @@
  */
 
 export const tdseInitBlock = /* wgsl */ `
-@group(0) @binding(0) var<uniform> params: TDSEUniforms;
+@group(0) @binding(0) var<storage, read> params: TDSEUniforms;
 @group(0) @binding(1) var<storage, read_write> psiRe: array<f32>;
 @group(0) @binding(2) var<storage, read_write> psiIm: array<f32>;
 

@@ -101,3 +101,48 @@ export function computePMLSigmaMaxND(
   const result = ((p + 1) * -Math.log(targetReflection)) / (2 * minPMLPoints * dt)
   return isFinite(result) ? result : 0
 }
+
+/**
+ * Subset of a compute-pass config sufficient to compute σ_max. Every
+ * analytic-compute pass (TDSE, Dirac, Pauli, FreeScalarField) stores these
+ * fields on its mode config, so {@link sigmaMaxFromPmlConfig} accepts a
+ * structural type rather than requiring one shared config union.
+ */
+export interface PmlSigmaMaxConfig {
+  absorberEnabled: boolean
+  pmlTargetReflection?: number
+  absorberWidth: number
+  gridSize: number[]
+  dt: number
+  latticeDim: number
+}
+
+/**
+ * Return σ_max for the CAP absorber when `absorberEnabled`, else `0`.
+ *
+ * Thin wrapper over {@link computePMLSigmaMaxND} that collapses the
+ * identical ternary block four analytic-compute passes (TDSE, Dirac,
+ * Pauli, FreeScalarField) each hand-rolled — including the historical
+ * `pmlTargetReflection ?? 1e-6` safety default and the
+ * {@link PML_GRADING_EXPONENT} cubic grading order.
+ *
+ * Not used by the QuantumWalk pass. QW runs at `dt = 1.0` (dimensionless
+ * walker step, not a PDE timestep) and hardcodes grading order 3 without
+ * the target-reflection default — encoding those in this wrapper would
+ * change QW behaviour, so QW keeps the explicit call.
+ */
+export function sigmaMaxFromPmlConfig(
+  config: PmlSigmaMaxConfig,
+  absorberWidthOverride?: number
+): number {
+  if (!config.absorberEnabled) return 0
+  const width = absorberWidthOverride ?? config.absorberWidth
+  return computePMLSigmaMaxND(
+    config.pmlTargetReflection ?? 1e-6,
+    width,
+    config.gridSize,
+    config.dt,
+    PML_GRADING_EXPONENT,
+    config.latticeDim
+  )
+}

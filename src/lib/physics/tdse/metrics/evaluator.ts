@@ -88,30 +88,60 @@ export function sampleMetric(
   latticeDim: number,
   time: number = 0
 ): MetricSample {
+  const out: MetricSample = {
+    gInverseDiag: new Array<number>(latticeDim),
+    sqrtDet: 1,
+  }
+  sampleMetricInto(cfg, coords, latticeDim, time, out)
+  return out
+}
+
+/**
+ * Mutating variant of {@link sampleMetric}. Writes into `out.gInverseDiag`
+ * (which must have length ≥ latticeDim) and `out.sqrtDet`. Allocates nothing.
+ * Hot callers (lattice kinetic, proper-norm, inner product) should reuse a
+ * pooled `MetricSample` across every site to avoid GC pressure.
+ */
+export function sampleMetricInto(
+  cfg: MetricConfig,
+  coords: readonly number[],
+  latticeDim: number,
+  time: number,
+  out: MetricSample
+): void {
   switch (cfg.kind) {
     case 'morrisThorne':
-      return sampleMorrisThorne(cfg, coords, latticeDim)
+      sampleMorrisThorneInto(cfg, coords, latticeDim, out)
+      return
     case 'schwarzschild':
-      return sampleSchwarzschild(cfg, coords, latticeDim)
+      sampleSchwarzschildInto(cfg, coords, latticeDim, out)
+      return
     case 'deSitter':
-      return sampleDeSitter(cfg, latticeDim, time)
+      sampleDeSitterInto(cfg, latticeDim, time, out)
+      return
     case 'antiDeSitter':
-      return sampleAntiDeSitter(cfg, coords, latticeDim)
+      sampleAntiDeSitterInto(cfg, coords, latticeDim, out)
+      return
     case 'sphere2D':
-      return sampleSphere2D(cfg, coords, latticeDim)
+      sampleSphere2DInto(cfg, coords, latticeDim, out)
+      return
     case 'torus':
-      // Flat metric; periodic boundaries applied by the integrator, not here.
-      return flatSample(latticeDim)
+      flatSampleInto(latticeDim, out)
+      return
     case 'doubleThroat':
-      return sampleDoubleThroat(cfg, coords, latticeDim)
+      sampleDoubleThroatInto(cfg, coords, latticeDim, out)
+      return
     case 'flat':
     default:
-      return flatSample(latticeDim)
+      flatSampleInto(latticeDim, out)
+      return
   }
 }
 
-function flatSample(latticeDim: number): MetricSample {
-  return { gInverseDiag: new Array<number>(latticeDim).fill(1), sqrtDet: 1 }
+function flatSampleInto(latticeDim: number, out: MetricSample): void {
+  const g = out.gInverseDiag
+  for (let d = 0; d < latticeDim; d++) g[d] = 1
+  out.sqrtDet = 1
 }
 
 /**
@@ -119,22 +149,26 @@ function flatSample(latticeDim: number): MetricSample {
  * g^00 = 1, g^μμ = 1/r², √|g| = r^(latticeDim−1).
  * (Morris–Thorne, 1988.)
  */
-function sampleMorrisThorne(
+function sampleMorrisThorneInto(
   cfg: MetricConfig,
   coords: readonly number[],
-  latticeDim: number
-): MetricSample {
-  if (latticeDim < 2) return flatSample(latticeDim)
+  latticeDim: number,
+  out: MetricSample
+): void {
+  if (latticeDim < 2) {
+    flatSampleInto(latticeDim, out)
+    return
+  }
   const b0 = Math.max(cfg.throatRadius ?? MIN_THROAT_RADIUS, MIN_THROAT_RADIUS)
   const l = (coords[0] ?? 0) as number
   const r = morrisThorneRadius(l, b0)
   const invR2 = 1 / (r * r)
-  const gInverseDiag = new Array<number>(latticeDim)
-  gInverseDiag[0] = 1
-  for (let d = 1; d < latticeDim; d++) gInverseDiag[d] = invR2
+  const g = out.gInverseDiag
+  g[0] = 1
+  for (let d = 1; d < latticeDim; d++) g[d] = invR2
   let sqrtDet = 1
   for (let d = 1; d < latticeDim; d++) sqrtDet *= r
-  return { gInverseDiag, sqrtDet }
+  out.sqrtDet = sqrtDet
 }
 
 /**
@@ -142,25 +176,30 @@ function sampleMorrisThorne(
  *   g_ij = ψ⁴ δ_ij,  ψ = 1 + M/(2r),  r = |x|.
  * ⇒ g^ij = ψ⁻⁴ δ_ij,  √|g| = ψ^(2·latticeDim).
  */
-function sampleSchwarzschild(
+function sampleSchwarzschildInto(
   cfg: MetricConfig,
   coords: readonly number[],
-  latticeDim: number
-): MetricSample {
+  latticeDim: number,
+  out: MetricSample
+): void {
   const M = Math.max(cfg.schwarzschildMass ?? MIN_SCHWARZSCHILD_MASS, MIN_SCHWARZSCHILD_MASS)
   let r2 = 0
-  for (let d = 0; d < latticeDim; d++) r2 += (coords[d] ?? 0) * (coords[d] ?? 0)
+  for (let d = 0; d < latticeDim; d++) {
+    const c = (coords[d] ?? 0) as number
+    r2 += c * c
+  }
   const rMin = Math.max(M / 2, SCHWARZSCHILD_MIN_RADIUS)
   const r = Math.max(Math.sqrt(r2), rMin)
   const psi = 1 + M / (2 * r)
   const psi2 = psi * psi
   const psi4 = psi2 * psi2
   const invPsi4 = 1 / psi4
-  const gInverseDiag = new Array<number>(latticeDim).fill(invPsi4)
+  const g = out.gInverseDiag
+  for (let d = 0; d < latticeDim; d++) g[d] = invPsi4
   // √|g| = ψ^(2·latticeDim) = (ψ²)^latticeDim.
   let sqrtDet = 1
   for (let d = 0; d < latticeDim; d++) sqrtDet *= psi2
-  return { gInverseDiag, sqrtDet }
+  out.sqrtDet = sqrtDet
 }
 
 /**
@@ -168,14 +207,20 @@ function sampleSchwarzschild(
  *   g_ij = a² δ_ij ⇒ g^ij = (1/a²) δ_ij, √|g| = a^latticeDim.
  * (Carroll, Spacetime & Geometry, §8.)
  */
-function sampleDeSitter(cfg: MetricConfig, latticeDim: number, time: number): MetricSample {
+function sampleDeSitterInto(
+  cfg: MetricConfig,
+  latticeDim: number,
+  time: number,
+  out: MetricSample
+): void {
   const H = Math.max(cfg.hubbleRate ?? MIN_HUBBLE_RATE, MIN_HUBBLE_RATE)
   const a = Math.exp(H * time)
   const invA2 = 1 / (a * a)
-  const gInverseDiag = new Array<number>(latticeDim).fill(invA2)
+  const g = out.gInverseDiag
+  for (let d = 0; d < latticeDim; d++) g[d] = invA2
   let sqrtDet = 1
   for (let d = 0; d < latticeDim; d++) sqrtDet *= a
-  return { gInverseDiag, sqrtDet }
+  out.sqrtDet = sqrtDet
 }
 
 /**
@@ -184,20 +229,22 @@ function sampleDeSitter(cfg: MetricConfig, latticeDim: number, time: number): Me
  * Coords[0] clamped to ≥ ADS_MIN_Z to avoid the conformal boundary z=0.
  * (Carroll, §8.)
  */
-function sampleAntiDeSitter(
+function sampleAntiDeSitterInto(
   cfg: MetricConfig,
   coords: readonly number[],
-  latticeDim: number
-): MetricSample {
+  latticeDim: number,
+  out: MetricSample
+): void {
   const L = Math.max(cfg.adsRadius ?? MIN_ADS_RADIUS, MIN_ADS_RADIUS)
   const z = Math.max(Math.abs((coords[0] ?? ADS_MIN_Z) as number), ADS_MIN_Z)
   const zOverL = z / L
   const gInv = zOverL * zOverL
-  const gInverseDiag = new Array<number>(latticeDim).fill(gInv)
+  const g = out.gInverseDiag
+  for (let d = 0; d < latticeDim; d++) g[d] = gInv
   const LoverZ = L / z
   let sqrtDet = 1
   for (let d = 0; d < latticeDim; d++) sqrtDet *= LoverZ
-  return { gInverseDiag, sqrtDet }
+  out.sqrtDet = sqrtDet
 }
 
 /**
@@ -211,35 +258,43 @@ function sampleAntiDeSitter(
  * ⇒ g^11 = 1/R², g^22 = 1/(R² sin²θ_eff), √|g| = R² · sin(θ_eff).
  * (Carroll §3.7.)
  */
-function sampleSphere2D(
+function sampleSphere2DInto(
   cfg: MetricConfig,
   coords: readonly number[],
-  latticeDim: number
-): MetricSample {
-  if (latticeDim < 3) return flatSample(latticeDim)
+  latticeDim: number,
+  out: MetricSample
+): void {
+  if (latticeDim < 3) {
+    flatSampleInto(latticeDim, out)
+    return
+  }
   const R = Math.max(cfg.sphereRadius ?? MIN_SPHERE_RADIUS, MIN_SPHERE_RADIUS)
   const thetaRaw = (coords[1] ?? Math.PI / 2) as number
   const theta = Math.min(Math.max(thetaRaw, SPHERE_POLE_EPSILON), Math.PI - SPHERE_POLE_EPSILON)
   const sinTheta = Math.sin(theta)
-  const gInverseDiag = new Array<number>(latticeDim).fill(1)
-  gInverseDiag[1] = 1 / (R * R)
-  gInverseDiag[2] = 1 / (R * R * sinTheta * sinTheta)
+  const g = out.gInverseDiag
+  for (let d = 0; d < latticeDim; d++) g[d] = 1
+  g[1] = 1 / (R * R)
+  g[2] = 1 / (R * R * sinTheta * sinTheta)
   // √|g| uses the two-sphere factor R² sinθ; axis 0 contributes ×1.
   // For latticeDim > 3, extra flat axes also contribute ×1.
-  const sqrtDet = R * R * sinTheta
-  return { gInverseDiag, sqrtDet }
+  out.sqrtDet = R * R * sinTheta
 }
 
 /**
  * Double-throat wormhole along axis 0. Same transverse structure as MT
  * but with effective radius r(l) featuring two throat shoulders at ±s/2.
  */
-function sampleDoubleThroat(
+function sampleDoubleThroatInto(
   cfg: MetricConfig,
   coords: readonly number[],
-  latticeDim: number
-): MetricSample {
-  if (latticeDim < 2) return flatSample(latticeDim)
+  latticeDim: number,
+  out: MetricSample
+): void {
+  if (latticeDim < 2) {
+    flatSampleInto(latticeDim, out)
+    return
+  }
   const b0 = Math.max(
     cfg.doubleThroatRadius ?? cfg.throatRadius ?? MIN_THROAT_RADIUS,
     MIN_THROAT_RADIUS
@@ -251,12 +306,12 @@ function sampleDoubleThroat(
   const l = (coords[0] ?? 0) as number
   const r = doubleThroatRadius(l, b0, s)
   const invR2 = 1 / (r * r)
-  const gInverseDiag = new Array<number>(latticeDim)
-  gInverseDiag[0] = 1
-  for (let d = 1; d < latticeDim; d++) gInverseDiag[d] = invR2
+  const g = out.gInverseDiag
+  g[0] = 1
+  for (let d = 1; d < latticeDim; d++) g[d] = invR2
   let sqrtDet = 1
   for (let d = 1; d < latticeDim; d++) sqrtDet *= r
-  return { gInverseDiag, sqrtDet }
+  out.sqrtDet = sqrtDet
 }
 
 // ── Curvature scalars ────────────────────────────────────────────────────

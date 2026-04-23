@@ -33,7 +33,10 @@ struct QWShiftUniforms {
   strides: array<u32, 12>,
 }
 
-@group(0) @binding(0) var<uniform> params: QWShiftUniforms;
+// QWShiftUniforms binds as storage because the struct embeds scalar arrays
+// (array<u32, 12>) with 4-byte stride — spec-forbidden in uniform address
+// space. Chrome/Tint accepts it; naga rejects. Storage has no stride restriction.
+@group(0) @binding(0) var<storage, read> params: QWShiftUniforms;
 @group(0) @binding(1) var<storage, read> coinIn: array<f32>;
 @group(0) @binding(2) var<storage, read_write> coinOut: array<f32>;
 

@@ -30,7 +30,7 @@
  */
 
 export const becHawkingInjectBlock = /* wgsl */ `
-@group(0) @binding(0) var<uniform> params: TDSEUniforms;
+@group(0) @binding(0) var<storage, read> params: TDSEUniforms;
 @group(0) @binding(1) var<storage, read_write> psiRe: array<f32>;
 @group(0) @binding(2) var<storage, read_write> psiIm: array<f32>;
 
@@ -71,6 +71,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // and superfluidVelocity branches. Skip the injection for boundary voxels
   // (central difference undefined) — the horizon is interior by construction.
   let hbarOverM = params.hbar / max(params.mass, 1e-6);
+  // density is loop-invariant — hoist 1/density so the inner loop does a multiply, not a divide.
+  let invDensity = 1.0 / max(density, 1e-20);
   var vsMagSq: f32 = 0.0;
   for (var d: u32 = 0u; d < params.latticeDim; d++) {
     if (params.gridSize[d] <= 1u) { continue; }
@@ -84,13 +86,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let dRe = (psiRe[fwdIdx] - psiRe[bwdIdx]) * invDx;
     let dIm = (psiIm[fwdIdx] - psiIm[bwdIdx]) * invDx;
     let jd = hbarOverM * (re * dIm - im * dRe);
-    let vsd = jd / max(density, 1e-20);
+    let vsd = jd * invDensity;
     vsMagSq += vsd * vsd;
   }
 
   let gAbs = max(abs(params.interactionStrength), 1e-10);
   let csSq = max(gAbs * density / max(params.mass, 1e-6), 1e-12);
-  let mach = sqrt(vsMagSq) / sqrt(csSq);
+  // sqrt(A)/sqrt(B) == sqrt(A/B): saves one sqrt per voxel (both operands are >= 0 by construction).
+  let mach = sqrt(vsMagSq / csSq);
 
   // Gaussian horizon weight (σ = 0.25 in Mach units) — matches CPU default
   // in sonicHorizon.ts/horizonWeight so CPU diagnostics and GPU injection

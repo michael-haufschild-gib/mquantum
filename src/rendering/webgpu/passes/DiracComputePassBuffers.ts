@@ -9,7 +9,12 @@ import type { DiracConfig } from '@/lib/geometry/extended/dirac'
 import { spinorSize } from '@/lib/physics/dirac/cliffordAlgebraFallback'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
-import { assertPow2Log2, FFT_UNIFORM_SIZE, PACK_UNIFORM_SIZE } from './computePassUtils'
+import {
+  assertPow2Log2,
+  FFT_UNIFORM_SIZE,
+  PACK_UNIFORM_SIZE,
+  packFFTAxisUniforms,
+} from './computePassUtils'
 import type {
   DiracBufferResult,
   DiracDestroyableBuffers,
@@ -115,8 +120,14 @@ export function rebuildDiracBuffers(
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
   })
 
-  // Uniform buffers
-  const uniformBuffer = helpers.createUniformBuffer(device, UNIFORM_SIZE, 'dirac-uniforms')
+  // DiracUniforms params buffer is STORAGE (not UNIFORM) because the struct
+  // embeds scalar arrays that are spec-forbidden in uniform address space.
+  // See diracInit.wgsl.ts for the matching `var<storage, read>` declaration.
+  const uniformBuffer = device.createBuffer({
+    label: 'dirac-uniforms',
+    size: UNIFORM_SIZE,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  })
   const fftUniformBuffer = helpers.createUniformBuffer(
     device,
     FFT_UNIFORM_SIZE,
@@ -156,7 +167,7 @@ export function rebuildDiracBuffers(
     size: Math.max(FFT_UNIFORM_SIZE, axisSlotCount * FFT_UNIFORM_SIZE),
     usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
   })
-  const fftAxisStagingData = buildFFTAxisStagingData(config, totalSites)
+  const fftAxisStagingData = packFFTAxisUniforms(config, totalSites)
   device.queue.writeBuffer(fftAxisStagingBuffer, 0, fftAxisStagingData)
 
   // PERF: per-slot uniform buffers for batched Strang-step FFT dispatch.
@@ -265,39 +276,4 @@ export function rebuildDiracBuffers(
     fwdStageCount,
     diagNumWorkgroups,
   }
-}
-
-/**
- * Build per-axis staging data for the shared-memory FFT.
- * One 32-byte slot per axis per direction (forward + inverse).
- * Identical layout to TDSE's `buildTdseFFTAxisStagingData`.
- */
-function buildFFTAxisStagingData(config: DiracConfig, totalSites: number): ArrayBuffer {
-  const slotCount = config.latticeDim * 2 // forward + inverse
-  const data = new ArrayBuffer(slotCount * FFT_UNIFORM_SIZE)
-  let slotIdx = 0
-
-  for (const direction of [1.0, -1.0]) {
-    let axisStride = 1
-    for (let d = config.latticeDim - 1; d >= 0; d--) {
-      const axisDim = config.gridSize[d]!
-      const log2N = assertPow2Log2(axisDim)
-
-      const offset = slotIdx * FFT_UNIFORM_SIZE
-      const view = new DataView(data, offset, FFT_UNIFORM_SIZE)
-      view.setUint32(0, axisDim, true) // axisDim
-      view.setFloat32(4, direction, true) // direction
-      view.setUint32(8, totalSites, true) // totalElements
-      view.setUint32(12, axisStride, true) // axisStride
-      view.setUint32(16, log2N, true) // log2N
-      view.setUint32(20, 0, true) // _pad0
-      view.setUint32(24, 0, true) // _pad1
-      view.setUint32(28, 0, true) // _pad2
-      slotIdx++
-
-      axisStride *= axisDim
-    }
-  }
-
-  return data
 }

@@ -20,7 +20,7 @@
  */
 
 export const diracPotentialBlock = /* wgsl */ `
-@group(0) @binding(0) var<uniform> params: DiracUniforms;
+@group(0) @binding(0) var<storage, read> params: DiracUniforms;
 @group(0) @binding(1) var<storage, read_write> potential: array<f32>;
 
 @compute @workgroup_size(64)

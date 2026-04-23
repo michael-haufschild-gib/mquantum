@@ -109,12 +109,78 @@ export interface PauliBindGroupInputs {
  * @param device - WebGPU device
  * @returns All pipelines and their associated bind group layouts
  */
-export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
-  // Common shader preamble: uniforms struct + N-D index utilities
-  const preamble = `${pauliUniformsBlock}\n${freeScalarNDIndexBlock}\n`
+// --- Pure WGSL composers (Phase 2b) ---
+const pauliPrelude = (): string => `${pauliUniformsBlock}\n${freeScalarNDIndexBlock}\n`
 
-  // Shared BGL for spinor passes: uniform + spinorRe(rw) + spinorIm(rw)
-  const spinorBGL = createComputeBGL(device, 'pauli-spinor-bgl', ['uniform', 'storage', 'storage'])
+/** Pure WGSL for the Pauli init compute shader. */
+export function composePauliInitShader(): string {
+  return pauliPrelude() + pauliInitBlock
+}
+
+/** Pure WGSL for the Pauli potentialHalf+Zeeman compute shader. */
+export function composePauliPotentialHalfShader(): string {
+  return pauliPrelude() + pauliPotentialHalfBlock
+}
+
+/** Pure WGSL for the Pauli absorber compute shader. */
+export function composePauliAbsorberShader(): string {
+  return pauliPrelude() + pmlProfileBlock + pauliAbsorberBlock
+}
+
+/** Pure WGSL for the Pauli kinetic phase-kick (k-space) compute shader. */
+export function composePauliKineticShader(): string {
+  return pauliPrelude() + pauliKineticBlock
+}
+
+/** Pure WGSL for the Pauli renormalize compute shader. */
+export function composePauliRenormalizeShader(): string {
+  return renormalizeBlock
+}
+
+/** Pure WGSL for the Pauli write-grid compute shader. */
+export function composePauliWriteGridShader(): string {
+  return pauliPrelude() + pauliWriteGridBlock
+}
+
+/** Pure WGSL for the Pauli pack compute shader. */
+export function composePauliPackShader(): string {
+  return assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexPackShaderBlock]).wgsl
+}
+
+/** Pure WGSL for the Pauli unpack compute shader. */
+export function composePauliUnpackShader(): string {
+  return assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexUnpackShaderBlock]).wgsl
+}
+
+/** Pure WGSL for the Pauli Stockham FFT stage compute shader. */
+export function composePauliFftStageShader(): string {
+  return `\n${tdseFFTStageUniformsBlock}\n${tdseStockhamFFTBlock}\n`
+}
+
+/** Pure WGSL for the Pauli diagnostics reduce compute shader. */
+export function composePauliDiagReduceShader(): string {
+  return pauliDiagReduceBlock
+}
+
+/** Pure WGSL for the Pauli diagnostics finalize compute shader. */
+export function composePauliDiagFinalizeShader(): string {
+  return pauliDiagFinalizeBlock
+}
+
+/**
+ * Compile every Pauli-spinor compute pipeline and return them with
+ * their bind group layouts. One-time setup per device.
+ */
+export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
+  // Shared BGL for spinor passes: PauliUniforms + spinorRe(rw) + spinorIm(rw).
+  // Binding 0 is `read-only-storage` because PauliUniforms embeds scalar arrays
+  // (spec-forbidden in uniform address space). See pauliInit.wgsl.ts for the
+  // matching `var<storage, read>` declaration.
+  const spinorBGL = createComputeBGL(device, 'pauli-spinor-bgl', [
+    'read-only-storage',
+    'storage',
+    'storage',
+  ])
   const spinorLayout = device.createPipelineLayout({ bindGroupLayouts: [spinorBGL] })
 
   // Init pipeline
@@ -122,7 +188,7 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
     label: 'pauli-init-pipeline',
     layout: spinorLayout,
     compute: {
-      module: device.createShaderModule({ label: 'pauli-init', code: preamble + pauliInitBlock }),
+      module: device.createShaderModule({ label: 'pauli-init', code: composePauliInitShader() }),
       entryPoint: 'main',
     },
   })
@@ -134,23 +200,20 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
     compute: {
       module: device.createShaderModule({
         label: 'pauli-potential-half',
-        code: preamble + pauliPotentialHalfBlock,
+        code: composePauliPotentialHalfShader(),
       }),
       entryPoint: 'main',
     },
   })
 
-  // Absorber (separate pass after Strang step — NOT merged into potential half-step).
-  // Running absorption after the FFT kinetic step prevents the FFT from scattering
-  // the spatially-modulated absorber profile across k-space.
-  // Reuses spinorBGL layout (uniform + spinorRe + spinorIm).
+  // Absorber — reuses spinorBGL layout.
   const absorberPipeline = device.createComputePipeline({
     label: 'pauli-absorber-pipeline',
     layout: spinorLayout,
     compute: {
       module: device.createShaderModule({
         label: 'pauli-absorber',
-        code: preamble + pmlProfileBlock + pauliAbsorberBlock,
+        code: composePauliAbsorberShader(),
       }),
       entryPoint: 'main',
     },
@@ -163,15 +226,13 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
     compute: {
       module: device.createShaderModule({
         label: 'pauli-kinetic',
-        code: preamble + pauliKineticBlock,
+        code: composePauliKineticShader(),
       }),
       entryPoint: 'main',
     },
   })
 
-  // Renormalization pipeline: reads totalNorm from diagResultBuffer,
-  // scales ψ by 1/√(totalNorm) to counteract f32 norm drift.
-  // Layout: uniform(totalElements) + diagResult(read) + spinorRe(rw) + spinorIm(rw)
+  // Renormalization pipeline
   const renormalizeBGL = createComputeBGL(device, 'pauli-renormalize-bgl', [
     'uniform',
     'read-only-storage',
@@ -184,15 +245,15 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
     compute: {
       module: device.createShaderModule({
         label: 'pauli-renormalize',
-        code: renormalizeBlock,
+        code: composePauliRenormalizeShader(),
       }),
       entryPoint: 'main',
     },
   })
 
-  // Write-grid pipeline: uniform + spinorRe(read) + spinorIm(read) + texture_storage_3d(write)
+  // Write-grid pipeline. Binding 0 (PauliUniforms) — see spinor BGL comment.
   const writeGridBGL = createComputeBGL(device, 'pauli-write-grid-bgl', [
-    'uniform',
+    'read-only-storage',
     'read-only-storage',
     'read-only-storage',
     { storageTexture: { format: 'rgba16float', viewDimension: '3d' } },
@@ -203,13 +264,13 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
     compute: {
       module: device.createShaderModule({
         label: 'pauli-write-grid',
-        code: preamble + pauliWriteGridBlock,
+        code: composePauliWriteGridShader(),
       }),
       entryPoint: 'main',
     },
   })
 
-  // Pack BGL: uniforms + spinorRe + spinorIm + scratchA
+  // Pack BGL
   const packBGL = createComputeBGL(device, 'pauli-pack-bgl', [
     'uniform',
     'read-only-storage',
@@ -222,13 +283,13 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
     compute: {
       module: device.createShaderModule({
         label: 'pauli-pack',
-        code: assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexPackShaderBlock]).wgsl,
+        code: composePauliPackShader(),
       }),
       entryPoint: 'main',
     },
   })
 
-  // Unpack BGL: uniforms + scratchA + spinorRe + spinorIm
+  // Unpack BGL
   const unpackBGL = createComputeBGL(device, 'pauli-unpack-bgl', [
     'uniform',
     'read-only-storage',
@@ -241,8 +302,7 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
     compute: {
       module: device.createShaderModule({
         label: 'pauli-unpack',
-        code: assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexUnpackShaderBlock])
-          .wgsl,
+        code: composePauliUnpackShader(),
       }),
       entryPoint: 'main',
     },
@@ -260,7 +320,7 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
     compute: {
       module: device.createShaderModule({
         label: 'pauli-fft-stage',
-        code: `\n${tdseFFTStageUniformsBlock}\n${tdseStockhamFFTBlock}\n`,
+        code: composePauliFftStageShader(),
       }),
       entryPoint: 'main',
     },
@@ -279,7 +339,7 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
     compute: {
       module: device.createShaderModule({
         label: 'pauli-diag-reduce',
-        code: pauliDiagReduceBlock,
+        code: composePauliDiagReduceShader(),
       }),
       entryPoint: 'main',
     },
@@ -297,7 +357,7 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
     compute: {
       module: device.createShaderModule({
         label: 'pauli-diag-finalize',
-        code: pauliDiagFinalizeBlock,
+        code: composePauliDiagFinalizeShader(),
       }),
       entryPoint: 'main',
     },
