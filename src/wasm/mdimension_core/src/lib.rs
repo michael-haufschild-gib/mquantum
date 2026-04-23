@@ -27,6 +27,9 @@ mod disorder;
 mod entanglement;
 mod fft;
 mod tdse_diagnostics;
+mod wdw_airy;
+mod wdw_bessel;
+mod wdw_implicit_bulk;
 mod wheeler_dewitt;
 
 // ============================================================================

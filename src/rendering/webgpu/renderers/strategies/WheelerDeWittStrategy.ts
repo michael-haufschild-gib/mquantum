@@ -18,6 +18,7 @@
 import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
 import type { WheelerDeWittConfig } from '@/lib/geometry/extended/wheelerDeWitt'
 import {
+  applyWdwPulseAlpha,
   clampWdwHeadroom,
   packWdwDensityGrid,
   WDW_EUCLIDEAN_RENDER_HEADROOM,
@@ -109,6 +110,27 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
    */
   private lastRenderDynamicRange = Number.NaN
 
+  /**
+   * Persistent scratch buffers that back the render hot path. Resized
+   * only when the density-grid or solver-grid dimensions change —
+   * allocating a fresh `Uint16Array(4·96³)` (~7.5 MB) every frame
+   * triggered major GC pauses during the "Semiclassical Worldline"
+   * pulse animation and dropped the frame rate from 60 FPS to ~1 FPS.
+   *
+   * `baselineDensity` + `baselineAlpha` are snapshots of the non-
+   * animating texture state (R, G, B, and A = max(srmt, static
+   * overlay)). The worldline pulse's animation-tick reuses them via
+   * {@link applyWdwPulseAlpha} so that chi trilinear sampling, atan2,
+   * and log work run once per physics-dirty frame rather than once per
+   * animating frame.
+   */
+  private workingDensity: Uint16Array | null = null
+  private baselineDensity: Uint16Array | null = null
+  private baselineAlpha: Float32Array | null = null
+  private pulseIntensityScratch: Float32Array | null = null
+  private pulseIntensityGridSig = ''
+  private baselineGridSize = 0
+
   configureShader(_shader: SchroedingerWGSLShaderConfig, _config: SchrodingerRendererConfig): void {
     // Compute-mode overrides are applied by the renderer constructor.
   }
@@ -185,8 +207,6 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     this.srmtSweep.update(wdw, physicsTick.solverDirty)
     this.srmtSweep.maybeDispatchPending(wdw, physicsTick.output, physicsTick.solverDirty)
 
-    // Worldline pulse re-packs every playing frame; a toggle-off
-    // triggers a one-shot repack to clear the pulse snapshot.
     const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
     const isPlaying = animation?.isPlaying ?? false
     const worldlineEnabled = !!wdw.worldlineEnabled
@@ -197,41 +217,82 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     const headroom = clampWdwHeadroom(wdw.renderDynamicRange ?? WDW_EUCLIDEAN_RENDER_HEADROOM)
     const headroomChanged = headroom !== this.lastRenderDynamicRange
 
-    const needRepack =
+    // A "baseline" repack regenerates R/G/B and the non-animating part
+    // of A (SRMT + static streamline). An "animation-only" tick reuses
+    // the cached baseline and only rewrites the pulse overlay into A.
+    // Worldline pulse playback runs thousands of animation-only ticks
+    // per physics-dirty event — doing the full pack every frame ate
+    // ~900 ms of CPU per frame (atan2/log/chi trilinear × 96³ voxels
+    // plus 8 MB of fresh allocations triggering major GC).
+    const baselineDirty =
       physicsTick.solverDirty ||
       physicsTick.trajectoryDirty ||
-      worldlineAnimating ||
       worldlineToggled ||
       srmtTick.overlayDirty ||
-      headroomChanged
+      headroomChanged ||
+      this.baselineDensity === null
+    const animationOnlyDirty = !baselineDirty && worldlineAnimating
 
-    if (!needRepack) return
+    if (!baselineDirty && !animationOnlyDirty) return
 
-    const streamlineOverlay = this.buildStreamlineOverlay(
-      wdw,
-      physicsTick.trajectories,
-      physicsTick.output.gridSize,
-      animation,
-      worldlineEnabled
-    )
+    const N = this.densityTexture.width
+    this.ensureScratchBuffers(N, physicsTick.output.gridSize)
 
-    const packed = packWdwDensityGrid(
-      physicsTick.output,
-      streamlineOverlay,
-      srmtTick.overlay ?? undefined,
-      this.densityTexture.width,
-      headroom
-    )
+    if (baselineDirty) {
+      // Baseline carries everything EXCEPT the travelling pulse. The
+      // static-streamline branch and the pulse branch are mutually
+      // exclusive in `buildStreamlineOverlay`, so when `worldlineEnabled`
+      // we omit the static overlay from baseline (pulse fills A via the
+      // animation tick below).
+      const staticOverlay =
+        !worldlineEnabled && wdw.streamlinesEnabled && physicsTick.trajectories
+          ? buildStaticOverlay(
+              physicsTick.trajectories,
+              DEFAULT_STREAMLINE_INPUT.splatRadius,
+              physicsTick.output.gridSize
+            )
+          : null
+      packWdwDensityGrid(
+        physicsTick.output,
+        staticOverlay,
+        srmtTick.overlay ?? undefined,
+        N,
+        headroom,
+        { density: this.workingDensity!, baselineAlpha: this.baselineAlpha! }
+      )
+      // Snapshot baseline for subsequent animation-only ticks.
+      this.baselineDensity!.set(this.workingDensity!)
+    }
 
+    if (worldlineAnimating) {
+      const pulseOverlay = this.buildPulseOverlayScratch(
+        wdw,
+        physicsTick.trajectories!,
+        physicsTick.output.gridSize,
+        animation
+      )
+      if (pulseOverlay) {
+        applyWdwPulseAlpha(
+          this.baselineDensity!,
+          this.baselineAlpha!,
+          pulseOverlay,
+          physicsTick.output.gridSize,
+          N,
+          this.workingDensity!
+        )
+      }
+    }
+
+    const density = this.workingDensity!
     ctx.device.queue.writeTexture(
       { texture: this.densityTexture },
-      packed.density.buffer,
+      density.buffer,
       {
-        offset: packed.density.byteOffset,
-        bytesPerRow: packed.bytesPerRow,
-        rowsPerImage: packed.rowsPerImage,
+        offset: density.byteOffset,
+        bytesPerRow: N * 8,
+        rowsPerImage: N,
       },
-      { width: packed.gridSize, height: packed.gridSize, depthOrArrayLayers: packed.gridSize }
+      { width: N, height: N, depthOrArrayLayers: N }
     )
 
     this.lastWorldlineEnabled = worldlineEnabled
@@ -239,34 +300,48 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
   }
 
   /**
-   * Pick the streamline overlay for the current frame: static overlay
-   * when streamlines are enabled but not animating; pulse overlay when
-   * worldline is enabled; null otherwise.
+   * Ensure persistent scratch buffers exist and are sized for the
+   * current density grid (`N³` voxels) and solver grid (`Na·Nphi²`
+   * cells). Reallocates only when the grid size actually changes.
    */
-  private buildStreamlineOverlay(
+  private ensureScratchBuffers(N: number, solverGrid: [number, number, number]): void {
+    const totalDensity = N * N * N
+    if (!this.workingDensity || this.workingDensity.length !== totalDensity * 4) {
+      this.workingDensity = new Uint16Array(totalDensity * 4)
+      this.baselineDensity = new Uint16Array(totalDensity * 4)
+      this.baselineAlpha = new Float32Array(totalDensity)
+      this.baselineGridSize = N
+    }
+    const solverKey = `${solverGrid[0]}x${solverGrid[1]}x${solverGrid[2]}`
+    const totalSolver = solverGrid[0] * solverGrid[1] * solverGrid[2]
+    if (!this.pulseIntensityScratch || this.pulseIntensityGridSig !== solverKey) {
+      this.pulseIntensityScratch = new Float32Array(totalSolver)
+      this.pulseIntensityGridSig = solverKey
+    }
+  }
+
+  /**
+   * Build the pulse overlay into the persistent scratch buffer. Returns
+   * null when trajectories are empty.
+   */
+  private buildPulseOverlayScratch(
     wdw: WheelerDeWittConfig,
-    trajectories: ReturnType<WheelerDeWittPhysicsCache['getTrajectories']>,
+    trajectories: NonNullable<ReturnType<WheelerDeWittPhysicsCache['getTrajectories']>>,
     gridSize: [number, number, number],
-    animation: AnimationState | undefined,
-    worldlineEnabled: boolean
+    animation: AnimationState | undefined
   ): StreamlineOverlay | null {
-    if (!trajectories || trajectories.length === 0) return null
-    if (worldlineEnabled) {
-      const t = animation?.accumulatedTime ?? 0
-      const rawAnim = (t * wdw.worldlineSpeed) % 1
-      const animTime = rawAnim < 0 ? rawAnim + 1 : rawAnim
-      return buildPulseOverlay(
-        trajectories,
-        animTime,
-        wdw.worldlinePulseWidth,
-        DEFAULT_STREAMLINE_INPUT.splatRadius,
-        gridSize
-      )
-    }
-    if (wdw.streamlinesEnabled) {
-      return buildStaticOverlay(trajectories, DEFAULT_STREAMLINE_INPUT.splatRadius, gridSize)
-    }
-    return null
+    if (trajectories.length === 0) return null
+    const t = animation?.accumulatedTime ?? 0
+    const rawAnim = (t * wdw.worldlineSpeed) % 1
+    const animTime = rawAnim < 0 ? rawAnim + 1 : rawAnim
+    return buildPulseOverlay(
+      trajectories,
+      animTime,
+      wdw.worldlinePulseWidth,
+      DEFAULT_STREAMLINE_INPUT.splatRadius,
+      gridSize,
+      this.pulseIntensityScratch!
+    )
   }
 
   /** Expose the canonical clock order for tests + debugging. */
@@ -292,6 +367,17 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     this.srmt.adoptFrom(source.srmt)
     this.srmtSweep.adoptFrom(source.srmtSweep)
     this.lastWorldlineEnabled = source.lastWorldlineEnabled
+    this.lastRenderDynamicRange = source.lastRenderDynamicRange
+    this.workingDensity = source.workingDensity
+    this.baselineDensity = source.baselineDensity
+    this.baselineAlpha = source.baselineAlpha
+    this.pulseIntensityScratch = source.pulseIntensityScratch
+    this.pulseIntensityGridSig = source.pulseIntensityGridSig
+    this.baselineGridSize = source.baselineGridSize
+    source.workingDensity = null
+    source.baselineDensity = null
+    source.baselineAlpha = null
+    source.pulseIntensityScratch = null
     source.densityTexture = null
     source.densityTextureView = null
     source.transferredOut = true
@@ -310,6 +396,12 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     this.srmt.dispose()
     this.srmtSweep.dispose()
     this.lastWorldlineEnabled = false
+    this.workingDensity = null
+    this.baselineDensity = null
+    this.baselineAlpha = null
+    this.pulseIntensityScratch = null
+    this.pulseIntensityGridSig = ''
+    this.baselineGridSize = 0
   }
 
   /** Accessor for UI + tests that need to trigger a sweep via the coordinator. */

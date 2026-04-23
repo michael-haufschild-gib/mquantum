@@ -125,47 +125,99 @@ async function assertSolverParity(
   expect(m.normalisedRelDiff).toBeLessThan(tolerance)
 }
 
-describe.skipIf(!validatorAvailable)('Wheeler-DeWitt JS↔Rust pointwise comparison', () => {
-  // Skip reason for the skipped describe block surfaces in vitest output:
-  //   "Wheeler-DeWitt JS↔Rust pointwise comparison · skipped"
-  // To regenerate the validator binary: `pnpm wasm:build:validator`.
+// Phase 5 + 5b landed: the Rust validator now ports the Langer-uniform HH /
+// Vilenkin seeds for all three regimes — `V > 0` (Langer-uniform Ai /
+// Ai + i·Bi), `V = 0` (exact Bessel-1/4), and `V < 0` (leading-WKB
+// outgoing / standing-wave). The CN-implicit ADI bulk propagator is also
+// ported. See `src/wasm/mdimension_core/src/wheeler_dewitt.rs` and
+// `src/wasm/mdimension_core/src/wdw_airy.rs`. Stage-2 / Stage-3 (deep
+// Euclidean WKB absorber + Airy overwrite) are intentionally NOT ported:
+// they are numerical post-processing layers applied only past the turning
+// surface in the TS path. The V>0 parity regimes below therefore restrict
+// `aMax < a_turn(0) = 1/√(K·V(0))` so Stage-2/3 never engage and the raw
+// CN-ADI outputs can be compared pointwise.
+const rustValidatorMatchesPhase2Js = true
+describe.skipIf(!validatorAvailable || !rustValidatorMatchesPhase2Js)(
+  'Wheeler-DeWitt JS↔Rust pointwise comparison',
+  () => {
+    it('matches in the free regime (m=0, Λ=0) within 1e-5 normalised', async () => {
+      // Pure free Wheeler–DeWitt: V(φ) ≡ 0, no turning surface, no Stage-2/3.
+      // 128 × 17² grid is the user-specified comparison shape.
+      await assertSolverParity(
+        {
+          boundaryCondition: 'noBoundary',
+          inflatonMass: 0,
+          cosmologicalConstant: 0,
+          aMin: 0.05,
+          aMax: 1.4,
+          gridNa: 128,
+          gridNphi: 17,
+          phiExtent: 2.5,
+        },
+        1e-5
+      )
+    })
 
-  it('matches in the free regime (m=0, Λ=0) within 1e-5 normalised', async () => {
-    // Pure free Wheeler–DeWitt: V(φ) ≡ 0, no turning surface, no Stage-2/3.
-    // 128 × 17² grid is the user-specified comparison shape.
-    await assertSolverParity(
-      {
-        boundaryCondition: 'noBoundary',
-        inflatonMass: 0,
-        cosmologicalConstant: 0,
-        aMin: 0.05,
-        aMax: 1.4,
-        gridNa: 128,
-        gridNphi: 17,
-        phiExtent: 2.5,
-      },
-      1e-5
-    )
-  })
+    it('matches in the AdS regime (m=0, Λ=-0.5) within 1e-5 normalised', async () => {
+      // Pure anti-de Sitter: V(φ) ≡ Λ < 0 everywhere, no turning surface,
+      // pure Lorentzian column, no Stage-2/3 overwrite.
+      await assertSolverParity(
+        {
+          boundaryCondition: 'noBoundary',
+          inflatonMass: 0,
+          cosmologicalConstant: -0.5,
+          aMin: 0.05,
+          aMax: 1.4,
+          gridNa: 128,
+          gridNphi: 17,
+          phiExtent: 2.5,
+        },
+        1e-5
+      )
+    })
 
-  it('matches in the AdS regime (m=0, Λ=-0.5) within 1e-5 normalised', async () => {
-    // Pure anti-de Sitter: V(φ) ≡ Λ < 0 everywhere, no turning surface,
-    // pure Lorentzian column, no Stage-2/3 overwrite.
-    await assertSolverParity(
-      {
-        boundaryCondition: 'noBoundary',
-        inflatonMass: 0,
-        cosmologicalConstant: -0.5,
-        aMin: 0.05,
-        aMax: 1.4,
-        gridNa: 128,
-        gridNphi: 17,
-        phiExtent: 2.5,
-      },
-      1e-5
-    )
-  })
-})
+    it('matches in the pure-Lorentzian dS regime (m=0, Λ=0.1, aMax<a_turn) within 1e-5', async () => {
+      // V(φ) ≡ Λ = 0.1 > 0. Turning surface at a = 1/√(K·V) =
+      // 1/√(8π/3·0.1) ≈ 1.093. `aMax = 1.0` stays strictly Lorentzian, so
+      // Stage-2 (transition band) and Stage-3 (deep Euclidean Airy
+      // overwrite) never engage and the raw CN-ADI output is what both
+      // implementations produce. The seed uses the Langer-uniform Ai
+      // combination (Phase 5b) on both sides.
+      await assertSolverParity(
+        {
+          boundaryCondition: 'noBoundary',
+          inflatonMass: 0,
+          cosmologicalConstant: 0.1,
+          aMin: 0.05,
+          aMax: 1.0,
+          gridNa: 128,
+          gridNphi: 17,
+          phiExtent: 2.5,
+        },
+        1e-5
+      )
+    })
+
+    it('matches Vilenkin in the pure-Lorentzian dS regime (m=0, Λ=0.1, aMax<a_turn) within 1e-5', async () => {
+      // Same V>0 Lorentzian geometry as above but with the Vilenkin seed —
+      // selects the outgoing `Ai + i·Bi` Langer combination. Exercises the
+      // complex-valued branch of the Phase 5b Rust port.
+      await assertSolverParity(
+        {
+          boundaryCondition: 'tunneling',
+          inflatonMass: 0,
+          cosmologicalConstant: 0.1,
+          aMin: 0.05,
+          aMax: 1.0,
+          gridNa: 128,
+          gridNphi: 17,
+          phiExtent: 2.5,
+        },
+        1e-5
+      )
+    })
+  }
+)
 
 describe.skipIf(validatorAvailable)(
   'Wheeler-DeWitt JS↔Rust comparison (skipped — validator missing)',

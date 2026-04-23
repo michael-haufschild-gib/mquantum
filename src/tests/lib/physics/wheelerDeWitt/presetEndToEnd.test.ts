@@ -407,6 +407,20 @@ describe('WDW preset end-to-end pipeline', () => {
       })
 
       it('PDE residual on Lorentzian + deep-Euclidean stencils stays small', () => {
+        // SELF-REFERENTIAL (Phase 1 migration note): `wdwOperatorResidual`
+        // checks that the solver's output is a self-consistent PDE
+        // solution — not that it matches the physical BC the preset
+        // selected. A Bi-branch-contaminated χ or a
+        // φ-translation-broken χ can both satisfy this check. See
+        // `docs/plans/wdw-solver-physics-correctness.md` Finding 3.
+        // The authoritative per-regime physics check is
+        // `exactSolutionAgreement.test.ts`; per-preset authoritative
+        // checks arrive in Phase 4 (1e-3 RMS tolerance on the
+        // interior-cell-only subset).
+        //
+        // Retained here as coarse sanity: catches NaN / Inf / zero
+        // output, and catches gross mis-configurations like wrong c_U.
+        //
         // `wdwOperatorResidual` plugs the solver output back into the
         // Wheeler–DeWitt equation and returns the L² norm of the
         // residual, normalised against ‖U·χ‖₂ over the measurement
@@ -435,7 +449,15 @@ describe('WDW preset end-to-end pipeline', () => {
         // Residual IS allowed to be zero (no measurable cells) on tiny
         // grids, but not NaN. Positive-and-small is the production shape.
         expect(residual).toBeGreaterThanOrEqual(0)
-        expect(residual).toBeLessThan(0.35)
+        // Phase 3 rebaseline: the CN-implicit scheme's discrete
+        // residual against the *continuous* pointwise operator is
+        // `O(1)` rather than the explicit scheme's `O(0.01)`. See
+        // `solver.test.ts::WdW operator residual` for the derivation.
+        // Preset-sweep tolerance set generously to catch gross
+        // mis-configuration / NaN / Inf; per-preset authoritative
+        // physics checks arrive in Phase 4 (exactSolutionAgreement
+        // against restricted-regime references).
+        expect(residual).toBeLessThan(10)
       })
 
       it('density + streamline overlay blend stays in [0, 1]', () => {

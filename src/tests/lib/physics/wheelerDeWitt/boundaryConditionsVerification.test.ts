@@ -32,6 +32,11 @@ import {
 } from '@/lib/physics/wheelerDeWitt/boundaryConditions'
 import { WDW_C_U, WDW_G_PREFACTOR, wdwTurningA, wdwU } from '@/lib/physics/wheelerDeWitt/constants'
 import {
+  columnSolutionNegativeV,
+  columnSolutionPositiveV,
+  columnSolutionZeroV,
+} from '@/lib/physics/wheelerDeWitt/exactColumnSolution'
+import {
   resetCflWarningBudget,
   solveWheelerDeWitt,
   wdwOperatorResidual,
@@ -52,7 +57,14 @@ const LORENTZIAN_DS = {
 }
 
 describe('Tunneling BC: outgoing-wave phase sign at a_min', () => {
-  it('χ′/χ has Im > 0 on the central column (outgoing = +a direction)', () => {
+  it('χ′/χ has Im > 0 on the central column and matches Langer-uniform reference', () => {
+    // Phase 2: the Vilenkin seed is now the Langer-uniform outgoing
+    // combination `(ζ/U)^{1/4}·(Ai(ζ) + i·Bi(ζ))`. The leading-WKB
+    // prediction `Im(χ′/χ) = +√|U|` is the |ζ| → ∞ asymptotic limit
+    // only; at the typical `a_min = 0.05, Λ = 0.5` cell `|ζ| ≈ 1.7`,
+    // where the Langer form has an O(1/ζ³/²) correction (~2%) relative
+    // to leading WKB. Test against the exact Langer reference and also
+    // verify it sits within the leading-WKB tolerance band.
     const { chi, chiDeriv } = vilenkinBoundary(LORENTZIAN_DS)
     const { Nphi, aMin, mass, lambda } = LORENTZIAN_DS
     const c = (Nphi - 1) >> 1
@@ -62,35 +74,47 @@ describe('Tunneling BC: outgoing-wave phase sign at a_min', () => {
     const dre = chiDeriv[2 * idx]!
     const dim = chiDeriv[2 * idx + 1]!
 
-    // (χ′ / χ) = (d · conj(χ)) / |χ|²
+    // (χ′ / χ) = (χ′ · conj(χ)) / |χ|²
     const denom = cre * cre + cim * cim
     expect(denom).toBeGreaterThan(1e-12)
     const ratioRe = (dre * cre + dim * cim) / denom
     const ratioIm = (dim * cre - dre * cim) / denom
 
-    // Closed-form expected values from boundaryConditions.ts:171-184:
-    //   Im(χ′/χ) = +√|U(a_min, 0, 0)|   (outgoing WKB branch)
-    //   Re(χ′/χ) = −(∂_a|U|)/(4·|U|)    (prefactor |U|^{−1/4} logarithmic deriv)
+    // Langer-uniform reference: build the Ai + i·Bi seed directly and
+    // compute the same ratio from its analytic derivative.
+    const reSample = columnSolutionPositiveV({ a: aMin, phi1: 0, phi2: 0, m: mass, lambda }, 1, 0)
+    const imSample = columnSolutionPositiveV({ a: aMin, phi1: 0, phi2: 0, m: mass, lambda }, 0, 1)
+    const refCre = reSample.chi.re
+    const refCim = imSample.chi.re
+    const refDre = reSample.dChi.re
+    const refDim = imSample.dChi.re
+    const refDen = refCre * refCre + refCim * refCim
+    const refRatioRe = (refDre * refCre + refDim * refCim) / refDen
+    const refRatioIm = (refDim * refCre - refDre * refCim) / refDen
+
+    // Sign: the outgoing (+a) branch selection.
+    expect(ratioIm).toBeGreaterThan(0)
+
+    // Exact Langer-uniform match (f32-storage tolerance, ~1e-4 relative).
+    expect(ratioIm).toBeCloseTo(refRatioIm, 3)
+    expect(ratioRe).toBeCloseTo(refRatioRe, 3)
+
+    // Leading-WKB check: the Langer ratio should sit within ~5 % of the
+    // asymptotic `+√|U|` / `−(∂_a|U|)/(4|U|)` expressions. A regression
+    // that flipped the Vilenkin sign (c₂ = +i → c₂ = −i) would fail the
+    // positivity check above; a regression that broke the Langer
+    // derivative chain-rule would fail this bounds check without
+    // necessarily breaking the exact-reference match.
     const U0 = wdwU(aMin, 0, 0, mass, lambda)
     expect(U0).toBeLessThan(0)
     const absU = -U0
     const a2 = aMin * aMin
-    // V(0,0) = Λ when m=0.
-    const V = lambda
-    // ∂_a U = −2·c_U·a·(1 − 2·K·V·a²) — see boundaryConditions.ts:177
+    const V = lambda // V(0,0) = Λ at m = 0.
     const dUda = -2 * WDW_C_U * aMin * (1 - 2 * WDW_G_PREFACTOR * V * a2)
-    const expectedIm = Math.sqrt(absU)
-    const expectedRe = -(-dUda) / (4 * absU)
-
-    // Sign of the imaginary part is the load-bearing assertion — that is
-    // what selects the outgoing branch. A test that only checks magnitude
-    // would pass for the incoming (−√|U|) branch too.
-    // Float32Array storage caps precision at ~1e-6 relative; use digits=5
-    // so the assertion is tight enough to catch wrong-sign or
-    // wrong-formula regressions but loose enough to tolerate f32 rounding.
-    expect(ratioIm).toBeGreaterThan(0)
-    expect(ratioIm).toBeCloseTo(expectedIm, 5)
-    expect(ratioRe).toBeCloseTo(expectedRe, 5)
+    const wkbIm = Math.sqrt(absU)
+    const wkbRe = -(-dUda) / (4 * absU)
+    expect(Math.abs(ratioIm - wkbIm) / Math.abs(wkbIm)).toBeLessThan(0.05)
+    expect(Math.abs(ratioRe - wkbRe) / Math.abs(wkbRe)).toBeLessThan(0.05)
   })
 })
 
@@ -238,6 +262,14 @@ describe('HH vs tunneling: marched imaginary amplitude differs as a diagnostic',
 
 describe('BC consistency: both HH and tunneling solve the WdW PDE', () => {
   it('wdwOperatorResidual is small on the Lorentzian band for both BCs', () => {
+    // SELF-REFERENTIAL (Phase 1 migration note): see
+    // `docs/plans/wdw-solver-physics-correctness.md` Finding 3. A small
+    // residual here does not imply the solver satisfies the HH or
+    // Vilenkin boundary condition — any self-consistent PDE solution
+    // (including Bi-branch contaminated HH) passes. The reference-
+    // comparison test is `exactSolutionAgreement.test.ts`; retained
+    // here as coarse sanity.
+    //
     // Run both BCs on the same de-Sitter background. Residual is the
     // natural "is this a valid WdW wavefunction" metric — it replaces
     // the naive superposition identity, which doesn't hold at a_min
@@ -306,5 +338,158 @@ describe('buildWdwBoundary dispatch: tunneling preserves outgoing sign', () => {
     // for rounding while catching regressions that zero the imaginary
     // derivative.
     expect(maxVilenkinDerivIm).toBeGreaterThan(0.5)
+  })
+})
+
+describe('Langer-uniform HH seed: pure Ai branch selection (Phase 2)', () => {
+  // The Hartle-Hawking proposal's defining selection is the **pure Ai
+  // branch** of the Langer-uniform Airy form. Equivalently, fitting the
+  // seed at a column (a_min, φ) against the basis `{Ai(ζ), Bi(ζ)}`
+  // must give `|c₂/c₁| < ε` for some small ε — the old leading-WKB
+  // seed gave ε ≈ 0.53 (53 % Bi contamination, see plan §Finding 1).
+  // The new seed gives `c₂ = 0` by construction; we assert that here.
+  it('hartleHawkingBoundary fits the pure Ai branch (c₂/c₁ = 0) on V>0 columns', () => {
+    // Set up a grid with every cell in the V > 0 regime (no V=0 branch
+    // cells). Config: m=0, Λ=0.5, aMin=0.1 → V ≡ 0.5, a_turn ≈ 0.489,
+    // so a_min = 0.1 < a_turn (Lorentzian seed) and ζ ≈ -1.7 (not
+    // asymptotic — any leading-WKB seed would show measurable Bi
+    // admixture).
+    const input = { Nphi: 17, phiExtent: 1.0, aMin: 0.1, mass: 0, lambda: 0.5 }
+    const { chi, chiDeriv } = hartleHawkingBoundary(input)
+
+    const c = (input.Nphi - 1) >> 1
+    const idx = c * input.Nphi + c
+
+    const refAi = columnSolutionPositiveV(
+      { a: input.aMin, phi1: 0, phi2: 0, m: input.mass, lambda: input.lambda },
+      1,
+      0
+    )
+    const refBi = columnSolutionPositiveV(
+      { a: input.aMin, phi1: 0, phi2: 0, m: input.mass, lambda: input.lambda },
+      0,
+      1
+    )
+
+    // Two-coefficient fit: find (c1, c2) minimising
+    //   (chi  − c1·refAi.chi.re − c2·refBi.chi.re)²
+    // + (dChi − c1·refAi.dChi.re − c2·refBi.dChi.re)².
+    // Closed-form least squares on a 2×2 system.
+    const M11 = refAi.chi.re ** 2 + refAi.dChi.re ** 2
+    const M22 = refBi.chi.re ** 2 + refBi.dChi.re ** 2
+    const M12 = refAi.chi.re * refBi.chi.re + refAi.dChi.re * refBi.dChi.re
+    const y1 = chi[2 * idx]! * refAi.chi.re + chiDeriv[2 * idx]! * refAi.dChi.re
+    const y2 = chi[2 * idx]! * refBi.chi.re + chiDeriv[2 * idx]! * refBi.dChi.re
+    const det = M11 * M22 - M12 * M12
+    expect(Math.abs(det)).toBeGreaterThan(1e-6)
+    const c1 = (M22 * y1 - M12 * y2) / det
+    const c2 = (-M12 * y1 + M11 * y2) / det
+    // c1 should be ~1 (pure Ai); c2 should be ~0 (no Bi). Tolerance
+    // covers f32 storage noise (~1e-6 relative).
+    expect(c1).toBeCloseTo(1, 4)
+    expect(Math.abs(c2)).toBeLessThan(1e-4)
+  })
+})
+
+describe('Langer-uniform seeds: reduction to classical instanton at small a (Phase 2)', () => {
+  // At a → 0⁺ (well below the turning surface) the Lorentzian Langer
+  // variable ζ → ζ₀ < 0 finite, Ai(ζ₀) is finite, U → 0 so the
+  // prefactor (ζ/U)^{1/4} → ∞ as a^{-1/2}. The physical Ψ = χ/a^{3/2}
+  // remains finite; the χ blow-up is an artefact of the χ = a^{3/2}·Ψ
+  // reduction. We assert the decaying-branch Euclidean signature:
+  // for V > 0 cells past a_turn, the Langer-Ai form decays like
+  // |U|^{-1/4}·(1/(2√π))·exp(-S_E). That matches the leading-WKB
+  // envelope in the deep Euclidean limit.
+  it('HH seed at a > a_turn matches the Euclidean decaying branch', () => {
+    // Pick V, a so a_min is well past a_turn → column is Euclidean.
+    // V = 5, a_min = 0.8: a_turn(V=5) = 1/√(K·5) = 1/√(4.19) ≈ 0.489.
+    // So a_min = 0.8 > a_turn — Euclidean regime.
+    const input = { Nphi: 5, phiExtent: 0.5, aMin: 0.8, mass: 0, lambda: 5.0 }
+    const { chi, chiDeriv } = hartleHawkingBoundary(input)
+    const c = (input.Nphi - 1) >> 1
+    const idx = c * input.Nphi + c
+    const seed = chi[2 * idx]!
+    const dSeed = chiDeriv[2 * idx]!
+    // Reference: Ai(ζ) with ζ > 0 decays exponentially — pure
+    // decaying branch. A test that sampled the Bi contaminated
+    // growing branch would detect it here as seed magnitude well
+    // above the Ai prediction.
+    const ref = columnSolutionPositiveV(
+      { a: input.aMin, phi1: 0, phi2: 0, m: input.mass, lambda: input.lambda },
+      1,
+      0
+    )
+    expect(seed).toBeCloseTo(ref.chi.re, 5)
+    expect(dSeed).toBeCloseTo(ref.dChi.re, 5)
+    // Decaying branch: derivative sign is negative (Ai(ζ) is positive
+    // and decreasing for ζ > 0), consistent with the Euclidean decaying
+    // classical instanton.
+    expect(seed).toBeGreaterThan(0)
+    expect(dSeed).toBeLessThan(0)
+  })
+})
+
+describe('Langer-uniform seeds: three-regime continuity (Phase 2)', () => {
+  // The V > 0, V = 0, V < 0 regimes are dispatched to three different
+  // forms (Langer-Ai, Bessel-¼, leading-WKB-cos). On a grid that
+  // spans the V = 0 boundary, the seed magnitudes across adjacent
+  // cells should be within the same order of magnitude — any
+  // regression that introduced a step-discontinuity at a regime
+  // boundary would be caught here.
+  it('HH seed magnitudes are of the same order across a V-sign boundary', () => {
+    // m = 1.0, Λ = -0.3, phiExtent = 1.5 → V(φ=0) = -0.3 < 0 (inner
+    // cells), V(φ=1) = 0.5·1·2 − 0.3 = 0.7 > 0 (outer cells).
+    // Crossing occurs at |φ|² = 0.6 → |φ| ≈ 0.775.
+    const input = { Nphi: 21, phiExtent: 1.5, aMin: 0.1, mass: 1.0, lambda: -0.3 }
+    const { chi } = hartleHawkingBoundary(input)
+    // Walk across the central row; collect |χ| on cells whose V
+    // changes sign. Expect the amplitudes to stay within an order of
+    // magnitude across the crossing.
+    const cMid = (input.Nphi - 1) >> 1
+    let maxAmp = 0
+    let minAmp = Infinity
+    for (let i1 = 0; i1 < input.Nphi; i1++) {
+      const amp = Math.abs(chi[2 * (i1 * input.Nphi + cMid)]!)
+      if (amp > 1e-8) {
+        if (amp > maxAmp) maxAmp = amp
+        if (amp < minAmp) minAmp = amp
+      }
+    }
+    // Wide band (factor 100) — the V>0 Langer-Ai and V<0 Gaussian·cos
+    // gauge differ by O(1) but not by orders of magnitude.
+    expect(maxAmp / minAmp).toBeLessThan(100)
+    expect(maxAmp).toBeGreaterThan(0)
+  })
+
+  it('Vilenkin seed magnitudes are finite and nonzero across all three regimes', () => {
+    // Free case: V ≡ 0 everywhere.
+    const freeInput = { Nphi: 7, phiExtent: 1.0, aMin: 0.1, mass: 0, lambda: 0 }
+    const free = vilenkinBoundary(freeInput)
+    let maxFreeIm = 0
+    for (let i = 1; i < free.chi.length; i += 2) {
+      const v = Math.abs(free.chi[i] ?? 0)
+      if (v > maxFreeIm) maxFreeIm = v
+    }
+    // V = 0 Vilenkin = env · √a · H^{(1)}_{1/4}(3πa²). Im = env · √a · Y.
+    // Reference at origin: columnSolutionZeroV with A=1, B=i.
+    const freeRef = columnSolutionZeroV(freeInput.aMin, { re: 1, im: 0 }, { re: 0, im: 1 })
+    expect(maxFreeIm).toBeGreaterThan(Math.abs(freeRef.chi.im) * 0.1)
+    expect(Number.isFinite(maxFreeIm)).toBe(true)
+
+    // Pure AdS (V < 0 everywhere).
+    const adsInput = { Nphi: 7, phiExtent: 1.0, aMin: 0.1, mass: 0, lambda: -0.5 }
+    const ads = vilenkinBoundary(adsInput)
+    let maxAdsIm = 0
+    for (let i = 1; i < ads.chi.length; i += 2) {
+      const v = Math.abs(ads.chi[i] ?? 0)
+      if (v > maxAdsIm) maxAdsIm = v
+    }
+    const adsRef = columnSolutionNegativeV(
+      { a: adsInput.aMin, phi1: 0, phi2: 0, m: 0, lambda: -0.5 },
+      { re: 1, im: 0 },
+      { re: 0, im: 1 }
+    )
+    expect(maxAdsIm).toBeGreaterThan(Math.abs(adsRef.chi.im) * 0.1)
+    expect(Number.isFinite(maxAdsIm)).toBe(true)
   })
 })
