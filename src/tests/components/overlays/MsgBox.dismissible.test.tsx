@@ -17,39 +17,8 @@ import { MsgBox } from '@/components/overlays/MsgBox'
 import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
 import { useMsgBoxStore } from '@/stores/msgBoxStore'
 
-// Mock localStorage
-const localStorageMock = (() => {
-  let store: Record<string, string> = {}
-  return {
-    getItem: vi.fn((key: string) => store[key] ?? null),
-    setItem: vi.fn((key: string, value: string) => {
-      store[key] = value
-    }),
-    removeItem: vi.fn((key: string) => {
-      delete store[key]
-    }),
-    clear: vi.fn(() => {
-      store = {}
-    }),
-    get length() {
-      return Object.keys(store).length
-    },
-    key: vi.fn((index: number) => Object.keys(store)[index] ?? null),
-  }
-})()
-
-Object.defineProperty(window, 'localStorage', { value: localStorageMock })
-
-// Mock HTMLDialogElement methods not available in happy-dom
-// We need to set the 'open' attribute for the dialog to be accessible
-beforeEach(() => {
-  HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
-    this.setAttribute('open', '')
-  })
-  HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) {
-    this.removeAttribute('open')
-  })
-})
+// localStorage and HTMLDialogElement mocks are provided globally by
+// installDOMMocks() in src/tests/setup.ts.
 
 describe('MsgBox dismissible (invariants)', () => {
   beforeEach(() => {
@@ -66,7 +35,7 @@ describe('MsgBox dismissible (invariants)', () => {
     useDismissedDialogsStore.setState({
       dismissedIds: new Set<string>(),
     })
-    localStorageMock.clear()
+    localStorage.clear()
     vi.clearAllMocks()
   })
 

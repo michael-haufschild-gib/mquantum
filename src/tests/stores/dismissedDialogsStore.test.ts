@@ -12,36 +12,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DIALOG_IDS, useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
 
-// Mock localStorage
-const localStorageMock = (() => {
-  let store: Record<string, string> = {}
-  return {
-    getItem: vi.fn((key: string) => store[key] ?? null),
-    setItem: vi.fn((key: string, value: string) => {
-      store[key] = value
-    }),
-    removeItem: vi.fn((key: string) => {
-      delete store[key]
-    }),
-    clear: vi.fn(() => {
-      store = {}
-    }),
-    get length() {
-      return Object.keys(store).length
-    },
-    key: vi.fn((index: number) => Object.keys(store)[index] ?? null),
-  }
-})()
-
-Object.defineProperty(window, 'localStorage', { value: localStorageMock })
-
 describe('dismissedDialogsStore', () => {
   beforeEach(() => {
-    // Reset store state before each test
+    // Reset store state before each test.
+    // localStorage is provided globally by installDOMMocks() in src/tests/setup.ts.
     useDismissedDialogsStore.setState({
       dismissedIds: new Set<string>(),
     })
-    localStorageMock.clear()
+    localStorage.clear()
     vi.clearAllMocks()
   })
 
