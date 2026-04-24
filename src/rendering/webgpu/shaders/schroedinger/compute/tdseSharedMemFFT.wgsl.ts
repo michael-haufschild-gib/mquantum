@@ -45,15 +45,12 @@ export const tdseSharedMemFFTBlock = /* wgsl */ `
 @group(0) @binding(0) var<uniform> axisUni: FFTAxisUniforms;
 @group(0) @binding(1) var<storage, read_write> complexBuf: array<f32>;
 
-// Ping-pong shared memory buffers. Max N=128 → 128 vec2f = 1024 bytes each.
-// Total workgroup storage: 2048 bytes (well under 16KB limit).
-var<workgroup> smemA: array<vec2f, 128>;
-var<workgroup> smemB: array<vec2f, 128>;
+const SM_FFT_TWO_PI: f32 = 6.28318530717958647692;
 
-fn twiddle_sm(k: u32, N: u32, direction: f32) -> vec2f {
-  let angle = -direction * 2.0 * 3.14159265358979323846 * f32(k) / f32(N);
-  return vec2f(cos(angle), sin(angle));
-}
+// Unified ping-pong shared memory: A at [0..128), B at [128..256).
+// 256 * 8 = 2048 bytes — well under the 16 KB workgroup storage cap.
+// Avoids per-stage A/B selection branches by indexing a single flat buffer.
+var<workgroup> smem: array<vec2f, 256>;
 
 fn cmul_sm(a: vec2f, b: vec2f) -> vec2f {
   return vec2f(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
@@ -66,90 +63,84 @@ fn main(
 ) {
   let tid = lid.x;
   let N = axisUni.axisDim;
-  let halfN = N / 2u;
+  let halfN = N >> 1u;
   let log2N = axisUni.log2N;
   let pencilId = wgid.x;
 
-  // Decompose pencilId into batch-outer and batch-inner components
-  // to compute the global memory base offset for this pencil.
-  let batchInner = pencilId % axisUni.axisStride;
-  let batchOuter = pencilId / axisUni.axisStride;
-  let outerStride = axisUni.axisStride * N;
+  // axisStride is a product of power-of-2 grid dims → itself power of 2.
+  let axisStride = axisUni.axisStride;
+  let log2Stride = firstTrailingBit(axisStride);
+  let strideMask = axisStride - 1u;
+  let batchInner = pencilId & strideMask;
+  let batchOuter = pencilId >> log2Stride;
+  let outerStride = axisStride * N;
   let baseOffset = batchOuter * outerStride + batchInner;
 
-  // ── Load pencil from global memory into smemA ──
-  // Thread tid loads element tid (if tid < N).
-  // Each element is at global index: baseOffset + tid * axisStride
-  if (tid < N) {
-    let gAddr = (baseOffset + tid * axisUni.axisStride) * 2u;
-    smemA[tid] = vec2f(complexBuf[gAddr], complexBuf[gAddr + 1u]);
+  // ── Load pencil from global memory into smem[0..N) (A half). ──
+  // Loop: each thread handles ceil(N/64) elements. For N ≤ 64 only iteration
+  // i=tid runs; for N=128 each thread does 2 loads. Without this loop a
+  // workgroup_size(64) kernel silently drops elements 64..127 at N=128.
+  for (var i = tid; i < N; i = i + 64u) {
+    let gAddr = (baseOffset + i * axisStride) << 1u;
+    smem[i] = vec2f(complexBuf[gAddr], complexBuf[gAddr + 1u]);
   }
   workgroupBarrier();
 
-  // ── Butterfly stages ──
-  // Stockham auto-sort: read from src buffer, write to dst buffer.
-  // Stage 0: read smemA → write smemB
-  // Stage 1: read smemB → write smemA
-  // ...alternating per stage.
-  for (var s = 0u; s < log2N; s++) {
+  // ── Stage 0 (specialized). ──
+  // First butterfly has halfStage=1, so j = tid & 0 = 0 and the twiddle is
+  // W^0 = (1, 0). Skip the cos/sin and complex multiply entirely.
+  if (log2N > 0u && tid < halfN) {
+    let val0 = smem[tid];
+    let val1 = smem[tid + halfN];
+    // g = tid, fullStage = 2, j = 0 → outIdx0 = tid * 2.
+    let outIdx0 = tid << 1u;
+    smem[128u + outIdx0]       = val0 + val1;
+    smem[128u + outIdx0 + 1u]  = val0 - val1;
+  }
+  workgroupBarrier();
+
+  // ── Butterfly stages 1..log2N-1. ──
+  // Stage s reads from half ((s & 1) == 0 → A[0..128), else B[128..256)) and
+  // writes to the other half. srcBase/dstBase pre-computed per stage avoid
+  // per-butterfly branches over smemA vs smemB.
+  let inv_fullStage_base = -axisUni.direction * SM_FFT_TWO_PI;
+  for (var s = 1u; s < log2N; s = s + 1u) {
     let halfStage = 1u << s;
     let fullStage = halfStage << 1u;
+    let hsMask = halfStage - 1u;
+    let srcBase = (s & 1u) << 7u;         // 0 or 128
+    let dstBase = ((s + 1u) & 1u) << 7u;  // 128 or 0
+    // 1/fullStage is uniform across halfN butterfly threads — compute once.
+    let invFullStage = 1.0 / f32(fullStage);
+    let anglePerJ = inv_fullStage_base * invFullStage;
 
     if (tid < halfN) {
-      // Stockham decomposition: which group and position within group
-      let g = tid / halfStage;
-      let j = tid % halfStage;
+      // Stockham decomposition: g = tid >> s, j = tid & (halfStage-1).
+      let j = tid & hsMask;
+      // g * fullStage = ((tid >> s) << (s+1)) = (tid & ~hsMask) << 1.
+      let outIdx0 = ((tid & ~hsMask) << 1u) + j;
 
-      // Input indices (natural order from previous stage)
-      let inIdx0 = tid;
-      let inIdx1 = tid + halfN;
+      let val0 = smem[srcBase + tid];
+      let val1 = smem[srcBase + tid + halfN];
 
-      // Read from current source buffer
-      var val0: vec2f;
-      var val1: vec2f;
-      if (s % 2u == 0u) {
-        val0 = smemA[inIdx0];
-        val1 = smemA[inIdx1];
-      } else {
-        val0 = smemB[inIdx0];
-        val1 = smemB[inIdx1];
-      }
-
-      // Twiddle factor
-      let tw = twiddle_sm(j * (N / fullStage), N, axisUni.direction);
+      // Twiddle: W_N^{j*N/fullStage} = exp(-i·dir·2π·j/fullStage).
+      let angle = anglePerJ * f32(j);
+      let tw = vec2f(cos(angle), sin(angle));
       let twVal1 = cmul_sm(tw, val1);
 
-      // Butterfly outputs
-      let outTop = val0 + twVal1;
-      let outBot = val0 - twVal1;
-
-      // Stockham output indices (auto-sort reordering)
-      let outIdx0 = g * fullStage + j;
-      let outIdx1 = outIdx0 + halfStage;
-
-      // Write to destination buffer
-      if (s % 2u == 0u) {
-        smemB[outIdx0] = outTop;
-        smemB[outIdx1] = outBot;
-      } else {
-        smemA[outIdx0] = outTop;
-        smemA[outIdx1] = outBot;
-      }
+      smem[dstBase + outIdx0] = val0 + twVal1;
+      smem[dstBase + outIdx0 + halfStage] = val0 - twVal1;
     }
 
     workgroupBarrier();
   }
 
-  // ── Write result back to global memory ──
-  // After log2N stages, result is in smemA (even stages) or smemB (odd stages).
-  if (tid < N) {
-    let gAddr = (baseOffset + tid * axisUni.axisStride) * 2u;
-    var val: vec2f;
-    if (log2N % 2u == 0u) {
-      val = smemA[tid];
-    } else {
-      val = smemB[tid];
-    }
+  // ── Write result back to global memory. ──
+  // After log2N stages the result lives in half (log2N & 1).
+  let finalBase = (log2N & 1u) << 7u;
+  for (var i = tid; i < N; i = i + 64u) {
+    let gAddr = (baseOffset + i * axisStride) << 1u;
+    let val = smem[finalBase + i];
     complexBuf[gAddr] = val.x;
     complexBuf[gAddr + 1u] = val.y;
   }

@@ -60,13 +60,16 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
 
-  // Convert flat index to N-D lattice coordinates
+  // Lattice-coord decomposition. Strides are products of power-of-2 grid
+  // dims → shift/mask beats u32 divide/modulo here.
   var coords: array<f32, 12>;
   var rem = idx;
-  for (var d: u32 = 0u; d < tdseParams.latticeDim; d++) {
+  let ldim = tdseParams.latticeDim;
+  for (var d: u32 = 0u; d < ldim; d = d + 1u) {
     let stride = tdseParams.strides[d];
-    let ci = rem / stride;
-    rem = rem % stride;
+    let logStride = firstTrailingBit(stride);
+    let ci = rem >> logStride;
+    rem = rem & (stride - 1u);
     let halfExtent = f32(tdseParams.gridSize[d]) * tdseParams.spacing[d] * 0.5;
     coords[d] = f32(ci) * tdseParams.spacing[d] - halfExtent;
   }
@@ -75,30 +78,36 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let sqrtGammaDt = sqrt(sParams.gamma * sParams.dt);
   let halfGammaDt = 0.5 * sParams.gamma * sParams.dt;
   let normFactor = pow(
-    3.14159265 * sParams.sigma * sParams.sigma,
-    -f32(tdseParams.latticeDim) * 0.25
+    3.14159265358979323846 * sParams.sigma * sParams.sigma,
+    -f32(ldim) * 0.25
   );
 
-  // Compute W(x) = Σ_k L_k(x) · ξ_k (combined noise field at this site)
-  var noiseField: f32 = 0.0;
-  for (var k: u32 = 0u; k < sParams.numCollapseSites; k++) {
+  // Compute W(x) = normFactor · Σ_k exp(-d²/(2σ²)) · ξ_k.
+  // Factor normFactor out of the inner loop — one mul saved per collapse site.
+  // 6σ cutoff: beyond that exp(-18) ≈ 1.5e-8 is below f32 precision after the
+  // ξ·normFactor scaling. Must match the cutoff in tdseStochasticExpect so
+  // ⟨W⟩ and W(x) are computed from the same effective formula — otherwise the
+  // centering would be inconsistent and violate the martingale property.
+  let maxDistSq = 36.0 * sParams.sigma * sParams.sigma;
+  var rawSum: f32 = 0.0;
+  let nSites = sParams.numCollapseSites;
+  for (var k: u32 = 0u; k < nSites; k = k + 1u) {
     var distSq: f32 = 0.0;
-    for (var d: u32 = 0u; d < tdseParams.latticeDim; d++) {
+    for (var d: u32 = 0u; d < ldim; d = d + 1u) {
       let diff = coords[d] - getCenterCoord(k, d);
       distSq += diff * diff;
     }
-    let weight = normFactor * exp(-distSq * invTwoSigmaSq);
-    noiseField += weight * getCenterNoise(k);
+    if (distSq < maxDistSq) {
+      rawSum += exp(-distSq * invTwoSigmaSq) * getCenterNoise(k);
+    }
   }
+  let noiseField = normFactor * rawSum;
 
-  // Read ⟨W⟩ from the reduction result (computed by expect pass)
-  let expectW = expectResult[0];
-
-  // Centered noise field: removes the density-weighted mean
-  let wCentered = noiseField - expectW;
+  // Centered noise field: removes the density-weighted mean ⟨W⟩.
+  let wCentered = noiseField - expectResult[0];
 
   // Exponential Milstein discretization with centering:
-  //   ψ *= exp(√(γ·dt) · (W - ⟨W⟩) - (γ/2) · (W - ⟨W⟩)² · dt)
+  //   ψ *= exp(√(γ·dt)·(W − ⟨W⟩) − (γ/2)·(W − ⟨W⟩)²·dt)
   let factor = sqrtGammaDt * wCentered - halfGammaDt * wCentered * wCentered;
   let scale = exp(factor);
   psiRe[idx] = psiRe[idx] * scale;

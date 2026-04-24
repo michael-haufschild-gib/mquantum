@@ -46,37 +46,46 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
 
-  // Decompose linear index to N-D k-space coordinates
+  // Decompose linear index to N-D k-space coordinates.
+  // Every grid dim is a power of 2 → use shift/mask instead of u32 div/mod.
   var remaining = idx;
   var coords: array<u32, 12>;
-  for (var d: i32 = i32(esParams.latticeDim) - 1; d >= 0; d--) {
+  let ldim = esParams.latticeDim;
+  for (var d: i32 = i32(ldim) - 1; d >= 0; d = d - 1) {
     let du = u32(d);
-    coords[du] = remaining % esParams.gridSize[du];
-    remaining /= esParams.gridSize[du];
+    let n = esParams.gridSize[du];
+    let logN = firstTrailingBit(n);
+    coords[du] = remaining & (n - 1u);
+    remaining = remaining >> logN;
   }
 
   // Compute kinetic energy E(k) = ℏ²|k|²/(2m)
   var k2: f32 = 0.0;
-  for (var d: u32 = 0u; d < esParams.latticeDim; d++) {
+  for (var d: u32 = 0u; d < ldim; d = d + 1u) {
     let n = esParams.gridSize[d];
-    let halfN = n / 2u;
+    let halfN = n >> 1u;
     let kIdx = select(i32(coords[d]) - i32(n), i32(coords[d]), coords[d] < halfN);
     let kVal = esParams.kGridScale[d] * f32(kIdx);
     k2 += kVal * kVal;
   }
-  let ek = esParams.hbar * esParams.hbar * k2 / (2.0 * max(esParams.mass, 1e-6));
+  // Hoist the uniform-only ℏ²/(2m) prefactor — replaces per-thread divide with multiply.
+  let kineticCoef = (esParams.hbar * esParams.hbar) / (2.0 * max(esParams.mass, 1e-6));
+  let ek = k2 * kineticCoef;
 
   // Determine energy bin
   let eRange = esParams.eMax - esParams.eMin;
   if (eRange <= 0.0 || ek < esParams.eMin || ek > esParams.eMax) {
     return;
   }
-  let fBin = (ek - esParams.eMin) / eRange * f32(esParams.numBins);
+  // invRange once; multiply replaces divide per thread.
+  let invRange = f32(esParams.numBins) / eRange;
+  let fBin = (ek - esParams.eMin) * invRange;
   let bin = min(u32(floor(fBin)), esParams.numBins - 1u);
 
   // Read |φ(k)|² from interleaved complex buffer
-  let re = complexBuf[idx * 2u];
-  let im = complexBuf[idx * 2u + 1u];
+  let c = idx << 1u;
+  let re = complexBuf[c];
+  let im = complexBuf[c + 1u];
   let density = re * re + im * im;
 
   // Fixed-point encode and atomically accumulate

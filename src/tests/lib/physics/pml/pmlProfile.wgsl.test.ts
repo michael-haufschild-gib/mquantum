@@ -30,14 +30,16 @@ describe('pmlProfile WGSL block', () => {
 })
 
 describe('linearToND WGSL correctness', () => {
-  it('uses stride-based forward decomposition', () => {
-    // linearToND decomposes idx using precomputed strides:
-    //   coords[d] = remaining / strides[d]
-    //   remaining = remaining % strides[d]
-    // This is equivalent to repeated mod/div by gridSize (backward iteration)
-    // but uses strides for forward iteration, which the GPU compiler can optimize
-    // for power-of-2 grid sizes.
-    expect(freeScalarNDIndexBlock).toContain('remaining / s')
-    expect(freeScalarNDIndexBlock).toContain('remaining % s')
+  it('uses stride-based forward decomposition with power-of-2 shift/mask', () => {
+    // linearToND decomposes idx using precomputed strides. Every grid dim in
+    // the project is a power of two, so strides are too, and the runtime u32
+    // divide/modulo are lowered to a single shift and mask:
+    //   coords[d] = remaining >> log2(strides[d])
+    //   remaining = remaining & (strides[d] - 1)
+    // This is equivalent to `remaining / strides[d]` / `remaining % strides[d]`
+    // for power-of-2 strides but ~20× cheaper on GPU.
+    expect(freeScalarNDIndexBlock).toContain('firstTrailingBit(s)')
+    expect(freeScalarNDIndexBlock).toContain('remaining >> logS')
+    expect(freeScalarNDIndexBlock).toContain('remaining & (s - 1u)')
   })
 })

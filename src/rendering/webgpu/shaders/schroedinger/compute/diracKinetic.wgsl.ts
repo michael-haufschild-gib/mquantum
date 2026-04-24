@@ -62,18 +62,24 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Compute k-vector components with FFT frequency ordering
   var kVec: array<f32, 12>;
   var ck2: f32 = 0.0;
-  let TWO_PI: f32 = 6.28318530;
-  for (var d: u32 = 0u; d < latDim; d++) {
+  const DIRAC_K_TWO_PI: f32 = 6.28318530717958647692;
+  for (var d: u32 = 0u; d < latDim; d = d + 1u) {
     let gd = params.gridSize[d];
-    let halfN = gd / 2u;
+    let halfN = gd >> 1u;
     let kIdx = select(i32(coords[d]) - i32(gd), i32(coords[d]), coords[d] < halfN);
-    kVec[d] = f32(kIdx) * TWO_PI / (f32(gd) * params.spacing[d]);
-    let ck = c_hbar * kVec[d];
+    // Precompute 2π/L to replace divide with multiply.
+    let twoPiOverL = DIRAC_K_TWO_PI / (f32(gd) * params.spacing[d]);
+    let k_d = f32(kIdx) * twoPiOverL;
+    kVec[d] = k_d;
+    let ck = c_hbar * k_d;
     ck2 += ck * ck;
   }
 
-  // Energy: E = √((cℏ|k|)² + (mc²)²)
-  let E = sqrt(ck2 + mc2 * mc2);
+  // Energy: E = √((cℏ|k|)² + (mc²)²). Fuse via inverseSqrt so we can
+  // later form sin(E·dt/ℏ)/E as a multiply (avoids a second divide).
+  let E2 = ck2 + mc2 * mc2;
+  let invE = inverseSqrt(max(E2, 1e-40));
+  let E = E2 * invE;
 
   // Read spinor at this k-point into local arrays
   // Max spinor size is 64 (for 11D: S = 2^⌊(11+1)/2⌋ = 64)
@@ -144,11 +150,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   //   exp(-iH·dt/ℏ)·ψ = cos(E·dt/ℏ)·ψ - i·sin(E·dt/ℏ)·(H·ψ)/E
   let arg = E * dtOverHbar;
   // Reduce to [-π, π] so f32 cos/sin stay precise at high energies
-  let argReduced = arg - round(arg * 0.15915494) * 6.28318530;
+  const DIRAC_INV_TAU: f32 = 0.15915494309189535;
+  const DIRAC_TAU: f32     = 6.28318530717958647692;
+  let argReduced = arg - round(arg * DIRAC_INV_TAU) * DIRAC_TAU;
   let cosArg = cos(argReduced);
   let sinArg = sin(argReduced);
-  // Precompute sin(arg)/E to avoid per-component multiply
-  let sinOverE = select(sinArg / E, 0.0, E < 1e-20);
+  // sin(arg) * (1/E) using the hoisted invE — avoids a per-thread divide.
+  let sinOverE = select(sinArg * invE, 0.0, E < 1e-20);
 
   let T = params.totalSites;
   for (var sc: u32 = 0u; sc < S; sc++) {

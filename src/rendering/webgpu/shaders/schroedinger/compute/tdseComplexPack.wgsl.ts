@@ -44,8 +44,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (idx >= packUni.totalElements) {
     return;
   }
-  complexBuf[idx * 2u] = psiRe[idx];
-  complexBuf[idx * 2u + 1u] = psiIm[idx];
+  let c = idx << 1u;
+  complexBuf[c] = psiRe[idx];
+  complexBuf[c + 1u] = psiIm[idx];
 }
 `
 
@@ -72,8 +73,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
   // Apply 1/N normalization from inverse FFT
-  psiRe[idx] = complexBuf[idx * 2u] * packUni.invN;
-  psiIm[idx] = complexBuf[idx * 2u + 1u] * packUni.invN;
+  let c = idx << 1u;
+  let invN = packUni.invN;
+  psiRe[idx] = complexBuf[c] * invN;
+  psiIm[idx] = complexBuf[c + 1u] * invN;
 }
 `
 

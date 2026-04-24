@@ -27,6 +27,10 @@ export const tdseWriteGridBlock = /* wgsl */ `
 @group(0) @binding(3) var<storage, read> potential: array<f32>;
 @group(0) @binding(4) var outputTex: texture_storage_3d<rgba16float, write>;
 
+const TDSE_WG_PI:     f32 = 3.14159265358979323846;
+const TDSE_WG_TAU:    f32 = 6.28318530717958647692;
+const TDSE_WG_INV_TAU: f32 = 0.15915494309189535;
+
 // Compute the appropriate normalization scale for the active potential type.
 fn getPotentialScale() -> f32 {
   if (params.potentialType == 1u || params.potentialType == 5u) {
@@ -200,6 +204,7 @@ fn computeSuperfluidVelocityMagSq(
 ) -> f32 {
   let hbarOverM = params.hbar / max(params.mass, 1e-6);
   let densitySafe = max(density, 1e-20);
+  let invDensity = 1.0 / densitySafe;  // per-thread scalar, used inside axis loop
   let hasPML = params.absorberEnabled != 0u;
   var vsMagSq: f32 = 0.0;
   for (var d: u32 = 0u; d < params.latticeDim; d++) {
@@ -207,7 +212,8 @@ fn computeSuperfluidVelocityMagSq(
     let stride = params.strides[d];
     let coord = (*nnCoords)[d];
     let Nd = params.gridSize[d];
-    let invDx = 0.5 / params.spacing[d];
+    let invSpacing = 1.0 / params.spacing[d];
+    let invDx = 0.5 * invSpacing;
     let atLo = coord == 0u;
     let atHi = coord == Nd - 1u;
 
@@ -215,12 +221,12 @@ fn computeSuperfluidVelocityMagSq(
     var dIm: f32;
     if (hasPML && atLo) {
       let fIdx = idx + stride;
-      dRe = (psiRe[fIdx] - re) / params.spacing[d];
-      dIm = (psiIm[fIdx] - im) / params.spacing[d];
+      dRe = (psiRe[fIdx] - re) * invSpacing;
+      dIm = (psiIm[fIdx] - im) * invSpacing;
     } else if (hasPML && atHi) {
       let bIdx = idx - stride;
-      dRe = (re - psiRe[bIdx]) / params.spacing[d];
-      dIm = (im - psiIm[bIdx]) / params.spacing[d];
+      dRe = (re - psiRe[bIdx]) * invSpacing;
+      dIm = (im - psiIm[bIdx]) * invSpacing;
     } else {
       let fwdIdx = select(idx + stride, idx - stride * (Nd - 1u), atHi);
       let bwdIdx = select(idx - stride, idx + stride * (Nd - 1u), atLo);
@@ -228,7 +234,7 @@ fn computeSuperfluidVelocityMagSq(
       dIm = (psiIm[fwdIdx] - psiIm[bwdIdx]) * invDx;
     }
     let jd = hbarOverM * (re * dIm - im * dRe);
-    let vsd = jd / densitySafe;
+    let vsd = jd * invDensity;
     vsMagSq += vsd * vsd;
   }
   return vsMagSq;
@@ -285,7 +291,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     }
     let perpDist2 = max(dot(modelPos, modelPos) - projSq, 0.0);
     let perpSigma = bound * 0.06;
-    perpFalloff = exp(-perpDist2 / (2.0 * perpSigma * perpSigma));
+    let invTwoPerpSigma2 = 1.0 / (2.0 * perpSigma * perpSigma);
+    perpFalloff = exp(-perpDist2 * invTwoPerpSigma2);
   }
 
   let numCorners = 1u << min(params.latticeDim, 3u);
@@ -329,14 +336,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     re = blendedRe;
     im = blendedIm;
     density = blendedDensity;
-    phase = atan2(blendedIm, blendedRe) + 3.14159265;
+    phase = atan2(blendedIm, blendedRe) + TDSE_WG_PI;
     idx = nnIdx; // for potential overlay
   } else {
     idx = nnIdx;
     re = psiRe[idx];
     im = psiIm[idx];
     density = re * re + im * im;
-    phase = atan2(im, re) + 3.14159265;
+    phase = atan2(im, re) + TDSE_WG_PI;
   }
 
   let potentialVal = potential[idx];
@@ -348,7 +355,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (params.fieldView == 0u) {
     displayScalar = normDensityRaw;
   } else if (params.fieldView == 1u) {
-    displayScalar = phase / (2.0 * 3.14159265) * densityGate;
+    displayScalar = phase * TDSE_WG_INV_TAU * densityGate;
   } else if (params.fieldView == 2u) {
     // current magnitude via central differences (NN) with PML-aware boundaries
     var currentMagSq: f32 = 0.0;
@@ -361,7 +368,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       let stride = params.strides[d];
       let coord = nnCoords[d];
       let Nd = params.gridSize[d];
-      let invDx = 0.5 / params.spacing[d];
+      let invSpacing = 1.0 / params.spacing[d];
+      let invDx = 0.5 * invSpacing;
       let atLo = coord == 0u;
       let atHi = coord == Nd - 1u;
 
@@ -369,12 +377,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       var dIm: f32;
       if (hasPML && atLo) {
         let fIdx = idx + stride;
-        dRe = (psiRe[fIdx] - re) / params.spacing[d];
-        dIm = (psiIm[fIdx] - im) / params.spacing[d];
+        dRe = (psiRe[fIdx] - re) * invSpacing;
+        dIm = (psiIm[fIdx] - im) * invSpacing;
       } else if (hasPML && atHi) {
         let bIdx = idx - stride;
-        dRe = (re - psiRe[bIdx]) / params.spacing[d];
-        dIm = (im - psiIm[bIdx]) / params.spacing[d];
+        dRe = (re - psiRe[bIdx]) * invSpacing;
+        dIm = (im - psiIm[bIdx]) * invSpacing;
       } else {
         let fwdIdx = select(idx + stride, idx - stride * (Nd - 1u), atHi);
         let bwdIdx = select(idx - stride, idx + stride * (Nd - 1u), atLo);
@@ -442,8 +450,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (voxelIsInIsland(&nnCoords)) {
     displayScalar = displayScalar * params.islandBoost;
     phase = phase + 0.7853981633974483;
-    if (phase >= 6.283185307179586) {
-      phase = phase - 6.283185307179586;
+    if (phase >= TDSE_WG_TAU) {
+      phase = phase - TDSE_WG_TAU;
     }
   }
 

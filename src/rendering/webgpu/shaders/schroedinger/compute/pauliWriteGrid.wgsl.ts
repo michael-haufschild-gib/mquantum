@@ -55,6 +55,16 @@ fn totalDensityAt(siteIdx: u32, T: u32) -> f32 {
   return upDensityAt(siteIdx, T) + downDensityAt(siteIdx, T);
 }
 
+// Combined up + down density in one pass (vec2: up, down). Used by fieldView
+// 0 and 2 to avoid two separate function-call boundaries per corner.
+fn upDownDensityAt(siteIdx: u32, T: u32) -> vec2f {
+  let re0 = spinorRe[siteIdx];
+  let im0 = spinorIm[siteIdx];
+  let re1 = spinorRe[T + siteIdx];
+  let im1 = spinorIm[T + siteIdx];
+  return vec2f(re0 * re0 + im0 * im0, re1 * re1 + im1 * im1);
+}
+
 // Map N-D world position to lattice coordinates for trilinear interpolation.
 // Dims 0..min(latticeDim,3)-1 use trilinear (lo/hi + frac).
 // Dims >= 3 use nearest-neighbour (slice-fixed).
@@ -179,7 +189,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     }
     let perpDist2 = max(dot(modelPos, modelPos) - projSq, 0.0);
     let perpSigma = bound * 0.06;
-    perpFalloff = exp(-perpDist2 / (2.0 * perpSigma * perpSigma));
+    let invTwoPerpSigma2 = 1.0 / (2.0 * perpSigma * perpSigma);
+    perpFalloff = exp(-perpDist2 * invTwoPerpSigma2);
   }
 
   let T = params.totalSites;
@@ -197,7 +208,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Phase of spin-up component (NN, not interpolated)
   let re0nn = spinorRe[nnSite];
   let im0nn = spinorIm[nnSite];
-  let phase = atan2(im0nn, re0nn) + 3.14159265;
+  const PAULI_WG_PI: f32 = 3.14159265358979323846;
+  let phase = atan2(im0nn, re0nn) + PAULI_WG_PI;
 
   // Density scale: when autoScale is on, normalize by GPU-computed maxDensity;
   // when off, use a fixed scale of 1.0 so raw density values are displayed.
@@ -206,6 +218,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     select(params.densityScale, 1.0, params.densityScale <= 0.0),
     params.autoScale != 0u
   );
+  // 1/scale is uniform across threads — compute once, multiply below.
+  let invScale = 1.0 / max(scale, 1e-20);
+  let invScalePerp = invScale * perpFalloff;
 
   var outR: f32 = 0.0;
   var outG: f32 = 0.0;
@@ -215,18 +230,16 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (params.fieldView == 0u) {
     // spinDensity: R = |ψ_up|², G = |ψ_down|², B = phase, A = total
     // Aligned with Dirac dual-channel convention for raymarcher reuse
-    var blendUp: f32 = 0.0;
-    var blendDown: f32 = 0.0;
-    for (var corner: u32 = 0u; corner < numCorners; corner++) {
+    var blend: vec2f = vec2f(0.0, 0.0);
+    for (var corner: u32 = 0u; corner < numCorners; corner = corner + 1u) {
       let w = cornerWeight(&fracs, corner);
       if (w > 0.0) {
         let sIdx = siteIndexForCorner(&coordsLo, &coordsHi, corner);
-        blendUp += w * upDensityAt(sIdx, T);
-        blendDown += w * downDensityAt(sIdx, T);
+        blend = blend + w * upDownDensityAt(sIdx, T);
       }
     }
-    let upNorm = clamp(blendUp / scale * perpFalloff, 0.0, 1.0);
-    let downNorm = clamp(blendDown / scale * perpFalloff, 0.0, 1.0);
+    let upNorm = clamp(blend.x * invScalePerp, 0.0, 1.0);
+    let downNorm = clamp(blend.y * invScalePerp, 0.0, 1.0);
     outR = upNorm;
     outG = downNorm;
     outA = upNorm + downNorm;
@@ -235,14 +248,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // totalDensity: R = total, G = log(total), B = phase, A = total
     // Standard single-density path — compatible with all existing color algorithms
     var blendTotal: f32 = 0.0;
-    for (var corner: u32 = 0u; corner < numCorners; corner++) {
+    for (var corner: u32 = 0u; corner < numCorners; corner = corner + 1u) {
       let w = cornerWeight(&fracs, corner);
       if (w > 0.0) {
         let sIdx = siteIndexForCorner(&coordsLo, &coordsHi, corner);
         blendTotal += w * totalDensityAt(sIdx, T);
       }
     }
-    let norm = clamp(blendTotal / scale * perpFalloff, 0.0, 1.0);
+    let norm = clamp(blendTotal * invScalePerp, 0.0, 1.0);
     outR = norm;
     outG = log(norm + 1e-10);
     outA = norm;
@@ -251,20 +264,21 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // spinExpectation: R = spin-up fraction * density, G = spin-down fraction * density
     // B = phase, A = total. R+G = totalNorm always, so raymarcher sees correct opacity.
     // Color algo reconstructs σ_z = (R-G)/(R+G) for diverging blue/red mapping.
-    var blendUp: f32 = 0.0;
-    var blendDown: f32 = 0.0;
-    for (var corner: u32 = 0u; corner < numCorners; corner++) {
+    var blend: vec2f = vec2f(0.0, 0.0);
+    for (var corner: u32 = 0u; corner < numCorners; corner = corner + 1u) {
       let w = cornerWeight(&fracs, corner);
       if (w > 0.0) {
         let sIdx = siteIndexForCorner(&coordsLo, &coordsHi, corner);
-        blendUp += w * upDensityAt(sIdx, T);
-        blendDown += w * downDensityAt(sIdx, T);
+        blend = blend + w * upDownDensityAt(sIdx, T);
       }
     }
+    let blendUp = blend.x;
+    let blendDown = blend.y;
     let total = blendUp + blendDown;
-    let upFrac = select(blendUp / total, 0.5, total < 1e-20);
-    let downFrac = select(blendDown / total, 0.5, total < 1e-20);
-    let totalNorm = clamp(total / scale * perpFalloff, 0.0, 1.0);
+    let invTotal = select(1.0 / total, 0.0, total < 1e-20);
+    let upFrac = select(blendUp * invTotal, 0.5, total < 1e-20);
+    let downFrac = select(blendDown * invTotal, 0.5, total < 1e-20);
+    let totalNorm = clamp(total * invScalePerp, 0.0, 1.0);
     outR = upFrac * totalNorm;
     outG = downFrac * totalNorm;
     outA = totalNorm;
@@ -273,7 +287,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // coherence: R = |ψ_up* ψ_down|, G = log(coh), B = phase, A = coherence
     // Trilinear interpolation of coherence magnitude at each corner
     var blendCoh: f32 = 0.0;
-    for (var corner: u32 = 0u; corner < numCorners; corner++) {
+    for (var corner: u32 = 0u; corner < numCorners; corner = corner + 1u) {
       let w = cornerWeight(&fracs, corner);
       if (w > 0.0) {
         let sIdx = siteIndexForCorner(&coordsLo, &coordsHi, corner);
@@ -281,12 +295,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
         let im0c = spinorIm[sIdx];
         let re1c = spinorRe[T + sIdx];
         let im1c = spinorIm[T + sIdx];
+        // |ψ_up* ψ_down| = |vec2(coh_re, coh_im)|
         let cohReC = re0c * re1c + im0c * im1c;
         let cohImC = re0c * im1c - im0c * re1c;
-        blendCoh += w * sqrt(cohReC * cohReC + cohImC * cohImC);
+        blendCoh += w * length(vec2f(cohReC, cohImC));
       }
     }
-    let cohNorm = clamp(blendCoh / scale * perpFalloff, 0.0, 1.0);
+    let cohNorm = clamp(blendCoh * invScalePerp, 0.0, 1.0);
     outR = cohNorm;
     outG = log(cohNorm + 1e-10);
     outA = cohNorm;

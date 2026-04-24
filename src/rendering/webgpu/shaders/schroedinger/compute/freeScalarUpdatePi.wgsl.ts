@@ -60,8 +60,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   if (params.latticeDim == 3u) {
     // ── 3D fast path ──
-    // Avoids linearToND (2 integer divides + 2 modulos ≈ 80 cycles) by computing
-    // coordinates directly. Uses precomputed inverse spacing² instead of per-axis division.
+    // Strides are power-of-2; shift/mask beats divide/mul-sub by ~10× on
+    // every backend. Spacing divides replaced with pre-reciprocal multiplies.
     let s0 = params.strides[0];
     let s1 = params.strides[1];
     // s2 = 1 for C-order strides (row-major, last dim contiguous)
@@ -69,38 +69,40 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let N1 = params.gridSize[1];
     let N2 = params.gridSize[2];
 
-    // Coordinate decomposition using multiply-subtract (avoids integer division
-    // when the compiler can prove stride is power-of-2, otherwise still ~2× faster
-    // than the generic linearToND loop for 3 dimensions)
-    let c0 = idx / s0;
-    let r0 = idx - c0 * s0;
-    let c1 = r0 / s1;
-    let c2 = r0 - c1 * s1;
+    let log0 = firstTrailingBit(s0);
+    let log1 = firstTrailingBit(s1);
+    let c0 = idx >> log0;
+    let r0 = idx & (s0 - 1u);
+    let c1 = r0 >> log1;
+    let c2 = r0 & (s1 - 1u);
+
+    // 1/Δx² per axis — one reciprocal per axis, multiplies inside loops.
+    let invA2_0 = 1.0 / max(params.spacing[0] * params.spacing[0], 1e-12);
+    let invA2_1 = 1.0 / max(params.spacing[1] * params.spacing[1], 1e-12);
+    let invA2_2 = 1.0 / max(params.spacing[2] * params.spacing[2], 1e-12);
 
     // Axis 0 Laplacian
-    let a2_0 = max(params.spacing[0] * params.spacing[0], 1e-12);
     let fwd0 = select(idx + s0, idx - s0 * (N0 - 1u), c0 == N0 - 1u);
     let bwd0 = select(idx - s0, idx + s0 * (N0 - 1u), c0 == 0u);
-    let axialLap0 = (phi[fwd0] - 2.0 * phiCenter + phi[bwd0]) / a2_0;
+    let axialLap0 = (phi[fwd0] - 2.0 * phiCenter + phi[bwd0]) * invA2_0;
 
     // Axis 1 Laplacian
-    let a2_1 = max(params.spacing[1] * params.spacing[1], 1e-12);
     let fwd1 = select(idx + s1, idx - s1 * (N1 - 1u), c1 == N1 - 1u);
     let bwd1 = select(idx - s1, idx + s1 * (N1 - 1u), c1 == 0u);
-    axialLap1 = (phi[fwd1] - 2.0 * phiCenter + phi[bwd1]) / a2_1;
+    axialLap1 = (phi[fwd1] - 2.0 * phiCenter + phi[bwd1]) * invA2_1;
 
     // Axis 2 Laplacian (stride = 1 for the last C-order dimension)
-    let a2_2 = max(params.spacing[2] * params.spacing[2], 1e-12);
     let fwd2 = select(idx + 1u, idx - (N2 - 1u), c2 == N2 - 1u);
     let bwd2 = select(idx - 1u, idx + (N2 - 1u), c2 == 0u);
-    axialLap2 = (phi[fwd2] - 2.0 * phiCenter + phi[bwd2]) / a2_2;
+    axialLap2 = (phi[fwd2] - 2.0 * phiCenter + phi[bwd2]) * invA2_2;
 
     laplacian = axialLap0 + axialLap1 + axialLap2;
   } else {
     // ── Generic N-D path ──
     let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
+    let ldim = params.latticeDim;
 
-    for (var d: u32 = 0u; d < params.latticeDim; d++) {
+    for (var d: u32 = 0u; d < ldim; d = d + 1u) {
       if (params.gridSize[d] <= 1u) { continue; }
 
       let stride = params.strides[d];
@@ -108,8 +110,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       let fwdIdx = select(idx + stride, idx - stride * (params.gridSize[d] - 1u), coord == params.gridSize[d] - 1u);
       let bwdIdx = select(idx - stride, idx + stride * (params.gridSize[d] - 1u), coord == 0u);
 
-      let a2 = max(params.spacing[d] * params.spacing[d], 1e-12);
-      let axialLap = (phi[fwdIdx] - 2.0 * phiCenter + phi[bwdIdx]) / a2;
+      let invA2 = 1.0 / max(params.spacing[d] * params.spacing[d], 1e-12);
+      let axialLap = (phi[fwdIdx] - 2.0 * phiCenter + phi[bwdIdx]) * invA2;
       laplacian += axialLap;
       if (d == 1u) { axialLap1 = axialLap; }
       else if (d == 2u) { axialLap2 = axialLap; }
@@ -129,10 +131,11 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // vacuum Kasner the non-unity ratios drive each axis gradient
   // contribution separately — the visible cigar distortion.
   let massCoef = params.mass * params.mass * params.aFull * params.massSquaredScale;
-  var force = params.aPotential * laplacian
-            + params.aPotential * (params.aPotentialRatio1 - 1.0) * axialLap1
-            + params.aPotential * (params.aPotentialRatio2 - 1.0) * axialLap2
-            - massCoef * phiCenter;
+  // Factor aPotential out of the three gradient contributions (3 muls → 1 mul).
+  let aniso = laplacian
+            + (params.aPotentialRatio1 - 1.0) * axialLap1
+            + (params.aPotentialRatio2 - 1.0) * axialLap2;
+  var force = params.aPotential * aniso - massCoef * phiCenter;
 
   // Self-interaction: V(phi) = lambda*(phi^2 - v^2)^2,
   //                   V'(phi) = 4*lambda*phi*(phi^2 - v^2).

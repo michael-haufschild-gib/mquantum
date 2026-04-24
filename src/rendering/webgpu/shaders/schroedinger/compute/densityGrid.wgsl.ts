@@ -319,8 +319,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     totalDensity *= schroedinger.hydrogenNDBoost;
   }
 
-  // Log density for rendering (from boosted density)
-  let logRho = select(-20.0, log(max(totalDensity, 1e-20)), totalDensity > 1e-10);
+  // Log density for rendering. Branch instead of select() so log() is
+  // not evaluated on near-zero densities (common in empty regions).
+  var logRho: f32;
+  if (totalDensity > 1e-10) {
+    logRho = log(totalDensity);
+  } else {
+    logRho = -20.0;
+  }
 
   // Store: R=density, G=logDensity, B=coherenceFraction, A=0
   textureStore(densityGrid, gid, vec4f(totalDensity, logRho, coherenceFraction, 0.0));

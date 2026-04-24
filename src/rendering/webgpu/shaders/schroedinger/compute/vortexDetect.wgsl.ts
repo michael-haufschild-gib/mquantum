@@ -47,11 +47,14 @@ var<workgroup> shared_count: array<u32, 256>;
 var<workgroup> shared_pos: array<u32, 256>;
 var<workgroup> shared_neg: array<u32, 256>;
 
-// Wrap phase difference to [-π, π]
+const VORTEX_PI:  f32 = 3.14159265358979323846;
+const VORTEX_TAU: f32 = 6.28318530717958647692;
+
+// Wrap phase difference to [-π, π]. Two predicated subs on GPU; no branch penalty.
 fn wrapPhase(dp: f32) -> f32 {
   var w = dp;
-  if (w > 3.14159265) { w -= 6.28318530; }
-  if (w < -3.14159265) { w += 6.28318530; }
+  if (w > VORTEX_PI)  { w -= VORTEX_TAU; }
+  if (w < -VORTEX_PI) { w += VORTEX_TAU; }
   return w;
 }
 

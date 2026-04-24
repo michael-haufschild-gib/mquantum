@@ -48,8 +48,9 @@ fn getCenterNoise(k: u32) -> f32 {
   return sParams.centers[k * 3u + 2u][3];
 }
 
-var<workgroup> shared_psiW: array<f32, 256>;
-var<workgroup> shared_norm: array<f32, 256>;
+// Pack the two additive channels (|ψ|²·W and |ψ|²) into a single vec2 —
+// tree reduction touches shared memory 1× per step instead of 2×.
+var<workgroup> shared_pair: array<vec2f, 256>;
 
 @compute @workgroup_size(256)
 fn main(
@@ -61,7 +62,7 @@ fn main(
   let local = lid.x;
   let invTwoSigmaSq = 1.0 / (2.0 * sParams.sigma * sParams.sigma);
   let normFactor = pow(
-    3.14159265 * sParams.sigma * sParams.sigma,
+    3.14159265358979323846 * sParams.sigma * sParams.sigma,
     -f32(tdseParams.latticeDim) * 0.25
   );
 
@@ -73,39 +74,49 @@ fn main(
     let im = psiIm[idx];
     density = re * re + im * im;
 
-    // Compute lattice coordinates
+    // Compute lattice coordinates. Strides are products of power-of-2 grid
+    // dims → use firstTrailingBit for shift/mask instead of u32 divide/modulo.
     var coords: array<f32, 12>;
     var rem = idx;
-    for (var d: u32 = 0u; d < tdseParams.latticeDim; d++) {
+    let ldim = tdseParams.latticeDim;
+    for (var d: u32 = 0u; d < ldim; d = d + 1u) {
       let stride = tdseParams.strides[d];
-      let ci = rem / stride;
-      rem = rem % stride;
+      let logStride = firstTrailingBit(stride);
+      let ci = rem >> logStride;
+      rem = rem & (stride - 1u);
       let halfExtent = f32(tdseParams.gridSize[d]) * tdseParams.spacing[d] * 0.5;
       coords[d] = f32(ci) * tdseParams.spacing[d] - halfExtent;
     }
 
-    // W(x) = Σ_k L_k(x) · ξ_k
-    for (var k: u32 = 0u; k < sParams.numCollapseSites; k++) {
+    // W(x) = normFactor · Σ_k exp(-dist²/(2σ²)) · ξ_k
+    // Factor normFactor OUTSIDE the inner loop (one multiply saved per collapse site).
+    // Cutoff at 6σ (distSq > 36σ²): exp(-18) ≈ 1.5e-8 is below f32 precision after
+    // the ξ·normFactor scaling, so skip the exp + center lookups for far sites.
+    // For typical σ = 1 grid unit this skips 95-99% of (voxel, site) pairs.
+    let maxDistSq = 36.0 * sParams.sigma * sParams.sigma;
+    var rawSum: f32 = 0.0;
+    let nSites = sParams.numCollapseSites;
+    for (var k: u32 = 0u; k < nSites; k = k + 1u) {
       var distSq: f32 = 0.0;
-      for (var d: u32 = 0u; d < tdseParams.latticeDim; d++) {
+      for (var d: u32 = 0u; d < ldim; d = d + 1u) {
         let diff = coords[d] - getCenterCoord(k, d);
         distSq += diff * diff;
       }
-      let weight = normFactor * exp(-distSq * invTwoSigmaSq);
-      noiseField += weight * getCenterNoise(k);
+      if (distSq < maxDistSq) {
+        rawSum += exp(-distSq * invTwoSigmaSq) * getCenterNoise(k);
+      }
     }
+    noiseField = normFactor * rawSum;
   }
 
   // 2 channels: |ψ|²·W and |ψ|²
-  shared_psiW[local] = density * noiseField;
-  shared_norm[local] = density;
+  shared_pair[local] = vec2f(density * noiseField, density);
   workgroupBarrier();
 
   // Tree reduction
   for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
-      shared_psiW[local] += shared_psiW[local + stride];
-      shared_norm[local] += shared_norm[local + stride];
+      shared_pair[local] = shared_pair[local] + shared_pair[local + stride];
     }
     workgroupBarrier();
   }
@@ -113,8 +124,9 @@ fn main(
   // Write workgroup partial sums: [psiW_wg0, psiW_wg1, ..., norm_wg0, norm_wg1, ...]
   if (local == 0u) {
     let numWG = arrayLength(&partialSums) / 2u;
-    partialSums[wid.x] = shared_psiW[0];
-    partialSums[numWG + wid.x] = shared_norm[0];
+    let sum = shared_pair[0];
+    partialSums[wid.x] = sum.x;
+    partialSums[numWG + wid.x] = sum.y;
   }
 }
 `

@@ -74,15 +74,32 @@ fn upperDensityAt(siteIdx: u32, S: u32, T: u32) -> f32 {
 
 // Compute lower-spinor density Σ_{c>=S/2} |ψ_c|² at a given site
 fn lowerDensityAt(siteIdx: u32, S: u32, T: u32) -> f32 {
-  let half = S / 2u;
+  let half = S >> 1u;
   var density: f32 = 0.0;
-  for (var c: u32 = half; c < S; c++) {
+  for (var c: u32 = half; c < S; c = c + 1u) {
     let bufIdx = c * T + siteIdx;
     let re = spinorRe[bufIdx];
     let im = spinorIm[bufIdx];
     density += re * re + im * im;
   }
   return density;
+}
+
+// Combined upper-and-lower density — one pass through the spinor buffers
+// instead of two. Used by fieldView=3 (particle/antiparticle split) so S
+// buffer reads are halved on each corner evaluation.
+fn upperLowerDensityAt(siteIdx: u32, S: u32, T: u32) -> vec2f {
+  let half = S >> 1u;
+  var upper: f32 = 0.0;
+  var lower: f32 = 0.0;
+  for (var c: u32 = 0u; c < S; c = c + 1u) {
+    let bufIdx = c * T + siteIdx;
+    let re = spinorRe[bufIdx];
+    let im = spinorIm[bufIdx];
+    let d = re * re + im * im;
+    if (c < half) { upper += d; } else { lower += d; }
+  }
+  return vec2f(upper, lower);
 }
 
 // Convert N-D world position to lattice coordinates (fractional).
@@ -213,7 +230,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     }
     let perpDist2 = max(dot(modelPos, modelPos) - projSq, 0.0);
     let perpSigma = bound * 0.06;
-    perpFalloff = exp(-perpDist2 / (2.0 * perpSigma * perpSigma));
+    let invTwoPerpSigma2 = 1.0 / (2.0 * perpSigma * perpSigma);
+    perpFalloff = exp(-perpDist2 * invTwoPerpSigma2);
   }
 
   let S = params.spinorSize;
@@ -234,7 +252,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Phase of dominant component (nearest-neighbor, not interpolated)
   let re0 = spinorRe[nnSiteIdx];
   let im0 = spinorIm[nnSiteIdx];
-  let phase = atan2(im0, re0) + 3.14159265;
+  const DIRAC_WG_PI:  f32 = 3.14159265358979323846;
+  const DIRAC_WG_INV_TAU: f32 = 0.15915494309189535;
+  let phase = atan2(im0, re0) + DIRAC_WG_PI;
+
+  // Precompute 1/densityScale once (guard against 0): each field-view branch
+  // used select(x / scale, 0.0, scale <= 0), which always ran the divide —
+  // 11 redundant divides total. One reciprocal + 11 multiplies is ~10× cheaper.
+  let invDensityScale = select(0.0, 1.0 / params.densityScale, params.densityScale > 0.0);
 
   var displayScalar: f32 = 0.0;
 
@@ -248,7 +273,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
         blended += w * totalDensityAt(sIdx, S, T);
       }
     }
-    displayScalar = select(blended / params.densityScale, 0.0, params.densityScale <= 0.0);
+    displayScalar = (blended * invDensityScale);
 
   } else if (params.fieldView == 1u) {
     // Upper spinor: trilinear interpolation
@@ -260,7 +285,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
         blended += w * upperDensityAt(sIdx, S, T);
       }
     }
-    displayScalar = select(blended / params.densityScale, 0.0, params.densityScale <= 0.0);
+    displayScalar = (blended * invDensityScale);
 
   } else if (params.fieldView == 2u) {
     // Lower spinor: trilinear interpolation
@@ -272,22 +297,25 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
         blended += w * lowerDensityAt(sIdx, S, T);
       }
     }
-    displayScalar = select(blended / params.densityScale, 0.0, params.densityScale <= 0.0);
+    displayScalar = (blended * invDensityScale);
 
   } else if (params.fieldView == 3u) {
-    // Upper/lower split: trilinear interpolation of both channels
+    // Upper/lower split: trilinear interpolation of both channels.
+    // Uses the fused upperLowerDensityAt helper so each corner reads the
+    // spinor buffers once instead of twice.
     var blendedP: f32 = 0.0;
     var blendedA: f32 = 0.0;
-    for (var corner: u32 = 0u; corner < numCorners; corner++) {
+    for (var corner: u32 = 0u; corner < numCorners; corner = corner + 1u) {
       let w = cornerWeight(&fracs, corner);
       if (w > 0.0) {
         let sIdx = siteIndexForCorner(&coordsLo, &coordsHi, corner);
-        blendedP += w * upperDensityAt(sIdx, S, T);
-        blendedA += w * lowerDensityAt(sIdx, S, T);
+        let ul = upperLowerDensityAt(sIdx, S, T);
+        blendedP += w * ul.x;
+        blendedA += w * ul.y;
       }
     }
-    let pNorm = select(blendedP / params.densityScale, 0.0, params.densityScale <= 0.0);
-    let aNorm = select(blendedA / params.densityScale, 0.0, params.densityScale <= 0.0);
+    let pNorm = (blendedP * invDensityScale);
+    let aNorm = (blendedA * invDensityScale);
     let totalNorm = clamp((pNorm + aNorm) * perpFalloff, 0.0, 1.0);
     textureStore(outputTex, gid, vec4f(
       clamp(pNorm * perpFalloff, 0.0, 1.0),
@@ -297,10 +325,22 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
 
   } else if (params.fieldView == 4u) {
-    // spinDensity: nearest-neighbor (expensive gamma matrix work)
+    // spinDensity: nearest-neighbor (expensive gamma matrix work).
+    // Preload spinor components at this site ONCE. The inner loops would
+    // otherwise re-read each component S times per row × S rows × nSpin axes.
     let siteIdx = nnSiteIdx;
-    let totalDensity = totalDensityAt(siteIdx, S, T);
-    let normDensityRaw = select(totalDensity / params.densityScale, 0.0, params.densityScale <= 0.0);
+    var psiSiteRe: array<f32, 64>;
+    var psiSiteIm: array<f32, 64>;
+    for (var c: u32 = 0u; c < S; c = c + 1u) {
+      let bIdx = c * T + siteIdx;
+      psiSiteRe[c] = spinorRe[bIdx];
+      psiSiteIm[c] = spinorIm[bIdx];
+    }
+    var totalDensity: f32 = 0.0;
+    for (var c: u32 = 0u; c < S; c = c + 1u) {
+      totalDensity += psiSiteRe[c] * psiSiteRe[c] + psiSiteIm[c] * psiSiteIm[c];
+    }
+    let normDensityRaw = (totalDensity * invDensityScale);
     let densityGate = smoothstep(0.0, 0.02, normDensityRaw);
 
     var spinMag2: f32 = 0.0;
@@ -311,14 +351,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
         let kBase = k * matStride;
         var expectRe: f32 = 0.0;
         for (var row: u32 = 0u; row < S; row++) {
-          let bufIdxR = row * T + siteIdx;
-          let psiRRow = spinorRe[bufIdxR];
-          let psiIRow = spinorIm[bufIdxR];
+          let psiRRow = psiSiteRe[row];
+          let psiIRow = psiSiteIm[row];
           let rowBase = kBase + row * S * 2u;
           for (var col: u32 = 0u; col < S; col++) {
-            let bufIdxC = col * T + siteIdx;
-            let psiRCol = spinorRe[bufIdxC];
-            let psiICol = spinorIm[bufIdxC];
+            let psiRCol = psiSiteRe[col];
+            let psiICol = psiSiteIm[col];
             let gRe = gammaMatrices[rowBase + col * 2u];
             let gIm = gammaMatrices[rowBase + col * 2u + 1u];
             let matPsiRe = gRe * psiRCol - gIm * psiICol;
@@ -342,9 +380,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
           var aIm: f32 = 0.0;
           let rowBaseJ = baseJ + row * S * 2u;
           for (var col: u32 = 0u; col < S; col++) {
-            let bufIdx = col * T + siteIdx;
-            let pR = spinorRe[bufIdx];
-            let pI = spinorIm[bufIdx];
+            let pR = psiSiteRe[col];
+            let pI = psiSiteIm[col];
             let gRe = gammaMatrices[rowBaseJ + col * 2u];
             let gIm = gammaMatrices[rowBaseJ + col * 2u + 1u];
             aRe += gRe * pR - gIm * pI;
@@ -356,9 +393,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
         var dotIm: f32 = 0.0;
         for (var row: u32 = 0u; row < S; row++) {
-          let bufIdxR = row * T + siteIdx;
-          let psiRRow = spinorRe[bufIdxR];
-          let psiIRow = spinorIm[bufIdxR];
+          let psiRRow = psiSiteRe[row];
+          let psiIRow = psiSiteIm[row];
           var aRe: f32 = 0.0;
           var aIm: f32 = 0.0;
           let rowBaseI = baseI + row * S * 2u;
@@ -375,13 +411,24 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       }
     }
     let rawSpin = sqrt(spinMag2);
-    displayScalar = select(rawSpin / params.densityScale, 0.0, params.densityScale <= 0.0) * densityGate;
+    displayScalar = (rawSpin * invDensityScale) * densityGate;
 
   } else if (params.fieldView == 5u) {
-    // currentDensity: nearest-neighbor (expensive gamma matrix work)
+    // currentDensity: nearest-neighbor (expensive gamma matrix work).
+    // Preload once — same rationale as fieldView=4.
     let siteIdx = nnSiteIdx;
-    let totalDensity = totalDensityAt(siteIdx, S, T);
-    let normDensityRaw = select(totalDensity / params.densityScale, 0.0, params.densityScale <= 0.0);
+    var psiSiteRe: array<f32, 64>;
+    var psiSiteIm: array<f32, 64>;
+    for (var c: u32 = 0u; c < S; c = c + 1u) {
+      let bIdx = c * T + siteIdx;
+      psiSiteRe[c] = spinorRe[bIdx];
+      psiSiteIm[c] = spinorIm[bIdx];
+    }
+    var totalDensity: f32 = 0.0;
+    for (var c: u32 = 0u; c < S; c = c + 1u) {
+      totalDensity += psiSiteRe[c] * psiSiteRe[c] + psiSiteIm[c] * psiSiteIm[c];
+    }
+    let normDensityRaw = (totalDensity * invDensityScale);
     let densityGate = smoothstep(0.0, 0.02, normDensityRaw);
 
     var currentMag2: f32 = 0.0;
@@ -389,14 +436,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       let kBase = k * matStride;
       var expectRe: f32 = 0.0;
       for (var row: u32 = 0u; row < S; row++) {
-        let bufIdxR = row * T + siteIdx;
-        let psiRRow = spinorRe[bufIdxR];
-        let psiIRow = spinorIm[bufIdxR];
+        let psiRRow = psiSiteRe[row];
+        let psiIRow = psiSiteIm[row];
         let rowBase = kBase + row * S * 2u;
         for (var col: u32 = 0u; col < S; col++) {
-          let bufIdxC = col * T + siteIdx;
-          let psiRCol = spinorRe[bufIdxC];
-          let psiICol = spinorIm[bufIdxC];
+          let psiRCol = psiSiteRe[col];
+          let psiICol = psiSiteIm[col];
           let gRe = gammaMatrices[rowBase + col * 2u];
           let gIm = gammaMatrices[rowBase + col * 2u + 1u];
           let matPsiRe = gRe * psiRCol - gIm * psiICol;
@@ -408,7 +453,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     }
     let cFactor = params.speedOfLight;
     let rawCurrent = cFactor * sqrt(currentMag2);
-    displayScalar = select(rawCurrent / params.densityScale, 0.0, params.densityScale <= 0.0) * densityGate;
+    displayScalar = (rawCurrent * invDensityScale) * densityGate;
 
   } else if (params.fieldView == 6u) {
     // phase: trilinear-interpolated density for gating, NN for phase value
@@ -420,9 +465,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
         blended += w * totalDensityAt(sIdx, S, T);
       }
     }
-    let normDensityRaw = select(blended / params.densityScale, 0.0, params.densityScale <= 0.0);
+    let normDensityRaw = (blended * invDensityScale);
     let densityGate = smoothstep(0.0, 0.02, normDensityRaw);
-    displayScalar = phase / (2.0 * 3.14159265) * densityGate;
+    displayScalar = phase * DIRAC_WG_INV_TAU * densityGate;
   }
 
   let normDisplay = clamp(displayScalar * perpFalloff, 0.0, 1.0);
@@ -431,7 +476,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Alpha dual-encoding: raw density (>= 0) or -potOverlay (< 0)
   let rawTotalDensity = totalDensityAt(nnSiteIdx, S, T);
   let rawDensityNorm = clamp(
-    select(rawTotalDensity / params.densityScale, 0.0, params.densityScale <= 0.0) * perpFalloff,
+    (rawTotalDensity * invDensityScale) * perpFalloff,
     0.0, 1.0
   );
   var alphaChannel: f32 = rawDensityNorm;

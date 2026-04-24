@@ -47,33 +47,36 @@ fn main(
   let idx = gid.x;
   let local = lid.x;
   let nc = obsParams.numChannels;
+  let localBase = local * MAX_CHANNELS;
 
-  for (var ch: u32 = 0u; ch < nc; ch++) {
-    sdata[local * MAX_CHANNELS + ch] = 0.0;
+  for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
+    sdata[localBase + ch] = 0.0;
   }
 
   if (idx < obsParams.totalSites) {
     // Read interleaved complex value from FFT buffer
-    let re = complexBuf[idx * 2u];
-    let im = complexBuf[idx * 2u + 1u];
+    let c = idx << 1u;
+    let re = complexBuf[c];
+    let im = complexBuf[c + 1u];
     let density = re * re + im * im;
 
     // Channel 0: k-space norm
-    sdata[local * MAX_CHANNELS] = density;
+    sdata[localBase] = density;
 
     // Decompose linear index to N-D coordinates
-    let coords = linearToND(idx, obsParams.strides, obsParams.gridSize, obsParams.latticeDim);
+    let ldim = obsParams.latticeDim;
+    let coords = linearToND(idx, obsParams.strides, obsParams.gridSize, ldim);
 
     // Per-dimension k-vector components (FFT frequency ordering)
-    for (var d: u32 = 0u; d < obsParams.latticeDim; d++) {
+    for (var d: u32 = 0u; d < ldim; d = d + 1u) {
       let n = obsParams.gridSize[d];
-      let halfN = n / 2u;
+      let halfN = n >> 1u;
       let kIdx = select(i32(coords[d]) - i32(n), i32(coords[d]), coords[d] < halfN);
       let kVal = obsParams.kGridScale[d] * f32(kIdx);
 
-      let chBase = 1u + d * 2u;
-      sdata[local * MAX_CHANNELS + chBase] = kVal * density;          // k_d * |φ|²
-      sdata[local * MAX_CHANNELS + chBase + 1u] = kVal * kVal * density; // k_d² * |φ|²
+      let chBase = localBase + 1u + (d << 1u);
+      sdata[chBase]       = kVal * density;          // k_d · |φ|²
+      sdata[chBase + 1u]  = kVal * kVal * density;   // k_d² · |φ|²
     }
   }
   workgroupBarrier();
@@ -81,16 +84,18 @@ fn main(
   // Tree reduction
   for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
-      for (var ch: u32 = 0u; ch < nc; ch++) {
-        sdata[local * MAX_CHANNELS + ch] += sdata[(local + stride) * MAX_CHANNELS + ch];
+      let rightBase = (local + stride) * MAX_CHANNELS;
+      for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
+        sdata[localBase + ch] += sdata[rightBase + ch];
       }
     }
     workgroupBarrier();
   }
 
   if (local == 0u) {
-    for (var ch: u32 = 0u; ch < nc; ch++) {
-      partials[wid.x * nc + ch] = sdata[ch];
+    let outBase = wid.x * nc;
+    for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
+      partials[outBase + ch] = sdata[ch];
     }
   }
 }
@@ -129,15 +134,18 @@ fn main(
 ) {
   let local = lid.x;
   let nc = obsParams.numChannels;
+  let localBase = local * MAX_CHANNELS;
+  let ngroups = obsParams.numWorkgroups;
 
-  for (var ch: u32 = 0u; ch < nc; ch++) {
-    sdata[local * MAX_CHANNELS + ch] = 0.0;
+  for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
+    sdata[localBase + ch] = 0.0;
   }
 
   var i = local;
-  while (i < obsParams.numWorkgroups) {
-    for (var ch: u32 = 0u; ch < nc; ch++) {
-      sdata[local * MAX_CHANNELS + ch] += partials[i * nc + ch];
+  while (i < ngroups) {
+    let inBase = i * nc;
+    for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
+      sdata[localBase + ch] += partials[inBase + ch];
     }
     i += WG_SIZE;
   }
@@ -145,15 +153,16 @@ fn main(
 
   for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
-      for (var ch: u32 = 0u; ch < nc; ch++) {
-        sdata[local * MAX_CHANNELS + ch] += sdata[(local + stride) * MAX_CHANNELS + ch];
+      let rightBase = (local + stride) * MAX_CHANNELS;
+      for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
+        sdata[localBase + ch] += sdata[rightBase + ch];
       }
     }
     workgroupBarrier();
   }
 
   if (local == 0u) {
-    for (var ch: u32 = 0u; ch < nc; ch++) {
+    for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
       result[ch] = sdata[ch];
     }
   }

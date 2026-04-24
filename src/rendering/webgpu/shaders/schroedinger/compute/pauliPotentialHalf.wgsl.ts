@@ -88,15 +88,17 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
 
   // ---- Scalar potential phase rotation ----
-  // φ_V = -V dt / (2ℏ)
-  let phiV = -V * params.dt / (2.0 * max(params.hbar, 1e-6));
+  // Hoist dt/(2ℏ) once so it can be reused below for θ_B (saves 1 divide).
+  let dtOver2Hbar = params.dt / (2.0 * max(params.hbar, 1e-6));
+  let phiV = -V * dtOver2Hbar;
   let cosPV = cos(phiV);
   let sinPV = sin(phiV);
 
+  let idx1 = T + idx;
   let re0_in = spinorRe[idx];
   let im0_in = spinorIm[idx];
-  let re1_in = spinorRe[T + idx];
-  let im1_in = spinorIm[T + idx];
+  let re1_in = spinorRe[idx1];
+  let im1_in = spinorIm[idx1];
 
   // Apply scalar phase to both components
   let re0_v = re0_in * cosPV - im0_in * sinPV;
@@ -138,37 +140,40 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
 
   // ---- Zeeman SU(2) rotation ----
-  // θ_B = |B| dt / (2ℏ)
-  let Bmag = sqrt(Bx * Bx + By * By + Bz * Bz);
+  // θ_B = |B| dt / (2ℏ). Fuse sqrt + reciprocal via inverseSqrt: one rsqrt and
+  // one multiply reproduce |B| from |B|^2.
+  let BmagSq = Bx * Bx + By * By + Bz * Bz;
 
   var re0_out: f32 = re0_v;
   var im0_out: f32 = im0_v;
   var re1_out: f32 = re1_v;
   var im1_out: f32 = im1_v;
 
-  if (Bmag > 1e-20) {
-    let nx = Bx / Bmag;
-    let ny = By / Bmag;
-    let nz = Bz / Bmag;
+  if (BmagSq > 1e-40) {
+    let invBmag = inverseSqrt(BmagSq);
+    let Bmag = BmagSq * invBmag;
+    let nx = Bx * invBmag;
+    let ny = By * invBmag;
+    let nz = Bz * invBmag;
 
-    let thetaB = Bmag * params.dt / (2.0 * max(params.hbar, 1e-6));
+    let thetaB = Bmag * dtOver2Hbar;
     let cosB = cos(thetaB);
     let sinB = sin(thetaB);
+    // Precompute the three sinB·n* products — each appears twice below.
+    let sBx = sinB * nx;
+    let sBy = sinB * ny;
+    let sBz = sinB * nz;
 
     // U_00 = (cosB - i sinB nz),  U_01 = (-sinB ny - i sinB nx)
     // U_10 = ( sinB ny - i sinB nx), U_11 = (cosB + i sinB nz)
-    //
-    // New ψ_up   = U_00 ψ_up + U_01 ψ_down
-    // New ψ_down = U_10 ψ_up + U_11 ψ_down
-
     let a00Re = cosB;
-    let a00Im = -sinB * nz;
-    let a01Re = -sinB * ny;
-    let a01Im = -sinB * nx;
-    let a10Re = sinB * ny;
-    let a10Im = -sinB * nx;
+    let a00Im = -sBz;
+    let a01Re = -sBy;
+    let a01Im = -sBx;
+    let a10Re =  sBy;
+    let a10Im = -sBx;
     let a11Re = cosB;
-    let a11Im = sinB * nz;
+    let a11Im =  sBz;
 
     // Complex matrix-vector multiply: (aRe + i aIm)(rV + i iV) = aRe·rV - aIm·iV + i(aRe·iV + aIm·rV)
     let new_re0 = (a00Re * re0_v - a00Im * im0_v) + (a01Re * re1_v - a01Im * im1_v);
@@ -188,7 +193,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   spinorRe[idx] = re0_out;
   spinorIm[idx] = im0_out;
-  spinorRe[T + idx] = re1_out;
-  spinorIm[T + idx] = im1_out;
+  spinorRe[idx1] = re1_out;
+  spinorIm[idx1] = im1_out;
 }
 `

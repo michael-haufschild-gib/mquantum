@@ -156,7 +156,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       let latticeL = f32(params.gridSize[d]) * params.spacing[d];
       if (latticeL <= 0.0 || params.gridSize[d] <= 1u) { continue; }
 
-      let kPhys = 6.283185307 * f32(params.modeK[d]) / latticeL;
+      let kPhys = 6.28318530717958647692 * f32(params.modeK[d]) / latticeL;
       phase += kPhys * worldPos[d];
 
       // Lattice dispersion: (2/a) * sin(k * a / 2)
@@ -183,7 +183,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
       let latticeL = f32(params.gridSize[d]) * params.spacing[d];
       if (latticeL > 0.0 && params.gridSize[d] > 1u) {
-        let kPhys = 6.283185307 * f32(params.modeK[d]) / latticeL;
+        let kPhys = 6.28318530717958647692 * f32(params.modeK[d]) / latticeL;
         phase += kPhys * worldPos[d];
 
         // Lattice dispersion: (2/a) * sin(k * a / 2)
@@ -193,8 +193,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     }
 
     let omega = sqrt(max(omegaSq, 0.0));
-    let sigma2 = params.packetWidth * params.packetWidth;
-    let envelope = params.packetAmplitude * exp(-r2 / (2.0 * sigma2));
+    let invTwoSigma2 = 1.0 / (2.0 * params.packetWidth * params.packetWidth);
+    let envelope = params.packetAmplitude * exp(-r2 * invTwoSigma2);
     phiVal = envelope * cos(phase);
     piVal = params.aPotential * envelope * omega * sin(phase);
   } else if (params.initCondition == 3u) {

@@ -39,8 +39,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
 
   let sigma = params.packetWidth;
-  let sigma2 = sigma * sigma;
-  let envelope = params.packetAmplitude * exp(-r2 / (4.0 * sigma2));
+  let inv4Sigma2 = 1.0 / (4.0 * sigma * sigma);
+  let envelope = params.packetAmplitude * exp(-r2 * inv4Sigma2);
 
   var reVal: f32 = 0.0;
   var imVal: f32 = 0.0;
@@ -56,8 +56,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     reVal = envelope * cos(kdotx);
     imVal = envelope * sin(kdotx);
   } else if (params.initCondition == 2u) {
-    // superposition: two counter-propagating Gaussian packets
-    let env1 = params.packetAmplitude * 0.7071 * exp(-r2 / (4.0 * sigma2));
+    // superposition: two counter-propagating Gaussian packets (amp ÷ √2 per arm)
+    let env1 = params.packetAmplitude * 0.7071067811865475 * exp(-r2 * inv4Sigma2);
     let phase1 = kdotx;
 
     // Second packet: shifted center, reversed momentum
@@ -69,7 +69,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       r2b += dx2 * dx2;
       kdotx2 += -params.packetMomentum[d2] * pos2; // reversed momentum
     }
-    let env2 = params.packetAmplitude * 0.7071 * exp(-r2b / (4.0 * sigma2));
+    let env2 = params.packetAmplitude * 0.7071067811865475 * exp(-r2b * inv4Sigma2);
 
     reVal = env1 * cos(phase1) + env2 * cos(kdotx2);
     imVal = env1 * sin(phase1) + env2 * sin(kdotx2);
@@ -128,8 +128,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       var totalRe: f32 = rho;
       var totalIm: f32 = 0.0;
       let nf = f32(nVortices);
-      for (var vi: i32 = 0; vi < nVortices; vi++) {
-        let angle = 2.0 * 3.14159265 * f32(vi) / nf;
+      let invNf = 1.0 / nf;
+      let TAU_VORT: f32 = 6.28318530717958647692;
+      for (var vi: i32 = 0; vi < nVortices; vi = vi + 1) {
+        let angle = TAU_VORT * f32(vi) * invNf;
         let cx = ringRadius * cos(angle);
         let cy = ringRadius * sin(angle);
         let dx = pos0v - cx;
@@ -177,10 +179,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // β = √(depth² - v²) clamped; for depth=1, v=0 → β=1 (black soliton)
     let beta = sqrt(max(depthParam * depthParam - vFrac * vFrac, 0.0));
     let xi_safe = max(xi, 1e-6);
-    let solitonRe = beta * tanh(beta * pos0s / (1.414 * xi_safe));
+    // 1/(√2·ξ) — computed once instead of divide per thread.
+    let invSqrt2Xi = 0.70710678118654752 / xi_safe;
+    let solitonRe = beta * tanh(beta * pos0s * invSqrt2Xi);
     let solitonIm = vFrac;
-    reVal = sqrt(n0) * solitonRe;
-    imVal = sqrt(n0) * solitonIm;
+    let rho0 = sqrt(n0);
+    reVal = rho0 * solitonRe;
+    imVal = rho0 * solitonIm;
   } else if (params.initCondition == 6u) {
     // N-D vortex reconnection pair: product of phase windings in configurable planes.
     //

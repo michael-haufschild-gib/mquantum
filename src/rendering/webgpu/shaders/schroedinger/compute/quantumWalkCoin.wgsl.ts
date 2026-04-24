@@ -39,25 +39,30 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   if (params.coinType == 0u) {
     // Grover coin: out[j] = (2/N) * sum(in[k]) - in[j]
-    // Simplified: out[j] = invN * sum - in[j] where invN = 2/numCoinStates
+    // Load each coin component once into function-local arrays so the output
+    // loop doesn't re-read from storage (previous: 2·N reads; now: N reads).
+    var inRe: array<f32, 22>;
+    var inIm: array<f32, 22>;
     var sumRe: f32 = 0.0;
     var sumIm: f32 = 0.0;
     for (var k: u32 = 0u; k < numCoinStates; k++) {
-      sumRe += coinIn[baseIdx + k * 2u];
-      sumIm += coinIn[baseIdx + k * 2u + 1u];
+      let r = coinIn[baseIdx + k * 2u];
+      let i = coinIn[baseIdx + k * 2u + 1u];
+      inRe[k] = r;
+      inIm[k] = i;
+      sumRe += r;
+      sumIm += i;
     }
     let invN = 2.0 / f32(numCoinStates);
     for (var j: u32 = 0u; j < numCoinStates; j++) {
-      let reIn = coinIn[baseIdx + j * 2u];
-      let imIn = coinIn[baseIdx + j * 2u + 1u];
-      coinOut[baseIdx + j * 2u] = invN * sumRe - reIn;
-      coinOut[baseIdx + j * 2u + 1u] = invN * sumIm - imIn;
+      coinOut[baseIdx + j * 2u] = invN * sumRe - inRe[j];
+      coinOut[baseIdx + j * 2u + 1u] = invN * sumIm - inIm[j];
     }
   } else if (params.coinType == 1u) {
     // Biased Hadamard: H(θ) = [[cos θ, sin θ], [sin θ, -cos θ]] per axis pair
     // coinBias ∈ [0,1] maps to θ ∈ [0, π/2]. Standard Hadamard at coinBias=0.5 (θ=π/4).
     // For D dimensions: applied independently to each (2d, 2d+1) pair.
-    let theta = clamp(params.coinBias, 0.0, 1.0) * 1.57079632679; // π/2
+    let theta = clamp(params.coinBias, 0.0, 1.0) * 1.57079632679489661923; // π/2
     let c = cos(theta);
     let s = sin(theta);
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
@@ -71,21 +76,33 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       coinOut[i1 + 1u] = s * aIm - c * bIm;
     }
   } else {
-    // DFT coin: F_jk = exp(2πi·jk/N) / √N where N = 2D
+    // DFT coin: F_jk = exp(2πi·jk/N) / √N where N = 2D.
+    // Inner k-phase is an arithmetic progression (step = j * twoPiOverN).
+    // Use a 2x2 rotation recurrence to advance (cos, sin) without calling cos/sin
+    // per k. Init once per j; then N-1 iterations of 2 muls + 1 sub + 1 add each.
+    // For N=22 this replaces 484 cos/sin calls per site with 44 (init) + recurrence.
     let N = f32(numCoinStates);
-    let invSqrtN = 1.0 / sqrt(N);
-    let twoPiOverN = 6.28318530718 / N;
+    let invSqrtN = inverseSqrt(N);
+    let twoPiOverN = 6.28318530717958647692 / N;
     for (var j: u32 = 0u; j < numCoinStates; j++) {
       var outRe: f32 = 0.0;
       var outIm: f32 = 0.0;
+      // Phase increment per k for this j.
+      let dPhi = twoPiOverN * f32(j);
+      let cosD = cos(dPhi);
+      let sinD = sin(dPhi);
+      var cosP: f32 = 1.0; // cos(0)
+      var sinP: f32 = 0.0; // sin(0)
       for (var k: u32 = 0u; k < numCoinStates; k++) {
-        let phase = twoPiOverN * f32(j * k);
-        let cosP = cos(phase);
-        let sinP = sin(phase);
         let inRe = coinIn[baseIdx + k * 2u];
         let inIm = coinIn[baseIdx + k * 2u + 1u];
         outRe += cosP * inRe - sinP * inIm;
         outIm += cosP * inIm + sinP * inRe;
+        // Advance (cosP, sinP) by dPhi via 2x2 rotation.
+        let newCos = cosP * cosD - sinP * sinD;
+        let newSin = sinP * cosD + cosP * sinD;
+        cosP = newCos;
+        sinP = newSin;
       }
       coinOut[baseIdx + j * 2u] = outRe * invSqrtN;
       coinOut[baseIdx + j * 2u + 1u] = outIm * invSqrtN;

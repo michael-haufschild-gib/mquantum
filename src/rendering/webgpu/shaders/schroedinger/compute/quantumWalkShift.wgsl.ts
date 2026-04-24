@@ -51,12 +51,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Decompose destination site to N-D coordinates
   let destCoords = linearToND(destSite, params.strides, params.gridSize, params.latticeDim);
 
-  for (var cs: u32 = 0u; cs < numCoinStates; cs++) {
-    let dim = cs / 2u;
-    let isPositive = (cs % 2u) == 0u;
+  for (var cs: u32 = 0u; cs < numCoinStates; cs = cs + 1u) {
+    let dim = cs >> 1u;
+    let isPositive = (cs & 1u) == 0u;
+    let cs2 = cs << 1u;
+    let destOut = destBase + cs2;
 
-    // Source site: shift backwards from destination
-    // If this coin state shifts +1, the source was at coord-1 (and vice versa)
+    // Source site: shift backwards from destination. (cs=+ dir → source at coord-1)
     var srcCoord: i32;
     if (isPositive) {
       srcCoord = i32(destCoords[dim]) - 1;
@@ -64,20 +65,22 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       srcCoord = i32(destCoords[dim]) + 1;
     }
 
-    // Open boundary: out-of-bounds sources contribute zero (amplitude leaves the domain).
-    // Periodic boundary: wrap via modular arithmetic (default when absorber is off).
-    if (params.openBoundary != 0u && (srcCoord < 0 || srcCoord >= i32(params.gridSize[dim]))) {
-      coinOut[destBase + cs * 2u] = 0.0;
-      coinOut[destBase + cs * 2u + 1u] = 0.0;
+    let Nd = params.gridSize[dim];
+    let Ni = i32(Nd);
+    // Open boundary: out-of-bounds sources contribute zero.
+    if (params.openBoundary != 0u && (srcCoord < 0 || srcCoord >= Ni)) {
+      coinOut[destOut] = 0.0;
+      coinOut[destOut + 1u] = 0.0;
     } else {
       var srcCoords = destCoords;
-      srcCoords[dim] = u32((srcCoord + i32(params.gridSize[dim])) % i32(params.gridSize[dim]));
+      // Power-of-2 grid dim: (x + N) mod N == (x + N) & (N - 1).
+      srcCoords[dim] = u32((srcCoord + Ni) & (Ni - 1));
 
       let srcSite = ndToLinear(srcCoords, params.strides, params.latticeDim);
-      let srcBase = srcSite * numCoinStates * 2u + cs * 2u;
+      let srcBase = srcSite * numCoinStates * 2u + cs2;
 
-      coinOut[destBase + cs * 2u] = coinIn[srcBase];
-      coinOut[destBase + cs * 2u + 1u] = coinIn[srcBase + 1u];
+      coinOut[destOut] = coinIn[srcBase];
+      coinOut[destOut + 1u] = coinIn[srcBase + 1u];
     }
   }
 }

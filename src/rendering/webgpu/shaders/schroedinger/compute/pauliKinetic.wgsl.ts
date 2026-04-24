@@ -41,26 +41,32 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
 
   // Compute k² using FFT frequency ordering
-  let TWO_PI: f32 = 6.28318530718;
+  const PAULI_TWO_PI: f32 = 6.28318530717958647692;
   var k2: f32 = 0.0;
-  for (var d: u32 = 0u; d < params.latticeDim; d++) {
+  let ldim = params.latticeDim;
+  for (var d: u32 = 0u; d < ldim; d = d + 1u) {
     let gd = params.gridSize[d];
-    let halfN = gd / 2u;
+    let halfN = gd >> 1u;
     // FFT frequency: positive half [0, N/2), negative half [N/2, N) → [0, -N/2)
     let kIdx = select(i32(coords[d]) - i32(gd), i32(coords[d]), coords[d] < halfN);
-    let kPhys = f32(kIdx) * TWO_PI / (f32(gd) * params.spacing[d]);
+    let twoPiOverL = PAULI_TWO_PI / (f32(gd) * params.spacing[d]);
+    let kPhys = f32(kIdx) * twoPiOverL;
     k2 += kPhys * kPhys;
   }
 
-  // Kinetic phase: e^{-i ℏ k² dt / (2m)}  — negative sign for forward time evolution
-  let phase = -params.hbar * k2 * params.dt / (2.0 * max(params.mass, 1e-6));
+  // Kinetic phase: e^{-i ℏ k² dt / (2m)}. Hoist the uniform-only prefactor
+  // (-0.5·ℏ·dt/max(m,ε)) so k² becomes a single multiply per thread.
+  let kineticCoef = -(0.5 * params.hbar * params.dt) / max(params.mass, 1e-6);
+  let phase = k2 * kineticCoef;
   // Reduce to [-π, π] so f32 cos/sin stay precise for high-frequency k-modes
-  let reduced = phase - round(phase * 0.15915494) * 6.28318530;
+  const PAULI_INV_TAU: f32 = 0.15915494309189535;
+  let reduced = phase - round(phase * PAULI_INV_TAU) * PAULI_TWO_PI;
   let cosP = cos(reduced);
   let sinP = sin(reduced);
 
   // Apply the same phase rotation to both spinor components independently
   let T = params.totalSites;
+  let idx1 = T + idx;
 
   // Spin-up (c=0)
   let re0 = spinorRe[idx];
@@ -69,9 +75,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   spinorIm[idx] = re0 * sinP + im0 * cosP;
 
   // Spin-down (c=1)
-  let re1 = spinorRe[T + idx];
-  let im1 = spinorIm[T + idx];
-  spinorRe[T + idx] = re1 * cosP - im1 * sinP;
-  spinorIm[T + idx] = re1 * sinP + im1 * cosP;
+  let re1 = spinorRe[idx1];
+  let im1 = spinorIm[idx1];
+  spinorRe[idx1] = re1 * cosP - im1 * sinP;
+  spinorIm[idx1] = re1 * sinP + im1 * cosP;
 }
 `
