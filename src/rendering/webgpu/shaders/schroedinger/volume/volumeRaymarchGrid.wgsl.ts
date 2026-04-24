@@ -99,6 +99,23 @@ fn volumeRaymarchGrid(
     // via phase' = B - E·t. phaseOffset is 0 for every compute mode (hoisted).
     let phase = gridSample.b - phaseOffset;
 
+    // Dual-channel remap (Dirac particle/antiparticle, Pauli spin-up/down):
+    // R = primary density, G = secondary density. The single-density path
+    // below uses rho for alpha + empty-skip + adaptive-step; a state with
+    // all probability in G (e.g. pure gaussianSpinDown: R=0, G=spin-down
+    // density) would otherwise evaluate alpha near zero at every sample
+    // and render blank. Mirror the full-variant fix: fold G into rho for
+    // the opacity pipeline while keeping raw R / G for the color function
+    // so algo 24 / 25 can still read the individual channels. Dead-code-
+    // eliminated when IS_DUAL_CHANNEL is false (TDSE/BEC/QW/FSF).
+    var colorRho: f32 = rho;
+    var colorS: f32 = 0.0;
+    if (IS_DUAL_CHANNEL) {
+      colorRho = gridSample.r;
+      colorS = gridSample.g;
+      rho = rho + gridSample.g;
+    }
+
     // Potential overlay: .a < 0 encodes -potOverlay from compute write-grid
     let hasPotOverlay = DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01;
     // Wheeler-DeWitt overlay: A > 0 carries streamline / SRMT overlay alpha
@@ -118,13 +135,10 @@ fn volumeRaymarchGrid(
     // attempt with no detectable correctness loss on BEC groundState /
     // singleVortex / quantumTurbulence (measured via
     // bec-raymarch-profile.spec.ts at DPR=2).
-    // For dual-channel modes (Dirac particle/antiparticle, Pauli spin-up/down),
-    // the R channel alone is NOT sufficient to detect emptiness — e.g. a pure
-    // gaussianSpinDown state has R=0 everywhere but G=|ψ↓|² filling the packet
-    // region. Including the G channel in the skip predicate prevents the
-    // raymarcher from jumping past the entire density on those modes.
-    let totalForSkip = select(rho, rho + sCenter, IS_DUAL_CHANNEL);
-    if (!PROFILING_STRIP_EMPTY_SKIP && totalForSkip < EMPTY_SKIP_THRESHOLD && !hasPotOverlay && !hasWdwOverlay) {
+    // rho already carries total density for dual-channel modes (see remap
+    // above), so the predicate reads the correct emptiness signal in both
+    // single- and dual-channel paths.
+    if (!PROFILING_STRIP_EMPTY_SKIP && rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay && !hasWdwOverlay) {
       let skipDistance = min(stepLen * 10.0, max(tFar - t, 0.0));
       if (skipDistance > stepLen) {
         let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms);
@@ -138,10 +152,23 @@ fn volumeRaymarchGrid(
       }
     }
 
-    // Adaptive step
+    // Adaptive step — use log(total) for dual-channel so the multiplier
+    // thresholds compare against a log-density (mirrors the full variant).
+    // sCenter is raw G in dual-channel modes, not logRho, so feeding it
+    // directly would wedge the multiplier at 1.0 everywhere.
     var adaptiveStep: f32;
     if (!PROFILING_STRIP_ADAPTIVE_STEP) {
-      adaptiveStep = computeAdaptiveStep(sCenter, stepLen, tFar - t);
+      var logRhoForStep: f32;
+      if (IS_DUAL_CHANNEL) {
+        if (rho > 1e-9) {
+          logRhoForStep = log(rho);
+        } else {
+          logRhoForStep = -20.0;
+        }
+      } else {
+        logRhoForStep = sCenter;
+      }
+      adaptiveStep = computeAdaptiveStep(logRhoForStep, stepLen, tFar - t);
     } else {
       adaptiveStep = min(stepLen, tFar - t);
     }
@@ -183,11 +210,19 @@ fn volumeRaymarchGrid(
           gradient = fetchGradient(pos, uniforms);
         }
 
+        // Dual-channel path uses raw R (colorRho) and raw G (colorS) so algo
+        // 24 / 25 colour algorithms still see the individual spin / particle
+        // channels; single-channel path falls back to (rho, sCenter). rho was
+        // mutated above to total density for the alpha pipeline — feeding it
+        // back into computeBaseColor would collapse every dual-channel state
+        // onto the midpoint hue.
+        let emissionRho = select(rho, colorRho, IS_DUAL_CHANNEL);
+        let emissionS = select(sCenter, colorS, IS_DUAL_CHANNEL);
         var emission: vec3f;
         if (PROFILING_STRIP_LIGHTING) {
-          emission = computeBaseColor(rho, sCenter, phase, pos, uniforms);
+          emission = computeBaseColor(emissionRho, emissionS, phase, pos, uniforms);
         } else {
-          emission = computeEmissionLit(rho, sCenter, phase, pos, gradient, viewDir, uniforms);
+          emission = computeEmissionLit(emissionRho, emissionS, phase, pos, gradient, viewDir, uniforms);
         }
 
         // Branch coloring: compute from ray position (not density texture alpha)
