@@ -6,7 +6,6 @@
  *   - lnGamma(x)            Lanczos log-gamma (g = 7)
  *   - lnFactorial(k)        log(k!) via lnGamma
  *   - jacobiP(n, α, β, x)   Jacobi polynomial via DLMF 18.9.1 recurrence
- *   - adsRadialNorm(...)     normalization coefficient N
  *   - adsAssocLegendre(...)  associated Legendre P_ℓ^m(x)
  *   - adsSphericalY(...)     real-valued Y_ℓm(θ, φ)
  *   - adsAngularHarmonic(...) dimension-aware angular part
@@ -91,22 +90,6 @@ fn adsJacobiP(n: i32, alpha: f32, beta: f32, x: f32) -> f32 {
   return pCurr;
 }
 
-// Radial normalization N.
-fn adsRadialNorm(n: i32, l: i32, delta: f32, d: i32) -> f32 {
-  let fn_ = f32(n);
-  let fl = f32(l);
-  let fd = f32(d);
-  let alpha = fl + (fd - 3.0) / 2.0;
-  let beta = delta - (fd - 1.0) / 2.0;
-  let lnN2 = log(2.0)
-    + log(2.0 * fn_ + delta + fl)
-    + adsLnFactorial(n)
-    + adsLnGamma(fn_ + delta + fl)
-    - adsLnGamma(fn_ + alpha + 1.0)
-    - adsLnGamma(fn_ + beta + 1.0);
-  return exp(lnN2 * 0.5);
-}
-
 // Associated Legendre P_l^m(x), m >= 0, Condon-Shortley phase included.
 fn adsAssocLegendre(l: i32, m: i32, x: f32) -> f32 {
   let absM = abs(m);
@@ -185,7 +168,8 @@ struct AdsConfig {
   mL: f32,              // Mass × AdS radius (signed)
   delta: f32,            // Effective conformal dimension Δ
   boundaryOverlay: u32,  // 1 = render boundary primary shell
-  _pad: u32,             // 16-byte alignment padding
+  radialNorm: f32,       // CPU-precomputed N(n, l, delta, d) so per-voxel
+                         // adsRadialNorm() skips its 3 lgamma + factorial chain.
 }
 `
 
@@ -261,7 +245,8 @@ fn main(@builtin(global_invocation_id) global_id: vec3u) {
   let fl = f32(l);
   let alpha = fl + (fd - 3.0) / 2.0;
   let beta = delta - (fd - 1.0) / 2.0;
-  let norm = adsRadialNorm(n, l, delta, d);
+  // CPU-precomputed once per (n, l, delta, d) change — see AdsDensityComputePass.updateAdsConfig.
+  let norm = adsConfig.radialNorm;
 
   // Radial wavefunction R(ρ).
   let cosRho = cos(rho);
