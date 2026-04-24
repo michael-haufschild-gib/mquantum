@@ -462,8 +462,9 @@ fn hydrogenRadialMomentumND(n: i32, l: i32, k: f32, a0: f32, dim: i32) -> f32 {
 
   // q^lambda -- mirrors the integer/half-integer fast path in hydrogenRadialND.
   // Avoids pow()'s exp+log (~20 cycles) for the integer case and replaces it with
-  // up to 5 iterative multiplies. At D=3,5,7,9,11 lambda is integer; at D=4,6,8,10
-  // it is half-integer (k+0.5), handled via sqrt(q) multiplier.
+  // up to 10 iterative multiplies (current caps: hyd_n <= 7 → l <= 6, dim <= 11
+  // → lambda_int <= 10). At D=3,5,7,9,11 lambda is integer; at D=4,6,8,10 it is
+  // half-integer (k+0.5), handled via sqrt(q) multiplier.
   var qPow: f32;
   let qLambdaInt = i32(lambda);
   let qLambdaFrac = lambda - f32(qLambdaInt);

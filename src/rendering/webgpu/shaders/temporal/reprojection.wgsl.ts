@@ -62,11 +62,12 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
     return vec4f(0.0, 0.0, 0.0, 0.0);
   }
 
-  // Reproject world position to previous frame's UV. A non-positive w means
-  // the point was at or behind the previous frame's camera plane — clamping
-  // to a tiny positive would flip the divisor's sign and produce bogus UVs,
-  // which then blend stale history onto a disoccluded pixel. Treat that as
-  // invalid and return 0.
+  // Reproject world position to previous frame's UV. A non-positive or
+  // near-zero w (<= 0.0001) means the point was at or behind the previous
+  // frame's camera plane (or approximately on it) — clamping to a tiny
+  // positive would either flip the divisor's sign or produce enormous NDCs,
+  // which then blend stale history onto a disoccluded pixel. Treat that
+  // band as invalid and return 0.
   let prevClip = temporal.prevViewProjection * vec4f(worldPos, 1.0);
   if (prevClip.w <= 0.0001) {
     return vec4f(0.0);
