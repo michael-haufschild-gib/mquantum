@@ -307,7 +307,7 @@ fn hydrogenRadialNDWithNorm(n: i32, l: i32, r: f32, a0: f32, dim: i32, norm: f32
   if (abs(lambdaFrac) < 1e-6) {
     // Integer lambda (odd dimensions): iterative multiply.
     rhoLambda = 1.0;
-    for (var il = 0; il < lambdaInt; il++) {
+    for (var il = 0; il < lambdaInt; il = il + 1) {
       rhoLambda *= rho;
     }
   } else if (abs(lambdaFrac - 0.5) < 1e-6) {

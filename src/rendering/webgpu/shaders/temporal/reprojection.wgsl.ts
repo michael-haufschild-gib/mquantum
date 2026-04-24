@@ -62,9 +62,16 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
     return vec4f(0.0, 0.0, 0.0, 0.0);
   }
 
-  // Reproject world position to previous frame's UV.
+  // Reproject world position to previous frame's UV. A non-positive w means
+  // the point was at or behind the previous frame's camera plane — clamping
+  // to a tiny positive would flip the divisor's sign and produce bogus UVs,
+  // which then blend stale history onto a disoccluded pixel. Treat that as
+  // invalid and return 0.
   let prevClip = temporal.prevViewProjection * vec4f(worldPos, 1.0);
-  let prevNDC = prevClip.xyz / max(prevClip.w, 0.0001);
+  if (prevClip.w <= 0.0001) {
+    return vec4f(0.0);
+  }
+  let prevNDC = prevClip.xyz / prevClip.w;
   // NDC → UV: X is direct, Y must be flipped because NDC.y=+1 is screen top
   // but UV.y=0 is texture top (WebGPU framebuffer convention).
   let prevUV = vec2f(prevNDC.x, -prevNDC.y) * 0.5 + 0.5;
