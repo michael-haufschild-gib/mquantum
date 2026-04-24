@@ -22,6 +22,7 @@
 
 import { expect, test } from './fixtures'
 import {
+  applyBecPreset,
   expectCanvasNotBlank,
   getFrameCount,
   getPerformanceMetrics,
@@ -78,6 +79,15 @@ test.describe('quantum mode rendering', () => {
       await gotoPauli(page, dim)
       await waitForShaderCompilation(page)
 
+      // Pauli starts from a localized Gaussian spinor packet centered at the
+      // origin. Free-particle evolution disperses the packet to a ring within
+      // ~2 s (120 frames at 60 fps), which is exactly the window
+      // expectCanvasNotBlank waits through before sampling. By then the
+      // center-30% crop the sampler uses is empty — all probability has moved
+      // to the rim. Pause immediately so the packet stays where the sampler
+      // looks.
+      await pauseAnimation(page)
+
       await expectCanvasNotBlank(page)
     })
   }
@@ -97,6 +107,16 @@ test.describe('quantum mode rendering', () => {
       if (mode === 'quantumWalk') {
         const fc = await getFrameCount(page)
         await waitForFrameAdvance(page, fc + 60)
+        await pauseAnimation(page)
+      } else if (mode === 'becDynamics') {
+        // BEC evolves a localized Gross-Pitaevskii condensate that disperses
+        // away from the center within tens of milliseconds. Just calling
+        // pauseAnimation here is too late — the condensate has already moved
+        // into an annulus outside the sampler's center-30% crop by the time
+        // the renderer is ready. Apply the 'groundState' preset, which is a
+        // Thomas-Fermi profile that stays concentrated at the origin, so the
+        // sampler sees probability where it expects to.
+        await applyBecPreset(page, 'groundState')
         await pauseAnimation(page)
       }
 
