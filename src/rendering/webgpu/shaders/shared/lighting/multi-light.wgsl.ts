@@ -152,8 +152,27 @@ fn computeMultiLighting(
       continue;
     }
 
-    // Get light direction (Surface -> Light)
-    let L = getLightDirection(light, fragPos);
+    // Inline the surface->light direction AND the distance together, so the
+    // (position - fragPos) delta is computed once per light instead of twice
+    // (once inside getLightDirection, once inside length() below). This saves
+    // one vec3 sub + one dot3 + one sqrt per point/spot light per pixel.
+    var L: vec3f;
+    var lightDistance: f32 = 0.0;
+    if (lightType == LIGHT_TYPE_DIRECTIONAL) {
+      // Stored direction is Light -> Surface; negate for Surface -> Light.
+      L = fastNormalize(-light.direction.xyz);
+    } else {
+      let delta = light.position.xyz - fragPos;
+      let lenSq = dot(delta, delta);
+      if (lenSq < LEN_SQ_THRESHOLD) {
+        L = vec3f(0.0, 1.0, 0.0);
+        lightDistance = 0.0;
+      } else {
+        let invLen = inverseSqrt(lenSq);
+        L = delta * invLen;
+        lightDistance = lenSq * invLen; // == sqrt(lenSq), no extra sqrt
+      }
+    }
 
     let nDotLRaw = dot(N, L);
     let NdotL = select(max(nDotLRaw, 0.0), abs(nDotLRaw), twoSided);
@@ -161,16 +180,14 @@ fn computeMultiLighting(
       continue;
     }
 
-    // Distance attenuation for point and spot lights
+    // Distance attenuation for point and spot lights (distance already computed above)
     if (lightType == LIGHT_TYPE_POINT || lightType == LIGHT_TYPE_SPOT) {
-      let distance = length(light.position.xyz - fragPos);
-      attenuation *= getDistanceAttenuation(light, distance);
+      attenuation *= getDistanceAttenuation(light, lightDistance);
     }
 
-    // Spot light cone attenuation
+    // Spot light cone attenuation — lightToFrag = -L (L is already normalized).
     if (lightType == LIGHT_TYPE_SPOT) {
-      let lightToFrag = normalize(fragPos - light.position.xyz);
-      attenuation *= getSpotAttenuation(light, lightToFrag);
+      attenuation *= getSpotAttenuation(light, -L);
     }
 
     // Skip negligible contributions
@@ -233,18 +250,33 @@ fn computeTotalNdotL(
       continue;
     }
 
-    let L = getLightDirection(light, fragPos);
+    // Same delta+distance fusion as computeMultiLighting.
+    var L: vec3f;
+    var lightDistance: f32 = 0.0;
+    if (lightType == LIGHT_TYPE_DIRECTIONAL) {
+      L = fastNormalize(-light.direction.xyz);
+    } else {
+      let delta = light.position.xyz - fragPos;
+      let lenSq = dot(delta, delta);
+      if (lenSq < LEN_SQ_THRESHOLD) {
+        L = vec3f(0.0, 1.0, 0.0);
+      } else {
+        let invLen = inverseSqrt(lenSq);
+        L = delta * invLen;
+        lightDistance = lenSq * invLen;
+      }
+    }
+
     let nDotLRaw = dot(N, L);
     let NdotL = select(max(nDotLRaw, 0.0), abs(nDotLRaw), twoSided);
 
     if (lightType == LIGHT_TYPE_POINT || lightType == LIGHT_TYPE_SPOT) {
-      let distance = length(light.position.xyz - fragPos);
-      attenuation *= getDistanceAttenuation(light, distance);
+      attenuation *= getDistanceAttenuation(light, lightDistance);
     }
 
     if (lightType == LIGHT_TYPE_SPOT) {
-      let lightToFrag = normalize(fragPos - light.position.xyz);
-      attenuation *= getSpotAttenuation(light, lightToFrag);
+      // lightToFrag = -L (L is already normalized)
+      attenuation *= getSpotAttenuation(light, -L);
     }
 
     total += NdotL * attenuation;

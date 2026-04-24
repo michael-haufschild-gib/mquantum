@@ -235,7 +235,8 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
     let ubWidth = max(schroedinger.uncertaintyBoundaryWidth, 1e-3);
     let logRhoDelta = abs(sSurface - schroedinger.uncertaintyLogRhoThreshold);
     let spatialDist = logRhoDelta / max(gradMag, 1e-6);
-    let ubBand = exp(-0.5 * (spatialDist / ubWidth) * (spatialDist / ubWidth));
+    let z = spatialDist / ubWidth;  // cache (spatialDist/ubWidth) once — was computed twice
+    let ubBand = exp(-0.5 * z * z);
     let ubGlow = ubBand * schroedinger.uncertaintyBoundaryStrength;
     surfaceColor = mix(surfaceColor, surfaceColor * 2.0 + vec3f(0.1, 0.08, 0.15), ubGlow);
   }
@@ -257,19 +258,31 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
     let lightIntensity = light.color.a;
     if (lightIntensity < 0.001) { continue; }
 
-    let l = getEmissionLightDir(i, p);
+    // Fuse light direction + distance so (position - p) is computed once
+    // (avoids the double dot3+sqrt that getEmissionLightDir + length() does).
+    let lightType = i32(light.position.w);
+    var l: vec3f;
+    var lightDistance: f32 = 0.0;
+    if (lightType == LIGHT_TYPE_DIRECTIONAL) {
+      l = normalize(-light.direction.xyz);
+    } else {
+      let delta = light.position.xyz - p;
+      let lenSq = max(dot(delta, delta), 1.0e-12);
+      let invLen = inverseSqrt(lenSq);
+      l = delta * invLen;
+      lightDistance = lenSq * invLen;
+    }
+
     var attenuation = lightIntensity;
 
-    let lightType = i32(light.position.w);
     if (lightType == LIGHT_TYPE_POINT || lightType == LIGHT_TYPE_SPOT) {
-      let distance = length(light.position.xyz - p);
-      attenuation *= getEmissionLightAttenuation(i, distance);
+      attenuation *= getEmissionLightAttenuation(i, lightDistance);
     }
 
     if (lightType == LIGHT_TYPE_SPOT) {
-      let lightToFrag = normalize(p - light.position.xyz);
+      // lightToFrag == -l (l is already the surface->light unit vector).
       let spotDir = normalize(light.direction.xyz);
-      let cosAngle = dot(lightToFrag, spotDir);
+      let cosAngle = dot(-l, spotDir);
       let spotCosOuter = light.params.z;
       let spotCosInner = light.params.y;
       let spotAttenuation = smoothstep(spotCosOuter, spotCosInner, cosAngle);
