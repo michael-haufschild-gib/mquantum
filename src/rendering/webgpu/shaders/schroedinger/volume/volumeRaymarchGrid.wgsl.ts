@@ -118,13 +118,20 @@ fn volumeRaymarchGrid(
     // attempt with no detectable correctness loss on BEC groundState /
     // singleVortex / quantumTurbulence (measured via
     // bec-raymarch-profile.spec.ts at DPR=2).
-    if (!PROFILING_STRIP_EMPTY_SKIP && rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay && !hasWdwOverlay) {
+    // For dual-channel modes (Dirac particle/antiparticle, Pauli spin-up/down),
+    // the R channel alone is NOT sufficient to detect emptiness — e.g. a pure
+    // gaussianSpinDown state has R=0 everywhere but G=|ψ↓|² filling the packet
+    // region. Including the G channel in the skip predicate prevents the
+    // raymarcher from jumping past the entire density on those modes.
+    let totalForSkip = select(rho, rho + sCenter, IS_DUAL_CHANNEL);
+    if (!PROFILING_STRIP_EMPTY_SKIP && totalForSkip < EMPTY_SKIP_THRESHOLD && !hasPotOverlay && !hasWdwOverlay) {
       let skipDistance = min(stepLen * 10.0, max(tFar - t, 0.0));
       if (skipDistance > stepLen) {
         let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms);
         let midHasPot = DENSITY_GRID_HAS_PHASE && probeMid.a < -0.01;
         let midHasWdwOverlay = DENSITY_GRID_HAS_PHASE && uniforms.quantumMode == 9 && probeMid.a > 0.01;
-        if (probeMid.r < EMPTY_SKIP_THRESHOLD && !midHasPot && !midHasWdwOverlay) {
+        let midTotal = select(probeMid.r, probeMid.r + probeMid.g, IS_DUAL_CHANNEL);
+        if (midTotal < EMPTY_SKIP_THRESHOLD && !midHasPot && !midHasWdwOverlay) {
           t += skipDistance;
           continue;
         }

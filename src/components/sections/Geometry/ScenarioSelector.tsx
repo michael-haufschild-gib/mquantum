@@ -211,10 +211,19 @@ export const ScenarioSelector: React.FC = React.memo(() => {
   // compute modes use async apply actions that make reverse-detection unreliable.
   const [computePreset, setComputePreset] = useState<Record<string, string>>({})
 
-  // Auto-apply first Pauli preset when the mode transitions INTO
+  // Auto-apply first Pauli preset when the mode is / transitions INTO
   // pauliSpinor. Pauli is driven by `objectType`, not `quantumMode`, so
   // the auto-apply logic in `quantumModeSetters` never sees the
   // transition. We fill the gap here.
+  //
+  // prevModeRef starts at `null` so the effect fires on initial mount
+  // as well — if the URL lands directly on `?t=pauliSpinor`, the mode
+  // never "transitions" (prev === current from the first render), and
+  // the earlier `prevModeRef.current === mode` guard would skip preset
+  // application. That left the store holding DEFAULT_PAULI_CONFIG
+  // (fieldType='gradient', fieldStrength=2.0 — Stern-Gerlach values)
+  // while the scenario dropdown advertised "Larmor Precession",
+  // causing spin-down packets to accelerate out of view on first load.
   //
   // The side effect lives at the effect-body level, not inside a
   // `setComputePreset((prev) => ...)` updater. React 19 StrictMode
@@ -227,7 +236,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
   // but that was redundant: `activeValue` already falls back to
   // `getFirstPresetId(mode, dimension)` when the key is absent, and
   // `handleChange` populates the entry on first user selection.
-  const prevModeRef = useRef(mode)
+  const prevModeRef = useRef<string | null>(null)
   useEffect(() => {
     if (prevModeRef.current === mode) return
     prevModeRef.current = mode
