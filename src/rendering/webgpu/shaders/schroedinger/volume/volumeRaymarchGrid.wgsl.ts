@@ -99,6 +99,23 @@ fn volumeRaymarchGrid(
     // via phase' = B - E·t. phaseOffset is 0 for every compute mode (hoisted).
     let phase = gridSample.b - phaseOffset;
 
+    // Dual-channel remap (Dirac particle/antiparticle, Pauli spin-up/down):
+    // R = primary density, G = secondary density. The single-density path
+    // below uses rho for alpha + empty-skip + adaptive-step; a state with
+    // all probability in G (e.g. pure gaussianSpinDown: R=0, G=spin-down
+    // density) would otherwise evaluate alpha near zero at every sample
+    // and render blank. Mirror the full-variant fix: fold G into rho for
+    // the opacity pipeline while keeping raw R / G for the color function
+    // so algo 24 / 25 can still read the individual channels. Dead-code-
+    // eliminated when IS_DUAL_CHANNEL is false (TDSE/BEC/QW/FSF).
+    var colorRho: f32 = rho;
+    var colorS: f32 = 0.0;
+    if (IS_DUAL_CHANNEL) {
+      colorRho = gridSample.r;
+      colorS = gridSample.g;
+      rho = rho + gridSample.g;
+    }
+
     // Potential overlay: .a < 0 encodes -potOverlay from compute write-grid
     let hasPotOverlay = DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01;
     // Wheeler-DeWitt overlay: A > 0 carries streamline / SRMT overlay alpha
@@ -118,23 +135,40 @@ fn volumeRaymarchGrid(
     // attempt with no detectable correctness loss on BEC groundState /
     // singleVortex / quantumTurbulence (measured via
     // bec-raymarch-profile.spec.ts at DPR=2).
+    // rho already carries total density for dual-channel modes (see remap
+    // above), so the predicate reads the correct emptiness signal in both
+    // single- and dual-channel paths.
     if (!PROFILING_STRIP_EMPTY_SKIP && rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay && !hasWdwOverlay) {
       let skipDistance = min(stepLen * 10.0, max(tFar - t, 0.0));
       if (skipDistance > stepLen) {
         let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms);
         let midHasPot = DENSITY_GRID_HAS_PHASE && probeMid.a < -0.01;
         let midHasWdwOverlay = DENSITY_GRID_HAS_PHASE && uniforms.quantumMode == 9 && probeMid.a > 0.01;
-        if (probeMid.r < EMPTY_SKIP_THRESHOLD && !midHasPot && !midHasWdwOverlay) {
+        let midTotal = select(probeMid.r, probeMid.r + probeMid.g, IS_DUAL_CHANNEL);
+        if (midTotal < EMPTY_SKIP_THRESHOLD && !midHasPot && !midHasWdwOverlay) {
           t += skipDistance;
           continue;
         }
       }
     }
 
-    // Adaptive step
+    // Adaptive step — use log(total) for dual-channel so the multiplier
+    // thresholds compare against a log-density (mirrors the full variant).
+    // sCenter is raw G in dual-channel modes, not logRho, so feeding it
+    // directly would wedge the multiplier at 1.0 everywhere.
     var adaptiveStep: f32;
     if (!PROFILING_STRIP_ADAPTIVE_STEP) {
-      adaptiveStep = computeAdaptiveStep(sCenter, stepLen, tFar - t);
+      var logRhoForStep: f32;
+      if (IS_DUAL_CHANNEL) {
+        if (rho > 1e-9) {
+          logRhoForStep = log(rho);
+        } else {
+          logRhoForStep = -20.0;
+        }
+      } else {
+        logRhoForStep = sCenter;
+      }
+      adaptiveStep = computeAdaptiveStep(logRhoForStep, stepLen, tFar - t);
     } else {
       adaptiveStep = min(stepLen, tFar - t);
     }
@@ -176,11 +210,19 @@ fn volumeRaymarchGrid(
           gradient = fetchGradient(pos, uniforms);
         }
 
+        // Dual-channel path uses raw R (colorRho) and raw G (colorS) so algo
+        // 24 / 25 colour algorithms still see the individual spin / particle
+        // channels; single-channel path falls back to (rho, sCenter). rho was
+        // mutated above to total density for the alpha pipeline — feeding it
+        // back into computeBaseColor would collapse every dual-channel state
+        // onto the midpoint hue.
+        let emissionRho = select(rho, colorRho, IS_DUAL_CHANNEL);
+        let emissionS = select(sCenter, colorS, IS_DUAL_CHANNEL);
         var emission: vec3f;
         if (PROFILING_STRIP_LIGHTING) {
-          emission = computeBaseColor(rho, sCenter, phase, pos, uniforms);
+          emission = computeBaseColor(emissionRho, emissionS, phase, pos, uniforms);
         } else {
-          emission = computeEmissionLit(rho, sCenter, phase, pos, gradient, viewDir, uniforms);
+          emission = computeEmissionLit(emissionRho, emissionS, phase, pos, gradient, viewDir, uniforms);
         }
 
         // Branch coloring: compute from ray position (not density texture alpha)
@@ -314,7 +356,12 @@ fn volumeRaymarchGrid(
       sCenter = gridSample.g; // logRho from grid
       colorS = sCenter;
     } else {
-      sCenter = select(-20.0, log(rho), rho > 1e-9);
+      // r16float fallback: derive logRho. select() would evaluate log() on zero.
+      if (rho > 1e-9) {
+        sCenter = log(rho);
+      } else {
+        sCenter = -20.0;
+      }
       colorS = sCenter;
     }
 
@@ -354,9 +401,13 @@ fn volumeRaymarchGrid(
     // Skip for dual-channel modes since sCenter is secondary density, not logRho.
     if (FEATURE_UNCERTAINTY_BOUNDARY && !IS_DUAL_CHANNEL) {
       rho = applyUncertaintyBoundaryEmphasis(rho, sCenter, uniforms);
-      // Update logRho to reflect emphasis so emission color/brightness matches inline path
-      // (computeBaseColor uses s for color mapping: normalized = clamp((s+8)/8, 0, 1))
-      sCenter = select(-20.0, log(rho), rho > 1e-9);
+      // Update logRho to reflect emphasis. Branch so log() is not evaluated on
+      // near-zero rho when emphasis leaves a region dim.
+      if (rho > 1e-9) {
+        sCenter = log(rho);
+      } else {
+        sCenter = -20.0;
+      }
       colorRho = rho;
       colorS = sCenter;
     }
@@ -395,10 +446,21 @@ fn volumeRaymarchGrid(
 
     // Adaptive step size based on log-density.
     // For dual-channel modes, sCenter is secondary density [0,1], not logRho [-20,0].
-    // Use logRho of total density for adaptive stepping.
+    // Use logRho of total density for adaptive stepping. select() would evaluate log(rho)
+    // unconditionally -- the branch below skips the log entirely when rho is near-zero
+    // (common in empty regions, where the raymarch spends most of its iterations).
     var adaptiveStep: f32;
     if (!PROFILING_STRIP_ADAPTIVE_STEP && !hasPotOverlay) {
-      let logRhoForStep = select(sCenter, select(-20.0, log(rho), rho > 1e-9), IS_DUAL_CHANNEL);
+      var logRhoForStep: f32;
+      if (IS_DUAL_CHANNEL) {
+        if (rho > 1e-9) {
+          logRhoForStep = log(rho);
+        } else {
+          logRhoForStep = -20.0;
+        }
+      } else {
+        logRhoForStep = sCenter;
+      }
       adaptiveStep = computeAdaptiveStep(logRhoForStep, stepLen, tFar - t);
     } else {
       adaptiveStep = min(stepLen, tFar - t);

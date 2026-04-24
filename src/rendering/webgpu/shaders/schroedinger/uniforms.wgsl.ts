@@ -307,6 +307,14 @@ struct SchroedingerUniforms {
   wdwPhaseRotationRate: f32,        // offset 1628 — rad/unit-time; 0 disables (non-WdW or toggle off)
   adsEnergy: f32,                   // offset 1632 — AdS bound-state energy E; rotates phase as -E*t (0 for non-AdS or tachyon)
   adsGrowthRate: f32,               // offset 1636 — AdS tachyon growth rate γ; amplifies |ψ|² as cosh²(γ*t) (0 otherwise)
+
+  // Precomputed HSL forms of pauliSpinUpColor / pauliSpinDownColor so Pauli
+  // color algorithm 24 (hue-space blend) does not re-run rgb2hsl per raymarch
+  // sample. Packed CPU-side next to the RGB fields.
+  pauliSpinUpColorHSL: vec3f,       // offset 1648 (vec3f aligns to 16)
+  _padPauliUpHSL: f32,              // offset 1660
+  pauliSpinDownColorHSL: vec3f,     // offset 1664
+  _padPauliDownHSL: f32,            // offset 1676
 }
 
 // ============================================

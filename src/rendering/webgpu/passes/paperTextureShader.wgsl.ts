@@ -282,7 +282,9 @@ fn folds(uv: vec2f, foldCount: f32, seed: f32) -> vec2f {
       pp = vec3f(uv.x - p.x, uv.y - p.y, dist);
     }
   }
-  return mix(pp.xy, vec2f(0.0), pow(pp.z, 0.25));
+  // pow(x, 0.25) == sqrt(sqrt(x)). Two GPU sqrts (~8 cyc total) beat the
+  // exp(0.25 * log(x)) chain pow() compiles to (~15-20 cyc).
+  return mix(pp.xy, vec2f(0.0), sqrt(sqrt(max(pp.z, 0.0))));
 }
 
 // ============================================================================
@@ -304,7 +306,8 @@ fn drops(uv: vec2f, seed: f32) -> f32 {
       dropsMinDist = min(dropsMinDist, dropsMinDist * dist);
     }
   }
-  return 1.0 - smoothstep(0.05, 0.09, pow(dropsMinDist, 0.5));
+  // pow(x, 0.5) == sqrt(x). Single sqrt is ~3x cheaper than pow's exp+log chain.
+  return 1.0 - smoothstep(0.05, 0.09, sqrt(max(dropsMinDist, 0.0)));
 }
 
 // ============================================================================

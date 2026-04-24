@@ -143,9 +143,12 @@ fn computeProbabilityCurrentOverlay(
   if (uniforms.probabilityCurrentStyle == PROBABILITY_CURRENT_STYLE_ARROWS) {
     let u = dot(pos, tangent) * lineDensity - speedPhase;
     let v = dot(pos, bitangent) * lineDensity;
-    let shaft = 1.0 - smoothstep(0.24, 0.48, abs(fract(v) - 0.5));
-    let body = smoothstep(0.15, 0.72, fract(u)) * (1.0 - smoothstep(0.72, 0.97, fract(u)));
-    let head = smoothstep(0.76, 0.97, fract(u)) * (1.0 - smoothstep(0.0, 0.22, abs(fract(v) - 0.5)));
+    // Cache fract(u), abs(fract(v) - 0.5) -- each was recomputed 3 / 2 times below.
+    let fu = fract(u);
+    let absFvCentered = abs(fract(v) - 0.5);
+    let shaft = 1.0 - smoothstep(0.24, 0.48, absFvCentered);
+    let body = smoothstep(0.15, 0.72, fu) * (1.0 - smoothstep(0.72, 0.97, fu));
+    let head = smoothstep(0.76, 0.97, fu) * (1.0 - smoothstep(0.0, 0.22, absFvCentered));
     styleMask = max(shaft * body, head);
   } else if (uniforms.probabilityCurrentStyle == PROBABILITY_CURRENT_STYLE_SURFACE_LIC) {
     let u = dot(pos, tangent) * lineDensity + speedPhase;

@@ -43,15 +43,17 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
 
-  // 3D fast path: decompose coords without linearToND (avoids 2 integer divides)
+  // 3D fast path: decompose coords via shift/mask (strides are power-of-2).
   var coords: array<u32, 12>;
   if (params.latticeDim == 3u) {
     let s0 = params.strides[0];
     let s1 = params.strides[1];
-    coords[0] = idx / s0;
-    let r0 = idx - coords[0] * s0;
-    coords[1] = r0 / s1;
-    coords[2] = r0 - coords[1] * s1;
+    let log0 = firstTrailingBit(s0);
+    let log1 = firstTrailingBit(s1);
+    coords[0] = idx >> log0;
+    let r0 = idx & (s0 - 1u);
+    coords[1] = r0 >> log1;
+    coords[2] = r0 & (s1 - 1u);
   } else {
     coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
   }

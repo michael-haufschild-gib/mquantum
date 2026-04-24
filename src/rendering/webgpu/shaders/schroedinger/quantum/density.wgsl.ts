@@ -227,9 +227,10 @@ fn sampleDensityWithPhaseComponents(pos: vec3f, t: f32, uniforms: SchroedingerUn
     let pcfSpeedMod = 1.0 - clamp(rho * 5.0, 0.0, 1.0);
     let pcfTime = uniforms.time * uniforms.phaseShimmerSpeed;
     let pcfOffset = pcfTime * pcfSpeedMod;
-    let psiLen = max(length(psi), 1e-8);
-    let pcfCosP = psi.x / psiLen;
-    let pcfSinP = psi.y / psiLen;
+    // inverseSqrt(|psi|^2) replaces length() + two scalar divides with one rsqrt + two muls.
+    let invPsiLen = inverseSqrt(max(dot(psi, psi), 1e-16));
+    let pcfCosP = psi.x * invPsiLen;
+    let pcfSinP = psi.y * invPsiLen;
     let pcfNoise = gradientNoise(pos * 2.0 + vec3f(
         pcfOffset + pcfCosP * 0.5,
         pcfSinP * 0.5,
@@ -284,9 +285,10 @@ fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUnifo
     let pcfSpeedMod = 1.0 - clamp(rho * 5.0, 0.0, 1.0);
     let pcfTime = uniforms.time * uniforms.phaseShimmerSpeed;
     let pcfOffset = pcfTime * pcfSpeedMod;
-    let psiLen = max(length(psi), 1e-8);
-    let pcfCosP = psi.x / psiLen;
-    let pcfSinP = psi.y / psiLen;
+    // inverseSqrt(|psi|^2) replaces length() + two scalar divides with one rsqrt + two muls.
+    let invPsiLen = inverseSqrt(max(dot(psi, psi), 1e-16));
+    let pcfCosP = psi.x * invPsiLen;
+    let pcfSinP = psi.y * invPsiLen;
     let pcfNoise = gradientNoise(pos * 2.0 + vec3f(
         pcfOffset + pcfCosP * 0.5,
         pcfSinP * 0.5,

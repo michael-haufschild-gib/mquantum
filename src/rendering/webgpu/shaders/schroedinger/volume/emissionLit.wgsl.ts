@@ -78,14 +78,16 @@ fn computeEmissionLit(
   // Start with ambient (Lambertian — no PBR metallic suppression for volumetric)
   var col = surfaceColor * lighting.ambientColor * lighting.ambientIntensity;
 
-  // Normalize gradient as pseudo-normal; fallback to view direction at wavefunction peak
-  // where gradient of log(rho) is exactly zero (avoids division by zero)
-  let gradLen = length(gradient);
+  // Normalize gradient as pseudo-normal; fallback to view direction at the
+  // wavefunction peak where ∇log(ρ) is zero. Uses rsqrt(dot) instead of
+  // length+divide (1 rsqrt vs 1 sqrt + 1 reciprocal — ~2× cheaper on GPU).
+  let gradDot = dot(gradient, gradient);
   var n: vec3f;
-  if (gradLen < 0.0001) {
+  if (gradDot < 1.0e-8) {
     n = viewDir;
   } else {
-    n = gradient / gradLen;
+    let invGradLen = inverseSqrt(gradDot);
+    n = gradient * invGradLen;
   }
 
   // PERF: Hoist light-independent computations out of the per-light loop.
@@ -125,29 +127,36 @@ fn computeEmissionLit(
 
     let lightType = i32(light.position.w);
 
-    // Inlined getEmissionLightDir
+    // Fuse surface->light direction with the distance calculation so the
+    // (position - p) delta is computed ONCE per point/spot light per sample.
+    // Old path paid a dot3 + sqrt for length() on top of the normalize; the
+    // fused form reuses lenSq * invLen = sqrt(lenSq).
     var l: vec3f;
+    var lightDistance: f32 = 0.0;
     if (lightType == LIGHT_TYPE_DIRECTIONAL) {
       l = normalize(-light.direction.xyz);
     } else {
-      l = normalize(light.position.xyz - p);
+      let delta = light.position.xyz - p;
+      let lenSq = max(dot(delta, delta), 1.0e-12);
+      let invLen = inverseSqrt(lenSq);
+      l = delta * invLen;
+      lightDistance = lenSq * invLen;
     }
 
     var attenuation = lightIntensity;
 
     // Inlined attenuation + spot falloff
     if (lightType == LIGHT_TYPE_POINT || lightType == LIGHT_TYPE_SPOT) {
-      let distance = length(light.position.xyz - p);
       let lightRange = light.direction.w;
       if (lightRange > 0.0) {
-        let d = max(distance, EPS_DIVISION);
+        let d = max(lightDistance, EPS_DIVISION);
         let rangeAttenuation = clamp(1.0 - d / lightRange, 0.0, 1.0);
         attenuation *= pow(rangeAttenuation, light.params.x);
       }
 
       if (lightType == LIGHT_TYPE_SPOT) {
-        let lightToFrag = normalize(p - light.position.xyz);
-        let cosAngle = dot(lightToFrag, normalize(light.direction.xyz));
+        // lightToFrag is -l (l is already the surface->light unit vector).
+        let cosAngle = dot(-l, normalize(light.direction.xyz));
         attenuation *= smoothstep(light.params.z, light.params.y, cosAngle);
       }
     }

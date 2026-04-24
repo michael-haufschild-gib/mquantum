@@ -81,19 +81,23 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // gaussianSuperposition: Bloch-sphere state with Gaussian envelope
     // spin-up:   cosHalf · envelope · e^{ikx}
     // spin-down: sinHalf · e^{iφ} · envelope · e^{ikx}
-
+    let rotRe = cosP * phiCos - sinP * phiSin;
+    let rotIm = sinP * phiCos + cosP * phiSin;
+    let sinHEnv = sinHalf * envelope;
     spinorRe[idx] = cosHalf * envelope * cosP;
     spinorIm[idx] = cosHalf * envelope * sinP;
-    spinorRe[T + idx] = sinHalf * envelope * (cosP * phiCos - sinP * phiSin);
-    spinorIm[T + idx] = sinHalf * envelope * (sinP * phiCos + cosP * phiSin);
+    spinorRe[T + idx] = sinHEnv * rotRe;
+    spinorIm[T + idx] = sinHEnv * rotIm;
 
   } else if (params.initCondition == 3u) {
     // planeWaveSpinor: flat envelope (plane wave limit) with Bloch-sphere spin
     // Uses unit amplitude everywhere — the absorbing boundary prevents edge wrap.
+    let rotRe = cosP * phiCos - sinP * phiSin;
+    let rotIm = sinP * phiCos + cosP * phiSin;
     spinorRe[idx] = cosHalf * cosP;
     spinorIm[idx] = cosHalf * sinP;
-    spinorRe[T + idx] = sinHalf * (cosP * phiCos - sinP * phiSin);
-    spinorIm[T + idx] = sinHalf * (sinP * phiCos + cosP * phiSin);
+    spinorRe[T + idx] = sinHalf * rotRe;
+    spinorIm[T + idx] = sinHalf * rotIm;
   }
 }
 `

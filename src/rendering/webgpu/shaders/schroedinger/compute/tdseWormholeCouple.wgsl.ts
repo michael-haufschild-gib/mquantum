@@ -50,23 +50,19 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // totalSites/2 over-counts the mirrored-pair space for odd Na (e.g. Na=3
   // leaves a self-mirror center row that belongs to no pair). Bound threads
   // by the exact pair count = (totalSites / Na) * (Na/2).
-  let halfA = Na / 2u;
+  let halfA = Na >> 1u;
   let pairTotal = (params.totalSites / Na) * halfA;
   if (tid >= pairTotal) { return; }
 
-  // Map the half-space thread id to a full-lattice voxel index whose
-  // coordinate along the mirror axis is < Na/2. This is done by unfolding
-  // tid into the lattice coordinates, treating the mirror axis as the
-  // slowest-varying "outer" dimension. Concretely, tid = outerBlock * blockSize
-  // + innerOffset, where blockSize = strides[axis] (voxels per coord step)
-  // and the "outer block" counts how many full (Na/2) steps of axis coord
-  // plus how many full strides we've advanced past.
+  // Grid dims and strides are products of power-of-2 dims → shift/mask.
   let strideA = params.strides[axis];
   let blockSize = strideA * halfA;
-  let outer = tid / blockSize;
-  let withinBlock = tid - outer * blockSize;
-  let coordA = withinBlock / strideA;
-  let innerOffset = withinBlock - coordA * strideA;
+  let logStride = firstTrailingBit(strideA);
+  let logBlock = firstTrailingBit(blockSize);
+  let outer = tid >> logBlock;
+  let withinBlock = tid & (blockSize - 1u);
+  let coordA = withinBlock >> logStride;
+  let innerOffset = withinBlock & (strideA - 1u);
   let idx = outer * (strideA * Na) + coordA * strideA + innerOffset;
   // Mirror partner: coord (Na-1-coordA) along the mirror axis.
   let mirrorIdx = idx + (Na - 1u - 2u * coordA) * strideA;

@@ -44,7 +44,9 @@ fn wignerFactorial(n: i32) -> f32 {
  * where u^2 = omega*x^2 + p^2/omega
  */
 fn wignerDiagonal(n: i32, x: f32, p: f32, omega: f32) -> f32 {
-  let u2 = omega * x * x + p * p / omega;
+  // Cache 1/ω once — per-voxel divide → multiply.
+  let invOmega = 1.0 / max(omega, 1e-20);
+  let u2 = omega * x * x + p * p * invOmega;
   let sign = select(1.0, -1.0, (n & 1) != 0); // (-1)^n
   return sign / PI * laguerre(n, 0.0, 2.0 * u2) * exp(-u2);
 }
@@ -66,7 +68,9 @@ fn wignerCross(m: i32, n: i32, x: f32, p: f32, omega: f32) -> vec2f {
   let nMin = min(m, n);
   let delta = mMax - nMin;
 
-  let u2 = omega * x * x + p * p / omega;
+  // invOmega shared by u² and p/√ω denominators — one divide, multiply downstream.
+  let invOmega = 1.0 / max(omega, 1e-20);
+  let u2 = omega * x * x + p * p * invOmega;
   let signN = select(1.0, -1.0, (nMin & 1) != 0); // (-1)^n
 
   // sqrt(n!/m!) coefficient
@@ -75,10 +79,11 @@ fn wignerCross(m: i32, n: i32, x: f32, p: f32, omega: f32) -> vec2f {
   // Associated Laguerre L_n^{m-n}(2*u^2)
   let lagVal = laguerre(nMin, f32(delta), 2.0 * u2);
 
-  // Complex zeta = sqrt(omega)*x + i*p/sqrt(omega)
+  // Complex zeta = √ω·x + i·p·(1/√ω) — uses invSqrtOmega to avoid a second divide.
   let sqrtOmega = sqrt(omega);
+  let invSqrtOmega = inverseSqrt(max(omega, 1e-20));
   let zetaRe = sqrtOmega * x;
-  let zetaIm = p / sqrtOmega;
+  let zetaIm = p * invSqrtOmega;
 
   // (sqrt(2) * zeta)^(m-n) via complex power
   // For efficiency, compute iteratively for small delta
@@ -96,6 +101,39 @@ fn wignerCross(m: i32, n: i32, x: f32, p: f32, omega: f32) -> vec2f {
 
   // Assemble: (-1)^n / pi * sqrt(n!/m!) * (sqrt(2)*zeta)^(m-n) * L_n^{m-n}(2u2) * exp(-u2)
   let scalar = signN / PI * coeffNM * lagVal * exp(-u2);
+  return vec2f(scalar * powRe, scalar * powIm);
+}
+
+// Variant that takes pre-computed per-pixel scalars (u², exp(-u²), szetaRe, szetaIm).
+// Lets callers that evaluate many (m, n) pairs at the same (x, p, omega) hoist the
+// expensive transcendental + sqrt work out of the inner pair loop.
+fn wignerCrossShared(
+  m: i32,
+  n: i32,
+  u2: f32,
+  expU2: f32,
+  szetaRe: f32,
+  szetaIm: f32
+) -> vec2f {
+  let mMax = max(m, n);
+  let nMin = min(m, n);
+  let delta = mMax - nMin;
+
+  let signN = select(1.0, -1.0, (nMin & 1) != 0);
+  let coeffNM = sqrt(wignerFactorial(nMin) / wignerFactorial(mMax));
+  let lagVal = laguerre(nMin, f32(delta), 2.0 * u2);
+
+  // (sqrt(2)*zeta)^(m-n) via complex power; reuses pre-scaled szeta.
+  var powRe = 1.0;
+  var powIm = 0.0;
+  for (var i = 0; i < delta; i++) {
+    let newRe = powRe * szetaRe - powIm * szetaIm;
+    let newIm = powRe * szetaIm + powIm * szetaRe;
+    powRe = newRe;
+    powIm = newIm;
+  }
+
+  let scalar = signN * INV_PI * coeffNM * lagVal * expU2;
   return vec2f(scalar * powRe, scalar * powIm);
 }
 
@@ -128,16 +166,35 @@ fn evaluateWignerMarginalHO(x: f32, p: f32, dimIdx: i32, time: f32, uniforms: Sc
   let tc = uniforms.termCount;
   var W = 0.0;
 
-  // Diagonal contributions: sum_k |c_k|^2 * W_{n_k}
+  // Diagonal contributions: sum_k |c_k|² · W_{n_k}.
+  // u² and exp(-u²) are identical across terms (depend on ω, x, p only) —
+  // hoist them outside the loop so we don't recompute the transcendental K times.
+  let invOmega = 1.0 / max(omega, 1e-20);
+  let u2 = omega * x * x + p * p * invOmega;
+  let expU2 = exp(-u2);
+  let invPiExpU2 = INV_PI * expU2;
+  let twoU2 = 2.0 * u2;
   for (var k = 0; k < tc; k++) {
     let c = getCoeff(uniforms, k);
-    let weight = c.x * c.x + c.y * c.y; // |c_k|^2
+    let weight = c.x * c.x + c.y * c.y; // |c_k|²
     let n = getQuantumNumber(uniforms, k, dimIdx);
-    W += weight * wignerDiagonal(n, x, p, omega);
+    // Inlined wignerDiagonal with the shared u² and exp(-u²) reused.
+    let signN = select(1.0, -1.0, (n & 1) != 0);
+    W += weight * signN * laguerre(n, 0.0, twoU2) * invPiExpU2;
   }
 
   // Cross-term contributions (only when cross terms enabled)
   if (uniforms.wignerCrossTermsEnabled != 0u) {
+    // Hoist the (x, p, omega)-only quantities out of the per-pair loop.
+    // wignerCross() recomputed all five of these on every (j, k) pair; for a
+    // full superposition (tc=8) that is 28 pairs * {sqrt, inverseSqrt, sqrt,
+    // exp, divide} = ~140 redundant transcendentals per pixel.
+    let sqrtOmega = sqrt(omega);
+    let invSqrtOmega = inverseSqrt(max(omega, 1e-20));
+    let scaleSqrt2 = sqrt(2.0);
+    let szetaRe = scaleSqrt2 * sqrtOmega * x;
+    let szetaIm = scaleSqrt2 * p * invSqrtOmega;
+
     for (var j = 0; j < tc; j++) {
       for (var k = j + 1; k < tc; k++) {
         // Marginal rule: all non-selected dimensions must match
@@ -146,10 +203,10 @@ fn evaluateWignerMarginalHO(x: f32, p: f32, dimIdx: i32, time: f32, uniforms: Sc
         let nj = getQuantumNumber(uniforms, j, dimIdx);
         let nk = getQuantumNumber(uniforms, k, dimIdx);
 
-        // Cross-Wigner: wignerCross always computes W_{max,min}.
-        // When nj < nk we get W_{nk,nj} but need W_{nj,nk} = conj(W_{nk,nj}),
-        // so negate the imaginary part.
-        let Wcross = wignerCross(nj, nk, x, p, omega);
+        // Cross-Wigner: wignerCrossShared always computes W_{max,min} using the
+        // hoisted per-pixel values. When nj < nk we got W_{nk,nj} but need
+        // W_{nj,nk} = conj(W_{nk,nj}), so negate the imaginary part.
+        let Wcross = wignerCrossShared(nj, nk, u2, expU2, szetaRe, szetaIm);
         let WcrossIm = select(Wcross.y, -Wcross.y, nj < nk);
 
         // Time-dependent phase: e^{-i*(E_j - E_k)*t}

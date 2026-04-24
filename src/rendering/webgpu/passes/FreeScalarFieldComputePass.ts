@@ -26,6 +26,7 @@ import {
   DENSITY_GRID_SIZE,
   GRID_WG as GRID_WORKGROUP_SIZE,
   LINEAR_WG as LINEAR_WORKGROUP_SIZE,
+  sanitizeGridSizes,
 } from './computePassUtils'
 import { rebuildFsfFieldBuffers } from './FreeScalarFieldComputePassBuffers'
 import { disposeFsfPassGpu, type FsfGpuFields } from './FreeScalarFieldComputePassDispose'
@@ -560,7 +561,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
    */
   executeField(
     ctx: WebGPURenderContext,
-    config: FreeScalarConfig,
+    rawConfig: FreeScalarConfig,
     isPlaying: boolean,
     speed: number,
     basisX?: Float32Array,
@@ -569,6 +570,11 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     boundingRadius?: number,
     colorAlgorithm?: number
   ): void {
+    // Snap grid dims to powers of two before any downstream use. The 3D fast
+    // path in freeScalarUpdatePi.wgsl decomposes the linear index with
+    // firstTrailingBit(stride), which is only correct when strides are
+    // powers of two. TDSE / Dirac / Pauli compute passes do the same.
+    const config = sanitizeGridSizes(rawConfig)
     const { device, encoder } = ctx
 
     for (const buf of this.pendingStagingBuffers) buf.destroy()

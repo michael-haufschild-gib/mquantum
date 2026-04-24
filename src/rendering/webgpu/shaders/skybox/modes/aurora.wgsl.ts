@@ -35,7 +35,8 @@ fn getAurora(dir: vec3<f32>, time: f32) -> vec3<f32> {
   let pulseGlow = 1.0 + sin(time * 0.18 + theta * 2.0) * 0.15;
 
   // Vertical fade
-  let verticalFade = pow(clamp(dir.y + 0.2, 0.0, 1.0), 0.5);
+  // pow(x, 0.5) == sqrt(x) — one sqrt is ~2× cheaper than pow's exp+log.
+  let verticalFade = sqrt(clamp(dir.y + 0.2, 0.0, 1.0));
   let bottomFade = smoothstep(-0.3, 0.2, dir.y);
 
   // Combined intensity

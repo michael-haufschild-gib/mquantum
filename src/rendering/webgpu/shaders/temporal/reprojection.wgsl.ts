@@ -55,35 +55,44 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   let worldPos = positionData.xyz;
   let depth = positionData.w;
 
-  // Reproject world position to previous frame's UV
-  // Compute this BEFORE any early returns so we can sample history uniformly
-  let prevClip = temporal.prevViewProjection * vec4f(worldPos, 1.0);
-  let prevNDC = prevClip.xyz / max(prevClip.w, 0.0001);
-  // NDC → UV: X is direct, Y must be flipped because NDC.y=+1 is screen top
-  // but UV.y=0 is texture top (WebGPU framebuffer convention)
-  let prevUV = vec2f(prevNDC.x, -prevNDC.y) * 0.5 + 0.5;
-
-  // CRITICAL: textureSample must be called from UNIFORM control flow
-  // Sample history BEFORE any per-pixel conditional branches
-  let clampedUV = clamp(prevUV, vec2f(0.0), vec2f(1.0));
-  let history = textureSample(prevAccumulation, linearSampler, clampedUV);
-
-  // Now we can do per-pixel early returns and validity checks
-  // Check for valid hit (depth > 0 indicates valid position)
+  // Fast early-out for invalid pixels. Anything below is skipped (no history sample,
+  // no matrix multiply, no smoothsteps) when this pixel has no hit, which saves a
+  // full bilinear history fetch on every background/sky pixel.
   if (depth <= 0.0) {
-    // No hit at this pixel - return invalid marker
     return vec4f(0.0, 0.0, 0.0, 0.0);
   }
 
-  // Validity checks
-  var valid = true;
+  // Reproject world position to previous frame's UV. A non-positive or
+  // near-zero w (<= 0.0001) means the point was at or behind the previous
+  // frame's camera plane (or approximately on it) — clamping to a tiny
+  // positive would either flip the divisor's sign or produce enormous NDCs,
+  // which then blend stale history onto a disoccluded pixel. Treat that
+  // band as invalid and return 0.
+  let prevClip = temporal.prevViewProjection * vec4f(worldPos, 1.0);
+  if (prevClip.w <= 0.0001) {
+    return vec4f(0.0);
+  }
+  let prevNDC = prevClip.xyz / prevClip.w;
+  // NDC → UV: X is direct, Y must be flipped because NDC.y=+1 is screen top
+  // but UV.y=0 is texture top (WebGPU framebuffer convention).
+  let prevUV = vec2f(prevNDC.x, -prevNDC.y) * 0.5 + 0.5;
 
-  // Off-screen rejection with small margin
+  // Off-screen rejection runs BEFORE the history fetch so any pixel that the
+  // validity logic below would zero-out anyway skips the bilinear sample too.
+  // textureSampleLevel tolerates non-uniform control flow (no implicit
+  // derivatives), so the early return is legal here. The sampler is
+  // clamp-to-edge, so once we pass the margin check no explicit clamp is
+  // needed on prevUV.
   let margin = 0.01;
   if (prevUV.x < -margin || prevUV.x > 1.0 + margin ||
       prevUV.y < -margin || prevUV.y > 1.0 + margin) {
-    valid = false;
+    return vec4f(0.0);
   }
+
+  let history = textureSampleLevel(prevAccumulation, linearSampler, prevUV, 0.0);
+
+  // Validity checks
+  var valid = true;
 
   // Screen edge fade (reject pixels near edges)
   let edgeDistance = min(

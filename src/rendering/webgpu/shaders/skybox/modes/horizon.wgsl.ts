@@ -37,10 +37,16 @@ fn getHorizonGradient(dir: vec3<f32>, time: f32) -> vec3<f32> {
   // Animation Layer 2: Color temperature pulse (warm/cool shift)
   let tempPulse = sin(time * 0.12) * 0.08 + sin(time * 0.07) * 0.04;
 
-  // Animation Layer 3: Light sweep across horizon
-  let sweepAngle = (time * 0.15) - floor(time * 0.15 / TAU) * TAU; // mod(time * 0.15, TAU)
-  let lightSweep_raw = sin(atan2(dir.x, dir.z) - sweepAngle);
-  let lightSweep = pow(max(0.0, lightSweep_raw), 8.0) * 0.15 * horizonZone;
+  // Animation Layer 3: Light sweep across horizon.
+  // sin() is 2π-periodic, so wrapping (time * 0.15) into [0, TAU) via floor() is purely
+  // cosmetic -- it only matters once time itself overflows the f32 mantissa. At typical
+  // frame rates the angle stays tiny, so we drop the div + floor + mul + sub (4 ops/pixel).
+  let lightSweep_raw = sin(atan2(dir.x, dir.z) - time * 0.15);
+  // pow(x, 8.0) via three squarings — cheaper than exp+log.
+  let lightSweep_clamped = max(0.0, lightSweep_raw);
+  let ls2 = lightSweep_clamped * lightSweep_clamped;
+  let ls4 = ls2 * ls2;
+  let lightSweep = ls4 * ls4 * 0.15 * horizonZone;
 
   // Animation Layer 4: Ambient brightness variation
   let ambientPulse = sin(time * 0.1 + dir.x * 0.5) * 0.03 + 1.0;

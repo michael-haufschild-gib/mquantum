@@ -408,8 +408,10 @@ fn evalHydrogenNDMomentumSpatial(
   let kx = xND[0] * kScale;
   let ky = xND[1] * kScale;
   let kz = xND[2] * kScale;
-  let r3D = length(vec3f(kx, ky, kz));
-  let invR = 1.0 / max(r3D, 1e-10);
+  // length() + divide fused into inverseSqrt (1 transcendental instead of 2).
+  let sumK = kx * kx + ky * ky + kz * kz;
+  let invR = inverseSqrt(max(sumK, 1e-20));
+  let r3D = sumK * invR;
   let nx = kx * invR;
   let ny = ky * invR;
   let nz = kz * invR;

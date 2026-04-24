@@ -22,9 +22,12 @@ fn evalHydrogenNodeFactorsAtXND(xND: array<f32, 11>, uniforms: SchroedingerUnifo
   let x1 = xND[1];
   let x2 = xND[2];
 
+  // squares are always >= 0, so max(sum3D, 0.0) was redundant.
+  // Fuse sqrt + reciprocal into a single inverseSqrt: r3D = sum3D * invR recovers
+  // the length from the reciprocal root at no extra sqrt.
   let sum3D = x0 * x0 + x1 * x1 + x2 * x2;
-  let r3D = sqrt(max(sum3D, 0.0));
-  let invR = 1.0 / max(r3D, 1e-10);
+  let invR = inverseSqrt(max(sum3D, 1e-20));
+  let r3D = sum3D * invR;
   let nx = x0 * invR;
   let ny = x1 * invR;
   let nz = x2 * invR;
@@ -294,6 +297,9 @@ fn computePhysicalNodalFieldWithGradient(pos: vec3f, t: f32, uniforms: Schroedin
   // adjacent lobes for hydrogen (whose bounding radius is much larger than HO).
   // Reference radius ~3.0 keeps delta ≈ 0.05 for typical HO states.
   let delta = 0.05 * max(uniforms.boundingRadius / 3.0, 1.0);
+  // Hoist the tetrahedral-gradient scale factor (0.75/delta) so it's one
+  // reciprocal per call instead of one per gradient combine (up to 5× below).
+  let invGradDelta = 0.75 / delta;
 
   var intensity = 0.0;
   var signValue = 0.0;
@@ -332,7 +338,7 @@ fn computePhysicalNodalFieldWithGradient(pos: vec3f, t: f32, uniforms: Schroedin
     maxBoostedRho = maxFactor * maxFactor * uniforms.hydrogenNDBoost;
 
     let fCenter = (f0 + f1 + f2 + f3) * 0.25;
-    let fGrad = (TETRA_V0 * f0 + TETRA_V1 * f1 + TETRA_V2 * f2 + TETRA_V3 * f3) * (0.75 / delta);
+    let fGrad = (TETRA_V0 * f0 + TETRA_V1 * f1 + TETRA_V2 * f2 + TETRA_V3 * f3) * invGradDelta;
     let crossing = nodalCrossingMask(f0, f1, f2, f3, eps);
     intensity = nodalBandMask(fCenter, fGrad, eps) * crossing;
     signValue = fCenter;
@@ -344,7 +350,7 @@ fn computePhysicalNodalFieldWithGradient(pos: vec3f, t: f32, uniforms: Schroedin
     let sd1 = sFromRho(sampleDensity(pos + TETRA_V1 * delta, t, uniforms));
     let sd2 = sFromRho(sampleDensity(pos + TETRA_V2 * delta, t, uniforms));
     let sd3 = sFromRho(sampleDensity(pos + TETRA_V3 * delta, t, uniforms));
-    densityGrad = (TETRA_V0 * sd0 + TETRA_V1 * sd1 + TETRA_V2 * sd2 + TETRA_V3 * sd3) * (0.75 / delta);
+    densityGrad = (TETRA_V0 * sd0 + TETRA_V1 * sd1 + TETRA_V2 * sd2 + TETRA_V3 * sd3) * invGradDelta;
     avgS = (sd0 + sd1 + sd2 + sd3) * 0.25;
   } else {
     // Full tetrahedral psi sampling — SHARED between nodal detection and gradient
@@ -372,12 +378,12 @@ fn computePhysicalNodalFieldWithGradient(pos: vec3f, t: f32, uniforms: Schroedin
     let s2 = sFromRho(rho2); let s3 = sFromRho(rho3);
     avgRho = (rho0 + rho1 + rho2 + rho3) * 0.25;
     avgS = (s0 + s1 + s2 + s3) * 0.25;
-    densityGrad = (TETRA_V0 * s0 + TETRA_V1 * s1 + TETRA_V2 * s2 + TETRA_V3 * s3) * (0.75 / delta);
+    densityGrad = (TETRA_V0 * s0 + TETRA_V1 * s1 + TETRA_V2 * s2 + TETRA_V3 * s3) * invGradDelta;
 
     // Nodal detection from the same samples
     let psiCenter = (p0 + p1 + p2 + p3) * 0.25;
-    let gradRe = (TETRA_V0 * re0 + TETRA_V1 * re1 + TETRA_V2 * re2 + TETRA_V3 * re3) * (0.75 / delta);
-    let gradIm = (TETRA_V0 * im0 + TETRA_V1 * im1 + TETRA_V2 * im2 + TETRA_V3 * im3) * (0.75 / delta);
+    let gradRe = (TETRA_V0 * re0 + TETRA_V1 * re1 + TETRA_V2 * re2 + TETRA_V3 * re3) * invGradDelta;
+    let gradIm = (TETRA_V0 * im0 + TETRA_V1 * im1 + TETRA_V2 * im2 + TETRA_V3 * im3) * invGradDelta;
     let crossingRe = nodalCrossingMask(re0, re1, re2, re3, eps);
     let crossingIm = nodalCrossingMask(im0, im1, im2, im3, eps);
 
@@ -397,7 +403,7 @@ fn computePhysicalNodalFieldWithGradient(pos: vec3f, t: f32, uniforms: Schroedin
       colorMode = NODAL_DEFINITION_COMPLEX_INTERSECTION;
     } else {
       let psiAbsCenter = 0.25 * (abs0 + abs1 + abs2 + abs3);
-      let gradAbs = (TETRA_V0 * abs0 + TETRA_V1 * abs1 + TETRA_V2 * abs2 + TETRA_V3 * abs3) * (0.75 / delta);
+      let gradAbs = (TETRA_V0 * abs0 + TETRA_V1 * abs1 + TETRA_V2 * abs2 + TETRA_V3 * abs3) * invGradDelta;
       let crossingAbs = nodalCrossingMask(abs0, abs1, abs2, abs3, eps);
       let crossingAny = max(max(crossingRe, crossingIm), crossingAbs);
       intensity = nodalBandMask(psiAbsCenter, gradAbs, eps) * crossingAny;
@@ -427,6 +433,7 @@ fn computePhysicalNodalField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms)
   let eps = max(uniforms.nodalTolerance, 1e-6);
   // Scale tetrahedral sampling radius with bounding radius (see WithGradient variant).
   let delta = 0.05 * max(uniforms.boundingRadius / 3.0, 1.0);
+  let invGradDelta = 0.75 / delta;
 
   var intensity = 0.0;
   var signValue = 0.0;
@@ -464,7 +471,7 @@ fn computePhysicalNodalField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms)
     maxFamilyFactor = max(max(abs(f0), abs(f1)), max(abs(f2), abs(f3)));
 
     let fCenter = (f0 + f1 + f2 + f3) * 0.25;
-    let fGrad = (TETRA_V0 * f0 + TETRA_V1 * f1 + TETRA_V2 * f2 + TETRA_V3 * f3) * (0.75 / delta);
+    let fGrad = (TETRA_V0 * f0 + TETRA_V1 * f1 + TETRA_V2 * f2 + TETRA_V3 * f3) * invGradDelta;
     let crossing = nodalCrossingMask(f0, f1, f2, f3, eps);
     intensity = nodalBandMask(fCenter, fGrad, eps) * crossing;
     signValue = fCenter;
@@ -491,8 +498,8 @@ fn computePhysicalNodalField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms)
     maxAbsPsi = max(max(abs0, abs1), max(abs2, abs3));
 
     let psiCenter = (p0 + p1 + p2 + p3) * 0.25;
-    let gradRe = (TETRA_V0 * re0 + TETRA_V1 * re1 + TETRA_V2 * re2 + TETRA_V3 * re3) * (0.75 / delta);
-    let gradIm = (TETRA_V0 * im0 + TETRA_V1 * im1 + TETRA_V2 * im2 + TETRA_V3 * im3) * (0.75 / delta);
+    let gradRe = (TETRA_V0 * re0 + TETRA_V1 * re1 + TETRA_V2 * re2 + TETRA_V3 * re3) * invGradDelta;
+    let gradIm = (TETRA_V0 * im0 + TETRA_V1 * im1 + TETRA_V2 * im2 + TETRA_V3 * im3) * invGradDelta;
     let crossingRe = nodalCrossingMask(re0, re1, re2, re3, eps);
     let crossingIm = nodalCrossingMask(im0, im1, im2, im3, eps);
 
@@ -513,7 +520,7 @@ fn computePhysicalNodalField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms)
     } else {
       // |psi| mode: near-zero envelope, gated by sign changes or near-zero contact.
       let psiAbsCenter = 0.25 * (abs0 + abs1 + abs2 + abs3);
-      let gradAbs = (TETRA_V0 * abs0 + TETRA_V1 * abs1 + TETRA_V2 * abs2 + TETRA_V3 * abs3) * (0.75 / delta);
+      let gradAbs = (TETRA_V0 * abs0 + TETRA_V1 * abs1 + TETRA_V2 * abs2 + TETRA_V3 * abs3) * invGradDelta;
       let crossingAbs = nodalCrossingMask(abs0, abs1, abs2, abs3, eps);
       let crossingAny = max(max(crossingRe, crossingIm), crossingAbs);
       intensity = nodalBandMask(psiAbsCenter, gradAbs, eps) * crossingAny;

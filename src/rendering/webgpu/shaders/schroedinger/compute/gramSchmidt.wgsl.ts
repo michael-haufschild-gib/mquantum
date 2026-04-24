@@ -39,8 +39,8 @@ struct GSReduceUniforms {
 @group(0) @binding(5) var<storage, read_write> partialRe: array<f32>;
 @group(0) @binding(6) var<storage, read_write> partialIm: array<f32>;
 
-var<workgroup> shared_re: array<f32, 256>;
-var<workgroup> shared_im: array<f32, 256>;
+// Pack (re, im) into vec2 — halves shared-memory ops in the tree reduce.
+var<workgroup> shared_ip: array<vec2<f32>, 256>;
 
 @compute @workgroup_size(256)
 fn main(
@@ -51,33 +51,30 @@ fn main(
   let idx = gid.x;
   let local = lid.x;
 
-  var ipRe: f32 = 0.0;
-  var ipIm: f32 = 0.0;
+  var ip: vec2<f32> = vec2<f32>(0.0, 0.0);
   if (idx < params.totalElements) {
     let pRe = phiRe[idx];
     let pIm = phiIm[idx];
     let wRe = psiRe[idx];
     let wIm = psiIm[idx];
     // ⟨φ|ψ⟩ = conj(φ) · ψ = (φ_re - iφ_im)(ψ_re + iψ_im)
-    ipRe = pRe * wRe + pIm * wIm;
-    ipIm = pRe * wIm - pIm * wRe;
+    ip = vec2<f32>(pRe * wRe + pIm * wIm, pRe * wIm - pIm * wRe);
   }
 
-  shared_re[local] = ipRe;
-  shared_im[local] = ipIm;
+  shared_ip[local] = ip;
   workgroupBarrier();
 
   for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
-      shared_re[local] += shared_re[local + stride];
-      shared_im[local] += shared_im[local + stride];
+      shared_ip[local] = shared_ip[local] + shared_ip[local + stride];
     }
     workgroupBarrier();
   }
 
   if (local == 0u) {
-    partialRe[wid.x] = shared_re[0];
-    partialIm[wid.x] = shared_im[0];
+    let sum = shared_ip[0];
+    partialRe[wid.x] = sum.x;
+    partialIm[wid.x] = sum.y;
   }
 }
 `
@@ -96,36 +93,33 @@ struct GSReduceUniforms {
 @group(0) @binding(2) var<storage, read> partialIm: array<f32>;
 @group(0) @binding(3) var<storage, read_write> result: array<f32>;
 
-var<workgroup> shared_re: array<f32, 256>;
-var<workgroup> shared_im: array<f32, 256>;
+var<workgroup> shared_ip: array<vec2<f32>, 256>;
 
 @compute @workgroup_size(256)
 fn main(@builtin(local_invocation_id) lid: vec3u) {
   let local = lid.x;
 
-  var accRe: f32 = 0.0;
-  var accIm: f32 = 0.0;
+  var acc: vec2<f32> = vec2<f32>(0.0, 0.0);
+  let ngroups = params.numWorkgroups;
   var i = local;
-  while (i < params.numWorkgroups) {
-    accRe += partialRe[i];
-    accIm += partialIm[i];
+  while (i < ngroups) {
+    acc = acc + vec2<f32>(partialRe[i], partialIm[i]);
     i += 256u;
   }
-  shared_re[local] = accRe;
-  shared_im[local] = accIm;
+  shared_ip[local] = acc;
   workgroupBarrier();
 
   for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
-      shared_re[local] += shared_re[local + stride];
-      shared_im[local] += shared_im[local + stride];
+      shared_ip[local] = shared_ip[local] + shared_ip[local + stride];
     }
     workgroupBarrier();
   }
 
   if (local == 0u) {
-    result[0] = shared_re[0];
-    result[1] = shared_im[0];
+    let sum = shared_ip[0];
+    result[0] = sum.x;
+    result[1] = sum.y;
   }
 }
 `
@@ -157,9 +151,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let idx = gid.x;
   if (idx >= params.totalElements) { return; }
 
-  let norm2 = max(params.normSquared, 1e-20);
-  let cRe = innerProduct[0] / norm2;
-  let cIm = innerProduct[1] / norm2;
+  // Both threads divide by the same norm2; one reciprocal replaces N divides.
+  let invNorm2 = 1.0 / max(params.normSquared, 1e-20);
+  let cRe = innerProduct[0] * invNorm2;
+  let cIm = innerProduct[1] * invNorm2;
 
   let fRe = phiRe[idx];
   let fIm = phiIm[idx];

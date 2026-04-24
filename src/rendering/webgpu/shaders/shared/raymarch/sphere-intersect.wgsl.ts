@@ -65,7 +65,9 @@ fn intersectSphereAt(ro: vec3f, rd: vec3f, center: vec3f, radius: f32) -> vec2f 
  * @returns true if point is inside sphere
  */
 fn isInsideSphere(p: vec3f, center: vec3f, radius: f32) -> bool {
-  return length(p - center) < radius;
+  // Squared comparison avoids the sqrt in length().
+  let d = p - center;
+  return dot(d, d) < radius * radius;
 }
 
 /**

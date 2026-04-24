@@ -53,10 +53,11 @@ fn main(
   let idx = gid.x;
   let local = lid.x;
   let nc = obsParams.numChannels;
+  let localBase = local * MAX_CHANNELS;
 
   // Initialize shared memory for this thread's channels
-  for (var ch: u32 = 0u; ch < nc; ch++) {
-    sdata[local * MAX_CHANNELS + ch] = 0.0;
+  for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
+    sdata[localBase + ch] = 0.0;
   }
 
   if (idx < obsParams.totalSites) {
@@ -66,36 +67,37 @@ fn main(
 
     // Compute volume element dV = product of all spacings
     var dV: f32 = 1.0;
-    for (var d: u32 = 0u; d < obsParams.latticeDim; d++) {
+    let ldim = obsParams.latticeDim;
+    for (var d: u32 = 0u; d < ldim; d = d + 1u) {
       dV *= obsParams.spacing[d];
     }
     let weightedDensity = density * dV;
 
     // Channel 0: norm
-    sdata[local * MAX_CHANNELS] = weightedDensity;
+    sdata[localBase] = weightedDensity;
 
     // Decompose linear index to N-D coordinates
-    let coords = linearToND(idx, obsParams.strides, obsParams.gridSize, obsParams.latticeDim);
+    let coords = linearToND(idx, obsParams.strides, obsParams.gridSize, ldim);
 
     // Per-dimension position moments
-    for (var d: u32 = 0u; d < obsParams.latticeDim; d++) {
+    for (var d: u32 = 0u; d < ldim; d = d + 1u) {
       let pos_d = (f32(coords[d]) - f32(obsParams.gridSize[d]) * 0.5 + 0.5) * obsParams.spacing[d];
-      let chBase = 1u + d * 2u;
-      sdata[local * MAX_CHANNELS + chBase] = pos_d * weightedDensity;          // x_d * |ψ|² dV
-      sdata[local * MAX_CHANNELS + chBase + 1u] = pos_d * pos_d * weightedDensity; // x_d² * |ψ|² dV
+      let chBase = localBase + 1u + (d << 1u);
+      sdata[chBase]        = pos_d * weightedDensity;           // x_d · |ψ|² dV
+      sdata[chBase + 1u]   = pos_d * pos_d * weightedDensity;   // x_d² · |ψ|² dV
     }
 
     // Last channel: potential energy ⟨V⟩ = Σ V(x) |ψ|² dV
-    let vIdx = 1u + 2u * obsParams.latticeDim;
-    sdata[local * MAX_CHANNELS + vIdx] = potentialBuf[idx] * weightedDensity;
+    sdata[localBase + 1u + (ldim << 1u)] = potentialBuf[idx] * weightedDensity;
   }
   workgroupBarrier();
 
   // Tree reduction within workgroup — all channels
   for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
-      for (var ch: u32 = 0u; ch < nc; ch++) {
-        sdata[local * MAX_CHANNELS + ch] += sdata[(local + stride) * MAX_CHANNELS + ch];
+      let rightBase = (local + stride) * MAX_CHANNELS;
+      for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
+        sdata[localBase + ch] += sdata[rightBase + ch];
       }
     }
     workgroupBarrier();
@@ -103,8 +105,9 @@ fn main(
 
   // Write workgroup results: partials[wid.x * numChannels + ch]
   if (local == 0u) {
-    for (var ch: u32 = 0u; ch < nc; ch++) {
-      partials[wid.x * nc + ch] = sdata[ch];
+    let outBase = wid.x * nc;
+    for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
+      partials[outBase + ch] = sdata[ch];
     }
   }
 }
@@ -143,16 +146,19 @@ fn main(
 ) {
   let local = lid.x;
   let nc = obsParams.numChannels;
+  let localBase = local * MAX_CHANNELS;
+  let ngroups = obsParams.numWorkgroups;
 
   // Each thread accumulates multiple workgroup entries
-  for (var ch: u32 = 0u; ch < nc; ch++) {
-    sdata[local * MAX_CHANNELS + ch] = 0.0;
+  for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
+    sdata[localBase + ch] = 0.0;
   }
 
   var i = local;
-  while (i < obsParams.numWorkgroups) {
-    for (var ch: u32 = 0u; ch < nc; ch++) {
-      sdata[local * MAX_CHANNELS + ch] += partials[i * nc + ch];
+  while (i < ngroups) {
+    let inBase = i * nc;
+    for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
+      sdata[localBase + ch] += partials[inBase + ch];
     }
     i += WG_SIZE;
   }
@@ -161,8 +167,9 @@ fn main(
   // Tree reduction
   for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
-      for (var ch: u32 = 0u; ch < nc; ch++) {
-        sdata[local * MAX_CHANNELS + ch] += sdata[(local + stride) * MAX_CHANNELS + ch];
+      let rightBase = (local + stride) * MAX_CHANNELS;
+      for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
+        sdata[localBase + ch] += sdata[rightBase + ch];
       }
     }
     workgroupBarrier();
@@ -170,7 +177,7 @@ fn main(
 
   // Write final result
   if (local == 0u) {
-    for (var ch: u32 = 0u; ch < nc; ch++) {
+    for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
       result[ch] = sdata[ch];
     }
   }

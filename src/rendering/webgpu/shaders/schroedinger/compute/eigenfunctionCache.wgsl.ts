@@ -83,22 +83,33 @@ fn computeHo1D(n: i32, x: f32, omega: f32) -> f32 {
   return alphaNorm * HO_NORM_C[n] * H * gauss;
 }
 
-// Evaluate φ'_n(x, ω) using ladder operator identity:
-// φ'_n(x) = sqrt(ω) * (sqrt(2n) * φ_{n-1}(x) - sqrt(ω) * x * φ_n(x))
-//
-// Derivation: d/dx[N_n H_n(αx) e^{-½α²x²}]
-//   = N_n [H'_n(αx)·α - α²x·H_n(αx)] e^{-½α²x²}
-//   = α [2n · (N_n/N_{n-1}) · φ_{n-1}(x) - αx · φ_n(x)]
-//   = sqrt(ω) [sqrt(2n) · φ_{n-1}(x) - sqrt(ω) · x · φ_n(x)]
-fn computeHo1DDeriv(n: i32, x: f32, omega: f32, phi_n: f32) -> f32 {
+// Compute φ_n(x,ω) AND φ'_n(x,ω) in a single pass, reusing α, u, e^{-½u²},
+// α-normalization, and the shared gaussian envelope. Calling this is ~40 %
+// cheaper than calling computeHo1D twice (once for n and once for n-1 via
+// computeHo1DDeriv), which is why the cache kernel uses this fused form.
+fn computeHo1DPhiDeriv(n: i32, x: f32, omega: f32) -> vec2f {
+  if (n < 0 || n > 6) { return vec2f(0.0, 0.0); }
   let omegaClamped = max(omega, 0.01);
   let sqrtOmega = sqrt(omegaClamped);
+  let u = sqrtOmega * x;
+  let u2 = min(u * u, 40.0);
+  let gauss = exp(-0.5 * u2);
+  let alphaNorm = sqrt(sqrt(omegaClamped * INV_PI));
+  let gaussNorm = alphaNorm * gauss;
+  let Hn = hermite(n, u);
+  let phi_n = gaussNorm * HO_NORM_C[n] * Hn;
+
+  // φ'_n(x) = √ω · (√(2n)·φ_{n-1}(x) - √ω · x · φ_n(x))
+  // For n=0: φ'_0 = -ω·x·φ_0 (√ω² = ω).
+  var dphi: f32;
   if (n == 0) {
-    // φ'_0(x) = -ωx · φ_0(x); sqrtOmega² = omegaClamped
-    return -omegaClamped * x * phi_n;
+    dphi = -omegaClamped * x * phi_n;
+  } else {
+    let Hnm1 = hermite(n - 1, u);
+    let phi_nm1 = gaussNorm * HO_NORM_C[n - 1] * Hnm1;
+    dphi = sqrtOmega * (sqrt(2.0 * f32(n)) * phi_nm1 - sqrtOmega * x * phi_n);
   }
-  let phi_nm1 = computeHo1D(n - 1, x, omega);
-  return sqrtOmega * (sqrt(2.0 * f32(n)) * phi_nm1 - sqrtOmega * x * phi_n);
+  return vec2f(phi_n, dphi);
 }
 
 const WORKGROUP_SIZE: u32 = 256u;
@@ -130,12 +141,11 @@ fn main(
   // Matches fragment shader's invRange = (SAMPLES-1) / (xMax-xMin) for Catmull-Rom lookup.
   let x = mix(xMin, xMax, f32(sampleIdx) / f32(EIGEN_CACHE_SAMPLES - 1u));
 
-  // Compute eigenfunction value and derivative
-  let phi = computeHo1D(n, x, omega);
-  let dphi = computeHo1DDeriv(n, x, omega, phi);
+  // Compute eigenfunction value and derivative in a single fused pass
+  let phiDphi = computeHo1DPhiDeriv(n, x, omega);
 
   // Write to storage buffer
   let bufIdx = funcIdx * EIGEN_CACHE_SAMPLES + sampleIdx;
-  eigenCacheOut[bufIdx] = vec2f(phi, dphi);
+  eigenCacheOut[bufIdx] = phiDphi;
 }
 `

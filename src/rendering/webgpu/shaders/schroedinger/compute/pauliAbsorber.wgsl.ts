@@ -39,12 +39,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   if (sigma > 0.0) {
     let dampFactor = exp(-sigma * params.dt);
-    let T = params.totalSites;
+    let idx1 = params.totalSites + idx;
     // Apply to spin-up (c=0) and spin-down (c=1)
-    spinorRe[idx] *= dampFactor;
-    spinorIm[idx] *= dampFactor;
-    spinorRe[T + idx] *= dampFactor;
-    spinorIm[T + idx] *= dampFactor;
+    spinorRe[idx]  *= dampFactor;
+    spinorIm[idx]  *= dampFactor;
+    spinorRe[idx1] *= dampFactor;
+    spinorIm[idx1] *= dampFactor;
   }
 }
 `

@@ -43,11 +43,7 @@ export const tdseStockhamFFTBlock = /* wgsl */ `
 @group(0) @binding(1) var<storage, read> srcBuf: array<f32>;
 @group(0) @binding(2) var<storage, read_write> dstBuf: array<f32>;
 
-// Twiddle factor: exp(-i * direction * 2*pi*k / N)
-fn twiddle(k: u32, N: u32, direction: f32) -> vec2f {
-  let angle = -direction * 2.0 * 3.14159265358979323846 * f32(k) / f32(N);
-  return vec2f(cos(angle), sin(angle));
-}
+const FFT_TWO_PI: f32 = 6.28318530717958647692;
 
 // Complex multiply: (a+bi)(c+di) = (ac-bd) + (ad+bc)i
 fn cmul(a: vec2f, b: vec2f) -> vec2f {
@@ -58,59 +54,65 @@ fn cmul(a: vec2f, b: vec2f) -> vec2f {
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let tid = gid.x;
   // Total butterflies = totalElements / 2 (each butterfly reads 2 and writes 2)
-  let halfTotal = fftUni.totalElements / 2u;
+  let halfTotal = fftUni.totalElements >> 1u;
   if (tid >= halfTotal) {
     return;
   }
 
   let N = fftUni.axisDim;
   let s = fftUni.stage;
-  let halfStage = 1u << s;        // 2^s
+  let halfStage = 1u << s;         // 2^s
   let fullStage = halfStage << 1u; // 2^(s+1)
 
-  // Decompose tid into (batchId, localId within this 1-D transform)
-  // Number of butterflies per 1-D transform = N/2
-  let butterfliesPerTransform = N / 2u;
-  let batchId = tid / butterfliesPerTransform;
-  let localBfly = tid % butterfliesPerTransform;
+  // Decompose tid into (batchId, localId within this 1-D transform).
+  // butterfliesPerTransform = N/2 — N is a power of 2, so use shift.
+  let butterfliesPerTransform = N >> 1u;
+  let log2BpT = firstTrailingBit(butterfliesPerTransform);
+  let bptMask = butterfliesPerTransform - 1u;
+  let batchId = tid >> log2BpT;
+  let localBfly = tid & bptMask;
 
   // Stockham auto-sort index decomposition:
-  // g = which group of size fullStage, j = position within half-group
-  let g = localBfly / halfStage;
-  let j = localBfly % halfStage;
+  //   g = which group of size fullStage, j = position within half-group.
+  //   halfStage is 2^s → divide/modulo become shift/mask.
+  let g = localBfly >> s;
+  let j = localBfly & (halfStage - 1u);
 
-  // Batch offset: decompose batchId into slow/fast axis components
-  let batchInner = batchId % fftUni.axisStride;
-  let batchOuter = batchId / fftUni.axisStride;
-  let outerStride = fftUni.axisStride * N;
+  // Batch offset: decompose batchId by axisStride (axisStride is a product
+  // of power-of-2 grid dims, so itself a power of 2).
+  let axisStride = fftUni.axisStride;
+  let log2Stride = firstTrailingBit(axisStride);
+  let strideMask = axisStride - 1u;
+  let batchInner = batchId & strideMask;
+  let batchOuter = batchId >> log2Stride;
+  let outerStride = axisStride * N;
   let baseOffset = batchOuter * outerStride + batchInner;
 
-  // Stockham INPUT: read from sequential halves (natural order from previous stage)
-  // in0 = localBfly, in1 = localBfly + N/2
-  let inIdx0 = localBfly;
-  let inIdx1 = localBfly + butterfliesPerTransform;
-
-  let inAddr0 = (baseOffset + inIdx0 * fftUni.axisStride) * 2u; // *2 for interleaved re,im
-  let inAddr1 = (baseOffset + inIdx1 * fftUni.axisStride) * 2u;
+  // Address pattern: in0 at localBfly, in1 at localBfly + N/2.
+  // Compute inAddr0 once; inAddr1 is inAddr0 + 2 * bpt * axisStride (one mul saved).
+  let pairDelta = (butterfliesPerTransform * axisStride) << 1u;
+  let inAddr0 = (baseOffset + localBfly * axisStride) << 1u; // *2 for interleaved re,im
+  let inAddr1 = inAddr0 + pairDelta;
 
   let val0 = vec2f(srcBuf[inAddr0], srcBuf[inAddr0 + 1u]);
   let val1 = vec2f(srcBuf[inAddr1], srcBuf[inAddr1 + 1u]);
 
-  // Twiddle factor: W_N^(j * N / fullStage) = exp(-i * direction * 2pi * j / fullStage)
-  let tw = twiddle(j * (N / fullStage), N, fftUni.direction);
+  // Twiddle factor: W_N^(j * N / fullStage) = exp(-i * direction * 2π * j / fullStage).
+  // fullStage is a per-dispatch uniform → the (−dir·2π/fullStage) factor is the same for every
+  // thread. Precomputing it turns the per-thread divide into a multiply.
+  let anglePerJ = (-fftUni.direction * FFT_TWO_PI) / f32(fullStage);
+  let angle = anglePerJ * f32(j);
+  let tw = vec2f(cos(angle), sin(angle));
   let twVal1 = cmul(tw, val1);
 
   // Butterfly
   let outTop = val0 + twVal1;
   let outBot = val0 - twVal1;
 
-  // Stockham OUTPUT: write to shuffled positions (auto-sort reordering)
-  // out0 = g * fullStage + j, out1 = out0 + halfStage
+  // Stockham OUTPUT: out0 = g * fullStage + j, out1 = out0 + halfStage.
   let outIdx0 = g * fullStage + j;
-  let outIdx1 = outIdx0 + halfStage;
-
-  let outAddr0 = (baseOffset + outIdx0 * fftUni.axisStride) * 2u;
-  let outAddr1 = (baseOffset + outIdx1 * fftUni.axisStride) * 2u;
+  let outAddr0 = (baseOffset + outIdx0 * axisStride) << 1u;
+  let outAddr1 = outAddr0 + ((halfStage * axisStride) << 1u);
 
   dstBuf[outAddr0] = outTop.x;
   dstBuf[outAddr0 + 1u] = outTop.y;

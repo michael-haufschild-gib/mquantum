@@ -233,6 +233,38 @@ export const rgbToHex = (r: number, g: number, b: number): string => {
 }
 
 /**
+ * Convert a linear sRGB triple in [0, 1] to HSL. Must stay bit-compatible with
+ * the WGSL `rgb2hsl` in `src/rendering/webgpu/shaders/shared/color/hsl.wgsl`
+ * so CPU-precomputed HSL uniforms match what the shader would produce.
+ * @param r - Red (0-1).
+ * @param g - Green (0-1).
+ * @param b - Blue (0-1).
+ * @returns [h, s, l] with each component in [0, 1].
+ */
+export function rgbUnitToHsl(r: number, g: number, b: number): [number, number, number] {
+  const maxC = Math.max(r, g, b)
+  const minC = Math.min(r, g, b)
+  const delta = maxC - minC
+  const l = (maxC + minC) * 0.5
+
+  let h = 0
+  let s = 0
+  if (delta > 1e-6) {
+    s = delta / (1.0 - Math.abs(2.0 * l - 1.0))
+    if (maxC === r) {
+      h = (g - b) / delta
+      if (g < b) h += 6.0
+    } else if (maxC === g) {
+      h = (b - r) / delta + 2.0
+    } else {
+      h = (r - g) / delta + 4.0
+    }
+    h /= 6.0
+  }
+  return [h, s, l]
+}
+
+/**
  * Helper: HSV to RGB struct.
  * @param h - Hue.
  * @param s - Saturation.

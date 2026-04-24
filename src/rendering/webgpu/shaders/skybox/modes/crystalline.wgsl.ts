@@ -67,8 +67,9 @@ fn getCrystalline(dir: vec3<f32>, time: f32) -> vec3<f32> {
 
   var col: vec3<f32>;
   col = cosinePalette(iridescence, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
-  // Add subtle facet highlights
-  col = mix(col * 0.3, col, edge1 * edge2);
+  // Add subtle facet highlights.
+  // mix(col*0.3, col, t) == col * (0.3 + 0.7*t) -- algebraic identity, saves a vec3 sub.
+  col *= 0.3 + 0.7 * (edge1 * edge2);
   // Shimmer on edges using palette highlight color
   // PERF: Use multiplication instead of pow(x, 2.0)
   let shimmerColor = cosinePalette(0.9, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);

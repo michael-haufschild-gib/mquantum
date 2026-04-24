@@ -231,16 +231,29 @@ fn evalMetric(kind: u32, coords: array<f32, 12>, dim: u32, time: f32) -> CurvedM
 }
 
 // Cell-center world coordinates for lattice index (via coords[] from linearToND).
+// WGSL default-zero-initializes locals; skip the explicit 12-element zero loop.
 fn curvedCellCoords(latCoords: array<u32, 12>, dim: u32) -> array<f32, 12> {
   var w: array<f32, 12>;
-  for (var d: u32 = 0u; d < 12u; d++) {
-    w[d] = 0.0;
-  }
-  for (var d: u32 = 0u; d < dim; d++) {
+  for (var d: u32 = 0u; d < dim; d = d + 1u) {
     let N = f32(params.gridSize[d]);
     w[d] = curvedWorldCoord(f32(latCoords[d]), N, params.spacing[d]);
   }
   return w;
+}
+
+// Whether the diagonal metric (gInvDiag, sqrtDet) actually varies along the
+// given axis for the active metric kind. When false, mPlus = mMinus = mCenter
+// and the two half-point evalMetric calls can be skipped — a 2-4× reduction
+// in metric-eval work for non-Schwarzschild kinds on the RK4 hot path.
+//   - flat(0) / deSitter(3) / torus(6): spatially uniform → never varies
+//   - MT(1) / AdS(4) / doubleThroat(7): depend on coords[0] only
+//   - sphere2D(5): depends on coords[1] (theta) only
+//   - Schwarzschild(2): r = |coords| → varies along every axis
+fn metricVariesAlongAxis(kind: u32, axis: u32) -> bool {
+  if (kind == 1u || kind == 4u || kind == 7u) { return axis == 0u; }
+  if (kind == 5u) { return axis == 1u; }
+  if (kind == 2u) { return true; }
+  return false;
 }
 
 // ── Diagnostic curvature scalars (provided for Wave 6 visualization) ────
@@ -344,15 +357,25 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   var divFluxRe: f32 = 0.0;
   var divFluxIm: f32 = 0.0;
 
-  for (var axis: u32 = 0u; axis < params.latticeDim; axis++) {
+  // Combine prefactor·invSqrtDet once; applied to the accumulated divergence.
+  let kineticScale = prefactor * invSqrtDet;
+  let ldim = params.latticeDim;
+  let kind = params.metricKind;
+  // Reuse a single 12-element scratch array for both half-point coord evaluations
+  // (write, call, overwrite, call) instead of keeping two 12-entry arrays live.
+  var coordsWork = cellW;
+
+  for (var axis: u32 = 0u; axis < ldim; axis = axis + 1u) {
     let dx = params.spacing[axis];
     let invDx = 1.0 / max(dx, 1e-12);
+    let invDx2 = invDx * invDx;            // fold both /dx factors into one mul
+    let halfDx = 0.5 * dx;
     let Naxis = params.gridSize[axis];
     let stride = params.strides[axis];
     let coordAxis = coords[axis];
     // axisIsPeriodic is exposed for future kinds; in v2a all active metric
     // kinds in this kernel use Dirichlet (torus is routed to FFT path).
-    let periodic = axisIsPeriodic(params.metricKind, axis);
+    let periodic = axisIsPeriodic(kind, axis);
 
     // Plus neighbor ψ (Dirichlet: 0 outside grid; wrap when periodic).
     var psiPlusRe: f32 = 0.0;
@@ -381,29 +404,40 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       psiMinusIm = curvedKinPsiIm[idxMinus];
     }
 
-    // Half-point world coords along this axis (+½ and −½).
-    var coordsPlus = cellW;
-    coordsPlus[axis] = cellW[axis] + 0.5 * dx;
-    var coordsMinus = cellW;
-    coordsMinus[axis] = cellW[axis] - 0.5 * dx;
+    // Skip the two half-point evalMetric calls when the metric does not
+    // actually vary along this axis (see metricVariesAlongAxis). For flat /
+    // torus / deSitter kinds and for non-primary axes of MT / AdS / sphere2D
+    // / doubleThroat, mPlus = mMinus = mCenter, so the center value can be
+    // reused. Saves 2 evalMetric calls per voxel per non-varying axis —
+    // 4 of 6 calls in 3D for most metric kinds.
+    var aPlus: f32;
+    var aMinus: f32;
+    if (metricVariesAlongAxis(kind, axis)) {
+      let baseCoord = cellW[axis];
+      coordsWork[axis] = baseCoord + halfDx;
+      let mPlus = evalMetric(kind, coordsWork, ldim, stageT);
+      coordsWork[axis] = baseCoord - halfDx;
+      let mMinus = evalMetric(kind, coordsWork, ldim, stageT);
+      coordsWork[axis] = baseCoord; // restore for next iteration
+      aPlus = mPlus.sqrtDet * mPlus.gInvDiag[axis];
+      aMinus = mMinus.sqrtDet * mMinus.gInvDiag[axis];
+    } else {
+      let aCenter = mCenter.sqrtDet * mCenter.gInvDiag[axis];
+      aPlus = aCenter;
+      aMinus = aCenter;
+    }
 
-    let mPlus = evalMetric(params.metricKind, coordsPlus, params.latticeDim, stageT);
-    let mMinus = evalMetric(params.metricKind, coordsMinus, params.latticeDim, stageT);
-    let aPlus = mPlus.sqrtDet * mPlus.gInvDiag[axis];
-    let aMinus = mMinus.sqrtDet * mMinus.gInvDiag[axis];
-
-    // Staggered flux: F_+ = a_+ · (ψ_{+1} − ψ_0)/dx, F_− = a_− · (ψ_0 − ψ_{−1})/dx.
-    let fluxPlusRe = aPlus * (psiPlusRe - psiCenterRe) * invDx;
-    let fluxPlusIm = aPlus * (psiPlusIm - psiCenterIm) * invDx;
-    let fluxMinusRe = aMinus * (psiCenterRe - psiMinusRe) * invDx;
-    let fluxMinusIm = aMinus * (psiCenterIm - psiMinusIm) * invDx;
-
-    divFluxRe = divFluxRe + (fluxPlusRe - fluxMinusRe) * invDx;
-    divFluxIm = divFluxIm + (fluxPlusIm - fluxMinusIm) * invDx;
+    // Staggered flux divergence: [a_+(ψ_{+1}−ψ_0) − a_−(ψ_0−ψ_{−1})] / dx²
+    let diffPlusRe = psiPlusRe - psiCenterRe;
+    let diffPlusIm = psiPlusIm - psiCenterIm;
+    let diffMinusRe = psiCenterRe - psiMinusRe;
+    let diffMinusIm = psiCenterIm - psiMinusIm;
+    divFluxRe = divFluxRe + (aPlus * diffPlusRe - aMinus * diffMinusRe) * invDx2;
+    divFluxIm = divFluxIm + (aPlus * diffPlusIm - aMinus * diffMinusIm) * invDx2;
   }
 
-  curvedKinOutRe[idx] = prefactor * invSqrtDet * divFluxRe;
-  curvedKinOutIm[idx] = prefactor * invSqrtDet * divFluxIm;
+  curvedKinOutRe[idx] = kineticScale * divFluxRe;
+  curvedKinOutIm[idx] = kineticScale * divFluxIm;
 }
 `
 

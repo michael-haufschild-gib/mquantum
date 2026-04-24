@@ -110,8 +110,11 @@ fn evaluateSingleBasis(xND: array<f32, 11>, t: f32, k: u32, uniforms: Schroeding
   // Guard: skip invalid/unused basis states
   if (n_k <= 0) { return vec2f(0.0, 0.0); }
 
-  // 3D radius
-  let r3D = sqrt(xND[0]*xND[0] + xND[1]*xND[1] + xND[2]*xND[2]);
+  // 3D radius + inverse via a single inverseSqrt, with r3D = sum * invR.
+  // One transcendental instead of sqrt + divide.
+  let sum3D = xND[0]*xND[0] + xND[1]*xND[1] + xND[2]*xND[2];
+  let invR = inverseSqrt(max(sum3D, 1e-20));
+  let r3D = sum3D * invR;
 
   // Radial threshold with D-dimensional n_eff (per-basis, computed inline)
   let nEff_k = f32(n_k) + f32(${dim} - 3) * 0.5;
@@ -119,7 +122,6 @@ fn evaluateSingleBasis(xND: array<f32, 11>, t: f32, k: u32, uniforms: Schroeding
   if (r3D > threshold) { return vec2f(0.0, 0.0); }
 
   // Cartesian unit direction for angular evaluation
-  let invR = 1.0 / max(r3D, 1e-10);
   let nx = xND[0] * invR;
   let ny = xND[1] * invR;
   let nz = xND[2] * invR;

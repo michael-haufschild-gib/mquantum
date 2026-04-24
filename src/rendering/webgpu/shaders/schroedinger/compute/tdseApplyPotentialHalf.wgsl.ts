@@ -26,6 +26,9 @@ export const tdseApplyPotentialHalfBlock = /* wgsl */ `
 @group(0) @binding(2) var<storage, read_write> psiIm: array<f32>;
 @group(0) @binding(3) var<storage, read> potential: array<f32>;
 
+const POT_INV_TWO_PI: f32 = 0.15915494309189535;
+const POT_TWO_PI: f32 = 6.283185307179587;
+
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let idx = gid.x;
@@ -40,7 +43,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let density = re * re + im * im;
   let effectiveV = potential[idx] + params.interactionStrength * density;
 
-  let arg = effectiveV * params.dt / (2.0 * max(params.hbar, 1e-6));
+  // Uniform-only: dt/(2·max(ℏ,ε)) — one reciprocal per thread turns into a multiply.
+  let halfDtOverHbar = (0.5 * params.dt) / max(params.hbar, 1e-6);
+  let arg = effectiveV * halfDtOverHbar;
 
   if (params.imaginaryTime != 0u) {
     // Imaginary-time (Wick rotation): exp(-V·dτ/(2ℏ)) — real exponential decay
@@ -51,7 +56,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // Real-time: exp(-i·V·dt/(2ℏ)) — unitary phase rotation
     // Reduce to [-π, π] so f32 cos/sin stay precise for high-V / small-ℏ combos
     let phase = -arg;
-    let reduced = phase - round(phase * 0.15915494) * 6.28318530;
+    let reduced = phase - round(phase * POT_INV_TWO_PI) * POT_TWO_PI;
     let cosP = cos(reduced);
     let sinP = sin(reduced);
     psiRe[idx] = re * cosP - im * sinP;

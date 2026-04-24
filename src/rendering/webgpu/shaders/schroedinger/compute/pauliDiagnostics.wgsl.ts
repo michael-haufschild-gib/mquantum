@@ -41,14 +41,12 @@ struct PauliDiagUniforms {
 @group(0) @binding(2) var<storage, read> spinorIm: array<f32>;
 @group(0) @binding(3) var<storage, read_write> partial: array<f32>;
 
-// 8 quantities × 64 threads
-var<workgroup> sh_totalNorm: array<f32, 64>;
-var<workgroup> sh_normUp: array<f32, 64>;
-var<workgroup> sh_normDown: array<f32, 64>;
-var<workgroup> sh_sigmaX: array<f32, 64>;
-var<workgroup> sh_sigmaY: array<f32, 64>;
-var<workgroup> sh_sigmaZ: array<f32, 64>;
-var<workgroup> sh_maxDensity: array<f32, 64>;
+// Pack 4 independent additive channels (normUp, normDown, sigmaX, sigmaY) into a
+// single vec4. totalNorm = normUp + normDown and sigmaZ = normUp - normDown are
+// derived on final write — no need to reduce them separately. Max stays scalar
+// (different reduction op). Tree-reduction shared-mem ops per step: 7 → 2.
+var<workgroup> sh_add: array<vec4<f32>, 64>;
+var<workgroup> sh_max: array<f32, 64>;
 
 @compute @workgroup_size(64)
 fn main(
@@ -60,12 +58,7 @@ fn main(
   let local = lid.x;
   let T = diagParams.totalSites;
 
-  var totalNorm: f32 = 0.0;
-  var normUp: f32 = 0.0;
-  var normDown: f32 = 0.0;
-  var sigmaX: f32 = 0.0;
-  var sigmaY: f32 = 0.0;
-  var sigmaZ: f32 = 0.0;
+  var acc: vec4<f32> = vec4<f32>(0.0, 0.0, 0.0, 0.0);
   var maxDensity: f32 = 0.0;
 
   if (idx < T) {
@@ -76,55 +69,42 @@ fn main(
 
     let d0 = re0 * re0 + im0 * im0;  // |ψ_up|²
     let d1 = re1 * re1 + im1 * im1;  // |ψ_down|²
-    let total = d0 + d1;
 
     // ψ_up* · ψ_down = (re0 - i im0)(re1 + i im1)
     //                 = (re0·re1 + im0·im1) + i(re0·im1 - im0·re1)
     let cohRe = re0 * re1 + im0 * im1;
     let cohIm = re0 * im1 - im0 * re1;
 
-    totalNorm = total;
-    normUp = d0;
-    normDown = d1;
-    sigmaX = 2.0 * cohRe;                // ⟨σ_x⟩ unnormalized
-    sigmaY = 2.0 * cohIm;                // ⟨σ_y⟩ unnormalized (2 Im(ψ_up* ψ_down))
-    sigmaZ = d0 - d1;                    // ⟨σ_z⟩ unnormalized
-    maxDensity = total;
+    acc = vec4<f32>(d0, d1, 2.0 * cohRe, 2.0 * cohIm);
+    maxDensity = d0 + d1;
   }
 
-  sh_totalNorm[local] = totalNorm;
-  sh_normUp[local] = normUp;
-  sh_normDown[local] = normDown;
-  sh_sigmaX[local] = sigmaX;
-  sh_sigmaY[local] = sigmaY;
-  sh_sigmaZ[local] = sigmaZ;
-  sh_maxDensity[local] = maxDensity;
+  sh_add[local] = acc;
+  sh_max[local] = maxDensity;
   workgroupBarrier();
 
   // Tree reduction (64 threads → 1)
   for (var stride: u32 = 32u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
-      sh_totalNorm[local] += sh_totalNorm[local + stride];
-      sh_normUp[local] += sh_normUp[local + stride];
-      sh_normDown[local] += sh_normDown[local + stride];
-      sh_sigmaX[local] += sh_sigmaX[local + stride];
-      sh_sigmaY[local] += sh_sigmaY[local + stride];
-      sh_sigmaZ[local] += sh_sigmaZ[local + stride];
-      sh_maxDensity[local] = max(sh_maxDensity[local], sh_maxDensity[local + stride]);
+      sh_add[local] = sh_add[local] + sh_add[local + stride];
+      sh_max[local] = max(sh_max[local], sh_max[local + stride]);
     }
     workgroupBarrier();
   }
 
   if (local == 0u) {
+    let sum = sh_add[0];           // (normUp, normDown, sigmaX, sigmaY)
+    let nUp = sum.x;
+    let nDn = sum.y;
     // Each workgroup writes 8 floats starting at wid.x * 8
     let base = wid.x * 8u;
-    partial[base + 0u] = sh_totalNorm[0];
-    partial[base + 1u] = sh_normUp[0];
-    partial[base + 2u] = sh_normDown[0];
-    partial[base + 3u] = sh_sigmaX[0];
-    partial[base + 4u] = sh_sigmaY[0];
-    partial[base + 5u] = sh_sigmaZ[0];
-    partial[base + 6u] = sh_maxDensity[0];
+    partial[base + 0u] = nUp + nDn;    // totalNorm
+    partial[base + 1u] = nUp;           // normUp
+    partial[base + 2u] = nDn;           // normDown
+    partial[base + 3u] = sum.z;         // sigmaX
+    partial[base + 4u] = sum.w;         // sigmaY
+    partial[base + 5u] = nUp - nDn;     // sigmaZ
+    partial[base + 6u] = sh_max[0];     // maxDensity
     partial[base + 7u] = 0.0;
   }
 }
@@ -143,71 +123,57 @@ struct PauliDiagUniforms {
 @group(0) @binding(1) var<storage, read> partial: array<f32>;
 @group(0) @binding(2) var<storage, read_write> result: array<f32>;
 
-var<workgroup> sh_totalNorm: array<f32, 64>;
-var<workgroup> sh_normUp: array<f32, 64>;
-var<workgroup> sh_normDown: array<f32, 64>;
-var<workgroup> sh_sigmaX: array<f32, 64>;
-var<workgroup> sh_sigmaY: array<f32, 64>;
-var<workgroup> sh_sigmaZ: array<f32, 64>;
-var<workgroup> sh_maxDensity: array<f32, 64>;
+// Pack 4 independent additive channels (normUp, normDown, sigmaX, sigmaY) and
+// derive totalNorm, sigmaZ on final write — matches reduce-pass packing.
+var<workgroup> sh_add: array<vec4<f32>, 64>;
+var<workgroup> sh_max: array<f32, 64>;
 
 @compute @workgroup_size(64)
 fn main(@builtin(local_invocation_id) lid: vec3u) {
   let local = lid.x;
 
-  var totalNorm: f32 = 0.0;
-  var normUp: f32 = 0.0;
-  var normDown: f32 = 0.0;
-  var sigmaX: f32 = 0.0;
-  var sigmaY: f32 = 0.0;
-  var sigmaZ: f32 = 0.0;
+  var acc: vec4<f32> = vec4<f32>(0.0, 0.0, 0.0, 0.0);
   var maxDensity: f32 = 0.0;
 
-  // Each thread accumulates from multiple workgroups (strided)
+  // Each thread accumulates from multiple workgroups (strided).
+  let ngroups = diagParams.numWorkgroups;
   var i = local;
-  while (i < diagParams.numWorkgroups) {
+  while (i < ngroups) {
     let base = i * 8u;
-    totalNorm += partial[base + 0u];
-    normUp += partial[base + 1u];
-    normDown += partial[base + 2u];
-    sigmaX += partial[base + 3u];
-    sigmaY += partial[base + 4u];
-    sigmaZ += partial[base + 5u];
+    acc = acc + vec4<f32>(
+      partial[base + 1u],           // normUp
+      partial[base + 2u],           // normDown
+      partial[base + 3u],           // sigmaX
+      partial[base + 4u]            // sigmaY
+    );
     maxDensity = max(maxDensity, partial[base + 6u]);
     i += 64u;
   }
 
-  sh_totalNorm[local] = totalNorm;
-  sh_normUp[local] = normUp;
-  sh_normDown[local] = normDown;
-  sh_sigmaX[local] = sigmaX;
-  sh_sigmaY[local] = sigmaY;
-  sh_sigmaZ[local] = sigmaZ;
-  sh_maxDensity[local] = maxDensity;
+  sh_add[local] = acc;
+  sh_max[local] = maxDensity;
   workgroupBarrier();
 
   for (var stride: u32 = 32u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
-      sh_totalNorm[local] += sh_totalNorm[local + stride];
-      sh_normUp[local] += sh_normUp[local + stride];
-      sh_normDown[local] += sh_normDown[local + stride];
-      sh_sigmaX[local] += sh_sigmaX[local + stride];
-      sh_sigmaY[local] += sh_sigmaY[local + stride];
-      sh_sigmaZ[local] += sh_sigmaZ[local + stride];
-      sh_maxDensity[local] = max(sh_maxDensity[local], sh_maxDensity[local + stride]);
+      sh_add[local] = sh_add[local] + sh_add[local + stride];
+      sh_max[local] = max(sh_max[local], sh_max[local + stride]);
     }
     workgroupBarrier();
   }
 
   // Result layout: [totalNorm, normUp, normDown, sigmaX, sigmaY, sigmaZ, maxDensity, pad]
   if (local == 0u) {
-    result[0] = sh_totalNorm[0];
-    result[1] = sh_normUp[0];
-    result[2] = sh_normDown[0];
-    result[3] = sh_sigmaX[0];
-    result[4] = sh_sigmaY[0];
-    result[5] = sh_sigmaZ[0];
-    result[6] = sh_maxDensity[0];
+    let sum = sh_add[0];
+    let nUp = sum.x;
+    let nDn = sum.y;
+    result[0] = nUp + nDn;     // totalNorm
+    result[1] = nUp;            // normUp
+    result[2] = nDn;            // normDown
+    result[3] = sum.z;          // sigmaX
+    result[4] = sum.w;          // sigmaY
+    result[5] = nUp - nDn;      // sigmaZ
+    result[6] = sh_max[0];      // maxDensity
     result[7] = 0.0;
   }
 }

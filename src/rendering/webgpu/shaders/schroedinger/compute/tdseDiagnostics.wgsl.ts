@@ -42,11 +42,11 @@ struct DiagReduceUniforms {
 @group(0) @binding(6) var<storage, read_write> partialRight: array<f32>;
 @group(0) @binding(7) var<storage, read_write> partialIpr: array<f32>;
 
-var<workgroup> shared_norm: array<f32, 256>;
+// Pack the four additive fields (norm, left, right, ipr) into a single vec4
+// so the tree reduction touches shared memory 2× per step instead of 5×.
+// Max uses a different op (max) and stays separate.
+var<workgroup> shared_add: array<vec4f, 256>;
 var<workgroup> shared_max: array<f32, 256>;
-var<workgroup> shared_left: array<f32, 256>;
-var<workgroup> shared_right: array<f32, 256>;
-var<workgroup> shared_ipr: array<f32, 256>;
 
 @compute @workgroup_size(256)
 fn main(
@@ -65,40 +65,40 @@ fn main(
     let im = psiIm[idx];
     val = re * re + im * im;
 
-    // Determine if this site is left or right of barrier along axis 0
-    // coord0 = (idx / stride0_unused) % gridSize0 — but for general N-D,
-    // we extract the axis-0 coordinate from the linear index
-    let coord0 = (idx / diagParams.stride0) % diagParams.gridSize0;
+    // Axis-0 coordinate from linear index. stride0 and gridSize0 are always
+    // powers of 2 in this codebase, so replace the integer divide + mod with
+    // a shift + AND. Both factors are uniform so firstTrailingBit hoists to
+    // scalar registers. Saves ~20 cycles per thread vs hardware udiv/umod.
+    let log2Stride0 = firstTrailingBit(diagParams.stride0);
+    let mask0 = diagParams.gridSize0 - 1u;
+    let coord0 = (idx >> log2Stride0) & mask0;
     let pos0 = (f32(coord0) - f32(diagParams.gridSize0) * 0.5 + 0.5) * diagParams.spacing0;
     isLeft = pos0 < diagParams.barrierCenter;
   }
 
-  shared_norm[local] = val;
+  let leftVal = select(0.0, val, isLeft);
+  let rightVal = val - leftVal; // exactly one branch contributes — saves a select
+  shared_add[local] = vec4f(val, leftVal, rightVal, val * val);
   shared_max[local] = val;
-  shared_left[local] = select(0.0, val, isLeft);
-  shared_right[local] = select(val, 0.0, isLeft);
-  shared_ipr[local] = val * val;  // |ψ|⁴ for inverse participation ratio
   workgroupBarrier();
 
   // Tree reduction within workgroup
   for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
-      shared_norm[local] += shared_norm[local + stride];
+      shared_add[local] = shared_add[local] + shared_add[local + stride];
       shared_max[local] = max(shared_max[local], shared_max[local + stride]);
-      shared_left[local] += shared_left[local + stride];
-      shared_right[local] += shared_right[local + stride];
-      shared_ipr[local] += shared_ipr[local + stride];
     }
     workgroupBarrier();
   }
 
   // Write workgroup result
   if (local == 0u) {
-    partialSums[wid.x] = shared_norm[0];
+    let sum = shared_add[0];
+    partialSums[wid.x] = sum.x;
     partialMax[wid.x] = shared_max[0];
-    partialLeft[wid.x] = shared_left[0];
-    partialRight[wid.x] = shared_right[0];
-    partialIpr[wid.x] = shared_ipr[0];
+    partialLeft[wid.x] = sum.y;
+    partialRight[wid.x] = sum.z;
+    partialIpr[wid.x] = sum.w;
   }
 }
 `
@@ -124,11 +124,8 @@ struct DiagReduceUniforms {
 @group(0) @binding(5) var<storage, read> partialRight: array<f32>;
 @group(0) @binding(6) var<storage, read> partialIpr: array<f32>;
 
-var<workgroup> shared_norm: array<f32, 256>;
+var<workgroup> shared_add: array<vec4f, 256>;
 var<workgroup> shared_max: array<f32, 256>;
-var<workgroup> shared_left: array<f32, 256>;
-var<workgroup> shared_right: array<f32, 256>;
-var<workgroup> shared_ipr: array<f32, 256>;
 
 @compute @workgroup_size(256)
 fn main(
@@ -136,48 +133,38 @@ fn main(
 ) {
   let local = lid.x;
 
-  // Load partial sums — each thread accumulates multiple entries
-  // when numWorkgroups > 256 (e.g. 64^3 grid produces 1024 partials)
-  var norm_val: f32 = 0.0;
+  // Load partial sums — each thread accumulates multiple entries when
+  // numWorkgroups > 256 (e.g. 64³ grid → 1024 partials).
+  var acc: vec4f = vec4f(0.0, 0.0, 0.0, 0.0);
   var max_val: f32 = 0.0;
-  var left_val: f32 = 0.0;
-  var right_val: f32 = 0.0;
-  var ipr_val: f32 = 0.0;
+  let ngroups = diagParams.numWorkgroups;
   var i = local;
-  while (i < diagParams.numWorkgroups) {
-    norm_val += partialSums[i];
+  while (i < ngroups) {
+    acc = acc + vec4f(partialSums[i], partialLeft[i], partialRight[i], partialIpr[i]);
     max_val = max(max_val, partialMax[i]);
-    left_val += partialLeft[i];
-    right_val += partialRight[i];
-    ipr_val += partialIpr[i];
     i += 256u;
   }
-  shared_norm[local] = norm_val;
+  shared_add[local] = acc;
   shared_max[local] = max_val;
-  shared_left[local] = left_val;
-  shared_right[local] = right_val;
-  shared_ipr[local] = ipr_val;
   workgroupBarrier();
 
   // Tree reduction
   for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
-      shared_norm[local] += shared_norm[local + stride];
+      shared_add[local] = shared_add[local] + shared_add[local + stride];
       shared_max[local] = max(shared_max[local], shared_max[local + stride]);
-      shared_left[local] += shared_left[local + stride];
-      shared_right[local] += shared_right[local + stride];
-      shared_ipr[local] += shared_ipr[local + stride];
     }
     workgroupBarrier();
   }
 
   // Write final result: [0]=totalNorm, [1]=maxDensity, [2]=normLeft, [3]=normRight, [4]=sumPsi4
   if (local == 0u) {
-    result[0] = shared_norm[0];
+    let sum = shared_add[0];
+    result[0] = sum.x;
     result[1] = shared_max[0];
-    result[2] = shared_left[0];
-    result[3] = shared_right[0];
-    result[4] = shared_ipr[0];
+    result[2] = sum.y;
+    result[3] = sum.z;
+    result[4] = sum.w;
   }
 }
 `

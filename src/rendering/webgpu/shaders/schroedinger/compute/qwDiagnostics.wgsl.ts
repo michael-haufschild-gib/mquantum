@@ -41,9 +41,10 @@ struct QWDiagUniforms {
 @group(0) @binding(3) var<storage, read_write> partialPosSum: array<f32>;
 @group(0) @binding(4) var<storage, read_write> partialPosSqSum: array<f32>;
 
-var<workgroup> shared_norm: array<f32, 256>;
-var<workgroup> shared_pos: array<f32, 256>;
-var<workgroup> shared_pos2: array<f32, 256>;
+// Pack 3 additives (prob, xProb, x2Prob) into a vec3<f32> so tree-reduce does
+// one SM op per step instead of three. (vec3 aligns to 16 bytes — same SM
+// footprint as three scalar arrays would use after alignment.)
+var<workgroup> shared_add: array<vec3<f32>, 256>;
 
 @compute @workgroup_size(256)
 fn main(
@@ -61,41 +62,39 @@ fn main(
 
   if (site < diagParams.totalSites) {
     let baseIdx = site * diagParams.numCoinStates * 2u;
-    for (var j: u32 = 0u; j < diagParams.numCoinStates; j++) {
-      let re = coinState[baseIdx + j * 2u];
-      let im = coinState[baseIdx + j * 2u + 1u];
+    let nCoin = diagParams.numCoinStates;
+    for (var j: u32 = 0u; j < nCoin; j = j + 1u) {
+      let j2 = j << 1u;
+      let re = coinState[baseIdx + j2];
+      let im = coinState[baseIdx + j2 + 1u];
       prob += re * re + im * im;
     }
 
-    // Site position along dimension 0: use stride-based decomposition
-    // (C-order: dim 0 has largest stride = gridSize[1]*gridSize[2]*...)
-    // centered so x ∈ [-G/2, G/2)
-    let coord0 = f32(site / diagParams.stride0);
+    // Site position along dim 0 via shift (stride0 is power-of-2).
+    let logS0 = firstTrailingBit(diagParams.stride0);
+    let coord0 = f32(site >> logS0);
     let x = coord0 - f32(diagParams.gridSize0) * 0.5 + 0.5;
     xProb = x * prob;
     x2Prob = x * x * prob;
   }
 
-  shared_norm[local] = prob;
-  shared_pos[local] = xProb;
-  shared_pos2[local] = x2Prob;
+  shared_add[local] = vec3<f32>(prob, xProb, x2Prob);
   workgroupBarrier();
 
   // Tree reduction within workgroup
   for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
-      shared_norm[local] += shared_norm[local + stride];
-      shared_pos[local] += shared_pos[local + stride];
-      shared_pos2[local] += shared_pos2[local + stride];
+      shared_add[local] = shared_add[local] + shared_add[local + stride];
     }
     workgroupBarrier();
   }
 
   // Write workgroup results (3 arrays of partials)
   if (local == 0u) {
-    partialNorm[wid.x] = shared_norm[0];
-    partialPosSum[wid.x] = shared_pos[0];
-    partialPosSqSum[wid.x] = shared_pos2[0];
+    let sum = shared_add[0];
+    partialNorm[wid.x] = sum.x;
+    partialPosSum[wid.x] = sum.y;
+    partialPosSqSum[wid.x] = sum.z;
   }
 }
 `
@@ -119,9 +118,7 @@ struct QWDiagUniforms {
 @group(0) @binding(3) var<storage, read> partialPosSqSum: array<f32>;
 @group(0) @binding(4) var<storage, read_write> result: array<f32>;
 
-var<workgroup> shared_norm: array<f32, 256>;
-var<workgroup> shared_pos: array<f32, 256>;
-var<workgroup> shared_pos2: array<f32, 256>;
+var<workgroup> shared_add: array<vec3<f32>, 256>;
 
 @compute @workgroup_size(256)
 fn main(
@@ -130,36 +127,30 @@ fn main(
   let local = lid.x;
 
   // Load partial sums — each thread accumulates multiple entries
-  var norm_val: f32 = 0.0;
-  var pos_val: f32 = 0.0;
-  var pos2_val: f32 = 0.0;
+  var acc: vec3<f32> = vec3<f32>(0.0, 0.0, 0.0);
+  let ngroups = diagParams.numWorkgroups;
   var i = local;
-  while (i < diagParams.numWorkgroups) {
-    norm_val += partialNorm[i];
-    pos_val += partialPosSum[i];
-    pos2_val += partialPosSqSum[i];
+  while (i < ngroups) {
+    acc = acc + vec3<f32>(partialNorm[i], partialPosSum[i], partialPosSqSum[i]);
     i += 256u;
   }
-  shared_norm[local] = norm_val;
-  shared_pos[local] = pos_val;
-  shared_pos2[local] = pos2_val;
+  shared_add[local] = acc;
   workgroupBarrier();
 
   // Tree reduction
   for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
-      shared_norm[local] += shared_norm[local + stride];
-      shared_pos[local] += shared_pos[local + stride];
-      shared_pos2[local] += shared_pos2[local + stride];
+      shared_add[local] = shared_add[local] + shared_add[local + stride];
     }
     workgroupBarrier();
   }
 
   // Write final result: [0] = totalNorm, [1] = posSum, [2] = posSqSum
   if (local == 0u) {
-    result[0] = shared_norm[0];
-    result[1] = shared_pos[0];
-    result[2] = shared_pos2[0];
+    let sum = shared_add[0];
+    result[0] = sum.x;
+    result[1] = sum.y;
+    result[2] = sum.z;
   }
 }
 `

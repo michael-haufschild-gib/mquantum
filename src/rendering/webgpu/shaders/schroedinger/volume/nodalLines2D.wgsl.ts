@@ -67,9 +67,10 @@ fn evaluateNodalLines2D(pos: vec3f, animTime: f32, uniforms: SchroedingerUniform
   }
 
   // Gradient via finite differences
+  let invEps = 1.0 / eps;
   let grad = vec2f(
-    (f_r - f_c) / eps,
-    (f_u - f_c) / eps
+    (f_r - f_c) * invEps,
+    (f_u - f_c) * invEps
   );
   let gradLen = length(grad);
 
@@ -77,8 +78,8 @@ fn evaluateNodalLines2D(pos: vec3f, animTime: f32, uniforms: SchroedingerUniform
   if (gradLen < 1e-8) {
     return vec4f(0.0);
   }
-  let distWorld = abs(f_c) / gradLen;
-  let distPixels = distWorld / pixelSize;
+  // Fold the two divides (1/gradLen, 1/pixelSize) into one.
+  let distPixels = abs(f_c) / (gradLen * pixelSize);
 
   // Anti-aliased line (1.5 pixel feather)
   let lineWidth = max(uniforms.nodalTolerance * 20.0, 1.0);

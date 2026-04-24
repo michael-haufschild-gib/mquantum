@@ -11,7 +11,7 @@
  */
 
 import type { AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
-import { resolveDelta } from '@/lib/physics/antiDeSitter/math'
+import { radialNorm, resolveDelta } from '@/lib/physics/antiDeSitter/math'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
@@ -192,7 +192,11 @@ export class AdsDensityComputePass extends WebGPUBaseComputePass {
     f32[4] = ads.mL
     f32[5] = resolved.delta
     u32[6] = ads.boundaryOverlay ? 1 : 0
-    u32[7] = 0
+    // Radial normalization N(n, l, delta, d) precomputed here — the compute
+    // shader reads it as a uniform instead of running lgamma/lnFactorial
+    // per voxel. Same (n, l, delta, d) dependency as the hash above, so
+    // the buffer write is already dirty-gated.
+    f32[7] = radialNorm(ads.n, ads.l, resolved.delta, ads.d)
 
     device.queue.writeBuffer(this.adsConfigBuffer, 0, this.adsConfigData)
     this.needsRecompute = true

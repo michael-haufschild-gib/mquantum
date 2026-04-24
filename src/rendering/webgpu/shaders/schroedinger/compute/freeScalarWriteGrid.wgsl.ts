@@ -166,7 +166,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     }
     let perpDist2 = max(dot(modelPos, modelPos) - projSq, 0.0);
     let perpSigma = bound * 0.06;
-    perpFalloff = exp(-perpDist2 / (2.0 * perpSigma * perpSigma));
+    let invTwoPerpSigma2 = 1.0 / (2.0 * perpSigma * perpSigma);
+    perpFalloff = exp(-perpDist2 * invTwoPerpSigma2);
   }
 
   let numCorners = 1u << min(params.latticeDim, 3u);
@@ -381,7 +382,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let rho = abs(fieldValue);
   let normRho = select(rho / params.maxFieldValue, 0.0, params.maxFieldValue <= 0.0) * perpFalloff;
   let logRho = log(normRho + 1e-10);
-  let phase = select(0.0, 3.14159265, fieldValue < 0.0);
+  const FSF_NEGATIVE_BRANCH_PHASE: f32 = 3.14159265358979323846;
+  let phase = select(0.0, FSF_NEGATIVE_BRANCH_PHASE, fieldValue < 0.0);
 
   textureStore(outputTex, gid, vec4f(normRho, logRho, phase, normRho));
 
@@ -420,7 +422,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       Sy += fluxD * params.basisY[d];
       Sz += fluxD * params.basisZ[d];
     }
-    let Smag = sqrt(Sx * Sx + Sy * Sy + Sz * Sz);
+    let Smag = length(vec3f(Sx, Sy, Sz));
     textureStore(analysisTex, gid, vec4f(Sx, Sy, Sz, Smag));
   } else if (hasAnalysis) {
     textureStore(analysisTex, gid, vec4f(0.0));

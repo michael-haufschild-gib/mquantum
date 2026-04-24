@@ -36,10 +36,11 @@ struct DiracDiagUniforms {
 @group(0) @binding(5) var<storage, read_write> partialParticle: array<f32>;
 @group(0) @binding(6) var<storage, read_write> partialAnti: array<f32>;
 
-var<workgroup> shared_norm: array<f32, 256>;
+// Pack 3 additive channels (norm, particle, anti) into a vec3 — cuts
+// tree-reduce shared-memory ops 4→2 per step. Max stays separate.
+// norm = particle + anti so we can drop the third accumulator.
+var<workgroup> shared_add: array<vec3<f32>, 256>;
 var<workgroup> shared_max: array<f32, 256>;
-var<workgroup> shared_particle: array<f32, 256>;
-var<workgroup> shared_anti: array<f32, 256>;
 
 @compute @workgroup_size(256)
 fn main(
@@ -50,20 +51,19 @@ fn main(
   let idx = gid.x;
   let local = lid.x;
   let S = diagParams.spinorSize;
-  let half = S / 2u;
+  let half = S >> 1u;
 
-  var totalD: f32 = 0.0;
   var particleD: f32 = 0.0;
   var antiD: f32 = 0.0;
 
   if (idx < diagParams.totalSites) {
     // Sum |ψ_c|² over all spinor components at this site
-    for (var c: u32 = 0u; c < S; c++) {
-      let bufIdx = c * diagParams.totalSites + idx;
+    let T = diagParams.totalSites;
+    for (var c: u32 = 0u; c < S; c = c + 1u) {
+      let bufIdx = c * T + idx;
       let re = spinorRe[bufIdx];
       let im = spinorIm[bufIdx];
       let d = re * re + im * im;
-      totalD += d;
       if (c < half) {
         particleD += d;
       } else {
@@ -72,28 +72,26 @@ fn main(
     }
   }
 
-  shared_norm[local] = totalD;
+  let totalD = particleD + antiD;
+  shared_add[local] = vec3<f32>(totalD, particleD, antiD);
   shared_max[local] = totalD;
-  shared_particle[local] = particleD;
-  shared_anti[local] = antiD;
   workgroupBarrier();
 
   // Tree reduction within workgroup
   for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
-      shared_norm[local] += shared_norm[local + stride];
+      shared_add[local] = shared_add[local] + shared_add[local + stride];
       shared_max[local] = max(shared_max[local], shared_max[local + stride]);
-      shared_particle[local] += shared_particle[local + stride];
-      shared_anti[local] += shared_anti[local + stride];
     }
     workgroupBarrier();
   }
 
   if (local == 0u) {
-    partialNorm[wid.x] = shared_norm[0];
+    let sum = shared_add[0];
+    partialNorm[wid.x] = sum.x;
     partialMax[wid.x] = shared_max[0];
-    partialParticle[wid.x] = shared_particle[0];
-    partialAnti[wid.x] = shared_anti[0];
+    partialParticle[wid.x] = sum.y;
+    partialAnti[wid.x] = sum.z;
   }
 }
 `
@@ -114,10 +112,8 @@ struct DiracDiagUniforms {
 @group(0) @binding(4) var<storage, read> partialParticle: array<f32>;
 @group(0) @binding(5) var<storage, read> partialAnti: array<f32>;
 
-var<workgroup> shared_norm: array<f32, 256>;
+var<workgroup> shared_add: array<vec3<f32>, 256>;
 var<workgroup> shared_max: array<f32, 256>;
-var<workgroup> shared_particle: array<f32, 256>;
-var<workgroup> shared_anti: array<f32, 256>;
 
 @compute @workgroup_size(256)
 fn main(
@@ -125,40 +121,34 @@ fn main(
 ) {
   let local = lid.x;
 
-  var norm_val: f32 = 0.0;
+  var acc: vec3<f32> = vec3<f32>(0.0, 0.0, 0.0);
   var max_val: f32 = 0.0;
-  var particle_val: f32 = 0.0;
-  var anti_val: f32 = 0.0;
+  let ngroups = diagParams.numWorkgroups;
   var i = local;
-  while (i < diagParams.numWorkgroups) {
-    norm_val += partialNorm[i];
+  while (i < ngroups) {
+    acc = acc + vec3<f32>(partialNorm[i], partialParticle[i], partialAnti[i]);
     max_val = max(max_val, partialMax[i]);
-    particle_val += partialParticle[i];
-    anti_val += partialAnti[i];
     i += 256u;
   }
-  shared_norm[local] = norm_val;
+  shared_add[local] = acc;
   shared_max[local] = max_val;
-  shared_particle[local] = particle_val;
-  shared_anti[local] = anti_val;
   workgroupBarrier();
 
   for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
-      shared_norm[local] += shared_norm[local + stride];
+      shared_add[local] = shared_add[local] + shared_add[local + stride];
       shared_max[local] = max(shared_max[local], shared_max[local + stride]);
-      shared_particle[local] += shared_particle[local + stride];
-      shared_anti[local] += shared_anti[local + stride];
     }
     workgroupBarrier();
   }
 
   // Output: [0]=totalNorm, [1]=maxDensity, [2]=particleNorm, [3]=antiparticleNorm
   if (local == 0u) {
-    result[0] = shared_norm[0];
+    let sum = shared_add[0];
+    result[0] = sum.x;
     result[1] = shared_max[0];
-    result[2] = shared_particle[0];
-    result[3] = shared_anti[0];
+    result[2] = sum.y;
+    result[3] = sum.z;
   }
 }
 `

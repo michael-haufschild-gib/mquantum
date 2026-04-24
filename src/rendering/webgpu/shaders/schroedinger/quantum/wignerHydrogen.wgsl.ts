@@ -76,6 +76,17 @@ fn wignerHydrogenRadial(r: f32, pr: f32, n: i32, l: i32, a0: f32, nPts: i32) -> 
   let ds = sMax / f32(effectiveNPts);
   let signL = select(-1.0, 1.0, (l & 1) != 0); // (-1)^{l+1}: u_nl(-r) = (-1)^{l+1} u_nl(r)
 
+  // Rotate-by-delta recurrence for cos(2*pr*s_i) where s_i = (i + 0.5) * ds.
+  // Replaces 256 transcendental cos() calls with 2 muls + 1 sub + 1 add per iter
+  // (the rotation of a unit complex on the arg axis). Accuracy drift over N steps
+  // is ~O(N * eps) ~ 1e-5 for N=256 — imperceptible in a visualization quadrature.
+  let phi0  = pr * ds;          // 2*pr*0.5*ds
+  let dPhi  = 2.0 * pr * ds;
+  let cosD  = cos(dPhi);
+  let sinD  = sin(dPhi);
+  var cosI  = cos(phi0);
+  var sinI  = sin(phi0);
+
   var integral = 0.0;
   for (var i = 0; i < effectiveNPts; i++) {
     let s = (f32(i) + 0.5) * ds;
@@ -92,7 +103,13 @@ fn wignerHydrogenRadial(r: f32, pr: f32, n: i32, l: i32, a0: f32, nPts: i32) -> 
     // near origin, giving parity (-1)^{l+1} under reflection r -> -r
     let sign = select(1.0, signL, rms < 0.0);
 
-    integral += uPlus * uMinus * sign * cos(2.0 * pr * s);
+    integral += uPlus * uMinus * sign * cosI;
+
+    // Advance (cosI, sinI) -> (cosI+dPhi, sinI+dPhi) by 2x2 rotation.
+    let newCos = cosI * cosD - sinI * sinD;
+    let newSin = sinI * cosD + cosI * sinD;
+    cosI = newCos;
+    sinI = newSin;
   }
 
   return (2.0 / PI) * integral * ds;

@@ -72,20 +72,27 @@ ${uCalcs}
 function generateRadiusCalculation(dimension: number): string {
   const sum3D = 'x0*x0 + x1*x1 + x2*x2'
 
+  // We need sum3D for the squared-threshold early exit, and r3D + invR for the
+  // angular + radial paths. A fused inverseSqrt gives us invR directly and
+  // reconstructs r3D via sum3D * invR, saving one sqrt + one divide + one max
+  // per hydrogen eval vs the separate sqrt() + 1.0/max(r3D, eps) path below.
   if (dimension === 3) {
     return `
-  // 3D radius
+  // 3D radius (fused sqrt + reciprocal via inverseSqrt)
   let sum3D = ${sum3D};
-  let r3D = sqrt(sum3D);
+  let invR = inverseSqrt(max(sum3D, 1e-20));
+  let r3D = sum3D * invR;
 `
   }
 
   return `
-  // PERF: Compute sum3D once, reuse for early exit (squared comparison) and angular/radial terms.
+  // PERF: Compute sum3D once; reuse for early exit (squared comparison) AND
+  // derive both r3D and invR from a single inverseSqrt (no separate sqrt + divide).
   let sum3D = ${sum3D};
 
-  // 3D hydrogen-core radius (deferred sqrt until after squared early exit)
-  let r3D = sqrt(sum3D);
+  // Deferred until after the squared early exit.
+  let invR = inverseSqrt(max(sum3D, 1e-20));
+  let r3D = sum3D * invR;
 `
 }
 
@@ -219,8 +226,8 @@ ${extraDimEarlyExit}${radiusCalc}
     return vec2f(0.0, 0.0);
   }
 
-  // Cartesian unit direction — singularity-free angular evaluation (no atan2)
-  let invR = 1.0 / max(r3D, 1e-10);
+  // Cartesian unit direction -- singularity-free angular evaluation (no atan2).
+  // invR already computed above via inverseSqrt(max(sum3D, 1e-20)).
   let nx = x0 * invR;
   let ny = x1 * invR;
   let nz = x2 * invR;
@@ -348,8 +355,8 @@ ${extraDimEarlyExit}${radiusCalc}
     return vec2f(0.0, 0.0);
   }
 
-  // Cartesian unit direction — singularity-free angular evaluation (no atan2)
-  let invR = 1.0 / max(r3D, 1e-10);
+  // Cartesian unit direction -- singularity-free angular evaluation (no atan2).
+  // invR already computed above via inverseSqrt(max(sum3D, 1e-20)).
   let nx = x0 * invR;
   let ny = x1 * invR;
   let nz = x2 * invR;

@@ -28,12 +28,6 @@ struct VertexUniforms {
 }
 
 @group(0) @binding(1) var<uniform> vertexUniforms: VertexUniforms;
-
-// Aliases for compatibility
-fn getModelMatrix() -> mat4x4<f32> { return vertexUniforms.modelMatrix; }
-fn getModelViewMatrix() -> mat4x4<f32> { return vertexUniforms.modelViewMatrix; }
-fn getProjectionMatrix() -> mat4x4<f32> { return vertexUniforms.projectionMatrix; }
-fn getRotationMatrix() -> mat3x3<f32> { return vertexUniforms.rotationMatrix; }
 `
 
 /**
@@ -73,10 +67,12 @@ fn main(input: VertexInput) -> VertexOutput {
   var output: VertexOutput;
 
   // Standard Skybox Rotation
-  let worldPos4 = vertexUniforms.modelMatrix * vec4<f32>(input.position, 1.0);
-  let worldPos = worldPos4.xyz;
+  let posLocal = vec4<f32>(input.position, 1.0);
+  let worldPos = (vertexUniforms.modelMatrix * posLocal).xyz;
 
-  let clipPos = vertexUniforms.projectionMatrix * vertexUniforms.modelViewMatrix * vec4<f32>(input.position, 1.0);
+  // Parenthesize so the compiler lowers this as two mat4×vec4 (32 fmas)
+  // instead of one mat4×mat4 + mat4×vec4 (80 fmas) per vertex.
+  let clipPos = vertexUniforms.projectionMatrix * (vertexUniforms.modelViewMatrix * posLocal);
 
   ${outputAssignments.join('\n  ')}
 

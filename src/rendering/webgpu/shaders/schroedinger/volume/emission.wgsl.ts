@@ -196,7 +196,7 @@ const ALGO_BRANCH: Record<number, string> = {
     let distributedT = applyDistributionS(normalized, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
     let totalW = uniforms.multiSourceWeights.x + uniforms.multiSourceWeights.y + uniforms.multiSourceWeights.z;
     let w = uniforms.multiSourceWeights.xyz / max(totalW, 0.001);
-    let radialT = clamp(length(pos) / uniforms.boundingRadius, 0.0, 1.0);
+    let radialT = clamp(length(pos) * uniforms.invBoundingRadius, 0.0, 1.0);
     let verticalT = pos.y * 0.5 + 0.5;
     let blendedT = w.x * distributedT + w.y * radialT + w.z * verticalT;
     let a = uniforms.cosineA.xyz;
@@ -207,7 +207,7 @@ const ALGO_BRANCH: Record<number, string> = {
 
   2: /* wgsl */ `
     // 2: Radial - color by distance from center through cosine palette
-    let rawRadialT = clamp(length(pos) / uniforms.boundingRadius, 0.0, 1.0);
+    let rawRadialT = clamp(length(pos) * uniforms.invBoundingRadius, 0.0, 1.0);
     let radialT = applyDistributionS(rawRadialT, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
     let a = uniforms.cosineA.xyz;
     let b = uniforms.cosineB.xyz;
@@ -323,7 +323,7 @@ const ALGO_BRANCH: Record<number, string> = {
   11: /* wgsl */ `
     // 11: Radial Distance (spectral)
     let r = length(pos);
-    let distanceNorm = clamp(r / uniforms.boundingRadius, 0.0, 1.0);
+    let distanceNorm = clamp(r * uniforms.invBoundingRadius, 0.0, 1.0);
     let hue = 0.8 * distanceNorm;
     col = hsl2rgb(hue, 1.0, 0.5);`,
 
@@ -486,14 +486,33 @@ const ALGO_BRANCH: Record<number, string> = {
   // Raymarcher passes rho = R (spin-up), s = G (spin-down) via IS_DUAL_CHANNEL path.
 
   24: /* wgsl */ `
-    // 24: Pauli Spin Density — user-configurable spin-up/down colors
-    // Additive blend produces mixed hue where both components overlap.
+    // 24: Pauli Spin Density — user-configurable spin-up/down colors.
+    // Hue-space (HSL) interpolation: polarization fraction drives a shortest-
+    // path hue mix between spin-up and spin-down colors; total density drives
+    // brightness. Equal-mix voxels render as the hue-midpoint (e.g. blue for
+    // default cyan↔magenta) — NOT the RGB arithmetic mean, which would collapse
+    // to a near-gray that perceptually reads as green/teal once ambient is
+    // applied. Saturation and lightness are likewise interpolated, so colors
+    // with mismatched saturation/luminance blend smoothly.
     let upDensity = clamp(rho, 0.0, 1.0);
     let downDensity = clamp(s, 0.0, 1.0);
-    let upColor = uniforms.pauliSpinUpColor * upDensity;
-    let downColor = uniforms.pauliSpinDownColor * downDensity;
-    col = upColor + downColor;
-    // Subtle phase modulation on brightness
+    let total = upDensity + downDensity;
+    let upFrac = select(0.5, upDensity / total, total > 1e-6);
+    // Precomputed on the CPU in uniformPacking.rgbToHsl — keeps the per-sample
+    // raymarch path free of two rgb2hsl() calls.
+    let hslUp = uniforms.pauliSpinUpColorHSL;
+    let hslDown = uniforms.pauliSpinDownColorHSL;
+    // Shortest-arc hue interpolation — if the two hues straddle the 0/1 wrap,
+    // shift the up-hue by one turn before mixing, then wrap back via fract().
+    var hUp = hslUp.x;
+    var hDown = hslDown.x;
+    if (hUp - hDown > 0.5) { hDown = hDown + 1.0; }
+    else if (hDown - hUp > 0.5) { hUp = hUp + 1.0; }
+    let h = fract(mix(hDown, hUp, upFrac));
+    let s_ = mix(hslDown.y, hslUp.y, upFrac);
+    let l = mix(hslDown.z, hslUp.z, upFrac);
+    col = hsl2rgb(h, s_, l) * total;
+    // Subtle phase modulation on brightness.
     let spinPhaseBrightness = 0.75 + 0.25 * cos(phase);
     col *= spinPhaseBrightness;`,
 

@@ -254,17 +254,26 @@ fn hydrogenRadialND(n: i32, l: i32, r: f32, a0: f32, dim: i32) -> f32 {
   // Normalization
   let norm = hydrogenRadialNormND(nr, lambda, nEff, a0Safe);
 
-  // ρ^λ — for integer lambda use iterative multiply, else use pow
+  // ρ^λ — for integer lambda use iterative multiply; for half-integer λ = k+½
+  // decompose as ρ^k · √ρ so we pay one sqrt (~12 cycles) instead of pow()'s
+  // full exp+log (~25 cycles).
   var rhoLambda: f32;
   let lambdaInt = i32(lambda);
-  if (abs(lambda - f32(lambdaInt)) < 1e-6) {
-    // Integer lambda (even dimensions): iterative multiply avoids exp+log
+  let lambdaFrac = lambda - f32(lambdaInt);
+  if (abs(lambdaFrac) < 1e-6) {
+    // Integer lambda (odd dimensions): iterative multiply.
     rhoLambda = 1.0;
-    for (var il = 0; il < lambdaInt; il++) {
+    for (var il = 0; il < lambdaInt; il = il + 1) {
       rhoLambda *= rho;
     }
+  } else if (abs(lambdaFrac - 0.5) < 1e-6) {
+    // Half-integer lambda (even dimensions): ρ^(k+½) = ρ^k · √ρ.
+    var rhoK: f32 = 1.0;
+    for (var il = 0; il < lambdaInt; il = il + 1) {
+      rhoK *= rho;
+    }
+    rhoLambda = rhoK * sqrt(max(rho, 0.0));
   } else {
-    // Half-integer lambda (odd dimensions): must use pow
     rhoLambda = pow(max(rho, 1e-20), lambda);
   }
 
@@ -294,11 +303,22 @@ fn hydrogenRadialNDWithNorm(n: i32, l: i32, r: f32, a0: f32, dim: i32, norm: f32
 
   var rhoLambda: f32;
   let lambdaInt = i32(lambda);
-  if (abs(lambda - f32(lambdaInt)) < 1e-6) {
+  let lambdaFrac = lambda - f32(lambdaInt);
+  if (abs(lambdaFrac) < 1e-6) {
+    // Integer lambda (odd dimensions): iterative multiply.
     rhoLambda = 1.0;
-    for (var il = 0; il < lambdaInt; il++) {
+    for (var il = 0; il < lambdaInt; il = il + 1) {
       rhoLambda *= rho;
     }
+  } else if (abs(lambdaFrac - 0.5) < 1e-6) {
+    // Half-integer lambda (even dimensions): ρ^(k+½) = ρ^k · √ρ. Mirrors
+    // hydrogenRadialND so even-dimensional renders that go through the
+    // precomputed-norm path pay one sqrt instead of pow()'s exp+log.
+    var rhoK: f32 = 1.0;
+    for (var il = 0; il < lambdaInt; il = il + 1) {
+      rhoK *= rho;
+    }
+    rhoLambda = rhoK * sqrt(max(rho, 0.0));
   } else {
     rhoLambda = pow(max(rho, 1e-20), lambda);
   }
@@ -440,8 +460,28 @@ fn hydrogenRadialMomentumND(n: i32, l: i32, k: f32, a0: f32, dim: i32) -> f32 {
   let gegen = gegenbauer(nr, lambda + 1.0, clamp(x, -1.0, 1.0));
   let denom = pow(1.0 + q2, lambda + 2.0);
 
-  // q^λ
-  let qPow = pow(max(q, 1e-20), lambda);
+  // q^lambda -- mirrors the integer/half-integer fast path in hydrogenRadialND.
+  // Avoids pow()'s exp+log (~20 cycles) for the integer case and replaces it with
+  // up to 10 iterative multiplies (current caps: hyd_n <= 7 → l <= 6, dim <= 11
+  // → lambda_int <= 10). At D=3,5,7,9,11 lambda is integer; at D=4,6,8,10 it is
+  // half-integer (k+0.5), handled via sqrt(q) multiplier.
+  var qPow: f32;
+  let qLambdaInt = i32(lambda);
+  let qLambdaFrac = lambda - f32(qLambdaInt);
+  if (abs(qLambdaFrac) < 1e-6) {
+    qPow = 1.0;
+    for (var il = 0; il < qLambdaInt; il = il + 1) {
+      qPow *= q;
+    }
+  } else if (abs(qLambdaFrac - 0.5) < 1e-6) {
+    var qK: f32 = 1.0;
+    for (var il = 0; il < qLambdaInt; il = il + 1) {
+      qK *= q;
+    }
+    qPow = qK * sqrt(max(q, 0.0));
+  } else {
+    qPow = pow(max(q, 1e-20), lambda);
+  }
 
   // Normalization via log-factorial ratio: sqrt(nr! / (nr + 2λ + 1)!)
   // Both arguments are always integers. denomFactIdx = n+l+D-3 ≤ 21 (see LUT comment).

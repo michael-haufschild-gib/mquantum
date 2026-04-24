@@ -19,23 +19,28 @@ fn getDeepOcean(dir: vec3<f32>, time: f32) -> vec3<f32> {
   var caustic1 = 0.0;
   var caustic2 = 0.0;
 
-  // First caustic layer - primary seaweed pattern
+  // First caustic layer - primary seaweed pattern.
+  // (sin * sin) * 0.5 + 0.5 is already in [0,1] so the clamp was redundant.
+  // pow(x, 2.5) is decomposed as x*x*sqrt(x) -- roughly half the cycles on all
+  // GPU back-ends vs the pow() intrinsic (exp+log).
   let c1 = p + vec3<f32>(time * 0.03, time * 0.02, 0.0);
   caustic1 = sin(c1.x * 2.0 + sin(c1.z * 3.0)) * sin(c1.z * 2.0 + sin(c1.x * 3.0));
-  caustic1 = clamp(caustic1 * 0.5 + 0.5, 0.0, 1.0);
-  caustic1 = pow(caustic1, 2.5);
+  caustic1 = caustic1 * 0.5 + 0.5;
+  // max(..., 0.0) guards against tiny negatives from transcendental precision
+  // loss — sqrt(-eps) otherwise NaN-poisons the pixel.
+  caustic1 = caustic1 * caustic1 * sqrt(max(caustic1, 0.0));
 
-  // Second caustic layer (different frequency) - secondary detail
+  // Second caustic layer (different frequency) - secondary detail.
   let c2 = p * 1.5 + vec3<f32>(-time * 0.02, time * 0.015, time * 0.01);
   caustic2 = sin(c2.x * 3.0 + sin(c2.z * 2.0)) * sin(c2.z * 3.0 + sin(c2.x * 2.0));
-  caustic2 = clamp(caustic2 * 0.5 + 0.5, 0.0, 1.0);
-  caustic2 = pow(caustic2, 2.5);
+  caustic2 = caustic2 * 0.5 + 0.5;
+  caustic2 = caustic2 * caustic2 * sqrt(max(caustic2, 0.0));
 
-  // Third layer - fine seaweed detail with sharper edges
+  // Third layer - fine seaweed detail with sharper edges.
   let c3 = p * 2.5 + vec3<f32>(time * 0.01, -time * 0.025, time * 0.02);
   var caustic3 = sin(c3.x * 4.0 + sin(c3.z * 5.0 + c3.y * 2.0)) *
                  sin(c3.z * 4.0 + sin(c3.x * 5.0 - c3.y * 2.0));
-  caustic3 = clamp(caustic3 * 0.5 + 0.5, 0.0, 1.0);
+  caustic3 = caustic3 * 0.5 + 0.5;
   caustic3 = caustic3 * caustic3; // pow 2
 
   // Combine caustics

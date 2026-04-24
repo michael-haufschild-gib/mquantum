@@ -32,6 +32,9 @@ export const tdseFusedPotentialPackBlock = /* wgsl */ `
 @group(0) @binding(3) var<storage, read> potential: array<f32>;
 @group(0) @binding(4) var<storage, read_write> complexBuf: array<f32>;
 
+const INV_TWO_PI: f32 = 0.15915494309189535;
+const TWO_PI: f32 = 6.283185307179587;
+
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let idx = gid.x;
@@ -42,10 +45,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let re = psiRe[idx];
   let im = psiIm[idx];
 
+  // Uniform-only: precompute 0.5·dt/max(ℏ,ε) to replace per-thread divide with multiply.
+  let halfDtOverHbar = (0.5 * params.dt) / max(params.hbar, 1e-6);
+
   // 1. Apply half-step potential: psi -> exp(-iV_eff*dt/(2h)) * psi
   let density = re * re + im * im;
   let effectiveV = potential[idx] + params.interactionStrength * density;
-  let arg = effectiveV * params.dt / (2.0 * max(params.hbar, 1e-6));
+  let arg = effectiveV * halfDtOverHbar;
 
   var newRe: f32;
   var newIm: f32;
@@ -57,7 +63,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   } else {
     let phase = -arg;
     // Reduce to [-π, π] so f32 cos/sin stay precise for high-V / small-ℏ combos
-    let reduced = phase - round(phase * 0.15915494) * 6.28318530;
+    let reduced = phase - round(phase * INV_TWO_PI) * TWO_PI;
     let cosP = cos(reduced);
     let sinP = sin(reduced);
     newRe = re * cosP - im * sinP;
@@ -68,9 +74,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   psiRe[idx] = newRe;
   psiIm[idx] = newIm;
 
-  // 3. Pack into interleaved complex buffer for FFT
-  complexBuf[idx * 2u] = newRe;
-  complexBuf[idx * 2u + 1u] = newIm;
+  // 3. Pack into interleaved complex buffer for FFT (one address → adjacent writes).
+  let c = idx << 1u;
+  complexBuf[c] = newRe;
+  complexBuf[c + 1u] = newIm;
 }
 `
 
@@ -92,6 +99,9 @@ export const tdseFusedUnpackPotentialBlock = /* wgsl */ `
 @group(0) @binding(3) var<storage, read_write> psiIm: array<f32>;
 @group(0) @binding(4) var<storage, read> potential: array<f32>;
 
+const UP_INV_TWO_PI: f32 = 0.15915494309189535;
+const UP_TWO_PI: f32 = 6.283185307179587;
+
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let idx = gid.x;
@@ -99,15 +109,17 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
 
-  // 1. Unpack with 1/N normalization from inverse FFT
+  // 1. Unpack with 1/N normalization from inverse FFT (one index compute, two reads).
   let invN = 1.0 / f32(params.totalSites);
-  let re = complexBuf[idx * 2u] * invN;
-  let im = complexBuf[idx * 2u + 1u] * invN;
+  let c = idx << 1u;
+  let re = complexBuf[c] * invN;
+  let im = complexBuf[c + 1u] * invN;
 
-  // 2. Apply half-step potential: psi -> exp(-iV_eff*dt/(2h)) * psi
+  // 2. Half-step potential. Uniform-only prefactor hoisted to a multiply.
+  let halfDtOverHbar = (0.5 * params.dt) / max(params.hbar, 1e-6);
   let density = re * re + im * im;
   let effectiveV = potential[idx] + params.interactionStrength * density;
-  let arg = effectiveV * params.dt / (2.0 * max(params.hbar, 1e-6));
+  let arg = effectiveV * halfDtOverHbar;
 
   if (params.imaginaryTime != 0u) {
     let decay = exp(-arg);
@@ -116,7 +128,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   } else {
     let phase = -arg;
     // Reduce to [-π, π] so f32 cos/sin stay precise for high-V / small-ℏ combos
-    let reduced = phase - round(phase * 0.15915494) * 6.28318530;
+    let reduced = phase - round(phase * UP_INV_TWO_PI) * UP_TWO_PI;
     let cosP = cos(reduced);
     let sinP = sin(reduced);
     psiRe[idx] = re * cosP - im * sinP;

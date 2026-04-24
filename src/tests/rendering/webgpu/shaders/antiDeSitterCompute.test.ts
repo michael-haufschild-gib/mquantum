@@ -35,10 +35,15 @@ describe('AdS compute shader composition', () => {
     const { wgsl } = composeAdsDensityComputeShader()
     expect(wgsl).toContain('fn adsLnGamma(')
     expect(wgsl).toContain('fn adsJacobiP(')
-    expect(wgsl).toContain('fn adsRadialNorm(')
     expect(wgsl).toContain('fn adsAssocLegendre(')
     expect(wgsl).toContain('fn adsSphericalY(')
     expect(wgsl).toContain('fn adsAngularHarmonic(')
+    // adsRadialNorm() has been moved to CPU (AdsDensityComputePass.updateAdsConfig);
+    // the compute shader now reads AdsConfig.radialNorm directly to skip 3 lgamma
+    // + 1 factorial evaluations per voxel. Verify both the wire-up and the removal.
+    expect(wgsl).not.toContain('fn adsRadialNorm(')
+    expect(wgsl).toContain('radialNorm: f32')
+    expect(wgsl).toContain('adsConfig.radialNorm')
   })
 
   it('includes AdsConfig uniform struct and binding', () => {

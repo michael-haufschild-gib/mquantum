@@ -36,41 +36,19 @@ fn skyboxNoise(x: vec3<f32>) -> f32 {
   );
 }
 
-// FBM (Fractal Brownian Motion) - unrolled for WGSL
-// Note: WGSL requires explicit loop bounds, using manual unrolling for flexibility
+// FBM (Fractal Brownian Motion) - 3 octaves, fully unrolled with compile-time weights.
+// The previous version threaded an 'a' running-weight variable through each iteration;
+// baking the constants in (0.5, 0.25, 0.125) lets the compiler fold them directly into
+// the multiply-adds and saves three running multiplications per pixel.
 fn skyboxFbm3(x_in: vec3<f32>) -> f32 {
-  var v = 0.0;
-  var a = 0.5;
-  var x = x_in;
   let shift = vec3<f32>(100.0);
-
-  // 3 octaves
-  v += a * skyboxNoise(x);
-  x = x * 2.0 + shift;
-  a *= 0.5;
-
-  v += a * skyboxNoise(x);
-  x = x * 2.0 + shift;
-  a *= 0.5;
-
-  v += a * skyboxNoise(x);
-
-  return v;
-}
-
-fn skyboxFbm5(x_in: vec3<f32>) -> f32 {
-  var v = 0.0;
-  var a = 0.5;
   var x = x_in;
-  let shift = vec3<f32>(100.0);
 
-  // 5 octaves
-  for (var i = 0; i < 5; i++) {
-    v += a * skyboxNoise(x);
-    x = x * 2.0 + shift;
-    a *= 0.5;
-  }
-
+  var v  = 0.5   * skyboxNoise(x);
+  x = x * 2.0 + shift;
+  v     += 0.25  * skyboxNoise(x);
+  x = x * 2.0 + shift;
+  v     += 0.125 * skyboxNoise(x);
   return v;
 }
 `

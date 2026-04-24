@@ -31,7 +31,9 @@ fn getNebula(dir: vec3<f32>, time: f32) -> vec3<f32> {
 
   // --- Bright knots (cheap noise instead of fbm) ---
   let knotNoise = skyboxNoise(p * 3.0 + time * 0.05);
-  let knots = pow(smoothstep(0.6, 0.9, knotNoise), 3.0) * uniforms.complexity;
+  // pow(x, 3.0) via multiply chain — avoids exp+log transcendental.
+  let knotBase = smoothstep(0.6, 0.9, knotNoise);
+  let knots = knotBase * knotBase * knotBase * uniforms.complexity;
 
   // Combined density
   let totalDensity = mainDensity * 0.6 + detailDensity * 0.25 + knots * 0.25;
@@ -45,9 +47,10 @@ fn getNebula(dir: vec3<f32>, time: f32) -> vec3<f32> {
   let emissionColor = cosinePalette(mainDensity * 0.6 + 0.2, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
   let knotColor = cosinePalette(0.85, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD) * 1.5;
 
-  col = deepColor;
-  col = mix(col, emissionColor, mainDensity * 0.8);
-  col = mix(col, deepColor, absorption);
+  // mix(mix(D, E, 0.8m), D, a) collapses algebraically to mix(D, E, 0.8m*(1-a)).
+  // Saves one vec3 mix (3 FMAs) per pixel.
+  let emitWeight = mainDensity * 0.8 * (1.0 - absorption);
+  col = mix(deepColor, emissionColor, emitWeight);
   col += knotColor * knots;
   col *= smoothstep(0.0, 0.4, totalDensity) * 0.7 + 0.3;
 

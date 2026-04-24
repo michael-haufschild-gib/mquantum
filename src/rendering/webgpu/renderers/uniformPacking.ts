@@ -10,6 +10,7 @@
  * @module rendering/webgpu/renderers/uniformPacking
  */
 
+import { rgbUnitToHsl } from '@/lib/colors/colorUtils'
 import type { AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
 import { DEFAULT_PAULI_CONFIG, type SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { computeRadialProbabilityNorm } from '@/lib/math/hydrogenRadialProbability'
@@ -677,7 +678,8 @@ function packWignerAndPauliFields(
   }
   intView[I.wignerQuadPoints] = schroedinger?.wignerQuadPoints ?? 32
 
-  // Pauli spinor colors
+  // Pauli spinor colors. HSL forms are precomputed here so the hue-space
+  // blend in color algorithm 24 does not re-run rgb2hsl per raymarch sample.
   const spinUp = pauliSpinor?.spinUpColor ?? DEFAULT_PAULI_CONFIG.spinUpColor
   const spinDown = pauliSpinor?.spinDownColor ?? DEFAULT_PAULI_CONFIG.spinDownColor
   floatView[I.pauliSpinUpColor] = spinUp[0]!
@@ -686,6 +688,15 @@ function packWignerAndPauliFields(
   floatView[I.pauliSpinDownColor] = spinDown[0]!
   floatView[I.pauliSpinDownColor + 1] = spinDown[1]!
   floatView[I.pauliSpinDownColor + 2] = spinDown[2]!
+
+  const upHsl = rgbUnitToHsl(spinUp[0]!, spinUp[1]!, spinUp[2]!)
+  const downHsl = rgbUnitToHsl(spinDown[0]!, spinDown[1]!, spinDown[2]!)
+  floatView[I.pauliSpinUpColorHSL] = upHsl[0]
+  floatView[I.pauliSpinUpColorHSL + 1] = upHsl[1]
+  floatView[I.pauliSpinUpColorHSL + 2] = upHsl[2]
+  floatView[I.pauliSpinDownColorHSL] = downHsl[0]
+  floatView[I.pauliSpinDownColorHSL + 1] = downHsl[1]
+  floatView[I.pauliSpinDownColorHSL + 2] = downHsl[2]
 }
 
 /** Compute Wigner auto-range values based on quantum mode and state. */

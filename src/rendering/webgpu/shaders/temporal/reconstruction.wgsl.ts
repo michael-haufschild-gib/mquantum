@@ -46,55 +46,60 @@ fn sampleQuarterRes(coord: vec2i, dims: vec2i) -> vec4f {
   return textureLoad(quarterColor, clamped, 0);
 }
 
-// Compute neighborhood min/max for clamping (3x3 at 2-pixel stride = 6x6 effective area)
-fn computeNeighborhoodBounds(centerCoord: vec2i, dims: vec2i) -> array<vec3f, 2> {
+// Compute neighborhood min/max for clamping (3x3 at 2-pixel stride = 6x6 effective area).
+// centerSample is the already-loaded texel at centerCoord -- passed in so the center
+// iteration of the 3x3 does not reload the same texel the caller already has.
+fn computeNeighborhoodBounds(centerCoord: vec2i, dims: vec2i, centerSample: vec4f) -> array<vec3f, 2> {
   var minColor = vec3f(99999.0);
   var maxColor = vec3f(-99999.0);
 
-  // Sample 3x3 neighborhood with stride 2 (covers larger area)
-  for (var dy = -1; dy <= 1; dy++) {
-    for (var dx = -1; dx <= 1; dx++) {
-      let offset = vec2i(dx * 2, dy * 2);
-      let sample = sampleQuarterRes(centerCoord + offset, dims);
-
-      // Only include samples with valid alpha
-      if (sample.a > 0.001) {
-        minColor = min(minColor, sample.rgb);
-        maxColor = max(maxColor, sample.rgb);
-      }
-    }
+  // Fold the pre-loaded center sample into the min/max first.
+  if (centerSample.a > 0.001) {
+    minColor = centerSample.rgb;
+    maxColor = centerSample.rgb;
   }
 
-  // Fallback if no valid samples
+  // Sample 3x3 neighborhood with stride 2 (covers larger area).
+  // NB: the center (dx=0, dy=0) is skipped -- it is centerSample, already folded in above.
+  // Unrolled so the compiler sees eight plain textureLoads.
+  let s_nn = sampleQuarterRes(centerCoord + vec2i(-2, -2), dims);
+  let s_0n = sampleQuarterRes(centerCoord + vec2i( 0, -2), dims);
+  let s_pn = sampleQuarterRes(centerCoord + vec2i( 2, -2), dims);
+  let s_n0 = sampleQuarterRes(centerCoord + vec2i(-2,  0), dims);
+  let s_p0 = sampleQuarterRes(centerCoord + vec2i( 2,  0), dims);
+  let s_np = sampleQuarterRes(centerCoord + vec2i(-2,  2), dims);
+  let s_0p = sampleQuarterRes(centerCoord + vec2i( 0,  2), dims);
+  let s_pp = sampleQuarterRes(centerCoord + vec2i( 2,  2), dims);
+
+  // Fold each neighbor in if it has valid alpha. Done branchlessly via select() on
+  // sentinel extrema — the compiler lowers this to predicated min/max on all known
+  // back-ends and avoids per-sample branches.
+  let INF = vec3f(99999.0);
+  let NEG_INF = vec3f(-99999.0);
+  minColor = min(minColor, select(INF,     s_nn.rgb, s_nn.a > 0.001));
+  maxColor = max(maxColor, select(NEG_INF, s_nn.rgb, s_nn.a > 0.001));
+  minColor = min(minColor, select(INF,     s_0n.rgb, s_0n.a > 0.001));
+  maxColor = max(maxColor, select(NEG_INF, s_0n.rgb, s_0n.a > 0.001));
+  minColor = min(minColor, select(INF,     s_pn.rgb, s_pn.a > 0.001));
+  maxColor = max(maxColor, select(NEG_INF, s_pn.rgb, s_pn.a > 0.001));
+  minColor = min(minColor, select(INF,     s_n0.rgb, s_n0.a > 0.001));
+  maxColor = max(maxColor, select(NEG_INF, s_n0.rgb, s_n0.a > 0.001));
+  minColor = min(minColor, select(INF,     s_p0.rgb, s_p0.a > 0.001));
+  maxColor = max(maxColor, select(NEG_INF, s_p0.rgb, s_p0.a > 0.001));
+  minColor = min(minColor, select(INF,     s_np.rgb, s_np.a > 0.001));
+  maxColor = max(maxColor, select(NEG_INF, s_np.rgb, s_np.a > 0.001));
+  minColor = min(minColor, select(INF,     s_0p.rgb, s_0p.a > 0.001));
+  maxColor = max(maxColor, select(NEG_INF, s_0p.rgb, s_0p.a > 0.001));
+  minColor = min(minColor, select(INF,     s_pp.rgb, s_pp.a > 0.001));
+  maxColor = max(maxColor, select(NEG_INF, s_pp.rgb, s_pp.a > 0.001));
+
+  // Fallback: if neither the center nor any neighbor was valid, fall back to centerSample.
   if (minColor.x > 90000.0) {
-    let center = sampleQuarterRes(centerCoord, dims);
-    minColor = center.rgb;
-    maxColor = center.rgb;
+    minColor = centerSample.rgb;
+    maxColor = centerSample.rgb;
   }
 
   return array<vec3f, 2>(minColor, maxColor);
-}
-
-// Spatial interpolation from quarter-res (for non-rendered pixels without history)
-fn spatialInterpolate(fullCoord: vec2i, quarterDims: vec2i) -> vec4f {
-  // Determine sub-pixel position within the 2x2 block
-  let subPixel = fullCoord % 2;
-  let quarterCoord = fullCoord / 2;
-
-  // Bilinear weights based on position in block
-  let fx = f32(subPixel.x) * 0.5 + 0.25;
-  let fy = f32(subPixel.y) * 0.5 + 0.25;
-
-  // Sample 4 nearest quarter-res pixels
-  let tl = sampleQuarterRes(quarterCoord, quarterDims);
-  let tr = sampleQuarterRes(quarterCoord + vec2i(1, 0), quarterDims);
-  let bl = sampleQuarterRes(quarterCoord + vec2i(0, 1), quarterDims);
-  let br = sampleQuarterRes(quarterCoord + vec2i(1, 1), quarterDims);
-
-  // Bilinear blend
-  let top = mix(tl, tr, fx);
-  let bottom = mix(bl, br, fx);
-  return mix(top, bottom, fy);
 }
 
 @fragment
@@ -106,28 +111,43 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   // Get quarter-res texture dimensions
   let quarterDims = vec2i(textureDimensions(quarterColor));
 
-  // Current frame: spatially interpolate from quarter-res for ALL pixels.
-  // This ensures every pixel reflects the current frame's data, eliminating
-  // the visible Bayer shimmer caused by treating pixels differently based
-  // on the cycling Bayer offset.
-  let interpolated = spatialInterpolate(fullCoord, quarterDims);
+  // Load the four bilinear taps ONCE. Reuse tl as both the bilinear top-left AND
+  // the exact sample for the Bayer-aligned pixel (current). This fuses the old
+  // spatialInterpolate() helper and the stand-alone current = sampleQuarterRes(
+  // quarterCoord, ...) into a single set of four loads, saving one textureLoad
+  // per pixel vs. the previous implementation.
+  let tl = sampleQuarterRes(quarterCoord, quarterDims);
+  let tr = sampleQuarterRes(quarterCoord + vec2i(1, 0), quarterDims);
+  let bl = sampleQuarterRes(quarterCoord + vec2i(0, 1), quarterDims);
+  let br = sampleQuarterRes(quarterCoord + vec2i(1, 1), quarterDims);
 
-  // For the Bayer-aligned pixel, we have an exact sample (no interpolation needed)
-  let blockPos = vec2f(f32(fullCoord.x % 2), f32(fullCoord.y % 2));
+  // Determine sub-pixel position within the 2x2 block.
+  // (fullCoord & 1 == fullCoord % 2 for non-negative ints, but cheaper on all back-ends.)
+  let subPixel = fullCoord & vec2i(1);
+  // Bilinear weights: 0.25 or 0.75 depending on sub-pixel parity.
+  let fx = f32(subPixel.x) * 0.5 + 0.25;
+  let fy = f32(subPixel.y) * 0.5 + 0.25;
+
+  // Bilinear blend (for non-rendered pixels — ensures every pixel reflects the current
+  // frame's data and eliminates Bayer shimmer).
+  let interpolated = mix(mix(tl, tr, fx), mix(bl, br, fx), fy);
+
+  // For the Bayer-aligned pixel, reuse tl (same coord as quarterCoord).
+  let blockPos = vec2f(f32(subPixel.x), f32(subPixel.y));
   let isRenderedPixel = (blockPos.x == temporal.bayerOffset.x && blockPos.y == temporal.bayerOffset.y);
-  let current = sampleQuarterRes(quarterCoord, quarterDims);
 
   // Use exact sample for rendered pixel, interpolated for others
-  let currentColor = select(interpolated.rgb, current.rgb, isRenderedPixel);
-  let currentAlpha = select(interpolated.a, current.a, isRenderedPixel);
+  let currentColor = select(interpolated.rgb, tl.rgb, isRenderedPixel);
+  let currentAlpha = select(interpolated.a, tl.a, isRenderedPixel);
 
   // Sample reprojected history (RGB color, A = validity)
   let historyData = textureLoad(reprojectedHistory, fullCoord, 0);
   let historyColor = historyData.rgb;
   let validity = historyData.a;
 
-  // Compute neighborhood bounds for clamping
-  let bounds = computeNeighborhoodBounds(quarterCoord, quarterDims);
+  // Compute neighborhood bounds for clamping — pass the already-loaded tl as the
+  // center sample so the bounds pass reuses it (saves one more textureLoad per pixel).
+  let bounds = computeNeighborhoodBounds(quarterCoord, quarterDims, tl);
   let neighborMin = bounds[0];
   let neighborMax = bounds[1];
 

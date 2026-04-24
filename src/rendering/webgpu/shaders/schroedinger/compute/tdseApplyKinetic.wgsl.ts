@@ -17,6 +17,9 @@ export const tdseApplyKineticBlock = /* wgsl */ `
 @group(0) @binding(0) var<storage, read> params: TDSEUniforms;
 @group(0) @binding(1) var<storage, read_write> complexBuf: array<f32>;
 
+const KIN_INV_TWO_PI: f32 = 0.15915494309189535;
+const KIN_TWO_PI: f32 = 6.283185307179587;
+
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let idx = gid.x;
@@ -27,39 +30,42 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Convert linear index to N-D k-space coordinates
   let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
 
-  // Compute |k|^2 from lattice k-indices
-  // k_d = kGridScale[d] * (coord_d < N_d/2 ? coord_d : coord_d - N_d)
-  // This gives the standard FFT frequency ordering
+  // Compute |k|² from lattice k-indices.
+  // k_d = kGridScale[d] * (coord_d < N_d/2 ? coord_d : coord_d - N_d)  (FFT freq ordering)
   var k2: f32 = 0.0;
-  for (var d: u32 = 0u; d < params.latticeDim; d++) {
+  let ldim = params.latticeDim;
+  for (var d: u32 = 0u; d < ldim; d = d + 1u) {
     let n = params.gridSize[d];
-    let halfN = n / 2u;
+    let halfN = n >> 1u;
     let kIdx = select(i32(coords[d]) - i32(n), i32(coords[d]), coords[d] < halfN);
     let kVal = params.kGridScale[d] * f32(kIdx);
     k2 += kVal * kVal;
   }
 
-  // Read interleaved complex value
-  let re = complexBuf[idx * 2u];
-  let im = complexBuf[idx * 2u + 1u];
+  // Cache adjacent complex-buffer address (4 accesses otherwise).
+  let c = idx << 1u;
+  let re = complexBuf[c];
+  let im = complexBuf[c + 1u];
 
-  let arg = params.hbar * k2 * params.dt / (2.0 * max(params.mass, 1e-6));
+  // Uniform-only factor: hoist ℏ·dt/(2m) to replace the per-thread divide with a multiply.
+  let hbarDtOver2m = (0.5 * params.hbar * params.dt) / max(params.mass, 1e-6);
+  let arg = k2 * hbarDtOver2m;
 
   if (params.imaginaryTime != 0u) {
     // Imaginary-time (Wick rotation): exp(-ℏk²dτ/(2m)) — real exponential decay
     // High-k modes decay exponentially, leaving the ground state
     let decay = exp(-arg);
-    complexBuf[idx * 2u] = re * decay;
-    complexBuf[idx * 2u + 1u] = im * decay;
+    complexBuf[c] = re * decay;
+    complexBuf[c + 1u] = im * decay;
   } else {
     // Real-time: exp(-i·ℏk²dt/(2m)) — unitary phase rotation
     let phase = -arg;
     // Reduce to [-π, π] so f32 cos/sin stay precise for high-frequency k-modes
-    let reduced = phase - round(phase * 0.15915494) * 6.28318530;
+    let reduced = phase - round(phase * KIN_INV_TWO_PI) * KIN_TWO_PI;
     let cosP = cos(reduced);
     let sinP = sin(reduced);
-    complexBuf[idx * 2u] = re * cosP - im * sinP;
-    complexBuf[idx * 2u + 1u] = re * sinP + im * cosP;
+    complexBuf[c] = re * cosP - im * sinP;
+    complexBuf[c + 1u] = re * sinP + im * cosP;
   }
 }
 `

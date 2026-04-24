@@ -102,30 +102,32 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   } else if (params.initCondition == 2u) {
     // standingWave: superposition of +k and -k spin-polarized packets
-    let env1 = 0.7071 * envelope;
+    const INV_SQRT2: f32 = 0.70710678118654752;
+    let env1 = INV_SQRT2 * envelope;
     var r2b: f32 = 0.0;
     var kdotx2: f32 = 0.0;
-    for (var d2: u32 = 0u; d2 < params.latticeDim; d2++) {
+    for (var d2: u32 = 0u; d2 < params.latticeDim; d2 = d2 + 1u) {
       let pos2 = (f32(coords[d2]) - f32(params.gridSize[d2]) * 0.5 + 0.5) * params.spacing[d2];
       let dx2 = pos2 + params.packetCenter[d2];
       r2b += dx2 * dx2;
       kdotx2 += -params.packetMomentum[d2] * pos2;
     }
-    let env2 = 0.7071 * exp(-r2b * invFourSigma2);
-    let phase2 = kdotx2;
-    let cosP2 = cos(phase2);
-    let sinP2 = sin(phase2);
+    let env2 = INV_SQRT2 * exp(-r2b * invFourSigma2);
+    let cosP2 = cos(kdotx2);
+    let sinP2 = sin(kdotx2);
+
+    // Cache the two combined-envelope projections (used 2× for re, 2× for im).
+    let combinedCos = env1 * cosP + env2 * cosP2;
+    let combinedSin = env1 * sinP + env2 * sinP2;
 
     // Component 0: spin-up from both packets
-    let re0 = pAmp * cosHalf * (env1 * cosP + env2 * cosP2);
-    let im0 = pAmp * cosHalf * (env1 * sinP + env2 * sinP2);
-    spinorRe[idx] = re0;
-    spinorIm[idx] = im0;
+    spinorRe[idx] = pAmp * cosHalf * combinedCos;
+    spinorIm[idx] = pAmp * cosHalf * combinedSin;
     // Component 1: spin-down
     if (S > 1u) {
       let bufIdx1 = 1u * T + idx;
-      spinorRe[bufIdx1] = pAmp * sinHalf * ((env1 * cosP + env2 * cosP2) * phiCos - (env1 * sinP + env2 * sinP2) * phiSin);
-      spinorIm[bufIdx1] = pAmp * sinHalf * ((env1 * sinP + env2 * sinP2) * phiCos + (env1 * cosP + env2 * cosP2) * phiSin);
+      spinorRe[bufIdx1] = pAmp * sinHalf * (combinedCos * phiCos - combinedSin * phiSin);
+      spinorIm[bufIdx1] = pAmp * sinHalf * (combinedSin * phiCos + combinedCos * phiSin);
     }
 
   } else if (params.initCondition == 3u) {

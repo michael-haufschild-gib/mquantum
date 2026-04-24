@@ -81,13 +81,16 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
         let t = params.simTime;
         let w = params.driveFrequency;
         let A = params.driveAmplitude;
+        const TAU_DRIVE: f32 = 6.28318530717958647692;
         if (params.driveWaveform == 0u) {
-          drive = A * sin(2.0 * 3.14159265 * w * t);
+          drive = A * sin(TAU_DRIVE * w * t);
         } else if (params.driveWaveform == 1u) {
-          let tau = 1.0 / (w + 0.001);
-          drive = A * exp(-t * t / (2.0 * tau * tau));
+          // 0.5 / tau² = 0.5 · (w + 0.001)² — skip the reciprocal cancellation.
+          let wShift = w + 0.001;
+          let invTwoTau2 = 0.5 * wShift * wShift;
+          drive = A * exp(-t * t * invTwoTau2);
         } else {
-          let phase = 2.0 * 3.14159265 * w * t * (1.0 + 0.5 * w * t);
+          let phase = TAU_DRIVE * w * t * (1.0 + 0.5 * w * t);
           drive = A * sin(phase);
         }
       }
@@ -111,8 +114,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       }
     }
   } else if (params.potentialType == 7u) {
-    // Periodic lattice: directional — V = V0 * cos^2(pi * x / a) along axis 0
-    let phase = 3.14159265 * pos0 / max(params.latticePeriod, 1e-6);
+    // Periodic lattice: directional — V = V0 * cos²(π · x / a) along axis 0
+    const PI_LATTICE: f32 = 3.14159265358979323846;
+    let phase = PI_LATTICE * pos0 / max(params.latticePeriod, 1e-6);
     let c = cos(phase);
     V = params.latticeDepth * c * c;
   } else if (params.potentialType == 8u) {
