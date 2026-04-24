@@ -102,6 +102,10 @@ fn evalHydrogenNDAngularDirect(l: i32, m: i32, cosTheta: f32, sinTheta: f32, phi
 /**
  * Evaluate angular part Y_lm from Cartesian unit direction (nx, ny, nz) = (x/r, y/r, z/r).
  * Returns vec2f(re, im). Eliminates atan2 singularity for real orbitals at l <= 2.
+ *
+ * Complex-orbital path replaces atan2(ny, nx) + cos(m*phi) + sin(m*phi) with a
+ * Chebyshev-style recurrence on (cos phi, sin phi) recovered from (nx, ny) via
+ * inverseSqrt. For |m| <= 3 this is ~20 ops vs ~50 for the transcendental chain.
  */
 fn evalHydrogenNDAngularCartesian(l: i32, m: i32, nx: f32, ny: f32, nz: f32, useReal: bool) -> vec2f {
   if (useReal) {
@@ -117,19 +121,35 @@ fn evalHydrogenNDAngularCartesian(l: i32, m: i32, nx: f32, ny: f32, nz: f32, use
       return vec2f(realSphericalHarmonic(l, m, theta, phi, true), 0.0);
     }
   } else {
-    // Complex: Y_lm = K·P·e^{imφ}; recover phi from Cartesian direction
+    // Complex: Y_lm = K * P * e^{i m phi}.
     let rxy2 = nx * nx + ny * ny;
     if (m != 0 && rxy2 < 1e-8) {
       return vec2f(0.0, 0.0);
     }
     let K = sphericalHarmonicNorm(l, m);
     var P = legendre(l, m, nz);
-    // Undo Condon-Shortley phase for m < 0 (see evalHydrogenNDAngular)
+    // Undo Condon-Shortley phase for m < 0 (mirrors evalHydrogenNDAngular).
     if (m < 0 && (abs(m) & 1) == 1) { P = -P; }
     let KP = K * P;
-    let phi = atan2(ny, nx);
-    let mf = f32(m);
-    return vec2f(KP * cos(mf * phi), KP * sin(mf * phi));
+
+    // (cos(m*phi), sin(m*phi)) via Chebyshev recurrence from (cos phi, sin phi),
+    // skipping the atan2 -> cos/sin round-trip entirely. For m = 0 the loop does
+    // zero iterations and we return (1, 0), multiplied by KP below.
+    let invRxy = inverseSqrt(max(rxy2, 1e-20));
+    let cPhi = nx * invRxy;
+    let sPhi = ny * invRxy;
+    let absM = abs(m);
+    var mCos: f32 = 1.0;
+    var mSin: f32 = 0.0;
+    for (var i: i32 = 0; i < absM; i++) {
+      let newCos = mCos * cPhi - mSin * sPhi;
+      let newSin = mSin * cPhi + mCos * sPhi;
+      mCos = newCos;
+      mSin = newSin;
+    }
+    // cos(-m phi) = cos(m phi); sin(-m phi) = -sin(m phi).
+    let signedSin = select(mSin, -mSin, m < 0);
+    return vec2f(KP * mCos, KP * signedSin);
   }
 }
 

@@ -33,16 +33,34 @@ export function generateAnalyticalGradientBlock(dimension: number, termCount?: n
     ).join('\n')
   }
 
-  // Generate the full spatial product expression
-  function genSpatialProduct(): string {
-    return Array.from({ length: dim }, (_, j) => `lk_${j}.x`).join(' * ')
+  // Prefix / suffix products over the .x components.
+  // prefixX[j] = lk_0.x * lk_1.x * ... * lk_{j-1}.x
+  // suffixX[j] = lk_{j+1}.x * lk_{j+2}.x * ... * lk_{dim-1}.x
+  // spatial_k (product of all .x) = prefixX[dim] = prefixX[j] * lk_j.x * suffixX[j].
+  // This turns every gradient-component partial product from O(dim) muls into 2 muls:
+  //   partial(j) = prefixX[j] * lk_j.y * suffixX[j]
+  // For dim=11 / termCount=8 the saving is ~544 muls per pixel.
+  function genPrefixSuffix(): string {
+    const lines: string[] = []
+    lines.push(`    let prefix_0: f32 = 1.0;`)
+    for (let j = 1; j <= dim; j++) {
+      lines.push(`    let prefix_${j}: f32 = prefix_${j - 1} * lk_${j - 1}.x;`)
+    }
+    lines.push(`    let suffix_${dim}: f32 = 1.0;`)
+    for (let j = dim - 1; j >= 0; j--) {
+      lines.push(`    let suffix_${j}: f32 = suffix_${j + 1} * lk_${j}.x;`)
+    }
+    return lines.join('\n')
   }
 
-  // Generate partial product for gradient component j (φ_j replaced by φ'_j)
-  function genPartialProduct(gradJ: number): string {
-    return Array.from({ length: dim }, (_, i) => (i === gradJ ? `lk_${i}.y` : `lk_${i}.x`)).join(
-      ' * '
-    )
+  // Full spatial product, reusing the suffix[0] we already built.
+  function spatialProductExpr(): string {
+    return `suffix_0`
+  }
+
+  // Partial product for gradient component j -- two muls against pre-built chains.
+  function partialProductExpr(gradJ: number): string {
+    return `prefix_${gradJ} * lk_${gradJ}.y * suffix_${gradJ + 1}`
   }
 
   // For the unrolled path, generate one complete term block
@@ -50,7 +68,8 @@ export function generateAnalyticalGradientBlock(dimension: number, termCount?: n
     const lines: string[] = []
     lines.push(`  { // Term ${k}`)
     lines.push(genLoadPhis(String(k)))
-    lines.push(`    let spatial_k = ${genSpatialProduct()};`)
+    lines.push(genPrefixSuffix())
+    lines.push(`    let spatial_k = ${spatialProductExpr()};`)
     lines.push(`    let coeff_k = getCoeff(uniforms, ${k});`)
     lines.push(`    let phase_k = -getEnergy(uniforms, ${k}) * t;`)
     lines.push(`    let tf_k = cexp_i(phase_k);`)
@@ -71,13 +90,13 @@ export function generateAnalyticalGradientBlock(dimension: number, termCount?: n
 
     // Gradient components for each ND dimension
     for (let j = 0; j < dim; j++) {
-      const pp = genPartialProduct(j)
+      const pp = partialProductExpr(j)
       if (isFirst) {
-        lines.push(`    dPsiRe[${j}] = ct_k.x * ${pp};`)
-        lines.push(`    dPsiIm[${j}] = ct_k.y * ${pp};`)
+        lines.push(`    dPsiRe[${j}] = ct_k.x * (${pp});`)
+        lines.push(`    dPsiIm[${j}] = ct_k.y * (${pp});`)
       } else {
-        lines.push(`    dPsiRe[${j}] += ct_k.x * ${pp};`)
-        lines.push(`    dPsiIm[${j}] += ct_k.y * ${pp};`)
+        lines.push(`    dPsiRe[${j}] += ct_k.x * (${pp});`)
+        lines.push(`    dPsiIm[${j}] += ct_k.y * (${pp});`)
       }
     }
 
@@ -107,7 +126,8 @@ export function generateAnalyticalGradientBlock(dimension: number, termCount?: n
   var dPsiIm: array<f32, ${dim}>;
   for (var k = 0; k < uniforms.termCount; k++) {
 ${genLoadPhis('k')}
-    let spatial_k = ${genSpatialProduct()};
+${genPrefixSuffix()}
+    let spatial_k = ${spatialProductExpr()};
     let coeff_k = getCoeff(uniforms, k);
     let phase_k = -getEnergy(uniforms, k) * t;
     let tf_k = cexp_i(phase_k);
@@ -117,8 +137,8 @@ ${genLoadPhis('k')}
     spatRe += coeff_k.x * spatial_k;
     spatIm += coeff_k.y * spatial_k;
 ${Array.from({ length: dim }, (_, j) => {
-  const pp = genPartialProduct(j).replace(/\bk\b/g, 'k')
-  return `    dPsiRe[${j}] += ct_k.x * ${pp};\n    dPsiIm[${j}] += ct_k.y * ${pp};`
+  const pp = partialProductExpr(j)
+  return `    dPsiRe[${j}] += ct_k.x * (${pp});\n    dPsiIm[${j}] += ct_k.y * (${pp});`
 }).join('\n')}
   }`
   }

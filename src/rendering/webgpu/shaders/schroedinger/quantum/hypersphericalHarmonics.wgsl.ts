@@ -171,9 +171,11 @@ fn cartesianToHyperspherical${D}D(xND: array<f32, 11>) -> HypersphericalCoords {
     const xIdx = D - 1 - k // x_{D-k} (0-indexed: D-1-k)
     const psqIdx = D - 2 - k // partial sum including up to x_{D-k}
     lines.push(`  {`)
+    // r itself is unused; cosTheta only needs x/r. Fused sqrt+divide via
+    // inverseSqrt saves one divide per theta layer (up to 9 for D=11).
     lines.push(`    let r2 = psq${psqIdx};`)
-    lines.push(`    let r = sqrt(max(r2, 1e-20));`)
-    lines.push(`    let ct = clamp(c${xIdx} / r, -1.0, 1.0);`)
+    lines.push(`    let invR = inverseSqrt(max(r2, 1e-20));`)
+    lines.push(`    let ct = clamp(c${xIdx} * invR, -1.0, 1.0);`)
     lines.push(`    hs.cosTheta[${k}] = ct;`)
     lines.push(`    hs.sinTheta[${k}] = sqrt(max(1.0 - ct * ct, 0.0));`)
     lines.push(`  }`)

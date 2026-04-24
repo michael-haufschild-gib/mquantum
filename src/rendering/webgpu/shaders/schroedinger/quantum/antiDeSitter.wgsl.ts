@@ -288,26 +288,18 @@ fn main(@builtin(global_invocation_id) global_id: vec3u) {
   // Phase: real eigenstate at t=0 → 0 (ψ ≥ 0) or π (ψ < 0).
   let phase = select(0.0, ADS_PI, psi < 0.0);
 
-  // Boundary overlay: thin shell at r ≈ 0.98.
+  // Boundary overlay: thin shell at r ~ 0.98. All per-voxel ingredients
+  // (sin(rho), jacobi, angular harmonic) are identical to what we already
+  // computed for the volume density above -- reuse them instead of running
+  // adsJacobiP + adsAngularHarmonic a second time per voxel.
   var boundary: f32 = 0.0;
   if (adsConfig.boundaryOverlay != 0u
       && rCompact >= ADS_BOUNDARY_SHELL_MIN
       && rCompact < ADS_BOUNDARY_SHELL_MAX) {
-    let bSinRho = sin(rho);
-    let bSin2l = select(pow(abs(bSinRho), 2.0 * fl), 1.0, l == 0);
-    let bJacobi = adsJacobiP(n, alpha, beta, cos(2.0 * rho));
-
-    var bY: f32;
-    if (l == 0 && d >= 4) {
-      bY = 1.0 / sqrt(4.0 * ADS_PI);
-    } else {
-      let bInvR = select(1.0 / rCompact, 0.0, rCompact < 1e-10);
-      let bTheta = acos(clamp(worldPos.z * bInvR, -1.0, 1.0));
-      let bPhi = atan2(worldPos.y, worldPos.x);
-      bY = adsAngularHarmonic(l, m, d, bTheta, bPhi);
-    }
+    // sinPow == |sin(rho)|^l (or 1 when l==0). |sin(rho)|^(2l) == sinPow^2.
+    let bSin2l = sinPow * sinPow;
     let normSq = norm * norm;
-    boundary = normSq * bSin2l * bJacobi * bJacobi * bY * bY;
+    boundary = normSq * bSin2l * jacobi * jacobi * Y * Y;
   }
 
   textureStore(densityGrid, global_id, vec4f(rho2, logRho, phase, boundary));
