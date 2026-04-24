@@ -89,11 +89,21 @@ export const wignerSpatialComputeBlock = /* wgsl */ `
 // ============================================
 
 /**
- * Compute the cross-Wigner spatial pattern for a pair (termJ, termK).
- * Returns vec2f(Re, Im) with conjugation applied when nj < nk.
- * Returns vec2f(0,0) if the marginal rule rejects this pair.
+ * Compute the cross-Wigner spatial pattern for a pair (termJ, termK) using
+ * pre-hoisted per-voxel scalars (u2, expU2, szetaRe, szetaIm). Mirrors the
+ * wignerCrossShared path in the HO marginal evaluator -- saves 5 transcendentals
+ * (sqrt, inverseSqrt, sqrt, exp, divide) per pair call by keeping them hoisted
+ * at the voxel-loop level instead of per pair.
  */
-fn computeCrossPairSpatial(termJ: i32, termK: i32, xPhys: f32, pPhys: f32, dimIdx: i32, omega: f32) -> vec2f {
+fn computeCrossPairSpatialShared(
+  termJ: i32,
+  termK: i32,
+  dimIdx: i32,
+  u2: f32,
+  expU2: f32,
+  szetaRe: f32,
+  szetaIm: f32
+) -> vec2f {
   // Marginal rule: all non-selected dims must match
   if (!wignerTermsMatchExcept(termJ, termK, dimIdx, schroedinger)) {
     return vec2f(0.0, 0.0);
@@ -102,11 +112,8 @@ fn computeCrossPairSpatial(termJ: i32, termK: i32, xPhys: f32, pPhys: f32, dimId
   let nj = getQuantumNumber(schroedinger, termJ, dimIdx);
   let nk = getQuantumNumber(schroedinger, termK, dimIdx);
 
-  // wignerCross always computes W_{max,min}
-  let Wcross = wignerCross(nj, nk, xPhys, pPhys, omega);
-  // When nj < nk, need conjugate: negate imaginary
+  let Wcross = wignerCrossShared(nj, nk, u2, expU2, szetaRe, szetaIm);
   let crossIm = select(Wcross.y, -Wcross.y, nj < nk);
-
   return vec2f(Wcross.x, crossIm);
 }
 
@@ -172,16 +179,27 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let omega = getOmega(schroedinger, dimIdx);
     let numLayers = spatialParams.numLayers;
 
+    // Hoist all (x, p, omega)-only scalars out of the pair loop. Each pair
+    // would otherwise recompute invOmega, u2, sqrtOmega, invSqrtOmega, exp(-u2).
+    let invOmega = 1.0 / max(omega, 1e-20);
+    let u2 = omega * xPhys * xPhys + pPhys * pPhys * invOmega;
+    let expU2 = exp(-u2);
+    let sqrtOmega = sqrt(omega);
+    let invSqrtOmega = inverseSqrt(max(omega, 1e-20));
+    let scaleSqrt2 = sqrt(2.0);
+    let szetaRe = scaleSqrt2 * sqrtOmega * xPhys;
+    let szetaIm = scaleSqrt2 * pPhys * invSqrtOmega;
+
     for (var layerIdx = 0u; layerIdx < numLayers; layerIdx++) {
       let lp = spatialParams.layerPairs[layerIdx];
 
       // First pair (always present)
-      let pair0 = computeCrossPairSpatial(lp.x, lp.y, xPhys, pPhys, dimIdx, omega);
+      let pair0 = computeCrossPairSpatialShared(lp.x, lp.y, dimIdx, u2, expU2, szetaRe, szetaIm);
 
       // Second pair (j1 = -1 means no second pair)
       var pair1 = vec2f(0.0, 0.0);
       if (lp.z >= 0) {
-        pair1 = computeCrossPairSpatial(lp.z, lp.w, xPhys, pPhys, dimIdx, omega);
+        pair1 = computeCrossPairSpatialShared(lp.z, lp.w, dimIdx, u2, expU2, szetaRe, szetaIm);
       }
 
       // Pack both pairs: .rg = pair0, .ba = pair1
