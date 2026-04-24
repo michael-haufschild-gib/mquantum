@@ -54,13 +54,13 @@ fn mapCrossSectionColor(
   envelope: f32,
   uniforms: SchroedingerUniforms
 ) -> vec3f {
-  // Reuse the existing object color algorithm pipeline, but drive it from the
-  // slice scalar alone (1D ramp). This avoids spatial/phase artifacts in slices.
-  let t = clamp(value01, 0.0, 1.0);
-  let proxyS = t * 8.0 - 8.0;
+  // value01 was already clamp(0,1)'d in sampleCrossSectionScalar, so the extra
+  // clamp here was redundant. vec3f(x) also broadcasts instead of repeating the
+  // expression three times.
+  let proxyS = value01 * 8.0 - 8.0;
   let proxyRho = exp(proxyS);
-  let proxyPhase = t * TAU - PI;
-  let proxyPos = vec3f(t * 2.0 - 1.0, t * 2.0 - 1.0, t * 2.0 - 1.0);
+  let proxyPhase = value01 * TAU - PI;
+  let proxyPos = vec3f(value01 * 2.0 - 1.0);
   let scalarColor = computeBaseColor(proxyRho, proxyS, proxyPhase, proxyPos, uniforms);
   let planeColor = uniforms.crossSectionPlaneColor.xyz;
   return mix(planeColor, scalarColor, clamp(envelope, 0.0, 1.0));

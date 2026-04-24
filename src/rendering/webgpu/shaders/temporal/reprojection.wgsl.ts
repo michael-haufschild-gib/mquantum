@@ -55,25 +55,24 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   let worldPos = positionData.xyz;
   let depth = positionData.w;
 
-  // Reproject world position to previous frame's UV
-  // Compute this BEFORE any early returns so we can sample history uniformly
+  // Fast early-out for invalid pixels. Anything below is skipped (no history sample,
+  // no matrix multiply, no smoothsteps) when this pixel has no hit, which saves a
+  // full bilinear history fetch on every background/sky pixel.
+  if (depth <= 0.0) {
+    return vec4f(0.0, 0.0, 0.0, 0.0);
+  }
+
+  // Reproject world position to previous frame's UV.
   let prevClip = temporal.prevViewProjection * vec4f(worldPos, 1.0);
   let prevNDC = prevClip.xyz / max(prevClip.w, 0.0001);
   // NDC → UV: X is direct, Y must be flipped because NDC.y=+1 is screen top
-  // but UV.y=0 is texture top (WebGPU framebuffer convention)
+  // but UV.y=0 is texture top (WebGPU framebuffer convention).
   let prevUV = vec2f(prevNDC.x, -prevNDC.y) * 0.5 + 0.5;
 
-  // CRITICAL: textureSample must be called from UNIFORM control flow
-  // Sample history BEFORE any per-pixel conditional branches
-  let clampedUV = clamp(prevUV, vec2f(0.0), vec2f(1.0));
-  let history = textureSample(prevAccumulation, linearSampler, clampedUV);
-
-  // Now we can do per-pixel early returns and validity checks
-  // Check for valid hit (depth > 0 indicates valid position)
-  if (depth <= 0.0) {
-    // No hit at this pixel - return invalid marker
-    return vec4f(0.0, 0.0, 0.0, 0.0);
-  }
+  // textureSampleLevel does not require uniform control flow (no implicit derivatives),
+  // so we can call it after the depth early-out. The sampler is clamp-to-edge, so the
+  // previous explicit clamp(prevUV, 0, 1) was redundant and has been removed.
+  let history = textureSampleLevel(prevAccumulation, linearSampler, prevUV, 0.0);
 
   // Validity checks
   var valid = true;

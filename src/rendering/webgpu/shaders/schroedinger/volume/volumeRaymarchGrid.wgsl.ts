@@ -314,7 +314,12 @@ fn volumeRaymarchGrid(
       sCenter = gridSample.g; // logRho from grid
       colorS = sCenter;
     } else {
-      sCenter = select(-20.0, log(rho), rho > 1e-9);
+      // r16float fallback: derive logRho. select() would evaluate log() on zero.
+      if (rho > 1e-9) {
+        sCenter = log(rho);
+      } else {
+        sCenter = -20.0;
+      }
       colorS = sCenter;
     }
 
@@ -354,9 +359,13 @@ fn volumeRaymarchGrid(
     // Skip for dual-channel modes since sCenter is secondary density, not logRho.
     if (FEATURE_UNCERTAINTY_BOUNDARY && !IS_DUAL_CHANNEL) {
       rho = applyUncertaintyBoundaryEmphasis(rho, sCenter, uniforms);
-      // Update logRho to reflect emphasis so emission color/brightness matches inline path
-      // (computeBaseColor uses s for color mapping: normalized = clamp((s+8)/8, 0, 1))
-      sCenter = select(-20.0, log(rho), rho > 1e-9);
+      // Update logRho to reflect emphasis. Branch so log() is not evaluated on
+      // near-zero rho when emphasis leaves a region dim.
+      if (rho > 1e-9) {
+        sCenter = log(rho);
+      } else {
+        sCenter = -20.0;
+      }
       colorRho = rho;
       colorS = sCenter;
     }
@@ -395,10 +404,21 @@ fn volumeRaymarchGrid(
 
     // Adaptive step size based on log-density.
     // For dual-channel modes, sCenter is secondary density [0,1], not logRho [-20,0].
-    // Use logRho of total density for adaptive stepping.
+    // Use logRho of total density for adaptive stepping. select() would evaluate log(rho)
+    // unconditionally -- the branch below skips the log entirely when rho is near-zero
+    // (common in empty regions, where the raymarch spends most of its iterations).
     var adaptiveStep: f32;
     if (!PROFILING_STRIP_ADAPTIVE_STEP && !hasPotOverlay) {
-      let logRhoForStep = select(sCenter, select(-20.0, log(rho), rho > 1e-9), IS_DUAL_CHANNEL);
+      var logRhoForStep: f32;
+      if (IS_DUAL_CHANNEL) {
+        if (rho > 1e-9) {
+          logRhoForStep = log(rho);
+        } else {
+          logRhoForStep = -20.0;
+        }
+      } else {
+        logRhoForStep = sCenter;
+      }
       adaptiveStep = computeAdaptiveStep(logRhoForStep, stepLen, tFar - t);
     } else {
       adaptiveStep = min(stepLen, tFar - t);

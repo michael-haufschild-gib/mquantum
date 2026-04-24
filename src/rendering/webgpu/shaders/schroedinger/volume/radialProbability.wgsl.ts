@@ -35,8 +35,10 @@ fn computeRadialProbabilityOverlay(pos: vec3f, uniforms: SchroedingerUniforms) -
   // Evaluate R_nl(r) using existing hydrogen radial function
   let R = hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, r, uniforms.bohrRadius);
 
-  // P(r) = 4π r² |R_nl(r)|², normalized by CPU precomputed norm
-  let Pr = 4.0 * PI * r * r * R * R * uniforms.radialProbabilityNorm;
+  // P(r) = 4π r² |R_nl(r)|² * norm, rewritten as 4π*(r*R)^2 * norm so we do
+  // ONE multiply + ONE square instead of (r*r*R*R) = 3 muls.
+  let rR = r * R;
+  let Pr = 4.0 * PI * rR * rR * uniforms.radialProbabilityNorm;
 
   // sqrt compression: preserves all peaks (inner ones are much smaller than outer)
   // while giving good visual contrast. Without this, inner shells of n=3,l=0 vanish.

@@ -196,7 +196,7 @@ const ALGO_BRANCH: Record<number, string> = {
     let distributedT = applyDistributionS(normalized, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
     let totalW = uniforms.multiSourceWeights.x + uniforms.multiSourceWeights.y + uniforms.multiSourceWeights.z;
     let w = uniforms.multiSourceWeights.xyz / max(totalW, 0.001);
-    let radialT = clamp(length(pos) / uniforms.boundingRadius, 0.0, 1.0);
+    let radialT = clamp(length(pos) * uniforms.invBoundingRadius, 0.0, 1.0);
     let verticalT = pos.y * 0.5 + 0.5;
     let blendedT = w.x * distributedT + w.y * radialT + w.z * verticalT;
     let a = uniforms.cosineA.xyz;
@@ -207,7 +207,7 @@ const ALGO_BRANCH: Record<number, string> = {
 
   2: /* wgsl */ `
     // 2: Radial - color by distance from center through cosine palette
-    let rawRadialT = clamp(length(pos) / uniforms.boundingRadius, 0.0, 1.0);
+    let rawRadialT = clamp(length(pos) * uniforms.invBoundingRadius, 0.0, 1.0);
     let radialT = applyDistributionS(rawRadialT, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
     let a = uniforms.cosineA.xyz;
     let b = uniforms.cosineB.xyz;
@@ -323,7 +323,7 @@ const ALGO_BRANCH: Record<number, string> = {
   11: /* wgsl */ `
     // 11: Radial Distance (spectral)
     let r = length(pos);
-    let distanceNorm = clamp(r / uniforms.boundingRadius, 0.0, 1.0);
+    let distanceNorm = clamp(r * uniforms.invBoundingRadius, 0.0, 1.0);
     let hue = 0.8 * distanceNorm;
     col = hsl2rgb(hue, 1.0, 0.5);`,
 

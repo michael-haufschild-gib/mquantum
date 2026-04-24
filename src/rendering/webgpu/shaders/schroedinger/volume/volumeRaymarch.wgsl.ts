@@ -55,6 +55,21 @@ fn volumeRaymarch(
   // sqrt(0.85)≈0.92: outer 8% shell is deep exponential tail for HO/hydrogen wavefunctions.
   let boundR2Skip = boundR2 * 0.85;
 
+  // PERF: Hoist uniform-only feature gates out of the 128-iteration loop body.
+  // Every read here would otherwise hit the uniform cache on every iteration.
+  let nodalBandEnabled =
+    FEATURE_NODAL &&
+    uniforms.nodalEnabled != 0u &&
+    uniforms.nodalStrength > 0.0 &&
+    uniforms.nodalRenderMode == NODAL_RENDER_MODE_BAND;
+  let probCurrentEnabled =
+    FEATURE_PROBABILITY_CURRENT &&
+    uniforms.probabilityCurrentEnabled != 0u &&
+    uniforms.probabilityCurrentScale > 0.0;
+  let probCurrentDensityThreshold = max(uniforms.probabilityCurrentDensityThreshold, 0.0);
+  let radialProbEnabled = FEATURE_RADIAL_PROBABILITY && uniforms.radialProbabilityEnabled != 0u;
+  let momentumRepresentation = uniforms.representationMode == REPRESENTATION_MOMENTUM;
+
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (i >= sampleCount) { break; }
     iterCount = i + 1;  // Track iteration count
@@ -106,13 +121,7 @@ fn volumeRaymarch(
     // psi evaluations would produce an invisible result. Saves ~44% ALU per low-density step.
     var nodalGradient = vec3f(0.0);
     var hasNodalGradient = false;
-    if (
-      FEATURE_NODAL &&
-      uniforms.nodalEnabled != 0u &&
-      uniforms.nodalStrength > 0.0 &&
-      uniforms.nodalRenderMode == NODAL_RENDER_MODE_BAND &&
-      sCenter > -10.0
-    ) {
+    if (nodalBandEnabled && sCenter > -10.0) {
       let combined = computePhysicalNodalFieldWithGradient(pos, animTime, uniforms);
       nodalGradient = combined.gradient;
       hasNodalGradient = true;
@@ -127,17 +136,14 @@ fn volumeRaymarch(
       }
     }
 
-    // PERF: Hoist density threshold check before expensive current sampling.
-    // sampleProbabilityCurrentWithPsi uses 3 forward-diff evalPsi calls (was 7 central).
-    // The center ψ is reused from the density pass above (rawPsiVec).
-    let momentumOverlaySubsample =
-      uniforms.representationMode == REPRESENTATION_MOMENTUM && (i & 3) != 0;
+    // Hoisted feature gates are used below. sampleProbabilityCurrentWithPsi uses
+    // 3 forward-diff evalPsi calls (was 7 central). The center psi is reused from
+    // the density pass above (rawPsiVec).
+    let momentumOverlaySubsample = momentumRepresentation && (i & 3) != 0;
     if (
-      FEATURE_PROBABILITY_CURRENT &&
+      probCurrentEnabled &&
       !momentumOverlaySubsample &&
-      uniforms.probabilityCurrentEnabled != 0u &&
-      uniforms.probabilityCurrentScale > 0.0 &&
-      rho >= max(uniforms.probabilityCurrentDensityThreshold, 0.0)
+      rho >= probCurrentDensityThreshold
     ) {
       let normalProxy = normalize(pos + vec3f(1e-6, 0.0, 0.0));
       let currentSample = sampleProbabilityCurrentWithPsi(pos, animTime, rawPsiVec.xy, uniforms);
@@ -148,7 +154,7 @@ fn volumeRaymarch(
     }
 
     // Radial probability overlay (hydrogen P(r) shells)
-    if (FEATURE_RADIAL_PROBABILITY && uniforms.radialProbabilityEnabled != 0u) {
+    if (radialProbEnabled) {
       let rProbOverlay = computeRadialProbabilityOverlay(pos, uniforms);
       compositeOverlay(rProbOverlay, adaptiveStep, stepLen, 0.5, &transmittance, &accColor);
     }
@@ -231,6 +237,15 @@ fn volumeRaymarchHQ(
   let boundR2 = uniforms.boundingRadius * uniforms.boundingRadius;
   // sqrt(0.85)≈0.92: outer 8% shell is deep exponential tail for HO/hydrogen wavefunctions.
   let boundR2Skip = boundR2 * 0.85;
+
+  // PERF: Hoist uniform-only feature gates (same pattern as volumeRaymarch above).
+  let probCurrentEnabled =
+    FEATURE_PROBABILITY_CURRENT &&
+    uniforms.probabilityCurrentEnabled != 0u &&
+    uniforms.probabilityCurrentScale > 0.0;
+  let probCurrentDensityThreshold = max(uniforms.probabilityCurrentDensityThreshold, 0.0);
+  let radialProbEnabled = FEATURE_RADIAL_PROBABILITY && uniforms.radialProbabilityEnabled != 0u;
+  let momentumRepresentation = uniforms.representationMode == REPRESENTATION_MOMENTUM;
 
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (i >= sampleCount) { break; }
@@ -347,15 +362,12 @@ fn volumeRaymarchHQ(
       }
     }
 
-    // PERF: Hoist density threshold check before current sampling (4 evalPsi via forward diffs).
-    let momentumOverlaySubsample =
-      uniforms.representationMode == REPRESENTATION_MOMENTUM && (i & 3) != 0;
+    // Hoisted feature gates (see start of function).
+    let momentumOverlaySubsample = momentumRepresentation && (i & 3) != 0;
     if (
-      FEATURE_PROBABILITY_CURRENT &&
+      probCurrentEnabled &&
       !momentumOverlaySubsample &&
-      uniforms.probabilityCurrentEnabled != 0u &&
-      uniforms.probabilityCurrentScale > 0.0 &&
-      rho >= max(uniforms.probabilityCurrentDensityThreshold, 0.0)
+      rho >= probCurrentDensityThreshold
     ) {
       let normalProxy = normalize(gradient + pos * 0.2 + vec3f(1e-6, 0.0, 0.0));
       let currentSample = sampleProbabilityCurrent(pos, animTime, uniforms);
@@ -366,7 +378,7 @@ fn volumeRaymarchHQ(
     }
 
     // Radial probability overlay (hydrogen P(r) shells)
-    if (FEATURE_RADIAL_PROBABILITY && uniforms.radialProbabilityEnabled != 0u) {
+    if (radialProbEnabled) {
       let rProbOverlay = computeRadialProbabilityOverlay(pos, uniforms);
       compositeOverlay(rProbOverlay, adaptiveStep, stepLen, 0.5, &transmittance, &accColor);
     }

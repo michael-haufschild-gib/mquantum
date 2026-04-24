@@ -139,13 +139,14 @@ fn applySampleRotation(pos: vec3f) -> vec3f {
 fn worldToDensityGridUVW(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
   let bound = uniforms.boundingRadius;
   let gridPos = applySampleRotation(pos);
-  // Linear world-to-UVW for the isotropic cube [-bound, +bound]^3. Modes
-  // whose solver grid has different physical extents per axis (notably
+  // Linear world-to-UVW for the isotropic cube [-bound, +bound]^3. Uses the
+  // CPU-precomputed invBoundingRadius to replace a vec3 divide with a vec3 mul.
+  // Modes whose solver grid has different physical extents per axis (notably
   // Wheeler-DeWitt: a in [aMin, aMax], phi1/phi2 in [-phiExtent, +phiExtent])
   // inherit a cosmetic anisotropy -- phi features render visually
   // compressed relative to a features whenever phiExtent > (aMax - aMin).
   // See WheelerDeWittStrategy.computeBoundingRadius for the full note.
-  return (gridPos + vec3f(bound)) / (2.0 * bound);
+  return (gridPos + vec3f(bound)) * (uniforms.invBoundingRadius * 0.5);
 }
 
 /**
@@ -213,12 +214,14 @@ fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f 
   // World-space half-distance between sample points (each offset is ±uvwStep
   // = ±2 texels in UVW = ±(2/N * 2*bound) in world, total 2h = 8*bound/N).
   let eps = bound * (4.0 / DENSITY_GRID_SIZE);
+  // 1/(2·eps) once — three vec3 divides become three multiplies downstream.
+  let inv2eps = 1.0 / (2.0 * eps);
 
   if (IS_DUAL_CHANNEL) {
     let gradX = (sxp.r + sxp.g) - (sxn.r + sxn.g);
     let gradY = (syp.r + syp.g) - (syn.r + syn.g);
     let gradZ = (szp.r + szp.g) - (szn.r + szn.g);
-    let gradRho = vec3f(gradX, gradY, gradZ) / (2.0 * eps);
+    let gradRho = vec3f(gradX, gradY, gradZ) * inv2eps;
     let rhoCenter = textureSampleLevel(densityGridTexture, densityGridSampler, baseUVW, 0.0);
     let rhoTotal = rhoCenter.r + rhoCenter.g;
     return gradRho / max(rhoTotal + 1e-8, 1e-8);
@@ -226,12 +229,12 @@ fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f 
     let gradX = sxp.g - sxn.g;
     let gradY = syp.g - syn.g;
     let gradZ = szp.g - szn.g;
-    return vec3f(gradX, gradY, gradZ) / (2.0 * eps);
+    return vec3f(gradX, gradY, gradZ) * inv2eps;
   } else {
     let gradX = sxp.r - sxn.r;
     let gradY = syp.r - syn.r;
     let gradZ = szp.r - szn.r;
-    let gradRho = vec3f(gradX, gradY, gradZ) / (2.0 * eps);
+    let gradRho = vec3f(gradX, gradY, gradZ) * inv2eps;
     let rho = textureSampleLevel(densityGridTexture, densityGridSampler, baseUVW, 0.0).r;
     return gradRho / max(rho + 1e-8, 1e-8);
   }
@@ -332,8 +335,11 @@ fn computeQuantumPotentialFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -
   // World half-step h = 2·bound / DENSITY_GRID_SIZE (one texel).
   let h = (2.0 * bound) / DENSITY_GRID_SIZE;
   let hSq = h * h;
-  let laplR = (Rxp + Rxn + Ryp + Ryn + Rzp + Rzn - 6.0 * Rc) / hSq;
-  return (-0.5 * laplR) / max(Rc, 1e-4);
+  // Fold the two divides (/hSq and /Rc) into a single reciprocal: Q = -0.5·(∇²R)/R
+  //   -0.5 · (Σneighbor − 6·Rc) / (hSq · max(Rc, 1e-4))
+  let invHSqRc = 1.0 / (hSq * max(Rc, 1e-4));
+  let neighborSum = Rxp + Rxn + Ryp + Ryn + Rzp + Rzn;
+  return -0.5 * (neighborSum - 6.0 * Rc) * invHSqRc;
 }
 
 // ------------------------------------------------------------------
@@ -430,13 +436,15 @@ fn computeVortexDensityFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> f
 
   // Seven unique corner phases — the 2×2×2 cube minus its far +x+y+z
   // corner (never referenced by any of the three plaquettes below).
-  let p000 = samplePhaseOrZero(baseTi);                       // origin
-  let p100 = samplePhaseOrZero(baseTi + vec3i(1, 0, 0));      // +x
-  let p010 = samplePhaseOrZero(baseTi + vec3i(0, 1, 0));      // +y
-  let p001 = samplePhaseOrZero(baseTi + vec3i(0, 0, 1));      // +z
-  let p110 = samplePhaseOrZero(baseTi + vec3i(1, 1, 0));      // +x+y
-  let p011 = samplePhaseOrZero(baseTi + vec3i(0, 1, 1));      // +y+z
-  let p101 = samplePhaseOrZero(baseTi + vec3i(1, 0, 1));      // +x+z
+  // The far-corner bounds gate above already covers every one of these loads,
+  // so inline textureLoad skips samplePhaseOrZero's per-call bounds check (7 gates saved).
+  let p000 = textureLoad(densityGridTexture, baseTi,                    0).b; // origin
+  let p100 = textureLoad(densityGridTexture, baseTi + vec3i(1, 0, 0),   0).b; // +x
+  let p010 = textureLoad(densityGridTexture, baseTi + vec3i(0, 1, 0),   0).b; // +y
+  let p001 = textureLoad(densityGridTexture, baseTi + vec3i(0, 0, 1),   0).b; // +z
+  let p110 = textureLoad(densityGridTexture, baseTi + vec3i(1, 1, 0),   0).b; // +x+y
+  let p011 = textureLoad(densityGridTexture, baseTi + vec3i(0, 1, 1),   0).b; // +y+z
+  let p101 = textureLoad(densityGridTexture, baseTi + vec3i(1, 0, 1),   0).b; // +x+z
 
   // xy plaquette at fixed z = baseTi.z — corners: origin, +x, +x+y, +y.
   let w_xy = plaquetteWindingFromPhases(p000, p100, p110, p010);

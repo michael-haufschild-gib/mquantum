@@ -68,9 +68,10 @@ function generate2DCommonBody(): string {
     let shimmerSpeed = 1.0 - clamp(rho * 5.0, 0.0, 1.0);
     let shimmerTime = schroedinger.time * schroedinger.phaseShimmerSpeed;
     let shimmerOffset = shimmerTime * shimmerSpeed;
-    let psiLen = max(length(psi), 1e-8);
-    let shimmerCosP = psi.x / psiLen;
-    let shimmerSinP = psi.y / psiLen;
+    // inverseSqrt(|psi|^2) avoids the separate sqrt() inside length() and the subsequent divide.
+    let invPsiLen = inverseSqrt(max(dot(psi, psi), 1e-16));
+    let shimmerCosP = psi.x * invPsiLen;
+    let shimmerSinP = psi.y * invPsiLen;
     let shimmerNoise = gradientNoise(pos * 2.0 + vec3f(
         shimmerOffset + shimmerCosP * 0.5,
         shimmerSinP * 0.5,
