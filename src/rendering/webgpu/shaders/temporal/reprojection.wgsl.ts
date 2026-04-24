@@ -69,20 +69,22 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   // but UV.y=0 is texture top (WebGPU framebuffer convention).
   let prevUV = vec2f(prevNDC.x, -prevNDC.y) * 0.5 + 0.5;
 
-  // textureSampleLevel does not require uniform control flow (no implicit derivatives),
-  // so we can call it after the depth early-out. The sampler is clamp-to-edge, so the
-  // previous explicit clamp(prevUV, 0, 1) was redundant and has been removed.
+  // Off-screen rejection runs BEFORE the history fetch so any pixel that the
+  // validity logic below would zero-out anyway skips the bilinear sample too.
+  // textureSampleLevel tolerates non-uniform control flow (no implicit
+  // derivatives), so the early return is legal here. The sampler is
+  // clamp-to-edge, so once we pass the margin check no explicit clamp is
+  // needed on prevUV.
+  let margin = 0.01;
+  if (prevUV.x < -margin || prevUV.x > 1.0 + margin ||
+      prevUV.y < -margin || prevUV.y > 1.0 + margin) {
+    return vec4f(0.0);
+  }
+
   let history = textureSampleLevel(prevAccumulation, linearSampler, prevUV, 0.0);
 
   // Validity checks
   var valid = true;
-
-  // Off-screen rejection with small margin
-  let margin = 0.01;
-  if (prevUV.x < -margin || prevUV.x > 1.0 + margin ||
-      prevUV.y < -margin || prevUV.y > 1.0 + margin) {
-    valid = false;
-  }
 
   // Screen edge fade (reject pixels near edges)
   let edgeDistance = min(

@@ -382,8 +382,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let rho = abs(fieldValue);
   let normRho = select(rho / params.maxFieldValue, 0.0, params.maxFieldValue <= 0.0) * perpFalloff;
   let logRho = log(normRho + 1e-10);
-  const FSF_PI_NEG: f32 = 3.14159265358979323846;
-  let phase = select(0.0, FSF_PI_NEG, fieldValue < 0.0);
+  const FSF_NEGATIVE_BRANCH_PHASE: f32 = 3.14159265358979323846;
+  let phase = select(0.0, FSF_NEGATIVE_BRANCH_PHASE, fieldValue < 0.0);
 
   textureStore(outputTex, gid, vec4f(normRho, logRho, phase, normRho));
 

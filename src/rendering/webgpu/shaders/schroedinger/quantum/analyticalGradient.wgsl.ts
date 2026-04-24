@@ -33,12 +33,16 @@ export function generateAnalyticalGradientBlock(dimension: number, termCount?: n
     ).join('\n')
   }
 
-  // Prefix / suffix products over the .x components.
-  // prefixX[j] = lk_0.x * lk_1.x * ... * lk_{j-1}.x
-  // suffixX[j] = lk_{j+1}.x * lk_{j+2}.x * ... * lk_{dim-1}.x
-  // spatial_k (product of all .x) = prefixX[dim] = prefixX[j] * lk_j.x * suffixX[j].
-  // This turns every gradient-component partial product from O(dim) muls into 2 muls:
-  //   partial(j) = prefixX[j] * lk_j.y * suffixX[j]
+  // Prefix / suffix products over the .x components, matching the WGSL
+  // locals emitted below:
+  //   prefix_j = lk_0.x * lk_1.x * ... * lk_{j-1}.x     (excludes index j)
+  //   suffix_j = lk_j.x * lk_{j+1}.x * ... * lk_{dim-1}.x (INCLUDES index j)
+  //   spatial_k (product of all .x) = prefix_dim        (equivalently suffix_0)
+  //                                  = prefix_j * lk_j.x * suffix_{j+1}.
+  // For the gradient component at axis j we substitute lk_j.y (the derivative
+  // factor) into slot j and skip it in the suffix, so the partial product
+  // collapses to 2 muls:
+  //   partial(j) = prefix_j * lk_j.y * suffix_{j+1}
   // For dim=11 / termCount=8 the saving is ~544 muls per pixel.
   function genPrefixSuffix(): string {
     const lines: string[] = []
@@ -88,15 +92,18 @@ export function generateAnalyticalGradientBlock(dimension: number, termCount?: n
       lines.push(`    spatIm += coeff_k.y * spatial_k;`)
     }
 
-    // Gradient components for each ND dimension
+    // Gradient components for each ND dimension. Each partial product is
+    // materialized into a single local so the real and imaginary accumulations
+    // share it — don't rely on backend CSE to dedupe the expression.
     for (let j = 0; j < dim; j++) {
       const pp = partialProductExpr(j)
+      lines.push(`    let partial_${j} = ${pp};`)
       if (isFirst) {
-        lines.push(`    dPsiRe[${j}] = ct_k.x * (${pp});`)
-        lines.push(`    dPsiIm[${j}] = ct_k.y * (${pp});`)
+        lines.push(`    dPsiRe[${j}] = ct_k.x * partial_${j};`)
+        lines.push(`    dPsiIm[${j}] = ct_k.y * partial_${j};`)
       } else {
-        lines.push(`    dPsiRe[${j}] += ct_k.x * (${pp});`)
-        lines.push(`    dPsiIm[${j}] += ct_k.y * (${pp});`)
+        lines.push(`    dPsiRe[${j}] += ct_k.x * partial_${j};`)
+        lines.push(`    dPsiIm[${j}] += ct_k.y * partial_${j};`)
       }
     }
 
@@ -138,7 +145,7 @@ ${genPrefixSuffix()}
     spatIm += coeff_k.y * spatial_k;
 ${Array.from({ length: dim }, (_, j) => {
   const pp = partialProductExpr(j)
-  return `    dPsiRe[${j}] += ct_k.x * (${pp});\n    dPsiIm[${j}] += ct_k.y * (${pp});`
+  return `    let partial_${j} = ${pp};\n    dPsiRe[${j}] += ct_k.x * partial_${j};\n    dPsiIm[${j}] += ct_k.y * partial_${j};`
 }).join('\n')}
   }`
   }

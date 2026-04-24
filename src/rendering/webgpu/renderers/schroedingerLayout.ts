@@ -229,6 +229,16 @@ const SCHROEDINGER_FIELDS = [
   // AND the state is below the BF bound (tachyonic). The shader multiplies |ψ|²
   // by cosh²(γ*t) at render time. 0 otherwise.
   { name: 'adsGrowthRate', type: 'f32' },
+
+  // --- Precomputed HSL forms of the Pauli spinor colors ---
+  // Pauli algo 24 (hue-space blend) used to call rgb2hsl on
+  // pauliSpinUpColor / pauliSpinDownColor per raymarch sample; these slots let
+  // the CPU precompute once per uniform write. Written by the uniform packer
+  // alongside the RGB fields.
+  { name: 'pauliSpinUpColorHSL', type: 'vec3f' },
+  { name: '_padPauliUpHSL', type: 'f32' },
+  { name: 'pauliSpinDownColorHSL', type: 'vec3f' },
+  { name: '_padPauliDownHSL', type: 'f32' },
 ] as const satisfies readonly StructFieldDef[]
 
 /** Computed struct layout for SchroedingerUniforms. */

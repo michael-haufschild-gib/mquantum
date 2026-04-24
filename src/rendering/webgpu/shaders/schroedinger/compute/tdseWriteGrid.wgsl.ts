@@ -29,7 +29,7 @@ export const tdseWriteGridBlock = /* wgsl */ `
 
 const TDSE_WG_PI:     f32 = 3.14159265358979323846;
 const TDSE_WG_TAU:    f32 = 6.28318530717958647692;
-const TDSE_WG_INV_TAU: f32 = 0.15915494309189535;
+const TDSE_WG_INV_TAU: f32 = 1.0 / TDSE_WG_TAU;
 
 // Compute the appropriate normalization scale for the active potential type.
 fn getPotentialScale() -> f32 {

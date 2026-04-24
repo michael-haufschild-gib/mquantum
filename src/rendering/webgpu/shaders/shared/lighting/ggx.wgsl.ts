@@ -53,8 +53,10 @@ fn computePBRSpecular(N: vec3f, V: vec3f, L: vec3f, roughness: f32, F0: vec3f) -
   let NdotV = max(dot(N, V), 0.0);
   let NdotL = max(dot(N, L), 0.0);
 
-  // Distribution term (GGX / Trowbridge-Reitz) inlined so (a, a2) are shared with
-  // nothing -- but we can fuse the Smith k term across both Schlick calls below.
+  // Distribution term (GGX / Trowbridge-Reitz) inlined. Local roughness helpers
+  // (a, a2) do not feed any other term, so the win here is fusing the Smith
+  // visibility factor k — computed once and reused across both Schlick-GGX
+  // evaluations below instead of recomputing per call.
   let NdotH = max(dot(N, H), 0.0);
   let NdotH2 = NdotH * NdotH;
   let a = roughness * roughness;

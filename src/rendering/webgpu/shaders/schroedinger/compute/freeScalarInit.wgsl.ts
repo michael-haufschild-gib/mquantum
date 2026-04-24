@@ -193,7 +193,11 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     }
 
     let omega = sqrt(max(omegaSq, 0.0));
-    let invTwoSigma2 = 1.0 / (2.0 * params.packetWidth * params.packetWidth);
+    // Guard zero / near-zero packetWidth: a degenerate width would send
+    // invTwoSigma2 to INF and exp(-r2·INF) to NaN at the packet center,
+    // poisoning the phi / pi buffers for the rest of the run.
+    let width2 = max(params.packetWidth * params.packetWidth, 1e-12);
+    let invTwoSigma2 = 0.5 / width2;
     let envelope = params.packetAmplitude * exp(-r2 * invTwoSigma2);
     phiVal = envelope * cos(phase);
     piVal = params.aPotential * envelope * omega * sin(phase);

@@ -181,11 +181,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
     // Hoist all (x, p, omega)-only scalars out of the pair loop. Each pair
     // would otherwise recompute invOmega, u2, sqrtOmega, invSqrtOmega, exp(-u2).
-    let invOmega = 1.0 / max(omega, 1e-20);
+    // All sqrt / reciprocal paths share the same guarded omega so a pathological
+    // omega <= 0 cannot NaN-poison the cross terms.
+    let safeOmega = max(omega, 1e-20);
+    let invOmega = 1.0 / safeOmega;
     let u2 = omega * xPhys * xPhys + pPhys * pPhys * invOmega;
     let expU2 = exp(-u2);
-    let sqrtOmega = sqrt(omega);
-    let invSqrtOmega = inverseSqrt(max(omega, 1e-20));
+    let sqrtOmega = sqrt(safeOmega);
+    let invSqrtOmega = inverseSqrt(safeOmega);
     let scaleSqrt2 = sqrt(2.0);
     let szetaRe = scaleSqrt2 * sqrtOmega * xPhys;
     let szetaIm = scaleSqrt2 * pPhys * invSqrtOmega;

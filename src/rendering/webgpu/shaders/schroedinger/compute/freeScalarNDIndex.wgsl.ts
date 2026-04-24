@@ -21,9 +21,10 @@ fn ndToLinear(coords: array<u32, 12>, strides: array<u32, 12>, dim: u32) -> u32 
   return idx;
 }
 
-// Convert linear buffer index to N-D lattice coordinates. Every grid dim in
-// the project is a power of two, so each stride is too; a runtime u32 divide
-// becomes one shift and one mask — ~20×  cheaper on every backend we target.
+// Convert linear buffer index to N-D lattice coordinates. Compute-lattice grid
+// sizes are snapped to powers of two via sanitizeGridSizes, so the derived
+// strides used here are powers of two; a runtime u32 divide becomes one shift
+// and one mask — ~20× cheaper on every backend we target.
 // Note: gridSize is passed for call-site consistency but unused by the algorithm.
 fn linearToND(idx: u32, strides: array<u32, 12>, gridSize: array<u32, 12>, dim: u32) -> array<u32, 12> {
   var coords: array<u32, 12>;

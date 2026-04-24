@@ -498,8 +498,10 @@ const ALGO_BRANCH: Record<number, string> = {
     let downDensity = clamp(s, 0.0, 1.0);
     let total = upDensity + downDensity;
     let upFrac = select(0.5, upDensity / total, total > 1e-6);
-    let hslUp = rgb2hsl(uniforms.pauliSpinUpColor);
-    let hslDown = rgb2hsl(uniforms.pauliSpinDownColor);
+    // Precomputed on the CPU in uniformPacking.rgbToHsl — keeps the per-sample
+    // raymarch path free of two rgb2hsl() calls.
+    let hslUp = uniforms.pauliSpinUpColorHSL;
+    let hslDown = uniforms.pauliSpinDownColorHSL;
     // Shortest-arc hue interpolation — if the two hues straddle the 0/1 wrap,
     // shift the up-hue by one turn before mixing, then wrap back via fract().
     var hUp = hslUp.x;

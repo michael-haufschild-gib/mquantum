@@ -62,13 +62,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Compute k-vector components with FFT frequency ordering
   var kVec: array<f32, 12>;
   var ck2: f32 = 0.0;
-  const DIRAC_K_TWO_PI: f32 = 6.28318530717958647692;
+  const DIRAC_TWO_PI: f32 = 6.28318530717958647692;
   for (var d: u32 = 0u; d < latDim; d = d + 1u) {
     let gd = params.gridSize[d];
     let halfN = gd >> 1u;
     let kIdx = select(i32(coords[d]) - i32(gd), i32(coords[d]), coords[d] < halfN);
     // Precompute 2π/L to replace divide with multiply.
-    let twoPiOverL = DIRAC_K_TWO_PI / (f32(gd) * params.spacing[d]);
+    let twoPiOverL = DIRAC_TWO_PI / (f32(gd) * params.spacing[d]);
     let k_d = f32(kIdx) * twoPiOverL;
     kVec[d] = k_d;
     let ck = c_hbar * k_d;
@@ -151,8 +151,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let arg = E * dtOverHbar;
   // Reduce to [-π, π] so f32 cos/sin stay precise at high energies
   const DIRAC_INV_TAU: f32 = 0.15915494309189535;
-  const DIRAC_TAU: f32     = 6.28318530717958647692;
-  let argReduced = arg - round(arg * DIRAC_INV_TAU) * DIRAC_TAU;
+  let argReduced = arg - round(arg * DIRAC_INV_TAU) * DIRAC_TWO_PI;
   let cosArg = cos(argReduced);
   let sinArg = sin(argReduced);
   // sin(arg) * (1/E) using the hoisted invE — avoids a per-thread divide.

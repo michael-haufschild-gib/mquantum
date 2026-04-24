@@ -38,9 +38,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     kdotx += params.packetMomentum[d] * pos;
   }
 
-  let sigma = params.packetWidth;
+  // Guard near-zero packetWidth: inv4Sigma2 → INF → envelope = NaN poisons
+  // psiRe / psiIm for the rest of the run.
+  let sigma = max(abs(params.packetWidth), 1e-6);
   let inv4Sigma2 = 1.0 / (4.0 * sigma * sigma);
-  let envelope = params.packetAmplitude * exp(-r2 * inv4Sigma2);
+  let gauss = exp(-r2 * inv4Sigma2);
+  let envelope = params.packetAmplitude * gauss;
 
   var reVal: f32 = 0.0;
   var imVal: f32 = 0.0;
@@ -56,8 +59,11 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     reVal = envelope * cos(kdotx);
     imVal = envelope * sin(kdotx);
   } else if (params.initCondition == 2u) {
-    // superposition: two counter-propagating Gaussian packets (amp ÷ √2 per arm)
-    let env1 = params.packetAmplitude * 0.7071067811865475 * exp(-r2 * inv4Sigma2);
+    // superposition: two counter-propagating Gaussian packets (amp ÷ √2 per arm).
+    // Reuses the already-computed gauss = exp(-r2 * inv4Sigma2) — env1 shares
+    // r2 with the default envelope so there is no extra transcendental here.
+    let invSqrt2 = 0.7071067811865475;
+    let env1 = params.packetAmplitude * invSqrt2 * gauss;
     let phase1 = kdotx;
 
     // Second packet: shifted center, reversed momentum
@@ -69,7 +75,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       r2b += dx2 * dx2;
       kdotx2 += -params.packetMomentum[d2] * pos2; // reversed momentum
     }
-    let env2 = params.packetAmplitude * 0.7071067811865475 * exp(-r2b * inv4Sigma2);
+    let env2 = params.packetAmplitude * invSqrt2 * exp(-r2b * inv4Sigma2);
 
     reVal = env1 * cos(phase1) + env2 * cos(kdotx2);
     imVal = env1 * sin(phase1) + env2 * sin(kdotx2);

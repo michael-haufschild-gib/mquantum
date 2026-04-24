@@ -26,13 +26,15 @@ fn getDeepOcean(dir: vec3<f32>, time: f32) -> vec3<f32> {
   let c1 = p + vec3<f32>(time * 0.03, time * 0.02, 0.0);
   caustic1 = sin(c1.x * 2.0 + sin(c1.z * 3.0)) * sin(c1.z * 2.0 + sin(c1.x * 3.0));
   caustic1 = caustic1 * 0.5 + 0.5;
-  caustic1 = caustic1 * caustic1 * sqrt(caustic1);
+  // max(..., 0.0) guards against tiny negatives from transcendental precision
+  // loss — sqrt(-eps) otherwise NaN-poisons the pixel.
+  caustic1 = caustic1 * caustic1 * sqrt(max(caustic1, 0.0));
 
   // Second caustic layer (different frequency) - secondary detail.
   let c2 = p * 1.5 + vec3<f32>(-time * 0.02, time * 0.015, time * 0.01);
   caustic2 = sin(c2.x * 3.0 + sin(c2.z * 2.0)) * sin(c2.z * 3.0 + sin(c2.x * 2.0));
   caustic2 = caustic2 * 0.5 + 0.5;
-  caustic2 = caustic2 * caustic2 * sqrt(caustic2);
+  caustic2 = caustic2 * caustic2 * sqrt(max(caustic2, 0.0));
 
   // Third layer - fine seaweed detail with sharper edges.
   let c3 = p * 2.5 + vec3<f32>(time * 0.01, -time * 0.025, time * 0.02);

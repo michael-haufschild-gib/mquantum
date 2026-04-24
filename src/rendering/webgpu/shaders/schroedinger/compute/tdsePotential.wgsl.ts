@@ -85,9 +85,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
         if (params.driveWaveform == 0u) {
           drive = A * sin(TAU_DRIVE * w * t);
         } else if (params.driveWaveform == 1u) {
-          let tau = 1.0 / (w + 0.001);
-          // Avoid per-thread /tau²: multiply by precomputed reciprocal instead.
-          let invTwoTau2 = 0.5 / (tau * tau);
+          // 0.5 / tau² = 0.5 · (w + 0.001)² — skip the reciprocal cancellation.
+          let wShift = w + 0.001;
+          let invTwoTau2 = 0.5 * wShift * wShift;
           drive = A * exp(-t * t * invTwoTau2);
         } else {
           let phase = TAU_DRIVE * w * t * (1.0 + 0.5 * w * t);
