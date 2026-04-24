@@ -12,9 +12,13 @@ fn getTwilight(dir: vec3<f32>, time: f32) -> vec3<f32> {
   // Time-based color temperature shift (very slow, continuous)
   let tempShift = sin(time * 0.02) * 0.5 + 0.5;
 
-  // Horizontal position for sun placement
+  // Horizontal position for sun placement.
+  // length((cos(a), 0.1, sin(a))) = sqrt(cos^2 + 0.01 + sin^2) = sqrt(1.01), a constant.
+  // Expanding normalize inline saves one dot3 + one sqrt + one divide per pixel.
   let sunAngle = time * 0.01 + uniforms.evolution;
-  let sunDir = normalize(vec3<f32>(cos(sunAngle), 0.1, sin(sunAngle)));
+  let SUN_INV_NORM = 0.99503719; // 1 / sqrt(1.01)
+  let SUN_Y = 0.09950372;        // 0.1 / sqrt(1.01)
+  let sunDir = vec3<f32>(cos(sunAngle) * SUN_INV_NORM, SUN_Y, sin(sunAngle) * SUN_INV_NORM);
   let sunDist = 1.0 - max(0.0, dot(dir, sunDir));
 
   // Atmospheric scattering simulation (simplified)
@@ -50,9 +54,10 @@ fn getTwilight(dir: vec3<f32>, time: f32) -> vec3<f32> {
   let layers = sin(y * 20.0 + atmNoise * 2.0) * 0.02;
   col += layers * scatter;
 
-  // Atmospheric dust/haze (reuse noise)
+  // Atmospheric dust/haze (reuse noise).
+  // mix(col, col * 1.2, haze) == col * (1.0 + 0.2 * haze) -- one scale beats three fmas.
   let haze = scatter * atmNoise * 0.1;
-  col = mix(col, col * 1.2, haze);
+  col *= 1.0 + 0.2 * haze;
 
   return col;
 }

@@ -85,7 +85,11 @@ export function composeSkyboxFragmentShader(config: SkyboxShaderConfig): {
     { name: 'Fragment Output', content: mrt ? fragmentOutputStruct : fragmentOutputStructSingle },
     { name: 'Color Utils', content: colorBlock },
     { name: 'Cosine Palette', content: cosinePaletteBlock },
-    { name: 'Rotation Utils', content: rotationBlock },
+    // Rotation Utils (rotateX/Y/Z) - currently unused by every skybox mode.
+    // Gated off here so the WGSL module creation doesn't parse ~25 lines of
+    // dead helper code on every shader compile. Flip the condition when a new
+    // mode actually calls rotateX/Y/Z.
+    { name: 'Rotation Utils', content: rotationBlock, condition: false as const },
     { name: 'Noise Utils', content: noiseBlock, condition: needsNoise },
     { name: `Mode: ${mode}`, content: modeBlock },
     { name: 'Sun Effect', content: sunBlock, condition: useSun },

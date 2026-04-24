@@ -69,19 +69,4 @@ fn rgb2hsl(rgb: vec3f) -> vec3f {
   return vec3f(h, s, l);
 }
 
-/**
- * Adjust HSL values of an RGB color.
- * @param rgb Input RGB color
- * @param hueShift Hue shift (0-1)
- * @param satMult Saturation multiplier
- * @param lightAdd Lightness addition
- * @return Adjusted RGB color
- */
-fn adjustHSL(rgb: vec3f, hueShift: f32, satMult: f32, lightAdd: f32) -> vec3f {
-  var hsl = rgb2hsl(rgb);
-  hsl.x = fract(hsl.x + hueShift);
-  hsl.y = clamp(hsl.y * satMult, 0.0, 1.0);
-  hsl.z = clamp(hsl.z + lightAdd, 0.0, 1.0);
-  return hsl2rgb(hsl.x, hsl.y, hsl.z);
-}
 `
