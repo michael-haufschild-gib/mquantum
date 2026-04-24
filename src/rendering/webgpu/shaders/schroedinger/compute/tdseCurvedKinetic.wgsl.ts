@@ -319,40 +319,34 @@ fn kretschmannScalarWGSL(coords: array<f32, 12>, dim: u32, time: f32) -> f32 {
 }
 `
 
-/**
- * Evaluate T_LB · ψ and write the result to outRe/outIm.
- *
- * Output does NOT include V and does NOT include the (−i/ℏ) factor — the
- * caller fuses those in via {@link tdseCurvedBuildKBlock}.
- */
-export const tdseCurvedKineticBlock = /* wgsl */ `
+/** Shared bindings + CurvedStageIndex struct for both kinetic variants. */
+const curvedKineticPrelude = /* wgsl */ `
 ${curvedHelpers}
 
 struct CurvedStageIndex { value: u32, _p0: u32, _p1: u32, _p2: u32 }
 
 @group(0) @binding(0) var<storage, read> params: TDSEUniforms;
-@group(0) @binding(1) var<storage, read> curvedKinPsiRe: array<f32>;
-@group(0) @binding(2) var<storage, read> curvedKinPsiIm: array<f32>;
-@group(0) @binding(3) var<storage, read_write> curvedKinOutRe: array<f32>;
-@group(0) @binding(4) var<storage, read_write> curvedKinOutIm: array<f32>;
+@group(0) @binding(1) var<storage, read> curvedKinPsi: array<vec2f>;
+@group(0) @binding(2) var<storage, read_write> curvedKinOut: array<vec2f>;
 // Group 1: per-dispatch RK4 stage index (0..3). Selects one of
 // stageTimeK1..K4 for time-dependent metrics.
 @group(1) @binding(0) var<uniform> curvedKinStage: CurvedStageIndex;
+`
 
-@compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) gid: vec3u) {
-  let idx = gid.x;
-  if (idx >= params.totalSites) { return; }
-
-  let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
+/**
+ * Shared kinetic kernel body. Expects 'idx' and 'coords' to be defined by
+ * the prologue.
+ */
+const curvedKineticBody = /* wgsl */ `
   let cellW = curvedCellCoords(coords, params.latticeDim);
   let stageT = curvedStageTime(curvedKinStage.value);
   let mCenter = evalMetric(params.metricKind, cellW, params.latticeDim, stageT);
   let invSqrtDet = 1.0 / max(mCenter.sqrtDet, 1e-12);
   let prefactor = -(params.hbar * params.hbar) / (2.0 * max(params.mass, 1e-6));
 
-  let psiCenterRe = curvedKinPsiRe[idx];
-  let psiCenterIm = curvedKinPsiIm[idx];
+  let psiCenter = curvedKinPsi[idx];
+  let psiCenterRe = psiCenter.x;
+  let psiCenterIm = psiCenter.y;
 
   var divFluxRe: f32 = 0.0;
   var divFluxIm: f32 = 0.0;
@@ -382,26 +376,30 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     var psiPlusIm: f32 = 0.0;
     if (coordAxis + 1u < Naxis) {
       let idxPlus = idx + stride;
-      psiPlusRe = curvedKinPsiRe[idxPlus];
-      psiPlusIm = curvedKinPsiIm[idxPlus];
+      let zp = curvedKinPsi[idxPlus];
+      psiPlusRe = zp.x;
+      psiPlusIm = zp.y;
     } else if (periodic) {
       // Wrap to index 0 along this axis (subtract (N-1)*stride to move from
       // coordAxis=N-1 back to coordAxis=0 while keeping all other coords).
       let idxPlus = idx - (Naxis - 1u) * stride;
-      psiPlusRe = curvedKinPsiRe[idxPlus];
-      psiPlusIm = curvedKinPsiIm[idxPlus];
+      let zp = curvedKinPsi[idxPlus];
+      psiPlusRe = zp.x;
+      psiPlusIm = zp.y;
     }
     // Minus neighbor ψ.
     var psiMinusRe: f32 = 0.0;
     var psiMinusIm: f32 = 0.0;
     if (coordAxis >= 1u) {
       let idxMinus = idx - stride;
-      psiMinusRe = curvedKinPsiRe[idxMinus];
-      psiMinusIm = curvedKinPsiIm[idxMinus];
+      let zm = curvedKinPsi[idxMinus];
+      psiMinusRe = zm.x;
+      psiMinusIm = zm.y;
     } else if (periodic) {
       let idxMinus = idx + (Naxis - 1u) * stride;
-      psiMinusRe = curvedKinPsiRe[idxMinus];
-      psiMinusIm = curvedKinPsiIm[idxMinus];
+      let zm = curvedKinPsi[idxMinus];
+      psiMinusRe = zm.x;
+      psiMinusIm = zm.y;
     }
 
     // Skip the two half-point evalMetric calls when the metric does not
@@ -436,8 +434,50 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     divFluxIm = divFluxIm + (aPlus * diffPlusIm - aMinus * diffMinusIm) * invDx2;
   }
 
-  curvedKinOutRe[idx] = kineticScale * divFluxRe;
-  curvedKinOutIm[idx] = kineticScale * divFluxIm;
+  curvedKinOut[idx] = vec2f(kineticScale * divFluxRe, kineticScale * divFluxIm);
+`
+
+/**
+ * 1-D variant: linear dispatch, linearToND coord decomposition. Used when
+ * latticeDim !== 3.
+ *
+ * Output does NOT include V and does NOT include the (−i/ℏ) factor — the
+ * caller fuses those in via {@link tdseCurvedBuildKBlock}.
+ */
+export const tdseCurvedKineticBlock =
+  curvedKineticPrelude +
+  /* wgsl */ `
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  let idx = gid.x;
+  if (idx >= params.totalSites) { return; }
+  let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
+${curvedKineticBody}
+}
+`
+
+/**
+ * 3-D variant: workgroup_size(4,4,4), gid.xyz coords. Used when
+ * latticeDim === 3 — saves the per-thread linearToND shift/mask cost.
+ *
+ * Bit-identical to the 1-D variant: idx maps row-major (strides[2] = 1),
+ * the body is shared, and per-axis neighbor offsets are computed from
+ * params.strides exactly the same way.
+ */
+export const tdseCurvedKineticBlock3D =
+  curvedKineticPrelude +
+  /* wgsl */ `
+@compute @workgroup_size(4, 4, 4)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  if (gid.x >= params.gridSize[0] || gid.y >= params.gridSize[1] || gid.z >= params.gridSize[2]) {
+    return;
+  }
+  var coords: array<u32, 12>;
+  coords[0] = gid.x;
+  coords[1] = gid.y;
+  coords[2] = gid.z;
+  let idx = gid.x * params.strides[0] + gid.y * params.strides[1] + gid.z;
+${curvedKineticBody}
 }
 `
 
@@ -451,13 +491,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
  */
 export const tdseCurvedBuildKBlock = /* wgsl */ `
 @group(0) @binding(0) var<storage, read> params: TDSEUniforms;
-@group(0) @binding(1) var<storage, read> curvedBkTRe: array<f32>;
-@group(0) @binding(2) var<storage, read> curvedBkTIm: array<f32>;
-@group(0) @binding(3) var<storage, read> curvedBkStageRe: array<f32>;
-@group(0) @binding(4) var<storage, read> curvedBkStageIm: array<f32>;
-@group(0) @binding(5) var<storage, read> curvedBkPotential: array<f32>;
-@group(0) @binding(6) var<storage, read_write> curvedBkKRe: array<f32>;
-@group(0) @binding(7) var<storage, read_write> curvedBkKIm: array<f32>;
+@group(0) @binding(1) var<storage, read> curvedBkT: array<vec2f>;
+@group(0) @binding(2) var<storage, read> curvedBkStage: array<vec2f>;
+@group(0) @binding(3) var<storage, read> curvedBkPotential: array<f32>;
+@group(0) @binding(4) var<storage, read_write> curvedBkK: array<vec2f>;
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
@@ -466,15 +503,15 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   let invHbar = 1.0 / max(params.hbar, 1e-6);
   let V = curvedBkPotential[idx];
-  let hRe = curvedBkTRe[idx] + V * curvedBkStageRe[idx];
-  let hIm = curvedBkTIm[idx] + V * curvedBkStageIm[idx];
+  let tVal = curvedBkT[idx];
+  let stageVal = curvedBkStage[idx];
+  let hRe = tVal.x + V * stageVal.x;
+  let hIm = tVal.y + V * stageVal.y;
 
   if (params.imaginaryTime != 0u) {
-    curvedBkKRe[idx] = -invHbar * hRe;
-    curvedBkKIm[idx] = -invHbar * hIm;
+    curvedBkK[idx] = vec2f(-invHbar * hRe, -invHbar * hIm);
   } else {
-    curvedBkKRe[idx] = invHbar * hIm;
-    curvedBkKIm[idx] = -invHbar * hRe;
+    curvedBkK[idx] = vec2f(invHbar * hIm, -invHbar * hRe);
   }
 }
 `
@@ -494,12 +531,9 @@ export const tdseCurvedStageBlock = /* wgsl */ `
 struct CurvedScalarUniform { value: f32, _p0: f32, _p1: f32, _p2: f32 }
 
 @group(0) @binding(0) var<storage, read> curvedStageParams: TDSEUniforms;
-@group(0) @binding(1) var<storage, read> curvedStagePsiRe: array<f32>;
-@group(0) @binding(2) var<storage, read> curvedStagePsiIm: array<f32>;
-@group(0) @binding(3) var<storage, read> curvedStageKRe: array<f32>;
-@group(0) @binding(4) var<storage, read> curvedStageKIm: array<f32>;
-@group(0) @binding(5) var<storage, read_write> curvedStageOutRe: array<f32>;
-@group(0) @binding(6) var<storage, read_write> curvedStageOutIm: array<f32>;
+@group(0) @binding(1) var<storage, read> curvedStagePsi: array<vec2f>;
+@group(0) @binding(2) var<storage, read> curvedStageK: array<vec2f>;
+@group(0) @binding(3) var<storage, read_write> curvedStageOut: array<vec2f>;
 @group(1) @binding(0) var<uniform> curvedStageAlpha: CurvedScalarUniform;
 
 @compute @workgroup_size(64)
@@ -507,8 +541,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let idx = gid.x;
   if (idx >= curvedStageParams.totalSites) { return; }
   let s = curvedStageAlpha.value * curvedStageParams.dt;
-  curvedStageOutRe[idx] = curvedStagePsiRe[idx] + s * curvedStageKRe[idx];
-  curvedStageOutIm[idx] = curvedStagePsiIm[idx] + s * curvedStageKIm[idx];
+  curvedStageOut[idx] = curvedStagePsi[idx] + s * curvedStageK[idx];
 }
 `
 
@@ -521,10 +554,8 @@ export const tdseCurvedAccumulateBlock = /* wgsl */ `
 struct CurvedScalarUniform { value: f32, _p0: f32, _p1: f32, _p2: f32 }
 
 @group(0) @binding(0) var<storage, read> curvedAccParams: TDSEUniforms;
-@group(0) @binding(1) var<storage, read_write> curvedAccPsiRe: array<f32>;
-@group(0) @binding(2) var<storage, read_write> curvedAccPsiIm: array<f32>;
-@group(0) @binding(3) var<storage, read> curvedAccKRe: array<f32>;
-@group(0) @binding(4) var<storage, read> curvedAccKIm: array<f32>;
+@group(0) @binding(1) var<storage, read_write> curvedAccPsi: array<vec2f>;
+@group(0) @binding(2) var<storage, read> curvedAccK: array<vec2f>;
 @group(1) @binding(0) var<uniform> curvedAccCoef: CurvedScalarUniform;
 
 @compute @workgroup_size(64)
@@ -532,7 +563,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let idx = gid.x;
   if (idx >= curvedAccParams.totalSites) { return; }
   let s = curvedAccCoef.value * curvedAccParams.dt;
-  curvedAccPsiRe[idx] = curvedAccPsiRe[idx] + s * curvedAccKRe[idx];
-  curvedAccPsiIm[idx] = curvedAccPsiIm[idx] + s * curvedAccKIm[idx];
+  curvedAccPsi[idx] = curvedAccPsi[idx] + s * curvedAccK[idx];
 }
 `

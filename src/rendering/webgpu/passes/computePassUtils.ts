@@ -28,6 +28,84 @@ export const MAX_LINEAR_DISPATCH_SITES = MAX_DISPATCH_PER_DIM * LINEAR_WG
 /** 3D dispatch workgroup size for write-grid passes */
 export const GRID_WG = 4
 
+/** 3D dispatch workgroup size for site-based compute kernels at latticeDim ≤ 3. */
+export const SITE_3D_WG = 4
+
+/**
+ * Compute 3-D workgroup-count tuple for site-based kernels using a
+ * `@workgroup_size(SITE_3D_WG, SITE_3D_WG, SITE_3D_WG)` block dispatched
+ * directly over the lattice extent.
+ *
+ * For each axis `d < latticeDim`, returns `ceil(gridSize[d] / SITE_3D_WG)`.
+ * Axes `d >= latticeDim` are clamped to 1 so the dispatch shape stays
+ * 1×1 along unused axes regardless of stale values left in `gridSize`.
+ *
+ * Caller must guarantee `latticeDim <= 3` — at higher dims the kernel
+ * cannot encode the extra axes in `gid.xyz` and must keep using the 1-D
+ * dispatch path.
+ *
+ * @param gridSize - Per-axis grid dimensions
+ * @param latticeDim - Number of active lattice dimensions (must be ≤ 3)
+ * @returns Workgroup counts as `[xCount, yCount, zCount]`
+ */
+export function compute3DDispatchCounts(
+  gridSize: readonly number[],
+  latticeDim: number
+): [number, number, number] {
+  const x = latticeDim >= 1 ? Math.max(1, Math.ceil(gridSize[0]! / SITE_3D_WG)) : 1
+  const y = latticeDim >= 2 ? Math.max(1, Math.ceil(gridSize[1]! / SITE_3D_WG)) : 1
+  const z = latticeDim >= 3 ? Math.max(1, Math.ceil(gridSize[2]! / SITE_3D_WG)) : 1
+  return [x, y, z]
+}
+
+/** Result of {@link pickSiteDispatch}: dispatch extents + variant flag. */
+export interface SiteDispatch {
+  x: number
+  y: number
+  z: number
+  /**
+   * `true` when the 3-D kernel variant should be used (latticeDim===3).
+   * `false` when the legacy 1-D linear-WG kernel variant should be used.
+   */
+  use3D: boolean
+}
+
+/**
+ * Choose the dispatch shape for a TDSE-family per-site compute kernel.
+ *
+ * For `latticeDim === 3` the host dispatches a 3-D grid sized
+ * `ceil(gridSize[d] / SITE_3D_WG)` per axis. The matching kernel uses
+ * `@workgroup_size(4, 4, 4)` and reads `gid.xyz` directly, skipping
+ * `linearToND`'s shift/mask coord decomposition.
+ *
+ * For `latticeDim !== 3` (1, 2, or ≥4) the host falls back to the legacy
+ * 1-D dispatch with `LINEAR_WG`. 3-D dispatch is skipped at lower dims
+ * because workgroup_size(4,4,4) wastes 4× / 16× of its 64 threads when
+ * only one or two axes are active, and is skipped at higher dims because
+ * `gid.xyz` only addresses three lattice axes.
+ *
+ * @param latticeDim - Active lattice dimension count
+ * @param totalSites - Total lattice sites (used by the 1-D fallback)
+ * @param gridSize - Per-axis grid dimensions (only [0..2] consulted)
+ * @returns Dispatch shape and `use3D` flag
+ */
+export function pickSiteDispatch(
+  latticeDim: number,
+  totalSites: number,
+  gridSize: readonly number[]
+): SiteDispatch {
+  if (latticeDim === 3) {
+    const [x, y, z] = compute3DDispatchCounts(gridSize, 3)
+    return { x, y, z, use3D: true }
+  }
+  return {
+    x: Math.ceil(totalSites / LINEAR_WG),
+    y: 1,
+    z: 1,
+    use3D: false,
+  }
+}
+
 // Re-export from shared constant for backward compatibility with existing importers
 export { DENSITY_GRID_SIZE }
 

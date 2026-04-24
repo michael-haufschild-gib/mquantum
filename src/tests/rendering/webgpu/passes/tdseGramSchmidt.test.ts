@@ -46,8 +46,7 @@ function createGSState(overrides: Partial<GramSchmidtState> = {}): GramSchmidtSt
     gsPartialImBuffer: null,
     gsResultBuffer: null,
     gsNumWorkgroups: 0,
-    psiReBuffer: null,
-    psiImBuffer: null,
+    psiBuffer: null,
     totalSites: 0,
     pl: null,
     ...overrides,
@@ -103,8 +102,7 @@ describe('storeCurrentEigenstate', () => {
   it('copies psi buffers and increments eigenstate count', () => {
     const device = createMockDevice()
     const state = createGSState({
-      psiReBuffer: createMockBuffer('psi-re'),
-      psiImBuffer: createMockBuffer('psi-im'),
+      psiBuffer: createMockBuffer('psi'),
       totalSites: 256,
     })
 
@@ -112,8 +110,8 @@ describe('storeCurrentEigenstate', () => {
 
     expect(count).toBe(1)
     expect(state.gsEigenstates).toHaveLength(1)
-    // 2 buffers for eigenstate copy (re + im) + 2 staging buffers for async IPR readback
-    expect(device.createBuffer).toHaveBeenCalledTimes(4)
+    // 1 buffer for eigenstate copy (merged vec2f psi) + 1 staging buffer for async IPR readback
+    expect(device.createBuffer).toHaveBeenCalledTimes(2)
     // 2 submits: one for eigenstate copy, one for IPR readback
     expect(device.queue.submit).toHaveBeenCalledTimes(2)
   })
@@ -121,8 +119,7 @@ describe('storeCurrentEigenstate', () => {
   it('stores multiple eigenstates up to MAX_STORED_EIGENSTATES', () => {
     const device = createMockDevice()
     const state = createGSState({
-      psiReBuffer: createMockBuffer('psi-re'),
-      psiImBuffer: createMockBuffer('psi-im'),
+      psiBuffer: createMockBuffer('psi'),
       totalSites: 256,
     })
 
@@ -137,8 +134,7 @@ describe('storeCurrentEigenstate', () => {
   it('returns -1 when storage is full', () => {
     const device = createMockDevice()
     const state = createGSState({
-      psiReBuffer: createMockBuffer('psi-re'),
-      psiImBuffer: createMockBuffer('psi-im'),
+      psiBuffer: createMockBuffer('psi'),
       totalSites: 256,
     })
 
@@ -153,22 +149,18 @@ describe('storeCurrentEigenstate', () => {
 
 describe('clearEigenstates', () => {
   it('destroys all eigenstate buffers and resets array', () => {
-    const buf1Re = createMockBuffer('es-0-re')
-    const buf1Im = createMockBuffer('es-0-im')
-    const buf2Re = createMockBuffer('es-1-re')
-    const buf2Im = createMockBuffer('es-1-im')
+    const buf1 = createMockBuffer('es-0')
+    const buf2 = createMockBuffer('es-1')
     const state = createGSState()
     state.gsEigenstates = [
-      { re: buf1Re, im: buf1Im, normSquared: 1.0, energy: NaN, ipr: NaN },
-      { re: buf2Re, im: buf2Im, normSquared: 1.0, energy: NaN, ipr: NaN },
+      { psi: buf1, normSquared: 1.0, energy: NaN, ipr: NaN },
+      { psi: buf2, normSquared: 1.0, energy: NaN, ipr: NaN },
     ]
 
     clearEigenstates(state)
 
-    expect(buf1Re.destroy).toHaveBeenCalled()
-    expect(buf1Im.destroy).toHaveBeenCalled()
-    expect(buf2Re.destroy).toHaveBeenCalled()
-    expect(buf2Im.destroy).toHaveBeenCalled()
+    expect(buf1.destroy).toHaveBeenCalled()
+    expect(buf2.destroy).toHaveBeenCalled()
     expect(state.gsEigenstates).toHaveLength(0)
   })
 })

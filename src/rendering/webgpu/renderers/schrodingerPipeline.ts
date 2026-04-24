@@ -386,7 +386,7 @@ async function createSchrodingerPipelineImpl(
   // Phase 5: Create uniform buffers, bind groups, geometry
   // =====================================================================
 
-  const cameraUniformBuffer = deps.createUniformBuffer(device, 512, 'schroedinger-camera')
+  const cameraUniformBuffer = deps.createUniformBuffer(device, 528, 'schroedinger-camera')
   const lightingUniformBuffer = deps.createUniformBuffer(device, 576, 'schroedinger-lighting')
   const materialUniformBuffer = deps.createUniformBuffer(device, 160, 'schroedinger-material')
   const qualityUniformBuffer = deps.createUniformBuffer(device, 64, 'schroedinger-quality')

@@ -62,7 +62,8 @@ fn fragmentMain(input: VertexOutput) -> TemporalFragmentOutput {
   var output: TemporalFragmentOutput;
 ${bayerJitterSection}
   // Ray setup: transform to model space
-  let ro = (camera.inverseModelMatrix * vec4f(camera.cameraPosition, 1.0)).xyz;
+  // PERF: cameraPositionModel is CPU-precomputed as inverseModelMatrix * (cameraPosition, 1).
+  let ro = camera.cameraPositionModel;
   let worldRayDir = normalize(${rayDirSource} - camera.cameraPosition);
   let rd = normalize((camera.inverseModelMatrix * vec4f(worldRayDir, 0.0)).xyz);
 
@@ -196,8 +197,14 @@ ${bayerJitterSection}
   let p = ro + rd * hitT;
   var rawGrad: vec3f;
   ${gradientCompute}
-  let gradMag = length(rawGrad);
-  let n = -rawGrad / max(gradMag, 1e-6);
+  // PERF: rsqrt form — single hardware op replaces sqrt + divide for the
+  // normal, and the same invGradMag is reused by the uncertainty boundary
+  // below (saves two divides per isosurface hit). Clamp migrates from
+  // max(gradMag, 1e-6) to max(gradMagSq, 1e-12) — same 1e6 cap on the output.
+  let gradMagSq = dot(rawGrad, rawGrad);
+  let invGradMag = inverseSqrt(max(gradMagSq, 1e-12));
+  let gradMag = gradMagSq * invGradMag;
+  let n = -rawGrad * invGradMag;
 
   // Sample for color
   ${colorSample}
@@ -234,7 +241,8 @@ ${bayerJitterSection}
   if (FEATURE_UNCERTAINTY_BOUNDARY && schroedinger.uncertaintyBoundaryEnabled != 0u && schroedinger.uncertaintyBoundaryStrength > 0.0) {
     let ubWidth = max(schroedinger.uncertaintyBoundaryWidth, 1e-3);
     let logRhoDelta = abs(sSurface - schroedinger.uncertaintyLogRhoThreshold);
-    let spatialDist = logRhoDelta / max(gradMag, 1e-6);
+    // PERF: reuse invGradMag computed above — divide becomes a multiply.
+    let spatialDist = logRhoDelta * invGradMag;
     let z = spatialDist / ubWidth;  // cache once instead of computing twice
     let ubBand = exp(-0.5 * z * z);
     let ubGlow = ubBand * schroedinger.uncertaintyBoundaryStrength;
@@ -294,14 +302,12 @@ ${bayerJitterSection}
     // Filament convention: F0 = 0.16 * reflectance^2 for dielectrics (0.5 → 0.04)
     let dielectricF0_iso = 0.16 * material.reflectance * material.reflectance;
     let F0 = mix(vec3f(dielectricF0_iso), surfaceColor, material.metallic);
+    // Halfway vector: rsqrt + select mirrors the pattern already used in
+    // ggx.wgsl.ts:46. Saves 1 sqrt + 1 divide per light per pixel.
     let halfSum = l + viewDir;
-    let halfLen = length(halfSum);
-    var H: vec3f;
-    if (halfLen > EPS_DIVISION) {
-      H = halfSum / halfLen;
-    } else {
-      H = n;
-    }
+    let halfSumSq = dot(halfSum, halfSum);
+    let invHalfLen = inverseSqrt(max(halfSumSq, EPS_DIVISION * EPS_DIVISION));
+    let H = select(n, halfSum * invHalfLen, halfSumSq > EPS_DIVISION * EPS_DIVISION);
     let F = fresnelSchlick(max(dot(H, viewDir), 0.0), F0);
 
     let kS = F;

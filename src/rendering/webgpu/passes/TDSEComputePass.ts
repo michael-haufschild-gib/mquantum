@@ -12,11 +12,11 @@
  *
  * Strang splitting per substep:
  *   1. applyPotentialHalf (half-step V)
- *   2. packComplex (psiRe+psiIm -> interleaved)
+ *   2. packComplex (vec2f psi -> interleaved f32 [re,im,re,im,...])
  *   3. Forward FFT (log2(N) dispatches per axis)
  *   4. applyKinetic (full-step T in k-space)
  *   5. Inverse FFT (log2(N) dispatches per axis)
- *   6. unpackComplex (interleaved -> psiRe+psiIm, with 1/N normalization)
+ *   6. unpackComplex (interleaved f32 -> vec2f psi, with 1/N normalization)
  *   7. applyPotentialHalf (half-step V)
  *   8. PML absorber (cubic-graded damping, separate pass)
  */
@@ -35,6 +35,7 @@ import {
   createDensityTexture,
   DENSITY_GRID_SIZE,
   LINEAR_WG,
+  type SiteDispatch,
 } from './computePassUtils'
 import {
   applyBufferResult,
@@ -136,8 +137,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   // cast by the extracted `runTdseExecute` / `runTdseDispose` helpers; TS
   // `noUnusedLocals` fires on unused private class members, so those helpers'
   // fields are declared as package-internal instead.
-  psiReBuffer: GPUBuffer | null = null
-  psiImBuffer: GPUBuffer | null = null
+  /** Merged ψ buffer (array<vec2f>, 8 bytes per site: .x=Re, .y=Im). */
+  psiBuffer: GPUBuffer | null = null
   potentialBuffer: GPUBuffer | null = null
   fftScratchA: GPUBuffer | null = null
   fftScratchB: GPUBuffer | null = null
@@ -148,6 +149,12 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   private fftAxisStagingBuffer: GPUBuffer | null = null
   /** Per-slot FFT axis uniform buffers (length = 2 × latticeDim). */
   private fftAxisUniformBuffers: GPUBuffer[] | null = null
+  /**
+   * CPU-precomputed radix-2 twiddle table bound at binding 2 (shared-mem FFT)
+   * and binding 3 (per-stage FFT). Replaces per-thread `cos/sin` at stages
+   * >= 2. Rebuilt on grid-dim change only. See `TDSEFFTTwiddle.ts`.
+   */
+  private fftTwiddleBuffer: GPUBuffer | null = null
   packUniformBuffer: GPUBuffer | null = null
   private densityTexture: GPUTexture | null = null
   private densityTextureView: GPUTextureView | null = null
@@ -185,16 +192,14 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     gsPartialImBuffer: null,
     gsResultBuffer: null,
     gsNumWorkgroups: 0,
-    psiReBuffer: null,
-    psiImBuffer: null,
+    psiBuffer: null,
     totalSites: 0,
     pl: null,
   }
 
   // Save/load state (shared mutable object for extracted module)
   private readonly _slState: SaveLoadState = {
-    psiReBuffer: null,
-    psiImBuffer: null,
+    psiBuffer: null,
     totalSites: 0,
     saveMappingInFlight: false,
     pendingInjection: null,
@@ -211,8 +216,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     esMappingInFlight: false,
     obsMappingInFlight: false,
     obsEnabled: false,
-    psiReBuffer: null,
-    psiImBuffer: null,
+    psiBuffer: null,
     potentialBuffer: null,
     fftScratchA: null,
     totalSites: 0,
@@ -351,28 +355,19 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     ctx: WebGPURenderContext
   ): Promise<{ re: Float32Array; im: Float32Array } | null> {
     return extRequestMeasurementReadback(ctx, {
-      psiReBuffer: this.psiReBuffer,
-      psiImBuffer: this.psiImBuffer,
+      psiBuffer: this.psiBuffer,
       totalSites: this.totalSites,
     })
   }
 
   /** Sync shared state objects with current buffer references. */
   syncSharedState(): void {
-    const {
-      psiReBuffer: re,
-      psiImBuffer: im,
-      totalSites: n,
-      pl,
-      potentialBuffer,
-      fftScratchA,
-    } = this
-    Object.assign(this._gsState, { psiReBuffer: re, psiImBuffer: im, totalSites: n, pl })
-    Object.assign(this._slState, { psiReBuffer: re, psiImBuffer: im, totalSites: n })
-    Object.assign(this._hellerState, { psiReBuffer: re, psiImBuffer: im, totalSites: n })
+    const { psiBuffer: psi, totalSites: n, pl, potentialBuffer, fftScratchA } = this
+    Object.assign(this._gsState, { psiBuffer: psi, totalSites: n, pl })
+    Object.assign(this._slState, { psiBuffer: psi, totalSites: n })
+    Object.assign(this._hellerState, { psiBuffer: psi, totalSites: n })
     Object.assign(this._obsState, {
-      psiReBuffer: re,
-      psiImBuffer: im,
+      psiBuffer: psi,
       potentialBuffer,
       fftScratchA,
       totalSites: n,
@@ -411,14 +406,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     // next enabled capture re-anchor from fresh.
     resetHellerCapture(this._hellerState)
     useHellerSpectrometerStore.getState().bumpResetVersion()
-    rebuildVortexDetect(
-      device,
-      this._vdState,
-      this.totalSites,
-      this.uniformBuffer,
-      this.psiReBuffer,
-      this.psiImBuffer
-    )
+    rebuildVortexDetect(device, this._vdState, this.totalSites, this.uniformBuffer, this.psiBuffer)
     // Wormhole HUD staging — drop stale buffers; new size picked lazily.
     resetWormholeReadback(this._wormholeReadback)
     // Curved-space RK4 scratch is sized by totalSites; destroy now and
@@ -454,6 +442,12 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   rebuildBindGroups(device: GPUDevice): void {
     if (!this.pl || !this.densityTextureView) return
     const bgSelf = this as unknown as TdsePassBufferFields
+    if (!this.fftTwiddleBuffer) {
+      // fftTwiddleBuffer is created by rebuildTdseBuffers. If it's missing here
+      // the buffer pass hasn't run yet — skip bind-group rebuild so the caller
+      // retries after a successful buffer build.
+      return
+    }
     this.bg = rebuildTdseBindGroups(
       device,
       this.pl,
@@ -464,38 +458,36 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
           this._diagState.diagStagingBuffer
         ),
         fftAxisUniformBuffers: this.fftAxisUniformBuffers ?? [],
+        fftTwiddleBuffer: this.fftTwiddleBuffer,
         densityTextureView: this.densityTextureView,
         totalSites: this.totalSites,
       } as TdseBindGroupInputs,
       this.bg?.renormalizeUniformBuffer ?? null
     )
     // Rebuild stochastic localization bind group + expectation reduction
-    if (this.uniformBuffer && this.psiReBuffer && this.psiImBuffer) {
+    if (this.uniformBuffer && this.psiBuffer) {
       rebuildStochasticLocBindGroup(
         device,
         this._stochasticState,
         this.uniformBuffer,
-        this.psiReBuffer,
-        this.psiImBuffer
+        this.psiBuffer
       )
       const expectWG = Math.ceil(this.totalSites / EXPECT_WG)
       rebuildExpectationBindGroups(
         device,
         this._stochasticState,
         this.uniformBuffer,
-        this.psiReBuffer,
-        this.psiImBuffer,
+        this.psiBuffer,
         expectWG
       )
     }
     // ER=EPR wormhole coupling bind group — reuses uniform + ψ storage.
-    if (this.wormholePipeline && this.uniformBuffer && this.psiReBuffer && this.psiImBuffer) {
+    if (this.wormholePipeline && this.uniformBuffer && this.psiBuffer) {
       this.wormholeBG = createWormholeBindGroup(
         device,
         this.wormholePipeline,
         this.uniformBuffer,
-        this.psiReBuffer,
-        this.psiImBuffer
+        this.psiBuffer
       )
     }
     // Curved-space RK4 bind groups — rebuild only when the integrator has
@@ -511,13 +503,12 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   private rebuildCurvedBindGroupsIfActive(device: GPUDevice): void {
     const { pipelines, scratch } = this._curvedState
     if (!pipelines || !scratch) return
-    if (!this.uniformBuffer || !this.psiReBuffer || !this.psiImBuffer || !this.potentialBuffer) {
+    if (!this.uniformBuffer || !this.psiBuffer || !this.potentialBuffer) {
       return
     }
     this._curvedState.bindGroups = rebuildCurvedBindGroups(device, pipelines, {
       uniformBuffer: this.uniformBuffer,
-      psiReBuffer: this.psiReBuffer,
-      psiImBuffer: this.psiImBuffer,
+      psiBuffer: this.psiBuffer,
       potentialBuffer: this.potentialBuffer,
       scratch,
     })
@@ -530,14 +521,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
    * lattice rebuild). Callers guard on `config.metric?.kind` before calling
    * to preserve the flat-path zero-regression invariant.
    */
-  runCurvedFrame(device: GPUDevice, encoder: GPUCommandEncoder): void {
-    if (
-      !this.uniformBuffer ||
-      !this.psiReBuffer ||
-      !this.psiImBuffer ||
-      !this.potentialBuffer ||
-      this.totalSites <= 0
-    ) {
+  runCurvedFrame(device: GPUDevice, encoder: GPUCommandEncoder, siteDispatch: SiteDispatch): void {
+    if (!this.uniformBuffer || !this.psiBuffer || !this.potentialBuffer || this.totalSites <= 0) {
       return
     }
     if (!this._curvedState.pipelines) {
@@ -554,7 +539,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     if (!this._curvedState.bindGroups) {
       this.rebuildCurvedBindGroupsIfActive(device)
     }
-    runCurvedRK4Step(encoder, this._curvedState)
+    runCurvedRK4Step(encoder, this._curvedState, siteDispatch)
   }
 
   /**

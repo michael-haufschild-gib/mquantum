@@ -5,7 +5,8 @@
  * for raymarching. Maps each texture voxel to a physical position via the
  * basis vectors, then trilinearly interpolates the spinor density.
  *
- * Component layout: spinorRe/Im[c * totalSites + siteIdx], c ∈ {0=up, 1=down}.
+ * Component layout: spinor[c * totalSites + siteIdx] = vec2f(re, im),
+ *                   c ∈ {0=up, 1=down}.
  *
  * Field view modes (fieldView):
  *   0 spinDensity:     R = |ψ_up|², G = |ψ_down|², B = phase, A = total
@@ -32,22 +33,19 @@
 
 export const pauliWriteGridBlock = /* wgsl */ `
 @group(0) @binding(0) var<storage, read> params: PauliUniforms;
-@group(0) @binding(1) var<storage, read> spinorRe: array<f32>;
-@group(0) @binding(2) var<storage, read> spinorIm: array<f32>;
-@group(0) @binding(3) var densityGrid: texture_storage_3d<rgba16float, write>;
+@group(0) @binding(1) var<storage, read> spinor: array<vec2f>;
+@group(0) @binding(2) var densityGrid: texture_storage_3d<rgba16float, write>;
 
 // Spin-up density |ψ_up|² at a lattice site
 fn upDensityAt(siteIdx: u32, T: u32) -> f32 {
-  let re = spinorRe[siteIdx];
-  let im = spinorIm[siteIdx];
-  return re * re + im * im;
+  let v = spinor[siteIdx];
+  return v.x * v.x + v.y * v.y;
 }
 
 // Spin-down density |ψ_down|² at a lattice site
 fn downDensityAt(siteIdx: u32, T: u32) -> f32 {
-  let re = spinorRe[T + siteIdx];
-  let im = spinorIm[T + siteIdx];
-  return re * re + im * im;
+  let v = spinor[T + siteIdx];
+  return v.x * v.x + v.y * v.y;
 }
 
 // Total density (|ψ_up|² + |ψ_down|²) at a lattice site
@@ -58,27 +56,27 @@ fn totalDensityAt(siteIdx: u32, T: u32) -> f32 {
 // Combined up + down density in one pass (vec2: up, down). Used by fieldView
 // 0 and 2 to avoid two separate function-call boundaries per corner.
 fn upDownDensityAt(siteIdx: u32, T: u32) -> vec2f {
-  let re0 = spinorRe[siteIdx];
-  let im0 = spinorIm[siteIdx];
-  let re1 = spinorRe[T + siteIdx];
-  let im1 = spinorIm[T + siteIdx];
-  return vec2f(re0 * re0 + im0 * im0, re1 * re1 + im1 * im1);
+  let v0 = spinor[siteIdx];
+  let v1 = spinor[T + siteIdx];
+  return vec2f(v0.x * v0.x + v0.y * v0.y, v1.x * v1.x + v1.y * v1.y);
 }
 
-// Map N-D world position to lattice coordinates for trilinear interpolation.
+// Map precomputed fractional lattice coordinates to trilinear corners.
 // Dims 0..min(latticeDim,3)-1 use trilinear (lo/hi + frac).
 // Dims >= 3 use nearest-neighbour (slice-fixed).
+// Caller passes coordFs[d] = (ndWorldPos[d] + N/2*dx)/dx - 0.5 so the same
+// value feeds both the interp branching and the nearest-neighbour round+clamp
+// used downstream — avoids a second per-dim mul/div/sub chain per voxel.
 // Returns false if position is out of lattice bounds.
 fn worldToLatticeInterp(
-  ndWorldPos: ptr<function, array<f32, 12>>,
+  coordFs: ptr<function, array<f32, 12>>,
   coordsLo: ptr<function, array<u32, 12>>,
   coordsHi: ptr<function, array<u32, 12>>,
   fracs: ptr<function, array<f32, 12>>
 ) -> bool {
   let interpDims = min(params.latticeDim, 3u);
   for (var d: u32 = 0u; d < params.latticeDim; d++) {
-    let halfExtent = f32(params.gridSize[d]) * params.spacing[d] * 0.5;
-    let coordF = ((*ndWorldPos)[d] + halfExtent) / params.spacing[d] - 0.5;
+    let coordF = (*coordFs)[d];
 
     if (d < interpDims) {
       let lo = floor(coordF);
@@ -168,11 +166,20 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     }
   }
 
+  // Precompute fractional lattice coordinate per dim ONCE. Reused by the interp
+  // helper (lo/hi/frac) and the nearest-neighbour derivation below — the
+  // previous code recomputed this in two separate per-dim loops.
+  var coordF: array<f32, 12>;
+  for (var d: u32 = 0u; d < params.latticeDim; d++) {
+    let halfExtent = f32(params.gridSize[d]) * params.spacing[d] * 0.5;
+    coordF[d] = (ndWorldPos[d] + halfExtent) / params.spacing[d] - 0.5;
+  }
+
   var coordsLo: array<u32, 12>;
   var coordsHi: array<u32, 12>;
   var fracs: array<f32, 12>;
 
-  let inBounds = worldToLatticeInterp(&ndWorldPos, &coordsLo, &coordsHi, &fracs);
+  let inBounds = worldToLatticeInterp(&coordF, &coordsLo, &coordsHi, &fracs);
   if (!inBounds) {
     textureStore(densityGrid, gid, vec4f(0.0));
     return;
@@ -196,20 +203,21 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let T = params.totalSites;
   let numCorners = 1u << min(params.latticeDim, 3u);
 
-  // Nearest-neighbour site for phase and coherence queries
+  // Nearest-neighbour site for phase and coherence queries. Derived from the
+  // coordF values computed above — round+clamp on the exact same fractional
+  // coordinate preserves boundary behaviour bit-for-bit (deriving round from
+  // coordsLo/frac would disagree at grid edges where the interp clamps
+  // truncate loI=-1 and hiI=N to valid neighbors).
   var nnCoords: array<u32, 12>;
   for (var d: u32 = 0u; d < params.latticeDim; d++) {
-    let halfExtent = f32(params.gridSize[d]) * params.spacing[d] * 0.5;
-    let coordF = (ndWorldPos[d] + halfExtent) / params.spacing[d] - 0.5;
-    nnCoords[d] = u32(clamp(i32(round(coordF)), 0, i32(params.gridSize[d]) - 1));
+    nnCoords[d] = u32(clamp(i32(round(coordF[d])), 0, i32(params.gridSize[d]) - 1));
   }
   let nnSite = ndToLinear(nnCoords, params.strides, params.latticeDim);
 
   // Phase of spin-up component (NN, not interpolated)
-  let re0nn = spinorRe[nnSite];
-  let im0nn = spinorIm[nnSite];
+  let v0nn = spinor[nnSite];
   const PAULI_WG_PI: f32 = 3.14159265358979323846;
-  let phase = atan2(im0nn, re0nn) + PAULI_WG_PI;
+  let phase = atan2(v0nn.y, v0nn.x) + PAULI_WG_PI;
 
   // Density scale: when autoScale is on, normalize by GPU-computed maxDensity;
   // when off, use a fixed scale of 1.0 so raw density values are displayed.
@@ -291,10 +299,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       let w = cornerWeight(&fracs, corner);
       if (w > 0.0) {
         let sIdx = siteIndexForCorner(&coordsLo, &coordsHi, corner);
-        let re0c = spinorRe[sIdx];
-        let im0c = spinorIm[sIdx];
-        let re1c = spinorRe[T + sIdx];
-        let im1c = spinorIm[T + sIdx];
+        let v0c = spinor[sIdx];
+        let v1c = spinor[T + sIdx];
+        let re0c = v0c.x;
+        let im0c = v0c.y;
+        let re1c = v1c.x;
+        let im1c = v1c.y;
         // |ψ_up* ψ_down| = |vec2(coh_re, coh_im)|
         let cohReC = re0c * re1c + im0c * im1c;
         let cohImC = re0c * im1c - im0c * re1c;

@@ -31,21 +31,25 @@ export const freeScalarWriteGridBlock = /* wgsl */ `
 @group(0) @binding(4) var analysisTex: texture_storage_3d<rgba16float, write>;
 
 // Convert N-D world position to lattice coordinates with trilinear interpolation.
+// Also caches coordF per dimension so downstream NN code can reuse it without
+// recomputing the halfExtent + divide.
 fn worldToLatticeInterp(
   ndWorldPos: ptr<function, array<f32, 12>>,
   coordsLo: ptr<function, array<u32, 12>>,
   coordsHi: ptr<function, array<u32, 12>>,
-  fracs: ptr<function, array<f32, 12>>
+  fracs: ptr<function, array<f32, 12>>,
+  coordF: ptr<function, array<f32, 12>>
 ) -> bool {
   let interpDims = min(params.latticeDim, 3u);
   for (var d: u32 = 0u; d < params.latticeDim; d++) {
     let halfExtent = f32(params.gridSize[d]) * params.spacing[d] * 0.5;
-    let coordF = ((*ndWorldPos)[d] + halfExtent) / params.spacing[d];
+    let cF = ((*ndWorldPos)[d] + halfExtent) / params.spacing[d];
+    (*coordF)[d] = cF;
 
     if (d < interpDims) {
-      let lo = floor(coordF);
+      let lo = floor(cF);
       let hi = lo + 1.0;
-      let f = coordF - lo;
+      let f = cF - lo;
       let loI = i32(lo);
       let hiI = i32(hi);
       if (loI < -1 || hiI > i32(params.gridSize[d])) {
@@ -55,7 +59,7 @@ fn worldToLatticeInterp(
       (*coordsHi)[d] = u32(clamp(hiI, 0, i32(params.gridSize[d]) - 1));
       (*fracs)[d] = clamp(f, 0.0, 1.0);
     } else {
-      let coordI = i32(round(coordF));
+      let coordI = i32(round(cF));
       if (coordI < 0 || coordI >= i32(params.gridSize[d])) {
         return false;
       }
@@ -114,10 +118,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
 
   // Map texture voxel to model-space position [-bound, +bound]^3.
-  // PERF: precompute inverse dimensions to replace 3 divisions with multiplies.
-  let invDims = 1.0 / vec3f(texDims);
-  let twoBound = 2.0 * bound;
-  let modelPos = (vec3f(gid) + 0.5) * invDims * twoBound - bound;
+  // PERF: precompute inverse dimensions to replace 3 divisions with multiplies;
+  // hoist (invDims * twoBound) so the per-thread expression is one vec3 mul-add.
+  let gridToModel = (2.0 * bound) / vec3f(texDims);
+  let modelPos = fma(vec3f(gid) + 0.5, gridToModel, vec3f(-bound));
 
   // Project model-space position into N-D lattice coordinates via basis vectors.
   // 3D fast path: three dot products (no loop, no branch on d >= 3).
@@ -143,12 +147,15 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     }
   }
 
-  // Convert to lattice coordinates with trilinear interpolation support
+  // Convert to lattice coordinates with trilinear interpolation support.
+  // coordFArr captures the raw lattice-coord for NN reuse without redoing the
+  // halfExtent + divide — preserves banker's-rounding semantics bit-exactly.
   var coordsLo: array<u32, 12>;
   var coordsHi: array<u32, 12>;
   var fracs: array<f32, 12>;
+  var coordFArr: array<f32, 12>;
 
-  let inBounds = worldToLatticeInterp(&ndWorldPos, &coordsLo, &coordsHi, &fracs);
+  let inBounds = worldToLatticeInterp(&ndWorldPos, &coordsLo, &coordsHi, &fracs, &coordFArr);
   if (!inBounds) {
     textureStore(outputTex, gid, vec4f(0.0));
     if (hasAnalysis) { textureStore(analysisTex, gid, vec4f(0.0)); }
@@ -182,13 +189,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   var piVal: f32;
   var nnIdx: u32 = 0u;
 
-  // Nearest-neighbor coords (only computed when needed for gradient/analysis)
+  // Nearest-neighbor coords (only computed when needed for gradient/analysis).
+  // PERF: reuse coordF cached by worldToLatticeInterp so each dim drops its
+  // halfExtent mul+add and its divide. round() is preserved — WGSL round()
+  // uses banker's rounding (ties to even) and we keep that semantics exactly.
   var nnCoords: array<u32, 12>;
   if (needNN) {
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
-      let halfExtent = f32(params.gridSize[d]) * params.spacing[d] * 0.5;
-      let coordF = (ndWorldPos[d] + halfExtent) / params.spacing[d];
-      nnCoords[d] = u32(clamp(i32(round(coordF)), 0, i32(params.gridSize[d]) - 1));
+      nnCoords[d] = u32(clamp(i32(round(coordFArr[d])), 0, i32(params.gridSize[d]) - 1));
     }
     nnIdx = ndToLinear(nnCoords, params.strides, params.latticeDim);
   }

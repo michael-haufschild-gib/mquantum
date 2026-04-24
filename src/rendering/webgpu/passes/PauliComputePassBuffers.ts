@@ -27,8 +27,13 @@ const DIAG_RESULT_COUNT = 8
 
 /** GPU buffers created by {@link rebuildPauliBuffers}. */
 export interface PauliBufferResult {
-  spinorReBuffer: GPUBuffer
-  spinorImBuffer: GPUBuffer
+  /**
+   * Merged spinor buffer: `array<vec2f>` of length `2 * totalSites`.
+   * Layout: `spinor[c * totalSites + idx] = vec2f(re, im)` for c ∈ {0, 1}.
+   * One 8-byte load replaces two 4-byte loads from the previous split
+   * Re/Im buffers.
+   */
+  spinorBuffer: GPUBuffer
   fftScratchA: GPUBuffer
   fftScratchB: GPUBuffer
   uniformBuffer: GPUBuffer
@@ -36,6 +41,8 @@ export interface PauliBufferResult {
   fftStagingBuffer: GPUBuffer
   packUniformBuffer: GPUBuffer
   packUniformBufferNoNorm: GPUBuffer
+  /** Scalar potential V(x) — filled once per parameter change, read every substep. */
+  potentialBuffer: GPUBuffer
   diagUniformBuffer: GPUBuffer
   diagPartialBuffer: GPUBuffer
   diagResultBuffer: GPUBuffer
@@ -47,8 +54,7 @@ export interface PauliBufferResult {
 
 /** Old buffers to destroy before rebuilding. Any field may be null. */
 export interface PauliDestroyableBuffers {
-  spinorReBuffer: GPUBuffer | null
-  spinorImBuffer: GPUBuffer | null
+  spinorBuffer: GPUBuffer | null
   fftScratchA: GPUBuffer | null
   fftScratchB: GPUBuffer | null
   uniformBuffer: GPUBuffer | null
@@ -56,6 +62,7 @@ export interface PauliDestroyableBuffers {
   fftStagingBuffer: GPUBuffer | null
   packUniformBuffer: GPUBuffer | null
   packUniformBufferNoNorm: GPUBuffer | null
+  potentialBuffer: GPUBuffer | null
   diagUniformBuffer: GPUBuffer | null
   diagPartialBuffer: GPUBuffer | null
   diagResultBuffer: GPUBuffer | null
@@ -77,8 +84,7 @@ export function rebuildPauliBuffers(
   old: PauliDestroyableBuffers
 ): PauliBufferResult {
   // Destroy old buffers
-  old.spinorReBuffer?.destroy()
-  old.spinorImBuffer?.destroy()
+  old.spinorBuffer?.destroy()
   old.fftScratchA?.destroy()
   old.fftScratchB?.destroy()
   old.uniformBuffer?.destroy()
@@ -86,6 +92,7 @@ export function rebuildPauliBuffers(
   old.fftStagingBuffer?.destroy()
   old.packUniformBuffer?.destroy()
   old.packUniformBufferNoNorm?.destroy()
+  old.potentialBuffer?.destroy()
   old.diagUniformBuffer?.destroy()
   old.diagPartialBuffer?.destroy()
   old.diagResultBuffer?.destroy()
@@ -95,17 +102,27 @@ export function rebuildPauliBuffers(
   const totalSites = gridSize.reduce((a, b) => a * b, 1)
   const S = 2 // Always 2 spinor components
 
-  // Spinor buffers: S components packed sequentially
-  const spinorBytes = S * totalSites * Float32Array.BYTES_PER_ELEMENT
-  const spinorReBuffer = device.createBuffer({
-    label: 'pauli-spinor-re',
+  // Merged spinor buffer: `array<vec2f>` of length S * totalSites, where
+  // spinor[c * totalSites + idx] = vec2f(re, im). Size in bytes is
+  // S * totalSites * 8 (vs the previous 2 * S * totalSites * 4 split into
+  // separate Re/Im storage buffers). Alignment for pack/unpack
+  // per-component sub-bindings (offset = c * totalSites * 8) is safe:
+  // Pauli enforces latticeDim >= 3 and per-axis gridSize >= 8, so
+  // totalSites * 8 >= 4096, always a multiple of 256.
+  const SPINOR_VEC2F_BYTES = 8
+  const spinorBytes = S * totalSites * SPINOR_VEC2F_BYTES
+  const spinorBuffer = device.createBuffer({
+    label: 'pauli-spinor',
     size: spinorBytes,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
   })
-  const spinorImBuffer = device.createBuffer({
-    label: 'pauli-spinor-im',
-    size: spinorBytes,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+
+  // Scalar potential buffer V(x). Written once per parameter change by the
+  // pauliPotential compute pass; read every substep by pauliPotentialHalf.
+  const potentialBuffer = device.createBuffer({
+    label: 'pauli-potential',
+    size: totalSites * Float32Array.BYTES_PER_ELEMENT,
+    usage: GPUBufferUsage.STORAGE,
   })
 
   // FFT scratch (interleaved complex: 2 floats per site)
@@ -200,8 +217,7 @@ export function rebuildPauliBuffers(
   useDiagnosticsStore.getState().resetPauli()
 
   return {
-    spinorReBuffer,
-    spinorImBuffer,
+    spinorBuffer,
     fftScratchA,
     fftScratchB,
     uniformBuffer,
@@ -209,6 +225,7 @@ export function rebuildPauliBuffers(
     fftStagingBuffer,
     packUniformBuffer,
     packUniformBufferNoNorm,
+    potentialBuffer,
     diagUniformBuffer,
     diagPartialBuffer,
     diagResultBuffer,

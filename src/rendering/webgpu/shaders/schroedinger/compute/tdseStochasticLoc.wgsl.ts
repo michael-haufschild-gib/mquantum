@@ -16,11 +16,16 @@
  *
  * Supports up to 32 collapse centers for a smooth effective collapse field.
  *
- * @workgroup_size(64) — matches LINEAR_WG
+ * Two variants: tdseStochasticLocBlock (1-D, workgroup_size(64)) and
+ * tdseStochasticLocBlock3D (3-D, workgroup_size(4,4,4), gid.xyz). See
+ * pickSiteDispatch in computePassUtils for the selection rule.
+ *
+ * @workgroup_size(64) (1-D variant) | @workgroup_size(4, 4, 4) (3-D variant)
  * @module
  */
 
-export const tdseStochasticLocBlock = /* wgsl */ `
+/** Shared bindings + helpers used by both variants. */
+const TDSE_STOCH_LOC_PRELUDE = /* wgsl */ `
 struct StochasticParams {
   gamma: f32,
   sigma: f32,
@@ -36,10 +41,9 @@ struct StochasticParams {
 };
 
 @group(0) @binding(0) var<storage, read> tdseParams: TDSEUniforms;
-@group(0) @binding(1) var<storage, read_write> psiRe: array<f32>;
-@group(0) @binding(2) var<storage, read_write> psiIm: array<f32>;
-@group(0) @binding(3) var<uniform> sParams: StochasticParams;
-@group(0) @binding(4) var<storage, read> expectResult: array<f32>;
+@group(0) @binding(1) var<storage, read_write> psi: array<vec2f>;
+@group(0) @binding(2) var<uniform> sParams: StochasticParams;
+@group(0) @binding(3) var<storage, read> expectResult: array<f32>;
 
 // Helper: read coordinate d from center k's packed vec4 triplet
 fn getCenterCoord(k: u32, d: u32) -> f32 {
@@ -52,28 +56,13 @@ fn getCenterCoord(k: u32, d: u32) -> f32 {
 fn getCenterNoise(k: u32) -> f32 {
   return sParams.centers[k * 3u + 2u][3];
 }
+`
 
-@compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) gid: vec3u) {
-  let idx = gid.x;
-  if (idx >= tdseParams.totalSites) {
-    return;
-  }
-
-  // Lattice-coord decomposition. Strides are products of power-of-2 grid
-  // dims → shift/mask beats u32 divide/modulo here.
-  var coords: array<f32, 12>;
-  var rem = idx;
-  let ldim = tdseParams.latticeDim;
-  for (var d: u32 = 0u; d < ldim; d = d + 1u) {
-    let stride = tdseParams.strides[d];
-    let logStride = firstTrailingBit(stride);
-    let ci = rem >> logStride;
-    rem = rem & (stride - 1u);
-    let halfExtent = f32(tdseParams.gridSize[d]) * tdseParams.spacing[d] * 0.5;
-    coords[d] = f32(ci) * tdseParams.spacing[d] - halfExtent;
-  }
-
+/**
+ * Shared body. Expects 'idx', 'coords' (array<f32,12> of worldspace
+ * positions), and 'ldim' to be defined by the prologue.
+ */
+const TDSE_STOCH_LOC_BODY = /* wgsl */ `
   let invTwoSigmaSq = 1.0 / (2.0 * sParams.sigma * sParams.sigma);
   let sqrtGammaDt = sqrt(sParams.gamma * sParams.dt);
   let halfGammaDt = 0.5 * sParams.gamma * sParams.dt;
@@ -110,7 +99,60 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   //   ψ *= exp(√(γ·dt)·(W − ⟨W⟩) − (γ/2)·(W − ⟨W⟩)²·dt)
   let factor = sqrtGammaDt * wCentered - halfGammaDt * wCentered * wCentered;
   let scale = exp(factor);
-  psiRe[idx] = psiRe[idx] * scale;
-  psiIm[idx] = psiIm[idx] * scale;
+  psi[idx] = psi[idx] * scale;
+`
+
+/** 1-D variant: linear dispatch, linearToND-equivalent shift/mask coord loop. */
+export const tdseStochasticLocBlock =
+  TDSE_STOCH_LOC_PRELUDE +
+  /* wgsl */ `
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  let idx = gid.x;
+  if (idx >= tdseParams.totalSites) {
+    return;
+  }
+
+  // Lattice-coord decomposition. Strides are products of power-of-2 grid
+  // dims → shift/mask beats u32 divide/modulo here.
+  var coords: array<f32, 12>;
+  var rem = idx;
+  let ldim = tdseParams.latticeDim;
+  for (var d: u32 = 0u; d < ldim; d = d + 1u) {
+    let stride = tdseParams.strides[d];
+    let logStride = firstTrailingBit(stride);
+    let ci = rem >> logStride;
+    rem = rem & (stride - 1u);
+    let halfExtent = f32(tdseParams.gridSize[d]) * tdseParams.spacing[d] * 0.5;
+    coords[d] = f32(ci) * tdseParams.spacing[d] - halfExtent;
+  }
+${TDSE_STOCH_LOC_BODY}
+}
+`
+
+/** 3-D variant: workgroup_size(4,4,4), gid.xyz → worldspace coords. */
+export const tdseStochasticLocBlock3D =
+  TDSE_STOCH_LOC_PRELUDE +
+  /* wgsl */ `
+@compute @workgroup_size(4, 4, 4)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  if (gid.x >= tdseParams.gridSize[0]
+   || gid.y >= tdseParams.gridSize[1]
+   || gid.z >= tdseParams.gridSize[2]) {
+    return;
+  }
+  let idx = gid.x * tdseParams.strides[0] + gid.y * tdseParams.strides[1] + gid.z;
+
+  // Direct worldspace coords from gid.xyz — skips the per-thread shift/mask
+  // decomposition the 1-D variant performs.
+  let ldim = tdseParams.latticeDim;
+  var coords: array<f32, 12>;
+  let halfExtent0 = f32(tdseParams.gridSize[0]) * tdseParams.spacing[0] * 0.5;
+  let halfExtent1 = f32(tdseParams.gridSize[1]) * tdseParams.spacing[1] * 0.5;
+  let halfExtent2 = f32(tdseParams.gridSize[2]) * tdseParams.spacing[2] * 0.5;
+  coords[0] = f32(gid.x) * tdseParams.spacing[0] - halfExtent0;
+  coords[1] = f32(gid.y) * tdseParams.spacing[1] - halfExtent1;
+  coords[2] = f32(gid.z) * tdseParams.spacing[2] - halfExtent2;
+${TDSE_STOCH_LOC_BODY}
 }
 `

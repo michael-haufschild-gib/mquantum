@@ -20,7 +20,9 @@ import {
   computeConfigHash,
   computeStridesPadded,
   LINEAR_WG,
+  pickSiteDispatch,
   sanitizeGridSizes,
+  type SiteDispatch,
 } from './computePassUtils'
 import {
   computePotentialHash,
@@ -53,8 +55,7 @@ import { requestWormholeReadback, type WormholeReadbackState } from './TDSEWormh
 /** Narrow view of `TDSEComputePass` used by `runTdseExecute`. */
 export interface TdseExecuteFields {
   // GPU buffers
-  psiReBuffer: GPUBuffer | null
-  psiImBuffer: GPUBuffer | null
+  psiBuffer: GPUBuffer | null
   potentialBuffer: GPUBuffer | null
   fftScratchA: GPUBuffer | null
   uniformBuffer: GPUBuffer | null
@@ -105,7 +106,7 @@ export interface TdseExecuteFields {
   dispatchFFTAxis(ctx: WebGPURenderContext, axisDim: number, slotOffset: number): number
   dispatchFFTAxisInPass(passEncoder: GPUComputePassEncoder, axisDim: number, slot: number): void
   /** Curved-space RK4 dispatcher — only invoked when the TDSE metric is non-flat. */
-  runCurvedFrame(device: GPUDevice, encoder: GPUCommandEncoder): void
+  runCurvedFrame(device: GPUDevice, encoder: GPUCommandEncoder, siteDispatch: SiteDispatch): void
   /**
    * Populate the curved integrator's per-step RK4 stage-time staging buffer
    * for the upcoming frame. Called once per frame before any encoder work
@@ -172,7 +173,7 @@ export function runTdseExecute(
   pass.syncSharedState()
   const configHash = computeConfigHash(config.gridSize, config.latticeDim)
 
-  if (configHash !== pass.lastConfigHash || !pass.psiReBuffer) {
+  if (configHash !== pass.lastConfigHash || !pass.psiBuffer) {
     pass.rebuildBuffers(device, config)
     pass.buildPipelines(device)
     pass.rebuildBindGroups(device)
@@ -221,6 +222,10 @@ export function runTdseExecute(
 
   // Strang splitting time steps (only when playing)
   const linearWG = Math.ceil(pass.totalSites / LINEAR_WG)
+  // 3-D dispatch fast-path for the per-site kernels (init/potential/absorber/
+  // stochastic-loc/curved-kinetic). Computed once per frame so all site
+  // dispatches share the same shape choice.
+  const siteDispatch = pickSiteDispatch(config.latticeDim, pass.totalSites, config.gridSize)
 
   // Refresh potential only when parameters change (dirty tracking).
   const fullPotHash = computePotentialHash(config, pass.simTime)
@@ -241,7 +246,15 @@ export function runTdseExecute(
         )
       } else {
         const p = ctx.beginComputePass({ label: 'tdse-potential-update' })
-        pass.dispatchCompute(p, pass.pl.potentialPipeline, [pass.bg.potentialBG], linearWG)
+        const potPl = siteDispatch.use3D ? pass.pl.potentialPipeline3D : pass.pl.potentialPipeline
+        pass.dispatchCompute(
+          p,
+          potPl,
+          [pass.bg.potentialBG],
+          siteDispatch.x,
+          siteDispatch.y,
+          siteDispatch.z
+        )
         p.end()
       }
       // Disorder overlay: add random noise to non-Anderson potentials.
@@ -292,7 +305,8 @@ export function runTdseExecute(
     const metricKind = config.metric?.kind
     const curvedActive = metricKind !== undefined && metricKind !== 'flat' && metricKind !== 'torus'
     const dispatchCurvedRK4 = curvedActive
-      ? (curvedCtx: WebGPURenderContext) => pass.runCurvedFrame(curvedCtx.device, curvedCtx.encoder)
+      ? (curvedCtx: WebGPURenderContext) =>
+          pass.runCurvedFrame(curvedCtx.device, curvedCtx.encoder, siteDispatch)
       : undefined
     // Per-step RK4 stage-time hooks for time-dependent metrics. Wired up
     // only when the curved path is active — flat / torus runs get
@@ -318,6 +332,7 @@ export function runTdseExecute(
       hellerState: pass._hellerState,
       wormholePipeline: pass.wormholePipeline,
       wormholeBG: pass.wormholeBG,
+      siteDispatch,
       dc: pass.dc,
       dispatchFFTAxis: (c, axisDim, slot) => pass.dispatchFFTAxis(c, axisDim, slot),
       dispatchFFTAxisInPass: (passEncoder, axisDim, slot) =>
@@ -336,8 +351,7 @@ export function runTdseExecute(
       config,
       pass._hawkingState,
       pass.uniformBuffer,
-      pass.psiReBuffer,
-      pass.psiImBuffer,
+      pass.psiBuffer,
       linearWG,
       pass.dispatchCompute.bind(pass)
     )
@@ -352,8 +366,7 @@ export function runTdseExecute(
       ctx.encoder,
       pass._wormholeReadback,
       true,
-      pass.psiReBuffer,
-      pass.psiImBuffer,
+      pass.psiBuffer,
       pass.totalSites,
       config.gridSize,
       (config.wormholeMirrorAxis ?? 0) as 0 | 1 | 2,

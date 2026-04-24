@@ -71,11 +71,7 @@ export function createWormholePipeline(
 ): WormholePipelineResources {
   // Binding 0 (TDSEUniforms) is `read-only-storage` — see tdseInit.wgsl.ts /
   // TDSEComputePassSetup init BGL comment for the spec-noncompliance rationale.
-  const bgl = createComputeBGL(device, 'tdse-wormhole-couple-bgl', [
-    'read-only-storage',
-    'storage',
-    'storage',
-  ])
+  const bgl = createComputeBGL(device, 'tdse-wormhole-couple-bgl', ['read-only-storage', 'storage'])
   const module = createShaderModule(
     device,
     composeTdseWormholeCoupleShader(),
@@ -86,30 +82,27 @@ export function createWormholePipeline(
 }
 
 /**
- * Build a bind group that binds `uniformBuf`, `psiReBuf`, `psiImBuf`
+ * Build a bind group that binds `uniformBuf` and the merged vec2f ψ buffer
  * into the wormhole pipeline's BGL.
  *
  * @param device - Current WebGPU device.
  * @param resources - Pipeline + layout produced by {@link createWormholePipeline}.
  * @param uniformBuf - Current `TDSEUniforms` buffer.
- * @param psiReBuf - Real part of ψ (read/write storage).
- * @param psiImBuf - Imaginary part of ψ (read/write storage).
+ * @param psiBuf - Merged ψ (array<vec2f>, read/write storage).
  * @returns Freshly constructed bind group.
  */
 export function createWormholeBindGroup(
   device: GPUDevice,
   resources: WormholePipelineResources,
   uniformBuf: GPUBuffer,
-  psiReBuf: GPUBuffer,
-  psiImBuf: GPUBuffer
+  psiBuf: GPUBuffer
 ): GPUBindGroup {
   return device.createBindGroup({
     label: 'tdse-wormhole-couple-bg',
     layout: resources.bgl,
     entries: [
       { binding: 0, resource: { buffer: uniformBuf } },
-      { binding: 1, resource: { buffer: psiReBuf } },
-      { binding: 2, resource: { buffer: psiImBuf } },
+      { binding: 1, resource: { buffer: psiBuf } },
     ],
   })
 }

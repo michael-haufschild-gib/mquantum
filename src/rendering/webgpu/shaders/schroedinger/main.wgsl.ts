@@ -159,8 +159,9 @@ export function generateMainBlockVolumetric(config: VolumetricMainBlockConfig = 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   // Ray setup: transform to model space
-  // This matches WebGL: ro = (uInverseModelMatrix * vec4(uCameraPosition, 1.0)).xyz
-  let ro = (camera.inverseModelMatrix * vec4f(camera.cameraPosition, 1.0)).xyz;
+  // PERF: cameraPositionModel is CPU-precomputed as inverseModelMatrix * (cameraPosition, 1);
+  // matches WebGL: ro = (uInverseModelMatrix * vec4(uCameraPosition, 1.0)).xyz
+  let ro = camera.cameraPositionModel;
 
   // Compute ray direction per-pixel from interpolated world position
   // This matches WebGL: worldRayDir = normalize(vPosition - uCameraPosition)
@@ -343,8 +344,9 @@ fn fragmentMain(input: VertexOutput) -> TemporalFragmentOutput {
   var output: TemporalFragmentOutput;
 ${bayerJitterSection}
   // Ray setup: transform to model space
-  // This matches WebGL: ro = (uInverseModelMatrix * vec4(uCameraPosition, 1.0)).xyz
-  let ro = (camera.inverseModelMatrix * vec4f(camera.cameraPosition, 1.0)).xyz;
+  // PERF: cameraPositionModel is CPU-precomputed as inverseModelMatrix * (cameraPosition, 1);
+  // matches WebGL: ro = (uInverseModelMatrix * vec4(uCameraPosition, 1.0)).xyz
+  let ro = camera.cameraPositionModel;
 
   // Compute ray direction per-pixel from interpolated world position
   // In temporal mode, use jittered position for sub-pixel sampling

@@ -10,8 +10,14 @@
  * Every field is non-null after a successful call.
  */
 export interface DiracBufferResult {
-  spinorReBuffer: GPUBuffer
-  spinorImBuffer: GPUBuffer
+  /**
+   * Merged spinor buffer: `array<vec2f>` of length `S * totalSites`.
+   * Component c at site idx = `spinor[c*totalSites + idx] = vec2f(re, im)`.
+   * Replaces the previous split `spinorReBuffer` / `spinorImBuffer` layout so
+   * the gamma mat-vec loops perform one 8-byte complex load per component
+   * rather than two 4-byte f32 loads.
+   */
+  spinorBuffer: GPUBuffer
   potentialBuffer: GPUBuffer
   gammaBuffer: GPUBuffer
   fftScratchA: GPUBuffer
@@ -45,8 +51,7 @@ export interface DiracBufferResult {
 
 /** Old buffers to destroy before rebuilding. Any field may be null. */
 export interface DiracDestroyableBuffers {
-  spinorReBuffer: GPUBuffer | null
-  spinorImBuffer: GPUBuffer | null
+  spinorBuffer: GPUBuffer | null
   potentialBuffer: GPUBuffer | null
   gammaBuffer: GPUBuffer | null
   fftScratchA: GPUBuffer | null
@@ -70,6 +75,17 @@ export interface DiracDestroyableBuffers {
 
 /**
  * Pipeline and bind group layout objects created by {@link buildDiracPipelines}.
+ *
+ * Pipelines for the four site-based kernels that consume N-D coords (init,
+ * potential, absorber, kinetic) are emitted in two variants: a 1-D dispatch
+ * variant (`@workgroup_size(64)`, decodes coords via `linearToND`) and a 3-D
+ * dispatch variant (`@workgroup_size(4, 4, 4)`, reads coords directly from
+ * `gid.xyz`). The `use3DSiteDispatch` flag indicates which variant the
+ * `*Pipeline` field references — `true` when `latticeDim ≤ 3`. The 3-D path
+ * eliminates the per-thread `linearToND` decode (a few shifts + masks +
+ * `firstTrailingBit` calls per dim, since strides are pow-of-2). Bind group
+ * layouts are unchanged between variants, so bind groups built from this
+ * result work for both paths.
  */
 export interface DiracPipelineResult {
   initPipeline: GPUComputePipeline
@@ -97,6 +113,13 @@ export interface DiracPipelineResult {
   diagReduceBGL: GPUBindGroupLayout
   diagFinalizePipeline: GPUComputePipeline
   diagFinalizeBGL: GPUBindGroupLayout
+  /**
+   * `true` when the init/potential/absorber/kinetic pipelines were built from
+   * the 3-D dispatch variant (`@workgroup_size(4, 4, 4)`, `gid.xyz`-direct
+   * coords). Caller must use a 3-D workgroup count for these dispatches.
+   * Always `false` for `latticeDim > 3`.
+   */
+  use3DSiteDispatch: boolean
 }
 
 /**
@@ -130,8 +153,7 @@ export interface DiracBindGroupResult {
 /** Buffers and resources needed to create bind groups. */
 export interface DiracBindGroupInputs {
   uniformBuffer: GPUBuffer
-  spinorReBuffer: GPUBuffer
-  spinorImBuffer: GPUBuffer
+  spinorBuffer: GPUBuffer
   potentialBuffer: GPUBuffer
   gammaBuffer: GPUBuffer
   fftScratchA: GPUBuffer

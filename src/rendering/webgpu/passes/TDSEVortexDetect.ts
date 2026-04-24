@@ -95,8 +95,7 @@ export function initVortexDetect(
   state: VortexDetectState,
   totalSites: number,
   tdseUniformBuffer: GPUBuffer,
-  psiReBuffer: GPUBuffer,
-  psiImBuffer: GPUBuffer
+  psiBuffer: GPUBuffer
 ): void {
   const WG = 256
   state.numWorkgroups = Math.ceil(totalSites / WG)
@@ -144,13 +143,12 @@ export function initVortexDetect(
     code: composeVortexDetectReduceShader(),
   })
 
-  // Binding 0 = VortexDetectUniforms (uniform). Binding 3 = TDSEUniforms which
-  // binds as `read-only-storage` because the struct embeds scalar arrays that
-  // are spec-forbidden in uniform address space. See tdseInit.wgsl.ts for the
-  // spec-noncompliance rationale.
+  // Binding 0 = VortexDetectUniforms (uniform). Binding 1 is the merged ψ
+  // (vec2f). Binding 2 = TDSEUniforms which binds as `read-only-storage`
+  // because the struct embeds scalar arrays that are spec-forbidden in uniform
+  // address space. See tdseInit.wgsl.ts for the spec-noncompliance rationale.
   const reduceLayout = createComputeBGL(device, 'vortex-detect-reduce-layout', [
     'uniform',
-    'read-only-storage',
     'read-only-storage',
     'read-only-storage',
     'storage',
@@ -169,12 +167,11 @@ export function initVortexDetect(
     layout: reduceLayout,
     entries: [
       { binding: 0, resource: { buffer: state.uniformBuffer } },
-      { binding: 1, resource: { buffer: psiReBuffer } },
-      { binding: 2, resource: { buffer: psiImBuffer } },
-      { binding: 3, resource: { buffer: tdseUniformBuffer } },
-      { binding: 4, resource: { buffer: state.partialCountsBuffer } },
-      { binding: 5, resource: { buffer: state.partialPosBuffer } },
-      { binding: 6, resource: { buffer: state.partialNegBuffer } },
+      { binding: 1, resource: { buffer: psiBuffer } },
+      { binding: 2, resource: { buffer: tdseUniformBuffer } },
+      { binding: 3, resource: { buffer: state.partialCountsBuffer } },
+      { binding: 4, resource: { buffer: state.partialPosBuffer } },
+      { binding: 5, resource: { buffer: state.partialNegBuffer } },
     ],
   })
 
@@ -359,12 +356,11 @@ export function rebuildVortexDetect(
   state: VortexDetectState,
   totalSites: number,
   uniformBuffer: GPUBuffer | null,
-  psiReBuffer: GPUBuffer | null,
-  psiImBuffer: GPUBuffer | null
+  psiBuffer: GPUBuffer | null
 ): void {
   disposeVortexDetect(state)
-  if (uniformBuffer && psiReBuffer && psiImBuffer && totalSites > 0) {
-    initVortexDetect(device, state, totalSites, uniformBuffer, psiReBuffer, psiImBuffer)
+  if (uniformBuffer && psiBuffer && totalSites > 0) {
+    initVortexDetect(device, state, totalSites, uniformBuffer, psiBuffer)
   }
 }
 

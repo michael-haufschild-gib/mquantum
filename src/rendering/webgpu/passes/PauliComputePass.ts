@@ -8,7 +8,10 @@
  * iℏ ∂ψ/∂t = [p²/(2m) + V(x) + μ_B σ·B(x)] ψ
  *
  * Architecture:
- * - 2 pairs of (Re, Im) storage buffers for spin-up and spin-down
+ * - Single merged `spinor: array<vec2f>` storage buffer of length
+ *   2·totalSites, where spinor[c·T + idx] = vec2f(re, im). One 8-byte
+ *   vec2f load/store per site replaces two 4-byte scalar ops from the
+ *   previous split-buffer layout.
  * - 2 independent FFTs per time step (reuses Stockham FFT from Dirac pass)
  * - Scalar kinetic phase exp(-iℏk²dt/(2m)) per component (reuses TDSE)
  * - Zeeman 2×2 SU(2) rotation in position space (closed-form)
@@ -50,6 +53,36 @@ const UNIFORM_SIZE = 592
 /** Number of f32 values in diagnostic result buffer:
  *  totalNorm, normUp, normDown, sigmaX, sigmaY, sigmaZ, maxDensity, pad */
 const DIAG_RESULT_COUNT = 8
+/** Workgroup-X for the 3D-dispatch site kernels (matches @workgroup_size(4,4,4)). */
+const SITE3D_WG = 4
+
+/**
+ * Site-kernel dispatch shape selector.
+ *
+ * For `latticeDim === 3`, returns a 3D dispatch (`shape: '3d'`) sized to the
+ * actual gridSize so the kernel can read `gid.xyz` directly and skip the
+ * `linearToND()` per-thread shift sequence (~3 shifts + 3 masks per voxel).
+ *
+ * For every other dimensionality (2D Pauli is store-permitted but not exposed
+ * by the registry, 4D-6D Pauli is registry-supported), falls back to the
+ * existing 1D linear dispatch — the 3D path covers only the first three axes
+ * and would miss the extra-dim slices in 4D+.
+ */
+function pickPauliSiteDispatch(
+  latticeDim: number,
+  totalSites: number,
+  gridSize: readonly number[]
+): { shape: '3d'; x: number; y: number; z: number } | { shape: '1d'; x: number } {
+  if (latticeDim === 3 && gridSize.length >= 3) {
+    return {
+      shape: '3d',
+      x: Math.ceil(gridSize[0]! / SITE3D_WG),
+      y: Math.ceil(gridSize[1]! / SITE3D_WG),
+      z: Math.ceil(gridSize[2]! / SITE3D_WG),
+    }
+  }
+  return { shape: '1d', x: Math.ceil(totalSites / LINEAR_WG) }
+}
 
 /**
  * Compute pass for Pauli equation split-operator dynamics.
@@ -79,6 +112,8 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   // State
   private initialized = false
   private lastConfigHash = ''
+  /** Hash of V(x)-shaping parameters — dirty check for potentialPipeline dispatch. */
+  private lastPotentialHash = ''
   private simTime = 0
   private maxDensity = 1.0
   private stepAccumulator = 0
@@ -128,6 +163,11 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   /**
    * Set loaded spinor data for injection on next maybeInitialize.
    *
+   * The caller supplies the spinor in the legacy split layout (re and im
+   * Float32Arrays of length 2·totalSites, each containing the c=0 slice
+   * followed by the c=1 slice). We interleave into the merged vec2f
+   * storage on upload: `merged[2i] = re[i]`, `merged[2i + 1] = im[i]`.
+   *
    * @param re - Real part of the spinor buffer (2 * totalSites floats)
    * @param im - Imaginary part of the spinor buffer (2 * totalSites floats)
    */
@@ -137,23 +177,32 @@ export class PauliComputePass extends WebGPUBaseComputePass {
 
   /**
    * Initiate async save of the current spinor state.
-   * Copies spinor buffers to staging within the current command encoder,
-   * then maps async after GPU submit.
+   * Copies the merged spinor buffer to staging within the current command
+   * encoder, then maps async after GPU submit. The `interleaved` save
+   * layout deinterleaves the vec2f stream [re, im, re, im, ...] into the
+   * separate re/im Float32Arrays that the serializer expects — this
+   * matches the legacy split-buffer save output byte-for-byte because
+   * the merged vec2f stream is exactly [re_c0s0, im_c0s0, re_c0s1, ...,
+   * re_c1s0, im_c1s0, ...] while the old split layout stored
+   * [re_c0s0, re_c0s1, ..., re_c1s0, ...] and [im_c0s0, ...] in parallel
+   * arrays of length 2·T.
    *
    * @param ctx - Render context (device + encoder)
    */
   requestStateSave(ctx: WebGPURenderContext): void {
-    if (!this.buf?.spinorReBuffer || !this.buf?.spinorImBuffer || this.saveMappingInFlight) return
-    const byteSize = 2 * (this.buf.totalSites ?? 0) * 4
-    if (byteSize === 0) return
+    if (!this.buf?.spinorBuffer || this.saveMappingInFlight) return
+    const totalSites = this.buf.totalSites ?? 0
+    if (totalSites === 0) return
+    const elementCount = 2 * totalSites
+    const byteSize = elementCount * 2 * Float32Array.BYTES_PER_ELEMENT
 
     this.saveMappingInFlight = true
     genericStateSave(ctx, {
       source: {
-        layout: 'separate',
-        reBuffer: this.buf.spinorReBuffer,
-        imBuffer: this.buf.spinorImBuffer,
+        layout: 'interleaved',
+        buffer: this.buf.spinorBuffer,
         byteSize,
+        elementCount,
       },
       totalSites: this.buf.totalSites,
       label: 'pauli',
@@ -187,6 +236,28 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     return `${config.latticeDim}|${config.gridSize.join(',')}|${config.spacing.join(',')}`
   }
 
+  /**
+   * Hash V(x)-shaping parameters. A difference here triggers a single
+   * pauliPotential dispatch before the next Strang loop so the substep kernel
+   * reads a fresh potential[idx] without recomputing V per voxel.
+   *
+   * Pauli V is not time-dependent (no driven branch), so simTime is absent.
+   * Grid topology and spacing are included because they define the physical
+   * position (f32(coord) − N/2 + 0.5)·spacing used by every V formula.
+   */
+  private computePauliPotentialHash(config: PauliConfig): string {
+    return [
+      config.potentialType,
+      config.harmonicOmega,
+      config.wellDepth,
+      config.wellWidth,
+      config.mass,
+      config.latticeDim,
+      config.gridSize.slice(0, config.latticeDim).join(','),
+      config.spacing.slice(0, config.latticeDim).join(','),
+    ].join('|')
+  }
+
   // ============================================================================
   // Buffer & Resource Rebuild (delegated to PauliComputePassBuffers)
   // ============================================================================
@@ -203,8 +274,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
 
     const oldBuf = this.buf
     this.buf = rebuildPauliBuffers(device, config, {
-      spinorReBuffer: oldBuf?.spinorReBuffer ?? null,
-      spinorImBuffer: oldBuf?.spinorImBuffer ?? null,
+      spinorBuffer: oldBuf?.spinorBuffer ?? null,
       fftScratchA: oldBuf?.fftScratchA ?? null,
       fftScratchB: oldBuf?.fftScratchB ?? null,
       uniformBuffer: oldBuf?.uniformBuffer ?? null,
@@ -212,6 +282,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       fftStagingBuffer: oldBuf?.fftStagingBuffer ?? null,
       packUniformBuffer: oldBuf?.packUniformBuffer ?? null,
       packUniformBufferNoNorm: oldBuf?.packUniformBufferNoNorm ?? null,
+      potentialBuffer: oldBuf?.potentialBuffer ?? null,
       diagUniformBuffer: oldBuf?.diagUniformBuffer ?? null,
       diagPartialBuffer: oldBuf?.diagPartialBuffer ?? null,
       diagResultBuffer: oldBuf?.diagResultBuffer ?? null,
@@ -220,6 +291,10 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     this.diagFrameCounter = 0
     this.diagMappingInFlight = false
     this.lastConfigHash = this.computeConfigHash(config)
+    // Freshly-created potentialBuffer holds uninitialized memory — force the
+    // next executePauli to fire the potential fill kernel before the Strang
+    // loop reads from it (otherwise potentialHalf would see garbage).
+    this.lastPotentialHash = ''
   }
 
   /** Create the 3D density texture for spin-resolved rendering */
@@ -249,13 +324,13 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       this.pl,
       {
         uniformBuffer: this.buf.uniformBuffer,
-        spinorReBuffer: this.buf.spinorReBuffer,
-        spinorImBuffer: this.buf.spinorImBuffer,
+        spinorBuffer: this.buf.spinorBuffer,
         fftScratchA: this.buf.fftScratchA,
         fftScratchB: this.buf.fftScratchB,
         fftUniformBuffer: this.buf.fftUniformBuffer,
         packUniformBuffer: this.buf.packUniformBuffer,
         packUniformBufferNoNorm: this.buf.packUniformBufferNoNorm,
+        potentialBuffer: this.buf.potentialBuffer,
         densityTextureView: this.densityTextureView,
         diagUniformBuffer: this.buf.diagUniformBuffer,
         diagPartialBuffer: this.buf.diagPartialBuffer,
@@ -272,24 +347,34 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     if (this.initialized && !config.needsReset) return
     const { device } = ctx
 
-    // Check for pending loaded wavefunction data — skip init shader and inject directly
-    if (this.pendingInjection && this.buf?.spinorReBuffer && this.buf?.spinorImBuffer) {
+    // Check for pending loaded wavefunction data — skip init shader and inject directly.
+    // Interleave the incoming split (re, im) arrays of length 2·T into the
+    // merged vec2f buffer: interleaved[2i] = re[i], interleaved[2i + 1] = im[i].
+    // One writeBuffer call replaces the two that the split-buffer layout needed.
+    if (this.pendingInjection && this.buf?.spinorBuffer) {
       const { re, im } = this.pendingInjection
-      const elementCount = Math.min(re.length, 2 * this.buf.totalSites)
-      const reData = re.slice(0, elementCount)
-      const imData = im.slice(0, elementCount)
-      device.queue.writeBuffer(this.buf.spinorReBuffer, 0, reData)
-      device.queue.writeBuffer(this.buf.spinorImBuffer, 0, imData)
+      const elementCount = Math.min(re.length, im.length, 2 * this.buf.totalSites)
+      const interleaved = new Float32Array(elementCount * 2)
+      for (let i = 0; i < elementCount; i++) {
+        interleaved[2 * i] = re[i]!
+        interleaved[2 * i + 1] = im[i]!
+      }
+      device.queue.writeBuffer(this.buf.spinorBuffer, 0, interleaved)
       this.pendingInjection = null
       logger.log(`[Pauli] Injected loaded wavefunction (${elementCount} elements)`)
     } else if (this.pl && this.bg && this.buf) {
       const pass = ctx.beginComputePass({ label: 'pauli-init-pass' })
-      this.dispatchCompute(
-        pass,
-        this.pl.initPipeline,
-        [this.bg.spinorBG],
-        Math.ceil(this.buf.totalSites / LINEAR_WG)
+      const dispatch = pickPauliSiteDispatch(
+        config.latticeDim,
+        this.buf.totalSites,
+        config.gridSize
       )
+      const pipeline = dispatch.shape === '3d' ? this.pl.init3DPipeline : this.pl.initPipeline
+      if (dispatch.shape === '3d') {
+        this.dispatchCompute(pass, pipeline, [this.bg.spinorBG], dispatch.x, dispatch.y, dispatch.z)
+      } else {
+        this.dispatchCompute(pass, pipeline, [this.bg.spinorBG], dispatch.x)
+      }
       pass.end()
     }
     this.maxDensity = 1.0
@@ -421,6 +506,44 @@ export class PauliComputePass extends WebGPUBaseComputePass {
 
     if (!this.pl || !this.bg || !this.buf) return
     const linearWG = Math.ceil(this.buf.totalSites / LINEAR_WG)
+    // 3D-vs-1D site dispatch picker for init/potential/potentialHalf/absorber.
+    // Computed once per executePauli call so all site kernels in this frame
+    // share the same shape decision.
+    const siteDispatch = pickPauliSiteDispatch(
+      config.latticeDim,
+      this.buf.totalSites,
+      config.gridSize
+    )
+    const dispatchSite = (
+      pass: GPUComputePassEncoder,
+      pipeline1D: GPUComputePipeline,
+      pipeline3D: GPUComputePipeline,
+      bindGroups: GPUBindGroup[]
+    ): void => {
+      if (siteDispatch.shape === '3d') {
+        this.dispatchCompute(
+          pass,
+          pipeline3D,
+          bindGroups,
+          siteDispatch.x,
+          siteDispatch.y,
+          siteDispatch.z
+        )
+      } else {
+        this.dispatchCompute(pass, pipeline1D, bindGroups, siteDispatch.x)
+      }
+    }
+
+    // Refresh scalar potential V(x) only when its shaping parameters change.
+    // Uniforms are written above, so the fill kernel reads the current
+    // potentialType / harmonicOmega / wellDepth / wellWidth / mass values.
+    const potHash = this.computePauliPotentialHash(config)
+    if (potHash !== this.lastPotentialHash) {
+      this.lastPotentialHash = potHash
+      const p = ctx.beginComputePass({ label: 'pauli-potential-fill' })
+      dispatchSite(p, this.pl.potentialPipeline, this.pl.potential3DPipeline, [this.bg.potentialBG])
+      p.end()
+    }
 
     // Time evolution (Strang splitting)
     if (isPlaying) {
@@ -430,10 +553,15 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       this.stepAccumulator -= stepsThisFrame
 
       for (let step = 0; step < stepsThisFrame; step++) {
-        // 1. Half-step potential + Zeeman rotation
+        // 1. Half-step potential + Zeeman rotation.
+        //    Uses potentialHalfBG (3 bindings: params, merged spinor,
+        //    potential) — V is read from the precomputed potentialBuffer
+        //    instead of being re-evaluated per voxel.
         {
           const p = ctx.beginComputePass({ label: `pauli-V-half-1-${step}` })
-          this.dispatchCompute(p, this.pl.potentialHalfPipeline, [this.bg.spinorBG], linearWG)
+          dispatchSite(p, this.pl.potentialHalfPipeline, this.pl.potentialHalf3DPipeline, [
+            this.bg.potentialHalfBG,
+          ])
           p.end()
         }
 
@@ -487,14 +615,16 @@ export class PauliComputePass extends WebGPUBaseComputePass {
         // 6. Second half-step potential + Zeeman rotation
         {
           const p = ctx.beginComputePass({ label: `pauli-V-half-2-${step}` })
-          this.dispatchCompute(p, this.pl.potentialHalfPipeline, [this.bg.spinorBG], linearWG)
+          dispatchSite(p, this.pl.potentialHalfPipeline, this.pl.potentialHalf3DPipeline, [
+            this.bg.potentialHalfBG,
+          ])
           p.end()
         }
 
         // 7. Absorber (separate pass AFTER the Strang step)
         {
           const p = ctx.beginComputePass({ label: `pauli-absorber-${step}` })
-          this.dispatchCompute(p, this.pl.absorberPipeline, [this.bg.spinorBG], linearWG)
+          dispatchSite(p, this.pl.absorberPipeline, this.pl.absorber3DPipeline, [this.bg.spinorBG])
           p.end()
         }
 
@@ -674,8 +804,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       this.diagMappingInFlight = false
     }
     if (this.buf) {
-      this.buf.spinorReBuffer.destroy()
-      this.buf.spinorImBuffer.destroy()
+      this.buf.spinorBuffer.destroy()
       this.buf.fftScratchA.destroy()
       this.buf.fftScratchB.destroy()
       this.buf.uniformBuffer.destroy()
@@ -683,6 +812,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       this.buf.fftStagingBuffer.destroy()
       this.buf.packUniformBuffer.destroy()
       this.buf.packUniformBufferNoNorm.destroy()
+      this.buf.potentialBuffer.destroy()
       this.buf.diagUniformBuffer.destroy()
       this.buf.diagPartialBuffer.destroy()
       this.buf.diagResultBuffer.destroy()

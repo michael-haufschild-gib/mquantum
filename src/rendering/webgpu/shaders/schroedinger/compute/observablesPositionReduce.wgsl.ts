@@ -32,17 +32,20 @@ struct ObsReduceUniforms {
 }
 
 @group(0) @binding(0) var<storage, read> obsParams: ObsReduceUniforms;
-@group(0) @binding(1) var<storage, read> psiRe: array<f32>;
-@group(0) @binding(2) var<storage, read> psiIm: array<f32>;
-@group(0) @binding(3) var<storage, read_write> partials: array<f32>;
-@group(0) @binding(4) var<storage, read> potentialBuf: array<f32>;
+@group(0) @binding(1) var<storage, read> psi: array<vec2f>;
+@group(0) @binding(2) var<storage, read_write> partials: array<f32>;
+@group(0) @binding(3) var<storage, read> potentialBuf: array<f32>;
 
-// Max channels: 2 + 2*11 = 24. Shared memory: 256 * 24 = 6144 floats.
-// WGSL requires compile-time constants for arrays, so use a flat block
-// and index as sdata[local * MAX_CHANNELS + ch].
+// Max channels: 2 + 2*11 = 24. Shared memory: 24 * 256 = 6144 floats.
+// Layout is CHANNEL-MAJOR: sdata[ch * WG_SIZE + local]. This gives bank-
+// conflict-free access in the tree reduction because WG_SIZE=256 is a
+// multiple of the 32-bank width — every warp hits 32 distinct banks
+// (bank = (ch*256 + local) mod 32 = local mod 32). The previous
+// thread-major layout sdata[local * 24 + ch] caused 4-way bank conflicts
+// (gcd(24, 32) = 8 ⇒ 4 threads per warp per bank per channel access).
 const MAX_CHANNELS: u32 = 24u;
 const WG_SIZE: u32 = 256u;
-var<workgroup> sdata: array<f32, 6144>;  // WG_SIZE * MAX_CHANNELS
+var<workgroup> sdata: array<f32, 6144>;  // MAX_CHANNELS * WG_SIZE
 
 @compute @workgroup_size(256)
 fn main(
@@ -53,16 +56,16 @@ fn main(
   let idx = gid.x;
   let local = lid.x;
   let nc = obsParams.numChannels;
-  let localBase = local * MAX_CHANNELS;
 
-  // Initialize shared memory for this thread's channels
+  // Initialize shared memory for this thread's channel slots (channel-major).
   for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
-    sdata[localBase + ch] = 0.0;
+    sdata[ch * WG_SIZE + local] = 0.0;
   }
 
   if (idx < obsParams.totalSites) {
-    let re = psiRe[idx];
-    let im = psiIm[idx];
+    let z = psi[idx];
+    let re = z.x;
+    let im = z.y;
     let density = re * re + im * im;
 
     // Compute volume element dV = product of all spacings
@@ -74,7 +77,7 @@ fn main(
     let weightedDensity = density * dV;
 
     // Channel 0: norm
-    sdata[localBase] = weightedDensity;
+    sdata[local] = weightedDensity;
 
     // Decompose linear index to N-D coordinates
     let coords = linearToND(idx, obsParams.strides, obsParams.gridSize, ldim);
@@ -82,32 +85,35 @@ fn main(
     // Per-dimension position moments
     for (var d: u32 = 0u; d < ldim; d = d + 1u) {
       let pos_d = (f32(coords[d]) - f32(obsParams.gridSize[d]) * 0.5 + 0.5) * obsParams.spacing[d];
-      let chBase = localBase + 1u + (d << 1u);
-      sdata[chBase]        = pos_d * weightedDensity;           // x_d · |ψ|² dV
-      sdata[chBase + 1u]   = pos_d * pos_d * weightedDensity;   // x_d² · |ψ|² dV
+      let chMean = (1u + (d << 1u)) * WG_SIZE + local;
+      let chSq   = chMean + WG_SIZE;
+      sdata[chMean] = pos_d * weightedDensity;           // x_d · |ψ|² dV
+      sdata[chSq]   = pos_d * pos_d * weightedDensity;   // x_d² · |ψ|² dV
     }
 
     // Last channel: potential energy ⟨V⟩ = Σ V(x) |ψ|² dV
-    sdata[localBase + 1u + (ldim << 1u)] = potentialBuf[idx] * weightedDensity;
+    sdata[(1u + (ldim << 1u)) * WG_SIZE + local] = potentialBuf[idx] * weightedDensity;
   }
   workgroupBarrier();
 
-  // Tree reduction within workgroup — all channels
+  // Tree reduction within workgroup — all channels.
+  // Channel-major layout: sdata[ch * WG_SIZE + local] += sdata[ch * WG_SIZE + local + stride].
   for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
-      let rightBase = (local + stride) * MAX_CHANNELS;
       for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
-        sdata[localBase + ch] += sdata[rightBase + ch];
+        let chBase = ch * WG_SIZE;
+        sdata[chBase + local] += sdata[chBase + local + stride];
       }
     }
     workgroupBarrier();
   }
 
   // Write workgroup results: partials[wid.x * numChannels + ch]
+  // After reduction, channel ch's total lives at sdata[ch * WG_SIZE + 0].
   if (local == 0u) {
     let outBase = wid.x * nc;
     for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
-      partials[outBase + ch] = sdata[ch];
+      partials[outBase + ch] = sdata[ch * WG_SIZE];
     }
   }
 }
@@ -136,6 +142,7 @@ struct ObsReduceUniforms {
 @group(0) @binding(1) var<storage, read> partials: array<f32>;
 @group(0) @binding(2) var<storage, read_write> result: array<f32>;
 
+// Channel-major layout matches pass 1 — see rationale in observablesPositionReduceBlock.
 const MAX_CHANNELS: u32 = 24u;
 const WG_SIZE: u32 = 256u;
 var<workgroup> sdata: array<f32, 6144>;
@@ -146,39 +153,38 @@ fn main(
 ) {
   let local = lid.x;
   let nc = obsParams.numChannels;
-  let localBase = local * MAX_CHANNELS;
   let ngroups = obsParams.numWorkgroups;
 
-  // Each thread accumulates multiple workgroup entries
+  // Each thread accumulates multiple workgroup entries (channel-major layout).
   for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
-    sdata[localBase + ch] = 0.0;
+    sdata[ch * WG_SIZE + local] = 0.0;
   }
 
   var i = local;
   while (i < ngroups) {
     let inBase = i * nc;
     for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
-      sdata[localBase + ch] += partials[inBase + ch];
+      sdata[ch * WG_SIZE + local] += partials[inBase + ch];
     }
     i += WG_SIZE;
   }
   workgroupBarrier();
 
-  // Tree reduction
+  // Tree reduction (channel-major, bank-conflict-free).
   for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
-      let rightBase = (local + stride) * MAX_CHANNELS;
       for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
-        sdata[localBase + ch] += sdata[rightBase + ch];
+        let chBase = ch * WG_SIZE;
+        sdata[chBase + local] += sdata[chBase + local + stride];
       }
     }
     workgroupBarrier();
   }
 
-  // Write final result
+  // Write final result — channel ch's total lives at sdata[ch * WG_SIZE + 0].
   if (local == 0u) {
     for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
-      result[ch] = sdata[ch];
+      result[ch] = sdata[ch * WG_SIZE];
     }
   }
 }

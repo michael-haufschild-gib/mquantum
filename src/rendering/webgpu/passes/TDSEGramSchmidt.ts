@@ -31,10 +31,15 @@ export const MAX_STORED_EIGENSTATES = 32
 /** GSReduceUniforms struct size (16 bytes: totalElements, numWorkgroups, pad, pad) */
 const GS_UNIFORM_SIZE = 16
 
-/** Eigenstate GPU buffer pair with cached norm and diagnostics. */
+/**
+ * Eigenstate GPU buffer with cached norm and diagnostics.
+ * Stored as a single `array<vec2f>` (8 bytes/site, .x=Re, .y=Im) to match
+ * the merged TDSE psi layout — the gramSchmidt reduce/subtract shaders
+ * read both ψ and the stored eigenstate as vec2f.
+ */
 export interface EigenstateBuffers {
-  re: GPUBuffer
-  im: GPUBuffer
+  /** Merged ψ buffer for this stored eigenstate (vec2f, totalSites * 8 bytes). */
+  psi: GPUBuffer
   /** ⟨φ|φ⟩ at storage time (from renormalization targetNorm) */
   normSquared: number
   /** Eigenstate energy ⟨H⟩ at storage time (NaN if observables were disabled) */
@@ -51,8 +56,8 @@ export interface GramSchmidtState {
   gsPartialImBuffer: GPUBuffer | null
   gsResultBuffer: GPUBuffer | null
   gsNumWorkgroups: number
-  psiReBuffer: GPUBuffer | null
-  psiImBuffer: GPUBuffer | null
+  /** Merged ψ buffer (array<vec2f>) — see TDSEComputePassBuffers. */
+  psiBuffer: GPUBuffer | null
   totalSites: number
   pl: TdsePipelineResult | null
 }
@@ -104,29 +109,24 @@ export function storeCurrentEigenstate(
   energy = NaN,
   tdseConfig?: TdseConfig
 ): number {
-  if (!state.psiReBuffer || !state.psiImBuffer) return -1
+  if (!state.psiBuffer) return -1
   if (state.gsEigenstates.length >= MAX_STORED_EIGENSTATES) return -1
 
-  const byteSize = state.totalSites * 4
-  const reBuffer = device.createBuffer({
-    label: `gs-eigenstate-${state.gsEigenstates.length}-re`,
-    size: byteSize,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
-  })
-  const imBuffer = device.createBuffer({
-    label: `gs-eigenstate-${state.gsEigenstates.length}-im`,
+  // One vec2f buffer per stored eigenstate, sized 8 bytes/site to mirror the
+  // merged TDSE ψ layout (was: two 4-byte/site Re + Im buffers).
+  const byteSize = state.totalSites * 8
+  const psiCopy = device.createBuffer({
+    label: `gs-eigenstate-${state.gsEigenstates.length}-psi`,
     size: byteSize,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
   })
 
   const encoder = device.createCommandEncoder({ label: 'gs-copy-eigenstate' })
-  encoder.copyBufferToBuffer(state.psiReBuffer, 0, reBuffer, 0, byteSize)
-  encoder.copyBufferToBuffer(state.psiImBuffer, 0, imBuffer, 0, byteSize)
+  encoder.copyBufferToBuffer(state.psiBuffer, 0, psiCopy, 0, byteSize)
   device.queue.submit([encoder.finish()])
 
   const eigenstateEntry: EigenstateBuffers = {
-    re: reBuffer,
-    im: imBuffer,
+    psi: psiCopy,
     normSquared: targetNorm > 0 ? targetNorm : 1.0,
     energy,
     ipr: NaN,
@@ -137,8 +137,7 @@ export function storeCurrentEigenstate(
   const eigIdx = state.gsEigenstates.length - 1
   void computeEigenstateDiagnosticsAsync(
     device,
-    reBuffer,
-    imBuffer,
+    psiCopy,
     state.totalSites,
     energy,
     tdseConfig
@@ -173,36 +172,35 @@ interface EigenstateDiagnostics {
  */
 async function computeEigenstateDiagnosticsAsync(
   device: GPUDevice,
-  reBuffer: GPUBuffer,
-  imBuffer: GPUBuffer,
+  psiBuffer: GPUBuffer,
   totalSites: number,
   energy: number,
   tdseConfig?: TdseConfig
 ): Promise<EigenstateDiagnostics> {
-  const byteSize = totalSites * 4
+  // Merged ψ buffer is array<vec2f>: 8 bytes per site, interleaved [re,im,...].
+  const byteSize = totalSites * 8
 
-  const stagingRe = device.createBuffer({
-    label: 'eigendiag-staging-re',
-    size: byteSize,
-    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-  })
-  const stagingIm = device.createBuffer({
-    label: 'eigendiag-staging-im',
+  const staging = device.createBuffer({
+    label: 'eigendiag-staging',
     size: byteSize,
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
   })
 
   const encoder = device.createCommandEncoder({ label: 'eigendiag-readback' })
-  encoder.copyBufferToBuffer(reBuffer, 0, stagingRe, 0, byteSize)
-  encoder.copyBufferToBuffer(imBuffer, 0, stagingIm, 0, byteSize)
+  encoder.copyBufferToBuffer(psiBuffer, 0, staging, 0, byteSize)
   device.queue.submit([encoder.finish()])
 
   try {
-    await stagingRe.mapAsync(GPUMapMode.READ)
-    await stagingIm.mapAsync(GPUMapMode.READ)
+    await staging.mapAsync(GPUMapMode.READ)
 
-    const re = new Float32Array(stagingRe.getMappedRange())
-    const im = new Float32Array(stagingIm.getMappedRange())
+    // Single Float32Array view — even indices are Re, odd are Im (vec2f layout).
+    const interleaved = new Float32Array(staging.getMappedRange())
+    const re = new Float32Array(totalSites)
+    const im = new Float32Array(totalSites)
+    for (let i = 0; i < totalSites; i++) {
+      re[i] = interleaved[2 * i]!
+      im[i] = interleaved[2 * i + 1]!
+    }
 
     // IPR computation
     let sumDensity = 0
@@ -217,8 +215,6 @@ async function computeEigenstateDiagnosticsAsync(
 
     // Orbit correlation: compare eigenstate density against classical trajectories
     // at the same energy on the CLEAN (disorder-free) Hamiltonian.
-    // This is intentional: for scar–localization competition studies, we measure
-    // whether clean-system orbits leave an imprint on the disordered eigenstates.
     let orbitCorrelation = NaN
     if (tdseConfig && Number.isFinite(energy) && energy > 0) {
       try {
@@ -241,20 +237,16 @@ async function computeEigenstateDiagnosticsAsync(
           orbitCorrelation = result.orbitCorrelation
         }
       } catch {
-        // Orbit correlation is non-critical — proceed with IPR only
         orbitCorrelation = NaN
       }
     }
 
-    stagingRe.unmap()
-    stagingIm.unmap()
-    stagingRe.destroy()
-    stagingIm.destroy()
+    staging.unmap()
+    staging.destroy()
 
     return { ipr, orbitCorrelation }
   } catch {
-    stagingRe.destroy()
-    stagingIm.destroy()
+    staging.destroy()
     return { ipr: NaN, orbitCorrelation: NaN }
   }
 }
@@ -262,8 +254,7 @@ async function computeEigenstateDiagnosticsAsync(
 /** Destroy all stored eigenstates. */
 export function clearEigenstates(state: GramSchmidtState): void {
   for (const es of state.gsEigenstates) {
-    es.re.destroy()
-    es.im.destroy()
+    es.psi.destroy()
   }
   state.gsEigenstates = []
 }
@@ -310,8 +301,7 @@ export function dispatchGramSchmidt(
   if (
     state.gsEigenstates.length === 0 ||
     !state.pl ||
-    !state.psiReBuffer ||
-    !state.psiImBuffer ||
+    !state.psiBuffer ||
     !state.gsUniformBuffer ||
     !state.gsPartialReBuffer ||
     !state.gsPartialImBuffer ||
@@ -335,12 +325,10 @@ export function dispatchGramSchmidt(
       layout: state.pl.gsReduceBGL,
       entries: [
         { binding: 0, resource: { buffer: state.gsUniformBuffer } },
-        { binding: 1, resource: { buffer: eigenstate.re } },
-        { binding: 2, resource: { buffer: eigenstate.im } },
-        { binding: 3, resource: { buffer: state.psiReBuffer } },
-        { binding: 4, resource: { buffer: state.psiImBuffer } },
-        { binding: 5, resource: { buffer: state.gsPartialReBuffer } },
-        { binding: 6, resource: { buffer: state.gsPartialImBuffer } },
+        { binding: 1, resource: { buffer: eigenstate.psi } },
+        { binding: 2, resource: { buffer: state.psiBuffer } },
+        { binding: 3, resource: { buffer: state.gsPartialReBuffer } },
+        { binding: 4, resource: { buffer: state.gsPartialImBuffer } },
       ],
     })
     const rPass = ctx.beginComputePass({ label: 'gs-reduce' })
@@ -372,10 +360,8 @@ export function dispatchGramSchmidt(
       entries: [
         { binding: 0, resource: { buffer: state.gsUniformBuffer } },
         { binding: 1, resource: { buffer: state.gsResultBuffer } },
-        { binding: 2, resource: { buffer: eigenstate.re } },
-        { binding: 3, resource: { buffer: eigenstate.im } },
-        { binding: 4, resource: { buffer: state.psiReBuffer } },
-        { binding: 5, resource: { buffer: state.psiImBuffer } },
+        { binding: 2, resource: { buffer: eigenstate.psi } },
+        { binding: 3, resource: { buffer: state.psiBuffer } },
       ],
     })
     const sPass = ctx.beginComputePass({ label: 'gs-subtract' })

@@ -64,8 +64,7 @@ function makeState(totalSites = 8): {
   device: GPUDevice
 } {
   const state = createHellerReadbackState()
-  state.psiReBuffer = createMockBuffer('psi-re')
-  state.psiImBuffer = createMockBuffer('psi-im')
+  state.psiBuffer = createMockBuffer('psi')
   state.totalSites = totalSites
   state.enabled = true
   state.sampleInterval = 1
@@ -111,71 +110,61 @@ describe('Heller readback staging buffer pool', () => {
     const createBufferSpy = vi.spyOn(device, 'createBuffer')
 
     await runOneSchedule(state, device, 0)
-    const firstRe = state.stagingRe
-    const firstIm = state.stagingIm
-    if (!firstRe || !firstIm) {
-      throw new Error('expected staging buffers after first schedule')
+    const first = state.staging
+    if (!first) {
+      throw new Error('expected staging buffer after first schedule')
     }
-    // The first schedule allocates exactly the re + im pair (two
-    // createBuffer calls scoped to the Heller path). The helper keeps
-    // the count-tolerance low so any future double-allocation
-    // regression trips the assertion.
+    // The first schedule allocates a single vec2f staging buffer (one
+    // createBuffer call scoped to the Heller path).
     const callsAfterFirst = createBufferSpy.mock.calls.length
-    expect(callsAfterFirst).toBeGreaterThanOrEqual(2)
+    expect(callsAfterFirst).toBeGreaterThanOrEqual(1)
 
     await runOneSchedule(state, device, 0.1)
     // Second schedule must reuse the pool — no new createBuffer calls.
     expect(createBufferSpy.mock.calls.length).toBe(callsAfterFirst)
-    expect(state.stagingRe).toBe(firstRe)
-    expect(state.stagingIm).toBe(firstIm)
+    expect(state.staging).toBe(first)
   })
 
   it('reallocates staging buffers when totalSites changes across a rebuild', async () => {
     const { state, device } = makeState(8)
     await runOneSchedule(state, device, 0)
-    const firstRe = state.stagingRe
-    const firstIm = state.stagingIm
+    const first = state.staging
 
     // Simulate a field rebuild: bump generation + swap totalSites.
     resetHellerCapture(state)
     state.totalSites = 16
 
     await runOneSchedule(state, device, 1)
-    // The old buffers must have been destroyed and new ones allocated.
-    const destroySpy = firstRe?.destroy as unknown as { mock: { calls: unknown[] } }
+    // The old buffer must have been destroyed and a new one allocated.
+    const destroySpy = first?.destroy as unknown as { mock: { calls: unknown[] } }
     expect(destroySpy.mock.calls.length).toBeGreaterThanOrEqual(1)
-    expect(state.stagingRe).not.toBe(firstRe)
-    expect(state.stagingIm).not.toBe(firstIm)
-    expect(state.stagingBytes).toBe(16 * 4)
+    expect(state.staging).not.toBe(first)
+    // Merged ψ stride: 8 bytes per site (vec2f).
+    expect(state.stagingBytes).toBe(16 * 8)
   })
 
   it('disposeHellerStagingBuffers clears the pool without breaking future schedules', async () => {
     const { state, device } = makeState(8)
     await runOneSchedule(state, device, 0)
-    const initialRe = state.stagingRe
-    const destroyCountRe = (initialRe?.destroy as unknown as { mock: { calls: unknown[] } }).mock
-      .calls.length
+    const initial = state.staging
+    const destroyCount = (initial?.destroy as unknown as { mock: { calls: unknown[] } }).mock.calls
+      .length
     disposeHellerStagingBuffers(state)
-    expect(state.stagingRe).toBeNull()
-    expect(state.stagingIm).toBeNull()
+    expect(state.staging).toBeNull()
     expect(state.stagingBytes).toBe(0)
-    expect(
-      (initialRe?.destroy as unknown as { mock: { calls: unknown[] } }).mock.calls.length
-    ).toBe(destroyCountRe + 1)
+    expect((initial?.destroy as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBe(
+      destroyCount + 1
+    )
 
-    // Next schedule must still work — it allocates a fresh pair with
-    // bytes matching totalSites. Assert the concrete size instead of a
-    // loose not-null check so a regression that leaks a zero-byte
-    // allocation still trips the test.
+    // Next schedule must still work — it allocates a fresh buffer with
+    // bytes matching totalSites × 8 (vec2f stride).
     await runOneSchedule(state, device, 0.1)
-    expect(state.stagingBytes).toBe(8 * 4)
-    const newRe = state.stagingRe
-    const newIm = state.stagingIm
-    if (!newRe || !newIm) {
-      throw new Error('expected staging buffers to be reallocated after dispose')
+    expect(state.stagingBytes).toBe(8 * 8)
+    const next = state.staging
+    if (!next) {
+      throw new Error('expected staging buffer to be reallocated after dispose')
     }
-    // The new buffers must be distinct objects from the initial ones.
-    expect(newRe).not.toBe(initialRe)
+    expect(next).not.toBe(initial)
   })
 })
 
@@ -197,8 +186,7 @@ describe('Heller readback back-pressure scheduling', () => {
     // counter must advance on every call — only the sample schedule
     // itself is suppressed.
     const state = createHellerReadbackState()
-    state.psiReBuffer = createMockBuffer('psi-re')
-    state.psiImBuffer = createMockBuffer('psi-im')
+    state.psiBuffer = createMockBuffer('psi')
     state.totalSites = 8
     state.enabled = true
     state.sampleInterval = 3
@@ -228,8 +216,7 @@ describe('Heller readback back-pressure scheduling', () => {
     // not one step later (which would stretch the effective period)
     // and not starved indefinitely.
     const state = createHellerReadbackState()
-    state.psiReBuffer = createMockBuffer('psi-re')
-    state.psiImBuffer = createMockBuffer('psi-im')
+    state.psiBuffer = createMockBuffer('psi')
     state.totalSites = 8
     state.enabled = true
     state.sampleInterval = 2
@@ -267,8 +254,7 @@ describe('Heller readback back-pressure scheduling', () => {
     // what `tickHellerStep` consumes — is perfectly regular, so the
     // captured times must land on a uniform grid.
     const state = createHellerReadbackState()
-    state.psiReBuffer = createMockBuffer('psi-re')
-    state.psiImBuffer = createMockBuffer('psi-im')
+    state.psiBuffer = createMockBuffer('psi')
     state.totalSites = 8
     state.enabled = true
     state.sampleInterval = 4
@@ -380,30 +366,27 @@ describe('Heller readback race / generation cancellation', () => {
 
     const encoder = createMockCommandEncoder()
     scheduleHellerReadback(device, encoder, state, 0)
-    const capturedRe = state.stagingRe
-    const capturedIm = state.stagingIm
-    if (!capturedRe || !capturedIm) {
-      throw new Error('expected staging buffers to be allocated on schedule')
+    const captured = state.staging
+    if (!captured) {
+      throw new Error('expected staging buffer to be allocated on schedule')
     }
 
     // Simulate pass dispose: bump generation, then clear the pool.
-    // After this, `state.stagingRe === null` so the identity guard in
-    // finish() must skip the `capturedRe.unmap()` call.
+    // After this, `state.staging === null` so the identity guard in
+    // finish() must skip the `captured.unmap()` call.
     resetHellerCapture(state)
     disposeHellerStagingBuffers(state)
-    expect(state.stagingRe).toBeNull()
-    expect(state.stagingIm).toBeNull()
+    expect(state.staging).toBeNull()
 
     // Resolve the old submit — the stale handler runs and should
     // observe the generation mismatch first, then call finish(). The
-    // identity guard ensures no unmap() is called on the destroyed
-    // buffers.
+    // identity guard ensures no unmap() is called on the destroyed buffer.
     dSubmit.resolve()
     await Promise.resolve()
     await Promise.resolve()
     await Promise.resolve()
 
-    const unmapCalls = (capturedRe.unmap as unknown as { mock: { calls: unknown[] } }).mock.calls
+    const unmapCalls = (captured.unmap as unknown as { mock: { calls: unknown[] } }).mock.calls
       .length
     expect(unmapCalls).toBe(0)
     expect(state.readbackInFlight).toBe(false)

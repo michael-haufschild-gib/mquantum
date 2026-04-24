@@ -113,20 +113,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // Load spatial cross-Wigner from texture array
     let crossSample = textureLoad(crossArrayTex, coord, layerIdx, 0);
 
-    // Select correct channel pair: .rg (off=0) or .ba (off=1)
-    var spatialRe: f32;
-    var spatialIm: f32;
-    if (channelOff < 0.5) {
-      spatialRe = crossSample.x;
-      spatialIm = crossSample.y;
-    } else {
-      spatialRe = crossSample.z;
-      spatialIm = crossSample.w;
-    }
+    // Select correct channel pair: .rg (off=0) or .ba (off=1).
+    // Branchless — both swizzles are free; the select avoids an if that
+    // would otherwise be per-iteration inside the inner loop.
+    let spatial = select(crossSample.zw, crossSample.xy, channelOff < 0.5);
 
     // W += 2 * Re(phased * spatial) = phasedRe * spatialRe - phasedIm * spatialIm
     // Factor of 2 is already baked into phasedRe/phasedIm on the CPU side
-    W += phasedRe * spatialRe - phasedIm * spatialIm;
+    W += phasedRe * spatial.x - phasedIm * spatial.y;
   }
 
   // Store final: same format as original cache — R = signed W, G = |W|, B = 0, A = 1

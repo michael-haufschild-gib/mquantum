@@ -36,12 +36,11 @@ struct VortexDetectUniforms {
 }
 
 @group(0) @binding(0) var<uniform> vdParams: VortexDetectUniforms;
-@group(0) @binding(1) var<storage, read> psiRe: array<f32>;
-@group(0) @binding(2) var<storage, read> psiIm: array<f32>;
-@group(0) @binding(3) var<storage, read> tParams: TDSEUniforms;
-@group(0) @binding(4) var<storage, read_write> partialCounts: array<u32>;
-@group(0) @binding(5) var<storage, read_write> partialPosCharge: array<u32>;
-@group(0) @binding(6) var<storage, read_write> partialNegCharge: array<u32>;
+@group(0) @binding(1) var<storage, read> psi: array<vec2f>;
+@group(0) @binding(2) var<storage, read> tParams: TDSEUniforms;
+@group(0) @binding(3) var<storage, read_write> partialCounts: array<u32>;
+@group(0) @binding(4) var<storage, read_write> partialPosCharge: array<u32>;
+@group(0) @binding(5) var<storage, read_write> partialNegCharge: array<u32>;
 
 var<workgroup> shared_count: array<u32, 256>;
 var<workgroup> shared_pos: array<u32, 256>;
@@ -75,8 +74,9 @@ fn main(
     let coords = linearToND(idx, tParams.strides, tParams.gridSize, tParams.latticeDim);
 
     // Check density: only look for vortices where density is low
-    let re0 = psiRe[idx];
-    let im0 = psiIm[idx];
+    let z0 = psi[idx];
+    let re0 = z0.x;
+    let im0 = z0.y;
     let density = re0 * re0 + im0 * im0;
     let threshold = vdParams.densityThreshold * vdParams.maxDensity;
 
@@ -104,10 +104,14 @@ fn main(
           let idx11 = idx + strideA + strideB;
           let idx01 = idx + strideB;
 
-          let phi00 = atan2(psiIm[idx00], psiRe[idx00]);
-          let phi10 = atan2(psiIm[idx10], psiRe[idx10]);
-          let phi11 = atan2(psiIm[idx11], psiRe[idx11]);
-          let phi01 = atan2(psiIm[idx01], psiRe[idx01]);
+          let z00 = psi[idx00];
+          let z10 = psi[idx10];
+          let z11 = psi[idx11];
+          let z01 = psi[idx01];
+          let phi00 = atan2(z00.y, z00.x);
+          let phi10 = atan2(z10.y, z10.x);
+          let phi11 = atan2(z11.y, z11.x);
+          let phi01 = atan2(z01.y, z01.x);
 
           // Phase circulation around plaquette
           let circulation = wrapPhase(phi10 - phi00)

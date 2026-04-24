@@ -145,6 +145,16 @@ export function writeDiracUniforms(
   f32[134] = config.spinDirection[0] ?? 0
   f32[135] = config.spinDirection[1] ?? 0
 
+  // kGridScale (offset 544, indices 136-147): 2π / (N * a) per dimension.
+  // Hoisted out of the kinetic kernel so each thread replaces a divide with
+  // a multiply during k-vector construction. Mirrors TDSE's kGridScale field.
+  const TWO_PI = Math.PI * 2
+  for (let d = 0; d < config.latticeDim; d++) {
+    const N = config.gridSize[d]!
+    const a = config.spacing[d]!
+    f32[136 + d] = TWO_PI / (N * a)
+  }
+
   device.queue.writeBuffer(uniformBuffer, 0, uniformData)
 }
 

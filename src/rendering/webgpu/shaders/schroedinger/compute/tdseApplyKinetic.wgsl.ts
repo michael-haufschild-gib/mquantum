@@ -30,15 +30,20 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Convert linear index to N-D k-space coordinates
   let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
 
+  // Uniform-only factor: hoist ℏ·dt/(2m) — one division+max+mul per thread, kept here
+  // (not as a pre-computed uniform) because it avoids a struct re-layout and the
+  // compiler promotes it to subgroup-uniform ALU on every driver we ship against.
+  let hbarDtOver2m = (0.5 * params.hbar * params.dt) / max(params.mass, 1e-6);
+
   // Compute |k|² from lattice k-indices.
-  // k_d = kGridScale[d] * (coord_d < N_d/2 ? coord_d : coord_d - N_d)  (FFT freq ordering)
+  // |k_d| = kGridScale[d] · min(coord_d, N_d − coord_d); k² is sign-invariant so we
+  // skip the signed cast (select + i32 subtract) from the canonical FFT ordering.
   var k2: f32 = 0.0;
   let ldim = params.latticeDim;
   for (var d: u32 = 0u; d < ldim; d = d + 1u) {
     let n = params.gridSize[d];
-    let halfN = n >> 1u;
-    let kIdx = select(i32(coords[d]) - i32(n), i32(coords[d]), coords[d] < halfN);
-    let kVal = params.kGridScale[d] * f32(kIdx);
+    let kAbs = min(coords[d], n - coords[d]);
+    let kVal = params.kGridScale[d] * f32(kAbs);
     k2 += kVal * kVal;
   }
 
@@ -47,8 +52,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let re = complexBuf[c];
   let im = complexBuf[c + 1u];
 
-  // Uniform-only factor: hoist ℏ·dt/(2m) to replace the per-thread divide with a multiply.
-  let hbarDtOver2m = (0.5 * params.hbar * params.dt) / max(params.mass, 1e-6);
   let arg = k2 * hbarDtOver2m;
 
   if (params.imaginaryTime != 0u) {
@@ -58,14 +61,15 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     complexBuf[c] = re * decay;
     complexBuf[c + 1u] = im * decay;
   } else {
-    // Real-time: exp(-i·ℏk²dt/(2m)) — unitary phase rotation
-    let phase = -arg;
-    // Reduce to [-π, π] so f32 cos/sin stay precise for high-frequency k-modes
-    let reduced = phase - round(phase * KIN_INV_TWO_PI) * KIN_TWO_PI;
-    let cosP = cos(reduced);
-    let sinP = sin(reduced);
-    complexBuf[c] = re * cosP - im * sinP;
-    complexBuf[c + 1u] = re * sinP + im * cosP;
+    // Real-time: exp(-i·ℏk²dt/(2m)) — unitary phase rotation.
+    // Reduce arg (not −arg) to [-π, π], then fold the sign of −arg into the
+    // complex multiply via cos(-x)=cos(x), sin(-x)=-sin(x). Saves one neg.
+    let argReduced = arg - round(arg * KIN_INV_TWO_PI) * KIN_TWO_PI;
+    let cosP = cos(argReduced);
+    let sinP = sin(argReduced);
+    // exp(−i·arg) · (re + i·im) = (re·cosP + im·sinP) + i·(im·cosP − re·sinP)
+    complexBuf[c] = re * cosP + im * sinP;
+    complexBuf[c + 1u] = im * cosP - re * sinP;
   }
 }
 `

@@ -32,8 +32,7 @@
 
 export const tdseWormholeCoupleBlock = /* wgsl */ `
 @group(0) @binding(0) var<storage, read> params: TDSEUniforms;
-@group(0) @binding(1) var<storage, read_write> psiRe: array<f32>;
-@group(0) @binding(2) var<storage, read_write> psiIm: array<f32>;
+@group(0) @binding(1) var<storage, read_write> psi: array<vec2f>;
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
@@ -72,16 +71,16 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let s = sin(tau * params.wormholeCouplingG);
 
   // Read both values BEFORE writing either — prevents races inside a pair.
-  let reV  = psiRe[idx];
-  let imV  = psiIm[idx];
-  let reVP = psiRe[mirrorIdx];
-  let imVP = psiIm[mirrorIdx];
+  let zV  = psi[idx];
+  let zVP = psi[mirrorIdx];
+  let reV  = zV.x;
+  let imV  = zV.y;
+  let reVP = zVP.x;
+  let imVP = zVP.y;
 
   // (a − ib)·(x + iy) = (ax + by) + i(ay − bx). Here the coefficient acting on
   // ψ(v') is (−i·s) → real part contribution = +s·im(ψ(v')), imag = −s·re(ψ(v')).
-  psiRe[idx]        = c * reV  + s * imVP;
-  psiIm[idx]        = c * imV  - s * reVP;
-  psiRe[mirrorIdx]  = c * reVP + s * imV;
-  psiIm[mirrorIdx]  = c * imVP - s * reV;
+  psi[idx]       = vec2f(c * reV  + s * imVP, c * imV  - s * reVP);
+  psi[mirrorIdx] = vec2f(c * reVP + s * imV,  c * imVP - s * reV);
 }
 `

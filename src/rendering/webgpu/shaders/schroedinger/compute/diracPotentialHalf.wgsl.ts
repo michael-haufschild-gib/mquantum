@@ -18,9 +18,8 @@
 
 export const diracPotentialHalfBlock = /* wgsl */ `
 @group(0) @binding(0) var<storage, read> params: DiracUniforms;
-@group(0) @binding(1) var<storage, read_write> spinorRe: array<f32>;
-@group(0) @binding(2) var<storage, read_write> spinorIm: array<f32>;
-@group(0) @binding(3) var<storage, read> potential: array<f32>;
+@group(0) @binding(1) var<storage, read_write> spinor: array<vec2f>;
+@group(0) @binding(2) var<storage, read> potential: array<f32>;
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
@@ -45,10 +44,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let T = params.totalSites;
   for (var c: u32 = 0u; c < S; c++) {
     let bufIdx = c * T + idx;
-    let re = spinorRe[bufIdx];
-    let im = spinorIm[bufIdx];
-    spinorRe[bufIdx] = re * cosP - im * sinP;
-    spinorIm[bufIdx] = re * sinP + im * cosP;
+    let v = spinor[bufIdx];
+    spinor[bufIdx] = vec2f(v.x * cosP - v.y * sinP, v.x * sinP + v.y * cosP);
   }
 }
 `

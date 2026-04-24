@@ -62,7 +62,11 @@ describe('BloomPass (progressive downsample/upsample)', () => {
 
   it('prefilter shader is alpha-aware for premultiplied bloom input', () => {
     expect(bloomPrefilterShader).toContain('fn extractBloomSample(colorSample: vec4f')
-    expect(bloomPrefilterShader).toContain('let straightColor = colorSample.rgb / alpha')
+    // Premul→straight via reciprocal-mul (invAlpha): 1 f32 div + 3 muls beats
+    // `colorSample.rgb / alpha` (3 vec3-over-scalar divs). Mathematically identical
+    // and ≤1 ULP different; visually imperceptible on blurred bloom output.
+    expect(bloomPrefilterShader).toContain('let invAlpha = 1.0 / alpha')
+    expect(bloomPrefilterShader).toContain('colorSample.rgb * invAlpha')
     expect(bloomPrefilterShader).toContain('return thresholded * alpha')
   })
 

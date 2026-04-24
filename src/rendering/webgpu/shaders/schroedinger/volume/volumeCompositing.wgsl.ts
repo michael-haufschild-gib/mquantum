@@ -118,9 +118,13 @@ fn compositeNodalBand(
  * Composite a generic overlay (probability current or radial probability)
  * into the volume accumulation. Uses linear alpha scaling.
  *
+ * Accepts invStepLen (reciprocal of base step length) rather than stepLen so
+ * the caller can hoist the 1/stepLen division once per ray — replacing up to
+ * ~128 iteration-inner divisions per ray with a single div + multiply.
+ *
  * @param overlay RGBA overlay (rgb = color, a = raw alpha)
  * @param adaptiveStep Current adaptive step length
- * @param stepLen Base step length
+ * @param invStepLen 1 / base step length (hoisted by caller once per ray)
  * @param damping Transmittance damping factor (0.45 for current, 0.5 for radial)
  * @param transmittance Mutable accumulated transmittance
  * @param accColor Mutable accumulated color
@@ -128,14 +132,14 @@ fn compositeNodalBand(
 fn compositeOverlay(
   overlay: vec4f,
   adaptiveStep: f32,
-  stepLen: f32,
+  invStepLen: f32,
   damping: f32,
   transmittance: ptr<function, f32>,
   accColor: ptr<function, vec3f>
 ) {
   if (overlay.a > 1e-5) {
     let alpha = clamp(
-      overlay.a * min(adaptiveStep / max(stepLen, 1e-5), 2.0),
+      overlay.a * min(adaptiveStep * invStepLen, 2.0),
       0.0,
       1.0
     );

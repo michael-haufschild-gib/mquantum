@@ -42,7 +42,9 @@ function generate2DCommonBody(): string {
   let psi = psiResult.xy;
   let spatialPhase = psiResult.z;
 
-  var rho = rhoFromPsi(psi);
+  // Cache |psi|^2 before rho is mutated — shimmer branch reuses it (saves a dot).
+  let psiMag2 = rhoFromPsi(psi);
+  var rho = psiMag2;
 
   // Hydrogen ND density boost
   if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
@@ -69,7 +71,7 @@ function generate2DCommonBody(): string {
     let shimmerTime = schroedinger.time * schroedinger.phaseShimmerSpeed;
     let shimmerOffset = shimmerTime * shimmerSpeed;
     // inverseSqrt(|psi|^2) avoids the separate sqrt() inside length() and the subsequent divide.
-    let invPsiLen = inverseSqrt(max(dot(psi, psi), 1e-16));
+    let invPsiLen = inverseSqrt(max(psiMag2, 1e-16));
     let shimmerCosP = psi.x * invPsiLen;
     let shimmerSinP = psi.y * invPsiLen;
     let shimmerNoise = gradientNoise(pos * 2.0 + vec3f(

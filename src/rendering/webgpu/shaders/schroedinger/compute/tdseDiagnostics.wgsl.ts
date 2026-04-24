@@ -34,13 +34,12 @@ struct DiagReduceUniforms {
 }
 
 @group(0) @binding(0) var<uniform> diagParams: DiagReduceUniforms;
-@group(0) @binding(1) var<storage, read> psiRe: array<f32>;
-@group(0) @binding(2) var<storage, read> psiIm: array<f32>;
-@group(0) @binding(3) var<storage, read_write> partialSums: array<f32>;
-@group(0) @binding(4) var<storage, read_write> partialMax: array<f32>;
-@group(0) @binding(5) var<storage, read_write> partialLeft: array<f32>;
-@group(0) @binding(6) var<storage, read_write> partialRight: array<f32>;
-@group(0) @binding(7) var<storage, read_write> partialIpr: array<f32>;
+@group(0) @binding(1) var<storage, read> psi: array<vec2f>;
+@group(0) @binding(2) var<storage, read_write> partialSums: array<f32>;
+@group(0) @binding(3) var<storage, read_write> partialMax: array<f32>;
+@group(0) @binding(4) var<storage, read_write> partialLeft: array<f32>;
+@group(0) @binding(5) var<storage, read_write> partialRight: array<f32>;
+@group(0) @binding(6) var<storage, read_write> partialIpr: array<f32>;
 
 // Pack the four additive fields (norm, left, right, ipr) into a single vec4
 // so the tree reduction touches shared memory 2× per step instead of 5×.
@@ -61,8 +60,9 @@ fn main(
   var val: f32 = 0.0;
   var isLeft: bool = true;
   if (idx < diagParams.totalSites) {
-    let re = psiRe[idx];
-    let im = psiIm[idx];
+    let z = psi[idx];
+    let re = z.x;
+    let im = z.y;
     val = re * re + im * im;
 
     // Axis-0 coordinate from linear index. stride0 and gridSize0 are always

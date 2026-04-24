@@ -45,11 +45,14 @@ fn evaluateIsolines2D(pos: vec3f, rho: f32, s: f32, uniforms: SchroedingerUnifor
     (s_r - s) * invEps,
     (s_u - s) * invEps
   );
-  let gradLen = length(grad);
 
-  if (gradLen < 1e-8) {
+  // PERF: test gradient magnitude via squared length (skips sqrt on rejects)
+  // and use inverseSqrt + mul for the final pixel-distance divide.
+  let gradLenSq = dot(grad, grad);
+  if (gradLenSq < 1e-16) {
     return vec4f(0.0);
   }
+  let invGradLen = inverseSqrt(gradLenSq);
 
   // Generate multiple contour levels at log-spaced intervals.
   // isoThreshold is already in log-density space (range [-6, 0]),
@@ -64,8 +67,8 @@ fn evaluateIsolines2D(pos: vec3f, rho: f32, s: f32, uniforms: SchroedingerUnifor
   let nearestLevel = round(levelIndex);
   let distToLevel = abs(s - (baseLevel + nearestLevel * spacing));
 
-  // Convert to pixel distance via gradient — fold the two divides into one.
-  let distPixels = distToLevel / (gradLen * pixelSize);
+  // Convert to pixel distance via gradient — replaces divide with 2 muls.
+  let distPixels = distToLevel * invGradLen / pixelSize;
 
   // Anti-aliased line rendering
   let lineWidth = 1.2;

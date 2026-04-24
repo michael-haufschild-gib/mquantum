@@ -45,7 +45,8 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
   var output: FragmentOutput;
 
   // Ray setup: transform to model space
-  let ro = (camera.inverseModelMatrix * vec4f(camera.cameraPosition, 1.0)).xyz;
+  // PERF: cameraPositionModel is CPU-precomputed as inverseModelMatrix * (cameraPosition, 1).
+  let ro = camera.cameraPositionModel;
   let worldRayDir = normalize(input.vPosition - camera.cameraPosition);
   let rd = normalize((camera.inverseModelMatrix * vec4f(worldRayDir, 0.0)).xyz);
 
@@ -185,12 +186,16 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
     discard;
   }
 
-  // Compute surface point and normal (preserve gradient magnitude for uncertainty)
+  // Compute surface point and normal (preserve gradient magnitude for uncertainty).
+  // Fuse normalization + length via inverseSqrt: one rsqrt replaces
+  // sqrt + 3 vec3-by-scalar divs with rsqrt + 4 muls.
   let p = ro + rd * hitT;
   var rawGrad: vec3f;
   ${gradientCompute}
-  let gradMag = length(rawGrad);
-  let n = -rawGrad / max(gradMag, 1e-6);
+  let gMagSq = dot(rawGrad, rawGrad);
+  let invGMag = inverseSqrt(max(gMagSq, 1e-12));
+  let gradMag = gMagSq * invGMag;  // = sqrt(gMagSq)
+  let n = -rawGrad * invGMag;
 
   // Sample for color
   ${colorSample}

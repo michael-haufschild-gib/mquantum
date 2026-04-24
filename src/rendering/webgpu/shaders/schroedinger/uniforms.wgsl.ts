@@ -484,16 +484,15 @@ struct OpenQuantumUniforms {
 /**
  * Access density matrix element ρ_{kl} as vec2f(re, im).
  * Layout: index = k*14 + l; each vec4f holds 2 complex values (xy, zw).
+ *
+ * PERF: branchless select — called ~105× per voxel in the density-matrix
+ * compute path, so eliminating divergent branches is worth the guaranteed
+ * evaluation of both swizzles (swizzle is free on every known backend).
  */
 fn getRho(oq: OpenQuantumUniforms, k: u32, l: u32) -> vec2f {
   let idx = k * 14u + l;
-  let vec_idx = idx / 2u;
-  let comp_idx = idx % 2u;
-  if (comp_idx == 0u) {
-    return oq.rho[vec_idx].xy;
-  } else {
-    return oq.rho[vec_idx].zw;
-  }
+  let pair = oq.rho[idx / 2u];
+  return select(pair.zw, pair.xy, (idx & 1u) == 0u);
 }
 `
 

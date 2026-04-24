@@ -27,8 +27,7 @@ export interface ObservablesState {
   obsMappingInFlight: boolean
   obsEnabled: boolean
   // References to pass state
-  psiReBuffer: GPUBuffer | null
-  psiImBuffer: GPUBuffer | null
+  psiBuffer: GPUBuffer | null
   potentialBuffer: GPUBuffer | null
   fftScratchA: GPUBuffer | null
   totalSites: number
@@ -59,14 +58,7 @@ export function updateObservablesResources(
     return
   }
 
-  if (
-    !state.pl ||
-    !state.psiReBuffer ||
-    !state.psiImBuffer ||
-    !state.potentialBuffer ||
-    !state.fftScratchA
-  )
-    return
+  if (!state.pl || !state.psiBuffer || !state.potentialBuffer || !state.fftScratchA) return
 
   destroyObservablesBuffers(state.obsResources)
   state.obsResources = createObservablesBuffers(device, state.totalSites, config.latticeDim)
@@ -76,10 +68,9 @@ export function updateObservablesResources(
     layout: state.pl.obsPosReduceBGL,
     entries: [
       { binding: 0, resource: { buffer: res.posUniformBuffer } },
-      { binding: 1, resource: { buffer: state.psiReBuffer } },
-      { binding: 2, resource: { buffer: state.psiImBuffer } },
-      { binding: 3, resource: { buffer: res.posPartialBuffer } },
-      { binding: 4, resource: { buffer: state.potentialBuffer } },
+      { binding: 1, resource: { buffer: state.psiBuffer } },
+      { binding: 2, resource: { buffer: res.posPartialBuffer } },
+      { binding: 3, resource: { buffer: state.potentialBuffer } },
     ],
   })
   state.obsPosFinalBG = device.createBindGroup({

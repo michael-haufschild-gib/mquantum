@@ -30,14 +30,14 @@ export function rebuildTdseBindGroups(
 ): TdseBindGroupResult {
   const {
     uniformBuffer,
-    psiReBuffer,
-    psiImBuffer,
+    psiBuffer,
     potentialBuffer,
     fftScratchA,
     fftScratchB,
     fftUniformBuffer,
     fftAxisUniformBuffer,
     fftAxisUniformBuffers,
+    fftTwiddleBuffer,
     packUniformBuffer,
     densityTextureView,
     diagUniformBuffer,
@@ -55,8 +55,7 @@ export function rebuildTdseBindGroups(
     layout: pipelines.initBGL,
     entries: [
       { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: psiReBuffer } },
-      { binding: 2, resource: { buffer: psiImBuffer } },
+      { binding: 1, resource: { buffer: psiBuffer } },
     ],
   })
 
@@ -74,26 +73,24 @@ export function rebuildTdseBindGroups(
     layout: pipelines.potentialHalfBGL,
     entries: [
       { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: psiReBuffer } },
-      { binding: 2, resource: { buffer: psiImBuffer } },
-      { binding: 3, resource: { buffer: potentialBuffer } },
+      { binding: 1, resource: { buffer: psiBuffer } },
+      { binding: 2, resource: { buffer: potentialBuffer } },
     ],
   })
 
-  // PERF: Fused potentialHalf + pack bind group
+  // PERF: Fused potentialHalf + pack bind group (vec2f ψ)
   const fusedPotentialPackBG = device.createBindGroup({
     label: 'tdse-fused-potential-pack-bg',
     layout: pipelines.fusedPotentialPackBGL,
     entries: [
       { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: psiReBuffer } },
-      { binding: 2, resource: { buffer: psiImBuffer } },
-      { binding: 3, resource: { buffer: potentialBuffer } },
-      { binding: 4, resource: { buffer: fftScratchA } },
+      { binding: 1, resource: { buffer: psiBuffer } },
+      { binding: 2, resource: { buffer: potentialBuffer } },
+      { binding: 3, resource: { buffer: fftScratchA } },
     ],
   })
 
-  // PERF: Fused unpack + potentialHalf bind group
+  // PERF: Fused unpack + potentialHalf bind group (vec2f ψ)
   // Note: shared-memory FFT writes result back to fftScratchA in-place,
   // so the fused unpack always reads from fftScratchA.
   const fusedUnpackPotentialBG = device.createBindGroup({
@@ -102,9 +99,8 @@ export function rebuildTdseBindGroups(
     entries: [
       { binding: 0, resource: { buffer: uniformBuffer } },
       { binding: 1, resource: { buffer: fftScratchA } },
-      { binding: 2, resource: { buffer: psiReBuffer } },
-      { binding: 3, resource: { buffer: psiImBuffer } },
-      { binding: 4, resource: { buffer: potentialBuffer } },
+      { binding: 2, resource: { buffer: psiBuffer } },
+      { binding: 3, resource: { buffer: potentialBuffer } },
     ],
   })
 
@@ -113,9 +109,8 @@ export function rebuildTdseBindGroups(
     layout: pipelines.packBGL,
     entries: [
       { binding: 0, resource: { buffer: packUniformBuffer } },
-      { binding: 1, resource: { buffer: psiReBuffer } },
-      { binding: 2, resource: { buffer: psiImBuffer } },
-      { binding: 3, resource: { buffer: fftScratchA } },
+      { binding: 1, resource: { buffer: psiBuffer } },
+      { binding: 2, resource: { buffer: fftScratchA } },
     ],
   })
 
@@ -125,12 +120,12 @@ export function rebuildTdseBindGroups(
     entries: [
       { binding: 0, resource: { buffer: packUniformBuffer } },
       { binding: 1, resource: { buffer: fftScratchA } },
-      { binding: 2, resource: { buffer: psiReBuffer } },
-      { binding: 3, resource: { buffer: psiImBuffer } },
+      { binding: 2, resource: { buffer: psiBuffer } },
     ],
   })
 
-  // FFT bind groups for A->B and B->A ping-pong (used by Dirac/Pauli per-stage FFT)
+  // FFT bind groups for A->B and B->A ping-pong. Binding 3 is the twiddle
+  // table that replaces cos/sin at stages >= 2 (see TDSEFFTTwiddle.ts).
   const fftStageABBG = device.createBindGroup({
     label: 'tdse-fft-ab-bg',
     layout: pipelines.fftStageBGL,
@@ -138,6 +133,7 @@ export function rebuildTdseBindGroups(
       { binding: 0, resource: { buffer: fftUniformBuffer } },
       { binding: 1, resource: { buffer: fftScratchA } },
       { binding: 2, resource: { buffer: fftScratchB } },
+      { binding: 3, resource: { buffer: fftTwiddleBuffer } },
     ],
   })
   const fftStageBABG = device.createBindGroup({
@@ -147,18 +143,21 @@ export function rebuildTdseBindGroups(
       { binding: 0, resource: { buffer: fftUniformBuffer } },
       { binding: 1, resource: { buffer: fftScratchB } },
       { binding: 2, resource: { buffer: fftScratchA } },
+      { binding: 3, resource: { buffer: fftTwiddleBuffer } },
     ],
   })
 
   // Shared-memory FFT bind group: per-axis uniforms + complexBuf (read_write on fftScratchA).
   // `fftSharedMemBG` uses the legacy single-uniform buffer; observables momentum FFT path
   // (runPostStepDispatches) copies the right axis slot into it via copyBufferToBuffer.
+  // Binding 2 is the twiddle table shared with the per-stage kernel.
   const fftSharedMemBG = device.createBindGroup({
     label: 'tdse-fft-shared-mem-bg',
     layout: pipelines.fftSharedMemBGL,
     entries: [
       { binding: 0, resource: { buffer: fftAxisUniformBuffer } },
       { binding: 1, resource: { buffer: fftScratchA } },
+      { binding: 2, resource: { buffer: fftTwiddleBuffer } },
     ],
   })
   // PERF: per-slot bind groups (one per axis per direction) so the Strang-step
@@ -172,6 +171,7 @@ export function rebuildTdseBindGroups(
       entries: [
         { binding: 0, resource: { buffer: fftAxisUniformBuffers[slot]! } },
         { binding: 1, resource: { buffer: fftScratchA } },
+        { binding: 2, resource: { buffer: fftTwiddleBuffer } },
       ],
     })
   }
@@ -190,26 +190,25 @@ export function rebuildTdseBindGroups(
     layout: pipelines.writeGridBGL,
     entries: [
       { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: psiReBuffer } },
-      { binding: 2, resource: { buffer: psiImBuffer } },
-      { binding: 3, resource: { buffer: potentialBuffer } },
-      { binding: 4, resource: densityTextureView },
+      { binding: 1, resource: { buffer: psiBuffer } },
+      { binding: 2, resource: { buffer: potentialBuffer } },
+      { binding: 3, resource: densityTextureView },
     ],
   })
 
-  // Diagnostics bind groups
+  // Diagnostics bind groups. ψ is now a single vec2f binding; partial-sum
+  // buffers shifted down by one binding index to stay contiguous.
   const diagReduceBG = device.createBindGroup({
     label: 'tdse-diag-reduce-bg',
     layout: pipelines.diagReduceBGL,
     entries: [
       { binding: 0, resource: { buffer: diagUniformBuffer } },
-      { binding: 1, resource: { buffer: psiReBuffer } },
-      { binding: 2, resource: { buffer: psiImBuffer } },
-      { binding: 3, resource: { buffer: diagPartialSumsBuffer } },
-      { binding: 4, resource: { buffer: diagPartialMaxBuffer } },
-      { binding: 5, resource: { buffer: diagPartialLeftBuffer } },
-      { binding: 6, resource: { buffer: diagPartialRightBuffer } },
-      { binding: 7, resource: { buffer: diagPartialIprBuffer } },
+      { binding: 1, resource: { buffer: psiBuffer } },
+      { binding: 2, resource: { buffer: diagPartialSumsBuffer } },
+      { binding: 3, resource: { buffer: diagPartialMaxBuffer } },
+      { binding: 4, resource: { buffer: diagPartialLeftBuffer } },
+      { binding: 5, resource: { buffer: diagPartialRightBuffer } },
+      { binding: 6, resource: { buffer: diagPartialIprBuffer } },
     ],
   })
 
@@ -246,8 +245,7 @@ export function rebuildTdseBindGroups(
     entries: [
       { binding: 0, resource: { buffer: renormalizeUniformBuffer } },
       { binding: 1, resource: { buffer: diagResultBuffer } },
-      { binding: 2, resource: { buffer: psiReBuffer } },
-      { binding: 3, resource: { buffer: psiImBuffer } },
+      { binding: 2, resource: { buffer: psiBuffer } },
     ],
   })
 

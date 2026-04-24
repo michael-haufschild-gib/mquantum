@@ -29,12 +29,11 @@ struct DiracDiagUniforms {
 }
 
 @group(0) @binding(0) var<uniform> diagParams: DiracDiagUniforms;
-@group(0) @binding(1) var<storage, read> spinorRe: array<f32>;
-@group(0) @binding(2) var<storage, read> spinorIm: array<f32>;
-@group(0) @binding(3) var<storage, read_write> partialNorm: array<f32>;
-@group(0) @binding(4) var<storage, read_write> partialMax: array<f32>;
-@group(0) @binding(5) var<storage, read_write> partialParticle: array<f32>;
-@group(0) @binding(6) var<storage, read_write> partialAnti: array<f32>;
+@group(0) @binding(1) var<storage, read> spinor: array<vec2f>;
+@group(0) @binding(2) var<storage, read_write> partialNorm: array<f32>;
+@group(0) @binding(3) var<storage, read_write> partialMax: array<f32>;
+@group(0) @binding(4) var<storage, read_write> partialParticle: array<f32>;
+@group(0) @binding(5) var<storage, read_write> partialAnti: array<f32>;
 
 // Pack 3 additive channels (norm, particle, anti) into a vec3 — cuts
 // tree-reduce shared-memory ops 4→2 per step. Max stays separate.
@@ -60,10 +59,8 @@ fn main(
     // Sum |ψ_c|² over all spinor components at this site
     let T = diagParams.totalSites;
     for (var c: u32 = 0u; c < S; c = c + 1u) {
-      let bufIdx = c * T + idx;
-      let re = spinorRe[bufIdx];
-      let im = spinorIm[bufIdx];
-      let d = re * re + im * im;
+      let v = spinor[c * T + idx];
+      let d = v.x * v.x + v.y * v.y;
       if (c < half) {
         particleD += d;
       } else {

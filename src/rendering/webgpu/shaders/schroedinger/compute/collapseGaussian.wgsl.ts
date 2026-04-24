@@ -27,8 +27,7 @@ struct CollapseUniforms {
 }
 
 @group(0) @binding(0) var<uniform> params: CollapseUniforms;
-@group(0) @binding(1) var<storage, read_write> psiRe: array<f32>;
-@group(0) @binding(2) var<storage, read_write> psiIm: array<f32>;
+@group(0) @binding(1) var<storage, read_write> psi: array<vec2f>;
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
@@ -49,7 +48,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let invTwoSigma2 = 1.0 / (2.0 * max(sigma2, 1e-8));
   let amplitude = exp(-dist2 * invTwoSigma2);
 
-  psiRe[idx] = amplitude;
-  psiIm[idx] = 0.0;
+  psi[idx] = vec2f(amplitude, 0.0);
 }
 `

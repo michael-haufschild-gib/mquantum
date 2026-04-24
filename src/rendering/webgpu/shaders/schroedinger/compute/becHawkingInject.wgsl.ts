@@ -31,8 +31,7 @@
 
 export const becHawkingInjectBlock = /* wgsl */ `
 @group(0) @binding(0) var<storage, read> params: TDSEUniforms;
-@group(0) @binding(1) var<storage, read_write> psiRe: array<f32>;
-@group(0) @binding(2) var<storage, read_write> psiIm: array<f32>;
+@group(0) @binding(1) var<storage, read_write> psi: array<vec2f>;
 
 fn splitmix32_inj(x: u32) -> u32 {
   var z: u32 = x + 0x9e3779b9u;
@@ -62,8 +61,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Recover N-D coords for boundary guard.
   let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
 
-  let re = psiRe[idx];
-  let im = psiIm[idx];
+  let zC = psi[idx];
+  let re = zC.x;
+  let im = zC.y;
   let density = re * re + im * im;
   if (density < 1e-12) { return; }
 
@@ -83,8 +83,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let fwdIdx = idx + stride;
     let bwdIdx = idx - stride;
     let invDx = 0.5 / params.spacing[d];
-    let dRe = (psiRe[fwdIdx] - psiRe[bwdIdx]) * invDx;
-    let dIm = (psiIm[fwdIdx] - psiIm[bwdIdx]) * invDx;
+    let zF = psi[fwdIdx];
+    let zB = psi[bwdIdx];
+    let dRe = (zF.x - zB.x) * invDx;
+    let dIm = (zF.y - zB.y) * invDx;
     let jd = hbarOverM * (re * dIm - im * dRe);
     let vsd = jd * invDensity;
     vsMagSq += vsd * vsd;
@@ -105,7 +107,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Small-angle rotation of ψ by δφ. Avoids norm drift beyond O(dPhi²) rounding.
   let c = cos(dPhi);
   let s = sin(dPhi);
-  psiRe[idx] = re * c - im * s;
-  psiIm[idx] = re * s + im * c;
+  psi[idx] = vec2f(re * c - im * s, re * s + im * c);
 }
 `

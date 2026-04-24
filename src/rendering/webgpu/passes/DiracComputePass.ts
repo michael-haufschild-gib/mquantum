@@ -36,6 +36,7 @@ import {
   DIAG_DECIMATION,
   GRID_WG,
   LINEAR_WG,
+  pickSiteDispatch,
   sanitizeGridSizes,
 } from './computePassUtils'
 import type { DiagDispatchParams, FFTAxisSharedMemParams } from './DiracComputePassDispatchers'
@@ -64,10 +65,12 @@ import { requestStateSave as genericStateSave } from './stateSave'
  * potential buffer, and density grid output.
  */
 export class DiracComputePass extends WebGPUBaseComputePass {
-  // Spinor field: S components packed sequentially
-  // spinorRe[c * totalSites + idx] = Re(ψ_c(idx))
-  private spinorReBuffer: GPUBuffer | null = null
-  private spinorImBuffer: GPUBuffer | null = null
+  // Spinor field: S components packed sequentially into a single vec2f buffer.
+  // spinor[c * totalSites + idx] = vec2f(re, im) of ψ_c(idx). Merging the
+  // previous split re/im f32 buffers into one vec2f buffer halves address
+  // arithmetic and issues one 8-byte load per site instead of two 4-byte
+  // loads in the gamma mat-vec loops.
+  private spinorBuffer: GPUBuffer | null = null
   private currentSpinorSize = 0
 
   // Gamma matrices storage buffer (uploaded from CPU via DiracAlgebraBridge)
@@ -136,8 +139,8 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   private readonly algebraBridge = new DiracAlgebraBridge()
 
   // Pre-allocated uniform views
-  /** DiracUniforms struct: 544 bytes */
-  private readonly uniformData = new ArrayBuffer(544)
+  /** DiracUniforms struct: 592 bytes (includes kGridScale) */
+  private readonly uniformData = new ArrayBuffer(592)
   private readonly uniformU32 = new Uint32Array(this.uniformData)
   private readonly uniformF32 = new Float32Array(this.uniformData)
 
@@ -191,17 +194,22 @@ export class DiracComputePass extends WebGPUBaseComputePass {
    * @param ctx - Render context (device + encoder)
    */
   requestStateSave(ctx: WebGPURenderContext): void {
-    if (!this.spinorReBuffer || !this.spinorImBuffer || this.saveMappingInFlight) return
-    const byteSize = this.currentSpinorSize * this.totalSites * 4
+    if (!this.spinorBuffer || this.saveMappingInFlight) return
+    // Merged layout: one buffer of S*totalSites vec2f (8 bytes each).
+    // The generic 'interleaved' path de-interleaves [re, im, re, im, ...]
+    // into separate re[n] / im[n] Float32Arrays for the serializer —
+    // bit-identical to the prior 'separate' save output.
+    const elementCount = this.currentSpinorSize * this.totalSites
+    const byteSize = elementCount * 8
     const componentCount = this.currentSpinorSize
 
     this.saveMappingInFlight = true
     genericStateSave(ctx, {
       source: {
-        layout: 'separate',
-        reBuffer: this.spinorReBuffer,
-        imBuffer: this.spinorImBuffer,
+        layout: 'interleaved',
+        buffer: this.spinorBuffer,
         byteSize,
+        elementCount,
       },
       totalSites: this.totalSites,
       label: 'dirac',
@@ -251,8 +259,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       device,
       config,
       {
-        spinorReBuffer: this.spinorReBuffer,
-        spinorImBuffer: this.spinorImBuffer,
+        spinorBuffer: this.spinorBuffer,
         potentialBuffer: this.potentialBuffer,
         gammaBuffer: this.gammaBuffer,
         fftScratchA: this.fftScratchA,
@@ -278,8 +285,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     )
 
     // Apply buffer results to instance fields
-    this.spinorReBuffer = result.spinorReBuffer
-    this.spinorImBuffer = result.spinorImBuffer
+    this.spinorBuffer = result.spinorBuffer
     this.potentialBuffer = result.potentialBuffer
     this.gammaBuffer = result.gammaBuffer
     this.fftScratchA = result.fftScratchA
@@ -332,8 +338,8 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     // Pipelines created lazily on first execute
   }
 
-  private buildPipelines(device: GPUDevice): void {
-    this.pl = buildDiracPipelines(device, this.setupHelpers)
+  private buildPipelines(device: GPUDevice, latticeDim: number): void {
+    this.pl = buildDiracPipelines(device, this.setupHelpers, latticeDim)
   }
 
   /** Called immediately after rebuildBuffers + buildPipelines, so all fields are non-null. */
@@ -344,8 +350,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       this.pl,
       {
         uniformBuffer: this.uniformBuffer!,
-        spinorReBuffer: this.spinorReBuffer!,
-        spinorImBuffer: this.spinorImBuffer!,
+        spinorBuffer: this.spinorBuffer!,
         potentialBuffer: this.potentialBuffer!,
         gammaBuffer: this.gammaBuffer!,
         fftScratchA: this.fftScratchA!,
@@ -386,10 +391,10 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     const potHash = `${config.potentialType}|${config.potentialStrength}|${config.potentialWidth}|${config.potentialCenter}|${config.harmonicOmega}|${config.coulombZ}|${config.mass}|${config.spacing.join(',')}`
     if (potHash !== this.lastPotentialHash) {
       this.lastPotentialHash = potHash
-      const linearWG = Math.ceil(this.totalSites / LINEAR_WG)
       if (this.pl && this.bg) {
+        const d = pickSiteDispatch(config.latticeDim, this.totalSites, config.gridSize)
         const p = ctx.beginComputePass({ label: 'dirac-potential-update' })
-        this.dispatchCompute(p, this.pl.potentialPipeline, [this.bg.potentialBG!], linearWG)
+        this.dispatchCompute(p, this.pl.potentialPipeline, [this.bg.potentialBG!], d.x, d.y, d.z)
         p.end()
       }
     }
@@ -400,28 +405,50 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     if (this.initialized && !config.needsReset) return
     const { device } = ctx
 
-    // Check for pending loaded wavefunction data — skip init shader and inject directly
-    if (this.pendingInjection && this.spinorReBuffer && this.spinorImBuffer) {
+    // Site-dispatch shape covers init + potential-fill. pickSiteDispatch picks
+    // 3-D when latticeDim===3 (matches the @workgroup_size(4,4,4) variant
+    // emitted by buildDiracPipelines), otherwise the 1-D linearWG fallback.
+    const siteDispatch = pickSiteDispatch(config.latticeDim, this.totalSites, config.gridSize)
+
+    // Check for pending loaded wavefunction data — skip init shader and inject directly.
+    // The merged vec2f layout expects interleaved [re0, im0, re1, im1, ...]
+    // so the saved `re: Float32Array` + `im: Float32Array` must be
+    // re-interleaved here before upload.
+    if (this.pendingInjection && this.spinorBuffer) {
       const { re, im } = this.pendingInjection
       const elementCount = Math.min(re.length, this.currentSpinorSize * this.totalSites)
-      const reData = re.slice(0, elementCount)
-      const imData = im.slice(0, elementCount)
-      device.queue.writeBuffer(this.spinorReBuffer, 0, reData)
-      device.queue.writeBuffer(this.spinorImBuffer, 0, imData)
+      const interleaved = new Float32Array(elementCount * 2)
+      for (let i = 0; i < elementCount; i++) {
+        interleaved[i * 2] = re[i]!
+        interleaved[i * 2 + 1] = im[i]!
+      }
+      device.queue.writeBuffer(this.spinorBuffer, 0, interleaved)
       this.pendingInjection = null
       logger.log(`[Dirac] Injected loaded wavefunction (${elementCount} elements)`)
     } else if (this.pl && this.bg) {
-      const wg = Math.ceil(this.totalSites / LINEAR_WG)
       const initPass = ctx.beginComputePass({ label: 'dirac-init-pass' })
-      this.dispatchCompute(initPass, this.pl.initPipeline, [this.bg.initBG!], wg)
+      this.dispatchCompute(
+        initPass,
+        this.pl.initPipeline,
+        [this.bg.initBG!],
+        siteDispatch.x,
+        siteDispatch.y,
+        siteDispatch.z
+      )
       initPass.end()
     }
 
     // Always fill potential (needed for both init and load)
     if (this.pl && this.bg) {
-      const wg = Math.ceil(this.totalSites / LINEAR_WG)
       const potPass = ctx.beginComputePass({ label: 'dirac-potential-fill' })
-      this.dispatchCompute(potPass, this.pl.potentialPipeline, [this.bg.potentialBG!], wg)
+      this.dispatchCompute(
+        potPass,
+        this.pl.potentialPipeline,
+        [this.bg.potentialBG!],
+        siteDispatch.x,
+        siteDispatch.y,
+        siteDispatch.z
+      )
       potPass.end()
     }
 
@@ -500,10 +527,15 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     const { device } = ctx
     const configHash = `${computeConfigHash(config.gridSize, config.latticeDim)}_s${spinorSize(config.latticeDim)}`
 
-    if (configHash !== this.lastConfigHash || !this.spinorReBuffer) {
+    if (configHash !== this.lastConfigHash || !this.spinorBuffer) {
       logger.log(`[Dirac-COMPUTE] rebuild: ${this.lastConfigHash} → ${configHash}`)
       this.rebuildBuffers(device, config)
-      this.buildPipelines(device)
+      // Kinetic + write-grid pipelines are specialized on latticeDim so the
+      // sparse monomial gamma tables emitted at compose time match the
+      // generated α/β matrices for this dimension. Rebuild is already gated
+      // on configHash (which includes latticeDim) so we only recompile when
+      // the specialization actually changes.
+      this.buildPipelines(device, config.latticeDim)
       this.rebuildBindGroups(device)
       this.initialized = false
       this.simTime = 0
@@ -519,6 +551,9 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     if (!pl || !bg) return
 
     const linearWG = Math.ceil(this.totalSites / LINEAR_WG)
+    // Kinetic + absorber use the 3-D dispatch variant when latticeDim===3.
+    // Init/potential paths upstream pick their own dispatch shape inline.
+    const siteDispatch = pickSiteDispatch(config.latticeDim, this.totalSites, config.gridSize)
     const S = this.currentSpinorSize
 
     // Time evolution (Strang splitting)
@@ -569,6 +604,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
             step,
             S,
             linearWG,
+            siteDispatch,
             dispatchCompute,
             ifftSlotOffset,
             totalSites: this.totalSites,
@@ -582,6 +618,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
             step,
             S,
             linearWG,
+            siteDispatch,
             dispatchCompute,
             fwdStageCount: this.fwdStageCount,
             dispatchFFTAxisDelegated,
@@ -671,7 +708,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     }
     // prettier-ignore
     const gpuBuffers: (GPUBuffer | null | undefined)[] = [
-      this.spinorReBuffer, this.spinorImBuffer, this.potentialBuffer, this.gammaBuffer,
+      this.spinorBuffer, this.potentialBuffer, this.gammaBuffer,
       this.fftScratchA, this.fftScratchB, this.uniformBuffer, this.fftUniformBuffer,
       this.fftStagingBuffer, this.fftAxisUniformBuffer, this.fftAxisStagingBuffer,
       this.packUniformBuffer, this.packUniformBufferNoNorm,
@@ -685,7 +722,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     }
     this.densityTexture?.destroy()
 
-    this.spinorReBuffer = this.spinorImBuffer = this.potentialBuffer = this.gammaBuffer = null
+    this.spinorBuffer = this.potentialBuffer = this.gammaBuffer = null
     this.fftScratchA = this.fftScratchB = this.uniformBuffer = this.fftUniformBuffer = null
     this.fftStagingBuffer = this.fftAxisUniformBuffer = this.fftAxisStagingBuffer = null
     this.fftAxisUniformBuffers = null

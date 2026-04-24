@@ -17,27 +17,28 @@
  *   2 = standingWave: Two counter-propagating spin-polarized packets
  *   3 = zitterbewegung: Uses positiveEnergyFraction for mixing control
  *
+ * Spinor buffer layout: single array<vec2f> where component c at site idx
+ * occupies spinor[c*T + idx] = vec2f(re, im). One 8-byte complex load per
+ * site replaces the prior split spinorRe/spinorIm f32 bindings.
+ *
+ * Two emitted variants:
+ *   - 1D (@workgroup_size(64)): legacy linear dispatch using linearToND.
+ *   - 3D (@workgroup_size(4, 4, 4)): direct gid.xyz coords for latticeDim ≤ 3.
+ *     Eliminates the per-thread linearToND decode (firstTrailingBit + shift +
+ *     mask per dim — strides are pow-of-2). Body and buffer access pattern
+ *     are otherwise identical, so the spinor[c*T+idx] write set is the same.
+ *
  * Requires diracUniformsBlock + freeScalarNDIndexBlock to be prepended.
  *
- * @workgroup_size(64)
  * @module
  */
 
-export const diracInitBlock = /* wgsl */ `
+const diracInitBindings = /* wgsl */ `
 @group(0) @binding(0) var<storage, read> params: DiracUniforms;
-@group(0) @binding(1) var<storage, read_write> spinorRe: array<f32>;
-@group(0) @binding(2) var<storage, read_write> spinorIm: array<f32>;
+@group(0) @binding(1) var<storage, read_write> spinor: array<vec2f>;
+`
 
-@compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) gid: vec3u) {
-  let idx = gid.x;
-  if (idx >= params.totalSites) {
-    return;
-  }
-
-  // Convert linear index to N-D coordinates
-  let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
-
+const diracInitBody = /* wgsl */ `
   // Compute physical position, Gaussian envelope, and plane-wave phase
   var r2: f32 = 0.0;
   var kdotx: f32 = 0.0;
@@ -51,7 +52,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let sigma = params.packetWidth;
   let invFourSigma2 = 1.0 / (4.0 * sigma * sigma);
   let envelope = exp(-r2 * invFourSigma2);
-  // packetMomentum stores wavevector k₀ (units 1/length); phase = k₀·x
+  // packetMomentum stores wavevector k_0 (units 1/length); phase = k_0 . x
   let phase = kdotx;
   let cosP = cos(phase);
   let sinP = sin(phase);
@@ -61,12 +62,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   // Zero all spinor components first
   for (var c: u32 = 0u; c < S; c++) {
-    let bufIdx = c * T + idx;
-    spinorRe[bufIdx] = 0.0;
-    spinorIm[bufIdx] = 0.0;
+    spinor[c * T + idx] = vec2f(0.0, 0.0);
   }
 
-  // Spin polarization on the Bloch sphere: u = (cos(θ/2), sin(θ/2)·e^{iφ})
+  // Spin polarization on the Bloch sphere: u = (cos(theta/2), sin(theta/2) e^{i phi})
   let cosHalf = cos(params.spinTheta * 0.5);
   let sinHalf = sin(params.spinTheta * 0.5);
   let phiCos = cos(params.spinPhi);
@@ -80,23 +79,24 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   if (params.initCondition == 0u || params.initCondition == 1u) {
     // gaussianPacket / planeWave: spin-polarized packet with energy projection
-    // Upper (particle) spinor: pAmp · u · envelope · e^{ikx}
-    spinorRe[idx] = pAmp * cosHalf * envelope * cosP;
-    spinorIm[idx] = pAmp * cosHalf * envelope * sinP;
+    // Upper (particle) spinor
+    spinor[idx] = vec2f(pAmp * cosHalf * envelope * cosP,
+                        pAmp * cosHalf * envelope * sinP);
     if (S > 1u) {
-      let bufIdx1 = 1u * T + idx;
-      spinorRe[bufIdx1] = pAmp * sinHalf * envelope * (cosP * phiCos - sinP * phiSin);
-      spinorIm[bufIdx1] = pAmp * sinHalf * envelope * (sinP * phiCos + cosP * phiSin);
+      spinor[1u * T + idx] = vec2f(
+        pAmp * sinHalf * envelope * (cosP * phiCos - sinP * phiSin),
+        pAmp * sinHalf * envelope * (sinP * phiCos + cosP * phiSin)
+      );
     }
-    // Lower (antiparticle) spinor: aAmp · u · envelope · e^{ikx}
+    // Lower (antiparticle) spinor
     if (aAmp > 1e-10 && halfS > 0u) {
-      let bufIdxH0 = halfS * T + idx;
-      spinorRe[bufIdxH0] = aAmp * cosHalf * envelope * cosP;
-      spinorIm[bufIdxH0] = aAmp * cosHalf * envelope * sinP;
+      spinor[halfS * T + idx] = vec2f(aAmp * cosHalf * envelope * cosP,
+                                      aAmp * cosHalf * envelope * sinP);
       if (S > halfS + 1u) {
-        let bufIdxH1 = (halfS + 1u) * T + idx;
-        spinorRe[bufIdxH1] = aAmp * sinHalf * envelope * (cosP * phiCos - sinP * phiSin);
-        spinorIm[bufIdxH1] = aAmp * sinHalf * envelope * (sinP * phiCos + cosP * phiSin);
+        spinor[(halfS + 1u) * T + idx] = vec2f(
+          aAmp * sinHalf * envelope * (cosP * phiCos - sinP * phiSin),
+          aAmp * sinHalf * envelope * (sinP * phiCos + cosP * phiSin)
+        );
       }
     }
 
@@ -116,42 +116,85 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let cosP2 = cos(kdotx2);
     let sinP2 = sin(kdotx2);
 
-    // Cache the two combined-envelope projections (used 2× for re, 2× for im).
+    // Cache the two combined-envelope projections (used 2x for re, 2x for im).
     let combinedCos = env1 * cosP + env2 * cosP2;
     let combinedSin = env1 * sinP + env2 * sinP2;
 
     // Component 0: spin-up from both packets
-    spinorRe[idx] = pAmp * cosHalf * combinedCos;
-    spinorIm[idx] = pAmp * cosHalf * combinedSin;
+    spinor[idx] = vec2f(pAmp * cosHalf * combinedCos, pAmp * cosHalf * combinedSin);
     // Component 1: spin-down
     if (S > 1u) {
-      let bufIdx1 = 1u * T + idx;
-      spinorRe[bufIdx1] = pAmp * sinHalf * (combinedCos * phiCos - combinedSin * phiSin);
-      spinorIm[bufIdx1] = pAmp * sinHalf * (combinedSin * phiCos + combinedCos * phiSin);
+      spinor[1u * T + idx] = vec2f(
+        pAmp * sinHalf * (combinedCos * phiCos - combinedSin * phiSin),
+        pAmp * sinHalf * (combinedSin * phiCos + combinedCos * phiSin)
+      );
     }
 
   } else if (params.initCondition == 3u) {
     // zitterbewegung: uses positiveEnergyFraction to control mixing
     // (pef=0.5 gives maximum Zitterbewegung, equal upper/lower)
     // Upper spinor
-    spinorRe[idx] = pAmp * cosHalf * envelope * cosP;
-    spinorIm[idx] = pAmp * cosHalf * envelope * sinP;
+    spinor[idx] = vec2f(pAmp * cosHalf * envelope * cosP,
+                        pAmp * cosHalf * envelope * sinP);
     if (S > 1u) {
-      let bufIdx1 = 1u * T + idx;
-      spinorRe[bufIdx1] = pAmp * sinHalf * envelope * (cosP * phiCos - sinP * phiSin);
-      spinorIm[bufIdx1] = pAmp * sinHalf * envelope * (sinP * phiCos + cosP * phiSin);
+      spinor[1u * T + idx] = vec2f(
+        pAmp * sinHalf * envelope * (cosP * phiCos - sinP * phiSin),
+        pAmp * sinHalf * envelope * (sinP * phiCos + cosP * phiSin)
+      );
     }
     // Lower spinor
     if (halfS > 0u) {
-      let bufIdxH0 = halfS * T + idx;
-      spinorRe[bufIdxH0] = aAmp * cosHalf * envelope * cosP;
-      spinorIm[bufIdxH0] = aAmp * cosHalf * envelope * sinP;
+      spinor[halfS * T + idx] = vec2f(aAmp * cosHalf * envelope * cosP,
+                                      aAmp * cosHalf * envelope * sinP);
       if (S > halfS + 1u) {
-        let bufIdxH1 = (halfS + 1u) * T + idx;
-        spinorRe[bufIdxH1] = aAmp * sinHalf * envelope * (cosP * phiCos - sinP * phiSin);
-        spinorIm[bufIdxH1] = aAmp * sinHalf * envelope * (sinP * phiCos + cosP * phiSin);
+        spinor[(halfS + 1u) * T + idx] = vec2f(
+          aAmp * sinHalf * envelope * (cosP * phiCos - sinP * phiSin),
+          aAmp * sinHalf * envelope * (sinP * phiCos + cosP * phiSin)
+        );
       }
     }
   }
 }
 `
+
+/**
+ * Legacy 1D dispatch variant. Workgroup size 64. Uses linearToND to decode
+ * the linear thread index into N-D coords.
+ */
+export const diracInitBlock = /* wgsl */ `${diracInitBindings}
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  let idx = gid.x;
+  if (idx >= params.totalSites) {
+    return;
+  }
+
+  // Convert linear index to N-D coordinates
+  let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
+${diracInitBody}`
+
+/**
+ * 3-D dispatch variant for latticeDim <= 3. Workgroup size 4x4x4. Reads coords
+ * directly from gid.xyz, eliminating the per-thread linearToND decode. Caller
+ * must dispatch (ceil(N0/4), ceil(N1/4), ceil(N2/4)) with axes beyond
+ * latticeDim clamped to 1.
+ */
+export const diracInitBlock3D = /* wgsl */ `${diracInitBindings}
+@compute @workgroup_size(4, 4, 4)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  let latDim = params.latticeDim;
+  // Bounds: only check axes that actually correspond to a lattice dimension.
+  // Dispatch shape clamps unused axes to 1, so gid.y/gid.z are 0 there.
+  if (gid.x >= params.gridSize[0]) { return; }
+  if (latDim > 1u && gid.y >= params.gridSize[1]) { return; }
+  if (latDim > 2u && gid.z >= params.gridSize[2]) { return; }
+
+  // Build coords directly from gid.xyz; unused axes stay at 0 (ndToLinear
+  // ignores them since it loops only to latDim).
+  var coords: array<u32, 12>;
+  coords[0] = gid.x;
+  if (latDim > 1u) { coords[1] = gid.y; }
+  if (latDim > 2u) { coords[2] = gid.z; }
+
+  let idx = ndToLinear(coords, params.strides, latDim);
+${diracInitBody}`

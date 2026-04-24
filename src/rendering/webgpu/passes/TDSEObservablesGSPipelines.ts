@@ -113,7 +113,6 @@ export function buildObsGSPipelines(
   const obsPosReduceBGL = createComputeBGL(device, 'obs-pos-reduce-bgl', [
     'read-only-storage',
     'read-only-storage',
-    'read-only-storage',
     'storage',
     'read-only-storage',
   ])
@@ -169,8 +168,6 @@ export function buildObsGSPipelines(
     'uniform',
     'read-only-storage',
     'read-only-storage',
-    'read-only-storage',
-    'read-only-storage',
     'storage',
     'storage',
   ])
@@ -198,8 +195,6 @@ export function buildObsGSPipelines(
     'uniform',
     'read-only-storage',
     'read-only-storage',
-    'read-only-storage',
-    'storage',
     'storage',
   ])
   const gsSubtractPipeline = helpers.createComputePipeline(

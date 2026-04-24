@@ -21,23 +21,16 @@
  *
  * Requires tdseUniformsBlock + freeScalarNDIndexBlock to be prepended.
  *
- * @workgroup_size(64)
+ * Two variants: tdsePotentialBlock (1-D, workgroup_size(64), linearToND)
+ * and tdsePotentialBlock3D (3-D, workgroup_size(4,4,4), gid.xyz). See
+ * pickSiteDispatch in computePassUtils for the selection rule.
+ *
+ * @workgroup_size(64) (1-D variant) | @workgroup_size(4, 4, 4) (3-D variant)
  * @module
  */
 
-export const tdsePotentialBlock = /* wgsl */ `
-@group(0) @binding(0) var<storage, read> params: TDSEUniforms;
-@group(0) @binding(1) var<storage, read_write> potential: array<f32>;
-
-@compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) gid: vec3u) {
-  let idx = gid.x;
-  if (idx >= params.totalSites) {
-    return;
-  }
-
-  let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
-
+/** Shared kernel body. Expects 'idx' and 'coords' to be defined by the prologue. */
+const TDSE_POTENTIAL_BODY = /* wgsl */ `
   // Axis-0 position (used by directional potentials)
   let pos0 = (f32(coords[0]) - f32(params.gridSize[0]) * 0.5 + 0.5) * params.spacing[0];
 
@@ -270,5 +263,39 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
 
   potential[idx] = V;
+`
+
+/** 1-D variant: linear dispatch + linearToND coord decomposition. Used when latticeDim !== 3. */
+export const tdsePotentialBlock = /* wgsl */ `
+@group(0) @binding(0) var<storage, read> params: TDSEUniforms;
+@group(0) @binding(1) var<storage, read_write> potential: array<f32>;
+
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  let idx = gid.x;
+  if (idx >= params.totalSites) {
+    return;
+  }
+  let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
+${TDSE_POTENTIAL_BODY}
+}
+`
+
+/** 3-D variant: workgroup_size(4,4,4) + direct gid.xyz coord read. Used when latticeDim === 3. */
+export const tdsePotentialBlock3D = /* wgsl */ `
+@group(0) @binding(0) var<storage, read> params: TDSEUniforms;
+@group(0) @binding(1) var<storage, read_write> potential: array<f32>;
+
+@compute @workgroup_size(4, 4, 4)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  if (gid.x >= params.gridSize[0] || gid.y >= params.gridSize[1] || gid.z >= params.gridSize[2]) {
+    return;
+  }
+  var coords: array<u32, 12>;
+  coords[0] = gid.x;
+  coords[1] = gid.y;
+  coords[2] = gid.z;
+  let idx = gid.x * params.strides[0] + gid.y * params.strides[1] + gid.z;
+${TDSE_POTENTIAL_BODY}
 }
 `

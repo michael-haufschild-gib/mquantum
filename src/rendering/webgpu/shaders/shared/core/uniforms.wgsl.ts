@@ -41,7 +41,13 @@ struct CameraUniforms {
   frameNumber: u32,
   // Temporal accumulation support
   bayerOffset: vec2f,            // Bayer pattern offset [0,0], [1,1], [1,0], [0,1]
-  _padding: vec2f,               // Padding for 16-byte alignment
+  _padding: vec2f,               // Padding for 16-byte alignment (vec3f below needs 16-align)
+  // PERF: CPU-precomputed camera position in model space. Equal to
+  // (inverseModelMatrix * vec4f(cameraPosition, 1.0)).xyz. Moves a per-pixel
+  // mat4*vec4 of all-uniform operands out of fragment shaders — Apple Metal
+  // (primary Safari/WebGPU target) does not reliably hoist this.
+  cameraPositionModel: vec3f,
+  _paddingEnd: f32,              // Struct size must be a multiple of 16 bytes
 }
 `
 

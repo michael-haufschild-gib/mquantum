@@ -170,12 +170,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
 
-  // Map texture voxel to model-space position [-bound, +bound]^3
-  let modelPos = vec3f(
-    (f32(gid.x) + 0.5) / f32(texDims.x) * 2.0 * bound - bound,
-    (f32(gid.y) + 0.5) / f32(texDims.y) * 2.0 * bound - bound,
-    (f32(gid.z) + 0.5) / f32(texDims.z) * 2.0 * bound - bound
-  );
+  // Map texture voxel to model-space position [-bound, +bound]^3.
+  // PERF: fold per-axis divides into one hoisted vec3 reciprocal + fma.
+  let gridToModel = (2.0 * bound) / vec3f(texDims);
+  let modelPos = fma(vec3f(gid) + 0.5, gridToModel, vec3f(-bound));
 
   // Project model-space position into N-D lattice coordinates via basis vectors
   var ndWorldPos: array<f32, 12>;
