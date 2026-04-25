@@ -52,6 +52,11 @@ export function compute3DDispatchCounts(
   gridSize: readonly number[],
   latticeDim: number
 ): [number, number, number] {
+  if (!Number.isInteger(latticeDim) || latticeDim < 0 || latticeDim > 3) {
+    throw new Error(
+      `[compute] compute3DDispatchCounts: latticeDim=${latticeDim} is unsupported; expected integer 0..3`
+    )
+  }
   const x = latticeDim >= 1 ? Math.max(1, Math.ceil(gridSize[0]! / SITE_3D_WG)) : 1
   const y = latticeDim >= 2 ? Math.max(1, Math.ceil(gridSize[1]! / SITE_3D_WG)) : 1
   const z = latticeDim >= 3 ? Math.max(1, Math.ceil(gridSize[2]! / SITE_3D_WG)) : 1

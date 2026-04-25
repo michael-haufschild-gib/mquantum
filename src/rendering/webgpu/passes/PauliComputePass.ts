@@ -40,6 +40,7 @@ import {
   FFT_UNIFORM_SIZE,
   GRID_WG,
   LINEAR_WG,
+  pickSiteDispatch,
   sanitizeGridSizes,
 } from './computePassUtils'
 import type { PauliBufferResult } from './PauliComputePassBuffers'
@@ -53,36 +54,6 @@ const UNIFORM_SIZE = 592
 /** Number of f32 values in diagnostic result buffer:
  *  totalNorm, normUp, normDown, sigmaX, sigmaY, sigmaZ, maxDensity, pad */
 const DIAG_RESULT_COUNT = 8
-/** Workgroup-X for the 3D-dispatch site kernels (matches @workgroup_size(4,4,4)). */
-const SITE3D_WG = 4
-
-/**
- * Site-kernel dispatch shape selector.
- *
- * For `latticeDim === 3`, returns a 3D dispatch (`shape: '3d'`) sized to the
- * actual gridSize so the kernel can read `gid.xyz` directly and skip the
- * `linearToND()` per-thread shift sequence (~3 shifts + 3 masks per voxel).
- *
- * For every other dimensionality (2D Pauli is store-permitted but not exposed
- * by the registry, 4D-6D Pauli is registry-supported), falls back to the
- * existing 1D linear dispatch — the 3D path covers only the first three axes
- * and would miss the extra-dim slices in 4D+.
- */
-function pickPauliSiteDispatch(
-  latticeDim: number,
-  totalSites: number,
-  gridSize: readonly number[]
-): { shape: '3d'; x: number; y: number; z: number } | { shape: '1d'; x: number } {
-  if (latticeDim === 3 && gridSize.length >= 3) {
-    return {
-      shape: '3d',
-      x: Math.ceil(gridSize[0]! / SITE3D_WG),
-      y: Math.ceil(gridSize[1]! / SITE3D_WG),
-      z: Math.ceil(gridSize[2]! / SITE3D_WG),
-    }
-  }
-  return { shape: '1d', x: Math.ceil(totalSites / LINEAR_WG) }
-}
 
 /**
  * Compute pass for Pauli equation split-operator dynamics.
@@ -373,13 +344,9 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       logger.log(`[Pauli] Injected loaded wavefunction (${expected} elements)`)
     } else if (this.pl && this.bg && this.buf) {
       const pass = ctx.beginComputePass({ label: 'pauli-init-pass' })
-      const dispatch = pickPauliSiteDispatch(
-        config.latticeDim,
-        this.buf.totalSites,
-        config.gridSize
-      )
-      const pipeline = dispatch.shape === '3d' ? this.pl.init3DPipeline : this.pl.initPipeline
-      if (dispatch.shape === '3d') {
+      const dispatch = pickSiteDispatch(config.latticeDim, this.buf.totalSites, config.gridSize)
+      const pipeline = dispatch.use3D ? this.pl.init3DPipeline : this.pl.initPipeline
+      if (dispatch.use3D) {
         this.dispatchCompute(pass, pipeline, [this.bg.spinorBG], dispatch.x, dispatch.y, dispatch.z)
       } else {
         this.dispatchCompute(pass, pipeline, [this.bg.spinorBG], dispatch.x)
@@ -518,18 +485,14 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     // 3D-vs-1D site dispatch picker for init/potential/potentialHalf/absorber.
     // Computed once per executePauli call so all site kernels in this frame
     // share the same shape decision.
-    const siteDispatch = pickPauliSiteDispatch(
-      config.latticeDim,
-      this.buf.totalSites,
-      config.gridSize
-    )
+    const siteDispatch = pickSiteDispatch(config.latticeDim, this.buf.totalSites, config.gridSize)
     const dispatchSite = (
       pass: GPUComputePassEncoder,
       pipeline1D: GPUComputePipeline,
       pipeline3D: GPUComputePipeline,
       bindGroups: GPUBindGroup[]
     ): void => {
-      if (siteDispatch.shape === '3d') {
+      if (siteDispatch.use3D) {
         this.dispatchCompute(
           pass,
           pipeline3D,
