@@ -57,6 +57,18 @@ export function compute3DDispatchCounts(
       `[compute] compute3DDispatchCounts: latticeDim=${latticeDim} is unsupported; expected integer 0..3`
     )
   }
+  // Reject malformed active-axis sizes up-front. Fractional / NaN values would
+  // slip past the per-dim max-dispatch guard below (NaN compares false), and
+  // an undefined slot would Math.ceil to NaN — both push the failure to a
+  // later dispatchWorkgroups() call instead of failing here.
+  for (let d = 0; d < latticeDim; d++) {
+    const axis = gridSize[d]
+    if (typeof axis !== 'number' || !Number.isInteger(axis) || axis < 1) {
+      throw new Error(
+        `[compute] compute3DDispatchCounts: gridSize[${d}]=${axis} is invalid; expected integer >= 1`
+      )
+    }
+  }
   const x = latticeDim >= 1 ? Math.max(1, Math.ceil(gridSize[0]! / SITE_3D_WG)) : 1
   const y = latticeDim >= 2 ? Math.max(1, Math.ceil(gridSize[1]! / SITE_3D_WG)) : 1
   const z = latticeDim >= 3 ? Math.max(1, Math.ceil(gridSize[2]! / SITE_3D_WG)) : 1
@@ -104,6 +116,16 @@ export function pickSiteDispatch(
   totalSites: number,
   gridSize: readonly number[]
 ): SiteDispatch {
+  if (!Number.isInteger(latticeDim) || latticeDim < 0) {
+    throw new Error(
+      `[compute] pickSiteDispatch: latticeDim=${latticeDim} is unsupported; expected integer >= 0`
+    )
+  }
+  if (!Number.isInteger(totalSites) || totalSites < 1) {
+    throw new Error(
+      `[compute] pickSiteDispatch: totalSites=${totalSites} is invalid; expected integer >= 1`
+    )
+  }
   if (latticeDim === 3) {
     const [x, y, z] = compute3DDispatchCounts(gridSize, 3)
     return { x, y, z, use3D: true }
