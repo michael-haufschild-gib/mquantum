@@ -105,7 +105,7 @@ export function applyHOMomentumTransform(
 // Camera uniform buffer
 // =========================================================================
 
-/** All values needed to pack the camera uniform buffer (512 bytes). */
+/** All values needed to pack the camera uniform buffer (528 bytes). */
 export interface CameraPackParams {
   camera: CameraSnapshot
   animationTime: number
@@ -120,7 +120,12 @@ export interface CameraPackParams {
 /**
  * Pack camera matrices, model matrix, and per-frame scalars into the camera uniform buffer.
  *
- * @param data - Float32Array(128) for the camera uniform buffer
+ * Also precomputes `cameraPositionModel = inverseModelMatrix * (cameraPosition, 1)` to
+ * eliminate a per-pixel mat4*vec4 of all-uniform operands in the fragment shaders.
+ * Re-run whenever camera position OR model matrix changes — this function is called
+ * every frame the camera buffer is marked dirty, which already covers both.
+ *
+ * @param data - Float32Array(132) for the camera uniform buffer (528 bytes)
  * @param dataView - DataView of the same buffer (for uint32 writes)
  * @param p - Camera pack parameters
  */
@@ -201,7 +206,13 @@ export function packCameraUniforms(
   data[110] = -posZ * invScale
   data[111] = 1.0
 
-  // Camera position (offset 112)
+  // Camera position (offset 112). Zero before the conditional so a frame
+  // without `camera.position` doesn't leak prior-frame values into the
+  // world-space camera position OR the cameraPositionModel derived below
+  // (data is reused across frames).
+  data[112] = 0
+  data[113] = 0
+  data[114] = 0
   if (camera.position) {
     data[112] = camera.position.x
     data[113] = camera.position.y
@@ -233,6 +244,25 @@ export function packCameraUniforms(
   data[125] = bayerOffset[1]
   data[126] = 0
   data[127] = 0
+
+  // PERF: Precompute `cameraPositionModel = inverseModelMatrix * (cameraPosition, 1)`.
+  // inverseModelMatrix starts at float index 96 (column-major, w-column at 108..111).
+  // cameraPosition is at float indices 112..114.
+  // Writing result to float indices 128..130 (WGSL struct offset 512, vec3f-aligned).
+  const cx = data[112] ?? 0
+  const cy = data[113] ?? 0
+  const cz = data[114] ?? 0
+  // Column-major mat4 * vec4(cx, cy, cz, 1):
+  //   out.x = M[0]*cx + M[4]*cy + M[8]*cz  + M[12]
+  //   out.y = M[1]*cx + M[5]*cy + M[9]*cz  + M[13]
+  //   out.z = M[2]*cx + M[6]*cy + M[10]*cz + M[14]
+  data[128] =
+    (data[96] ?? 0) * cx + (data[100] ?? 0) * cy + (data[104] ?? 0) * cz + (data[108] ?? 0)
+  data[129] =
+    (data[97] ?? 0) * cx + (data[101] ?? 0) * cy + (data[105] ?? 0) * cz + (data[109] ?? 0)
+  data[130] =
+    (data[98] ?? 0) * cx + (data[102] ?? 0) * cy + (data[106] ?? 0) * cz + (data[110] ?? 0)
+  data[131] = 0
 }
 
 // =========================================================================

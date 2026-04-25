@@ -37,9 +37,8 @@ struct PauliDiagUniforms {
 }
 
 @group(0) @binding(0) var<uniform> diagParams: PauliDiagUniforms;
-@group(0) @binding(1) var<storage, read> spinorRe: array<f32>;
-@group(0) @binding(2) var<storage, read> spinorIm: array<f32>;
-@group(0) @binding(3) var<storage, read_write> partial: array<f32>;
+@group(0) @binding(1) var<storage, read> spinor: array<vec2f>;
+@group(0) @binding(2) var<storage, read_write> partial: array<f32>;
 
 // Pack 4 independent additive channels (normUp, normDown, sigmaX, sigmaY) into a
 // single vec4. totalNorm = normUp + normDown and sigmaZ = normUp - normDown are
@@ -62,10 +61,13 @@ fn main(
   var maxDensity: f32 = 0.0;
 
   if (idx < T) {
-    let re0 = spinorRe[idx];
-    let im0 = spinorIm[idx];
-    let re1 = spinorRe[T + idx];
-    let im1 = spinorIm[T + idx];
+    // Merged vec2f layout: one 8-byte load per component.
+    let v0 = spinor[idx];
+    let v1 = spinor[T + idx];
+    let re0 = v0.x;
+    let im0 = v0.y;
+    let re1 = v1.x;
+    let im1 = v1.y;
 
     let d0 = re0 * re0 + im0 * im0;  // |ψ_up|²
     let d1 = re1 * re1 + im1 * im1;  // |ψ_down|²

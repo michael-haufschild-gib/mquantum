@@ -89,26 +89,19 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
     return vec4f(0.0);
   }
 
-  let history = textureSampleLevel(prevAccumulation, linearSampler, prevUV, 0.0);
-
-  // Validity checks
-  var valid = true;
-
-  // Screen edge fade (reject pixels near edges)
-  let edgeDistance = min(
-    min(prevUV.x, 1.0 - prevUV.x),
-    min(prevUV.y, 1.0 - prevUV.y)
-  );
-  let edgeFade = smoothstep(0.0, 0.03, edgeDistance);
-
-  // Depth discontinuity check using position neighbors
-  // This helps detect disocclusion
+  // Depth discontinuity check via quarter-res position neighbors.
+  // PERF: moved BEFORE the bilinear history fetch — on disocclusion we return
+  // vec4f(0.0), which matches the previous behavior because reconstruction
+  // only reads history.rgb when the validity alpha > 0.5, and any disoccluded
+  // pixel would have output validity 0 regardless. Skipping the fetch on
+  // silhouettes and motion edges saves one textureSampleLevel per affected
+  // pixel per frame.
   let topLeftCoord = clamp(quarterCoord + vec2i(-1, 1), vec2i(0), quarterDims - vec2i(1));
   let bottomRightCoord = clamp(quarterCoord + vec2i(1, -1), vec2i(0), quarterDims - vec2i(1));
   let topLeftDepth = textureLoad(quarterPosition, topLeftCoord, 0).w;
   let bottomRightDepth = textureLoad(quarterPosition, bottomRightCoord, 0).w;
 
-  let avgDepth = (depth + topLeftDepth + bottomRightDepth) / 3.0;
+  let avgDepth = (depth + topLeftDepth + bottomRightDepth) * (1.0 / 3.0);
   let maxDepthDiff = max(
     abs(depth - topLeftDepth),
     abs(depth - bottomRightDepth)
@@ -117,17 +110,23 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   // Reject on depth discontinuity (20% relative threshold)
   let depthThreshold = max(0.2 * avgDepth, 0.05);
   if (maxDepthDiff > depthThreshold) {
-    valid = false;
+    return vec4f(0.0);
   }
+
+  let history = textureSampleLevel(prevAccumulation, linearSampler, prevUV, 0.0);
+
+  // Screen edge fade (reject pixels near edges)
+  let edgeDistance = min(
+    min(prevUV.x, 1.0 - prevUV.x),
+    min(prevUV.y, 1.0 - prevUV.y)
+  );
+  let edgeFade = smoothstep(0.0, 0.03, edgeDistance);
 
   // Motion-based rejection
   let motion = length((prevUV - uv) * temporal.fullResolution);
   let motionFade = 1.0 - smoothstep(2.0, 8.0, motion);
 
-  // Calculate validity based on all checks
-  let validity = select(0.0, edgeFade * motionFade, valid);
-
   // Output: RGB = reprojected color, A = validity (0 = invalid, 1 = fully valid)
-  return vec4f(history.rgb, validity);
+  return vec4f(history.rgb, edgeFade * motionFade);
 }
 `

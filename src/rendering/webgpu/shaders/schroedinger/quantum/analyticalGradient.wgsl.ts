@@ -150,14 +150,16 @@ ${Array.from({ length: dim }, (_, j) => {
   }`
   }
 
-  // Generate the basis vector back-projection (ND gradient → world-space gradient)
+  // Generate the basis vector back-projection (ND gradient → world-space gradient).
+  // PERF: fold 2.0 (from dRhoND = 2·Re(ψ*·∂ψ)) and 1/rho into one reciprocal
+  // so each dim does 1 mul instead of 2 (saves D muls per call; 11 at dim=11).
   const basisProjection = `
   // Project ND gradient to 3D world space via basis vectors:
   // ∇_pos(s) = fieldScale · Σ_j dsND[j] · vec3f(basisX[j], basisY[j], basisZ[j])
   var gradWorld = vec3f(0.0);
   ${Array.from({ length: dim }, (_, j) => {
     return `{
-    let dsND_${j} = dRhoND_${j} * invRhoEps;
+    let dsND_${j} = dRhoHalfND_${j} * twoInvRhoEps;
     let bx = getBasisComponent(basis.basisX, ${j});
     let by = getBasisComponent(basis.basisY, ${j});
     let bz = getBasisComponent(basis.basisZ, ${j});
@@ -188,8 +190,10 @@ ${termsBlock}
   let spatialPhase = atan2(spatIm, spatRe);
 
   // ∂ρ/∂xND[j] = 2 · Re(ψ* · ∂ψ/∂xND[j]) = 2 · (ψ_re · ∂ψ_re/∂xND[j] + ψ_im · ∂ψ_im/∂xND[j])
-  let invRhoEps = 1.0 / (rho + 1e-8);
-${Array.from({ length: dim }, (_, j) => `  let dRhoND_${j} = 2.0 * (psiRe * dPsiRe[${j}] + psiIm * dPsiIm[${j}]);`).join('\n')}
+  // PERF: emit dRhoHalfND (without the 2× factor) and fold 2× into twoInvRhoEps
+  // so basisProjection does 1 mul/dim instead of 2.
+  let twoInvRhoEps = 2.0 / (rho + 1e-8);
+${Array.from({ length: dim }, (_, j) => `  let dRhoHalfND_${j} = psiRe * dPsiRe[${j}] + psiIm * dPsiIm[${j}];`).join('\n')}
 
 ${basisProjection}
 

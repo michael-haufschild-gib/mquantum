@@ -157,7 +157,7 @@ describe('packCameraUniforms', () => {
   }
 
   it('packs camera position at offset 112', () => {
-    const buffer = new ArrayBuffer(512)
+    const buffer = new ArrayBuffer(528)
     const data = new Float32Array(buffer)
     const dataView = new DataView(buffer)
 
@@ -179,7 +179,7 @@ describe('packCameraUniforms', () => {
   })
 
   it('packs screen size and aspect ratio', () => {
-    const buffer = new ArrayBuffer(512)
+    const buffer = new ArrayBuffer(528)
     const data = new Float32Array(buffer)
     const dataView = new DataView(buffer)
 
@@ -199,7 +199,7 @@ describe('packCameraUniforms', () => {
   })
 
   it('builds model matrix from transform in 3D mode', () => {
-    const buffer = new ArrayBuffer(512)
+    const buffer = new ArrayBuffer(528)
     const data = new Float32Array(buffer)
     const dataView = new DataView(buffer)
 
@@ -226,7 +226,7 @@ describe('packCameraUniforms', () => {
   })
 
   it('packs frame number as uint32', () => {
-    const buffer = new ArrayBuffer(512)
+    const buffer = new ArrayBuffer(528)
     const data = new Float32Array(buffer)
     const dataView = new DataView(buffer)
 
@@ -241,6 +241,64 @@ describe('packCameraUniforms', () => {
     })
 
     expect(dataView.getUint32(123 * 4, true)).toBe(12345)
+  })
+
+  it('precomputes cameraPositionModel at offset 128 (inverseModelMatrix * cameraPosition)', () => {
+    const buffer = new ArrayBuffer(528)
+    const data = new Float32Array(buffer)
+    const dataView = new DataView(buffer)
+
+    // Camera at (0, 0, 8), transform scale=2, position=(1, 2, 3).
+    // inverseModelMatrix is diag(1/2) + translate(-pos/2).
+    // cameraPositionModel = (0.5*0 + (-0.5), 0.5*0 + (-1), 0.5*8 + (-1.5)) = (-0.5, -1, 2.5).
+    packCameraUniforms(data, dataView, {
+      camera: mockCamera, // position=(0,0,8)
+      animationTime: 0,
+      is2D: false,
+      transform: { uniformScale: 2.0, position: [1, 2, 3] },
+      bayerOffset: [0, 0],
+      size: { width: 100, height: 100 },
+      frameDelta: 0.016,
+      frameNumber: 0,
+    })
+
+    expect(data[128]).toBeCloseTo(-0.5)
+    expect(data[129]).toBeCloseTo(-1.0)
+    expect(data[130]).toBeCloseTo(2.5)
+    // Final padding slot zeroed
+    expect(data[131]).toBe(0)
+  })
+
+  it('recomputes cameraPositionModel when model matrix changes (scale)', () => {
+    const buffer = new ArrayBuffer(528)
+    const data = new Float32Array(buffer)
+    const dataView = new DataView(buffer)
+
+    // First pack: scale=1 → cameraPositionModel equals cameraPosition
+    packCameraUniforms(data, dataView, {
+      camera: mockCamera, // position=(0,0,8)
+      animationTime: 0,
+      is2D: false,
+      transform: { uniformScale: 1.0, position: [0, 0, 0] },
+      bayerOffset: [0, 0],
+      size: { width: 100, height: 100 },
+      frameDelta: 0.016,
+      frameNumber: 0,
+    })
+    expect(data[130]).toBeCloseTo(8.0)
+
+    // Repack with scale=4 → cameraPositionModel.z = 8 / 4 = 2
+    packCameraUniforms(data, dataView, {
+      camera: mockCamera,
+      animationTime: 0,
+      is2D: false,
+      transform: { uniformScale: 4.0, position: [0, 0, 0] },
+      bayerOffset: [0, 0],
+      size: { width: 100, height: 100 },
+      frameDelta: 0.016,
+      frameNumber: 0,
+    })
+    expect(data[130]).toBeCloseTo(2.0)
   })
 })
 

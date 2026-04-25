@@ -15,22 +15,20 @@
  */
 
 /**
- * Fused potentialHalf + pack: Apply half-step potential rotation to psiRe/psiIm
- * in-place, then interleave into the complex FFT buffer.
+ * Fused potentialHalf + pack: Apply half-step potential rotation to the
+ * vec2f psi buffer in-place, then interleave into the complex FFT buffer.
  *
  * Bind group layout:
  *   @group(0) @binding(0) TDSEUniforms
- *   @group(0) @binding(1) psiRe (read_write)
- *   @group(0) @binding(2) psiIm (read_write)
- *   @group(0) @binding(3) potential (read)
- *   @group(0) @binding(4) complexBuf (read_write)
+ *   @group(0) @binding(1) psi (vec2f, read_write)
+ *   @group(0) @binding(2) potential (read)
+ *   @group(0) @binding(3) complexBuf (read_write)
  */
 export const tdseFusedPotentialPackBlock = /* wgsl */ `
 @group(0) @binding(0) var<storage, read> params: TDSEUniforms;
-@group(0) @binding(1) var<storage, read_write> psiRe: array<f32>;
-@group(0) @binding(2) var<storage, read_write> psiIm: array<f32>;
-@group(0) @binding(3) var<storage, read> potential: array<f32>;
-@group(0) @binding(4) var<storage, read_write> complexBuf: array<f32>;
+@group(0) @binding(1) var<storage, read_write> psi: array<vec2f>;
+@group(0) @binding(2) var<storage, read> potential: array<f32>;
+@group(0) @binding(3) var<storage, read_write> complexBuf: array<f32>;
 
 const INV_TWO_PI: f32 = 0.15915494309189535;
 const TWO_PI: f32 = 6.283185307179587;
@@ -42,8 +40,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
 
-  let re = psiRe[idx];
-  let im = psiIm[idx];
+  let z = psi[idx];
+  let re = z.x;
+  let im = z.y;
 
   // Uniform-only: precompute 0.5·dt/max(ℏ,ε) to replace per-thread divide with multiply.
   let halfDtOverHbar = (0.5 * params.dt) / max(params.hbar, 1e-6);
@@ -61,18 +60,18 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     newRe = re * decay;
     newIm = im * decay;
   } else {
-    let phase = -arg;
-    // Reduce to [-π, π] so f32 cos/sin stay precise for high-V / small-ℏ combos
-    let reduced = phase - round(phase * INV_TWO_PI) * TWO_PI;
-    let cosP = cos(reduced);
-    let sinP = sin(reduced);
-    newRe = re * cosP - im * sinP;
-    newIm = re * sinP + im * cosP;
+    // Reduce arg (positive) to [-π, π]; fold the −arg sign into the complex
+    // multiply via cos(-x)=cos(x), sin(-x)=-sin(x). Saves one negate per thread.
+    let argReduced = arg - round(arg * INV_TWO_PI) * TWO_PI;
+    let cosP = cos(argReduced);
+    let sinP = sin(argReduced);
+    // exp(−i·arg)·(re + i·im) = (re·cosP + im·sinP) + i·(im·cosP − re·sinP)
+    newRe = re * cosP + im * sinP;
+    newIm = im * cosP - re * sinP;
   }
 
-  // 2. Write back to psiRe/psiIm (needed for potential/absorber in later passes)
-  psiRe[idx] = newRe;
-  psiIm[idx] = newIm;
+  // 2. Write back to psi (needed for potential/absorber in later passes) — one vec2f store.
+  psi[idx] = vec2f(newRe, newIm);
 
   // 3. Pack into interleaved complex buffer for FFT (one address → adjacent writes).
   let c = idx << 1u;
@@ -83,21 +82,19 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
 /**
  * Fused unpack + potentialHalf: Deinterleave complex FFT output with 1/N normalization,
- * then apply half-step potential rotation, writing directly to psiRe/psiIm.
+ * then apply half-step potential rotation, writing directly to vec2f psi.
  *
  * Bind group layout:
  *   @group(0) @binding(0) TDSEUniforms
  *   @group(0) @binding(1) complexBuf (read)
- *   @group(0) @binding(2) psiRe (read_write)
- *   @group(0) @binding(3) psiIm (read_write)
- *   @group(0) @binding(4) potential (read)
+ *   @group(0) @binding(2) psi (vec2f, read_write)
+ *   @group(0) @binding(3) potential (read)
  */
 export const tdseFusedUnpackPotentialBlock = /* wgsl */ `
 @group(0) @binding(0) var<storage, read> params: TDSEUniforms;
 @group(0) @binding(1) var<storage, read> complexBuf: array<f32>;
-@group(0) @binding(2) var<storage, read_write> psiRe: array<f32>;
-@group(0) @binding(3) var<storage, read_write> psiIm: array<f32>;
-@group(0) @binding(4) var<storage, read> potential: array<f32>;
+@group(0) @binding(2) var<storage, read_write> psi: array<vec2f>;
+@group(0) @binding(3) var<storage, read> potential: array<f32>;
 
 const UP_INV_TWO_PI: f32 = 0.15915494309189535;
 const UP_TWO_PI: f32 = 6.283185307179587;
@@ -123,16 +120,15 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   if (params.imaginaryTime != 0u) {
     let decay = exp(-arg);
-    psiRe[idx] = re * decay;
-    psiIm[idx] = im * decay;
+    psi[idx] = vec2f(re * decay, im * decay);
   } else {
-    let phase = -arg;
-    // Reduce to [-π, π] so f32 cos/sin stay precise for high-V / small-ℏ combos
-    let reduced = phase - round(phase * UP_INV_TWO_PI) * UP_TWO_PI;
-    let cosP = cos(reduced);
-    let sinP = sin(reduced);
-    psiRe[idx] = re * cosP - im * sinP;
-    psiIm[idx] = re * sinP + im * cosP;
+    // Reduce arg (positive) to [-π, π]; fold the −arg sign into the complex
+    // multiply via cos(-x)=cos(x), sin(-x)=-sin(x). Saves one negate per thread.
+    let argReduced = arg - round(arg * UP_INV_TWO_PI) * UP_TWO_PI;
+    let cosP = cos(argReduced);
+    let sinP = sin(argReduced);
+    // exp(−i·arg)·(re + i·im) = (re·cosP + im·sinP) + i·(im·cosP − re·sinP)
+    psi[idx] = vec2f(re * cosP + im * sinP, im * cosP - re * sinP);
   }
 }
 `

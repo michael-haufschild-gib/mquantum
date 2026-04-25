@@ -19,7 +19,13 @@ import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { isTimeDependentMetric } from '@/lib/physics/tdse/metrics/types'
 
 import type { WebGPURenderContext } from '../core/types'
-import { computeStridesPadded, DIAG_DECIMATION, GRID_WG, LINEAR_WG } from './computePassUtils'
+import {
+  computeStridesPadded,
+  DIAG_DECIMATION,
+  GRID_WG,
+  LINEAR_WG,
+  type SiteDispatch,
+} from './computePassUtils'
 import { dispatchDiagnostics as extDispatchDiagnostics } from './TDSEComputePassDispatchers'
 import type { TdseBindGroupResult, TdsePipelineResult } from './TDSEComputePassSetup'
 import {
@@ -82,6 +88,12 @@ export interface EvolutionResources {
    */
   wormholePipeline: WormholePipelineResources | null
   wormholeBG: GPUBindGroup | null
+  /**
+   * 3-D dispatch shape + variant flag for per-site kernels (absorber, etc.).
+   * Computed once per frame in {@link runTdseExecute} and forwarded so all
+   * dispatches in this frame share the same choice.
+   */
+  siteDispatch: SiteDispatch
   /** Dispatch a compute pass. */
   dc: (
     pe: GPUComputePassEncoder,
@@ -187,7 +199,17 @@ export function runStrangEvolution(
       // init-bind-group as the flat path; operates on ψ regardless of metric.
       if (curvedAbsorberActive) {
         const absPass = ctx.beginComputePass({ label: `tdse-curved-absorber-${step}` })
-        curvedDc(absPass, curvedPl.absorberPipeline, [curvedBg.initBG], curvedLinearWG)
+        const absPl = res.siteDispatch.use3D
+          ? curvedPl.absorberPipeline3D
+          : curvedPl.absorberPipeline
+        curvedDc(
+          absPass,
+          absPl,
+          [curvedBg.initBG],
+          res.siteDispatch.x,
+          res.siteDispatch.y,
+          res.siteDispatch.z
+        )
         absPass.end()
       }
       // Per-step renormalization for non-unitary modes (imaginary-time,
@@ -326,7 +348,15 @@ export function runStrangEvolution(
       // dispatched after the stochastic sub-step loop below.
       const inlineAbsorber = config.absorberEnabled && !stochasticActive
       if (inlineAbsorber) {
-        dc(strangPass, pl.absorberPipeline, [bg.initBG], linearWG)
+        const absPl = res.siteDispatch.use3D ? pl.absorberPipeline3D : pl.absorberPipeline
+        dc(
+          strangPass,
+          absPl,
+          [bg.initBG],
+          res.siteDispatch.x,
+          res.siteDispatch.y,
+          res.siteDispatch.z
+        )
       }
       strangPass.end()
     } else {
@@ -374,7 +404,8 @@ export function runStrangEvolution(
 
       if (config.absorberEnabled && !stochasticActive) {
         const absPass = ctx.beginComputePass({ label: `tdse-absorber-${step}` })
-        dc(absPass, pl.absorberPipeline, [bg.initBG], linearWG)
+        const absPl = res.siteDispatch.use3D ? pl.absorberPipeline3D : pl.absorberPipeline
+        dc(absPass, absPl, [bg.initBG], res.siteDispatch.x, res.siteDispatch.y, res.siteDispatch.z)
         absPass.end()
       }
     }
@@ -391,10 +422,10 @@ export function runStrangEvolution(
           ctx,
           config,
           res.stochasticState,
-          linearWG,
+          res.siteDispatch,
           res.totalSites,
           step * cslSub + sub,
-          (pass, pipeline, bindGroups, wgX) => dc(pass, pipeline, bindGroups, wgX)
+          dc
         )
       }
     }
@@ -405,7 +436,8 @@ export function runStrangEvolution(
     // here for the stochastic case.
     if (config.absorberEnabled && stochasticActive) {
       const absPass = ctx.beginComputePass({ label: `tdse-absorber-${step}` })
-      dc(absPass, pl.absorberPipeline, [bg.initBG], linearWG)
+      const absPl = res.siteDispatch.use3D ? pl.absorberPipeline3D : pl.absorberPipeline
+      dc(absPass, absPl, [bg.initBG], res.siteDispatch.x, res.siteDispatch.y, res.siteDispatch.z)
       absPass.end()
     }
 

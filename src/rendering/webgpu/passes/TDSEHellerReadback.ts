@@ -83,21 +83,19 @@ export interface HellerReadbackState {
   baseSimTime: number | null
   /** Monotonic generation counter; bumped on reset to invalidate pending readbacks. */
   generation: number
-  /** psi real GPU buffer (borrowed, not owned). */
-  psiReBuffer: GPUBuffer | null
-  /** psi imaginary GPU buffer (borrowed, not owned). */
-  psiImBuffer: GPUBuffer | null
-  /** Number of lattice sites in the borrowed psi buffers. */
+  /** Merged ψ buffer (array<vec2f>, borrowed, not owned). */
+  psiBuffer: GPUBuffer | null
+  /** Number of lattice sites in the borrowed psi buffer. */
   totalSites: number
   /**
-   * Reusable MAP_READ staging buffer for ψ.re. Persistently allocated so
-   * the per-sample hot path does not churn `createBuffer` / `destroy`
-   * every capture. `null` until the first schedule or after
+   * Reusable MAP_READ staging buffer for the merged interleaved ψ. Sized
+   * for `totalSites * 8` bytes — Float32Array view alternates Re,Im per
+   * site (vec2f memory layout). Persistent so the per-sample hot path
+   * does not churn `createBuffer` / `destroy` every capture. `null`
+   * until the first schedule or after
    * {@link disposeHellerStagingBuffers}.
    */
-  stagingRe: GPUBuffer | null
-  /** Reusable MAP_READ staging buffer for ψ.im. */
-  stagingIm: GPUBuffer | null
+  staging: GPUBuffer | null
   /**
    * Size in bytes of the allocated staging buffers. Used to detect
    * whether a field rebuild changed `totalSites` and we therefore need
@@ -130,11 +128,9 @@ export function createHellerReadbackState(): HellerReadbackState {
     buffer: createHellerBuffer(),
     baseSimTime: null,
     generation: 0,
-    psiReBuffer: null,
-    psiImBuffer: null,
+    psiBuffer: null,
     totalSites: 0,
-    stagingRe: null,
-    stagingIm: null,
+    staging: null,
     stagingBytes: 0,
     staticHFingerprint: null,
   }
@@ -212,43 +208,34 @@ function computeStaticHFingerprint(config: TdseConfig): string {
  * mapAsync — the caller must bump the `generation` counter first so the
  * stale handler bails out.
  *
- * @param state - Readback state; `stagingRe`, `stagingIm`, and
- *                `stagingBytes` are cleared.
+ * @param state - Readback state; `staging` and `stagingBytes` are cleared.
  */
 export function disposeHellerStagingBuffers(state: HellerReadbackState): void {
-  state.stagingRe?.destroy()
-  state.stagingIm?.destroy()
-  state.stagingRe = null
-  state.stagingIm = null
+  state.staging?.destroy()
+  state.staging = null
   state.stagingBytes = 0
 }
 
 /**
- * Ensure the state has a pair of MAP_READ staging buffers sized for the
- * current `totalSites`. If the pool is empty or the cached size differs,
- * destroy the old pair and allocate a new one. Safe to call every
- * schedule — the fast path is a pair of identity checks.
+ * Ensure the state has a single MAP_READ staging buffer sized for the
+ * current `totalSites` (8 bytes/site, vec2f). If the pool is empty or
+ * the cached size differs, destroy the old buffer and allocate a new
+ * one. Safe to call every schedule — the fast path is one identity check.
  *
  * @param device - WebGPU device
  * @param state - Readback state (mutated in place)
- * @param byteSize - `totalSites * 4` (Float32 lattice)
+ * @param byteSize - `totalSites * 8` (interleaved [re,im,...] f32 layout)
  */
 function ensureStagingBuffers(
   device: GPUDevice,
   state: HellerReadbackState,
   byteSize: number
 ): void {
-  if (state.stagingRe && state.stagingIm && state.stagingBytes === byteSize) return
+  if (state.staging && state.stagingBytes === byteSize) return
   // Size mismatch (field rebuilt) or first-time init — recreate.
-  state.stagingRe?.destroy()
-  state.stagingIm?.destroy()
-  state.stagingRe = device.createBuffer({
-    label: 'heller-staging-re',
-    size: byteSize,
-    usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-  })
-  state.stagingIm = device.createBuffer({
-    label: 'heller-staging-im',
+  state.staging?.destroy()
+  state.staging = device.createBuffer({
+    label: 'heller-staging',
     size: byteSize,
     usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
   })
@@ -280,7 +267,7 @@ export function tickHellerStep(
   state: HellerReadbackState,
   simTime: number
 ): void {
-  if (!state.enabled || !state.psiReBuffer || !state.psiImBuffer || state.totalSites <= 0) return
+  if (!state.enabled || !state.psiBuffer || state.totalSites <= 0) return
 
   state.stepCounter++
   if (state.stepCounter < Math.max(1, state.sampleInterval)) return
@@ -316,7 +303,7 @@ export function scheduleHellerReadback(
   state: HellerReadbackState,
   simTime: number
 ): void {
-  if (!state.enabled || !state.psiReBuffer || !state.psiImBuffer || state.totalSites <= 0) return
+  if (!state.enabled || !state.psiBuffer || state.totalSites <= 0) return
   if (state.readbackInFlight) return
   submitHellerCopy(device, encoder, state, simTime)
 }
@@ -339,19 +326,15 @@ function submitHellerCopy(
   state: HellerReadbackState,
   simTime: number
 ): void {
-  const psiReBuffer = state.psiReBuffer
-  const psiImBuffer = state.psiImBuffer
-  if (!psiReBuffer || !psiImBuffer) return
-  const byteSize = state.totalSites * 4
+  const psiBuffer = state.psiBuffer
+  if (!psiBuffer) return
+  // Merged ψ is array<vec2f>: 8 bytes per site, interleaved [re,im,...].
+  const byteSize = state.totalSites * 8
   ensureStagingBuffers(device, state, byteSize)
-  // After ensureStagingBuffers the pool is guaranteed populated, but TS
-  // needs the local aliases to be non-null for the closure below.
-  const stagingRe = state.stagingRe
-  const stagingIm = state.stagingIm
-  if (!stagingRe || !stagingIm) return
+  const staging = state.staging
+  if (!staging) return
 
-  encoder.copyBufferToBuffer(psiReBuffer, 0, stagingRe, 0, byteSize)
-  encoder.copyBufferToBuffer(psiImBuffer, 0, stagingIm, 0, byteSize)
+  encoder.copyBufferToBuffer(psiBuffer, 0, staging, 0, byteSize)
 
   state.readbackInFlight = true
   const capturedGeneration = state.generation
@@ -359,26 +342,13 @@ function submitHellerCopy(
   const capturedTotalSites = state.totalSites
 
   /**
-   * Release the staging buffers back into the pool. They are NOT
-   * destroyed — only unmapped — so the next schedule can reuse them
-   * without paying for a WebGPU allocation.
-   *
-   * Identity guard against the replace-then-resolve race: if the pool
-   * has swapped out the staging buffers while this readback was in
-   * flight (via `ensureStagingBuffers` on a size change, or via
-   * `disposeHellerStagingBuffers` on a pass dispose), the local
-   * aliases point to freed / destroyed buffers and calling `unmap()`
-   * on them is undefined. We only touch the buffers if they are still
-   * the ones published on `state` — otherwise whoever swapped them out
-   * already took care of unmapping / destruction, and we just clear
-   * the in-flight flag.
+   * Release the staging buffer back into the pool. NOT destroyed — only
+   * unmapped. Identity guard handles the replace-then-resolve race when
+   * the pool has swapped out the buffer mid-flight.
    */
   const finish = (): void => {
-    if (state.stagingRe === stagingRe && stagingRe.mapState !== 'unmapped') {
-      stagingRe.unmap()
-    }
-    if (state.stagingIm === stagingIm && stagingIm.mapState !== 'unmapped') {
-      stagingIm.unmap()
+    if (state.staging === staging && staging.mapState !== 'unmapped') {
+      staging.unmap()
     }
     state.readbackInFlight = false
   }
@@ -390,25 +360,27 @@ function submitHellerCopy(
         finish()
         return
       }
-      if (stagingRe.mapState !== 'unmapped' || stagingIm.mapState !== 'unmapped') {
+      if (staging.mapState !== 'unmapped') {
         finish()
         return
       }
-      await Promise.all([stagingRe.mapAsync(GPUMapMode.READ), stagingIm.mapAsync(GPUMapMode.READ)])
+      await staging.mapAsync(GPUMapMode.READ)
       if (capturedGeneration !== state.generation) {
         finish()
         return
       }
 
-      const mappedRe = new Float32Array(stagingRe.getMappedRange())
-      const mappedIm = new Float32Array(stagingIm.getMappedRange())
+      // Interleaved view: even indices = Re, odd = Im (vec2f layout).
+      const interleaved = new Float32Array(staging.getMappedRange())
 
       if (state.psi0Re === null || state.psi0Im === null) {
-        // First sample: cache ψ(0) deep copy and record the anchor.
+        // First sample: cache ψ(0) deep copy (deinterleaved) and record the anchor.
         const psi0Re = new Float32Array(capturedTotalSites)
         const psi0Im = new Float32Array(capturedTotalSites)
-        psi0Re.set(mappedRe.subarray(0, capturedTotalSites))
-        psi0Im.set(mappedIm.subarray(0, capturedTotalSites))
+        for (let i = 0; i < capturedTotalSites; i++) {
+          psi0Re[i] = interleaved[2 * i]!
+          psi0Im[i] = interleaved[2 * i + 1]!
+        }
         state.psi0Re = psi0Re
         state.psi0Im = psi0Im
         state.baseSimTime = capturedSimTime
@@ -439,8 +411,8 @@ function submitHellerCopy(
           for (let i = 0; i < nSites; i++) {
             const ar = psi0Re[i]!
             const ai = psi0Im[i]!
-            const br = mappedRe[i]!
-            const bi = mappedIm[i]!
+            const br = interleaved[2 * i]!
+            const bi = interleaved[2 * i + 1]!
             // ⟨a|b⟩ = Σ conj(a) · b = Σ (ar - i·ai)(br + i·bi)
             cRe += ar * br + ai * bi
             cIm += ar * bi - ai * br

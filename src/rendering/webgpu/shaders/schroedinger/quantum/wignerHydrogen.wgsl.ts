@@ -87,10 +87,12 @@ fn wignerHydrogenRadial(r: f32, pr: f32, n: i32, l: i32, a0: f32, nPts: i32) -> 
   var cosI  = cos(phi0);
   var sinI  = sin(phi0);
 
+  // PERF: run s via an additive recurrence alongside the cos/sin rotation —
+  // saves one f32 cast and one mul per iter. Accumulated drift is O(N*eps*ds),
+  // on the same order as the rotation recurrence's already-accepted drift.
   var integral = 0.0;
+  var s = 0.5 * ds;
   for (var i = 0; i < effectiveNPts; i++) {
-    let s = (f32(i) + 0.5) * ds;
-
     // u_nl(r + s)
     let uPlus = hydrogenReducedRadial(n, l, r + s, a0);
 
@@ -110,6 +112,7 @@ fn wignerHydrogenRadial(r: f32, pr: f32, n: i32, l: i32, a0: f32, nPts: i32) -> 
     let newSin = sinI * cosD + cosI * sinD;
     cosI = newCos;
     sinI = newSin;
+    s += ds;
   }
 
   return (2.0 / PI) * integral * ds;

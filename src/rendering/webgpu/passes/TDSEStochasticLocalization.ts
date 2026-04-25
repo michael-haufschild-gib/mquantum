@@ -27,9 +27,13 @@ import {
   tdseStochasticExpectFinalizeBlock,
   tdseStochasticExpectReduceBlock,
 } from '../shaders/schroedinger/compute/tdseStochasticExpect.wgsl'
-import { tdseStochasticLocBlock } from '../shaders/schroedinger/compute/tdseStochasticLoc.wgsl'
+import {
+  tdseStochasticLocBlock,
+  tdseStochasticLocBlock3D,
+} from '../shaders/schroedinger/compute/tdseStochasticLoc.wgsl'
 import { tdseUniformsBlock } from '../shaders/schroedinger/compute/tdseUniforms.wgsl'
 import { createComputeBGL } from '../utils/computeBindGroupLayout'
+import type { SiteDispatch } from './computePassUtils'
 
 /** Maximum collapse centers per dispatch (mirrors physics constant). */
 const MAX_CENTERS_PER_DISPATCH = MAX_STOCHASTIC_SITES
@@ -49,9 +53,14 @@ const STOCHASTIC_UNIFORM_SIZE = 1568
 /** Size of the expectation finalize uniform buffer (16 bytes). */
 const EXPECT_FINALIZE_UNIFORM_SIZE = 16
 
-/** Pure WGSL composition for the stochastic-localization apply-kick compute shader. */
+/** Pure WGSL composition for the stochastic-localization apply-kick compute shader (1-D variant). */
 export function composeTdseStochasticLocShader(): string {
   return tdseUniformsBlock + freeScalarNDIndexBlock + tdseStochasticLocBlock
+}
+
+/** Pure WGSL for the stochastic-localization apply-kick shader (3-D variant). */
+export function composeTdseStochasticLoc3DShader(): string {
+  return tdseUniformsBlock + freeScalarNDIndexBlock + tdseStochasticLocBlock3D
 }
 
 /** Pure WGSL composition for the 2-channel expect-reduce compute shader. */
@@ -68,6 +77,8 @@ export function composeTdseStochasticExpectFinalizeShader(): string {
 export interface StochasticLocState {
   uniformBuffer: GPUBuffer | null
   pipeline: GPUComputePipeline | null
+  /** 3-D dispatch sibling — same BGL/bindings, workgroup_size(4,4,4). */
+  pipeline3D: GPUComputePipeline | null
   bgl: GPUBindGroupLayout | null
   bg: GPUBindGroup | null
 
@@ -94,6 +105,7 @@ export function createStochasticLocState(): StochasticLocState {
   return {
     uniformBuffer: null,
     pipeline: null,
+    pipeline3D: null,
     bgl: null,
     bg: null,
     expectReducePipeline: null,
@@ -116,8 +128,8 @@ export function createStochasticLocState(): StochasticLocState {
 /**
  * Build the stochastic localization compute pipeline.
  *
- * Localization shader bind group (5 bindings):
- *   0: TDSEUniforms, 1: psiRe, 2: psiIm, 3: StochasticParams, 4: expectResult
+ * Localization shader bind group (4 bindings after vec2f-ψ merge):
+ *   0: TDSEUniforms, 1: psi (vec2f), 2: StochasticParams, 3: expectResult
  */
 export function buildStochasticLocPipeline(
   device: GPUDevice,
@@ -130,12 +142,11 @@ export function buildStochasticLocPipeline(
     label: string
   ) => GPUComputePipeline
 ): void {
-  // Localization pipeline: TDSEUniforms(storage), storage×2, StochasticParams(uniform),
+  // Localization pipeline: TDSEUniforms(storage), psi(vec2f rw), StochasticParams(uniform),
   // read-only-storage. Binding 0 (TDSEUniforms) — see tdseInit.wgsl.ts for the
   // spec-noncompliance rationale.
   state.bgl = createComputeBGL(device, 'tdse-stochastic-loc-bgl', [
     'read-only-storage',
-    'storage',
     'storage',
     'uniform',
     'read-only-storage',
@@ -143,6 +154,13 @@ export function buildStochasticLocPipeline(
 
   const sm = createShaderModule(device, composeTdseStochasticLocShader(), 'tdse-stochastic-loc')
   state.pipeline = createComputePipeline(device, sm, [state.bgl], 'tdse-stochastic-loc')
+  // 3-D dispatch sibling — same BGL/bindings, workgroup_size(4,4,4).
+  const sm3D = createShaderModule(
+    device,
+    composeTdseStochasticLoc3DShader(),
+    'tdse-stochastic-loc-3d'
+  )
+  state.pipeline3D = createComputePipeline(device, sm3D, [state.bgl], 'tdse-stochastic-loc-3d')
 
   state.uniformBuffer?.destroy()
   state.uniformBuffer = device.createBuffer({
@@ -161,10 +179,9 @@ export function buildStochasticLocPipeline(
   device.queue.writeBuffer(state.expectResultBuffer, 0, new Float32Array(EXPECT_CHANNELS))
 
   // Expectation reduction pipelines (2-channel: Σ|ψ|²W + Σ|ψ|²).
-  // Binding 0 (TDSEUniforms) — see loc BGL comment; binding 3 (StochasticParams)
-  // stays uniform.
+  // Binding 0 (TDSEUniforms) — see loc BGL comment; binding 2 (StochasticParams)
+  // stays uniform; binding 1 is now the merged ψ (vec2f).
   state.expectReduceBGL = createComputeBGL(device, 'tdse-stochastic-expect-reduce-bgl', [
-    'read-only-storage',
     'read-only-storage',
     'read-only-storage',
     'uniform',
@@ -205,8 +222,7 @@ export function rebuildStochasticLocBindGroup(
   device: GPUDevice,
   state: StochasticLocState,
   uniformBuffer: GPUBuffer,
-  psiReBuffer: GPUBuffer,
-  psiImBuffer: GPUBuffer
+  psiBuffer: GPUBuffer
 ): void {
   if (!state.bgl || !state.uniformBuffer || !state.expectResultBuffer) return
   state.bg = device.createBindGroup({
@@ -214,10 +230,9 @@ export function rebuildStochasticLocBindGroup(
     layout: state.bgl,
     entries: [
       { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: psiReBuffer } },
-      { binding: 2, resource: { buffer: psiImBuffer } },
-      { binding: 3, resource: { buffer: state.uniformBuffer } },
-      { binding: 4, resource: { buffer: state.expectResultBuffer } },
+      { binding: 1, resource: { buffer: psiBuffer } },
+      { binding: 2, resource: { buffer: state.uniformBuffer } },
+      { binding: 3, resource: { buffer: state.expectResultBuffer } },
     ],
   })
 }
@@ -230,8 +245,7 @@ export function rebuildExpectationBindGroups(
   device: GPUDevice,
   state: StochasticLocState,
   uniformBuffer: GPUBuffer,
-  psiReBuffer: GPUBuffer,
-  psiImBuffer: GPUBuffer,
+  psiBuffer: GPUBuffer,
   numWorkgroups: number
 ): void {
   if (
@@ -255,10 +269,9 @@ export function rebuildExpectationBindGroups(
     layout: state.expectReduceBGL,
     entries: [
       { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: psiReBuffer } },
-      { binding: 2, resource: { buffer: psiImBuffer } },
-      { binding: 3, resource: { buffer: state.uniformBuffer } },
-      { binding: 4, resource: { buffer: state.expectPartialBuffer } },
+      { binding: 1, resource: { buffer: psiBuffer } },
+      { binding: 2, resource: { buffer: state.uniformBuffer } },
+      { binding: 3, resource: { buffer: state.expectPartialBuffer } },
     ],
   })
 
@@ -406,14 +419,16 @@ export function maybeDispatchStochasticLoc(
   ctx: WebGPURenderContext,
   config: TdseConfig,
   state: StochasticLocState,
-  linearWG: number,
+  siteDispatch: SiteDispatch,
   totalSites: number,
   step: number,
   dispatchCompute: (
     pass: GPUComputePassEncoder,
     pipeline: GPUComputePipeline,
     bindGroups: GPUBindGroup[],
-    wgX: number
+    wgX: number,
+    wgY?: number,
+    wgZ?: number
   ) => void
 ): void {
   if (
@@ -455,9 +470,11 @@ export function maybeDispatchStochasticLoc(
     fPass.end()
   }
 
-  // Apply the centered stochastic localization kick
+  // Apply the centered stochastic localization kick. 3-D dispatch fast-path
+  // when latticeDim===3 (skips the per-thread shift/mask coord decomposition).
+  const kickPipeline = siteDispatch.use3D && state.pipeline3D ? state.pipeline3D : state.pipeline
   const pass = ctx.beginComputePass({ label: `tdse-stochastic-loc-step${step}` })
-  dispatchCompute(pass, state.pipeline, [state.bg], linearWG)
+  dispatchCompute(pass, kickPipeline, [state.bg], siteDispatch.x, siteDispatch.y, siteDispatch.z)
   pass.end()
 }
 
@@ -484,6 +501,10 @@ export function disposeStochasticLoc(state: StochasticLocState): void {
   state.bg = null
   state.expectReduceBG = null
   state.expectFinalizeBG = null
+  // Pipelines are GC'd by the underlying GPUDevice; null the refs so a
+  // subsequent buildStochasticLocPipeline call recompiles cleanly.
+  state.pipeline = null
+  state.pipeline3D = null
   state.stepCounter = 0
   state.rng = null
   state.lastSeed = -1

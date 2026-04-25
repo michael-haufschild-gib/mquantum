@@ -28,6 +28,122 @@ export const MAX_LINEAR_DISPATCH_SITES = MAX_DISPATCH_PER_DIM * LINEAR_WG
 /** 3D dispatch workgroup size for write-grid passes */
 export const GRID_WG = 4
 
+/** 3D dispatch workgroup size for site-based compute kernels at latticeDim ≤ 3. */
+export const SITE_3D_WG = 4
+
+/**
+ * Compute 3-D workgroup-count tuple for site-based kernels using a
+ * `@workgroup_size(SITE_3D_WG, SITE_3D_WG, SITE_3D_WG)` block dispatched
+ * directly over the lattice extent.
+ *
+ * For each axis `d < latticeDim`, returns `ceil(gridSize[d] / SITE_3D_WG)`.
+ * Axes `d >= latticeDim` are clamped to 1 so the dispatch shape stays
+ * 1×1 along unused axes regardless of stale values left in `gridSize`.
+ *
+ * Caller must guarantee `latticeDim <= 3` — at higher dims the kernel
+ * cannot encode the extra axes in `gid.xyz` and must keep using the 1-D
+ * dispatch path.
+ *
+ * @param gridSize - Per-axis grid dimensions
+ * @param latticeDim - Number of active lattice dimensions (must be ≤ 3)
+ * @returns Workgroup counts as `[xCount, yCount, zCount]`
+ */
+export function compute3DDispatchCounts(
+  gridSize: readonly number[],
+  latticeDim: number
+): [number, number, number] {
+  if (!Number.isInteger(latticeDim) || latticeDim < 0 || latticeDim > 3) {
+    throw new Error(
+      `[compute] compute3DDispatchCounts: latticeDim=${latticeDim} is unsupported; expected integer 0..3`
+    )
+  }
+  // Reject malformed active-axis sizes up-front. Fractional / NaN values would
+  // slip past the per-dim max-dispatch guard below (NaN compares false), and
+  // an undefined slot would Math.ceil to NaN — both push the failure to a
+  // later dispatchWorkgroups() call instead of failing here.
+  for (let d = 0; d < latticeDim; d++) {
+    const axis = gridSize[d]
+    if (typeof axis !== 'number' || !Number.isInteger(axis) || axis < 1) {
+      throw new Error(
+        `[compute] compute3DDispatchCounts: gridSize[${d}]=${axis} is invalid; expected integer >= 1`
+      )
+    }
+  }
+  const x = latticeDim >= 1 ? Math.max(1, Math.ceil(gridSize[0]! / SITE_3D_WG)) : 1
+  const y = latticeDim >= 2 ? Math.max(1, Math.ceil(gridSize[1]! / SITE_3D_WG)) : 1
+  const z = latticeDim >= 3 ? Math.max(1, Math.ceil(gridSize[2]! / SITE_3D_WG)) : 1
+  if (x > MAX_DISPATCH_PER_DIM || y > MAX_DISPATCH_PER_DIM || z > MAX_DISPATCH_PER_DIM) {
+    throw new Error(
+      `[compute] compute3DDispatchCounts: dispatch (${x}, ${y}, ${z}) exceeds WebGPU limit ${MAX_DISPATCH_PER_DIM} per dim`
+    )
+  }
+  return [x, y, z]
+}
+
+/** Result of {@link pickSiteDispatch}: dispatch extents + variant flag. */
+export interface SiteDispatch {
+  x: number
+  y: number
+  z: number
+  /**
+   * `true` when the 3-D kernel variant should be used (latticeDim===3).
+   * `false` when the legacy 1-D linear-WG kernel variant should be used.
+   */
+  use3D: boolean
+}
+
+/**
+ * Choose the dispatch shape for a TDSE-family per-site compute kernel.
+ *
+ * For `latticeDim === 3` the host dispatches a 3-D grid sized
+ * `ceil(gridSize[d] / SITE_3D_WG)` per axis. The matching kernel uses
+ * `@workgroup_size(4, 4, 4)` and reads `gid.xyz` directly, skipping
+ * `linearToND`'s shift/mask coord decomposition.
+ *
+ * For `latticeDim !== 3` (1, 2, or ≥4) the host falls back to the legacy
+ * 1-D dispatch with `LINEAR_WG`. 3-D dispatch is skipped at lower dims
+ * because workgroup_size(4,4,4) wastes 4× / 16× of its 64 threads when
+ * only one or two axes are active, and is skipped at higher dims because
+ * `gid.xyz` only addresses three lattice axes.
+ *
+ * @param latticeDim - Active lattice dimension count
+ * @param totalSites - Total lattice sites (used by the 1-D fallback)
+ * @param gridSize - Per-axis grid dimensions (only [0..2] consulted)
+ * @returns Dispatch shape and `use3D` flag
+ */
+export function pickSiteDispatch(
+  latticeDim: number,
+  totalSites: number,
+  gridSize: readonly number[]
+): SiteDispatch {
+  if (!Number.isInteger(latticeDim) || latticeDim < 0) {
+    throw new Error(
+      `[compute] pickSiteDispatch: latticeDim=${latticeDim} is unsupported; expected integer >= 0`
+    )
+  }
+  if (!Number.isInteger(totalSites) || totalSites < 1) {
+    throw new Error(
+      `[compute] pickSiteDispatch: totalSites=${totalSites} is invalid; expected integer >= 1`
+    )
+  }
+  if (latticeDim === 3) {
+    const [x, y, z] = compute3DDispatchCounts(gridSize, 3)
+    return { x, y, z, use3D: true }
+  }
+  const x = Math.ceil(totalSites / LINEAR_WG)
+  if (x > MAX_DISPATCH_PER_DIM) {
+    throw new Error(
+      `[compute] pickSiteDispatch: linear dispatch ${x} exceeds WebGPU limit ${MAX_DISPATCH_PER_DIM} (totalSites=${totalSites})`
+    )
+  }
+  return {
+    x,
+    y: 1,
+    z: 1,
+    use3D: false,
+  }
+}
+
 // Re-export from shared constant for backward compatibility with existing importers
 export { DENSITY_GRID_SIZE }
 

@@ -13,11 +13,11 @@
  *   - stage:      staged = ψ + α · k (with α from small uniform)
  *   - accumulate: ψ += coef · dt · k (coef from small uniform)
  *
- * Scratch (allocated once per lattice rebuild, sized totalSites * 4 bytes
- * per Float32 array):
- *   - stagedRe, stagedIm        — RK4 intermediate input ψ + α·k
- *   - tmpRe,    tmpIm           — Tψ scratch (overwritten per k_m)
- *   - k{1..4}Re, k{1..4}Im      — RK4 derivatives
+ * Scratch (allocated once per lattice rebuild, sized totalSites * 8 bytes
+ * per `array<vec2f>` buffer; .x = Re, .y = Im):
+ *   - staged                    — RK4 intermediate input ψ + α·k
+ *   - tmp                       — Tψ scratch (overwritten per k_m)
+ *   - k1, k2, k3, k4            — RK4 derivatives
  *
  * Small 16-byte uniform buffers hold the RK4 constants 0.5/0.5/1.0 (stage α)
  * and 1/6/2/6/2/6/1/6 (accumulate coef). These are dt-independent and are
@@ -35,10 +35,12 @@ import {
   tdseCurvedAccumulateBlock,
   tdseCurvedBuildKBlock,
   tdseCurvedKineticBlock,
+  tdseCurvedKineticBlock3D,
   tdseCurvedStageBlock,
 } from '../shaders/schroedinger/compute/tdseCurvedKinetic.wgsl'
 import { tdseUniformsBlock } from '../shaders/schroedinger/compute/tdseUniforms.wgsl'
 import { createComputeBGL } from '../utils/computeBindGroupLayout'
+import type { SiteDispatch } from './computePassUtils'
 import { TDSE_UNIFORM_OFFSET_STAGE_TIME_K1 } from './TDSEComputePassBuffers'
 
 /** Workgroup size — must match `@workgroup_size` in all curved kernels. */
@@ -75,6 +77,12 @@ type CreateComputePipeline = (
 /** Compiled curved-integrator pipelines and their bind-group layouts. */
 export interface CurvedIntegratorPipelines {
   kineticPipeline: GPUComputePipeline
+  /**
+   * 3-D dispatch sibling of {@link kineticPipeline}. Same BGLs, same body;
+   * @workgroup_size(4,4,4) reads gid.xyz directly. Selected by host when
+   * latticeDim===3 (see pickSiteDispatch in computePassUtils).
+   */
+  kineticPipeline3D: GPUComputePipeline
   /** Group 0: uniform + psi(re,im) + out(re,im) storage. */
   kineticBGL: GPUBindGroupLayout
   /**
@@ -93,20 +101,18 @@ export interface CurvedIntegratorPipelines {
   accumulateScalarBGL: GPUBindGroupLayout
 }
 
-/** Float32 scratch buffers used by the RK4 loop (all sized totalSites * 4 bytes). */
+/**
+ * vec2f scratch buffers used by the RK4 loop (all sized totalSites * 8 bytes;
+ * each site stores one `vec2f` = .x Re, .y Im). Previous split Re/Im pairs
+ * have been merged to match the TDSE-wide `array<vec2f>` ψ layout.
+ */
 export interface CurvedIntegratorScratch {
-  stagedRe: GPUBuffer
-  stagedIm: GPUBuffer
-  tmpRe: GPUBuffer
-  tmpIm: GPUBuffer
-  k1Re: GPUBuffer
-  k1Im: GPUBuffer
-  k2Re: GPUBuffer
-  k2Im: GPUBuffer
-  k3Re: GPUBuffer
-  k3Im: GPUBuffer
-  k4Re: GPUBuffer
-  k4Im: GPUBuffer
+  staged: GPUBuffer
+  tmp: GPUBuffer
+  k1: GPUBuffer
+  k2: GPUBuffer
+  k3: GPUBuffer
+  k4: GPUBuffer
   /** Small 16-byte uniform buffers, pre-populated with RK4 constants. */
   alpha05Buffer: GPUBuffer // α = 0.5 (for k2, k3 staging)
   alpha10Buffer: GPUBuffer // α = 1.0 (for k4 staging)
@@ -191,9 +197,18 @@ export function createCurvedIntegratorState(): CurvedIntegratorState {
 // freeScalarNDIndexBlock`); each appends its specific kernel block.
 const curvedPrelude = (): string => tdseUniformsBlock + freeScalarNDIndexBlock
 
-/** Pure WGSL for the curved-kinetic half-step compute shader. */
+/** Pure WGSL for the curved-kinetic half-step compute shader (1-D variant). */
 export function composeTdseCurvedKineticShader(): string {
   return curvedPrelude() + tdseCurvedKineticBlock
+}
+
+/**
+ * Pure WGSL for the curved-kinetic half-step compute shader (3-D variant).
+ * Bit-identical output to {@link composeTdseCurvedKineticShader}; only
+ * the dispatch shape and per-thread coord-decomposition path differ.
+ */
+export function composeTdseCurvedKinetic3DShader(): string {
+  return curvedPrelude() + tdseCurvedKineticBlock3D
 }
 
 /** Pure WGSL for the curved RK4 buildK compute shader. */
@@ -221,15 +236,13 @@ export function buildCurvedPipelines(
   createShaderModule: CreateShaderModule,
   createComputePipeline: CreateComputePipeline
 ): CurvedIntegratorPipelines {
-  // Kinetic: group 0 = TDSEUniforms(storage) + 2 read-only storage (psi) + 2 storage (tmp out).
+  // Kinetic: group 0 = TDSEUniforms(storage) + ψ(vec2f read) + tmp(vec2f storage).
   // Group 1 = 16-byte RK4 stage-index uniform, rebound per k_m so the shader
   // can select the right stageTimeK{1..4} for time-dependent metrics.
   // Binding 0 (TDSEUniforms) — see tdseInit.wgsl.ts for the spec-noncompliance rationale.
   const kineticBGL = createComputeBGL(device, 'tdse-curved-kinetic-bgl', [
     'read-only-storage',
     'read-only-storage',
-    'read-only-storage',
-    'storage',
     'storage',
   ])
   const kineticStageBGL = createComputeBGL(device, 'tdse-curved-kinetic-stage-bgl', ['uniform'])
@@ -239,17 +252,20 @@ export function buildCurvedPipelines(
     [kineticBGL, kineticStageBGL],
     'tdse-curved-kinetic'
   )
+  const kineticPipeline3D = createComputePipeline(
+    device,
+    createShaderModule(device, composeTdseCurvedKinetic3DShader(), 'tdse-curved-kinetic-3d'),
+    [kineticBGL, kineticStageBGL],
+    'tdse-curved-kinetic-3d'
+  )
 
-  // buildK: TDSEUniforms(storage) + T(re,im) + stageIn(re,im) + potential + k(re,im).
+  // buildK: TDSEUniforms(storage) + T(vec2f) + stageIn(vec2f) + potential + k(vec2f).
   // Binding 0 (TDSEUniforms) — see kinetic BGL comment.
   const buildKBGL = createComputeBGL(device, 'tdse-curved-buildk-bgl', [
     'read-only-storage',
     'read-only-storage',
     'read-only-storage',
     'read-only-storage',
-    'read-only-storage',
-    'read-only-storage',
-    'storage',
     'storage',
   ])
   const buildKPipeline = createComputePipeline(
@@ -259,15 +275,12 @@ export function buildCurvedPipelines(
     'tdse-curved-buildk'
   )
 
-  // stage: two bind groups. G0: TDSEUniforms(storage) + psi + k + staged-out. G1: α uniform.
+  // stage: two bind groups. G0: TDSEUniforms(storage) + psi(vec2f) + k(vec2f) + stagedOut(vec2f). G1: α uniform.
   // Binding 0 (TDSEUniforms) — see kinetic BGL comment.
   const stageDataBGL = createComputeBGL(device, 'tdse-curved-stage-data-bgl', [
     'read-only-storage',
     'read-only-storage',
     'read-only-storage',
-    'read-only-storage',
-    'read-only-storage',
-    'storage',
     'storage',
   ])
   const stageScalarBGL = createComputeBGL(device, 'tdse-curved-stage-scalar-bgl', ['uniform'])
@@ -278,13 +291,11 @@ export function buildCurvedPipelines(
     'tdse-curved-stage'
   )
 
-  // accumulate: G0: TDSEUniforms(storage) + psi(rw) + k(r). G1: coef uniform.
+  // accumulate: G0: TDSEUniforms(storage) + psi(vec2f rw) + k(vec2f r). G1: coef uniform.
   // Binding 0 (TDSEUniforms) — see kinetic BGL comment.
   const accumulateDataBGL = createComputeBGL(device, 'tdse-curved-accumulate-data-bgl', [
     'read-only-storage',
     'storage',
-    'storage',
-    'read-only-storage',
     'read-only-storage',
   ])
   const accumulateScalarBGL = createComputeBGL(device, 'tdse-curved-accumulate-scalar-bgl', [
@@ -299,6 +310,7 @@ export function buildCurvedPipelines(
 
   return {
     kineticPipeline,
+    kineticPipeline3D,
     kineticBGL,
     kineticStageBGL,
     buildKPipeline,
@@ -312,11 +324,16 @@ export function buildCurvedPipelines(
   }
 }
 
-/** Create an f32 storage buffer with the usual RK4-scratch usage flags. */
+/**
+ * Create a vec2f (8 bytes/site) storage buffer with the usual RK4-scratch
+ * usage flags. Each RK4 scratch array stores one complex ψ per site; this
+ * function allocates 2× the site count in f32 terms to cover Re+Im packed
+ * into a single `vec2f` element on the GPU.
+ */
 function createScratch(device: GPUDevice, totalSites: number, label: string): GPUBuffer {
   return device.createBuffer({
     label,
-    size: totalSites * 4,
+    size: totalSites * 8,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
   })
 }
@@ -350,18 +367,12 @@ function createU32Uniform(device: GPUDevice, label: string, value: number): GPUB
 /** Destroy every scratch buffer held by the integrator state (safe on null). */
 export function disposeCurvedScratch(scratch: CurvedIntegratorScratch | null): void {
   if (!scratch) return
-  scratch.stagedRe.destroy()
-  scratch.stagedIm.destroy()
-  scratch.tmpRe.destroy()
-  scratch.tmpIm.destroy()
-  scratch.k1Re.destroy()
-  scratch.k1Im.destroy()
-  scratch.k2Re.destroy()
-  scratch.k2Im.destroy()
-  scratch.k3Re.destroy()
-  scratch.k3Im.destroy()
-  scratch.k4Re.destroy()
-  scratch.k4Im.destroy()
+  scratch.staged.destroy()
+  scratch.tmp.destroy()
+  scratch.k1.destroy()
+  scratch.k2.destroy()
+  scratch.k3.destroy()
+  scratch.k4.destroy()
   scratch.alpha05Buffer.destroy()
   scratch.alpha10Buffer.destroy()
   scratch.coef1Buffer.destroy()
@@ -397,18 +408,12 @@ export function createCurvedScratchBuffers(
     usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
   })
   return {
-    stagedRe: mk('tdse-curved-stagedRe'),
-    stagedIm: mk('tdse-curved-stagedIm'),
-    tmpRe: mk('tdse-curved-tmpRe'),
-    tmpIm: mk('tdse-curved-tmpIm'),
-    k1Re: mk('tdse-curved-k1Re'),
-    k1Im: mk('tdse-curved-k1Im'),
-    k2Re: mk('tdse-curved-k2Re'),
-    k2Im: mk('tdse-curved-k2Im'),
-    k3Re: mk('tdse-curved-k3Re'),
-    k3Im: mk('tdse-curved-k3Im'),
-    k4Re: mk('tdse-curved-k4Re'),
-    k4Im: mk('tdse-curved-k4Im'),
+    staged: mk('tdse-curved-staged'),
+    tmp: mk('tdse-curved-tmp'),
+    k1: mk('tdse-curved-k1'),
+    k2: mk('tdse-curved-k2'),
+    k3: mk('tdse-curved-k3'),
+    k4: mk('tdse-curved-k4'),
     alpha05Buffer: createScalarUniform(device, 'tdse-curved-alpha-05', 0.5),
     alpha10Buffer: createScalarUniform(device, 'tdse-curved-alpha-10', 1.0),
     coef1Buffer: createScalarUniform(device, 'tdse-curved-coef-1-6', oneSixth),
@@ -507,8 +512,7 @@ export function copyCurvedStageTimesForStep(
 /** Inputs required to (re)build the RK4 bind groups. */
 export interface CurvedBindGroupInputs {
   uniformBuffer: GPUBuffer
-  psiReBuffer: GPUBuffer
-  psiImBuffer: GPUBuffer
+  psiBuffer: GPUBuffer
   potentialBuffer: GPUBuffer
   scratch: CurvedIntegratorScratch
 }
@@ -522,7 +526,7 @@ export function rebuildCurvedBindGroups(
   pipelines: CurvedIntegratorPipelines,
   inputs: CurvedBindGroupInputs
 ): CurvedIntegratorBindGroups {
-  const { uniformBuffer: uni, psiReBuffer: psiRe, psiImBuffer: psiIm } = inputs
+  const { uniformBuffer: uni, psiBuffer: psi } = inputs
   const { potentialBuffer: V, scratch: s } = inputs
 
   const mkBG = (label: string, layout: GPUBindGroupLayout, entries: GPUBindGroupEntry[]) =>
@@ -531,56 +535,40 @@ export function rebuildCurvedBindGroups(
   // Kinetic variants. Input ψ source differs; output tmp is shared.
   const kineticPsiBG = mkBG('tdse-curved-kinetic-psi-bg', pipelines.kineticBGL, [
     { binding: 0, resource: { buffer: uni } },
-    { binding: 1, resource: { buffer: psiRe } },
-    { binding: 2, resource: { buffer: psiIm } },
-    { binding: 3, resource: { buffer: s.tmpRe } },
-    { binding: 4, resource: { buffer: s.tmpIm } },
+    { binding: 1, resource: { buffer: psi } },
+    { binding: 2, resource: { buffer: s.tmp } },
   ])
   const kineticStagedBG = mkBG('tdse-curved-kinetic-staged-bg', pipelines.kineticBGL, [
     { binding: 0, resource: { buffer: uni } },
-    { binding: 1, resource: { buffer: s.stagedRe } },
-    { binding: 2, resource: { buffer: s.stagedIm } },
-    { binding: 3, resource: { buffer: s.tmpRe } },
-    { binding: 4, resource: { buffer: s.tmpIm } },
+    { binding: 1, resource: { buffer: s.staged } },
+    { binding: 2, resource: { buffer: s.tmp } },
   ])
 
   // buildK — one BG per k_m. Stage input is ψ for k1, staged scratch for k2..k4.
-  const mkBuildK = (
-    label: string,
-    stageReBuf: GPUBuffer,
-    stageImBuf: GPUBuffer,
-    kReBuf: GPUBuffer,
-    kImBuf: GPUBuffer
-  ): GPUBindGroup =>
+  const mkBuildK = (label: string, stageBuf: GPUBuffer, kBuf: GPUBuffer): GPUBindGroup =>
     mkBG(label, pipelines.buildKBGL, [
       { binding: 0, resource: { buffer: uni } },
-      { binding: 1, resource: { buffer: s.tmpRe } },
-      { binding: 2, resource: { buffer: s.tmpIm } },
-      { binding: 3, resource: { buffer: stageReBuf } },
-      { binding: 4, resource: { buffer: stageImBuf } },
-      { binding: 5, resource: { buffer: V } },
-      { binding: 6, resource: { buffer: kReBuf } },
-      { binding: 7, resource: { buffer: kImBuf } },
+      { binding: 1, resource: { buffer: s.tmp } },
+      { binding: 2, resource: { buffer: stageBuf } },
+      { binding: 3, resource: { buffer: V } },
+      { binding: 4, resource: { buffer: kBuf } },
     ])
-  const buildK1BG = mkBuildK('tdse-curved-buildk-1', psiRe, psiIm, s.k1Re, s.k1Im)
-  const buildK2BG = mkBuildK('tdse-curved-buildk-2', s.stagedRe, s.stagedIm, s.k2Re, s.k2Im)
-  const buildK3BG = mkBuildK('tdse-curved-buildk-3', s.stagedRe, s.stagedIm, s.k3Re, s.k3Im)
-  const buildK4BG = mkBuildK('tdse-curved-buildk-4', s.stagedRe, s.stagedIm, s.k4Re, s.k4Im)
+  const buildK1BG = mkBuildK('tdse-curved-buildk-1', psi, s.k1)
+  const buildK2BG = mkBuildK('tdse-curved-buildk-2', s.staged, s.k2)
+  const buildK3BG = mkBuildK('tdse-curved-buildk-3', s.staged, s.k3)
+  const buildK4BG = mkBuildK('tdse-curved-buildk-4', s.staged, s.k4)
 
   // stage — reads live ψ + one k_m, writes staged. Group 1 holds the α scalar.
-  const mkStageFromK = (label: string, kReBuf: GPUBuffer, kImBuf: GPUBuffer): GPUBindGroup =>
+  const mkStageFromK = (label: string, kBuf: GPUBuffer): GPUBindGroup =>
     mkBG(label, pipelines.stageDataBGL, [
       { binding: 0, resource: { buffer: uni } },
-      { binding: 1, resource: { buffer: psiRe } },
-      { binding: 2, resource: { buffer: psiIm } },
-      { binding: 3, resource: { buffer: kReBuf } },
-      { binding: 4, resource: { buffer: kImBuf } },
-      { binding: 5, resource: { buffer: s.stagedRe } },
-      { binding: 6, resource: { buffer: s.stagedIm } },
+      { binding: 1, resource: { buffer: psi } },
+      { binding: 2, resource: { buffer: kBuf } },
+      { binding: 3, resource: { buffer: s.staged } },
     ])
-  const stageFromK1BG = mkStageFromK('tdse-curved-stage-from-k1', s.k1Re, s.k1Im)
-  const stageFromK2BG = mkStageFromK('tdse-curved-stage-from-k2', s.k2Re, s.k2Im)
-  const stageFromK3BG = mkStageFromK('tdse-curved-stage-from-k3', s.k3Re, s.k3Im)
+  const stageFromK1BG = mkStageFromK('tdse-curved-stage-from-k1', s.k1)
+  const stageFromK2BG = mkStageFromK('tdse-curved-stage-from-k2', s.k2)
+  const stageFromK3BG = mkStageFromK('tdse-curved-stage-from-k3', s.k3)
   const stageAlpha05BG = mkBG('tdse-curved-stage-alpha-05', pipelines.stageScalarBGL, [
     { binding: 0, resource: { buffer: s.alpha05Buffer } },
   ])
@@ -589,18 +577,16 @@ export function rebuildCurvedBindGroups(
   ])
 
   // accumulate — one BG per k_m, each writes into live ψ. Group 1 holds the coef scalar.
-  const mkAccBG = (label: string, kReBuf: GPUBuffer, kImBuf: GPUBuffer): GPUBindGroup =>
+  const mkAccBG = (label: string, kBuf: GPUBuffer): GPUBindGroup =>
     mkBG(label, pipelines.accumulateDataBGL, [
       { binding: 0, resource: { buffer: uni } },
-      { binding: 1, resource: { buffer: psiRe } },
-      { binding: 2, resource: { buffer: psiIm } },
-      { binding: 3, resource: { buffer: kReBuf } },
-      { binding: 4, resource: { buffer: kImBuf } },
+      { binding: 1, resource: { buffer: psi } },
+      { binding: 2, resource: { buffer: kBuf } },
     ])
-  const accumulateK1BG = mkAccBG('tdse-curved-accumulate-k1', s.k1Re, s.k1Im)
-  const accumulateK2BG = mkAccBG('tdse-curved-accumulate-k2', s.k2Re, s.k2Im)
-  const accumulateK3BG = mkAccBG('tdse-curved-accumulate-k3', s.k3Re, s.k3Im)
-  const accumulateK4BG = mkAccBG('tdse-curved-accumulate-k4', s.k4Re, s.k4Im)
+  const accumulateK1BG = mkAccBG('tdse-curved-accumulate-k1', s.k1)
+  const accumulateK2BG = mkAccBG('tdse-curved-accumulate-k2', s.k2)
+  const accumulateK3BG = mkAccBG('tdse-curved-accumulate-k3', s.k3)
+  const accumulateK4BG = mkAccBG('tdse-curved-accumulate-k4', s.k4)
   const accCoef1BG = mkBG('tdse-curved-acc-coef-1', pipelines.accumulateScalarBGL, [
     { binding: 0, resource: { buffer: s.coef1Buffer } },
   ])
@@ -667,20 +653,32 @@ export function rebuildCurvedBindGroups(
  *
  * @param encoder - Current frame command encoder.
  * @param state - Fully populated curved integrator state.
+ * @param siteDispatch - 3-D dispatch shape + variant flag for the kinetic
+ *   sub-step. The kinetic kernel reads coords, so the 3-D variant is used
+ *   when latticeDim===3. The other three sub-steps (buildK / stage /
+ *   accumulate) are pure linear per-site ops and stay on the 1-D path.
  */
-export function runCurvedRK4Step(encoder: GPUCommandEncoder, state: CurvedIntegratorState): void {
+export function runCurvedRK4Step(
+  encoder: GPUCommandEncoder,
+  state: CurvedIntegratorState,
+  siteDispatch: SiteDispatch
+): void {
   const { pipelines, scratch, bindGroups } = state
   if (!pipelines || !scratch || !bindGroups) return
   const wgCount = Math.ceil(scratch.totalSites / CURVED_WG)
+  const kPl = siteDispatch.use3D ? pipelines.kineticPipeline3D : pipelines.kineticPipeline
+  const kx = siteDispatch.x
+  const ky = siteDispatch.y
+  const kz = siteDispatch.z
 
   const pass = encoder.beginComputePass({ label: 'tdse-curved-rk4-step' })
 
   // ─── k1 ───────────────────────────────────────────────────────────────
   // Tψ into tmp (using live ψ as input). Stage index 0 → stageTimeK1.
-  pass.setPipeline(pipelines.kineticPipeline)
+  pass.setPipeline(kPl)
   pass.setBindGroup(0, bindGroups.kineticPsiBG)
   pass.setBindGroup(1, bindGroups.stageIndex0BG)
-  pass.dispatchWorkgroups(wgCount)
+  pass.dispatchWorkgroups(kx, ky, kz)
   // k1 = (−i/ℏ)(Tψ + V·ψ).
   pass.setPipeline(pipelines.buildKPipeline)
   pass.setBindGroup(0, bindGroups.buildK1BG)
@@ -692,10 +690,10 @@ export function runCurvedRK4Step(encoder: GPUCommandEncoder, state: CurvedIntegr
   pass.dispatchWorkgroups(wgCount)
 
   // ─── k2 ─── Stage index 1 → stageTimeK2 = t + dt/2.
-  pass.setPipeline(pipelines.kineticPipeline)
+  pass.setPipeline(kPl)
   pass.setBindGroup(0, bindGroups.kineticStagedBG)
   pass.setBindGroup(1, bindGroups.stageIndex1BG)
-  pass.dispatchWorkgroups(wgCount)
+  pass.dispatchWorkgroups(kx, ky, kz)
   pass.setPipeline(pipelines.buildKPipeline)
   pass.setBindGroup(0, bindGroups.buildK2BG)
   pass.dispatchWorkgroups(wgCount)
@@ -706,10 +704,10 @@ export function runCurvedRK4Step(encoder: GPUCommandEncoder, state: CurvedIntegr
   pass.dispatchWorkgroups(wgCount)
 
   // ─── k3 ─── Stage index 2 → stageTimeK3 = t + dt/2.
-  pass.setPipeline(pipelines.kineticPipeline)
+  pass.setPipeline(kPl)
   pass.setBindGroup(0, bindGroups.kineticStagedBG)
   pass.setBindGroup(1, bindGroups.stageIndex2BG)
-  pass.dispatchWorkgroups(wgCount)
+  pass.dispatchWorkgroups(kx, ky, kz)
   pass.setPipeline(pipelines.buildKPipeline)
   pass.setBindGroup(0, bindGroups.buildK3BG)
   pass.dispatchWorkgroups(wgCount)
@@ -720,10 +718,10 @@ export function runCurvedRK4Step(encoder: GPUCommandEncoder, state: CurvedIntegr
   pass.dispatchWorkgroups(wgCount)
 
   // ─── k4 ─── Stage index 3 → stageTimeK4 = t + dt.
-  pass.setPipeline(pipelines.kineticPipeline)
+  pass.setPipeline(kPl)
   pass.setBindGroup(0, bindGroups.kineticStagedBG)
   pass.setBindGroup(1, bindGroups.stageIndex3BG)
-  pass.dispatchWorkgroups(wgCount)
+  pass.dispatchWorkgroups(kx, ky, kz)
   pass.setPipeline(pipelines.buildKPipeline)
   pass.setBindGroup(0, bindGroups.buildK4BG)
   pass.dispatchWorkgroups(wgCount)

@@ -22,9 +22,8 @@
 
 export const tdseApplyPotentialHalfBlock = /* wgsl */ `
 @group(0) @binding(0) var<storage, read> params: TDSEUniforms;
-@group(0) @binding(1) var<storage, read_write> psiRe: array<f32>;
-@group(0) @binding(2) var<storage, read_write> psiIm: array<f32>;
-@group(0) @binding(3) var<storage, read> potential: array<f32>;
+@group(0) @binding(1) var<storage, read_write> psi: array<vec2f>;
+@group(0) @binding(2) var<storage, read> potential: array<f32>;
 
 const POT_INV_TWO_PI: f32 = 0.15915494309189535;
 const POT_TWO_PI: f32 = 6.283185307179587;
@@ -36,8 +35,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
 
-  let re = psiRe[idx];
-  let im = psiIm[idx];
+  let z = psi[idx];
+  let re = z.x;
+  let im = z.y;
 
   // Effective potential: V(x) + g|ψ|² (GPE nonlinear term; g=0 for linear TDSE)
   let density = re * re + im * im;
@@ -50,17 +50,16 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (params.imaginaryTime != 0u) {
     // Imaginary-time (Wick rotation): exp(-V·dτ/(2ℏ)) — real exponential decay
     let decay = exp(-arg);
-    psiRe[idx] = re * decay;
-    psiIm[idx] = im * decay;
+    psi[idx] = vec2f(re * decay, im * decay);
   } else {
-    // Real-time: exp(-i·V·dt/(2ℏ)) — unitary phase rotation
-    // Reduce to [-π, π] so f32 cos/sin stay precise for high-V / small-ℏ combos
-    let phase = -arg;
-    let reduced = phase - round(phase * POT_INV_TWO_PI) * POT_TWO_PI;
-    let cosP = cos(reduced);
-    let sinP = sin(reduced);
-    psiRe[idx] = re * cosP - im * sinP;
-    psiIm[idx] = re * sinP + im * cosP;
+    // Real-time: exp(-i·V·dt/(2ℏ)) — unitary phase rotation.
+    // Reduce arg (not -arg) to [-π, π] for f32 trig precision on high-V/small-ℏ,
+    // then fold the sign of -arg into the complex multiply: cos is even, sin is odd.
+    let argReduced = arg - round(arg * POT_INV_TWO_PI) * POT_TWO_PI;
+    let cosP = cos(argReduced);
+    let sinP = sin(argReduced);
+    // exp(−i·arg)·(re + i·im) = (re·cosP + im·sinP) + i·(im·cosP − re·sinP)
+    psi[idx] = vec2f(re * cosP + im * sinP, im * cosP - re * sinP);
   }
 }
 `

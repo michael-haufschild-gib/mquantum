@@ -5,7 +5,7 @@
  * potential configuration, initial condition settings, display options,
  * absorber settings, and basis vectors for N-D to 3D projection.
  *
- * Total size: 544 bytes (aligned to 16-byte boundaries).
+ * Total size: 592 bytes (aligned to 16-byte boundaries).
  *
  * @module
  */
@@ -72,5 +72,9 @@ struct DiracUniforms {
   // Spin polarization angles (Bloch sphere)
   spinTheta: f32,                 // offset 536
   spinPhi: f32,                   // offset 540
+
+  // k-space grid info for kinetic step (48 bytes): 2*pi / (N * a) per dimension.
+  // Host precomputes this so the kinetic kernel avoids a per-thread per-dim divide.
+  kGridScale: array<f32, 12>,     // offset 544
 }
 `

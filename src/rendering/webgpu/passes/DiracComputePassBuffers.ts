@@ -21,8 +21,8 @@ import type {
   DiracPassHelpers,
 } from './DiracComputePassTypes'
 
-/** DiracUniforms struct size in bytes (544) */
-const UNIFORM_SIZE = 544
+/** DiracUniforms struct size in bytes (592 — includes kGridScale) */
+const UNIFORM_SIZE = 592
 /** Diagnostics workgroup size */
 const DIAG_WG = 256
 /** DiracDiagUniforms struct size (16 bytes: totalSites, numWorkgroups, spinorSize, pad) */
@@ -49,8 +49,7 @@ export function rebuildDiracBuffers(
   buildFFTStagingData: (config: DiracConfig, totalSites: number) => ArrayBuffer
 ): DiracBufferResult {
   // Destroy old buffers
-  old.spinorReBuffer?.destroy()
-  old.spinorImBuffer?.destroy()
+  old.spinorBuffer?.destroy()
   old.potentialBuffer?.destroy()
   old.gammaBuffer?.destroy()
   old.fftScratchA?.destroy()
@@ -78,15 +77,13 @@ export function rebuildDiracBuffers(
   for (let d = 0; d < config.latticeDim; d++) totalSites *= config.gridSize[d]!
   const S = spinorSize(config.latticeDim)
 
-  // Spinor buffers: S × totalSites floats each
-  const spinorBytes = S * totalSites * 4
-  const spinorReBuffer = device.createBuffer({
-    label: 'dirac-spinorRe',
-    size: spinorBytes,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
-  })
-  const spinorImBuffer = device.createBuffer({
-    label: 'dirac-spinorIm',
+  // Merged spinor buffer: S × totalSites vec2f (8 bytes per complex element).
+  // Component c at site idx = spinor[c*totalSites + idx] = vec2f(re, im).
+  // One vec2f load per site replaces two f32 loads — halves address
+  // arithmetic in the S-wide preload of the gamma mat-vec kernels.
+  const spinorBytes = S * totalSites * 8
+  const spinorBuffer = device.createBuffer({
+    label: 'dirac-spinor',
     size: spinorBytes,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
   })
@@ -250,8 +247,7 @@ export function rebuildDiracBuffers(
   useDiagnosticsStore.getState().resetDirac()
 
   return {
-    spinorReBuffer,
-    spinorImBuffer,
+    spinorBuffer,
     potentialBuffer,
     gammaBuffer,
     fftScratchA,

@@ -20,28 +20,53 @@ export const densityPreMapBlock = /* wgsl */ `
 // Noise Functions
 // ============================================
 
-// OPTIMIZED: Integer bit-manipulation hash
-// Uses WebGPU u32 operations - faster than sin()-based hash
-fn hash33(p: vec3f) -> vec3f {
-  var q = vec3u(vec3i(floor(p))) * vec3u(1597334673u, 3812015801u, 2798796415u);
+// OPTIMIZED: Integer bit-manipulation hash.
+// Uses WebGPU u32 operations - faster than sin()-based hash.
+// The u32 reciprocal is a precomputed const so drivers don't re-fold the divide.
+const INV_U32_MAX: f32 = 2.3283064365386963e-10; // 1.0 / f32(0xffffffffu)
+
+fn hash33u(q0: vec3u) -> vec3f {
+  var q = q0 * vec3u(1597334673u, 3812015801u, 2798796415u);
   q = (q.x ^ q.y ^ q.z) * vec3u(1597334673u, 3812015801u, 2798796415u);
-  return -1.0 + 2.0 * vec3f(q) * (1.0 / f32(0xffffffffu));
+  return fma(vec3f(q), vec3f(2.0 * INV_U32_MAX), vec3f(-1.0));
 }
 
-// 3D Perlin/Gradient Noise
+// f32-entry wrapper kept for API compatibility.
+fn hash33(p: vec3f) -> vec3f {
+  return hash33u(vec3u(vec3i(floor(p))));
+}
+
+// 3D Perlin/Gradient Noise.
+// PERF: the 8 hash33 calls in the original form each redid floor()+vec3i() on
+// lattice-aligned inputs that were already integers. We compute the u32 lattice
+// base once and add integer deltas, saving 7 floors + 7 f32->i32 casts per call.
 fn gradientNoise(p: vec3f) -> f32 {
   let i = floor(p);
   let f = fract(p);
   let u = f * f * (3.0 - 2.0 * f);
+  let iu = vec3u(vec3i(i));
 
-  return mix(mix(mix(dot(hash33(i + vec3f(0.0,0.0,0.0)), f - vec3f(0.0,0.0,0.0)),
-                     dot(hash33(i + vec3f(1.0,0.0,0.0)), f - vec3f(1.0,0.0,0.0)), u.x),
-                 mix(dot(hash33(i + vec3f(0.0,1.0,0.0)), f - vec3f(0.0,1.0,0.0)),
-                     dot(hash33(i + vec3f(1.0,1.0,0.0)), f - vec3f(1.0,1.0,0.0)), u.x), u.y),
-             mix(mix(dot(hash33(i + vec3f(0.0,0.0,1.0)), f - vec3f(0.0,0.0,1.0)),
-                     dot(hash33(i + vec3f(1.0,0.0,1.0)), f - vec3f(1.0,0.0,1.0)), u.x),
-                 mix(dot(hash33(i + vec3f(0.0,1.0,1.0)), f - vec3f(0.0,1.0,1.0)),
-                     dot(hash33(i + vec3f(1.0,1.0,1.0)), f - vec3f(1.0,1.0,1.0)), u.x), u.y), u.z);
+  let g000 = hash33u(iu);
+  let g100 = hash33u(iu + vec3u(1u, 0u, 0u));
+  let g010 = hash33u(iu + vec3u(0u, 1u, 0u));
+  let g110 = hash33u(iu + vec3u(1u, 1u, 0u));
+  let g001 = hash33u(iu + vec3u(0u, 0u, 1u));
+  let g101 = hash33u(iu + vec3u(1u, 0u, 1u));
+  let g011 = hash33u(iu + vec3u(0u, 1u, 1u));
+  let g111 = hash33u(iu + vec3u(1u, 1u, 1u));
+
+  let f100 = f - vec3f(1.0, 0.0, 0.0);
+  let f010 = f - vec3f(0.0, 1.0, 0.0);
+  let f110 = f - vec3f(1.0, 1.0, 0.0);
+  let f001 = f - vec3f(0.0, 0.0, 1.0);
+  let f101 = f - vec3f(1.0, 0.0, 1.0);
+  let f011 = f - vec3f(0.0, 1.0, 1.0);
+  let f111 = f - vec3f(1.0, 1.0, 1.0);
+
+  return mix(mix(mix(dot(g000, f),    dot(g100, f100), u.x),
+                 mix(dot(g010, f010), dot(g110, f110), u.x), u.y),
+             mix(mix(dot(g001, f001), dot(g101, f101), u.x),
+                 mix(dot(g011, f011), dot(g111, f111), u.x), u.y), u.z);
 }
 
 `
@@ -194,7 +219,11 @@ fn sampleDensityWithPhaseComponents(pos: vec3f, t: f32, uniforms: SchroedingerUn
   let spatialPhase = psiResult.z;
   let relativePhase = psiResult.w;
 
-  var rho = rhoFromPsi(psi);
+  // Cache |psi|^2 before rho is mutated by boost / boundary / interference.
+  // The shimmer branch below needs the raw magnitude, and rho starts equal to it,
+  // so we save a second dot(psi, psi) in the raymarch hot path.
+  let psiMag2 = rhoFromPsi(psi);
+  var rho = psiMag2;
 
   // Hydrogen ND density boost
   if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
@@ -228,7 +257,7 @@ fn sampleDensityWithPhaseComponents(pos: vec3f, t: f32, uniforms: SchroedingerUn
     let pcfTime = uniforms.time * uniforms.phaseShimmerSpeed;
     let pcfOffset = pcfTime * pcfSpeedMod;
     // inverseSqrt(|psi|^2) replaces length() + two scalar divides with one rsqrt + two muls.
-    let invPsiLen = inverseSqrt(max(dot(psi, psi), 1e-16));
+    let invPsiLen = inverseSqrt(max(psiMag2, 1e-16));
     let pcfCosP = psi.x * invPsiLen;
     let pcfSinP = psi.y * invPsiLen;
     let pcfNoise = gradientNoise(pos * 2.0 + vec3f(
@@ -267,7 +296,9 @@ fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUnifo
   let spatialPhase = psiResult.z;
   let relativePhase = psiResult.w;
 
-  var rho = rhoFromPsi(psi);
+  // Cache |psi|^2 before rho is mutated — shimmer branch reuses it to skip a second dot.
+  let psiMag2 = rhoFromPsi(psi);
+  var rho = psiMag2;
   if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
     rho *= uniforms.hydrogenNDBoost;
   }
@@ -286,7 +317,7 @@ fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUnifo
     let pcfTime = uniforms.time * uniforms.phaseShimmerSpeed;
     let pcfOffset = pcfTime * pcfSpeedMod;
     // inverseSqrt(|psi|^2) replaces length() + two scalar divides with one rsqrt + two muls.
-    let invPsiLen = inverseSqrt(max(dot(psi, psi), 1e-16));
+    let invPsiLen = inverseSqrt(max(psiMag2, 1e-16));
     let pcfCosP = psi.x * invPsiLen;
     let pcfSinP = psi.y * invPsiLen;
     let pcfNoise = gradientNoise(pos * 2.0 + vec3f(

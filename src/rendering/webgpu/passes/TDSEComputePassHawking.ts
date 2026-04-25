@@ -5,7 +5,7 @@
  * TDSEComputePassDisorder: owns its pipeline + bind group, exposes
  * build/dispatch/dispose helpers that the main pass calls.
  *
- * Pipeline binds {uniforms, psiRe, psiIm} and perturbs ψ by a
+ * Pipeline binds {uniforms, psi (vec2f)} and perturbs ψ by a
  * horizon-localized stochastic phase kick each time it is dispatched.
  * Intended frequency: once per frame (after the full Strang evolution loop)
  * for the `blackHoleAnalog` BEC preset. Dispatch is gated on
@@ -28,8 +28,7 @@ export interface HawkingInjectState {
   bgl: GPUBindGroupLayout | null
   bg: GPUBindGroup | null
   lastUniformBuffer: GPUBuffer | null
-  lastPsiRe: GPUBuffer | null
-  lastPsiIm: GPUBuffer | null
+  lastPsi: GPUBuffer | null
   /** Deterministic noise-evolution step counter (u32-wrapping). */
   stepIndex: number
 }
@@ -41,8 +40,7 @@ export function createHawkingInjectState(): HawkingInjectState {
     bgl: null,
     bg: null,
     lastUniformBuffer: null,
-    lastPsiRe: null,
-    lastPsiIm: null,
+    lastPsi: null,
     stepIndex: 0,
   }
 }
@@ -70,11 +68,7 @@ export function buildHawkingInjectPipeline(
   if (state.pipeline) return
   // Binding 0 (TDSEUniforms) is `read-only-storage` — see tdseInit.wgsl.ts /
   // TDSEComputePassSetup init BGL comment for the spec-noncompliance rationale.
-  state.bgl = createComputeBGL(device, 'bec-hawking-inject-bgl', [
-    'read-only-storage',
-    'storage',
-    'storage',
-  ])
+  state.bgl = createComputeBGL(device, 'bec-hawking-inject-bgl', ['read-only-storage', 'storage'])
   const sm = createShaderModule(device, composeBecHawkingInjectShader(), 'bec-hawking-inject')
   state.pipeline = createComputePipeline(device, sm, [state.bgl], 'bec-hawking-inject')
 }
@@ -96,15 +90,9 @@ function ensureHawkingBindGroup(
   device: GPUDevice,
   state: HawkingInjectState,
   uniformBuffer: GPUBuffer,
-  psiRe: GPUBuffer,
-  psiIm: GPUBuffer
+  psi: GPUBuffer
 ): void {
-  if (
-    state.bg &&
-    state.lastUniformBuffer === uniformBuffer &&
-    state.lastPsiRe === psiRe &&
-    state.lastPsiIm === psiIm
-  ) {
+  if (state.bg && state.lastUniformBuffer === uniformBuffer && state.lastPsi === psi) {
     return
   }
   if (!state.bgl) return
@@ -113,13 +101,11 @@ function ensureHawkingBindGroup(
     layout: state.bgl,
     entries: [
       { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: psiRe } },
-      { binding: 2, resource: { buffer: psiIm } },
+      { binding: 1, resource: { buffer: psi } },
     ],
   })
   state.lastUniformBuffer = uniformBuffer
-  state.lastPsiRe = psiRe
-  state.lastPsiIm = psiIm
+  state.lastPsi = psi
 }
 
 /**
@@ -133,8 +119,7 @@ function ensureHawkingBindGroup(
  * @param config - Active TDSE config (carries hawking flags in BEC mode)
  * @param state - Hawking injection state
  * @param uniformBuffer - TDSEUniforms buffer (must be fully written this frame)
- * @param psiRe - Real part of wavefunction (read/write)
- * @param psiIm - Imaginary part of wavefunction (read/write)
+ * @param psi - Merged ψ buffer (array<vec2f>, read/write)
  * @param linearWG - Dispatch count (ceil(totalSites / 64))
  * @param dispatchCompute - Pass's dispatch helper
  */
@@ -144,8 +129,7 @@ export function maybeDispatchHawkingInject(
   config: TdseConfig,
   state: HawkingInjectState,
   uniformBuffer: GPUBuffer | null,
-  psiRe: GPUBuffer | null,
-  psiIm: GPUBuffer | null,
+  psi: GPUBuffer | null,
   linearWG: number,
   dispatchCompute: (
     pass: GPUComputePassEncoder,
@@ -156,9 +140,9 @@ export function maybeDispatchHawkingInject(
 ): void {
   if (!config.hawkingPairInjection) return
   if ((config.hawkingInjectRate ?? 0) <= 0) return
-  if (!state.pipeline || !uniformBuffer || !psiRe || !psiIm) return
+  if (!state.pipeline || !uniformBuffer || !psi) return
 
-  ensureHawkingBindGroup(device, state, uniformBuffer, psiRe, psiIm)
+  ensureHawkingBindGroup(device, state, uniformBuffer, psi)
   if (!state.bg) return
 
   const pass = ctx.beginComputePass({ label: 'bec-hawking-inject' })
@@ -178,8 +162,7 @@ export function maybeDispatchHawkingInject(
  * @param config - Current TDSE config (carries hawking flags in BEC mode)
  * @param state - Hawking injection state (stepIndex is mutated in place)
  * @param uniformBuffer - TDSEUniforms buffer
- * @param psiRe - Real part of wavefunction
- * @param psiIm - Imaginary part of wavefunction
+ * @param psi - Merged ψ buffer (array<vec2f>)
  * @param linearWG - Dispatch count (ceil(totalSites / 64))
  * @param dispatchCompute - Pass's dispatch helper
  */
@@ -189,8 +172,7 @@ export function runHawkingFrame(
   config: TdseConfig,
   state: HawkingInjectState,
   uniformBuffer: GPUBuffer | null,
-  psiRe: GPUBuffer | null,
-  psiIm: GPUBuffer | null,
+  psi: GPUBuffer | null,
   linearWG: number,
   dispatchCompute: (
     pass: GPUComputePassEncoder,
@@ -205,8 +187,7 @@ export function runHawkingFrame(
     config,
     state,
     uniformBuffer,
-    psiRe,
-    psiIm,
+    psi,
     linearWG,
     dispatchCompute
   )
@@ -221,6 +202,5 @@ export function disposeHawkingInject(state: HawkingInjectState): void {
   state.bgl = null
   state.bg = null
   state.lastUniformBuffer = null
-  state.lastPsiRe = null
-  state.lastPsiIm = null
+  state.lastPsi = null
 }

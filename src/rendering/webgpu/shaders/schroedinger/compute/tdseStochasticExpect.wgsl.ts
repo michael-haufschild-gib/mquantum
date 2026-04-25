@@ -33,10 +33,9 @@ struct StochasticParams {
 };
 
 @group(0) @binding(0) var<storage, read> tdseParams: TDSEUniforms;
-@group(0) @binding(1) var<storage, read> psiRe: array<f32>;
-@group(0) @binding(2) var<storage, read> psiIm: array<f32>;
-@group(0) @binding(3) var<uniform> sParams: StochasticParams;
-@group(0) @binding(4) var<storage, read_write> partialSums: array<f32>;
+@group(0) @binding(1) var<storage, read> psi: array<vec2f>;
+@group(0) @binding(2) var<uniform> sParams: StochasticParams;
+@group(0) @binding(3) var<storage, read_write> partialSums: array<f32>;
 
 fn getCenterCoord(k: u32, d: u32) -> f32 {
   let vecIdx = k * 3u + d / 4u;
@@ -70,8 +69,9 @@ fn main(
   var noiseField: f32 = 0.0;
 
   if (idx < tdseParams.totalSites) {
-    let re = psiRe[idx];
-    let im = psiIm[idx];
+    let z = psi[idx];
+    let re = z.x;
+    let im = z.y;
     density = re * re + im * im;
 
     // Compute lattice coordinates. Strides are products of power-of-2 grid
@@ -93,6 +93,10 @@ fn main(
     // Cutoff at 6σ (distSq > 36σ²): exp(-18) ≈ 1.5e-8 is below f32 precision after
     // the ξ·normFactor scaling, so skip the exp + center lookups for far sites.
     // For typical σ = 1 grid unit this skips 95-99% of (voxel, site) pairs.
+    // PERF: early-break the distSq accumulation loop once it exceeds maxDistSq —
+    // for high-ldim (up to 11) with many far sites, this avoids evaluating
+    // (ldim − breakpoint) subtract/square per skipped site. The outer test
+    // stays correct because distSq after break is already > maxDistSq.
     let maxDistSq = 36.0 * sParams.sigma * sParams.sigma;
     var rawSum: f32 = 0.0;
     let nSites = sParams.numCollapseSites;
@@ -101,6 +105,7 @@ fn main(
       for (var d: u32 = 0u; d < ldim; d = d + 1u) {
         let diff = coords[d] - getCenterCoord(k, d);
         distSq += diff * diff;
+        if (distSq > maxDistSq) { break; }
       }
       if (distSq < maxDistSq) {
         rawSum += exp(-distSq * invTwoSigmaSq) * getCenterNoise(k);

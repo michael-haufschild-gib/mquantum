@@ -31,11 +31,10 @@
 
 export const diracWriteGridBlock = /* wgsl */ `
 @group(0) @binding(0) var<storage, read> params: DiracUniforms;
-@group(0) @binding(1) var<storage, read> spinorRe: array<f32>;
-@group(0) @binding(2) var<storage, read> spinorIm: array<f32>;
-@group(0) @binding(3) var<storage, read> potential: array<f32>;
-@group(0) @binding(4) var<storage, read> gammaMatrices: array<f32>;
-@group(0) @binding(5) var outputTex: texture_storage_3d<rgba16float, write>;
+@group(0) @binding(1) var<storage, read> spinor: array<vec2f>;
+@group(0) @binding(2) var<storage, read> potential: array<f32>;
+@group(0) @binding(3) var<storage, read> gammaMatrices: array<f32>;
+@group(0) @binding(4) var outputTex: texture_storage_3d<rgba16float, write>;
 
 // Access gamma matrix element using precomputed base offset for the matrix.
 // Caller should compute matBase = matIdx * S * S * 2u once per matrix.
@@ -51,10 +50,8 @@ fn gammaImAtBase(matBase: u32, row: u32, col: u32, S: u32) -> f32 {
 fn totalDensityAt(siteIdx: u32, S: u32, T: u32) -> f32 {
   var density: f32 = 0.0;
   for (var c: u32 = 0u; c < S; c++) {
-    let bufIdx = c * T + siteIdx;
-    let re = spinorRe[bufIdx];
-    let im = spinorIm[bufIdx];
-    density += re * re + im * im;
+    let v = spinor[c * T + siteIdx];
+    density += v.x * v.x + v.y * v.y;
   }
   return density;
 }
@@ -64,10 +61,8 @@ fn upperDensityAt(siteIdx: u32, S: u32, T: u32) -> f32 {
   let half = S / 2u;
   var density: f32 = 0.0;
   for (var c: u32 = 0u; c < half; c++) {
-    let bufIdx = c * T + siteIdx;
-    let re = spinorRe[bufIdx];
-    let im = spinorIm[bufIdx];
-    density += re * re + im * im;
+    let v = spinor[c * T + siteIdx];
+    density += v.x * v.x + v.y * v.y;
   }
   return density;
 }
@@ -77,10 +72,8 @@ fn lowerDensityAt(siteIdx: u32, S: u32, T: u32) -> f32 {
   let half = S >> 1u;
   var density: f32 = 0.0;
   for (var c: u32 = half; c < S; c = c + 1u) {
-    let bufIdx = c * T + siteIdx;
-    let re = spinorRe[bufIdx];
-    let im = spinorIm[bufIdx];
-    density += re * re + im * im;
+    let v = spinor[c * T + siteIdx];
+    density += v.x * v.x + v.y * v.y;
   }
   return density;
 }
@@ -93,30 +86,30 @@ fn upperLowerDensityAt(siteIdx: u32, S: u32, T: u32) -> vec2f {
   var upper: f32 = 0.0;
   var lower: f32 = 0.0;
   for (var c: u32 = 0u; c < S; c = c + 1u) {
-    let bufIdx = c * T + siteIdx;
-    let re = spinorRe[bufIdx];
-    let im = spinorIm[bufIdx];
-    let d = re * re + im * im;
+    let v = spinor[c * T + siteIdx];
+    let d = v.x * v.x + v.y * v.y;
     if (c < half) { upper += d; } else { lower += d; }
   }
   return vec2f(upper, lower);
 }
 
-// Convert N-D world position to lattice coordinates (fractional).
+// Convert precomputed fractional lattice coordinates into interpolation corners.
 // Returns false if position is outside lattice bounds (with 0.5-cell margin for interpolation).
 // coordsLo/coordsHi: integer lattice coordinates for interpolation corners.
 // fracs: fractional part per dimension for blending weights.
 // For dims >= min(latticeDim, 3), uses nearest-neighbor (frac=0).
+// Caller passes coordFs[d] = (ndWorldPos[d] + N/2*dx)/dx - 0.5 so the same
+// value feeds both the interp branching and the nearest-neighbor round+clamp
+// used downstream — avoids a second per-dim mul/div/sub chain per voxel.
 fn worldToLatticeInterp(
-  ndWorldPos: ptr<function, array<f32, 12>>,
+  coordFs: ptr<function, array<f32, 12>>,
   coordsLo: ptr<function, array<u32, 12>>,
   coordsHi: ptr<function, array<u32, 12>>,
   fracs: ptr<function, array<f32, 12>>
 ) -> bool {
   let interpDims = min(params.latticeDim, 3u);
   for (var d: u32 = 0u; d < params.latticeDim; d++) {
-    let halfExtent = f32(params.gridSize[d]) * params.spacing[d] * 0.5;
-    let coordF = ((*ndWorldPos)[d] + halfExtent) / params.spacing[d] - 0.5;
+    let coordF = (*coordFs)[d];
 
     if (d < interpDims) {
       // Trilinear interpolation for visible dimensions
@@ -208,12 +201,21 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     }
   }
 
+  // Precompute fractional lattice coordinate per dim ONCE. Reused by the interp
+  // helper (lo/hi/frac) and the nearest-neighbor derivation below — the
+  // previous code recomputed this in two separate per-dim loops.
+  var coordF: array<f32, 12>;
+  for (var d: u32 = 0u; d < params.latticeDim; d++) {
+    let halfExtent = f32(params.gridSize[d]) * params.spacing[d] * 0.5;
+    coordF[d] = (ndWorldPos[d] + halfExtent) / params.spacing[d] - 0.5;
+  }
+
   // Convert to lattice coordinates with trilinear interpolation support
   var coordsLo: array<u32, 12>;
   var coordsHi: array<u32, 12>;
   var fracs: array<f32, 12>;
 
-  let inBounds = worldToLatticeInterp(&ndWorldPos, &coordsLo, &coordsHi, &fracs);
+  let inBounds = worldToLatticeInterp(&coordF, &coordsLo, &coordsHi, &fracs);
   if (!inBounds) {
     textureStore(outputTex, gid, vec4f(0.0));
     return;
@@ -240,18 +242,21 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let matStride = S * S * 2u;
   let numCorners = 1u << min(params.latticeDim, 3u); // 2, 4, or 8
 
-  // Nearest-neighbor site for complex field views and phase
+  // Nearest-neighbor site for complex field views and phase. Derived from the
+  // coordF values computed above — round+clamp on the exact same fractional
+  // coordinate preserves boundary behavior bit-for-bit (deriving round from
+  // coordsLo/frac would disagree at grid edges where the interp clamps
+  // truncate loI=-1 and hiI=N to valid neighbors).
   var nnCoords: array<u32, 12>;
   for (var d: u32 = 0u; d < params.latticeDim; d++) {
-    let halfExtent = f32(params.gridSize[d]) * params.spacing[d] * 0.5;
-    let coordF = (ndWorldPos[d] + halfExtent) / params.spacing[d] - 0.5;
-    nnCoords[d] = u32(clamp(i32(round(coordF)), 0, i32(params.gridSize[d]) - 1));
+    nnCoords[d] = u32(clamp(i32(round(coordF[d])), 0, i32(params.gridSize[d]) - 1));
   }
   let nnSiteIdx = ndToLinear(nnCoords, params.strides, params.latticeDim);
 
   // Phase of dominant component (nearest-neighbor, not interpolated)
-  let re0 = spinorRe[nnSiteIdx];
-  let im0 = spinorIm[nnSiteIdx];
+  let v0 = spinor[nnSiteIdx];
+  let re0 = v0.x;
+  let im0 = v0.y;
   const DIRAC_WG_PI:  f32 = 3.14159265358979323846;
   const DIRAC_WG_INV_TAU: f32 = 0.15915494309189535;
   let phase = atan2(im0, re0) + DIRAC_WG_PI;
@@ -328,13 +333,17 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // spinDensity: nearest-neighbor (expensive gamma matrix work).
     // Preload spinor components at this site ONCE. The inner loops would
     // otherwise re-read each component S times per row × S rows × nSpin axes.
+    //
+    // PERF: when DIRAC_USE_SPARSE_GAMMA is true, each α is monomial (1 non-zero
+    // per row), so the S-wide col loop collapses to a single lookup. IEEE
+    // bit-identical to the dense path (dense sum has S−1 exactly-zero terms).
     let siteIdx = nnSiteIdx;
     var psiSiteRe: array<f32, 64>;
     var psiSiteIm: array<f32, 64>;
     for (var c: u32 = 0u; c < S; c = c + 1u) {
-      let bIdx = c * T + siteIdx;
-      psiSiteRe[c] = spinorRe[bIdx];
-      psiSiteIm[c] = spinorIm[bIdx];
+      let v = spinor[c * T + siteIdx];
+      psiSiteRe[c] = v.x;
+      psiSiteIm[c] = v.y;
     }
     var totalDensity: f32 = 0.0;
     for (var c: u32 = 0u; c < S; c = c + 1u) {
@@ -347,7 +356,166 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let nSpin = min(params.latticeDim, 3u);
 
     if (S <= 2u || nSpin < 3u) {
-      for (var k: u32 = 0u; k < nSpin; k++) {
+      // ⟨α_k⟩ expectation for low S or low nSpin.
+      if (DIRAC_USE_SPARSE_GAMMA) {
+        for (var k: u32 = 0u; k < nSpin; k = k + 1u) {
+          let tBase = k * DIRAC_SPARSE_S;
+          var expectRe: f32 = 0.0;
+          for (var row: u32 = 0u; row < S; row = row + 1u) {
+            let t = tBase + row;
+            let col = DIRAC_SPARSE_COL[t];
+            let gRe = DIRAC_SPARSE_RE[t];
+            let gIm = DIRAC_SPARSE_IM[t];
+            let psiRCol = psiSiteRe[col];
+            let psiICol = psiSiteIm[col];
+            let matPsiRe = gRe * psiRCol - gIm * psiICol;
+            let matPsiIm = gRe * psiICol + gIm * psiRCol;
+            expectRe += psiSiteRe[row] * matPsiRe + psiSiteIm[row] * matPsiIm;
+          }
+          spinMag2 += expectRe * expectRe;
+        }
+      } else {
+        for (var k: u32 = 0u; k < nSpin; k++) {
+          let kBase = k * matStride;
+          var expectRe: f32 = 0.0;
+          for (var row: u32 = 0u; row < S; row++) {
+            let psiRRow = psiSiteRe[row];
+            let psiIRow = psiSiteIm[row];
+            let rowBase = kBase + row * S * 2u;
+            for (var col: u32 = 0u; col < S; col++) {
+              let psiRCol = psiSiteRe[col];
+              let psiICol = psiSiteIm[col];
+              let gRe = gammaMatrices[rowBase + col * 2u];
+              let gIm = gammaMatrices[rowBase + col * 2u + 1u];
+              let matPsiRe = gRe * psiRCol - gIm * psiICol;
+              let matPsiIm = gRe * psiICol + gIm * psiRCol;
+              expectRe += psiRRow * matPsiRe + psiIRow * matPsiIm;
+            }
+          }
+          spinMag2 += expectRe * expectRe;
+        }
+      }
+    } else {
+      // Σ_k = −i·α_i·α_j spin cyclic. Two sparse monomial multiplies per k.
+      if (DIRAC_USE_SPARSE_GAMMA) {
+        for (var k: u32 = 0u; k < 3u; k = k + 1u) {
+          let idxI = (k + 1u) % 3u;
+          let idxJ = (k + 2u) % 3u;
+          let tBaseJ = idxJ * DIRAC_SPARSE_S;
+          let tBaseI = idxI * DIRAC_SPARSE_S;
+
+          var tmpRe: array<f32, 64>;
+          var tmpIm: array<f32, 64>;
+          for (var row: u32 = 0u; row < S; row = row + 1u) {
+            let t = tBaseJ + row;
+            let col = DIRAC_SPARSE_COL[t];
+            let gRe = DIRAC_SPARSE_RE[t];
+            let gIm = DIRAC_SPARSE_IM[t];
+            let pR = psiSiteRe[col];
+            let pI = psiSiteIm[col];
+            tmpRe[row] = gRe * pR - gIm * pI;
+            tmpIm[row] = gRe * pI + gIm * pR;
+          }
+
+          var dotIm: f32 = 0.0;
+          for (var row: u32 = 0u; row < S; row = row + 1u) {
+            let t = tBaseI + row;
+            let col = DIRAC_SPARSE_COL[t];
+            let gRe = DIRAC_SPARSE_RE[t];
+            let gIm = DIRAC_SPARSE_IM[t];
+            let aRe = gRe * tmpRe[col] - gIm * tmpIm[col];
+            let aIm = gRe * tmpIm[col] + gIm * tmpRe[col];
+            dotIm += psiSiteRe[row] * aIm - psiSiteIm[row] * aRe;
+          }
+          spinMag2 += dotIm * dotIm;
+        }
+      } else {
+        for (var k: u32 = 0u; k < 3u; k++) {
+          let idxI = (k + 1u) % 3u;
+          let idxJ = (k + 2u) % 3u;
+          let baseJ = idxJ * matStride;
+          let baseI = idxI * matStride;
+
+          var tmpRe: array<f32, 64>;
+          var tmpIm: array<f32, 64>;
+          for (var row: u32 = 0u; row < S; row++) {
+            var aRe: f32 = 0.0;
+            var aIm: f32 = 0.0;
+            let rowBaseJ = baseJ + row * S * 2u;
+            for (var col: u32 = 0u; col < S; col++) {
+              let pR = psiSiteRe[col];
+              let pI = psiSiteIm[col];
+              let gRe = gammaMatrices[rowBaseJ + col * 2u];
+              let gIm = gammaMatrices[rowBaseJ + col * 2u + 1u];
+              aRe += gRe * pR - gIm * pI;
+              aIm += gRe * pI + gIm * pR;
+            }
+            tmpRe[row] = aRe;
+            tmpIm[row] = aIm;
+          }
+
+          var dotIm: f32 = 0.0;
+          for (var row: u32 = 0u; row < S; row++) {
+            let psiRRow = psiSiteRe[row];
+            let psiIRow = psiSiteIm[row];
+            var aRe: f32 = 0.0;
+            var aIm: f32 = 0.0;
+            let rowBaseI = baseI + row * S * 2u;
+            for (var col: u32 = 0u; col < S; col++) {
+              let gRe = gammaMatrices[rowBaseI + col * 2u];
+              let gIm = gammaMatrices[rowBaseI + col * 2u + 1u];
+              aRe += gRe * tmpRe[col] - gIm * tmpIm[col];
+              aIm += gRe * tmpIm[col] + gIm * tmpRe[col];
+            }
+            dotIm += psiRRow * aIm - psiIRow * aRe;
+          }
+
+          spinMag2 += dotIm * dotIm;
+        }
+      }
+    }
+    let rawSpin = sqrt(spinMag2);
+    displayScalar = (rawSpin * invDensityScale) * densityGate;
+
+  } else if (params.fieldView == 5u) {
+    // currentDensity: nearest-neighbor (expensive gamma matrix work).
+    // Preload once — same rationale as fieldView=4.
+    let siteIdx = nnSiteIdx;
+    var psiSiteRe: array<f32, 64>;
+    var psiSiteIm: array<f32, 64>;
+    for (var c: u32 = 0u; c < S; c = c + 1u) {
+      let v = spinor[c * T + siteIdx];
+      psiSiteRe[c] = v.x;
+      psiSiteIm[c] = v.y;
+    }
+    var totalDensity: f32 = 0.0;
+    for (var c: u32 = 0u; c < S; c = c + 1u) {
+      totalDensity += psiSiteRe[c] * psiSiteRe[c] + psiSiteIm[c] * psiSiteIm[c];
+    }
+    let normDensityRaw = (totalDensity * invDensityScale);
+    let densityGate = smoothstep(0.0, 0.02, normDensityRaw);
+
+    var currentMag2: f32 = 0.0;
+    if (DIRAC_USE_SPARSE_GAMMA) {
+      // ⟨α_k⟩ expectation — sparse lookup per row.
+      for (var k: u32 = 0u; k < params.latticeDim; k = k + 1u) {
+        let tBase = k * DIRAC_SPARSE_S;
+        var expectRe: f32 = 0.0;
+        for (var row: u32 = 0u; row < S; row = row + 1u) {
+          let t = tBase + row;
+          let col = DIRAC_SPARSE_COL[t];
+          let gRe = DIRAC_SPARSE_RE[t];
+          let gIm = DIRAC_SPARSE_IM[t];
+          let psiRCol = psiSiteRe[col];
+          let psiICol = psiSiteIm[col];
+          let matPsiRe = gRe * psiRCol - gIm * psiICol;
+          let matPsiIm = gRe * psiICol + gIm * psiRCol;
+          expectRe += psiSiteRe[row] * matPsiRe + psiSiteIm[row] * matPsiIm;
+        }
+        currentMag2 += expectRe * expectRe;
+      }
+    } else {
+      for (var k: u32 = 0u; k < params.latticeDim; k++) {
         let kBase = k * matStride;
         var expectRe: f32 = 0.0;
         for (var row: u32 = 0u; row < S; row++) {
@@ -364,92 +532,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
             expectRe += psiRRow * matPsiRe + psiIRow * matPsiIm;
           }
         }
-        spinMag2 += expectRe * expectRe;
+        currentMag2 += expectRe * expectRe;
       }
-    } else {
-      for (var k: u32 = 0u; k < 3u; k++) {
-        let idxI = (k + 1u) % 3u;
-        let idxJ = (k + 2u) % 3u;
-        let baseJ = idxJ * matStride;
-        let baseI = idxI * matStride;
-
-        var tmpRe: array<f32, 64>;
-        var tmpIm: array<f32, 64>;
-        for (var row: u32 = 0u; row < S; row++) {
-          var aRe: f32 = 0.0;
-          var aIm: f32 = 0.0;
-          let rowBaseJ = baseJ + row * S * 2u;
-          for (var col: u32 = 0u; col < S; col++) {
-            let pR = psiSiteRe[col];
-            let pI = psiSiteIm[col];
-            let gRe = gammaMatrices[rowBaseJ + col * 2u];
-            let gIm = gammaMatrices[rowBaseJ + col * 2u + 1u];
-            aRe += gRe * pR - gIm * pI;
-            aIm += gRe * pI + gIm * pR;
-          }
-          tmpRe[row] = aRe;
-          tmpIm[row] = aIm;
-        }
-
-        var dotIm: f32 = 0.0;
-        for (var row: u32 = 0u; row < S; row++) {
-          let psiRRow = psiSiteRe[row];
-          let psiIRow = psiSiteIm[row];
-          var aRe: f32 = 0.0;
-          var aIm: f32 = 0.0;
-          let rowBaseI = baseI + row * S * 2u;
-          for (var col: u32 = 0u; col < S; col++) {
-            let gRe = gammaMatrices[rowBaseI + col * 2u];
-            let gIm = gammaMatrices[rowBaseI + col * 2u + 1u];
-            aRe += gRe * tmpRe[col] - gIm * tmpIm[col];
-            aIm += gRe * tmpIm[col] + gIm * tmpRe[col];
-          }
-          dotIm += psiRRow * aIm - psiIRow * aRe;
-        }
-
-        spinMag2 += dotIm * dotIm;
-      }
-    }
-    let rawSpin = sqrt(spinMag2);
-    displayScalar = (rawSpin * invDensityScale) * densityGate;
-
-  } else if (params.fieldView == 5u) {
-    // currentDensity: nearest-neighbor (expensive gamma matrix work).
-    // Preload once — same rationale as fieldView=4.
-    let siteIdx = nnSiteIdx;
-    var psiSiteRe: array<f32, 64>;
-    var psiSiteIm: array<f32, 64>;
-    for (var c: u32 = 0u; c < S; c = c + 1u) {
-      let bIdx = c * T + siteIdx;
-      psiSiteRe[c] = spinorRe[bIdx];
-      psiSiteIm[c] = spinorIm[bIdx];
-    }
-    var totalDensity: f32 = 0.0;
-    for (var c: u32 = 0u; c < S; c = c + 1u) {
-      totalDensity += psiSiteRe[c] * psiSiteRe[c] + psiSiteIm[c] * psiSiteIm[c];
-    }
-    let normDensityRaw = (totalDensity * invDensityScale);
-    let densityGate = smoothstep(0.0, 0.02, normDensityRaw);
-
-    var currentMag2: f32 = 0.0;
-    for (var k: u32 = 0u; k < params.latticeDim; k++) {
-      let kBase = k * matStride;
-      var expectRe: f32 = 0.0;
-      for (var row: u32 = 0u; row < S; row++) {
-        let psiRRow = psiSiteRe[row];
-        let psiIRow = psiSiteIm[row];
-        let rowBase = kBase + row * S * 2u;
-        for (var col: u32 = 0u; col < S; col++) {
-          let psiRCol = psiSiteRe[col];
-          let psiICol = psiSiteIm[col];
-          let gRe = gammaMatrices[rowBase + col * 2u];
-          let gIm = gammaMatrices[rowBase + col * 2u + 1u];
-          let matPsiRe = gRe * psiRCol - gIm * psiICol;
-          let matPsiIm = gRe * psiICol + gIm * psiRCol;
-          expectRe += psiRRow * matPsiRe + psiIRow * matPsiIm;
-        }
-      }
-      currentMag2 += expectRe * expectRe;
     }
     let cFactor = params.speedOfLight;
     let rawCurrent = cFactor * sqrt(currentMag2);

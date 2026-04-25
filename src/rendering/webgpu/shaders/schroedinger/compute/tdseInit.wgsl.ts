@@ -1,7 +1,8 @@
 /**
  * TDSE Wavefunction Initialization Compute Shader
  *
- * Initializes psiRe and psiIm storage buffers with a Gaussian wavepacket:
+ * Initializes the psi storage buffer (array<vec2f>: .x = Re, .y = Im) with
+ * a Gaussian wavepacket:
  *   psi(x) = A * exp(-|x - x0|^2 / (4*sigma^2)) * exp(i * k0 . x)
  *
  * For 'planeWave' mode, sigma is set very large (flat envelope).
@@ -9,25 +10,20 @@
  *
  * Requires tdseUniformsBlock + freeScalarNDIndexBlock to be prepended.
  *
- * @workgroup_size(64)
+ * Two variants are exported. Both have identical semantics — the host picks
+ * one based on latticeDim (see pickSiteDispatch in computePassUtils):
+ *   - tdseInitBlock:    1-D dispatch, @workgroup_size(64), linearToND coords.
+ *   - tdseInitBlock3D:  3-D dispatch, @workgroup_size(4, 4, 4), gid.xyz coords.
+ *
+ * The 3-D variant is preferred when latticeDim === 3 — it skips the
+ * shift/mask decomposition that linearToND performs for every thread.
+ *
+ * @workgroup_size(64) (1-D variant) | @workgroup_size(4, 4, 4) (3-D variant)
  * @module
  */
 
-export const tdseInitBlock = /* wgsl */ `
-@group(0) @binding(0) var<storage, read> params: TDSEUniforms;
-@group(0) @binding(1) var<storage, read_write> psiRe: array<f32>;
-@group(0) @binding(2) var<storage, read_write> psiIm: array<f32>;
-
-@compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) gid: vec3u) {
-  let idx = gid.x;
-  if (idx >= params.totalSites) {
-    return;
-  }
-
-  // Convert linear index to N-D coordinates
-  let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
-
+/** Shared kernel body — read by both 1-D and 3-D variants. Expects 'idx' and 'coords' to be defined. */
+const TDSE_INIT_BODY = /* wgsl */ `
   // Compute physical position from lattice coordinates
   var r2: f32 = 0.0;    // |x - x0|^2
   var kdotx: f32 = 0.0; // k0 . x
@@ -39,7 +35,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
 
   // Guard near-zero packetWidth: inv4Sigma2 → INF → envelope = NaN poisons
-  // psiRe / psiIm for the rest of the run.
+  // psi for the rest of the run.
   let sigma = max(abs(params.packetWidth), 1e-6);
   let inv4Sigma2 = 1.0 / (4.0 * sigma * sigma);
   let gauss = exp(-r2 * inv4Sigma2);
@@ -345,7 +341,48 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     imVal = rho * sin(phi);
   }
 
-  psiRe[idx] = reVal;
-  psiIm[idx] = imVal;
+  psi[idx] = vec2f(reVal, imVal);
+`
+
+/** 1-D variant: linear dispatch + linearToND coord decomposition. Used when latticeDim !== 3. */
+export const tdseInitBlock = /* wgsl */ `
+@group(0) @binding(0) var<storage, read> params: TDSEUniforms;
+@group(0) @binding(1) var<storage, read_write> psi: array<vec2f>;
+
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  let idx = gid.x;
+  if (idx >= params.totalSites) {
+    return;
+  }
+  let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
+${TDSE_INIT_BODY}
+}
+`
+
+/**
+ * 3-D variant: @workgroup_size(4, 4, 4) + direct gid.xyz coord read.
+ * Saves ~3 shifts + 3 masks per thread (the linearToND decomposition).
+ * Host dispatches ceil(gridSize[d]/4) per axis; the kernel early-returns
+ * when gid.xyz lies outside the grid (handles non-multiple-of-4 dims).
+ */
+export const tdseInitBlock3D = /* wgsl */ `
+@group(0) @binding(0) var<storage, read> params: TDSEUniforms;
+@group(0) @binding(1) var<storage, read_write> psi: array<vec2f>;
+
+@compute @workgroup_size(4, 4, 4)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  if (gid.x >= params.gridSize[0] || gid.y >= params.gridSize[1] || gid.z >= params.gridSize[2]) {
+    return;
+  }
+  // Fill the lower 3 coord slots from gid; remaining slots stay zero-initialized.
+  // The shared body reads coords[d] for d < latticeDim, which is exactly 3 here.
+  var coords: array<u32, 12>;
+  coords[0] = gid.x;
+  coords[1] = gid.y;
+  coords[2] = gid.z;
+  // Strides[2] = 1 for row-major 3-D; use direct mul/add instead of linearToND.
+  let idx = gid.x * params.strides[0] + gid.y * params.strides[1] + gid.z;
+${TDSE_INIT_BODY}
 }
 `

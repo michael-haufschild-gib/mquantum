@@ -131,7 +131,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private schroedingerUniformData = new ArrayBuffer(SCHROEDINGER_UNIFORM_SIZE)
   private schroedingerFloatView = new Float32Array(this.schroedingerUniformData)
   private schroedingerIntView = new Int32Array(this.schroedingerUniformData)
-  private cameraUniformData = new Float32Array(128)
+  private cameraUniformData = new Float32Array(132)
   private basisUniformData = new Float32Array(48)
   private lightingUniformData = new Float32Array(144)
   private materialUniformData = new Float32Array(40)

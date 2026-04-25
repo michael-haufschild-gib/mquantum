@@ -19,6 +19,7 @@
 import type { DiracConfig } from '@/lib/geometry/extended/types'
 
 import type { WebGPURenderContext } from '../core/types'
+import type { SiteDispatch } from './computePassUtils'
 import type { DiracBindGroupResult, DiracPipelineResult } from './DiracComputePassTypes'
 
 /** Function shape matching WebGPUBasePass.dispatchCompute. */
@@ -47,6 +48,13 @@ export interface StrangStepCommon {
   step: number
   S: number
   linearWG: number
+  /**
+   * Site-kernel dispatch shape — selects the 3-D variant when
+   * `latticeDim === 3` (kinetic, absorber). When `use3D` is false, kinetic
+   * and absorber dispatch with `linearWG` (1-D fallback). The pack/unpack
+   * and FFT axes always run with `linearWG` regardless of `siteDispatch`.
+   */
+  siteDispatch: SiteDispatch
   dispatchCompute: DispatchComputeFn
 }
 
@@ -76,10 +84,22 @@ export interface LegacyStrangStepParams extends StrangStepCommon {
  * at dispatch time with a hard-to-diagnose WebGPU validation error.
  */
 export function runBatchedStrangStep(p: BatchedStrangStepParams): void {
-  const { ctx, pl, bg, config, step, S, linearWG, dispatchCompute, ifftSlotOffset, totalSites } = p
+  const {
+    ctx,
+    pl,
+    bg,
+    config,
+    step,
+    S,
+    linearWG,
+    siteDispatch,
+    dispatchCompute,
+    ifftSlotOffset,
+    totalSites,
+  } = p
   const strangPass = ctx.beginComputePass({ label: `dirac-strang-${step}` })
 
-  // 1. Half-step potential (per-component phase rotation)
+  // 1. Half-step potential (per-component phase rotation) — always 1-D.
   dispatchCompute(strangPass, pl.potentialHalfPipeline, [bg.potentialHalfBG!], linearWG)
 
   // 2. Forward FFT for each spinor component: pack → 3 axes → unpack (no-norm)
@@ -98,8 +118,18 @@ export function runBatchedStrangStep(p: BatchedStrangStepParams): void {
     if (unpackBG) dispatchCompute(strangPass, pl.unpackPipeline, [unpackBG], linearWG)
   }
 
-  // 3. Free Dirac propagator in k-space
-  dispatchCompute(strangPass, pl.kineticPipeline, [bg.kineticBG!], linearWG)
+  // 3. Free Dirac propagator in k-space.
+  // Uses 3-D dispatch when latticeDim===3 to skip the per-thread linearToND
+  // k-coord decode. Pipeline shape (use3DSiteDispatch) and dispatch shape
+  // (siteDispatch.use3D) are paired by buildDiracPipelines + pickSiteDispatch.
+  dispatchCompute(
+    strangPass,
+    pl.kineticPipeline,
+    [bg.kineticBG!],
+    siteDispatch.x,
+    siteDispatch.y,
+    siteDispatch.z
+  )
 
   // 4. Inverse FFT per component: pack → 3 axes → unpack (with 1/N norm)
   for (let c = 0; c < S; c++) {
@@ -122,9 +152,17 @@ export function runBatchedStrangStep(p: BatchedStrangStepParams): void {
 
   // 6. Absorber — placed after the FFT kinetic step so the FFT doesn't see
   // the absorber's spatial modulation (which would scatter across k-space
-  // and create spurious emission artifacts).
+  // and create spurious emission artifacts). Same 3-D dispatch as kinetic
+  // when latticeDim===3.
   if (config.absorberEnabled) {
-    dispatchCompute(strangPass, pl.absorberPipeline, [bg.initBG!], linearWG)
+    dispatchCompute(
+      strangPass,
+      pl.absorberPipeline,
+      [bg.initBG!],
+      siteDispatch.x,
+      siteDispatch.y,
+      siteDispatch.z
+    )
   }
 
   strangPass.end()
@@ -150,6 +188,7 @@ export function runLegacyStrangStep(p: LegacyStrangStepParams): void {
     step,
     S,
     linearWG,
+    siteDispatch,
     dispatchCompute,
     fwdStageCount,
     dispatchFFTAxisDelegated,
@@ -179,7 +218,15 @@ export function runLegacyStrangStep(p: LegacyStrangStepParams): void {
   }
 
   const kinPass = ctx.beginComputePass({ label: `dirac-kinetic-${step}` })
-  dispatchCompute(kinPass, pl.kineticPipeline, [bg.kineticBG!], linearWG)
+  // 3-D dispatch when latticeDim===3 (matches kinetic pipeline shape).
+  dispatchCompute(
+    kinPass,
+    pl.kineticPipeline,
+    [bg.kineticBG!],
+    siteDispatch.x,
+    siteDispatch.y,
+    siteDispatch.z
+  )
   kinPass.end()
 
   for (let c = 0; c < S; c++) {
@@ -207,7 +254,14 @@ export function runLegacyStrangStep(p: LegacyStrangStepParams): void {
 
   if (config.absorberEnabled) {
     const absPass = ctx.beginComputePass({ label: `dirac-absorber-${step}` })
-    dispatchCompute(absPass, pl.absorberPipeline, [bg.initBG!], linearWG)
+    dispatchCompute(
+      absPass,
+      pl.absorberPipeline,
+      [bg.initBG!],
+      siteDispatch.x,
+      siteDispatch.y,
+      siteDispatch.z
+    )
     absPass.end()
   }
 }

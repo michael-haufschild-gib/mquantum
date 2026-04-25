@@ -22,10 +22,9 @@
 
 export const tdseWriteGridBlock = /* wgsl */ `
 @group(0) @binding(0) var<storage, read> params: TDSEUniforms;
-@group(0) @binding(1) var<storage, read> psiRe: array<f32>;
-@group(0) @binding(2) var<storage, read> psiIm: array<f32>;
-@group(0) @binding(3) var<storage, read> potential: array<f32>;
-@group(0) @binding(4) var outputTex: texture_storage_3d<rgba16float, write>;
+@group(0) @binding(1) var<storage, read> psi: array<vec2f>;
+@group(0) @binding(2) var<storage, read> potential: array<f32>;
+@group(0) @binding(3) var outputTex: texture_storage_3d<rgba16float, write>;
 
 const TDSE_WG_PI:     f32 = 3.14159265358979323846;
 const TDSE_WG_TAU:    f32 = 6.28318530717958647692;
@@ -85,19 +84,21 @@ fn getPotentialScale() -> f32 {
   return 1.0;
 }
 
-// Convert N-D world position to lattice coordinates with trilinear interpolation.
-// Returns false if out of bounds. For visible dims (< min(latticeDim,3)): lo/hi/frac.
-// For slice dims (>= 3): nearest-neighbor (lo=hi, frac=0).
+// Convert precomputed fractional lattice coordinates to lo/hi/frac for trilinear
+// interpolation. Returns false if out of bounds. For visible dims
+// (< min(latticeDim,3)): lo/hi/frac. For slice dims (>= 3): nearest-neighbor
+// (lo=hi, frac=0). Caller supplies coordFs[d] = (ndWorldPos[d] + N/2*dx)/dx - 0.5
+// so the same value is reused for nearest-neighbor derivation, avoiding a
+// second per-dim mul/div/sub chain.
 fn worldToLatticeInterp(
-  ndWorldPos: ptr<function, array<f32, 12>>,
+  coordFs: ptr<function, array<f32, 12>>,
   coordsLo: ptr<function, array<u32, 12>>,
   coordsHi: ptr<function, array<u32, 12>>,
   fracs: ptr<function, array<f32, 12>>
 ) -> bool {
   let interpDims = min(params.latticeDim, 3u);
   for (var d: u32 = 0u; d < params.latticeDim; d++) {
-    let halfExtent = f32(params.gridSize[d]) * params.spacing[d] * 0.5;
-    let coordF = ((*ndWorldPos)[d] + halfExtent) / params.spacing[d] - 0.5;
+    let coordF = (*coordFs)[d];
 
     if (d < interpDims) {
       let lo = floor(coordF);
@@ -221,17 +222,21 @@ fn computeSuperfluidVelocityMagSq(
     var dIm: f32;
     if (hasPML && atLo) {
       let fIdx = idx + stride;
-      dRe = (psiRe[fIdx] - re) * invSpacing;
-      dIm = (psiIm[fIdx] - im) * invSpacing;
+      let zF = psi[fIdx];
+      dRe = (zF.x - re) * invSpacing;
+      dIm = (zF.y - im) * invSpacing;
     } else if (hasPML && atHi) {
       let bIdx = idx - stride;
-      dRe = (re - psiRe[bIdx]) * invSpacing;
-      dIm = (im - psiIm[bIdx]) * invSpacing;
+      let zB = psi[bIdx];
+      dRe = (re - zB.x) * invSpacing;
+      dIm = (im - zB.y) * invSpacing;
     } else {
       let fwdIdx = select(idx + stride, idx - stride * (Nd - 1u), atHi);
       let bwdIdx = select(idx - stride, idx + stride * (Nd - 1u), atLo);
-      dRe = (psiRe[fwdIdx] - psiRe[bwdIdx]) * invDx;
-      dIm = (psiIm[fwdIdx] - psiIm[bwdIdx]) * invDx;
+      let zF = psi[fwdIdx];
+      let zB = psi[bwdIdx];
+      dRe = (zF.x - zB.x) * invDx;
+      dIm = (zF.y - zB.y) * invDx;
     }
     let jd = hbarOverM * (re * dIm - im * dRe);
     let vsd = jd * invDensity;
@@ -269,12 +274,21 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     }
   }
 
+  // Precompute fractional lattice coordinate per dim ONCE. Used below by both
+  // the interp helper (lo/hi/frac) and the nearest-neighbor derivation — the
+  // previous code recomputed this in two separate per-dim loops.
+  var coordF: array<f32, 12>;
+  for (var d: u32 = 0u; d < params.latticeDim; d++) {
+    let halfExtent = f32(params.gridSize[d]) * params.spacing[d] * 0.5;
+    coordF[d] = (ndWorldPos[d] + halfExtent) / params.spacing[d] - 0.5;
+  }
+
   // Convert to lattice coordinates with trilinear interpolation support
   var coordsLo: array<u32, 12>;
   var coordsHi: array<u32, 12>;
   var fracs: array<f32, 12>;
 
-  let inBounds = worldToLatticeInterp(&ndWorldPos, &coordsLo, &coordsHi, &fracs);
+  let inBounds = worldToLatticeInterp(&coordF, &coordsLo, &coordsHi, &fracs);
   if (!inBounds) {
     textureStore(outputTex, gid, vec4f(0.0));
     return;
@@ -297,12 +311,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   let numCorners = 1u << min(params.latticeDim, 3u);
 
-  // Nearest-neighbor coords for derivative-based and potential field views
+  // Nearest-neighbor coords for derivative-based and potential field views.
+  // Derived from the coordF values computed above — round+clamp on the exact
+  // same fractional coordinate preserves boundary behavior bit-for-bit
+  // (deriving round from coordsLo/frac would disagree at grid edges where the
+  // interp clamps truncate loI=-1 and hiI=N to valid neighbors).
   var nnCoords: array<u32, 12>;
   for (var d: u32 = 0u; d < params.latticeDim; d++) {
-    let halfExtent = f32(params.gridSize[d]) * params.spacing[d] * 0.5;
-    let coordF = (ndWorldPos[d] + halfExtent) / params.spacing[d] - 0.5;
-    nnCoords[d] = u32(clamp(i32(round(coordF)), 0, i32(params.gridSize[d]) - 1));
+    nnCoords[d] = u32(clamp(i32(round(coordF[d])), 0, i32(params.gridSize[d]) - 1));
   }
   let nnIdx = ndToLinear(nnCoords, params.strides, params.latticeDim);
 
@@ -326,8 +342,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       let w = cornerWeight(&fracs, corner);
       if (w > 0.0) {
         let sIdx = siteIndexForCorner(&coordsLo, &coordsHi, corner);
-        let cRe = psiRe[sIdx];
-        let cIm = psiIm[sIdx];
+        let zc = psi[sIdx];
+        let cRe = zc.x;
+        let cIm = zc.y;
         blendedDensity += w * (cRe * cRe + cIm * cIm);
         blendedRe += w * cRe;
         blendedIm += w * cIm;
@@ -340,8 +357,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     idx = nnIdx; // for potential overlay
   } else {
     idx = nnIdx;
-    re = psiRe[idx];
-    im = psiIm[idx];
+    let z0 = psi[idx];
+    re = z0.x;
+    im = z0.y;
     density = re * re + im * im;
     phase = atan2(im, re) + TDSE_WG_PI;
   }
@@ -377,17 +395,21 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       var dIm: f32;
       if (hasPML && atLo) {
         let fIdx = idx + stride;
-        dRe = (psiRe[fIdx] - re) * invSpacing;
-        dIm = (psiIm[fIdx] - im) * invSpacing;
+        let zF = psi[fIdx];
+        dRe = (zF.x - re) * invSpacing;
+        dIm = (zF.y - im) * invSpacing;
       } else if (hasPML && atHi) {
         let bIdx = idx - stride;
-        dRe = (re - psiRe[bIdx]) * invSpacing;
-        dIm = (im - psiIm[bIdx]) * invSpacing;
+        let zB = psi[bIdx];
+        dRe = (re - zB.x) * invSpacing;
+        dIm = (im - zB.y) * invSpacing;
       } else {
         let fwdIdx = select(idx + stride, idx - stride * (Nd - 1u), atHi);
         let bwdIdx = select(idx - stride, idx + stride * (Nd - 1u), atLo);
-        dRe = (psiRe[fwdIdx] - psiRe[bwdIdx]) * invDx;
-        dIm = (psiIm[fwdIdx] - psiIm[bwdIdx]) * invDx;
+        let zF = psi[fwdIdx];
+        let zB = psi[bwdIdx];
+        dRe = (zF.x - zB.x) * invDx;
+        dIm = (zF.y - zB.y) * invDx;
       }
       let jd = hbarOverM * (re * dIm - im * dRe);
       currentMagSq += jd * jd;

@@ -10,6 +10,7 @@ import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import { assertPow2Log2, FFT_UNIFORM_SIZE, PACK_UNIFORM_SIZE } from './computePassUtils'
 import { buildTdseFFTAxisStagingData, buildTdseFFTStagingData } from './TDSEComputePassUniforms'
+import { buildTdseFFTTwiddleTable, FFT_TWIDDLE_BYTES } from './TDSEFFTTwiddle'
 
 /**
  * TDSEUniforms struct size in bytes.
@@ -85,8 +86,12 @@ const DIAG_RESULT_COUNT = 5
 
 /** Old buffers to destroy before rebuilding. Any field may be null. */
 export interface TdseDestroyableBuffers {
-  psiReBuffer: GPUBuffer | null
-  psiImBuffer: GPUBuffer | null
+  /**
+   * Merged ψ buffer (array<vec2f>, 8 bytes per site: .x = Re, .y = Im).
+   * Replaces the previous split psiReBuffer + psiImBuffer pair — one load per
+   * site instead of two, halved binding count, one vec2f store on writes.
+   */
+  psiBuffer: GPUBuffer | null
   potentialBuffer: GPUBuffer | null
   fftScratchA: GPUBuffer | null
   fftScratchB: GPUBuffer | null
@@ -98,6 +103,8 @@ export interface TdseDestroyableBuffers {
   /** PERF: one pre-populated uniform buffer per (axis, direction) slot — eliminates
    *  per-axis copyBufferToBuffer + per-dispatch compute pass boundaries. */
   fftAxisUniformBuffers?: GPUBuffer[] | null
+  /** CPU-precomputed radix-2 twiddle table (replaces cos/sin in the butterfly). */
+  fftTwiddleBuffer?: GPUBuffer | null
   packUniformBuffer: GPUBuffer | null
   omegaStagingBuffer: GPUBuffer | null
   diagUniformBuffer: GPUBuffer | null
@@ -115,8 +122,8 @@ export interface TdseDestroyableBuffers {
  * Every field is non-null after a successful call.
  */
 export interface TdseBufferResult {
-  psiReBuffer: GPUBuffer
-  psiImBuffer: GPUBuffer
+  /** Merged ψ buffer (array<vec2f>, 8 bytes per site). */
+  psiBuffer: GPUBuffer
   potentialBuffer: GPUBuffer
   fftScratchA: GPUBuffer
   fftScratchB: GPUBuffer
@@ -129,6 +136,8 @@ export interface TdseBufferResult {
    *  (length = 2 × latticeDim: forward axes first, then inverse axes).
    *  Each buffer holds a single pre-populated FFTAxisUniforms struct. */
   fftAxisUniformBuffers: GPUBuffer[]
+  /** CPU-precomputed radix-2 twiddle table (replaces per-thread cos/sin). */
+  fftTwiddleBuffer: GPUBuffer
   packUniformBuffer: GPUBuffer
   omegaStagingBuffer: GPUBuffer
   diagUniformBuffer: GPUBuffer
@@ -170,8 +179,7 @@ export function rebuildTdseBuffers(
   helpers: TdseBufferHelpers
 ): TdseBufferResult {
   // Destroy old buffers
-  old.psiReBuffer?.destroy()
-  old.psiImBuffer?.destroy()
+  old.psiBuffer?.destroy()
   old.potentialBuffer?.destroy()
   old.fftScratchA?.destroy()
   old.fftScratchB?.destroy()
@@ -183,6 +191,7 @@ export function rebuildTdseBuffers(
   if (old.fftAxisUniformBuffers) {
     for (const b of old.fftAxisUniformBuffers) b.destroy()
   }
+  old.fftTwiddleBuffer?.destroy()
   old.packUniformBuffer?.destroy()
   old.omegaStagingBuffer?.destroy()
   old.diagUniformBuffer?.destroy()
@@ -199,14 +208,12 @@ export function rebuildTdseBuffers(
   const siteBytes = totalSites * 4
   const complexBytes = totalSites * 8 // 2 floats per complex
 
-  const psiReBuffer = device.createBuffer({
-    label: 'tdse-psiRe',
-    size: siteBytes,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
-  })
-  const psiImBuffer = device.createBuffer({
-    label: 'tdse-psiIm',
-    size: siteBytes,
+  // Merged ψ buffer (array<vec2f>). Each site is (re, im) packed in 8 bytes.
+  // Replaces the earlier split psiReBuffer + psiImBuffer pair. Same byte count
+  // in aggregate (totalSites * 8), but one load per site and one binding.
+  const psiBuffer = device.createBuffer({
+    label: 'tdse-psi',
+    size: complexBytes,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
   })
   const potentialBuffer = device.createBuffer({
@@ -294,6 +301,19 @@ export function rebuildTdseBuffers(
     fftAxisUniformBuffers[slot] = buf
   }
 
+  // CPU-precomputed radix-2 twiddle table. Replaces per-thread cos/sin in the
+  // Stockham butterfly at stages s >= 2. Sized for N_MAX_FFT_TWIDDLE = 128;
+  // a single 512-byte buffer serves every axis length in [8, 128] and both
+  // FFT kernels (shared-mem + per-stage). See TDSEFFTTwiddle.ts for layout.
+  // Rebuilt on every grid-dim rebuild but uploaded exactly once — values are
+  // axis-length-independent.
+  const fftTwiddleBuffer = device.createBuffer({
+    label: 'tdse-fft-twiddle',
+    size: FFT_TWIDDLE_BYTES,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  })
+  device.queue.writeBuffer(fftTwiddleBuffer, 0, buildTdseFFTTwiddleTable())
+
   // Pack uniforms: totalSites and invN don't change between frames
   const packData = new ArrayBuffer(PACK_UNIFORM_SIZE)
   const pu32 = new Uint32Array(packData)
@@ -355,8 +375,7 @@ export function rebuildTdseBuffers(
   useDiagnosticsStore.getState().resetTdse()
 
   return {
-    psiReBuffer,
-    psiImBuffer,
+    psiBuffer,
     potentialBuffer,
     fftScratchA,
     fftScratchB,
@@ -366,6 +385,7 @@ export function rebuildTdseBuffers(
     fftAxisUniformBuffer,
     fftAxisStagingBuffer,
     fftAxisUniformBuffers,
+    fftTwiddleBuffer,
     packUniformBuffer,
     omegaStagingBuffer,
     diagUniformBuffer,
@@ -385,8 +405,8 @@ export function rebuildTdseBuffers(
 
 /** Mutable buffer fields on TDSEComputePass that mirror TdseBufferResult + TdseDestroyableBuffers. */
 export interface TdsePassBufferFields {
-  psiReBuffer: GPUBuffer | null
-  psiImBuffer: GPUBuffer | null
+  /** Merged ψ buffer (array<vec2f>, 8 bytes per site). */
+  psiBuffer: GPUBuffer | null
   potentialBuffer: GPUBuffer | null
   fftScratchA: GPUBuffer | null
   fftScratchB: GPUBuffer | null
@@ -396,6 +416,7 @@ export interface TdsePassBufferFields {
   fftAxisUniformBuffer: GPUBuffer | null
   fftAxisStagingBuffer: GPUBuffer | null
   fftAxisUniformBuffers: GPUBuffer[] | null
+  fftTwiddleBuffer: GPUBuffer | null
   packUniformBuffer: GPUBuffer | null
   omegaStagingBuffer: GPUBuffer | null
   diagUniformBuffer: GPUBuffer | null
@@ -420,8 +441,7 @@ export function collectOldBuffers(
 
 /** Apply rebuild result to the pass's mutable buffer fields and derived scalars. */
 export function applyBufferResult(fields: TdsePassBufferFields, r: TdseBufferResult): void {
-  fields.psiReBuffer = r.psiReBuffer
-  fields.psiImBuffer = r.psiImBuffer
+  fields.psiBuffer = r.psiBuffer
   fields.potentialBuffer = r.potentialBuffer
   fields.fftScratchA = r.fftScratchA
   fields.fftScratchB = r.fftScratchB
@@ -431,6 +451,7 @@ export function applyBufferResult(fields: TdsePassBufferFields, r: TdseBufferRes
   fields.fftAxisUniformBuffer = r.fftAxisUniformBuffer
   fields.fftAxisStagingBuffer = r.fftAxisStagingBuffer
   fields.fftAxisUniformBuffers = r.fftAxisUniformBuffers
+  fields.fftTwiddleBuffer = r.fftTwiddleBuffer
   fields.packUniformBuffer = r.packUniformBuffer
   fields.omegaStagingBuffer = r.omegaStagingBuffer
   fields.diagUniformBuffer = r.diagUniformBuffer

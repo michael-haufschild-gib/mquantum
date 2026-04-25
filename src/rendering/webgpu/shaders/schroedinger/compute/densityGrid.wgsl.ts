@@ -120,14 +120,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
 
-  // Convert grid coordinate to normalized [0,1] space
-  // PERF: hoist 1/gridSize to a per-warp reciprocal — 1 vec3 div → 1 vec3 mul per thread.
-  let gridSizeF = vec3f(gridParams.gridSize);
-  let invGridSize = 1.0 / gridSizeF;
-  let uvw = (vec3f(gid) + 0.5) * invGridSize;
-
-  // Convert to world-space position within bounding volume
-  let worldPos = mix(gridParams.worldMin, gridParams.worldMax, uvw);
+  // Convert grid coordinate directly to world-space.
+  // PERF: fold uvw + mix into one fma so the per-thread cost is
+  // 1 vec3 add + 1 vec3 fma. The uniform gridToWorld is computed from
+  // two uniforms and is hoistable by the driver.
+  let gridToWorld = (gridParams.worldMax - gridParams.worldMin) / vec3f(gridParams.gridSize);
+  let worldPos = fma(vec3f(gid) + 0.5, gridToWorld, gridParams.worldMin);
 
   // Check if position is within the bounding sphere (dynamic radius).
   // PERF: precompute boundR² once so the per-thread compare is a scalar no-op.
@@ -265,11 +263,18 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Active basis size: use oq.maxK for density matrix mode (supports up to 14)
   let basisK = min(u32(oq.maxK), 14u);
 
-  // Evaluate each basis function ψ_k(x) independently
-  // Store as complex values (re, im)
+  // Evaluate each basis function ψ_k(x) independently and cache |ψ_k|².
+  // PERF: caching |ψ_k|² skips K(K-1)/2 redundant dot(pl,pl) calls in the
+  // inner cross-term loop (up to ~90 dots per voxel at K=14), and also lets
+  // us skip the inner-loop basisValues[l] load entirely when that basis is
+  // negligible at this grid point — matters because array<vec2f,14> often
+  // lives in private/scratch memory.
   var basisValues: array<vec2f, 14>;
+  var basisMag2: array<f32, 14>;
   for (var k = 0u; k < basisK; k = k + 1u) {
-    basisValues[k] = evaluateSingleBasis(xND, t, k, schroedinger);
+    let v = evaluateSingleBasis(xND, t, k, schroedinger);
+    basisValues[k] = v;
+    basisMag2[k] = dot(v, v);
   }
 
   // Compute n(x) = Σ_{kl} ρ_{kl} · ψ_k(x) · ψ_l*(x)
@@ -280,7 +285,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   for (var k = 0u; k < basisK; k = k + 1u) {
     // PERF: skip basis states with negligible amplitude at this grid point
-    let psi_k_sq = dot(basisValues[k], basisValues[k]);
+    let psi_k_sq = basisMag2[k];
     if (psi_k_sq < 1e-20) { continue; }
 
     // Diagonal: ρ_{kk} |ψ_k|² (ρ_{kk} is real for Hermitian ρ)
@@ -292,12 +297,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // PERF: inline complex cross-term to avoid intermediate vec2f
     let pk = basisValues[k];
     for (var l = k + 1u; l < basisK; l = l + 1u) {
-      let pl = basisValues[l];
-      // PERF: skip negligible basis-state amplitude (avoids getRho uniform fetch)
-      if (dot(pl, pl) < 1e-20) { continue; }
+      // PERF: cached |ψ_l|² — skip array load when basis l is negligible.
+      if (basisMag2[l] < 1e-20) { continue; }
       let rho_kl = getRho(oq, k, l);
       // PERF: skip negligible coherence (common after decoherence)
       if (dot(rho_kl, rho_kl) < 1e-20) { continue; }
+      let pl = basisValues[l];
       // Re(ψ_k · ψ_l*) = dot(ψ_k, ψ_l), Im(ψ_k · ψ_l*) = ψk.y·ψl.x - ψk.x·ψl.y
       totalDensity += 2.0 * (rho_kl.x * dot(pk, pl) - rho_kl.y * (pk.y * pl.x - pk.x * pl.y));
     }

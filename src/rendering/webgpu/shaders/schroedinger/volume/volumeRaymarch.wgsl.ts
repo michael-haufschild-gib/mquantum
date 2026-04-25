@@ -40,6 +40,9 @@ fn volumeRaymarch(
   let sampleCount = max(i32(f32(max(uniforms.sampleCount, 1)) * (tFar - tNear) / maxPathLen), 4);
 
   let stepLen = (tFar - tNear) / f32(sampleCount);
+  // Hoist 1/stepLen so compositeOverlay can skip its per-call division
+  // (up to ~60-80 active calls per ray in the probCurrent/radialProb paths).
+  let invStepLen = 1.0 / max(stepLen, 1e-5);
   var t = tNear;
 
   // Time for animation
@@ -150,13 +153,13 @@ fn volumeRaymarch(
       let currentOverlay = computeProbabilityCurrentOverlay(
         pos, currentSample, rho, normalProxy, viewDir, uniforms
       );
-      compositeOverlay(currentOverlay, adaptiveStep, stepLen, 0.45, &transmittance, &accColor);
+      compositeOverlay(currentOverlay, adaptiveStep, invStepLen, 0.45, &transmittance, &accColor);
     }
 
     // Radial probability overlay (hydrogen P(r) shells)
     if (radialProbEnabled) {
       let rProbOverlay = computeRadialProbabilityOverlay(pos, uniforms);
-      compositeOverlay(rProbOverlay, adaptiveStep, stepLen, 0.5, &transmittance, &accColor);
+      compositeOverlay(rProbOverlay, adaptiveStep, invStepLen, 0.5, &transmittance, &accColor);
     }
 
     let effectiveRho = computeEffectiveDensity(rho, phase, transmittance, uniforms);
@@ -227,6 +230,8 @@ fn volumeRaymarchHQ(
   let maxPathLen = 2.0 * uniforms.boundingRadius;
   let sampleCount = max(i32(f32(max(uniforms.sampleCount, 1)) * (tFar - tNear) / maxPathLen), 4);
   let stepLen = (tFar - tNear) / f32(sampleCount);
+  // Hoist 1/stepLen so compositeOverlay skips its per-call division.
+  let invStepLen = 1.0 / max(stepLen, 1e-5);
   var t = tNear;
 
   let animTime = getVolumeTime(uniforms);
@@ -288,6 +293,10 @@ fn volumeRaymarchHQ(
       }
     }
 
+    // Hoisted so the nodal-band and main compositing paths share one computation
+    // (was computed twice — once as adaptiveStepN in the nodal branch, once here).
+    let adaptiveStep = computeAdaptiveStep(quickS, stepLen, tFar - t);
+
     var rho: f32;
     var sCenter: f32;
     var phase: f32;
@@ -322,11 +331,10 @@ fn volumeRaymarchHQ(
       // Process nodal contribution inline (avoid duplicate call)
       let fadedIntensityHQ = combined.nodal.intensity * combined.nodal.envelopeWeight;
       if (fadedIntensityHQ > 1e-4) {
-        let adaptiveStepN = computeAdaptiveStep(quickS, stepLen, tFar - t);
         let nodalColor = selectPhysicalNodalColor(uniforms, combined.nodal.colorMode, combined.nodal.signValue);
         compositeNodalBand(
           fadedIntensityHQ, uniforms.nodalStrength, nodalColor,
-          min(adaptiveStepN, stepLen * 1.5), ambientLight,
+          min(adaptiveStep, stepLen * 1.5), ambientLight,
           &transmittance, &accColor
         );
       }
@@ -345,8 +353,6 @@ fn volumeRaymarchHQ(
       phase = tetra.phase;
       gradient = tetra.gradient;
     }
-
-    let adaptiveStep = computeAdaptiveStep(quickS, stepLen, tFar - t);
 
     // Nodal band processing (only if not already handled by the combined path above)
     if (!nodalHandled && nodalBandActive) {
@@ -374,13 +380,13 @@ fn volumeRaymarchHQ(
       let currentOverlay = computeProbabilityCurrentOverlay(
         pos, currentSample, rho, normalProxy, viewDir, uniforms
       );
-      compositeOverlay(currentOverlay, adaptiveStep, stepLen, 0.45, &transmittance, &accColor);
+      compositeOverlay(currentOverlay, adaptiveStep, invStepLen, 0.45, &transmittance, &accColor);
     }
 
     // Radial probability overlay (hydrogen P(r) shells)
     if (radialProbEnabled) {
       let rProbOverlay = computeRadialProbabilityOverlay(pos, uniforms);
-      compositeOverlay(rProbOverlay, adaptiveStep, stepLen, 0.5, &transmittance, &accColor);
+      compositeOverlay(rProbOverlay, adaptiveStep, invStepLen, 0.5, &transmittance, &accColor);
     }
 
     let effectiveRho = computeEffectiveDensity(rho, phase, transmittance, uniforms);

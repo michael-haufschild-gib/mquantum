@@ -31,8 +31,7 @@ import { resetWormholeReadback, type WormholeReadbackState } from './TDSEWormhol
 
 /** Narrow view of `TDSEComputePass` used by `runTdseDispose`. */
 export interface TdseDisposeFields {
-  psiReBuffer: GPUBuffer | null
-  psiImBuffer: GPUBuffer | null
+  psiBuffer: GPUBuffer | null
   potentialBuffer: GPUBuffer | null
   fftScratchA: GPUBuffer | null
   fftScratchB: GPUBuffer | null
@@ -42,6 +41,7 @@ export interface TdseDisposeFields {
   fftAxisUniformBuffer: GPUBuffer | null
   fftAxisStagingBuffer: GPUBuffer | null
   fftAxisUniformBuffers: GPUBuffer[] | null
+  fftTwiddleBuffer: GPUBuffer | null
   packUniformBuffer: GPUBuffer | null
   omegaStagingBuffer: GPUBuffer | null
   densityTexture: GPUTexture | null
@@ -80,8 +80,7 @@ export interface TdseDisposeFields {
  */
 export function runTdseDispose(pass: TdseDisposeFields): void {
   const gpu: TdsePassGpuSnapshot = {
-    psiReBuffer: pass.psiReBuffer,
-    psiImBuffer: pass.psiImBuffer,
+    psiBuffer: pass.psiBuffer,
     potentialBuffer: pass.potentialBuffer,
     fftScratchA: pass.fftScratchA,
     fftScratchB: pass.fftScratchB,
@@ -91,6 +90,7 @@ export function runTdseDispose(pass: TdseDisposeFields): void {
     fftAxisUniformBuffer: pass.fftAxisUniformBuffer,
     fftAxisStagingBuffer: pass.fftAxisStagingBuffer,
     fftAxisUniformBuffers: pass.fftAxisUniformBuffers,
+    fftTwiddleBuffer: pass.fftTwiddleBuffer,
     packUniformBuffer: pass.packUniformBuffer,
     omegaStagingBuffer: pass.omegaStagingBuffer,
     densityTexture: pass.densityTexture,

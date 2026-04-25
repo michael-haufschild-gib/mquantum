@@ -81,6 +81,17 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // Use a 2x2 rotation recurrence to advance (cos, sin) without calling cos/sin
     // per k. Init once per j; then N-1 iterations of 2 muls + 1 sub + 1 add each.
     // For N=22 this replaces 484 cos/sin calls per site with 44 (init) + recurrence.
+    //
+    // PERF: coinIn is also cached into a function-local array so the j×k double
+    // loop makes 2N storage loads (not 2N·N). For D=11, N=22: 44 storage reads
+    // instead of 968 per site per timestep. Same cache strategy used by the
+    // Grover branch above.
+    var inRe: array<f32, 22>;
+    var inIm: array<f32, 22>;
+    for (var k: u32 = 0u; k < numCoinStates; k++) {
+      inRe[k] = coinIn[baseIdx + k * 2u];
+      inIm[k] = coinIn[baseIdx + k * 2u + 1u];
+    }
     let N = f32(numCoinStates);
     let invSqrtN = inverseSqrt(N);
     let twoPiOverN = 6.28318530717958647692 / N;
@@ -94,10 +105,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       var cosP: f32 = 1.0; // cos(0)
       var sinP: f32 = 0.0; // sin(0)
       for (var k: u32 = 0u; k < numCoinStates; k++) {
-        let inRe = coinIn[baseIdx + k * 2u];
-        let inIm = coinIn[baseIdx + k * 2u + 1u];
-        outRe += cosP * inRe - sinP * inIm;
-        outIm += cosP * inIm + sinP * inRe;
+        let rIn = inRe[k];
+        let iIn = inIm[k];
+        outRe += cosP * rIn - sinP * iIn;
+        outIm += cosP * iIn + sinP * rIn;
         // Advance (cosP, sinP) by dPhi via 2x2 rotation.
         let newCos = cosP * cosD - sinP * sinD;
         let newSin = sinP * cosD + cosP * sinD;

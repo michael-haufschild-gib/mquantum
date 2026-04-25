@@ -58,7 +58,10 @@ fn extractBloomSample(colorSample: vec4f, threshold: f32, knee: f32) -> vec3f {
     return vec3f(0.0);
   }
 
-  let straightColor = colorSample.rgb / alpha;
+  // vec3/f32 becomes 3 divisions; reciprocal + scalar-mul is 1 div + 3 muls.
+  // Division is 10-40× slower than multiply on GPU ALUs.
+  let invAlpha = 1.0 / alpha;
+  let straightColor = colorSample.rgb * invAlpha;
   let thresholded = softThreshold(straightColor, threshold, knee);
   return thresholded * alpha;
 }

@@ -174,7 +174,8 @@ fn volumeRaymarchGrid(
     }
 
     // Potential overlay rendering (TDSE / FSF negative-encoded).
-    if (DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01) {
+    // Reuse the hasPotOverlay boolean instead of re-evaluating the condition.
+    if (hasPotOverlay) {
       let potColor = vec3f(0.35, 0.45, 0.55);
       let potIntensity = abs(gridSample.a);
       let potOpacity = clamp(potIntensity * 0.06 * transmittance * min(adaptiveStep * invStepLen, 2.0), 0.0, 0.2);
@@ -470,7 +471,8 @@ fn volumeRaymarchGrid(
     // Alpha dual-encoding: .a < 0 encodes -potOverlay from the write-grid shader.
     // For HO/hydrogen modes, alpha is relativePhase (>= 0) — never triggers.
     // For Pauli spinor mode, alpha encodes total density (>= 0) — never triggers.
-    if (IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01) {
+    // Reuse the hasPotOverlay boolean (computed above) to avoid re-checking 4 conditions.
+    if (hasPotOverlay) {
       let potColor = vec3f(0.35, 0.45, 0.55);
       let potIntensity = abs(gridSample.a);
       // Scale opacity by current transmittance: first samples contribute strongly,
@@ -528,13 +530,13 @@ fn volumeRaymarchGrid(
       let currentOverlay = computeProbabilityCurrentOverlay(
         pos, currentSample, rho, normalProxy, viewDir, uniforms
       );
-      compositeOverlay(currentOverlay, adaptiveStep, stepLen, 0.45, &transmittance, &accColor);
+      compositeOverlay(currentOverlay, adaptiveStep, invStepLen, 0.45, &transmittance, &accColor);
     }
 
     // Radial probability overlay (hydrogen P(r) shells)
     if (FEATURE_RADIAL_PROBABILITY && uniforms.radialProbabilityEnabled != 0u) {
       let rProbOverlay = computeRadialProbabilityOverlay(pos, uniforms);
-      compositeOverlay(rProbOverlay, adaptiveStep, stepLen, 0.5, &transmittance, &accColor);
+      compositeOverlay(rProbOverlay, adaptiveStep, invStepLen, 0.5, &transmittance, &accColor);
     }
 
     let effectiveRho = computeEffectiveDensity(rho, phase, transmittance, uniforms);

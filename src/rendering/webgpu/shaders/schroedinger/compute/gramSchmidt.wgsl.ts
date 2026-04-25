@@ -32,12 +32,10 @@ struct GSReduceUniforms {
 }
 
 @group(0) @binding(0) var<uniform> params: GSReduceUniforms;
-@group(0) @binding(1) var<storage, read> phiRe: array<f32>;
-@group(0) @binding(2) var<storage, read> phiIm: array<f32>;
-@group(0) @binding(3) var<storage, read> psiRe: array<f32>;
-@group(0) @binding(4) var<storage, read> psiIm: array<f32>;
-@group(0) @binding(5) var<storage, read_write> partialRe: array<f32>;
-@group(0) @binding(6) var<storage, read_write> partialIm: array<f32>;
+@group(0) @binding(1) var<storage, read> phi: array<vec2f>;
+@group(0) @binding(2) var<storage, read> psi: array<vec2f>;
+@group(0) @binding(3) var<storage, read_write> partialRe: array<f32>;
+@group(0) @binding(4) var<storage, read_write> partialIm: array<f32>;
 
 // Pack (re, im) into vec2 — halves shared-memory ops in the tree reduce.
 var<workgroup> shared_ip: array<vec2<f32>, 256>;
@@ -53,10 +51,12 @@ fn main(
 
   var ip: vec2<f32> = vec2<f32>(0.0, 0.0);
   if (idx < params.totalElements) {
-    let pRe = phiRe[idx];
-    let pIm = phiIm[idx];
-    let wRe = psiRe[idx];
-    let wIm = psiIm[idx];
+    let phiV = phi[idx];
+    let psiV = psi[idx];
+    let pRe = phiV.x;
+    let pIm = phiV.y;
+    let wRe = psiV.x;
+    let wIm = psiV.y;
     // ⟨φ|ψ⟩ = conj(φ) · ψ = (φ_re - iφ_im)(ψ_re + iψ_im)
     ip = vec2<f32>(pRe * wRe + pIm * wIm, pRe * wIm - pIm * wRe);
   }
@@ -141,10 +141,8 @@ struct GSSubtractUniforms {
 
 @group(0) @binding(0) var<uniform> params: GSSubtractUniforms;
 @group(0) @binding(1) var<storage, read> innerProduct: array<f32>;
-@group(0) @binding(2) var<storage, read> phiRe: array<f32>;
-@group(0) @binding(3) var<storage, read> phiIm: array<f32>;
-@group(0) @binding(4) var<storage, read_write> psiRe: array<f32>;
-@group(0) @binding(5) var<storage, read_write> psiIm: array<f32>;
+@group(0) @binding(2) var<storage, read> phi: array<vec2f>;
+@group(0) @binding(3) var<storage, read_write> psi: array<vec2f>;
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
@@ -156,14 +154,15 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let cRe = innerProduct[0] * invNorm2;
   let cIm = innerProduct[1] * invNorm2;
 
-  let fRe = phiRe[idx];
-  let fIm = phiIm[idx];
+  let phiV = phi[idx];
+  let fRe = phiV.x;
+  let fIm = phiV.y;
 
   // (⟨φ|ψ⟩/⟨φ|φ⟩) · φ
   let projRe = cRe * fRe - cIm * fIm;
   let projIm = cRe * fIm + cIm * fRe;
 
-  psiRe[idx] = psiRe[idx] - projRe;
-  psiIm[idx] = psiIm[idx] - projIm;
+  let psiV = psi[idx];
+  psi[idx] = vec2f(psiV.x - projRe, psiV.y - projIm);
 }
 `

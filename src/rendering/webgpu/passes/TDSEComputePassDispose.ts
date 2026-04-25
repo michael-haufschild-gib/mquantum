@@ -70,8 +70,7 @@ export function disposeTdseResources(
  * in place by {@link destroyTdsePassGpu}.
  */
 export interface TdsePassGpuSnapshot {
-  psiReBuffer: GPUBuffer | null
-  psiImBuffer: GPUBuffer | null
+  psiBuffer: GPUBuffer | null
   potentialBuffer: GPUBuffer | null
   fftScratchA: GPUBuffer | null
   fftScratchB: GPUBuffer | null
@@ -82,6 +81,8 @@ export interface TdsePassGpuSnapshot {
   fftAxisStagingBuffer: GPUBuffer | null
   /** PERF: per-slot axis uniform buffers for batched Strang FFT (length = 2 × latticeDim). */
   fftAxisUniformBuffers: GPUBuffer[] | null
+  /** CPU-precomputed FFT twiddle table (replaces cos/sin in the butterfly). */
+  fftTwiddleBuffer: GPUBuffer | null
   packUniformBuffer: GPUBuffer | null
   omegaStagingBuffer: GPUBuffer | null
   densityTexture: GPUTexture | null
@@ -104,8 +105,7 @@ export interface TdsePassGpuSnapshot {
  */
 export function destroyTdsePassGpu(fields: TdsePassGpuSnapshot): void {
   const bufs: (GPUBuffer | GPUTexture | null | undefined)[] = [
-    fields.psiReBuffer,
-    fields.psiImBuffer,
+    fields.psiBuffer,
     fields.potentialBuffer,
     fields.fftScratchA,
     fields.fftScratchB,
@@ -114,6 +114,7 @@ export function destroyTdsePassGpu(fields: TdsePassGpuSnapshot): void {
     fields.fftStagingBuffer,
     fields.fftAxisUniformBuffer,
     fields.fftAxisStagingBuffer,
+    fields.fftTwiddleBuffer,
     fields.packUniformBuffer,
     fields.omegaStagingBuffer,
     fields.densityTexture,
@@ -129,11 +130,12 @@ export function destroyTdsePassGpu(fields: TdsePassGpuSnapshot): void {
   if (fields.fftAxisUniformBuffers) {
     for (const b of fields.fftAxisUniformBuffers) b.destroy()
   }
-  fields.psiReBuffer = fields.psiImBuffer = fields.potentialBuffer = null
+  fields.psiBuffer = fields.potentialBuffer = null
   fields.fftScratchA = fields.fftScratchB = fields.omegaStagingBuffer = null
   fields.uniformBuffer = fields.fftUniformBuffer = fields.fftStagingBuffer = null
   fields.fftAxisUniformBuffer = fields.fftAxisStagingBuffer = null
   fields.fftAxisUniformBuffers = null
+  fields.fftTwiddleBuffer = null
   fields.packUniformBuffer = fields.diagUniformBuffer = null
   fields.diagPartialSumsBuffer = fields.diagPartialMaxBuffer = null
   fields.diagPartialLeftBuffer = fields.diagPartialRightBuffer = fields.diagPartialIprBuffer = null
@@ -182,8 +184,7 @@ export function disposeFullPass(
   // release the pool.
   resetHellerCapture(hellerState)
   disposeHellerStagingBuffers(hellerState)
-  hellerState.psiReBuffer = null
-  hellerState.psiImBuffer = null
+  hellerState.psiBuffer = null
   hellerState.totalSites = 0
   useHellerSpectrometerStore.getState().setBufferRef(null)
 

@@ -34,9 +34,12 @@ struct ObsMomReduceUniforms {
 @group(0) @binding(1) var<storage, read> complexBuf: array<f32>;
 @group(0) @binding(2) var<storage, read_write> partials: array<f32>;
 
+// Channel-major layout: sdata[ch * WG_SIZE + local]. Bank-conflict-free
+// because WG_SIZE=256 is a multiple of 32-bank width (previously:
+// sdata[local * 24 + ch] caused 4-way bank conflicts since gcd(24,32)=8).
 const MAX_CHANNELS: u32 = 24u;
 const WG_SIZE: u32 = 256u;
-var<workgroup> sdata: array<f32, 6144>;  // WG_SIZE * MAX_CHANNELS
+var<workgroup> sdata: array<f32, 6144>;  // MAX_CHANNELS * WG_SIZE
 
 @compute @workgroup_size(256)
 fn main(
@@ -47,10 +50,9 @@ fn main(
   let idx = gid.x;
   let local = lid.x;
   let nc = obsParams.numChannels;
-  let localBase = local * MAX_CHANNELS;
 
   for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
-    sdata[localBase + ch] = 0.0;
+    sdata[ch * WG_SIZE + local] = 0.0;
   }
 
   if (idx < obsParams.totalSites) {
@@ -61,7 +63,7 @@ fn main(
     let density = re * re + im * im;
 
     // Channel 0: k-space norm
-    sdata[localBase] = density;
+    sdata[local] = density;
 
     // Decompose linear index to N-D coordinates
     let ldim = obsParams.latticeDim;
@@ -74,19 +76,20 @@ fn main(
       let kIdx = select(i32(coords[d]) - i32(n), i32(coords[d]), coords[d] < halfN);
       let kVal = obsParams.kGridScale[d] * f32(kIdx);
 
-      let chBase = localBase + 1u + (d << 1u);
-      sdata[chBase]       = kVal * density;          // k_d · |φ|²
-      sdata[chBase + 1u]  = kVal * kVal * density;   // k_d² · |φ|²
+      let chMean = (1u + (d << 1u)) * WG_SIZE + local;
+      let chSq   = chMean + WG_SIZE;
+      sdata[chMean] = kVal * density;          // k_d · |φ|²
+      sdata[chSq]   = kVal * kVal * density;   // k_d² · |φ|²
     }
   }
   workgroupBarrier();
 
-  // Tree reduction
+  // Tree reduction (channel-major, bank-conflict-free).
   for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
-      let rightBase = (local + stride) * MAX_CHANNELS;
       for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
-        sdata[localBase + ch] += sdata[rightBase + ch];
+        let chBase = ch * WG_SIZE;
+        sdata[chBase + local] += sdata[chBase + local + stride];
       }
     }
     workgroupBarrier();
@@ -95,7 +98,7 @@ fn main(
   if (local == 0u) {
     let outBase = wid.x * nc;
     for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
-      partials[outBase + ch] = sdata[ch];
+      partials[outBase + ch] = sdata[ch * WG_SIZE];
     }
   }
 }
@@ -124,6 +127,7 @@ struct ObsMomReduceUniforms {
 @group(0) @binding(1) var<storage, read> partials: array<f32>;
 @group(0) @binding(2) var<storage, read_write> result: array<f32>;
 
+// Channel-major layout — see observablesMomentumReduceBlock for rationale.
 const MAX_CHANNELS: u32 = 24u;
 const WG_SIZE: u32 = 256u;
 var<workgroup> sdata: array<f32, 6144>;
@@ -134,18 +138,17 @@ fn main(
 ) {
   let local = lid.x;
   let nc = obsParams.numChannels;
-  let localBase = local * MAX_CHANNELS;
   let ngroups = obsParams.numWorkgroups;
 
   for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
-    sdata[localBase + ch] = 0.0;
+    sdata[ch * WG_SIZE + local] = 0.0;
   }
 
   var i = local;
   while (i < ngroups) {
     let inBase = i * nc;
     for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
-      sdata[localBase + ch] += partials[inBase + ch];
+      sdata[ch * WG_SIZE + local] += partials[inBase + ch];
     }
     i += WG_SIZE;
   }
@@ -153,9 +156,9 @@ fn main(
 
   for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
-      let rightBase = (local + stride) * MAX_CHANNELS;
       for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
-        sdata[localBase + ch] += sdata[rightBase + ch];
+        let chBase = ch * WG_SIZE;
+        sdata[chBase + local] += sdata[chBase + local + stride];
       }
     }
     workgroupBarrier();
@@ -163,7 +166,7 @@ fn main(
 
   if (local == 0u) {
     for (var ch: u32 = 0u; ch < nc; ch = ch + 1u) {
-      result[ch] = sdata[ch];
+      result[ch] = sdata[ch * WG_SIZE];
     }
   }
 }

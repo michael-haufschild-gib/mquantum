@@ -11,7 +11,7 @@ import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import type { WebGPURenderContext } from '../core/types'
-import { LINEAR_WG } from './computePassUtils'
+import { LINEAR_WG, pickSiteDispatch } from './computePassUtils'
 import {
   uploadAndersonDisorderBuffer,
   uploadCustomPotentialBuffer,
@@ -80,6 +80,9 @@ export function maybeInitialize(
   }
 
   const linearWG = Math.ceil(ic.totalSites / LINEAR_WG)
+  // 3-D dispatch fast-path for latticeDim===3 — saves the per-thread
+  // linearToND coord decomposition. Falls back to 1-D for other dims.
+  const siteDispatch = pickSiteDispatch(config.latticeDim, ic.totalSites, config.gridSize)
   const hasOmegaQuench =
     config.harmonicOmegaInit !== undefined && config.harmonicOmegaInit !== config.harmonicOmega
 
@@ -88,7 +91,8 @@ export function maybeInitialize(
     ic.slState.pendingInjection = null
   } else if (ic.pl && ic.bg) {
     const pass = ctx.beginComputePass({ label: 'tdse-init-pass' })
-    ic.dispatchCompute(pass, ic.pl.initPipeline, [ic.bg.initBG], linearWG)
+    const initPl = siteDispatch.use3D ? ic.pl.initPipeline3D : ic.pl.initPipeline
+    ic.dispatchCompute(pass, initPl, [ic.bg.initBG], siteDispatch.x, siteDispatch.y, siteDispatch.z)
     pass.end()
   }
 
@@ -108,7 +112,15 @@ export function maybeInitialize(
       ic.customPotentialScale = uploadAndersonDisorderBuffer(device, ic.potentialBuffer, config)
     } else {
       const pass = ctx.beginComputePass({ label: 'tdse-potential-fill' })
-      ic.dispatchCompute(pass, ic.pl.potentialPipeline, [ic.bg.potentialBG], linearWG)
+      const potPl = siteDispatch.use3D ? ic.pl.potentialPipeline3D : ic.pl.potentialPipeline
+      ic.dispatchCompute(
+        pass,
+        potPl,
+        [ic.bg.potentialBG],
+        siteDispatch.x,
+        siteDispatch.y,
+        siteDispatch.z
+      )
       pass.end()
     }
     // Disorder overlay for non-Anderson potentials only.

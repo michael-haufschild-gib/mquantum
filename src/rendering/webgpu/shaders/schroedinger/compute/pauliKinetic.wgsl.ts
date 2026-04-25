@@ -27,8 +27,7 @@
 
 export const pauliKineticBlock = /* wgsl */ `
 @group(0) @binding(0) var<storage, read> params: PauliUniforms;
-@group(0) @binding(1) var<storage, read_write> spinorRe: array<f32>;
-@group(0) @binding(2) var<storage, read_write> spinorIm: array<f32>;
+@group(0) @binding(1) var<storage, read_write> spinor: array<vec2f>;
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
@@ -64,20 +63,17 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let cosP = cos(reduced);
   let sinP = sin(reduced);
 
-  // Apply the same phase rotation to both spinor components independently
+  // Apply the same phase rotation to both spinor components independently.
+  // Merged vec2f layout: one 8-byte load + one 8-byte store per component.
   let T = params.totalSites;
   let idx1 = T + idx;
 
   // Spin-up (c=0)
-  let re0 = spinorRe[idx];
-  let im0 = spinorIm[idx];
-  spinorRe[idx] = re0 * cosP - im0 * sinP;
-  spinorIm[idx] = re0 * sinP + im0 * cosP;
+  let v0 = spinor[idx];
+  spinor[idx] = vec2f(v0.x * cosP - v0.y * sinP, v0.x * sinP + v0.y * cosP);
 
   // Spin-down (c=1)
-  let re1 = spinorRe[idx1];
-  let im1 = spinorIm[idx1];
-  spinorRe[idx1] = re1 * cosP - im1 * sinP;
-  spinorIm[idx1] = re1 * sinP + im1 * cosP;
+  let v1 = spinor[idx1];
+  spinor[idx1] = vec2f(v1.x * cosP - v1.y * sinP, v1.x * sinP + v1.y * cosP);
 }
 `

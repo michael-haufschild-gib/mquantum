@@ -17,8 +17,8 @@ import { requestStateSave as genericStateSave } from './stateSave'
 
 /** Mutable state shared between the save function and the TDSE pass. */
 export interface SaveLoadState {
-  psiReBuffer: GPUBuffer | null
-  psiImBuffer: GPUBuffer | null
+  /** Merged ψ buffer (array<vec2f>, totalSites * 8 bytes). */
+  psiBuffer: GPUBuffer | null
   totalSites: number
   saveMappingInFlight: boolean
   pendingInjection: { re: Float32Array; im: Float32Array; isMeasurementCollapse?: boolean } | null
@@ -26,20 +26,24 @@ export interface SaveLoadState {
 
 /**
  * Initiate async save of the current wavefunction state.
- * Copies psi buffers to staging within the current command encoder,
- * then maps async after GPU submit.
+ * Copies the merged ψ buffer to staging within the current command encoder
+ * via the generic stateSave 'interleaved' layout (the merged ψ memory
+ * layout is exactly [Re,Im,Re,Im,...] f32, matching the existing
+ * interleaved consumer used by quantum walk), then maps async after GPU
+ * submit.
  */
 export function requestStateSave(ctx: WebGPURenderContext, state: SaveLoadState): void {
-  if (!state.psiReBuffer || !state.psiImBuffer || state.saveMappingInFlight) return
-  const byteSize = state.totalSites * 4
+  if (!state.psiBuffer || state.saveMappingInFlight) return
+  // Merged ψ stride: 8 bytes/site (vec2f = 2 × f32 interleaved).
+  const byteSize = state.totalSites * 8
 
   state.saveMappingInFlight = true
   genericStateSave(ctx, {
     source: {
-      layout: 'separate',
-      reBuffer: state.psiReBuffer,
-      imBuffer: state.psiImBuffer,
+      layout: 'interleaved',
+      buffer: state.psiBuffer,
       byteSize,
+      elementCount: state.totalSites,
     },
     totalSites: state.totalSites,
     label: 'tdse',
@@ -84,24 +88,18 @@ export function requestSliceCapture(
   gridSize: number[],
   worldBound: number
 ): void {
-  if (!state.psiReBuffer || !state.psiImBuffer || state.saveMappingInFlight) return
+  if (!state.psiBuffer || state.saveMappingInFlight) return
   const { device, encoder } = ctx
-  const byteSize = state.totalSites * 4
+  // Merged ψ stride: 8 bytes/site (vec2f, interleaved [Re,Im,...]).
+  const byteSize = state.totalSites * 8
 
-  // Create temporary staging buffers for the readback
-  const stagingRe = device.createBuffer({
-    label: 'slice-staging-re',
-    size: byteSize,
-    usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-  })
-  const stagingIm = device.createBuffer({
-    label: 'slice-staging-im',
+  const staging = device.createBuffer({
+    label: 'slice-staging',
     size: byteSize,
     usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
   })
 
-  encoder.copyBufferToBuffer(state.psiReBuffer, 0, stagingRe, 0, byteSize)
-  encoder.copyBufferToBuffer(state.psiImBuffer, 0, stagingIm, 0, byteSize)
+  encoder.copyBufferToBuffer(state.psiBuffer, 0, staging, 0, byteSize)
   state.saveMappingInFlight = true
 
   const totalSites = state.totalSites
@@ -109,16 +107,14 @@ export function requestSliceCapture(
   device.queue
     .onSubmittedWorkDone()
     .then(async () => {
-      if (stagingRe.mapState !== 'unmapped' || stagingIm.mapState !== 'unmapped') {
-        stagingRe.destroy()
-        stagingIm.destroy()
+      if (staging.mapState !== 'unmapped') {
+        staging.destroy()
         state.saveMappingInFlight = false
         return
       }
-      await Promise.all([stagingRe.mapAsync(GPUMapMode.READ), stagingIm.mapAsync(GPUMapMode.READ)])
+      await staging.mapAsync(GPUMapMode.READ)
 
-      const re = new Float32Array(stagingRe.getMappedRange())
-      const im = new Float32Array(stagingIm.getMappedRange())
+      const interleaved = new Float32Array(staging.getMappedRange())
 
       // Extract a 1D slice through the center of the grid
       const dims = gridSize.length
@@ -144,16 +140,15 @@ export function requestSliceCapture(
 
         const flatIdx = ix + iy * nx + iz * nx * ny
         if (flatIdx < totalSites) {
-          const r = re[flatIdx]!
-          const j = im[flatIdx]!
+          // Interleaved layout: [re0, im0, re1, im1, ...].
+          const r = interleaved[2 * flatIdx]!
+          const j = interleaved[2 * flatIdx + 1]!
           sliceData[i] = r * r + j * j
         }
       }
 
-      stagingRe.unmap()
-      stagingIm.unmap()
-      stagingRe.destroy()
-      stagingIm.destroy()
+      staging.unmap()
+      staging.destroy()
 
       useWavefunctionSliceStore.getState().fulfillCapture({
         sliceData,
@@ -165,8 +160,7 @@ export function requestSliceCapture(
       state.saveMappingInFlight = false
     })
     .catch(() => {
-      stagingRe.destroy()
-      stagingIm.destroy()
+      staging.destroy()
       state.saveMappingInFlight = false
     })
 }
@@ -182,22 +176,18 @@ export function injectLoadedWavefunction(
   state: SaveLoadState,
   totalSites: number
 ): boolean {
-  if (!state.pendingInjection || !state.psiReBuffer || !state.psiImBuffer) return false
+  if (!state.pendingInjection || !state.psiBuffer) return false
 
   const { re, im } = state.pendingInjection
-  const elementCount = Math.min(re.length, totalSites)
-  const reData = new Float32Array(
-    re.buffer instanceof ArrayBuffer ? re.buffer : new ArrayBuffer(0),
-    re.byteOffset,
-    elementCount
-  )
-  const imData = new Float32Array(
-    im.buffer instanceof ArrayBuffer ? im.buffer : new ArrayBuffer(0),
-    im.byteOffset,
-    elementCount
-  )
-  device.queue.writeBuffer(state.psiReBuffer, 0, reData)
-  device.queue.writeBuffer(state.psiImBuffer, 0, imData)
+  const elementCount = Math.min(re.length, im.length, totalSites)
+  // Interleave the loaded Re/Im halves into one [re,im,re,im,...] payload
+  // so a single writeBuffer matches the merged ψ buffer's vec2f layout.
+  const interleaved = new Float32Array(elementCount * 2)
+  for (let i = 0; i < elementCount; i++) {
+    interleaved[2 * i] = re[i]!
+    interleaved[2 * i + 1] = im[i]!
+  }
+  device.queue.writeBuffer(state.psiBuffer, 0, interleaved)
   state.pendingInjection = null
   logger.log(`[TDSE] Injected loaded wavefunction (${elementCount} sites)`)
   return true

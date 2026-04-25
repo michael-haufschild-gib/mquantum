@@ -15,20 +15,26 @@
  * Each spinor component occupies a contiguous segment of totalSites
  * complex values in the spinor buffers.
  *
+ * Two emitted variants:
+ *   - 1D (@workgroup_size(64)): legacy linear dispatch using linearToND on the
+ *     k-space site index.
+ *   - 3D (@workgroup_size(4, 4, 4)): direct gid.xyz coords for latticeDim ≤ 3.
+ *     Eliminates the per-thread linearToND decode of k-coords. The k-space
+ *     idx → coord mapping is identical (row-major strides match the FFT
+ *     buffer layout), so the (kIdx, kVec, mat-vec) chain is bit-identical.
+ *
  * Requires diracUniformsBlock + freeScalarNDIndexBlock to be prepended.
  *
- * @workgroup_size(64)
  * @module
  */
 
-export const diracKineticBlock = /* wgsl */ `
+const diracKineticBindings = /* wgsl */ `
 @group(0) @binding(0) var<storage, read> params: DiracUniforms;
-@group(0) @binding(1) var<storage, read_write> spinorRe: array<f32>;
-@group(0) @binding(2) var<storage, read_write> spinorIm: array<f32>;
-@group(0) @binding(3) var<storage, read> gammaMatrices: array<f32>;
+@group(0) @binding(1) var<storage, read_write> spinor: array<vec2f>;
+@group(0) @binding(2) var<storage, read> gammaMatrices: array<f32>;
 
 // Access element (row, col) of gamma matrix at index matIdx.
-// Each matrix is spinorSize × spinorSize complex entries (re/im interleaved).
+// Each matrix is spinorSize x spinorSize complex entries (re/im interleaved).
 // Layout: gammaMatrices[matIdx * S*S*2 + row * S*2 + col * 2 + 0] = real
 //         gammaMatrices[matIdx * S*S*2 + row * S*2 + col * 2 + 1] = imag
 fn gammaRe(matIdx: u32, row: u32, col: u32) -> f32 {
@@ -40,117 +46,150 @@ fn gammaIm(matIdx: u32, row: u32, col: u32) -> f32 {
   let S = params.spinorSize;
   return gammaMatrices[matIdx * S * S * 2u + row * S * 2u + col * 2u + 1u];
 }
+`
 
-@compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) gid: vec3u) {
-  let idx = gid.x;
-  if (idx >= params.totalSites) {
-    return;
-  }
-
+const diracKineticBody = /* wgsl */ `
   let S = params.spinorSize;
   let c_light = params.speedOfLight;
   let mc2 = params.mass * c_light * c_light;
   let c_hbar = c_light * params.hbar;
-  let latDim = params.latticeDim;
   // PERF: hoist dt/hbar once — replaces per-thread divide on 'arg = E*dt/max(hbar,eps)' with a multiply.
   let dtOverHbar = params.dt / max(params.hbar, 1e-6);
 
-  // Decode k-space coordinates using N-D index helper
-  let coords = linearToND(idx, params.strides, params.gridSize, latDim);
-
-  // Compute k-vector components with FFT frequency ordering
+  // Compute k-vector components with FFT frequency ordering.
+  // PERF: k_d = kGridScale[d] * kIdx uses a host-precomputed reciprocal so
+  // each thread replaces a per-dim divide with a multiply. kGridScale[d] =
+  // 2π / (N_d · a_d). Mirrors the TDSE kinetic kernel.
   var kVec: array<f32, 12>;
   var ck2: f32 = 0.0;
-  const DIRAC_TWO_PI: f32 = 6.28318530717958647692;
   for (var d: u32 = 0u; d < latDim; d = d + 1u) {
     let gd = params.gridSize[d];
     let halfN = gd >> 1u;
     let kIdx = select(i32(coords[d]) - i32(gd), i32(coords[d]), coords[d] < halfN);
-    // Precompute 2π/L to replace divide with multiply.
-    let twoPiOverL = DIRAC_TWO_PI / (f32(gd) * params.spacing[d]);
-    let k_d = f32(kIdx) * twoPiOverL;
+    let k_d = params.kGridScale[d] * f32(kIdx);
     kVec[d] = k_d;
     let ck = c_hbar * k_d;
     ck2 += ck * ck;
   }
 
-  // Energy: E = √((cℏ|k|)² + (mc²)²). Fuse via inverseSqrt so we can
-  // later form sin(E·dt/ℏ)/E as a multiply (avoids a second divide).
+  // Energy: E = sqrt((c hbar |k|)^2 + (mc^2)^2). Fuse via inverseSqrt so we can
+  // later form sin(E . dt/hbar)/E as a multiply (avoids a second divide).
   let E2 = ck2 + mc2 * mc2;
   let invE = inverseSqrt(max(E2, 1e-40));
   let E = E2 * invE;
 
   // Read spinor at this k-point into local arrays
-  // Max spinor size is 64 (for 11D: S = 2^⌊(11+1)/2⌋ = 64)
+  // Max spinor size is 64 (for 11D: S = 2^floor((11+1)/2) = 64)
+  // PERF: one 8-byte vec2f load per component replaces two 4-byte f32 loads;
+  // halves address arithmetic in the S-wide preload.
   var psiRe_local: array<f32, 64>;
   var psiIm_local: array<f32, 64>;
   for (var sc: u32 = 0u; sc < S; sc++) {
-    let bufIdx = sc * params.totalSites + idx;
-    psiRe_local[sc] = spinorRe[bufIdx];
-    psiIm_local[sc] = spinorIm[bufIdx];
+    let v = spinor[sc * params.totalSites + idx];
+    psiRe_local[sc] = v.x;
+    psiIm_local[sc] = v.y;
   }
 
-  // Compute H_free · ψ = (c·Σⱼ αⱼ·ℏkⱼ + β·mc²) · ψ
+  // Compute H_free . psi = (c . sum_j alpha_j . hbar k_j + beta . mc^2) . psi
   // Result stored in HpsiRe, HpsiIm
   var HpsiRe: array<f32, 64>;
   var HpsiIm: array<f32, 64>;
 
-  // Initialize Hψ = 0
+  // Initialize Hpsi = 0
   for (var sc: u32 = 0u; sc < S; sc++) {
     HpsiRe[sc] = 0.0;
     HpsiIm[sc] = 0.0;
   }
 
-  // Add contributions from each alpha matrix: c·ℏk_d · α_d · ψ
-  // Alpha matrices are stored at indices 0..latticeDim-1 in gammaMatrices
+  // Add contributions from each alpha matrix: c . hbar k_d . alpha_d . psi
+  // Alpha matrices are stored at indices 0..latticeDim-1 in gammaMatrices.
+  // Beta is stored at index latticeDim.
+  //
+  // PERF: every alpha and beta generated by the Pauli-tensor-product +
+  // standard-form permutation is monomial (1 non-zero per row). When
+  // DIRAC_USE_SPARSE_GAMMA is true (shader-compile-time const set from
+  // latticeDim), the S-wide col loop collapses to a single lookup per row
+  // using const tables. Result is IEEE bit-identical to the dense path
+  // because the dense sum contains S-1 terms that are exactly 0.x + 0.x = 0.
   let matStride = S * S * 2u; // stride between matrices in gammaMatrices array
-  for (var d: u32 = 0u; d < latDim; d++) {
-    let coeff = c_hbar * kVec[d];
-    if (abs(coeff) < 1e-20) {
-      continue;
+  let betaBase = latDim * matStride;
+
+  if (DIRAC_USE_SPARSE_GAMMA) {
+    // Sparse path: one lookup per row per matrix.
+    // Table index = matIdx * S + row; col/re/im from DIRAC_SPARSE_* consts.
+    for (var d: u32 = 0u; d < latDim; d = d + 1u) {
+      let coeff = c_hbar * kVec[d];
+      if (abs(coeff) < 1e-20) {
+        continue;
+      }
+      let tableBase = d * DIRAC_SPARSE_S;
+      for (var row: u32 = 0u; row < S; row = row + 1u) {
+        let t = tableBase + row;
+        let col = DIRAC_SPARSE_COL[t];
+        let gRe = DIRAC_SPARSE_RE[t];
+        let gIm = DIRAC_SPARSE_IM[t];
+        let accRe = gRe * psiRe_local[col] - gIm * psiIm_local[col];
+        let accIm = gRe * psiIm_local[col] + gIm * psiRe_local[col];
+        HpsiRe[row] += coeff * accRe;
+        HpsiIm[row] += coeff * accIm;
+      }
     }
-    // Precompute base offset for this matrix
-    let matBase = d * matStride;
-    // Matrix-vector multiply: Hψ += coeff · α_d · ψ
+    let betaTableBase = latDim * DIRAC_SPARSE_S;
+    for (var row: u32 = 0u; row < S; row = row + 1u) {
+      let t = betaTableBase + row;
+      let col = DIRAC_SPARSE_COL[t];
+      let gRe = DIRAC_SPARSE_RE[t];
+      let gIm = DIRAC_SPARSE_IM[t];
+      let accRe = gRe * psiRe_local[col] - gIm * psiIm_local[col];
+      let accIm = gRe * psiIm_local[col] + gIm * psiRe_local[col];
+      HpsiRe[row] += mc2 * accRe;
+      HpsiIm[row] += mc2 * accIm;
+    }
+  } else {
+    // Dense fallback: kept so gammaMatrices binding is statically referenced
+    // (WebGPU pipeline layout validation requires every BGL entry to match a
+    // shader binding use) and so higher-dim kernels still compile/run.
+    for (var d: u32 = 0u; d < latDim; d++) {
+      let coeff = c_hbar * kVec[d];
+      if (abs(coeff) < 1e-20) {
+        continue;
+      }
+      let matBase = d * matStride;
+      for (var row: u32 = 0u; row < S; row++) {
+        var accRe: f32 = 0.0;
+        var accIm: f32 = 0.0;
+        let rowBase = matBase + row * S * 2u;
+        for (var col: u32 = 0u; col < S; col++) {
+          let gRe = gammaMatrices[rowBase + col * 2u];
+          let gIm = gammaMatrices[rowBase + col * 2u + 1u];
+          accRe += gRe * psiRe_local[col] - gIm * psiIm_local[col];
+          accIm += gRe * psiIm_local[col] + gIm * psiRe_local[col];
+        }
+        HpsiRe[row] += coeff * accRe;
+        HpsiIm[row] += coeff * accIm;
+      }
+    }
     for (var row: u32 = 0u; row < S; row++) {
       var accRe: f32 = 0.0;
       var accIm: f32 = 0.0;
-      let rowBase = matBase + row * S * 2u;
+      let rowBase = betaBase + row * S * 2u;
       for (var col: u32 = 0u; col < S; col++) {
         let gRe = gammaMatrices[rowBase + col * 2u];
         let gIm = gammaMatrices[rowBase + col * 2u + 1u];
-        // Complex multiply: (gRe + i·gIm) · (psiRe + i·psiIm)
         accRe += gRe * psiRe_local[col] - gIm * psiIm_local[col];
         accIm += gRe * psiIm_local[col] + gIm * psiRe_local[col];
       }
-      HpsiRe[row] += coeff * accRe;
-      HpsiIm[row] += coeff * accIm;
+      HpsiRe[row] += mc2 * accRe;
+      HpsiIm[row] += mc2 * accIm;
     }
   }
 
-  // Add beta matrix contribution: mc² · β · ψ
-  // Beta is stored at index latticeDim in gammaMatrices
-  let betaBase = latDim * matStride;
-  for (var row: u32 = 0u; row < S; row++) {
-    var accRe: f32 = 0.0;
-    var accIm: f32 = 0.0;
-    let rowBase = betaBase + row * S * 2u;
-    for (var col: u32 = 0u; col < S; col++) {
-      let gRe = gammaMatrices[rowBase + col * 2u];
-      let gIm = gammaMatrices[rowBase + col * 2u + 1u];
-      accRe += gRe * psiRe_local[col] - gIm * psiIm_local[col];
-      accIm += gRe * psiIm_local[col] + gIm * psiRe_local[col];
-    }
-    HpsiRe[row] += mc2 * accRe;
-    HpsiIm[row] += mc2 * accIm;
-  }
-
-  // Apply matrix exponential using H² = E²·I identity:
-  //   exp(-iH·dt/ℏ)·ψ = cos(E·dt/ℏ)·ψ - i·sin(E·dt/ℏ)·(H·ψ)/E
+  // Apply matrix exponential using H^2 = E^2 . I identity:
+  //   exp(-iH . dt/hbar) . psi = cos(E . dt/hbar) . psi - i . sin(E . dt/hbar) . (H . psi)/E
   let arg = E * dtOverHbar;
-  // Reduce to [-π, π] so f32 cos/sin stay precise at high energies
+  // Reduce to [-pi, pi] so f32 cos/sin stay precise at high energies
   const DIRAC_INV_TAU: f32 = 0.15915494309189535;
+  const DIRAC_TWO_PI: f32 = 6.28318530717958647692;
   let argReduced = arg - round(arg * DIRAC_INV_TAU) * DIRAC_TWO_PI;
   let cosArg = cos(argReduced);
   let sinArg = sin(argReduced);
@@ -159,16 +198,52 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   let T = params.totalSites;
   for (var sc: u32 = 0u; sc < S; sc++) {
-    // cos(Et/ℏ) · ψ_c
+    // cos(Et/hbar) . psi_c
     let reCos = cosArg * psiRe_local[sc];
     let imCos = cosArg * psiIm_local[sc];
-    // -i · sin(Et/ℏ) · (Hψ)_c / E = sinOverE · (Hψ_im_c, -Hψ_re_c)
+    // -i . sin(Et/hbar) . (Hpsi)_c / E = sinOverE . (Hpsi_im_c, -Hpsi_re_c)
     let reKin = sinOverE * HpsiIm[sc];
     let imKin = -sinOverE * HpsiRe[sc];
 
-    let bufIdx = sc * T + idx;
-    spinorRe[bufIdx] = reCos + reKin;
-    spinorIm[bufIdx] = imCos + imKin;
+    spinor[sc * T + idx] = vec2f(reCos + reKin, imCos + imKin);
   }
 }
 `
+
+/** Legacy 1D dispatch. Workgroup size 64. */
+export const diracKineticBlock = /* wgsl */ `${diracKineticBindings}
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  let idx = gid.x;
+  if (idx >= params.totalSites) {
+    return;
+  }
+
+  let latDim = params.latticeDim;
+
+  // Decode k-space coordinates using N-D index helper
+  let coords = linearToND(idx, params.strides, params.gridSize, latDim);
+${diracKineticBody}`
+
+/**
+ * 3-D dispatch variant for latticeDim <= 3. Workgroup size 4x4x4. Reads
+ * k-coords directly from gid.xyz, then computes idx via ndToLinear so
+ * spinor[c*T+idx] addresses match the FFT buffer layout exactly. The kinetic
+ * mat-vec, FFT-shifted kVec, and matrix-exp output are bit-identical to the
+ * 1D variant (same coords, same row-major strides, same arithmetic order).
+ */
+export const diracKineticBlock3D = /* wgsl */ `${diracKineticBindings}
+@compute @workgroup_size(4, 4, 4)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  let latDim = params.latticeDim;
+  if (gid.x >= params.gridSize[0]) { return; }
+  if (latDim > 1u && gid.y >= params.gridSize[1]) { return; }
+  if (latDim > 2u && gid.z >= params.gridSize[2]) { return; }
+
+  var coords: array<u32, 12>;
+  coords[0] = gid.x;
+  if (latDim > 1u) { coords[1] = gid.y; }
+  if (latDim > 2u) { coords[2] = gid.z; }
+
+  let idx = ndToLinear(coords, params.strides, latDim);
+${diracKineticBody}`

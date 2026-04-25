@@ -10,25 +10,35 @@
  * the resources they create.
  */
 
-import { diracAbsorberBlock } from '../shaders/schroedinger/compute/diracAbsorber.wgsl'
+import {
+  diracAbsorberBlock,
+  diracAbsorberBlock3D,
+} from '../shaders/schroedinger/compute/diracAbsorber.wgsl'
 import {
   diracDiagNormFinalizeBlock,
   diracDiagNormReduceBlock,
 } from '../shaders/schroedinger/compute/diracDiagnostics.wgsl'
-import { diracInitBlock } from '../shaders/schroedinger/compute/diracInit.wgsl'
-import { diracKineticBlock } from '../shaders/schroedinger/compute/diracKinetic.wgsl'
-import { diracPotentialBlock } from '../shaders/schroedinger/compute/diracPotential.wgsl'
+import { diracInitBlock, diracInitBlock3D } from '../shaders/schroedinger/compute/diracInit.wgsl'
+import {
+  diracKineticBlock,
+  diracKineticBlock3D,
+} from '../shaders/schroedinger/compute/diracKinetic.wgsl'
+import {
+  diracPotentialBlock,
+  diracPotentialBlock3D,
+} from '../shaders/schroedinger/compute/diracPotential.wgsl'
 import { diracPotentialHalfBlock } from '../shaders/schroedinger/compute/diracPotentialHalf.wgsl'
+import { diracRenormalizeBlock } from '../shaders/schroedinger/compute/diracRenormalize.wgsl'
+import { generateDiracSparseGammaBlock } from '../shaders/schroedinger/compute/diracSparseGammaVariants.wgsl'
+import {
+  diracSpinorPackShaderBlock,
+  diracSpinorUnpackShaderBlock,
+} from '../shaders/schroedinger/compute/diracSpinorPack.wgsl'
 import { diracUniformsBlock } from '../shaders/schroedinger/compute/diracUniforms.wgsl'
 import { diracWriteGridBlock } from '../shaders/schroedinger/compute/diracWriteGrid.wgsl'
 import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
 import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
-import { renormalizeBlock } from '../shaders/schroedinger/compute/renormalize.wgsl'
-import {
-  tdseComplexPackShaderBlock,
-  tdseComplexUnpackShaderBlock,
-  tdsePackUniformsShaderBlock,
-} from '../shaders/schroedinger/compute/tdseComplexPack.wgsl'
+import { tdsePackUniformsShaderBlock } from '../shaders/schroedinger/compute/tdseComplexPack.wgsl'
 import {
   fftAxisUniformsBlock,
   tdseSharedMemFFTBlock,
@@ -72,14 +82,37 @@ import type {
 // --- Pure WGSL composers (Phase 2b) ---
 const diracPrelude = (): string => diracUniformsBlock + freeScalarNDIndexBlock
 
-/** Pure WGSL for the Dirac init compute shader. */
+/**
+ * Maximum lattice dimension at which the 3-D dispatch site-kernel variants
+ * (`@workgroup_size(4, 4, 4)`) are emitted. Above this, the kernels fall back
+ * to the legacy 1-D dispatch path because `gid.xyz` only exposes three axes.
+ */
+export const DIRAC_3D_SITE_MAX_DIM = 3
+
+/** Pure WGSL for the Dirac init compute shader (1-D dispatch, workgroup 64). */
 export function composeDiracInitShader(): string {
   return diracPrelude() + diracInitBlock
 }
 
-/** Pure WGSL for the Dirac potential-fill compute shader. */
+/**
+ * Pure WGSL for the Dirac init compute shader, 3-D dispatch variant
+ * (workgroup 4x4x4, gid.xyz coords). Used when latticeDim ≤ 3.
+ */
+export function composeDiracInitShader3D(): string {
+  return diracPrelude() + diracInitBlock3D
+}
+
+/** Pure WGSL for the Dirac potential-fill compute shader (1-D dispatch). */
 export function composeDiracPotentialShader(): string {
   return diracPrelude() + diracPotentialBlock
+}
+
+/**
+ * Pure WGSL for the Dirac potential-fill compute shader, 3-D dispatch variant
+ * (workgroup 4x4x4, gid.xyz coords). Used when latticeDim ≤ 3.
+ */
+export function composeDiracPotentialShader3D(): string {
+  return diracPrelude() + diracPotentialBlock3D
 }
 
 /** Pure WGSL for the Dirac potential half-step compute shader. */
@@ -87,24 +120,39 @@ export function composeDiracPotentialHalfShader(): string {
   return diracPrelude() + diracPotentialHalfBlock
 }
 
-/** Pure WGSL for the Dirac absorber (post-FFT) compute shader. */
+/** Pure WGSL for the Dirac absorber (post-FFT) compute shader (1-D dispatch). */
 export function composeDiracAbsorberShader(): string {
   return diracPrelude() + pmlProfileBlock + diracAbsorberBlock
 }
 
-/** Pure WGSL for the Dirac renormalization compute shader. */
-export function composeDiracRenormalizeShader(): string {
-  return renormalizeBlock
+/**
+ * Pure WGSL for the Dirac absorber compute shader, 3-D dispatch variant
+ * (workgroup 4x4x4, gid.xyz coords). Used when latticeDim ≤ 3.
+ */
+export function composeDiracAbsorberShader3D(): string {
+  return diracPrelude() + pmlProfileBlock + diracAbsorberBlock3D
 }
 
-/** Pure WGSL for the Dirac pack compute shader. */
+/** Pure WGSL for the Dirac renormalization compute shader. */
+export function composeDiracRenormalizeShader(): string {
+  return diracRenormalizeBlock
+}
+
+/**
+ * Pure WGSL for the Dirac pack compute shader.
+ *
+ * Dirac-specific variant operating on the merged `array<vec2f>` spinor
+ * layout. The TDSE pack shader cannot serve this layout because it expects
+ * two separate f32 buffers — a merged vec2f buffer has no way to expose re
+ * and im as two separate f32 bindings (they interleave at stride 8).
+ */
 export function composeDiracPackShader(): string {
-  return assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexPackShaderBlock]).wgsl
+  return assembleShaderBlocks([tdsePackUniformsShaderBlock, diracSpinorPackShaderBlock]).wgsl
 }
 
 /** Pure WGSL for the Dirac unpack compute shader. */
 export function composeDiracUnpackShader(): string {
-  return assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexUnpackShaderBlock]).wgsl
+  return assembleShaderBlocks([tdsePackUniformsShaderBlock, diracSpinorUnpackShaderBlock]).wgsl
 }
 
 /** Pure WGSL for the Dirac Stockham FFT stage compute shader. */
@@ -117,14 +165,44 @@ export function composeDiracFftSharedMemShader(): string {
   return fftAxisUniformsBlock + tdseSharedMemFFTBlock
 }
 
-/** Pure WGSL for the Dirac kinetic propagator compute shader. */
-export function composeDiracKineticShader(): string {
-  return diracPrelude() + diracKineticBlock
+/**
+ * Pure WGSL for the Dirac kinetic propagator compute shader (1-D dispatch).
+ *
+ * Accepts the lattice dimension so the composer can emit a sparse monomial
+ * gamma-matrix table (latticeDim ≤ DIRAC_SPARSE_MAX_DIM) that collapses the
+ * S-wide col loop to a single lookup per row. Higher dims use a dense
+ * fallback. Output is IEEE bit-identical in both paths.
+ *
+ * @param latticeDim - Spatial lattice dimension (1..11). Defaults to 3 for
+ *   call-sites that enumerate without a concrete dim (WGSL validation suite).
+ */
+export function composeDiracKineticShader(latticeDim: number = 3): string {
+  return diracPrelude() + generateDiracSparseGammaBlock(latticeDim) + diracKineticBlock
 }
 
-/** Pure WGSL for the Dirac write-grid compute shader. */
-export function composeDiracWriteGridShader(): string {
-  return diracPrelude() + diracWriteGridBlock
+/**
+ * Pure WGSL for the Dirac kinetic propagator compute shader, 3-D dispatch
+ * variant (`@workgroup_size(4, 4, 4)`, k-coords from `gid.xyz`). Used when
+ * `latticeDim ≤ 3`. Sparse monomial gamma-matrix specialization is emitted
+ * the same way as the 1-D variant — the only difference is the entry-point
+ * coord setup. The k-space `(coords -> idx)` mapping is identical to the
+ * 1-D variant (same row-major strides match the FFT buffer layout), so the
+ * mat-vec output is IEEE bit-identical.
+ */
+export function composeDiracKineticShader3D(latticeDim: number = 3): string {
+  return diracPrelude() + generateDiracSparseGammaBlock(latticeDim) + diracKineticBlock3D
+}
+
+/**
+ * Pure WGSL for the Dirac write-grid compute shader.
+ *
+ * Same sparse-gamma dispatch as the kinetic shader. Affects field views 4
+ * (spin density) and 5 (current density) where S-wide col loops dominate.
+ *
+ * @param latticeDim - Spatial lattice dimension (1..11). Defaults to 3.
+ */
+export function composeDiracWriteGridShader(latticeDim: number = 3): string {
+  return diracPrelude() + generateDiracSparseGammaBlock(latticeDim) + diracWriteGridBlock
 }
 
 /** Pure WGSL for the Dirac diagnostics norm-reduce compute shader. */
@@ -139,27 +217,45 @@ export function composeDiracDiagFinalizeShader(): string {
 
 /**
  * Compile every Dirac compute pipeline and return them with their bind
- * group layouts. One-time setup per device; safe to memoize at the pass
- * level.
+ * group layouts.
+ *
+ * Kinetic + write-grid pipelines are specialized on latticeDim so the
+ * composer can emit sparse monomial gamma-matrix const tables. DiracComputePass
+ * rebuilds pipelines whenever its config hash (which includes latticeDim)
+ * changes, so the specialization stays in sync with the active state.
+ *
+ * Init / potential / absorber / kinetic pipelines are additionally specialized
+ * on dispatch shape: `latticeDim === 3` selects the 3-D `gid.xyz`-coord
+ * variants (`@workgroup_size(4, 4, 4)`). Other dims use the legacy 1-D
+ * `linearToND` variants (workgroup 64). The choice mirrors
+ * {@link pickSiteDispatch} in `computePassUtils`.
+ *
+ * @param device - WebGPU device.
+ * @param helpers - Shader/pipeline creation helpers from the base pass.
+ * @param latticeDim - Active spatial lattice dimension (1..11).
  */
 export function buildDiracPipelines(
   device: GPUDevice,
-  helpers: DiracPassHelpers
+  helpers: DiracPassHelpers,
+  latticeDim: number
 ): DiracPipelineResult {
-  // Init: uniforms + spinorRe + spinorIm
+  // 3-D site-dispatch is restricted to latticeDim === 3 to avoid wasting
+  // workgroup threads at lower dims (a 4x4x4=64-thread workgroup at d=1 has
+  // 60 idle threads per dispatch). At d ≥ 4 we cannot encode the extra axes
+  // in gid.xyz so 1-D is mandatory. See pickSiteDispatch in computePassUtils.
+  const use3DSiteDispatch = latticeDim === DIRAC_3D_SITE_MAX_DIM
+  // Init: uniforms + spinor (vec2f).
   // Binding 0 (DiracUniforms) is `read-only-storage` because the struct embeds
   // scalar arrays (spec-forbidden in uniform address space). See
   // `diracInit.wgsl.ts` for the matching `var<storage, read>` declaration.
-  const initBGL = createComputeBGL(device, 'dirac-init-bgl', [
-    'read-only-storage',
-    'storage',
-    'storage',
-  ])
+  const initBGL = createComputeBGL(device, 'dirac-init-bgl', ['read-only-storage', 'storage'])
+  const initShader = use3DSiteDispatch ? composeDiracInitShader3D() : composeDiracInitShader()
+  const initLabel = use3DSiteDispatch ? 'dirac-init-3d' : 'dirac-init'
   const initPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(device, composeDiracInitShader(), 'dirac-init'),
+    helpers.createShaderModule(device, initShader, initLabel),
     [initBGL],
-    'dirac-init'
+    initLabel
   )
 
   // Potential fill: uniforms + potential
@@ -168,18 +264,21 @@ export function buildDiracPipelines(
     'read-only-storage',
     'storage',
   ])
+  const potentialShader = use3DSiteDispatch
+    ? composeDiracPotentialShader3D()
+    : composeDiracPotentialShader()
+  const potentialLabel = use3DSiteDispatch ? 'dirac-potential-3d' : 'dirac-potential'
   const potentialPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(device, composeDiracPotentialShader(), 'dirac-potential'),
+    helpers.createShaderModule(device, potentialShader, potentialLabel),
     [potentialBGL],
-    'dirac-potential'
+    potentialLabel
   )
 
-  // Potential half-step: uniforms + spinorRe + spinorIm + potential(read).
+  // Potential half-step: uniforms + spinor(vec2f) + potential(read).
   // Binding 0 (DiracUniforms) — see init BGL comment.
   const potentialHalfBGL = createComputeBGL(device, 'dirac-potential-half-bgl', [
     'read-only-storage',
-    'storage',
     'storage',
     'read-only-storage',
   ])
@@ -191,18 +290,21 @@ export function buildDiracPipelines(
   )
 
   // Absorber — reuses initBGL layout.
+  const absorberShader = use3DSiteDispatch
+    ? composeDiracAbsorberShader3D()
+    : composeDiracAbsorberShader()
+  const absorberLabel = use3DSiteDispatch ? 'dirac-absorber-3d' : 'dirac-absorber'
   const absorberPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(device, composeDiracAbsorberShader(), 'dirac-absorber'),
+    helpers.createShaderModule(device, absorberShader, absorberLabel),
     [initBGL],
-    'dirac-absorber'
+    absorberLabel
   )
 
-  // Renormalization
+  // Renormalization (Dirac-specific variant on merged vec2f spinor).
   const renormalizeBGL = createComputeBGL(device, 'dirac-renormalize-bgl', [
     'uniform',
     'read-only-storage',
-    'storage',
     'storage',
   ])
   const renormalizePipeline = device.createComputePipeline({
@@ -217,11 +319,10 @@ export function buildDiracPipelines(
     },
   })
 
-  // Pack/Unpack (reuse TDSE shaders directly — they operate on totalSites elements
-  // and include their own PackUniforms struct definition)
+  // Pack/Unpack (Dirac-specific variants reading spinor as array<vec2f>).
+  // Layout: uniform(0) + spinorSlice(1, vec2f) + complexBuf(2, f32).
   const packBGL = createComputeBGL(device, 'dirac-pack-bgl', [
     'uniform',
-    'read-only-storage',
     'read-only-storage',
     'storage',
   ])
@@ -235,7 +336,6 @@ export function buildDiracPipelines(
   const unpackBGL = createComputeBGL(device, 'dirac-unpack-bgl', [
     'uniform',
     'read-only-storage',
-    'storage',
     'storage',
   ])
   const unpackPipeline = helpers.createComputePipeline(
@@ -270,24 +370,28 @@ export function buildDiracPipelines(
     'dirac-fft-shared-mem'
   )
 
-  // Kinetic propagator: uniforms + spinorRe + spinorIm + gammaMatrices(read).
+  // Kinetic propagator: uniforms + spinor(vec2f) + gammaMatrices(read).
   // Binding 0 (DiracUniforms) — see init BGL comment.
   const kineticBGL = createComputeBGL(device, 'dirac-kinetic-bgl', [
     'read-only-storage',
     'storage',
-    'storage',
     'read-only-storage',
   ])
+  const kineticShader = use3DSiteDispatch
+    ? composeDiracKineticShader3D(latticeDim)
+    : composeDiracKineticShader(latticeDim)
+  const kineticLabel = use3DSiteDispatch ? 'dirac-kinetic-3d' : 'dirac-kinetic'
   const kineticPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(device, composeDiracKineticShader(), 'dirac-kinetic'),
+    helpers.createShaderModule(device, kineticShader, kineticLabel),
     [kineticBGL],
-    'dirac-kinetic'
+    kineticLabel
   )
 
-  // Write grid. Binding 0 (DiracUniforms) — see init BGL comment.
+  // Write grid. Bindings: params(0) + spinor(1, vec2f) + potential(2) +
+  // gammaMatrices(3) + outputTex(4). Binding 0 (DiracUniforms) — see init
+  // BGL comment.
   const writeGridBGL = createComputeBGL(device, 'dirac-write-grid-bgl', [
-    'read-only-storage',
     'read-only-storage',
     'read-only-storage',
     'read-only-storage',
@@ -296,15 +400,15 @@ export function buildDiracPipelines(
   ])
   const writeGridPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(device, composeDiracWriteGridShader(), 'dirac-write-grid'),
+    helpers.createShaderModule(device, composeDiracWriteGridShader(latticeDim), 'dirac-write-grid'),
     [writeGridBGL],
     'dirac-write-grid'
   )
 
-  // Diagnostics: reduce (pass 1)
+  // Diagnostics: reduce (pass 1). Bindings: diagParams(0) + spinor(1, vec2f)
+  // + partialNorm(2) + partialMax(3) + partialParticle(4) + partialAnti(5).
   const diagReduceBGL = createComputeBGL(device, 'dirac-diag-reduce-bgl', [
     'uniform',
-    'read-only-storage',
     'read-only-storage',
     'storage',
     'storage',
@@ -360,6 +464,7 @@ export function buildDiracPipelines(
     diagReduceBGL,
     diagFinalizePipeline,
     diagFinalizeBGL,
+    use3DSiteDispatch,
   }
 }
 
@@ -384,8 +489,7 @@ export function rebuildDiracBindGroups(
 ): DiracBindGroupResult {
   const {
     uniformBuffer,
-    spinorReBuffer,
-    spinorImBuffer,
+    spinorBuffer,
     potentialBuffer,
     gammaBuffer,
     fftScratchA,
@@ -409,8 +513,7 @@ export function rebuildDiracBindGroups(
     layout: pipelines.initBGL,
     entries: [
       { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: spinorReBuffer } },
-      { binding: 2, resource: { buffer: spinorImBuffer } },
+      { binding: 1, resource: { buffer: spinorBuffer } },
     ],
   })
 
@@ -428,9 +531,8 @@ export function rebuildDiracBindGroups(
     layout: pipelines.potentialHalfBGL,
     entries: [
       { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: spinorReBuffer } },
-      { binding: 2, resource: { buffer: spinorImBuffer } },
-      { binding: 3, resource: { buffer: potentialBuffer } },
+      { binding: 1, resource: { buffer: spinorBuffer } },
+      { binding: 2, resource: { buffer: potentialBuffer } },
     ],
   })
 
@@ -486,9 +588,8 @@ export function rebuildDiracBindGroups(
     layout: pipelines.kineticBGL,
     entries: [
       { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: spinorReBuffer } },
-      { binding: 2, resource: { buffer: spinorImBuffer } },
-      { binding: 3, resource: { buffer: gammaBuffer } },
+      { binding: 1, resource: { buffer: spinorBuffer } },
+      { binding: 2, resource: { buffer: gammaBuffer } },
     ],
   })
 
@@ -497,11 +598,10 @@ export function rebuildDiracBindGroups(
     layout: pipelines.writeGridBGL,
     entries: [
       { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: spinorReBuffer } },
-      { binding: 2, resource: { buffer: spinorImBuffer } },
-      { binding: 3, resource: { buffer: potentialBuffer } },
-      { binding: 4, resource: { buffer: gammaBuffer } },
-      { binding: 5, resource: densityTextureView },
+      { binding: 1, resource: { buffer: spinorBuffer } },
+      { binding: 2, resource: { buffer: potentialBuffer } },
+      { binding: 3, resource: { buffer: gammaBuffer } },
+      { binding: 4, resource: densityTextureView },
     ],
   })
 
@@ -511,12 +611,11 @@ export function rebuildDiracBindGroups(
     layout: pipelines.diagReduceBGL,
     entries: [
       { binding: 0, resource: { buffer: diagUniformBuffer } },
-      { binding: 1, resource: { buffer: spinorReBuffer } },
-      { binding: 2, resource: { buffer: spinorImBuffer } },
-      { binding: 3, resource: { buffer: diagPartialNormBuffer } },
-      { binding: 4, resource: { buffer: diagPartialMaxBuffer } },
-      { binding: 5, resource: { buffer: diagPartialParticleBuffer } },
-      { binding: 6, resource: { buffer: diagPartialAntiBuffer } },
+      { binding: 1, resource: { buffer: spinorBuffer } },
+      { binding: 2, resource: { buffer: diagPartialNormBuffer } },
+      { binding: 3, resource: { buffer: diagPartialMaxBuffer } },
+      { binding: 4, resource: { buffer: diagPartialParticleBuffer } },
+      { binding: 5, resource: { buffer: diagPartialAntiBuffer } },
     ],
   })
 
@@ -551,19 +650,20 @@ export function rebuildDiracBindGroups(
     entries: [
       { binding: 0, resource: { buffer: renormalizeUniformBuffer } },
       { binding: 1, resource: { buffer: diagResultBuffer } },
-      { binding: 2, resource: { buffer: spinorReBuffer } },
-      { binding: 3, resource: { buffer: spinorImBuffer } },
+      { binding: 2, resource: { buffer: spinorBuffer } },
     ],
   })
 
-  // Build cached per-component pack/unpack bind groups
+  // Build cached per-component pack/unpack bind groups.
+  // Merged layout: each vec2f is 8 bytes; component c occupies bytes
+  // [c*T*8 .. (c+1)*T*8] of spinorBuffer.
   const cachedPackBGs: GPUBindGroup[] = []
   const cachedUnpackBGs: GPUBindGroup[] = []
   const cachedUnpackBGsNoNorm: GPUBindGroup[] = []
   const S = currentSpinorSize
   for (let c = 0; c < S; c++) {
-    const byteOffset = c * totalSites * 4
-    const byteSize = totalSites * 4
+    const byteOffset = c * totalSites * 8
+    const byteSize = totalSites * 8
 
     cachedPackBGs.push(
       device.createBindGroup({
@@ -571,9 +671,8 @@ export function rebuildDiracBindGroups(
         layout: pipelines.packBGL,
         entries: [
           { binding: 0, resource: { buffer: packUniformBuffer } },
-          { binding: 1, resource: { buffer: spinorReBuffer, offset: byteOffset, size: byteSize } },
-          { binding: 2, resource: { buffer: spinorImBuffer, offset: byteOffset, size: byteSize } },
-          { binding: 3, resource: { buffer: fftScratchA } },
+          { binding: 1, resource: { buffer: spinorBuffer, offset: byteOffset, size: byteSize } },
+          { binding: 2, resource: { buffer: fftScratchA } },
         ],
       })
     )
@@ -585,8 +684,7 @@ export function rebuildDiracBindGroups(
         entries: [
           { binding: 0, resource: { buffer: packUniformBuffer } },
           { binding: 1, resource: { buffer: fftScratchA } },
-          { binding: 2, resource: { buffer: spinorReBuffer, offset: byteOffset, size: byteSize } },
-          { binding: 3, resource: { buffer: spinorImBuffer, offset: byteOffset, size: byteSize } },
+          { binding: 2, resource: { buffer: spinorBuffer, offset: byteOffset, size: byteSize } },
         ],
       })
     )
@@ -598,8 +696,7 @@ export function rebuildDiracBindGroups(
         entries: [
           { binding: 0, resource: { buffer: packUniformBufferNoNorm } },
           { binding: 1, resource: { buffer: fftScratchA } },
-          { binding: 2, resource: { buffer: spinorReBuffer, offset: byteOffset, size: byteSize } },
-          { binding: 3, resource: { buffer: spinorImBuffer, offset: byteOffset, size: byteSize } },
+          { binding: 2, resource: { buffer: spinorBuffer, offset: byteOffset, size: byteSize } },
         ],
       })
     )

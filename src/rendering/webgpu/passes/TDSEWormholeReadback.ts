@@ -6,14 +6,14 @@
  * `config.wormholeCoupling.wormholeCoherenceHudEnabled === true`.
  *
  * Design notes:
- * - Staging buffers are allocated once per lattice rebuild (sized by
- *   `totalSites · 4` bytes each), then re-used across frames. This
- *   mirrors the `DiagReadbackState` lifetime so we don't churn the GPU
- *   allocator at diagnostic frequency.
+ * - One staging buffer per readback (sized `totalSites · 8` bytes) is
+ *   allocated per lattice rebuild, then re-used across frames. The merged
+ *   ψ buffer's vec2f memory layout is `[re0, im0, re1, im1, ...]` — the
+ *   exact format `computeWormholeCoherence` already expects, so no CPU
+ *   interleave is needed (the previous split-buffer version had to
+ *   manually combine two Float32Arrays into one each tick).
  * - Only a single readback may be in flight at a time. If the previous
- *   mapAsync hasn't resolved, the current tick is skipped. Under normal
- *   cadence (~12 frames apart), this is effectively never hit; keeping
- *   the gate avoids unmap() churn if the render loop pauses.
+ *   mapAsync hasn't resolved, the current tick is skipped.
  * - All GPU work is gated behind `enabled` in {@link requestWormholeReadback}
  *   so the hot path has zero cost with the HUD off.
  *
@@ -26,66 +26,47 @@ import { useWormholeCoherenceStore } from '@/stores/wormholeCoherenceStore'
 
 /** Mutable per-pass readback state for the wormhole HUD. */
 export interface WormholeReadbackState {
-  /** Persistent staging for ψ_re (MAP_READ | COPY_DST). */
-  stagingRe: GPUBuffer | null
-  /** Persistent staging for ψ_im. */
-  stagingIm: GPUBuffer | null
-  /** Total sites the current staging buffers were sized for. */
+  /** Persistent staging for the merged ψ buffer (MAP_READ | COPY_DST, 8 bytes/site). */
+  staging: GPUBuffer | null
+  /** Total sites the current staging buffer was sized for. */
   stagingTotalSites: number
   /** A mapAsync is in flight — skip new requests until it resolves. */
   mappingInFlight: boolean
   /** Monotonic generation counter — bumped on reset, drops stale results. */
   generation: number
-  /**
-   * Persistent scratch buffer for the interleaved (re, im) ψ used by the CPU
-   * coherence reduction. Sized to match `stagingTotalSites` and reused across
-   * readbacks so the diagnostic cadence doesn't allocate (and GC) a fresh
-   * `Float32Array(2 * totalSites)` every tick. For a 128³ grid the buffer is
-   * 16 MiB — keeping it resident avoids megabyte-scale churn at ~5 Hz.
-   */
-  interleavedScratch: Float32Array | null
 }
 
 /** Create a zeroed readback state container. */
 export function createWormholeReadbackState(): WormholeReadbackState {
   return {
-    stagingRe: null,
-    stagingIm: null,
+    staging: null,
     stagingTotalSites: 0,
     mappingInFlight: false,
     generation: 0,
-    interleavedScratch: null,
   }
 }
 
 /**
- * Ensure staging buffers exist and match the current lattice size. Called
- * from {@link requestWormholeReadback} on-demand.
+ * Ensure the staging buffer exists and matches the current lattice size.
+ * Called from {@link requestWormholeReadback} on-demand.
  */
-function ensureStagingBuffers(
+function ensureStagingBuffer(
   device: GPUDevice,
   state: WormholeReadbackState,
   totalSites: number
 ): void {
-  if (state.stagingTotalSites === totalSites && state.stagingRe && state.stagingIm) return
-  state.stagingRe?.destroy()
-  state.stagingIm?.destroy()
-  const bytes = Math.max(4, totalSites * 4)
-  state.stagingRe = device.createBuffer({
-    label: 'tdse-wormhole-readback-re',
-    size: bytes,
-    usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-  })
-  state.stagingIm = device.createBuffer({
-    label: 'tdse-wormhole-readback-im',
+  if (state.stagingTotalSites === totalSites && state.staging) return
+  state.staging?.destroy()
+  // 8 bytes per site (vec2f). Floor to 8 so empty lattices don't violate
+  // the WebGPU minimum-buffer-size rule.
+  const bytes = Math.max(8, totalSites * 8)
+  state.staging = device.createBuffer({
+    label: 'tdse-wormhole-readback',
     size: bytes,
     usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
   })
   state.stagingTotalSites = totalSites
   state.mappingInFlight = false
-  // Resize the interleaved scratch to match; the previous backing is dropped
-  // with the lattice so no data needs copying.
-  state.interleavedScratch = new Float32Array(Math.max(2, 2 * totalSites))
 }
 
 /**
@@ -97,8 +78,7 @@ function ensureStagingBuffers(
  * @param encoder - Current frame command encoder.
  * @param state - Persistent readback state.
  * @param enabled - `wormholeCoherenceHudEnabled` gate.
- * @param psiRe - Source ψ_re storage buffer.
- * @param psiIm - Source ψ_im storage buffer.
+ * @param psiBuffer - Source merged ψ buffer (array<vec2f>).
  * @param totalSites - Current lattice size (must be > 0).
  * @param gridSize - Per-axis lattice sizes (used by the CPU reduction).
  * @param axis - Mirror axis index.
@@ -110,8 +90,7 @@ export function requestWormholeReadback(
   encoder: GPUCommandEncoder,
   state: WormholeReadbackState,
   enabled: boolean,
-  psiRe: GPUBuffer | null,
-  psiIm: GPUBuffer | null,
+  psiBuffer: GPUBuffer | null,
   totalSites: number,
   gridSize: readonly number[],
   axis: 0 | 1 | 2,
@@ -119,72 +98,52 @@ export function requestWormholeReadback(
   simTime: number
 ): void {
   if (!enabled) return
-  if (!psiRe || !psiIm || totalSites === 0) return
+  if (!psiBuffer || totalSites === 0) return
   if (state.mappingInFlight) return
-  ensureStagingBuffers(device, state, totalSites)
-  if (!state.stagingRe || !state.stagingIm) return
+  ensureStagingBuffer(device, state, totalSites)
+  if (!state.staging) return
 
-  const bytes = totalSites * 4
-  encoder.copyBufferToBuffer(psiRe, 0, state.stagingRe, 0, bytes)
-  encoder.copyBufferToBuffer(psiIm, 0, state.stagingIm, 0, bytes)
+  const bytes = totalSites * 8
+  encoder.copyBufferToBuffer(psiBuffer, 0, state.staging, 0, bytes)
   state.mappingInFlight = true
   const gen = state.generation
 
-  // Capture references up front — `state.stagingRe` can be reassigned by a
+  // Capture references up front — `state.staging` can be reassigned by a
   // lattice rebuild between now and the mapAsync resolving.
-  const stagingRe = state.stagingRe
-  const stagingIm = state.stagingIm
+  const staging = state.staging
   const capturedGridSize = gridSize.slice()
 
   device.queue
     .onSubmittedWorkDone()
     .then(async () => {
-      // A lattice rebuild may have orphaned these buffers (generation was
-      // bumped by {@link resetWormholeReadback}); skip instead of crashing.
       if (gen !== state.generation) {
         state.mappingInFlight = false
         return
       }
-      if (stagingRe.mapState !== 'unmapped' || stagingIm.mapState !== 'unmapped') {
+      if (staging.mapState !== 'unmapped') {
         state.mappingInFlight = false
         return
       }
-      await Promise.all([stagingRe.mapAsync(GPUMapMode.READ), stagingIm.mapAsync(GPUMapMode.READ)])
+      await staging.mapAsync(GPUMapMode.READ)
       if (gen !== state.generation) {
-        stagingRe.unmap()
-        stagingIm.unmap()
+        staging.unmap()
         state.mappingInFlight = false
         return
       }
-      const reView = new Float32Array(stagingRe.getMappedRange())
-      const imView = new Float32Array(stagingIm.getMappedRange())
-      // Reuse the persistent scratch buffer. `ensureStagingBuffers` sizes it
-      // to `2*totalSites` when staging is (re)allocated, so it cannot be
-      // shorter here. Allocate lazily only as a last-line-of-defence — this
-      // path only fires if a race dropped the scratch reference.
-      let interleaved = state.interleavedScratch
-      if (!interleaved || interleaved.length < 2 * totalSites) {
-        interleaved = new Float32Array(2 * totalSites)
-        state.interleavedScratch = interleaved
-      }
-      for (let i = 0; i < totalSites; i++) {
-        interleaved[2 * i] = reView[i]!
-        interleaved[2 * i + 1] = imView[i]!
-      }
-      stagingRe.unmap()
-      stagingIm.unmap()
+      // The merged ψ memory layout is exactly the [re0,im0,re1,im1,...]
+      // format `computeWormholeCoherence` consumes — no CPU interleave needed.
+      const interleaved = new Float32Array(staging.getMappedRange())
       let coherence: number
       try {
-        // Pass a view sized exactly to the lattice so `computeWormholeCoherence`'s
-        // length check keeps working even when the scratch buffer was
-        // over-allocated by a prior larger grid.
         const view = interleaved.subarray(0, 2 * totalSites)
         coherence = computeWormholeCoherence(view, capturedGridSize, axis)
       } catch (err) {
         logger.warn('[TDSE] Wormhole coherence CPU reduction failed:', err)
+        staging.unmap()
         state.mappingInFlight = false
         return
       }
+      staging.unmap()
       useWormholeCoherenceStore.getState().pushSample(simTime, coherence, axis, g)
       state.mappingInFlight = false
     })
@@ -195,16 +154,13 @@ export function requestWormholeReadback(
 }
 
 /**
- * Drop staging buffers and bump the generation counter so any in-flight
- * mapAsync callbacks terminate without touching the stale buffers.
+ * Drop the staging buffer and bump the generation counter so any in-flight
+ * mapAsync callbacks terminate without touching the stale buffer.
  */
 export function resetWormholeReadback(state: WormholeReadbackState): void {
-  state.stagingRe?.destroy()
-  state.stagingIm?.destroy()
-  state.stagingRe = null
-  state.stagingIm = null
+  state.staging?.destroy()
+  state.staging = null
   state.stagingTotalSites = 0
   state.mappingInFlight = false
-  state.interleavedScratch = null
   state.generation = (state.generation + 1) >>> 0
 }
