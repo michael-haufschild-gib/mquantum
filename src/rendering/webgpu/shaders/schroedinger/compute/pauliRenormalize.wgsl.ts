@@ -34,8 +34,15 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let currentNorm = diagResult[0];
   let targetNorm = renormUni.targetNorm;
 
-  // Guard: skip if norms are invalid
-  if (currentNorm <= 0.0 || currentNorm != currentNorm || targetNorm <= 0.0) {
+  // Guard: skip if either norm is non-positive or NaN. NaN propagation in the
+  // sqrt(targetNorm/currentNorm) scale would corrupt every spinor entry in a
+  // single dispatch, so reject NaN on both sides.
+  if (
+    currentNorm <= 0.0 ||
+    currentNorm != currentNorm ||
+    targetNorm <= 0.0 ||
+    targetNorm != targetNorm
+  ) {
     return;
   }
 

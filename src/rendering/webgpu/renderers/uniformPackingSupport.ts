@@ -206,7 +206,13 @@ export function packCameraUniforms(
   data[110] = -posZ * invScale
   data[111] = 1.0
 
-  // Camera position (offset 112)
+  // Camera position (offset 112). Zero before the conditional so a frame
+  // without `camera.position` doesn't leak prior-frame values into the
+  // world-space camera position OR the cameraPositionModel derived below
+  // (data is reused across frames).
+  data[112] = 0
+  data[113] = 0
+  data[114] = 0
   if (camera.position) {
     data[112] = camera.position.x
     data[113] = camera.position.y

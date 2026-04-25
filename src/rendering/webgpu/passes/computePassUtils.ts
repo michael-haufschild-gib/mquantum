@@ -55,6 +55,11 @@ export function compute3DDispatchCounts(
   const x = latticeDim >= 1 ? Math.max(1, Math.ceil(gridSize[0]! / SITE_3D_WG)) : 1
   const y = latticeDim >= 2 ? Math.max(1, Math.ceil(gridSize[1]! / SITE_3D_WG)) : 1
   const z = latticeDim >= 3 ? Math.max(1, Math.ceil(gridSize[2]! / SITE_3D_WG)) : 1
+  if (x > MAX_DISPATCH_PER_DIM || y > MAX_DISPATCH_PER_DIM || z > MAX_DISPATCH_PER_DIM) {
+    throw new Error(
+      `[compute] compute3DDispatchCounts: dispatch (${x}, ${y}, ${z}) exceeds WebGPU limit ${MAX_DISPATCH_PER_DIM} per dim`
+    )
+  }
   return [x, y, z]
 }
 
@@ -98,8 +103,14 @@ export function pickSiteDispatch(
     const [x, y, z] = compute3DDispatchCounts(gridSize, 3)
     return { x, y, z, use3D: true }
   }
+  const x = Math.ceil(totalSites / LINEAR_WG)
+  if (x > MAX_DISPATCH_PER_DIM) {
+    throw new Error(
+      `[compute] pickSiteDispatch: linear dispatch ${x} exceeds WebGPU limit ${MAX_DISPATCH_PER_DIM} (totalSites=${totalSites})`
+    )
+  }
   return {
-    x: Math.ceil(totalSites / LINEAR_WG),
+    x,
     y: 1,
     z: 1,
     use3D: false,

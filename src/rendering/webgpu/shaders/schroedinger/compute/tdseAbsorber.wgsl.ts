@@ -66,7 +66,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   coords[0] = gid.x;
   coords[1] = gid.y;
   coords[2] = gid.z;
-  let idx = gid.x * params.strides[0] + gid.y * params.strides[1] + gid.z;
+  let idx =
+    gid.x * params.strides[0] +
+    gid.y * params.strides[1] +
+    gid.z * params.strides[2];
 ${TDSE_ABSORBER_BODY}
 }
 `

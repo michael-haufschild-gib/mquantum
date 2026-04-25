@@ -110,6 +110,17 @@ describe('storeCurrentEigenstate', () => {
 
     expect(count).toBe(1)
     expect(state.gsEigenstates).toHaveLength(1)
+    // Both allocations must size to the merged vec2f layout (8 bytes / site).
+    // A stale 4-byte assumption would still satisfy createBuffer call counts
+    // but silently truncate half the spinor and break IPR readbacks.
+    expect(device.createBuffer).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ size: state.totalSites * 8 })
+    )
+    expect(device.createBuffer).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ size: state.totalSites * 8 })
+    )
     // 1 buffer for eigenstate copy (merged vec2f psi) + 1 staging buffer for async IPR readback
     expect(device.createBuffer).toHaveBeenCalledTimes(2)
     // 2 submits: one for eigenstate copy, one for IPR readback

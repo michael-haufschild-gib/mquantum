@@ -353,15 +353,24 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     // One writeBuffer call replaces the two that the split-buffer layout needed.
     if (this.pendingInjection && this.buf?.spinorBuffer) {
       const { re, im } = this.pendingInjection
-      const elementCount = Math.min(re.length, im.length, 2 * this.buf.totalSites)
-      const interleaved = new Float32Array(elementCount * 2)
-      for (let i = 0; i < elementCount; i++) {
+      const expected = 2 * this.buf.totalSites
+      if (re.length !== expected || im.length !== expected) {
+        // Drop the injection rather than partial-uploading: a truncated or
+        // version-mismatched state file would otherwise leave a hybrid spinor
+        // with stale data from the previous run beyond `min(re,im)`.
+        this.pendingInjection = null
+        throw new Error(
+          `[Pauli] Invalid save-state length: expected re=im=${expected} (2·totalSites), got re=${re.length}, im=${im.length}`
+        )
+      }
+      const interleaved = new Float32Array(expected * 2)
+      for (let i = 0; i < expected; i++) {
         interleaved[2 * i] = re[i]!
         interleaved[2 * i + 1] = im[i]!
       }
       device.queue.writeBuffer(this.buf.spinorBuffer, 0, interleaved)
       this.pendingInjection = null
-      logger.log(`[Pauli] Injected loaded wavefunction (${elementCount} elements)`)
+      logger.log(`[Pauli] Injected loaded wavefunction (${expected} elements)`)
     } else if (this.pl && this.bg && this.buf) {
       const pass = ctx.beginComputePass({ label: 'pauli-init-pass' })
       const dispatch = pickPauliSiteDispatch(

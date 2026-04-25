@@ -141,7 +141,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
    || gid.z >= tdseParams.gridSize[2]) {
     return;
   }
-  let idx = gid.x * tdseParams.strides[0] + gid.y * tdseParams.strides[1] + gid.z;
+  let idx =
+    gid.x * tdseParams.strides[0] +
+    gid.y * tdseParams.strides[1] +
+    gid.z * tdseParams.strides[2];
 
   // Direct worldspace coords from gid.xyz — skips the per-thread shift/mask
   // decomposition the 1-D variant performs.

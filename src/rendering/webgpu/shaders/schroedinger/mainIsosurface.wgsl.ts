@@ -193,9 +193,14 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
   var rawGrad: vec3f;
   ${gradientCompute}
   let gMagSq = dot(rawGrad, rawGrad);
+  // Floor only the scalar denominator path. Using the floored invGMag for the
+  // normal would shrink |n| < 1 in shallow-gradient regions and bias diffuse /
+  // specular energy. Compute the normal from the unfloored magnitude with an
+  // explicit zero-gradient guard.
   let invGMag = inverseSqrt(max(gMagSq, 1e-12));
   let gradMag = gMagSq * invGMag;  // = sqrt(gMagSq)
-  let n = -rawGrad * invGMag;
+  let invGMagExact = select(0.0, inverseSqrt(gMagSq), gMagSq > 1e-12);
+  let n = -rawGrad * invGMagExact;
 
   // Sample for color
   ${colorSample}

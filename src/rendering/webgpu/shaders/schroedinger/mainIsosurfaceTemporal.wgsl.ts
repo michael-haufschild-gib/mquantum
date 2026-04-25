@@ -202,9 +202,14 @@ ${bayerJitterSection}
   // below (saves two divides per isosurface hit). Clamp migrates from
   // max(gradMag, 1e-6) to max(gradMagSq, 1e-12) — same 1e6 cap on the output.
   let gradMagSq = dot(rawGrad, rawGrad);
+  // Floor only the scalar denominator path. The floored invGradMag would
+  // shrink |n| < 1 in shallow-gradient regions and bias diffuse / specular
+  // energy; recompute the normal from the unfloored magnitude with an
+  // explicit zero-gradient guard.
   let invGradMag = inverseSqrt(max(gradMagSq, 1e-12));
   let gradMag = gradMagSq * invGradMag;
-  let n = -rawGrad * invGradMag;
+  let invGradMagExact = select(0.0, inverseSqrt(gradMagSq), gradMagSq > 1e-12);
+  let n = -rawGrad * invGradMagExact;
 
   // Sample for color
   ${colorSample}

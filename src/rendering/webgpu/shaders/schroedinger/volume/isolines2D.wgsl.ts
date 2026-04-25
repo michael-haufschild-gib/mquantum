@@ -30,6 +30,7 @@ fn evaluateIsolines2D(pos: vec3f, rho: f32, s: f32, uniforms: SchroedingerUnifor
 
   // Pixel-space step for finite differences
   let pixelSize = 2.0 * uniforms.boundingRadius / max(camera.resolution.y, 1.0);
+  let invPixelSize = 1.0 / pixelSize;
   let eps = max(pixelSize * 1.5, 0.002);
   let invEps = 1.0 / eps;  // 1 reciprocal, 2 multiplies below
 
@@ -68,7 +69,7 @@ fn evaluateIsolines2D(pos: vec3f, rho: f32, s: f32, uniforms: SchroedingerUnifor
   let distToLevel = abs(s - (baseLevel + nearestLevel * spacing));
 
   // Convert to pixel distance via gradient — replaces divide with 2 muls.
-  let distPixels = distToLevel * invGradLen / pixelSize;
+  let distPixels = distToLevel * invGradLen * invPixelSize;
 
   // Anti-aliased line rendering
   let lineWidth = 1.2;
