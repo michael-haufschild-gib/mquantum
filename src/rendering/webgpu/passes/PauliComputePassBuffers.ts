@@ -19,7 +19,7 @@ import {
 import { buildFFTTwiddleTable, FFT_TWIDDLE_BYTES } from './FFTTwiddle'
 
 /** PauliUniforms struct size in bytes (640 = 160 indices × 4) */
-const UNIFORM_SIZE = 640
+export const PAULI_UNIFORM_SIZE = 640
 /** Diagnostics workgroup size — must match @workgroup_size in pauliDiagnostics.wgsl.ts */
 const DIAG_WG = 64
 /** Number of f32 values in diagnostic result buffer:
@@ -152,7 +152,7 @@ export function rebuildPauliBuffers(
   // See pauliInit.wgsl.ts for the matching `var<storage, read>` declaration.
   const uniformBuffer = device.createBuffer({
     label: 'pauli-uniforms',
-    size: UNIFORM_SIZE,
+    size: PAULI_UNIFORM_SIZE,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   })
 

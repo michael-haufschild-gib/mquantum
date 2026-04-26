@@ -154,12 +154,13 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
     // --- Handlers ---
 
     const handleExport = async () => {
-      soundManager.playSuccess()
+      soundManager.playClick()
       await new Promise((resolve) => setTimeout(resolve, 50))
       try {
         const { exportSceneToPNG, generateTimestampFilename } = await import('@/lib/export/image')
         const filename = generateTimestampFilename('ndimensional')
         await exportSceneToPNG({ filename })
+        soundManager.playSuccess()
       } catch (error) {
         logger.error('[Export] PNG export failed', error)
         addToast('Failed to export image', 'error')

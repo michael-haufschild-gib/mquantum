@@ -431,14 +431,12 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   /** Refresh potential buffer when physics parameters change. */
   private refreshPotentialIfDirty(ctx: WebGPURenderContext, config: DiracConfig): void {
     const potHash = `${config.potentialType}|${config.potentialStrength}|${config.potentialWidth}|${config.potentialCenter}|${config.harmonicOmega}|${config.coulombZ}|${config.mass}|${config.spacing.join(',')}`
-    if (potHash !== this.lastPotentialHash) {
+    if (potHash !== this.lastPotentialHash && this.pl && this.bg) {
       this.lastPotentialHash = potHash
-      if (this.pl && this.bg) {
-        const d = pickSiteDispatch(config.latticeDim, this.totalSites, config.gridSize)
-        const p = ctx.beginComputePass({ label: 'dirac-potential-update' })
-        this.dispatchCompute(p, this.pl.potentialPipeline, [this.bg.potentialBG!], d.x, d.y, d.z)
-        p.end()
-      }
+      const d = pickSiteDispatch(config.latticeDim, this.totalSites, config.gridSize)
+      const p = ctx.beginComputePass({ label: 'dirac-potential-update' })
+      this.dispatchCompute(p, this.pl.potentialPipeline, [this.bg.potentialBG!], d.x, d.y, d.z)
+      p.end()
     }
   }
 

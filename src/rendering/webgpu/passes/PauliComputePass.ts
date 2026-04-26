@@ -44,13 +44,15 @@ import {
   sanitizeGridSizes,
 } from './computePassUtils'
 import type { PauliBufferResult } from './PauliComputePassBuffers'
-import { rebuildPauliBuffers, writePauliUniforms } from './PauliComputePassBuffers'
+import {
+  PAULI_UNIFORM_SIZE,
+  rebuildPauliBuffers,
+  writePauliUniforms,
+} from './PauliComputePassBuffers'
 import type { PauliBindGroupResult, PauliPipelineResult } from './PauliComputePassSetup'
 import { buildPauliPipelines, rebuildPauliBindGroups } from './PauliComputePassSetup'
 import { requestStateSave as genericStateSave } from './stateSave'
 
-/** PauliUniforms struct size in bytes (640 = 160 indices × 4) */
-const UNIFORM_SIZE = 640
 /** Number of f32 values in diagnostic result buffer:
  *  totalNorm, normUp, normDown, sigmaX, sigmaY, sigmaZ, maxDensity, pad */
 const DIAG_RESULT_COUNT = 8
@@ -107,7 +109,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   private saveMappingInFlight = false
 
   // Pre-allocated uniform views
-  private readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
+  private readonly uniformData = new ArrayBuffer(PAULI_UNIFORM_SIZE)
   private readonly uniformU32 = new Uint32Array(this.uniformData)
   private readonly uniformF32 = new Float32Array(this.uniformData)
 

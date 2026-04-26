@@ -151,8 +151,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
  *   @group(0) @binding(3) fftTwiddleTable: array<vec2f> (read) — see
  *     src/rendering/webgpu/passes/FFTTwiddle.ts for layout.
  *
- * Dirac and Pauli import the unchanged `tdseStockhamFFTBlock` above and keep
- * their 3-entry BGLs — their shader binaries are bit-identical to before.
+ * All three modes (TDSE, Dirac, Pauli) use this 4-binding twiddle variant.
+ * The original 3-binding `tdseStockhamFFTBlock` above is retained for reference.
  */
 export const tdseStockhamFFTTwiddleBlock = /* wgsl */ `
 @group(0) @binding(0) var<uniform> fftUni: FFTStageUniforms;
