@@ -138,16 +138,14 @@ async function profileScenario(
 
   const metrics = await getPerformanceMetrics(page)
 
-  // Compute pass deltas from cumulative timestamps
+  // The metrics store publishes per-pass GPU deltas; keep the historical
+  // `passDeltas` output shape for downstream summary code.
   const passDeltas: Record<string, number> = {}
-  let prevGpu = 0
   for (const pt of metrics.passTimings) {
     if (!pt.skipped && pt.gpuTimeMs > 0) {
-      const delta = pt.gpuTimeMs - prevGpu
-      if (delta > 0.001) {
-        passDeltas[pt.passId] = delta
+      if (pt.gpuTimeMs > 0.001) {
+        passDeltas[pt.passId] = pt.gpuTimeMs
       }
-      prevGpu = pt.gpuTimeMs
     }
   }
 

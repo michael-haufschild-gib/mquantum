@@ -51,6 +51,9 @@ export interface TabsProps {
   tabListClassName?: string
   /** Optional class name for the content panel */
   contentClassName?: string
+  /** Optional ref forwarded to the scrollable content panel. Lets callers
+   *  attach scroll listeners (e.g. the panel-glass scrolling-attr hook). */
+  contentRef?: React.Ref<HTMLDivElement>
   /** Visual variant of the tabs */
   variant?: 'default' | 'minimal' | 'pills'
   /** Whether tabs should expand to fill the container width */
@@ -169,6 +172,7 @@ export const Tabs: React.FC<TabsProps> = React.memo(
     className = '',
     tabListClassName = '',
     contentClassName = '',
+    contentRef,
     variant = 'default',
     fullWidth = false,
     'data-testid': testId,
@@ -421,8 +425,16 @@ export const Tabs: React.FC<TabsProps> = React.memo(
           </div>
         </div>
 
-        {/* Content Panel - Keep Alive with Mount on Demand */}
+        {/* Content Panel - Keep Alive with Mount on Demand.
+         *  `contain: layout style paint` isolates the scroll repaint from the
+         *  surrounding glass-panel layer so the canvas behind the panel does
+         *  not get re-blurred whenever a tab's content layout shifts.
+         *  `overscroll-behavior: contain` blocks scroll chaining at the panel
+         *  edges — the page (and the canvas underneath) cannot scroll when
+         *  this list bottoms out. */}
         <div
+          ref={contentRef}
+          style={{ contain: 'layout style paint', overscrollBehavior: 'contain' }}
           className={`flex-1 min-h-0 relative overflow-y-auto scrollbar-none ${contentClassName}`}
         >
           {tabPanels}

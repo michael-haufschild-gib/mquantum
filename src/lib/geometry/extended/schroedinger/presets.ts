@@ -8,8 +8,11 @@
  * - Precomputed energies
  */
 
+import {
+  SCHROEDINGER_MAX_DIM as MAX_DIM,
+  SCHROEDINGER_MAX_TERMS as MAX_TERMS,
+} from '@/constants/quantum'
 import { mulberry32 } from '@/lib/math/rng'
-import { MAX_DIM, MAX_TERMS } from '@/rendering/webgpu/shaders/schroedinger/uniforms.wgsl'
 
 /**
  * Generated quantum state data

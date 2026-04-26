@@ -1,8 +1,7 @@
-import React, { useState } from 'react'
+import React, { Suspense, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { DimensionSelector } from '@/components/sections/Geometry/DimensionSelector'
-import { ObjectSettingsSection } from '@/components/sections/Geometry/ObjectSettingsSection'
 import { ScenarioSelector } from '@/components/sections/Geometry/ScenarioSelector'
 import { ObjectTypeExplorer } from '@/components/sections/ObjectTypes/ObjectTypeExplorer'
 import { Icon } from '@/components/ui/Icon'
@@ -10,11 +9,18 @@ import { Slider } from '@/components/ui/Slider'
 import { Tab, Tabs } from '@/components/ui/Tabs'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import { useAnySweepRunning } from '@/hooks/useAnySweepRunning'
+import { useScrollingPanelAttr } from '@/hooks/useScrollingPanelAttr'
 import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
 
 type SurfaceMode = 'volumetric' | 'isosurface'
+
+const ObjectSettingsSection = React.lazy(() =>
+  import('@/components/sections/Geometry/ObjectSettingsSection').then((m) => ({
+    default: m.ObjectSettingsSection,
+  }))
+)
 
 const SURFACE_MODE_OPTIONS = [
   { value: 'volumetric' as const, label: 'Volumetric Cloud' },
@@ -31,6 +37,8 @@ const GRID_RESOLUTION_OPTIONS = [
 export const EditorLeftPanel: React.FC = React.memo(() => {
   const [activeTab, setActiveTab] = useState('type')
   const sweepRunning = useAnySweepRunning()
+  const scrollContentRef = useRef<HTMLDivElement>(null)
+  useScrollingPanelAttr(scrollContentRef)
   const { dimension, objectType } = useGeometryStore(
     useShallow((state) => ({ dimension: state.dimension, objectType: state.objectType }))
   )
@@ -104,7 +112,9 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
               />
             </div>
           </div>
-          <ObjectSettingsSection />
+          <Suspense fallback={null}>
+            <ObjectSettingsSection />
+          </Suspense>
         </fieldset>
       ),
     },
@@ -171,6 +181,7 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
             className="flex-1 flex flex-col min-h-0"
             tabListClassName="px-3 pt-0 pb-0 bg-transparent"
             contentClassName="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--border-default)] hover:scrollbar-thumb-[var(--border-highlight)] p-0"
+            contentRef={scrollContentRef}
             variant="default"
             fullWidth
             data-testid="left-panel-tabs"

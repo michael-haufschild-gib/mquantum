@@ -9,12 +9,14 @@ import { MIN_DIMENSION } from '@/constants/dimension'
 import { getShortcutLabel, SHORTCUTS, useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useAnimationStore } from '@/stores/animationStore'
 import { useGeometryStore } from '@/stores/geometryStore'
+import { useLayoutStore } from '@/stores/layoutStore'
 import { useRotationStore } from '@/stores/rotationStore'
 
 describe('useKeyboardShortcuts', () => {
   beforeEach(() => {
     useAnimationStore.getState().reset()
     useGeometryStore.getState().reset()
+    useLayoutStore.getState().reset()
     useRotationStore.getState().resetAllRotations()
   })
 
@@ -114,6 +116,17 @@ describe('useKeyboardShortcuts', () => {
 
     expect(useAnimationStore.getState().isPlaying).toBe(initialState)
     document.body.removeChild(input)
+  })
+
+  it('should open command palette on Ctrl+K', () => {
+    renderHook(() => useKeyboardShortcuts({ enabled: true }))
+
+    act(() => {
+      const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true })
+      window.dispatchEvent(event)
+    })
+
+    expect(useLayoutStore.getState().isCommandPaletteOpen).toBe(true)
   })
 })
 

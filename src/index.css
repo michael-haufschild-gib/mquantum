@@ -262,7 +262,12 @@
 
 @utility glass-panel {
   background-color: var(--bg-panel);
-  backdrop-filter: blur(24px) saturate(180%);
+
+  /* Reduced from blur(24px) saturate(180%) — those values forced a full
+     re-blur of the underlying WebGPU canvas every frame and dropped fps
+     during scroll. blur(10px) saturate(150%) keeps the glass aesthetic
+     while substantially cutting the per-frame compositor cost. */
+  backdrop-filter: blur(10px) saturate(150%);
   border: 1px solid var(--border-subtle);
   box-shadow:
     var(--shadow-soft),
@@ -275,9 +280,16 @@
     box-shadow 0.3s ease;
 }
 
+/* While the user is actively scrolling inside a glass panel, drop the
+   backdrop-filter entirely. The scroll handler toggles data-scrolling
+   on the panel; the rAF-debounced clear restores blur on idle. */
+.glass-panel[data-scrolling='true'] {
+  backdrop-filter: none;
+}
+
 @utility glass-panel-dark {
   background-color: var(--bg-panel); /* Unified */
-  backdrop-filter: blur(32px);
+  backdrop-filter: blur(12px);
   border: 1px solid var(--border-subtle);
   box-shadow: inset 0 0 20px oklch(0% 0 0deg / 10%); /* Softer shadow */
 }

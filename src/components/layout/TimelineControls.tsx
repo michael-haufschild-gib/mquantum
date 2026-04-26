@@ -1,5 +1,5 @@
 import { AnimatePresence, m, useReducedMotion } from 'motion/react'
-import { type FC, useCallback, useEffect, useMemo, useState } from 'react'
+import { type FC, lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Button } from '@/components/ui/Button'
@@ -16,11 +16,31 @@ import {
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { type GeometryState, useGeometryStore } from '@/stores/geometryStore'
 
-import { PauliAnimationDrawer } from './TimelineControls/PauliAnimationDrawer'
-import { RotationAnimationDrawer } from './TimelineControls/RotationAnimationDrawer'
-import { SchroedingerAnimationDrawer } from './TimelineControls/SchroedingerAnimationDrawer'
-import { SchroedingerOpenQuantumDrawer } from './TimelineControls/SchroedingerOpenQuantumDrawer'
-import { WheelerDeWittAnimationDrawer } from './TimelineControls/WheelerDeWittAnimationDrawer'
+const PauliAnimationDrawer = lazy(() =>
+  import('./TimelineControls/PauliAnimationDrawer').then((m) => ({
+    default: m.PauliAnimationDrawer,
+  }))
+)
+const RotationAnimationDrawer = lazy(() =>
+  import('./TimelineControls/RotationAnimationDrawer').then((m) => ({
+    default: m.RotationAnimationDrawer,
+  }))
+)
+const SchroedingerAnimationDrawer = lazy(() =>
+  import('./TimelineControls/SchroedingerAnimationDrawer').then((m) => ({
+    default: m.SchroedingerAnimationDrawer,
+  }))
+)
+const SchroedingerOpenQuantumDrawer = lazy(() =>
+  import('./TimelineControls/SchroedingerOpenQuantumDrawer').then((m) => ({
+    default: m.SchroedingerOpenQuantumDrawer,
+  }))
+)
+const WheelerDeWittAnimationDrawer = lazy(() =>
+  import('./TimelineControls/WheelerDeWittAnimationDrawer').then((m) => ({
+    default: m.WheelerDeWittAnimationDrawer,
+  }))
+)
 
 export const TimelineControls: FC = () => {
   const objectType = useGeometryStore((state: GeometryState) => state.objectType)
@@ -228,22 +248,34 @@ export const TimelineControls: FC = () => {
   return (
     <div className="flex flex-col w-full h-full relative">
       <AnimatePresence>
-        {showRotationDrawer && <RotationAnimationDrawer onClose={() => setActiveDrawer(null)} />}
+        {showRotationDrawer && (
+          <Suspense fallback={null}>
+            <RotationAnimationDrawer onClose={() => setActiveDrawer(null)} />
+          </Suspense>
+        )}
 
         {showAnimDrawer && isSchroedinger && isWdW && (
-          <WheelerDeWittAnimationDrawer onClose={() => setActiveDrawer(null)} />
+          <Suspense fallback={null}>
+            <WheelerDeWittAnimationDrawer onClose={() => setActiveDrawer(null)} />
+          </Suspense>
         )}
 
         {showAnimDrawer && isSchroedinger && !isWdW && hasEffectsDrawerContent && (
-          <SchroedingerAnimationDrawer onClose={() => setActiveDrawer(null)} />
+          <Suspense fallback={null}>
+            <SchroedingerAnimationDrawer onClose={() => setActiveDrawer(null)} />
+          </Suspense>
         )}
 
         {showAnimDrawer && isPauliSpinor && (
-          <PauliAnimationDrawer onClose={() => setActiveDrawer(null)} />
+          <Suspense fallback={null}>
+            <PauliAnimationDrawer onClose={() => setActiveDrawer(null)} />
+          </Suspense>
         )}
 
         {effectiveShowOpenQDrawer && (
-          <SchroedingerOpenQuantumDrawer onClose={() => setActiveDrawer(null)} />
+          <Suspense fallback={null}>
+            <SchroedingerOpenQuantumDrawer onClose={() => setActiveDrawer(null)} />
+          </Suspense>
         )}
       </AnimatePresence>
 

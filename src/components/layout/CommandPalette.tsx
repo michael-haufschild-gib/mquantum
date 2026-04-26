@@ -18,14 +18,22 @@ interface Command {
 }
 
 export const CommandPalette: React.FC = React.memo(() => {
-  const [isOpen, setIsOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
-  const { toggleCinematicMode, toggleCollapsed, toggleLeftPanel, toggleShortcuts } = useLayoutStore(
+  const {
+    isOpen,
+    setIsOpen,
+    toggleCinematicMode,
+    toggleCollapsed,
+    toggleLeftPanel,
+    toggleShortcuts,
+  } = useLayoutStore(
     useShallow((state: LayoutStore) => ({
+      isOpen: state.isCommandPaletteOpen,
+      setIsOpen: state.setCommandPaletteOpen,
       toggleCinematicMode: state.toggleCinematicMode,
 
       toggleCollapsed: state.toggleCollapsed,
@@ -268,7 +276,7 @@ export const CommandPalette: React.FC = React.memo(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
-        setIsOpen((prev) => !prev)
+        useLayoutStore.getState().toggleCommandPalette()
         setQuery('')
       }
 
@@ -279,7 +287,7 @@ export const CommandPalette: React.FC = React.memo(() => {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [setIsOpen])
 
   useEffect(() => {
     if (isOpen) {

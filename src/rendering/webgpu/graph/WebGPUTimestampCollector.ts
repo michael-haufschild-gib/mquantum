@@ -147,6 +147,7 @@ export class WebGPUTimestampCollector {
           const range = readBuffer.getMappedRange(0, byteLength)
           const timestamps = new BigUint64Array(range)
           const nextTimings = new Map<string, PassGPUTiming>()
+          let previousPassEnd: bigint | null = null
 
           for (let i = 0; i < passIds.length; i++) {
             const base = i * 4
@@ -159,30 +160,56 @@ export class WebGPUTimestampCollector {
             const renderBegin = phase.hasRender ? timestamps[base + 2]! : 0n
             const renderEnd = phase.hasRender ? timestamps[base + 3]! : 0n
 
-            const computeMs =
-              computeEnd > computeBegin ? Number(computeEnd - computeBegin) / 1_000_000 : 0
-            const renderMs =
-              renderEnd > renderBegin ? Number(renderEnd - renderBegin) / 1_000_000 : 0
-
-            // Total: earliest begin to latest end (only from phases that were used)
-            const starts: bigint[] = []
-            const ends: bigint[] = []
-            if (phase.hasCompute && computeBegin > 0n) {
-              starts.push(computeBegin)
-              ends.push(computeEnd)
+            let earliestStart: bigint | null = null
+            let latestEnd: bigint | null = null
+            if (phase.hasCompute && computeEnd > 0n) {
+              if (computeBegin > 0n) earliestStart = computeBegin
+              latestEnd = computeEnd
             }
-            if (phase.hasRender && renderBegin > 0n) {
-              starts.push(renderBegin)
-              ends.push(renderEnd)
-            }
-            let totalMs = 0
-            if (starts.length > 0) {
-              const earliest = starts.reduce((a, b) => (a < b ? a : b))
-              const latest = ends.reduce((a, b) => (a > b ? a : b))
-              if (latest > earliest) {
-                totalMs = Number(latest - earliest) / 1_000_000
+            if (phase.hasRender && renderEnd > 0n) {
+              if (renderBegin > 0n && (earliestStart === null || renderBegin < earliestStart)) {
+                earliestStart = renderBegin
+              }
+              if (latestEnd === null || renderEnd > latestEnd) {
+                latestEnd = renderEnd
               }
             }
+
+            if (latestEnd === null) {
+              nextTimings.set(passIds[i]!, { total: 0, compute: 0, render: 0 })
+              continue
+            }
+
+            // Some browser/GPU stacks report per-pass begin timestamps from a
+            // common frame origin while end timestamps advance monotonically.
+            // Clamp each pass start to the previous pass end so consumers get
+            // actual per-pass deltas instead of cumulative frame time.
+            const timingFloor = previousPassEnd ?? earliestStart ?? latestEnd
+            const passStart =
+              earliestStart !== null && earliestStart > timingFloor ? earliestStart : timingFloor
+
+            let computeMs = 0
+            if (phase.hasCompute && computeEnd > 0n) {
+              const computeStart = computeBegin > passStart ? computeBegin : passStart
+              if (computeEnd > computeStart) {
+                computeMs = Number(computeEnd - computeStart) / 1_000_000
+              }
+            }
+
+            let renderMs = 0
+            if (phase.hasRender && renderEnd > 0n) {
+              let renderStart = renderBegin > passStart ? renderBegin : passStart
+              if (phase.hasCompute && computeEnd > renderStart && renderEnd > computeEnd) {
+                renderStart = computeEnd
+              }
+              if (renderEnd > renderStart) {
+                renderMs = Number(renderEnd - renderStart) / 1_000_000
+              }
+            }
+
+            const totalMs = latestEnd > passStart ? Number(latestEnd - passStart) / 1_000_000 : 0
+            previousPassEnd =
+              previousPassEnd === null || latestEnd > previousPassEnd ? latestEnd : previousPassEnd
 
             nextTimings.set(passIds[i]!, { total: totalMs, compute: computeMs, render: renderMs })
           }

@@ -48,8 +48,8 @@ function resolveKSpaceBasisCoefs(config: FreeScalarConfig, simEta: number): KSpa
  * visual and the thermometer readings.
  */
 export interface PendingKSpaceData {
-  density: Uint16Array
-  analysis: Uint16Array
+  density?: Uint16Array
+  analysis?: Uint16Array
   /** Total particle number `N(η) = Σ_k max(n_k, 0)` at the current vacuum reference. */
   totalParticles: number
 }
@@ -178,7 +178,8 @@ export class FsfKSpaceManager {
     totalSites: number,
     config: FreeScalarConfig,
     simEta: number,
-    densityGridSize?: number
+    densityGridSize?: number,
+    includeTextures = true
   ): void {
     this.kSpaceFrameCounter++
     if (
@@ -194,7 +195,7 @@ export class FsfKSpaceManager {
     const bufferSize = totalSites * 4
     encoder.copyBufferToBuffer(phiBuffer, 0, this.phiReadbackBuffer, 0, bufferSize)
     encoder.copyBufferToBuffer(piBuffer, 0, this.piReadbackBuffer, 0, bufferSize)
-    void this.readbackAndComputeKSpace(device, config, simEta, densityGridSize)
+    void this.readbackAndComputeKSpace(device, config, simEta, densityGridSize, includeTextures)
   }
 
   /**
@@ -255,10 +256,12 @@ export class FsfKSpaceManager {
           // cleanly to 0 instead of poisoning `pendingKSpaceData` and
           // the diagnostics ring buffer.
           const totalParticles = Number.isFinite(msg.totalParticles) ? msg.totalParticles : 0
-          this.pendingKSpaceData = {
-            density: msg.density,
-            analysis: msg.analysis,
-            totalParticles,
+          if (msg.density && msg.analysis) {
+            this.pendingKSpaceData = {
+              density: msg.density,
+              analysis: msg.analysis,
+              totalParticles,
+            }
           }
           // Feed the adiabatic-vacuum particle number into the diagnostics
           // ring buffer. Gated on the epoch check above so a worker result
@@ -280,7 +283,8 @@ export class FsfKSpaceManager {
     _device: GPUDevice,
     config: FreeScalarConfig,
     simEta: number,
-    densityGridSize?: number
+    densityGridSize?: number,
+    includeTextures = true
   ): Promise<void> {
     const phiReadbackBuffer = this.phiReadbackBuffer
     const piReadbackBuffer = this.piReadbackBuffer
@@ -349,6 +353,7 @@ export class FsfKSpaceManager {
           dispersion,
           basisCoefs,
           outputGridSize: densityGridSize,
+          includeTextures,
         },
         [phiComplex.buffer, piComplex.buffer]
       )

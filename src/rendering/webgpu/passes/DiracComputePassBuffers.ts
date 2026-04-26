@@ -20,6 +20,7 @@ import type {
   DiracDestroyableBuffers,
   DiracPassHelpers,
 } from './DiracComputePassTypes'
+import { buildTdseFFTTwiddleTable, FFT_TWIDDLE_BYTES } from './TDSEFFTTwiddle'
 
 /** DiracUniforms struct size in bytes (592 — includes kGridScale) */
 const UNIFORM_SIZE = 592
@@ -62,6 +63,7 @@ export function rebuildDiracBuffers(
   if (old.fftAxisUniformBuffers) {
     for (const b of old.fftAxisUniformBuffers) b.destroy()
   }
+  old.fftTwiddleBuffer?.destroy()
   old.packUniformBuffer?.destroy()
   old.packUniformBufferNoNorm?.destroy()
   old.diagUniformBuffer?.destroy()
@@ -186,6 +188,18 @@ export function rebuildDiracBuffers(
     fftAxisUniformBuffers[slot] = buf
   }
 
+  // CPU-precomputed radix-2 twiddle table. Replaces per-thread cos/sin in the
+  // Stockham butterfly at stages s >= 2 for both the per-stage and shared-mem
+  // FFT kernels. Sized for N_MAX_FFT_TWIDDLE = 128 (matches Dirac's per-axis
+  // grid clamp); a single 512-byte buffer serves every axis length in [8, 128].
+  // Uploaded once per rebuild — values are axis-length-independent.
+  const fftTwiddleBuffer = device.createBuffer({
+    label: 'dirac-fft-twiddle',
+    size: FFT_TWIDDLE_BYTES,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  })
+  device.queue.writeBuffer(fftTwiddleBuffer, 0, buildTdseFFTTwiddleTable())
+
   // Pack uniforms (with 1/N normalization for inverse FFT unpack)
   const packData = new ArrayBuffer(PACK_UNIFORM_SIZE)
   const pu32 = new Uint32Array(packData)
@@ -258,6 +272,7 @@ export function rebuildDiracBuffers(
     fftAxisUniformBuffer,
     fftAxisStagingBuffer,
     fftAxisUniformBuffers,
+    fftTwiddleBuffer,
     packUniformBuffer,
     packUniformBufferNoNorm,
     diagUniformBuffer,

@@ -22,6 +22,7 @@
  */
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
+import { logger } from '@/lib/logger'
 import {
   TdseDiagnosticsHistory,
   type TdseDiagnosticsSnapshot,
@@ -159,6 +160,14 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   private densityTexture: GPUTexture | null = null
   private densityTextureView: GPUTextureView | null = null
   pl: TdsePipelineResult | null = null
+
+  /**
+   * Generation counter for the async pipeline build. Incremented every
+   * time a config rebuild kicks off a new `buildTdsePipelines`; the
+   * resolution callback discards stale results that finish after a
+   * newer rebuild has already begun.
+   */
+  private pipelineGen = 0
   bg: TdseBindGroupResult | null = null
   diagUniformBuffer: GPUBuffer | null = null
   diagPartialSumsBuffer: GPUBuffer | null = null
@@ -423,20 +432,47 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     // Pipelines created lazily on first execute
   }
 
+  /**
+   * Kick off the async TDSE pipeline build. Returns immediately — the
+   * actual `device.createComputePipelineAsync` calls run on browser
+   * worker threads while the JS main thread continues rendering.
+   *
+   * On resolve, `this.pl` is populated and `rebuildBindGroups` runs.
+   * Stale builds (a newer config rebuild started before this one
+   * finished) are discarded via the `pipelineGen` counter.
+   *
+   * The smaller secondary pipelines (disorder, stochastic localization,
+   * Hawking injection, wormhole coupling) compile after the main TDSE
+   * batch — they're cheap relative to the core pipelines and folding
+   * them into the main `Promise.all` would entangle their state setup.
+   */
   buildPipelines(device: GPUDevice): void {
     const smBind = this.createShaderModule.bind(this)
     const cpBind = this.createComputePipeline.bind(this)
-    this.pl = buildTdsePipelines(device, {
+    const myGen = ++this.pipelineGen
+    buildTdsePipelines(device, {
       createShaderModule: smBind,
       createComputePipeline: cpBind,
       createUniformBuffer: (d, size, label) => this.createUniformBuffer(d, size, label),
     })
-    buildDisorderPipeline(device, this._disorderState, smBind, cpBind)
-    buildStochasticLocPipeline(device, this._stochasticState, smBind, cpBind)
-    buildHawkingInjectPipeline(device, this._hawkingState, smBind, cpBind)
-    if (!this.wormholePipeline) {
-      this.wormholePipeline = createWormholePipeline(device, smBind, cpBind)
-    }
+      .then((result) => {
+        if (myGen !== this.pipelineGen) return
+        this.pl = result
+        // Secondary state-resident pipelines: deferred to the post-resolve
+        // callback so they don't block the main async batch. Each is a
+        // single small pipeline whose sync compile is acceptable.
+        buildDisorderPipeline(device, this._disorderState, smBind, cpBind)
+        buildStochasticLocPipeline(device, this._stochasticState, smBind, cpBind)
+        buildHawkingInjectPipeline(device, this._hawkingState, smBind, cpBind)
+        if (!this.wormholePipeline) {
+          this.wormholePipeline = createWormholePipeline(device, smBind, cpBind)
+        }
+        this.rebuildBindGroups(device)
+      })
+      .catch((err: unknown) => {
+        if (myGen !== this.pipelineGen) return
+        logger.error('[TDSE-COMPUTE] pipeline build failed', err)
+      })
   }
 
   rebuildBindGroups(device: GPUDevice): void {

@@ -34,6 +34,13 @@ export interface DiracBufferResult {
    * (latticeDim forward axes followed by latticeDim inverse axes).
    */
   fftAxisUniformBuffers: GPUBuffer[]
+  /**
+   * CPU-precomputed radix-2 twiddle table bound to every Dirac FFT dispatch
+   * (per-stage Stockham + shared-mem). Replaces per-thread `cos/sin` at
+   * stages >= 2. See `TDSEFFTTwiddle.ts` for layout. Same buffer shape as the
+   * TDSE twiddle table — Dirac FFT axis lengths fit in N_MAX_FFT_TWIDDLE=128.
+   */
+  fftTwiddleBuffer: GPUBuffer
   packUniformBuffer: GPUBuffer
   packUniformBufferNoNorm: GPUBuffer
   diagUniformBuffer: GPUBuffer
@@ -62,6 +69,7 @@ export interface DiracDestroyableBuffers {
   fftAxisUniformBuffer: GPUBuffer | null
   fftAxisStagingBuffer: GPUBuffer | null
   fftAxisUniformBuffers: GPUBuffer[] | null
+  fftTwiddleBuffer: GPUBuffer | null
   packUniformBuffer: GPUBuffer | null
   packUniformBufferNoNorm: GPUBuffer | null
   diagUniformBuffer: GPUBuffer | null
@@ -161,6 +169,7 @@ export interface DiracBindGroupInputs {
   fftUniformBuffer: GPUBuffer
   fftAxisUniformBuffer: GPUBuffer
   fftAxisUniformBuffers: GPUBuffer[]
+  fftTwiddleBuffer: GPUBuffer
   packUniformBuffer: GPUBuffer
   packUniformBufferNoNorm: GPUBuffer
   densityTextureView: GPUTextureView

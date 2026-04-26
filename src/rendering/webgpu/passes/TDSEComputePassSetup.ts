@@ -285,217 +285,97 @@ export function composeTdseDiagFinalizeShader(): string {
 }
 
 /**
- * Compile all GPU compute pipelines and their bind group layouts for the
- * TDSE solver.
+ * Compile all TDSE GPU compute pipelines (and their bind group layouts)
+ * asynchronously.
+ *
+ * Why async: WGSL→backend (Metal/HLSL/SPIR-V) compilation can take
+ * hundreds of ms total across the ~25 TDSE compute pipelines. The
+ * synchronous `device.createComputePipeline` blocks the JS main thread
+ * for that whole compile — which freezes the UI on every config change.
+ * Issuing all compiles via `createComputePipelineAsync` and
+ * `Promise.all`-ing them lets the browser parallelize compilation
+ * across worker threads while the main thread keeps rendering.
+ *
+ * BGL / shader-module / pipeline-layout creation stays synchronous
+ * (those are cheap). Only the pipeline objects themselves are awaited.
  *
  * @param device - WebGPU device
- * @param helpers - Base-class helper methods for shader/pipeline creation
- * @returns All pipelines and their associated bind group layouts
+ * @param helpers - Base-class helper methods for shader creation
+ * @returns Promise resolving to all pipelines and their bind group layouts
  */
-export function buildTdsePipelines(
+export async function buildTdsePipelines(
   device: GPUDevice,
   helpers: TdsePassHelpers
-): TdsePipelineResult {
+): Promise<TdsePipelineResult> {
+  // ── Bind group layouts (sync, cheap) ───────────────────────────────
   // Init. Binding 0 is `read-only-storage` because TDSEUniforms embeds scalar
   // arrays (spec-forbidden in uniform address space). See tdseInit.wgsl.ts for
   // the matching `var<storage, read>` declaration. Binding 1 is the merged ψ
   // (array<vec2f>) — formerly two separate psiRe/psiIm bindings.
   const initBGL = createComputeBGL(device, 'tdse-init-bgl', ['read-only-storage', 'storage'])
-  const initPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeTdseInitShader(), 'tdse-init'),
-    [initBGL],
-    'tdse-init'
-  )
-  // 3-D dispatch sibling — identical bindings, @workgroup_size(4,4,4) body.
-  const initPipeline3D = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeTdseInit3DShader(), 'tdse-init-3d'),
-    [initBGL],
-    'tdse-init-3d'
-  )
-
-  // Potential fill. Binding 0 (TDSEUniforms) — see init BGL comment.
   const potentialBGL = createComputeBGL(device, 'tdse-potential-bgl', [
     'read-only-storage',
     'storage',
   ])
-  const potentialPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeTdsePotentialShader(), 'tdse-potential'),
-    [potentialBGL],
-    'tdse-potential'
-  )
-  const potentialPipeline3D = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeTdsePotential3DShader(), 'tdse-potential-3d'),
-    [potentialBGL],
-    'tdse-potential-3d'
-  )
-
-  // Potential half-step. Binding 0 (TDSEUniforms) — see init BGL comment.
-  // Binding 1 = merged ψ (storage), binding 2 = potential (read).
   const potentialHalfBGL = createComputeBGL(device, 'tdse-potential-half-bgl', [
     'read-only-storage',
     'storage',
     'read-only-storage',
   ])
-  const potentialHalfPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeTdsePotentialHalfShader(), 'tdse-potential-half'),
-    [potentialHalfBGL],
-    'tdse-potential-half'
-  )
-
   // PERF: Fused potentialHalf + pack kernel.
   // Bindings: TDSEUniforms(storage), psi(vec2f rw), potential(r), complexBuf(rw).
-  // Binding 0 (TDSEUniforms) — see init BGL comment.
   const fusedPotentialPackBGL = createComputeBGL(device, 'tdse-fused-potential-pack-bgl', [
     'read-only-storage',
     'storage',
     'read-only-storage',
     'storage',
   ])
-  const fusedPotentialPackPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(
-      device,
-      composeTdseFusedPotentialPackShader(),
-      'tdse-fused-potential-pack'
-    ),
-    [fusedPotentialPackBGL],
-    'tdse-fused-potential-pack'
-  )
-
   // PERF: Fused unpack + potentialHalf kernel.
   // Bindings: TDSEUniforms(storage), complexBuf(r), psi(vec2f rw), potential(r).
-  // Binding 0 (TDSEUniforms) — see init BGL comment.
   const fusedUnpackPotentialBGL = createComputeBGL(device, 'tdse-fused-unpack-potential-bgl', [
     'read-only-storage',
     'read-only-storage',
     'storage',
     'read-only-storage',
   ])
-  const fusedUnpackPotentialPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(
-      device,
-      composeTdseFusedUnpackPotentialShader(),
-      'tdse-fused-unpack-potential'
-    ),
-    [fusedUnpackPotentialBGL],
-    'tdse-fused-unpack-potential'
-  )
-
-  // Absorber — reuses initBGL layout.
-  const absorberPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeTdseAbsorberShader(), 'tdse-absorber'),
-    [initBGL],
-    'tdse-absorber'
-  )
-  const absorberPipeline3D = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeTdseAbsorber3DShader(), 'tdse-absorber-3d'),
-    [initBGL],
-    'tdse-absorber-3d'
-  )
-
-  // Renormalization: reads diagResult[0] (totalNorm) and scales ψ by 1/√(totalNorm).
-  // Layout: uniform(totalElements) + diagResult(read) + psi(vec2f rw).
+  // Renormalization layout: uniform(totalElements) + diagResult(read) + psi(vec2f rw).
   const renormalizeBGL = createComputeBGL(device, 'tdse-renormalize-bgl', [
     'uniform',
     'read-only-storage',
     'storage',
   ])
-  const renormalizePipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeTdseRenormalizeShader(), 'tdse-renormalize'),
-    [renormalizeBGL],
-    'tdse-renormalize'
-  )
-
-  // Pack (vec2f ψ → interleaved complex)
   const packBGL = createComputeBGL(device, 'tdse-pack-bgl', [
     'uniform',
     'read-only-storage',
     'storage',
   ])
-  const packPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeTdsePackShader(), 'tdse-pack'),
-    [packBGL],
-    'tdse-pack'
-  )
-
-  // Unpack (interleaved complex → vec2f ψ)
   const unpackBGL = createComputeBGL(device, 'tdse-unpack-bgl', [
     'uniform',
     'read-only-storage',
     'storage',
   ])
-  const unpackPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeTdseUnpackShader(), 'tdse-unpack'),
-    [unpackBGL],
-    'tdse-unpack'
-  )
-
   // FFT stage. Binding 3 is the twiddle table — precomputed CPU-side, read-only.
-  // See TDSEFFTTwiddle.ts for the layout. Separate TDSE-only BGL so Dirac/Pauli
-  // (which reuse the unforked shader block) keep their 3-entry FFT layout.
   const fftStageBGL = createComputeBGL(device, 'tdse-fft-bgl', [
     'uniform',
     'read-only-storage',
     'storage',
     'read-only-storage',
   ])
-  const fftStagePipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeTdseFftStageShader(), 'tdse-fft-stage'),
-    [fftStageBGL],
-    'tdse-fft-stage'
-  )
-
-  // Shared-memory FFT: one dispatch per axis (all stages in workgroup shared memory).
-  // Binding 2 is the twiddle table (same buffer as the per-stage kernel above).
+  // Shared-memory FFT: binding 2 is the twiddle table.
   const fftSharedMemBGL = createComputeBGL(device, 'tdse-fft-shared-mem-bgl', [
     'uniform',
     'storage',
     'read-only-storage',
   ])
-  const fftSharedMemPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeTdseFftSharedMemShader(), 'tdse-fft-shared-mem'),
-    [fftSharedMemBGL],
-    'tdse-fft-shared-mem'
-  )
-
-  // Kinetic (operates on interleaved complex buffer). Binding 0 (TDSEUniforms) — see init BGL comment.
   const kineticBGL = createComputeBGL(device, 'tdse-kinetic-bgl', ['read-only-storage', 'storage'])
-  const kineticPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeTdseKineticShader(), 'tdse-kinetic'),
-    [kineticBGL],
-    'tdse-kinetic'
-  )
-
-  // Write grid. Binding 0 (TDSEUniforms) — see init BGL comment.
-  // Layout: params(r), psi(vec2f r), potential(r), outputTex.
+  // Write grid: params(r), psi(vec2f r), potential(r), outputTex.
   const writeGridBGL = createComputeBGL(device, 'tdse-write-grid-bgl', [
     'read-only-storage',
     'read-only-storage',
     'read-only-storage',
     { storageTexture: { format: 'rgba16float', viewDimension: '3d' } },
   ])
-  const writeGridPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeTdseWriteGridShader(), 'tdse-write-grid'),
-    [writeGridBGL],
-    'tdse-write-grid'
-  )
-
-  // Diagnostics: norm reduction (pass 1). ψ is now a single vec2f binding;
+  // Diagnostics: norm reduction (pass 1). ψ is a single vec2f binding;
   // the 5 partial-sum buffers keep their existing layout.
   const diagReduceBGL = createComputeBGL(device, 'tdse-diag-reduce-bgl', [
     'uniform',
@@ -506,14 +386,6 @@ export function buildTdsePipelines(
     'storage',
     'storage',
   ])
-  const diagReducePipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeTdseDiagReduceShader(), 'tdse-diag-reduce'),
-    [diagReduceBGL],
-    'tdse-diag-reduce'
-  )
-
-  // Diagnostics: norm finalize (pass 2)
   const diagFinalizeBGL = createComputeBGL(device, 'tdse-diag-finalize-bgl', [
     'uniform',
     'read-only-storage',
@@ -523,15 +395,74 @@ export function buildTdsePipelines(
     'read-only-storage',
     'read-only-storage',
   ])
-  const diagFinalizePipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeTdseDiagFinalizeShader(), 'tdse-diag-finalize'),
-    [diagFinalizeBGL],
-    'tdse-diag-finalize'
-  )
 
-  // Observable + Gram-Schmidt pipelines (extracted to separate file for line limit)
-  const obsGS = buildObsGSPipelines(device, helpers)
+  // Helper: kick off async pipeline compile with the supplied source +
+  // BGL stack. Shader module construction stays synchronous (cheap).
+  const issuePipeline = (
+    label: string,
+    code: string,
+    bgls: GPUBindGroupLayout[]
+  ): Promise<GPUComputePipeline> =>
+    device.createComputePipelineAsync({
+      label: `${label}-pipeline`,
+      layout: device.createPipelineLayout({
+        label: `${label}-layout`,
+        bindGroupLayouts: bgls,
+      }),
+      compute: {
+        module: helpers.createShaderModule(device, code, label),
+        entryPoint: 'main',
+      },
+    })
+
+  // Issue every pipeline compile in parallel — TDSE core + observables/GS.
+  const [
+    initPipeline,
+    initPipeline3D,
+    potentialPipeline,
+    potentialPipeline3D,
+    potentialHalfPipeline,
+    fusedPotentialPackPipeline,
+    fusedUnpackPotentialPipeline,
+    absorberPipeline,
+    absorberPipeline3D,
+    renormalizePipeline,
+    packPipeline,
+    unpackPipeline,
+    fftStagePipeline,
+    fftSharedMemPipeline,
+    kineticPipeline,
+    writeGridPipeline,
+    diagReducePipeline,
+    diagFinalizePipeline,
+    obsGS,
+  ] = await Promise.all([
+    issuePipeline('tdse-init', composeTdseInitShader(), [initBGL]),
+    issuePipeline('tdse-init-3d', composeTdseInit3DShader(), [initBGL]),
+    issuePipeline('tdse-potential', composeTdsePotentialShader(), [potentialBGL]),
+    issuePipeline('tdse-potential-3d', composeTdsePotential3DShader(), [potentialBGL]),
+    issuePipeline('tdse-potential-half', composeTdsePotentialHalfShader(), [potentialHalfBGL]),
+    issuePipeline('tdse-fused-potential-pack', composeTdseFusedPotentialPackShader(), [
+      fusedPotentialPackBGL,
+    ]),
+    issuePipeline('tdse-fused-unpack-potential', composeTdseFusedUnpackPotentialShader(), [
+      fusedUnpackPotentialBGL,
+    ]),
+    // Absorber — reuses initBGL layout.
+    issuePipeline('tdse-absorber', composeTdseAbsorberShader(), [initBGL]),
+    issuePipeline('tdse-absorber-3d', composeTdseAbsorber3DShader(), [initBGL]),
+    issuePipeline('tdse-renormalize', composeTdseRenormalizeShader(), [renormalizeBGL]),
+    issuePipeline('tdse-pack', composeTdsePackShader(), [packBGL]),
+    issuePipeline('tdse-unpack', composeTdseUnpackShader(), [unpackBGL]),
+    issuePipeline('tdse-fft-stage', composeTdseFftStageShader(), [fftStageBGL]),
+    issuePipeline('tdse-fft-shared-mem', composeTdseFftSharedMemShader(), [fftSharedMemBGL]),
+    issuePipeline('tdse-kinetic', composeTdseKineticShader(), [kineticBGL]),
+    issuePipeline('tdse-write-grid', composeTdseWriteGridShader(), [writeGridBGL]),
+    issuePipeline('tdse-diag-reduce', composeTdseDiagReduceShader(), [diagReduceBGL]),
+    issuePipeline('tdse-diag-finalize', composeTdseDiagFinalizeShader(), [diagFinalizeBGL]),
+    // Observable + Gram-Schmidt pipelines (extracted to separate file).
+    buildObsGSPipelines(device, helpers),
+  ])
 
   return {
     initPipeline,

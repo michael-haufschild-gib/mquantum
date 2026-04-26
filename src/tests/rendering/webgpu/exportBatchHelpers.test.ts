@@ -9,7 +9,16 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+const { downloadFileMock } = vi.hoisted(() => ({
+  downloadFileMock: vi.fn(),
+}))
+
+vi.mock('@/lib/export/dataExport', () => ({
+  downloadFile: downloadFileMock,
+}))
+
 import {
+  applyCompletionByMode,
   type BatchContext,
   processRecordingPhase,
   processWarmupPhase,
@@ -146,6 +155,7 @@ describe('teardownRecorder', () => {
 describe('updateExportEta', () => {
   beforeEach(() => {
     useExportStore.setState(useExportStore.getInitialState())
+    downloadFileMock.mockReset()
   })
 
   it('skips update when called within 500ms of last update', () => {
@@ -197,6 +207,34 @@ describe('updateExportEta', () => {
     })
     updateExportEta(loop)
     expect(useExportStore.getState().progress).toBe(0)
+  })
+})
+
+// ============================================================================
+// applyCompletionByMode
+// ============================================================================
+
+describe('applyCompletionByMode', () => {
+  beforeEach(() => {
+    useExportStore.setState(useExportStore.getInitialState())
+    downloadFileMock.mockReset()
+  })
+
+  it('awaits segmented download before marking export completed', async () => {
+    const blob = new Blob(['segment'], { type: 'video/webm' })
+    const loop = makeLoop({ currentSegment: 2 })
+
+    await applyCompletionByMode('segmented', blob, loop, makeSettings())
+
+    expect(downloadFileMock).toHaveBeenCalledOnce()
+    expect(downloadFileMock.mock.calls[0]?.[0]).toBe(blob)
+    expect(downloadFileMock.mock.calls[0]?.[1]).toMatch(/^mquantum-\d+-part2\.webm$/)
+    expect(useExportStore.getState().completionDetails).toEqual({
+      type: 'segmented',
+      segmentCount: 2,
+    })
+    expect(useExportStore.getState().status).toBe('completed')
+    expect(useExportStore.getState().progress).toBe(1)
   })
 })
 

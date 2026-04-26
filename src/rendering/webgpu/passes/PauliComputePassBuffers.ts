@@ -16,9 +16,10 @@ import {
   PACK_UNIFORM_SIZE,
   packFFTStageUniforms,
 } from './computePassUtils'
+import { buildTdseFFTTwiddleTable, FFT_TWIDDLE_BYTES } from './TDSEFFTTwiddle'
 
-/** PauliUniforms struct size in bytes (592 = 148 indices × 4) */
-const UNIFORM_SIZE = 592
+/** PauliUniforms struct size in bytes (640 = 160 indices × 4) */
+const UNIFORM_SIZE = 640
 /** Diagnostics workgroup size — must match @workgroup_size in pauliDiagnostics.wgsl.ts */
 const DIAG_WG = 64
 /** Number of f32 values in diagnostic result buffer:
@@ -39,6 +40,12 @@ export interface PauliBufferResult {
   uniformBuffer: GPUBuffer
   fftUniformBuffer: GPUBuffer
   fftStagingBuffer: GPUBuffer
+  /**
+   * CPU-precomputed radix-2 twiddle table bound at binding 3 of every Pauli
+   * Stockham FFT dispatch. Replaces per-thread `cos/sin` at stages >= 2. See
+   * `TDSEFFTTwiddle.ts` for layout. Same N_MAX_FFT_TWIDDLE = 128 cap as TDSE.
+   */
+  fftTwiddleBuffer: GPUBuffer
   packUniformBuffer: GPUBuffer
   packUniformBufferNoNorm: GPUBuffer
   /** Scalar potential V(x) — filled once per parameter change, read every substep. */
@@ -60,6 +67,7 @@ export interface PauliDestroyableBuffers {
   uniformBuffer: GPUBuffer | null
   fftUniformBuffer: GPUBuffer | null
   fftStagingBuffer: GPUBuffer | null
+  fftTwiddleBuffer: GPUBuffer | null
   packUniformBuffer: GPUBuffer | null
   packUniformBufferNoNorm: GPUBuffer | null
   potentialBuffer: GPUBuffer | null
@@ -90,6 +98,7 @@ export function rebuildPauliBuffers(
   old.uniformBuffer?.destroy()
   old.fftUniformBuffer?.destroy()
   old.fftStagingBuffer?.destroy()
+  old.fftTwiddleBuffer?.destroy()
   old.packUniformBuffer?.destroy()
   old.packUniformBufferNoNorm?.destroy()
   old.potentialBuffer?.destroy()
@@ -160,6 +169,17 @@ export function rebuildPauliBuffers(
   })
   const fftStagingBuffer = buildPauliFFTStagingData(device, config, totalSites)
 
+  // CPU-precomputed radix-2 twiddle table. Replaces per-thread cos/sin in the
+  // Stockham butterfly at stages s >= 2. Sized for N_MAX_FFT_TWIDDLE = 128
+  // (Pauli per-axis grids fit in this bound); a single 512-byte buffer covers
+  // every axis length. Uploaded once per rebuild — values are axis-independent.
+  const fftTwiddleBuffer = device.createBuffer({
+    label: 'pauli-fft-twiddle',
+    size: FFT_TWIDDLE_BYTES,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  })
+  device.queue.writeBuffer(fftTwiddleBuffer, 0, buildTdseFFTTwiddleTable())
+
   // Pack uniforms (with and without normalization)
   const packUniformBuffer = device.createBuffer({
     label: 'pauli-pack-uniforms',
@@ -223,6 +243,7 @@ export function rebuildPauliBuffers(
     uniformBuffer,
     fftUniformBuffer,
     fftStagingBuffer,
+    fftTwiddleBuffer,
     packUniformBuffer,
     packUniformBufferNoNorm,
     potentialBuffer,
@@ -435,6 +456,19 @@ export function writePauliUniforms(
   // Spacing (offset 124*4 = 496)
   o = 124
   for (let d = 0; d < MAX_DIM; d++) f32[o++] = config.spacing[d] ?? 0.1
+
+  // kGridScale (offset 148*4 = 592, indices 148-159): 2π / (N · a) per dim.
+  // Hoisted out of the kinetic kernel so each thread replaces a divide with
+  // a multiply during k-vector construction. Mirrors TDSE/Dirac kGridScale.
+  // Slots beyond latticeDim left at the zero-fill default (unused by shader).
+  {
+    const TWO_PI = Math.PI * 2
+    for (let d = 0; d < config.latticeDim; d++) {
+      const N = config.gridSize[d]!
+      const a = config.spacing[d] ?? 0.1
+      f32[148 + d] = TWO_PI / (N * a)
+    }
+  }
 
   // Slice positions (offset 136*4 = 544, WGSL array<f32, 12>)
   // WGSL reads slicePositions[d] where d is the full dimension index (d >= 3).

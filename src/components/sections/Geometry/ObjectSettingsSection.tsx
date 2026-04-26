@@ -13,11 +13,9 @@
 import React, { Suspense, useMemo } from 'react'
 
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
-import {
-  getControlsComponent,
-  getControlsComponentKey,
-  hasControlsComponent,
-} from '@/lib/geometry/registry'
+import { getControlsComponent, hasControlsComponent } from '@/lib/geometry/registry/components'
+import { getControlsComponentKey } from '@/lib/geometry/registry/helpers'
+import { type ObjectType } from '@/lib/geometry/types'
 import { useGeometryStore } from '@/stores/geometryStore'
 
 /** Props for the quantum mode-specific settings panel. */
@@ -69,7 +67,7 @@ const CONTROLS_COMPONENTS: Record<string, React.ComponentType<unknown> | null> =
  */
 export const ObjectSettingsSection: React.FC<ObjectSettingsSectionProps> = React.memo(
   ({ className = '' }) => {
-    const objectType = useGeometryStore((state) => state.objectType)
+    const objectType = useGeometryStore((state) => state.objectType as ObjectType)
 
     // Get the controls component key from registry
     const componentKey = useMemo(() => getControlsComponentKey(objectType), [objectType])

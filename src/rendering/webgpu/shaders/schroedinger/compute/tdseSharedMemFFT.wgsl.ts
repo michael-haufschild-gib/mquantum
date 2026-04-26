@@ -39,11 +39,16 @@ struct FFTAxisUniforms {
  *
  * Bind group layout:
  *   @group(0) @binding(0) FFTAxisUniforms (uniform)
- *   @group(0) @binding(1) complexBuf (storage, read_write) — interleaved [re,im]
+ *   @group(0) @binding(1) complexBuf (storage, read_write) — array<vec2f>
+ *
+ * The buffer holds interleaved [re,im] complex values (8 bytes per element).
+ * The vec2f typed view drops one shift per address computation and replaces
+ * two scalar loads/stores per complex element with a single 8-byte vec2f op.
+ * The buffer base is WebGPU-aligned (256 bytes) and the element stride is 8.
  */
 export const tdseSharedMemFFTBlock = /* wgsl */ `
 @group(0) @binding(0) var<uniform> axisUni: FFTAxisUniforms;
-@group(0) @binding(1) var<storage, read_write> complexBuf: array<f32>;
+@group(0) @binding(1) var<storage, read_write> complexBuf: array<vec2f>;
 
 const SM_FFT_TWO_PI: f32 = 6.28318530717958647692;
 
@@ -81,8 +86,8 @@ fn main(
   // i=tid runs; for N=128 each thread does 2 loads. Without this loop a
   // workgroup_size(64) kernel silently drops elements 64..127 at N=128.
   for (var i = tid; i < N; i = i + 64u) {
-    let gAddr = (baseOffset + i * axisStride) << 1u;
-    smem[i] = vec2f(complexBuf[gAddr], complexBuf[gAddr + 1u]);
+    let gAddr = baseOffset + i * axisStride;
+    smem[i] = complexBuf[gAddr];
   }
   workgroupBarrier();
 
@@ -158,36 +163,35 @@ fn main(
   // After log2N stages the result lives in half (log2N & 1).
   let finalBase = (log2N & 1u) << 7u;
   for (var i = tid; i < N; i = i + 64u) {
-    let gAddr = (baseOffset + i * axisStride) << 1u;
-    let val = smem[finalBase + i];
-    complexBuf[gAddr] = val.x;
-    complexBuf[gAddr + 1u] = val.y;
+    let gAddr = baseOffset + i * axisStride;
+    complexBuf[gAddr] = smem[finalBase + i];
   }
 }
 `
 
 /**
- * TDSE-only shared-memory Stockham FFT kernel with a CPU-precomputed
- * twiddle table replacing `cos/sin` at stages s >= 2.
+ * Shared-memory Stockham FFT kernel with a CPU-precomputed twiddle table
+ * replacing `cos/sin` at stages s >= 2.
  *
  * Diverges from `tdseSharedMemFFTBlock` only in the s >= 2 butterfly body —
  * the stage-0/1 specializations, smem ping-pong layout, workgroup-barrier
  * cadence, and load/store loops are identical.
  *
- * Bind group layout (TDSE-only):
+ * Bind group layout:
  *   @group(0) @binding(0) FFTAxisUniforms (uniform)
- *   @group(0) @binding(1) complexBuf (storage, read_write) — interleaved [re,im]
- *   @group(0) @binding(2) fftTwiddleTable (storage, read) — interleaved forward
- *     twiddles of length N_MAX_FFT_TWIDDLE (= 128). See
+ *   @group(0) @binding(1) complexBuf (storage, read_write) — array<vec2f>,
+ *     interleaved [re,im] complex values, 8 bytes/element
+ *   @group(0) @binding(2) fftTwiddleTable (storage, read) — array<vec2f>
+ *     forward twiddles of length N_MAX_FFT_TWIDDLE/2 (= 64 vec2f). See
  *     src/rendering/webgpu/passes/TDSEFFTTwiddle.ts for layout/derivation.
  *
- * Dirac and Pauli do NOT use this block — they import the trig-based
- * `tdseSharedMemFFTBlock` above, and their 2-entry FFT BGL is untouched.
+ * Used by TDSE, Dirac, and Pauli (all three modes share the same twiddle
+ * buffer because their FFT axis lengths fit within N_MAX_FFT_TWIDDLE = 128).
  */
 export const tdseSharedMemFFTTwiddleBlock = /* wgsl */ `
 @group(0) @binding(0) var<uniform> axisUni: FFTAxisUniforms;
-@group(0) @binding(1) var<storage, read_write> complexBuf: array<f32>;
-@group(0) @binding(2) var<storage, read> fftTwiddleTable: array<f32>;
+@group(0) @binding(1) var<storage, read_write> complexBuf: array<vec2f>;
+@group(0) @binding(2) var<storage, read> fftTwiddleTable: array<vec2f>;
 
 // Max FFT axis length supported by the TDSE twiddle path. Must match
 // N_MAX_FFT_TWIDDLE in src/rendering/webgpu/passes/TDSEFFTTwiddle.ts.
@@ -222,8 +226,8 @@ fn main(
 
   // ── Load pencil from global memory into smem[0..N) (A half). ──
   for (var i = tid; i < N; i = i + 64u) {
-    let gAddr = (baseOffset + i * axisStride) << 1u;
-    smem_tw[i] = vec2f(complexBuf[gAddr], complexBuf[gAddr + 1u]);
+    let gAddr = baseOffset + i * axisStride;
+    smem_tw[i] = complexBuf[gAddr];
   }
   workgroupBarrier();
 
@@ -272,10 +276,7 @@ fn main(
       let val1 = smem_tw[srcBase + tid + halfN];
 
       let twIdx = j * twStride;
-      let twFwd = vec2f(
-        fftTwiddleTable[twIdx << 1u],
-        fftTwiddleTable[(twIdx << 1u) + 1u]
-      );
+      let twFwd = fftTwiddleTable[twIdx];
       let tw = vec2f(twFwd.x, dir * twFwd.y);
       let twVal1 = cmul_sm_tw(tw, val1);
 
@@ -289,10 +290,8 @@ fn main(
   // ── Write result back to global memory. ──
   let finalBase = (log2N & 1u) << 7u;
   for (var i = tid; i < N; i = i + 64u) {
-    let gAddr = (baseOffset + i * axisStride) << 1u;
-    let val = smem_tw[finalBase + i];
-    complexBuf[gAddr] = val.x;
-    complexBuf[gAddr + 1u] = val.y;
+    let gAddr = baseOffset + i * axisStride;
+    complexBuf[gAddr] = smem_tw[finalBase + i];
   }
 }
 `

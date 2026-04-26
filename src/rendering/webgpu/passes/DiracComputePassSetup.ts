@@ -41,11 +41,11 @@ import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl
 import { tdsePackUniformsShaderBlock } from '../shaders/schroedinger/compute/tdseComplexPack.wgsl'
 import {
   fftAxisUniformsBlock,
-  tdseSharedMemFFTBlock,
+  tdseSharedMemFFTTwiddleBlock,
 } from '../shaders/schroedinger/compute/tdseSharedMemFFT.wgsl'
 import {
   tdseFFTStageUniformsBlock,
-  tdseStockhamFFTBlock,
+  tdseStockhamFFTTwiddleBlock,
 } from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
 import { assembleShaderBlocks } from '../shaders/shared/compose-helpers'
 import { createComputeBGL } from '../utils/computeBindGroupLayout'
@@ -155,14 +155,26 @@ export function composeDiracUnpackShader(): string {
   return assembleShaderBlocks([tdsePackUniformsShaderBlock, diracSpinorUnpackShaderBlock]).wgsl
 }
 
-/** Pure WGSL for the Dirac Stockham FFT stage compute shader. */
+/**
+ * Pure WGSL for the Dirac Stockham FFT stage compute shader.
+ *
+ * Twiddle-table fork of the kernel — stages s >= 2 read precomputed twiddles
+ * from a `storage` buffer (binding 3) instead of calling `cos/sin` per thread.
+ * Stage 0 (W^0 = (1,0)) and stage 1 (twiddles in {(1,0), (0,-dir)}) remain
+ * specialized and need no table read. Same N_MAX_FFT_TWIDDLE = 128 cap as
+ * TDSE — Dirac per-axis grid lengths fit in this bound.
+ */
 export function composeDiracFftStageShader(): string {
-  return tdseFFTStageUniformsBlock + tdseStockhamFFTBlock
+  return tdseFFTStageUniformsBlock + tdseStockhamFFTTwiddleBlock
 }
 
-/** Pure WGSL for the Dirac shared-memory per-axis FFT compute shader. */
+/**
+ * Pure WGSL for the Dirac shared-memory per-axis FFT compute shader.
+ *
+ * Twiddle-table fork — stages s >= 2 use the table at binding 2.
+ */
 export function composeDiracFftSharedMemShader(): string {
-  return fftAxisUniformsBlock + tdseSharedMemFFTBlock
+  return fftAxisUniformsBlock + tdseSharedMemFFTTwiddleBlock
 }
 
 /**
@@ -216,8 +228,8 @@ export function composeDiracDiagFinalizeShader(): string {
 }
 
 /**
- * Compile every Dirac compute pipeline and return them with their bind
- * group layouts.
+ * Compile every Dirac compute pipeline asynchronously and return them
+ * with their bind group layouts.
  *
  * Kinetic + write-grid pipelines are specialized on latticeDim so the
  * composer can emit sparse monomial gamma-matrix const tables. DiracComputePass
@@ -230,167 +242,87 @@ export function composeDiracDiagFinalizeShader(): string {
  * `linearToND` variants (workgroup 64). The choice mirrors
  * {@link pickSiteDispatch} in `computePassUtils`.
  *
+ * Why async: WGSL→backend (Metal/HLSL/SPIR-V) compilation can take
+ * hundreds of ms for the larger Dirac kernels (sparse-gamma kinetic
+ * + 4-spinor write-grid in particular). The synchronous
+ * `device.createComputePipeline` blocks the JS main thread for the
+ * full compile — which freezes the UI on every config change.
+ * Issuing all compiles via `createComputePipelineAsync` and
+ * `Promise.all`-ing them lets the browser parallelize compilation
+ * across worker threads while the main thread keeps rendering.
+ *
  * @param device - WebGPU device.
  * @param helpers - Shader/pipeline creation helpers from the base pass.
+ *   `createShaderModule` is reused for module construction; the sync
+ *   `createComputePipeline` callback is intentionally bypassed below
+ *   in favour of `device.createComputePipelineAsync`.
  * @param latticeDim - Active spatial lattice dimension (1..11).
  */
-export function buildDiracPipelines(
+export async function buildDiracPipelines(
   device: GPUDevice,
   helpers: DiracPassHelpers,
   latticeDim: number
-): DiracPipelineResult {
+): Promise<DiracPipelineResult> {
   // 3-D site-dispatch is restricted to latticeDim === 3 to avoid wasting
   // workgroup threads at lower dims (a 4x4x4=64-thread workgroup at d=1 has
   // 60 idle threads per dispatch). At d ≥ 4 we cannot encode the extra axes
   // in gid.xyz so 1-D is mandatory. See pickSiteDispatch in computePassUtils.
   const use3DSiteDispatch = latticeDim === DIRAC_3D_SITE_MAX_DIM
+
+  // ── Bind group layouts (sync, cheap) ───────────────────────────────
   // Init: uniforms + spinor (vec2f).
   // Binding 0 (DiracUniforms) is `read-only-storage` because the struct embeds
   // scalar arrays (spec-forbidden in uniform address space). See
   // `diracInit.wgsl.ts` for the matching `var<storage, read>` declaration.
   const initBGL = createComputeBGL(device, 'dirac-init-bgl', ['read-only-storage', 'storage'])
-  const initShader = use3DSiteDispatch ? composeDiracInitShader3D() : composeDiracInitShader()
-  const initLabel = use3DSiteDispatch ? 'dirac-init-3d' : 'dirac-init'
-  const initPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, initShader, initLabel),
-    [initBGL],
-    initLabel
-  )
-
-  // Potential fill: uniforms + potential
-  // Binding 0 (DiracUniforms) — see init BGL comment.
   const potentialBGL = createComputeBGL(device, 'dirac-potential-bgl', [
     'read-only-storage',
     'storage',
   ])
-  const potentialShader = use3DSiteDispatch
-    ? composeDiracPotentialShader3D()
-    : composeDiracPotentialShader()
-  const potentialLabel = use3DSiteDispatch ? 'dirac-potential-3d' : 'dirac-potential'
-  const potentialPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, potentialShader, potentialLabel),
-    [potentialBGL],
-    potentialLabel
-  )
-
-  // Potential half-step: uniforms + spinor(vec2f) + potential(read).
-  // Binding 0 (DiracUniforms) — see init BGL comment.
   const potentialHalfBGL = createComputeBGL(device, 'dirac-potential-half-bgl', [
     'read-only-storage',
     'storage',
     'read-only-storage',
   ])
-  const potentialHalfPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeDiracPotentialHalfShader(), 'dirac-potential-half'),
-    [potentialHalfBGL],
-    'dirac-potential-half'
-  )
-
-  // Absorber — reuses initBGL layout.
-  const absorberShader = use3DSiteDispatch
-    ? composeDiracAbsorberShader3D()
-    : composeDiracAbsorberShader()
-  const absorberLabel = use3DSiteDispatch ? 'dirac-absorber-3d' : 'dirac-absorber'
-  const absorberPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, absorberShader, absorberLabel),
-    [initBGL],
-    absorberLabel
-  )
-
-  // Renormalization (Dirac-specific variant on merged vec2f spinor).
   const renormalizeBGL = createComputeBGL(device, 'dirac-renormalize-bgl', [
     'uniform',
     'read-only-storage',
     'storage',
   ])
-  const renormalizePipeline = device.createComputePipeline({
-    label: 'dirac-renormalize-pipeline',
-    layout: device.createPipelineLayout({ bindGroupLayouts: [renormalizeBGL] }),
-    compute: {
-      module: device.createShaderModule({
-        label: 'dirac-renormalize',
-        code: composeDiracRenormalizeShader(),
-      }),
-      entryPoint: 'main',
-    },
-  })
-
-  // Pack/Unpack (Dirac-specific variants reading spinor as array<vec2f>).
-  // Layout: uniform(0) + spinorSlice(1, vec2f) + complexBuf(2, f32).
   const packBGL = createComputeBGL(device, 'dirac-pack-bgl', [
     'uniform',
     'read-only-storage',
     'storage',
   ])
-  const packPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeDiracPackShader(), 'dirac-pack'),
-    [packBGL],
-    'dirac-pack'
-  )
-
   const unpackBGL = createComputeBGL(device, 'dirac-unpack-bgl', [
     'uniform',
     'read-only-storage',
     'storage',
   ])
-  const unpackPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeDiracUnpackShader(), 'dirac-unpack'),
-    [unpackBGL],
-    'dirac-unpack'
-  )
-
-  // FFT stage (reuse TDSE FFT shader)
+  // FFT stage (reuses the TDSE twiddle-table fork). Binding 3 is the
+  // CPU-precomputed twiddle table that replaces cos/sin at stages >= 2.
+  // See TDSEFFTTwiddle.ts for the layout.
   const fftStageBGL = createComputeBGL(device, 'dirac-fft-bgl', [
     'uniform',
     'read-only-storage',
     'storage',
+    'read-only-storage',
   ])
-  const fftStagePipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeDiracFftStageShader(), 'dirac-fft-stage'),
-    [fftStageBGL],
-    'dirac-fft-stage'
-  )
-
-  // Shared-memory FFT: one dispatch per axis
+  // Shared-memory FFT: one dispatch per axis. Binding 2 is the same twiddle
+  // table buffer bound to the per-stage kernel above.
   const fftSharedMemBGL = createComputeBGL(device, 'dirac-fft-shared-mem-bgl', [
     'uniform',
     'storage',
+    'read-only-storage',
   ])
-  const fftSharedMemPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeDiracFftSharedMemShader(), 'dirac-fft-shared-mem'),
-    [fftSharedMemBGL],
-    'dirac-fft-shared-mem'
-  )
-
   // Kinetic propagator: uniforms + spinor(vec2f) + gammaMatrices(read).
-  // Binding 0 (DiracUniforms) — see init BGL comment.
   const kineticBGL = createComputeBGL(device, 'dirac-kinetic-bgl', [
     'read-only-storage',
     'storage',
     'read-only-storage',
   ])
-  const kineticShader = use3DSiteDispatch
-    ? composeDiracKineticShader3D(latticeDim)
-    : composeDiracKineticShader(latticeDim)
-  const kineticLabel = use3DSiteDispatch ? 'dirac-kinetic-3d' : 'dirac-kinetic'
-  const kineticPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, kineticShader, kineticLabel),
-    [kineticBGL],
-    kineticLabel
-  )
-
   // Write grid. Bindings: params(0) + spinor(1, vec2f) + potential(2) +
-  // gammaMatrices(3) + outputTex(4). Binding 0 (DiracUniforms) — see init
-  // BGL comment.
+  // gammaMatrices(3) + outputTex(4).
   const writeGridBGL = createComputeBGL(device, 'dirac-write-grid-bgl', [
     'read-only-storage',
     'read-only-storage',
@@ -398,13 +330,6 @@ export function buildDiracPipelines(
     'read-only-storage',
     { storageTexture: { format: 'rgba16float', viewDimension: '3d' } },
   ])
-  const writeGridPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeDiracWriteGridShader(latticeDim), 'dirac-write-grid'),
-    [writeGridBGL],
-    'dirac-write-grid'
-  )
-
   // Diagnostics: reduce (pass 1). Bindings: diagParams(0) + spinor(1, vec2f)
   // + partialNorm(2) + partialMax(3) + partialParticle(4) + partialAnti(5).
   const diagReduceBGL = createComputeBGL(device, 'dirac-diag-reduce-bgl', [
@@ -415,14 +340,6 @@ export function buildDiracPipelines(
     'storage',
     'storage',
   ])
-  const diagReducePipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeDiracDiagReduceShader(), 'dirac-diag-reduce'),
-    [diagReduceBGL],
-    'dirac-diag-reduce'
-  )
-
-  // Diagnostics: finalize (pass 2)
   const diagFinalizeBGL = createComputeBGL(device, 'dirac-diag-finalize-bgl', [
     'uniform',
     'read-only-storage',
@@ -431,12 +348,73 @@ export function buildDiracPipelines(
     'read-only-storage',
     'read-only-storage',
   ])
-  const diagFinalizePipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeDiracDiagFinalizeShader(), 'dirac-diag-finalize'),
-    [diagFinalizeBGL],
-    'dirac-diag-finalize'
-  )
+
+  // Helper: kick off async pipeline compile against the supplied BGL stack.
+  // Builds the shader module synchronously (cheap) and the pipeline async.
+  const issuePipeline = (
+    label: string,
+    code: string,
+    bgls: GPUBindGroupLayout[]
+  ): Promise<GPUComputePipeline> =>
+    device.createComputePipelineAsync({
+      label: `${label}-pipeline`,
+      layout: device.createPipelineLayout({
+        label: `${label}-layout`,
+        bindGroupLayouts: bgls,
+      }),
+      compute: {
+        module: helpers.createShaderModule(device, code, label),
+        entryPoint: 'main',
+      },
+    })
+
+  // Pre-compose dispatch-shape-specialized shader sources.
+  const initShader = use3DSiteDispatch ? composeDiracInitShader3D() : composeDiracInitShader()
+  const initLabel = use3DSiteDispatch ? 'dirac-init-3d' : 'dirac-init'
+  const potentialShader = use3DSiteDispatch
+    ? composeDiracPotentialShader3D()
+    : composeDiracPotentialShader()
+  const potentialLabel = use3DSiteDispatch ? 'dirac-potential-3d' : 'dirac-potential'
+  const absorberShader = use3DSiteDispatch
+    ? composeDiracAbsorberShader3D()
+    : composeDiracAbsorberShader()
+  const absorberLabel = use3DSiteDispatch ? 'dirac-absorber-3d' : 'dirac-absorber'
+  const kineticShader = use3DSiteDispatch
+    ? composeDiracKineticShader3D(latticeDim)
+    : composeDiracKineticShader(latticeDim)
+  const kineticLabel = use3DSiteDispatch ? 'dirac-kinetic-3d' : 'dirac-kinetic'
+
+  // Issue every pipeline compile in parallel.
+  const [
+    initPipeline,
+    potentialPipeline,
+    potentialHalfPipeline,
+    absorberPipeline,
+    renormalizePipeline,
+    packPipeline,
+    unpackPipeline,
+    fftStagePipeline,
+    fftSharedMemPipeline,
+    kineticPipeline,
+    writeGridPipeline,
+    diagReducePipeline,
+    diagFinalizePipeline,
+  ] = await Promise.all([
+    issuePipeline(initLabel, initShader, [initBGL]),
+    issuePipeline(potentialLabel, potentialShader, [potentialBGL]),
+    issuePipeline('dirac-potential-half', composeDiracPotentialHalfShader(), [potentialHalfBGL]),
+    // Absorber reuses initBGL layout.
+    issuePipeline(absorberLabel, absorberShader, [initBGL]),
+    issuePipeline('dirac-renormalize', composeDiracRenormalizeShader(), [renormalizeBGL]),
+    issuePipeline('dirac-pack', composeDiracPackShader(), [packBGL]),
+    issuePipeline('dirac-unpack', composeDiracUnpackShader(), [unpackBGL]),
+    issuePipeline('dirac-fft-stage', composeDiracFftStageShader(), [fftStageBGL]),
+    issuePipeline('dirac-fft-shared-mem', composeDiracFftSharedMemShader(), [fftSharedMemBGL]),
+    issuePipeline(kineticLabel, kineticShader, [kineticBGL]),
+    issuePipeline('dirac-write-grid', composeDiracWriteGridShader(latticeDim), [writeGridBGL]),
+    issuePipeline('dirac-diag-reduce', composeDiracDiagReduceShader(), [diagReduceBGL]),
+    issuePipeline('dirac-diag-finalize', composeDiracDiagFinalizeShader(), [diagFinalizeBGL]),
+  ])
 
   return {
     initPipeline,
@@ -495,6 +473,7 @@ export function rebuildDiracBindGroups(
     fftScratchA,
     fftScratchB,
     fftUniformBuffer,
+    fftTwiddleBuffer,
     packUniformBuffer,
     packUniformBufferNoNorm,
     densityTextureView,
@@ -536,7 +515,8 @@ export function rebuildDiracBindGroups(
     ],
   })
 
-  // FFT bind groups
+  // FFT bind groups. Binding 3 is the twiddle table that replaces cos/sin
+  // at stages >= 2 (see TDSEFFTTwiddle.ts).
   const fftStageABBG = device.createBindGroup({
     label: 'dirac-fft-ab-bg',
     layout: pipelines.fftStageBGL,
@@ -544,6 +524,7 @@ export function rebuildDiracBindGroups(
       { binding: 0, resource: { buffer: fftUniformBuffer } },
       { binding: 1, resource: { buffer: fftScratchA } },
       { binding: 2, resource: { buffer: fftScratchB } },
+      { binding: 3, resource: { buffer: fftTwiddleBuffer } },
     ],
   })
   const fftStageBABG = device.createBindGroup({
@@ -553,18 +534,21 @@ export function rebuildDiracBindGroups(
       { binding: 0, resource: { buffer: fftUniformBuffer } },
       { binding: 1, resource: { buffer: fftScratchB } },
       { binding: 2, resource: { buffer: fftScratchA } },
+      { binding: 3, resource: { buffer: fftTwiddleBuffer } },
     ],
   })
 
   // Shared-memory FFT bind group: per-axis uniforms + complexBuf (read_write on fftScratchA).
   // `fftSharedMemBG` uses the shared single-uniform buffer (legacy dispatchFFTAxisSharedMem
   // path patches it via copyBufferToBuffer and incurs a pass boundary per axis).
+  // Binding 2 is the twiddle table shared with the per-stage kernel above.
   const fftSharedMemBG = device.createBindGroup({
     label: 'dirac-fft-shared-mem-bg',
     layout: pipelines.fftSharedMemBGL,
     entries: [
       { binding: 0, resource: { buffer: inputs.fftAxisUniformBuffer } },
       { binding: 1, resource: { buffer: fftScratchA } },
+      { binding: 2, resource: { buffer: fftTwiddleBuffer } },
     ],
   })
   // PERF: per-slot bind groups (one per axis per direction). Each references a
@@ -579,6 +563,7 @@ export function rebuildDiracBindGroups(
       entries: [
         { binding: 0, resource: { buffer: inputs.fftAxisUniformBuffers[slot]! } },
         { binding: 1, resource: { buffer: fftScratchA } },
+        { binding: 2, resource: { buffer: fftTwiddleBuffer } },
       ],
     })
   }

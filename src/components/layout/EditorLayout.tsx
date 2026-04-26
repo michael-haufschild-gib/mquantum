@@ -23,6 +23,7 @@ import { GlobalProgress } from '@/components/ui/GlobalProgress'
 import { useIsDesktop } from '@/hooks/useMediaQuery'
 import { useMobileBottomPanel } from '@/hooks/useMobileBottomPanel'
 import { soundManager } from '@/lib/audio/SoundManager'
+import { useExportStore } from '@/stores/exportStore'
 import { type LayoutStore, useLayoutStore } from '@/stores/layoutStore'
 import { useThemeStore } from '@/stores/themeStore'
 
@@ -67,6 +68,12 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
   const { accent, mode } = useThemeStore(
     useShallow((state) => ({ accent: state.accent, mode: state.mode }))
   )
+  const { exportModalOpen, cropEditorOpen } = useExportStore(
+    useShallow((state) => ({
+      exportModalOpen: state.isModalOpen,
+      cropEditorOpen: state.isCropEditorOpen,
+    }))
+  )
 
   const {
     isCollapsed,
@@ -77,6 +84,8 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
     setCollapsed,
     showLeftPanel,
     setLeftPanel,
+    showShortcuts,
+    isCommandPaletteOpen,
   } = useLayoutStore(
     useShallow((state: LayoutStore) => ({
       isCollapsed: state.isCollapsed,
@@ -87,6 +96,8 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
       setCollapsed: state.setCollapsed,
       showLeftPanel: state.showLeftPanel,
       setLeftPanel: state.setLeftPanel,
+      showShortcuts: state.showShortcuts,
+      isCommandPaletteOpen: state.isCommandPaletteOpen,
     }))
   )
 
@@ -172,10 +183,16 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
         className="relative z-10 flex flex-col h-full w-full pointer-events-none"
       >
         <GlobalProgress />
-        <Suspense>
-          <ExportModal />
-          <CropEditor />
-        </Suspense>
+        {exportModalOpen && (
+          <Suspense fallback={null}>
+            <ExportModal />
+          </Suspense>
+        )}
+        {cropEditorOpen && (
+          <Suspense fallback={null}>
+            <CropEditor />
+          </Suspense>
+        )}
 
         {!isCinematicMode && (
           <div className="pointer-events-auto shrink-0 z-50">
@@ -336,15 +353,17 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
             className="fixed bottom-0 inset-x-0 z-30 pointer-events-auto pb-[env(safe-area-inset-bottom)]"
             data-testid="mobile-timeline-controls"
           >
-            <EditorBottomPanel />
+            <Suspense fallback={null}>
+              <EditorBottomPanel />
+            </Suspense>
           </m.div>
         )}
       </AnimatePresence>
 
       <Suspense>
-        <CommandPalette />
+        {isCommandPaletteOpen && <CommandPalette />}
         <CanvasContextMenu />
-        {!isCinematicMode && <ShortcutsOverlay />}
+        {!isCinematicMode && showShortcuts && <ShortcutsOverlay />}
       </Suspense>
     </div>
   )

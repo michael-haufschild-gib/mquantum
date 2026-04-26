@@ -41,9 +41,10 @@ export function generateSingleBasisBlock(
 // ============================================
 
 fn evaluateSingleBasis(xND: array<f32, 11>, t: f32, k: u32, uniforms: SchroedingerUniforms) -> vec2f {
-  let n_k = getHydrogenBasisQN(hydrogenBasis, i32(k), 0);
-  let l_k = getHydrogenBasisQN(hydrogenBasis, i32(k), 1);
-  let m_k = getHydrogenBasisQN(hydrogenBasis, i32(k), 2);
+  let kI = i32(k);
+  let n_k = getHydrogenBasisQN(hydrogenBasis, kI, 0);
+  let l_k = getHydrogenBasisQN(hydrogenBasis, kI, 1);
+  let m_k = getHydrogenBasisQN(hydrogenBasis, kI, 2);
 
   if (n_k <= 0) { return vec2f(0.0, 0.0); }
 
@@ -71,6 +72,10 @@ fn evaluateSingleBasis(xND: array<f32, 11>, t: f32, k: u32, uniforms: Schroeding
     }
 
     const extraDimCount = dim - 3
+    // Pre-fold the dim-dependent half-shift so the WGSL constant is a single
+    // literal instead of a runtime f32(dim-3)*0.5 multiply per call. dim is
+    // captured at composition time.
+    const dimHalfShift = ((dim - 3) * 0.5).toFixed(1)
 
     // Generate extra-dimension HO product using per-basis quantum numbers
     let extraDimCode = ''
@@ -103,9 +108,10 @@ fn evaluateSingleBasis(xND: array<f32, 11>, t: f32, k: u32, uniforms: Schroeding
 
 fn evaluateSingleBasis(xND: array<f32, 11>, t: f32, k: u32, uniforms: SchroedingerUniforms) -> vec2f {
   // Read per-basis quantum numbers from HydrogenBasisUniforms
-  let n_k = getHydrogenBasisQN(hydrogenBasis, i32(k), 0);
-  let l_k = getHydrogenBasisQN(hydrogenBasis, i32(k), 1);
-  let m_k = getHydrogenBasisQN(hydrogenBasis, i32(k), 2);
+  let kI = i32(k);
+  let n_k = getHydrogenBasisQN(hydrogenBasis, kI, 0);
+  let l_k = getHydrogenBasisQN(hydrogenBasis, kI, 1);
+  let m_k = getHydrogenBasisQN(hydrogenBasis, kI, 2);
 
   // Guard: skip invalid/unused basis states
   if (n_k <= 0) { return vec2f(0.0, 0.0); }
@@ -116,8 +122,9 @@ fn evaluateSingleBasis(xND: array<f32, 11>, t: f32, k: u32, uniforms: Schroeding
   let invR = inverseSqrt(max(sum3D, 1e-20));
   let r3D = sum3D * invR;
 
-  // Radial threshold with D-dimensional n_eff (per-basis, computed inline)
-  let nEff_k = f32(n_k) + f32(${dim} - 3) * 0.5;
+  // Radial threshold with D-dimensional n_eff (per-basis, computed inline).
+  // Half-shift (D-3)/2 folded at composition time.
+  let nEff_k = f32(n_k) + ${dimHalfShift};
   let threshold = 25.0 * nEff_k * uniforms.bohrRadius * (1.0 + 0.1 * f32(l_k));
   if (r3D > threshold) { return vec2f(0.0, 0.0); }
 

@@ -175,8 +175,13 @@ export function runTdseExecute(
 
   if (configHash !== pass.lastConfigHash || !pass.psiBuffer) {
     pass.rebuildBuffers(device, config)
+    // Drop stale pipelines/bind groups so the early-return guards below
+    // (and inside the Strang loop) skip dispatch until the new async
+    // compile lands. `buildPipelines` kicks off an async build whose
+    // .then() callback wires bind groups when it resolves.
+    pass.pl = null
+    pass.bg = null
     pass.buildPipelines(device)
-    pass.rebuildBindGroups(device)
     pass.initialized = false
     pass.simTime = 0
     pass.lastPotentialHash = ''

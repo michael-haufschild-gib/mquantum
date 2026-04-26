@@ -23,7 +23,9 @@
  *     `analysis.r` half-float channel for every dispersion path (asserting
  *     the worker's downstream hand-off is not accidentally zeroed by an
  *     exposure/percentile short-circuit).
- *  4. Under cosmology, the `basisCoefs = {1/B, B}` pair combined with the
+ *  4. The particles-only dispatch path can skip display textures while
+ *     preserving the total-particle thermometer.
+ *  5. Under cosmology, the `basisCoefs = {1/B, B}` pair combined with the
  *     numeric `m²·a²(η)` dispersion returns the adiabatic vacuum to zero
  *     particles *up to* the numeric noise of the FFT + finite-N cutoff.
  *
@@ -87,8 +89,9 @@ function runWorkerBody(
   mass: number,
   latticeDim: number,
   dispersion: 'kgFloor' | number,
-  basisCoefs?: { aKinetic: number; aPotential: number }
-): { totalParticles: number; density: Uint16Array; analysis: Uint16Array } {
+  basisCoefs?: { aKinetic: number; aPotential: number },
+  includeTextures = true
+): { totalParticles: number; density?: Uint16Array; analysis?: Uint16Array } {
   const { phiComplex, piComplex } = buildComplexInputs(phi, pi)
   const raw = computeRawKSpaceDataFromComplex(
     phiComplex,
@@ -100,8 +103,9 @@ function runWorkerBody(
     dispersion,
     basisCoefs
   )
-  const { density, analysis } = buildKSpaceDisplayTextures(raw, PASSTHROUGH_KSPACE_VIZ, true)
   const totalParticles = computeTotalParticleNumber(raw)
+  if (!includeTextures) return { totalParticles }
+  const { density, analysis } = buildKSpaceDisplayTextures(raw, PASSTHROUGH_KSPACE_VIZ, true)
   return { totalParticles, density, analysis }
 }
 
@@ -150,12 +154,14 @@ describe('k-space worker body — dispersion dispatch', () => {
 
     expect(numeric.totalParticles).toBeCloseTo(kgFloor.totalParticles, 12)
     // Analysis texture length must match.
-    expect(numeric.analysis.length).toBe(kgFloor.analysis.length)
+    expect(numeric.analysis).toBeInstanceOf(Uint16Array)
+    expect(kgFloor.analysis).toBeInstanceOf(Uint16Array)
+    expect(numeric.analysis!.length).toBe(kgFloor.analysis!.length)
     // Compare via Uint16Array equality — single assertion instead of a
     // per-element loop so the test runner overhead stays bounded.
     const equalAnalysis =
-      numeric.analysis.length === kgFloor.analysis.length &&
-      numeric.analysis.every((v, i) => v === kgFloor.analysis[i])
+      numeric.analysis!.length === kgFloor.analysis!.length &&
+      numeric.analysis!.every((v, i) => v === kgFloor.analysis![i])
     expect(equalAnalysis).toBe(true)
   })
 
@@ -216,15 +222,48 @@ describe('k-space worker body — dispersion dispatch', () => {
       )
       // analysis is rgba16float packed: analysis[i*4] holds the R
       // channel (the n_k thermometer). Count non-zero R values.
+      expect(analysis).toBeInstanceOf(Uint16Array)
       let nonZeroR = 0
-      for (let px = 0; px * 4 < analysis.length; px++) {
-        if (analysis[px * 4] !== 0) nonZeroR++
+      for (let px = 0; px * 4 < analysis!.length; px++) {
+        if (analysis![px * 4] !== 0) nonZeroR++
       }
       expect(
         nonZeroR,
         `dispersion=${String(dispersion)} produced a fully-zero R channel`
       ).toBeGreaterThan(0)
     }
+  })
+
+  it('particles-only dispatch skips display textures but preserves total particles', () => {
+    const cfg = makeConfig({ mass: 0.3 })
+    const { phi, pi } = sampleVacuumSpectrum(cfg, 17, 'kgFloor')
+
+    const withTextures = runWorkerBody(
+      phi,
+      pi,
+      cfg.gridSize as number[],
+      cfg.spacing as number[],
+      cfg.mass,
+      cfg.latticeDim,
+      'kgFloor'
+    )
+    const particlesOnly = runWorkerBody(
+      phi,
+      pi,
+      cfg.gridSize as number[],
+      cfg.spacing as number[],
+      cfg.mass,
+      cfg.latticeDim,
+      'kgFloor',
+      undefined,
+      false
+    )
+
+    expect(particlesOnly.totalParticles).toBeCloseTo(withTextures.totalParticles, 12)
+    expect(particlesOnly.density).toBeUndefined()
+    expect(particlesOnly.analysis).toBeUndefined()
+    expect(withTextures.density).toBeInstanceOf(Uint16Array)
+    expect(withTextures.analysis).toBeInstanceOf(Uint16Array)
   })
 
   it('returns the adiabatic vacuum to ≈ 0 particles under a cosmology dispatch', () => {
