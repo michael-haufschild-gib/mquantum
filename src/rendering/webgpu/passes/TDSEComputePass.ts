@@ -160,6 +160,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   private densityTexture: GPUTexture | null = null
   private densityTextureView: GPUTextureView | null = null
   pl: TdsePipelineResult | null = null
+  /** Held between bg=null and async pipeline resolve to prevent GPU buffer leak. */
+  oldRenormBuffer: GPUBuffer | null = null
 
   /**
    * Generation counter for the async pipeline build. Incremented every
@@ -450,16 +452,24 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     const smBind = this.createShaderModule.bind(this)
     const cpBind = this.createComputePipeline.bind(this)
     const myGen = ++this.pipelineGen
+    const oldRenorm = this.oldRenormBuffer
+    this.oldRenormBuffer = null
     buildTdsePipelines(device, {
       createShaderModule: smBind,
       createComputePipeline: cpBind,
       createUniformBuffer: (d, size, label) => this.createUniformBuffer(d, size, label),
     })
       .then((result) => {
-        if (myGen !== this.pipelineGen) return
+        if (myGen !== this.pipelineGen) {
+          oldRenorm?.destroy()
+          return
+        }
         // Buffer guard: dispose() bumps pipelineGen so this branch is
         // unreachable post-dispose, but make the contract explicit.
-        if (!this.densityTextureView) return
+        if (!this.densityTextureView) {
+          oldRenorm?.destroy()
+          return
+        }
         this.pl = result
         // Secondary state-resident pipelines: deferred to the post-resolve
         // callback so they don't block the main async batch. Each is a
@@ -470,19 +480,23 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         if (!this.wormholePipeline) {
           this.wormholePipeline = createWormholePipeline(device, smBind, cpBind)
         }
-        this.rebuildBindGroups(device)
+        this.rebuildBindGroups(device, oldRenorm)
       })
       .catch((err: unknown) => {
-        if (myGen !== this.pipelineGen) return
+        if (myGen !== this.pipelineGen) {
+          oldRenorm?.destroy()
+          return
+        }
         logger.error('[TDSE-COMPUTE] pipeline build failed', err)
         // rebuildBuffers already advanced lastConfigHash; clear it so
         // executeTdse retries on the next frame instead of being wedged
         // with pl/bg null for the same config.
         this.lastConfigHash = ''
+        oldRenorm?.destroy()
       })
   }
 
-  rebuildBindGroups(device: GPUDevice): void {
+  rebuildBindGroups(device: GPUDevice, existingRenorm?: GPUBuffer | null): void {
     if (!this.pl || !this.densityTextureView) return
     const bgSelf = this as unknown as TdsePassBufferFields
     if (!this.fftTwiddleBuffer) {
@@ -505,7 +519,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         densityTextureView: this.densityTextureView,
         totalSites: this.totalSites,
       } as TdseBindGroupInputs,
-      this.bg?.renormalizeUniformBuffer ?? null
+      existingRenorm ?? this.bg?.renormalizeUniformBuffer ?? null
     )
     // Rebuild stochastic localization bind group + expectation reduction
     if (this.uniformBuffer && this.psiBuffer) {
@@ -720,6 +734,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     // Invalidate any in-flight async pipeline build so its `.then()`
     // handler no-ops instead of writing into destroyed state.
     this.pipelineGen++
+    this.oldRenormBuffer?.destroy()
+    this.oldRenormBuffer = null
     runTdseDispose(this._fieldView)
     // Tear down curved-space integrator scratch. Pipelines are GC'd by the
     // underlying GPUDevice; scratch buffers need explicit destroy() to

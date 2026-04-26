@@ -299,7 +299,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   // ============================================================================
 
   /** Called immediately after rebuildBuffers, so all buffer fields are non-null. */
-  private rebuildBindGroups(device: GPUDevice): void {
+  private rebuildBindGroups(device: GPUDevice, existingRenorm?: GPUBuffer | null): void {
     if (!this.pl || !this.buf || !this.densityTextureView) return
     this.bg = rebuildPauliBindGroups(
       device,
@@ -320,7 +320,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
         diagResultBuffer: this.buf.diagResultBuffer,
         totalSites: this.buf.totalSites,
       },
-      this.bg?.renormalizeUniformBuffer ?? null
+      existingRenorm ?? this.bg?.renormalizeUniformBuffer ?? null
     )
   }
 
@@ -500,6 +500,9 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       // Drop stale pipelines/bind groups until the new compile lands so
       // the next frame doesn't dispatch against an old layout that
       // doesn't match the rebuilt buffers.
+      // Capture the renormalize buffer before nulling bg — rebuildBindGroups
+      // reuses it instead of leaking a new allocation each rebuild.
+      const oldRenorm = this.bg?.renormalizeUniformBuffer ?? null
       this.pl = null
       this.bg = null
       this.initialized = false
@@ -508,15 +511,24 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       buildPauliPipelines(device)
         .then((result) => {
           // Discard if a newer rebuild has started while we were compiling.
-          if (myGen !== this.pipelineGen) return
+          if (myGen !== this.pipelineGen) {
+            oldRenorm?.destroy()
+            return
+          }
           // Buffer guard: dispose() bumps pipelineGen so this branch is
           // unreachable post-dispose, but make the contract explicit.
-          if (!this.buf) return
+          if (!this.buf) {
+            oldRenorm?.destroy()
+            return
+          }
           this.pl = result
-          this.rebuildBindGroups(device)
+          this.rebuildBindGroups(device, oldRenorm)
         })
         .catch((err: unknown) => {
-          if (myGen !== this.pipelineGen) return
+          if (myGen !== this.pipelineGen) {
+            oldRenorm?.destroy()
+            return
+          }
           logger.error('[Pauli-COMPUTE] pipeline build failed', err)
           // rebuildBuffers already advanced lastConfigHash; clear it so
           // executePauli retries on the next frame instead of being

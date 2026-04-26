@@ -359,32 +359,46 @@ export class DiracComputePass extends WebGPUBaseComputePass {
    * generation counter — if a newer config rebuild starts before this
    * one resolves, the stale result is discarded.
    */
-  private buildPipelinesAsync(device: GPUDevice, latticeDim: number): void {
+  private buildPipelinesAsync(
+    device: GPUDevice,
+    latticeDim: number,
+    oldRenorm: GPUBuffer | null = null
+  ): void {
     const myGen = ++this.pipelineGen
     buildDiracPipelines(device, this.setupHelpers, latticeDim)
       .then((result) => {
-        if (myGen !== this.pipelineGen) return
+        if (myGen !== this.pipelineGen) {
+          oldRenorm?.destroy()
+          return
+        }
         // Bail if dispose ran before this resolved — buffers below would
         // be null and `rebuildBindGroups` would crash. The generation
         // bump in dispose() makes this branch unreachable in practice,
         // but the buffer guard makes that promise explicit.
-        if (!this.densityTextureView || !this.uniformBuffer) return
+        if (!this.densityTextureView || !this.uniformBuffer) {
+          oldRenorm?.destroy()
+          return
+        }
         this.pl = result
-        this.rebuildBindGroups(device)
+        this.rebuildBindGroups(device, oldRenorm)
       })
       .catch((err: unknown) => {
-        if (myGen !== this.pipelineGen) return
+        if (myGen !== this.pipelineGen) {
+          oldRenorm?.destroy()
+          return
+        }
         logger.error('[Dirac-COMPUTE] pipeline build failed', err)
         // rebuildBuffers already advanced lastConfigHash, so without
         // this clear the next frame would skip the rebuild path and
         // leave Dirac wedged forever. Clearing it forces a retry on
         // the next execute().
         this.lastConfigHash = ''
+        oldRenorm?.destroy()
       })
   }
 
   /** Called immediately after rebuildBuffers + buildPipelines, so all fields are non-null. */
-  private rebuildBindGroups(device: GPUDevice): void {
+  private rebuildBindGroups(device: GPUDevice, existingRenorm?: GPUBuffer | null): void {
     if (!this.pl || !this.densityTextureView) return
     this.bg = rebuildDiracBindGroups(
       device,
@@ -412,7 +426,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
         totalSites: this.totalSites,
         currentSpinorSize: this.currentSpinorSize,
       },
-      this.bg?.renormalizeUniformBuffer ?? null
+      existingRenorm ?? this.bg?.renormalizeUniformBuffer ?? null
     )
   }
 
@@ -580,17 +594,22 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       // Drop stale pipelines/bind groups so the early-return guard below
       // skips dispatch until the new compile lands. Keeps the renderer
       // from issuing a stage with mismatched resources.
+      // Capture old renormalize buffer before nulling bg — passed into
+      // buildPipelinesAsync so the async resolve can reuse it.
+      const oldRenorm = this.bg?.renormalizeUniformBuffer ?? null
       this.pl = null
       this.bg = null
-      // Kinetic + write-grid pipelines are specialized on latticeDim so the
-      // sparse monomial gamma tables emitted at compose time match the
-      // generated α/β matrices for this dimension. Rebuild is already gated
-      // on configHash (which includes latticeDim) so we only recompile when
-      // the specialization actually changes.
+      // Kinetic + write-grid pipelines are specialized on latticeDim (the
+      // sparse monomial gamma tables emitted at compose time must match the
+      // generated α/β matrices for this dimension). configHash also includes
+      // gridSize, so resolution-only changes trigger an extra async compile
+      // even though the shader code hasn't changed. The compile is async and
+      // doesn't stall the main thread, so the cost is acceptable vs. the
+      // complexity of maintaining separate buffer/pipeline hashes.
       // Async: while the WGSL→backend compile runs on a worker, the JS
       // main thread keeps rendering. The .then() handler in
       // buildPipelinesAsync wires up bind groups when the compile lands.
-      this.buildPipelinesAsync(device, config.latticeDim)
+      this.buildPipelinesAsync(device, config.latticeDim, oldRenorm)
       this.initialized = false
       this.simTime = 0
       this.lastPotentialHash = ''

@@ -66,7 +66,17 @@ export const FFT_TWIDDLE_BYTES = FFT_TWIDDLE_COMPLEX_COUNT * 2 * 4
  *   stores in its twiddle cache: angle = `-2*pi/N * k`, stored as
  *   `(cos(angle), sin(angle))` — which equals `(cos(2*pi*k/N), -sin(2*pi*k/N))`.
  */
+let cachedTable: Float32Array<ArrayBuffer> | null = null
+
+/**
+ * Build (or return cached) forward-twiddle table for the radix-2 Stockham FFT.
+ * Config-independent — computed once and reused across all rebuild cycles.
+ *
+ * @returns Interleaved `[cos, -sin]` Float32Array of length
+ *   `N_MAX_FFT_TWIDDLE` (= 2 * FFT_TWIDDLE_COMPLEX_COUNT).
+ */
 export function buildFFTTwiddleTable(): Float32Array<ArrayBuffer> {
+  if (cachedTable) return cachedTable
   // Typed as Float32Array<ArrayBuffer> (not the default ArrayBufferLike) so
   // the WebGPU `writeBuffer` overload that requires `ArrayBufferView<ArrayBuffer>`
   // accepts the return value without a cast at the call site.
@@ -81,5 +91,6 @@ export function buildFFTTwiddleTable(): Float32Array<ArrayBuffer> {
     // produces the correct forward/inverse twiddle without branching.
     table[2 * k + 1] = -Math.sin(theta)
   }
+  cachedTable = table
   return table
 }
