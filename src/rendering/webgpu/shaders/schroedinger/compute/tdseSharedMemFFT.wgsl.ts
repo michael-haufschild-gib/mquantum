@@ -183,7 +183,7 @@ fn main(
  *     interleaved [re,im] complex values, 8 bytes/element
  *   @group(0) @binding(2) fftTwiddleTable (storage, read) — array<vec2f>
  *     forward twiddles of length N_MAX_FFT_TWIDDLE/2 (= 64 vec2f). See
- *     src/rendering/webgpu/passes/TDSEFFTTwiddle.ts for layout/derivation.
+ *     src/rendering/webgpu/passes/FFTTwiddle.ts for layout/derivation.
  *
  * Used by TDSE, Dirac, and Pauli (all three modes share the same twiddle
  * buffer because their FFT axis lengths fit within N_MAX_FFT_TWIDDLE = 128).
@@ -194,7 +194,7 @@ export const tdseSharedMemFFTTwiddleBlock = /* wgsl */ `
 @group(0) @binding(2) var<storage, read> fftTwiddleTable: array<vec2f>;
 
 // Max FFT axis length supported by the TDSE twiddle path. Must match
-// N_MAX_FFT_TWIDDLE in src/rendering/webgpu/passes/TDSEFFTTwiddle.ts.
+// N_MAX_FFT_TWIDDLE in src/rendering/webgpu/passes/FFTTwiddle.ts.
 const N_MAX_FFT_TWIDDLE: u32 = 128u;
 const LOG2_N_MAX_FFT_TWIDDLE: u32 = 7u;
 

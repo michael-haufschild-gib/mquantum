@@ -118,11 +118,14 @@ describe('useKeyboardShortcuts', () => {
     document.body.removeChild(input)
   })
 
-  it('should open command palette on Ctrl+K', () => {
+  it.each([
+    { ctrlKey: true, metaKey: false, label: 'Ctrl+K' },
+    { ctrlKey: false, metaKey: true, label: 'Cmd+K' },
+  ])('should open command palette on $label', ({ ctrlKey, metaKey }) => {
     renderHook(() => useKeyboardShortcuts({ enabled: true }))
 
     act(() => {
-      const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true })
+      const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey, metaKey })
       window.dispatchEvent(event)
     })
 

@@ -507,12 +507,19 @@ export class PauliComputePass extends WebGPUBaseComputePass {
         .then((result) => {
           // Discard if a newer rebuild has started while we were compiling.
           if (myGen !== this.pipelineGen) return
+          // Buffer guard: dispose() bumps pipelineGen so this branch is
+          // unreachable post-dispose, but make the contract explicit.
+          if (!this.buf) return
           this.pl = result
           this.rebuildBindGroups(device)
         })
         .catch((err: unknown) => {
           if (myGen !== this.pipelineGen) return
           logger.error('[Pauli-COMPUTE] pipeline build failed', err)
+          // rebuildBuffers already advanced lastConfigHash; clear it so
+          // executePauli retries on the next frame instead of being
+          // wedged with pl/bg null.
+          this.lastConfigHash = ''
         })
     }
 
@@ -809,6 +816,9 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   // ============================================================================
 
   dispose(): void {
+    // Invalidate any in-flight async pipeline build so its `.then()`
+    // handler no-ops instead of writing into destroyed state.
+    this.pipelineGen++
     // Cancel any pending diagnostic mapAsync before destroying buffers
     if (this.diagMappingInFlight && this.buf?.diagStagingBuffer) {
       this.buf.diagStagingBuffer.unmap()

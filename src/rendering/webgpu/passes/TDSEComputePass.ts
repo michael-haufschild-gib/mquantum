@@ -153,7 +153,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   /**
    * CPU-precomputed radix-2 twiddle table bound at binding 2 (shared-mem FFT)
    * and binding 3 (per-stage FFT). Replaces per-thread `cos/sin` at stages
-   * >= 2. Rebuilt on grid-dim change only. See `TDSEFFTTwiddle.ts`.
+   * >= 2. Rebuilt on grid-dim change only. See `FFTTwiddle.ts`.
    */
   private fftTwiddleBuffer: GPUBuffer | null = null
   packUniformBuffer: GPUBuffer | null = null
@@ -457,6 +457,9 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     })
       .then((result) => {
         if (myGen !== this.pipelineGen) return
+        // Buffer guard: dispose() bumps pipelineGen so this branch is
+        // unreachable post-dispose, but make the contract explicit.
+        if (!this.densityTextureView) return
         this.pl = result
         // Secondary state-resident pipelines: deferred to the post-resolve
         // callback so they don't block the main async batch. Each is a
@@ -472,6 +475,10 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       .catch((err: unknown) => {
         if (myGen !== this.pipelineGen) return
         logger.error('[TDSE-COMPUTE] pipeline build failed', err)
+        // rebuildBuffers already advanced lastConfigHash; clear it so
+        // executeTdse retries on the next frame instead of being wedged
+        // with pl/bg null for the same config.
+        this.lastConfigHash = ''
       })
   }
 
@@ -710,6 +717,9 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   }
 
   dispose(): void {
+    // Invalidate any in-flight async pipeline build so its `.then()`
+    // handler no-ops instead of writing into destroyed state.
+    this.pipelineGen++
     runTdseDispose(this._fieldView)
     // Tear down curved-space integrator scratch. Pipelines are GC'd by the
     // underlying GPUDevice; scratch buffers need explicit destroy() to

@@ -16,7 +16,7 @@ import {
   PACK_UNIFORM_SIZE,
   packFFTStageUniforms,
 } from './computePassUtils'
-import { buildTdseFFTTwiddleTable, FFT_TWIDDLE_BYTES } from './TDSEFFTTwiddle'
+import { buildFFTTwiddleTable, FFT_TWIDDLE_BYTES } from './FFTTwiddle'
 
 /** PauliUniforms struct size in bytes (640 = 160 indices × 4) */
 const UNIFORM_SIZE = 640
@@ -43,7 +43,7 @@ export interface PauliBufferResult {
   /**
    * CPU-precomputed radix-2 twiddle table bound at binding 3 of every Pauli
    * Stockham FFT dispatch. Replaces per-thread `cos/sin` at stages >= 2. See
-   * `TDSEFFTTwiddle.ts` for layout. Same N_MAX_FFT_TWIDDLE = 128 cap as TDSE.
+   * `FFTTwiddle.ts` for layout. Same N_MAX_FFT_TWIDDLE = 128 cap as TDSE.
    */
   fftTwiddleBuffer: GPUBuffer
   packUniformBuffer: GPUBuffer
@@ -178,7 +178,7 @@ export function rebuildPauliBuffers(
     size: FFT_TWIDDLE_BYTES,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   })
-  device.queue.writeBuffer(fftTwiddleBuffer, 0, buildTdseFFTTwiddleTable())
+  device.queue.writeBuffer(fftTwiddleBuffer, 0, buildFFTTwiddleTable())
 
   // Pack uniforms (with and without normalization)
   const packUniformBuffer = device.createBuffer({

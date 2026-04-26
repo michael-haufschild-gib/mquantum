@@ -41,7 +41,7 @@ describe('layoutStore', () => {
     expect(useLayoutStore.getState().sidebarWidth).toBe(DEFAULT_SIDEBAR_WIDTH_LARGE)
   })
 
-  it('tracks command palette visibility without persisting it', () => {
+  it('toggles and resets command palette visibility', () => {
     useLayoutStore.getState().setCommandPaletteOpen(true)
     expect(useLayoutStore.getState().isCommandPaletteOpen).toBe(true)
 

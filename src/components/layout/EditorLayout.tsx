@@ -360,7 +360,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
         )}
       </AnimatePresence>
 
-      <Suspense>
+      <Suspense fallback={null}>
         {isCommandPaletteOpen && <CommandPalette />}
         <CanvasContextMenu />
         {!isCinematicMode && showShortcuts && <ShortcutsOverlay />}

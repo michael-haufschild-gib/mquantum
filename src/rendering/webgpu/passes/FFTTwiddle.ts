@@ -1,5 +1,5 @@
 /**
- * TDSE FFT twiddle-factor table.
+ * FFT twiddle-factor table — shared by TDSE, Dirac, and Pauli compute paths.
  *
  * Replaces per-thread `cos(angle), sin(angle)` in the Stockham radix-2 butterfly
  * (stages s >= 2) with a single `storage` read into a CPU-precomputed table.
@@ -23,19 +23,16 @@
  * a power of two and uniform across the `halfStage` butterfly threads — so
  * every thread in a warp hits a strided, aligned region of the table.
  *
- * Why `N_MAX = 128` is fixed: the TDSE lattice is clamped to powers of two in
- * `[2, 128]` by `nearestPow2` (see `computePassUtils.ts`). Sizing the table at
- * the max handles every TDSE axis in one 512-byte allocation; the buffer is
- * rebuilt only when grid dimensions change.
+ * Why `N_MAX = 128` is fixed: every compute-path lattice is clamped to powers
+ * of two in `[2, 128]` by `nearestPow2` (see `computePassUtils.ts`). Sizing
+ * the table at the max handles every axis in one 512-byte allocation; the
+ * buffer is rebuilt only when grid dimensions change.
  *
- * This helper is TDSE-only. Dirac and Pauli import the unchanged shader blocks
- * (no twiddle binding) and keep their 2/3-entry FFT bind group layouts.
- *
- * @module rendering/webgpu/passes/TDSEFFTTwiddle
+ * @module rendering/webgpu/passes/FFTTwiddle
  */
 
 /**
- * Maximum FFT axis length supported by the TDSE twiddle table.
+ * Maximum FFT axis length supported by the twiddle table.
  *
  * Matches the `const N_MAX_FFT_TWIDDLE` declared in the WGSL shader blocks
  * `tdseSharedMemFFTTwiddleBlock` and `tdseStockhamFFTTwiddleBlock`. If you
@@ -60,7 +57,8 @@ export const FFT_TWIDDLE_COMPLEX_COUNT = N_MAX_FFT_TWIDDLE / 2
 export const FFT_TWIDDLE_BYTES = FFT_TWIDDLE_COMPLEX_COUNT * 2 * 4
 
 /**
- * Build the forward-twiddle table for the TDSE radix-2 Stockham FFT.
+ * Build the forward-twiddle table for the radix-2 Stockham FFT used by
+ * the TDSE, Dirac, and Pauli compute passes.
  *
  * @returns Interleaved `[cos, -sin]` Float32Array of length
  *   `N_MAX_FFT_TWIDDLE` (= 2 * FFT_TWIDDLE_COMPLEX_COUNT). Exactly matches
@@ -68,7 +66,7 @@ export const FFT_TWIDDLE_BYTES = FFT_TWIDDLE_COMPLEX_COUNT * 2 * 4
  *   stores in its twiddle cache: angle = `-2*pi/N * k`, stored as
  *   `(cos(angle), sin(angle))` — which equals `(cos(2*pi*k/N), -sin(2*pi*k/N))`.
  */
-export function buildTdseFFTTwiddleTable(): Float32Array<ArrayBuffer> {
+export function buildFFTTwiddleTable(): Float32Array<ArrayBuffer> {
   // Typed as Float32Array<ArrayBuffer> (not the default ArrayBufferLike) so
   // the WebGPU `writeBuffer` overload that requires `ArrayBufferView<ArrayBuffer>`
   // accepts the return value without a cast at the call site.

@@ -20,7 +20,7 @@ import type {
   DiracDestroyableBuffers,
   DiracPassHelpers,
 } from './DiracComputePassTypes'
-import { buildTdseFFTTwiddleTable, FFT_TWIDDLE_BYTES } from './TDSEFFTTwiddle'
+import { buildFFTTwiddleTable, FFT_TWIDDLE_BYTES } from './FFTTwiddle'
 
 /** DiracUniforms struct size in bytes (592 — includes kGridScale) */
 const UNIFORM_SIZE = 592
@@ -198,7 +198,7 @@ export function rebuildDiracBuffers(
     size: FFT_TWIDDLE_BYTES,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   })
-  device.queue.writeBuffer(fftTwiddleBuffer, 0, buildTdseFFTTwiddleTable())
+  device.queue.writeBuffer(fftTwiddleBuffer, 0, buildFFTTwiddleTable())
 
   // Pack uniforms (with 1/N normalization for inverse FFT unpack)
   const packData = new ArrayBuffer(PACK_UNIFORM_SIZE)

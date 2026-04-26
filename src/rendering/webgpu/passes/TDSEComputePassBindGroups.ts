@@ -125,7 +125,7 @@ export function rebuildTdseBindGroups(
   })
 
   // FFT bind groups for A->B and B->A ping-pong. Binding 3 is the twiddle
-  // table that replaces cos/sin at stages >= 2 (see TDSEFFTTwiddle.ts).
+  // table that replaces cos/sin at stages >= 2 (see FFTTwiddle.ts).
   const fftStageABBG = device.createBindGroup({
     label: 'tdse-fft-ab-bg',
     layout: pipelines.fftStageBGL,

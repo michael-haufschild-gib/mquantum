@@ -96,7 +96,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   /**
    * CPU-precomputed radix-2 twiddle table bound at binding 3 (per-stage FFT)
    * and binding 2 (shared-mem FFT). Replaces per-thread `cos/sin` at stages
-   * >= 2. Rebuilt on every grid-dim rebuild. See `TDSEFFTTwiddle.ts`.
+   * >= 2. Rebuilt on every grid-dim rebuild. See `FFTTwiddle.ts`.
    */
   private fftTwiddleBuffer: GPUBuffer | null = null
   private packUniformBuffer: GPUBuffer | null = null
@@ -364,12 +364,22 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     buildDiracPipelines(device, this.setupHelpers, latticeDim)
       .then((result) => {
         if (myGen !== this.pipelineGen) return
+        // Bail if dispose ran before this resolved — buffers below would
+        // be null and `rebuildBindGroups` would crash. The generation
+        // bump in dispose() makes this branch unreachable in practice,
+        // but the buffer guard makes that promise explicit.
+        if (!this.densityTextureView || !this.uniformBuffer) return
         this.pl = result
         this.rebuildBindGroups(device)
       })
       .catch((err: unknown) => {
         if (myGen !== this.pipelineGen) return
         logger.error('[Dirac-COMPUTE] pipeline build failed', err)
+        // rebuildBuffers already advanced lastConfigHash, so without
+        // this clear the next frame would skip the rebuild path and
+        // leave Dirac wedged forever. Clearing it forces a retry on
+        // the next execute().
+        this.lastConfigHash = ''
       })
   }
 
@@ -747,6 +757,9 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   }
 
   dispose(): void {
+    // Invalidate any in-flight async pipeline build so its `.then()`
+    // handler no-ops instead of writing into destroyed state.
+    this.pipelineGen++
     // Cancel any pending diagnostic mapAsync before destroying buffers
     if (this.diagMappingInFlight && this.diagStagingBuffer) {
       this.diagStagingBuffer.unmap()

@@ -301,7 +301,7 @@ export async function buildDiracPipelines(
   ])
   // FFT stage (reuses the TDSE twiddle-table fork). Binding 3 is the
   // CPU-precomputed twiddle table that replaces cos/sin at stages >= 2.
-  // See TDSEFFTTwiddle.ts for the layout.
+  // See FFTTwiddle.ts for the layout.
   const fftStageBGL = createComputeBGL(device, 'dirac-fft-bgl', [
     'uniform',
     'read-only-storage',
@@ -516,7 +516,7 @@ export function rebuildDiracBindGroups(
   })
 
   // FFT bind groups. Binding 3 is the twiddle table that replaces cos/sin
-  // at stages >= 2 (see TDSEFFTTwiddle.ts).
+  // at stages >= 2 (see FFTTwiddle.ts).
   const fftStageABBG = device.createBindGroup({
     label: 'dirac-fft-ab-bg',
     layout: pipelines.fftStageBGL,

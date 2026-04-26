@@ -7,6 +7,7 @@ import { useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
+import { logger } from '@/lib/logger'
 import { getModifierSymbols, getPlatformKeyLabel } from '@/lib/platform'
 import { useCameraStore } from '@/stores/cameraStore'
 import { useExportStore } from '@/stores/exportStore'
@@ -164,11 +165,13 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
         ...(isCtrlOrMeta && { k: toggleCommandPalette }),
         ...(isCtrlOrMeta && {
           s: () => {
-            void import('@/lib/export/image').then(
-              ({ exportSceneToPNG, generateTimestampFilename }) => {
-                void exportSceneToPNG({ filename: generateTimestampFilename('ndimensional') })
-              }
-            )
+            void import('@/lib/export/image')
+              .then(({ exportSceneToPNG, generateTimestampFilename }) =>
+                exportSceneToPNG({ filename: generateTimestampFilename('ndimensional') })
+              )
+              .catch((error: unknown) => {
+                logger.error('[Shortcuts] Ctrl/Cmd+S PNG export failed', error)
+              })
           },
         }),
         ...(isCtrlOrMeta && shiftKey && { e: () => useExportStore.getState().setModalOpen(true) }),

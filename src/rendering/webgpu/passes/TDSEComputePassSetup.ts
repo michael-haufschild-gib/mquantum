@@ -152,7 +152,7 @@ export interface TdseBindGroupInputs {
   /**
    * CPU-precomputed radix-2 twiddle table bound to every TDSE FFT dispatch
    * (shared-mem + per-stage kernels). Replaces per-thread `cos/sin` at
-   * stages >= 2. See `TDSEFFTTwiddle.ts` for format.
+   * stages >= 2. See `FFTTwiddle.ts` for format.
    */
   fftTwiddleBuffer: GPUBuffer
   packUniformBuffer: GPUBuffer
@@ -246,7 +246,7 @@ export function composeTdseUnpackShader(): string {
  *
  * Uses the twiddle-table fork of the kernel — stages >= 2 look the complex
  * exponential up in a CPU-precomputed `storage` buffer instead of calling
- * `cos/sin` per thread. See `TDSEFFTTwiddle.ts` for table layout. Dirac and
+ * `cos/sin` per thread. See `FFTTwiddle.ts` for table layout. Dirac and
  * Pauli compile the original `tdseStockhamFFTBlock` elsewhere.
  */
 export function composeTdseFftStageShader(): string {

@@ -118,7 +118,7 @@ export interface PauliBindGroupInputs {
   fftUniformBuffer: GPUBuffer
   /**
    * CPU-precomputed twiddle table bound at binding 3 of every FFT dispatch.
-   * Same buffer shape as the TDSE twiddle table. See `TDSEFFTTwiddle.ts`.
+   * Same buffer shape as the TDSE twiddle table. See `FFTTwiddle.ts`.
    */
   fftTwiddleBuffer: GPUBuffer
   packUniformBuffer: GPUBuffer
@@ -326,7 +326,7 @@ export async function buildPauliPipelines(device: GPUDevice): Promise<PauliPipel
   ])
 
   // FFT pipeline (twiddle-table Stockham FFT). Binding 3 is the CPU-precomputed
-  // twiddle table that replaces cos/sin at stages >= 2. See TDSEFFTTwiddle.ts.
+  // twiddle table that replaces cos/sin at stages >= 2. See FFTTwiddle.ts.
   const fftStageBGL = createComputeBGL(device, 'pauli-fft-stage-bgl', [
     'uniform',
     'read-only-storage',
@@ -535,7 +535,7 @@ export function rebuildPauliBindGroups(
   })
 
   // FFT bind groups (A→B and B→A). Binding 3 is the twiddle table that
-  // replaces cos/sin at stages >= 2 (see TDSEFFTTwiddle.ts).
+  // replaces cos/sin at stages >= 2 (see FFTTwiddle.ts).
   const fftStageABBG = device.createBindGroup({
     label: 'pauli-fft-ab',
     layout: pipelines.fftStageBGL,

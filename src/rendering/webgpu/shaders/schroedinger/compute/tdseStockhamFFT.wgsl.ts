@@ -35,8 +35,8 @@ struct FFTStageUniforms {
  *
  * Bind group layout:
  *   @group(0) @binding(0) FFTStageUniforms
- *   @group(0) @binding(1) srcBuf: array<f32> (read)
- *   @group(0) @binding(2) dstBuf: array<f32> (write)
+ *   @group(0) @binding(1) srcBuf: array<vec2f> (read)
+ *   @group(0) @binding(2) dstBuf: array<vec2f> (write)
  */
 export const tdseStockhamFFTBlock = /* wgsl */ `
 @group(0) @binding(0) var<uniform> fftUni: FFTStageUniforms;
@@ -146,10 +146,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
  *
  * Bind group layout (TDSE-only):
  *   @group(0) @binding(0) FFTStageUniforms (uniform)
- *   @group(0) @binding(1) srcBuf: array<f32> (read)
- *   @group(0) @binding(2) dstBuf: array<f32> (read_write)
- *   @group(0) @binding(3) fftTwiddleTable: array<f32> (read) — see
- *     src/rendering/webgpu/passes/TDSEFFTTwiddle.ts for layout.
+ *   @group(0) @binding(1) srcBuf: array<vec2f> (read)
+ *   @group(0) @binding(2) dstBuf: array<vec2f> (read_write)
+ *   @group(0) @binding(3) fftTwiddleTable: array<vec2f> (read) — see
+ *     src/rendering/webgpu/passes/FFTTwiddle.ts for layout.
  *
  * Dirac and Pauli import the unchanged `tdseStockhamFFTBlock` above and keep
  * their 3-entry BGLs — their shader binaries are bit-identical to before.
@@ -164,7 +164,7 @@ export const tdseStockhamFFTTwiddleBlock = /* wgsl */ `
 @group(0) @binding(3) var<storage, read> fftTwiddleTable: array<vec2f>;
 
 // Max FFT axis length for the TDSE twiddle path. Must match
-// N_MAX_FFT_TWIDDLE in src/rendering/webgpu/passes/TDSEFFTTwiddle.ts.
+// N_MAX_FFT_TWIDDLE in src/rendering/webgpu/passes/FFTTwiddle.ts.
 const N_MAX_FFT_TWIDDLE_PS: u32 = 128u;
 const LOG2_N_MAX_FFT_TWIDDLE_PS: u32 = 7u;
 

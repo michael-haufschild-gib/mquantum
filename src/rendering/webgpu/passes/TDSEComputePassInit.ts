@@ -86,21 +86,23 @@ export function maybeInitialize(
   const hasOmegaQuench =
     config.harmonicOmegaInit !== undefined && config.harmonicOmegaInit !== config.harmonicOmega
 
+  // Both the injection path and the GPU init dispatch run alongside the
+  // potential fill below, which itself needs the compiled pipelines.
+  // If we let injection complete here without pipelines, we'd reach
+  // `initialized = true` with an unfilled potential and no retry path.
+  // Defer the entire init until pipelines are ready — pendingInjection
+  // stays set so the next call still injects.
+  if (!ic.pl || !ic.bg) {
+    return
+  }
+
   // Inject loaded wavefunction or dispatch GPU init shader.
-  // Injection only needs `slState`/buffer, so it can complete before the
-  // async pipeline build finishes. The init dispatch needs the compiled
-  // pipelines + bind groups — defer the whole `initialized = true`
-  // bookkeeping if neither path can run, so a later frame retries
-  // initialization once the async compile lands.
-  if (injectLoadedWavefunction(device, ic.slState, ic.totalSites)) {
-    ic.slState.pendingInjection = null
-  } else if (ic.pl && ic.bg) {
+  // injectLoadedWavefunction clears `pendingInjection` internally on success.
+  if (!injectLoadedWavefunction(device, ic.slState, ic.totalSites)) {
     const pass = ctx.beginComputePass({ label: 'tdse-init-pass' })
     const initPl = siteDispatch.use3D ? ic.pl.initPipeline3D : ic.pl.initPipeline
     ic.dispatchCompute(pass, initPl, [ic.bg.initBG], siteDispatch.x, siteDispatch.y, siteDispatch.z)
     pass.end()
-  } else {
-    return
   }
 
   // For trap-frequency quench: restore evolution omega before filling the potential

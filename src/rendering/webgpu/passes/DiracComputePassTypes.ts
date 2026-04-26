@@ -37,7 +37,7 @@ export interface DiracBufferResult {
   /**
    * CPU-precomputed radix-2 twiddle table bound to every Dirac FFT dispatch
    * (per-stage Stockham + shared-mem). Replaces per-thread `cos/sin` at
-   * stages >= 2. See `TDSEFFTTwiddle.ts` for layout. Same buffer shape as the
+   * stages >= 2. See `FFTTwiddle.ts` for layout. Same buffer shape as the
    * TDSE twiddle table — Dirac FFT axis lengths fit in N_MAX_FFT_TWIDDLE=128.
    */
   fftTwiddleBuffer: GPUBuffer

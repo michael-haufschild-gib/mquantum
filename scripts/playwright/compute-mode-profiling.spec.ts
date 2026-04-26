@@ -142,10 +142,8 @@ async function profileScenario(
   // `passDeltas` output shape for downstream summary code.
   const passDeltas: Record<string, number> = {}
   for (const pt of metrics.passTimings) {
-    if (!pt.skipped && pt.gpuTimeMs > 0) {
-      if (pt.gpuTimeMs > 0.001) {
-        passDeltas[pt.passId] = pt.gpuTimeMs
-      }
+    if (!pt.skipped && pt.gpuTimeMs > 0.001) {
+      passDeltas[pt.passId] = pt.gpuTimeMs
     }
   }
 
