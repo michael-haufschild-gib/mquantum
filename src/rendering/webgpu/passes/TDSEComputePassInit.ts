@@ -86,10 +86,19 @@ export function maybeInitialize(
   const hasOmegaQuench =
     config.harmonicOmegaInit !== undefined && config.harmonicOmegaInit !== config.harmonicOmega
 
-  // Inject loaded wavefunction or dispatch GPU init shader
-  if (injectLoadedWavefunction(device, ic.slState, ic.totalSites)) {
-    ic.slState.pendingInjection = null
-  } else if (ic.pl && ic.bg) {
+  // Both the injection path and the GPU init dispatch run alongside the
+  // potential fill below, which itself needs the compiled pipelines.
+  // If we let injection complete here without pipelines, we'd reach
+  // `initialized = true` with an unfilled potential and no retry path.
+  // Defer the entire init until pipelines are ready — pendingInjection
+  // stays set so the next call still injects.
+  if (!ic.pl || !ic.bg) {
+    return
+  }
+
+  // Inject loaded wavefunction or dispatch GPU init shader.
+  // injectLoadedWavefunction clears `pendingInjection` internally on success.
+  if (!injectLoadedWavefunction(device, ic.slState, ic.totalSites)) {
     const pass = ctx.beginComputePass({ label: 'tdse-init-pass' })
     const initPl = siteDispatch.use3D ? ic.pl.initPipeline3D : ic.pl.initPipeline
     ic.dispatchCompute(pass, initPl, [ic.bg.initBG], siteDispatch.x, siteDispatch.y, siteDispatch.z)

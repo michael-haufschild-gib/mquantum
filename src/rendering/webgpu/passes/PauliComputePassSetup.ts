@@ -38,7 +38,7 @@ import { pauliWriteGridBlock } from '../shaders/schroedinger/compute/pauliWriteG
 import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
 import {
   tdseFFTStageUniformsBlock,
-  tdseStockhamFFTBlock,
+  tdseStockhamFFTTwiddleBlock,
 } from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
 import { createComputeBGL } from '../utils/computeBindGroupLayout'
 
@@ -116,6 +116,11 @@ export interface PauliBindGroupInputs {
   fftScratchA: GPUBuffer
   fftScratchB: GPUBuffer
   fftUniformBuffer: GPUBuffer
+  /**
+   * CPU-precomputed twiddle table bound at binding 3 of every FFT dispatch.
+   * Same buffer shape as the TDSE twiddle table. See `FFTTwiddle.ts`.
+   */
+  fftTwiddleBuffer: GPUBuffer
   packUniformBuffer: GPUBuffer
   packUniformBufferNoNorm: GPUBuffer
   potentialBuffer: GPUBuffer
@@ -221,9 +226,16 @@ export function composePauliUnpackShader(): string {
   return pauliComplexUnpackBlock
 }
 
-/** Pure WGSL for the Pauli Stockham FFT stage compute shader. */
+/**
+ * Pure WGSL for the Pauli Stockham FFT stage compute shader.
+ *
+ * Twiddle-table fork of the kernel — stages s >= 2 read precomputed twiddles
+ * from a `storage` buffer (binding 3) instead of calling `cos/sin` per thread.
+ * Stage 0 (W^0 = (1,0)) and stage 1 specializations remain. Same
+ * N_MAX_FFT_TWIDDLE = 128 cap as TDSE — Pauli per-axis grids fit in this bound.
+ */
 export function composePauliFftStageShader(): string {
-  return `\n${tdseFFTStageUniformsBlock}\n${tdseStockhamFFTBlock}\n`
+  return `\n${tdseFFTStageUniformsBlock}\n${tdseStockhamFFTTwiddleBlock}\n`
 }
 
 /** Pure WGSL for the Pauli diagnostics reduce compute shader. */
@@ -237,10 +249,22 @@ export function composePauliDiagFinalizeShader(): string {
 }
 
 /**
- * Compile every Pauli-spinor compute pipeline and return them with
- * their bind group layouts. One-time setup per device.
+ * Compile every Pauli-spinor compute pipeline asynchronously and return
+ * them with their bind group layouts. One-time setup per device.
+ *
+ * Why async: WGSL→backend (Metal/HLSL/SPIR-V) compilation can take
+ * hundreds of ms for the larger Pauli kernels. The synchronous
+ * `device.createComputePipeline` blocks the JS main thread for the full
+ * compile — which freezes the entire UI when a config change triggers
+ * a rebuild. Using `createComputePipelineAsync` and `Promise.all`-ing
+ * the issued descriptors lets the browser parallelize compilation
+ * across worker threads while the main thread keeps rendering.
+ *
+ * Cheap setup (BGLs, pipeline layouts, shader modules) still runs
+ * synchronously — those are inexpensive. Only the pipeline objects
+ * themselves are awaited.
  */
-export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
+export async function buildPauliPipelines(device: GPUDevice): Promise<PauliPipelineResult> {
   // Shared BGL for spinor passes: PauliUniforms + merged spinor (rw).
   // Binding 0 is `read-only-storage` because PauliUniforms embeds scalar arrays
   // (spec-forbidden in uniform address space). See pauliInit.wgsl.ts for the
@@ -250,62 +274,16 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
   const spinorBGL = createComputeBGL(device, 'pauli-spinor-bgl', ['read-only-storage', 'storage'])
   const spinorLayout = device.createPipelineLayout({ bindGroupLayouts: [spinorBGL] })
 
-  // Init pipeline
-  const initPipeline = device.createComputePipeline({
-    label: 'pauli-init-pipeline',
-    layout: spinorLayout,
-    compute: {
-      module: device.createShaderModule({ label: 'pauli-init', code: composePauliInitShader() }),
-      entryPoint: 'main',
-    },
-  })
-  // 3D-dispatch sibling — same BGL/layout, alternative entry-point shape.
-  const init3DPipeline = device.createComputePipeline({
-    label: 'pauli-init-3d-pipeline',
-    layout: spinorLayout,
-    compute: {
-      module: device.createShaderModule({
-        label: 'pauli-init-3d',
-        code: composePauliInit3DShader(),
-      }),
-      entryPoint: 'main',
-    },
-  })
-
-  // Potential fill pipeline (pauliPotential). Dispatched once per parameter
-  // change — not per substep — so pauliPotentialHalf only pays one load.
   const potentialBGL = createComputeBGL(device, 'pauli-potential-bgl', [
     'read-only-storage',
     'storage',
   ])
   const potentialLayout = device.createPipelineLayout({ bindGroupLayouts: [potentialBGL] })
-  const potentialPipeline = device.createComputePipeline({
-    label: 'pauli-potential-pipeline',
-    layout: potentialLayout,
-    compute: {
-      module: device.createShaderModule({
-        label: 'pauli-potential',
-        code: composePauliPotentialShader(),
-      }),
-      entryPoint: 'main',
-    },
-  })
-  const potential3DPipeline = device.createComputePipeline({
-    label: 'pauli-potential-3d-pipeline',
-    layout: potentialLayout,
-    compute: {
-      module: device.createShaderModule({
-        label: 'pauli-potential-3d',
-        code: composePauliPotential3DShader(),
-      }),
-      entryPoint: 'main',
-    },
-  })
 
-  // Potential half-step + Zeeman rotation pipeline. Separate 3-binding BGL
-  // so that init/kinetic/absorber (which never read V) stay on the lean
-  // 2-binding spinorBGL. With the merged `array<vec2f>` spinor, this
-  // shrinks from 4 to 3 bindings (was: params, spinorRe, spinorIm, potential).
+  // Potential half-step + Zeeman rotation. Separate 3-binding BGL so that
+  // init/kinetic/absorber (which never read V) stay on the lean 2-binding
+  // spinorBGL. With the merged `array<vec2f>` spinor, this shrinks from
+  // 4 to 3 bindings (was: params, spinorRe, spinorIm, potential).
   const potentialHalfBGL = createComputeBGL(device, 'pauli-potential-half-bgl', [
     'read-only-storage',
     'storage',
@@ -314,84 +292,12 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
   const potentialHalfLayout = device.createPipelineLayout({
     bindGroupLayouts: [potentialHalfBGL],
   })
-  const potentialHalfPipeline = device.createComputePipeline({
-    label: 'pauli-potential-half-pipeline',
-    layout: potentialHalfLayout,
-    compute: {
-      module: device.createShaderModule({
-        label: 'pauli-potential-half',
-        code: composePauliPotentialHalfShader(),
-      }),
-      entryPoint: 'main',
-    },
-  })
-  const potentialHalf3DPipeline = device.createComputePipeline({
-    label: 'pauli-potential-half-3d-pipeline',
-    layout: potentialHalfLayout,
-    compute: {
-      module: device.createShaderModule({
-        label: 'pauli-potential-half-3d',
-        code: composePauliPotentialHalf3DShader(),
-      }),
-      entryPoint: 'main',
-    },
-  })
 
-  // Absorber — reuses spinorBGL layout.
-  const absorberPipeline = device.createComputePipeline({
-    label: 'pauli-absorber-pipeline',
-    layout: spinorLayout,
-    compute: {
-      module: device.createShaderModule({
-        label: 'pauli-absorber',
-        code: composePauliAbsorberShader(),
-      }),
-      entryPoint: 'main',
-    },
-  })
-  const absorber3DPipeline = device.createComputePipeline({
-    label: 'pauli-absorber-3d-pipeline',
-    layout: spinorLayout,
-    compute: {
-      module: device.createShaderModule({
-        label: 'pauli-absorber-3d',
-        code: composePauliAbsorber3DShader(),
-      }),
-      entryPoint: 'main',
-    },
-  })
-
-  // Kinetic phase kick pipeline (k-space)
-  const kineticPipeline = device.createComputePipeline({
-    label: 'pauli-kinetic-pipeline',
-    layout: spinorLayout,
-    compute: {
-      module: device.createShaderModule({
-        label: 'pauli-kinetic',
-        code: composePauliKineticShader(),
-      }),
-      entryPoint: 'main',
-    },
-  })
-
-  // Renormalization pipeline. 3 bindings against the merged spinor buffer
-  // (uniform params, diagResult RO, merged spinor RW).
   const renormalizeBGL = createComputeBGL(device, 'pauli-renormalize-bgl', [
     'uniform',
     'read-only-storage',
     'storage',
   ])
-  const renormalizePipeline = device.createComputePipeline({
-    label: 'pauli-renormalize-pipeline',
-    layout: device.createPipelineLayout({ bindGroupLayouts: [renormalizeBGL] }),
-    compute: {
-      module: device.createShaderModule({
-        label: 'pauli-renormalize',
-        code: composePauliRenormalizeShader(),
-      }),
-      entryPoint: 'main',
-    },
-  })
 
   // Write-grid pipeline. Binding 0 (PauliUniforms) — see spinor BGL comment.
   // Binding 1 is the merged spinor buffer (RO); binding 2 is the density
@@ -401,17 +307,6 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
     'read-only-storage',
     { storageTexture: { format: 'rgba16float', viewDimension: '3d' } },
   ])
-  const writeGridPipeline = device.createComputePipeline({
-    label: 'pauli-write-grid-pipeline',
-    layout: device.createPipelineLayout({ bindGroupLayouts: [writeGridBGL] }),
-    compute: {
-      module: device.createShaderModule({
-        label: 'pauli-write-grid',
-        code: composePauliWriteGridShader(),
-      }),
-      entryPoint: 'main',
-    },
-  })
 
   // Pack BGL: uniform + per-component merged spinor slice (RO, array<vec2f>)
   // + interleaved complexBuf (RW). Collapsed from 4 bindings — the old
@@ -421,17 +316,6 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
     'read-only-storage',
     'storage',
   ])
-  const packPipeline = device.createComputePipeline({
-    label: 'pauli-pack-pipeline',
-    layout: device.createPipelineLayout({ bindGroupLayouts: [packBGL] }),
-    compute: {
-      module: device.createShaderModule({
-        label: 'pauli-pack',
-        code: composePauliPackShader(),
-      }),
-      entryPoint: 'main',
-    },
-  })
 
   // Unpack BGL: uniform + interleaved complexBuf (RO)
   // + per-component merged spinor slice (RW, array<vec2f>).
@@ -440,35 +324,15 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
     'read-only-storage',
     'storage',
   ])
-  const unpackPipeline = device.createComputePipeline({
-    label: 'pauli-unpack-pipeline',
-    layout: device.createPipelineLayout({ bindGroupLayouts: [unpackBGL] }),
-    compute: {
-      module: device.createShaderModule({
-        label: 'pauli-unpack',
-        code: composePauliUnpackShader(),
-      }),
-      entryPoint: 'main',
-    },
-  })
 
-  // FFT pipeline (shared Stockham FFT infrastructure)
+  // FFT pipeline (twiddle-table Stockham FFT). Binding 3 is the CPU-precomputed
+  // twiddle table that replaces cos/sin at stages >= 2. See FFTTwiddle.ts.
   const fftStageBGL = createComputeBGL(device, 'pauli-fft-stage-bgl', [
     'uniform',
     'read-only-storage',
     'storage',
+    'read-only-storage',
   ])
-  const fftStagePipeline = device.createComputePipeline({
-    label: 'pauli-fft-pipeline',
-    layout: device.createPipelineLayout({ bindGroupLayouts: [fftStageBGL] }),
-    compute: {
-      module: device.createShaderModule({
-        label: 'pauli-fft-stage',
-        code: composePauliFftStageShader(),
-      }),
-      entryPoint: 'main',
-    },
-  })
 
   // Diagnostics: reduce BGL. Collapsed from 4 bindings after the merge
   // (uniform + merged spinor RO + partial output RW).
@@ -477,17 +341,6 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
     'read-only-storage',
     'storage',
   ])
-  const diagReducePipeline = device.createComputePipeline({
-    label: 'pauli-diag-reduce-pipeline',
-    layout: device.createPipelineLayout({ bindGroupLayouts: [diagReduceBGL] }),
-    compute: {
-      module: device.createShaderModule({
-        label: 'pauli-diag-reduce',
-        code: composePauliDiagReduceShader(),
-      }),
-      entryPoint: 'main',
-    },
-  })
 
   // Diagnostics: finalize BGL
   const diagFinalizeBGL = createComputeBGL(device, 'pauli-diag-finalize-bgl', [
@@ -495,17 +348,94 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
     'read-only-storage',
     'storage',
   ])
-  const diagFinalizePipeline = device.createComputePipeline({
-    label: 'pauli-diag-finalize-pipeline',
-    layout: device.createPipelineLayout({ bindGroupLayouts: [diagFinalizeBGL] }),
-    compute: {
-      module: device.createShaderModule({
-        label: 'pauli-diag-finalize',
-        code: composePauliDiagFinalizeShader(),
-      }),
-      entryPoint: 'main',
-    },
-  })
+
+  // Helper: kick off `createComputePipelineAsync` with a shader module
+  // built from the supplied source. Returns a Promise that resolves to
+  // the compiled pipeline. All Pauli pipelines share this shape.
+  const issuePipeline = (
+    label: string,
+    layout: GPUPipelineLayout,
+    code: string
+  ): Promise<GPUComputePipeline> =>
+    device.createComputePipelineAsync({
+      label: `${label}-pipeline`,
+      layout,
+      compute: {
+        module: device.createShaderModule({ label, code }),
+        entryPoint: 'main',
+      },
+    })
+
+  // Issue every pipeline compile in parallel. Promise.all lets the
+  // browser drive WGSL→backend compilation concurrently while the
+  // main thread continues rendering frames.
+  const [
+    initPipeline,
+    init3DPipeline,
+    potentialPipeline,
+    potential3DPipeline,
+    potentialHalfPipeline,
+    potentialHalf3DPipeline,
+    absorberPipeline,
+    absorber3DPipeline,
+    kineticPipeline,
+    renormalizePipeline,
+    writeGridPipeline,
+    packPipeline,
+    unpackPipeline,
+    fftStagePipeline,
+    diagReducePipeline,
+    diagFinalizePipeline,
+  ] = await Promise.all([
+    issuePipeline('pauli-init', spinorLayout, composePauliInitShader()),
+    issuePipeline('pauli-init-3d', spinorLayout, composePauliInit3DShader()),
+    issuePipeline('pauli-potential', potentialLayout, composePauliPotentialShader()),
+    issuePipeline('pauli-potential-3d', potentialLayout, composePauliPotential3DShader()),
+    issuePipeline('pauli-potential-half', potentialHalfLayout, composePauliPotentialHalfShader()),
+    issuePipeline(
+      'pauli-potential-half-3d',
+      potentialHalfLayout,
+      composePauliPotentialHalf3DShader()
+    ),
+    issuePipeline('pauli-absorber', spinorLayout, composePauliAbsorberShader()),
+    issuePipeline('pauli-absorber-3d', spinorLayout, composePauliAbsorber3DShader()),
+    issuePipeline('pauli-kinetic', spinorLayout, composePauliKineticShader()),
+    issuePipeline(
+      'pauli-renormalize',
+      device.createPipelineLayout({ bindGroupLayouts: [renormalizeBGL] }),
+      composePauliRenormalizeShader()
+    ),
+    issuePipeline(
+      'pauli-write-grid',
+      device.createPipelineLayout({ bindGroupLayouts: [writeGridBGL] }),
+      composePauliWriteGridShader()
+    ),
+    issuePipeline(
+      'pauli-pack',
+      device.createPipelineLayout({ bindGroupLayouts: [packBGL] }),
+      composePauliPackShader()
+    ),
+    issuePipeline(
+      'pauli-unpack',
+      device.createPipelineLayout({ bindGroupLayouts: [unpackBGL] }),
+      composePauliUnpackShader()
+    ),
+    issuePipeline(
+      'pauli-fft-stage',
+      device.createPipelineLayout({ bindGroupLayouts: [fftStageBGL] }),
+      composePauliFftStageShader()
+    ),
+    issuePipeline(
+      'pauli-diag-reduce',
+      device.createPipelineLayout({ bindGroupLayouts: [diagReduceBGL] }),
+      composePauliDiagReduceShader()
+    ),
+    issuePipeline(
+      'pauli-diag-finalize',
+      device.createPipelineLayout({ bindGroupLayouts: [diagFinalizeBGL] }),
+      composePauliDiagFinalizeShader()
+    ),
+  ])
 
   return {
     initPipeline,
@@ -562,6 +492,7 @@ export function rebuildPauliBindGroups(
     fftScratchA,
     fftScratchB,
     fftUniformBuffer,
+    fftTwiddleBuffer,
     packUniformBuffer,
     packUniformBufferNoNorm,
     potentialBuffer,
@@ -603,7 +534,8 @@ export function rebuildPauliBindGroups(
     ],
   })
 
-  // FFT bind groups (A→B and B→A)
+  // FFT bind groups (A→B and B→A). Binding 3 is the twiddle table that
+  // replaces cos/sin at stages >= 2 (see FFTTwiddle.ts).
   const fftStageABBG = device.createBindGroup({
     label: 'pauli-fft-ab',
     layout: pipelines.fftStageBGL,
@@ -611,6 +543,7 @@ export function rebuildPauliBindGroups(
       { binding: 0, resource: { buffer: fftUniformBuffer } },
       { binding: 1, resource: { buffer: fftScratchA } },
       { binding: 2, resource: { buffer: fftScratchB } },
+      { binding: 3, resource: { buffer: fftTwiddleBuffer } },
     ],
   })
   const fftStageBABG = device.createBindGroup({
@@ -620,6 +553,7 @@ export function rebuildPauliBindGroups(
       { binding: 0, resource: { buffer: fftUniformBuffer } },
       { binding: 1, resource: { buffer: fftScratchB } },
       { binding: 2, resource: { buffer: fftScratchA } },
+      { binding: 3, resource: { buffer: fftTwiddleBuffer } },
     ],
   })
 

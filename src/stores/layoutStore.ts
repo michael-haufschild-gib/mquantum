@@ -60,6 +60,8 @@ export interface LayoutState {
   showLeftPanel: boolean
   /** Whether keyboard shortcuts overlay is visible */
   showShortcuts: boolean
+  /** Whether command palette is visible */
+  isCommandPaletteOpen: boolean
   /** Whether cinematic mode is active (hides all UI) */
   isCinematicMode: boolean
 }
@@ -93,6 +95,12 @@ export interface LayoutActions {
 
   /** Set shortcuts overlay explicitly */
   setShowShortcuts: (show: boolean) => void
+
+  /** Toggle command palette */
+  toggleCommandPalette: () => void
+
+  /** Set command palette explicitly */
+  setCommandPaletteOpen: (open: boolean) => void
 
   /** Toggle cinematic mode */
   toggleCinematicMode: () => void
@@ -171,6 +179,7 @@ const INITIAL_STATE: LayoutState = {
   isCollapsed: false,
   showLeftPanel: true,
   showShortcuts: false,
+  isCommandPaletteOpen: false,
   isCinematicMode: false,
 }
 
@@ -217,6 +226,14 @@ export const useLayoutStore = create<LayoutStore>()(
 
       setShowShortcuts: (show: boolean) => {
         set({ showShortcuts: show })
+      },
+
+      toggleCommandPalette: () => {
+        set((state) => ({ isCommandPaletteOpen: !state.isCommandPaletteOpen }))
+      },
+
+      setCommandPaletteOpen: (open: boolean) => {
+        set({ isCommandPaletteOpen: open })
       },
 
       toggleCinematicMode: () => {

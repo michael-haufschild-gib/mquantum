@@ -22,6 +22,7 @@
  */
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
+import { logger } from '@/lib/logger'
 import {
   TdseDiagnosticsHistory,
   type TdseDiagnosticsSnapshot,
@@ -152,13 +153,23 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   /**
    * CPU-precomputed radix-2 twiddle table bound at binding 2 (shared-mem FFT)
    * and binding 3 (per-stage FFT). Replaces per-thread `cos/sin` at stages
-   * >= 2. Rebuilt on grid-dim change only. See `TDSEFFTTwiddle.ts`.
+   * >= 2. Rebuilt on grid-dim change only. See `FFTTwiddle.ts`.
    */
   private fftTwiddleBuffer: GPUBuffer | null = null
   packUniformBuffer: GPUBuffer | null = null
   private densityTexture: GPUTexture | null = null
   private densityTextureView: GPUTextureView | null = null
   pl: TdsePipelineResult | null = null
+  /** Held between bg=null and async pipeline resolve to prevent GPU buffer leak. */
+  oldRenormBuffer: GPUBuffer | null = null
+
+  /**
+   * Generation counter for the async pipeline build. Incremented every
+   * time a config rebuild kicks off a new `buildTdsePipelines`; the
+   * resolution callback discards stale results that finish after a
+   * newer rebuild has already begun.
+   */
+  private pipelineGen = 0
   bg: TdseBindGroupResult | null = null
   diagUniformBuffer: GPUBuffer | null = null
   diagPartialSumsBuffer: GPUBuffer | null = null
@@ -423,23 +434,69 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     // Pipelines created lazily on first execute
   }
 
+  /**
+   * Kick off the async TDSE pipeline build. Returns immediately — the
+   * actual `device.createComputePipelineAsync` calls run on browser
+   * worker threads while the JS main thread continues rendering.
+   *
+   * On resolve, `this.pl` is populated and `rebuildBindGroups` runs.
+   * Stale builds (a newer config rebuild started before this one
+   * finished) are discarded via the `pipelineGen` counter.
+   *
+   * The smaller secondary pipelines (disorder, stochastic localization,
+   * Hawking injection, wormhole coupling) compile after the main TDSE
+   * batch — they're cheap relative to the core pipelines and folding
+   * them into the main `Promise.all` would entangle their state setup.
+   */
   buildPipelines(device: GPUDevice): void {
     const smBind = this.createShaderModule.bind(this)
     const cpBind = this.createComputePipeline.bind(this)
-    this.pl = buildTdsePipelines(device, {
+    const myGen = ++this.pipelineGen
+    const oldRenorm = this.oldRenormBuffer
+    this.oldRenormBuffer = null
+    buildTdsePipelines(device, {
       createShaderModule: smBind,
       createComputePipeline: cpBind,
       createUniformBuffer: (d, size, label) => this.createUniformBuffer(d, size, label),
     })
-    buildDisorderPipeline(device, this._disorderState, smBind, cpBind)
-    buildStochasticLocPipeline(device, this._stochasticState, smBind, cpBind)
-    buildHawkingInjectPipeline(device, this._hawkingState, smBind, cpBind)
-    if (!this.wormholePipeline) {
-      this.wormholePipeline = createWormholePipeline(device, smBind, cpBind)
-    }
+      .then((result) => {
+        if (myGen !== this.pipelineGen) {
+          oldRenorm?.destroy()
+          return
+        }
+        // Buffer guard: dispose() bumps pipelineGen so this branch is
+        // unreachable post-dispose, but make the contract explicit.
+        if (!this.densityTextureView) {
+          oldRenorm?.destroy()
+          return
+        }
+        this.pl = result
+        // Secondary state-resident pipelines: deferred to the post-resolve
+        // callback so they don't block the main async batch. Each is a
+        // single small pipeline whose sync compile is acceptable.
+        buildDisorderPipeline(device, this._disorderState, smBind, cpBind)
+        buildStochasticLocPipeline(device, this._stochasticState, smBind, cpBind)
+        buildHawkingInjectPipeline(device, this._hawkingState, smBind, cpBind)
+        if (!this.wormholePipeline) {
+          this.wormholePipeline = createWormholePipeline(device, smBind, cpBind)
+        }
+        this.rebuildBindGroups(device, oldRenorm)
+      })
+      .catch((err: unknown) => {
+        if (myGen !== this.pipelineGen) {
+          oldRenorm?.destroy()
+          return
+        }
+        logger.error('[TDSE-COMPUTE] pipeline build failed', err)
+        // rebuildBuffers already advanced lastConfigHash; clear it so
+        // executeTdse retries on the next frame instead of being wedged
+        // with pl/bg null for the same config.
+        this.lastConfigHash = ''
+        oldRenorm?.destroy()
+      })
   }
 
-  rebuildBindGroups(device: GPUDevice): void {
+  rebuildBindGroups(device: GPUDevice, existingRenorm?: GPUBuffer | null): void {
     if (!this.pl || !this.densityTextureView) return
     const bgSelf = this as unknown as TdsePassBufferFields
     if (!this.fftTwiddleBuffer) {
@@ -462,7 +519,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         densityTextureView: this.densityTextureView,
         totalSites: this.totalSites,
       } as TdseBindGroupInputs,
-      this.bg?.renormalizeUniformBuffer ?? null
+      existingRenorm ?? this.bg?.renormalizeUniformBuffer ?? null
     )
     // Rebuild stochastic localization bind group + expectation reduction
     if (this.uniformBuffer && this.psiBuffer) {
@@ -674,6 +731,11 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   }
 
   dispose(): void {
+    // Invalidate any in-flight async pipeline build so its `.then()`
+    // handler no-ops instead of writing into destroyed state.
+    this.pipelineGen++
+    this.oldRenormBuffer?.destroy()
+    this.oldRenormBuffer = null
     runTdseDispose(this._fieldView)
     // Tear down curved-space integrator scratch. Pipelines are GC'd by the
     // underlying GPUDevice; scratch buffers need explicit destroy() to

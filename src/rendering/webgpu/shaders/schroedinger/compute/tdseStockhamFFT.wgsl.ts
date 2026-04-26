@@ -35,13 +35,18 @@ struct FFTStageUniforms {
  *
  * Bind group layout:
  *   @group(0) @binding(0) FFTStageUniforms
- *   @group(0) @binding(1) srcBuf: array<f32> (read)
- *   @group(0) @binding(2) dstBuf: array<f32> (write)
+ *   @group(0) @binding(1) srcBuf: array<vec2f> (read)
+ *   @group(0) @binding(2) dstBuf: array<vec2f> (write)
  */
 export const tdseStockhamFFTBlock = /* wgsl */ `
 @group(0) @binding(0) var<uniform> fftUni: FFTStageUniforms;
-@group(0) @binding(1) var<storage, read> srcBuf: array<f32>;
-@group(0) @binding(2) var<storage, read_write> dstBuf: array<f32>;
+// vec2f view of the interleaved [re,im] buffer. The buffer base is
+// 256-byte aligned (WebGPU minStorageBufferOffsetAlignment) and each
+// complex element occupies exactly 8 bytes, so the typed view is
+// well-aligned and produces a single 8-byte load/store per access
+// instead of two scalar loads/stores at addr/addr+1.
+@group(0) @binding(1) var<storage, read> srcBuf: array<vec2f>;
+@group(0) @binding(2) var<storage, read_write> dstBuf: array<vec2f>;
 
 const FFT_TWO_PI: f32 = 6.28318530717958647692;
 
@@ -88,14 +93,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let outerStride = axisStride * N;
   let baseOffset = batchOuter * outerStride + batchInner;
 
-  // Address pattern: in0 at localBfly, in1 at localBfly + N/2.
-  // Compute inAddr0 once; inAddr1 is inAddr0 + 2 * bpt * axisStride (one mul saved).
-  let pairDelta = (butterfliesPerTransform * axisStride) << 1u;
-  let inAddr0 = (baseOffset + localBfly * axisStride) << 1u; // *2 for interleaved re,im
-  let inAddr1 = inAddr0 + pairDelta;
+  // Address pattern (complex-element units; the typed view drops the
+  // historical *2 shift). in0 at localBfly, in1 at localBfly + N/2.
+  let pairDelta = butterfliesPerTransform * axisStride;
+  let inIdx0 = baseOffset + localBfly * axisStride;
+  let inIdx1 = inIdx0 + pairDelta;
 
-  let val0 = vec2f(srcBuf[inAddr0], srcBuf[inAddr0 + 1u]);
-  let val1 = vec2f(srcBuf[inAddr1], srcBuf[inAddr1 + 1u]);
+  let val0 = srcBuf[inIdx0];
+  let val1 = srcBuf[inIdx1];
 
   // Twiddle factor: W_N^(j * N / fullStage) = exp(-i * direction * 2π * j / fullStage).
   // fftUni.stage is uniform across every thread in the dispatch, so the three
@@ -123,13 +128,11 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   // Stockham OUTPUT: out0 = g * fullStage + j, out1 = out0 + halfStage.
   let outIdx0 = g * fullStage + j;
-  let outAddr0 = (baseOffset + outIdx0 * axisStride) << 1u;
-  let outAddr1 = outAddr0 + ((halfStage * axisStride) << 1u);
+  let outAddr0 = baseOffset + outIdx0 * axisStride;
+  let outAddr1 = outAddr0 + halfStage * axisStride;
 
-  dstBuf[outAddr0] = outTop.x;
-  dstBuf[outAddr0 + 1u] = outTop.y;
-  dstBuf[outAddr1] = outBot.x;
-  dstBuf[outAddr1 + 1u] = outBot.y;
+  dstBuf[outAddr0] = outTop;
+  dstBuf[outAddr1] = outBot;
 }
 `
 
@@ -143,22 +146,25 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
  *
  * Bind group layout (TDSE-only):
  *   @group(0) @binding(0) FFTStageUniforms (uniform)
- *   @group(0) @binding(1) srcBuf: array<f32> (read)
- *   @group(0) @binding(2) dstBuf: array<f32> (read_write)
- *   @group(0) @binding(3) fftTwiddleTable: array<f32> (read) — see
- *     src/rendering/webgpu/passes/TDSEFFTTwiddle.ts for layout.
+ *   @group(0) @binding(1) srcBuf: array<vec2f> (read)
+ *   @group(0) @binding(2) dstBuf: array<vec2f> (read_write)
+ *   @group(0) @binding(3) fftTwiddleTable: array<vec2f> (read) — see
+ *     src/rendering/webgpu/passes/FFTTwiddle.ts for layout.
  *
- * Dirac and Pauli import the unchanged `tdseStockhamFFTBlock` above and keep
- * their 3-entry BGLs — their shader binaries are bit-identical to before.
+ * All three modes (TDSE, Dirac, Pauli) use this 4-binding twiddle variant.
+ * The original 3-binding `tdseStockhamFFTBlock` above is retained for reference.
  */
 export const tdseStockhamFFTTwiddleBlock = /* wgsl */ `
 @group(0) @binding(0) var<uniform> fftUni: FFTStageUniforms;
-@group(0) @binding(1) var<storage, read> srcBuf: array<f32>;
-@group(0) @binding(2) var<storage, read_write> dstBuf: array<f32>;
-@group(0) @binding(3) var<storage, read> fftTwiddleTable: array<f32>;
+// vec2f view: see comment in tdseStockhamFFTBlock above. Saves one
+// shift per address computation and replaces 2 scalar
+// loads/stores per element with a single 8-byte vector op.
+@group(0) @binding(1) var<storage, read> srcBuf: array<vec2f>;
+@group(0) @binding(2) var<storage, read_write> dstBuf: array<vec2f>;
+@group(0) @binding(3) var<storage, read> fftTwiddleTable: array<vec2f>;
 
 // Max FFT axis length for the TDSE twiddle path. Must match
-// N_MAX_FFT_TWIDDLE in src/rendering/webgpu/passes/TDSEFFTTwiddle.ts.
+// N_MAX_FFT_TWIDDLE in src/rendering/webgpu/passes/FFTTwiddle.ts.
 const N_MAX_FFT_TWIDDLE_PS: u32 = 128u;
 const LOG2_N_MAX_FFT_TWIDDLE_PS: u32 = 7u;
 
@@ -196,12 +202,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let outerStride = axisStride * N;
   let baseOffset = batchOuter * outerStride + batchInner;
 
-  let pairDelta = (butterfliesPerTransform * axisStride) << 1u;
-  let inAddr0 = (baseOffset + localBfly * axisStride) << 1u;
-  let inAddr1 = inAddr0 + pairDelta;
+  let pairDelta = butterfliesPerTransform * axisStride;
+  let inIdx0 = baseOffset + localBfly * axisStride;
+  let inIdx1 = inIdx0 + pairDelta;
 
-  let val0 = vec2f(srcBuf[inAddr0], srcBuf[inAddr0 + 1u]);
-  let val1 = vec2f(srcBuf[inAddr1], srcBuf[inAddr1 + 1u]);
+  let val0 = srcBuf[inIdx0];
+  let val1 = srcBuf[inIdx1];
 
   // Twiddle selection. fftUni.stage is uniform across every thread in the
   // dispatch, so the if-chain collapses to a single path per dispatch.
@@ -216,10 +222,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let dir = fftUni.direction;
     let twStride = 1u << (LOG2_N_MAX_FFT_TWIDDLE_PS - s - 1u);
     let twIdx = j * twStride;
-    let twFwd = vec2f(
-      fftTwiddleTable[twIdx << 1u],
-      fftTwiddleTable[(twIdx << 1u) + 1u]
-    );
+    let twFwd = fftTwiddleTable[twIdx];
     let tw = vec2f(twFwd.x, dir * twFwd.y);
     twVal1 = cmul_tw_ps(tw, val1);
   }
@@ -228,12 +231,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let outBot = val0 - twVal1;
 
   let outIdx0 = g * fullStage + j;
-  let outAddr0 = (baseOffset + outIdx0 * axisStride) << 1u;
-  let outAddr1 = outAddr0 + ((halfStage * axisStride) << 1u);
+  let outAddr0 = baseOffset + outIdx0 * axisStride;
+  let outAddr1 = outAddr0 + halfStage * axisStride;
 
-  dstBuf[outAddr0] = outTop.x;
-  dstBuf[outAddr0 + 1u] = outTop.y;
-  dstBuf[outAddr1] = outBot.x;
-  dstBuf[outAddr1 + 1u] = outBot.y;
+  dstBuf[outAddr0] = outTop;
+  dstBuf[outAddr1] = outBot;
 }
 `

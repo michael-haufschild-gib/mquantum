@@ -1,26 +1,13 @@
-import React, { useState } from 'react'
+import React, { Suspense, useRef, useState } from 'react'
 
 // Import existing sidebar sections
 import { AbsorptionSection } from '@/components/sections/Absorption/AbsorptionSection'
 import { AdvancedObjectControls } from '@/components/sections/Advanced/AdvancedObjectControls'
-import { AnalysisSection } from '@/components/sections/Analysis/AnalysisSection'
-import { BECPageCurveSection } from '@/components/sections/Analysis/BECPageCurveSection'
-import { CoordinateEntanglementSection } from '@/components/sections/Analysis/CoordinateEntanglementSection'
-import { DecoherenceSection } from '@/components/sections/Analysis/DecoherenceSection'
-import { OpenQuantumDiagnosticsSection } from '@/components/sections/Analysis/OpenQuantumDiagnosticsSection'
-import { QuantumnessAtlasSection } from '@/components/sections/Analysis/QuantumnessAtlasSection'
-import { SchroedingerQuantumEffectsSection } from '@/components/sections/Analysis/SchroedingerQuantumEffectsSection'
-import { SrmtDiagnosticSection } from '@/components/sections/Analysis/SrmtDiagnosticSection'
-import { SrmtSweepSection } from '@/components/sections/Analysis/SrmtSweepSection'
-import { EnvironmentSection } from '@/components/sections/Environment/EnvironmentSection'
 import { ExposureSection } from '@/components/sections/Exposure/ExposureSection'
 import { FacesSection } from '@/components/sections/Faces/FacesSection'
-import { LightsSection } from '@/components/sections/Lights/LightsSection'
-import { PerformanceSection } from '@/components/sections/Performance/PerformanceSection'
-import { PostProcessingSection } from '@/components/sections/PostProcessing/PostProcessingSection'
-import { SettingsSection } from '@/components/sections/Settings/SettingsSection'
 import { Icon } from '@/components/ui/Icon'
 import { Tab, Tabs } from '@/components/ui/Tabs'
+import { useScrollingPanelAttr } from '@/hooks/useScrollingPanelAttr'
 
 /** Object tab content — appearance, exposure, absorption, and advanced rendering. */
 const ObjectTabContent: React.FC = React.memo(() => {
@@ -36,26 +23,23 @@ const ObjectTabContent: React.FC = React.memo(() => {
 ObjectTabContent.displayName = 'ObjectTabContent'
 
 /** Analysis tab content — cross-section, decoherence, entanglement, and quantum effects. */
-const AnalysisTabContent: React.FC = React.memo(() => {
-  return (
-    <div>
-      <AnalysisSection defaultOpen={true} />
-      <BECPageCurveSection />
-      <DecoherenceSection />
-      <CoordinateEntanglementSection />
-      <QuantumnessAtlasSection />
-      <SchroedingerQuantumEffectsSection defaultOpen={true} />
-      <OpenQuantumDiagnosticsSection />
-      <SrmtDiagnosticSection />
-      <SrmtSweepSection />
-    </div>
-  )
-})
-AnalysisTabContent.displayName = 'AnalysisTabContent'
+const AnalysisTabContent = React.lazy(
+  () => import('@/components/layout/EditorRightPanel/AnalysisTabContent')
+)
+
+const SceneTabContent = React.lazy(
+  () => import('@/components/layout/EditorRightPanel/SceneTabContent')
+)
+
+const SystemTabContent = React.lazy(
+  () => import('@/components/layout/EditorRightPanel/SystemTabContent')
+)
 
 export const EditorRightPanel: React.FC = React.memo(() => {
   // Default to 'object' tab as per user feedback (primary creative focus)
   const [activeTab, setActiveTab] = useState('object')
+  const scrollContentRef = useRef<HTMLDivElement>(null)
+  useScrollingPanelAttr(scrollContentRef)
 
   const tabs: Tab[] = [
     {
@@ -78,7 +62,11 @@ export const EditorRightPanel: React.FC = React.memo(() => {
           <span>Analysis</span>
         </div>
       ),
-      content: <AnalysisTabContent />,
+      content: (
+        <Suspense fallback={null}>
+          <AnalysisTabContent />
+        </Suspense>
+      ),
     },
     {
       id: 'scene',
@@ -90,12 +78,9 @@ export const EditorRightPanel: React.FC = React.memo(() => {
         </div>
       ),
       content: (
-        <div>
-          {/* The "Stage" - Background, Lighting, Lens, FX */}
-          <EnvironmentSection defaultOpen={true} />
-          <LightsSection defaultOpen={false} />
-          <PostProcessingSection defaultOpen={false} />
-        </div>
+        <Suspense fallback={null}>
+          <SceneTabContent />
+        </Suspense>
       ),
     },
     {
@@ -108,11 +93,9 @@ export const EditorRightPanel: React.FC = React.memo(() => {
         </div>
       ),
       content: (
-        <div>
-          {/* The "App" - Settings, Meta, Output */}
-          <SettingsSection defaultOpen={true} />
-          <PerformanceSection defaultOpen={false} />
-        </div>
+        <Suspense fallback={null}>
+          <SystemTabContent />
+        </Suspense>
       ),
     },
   ]
@@ -136,6 +119,7 @@ export const EditorRightPanel: React.FC = React.memo(() => {
           className="flex-1 flex flex-col min-h-0"
           tabListClassName="px-3 pt-3 pb-0 bg-transparent"
           contentClassName="flex-1 overflow-y-auto p-0 scrollbar-thin scrollbar-thumb-[var(--border-default)] hover:scrollbar-thumb-[var(--border-highlight)]"
+          contentRef={scrollContentRef}
           variant="default"
           fullWidth
         />

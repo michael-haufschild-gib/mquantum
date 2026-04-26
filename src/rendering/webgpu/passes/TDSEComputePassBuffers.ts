@@ -9,8 +9,8 @@ import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import { assertPow2Log2, FFT_UNIFORM_SIZE, PACK_UNIFORM_SIZE } from './computePassUtils'
+import { buildFFTTwiddleTable, FFT_TWIDDLE_BYTES } from './FFTTwiddle'
 import { buildTdseFFTAxisStagingData, buildTdseFFTStagingData } from './TDSEComputePassUniforms'
-import { buildTdseFFTTwiddleTable, FFT_TWIDDLE_BYTES } from './TDSEFFTTwiddle'
 
 /**
  * TDSEUniforms struct size in bytes.
@@ -304,7 +304,7 @@ export function rebuildTdseBuffers(
   // CPU-precomputed radix-2 twiddle table. Replaces per-thread cos/sin in the
   // Stockham butterfly at stages s >= 2. Sized for N_MAX_FFT_TWIDDLE = 128;
   // a single 512-byte buffer serves every axis length in [8, 128] and both
-  // FFT kernels (shared-mem + per-stage). See TDSEFFTTwiddle.ts for layout.
+  // FFT kernels (shared-mem + per-stage). See FFTTwiddle.ts for layout.
   // Rebuilt on every grid-dim rebuild but uploaded exactly once — values are
   // axis-length-independent.
   const fftTwiddleBuffer = device.createBuffer({
@@ -312,7 +312,7 @@ export function rebuildTdseBuffers(
     size: FFT_TWIDDLE_BYTES,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   })
-  device.queue.writeBuffer(fftTwiddleBuffer, 0, buildTdseFFTTwiddleTable())
+  device.queue.writeBuffer(fftTwiddleBuffer, 0, buildFFTTwiddleTable())
 
   // Pack uniforms: totalSites and invN don't change between frames
   const packData = new ArrayBuffer(PACK_UNIFORM_SIZE)

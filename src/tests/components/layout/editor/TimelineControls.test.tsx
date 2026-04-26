@@ -157,7 +157,7 @@ describe('TimelineControls', () => {
     fireEvent.click(rotButton)
 
     // Now drawer should be open, and "XY" button visible
-    expect(screen.getByText('XY')).toBeInTheDocument()
+    expect(await screen.findByText('XY')).toBeInTheDocument()
 
     // Click Rotate again to close
     fireEvent.click(rotButton)
@@ -166,7 +166,7 @@ describe('TimelineControls', () => {
     })
   })
 
-  it('does not show Stop All button in main bar, but shows Deselect All in drawer', () => {
+  it('does not show Stop All button in main bar, but shows Deselect All in drawer', async () => {
     render(<TimelineControls />)
 
     // Stop All button should be removed from main bar
@@ -177,10 +177,10 @@ describe('TimelineControls', () => {
     fireEvent.click(rotButton)
 
     // Deselect All button (functionally the stop button) should be in drawer
-    expect(screen.getByText('Deselect All')).toBeInTheDocument()
+    expect(await screen.findByText('Deselect All')).toBeInTheDocument()
   })
 
-  it('shows randomize button in rotation drawer', () => {
+  it('shows randomize button in rotation drawer', async () => {
     render(<TimelineControls />)
 
     // Open rotation drawer
@@ -188,11 +188,13 @@ describe('TimelineControls', () => {
     fireEvent.click(rotButton)
 
     // Check for dice/randomize button
-    const randomizeButton = screen.getByRole('button', { name: /randomize rotation planes/i })
+    const randomizeButton = await screen.findByRole('button', {
+      name: /randomize rotation planes/i,
+    })
     expect(randomizeButton).toBeInTheDocument()
   })
 
-  it('calls randomizePlanes when dice button is clicked', () => {
+  it('calls randomizePlanes when dice button is clicked', async () => {
     render(<TimelineControls />)
 
     // Open rotation drawer
@@ -200,7 +202,9 @@ describe('TimelineControls', () => {
     fireEvent.click(rotButton)
 
     // Click randomize button
-    const randomizeButton = screen.getByRole('button', { name: /randomize rotation planes/i })
+    const randomizeButton = await screen.findByRole('button', {
+      name: /randomize rotation planes/i,
+    })
     fireEvent.click(randomizeButton)
 
     // Verify randomizePlanes was called with the current dimension (4)
@@ -215,7 +219,7 @@ describe('TimelineControls', () => {
     fireEvent.click(rotButton)
 
     // Drawer should be open
-    expect(screen.getByText('XY')).toBeInTheDocument()
+    expect(await screen.findByText('XY')).toBeInTheDocument()
 
     // Click close button (floating close button uses "Close drawer" aria label)
     const closeButton = screen.getByRole('button', { name: /close drawer/i })

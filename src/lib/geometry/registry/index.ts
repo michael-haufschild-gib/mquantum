@@ -9,7 +9,6 @@
  * import {
  *   getAvailableQuantumTypes,
  *   getQuantumTypeEntry,
- *   getControlsComponent,
  * } from '@/lib/geometry/registry';
  * ```
  */
@@ -64,6 +63,3 @@ export {
   isRaymarchingType,
   isValidObjectType,
 } from './helpers'
-
-// Component loader
-export { getControlsComponent, hasControlsComponent } from './components'

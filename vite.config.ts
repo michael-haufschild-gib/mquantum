@@ -88,6 +88,17 @@ const SOURCE_CHUNKS: [string, string][] = [
   ['/components/layout/EditorLeftPanel', 'components-panels'],
   ['/components/layout/EditorRightPanel', 'components-panels'],
   ['/components/layout/EditorBottomPanel', 'components-panels'],
+  ['/components/layout/TimelineControls/', 'components-timeline-deferred'],
+  ['/components/sections/Geometry/ObjectSettingsSection', 'components-geometry-deferred'],
+  ['/components/sections/Geometry/SchroedingerControls/tdseControlsConstants', 'components-panels'],
+  ['/components/sections/Geometry/SchroedingerControls/', 'components-geometry-deferred'],
+  ['/components/sections/Geometry/PauliSpinorControls/', 'components-geometry-deferred'],
+  ['/components/sections/Analysis/', 'components-analysis-deferred'],
+  ['/components/sections/Environment/', 'components-scene-system-deferred'],
+  ['/components/sections/Lights/', 'components-scene-system-deferred'],
+  ['/components/sections/PostProcessing/', 'components-scene-system-deferred'],
+  ['/components/sections/Performance/', 'components-scene-system-deferred'],
+  ['/components/sections/Settings/', 'components-scene-system-deferred'],
   ['/components/sections/', 'components-panels'],
   // Lazy-loaded overlays — deferred until user action
   ['/components/canvas/PerformanceMonitor', 'components-deferred'],
@@ -101,6 +112,8 @@ const SOURCE_CHUNKS: [string, string][] = [
   ['/components/overlays/WormholeCoherencePanel', 'components-deferred'],
   ['/components/overlays/pageCurve/', 'components-deferred'],
   ['/components/presets/', 'components-deferred'],
+  ['/components/layout/CommandPalette', 'components-deferred'],
+  ['/components/layout/ShortcutsOverlay', 'components-deferred'],
   ['/components/', 'components'],
 ]
 

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type {
   WebGPURenderPass,
@@ -142,6 +142,90 @@ async function createGraphHarness(pass: WebGPURenderPass) {
     copyBufferToBuffer,
   }
 }
+
+async function readTimestampTimings(
+  values: bigint[],
+  passIds: string[],
+  phases: Array<{ hasCompute: boolean; hasRender: boolean }>
+) {
+  const { WebGPUTimestampCollector } =
+    await import('@/rendering/webgpu/graph/WebGPUTimestampCollector')
+  vi.stubGlobal('GPUMapMode', { READ: 1 })
+
+  const timestampValues = new BigUint64Array(values)
+  const readBuffer = {
+    mapAsync: vi.fn().mockResolvedValue(undefined),
+    getMappedRange: vi.fn(() => timestampValues.buffer),
+    unmap: vi.fn(),
+  } as unknown as GPUBuffer
+
+  const device = {
+    queue: {
+      onSubmittedWorkDone: vi.fn().mockResolvedValue(undefined),
+    },
+  } as unknown as GPUDevice
+
+  const collector = new WebGPUTimestampCollector()
+  const internals = collector as unknown as {
+    enabled: boolean
+    readBuffer: GPUBuffer
+  }
+  internals.enabled = true
+  internals.readBuffer = readBuffer
+
+  collector.scheduleReadback(device, passIds.length, passIds, phases)
+  await vi.waitFor(() => expect(readBuffer.unmap).toHaveBeenCalledTimes(1))
+
+  return collector.getLastTimings()
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+describe('WebGPUTimestampCollector readback parsing', () => {
+  it('publishes per-pass deltas when begin timestamps share a frame origin', async () => {
+    const timings = await readTimestampTimings(
+      [0n, 0n, 100_000_000n, 101_000_000n, 0n, 0n, 100_000_000n, 103_500_000n],
+      ['scene', 'post'],
+      [
+        { hasCompute: false, hasRender: true },
+        { hasCompute: false, hasRender: true },
+      ]
+    )
+
+    expect(timings.get('scene')).toEqual({ total: 1, compute: 0, render: 1 })
+    expect(timings.get('post')).toEqual({ total: 2.5, compute: 0, render: 2.5 })
+  })
+
+  it('preserves true per-pass begin/end timings', async () => {
+    const timings = await readTimestampTimings(
+      [0n, 0n, 100_000_000n, 101_000_000n, 0n, 0n, 102_000_000n, 104_500_000n],
+      ['scene', 'post'],
+      [
+        { hasCompute: false, hasRender: true },
+        { hasCompute: false, hasRender: true },
+      ]
+    )
+
+    expect(timings.get('scene')).toEqual({ total: 1, compute: 0, render: 1 })
+    expect(timings.get('post')).toEqual({ total: 2.5, compute: 0, render: 2.5 })
+  })
+
+  it('splits compute and render deltas after an earlier pass', async () => {
+    const timings = await readTimestampTimings(
+      [0n, 0n, 100_000_000n, 101_000_000n, 100_000_000n, 103_000_000n, 100_000_000n, 106_000_000n],
+      ['scene', 'schroedinger'],
+      [
+        { hasCompute: false, hasRender: true },
+        { hasCompute: true, hasRender: true },
+      ]
+    )
+
+    expect(timings.get('scene')).toEqual({ total: 1, compute: 0, render: 1 })
+    expect(timings.get('schroedinger')).toEqual({ total: 5, compute: 2, render: 3 })
+  })
+})
 
 describe('WebGPURenderGraph timestampWrites wiring', () => {
   it('memoizes pass enabled-state checks per frame', async () => {

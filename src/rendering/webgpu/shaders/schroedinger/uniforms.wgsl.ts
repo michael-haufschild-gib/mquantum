@@ -9,10 +9,16 @@
  * @module rendering/webgpu/shaders/schroedinger/uniforms.wgsl
  */
 
+import {
+  SCHROEDINGER_MAX_DIM,
+  SCHROEDINGER_MAX_EXTRA_DIM,
+  SCHROEDINGER_MAX_TERMS,
+} from '@/constants/quantum'
+
 // CANONICAL CONSTANTS: These define array sizes for all quantum modules.
-export const MAX_DIM = 11
-export const MAX_TERMS = 8
-export const MAX_EXTRA_DIM = 8
+export const MAX_DIM = SCHROEDINGER_MAX_DIM
+export const MAX_TERMS = SCHROEDINGER_MAX_TERMS
+export const MAX_EXTRA_DIM = SCHROEDINGER_MAX_EXTRA_DIM
 
 export const schroedingerUniformsBlock = /* wgsl */ `
 // ============================================
@@ -20,9 +26,9 @@ export const schroedingerUniformsBlock = /* wgsl */ `
 // ============================================
 
 // CANONICAL DEFINITIONS
-const MAX_DIM: i32 = 11;
-const MAX_TERMS: i32 = 8;
-const MAX_EXTRA_DIM: i32 = 8;
+const MAX_DIM: i32 = ${MAX_DIM};
+const MAX_TERMS: i32 = ${MAX_TERMS};
+const MAX_EXTRA_DIM: i32 = ${MAX_EXTRA_DIM};
 
 // Quantum mode constants (used throughout all quantum modules)
 const QUANTUM_MODE_HARMONIC: i32 = 0;

@@ -61,6 +61,7 @@ export interface TdseExecuteFields {
   uniformBuffer: GPUBuffer | null
   diagUniformBuffer: GPUBuffer | null
 
+  oldRenormBuffer: GPUBuffer | null
   // Scalar state
   lastConfigHash: string
   lastPotentialHash: string
@@ -101,7 +102,7 @@ export interface TdseExecuteFields {
   syncSharedState(): void
   rebuildBuffers(device: GPUDevice, config: TdseConfig): void
   buildPipelines(device: GPUDevice): void
-  rebuildBindGroups(device: GPUDevice): void
+  rebuildBindGroups(device: GPUDevice, existingRenorm?: GPUBuffer | null): void
   maybeInitialize(ctx: WebGPURenderContext, config: TdseConfig): void
   dispatchFFTAxis(ctx: WebGPURenderContext, axisDim: number, slotOffset: number): number
   dispatchFFTAxisInPass(passEncoder: GPUComputePassEncoder, axisDim: number, slot: number): void
@@ -175,8 +176,16 @@ export function runTdseExecute(
 
   if (configHash !== pass.lastConfigHash || !pass.psiBuffer) {
     pass.rebuildBuffers(device, config)
+    // Drop stale pipelines/bind groups so the early-return guards below
+    // (and inside the Strang loop) skip dispatch until the new async
+    // compile lands. `buildPipelines` kicks off an async build whose
+    // .then() callback wires bind groups when it resolves.
+    // Capture old renormalize buffer before nulling bg so the async
+    // resolve can reuse it instead of leaking a new allocation.
+    pass.oldRenormBuffer = pass.bg?.renormalizeUniformBuffer ?? null
+    pass.pl = null
+    pass.bg = null
     pass.buildPipelines(device)
-    pass.rebuildBindGroups(device)
     pass.initialized = false
     pass.simTime = 0
     pass.lastPotentialHash = ''

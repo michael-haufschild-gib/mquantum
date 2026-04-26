@@ -93,6 +93,12 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   private fftAxisUniformBuffer: GPUBuffer | null = null
   private fftAxisStagingBuffer: GPUBuffer | null = null
   private fftAxisUniformBuffers: GPUBuffer[] | null = null
+  /**
+   * CPU-precomputed radix-2 twiddle table bound at binding 3 (per-stage FFT)
+   * and binding 2 (shared-mem FFT). Replaces per-thread `cos/sin` at stages
+   * >= 2. Rebuilt on every grid-dim rebuild. See `FFTTwiddle.ts`.
+   */
+  private fftTwiddleBuffer: GPUBuffer | null = null
   private packUniformBuffer: GPUBuffer | null = null
   private packUniformBufferNoNorm: GPUBuffer | null = null
 
@@ -105,6 +111,14 @@ export class DiracComputePass extends WebGPUBaseComputePass {
 
   // Bind groups + renormalize uniform buffer (created by rebuildDiracBindGroups)
   private bg: DiracBindGroupResult | null = null
+
+  /**
+   * Generation counter for the async pipeline build. Incremented every
+   * time a config change kicks off a new `buildDiracPipelines`; the
+   * resolution callback only commits its result if the gen hasn't
+   * advanced. Prevents a stale, slow compile from clobbering a newer one.
+   */
+  private pipelineGen = 0
 
   // Diagnostics buffers
   private diagUniformBuffer: GPUBuffer | null = null
@@ -270,6 +284,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
         fftAxisUniformBuffer: this.fftAxisUniformBuffer,
         fftAxisStagingBuffer: this.fftAxisStagingBuffer,
         fftAxisUniformBuffers: this.fftAxisUniformBuffers,
+        fftTwiddleBuffer: this.fftTwiddleBuffer,
         packUniformBuffer: this.packUniformBuffer,
         packUniformBufferNoNorm: this.packUniformBufferNoNorm,
         diagUniformBuffer: this.diagUniformBuffer,
@@ -296,6 +311,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     this.fftAxisUniformBuffer = result.fftAxisUniformBuffer
     this.fftAxisStagingBuffer = result.fftAxisStagingBuffer
     this.fftAxisUniformBuffers = result.fftAxisUniformBuffers
+    this.fftTwiddleBuffer = result.fftTwiddleBuffer
     this.packUniformBuffer = result.packUniformBuffer
     this.packUniformBufferNoNorm = result.packUniformBufferNoNorm
     this.diagUniformBuffer = result.diagUniformBuffer
@@ -338,12 +354,51 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     // Pipelines created lazily on first execute
   }
 
-  private buildPipelines(device: GPUDevice, latticeDim: number): void {
-    this.pl = buildDiracPipelines(device, this.setupHelpers, latticeDim)
+  /**
+   * Kick off the async pipeline build. Returns a Promise gated by a
+   * generation counter — if a newer config rebuild starts before this
+   * one resolves, the stale result is discarded.
+   */
+  private buildPipelinesAsync(
+    device: GPUDevice,
+    latticeDim: number,
+    oldRenorm: GPUBuffer | null = null
+  ): void {
+    const myGen = ++this.pipelineGen
+    buildDiracPipelines(device, this.setupHelpers, latticeDim)
+      .then((result) => {
+        if (myGen !== this.pipelineGen) {
+          oldRenorm?.destroy()
+          return
+        }
+        // Bail if dispose ran before this resolved — buffers below would
+        // be null and `rebuildBindGroups` would crash. The generation
+        // bump in dispose() makes this branch unreachable in practice,
+        // but the buffer guard makes that promise explicit.
+        if (!this.densityTextureView || !this.uniformBuffer) {
+          oldRenorm?.destroy()
+          return
+        }
+        this.pl = result
+        this.rebuildBindGroups(device, oldRenorm)
+      })
+      .catch((err: unknown) => {
+        if (myGen !== this.pipelineGen) {
+          oldRenorm?.destroy()
+          return
+        }
+        logger.error('[Dirac-COMPUTE] pipeline build failed', err)
+        // rebuildBuffers already advanced lastConfigHash, so without
+        // this clear the next frame would skip the rebuild path and
+        // leave Dirac wedged forever. Clearing it forces a retry on
+        // the next execute().
+        this.lastConfigHash = ''
+        oldRenorm?.destroy()
+      })
   }
 
   /** Called immediately after rebuildBuffers + buildPipelines, so all fields are non-null. */
-  private rebuildBindGroups(device: GPUDevice): void {
+  private rebuildBindGroups(device: GPUDevice, existingRenorm?: GPUBuffer | null): void {
     if (!this.pl || !this.densityTextureView) return
     this.bg = rebuildDiracBindGroups(
       device,
@@ -358,6 +413,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
         fftUniformBuffer: this.fftUniformBuffer!,
         fftAxisUniformBuffer: this.fftAxisUniformBuffer!,
         fftAxisUniformBuffers: this.fftAxisUniformBuffers!,
+        fftTwiddleBuffer: this.fftTwiddleBuffer!,
         packUniformBuffer: this.packUniformBuffer!,
         packUniformBufferNoNorm: this.packUniformBufferNoNorm!,
         densityTextureView: this.densityTextureView,
@@ -370,7 +426,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
         totalSites: this.totalSites,
         currentSpinorSize: this.currentSpinorSize,
       },
-      this.bg?.renormalizeUniformBuffer ?? null
+      existingRenorm ?? this.bg?.renormalizeUniformBuffer ?? null
     )
   }
 
@@ -389,14 +445,12 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   /** Refresh potential buffer when physics parameters change. */
   private refreshPotentialIfDirty(ctx: WebGPURenderContext, config: DiracConfig): void {
     const potHash = `${config.potentialType}|${config.potentialStrength}|${config.potentialWidth}|${config.potentialCenter}|${config.harmonicOmega}|${config.coulombZ}|${config.mass}|${config.spacing.join(',')}`
-    if (potHash !== this.lastPotentialHash) {
+    if (potHash !== this.lastPotentialHash && this.pl && this.bg) {
       this.lastPotentialHash = potHash
-      if (this.pl && this.bg) {
-        const d = pickSiteDispatch(config.latticeDim, this.totalSites, config.gridSize)
-        const p = ctx.beginComputePass({ label: 'dirac-potential-update' })
-        this.dispatchCompute(p, this.pl.potentialPipeline, [this.bg.potentialBG!], d.x, d.y, d.z)
-        p.end()
-      }
+      const d = pickSiteDispatch(config.latticeDim, this.totalSites, config.gridSize)
+      const p = ctx.beginComputePass({ label: 'dirac-potential-update' })
+      this.dispatchCompute(p, this.pl.potentialPipeline, [this.bg.potentialBG!], d.x, d.y, d.z)
+      p.end()
     }
   }
 
@@ -414,6 +468,8 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     // The merged vec2f layout expects interleaved [re0, im0, re1, im1, ...]
     // so the saved `re: Float32Array` + `im: Float32Array` must be
     // re-interleaved here before upload.
+    // Injection only needs the spinor buffer; can complete before the
+    // async pipeline build finishes.
     if (this.pendingInjection && this.spinorBuffer) {
       const { re, im } = this.pendingInjection
       const elementCount = Math.min(re.length, this.currentSpinorSize * this.totalSites)
@@ -425,7 +481,12 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       device.queue.writeBuffer(this.spinorBuffer, 0, interleaved)
       this.pendingInjection = null
       logger.log(`[Dirac] Injected loaded wavefunction (${elementCount} elements)`)
-    } else if (this.pl && this.bg) {
+    } else {
+      // Init kernel + potential fill both need the compiled pipelines and
+      // their bind groups. Defer marking `initialized` until they exist —
+      // otherwise we'd permanently skip init when the async compile lands.
+      if (!this.pl || !this.bg) return
+
       const initPass = ctx.beginComputePass({ label: 'dirac-init-pass' })
       this.dispatchCompute(
         initPass,
@@ -530,13 +591,25 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     if (configHash !== this.lastConfigHash || !this.spinorBuffer) {
       logger.log(`[Dirac-COMPUTE] rebuild: ${this.lastConfigHash} → ${configHash}`)
       this.rebuildBuffers(device, config)
-      // Kinetic + write-grid pipelines are specialized on latticeDim so the
-      // sparse monomial gamma tables emitted at compose time match the
-      // generated α/β matrices for this dimension. Rebuild is already gated
-      // on configHash (which includes latticeDim) so we only recompile when
-      // the specialization actually changes.
-      this.buildPipelines(device, config.latticeDim)
-      this.rebuildBindGroups(device)
+      // Drop stale pipelines/bind groups so the early-return guard below
+      // skips dispatch until the new compile lands. Keeps the renderer
+      // from issuing a stage with mismatched resources.
+      // Capture old renormalize buffer before nulling bg — passed into
+      // buildPipelinesAsync so the async resolve can reuse it.
+      const oldRenorm = this.bg?.renormalizeUniformBuffer ?? null
+      this.pl = null
+      this.bg = null
+      // Kinetic + write-grid pipelines are specialized on latticeDim (the
+      // sparse monomial gamma tables emitted at compose time must match the
+      // generated α/β matrices for this dimension). configHash also includes
+      // gridSize, so resolution-only changes trigger an extra async compile
+      // even though the shader code hasn't changed. The compile is async and
+      // doesn't stall the main thread, so the cost is acceptable vs. the
+      // complexity of maintaining separate buffer/pipeline hashes.
+      // Async: while the WGSL→backend compile runs on a worker, the JS
+      // main thread keeps rendering. The .then() handler in
+      // buildPipelinesAsync wires up bind groups when the compile lands.
+      this.buildPipelinesAsync(device, config.latticeDim, oldRenorm)
       this.initialized = false
       this.simTime = 0
       this.lastPotentialHash = ''
@@ -701,6 +774,9 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   }
 
   dispose(): void {
+    // Invalidate any in-flight async pipeline build so its `.then()`
+    // handler no-ops instead of writing into destroyed state.
+    this.pipelineGen++
     // Cancel any pending diagnostic mapAsync before destroying buffers
     if (this.diagMappingInFlight && this.diagStagingBuffer) {
       this.diagStagingBuffer.unmap()
@@ -711,6 +787,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       this.spinorBuffer, this.potentialBuffer, this.gammaBuffer,
       this.fftScratchA, this.fftScratchB, this.uniformBuffer, this.fftUniformBuffer,
       this.fftStagingBuffer, this.fftAxisUniformBuffer, this.fftAxisStagingBuffer,
+      this.fftTwiddleBuffer,
       this.packUniformBuffer, this.packUniformBufferNoNorm,
       this.diagUniformBuffer, this.diagPartialNormBuffer, this.diagPartialMaxBuffer,
       this.diagPartialParticleBuffer, this.diagPartialAntiBuffer,
@@ -726,6 +803,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     this.fftScratchA = this.fftScratchB = this.uniformBuffer = this.fftUniformBuffer = null
     this.fftStagingBuffer = this.fftAxisUniformBuffer = this.fftAxisStagingBuffer = null
     this.fftAxisUniformBuffers = null
+    this.fftTwiddleBuffer = null
     this.packUniformBuffer = this.packUniformBufferNoNorm = null
     this.diagUniformBuffer = this.diagPartialNormBuffer = this.diagPartialMaxBuffer = null
     this.diagPartialParticleBuffer = this.diagPartialAntiBuffer = null

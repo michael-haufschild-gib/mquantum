@@ -284,7 +284,7 @@ export function useExportRuntime({
 
       exportStore.setStatus('encoding')
       const blob = runtime.recorder ? await runtime.recorder.finalize() : null
-      applyCompletionByMode(runtime.mode, blob, runtime.loop, runtime.settings)
+      await applyCompletionByMode(runtime.mode, blob, runtime.loop, runtime.settings)
     } catch (error) {
       handledError = true
       await handleExportError(error)

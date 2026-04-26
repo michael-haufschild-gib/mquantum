@@ -56,12 +56,12 @@ export async function teardownRecorder(recorder: ExportRecorder | null): Promise
  * @param loop - Current loop state (for segment count)
  * @param settings - Export settings (for format)
  */
-export function applyCompletionByMode(
+export async function applyCompletionByMode(
   mode: RuntimeExportMode,
   blob: Blob | null,
   loop: ExportLoopState,
   settings: ExportSettings
-): void {
+): Promise<void> {
   const exportStore = useExportStore.getState()
   exportStore.setProgress(1)
 
@@ -75,7 +75,7 @@ export function applyCompletionByMode(
     exportStore.setCompletionDetails({ type: 'stream' })
   } else {
     if (blob) {
-      triggerSegmentDownload(blob, loop.currentSegment, settings.format)
+      await triggerSegmentDownload(blob, loop.currentSegment, settings.format)
     }
     exportStore.setCompletionDetails({
       type: 'segmented',
@@ -264,7 +264,7 @@ export async function rolloverSegment(
   if (runtime.recorder) {
     const segmentBlob = await runtime.recorder.finalize()
     if (segmentBlob) {
-      triggerSegmentDownload(segmentBlob, loop.currentSegment, settings.format)
+      await triggerSegmentDownload(segmentBlob, loop.currentSegment, settings.format)
     }
     runtime.recorder.dispose()
     runtime.recorder = null

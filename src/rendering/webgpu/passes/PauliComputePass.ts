@@ -44,13 +44,15 @@ import {
   sanitizeGridSizes,
 } from './computePassUtils'
 import type { PauliBufferResult } from './PauliComputePassBuffers'
-import { rebuildPauliBuffers, writePauliUniforms } from './PauliComputePassBuffers'
+import {
+  PAULI_UNIFORM_SIZE,
+  rebuildPauliBuffers,
+  writePauliUniforms,
+} from './PauliComputePassBuffers'
 import type { PauliBindGroupResult, PauliPipelineResult } from './PauliComputePassSetup'
 import { buildPauliPipelines, rebuildPauliBindGroups } from './PauliComputePassSetup'
 import { requestStateSave as genericStateSave } from './stateSave'
 
-/** PauliUniforms struct size in bytes (592 = 148 indices × 4) */
-const UNIFORM_SIZE = 592
 /** Number of f32 values in diagnostic result buffer:
  *  totalNorm, normUp, normDown, sigmaX, sigmaY, sigmaZ, maxDensity, pad */
 const DIAG_RESULT_COUNT = 8
@@ -73,6 +75,14 @@ export class PauliComputePass extends WebGPUBaseComputePass {
 
   // Bind groups + renormalize uniform buffer (created by rebuildPauliBindGroups)
   private bg: PauliBindGroupResult | null = null
+
+  /**
+   * Generation counter for the pipeline build. Incremented every time a
+   * config change kicks off a new `buildPauliPipelines` async run; the
+   * resolution callback only commits its result if the gen hasn't moved
+   * on. Prevents a stale, slow compile from clobbering a fresher one.
+   */
+  private pipelineGen = 0
 
   // Diagnostics state (not stored in buf — mutable per-frame)
   private diagFrameCounter = 0
@@ -99,7 +109,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   private saveMappingInFlight = false
 
   // Pre-allocated uniform views
-  private readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
+  private readonly uniformData = new ArrayBuffer(PAULI_UNIFORM_SIZE)
   private readonly uniformU32 = new Uint32Array(this.uniformData)
   private readonly uniformF32 = new Float32Array(this.uniformData)
 
@@ -251,6 +261,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       uniformBuffer: oldBuf?.uniformBuffer ?? null,
       fftUniformBuffer: oldBuf?.fftUniformBuffer ?? null,
       fftStagingBuffer: oldBuf?.fftStagingBuffer ?? null,
+      fftTwiddleBuffer: oldBuf?.fftTwiddleBuffer ?? null,
       packUniformBuffer: oldBuf?.packUniformBuffer ?? null,
       packUniformBufferNoNorm: oldBuf?.packUniformBufferNoNorm ?? null,
       potentialBuffer: oldBuf?.potentialBuffer ?? null,
@@ -288,7 +299,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   // ============================================================================
 
   /** Called immediately after rebuildBuffers, so all buffer fields are non-null. */
-  private rebuildBindGroups(device: GPUDevice): void {
+  private rebuildBindGroups(device: GPUDevice, existingRenorm?: GPUBuffer | null): void {
     if (!this.pl || !this.buf || !this.densityTextureView) return
     this.bg = rebuildPauliBindGroups(
       device,
@@ -299,6 +310,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
         fftScratchA: this.buf.fftScratchA,
         fftScratchB: this.buf.fftScratchB,
         fftUniformBuffer: this.buf.fftUniformBuffer,
+        fftTwiddleBuffer: this.buf.fftTwiddleBuffer,
         packUniformBuffer: this.buf.packUniformBuffer,
         packUniformBufferNoNorm: this.buf.packUniformBufferNoNorm,
         potentialBuffer: this.buf.potentialBuffer,
@@ -308,7 +320,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
         diagResultBuffer: this.buf.diagResultBuffer,
         totalSites: this.buf.totalSites,
       },
-      this.bg?.renormalizeUniformBuffer ?? null
+      existingRenorm ?? this.bg?.renormalizeUniformBuffer ?? null
     )
   }
 
@@ -316,13 +328,16 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   /** Initialize spinor state if not yet initialized or reset requested. */
   private maybeInitialize(ctx: WebGPURenderContext, config: PauliConfig): void {
     if (this.initialized && !config.needsReset) return
+    if (!this.buf) return
     const { device } = ctx
 
     // Check for pending loaded wavefunction data — skip init shader and inject directly.
     // Interleave the incoming split (re, im) arrays of length 2·T into the
     // merged vec2f buffer: interleaved[2i] = re[i], interleaved[2i + 1] = im[i].
     // One writeBuffer call replaces the two that the split-buffer layout needed.
-    if (this.pendingInjection && this.buf?.spinorBuffer) {
+    // Injection only needs the spinor buffer; it can complete even while the
+    // async pipeline build is still pending.
+    if (this.pendingInjection) {
       const { re, im } = this.pendingInjection
       const expected = 2 * this.buf.totalSites
       if (re.length !== expected || im.length !== expected) {
@@ -342,7 +357,12 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       device.queue.writeBuffer(this.buf.spinorBuffer, 0, interleaved)
       this.pendingInjection = null
       logger.log(`[Pauli] Injected loaded wavefunction (${expected} elements)`)
-    } else if (this.pl && this.bg && this.buf) {
+    } else {
+      // Init dispatch needs the compiled init pipelines + their bind groups.
+      // While the async pipeline build is still pending, defer the init
+      // kernel to a later frame so we don't permanently mark
+      // `initialized = true` without ever running it.
+      if (!this.pl || !this.bg) return
       const pass = ctx.beginComputePass({ label: 'pauli-init-pass' })
       const dispatch = pickSiteDispatch(config.latticeDim, this.buf.totalSites, config.gridSize)
       const pipeline = dispatch.use3D ? this.pl.init3DPipeline : this.pl.initPipeline
@@ -467,14 +487,54 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     const { device } = ctx
     const configHash = this.computeConfigHash(config)
 
-    // Rebuild if config changed
+    // Rebuild if config changed.
+    // Pipelines are compiled asynchronously (via createComputePipelineAsync
+    // inside buildPauliPipelines) so the JS main thread keeps rendering
+    // while WGSL→backend compilation runs on a worker. While the build is
+    // outstanding, this.pl / this.bg are null and the executePauli early
+    // return below skips the Strang loop. The first frame after the
+    // promise resolves wires up bind groups and runs maybeInitialize.
     if (configHash !== this.lastConfigHash || !this.buf) {
       logger.log(`[Pauli-COMPUTE] rebuild: ${this.lastConfigHash} → ${configHash}`)
       this.rebuildBuffers(device, config)
-      this.pl = buildPauliPipelines(device)
-      this.rebuildBindGroups(device)
+      // Drop stale pipelines/bind groups until the new compile lands so
+      // the next frame doesn't dispatch against an old layout that
+      // doesn't match the rebuilt buffers.
+      // Capture the renormalize buffer before nulling bg — rebuildBindGroups
+      // reuses it instead of leaking a new allocation each rebuild.
+      const oldRenorm = this.bg?.renormalizeUniformBuffer ?? null
+      this.pl = null
+      this.bg = null
       this.initialized = false
       this.simTime = 0
+      const myGen = ++this.pipelineGen
+      buildPauliPipelines(device)
+        .then((result) => {
+          // Discard if a newer rebuild has started while we were compiling.
+          if (myGen !== this.pipelineGen) {
+            oldRenorm?.destroy()
+            return
+          }
+          // Buffer guard: dispose() bumps pipelineGen so this branch is
+          // unreachable post-dispose, but make the contract explicit.
+          if (!this.buf) {
+            oldRenorm?.destroy()
+            return
+          }
+          this.pl = result
+          this.rebuildBindGroups(device, oldRenorm)
+        })
+        .catch((err: unknown) => {
+          if (myGen !== this.pipelineGen) {
+            oldRenorm?.destroy()
+            return
+          }
+          logger.error('[Pauli-COMPUTE] pipeline build failed', err)
+          // rebuildBuffers already advanced lastConfigHash; clear it so
+          // executePauli retries on the next frame instead of being
+          // wedged with pl/bg null.
+          this.lastConfigHash = ''
+        })
     }
 
     this.updateUniforms(device, config, basisX, basisY, basisZ, boundingRadius)
@@ -770,6 +830,9 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   // ============================================================================
 
   dispose(): void {
+    // Invalidate any in-flight async pipeline build so its `.then()`
+    // handler no-ops instead of writing into destroyed state.
+    this.pipelineGen++
     // Cancel any pending diagnostic mapAsync before destroying buffers
     if (this.diagMappingInFlight && this.buf?.diagStagingBuffer) {
       this.buf.diagStagingBuffer.unmap()
@@ -782,6 +845,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       this.buf.uniformBuffer.destroy()
       this.buf.fftUniformBuffer.destroy()
       this.buf.fftStagingBuffer.destroy()
+      this.buf.fftTwiddleBuffer.destroy()
       this.buf.packUniformBuffer.destroy()
       this.buf.packUniformBufferNoNorm.destroy()
       this.buf.potentialBuffer.destroy()

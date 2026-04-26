@@ -30,10 +30,8 @@ import { DropdownMenu } from '@/components/ui/DropdownMenu'
 import { InputModal } from '@/components/ui/InputModal'
 import { Modal } from '@/components/ui/Modal'
 import { useIsDesktop, useIsMobile } from '@/hooks/useMediaQuery'
-import { captureScreenshotAsync } from '@/hooks/useScreenshotCapture'
 import { useToast } from '@/hooks/useToast'
 import { soundManager } from '@/lib/audio/SoundManager'
-import { exportSceneToPNG, generateTimestampFilename } from '@/lib/export'
 import { getQuantumTypeName, resolveQuantumTypeKey } from '@/lib/geometry/registry'
 import { logger } from '@/lib/logger'
 import { useExportStore } from '@/stores/exportStore'
@@ -156,10 +154,17 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
     // --- Handlers ---
 
     const handleExport = async () => {
-      soundManager.playSuccess()
+      soundManager.playClick()
       await new Promise((resolve) => setTimeout(resolve, 50))
-      const filename = generateTimestampFilename('ndimensional')
-      void exportSceneToPNG({ filename })
+      try {
+        const { exportSceneToPNG, generateTimestampFilename } = await import('@/lib/export/image')
+        const filename = generateTimestampFilename('ndimensional')
+        await exportSceneToPNG({ filename })
+        soundManager.playSuccess()
+      } catch (error) {
+        logger.error('[Export] PNG export failed', error)
+        addToast('Failed to export image', 'error')
+      }
     }
 
     const { setExportModalOpen, setPreviewImage, updateExportSettings } = useExportStore(
@@ -173,6 +178,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
     const handleExportVideo = useCallback(async () => {
       // Capture preview using on-demand screenshot system
       try {
+        const { captureScreenshotAsync } = await import('@/hooks/useScreenshotCapture')
         const dataUrl = await captureScreenshotAsync()
         setPreviewImage(dataUrl)
       } catch (e) {
@@ -456,17 +462,29 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
           </div>
         </div>
 
-        <Modal isOpen={isStyleManagerOpen} onClose={handleCloseStyleManager} title="Manage Styles">
-          <Suspense fallback={null}>
-            <StyleManager onClose={handleCloseStyleManager} />
-          </Suspense>
-        </Modal>
+        {isStyleManagerOpen && (
+          <Modal
+            isOpen={isStyleManagerOpen}
+            onClose={handleCloseStyleManager}
+            title="Manage Styles"
+          >
+            <Suspense fallback={null}>
+              <StyleManager onClose={handleCloseStyleManager} />
+            </Suspense>
+          </Modal>
+        )}
 
-        <Modal isOpen={isSceneManagerOpen} onClose={handleCloseSceneManager} title="Manage Scenes">
-          <Suspense fallback={null}>
-            <SceneManager onClose={handleCloseSceneManager} />
-          </Suspense>
-        </Modal>
+        {isSceneManagerOpen && (
+          <Modal
+            isOpen={isSceneManagerOpen}
+            onClose={handleCloseSceneManager}
+            title="Manage Scenes"
+          >
+            <Suspense fallback={null}>
+              <SceneManager onClose={handleCloseSceneManager} />
+            </Suspense>
+          </Modal>
+        )}
 
         <InputModal
           isOpen={saveStyleOpen}

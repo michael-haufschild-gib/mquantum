@@ -94,6 +94,16 @@ test.describe('keyboard shortcuts', () => {
     await expect(page.getByTestId('shortcuts-overlay')).not.toBeVisible({ timeout: 3000 })
   })
 
+  test('Ctrl or Cmd+K opens command palette', async ({ page }) => {
+    await page.goto('/')
+    await waitForAppLoaded(page)
+
+    await page.keyboard.press('ControlOrMeta+K')
+    await expect(page.getByPlaceholder('Type a command or search...')).toBeVisible({
+      timeout: 5000,
+    })
+  })
+
   test('shortcuts do not fire when a text input is focused', async ({ page }) => {
     // Enable isosurface mode to guarantee the threshold input exists
     await page.goto('/?t=schroedinger&d=5&qm=harmonicOscillator&iso=1')

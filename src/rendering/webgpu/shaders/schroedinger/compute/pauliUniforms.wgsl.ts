@@ -9,7 +9,7 @@
  * Flat layout — all arrays use stride-4 scalars to avoid WGSL alignment
  * surprises. Basis vectors use array<f32, 12> for full N-D rotation support.
  *
- * Total size: 148 × 4 = 592 bytes.
+ * Total size: 160 × 4 = 640 bytes.
  *
  * Offset map (in units of u32/f32 = 4 bytes):
  *   [0]       latticeDim
@@ -61,6 +61,7 @@
  *   [112..123] basisZ[12]
  *   [124..135] spacing[12]
  *   [136..147] slicePositions[12]
+ *   [148..159] kGridScale[12]   2π / (N_d · spacing_d) per dim; unused slots = 0
  *
  * @module
  */
@@ -136,5 +137,10 @@ struct PauliUniforms {
   // Lattice spacing and slice positions
   spacing: array<f32, 12>,          // [124..135]
   slicePositions: array<f32, 12>,   // [136..147]
+
+  // k-space grid info for kinetic step (48 bytes): 2π / (N · a) per dimension.
+  // Host precomputes so the kinetic kernel avoids a per-thread per-dim divide.
+  // Mirrors TDSE/Dirac kGridScale.
+  kGridScale: array<f32, 12>,       // [148..159]
 }
 `

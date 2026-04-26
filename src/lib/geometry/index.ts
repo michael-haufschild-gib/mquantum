@@ -37,7 +37,6 @@ export type {
 export {
   getAvailableTypesForDimension,
   getConfigStoreKey,
-  getControlsComponent,
   getControlsComponentKey,
   getDimensionConstraints,
   getObjectTypeEntry,

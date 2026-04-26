@@ -55,6 +55,7 @@ import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { usePageCurveStore } from '@/stores/pageCurveStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
+import { useScreenshotStore } from '@/stores/screenshotStore'
 import { useUIStore } from '@/stores/uiStore'
 
 /**
@@ -137,6 +138,7 @@ function AppContent() {
   // Get performance monitor state
   const showPerfMonitor = useUIStore((state) => state.showPerfMonitor)
   const renderResolutionScale = usePerformanceStore((state) => state.renderResolutionScale)
+  const screenshotModalOpen = useScreenshotStore((state) => state.isOpen)
 
   // Opt-in HUD panel gates — reading the flag here lets React.lazy defer the
   // panel chunk until a user enables the HUD.
@@ -306,9 +308,11 @@ function AppContent() {
         )}
 
         {/* Screenshot Preview Modal */}
-        <Suspense fallback={null}>
-          <ScreenshotModal />
-        </Suspense>
+        {screenshotModalOpen && (
+          <Suspense fallback={null}>
+            <ScreenshotModal />
+          </Suspense>
+        )}
 
         {/* Shader Compilation Overlay */}
         <ShaderCompilationOverlay />

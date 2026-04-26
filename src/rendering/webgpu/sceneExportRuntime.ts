@@ -6,7 +6,6 @@
 
 import type React from 'react'
 
-import { downloadFile } from '@/lib/export/dataExport'
 import type { ExportMode, ExportSettings } from '@/stores/exportStore'
 import { useExportStore } from '@/stores/exportStore'
 
@@ -247,11 +246,12 @@ export function validateExportSettings(settings: ExportSettings): void {
 }
 
 /** Download a recorded video segment as a file. */
-export function triggerSegmentDownload(
+export async function triggerSegmentDownload(
   blob: Blob,
   segmentIndex: number,
   format: ExportSettings['format']
-): void {
+): Promise<void> {
+  const { downloadFile } = await import('@/lib/export/dataExport')
   const ext = format === 'webm' ? 'webm' : 'mp4'
   downloadFile(blob, `mquantum-${Date.now()}-part${segmentIndex}.${ext}`, `video/${ext}`)
 }

@@ -7,7 +7,7 @@ import { useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
-import { exportSceneToPNG, generateTimestampFilename } from '@/lib/export'
+import { logger } from '@/lib/logger'
 import { getModifierSymbols, getPlatformKeyLabel } from '@/lib/platform'
 import { useCameraStore } from '@/stores/cameraStore'
 import { useExportStore } from '@/stores/exportStore'
@@ -36,9 +36,7 @@ export interface UseKeyboardShortcutsOptions {
  * INVARIANT: every entry must have a working handler *somewhere* in the app
  * — the help overlay (`ShortcutsOverlay.tsx`) reads this list verbatim, so a
  * documented-but-unimplemented entry would teach the user that a key does
- * something it does not. Most entries are wired up in `handleGlobalShortcut`
- * below; a few are handled in dedicated components that mount their own
- * `keydown` listener (e.g. `CommandPalette.tsx` handles Ctrl/Cmd+K directly).
+ * something it does not.
  * Previously this list contained WASD camera movement, Shift+WASD camera
  * rotation, and `0`/`Shift+0` camera-to-origin entries that were never wired
  * up anywhere — `WebGPUCamera` exposes orbit/zoom/pan but no
@@ -46,7 +44,6 @@ export interface UseKeyboardShortcutsOptions {
  * If you re-add a shortcut here, make sure its handler actually exists.
  */
 export const SHORTCUTS: Omit<ShortcutConfig, 'action'>[] = [
-  // UI Navigation — Ctrl/Cmd+K is handled by `CommandPalette.tsx`, not here.
   { key: 'k', ctrl: true, description: 'Open command palette' },
   { key: '?', description: 'Show keyboard shortcuts' },
   { key: '\\', description: 'Toggle right sidebar' },
@@ -85,12 +82,19 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
   )
 
   // Grouped layout store subscription
-  const { toggleCinematicMode, toggleCollapsed, toggleLeftPanel, toggleShortcuts } = useLayoutStore(
+  const {
+    toggleCinematicMode,
+    toggleCollapsed,
+    toggleLeftPanel,
+    toggleShortcuts,
+    toggleCommandPalette,
+  } = useLayoutStore(
     useShallow((state) => ({
       toggleCinematicMode: state.toggleCinematicMode,
       toggleCollapsed: state.toggleCollapsed,
       toggleLeftPanel: state.toggleLeftPanel,
       toggleShortcuts: state.toggleShortcuts,
+      toggleCommandPalette: state.toggleCommandPalette,
     }))
   )
 
@@ -158,8 +162,17 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
 
       // Modifier-specific actions dispatched via lookup table
       const modifierActions: Record<string, () => void> = {
+        ...(isCtrlOrMeta && { k: toggleCommandPalette }),
         ...(isCtrlOrMeta && {
-          s: () => void exportSceneToPNG({ filename: generateTimestampFilename('ndimensional') }),
+          s: () => {
+            void import('@/lib/export/image')
+              .then(({ exportSceneToPNG, generateTimestampFilename }) =>
+                exportSceneToPNG({ filename: generateTimestampFilename('ndimensional') })
+              )
+              .catch((error: unknown) => {
+                logger.error('[Shortcuts] Ctrl/Cmd+S PNG export failed', error)
+              })
+          },
         }),
         ...(isCtrlOrMeta && shiftKey && { e: () => useExportStore.getState().setModalOpen(true) }),
       }
@@ -238,6 +251,7 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
     toggleCollapsed,
     toggleLeftPanel,
     toggleShortcuts,
+    toggleCommandPalette,
     resetCamera,
   ])
 }

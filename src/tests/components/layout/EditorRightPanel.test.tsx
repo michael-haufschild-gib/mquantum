@@ -33,7 +33,7 @@ describe('EditorRightPanel tab layout', () => {
     const analysisTab = screen.getByRole('tab', { name: /analysis/i })
     await user.click(analysisTab)
 
-    expect(screen.getByTestId('analysis-section')).toBeInTheDocument()
+    expect(await screen.findByTestId('analysis-section')).toBeInTheDocument()
     expect(screen.getByTestId('quantum-effects-section')).toBeInTheDocument()
   })
 

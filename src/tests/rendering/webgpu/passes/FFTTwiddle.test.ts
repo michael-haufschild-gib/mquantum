@@ -1,8 +1,8 @@
 /**
- * Tests for the TDSE FFT twiddle-table generator.
+ * Tests for the FFT twiddle-table generator.
  *
  * The GPU path replaces per-thread `cos(angle), sin(angle)` in the Stockham
- * radix-2 butterfly with a lookup into `buildTdseFFTTwiddleTable()`. Any drift
+ * radix-2 butterfly with a lookup into `buildFFTTwiddleTable()`. Any drift
  * in the table layout, sign convention, or value would silently introduce
  * phase errors in the FFT — so every byte of the table is validated against
  * the analytic formula.
@@ -11,13 +11,13 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  buildTdseFFTTwiddleTable,
+  buildFFTTwiddleTable,
   FFT_TWIDDLE_BYTES,
   FFT_TWIDDLE_COMPLEX_COUNT,
   N_MAX_FFT_TWIDDLE,
-} from '@/rendering/webgpu/passes/TDSEFFTTwiddle'
+} from '@/rendering/webgpu/passes/FFTTwiddle'
 
-describe('TDSEFFTTwiddle constants', () => {
+describe('FFTTwiddle constants', () => {
   it('N_MAX is 128 (power of two in TDSE grid range)', () => {
     expect(N_MAX_FFT_TWIDDLE).toBe(128)
     expect(N_MAX_FFT_TWIDDLE & (N_MAX_FFT_TWIDDLE - 1)).toBe(0)
@@ -33,9 +33,9 @@ describe('TDSEFFTTwiddle constants', () => {
   })
 })
 
-describe('buildTdseFFTTwiddleTable', () => {
+describe('buildFFTTwiddleTable', () => {
   it('returns a Float32Array of length 2 * FFT_TWIDDLE_COMPLEX_COUNT', () => {
-    const table = buildTdseFFTTwiddleTable()
+    const table = buildFFTTwiddleTable()
     expect(table).toBeInstanceOf(Float32Array)
     expect(table.length).toBe(2 * FFT_TWIDDLE_COMPLEX_COUNT)
     // 64 complex values * 2 floats = 128
@@ -43,7 +43,7 @@ describe('buildTdseFFTTwiddleTable', () => {
   })
 
   it('stores (cos(2*pi*k/N), -sin(2*pi*k/N)) at index 2k/2k+1', () => {
-    const table = buildTdseFFTTwiddleTable()
+    const table = buildFFTTwiddleTable()
     const twoPiOverN = (2 * Math.PI) / N_MAX_FFT_TWIDDLE
     for (let k = 0; k < FFT_TWIDDLE_COMPLEX_COUNT; k++) {
       const theta = twoPiOverN * k
@@ -56,7 +56,7 @@ describe('buildTdseFFTTwiddleTable', () => {
   })
 
   it('k=0 twiddle is exactly (1, 0) (W^0 identity)', () => {
-    const table = buildTdseFFTTwiddleTable()
+    const table = buildFFTTwiddleTable()
     expect(table[0]).toBe(1)
     // -sin(0) = 0 — no rounding.
     expect(table[1]).toBe(-0)
@@ -64,7 +64,7 @@ describe('buildTdseFFTTwiddleTable', () => {
 
   it('k=32 twiddle is (0, -1) (W_128^32 = exp(-i*pi/2))', () => {
     // 2*pi*32/128 = pi/2. cos = 0, -sin = -1.
-    const table = buildTdseFFTTwiddleTable()
+    const table = buildFFTTwiddleTable()
     expect(table[2 * 32]!).toBeCloseTo(0, 6)
     expect(table[2 * 32 + 1]!).toBeCloseTo(-1, 6)
   })
@@ -73,7 +73,7 @@ describe('buildTdseFFTTwiddleTable', () => {
     // For an axis of size 8 at stage s=2 (halfStage=4, fullStage=8), the
     // butterfly wants exp(-i*2*pi*j/8) for j in [0, 4). With stride =
     // 128/8 = 16 into the 128-sized table we must get the same values.
-    const table = buildTdseFFTTwiddleTable()
+    const table = buildFFTTwiddleTable()
     const stride = N_MAX_FFT_TWIDDLE / 8 // = 16
     for (let j = 0; j < 4; j++) {
       const k = j * stride
@@ -88,7 +88,7 @@ describe('buildTdseFFTTwiddleTable', () => {
   it('inverse direction reconstruction — tw.y = dir * twFwd.y', () => {
     // Shader flips imaginary component via `tw = vec2f(twFwd.x, dir * twFwd.y)`.
     // For dir=-1 (inverse) this must produce exp(+i*2*pi*j/fullStage).
-    const table = buildTdseFFTTwiddleTable()
+    const table = buildFFTTwiddleTable()
     const N = 8
     const stride = N_MAX_FFT_TWIDDLE / N
     for (let j = 0; j < N / 2; j++) {
@@ -108,7 +108,7 @@ describe('buildTdseFFTTwiddleTable', () => {
     // exactly our table for len = N_MAX. For len < N_MAX the CPU FFT stores a
     // separate cache, but the per-element formula is identical — the GPU
     // shader just indexes the N_MAX table at stride N_MAX/len.
-    const table = buildTdseFFTTwiddleTable()
+    const table = buildFFTTwiddleTable()
     const N = N_MAX_FFT_TWIDDLE
     for (let j = 0; j < N / 2; j++) {
       const angle = (-2 * Math.PI * j) / N

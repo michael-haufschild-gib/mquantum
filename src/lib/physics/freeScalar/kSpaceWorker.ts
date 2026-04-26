@@ -6,7 +6,7 @@
  *
  * Message protocol:
  *   Main → Worker: KSpaceWorkerRequest (with Transferable phi/pi buffers)
- *   Worker → Main: KSpaceWorkerResponse (with Transferable density/analysis buffers)
+ *   Worker → Main: KSpaceWorkerResponse (optionally with Transferable density/analysis buffers)
  */
 
 import type { KSpaceVizConfig } from '@/lib/geometry/extended/types'
@@ -46,14 +46,16 @@ export interface KSpaceWorkerRequest {
   basisCoefs?: KSpaceBasisCoefs
   /** Output display grid size — must match the density texture dimension. */
   outputGridSize?: number
+  /** Whether to build display textures. Particle count is always computed. */
+  includeTextures?: boolean
 }
 
 /** Outbound result from the k-space web worker with computed display textures. */
 export interface KSpaceWorkerResponse {
   type: 'result'
   epoch: number
-  density: Uint16Array
-  analysis: Uint16Array
+  density?: Uint16Array
+  analysis?: Uint16Array
   /** Total particle number `N(η) = Σ_k max(n_k, 0)` at the current vacuum reference. */
   totalParticles: number
 }
@@ -73,22 +75,27 @@ self.onmessage = (e: MessageEvent<KSpaceWorkerRequest>) => {
     msg.basisCoefs
   )
 
-  const { density, analysis } = buildKSpaceDisplayTextures(
-    raw,
-    msg.kSpaceViz,
-    true,
-    msg.outputGridSize
-  )
   const totalParticles = computeTotalParticleNumber(raw)
 
   const response: KSpaceWorkerResponse = {
     type: 'result',
     epoch: msg.epoch,
-    density,
-    analysis,
     totalParticles,
   }
 
-  // Transfer ownership of the typed array buffers back to main thread
-  self.postMessage(response, { transfer: [density.buffer, analysis.buffer] })
+  if (msg.includeTextures !== false) {
+    const { density, analysis } = buildKSpaceDisplayTextures(
+      raw,
+      msg.kSpaceViz,
+      true,
+      msg.outputGridSize
+    )
+    response.density = density
+    response.analysis = analysis
+    // Transfer ownership of the typed array buffers back to main thread.
+    self.postMessage(response, { transfer: [density.buffer, analysis.buffer] })
+    return
+  }
+
+  self.postMessage(response)
 }

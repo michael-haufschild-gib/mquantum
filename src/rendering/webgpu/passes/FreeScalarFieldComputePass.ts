@@ -431,6 +431,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     const pending = this.kSpace.takePendingData()
     if (!pending || !this.densityTexture || !this.analysisTexture) return
     const { density, analysis } = pending
+    if (!density || !analysis) return
     const gs = Math.round(Math.cbrt(density.length / 4))
     const layout = { bytesPerRow: gs * 8, rowsPerImage: gs }
     const size = { width: gs, height: gs, depthOrArrayLayers: gs }
@@ -799,12 +800,11 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     // Delegate k-space and diagnostics readback to the manager.
     //
     // The k-space readback owns the adiabatic-vacuum N(η) thermometer
-    // feed into the diagnostics store and runs **unconditionally** at
-    // its own interval — it is NOT gated on the analysis-mode switch
-    // the way it used to be. Threading `this.simEta` (not
-    // `config.cosmology.eta0`) into the manager is what keeps the
-    // thermometer physically meaningful once the sim starts evolving.
+    // feed into the diagnostics store and runs at its own interval. The
+    // expensive display texture projection/upload is only requested when
+    // the k-space color mode is active.
     if (this.initialized && this.phiBuffer && this.piBuffer) {
+      const shouldUpdateKSpaceTextures = analysisMode === 3
       this.kSpace.maybeStartKSpaceReadback(
         device,
         encoder,
@@ -813,7 +813,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         this.totalSites,
         config,
         this.simEta,
-        this.densityGridSize
+        this.densityGridSize,
+        shouldUpdateKSpaceTextures
       )
       // Snapshot cosmology + preheating coefs at the readback instant so
       // the diagnostics Hamiltonian matches the time-dependent terms the

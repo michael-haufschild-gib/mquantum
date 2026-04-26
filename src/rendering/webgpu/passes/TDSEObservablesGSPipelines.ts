@@ -98,15 +98,20 @@ export function composeEnergySpectrumShader(): string {
 }
 
 /**
- * Compile every observables/ground-state compute pipeline and return them
- * with their bind group layouts. One-time setup per device.
+ * Compile every observables/ground-state compute pipeline asynchronously
+ * and return them with their bind group layouts. One-time setup per device.
+ *
+ * Compiles fire in parallel via `Promise.all` so the JS main thread is
+ * not blocked on each `device.createComputePipelineAsync`. Called from
+ * the parent TDSE `buildTdsePipelines` whose own `Promise.all` stitches
+ * these with the core TDSE pipelines into a single concurrent compile
+ * batch.
  */
-export function buildObsGSPipelines(
+export async function buildObsGSPipelines(
   device: GPUDevice,
   helpers: TdsePassHelpers
-): ObsGSPipelineResult {
-  // ── Observable Expectation Value Reduction ──
-
+): Promise<ObsGSPipelineResult> {
+  // ── Bind group layouts (sync, cheap) ───────────────────────────────
   // Binding 0 (ObsReduceUniforms) is `read-only-storage` because the struct
   // embeds scalar arrays (spec-forbidden in uniform address space). See
   // observablesPositionReduce.wgsl.ts for the matching `var<storage, read>`.
@@ -116,54 +121,21 @@ export function buildObsGSPipelines(
     'storage',
     'read-only-storage',
   ])
-  const obsPosReducePipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeObsPosReduceShader(), 'obs-pos-reduce'),
-    [obsPosReduceBGL],
-    'obs-pos-reduce'
-  )
-
-  // Binding 0 (ObsReduceUniforms) — see obs-pos-reduce BGL comment.
   const obsPosFinalBGL = createComputeBGL(device, 'obs-pos-final-bgl', [
     'read-only-storage',
     'read-only-storage',
     'storage',
   ])
-  const obsPosFinalPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeObsPosFinalShader(), 'obs-pos-final'),
-    [obsPosFinalBGL],
-    'obs-pos-final'
-  )
-
-  // Binding 0 (ObsMomReduceUniforms) — see obs-pos-reduce BGL comment.
   const obsMomReduceBGL = createComputeBGL(device, 'obs-mom-reduce-bgl', [
     'read-only-storage',
     'read-only-storage',
     'storage',
   ])
-  const obsMomReducePipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeObsMomReduceShader(), 'obs-mom-reduce'),
-    [obsMomReduceBGL],
-    'obs-mom-reduce'
-  )
-
-  // Binding 0 (ObsMomReduceUniforms) — see obs-pos-reduce BGL comment.
   const obsMomFinalBGL = createComputeBGL(device, 'obs-mom-final-bgl', [
     'read-only-storage',
     'read-only-storage',
     'storage',
   ])
-  const obsMomFinalPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeObsMomFinalShader(), 'obs-mom-final'),
-    [obsMomFinalBGL],
-    'obs-mom-final'
-  )
-
-  // ── Gram-Schmidt Orthogonalization ──
-
   const gsReduceBGL = createComputeBGL(device, 'gs-reduce-bgl', [
     'uniform',
     'read-only-storage',
@@ -171,52 +143,60 @@ export function buildObsGSPipelines(
     'storage',
     'storage',
   ])
-  const gsReducePipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeGsReduceShader(), 'gs-reduce'),
-    [gsReduceBGL],
-    'gs-reduce'
-  )
-
   const gsFinalizeBGL = createComputeBGL(device, 'gs-finalize-bgl', [
     'uniform',
     'read-only-storage',
     'read-only-storage',
     'storage',
   ])
-  const gsFinalizePipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeGsFinalizeShader(), 'gs-finalize'),
-    [gsFinalizeBGL],
-    'gs-finalize'
-  )
-
   const gsSubtractBGL = createComputeBGL(device, 'gs-subtract-bgl', [
     'uniform',
     'read-only-storage',
     'read-only-storage',
     'storage',
   ])
-  const gsSubtractPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeGsSubtractShader(), 'gs-subtract'),
-    [gsSubtractBGL],
-    'gs-subtract'
-  )
-
-  // ── Energy Spectral Density ──
-  // Binding 0 (EnergySpectrumUniforms) — see obs-pos-reduce BGL comment.
   const energySpectrumBGL = createComputeBGL(device, 'energy-spectrum-bgl', [
     'read-only-storage',
     'read-only-storage',
     'storage',
   ])
-  const energySpectrumPipeline = helpers.createComputePipeline(
-    device,
-    helpers.createShaderModule(device, composeEnergySpectrumShader(), 'energy-spectrum'),
-    [energySpectrumBGL],
-    'energy-spectrum'
-  )
+
+  const issuePipeline = (
+    label: string,
+    code: string,
+    bgls: GPUBindGroupLayout[]
+  ): Promise<GPUComputePipeline> =>
+    device.createComputePipelineAsync({
+      label: `${label}-pipeline`,
+      layout: device.createPipelineLayout({
+        label: `${label}-layout`,
+        bindGroupLayouts: bgls,
+      }),
+      compute: {
+        module: helpers.createShaderModule(device, code, label),
+        entryPoint: 'main',
+      },
+    })
+
+  const [
+    obsPosReducePipeline,
+    obsPosFinalPipeline,
+    obsMomReducePipeline,
+    obsMomFinalPipeline,
+    gsReducePipeline,
+    gsFinalizePipeline,
+    gsSubtractPipeline,
+    energySpectrumPipeline,
+  ] = await Promise.all([
+    issuePipeline('obs-pos-reduce', composeObsPosReduceShader(), [obsPosReduceBGL]),
+    issuePipeline('obs-pos-final', composeObsPosFinalShader(), [obsPosFinalBGL]),
+    issuePipeline('obs-mom-reduce', composeObsMomReduceShader(), [obsMomReduceBGL]),
+    issuePipeline('obs-mom-final', composeObsMomFinalShader(), [obsMomFinalBGL]),
+    issuePipeline('gs-reduce', composeGsReduceShader(), [gsReduceBGL]),
+    issuePipeline('gs-finalize', composeGsFinalizeShader(), [gsFinalizeBGL]),
+    issuePipeline('gs-subtract', composeGsSubtractShader(), [gsSubtractBGL]),
+    issuePipeline('energy-spectrum', composeEnergySpectrumShader(), [energySpectrumBGL]),
+  ])
 
   return {
     obsPosReducePipeline,

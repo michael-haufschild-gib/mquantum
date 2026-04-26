@@ -166,6 +166,12 @@ test.describe('right panel tabs', () => {
     await objectTab.focus()
     await expect(objectTab).toHaveAttribute('aria-selected', 'true')
 
+    // ArrowRight should move to Analysis tab
+    await page.keyboard.press('ArrowRight')
+    const analysisTab = rightPanel.tabs.getByRole('tab', { name: 'Analysis' })
+    await expect(analysisTab).toBeFocused()
+    await expect(page.getByTestId('analysis-section')).toBeVisible({ timeout: 5000 })
+
     // ArrowRight should move to Scene tab
     await page.keyboard.press('ArrowRight')
     const sceneTab = rightPanel.tabs.getByRole('tab', { name: 'Scene' })
