@@ -233,9 +233,9 @@ export const ADS_PRESETS: readonly AdsPresetDefinition[] = [
   },
   {
     id: 'btzHotSmall',
-    label: 'BTZ Hot (small r₊)',
+    label: 'BTZ Small Horizon',
     description:
-      'd=3 BTZ black hole with small horizon r₊=0.15 — high Hawking temperature, sharp thermal spike near the horizon.',
+      'd=3 BTZ black hole with small horizon r₊=0.15 — lower Hawking temperature, compact visible horizon, and a sharp regulated near-horizon thermal spike.',
     d: 3,
     n: 0,
     l: 0,
@@ -250,7 +250,7 @@ export const ADS_PRESETS: readonly AdsPresetDefinition[] = [
   },
   {
     id: 'btzWarmMedium',
-    label: 'BTZ Warm (moderate r₊)',
+    label: 'BTZ Medium Horizon',
     description:
       'd=3 BTZ with r₊=0.6 and angular mode m_A=1 — moderate T and visible azimuthal lobes.',
     d: 3,
@@ -267,9 +267,9 @@ export const ADS_PRESETS: readonly AdsPresetDefinition[] = [
   },
   {
     id: 'btzCoolLarge',
-    label: 'BTZ Cool (large r₊)',
+    label: 'BTZ Large Horizon',
     description:
-      'd=3 BTZ with r₊=1.5 — large, cool horizon dominates the visible region; thermal spectrum pushed to low frequencies.',
+      'd=3 BTZ with r₊=1.5 — higher Hawking temperature and a large visible horizon that dominates the rendered region.',
     d: 3,
     n: 0,
     l: 0,

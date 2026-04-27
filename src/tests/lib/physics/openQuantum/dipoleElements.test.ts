@@ -209,6 +209,22 @@ describe('dipoleMatrixElementSquared', () => {
     // Bug caught: asymmetric cache key or angular factor argument ordering
     expect(forward).toBeCloseTo(reverse, 10)
   })
+
+  it('matches the analytic value |⟨1s|z|2p₀⟩|² = (256√2/243)² ≈ 0.5549', () => {
+    // The 2p₀ → 1s transition is purely along ẑ (Δm = 0, only q = 0 contributes).
+    // Analytic value (Bethe & Salpeter, NIST tabulations):
+    //   ⟨1s|z|2p,m=0⟩ = 128√2/243 ≈ 0.7449 a₀
+    //   ⟨1s|r|2p,m=0⟩² = (128√2/243)² = 0.55493 a₀²
+    // This pins the (4π/3) factor that converts r·Y_{1q} matrix elements to
+    // r_q matrix elements. Without it the value would be ≈ 0.1325 a₀² and
+    // every Einstein A coefficient downstream would be too small by 4π/3.
+    clearDipoleCache()
+    const s1s = makeState(0, 1, 0, 0)
+    const s2p0 = makeState(1, 2, 1, 0)
+    const dipoleSq = dipoleMatrixElementSquared(s1s, s2p0)
+    const analytic = ((128 * Math.sqrt(2)) / 243) ** 2
+    expect(dipoleSq).toBeCloseTo(analytic, 3)
+  })
 })
 
 // ---------------------------------------------------------------------------

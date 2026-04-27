@@ -176,6 +176,31 @@ describe('buildTransitionRates', () => {
       expect(rate.dipoleSq).toBeGreaterThan(0)
     }
   })
+
+  it('reproduces the tabulated A(2p→1s) ≈ 6.27×10⁸ s⁻¹', () => {
+    // The Lyman-α 2p→1s spontaneous emission rate is one of the most
+    // precisely known atomic constants (NIST: 6.2649e8 s⁻¹). Each of the
+    // three 2p substates (m=−1,0,+1) decays to 1s at the same rate.
+    // Bug caught: missing (4π/3) factor in dipole element converting
+    // r·Y_{1q} matrix elements to true r_q matrix elements; without it
+    // every Einstein A coefficient downstream is too small by 4π/3.
+    clearDipoleCache()
+    // Zero-temperature: gammaDown = A · (1 + n̄) = A (n̄ → 0).
+    const rates = buildTransitionRates(basis, 0)
+    const ATU_S = 2.4188843265857e-17 // atomic time unit in seconds
+    for (const rate of rates) {
+      // 2p substates have l=1; 1s has l=0; pick out the 2p→1s pairs.
+      const fromState = basis[rate.from]!
+      const toState = basis[rate.to]!
+      if (fromState.n === 2 && fromState.l === 1 && toState.n === 1 && toState.l === 0) {
+        const rateSI = rate.gammaDown / ATU_S
+        // 5% tolerance covers Gauss-Laguerre quadrature noise (~1e-4) and
+        // the 1/137 fine-structure-constant rounding.
+        expect(rateSI).toBeGreaterThan(5.9e8)
+        expect(rateSI).toBeLessThan(6.6e8)
+      }
+    }
+  })
 })
 
 describe('buildTransitionRates — ND', () => {

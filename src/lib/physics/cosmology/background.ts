@@ -33,9 +33,11 @@
  *    `ω² = k² + m²·a²` — the leapfrog CFL condition no longer explodes
  *    as `η → 0`.
  *
- * Time convention: we use conformal time `η < 0` for all presets, with the
- * "interesting" boundary at `η → 0⁻`. Deep past is `η → −∞`. Sign of the
- * conformal Hubble rate `ℋ = a'/a` distinguishes expansion from contraction.
+ * Time convention: isotropic FLRW power-law presets use conformal time
+ * `η < 0`, with the "interesting" boundary at `η → 0⁻`. Deep past is
+ * `η → −∞`. Bianchi-I Kasner and LQC bounce use positive-η gauges. Sign of
+ * the conformal Hubble rate `ℋ = a'/a` distinguishes expansion from
+ * contraction within each gauge.
  *
  * @module
  */
