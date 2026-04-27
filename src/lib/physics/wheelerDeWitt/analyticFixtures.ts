@@ -56,14 +56,14 @@
  *
  * `J_{1/4}` and `Y_{1/4}` are computed by:
  *
- *  - **Series for `|z| ≤ 12`** — convergent Maclaurin series for `J_ν`
- *    and the standard formula
+ *  - **Series for `|z| ≤ 12`** (`BESSEL_SERIES_RADIUS`) — convergent
+ *    Maclaurin series for `J_ν` and the standard formula
  *    `Y_ν(z) = (J_ν(z)·cos(νπ) − J_{−ν}(z)) / sin(νπ)` (using the
  *    series for `J_{−ν}` as well).
- *  - **Asymptotic for `|z| > 6`** — DLMF 10.17.3 with three correction
- *    terms in each of the `P` and `Q` series. Reaches relative
- *    accuracy ≲ 1e-10 just above the crossover and ≲ 1e-12 on the
- *    deep tail.
+ *  - **Asymptotic for `|z| > 12`** — DLMF 10.17.3 with eight correction
+ *    pairs (`BESSEL_ASYMPTOTIC_TERMS`) retained in each of the `P` and
+ *    `Q` series. Reaches relative accuracy ≲ 1e-10 just above the
+ *    crossover and ≲ 1e-12 on the deep tail.
  *
  * Tested against published values (Wolfram, DLMF) at sample `z` to
  * relative tolerance 1e-6, and via the Wronskian identity
