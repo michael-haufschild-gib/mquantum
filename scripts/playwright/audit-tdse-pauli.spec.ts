@@ -28,6 +28,10 @@ import {
 } from './helpers/app-helpers'
 
 test.setTimeout(180_000)
+// Force sequential execution — `allResults` is module-scoped and the summary
+// test reads results pushed by every prior test in this file. Parallel workers
+// would each see an empty array and the summary would be useless.
+test.describe.configure({ mode: 'serial' })
 
 const WARMUP_FRAMES = 60
 const MEASURE_FRAMES = 120
@@ -209,7 +213,10 @@ test.describe('TDSE FPS audit', () => {
 
 test.describe('summary', () => {
   test('print results', async ({ page }) => {
-    test.skip(allResults.length === 0, 'no results')
+    test.skip(
+      allResults.length === 0,
+      'no results — ensure audit tests ran in the same worker (--workers=1)'
+    )
     await page.goto('/')
     const sorted = [...allResults].sort((a, b) => a.fps - b.fps)
     console.log('\n══ TDSE + PAULI AUDIT ══')

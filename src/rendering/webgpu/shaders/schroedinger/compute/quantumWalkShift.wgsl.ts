@@ -78,12 +78,16 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       // save/load or programmatic config writes could route a non-power-of-2
       // dim here. Fall back to a safe modulo wrap when Ni is not a power of
       // two so the bitmask never reads from the wrong source cell.
+      // Use 'if' (not 'select') so the WGSL compiler dead-code-eliminates
+      // the unused branch — 'select' evaluates BOTH operands every iteration,
+      // which would defeat the pow-2 fast path in this hot D-axis loop.
       let isPow2 = (Nd & (Nd - 1u)) == 0u;
-      let srcCoordWrapped = select(
-        ((srcCoord % Ni) + Ni) % Ni,
-        (srcCoord + Ni) & (Ni - 1),
-        isPow2
-      );
+      var srcCoordWrapped: i32;
+      if (isPow2) {
+        srcCoordWrapped = (srcCoord + Ni) & (Ni - 1);
+      } else {
+        srcCoordWrapped = ((srcCoord % Ni) + Ni) % Ni;
+      }
       let delta = srcCoordWrapped - destCoordI;
       let strideDim = i32(params.strides[dim]);
       let srcSite = u32(i32(destSite) + delta * strideDim);
