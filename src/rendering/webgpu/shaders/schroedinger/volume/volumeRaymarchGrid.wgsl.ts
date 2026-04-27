@@ -82,12 +82,22 @@ fn volumeRaymarchGrid(
   // per pixel per frame in the worst case.
   let invStepLen = 1.0 / max(stepLen, 1e-5);
 
+  // PERF: hoist mode-only uniforms out of the per-sample loop.
+  let isWdwMode = uniforms.quantumMode == 9;
+  let branchColorActive =
+    uniforms.quantumMode == 3
+    && uniforms.branchSeparation > 0.5
+    && uniforms.branchTransitionWidth > 0.0;
+
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (PROFILING_HALF_SAMPLES && i >= 64) { break; }
     if (i >= sampleCount) { break; }
     iterCount = i + 1;
 
-    if (shouldTerminateRay(transmittance, uniforms.densityGain, max(tFar - t, 0.0))) { break; }
+    // PERF: cache tFar - t once per iteration. Used for shouldTerminateRay,
+    // skipDistance ceiling, and adaptiveStep clamp (3+ subtracts otherwise).
+    let remaining = tFar - t;
+    if (shouldTerminateRay(transmittance, uniforms.densityGain, max(remaining, 0.0))) { break; }
 
     let pos = rayOrigin + rayDir * t;
     let gridSample = sampleDensityFromGrid(pos, uniforms);
@@ -121,8 +131,8 @@ fn volumeRaymarchGrid(
     // Wheeler-DeWitt overlay: A > 0 carries streamline / SRMT overlay alpha
     // (packer stores max(streamlineAlpha, srmtAlpha) in [0, 1]). Gated
     // by quantumMode so the free-scalar negative-encoding path on other
-    // compute modes is not disturbed.
-    let hasWdwOverlay = DENSITY_GRID_HAS_PHASE && uniforms.quantumMode == 9 && gridSample.a > 0.01;
+    // compute modes is not disturbed. isWdwMode hoisted above.
+    let hasWdwOverlay = DENSITY_GRID_HAS_PHASE && isWdwMode && gridSample.a > 0.01;
 
     // Empty-skip: jump ahead when density is negligible.
     // Compute modes produce smoothly trilinearly-interpolated density fields on
@@ -139,11 +149,11 @@ fn volumeRaymarchGrid(
     // above), so the predicate reads the correct emptiness signal in both
     // single- and dual-channel paths.
     if (!PROFILING_STRIP_EMPTY_SKIP && rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay && !hasWdwOverlay) {
-      let skipDistance = min(stepLen * 10.0, max(tFar - t, 0.0));
+      let skipDistance = min(stepLen * 10.0, max(remaining, 0.0));
       if (skipDistance > stepLen) {
         let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms);
         let midHasPot = DENSITY_GRID_HAS_PHASE && probeMid.a < -0.01;
-        let midHasWdwOverlay = DENSITY_GRID_HAS_PHASE && uniforms.quantumMode == 9 && probeMid.a > 0.01;
+        let midHasWdwOverlay = DENSITY_GRID_HAS_PHASE && isWdwMode && probeMid.a > 0.01;
         let midTotal = select(probeMid.r, probeMid.r + probeMid.g, IS_DUAL_CHANNEL);
         if (midTotal < EMPTY_SKIP_THRESHOLD && !midHasPot && !midHasWdwOverlay) {
           t += skipDistance;
@@ -168,9 +178,9 @@ fn volumeRaymarchGrid(
       } else {
         logRhoForStep = sCenter;
       }
-      adaptiveStep = computeAdaptiveStep(logRhoForStep, stepLen, tFar - t);
+      adaptiveStep = computeAdaptiveStep(logRhoForStep, stepLen, remaining);
     } else {
-      adaptiveStep = min(stepLen, tFar - t);
+      adaptiveStep = min(stepLen, remaining);
     }
 
     // Potential overlay rendering (TDSE / FSF negative-encoded).
@@ -226,15 +236,16 @@ fn volumeRaymarchGrid(
           emission = computeEmissionLit(emissionRho, emissionS, phase, pos, gradient, viewDir, uniforms);
         }
 
-        // Branch coloring: compute from ray position (not density texture alpha)
-        if (uniforms.quantumMode == 3 && uniforms.branchSeparation > 0.5 && uniforms.branchTransitionWidth > 0.0) {
+        // Branch coloring: compute from ray position (not density texture alpha).
+        // branchColorActive hoisted above the loop (uniforms-only).
+        if (branchColorActive) {
           let branchFrac = smoothstep(
             uniforms.branchPlaneThreshold - uniforms.branchTransitionWidth,
             uniforms.branchPlaneThreshold + uniforms.branchTransitionWidth,
             pos.x
           );
           let branchColor = mix(uniforms.branchColorA, uniforms.branchColorB, branchFrac);
-          let lum = dot(emission, vec3f(0.2126, 0.7152, 0.0722));
+          let lum = dot(emission, LUMA_WEIGHTS);
           emission = branchColor * lum;
         }
 
@@ -321,12 +332,21 @@ fn volumeRaymarchGrid(
   // would otherwise run up to 128 times per pixel.
   let invStepLen = 1.0 / max(stepLen, 1e-5);
 
+  // PERF: hoist mode-only uniforms out of the per-sample loop.
+  let isWdwMode = uniforms.quantumMode == 9;
+  let branchColorActive =
+    uniforms.quantumMode == 3
+    && uniforms.branchSeparation > 0.5
+    && uniforms.branchTransitionWidth > 0.0;
+
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (PROFILING_HALF_SAMPLES && i >= 64) { break; }
     if (i >= sampleCount) { break; }
     iterCount = i + 1;
 
-    if (shouldTerminateRay(transmittance, uniforms.densityGain, max(tFar - t, 0.0))) { break; }
+    // PERF: cache tFar - t once per iter. Used 3+ times below.
+    let remaining = tFar - t;
+    if (shouldTerminateRay(transmittance, uniforms.densityGain, max(remaining, 0.0))) { break; }
 
     let pos = rayOrigin + rayDir * t;
 
@@ -420,17 +440,17 @@ fn volumeRaymarchGrid(
     let hasPotOverlay = IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01;
     // Wheeler-DeWitt overlay: A > 0 carries streamline / SRMT overlay alpha
     // (packer stores the max of the two alphas in [0, 1]). Must protect
-    // overlay cells from empty-skip when rho = 0.
-    let hasWdwOverlay = DENSITY_GRID_HAS_PHASE && uniforms.quantumMode == 9 && gridSample.a > 0.01;
+    // overlay cells from empty-skip when rho = 0. isWdwMode hoisted above.
+    let hasWdwOverlay = DENSITY_GRID_HAS_PHASE && isWdwMode && gridSample.a > 0.01;
     if (!PROFILING_STRIP_EMPTY_SKIP && rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay && !hasWdwOverlay) {
-      let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(tFar - t, 0.0));
+      let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(remaining, 0.0));
       if (skipDistance > stepLen) {
         let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms);
         let probeFar = sampleDensityFromGrid(pos + rayDir * skipDistance, uniforms);
         let midHasPot = IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && probeMid.a < -0.01;
         let farHasPot = IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && probeFar.a < -0.01;
-        let midHasWdwOverlay = DENSITY_GRID_HAS_PHASE && uniforms.quantumMode == 9 && probeMid.a > 0.01;
-        let farHasWdwOverlay = DENSITY_GRID_HAS_PHASE && uniforms.quantumMode == 9 && probeFar.a > 0.01;
+        let midHasWdwOverlay = DENSITY_GRID_HAS_PHASE && isWdwMode && probeMid.a > 0.01;
+        let farHasWdwOverlay = DENSITY_GRID_HAS_PHASE && isWdwMode && probeFar.a > 0.01;
         // For dual-channel modes, include secondary density (G channel) in skip check
         let midTotal = select(probeMid.r, probeMid.r + probeMid.g, IS_DUAL_CHANNEL);
         let farTotal = select(probeFar.r, probeFar.r + probeFar.g, IS_DUAL_CHANNEL);
@@ -462,9 +482,9 @@ fn volumeRaymarchGrid(
       } else {
         logRhoForStep = sCenter;
       }
-      adaptiveStep = computeAdaptiveStep(logRhoForStep, stepLen, tFar - t);
+      adaptiveStep = computeAdaptiveStep(logRhoForStep, stepLen, remaining);
     } else {
-      adaptiveStep = min(stepLen, tFar - t);
+      adaptiveStep = min(stepLen, remaining);
     }
 
     // Potential overlay: render V(x) as a solid semi-transparent wall.
@@ -575,18 +595,16 @@ fn volumeRaymarchGrid(
         // Guard: only TDSE dynamics (mode 3) produces branch-encoded alpha.
         // branchSeparation > 0.5 means stochastic decoherence is active (γ > 0).
         // Without this guard, enabling "show branches" at γ=0 would recolor
-        // the volume without any actual decoherence happening.
-        // Branch coloring: compute branch fraction from ray position
-        // (previously read from density texture alpha, but that triggered a Metal
-        // shader compiler bug — see tdseWriteGrid.wgsl.ts for details)
-        if (uniforms.quantumMode == 3 && uniforms.branchSeparation > 0.5 && uniforms.branchTransitionWidth > 0.0) {
+        // the volume without any actual decoherence happening. branchColorActive
+        // hoisted above the loop (uniforms-only).
+        if (branchColorActive) {
           let branchFrac = smoothstep(
             uniforms.branchPlaneThreshold - uniforms.branchTransitionWidth,
             uniforms.branchPlaneThreshold + uniforms.branchTransitionWidth,
             pos.x
           );
           let branchColor = mix(uniforms.branchColorA, uniforms.branchColorB, branchFrac);
-          let lum = dot(emission, vec3f(0.2126, 0.7152, 0.0722));
+          let lum = dot(emission, LUMA_WEIGHTS);
           emission = branchColor * lum;
         }
 

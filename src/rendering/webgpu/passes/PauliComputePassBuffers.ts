@@ -14,7 +14,7 @@ import {
   MAX_DIM,
   MAX_SLICE_POSITIONS_WRITE_COUNT,
   PACK_UNIFORM_SIZE,
-  packFFTStageUniforms,
+  packFFTAxisUniforms,
 } from './computePassUtils'
 import { buildFFTTwiddleTable, FFT_TWIDDLE_BYTES } from './FFTTwiddle'
 
@@ -36,14 +36,21 @@ export interface PauliBufferResult {
    */
   spinorBuffer: GPUBuffer
   fftScratchA: GPUBuffer
-  fftScratchB: GPUBuffer
   uniformBuffer: GPUBuffer
-  fftUniformBuffer: GPUBuffer
-  fftStagingBuffer: GPUBuffer
   /**
-   * CPU-precomputed radix-2 twiddle table bound at binding 3 of every Pauli
-   * Stockham FFT dispatch. Replaces per-thread `cos/sin` at stages >= 2. See
-   * `FFTTwiddle.ts` for layout. Same N_MAX_FFT_TWIDDLE = 128 cap as TDSE.
+   * Per-(axis, direction) FFT axis-uniform buffers. Length = `latticeDim * 2`.
+   * Each holds a 32-byte FFTAxisUniforms struct pre-populated for the
+   * corresponding axis dispatch slot. Forward axes occupy slots [0, latticeDim);
+   * inverse axes occupy [latticeDim, 2·latticeDim). With one bind group per
+   * buffer, all FFT dispatches inside a Strang substep can run inside a single
+   * compute pass without per-axis copyBufferToBuffer calls forcing pass
+   * boundaries.
+   */
+  fftAxisUniformBuffers: GPUBuffer[]
+  /**
+   * CPU-precomputed radix-2 twiddle table bound at binding 2 of every Pauli
+   * shared-memory FFT dispatch. Replaces per-thread `cos/sin` at stages >= 2.
+   * See `FFTTwiddle.ts` for layout. Same N_MAX_FFT_TWIDDLE = 128 cap as TDSE.
    */
   fftTwiddleBuffer: GPUBuffer
   packUniformBuffer: GPUBuffer
@@ -55,7 +62,8 @@ export interface PauliBufferResult {
   diagResultBuffer: GPUBuffer
   diagStagingBuffer: GPUBuffer
   totalSites: number
-  fwdStageCount: number
+  /** Number of axis slots per direction (== `latticeDim`). */
+  fwdAxisCount: number
   diagNumWorkgroups: number
 }
 
@@ -63,10 +71,8 @@ export interface PauliBufferResult {
 export interface PauliDestroyableBuffers {
   spinorBuffer: GPUBuffer | null
   fftScratchA: GPUBuffer | null
-  fftScratchB: GPUBuffer | null
   uniformBuffer: GPUBuffer | null
-  fftUniformBuffer: GPUBuffer | null
-  fftStagingBuffer: GPUBuffer | null
+  fftAxisUniformBuffers: GPUBuffer[] | null
   fftTwiddleBuffer: GPUBuffer | null
   packUniformBuffer: GPUBuffer | null
   packUniformBufferNoNorm: GPUBuffer | null
@@ -94,10 +100,10 @@ export function rebuildPauliBuffers(
   // Destroy old buffers
   old.spinorBuffer?.destroy()
   old.fftScratchA?.destroy()
-  old.fftScratchB?.destroy()
   old.uniformBuffer?.destroy()
-  old.fftUniformBuffer?.destroy()
-  old.fftStagingBuffer?.destroy()
+  if (old.fftAxisUniformBuffers) {
+    for (const b of old.fftAxisUniformBuffers) b.destroy()
+  }
   old.fftTwiddleBuffer?.destroy()
   old.packUniformBuffer?.destroy()
   old.packUniformBufferNoNorm?.destroy()
@@ -134,15 +140,12 @@ export function rebuildPauliBuffers(
     usage: GPUBufferUsage.STORAGE,
   })
 
-  // FFT scratch (interleaved complex: 2 floats per site)
+  // FFT scratch (interleaved complex: 2 floats per site).
+  // The shared-memory FFT operates in-place on this single buffer; no
+  // ping-pong scratch B is needed.
   const fftBytes = totalSites * 2 * Float32Array.BYTES_PER_ELEMENT
   const fftScratchA = device.createBuffer({
     label: 'pauli-fft-scratch-a',
-    size: fftBytes,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
-  })
-  const fftScratchB = device.createBuffer({
-    label: 'pauli-fft-scratch-b',
     size: fftBytes,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
   })
@@ -156,18 +159,28 @@ export function rebuildPauliBuffers(
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   })
 
-  // FFT stage uniforms — sum(log2(N_d)) per direction, not max(log2(N))*dim
-  let fwdStageCount = 0
-  for (let d = 0; d < config.latticeDim; d++) {
-    fwdStageCount += Math.round(Math.log2(gridSize[d]!))
+  // PERF: per-(axis, direction) FFT axis-uniform buffers. Each holds a
+  // 32-byte FFTAxisUniforms struct pre-populated for one dispatch slot.
+  // With one bind group per buffer, the entire Strang substep (fwd FFT
+  // axes × 2 components, kinetic, inv FFT axes × 2 components, V-half/
+  // absorber/etc.) can run inside a single compute pass without
+  // per-axis copyBufferToBuffer calls forcing pass boundaries.
+  const fwdAxisCount = config.latticeDim
+  const axisSlotCount = fwdAxisCount * 2 // forward + inverse
+  const fftAxisStagingData = packFFTAxisUniforms(config, totalSites)
+  const axisStagingBytes = new Uint8Array(fftAxisStagingData)
+  const fftAxisUniformBuffers: GPUBuffer[] = new Array(axisSlotCount)
+  for (let slot = 0; slot < axisSlotCount; slot++) {
+    const buf = device.createBuffer({
+      label: `pauli-fft-axis-uniforms-${slot}`,
+      size: FFT_UNIFORM_SIZE,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    })
+    const slotOffset = slot * FFT_UNIFORM_SIZE
+    const slotData = axisStagingBytes.slice(slotOffset, slotOffset + FFT_UNIFORM_SIZE)
+    device.queue.writeBuffer(buf, 0, slotData)
+    fftAxisUniformBuffers[slot] = buf
   }
-  const fftUniformBytes = fwdStageCount * 2 * FFT_UNIFORM_SIZE // fwd + inv
-  const fftUniformBuffer = device.createBuffer({
-    label: 'pauli-fft-uniforms',
-    size: Math.max(32, fftUniformBytes),
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-  })
-  const fftStagingBuffer = buildPauliFFTStagingData(device, config, totalSites)
 
   // CPU-precomputed radix-2 twiddle table. Replaces per-thread cos/sin in the
   // Stockham butterfly at stages s >= 2. Sized for N_MAX_FFT_TWIDDLE = 128
@@ -239,10 +252,8 @@ export function rebuildPauliBuffers(
   return {
     spinorBuffer,
     fftScratchA,
-    fftScratchB,
     uniformBuffer,
-    fftUniformBuffer,
-    fftStagingBuffer,
+    fftAxisUniformBuffers,
     fftTwiddleBuffer,
     packUniformBuffer,
     packUniformBufferNoNorm,
@@ -252,40 +263,9 @@ export function rebuildPauliBuffers(
     diagResultBuffer,
     diagStagingBuffer,
     totalSites,
-    fwdStageCount,
+    fwdAxisCount,
     diagNumWorkgroups,
   }
-}
-
-// ───────────────────────────────────────────────────────────────────────────
-// FFT Staging Data
-// ───────────────────────────────────────────────────────────────────────────
-
-/**
- * Pre-compute all FFT stage uniforms for all axes and both directions.
- * Matches FFTStageUniforms struct layout (tdseStockhamFFT.wgsl.ts):
- *   axisDim: u32, stage: u32, direction: f32, totalElements: u32,
- *   axisStride: u32, batchCount: u32, invN: f32, _pad0: u32
- *
- * Slots laid out in execution order: forward FFT axes (latticeDim-1 down to 0),
- * then inverse FFT axes (same axis order). Each axis has log2(N) stages in
- * ascending order (0..log2N-1) for both directions.
- */
-function buildPauliFFTStagingData(
-  device: GPUDevice,
-  config: PauliConfig,
-  totalSites: number
-): GPUBuffer {
-  const data = packFFTStageUniforms(config, totalSites)
-  const buf = device.createBuffer({
-    label: 'pauli-fft-staging',
-    size: Math.max(32, data.byteLength),
-    usage: GPUBufferUsage.COPY_SRC,
-    mappedAtCreation: true,
-  })
-  new Uint8Array(buf.getMappedRange()).set(new Uint8Array(data))
-  buf.unmap()
-  return buf
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -362,13 +342,28 @@ export function writePauliUniforms(
     rotating: 2,
     quadrupole: 3,
   }
-  u32[o++] = fieldTypeMap[config.fieldType] ?? 0
+  const fieldTypeId = fieldTypeMap[config.fieldType] ?? 0
+  u32[o++] = fieldTypeId
   f32[o++] = config.fieldStrength
   f32[o++] = config.fieldDirection[0] // theta
   f32[o++] = config.fieldDirection[1] // phi
   f32[o++] = config.gradientStrength
   f32[o] = config.rotatingFrequency
-  // 2 padding floats (o+1, o+2) skipped; next section uses absolute offset
+  // Slots [36] (fieldVecBx) and [37] (fieldVecBy) follow. fieldVecBz lives at
+  // [66] inside what was previously _pad2. Host precomputes the uniform-field
+  // B vector so the shader fieldType=0 branch avoids 4 sin/cos per thread per
+  // Strang substep. For fieldType != 0 these stay at 0 (zeroed by the fill on
+  // line 320) — the shader does not read them on those paths.
+  if (fieldTypeId === 0) {
+    const B0 = config.fieldStrength
+    const theta = config.fieldDirection[0] ?? 0
+    const phi = config.fieldDirection[1] ?? 0
+    const sinTheta = Math.sin(theta)
+    const cosTheta = Math.cos(theta)
+    f32[36] = B0 * sinTheta * Math.cos(phi)
+    f32[37] = B0 * sinTheta * Math.sin(phi)
+    f32[66] = B0 * cosTheta
+  }
 
   // Initial spin state (offset 38*4 = 152)
   o = 38

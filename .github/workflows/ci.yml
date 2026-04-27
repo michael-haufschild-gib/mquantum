@@ -16,13 +16,13 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
+      # pnpm version is read from `packageManager` field in package.json —
+      # specifying it here too triggers ERR_PNPM_BAD_PM_VERSION.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
@@ -30,8 +30,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Format check
-        run: pnpm exec prettier --check "src/**/*.{ts,tsx,json,css}"
+      # Prettier does NOT run in CI. Formatting is auto-applied locally by
+      # husky + lint-staged on every commit. A `prettier --check` step only
+      # fails the pipeline on drift that --write would have silently fixed,
+      # and `--write` in CI is a no-op (the runner discards the changes).
+      # The guard below rejects any future re-introduction of either form.
+      - name: Reject prettier in CI
+        run: node scripts/check-no-prettier-check.js
 
       - name: Lint
         run: pnpm exec eslint . --max-warnings 0 --no-warn-ignored
@@ -71,7 +76,7 @@ jobs:
     continue-on-error: false
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: dtolnay/rust-toolchain@stable
         with:

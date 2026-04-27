@@ -26,6 +26,8 @@ const LOG10E: f32 = 0.43429448190;
 const SQRT2: f32 = 1.41421356237;
 const SQRT3: f32 = 1.73205080757;
 const INV_SQRT2: f32 = 0.70710678118;
+// 1/√π — used by HO normalization: (ω/π)^(1/4) = √(α · √(1/π))
+const SQRT_INV_PI: f32 = 0.5641895835477563;
 
 const GOLDEN_RATIO: f32 = 1.61803398875;
 const GOLDEN_ANGLE: f32 = 2.39996322972; // PI * (3.0 - sqrt(5.0))

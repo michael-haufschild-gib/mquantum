@@ -33,6 +33,8 @@ import {
   computeBasisUpdate,
   computeCameraUpdate,
   computeSchroedingerUpdate,
+  PRECOMPUTED_TERM_BYTE_OFFSET,
+  PRECOMPUTED_TERM_BYTE_SIZE,
   type SchrodingerFrameState,
   type SchroedingerUpdateResult,
   TIME_FIELD_OFFSET,
@@ -270,6 +272,18 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         this.schroedingerUniformBuffer,
         UNCERTAINTY_THRESHOLD_OFFSET,
         this.timeUpdateBuffer
+      )
+      // Precomputed HO term_k = c_k * exp(-i * E_k * t) advances every frame.
+      // computeSchroedingerUpdate already wrote the new values into floatView;
+      // upload the 128-byte region. The 8-cos+sin + 8-cmul cost lifted off the
+      // fragment shader dwarfs this tiny per-frame writeBuffer.
+      const precomputedFloatStart = PRECOMPUTED_TERM_BYTE_OFFSET / 4
+      this.device.queue.writeBuffer(
+        this.schroedingerUniformBuffer,
+        PRECOMPUTED_TERM_BYTE_OFFSET,
+        this.schroedingerFloatView.buffer,
+        precomputedFloatStart * 4,
+        PRECOMPUTED_TERM_BYTE_SIZE
       )
     } else {
       this.writeUniformBuffer(

@@ -68,9 +68,13 @@ fn wignerCross(m: i32, n: i32, x: f32, p: f32, omega: f32) -> vec2f {
   let nMin = min(m, n);
   let delta = mMax - nMin;
 
+  // Clamped omega used consistently across all derivations (u², invOmega,
+  // sqrtOmega, invSqrtOmega) so tiny/negative ω never produces an inconsistent
+  // mix of clamped and raw values.
+  let omegaSafe = max(omega, 1e-20);
   // invOmega shared by u² and p/√ω denominators — one divide, multiply downstream.
-  let invOmega = 1.0 / max(omega, 1e-20);
-  let u2 = omega * x * x + p * p * invOmega;
+  let invOmega = 1.0 / omegaSafe;
+  let u2 = omegaSafe * x * x + p * p * invOmega;
   let signN = select(1.0, -1.0, (nMin & 1) != 0); // (-1)^n
 
   // sqrt(n!/m!) coefficient
@@ -79,9 +83,10 @@ fn wignerCross(m: i32, n: i32, x: f32, p: f32, omega: f32) -> vec2f {
   // Associated Laguerre L_n^{m-n}(2*u^2)
   let lagVal = laguerre(nMin, f32(delta), 2.0 * u2);
 
-  // Complex zeta = √ω·x + i·p·(1/√ω) — uses invSqrtOmega to avoid a second divide.
-  let sqrtOmega = sqrt(omega);
-  let invSqrtOmega = inverseSqrt(max(omega, 1e-20));
+  // Complex zeta = √ω·x + i·p·(1/√ω). PERF: derive √ω from rsqrt instead of
+  // calling sqrt() separately — sqrtOmega = ω · (1/√ω) saves one SFU op.
+  let invSqrtOmega = inverseSqrt(omegaSafe);
+  let sqrtOmega = omegaSafe * invSqrtOmega;
   let zetaRe = sqrtOmega * x;
   let zetaIm = p * invSqrtOmega;
 
@@ -163,14 +168,16 @@ fn wignerTermsMatchExcept(termA: i32, termB: i32, dimIdx: i32, uniforms: Schroed
  */
 fn evaluateWignerMarginalHO(x: f32, p: f32, dimIdx: i32, time: f32, uniforms: SchroedingerUniforms) -> f32 {
   let omega = getOmega(uniforms, dimIdx);
+  // Clamp once and reuse for u², √ω and 1/√ω derivations.
+  let omegaSafe = max(omega, 1e-20);
   let tc = uniforms.termCount;
   var W = 0.0;
 
   // Diagonal contributions: sum_k |c_k|² · W_{n_k}.
   // u² and exp(-u²) are identical across terms (depend on ω, x, p only) —
   // hoist them outside the loop so we don't recompute the transcendental K times.
-  let invOmega = 1.0 / max(omega, 1e-20);
-  let u2 = omega * x * x + p * p * invOmega;
+  let invOmega = 1.0 / omegaSafe;
+  let u2 = omegaSafe * x * x + p * p * invOmega;
   let expU2 = exp(-u2);
   let invPiExpU2 = INV_PI * expU2;
   let twoU2 = 2.0 * u2;
@@ -189,8 +196,9 @@ fn evaluateWignerMarginalHO(x: f32, p: f32, dimIdx: i32, time: f32, uniforms: Sc
     // wignerCross() recomputed all five of these on every (j, k) pair; for a
     // full superposition (tc=8) that is 28 pairs * {sqrt, inverseSqrt, sqrt,
     // exp, divide} = ~140 redundant transcendentals per pixel.
-    let sqrtOmega = sqrt(omega);
-    let invSqrtOmega = inverseSqrt(max(omega, 1e-20));
+    // PERF: derive √ω from rsqrt — saves one SFU op per pixel.
+    let invSqrtOmega = inverseSqrt(omegaSafe);
+    let sqrtOmega = omegaSafe * invSqrtOmega;
     let scaleSqrt2 = sqrt(2.0);
     let szetaRe = scaleSqrt2 * sqrtOmega * x;
     let szetaIm = scaleSqrt2 * p * invSqrtOmega;

@@ -58,12 +58,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let destOut = destBase + cs2;
 
     // Source site: shift backwards from destination. (cs=+ dir → source at coord-1)
-    var srcCoord: i32;
-    if (isPositive) {
-      srcCoord = i32(destCoords[dim]) - 1;
-    } else {
-      srcCoord = i32(destCoords[dim]) + 1;
-    }
+    let destCoordI = i32(destCoords[dim]);
+    let srcCoord = destCoordI + select(1, -1, isPositive);
 
     let Nd = params.gridSize[dim];
     let Ni = i32(Nd);
@@ -72,11 +68,29 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       coinOut[destOut] = 0.0;
       coinOut[destOut + 1u] = 0.0;
     } else {
-      var srcCoords = destCoords;
-      // Power-of-2 grid dim: (x + N) mod N == (x + N) & (N - 1).
-      srcCoords[dim] = u32((srcCoord + Ni) & (Ni - 1));
-
-      let srcSite = ndToLinear(srcCoords, params.strides, params.latticeDim);
+      // PERF: only one coordinate changes; compute the linear-index delta
+      // directly instead of copying destCoords[12] and re-running ndToLinear
+      // (which would multiply-add over all dims). For D=11 this saves an
+      // array copy + 11 mul-adds per coin-state iteration.
+      // Power-of-2 grid dim: (x + N) mod N == (x + N) & (N - 1). The UI
+      // restricts grid sizes to powers of two (defaultQwGridPerDim) but
+      // setSchroedingerConfig is a shallow merge with no validation, so
+      // save/load or programmatic config writes could route a non-power-of-2
+      // dim here. Fall back to a safe modulo wrap when Ni is not a power of
+      // two so the bitmask never reads from the wrong source cell.
+      // Use 'if' (not 'select') so the WGSL compiler dead-code-eliminates
+      // the unused branch — 'select' evaluates BOTH operands every iteration,
+      // which would defeat the pow-2 fast path in this hot D-axis loop.
+      let isPow2 = (Nd & (Nd - 1u)) == 0u;
+      var srcCoordWrapped: i32;
+      if (isPow2) {
+        srcCoordWrapped = (srcCoord + Ni) & (Ni - 1);
+      } else {
+        srcCoordWrapped = ((srcCoord % Ni) + Ni) % Ni;
+      }
+      let delta = srcCoordWrapped - destCoordI;
+      let strideDim = i32(params.strides[dim]);
+      let srcSite = u32(i32(destSite) + delta * strideDim);
       let srcBase = srcSite * numCoinStates * 2u + cs2;
 
       coinOut[destOut] = coinIn[srcBase];

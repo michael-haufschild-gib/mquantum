@@ -116,6 +116,22 @@ export const densityGridSamplingBlock = /* wgsl */ `
 // ============================================
 
 /**
+ * Sample the density grid at a UVW coord, returning vec4f(0) when the coord
+ * is outside the grid. Wraps textureSampleLevel in an if-guard rather than
+ * select() because WGSL select() evaluates both arguments -- the load was
+ * issued unconditionally, even for stencil taps that fell off the grid.
+ * The if form lets the GPU skip the load entirely when the wave is
+ * coherently out-of-bounds (boundary-grazing rays). textureSampleLevel is
+ * legal in non-uniform control flow because the LOD is explicit.
+ */
+fn sampleDensityIfInBounds(uvw: vec3f) -> vec4f {
+  if (all(uvw >= vec3f(0.0)) && all(uvw <= vec3f(1.0))) {
+    return textureSampleLevel(densityGridTexture, densityGridSampler, uvw, 0.0);
+  }
+  return vec4f(0.0);
+}
+
+/**
  * Rotate a world-space position through the N-D basis vectors (3D projection).
  * Active only when SAMPLE_SPACE_ROTATION is true (AdS modes). Dead-code-eliminated
  * otherwise. Used by all density grid sampling functions so rotation applies
@@ -198,18 +214,24 @@ fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f 
   // Sample 6 neighbors in UVW space with zero-outside-grid semantics.
   // Matches sampleDensityFromGrid: positions outside [0,1] return zero,
   // preventing clamp-to-edge from creating spurious gradients at the boundary.
+  // PERF: branch via if instead of select(). select evaluates BOTH arguments
+  // by WGSL spec, so the texture op was issued even when out-of-bounds; the
+  // if form lets a wave-coherent OOB stencil tap skip the load entirely.
+  // textureSampleLevel is allowed in non-uniform control flow because the
+  // LOD is explicit (no implicit derivatives) -- same reason this file uses
+  // textureSampleLevel everywhere instead of textureSample.
   let uxp = baseUVW + vec3f(uvwStep, 0.0, 0.0);
   let uxn = baseUVW - vec3f(uvwStep, 0.0, 0.0);
   let uyp = baseUVW + vec3f(0.0, uvwStep, 0.0);
   let uyn = baseUVW - vec3f(0.0, uvwStep, 0.0);
   let uzp = baseUVW + vec3f(0.0, 0.0, uvwStep);
   let uzn = baseUVW - vec3f(0.0, 0.0, uvwStep);
-  let sxp = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uxp, 0.0), all(uxp >= vec3f(0.0)) && all(uxp <= vec3f(1.0)));
-  let sxn = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uxn, 0.0), all(uxn >= vec3f(0.0)) && all(uxn <= vec3f(1.0)));
-  let syp = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uyp, 0.0), all(uyp >= vec3f(0.0)) && all(uyp <= vec3f(1.0)));
-  let syn = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uyn, 0.0), all(uyn >= vec3f(0.0)) && all(uyn <= vec3f(1.0)));
-  let szp = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uzp, 0.0), all(uzp >= vec3f(0.0)) && all(uzp <= vec3f(1.0)));
-  let szn = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uzn, 0.0), all(uzn >= vec3f(0.0)) && all(uzn <= vec3f(1.0)));
+  let sxp = sampleDensityIfInBounds(uxp);
+  let sxn = sampleDensityIfInBounds(uxn);
+  let syp = sampleDensityIfInBounds(uyp);
+  let syn = sampleDensityIfInBounds(uyn);
+  let szp = sampleDensityIfInBounds(uzp);
+  let szn = sampleDensityIfInBounds(uzn);
 
   // World-space half-distance between sample points (each offset is ±uvwStep
   // = ±2 texels in UVW = ±(2/N * 2*bound) in world, total 2h = 8*bound/N).
@@ -249,10 +271,11 @@ fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f 
  * identity Q + V = E holds where R is numerically well-defined. Boundary
  * handling: voxels whose CENTRE falls outside the grid return 0 up front;
  * individual neighbours that fall outside the grid are treated as rho=0
- * samples via select(vec4f(0.0), ..., inBounds) and still contribute to the
- * stencil (matching the CPU mirror). Voxels where the raw density is below
- * the near-vacuum cutoff (rho < 1e-12 which is R < 1e-6) also return 0 so
- * the colour-mode branch paints them as neutral grey.
+ * samples via sampleDensityIfInBounds (an if-guarded textureSampleLevel
+ * that skips the load when the wave is coherently OOB) and still contribute
+ * to the stencil (matching the CPU mirror). Voxels where the raw density is
+ * below the near-vacuum cutoff (rho < 1e-12 which is R < 1e-6) also return
+ * 0 so the colour-mode branch paints them as neutral grey.
  *
  * The helper reads ρ from the R channel exclusively. The Dirac strategy forces
  * fieldView=totalDensity and Pauli mode hides quantumPotential from the selector
@@ -288,13 +311,17 @@ fn computeQuantumPotentialFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -
   let uzp = baseUVW + vec3f(0.0, 0.0, uvwStep);
   let uzn = baseUVW - vec3f(0.0, 0.0, uvwStep);
 
+  // Center is in-bounds (gated by the early return above) -- sample directly.
+  // Neighbour taps may straddle the cube boundary; sampleDensityIfInBounds
+  // skips the load when the wave is coherently OOB. See the matching note in
+  // computeGradientFromGrid.
   let sc  = textureSampleLevel(densityGridTexture, densityGridSampler, baseUVW, 0.0);
-  let sxp = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uxp, 0.0), all(uxp >= vec3f(0.0)) && all(uxp <= vec3f(1.0)));
-  let sxn = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uxn, 0.0), all(uxn >= vec3f(0.0)) && all(uxn <= vec3f(1.0)));
-  let syp = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uyp, 0.0), all(uyp >= vec3f(0.0)) && all(uyp <= vec3f(1.0)));
-  let syn = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uyn, 0.0), all(uyn >= vec3f(0.0)) && all(uyn <= vec3f(1.0)));
-  let szp = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uzp, 0.0), all(uzp >= vec3f(0.0)) && all(uzp <= vec3f(1.0)));
-  let szn = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uzn, 0.0), all(uzn >= vec3f(0.0)) && all(uzn <= vec3f(1.0)));
+  let sxp = sampleDensityIfInBounds(uxp);
+  let sxn = sampleDensityIfInBounds(uxn);
+  let syp = sampleDensityIfInBounds(uyp);
+  let syn = sampleDensityIfInBounds(uyn);
+  let szp = sampleDensityIfInBounds(uzp);
+  let szn = sampleDensityIfInBounds(uzn);
 
   let rhoC  = sc.r;
   let rhoXp = sxp.r;
@@ -313,13 +340,13 @@ fn computeQuantumPotentialFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -
   }
 
   // Neighbor amplitudes: allow R = 0 for out-of-bounds or vacuum cells
-  // so the stencil preserves the zero-outside boundary convention the
-  // grid-clamp select(..., vec4f(0.0), ...) block above set up. Lifting
-  // these to sqrt(1e-8) ~= 3.16e-4 the way the center amplitude is
-  // clamped would inject spurious curvature into the Laplacian anywhere
-  // within a texel of vacuum -- visible as a thin highlighted rim on
-  // the Bohmian quantum-potential visualisation. max(v, 0.0) still
-  // guards the sqrt from float noise producing a tiny negative input.
+  // so the stencil preserves the zero-outside boundary convention that
+  // sampleDensityIfInBounds enforces above. Lifting these to sqrt(1e-8)
+  // ~= 3.16e-4 the way the center amplitude is clamped would inject
+  // spurious curvature into the Laplacian anywhere within a texel of
+  // vacuum -- visible as a thin highlighted rim on the Bohmian
+  // quantum-potential visualisation. max(v, 0.0) still guards the sqrt
+  // from float noise producing a tiny negative input.
   let Rxp = sqrt(max(rhoXp, 0.0));
   let Rxn = sqrt(max(rhoXn, 0.0));
   let Ryp = sqrt(max(rhoYp, 0.0));

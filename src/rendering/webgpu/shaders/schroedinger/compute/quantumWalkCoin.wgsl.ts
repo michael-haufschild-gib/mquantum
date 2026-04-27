@@ -93,21 +93,29 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let N = f32(numCoinStates);
     let invSqrtN = inverseSqrt(N);
     let twoPiOverN = 6.28318530717958647692 / N;
+    // PERF: outer-loop (cosD[j], sinD[j]) = (cos(j·twoPiOverN), sin(j·twoPiOverN))
+    // also obeys a 2x2 rotation recurrence — replace N cos + N sin calls with
+    // 2 cos+sin upfront + per-j vector rotation (4 muls + 2 adds).
+    let cosUnit = cos(twoPiOverN);
+    let sinUnit = sin(twoPiOverN);
+    var cosD: f32 = 1.0;
+    var sinD: f32 = 0.0;
     for (var j: u32 = 0u; j < numCoinStates; j++) {
       var acc = vec2f(0.0);
-      // Phase increment per k for this j.
-      let dPhi = twoPiOverN * f32(j);
-      let cosD = cos(dPhi);
-      let sinD = sin(dPhi);
       var p = vec2f(1.0, 0.0); // (cos(0), sin(0))
       for (var k: u32 = 0u; k < numCoinStates; k++) {
         let v = inVal[k];
         // (cos + i sin) * (re + i im) = (cos*re - sin*im) + i (cos*im + sin*re)
         acc += vec2f(p.x * v.x - p.y * v.y, p.x * v.y + p.y * v.x);
-        // Advance (cos, sin) by dPhi via 2x2 rotation. Vector update.
+        // Advance (cos, sin) by dPhi = j·twoPiOverN via 2x2 rotation.
         p = vec2f(p.x * cosD - p.y * sinD, p.y * cosD + p.x * sinD);
       }
       coinOut[baseIdx + j] = acc * invSqrtN;
+      // Advance (cosD, sinD) to next j via rotation by twoPiOverN.
+      let newCos = cosD * cosUnit - sinD * sinUnit;
+      let newSin = sinD * cosUnit + cosD * sinUnit;
+      cosD = newCos;
+      sinD = newSin;
     }
   }
 }

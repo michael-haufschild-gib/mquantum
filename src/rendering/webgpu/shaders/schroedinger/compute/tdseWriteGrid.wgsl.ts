@@ -125,22 +125,6 @@ fn worldToLatticeInterp(
   return true;
 }
 
-fn siteIndexForCorner(
-  coordsLo: ptr<function, array<u32, 12>>,
-  coordsHi: ptr<function, array<u32, 12>>,
-  corner: u32
-) -> u32 {
-  var coords: array<u32, 12>;
-  for (var d: u32 = 0u; d < params.latticeDim; d++) {
-    if ((corner & (1u << d)) != 0u) {
-      coords[d] = (*coordsHi)[d];
-    } else {
-      coords[d] = (*coordsLo)[d];
-    }
-  }
-  return ndToLinear(coords, params.strides, params.latticeDim);
-}
-
 fn cornerWeight(fracs: ptr<function, array<f32, 12>>, corner: u32) -> f32 {
   var w: f32 = 1.0;
   let interpDims = min(params.latticeDim, 3u);
@@ -334,14 +318,32 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   var idx: u32;
 
   if (useTrilinear) {
-    // Trilinear interpolation of density (and re/im for phase)
+    // Trilinear interpolation of density (and re/im for phase).
+    // PERF: precompute baseIdxLo (coordsLo → linear index) once and the 3
+    // visible-axis stride deltas, then derive each corner's index by adding
+    // up to 3 deltas. Replaces 8 × siteIndexForCorner (each scanned 12 dims
+    // and called ndToLinear) with 1 ndToLinear + 3 small subs + per-corner
+    // bit-tested adds.
+    let baseIdxLo = ndToLinear(coordsLo, params.strides, params.latticeDim);
+    let interpDimsTri = min(params.latticeDim, 3u);
+    var deltaIdx: array<u32, 3>;
+    deltaIdx[0] = 0u;
+    deltaIdx[1] = 0u;
+    deltaIdx[2] = 0u;
+    for (var d: u32 = 0u; d < interpDimsTri; d++) {
+      deltaIdx[d] = (coordsHi[d] - coordsLo[d]) * params.strides[d];
+    }
+
     var blendedDensity: f32 = 0.0;
     var blendedRe: f32 = 0.0;
     var blendedIm: f32 = 0.0;
     for (var corner: u32 = 0u; corner < numCorners; corner++) {
       let w = cornerWeight(&fracs, corner);
       if (w > 0.0) {
-        let sIdx = siteIndexForCorner(&coordsLo, &coordsHi, corner);
+        var sIdx = baseIdxLo;
+        if ((corner & 1u) != 0u) { sIdx += deltaIdx[0]; }
+        if ((corner & 2u) != 0u) { sIdx += deltaIdx[1]; }
+        if ((corner & 4u) != 0u) { sIdx += deltaIdx[2]; }
         let zc = psi[sIdx];
         let cRe = zc.x;
         let cIm = zc.y;

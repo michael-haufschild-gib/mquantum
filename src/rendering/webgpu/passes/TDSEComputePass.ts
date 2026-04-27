@@ -61,7 +61,7 @@ import { type ObservablesState } from './TDSEObservablesDispatch'
  * TDSEUniforms struct size in bytes.
  *
  * Mirrors the layout in `tdseUniforms.wgsl.ts` (authoritative source).
- * Total = 928 bytes (16-byte aligned). Update `TDSE_UNIFORM_SIZE` in
+ * Total = 1024 bytes (16-byte aligned). Update `TDSE_UNIFORM_SIZE` in
  * `TDSEComputePassBuffers.ts` and the WGSL struct together when adding
  * new fields.
  */

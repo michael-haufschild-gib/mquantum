@@ -20,29 +20,29 @@ function generateHOSuperpositionBlock(termCount: number): string {
   const terms = Array.from({ length: termCount }, (_, k) => {
     if (k === 0) {
       return `
-  // Term ${k}
+  // Term ${k}: term_k = c_k * exp(-i * E_k * t) is host-precomputed once per frame.
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
-  let phase${k} = -getEnergy(uniforms, ${k}) * t;
-  let timeFactor${k} = cexp_i(phase${k});
-  let term${k} = cmul(getCoeff(uniforms, ${k}), timeFactor${k});
+  let term${k} = uniforms.precomputedTerm[${k}].xy;
   var psi = cscale(spatial${k}, term${k});`
     } else {
       return `
   // Term ${k}
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
-  let phase${k} = -getEnergy(uniforms, ${k}) * t;
-  let timeFactor${k} = cexp_i(phase${k});
-  let term${k} = cmul(getCoeff(uniforms, ${k}), timeFactor${k});
+  let term${k} = uniforms.precomputedTerm[${k}].xy;
   psi += cscale(spatial${k}, term${k});`
     }
   }).join('\n')
 
+  // The 't' parameter is retained for ABI stability with the dispatch block but
+  // is no longer used inside the unrolled body; the time dependence now lives
+  // entirely inside uniforms.precomputedTerm. WGSL allows unused parameters.
   return `
 // ============================================
 // HO Superposition - ${termCount} Term${termCount > 1 ? 's' : ''} (Unrolled)
 // ============================================
 
-fn evalHOSuperposition${termCount}(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f {${terms}
+fn evalHOSuperposition${termCount}(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
+  let _t_unused = t; // suppress unused-parameter warnings on strict toolchains${terms}
 
   return psi;
 }
@@ -87,17 +87,17 @@ function generateHOCombinedBlock(termCount: number): string {
   const terms = Array.from({ length: termCount }, (_, k) => {
     if (k === 0) {
       return `
-  // Term ${k}: compute spatial ONCE, use for both
+  // Term ${k}: compute spatial ONCE, use for both spatial-only and time-dependent paths.
+  // term_k = c_k * exp(-i * E_k * t) is host-precomputed; coeff${k} is still needed
+  // for the spatial-only (t = 0) accumulator that drives the spatial reference phase.
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
   let coeff${k} = getCoeff(uniforms, ${k});
 
   // Spatial-only accumulation
   var psiSpatial = cscale(spatial${k}, coeff${k});
 
-  // Time-dependent accumulation
-  let phase${k} = -getEnergy(uniforms, ${k}) * t;
-  let timeFactor${k} = cexp_i(phase${k});
-  let term${k} = cmul(coeff${k}, timeFactor${k});
+  // Time-dependent accumulation (uses host-precomputed term)
+  let term${k} = uniforms.precomputedTerm[${k}].xy;
   var psiTime = cscale(spatial${k}, term${k});`
     } else {
       return `
@@ -105,16 +105,17 @@ function generateHOCombinedBlock(termCount: number): string {
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
   let coeff${k} = getCoeff(uniforms, ${k});
   psiSpatial += cscale(spatial${k}, coeff${k});
-  let phase${k} = -getEnergy(uniforms, ${k}) * t;
-  let timeFactor${k} = cexp_i(phase${k});
-  let term${k} = cmul(coeff${k}, timeFactor${k});
+  let term${k} = uniforms.precomputedTerm[${k}].xy;
   psiTime += cscale(spatial${k}, term${k});`
     }
   }).join('\n')
 
+  // The 't' parameter is retained for ABI stability; the time dependence has
+  // been hoisted into uniforms.precomputedTerm and computed on the host.
   return `
 // Combined time + spatial for ${termCount} term${termCount > 1 ? 's' : ''}
-fn evalHOCombined${termCount}(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec4f {${terms}
+fn evalHOCombined${termCount}(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec4f {
+  let _t_unused = t; // suppress unused-parameter warnings on strict toolchains${terms}
 
   let spatialPhase = atan2(psiSpatial.y, psiSpatial.x);
   let refNorm2 = dot(psiSpatial, psiSpatial);

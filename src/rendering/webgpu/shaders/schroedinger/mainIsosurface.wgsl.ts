@@ -78,9 +78,6 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
   var t = tNear;
   var hitT: f32 = -1.0;
 
-  // Iteration counter for debug visualization
-  var iterCount: i32 = 0;
-
   // Adaptive ray march: step size = |gap| / |ds/dt| along ray direction.
   // Uses cheap sampleDensity per step (same cost as fixed-step march),
   // with directional derivative estimated from consecutive samples.
@@ -98,7 +95,6 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
   for (var i = 0; i < 128; i++) {
     if (i >= maxSteps) { break; }
     if (t > tFar) { break; }
-    iterCount = i + 1;
 
     let pos = ro + rd * t;
     var rho: f32;
@@ -195,11 +191,12 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
   let gMagSq = dot(rawGrad, rawGrad);
   // Floor only the scalar denominator path. Using the floored invGMag for the
   // normal would shrink |n| < 1 in shallow-gradient regions and bias diffuse /
-  // specular energy. Compute the normal from the unfloored magnitude with an
-  // explicit zero-gradient guard.
+  // specular energy. PERF: when gMagSq > 1e-12, max(gMagSq, 1e-12) == gMagSq,
+  // so the same inverseSqrt is exact for the normal too — reuse instead of
+  // calling inverseSqrt twice.
   let invGMag = inverseSqrt(max(gMagSq, 1e-12));
-  let gradMag = gMagSq * invGMag;  // = sqrt(gMagSq)
-  let invGMagExact = select(0.0, inverseSqrt(gMagSq), gMagSq > 1e-12);
+  let gradMag = gMagSq * invGMag;  // = sqrt(max(gMagSq, 1e-12))
+  let invGMagExact = select(0.0, invGMag, gMagSq > 1e-12);
   let n = -rawGrad * invGMagExact;
 
   // Sample for color
@@ -258,6 +255,13 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
   let viewDir = -rd;
   let roughness = max(material.roughness, 0.04);
 
+  // PERF: hoist F0 / dielectricF0 / kD-divide-by-PI invariants out of the
+  // multi-light loop — they only depend on material + surfaceColor.
+  // Filament convention: F0 = 0.16 * reflectance^2 for dielectrics (0.5 → 0.04).
+  let dielectricF0 = 0.16 * material.reflectance * material.reflectance;
+  let F0 = mix(vec3f(dielectricF0), surfaceColor, material.metallic);
+  let surfaceColorOverPi = surfaceColor * INV_PI;
+
   // Multi-light loop using shared lighting system
   for (var i = 0; i < MAX_LIGHTS; i++) {
     if (i >= lighting.lightCount) { break; }
@@ -303,10 +307,7 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
 
     let NdotL = max(dot(n, l), 0.0);
 
-    // GGX Specular (PBR) with energy conservation
-    // Filament convention: F0 = 0.16 * reflectance^2 for dielectrics (0.5 → 0.04)
-    let dielectricF0 = 0.16 * material.reflectance * material.reflectance;
-    let F0 = mix(vec3f(dielectricF0), surfaceColor, material.metallic);
+    // GGX Specular (PBR) with energy conservation. F0/dielectricF0 hoisted above.
     let halfSum = l + viewDir;
     let halfLen = length(halfSum);
     var H: vec3f;
@@ -321,8 +322,8 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
     let kS = F;
     let kD = (vec3f(1.0) - kS) * (1.0 - material.metallic);
 
-    // Diffuse (Lambertian BRDF = albedo/PI)
-    col += kD * surfaceColor / PI * light.color.rgb * NdotL * attenuation;
+    // Diffuse (Lambertian BRDF = albedo/PI). surfaceColorOverPi hoisted above.
+    col += kD * surfaceColorOverPi * light.color.rgb * NdotL * attenuation;
 
     // Specular
     let specular = computePBRSpecular(n, viewDir, l, roughness, F0);

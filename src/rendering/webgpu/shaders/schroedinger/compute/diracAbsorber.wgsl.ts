@@ -33,10 +33,14 @@ const diracAbsorberBody = /* wgsl */ `
     let dampFactor = exp(-sigma * params.dt);
     let S = params.spinorSize;
     let T = params.totalSites;
-    // Apply to all spinor components
+    // Apply to all spinor components.
+    // PERF: stride bufIdx by T per iteration instead of recomputing c*T + idx —
+    // saves a multiply per spinor component when the runtime-S loop is not
+    // unrolled. Mirrors diracPotentialHalf.
+    var bufIdx = idx;
     for (var c: u32 = 0u; c < S; c++) {
-      let bufIdx = c * T + idx;
       spinor[bufIdx] = spinor[bufIdx] * dampFactor;
+      bufIdx += T;
     }
   }
 }

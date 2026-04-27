@@ -212,8 +212,9 @@ fn computeMultiLighting(
     let kS = F;
     let kD = (vec3f(1.0) - kS) * (1.0 - metallic);
 
-    // Diffuse (energy-conserved, Lambertian BRDF = albedo/PI)
-    let diffuse = kD * albedo / PI;
+    // Diffuse (energy-conserved, Lambertian BRDF = albedo/PI).
+    // PERF: * INV_PI replaces a vec3 divide (3 divs) with a vec3 mul (3 muls).
+    let diffuse = kD * albedo * INV_PI;
 
     // Specular (Cook-Torrance, with artist-controlled tint/intensity)
     let specular = computePBRSpecular(N, V, L, roughness, F0);

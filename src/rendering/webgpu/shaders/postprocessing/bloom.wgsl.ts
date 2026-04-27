@@ -43,9 +43,12 @@ fn softThreshold(color: vec3f, threshold: f32, knee: f32) -> vec3f {
   let radiance = max(color, vec3f(0.0));
   let luma = luminance(radiance);
   let safeKnee = max(knee, 0.0001);
-  let soft = clamp(luma - threshold + safeKnee, 0.0, 2.0 * safeKnee);
+  // PERF: cache luma - threshold (used for both the soft window and the
+  // hard contribution) so we do one sub instead of two.
+  let lumaMinusThreshold = luma - threshold;
+  let soft = clamp(lumaMinusThreshold + safeKnee, 0.0, 2.0 * safeKnee);
   let quadratic = soft * soft / (4.0 * safeKnee + 0.00001);
-  let contribution = max(quadratic, luma - threshold);
+  let contribution = max(quadratic, lumaMinusThreshold);
   let factor = min(contribution / max(luma, 0.00001), 1.0);
   return radiance * factor;
 }

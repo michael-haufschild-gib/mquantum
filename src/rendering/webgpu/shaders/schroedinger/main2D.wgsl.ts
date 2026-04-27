@@ -131,7 +131,7 @@ ${generate2DCommonBody()}
   // entry point: mix the color AND bump alpha so nodal-line pixels
   // survive the transparency cull below.
   if (FEATURE_NODAL && schroedinger.nodalEnabled != 0u && schroedinger.nodalStrength > 0.0) {
-    let nodalResult = evaluateNodalLines2D(pos, animTime, schroedinger);
+    let nodalResult = evaluateNodalLines2D(pos, psi, animTime, schroedinger);
     if (nodalResult.x > 0.0) {
       let nodalAlpha = nodalResult.x * schroedinger.nodalStrength;
       let nodalColor = vec3f(nodalResult.y, nodalResult.z, nodalResult.w);
@@ -182,7 +182,7 @@ ${generate2DCommonBody()}
 
   // Nodal lines
   if (FEATURE_NODAL && schroedinger.nodalEnabled != 0u && schroedinger.nodalStrength > 0.0) {
-    let nodalResult = evaluateNodalLines2D(pos, animTime, schroedinger);
+    let nodalResult = evaluateNodalLines2D(pos, psi, animTime, schroedinger);
     if (nodalResult.x > 0.0) {
       let nodalAlpha = nodalResult.x * schroedinger.nodalStrength;
       let nodalColor = vec3f(nodalResult.y, nodalResult.z, nodalResult.w);

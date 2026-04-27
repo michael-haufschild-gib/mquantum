@@ -26,15 +26,15 @@
  *   [33]      fieldDirPhi
  *   [34]      gradientStrength
  *   [35]      rotatingFrequency
- *   [36]      _pad0
- *   [37]      _pad1
+ *   [36]      fieldVecBx     (host-precomputed B0·sin(θ)·cos(φ) for fieldType=0; 0 otherwise)
+ *   [37]      fieldVecBy     (host-precomputed B0·sin(θ)·sin(φ) for fieldType=0; 0 otherwise)
  *   [38]      spinTheta
  *   [39]      spinPhi
  *   [40]      initCondition
  *   [41]      packetWidth
  *   [42..53]  packetCenter[12]
  *   [54..65]  packetMomentum[12]
- *   [66]      _pad2
+ *   [66]      fieldVecBz     (host-precomputed B0·cos(θ) for fieldType=0; 0 otherwise)
  *   [67]      potentialType
  *   [68]      harmonicOmega
  *   [69]      wellDepth
@@ -86,8 +86,11 @@ struct PauliUniforms {
   fieldDirPhi: f32,                 // [33]
   gradientStrength: f32,            // [34]
   rotatingFrequency: f32,           // [35]
-  _pad0: u32,                       // [36]
-  _pad1: u32,                       // [37]
+  // Host-precomputed B vector for fieldType=0 (uniform). Saves 4 sin/cos
+  // per thread per Strang substep. Zero for fieldType != 0 (unused on those
+  // paths). Bz lives at [66] to fit the existing 640-byte layout.
+  fieldVecBx: f32,                  // [36]
+  fieldVecBy: f32,                  // [37]
 
   // Spin state (Bloch sphere)
   spinTheta: f32,                   // [38]
@@ -98,7 +101,7 @@ struct PauliUniforms {
   packetWidth: f32,                 // [41]
   packetCenter: array<f32, 12>,     // [42..53]
   packetMomentum: array<f32, 12>,   // [54..65]
-  _pad2: f32,                       // [66]
+  fieldVecBz: f32,                  // [66]  see fieldVecBx/By note above
 
   // Potential
   potentialType: u32,               // [67]  0=none, 1=harmonicTrap, 2=barrier, 3=doubleWell

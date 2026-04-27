@@ -470,6 +470,22 @@ export function writeTdseUniforms(
   const rawOpacity = config.curvatureOverlayOpacity ?? 0.4
   f32[230] = Math.min(1, Math.max(0, Number.isFinite(rawOpacity) ? rawOpacity : 0.4))
 
+  // Host-precomputed reciprocal spacing (offsets 928-1023, indices 232-255).
+  // Eliminates one divide + max + mul per cell per RK4 stage in the curved
+  // kinetic kernel. Mirrors kGridScale's precompute pattern. Mirrors the
+  // shader's `1.0 / max(dx, 1e-12)` exactly so quantum dynamics are
+  // bit-identical to the prior in-shader compute. Slots beyond latticeDim
+  // remain zero from `u32.fill(0)` above.
+  for (let d = 0; d < config.latticeDim; d++) {
+    const dx = effSpacing[d]!
+    // Compute in JS double precision, then store as f32. The shader uses
+    // `1.0 / max(dx, 1e-12)`; mirror exactly to avoid drift.
+    const safeDx = Math.max(Number.isFinite(dx) ? dx : 0, 1e-12)
+    const invDx = 1.0 / safeDx
+    f32[232 + d] = invDx
+    f32[244 + d] = invDx * invDx
+  }
+
   device.queue.writeBuffer(uniformBuffer, 0, uniformData)
 }
 

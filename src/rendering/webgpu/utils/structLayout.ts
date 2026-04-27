@@ -60,6 +60,8 @@ interface StructLayout<Names extends string = string> {
   readonly fields: readonly StructFieldInfo[]
   /** Field name → byte offset mapping. */
   readonly byteOffset: Readonly<Record<Names, number>>
+  /** Field name → byte size (matches WGSL stride·count for arrays). */
+  readonly byteSize: Readonly<Record<Names, number>>
   /** Field name → float32/int32 index (byteOffset / 4). */
   readonly index: Readonly<Record<Names, number>>
   /** Total struct size in bytes (including trailing alignment padding). */
@@ -133,6 +135,7 @@ function computeStructLayout<const T extends readonly StructFieldDef[]>(
 ): StructLayout<T[number]['name']> {
   const computed: StructFieldInfo[] = []
   const byteOffset = {} as Record<string, number>
+  const byteSize = {} as Record<string, number>
   const index = {} as Record<string, number>
   let offset = 0
   let maxAlign = 0
@@ -151,6 +154,7 @@ function computeStructLayout<const T extends readonly StructFieldDef[]>(
       reserved: field.name.startsWith('_'),
     })
     byteOffset[field.name] = offset
+    byteSize[field.name] = size
     index[field.name] = offset / 4
 
     offset += size
@@ -159,6 +163,7 @@ function computeStructLayout<const T extends readonly StructFieldDef[]>(
   return {
     fields: computed,
     byteOffset: byteOffset as Readonly<Record<T[number]['name'], number>>,
+    byteSize: byteSize as Readonly<Record<T[number]['name'], number>>,
     index: index as Readonly<Record<T[number]['name'], number>>,
     totalSize: roundUp(maxAlign || 1, offset),
   }

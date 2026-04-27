@@ -103,23 +103,6 @@ fn worldToLatticeInterp(
   return true;
 }
 
-// Build a linear site index for a trilinear corner (corner bit d = use hi[d])
-fn siteIndexForCorner(
-  coordsLo: ptr<function, array<u32, 12>>,
-  coordsHi: ptr<function, array<u32, 12>>,
-  corner: u32
-) -> u32 {
-  var coords: array<u32, 12>;
-  for (var d: u32 = 0u; d < params.latticeDim; d++) {
-    if ((corner & (1u << d)) != 0u) {
-      coords[d] = (*coordsHi)[d];
-    } else {
-      coords[d] = (*coordsLo)[d];
-    }
-  }
-  return ndToLinear(coords, params.strides, params.latticeDim);
-}
-
 // Trilinear weight for a corner from fractional coordinates
 fn cornerWeight(fracs: ptr<function, array<f32, 12>>, corner: u32) -> f32 {
   var w: f32 = 1.0;
@@ -203,6 +186,21 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let T = params.totalSites;
   let numCorners = 1u << min(params.latticeDim, 3u);
 
+  // PERF: precompute baseIdxLo (coordsLo to linear index) once and the 3
+  // visible-axis stride deltas, then derive each corner's index by adding
+  // up to 3 deltas. Replaces 5 siteIndexForCorner call sites (each scanned
+  // 12 dims and called ndToLinear per corner) with 1 ndToLinear + 3 small
+  // subs + per-corner bit-tested adds shared across all 4 fieldView paths.
+  let baseIdxLo = ndToLinear(coordsLo, params.strides, params.latticeDim);
+  let interpDimsTri = min(params.latticeDim, 3u);
+  var deltaIdx: array<u32, 3>;
+  deltaIdx[0] = 0u;
+  deltaIdx[1] = 0u;
+  deltaIdx[2] = 0u;
+  for (var d: u32 = 0u; d < interpDimsTri; d++) {
+    deltaIdx[d] = (coordsHi[d] - coordsLo[d]) * params.strides[d];
+  }
+
   // Nearest-neighbour site for phase and coherence queries. Derived from the
   // coordF values computed above — round+clamp on the exact same fractional
   // coordinate preserves boundary behaviour bit-for-bit (deriving round from
@@ -242,7 +240,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     for (var corner: u32 = 0u; corner < numCorners; corner = corner + 1u) {
       let w = cornerWeight(&fracs, corner);
       if (w > 0.0) {
-        let sIdx = siteIndexForCorner(&coordsLo, &coordsHi, corner);
+        var sIdx = baseIdxLo;
+        if ((corner & 1u) != 0u) { sIdx += deltaIdx[0]; }
+        if ((corner & 2u) != 0u) { sIdx += deltaIdx[1]; }
+        if ((corner & 4u) != 0u) { sIdx += deltaIdx[2]; }
         blend = blend + w * upDownDensityAt(sIdx, T);
       }
     }
@@ -259,7 +260,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     for (var corner: u32 = 0u; corner < numCorners; corner = corner + 1u) {
       let w = cornerWeight(&fracs, corner);
       if (w > 0.0) {
-        let sIdx = siteIndexForCorner(&coordsLo, &coordsHi, corner);
+        var sIdx = baseIdxLo;
+        if ((corner & 1u) != 0u) { sIdx += deltaIdx[0]; }
+        if ((corner & 2u) != 0u) { sIdx += deltaIdx[1]; }
+        if ((corner & 4u) != 0u) { sIdx += deltaIdx[2]; }
         blendTotal += w * totalDensityAt(sIdx, T);
       }
     }
@@ -276,7 +280,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     for (var corner: u32 = 0u; corner < numCorners; corner = corner + 1u) {
       let w = cornerWeight(&fracs, corner);
       if (w > 0.0) {
-        let sIdx = siteIndexForCorner(&coordsLo, &coordsHi, corner);
+        var sIdx = baseIdxLo;
+        if ((corner & 1u) != 0u) { sIdx += deltaIdx[0]; }
+        if ((corner & 2u) != 0u) { sIdx += deltaIdx[1]; }
+        if ((corner & 4u) != 0u) { sIdx += deltaIdx[2]; }
         blend = blend + w * upDownDensityAt(sIdx, T);
       }
     }
@@ -298,7 +305,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     for (var corner: u32 = 0u; corner < numCorners; corner = corner + 1u) {
       let w = cornerWeight(&fracs, corner);
       if (w > 0.0) {
-        let sIdx = siteIndexForCorner(&coordsLo, &coordsHi, corner);
+        var sIdx = baseIdxLo;
+        if ((corner & 1u) != 0u) { sIdx += deltaIdx[0]; }
+        if ((corner & 2u) != 0u) { sIdx += deltaIdx[1]; }
+        if ((corner & 4u) != 0u) { sIdx += deltaIdx[2]; }
         let v0c = spinor[sIdx];
         let v1c = spinor[T + sIdx];
         let re0c = v0c.x;

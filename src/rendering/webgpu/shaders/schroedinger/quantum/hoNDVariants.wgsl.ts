@@ -19,11 +19,14 @@ function generateHoNDBlock(dimension: number): string {
   // PERF: Precompute alpha, alphaNorm, scaled coordinate u, and Gaussian envelope
   // per dimension ONCE. These depend only on omega[j] and xND[j], both term-invariant.
   // For 8-term superposition at 3D: saves 21 exp() + 21 mul (u²) = ~525 GPU cycles.
+  // SQRT_INV_PI = 1/sqrt(π) — shared constant from constants.wgsl.
+  // PERF: alphaNorm = sqrt(sqrt(ω·INV_PI)) = sqrt(α · SQRT_INV_PI) — saves
+  // one sqrt per dim by reusing the alpha = sqrt(ω) we already computed.
   const precomp = Array.from(
     { length: dimension },
     (_, i) => `  let omega_${i} = max(getOmega(uniforms, ${i}), 0.01);
   let alpha_${i} = sqrt(omega_${i});
-  let alphaNorm_${i} = sqrt(sqrt(omega_${i} * INV_PI));
+  let alphaNorm_${i} = sqrt(alpha_${i} * SQRT_INV_PI);
   let u_${i} = alpha_${i} * xND[${i}];
   let gauss_${i} = exp(-0.5 * min(u_${i} * u_${i}, 40.0));`
   ).join('\n')
