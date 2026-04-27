@@ -86,7 +86,10 @@ describe('AdS packer scratch pool', () => {
     }
   })
 
-  it('reused scratch does not leak voxels across heterogeneous packs', () => {
+  // Five sequential AdS packs (HKLL planeWave + BTZ + bound-state d=5 +
+  // bound-state d=3 reused + bound-state d=3 fresh); v8 coverage in CI
+  // pushes wall time past the default 5 s budget.
+  it('reused scratch does not leak voxels across heterogeneous packs', { timeout: 30000 }, () => {
     // Drive the scratch through every code path in a sequence that exercises
     // each buffer, then confirm the final pack (a small bound-state with
     // no boundary overlay) matches a fresh pack bit-for-bit. A buggy clear
