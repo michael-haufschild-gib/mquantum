@@ -140,24 +140,6 @@ fn worldToLatticeInterp(
   return true;
 }
 
-// Build site index from coordinate arrays, selecting lo or hi per dimension
-// based on corner bitmask (bit d set = use hi[d], else lo[d])
-fn siteIndexForCorner(
-  coordsLo: ptr<function, array<u32, 12>>,
-  coordsHi: ptr<function, array<u32, 12>>,
-  corner: u32
-) -> u32 {
-  var coords: array<u32, 12>;
-  for (var d: u32 = 0u; d < params.latticeDim; d++) {
-    if ((corner & (1u << d)) != 0u) {
-      coords[d] = (*coordsHi)[d];
-    } else {
-      coords[d] = (*coordsLo)[d];
-    }
-  }
-  return ndToLinear(coords, params.strides, params.latticeDim);
-}
-
 // Compute trilinear weight for a corner based on fractional coords
 fn cornerWeight(fracs: ptr<function, array<f32, 12>>, corner: u32) -> f32 {
   var w: f32 = 1.0;
@@ -223,9 +205,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   // PERF: precompute baseIdxLo (coordsLo to linear index) once and the up-to-3
   // visible-axis stride deltas, then derive each corner's index by adding up
-  // to 3 deltas. Replaces 4 x siteIndexForCorner per voxel (each scanned 12
-  // dims and called ndToLinear) with 1 ndToLinear + 3 small subs + per-corner
-  // bit-tested adds. Slice dims (d >= 3) always read coordsLo because corner
+  // to 3 deltas. Replaces a per-corner ndToLinear scan over 12 dims with 1
+  // ndToLinear + 3 small subs + per-corner bit-tested adds. All trilinear
+  // and phase paths reuse this. Slice dims (d >= 3) always read coordsLo
+  // because corner
   // bit (1u << d) is never set (numCorners caps at 1u << min(latticeDim, 3u)).
   // Edge voxels remain bit-equivalent: when worldToLatticeInterp clamps lo
   // and hi to the same value, deltaIdx[d] = 0 and the bit-add is a no-op,
@@ -571,12 +554,19 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     displayScalar = (rawCurrent * invDensityScale) * densityGate;
 
   } else if (params.fieldView == 6u) {
-    // phase: trilinear-interpolated density for gating, NN for phase value
+    // phase: trilinear-interpolated density for gating, NN for phase value.
+    // Reuses baseIdxLo + deltaIdx from the precompute above — the ndToLinear
+    // of coordsLo plus per-axis (coordsHi[d] - coordsLo[d]) * strides[d] is
+    // the linear index of the corner with that bit set, identical to what
+    // a per-corner coordinate-array selection would compute.
     var blended: f32 = 0.0;
     for (var corner: u32 = 0u; corner < numCorners; corner++) {
       let w = cornerWeight(&fracs, corner);
       if (w > 0.0) {
-        let sIdx = siteIndexForCorner(&coordsLo, &coordsHi, corner);
+        var sIdx = baseIdxLo;
+        if ((corner & 1u) != 0u) { sIdx += deltaIdx[0]; }
+        if ((corner & 2u) != 0u) { sIdx += deltaIdx[1]; }
+        if ((corner & 4u) != 0u) { sIdx += deltaIdx[2]; }
         blended += w * totalDensityAt(sIdx, S, T);
       }
     }

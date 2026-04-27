@@ -245,6 +245,9 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   /** Allocate GPU buffers for the spinor field, FFT scratch, and output texture */
   private rebuildBuffers(device: GPUDevice, config: PauliConfig): void {
     // Cancel any pending diagnostic mapAsync before destroying the staging buffer.
+    // Bumping diagGeneration invalidates any readback callback whose captured
+    // `staging` reference now points at a buffer slated for replacement.
+    this.diagGeneration++
     if (this.diagMappingInFlight && this.buf?.diagStagingBuffer) {
       this.buf.diagStagingBuffer.unmap()
       this.diagMappingInFlight = false
@@ -573,8 +576,6 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       this.stepAccumulator -= stepsThisFrame
 
       const fwdAxisCount = this.buf.fwdAxisCount
-      const usePotentialHalf3D = siteDispatch.use3D
-      const useAbsorber3D = siteDispatch.use3D
 
       for (let step = 0; step < stepsThisFrame; step++) {
         const strangPass = ctx.beginComputePass({ label: `pauli-strang-${step}` })
@@ -670,9 +671,6 @@ export class PauliComputePass extends WebGPUBaseComputePass {
         strangPass.end()
         this.simTime += config.dt
       }
-      // Suppress unused-var lint when site-dispatch helpers are disabled
-      void usePotentialHalf3D
-      void useAbsorber3D
     }
 
     // Write density grid
@@ -738,6 +736,10 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       // to avoid an extra GPU fence. Matches TDSE readback pattern.
       // Defer via queueMicrotask so the buffer isn't in "pending map" state
       // when queue.submit() fires later in the same synchronous block.
+      // The captured `staging` reference is used throughout the callback —
+      // `this.buf` may be replaced by `rebuildBuffers()` between scheduling
+      // the microtask and mapAsync resolving, and `rebuildBuffers()` bumps
+      // `diagGeneration` so the capturedGen guard invalidates this readback.
       const staging = this.buf.diagStagingBuffer
       queueMicrotask(() =>
         staging
@@ -752,8 +754,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
               this.diagMappingInFlight = false
               return
             }
-            if (!this.buf?.diagStagingBuffer) return
-            const data = new Float32Array(this.buf.diagStagingBuffer.getMappedRange())
+            const data = new Float32Array(staging.getMappedRange())
             if (data.length >= DIAG_RESULT_COUNT) {
               const totalNorm = data[0]!
               const normUp = data[1]!

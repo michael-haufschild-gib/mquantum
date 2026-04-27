@@ -103,23 +103,6 @@ fn worldToLatticeInterp(
   return true;
 }
 
-// Build a linear site index for a trilinear corner (corner bit d = use hi[d])
-fn siteIndexForCorner(
-  coordsLo: ptr<function, array<u32, 12>>,
-  coordsHi: ptr<function, array<u32, 12>>,
-  corner: u32
-) -> u32 {
-  var coords: array<u32, 12>;
-  for (var d: u32 = 0u; d < params.latticeDim; d++) {
-    if ((corner & (1u << d)) != 0u) {
-      coords[d] = (*coordsHi)[d];
-    } else {
-      coords[d] = (*coordsLo)[d];
-    }
-  }
-  return ndToLinear(coords, params.strides, params.latticeDim);
-}
-
 // Trilinear weight for a corner from fractional coordinates
 fn cornerWeight(fracs: ptr<function, array<f32, 12>>, corner: u32) -> f32 {
   var w: f32 = 1.0;

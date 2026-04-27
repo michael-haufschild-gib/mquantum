@@ -142,8 +142,12 @@ test.describe('Pauli FPS audit', () => {
       const ext = window.__EXTENDED_OBJECT_STORE__
       if (!ext) throw new Error('extended store dev bridge missing')
       const s = ext.getState() as Record<string, (...a: unknown[]) => void>
-      // Many implementations expose toggles via dedicated setters
-      ;(s.setPauliDiagnosticsEnabled ?? (() => {}))(true)
+      // Fail fast on missing setters: a silent no-op would let the audit run
+      // produce a "+ diagnostics" benchmark label without diagnostics enabled.
+      if (typeof s.setPauliDiagnosticsEnabled !== 'function') {
+        throw new Error('setPauliDiagnosticsEnabled is unavailable')
+      }
+      s.setPauliDiagnosticsEnabled(true)
     })
     await waitForShaderCompilation(page)
     await profile(page, 'Pauli 3D — default + diagnostics', 'pauliSpinor', 'diag')
@@ -179,11 +183,22 @@ test.describe('TDSE FPS audit', () => {
       const ext = window.__EXTENDED_OBJECT_STORE__
       if (!ext) throw new Error('extended store dev bridge missing')
       const s = ext.getState() as Record<string, (...a: unknown[]) => void>
-      s.setTdseAbsorberEnabled?.(true)
-      s.setTdseDiagnosticsEnabled?.(true)
-      s.setTdseObservablesEnabled?.(true)
-      s.setTdseStochasticEnabled?.(true)
-      s.setTdseStochasticGamma?.(2.0)
+      // Fail fast on missing setters — see Pauli diagnostics rationale above.
+      const required = [
+        'setTdseAbsorberEnabled',
+        'setTdseDiagnosticsEnabled',
+        'setTdseObservablesEnabled',
+        'setTdseStochasticEnabled',
+        'setTdseStochasticGamma',
+      ] as const
+      for (const k of required) {
+        if (typeof s[k] !== 'function') throw new Error(`${k} is unavailable`)
+      }
+      s.setTdseAbsorberEnabled(true)
+      s.setTdseDiagnosticsEnabled(true)
+      s.setTdseObservablesEnabled(true)
+      s.setTdseStochasticEnabled(true)
+      s.setTdseStochasticGamma(2.0)
     })
     await waitForShaderCompilation(page)
     await profile(page, 'TDSE 3D — all features', 'tdseDynamics', 'allFeatures')

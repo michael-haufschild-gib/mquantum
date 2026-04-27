@@ -48,6 +48,10 @@ var<workgroup> shared_neg: array<u32, 256>;
 
 const VORTEX_PI:  f32 = 3.14159265358979323846;
 const VORTEX_TAU: f32 = 6.28318530717958647692;
+// Upper bound on supported lattice dimensions. Current product max is 11;
+// keeping headroom of 16 lets the per-axis phi cache survive future growth
+// without re-tuning the array size at every call site.
+const VORTEX_MAX_LATTICE_DIM: u32 = 16u;
 
 // Wrap phase difference to [-π, π]. Two predicated subs on GPU; no branch penalty.
 fn wrapPhase(dp: f32) -> f32 {
@@ -97,10 +101,11 @@ fn main(
       // (0,1) corner along axis d when d is the second loop index) depends only
       // on a single axis, not the (da, db) pair. Precompute once per axis and
       // reuse: saves up to 88 atan2/site at D=11 (44 phi10 + 44 phi01).
-      // Sized for latticeDim up to 16 (current max is 11). Entries past
-      // totalDims are never read; entries at boundary are zero-initialized
-      // and never read because the (da, db) loop skips boundary plaquettes.
-      var phiDim: array<f32, 16>;
+      // Sized for latticeDim up to VORTEX_MAX_LATTICE_DIM (current product
+      // max is 11). Entries past totalDims are never read; entries at
+      // boundary are zero-initialized and never read because the (da, db)
+      // loop skips boundary plaquettes.
+      var phiDim: array<f32, VORTEX_MAX_LATTICE_DIM>;
       for (var d: u32 = 0u; d < totalDims; d++) {
         if (coords[d] < tParams.gridSize[d] - 1u) {
           let zd = psi[idx + tParams.strides[d]];

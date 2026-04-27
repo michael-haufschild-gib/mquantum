@@ -53,9 +53,9 @@ fn ho1D(n: i32, x: f32, omega: f32) -> f32 {
   let H = hermite(n, u);
 
   // Canonical normalization factor: (α²/π)^{1/4} = (ω/π)^{1/4}.
-  // PERF: alphaNorm = sqrt(sqrt(ω·INV_PI)) = sqrt(α · sqrt(INV_PI)) — saves
+  // PERF: alphaNorm = sqrt(sqrt(ω·INV_PI)) = sqrt(α · SQRT_INV_PI) — saves
   // one sqrt by reusing the alpha = sqrt(ω) we already computed.
-  let alphaNorm = sqrt(alpha * 0.5641895835477563);
+  let alphaNorm = sqrt(alpha * SQRT_INV_PI);
   let norm = HO_NORM[n];
 
   return alphaNorm * norm * H * gauss;

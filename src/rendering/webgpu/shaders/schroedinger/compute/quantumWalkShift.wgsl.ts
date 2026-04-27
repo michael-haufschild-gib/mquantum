@@ -72,8 +72,18 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       // directly instead of copying destCoords[12] and re-running ndToLinear
       // (which would multiply-add over all dims). For D=11 this saves an
       // array copy + 11 mul-adds per coin-state iteration.
-      // Power-of-2 grid dim: (x + N) mod N == (x + N) & (N - 1).
-      let srcCoordWrapped = (srcCoord + Ni) & (Ni - 1);
+      // Power-of-2 grid dim: (x + N) mod N == (x + N) & (N - 1). The UI
+      // restricts grid sizes to powers of two (defaultQwGridPerDim) but
+      // setSchroedingerConfig is a shallow merge with no validation, so
+      // save/load or programmatic config writes could route a non-power-of-2
+      // dim here. Fall back to a safe modulo wrap when Ni is not a power of
+      // two so the bitmask never reads from the wrong source cell.
+      let isPow2 = (Nd & (Nd - 1u)) == 0u;
+      let srcCoordWrapped = select(
+        ((srcCoord % Ni) + Ni) % Ni,
+        (srcCoord + Ni) & (Ni - 1),
+        isPow2
+      );
       let delta = srcCoordWrapped - destCoordI;
       let strideDim = i32(params.strides[dim]);
       let srcSite = u32(i32(destSite) + delta * strideDim);

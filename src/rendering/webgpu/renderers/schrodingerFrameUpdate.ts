@@ -64,8 +64,12 @@ export const UNCERTAINTY_THRESHOLD_OFFSET =
 /** Byte offset of the host-precomputed HO term array (array<vec4f, 8>). */
 export const PRECOMPUTED_TERM_BYTE_OFFSET = SCHROEDINGER_LAYOUT.byteOffset.precomputedTerm
 
-/** Total byte size of the precomputed HO term region — 8 vec4f = 128 bytes. */
-export const PRECOMPUTED_TERM_BYTE_SIZE = 8 * 16
+/**
+ * Total byte size of the host-precomputed HO term region. Derived from the
+ * shared SCHROEDINGER_LAYOUT so partial uniform uploads stay correct if the
+ * HO term capacity (MAX_TERMS) or vec4f layout ever changes.
+ */
+export const PRECOMPUTED_TERM_BYTE_SIZE = SCHROEDINGER_LAYOUT.byteSize.precomputedTerm
 
 const BOUND_RADIUS_QUANT_STEP = 0.05
 const BOUND_RADIUS_REBUILD_THRESHOLD = 0.05

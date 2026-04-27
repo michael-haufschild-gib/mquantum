@@ -125,22 +125,6 @@ fn worldToLatticeInterp(
   return true;
 }
 
-fn siteIndexForCorner(
-  coordsLo: ptr<function, array<u32, 12>>,
-  coordsHi: ptr<function, array<u32, 12>>,
-  corner: u32
-) -> u32 {
-  var coords: array<u32, 12>;
-  for (var d: u32 = 0u; d < params.latticeDim; d++) {
-    if ((corner & (1u << d)) != 0u) {
-      coords[d] = (*coordsHi)[d];
-    } else {
-      coords[d] = (*coordsLo)[d];
-    }
-  }
-  return ndToLinear(coords, params.strides, params.latticeDim);
-}
-
 fn cornerWeight(fracs: ptr<function, array<f32, 12>>, corner: u32) -> f32 {
   var w: f32 = 1.0;
   let interpDims = min(params.latticeDim, 3u);
