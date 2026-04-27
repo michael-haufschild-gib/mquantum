@@ -771,7 +771,7 @@ pub fn solve_leapfrog(input: WdwSolverInput) -> WdwSolverOutput {
     // a `Float32Array` (see `src/lib/physics/wheelerDeWitt/boundaryConditions.ts`
     // `WdwBoundaryField`), so slab-1 reads of the derivative also receive
     // f32-quantised values. Match that here.
-    for slot in bc_deriv.iter_mut() {
+    for slot in &mut bc_deriv {
         *slot = f32_roundtrip(*slot);
     }
 

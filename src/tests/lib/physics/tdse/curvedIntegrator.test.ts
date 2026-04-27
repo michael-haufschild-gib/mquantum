@@ -726,29 +726,35 @@ describe('stepRK4 — energy conservation on Schwarzschild', () => {
 // --- Test: advanceRK4 chaining contract ----------------------------------
 
 describe('advanceRK4 — chain-resume equals single call', () => {
-  it('advanceRK4 ×50 + ×50 (resumed via finalTime) equals advanceRK4 ×100', () => {
-    const grid = makeGrid(10, 0.3, 3)
-    const { re, im } = makeGaussian(grid, 0.5, [0, 0, 0], [0.5, 0, 0])
-    const metric: MetricConfig = { kind: 'flat' } // time-agnostic
-    const paramsOnce: CurvedIntegratorParams = {
-      gridSize: grid.gridSize,
-      spacing: grid.spacing,
-      mass: 1,
-      hbar: 1,
-      latticeDim: 3,
-      metric,
-      dt: 0.001,
+  // Three RK4 ×50 runs on a 10³ grid; v8 coverage in CI pushes wall time
+  // past the default 5 s budget.
+  it(
+    'advanceRK4 ×50 + ×50 (resumed via finalTime) equals advanceRK4 ×100',
+    { timeout: 30000 },
+    () => {
+      const grid = makeGrid(10, 0.3, 3)
+      const { re, im } = makeGaussian(grid, 0.5, [0, 0, 0], [0.5, 0, 0])
+      const metric: MetricConfig = { kind: 'flat' } // time-agnostic
+      const paramsOnce: CurvedIntegratorParams = {
+        gridSize: grid.gridSize,
+        spacing: grid.spacing,
+        mass: 1,
+        hbar: 1,
+        latticeDim: 3,
+        metric,
+        dt: 0.001,
+      }
+      const singleRun: CurvedIntegratorState = cloneState({ psiRe: re, psiIm: im })
+      const { finalTime: tFullEnd } = advanceRK4(singleRun, paramsOnce, 100)
+
+      const chained: CurvedIntegratorState = cloneState({ psiRe: re, psiIm: im })
+      const first = advanceRK4(chained, paramsOnce, 50)
+      const second = advanceRK4(chained, { ...paramsOnce, time: first.finalTime }, 50)
+
+      expect(second.finalTime).toBeCloseTo(tFullEnd, 12)
+      expect(second.finalTime).toBeCloseTo(100 * paramsOnce.dt, 12)
+      const diff = diffNormSq(singleRun.psiRe, singleRun.psiIm, chained.psiRe, chained.psiIm)
+      expect(diff).toBeLessThan(1e-10)
     }
-    const singleRun: CurvedIntegratorState = cloneState({ psiRe: re, psiIm: im })
-    const { finalTime: tFullEnd } = advanceRK4(singleRun, paramsOnce, 100)
-
-    const chained: CurvedIntegratorState = cloneState({ psiRe: re, psiIm: im })
-    const first = advanceRK4(chained, paramsOnce, 50)
-    const second = advanceRK4(chained, { ...paramsOnce, time: first.finalTime }, 50)
-
-    expect(second.finalTime).toBeCloseTo(tFullEnd, 12)
-    expect(second.finalTime).toBeCloseTo(100 * paramsOnce.dt, 12)
-    const diff = diffNormSq(singleRun.psiRe, singleRun.psiIm, chained.psiRe, chained.psiIm)
-    expect(diff).toBeLessThan(1e-10)
-  })
+  )
 })

@@ -279,11 +279,12 @@ describe('getOrComputeLqcBounceTable — caching', () => {
     expect(tA2).toBe(tA1)
   })
 
-  it('LRU: evicts the oldest entry once the byte budget is exceeded', () => {
+  it('LRU: evicts the oldest entry once the byte budget is exceeded', { timeout: 30000 }, () => {
     __resetLqcBounceCacheForTests()
     // Use large tHalfWidth so each table is ~1.6 MB (4 Float64Arrays of ~50k
     // elements). With a 4 MB cache budget, the 3rd entry triggers eviction of
-    // the 1st.
+    // the 1st. Three large numerical integrations (~100k-step RK4) blow past
+    // the default 5 s budget under v8 coverage instrumentation in CI.
     const bigParams = { ...DEFAULT_PARAMS, tHalfWidth: 25, stepSize: 5e-4 }
     const tables = [1, 2, 3].map((rhoC) =>
       getOrComputeLqcBounceTable({ ...bigParams, rhoCritical: rhoC })

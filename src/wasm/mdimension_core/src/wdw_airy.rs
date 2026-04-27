@@ -8,8 +8,8 @@
 //!
 //! - **Maclaurin series** for `|z| ≤ AIRY_SERIES_RADIUS = 6` (DLMF 9.4):
 //!
-//!     Ai(z) = c₁·f(z) − c₂·g(z)
-//!     Bi(z) = √3·(c₁·f(z) + c₂·g(z))
+//!   Ai(z) = c₁·f(z) − c₂·g(z)
+//!   Bi(z) = √3·(c₁·f(z) + c₂·g(z))
 //!
 //!   with `c₁ = Ai(0) = 0.355028…`, `c₂ = −Ai'(0) = 0.258819…`. The
 //!   recurrence `a_k / a_{k−1} = 1 / ((3k−1)·3k)` and

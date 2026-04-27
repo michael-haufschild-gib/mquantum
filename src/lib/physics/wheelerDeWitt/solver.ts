@@ -1094,11 +1094,7 @@ function captureMatch(
 
 // Diagnostic helpers (`wdwOperatorResidual`, `countEuclideanDeepCells`,
 // `maxEuclideanChiSquared`) live in `./solverDiagnostics` to keep this
-// module under the `max-lines` lint cap. Re-exported below so existing
-// call sites (`import { wdwOperatorResidual } from '@/lib/physics/wheelerDeWitt/solver'`)
-// keep working.
-export {
-  countEuclideanDeepCells,
-  maxEuclideanChiSquared,
-  wdwOperatorResidual,
-} from './solverDiagnostics'
+// module under the `max-lines` lint cap. Import them from there directly
+// — re-exporting here would create a value-import cycle with
+// `solverDiagnostics.ts`, which already imports value symbols from this
+// module.

@@ -26,11 +26,13 @@
 
 import type { CosmologyPresetParams } from '@/lib/physics/cosmology/presets'
 import {
-  buildLatticeSliceCorrelators,
   computeCosmologicalEntropyTrajectory,
+  type CosmologicalEntropyTrajectory,
+} from '@/lib/physics/entanglement/peschelCosmology'
+import {
+  buildLatticeSliceCorrelators,
   computeEntanglementSpectrum,
   computeEntropySpectrum,
-  type CosmologicalEntropyTrajectory,
   extractSubsystem,
   fitCentralCharge,
   fitEntanglementTemperature,

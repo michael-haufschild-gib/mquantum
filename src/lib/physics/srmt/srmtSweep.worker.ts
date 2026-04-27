@@ -56,16 +56,18 @@ import {
   predictRankCapSweepCount,
   runBcSweep,
   runCutSweep,
+  runLambdaSweep,
+  runMassSweep,
+  type SrmtSweepCancelToken,
+} from './sweepDriver'
+import {
   runGridNaSweep,
   runGridNphiCoupledSweep,
   runGridNphiSweep,
-  runLambdaSweep,
-  runMassSweep,
   runPhiExtentSweep,
   runPhiRefSweep,
   runRankCapSweep,
-  type SrmtSweepCancelToken,
-} from './sweepDriver'
+} from './sweepSensitivityDrivers'
 import type { SrmtSweepConfig, SrmtSweepLandmark, SrmtSweepPoint } from './sweepTypes'
 
 /** Transferable-friendly subset of {@link WheelerDeWittSolverOutput}. */

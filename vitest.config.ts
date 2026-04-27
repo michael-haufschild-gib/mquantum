@@ -90,13 +90,20 @@ export default defineConfig({
       // Coverage ratchet: thresholds track current actuals (rounded down to
       // nearest 0.5%). Raise when coverage improves. Lower only when the
       // denominator changes (new files, exclusion list changes) — document why.
-      // Last measured 2026-04-13: stmts 71.52%, branches 62.00%, funcs 74.26%, lines 71.85%
-      // Raised from 65/55.5/64/65.5 — 697 new tests across 50 files from L7+ audit.
+      // The companion `scripts/check-coverage-ratchet.js` rejects thresholds
+      // that drift > 1% below actual, so missed ratchet-ups break CI.
+      // Last measured 2026-04-27: stmts 72.80%, branches 63.00%, funcs 72.53%, lines 73.36%
+      // Functions lowered 74 → 72.5 — PR #69 added new and modified source
+      // files (uniformPackingHOTerms.ts, WebGPUSchrodingerRenderer.ts edits,
+      // schrodingerFrameUpdate.ts edits) without proportional test coverage,
+      // so the function denominator grew faster than the numerator.
+      // Statements 71.5 → 72.5 and lines 71.5 → 73 raised to track actuals
+      // within 1% per the ratchet contract.
       thresholds: {
-        statements: 71.5,
+        statements: 72.5,
         branches: 62,
-        functions: 74,
-        lines: 71.5,
+        functions: 72.5,
+        lines: 73,
       },
     },
   },

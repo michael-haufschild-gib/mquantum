@@ -11,7 +11,7 @@ fn mulberry32_next(state: &mut u32) -> f64 {
     *state = state.wrapping_add(0x6d2b_79f5);
     let s = *state;
     let mut t = (s ^ (s >> 15)).wrapping_mul(1 | s);
-    t = (t.wrapping_add((t ^ (t >> 7)).wrapping_mul(61 | t))) ^ t;
+    t = (t.wrapping_add((t ^ (t >> 7)).wrapping_mul(0x3D | t))) ^ t;
     f64::from(t ^ (t >> 14)) / 4_294_967_296.0
 }
 
