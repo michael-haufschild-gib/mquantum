@@ -21,24 +21,21 @@
  *
  * Requires pauliUniformsBlock + freeScalarNDIndexBlock to be prepended.
  *
- * @workgroup_size(64)
+ * Two variants:
+ *   pauliKineticBlock    — 1D dispatch, @workgroup_size(64), uses linearToND().
+ *   pauliKinetic3DBlock  — 3D dispatch, @workgroup_size(4, 4, 4), reads gid.xyz
+ *                          directly (latticeDim == 3 only). Saves the
+ *                          per-thread linearToND k-coord decode.
+ *
  * @module
  */
 
-export const pauliKineticBlock = /* wgsl */ `
+const pauliKineticBindings = /* wgsl */ `
 @group(0) @binding(0) var<storage, read> params: PauliUniforms;
 @group(0) @binding(1) var<storage, read_write> spinor: array<vec2f>;
+`
 
-@compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) gid: vec3u) {
-  let idx = gid.x;
-  if (idx >= params.totalSites) {
-    return;
-  }
-
-  // Decode k-space coordinates from linear index
-  let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
-
+const pauliKineticBody = /* wgsl */ `
   // Compute k² using FFT frequency ordering.
   // PERF: k_phys = kGridScale[d] · kIdx uses a host-precomputed reciprocal so
   // each thread replaces a per-dim divide with a multiply. kGridScale[d] =
@@ -79,3 +76,38 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   spinor[idx1] = vec2f(v1.x * cosP - v1.y * sinP, v1.x * sinP + v1.y * cosP);
 }
 `
+
+/** Legacy 1-D dispatch. Workgroup size 64. */
+export const pauliKineticBlock = /* wgsl */ `${pauliKineticBindings}
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  let idx = gid.x;
+  if (idx >= params.totalSites) {
+    return;
+  }
+
+  // Decode k-space coordinates from linear index
+  let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
+${pauliKineticBody}`
+
+/**
+ * 3-D dispatch variant for latticeDim==3. Workgroup size 4x4x4. Reads k-coords
+ * directly from gid.xyz, then computes idx via ndToLinear so spinor[idx] /
+ * spinor[T+idx] addresses match the FFT buffer layout. Body is bit-identical
+ * to pauliKineticBlock — same arithmetic order, same row-major strides.
+ */
+export const pauliKinetic3DBlock = /* wgsl */ `${pauliKineticBindings}
+@compute @workgroup_size(4, 4, 4)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  let latDim = params.latticeDim;
+  if (gid.x >= params.gridSize[0]) { return; }
+  if (latDim > 1u && gid.y >= params.gridSize[1]) { return; }
+  if (latDim > 2u && gid.z >= params.gridSize[2]) { return; }
+
+  var coords: array<u32, 12>;
+  coords[0] = gid.x;
+  if (latDim > 1u) { coords[1] = gid.y; }
+  if (latDim > 2u) { coords[2] = gid.z; }
+
+  let idx = ndToLinear(coords, params.strides, latDim);
+${pauliKineticBody}`

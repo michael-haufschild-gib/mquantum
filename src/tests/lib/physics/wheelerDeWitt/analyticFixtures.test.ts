@@ -9,10 +9,12 @@
  * for the wrong reason. This suite pins the fixture module against
  * three independent witnesses:
  *
- *   1. **Published Bessel values** at sample `z`. `J_{1/4}` and
- *      `Y_{1/4}` are computed by Wolfram (see the table at the head of
- *      {@link describe}; values quoted to ≥ 10 significant figures).
- *      Asserts agreement to relative tolerance 1e-6.
+ *   1. **External Bessel values** at sample `z`. `J_{1/4}`,
+ *      `Y_{1/4}`, and their first derivatives are computed by
+ *      SciPy's AMOS-backed `scipy.special` functions (values quoted to
+ *      ≥ 10 significant figures).
+ *      Asserts agreement to relative tolerance 1e-10 (the pointwise
+ *      value/derivative tables are pinned to the stricter bound).
  *
  *   2. **Wronskian identity** `J_ν(z)·Y_ν'(z) − J_ν'(z)·Y_ν(z) =
  *      2/(πz)`. A purely algebraic identity — failures isolate to the
@@ -55,31 +57,19 @@ import {
 } from '@/lib/physics/wheelerDeWitt/constants'
 
 /**
- * Reference values for `J_{1/4}(z)` and `Y_{1/4}(z)` at sample `z`,
- * pinned to ≥ 12 decimal digits.
+ * External reference values for `J_{1/4}(z)` and `Y_{1/4}(z)` at
+ * sample `z`, pinned to ≥ 12 decimal digits.
  *
- * **Provenance**: values produced by the same module under test, then
- * cross-validated by **two fully-independent witnesses** also asserted
- * in this suite:
+ * **Provenance**: generated with SciPy 1.17.1:
  *
- *  - **Wronskian identity** `J·Y' − J'·Y = 2/(πz)` — pure algebraic
- *    consequence of the Bessel ODE (DLMF 10.5.2). Holds to ≲ 1e-12 in
- *    the series regime and ≲ 1e-8 in the asymptotic regime.
- *  - **Hankel asymptotic envelope** `|J + iY| → √(2/(πz))` at large
- *    `z` — independent algebraic identity holding to ≲ 5e-4 at `z =
- *    12` and improving as `1/z` thereafter (DLMF 10.17.5).
+ *     scipy.special.jv(0.25, z)
+ *     scipy.special.yv(0.25, z)
  *
- * Spot-checks against hand-derived series at low `z` (e.g. `J_{1/4}(1)
- * ≈ 0.7522` from k=0..3 truncation) and against the leading asymptotic
- * `J_ν(z) ~ √(2/(πz))·cos(z − νπ/2 − π/4)` at high `z` (e.g.
- * `J_{1/4}(20) ≈ 0.1784·cos(−0.027) ≈ 0.1783`) confirm the values
- * below.
- *
- * The pin therefore catches future regressions in the Bessel
- * evaluator without requiring an external numerical-library
- * dependency. If the values change, the Wronskian / envelope tests
- * also need to flag — a coordinated regression of all three witnesses
- * would be required to silently break this fixture.
+ * These pins are deliberately external to this TypeScript evaluator.
+ * The Wronskian and Hankel-envelope tests below are independent
+ * structural witnesses, but they cannot replace an external table
+ * because a consistently biased asymptotic evaluator can still satisfy
+ * those identities.
  */
 const BESSEL_QUARTER_TABLE: ReadonlyArray<{
   z: number
@@ -92,9 +82,31 @@ const BESSEL_QUARTER_TABLE: ReadonlyArray<{
   { z: 2.0, J: 0.397_811_064_338_18, Y: 0.392_738_399_615_38 },
   { z: 4.0, J: -0.374_760_630_804_25, Y: 0.133_613_005_459_08 },
   { z: 6.0, J: 0.030_566_899_049_91, Y: -0.323_888_576_496_29 },
-  { z: 8.0, J: 0.243_633_140_969_29, Y: 0.141_797_543_030_85 },
-  { z: 12.0, J: -0.041_552_446_531_77, Y: -0.226_474_904_732_43 },
-  { z: 20.0, J: 0.178_298_338_500_80, Y: -0.005_767_228_373_92 },
+  { z: 8.0, J: 0.243_633_119_853_08, Y: 0.141_797_691_322_84 },
+  { z: 12.0, J: -0.041_552_439_750_37, Y: -0.226_474_908_025_82 },
+  { z: 20.0, J: 0.178_298_338_534_28, Y: -0.005_767_228_208_70 },
+]
+
+/**
+ * External derivative reference values from SciPy 1.17.1:
+ *
+ *     scipy.special.jvp(0.25, z, 1)
+ *     scipy.special.yvp(0.25, z, 1)
+ */
+const BESSEL_QUARTER_DERIVATIVE_TABLE: ReadonlyArray<{
+  z: number
+  Jp: number
+  Yp: number
+}> = [
+  { z: 0.1, Jp: 1.280_799_838_957_33, Yp: 7.524_336_707_681_92 },
+  { z: 0.5, Jp: 0.219_095_940_011_69, Yp: 1.493_168_457_221_11 },
+  { z: 1.0, Jp: -0.143_356_717_520_69, Yp: 0.883_360_486_777_70 },
+  { z: 2.0, Jp: -0.496_447_040_998_01, Yp: 0.310_036_801_046_82 },
+  { z: 4.0, Jp: -0.087_961_963_400_58, Yp: -0.393_323_280_728_64 },
+  { z: 6.0, Jp: 0.322_165_035_622_35, Yp: 0.057_504_053_882_85 },
+  { z: 8.0, Jp: -0.157_185_196_404_06, Yp: 0.235_144_440_215_16 },
+  { z: 12.0, Jp: 0.228_349_967_598_91, Yp: -0.032_154_785_511_15 },
+  { z: 20.0, Jp: 0.001_313_189_377_29, Yp: 0.178_484_081_327_78 },
 ]
 
 describe('Bessel J_{1/4}, Y_{1/4} pointwise pin', () => {
@@ -110,6 +122,21 @@ describe('Bessel J_{1/4}, Y_{1/4} pointwise pin', () => {
       const numerical = besselYQuarter(z)
       const relErr = Math.abs((numerical - Y) / Y)
       expect(relErr, `numerical=${numerical}, expected=${Y}, rel=${relErr}`).toBeLessThan(1e-10)
+    })
+  }
+})
+
+describe('Bessel J_{1/4}′, Y_{1/4}′ pointwise pin', () => {
+  for (const { z, Jp, Yp } of BESSEL_QUARTER_DERIVATIVE_TABLE) {
+    it(`J_{1/4}'(${z}) pinned to 1e-10 relative`, () => {
+      const numerical = besselJQuarterPrime(z)
+      const relErr = Math.abs((numerical - Jp) / Jp)
+      expect(relErr, `numerical=${numerical}, expected=${Jp}, rel=${relErr}`).toBeLessThan(1e-10)
+    })
+    it(`Y_{1/4}'(${z}) pinned to 1e-10 relative`, () => {
+      const numerical = besselYQuarterPrime(z)
+      const relErr = Math.abs((numerical - Yp) / Yp)
+      expect(relErr, `numerical=${numerical}, expected=${Yp}, rel=${relErr}`).toBeLessThan(1e-10)
     })
   }
 })

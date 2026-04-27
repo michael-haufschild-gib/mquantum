@@ -178,8 +178,8 @@ describe('packAntiDeSitterDensityGrid (BTZ path)', () => {
   it('varies with horizon radius: doubling r₊ changes the peak position', () => {
     const pSmall = packAntiDeSitterDensityGrid(btzConfig({ btzHorizonRadius: 0.1 }))
     const pLarge = packAntiDeSitterDensityGrid(btzConfig({ btzHorizonRadius: 1.5 }))
-    // Different horizon radii imply different temperatures ⇒ different
-    // thermal profiles. At least the packed bytes should differ in many voxels.
+    // Different horizon radii imply different visible horizon scales. At
+    // least the packed bytes should differ in many voxels.
     let diffCount = 0
     for (let i = 0; i < pSmall.density.length; i += 4) {
       if (pSmall.density[i] !== pLarge.density[i]) diffCount++

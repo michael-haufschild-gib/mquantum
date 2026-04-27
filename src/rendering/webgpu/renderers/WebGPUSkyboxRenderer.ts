@@ -45,6 +45,7 @@ import {
   packSkyboxCoreUniforms,
   packSkyboxModeSettings,
   packSkyboxPalette,
+  packSkyboxPrecomputedPalettes,
 } from './skyboxVertexData'
 
 /**
@@ -100,7 +101,10 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
   private loadedCubeTexture: GPUTexture | null = null
 
   // Reused uniform packing buffers to avoid per-frame allocations.
-  private skyboxUniformData = new Float32Array(64)
+  // SkyboxUniforms grew from 256 → 512 bytes when 14 dispatch-uniform palette
+  // samples were hoisted off the per-pixel hot path (see skyboxVertexData.ts
+  // packSkyboxPrecomputedPalettes). 128 floats = 512 bytes.
+  private skyboxUniformData = new Float32Array(128)
   private skyboxVertexUniformData = new Float32Array(64)
 
   constructor(config?: SkyboxRendererConfig) {
@@ -244,8 +248,10 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     })
 
     // Create uniform buffer
-    // SkyboxUniforms: 256 bytes + VertexUniforms: 256 bytes = 512 bytes total
-    this.uniformBuffer = this.createUniformBuffer(device, 512, 'skybox-uniforms')
+    // SkyboxUniforms: 512 bytes + VertexUniforms: 256 bytes = 768 bytes total.
+    // SkyboxUniforms grew from 256 → 512 to host CPU-precomputed palette samples
+    // hoisted off the per-pixel skybox shader hot path.
+    this.uniformBuffer = this.createUniformBuffer(device, 768, 'skybox-uniforms')
 
     // Create bind groups (will be recreated when textures change)
     this.recreateBindGroups(device)
@@ -362,8 +368,9 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       label: 'skybox-uniform-bg',
       layout: this.uniformBindGroupLayout,
       entries: [
-        { binding: 0, resource: { buffer: this.uniformBuffer, offset: 0, size: 256 } },
-        { binding: 1, resource: { buffer: this.uniformBuffer, offset: 256, size: 256 } },
+        // binding 0 = SkyboxUniforms (512 bytes); binding 1 = VertexUniforms (256 bytes at offset 512)
+        { binding: 0, resource: { buffer: this.uniformBuffer, offset: 0, size: 512 } },
+        { binding: 1, resource: { buffer: this.uniformBuffer, offset: 512, size: 256 } },
       ],
     })
 
@@ -506,6 +513,12 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     // Sun position + mode-specific settings (indices 40-51)
     packSkyboxModeSettings(data, settings)
 
+    // CPU-precomputed dispatch-uniform palette samples (indices 52-107).
+    // Hoists 14 cosinePalette() calls off the per-pixel skybox hot path.
+    // Effective time matches main.wgsl.ts line 64: time = uniforms.time * uniforms.timeScale.
+    const timeScale = settings?.timeScale ?? 0.2
+    packSkyboxPrecomputedPalettes(data, settings?.cosineCoefficients, t * timeScale)
+
     this.writeUniformBuffer(this.device!, this.uniformBuffer!, data, 0)
   }
 
@@ -626,7 +639,8 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     data[58] = m22
     data[59] = 0 // padding
 
-    this.writeUniformBuffer(this.device, this.uniformBuffer, data, 256)
+    // VertexUniforms now live at offset 512 (was 256) since SkyboxUniforms grew.
+    this.writeUniformBuffer(this.device, this.uniformBuffer, data, 512)
   }
 
   execute(ctx: WebGPURenderContext): void {

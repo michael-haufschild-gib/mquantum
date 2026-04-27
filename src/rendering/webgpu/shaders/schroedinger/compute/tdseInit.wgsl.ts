@@ -144,9 +144,16 @@ const TDSE_INIT_BODY = /* wgsl */ `
         let viCharge = select(charge, charge * select(1.0, -1.0, vi % 2 == 1), alternateCharge);
         let vPhase = viCharge * theta_i;
         let coreFactor = r_perp_i / sqrt(r_perp_i * r_perp_i + xi_bg * xi_bg);
-        // Multiply total wavefunction by this vortex's contribution
-        let nextRe = totalRe * coreFactor * cos(vPhase) - totalIm * coreFactor * sin(vPhase);
-        let nextIm = totalRe * coreFactor * sin(vPhase) + totalIm * coreFactor * cos(vPhase);
+        // Multiply total wavefunction by this vortex's contribution.
+        // Cache cos/sin once and the coreFactor·trig pair — the open form
+        // recomputed both per real/imag write (4 trig + 4 muls vs 2 trig +
+        // 2 muls of the cached form). Mirrors the init-6 reconnection block.
+        let cosV = cos(vPhase);
+        let sinV = sin(vPhase);
+        let cfCos = coreFactor * cosV;
+        let cfSin = coreFactor * sinV;
+        let nextRe = totalRe * cfCos - totalIm * cfSin;
+        let nextIm = totalRe * cfSin + totalIm * cfCos;
         totalRe = nextRe;
         totalIm = nextIm;
       }

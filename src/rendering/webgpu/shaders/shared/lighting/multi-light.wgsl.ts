@@ -71,7 +71,8 @@ fn getLightDirection(light: LightData, fragPos: vec3f) -> vec3f {
  * @return Spot attenuation factor
  */
 fn getSpotAttenuation(light: LightData, lightToFrag: vec3f) -> f32 {
-  let normDir = fastNormalize(light.direction.xyz);
+  // light.direction.xyz is pre-normalized on the CPU (packLightingUniforms).
+  let normDir = light.direction.xyz;
   let cosAngle = dot(lightToFrag, normDir);
   let cosOuter = light.params.z;  // spotCosOuter
   let cosInner = light.params.y;  // spotCosInner
@@ -159,8 +160,8 @@ fn computeMultiLighting(
     var L: vec3f;
     var lightDistance: f32 = 0.0;
     if (lightType == LIGHT_TYPE_DIRECTIONAL) {
-      // Stored direction is Light -> Surface; negate for Surface -> Light.
-      L = fastNormalize(-light.direction.xyz);
+      // Stored direction is Light -> Surface (pre-normalized on CPU); negate for Surface -> Light.
+      L = -light.direction.xyz;
     } else {
       let delta = light.position.xyz - fragPos;
       let lenSq = dot(delta, delta);
@@ -255,7 +256,8 @@ fn computeTotalNdotL(
     var L: vec3f;
     var lightDistance: f32 = 0.0;
     if (lightType == LIGHT_TYPE_DIRECTIONAL) {
-      L = fastNormalize(-light.direction.xyz);
+      // light.direction.xyz is pre-normalized on the CPU.
+      L = -light.direction.xyz;
     } else {
       let delta = light.position.xyz - fragPos;
       let lenSq = dot(delta, delta);

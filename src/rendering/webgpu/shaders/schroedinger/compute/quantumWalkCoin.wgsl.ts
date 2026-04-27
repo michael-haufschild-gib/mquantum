@@ -29,9 +29,9 @@ struct QWCoinUniforms {
 // vec2f view of interleaved [re,im] coin amplitudes. The buffer base is
 // 256-byte aligned and each complex slot is exactly 8 bytes, so the
 // view is well-aligned. This drops one shift per address and replaces
-// 2 scalar loads/stores per amplitude with 1 vec2 op. Sibling shaders
-// (shift / absorber / diagnostics / writeGrid) keep their array<f32>
-// views — the buffer is unchanged.
+// 2 scalar loads/stores per amplitude with 1 vec2 op. All sibling QW
+// shaders (shift / absorber / diagnostics / writeGrid) use the same
+// vec2f view — the underlying buffer bytes are unchanged.
 @group(0) @binding(1) var<storage, read> coinIn: array<vec2f>;
 @group(0) @binding(2) var<storage, read_write> coinOut: array<vec2f>;
 

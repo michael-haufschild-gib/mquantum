@@ -185,11 +185,17 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // omega <= 0 cannot NaN-poison the cross terms.
     let safeOmega = max(omega, 1e-20);
     let invOmega = 1.0 / safeOmega;
-    let u2 = omega * xPhys * xPhys + pPhys * pPhys * invOmega;
+    // Use safeOmega (not raw omega) for the u² first term so a pathological
+    // omega ≤ 0 cannot mix a negative ω·x² with the clamped p²/ω_safe path
+    // and drive exp(-u²) to NaN/inf — matches wignerHO.evaluateWignerMarginalHO.
+    let u2 = safeOmega * xPhys * xPhys + pPhys * pPhys * invOmega;
     let expU2 = exp(-u2);
-    let sqrtOmega = sqrt(safeOmega);
+    // PERF: derive √ω from rsqrt instead of an extra sqrt — saves one SFU op.
     let invSqrtOmega = inverseSqrt(safeOmega);
-    let scaleSqrt2 = sqrt(2.0);
+    let sqrtOmega = safeOmega * invSqrtOmega;
+    // sqrt(2) is a compile-time constant — bake it as a literal so the driver
+    // never has to fold a transcendental call.
+    let scaleSqrt2 = 1.4142135624;
     let szetaRe = scaleSqrt2 * sqrtOmega * xPhys;
     let szetaIm = scaleSqrt2 * pPhys * invSqrtOmega;
 

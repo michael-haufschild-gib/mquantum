@@ -61,7 +61,7 @@ export function WormholeControls({ td }: { td: TdseConfig }): React.ReactElement
     >
       <Switch
         label="Wormhole coupling"
-        tooltip="Enable the double-trace mirror coupling Ĥ_int = g·P_M. Acts as a controlled gate tunneling probability between a point and its reflection across the chosen axis — the analog of a traversable ER=EPR wormhole between the two halves of the lattice."
+        tooltip="Enable the double-trace mirror Hamiltonian Ĥ_int = g·P_M. It coherently swaps amplitude between each point and its reflection across the chosen axis — the boundary-side analog of traversable ER=EPR coupling between the two halves of the lattice."
         checked={td.wormholeCouplingEnabled ?? false}
         onCheckedChange={setTdseWormholeEnabled}
         data-testid="tdse-wormhole-enabled"

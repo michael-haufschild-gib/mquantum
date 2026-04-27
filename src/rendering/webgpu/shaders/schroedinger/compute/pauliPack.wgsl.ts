@@ -12,10 +12,12 @@
  * valid Pauli config has latticeDim >= 3 and per-axis gridSize >= 8,
  * so totalSites >= 512 and totalSites*8 >= 4096 (multiple of 256).
  *
- * The interleaved `complexBuf: array<f32>` contract is UNCHANGED — these
- * shaders produce / consume the exact same [re, im, re, im, ...] layout
- * that the shared Stockham FFT reads and writes, so the cross-family FFT
- * infrastructure never sees the buffer merge.
+ * The `complexBuf` byte layout is UNCHANGED — these shaders produce /
+ * consume the exact same [re, im, re, im, ...] interleaving that the
+ * shared Stockham FFT reads and writes; the binding is exposed here as
+ * an `array<vec2f>` storage view over those same bytes so each pair
+ * loads/stores in one 8-byte op. Cross-family FFT infrastructure that
+ * still binds it as `array<f32>` keeps working unchanged.
  *
  * @workgroup_size(64)
  * @module
@@ -29,7 +31,8 @@ import type { ShaderBlock } from '../../shared/compose-helpers'
  * Bind group layout:
  *   @group(0) @binding(0) uniforms { totalElements: u32, invN: f32 }
  *   @group(0) @binding(1) psi: array<vec2f> (read)    — totalSites slots (one component)
- *   @group(0) @binding(2) complexBuf: array<f32> (write)
+ *   @group(0) @binding(2) complexBuf: array<vec2f> (write) — same interleaved
+ *     [re, im, …] bytes the FFT consumes, exposed here as a vec2f storage view.
  */
 export const pauliComplexPackBlock = /* wgsl */ `
 struct PackUniforms {
@@ -41,7 +44,10 @@ struct PackUniforms {
 
 @group(0) @binding(0) var<uniform> packUni: PackUniforms;
 @group(0) @binding(1) var<storage, read> psi: array<vec2f>;
-@group(0) @binding(2) var<storage, read_write> complexBuf: array<f32>;
+// vec2f view: the same bytes the Stockham FFT reads and writes as
+// array<vec2f>. Lets the pack write both lanes in a single 8-byte op
+// instead of two scalar stores.
+@group(0) @binding(2) var<storage, read_write> complexBuf: array<vec2f>;
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
@@ -49,10 +55,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (idx >= packUni.totalElements) {
     return;
   }
-  let v = psi[idx];
-  let c = idx << 1u;
-  complexBuf[c] = v.x;
-  complexBuf[c + 1u] = v.y;
+  complexBuf[idx] = psi[idx];
 }
 `
 
@@ -62,7 +65,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
  *
  * Bind group layout:
  *   @group(0) @binding(0) uniforms { totalElements: u32, invN: f32 }
- *   @group(0) @binding(1) complexBuf: array<f32> (read)
+ *   @group(0) @binding(1) complexBuf: array<vec2f> (read) — same interleaved
+ *     [re, im, …] bytes the FFT writes, exposed here as a vec2f storage view.
  *   @group(0) @binding(2) psi: array<vec2f> (write)   — totalSites slots (one component)
  */
 export const pauliComplexUnpackBlock = /* wgsl */ `
@@ -74,7 +78,9 @@ struct PackUniforms {
 }
 
 @group(0) @binding(0) var<uniform> packUni: PackUniforms;
-@group(0) @binding(1) var<storage, read> complexBuf: array<f32>;
+// vec2f view (same byte layout as the FFT). One 8-byte load instead of two
+// scalar loads, then a single vec2 mul-by-scalar normalization.
+@group(0) @binding(1) var<storage, read> complexBuf: array<vec2f>;
 @group(0) @binding(2) var<storage, read_write> psi: array<vec2f>;
 
 @compute @workgroup_size(64)
@@ -83,9 +89,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (idx >= packUni.totalElements) {
     return;
   }
-  let c = idx << 1u;
-  let invN = packUni.invN;
-  psi[idx] = vec2f(complexBuf[c] * invN, complexBuf[c + 1u] * invN);
+  psi[idx] = complexBuf[idx] * packUni.invN;
 }
 `
 

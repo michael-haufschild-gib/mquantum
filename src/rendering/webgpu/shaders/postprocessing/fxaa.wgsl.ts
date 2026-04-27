@@ -56,22 +56,14 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   let colorE = textureSampleLevel(tInput, linearSampler, input.uv + vec2f(texelSize.x, 0.0), 0.0).rgb;
   let colorW = textureSampleLevel(tInput, linearSampler, input.uv - vec2f(texelSize.x, 0.0), 0.0).rgb;
 
-  // Sample corners (moved here for uniform control flow - all textureSamples before conditionals)
-  let colorNW = textureSampleLevel(tInput, linearSampler, input.uv + vec2f(-texelSize.x, texelSize.y), 0.0).rgb;
-  let colorNE = textureSampleLevel(tInput, linearSampler, input.uv + vec2f(texelSize.x, texelSize.y), 0.0).rgb;
-  let colorSW = textureSampleLevel(tInput, linearSampler, input.uv + vec2f(-texelSize.x, -texelSize.y), 0.0).rgb;
-  let colorSE = textureSampleLevel(tInput, linearSampler, input.uv + vec2f(texelSize.x, -texelSize.y), 0.0).rgb;
-
-  // Calculate luminance
+  // Calculate luminance for center + 4-neighbors. Corner samples are
+  // deferred until after the early-out so flat regions skip four extra
+  // texture fetches and their luminance math.
   let lumC = luminance(colorC);
   let lumN = luminance(colorN);
   let lumS = luminance(colorS);
   let lumE = luminance(colorE);
   let lumW = luminance(colorW);
-  let lumNW = luminance(colorNW);
-  let lumNE = luminance(colorNE);
-  let lumSW = luminance(colorSW);
-  let lumSE = luminance(colorSE);
 
   // Find min/max luma
   let lumMin = min(lumC, min(min(lumN, lumS), min(lumE, lumW)));
@@ -80,8 +72,26 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   // Calculate contrast
   let lumRange = lumMax - lumMin;
 
-  // Check if contrast is below threshold (no early return - use select at end)
-  let skipAA = lumRange < max(uniforms.edgeThresholdMin, lumMax * uniforms.edgeThreshold);
+  // Early out for low-contrast pixels. textureSampleLevel uses an
+  // explicit LOD so non-uniform control flow is permitted (no implicit
+  // derivatives), and on flat regions of the image the wave is
+  // coherent — the entire warp skips the ~30 arithmetic ops plus the
+  // four corner texture fetches below. The previous "compute everything
+  // then select" form was conservative against an outdated uniform-CF
+  // requirement that does not apply to textureSampleLevel.
+  if (lumRange < max(uniforms.edgeThresholdMin, lumMax * uniforms.edgeThreshold)) {
+    return vec4f(colorC, 1.0);
+  }
+
+  // Past the early-out: now sample and luminance-convert the corners.
+  let colorNW = textureSampleLevel(tInput, linearSampler, input.uv + vec2f(-texelSize.x, texelSize.y), 0.0).rgb;
+  let colorNE = textureSampleLevel(tInput, linearSampler, input.uv + vec2f(texelSize.x, texelSize.y), 0.0).rgb;
+  let colorSW = textureSampleLevel(tInput, linearSampler, input.uv + vec2f(-texelSize.x, -texelSize.y), 0.0).rgb;
+  let colorSE = textureSampleLevel(tInput, linearSampler, input.uv + vec2f(texelSize.x, -texelSize.y), 0.0).rgb;
+  let lumNW = luminance(colorNW);
+  let lumNE = luminance(colorNE);
+  let lumSW = luminance(colorSW);
+  let lumSE = luminance(colorSE);
 
   // Calculate edge direction.
   // edgeH sums vertical Laplacians (Y second derivatives at columns W, C, E).
@@ -113,8 +123,13 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   var lumaSum = lumN + lumS + lumE + lumW;
   lumaSum += lumNW + lumNE + lumSW + lumSE;
   let lumaAverage = lumaSum * 0.125;
-  // Use max to avoid division by zero when lumRange is 0
-  let subpixelOffset = clamp(abs(lumaAverage - lumC) / max(lumRange, 0.0001), 0.0, 1.0);
+  // The early-out above only enforces lumRange ≥ max(edgeThresholdMin,
+  // lumMax*edgeThreshold). Both threshold uniforms can be set to 0 from
+  // host code, in which case a perfectly flat patch (lumRange == 0) falls
+  // through and would inject NaNs via 0/0. Floor the denominator to keep
+  // subpixelOffset finite without changing behaviour on real edges.
+  let safeLumRange = max(lumRange, 1e-6);
+  let subpixelOffset = clamp(abs(lumaAverage - lumC) / safeLumRange, 0.0, 1.0);
   let subpixelOffsetFinal = (-2.0 * subpixelOffset + 3.0) * subpixelOffset * subpixelOffset;
   let pixelOffset = subpixelOffsetFinal * uniforms.subpixelQuality;
 
@@ -128,12 +143,7 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   let finalOffsetV = vec2f(pixelStep * 0.5, pixelOffset * alongEdgeStep);
   let finalOffset = select(finalOffsetV, finalOffsetH, isHorizontal);
 
-  // Sample final color (must be before any conditionals for uniform control flow)
   let finalColor = textureSampleLevel(tInput, linearSampler, input.uv + finalOffset, 0.0).rgb;
-
-  // Use select to choose between original color (skip AA) or processed color
-  let outputColor = select(finalColor, colorC, skipAA);
-
-  return vec4f(outputColor, 1.0);
+  return vec4f(finalColor, 1.0);
 }
 `

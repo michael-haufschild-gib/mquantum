@@ -101,7 +101,7 @@ export default defineConfig({
       // within 1% per the ratchet contract.
       thresholds: {
         statements: 72.5,
-        branches: 62,
+        branches: 63,
         functions: 72.5,
         lines: 73,
       },

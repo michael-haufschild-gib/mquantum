@@ -29,7 +29,10 @@ import {
 } from '../shaders/schroedinger/compute/diracPotential.wgsl'
 import { diracPotentialHalfBlock } from '../shaders/schroedinger/compute/diracPotentialHalf.wgsl'
 import { diracRenormalizeBlock } from '../shaders/schroedinger/compute/diracRenormalize.wgsl'
-import { generateDiracSparseGammaBlock } from '../shaders/schroedinger/compute/diracSparseGammaVariants.wgsl'
+import {
+  DIRAC_SPARSE_INIT_MAX_DIM,
+  generateDiracSparseGammaBlock,
+} from '../shaders/schroedinger/compute/diracSparseGammaVariants.wgsl'
 import {
   diracSpinorPackShaderBlock,
   diracSpinorUnpackShaderBlock,
@@ -90,16 +93,24 @@ const diracPrelude = (): string => diracUniformsBlock + freeScalarNDIndexBlock
 export const DIRAC_3D_SITE_MAX_DIM = 3
 
 /** Pure WGSL for the Dirac init compute shader (1-D dispatch, workgroup 64). */
-export function composeDiracInitShader(): string {
-  return diracPrelude() + diracInitBlock
+export function composeDiracInitShader(latticeDim: number = 3): string {
+  return (
+    diracPrelude() +
+    generateDiracSparseGammaBlock(latticeDim, DIRAC_SPARSE_INIT_MAX_DIM) +
+    diracInitBlock
+  )
 }
 
 /**
  * Pure WGSL for the Dirac init compute shader, 3-D dispatch variant
  * (workgroup 4x4x4, gid.xyz coords). Used when latticeDim ≤ 3.
  */
-export function composeDiracInitShader3D(): string {
-  return diracPrelude() + diracInitBlock3D
+export function composeDiracInitShader3D(latticeDim: number = 3): string {
+  return (
+    diracPrelude() +
+    generateDiracSparseGammaBlock(latticeDim, DIRAC_SPARSE_INIT_MAX_DIM) +
+    diracInitBlock3D
+  )
 }
 
 /** Pure WGSL for the Dirac potential-fill compute shader (1-D dispatch). */
@@ -369,7 +380,9 @@ export async function buildDiracPipelines(
     })
 
   // Pre-compose dispatch-shape-specialized shader sources.
-  const initShader = use3DSiteDispatch ? composeDiracInitShader3D() : composeDiracInitShader()
+  const initShader = use3DSiteDispatch
+    ? composeDiracInitShader3D(latticeDim)
+    : composeDiracInitShader(latticeDim)
   const initLabel = use3DSiteDispatch ? 'dirac-init-3d' : 'dirac-init'
   const potentialShader = use3DSiteDispatch
     ? composeDiracPotentialShader3D()

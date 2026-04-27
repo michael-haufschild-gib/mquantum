@@ -132,11 +132,10 @@ fn evaluateCrossSectionSample(
     return result;
   }
 
-  var planeNormal = uniforms.crossSectionPlane.xyz;
-  if (dot(planeNormal, planeNormal) < 1e-8) {
-    planeNormal = vec3f(0.0, 0.0, 1.0);
-  }
-  planeNormal = normalize(planeNormal);
+  // Invariant: crossSectionPlane.xyz is pre-normalized on the CPU
+  // (see packCrossSectionSlice in uniformPacking.ts). Zero-input fallback
+  // is also handled there, so the GPU just reads it.
+  let planeNormal = uniforms.crossSectionPlane.xyz;
 
   let planeDistance = uniforms.crossSectionPlane.w * uniforms.boundingRadius;
   let signedOrigin = dot(planeNormal, ro) - planeDistance;

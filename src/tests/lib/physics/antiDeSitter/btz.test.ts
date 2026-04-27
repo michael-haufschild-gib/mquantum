@@ -198,16 +198,16 @@ describe('btzThermalAmplitude', () => {
     expect(amp0).toBeCloseTo(amp2, 10)
   })
 
-  it('higher temperature (smaller r₊ at fixed L) gives larger near-horizon amplitude', () => {
-    const rHot = 0.1
-    const rCool = 1.0
-    const bHot = 1 / btzTemperature(rHot, L)
-    const bCool = 1 / btzTemperature(rCool, L)
-    // Sample at the same fractional distance above each horizon so both are
-    // "near horizon" in the relevant sense.
-    const ampHot = btzThermalAmplitude(rHot * 1.05, 0, rHot, L, omega, delta, 0, bHot)
-    const ampCool = btzThermalAmplitude(rCool * 1.05, 0, rCool, L, omega, delta, 0, bCool)
-    expect(ampHot).toBeGreaterThan(ampCool)
+  it('is scale-invariant at fixed fractional radius when the f-floor is inactive', () => {
+    const rSmall = 0.2
+    const rLarge = 1.0
+    const betaSmall = 1 / btzTemperature(rSmall, L)
+    const betaLarge = 1 / btzTemperature(rLarge, L)
+    // BTZ has T_H ∝ r₊ and f(r₊·q) ∝ r₊², so β·ω·√f and (r₊/r)^{2Δ}
+    // cancel at fixed q when epsilonF is not active.
+    const ampSmall = btzThermalAmplitude(rSmall * 1.2, 0, rSmall, L, omega, delta, 0, betaSmall)
+    const ampLarge = btzThermalAmplitude(rLarge * 1.2, 0, rLarge, L, omega, delta, 0, betaLarge)
+    expect(ampSmall).toBeCloseTo(ampLarge, 12)
   })
 
   it('rejects non-finite inputs without throwing', () => {

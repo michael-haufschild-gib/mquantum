@@ -40,6 +40,35 @@ fn hydrogenReducedRadial(n: i32, l: i32, r: f32, a0: f32) -> f32 {
   return r * hydrogenRadial(n, l, r, a0);
 }
 
+// PERF: u_nl(r) variant that consumes pre-hoisted (n,l,a0)-only quantities
+// (norm, twoOverNa = 2/(n·a0Safe), lagK, alpha). The full hydrogenRadial path
+// recomputes these on every call — at 2 calls × ≤256 quadrature steps × per-cell
+// dispatch the hoist eliminates ~512 redundant norm/reciprocal computes per
+// (r, p) cell (each carrying 1 sqrt + ≥1 divide + LUT loads).
+fn wignerHydrogenU(
+  l: i32,
+  lagK: i32,
+  alpha: f32,
+  r: f32,
+  twoOverNa: f32,
+  norm: f32
+) -> f32 {
+  if (r <= 0.0) { return 0.0; }
+  let rho = r * twoOverNa;
+
+  // ρ^l via iterative multiply (matches hydrogenRadial — avoids pow's exp+log).
+  var rhoL: f32 = 1.0;
+  for (var il = 0; il < l; il = il + 1) {
+    rhoL = rhoL * rho;
+  }
+
+  let L = laguerre(lagK, alpha, rho);
+  let expPart = exp(-rho * 0.5);
+
+  // u_nl(r) = r · R_nl(r) = r · norm · ρ^l · L · exp(-ρ/2)
+  return r * norm * rhoL * L * expPart;
+}
+
 /**
  * Evaluate the radial Wigner function W(r, p_r) for a hydrogen eigenstate
  * via numerical midpoint quadrature of the Fourier-cosine transform.
@@ -58,9 +87,25 @@ fn hydrogenReducedRadial(n: i32, l: i32, r: f32, a0: f32) -> f32 {
  * @return W(r, p_r) — quasi-probability value
  */
 fn wignerHydrogenRadial(r: f32, pr: f32, n: i32, l: i32, a0: f32, nPts: i32) -> f32 {
-  // Cutoff sMax: wavefunction decays exponentially beyond ~ 2*n^2*a0
+  // Validate quantum numbers once — lets the inner u_nl helper skip the
+  // per-call (n<1 || l<0 || l>=n) check that hydrogenRadial does internally.
+  if (n < 1 || l < 0 || l >= n) { return 0.0; }
+
+  // Cutoff sMax: wavefunction decays exponentially beyond ~ 2*n^2*a0.
+  // Use a0Safe consistently so a non-positive a0 doesn't collapse the
+  // integration domain to a non-positive ds further down.
   let nf = f32(n);
-  let sMax = 2.5 * nf * nf * a0;
+  let a0Safe = max(a0, 0.001);
+  let sMax = 2.5 * nf * nf * a0Safe;
+
+  // (n, l, a0)-only scalars hoisted once per (r, p) cell. Without this the
+  // quadrature would recompute norm, twoOverNa, lagK and alpha on every call
+  // to hydrogenReducedRadial → hydrogenRadial → hydrogenRadialNorm — i.e.
+  // 2·effectiveNPts redundant evaluations per cell.
+  let twoOverNa = 2.0 / (nf * a0Safe);
+  let normNL = hydrogenRadialNorm(n, l, a0Safe);
+  let lagK = n - l - 1;
+  let alpha = f32(2 * l + 1);
 
   // Auto-scale quadrature for Nyquist satisfaction:
   // cos(2*pr*s) oscillates with period pi/|pr|.
@@ -93,13 +138,13 @@ fn wignerHydrogenRadial(r: f32, pr: f32, n: i32, l: i32, a0: f32, nPts: i32) -> 
   var integral = 0.0;
   var s = 0.5 * ds;
   for (var i = 0; i < effectiveNPts; i++) {
-    // u_nl(r + s)
-    let uPlus = hydrogenReducedRadial(n, l, r + s, a0);
+    // u_nl(r + s) — uses pre-hoisted norm/twoOverNa to skip per-step norm rebuild.
+    let uPlus = wignerHydrogenU(l, lagK, alpha, r + s, twoOverNa, normNL);
 
     // u_nl(|r - s|) with sign correction
     let rms = r - s;
     let absRms = abs(rms);
-    let uMinus = hydrogenReducedRadial(n, l, absRms, a0);
+    let uMinus = wignerHydrogenU(l, lagK, alpha, absRms, twoOverNa, normNL);
 
     // Sign correction: (-1)^{l+1} when r < s because u_nl(r) ~ r^{l+1}
     // near origin, giving parity (-1)^{l+1} under reflection r -> -r

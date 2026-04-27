@@ -156,13 +156,14 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
   const { cameraRef, dimensionRef, startInteraction, scheduleEndInteraction, interactionTimerRef } =
     useSceneCameraController({ size, dimension })
 
-  // ── Gizmo interaction (produces mouse handlers) ──
-  const { overlayRef, handleMouseDown, handleMouseUp, handleMouseMove } = useGizmoInteraction({
-    cameraRef,
-    dimensionRef,
-    startInteraction,
-    scheduleEndInteraction,
-  })
+  // ── Gizmo interaction (produces pointer handlers with pointer capture) ──
+  const { overlayRef, handlePointerDown, handlePointerUp, handlePointerMove, handlePointerCancel } =
+    useGizmoInteraction({
+      cameraRef,
+      dimensionRef,
+      startInteraction,
+      scheduleEndInteraction,
+    })
 
   // ── Wheel handler (passive: false for preventDefault) ──
   useEffect(() => {
@@ -592,6 +593,12 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
   )
 
   // ── Render event capture overlay ──
+  // Pointer events with capture (handled inside useGizmoInteraction) keep the
+  // drag alive across overlay-leave and off-element release, eliminating the
+  // stale-lastMouseRef camera-jump when the cursor crossed a panel boundary
+  // mid-drag. `touch-action: none` prevents the browser from synthesizing
+  // pan/scroll/zoom gestures from a finger drag, which would otherwise
+  // cancel pointer capture and abort the rotation.
   return React.createElement('div', {
     ref: overlayRef,
     style: {
@@ -601,11 +608,12 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       width: '100%',
       height: '100%',
       cursor: measurementEnabled ? 'crosshair' : 'grab',
+      touchAction: 'none',
     },
-    onMouseDown: handleMouseDown,
-    onMouseUp: handleMouseUp,
-    onMouseMove: handleMouseMove,
-    onMouseLeave: handleMouseUp,
+    onPointerDown: handlePointerDown,
+    onPointerUp: handlePointerUp,
+    onPointerMove: handlePointerMove,
+    onPointerCancel: handlePointerCancel,
     onClick: handleMeasurementClick,
   })
 }

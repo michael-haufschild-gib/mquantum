@@ -288,13 +288,30 @@ const dipoleCache = new Map<string, number>()
 /**
  * Compute |⟨j|r|i⟩|² for the electric dipole operator.
  *
- * |⟨j|r|i⟩|² = Σ_{q=-1}^{+1} |⟨radial⟩ · ⟨angular_q⟩|²
+ * The Cartesian-summed squared dipole matrix element equals the
+ * spherical-component sum:
  *
- * where the radial part is ∫ R_{n_j,l_j}(r) · r · R_{n_i,l_i}(r) · r² dr
- * and the angular part is the Gaunt coefficient.
+ *   |⟨j|r|i⟩|² = |⟨j|x|i⟩|² + |⟨j|y|i⟩|² + |⟨j|z|i⟩|²
+ *              = Σ_{q=-1}^{+1} |⟨j|r_q|i⟩|²
+ *
+ * The spherical components of r are `r_q = √(4π/3) · r · Y_{1q}(θ,φ)`
+ * (e.g. `r_0 = z = √(4π/3) · r · Y_{10}`). Therefore
+ *
+ *   ⟨j|r_q|i⟩ = √(4π/3) · ⟨R_j|r|R_i⟩_radial · ⟨l_j m_j|Y_{1q}|l_i m_i⟩
+ *
+ * and the (4π/3) factor enters the squared element exactly once per q:
+ *
+ *   |⟨j|r|i⟩|² = (4π/3) · radial² · Σ_q |⟨l_j m_j|Y_{1q}|l_i m_i⟩|²
+ *
+ * Without the (4π/3) factor the result is too small by 4π/3 ≈ 4.19,
+ * and downstream Einstein A coefficients (which expect the squared
+ * Cartesian dipole) are correspondingly too small. The factor is
+ * absolutely required for the formula `A = (4 α³ ω³ / 3) · |⟨r⟩|²` to
+ * reproduce the tabulated A(2p→1s) ≈ 6.27 × 10⁸ s⁻¹.
  *
  * When dimension ≠ 3, the radial integral uses D-dimensional wavefunctions
- * for self-consistency with ND energy levels.
+ * for self-consistency with ND energy levels; the (4π/3) factor is the
+ * standard 3D spherical decomposition and is left unchanged.
  *
  * @param stateI - Initial hydrogen basis state
  * @param stateJ - Final hydrogen basis state
@@ -322,12 +339,15 @@ export function dipoleMatrixElementSquared(
   // Radial integral (dimension-aware)
   const radial = radialDipoleIntegral(stateI.n, stateI.l, stateJ.n, stateJ.l, dimension)
 
-  // Sum over spherical components q = -1, 0, +1
-  let sumSq = 0
+  // Sum over spherical components q = -1, 0, +1.
+  // angularFactor returns ⟨l_j m_j|Y_{1q}|l_i m_i⟩; the (4π/3) factor
+  // converting Y_{1q} to r_q is applied once after the sum.
+  let angularSqSum = 0
   for (let q = -1; q <= 1; q++) {
     const angular = angularFactor(stateJ.l, stateJ.m, stateI.l, stateI.m, q)
-    sumSq += radial * radial * angular * angular
+    angularSqSum += angular * angular
   }
+  const sumSq = ((4 * Math.PI) / 3) * radial * radial * angularSqSum
 
   dipoleCache.set(key, sumSq)
   return sumSq

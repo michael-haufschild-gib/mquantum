@@ -54,9 +54,11 @@ fn getDeepOcean(dir: vec3<f32>, time: f32) -> vec3<f32> {
   var userMid: vec3<f32>;
   var userSurface: vec3<f32>;
 
-  userDeep = cosinePalette(0.0, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
-  userMid = cosinePalette(0.5, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
-  userSurface = cosinePalette(1.0, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
+  // PERF: hoisted -- cosinePalette() at fixed t = {0.0, 0.5, 1.0} is dispatch-uniform.
+  // Saves 3 vec3 cos + 6 vec3 fma per pixel.
+  userDeep = uniforms.oceanDeepPalette;
+  userMid = uniforms.oceanMidPalette;
+  userSurface = uniforms.oceanSurfacePalette;
 
   // Calculate luminance contrast of user's palette
   let deepLum = dot(userDeep, vec3<f32>(0.299, 0.587, 0.114));

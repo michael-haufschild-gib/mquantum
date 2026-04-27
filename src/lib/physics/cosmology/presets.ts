@@ -1,16 +1,18 @@
 /**
- * Cosmological FLRW background presets for the Mukhanov-Sasaki bridge.
+ * Cosmological background presets for the canonical δφ integrator.
  *
- * Defines the four regimes under which the Free Scalar Field mode can evolve:
+ * Defines regimes under which the Free Scalar Field mode can evolve:
  *
  * - `minkowski`   — flat spacetime, `a = 1` (bit-identical to the default FSF pass)
- * - `deSitter`    — exponential inflation, `a ∝ |η|^(-1)`, scale-invariant spectrum
- * - `kasner`      — positive Kasner FLRW (`V₀ = 0`, `x = 1`), stiff-fluid limit
- * - `ekpyrotic`   — positive ekpyrotic FLRW (`V₀ = -1`, `s > s_c`), the regime
- *                   whose nonlinear stability is proven in Beyer et al. (2026).
+ * - `deSitter`      — exponential inflation, `a ∝ |η|^(-1)`, scale-invariant spectrum
+ * - `kasner`        — positive Kasner FLRW (`V₀ = 0`, `x = 1`), stiff-fluid limit
+ * - `ekpyrotic`     — positive ekpyrotic FLRW (`V₀ = -1`, `s > s_c`), the regime
+ *                     whose nonlinear stability is proven in Beyer et al. (2026)
+ * - `bianchiKasner` — anisotropic Bianchi-I Kasner background with per-axis scale factors
+ * - `lqcBounce`     — loop-quantum-cosmology bounce from tabulated Friedmann dynamics
  *
- * All power-law presets share the closed-form scale factor `a(η) = A·|η|^q`,
- * so the Mukhanov-Sasaki effective mass becomes
+ * Isotropic power-law presets share the closed-form scale factor
+ * `a(η) = A·|η|^q`, so the legacy Mukhanov-Sasaki effective mass would be
  *
  *     z''/z = β·(β − 1)/η²       with   β = q·(n − 2)/2,   z = a^((n − 2)/2)
  *

@@ -52,17 +52,21 @@ fn laguerre(k: i32, alpha: f32, x: f32) -> f32 {
   // Clamp k to prevent infinite loops
   let kClamped = min(k, MAX_LAGUERRE_K);
 
-  // Three-term recurrence
+  // Three-term recurrence. Track fi as an incrementing float so the inner
+  // loop avoids one int→float cast per step (f32(i)) — at up to 6 inner
+  // iterations per evaluation × per-pixel call counts in the hydrogen
+  // raymarch path, the savings compound.
   var Lkm1 = L0;
   var Lk = L1;
+  var fi: f32 = 1.0;
 
   for (var i = 1; i < kClamped; i++) {
-    let fi = f32(i);
     let invDen = LAGUERRE_INV_DEN[i + 1];
     // (k+1)L_{k+1} = (2k + 1 + α - x)L_k - (k + α)L_{k-1}
     let Lkp1 = ((2.0 * fi + 1.0 + alpha - x) * Lk - (fi + alpha) * Lkm1) * invDen;
     Lkm1 = Lk;
     Lk = Lkp1;
+    fi += 1.0;
   }
 
   return Lk;

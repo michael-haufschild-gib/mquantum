@@ -606,8 +606,13 @@ export class PauliComputePass extends WebGPUBaseComputePass {
           }
         }
 
-        // 4. Kinetic phase kick (scalar, applied to both components in-place)
-        this.dispatchCompute(strangPass, this.pl.kineticPipeline, [this.bg.spinorBG], linearWG)
+        // 4. Kinetic phase kick (scalar, applied to both components in-place).
+        // Uses 3-D dispatch when latticeDim===3 to skip the per-thread
+        // linearToND k-coord decode. Pipeline shape and dispatch shape are
+        // paired by pickSiteDispatch + buildPauliPipelines.
+        dispatchSite(strangPass, this.pl.kineticPipeline, this.pl.kinetic3DPipeline, [
+          this.bg.spinorBG,
+        ])
 
         // 5. Inverse FFT for each spinor component
         for (let c = 0; c < 2; c++) {

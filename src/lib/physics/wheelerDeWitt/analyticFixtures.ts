@@ -56,13 +56,14 @@
  *
  * `J_{1/4}` and `Y_{1/4}` are computed by:
  *
- *  - **Series for `|z| ≤ 6`** — convergent Maclaurin series for `J_ν`
- *    and the standard formula
+ *  - **Series for `|z| ≤ 12`** (`BESSEL_SERIES_RADIUS`) — convergent
+ *    Maclaurin series for `J_ν` and the standard formula
  *    `Y_ν(z) = (J_ν(z)·cos(νπ) − J_{−ν}(z)) / sin(νπ)` (using the
  *    series for `J_{−ν}` as well).
- *  - **Asymptotic for `|z| > 6`** — DLMF 10.17.3 with three correction
- *    terms in each of the `P` and `Q` series. Reaches relative
- *    accuracy ≲ 1e-9 at `z = 6`, ≲ 1e-12 at `z ≥ 12`.
+ *  - **Asymptotic for `|z| > 12`** — DLMF 10.17.3 with eight correction
+ *    pairs (`BESSEL_ASYMPTOTIC_TERMS`) retained in each of the `P` and
+ *    `Q` series. Reaches relative accuracy ≲ 1e-10 just above the
+ *    crossover and ≲ 1e-12 on the deep tail.
  *
  * Tested against published values (Wolfram, DLMF) at sample `z` to
  * relative tolerance 1e-6, and via the Wronskian identity
@@ -76,7 +77,9 @@ import { wdwEuclideanWkbAction, wdwLorentzianWkbPhase, wdwU } from './constants'
 
 const NU = 0.25
 /** Crossover between Maclaurin series and DLMF 10.17 asymptotic. */
-const BESSEL_SERIES_RADIUS = 6
+const BESSEL_SERIES_RADIUS = 12
+/** Number of DLMF 10.17 correction pairs retained in the asymptotic tail. */
+const BESSEL_ASYMPTOTIC_TERMS = 8
 const PI_OVER_4 = Math.PI / 4
 
 /**
@@ -94,7 +97,7 @@ function besselJSeries(z: number, nu: number): number {
   let term = Math.pow(halfZ, nu) / gammaFn(nu + 1)
   let sum = term
   const halfZSq = halfZ * halfZ
-  // Up to ~80 iterations are plenty for |z| ≤ 6.
+  // Up to ~80 iterations are plenty for |z| ≤ BESSEL_SERIES_RADIUS.
   for (let k = 1; k < 80; k++) {
     term *= -halfZSq / (k * (nu + k))
     sum += term
@@ -155,95 +158,81 @@ function besselYSeries(z: number, nu: number): number {
  *     P(ν,z) = 1 − (μ−1)(μ−9)/(2!·χ²) + (μ−1)(μ−9)(μ−25)(μ−49)/(4!·χ⁴) − …
  *     Q(ν,z) = (μ−1)/χ − (μ−1)(μ−9)(μ−25)/(3!·χ³) + …
  *
- * Three terms each (P up to `χ^{−6}`, Q up to `χ^{−5}`) reaches ≲ 1e-9
- * at `z = 6` for `ν = 1/4`. Returns both J and Y in a single call to
- * share the cosine/sine evaluation.
+ * The series is asymptotic, so callers only use it after
+ * {@link BESSEL_SERIES_RADIUS}. Eight correction pairs keep the
+ * `ν = 1/4` and `ν = −3/4` orders below the closed-form validation
+ * tolerance throughout the runtime range.
  */
-function besselAsymptotic(z: number, nu: number): { J: number; Y: number; Jp: number; Yp: number } {
+function besselAsymptotic(z: number, nu: number): { J: number; Y: number } {
   const mu = 4 * nu * nu
   const chi = 8 * z
-  const c2 = chi * chi
-  const c4 = c2 * c2
-  const c6 = c4 * c2
-  const m1 = mu - 1
-  const m9 = mu - 9
-  const m25 = mu - 25
-  const m49 = mu - 49
-  const m81 = mu - 81
-  const m121 = mu - 121
-  // DLMF 10.17.3 three-term P, three-term Q.
-  const P =
-    1 -
-    (m1 * m9) / (2 * c2) +
-    (m1 * m9 * m25 * m49) / (24 * c4) -
-    (m1 * m9 * m25 * m49 * m81 * m121) / (720 * c6)
-  const Q =
-    m1 / chi - (m1 * m9 * m25) / (6 * c2 * chi) + (m1 * m9 * m25 * m49 * m81) / (120 * c4 * chi)
+  const chiSq = chi * chi
+
+  // P series — leading term is the constant `1` in DLMF 10.17.5; the
+  // loop adds BESSEL_ASYMPTOTIC_TERMS correction pairs at orders
+  // chi⁻², chi⁻⁴, … → terms-beyond-leading == BESSEL_ASYMPTOTIC_TERMS.
+  let P = 1
+  let pProduct = 1
+  let pFactorial = 1
+  let pChiPower = 1
+  for (let k = 1; k <= BESSEL_ASYMPTOTIC_TERMS; k++) {
+    const oddA = 4 * k - 3
+    const oddB = 4 * k - 1
+    pProduct *= (mu - oddA * oddA) * (mu - oddB * oddB)
+    pFactorial *= (2 * k - 1) * (2 * k)
+    pChiPower *= chiSq
+    const sign = k % 2 === 0 ? 1 : -1
+    P += (sign * pProduct) / (pFactorial * pChiPower)
+  }
+
+  // Q series — leading term lives at chi⁻¹ (no constant counterpart),
+  // so the loop seeds the leading inside k=0 and adds the same
+  // BESSEL_ASYMPTOTIC_TERMS correction pairs (k=1..N) at orders
+  // chi⁻³, chi⁻⁵, … so P and Q stay matched in correction count.
+  let Q = 0
+  let qProduct = 1
+  let qFactorial = 1
+  let qChiPower = 1
+  for (let k = 0; k <= BESSEL_ASYMPTOTIC_TERMS; k++) {
+    if (k === 0) {
+      qProduct = mu - 1
+      qFactorial = 1
+      qChiPower = chi
+    } else {
+      const oddA = 4 * k - 1
+      const oddB = 4 * k + 1
+      qProduct *= (mu - oddA * oddA) * (mu - oddB * oddB)
+      qFactorial *= 2 * k * (2 * k + 1)
+      qChiPower *= chiSq
+    }
+    const sign = k % 2 === 0 ? 1 : -1
+    Q += (sign * qProduct) / (qFactorial * qChiPower)
+  }
+
   const arg = z - nu * PI_OVER_4 * 2 - PI_OVER_4
   const c = Math.cos(arg)
   const s = Math.sin(arg)
   const amp = Math.sqrt(2 / (Math.PI * z))
   const J = amp * (P * c - Q * s)
   const Y = amp * (P * s + Q * c)
-  // Derivatives by `z`: use DLMF 10.17.4 — same form, with P/Q swapped
-  // for the (+ν+1) shift, and the prefactor amplitude differs by a
-  // factor of −1 in the sin/cos roles. The cleanest universal route is
-  // the recurrence J_ν' = J_{ν−1} − (ν/z)·J_ν, but that requires a
-  // separate series/asymptotic at order ν−1. For the analytic-fixture
-  // tests we use the recurrence form via {@link besselJ} and
-  // {@link besselY} elsewhere; the derivative is reported back here only
-  // for the asymptotic Wronskian self-test.
-  // Asymptotic derivative (subtract ν/z and shift the argument by +π/2,
-  // i.e. swap cos↔sin and flip):
-  const dargdz = 1
-  const Jp =
-    -amp * dargdz * (P * s + Q * c) -
-    (1 / (2 * z)) * J +
-    amp * (asymPpDeriv(mu, chi, z) * c - asymQpDeriv(mu, chi, z) * s)
-  const Yp =
-    amp * dargdz * (P * c - Q * s) -
-    (1 / (2 * z)) * Y +
-    amp * (asymPpDeriv(mu, chi, z) * s + asymQpDeriv(mu, chi, z) * c)
-  return { J, Y, Jp, Yp }
+  return { J, Y }
 }
 
-/** d/dz of the P series. Each `1/χ^{2k}` term differentiates to
- *  `−2k/χ^{2k} · 1/z`. */
-function asymPpDeriv(mu: number, chi: number, z: number): number {
-  const c2 = chi * chi
-  const c4 = c2 * c2
-  const c6 = c4 * c2
-  const m1 = mu - 1
-  const m9 = mu - 9
-  const m25 = mu - 25
-  const m49 = mu - 49
-  const m81 = mu - 81
-  const m121 = mu - 121
-  const term2 = -(m1 * m9) / (2 * c2)
-  const term4 = (m1 * m9 * m25 * m49) / (24 * c4)
-  const term6 = -(m1 * m9 * m25 * m49 * m81 * m121) / (720 * c6)
-  return (-2 * term2 - 4 * term4 - 6 * term6) / z
+/** Bessel `J_ν(z)` for the quarter-order fixture family. */
+function besselJ(z: number, nu: number): number {
+  if (z <= BESSEL_SERIES_RADIUS) return besselJSeries(z, nu)
+  return besselAsymptotic(z, nu).J
 }
 
-/** d/dz of the Q series. The leading `(μ−1)/χ` term contributes
- *  `−(μ−1)/(8z²) = −(μ−1)/χ · 1/z`. */
-function asymQpDeriv(mu: number, chi: number, z: number): number {
-  const c2 = chi * chi
-  const c4 = c2 * c2
-  const m1 = mu - 1
-  const m9 = mu - 9
-  const m25 = mu - 25
-  const m49 = mu - 49
-  const m81 = mu - 81
-  const term1 = m1 / chi
-  const term3 = -(m1 * m9 * m25) / (6 * c2 * chi)
-  const term5 = (m1 * m9 * m25 * m49 * m81) / (120 * c4 * chi)
-  return (-1 * term1 - 3 * term3 - 5 * term5) / z
+/** Bessel `Y_ν(z)` for non-integer `ν` in the quarter-order fixture family. */
+function besselY(z: number, nu: number): number {
+  if (z <= BESSEL_SERIES_RADIUS) return besselYSeries(z, nu)
+  return besselAsymptotic(z, nu).Y
 }
 
 /**
- * Bessel function `J_{1/4}(z)` for `z > 0`. Uses series for `z ≤ 6`,
- * asymptotic otherwise.
+ * Bessel function `J_{1/4}(z)` for `z > 0`. Uses series for
+ * `z ≤ BESSEL_SERIES_RADIUS` (= 12), asymptotic otherwise.
  *
  * @param z - Real argument (`z > 0`).
  * @returns `J_{1/4}(z)`.
@@ -253,13 +242,12 @@ export function besselJQuarter(z: number): number {
     if (z === 0) return 0 // J_ν(0) = 0 for ν > 0
     throw new RangeError(`besselJQuarter requires z > 0, got ${z}`)
   }
-  if (z <= BESSEL_SERIES_RADIUS) return besselJSeries(z, NU)
-  return besselAsymptotic(z, NU).J
+  return besselJ(z, NU)
 }
 
 /**
  * Bessel function `Y_{1/4}(z)` for `z > 0`. Uses the J/J_{−ν} series
- * combination for `z ≤ 6`, asymptotic otherwise.
+ * combination for `z ≤ BESSEL_SERIES_RADIUS` (= 12), asymptotic otherwise.
  *
  * @param z - Real argument (`z > 0`).
  * @returns `Y_{1/4}(z)`.
@@ -268,8 +256,7 @@ export function besselYQuarter(z: number): number {
   if (z <= 0) {
     throw new RangeError(`besselYQuarter requires z > 0, got ${z}`)
   }
-  if (z <= BESSEL_SERIES_RADIUS) return besselYSeries(z, NU)
-  return besselAsymptotic(z, NU).Y
+  return besselY(z, NU)
 }
 
 /**
@@ -284,13 +271,7 @@ export function besselYQuarter(z: number): number {
  */
 export function besselJQuarterPrime(z: number): number {
   if (z <= 0) throw new RangeError(`besselJQuarterPrime requires z > 0, got ${z}`)
-  if (z <= BESSEL_SERIES_RADIUS) {
-    const Jm34 = besselJSeries(z, NU - 1) // J_{−3/4}
-    const J14 = besselJSeries(z, NU)
-    return Jm34 - (NU / z) * J14
-  }
-  const a = besselAsymptotic(z, NU)
-  return a.Jp
+  return besselJ(z, NU - 1) - (NU / z) * besselJ(z, NU)
 }
 
 /**
@@ -300,18 +281,7 @@ export function besselJQuarterPrime(z: number): number {
  */
 export function besselYQuarterPrime(z: number): number {
   if (z <= 0) throw new RangeError(`besselYQuarterPrime requires z > 0, got ${z}`)
-  if (z <= BESSEL_SERIES_RADIUS) {
-    // Y_{−3/4}(z): use the linear combination directly with ν' = −3/4.
-    // Y_{ν'}(z) = (J_{ν'}(z)·cos(ν'π) − J_{−ν'}(z)) / sin(ν'π).
-    const nuPrime = NU - 1 // = −3/4
-    const Jp = besselJSeries(z, nuPrime)
-    const Jm = besselJSeries(z, -nuPrime) // = J_{3/4}
-    const Ym34 = (Jp * Math.cos(nuPrime * Math.PI) - Jm) / Math.sin(nuPrime * Math.PI)
-    const Y14 = besselYSeries(z, NU)
-    return Ym34 - (NU / z) * Y14
-  }
-  const a = besselAsymptotic(z, NU)
-  return a.Yp
+  return besselY(z, NU - 1) - (NU / z) * besselY(z, NU)
 }
 
 /**

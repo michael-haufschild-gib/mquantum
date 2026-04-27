@@ -468,12 +468,19 @@ function packCrossSectionSlice(
   isUniformComputeMode: boolean,
   schroedinger: Partial<SchroedingerConfig> | undefined
 ): void {
+  // Pre-normalize the plane normal here so the GPU shader can read xyz directly
+  // (see crossSection.wgsl.ts). lengthSq < 1e-8 falls back to (0,0,1) — matches
+  // the previous WGSL-side fallback threshold exactly.
   const crossSectionNormal = schroedinger?.crossSectionPlaneNormal ?? [0, 0, 1]
   const nx = Number(crossSectionNormal[0] ?? 0)
   const ny = Number(crossSectionNormal[1] ?? 0)
   const nz = Number(crossSectionNormal[2] ?? 1)
-  const nLen = Math.hypot(nx, ny, nz)
-  const invNLen = nLen > 1e-6 ? 1.0 / nLen : 1.0
+  const nLenSq = nx * nx + ny * ny + nz * nz
+  const degenerate = !Number.isFinite(nLenSq) || nLenSq < 1e-8
+  const invNLen = degenerate ? 1.0 : 1.0 / Math.sqrt(nLenSq)
+  const outNx = degenerate ? 0.0 : nx * invNLen
+  const outNy = degenerate ? 0.0 : ny * invNLen
+  const outNz = degenerate ? 1.0 : nz * invNLen
 
   intView[I.crossSectionEnabled] =
     !isUniformComputeMode && schroedinger?.crossSectionEnabled ? 1 : 0
@@ -483,9 +490,10 @@ function packCrossSectionSlice(
     CROSS_SECTION_SCALAR_MAP[schroedinger?.crossSectionScalar ?? 'density'] ?? 0
   intView[I.crossSectionAutoWindow] = schroedinger?.crossSectionAutoWindow ? 1 : 0
 
-  floatView[I.crossSectionPlane] = nx * invNLen
-  floatView[I.crossSectionPlane + 1] = ny * invNLen
-  floatView[I.crossSectionPlane + 2] = nz * invNLen
+  floatView[I.crossSectionPlane] = outNx
+  floatView[I.crossSectionPlane + 1] = outNy
+  floatView[I.crossSectionPlane + 2] = outNz
+  // .w is the plane offset scalar — never normalized.
   floatView[I.crossSectionPlane + 3] = schroedinger?.crossSectionPlaneOffset ?? 0.0
 
   floatView[I.crossSectionWindow] = schroedinger?.crossSectionWindowMin ?? 0.0

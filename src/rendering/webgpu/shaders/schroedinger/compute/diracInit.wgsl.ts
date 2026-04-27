@@ -7,9 +7,9 @@
  * where u_c is the spinor polarization vector constructed from Bloch sphere
  * angles (spinTheta, spinPhi): u = (cos(θ/2), sin(θ/2)·e^{iφ}).
  * positiveEnergyFraction controls the particle/antiparticle mixing:
- *   1.0 = pure positive energy (upper spinor only)
+ *   1.0 = pure positive energy (P+ projected, when sparse Clifford tables are available)
  *   0.5 = equal mix (maximum Zitterbewegung)
- *   0.0 = pure negative energy (lower spinor only)
+ *   0.0 = pure negative energy (P- projected, when sparse Clifford tables are available)
  *
  * Initial condition modes:
  *   0 = gaussianPacket: Spin-polarized Gaussian with energy projection
@@ -42,11 +42,18 @@ const diracInitBody = /* wgsl */ `
   // Compute physical position, Gaussian envelope, and plane-wave phase
   var r2: f32 = 0.0;
   var kdotx: f32 = 0.0;
+  var initKVec: array<f32, 12>;
+  var initCk2: f32 = 0.0;
+  let initCHbar = params.speedOfLight * params.hbar;
   for (var d: u32 = 0u; d < params.latticeDim; d++) {
     let pos = (f32(coords[d]) - f32(params.gridSize[d]) * 0.5 + 0.5) * params.spacing[d];
     let dx = pos - params.packetCenter[d];
+    let kd = params.packetMomentum[d];
     r2 += dx * dx;
-    kdotx += params.packetMomentum[d] * pos;
+    kdotx += kd * pos;
+    initKVec[d] = kd;
+    let cpk = initCHbar * kd;
+    initCk2 += cpk * cpk;
   }
 
   let sigma = params.packetWidth;
@@ -59,6 +66,11 @@ const diracInitBody = /* wgsl */ `
 
   let S = params.spinorSize;
   let T = params.totalSites;
+  let initMc2 = params.mass * params.speedOfLight * params.speedOfLight;
+  let initE2 = initCk2 + initMc2 * initMc2;
+  let initInvE = inverseSqrt(max(initE2, 1e-40));
+  let initE = initE2 * initInvE;
+  let initProjectorNorm = sqrt((2.0 * initE) / max(initE + initMc2, 1e-20));
 
   // Zero all spinor components first
   for (var c: u32 = 0u; c < S; c++) {
@@ -77,26 +89,113 @@ const diracInitBody = /* wgsl */ `
   let aAmp = sqrt(1.0 - pef);
   let halfS = S / 2u;
 
-  if (params.initCondition == 0u || params.initCondition == 1u) {
+  // CSE — these subexpressions repeat across branches and components:
+  //   * Bloch-rotation product (cosP + i sinP)·(phiCos + i phiSin)
+  //     yields the spin-down phase used by every component-1 / component-3
+  //     write (4 sites in mode 0/1, 1 site in mode 3).
+  //   * pAmp/aAmp × cosHalf/sinHalf × envelope is the real-amplitude
+  //     factor before the cosP/sinP / spin-down-phase multiply. Caching
+  //     these 4 products replaces 8 mul-chain per site with 4.
+  let bdownCos = cosP * phiCos - sinP * phiSin;  // Re((cosP+i sinP)(phiCos+i phiSin))
+  let bdownSin = sinP * phiCos + cosP * phiSin;  // Im(...)
+  let pCosE = pAmp * cosHalf * envelope;
+  let pSinE = pAmp * sinHalf * envelope;
+  let aCosE = aAmp * cosHalf * envelope;
+  let aSinE = aAmp * sinHalf * envelope;
+
+  if ((params.initCondition == 0u || params.initCondition == 1u || params.initCondition == 3u)
+      && DIRAC_USE_SPARSE_GAMMA) {
+    // gaussianPacket / planeWave / zitterbewegung:
+    // Build rest-frame upper/lower spinors, then apply exact free-particle
+    // energy projectors P± = (I ± H/E)/2 for the packet carrier momentum.
+    // This avoids contaminating "pure positive energy" packets with
+    // representation-basis lower/upper components at non-zero momentum.
+    var posBaseRe: array<f32, 64>;
+    var posBaseIm: array<f32, 64>;
+    var negBaseRe: array<f32, 64>;
+    var negBaseIm: array<f32, 64>;
+    var hPosRe: array<f32, 64>;
+    var hPosIm: array<f32, 64>;
+    var hNegRe: array<f32, 64>;
+    var hNegIm: array<f32, 64>;
+    for (var sc0: u32 = 0u; sc0 < S; sc0 = sc0 + 1u) {
+      posBaseRe[sc0] = 0.0;
+      posBaseIm[sc0] = 0.0;
+      negBaseRe[sc0] = 0.0;
+      negBaseIm[sc0] = 0.0;
+      hPosRe[sc0] = 0.0;
+      hPosIm[sc0] = 0.0;
+      hNegRe[sc0] = 0.0;
+      hNegIm[sc0] = 0.0;
+    }
+
+    posBaseRe[0] = cosHalf;
+    if (S > 1u) {
+      posBaseRe[1] = sinHalf * phiCos;
+      posBaseIm[1] = sinHalf * phiSin;
+    }
+    negBaseRe[halfS] = cosHalf;
+    if (S > halfS + 1u) {
+      negBaseRe[halfS + 1u] = sinHalf * phiCos;
+      negBaseIm[halfS + 1u] = sinHalf * phiSin;
+    }
+
+    for (var md: u32 = 0u; md < params.latticeDim; md = md + 1u) {
+      let coeff = initCHbar * initKVec[md];
+      if (abs(coeff) < 1e-20) {
+        continue;
+      }
+      let tableBase = md * DIRAC_SPARSE_S;
+      for (var row: u32 = 0u; row < S; row = row + 1u) {
+        let t = tableBase + row;
+        let col = DIRAC_SPARSE_COL[t];
+        let gRe = DIRAC_SPARSE_RE[t];
+        let gIm = DIRAC_SPARSE_IM[t];
+        hPosRe[row] += coeff * (gRe * posBaseRe[col] - gIm * posBaseIm[col]);
+        hPosIm[row] += coeff * (gRe * posBaseIm[col] + gIm * posBaseRe[col]);
+        hNegRe[row] += coeff * (gRe * negBaseRe[col] - gIm * negBaseIm[col]);
+        hNegIm[row] += coeff * (gRe * negBaseIm[col] + gIm * negBaseRe[col]);
+      }
+    }
+
+    let betaTableBase = params.latticeDim * DIRAC_SPARSE_S;
+    for (var rowB: u32 = 0u; rowB < S; rowB = rowB + 1u) {
+      let t = betaTableBase + rowB;
+      let col = DIRAC_SPARSE_COL[t];
+      let gRe = DIRAC_SPARSE_RE[t];
+      let gIm = DIRAC_SPARSE_IM[t];
+      hPosRe[rowB] += initMc2 * (gRe * posBaseRe[col] - gIm * posBaseIm[col]);
+      hPosIm[rowB] += initMc2 * (gRe * posBaseIm[col] + gIm * posBaseRe[col]);
+      hNegRe[rowB] += initMc2 * (gRe * negBaseRe[col] - gIm * negBaseIm[col]);
+      hNegIm[rowB] += initMc2 * (gRe * negBaseIm[col] + gIm * negBaseRe[col]);
+    }
+
+    let halfProjNorm = 0.5 * initProjectorNorm;
+    for (var scP: u32 = 0u; scP < S; scP = scP + 1u) {
+      let posRe = halfProjNorm * (posBaseRe[scP] + hPosRe[scP] * initInvE);
+      let posIm = halfProjNorm * (posBaseIm[scP] + hPosIm[scP] * initInvE);
+      let negRe = halfProjNorm * (negBaseRe[scP] - hNegRe[scP] * initInvE);
+      let negIm = halfProjNorm * (negBaseIm[scP] - hNegIm[scP] * initInvE);
+      let projectedRe = envelope * (pAmp * posRe + aAmp * negRe);
+      let projectedIm = envelope * (pAmp * posIm + aAmp * negIm);
+      spinor[scP * T + idx] = vec2f(
+        projectedRe * cosP - projectedIm * sinP,
+        projectedRe * sinP + projectedIm * cosP
+      );
+    }
+
+  } else if (params.initCondition == 0u || params.initCondition == 1u) {
     // gaussianPacket / planeWave: spin-polarized packet with energy projection
     // Upper (particle) spinor
-    spinor[idx] = vec2f(pAmp * cosHalf * envelope * cosP,
-                        pAmp * cosHalf * envelope * sinP);
+    spinor[idx] = vec2f(pCosE * cosP, pCosE * sinP);
     if (S > 1u) {
-      spinor[1u * T + idx] = vec2f(
-        pAmp * sinHalf * envelope * (cosP * phiCos - sinP * phiSin),
-        pAmp * sinHalf * envelope * (sinP * phiCos + cosP * phiSin)
-      );
+      spinor[1u * T + idx] = vec2f(pSinE * bdownCos, pSinE * bdownSin);
     }
     // Lower (antiparticle) spinor
     if (aAmp > 1e-10 && halfS > 0u) {
-      spinor[halfS * T + idx] = vec2f(aAmp * cosHalf * envelope * cosP,
-                                      aAmp * cosHalf * envelope * sinP);
+      spinor[halfS * T + idx] = vec2f(aCosE * cosP, aCosE * sinP);
       if (S > halfS + 1u) {
-        spinor[(halfS + 1u) * T + idx] = vec2f(
-          aAmp * sinHalf * envelope * (cosP * phiCos - sinP * phiSin),
-          aAmp * sinHalf * envelope * (sinP * phiCos + cosP * phiSin)
-        );
+        spinor[(halfS + 1u) * T + idx] = vec2f(aSinE * bdownCos, aSinE * bdownSin);
       }
     }
 
@@ -120,37 +219,33 @@ const diracInitBody = /* wgsl */ `
     let combinedCos = env1 * cosP + env2 * cosP2;
     let combinedSin = env1 * sinP + env2 * sinP2;
 
+    // Standing-wave envelope is independent of cosHalf/sinHalf, so the
+    // base amplitude pAmp·cosHalf / pAmp·sinHalf is reused unscaled.
+    let pCos = pAmp * cosHalf;
+    let pSin = pAmp * sinHalf;
     // Component 0: spin-up from both packets
-    spinor[idx] = vec2f(pAmp * cosHalf * combinedCos, pAmp * cosHalf * combinedSin);
+    spinor[idx] = vec2f(pCos * combinedCos, pCos * combinedSin);
     // Component 1: spin-down
     if (S > 1u) {
       spinor[1u * T + idx] = vec2f(
-        pAmp * sinHalf * (combinedCos * phiCos - combinedSin * phiSin),
-        pAmp * sinHalf * (combinedSin * phiCos + combinedCos * phiSin)
+        pSin * (combinedCos * phiCos - combinedSin * phiSin),
+        pSin * (combinedSin * phiCos + combinedCos * phiSin)
       );
     }
 
   } else if (params.initCondition == 3u) {
     // zitterbewegung: uses positiveEnergyFraction to control mixing
-    // (pef=0.5 gives maximum Zitterbewegung, equal upper/lower)
-    // Upper spinor
-    spinor[idx] = vec2f(pAmp * cosHalf * envelope * cosP,
-                        pAmp * cosHalf * envelope * sinP);
+    // (pef=0.5 gives maximum Zitterbewegung, equal upper/lower).
+    // Reuses the bdownCos / bdownSin / p*E / a*E CSE blocks computed above.
+    spinor[idx] = vec2f(pCosE * cosP, pCosE * sinP);
     if (S > 1u) {
-      spinor[1u * T + idx] = vec2f(
-        pAmp * sinHalf * envelope * (cosP * phiCos - sinP * phiSin),
-        pAmp * sinHalf * envelope * (sinP * phiCos + cosP * phiSin)
-      );
+      spinor[1u * T + idx] = vec2f(pSinE * bdownCos, pSinE * bdownSin);
     }
     // Lower spinor
     if (halfS > 0u) {
-      spinor[halfS * T + idx] = vec2f(aAmp * cosHalf * envelope * cosP,
-                                      aAmp * cosHalf * envelope * sinP);
+      spinor[halfS * T + idx] = vec2f(aCosE * cosP, aCosE * sinP);
       if (S > halfS + 1u) {
-        spinor[(halfS + 1u) * T + idx] = vec2f(
-          aAmp * sinHalf * envelope * (cosP * phiCos - sinP * phiSin),
-          aAmp * sinHalf * envelope * (sinP * phiCos + cosP * phiSin)
-        );
+        spinor[(halfS + 1u) * T + idx] = vec2f(aSinE * bdownCos, aSinE * bdownSin);
       }
     }
   }

@@ -42,11 +42,13 @@ fn computeRadialProbabilityOverlay(pos: vec3f, uniforms: SchroedingerUniforms) -
 
   // sqrt compression: preserves all peaks (inner ones are much smaller than outer)
   // while giving good visual contrast. Without this, inner shells of n=3,l=0 vanish.
-  let shellIntensity = sqrt(Pr);
-
-  if (shellIntensity < 0.01) {
+  // Threshold-test BEFORE the sqrt: shellIntensity < 0.01 ⇔ Pr < 1e-4. Most
+  // raymarch samples are off-shell, so this skips the sqrt for the common
+  // case where the overlay won't contribute.
+  if (Pr < 1.0e-4) {
     return vec4f(0.0);
   }
+  let shellIntensity = sqrt(Pr);
 
   let alpha = shellIntensity * uniforms.radialProbabilityOpacity;
   return vec4f(uniforms.radialProbabilityColor * shellIntensity, alpha);

@@ -35,10 +35,14 @@ struct DiracDiagUniforms {
 @group(0) @binding(4) var<storage, read_write> partialParticle: array<f32>;
 @group(0) @binding(5) var<storage, read_write> partialAnti: array<f32>;
 
-// Pack 3 additive channels (norm, particle, anti) into a vec3 — cuts
-// tree-reduce shared-memory ops 4→2 per step. Max stays separate.
-// norm = particle + anti so we can drop the third accumulator.
-var<workgroup> shared_add: array<vec3<f32>, 256>;
+// Pack the 2 truly-independent additive channels (particle, anti) into a vec2
+// — the total norm is just particle + anti, so reducing it as a separate
+// channel was redundant work. Drops shared_add from vec3 to vec2:
+//   * 256-thread workgroup memory: 3 KB → 2 KB (frees up cache lines for
+//     occupancy on tile-based GPUs).
+//   * Tree reduce: 2-lane vec adds instead of 3-lane.
+// The total is reconstructed at write-time.
+var<workgroup> shared_add: array<vec2<f32>, 256>;
 var<workgroup> shared_max: array<f32, 256>;
 
 @compute @workgroup_size(256)
@@ -69,9 +73,8 @@ fn main(
     }
   }
 
-  let totalD = particleD + antiD;
-  shared_add[local] = vec3<f32>(totalD, particleD, antiD);
-  shared_max[local] = totalD;
+  shared_add[local] = vec2<f32>(particleD, antiD);
+  shared_max[local] = particleD + antiD;
   workgroupBarrier();
 
   // Tree reduction within workgroup
@@ -85,10 +88,10 @@ fn main(
 
   if (local == 0u) {
     let sum = shared_add[0];
-    partialNorm[wid.x] = sum.x;
+    partialNorm[wid.x] = sum.x + sum.y;
     partialMax[wid.x] = shared_max[0];
-    partialParticle[wid.x] = sum.y;
-    partialAnti[wid.x] = sum.z;
+    partialParticle[wid.x] = sum.x;
+    partialAnti[wid.x] = sum.y;
   }
 }
 `
@@ -109,7 +112,11 @@ struct DiracDiagUniforms {
 @group(0) @binding(4) var<storage, read> partialParticle: array<f32>;
 @group(0) @binding(5) var<storage, read> partialAnti: array<f32>;
 
-var<workgroup> shared_add: array<vec3<f32>, 256>;
+// Same vec2 packing as Pass 1: total = particle + anti, reconstructed at
+// final write. Reading partialParticle + partialAnti and computing the sum
+// locally is one f32 add per i and saves a storage read of partialNorm
+// (memory ops are slower than ALU on every backend we ship against).
+var<workgroup> shared_add: array<vec2<f32>, 256>;
 var<workgroup> shared_max: array<f32, 256>;
 
 @compute @workgroup_size(256)
@@ -118,12 +125,12 @@ fn main(
 ) {
   let local = lid.x;
 
-  var acc: vec3<f32> = vec3<f32>(0.0, 0.0, 0.0);
+  var acc: vec2<f32> = vec2<f32>(0.0, 0.0);
   var max_val: f32 = 0.0;
   let ngroups = diagParams.numWorkgroups;
   var i = local;
   while (i < ngroups) {
-    acc = acc + vec3<f32>(partialNorm[i], partialParticle[i], partialAnti[i]);
+    acc = acc + vec2<f32>(partialParticle[i], partialAnti[i]);
     max_val = max(max_val, partialMax[i]);
     i += 256u;
   }
@@ -142,10 +149,10 @@ fn main(
   // Output: [0]=totalNorm, [1]=maxDensity, [2]=particleNorm, [3]=antiparticleNorm
   if (local == 0u) {
     let sum = shared_add[0];
-    result[0] = sum.x;
+    result[0] = sum.x + sum.y;
     result[1] = shared_max[0];
-    result[2] = sum.y;
-    result[3] = sum.z;
+    result[2] = sum.x;
+    result[3] = sum.y;
   }
 }
 `

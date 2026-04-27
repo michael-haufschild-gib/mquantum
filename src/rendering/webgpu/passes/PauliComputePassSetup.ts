@@ -19,7 +19,10 @@ import {
   pauliDiagReduceBlock,
 } from '../shaders/schroedinger/compute/pauliDiagnostics.wgsl'
 import { pauliInit3DBlock, pauliInitBlock } from '../shaders/schroedinger/compute/pauliInit.wgsl'
-import { pauliKineticBlock } from '../shaders/schroedinger/compute/pauliKinetic.wgsl'
+import {
+  pauliKinetic3DBlock,
+  pauliKineticBlock,
+} from '../shaders/schroedinger/compute/pauliKinetic.wgsl'
 import {
   pauliComplexPackBlock,
   pauliComplexUnpackBlock,
@@ -64,6 +67,8 @@ export interface PauliPipelineResult {
   /** 3D-dispatch sibling of {@link absorberPipeline}; used iff latticeDim == 3. */
   absorber3DPipeline: GPUComputePipeline
   kineticPipeline: GPUComputePipeline
+  /** 3D-dispatch sibling of {@link kineticPipeline}; used iff latticeDim == 3. */
+  kinetic3DPipeline: GPUComputePipeline
   renormalizePipeline: GPUComputePipeline
   renormalizeBGL: GPUBindGroupLayout
   packPipeline: GPUComputePipeline
@@ -210,6 +215,14 @@ export function composePauliAbsorber3DShader(): string {
 /** Pure WGSL for the Pauli kinetic phase-kick (k-space) compute shader. */
 export function composePauliKineticShader(): string {
   return pauliPrelude() + pauliKineticBlock
+}
+
+/**
+ * 3D-dispatch variant of {@link composePauliKineticShader} (latticeDim == 3).
+ * Reads k-coords from gid.xyz instead of linearToND-decoding the linear idx.
+ */
+export function composePauliKinetic3DShader(): string {
+  return pauliPrelude() + pauliKinetic3DBlock
 }
 
 /**
@@ -400,6 +413,7 @@ export async function buildPauliPipelines(device: GPUDevice): Promise<PauliPipel
     absorberPipeline,
     absorber3DPipeline,
     kineticPipeline,
+    kinetic3DPipeline,
     renormalizePipeline,
     writeGridPipeline,
     packPipeline,
@@ -421,6 +435,7 @@ export async function buildPauliPipelines(device: GPUDevice): Promise<PauliPipel
     issuePipeline('pauli-absorber', spinorLayout, composePauliAbsorberShader()),
     issuePipeline('pauli-absorber-3d', spinorLayout, composePauliAbsorber3DShader()),
     issuePipeline('pauli-kinetic', spinorLayout, composePauliKineticShader()),
+    issuePipeline('pauli-kinetic-3d', spinorLayout, composePauliKinetic3DShader()),
     issuePipeline(
       'pauli-renormalize',
       device.createPipelineLayout({ bindGroupLayouts: [renormalizeBGL] }),
@@ -468,6 +483,7 @@ export async function buildPauliPipelines(device: GPUDevice): Promise<PauliPipel
     absorberPipeline,
     absorber3DPipeline,
     kineticPipeline,
+    kinetic3DPipeline,
     renormalizePipeline,
     renormalizeBGL,
     packPipeline,

@@ -278,6 +278,24 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
       cameraPosition = { x: 0, y: 0, z: 0 }
     }
 
+    // A changed animation clock means the quantum field itself changed:
+    // density, phase, nodal sets, and current overlays are sampled at a new
+    // physical time. Reprojecting the prior color would blend an old
+    // wavefunction into the current frame, which is motion blur, not a
+    // physics-faithful instantaneous observable.
+    // ctx.frame.time advances on every rendered frame regardless of physics
+    // time, so falling back to it would force animTimeChanged=true on every
+    // frame the snapshot is missing — history would be invalidated forever
+    // and static-scene Bayer freezing could never settle. Only invalidate
+    // when we actually observe a real animation clock change.
+    const animation = getStoreSnapshot<AnimationSnapshot>(ctx, 'animation')
+    const currentAnimTime = animation?.accumulatedTime
+    const animTimeChanged =
+      currentAnimTime !== undefined && currentAnimTime !== this.prevAnimationTime
+    if (this.hasValidHistory && animTimeChanged) {
+      this.hasValidHistory = false
+    }
+
     const readAccumulationView =
       this.frameIndex % 2 === 0 ? this.accumulationViewA! : this.accumulationViewB!
     const writeAccumulationTexture =
@@ -383,9 +401,6 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     // Static scene detection: freeze Bayer cycling when nothing changes.
     // cameraChanged was captured above, before updateTemporalUniforms()
     // overwrote prevViewProjectionMatrix with the current frame's matrix.
-    const animation = getStoreSnapshot<AnimationSnapshot>(ctx, 'animation')
-    const currentAnimTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
-    const animTimeChanged = currentAnimTime !== this.prevAnimationTime
     const sceneChanged = animTimeChanged || cameraChanged
 
     if (sceneChanged) {
@@ -398,7 +413,9 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
         this.completedFullCycle = true
       }
     }
-    this.prevAnimationTime = currentAnimTime
+    if (currentAnimTime !== undefined) {
+      this.prevAnimationTime = currentAnimTime
+    }
     this.hasValidHistory = true
 
     this.prevCameraPosition.x = cameraPosition.x

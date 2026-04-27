@@ -46,20 +46,12 @@ var<workgroup> shared_count: array<u32, 256>;
 var<workgroup> shared_pos: array<u32, 256>;
 var<workgroup> shared_neg: array<u32, 256>;
 
-const VORTEX_PI:  f32 = 3.14159265358979323846;
 const VORTEX_TAU: f32 = 6.28318530717958647692;
+const VORTEX_INV_TAU: f32 = 0.15915494309189535;  // 1 / (2π)
 // Upper bound on supported lattice dimensions. Current product max is 11;
 // keeping headroom of 16 lets the per-axis phi cache survive future growth
 // without re-tuning the array size at every call site.
 const VORTEX_MAX_LATTICE_DIM: u32 = 16u;
-
-// Wrap phase difference to [-π, π]. Two predicated subs on GPU; no branch penalty.
-fn wrapPhase(dp: f32) -> f32 {
-  var w = dp;
-  if (w > VORTEX_PI)  { w -= VORTEX_TAU; }
-  if (w < -VORTEX_PI) { w += VORTEX_TAU; }
-  return w;
-}
 
 @compute @workgroup_size(256)
 fn main(
@@ -131,16 +123,27 @@ fn main(
           let phi11 = atan2(z11.y, z11.x);
           let phi01 = phiDim[db];
 
-          // Phase circulation around plaquette
-          let circulation = wrapPhase(phi10 - phi00)
-                          + wrapPhase(phi11 - phi10)
-                          + wrapPhase(phi01 - phi11)
-                          + wrapPhase(phi00 - phi01);
+          // Phase circulation around plaquette. Classic identity:
+          //   wrap(x) = x − τ·round(x/τ)
+          // Around a closed 4-edge loop the unwrapped Δφ's sum to zero
+          // exactly, so circulation = −τ·Σround(Δφ/τ). Computing only the
+          // four rounds replaces 4×(mul+round+fma) wrapPhase calls with
+          // 4×(sub+mul+round) plus a single trailing fma — saves four
+          // fma's per plaquette per site (×D(D−1)/2 plaquettes ×N^D
+          // sites every detection frame).
+          let r0 = round((phi10 - phi00) * VORTEX_INV_TAU);
+          let r1 = round((phi11 - phi10) * VORTEX_INV_TAU);
+          let r2 = round((phi01 - phi11) * VORTEX_INV_TAU);
+          let r3 = round((phi00 - phi01) * VORTEX_INV_TAU);
+          let windingSum = r0 + r1 + r2 + r3;
 
-          // Vortex if |circulation| > π (should be ≈ ±2π)
-          if (abs(circulation) > 3.0) {
+          // Vortex iff the rounded branch-cut count is non-zero.
+          // round() returns exact integer-valued f32, so compare exactly.
+          if (windingSum != 0.0) {
             vCount += 1u;
-            if (circulation > 0.0) {
+            // circulation = −τ·windingSum, so positive circulation
+            // corresponds to negative windingSum (and vice-versa).
+            if (windingSum < 0.0) {
               posCount += 1u;
             } else {
               negCount += 1u;

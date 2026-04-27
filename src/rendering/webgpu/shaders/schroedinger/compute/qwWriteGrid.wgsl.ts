@@ -58,7 +58,9 @@ export const qwWriteGridBlock = /* wgsl */ `
 // (array<u32/f32, 12>) with 4-byte stride — spec-forbidden in uniform address
 // space. Chrome/Tint accepts it; naga rejects.
 @group(0) @binding(0) var<storage, read> params: QWWriteGridUniforms;
-@group(0) @binding(1) var<storage, read> coinState: array<f32>;
+// vec2f view of the [re,im] interleaved coin buffer (matches sibling QW
+// shaders). One vec2 load replaces two scalar loads per amplitude.
+@group(0) @binding(1) var<storage, read> coinState: array<vec2f>;
 @group(0) @binding(2) var outputTex: texture_storage_3d<rgba16float, write>;
 @group(0) @binding(3) var<storage, read_write> maxDensityAtomic: atomic<u32>;
 
@@ -137,23 +139,22 @@ struct CoinSiteData {
 }
 
 // Sum raw coin state quantities at a single lattice site.
-// Coin state layout: j=2d → +axis_d, j=2d+1 → -axis_d; each j has (re, im).
+// Coin state layout: j=2d → +axis_d, j=2d+1 → -axis_d; each j is one vec2f.
 fn sumCoinStates(site: u32) -> CoinSiteData {
-  let baseIdx = site * params.numCoinStates * 2u;
+  // vec2f view: per-site stride is numCoinStates (was numCoinStates * 2 in f32 units).
+  let baseIdx = site * params.numCoinStates;
   var data: CoinSiteData;
   let ldim = params.latticeDim;
   for (var d: u32 = 0u; d < ldim; d = d + 1u) {
-    // Each axis uses 4 consecutive f32 slots: [re+, im+, re-, im-].
-    let b = baseIdx + (d << 2u);
-    let rePlus = coinState[b];
-    let imPlus = coinState[b + 1u];
-    let reMinus = coinState[b + 2u];
-    let imMinus = coinState[b + 3u];
-    let pPlus = rePlus * rePlus + imPlus * imPlus;
-    let pMinus = reMinus * reMinus + imMinus * imMinus;
+    // Each axis uses 2 consecutive vec2 slots: [+, -]. (Was 4 f32 slots.)
+    let b = baseIdx + (d << 1u);
+    let zPlus = coinState[b];
+    let zMinus = coinState[b + 1u];
+    let pPlus = dot(zPlus, zPlus);
+    let pMinus = dot(zMinus, zMinus);
     data.prob += pPlus + pMinus;
-    data.sumRe += rePlus + reMinus;
-    data.sumIm += imPlus + imMinus;
+    data.sumRe += zPlus.x + zMinus.x;
+    data.sumIm += zPlus.y + zMinus.y;
     data.chirality += pPlus - pMinus;
   }
   return data;

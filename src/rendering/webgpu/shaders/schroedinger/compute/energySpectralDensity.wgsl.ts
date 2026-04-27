@@ -39,61 +39,98 @@ export const energySpectralDensityBlock = /* wgsl */ `
 @group(0) @binding(1) var<storage, read> complexBuf: array<f32>;
 @group(0) @binding(2) var<storage, read_write> bins: array<atomic<u32>>;
 
+// PERF: Workgroup-local histogram. With 884k threads and only 32 global bins,
+// raw atomicAdd to global serializes catastrophically. We accumulate into
+// shared workgroup bins first, then flush one atomic per bin per workgroup —
+// reducing global atomic contention by a factor of #workgroups (thousands).
+// u32 addition is associative & commutative mod 2^32, so the final per-bin
+// value is bit-identical to the original direct-to-global implementation.
+var<workgroup> shared_bins: array<atomic<u32>, 32>;
+
 @compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) gid: vec3u) {
+fn main(
+  @builtin(global_invocation_id) gid: vec3u,
+  @builtin(local_invocation_id) lid: vec3u,
+) {
+  // Init shared bins. workgroup_size=64, NUM_BINS=32 → first 32 lanes init.
+  // Barriers below MUST run on every thread, so we never early-return.
+  if (lid.x < 32u) {
+    atomicStore(&shared_bins[lid.x], 0u);
+  }
+  workgroupBarrier();
+
   let idx = gid.x;
-  if (idx >= esParams.totalSites) {
-    return;
-  }
-
-  // Decompose linear index to N-D k-space coordinates.
-  // Every grid dim is a power of 2 → use shift/mask instead of u32 div/mod.
-  var remaining = idx;
-  var coords: array<u32, 12>;
-  let ldim = esParams.latticeDim;
-  for (var d: i32 = i32(ldim) - 1; d >= 0; d = d - 1) {
-    let du = u32(d);
-    let n = esParams.gridSize[du];
-    let logN = firstTrailingBit(n);
-    coords[du] = remaining & (n - 1u);
-    remaining = remaining >> logN;
-  }
-
-  // Compute kinetic energy E(k) = ℏ²|k|²/(2m).
-  // PERF: k² is sign-invariant — |k_d| = min(coord, N − coord) drops the signed
-  // cast (i32 cast, sub, select) for one u32 sub + one min per dim. Mirrors
-  // tdseApplyKinetic / pauliKinetic.
-  var k2: f32 = 0.0;
-  for (var d: u32 = 0u; d < ldim; d = d + 1u) {
-    let n = esParams.gridSize[d];
-    let kAbs = min(coords[d], n - coords[d]);
-    let kVal = esParams.kGridScale[d] * f32(kAbs);
-    k2 += kVal * kVal;
-  }
-  // Hoist the uniform-only ℏ²/(2m) prefactor — replaces per-thread divide with multiply.
-  let kineticCoef = (esParams.hbar * esParams.hbar) / (2.0 * max(esParams.mass, 1e-6));
-  let ek = k2 * kineticCoef;
-
-  // Determine energy bin
+  let inBounds = idx < esParams.totalSites;
   let eRange = esParams.eMax - esParams.eMin;
-  if (eRange <= 0.0 || ek < esParams.eMin || ek > esParams.eMax) {
-    return;
+
+  // Per-site accumulation gated by all early-out conditions, but no return —
+  // every thread must reach the trailing workgroupBarrier in uniform CF.
+  if (inBounds && eRange > 0.0) {
+    // Decompose linear index to N-D k-space coordinates. The UI restricts
+    // gridSize to powers of two, but a malformed save or programmatic
+    // config could still land a non-pow2 dim here. Use the shift/mask
+    // fast path when n is pow2, and fall back to u32 div/mod otherwise so
+    // density still bins into the right energy bucket.
+    var remaining = idx;
+    var coords: array<u32, 12>;
+    let ldim = esParams.latticeDim;
+    for (var d: i32 = i32(ldim) - 1; d >= 0; d = d - 1) {
+      let du = u32(d);
+      let n = esParams.gridSize[du];
+      if ((n & (n - 1u)) == 0u) {
+        let logN = firstTrailingBit(n);
+        coords[du] = remaining & (n - 1u);
+        remaining = remaining >> logN;
+      } else {
+        coords[du] = remaining % n;
+        remaining = remaining / n;
+      }
+    }
+
+    // Compute kinetic energy E(k) = ℏ²|k|²/(2m).
+    // PERF: k² is sign-invariant — |k_d| = min(coord, N − coord) drops the signed
+    // cast (i32 cast, sub, select) for one u32 sub + one min per dim. Mirrors
+    // tdseApplyKinetic / pauliKinetic.
+    var k2: f32 = 0.0;
+    for (var d: u32 = 0u; d < ldim; d = d + 1u) {
+      let n = esParams.gridSize[d];
+      let kAbs = min(coords[d], n - coords[d]);
+      let kVal = esParams.kGridScale[d] * f32(kAbs);
+      k2 += kVal * kVal;
+    }
+    // Hoist the uniform-only ℏ²/(2m) prefactor — replaces per-thread divide with multiply.
+    let kineticCoef = (esParams.hbar * esParams.hbar) / (2.0 * max(esParams.mass, 1e-6));
+    let ek = k2 * kineticCoef;
+
+    if (ek >= esParams.eMin && ek <= esParams.eMax) {
+      // invRange once; multiply replaces divide per thread.
+      let invRange = f32(esParams.numBins) / eRange;
+      let fBin = (ek - esParams.eMin) * invRange;
+      let bin = min(u32(floor(fBin)), esParams.numBins - 1u);
+
+      // Read |φ(k)|² from interleaved complex buffer
+      let c = idx << 1u;
+      let re = complexBuf[c];
+      let im = complexBuf[c + 1u];
+      let density = re * re + im * im;
+
+      // Fixed-point encode and atomically accumulate into workgroup-local bin
+      let scaled = u32(clamp(density * 1048576.0, 0.0, 4294967040.0));
+      if (scaled > 0u) {
+        atomicAdd(&shared_bins[bin], scaled);
+      }
+    }
   }
-  // invRange once; multiply replaces divide per thread.
-  let invRange = f32(esParams.numBins) / eRange;
-  let fBin = (ek - esParams.eMin) * invRange;
-  let bin = min(u32(floor(fBin)), esParams.numBins - 1u);
 
-  // Read |φ(k)|² from interleaved complex buffer
-  let c = idx << 1u;
-  let re = complexBuf[c];
-  let im = complexBuf[c + 1u];
-  let density = re * re + im * im;
+  workgroupBarrier();
 
-  // Fixed-point encode and atomically accumulate
-  let scaled = u32(clamp(density * 1048576.0, 0.0, 4294967040.0));
-  if (scaled > 0u) {
-    atomicAdd(&bins[bin], scaled);
+  // Flush workgroup-local bins to global. Skip global atomic when local sum
+  // is zero — saves ~all-zero workgroups from any global traffic.
+  if (lid.x < 32u) {
+    let v = atomicLoad(&shared_bins[lid.x]);
+    if (v != 0u) {
+      atomicAdd(&bins[lid.x], v);
+    }
   }
 }
 `

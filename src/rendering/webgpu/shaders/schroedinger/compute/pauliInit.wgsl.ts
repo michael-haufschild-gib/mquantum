@@ -88,10 +88,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // gaussianSuperposition: Bloch-sphere state with Gaussian envelope
     // spin-up:   cosHalf · envelope · e^{ikx}
     // spin-down: sinHalf · e^{iφ} · envelope · e^{ikx}
+    // Cache cosHalf·envelope (mirrors existing sinHEnv cache) — saves one
+    // mul per voxel by reusing the product across both real and imag writes.
     let rotRe = cosP * phiCos - sinP * phiSin;
     let rotIm = sinP * phiCos + cosP * phiSin;
+    let cosHEnv = cosHalf * envelope;
     let sinHEnv = sinHalf * envelope;
-    spinor[idx] = vec2f(cosHalf * envelope * cosP, cosHalf * envelope * sinP);
+    spinor[idx] = vec2f(cosHEnv * cosP, cosHEnv * sinP);
     spinor[idx1] = vec2f(sinHEnv * rotRe, sinHEnv * rotIm);
 
   } else if (params.initCondition == 3u) {

@@ -319,8 +319,19 @@ export function runStrangEvolution(
         strangPass.dispatchWorkgroups(res.totalSites / axisDim)
         fftSlot++
       }
-      // 4. Kinetic propagator in k-space
-      dc(strangPass, pl.kineticPipeline, [bg.kineticBG], linearWG)
+      // 4. Kinetic propagator in k-space.
+      // Uses 3-D dispatch when latticeDim===3 to skip the per-thread linearToND
+      // k-coord decode. Pipeline shape and dispatch shape are paired by
+      // pickSiteDispatch + buildTdsePipelines.
+      const kinPl = res.siteDispatch.use3D ? pl.kineticPipeline3D : pl.kineticPipeline
+      dc(
+        strangPass,
+        kinPl,
+        [bg.kineticBG],
+        res.siteDispatch.x,
+        res.siteDispatch.y,
+        res.siteDispatch.z
+      )
       // 5. Inverse FFT — axes batched
       strangPass.setPipeline(pl.fftSharedMemPipeline)
       fftSlot = res.ifftSlotOffset
@@ -380,7 +391,15 @@ export function runStrangEvolution(
       }
 
       const kinPass = ctx.beginComputePass({ label: `tdse-kinetic-${step}` })
-      dc(kinPass, pl.kineticPipeline, [bg.kineticBG], linearWG)
+      const kinPlLegacy = res.siteDispatch.use3D ? pl.kineticPipeline3D : pl.kineticPipeline
+      dc(
+        kinPass,
+        kinPlLegacy,
+        [bg.kineticBG],
+        res.siteDispatch.x,
+        res.siteDispatch.y,
+        res.siteDispatch.z
+      )
       kinPass.end()
 
       fftSlot = res.ifftSlotOffset

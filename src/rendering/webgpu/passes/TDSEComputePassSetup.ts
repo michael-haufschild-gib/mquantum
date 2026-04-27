@@ -6,7 +6,10 @@ import {
   tdseAbsorberBlock,
   tdseAbsorberBlock3D,
 } from '../shaders/schroedinger/compute/tdseAbsorber.wgsl'
-import { tdseApplyKineticBlock } from '../shaders/schroedinger/compute/tdseApplyKinetic.wgsl'
+import {
+  tdseApplyKineticBlock,
+  tdseApplyKineticBlock3D,
+} from '../shaders/schroedinger/compute/tdseApplyKinetic.wgsl'
 import { tdseApplyPotentialHalfBlock } from '../shaders/schroedinger/compute/tdseApplyPotentialHalf.wgsl'
 import {
   tdseComplexPackVec2ShaderBlock,
@@ -102,6 +105,8 @@ export interface TdsePipelineResult extends ObsGSPipelineResult {
   fftSharedMemPipeline: GPUComputePipeline
   fftSharedMemBGL: GPUBindGroupLayout
   kineticPipeline: GPUComputePipeline
+  /** 3-D dispatch variant of {@link kineticPipeline}. See initPipeline3D. */
+  kineticPipeline3D: GPUComputePipeline
   kineticBGL: GPUBindGroupLayout
   writeGridPipeline: GPUComputePipeline
   writeGridBGL: GPUBindGroupLayout
@@ -269,6 +274,15 @@ export function composeTdseKineticShader(): string {
   return tdsePrelude() + tdseApplyKineticBlock
 }
 
+/**
+ * Pure WGSL for the TDSE kinetic compute shader, 3-D dispatch variant
+ * (@workgroup_size(4,4,4), gid.xyz k-coords). Used when latticeDim===3.
+ * Bit-identical writes to {@link composeTdseKineticShader}.
+ */
+export function composeTdseKinetic3DShader(): string {
+  return tdsePrelude() + tdseApplyKineticBlock3D
+}
+
 /** Pure WGSL for the TDSE write-grid compute shader. */
 export function composeTdseWriteGridShader(): string {
   return tdsePrelude() + tdseCurvatureHelpersBlock + tdseWriteGridBlock
@@ -432,6 +446,7 @@ export async function buildTdsePipelines(
     fftStagePipeline,
     fftSharedMemPipeline,
     kineticPipeline,
+    kineticPipeline3D,
     writeGridPipeline,
     diagReducePipeline,
     diagFinalizePipeline,
@@ -457,6 +472,7 @@ export async function buildTdsePipelines(
     issuePipeline('tdse-fft-stage', composeTdseFftStageShader(), [fftStageBGL]),
     issuePipeline('tdse-fft-shared-mem', composeTdseFftSharedMemShader(), [fftSharedMemBGL]),
     issuePipeline('tdse-kinetic', composeTdseKineticShader(), [kineticBGL]),
+    issuePipeline('tdse-kinetic-3d', composeTdseKinetic3DShader(), [kineticBGL]),
     issuePipeline('tdse-write-grid', composeTdseWriteGridShader(), [writeGridBGL]),
     issuePipeline('tdse-diag-reduce', composeTdseDiagReduceShader(), [diagReduceBGL]),
     issuePipeline('tdse-diag-finalize', composeTdseDiagFinalizeShader(), [diagFinalizeBGL]),
@@ -490,6 +506,7 @@ export async function buildTdsePipelines(
     fftSharedMemPipeline,
     fftSharedMemBGL,
     kineticPipeline,
+    kineticPipeline3D,
     kineticBGL,
     writeGridPipeline,
     writeGridBGL,
