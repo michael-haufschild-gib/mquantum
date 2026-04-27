@@ -44,7 +44,7 @@ import {
   composePauliAbsorberShader,
   composePauliDiagFinalizeShader,
   composePauliDiagReduceShader,
-  composePauliFftStageShader,
+  composePauliFftSharedMemShader,
   composePauliInit3DShader,
   composePauliInitShader,
   composePauliKineticShader,
@@ -202,7 +202,7 @@ const COMPUTE_SHADERS: readonly Entry[] = [
   { label: 'pauli-write-grid', fn: composePauliWriteGridShader },
   { label: 'pauli-pack', fn: composePauliPackShader },
   { label: 'pauli-unpack', fn: composePauliUnpackShader },
-  { label: 'pauli-fft-stage', fn: composePauliFftStageShader },
+  { label: 'pauli-fft-shared-mem', fn: composePauliFftSharedMemShader },
   { label: 'pauli-diag-reduce', fn: composePauliDiagReduceShader },
   { label: 'pauli-diag-finalize', fn: composePauliDiagFinalizeShader },
   // FSF (Klein-Gordon leapfrog)

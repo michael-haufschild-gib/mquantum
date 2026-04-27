@@ -39,6 +39,7 @@ struct VertexOutput {
 @group(1) @binding(0) var quarterColor: texture_2d<f32>;       // Quarter-res color from current frame
 @group(1) @binding(1) var reprojectedHistory: texture_2d<f32>; // Reprojected history (RGB + validity in A)
 @group(1) @binding(2) var nearestSampler: sampler;
+@group(1) @binding(3) var linearSampler: sampler;
 
 // Sample quarter-res texture with bounds checking
 fn sampleQuarterRes(coord: vec2i, dims: vec2i) -> vec4f {
@@ -104,22 +105,20 @@ fn computeNeighborhoodBounds(centerCoord: vec2i, dims: vec2i, centerSample: vec4
 
 @fragment
 fn main(input: VertexOutput) -> @location(0) vec4f {
-  let fullDims = vec2i(temporal.fullResolution);
-  let fullCoord = clamp(vec2i(input.uv * temporal.fullResolution), vec2i(0), fullDims - vec2i(1));
+  // PERF: input.position.xy is the rasterizer-derived pixel center (0.5, 1.5, …);
+  // truncating to i32 yields exact pixel coords without the uv*fullRes mul + clamp.
+  let fullCoord = vec2i(input.position.xy);
   let quarterCoord = fullCoord / 2;
 
   // Get quarter-res texture dimensions
   let quarterDims = vec2i(textureDimensions(quarterColor));
+  let quarterDimsF = vec2f(quarterDims);
 
-  // Load the four bilinear taps ONCE. Reuse tl as both the bilinear top-left AND
-  // the exact sample for the Bayer-aligned pixel (current). This fuses the old
-  // spatialInterpolate() helper and the stand-alone current = sampleQuarterRes(
-  // quarterCoord, ...) into a single set of four loads, saving one textureLoad
-  // per pixel vs. the previous implementation.
-  let tl = sampleQuarterRes(quarterCoord, quarterDims);
-  let tr = sampleQuarterRes(quarterCoord + vec2i(1, 0), quarterDims);
-  let bl = sampleQuarterRes(quarterCoord + vec2i(0, 1), quarterDims);
-  let br = sampleQuarterRes(quarterCoord + vec2i(1, 1), quarterDims);
+  // Load the exact center texel ONCE. Reused as (a) the bilinear-coincident sample
+  // for the Bayer-aligned (rendered) pixel and (b) the centerSample fed into the
+  // neighborhood-bounds pass. Must remain a nearest textureLoad because both
+  // consumers need the exact texel at quarterCoord, not a filtered value.
+  let centerSample = textureLoad(quarterColor, quarterCoord, 0);
 
   // Determine sub-pixel position within the 2x2 block.
   // (fullCoord & 1 == fullCoord % 2 for non-negative ints, but cheaper on all back-ends.)
@@ -128,26 +127,29 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   let fx = f32(subPixel.x) * 0.5 + 0.25;
   let fy = f32(subPixel.y) * 0.5 + 0.25;
 
-  // Bilinear blend (for non-rendered pixels — ensures every pixel reflects the current
-  // frame's data and eliminates Bayer shimmer).
-  let interpolated = mix(mix(tl, tr, fx), mix(bl, br, fx), fy);
+  // Hardware bilinear (1 sample) replaces the previous 4-textureLoad + manual mix path.
+  // HW bilinear at uv returns mix(mix(tl,tr,wx), mix(bl,br,wx), wy) where
+  // wx = fract(uv.x*dims - 0.5). Setting uv = (quarterCoord + 0.5 + (fx, fy)) / dims
+  // makes wx = fx and wy = fy exactly (when (fx, fy) in (0, 1)).
+  let bilinearUv = (vec2f(quarterCoord) + vec2f(0.5) + vec2f(fx, fy)) / quarterDimsF;
+  let interpolated = textureSampleLevel(quarterColor, linearSampler, bilinearUv, 0.0);
 
-  // For the Bayer-aligned pixel, reuse tl (same coord as quarterCoord).
+  // For the Bayer-aligned pixel, reuse the exact center texel.
   let blockPos = vec2f(f32(subPixel.x), f32(subPixel.y));
   let isRenderedPixel = (blockPos.x == temporal.bayerOffset.x && blockPos.y == temporal.bayerOffset.y);
 
   // Use exact sample for rendered pixel, interpolated for others
-  let currentColor = select(interpolated.rgb, tl.rgb, isRenderedPixel);
-  let currentAlpha = select(interpolated.a, tl.a, isRenderedPixel);
+  let currentColor = select(interpolated.rgb, centerSample.rgb, isRenderedPixel);
+  let currentAlpha = select(interpolated.a, centerSample.a, isRenderedPixel);
 
   // Sample reprojected history (RGB color, A = validity)
   let historyData = textureLoad(reprojectedHistory, fullCoord, 0);
   let historyColor = historyData.rgb;
   let validity = historyData.a;
 
-  // Compute neighborhood bounds for clamping — pass the already-loaded tl as the
-  // center sample so the bounds pass reuses it (saves one more textureLoad per pixel).
-  let bounds = computeNeighborhoodBounds(quarterCoord, quarterDims, tl);
+  // Compute neighborhood bounds for clamping — pass the already-loaded centerSample
+  // so the bounds pass reuses it (saves one textureLoad per pixel).
+  let bounds = computeNeighborhoodBounds(quarterCoord, quarterDims, centerSample);
   let neighborMin = bounds[0];
   let neighborMax = bounds[1];
 

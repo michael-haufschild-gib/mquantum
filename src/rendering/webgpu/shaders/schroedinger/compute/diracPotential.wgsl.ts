@@ -29,12 +29,9 @@ const diracPotentialBindings = /* wgsl */ `
 `
 
 const diracPotentialBody = /* wgsl */ `
-  // Compute physical positions
-  var pos: array<f32, 12>;
-  for (var d: u32 = 0u; d < params.latticeDim; d++) {
-    pos[d] = (f32(coords[d]) - f32(params.gridSize[d]) * 0.5 + 0.5) * params.spacing[d];
-  }
-
+  // PERF: pos computed lazily inside each potential-type branch instead of
+  // filling a pos[12] array. Type 0 needs nothing; types 1/2/3 need only
+  // pos[0]; types 4/5 stream coordinates into r2 directly.
   var V: f32 = 0.0;
 
   if (params.potentialType == 0u) {
@@ -43,25 +40,29 @@ const diracPotentialBody = /* wgsl */ `
 
   } else if (params.potentialType == 1u) {
     // Step potential: V0 for x_0 > center (Klein paradox)
-    V = select(0.0, params.potentialStrength, pos[0] > params.potentialCenter);
+    let pos0 = (f32(coords[0]) - f32(params.gridSize[0]) * 0.5 + 0.5) * params.spacing[0];
+    V = select(0.0, params.potentialStrength, pos0 > params.potentialCenter);
 
   } else if (params.potentialType == 2u) {
     // Rectangular barrier: V0 within half-width of center
+    let pos0 = (f32(coords[0]) - f32(params.gridSize[0]) * 0.5 + 0.5) * params.spacing[0];
     let halfWidth = params.potentialWidth * 0.5;
-    let inBarrier = abs(pos[0] - params.potentialCenter) < halfWidth;
+    let inBarrier = abs(pos0 - params.potentialCenter) < halfWidth;
     V = select(0.0, params.potentialStrength, inBarrier);
 
   } else if (params.potentialType == 3u) {
     // Finite square well: -V0 within half-width of center
+    let pos0 = (f32(coords[0]) - f32(params.gridSize[0]) * 0.5 + 0.5) * params.spacing[0];
     let halfWidth = params.potentialWidth * 0.5;
-    let inWell = abs(pos[0] - params.potentialCenter) < halfWidth;
+    let inWell = abs(pos0 - params.potentialCenter) < halfWidth;
     V = select(0.0, -params.potentialStrength, inWell);
 
   } else if (params.potentialType == 4u) {
     // Harmonic trap: V = 0.5 * m * omega^2 * |x|^2
     var r2: f32 = 0.0;
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
-      r2 += pos[d] * pos[d];
+      let p = (f32(coords[d]) - f32(params.gridSize[d]) * 0.5 + 0.5) * params.spacing[d];
+      r2 += p * p;
     }
     let omega2 = params.harmonicOmega * params.harmonicOmega;
     V = 0.5 * params.mass * omega2 * r2;
@@ -70,7 +71,8 @@ const diracPotentialBody = /* wgsl */ `
     // Coulomb: V = -Z/r (soft-core regularized to avoid singularity)
     var r2: f32 = 0.0;
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
-      r2 += pos[d] * pos[d];
+      let p = (f32(coords[d]) - f32(params.gridSize[d]) * 0.5 + 0.5) * params.spacing[d];
+      r2 += p * p;
     }
     // Soft-core: r_eff = sqrt(r^2 + (0.1 * dx)^2)
     let softCore = 0.1 * params.spacing[0];

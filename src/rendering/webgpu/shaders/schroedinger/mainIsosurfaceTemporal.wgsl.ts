@@ -91,7 +91,6 @@ ${bayerJitterSection}
   let stepLen = (tFar - tNear) / f32(maxSteps);
   var t = tNear;
   var hitT: f32 = -1.0;
-  var iterCount: i32 = 0;
 
   let stMinStep = stepLen * 0.1;
   let stDsDtFloor: f32 = 0.5;
@@ -105,7 +104,6 @@ ${bayerJitterSection}
   for (var i = 0; i < 128; i++) {
     if (i >= maxSteps) { break; }
     if (t > tFar) { break; }
-    iterCount = i + 1;
 
     let pos = ro + rd * t;
     var rho: f32;
@@ -206,9 +204,12 @@ ${bayerJitterSection}
   // shrink |n| < 1 in shallow-gradient regions and bias diffuse / specular
   // energy; recompute the normal from the unfloored magnitude with an
   // explicit zero-gradient guard.
+  // PERF: when gradMagSq > 1e-12, max(gradMagSq, 1e-12) == gradMagSq, so the
+  // floored inverseSqrt is exact for the normal too — reuse instead of calling
+  // inverseSqrt twice.
   let invGradMag = inverseSqrt(max(gradMagSq, 1e-12));
   let gradMag = gradMagSq * invGradMag;
-  let invGradMagExact = select(0.0, inverseSqrt(gradMagSq), gradMagSq > 1e-12);
+  let invGradMagExact = select(0.0, invGradMag, gradMagSq > 1e-12);
   let n = -rawGrad * invGradMagExact;
 
   // Sample for color
@@ -226,7 +227,7 @@ ${bayerJitterSection}
       p.x
     );
     let branchTint = mix(schroedinger.branchColorA, schroedinger.branchColorB, branchFrac);
-    let lum = dot(surfaceColor, vec3f(0.2126, 0.7152, 0.0722));
+    let lum = dot(surfaceColor, LUMA_WEIGHTS);
     surfaceColor = branchTint * lum;
   }
 
@@ -260,6 +261,13 @@ ${bayerJitterSection}
 
   let viewDir = -rd;
   let roughness = max(material.roughness, 0.04);
+
+  // PERF: hoist F0 / dielectricF0 / kD-divide-by-PI invariants out of the
+  // multi-light loop — they only depend on material + surfaceColor.
+  // Filament convention: F0 = 0.16 * reflectance^2 for dielectrics (0.5 → 0.04).
+  let dielectricF0_iso = 0.16 * material.reflectance * material.reflectance;
+  let F0 = mix(vec3f(dielectricF0_iso), surfaceColor, material.metallic);
+  let surfaceColorOverPi = surfaceColor * INV_PI;
 
   for (var i = 0; i < MAX_LIGHTS; i++) {
     if (i >= lighting.lightCount) { break; }
@@ -304,9 +312,7 @@ ${bayerJitterSection}
 
     let NdotL = max(dot(n, l), 0.0);
 
-    // Filament convention: F0 = 0.16 * reflectance^2 for dielectrics (0.5 → 0.04)
-    let dielectricF0_iso = 0.16 * material.reflectance * material.reflectance;
-    let F0 = mix(vec3f(dielectricF0_iso), surfaceColor, material.metallic);
+    // F0/dielectricF0_iso hoisted above the loop.
     // Halfway vector: rsqrt + select mirrors the pattern already used in
     // ggx.wgsl.ts:46. Saves 1 sqrt + 1 divide per light per pixel.
     let halfSum = l + viewDir;
@@ -318,7 +324,7 @@ ${bayerJitterSection}
     let kS = F;
     let kD = (vec3f(1.0) - kS) * (1.0 - material.metallic);
 
-    col += kD * surfaceColor / PI * light.color.rgb * NdotL * attenuation;
+    col += kD * surfaceColorOverPi * light.color.rgb * NdotL * attenuation;
 
     let specular = computePBRSpecular(n, viewDir, l, roughness, F0);
     col += specular * material.specularColor * light.color.rgb * NdotL * material.specularIntensity * attenuation;

@@ -39,23 +39,21 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
 
-  // Compute physical position for each dimension.
-  var pos: array<f32, 12>;
-  for (var d: u32 = 0u; d < params.latticeDim; d++) {
-    pos[d] = (f32(coords[d]) - f32(params.gridSize[d]) * 0.5 + 0.5) * params.spacing[d];
-  }
-
+  // PERF: compute pos lazily inside each potential-type branch instead of
+  // filling a pos[12] array. Type 0 needs nothing; type 2 needs only x0;
+  // types 1 and 3 stream the coordinate into r2 directly.
   var V: f32 = 0.0;
   if (params.potentialType == 1u) {
     // Harmonic trap: V = 1/2 m omega^2 |x|^2
     var r2: f32 = 0.0;
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
-      r2 += pos[d] * pos[d];
+      let p = (f32(coords[d]) - f32(params.gridSize[d]) * 0.5 + 0.5) * params.spacing[d];
+      r2 += p * p;
     }
     V = 0.5 * params.mass * params.harmonicOmega * params.harmonicOmega * r2;
   } else if (params.potentialType == 2u) {
     // Barrier: step function along first dimension
-    let x0 = pos[0u];
+    let x0 = (f32(coords[0u]) - f32(params.gridSize[0u]) * 0.5 + 0.5) * params.spacing[0u];
     let halfW = params.wellWidth * 0.5;
     if (x0 > -halfW && x0 < halfW) {
       V = params.wellDepth;
@@ -64,7 +62,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // Double well (radial Gaussian): V = D (1 - exp(-|x|^2 / W^2))
     var r2: f32 = 0.0;
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
-      r2 += pos[d] * pos[d];
+      let p = (f32(coords[d]) - f32(params.gridSize[d]) * 0.5 + 0.5) * params.spacing[d];
+      r2 += p * p;
     }
     let W2 = max(params.wellWidth * params.wellWidth, 1e-12);
     V = params.wellDepth * (1.0 - exp(-r2 / W2));
@@ -89,34 +88,26 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
   let idx = gid.x * params.strides[0] + gid.y * params.strides[1] + gid.z * params.strides[2];
 
-  var coords: array<u32, 12>;
-  coords[0] = gid.x;
-  coords[1] = gid.y;
-  coords[2] = gid.z;
-
-  var pos: array<f32, 12>;
-  for (var d: u32 = 0u; d < params.latticeDim; d++) {
-    pos[d] = (f32(coords[d]) - f32(params.gridSize[d]) * 0.5 + 0.5) * params.spacing[d];
-  }
-
+  // PERF: pos[] computed lazily inside each potential-type branch — gid.xyz
+  // is the coord directly, no array fill needed.
   var V: f32 = 0.0;
   if (params.potentialType == 1u) {
-    var r2: f32 = 0.0;
-    for (var d: u32 = 0u; d < params.latticeDim; d++) {
-      r2 += pos[d] * pos[d];
-    }
+    let px = (f32(gid.x) - f32(params.gridSize[0]) * 0.5 + 0.5) * params.spacing[0];
+    let py = (f32(gid.y) - f32(params.gridSize[1]) * 0.5 + 0.5) * params.spacing[1];
+    let pz = (f32(gid.z) - f32(params.gridSize[2]) * 0.5 + 0.5) * params.spacing[2];
+    let r2 = px * px + py * py + pz * pz;
     V = 0.5 * params.mass * params.harmonicOmega * params.harmonicOmega * r2;
   } else if (params.potentialType == 2u) {
-    let x0 = pos[0u];
+    let x0 = (f32(gid.x) - f32(params.gridSize[0]) * 0.5 + 0.5) * params.spacing[0];
     let halfW = params.wellWidth * 0.5;
     if (x0 > -halfW && x0 < halfW) {
       V = params.wellDepth;
     }
   } else if (params.potentialType == 3u) {
-    var r2: f32 = 0.0;
-    for (var d: u32 = 0u; d < params.latticeDim; d++) {
-      r2 += pos[d] * pos[d];
-    }
+    let px = (f32(gid.x) - f32(params.gridSize[0]) * 0.5 + 0.5) * params.spacing[0];
+    let py = (f32(gid.y) - f32(params.gridSize[1]) * 0.5 + 0.5) * params.spacing[1];
+    let pz = (f32(gid.z) - f32(params.gridSize[2]) * 0.5 + 0.5) * params.spacing[2];
+    let r2 = px * px + py * py + pz * pz;
     let W2 = max(params.wellWidth * params.wellWidth, 1e-12);
     V = params.wellDepth * (1.0 - exp(-r2 / W2));
   }

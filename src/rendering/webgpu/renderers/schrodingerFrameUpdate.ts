@@ -50,6 +50,7 @@ import {
   computeCanonicalCompensation,
   packBasisVectors,
   packCameraUniforms,
+  packPrecomputedHOTerms,
   packSchroedingerUniforms,
 } from './uniformPacking'
 
@@ -59,6 +60,12 @@ export const TIME_FIELD_OFFSET = SCHROEDINGER_LAYOUT.byteOffset.time
 /** Byte offset of the uncertainty log-rho threshold in SchroedingerUniforms. */
 export const UNCERTAINTY_THRESHOLD_OFFSET =
   SCHROEDINGER_LAYOUT.byteOffset.uncertaintyLogRhoThreshold
+
+/** Byte offset of the host-precomputed HO term array (array<vec4f, 8>). */
+export const PRECOMPUTED_TERM_BYTE_OFFSET = SCHROEDINGER_LAYOUT.byteOffset.precomputedTerm
+
+/** Total byte size of the precomputed HO term region — 8 vec4f = 128 bytes. */
+export const PRECOMPUTED_TERM_BYTE_SIZE = 8 * 16
 
 const BOUND_RADIUS_QUANT_STEP = 0.05
 const BOUND_RADIUS_REBUILD_THRESHOLD = 0.05
@@ -378,6 +385,14 @@ export function computeSchroedingerUpdate(
   }
 
   if (!isSchroedingerDirty(state.versions, storeVersions)) {
+    // Even on the partial-write fast path the time advances every frame, so
+    // term_k = c_k * exp(-i * E_k * t) must be recomputed and uploaded — the
+    // shader reads it unconditionally for the HO superposition path. Reads
+    // post-momentum-rotated coeff[k] from floatView, which is correct because
+    // any change to coeff/energy/termCount would have bumped a tracked version
+    // and routed us into the full-write branch instead.
+    const partialTimeScale = inputs.schroedinger?.timeScale ?? 0.8
+    packPrecomputedHOTerms(floatView, intView, inputs.animationTime, partialTimeScale)
     return {
       writeMode: 'partial',
       partialTime: inputs.animationTime,
@@ -462,6 +477,13 @@ export function computeSchroedingerUpdate(
   ) {
     applyHOMomentumTransform(floatView, intView, inputs.dimension, hbar)
   }
+
+  // Host-precompute term_k = c_k * exp(-i * E_k * t) AFTER the momentum
+  // transform — applyHOMomentumTransform rotates coeff[k] by (-i)^{Σ n_j} per
+  // term, and the precompute must consume the rotated values to stay
+  // numerically identical to the original GPU expression.
+  const fullTimeScale = inputs.schroedinger?.timeScale ?? 0.8
+  packPrecomputedHOTerms(floatView, intView, inputs.animationTime, fullTimeScale)
 
   return {
     writeMode: 'full',

@@ -39,13 +39,16 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let cosP = cos(phase);
   let sinP = sin(phase);
 
-  // Apply potential phase rotation to each spinor component
+  // Apply potential phase rotation to each spinor component.
+  // PERF: stride bufIdx by T per iteration instead of c*T + idx — saves
+  // a multiply per spinor component when the runtime-S loop is not unrolled.
   let S = params.spinorSize;
   let T = params.totalSites;
+  var bufIdx = idx;
   for (var c: u32 = 0u; c < S; c++) {
-    let bufIdx = c * T + idx;
     let v = spinor[bufIdx];
     spinor[bufIdx] = vec2f(v.x * cosP - v.y * sinP, v.x * sinP + v.y * cosP);
+    bufIdx += T;
   }
 }
 `

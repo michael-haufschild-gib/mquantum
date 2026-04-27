@@ -118,17 +118,35 @@ fn dirichletInterp3D(
 
   var result: f32 = 0.0;
   let n12 = n1 * n2;
-  for (var i: u32 = 0u; i < n0; i++) {
-    let wxi = wx[i];
-    if (abs(wxi) < 1e-10) { continue; }
-    let iBase = i * n12;
-    for (var j: u32 = 0u; j < n1; j++) {
-      let wxy = wxi * wy[j];
-      if (abs(wxy) < 1e-10) { continue; }
-      let ijBase = iBase + j * n2;
-      for (var k: u32 = 0u; k < n2; k++) {
-        let val = select(sharedPhi[ijBase + k], sharedPi[ijBase + k], usePi);
-        result += wxy * wz[k] * val;
+  // PERF: usePi is uniform across the entire dispatch, but select() in WGSL
+  // evaluates both array reads unconditionally. Hoist the branch outside the
+  // triple loop so each iteration does exactly one shared-memory load.
+  if (usePi) {
+    for (var i: u32 = 0u; i < n0; i++) {
+      let wxi = wx[i];
+      if (abs(wxi) < 1e-10) { continue; }
+      let iBase = i * n12;
+      for (var j: u32 = 0u; j < n1; j++) {
+        let wxy = wxi * wy[j];
+        if (abs(wxy) < 1e-10) { continue; }
+        let ijBase = iBase + j * n2;
+        for (var k: u32 = 0u; k < n2; k++) {
+          result += wxy * wz[k] * sharedPi[ijBase + k];
+        }
+      }
+    }
+  } else {
+    for (var i: u32 = 0u; i < n0; i++) {
+      let wxi = wx[i];
+      if (abs(wxi) < 1e-10) { continue; }
+      let iBase = i * n12;
+      for (var j: u32 = 0u; j < n1; j++) {
+        let wxy = wxi * wy[j];
+        if (abs(wxy) < 1e-10) { continue; }
+        let ijBase = iBase + j * n2;
+        for (var k: u32 = 0u; k < n2; k++) {
+          result += wxy * wz[k] * sharedPhi[ijBase + k];
+        }
       }
     }
   }

@@ -37,9 +37,9 @@ import { pauliUniformsBlock } from '../shaders/schroedinger/compute/pauliUniform
 import { pauliWriteGridBlock } from '../shaders/schroedinger/compute/pauliWriteGrid.wgsl'
 import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
 import {
-  tdseFFTStageUniformsBlock,
-  tdseStockhamFFTTwiddleBlock,
-} from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
+  fftAxisUniformsBlock,
+  tdseSharedMemFFTTwiddleBlock,
+} from '../shaders/schroedinger/compute/tdseSharedMemFFT.wgsl'
 import { createComputeBGL } from '../utils/computeBindGroupLayout'
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -68,7 +68,13 @@ export interface PauliPipelineResult {
   renormalizeBGL: GPUBindGroupLayout
   packPipeline: GPUComputePipeline
   unpackPipeline: GPUComputePipeline
-  fftStagePipeline: GPUComputePipeline
+  /**
+   * Shared-memory Stockham FFT pipeline. Performs all log2(N) butterfly
+   * stages for one pencil inside a single workgroup using workgroup-local
+   * shared memory — replaces the per-stage Stockham kernel that needed
+   * log2(N) separate dispatches per axis.
+   */
+  fftSharedMemPipeline: GPUComputePipeline
   writeGridPipeline: GPUComputePipeline
   diagReducePipeline: GPUComputePipeline
   diagFinalizePipeline: GPUComputePipeline
@@ -81,7 +87,8 @@ export interface PauliPipelineResult {
   potentialHalfBGL: GPUBindGroupLayout
   packBGL: GPUBindGroupLayout
   unpackBGL: GPUBindGroupLayout
-  fftStageBGL: GPUBindGroupLayout
+  /** BGL for the shared-memory FFT: (axis-uniforms, complexBuf rw, twiddle ro). */
+  fftSharedMemBGL: GPUBindGroupLayout
   writeGridBGL: GPUBindGroupLayout
   diagReduceBGL: GPUBindGroupLayout
   diagFinalizeBGL: GPUBindGroupLayout
@@ -96,8 +103,14 @@ export interface PauliBindGroupResult {
   potentialBG: GPUBindGroup
   /** Bind group for pauliPotentialHalf (adds potential as binding 3). */
   potentialHalfBG: GPUBindGroup
-  fftStageABBG: GPUBindGroup
-  fftStageBABG: GPUBindGroup
+  /**
+   * One bind group per (axis, direction) FFT slot. Length = `latticeDim * 2`.
+   * Forward axes occupy slots [0, latticeDim); inverse axes occupy
+   * [latticeDim, 2·latticeDim). Inside the batched Strang-step compute pass
+   * the host iterates this array, calling `setBindGroup(0, fftSharedMemBGs[slot])`
+   * + `dispatchWorkgroups(totalSites / axisDim)` for each axis.
+   */
+  fftSharedMemBGs: GPUBindGroup[]
   writeGridBG: GPUBindGroup
   diagReduceBG: GPUBindGroup
   diagFinalizeBG: GPUBindGroup
@@ -114,11 +127,14 @@ export interface PauliBindGroupInputs {
   /** Merged spinor buffer (`array<vec2f>` of length 2·totalSites). */
   spinorBuffer: GPUBuffer
   fftScratchA: GPUBuffer
-  fftScratchB: GPUBuffer
-  fftUniformBuffer: GPUBuffer
   /**
-   * CPU-precomputed twiddle table bound at binding 3 of every FFT dispatch.
-   * Same buffer shape as the TDSE twiddle table. See `FFTTwiddle.ts`.
+   * Per-(axis, direction) FFT axis-uniform buffers. Length = `latticeDim * 2`.
+   * One bind group per slot enables single-pass Strang-step FFT dispatch.
+   */
+  fftAxisUniformBuffers: GPUBuffer[]
+  /**
+   * CPU-precomputed twiddle table bound at binding 2 of every shared-memory
+   * FFT dispatch. Same buffer shape as the TDSE twiddle table.
    */
   fftTwiddleBuffer: GPUBuffer
   packUniformBuffer: GPUBuffer
@@ -227,15 +243,20 @@ export function composePauliUnpackShader(): string {
 }
 
 /**
- * Pure WGSL for the Pauli Stockham FFT stage compute shader.
+ * Pure WGSL for the Pauli shared-memory Stockham FFT compute shader.
  *
- * Twiddle-table fork of the kernel — stages s >= 2 read precomputed twiddles
- * from a `storage` buffer (binding 3) instead of calling `cos/sin` per thread.
- * Stage 0 (W^0 = (1,0)) and stage 1 specializations remain. Same
- * N_MAX_FFT_TWIDDLE = 128 cap as TDSE — Pauli per-axis grids fit in this bound.
+ * Shared-memory variant: performs all log2(N) butterfly stages for one pencil
+ * inside a single workgroup using workgroup-local shared memory. One dispatch
+ * per axis replaces log2(N) dispatches of the per-stage Stockham kernel,
+ * cutting kernel-launch overhead 6× at N=64 and removing log2(N) global-memory
+ * round-trips per pencil. Twiddle-table fork: stages s >= 2 read CPU-precomputed
+ * twiddles from a storage buffer instead of calling cos/sin per thread.
+ *
+ * Reuses the TDSE shared-memory FFT shader bytes — the kernel is grid-config
+ * agnostic and the bind group layout is identical.
  */
-export function composePauliFftStageShader(): string {
-  return `\n${tdseFFTStageUniformsBlock}\n${tdseStockhamFFTTwiddleBlock}\n`
+export function composePauliFftSharedMemShader(): string {
+  return `\n${fftAxisUniformsBlock}\n${tdseSharedMemFFTTwiddleBlock}\n`
 }
 
 /** Pure WGSL for the Pauli diagnostics reduce compute shader. */
@@ -325,11 +346,11 @@ export async function buildPauliPipelines(device: GPUDevice): Promise<PauliPipel
     'storage',
   ])
 
-  // FFT pipeline (twiddle-table Stockham FFT). Binding 3 is the CPU-precomputed
-  // twiddle table that replaces cos/sin at stages >= 2. See FFTTwiddle.ts.
-  const fftStageBGL = createComputeBGL(device, 'pauli-fft-stage-bgl', [
+  // Shared-memory FFT BGL. Binding 0: per-axis uniforms (32-byte FFTAxisUniforms),
+  // binding 1: complex storage buffer (read_write, in-place butterfly),
+  // binding 2: CPU-precomputed twiddle table (read-only).
+  const fftSharedMemBGL = createComputeBGL(device, 'pauli-fft-shared-mem-bgl', [
     'uniform',
-    'read-only-storage',
     'storage',
     'read-only-storage',
   ])
@@ -383,7 +404,7 @@ export async function buildPauliPipelines(device: GPUDevice): Promise<PauliPipel
     writeGridPipeline,
     packPipeline,
     unpackPipeline,
-    fftStagePipeline,
+    fftSharedMemPipeline,
     diagReducePipeline,
     diagFinalizePipeline,
   ] = await Promise.all([
@@ -421,9 +442,9 @@ export async function buildPauliPipelines(device: GPUDevice): Promise<PauliPipel
       composePauliUnpackShader()
     ),
     issuePipeline(
-      'pauli-fft-stage',
-      device.createPipelineLayout({ bindGroupLayouts: [fftStageBGL] }),
-      composePauliFftStageShader()
+      'pauli-fft-shared-mem',
+      device.createPipelineLayout({ bindGroupLayouts: [fftSharedMemBGL] }),
+      composePauliFftSharedMemShader()
     ),
     issuePipeline(
       'pauli-diag-reduce',
@@ -451,7 +472,7 @@ export async function buildPauliPipelines(device: GPUDevice): Promise<PauliPipel
     renormalizeBGL,
     packPipeline,
     unpackPipeline,
-    fftStagePipeline,
+    fftSharedMemPipeline,
     writeGridPipeline,
     diagReducePipeline,
     diagFinalizePipeline,
@@ -460,7 +481,7 @@ export async function buildPauliPipelines(device: GPUDevice): Promise<PauliPipel
     potentialHalfBGL,
     packBGL,
     unpackBGL,
-    fftStageBGL,
+    fftSharedMemBGL,
     writeGridBGL,
     diagReduceBGL,
     diagFinalizeBGL,
@@ -490,8 +511,7 @@ export function rebuildPauliBindGroups(
     uniformBuffer,
     spinorBuffer,
     fftScratchA,
-    fftScratchB,
-    fftUniformBuffer,
+    fftAxisUniformBuffers,
     fftTwiddleBuffer,
     packUniformBuffer,
     packUniformBufferNoNorm,
@@ -534,28 +554,23 @@ export function rebuildPauliBindGroups(
     ],
   })
 
-  // FFT bind groups (A→B and B→A). Binding 3 is the twiddle table that
-  // replaces cos/sin at stages >= 2 (see FFTTwiddle.ts).
-  const fftStageABBG = device.createBindGroup({
-    label: 'pauli-fft-ab',
-    layout: pipelines.fftStageBGL,
-    entries: [
-      { binding: 0, resource: { buffer: fftUniformBuffer } },
-      { binding: 1, resource: { buffer: fftScratchA } },
-      { binding: 2, resource: { buffer: fftScratchB } },
-      { binding: 3, resource: { buffer: fftTwiddleBuffer } },
-    ],
-  })
-  const fftStageBABG = device.createBindGroup({
-    label: 'pauli-fft-ba',
-    layout: pipelines.fftStageBGL,
-    entries: [
-      { binding: 0, resource: { buffer: fftUniformBuffer } },
-      { binding: 1, resource: { buffer: fftScratchB } },
-      { binding: 2, resource: { buffer: fftScratchA } },
-      { binding: 3, resource: { buffer: fftTwiddleBuffer } },
-    ],
-  })
+  // PERF: per-(axis, direction) shared-memory FFT bind groups. Each binds
+  // its own pre-populated FFTAxisUniforms buffer, the in-place complex
+  // scratch storage, and the shared twiddle table. With one bind group per
+  // axis slot, the entire Strang substep's FFT round trip stays inside one
+  // batched compute pass — no per-axis copyBufferToBuffer.
+  const fftSharedMemBGs: GPUBindGroup[] = new Array(fftAxisUniformBuffers.length)
+  for (let slot = 0; slot < fftAxisUniformBuffers.length; slot++) {
+    fftSharedMemBGs[slot] = device.createBindGroup({
+      label: `pauli-fft-shared-mem-bg-slot-${slot}`,
+      layout: pipelines.fftSharedMemBGL,
+      entries: [
+        { binding: 0, resource: { buffer: fftAxisUniformBuffers[slot]! } },
+        { binding: 1, resource: { buffer: fftScratchA } },
+        { binding: 2, resource: { buffer: fftTwiddleBuffer } },
+      ],
+    })
+  }
 
   // Renormalization bind group
   oldRenormUniformBuffer?.destroy()
@@ -666,8 +681,7 @@ export function rebuildPauliBindGroups(
     spinorBG,
     potentialBG,
     potentialHalfBG,
-    fftStageABBG,
-    fftStageBABG,
+    fftSharedMemBGs,
     writeGridBG,
     diagReduceBG,
     diagFinalizeBG,

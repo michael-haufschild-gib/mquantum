@@ -24,15 +24,18 @@ export const nodalLines2DBlock = /* wgsl */ `
 
 // Evaluate nodal lines at a 2D position.
 // Returns vec4f(coverage, r, g, b) where coverage is 0..1 line alpha.
-fn evaluateNodalLines2D(pos: vec3f, animTime: f32, uniforms: SchroedingerUniforms) -> vec4f {
+//
+// PERF: psi_c is provided by the caller (main2D already evaluated psi at the
+// pixel's center point). Skipping the redundant central evalPsi cuts the
+// nodal-line pass from 3 to 2 wavefunction evaluations per pixel — evalPsi
+// dominates 2D fragment cost (Hermite/Laguerre/spherical-harmonic chains).
+fn evaluateNodalLines2D(pos: vec3f, psi_c: vec2f, animTime: f32, uniforms: SchroedingerUniforms) -> vec4f {
   // Pixel-space step for finite differences
   let pixelSize = 2.0 * uniforms.boundingRadius / max(camera.resolution.y, 1.0);
   let eps = max(pixelSize * 1.5, 0.002);
 
-  // Evaluate wavefunction at current point and neighbors
-  let xND_c = mapPosToND(pos, uniforms);
-  let psi_c = evalPsi(xND_c, animTime, uniforms);
-
+  // Evaluate wavefunction at right and up neighbours; centre value is supplied
+  // by the caller via psi_c.
   let xND_r = mapPosToND(pos + vec3f(eps, 0.0, 0.0), uniforms);
   let psi_r = evalPsi(xND_r, animTime, uniforms);
 
@@ -118,7 +121,7 @@ fn evaluateNodalLines2D(pos: vec3f, animTime: f32, uniforms: SchroedingerUniform
  */
 export const nodalLines2DStubBlock = /* wgsl */ `
 // Stub: 2D nodal lines not available in this mode
-fn evaluateNodalLines2D(pos: vec3f, animTime: f32, uniforms: SchroedingerUniforms) -> vec4f {
+fn evaluateNodalLines2D(pos: vec3f, psi_c: vec2f, animTime: f32, uniforms: SchroedingerUniforms) -> vec4f {
   return vec4f(0.0);
 }
 `

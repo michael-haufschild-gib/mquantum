@@ -59,13 +59,15 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     remaining = remaining >> logN;
   }
 
-  // Compute kinetic energy E(k) = ℏ²|k|²/(2m)
+  // Compute kinetic energy E(k) = ℏ²|k|²/(2m).
+  // PERF: k² is sign-invariant — |k_d| = min(coord, N − coord) drops the signed
+  // cast (i32 cast, sub, select) for one u32 sub + one min per dim. Mirrors
+  // tdseApplyKinetic / pauliKinetic.
   var k2: f32 = 0.0;
   for (var d: u32 = 0u; d < ldim; d = d + 1u) {
     let n = esParams.gridSize[d];
-    let halfN = n >> 1u;
-    let kIdx = select(i32(coords[d]) - i32(n), i32(coords[d]), coords[d] < halfN);
-    let kVal = esParams.kGridScale[d] * f32(kIdx);
+    let kAbs = min(coords[d], n - coords[d]);
+    let kVal = esParams.kGridScale[d] * f32(kAbs);
     k2 += kVal * kVal;
   }
   // Hoist the uniform-only ℏ²/(2m) prefactor — replaces per-thread divide with multiply.

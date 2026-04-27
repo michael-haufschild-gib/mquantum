@@ -1,7 +1,7 @@
 /**
  * Structural unit test for the analog-Hawking island overlay fields of the
  * TDSE uniform buffer. Drives {@link writeTdseUniforms} directly and inspects
- * the packed 928-byte ArrayBuffer at indices 204..207 to confirm the writer
+ * the packed 1024-byte ArrayBuffer at indices 204..207 to confirm the writer
  *
  *   - emits `islandOverlayEnabled = 1` and the triple (center, radius, boost)
  *     when the overlay is on AND radius > 0,
@@ -69,8 +69,8 @@ function packAndCapture(overrides: Partial<TdseConfig>): CapturedPack {
 }
 
 describe('TDSE uniform pack — analog-Hawking island overlay', () => {
-  it('struct size is 928 bytes (island + v1/v2 metric rows + W6 overlay row)', () => {
-    expect(TDSE_UNIFORM_SIZE).toBe(928)
+  it('struct size is 1024 bytes (island + v1/v2 metric rows + W6 overlay row + invSpacing precompute)', () => {
+    expect(TDSE_UNIFORM_SIZE).toBe(1024)
   })
 
   it('writes active island triple when overlay is enabled and radius is positive', () => {
@@ -84,7 +84,7 @@ describe('TDSE uniform pack — analog-Hawking island overlay', () => {
     expect(packed.centerX0).toBeCloseTo(1.25, 5)
     expect(packed.radius).toBeCloseTo(0.8, 5)
     expect(packed.boost).toBeCloseTo(1.8, 5)
-    expect(packed.size).toBe(928)
+    expect(packed.size).toBe(1024)
   })
 
   it('preserves a negative centerX0 (encoding the white-hole side)', () => {

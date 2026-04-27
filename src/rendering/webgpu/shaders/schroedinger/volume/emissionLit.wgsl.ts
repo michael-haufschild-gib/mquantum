@@ -109,8 +109,9 @@ fn computeEmissionLit(
     sssTransmission = exp(-rho * material.sssThickness);
   }
 
-  // Pre-compute diffuse color factor (light-independent)
-  let diffuseBase = surfaceColor / PI;
+  // Pre-compute diffuse color factor (light-independent).
+  // PERF: * INV_PI replaces a vec3 divide (3 divs) with a vec3 mul (3 muls).
+  let diffuseBase = surfaceColor * INV_PI;
 
   // PERF: Pre-compute scattering state outside loop (uniform across all lights)
   let hasScattering = abs(uniforms.scatteringAnisotropy) > 0.01;
@@ -172,7 +173,10 @@ fn computeEmissionLit(
     }
 
     let NdotL = max(dot(n, l), 0.0);
-    col += diffuseBase * light.color.rgb * NdotL * attenuation * powder * phaseFactor;
+    // PERF: pre-multiply scalars (NdotL · attenuation · powder · phaseFactor)
+    // before applying to the vec3 color terms — saves ~6 vec3 muls per light.
+    let lightScalar = NdotL * attenuation * powder * phaseFactor;
+    col += diffuseBase * light.color.rgb * lightScalar;
 
     // Subsurface Scattering (SSS) — noise/transmission pre-computed above
     if (sssActive) {

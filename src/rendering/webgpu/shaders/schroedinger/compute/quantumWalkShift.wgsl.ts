@@ -58,12 +58,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let destOut = destBase + cs2;
 
     // Source site: shift backwards from destination. (cs=+ dir → source at coord-1)
-    var srcCoord: i32;
-    if (isPositive) {
-      srcCoord = i32(destCoords[dim]) - 1;
-    } else {
-      srcCoord = i32(destCoords[dim]) + 1;
-    }
+    let destCoordI = i32(destCoords[dim]);
+    let srcCoord = destCoordI + select(1, -1, isPositive);
 
     let Nd = params.gridSize[dim];
     let Ni = i32(Nd);
@@ -72,11 +68,15 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       coinOut[destOut] = 0.0;
       coinOut[destOut + 1u] = 0.0;
     } else {
-      var srcCoords = destCoords;
+      // PERF: only one coordinate changes; compute the linear-index delta
+      // directly instead of copying destCoords[12] and re-running ndToLinear
+      // (which would multiply-add over all dims). For D=11 this saves an
+      // array copy + 11 mul-adds per coin-state iteration.
       // Power-of-2 grid dim: (x + N) mod N == (x + N) & (N - 1).
-      srcCoords[dim] = u32((srcCoord + Ni) & (Ni - 1));
-
-      let srcSite = ndToLinear(srcCoords, params.strides, params.latticeDim);
+      let srcCoordWrapped = (srcCoord + Ni) & (Ni - 1);
+      let delta = srcCoordWrapped - destCoordI;
+      let strideDim = i32(params.strides[dim]);
+      let srcSite = u32(i32(destSite) + delta * strideDim);
       let srcBase = srcSite * numCoinStates * 2u + cs2;
 
       coinOut[destOut] = coinIn[srcBase];

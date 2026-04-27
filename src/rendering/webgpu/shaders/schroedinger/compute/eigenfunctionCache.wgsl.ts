@@ -69,24 +69,12 @@ const HO_NORM_C: array<f32, 7> = array<f32, 7>(
   0.00465847495312
 );
 
-// Evaluate φ_n(x, ω) inline (same as ho1D but without external dependencies)
-fn computeHo1D(n: i32, x: f32, omega: f32) -> f32 {
-  if (n < 0 || n > 6) { return 0.0; }
-  let omegaClamped = max(omega, 0.01);
-  let alpha = sqrt(omegaClamped);
-  let u = alpha * x;
-  let u2 = min(u * u, 40.0);
-  let gauss = exp(-0.5 * u2);
-  let H = hermite(n, u);
-  // α² = ω (clamped), so use omegaClamped directly
-  let alphaNorm = sqrt(sqrt(omegaClamped * INV_PI));
-  return alphaNorm * HO_NORM_C[n] * H * gauss;
-}
-
 // Compute φ_n(x,ω) AND φ'_n(x,ω) in a single pass, reusing α, u, e^{-½u²},
-// α-normalization, and the shared gaussian envelope. Calling this is ~40 %
-// cheaper than calling computeHo1D twice (once for n and once for n-1 via
-// computeHo1DDeriv), which is why the cache kernel uses this fused form.
+// α-normalization, and the shared gaussian envelope. Single fused form is
+// ~40% cheaper than evaluating φ_n with computeHo1D and the derivative with a
+// hypothetical computeHo1DDeriv separately, which is why the cache kernel uses
+// it. (Earlier scaffolding here exposed split helpers; only this fused entry
+// is reachable now.)
 fn computeHo1DPhiDeriv(n: i32, x: f32, omega: f32) -> vec2f {
   if (n < 0 || n > 6) { return vec2f(0.0, 0.0); }
   let omegaClamped = max(omega, 0.01);

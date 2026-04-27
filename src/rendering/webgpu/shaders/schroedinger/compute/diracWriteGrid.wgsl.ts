@@ -221,6 +221,25 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
 
+  // PERF: precompute baseIdxLo (coordsLo to linear index) once and the up-to-3
+  // visible-axis stride deltas, then derive each corner's index by adding up
+  // to 3 deltas. Replaces 4 x siteIndexForCorner per voxel (each scanned 12
+  // dims and called ndToLinear) with 1 ndToLinear + 3 small subs + per-corner
+  // bit-tested adds. Slice dims (d >= 3) always read coordsLo because corner
+  // bit (1u << d) is never set (numCorners caps at 1u << min(latticeDim, 3u)).
+  // Edge voxels remain bit-equivalent: when worldToLatticeInterp clamps lo
+  // and hi to the same value, deltaIdx[d] = 0 and the bit-add is a no-op,
+  // matching the original behavior.
+  let baseIdxLo = ndToLinear(coordsLo, params.strides, params.latticeDim);
+  let interpDimsTri = min(params.latticeDim, 3u);
+  var deltaIdx: array<u32, 3>;
+  deltaIdx[0] = 0u;
+  deltaIdx[1] = 0u;
+  deltaIdx[2] = 0u;
+  for (var d: u32 = 0u; d < interpDimsTri; d++) {
+    deltaIdx[d] = (coordsHi[d] - coordsLo[d]) * params.strides[d];
+  }
+
   // Perpendicular falloff for low-dimensional lattices (1D → tube, 2D → sheet)
   var perpFalloff: f32 = 1.0;
   if (params.latticeDim < 3u) {
@@ -274,7 +293,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     for (var corner: u32 = 0u; corner < numCorners; corner++) {
       let w = cornerWeight(&fracs, corner);
       if (w > 0.0) {
-        let sIdx = siteIndexForCorner(&coordsLo, &coordsHi, corner);
+        var sIdx = baseIdxLo;
+        if ((corner & 1u) != 0u) { sIdx += deltaIdx[0]; }
+        if ((corner & 2u) != 0u) { sIdx += deltaIdx[1]; }
+        if ((corner & 4u) != 0u) { sIdx += deltaIdx[2]; }
         blended += w * totalDensityAt(sIdx, S, T);
       }
     }
@@ -286,7 +308,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     for (var corner: u32 = 0u; corner < numCorners; corner++) {
       let w = cornerWeight(&fracs, corner);
       if (w > 0.0) {
-        let sIdx = siteIndexForCorner(&coordsLo, &coordsHi, corner);
+        var sIdx = baseIdxLo;
+        if ((corner & 1u) != 0u) { sIdx += deltaIdx[0]; }
+        if ((corner & 2u) != 0u) { sIdx += deltaIdx[1]; }
+        if ((corner & 4u) != 0u) { sIdx += deltaIdx[2]; }
         blended += w * upperDensityAt(sIdx, S, T);
       }
     }
@@ -298,7 +323,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     for (var corner: u32 = 0u; corner < numCorners; corner++) {
       let w = cornerWeight(&fracs, corner);
       if (w > 0.0) {
-        let sIdx = siteIndexForCorner(&coordsLo, &coordsHi, corner);
+        var sIdx = baseIdxLo;
+        if ((corner & 1u) != 0u) { sIdx += deltaIdx[0]; }
+        if ((corner & 2u) != 0u) { sIdx += deltaIdx[1]; }
+        if ((corner & 4u) != 0u) { sIdx += deltaIdx[2]; }
         blended += w * lowerDensityAt(sIdx, S, T);
       }
     }
@@ -313,7 +341,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     for (var corner: u32 = 0u; corner < numCorners; corner = corner + 1u) {
       let w = cornerWeight(&fracs, corner);
       if (w > 0.0) {
-        let sIdx = siteIndexForCorner(&coordsLo, &coordsHi, corner);
+        var sIdx = baseIdxLo;
+        if ((corner & 1u) != 0u) { sIdx += deltaIdx[0]; }
+        if ((corner & 2u) != 0u) { sIdx += deltaIdx[1]; }
+        if ((corner & 4u) != 0u) { sIdx += deltaIdx[2]; }
         let ul = upperLowerDensityAt(sIdx, S, T);
         blendedP += w * ul.x;
         blendedA += w * ul.y;

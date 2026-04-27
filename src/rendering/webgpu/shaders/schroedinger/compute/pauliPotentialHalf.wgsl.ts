@@ -60,12 +60,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let T = params.totalSites;
   let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
 
-  // Compute physical position for each dimension. Needed below for the
-  // magnetic-field evaluation (gradient / quadrupole branches).
-  var pos: array<f32, 12>;
-  for (var d: u32 = 0u; d < params.latticeDim; d++) {
-    pos[d] = (f32(coords[d]) - f32(params.gridSize[d]) * 0.5 + 0.5) * params.spacing[d];
-  }
+  // PERF: only the gradient (fieldType=1) and quadrupole (fieldType=3) branches
+  // consume physical position, and only along axes 0 and 2. Compute lazily
+  // inside those branches instead of filling a pos[12] array per thread.
 
   // Scalar potential V(x) — filled once per parameter change by
   // pauliPotential.wgsl.ts so this per-substep kernel only pays 1 load.
@@ -103,17 +100,19 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let B0 = params.fieldStrength;
 
   if (params.fieldType == 0u) {
-    // Uniform field in direction (theta_d, phi_d)
-    let st = sin(params.fieldDirTheta);
-    let ct = cos(params.fieldDirTheta);
-    let sp = sin(params.fieldDirPhi);
-    let cp = cos(params.fieldDirPhi);
-    Bx = B0 * st * cp;
-    By = B0 * st * sp;
-    Bz = B0 * ct;
+    // Uniform field in direction (theta_d, phi_d). Host precomputes the
+    // (Bx, By, Bz) vector once per parameter change so this branch avoids
+    // 4 sin/cos per thread per Strang substep.
+    Bx = params.fieldVecBx;
+    By = params.fieldVecBy;
+    Bz = params.fieldVecBz;
   } else if (params.fieldType == 1u) {
-    // Gradient along z (dim 2): B = (B0 + g·z) ẑ
-    let zCoord = select(0.0, pos[2u], params.latticeDim > 2u);
+    // Gradient along z (dim 2): B = (B0 + g·z) ẑ. Only pos[2] is needed.
+    let zCoord = select(
+      0.0,
+      (f32(coords[2u]) - f32(params.gridSize[2u]) * 0.5 + 0.5) * params.spacing[2u],
+      params.latticeDim > 2u
+    );
     Bz = B0 + params.gradientStrength * zCoord;
   } else if (params.fieldType == 2u) {
     // Rotating field in xy-plane: B = B0 (cos(ωt), sin(ωt), 0)
@@ -121,9 +120,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     Bx = B0 * cos(ang);
     By = B0 * sin(ang);
   } else if (params.fieldType == 3u) {
-    // Quadrupole: B = g (x ẑ + z x̂)
-    let xCoord = pos[0u];
-    let zCoord = select(0.0, pos[2u], params.latticeDim > 2u);
+    // Quadrupole: B = g (x ẑ + z x̂). Only pos[0] and pos[2] are needed.
+    let xCoord = (f32(coords[0u]) - f32(params.gridSize[0u]) * 0.5 + 0.5) * params.spacing[0u];
+    let zCoord = select(
+      0.0,
+      (f32(coords[2u]) - f32(params.gridSize[2u]) * 0.5 + 0.5) * params.spacing[2u],
+      params.latticeDim > 2u
+    );
     let g = params.gradientStrength;
     Bx = g * zCoord;
     Bz = g * xCoord;
@@ -206,15 +209,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let T = params.totalSites;
   let idx = gid.x * params.strides[0] + gid.y * params.strides[1] + gid.z * params.strides[2];
 
-  var coords: array<u32, 12>;
-  coords[0] = gid.x;
-  coords[1] = gid.y;
-  coords[2] = gid.z;
-
-  var pos: array<f32, 12>;
-  for (var d: u32 = 0u; d < params.latticeDim; d++) {
-    pos[d] = (f32(coords[d]) - f32(params.gridSize[d]) * 0.5 + 0.5) * params.spacing[d];
-  }
+  // PERF: pos[] computed lazily inside the magnetic-field branches that need
+  // it (fieldType 1 / 3). gid.xyz is the coord directly — no array fill needed.
+  let cx = gid.x;
+  let cz = gid.z;
 
   let V = potential[idx];
 
@@ -242,23 +240,20 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let B0 = params.fieldStrength;
 
   if (params.fieldType == 0u) {
-    let st = sin(params.fieldDirTheta);
-    let ct = cos(params.fieldDirTheta);
-    let sp = sin(params.fieldDirPhi);
-    let cp = cos(params.fieldDirPhi);
-    Bx = B0 * st * cp;
-    By = B0 * st * sp;
-    Bz = B0 * ct;
+    // Host-precomputed uniform-field vector — see pauliPotentialHalfBlock.
+    Bx = params.fieldVecBx;
+    By = params.fieldVecBy;
+    Bz = params.fieldVecBz;
   } else if (params.fieldType == 1u) {
-    let zCoord = select(0.0, pos[2u], params.latticeDim > 2u);
+    let zCoord = (f32(cz) - f32(params.gridSize[2u]) * 0.5 + 0.5) * params.spacing[2u];
     Bz = B0 + params.gradientStrength * zCoord;
   } else if (params.fieldType == 2u) {
     let ang = params.rotatingFrequency * params.simTime;
     Bx = B0 * cos(ang);
     By = B0 * sin(ang);
   } else if (params.fieldType == 3u) {
-    let xCoord = pos[0u];
-    let zCoord = select(0.0, pos[2u], params.latticeDim > 2u);
+    let xCoord = (f32(cx) - f32(params.gridSize[0u]) * 0.5 + 0.5) * params.spacing[0u];
+    let zCoord = (f32(cz) - f32(params.gridSize[2u]) * 0.5 + 0.5) * params.spacing[2u];
     let g = params.gradientStrength;
     Bx = g * zCoord;
     Bz = g * xCoord;

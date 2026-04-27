@@ -77,7 +77,10 @@ fn volumeRaymarch(
     if (i >= sampleCount) { break; }
     iterCount = i + 1;  // Track iteration count
 
-    if (shouldTerminateRay(transmittance, uniforms.densityGain, max(tFar - t, 0.0))) { break; }
+    // PERF: cache tFar - t once per iter — used by shouldTerminateRay,
+    // skipDistance ceiling, and adaptiveStep.
+    let remaining = tFar - t;
+    if (shouldTerminateRay(transmittance, uniforms.densityGain, max(remaining, 0.0))) { break; }
 
     let pos = rayOrigin + rayDir * t;
 
@@ -103,7 +106,7 @@ fn volumeRaymarch(
     let phase = densityInfo.z;
 
     if (rho < EMPTY_SKIP_THRESHOLD) {
-      let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(tFar - t, 0.0));
+      let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(remaining, 0.0));
       if (skipDistance > stepLen) {
         let probeMid = sampleDensity(pos + rayDir * (skipDistance * 0.5), animTime, uniforms);
         let probeFar = sampleDensity(pos + rayDir * skipDistance, animTime, uniforms);
@@ -114,7 +117,7 @@ fn volumeRaymarch(
       }
     }
 
-    let adaptiveStep = computeAdaptiveStep(sCenter, stepLen, tFar - t);
+    let adaptiveStep = computeAdaptiveStep(sCenter, stepLen, remaining);
 
     // PERF: When nodal band mode is active, use the combined function that also computes
     // the density gradient from the same tetrahedral samples. This eliminates 4 redundant
@@ -256,7 +259,9 @@ fn volumeRaymarchHQ(
     if (i >= sampleCount) { break; }
     iterCount = i + 1;  // Track iteration count
 
-    if (shouldTerminateRay(transmittance, uniforms.densityGain, max(tFar - t, 0.0))) { break; }
+    // PERF: cache tFar - t once per iter — used 3+ times below.
+    let remaining = tFar - t;
+    if (shouldTerminateRay(transmittance, uniforms.densityGain, max(remaining, 0.0))) { break; }
 
     let pos = rayOrigin + rayDir * t;
 
@@ -282,7 +287,7 @@ fn volumeRaymarchHQ(
     var skipGradient = (quickS < -15.0);
 
     if (quickRho < EMPTY_SKIP_THRESHOLD) {
-      let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(tFar - t, 0.0));
+      let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(remaining, 0.0));
       if (skipDistance > stepLen) {
         let probeMid = sampleDensity(pos + rayDir * (skipDistance * 0.5), animTime, uniforms);
         let probeFar = sampleDensity(pos + rayDir * skipDistance, animTime, uniforms);
@@ -295,7 +300,7 @@ fn volumeRaymarchHQ(
 
     // Hoisted so the nodal-band and main compositing paths share one computation
     // (was computed twice — once as adaptiveStepN in the nodal branch, once here).
-    let adaptiveStep = computeAdaptiveStep(quickS, stepLen, tFar - t);
+    let adaptiveStep = computeAdaptiveStep(quickS, stepLen, remaining);
 
     var rho: f32;
     var sCenter: f32;

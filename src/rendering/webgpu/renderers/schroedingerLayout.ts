@@ -239,6 +239,11 @@ const SCHROEDINGER_FIELDS = [
   { name: '_padPauliUpHSL', type: 'f32' },
   { name: 'pauliSpinDownColorHSL', type: 'vec3f' },
   { name: '_padPauliDownHSL', type: 'f32' },
+
+  // --- Host-precomputed HO superposition terms (offset 1680) ---
+  // term_k = c_k * exp(-i * E_k * t) packed as (Re, Im, 0, 0) per vec4f slot.
+  // Hot path replaces 8 cos/sin + 8 cmul per pixel with a single uniform read.
+  { name: 'precomputedTerm', type: arr('vec4f', 8) },
 ] as const satisfies readonly StructFieldDef[]
 
 /** Computed struct layout for SchroedingerUniforms. */

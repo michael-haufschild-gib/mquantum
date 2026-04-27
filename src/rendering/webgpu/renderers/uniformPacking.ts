@@ -768,8 +768,9 @@ function packVec4Color(
   floatView[idx + 3] = 0.0
 }
 
-// Re-export support functions from the split module
+// Re-export support functions from the split modules
 export { packAdsTimeEvolution }
+export { packPrecomputedHOTerms } from './uniformPackingHOTerms'
 export {
   applyHOMomentumTransform,
   type BasisPackParams,

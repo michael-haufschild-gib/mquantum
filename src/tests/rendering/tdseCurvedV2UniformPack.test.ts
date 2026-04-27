@@ -1,7 +1,7 @@
 /**
  * Structural unit test for the curved-space v2 metric block of the TDSE
  * uniform buffer. Drives {@link writeTdseUniforms} directly and inspects
- * the packed 912-byte ArrayBuffer at:
+ * the packed 1024-byte ArrayBuffer at:
  *   - index 208 (u32 metricKind)
  *   - index 209 (f32 throatRadius)
  *   - indices 212..227 (v2 metric block: per-kind params + torusPeriod + stage times)
@@ -81,7 +81,7 @@ describe('TDSE uniform pack — curved-space v2 metric block', () => {
   ] as const)('maps metric kind %s → numeric code %i at u32[208]', (kind, code) => {
     const { u32, size } = packAndCapture({ kind } as MetricConfig)
     expect(u32[208]).toBe(code)
-    expect(size).toBe(928)
+    expect(size).toBe(1024)
   })
 
   // ── Schwarzschild mass written to f32[212] and nowhere else ───────────

@@ -353,6 +353,7 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
       quarterColorView,
       this.reprojectedHistoryView!,
       p.nearestSampler,
+      p.linearSampler,
       this.setupHelpers
     )
 

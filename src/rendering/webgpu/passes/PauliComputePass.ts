@@ -37,7 +37,6 @@ import {
   createDensityTexture,
   DENSITY_GRID_SIZE,
   DIAG_DECIMATION,
-  FFT_UNIFORM_SIZE,
   GRID_WG,
   LINEAR_WG,
   pickSiteDispatch,
@@ -257,10 +256,8 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     this.buf = rebuildPauliBuffers(device, config, {
       spinorBuffer: oldBuf?.spinorBuffer ?? null,
       fftScratchA: oldBuf?.fftScratchA ?? null,
-      fftScratchB: oldBuf?.fftScratchB ?? null,
       uniformBuffer: oldBuf?.uniformBuffer ?? null,
-      fftUniformBuffer: oldBuf?.fftUniformBuffer ?? null,
-      fftStagingBuffer: oldBuf?.fftStagingBuffer ?? null,
+      fftAxisUniformBuffers: oldBuf?.fftAxisUniformBuffers ?? null,
       fftTwiddleBuffer: oldBuf?.fftTwiddleBuffer ?? null,
       packUniformBuffer: oldBuf?.packUniformBuffer ?? null,
       packUniformBufferNoNorm: oldBuf?.packUniformBufferNoNorm ?? null,
@@ -308,8 +305,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
         uniformBuffer: this.buf.uniformBuffer,
         spinorBuffer: this.buf.spinorBuffer,
         fftScratchA: this.buf.fftScratchA,
-        fftScratchB: this.buf.fftScratchB,
-        fftUniformBuffer: this.buf.fftUniformBuffer,
+        fftAxisUniformBuffers: this.buf.fftAxisUniformBuffers,
         fftTwiddleBuffer: this.buf.fftTwiddleBuffer,
         packUniformBuffer: this.buf.packUniformBuffer,
         packUniformBufferNoNorm: this.buf.packUniformBufferNoNorm,
@@ -414,50 +410,31 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   }
 
   // ============================================================================
-  // FFT Dispatch
+  // FFT Dispatch (shared-memory variant — single dispatch per axis)
   // ============================================================================
 
   /**
-   * Dispatch FFT for one axis: log2(N) Stockham stages with A/B ping-pong.
-   * Uses local stage parity (s % 2) so each axis independently starts from A.
-   * Copies B→A after axes with odd stage count to normalize buffer state.
+   * Dispatch one shared-memory FFT axis inside an already-open compute pass.
    *
-   * @returns Next slot offset for subsequent axis dispatches.
+   * The shared-memory kernel performs all log2(N) butterfly stages for one
+   * pencil inside a single workgroup using workgroup-local shared memory.
+   * One workgroup is dispatched per pencil (`totalSites / axisDim`); the
+   * caller has already set the pipeline on the encoder.
+   *
+   * @param passEncoder - Active compute pass encoder.
+   * @param axisDim - Per-axis grid dimension (power of two, [8, 128]).
+   * @param slot - Index into `bg.fftSharedMemBGs` for this (axis, direction).
    */
-  private dispatchFFTAxis(ctx: WebGPURenderContext, axisDim: number, slotOffset: number): number {
-    const encoder = ctx.encoder
-    if (!this.pl || !this.bg || !this.buf) return slotOffset
-
-    const stages = Math.round(Math.log2(axisDim))
-    const halfTotal = this.buf.totalSites / 2
-
-    for (let s = 0; s < stages; s++) {
-      encoder.copyBufferToBuffer(
-        this.buf.fftStagingBuffer,
-        (slotOffset + s) * FFT_UNIFORM_SIZE,
-        this.buf.fftUniformBuffer,
-        0,
-        FFT_UNIFORM_SIZE
-      )
-
-      const bg = s % 2 === 0 ? this.bg.fftStageABBG : this.bg.fftStageBABG
-      const pass = ctx.beginComputePass({ label: `pauli-fft-stage-${s}` })
-      this.dispatchCompute(pass, this.pl.fftStagePipeline, [bg], Math.ceil(halfTotal / LINEAR_WG))
-      pass.end()
-    }
-
-    // If odd number of stages, final result is in B. Copy B→A to normalize.
-    if (stages % 2 !== 0) {
-      encoder.copyBufferToBuffer(
-        this.buf.fftScratchB,
-        0,
-        this.buf.fftScratchA,
-        0,
-        this.buf.totalSites * 8
-      )
-    }
-
-    return slotOffset + stages
+  private dispatchFFTAxisInPass(
+    passEncoder: GPUComputePassEncoder,
+    axisDim: number,
+    slot: number
+  ): void {
+    if (!this.bg || !this.buf) return
+    const bg = this.bg.fftSharedMemBGs[slot]
+    if (!bg) return
+    passEncoder.setBindGroup(0, bg)
+    passEncoder.dispatchWorkgroups(this.buf.totalSites / axisDim)
   }
 
   // ============================================================================
@@ -577,120 +554,125 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       p.end()
     }
 
-    // Time evolution (Strang splitting)
+    // Time evolution (Strang splitting).
+    //
+    // PERF: every dispatch in a single Strang substep is encoded inside one
+    // batched compute pass. Previously each substep opened ~80 separate
+    // `MTLComputeCommandEncoder`s (V-half, pack/unpack/FFT-stage per
+    // component per direction, kinetic, absorber) — each pass open/close
+    // costs 5–20 µs CPU/driver overhead on Metal-backed WebGPU. Per-slot
+    // FFT bind groups (`bg.fftSharedMemBGs`) plus the shared-memory FFT
+    // kernel mean no per-axis `copyBufferToBuffer` is needed between FFT
+    // axes, so the entire substep stays inside one pass. Implicit WAW/RAW
+    // barriers between dispatches against overlapping storage buffers are
+    // inserted by the driver automatically, so correctness is unchanged.
     if (isPlaying) {
       const scaledSteps = config.stepsPerFrame * speed
       this.stepAccumulator += scaledSteps
       const stepsThisFrame = Math.floor(this.stepAccumulator)
       this.stepAccumulator -= stepsThisFrame
 
+      const fwdAxisCount = this.buf.fwdAxisCount
+      const usePotentialHalf3D = siteDispatch.use3D
+      const useAbsorber3D = siteDispatch.use3D
+
       for (let step = 0; step < stepsThisFrame; step++) {
-        // 1. Half-step potential + Zeeman rotation.
-        //    Uses potentialHalfBG (3 bindings: params, merged spinor,
-        //    potential) — V is read from the precomputed potentialBuffer
-        //    instead of being re-evaluated per voxel.
-        {
-          const p = ctx.beginComputePass({ label: `pauli-V-half-1-${step}` })
-          dispatchSite(p, this.pl.potentialHalfPipeline, this.pl.potentialHalf3DPipeline, [
-            this.bg.potentialHalfBG,
-          ])
-          p.end()
-        }
+        const strangPass = ctx.beginComputePass({ label: `pauli-strang-${step}` })
+
+        // 1. Half-step V + Zeeman rotation
+        dispatchSite(strangPass, this.pl.potentialHalfPipeline, this.pl.potentialHalf3DPipeline, [
+          this.bg.potentialHalfBG,
+        ])
 
         // 2-3. Forward FFT for each spinor component (2 independent FFTs)
         for (let c = 0; c < 2; c++) {
+          // Pack: spinor[c slice] → fftScratchA
           const packBG = this.bg.cachedPackBGs[c]
           if (packBG) {
-            const p = ctx.beginComputePass({ label: `pauli-pack-c${c}-${step}` })
-            this.dispatchCompute(p, this.pl.packPipeline, [packBG], linearWG)
-            p.end()
+            this.dispatchCompute(strangPass, this.pl.packPipeline, [packBG], linearWG)
           }
+          // Forward FFT axes (shared-mem kernel, slots [0, fwdAxisCount))
+          strangPass.setPipeline(this.pl.fftSharedMemPipeline)
           let fftSlot = 0
           for (let d = config.latticeDim - 1; d >= 0; d--) {
-            fftSlot = this.dispatchFFTAxis(ctx, config.gridSize[d]!, fftSlot)
+            this.dispatchFFTAxisInPass(strangPass, config.gridSize[d]!, fftSlot)
+            fftSlot++
           }
+          // Unpack (no normalization for forward FFT): fftScratchA → spinor[c slice]
           const unpackBG = this.bg.cachedUnpackBGsNoNorm[c]
           if (unpackBG) {
-            const p = ctx.beginComputePass({ label: `pauli-fft-unpack-c${c}-${step}` })
-            this.dispatchCompute(p, this.pl.unpackPipeline, [unpackBG], linearWG)
-            p.end()
+            this.dispatchCompute(strangPass, this.pl.unpackPipeline, [unpackBG], linearWG)
           }
         }
 
-        // 4. Kinetic phase kick (scalar, applied to each component independently)
-        {
-          const p = ctx.beginComputePass({ label: `pauli-kinetic-${step}` })
-          this.dispatchCompute(p, this.pl.kineticPipeline, [this.bg.spinorBG], linearWG)
-          p.end()
-        }
+        // 4. Kinetic phase kick (scalar, applied to both components in-place)
+        this.dispatchCompute(strangPass, this.pl.kineticPipeline, [this.bg.spinorBG], linearWG)
 
         // 5. Inverse FFT for each spinor component
         for (let c = 0; c < 2; c++) {
           const packBG = this.bg.cachedPackBGs[c]
           if (packBG) {
-            const p = ctx.beginComputePass({ label: `pauli-ifft-pack-c${c}-${step}` })
-            this.dispatchCompute(p, this.pl.packPipeline, [packBG], linearWG)
-            p.end()
+            this.dispatchCompute(strangPass, this.pl.packPipeline, [packBG], linearWG)
           }
-          let fftSlot = this.buf.fwdStageCount
+          // Inverse FFT axes (slots [fwdAxisCount, fwdAxisCount * 2))
+          strangPass.setPipeline(this.pl.fftSharedMemPipeline)
+          let fftSlot = fwdAxisCount
           for (let d = config.latticeDim - 1; d >= 0; d--) {
-            fftSlot = this.dispatchFFTAxis(ctx, config.gridSize[d]!, fftSlot)
+            this.dispatchFFTAxisInPass(strangPass, config.gridSize[d]!, fftSlot)
+            fftSlot++
           }
+          // Unpack with 1/N normalization
           const unpackBG = this.bg.cachedUnpackBGs[c]
           if (unpackBG) {
-            const p = ctx.beginComputePass({ label: `pauli-ifft-unpack-c${c}-${step}` })
-            this.dispatchCompute(p, this.pl.unpackPipeline, [unpackBG], linearWG)
-            p.end()
+            this.dispatchCompute(strangPass, this.pl.unpackPipeline, [unpackBG], linearWG)
           }
         }
 
-        // 6. Second half-step potential + Zeeman rotation
-        {
-          const p = ctx.beginComputePass({ label: `pauli-V-half-2-${step}` })
-          dispatchSite(p, this.pl.potentialHalfPipeline, this.pl.potentialHalf3DPipeline, [
-            this.bg.potentialHalfBG,
-          ])
-          p.end()
-        }
+        // 6. Second half-step V + Zeeman
+        dispatchSite(strangPass, this.pl.potentialHalfPipeline, this.pl.potentialHalf3DPipeline, [
+          this.bg.potentialHalfBG,
+        ])
 
-        // 7. Absorber (separate pass AFTER the Strang step)
-        {
-          const p = ctx.beginComputePass({ label: `pauli-absorber-${step}` })
-          dispatchSite(p, this.pl.absorberPipeline, this.pl.absorber3DPipeline, [this.bg.spinorBG])
-          p.end()
-        }
+        // 7. Absorber (PML damping at boundaries) — inline in the same pass
+        dispatchSite(strangPass, this.pl.absorberPipeline, this.pl.absorber3DPipeline, [
+          this.bg.spinorBG,
+        ])
 
-        this.simTime += config.dt
-
-        // 8. Periodic renormalization: counteract f32 norm drift.
-        //    Skipped under PML — see TDSEComputePassEvolution for the long
-        //    explanation. Short version: with absorberEnabled the user is
-        //    watching physical wave-packet decay at boundaries, and the
-        //    renorm pass would scale ψ back up to its initial norm and
-        //    visually cancel every step's absorption.
+        // 8. Periodic renormalization: counteract f32 norm drift on the
+        //    last step of the frame. Skipped under PML — see
+        //    TDSEComputePassEvolution for the long explanation. With
+        //    absorberEnabled the user is watching physical wave-packet
+        //    decay at boundaries, and the renorm pass would scale ψ back
+        //    up to its initial norm and visually cancel every step's
+        //    absorption.
         if (step === stepsThisFrame - 1 && !config.absorberEnabled) {
-          const rPass = ctx.beginComputePass({ label: `pauli-renorm-reduce-${step}` })
           this.dispatchCompute(
-            rPass,
+            strangPass,
             this.pl.diagReducePipeline,
             [this.bg.diagReduceBG],
             this.buf.diagNumWorkgroups
           )
-          rPass.end()
-          const fPass = ctx.beginComputePass({ label: `pauli-renorm-finalize-${step}` })
-          this.dispatchCompute(fPass, this.pl.diagFinalizePipeline, [this.bg.diagFinalizeBG], 1)
-          fPass.end()
-          const sPass = ctx.beginComputePass({ label: `pauli-renorm-scale-${step}` })
+          this.dispatchCompute(
+            strangPass,
+            this.pl.diagFinalizePipeline,
+            [this.bg.diagFinalizeBG],
+            1
+          )
           const renormWG = Math.ceil((2 * this.buf.totalSites) / LINEAR_WG)
           this.dispatchCompute(
-            sPass,
+            strangPass,
             this.pl.renormalizePipeline,
             [this.bg.renormalizeBG],
             renormWG
           )
-          sPass.end()
         }
+
+        strangPass.end()
+        this.simTime += config.dt
       }
+      // Suppress unused-var lint when site-dispatch helpers are disabled
+      void usePotentialHalf3D
+      void useAbsorber3D
     }
 
     // Write density grid
@@ -752,17 +734,24 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       this.diagMappingInFlight = true
       const capturedGen = this.diagGeneration
 
-      void device.queue.onSubmittedWorkDone().then(() => {
-        // Discard stale readback if field was reinitialized since dispatch
-        if (capturedGen !== this.diagGeneration) {
-          this.diagMappingInFlight = false
-          return
-        }
-        const staging = this.buf?.diagStagingBuffer
-        if (!staging) return
+      // PERF: mapAsync waits for the GPU copy — skip onSubmittedWorkDone()
+      // to avoid an extra GPU fence. Matches TDSE readback pattern.
+      // Defer via queueMicrotask so the buffer isn't in "pending map" state
+      // when queue.submit() fires later in the same synchronous block.
+      const staging = this.buf.diagStagingBuffer
+      queueMicrotask(() =>
         staging
           .mapAsync(GPUMapMode.READ)
           .then(() => {
+            if (capturedGen !== this.diagGeneration || staging.mapState !== 'mapped') {
+              try {
+                staging.unmap()
+              } catch {
+                /* already unmapped */
+              }
+              this.diagMappingInFlight = false
+              return
+            }
             if (!this.buf?.diagStagingBuffer) return
             const data = new Float32Array(this.buf.diagStagingBuffer.getMappedRange())
             if (data.length >= DIAG_RESULT_COUNT) {
@@ -815,13 +804,13 @@ export class PauliComputePass extends WebGPUBaseComputePass {
               })
             }
 
-            this.buf!.diagStagingBuffer.unmap()
+            staging.unmap()
             this.diagMappingInFlight = false
           })
           .catch(() => {
             this.diagMappingInFlight = false
           })
-      })
+      )
     }
   }
 
@@ -841,10 +830,8 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     if (this.buf) {
       this.buf.spinorBuffer.destroy()
       this.buf.fftScratchA.destroy()
-      this.buf.fftScratchB.destroy()
       this.buf.uniformBuffer.destroy()
-      this.buf.fftUniformBuffer.destroy()
-      this.buf.fftStagingBuffer.destroy()
+      for (const b of this.buf.fftAxisUniformBuffers) b.destroy()
       this.buf.fftTwiddleBuffer.destroy()
       this.buf.packUniformBuffer.destroy()
       this.buf.packUniformBufferNoNorm.destroy()

@@ -88,6 +88,26 @@ fn main(
       // For D=5+: all pairs — detects vortex volumes across all codimension-2 planes.
       let totalDims = tParams.latticeDim;
 
+      // PERF: phi at idx (the (0,0) corner of every plaquette) is invariant
+      // across all (da, db) iterations. Hoist the atan2 once instead of
+      // recomputing C(D,2) times per site (1× for D=2, 55× for D=11).
+      let phi00 = atan2(im0, re0);
+
+      // PERF: phi at idx + strides[d] (the (1,0) corner along axis d, and the
+      // (0,1) corner along axis d when d is the second loop index) depends only
+      // on a single axis, not the (da, db) pair. Precompute once per axis and
+      // reuse: saves up to 88 atan2/site at D=11 (44 phi10 + 44 phi01).
+      // Sized for latticeDim up to 16 (current max is 11). Entries past
+      // totalDims are never read; entries at boundary are zero-initialized
+      // and never read because the (da, db) loop skips boundary plaquettes.
+      var phiDim: array<f32, 16>;
+      for (var d: u32 = 0u; d < totalDims; d++) {
+        if (coords[d] < tParams.gridSize[d] - 1u) {
+          let zd = psi[idx + tParams.strides[d]];
+          phiDim[d] = atan2(zd.y, zd.x);
+        }
+      }
+
       for (var da: u32 = 0u; da < totalDims; da++) {
         for (var db: u32 = da + 1u; db < totalDims; db++) {
           // Skip if at boundary (can't form plaquette)
@@ -95,23 +115,16 @@ fn main(
             continue;
           }
 
-          // Get phase at 4 plaquette corners: (0,0), (1,0), (1,1), (0,1)
+          // Get phase at the other 3 plaquette corners: (1,0), (1,1), (0,1).
+          // phi10 and phi01 come from the precomputed per-axis array; phi11
+          // depends on both axes and must be computed per (da, db) pair.
           let strideA = tParams.strides[da];
           let strideB = tParams.strides[db];
 
-          let idx00 = idx;
-          let idx10 = idx + strideA;
-          let idx11 = idx + strideA + strideB;
-          let idx01 = idx + strideB;
-
-          let z00 = psi[idx00];
-          let z10 = psi[idx10];
-          let z11 = psi[idx11];
-          let z01 = psi[idx01];
-          let phi00 = atan2(z00.y, z00.x);
-          let phi10 = atan2(z10.y, z10.x);
+          let z11 = psi[idx + strideA + strideB];
+          let phi10 = phiDim[da];
           let phi11 = atan2(z11.y, z11.x);
-          let phi01 = atan2(z01.y, z01.x);
+          let phi01 = phiDim[db];
 
           // Phase circulation around plaquette
           let circulation = wrapPhase(phi10 - phi00)

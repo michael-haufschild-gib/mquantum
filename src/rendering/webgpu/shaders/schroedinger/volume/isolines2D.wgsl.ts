@@ -34,9 +34,14 @@ fn evaluateIsolines2D(pos: vec3f, rho: f32, s: f32, uniforms: SchroedingerUnifor
   let eps = max(pixelSize * 1.5, 0.002);
   let invEps = 1.0 / eps;  // 1 reciprocal, 2 multiplies below
 
+  // PERF: hoist animTime = time * timeScale once instead of recomputing per
+  // sampleDensity call (the caller already paid this multiply but we cannot
+  // share locals across functions without an arg change).
+  let animTime = uniforms.time * uniforms.timeScale;
+
   // Sample density at neighbors for gradient
-  let rho_r = sampleDensity(pos + vec3f(eps, 0.0, 0.0), uniforms.time * uniforms.timeScale, uniforms);
-  let rho_u = sampleDensity(pos + vec3f(0.0, eps, 0.0), uniforms.time * uniforms.timeScale, uniforms);
+  let rho_r = sampleDensity(pos + vec3f(eps, 0.0, 0.0), animTime, uniforms);
+  let rho_u = sampleDensity(pos + vec3f(0.0, eps, 0.0), animTime, uniforms);
 
   let s_r = sFromRho(rho_r);
   let s_u = sFromRho(rho_u);

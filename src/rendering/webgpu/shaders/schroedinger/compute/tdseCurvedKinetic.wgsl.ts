@@ -361,8 +361,11 @@ const curvedKineticBody = /* wgsl */ `
 
   for (var axis: u32 = 0u; axis < ldim; axis = axis + 1u) {
     let dx = params.spacing[axis];
-    let invDx = 1.0 / max(dx, 1e-12);
-    let invDx2 = invDx * invDx;            // fold both /dx factors into one mul
+    // Host-precomputed reciprocal spacing (mirrors kGridScale pattern). Saves
+    // one divide + max + mul per cell per axis per RK4 stage. Host writer in
+    // TDSEComputePassUniforms.ts must match: invSpacing[d] = 1 / max(spacing[d], 1e-12).
+    let invDx = params.invSpacing[axis];
+    let invDx2 = params.invSpacing2[axis];
     let halfDx = 0.5 * dx;
     let Naxis = params.gridSize[axis];
     let stride = params.strides[axis];

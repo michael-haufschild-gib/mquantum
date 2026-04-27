@@ -43,8 +43,10 @@ struct VertexOutput {
 @fragment
 fn main(input: VertexOutput) -> @location(0) vec4f {
   let uv = input.uv;
-  let fullDims = vec2i(temporal.fullResolution);
-  let fullCoord = clamp(vec2i(uv * temporal.fullResolution), vec2i(0), fullDims - vec2i(1));
+  // PERF: input.position.xy is the rasterizer-derived pixel center (0.5, 1.5,
+  // …); truncating to i32 gives exact pixel coords — saves uv*fullRes mul +
+  // clamp + vec2i sub.
+  let fullCoord = vec2i(input.position.xy);
 
   // Quarter-res coordinate (current frame's position data)
   let quarterDims = vec2i(textureDimensions(quarterPosition));

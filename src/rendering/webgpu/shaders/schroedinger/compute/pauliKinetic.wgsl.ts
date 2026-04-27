@@ -43,17 +43,15 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // PERF: k_phys = kGridScale[d] · kIdx uses a host-precomputed reciprocal so
   // each thread replaces a per-dim divide with a multiply. kGridScale[d] =
   // 2π / (N_d · a_d). Mirrors TDSE/Dirac kinetic kernels.
+  // PERF: k² is sign-invariant, so |k_d| = min(coord, N − coord) drops the
+  // signed cast (i32 cd, i32 gdI, select) for one u32 sub + one min per dim.
   const PAULI_TWO_PI: f32 = 6.28318530717958647692;
   var k2: f32 = 0.0;
   let ldim = params.latticeDim;
   for (var d: u32 = 0u; d < ldim; d = d + 1u) {
-    let gd = params.gridSize[d];
-    let cd = i32(coords[d]);
-    let gdI = i32(gd);
-    // FFT frequency: positive half [0, N/2), negative half [N/2, N) → [0, -N/2)
-    // Branchless via direct subtraction with a u32 comparison instead of two i32 casts.
-    let kIdx = select(cd - gdI, cd, coords[d] < (gd >> 1u));
-    let kPhys = params.kGridScale[d] * f32(kIdx);
+    let n = params.gridSize[d];
+    let kAbs = min(coords[d], n - coords[d]);
+    let kPhys = params.kGridScale[d] * f32(kAbs);
     k2 += kPhys * kPhys;
   }
 

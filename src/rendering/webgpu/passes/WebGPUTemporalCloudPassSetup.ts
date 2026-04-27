@@ -143,6 +143,11 @@ export function buildTemporalPipelines(
         visibility: GPUShaderStage.FRAGMENT,
         sampler: { type: 'non-filtering' },
       },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'filtering' },
+      },
     ],
   })
 
@@ -275,6 +280,7 @@ export class TemporalBindGroupCache {
     quarterColorView: GPUTextureView,
     historyView: GPUTextureView,
     nearestSampler: GPUSampler,
+    linearSampler: GPUSampler,
     helpers: TemporalPassHelpers
   ): GPUBindGroup {
     const cached = this.reconstructionBG1Cache.find(
@@ -289,6 +295,7 @@ export class TemporalBindGroupCache {
         { binding: 0, resource: quarterColorView },
         { binding: 1, resource: historyView },
         { binding: 2, resource: nearestSampler },
+        { binding: 3, resource: linearSampler },
       ],
       'temporal-reconstruction-bg1'
     )

@@ -55,15 +55,17 @@ import { buildTdseFFTAxisStagingData, buildTdseFFTStagingData } from './TDSEComp
  *   - densityViewMode:         u32 @ 916 (Wave 6: 0=coordinate, 1=proper ×√|g|)
  *   - curvatureOverlayOpacity: f32 @ 920 (Wave 6: clamped [0, 1])
  *   - _padV2d:                 u32 @ 924 (pad to 16-byte row)
+ *   - invSpacing:              array<f32,12> @ 928 (host-precomputed 1/max(dx,1e-12))
+ *   - invSpacing2:             array<f32,12> @ 976 (invSpacing^2; saves a mul per cell)
  *
- * Total = 832 + 16 + 64 + 16 = 928. Update both this constant and the WGSL
- * struct if you add new fields, and keep this comment in sync.
+ * Total = 832 + 16 + 64 + 16 + 48 + 48 = 1024. Update both this constant and
+ * the WGSL struct if you add new fields, and keep this comment in sync.
  *
  * Exported as `TDSE_UNIFORM_SIZE` so tests that validate struct packing
  * offsets can import the canonical size instead of hardcoding a literal
  * that silently drifts from the WGSL definition.
  */
-export const TDSE_UNIFORM_SIZE = 928
+export const TDSE_UNIFORM_SIZE = 1024
 const UNIFORM_SIZE = TDSE_UNIFORM_SIZE
 
 /**
