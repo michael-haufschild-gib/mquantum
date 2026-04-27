@@ -3,6 +3,10 @@ set -e
 
 pnpm exec lint-staged
 
+# Reject any reintroduction of `prettier` in CI workflows or `prettier --check`
+# anywhere in the repo. Local hooks must catch this before it ever ships.
+node scripts/check-no-prettier-check.js
+
 # Type check: prevents committing code with type errors.
 # Takes ~4s — acceptable for pre-commit since type safety is a core quality gate.
 pnpm exec tsc -b

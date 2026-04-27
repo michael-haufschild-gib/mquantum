@@ -30,8 +30,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Format check
-        run: pnpm exec prettier --check "src/**/*.{ts,tsx,json,css}"
+      # Prettier does NOT run in CI. Formatting is auto-applied locally by
+      # husky + lint-staged on every commit. A `prettier --check` step only
+      # fails the pipeline on drift that --write would have silently fixed,
+      # and `--write` in CI is a no-op (the runner discards the changes).
+      # The guard below rejects any future re-introduction of either form.
+      - name: Reject prettier in CI
+        run: node scripts/check-no-prettier-check.js
 
       - name: Lint
         run: pnpm exec eslint . --max-warnings 0 --no-warn-ignored
