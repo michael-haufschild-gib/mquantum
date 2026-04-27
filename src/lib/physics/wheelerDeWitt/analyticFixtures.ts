@@ -97,7 +97,7 @@ function besselJSeries(z: number, nu: number): number {
   let term = Math.pow(halfZ, nu) / gammaFn(nu + 1)
   let sum = term
   const halfZSq = halfZ * halfZ
-  // Up to ~80 iterations are plenty for |z| ≤ 6.
+  // Up to ~80 iterations are plenty for |z| ≤ BESSEL_SERIES_RADIUS.
   for (let k = 1; k < 80; k++) {
     term *= -halfZSq / (k * (nu + k))
     sum += term
@@ -231,8 +231,8 @@ function besselY(z: number, nu: number): number {
 }
 
 /**
- * Bessel function `J_{1/4}(z)` for `z > 0`. Uses series for `z ≤ 6`,
- * asymptotic otherwise.
+ * Bessel function `J_{1/4}(z)` for `z > 0`. Uses series for
+ * `z ≤ BESSEL_SERIES_RADIUS` (= 12), asymptotic otherwise.
  *
  * @param z - Real argument (`z > 0`).
  * @returns `J_{1/4}(z)`.
@@ -247,7 +247,7 @@ export function besselJQuarter(z: number): number {
 
 /**
  * Bessel function `Y_{1/4}(z)` for `z > 0`. Uses the J/J_{−ν} series
- * combination for `z ≤ 6`, asymptotic otherwise.
+ * combination for `z ≤ BESSEL_SERIES_RADIUS` (= 12), asymptotic otherwise.
  *
  * @param z - Real argument (`z > 0`).
  * @returns `Y_{1/4}(z)`.

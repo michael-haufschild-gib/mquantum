@@ -54,9 +54,8 @@ fn legendre(l: i32, m: i32, x: f32) -> f32 {
   let xClamped = clamp(x, -1.0, 1.0);
 
   // Compute (1 - x²)^{1/2} = sin(θ) for x = cos(θ).
-  // 1.0 − x·x uses one fewer FP op than (1−x)(1+x); the rounding can
-  // differ by ≤ 1 ulp but xClamped is already clamped to [−1, 1], so
-  // 1.0 − x·x ≥ 0 and the sqrt is well-defined.
+  // 1.0 − x·x uses one fewer FP op than (1−x)(1+x). xClamped is already
+  // clamped to [−1, 1], so 1.0 − x·x ≥ 0 and the sqrt is well-defined.
   let somx2 = sqrt(1.0 - xClamped * xClamped);
 
   // Start with P^m_m using the closed form:
