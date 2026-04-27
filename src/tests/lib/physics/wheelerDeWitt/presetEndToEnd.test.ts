@@ -34,7 +34,8 @@ import { DEFAULT_WHEELER_DEWITT_CONFIG } from '@/lib/geometry/extended/wheelerDe
 import { wdwPotential } from '@/lib/physics/wheelerDeWitt/constants'
 import { computeWdwRenderMaxRho, packWdwDensityGrid } from '@/lib/physics/wheelerDeWitt/densityGrid'
 import { WDW_SCENARIO_PRESETS } from '@/lib/physics/wheelerDeWitt/presets'
-import { solveWheelerDeWitt, wdwOperatorResidual } from '@/lib/physics/wheelerDeWitt/solver'
+import { solveWheelerDeWitt } from '@/lib/physics/wheelerDeWitt/solver'
+import { wdwOperatorResidual } from '@/lib/physics/wheelerDeWitt/solverDiagnostics'
 import {
   buildStaticOverlay,
   DEFAULT_STREAMLINE_INPUT,

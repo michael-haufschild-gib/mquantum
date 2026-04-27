@@ -62,9 +62,9 @@ export {
   fitEntanglementTemperature,
 } from './peschelSpectrum'
 
-// ── Re-exports: cosmological entropy trajectory ──────────────────────────
-export type { CosmologicalEntropyInput, CosmologicalEntropyTrajectory } from './peschelCosmology'
-export { computeCosmologicalEntropyTrajectory } from './peschelCosmology'
+// Cosmological entropy trajectory lives in `./peschelCosmology` and is
+// imported there directly to avoid a value-import cycle with this module
+// (which `peschelCosmology` consumes for the core Peschel routines).
 
 // ── Core Peschel entropy computation ─────────────────────────────────────
 

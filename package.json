@@ -75,6 +75,7 @@
     "happy-dom": "^20.8.9",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
+    "madge": "^8.0.0",
     "playwright": "^1.57.0",
     "png-to-ico": "^3.0.1",
     "prettier": "^3.4.1",

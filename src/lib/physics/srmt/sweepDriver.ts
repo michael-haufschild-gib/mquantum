@@ -663,26 +663,11 @@ export function writePerClockFit(
 }
 
 // Tier-3 sensitivity drivers (phiRef / rankCap / phiExtent / gridNa /
-// gridNphi) live in `./sweepSensitivityDrivers.ts`. They share
-// `writePerClockFit`, `linspace`, `normaliseClocks`, etc., which are
-// exported below.
-export type {
-  RunGridNaSweepInputs,
-  RunGridNphiCoupledSweepInputs,
-  RunGridNphiSweepInputs,
-  RunPhiExtentSweepInputs,
-  RunPhiRefSweepInputs,
-  RunRankCapSweepInputs,
-} from './sweepSensitivityDrivers'
-export {
-  coupledGridNaFor,
-  runGridNaSweep,
-  runGridNphiCoupledSweep,
-  runGridNphiSweep,
-  runPhiExtentSweep,
-  runPhiRefSweep,
-  runRankCapSweep,
-} from './sweepSensitivityDrivers'
+// gridNphi) live in `./sweepSensitivityDrivers.ts` and import
+// `writePerClockFit`, `linspace`, `normaliseClocks`, etc. from this
+// module. Re-exporting them here would create a value-import cycle —
+// callers should import the sensitivity drivers from
+// `./sweepSensitivityDrivers.ts` directly.
 
 // Re-export so consumers that branch on landmark kind keep the symbol
 // path stable.

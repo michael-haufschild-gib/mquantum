@@ -21,22 +21,24 @@ import {
   clampGridNphi,
   clampPhiExtent,
   clampRankCap,
-  coupledGridNaFor,
   predictGridNaSweepCount,
   predictGridNphiSweepCount,
   resolveCutIndexForAxisLen,
   runBcSweep,
   runCutSweep,
+  runLambdaSweep,
+  runMassSweep,
+  type SrmtSweepCancelToken,
+} from '@/lib/physics/srmt/sweepDriver'
+import {
+  coupledGridNaFor,
   runGridNaSweep,
   runGridNphiCoupledSweep,
   runGridNphiSweep,
-  runLambdaSweep,
-  runMassSweep,
   runPhiExtentSweep,
   runPhiRefSweep,
   runRankCapSweep,
-  type SrmtSweepCancelToken,
-} from '@/lib/physics/srmt/sweepDriver'
+} from '@/lib/physics/srmt/sweepSensitivityDrivers'
 import { SRMT_BC_SWEEP_ORDER, type SrmtSweepConfig } from '@/lib/physics/srmt/sweepTypes'
 import type { WheelerDeWittSolverOutput } from '@/lib/physics/wheelerDeWitt/solver'
 

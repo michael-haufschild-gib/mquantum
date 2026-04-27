@@ -20,9 +20,9 @@ import { bench, describe } from 'vitest'
 
 import {
   solveWheelerDeWitt,
-  wdwOperatorResidual,
   type WheelerDeWittSolverInput,
 } from '@/lib/physics/wheelerDeWitt/solver'
+import { wdwOperatorResidual } from '@/lib/physics/wheelerDeWitt/solverDiagnostics'
 import {
   buildStaticOverlay,
   DEFAULT_STREAMLINE_INPUT,

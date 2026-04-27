@@ -31,7 +31,7 @@ import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { logger } from '@/lib/logger'
-import type { CosmologicalEntropyTrajectory } from '@/lib/physics/entanglement/peschelEntropy'
+import type { CosmologicalEntropyTrajectory } from '@/lib/physics/entanglement/peschelCosmology'
 import type {
   PeschelWorkerRequest,
   PeschelWorkerResponse,

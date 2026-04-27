@@ -3,12 +3,14 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_WHEELER_DEWITT_CONFIG } from '@/lib/geometry/extended/wheelerDeWitt'
 import { vilenkinLangerSeed } from '@/lib/physics/wheelerDeWitt/hhLangerSeed'
 import {
-  countEuclideanDeepCells,
-  maxEuclideanChiSquared,
   solveWheelerDeWitt,
-  wdwOperatorResidual,
   type WheelerDeWittSolverInput,
 } from '@/lib/physics/wheelerDeWitt/solver'
+import {
+  countEuclideanDeepCells,
+  maxEuclideanChiSquared,
+  wdwOperatorResidual,
+} from '@/lib/physics/wheelerDeWitt/solverDiagnostics'
 
 /** Project's runtime WdW config stripped of display-only fields. */
 const DEFAULT_SOLVER_INPUT: WheelerDeWittSolverInput = {

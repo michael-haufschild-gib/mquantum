@@ -12,10 +12,10 @@
 import { describe, expect, it } from 'vitest'
 
 import { jacobiEigenvalues } from '@/lib/math/jacobiEigenvalues'
+import { computeCosmologicalEntropyTrajectory } from '@/lib/physics/entanglement/peschelCosmology'
 import {
   buildLatticeCorrelators1D,
   buildLatticeSliceCorrelators,
-  computeCosmologicalEntropyTrajectory,
   computeEntanglementSpectrum,
   computeEntropySpectrum,
   extractSubsystem,

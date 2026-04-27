@@ -36,11 +36,8 @@ import {
   columnSolutionPositiveV,
   columnSolutionZeroV,
 } from '@/lib/physics/wheelerDeWitt/exactColumnSolution'
-import {
-  resetCflWarningBudget,
-  solveWheelerDeWitt,
-  wdwOperatorResidual,
-} from '@/lib/physics/wheelerDeWitt/solver'
+import { resetCflWarningBudget, solveWheelerDeWitt } from '@/lib/physics/wheelerDeWitt/solver'
+import { wdwOperatorResidual } from '@/lib/physics/wheelerDeWitt/solverDiagnostics'
 
 /**
  * Grid parameters chosen so the central column is in the Lorentzian
