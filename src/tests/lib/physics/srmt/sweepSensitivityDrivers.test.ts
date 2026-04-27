@@ -92,38 +92,44 @@ describe('coupledGridNaFor', () => {
 })
 
 describe('runGridNphiCoupledSweep', () => {
-  it('emits one point per unique Nφ with sweepValue=Nφ (not the derived Na)', () => {
-    // Physics tuned so the CFL-derived linear coupling produces
-    // distinct, non-floor-dominated Na values at Nφ=32 and Nφ=48
-    // while keeping per-point solver cost tolerable for a unit test.
-    // Δa=1, phiExt=0.5, aMin=0.5 → coefficient = 1/(√2·0.5·0.5) =
-    // 2.8284…
-    const wdw = {
-      ...DEFAULT_WHEELER_DEWITT_CONFIG,
-      gridNa: 64,
-      phiExtent: 0.5,
-      aMin: 0.5,
-      aMax: 1.5,
-      inflatonMass: 0.4,
-      cosmologicalConstant: 0.0,
+  // Coupled sweep runs the WdW solver twice at gridNa ≥ 89; v8 coverage in
+  // CI pushes wall time past the default 5 s budget.
+  it(
+    'emits one point per unique Nφ with sweepValue=Nφ (not the derived Na)',
+    { timeout: 30000 },
+    () => {
+      // Physics tuned so the CFL-derived linear coupling produces
+      // distinct, non-floor-dominated Na values at Nφ=32 and Nφ=48
+      // while keeping per-point solver cost tolerable for a unit test.
+      // Δa=1, phiExt=0.5, aMin=0.5 → coefficient = 1/(√2·0.5·0.5) =
+      // 2.8284…
+      const wdw = {
+        ...DEFAULT_WHEELER_DEWITT_CONFIG,
+        gridNa: 64,
+        phiExtent: 0.5,
+        aMin: 0.5,
+        aMax: 1.5,
+        inflatonMass: 0.4,
+        cosmologicalConstant: 0.0,
+      }
+      // Assert the coupling produces distinct per-point Na values before
+      // the driver invokes the solver — this is the load-bearing check
+      // that coupling is linear in (Nφ − 1) and not saturated.
+      // ceil(1 + 2.8284·31) = ceil(88.68) = 89
+      expect(coupledGridNaFor(32, wdw)).toBe(89)
+      // ceil(1 + 2.8284·47) = ceil(133.93) = 134
+      expect(coupledGridNaFor(48, wdw)).toBe(134)
+      // 2 points across [32, 48] → {32, 48}, both unique integers.
+      const result = runGridNphiCoupledSweep({
+        wdwConfig: wdw,
+        config: baseCoupledConfig({ sweepMin: 32, sweepMax: 48, points: 2 }),
+      })
+      expect(result.map((p) => p.sweepValue)).toEqual([32, 48])
+      for (const p of result) {
+        expect(Number.isFinite(p.quality.a!)).toBe(true)
+      }
     }
-    // Assert the coupling produces distinct per-point Na values before
-    // the driver invokes the solver — this is the load-bearing check
-    // that coupling is linear in (Nφ − 1) and not saturated.
-    // ceil(1 + 2.8284·31) = ceil(88.68) = 89
-    expect(coupledGridNaFor(32, wdw)).toBe(89)
-    // ceil(1 + 2.8284·47) = ceil(133.93) = 134
-    expect(coupledGridNaFor(48, wdw)).toBe(134)
-    // 2 points across [32, 48] → {32, 48}, both unique integers.
-    const result = runGridNphiCoupledSweep({
-      wdwConfig: wdw,
-      config: baseCoupledConfig({ sweepMin: 32, sweepMax: 48, points: 2 }),
-    })
-    expect(result.map((p) => p.sweepValue)).toEqual([32, 48])
-    for (const p of result) {
-      expect(Number.isFinite(p.quality.a!)).toBe(true)
-    }
-  })
+  )
 
   it('rejects wrong kind', () => {
     const wdw = DEFAULT_WHEELER_DEWITT_CONFIG

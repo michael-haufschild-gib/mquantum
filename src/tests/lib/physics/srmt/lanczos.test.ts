@@ -12,8 +12,10 @@
  *   5. Numerical stability: tightly-clustered eigenvalues do not produce
  *      spurious ghosts (the classical failure mode of unreorthogonalized
  *      Lanczos); all distinct eigenvalues near a cluster are recovered.
- *   6. Timing sanity: n = 1024 with k = 64 completes within 1 second.
- *      Test timeout set to 3 s for margin against slow CI runners.
+ *
+ * Timing sanity at n = 1024 was previously asserted here; it lives in
+ * `solver.bench.ts` now because the hard millisecond gate flaked under
+ * GitHub Actions coverage instrumentation.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -217,31 +219,5 @@ describe('lanczosTopK — edge cases', () => {
   it('rejects buffer shorter than n²', () => {
     const A = new Float32Array(10)
     expect(() => lanczosTopK(A, 4, 2)).toThrow(/buffer length/)
-  })
-})
-
-describe('lanczosTopK — timing sanity at n = 1024, k = 64', () => {
-  it('completes under the soft 2.5-second gate', { timeout: 3000 }, () => {
-    const n = 1024
-    const k = 64
-    const A = randomSymmetric(n, 0x5a11_ed)
-    const t0 =
-      typeof performance !== 'undefined' && typeof performance.now === 'function'
-        ? performance.now()
-        : Date.now()
-    const top = lanczosTopK(A, n, k)
-    const t1 =
-      typeof performance !== 'undefined' && typeof performance.now === 'function'
-        ? performance.now()
-        : Date.now()
-    const elapsedMs = t1 - t0
-    expect(top.length).toBeGreaterThan(0)
-    expect(top.length).toBeLessThanOrEqual(k)
-    // Soft gate: must finish well under the 3 s vitest timeout. A hard
-    // sub-second expectation would be flaky on slower CI runners; 2500
-    // ms catches pathological regressions without false positives. If
-    // this ever becomes flaky, move the measurement to a `.bench.ts`
-    // file alongside `solver.bench.ts`.
-    expect(elapsedMs).toBeLessThan(2500)
   })
 })

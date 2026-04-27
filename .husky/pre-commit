@@ -16,3 +16,10 @@ if git diff --cached --name-only | grep -q 'vite.config.ts'; then
   echo "vite.config.ts changed — checking for circular chunk dependencies..."
   node scripts/check-chunk-cycles.js
 fi
+
+# Clippy on the Rust crate when any file in it is staged. CI rejects warnings
+# (-D warnings); catching it here saves the round-trip.
+if git diff --cached --name-only | grep -q '^src/wasm/mdimension_core/'; then
+  echo "src/wasm/mdimension_core/ changed — running cargo clippy..."
+  cargo clippy --manifest-path src/wasm/mdimension_core/Cargo.toml --target wasm32-unknown-unknown -- -D warnings
+fi

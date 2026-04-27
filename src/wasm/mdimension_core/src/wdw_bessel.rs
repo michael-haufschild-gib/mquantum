@@ -165,7 +165,7 @@ fn bessel_asymptotic(z: f64, nu: f64) -> Asymptotic {
         let term1 = m1 / chi;
         let term3 = -(m1 * m9 * m25) / (6.0 * c2 * chi);
         let term5 = (m1 * m9 * m25 * m49 * m81) / (120.0 * c4 * chi);
-        (-1.0 * term1 - 3.0 * term3 - 5.0 * term5) / z
+        (-term1 - 3.0 * term3 - 5.0 * term5) / z
     };
 
     // d/dz [amp·(P·c − Q·s)] where d(amp)/dz = −amp/(2z) and

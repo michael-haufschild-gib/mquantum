@@ -981,54 +981,60 @@ describe('runGridNphiSweep', () => {
 })
 
 describe('runGridNphiCoupledSweep', () => {
-  it('auto-bumps gridNa per point with CFL-linear coupling and emits Nφ as sweepValue', () => {
-    const solveStarts: number[] = []
-    // Physics picked so the per-point solver cost stays unit-test
-    // friendly while both coupled Na values sit inside [64, 1024] and
-    // above the baseline floor. Δa=1, phiExt=0.5, aMin=0.5 ⇒
-    // coefficient 1/(√2·0.5·0.5) = 2.8284…
-    //   Nφ=32 → ceil(1 + 2.8284·31) = 89
-    //   Nφ=48 → ceil(1 + 2.8284·47) = 134
-    const wdwConfig = {
-      ...DEFAULT_WHEELER_DEWITT_CONFIG,
-      gridNa: 64,
-      phiExtent: 0.5,
-      aMin: 0.5,
-      aMax: 1.5,
-      inflatonMass: 0.4,
-      cosmologicalConstant: 0.0,
-    }
-    // The auto-bumped gridNa grows LINEARLY in (Nφ − 1) at fixed
-    // (Δa, aMin, phiExtent). Load-bearing assertion: ratio of `Na − 1`
-    // tracks `(Nφ − 1)/(Nφ₀ − 1)` up to integer-ceil rounding.
-    const gridNaLo = coupledGridNaFor(32, wdwConfig)
-    const gridNaHi = coupledGridNaFor(48, wdwConfig)
-    expect(gridNaLo).toBe(89)
-    expect(gridNaHi).toBe(134)
-    expect((gridNaHi - 1) / (gridNaLo - 1)).toBeCloseTo((48 - 1) / (32 - 1), 2)
+  // Coupled sweep invokes the WdW solver twice at gridNa ≥ 89; under v8
+  // coverage instrumentation in CI this exceeds the default 5 s budget.
+  it(
+    'auto-bumps gridNa per point with CFL-linear coupling and emits Nφ as sweepValue',
+    { timeout: 30000 },
+    () => {
+      const solveStarts: number[] = []
+      // Physics picked so the per-point solver cost stays unit-test
+      // friendly while both coupled Na values sit inside [64, 1024] and
+      // above the baseline floor. Δa=1, phiExt=0.5, aMin=0.5 ⇒
+      // coefficient 1/(√2·0.5·0.5) = 2.8284…
+      //   Nφ=32 → ceil(1 + 2.8284·31) = 89
+      //   Nφ=48 → ceil(1 + 2.8284·47) = 134
+      const wdwConfig = {
+        ...DEFAULT_WHEELER_DEWITT_CONFIG,
+        gridNa: 64,
+        phiExtent: 0.5,
+        aMin: 0.5,
+        aMax: 1.5,
+        inflatonMass: 0.4,
+        cosmologicalConstant: 0.0,
+      }
+      // The auto-bumped gridNa grows LINEARLY in (Nφ − 1) at fixed
+      // (Δa, aMin, phiExtent). Load-bearing assertion: ratio of `Na − 1`
+      // tracks `(Nφ − 1)/(Nφ₀ − 1)` up to integer-ceil rounding.
+      const gridNaLo = coupledGridNaFor(32, wdwConfig)
+      const gridNaHi = coupledGridNaFor(48, wdwConfig)
+      expect(gridNaLo).toBe(89)
+      expect(gridNaHi).toBe(134)
+      expect((gridNaHi - 1) / (gridNaLo - 1)).toBeCloseTo((48 - 1) / (32 - 1), 2)
 
-    const result = runGridNphiCoupledSweep({
-      wdwConfig,
-      config: {
-        kind: 'gridNphiCoupled',
-        points: 2,
-        clocks: ['a'],
-        rankCap: 10,
-        cutNormalized: 0.5,
-        phiRef: 0.25,
-        sweepMin: 32,
-        sweepMax: 48,
-      },
-      onSolveStart: (i) => solveStarts.push(i),
-    })
-    expect(result.length).toBe(2)
-    expect(result.map((p) => p.sweepValue)).toEqual([32, 48])
-    expect(solveStarts).toEqual([0, 1])
-    for (const point of result) {
-      expect(Number.isInteger(point.sweepValue)).toBe(true)
-      expect(Number.isFinite(point.quality.a!)).toBe(true)
+      const result = runGridNphiCoupledSweep({
+        wdwConfig,
+        config: {
+          kind: 'gridNphiCoupled',
+          points: 2,
+          clocks: ['a'],
+          rankCap: 10,
+          cutNormalized: 0.5,
+          phiRef: 0.25,
+          sweepMin: 32,
+          sweepMax: 48,
+        },
+        onSolveStart: (i) => solveStarts.push(i),
+      })
+      expect(result.length).toBe(2)
+      expect(result.map((p) => p.sweepValue)).toEqual([32, 48])
+      expect(solveStarts).toEqual([0, 1])
+      for (const point of result) {
+        expect(Number.isInteger(point.sweepValue)).toBe(true)
+        expect(Number.isFinite(point.quality.a!)).toBe(true)
+      }
     }
-  })
+  )
 
   it('floors gridNa at wdwConfig.gridNa when the coupling formula under-runs the baseline', () => {
     // aMin=10, phiExtent=0.1 shrinks the coupled formula below the
