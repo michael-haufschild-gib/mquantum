@@ -121,7 +121,7 @@ function scheduleClearLoadingFlag(): void {
  * useSimulationStateStore.getState().requestSave()
  * ```
  */
-export const useSimulationStateStore = create<SimulationStateState>((set) => ({
+export const useSimulationStateStore = create<SimulationStateState>((set, get) => ({
   status: 'idle',
   error: null,
   saveRequested: false,
@@ -132,6 +132,11 @@ export const useSimulationStateStore = create<SimulationStateState>((set) => ({
   requestSave: () => set({ saveRequested: true, status: 'saving', error: null }),
 
   loadFromFile: (file: File) => {
+    // Block overlapping load attempts. The async deserialize/restore chain
+    // below mutates the global isLoadingScene flag and pendingLoadData;
+    // letting two loads run interleaved would clear the guard mid-restore
+    // and let the second write race the first into the store.
+    if (get().status === 'loading') return
     set({ status: 'loading', error: null })
     file
       .arrayBuffer()

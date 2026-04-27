@@ -298,4 +298,86 @@ describe('useGizmoInteraction — camera drag (pointer events with capture)', ()
     local.overlayEl.remove()
     baseSetup = setup()
   })
+
+  it('ignores secondary pointers while a drag from another pointer is active', () => {
+    const { handlers, overlayEl, cameraRef } = baseSetup
+
+    // Pointer A starts a drag.
+    handlers.handlePointerDown(
+      makePointerEvent(overlayEl, {
+        clientX: 100,
+        clientY: 100,
+        pointerId: 1,
+      }) as unknown as React.PointerEvent
+    )
+    handlers.handlePointerMove(
+      makePointerEvent(overlayEl, {
+        clientX: 120,
+        clientY: 110,
+        pointerId: 1,
+      }) as unknown as React.PointerEvent
+    )
+    expect(cameraRef.current!.orbit).toHaveBeenCalledTimes(1)
+
+    // Pointer B's down/move/up must be ignored — they would otherwise
+    // overwrite lastMouseRef or end the active drag prematurely.
+    handlers.handlePointerDown(
+      makePointerEvent(overlayEl, {
+        clientX: 50,
+        clientY: 50,
+        pointerId: 2,
+      }) as unknown as React.PointerEvent
+    )
+    handlers.handlePointerMove(
+      makePointerEvent(overlayEl, {
+        clientX: 200,
+        clientY: 200,
+        pointerId: 2,
+      }) as unknown as React.PointerEvent
+    )
+    handlers.handlePointerUp(
+      makePointerEvent(overlayEl, {
+        clientX: 200,
+        clientY: 200,
+        pointerId: 2,
+      }) as unknown as React.PointerEvent
+    )
+    // Pointer B's move was ignored, so orbit count stays at 1.
+    expect(cameraRef.current!.orbit).toHaveBeenCalledTimes(1)
+
+    // Pointer A's drag is still alive and producing orbits.
+    handlers.handlePointerMove(
+      makePointerEvent(overlayEl, {
+        clientX: 130,
+        clientY: 115,
+        pointerId: 1,
+      }) as unknown as React.PointerEvent
+    )
+    expect(cameraRef.current!.orbit).toHaveBeenCalledTimes(2)
+
+    // Pointer A ends the drag — and after that, B's pointerdown can
+    // start a fresh drag.
+    handlers.handlePointerUp(
+      makePointerEvent(overlayEl, {
+        clientX: 130,
+        clientY: 115,
+        pointerId: 1,
+      }) as unknown as React.PointerEvent
+    )
+    handlers.handlePointerDown(
+      makePointerEvent(overlayEl, {
+        clientX: 70,
+        clientY: 70,
+        pointerId: 2,
+      }) as unknown as React.PointerEvent
+    )
+    handlers.handlePointerMove(
+      makePointerEvent(overlayEl, {
+        clientX: 80,
+        clientY: 80,
+        pointerId: 2,
+      }) as unknown as React.PointerEvent
+    )
+    expect(cameraRef.current!.orbit).toHaveBeenCalledTimes(3)
+  })
 })

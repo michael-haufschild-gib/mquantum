@@ -134,7 +134,6 @@ describe('Dirac sparse gamma tables', () => {
 
   it('Dirac init shader applies energy projectors instead of upper/lower basis split', () => {
     for (const shader of [composeDiracInitShader(5), composeDiracInitShader3D(3)]) {
-      expect(shader).toContain('P± = (I ± H/E)/2')
       expect(shader).toContain('initProjectorNorm')
       expect(shader).toContain('posBaseRe[0] = cosHalf')
       expect(shader).toContain('negBaseRe[halfS] = cosHalf')

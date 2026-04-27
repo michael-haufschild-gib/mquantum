@@ -53,22 +53,35 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let pairTotal = (params.totalSites / Na) * halfA;
   if (tid >= pairTotal) { return; }
 
-  // Grid dims and strides are products of power-of-2 dims → shift/mask.
+  // The UI restricts gridSize to powers of two, so blockSize is normally
+  // pow2 and the shift/mask fast path applies. A corrupt save or
+  // programmatic config can still land a non-pow2 mirror axis size here
+  // (e.g. Na=6 → halfA=3), in which case shift/mask aliases distinct
+  // pairs onto the same idx and updates the wrong mirror partner. Fall
+  // back to integer div/mod when blockSize is not pow2.
   let strideA = params.strides[axis];
   let blockSize = strideA * halfA;
-  let logBlock = firstTrailingBit(blockSize);
   let naStride = strideA * Na;
-  let outer = tid >> logBlock;
-  let withinBlock = tid & (blockSize - 1u);
+  var outer: u32;
+  var withinBlock: u32;
+  if ((blockSize & (blockSize - 1u)) == 0u) {
+    let logBlock = firstTrailingBit(blockSize);
+    outer = tid >> logBlock;
+    withinBlock = tid & (blockSize - 1u);
+  } else {
+    outer = tid / blockSize;
+    withinBlock = tid % blockSize;
+  }
+  // strideA stays pow2 across both branches (it's a product of higher-axis
+  // dims, all of which are pow2 in the supported configurations), so the
+  // innerOffset / coordAStride decomposition still holds.
   let innerOffset = withinBlock & (strideA - 1u);
   // coordAStride = coordA * strideA recovered without an explicit mul:
-  // since strideA is a power of 2, withinBlock = coordA·strideA + innerOffset
-  // exactly, so coordA·strideA = withinBlock − innerOffset. This recombines
-  // the shift/mask split without re-multiplying, and lets idx fold to
-  //   outer * (strideA * Na) + coordA*strideA + innerOffset
-  //   = outer * naStride + withinBlock
-  // Saves one per-thread multiply (the coordA*strideA in the original) and
-  // removes the now-unused firstTrailingBit(strideA) / logStride pair.
+  // withinBlock = coordA·strideA + innerOffset exactly when strideA is a
+  // power of 2, so coordA·strideA = withinBlock − innerOffset. This
+  // recombines the shift/mask split without re-multiplying, and lets idx
+  // fold to outer * (strideA * Na) + coordA*strideA + innerOffset
+  //         = outer * naStride + withinBlock.
   let coordAStride = withinBlock - innerOffset;
   let idx = outer * naStride + withinBlock;
   // Mirror partner: coord (Na-1-coordA) along the mirror axis.

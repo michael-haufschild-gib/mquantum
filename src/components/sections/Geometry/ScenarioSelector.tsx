@@ -53,7 +53,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function presetValueEquals(a: unknown, b: unknown): boolean {
   if (Array.isArray(a) && Array.isArray(b)) {
-    return a.length === b.length && a.every((value, index) => presetValueEquals(value, b[index]))
+    // Subset semantics: a preset that specifies the leading entries of an
+    // array (e.g. a per-axis vector that the live config has padded with
+    // trailing defaults) should still match. Pure equality on length would
+    // pin the selector to "Custom" whenever the active config carries
+    // extra trailing entries, even when every preset-specified entry agrees.
+    return b.every((value, index) => presetValueEquals(a[index], value))
   }
   if (isRecord(a) && isRecord(b)) {
     const bKeys = Object.keys(b)

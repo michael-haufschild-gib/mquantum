@@ -188,11 +188,13 @@ describe('buildTransitionRates', () => {
     // Zero-temperature: gammaDown = A · (1 + n̄) = A (n̄ → 0).
     const rates = buildTransitionRates(basis, 0)
     const ATU_S = 2.4188843265857e-17 // atomic time unit in seconds
+    let matched = 0
     for (const rate of rates) {
       // 2p substates have l=1; 1s has l=0; pick out the 2p→1s pairs.
       const fromState = basis[rate.from]!
       const toState = basis[rate.to]!
       if (fromState.n === 2 && fromState.l === 1 && toState.n === 1 && toState.l === 0) {
+        matched += 1
         const rateSI = rate.gammaDown / ATU_S
         // 5% tolerance covers Gauss-Laguerre quadrature noise (~1e-4) and
         // the 1/137 fine-structure-constant rounding.
@@ -200,6 +202,10 @@ describe('buildTransitionRates', () => {
         expect(rateSI).toBeLessThan(6.6e8)
       }
     }
+    // Three 2p substates (m = −1, 0, +1) → 1s. Without this assertion the
+    // test would silently pass if buildTransitionRates regressed and
+    // emitted no 2p→1s entries at all.
+    expect(matched).toBe(3)
   })
 })
 

@@ -13,7 +13,8 @@
  *      `Y_{1/4}`, and their first derivatives are computed by
  *      SciPy's AMOS-backed `scipy.special` functions (values quoted to
  *      ≥ 10 significant figures).
- *      Asserts agreement to relative tolerance 1e-6.
+ *      Asserts agreement to relative tolerance 1e-10 (the pointwise
+ *      value/derivative tables are pinned to the stricter bound).
  *
  *   2. **Wronskian identity** `J_ν(z)·Y_ν'(z) − J_ν'(z)·Y_ν(z) =
  *      2/(πz)`. A purely algebraic identity — failures isolate to the

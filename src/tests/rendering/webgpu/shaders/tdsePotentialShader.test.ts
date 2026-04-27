@@ -14,7 +14,9 @@ import {
 
 describe('TDSE potential shader', () => {
   it('does not add implicit transverse confinement to selected potentials', () => {
-    const shaders = [composeTdsePotentialShader(), composeTdsePotential3DShader()]
+    const shader1D = composeTdsePotentialShader()
+    const shader3D = composeTdsePotential3DShader()
+    const shaders = [shader1D, shader3D]
 
     for (const wgsl of shaders) {
       expect(wgsl).not.toContain('wallStrength')
@@ -23,5 +25,21 @@ describe('TDSE potential shader', () => {
       expect(wgsl).toContain('if (params.potentialType == 0u)')
       expect(wgsl).toContain('V = 0.0;')
     }
+  })
+
+  it('keeps the 3D fast path on direct gid.xyz coords', () => {
+    // The 3D variant exists specifically to skip the linearToND coordinate
+    // decomposition. A future refactor that re-introduced linearToND there
+    // would silently regress this perf invariant on the most common config.
+    // Both shaders share the prelude that *defines* linearToND, so we
+    // check for the actual *call* instead — `coords = linearToND(`.
+    const shader1D = composeTdsePotentialShader()
+    const shader3D = composeTdsePotential3DShader()
+
+    expect(shader1D).toContain('coords = linearToND(')
+    expect(shader3D).not.toContain('coords = linearToND(')
+    expect(shader3D).toContain('coords[0] = gid.x;')
+    expect(shader3D).toContain('coords[1] = gid.y;')
+    expect(shader3D).toContain('coords[2] = gid.z;')
   })
 })

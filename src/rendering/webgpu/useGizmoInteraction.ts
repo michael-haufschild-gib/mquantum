@@ -64,6 +64,12 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
   const gizmoDragRef = useRef<GizmoDragState | null>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
 
+  // Track the pointer that opened the active drag. Secondary contacts
+  // (a second touch, a stylus while a finger is down) must not overwrite
+  // the baseline or end the first drag — otherwise multi-touch behaves
+  // erratically. `null` means no drag is in progress.
+  const activePointerIdRef = useRef<number | null>(null)
+
   // Set when the cursor leaves the document (top/bottom of the screen on
   // desktop, where the canvas is full-bleed). The next pointermove after
   // re-entry must NOT apply orbit — between the leave and the re-entry the
@@ -87,6 +93,7 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
       isDraggingRef.current = false
     }
     cursorOutsideDocumentRef.current = false
+    activePointerIdRef.current = null
     scheduleEndInteraction()
   }, [scheduleEndInteraction])
 
@@ -123,6 +130,10 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
   // ── pointerDown: capture pointer, test gizmo hit or enter camera drag ──
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
+      // Ignore secondary contacts while a drag is already in flight.
+      if (activePointerIdRef.current !== null) return
+
+      activePointerIdRef.current = e.pointerId
       mouseDownPosRef.current = { x: e.clientX, y: e.clientY }
       lastMouseRef.current = { x: e.clientX, y: e.clientY }
 
@@ -153,6 +164,12 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
   // ── pointerUp: release capture, commit gizmo drag or handle click-to-select ──
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
+      // Ignore secondary contacts — only the pointer that opened the drag
+      // ends it. A stray pointerup from a competing finger/stylus would
+      // otherwise terminate the in-flight drag mid-gesture.
+      if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) {
+        return
+      }
       try {
         e.currentTarget.releasePointerCapture(e.pointerId)
       } catch {
@@ -169,6 +186,7 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
 
         gizmoDragRef.current = null
         useLightingStore.getState().setIsDraggingLight(false)
+        activePointerIdRef.current = null
         scheduleEndInteraction()
         return
       }
@@ -176,6 +194,7 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
       const wasClick = isClick(e, mouseDownPosRef.current)
 
       isDraggingRef.current = false
+      activePointerIdRef.current = null
       scheduleEndInteraction()
 
       if (!wasClick) return
@@ -187,6 +206,10 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
   // ── pointerCancel: capture interrupted (focus loss, OS gesture). Abort drag. ──
   const handlePointerCancel = useCallback(
     (e: React.PointerEvent) => {
+      // Cancel only when the active pointer is the one being cancelled.
+      if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) {
+        return
+      }
       try {
         e.currentTarget.releasePointerCapture(e.pointerId)
       } catch {
@@ -200,6 +223,12 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
   // ── pointerMove: gizmo drag or camera orbit/pan ──
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
+      // Ignore moves from a different pointer while a drag is active —
+      // a secondary contact would otherwise overwrite lastMouseRef and
+      // jump the camera once the active drag delta is recomputed.
+      if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) {
+        return
+      }
       // Handle gizmo dragging
       const drag = gizmoDragRef.current
       if (drag) {

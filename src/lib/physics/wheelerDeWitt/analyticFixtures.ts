@@ -168,6 +168,9 @@ function besselAsymptotic(z: number, nu: number): { J: number; Y: number } {
   const chi = 8 * z
   const chiSq = chi * chi
 
+  // P series — leading term is the constant `1` in DLMF 10.17.5; the
+  // loop adds BESSEL_ASYMPTOTIC_TERMS correction pairs at orders
+  // chi⁻², chi⁻⁴, … → terms-beyond-leading == BESSEL_ASYMPTOTIC_TERMS.
   let P = 1
   let pProduct = 1
   let pFactorial = 1
@@ -182,6 +185,10 @@ function besselAsymptotic(z: number, nu: number): { J: number; Y: number } {
     P += (sign * pProduct) / (pFactorial * pChiPower)
   }
 
+  // Q series — leading term lives at chi⁻¹ (no constant counterpart),
+  // so the loop seeds the leading inside k=0 and adds the same
+  // BESSEL_ASYMPTOTIC_TERMS correction pairs (k=1..N) at orders
+  // chi⁻³, chi⁻⁵, … so P and Q stay matched in correction count.
   let Q = 0
   let qProduct = 1
   let qFactorial = 1

@@ -13,7 +13,12 @@
  *   positionVar  = posSqSum / totalNorm - positionMean²
  *   (computed CPU-side to avoid division in the shader)
  *
- * Buffer layout: coinState[site * numCoinStates * 2 + j * 2 + {0=re, 1=im}]
+ * Buffer layout: coinState is an array<vec2f> view over the interleaved
+ *   [re, im, re, im, …] bytes the QW shaders share. Each amplitude is a
+ *   single vec2f load and |c|² becomes dot(z, z). Index:
+ *     coinState[site * numCoinStates + j] = vec2f(re, im).
+ *   partialNorm / partialPosSum / partialPosSqSum remain array<f32> for
+ *   scalar reduction sums.
  *
  * @workgroup_size(256) for both passes
  * @module

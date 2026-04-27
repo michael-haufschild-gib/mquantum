@@ -66,17 +66,25 @@ fn main(
   // Per-site accumulation gated by all early-out conditions, but no return —
   // every thread must reach the trailing workgroupBarrier in uniform CF.
   if (inBounds && eRange > 0.0) {
-    // Decompose linear index to N-D k-space coordinates.
-    // Every grid dim is a power of 2 → use shift/mask instead of u32 div/mod.
+    // Decompose linear index to N-D k-space coordinates. The UI restricts
+    // gridSize to powers of two, but a malformed save or programmatic
+    // config could still land a non-pow2 dim here. Use the shift/mask
+    // fast path when n is pow2, and fall back to u32 div/mod otherwise so
+    // density still bins into the right energy bucket.
     var remaining = idx;
     var coords: array<u32, 12>;
     let ldim = esParams.latticeDim;
     for (var d: i32 = i32(ldim) - 1; d >= 0; d = d - 1) {
       let du = u32(d);
       let n = esParams.gridSize[du];
-      let logN = firstTrailingBit(n);
-      coords[du] = remaining & (n - 1u);
-      remaining = remaining >> logN;
+      if ((n & (n - 1u)) == 0u) {
+        let logN = firstTrailingBit(n);
+        coords[du] = remaining & (n - 1u);
+        remaining = remaining >> logN;
+      } else {
+        coords[du] = remaining % n;
+        remaining = remaining / n;
+      }
     }
 
     // Compute kinetic energy E(k) = ℏ²|k|²/(2m).

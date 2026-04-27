@@ -373,8 +373,11 @@ export function writeTdseUniforms(
   // single CPU compute per pack. The shader early-returns when wormhole is
   // disabled, so values are unused in that path; we still write valid trig
   // (cos(0)=1, sin(0)=0 with default g=0) so the buffer stays deterministic.
-  const wormholeG = Math.max(0, config.wormholeCouplingG ?? 0)
-  const wormholeTau = 0.5 * config.dt
+  // Clamp through clampFinite so a transient NaN/Infinity in either field
+  // (e.g. malformed saved state) cannot leak into the trig and contaminate
+  // the wormhole kernel. Default to (0, 0) → cos=1, sin=0 (no coupling).
+  const wormholeG = clampFinite(config.wormholeCouplingG, 0, Number.POSITIVE_INFINITY)
+  const wormholeTau = 0.5 * clampFinite(config.dt, 0, Number.POSITIVE_INFINITY)
   f32[198] = Math.cos(wormholeTau * wormholeG)
   f32[199] = Math.sin(wormholeTau * wormholeG)
 

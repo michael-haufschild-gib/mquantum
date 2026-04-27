@@ -210,7 +210,7 @@ describe('dipoleMatrixElementSquared', () => {
     expect(forward).toBeCloseTo(reverse, 10)
   })
 
-  it('matches the analytic value |⟨1s|z|2p₀⟩|² = (256√2/243)² ≈ 0.5549', () => {
+  it('matches the analytic value |⟨1s|z|2p₀⟩|² = (128√2/243)² ≈ 0.5549', () => {
     // The 2p₀ → 1s transition is purely along ẑ (Δm = 0, only q = 0 contributes).
     // Analytic value (Bethe & Salpeter, NIST tabulations):
     //   ⟨1s|z|2p,m=0⟩ = 128√2/243 ≈ 0.7449 a₀

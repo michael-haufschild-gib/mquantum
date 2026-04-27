@@ -312,10 +312,12 @@ describe('writeTdseUniforms', () => {
     expect(u32[195]).toBe(4242) // hawkingSeed
     expect(u32[196]).toBe(12345) // hawkingStepIndex
     // _padHawk0 (offset 788) stays zero. Slots 198/199 (offsets 792/796) host
-    // the host-precomputed wormhole trig cache; with default dt=0.005 and
-    // wormholeCouplingG=0.5 they hold cos(0.00125) and sin(0.00125).
+    // the host-precomputed wormhole trig cache. Derive tauG from the same
+    // config that drove writeTdseUniforms() so future default changes don't
+    // make the assertion stale even though the packing is still correct.
     expect(u32[197]).toBe(0)
-    const tauG = 0.5 * 0.005 * 0.5
+    const trigConfig = DEFAULT_TDSE_CONFIG
+    const tauG = 0.5 * trigConfig.dt * Math.max(0, trigConfig.wormholeCouplingG ?? 0)
     expect(f32[198]).toBeCloseTo(Math.cos(tauG), 6)
     expect(f32[199]).toBeCloseTo(Math.sin(tauG), 6)
   })

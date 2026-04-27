@@ -283,9 +283,15 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     // physical time. Reprojecting the prior color would blend an old
     // wavefunction into the current frame, which is motion blur, not a
     // physics-faithful instantaneous observable.
+    // ctx.frame.time advances on every rendered frame regardless of physics
+    // time, so falling back to it would force animTimeChanged=true on every
+    // frame the snapshot is missing — history would be invalidated forever
+    // and static-scene Bayer freezing could never settle. Only invalidate
+    // when we actually observe a real animation clock change.
     const animation = getStoreSnapshot<AnimationSnapshot>(ctx, 'animation')
-    const currentAnimTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
-    const animTimeChanged = currentAnimTime !== this.prevAnimationTime
+    const currentAnimTime = animation?.accumulatedTime
+    const animTimeChanged =
+      currentAnimTime !== undefined && currentAnimTime !== this.prevAnimationTime
     if (this.hasValidHistory && animTimeChanged) {
       this.hasValidHistory = false
     }
@@ -407,7 +413,9 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
         this.completedFullCycle = true
       }
     }
-    this.prevAnimationTime = currentAnimTime
+    if (currentAnimTime !== undefined) {
+      this.prevAnimationTime = currentAnimTime
+    }
     this.hasValidHistory = true
 
     this.prevCameraPosition.x = cameraPosition.x

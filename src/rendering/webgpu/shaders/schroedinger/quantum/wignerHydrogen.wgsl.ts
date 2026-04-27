@@ -91,15 +91,17 @@ fn wignerHydrogenRadial(r: f32, pr: f32, n: i32, l: i32, a0: f32, nPts: i32) -> 
   // per-call (n<1 || l<0 || l>=n) check that hydrogenRadial does internally.
   if (n < 1 || l < 0 || l >= n) { return 0.0; }
 
-  // Cutoff sMax: wavefunction decays exponentially beyond ~ 2*n^2*a0
+  // Cutoff sMax: wavefunction decays exponentially beyond ~ 2*n^2*a0.
+  // Use a0Safe consistently so a non-positive a0 doesn't collapse the
+  // integration domain to a non-positive ds further down.
   let nf = f32(n);
-  let sMax = 2.5 * nf * nf * a0;
+  let a0Safe = max(a0, 0.001);
+  let sMax = 2.5 * nf * nf * a0Safe;
 
   // (n, l, a0)-only scalars hoisted once per (r, p) cell. Without this the
   // quadrature would recompute norm, twoOverNa, lagK and alpha on every call
   // to hydrogenReducedRadial → hydrogenRadial → hydrogenRadialNorm — i.e.
   // 2·effectiveNPts redundant evaluations per cell.
-  let a0Safe = max(a0, 0.001);
   let twoOverNa = 2.0 / (nf * a0Safe);
   let normNL = hydrogenRadialNorm(n, l, a0Safe);
   let lagK = n - l - 1;

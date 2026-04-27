@@ -130,12 +130,12 @@ const diracInitBody = /* wgsl */ `
     }
 
     posBaseRe[0] = cosHalf;
-    if (S > 2u) {
+    if (S > 1u) {
       posBaseRe[1] = sinHalf * phiCos;
       posBaseIm[1] = sinHalf * phiSin;
     }
     negBaseRe[halfS] = cosHalf;
-    if (S > halfS + 1u && S > 2u) {
+    if (S > halfS + 1u) {
       negBaseRe[halfS + 1u] = sinHalf * phiCos;
       negBaseIm[halfS + 1u] = sinHalf * phiSin;
     }
