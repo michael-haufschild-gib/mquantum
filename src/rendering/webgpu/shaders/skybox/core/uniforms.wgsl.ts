@@ -61,6 +61,40 @@ struct SkyboxUniforms {
   oceanDepthGradient: f32,
   oceanBubbleDensity: f32,
   oceanSurfaceShimmer: f32,
+
+  // CPU-precomputed dispatch-uniform palette samples.
+  // Hoisted from per-pixel cosinePalette() calls whose t-input is constant
+  // or only depends on uniform 'time' (and therefore identical for every
+  // pixel in a dispatch). Each is the raw a + b*cos(TAU*(c*t + d)) result;
+  // any per-mode scalar multiplier is applied at the call site in WGSL.
+  auroraTopColor: vec3<f32>,
+  _padHoist0: f32,
+  crystallineShimmerColor: vec3<f32>,
+  _padHoist1: f32,
+  nebulaDeepColor: vec3<f32>,
+  _padHoist2: f32,
+  nebulaKnotColor: vec3<f32>,
+  _padHoist3: f32,
+  oceanDeepPalette: vec3<f32>,
+  _padHoist4: f32,
+  oceanMidPalette: vec3<f32>,
+  _padHoist5: f32,
+  oceanSurfacePalette: vec3<f32>,
+  _padHoist6: f32,
+  horizonFloorColor: vec3<f32>,
+  _padHoist7: f32,
+  horizonHorizonColor: vec3<f32>,
+  _padHoist8: f32,
+  horizonMidColor: vec3<f32>,
+  _padHoist9: f32,
+  horizonTopColor: vec3<f32>,
+  _padHoist10: f32,
+  horizonSweepColor: vec3<f32>,
+  _padHoist11: f32,
+  twilightHorizonColor: vec3<f32>,
+  _padHoist12: f32,
+  twilightSunColor: vec3<f32>,
+  _padHoist13: f32,
 }
 `
 

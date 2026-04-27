@@ -9,7 +9,8 @@
  * Note: imaginaryTime at offset 700 controls Wick rotation mode.
  * Vortex reconnection fields at offsets 708-727 for N-D vortex topology.
  * Black-hole Regge–Wheeler fields at offsets 748-756.
- * Analog Hawking (waterfall sonic horizon) block at offsets 760-792.
+ * Analog Hawking (waterfall sonic horizon) block at offsets 760-788.
+ * Wormhole shader trig precompute (cos/sin of 0.5·dt·g) at offsets 792-799.
  * ER=EPR double-trace wormhole coupling at offsets 800-815.
  * Analog Hawking quantum-extremal island overlay at offsets 816-831.
  * Curved-space TDSE v1 metric block at offsets 832-847 (metricKind + throatRadius).
@@ -146,8 +147,10 @@ struct TDSEUniforms {
   hawkingSeed: u32,          // offset 780 — deterministic integer noise seed
   hawkingStepIndex: u32,     // offset 784 — frame counter, drives noise evolution
   _padHawk0: u32,            // offset 788 — pad to 16-byte alignment
-  _padHawk1: u32,            // offset 792 — pad to 16-byte alignment
-  _padHawk2: u32,            // offset 796 — pad to 16-byte alignment
+  // Host-precomputed trig cache for the ER=EPR wormhole shader. Placed in the
+  // former Hawking pad slots so all downstream offsets stay byte-stable.
+  wormholeCosTau: f32,       // offset 792 — cos(0.5 * dt * wormholeCouplingG)
+  wormholeSinTau: f32,       // offset 796 — sin(0.5 * dt * wormholeCouplingG)
 
   // ER=EPR Double-trace Wormhole Coupling (16 bytes, 800-815)
   wormholeCouplingEnabled: u32, // offset 800 — 0/1 flag

@@ -59,14 +59,14 @@ export type DiracPotentialType = 'none' | 'step' | 'barrier' | 'well' | 'harmoni
 /**
  * Configuration for the Dirac equation solver.
  *
- * The Dirac equation operates on multi-component spinors — S = 2^(⌊N/2⌋)
+ * The Dirac equation operates on multi-component spinors — S = 2^(⌊(N+1)/2⌋)
  * components in N spatial dimensions. Uses split-operator method with
  * matrix exponentials exploiting the Clifford algebra identity H² = E²·I.
  */
 export interface DiracConfig {
   // === Lattice ===
   /** Spatial dimensionality (1-11, synced from global dimension).
-   *  S = 2^(⌊N/2⌋) spinor components are allocated. */
+   *  S = 2^(⌊(N+1)/2⌋) spinor components are allocated. */
   latticeDim: number
   /** Grid points per dimension (power of 2, FFT requirement) */
   gridSize: number[]
@@ -117,9 +117,9 @@ export interface DiracConfig {
 
   // === Display ===
   fieldView: DiracFieldView
-  /** Color for particle (positive-energy) component [r, g, b] 0-1 */
+  /** Color for upper-spinor particle component [r, g, b] 0-1 */
   particleColor: [number, number, number]
-  /** Color for antiparticle (negative-energy) component [r, g, b] 0-1 */
+  /** Color for lower-spinor antiparticle component [r, g, b] 0-1 */
   antiparticleColor: [number, number, number]
   /** Auto-scale density normalization */
   autoScale: boolean

@@ -53,8 +53,10 @@ fn legendre(l: i32, m: i32, x: f32) -> f32 {
   // Clamp x to valid range to avoid numerical issues
   let xClamped = clamp(x, -1.0, 1.0);
 
-  // Compute (1 - x²)^{1/2} = sin(θ) for x = cos(θ)
-  let somx2 = sqrt((1.0 - xClamped) * (1.0 + xClamped));
+  // Compute (1 - x²)^{1/2} = sin(θ) for x = cos(θ).
+  // 1.0 − x·x is bit-equivalent to (1−x)(1+x) for f32 in [-1, 1] but uses
+  // one fewer FP op (skips an explicit sub or add).
+  let somx2 = sqrt(1.0 - xClamped * xClamped);
 
   // Start with P^m_m using the closed form:
   // P^m_m(x) = (-1)^m (2m-1)!! (1-x²)^{m/2}
@@ -86,13 +88,17 @@ fn legendre(l: i32, m: i32, x: f32) -> f32 {
   // (l-m)P^m_l = x(2l-1)P^m_{l-1} - (l+m-1)P^m_{l-2}
   var pll = pmmp1;
 
+  // Track fll as an incrementing float so the inner loop avoids an
+  // int→float cast per step (mirrors the Laguerre/Hermite recurrence
+  // pattern). Loop runs at most MAX_LEGENDRE_L − absM iterations.
+  var fll: f32 = f32(absM + 2);
   for (var ll = absM + 2; ll <= min(l, MAX_LEGENDRE_L); ll++) {
-    let fll = f32(ll);
     // PERF: multiply by precomputed 1/(ll-|m|) instead of dividing
     let invDen = LEGENDRE_INV_K[ll - absM];
     pll = (xClamped * (2.0 * fll - 1.0) * pmmp1 - (fll + fm - 1.0) * pmm) * invDen;
     pmm = pmmp1;
     pmmp1 = pll;
+    fll += 1.0;
   }
 
   return pll;

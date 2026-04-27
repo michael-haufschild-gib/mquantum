@@ -37,8 +37,11 @@ struct QWShiftUniforms {
 // (array<u32, 12>) with 4-byte stride — spec-forbidden in uniform address
 // space. Chrome/Tint accepts it; naga rejects. Storage has no stride restriction.
 @group(0) @binding(0) var<storage, read> params: QWShiftUniforms;
-@group(0) @binding(1) var<storage, read> coinIn: array<f32>;
-@group(0) @binding(2) var<storage, read_write> coinOut: array<f32>;
+// vec2f view of the [re,im] interleaved coin buffer (matches sibling QW
+// shaders). Index density halves: one vec2 element per complex amplitude,
+// so the per-site base no longer multiplies by 2.
+@group(0) @binding(1) var<storage, read> coinIn: array<vec2f>;
+@group(0) @binding(2) var<storage, read_write> coinOut: array<vec2f>;
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
@@ -46,7 +49,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (destSite >= params.totalSites) { return; }
 
   let numCoinStates = 2u * params.latticeDim;
-  let destBase = destSite * numCoinStates * 2u;
+  // vec2f view: per-site stride is numCoinStates (was numCoinStates * 2 in f32 units).
+  let destBase = destSite * numCoinStates;
 
   // Decompose destination site to N-D coordinates
   let destCoords = linearToND(destSite, params.strides, params.gridSize, params.latticeDim);
@@ -54,8 +58,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   for (var cs: u32 = 0u; cs < numCoinStates; cs = cs + 1u) {
     let dim = cs >> 1u;
     let isPositive = (cs & 1u) == 0u;
-    let cs2 = cs << 1u;
-    let destOut = destBase + cs2;
+    let destOut = destBase + cs;
 
     // Source site: shift backwards from destination. (cs=+ dir → source at coord-1)
     let destCoordI = i32(destCoords[dim]);
@@ -65,8 +68,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let Ni = i32(Nd);
     // Open boundary: out-of-bounds sources contribute zero.
     if (params.openBoundary != 0u && (srcCoord < 0 || srcCoord >= Ni)) {
-      coinOut[destOut] = 0.0;
-      coinOut[destOut + 1u] = 0.0;
+      coinOut[destOut] = vec2f(0.0);
     } else {
       // PERF: only one coordinate changes; compute the linear-index delta
       // directly instead of copying destCoords[12] and re-running ndToLinear
@@ -91,10 +93,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       let delta = srcCoordWrapped - destCoordI;
       let strideDim = i32(params.strides[dim]);
       let srcSite = u32(i32(destSite) + delta * strideDim);
-      let srcBase = srcSite * numCoinStates * 2u + cs2;
+      // vec2f view: srcSite * numCoinStates (no *2) + cs (no <<1).
+      let srcBase = srcSite * numCoinStates + cs;
 
       coinOut[destOut] = coinIn[srcBase];
-      coinOut[destOut + 1u] = coinIn[srcBase + 1u];
     }
   }
 }

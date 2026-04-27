@@ -43,9 +43,12 @@ fn getNebula(dir: vec3<f32>, time: f32) -> vec3<f32> {
 
   // Coloring
   var col: vec3<f32>;
-  let deepColor = cosinePalette(0.1, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD) * 0.1;
+  // PERF: hoisted -- cosinePalette(0.1, palA..palD) and cosinePalette(0.85, palA..palD)
+  // are dispatch-uniform constants. CPU precomputes the raw palette samples; the
+  // 0.1 / 1.5 scalars stay here so the WGSL semantics are unchanged.
+  let deepColor = uniforms.nebulaDeepColor * 0.1;
   let emissionColor = cosinePalette(mainDensity * 0.6 + 0.2, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
-  let knotColor = cosinePalette(0.85, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD) * 1.5;
+  let knotColor = uniforms.nebulaKnotColor * 1.5;
 
   // mix(mix(D, E, 0.8m), D, a) collapses algebraically to mix(D, E, 0.8m*(1-a)).
   // Saves one vec3 mix (3 FMAs) per pixel.

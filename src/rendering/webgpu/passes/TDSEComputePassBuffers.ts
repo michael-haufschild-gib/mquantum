@@ -29,7 +29,9 @@ import { buildTdseFFTAxisStagingData, buildTdseFFTStagingData } from './TDSEComp
  *   - hawkingPairInjection:u32 @ 776
  *   - hawkingSeed:         u32 @ 780
  *   - hawkingStepIndex:    u32 @ 784
- *   - _padHawk0..2:        u32 @ 788/792/796 (16-byte align)
+ *   - _padHawk0:           u32 @ 788 (16-byte align)
+ *   - wormholeCosTau:      f32 @ 792 (host-precomputed cos(0.5·dt·g))
+ *   - wormholeSinTau:      f32 @ 796 (host-precomputed sin(0.5·dt·g))
  *   - wormholeCouplingEnabled: u32 @ 800 (ER=EPR double-trace coupling)
  *   - wormholeCouplingG:       f32 @ 804
  *   - wormholeMirrorAxis:      u32 @ 808

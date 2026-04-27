@@ -24,7 +24,12 @@ import {
   spinorSize,
 } from '@/lib/physics/dirac/cliffordAlgebraFallback'
 import {
+  composeDiracInitShader,
+  composeDiracInitShader3D,
+} from '@/rendering/webgpu/passes/DiracComputePassSetup'
+import {
   buildDiracSparseTables,
+  DIRAC_SPARSE_INIT_MAX_DIM,
   DIRAC_SPARSE_MAX_DIM,
   generateDiracSparseGammaBlock,
 } from '@/rendering/webgpu/shaders/schroedinger/compute/diracSparseGammaVariants.wgsl'
@@ -117,5 +122,24 @@ describe('Dirac sparse gamma tables', () => {
     expect(() => generateDiracSparseGammaBlock(12)).not.toThrow()
     expect(generateDiracSparseGammaBlock(0)).toContain('DIRAC_USE_SPARSE_GAMMA: bool = false')
     expect(generateDiracSparseGammaBlock(12)).toContain('DIRAC_USE_SPARSE_GAMMA: bool = false')
+  })
+
+  it('can emit init-projector tables for every supported Dirac dimension', () => {
+    for (let dim = 1; dim <= DIRAC_SPARSE_INIT_MAX_DIM; dim++) {
+      const block = generateDiracSparseGammaBlock(dim, DIRAC_SPARSE_INIT_MAX_DIM)
+      expect(block).toContain('DIRAC_USE_SPARSE_GAMMA: bool = true')
+      expect(block).toContain(`DIRAC_SPARSE_S: u32 = ${spinorSize(dim)}u`)
+    }
+  })
+
+  it('Dirac init shader applies energy projectors instead of upper/lower basis split', () => {
+    for (const shader of [composeDiracInitShader(5), composeDiracInitShader3D(3)]) {
+      expect(shader).toContain('P± = (I ± H/E)/2')
+      expect(shader).toContain('initProjectorNorm')
+      expect(shader).toContain('posBaseRe[0] = cosHalf')
+      expect(shader).toContain('negBaseRe[halfS] = cosHalf')
+      expect(shader).toContain('projectedRe')
+      expect(shader).toContain('DIRAC_USE_SPARSE_GAMMA: bool = true')
+    }
   })
 })

@@ -184,12 +184,19 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
 
   // Precompute fractional lattice coordinate per dim ONCE. Reused by the interp
-  // helper (lo/hi/frac) and the nearest-neighbor derivation below — the
-  // previous code recomputed this in two separate per-dim loops.
+  // helper (lo/hi/frac) and the nearest-neighbor derivation below.
+  //
+  // The halfExtent/spacing factor is just (N·dx·½)/dx = N/2, so the original
+  //   coordF = (ndWorldPos + halfExtent) / dx − 0.5
+  // simplifies algebraically to
+  //   coordF = ndWorldPos · invSpacing + (N/2 − ½)
+  // — one less multiply and the spacing divide is folded into a multiply
+  // by precomputed invSpacing. Bit-identical for f32 within rounding.
   var coordF: array<f32, 12>;
   for (var d: u32 = 0u; d < params.latticeDim; d++) {
-    let halfExtent = f32(params.gridSize[d]) * params.spacing[d] * 0.5;
-    coordF[d] = (ndWorldPos[d] + halfExtent) / params.spacing[d] - 0.5;
+    let invSpacing = 1.0 / params.spacing[d];
+    let centerOffset = f32(params.gridSize[d]) * 0.5 - 0.5;
+    coordF[d] = ndWorldPos[d] * invSpacing + centerOffset;
   }
 
   // Convert to lattice coordinates with trilinear interpolation support

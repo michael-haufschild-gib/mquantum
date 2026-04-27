@@ -53,11 +53,14 @@ fn getHorizonGradient(dir: vec3<f32>, time: f32) -> vec3<f32> {
 
   var col: vec3<f32>;
   // 4-point gradient for smooth studio look
-  // Apply temperature pulse to palette sampling
-  let floorColor = cosinePalette(0.1 + tempPulse * 0.1, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD) * 0.6;
-  let horizonColor = cosinePalette(0.4 + tempPulse * 0.05, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
-  let midColor = cosinePalette(0.6, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
-  let topColor = cosinePalette(0.85 - tempPulse * 0.05, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
+  // PERF: hoisted -- all four palette samples are dispatch-uniform.
+  //   floor/horizon/top depend on tempPulse which is sin(time)+sin(time), uniform per dispatch.
+  //   mid is a hard constant (t=0.6). CPU precomputes raw palette samples; 0.6 scalar applied here.
+  // Saves 4 vec3 cos + 8 vec3 fma per pixel for this mode.
+  let floorColor = uniforms.horizonFloorColor * 0.6;
+  let horizonColor = uniforms.horizonHorizonColor;
+  let midColor = uniforms.horizonMidColor;
+  let topColor = uniforms.horizonTopColor;
 
   // Smooth 4-zone blend
   col = mix(floorColor, horizonColor, floorZone);
@@ -68,7 +71,8 @@ fn getHorizonGradient(dir: vec3<f32>, time: f32) -> vec3<f32> {
   col += horizonColor * horizonZone * 0.2 * uniforms.scale;
 
   // Add light sweep highlight
-  let sweepColor = cosinePalette(0.95, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
+  // PERF: hoisted -- cosinePalette(0.95, palA..palD) is a hard constant.
+  let sweepColor = uniforms.horizonSweepColor;
   col += sweepColor * lightSweep;
 
   // Apply ambient pulse

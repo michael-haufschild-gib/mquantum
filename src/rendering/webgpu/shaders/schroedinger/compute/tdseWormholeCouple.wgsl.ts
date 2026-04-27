@@ -2,7 +2,7 @@
  * TDSE — ER=EPR Double-trace Wormhole Coupling Shader.
  *
  * Implements `exp(-i·τ·g·P_M)` where `P_M` is the reflection operator across
- * the chosen mirror axis. Because `P_M` is a rank-1 involution (`P_M² = 1`),
+ * the chosen mirror axis. Because `P_M` is a unitary involution (`P_M² = 1`),
  * the exponential reduces to the closed form
  *
  *   `exp(-i·τ·g·P_M) = cos(τg)·I − i·sin(τg)·P_M`
@@ -56,19 +56,30 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Grid dims and strides are products of power-of-2 dims → shift/mask.
   let strideA = params.strides[axis];
   let blockSize = strideA * halfA;
-  let logStride = firstTrailingBit(strideA);
   let logBlock = firstTrailingBit(blockSize);
+  let naStride = strideA * Na;
   let outer = tid >> logBlock;
   let withinBlock = tid & (blockSize - 1u);
-  let coordA = withinBlock >> logStride;
   let innerOffset = withinBlock & (strideA - 1u);
-  let idx = outer * (strideA * Na) + coordA * strideA + innerOffset;
+  // coordAStride = coordA * strideA recovered without an explicit mul:
+  // since strideA is a power of 2, withinBlock = coordA·strideA + innerOffset
+  // exactly, so coordA·strideA = withinBlock − innerOffset. This recombines
+  // the shift/mask split without re-multiplying, and lets idx fold to
+  //   outer * (strideA * Na) + coordA*strideA + innerOffset
+  //   = outer * naStride + withinBlock
+  // Saves one per-thread multiply (the coordA*strideA in the original) and
+  // removes the now-unused firstTrailingBit(strideA) / logStride pair.
+  let coordAStride = withinBlock - innerOffset;
+  let idx = outer * naStride + withinBlock;
   // Mirror partner: coord (Na-1-coordA) along the mirror axis.
-  let mirrorIdx = idx + (Na - 1u - 2u * coordA) * strideA;
+  // (Na - 1 - 2·coordA) · strideA = (Na - 1)·strideA − 2·coordA·strideA;
+  // (Na − 1)·strideA is uniform per dispatch (CSE'd), and
+  // 2·coordA·strideA is just (coordAStride << 1).
+  let mirrorIdx = idx + (Na - 1u) * strideA - (coordAStride << 1u);
 
-  let tau = 0.5 * params.dt;
-  let c = cos(tau * params.wormholeCouplingG);
-  let s = sin(tau * params.wormholeCouplingG);
+  // cos/sin of (0.5·dt·g) are dispatch-uniform; precomputed host-side.
+  let c = params.wormholeCosTau;
+  let s = params.wormholeSinTau;
 
   // Read both values BEFORE writing either — prevents races inside a pair.
   let zV  = psi[idx];

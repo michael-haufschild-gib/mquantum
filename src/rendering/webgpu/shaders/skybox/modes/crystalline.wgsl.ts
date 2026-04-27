@@ -72,7 +72,8 @@ fn getCrystalline(dir: vec3<f32>, time: f32) -> vec3<f32> {
   col *= 0.3 + 0.7 * (edge1 * edge2);
   // Shimmer on edges using palette highlight color
   // PERF: Use multiplication instead of pow(x, 2.0)
-  let shimmerColor = cosinePalette(0.9, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
+  // PERF: hoisted -- cosinePalette(0.9, palA..palD) is dispatch-uniform.
+  let shimmerColor = uniforms.crystallineShimmerColor;
   col += shimmerColor * 0.15 * (1.0 - edge1) * iridescence * iridescence;
 
   return col;

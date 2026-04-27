@@ -278,6 +278,18 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
       cameraPosition = { x: 0, y: 0, z: 0 }
     }
 
+    // A changed animation clock means the quantum field itself changed:
+    // density, phase, nodal sets, and current overlays are sampled at a new
+    // physical time. Reprojecting the prior color would blend an old
+    // wavefunction into the current frame, which is motion blur, not a
+    // physics-faithful instantaneous observable.
+    const animation = getStoreSnapshot<AnimationSnapshot>(ctx, 'animation')
+    const currentAnimTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
+    const animTimeChanged = currentAnimTime !== this.prevAnimationTime
+    if (this.hasValidHistory && animTimeChanged) {
+      this.hasValidHistory = false
+    }
+
     const readAccumulationView =
       this.frameIndex % 2 === 0 ? this.accumulationViewA! : this.accumulationViewB!
     const writeAccumulationTexture =
@@ -383,9 +395,6 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     // Static scene detection: freeze Bayer cycling when nothing changes.
     // cameraChanged was captured above, before updateTemporalUniforms()
     // overwrote prevViewProjectionMatrix with the current frame's matrix.
-    const animation = getStoreSnapshot<AnimationSnapshot>(ctx, 'animation')
-    const currentAnimTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
-    const animTimeChanged = currentAnimTime !== this.prevAnimationTime
     const sceneChanged = animTimeChanged || cameraChanged
 
     if (sceneChanged) {

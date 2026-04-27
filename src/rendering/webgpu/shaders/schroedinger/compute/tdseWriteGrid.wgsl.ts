@@ -180,12 +180,16 @@ fn voxelIsInIsland(nnCoords: ptr<function, array<u32, 12>>) -> bool {
 // handling and periodic wrap-around. Shared by fieldView 4 (superfluidVelocity)
 // and fieldView 6 (machNumber) so both views agree voxel-for-voxel. Uses
 // j/ρ with v_s = (ℏ/m)·Im(ψ*∇ψ)/|ψ|². Returns 0 if only degenerate axes exist.
+//
+// invSpacings is the per-dim 1/spacing[d] precomputed once at top of main()
+// — see comment there. This avoids two-or-three divides per voxel per axis.
 fn computeSuperfluidVelocityMagSq(
   idx: u32,
   re: f32,
   im: f32,
   density: f32,
-  nnCoords: ptr<function, array<u32, 12>>
+  nnCoords: ptr<function, array<u32, 12>>,
+  invSpacings: ptr<function, array<f32, 12>>
 ) -> f32 {
   let hbarOverM = params.hbar / max(params.mass, 1e-6);
   let densitySafe = max(density, 1e-20);
@@ -197,7 +201,7 @@ fn computeSuperfluidVelocityMagSq(
     let stride = params.strides[d];
     let coord = (*nnCoords)[d];
     let Nd = params.gridSize[d];
-    let invSpacing = 1.0 / params.spacing[d];
+    let invSpacing = (*invSpacings)[d];
     let invDx = 0.5 * invSpacing;
     let atLo = coord == 0u;
     let atHi = coord == Nd - 1u;
@@ -261,10 +265,19 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Precompute fractional lattice coordinate per dim ONCE. Used below by both
   // the interp helper (lo/hi/frac) and the nearest-neighbor derivation — the
   // previous code recomputed this in two separate per-dim loops.
+  //
+  // invSpacings caches 1/spacing[d] per voxel and is reused (a) here in the
+  // coordF divide, (b) by computeSuperfluidVelocityMagSq, and (c) by the
+  // fieldView==2 current-magnitude loop. Saves up to ~2·latticeDim divides
+  // per voxel when fieldView selects a derivative-based view.
+  var invSpacings: array<f32, 12>;
+  for (var dInv: u32 = 0u; dInv < params.latticeDim; dInv++) {
+    invSpacings[dInv] = 1.0 / params.spacing[dInv];
+  }
   var coordF: array<f32, 12>;
   for (var d: u32 = 0u; d < params.latticeDim; d++) {
     let halfExtent = f32(params.gridSize[d]) * params.spacing[d] * 0.5;
-    coordF[d] = (ndWorldPos[d] + halfExtent) / params.spacing[d] - 0.5;
+    coordF[d] = (ndWorldPos[d] + halfExtent) * invSpacings[d] - 0.5;
   }
 
   // Convert to lattice coordinates with trilinear interpolation support
@@ -388,7 +401,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       let stride = params.strides[d];
       let coord = nnCoords[d];
       let Nd = params.gridSize[d];
-      let invSpacing = 1.0 / params.spacing[d];
+      let invSpacing = invSpacings[d];
       let invDx = 0.5 * invSpacing;
       let atLo = coord == 0u;
       let atHi = coord == Nd - 1u;
@@ -425,7 +438,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     displayScalar = (1.0 - exp(-jNorm)) * densityGate;
   } else if (params.fieldView == 4u) {
     // superfluid velocity magnitude (NN) with PML-aware boundaries
-    let vsqMag = computeSuperfluidVelocityMagSq(idx, re, im, density, &nnCoords);
+    let vsqMag = computeSuperfluidVelocityMagSq(idx, re, im, density, &nnCoords, &invSpacings);
     let cs2Peak = max(abs(params.interactionStrength) * params.maxDensity / max(params.mass, 1e-6), 1e-10);
     displayScalar = clamp(sqrt(vsqMag / cs2Peak), 0.0, 1.0) * densityGate;
   } else if (params.fieldView == 5u) {
@@ -442,7 +455,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // probability-current helper as superfluidVelocity (fieldView 4), so the
     // colour agrees with that view at M = 1. c_s = √(g|ψ|²/m) is the local
     // Bogoliubov sound speed in natural units (ℏ absorbed into mass).
-    let vsMagSq = computeSuperfluidVelocityMagSq(idx, re, im, density, &nnCoords);
+    let vsMagSq = computeSuperfluidVelocityMagSq(idx, re, im, density, &nnCoords, &invSpacings);
     // c_s² = g|ψ|²/m (Bogoliubov). Guard against non-positive g or |ψ|²=0.
     let gAbs = max(abs(params.interactionStrength), 1e-10);
     let csSq = max(gAbs * density / max(params.mass, 1e-6), 1e-12);

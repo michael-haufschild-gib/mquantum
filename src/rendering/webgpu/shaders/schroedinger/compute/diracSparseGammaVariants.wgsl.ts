@@ -28,6 +28,9 @@ import { generateDiracMatricesFallback } from '@/lib/physics/dirac/cliffordAlgeb
 /** Highest latticeDim for which sparse specialization is emitted. */
 export const DIRAC_SPARSE_MAX_DIM = 4
 
+/** Highest latticeDim for sparse tables in the init projector. */
+export const DIRAC_SPARSE_INIT_MAX_DIM = 11
+
 /** Single non-zero cell of a monomial row. */
 export interface SparseCell {
   readonly col: number
@@ -127,11 +130,19 @@ function wgslF32(x: number): string {
  * kernel's compile-time dispatch selects the dense path.
  *
  * @param latticeDim - Spatial lattice dimension.
+ * @param maxSparseDim - Highest spatial dimension to emit sparse tables for.
+ *   Kinetic/write-grid keep this at `DIRAC_SPARSE_MAX_DIM` for shader-size
+ *   control; init uses `DIRAC_SPARSE_INIT_MAX_DIM` because physical energy
+ *   projection is a one-shot reset operation and needs the tables in every
+ *   supported dimension.
  * @returns WGSL block with const tables and a USE_SPARSE flag, or a single
  *          flag-only block when sparse is disabled for this dim.
  */
-export function generateDiracSparseGammaBlock(latticeDim: number): string {
-  if (latticeDim < 1 || latticeDim > DIRAC_SPARSE_MAX_DIM) {
+export function generateDiracSparseGammaBlock(
+  latticeDim: number,
+  maxSparseDim: number = DIRAC_SPARSE_MAX_DIM
+): string {
+  if (latticeDim < 1 || latticeDim > maxSparseDim) {
     return `
 // Dirac sparse gamma disabled for latticeDim=${latticeDim} (uses dense path).
 const DIRAC_USE_SPARSE_GAMMA: bool = false;

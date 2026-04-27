@@ -36,7 +36,10 @@ struct QWDiagUniforms {
 }
 
 @group(0) @binding(0) var<uniform> diagParams: QWDiagUniforms;
-@group(0) @binding(1) var<storage, read> coinState: array<f32>;
+// vec2f view of the [re,im] interleaved coin buffer (matches sibling QW
+// shaders). |c|² becomes dot(z, z) — one load per amplitude instead of two.
+@group(0) @binding(1) var<storage, read> coinState: array<vec2f>;
+// partial buffers hold scalar reduction sums (norm + position moments) — f32 only.
 @group(0) @binding(2) var<storage, read_write> partialNorm: array<f32>;
 @group(0) @binding(3) var<storage, read_write> partialPosSum: array<f32>;
 @group(0) @binding(4) var<storage, read_write> partialPosSqSum: array<f32>;
@@ -61,13 +64,12 @@ fn main(
   var x2Prob: f32 = 0.0;
 
   if (site < diagParams.totalSites) {
-    let baseIdx = site * diagParams.numCoinStates * 2u;
+    // vec2f view: per-site stride is numCoinStates (was numCoinStates * 2 in f32 units).
+    let baseIdx = site * diagParams.numCoinStates;
     let nCoin = diagParams.numCoinStates;
     for (var j: u32 = 0u; j < nCoin; j = j + 1u) {
-      let j2 = j << 1u;
-      let re = coinState[baseIdx + j2];
-      let im = coinState[baseIdx + j2 + 1u];
-      prob += re * re + im * im;
+      let z = coinState[baseIdx + j];
+      prob += dot(z, z);
     }
 
     // Site position along dim 0 via shift (stride0 is power-of-2).

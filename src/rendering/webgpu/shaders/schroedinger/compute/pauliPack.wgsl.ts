@@ -41,7 +41,10 @@ struct PackUniforms {
 
 @group(0) @binding(0) var<uniform> packUni: PackUniforms;
 @group(0) @binding(1) var<storage, read> psi: array<vec2f>;
-@group(0) @binding(2) var<storage, read_write> complexBuf: array<f32>;
+// vec2f view: the same bytes the Stockham FFT reads and writes as
+// array<vec2f>. Lets the pack write both lanes in a single 8-byte op
+// instead of two scalar stores.
+@group(0) @binding(2) var<storage, read_write> complexBuf: array<vec2f>;
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
@@ -49,10 +52,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (idx >= packUni.totalElements) {
     return;
   }
-  let v = psi[idx];
-  let c = idx << 1u;
-  complexBuf[c] = v.x;
-  complexBuf[c + 1u] = v.y;
+  complexBuf[idx] = psi[idx];
 }
 `
 
@@ -74,7 +74,9 @@ struct PackUniforms {
 }
 
 @group(0) @binding(0) var<uniform> packUni: PackUniforms;
-@group(0) @binding(1) var<storage, read> complexBuf: array<f32>;
+// vec2f view (same byte layout as the FFT). One 8-byte load instead of two
+// scalar loads, then a single vec2 mul-by-scalar normalization.
+@group(0) @binding(1) var<storage, read> complexBuf: array<vec2f>;
 @group(0) @binding(2) var<storage, read_write> psi: array<vec2f>;
 
 @compute @workgroup_size(64)
@@ -83,9 +85,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (idx >= packUni.totalElements) {
     return;
   }
-  let c = idx << 1u;
-  let invN = packUni.invN;
-  psi[idx] = vec2f(complexBuf[c] * invN, complexBuf[c + 1u] * invN);
+  psi[idx] = complexBuf[idx] * packUni.invN;
 }
 `
 

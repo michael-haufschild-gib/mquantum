@@ -55,7 +55,9 @@ fn getAurora(dir: vec3<f32>, time: f32) -> vec3<f32> {
 
   // Vertical color variation
   let heightColor = smoothstep(0.0, 0.6, dir.y);
-  let topColor = cosinePalette(0.8, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
+  // PERF: hoisted -- cosinePalette(0.8, palA..palD) is dispatch-uniform.
+  // CPU precomputes auroraTopColor; saves 1 vec3 cos + 2 vec3 fma per pixel.
+  let topColor = uniforms.auroraTopColor;
   auroraColor = mix(auroraColor, topColor, heightColor * 0.4);
 
   // Final composite

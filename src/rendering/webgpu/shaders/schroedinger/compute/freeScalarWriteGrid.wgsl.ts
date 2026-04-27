@@ -32,18 +32,21 @@ export const freeScalarWriteGridBlock = /* wgsl */ `
 
 // Convert N-D world position to lattice coordinates with trilinear interpolation.
 // Also caches coordF per dimension so downstream NN code can reuse it without
-// recomputing the halfExtent + divide.
+// recomputing the halfExtent + divide. invSpacings is supplied by the caller
+// so that the divide-by-spacing here and the divide in the gradient stencil
+// share a single recip per dim per voxel.
 fn worldToLatticeInterp(
   ndWorldPos: ptr<function, array<f32, 12>>,
   coordsLo: ptr<function, array<u32, 12>>,
   coordsHi: ptr<function, array<u32, 12>>,
   fracs: ptr<function, array<f32, 12>>,
-  coordF: ptr<function, array<f32, 12>>
+  coordF: ptr<function, array<f32, 12>>,
+  invSpacings: ptr<function, array<f32, 12>>
 ) -> bool {
   let interpDims = min(params.latticeDim, 3u);
   for (var d: u32 = 0u; d < params.latticeDim; d++) {
     let halfExtent = f32(params.gridSize[d]) * params.spacing[d] * 0.5;
-    let cF = ((*ndWorldPos)[d] + halfExtent) / params.spacing[d];
+    let cF = ((*ndWorldPos)[d] + halfExtent) * (*invSpacings)[d];
     (*coordF)[d] = cF;
 
     if (d < interpDims) {
@@ -150,12 +153,20 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Convert to lattice coordinates with trilinear interpolation support.
   // coordFArr captures the raw lattice-coord for NN reuse without redoing the
   // halfExtent + divide — preserves banker's-rounding semantics bit-exactly.
+  // invSpacings caches 1/spacing[d] once per voxel so worldToLatticeInterp
+  // and the gradient stencil below share a single recip per dim instead
+  // of dividing twice (saved ~latticeDim divides per voxel when fieldView
+  // ≥ 2 or analysisMode > 0).
   var coordsLo: array<u32, 12>;
   var coordsHi: array<u32, 12>;
   var fracs: array<f32, 12>;
   var coordFArr: array<f32, 12>;
+  var invSpacings: array<f32, 12>;
+  for (var dInv: u32 = 0u; dInv < params.latticeDim; dInv++) {
+    invSpacings[dInv] = 1.0 / params.spacing[dInv];
+  }
 
-  let inBounds = worldToLatticeInterp(&ndWorldPos, &coordsLo, &coordsHi, &fracs, &coordFArr);
+  let inBounds = worldToLatticeInterp(&ndWorldPos, &coordsLo, &coordsHi, &fracs, &coordFArr, &invSpacings);
   if (!inBounds) {
     textureStore(outputTex, gid, vec4f(0.0));
     if (hasAnalysis) { textureStore(analysisTex, gid, vec4f(0.0)); }
@@ -287,7 +298,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       let stride = params.strides[d];
       let coord = nnCoords[d];
       let Nd = params.gridSize[d];
-      let invA = 1.0 / params.spacing[d];
+      let invA = invSpacings[d];
 
       // Centered difference (second-order): (phi[i+1] - phi[i-1]) / (2a)
       // At boundaries with PML: one-sided difference to avoid periodic wrap

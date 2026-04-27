@@ -368,10 +368,20 @@ export function writeTdseUniforms(
   u32[195] = (config.hawkingSeed ?? 1337) >>> 0
   u32[196] = (params.hawkingStepIndex ?? 0) >>> 0
 
+  // Wormhole-shader trig cache (offsets 792, 796 — indices 198, 199).
+  // tau·g is dispatch-uniform; hoist cos/sin off the GPU thread and into a
+  // single CPU compute per pack. The shader early-returns when wormhole is
+  // disabled, so values are unused in that path; we still write valid trig
+  // (cos(0)=1, sin(0)=0 with default g=0) so the buffer stays deterministic.
+  const wormholeG = Math.max(0, config.wormholeCouplingG ?? 0)
+  const wormholeTau = 0.5 * config.dt
+  f32[198] = Math.cos(wormholeTau * wormholeG)
+  f32[199] = Math.sin(wormholeTau * wormholeG)
+
   // ER=EPR double-trace wormhole coupling (offsets 800-815, indices 200-203).
   // Enabled + G + axis + pad. Axis defaults to 0 (x-axis reflection).
   u32[200] = config.wormholeCouplingEnabled ? 1 : 0
-  f32[201] = Math.max(0, config.wormholeCouplingG ?? 0)
+  f32[201] = wormholeG
   u32[202] = Math.max(0, Math.min(2, Math.floor(config.wormholeMirrorAxis ?? 0))) >>> 0
   u32[203] = 0
 

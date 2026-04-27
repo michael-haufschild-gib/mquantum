@@ -68,11 +68,25 @@ export function packLightingUniforms(data: Float32Array, lighting: WebGPULightin
 
     // direction: vec4f (xyz = direction, w = range)
     // Direction is derived from rotation (matches WebGL rotationToDirection()).
+    // Pre-normalized on CPU so WGSL avoids per-pixel fastNormalize on the
+    // directional/spot path. Zero-length input falls back to (0, 1, 0) to
+    // mirror WGSL's fastNormalize semantics (LEN_SQ_THRESHOLD = EPS_POSITION²).
     const rot = light.rotation ?? [0, 0, 0]
     const direction = rotationToDirection(rot)
-    data[offset + 4] = direction[0]
-    data[offset + 5] = direction[1]
-    data[offset + 6] = direction[2]
+    const dx = direction[0]
+    const dy = direction[1]
+    const dz = direction[2]
+    const lenSq = dx * dx + dy * dy + dz * dz
+    if (lenSq < 1e-8) {
+      data[offset + 4] = 0
+      data[offset + 5] = 1
+      data[offset + 6] = 0
+    } else {
+      const invLen = 1 / Math.sqrt(lenSq)
+      data[offset + 4] = dx * invLen
+      data[offset + 5] = dy * invLen
+      data[offset + 6] = dz * invLen
+    }
     data[offset + 7] = light.range ?? 0
 
     // color: vec4f (rgb = linear color, a = intensity)

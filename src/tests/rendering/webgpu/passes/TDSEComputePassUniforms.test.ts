@@ -311,10 +311,13 @@ describe('writeTdseUniforms', () => {
     expect(u32[194]).toBe(1) // hawkingPairInjection
     expect(u32[195]).toBe(4242) // hawkingSeed
     expect(u32[196]).toBe(12345) // hawkingStepIndex
-    // Pad slots (offsets 788/792/796) stay zero
+    // _padHawk0 (offset 788) stays zero. Slots 198/199 (offsets 792/796) host
+    // the host-precomputed wormhole trig cache; with default dt=0.005 and
+    // wormholeCouplingG=0.5 they hold cos(0.00125) and sin(0.00125).
     expect(u32[197]).toBe(0)
-    expect(u32[198]).toBe(0)
-    expect(u32[199]).toBe(0)
+    const tauG = 0.5 * 0.005 * 0.5
+    expect(f32[198]).toBeCloseTo(Math.cos(tauG), 6)
+    expect(f32[199]).toBeCloseTo(Math.sin(tauG), 6)
   })
 
   it('clamps hawkingDeltaN into [0, 0.6]', () => {

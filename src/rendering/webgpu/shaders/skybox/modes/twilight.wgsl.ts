@@ -36,7 +36,8 @@ fn getTwilight(dir: vec3<f32>, time: f32) -> vec3<f32> {
   palettePos = clamp(palettePos, 0.0, 1.0);
 
   let skyColor = cosinePalette(palettePos, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
-  let horizonColor = cosinePalette(0.5 + tempShift * 0.3, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
+  // PERF: hoisted -- horizonColor depends on tempShift = sin(time*0.02)*0.5+0.5, uniform per dispatch.
+  let horizonColor = uniforms.twilightHorizonColor;
 
   // PERF: Use sqrt() instead of pow(x, 0.5)
   col = mix(horizonColor, skyColor, sqrt(abs(y)));
@@ -46,7 +47,8 @@ fn getTwilight(dir: vec3<f32>, time: f32) -> vec3<f32> {
   let sunDotVal = max(0.0, dot(dir, sunDir));
   let sunDot2 = sunDotVal * sunDotVal;
   let sunGlow = sunDot2 * sunDot2;
-  let sunColor = cosinePalette(tempShift, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD) * 1.5;
+  // PERF: hoisted -- sunColor depends only on tempShift (uniform per dispatch).
+  let sunColor = uniforms.twilightSunColor * 1.5;
   col = mix(col, sunColor, sunGlow * 0.5);
 
   // Subtle atmospheric layers and haze (reuse single noise sample)

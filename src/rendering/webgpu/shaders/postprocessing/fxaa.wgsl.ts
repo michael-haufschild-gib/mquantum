@@ -80,8 +80,16 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   // Calculate contrast
   let lumRange = lumMax - lumMin;
 
-  // Check if contrast is below threshold (no early return - use select at end)
-  let skipAA = lumRange < max(uniforms.edgeThresholdMin, lumMax * uniforms.edgeThreshold);
+  // Early out for low-contrast pixels. textureSampleLevel uses an
+  // explicit LOD so non-uniform control flow is permitted (no implicit
+  // derivatives), and on flat regions of the image the wave is
+  // coherent — the entire warp skips the ~30 arithmetic ops plus the
+  // final texture fetch below. The previous "compute everything then
+  // select" form was conservative against an outdated uniform-CF
+  // requirement that does not apply to textureSampleLevel.
+  if (lumRange < max(uniforms.edgeThresholdMin, lumMax * uniforms.edgeThreshold)) {
+    return vec4f(colorC, 1.0);
+  }
 
   // Calculate edge direction.
   // edgeH sums vertical Laplacians (Y second derivatives at columns W, C, E).
@@ -113,8 +121,10 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   var lumaSum = lumN + lumS + lumE + lumW;
   lumaSum += lumNW + lumNE + lumSW + lumSE;
   let lumaAverage = lumaSum * 0.125;
-  // Use max to avoid division by zero when lumRange is 0
-  let subpixelOffset = clamp(abs(lumaAverage - lumC) / max(lumRange, 0.0001), 0.0, 1.0);
+  // lumRange ≥ max(edgeThresholdMin, lumMax*edgeThreshold) > 0 here, so the
+  // divide is safe without an explicit floor; the early-out above guarantees
+  // we never reach this with lumRange == 0.
+  let subpixelOffset = clamp(abs(lumaAverage - lumC) / lumRange, 0.0, 1.0);
   let subpixelOffsetFinal = (-2.0 * subpixelOffset + 3.0) * subpixelOffset * subpixelOffset;
   let pixelOffset = subpixelOffsetFinal * uniforms.subpixelQuality;
 
@@ -128,12 +138,7 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   let finalOffsetV = vec2f(pixelStep * 0.5, pixelOffset * alongEdgeStep);
   let finalOffset = select(finalOffsetV, finalOffsetH, isHorizontal);
 
-  // Sample final color (must be before any conditionals for uniform control flow)
   let finalColor = textureSampleLevel(tInput, linearSampler, input.uv + finalOffset, 0.0).rgb;
-
-  // Use select to choose between original color (skip AA) or processed color
-  let outputColor = select(finalColor, colorC, skipAA);
-
-  return vec4f(outputColor, 1.0);
+  return vec4f(finalColor, 1.0);
 }
 `

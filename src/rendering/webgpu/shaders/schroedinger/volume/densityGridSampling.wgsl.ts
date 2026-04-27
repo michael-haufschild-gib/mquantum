@@ -245,8 +245,12 @@ fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f 
     let gradZ = (szp.r + szp.g) - (szn.r + szn.g);
     let gradRho = vec3f(gradX, gradY, gradZ) * inv2eps;
     let rhoCenter = textureSampleLevel(densityGridTexture, densityGridSampler, baseUVW, 0.0);
-    let rhoTotal = rhoCenter.r + rhoCenter.g;
-    return gradRho / max(rhoTotal + 1e-8, 1e-8);
+    // rhoCenter.r and .g are |ψ|²-like probability densities (Dirac
+    // particle/antiparticle channels), each ≥ 0. Their sum + 1e-8 is
+    // therefore ≥ 1e-8, so the max() that previously guarded the divide
+    // was redundant — dropping it saves a per-sample max in the raymarch
+    // loop (called every march step, every pixel, every frame).
+    return gradRho / (rhoCenter.r + rhoCenter.g + 1e-8);
   } else if (DENSITY_GRID_HAS_PHASE) {
     let gradX = sxp.g - sxn.g;
     let gradY = syp.g - syn.g;
@@ -258,7 +262,10 @@ fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f 
     let gradZ = szp.r - szn.r;
     let gradRho = vec3f(gradX, gradY, gradZ) * inv2eps;
     let rho = textureSampleLevel(densityGridTexture, densityGridSampler, baseUVW, 0.0).r;
-    return gradRho / max(rho + 1e-8, 1e-8);
+    // rho = |ψ|² ≥ 0 by construction, and trilinear interpolation of
+    // non-negative samples stays non-negative, so rho + 1e-8 ≥ 1e-8 and
+    // the max() guard is redundant.
+    return gradRho / (rho + 1e-8);
   }
 }
 
@@ -392,24 +399,6 @@ fn wrapPhase(dTheta: f32) -> f32 {
 }
 
 /**
- * Fetch the spatial phase stored in the density grid's B channel at a
- * discrete texel index. Returns 0 for out-of-grid texels. r16float grids
- * always return 0 because their B channel is a constant-zero swizzle.
- *
- * Uses textureLoad (nearest-texel fetch) rather than textureSampleLevel
- * because linear filtering interpolates across the ±pi branch cut, which
- * corrupts wrapped edge differences and the quantised plaquette winding.
- * The plaquette winding formula is only topologically well-defined when the
- * four corner phases come from discrete texel centres.
- */
-fn samplePhaseOrZero(ti: vec3i) -> f32 {
-  let N = i32(DENSITY_GRID_SIZE);
-  if (any(ti < vec3i(0)) || any(ti >= vec3i(N))) { return 0.0; }
-  let s = textureLoad(densityGridTexture, ti, 0);
-  return s.b;
-}
-
-/**
  * Winding of a pre-sampled plaquette: four wrapped edge differences
  * around the loop c00 -> c10 -> c11 -> c01 -> c00. Takes phase values at
  * the corners directly so the caller can share texel loads across
@@ -445,26 +434,27 @@ fn computeVortexDensityFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> f
   let baseUVW = (vortexRotatedPos + vec3f(bound)) * invDiameter;
 
   // Quantise to the nearest texel corner. Phase must be read from discrete
-  // texel centres via textureLoad (see samplePhaseOrZero); linear filtering
-  // across the ±pi branch cut would corrupt the winding. floor() anchors
-  // the plaquette to the bottom-left corner of the enclosing texel cube,
-  // and negative out-of-grid positions produce negative texel indices that
-  // the bounds gate below will reject.
+  // texel centres via textureLoad; linear filtering across the ±pi branch
+  // cut would corrupt the winding. floor() anchors the plaquette to the
+  // bottom-left corner of the enclosing texel cube, and negative
+  // out-of-grid positions produce negative texel indices that the bounds
+  // gate below will reject.
   let baseTi = vec3i(floor(baseUVW * DENSITY_GRID_SIZE));
 
-  // Early-out if the furthest unique corner baseTi + (1,1,1) is already
-  // outside the grid -- one cheap bounds check covers every texel the
-  // three plaquettes will read.
-  let N = i32(DENSITY_GRID_SIZE);
-  let farTi = baseTi + vec3i(1, 1, 1);
-  if (any(baseTi < vec3i(0)) || any(farTi >= vec3i(N))) {
+  // Early-out if the furthest unique corner baseTi + (1,1,1) would land
+  // outside the grid: equivalent to baseTi.{xyz} >= N - 1. One cheap
+  // bounds check covers every texel the three plaquettes will read, and
+  // collapses the previous (baseTi + (1,1,1) >= N) form into a single
+  // vec3i comparison without the pre-add.
+  let limit = i32(DENSITY_GRID_SIZE) - 1;
+  if (any(baseTi < vec3i(0)) || any(baseTi >= vec3i(limit))) {
     return 0.0;
   }
 
   // Seven unique corner phases — the 2×2×2 cube minus its far +x+y+z
   // corner (never referenced by any of the three plaquettes below).
-  // The far-corner bounds gate above already covers every one of these loads,
-  // so inline textureLoad skips samplePhaseOrZero's per-call bounds check (7 gates saved).
+  // The far-corner bounds gate above covers every one of these loads,
+  // so inline textureLoad omits any per-call bounds check (7 gates saved).
   let p000 = textureLoad(densityGridTexture, baseTi,                    0).b; // origin
   let p100 = textureLoad(densityGridTexture, baseTi + vec3i(1, 0, 0),   0).b; // +x
   let p010 = textureLoad(densityGridTexture, baseTi + vec3i(0, 1, 0),   0).b; // +y

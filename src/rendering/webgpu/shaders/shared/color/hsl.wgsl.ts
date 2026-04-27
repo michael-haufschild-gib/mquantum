@@ -19,19 +19,25 @@ export const hslBlock = /* wgsl */ `
  * @return RGB color (0-1)
  */
 fn hsl2rgb(h: f32, s: f32, l: f32) -> vec3f {
-  // PERF: Branchless HSL→RGB using the triangle-wave identity.
-  // Each RGB channel is a triangle wave offset by 120° in hue space.
-  // This eliminates the 6-branch if-else chain that causes GPU warp divergence.
+  // PERF: Branchless HSL→RGB using the triangle-wave identity, fully
+  // vectorised. Each RGB channel is a triangle wave centred at hue
+  // sectors 0/2/4 (R wraps at the ±3 endpoints) — folding the three
+  // scalar abs/clamp pairs into three vec3 ops lets the hardware run
+  // them as a single SIMD instruction on every backend instead of
+  // relying on the compiler to re-vectorise three independent scalars.
   let c = (1.0 - abs(2.0 * l - 1.0)) * s;
   let m = l - c * 0.5;
   let hue6 = fract(h) * 6.0;
 
-  // Triangle wave: T(x) = clamp(|x - 3| - 1, 0, 1) maps hue sector to channel intensity
-  let r = clamp(abs(hue6 - 3.0) - 1.0, 0.0, 1.0);
-  let g = clamp(2.0 - abs(hue6 - 2.0), 0.0, 1.0);
-  let b = clamp(2.0 - abs(hue6 - 4.0), 0.0, 1.0);
+  // dist.x = |hue6 − 3|: R is high outside [2, 4]   → pre = dist − 1
+  // dist.yz = |hue6 − 2|, |hue6 − 4|: G, B are tents → pre = 2 − dist
+  // Unify via a per-component sign+offset so the pre-clamp lane is one
+  // vec3 fma:   signs * dist + offsets.
+  let dist = abs(hue6 - vec3f(3.0, 2.0, 4.0));
+  let preClamp = vec3f(1.0, -1.0, -1.0) * dist + vec3f(-1.0, 2.0, 2.0);
+  let rgb = clamp(preClamp, vec3f(0.0), vec3f(1.0));
 
-  return vec3f(r, g, b) * c + m;
+  return rgb * c + m;
 }
 
 /**

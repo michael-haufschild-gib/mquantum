@@ -38,7 +38,10 @@ export const quantumWalkAbsorberBlock = /* wgsl */ `
 // (array<u32, 12>) with 4-byte stride — spec-forbidden in uniform address
 // space. Chrome/Tint accepts it; naga rejects.
 @group(0) @binding(0) var<storage, read> params: QWAbsorberUniforms;
-@group(0) @binding(1) var<storage, read_write> coinState: array<f32>;
+// vec2f view of the [re,im] interleaved coin buffer (matches sibling QW
+// shaders). One vec2 element per complex amplitude — re and im scale
+// together with a single multiply.
+@group(0) @binding(1) var<storage, read_write> coinState: array<vec2f>;
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
@@ -58,10 +61,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // Per-step damping (no dt for discrete walk)
     let dampFactor = exp(-sigma);
     let numCoinStates = 2u * params.latticeDim;
-    let base = idx * numCoinStates * 2u;
+    // vec2f view: per-site stride is numCoinStates (was numCoinStates * 2 in f32 units).
+    let base = idx * numCoinStates;
     for (var j: u32 = 0u; j < numCoinStates; j++) {
-      coinState[base + j * 2u] *= dampFactor;       // re
-      coinState[base + j * 2u + 1u] *= dampFactor;  // im
+      coinState[base + j] *= dampFactor;
     }
   }
 }
