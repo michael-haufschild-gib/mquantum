@@ -284,7 +284,7 @@ export const CosmologyControls: React.FC<CosmologyControlsProps> = React.memo(
 
             <Slider
               label="η₀ (initial)"
-              tooltip="Initial conformal time. Isotropic FLRW presets use η < 0 (deep past). Bianchi-I Kasner and LQC Bounce use η > 0 (conformal time increases monotonically through the bounce). Runtime floor |η| ≥ 1e-3 prevents singularity crossing."
+              tooltip="Initial conformal time. Isotropic FLRW presets use η < 0 (deep past). Bianchi-I Kasner and LQC Bounce use η > 0. Runtime floor |η| ≥ 1e-2 prevents singularity crossing."
               min={
                 cosmology.preset === 'bianchiKasner'
                   ? 0.01

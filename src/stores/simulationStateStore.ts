@@ -16,6 +16,7 @@ import type { SaveableQuantumMode } from '@/lib/export/simulationState'
 import type { PauliConfig } from '@/lib/geometry/extended/types'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
+import { usePerformanceStore } from '@/stores/performanceStore'
 
 /** Status of save/load operations */
 export type SimulationStateStatus = 'idle' | 'saving' | 'loading' | 'done' | 'error'
@@ -102,6 +103,16 @@ interface SimulationStateState {
   reset: () => void
 }
 
+/** Clear the scene-loading guard after React effects observe the guarded restore. */
+function scheduleClearLoadingFlag(): void {
+  const clearFlag = () => usePerformanceStore.getState().setIsLoadingScene(false)
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(clearFlag)
+  } else {
+    setTimeout(clearFlag, 0)
+  }
+}
+
 /**
  * Zustand store for simulation state save/load operations.
  *
@@ -141,59 +152,65 @@ export const useSimulationStateStore = create<SimulationStateState>((set) => ({
         const runtimeMeta: RuntimeMeta | undefined =
           typeof rawMeta === 'object' && rawMeta !== null ? (rawMeta as RuntimeMeta) : undefined
 
-        if (result.quantumMode === 'pauliSpinor') {
-          // Pauli is a separate object type — switch objectType and apply pauli config.
-          useGeometryStore.getState().setObjectType('pauliSpinor')
-          const pauliConfig = (restConfig.pauli ?? restConfig) as Partial<PauliConfig>
-          useExtendedObjectStore.getState().setPauliConfig({
-            ...pauliConfig,
-            needsReset: true,
-          })
-        } else {
-          // Compute-mode sub-configs live on `schroedinger.<mode>`, and
-          // `setSchroedingerConfig` does a SHALLOW merge. Setting
-          // `needsReset: true` at the top level does not propagate into the
-          // sub-config the compute pass actually checks, so the field
-          // buffers keep whatever vacuum data the previous reinit sampled
-          // and the loaded wavefunction is silently dropped. Build a new
-          // config object with the reset flag forced into the correct
-          // sub-config for each compute mode.
-          const MODE_TO_SUBCONFIG_KEY: Record<string, string> = {
-            freeScalarField: 'freeScalar',
-            tdseDynamics: 'tdse',
-            becDynamics: 'bec',
-            diracEquation: 'dirac',
-            quantumWalk: 'quantumWalk',
+        const wasLoadingScene = usePerformanceStore.getState().isLoadingScene
+        usePerformanceStore.getState().setIsLoadingScene(true)
+        try {
+          if (result.quantumMode === 'pauliSpinor') {
+            // Pauli is a separate object type — switch objectType and apply pauli config.
+            useGeometryStore.getState().setObjectType('pauliSpinor')
+            const pauliConfig = (restConfig.pauli ?? restConfig) as Partial<PauliConfig>
+            useExtendedObjectStore.getState().setPauliConfig({
+              ...pauliConfig,
+              needsReset: true,
+            })
+          } else {
+            // Compute-mode sub-configs live on `schroedinger.<mode>`, and
+            // `setSchroedingerConfig` does a SHALLOW merge. Setting
+            // `needsReset: true` at the top level does NOT propagate into the
+            // sub-config the compute pass actually checks, so the field
+            // buffers keep whatever vacuum data the previous reinit sampled
+            // and the loaded wavefunction is silently dropped. Build a new
+            // config object with the reset flag forced into the correct
+            // sub-config for each compute mode.
+            const MODE_TO_SUBCONFIG_KEY: Record<string, string> = {
+              freeScalarField: 'freeScalar',
+              tdseDynamics: 'tdse',
+              becDynamics: 'bec',
+              diracEquation: 'dirac',
+              quantumWalk: 'quantumWalk',
+            }
+            const subKey = MODE_TO_SUBCONFIG_KEY[result.quantumMode]
+            const subConfig =
+              subKey && typeof restConfig[subKey] === 'object' && restConfig[subKey] !== null
+                ? { ...(restConfig[subKey] as Record<string, unknown>), needsReset: true }
+                : undefined
+            const pushed: Record<string, unknown> = {
+              ...restConfig,
+              quantumMode: result.quantumMode,
+              // Preserve the top-level flag too for analytic modes that read it.
+              needsReset: true,
+              ...(subKey && subConfig ? { [subKey]: subConfig } : {}),
+            }
+            useExtendedObjectStore.getState().setSchroedingerConfig(pushed)
           }
-          const subKey = MODE_TO_SUBCONFIG_KEY[result.quantumMode]
-          const subConfig =
-            subKey && typeof restConfig[subKey] === 'object' && restConfig[subKey] !== null
-              ? { ...(restConfig[subKey] as Record<string, unknown>), needsReset: true }
-              : undefined
-          const pushed: Record<string, unknown> = {
-            ...restConfig,
-            quantumMode: result.quantumMode,
-            // Preserve the top-level flag too for analytic modes that read it.
-            needsReset: true,
-            ...(subKey && subConfig ? { [subKey]: subConfig } : {}),
-          }
-          useExtendedObjectStore.getState().setSchroedingerConfig(pushed)
-        }
 
-        set({
-          pendingLoadData: {
-            quantumMode: result.quantumMode,
-            latticeDim: result.latticeDim,
-            gridSize: result.gridSize,
-            totalSites: result.totalSites,
-            // Expose the deserializer's untouched config so consumers see
-            // exactly what was on disk, including `_runtimeMeta`.
-            config: sourceConfig,
-            psiRe: result.psiRe,
-            psiIm: result.psiIm,
-            runtimeMeta,
-          },
-        })
+          set({
+            pendingLoadData: {
+              quantumMode: result.quantumMode,
+              latticeDim: result.latticeDim,
+              gridSize: result.gridSize,
+              totalSites: result.totalSites,
+              // Expose the deserializer's untouched config so consumers see
+              // exactly what was on disk, including `_runtimeMeta`.
+              config: sourceConfig,
+              psiRe: result.psiRe,
+              psiIm: result.psiIm,
+              runtimeMeta,
+            },
+          })
+        } finally {
+          if (!wasLoadingScene) scheduleClearLoadingFlag()
+        }
       })
       .catch((err) => {
         set({ status: 'error', error: String(err) })

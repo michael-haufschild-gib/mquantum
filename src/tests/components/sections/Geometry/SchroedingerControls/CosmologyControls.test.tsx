@@ -2,7 +2,7 @@
  * Tests for CosmologyControls — Mukhanov-Sasaki cosmological background sub-panel.
  */
 
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -101,6 +101,28 @@ describe('CosmologyControls', () => {
     await openGroup(user)
     expect(screen.getByTestId('cosmology-preset-select')).toBeInTheDocument()
     expect(screen.getByTestId('cosmology-eta0-slider')).toBeInTheDocument()
+  })
+
+  it('describes the runtime eta floor from COSMOLOGY_ETA_FLOOR in the eta0 tooltip', async () => {
+    const user = userEvent.setup()
+    render(
+      <CosmologyControls
+        cosmology={{ ...DEFAULT_COSMOLOGY_CONFIG, enabled: true }}
+        latticeDim={VALID_LATTICE_DIM}
+        gridSize={DEFAULT_GRID_SIZE}
+        spacing={DEFAULT_SPACING}
+        selfInteractionEnabled={false}
+        actions={makeMockActions()}
+      />
+    )
+    await openGroup(user)
+    await user.hover(screen.getByText('η₀ (initial)'))
+    await waitFor(
+      () => {
+        expect(screen.getByRole('tooltip')).toHaveTextContent('|η| ≥ 1e-2')
+      },
+      { timeout: 1000 }
+    )
   })
 
   it('shows Hubble slider for deSitter preset after opening', async () => {

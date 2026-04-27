@@ -3,12 +3,17 @@
  *
  * Encapsulates the light gizmo drag state machine: translate axis,
  * rotate ring, ground-target drag, and click-to-select. Produces
- * mouse event handlers that the scene component attaches to its overlay.
+ * pointer event handlers that the scene component attaches to its overlay.
+ *
+ * Uses Pointer Events with `setPointerCapture` so drag state survives the
+ * cursor leaving the overlay, releasing off-element, or the window losing
+ * focus — the failure modes that previously stranded `lastMouseRef` and
+ * caused the camera to leap by hundreds of degrees on the next move.
  *
  * @module rendering/webgpu/useGizmoInteraction
  */
 
-import React, { useCallback, useRef } from 'react'
+import React, { useCallback, useEffect, useRef } from 'react'
 
 import { directionToRotation } from '@/rendering/lights/types'
 import { useLightingStore } from '@/stores/lightingStore'
@@ -32,21 +37,23 @@ export interface GizmoInteractionDeps {
   scheduleEndInteraction: () => void
 }
 
-/** Return value: mouse event handlers and overlay ref. */
+/** Return value: pointer event handlers and overlay ref. */
 export interface GizmoInteractionHandlers {
   overlayRef: React.RefObject<HTMLDivElement | null>
-  handleMouseDown: (e: React.MouseEvent) => void
-  handleMouseUp: (e: React.MouseEvent) => void
-  handleMouseMove: (e: React.MouseEvent) => void
+  handlePointerDown: (e: React.PointerEvent) => void
+  handlePointerUp: (e: React.PointerEvent) => void
+  handlePointerMove: (e: React.PointerEvent) => void
+  handlePointerCancel: (e: React.PointerEvent) => void
 }
 
 /**
- * Hook that manages light gizmo interaction state and produces mouse handlers.
+ * Hook that manages light gizmo interaction state and produces pointer handlers.
  *
  * Drag state machine:
- * - mouseDown: test gizmo hit (translate/rotate/ground-target) → enter gizmo drag, or fall through to camera drag
- * - mouseMove: update light position/rotation based on drag kind
- * - mouseUp: commit drag, handle click-to-select
+ * - pointerDown: capture pointer, test gizmo hit (translate/rotate/ground-target) → enter gizmo drag, or fall through to camera drag
+ * - pointerMove: update light position/rotation based on drag kind, or orbit/pan camera
+ * - pointerUp: release capture, commit drag, handle click-to-select
+ * - pointerCancel: release capture, abort drag without commit
  */
 export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractionHandlers {
   const { cameraRef, dimensionRef, startInteraction, scheduleEndInteraction } = deps
@@ -57,11 +64,77 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
   const gizmoDragRef = useRef<GizmoDragState | null>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
 
-  // ── mouseDown: test gizmo hit or enter camera drag ──
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
+  // Set when the cursor leaves the document (top/bottom of the screen on
+  // desktop, where the canvas is full-bleed). The next pointermove after
+  // re-entry must NOT apply orbit — between the leave and the re-entry the
+  // cursor moved freely off-screen, so the delta computed against
+  // `lastMouseRef` would jerk the camera by an arbitrary amount. Instead we
+  // re-baseline `lastMouseRef` to the new position and skip the orbit for
+  // exactly that one event. Without this, vertical drags felt like a
+  // "reset" near the top/bottom of the screen.
+  const cursorOutsideDocumentRef = useRef(false)
+
+  // Abort any in-flight drag without committing — used by pointercancel and
+  // the window-blur safety net. Without this, a missed pointerup leaves
+  // `isDraggingRef === true` and the next pointermove computes a stale
+  // delta from the now-far-away `lastMouseRef`, jumping the camera.
+  const abortDrag = useCallback(() => {
+    if (gizmoDragRef.current) {
+      gizmoDragRef.current = null
+      useLightingStore.getState().setIsDraggingLight(false)
+    }
+    if (isDraggingRef.current) {
+      isDraggingRef.current = false
+    }
+    cursorOutsideDocumentRef.current = false
+    scheduleEndInteraction()
+  }, [scheduleEndInteraction])
+
+  // Window-blur safeguard: some browsers (notably Safari historically) do not
+  // emit pointercancel reliably on focus loss, so we mirror the abort here.
+  useEffect(() => {
+    const handleBlur = () => abortDrag()
+    window.addEventListener('blur', handleBlur)
+    return () => {
+      window.removeEventListener('blur', handleBlur)
+    }
+  }, [abortDrag])
+
+  // Document-level cursor leave: fires when the cursor exits the viewport
+  // (top, bottom, or sides of the screen on a full-bleed canvas). With
+  // pointer capture the drag stays alive, but pointermove events stop until
+  // the cursor returns. We mark the next pointermove as "gap recovery" so
+  // it re-baselines `lastMouseRef` instead of orbiting by an off-screen
+  // delta. Listened on `document.documentElement` because that is the
+  // element whose `mouseleave` fires when the cursor exits the viewport.
+  useEffect(() => {
+    const root = document.documentElement
+    const handleDocLeave = () => {
+      if (isDraggingRef.current || gizmoDragRef.current) {
+        cursorOutsideDocumentRef.current = true
+      }
+    }
+    root.addEventListener('mouseleave', handleDocLeave)
+    return () => {
+      root.removeEventListener('mouseleave', handleDocLeave)
+    }
+  }, [])
+
+  // ── pointerDown: capture pointer, test gizmo hit or enter camera drag ──
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
       mouseDownPosRef.current = { x: e.clientX, y: e.clientY }
       lastMouseRef.current = { x: e.clientX, y: e.clientY }
+
+      // Capture the pointer so subsequent move/up/cancel events route here
+      // even when the cursor leaves the overlay or the user releases over
+      // a panel. Wrap in try/catch — capture can throw on detached nodes.
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId)
+      } catch {
+        // Capture not available (jsdom/happy-dom in tests, or detached node).
+        // Drag still works for events delivered to this element.
+      }
 
       const dragState = tryGizmoDragStart(cameraRef, overlayRef, e)
       if (dragState) {
@@ -77,9 +150,15 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
     [cameraRef, startInteraction]
   )
 
-  // ── mouseUp: commit gizmo drag or handle click-to-select ──
-  const handleMouseUp = useCallback(
-    (e: React.MouseEvent) => {
+  // ── pointerUp: release capture, commit gizmo drag or handle click-to-select ──
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId)
+      } catch {
+        // Already released or never captured — safe to ignore.
+      }
+
       // End gizmo drag if active
       if (gizmoDragRef.current) {
         const wasGizmoClick = isClick(e, mouseDownPosRef.current)
@@ -105,9 +184,22 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
     [cameraRef, scheduleEndInteraction]
   )
 
-  // ── mouseMove: gizmo drag or camera orbit/pan ──
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => {
+  // ── pointerCancel: capture interrupted (focus loss, OS gesture). Abort drag. ──
+  const handlePointerCancel = useCallback(
+    (e: React.PointerEvent) => {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId)
+      } catch {
+        // Already released — safe to ignore.
+      }
+      abortDrag()
+    },
+    [abortDrag]
+  )
+
+  // ── pointerMove: gizmo drag or camera orbit/pan ──
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
       // Handle gizmo dragging
       const drag = gizmoDragRef.current
       if (drag) {
@@ -125,6 +217,15 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
 
       if (!isDraggingRef.current || !cameraRef.current) return
 
+      // Gap recovery: cursor returned from off-document. Re-baseline without
+      // applying the off-screen delta — that delta represents OS-level cursor
+      // motion the user made outside the viewport, not intent to rotate.
+      if (cursorOutsideDocumentRef.current) {
+        cursorOutsideDocumentRef.current = false
+        lastMouseRef.current = { x: e.clientX, y: e.clientY }
+        return
+      }
+
       const dx = e.clientX - lastMouseRef.current.x
       const dy = e.clientY - lastMouseRef.current.y
       lastMouseRef.current = { x: e.clientX, y: e.clientY }
@@ -140,7 +241,13 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
     [cameraRef, dimensionRef]
   )
 
-  return { overlayRef, handleMouseDown, handleMouseUp, handleMouseMove }
+  return {
+    overlayRef,
+    handlePointerDown,
+    handlePointerUp,
+    handlePointerMove,
+    handlePointerCancel,
+  }
 }
 
 // ── Helper: click detection ──

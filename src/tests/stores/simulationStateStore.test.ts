@@ -16,13 +16,26 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { type PendingLoadData, useSimulationStateStore } from '@/stores/simulationStateStore'
 
 // Mock target — mutated per test to exercise different quantum modes.
-const { deserializeMock, setSchroedingerConfigSpy, setPauliConfigSpy, setObjectTypeSpy } =
-  vi.hoisted(() => ({
+const {
+  deserializeMock,
+  setSchroedingerConfigSpy,
+  setPauliConfigSpy,
+  setObjectTypeSpy,
+  performanceState,
+  setIsLoadingSceneSpy,
+} = vi.hoisted(() => {
+  const performanceState = { isLoadingScene: false }
+  return {
     deserializeMock: vi.fn(),
     setSchroedingerConfigSpy: vi.fn(),
     setPauliConfigSpy: vi.fn(),
     setObjectTypeSpy: vi.fn(),
-  }))
+    performanceState,
+    setIsLoadingSceneSpy: vi.fn((loading: boolean) => {
+      performanceState.isLoadingScene = loading
+    }),
+  }
+})
 
 // Mock the dynamic imports used by loadFromFile
 vi.mock('@/lib/export/simulationState', () => ({
@@ -46,12 +59,23 @@ vi.mock('@/stores/geometryStore', () => ({
   },
 }))
 
+vi.mock('@/stores/performanceStore', () => ({
+  usePerformanceStore: {
+    getState: () => ({
+      isLoadingScene: performanceState.isLoadingScene,
+      setIsLoadingScene: setIsLoadingSceneSpy,
+    }),
+  },
+}))
+
 describe('simulationStateStore', () => {
   beforeEach(() => {
     useSimulationStateStore.getState().reset()
     setSchroedingerConfigSpy.mockClear()
     setPauliConfigSpy.mockClear()
     setObjectTypeSpy.mockClear()
+    setIsLoadingSceneSpy.mockClear()
+    performanceState.isLoadingScene = false
     // Default mock — individual tests override.
     deserializeMock.mockImplementation(async () => ({
       quantumMode: 'tdseDynamics' as const,
@@ -311,6 +335,67 @@ describe('simulationStateStore', () => {
         tdse: { needsReset: boolean }
       }
       expect(pushed.tdse.needsReset).toBe(true)
+    })
+
+    it('guards Pauli mqstate restore so object-type initialization cannot clobber loaded config', async () => {
+      setObjectTypeSpy.mockImplementationOnce(() => {
+        expect(performanceState.isLoadingScene).toBe(true)
+      })
+      setPauliConfigSpy.mockImplementationOnce(() => {
+        expect(performanceState.isLoadingScene).toBe(true)
+      })
+      deserializeMock.mockImplementationOnce(async () => ({
+        quantumMode: 'pauliSpinor' as const,
+        latticeDim: 3,
+        componentCount: 2,
+        gridSize: [16, 16, 16],
+        totalSites: 4096,
+        config: {
+          pauli: {
+            fieldType: 'quadrupole',
+            fieldView: 'coherence',
+            latticeDim: 3,
+            gridSize: [16, 16, 16],
+            spacing: [0.2, 0.2, 0.2],
+            packetCenter: [1, 2, 3],
+            packetMomentum: [4, 5, 6],
+            needsReset: false,
+          },
+        },
+        psiRe: new Float32Array(8192),
+        psiIm: new Float32Array(8192),
+      }))
+
+      const file = new File([new ArrayBuffer(128)], 'pauli.mqstate', {
+        type: 'application/octet-stream',
+      })
+      useSimulationStateStore.getState().loadFromFile(file)
+
+      await vi.waitFor(() => {
+        expect(setPauliConfigSpy).toHaveBeenCalledTimes(1)
+      })
+
+      const loadingOnOrder = setIsLoadingSceneSpy.mock.invocationCallOrder[0]!
+      expect(setIsLoadingSceneSpy.mock.calls[0]).toEqual([true])
+      expect(loadingOnOrder).toBeLessThan(setObjectTypeSpy.mock.invocationCallOrder[0]!)
+      expect(loadingOnOrder).toBeLessThan(setPauliConfigSpy.mock.invocationCallOrder[0]!)
+      expect(setObjectTypeSpy).toHaveBeenCalledWith('pauliSpinor')
+      expect(setPauliConfigSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fieldType: 'quadrupole',
+          fieldView: 'coherence',
+          gridSize: [16, 16, 16],
+          spacing: [0.2, 0.2, 0.2],
+          packetCenter: [1, 2, 3],
+          packetMomentum: [4, 5, 6],
+          needsReset: true,
+        })
+      )
+
+      await vi.waitFor(() => {
+        expect(setIsLoadingSceneSpy).toHaveBeenLastCalledWith(false)
+      })
+      expect(performanceState.isLoadingScene).toBe(false)
     })
 
     it('setLoadError transitions to error and clears pendingLoadData', () => {
