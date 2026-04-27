@@ -77,7 +77,11 @@ async function profile(
   await page.waitForFunction(
     async () => {
       const mod = await import('/src/stores/performanceMetricsStore.ts')
-      return mod.usePerformanceMetricsStore.getState().fps > 0
+      // `fps` initializes to 60 (smoothed history), so it cannot signal that
+      // a real metrics frame has landed. Wait on fields that start at 0/[]
+      // and are only populated by an actual update.
+      const s = mod.usePerformanceMetricsStore.getState()
+      return s.frameTime > 0 || s.cpuTime > 0 || s.totalGpuTimeMs > 0 || s.passTimings.length > 0
     },
     { timeout: 5_000 }
   )
