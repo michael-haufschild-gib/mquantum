@@ -177,6 +177,46 @@ Render local internal-state entropy in the N-D discrete quantum walk. The view s
   - `git diff --check` — PASS.
 - Follow-up threads: use entropy as a decoherence-candidate isosurface; compare Grover localization entropy against DFT spreading; expose a combined entropy/chirality bivariate view.
 
+## Round PRD: Dirac Axial Charge Field View
+
+### Scientific Goal
+
+Render local axial/chiral charge in the Dirac spinor solver. The view should expose where relativistic wavefunctions carry `ψ†γ5ψ` imbalance, making anomaly-adjacent left/right coherence visible during Klein, Zitterbewegung, and supercritical-potential scenarios.
+
+### Physics / Math
+
+- Add `axialCharge` to `DiracFieldView`.
+- Map `axialCharge` to Dirac write-grid `fieldView = 7`.
+- In `diracWriteGrid`:
+  - For `latticeDim >= 3`, compute the Hermitian 3+1D chirality operator from existing Clifford matrices:
+    - `γ5 = -i α0 α1 α2`
+    - `α_i = γ0 γ_i` are the existing Dirac alpha matrices.
+  - Evaluate nearest-neighbor local axial charge:
+    - `A5 = ψ† γ5 ψ`
+    - `ρ = ψ†ψ`
+    - display scalar `abs(A5) / max(ρ, eps)`, density-gated by the existing normalized density gate.
+  - For `latticeDim < 3`, render zero for this view.
+  - Preserve alpha as raw normalized density and preserve potential overlay behavior.
+- Existing field-view enum values and rendering must remain unchanged.
+
+### User Sees
+
+- Dirac controls gain an `Axial |ψ†γ5ψ|` field-view option.
+- Selecting it renders bright regions where the spinor has strong local chiral/axial imbalance and dark regions where left/right contributions cancel or density is absent.
+
+### Acceptance Bar
+
+- TypeScript compiles.
+- Unit/source tests cover:
+  - `axialCharge` is a valid Dirac field view and packs to uniform enum `7`.
+  - Dirac controls expose `Axial |ψ†γ5ψ|`.
+  - `diracWriteGrid` has a `fieldView == 7u` branch using `-i α0 α1 α2`, `DIRAC_USE_SPARSE_GAMMA`, `gammaMatrices`, density gating, and raw-density alpha preservation.
+  - A CPU algebra regression confirms `-i α0 α1 α2` matches the expected 3D gamma5 action for the project’s standard Dirac form.
+- `pnpm exec vitest run src/tests/rendering/webgpu/diracAxialChargeShader.test.ts src/tests/components/sections/Geometry/SchroedingerControls/DiracControls.test.tsx src/tests/stores/extendedObjectStore.dirac.test.ts`
+- `pnpm exec tsc --noEmit`
+- `pnpm run lint`
+- `pnpm test:shaders:fast`
+
 ### Outcome
 
 - Commit: `353352ea` (`Add Coleman-De Luccia bubble lens`)
@@ -424,3 +464,18 @@ Render the analog black-hole sonic horizon as an emitted-flux field, not only as
 - `pnpm exec tsc --noEmit`
 - `pnpm run lint`
 - `pnpm test:shaders:fast`
+
+### Outcome
+
+- Commit: `Add Dirac axial charge view` (amended with this outcome).
+- Reviewer result: independent reviewer stalled and was closed; local source review found no blocking issue.
+- What renderer now draws: Dirac Equation has a new `Axial |ψ†γ5ψ|` field view that raymarches normalized local axial/chiral charge magnitude.
+- Physics implemented: `γ5 = -i α0 α1 α2` using the existing Clifford alpha matrices, sparse monomial tables when available, dense `gammaMatrices` fallback otherwise, and zero output for `latticeDim < 3`.
+- Paths affected: Dirac field-view type/UI/packing, Dirac write-grid shader composition, new axial helper WGSL block, palette sync, and focused tests.
+- Verification:
+  - `pnpm exec vitest run src/tests/rendering/webgpu/diracAxialChargeShader.test.ts src/tests/components/sections/Geometry/SchroedingerControls/DiracControls.test.tsx src/tests/stores/extendedObjectStore.dirac.test.ts` — PASS, 35 tests.
+  - `pnpm exec tsc --noEmit` — PASS.
+  - `pnpm run lint` — PASS.
+  - `pnpm test:shaders:fast` — PASS.
+  - `git diff --check` — PASS.
+- Follow-up threads: color signed axial charge instead of magnitude; couple axial charge to a synthetic anomaly source; compare axial domains during Zitterbewegung versus Klein tunneling.

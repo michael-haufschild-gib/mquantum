@@ -266,6 +266,7 @@ export const DIRAC_FIELD_VIEW_TO_COLOR_ALGO: Record<DiracFieldView, ColorAlgorit
   spinDensity: 'blackbody',
   currentDensity: 'blackbody',
   phase: 'phaseCyclicUniform',
+  axialCharge: 'blackbody',
 }
 
 /**

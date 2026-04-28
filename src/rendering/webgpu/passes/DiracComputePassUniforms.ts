@@ -47,6 +47,7 @@ const VIEW_MAP: Record<string, number> = {
   spinDensity: 4,
   currentDensity: 5,
   phase: 6,
+  axialCharge: 7,
 }
 
 /**

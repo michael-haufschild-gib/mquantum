@@ -61,6 +61,9 @@ describe('Dirac store slice', () => {
     expect(useExtendedObjectStore.getState().schroedinger.dirac.fieldView).toBe(
       'antiparticleDensity'
     )
+
+    store.setDiracFieldView('axialCharge')
+    expect(useExtendedObjectStore.getState().schroedinger.dirac.fieldView).toBe('axialCharge')
   })
 
   it('setDiracInitialCondition changes condition', () => {

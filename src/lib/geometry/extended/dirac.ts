@@ -31,6 +31,7 @@ export type DiracInitialCondition =
  * - spinDensity: magnitude of spin vector |s| = |ψ†Σψ|
  * - currentDensity: magnitude of probability current |j| = |cψ†αψ|
  * - phase: phase of dominant spinor component
+ * - axialCharge: normalized axial/chiral charge magnitude |ψ†γ5ψ|/ρ
  */
 export type DiracFieldView =
   | 'totalDensity'
@@ -40,6 +41,7 @@ export type DiracFieldView =
   | 'spinDensity'
   | 'currentDensity'
   | 'phase'
+  | 'axialCharge'
 
 /**
  * Potential type for the Dirac equation.
@@ -67,6 +69,7 @@ export const DIRAC_FIELD_VIEWS: readonly DiracFieldView[] = [
   'spinDensity',
   'currentDensity',
   'phase',
+  'axialCharge',
 ]
 
 export const DIRAC_POTENTIAL_TYPES: readonly DiracPotentialType[] = [

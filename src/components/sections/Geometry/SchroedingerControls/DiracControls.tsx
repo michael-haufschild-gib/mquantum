@@ -40,6 +40,7 @@ const FIELD_VIEW_OPTIONS: { value: DiracFieldView; label: string }[] = [
   { value: 'spinDensity', label: 'Spin Density |s|' },
   { value: 'currentDensity', label: 'Current Density |j|' },
   { value: 'phase', label: 'Phase arg(ψ₀)' },
+  { value: 'axialCharge', label: 'Axial |ψ†γ5ψ|' },
 ]
 
 const POTENTIAL_TYPE_OPTIONS: { value: DiracPotentialType; label: string }[] = [
