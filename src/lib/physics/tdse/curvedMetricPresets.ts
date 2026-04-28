@@ -15,7 +15,7 @@
  * @module lib/physics/tdse/curvedMetricPresets
  */
 
-import type { TdseScenarioPreset } from './presets'
+import type { TdseScenarioPreset } from './tdsePresetTypes'
 
 /** Curved-space TDSE v2 presets, appended to the main preset registry. */
 export const CURVED_METRIC_TDSE_PRESETS: TdseScenarioPreset[] = [

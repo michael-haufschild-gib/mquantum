@@ -8,9 +8,20 @@
 import { expect, test } from './fixtures'
 import {
   gotoModeWithParams,
+  waitForDiagnostics,
   waitForFirstFrame,
   waitForRendererSettled,
+  waitForSimulationFrames,
 } from './helpers/app-helpers'
+
+const DIAG_STORE = '/src/stores/diagnosticsStore.ts'
+
+/** Wait for tdse diagnostics to populate AND simulation to advance enough frames for stable readout. */
+async function waitForTdseDiagnosticsReady(page: import('@playwright/test').Page): Promise<void> {
+  await waitForFirstFrame(page)
+  await waitForSimulationFrames(page, 60)
+  await waitForDiagnostics(page, DIAG_STORE, 30_000, 'tdse')
+}
 
 test.describe('Continuous Monitoring Transition', () => {
   test('IPR diagnostics produce valid values with monitoring', async ({ page }) => {
@@ -22,12 +33,11 @@ test.describe('Continuous Monitoring Transition', () => {
       sloc_g: '1.0',
     })
     const state = await waitForRendererSettled(page)
-    if (state === 'error') {
-      test.skip()
-      return
-    }
-    await waitForFirstFrame(page)
-    await page.waitForTimeout(2000)
+    expect(
+      state,
+      'renderer entered error state — investigate WebGPU init or shader compilation rather than skipping the physics check'
+    ).not.toBe('error')
+    await waitForTdseDiagnosticsReady(page)
 
     const ipr = await page.evaluate(async () => {
       const mod = await import('/src/stores/diagnosticsStore.ts')
@@ -51,12 +61,11 @@ test.describe('Continuous Monitoring Transition', () => {
         sloc_s: '2.0',
       })
       const state = await waitForRendererSettled(page)
-      if (state === 'error') {
-        test.skip()
-        return
-      }
-      await waitForFirstFrame(page)
-      await page.waitForTimeout(3000)
+      expect(
+        state,
+        `renderer entered error state at γ=${gamma} — investigate rather than skipping`
+      ).not.toBe('error')
+      await waitForTdseDiagnosticsReady(page)
 
       const ipr = await page.evaluate(async () => {
         const mod = await import('/src/stores/diagnosticsStore.ts')
@@ -80,12 +89,11 @@ test.describe('Continuous Monitoring Transition', () => {
       sloc_g: '0',
     })
     let state = await waitForRendererSettled(page)
-    if (state === 'error') {
-      test.skip()
-      return
-    }
-    await waitForFirstFrame(page)
-    await page.waitForTimeout(2000)
+    expect(
+      state,
+      'renderer entered error state — investigate WebGPU init or shader compilation rather than skipping the physics check'
+    ).not.toBe('error')
+    await waitForTdseDiagnosticsReady(page)
 
     const iprMonitored = await page.evaluate(async () => {
       const mod = await import('/src/stores/diagnosticsStore.ts')
@@ -99,12 +107,11 @@ test.describe('Continuous Monitoring Transition', () => {
       diag: '1',
     })
     state = await waitForRendererSettled(page)
-    if (state === 'error') {
-      test.skip()
-      return
-    }
-    await waitForFirstFrame(page)
-    await page.waitForTimeout(2000)
+    expect(
+      state,
+      'renderer entered error state — investigate WebGPU init or shader compilation rather than skipping the physics check'
+    ).not.toBe('error')
+    await waitForTdseDiagnosticsReady(page)
 
     const iprStandard = await page.evaluate(async () => {
       const mod = await import('/src/stores/diagnosticsStore.ts')
@@ -124,12 +131,11 @@ test.describe('Continuous Monitoring Transition', () => {
       sloc_g: '2.0',
     })
     const state = await waitForRendererSettled(page)
-    if (state === 'error') {
-      test.skip()
-      return
-    }
-    await waitForFirstFrame(page)
-    await page.waitForTimeout(3000)
+    expect(
+      state,
+      'renderer entered error state — investigate WebGPU init or shader compilation rather than skipping the physics check'
+    ).not.toBe('error')
+    await waitForTdseDiagnosticsReady(page)
 
     const { norm, normDrift } = await page.evaluate(async () => {
       const mod = await import('/src/stores/diagnosticsStore.ts')

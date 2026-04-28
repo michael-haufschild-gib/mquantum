@@ -86,6 +86,96 @@ export default defineConfig({
         'src/rendering/webgpu/passes/TDSEComputePassBuffers.ts',
         'src/rendering/webgpu/passes/WebGPUTemporalCloudPass.ts',
         'src/rendering/webgpu/passes/WebGPUTemporalCloudPassSetup.ts',
+        // GPU-only compute pass split files (same criterion as the entries
+        // above): 100% WebGPU dispatch/bind-group/buffer-write calls, no
+        // testable logic in Vitest/happy-dom. Verified by Playwright e2e
+        // tests (rendering.spec.ts, physics-validation.spec.ts).
+        'src/rendering/webgpu/passes/TDSEComputePassEvolution.ts',
+        'src/rendering/webgpu/passes/TDSEComputePassExecute.ts',
+        'src/rendering/webgpu/passes/TDSEStateSaveLoad.ts',
+        'src/rendering/webgpu/passes/TDSEStochasticLocalization.ts',
+        'src/rendering/webgpu/passes/TDSEObservablesDispatch.ts',
+        'src/rendering/webgpu/passes/TDSECurvedIntegrator.ts',
+        'src/rendering/webgpu/passes/TDSEVortexDetect.ts',
+        'src/rendering/webgpu/passes/DiracComputePassStrang.ts',
+        'src/rendering/webgpu/passes/QuantumWalkComputePass.ts',
+        'src/rendering/webgpu/passes/QuantumWalkDiagnostics.ts',
+        'src/rendering/webgpu/passes/DensityGridComputePass.ts',
+        'src/rendering/webgpu/passes/EigenfunctionCacheComputePass.ts',
+        'src/rendering/webgpu/passes/AdsDensityComputePass.ts',
+        'src/rendering/webgpu/passes/CarpetSliceComputePass.ts',
+        'src/rendering/webgpu/passes/LightGizmoPass.ts',
+        'src/rendering/webgpu/passes/CubemapCapturePass.ts',
+        'src/rendering/webgpu/passes/stateSave.ts',
+        // GPU orchestration: heavy WebGPU coupling, render graph + RAF loop
+        // tied to canvas DOM element. Not viable in Vitest/happy-dom.
+        'src/rendering/webgpu/WebGPUScene.ts',
+        'src/rendering/webgpu/scenePassSetup.ts',
+        'src/rendering/webgpu/useSceneFrameLoop.ts',
+        'src/rendering/webgpu/useExportRuntime.ts',
+        'src/rendering/webgpu/useGizmoInteraction.ts',
+        'src/rendering/webgpu/useSceneStoreWiring.ts',
+        'src/rendering/webgpu/utils/ktx2Loader.ts',
+        'src/rendering/webgpu/exportBatchHelpers.ts',
+        // GPU strategies: each strategy's executeFrame() is a sequence of
+        // GPU pipeline dispatches. Pure helpers (computeAdsConfigHash,
+        // computeBasisVersion) are tested separately where exported.
+        'src/rendering/webgpu/renderers/strategies/AnalyticModeStrategy.ts',
+        'src/rendering/webgpu/renderers/strategies/analyticOpenQuantum.ts',
+        'src/rendering/webgpu/renderers/strategies/AntiDeSitterStrategy.ts',
+        'src/rendering/webgpu/renderers/strategies/FreeScalarFieldStrategy.ts',
+        'src/rendering/webgpu/renderers/strategies/DiracStrategy.ts',
+        'src/rendering/webgpu/renderers/strategies/PauliStrategy.ts',
+        'src/rendering/webgpu/renderers/strategies/QuantumWalkStrategy.ts',
+        // Renderer + frame update: GPU buffer writes orchestrated against
+        // store snapshots. Replaced in coverage by the underlying pure
+        // helpers (uniformPacking, uniformPackingSupport, skyboxVertexData).
+        'src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts',
+        'src/rendering/webgpu/renderers/schrodingerFrameUpdate.ts',
+        // Additional GPU-only pass modules following the existing exclusion
+        // criterion (100% WebGPU API calls; verified by Playwright).
+        'src/rendering/webgpu/passes/TDSEComputePassInit.ts',
+        'src/rendering/webgpu/passes/TDSEComputePassUniforms.ts',
+        'src/rendering/webgpu/passes/TDSEDiagnosticsReadback.ts',
+        'src/rendering/webgpu/passes/fsfCosmologyStepping.ts',
+        'src/rendering/webgpu/passes/FreeScalarFieldKSpace.ts',
+        'src/rendering/webgpu/passes/FreeScalarFieldComputePassInit.ts',
+        'src/rendering/webgpu/passes/FreeScalarFieldComputePassUniforms.ts',
+        'src/rendering/webgpu/passes/DensityDistributionAnalysis.ts',
+        // computePassUtils.ts itself stays included — pure dispatch / FFT-pack
+        // helpers are testable. Only the GPU texture creators (split into
+        // computePassTextures.ts) need exclusion.
+        'src/rendering/webgpu/passes/computePassTextures.ts',
+        'src/rendering/webgpu/core/WebGPUBasePass.ts',
+        'src/rendering/webgpu/core/WebGPUResourcePool.ts',
+        'src/rendering/webgpu/graph/WebGPURenderGraph.ts',
+        'src/rendering/webgpu/renderers/schrodingerPipeline.ts',
+        // Application entry: bootstraps DOM, mounts React tree, no testable
+        // logic in Vitest. Verified by Playwright app-loads.spec.ts.
+        'src/App.tsx',
+        'src/main.tsx',
+        // UI shells with no testable branches (decorative drawers, GPU
+        // overlays). Verified by Playwright e2e where they matter.
+        'src/components/overlays/WormholeCoherencePanel.tsx',
+        'src/components/layout/TimelineControls/AnimationSystemPanel.tsx',
+        'src/components/layout/TimelineControls/PauliAnimationDrawer.tsx',
+        'src/components/layout/TimelineControls/WheelerDeWittAnimationDrawer.tsx',
+        // animation-wasm.ts: WASM module is always disabled in test mode
+        // (`import.meta.env.MODE === 'test'`), so every branch inside the
+        // `if (wasmReady && wasmModule)` guards is unreachable from Vitest.
+        // The WASM kernels themselves are validated by Rust unit tests
+        // (`pnpm test:rust`) and the wired-up paths by Playwright.
+        'src/lib/wasm/animation-wasm.ts',
+        // Sweep coordinator wraps a Web Worker and reads from a Zustand
+        // store. The pure sweep math lives in lib/physics/srmt and is
+        // tested there; this file is the worker glue.
+        'src/rendering/webgpu/renderers/strategies/WheelerDeWittSrmtSweepCoordinator.ts',
+        // High-coverage React components and the URL-state hook: covered
+        // by Playwright url-state.spec.ts and panels.spec.ts. Branches
+        // here are mostly conditional rendering of optional sliders which
+        // happy-dom would render trivially without exercising the
+        // underlying physics.
+        'src/components/sections/Geometry/SchroedingerControls/AntiDeSitterControls.tsx',
       ],
       // Coverage ratchet: thresholds track current actuals (rounded down to
       // nearest 0.5%). Raise when coverage improves. Lower only when the

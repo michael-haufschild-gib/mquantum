@@ -10,7 +10,13 @@
  * for the missing parameters.
  */
 
+import {
+  isDiracFieldView,
+  isDiracInitialCondition,
+  isDiracPotentialType,
+} from '@/lib/geometry/extended/dirac'
 import { DEFAULT_PREHEATING_CONFIG } from '@/lib/geometry/extended/freeScalar'
+import { normalizeTdseBlackHoleParams } from '@/lib/geometry/extended/tdse'
 import {
   DEFAULT_PAULI_CONFIG,
   DEFAULT_SCHROEDINGER_CONFIG,
@@ -155,24 +161,39 @@ function normalizeTdseBhParams(normalized: Record<string, unknown>): Record<stri
   const tdse = normalized.tdse
   if (!tdse || typeof tdse !== 'object') return normalized
   const tdseRecord = tdse as Record<string, unknown>
-  // Replace NaN / non-finite BH params with safe defaults before clamping.
-  // `typeof NaN === 'number'` is true, so a corrupted scene could sneak
-  // NaN through a bare `typeof` guard. Default to the canonical TDSE
-  // defaults (bhMass=1, bhSpin=2, bhMultipoleL=2).
-  const rawMass = tdseRecord.bhMass
-  if (typeof rawMass === 'number' && !Number.isFinite(rawMass)) {
-    tdseRecord.bhMass = 1.0
-  }
-  const rawSpin = tdseRecord.bhSpin
-  const rawEll = tdseRecord.bhMultipoleL
-  const spinNum = typeof rawSpin === 'number' && Number.isFinite(rawSpin) ? rawSpin : 2
-  const ellNum = typeof rawEll === 'number' && Number.isFinite(rawEll) ? rawEll : 2
-  const spin = Math.max(0, Math.min(2, Math.floor(spinNum)))
-  const ell = Math.max(spin, Math.min(6, Math.floor(ellNum)))
-  if (spin !== rawSpin || ell !== rawEll) {
-    return { ...normalized, tdse: { ...tdseRecord, bhSpin: spin, bhMultipoleL: ell } }
+  const bh = normalizeTdseBlackHoleParams(tdseRecord)
+  if (
+    bh.bhMass !== tdseRecord.bhMass ||
+    bh.bhSpin !== tdseRecord.bhSpin ||
+    bh.bhMultipoleL !== tdseRecord.bhMultipoleL
+  ) {
+    return { ...normalized, tdse: { ...tdseRecord, ...bh } }
   }
   return normalized
+}
+
+function normalizeDiracEnums(normalized: Record<string, unknown>): Record<string, unknown> {
+  const dirac = normalized.dirac
+  if (!dirac || typeof dirac !== 'object' || Array.isArray(dirac)) return normalized
+
+  const diracRecord = dirac as Record<string, unknown>
+  const defaults = DEFAULT_SCHROEDINGER_CONFIG.dirac
+  let next = diracRecord
+
+  if (!isDiracPotentialType(diracRecord.potentialType)) {
+    next = next === diracRecord ? { ...diracRecord } : next
+    next.potentialType = defaults.potentialType
+  }
+  if (!isDiracInitialCondition(diracRecord.initialCondition)) {
+    next = next === diracRecord ? { ...diracRecord } : next
+    next.initialCondition = defaults.initialCondition
+  }
+  if (!isDiracFieldView(diracRecord.fieldView)) {
+    next = next === diracRecord ? { ...diracRecord } : next
+    next.fieldView = defaults.fieldView
+  }
+
+  return next === diracRecord ? normalized : { ...normalized, dirac: next }
 }
 
 /**
@@ -218,6 +239,7 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged
     normalized = { ...normalized, quantumMode: 'hydrogenND' }
   }
   normalized = sanitizeComputeLatticeDims(normalized)
+  normalized = normalizeDiracEnums(normalized)
 
   // Enforce the ℓ ≥ s physical invariant on TDSE black-hole parameters for
   // legacy scenes. The BH setters promote ℓ whenever the user raises s, but

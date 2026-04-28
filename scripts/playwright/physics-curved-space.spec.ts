@@ -73,12 +73,12 @@ test.describe('Curved-space TDSE v2 — physics validation', () => {
       await requireWebGPU(page, testInfo)
 
       const drift = await measureNormDrift(page, presetId, 300)
-      if (drift === null) {
-        test.skip(true, `TDSE normDrift unavailable for ${presetId}`)
-        return
-      }
       expect(
-        Math.abs(drift),
+        Number.isFinite(drift),
+        `${presetId}: TDSE diagnostics missing or non-finite (normDrift=${drift}). Diagnostics must populate after 300 frames; investigate the diagnostics pipeline rather than silently skipping.`
+      ).toBe(true)
+      expect(
+        Math.abs(drift!),
         `${presetId}: |normDrift|=${drift} must be under 2% (static metric target per plan 5.5)`
       ).toBeLessThan(0.02)
     })
@@ -91,12 +91,12 @@ test.describe('Curved-space TDSE v2 — physics validation', () => {
     await requireWebGPU(page, testInfo)
 
     const drift = await measureNormDrift(page, 'cosmologicalRedshift', 300)
-    if (drift === null) {
-      test.skip(true, 'TDSE normDrift unavailable for cosmologicalRedshift')
-      return
-    }
     expect(
-      Math.abs(drift),
+      Number.isFinite(drift),
+      `cosmologicalRedshift: TDSE diagnostics missing or non-finite (normDrift=${drift}) after 300 frames. Investigate the diagnostics pipeline.`
+    ).toBe(true)
+    expect(
+      Math.abs(drift!),
       `deSitter: |normDrift|=${drift} must be under 3% (time-dependent metric target per plan 5.5)`
     ).toBeLessThan(0.03)
   })
@@ -108,14 +108,14 @@ test.describe('Curved-space TDSE v2 — physics validation', () => {
     await requireWebGPU(page, testInfo)
 
     const drift = await measureNormDrift(page, 'torusEigenstates', 400)
-    if (drift === null) {
-      test.skip(true, 'TDSE normDrift unavailable for torusEigenstates')
-      return
-    }
+    expect(
+      Number.isFinite(drift),
+      `torusEigenstates: TDSE diagnostics missing or non-finite (normDrift=${drift}) after 400 frames. Investigate the diagnostics pipeline.`
+    ).toBe(true)
     // Torus takes the FFT path (flat metric + periodic) — should match the
     // strictness of the baseline flat-space kinetic operator.
     expect(
-      Math.abs(drift),
+      Math.abs(drift!),
       `torus: |normDrift|=${drift} must be under 1% (FFT path matches flat space)`
     ).toBeLessThan(0.01)
   })
@@ -131,20 +131,20 @@ test.describe('Curved-space TDSE v2 — physics validation', () => {
     await waitForSimulationFrames(page, 20)
     await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', 30_000, 'tdse')
     const initial = await readTdseDiagnostics(page)
-    if (!initial.hasData) {
-      test.skip(true, 'sphere2D diagnostics unavailable at t0')
-      return
-    }
+    expect(
+      initial.hasData,
+      'sphere2D diagnostics missing at t0 — diagnostics must populate after the preset settles.'
+    ).toBe(true)
     const initialPeak = initial.maxDensity
 
     // Late sample: 100 frames of evolution.
     const fc = await getFrameCount(page)
     await waitForFrameAdvance(page, fc + 100)
     const late = await readTdseDiagnostics(page)
-    if (!late.hasData) {
-      test.skip(true, 'sphere2D diagnostics unavailable at t_late')
-      return
-    }
+    expect(
+      late.hasData,
+      'sphere2D diagnostics missing at t_late — diagnostics dropped during evolution. Investigate.'
+    ).toBe(true)
 
     expect(
       Number.isFinite(late.maxDensity),
@@ -171,11 +171,11 @@ test.describe('Curved-space TDSE v2 — physics validation', () => {
     await waitForSimulationFrames(page, 200)
     await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', 30_000, 'tdse')
     const diagOff = await readTdseDiagnostics(page)
-    if (!diagOff.hasData || diagOff.normDrift === undefined || diagOff.normDrift === null) {
-      test.skip(true, 'schwarzschildOrbit diagnostics unavailable with overlay off')
-      return
-    }
-    const driftOff = diagOff.normDrift
+    expect(
+      diagOff.hasData && diagOff.normDrift !== undefined && diagOff.normDrift !== null,
+      'schwarzschildOrbit diagnostics missing with overlay off — overlay flag is render-only and must not affect compute/diagnostics.'
+    ).toBe(true)
+    const driftOff = diagOff.normDrift!
 
     // Run B: fresh navigation + same preset, overlay ON. Fresh navigation
     // avoids any residual integrator state from the previous run.
@@ -188,11 +188,11 @@ test.describe('Curved-space TDSE v2 — physics validation', () => {
     await waitForSimulationFrames(page, 200)
     await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', 30_000, 'tdse')
     const diagOn = await readTdseDiagnostics(page)
-    if (!diagOn.hasData || diagOn.normDrift === undefined || diagOn.normDrift === null) {
-      test.skip(true, 'schwarzschildOrbit diagnostics unavailable with overlay on')
-      return
-    }
-    const driftOn = diagOn.normDrift
+    expect(
+      diagOn.hasData && diagOn.normDrift !== undefined && diagOn.normDrift !== null,
+      'schwarzschildOrbit diagnostics missing with overlay on — overlay flag is render-only and must not affect compute/diagnostics.'
+    ).toBe(true)
+    const driftOn = diagOn.normDrift!
 
     // Overlay is a render-only flag — the compute path is unchanged, so
     // normDrift must match within a tight tolerance (0.5%) that still

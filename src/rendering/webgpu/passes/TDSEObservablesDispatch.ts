@@ -36,6 +36,15 @@ export interface ObservablesState {
 }
 
 /**
+ * Returns true when the configured metric admits a flat-space Fourier path
+ * for observables (flat or torus). Curved metrics fall back to real-space.
+ */
+export function supportsFlatFourierObservables(config: Pick<TdseConfig, 'metric'>): boolean {
+  const metricKind = config.metric?.kind ?? 'flat'
+  return metricKind === 'flat' || metricKind === 'torus'
+}
+
+/**
  * Create or destroy observables GPU resources when observablesEnabled changes.
  */
 export function updateObservablesResources(
@@ -43,7 +52,28 @@ export function updateObservablesResources(
   config: TdseConfig,
   state: ObservablesState
 ): void {
-  const wantObs = config.observablesEnabled
+  const supported = supportsFlatFourierObservables(config)
+  const wantObs = config.observablesEnabled && supported
+
+  if (config.observablesEnabled && !supported) {
+    if (
+      state.obsEnabled ||
+      state.obsResources ||
+      useDiagnosticsStore.getState().observables.hasData
+    ) {
+      destroyObservablesBuffers(state.obsResources)
+      state.obsResources = null
+      state.obsPosReduceBG = null
+      state.obsPosFinalBG = null
+      state.obsMomReduceBG = null
+      state.obsMomFinalBG = null
+      state.esSpectrumBG = null
+      state.obsEnabled = false
+      useDiagnosticsStore.getState().resetObservables()
+    }
+    return
+  }
+
   if (wantObs === state.obsEnabled && (state.obsResources || !wantObs)) return
 
   if (!wantObs) {
@@ -53,6 +83,7 @@ export function updateObservablesResources(
     state.obsPosFinalBG = null
     state.obsMomReduceBG = null
     state.obsMomFinalBG = null
+    state.esSpectrumBG = null
     state.obsEnabled = false
     useDiagnosticsStore.getState().resetObservables()
     return
@@ -194,6 +225,7 @@ export function shouldDispatchObs(
   config: TdseConfig
 ): boolean {
   if (!obsEnabled) return false
+  if (!supportsFlatFourierObservables(config)) return false
   const interval = config.diagnosticsEnabled
     ? config.diagnosticsInterval || DIAG_DECIMATION
     : DIAG_DECIMATION
@@ -284,5 +316,6 @@ export function disposeObservables(state: ObservablesState): void {
   state.obsPosFinalBG = null
   state.obsMomReduceBG = null
   state.obsMomFinalBG = null
+  state.esSpectrumBG = null
   state.obsEnabled = false
 }

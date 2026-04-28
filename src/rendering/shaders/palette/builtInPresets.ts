@@ -8,7 +8,7 @@
  */
 
 import { COSINE_PRESETS } from './cosinePresetData'
-import type { ColorPreset } from './presets'
+import type { ColorPreset } from './types'
 
 export const BUILT_IN_PRESETS: ColorPreset[] = [
   // ===========================================================================

@@ -206,16 +206,13 @@ test.describe('TDSE curved space', () => {
     await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', 30_000, 'tdse')
     const diag = await readTdseDiagnostics(page)
 
-    if (!diag.hasData || diag.normDrift === undefined || diag.normDrift === null) {
-      test.skip(
-        true,
-        `TDSE normDrift unavailable (hasData=${diag.hasData}, normDrift=${diag.normDrift}) — cannot assert stability`
-      )
-      return
-    }
+    expect(
+      diag.hasData && diag.normDrift !== undefined && diag.normDrift !== null,
+      `TDSE diagnostics missing (hasData=${diag.hasData}, normDrift=${diag.normDrift}) — diagnostics must populate after 200 frames; investigate the diagnostics pipeline.`
+    ).toBe(true)
 
     expect(
-      Math.abs(diag.normDrift),
+      Math.abs(diag.normDrift!),
       `|normDrift| must stay under 1% on curved metric (got ${diag.normDrift})`
     ).toBeLessThan(0.01)
   })

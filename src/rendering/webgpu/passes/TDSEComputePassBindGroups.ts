@@ -11,7 +11,7 @@ import type {
   TdseBindGroupInputs,
   TdseBindGroupResult,
   TdsePipelineResult,
-} from './TDSEComputePassSetup'
+} from './TDSEComputePassTypes'
 
 /**
  * Create all bind groups for the TDSE compute pass from pipelines and buffers.
@@ -209,6 +209,7 @@ export function rebuildTdseBindGroups(
       { binding: 4, resource: { buffer: diagPartialLeftBuffer } },
       { binding: 5, resource: { buffer: diagPartialRightBuffer } },
       { binding: 6, resource: { buffer: diagPartialIprBuffer } },
+      { binding: 7, resource: { buffer: uniformBuffer } },
     ],
   })
 

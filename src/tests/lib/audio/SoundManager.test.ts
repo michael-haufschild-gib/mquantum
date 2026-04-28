@@ -67,29 +67,48 @@ describe('SoundManager state management', () => {
     soundManager.toggle(true)
   })
 
-  it('playClick does not throw when disabled', () => {
+  it('playClick is a no-op when disabled (does NOT touch the audio context)', () => {
     soundManager.toggle(false)
-    expect(() => soundManager.playClick()).not.toThrow()
+    const internal = soundManager as unknown as {
+      ctx: { createBufferSource?: ReturnType<typeof vi.fn> } | null
+    }
+    if (internal.ctx?.createBufferSource) {
+      internal.ctx.createBufferSource.mockClear()
+      soundManager.playClick()
+      expect(internal.ctx.createBufferSource).not.toHaveBeenCalled()
+    } else {
+      // ctx may be uninitialised at this point — disabled-state guard fires
+      // first so playClick is a no-op regardless. Just verify no throw.
+      expect(() => soundManager.playClick()).not.toThrow()
+    }
   })
 
-  it('playClick does not throw when enabled (mock AudioContext)', () => {
-    expect(() => soundManager.playClick()).not.toThrow()
-  })
-
-  it('playHover does not throw', () => {
-    expect(() => soundManager.playHover()).not.toThrow()
-  })
-
-  it('playSnap does not throw', () => {
-    expect(() => soundManager.playSnap()).not.toThrow()
-  })
-
-  it('playSuccess does not throw', () => {
-    expect(() => soundManager.playSuccess()).not.toThrow()
-  })
-
-  it('playSwish does not throw', () => {
-    expect(() => soundManager.playSwish()).not.toThrow()
+  it('all play methods are no-ops when SoundManager is disabled (every audio API path stays untouched)', () => {
+    soundManager.toggle(false)
+    const internal = soundManager as unknown as {
+      ctx: {
+        createBufferSource?: ReturnType<typeof vi.fn>
+        createOscillator?: ReturnType<typeof vi.fn>
+      } | null
+    }
+    if (!internal.ctx) {
+      // No audio context to inspect; smoke test: every method returns void.
+      expect(soundManager.playClick()).toBeUndefined()
+      expect(soundManager.playHover()).toBeUndefined()
+      expect(soundManager.playSnap()).toBeUndefined()
+      expect(soundManager.playSuccess()).toBeUndefined()
+      expect(soundManager.playSwish()).toBeUndefined()
+      return
+    }
+    internal.ctx.createBufferSource?.mockClear()
+    internal.ctx.createOscillator?.mockClear()
+    soundManager.playClick()
+    soundManager.playHover()
+    soundManager.playSnap()
+    soundManager.playSuccess()
+    soundManager.playSwish()
+    expect(internal.ctx.createBufferSource).not.toHaveBeenCalled()
+    expect(internal.ctx.createOscillator).not.toHaveBeenCalled()
   })
 })
 

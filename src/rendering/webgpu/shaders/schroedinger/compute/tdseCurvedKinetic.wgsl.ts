@@ -304,7 +304,8 @@ fn ricciScalarWGSL(coords: array<f32, 12>, dim: u32, time: f32) -> f32 {
 }
 
 fn kretschmannScalarWGSL(coords: array<f32, 12>, dim: u32, time: f32) -> f32 {
-  // Only non-zero for Schwarzschild: K = 48 M² / r⁶.
+  // Only non-zero for Schwarzschild: K = 48 M² / R⁶, where
+  // R = rho * (1 + M/(2rho))² is the areal radius for isotropic rho = |x|.
   if (params.metricKind != 2u) { return 0.0; }
   let M = max(params.schwarzschildMass, 0.01);
   var r2: f32 = 0.0;
@@ -312,8 +313,10 @@ fn kretschmannScalarWGSL(coords: array<f32, 12>, dim: u32, time: f32) -> f32 {
     r2 = r2 + coords[d] * coords[d];
   }
   let rMin = max(M * 0.5, CURVED_SCHW_MIN_RADIUS);
-  let r = max(sqrt(r2), rMin);
-  let r2f = r * r;
+  let rho = max(sqrt(r2), rMin);
+  let psi = 1.0 + M / (2.0 * rho);
+  let arealR = rho * psi * psi;
+  let r2f = arealR * arealR;
   let r6 = r2f * r2f * r2f;
   return (48.0 * M * M) / r6;
 }

@@ -3,7 +3,8 @@
  *
  * Two-pass parallel reduction to compute total wavefunction norm and
  * spatially-partitioned norms (left/right of barrierCenter) for
- * reflection/transmission coefficient estimation.
+ * reflection/transmission coefficient estimation. Curved metrics integrate
+ * norms and IPR with the proper spatial measure sqrt(|g|) dV.
  *
  * Output: [totalNorm, maxDensity, normLeft, normRight, sumPsi4]
  *
@@ -40,12 +41,29 @@ struct DiagReduceUniforms {
 @group(0) @binding(4) var<storage, read_write> partialLeft: array<f32>;
 @group(0) @binding(5) var<storage, read_write> partialRight: array<f32>;
 @group(0) @binding(6) var<storage, read_write> partialIpr: array<f32>;
+@group(0) @binding(7) var<storage, read> params: TDSEUniforms;
 
 // Pack the four additive fields (norm, left, right, ipr) into a single vec4
 // so the tree reduction touches shared memory 2× per step instead of 5×.
 // Max uses a different op (max) and stays separate.
 var<workgroup> shared_add: array<vec4f, 256>;
 var<workgroup> shared_max: array<f32, 256>;
+
+fn tdseDiagWorldCoords(idx: u32) -> array<f32, 12> {
+  let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
+  var world: array<f32, 12>;
+  for (var d: u32 = 0u; d < params.latticeDim; d = d + 1u) {
+    world[d] = (f32(coords[d]) - f32(params.gridSize[d]) * 0.5 + 0.5) * params.spacing[d];
+  }
+  return world;
+}
+
+fn tdseDiagVolumeWeight(idx: u32) -> f32 {
+  if (params.metricKind == 0u || params.metricKind == 6u) { return 1.0; }
+  let coords = tdseDiagWorldCoords(idx);
+  let metricTime = select(params.simTime, params.stageTimeK4, params.metricKind == 3u);
+  return max(tdseCurvatureSqrtDet(coords, params.latticeDim, metricTime), 0.0);
+}
 
 @compute @workgroup_size(256)
 fn main(
@@ -58,12 +76,16 @@ fn main(
 
   // Load: each thread computes |psi|^2 for one site
   var val: f32 = 0.0;
+  var density: f32 = 0.0;
+  var volumeWeight: f32 = 1.0;
   var isLeft: bool = true;
   if (idx < diagParams.totalSites) {
     let z = psi[idx];
     let re = z.x;
     let im = z.y;
-    val = re * re + im * im;
+    density = re * re + im * im;
+    volumeWeight = tdseDiagVolumeWeight(idx);
+    val = density * volumeWeight;
 
     // Axis-0 coordinate from linear index. stride0 and gridSize0 are always
     // powers of 2 in this codebase, so replace the integer divide + mod with
@@ -78,8 +100,8 @@ fn main(
 
   let leftVal = select(0.0, val, isLeft);
   let rightVal = val - leftVal; // exactly one branch contributes — saves a select
-  shared_add[local] = vec4f(val, leftVal, rightVal, val * val);
-  shared_max[local] = val;
+  shared_add[local] = vec4f(val, leftVal, rightVal, density * density * volumeWeight);
+  shared_max[local] = density;
   workgroupBarrier();
 
   // Tree reduction within workgroup

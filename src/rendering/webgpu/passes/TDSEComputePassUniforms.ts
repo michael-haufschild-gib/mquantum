@@ -5,6 +5,7 @@
  * No GPU pipeline or bind group logic — only buffer writes.
  */
 
+import { normalizeTdseBlackHoleParams } from '@/lib/geometry/extended/tdse'
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { buildCompactDimsMask, computeEffectiveSpacing } from '@/lib/physics/compactification'
 import { sigmaMaxFromPmlConfig } from '@/lib/physics/pml/profile'
@@ -352,9 +353,10 @@ export function writeTdseUniforms(
   f32[186] = config.branchPlanePosition ?? 0.0
 
   // Black-hole Regge–Wheeler ringdown parameters (offsets 748-756, indices 187-189)
-  f32[187] = config.bhMass ?? 1.0
-  f32[188] = config.bhMultipoleL ?? 2
-  f32[189] = config.bhSpin ?? 2
+  const bh = normalizeTdseBlackHoleParams(config)
+  f32[187] = bh.bhMass
+  f32[188] = bh.bhMultipoleL
+  f32[189] = bh.bhSpin
 
   // Analog Hawking (waterfall sonic horizon) parameters (offsets 760-796, indices 190-199).
   // Only the first 7 slots are live — the remaining three are pad to preserve

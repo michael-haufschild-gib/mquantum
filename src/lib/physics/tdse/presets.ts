@@ -8,33 +8,21 @@
  * @module lib/physics/tdse/presets
  */
 
-import type { TdseConfig } from '@/lib/geometry/extended/types'
-import type { ScenarioPreset } from '@/lib/physics/presetTypes'
-
 import { CURVED_METRIC_TDSE_PRESETS } from './curvedMetricPresets'
 import { DECOHERENCE_PRESETS } from './decoherencePresets'
+import type {
+  TdsePresetOverride,
+  TdseRenderingOverrides,
+  TdseScenarioPreset,
+} from './tdsePresetTypes'
 
-/** Subset of TdseConfig fields that a scenario preset can override. */
-export type TdsePresetOverride = Partial<Omit<TdseConfig, 'needsReset' | 'slicePositions'>>
-
-/** Parent-level SchroedingerConfig rendering fields that a TDSE preset can override. */
-export interface TdseRenderingOverrides {
-  densityGain?: number
-  densityContrast?: number
-  autoScaleMaxGain?: number
-}
+export type { TdsePresetOverride, TdseRenderingOverrides, TdseScenarioPreset }
 
 /** Default rendering overrides applied to every TDSE preset unless explicitly overridden. */
 const TDSE_DEFAULT_RENDERING: TdseRenderingOverrides = {
   densityGain: 2.0,
   densityContrast: 1.8,
   autoScaleMaxGain: 20,
-}
-
-/** A named TDSE scenario preset with config overrides applied on selection. */
-export interface TdseScenarioPreset extends ScenarioPreset<TdsePresetOverride> {
-  /** Parent-level rendering overrides applied alongside TdseConfig overrides. */
-  renderingOverrides?: TdseRenderingOverrides
 }
 
 /**

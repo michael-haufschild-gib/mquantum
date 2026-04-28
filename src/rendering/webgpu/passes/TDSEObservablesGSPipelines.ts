@@ -26,27 +26,9 @@ import {
   observablesPositionReduceBlock,
 } from '../shaders/schroedinger/compute/observablesPositionReduce.wgsl'
 import { createComputeBGL } from '../utils/computeBindGroupLayout'
-import type { TdsePassHelpers } from './TDSEComputePassSetup'
+import type { ObsGSPipelineResult, TdsePassHelpers } from './TDSEComputePassTypes'
 
-/** Pipeline results for observables + Gram-Schmidt. */
-export interface ObsGSPipelineResult {
-  obsPosReducePipeline: GPUComputePipeline
-  obsPosReduceBGL: GPUBindGroupLayout
-  obsPosFinalPipeline: GPUComputePipeline
-  obsPosFinalBGL: GPUBindGroupLayout
-  obsMomReducePipeline: GPUComputePipeline
-  obsMomReduceBGL: GPUBindGroupLayout
-  obsMomFinalPipeline: GPUComputePipeline
-  obsMomFinalBGL: GPUBindGroupLayout
-  gsReducePipeline: GPUComputePipeline
-  gsReduceBGL: GPUBindGroupLayout
-  gsFinalizePipeline: GPUComputePipeline
-  gsFinalizeBGL: GPUBindGroupLayout
-  gsSubtractPipeline: GPUComputePipeline
-  gsSubtractBGL: GPUBindGroupLayout
-  energySpectrumPipeline: GPUComputePipeline
-  energySpectrumBGL: GPUBindGroupLayout
-}
+export type { ObsGSPipelineResult }
 
 /**
  * Build observables reduction + Gram-Schmidt orthogonalization pipelines.

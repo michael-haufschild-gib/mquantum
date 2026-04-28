@@ -279,6 +279,33 @@ describe('writeTdseUniforms', () => {
     expect(f32[191]).toBeCloseTo(0.6) // hawkingLh @ 764
   })
 
+  it('normalizes corrupted blackHoleRingdown BH params before uniform packing', () => {
+    const uniformData = new ArrayBuffer(UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({
+        config: createTdseConfig({
+          potentialType: 'blackHoleRingdown',
+          bhMass: Number.NaN,
+          bhMultipoleL: 0,
+          bhSpin: 2,
+        }),
+      })
+    )
+
+    expect(f32[187]).toBeCloseTo(1)
+    expect(f32[188]).toBeCloseTo(2)
+    expect(f32[189]).toBeCloseTo(2)
+  })
+
   it('packs analog-Hawking fields at f32[190..196] (offsets 760-784)', () => {
     const uniformData = new ArrayBuffer(UNIFORM_SIZE)
     const u32 = new Uint32Array(uniformData)

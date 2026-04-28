@@ -369,6 +369,46 @@ describe('mergeExtendedObjectStateForType — compute-mode lattice arrays', () =
   })
 })
 
+describe('mergeExtendedObjectStateForType — Dirac enum invariants', () => {
+  it('normalizes invalid loaded Dirac enums before shader packing can remap them', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'diracEquation',
+        dirac: {
+          potentialType: 'harmonic',
+          initialCondition: 'gaussian',
+          fieldView: 'spin',
+        },
+      },
+    }
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const dirac = (merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG).dirac
+
+    expect(dirac.potentialType).toBe(DEFAULT_SCHROEDINGER_CONFIG.dirac.potentialType)
+    expect(dirac.initialCondition).toBe(DEFAULT_SCHROEDINGER_CONFIG.dirac.initialCondition)
+    expect(dirac.fieldView).toBe(DEFAULT_SCHROEDINGER_CONFIG.dirac.fieldView)
+  })
+
+  it('preserves valid loaded Dirac enums', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'diracEquation',
+        dirac: {
+          potentialType: 'coulomb',
+          initialCondition: 'planeWave',
+          fieldView: 'currentDensity',
+        },
+      },
+    }
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const dirac = (merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG).dirac
+
+    expect(dirac.potentialType).toBe('coulomb')
+    expect(dirac.initialCondition).toBe('planeWave')
+    expect(dirac.fieldView).toBe('currentDensity')
+  })
+})
+
 describe('mergeExtendedObjectStateForType — pauliSpinor', () => {
   it('fills missing Pauli fields with defaults', () => {
     const loaded = {

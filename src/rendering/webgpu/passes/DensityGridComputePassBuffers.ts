@@ -9,7 +9,7 @@
  */
 
 import { SCHROEDINGER_UNIFORM_SIZE } from '../renderers/schroedingerLayout'
-import type { DensityGridComputeConfig } from './DensityGridComputePass'
+import type { DensityGridComputeConfig } from './DensityGridComputePassTypes'
 
 /** Size in bytes of the GridParams WGSL struct (vec3u + pad + vec3f + pad + vec3f + pad = 48). */
 export const GRID_PARAMS_SIZE = 48

@@ -50,6 +50,27 @@ const MAX_FPS_KEY = 'mdim_max_fps'
 /** localStorage key for persisting density grid resolution */
 const DENSITY_GRID_RESOLUTION_KEY = 'mdim_density_grid_resolution'
 
+/**
+ * Throttled diagnostic for localStorage failures.
+ *
+ * Private browsing, exhausted quota, or storage-blocking extensions can make
+ * every read/write throw. We log the first occurrence per key with the error
+ * detail so it shows up in DevTools, then suppress further messages for that
+ * key to avoid spamming the console on every persist.
+ */
+const reportedStorageFailures = new Set<string>()
+function reportStorageFailure(op: 'read' | 'write', key: string, err: unknown): void {
+  const tag = `${op}:${key}`
+  if (reportedStorageFailures.has(tag)) return
+  reportedStorageFailures.add(tag)
+  const message = err instanceof Error ? err.message : String(err)
+  logger.warn(
+    `[performanceStore] localStorage ${op} failed for key "${key}" (${message}). ` +
+      `Persistence disabled for this preference; defaults will be used. ` +
+      `Common causes: private browsing, full quota, extension blocking storage.`
+  )
+}
+
 /** Valid density grid resolution options. */
 export type DensityGridResolution = 64 | 96 | 128 | 256
 
@@ -84,8 +105,8 @@ function loadPersistedResolutionScale(): number | null {
         return value
       }
     }
-  } catch {
-    // Silent fail - localStorage may not be available
+  } catch (err) {
+    reportStorageFailure('read', RESOLUTION_SCALE_KEY, err)
   }
   return null
 }
@@ -97,8 +118,8 @@ function loadPersistedResolutionScale(): number | null {
 function persistResolutionScale(scale: number): void {
   try {
     localStorage.setItem(RESOLUTION_SCALE_KEY, scale.toString())
-  } catch {
-    // Silent fail - localStorage may not be available
+  } catch (err) {
+    reportStorageFailure('write', RESOLUTION_SCALE_KEY, err)
   }
 }
 
@@ -123,8 +144,8 @@ function loadPersistedMaxFps(): number | null {
         return value
       }
     }
-  } catch {
-    // Silent fail - localStorage may not be available
+  } catch (err) {
+    reportStorageFailure('read', MAX_FPS_KEY, err)
   }
   return null
 }
@@ -136,8 +157,8 @@ function loadPersistedMaxFps(): number | null {
 function persistMaxFps(fps: number): void {
   try {
     localStorage.setItem(MAX_FPS_KEY, fps.toString())
-  } catch {
-    // Silent fail - localStorage may not be available
+  } catch (err) {
+    reportStorageFailure('write', MAX_FPS_KEY, err)
   }
 }
 
@@ -158,8 +179,8 @@ function loadPersistedDensityGridResolution(): DensityGridResolution | null {
         return value as DensityGridResolution
       }
     }
-  } catch {
-    // Silent fail
+  } catch (err) {
+    reportStorageFailure('read', DENSITY_GRID_RESOLUTION_KEY, err)
   }
   return null
 }
@@ -167,8 +188,8 @@ function loadPersistedDensityGridResolution(): DensityGridResolution | null {
 function persistDensityGridResolution(resolution: DensityGridResolution): void {
   try {
     localStorage.setItem(DENSITY_GRID_RESOLUTION_KEY, resolution.toString())
-  } catch {
-    // Silent fail
+  } catch (err) {
+    reportStorageFailure('write', DENSITY_GRID_RESOLUTION_KEY, err)
   }
 }
 

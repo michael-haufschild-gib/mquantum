@@ -97,8 +97,11 @@ export function useColorPickerState(args: UseColorPickerStateArgs): ColorPickerS
       const newHistory = [color, ...filtered].slice(0, MAX_HISTORY)
       try {
         localStorage.setItem(HISTORY_KEY, JSON.stringify(newHistory))
-      } catch {
-        /* quota exceeded — ignore */
+      } catch (error) {
+        logger.warn(
+          'ColorPicker: failed to persist color history (likely quota exceeded or storage unavailable)',
+          error
+        )
       }
       return newHistory
     })

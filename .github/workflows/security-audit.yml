@@ -5,11 +5,26 @@ on:
     # Every Monday at 09:00 UTC
     - cron: '0 9 * * 1'
   workflow_dispatch: # Allow manual trigger
+  # PR gate: any PR that touches production dependencies must pass `pnpm audit
+  # --prod --audit-level high`. Catches a vulnerable dep before it lands on
+  # main, while still letting the weekly schedule catch advisories disclosed
+  # against unchanged dependencies.
+  pull_request:
+    branches: [main]
+    paths:
+      - 'package.json'
+      - 'pnpm-lock.yaml'
 
 jobs:
   audit:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+
+    # Don't queue redundant runs on the same PR; the latest commit's audit
+    # is the only one whose result is meaningful for the merge gate.
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
 
     steps:
       - uses: actions/checkout@v6

@@ -12,12 +12,13 @@ dist
 dist-ssr
 *.local
 
-# Claude Code
+# AI
 .claude/scheduled_tasks.lock
 .claude/commands/
 .claude/worktrees/
 claude.sh
 claude-mcp.sh
+.agents
 
 # Editor directories and files
 .vscode/*

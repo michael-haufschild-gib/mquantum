@@ -12,10 +12,12 @@
  */
 
 import { logger } from '@/lib/logger'
+import type { MetricConfig } from '@/lib/physics/tdse/metrics/types'
 
 import {
   computeFullCollapse,
   computePartialCollapse,
+  type DensitySamplingOptions,
   sampleFromDensity,
   sampleFromMarginalDensity,
 } from './measurement'
@@ -30,6 +32,10 @@ export interface MeasurementGridConfig {
   spacing: number[]
   /** Per-dimension compact flag for periodic distance wrapping */
   compactDims?: boolean[]
+  /** Spatial metric used by the TDSE kinetic operator. */
+  metric?: MetricConfig | undefined
+  /** Simulation time for time-dependent metrics. */
+  time?: number | undefined
 }
 
 /** Callback to inject the collapsed wavefunction back into the compute pass. */
@@ -61,8 +67,9 @@ export function executeFullMeasurement(
   inject: InjectWavefunctionFn,
   record: RecordMeasurementFn
 ): void {
-  const { gridSize, spacing, compactDims } = config
-  const result = sampleFromDensity(psiRe, psiIm, gridSize, spacing)
+  const { gridSize, spacing, compactDims, metric, time } = config
+  const samplingOptions: DensitySamplingOptions = { metric, time }
+  const result = sampleFromDensity(psiRe, psiIm, gridSize, spacing, samplingOptions)
 
   logger.log(
     `[Measurement] Full: pos=[${result.position.map((p) => p.toFixed(3)).join(', ')}] density=${result.density.toExponential(3)}`
@@ -102,8 +109,9 @@ export function executePartialMeasurement(
   inject: InjectWavefunctionFn,
   record: RecordMeasurementFn
 ): void {
-  const { gridSize, spacing, latticeDim, compactDims } = config
-  const result = sampleFromMarginalDensity(psiRe, psiIm, gridSize, spacing, axis)
+  const { gridSize, spacing, latticeDim, compactDims, metric, time } = config
+  const samplingOptions: DensitySamplingOptions = { metric, time }
+  const result = sampleFromMarginalDensity(psiRe, psiIm, gridSize, spacing, axis, samplingOptions)
 
   // Build full N-D position with the measured axis filled in, others set to 0
   const position = new Array<number>(latticeDim).fill(0)

@@ -7,7 +7,9 @@
  * @see https://iquilezles.org/articles/palettes/
  */
 
-import type { ColorAlgorithm, CosineCoefficients, DistributionSettings } from './types'
+import type { ColorAlgorithm, ColorPreset, CosineCoefficients } from './types'
+
+export type { ColorPreset }
 
 // Re-export coefficient data from dedicated module
 export { COSINE_PRESETS, type PresetKey } from './cosinePresetData'
@@ -77,18 +79,6 @@ export const COSINE_PRESET_OPTIONS: PresetOption[] = [
     coefficients: COSINE_PRESETS.chromaticShift,
   },
 ]
-
-/**
- * Full color preset including algorithm and distribution settings.
- */
-export interface ColorPreset {
-  id: string
-  name: string
-  algorithm: ColorAlgorithm
-  coefficients: CosineCoefficients
-  distribution: DistributionSettings
-  isBuiltIn: boolean
-}
 
 import { BUILT_IN_PRESETS } from './builtInPresets'
 

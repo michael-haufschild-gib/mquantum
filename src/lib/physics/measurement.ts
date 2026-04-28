@@ -9,6 +9,8 @@
  * @module lib/physics/measurement
  */
 
+import { sampleMetricInto } from '@/lib/physics/tdse/metrics/evaluator'
+import type { MetricConfig, MetricSample } from '@/lib/physics/tdse/metrics/types'
 import {
   computeFullCollapseWasm,
   computePartialCollapseWasm,
@@ -36,10 +38,55 @@ export interface PartialMeasurementResult {
 }
 
 /**
- * Sample a position from |psi(x)|^2 using inverse CDF (binary search).
+ * Optional sampling configuration for {@link sampleFromDensity}.
+ */
+export interface DensitySamplingOptions {
+  /** Spatial metric. Curved metrics sample Born probabilities using |psi|^2 sqrt(|g|). */
+  metric?: MetricConfig | undefined
+  /** Simulation time for time-dependent metrics. */
+  time?: number | undefined
+}
+
+function linearIndexToPosition(
+  linearIndex: number,
+  gridSize: readonly number[],
+  spacing: readonly number[],
+  latticeDim: number,
+  out: number[]
+): void {
+  let remaining = linearIndex
+  for (let d = latticeDim - 1; d >= 0; d--) {
+    const size = gridSize[d]!
+    const coordInt = remaining % size
+    remaining = (remaining - coordInt) / size
+    out[d] = (coordInt - size * 0.5 + 0.5) * spacing[d]!
+  }
+}
+
+function metricVolumeWeight(
+  linearIndex: number,
+  gridSize: readonly number[],
+  spacing: readonly number[],
+  latticeDim: number,
+  options: DensitySamplingOptions | undefined,
+  positionScratch: number[],
+  metricScratch: MetricSample
+): number {
+  const metric = options?.metric
+  if (!metric || metric.kind === 'flat' || metric.kind === 'torus') return 1
+
+  linearIndexToPosition(linearIndex, gridSize, spacing, latticeDim, positionScratch)
+  sampleMetricInto(metric, positionScratch, latticeDim, options?.time ?? 0, metricScratch)
+  return Number.isFinite(metricScratch.sqrtDet) && metricScratch.sqrtDet > 0
+    ? metricScratch.sqrtDet
+    : 0
+}
+
+/**
+ * Sample a position from the Born probability measure using inverse CDF.
  *
- * Builds the cumulative distribution function from the wavefunction,
- * draws a uniform random number, and binary-searches for the grid site.
+ * Flat space samples |psi(x)|². Curved space samples |psi(x)|²√|g|, the
+ * proper-volume probability mass associated with each lattice site.
  * O(N) to build CDF + O(log N) per sample.
  *
  * @param psiRe - Real parts of the wavefunction (Float32Array)
@@ -52,10 +99,16 @@ export function sampleFromDensity(
   psiRe: Float32Array,
   psiIm: Float32Array,
   gridSize: number[],
-  spacing: number[]
+  spacing: number[],
+  options?: DensitySamplingOptions
 ): MeasurementResult {
   const latticeDim = gridSize.length
   const totalSites = psiRe.length
+  const positionScratch = new Array<number>(latticeDim)
+  const metricScratch: MetricSample = {
+    gInverseDiag: new Array<number>(latticeDim),
+    sqrtDet: 1,
+  }
 
   // Build CDF: C[i] = sum of |psi|^2 for sites 0..i
   const cdf = new Float64Array(totalSites)
@@ -63,12 +116,25 @@ export function sampleFromDensity(
   for (let i = 0; i < totalSites; i++) {
     const re = psiRe[i]!
     const im = psiIm[i]!
-    cumulative += re * re + im * im
+    const density = re * re + im * im
+    const volumeWeight = metricVolumeWeight(
+      i,
+      gridSize,
+      spacing,
+      latticeDim,
+      options,
+      positionScratch,
+      metricScratch
+    )
+    cumulative += density * volumeWeight
     cdf[i] = cumulative
   }
 
   // Draw uniform random in [0, totalProb)
   const totalProb = cdf[totalSites - 1]!
+  if (!(totalProb > 0) || !Number.isFinite(totalProb)) {
+    throw new Error('Cannot sample from zero total probability density')
+  }
   const u = Math.random() * totalProb
 
   // Binary search for the sampled index
@@ -86,13 +152,7 @@ export function sampleFromDensity(
 
   // Convert linear index to N-D world position
   const position = new Array<number>(latticeDim)
-  let remaining = gridIndex
-  for (let d = latticeDim - 1; d >= 0; d--) {
-    const size = gridSize[d]!
-    const coordInt = remaining % size
-    remaining = (remaining - coordInt) / size
-    position[d] = (coordInt - size * 0.5 + 0.5) * spacing[d]!
-  }
+  linearIndexToPosition(gridIndex, gridSize, spacing, latticeDim, position)
 
   const reVal = psiRe[gridIndex]!
   const imVal = psiIm[gridIndex]!
@@ -104,9 +164,8 @@ export function sampleFromDensity(
 /**
  * Sample a coordinate along a single axis from the marginal distribution.
  *
- * Marginalizes |psi|^2 over all dimensions except `axis`, producing a 1D
- * probability distribution P(x_axis). Then samples from that distribution
- * using inverse CDF.
+ * Marginalizes the proper Born probability mass over all dimensions except
+ * `axis`, producing a 1D probability distribution P(x_axis).
  *
  * @param psiRe - Real parts of the wavefunction
  * @param psiIm - Imaginary parts of the wavefunction
@@ -120,11 +179,17 @@ export function sampleFromMarginalDensity(
   psiIm: Float32Array,
   gridSize: number[],
   spacing: number[],
-  axis: number
+  axis: number,
+  options?: DensitySamplingOptions
 ): PartialMeasurementResult {
   const latticeDim = gridSize.length
   const totalSites = psiRe.length
   const axisSize = gridSize[axis]!
+  const positionScratch = new Array<number>(latticeDim)
+  const metricScratch: MetricSample = {
+    gInverseDiag: new Array<number>(latticeDim),
+    sqrtDet: 1,
+  }
 
   // Compute marginal distribution: sum |psi|^2 over all dimensions except axis
   const marginal = new Float64Array(axisSize)
@@ -134,10 +199,19 @@ export function sampleFromMarginalDensity(
     const re = psiRe[i]!
     const im = psiIm[i]!
     const density = re * re + im * im
+    const volumeWeight = metricVolumeWeight(
+      i,
+      gridSize,
+      spacing,
+      latticeDim,
+      options,
+      positionScratch,
+      metricScratch
+    )
 
     // Extract axis coordinate from linear index
     const axisCoord = extractAxisCoord(i, gridSize, axis, latticeDim)
-    marginal[axisCoord] = (marginal[axisCoord] ?? 0) + density
+    marginal[axisCoord] = (marginal[axisCoord] ?? 0) + density * volumeWeight
   }
 
   // Build CDF of marginal
@@ -150,6 +224,9 @@ export function sampleFromMarginalDensity(
 
   // Sample from marginal CDF
   const totalProb = cdf[axisSize - 1]!
+  if (!(totalProb > 0) || !Number.isFinite(totalProb)) {
+    throw new Error('Cannot sample from zero total probability density')
+  }
   const u = Math.random() * totalProb
 
   let lo = 0

@@ -52,6 +52,51 @@ export type DiracFieldView =
  */
 export type DiracPotentialType = 'none' | 'step' | 'barrier' | 'well' | 'harmonicTrap' | 'coulomb'
 
+export const DIRAC_INITIAL_CONDITIONS: readonly DiracInitialCondition[] = [
+  'gaussianPacket',
+  'planeWave',
+  'standingWave',
+  'zitterbewegung',
+]
+
+export const DIRAC_FIELD_VIEWS: readonly DiracFieldView[] = [
+  'totalDensity',
+  'particleDensity',
+  'antiparticleDensity',
+  'particleAntiparticleSplit',
+  'spinDensity',
+  'currentDensity',
+  'phase',
+]
+
+export const DIRAC_POTENTIAL_TYPES: readonly DiracPotentialType[] = [
+  'none',
+  'step',
+  'barrier',
+  'well',
+  'harmonicTrap',
+  'coulomb',
+]
+
+const DIRAC_INITIAL_CONDITION_SET = new Set<string>(DIRAC_INITIAL_CONDITIONS)
+const DIRAC_FIELD_VIEW_SET = new Set<string>(DIRAC_FIELD_VIEWS)
+const DIRAC_POTENTIAL_TYPE_SET = new Set<string>(DIRAC_POTENTIAL_TYPES)
+
+/** Return true when a value is a supported Dirac initial condition. */
+export function isDiracInitialCondition(value: unknown): value is DiracInitialCondition {
+  return typeof value === 'string' && DIRAC_INITIAL_CONDITION_SET.has(value)
+}
+
+/** Return true when a value is a supported Dirac field-view mode. */
+export function isDiracFieldView(value: unknown): value is DiracFieldView {
+  return typeof value === 'string' && DIRAC_FIELD_VIEW_SET.has(value)
+}
+
+/** Return true when a value is a supported Dirac potential type. */
+export function isDiracPotentialType(value: unknown): value is DiracPotentialType {
+  return typeof value === 'string' && DIRAC_POTENTIAL_TYPE_SET.has(value)
+}
+
 // ============================================================================
 // Dirac Config
 // ============================================================================

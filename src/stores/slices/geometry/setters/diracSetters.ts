@@ -7,7 +7,12 @@
  * @module stores/slices/geometry/setters/diracSetters
  */
 
-import type { DiracConfig } from '@/lib/geometry/extended/types'
+import {
+  type DiracConfig,
+  isDiracFieldView,
+  isDiracInitialCondition,
+  isDiracPotentialType,
+} from '@/lib/geometry/extended/dirac'
 import { logger } from '@/lib/logger'
 import { reduceGridToFit } from '@/lib/math/ndArray'
 import { maxStableDt } from '@/lib/physics/dirac/scales'
@@ -197,6 +202,10 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
     },
     setDiracStepsPerFrame: nestedIntSetter(ctx, D, 'stepsPerFrame', 1, 16),
     setDiracPotentialType: (type) => {
+      if (!isDiracPotentialType(type)) {
+        logger.warn(`[diracSetters] Ignoring invalid Dirac potential type: ${String(type)}`)
+        return
+      }
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
@@ -210,6 +219,10 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
     setDiracHarmonicOmega: nestedClampedSetter(ctx, D, 'harmonicOmega', 0.01, 10),
     setDiracCoulombZ: nestedIntSetter(ctx, D, 'coulombZ', 1, 137),
     setDiracInitialCondition: (condition) => {
+      if (!isDiracInitialCondition(condition)) {
+        logger.warn(`[diracSetters] Ignoring invalid Dirac initial condition: ${String(condition)}`)
+        return
+      }
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
@@ -237,7 +250,18 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
         },
       }))
     },
-    setDiracFieldView: nestedValueSetter(ctx, D, 'fieldView'),
+    setDiracFieldView: (view) => {
+      if (!isDiracFieldView(view)) {
+        logger.warn(`[diracSetters] Ignoring invalid Dirac field view: ${String(view)}`)
+        return
+      }
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, fieldView: view },
+        },
+      }))
+    },
     setDiracAutoScale: nestedValueSetter(ctx, D, 'autoScale'),
     setDiracShowPotential: nestedValueSetter(ctx, D, 'showPotential'),
     setDiracAbsorberEnabled: (enabled: boolean) => {

@@ -117,6 +117,26 @@ describe('executeFullMeasurement', () => {
     expect(record.mock.calls[0]![0][0]).toBeCloseTo(-1.5) // site 0 position
     expect(record.mock.calls[0]![1]).toBeCloseTo(1.0) // density at site 0
   })
+
+  it('passes metric weighting into full-measurement sampling', () => {
+    const psiRe = new Float32Array([1, 2, 0])
+    const psiIm = new Float32Array(3).fill(0)
+    const config = {
+      latticeDim: 2,
+      gridSize: [3, 1],
+      spacing: [1, 1],
+      metric: { kind: 'morrisThorne' as const, throatRadius: 0.1 },
+      time: 0,
+    }
+    const inject = vi.fn()
+    const record = vi.fn()
+
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    executeFullMeasurement(psiRe, psiIm, config, 0.5, inject, record)
+
+    expect(record.mock.calls[0]![0][0]).toBeCloseTo(-1)
+    expect(record.mock.calls[0]![1]).toBeCloseTo(1)
+  })
 })
 
 describe('executePartialMeasurement', () => {
@@ -201,5 +221,27 @@ describe('executePartialMeasurement', () => {
     expect(position[0]).toBe(0)
     // axis 1, size=4, spacing=0.5: index 2 → pos = (2 - 2 + 0.5) * 0.5 = 0.25
     expect(position[1]).toBeCloseTo(0.25)
+  })
+
+  it('passes metric weighting into partial-measurement sampling', () => {
+    const psiRe = new Float32Array([1, 2, 0])
+    const psiIm = new Float32Array(3).fill(0)
+    const config = {
+      latticeDim: 2,
+      gridSize: [3, 1],
+      spacing: [1, 1],
+      metric: { kind: 'morrisThorne' as const, throatRadius: 0.1 },
+      time: 0,
+    }
+    const inject = vi.fn()
+    const record = vi.fn()
+
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    executePartialMeasurement(psiRe, psiIm, config, 0, 0.5, inject, record)
+
+    const [position, density, measuredAxis] = record.mock.calls[0]!
+    expect(position[0]).toBeCloseTo(-1)
+    expect(density).toBeCloseTo(Math.sqrt(1.01))
+    expect(measuredAxis).toBe(0)
   })
 })

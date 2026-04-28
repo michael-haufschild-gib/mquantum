@@ -16,6 +16,8 @@ import type { PauliConfig } from '@/lib/geometry/extended/pauli'
 import type { HydrogenNDPresetName, SchroedingerConfig } from '@/lib/geometry/extended/schroedinger'
 import { getHydrogenNDPresetsWithKeysByDimension } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
+import type { TdseConfig } from '@/lib/geometry/extended/tdse'
+import { DEFAULT_TDSE_CONFIG } from '@/lib/geometry/extended/tdse'
 import { ADS_PRESETS } from '@/lib/physics/antiDeSitter/presets'
 import { BEC_SCENARIO_PRESETS } from '@/lib/physics/bec/presets'
 import { DIRAC_SCENARIO_PRESETS } from '@/lib/physics/dirac/presets'
@@ -30,6 +32,7 @@ import { PAULI_FIELD_VIEW_TO_COLOR_ALGO } from '@/rendering/shaders/palette/type
 import { useAppearanceStore } from '@/stores/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
+import { resizeTdseArrays } from '@/stores/slices/geometry/setters/tdseSetters'
 
 import { getScenarioPresetOptions as getTdsePresetOptions } from './SchroedingerControls/tdseControlsConstants'
 
@@ -51,14 +54,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+function isNeutralPresetTailValue(value: unknown): boolean {
+  return typeof value === 'number' ? Object.is(value, 0) : value === undefined
+}
+
+function matchesLiveArrayTail(live: unknown[], preset: unknown[], start: number): boolean {
+  const repeatedPresetValue = preset[preset.length - 1]
+  return live
+    .slice(start)
+    .every(
+      (value) => presetValueEquals(value, repeatedPresetValue) || isNeutralPresetTailValue(value)
+    )
+}
+
 function presetValueEquals(a: unknown, b: unknown): boolean {
   if (Array.isArray(a) && Array.isArray(b)) {
-    // Subset semantics: a preset that specifies the leading entries of an
-    // array (e.g. a per-axis vector that the live config has padded with
-    // trailing defaults) should still match. Pure equality on length would
-    // pin the selector to "Custom" whenever the active config carries
-    // extra trailing entries, even when every preset-specified entry agrees.
-    return b.every((value, index) => presetValueEquals(a[index], value))
+    const commonLength = Math.min(a.length, b.length)
+    for (let i = 0; i < commonLength; i++) {
+      if (!presetValueEquals(a[i], b[i])) return false
+    }
+    if (a.length > b.length) return matchesLiveArrayTail(a, b, commonLength)
+    return b.slice(commonLength).every(isNeutralPresetTailValue)
   }
   if (isRecord(a) && isRecord(b)) {
     const bKeys = Object.keys(b)
@@ -80,19 +96,50 @@ function findScenarioPresetId<TConfig extends object>(
   return null
 }
 
+function tdseConfigMatches(current: TdseConfig, expected: TdseConfig): boolean {
+  const ignored = new Set(['needsReset', 'slicePositions'])
+  return Object.keys(expected).every((key) => {
+    if (ignored.has(key)) return true
+    const currentValue = (current as unknown as Record<string, unknown>)[key]
+    const expectedValue = (expected as unknown as Record<string, unknown>)[key]
+    return presetValueEquals(currentValue, expectedValue)
+  })
+}
+
+function findTdsePresetId(config: TdseConfig, dimension: number): string | null {
+  for (const preset of TDSE_SCENARIO_PRESETS) {
+    const { latticeDim: _presetDim, ...safeOverrides } = preset.overrides
+    const base = {
+      ...DEFAULT_TDSE_CONFIG,
+      ...safeOverrides,
+      slicePositions: config.slicePositions,
+      needsReset: true,
+    }
+    const resized = resizeTdseArrays(base, dimension)
+    const potentialType =
+      dimension < 2 && base.potentialType === 'doubleSlit'
+        ? ('barrier' as const)
+        : base.potentialType
+    const expected = { ...base, ...resized, potentialType, needsReset: true }
+    if (tdseConfigMatches(config, expected)) return preset.id
+  }
+  return null
+}
+
 function findPauliPresetId(config: PauliConfig): string | null {
   return findScenarioPresetId(config, PAULI_SCENARIO_PRESETS)
 }
 
 function findActiveScenarioPresetId(
   mode: SchroedingerConfig['quantumMode'],
-  schroedinger: SchroedingerConfig
+  schroedinger: SchroedingerConfig,
+  dimension: number
 ): string | null {
   switch (mode) {
     case 'hydrogenNDCoupled':
       return findScenarioPresetId(schroedinger, HYDROGEN_COUPLED_PRESETS)
     case 'tdseDynamics':
-      return findScenarioPresetId(schroedinger.tdse, TDSE_SCENARIO_PRESETS)
+      return findTdsePresetId(schroedinger.tdse, dimension)
     case 'becDynamics':
       return findScenarioPresetId(schroedinger.bec, BEC_SCENARIO_PRESETS)
     case 'diracEquation':
@@ -285,10 +332,14 @@ export const ScenarioSelector: React.FC = React.memo(() => {
         return findPauliPresetId(pauliSpinor) ?? ''
       default:
         return (
-          findActiveScenarioPresetId(mode as SchroedingerConfig['quantumMode'], schroedinger) ?? ''
+          findActiveScenarioPresetId(
+            mode as SchroedingerConfig['quantumMode'],
+            schroedinger,
+            dimension
+          ) ?? ''
         )
     }
-  }, [mode, presetName, hydrogenNDPreset, adsPreset, pauliSpinor, schroedinger])
+  }, [mode, presetName, hydrogenNDPreset, adsPreset, pauliSpinor, schroedinger, dimension])
 
   const selectOptions = useMemo(() => {
     if (!options || activeValue !== '') return options

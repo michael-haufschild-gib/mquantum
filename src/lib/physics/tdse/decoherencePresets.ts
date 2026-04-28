@@ -7,7 +7,7 @@
  * @module lib/physics/tdse/decoherencePresets
  */
 
-import type { TdseScenarioPreset } from './presets'
+import type { TdseScenarioPreset } from './tdsePresetTypes'
 
 /** Decoherent branching and monitoring presets. */
 export const DECOHERENCE_PRESETS: TdseScenarioPreset[] = [

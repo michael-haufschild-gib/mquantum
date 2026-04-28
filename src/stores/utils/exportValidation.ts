@@ -16,7 +16,7 @@ import type {
   ExportSettings,
   TextOverlaySettings,
   VideoCodec,
-} from '../exportStore'
+} from './exportTypes'
 
 // ---------------------------------------------------------------------------
 // Bitrate heuristics

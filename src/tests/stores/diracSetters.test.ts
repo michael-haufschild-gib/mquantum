@@ -78,11 +78,13 @@ describe('Dirac setters', () => {
     expect(getDirac().potentialStrength).toBe(100)
   })
 
-  it('sets potential type', () => {
+  it('sets valid potential type and rejects invalid values', () => {
     const s = useExtendedObjectStore.getState()
+    s.setDiracPotentialType('coulomb')
+    expect(getDirac().potentialType).toBe('coulomb')
     // @ts-expect-error intentional invalid input
     s.setDiracPotentialType('harmonic')
-    expect(getDirac().potentialType).toBe('harmonic')
+    expect(getDirac().potentialType).toBe('coulomb')
   })
 
   it('sets packet center per axis', () => {
@@ -97,11 +99,13 @@ describe('Dirac setters', () => {
     expect(getDirac().packetMomentum[0]).toBe(3.0)
   })
 
-  it('sets initial condition', () => {
+  it('sets valid initial condition and rejects invalid values', () => {
     const s = useExtendedObjectStore.getState()
+    s.setDiracInitialCondition('planeWave')
+    expect(getDirac().initialCondition).toBe('planeWave')
     // @ts-expect-error intentional invalid input
     s.setDiracInitialCondition('gaussian')
-    expect(getDirac().initialCondition).toBe('gaussian')
+    expect(getDirac().initialCondition).toBe('planeWave')
   })
 
   it('dt is stability-limited', () => {
@@ -160,9 +164,12 @@ describe('Dirac setters', () => {
     expect(getDirac().positiveEnergyFraction).toBe(1)
   })
 
-  it('sets fieldView', () => {
+  it('sets valid fieldView and rejects invalid values', () => {
     const s = useExtendedObjectStore.getState()
     s.setDiracFieldView('spinDensity')
+    expect(getDirac().fieldView).toBe('spinDensity')
+    // @ts-expect-error intentional invalid input
+    s.setDiracFieldView('spin')
     expect(getDirac().fieldView).toBe('spinDensity')
   })
 

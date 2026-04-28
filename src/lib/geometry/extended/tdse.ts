@@ -498,3 +498,37 @@ export const DEFAULT_TDSE_CONFIG: TdseConfig = {
   needsReset: false,
   slicePositions: [],
 }
+
+/** Regge-Wheeler black-hole parameters after physical bounds normalization. */
+export interface NormalizedTdseBlackHoleParams {
+  bhMass: number
+  bhMultipoleL: number
+  bhSpin: 0 | 1 | 2
+}
+
+const clampTdseBhInt = (value: unknown, fallback: number, lo: number, hi: number): number => {
+  const n = typeof value === 'number' && Number.isFinite(value) ? value : fallback
+  return Math.max(lo, Math.min(hi, Math.floor(n)))
+}
+
+/**
+ * Normalize Regge-Wheeler TDSE parameters to the same physical band enforced
+ * by the user-facing setters: M in [0.1, 5], s in {0,1,2}, and ell in
+ * [s, 6]. Scene loading and GPU uniform packing both bypass setters, so they
+ * must share this guard to avoid NaN or non-physical Schwarzschild inputs.
+ */
+export function normalizeTdseBlackHoleParams(input: {
+  bhMass?: unknown
+  bhMultipoleL?: unknown
+  bhSpin?: unknown
+}): NormalizedTdseBlackHoleParams {
+  const rawMass = input.bhMass
+  const mass =
+    typeof rawMass === 'number' && Number.isFinite(rawMass)
+      ? Math.max(0.1, Math.min(5, rawMass))
+      : DEFAULT_TDSE_CONFIG.bhMass
+  const spin = clampTdseBhInt(input.bhSpin, DEFAULT_TDSE_CONFIG.bhSpin, 0, 2) as 0 | 1 | 2
+  const ell = clampTdseBhInt(input.bhMultipoleL, DEFAULT_TDSE_CONFIG.bhMultipoleL, spin, 6)
+
+  return { bhMass: mass, bhMultipoleL: ell, bhSpin: spin }
+}

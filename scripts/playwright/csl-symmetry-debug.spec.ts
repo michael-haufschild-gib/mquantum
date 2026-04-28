@@ -133,10 +133,10 @@ test.describe('CSL Symmetry-Breaking Investigation', () => {
     // Navigate to TDSE mode
     await gotoMode(page, 'tdseDynamics', 3)
     const state = await waitForRendererSettled(page)
-    if (state === 'error') {
-      test.skip()
-      return
-    }
+    expect(
+      state,
+      'renderer entered error state — investigate WebGPU init / shader compilation rather than silently skipping'
+    ).not.toBe('error')
     await waitForFirstFrame(page)
 
     // Select the Schrödinger's Cat preset from the dropdown
@@ -187,10 +187,10 @@ test.describe('CSL Symmetry-Breaking Investigation', () => {
   test('rapid collapse preset: one blob must survive', async ({ page }) => {
     await gotoMode(page, 'tdseDynamics', 3)
     const state = await waitForRendererSettled(page)
-    if (state === 'error') {
-      test.skip()
-      return
-    }
+    expect(
+      state,
+      'renderer entered error state — investigate WebGPU init / shader compilation rather than silently skipping'
+    ).not.toBe('error')
     await waitForFirstFrame(page)
 
     // rapidCollapse has γ=5, σ=1, 32 centers — strongest branching preset

@@ -205,6 +205,31 @@ describe('sampleFromDensity', () => {
     expect(r2.gridIndex).toBe(7)
     expect(r2.density).toBeCloseTo(25)
   })
+
+  it('weights curved-space sampling by the proper volume element', () => {
+    // Morris-Thorne sqrt(|g|)=sqrt(b0^2+l^2) in 2D. Raw densities [1,4,0]
+    // would sample the center for u=0.5, but proper-volume weights favor l=-1.
+    const psiRe = new Float32Array([1, 2, 0])
+    const psiIm = new Float32Array(3).fill(0)
+    const gridSize = [3, 1]
+    const spacing = [1, 1]
+
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    const result = sampleFromDensity(psiRe, psiIm, gridSize, spacing, {
+      metric: { kind: 'morrisThorne', throatRadius: 0.1 },
+      time: 0,
+    })
+
+    expect(result.gridIndex).toBe(0)
+    expect(result.position[0]).toBeCloseTo(-1)
+    expect(result.density).toBeCloseTo(1)
+  })
+
+  it('throws when the total probability density is zero', () => {
+    expect(() => sampleFromDensity(new Float32Array(4), new Float32Array(4), [4], [1])).toThrow(
+      'Cannot sample from zero total probability density'
+    )
+  })
 })
 
 // ── sampleFromMarginalDensity ────────────────────────────────────────────
@@ -300,6 +325,29 @@ describe('sampleFromMarginalDensity', () => {
     const result = sampleFromMarginalDensity(psiRe, psiIm, gridSize, spacing, 1)
     expect(result.axisIndex).toBe(2)
     expect(result.axisPosition).toBeCloseTo(2.0)
+  })
+
+  it('weights curved-space marginal sampling by the proper volume element', () => {
+    const psiRe = new Float32Array([1, 2, 0])
+    const psiIm = new Float32Array(3).fill(0)
+    const gridSize = [3, 1]
+    const spacing = [1, 1]
+
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    const result = sampleFromMarginalDensity(psiRe, psiIm, gridSize, spacing, 0, {
+      metric: { kind: 'morrisThorne', throatRadius: 0.1 },
+      time: 0,
+    })
+
+    expect(result.axisIndex).toBe(0)
+    expect(result.axisPosition).toBeCloseTo(-1)
+    expect(result.marginalDensity).toBeCloseTo(Math.sqrt(1.01))
+  })
+
+  it('throws when the marginal probability density is zero', () => {
+    expect(() =>
+      sampleFromMarginalDensity(new Float32Array(4), new Float32Array(4), [4], [1], 0)
+    ).toThrow('Cannot sample from zero total probability density')
   })
 })
 

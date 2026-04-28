@@ -197,4 +197,17 @@ describe('shouldDispatchObs', () => {
     const config = { ...baseConfig, diagnosticsEnabled: true, diagnosticsInterval: 1 }
     expect(shouldDispatchObs(true, 0, config)).toBe(true)
   })
+
+  it('does not dispatch flat-FFT observables for curved metrics', () => {
+    const config = {
+      ...baseConfig,
+      metric: { kind: 'morrisThorne' as const, throatRadius: 0.5 },
+    }
+    expect(shouldDispatchObs(true, 100, config)).toBe(false)
+  })
+
+  it('allows flat torus observables', () => {
+    const config = { ...baseConfig, metric: { kind: 'torus' as const } }
+    expect(shouldDispatchObs(true, 4, config)).toBe(true)
+  })
 })

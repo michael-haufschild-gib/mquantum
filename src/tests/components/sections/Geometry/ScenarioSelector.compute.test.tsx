@@ -2,7 +2,8 @@
  * Regression tests for computed scenario selection in Schroedinger compute modes.
  */
 
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { ScenarioSelector } from '@/components/sections/Geometry/ScenarioSelector'
@@ -62,5 +63,41 @@ describe('ScenarioSelector - compute mode presets', () => {
     render(<ScenarioSelector />)
 
     expect(screen.getByRole('combobox', { name: /scenario/i })).toHaveValue('')
+  })
+
+  it('keeps a TDSE preset selected after applying it in a higher dimension', async () => {
+    const user = userEvent.setup()
+    useGeometryStore.setState({ dimension: 4 })
+    enterTdseModeWithConfig({ latticeDim: 4 })
+
+    render(<ScenarioSelector />)
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: /scenario/i }),
+      'classicTunneling'
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: /scenario/i })).toHaveValue('classicTunneling')
+    })
+  })
+
+  it('keeps a Dirac preset selected when padded preset vectors are resized to live dimension', async () => {
+    const user = userEvent.setup()
+    useExtendedObjectStore.setState((state) => ({
+      schroedinger: {
+        ...state.schroedinger,
+        quantumMode: 'diracEquation',
+        dirac: { ...state.schroedinger.dirac, latticeDim: 3 },
+      },
+    }))
+
+    render(<ScenarioSelector />)
+
+    await user.selectOptions(screen.getByRole('combobox', { name: /scenario/i }), 'kleinParadox')
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: /scenario/i })).toHaveValue('kleinParadox')
+    })
   })
 })

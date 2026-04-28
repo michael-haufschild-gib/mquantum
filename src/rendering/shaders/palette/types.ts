@@ -512,6 +512,22 @@ export function getAvailableColorAlgorithms(
 }
 
 /**
+ * Full color preset including algorithm and distribution settings.
+ *
+ * Lives in this types module (rather than presets.ts) so `builtInPresets.ts`
+ * can reference the shape without importing presets.ts — that hub imports
+ * builtInPresets.ts back, which would form a structural cycle.
+ */
+export interface ColorPreset {
+  id: string
+  name: string
+  algorithm: ColorAlgorithm
+  coefficients: CosineCoefficients
+  distribution: DistributionSettings
+  isBuiltIn: boolean
+}
+
+/**
  * Multi-source weight configuration for blending different value sources.
  */
 export interface MultiSourceWeights {

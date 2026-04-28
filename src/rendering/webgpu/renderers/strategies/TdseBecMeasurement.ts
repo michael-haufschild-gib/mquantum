@@ -75,6 +75,8 @@ export function handleMeasurement(
         gridSize,
         spacing,
         compactDims: tdseConfig.compactDims as boolean[] | undefined,
+        metric: tdseConfig.metric,
+        time: tdsePass.simTime,
       }
 
       const inject = (re: Float32Array, im: Float32Array) => {
