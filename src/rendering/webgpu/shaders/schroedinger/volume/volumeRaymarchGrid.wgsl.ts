@@ -184,7 +184,9 @@ fn volumeRaymarchGrid(
     if (bilocalBridgeActive && rho >= EMPTY_SKIP_THRESHOLD) {
       let remoteEndpoint = vec3f(-basePos.x, basePos.y, basePos.z);
       let remoteGridSample = sampleDensityFromGrid(remoteEndpoint, uniforms);
-      let remoteRho = select(remoteGridSample.r, remoteGridSample.r + remoteGridSample.g, IS_DUAL_CHANNEL);
+      // Match local rho amplitude scaling so AdS bridge locking compares like-for-like.
+      let remotePrimaryRho = remoteGridSample.r * adsAmplitudeSq;
+      let remoteRho = select(remotePrimaryRho, remotePrimaryRho + remoteGridSample.g, IS_DUAL_CHANNEL);
       var localLogDensity = sCenter;
       var remoteLogDensity = remoteGridSample.g;
       if (IS_DUAL_CHANNEL) {

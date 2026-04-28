@@ -7,21 +7,7 @@ import {
   generateVolumeRaymarchGridSimpleBlock,
 } from '@/rendering/webgpu/shaders/schroedinger/volume/volumeRaymarchGrid.wgsl'
 
-function functionSlice(source: string, name: string): string {
-  const start = source.indexOf(`fn ${name}(`)
-  expect(start).toBeGreaterThanOrEqual(0)
-  const next = source.indexOf('\nfn ', start + 1)
-  return next === -1 ? source.slice(start) : source.slice(start, next)
-}
-
-function expectOrdered(source: string, needles: string[]): void {
-  let cursor = -1
-  for (const needle of needles) {
-    const found = source.indexOf(needle, cursor + 1)
-    expect(found).toBeGreaterThan(cursor)
-    cursor = found
-  }
-}
+import { expectOrdered, functionSlice } from './wgslTestHelpers'
 
 describe('Schroedinger entropic time-shear WGSL composition', () => {
   it('includes uniforms and helper contract', () => {

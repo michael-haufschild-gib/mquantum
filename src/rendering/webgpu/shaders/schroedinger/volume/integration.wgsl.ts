@@ -217,7 +217,7 @@ fn entropyShearFilamentField(worldPosition: vec3f, phase: f32, uniforms: Schroed
   let scale = clamp(uniforms.entropicTimeShearFilamentScale, 0.1, 4.0);
   let spatialFrequency = 6.2831853 / scale;
   let p = worldPosition * spatialFrequency;
-  let t = uniforms.time * 0.37;
+  let t = getVolumeTime(uniforms) * 0.37;
   let a = sin(dot(p, vec3f(0.73, 1.19, 0.41)) + phase + t);
   let b = cos(dot(p, vec3f(-0.37, 0.67, 1.31)) - phase * 0.5 - t * 0.7);
   let c = sin(dot(p, vec3f(1.11, -0.29, 0.83)) + a * b + t * 1.3);

@@ -78,11 +78,12 @@ export function packWignerAndPauliFields(
 ): void {
   const { schroedinger, pauliSpinor, dimension } = p
   const wignerDimIdx = schroedinger?.wignerDimensionIndex ?? 0
-  intView[I.wignerDimensionIndex] = Math.max(0, Math.min(wignerDimIdx, dimension - 1))
+  const clampedWignerDimIdx = Math.max(0, Math.min(wignerDimIdx, dimension - 1))
+  intView[I.wignerDimensionIndex] = clampedWignerDimIdx
   intView[I.wignerCrossTermsEnabled] = schroedinger?.wignerCrossTermsEnabled ? 1 : 0
 
   if (schroedinger?.wignerAutoRange ?? true) {
-    packWignerAutoRange(floatView, intView, p, wignerDimIdx)
+    packWignerAutoRange(floatView, intView, p, clampedWignerDimIdx)
   } else {
     floatView[I.wignerXRange] = schroedinger?.wignerXRange ?? 6.0
     floatView[I.wignerPRange] = schroedinger?.wignerPRange ?? 6.0
