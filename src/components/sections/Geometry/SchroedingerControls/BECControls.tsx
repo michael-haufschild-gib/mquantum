@@ -49,6 +49,7 @@ const FIELD_VIEW_OPTIONS = [
   { value: 'healingLength', label: 'Healing Length' },
   { value: 'machNumber', label: 'Mach Number M = |v_s|/c_s' },
   { value: 'hawkingFlux', label: 'Hawking Flux κ/2π' },
+  { value: 'vorticity', label: 'Circulation Ω' },
 ]
 
 /**

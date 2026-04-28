@@ -55,7 +55,7 @@ struct TDSEUniforms {
   packetWidth: f32,          // offset 272
   packetAmplitude: f32,      // offset 276
   boundingRadius: f32,       // offset 280
-  fieldView: u32,            // offset 284 (0=density, 1=phase, 2=current, 3=potential, 4=superfluidVelocity, 5=healingLength, 6=machNumber, 7=hawkingFlux, 8=quantumPressure)
+  fieldView: u32,            // offset 284 (0=density, 1=phase, 2=current, 3=potential, 4=superfluidVelocity, 5=healingLength, 6=machNumber, 7=hawkingFlux, 8=quantumPressure, 9=vorticity)
 
   // Potential parameters (32 bytes)
   barrierHeight: f32,        // offset 288

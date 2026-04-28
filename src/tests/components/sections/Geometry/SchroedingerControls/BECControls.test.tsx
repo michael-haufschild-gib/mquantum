@@ -161,6 +161,7 @@ describe('BECControls', () => {
   it('hides the Hawking flux field view option outside the analog horizon', () => {
     render(<BECControls config={defaultConfig()} dimension={3} actions={createMockActions()} />)
     expect(screen.queryByRole('option', { name: 'Hawking Flux κ/2π' })).not.toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Circulation Ω' })).toBeInTheDocument()
   })
 
   describe('Hawking (Analog Horizon) controls', () => {

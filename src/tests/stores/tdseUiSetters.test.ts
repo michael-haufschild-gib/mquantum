@@ -84,6 +84,11 @@ describe('TDSE UI setters', () => {
       useExtendedObjectStore.getState().setTdseFieldView('quantumPressure')
       expect(getTdse().fieldView).toBe('quantumPressure')
     })
+
+    it('sets field view to vorticity', () => {
+      useExtendedObjectStore.getState().setTdseFieldView('vorticity')
+      expect(getTdse().fieldView).toBe('vorticity')
+    })
   })
 
   describe('boolean toggle setters', () => {

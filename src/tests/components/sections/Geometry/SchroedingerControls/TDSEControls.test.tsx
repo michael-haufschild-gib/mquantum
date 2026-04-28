@@ -105,6 +105,7 @@ describe('TDSEControls', () => {
     fireEvent.click(header)
     expect(screen.getByTestId('tdse-field-view')).toBeInTheDocument()
     expect(screen.getByText('Quantum Pressure Q')).toBeInTheDocument()
+    expect(screen.getByText('Circulation Ω')).toBeInTheDocument()
     expect(screen.getByTestId('tdse-show-potential')).toBeInTheDocument()
     expect(screen.getByTestId('tdse-imaginary-time')).toBeInTheDocument()
   })

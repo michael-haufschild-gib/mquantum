@@ -30,6 +30,7 @@ import {
   tdsePotentialBlock,
   tdsePotentialBlock3D,
 } from '../shaders/schroedinger/compute/tdsePotential.wgsl'
+import { tdsePotentialScaleBlock } from '../shaders/schroedinger/compute/tdsePotentialScale.wgsl'
 import { tdseQuantumPressureBlock } from '../shaders/schroedinger/compute/tdseQuantumPressure.wgsl'
 import {
   fftAxisUniformsBlock,
@@ -40,6 +41,7 @@ import {
   tdseStockhamFFTTwiddleBlock,
 } from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
 import { tdseUniformsBlock } from '../shaders/schroedinger/compute/tdseUniforms.wgsl'
+import { tdseVorticityBlock } from '../shaders/schroedinger/compute/tdseVorticity.wgsl'
 import { tdseWriteGridBlock } from '../shaders/schroedinger/compute/tdseWriteGrid.wgsl'
 import { assembleShaderBlocks } from '../shaders/shared/compose-helpers'
 import { createComputeBGL } from '../utils/computeBindGroupLayout'
@@ -173,7 +175,14 @@ export function composeTdseKinetic3DShader(): string {
 
 /** Pure WGSL for the TDSE write-grid compute shader. */
 export function composeTdseWriteGridShader(): string {
-  return tdsePrelude() + tdseCurvatureHelpersBlock + tdseWriteGridBlock + tdseQuantumPressureBlock
+  return (
+    tdsePrelude() +
+    tdseCurvatureHelpersBlock +
+    tdseWriteGridBlock +
+    tdsePotentialScaleBlock +
+    tdseQuantumPressureBlock +
+    tdseVorticityBlock
+  )
 }
 
 /** Pure WGSL for the TDSE diagnostics norm-reduce compute shader. */

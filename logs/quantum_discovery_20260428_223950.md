@@ -642,3 +642,59 @@ Render the Pauli spinor's local Berry curvature as an emergent gauge field. The 
   - `pnpm test:shaders:fast` — PASS.
   - `git diff --check` — PASS.
 - Follow-up threads: signed Berry-curvature diverging palette; integrate curvature flux through moving slices; correlate curvature knots with Stern-Gerlach packet splitting.
+
+## Round PRD: TDSE/BEC Quantized Circulation View
+
+### Scientific Goal
+
+Render quantized circulation as a phase-winding two-form so vortex defects appear as topological objects, not merely high-speed flow. The view should expose BEC vortex cores, vortex reconnection sheets in higher dimensions, and TDSE phase singularities as cosmic-string-like defects in the raymarched volume.
+
+### Physics / Math
+
+- Add `vorticity` to `TdseFieldView` and `BecFieldView`.
+- Map `vorticity` to TDSE write-grid `fieldView = 9`; keep `quantumPressure = 8` and `hawkingFlux = 7`.
+- In `tdseWriteGrid`:
+  - Add a phase helper and wrapped phase-delta helper.
+  - Add a forward-neighbor helper using the same PML clamp / periodic wrap behavior as existing derivative views.
+  - For every active lattice-axis pair `(i,j)` with `i < j`, compute plaquette circulation:
+    - `Δθ(i) + Δθ(j at i+) - Δθ(i at j+) - Δθ(j)`
+    - wrap every phase difference into `[-π, π]`.
+    - normalize by `2π` so one vortex quantum maps to `1`.
+  - Sum `abs(winding)` across all axis pairs to support 3D and higher-dimensional slices.
+  - Render bounded `1 - exp(-circulationAbs)` density-gated by `densityGate`.
+  - Preserve alpha as raw normalized density.
+- Existing field views and potential overlay behavior remain unchanged.
+
+### User Sees
+
+- TDSE display controls gain `Circulation Ω`.
+- BEC display controls gain `Circulation Ω`.
+- Vortex-imprint, vortex-lattice, and reconnection initial states show bright quantized cores/sheets; non-vortical smooth packets stay dark except at real phase singularities.
+
+### Acceptance Bar
+
+- TypeScript compiles.
+- Unit/source tests cover:
+  - TDSE `vorticity` packs to fieldView enum `9`; Hawking remains `7`; quantumPressure remains `8`.
+  - `tdseWriteGrid` fieldView-9 branch uses `wrappedPhaseDelta`, `forwardPhaseNeighbor`, `plaquetteWinding`, `circulationAbs`, `TDSE_WG_INV_TAU`, and density gating.
+  - TDSE UI exposes `Circulation Ω` and setter accepts it.
+  - BEC type/UI expose `Circulation Ω`, and BEC config maps through to TDSE field view.
+- `pnpm exec vitest run src/tests/rendering/webgpu/passes/TDSEComputePassUniforms.test.ts src/tests/rendering/webgpu/tdseWriteGridVorticity.test.ts src/tests/components/sections/Geometry/SchroedingerControls/TDSEControls.test.tsx src/tests/components/sections/Geometry/SchroedingerControls/BECControls.test.tsx src/tests/stores/tdseUiSetters.test.ts src/tests/lib/geometry/extended/becConfig.test.ts`
+- `pnpm exec tsc --noEmit`
+- `pnpm run lint`
+- `pnpm test:shaders:fast`
+
+### Outcome
+
+- Commit: `Add TDSE BEC circulation view`.
+- Reviewer result: PASS.
+- What renderer now draws: TDSE and BEC display controls have a `Circulation Omega` view that raymarches phase-winding defects as bright vortex cores/sheets.
+- Physics implemented: wrapped plaquette phase circulation over every active lattice-axis pair, normalized by `1 / 2pi`, summed as absolute winding, bounded by `1 - exp(-circulationAbs)`, and gated by density.
+- Paths affected: TDSE/BEC field-view types and controls, TDSE uniform packing, composed TDSE write-grid WGSL, extracted potential-scale helper, new circulation helper block, and focused tests.
+- Verification:
+  - `pnpm exec vitest run src/tests/rendering/webgpu/passes/TDSEComputePassUniforms.test.ts src/tests/rendering/webgpu/tdseWriteGridVorticity.test.ts src/tests/components/sections/Geometry/SchroedingerControls/TDSEControls.test.tsx src/tests/components/sections/Geometry/SchroedingerControls/BECControls.test.tsx src/tests/stores/tdseUiSetters.test.ts src/tests/lib/geometry/extended/becConfig.test.ts src/tests/rendering/webgpu/renderers/strategies/TdseBecConfigBuilder.test.ts` — PASS, 134 tests.
+  - `pnpm exec tsc --noEmit` — PASS.
+  - `pnpm run lint` — PASS.
+  - `pnpm test:shaders:fast` — PASS.
+  - `git diff --check` — PASS.
+- Follow-up threads: signed circulation palette; vortex-line extraction from plaquette winding; compare BEC reconnection initial states against TDSE phase singularity statistics.

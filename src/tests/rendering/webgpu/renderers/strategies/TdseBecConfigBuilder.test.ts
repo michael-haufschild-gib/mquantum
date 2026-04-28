@@ -157,6 +157,11 @@ describe('buildBecConfig — schroedinger overrides', () => {
     const { config } = buildBecConfig(minimalBec(), undefined)
     expect(config.autoScaleMaxGain).toBe(20)
   })
+
+  it('passes vorticity field view through to the TDSE compute config', () => {
+    const { config } = buildBecConfig(minimalBec({ fieldView: 'vorticity' }), undefined)
+    expect(config.fieldView).toBe('vorticity')
+  })
 })
 
 describe('buildBecConfig — lattice passthrough', () => {

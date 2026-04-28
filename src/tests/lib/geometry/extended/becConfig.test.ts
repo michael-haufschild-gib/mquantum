@@ -54,10 +54,13 @@ describe('BecInitialCondition / BecFieldView — union members', () => {
   it('accepts analog-horizon field views as BecFieldView values', () => {
     const mach: BecFieldView = 'machNumber'
     const flux: BecFieldView = 'hawkingFlux'
+    const vorticity: BecFieldView = 'vorticity'
     const machCfg: BecConfig = { ...DEFAULT_BEC_CONFIG, fieldView: mach }
     const fluxCfg: BecConfig = { ...DEFAULT_BEC_CONFIG, fieldView: flux }
+    const vorticityCfg: BecConfig = { ...DEFAULT_BEC_CONFIG, fieldView: vorticity }
     expect(machCfg.fieldView).toBe('machNumber')
     expect(fluxCfg.fieldView).toBe('hawkingFlux')
+    expect(vorticityCfg.fieldView).toBe('vorticity')
   })
 })
 
