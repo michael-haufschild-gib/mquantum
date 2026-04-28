@@ -122,7 +122,10 @@ function normalizeSliceDensity(values: Float32Array): Float32Array {
     const v = values[i]!
     if (Number.isFinite(v) && v > 0) sum += v
   }
-  if (sum <= 0) return values
+  if (sum <= 0) {
+    values.fill(0)
+    return values
+  }
   const inv = 1 / sum
   for (let i = 0; i < values.length; i++) {
     const v = values[i]!

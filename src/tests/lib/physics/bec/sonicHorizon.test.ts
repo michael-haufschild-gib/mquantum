@@ -116,7 +116,9 @@ describe('sonicHorizon — detrended waterfall profile', () => {
     expect(Math.abs(dnHi)).toBeLessThan(1e-5)
     expect(Math.abs(dnLo)).toBeLessThan(1e-5)
     expect(waterfallDensityCoordinate(0, p)).toBeCloseTo(0, 12)
-    expect(Math.abs(waterfallDensityCoordinate(edge, p))).toBeGreaterThan(5)
+    const expectedEdge = p.lBox / (Math.PI * p.lh)
+    expect(waterfallDensityCoordinate(edge, p)).toBeCloseTo(expectedEdge, 12)
+    expect(waterfallDensityCoordinate(-edge, p)).toBeCloseTo(-expectedEdge, 12)
   })
 
   it('matches c_s(x) = √(g n(x)/m) with the periodized density dip', () => {

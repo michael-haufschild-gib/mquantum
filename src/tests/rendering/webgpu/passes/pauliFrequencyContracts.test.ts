@@ -33,7 +33,7 @@ describe('Pauli spin frequency contracts', () => {
     expect(pauliPotentialHalf).toContain('U_half = exp(-i [V(x) + μ_B σ·B(x)] dt/(2ℏ))')
     expect(pauliPotentialHalf).toContain('θ_B = |B(x)| dt / (2ℏ)')
     expect(pauliComputePass).toContain(
-      'const larmorFrequency = (2 * this.cachedFieldStrength) / this.cachedHbar'
+      'const larmorFrequency = (2 * this.cachedFieldStrength) / safeHbar'
     )
   })
 

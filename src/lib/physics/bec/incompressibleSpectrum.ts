@@ -170,8 +170,28 @@ export function computeIncompressibleSpectrum(
     // packed is null/undefined → WASM not initialized, fall through to TS path
   }
 
+  // TS fallback validation (mirrors the WASM input rejection above).
+  // Without these guards, invalid grid/spacing would produce NaN/Infinity
+  // energies and spectrum values via the Parseval scaling at the end.
+  const zeroResult = (): IncompressibleSpectrumResult => ({
+    spectrum: new Float32Array(numBins),
+    kValues: new Float32Array(numBins),
+    totalIncompressible: 0,
+    totalCompressible: 0,
+  })
+
+  if (dim === 0 || spacing.length !== dim) return zeroResult()
+  for (let d = 0; d < dim; d++) {
+    const n = gridSize[d]!
+    const dx = spacing[d]!
+    if (!Number.isFinite(n) || n < 2 || (n & (n - 1)) !== 0) return zeroResult()
+    if (!Number.isFinite(dx) || dx <= 0) return zeroResult()
+  }
+
   let totalSites = 1
   for (let d = 0; d < dim; d++) totalSites *= gridSize[d]!
+  if (!Number.isFinite(totalSites) || totalSites <= 0) return zeroResult()
+  if (psiRe.length !== totalSites || psiIm.length !== totalSites) return zeroResult()
 
   const hbarOverM = hbar / Math.max(mass, 1e-10)
 
