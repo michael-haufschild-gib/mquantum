@@ -26,7 +26,8 @@ export interface DensityGridMapping {
 
 /** Compute density-grid center and half-extent values for the active mode. */
 export function computeDensityGridMapping(input: DensityGridMappingInputs): DensityGridMapping {
-  const isotropicHalf = Math.max(1e-3, input.boundingRadius)
+  const r = input.boundingRadius
+  const isotropicHalf = Number.isFinite(r) ? Math.max(1e-3, r) : 1e-3
   return {
     center: [0, 0, 0],
     halfExtent: [isotropicHalf, isotropicHalf, isotropicHalf],

@@ -42,7 +42,7 @@ export function applyTorusMetricSpacing(
   if (metric?.kind !== 'torus' || metric.torusPeriod?.length !== 3) return spacing
 
   const result = spacing.slice()
-  const overrideDims = Math.min(latticeDim, 3)
+  const overrideDims = Math.max(0, Math.min(3, Math.floor(latticeDim)))
   for (let d = 0; d < overrideDims; d++) {
     const n = gridSize[d]
     if (!Number.isFinite(n) || n! <= 0) continue

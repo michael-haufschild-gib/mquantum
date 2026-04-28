@@ -156,8 +156,8 @@ the density-packer soft-clamp filter are removed.
 
 | BC              | Key          | Current seed at `a_min` |
 | --------------- | ------------ | ----------------------- |
-| Hartle–Hawking  | `noBoundary` | `V > 0`: Langer-uniform pure `Ai`; `V = 0`: `√a·J_{1/4}` with Gaussian gauge envelope; `V < 0`: real standing wave `|U|^{-1/4}·cos Φ_L` with Gaussian gauge envelope. |
-| Vilenkin        | `tunneling`  | `V > 0`: Langer-uniform `Ai + i·Bi`; `V = 0`: outgoing Hankel `H_{1/4}^{(1)}` with Gaussian gauge envelope; `V < 0`: outgoing WKB `|U|^{-1/4}·exp(+iΦ_L)`. |
+| Hartle–Hawking  | `noBoundary` | `V > 0`: Langer-uniform pure `Ai`; `V = 0`: `√a·J_{1/4}` with Gaussian gauge envelope; `V < 0`: real standing wave `\|U\|^{-1/4}·cos Φ_L` with Gaussian gauge envelope. |
+| Vilenkin        | `tunneling`  | `V > 0`: Langer-uniform `Ai + i·Bi`; `V = 0`: outgoing Hankel `H_{1/4}^{(1)}` with Gaussian gauge envelope; `V < 0`: outgoing WKB `\|U\|^{-1/4}·exp(+iΦ_L)`. |
 | DeWitt          | `deWitt`     | Implements `χ(0, φ) = 0`; bootstraps finite `a_min` with `χ(a_min, φ) = a_min·exp(−½(φ₁²+φ₂²))` and `∂_aχ(a_min, φ) = exp(−½(φ₁²+φ₂²))`. |
 
 Each generator lives in

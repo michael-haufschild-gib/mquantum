@@ -829,7 +829,11 @@ export class PauliComputePass extends WebGPUBaseComputePass {
               const coherenceMagnitude = Math.sqrt(
                 (sigmaX * sigmaX + sigmaY * sigmaY) / (safeTotalNorm * safeTotalNorm)
               )
-              const larmorFrequency = (2 * this.cachedFieldStrength) / this.cachedHbar
+              const safeHbar =
+                Number.isFinite(this.cachedHbar) && Math.abs(this.cachedHbar) > 1e-9
+                  ? this.cachedHbar
+                  : 1.0
+              const larmorFrequency = (2 * this.cachedFieldStrength) / safeHbar
 
               if (this.initialNorm === 0 && totalNorm > 0) {
                 this.initialNorm = totalNorm
