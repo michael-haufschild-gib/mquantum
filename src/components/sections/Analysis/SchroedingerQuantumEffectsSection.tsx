@@ -17,6 +17,8 @@ import { isComputeQuantumType } from '@/lib/geometry/registry'
 import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
+import { SchroedingerEntropicTimeShearControls } from './SchroedingerEntropicTimeShearControls'
+
 const NODAL_DEFINITION_OPTIONS: { value: SchroedingerNodalDefinition; label: string }[] = [
   { value: 'psiAbs', label: '|ψ| (Nodal Envelope)' },
   { value: 'realPart', label: 'Re(ψ) = 0' },
@@ -66,6 +68,19 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
       setUncertaintyBoundaryWidth: state.setSchroedingerUncertaintyBoundaryWidth,
       setPhaseMaterialityEnabled: state.setSchroedingerPhaseMaterialityEnabled,
       setPhaseMaterialityStrength: state.setSchroedingerPhaseMaterialityStrength,
+      setQuantumBackreactionLensingEnabled: state.setSchroedingerQuantumBackreactionLensingEnabled,
+      setQuantumBackreactionLensingStrength:
+        state.setSchroedingerQuantumBackreactionLensingStrength,
+      setQuantumBackreactionCausticGain: state.setSchroedingerQuantumBackreactionCausticGain,
+      setQuantumBackreactionSoftening: state.setSchroedingerQuantumBackreactionSoftening,
+      setBilocalERBridgeEnabled: state.setSchroedingerBilocalERBridgeEnabled,
+      setBilocalERBridgeStrength: state.setSchroedingerBilocalERBridgeStrength,
+      setBilocalERBridgeThroatRadius: state.setSchroedingerBilocalERBridgeThroatRadius,
+      setBilocalERBridgePhaseLock: state.setSchroedingerBilocalERBridgePhaseLock,
+      setEntropicTimeShearEnabled: state.setSchroedingerEntropicTimeShearEnabled,
+      setEntropicTimeShearStrength: state.setSchroedingerEntropicTimeShearStrength,
+      setEntropicTimeShearFilamentScale: state.setSchroedingerEntropicTimeShearFilamentScale,
+      setEntropicTimeShearIrreversibility: state.setSchroedingerEntropicTimeShearIrreversibility,
     }))
     const {
       config,
@@ -88,6 +103,18 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
       setUncertaintyBoundaryWidth,
       setPhaseMaterialityEnabled,
       setPhaseMaterialityStrength,
+      setQuantumBackreactionLensingEnabled,
+      setQuantumBackreactionLensingStrength,
+      setQuantumBackreactionCausticGain,
+      setQuantumBackreactionSoftening,
+      setBilocalERBridgeEnabled,
+      setBilocalERBridgeStrength,
+      setBilocalERBridgeThroatRadius,
+      setBilocalERBridgePhaseLock,
+      setEntropicTimeShearEnabled,
+      setEntropicTimeShearStrength,
+      setEntropicTimeShearFilamentScale,
+      setEntropicTimeShearIrreversibility,
     } = useExtendedObjectStore(extendedObjectSelector)
 
     if (objectType !== 'schroedinger') {
@@ -95,20 +122,13 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
     }
     const isHydrogenMode =
       config.quantumMode === 'hydrogenND' || config.quantumMode === 'hydrogenNDCoupled'
-    // Quantum effects are 3D volumetric shader features — hide for 2D, Wigner, and freeScalar modes.
-    // Free scalar field uses density-grid raymarching; these shader features are disabled in
-    // extractSchrodingerConfig and would have no visual effect.
-    if (
-      dimension <= 2 ||
-      config.representation === 'wigner' ||
-      isComputeQuantumType(config.quantumMode)
-    ) {
+    const isComputeMode = isComputeQuantumType(config.quantumMode)
+    // Quantum effects are 3D volumetric shader features. Analytic-only effects
+    // are hidden below for compute modes, but backreaction lensing also runs on
+    // density-grid raymarchers.
+    if (dimension <= 2 || config.representation === 'wigner') {
       const reason =
-        dimension <= 2
-          ? 'Requires 3D or higher'
-          : config.representation === 'wigner'
-            ? 'Not available in Wigner representation'
-            : 'Available in Harmonic Oscillator and Hydrogen modes'
+        dimension <= 2 ? 'Requires 3D or higher' : 'Not available in Wigner representation'
       return <UnavailableSection title="Quantum Effects" reason={reason} />
     }
 
@@ -119,206 +139,270 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
         data-testid="quantum-effects-section"
       >
         <div className="space-y-2">
-          <div className="space-y-1">
-            <Switch
-              label="Nodal Surfaces"
-              tooltip="Highlight regions where the wavefunction passes through zero. These surfaces separate positive and negative lobes."
-              checked={config.nodalEnabled ?? false}
-              onCheckedChange={(checked) => setNodalEnabled(checked)}
-              data-testid="schroedinger-nodal-toggle"
-            />
-            {config.nodalEnabled && (
-              <div className="ps-2 border-s border-border-default space-y-2">
-                <Slider
-                  label="Strength"
-                  tooltip="Visual intensity of the nodal surface highlight. Higher values make the zero-crossing surfaces more prominent."
-                  min={0.0}
-                  max={2.0}
-                  step={0.1}
-                  value={config.nodalStrength ?? 1.0}
-                  onChange={setNodalStrength}
-                  showValue
-                  data-testid="schroedinger-nodal-strength"
-                />
-
-                <Select
-                  label="Rendering Mode"
-                  tooltip="Volumetric Band renders a soft glowing region around the node. Ray-Hit Surface renders a sharp isosurface."
-                  options={NODAL_RENDER_MODE_OPTIONS}
-                  value={config.nodalRenderMode ?? 'band'}
-                  onChange={setNodalRenderMode}
-                  data-testid="schroedinger-nodal-render-mode"
-                />
-
-                <Select
-                  label="Definition"
-                  tooltip="Which zero-crossing to detect: |psi| envelope nodes, Re(psi)=0, Im(psi)=0, or the intersection of Re and Im zeros."
-                  options={NODAL_DEFINITION_OPTIONS}
-                  value={config.nodalDefinition ?? 'psiAbs'}
-                  onChange={setNodalDefinition}
-                  data-testid="schroedinger-nodal-definition"
-                />
-
-                <Slider
-                  label="Zero Tolerance ε"
-                  tooltip="Width of the zero-crossing detection band. Smaller values produce thinner, more precise nodal surfaces."
-                  min={0.00001}
-                  max={0.5}
-                  step={0.001}
-                  value={config.nodalTolerance ?? 0.02}
-                  onChange={setNodalTolerance}
-                  showValue
-                  formatValue={(value) => value.toFixed(4)}
-                  data-testid="schroedinger-nodal-tolerance"
-                />
-
-                <Select
-                  label="Hydrogen Node Family"
-                  tooltip="Filter nodal surfaces by origin: radial nodes (from the Laguerre polynomial), angular nodes (from spherical harmonics), or both."
-                  options={NODAL_FAMILY_OPTIONS}
-                  value={config.nodalFamilyFilter ?? 'all'}
-                  onChange={setNodalFamilyFilter}
-                  disabled={!isHydrogenMode}
-                  data-testid="schroedinger-nodal-family-filter"
-                />
-                {!isHydrogenMode && (
-                  <p className="text-xs text-text-tertiary">
-                    Family filtering is available in Hydrogen ND mode.
-                  </p>
-                )}
-
+          {!isComputeMode && (
+            <>
+              <div className="space-y-1">
                 <Switch
-                  label="Lobe Sign Colors"
-                  tooltip="Color positive and negative wavefunction lobes differently, making the sign structure visible across nodal boundaries."
-                  checked={config.nodalLobeColoringEnabled ?? false}
-                  onCheckedChange={(checked) => setNodalLobeColoringEnabled(checked)}
-                  data-testid="schroedinger-nodal-lobe-toggle"
+                  label="Nodal Surfaces"
+                  tooltip="Highlight regions where the wavefunction passes through zero. These surfaces separate positive and negative lobes."
+                  checked={config.nodalEnabled ?? false}
+                  onCheckedChange={(checked) => setNodalEnabled(checked)}
+                  data-testid="schroedinger-nodal-toggle"
                 />
+                {config.nodalEnabled && (
+                  <div className="ps-2 border-s border-border-default space-y-2">
+                    <Slider
+                      label="Strength"
+                      tooltip="Visual intensity of the nodal surface highlight. Higher values make the zero-crossing surfaces more prominent."
+                      min={0.0}
+                      max={2.0}
+                      step={0.1}
+                      value={config.nodalStrength ?? 1.0}
+                      onChange={setNodalStrength}
+                      showValue
+                      data-testid="schroedinger-nodal-strength"
+                    />
 
-                {config.nodalLobeColoringEnabled ? (
-                  <>
-                    <div
-                      className="flex items-center justify-between"
-                      data-testid="schroedinger-nodal-color-positive"
-                    >
-                      <label className="text-xs text-text-secondary">Positive Lobe</label>
-                      <ColorPicker
-                        value={
-                          config.nodalColorPositive ??
-                          DEFAULT_SCHROEDINGER_CONFIG.nodalColorPositive
-                        }
-                        onChange={setNodalColorPositive}
-                        tooltip="Color for regions where the wavefunction is positive."
-                        disableAlpha={true}
-                        className="w-24"
-                      />
-                    </div>
-                    <div
-                      className="flex items-center justify-between"
-                      data-testid="schroedinger-nodal-color-negative"
-                    >
-                      <label className="text-xs text-text-secondary">Negative Lobe</label>
-                      <ColorPicker
-                        value={
-                          config.nodalColorNegative ??
-                          DEFAULT_SCHROEDINGER_CONFIG.nodalColorNegative
-                        }
-                        onChange={setNodalColorNegative}
-                        tooltip="Color for regions where the wavefunction is negative."
-                        disableAlpha={true}
-                        className="w-24"
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div
-                      className="flex items-center justify-between"
-                      data-testid="schroedinger-nodal-color-abs"
-                    >
-                      <label className="text-xs text-text-secondary">|ψ| Color</label>
-                      <ColorPicker
-                        value={config.nodalColor ?? DEFAULT_SCHROEDINGER_CONFIG.nodalColor}
-                        onChange={setNodalColor}
-                        tooltip="Color of the nodal surface where |psi| passes through zero."
-                        disableAlpha={true}
-                        className="w-24"
-                      />
-                    </div>
-                    <div
-                      className="flex items-center justify-between"
-                      data-testid="schroedinger-nodal-color-real"
-                    >
-                      <label className="text-xs text-text-secondary">Re(ψ) Color</label>
-                      <ColorPicker
-                        value={config.nodalColorReal ?? DEFAULT_SCHROEDINGER_CONFIG.nodalColorReal}
-                        onChange={setNodalColorReal}
-                        tooltip="Color of the nodal surface where Re(psi) = 0."
-                        disableAlpha={true}
-                        className="w-24"
-                      />
-                    </div>
-                    <div
-                      className="flex items-center justify-between"
-                      data-testid="schroedinger-nodal-color-imag"
-                    >
-                      <label className="text-xs text-text-secondary">Im(ψ) Color</label>
-                      <ColorPicker
-                        value={config.nodalColorImag ?? DEFAULT_SCHROEDINGER_CONFIG.nodalColorImag}
-                        onChange={setNodalColorImag}
-                        tooltip="Color of the nodal surface where Im(psi) = 0."
-                        disableAlpha={true}
-                        className="w-24"
-                      />
-                    </div>
-                  </>
+                    <Select
+                      label="Rendering Mode"
+                      tooltip="Volumetric Band renders a soft glowing region around the node. Ray-Hit Surface renders a sharp isosurface."
+                      options={NODAL_RENDER_MODE_OPTIONS}
+                      value={config.nodalRenderMode ?? 'band'}
+                      onChange={setNodalRenderMode}
+                      data-testid="schroedinger-nodal-render-mode"
+                    />
+
+                    <Select
+                      label="Definition"
+                      tooltip="Which zero-crossing to detect: |psi| envelope nodes, Re(psi)=0, Im(psi)=0, or the intersection of Re and Im zeros."
+                      options={NODAL_DEFINITION_OPTIONS}
+                      value={config.nodalDefinition ?? 'psiAbs'}
+                      onChange={setNodalDefinition}
+                      data-testid="schroedinger-nodal-definition"
+                    />
+
+                    <Slider
+                      label="Zero Tolerance ε"
+                      tooltip="Width of the zero-crossing detection band. Smaller values produce thinner, more precise nodal surfaces."
+                      min={0.00001}
+                      max={0.5}
+                      step={0.001}
+                      value={config.nodalTolerance ?? 0.02}
+                      onChange={setNodalTolerance}
+                      showValue
+                      formatValue={(value) => value.toFixed(4)}
+                      data-testid="schroedinger-nodal-tolerance"
+                    />
+
+                    <Select
+                      label="Hydrogen Node Family"
+                      tooltip="Filter nodal surfaces by origin: radial nodes (from the Laguerre polynomial), angular nodes (from spherical harmonics), or both."
+                      options={NODAL_FAMILY_OPTIONS}
+                      value={config.nodalFamilyFilter ?? 'all'}
+                      onChange={setNodalFamilyFilter}
+                      disabled={!isHydrogenMode}
+                      data-testid="schroedinger-nodal-family-filter"
+                    />
+                    {!isHydrogenMode && (
+                      <p className="text-xs text-text-tertiary">
+                        Family filtering is available in Hydrogen ND mode.
+                      </p>
+                    )}
+
+                    <Switch
+                      label="Lobe Sign Colors"
+                      tooltip="Color positive and negative wavefunction lobes differently, making the sign structure visible across nodal boundaries."
+                      checked={config.nodalLobeColoringEnabled ?? false}
+                      onCheckedChange={(checked) => setNodalLobeColoringEnabled(checked)}
+                      data-testid="schroedinger-nodal-lobe-toggle"
+                    />
+
+                    {config.nodalLobeColoringEnabled ? (
+                      <>
+                        <div
+                          className="flex items-center justify-between"
+                          data-testid="schroedinger-nodal-color-positive"
+                        >
+                          <label className="text-xs text-text-secondary">Positive Lobe</label>
+                          <ColorPicker
+                            value={
+                              config.nodalColorPositive ??
+                              DEFAULT_SCHROEDINGER_CONFIG.nodalColorPositive
+                            }
+                            onChange={setNodalColorPositive}
+                            tooltip="Color for regions where the wavefunction is positive."
+                            disableAlpha={true}
+                            className="w-24"
+                          />
+                        </div>
+                        <div
+                          className="flex items-center justify-between"
+                          data-testid="schroedinger-nodal-color-negative"
+                        >
+                          <label className="text-xs text-text-secondary">Negative Lobe</label>
+                          <ColorPicker
+                            value={
+                              config.nodalColorNegative ??
+                              DEFAULT_SCHROEDINGER_CONFIG.nodalColorNegative
+                            }
+                            onChange={setNodalColorNegative}
+                            tooltip="Color for regions where the wavefunction is negative."
+                            disableAlpha={true}
+                            className="w-24"
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div
+                          className="flex items-center justify-between"
+                          data-testid="schroedinger-nodal-color-abs"
+                        >
+                          <label className="text-xs text-text-secondary">|ψ| Color</label>
+                          <ColorPicker
+                            value={config.nodalColor ?? DEFAULT_SCHROEDINGER_CONFIG.nodalColor}
+                            onChange={setNodalColor}
+                            tooltip="Color of the nodal surface where |psi| passes through zero."
+                            disableAlpha={true}
+                            className="w-24"
+                          />
+                        </div>
+                        <div
+                          className="flex items-center justify-between"
+                          data-testid="schroedinger-nodal-color-real"
+                        >
+                          <label className="text-xs text-text-secondary">Re(ψ) Color</label>
+                          <ColorPicker
+                            value={
+                              config.nodalColorReal ?? DEFAULT_SCHROEDINGER_CONFIG.nodalColorReal
+                            }
+                            onChange={setNodalColorReal}
+                            tooltip="Color of the nodal surface where Re(psi) = 0."
+                            disableAlpha={true}
+                            className="w-24"
+                          />
+                        </div>
+                        <div
+                          className="flex items-center justify-between"
+                          data-testid="schroedinger-nodal-color-imag"
+                        >
+                          <label className="text-xs text-text-secondary">Im(ψ) Color</label>
+                          <ColorPicker
+                            value={
+                              config.nodalColorImag ?? DEFAULT_SCHROEDINGER_CONFIG.nodalColorImag
+                            }
+                            onChange={setNodalColorImag}
+                            tooltip="Color of the nodal surface where Im(psi) = 0."
+                            disableAlpha={true}
+                            className="w-24"
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
+
+              <div className="space-y-1 mt-2">
+                <Switch
+                  label="Uncertainty Boundary"
+                  tooltip="Render a shell at the boundary enclosing a given fraction of the probability density, visualizing the spatial extent of quantum uncertainty."
+                  checked={config.uncertaintyBoundaryEnabled ?? false}
+                  onCheckedChange={(checked) => setUncertaintyBoundaryEnabled(checked)}
+                  data-testid="schroedinger-uncertainty-boundary-toggle"
+                />
+                {config.uncertaintyBoundaryEnabled && (
+                  <div className="ps-2 border-s border-border-default space-y-2">
+                    <Slider
+                      label="Strength"
+                      tooltip="Visual intensity of the uncertainty boundary shell."
+                      min={0.0}
+                      max={1.0}
+                      step={0.05}
+                      value={config.uncertaintyBoundaryStrength ?? 0.5}
+                      onChange={setUncertaintyBoundaryStrength}
+                      showValue
+                      data-testid="schroedinger-uncertainty-boundary-strength"
+                    />
+                    <Slider
+                      label="Confidence Mass"
+                      tooltip="Fraction of the total probability enclosed by the boundary. 0.68 corresponds to one standard deviation for a Gaussian."
+                      min={0.5}
+                      max={0.99}
+                      step={0.01}
+                      value={config.uncertaintyConfidenceMass ?? 0.68}
+                      onChange={setUncertaintyConfidenceMass}
+                      showValue
+                      data-testid="schroedinger-uncertainty-confidence"
+                    />
+                    <Slider
+                      label="Boundary Width"
+                      tooltip="Spatial thickness of the boundary shell transition. Larger values produce a softer, more diffuse boundary."
+                      min={0.1}
+                      max={2.0}
+                      step={0.1}
+                      value={config.uncertaintyBoundaryWidth ?? 0.6}
+                      onChange={setUncertaintyBoundaryWidth}
+                      showValue
+                      data-testid="schroedinger-uncertainty-boundary-width"
+                    />
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           <div className="space-y-1 mt-2">
             <Switch
-              label="Uncertainty Boundary"
-              tooltip="Render a shell at the boundary enclosing a given fraction of the probability density, visualizing the spatial extent of quantum uncertainty."
-              checked={config.uncertaintyBoundaryEnabled ?? false}
-              onCheckedChange={(checked) => setUncertaintyBoundaryEnabled(checked)}
-              data-testid="schroedinger-uncertainty-boundary-toggle"
+              label="Quantum Backreaction Lensing"
+              tooltip="Bend raymarch sampling through a density-derived optical metric so coherent lobes lens nearby structure."
+              checked={config.quantumBackreactionLensingEnabled ?? false}
+              onCheckedChange={(checked) => setQuantumBackreactionLensingEnabled(checked)}
+              data-testid="schroedinger-quantum-backreaction-toggle"
             />
-            {config.uncertaintyBoundaryEnabled && (
+            {config.quantumBackreactionLensingEnabled && (
               <div className="ps-2 border-s border-border-default space-y-2">
                 <Slider
                   label="Strength"
-                  tooltip="Visual intensity of the uncertainty boundary shell."
-                  min={0.0}
-                  max={1.0}
+                  tooltip="How strongly probability density perturbs the sampling metric."
+                  min={0}
+                  max={3}
                   step={0.05}
-                  value={config.uncertaintyBoundaryStrength ?? 0.5}
-                  onChange={setUncertaintyBoundaryStrength}
+                  value={
+                    config.quantumBackreactionLensingStrength ??
+                    DEFAULT_SCHROEDINGER_CONFIG.quantumBackreactionLensingStrength
+                  }
+                  onChange={setQuantumBackreactionLensingStrength}
                   showValue
-                  data-testid="schroedinger-uncertainty-boundary-strength"
+                  data-testid="schroedinger-quantum-backreaction-strength"
                 />
                 <Slider
-                  label="Confidence Mass"
-                  tooltip="Fraction of the total probability enclosed by the boundary. 0.68 corresponds to one standard deviation for a Gaussian."
-                  min={0.5}
-                  max={0.99}
-                  step={0.01}
-                  value={config.uncertaintyConfidenceMass ?? 0.68}
-                  onChange={setUncertaintyConfidenceMass}
+                  label="Caustic Gain"
+                  tooltip="Emission lift from lens focusing after sample coordinates have been deformed."
+                  min={0}
+                  max={2}
+                  step={0.05}
+                  value={
+                    config.quantumBackreactionCausticGain ??
+                    DEFAULT_SCHROEDINGER_CONFIG.quantumBackreactionCausticGain
+                  }
+                  onChange={setQuantumBackreactionCausticGain}
                   showValue
-                  data-testid="schroedinger-uncertainty-confidence"
+                  data-testid="schroedinger-quantum-backreaction-caustic-gain"
                 />
                 <Slider
-                  label="Boundary Width"
-                  tooltip="Spatial thickness of the boundary shell transition. Larger values produce a softer, more diffuse boundary."
-                  min={0.1}
-                  max={2.0}
-                  step={0.1}
-                  value={config.uncertaintyBoundaryWidth ?? 0.6}
-                  onChange={setUncertaintyBoundaryWidth}
+                  label="Softening"
+                  tooltip="Radius that prevents singular metric spikes while setting the lensing range."
+                  min={0.05}
+                  max={2}
+                  step={0.05}
+                  value={
+                    config.quantumBackreactionSoftening ??
+                    DEFAULT_SCHROEDINGER_CONFIG.quantumBackreactionSoftening
+                  }
+                  onChange={setQuantumBackreactionSoftening}
                   showValue
-                  data-testid="schroedinger-uncertainty-boundary-width"
+                  data-testid="schroedinger-quantum-backreaction-softening"
                 />
               </div>
             )}
@@ -326,26 +410,92 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
 
           <div className="space-y-1 mt-2">
             <Switch
-              label="Phase Materiality"
-              tooltip="Modulate material properties (roughness, metalness) based on the complex phase of the wavefunction, making phase visible through surface appearance."
-              checked={config.phaseMaterialityEnabled ?? false}
-              onCheckedChange={(checked) => setPhaseMaterialityEnabled(checked)}
-              data-testid="schroedinger-phase-materiality-toggle"
+              label="Bilocal ER Bridge"
+              tooltip="Warp raymarch sampling toward a mirrored nonlocal throat when local and remote wavefunction phases lock."
+              checked={config.bilocalERBridgeEnabled ?? false}
+              onCheckedChange={(checked) => setBilocalERBridgeEnabled(checked)}
+              data-testid="schroedinger-bilocal-er-bridge-toggle"
             />
-            {config.phaseMaterialityEnabled && (
-              <Slider
-                label="Strength"
-                tooltip="How strongly the wavefunction phase modulates the surface material properties."
-                min={0}
-                max={1}
-                step={0.05}
-                value={config.phaseMaterialityStrength ?? 1.0}
-                onChange={setPhaseMaterialityStrength}
-                showValue
-                data-testid="schroedinger-phase-materiality-strength"
-              />
+            {config.bilocalERBridgeEnabled && (
+              <div className="ps-2 border-s border-border-default space-y-2">
+                <Slider
+                  label="Strength"
+                  tooltip="How strongly coherent mirrored endpoints bend sample coordinates through the bridge."
+                  min={0}
+                  max={2}
+                  step={0.05}
+                  value={
+                    config.bilocalERBridgeStrength ??
+                    DEFAULT_SCHROEDINGER_CONFIG.bilocalERBridgeStrength
+                  }
+                  onChange={setBilocalERBridgeStrength}
+                  showValue
+                  data-testid="schroedinger-bilocal-er-bridge-strength"
+                />
+                <Slider
+                  label="Throat Radius"
+                  tooltip="Softened radius of the transverse bridge throat around the mirror plane."
+                  min={0.05}
+                  max={2}
+                  step={0.05}
+                  value={
+                    config.bilocalERBridgeThroatRadius ??
+                    DEFAULT_SCHROEDINGER_CONFIG.bilocalERBridgeThroatRadius
+                  }
+                  onChange={setBilocalERBridgeThroatRadius}
+                  showValue
+                  data-testid="schroedinger-bilocal-er-bridge-throat-radius"
+                />
+                <Slider
+                  label="Phase Lock"
+                  tooltip="How strongly the bridge requires phase agreement between local and mirrored endpoints."
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={
+                    config.bilocalERBridgePhaseLock ??
+                    DEFAULT_SCHROEDINGER_CONFIG.bilocalERBridgePhaseLock
+                  }
+                  onChange={setBilocalERBridgePhaseLock}
+                  showValue
+                  data-testid="schroedinger-bilocal-er-bridge-phase-lock"
+                />
+              </div>
             )}
           </div>
+
+          <SchroedingerEntropicTimeShearControls
+            config={config}
+            setEnabled={setEntropicTimeShearEnabled}
+            setStrength={setEntropicTimeShearStrength}
+            setFilamentScale={setEntropicTimeShearFilamentScale}
+            setIrreversibility={setEntropicTimeShearIrreversibility}
+          />
+
+          {!isComputeMode && (
+            <div className="space-y-1 mt-2">
+              <Switch
+                label="Phase Materiality"
+                tooltip="Modulate material properties (roughness, metalness) based on the complex phase of the wavefunction, making phase visible through surface appearance."
+                checked={config.phaseMaterialityEnabled ?? false}
+                onCheckedChange={(checked) => setPhaseMaterialityEnabled(checked)}
+                data-testid="schroedinger-phase-materiality-toggle"
+              />
+              {config.phaseMaterialityEnabled && (
+                <Slider
+                  label="Strength"
+                  tooltip="How strongly the wavefunction phase modulates the surface material properties."
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={config.phaseMaterialityStrength ?? 1.0}
+                  onChange={setPhaseMaterialityStrength}
+                  showValue
+                  data-testid="schroedinger-phase-materiality-strength"
+                />
+              )}
+            </div>
+          )}
         </div>
       </Section>
     )

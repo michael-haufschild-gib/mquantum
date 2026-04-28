@@ -329,12 +329,33 @@ struct SchroedingerUniforms {
   densityGridHalfExtent: vec3f,
   _padDensityGridHalfExtent: f32,
 
+  // Quantum stress backreaction lensing. When disabled, host packing writes
+  // all four fields as zero so metric application is an exact no-op.
+  quantumBackreactionLensingEnabled: u32,
+  quantumBackreactionLensingStrength: f32,
+  quantumBackreactionCausticGain: f32,
+  quantumBackreactionSoftening: f32,
+
   // Host-precomputed HO superposition terms term_k = c_k * exp(-i * E_k * t)
   // for t = uniforms.time * uniforms.timeScale. Lifts 8 cos+sin and 8 cmul out
   // of every fragment shader invocation. Only .xy carries (Re, Im); .zw is
   // 16-byte vec4f padding required by uniform-buffer array stride.
   // Updated every frame (including the partial-write path) by the host packer.
   precomputedTerm: array<vec4f, 8>,
+
+  // Bilocal Einstein-Rosen bridge topology. When disabled, host packing writes
+  // all four fields as zero so topology application is an exact no-op.
+  bilocalERBridgeEnabled: u32,
+  bilocalERBridgeStrength: f32,
+  bilocalERBridgeThroatRadius: f32,
+  bilocalERBridgePhaseLock: f32,
+
+  // Entropic time-shear filaments. When disabled, host packing writes all four
+  // fields as zero so shear application is an exact no-op.
+  entropicTimeShearEnabled: u32,
+  entropicTimeShearStrength: f32,
+  entropicTimeShearFilamentScale: f32,
+  entropicTimeShearIrreversibility: f32,
 }
 
 // ============================================

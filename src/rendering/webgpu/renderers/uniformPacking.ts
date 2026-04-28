@@ -10,13 +10,9 @@
  * @module rendering/webgpu/renderers/uniformPacking
  */
 
-import { rgbUnitToHsl } from '@/lib/colors/colorUtils'
 import type { AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
-import { DEFAULT_PAULI_CONFIG, type SchroedingerConfig } from '@/lib/geometry/extended/types'
-import { computeRadialProbabilityNorm } from '@/lib/math/hydrogenRadialProbability'
+import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { DEFAULT_COSINE_COEFFICIENTS } from '@/rendering/shaders/palette'
-import type { AppearanceStoreState } from '@/stores/appearanceStore'
-import type { PBRSliceState } from '@/stores/slices/visual/pbrSlice'
 
 import { MAX_DIM, MAX_EXTRA_DIM, MAX_TERMS } from '../shaders/schroedinger/uniforms.wgsl'
 import { parseHexColorToLinearRgb, type Rgb } from '../utils/color'
@@ -24,18 +20,28 @@ import { zeroReservedFields } from '../utils/structLayout'
 import {
   CROSS_SECTION_COMPOSITE_MODE_MAP,
   CROSS_SECTION_SCALAR_MAP,
-  MOMENTUM_DISPLAY_MODE_MAP,
   NODAL_DEFINITION_MAP,
   NODAL_FAMILY_MAP,
   NODAL_RENDER_MODE_MAP,
   PROBABILITY_CURRENT_COLOR_MODE_MAP,
   PROBABILITY_CURRENT_PLACEMENT_MAP,
   PROBABILITY_CURRENT_STYLE_MAP,
-  REPRESENTATION_MODE_MAP,
 } from './schrodingerRendererTypes'
 import { SCHROEDINGER_LAYOUT } from './schroedingerLayout'
+import {
+  packBilocalERBridge,
+  packEntropicTimeShear,
+  packQuantumBackreaction,
+} from './uniformPackingBackreaction'
+import {
+  packRepresentationAndColorOverlays,
+  packWignerAndPauliFields,
+} from './uniformPackingColorOverlays'
 import { packDensityGridMapping } from './uniformPackingDensityGrid'
 import { packAdsTimeEvolution } from './uniformPackingSupport'
+import type { SchroedingerPackParams } from './uniformPackingTypes'
+
+export type { FlattenedPreset, SchroedingerPackParams } from './uniformPackingTypes'
 
 // Field name → float32/int32 index (byte offset / 4)
 const I = SCHROEDINGER_LAYOUT.index
@@ -53,62 +59,6 @@ const parseColor = (hex: string): Rgb => parseHexColorToLinearRgb(hex)
 // =========================================================================
 // Schroedinger uniform buffer
 // =========================================================================
-
-/** Flattened preset arrays as produced by `flattenPresetForUniforms`. */
-export interface FlattenedPreset {
-  omega: Float32Array
-  quantum: Int32Array
-  coeff: Float32Array
-  energy: Float32Array
-}
-
-/** All values needed to pack the Schroedinger uniform buffer. */
-export interface SchroedingerPackParams {
-  // Mode classification
-  quantumModeInt: number
-  quantumModeStr: string
-  isUniformComputeMode: boolean
-  isDensityMatrixMode: boolean
-  dimension: number
-
-  // Preset data
-  presetTermCount: number
-  presetData: FlattenedPreset | null
-
-  // Renderer state
-  boundingRadius: number
-  canonicalDensityCompensation: number
-  cachedPeakDensity: number
-  colorAlgorithm: number
-  effectiveSampleCount: number
-  effectiveMomentumScale: number
-  hbar: number
-  animationTime: number
-  uncertaintyLogRhoThreshold: number
-  uncertaintyConfidenceMass: number
-  uncertaintyBoundaryWidth: number
-
-  // Store snapshots (accessed for individual field reads)
-  schroedinger: Partial<SchroedingerConfig> | undefined
-  appearance: AppearanceStoreState | undefined
-  pbr: PBRSliceState | undefined
-  pauliSpinor: { spinUpColor?: number[]; spinDownColor?: number[] } | undefined
-
-  // Renderer config subset
-  rendererOpenQuantumEnabled: boolean
-  rendererQuantumMode: string
-  rendererTermCount: number | undefined
-
-  // Decoherent branching colors [r, g, b] in 0–1 range
-  branchColorA?: [number, number, number]
-  branchColorB?: [number, number, number]
-  /** Branch separation metric: 0 = coherent (equal populations), 1 = fully separated */
-  branchSeparation?: number
-  /** Branch plane threshold in world-space (for fragment-shader branch fraction) */
-  branchPlaneThreshold?: number
-  /** Branch transition width in world-space (for fragment-shader smoothstep) */
-  branchTransitionWidth?: number
-}
 
 /**
  * Pack all Schroedinger uniform values into the pre-allocated typed-array views.
@@ -350,6 +300,9 @@ function packVisualFields(
   floatView[I.densityContrast] = schroedinger?.densityContrast ?? 1.8
   floatView[I.scatteringAnisotropy] = schroedinger?.scatteringAnisotropy ?? 0.0
   floatView[I.roughness] = pbr?.face?.roughness ?? 0.3
+  packQuantumBackreaction(floatView, intView, schroedinger)
+  packBilocalERBridge(floatView, intView, schroedinger)
+  packEntropicTimeShear(floatView, intView, schroedinger)
 }
 
 /** Pack nodal fields, color algorithm, and cosine palette. */
@@ -562,199 +515,6 @@ function packCrossSectionAndCurrent(
   )
 }
 
-/** Pack representation, radial probability, domain coloring, and diverging. */
-function packRepresentationAndColorOverlays(
-  floatView: Float32Array,
-  intView: Int32Array,
-  p: SchroedingerPackParams,
-  hydrogen: HydrogenResult
-): void {
-  const { isUniformComputeMode, isDensityMatrixMode, quantumModeStr, schroedinger, appearance } = p
-
-  // Representation + momentum controls
-  const forcePosition =
-    isUniformComputeMode ||
-    (isDensityMatrixMode &&
-      (quantumModeStr === 'hydrogenND' || quantumModeStr === 'hydrogenNDCoupled'))
-  intView[I.representationMode] = forcePosition
-    ? 0
-    : (REPRESENTATION_MODE_MAP[schroedinger?.representation ?? 'position'] ?? 0)
-  intView[I.momentumDisplayMode] =
-    MOMENTUM_DISPLAY_MODE_MAP[schroedinger?.momentumDisplayUnits ?? 'k'] ?? 0
-  floatView[I.momentumScale] = p.effectiveMomentumScale
-  floatView[I.momentumHbar] = schroedinger?.momentumHbar ?? 1.0
-
-  // Radial probability overlay
-  const isMomentumRep = !isUniformComputeMode && schroedinger?.representation === 'momentum'
-  const radialProbEnabled = (schroedinger?.radialProbabilityEnabled ?? false) && !isMomentumRep
-  intView[I.radialProbabilityEnabled] = radialProbEnabled ? 1 : 0
-  floatView[I.radialProbabilityOpacity] = schroedinger?.radialProbabilityOpacity ?? 0.6
-  floatView[I.radialProbabilityNorm] =
-    radialProbEnabled && quantumModeStr !== 'harmonicOscillator'
-      ? computeRadialProbabilityNorm(
-          hydrogen.validN,
-          hydrogen.validL,
-          hydrogen.bohrRadius,
-          p.dimension
-        )
-      : 1.0
-  packColorRgba(
-    floatView,
-    I.radialProbabilityColor,
-    schroedinger?.radialProbabilityColor ?? '#44aaff'
-  )
-
-  // Domain coloring controls
-  const domainColoring = appearance?.domainColoring
-  floatView[I.domainColoringParams0] = domainColoring?.modulusMode === 'logPsiAbs' ? 1.0 : 0.0
-  floatView[I.domainColoringParams0 + 1] = domainColoring?.contoursEnabled ? 1.0 : 0.0
-  floatView[I.domainColoringParams0 + 2] = domainColoring?.contourDensity ?? 8.0
-  floatView[I.domainColoringParams0 + 3] = domainColoring?.contourWidth ?? 0.08
-  floatView[I.domainColoringParams1] = domainColoring?.contourStrength ?? 0.45
-  floatView[I.domainColoringParams1 + 1] = 0.0
-  floatView[I.domainColoringParams1 + 2] = 0.0
-  floatView[I.domainColoringParams1 + 3] = 0.0
-
-  // Diverging color controls
-  packDivergingColors(floatView, appearance)
-}
-
-/** Pack diverging color palette controls. */
-function packDivergingColors(
-  floatView: Float32Array,
-  appearance: AppearanceStoreState | undefined
-): void {
-  const usePhaseDivergingPalette = appearance?.colorAlgorithm === 'phaseDiverging'
-  const phaseDiverging = appearance?.phaseDiverging
-  const divergingPsi = appearance?.divergingPsi
-  const divergingNeutral = parseColor(
-    usePhaseDivergingPalette
-      ? (phaseDiverging?.neutralColor ?? '#ebebeb')
-      : (divergingPsi?.neutralColor ?? '#d9d9d9')
-  )
-  const divergingPositive = parseColor(
-    usePhaseDivergingPalette
-      ? (phaseDiverging?.positiveColor ?? '#eb3d38')
-      : (divergingPsi?.positiveColor ?? '#e83b3b')
-  )
-  const divergingNegative = parseColor(
-    usePhaseDivergingPalette
-      ? (phaseDiverging?.negativeColor ?? '#3866f2')
-      : (divergingPsi?.negativeColor ?? '#3166f5')
-  )
-  floatView[I.divergingNeutralParams] = divergingNeutral[0]
-  floatView[I.divergingNeutralParams + 1] = divergingNeutral[1]
-  floatView[I.divergingNeutralParams + 2] = divergingNeutral[2]
-  floatView[I.divergingNeutralParams + 3] = usePhaseDivergingPalette
-    ? 0.2
-    : Math.max(0, Math.min(1, divergingPsi?.intensityFloor ?? 0.2))
-
-  floatView[I.divergingPositiveParams] = divergingPositive[0]
-  floatView[I.divergingPositiveParams + 1] = divergingPositive[1]
-  floatView[I.divergingPositiveParams + 2] = divergingPositive[2]
-  floatView[I.divergingPositiveParams + 3] = usePhaseDivergingPalette
-    ? 0.0
-    : divergingPsi?.component === 'imag'
-      ? 1.0
-      : 0.0
-
-  floatView[I.divergingNegativeParams] = divergingNegative[0]
-  floatView[I.divergingNegativeParams + 1] = divergingNegative[1]
-  floatView[I.divergingNegativeParams + 2] = divergingNegative[2]
-  floatView[I.divergingNegativeParams + 3] = 0.0
-}
-
-/** Pack Wigner phase-space and Pauli spinor color fields. */
-function packWignerAndPauliFields(
-  floatView: Float32Array,
-  intView: Int32Array,
-  p: SchroedingerPackParams
-): void {
-  const { schroedinger, pauliSpinor, dimension } = p
-
-  // Wigner phase-space controls
-  const wignerDimIdx = schroedinger?.wignerDimensionIndex ?? 0
-  intView[I.wignerDimensionIndex] = Math.max(0, Math.min(wignerDimIdx, dimension - 1))
-  intView[I.wignerCrossTermsEnabled] = schroedinger?.wignerCrossTermsEnabled ? 1 : 0
-
-  const wignerAutoRange = schroedinger?.wignerAutoRange ?? true
-  if (wignerAutoRange) {
-    packWignerAutoRange(floatView, intView, p, wignerDimIdx)
-  } else {
-    floatView[I.wignerXRange] = schroedinger?.wignerXRange ?? 6.0
-    floatView[I.wignerPRange] = schroedinger?.wignerPRange ?? 6.0
-  }
-  intView[I.wignerQuadPoints] = schroedinger?.wignerQuadPoints ?? 32
-
-  // Pauli spinor colors. HSL forms are precomputed here so the hue-space
-  // blend in color algorithm 24 does not re-run rgb2hsl per raymarch sample.
-  const spinUp = pauliSpinor?.spinUpColor ?? DEFAULT_PAULI_CONFIG.spinUpColor
-  const spinDown = pauliSpinor?.spinDownColor ?? DEFAULT_PAULI_CONFIG.spinDownColor
-  floatView[I.pauliSpinUpColor] = spinUp[0]!
-  floatView[I.pauliSpinUpColor + 1] = spinUp[1]!
-  floatView[I.pauliSpinUpColor + 2] = spinUp[2]!
-  floatView[I.pauliSpinDownColor] = spinDown[0]!
-  floatView[I.pauliSpinDownColor + 1] = spinDown[1]!
-  floatView[I.pauliSpinDownColor + 2] = spinDown[2]!
-
-  const upHsl = rgbUnitToHsl(spinUp[0]!, spinUp[1]!, spinUp[2]!)
-  const downHsl = rgbUnitToHsl(spinDown[0]!, spinDown[1]!, spinDown[2]!)
-  floatView[I.pauliSpinUpColorHSL] = upHsl[0]
-  floatView[I.pauliSpinUpColorHSL + 1] = upHsl[1]
-  floatView[I.pauliSpinUpColorHSL + 2] = upHsl[2]
-  floatView[I.pauliSpinDownColorHSL] = downHsl[0]
-  floatView[I.pauliSpinDownColorHSL + 1] = downHsl[1]
-  floatView[I.pauliSpinDownColorHSL + 2] = downHsl[2]
-}
-
-/** Compute Wigner auto-range values based on quantum mode and state. */
-function packWignerAutoRange(
-  floatView: Float32Array,
-  intView: Int32Array,
-  p: SchroedingerPackParams,
-  wignerDimIdx: number
-): void {
-  const { schroedinger } = p
-  const isHydrogenMode =
-    p.rendererQuantumMode === 'hydrogenND' || p.rendererQuantumMode === 'hydrogenNDCoupled'
-
-  if (isHydrogenMode && wignerDimIdx < 3) {
-    const n = schroedinger?.principalQuantumNumber ?? 2
-    const a0 = schroedinger?.bohrRadiusScale ?? 1.0
-    const rCenter = n * n * a0
-    const rMax = rCenter * 2.5
-    const halfExtent = Math.max(rCenter, rMax - rCenter)
-    floatView[I.wignerXRange] = halfExtent
-    floatView[I.wignerPRange] = 3.0 / (n * a0)
-    return
-  }
-
-  let selectedOmega: number
-  let maxN: number
-  if (isHydrogenMode && wignerDimIdx >= 3) {
-    const extraIdx = wignerDimIdx - 3
-    selectedOmega = floatView[I.extraDimOmega + extraIdx] ?? 1.0
-    maxN = intView[I.extraDimN + extraIdx] ?? 0
-  } else {
-    selectedOmega = floatView[I.omega + Math.min(wignerDimIdx, 10)] ?? 1.0
-    maxN = 0
-    const tc = p.rendererTermCount ?? 1
-    for (let k = 0; k < tc; k++) {
-      const qn = intView[I.quantum + k * 11 + Math.min(wignerDimIdx, 10)] ?? 0
-      if (qn > maxN) maxN = qn
-    }
-  }
-  const xScale = Math.sqrt(Math.max(2 * maxN + 1, 1) / Math.max(selectedOmega, 0.01))
-  const pScale = Math.sqrt(Math.max(2 * maxN + 1, 1) * Math.max(selectedOmega, 0.01))
-  floatView[I.wignerXRange] = xScale * 3.5
-  floatView[I.wignerPRange] = pScale * 3.5
-}
-
-// ---------------------------------------------------------------------------
-// Micro-helpers for repeated color packing patterns
-// ---------------------------------------------------------------------------
-
-/** Pack a hex color as vec4f (RGB + 0.0 padding) at the given float index. */
 function packColorRgba(floatView: Float32Array, idx: number, hex: string): void {
   const rgb = parseColor(hex)
   floatView[idx] = rgb[0]
@@ -763,7 +523,6 @@ function packColorRgba(floatView: Float32Array, idx: number, hex: string): void 
   floatView[idx + 3] = 0.0
 }
 
-/** Pack a 3-element array as vec4f (xyz + 0.0 padding), with per-component defaults. */
 function packVec4Color(
   floatView: Float32Array,
   idx: number,
@@ -776,7 +535,6 @@ function packVec4Color(
   floatView[idx + 3] = 0.0
 }
 
-// Re-export support functions from the split modules
 export { packAdsTimeEvolution }
 export { packPrecomputedHOTerms } from './uniformPackingHOTerms'
 export {

@@ -208,6 +208,26 @@ describe('DEFAULT_SCHROEDINGER_CONFIG structural invariants', () => {
     expect(cfg.termCount).toBeLessThanOrEqual(8)
   })
 
+  it('bilocal ER bridge defaults are in shader control ranges', () => {
+    expect(cfg.bilocalERBridgeEnabled).toBe(false)
+    expect(cfg.bilocalERBridgeStrength).toBeGreaterThanOrEqual(0)
+    expect(cfg.bilocalERBridgeStrength).toBeLessThanOrEqual(2)
+    expect(cfg.bilocalERBridgeThroatRadius).toBeGreaterThanOrEqual(0.05)
+    expect(cfg.bilocalERBridgeThroatRadius).toBeLessThanOrEqual(2)
+    expect(cfg.bilocalERBridgePhaseLock).toBeGreaterThanOrEqual(0)
+    expect(cfg.bilocalERBridgePhaseLock).toBeLessThanOrEqual(1)
+  })
+
+  it('entropic time-shear defaults are in shader control ranges', () => {
+    expect(cfg.entropicTimeShearEnabled).toBe(false)
+    expect(cfg.entropicTimeShearStrength).toBeGreaterThanOrEqual(0)
+    expect(cfg.entropicTimeShearStrength).toBeLessThanOrEqual(2)
+    expect(cfg.entropicTimeShearFilamentScale).toBeGreaterThanOrEqual(0.1)
+    expect(cfg.entropicTimeShearFilamentScale).toBeLessThanOrEqual(4)
+    expect(cfg.entropicTimeShearIrreversibility).toBeGreaterThanOrEqual(0)
+    expect(cfg.entropicTimeShearIrreversibility).toBeLessThanOrEqual(1)
+  })
+
   it('cosineParams has correct structure', () => {
     for (const key of ['a', 'b', 'c', 'd'] as const) {
       expect(cfg.cosineParams[key]).toHaveLength(3)

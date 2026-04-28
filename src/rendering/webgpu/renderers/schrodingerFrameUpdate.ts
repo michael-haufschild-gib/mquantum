@@ -54,6 +54,14 @@ import {
   packSchroedingerUniforms,
 } from './uniformPacking'
 
+/**
+ * Decimal precision used when stringifying `qualityMultiplier` into the
+ * Schrödinger dirty-flag signature. Held as a named constant so frame-update
+ * logic and any test/state-diffing checks that depend on the same rounding
+ * stay in sync.
+ */
+const QUALITY_SIGNATURE_PRECISION = 4
+
 /** Byte offset of the time field in the SchroedingerUniforms buffer. */
 export const TIME_FIELD_OFFSET = SCHROEDINGER_LAYOUT.byteOffset.time
 
@@ -368,6 +376,9 @@ export function computeSchroedingerUpdate(
     appearanceVersion: inputs.appearance?.appearanceVersion ?? 0,
     pbrVersion: inputs.pbr?.pbrVersion ?? 0,
     pauliSpinorVersion: inputs.extended?.pauliSpinorVersion ?? 0,
+    qualitySignature: (inputs.performance?.qualityMultiplier ?? 1.0).toFixed(
+      QUALITY_SIGNATURE_PRECISION
+    ),
   }
 
   if (!isSchroedingerDirty(state.versions, storeVersions)) {

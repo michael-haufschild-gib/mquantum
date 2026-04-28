@@ -147,6 +147,18 @@ export interface SchroedingerSliceActions {
   setSchroedingerInterferenceAmp: (amp: number) => void
   setSchroedingerInterferenceFreq: (freq: number) => void
   setSchroedingerInterferenceSpeed: (speed: number) => void
+  setSchroedingerQuantumBackreactionLensingEnabled: (enabled: boolean) => void
+  setSchroedingerQuantumBackreactionLensingStrength: (strength: number) => void
+  setSchroedingerQuantumBackreactionCausticGain: (gain: number) => void
+  setSchroedingerQuantumBackreactionSoftening: (softening: number) => void
+  setSchroedingerBilocalERBridgeEnabled: (enabled: boolean) => void
+  setSchroedingerBilocalERBridgeStrength: (strength: number) => void
+  setSchroedingerBilocalERBridgeThroatRadius: (radius: number) => void
+  setSchroedingerBilocalERBridgePhaseLock: (phaseLock: number) => void
+  setSchroedingerEntropicTimeShearEnabled: (enabled: boolean) => void
+  setSchroedingerEntropicTimeShearStrength: (strength: number) => void
+  setSchroedingerEntropicTimeShearFilamentScale: (scale: number) => void
+  setSchroedingerEntropicTimeShearIrreversibility: (irreversibility: number) => void
   // Physical Probability Current (j-field)
   setSchroedingerProbabilityCurrentEnabled: (enabled: boolean) => void
   setSchroedingerProbabilityCurrentStyle: (

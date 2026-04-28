@@ -181,6 +181,187 @@ struct NodalWithGradient {
   s: f32,          // Average log-density
 }
 
+struct QuantumBackreactionMetric {
+  position: vec3f,
+  caustic: f32,
+}
+
+struct BilocalERBridgeTopology {
+  position: vec3f,
+  gain: f32,
+}
+
+struct EntropicTimeShearResult {
+  position: vec3f,
+  entropyGain: f32,
+}
+
+fn isQuantumBackreactionActive(uniforms: SchroedingerUniforms) -> bool {
+  return uniforms.quantumBackreactionLensingEnabled != 0u
+    && uniforms.quantumBackreactionLensingStrength > 0.0;
+}
+
+fn isBilocalERBridgeActive(uniforms: SchroedingerUniforms) -> bool {
+  return uniforms.bilocalERBridgeEnabled != 0u
+    && uniforms.bilocalERBridgeStrength > 0.0
+    && uniforms.bilocalERBridgeThroatRadius > 0.0;
+}
+
+fn isEntropicTimeShearActive(uniforms: SchroedingerUniforms) -> bool {
+  return uniforms.entropicTimeShearEnabled != 0u
+    && uniforms.entropicTimeShearStrength > 0.0
+    && uniforms.entropicTimeShearFilamentScale > 0.0;
+}
+
+fn entropyShearFilamentField(worldPosition: vec3f, phase: f32, uniforms: SchroedingerUniforms) -> vec3f {
+  let scale = clamp(uniforms.entropicTimeShearFilamentScale, 0.1, 4.0);
+  let spatialFrequency = 6.2831853 / scale;
+  let p = worldPosition * spatialFrequency;
+  let t = getVolumeTime(uniforms) * 0.37;
+  let a = sin(dot(p, vec3f(0.73, 1.19, 0.41)) + phase + t);
+  let b = cos(dot(p, vec3f(-0.37, 0.67, 1.31)) - phase * 0.5 - t * 0.7);
+  let c = sin(dot(p, vec3f(1.11, -0.29, 0.83)) + a * b + t * 1.3);
+  return vec3f(a, b, c);
+}
+
+fn applyEntropicTimeShear(
+  worldPosition: vec3f,
+  rayDirection: vec3f,
+  densityProxy: f32,
+  logDensityProxy: f32,
+  phaseProxy: f32,
+  localGradient: vec3f,
+  uniforms: SchroedingerUniforms
+) -> EntropicTimeShearResult {
+  if (!isEntropicTimeShearActive(uniforms)) {
+    return EntropicTimeShearResult(worldPosition, 0.0);
+  }
+
+  let rayN = normalize(rayDirection);
+  let gradMag = length(localGradient);
+  let gradN = select(localGradient / max(gradMag, 1e-6), vec3f(0.0, 1.0, 0.0), gradMag < 1e-6);
+  let densityWindow = smoothstep(-16.0, -2.0, logDensityProxy) *
+    (1.0 - smoothstep(1.5, 8.0, densityProxy / max(uniforms.peakDensity, 1e-6)));
+  let gradientWindow = clamp(log(1.0 + gradMag) * 0.35, 0.0, 1.0);
+
+  let filament = entropyShearFilamentField(worldPosition, phaseProxy, uniforms);
+  let filamentTransverse = filament - rayN * dot(filament, rayN);
+  let fallbackCross = cross(rayN, gradN);
+  let fallbackSeed = select(vec3f(1.0, 0.0, 0.0), vec3f(0.0, 1.0, 0.0), abs(rayN.x) > 0.9);
+  let fallbackSeedTransverse = fallbackSeed - rayN * dot(fallbackSeed, rayN);
+  let fallbackLen = length(fallbackCross);
+  let fallbackSeedLen = length(fallbackSeedTransverse);
+  let fallbackTransverse = select(
+    fallbackCross / max(fallbackLen, 1e-6),
+    fallbackSeedTransverse / max(fallbackSeedLen, 1e-6),
+    fallbackLen < 1e-6
+  );
+  let filamentLen = length(filamentTransverse);
+  let shearDir = select(
+    filamentTransverse / max(filamentLen, 1e-6),
+    fallbackTransverse,
+    filamentLen < 1e-6
+  );
+
+  let flowHandedness = clamp(dot(cross(rayN, gradN), shearDir), -1.0, 1.0);
+  let phaseHandedness = sin(phaseProxy + dot(filament, vec3f(0.31, 0.57, 0.79)));
+  let handedness = clamp(0.5 * flowHandedness + 0.5 * phaseHandedness, -1.0, 1.0);
+  let entropyProxy = densityWindow * gradientWindow;
+  let reversibleGain = entropyProxy * handedness;
+  let irreversibleGain = entropyProxy * (0.5 + 0.5 * handedness);
+  let irreversibility = clamp(uniforms.entropicTimeShearIrreversibility, 0.0, 1.0);
+  let entropyGain = mix(reversibleGain, max(irreversibleGain, 0.0), irreversibility);
+
+  let coherenceScale = clamp(uniforms.entropicTimeShearFilamentScale, 0.1, 4.0);
+  let shearMagnitude = clamp(
+    uniforms.entropicTimeShearStrength * entropyGain * coherenceScale * 0.08,
+    -coherenceScale * 0.25,
+    coherenceScale * 0.25
+  );
+  return EntropicTimeShearResult(worldPosition + shearDir * shearMagnitude, entropyGain);
+}
+
+fn applyQuantumBackreactionMetric(
+  worldPosition: vec3f,
+  rayDirection: vec3f,
+  densityProxy: f32,
+  logDensityProxy: f32,
+  localGradient: vec3f,
+  uniforms: SchroedingerUniforms
+) -> QuantumBackreactionMetric {
+  if (!isQuantumBackreactionActive(uniforms)) {
+    return QuantumBackreactionMetric(worldPosition, 1.0);
+  }
+
+  let peakDensity = max(uniforms.peakDensity, 1e-6);
+  let densityStress = clamp(densityProxy / peakDensity, 0.0, 4.0);
+  let stressWindow = smoothstep(-14.0, -2.0, logDensityProxy);
+  let stressT00 = densityStress * stressWindow;
+  let softening = max(uniforms.quantumBackreactionSoftening, 0.0001);
+  let softening2 = softening * softening;
+  let r2 = dot(worldPosition, worldPosition);
+  let potentialPhi =
+    uniforms.quantumBackreactionLensingStrength * stressT00 / (r2 + softening2);
+
+  let rayN = normalize(rayDirection);
+  let transverseGradient = localGradient - rayN * dot(localGradient, rayN);
+  let gradLen = length(transverseGradient);
+  if (gradLen < 1e-5 || stressT00 <= 0.0) {
+    let causticOnly = 1.0 + uniforms.quantumBackreactionCausticGain * clamp(potentialPhi * 0.01, 0.0, 0.35);
+    return QuantumBackreactionMetric(worldPosition, causticOnly);
+  }
+
+  let bendDir = transverseGradient / gradLen;
+  let bendMagnitude = clamp(potentialPhi * softening * 0.08, 0.0, softening * 1.5);
+  let warpedPosition = worldPosition + bendDir * bendMagnitude;
+  let caustic =
+    1.0 + uniforms.quantumBackreactionCausticGain *
+    clamp(potentialPhi * clamp(gradLen * softening, 0.0, 4.0) * 0.02, 0.0, 2.0);
+
+  return QuantumBackreactionMetric(warpedPosition, caustic);
+}
+
+fn applyBilocalERBridgeTopology(
+  worldPosition: vec3f,
+  rayDirection: vec3f,
+  localRho: f32,
+  localLogDensity: f32,
+  localPhase: f32,
+  remoteRho: f32,
+  remoteLogDensity: f32,
+  remotePhase: f32,
+  uniforms: SchroedingerUniforms
+) -> BilocalERBridgeTopology {
+  if (!isBilocalERBridgeActive(uniforms)) {
+    return BilocalERBridgeTopology(worldPosition, 1.0);
+  }
+
+  let remoteEndpoint = vec3f(-worldPosition.x, worldPosition.y, worldPosition.z);
+  let throatMidpoint = (worldPosition + remoteEndpoint) * 0.5;
+  let rayN = normalize(rayDirection);
+  let toThroat = throatMidpoint - worldPosition;
+  let transverseToRay = toThroat - rayN * dot(toThroat, rayN);
+
+  let throatRadius = max(uniforms.bilocalERBridgeThroatRadius, 0.0001);
+  let throatRadius2 = throatRadius * throatRadius;
+  let throatSoftening = throatRadius2 / (dot(transverseToRay, transverseToRay) + throatRadius2);
+  let logWindow =
+    smoothstep(-18.0, -2.0, localLogDensity) *
+    smoothstep(-18.0, -2.0, remoteLogDensity);
+
+  let peakDensity = max(uniforms.peakDensity, 1e-6);
+  let amplitudeWeight = sqrt(max(localRho, 0.0) * max(remoteRho, 0.0)) / peakDensity;
+  let phaseAgreement = clamp(0.5 + 0.5 * cos(localPhase - remotePhase), 0.0, 1.0);
+  let phaseGate = mix(1.0, phaseAgreement, clamp(uniforms.bilocalERBridgePhaseLock, 0.0, 1.0));
+  let bridgeWeight = clamp(amplitudeWeight * phaseGate * throatSoftening * logWindow, 0.0, 1.0);
+
+  let warpScale = clamp(uniforms.bilocalERBridgeStrength * bridgeWeight * 0.45, -0.75, 0.75);
+  let warpedPosition = worldPosition + transverseToRay * warpScale;
+  let bridgeGain = 1.0 + uniforms.bilocalERBridgeStrength * max(bridgeWeight, 0.0);
+
+  return BilocalERBridgeTopology(warpedPosition, bridgeGain);
+}
+
 // Sample complex wavefunction ψ at world position.
 fn samplePsiWithFlow(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
   let xND = mapPosToND(pos, uniforms);

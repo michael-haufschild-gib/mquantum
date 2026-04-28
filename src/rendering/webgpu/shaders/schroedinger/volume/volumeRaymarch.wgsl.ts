@@ -72,6 +72,9 @@ fn volumeRaymarch(
   let probCurrentDensityThreshold = max(uniforms.probabilityCurrentDensityThreshold, 0.0);
   let radialProbEnabled = FEATURE_RADIAL_PROBABILITY && uniforms.radialProbabilityEnabled != 0u;
   let momentumRepresentation = uniforms.representationMode == REPRESENTATION_MOMENTUM;
+  let backreactionActive = isQuantumBackreactionActive(uniforms);
+  let bilocalBridgeActive = isBilocalERBridgeActive(uniforms);
+  let entropyShearActive = isEntropicTimeShearActive(uniforms);
 
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (i >= sampleCount) { break; }
@@ -99,11 +102,11 @@ fn volumeRaymarch(
 
     // Sample density with phase AND raw ψ for probability current reuse
     let densityResult = sampleDensityWithPhaseAndFlow(pos, animTime, uniforms);
-    let densityInfo = densityResult[0];
-    let rawPsiVec = densityResult[1];
-    let rho = densityInfo.x;
-    let sCenter = densityInfo.y;
-    let phase = densityInfo.z;
+    var densityInfo = densityResult[0];
+    var rawPsiVec = densityResult[1];
+    var rho = densityInfo.x;
+    var sCenter = densityInfo.y;
+    var phase = densityInfo.z;
 
     if (rho < EMPTY_SKIP_THRESHOLD) {
       let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(remaining, 0.0));
@@ -114,6 +117,82 @@ fn volumeRaymarch(
           t += skipDistance;
           continue;
         }
+      }
+    }
+
+    var samplePos = pos;
+    var bridgeGain = 1.0;
+    if (bilocalBridgeActive && rho >= EMPTY_SKIP_THRESHOLD) {
+      let remoteEndpoint = vec3f(-pos.x, pos.y, pos.z);
+      let remoteDensityInfo = sampleDensityWithPhase(remoteEndpoint, animTime, uniforms);
+      let bridge = applyBilocalERBridgeTopology(
+        pos,
+        rayDir,
+        rho,
+        sCenter,
+        phase,
+        remoteDensityInfo.x,
+        remoteDensityInfo.y,
+        remoteDensityInfo.z,
+        uniforms
+      );
+      samplePos = bridge.position;
+      bridgeGain = bridge.gain;
+      if (length(samplePos - pos) > 1e-6) {
+        let warpedDensityResult = sampleDensityWithPhaseAndFlow(samplePos, animTime, uniforms);
+        densityInfo = warpedDensityResult[0];
+        rawPsiVec = warpedDensityResult[1];
+        rho = densityInfo.x;
+        sCenter = densityInfo.y;
+        phase = densityInfo.z;
+      }
+    }
+
+    var causticMultiplier = 1.0;
+    if (backreactionActive && rho >= EMPTY_SKIP_THRESHOLD) {
+      var metricGradient: vec3f;
+      if (USE_ANALYTICAL_GRADIENT) {
+        metricGradient = computeAnalyticalGradient(samplePos, animTime, uniforms);
+      } else {
+        metricGradient = computeGradientTetrahedral(samplePos, animTime, 0.05, uniforms);
+      }
+      let beforeBackreaction = samplePos;
+      let metric = applyQuantumBackreactionMetric(
+        beforeBackreaction, rayDir, rho, sCenter, metricGradient, uniforms
+      );
+      samplePos = metric.position;
+      causticMultiplier = metric.caustic;
+      if (length(samplePos - beforeBackreaction) > 1e-6) {
+        let warpedDensityResult = sampleDensityWithPhaseAndFlow(samplePos, animTime, uniforms);
+        densityInfo = warpedDensityResult[0];
+        rawPsiVec = warpedDensityResult[1];
+        rho = densityInfo.x;
+        sCenter = densityInfo.y;
+        phase = densityInfo.z;
+      }
+    }
+
+    var entropyGain = 0.0;
+    if (entropyShearActive && rho >= EMPTY_SKIP_THRESHOLD) {
+      var entropyGradient: vec3f;
+      if (USE_ANALYTICAL_GRADIENT) {
+        entropyGradient = computeAnalyticalGradient(samplePos, animTime, uniforms);
+      } else {
+        entropyGradient = computeGradientTetrahedral(samplePos, animTime, 0.05, uniforms);
+      }
+      let beforeEntropyShear = samplePos;
+      let entropyShear = applyEntropicTimeShear(
+        samplePos, rayDir, rho, sCenter, phase, entropyGradient, uniforms
+      );
+      samplePos = entropyShear.position;
+      entropyGain = entropyShear.entropyGain;
+      if (length(samplePos - beforeEntropyShear) > 1e-6) {
+        let warpedDensityResult = sampleDensityWithPhaseAndFlow(samplePos, animTime, uniforms);
+        densityInfo = warpedDensityResult[0];
+        rawPsiVec = warpedDensityResult[1];
+        rho = densityInfo.x;
+        sCenter = densityInfo.y;
+        phase = densityInfo.z;
       }
     }
 
@@ -128,7 +207,7 @@ fn volumeRaymarch(
     var nodalGradient = vec3f(0.0);
     var hasNodalGradient = false;
     if (nodalBandEnabled && sCenter > -10.0) {
-      let combined = computePhysicalNodalFieldWithGradient(pos, animTime, uniforms);
+      let combined = computePhysicalNodalFieldWithGradient(samplePos, animTime, uniforms);
       nodalGradient = combined.gradient;
       hasNodalGradient = true;
       let fadedIntensity = combined.nodal.intensity * combined.nodal.envelopeWeight;
@@ -151,17 +230,17 @@ fn volumeRaymarch(
       !momentumOverlaySubsample &&
       rho >= probCurrentDensityThreshold
     ) {
-      let normalProxy = normalize(pos + vec3f(1e-6, 0.0, 0.0));
-      let currentSample = sampleProbabilityCurrentWithPsi(pos, animTime, rawPsiVec.xy, uniforms);
+      let normalProxy = normalize(samplePos + vec3f(1e-6, 0.0, 0.0));
+      let currentSample = sampleProbabilityCurrentWithPsi(samplePos, animTime, rawPsiVec.xy, uniforms);
       let currentOverlay = computeProbabilityCurrentOverlay(
-        pos, currentSample, rho, normalProxy, viewDir, uniforms
+        samplePos, currentSample, rho, normalProxy, viewDir, uniforms
       );
       compositeOverlay(currentOverlay, adaptiveStep, invStepLen, 0.45, &transmittance, &accColor);
     }
 
     // Radial probability overlay (hydrogen P(r) shells)
     if (radialProbEnabled) {
-      let rProbOverlay = computeRadialProbabilityOverlay(pos, uniforms);
+      let rProbOverlay = computeRadialProbabilityOverlay(samplePos, uniforms);
       compositeOverlay(rProbOverlay, adaptiveStep, invStepLen, 0.5, &transmittance, &accColor);
     }
 
@@ -181,16 +260,19 @@ fn volumeRaymarch(
       if (hasNodalGradient) {
         gradient = nodalGradient;
       } else if (USE_ANALYTICAL_GRADIENT) {
-        gradient = computeAnalyticalGradient(pos, animTime, uniforms);
+        gradient = computeAnalyticalGradient(samplePos, animTime, uniforms);
       } else {
-        gradient = computeGradientTetrahedral(pos, animTime, 0.05, uniforms);
+        gradient = computeGradientTetrahedral(samplePos, animTime, 0.05, uniforms);
       }
 
       // Compute emission with lighting (pass pre-computed log-density to avoid redundant log())
-      let emission = computeEmissionLit(rho, sCenter, phase, pos, gradient, viewDir, uniforms);
+      let emission = computeEmissionLit(rho, sCenter, phase, samplePos, gradient, viewDir, uniforms)
+        * causticMultiplier * bridgeGain;
+      let entropyEmissionGain =
+        1.0 + uniforms.entropicTimeShearStrength * max(entropyGain, 0.0) * 0.35;
 
       // Front-to-back compositing (scalar path)
-      accColor += transmittance * alpha * emission;
+      accColor += transmittance * alpha * emission * entropyEmissionGain;
       transmittance *= (1.0 - alpha);
     }
 
@@ -254,6 +336,9 @@ fn volumeRaymarchHQ(
   let probCurrentDensityThreshold = max(uniforms.probabilityCurrentDensityThreshold, 0.0);
   let radialProbEnabled = FEATURE_RADIAL_PROBABILITY && uniforms.radialProbabilityEnabled != 0u;
   let momentumRepresentation = uniforms.representationMode == REPRESENTATION_MOMENTUM;
+  let backreactionActive = isQuantumBackreactionActive(uniforms);
+  let bilocalBridgeActive = isBilocalERBridgeActive(uniforms);
+  let entropyShearActive = isEntropicTimeShearActive(uniforms);
 
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (i >= sampleCount) { break; }
@@ -277,9 +362,9 @@ fn volumeRaymarchHQ(
     }
 
     // First do cheap center-only density check
-    let quickCheck = sampleDensityWithPhase(pos, animTime, uniforms);
-    let quickRho = quickCheck.x;
-    let quickS = quickCheck.y;
+    var quickCheck = sampleDensityWithPhase(pos, animTime, uniforms);
+    var quickRho = quickCheck.x;
+    var quickS = quickCheck.y;
 
     // Skip expensive tetrahedral gradient when density is negligible.
     // log(ρ)=-15 → ρ≈3e-7: gradient contributes to lighting normal only, and at this
@@ -297,6 +382,73 @@ fn volumeRaymarchHQ(
         }
       }
     }
+
+    var samplePos = pos;
+    var bridgeGain = 1.0;
+    if (bilocalBridgeActive && quickRho >= EMPTY_SKIP_THRESHOLD) {
+      let remoteEndpoint = vec3f(-pos.x, pos.y, pos.z);
+      let remoteDensityInfo = sampleDensityWithPhase(remoteEndpoint, animTime, uniforms);
+      let bridge = applyBilocalERBridgeTopology(
+        pos,
+        rayDir,
+        quickRho,
+        quickS,
+        quickCheck.z,
+        remoteDensityInfo.x,
+        remoteDensityInfo.y,
+        remoteDensityInfo.z,
+        uniforms
+      );
+      samplePos = bridge.position;
+      bridgeGain = bridge.gain;
+      if (length(samplePos - pos) > 1e-6) {
+        quickCheck = sampleDensityWithPhase(samplePos, animTime, uniforms);
+        quickRho = quickCheck.x;
+        quickS = quickCheck.y;
+      }
+    }
+
+    var causticMultiplier = 1.0;
+    if (backreactionActive && quickRho >= EMPTY_SKIP_THRESHOLD) {
+      var metricGradient: vec3f;
+      if (USE_ANALYTICAL_GRADIENT) {
+        metricGradient = computeAnalyticalGradient(samplePos, animTime, uniforms);
+      } else {
+        metricGradient = computeGradientTetrahedral(samplePos, animTime, 0.05, uniforms);
+      }
+      let beforeBackreaction = samplePos;
+      let metric = applyQuantumBackreactionMetric(
+        beforeBackreaction, rayDir, quickRho, quickS, metricGradient, uniforms
+      );
+      samplePos = metric.position;
+      causticMultiplier = metric.caustic;
+      if (length(samplePos - beforeBackreaction) > 1e-6) {
+        quickCheck = sampleDensityWithPhase(samplePos, animTime, uniforms);
+        quickRho = quickCheck.x;
+        quickS = quickCheck.y;
+      }
+    }
+    var entropyGain = 0.0;
+    if (entropyShearActive && quickRho >= EMPTY_SKIP_THRESHOLD) {
+      var entropyGradient: vec3f;
+      if (USE_ANALYTICAL_GRADIENT) {
+        entropyGradient = computeAnalyticalGradient(samplePos, animTime, uniforms);
+      } else {
+        entropyGradient = computeGradientTetrahedral(samplePos, animTime, 0.05, uniforms);
+      }
+      let beforeEntropyShear = samplePos;
+      let entropyShear = applyEntropicTimeShear(
+        samplePos, rayDir, quickRho, quickS, quickCheck.z, entropyGradient, uniforms
+      );
+      samplePos = entropyShear.position;
+      entropyGain = entropyShear.entropyGain;
+      if (length(samplePos - beforeEntropyShear) > 1e-6) {
+        quickCheck = sampleDensityWithPhase(samplePos, animTime, uniforms);
+        quickRho = quickCheck.x;
+        quickS = quickCheck.y;
+      }
+    }
+    skipGradient = (quickS < -15.0);
 
     // Hoisted so the nodal-band and main compositing paths share one computation
     // (was computed twice — once as adaptiveStepN in the nodal branch, once here).
@@ -327,7 +479,7 @@ fn volumeRaymarchHQ(
     } else if (nodalBandActive && !USE_ANALYTICAL_GRADIENT) {
       // Combined path: nodal detection + density gradient from shared tetrahedral samples.
       // Saves 4 psi evaluations per step compared to separate computePhysicalNodalField + gradient.
-      let combined = computePhysicalNodalFieldWithGradient(pos, animTime, uniforms);
+      let combined = computePhysicalNodalFieldWithGradient(samplePos, animTime, uniforms);
       gradient = combined.gradient;
       // Use center density from the quick check (more accurate single-point value for compositing)
       rho = quickRho;
@@ -346,13 +498,13 @@ fn volumeRaymarchHQ(
       nodalHandled = true;
     } else if (USE_ANALYTICAL_GRADIENT) {
       // Analytical gradient from cached eigenfunctions (1 eval vs 4 tetrahedral samples)
-      let cached = sampleDensityWithAnalyticalGradient(pos, animTime, uniforms);
+      let cached = sampleDensityWithAnalyticalGradient(samplePos, animTime, uniforms);
       rho = cached.rho;
       sCenter = cached.s;
       phase = cached.phase;
       gradient = cached.gradient;
     } else {
-      let tetra = sampleWithTetrahedralGradient(pos, animTime, 0.05, uniforms);
+      let tetra = sampleWithTetrahedralGradient(samplePos, animTime, 0.05, uniforms);
       rho = tetra.rho;
       sCenter = tetra.s;
       phase = tetra.phase;
@@ -361,7 +513,7 @@ fn volumeRaymarchHQ(
 
     // Nodal band processing (only if not already handled by the combined path above)
     if (!nodalHandled && nodalBandActive) {
-      let nodal = computePhysicalNodalField(pos, animTime, uniforms);
+      let nodal = computePhysicalNodalField(samplePos, animTime, uniforms);
       let fadedIntensityHQ = nodal.intensity * nodal.envelopeWeight;
       if (fadedIntensityHQ > 1e-4) {
         let nodalColor = selectPhysicalNodalColor(uniforms, nodal.colorMode, nodal.signValue);
@@ -380,17 +532,17 @@ fn volumeRaymarchHQ(
       !momentumOverlaySubsample &&
       rho >= probCurrentDensityThreshold
     ) {
-      let normalProxy = normalize(gradient + pos * 0.2 + vec3f(1e-6, 0.0, 0.0));
-      let currentSample = sampleProbabilityCurrent(pos, animTime, uniforms);
+      let normalProxy = normalize(gradient + samplePos * 0.2 + vec3f(1e-6, 0.0, 0.0));
+      let currentSample = sampleProbabilityCurrent(samplePos, animTime, uniforms);
       let currentOverlay = computeProbabilityCurrentOverlay(
-        pos, currentSample, rho, normalProxy, viewDir, uniforms
+        samplePos, currentSample, rho, normalProxy, viewDir, uniforms
       );
       compositeOverlay(currentOverlay, adaptiveStep, invStepLen, 0.45, &transmittance, &accColor);
     }
 
     // Radial probability overlay (hydrogen P(r) shells)
     if (radialProbEnabled) {
-      let rProbOverlay = computeRadialProbabilityOverlay(pos, uniforms);
+      let rProbOverlay = computeRadialProbabilityOverlay(samplePos, uniforms);
       compositeOverlay(rProbOverlay, adaptiveStep, invStepLen, 0.5, &transmittance, &accColor);
     }
 
@@ -404,10 +556,13 @@ fn volumeRaymarchHQ(
       }
 
       // Compute emission with lighting (pass pre-computed log-density to avoid redundant log())
-      let emission = computeEmissionLit(rho, sCenter, phase, pos, gradient, viewDir, uniforms);
+      let emission = computeEmissionLit(rho, sCenter, phase, samplePos, gradient, viewDir, uniforms)
+        * causticMultiplier * bridgeGain;
+      let entropyEmissionGain =
+        1.0 + uniforms.entropicTimeShearStrength * max(entropyGain, 0.0) * 0.35;
 
       // Front-to-back compositing
-      accColor += transmittance * alpha * emission;
+      accColor += transmittance * alpha * emission * entropyEmissionGain;
       transmittance *= (1.0 - alpha);
     }
 

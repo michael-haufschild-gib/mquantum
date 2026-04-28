@@ -18,6 +18,7 @@ export interface VersionTracker {
   lastSchroedingerAppearanceVersion: number
   lastSchroedingerPbrVersion: number
   lastPauliSpinorVersion: number
+  lastSchroedingerQualitySignature: string
 
   // Lighting uniform buffer
   lastLightingVersion: number
@@ -43,6 +44,7 @@ export function createVersionTracker(): VersionTracker {
     lastSchroedingerAppearanceVersion: -1,
     lastSchroedingerPbrVersion: -1,
     lastPauliSpinorVersion: -1,
+    lastSchroedingerQualitySignature: '',
     lastLightingVersion: -1,
     lastAppearanceVersion: -1,
     lastPbrVersion: -1,
@@ -69,6 +71,7 @@ export interface SchroedingerVersions {
   appearanceVersion: number
   pbrVersion: number
   pauliSpinorVersion: number
+  qualitySignature: string
 }
 
 /**
@@ -85,7 +88,8 @@ export function isSchroedingerDirty(tracker: VersionTracker, v: SchroedingerVers
     v.schroedingerVersion !== tracker.lastSchroedingerVersion ||
     v.appearanceVersion !== tracker.lastSchroedingerAppearanceVersion ||
     v.pbrVersion !== tracker.lastSchroedingerPbrVersion ||
-    v.pauliSpinorVersion !== tracker.lastPauliSpinorVersion
+    v.pauliSpinorVersion !== tracker.lastPauliSpinorVersion ||
+    v.qualitySignature !== tracker.lastSchroedingerQualitySignature
   )
 }
 
@@ -95,6 +99,7 @@ export function updateSchroedingerVersions(tracker: VersionTracker, v: Schroedin
   tracker.lastSchroedingerAppearanceVersion = v.appearanceVersion
   tracker.lastSchroedingerPbrVersion = v.pbrVersion
   tracker.lastPauliSpinorVersion = v.pauliSpinorVersion
+  tracker.lastSchroedingerQualitySignature = v.qualitySignature
 }
 
 // ---------------------------------------------------------------------------
