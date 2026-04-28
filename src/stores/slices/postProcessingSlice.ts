@@ -22,6 +22,7 @@ import {
   DEFAULT_HORIZON_MEMORY_ECHOES,
   DEFAULT_HORIZON_MEMORY_ENABLED,
   DEFAULT_HORIZON_MEMORY_RADIUS,
+  DEFAULT_HORIZON_MEMORY_SPIN,
   DEFAULT_HORIZON_MEMORY_STRENGTH,
   DEFAULT_PAPER_COLOR_BACK,
   DEFAULT_PAPER_COLOR_FRONT,
@@ -125,6 +126,8 @@ export interface PostProcessingSliceState {
   horizonMemoryRadius: number
   /** Number of previous-frame echo shells (1-6, rounded). */
   horizonMemoryEchoes: number
+  /** Angular spin/shear applied to previous-frame echo shells (0-1). */
+  horizonMemorySpin: number
 }
 
 /**
@@ -172,6 +175,7 @@ export interface PostProcessingSliceActions {
   setHorizonMemoryStrength: (strength: number) => void
   setHorizonMemoryRadius: (radius: number) => void
   setHorizonMemoryEchoes: (echoes: number) => void
+  setHorizonMemorySpin: (spin: number) => void
 }
 
 /**
@@ -225,6 +229,7 @@ export const POST_PROCESSING_INITIAL_STATE: PostProcessingSliceState = {
   horizonMemoryStrength: DEFAULT_HORIZON_MEMORY_STRENGTH,
   horizonMemoryRadius: DEFAULT_HORIZON_MEMORY_RADIUS,
   horizonMemoryEchoes: DEFAULT_HORIZON_MEMORY_ECHOES,
+  horizonMemorySpin: DEFAULT_HORIZON_MEMORY_SPIN,
 }
 
 // ============================================================================
@@ -462,5 +467,13 @@ export const createPostProcessingSlice: StateCreator<
       return
     }
     set({ horizonMemoryEchoes: clamp(Math.round(echoes), 1, 6) })
+  },
+
+  setHorizonMemorySpin: (spin: number) => {
+    if (!isFinitePostProcessingInput(spin)) {
+      logger.warn('[postProcessingSlice] Ignoring non-finite horizon memory spin:', spin)
+      return
+    }
+    set({ horizonMemorySpin: clamp(spin, 0, 1) })
   },
 })

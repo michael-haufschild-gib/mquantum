@@ -529,3 +529,62 @@ Render the Madelung quantum-pressure / Bohm quantum-potential magnitude directly
   - `pnpm test:shaders:fast` — PASS.
   - `git diff --check` — PASS.
 - Follow-up threads: signed Q colormap; pressure-gradient force vectors; compare quantum-pressure shells with Regge-Wheeler ringdown potential caustics.
+
+## Round PRD: Kerr Horizon Memory Spin-Shear Echo
+
+### Scientific Goal
+
+Render temporal memory as rotational causal geometry, not only scalar persistence. The frame-blending pass should gain a controllable spin-shear term so previous-frame light echoes are dragged around the horizon boundary like a screen-space analog of Kerr frame dragging and gravitational-wave memory.
+
+### Physics / Math
+
+- Add `horizonMemorySpin` to post-processing state, preset load allowlist, import normalization, UI controls, and `FrameBlendingPassConfig`.
+- Pack frame-blending uniforms as:
+  - `blendFactor`
+  - `horizonStrength`
+  - `horizonRadius`
+  - `horizonEchoes`
+  - `horizonSpin`
+- Clamp `horizonMemorySpin` to `[0, 1]`, default `0`.
+- Preserve exact linear frame blending when `horizonStrength <= 0.0001`.
+- When horizon memory is active:
+  - Continue using previous-frame luminance gradients for refraction.
+  - For each previous-frame echo shell, compute an angular spin offset from `horizonSpin`, `memoryStrength`, echo index, shell presence, and the sign of the prior-frame luminance curl/gradient orientation.
+  - Rotate the radial echo sample direction by that angle before sampling the previous history texture.
+  - Add a small tangential gradient shear to the current-frame refraction path so current light is also dragged by stored history.
+- Default spin `0` must preserve existing horizon-memory visual behavior.
+
+### User Sees
+
+- Post-processing `Frame Blending` controls gain a `Memory Spin` slider under `Causal Horizon Memory`.
+- With horizon memory enabled and spin above zero, echo shells twist around the center instead of only pulsing radially. Dense luminous fronts leave asymmetric arcs and sheared traces across frames; spin `0` returns to the existing radial echo.
+
+### Acceptance Bar
+
+- TypeScript compiles.
+- Unit/source tests cover:
+  - Frame-blending shader exposes `horizonSpin`, `tangentDir`, `spinAngle`, and rotated echo sampling.
+  - Uniform uploads include five floats and clamp spin from store/config to `[0, 1]`.
+  - Disabled horizon memory still returns exact `mix(current, previous, blendFactor)`.
+  - Post-processing store setter clamps finite spin and ignores non-finite spin.
+  - Preset normalization preserves/clamps valid spin and strips non-finite spin.
+  - MiscControls renders `Memory Spin` and wires it to `setHorizonMemorySpin`.
+- `pnpm exec vitest run src/tests/rendering/webgpu/passes/FrameBlendingPass.test.ts src/tests/stores/postProcessingStore.test.ts src/tests/stores/utils/presetNormalizationVisual.test.ts src/tests/components/sections/PostProcessing/MiscControls.test.tsx`
+- `pnpm exec tsc --noEmit`
+- `pnpm run lint`
+- `pnpm test:shaders:fast`
+
+### Outcome
+
+- Commit: `Add Kerr horizon memory spin shear`.
+- Reviewer result: PASS.
+- What renderer now draws: horizon memory can now twist previous-frame echo shells with Kerr-like angular shear instead of only accumulating radial persistence.
+- Physics implemented: previous-frame luminance gradients still refract current samples; the gradient's tangential orientation now drives a spin direction, per-shell angular rotation, and tangential current-frame shear.
+- Paths affected: frame-blending WGSL/uniforms, post-processing store/defaults/preset normalization, MiscControls UI, and focused tests.
+- Verification:
+  - `pnpm exec vitest run src/tests/rendering/webgpu/passes/FrameBlendingPass.test.ts src/tests/stores/postProcessingStore.test.ts src/tests/stores/utils/presetNormalizationVisual.test.ts src/tests/components/sections/PostProcessing/MiscControls.test.tsx` — PASS, 42 tests.
+  - `pnpm exec tsc --noEmit` — PASS.
+  - `pnpm run lint` — PASS.
+  - `pnpm test:shaders:fast` — PASS.
+  - `git diff --check` — PASS.
+- Follow-up threads: signed spin direction control; camera-space versus screen-space horizon centers; couple spin shear to black-hole analog Mach horizon output.

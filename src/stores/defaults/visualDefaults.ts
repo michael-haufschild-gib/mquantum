@@ -131,6 +131,9 @@ export const DEFAULT_HORIZON_MEMORY_RADIUS = 0.62
 /** Number of radial echo shells sampled from previous-frame history (1-6). */
 export const DEFAULT_HORIZON_MEMORY_ECHOES = 3
 
+/** Angular Kerr-like spin/shear applied to horizon memory echoes (0-1). */
+export const DEFAULT_HORIZON_MEMORY_SPIN = 0
+
 // ============================================================================
 // Lighting Defaults
 // ============================================================================

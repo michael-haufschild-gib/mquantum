@@ -120,12 +120,14 @@ describe('normalizePostProcessingLoadData', () => {
       bloomGain: 1.5,
       bloomThreshold: 0.8,
       antiAliasingMethod: 'fxaa',
+      horizonMemorySpin: 0.45,
     })
 
     expect(result.bloomEnabled).toBe(true)
     expect(result.bloomGain).toBe(1.5)
     expect(result.bloomThreshold).toBe(0.8)
     expect(result.antiAliasingMethod).toBe('fxaa')
+    expect(result.horizonMemorySpin).toBe(0.45)
   })
 
   it('clamps out-of-range bloom values', () => {
@@ -133,22 +135,26 @@ describe('normalizePostProcessingLoadData', () => {
       bloomGain: 10, // max 3
       bloomThreshold: -1, // min 0
       bloomRadius: 0.1, // min 0.25
+      horizonMemorySpin: 5, // max 1
     })
 
     expect(result.bloomGain).toBe(3)
     expect(result.bloomThreshold).toBe(0)
     expect(result.bloomRadius).toBe(0.25)
+    expect(result.horizonMemorySpin).toBe(1)
   })
 
   it('strips non-finite numeric values', () => {
     const result = normalizePostProcessingLoadData({
       bloomGain: NaN,
       cinematicVignette: Infinity,
+      horizonMemorySpin: Number.NEGATIVE_INFINITY,
       bloomEnabled: true,
     })
 
     expect(result).not.toHaveProperty('bloomGain')
     expect(result).not.toHaveProperty('cinematicVignette')
+    expect(result).not.toHaveProperty('horizonMemorySpin')
     expect(result.bloomEnabled).toBe(true)
   })
 

@@ -46,16 +46,17 @@ function makeRenderContext(
 }
 
 function requireUploadedUniforms(data: Float32Array | null): Float32Array {
-  expect(data?.length).toBe(4)
+  expect(data?.length).toBe(5)
   return data ?? new Float32Array(0)
 }
 
 describe('FrameBlendingPass horizon memory', () => {
-  it('keeps the frame-blending uniform buffer at four floats', () => {
+  it('keeps the frame-blending uniform buffer at five floats', () => {
     expect(frameBlendingShader).toContain('blendFactor: f32')
     expect(frameBlendingShader).toContain('horizonStrength: f32')
     expect(frameBlendingShader).toContain('horizonRadius: f32')
     expect(frameBlendingShader).toContain('horizonEchoes: f32')
+    expect(frameBlendingShader).toContain('horizonSpin: f32')
   })
 
   it('preserves exact linear mix when horizon memory is disabled', () => {
@@ -69,6 +70,9 @@ describe('FrameBlendingPass horizon memory', () => {
     expect(frameBlendingShader).toContain('let center = vec2f(0.5)')
     expect(frameBlendingShader).toContain('for (var i = 1; i <= 6; i = i + 1)')
     expect(frameBlendingShader).toContain('changeGate')
+    expect(frameBlendingShader).toContain('tangentDir')
+    expect(frameBlendingShader).toContain('spinAngle')
+    expect(frameBlendingShader).toContain('spunDir')
     expect(frameBlendingShader).toContain(
       'let changeGate = 1.0 - smoothstep(0.01, 0.25, abs(currentLum - previousLum));'
     )
@@ -107,6 +111,7 @@ describe('FrameBlendingPass horizon memory', () => {
         horizonMemoryStrength: 2,
         horizonMemoryRadius: 0,
         horizonMemoryEchoes: 4.6,
+        horizonMemorySpin: 2,
       })
     )
 
@@ -115,6 +120,7 @@ describe('FrameBlendingPass horizon memory', () => {
     expect(uniformData[1]).toBe(1.5)
     expect(uniformData[2]).toBeCloseTo(0.05)
     expect(uniformData[3]).toBe(5)
+    expect(uniformData[4]).toBe(1)
   })
 
   it('writes zero horizon strength when memory is disabled in the store', () => {
@@ -138,6 +144,7 @@ describe('FrameBlendingPass horizon memory', () => {
         horizonMemoryStrength: 1.2,
         horizonMemoryRadius: 0.8,
         horizonMemoryEchoes: 3,
+        horizonMemorySpin: 0.75,
       })
     )
 
@@ -146,5 +153,6 @@ describe('FrameBlendingPass horizon memory', () => {
     expect(uniformData[1]).toBe(0)
     expect(uniformData[2]).toBeCloseTo(0.8)
     expect(uniformData[3]).toBe(3)
+    expect(uniformData[4]).toBeCloseTo(0.75)
   })
 })

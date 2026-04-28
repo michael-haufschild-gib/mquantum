@@ -50,6 +50,8 @@ export const MiscControls: React.FC<MiscControlsProps> = React.memo(({ className
     setHorizonMemoryRadius: state.setHorizonMemoryRadius,
     horizonMemoryEchoes: state.horizonMemoryEchoes,
     setHorizonMemoryEchoes: state.setHorizonMemoryEchoes,
+    horizonMemorySpin: state.horizonMemorySpin,
+    setHorizonMemorySpin: state.setHorizonMemorySpin,
   }))
   const {
     antiAliasingMethod,
@@ -66,6 +68,8 @@ export const MiscControls: React.FC<MiscControlsProps> = React.memo(({ className
     setHorizonMemoryRadius,
     horizonMemoryEchoes,
     setHorizonMemoryEchoes,
+    horizonMemorySpin,
+    setHorizonMemorySpin,
   } = usePostProcessingStore(postProcessingSelector)
 
   return (
@@ -157,6 +161,18 @@ export const MiscControls: React.FC<MiscControlsProps> = React.memo(({ className
             disabled={!frameBlendingEnabled || !horizonMemoryEnabled}
             showValue
             data-testid="horizon-memory-echoes-slider"
+          />
+          <Slider
+            label="Memory Spin"
+            tooltip="Angular frame-dragging shear applied to previous-frame horizon echoes."
+            min={0}
+            max={1}
+            step={0.05}
+            value={horizonMemorySpin}
+            onChange={setHorizonMemorySpin}
+            disabled={!frameBlendingEnabled || !horizonMemoryEnabled}
+            showValue
+            data-testid="horizon-memory-spin-slider"
           />
         </div>
         <p className="text-xs text-text-secondary mt-1">

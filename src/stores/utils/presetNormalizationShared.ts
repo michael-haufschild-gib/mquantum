@@ -88,6 +88,7 @@ export const POST_PROCESSING_LOAD_KEYS = [
   'horizonMemoryStrength',
   'horizonMemoryRadius',
   'horizonMemoryEchoes',
+  'horizonMemorySpin',
 ] as const
 
 export const APPEARANCE_LOAD_KEYS = [
