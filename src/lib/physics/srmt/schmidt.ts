@@ -211,41 +211,25 @@ export function computeVolumeElement(spec: ChiGridSpec): number {
 }
 
 /**
- * L²-normalised Schmidt singular values under a volume-weighted or
- * unit-volume convention.
+ * L²-normalised Schmidt singular values.
  *
- * Runs the raw {@link schmidtValues} and rescales by
- * `1 / sqrt(Σ|χ|² · dVol)` so the resulting singular values satisfy the
- * volume-weighted normalisation `Σ s_n² · dVol = 1` — the Riemann-sum
- * approximation of the continuum identity `∫|χ|² d³x = 1`. Passing
- * `volumeElement = 1` (the default) reduces the rescale to the pure
- * discrete Frobenius norm `Σ s_n² = 1`, preserving the prior API
- * contract for callers that do not set up a physical grid.
+ * Runs the raw {@link schmidtValues} and rescales by `1 / sqrt(Σ|χ|²)` so
+ * the resulting singular values are dimensionless reduced-density
+ * eigenvalue square roots satisfying `Σ s_n² = 1`.
  *
- * Physical interpretation: the modular Hamiltonian
- * `K_n = −log(s_n² + ε)` is defined against a probability density — not
- * a raw sum of lattice amplitudes. Discretising the continuum via
- * Riemann sum requires `|χ|² · dVol` for the density reading, which
- * introduces a `log(dVol)` additive term into `K_n`. Under a
- * fixed-physics, fixed-`(aMin, aMax, phiExtent)`, variable-`(Na, Nphi)`
- * sweep (`gridNa`, `gridNphi`, `phiExtent`) the Frobenius-only convention
- * leaves that term as a residual drift in the affine fit's `β`; the
- * volume-weighted convention absorbs it into the lattice density
- * normalisation so `β` tracks only the genuine `K ≈ α·E + β`
- * zero-of-energy offset the SRMT conjecture is probing.
- *
- * See {@link computeVolumeElement} for the `dVol` formula.
+ * For uniform-grid continuum data, the physical coefficient matrix is
+ * `χ · sqrt(dVol)` while the continuum norm is `Σ|χ|² · dVol`; those
+ * factors cancel in the Schmidt probabilities. Keeping `dVol` inside
+ * `s_n²` turns probabilities into probability densities and can make
+ * `K_n = −log(s_n² + ε)` negative when `dVol < 1`.
  *
  * @param tensor - `χ` tensor (raw, unnormalised).
  * @param clock - Clock axis used as the row index of the reshaped matrix.
- * @param volumeElement - Per-cell volume element
- *                        `dVol = da · dφ²`. Defaults to `1`
- *                        (unit-volume Frobenius, backward-compatible).
- *                        Must be non-negative; `dVol = 0` falls back to
- *                        the Frobenius-only rescale.
- * @returns Descending singular values of the (volume-weighted) unit-norm
- *          state. When `χ` is identically zero the raw singular values
- *          are returned unchanged (all zeros).
+ * @param volumeElement - Deprecated uniform-grid per-cell volume. Accepted
+ *                        for backward compatibility; uniform-grid `dVol`
+ *                        cancels from dimensionless Schmidt probabilities.
+ * @returns Descending singular values of the unit-norm state. When `χ` is
+ *          identically zero the raw singular values are returned unchanged.
  */
 export function normalizedSchmidtValues(
   tensor: ChiTensor,
@@ -255,8 +239,8 @@ export function normalizedSchmidtValues(
   const sv = schmidtValues(tensor, clock)
   const fro2 = chiFrobeniusNormSq(tensor.chi)
   if (fro2 <= 0) return sv
-  const dVol = volumeElement > 0 ? volumeElement : 1
-  const scale = 1 / Math.sqrt(fro2 * dVol)
+  void volumeElement
+  const scale = 1 / Math.sqrt(fro2)
   for (let i = 0; i < sv.length; i++) sv[i] = sv[i]! * scale
   return sv
 }

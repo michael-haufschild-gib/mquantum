@@ -6,15 +6,16 @@
  *   1. Navigate via URL params that enable SRMT with clock axis `a`.
  *   2. Wait for the renderer to report ready and produce its first frame.
  *   3. Wait for the three-clock sequential dispatch queue to fully drain.
- *   4. Assert the spectrum-comparison UI (chart + K / HJ polylines + per-clock
- *      rows) is populated, no row left in the "pending" tier.
- *   5. Assert whichever clock owns the lowest affine-match quality carries the
+ *   4. Open the right Inspector's Analysis tab and expand SRMT Diagnostic.
+ *   5. Assert the controls + spectrum-comparison UI (chart + K / HJ polylines
+ *      + per-clock rows) is populated, no row left in the "pending" tier.
+ *   6. Assert whichever clock owns the lowest affine-match quality carries the
  *      `data-champion="true"` attribute — provided the winner leads the
  *      runner-up by ≥ the UI's own 0.02 tie tolerance. A genuine tie leaves
  *      no champion and is not a failure.
- *   6. Assert the canvas renders non-blank content (uses `expectCanvasNotBlank`
+ *   7. Assert the canvas renders non-blank content (uses `expectCanvasNotBlank`
  *      which center-crops and tolerates oscillating modes).
- *   7. Assert the page has no non-benign errors — the shared fixture already
+ *   8. Assert the page has no non-benign errors — the shared fixture already
  *      captures GPU/shader/WGSL issues; this adds a classical page-error
  *      collector for JS runtime exceptions and filters the known-benign
  *      ResizeObserver noise.
@@ -37,7 +38,7 @@ import {
   waitForRendererReady,
   waitForSrmtQueueDrain,
 } from './helpers/app-helpers'
-import { LeftPanel } from './pages/LeftPanel'
+import { RightPanel } from './pages/RightPanel'
 
 test.setTimeout(180_000)
 
@@ -62,14 +63,30 @@ test.describe('Wheeler–DeWitt SRMT — rendering & console cleanliness', () =>
     // Drain the three-clock queue. Budget: 60 s (3× Lanczos @ 3-7 s each on CI).
     await waitForSrmtQueueDrain(page, 60_000)
 
-    // Switch to the Geometry tab so the Wheeler–DeWitt + SRMT controls mount.
-    // The left panel defaults to the "Type" tab; the SRMT spectrum panel is
-    // nested under `ObjectSettingsSection` which only renders inside the
-    // "Geometry" tab's tabpanel (see `EditorLeftPanel.tsx`).
-    const leftPanel = new LeftPanel(page)
-    await leftPanel.switchTab('Geometry')
+    // Open the right Inspector Analysis tab where SrmtDiagnosticSection now lives.
+    const rightPanelToggle = page.getByTestId('toggle-right-panel')
+    if ((await rightPanelToggle.getAttribute('aria-expanded')) !== 'true') {
+      await rightPanelToggle.click()
+    }
+
+    const rightPanel = new RightPanel(page)
+    await rightPanel.waitForVisible()
+    await rightPanel.switchToAnalysisTab()
+    await rightPanel.expectTabActive('Analysis')
+
+    const srmtHeader = page.getByTestId('srmt-diagnostic-section-header')
+    await expect(srmtHeader, 'SRMT Diagnostic section header must be visible').toBeVisible({
+      timeout: 15_000,
+    })
+    if ((await srmtHeader.getAttribute('aria-expanded')) !== 'true') {
+      await srmtHeader.click()
+    }
+    await expect(srmtHeader).toHaveAttribute('aria-expanded', 'true', { timeout: 5_000 })
 
     // ─── Spectrum panel visibility + chart content ────────────────────────────
+
+    const controls = page.getByTestId('wdw-srmt-controls')
+    await expect(controls, 'SRMT controls must render in the Analysis tab').toBeVisible()
 
     const panel = page.getByTestId('wdw-srmt-spectrum-panel')
     await expect(panel, 'SRMT spectrum panel must render after queue drain').toBeVisible()

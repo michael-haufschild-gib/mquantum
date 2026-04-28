@@ -136,21 +136,21 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   var phiVal: f32 = 0.0;
   var piVal: f32 = 0.0;
 
-  // Cosmology-aware physical dispersion for the initial conjugate-momentum
-  // kick. The canonical δφ Hamiltonian has ω² = k_lat² + mass²·a². We get
-  // a² from aFull/aPotential (a^n / a^(n−2) = a²), valid for every preset
-  // including the Minkowski trivial case where both coefs are 1. Under a
-  // degenerate config (aPotential = 0), the fallback keeps ω² real and the
-  // integrator can recover on the first full step.
-  let aSq = select(1.0, params.aFull / params.aPotential, params.aPotential > 0.0);
-  let massTerm = params.mass * params.mass * aSq;
+  // Cosmology-aware oscillator for the initial conjugate-momentum kick.
+  // Hamilton equations give:
+  //   δφ' = aKinetic·π
+  //   π'  = −K·δφ, K = Σ_d aPotential_d·k_d² + m²·aFull·massSquaredScale
+  // so ω² = aKinetic·K and π amplitude = ω/aKinetic. Under isotropic FLRW
+  // aKinetic·aPotential = 1, reducing to the old k² + m²a² formula.
+  let safeAKinetic = select(1.0, params.aKinetic, params.aKinetic > 0.0);
+  let massStiffness = params.mass * params.mass * params.aFull * params.massSquaredScale;
 
   if (params.initCondition == 1u) {
-    // Single mode: δφ = A * cos(k . x), π_δφ = a^(n−2) · δφ'
-    //                  = aPotential · A · ω · sin(k . x)
+    // Single mode: δφ = A * cos(k . x), π_δφ = δφ' / aKinetic
+    //                  = (ω / aKinetic) · A · sin(k . x)
     // Physical wave vector: k_phys_d = 2*pi*n_d / L_d.
     var phase: f32 = 0.0;
-    var omegaSq: f32 = massTerm;
+    var omegaSq: f32 = safeAKinetic * massStiffness;
 
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
       let latticeL = f32(params.gridSize[d]) * params.spacing[d];
@@ -161,21 +161,23 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
       // Lattice dispersion: (2/a) * sin(k * a / 2)
       let sk = 2.0 * sin(kPhys * params.spacing[d] * 0.5) / params.spacing[d];
-      omegaSq += sk * sk;
+      var axisPotential = params.aPotential;
+      if (d == 1u) { axisPotential *= params.aPotentialRatio1; }
+      if (d == 2u) { axisPotential *= params.aPotentialRatio2; }
+      omegaSq += safeAKinetic * axisPotential * sk * sk;
     }
 
-    // ω² = k_lat² + m²·a² is non-negative for real mass; the max() is a
-    // belt-and-braces guard against pathological configs (aFull/aPotential
-    // overflow on underflow in extreme de Sitter futures).
+    // ω² is non-negative for real mass and positive stiffness; the max() is
+    // a belt-and-braces guard against pathological coefficient underflow.
     let omega = sqrt(max(omegaSq, 0.0));
     phiVal = params.packetAmplitude * cos(phase);
-    piVal = params.aPotential * params.packetAmplitude * omega * sin(phase);
+    piVal = (omega / safeAKinetic) * params.packetAmplitude * sin(phase);
   } else if (params.initCondition == 2u) {
     // Gaussian packet: δφ = A * exp(-|x-x0|^2 / (2*sigma^2)) * cos(k . x)
-    //                  π_δφ = aPotential · A · ω · exp(...) * sin(k . x)
+    //                  π_δφ = (ω / aKinetic) · A · exp(...) * sin(k . x)
     var r2: f32 = 0.0;
     var phase: f32 = 0.0;
-    var omegaSq: f32 = massTerm;
+    var omegaSq: f32 = safeAKinetic * massStiffness;
 
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
       let dx = worldPos[d] - params.packetCenter[d];
@@ -188,7 +190,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
         // Lattice dispersion: (2/a) * sin(k * a / 2)
         let sk = 2.0 * sin(kPhys * params.spacing[d] * 0.5) / params.spacing[d];
-        omegaSq += sk * sk;
+        var axisPotential = params.aPotential;
+        if (d == 1u) { axisPotential *= params.aPotentialRatio1; }
+        if (d == 2u) { axisPotential *= params.aPotentialRatio2; }
+        omegaSq += safeAKinetic * axisPotential * sk * sk;
       }
     }
 
@@ -200,7 +205,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let invTwoSigma2 = 0.5 / width2;
     let envelope = params.packetAmplitude * exp(-r2 * invTwoSigma2);
     phiVal = envelope * cos(phase);
-    piVal = params.aPotential * envelope * omega * sin(phase);
+    piVal = (omega / safeAKinetic) * envelope * sin(phase);
   } else if (params.initCondition == 3u) {
     // Kink profile: phi = v * tanh((x0 - center0) / width), pi = 0
     // Domain wall interpolating between -v and +v along axis 0

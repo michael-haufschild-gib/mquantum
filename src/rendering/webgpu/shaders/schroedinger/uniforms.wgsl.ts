@@ -322,12 +322,19 @@ struct SchroedingerUniforms {
   pauliSpinDownColorHSL: vec3f,     // offset 1664
   _padPauliDownHSL: f32,            // offset 1676
 
+  // Density-grid world mapping. Defaults to the isotropic render cube; explicit
+  // fields let modes opt into non-cubic grid placement without layout churn.
+  densityGridCenter: vec3f,
+  _padDensityGridCenter: f32,
+  densityGridHalfExtent: vec3f,
+  _padDensityGridHalfExtent: f32,
+
   // Host-precomputed HO superposition terms term_k = c_k * exp(-i * E_k * t)
   // for t = uniforms.time * uniforms.timeScale. Lifts 8 cos+sin and 8 cmul out
   // of every fragment shader invocation. Only .xy carries (Re, Im); .zw is
   // 16-byte vec4f padding required by uniform-buffer array stride.
   // Updated every frame (including the partial-write path) by the host packer.
-  precomputedTerm: array<vec4f, 8>, // offset 1680
+  precomputedTerm: array<vec4f, 8>,
 }
 
 // ============================================

@@ -174,23 +174,9 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
   ): number | null {
     const wdw = schroedinger.wheelerDeWitt as WheelerDeWittConfig | undefined
     if (!wdw) return null
-    // Bounding radius = a_max so the density cube covers the simulated
-    // range. The packer uses `R = aMax` as the cube extent, and the
-    // shader (`worldToDensityGridUVW`) maps world positions by the same
-    // bound. Any multiplier here introduces a silent spatial rescale
-    // mismatch between the baked texels and the rendered cube.
-    //
-    // Anisotropy note: the rendered cube is [-aMax, +aMax]^3 in world
-    // space, but the solver grid spans `a ∈ [aMin, aMax]` along x and
-    // `phi1, phi2 ∈ [-phiExtent, +phiExtent]` along y/z. With the
-    // defaults (aMax = 1.5, phiExtent = 3.5), phi features are visually
-    // compressed by ~2.33× relative to a features — the phi axis packs
-    // 7 physics units into the same world extent that the a axis uses
-    // for ~1.45 physics units. This is cosmetic (physics is correct) and
-    // aMax / phiExtent are not exposed as user-facing sliders, so no
-    // tooltip fix applies. If we later add per-axis scaling, the natural
-    // home is a `SchroedingerUniforms.densityScale: vec3f` plus a
-    // matching divide inside `worldToDensityGridUVW`.
+    // Use normalized display axes for WdW. The density texture maps its three
+    // solver coordinates independently into the render cube; using the full
+    // physical φ extent here makes the a-axis appear visibly squashed.
     return Math.max(0.25, wdw.aMax)
   }
 

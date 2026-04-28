@@ -56,7 +56,7 @@ export const MagneticFieldControls: React.FC<MagneticFieldControlsProps> = React
       <div className="space-y-3">
         <Select
           label="Field Type"
-          tooltip="Spatial profile of the external magnetic field. Uniform for Larmor precession, Gradient for Stern-Gerlach splitting, Rotating for NMR-like dynamics."
+          tooltip="Spatial profile of the effective Zeeman field. Magnetic orbital motion is not included in this spin-only Pauli mode."
           options={FIELD_TYPE_OPTIONS}
           value={fieldType}
           onChange={(v) => onFieldTypeChange(v as PauliFieldType)}
@@ -64,7 +64,7 @@ export const MagneticFieldControls: React.FC<MagneticFieldControlsProps> = React
 
         <Slider
           label="Field Strength B₀"
-          tooltip="Magnitude of the magnetic field. Higher values increase the Larmor precession frequency ω_L = gμ_B B₀/ℏ."
+          tooltip="Magnitude of the effective Zeeman coupling. Higher values increase the Larmor precession frequency ω_L = 2B₀/ℏ in this convention."
           value={fieldStrength}
           onChange={onFieldStrengthChange}
           min={0}

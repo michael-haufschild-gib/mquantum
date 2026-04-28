@@ -13,6 +13,11 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { DEFAULT_FREE_SCALAR_CONFIG } from '@/lib/geometry/extended/freeScalar'
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
+import {
+  computeFsfCosmologyCoefs,
+  computeFsfVacuumDispersion,
+} from '@/lib/physics/freeScalar/vacuumDispersion'
+import { estimateVacuumMaxPhi, estimateVacuumMaxPi } from '@/lib/physics/freeScalar/vacuumSpectrum'
 import { computeStridesPadded } from '@/rendering/webgpu/passes/computePassUtils'
 import {
   computeFsfConfigHash,
@@ -801,5 +806,38 @@ describe('computeFsfMaxPhiEstimate with self-interaction', () => {
     // brightness calibration. Same value would prove the anisotropic
     // dispersion was silently reduced to the scalar branch.
     expect(anisoEstimate).not.toBe(isoEstimate)
+  })
+
+  it('vacuum phi/pi auto-scale uses aKinetic for anisotropic Bianchi-I rescale', () => {
+    const eta0 = 2
+    const config = createConfig({
+      initialCondition: 'vacuumNoise',
+      latticeDim: 3,
+      gridSize: [32, 32, 32],
+      spacing: [0.15, 0.15, 0.15],
+      mass: 0.3,
+      autoScale: true,
+      cosmology: {
+        ...DEFAULT_FREE_SCALAR_CONFIG.cosmology,
+        enabled: true,
+        preset: 'bianchiKasner',
+        eta0,
+        kasnerExponents: { p1: -1 / 3, p2: 2 / 3, p3: 2 / 3 },
+      },
+    })
+    const dispersion = computeFsfVacuumDispersion(config, eta0)
+    if (typeof dispersion !== 'object') {
+      throw new Error('expected anisotropic Bianchi-I dispersion')
+    }
+    const coefs = computeFsfCosmologyCoefs(config, eta0)
+
+    const rawPhi = estimateVacuumMaxPhi(config, dispersion)
+    const expectedPhi = rawPhi * Math.sqrt(coefs.aKinetic)
+    expect(computeFsfMaxPhiEstimate(config)).toBeCloseTo(expectedPhi, 8)
+
+    const piConfig = { ...config, fieldView: 'pi' as const }
+    const rawPi = estimateVacuumMaxPi(piConfig, dispersion)
+    const expectedPi = rawPi / Math.sqrt(coefs.aKinetic)
+    expect(estimateFsfMaxFieldValue(piConfig, expectedPhi)).toBeCloseTo(expectedPi, 8)
   })
 })

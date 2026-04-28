@@ -11,7 +11,8 @@
  *      û_incomp_d(k) = û_d(k) − k_d · (Σ_j k_j û_j(k)) / |k|²
  *      This removes the compressible (longitudinal/irrotational) part.
  *   4. Shell binning (logarithmic):
- *      E_incomp(k_n) = ½m Σ_{|k'| ∈ shell(n)} Σ_d |û_incomp_d(k')|²
+ *      E_incomp(k_n) = ½m (dV/N) Σ_{|k'| ∈ shell(n)} Σ_d |û_incomp_d(k')|²
+ *      because the shared FFT is unnormalized: Σ_k |û_k|² = N Σ_x |u_x|².
  *
  * The result reveals the Kolmogorov cascade k^{-5/3} in quantum turbulence.
  *
@@ -351,17 +352,20 @@ export function computeIncompressibleSpectrum(
     spectrum[bin] = spectrum[bin]! + incompSq
   }
 
-  // Scale by ½m and convert to Float32
-  const halfM = 0.5 * mass
+  let voxelVolume = 1
+  for (let d = 0; d < dim; d++) voxelVolume *= spacing[d]!
+  const energyScale = 0.5 * mass * (voxelVolume / totalSites)
+
+  // Scale by physical Parseval factor and convert to Float32.
   const spectrumF32 = new Float32Array(numBins)
   for (let b = 0; b < numBins; b++) {
-    spectrumF32[b] = halfM * spectrum[b]!
+    spectrumF32[b] = energyScale * spectrum[b]!
   }
 
   return {
     spectrum: spectrumF32,
     kValues,
-    totalIncompressible: halfM * totalIncomp,
-    totalCompressible: halfM * totalComp,
+    totalIncompressible: energyScale * totalIncomp,
+    totalCompressible: energyScale * totalComp,
   }
 }

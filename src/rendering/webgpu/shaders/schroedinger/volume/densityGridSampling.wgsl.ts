@@ -9,7 +9,7 @@
  * - rgba16float: R=rho, G=logRho, B=spatialPhase, A=relativePhase
  * - r16float: R=rho only (fallback)
  *
- * Coordinate mapping: world pos in [-boundingRadius, +boundingRadius] → UVW [0, 1]
+ * Coordinate mapping: world pos inside the density-grid cuboid → UVW [0, 1]
  *
  * @module rendering/webgpu/shaders/schroedinger/volume/densityGridSampling
  */
@@ -92,7 +92,7 @@ export const analysisTextureSamplingBlock = /* wgsl */ `
  *   Energy Flux: R=Sx, G=Sy, B=Sz, A=|S|
  *
  * @param pos World-space position (model space during raymarching)
- * @param uniforms Schroedinger uniforms containing boundingRadius
+ * @param uniforms Schroedinger uniforms containing density-grid mapping fields
  * @return vec4f with analysis data channels
  */
 fn sampleAnalysisFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec4f {
@@ -147,22 +147,23 @@ fn applySampleRotation(pos: vec3f) -> vec3f {
   return pos;
 }
 
+fn densityGridHalfExtent(uniforms: SchroedingerUniforms) -> vec3f {
+  return max(uniforms.densityGridHalfExtent, vec3f(1e-6));
+}
+
+fn worldToDensityGridUVWFromRotated(gridPos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
+  let halfExtent = densityGridHalfExtent(uniforms);
+  return ((gridPos - uniforms.densityGridCenter) / halfExtent + vec3f(1.0)) * 0.5;
+}
+
 /**
  * Convert world position to density grid UVW coordinates.
- * Maps [-boundingRadius, +boundingRadius] to [0, 1].
+ * Maps the density-grid world cuboid to [0, 1].
  * Applies sample-space rotation when enabled (AdS modes).
  */
 fn worldToDensityGridUVW(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
-  let bound = uniforms.boundingRadius;
   let gridPos = applySampleRotation(pos);
-  // Linear world-to-UVW for the isotropic cube [-bound, +bound]^3. Uses the
-  // CPU-precomputed invBoundingRadius to replace a vec3 divide with a vec3 mul.
-  // Modes whose solver grid has different physical extents per axis (notably
-  // Wheeler-DeWitt: a in [aMin, aMax], phi1/phi2 in [-phiExtent, +phiExtent])
-  // inherit a cosmetic anisotropy -- phi features render visually
-  // compressed relative to a features whenever phiExtent > (aMax - aMin).
-  // See WheelerDeWittStrategy.computeBoundingRadius for the full note.
-  return (gridPos + vec3f(bound)) * (uniforms.invBoundingRadius * 0.5);
+  return worldToDensityGridUVWFromRotated(gridPos, uniforms);
 }
 
 /**
@@ -174,7 +175,7 @@ fn worldToDensityGridUVW(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
  * When position is outside grid bounds, returns zero density.
  *
  * @param pos World-space position (model space during raymarching)
- * @param uniforms Schroedinger uniforms containing boundingRadius
+ * @param uniforms Schroedinger uniforms containing density-grid mapping fields
  * @return vec4f with density data channels
  */
 fn sampleDensityFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec4f {
@@ -197,19 +198,18 @@ fn sampleDensityFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec4f {
  * Uses 6 axis-aligned texture samples (2 per axis) for gradient estimation.
  *
  * @param pos World-space position
- * @param uniforms Schroedinger uniforms containing boundingRadius
+ * @param uniforms Schroedinger uniforms containing density-grid mapping fields
  * @return Gradient vector (ds/dx, ds/dy, ds/dz) where s = log(ρ + ε)
  */
 fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
   // PERF: Compute base UVW once, then offset in UVW space directly.
   // This avoids 6 redundant worldToDensityGridUVW calls (each does div + add).
-  let bound = uniforms.boundingRadius;
-  let invDiameter = uniforms.invBoundingRadius * 0.5; // = 1 / (2 * bound)
+  let halfExtent = densityGridHalfExtent(uniforms);
 
   // Step size in UVW space: 2 texels / gridSize
   let uvwStep = 2.0 / DENSITY_GRID_SIZE;
   let rotatedPos = applySampleRotation(pos);
-  let baseUVW = (rotatedPos + vec3f(bound)) * invDiameter;
+  let baseUVW = worldToDensityGridUVWFromRotated(rotatedPos, uniforms);
 
   // Sample 6 neighbors in UVW space with zero-outside-grid semantics.
   // Matches sampleDensityFromGrid: positions outside [0,1] return zero,
@@ -233,11 +233,11 @@ fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f 
   let szp = sampleDensityIfInBounds(uzp);
   let szn = sampleDensityIfInBounds(uzn);
 
-  // World-space half-distance between sample points (each offset is ±uvwStep
-  // = ±2 texels in UVW = ±(2/N * 2*bound) in world, total 2h = 8*bound/N).
-  let eps = bound * (4.0 / DENSITY_GRID_SIZE);
+  // World-space half-distance per axis between sample points. Each offset is
+  // ±uvwStep = ±2 texels in UVW = ±(2/N * 2*halfExtent) in world.
+  let eps = halfExtent * (4.0 / DENSITY_GRID_SIZE);
   // 1/(2·eps) once — three vec3 divides become three multiplies downstream.
-  let inv2eps = 1.0 / (2.0 * eps);
+  let inv2eps = vec3f(1.0) / (2.0 * eps);
 
   if (IS_DUAL_CHANNEL) {
     let gradX = (sxp.r + sxp.g) - (sxn.r + sxn.g);
@@ -273,7 +273,7 @@ fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f 
  * Compute the Bohmian quantum potential Q(x) = -½·∇²R(x)/R(x), where R = sqrt(ρ),
  * via a 7-point second-order central-difference Laplacian on the density grid.
  *
- * World half-step h = 2·boundingRadius / DENSITY_GRID_SIZE (one texel). The
+ * World half-step h = 2·densityGridHalfExtent / DENSITY_GRID_SIZE (one texel per axis). The
  * Laplacian denominator is h·h. For any stationary state of H = -½∇² + V the
  * identity Q + V = E holds where R is numerically well-defined. Boundary
  * handling: voxels whose CENTRE falls outside the grid return 0 up front;
@@ -293,18 +293,17 @@ fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f 
  * does not attempt to do so.
  *
  * @param pos World-space position (model space during raymarching)
- * @param uniforms Schroedinger uniforms containing boundingRadius
+ * @param uniforms Schroedinger uniforms containing density-grid mapping fields
  * @return Q at pos as f32
  */
 fn computeQuantumPotentialFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> f32 {
-  let bound = uniforms.boundingRadius;
-  let invDiameter = uniforms.invBoundingRadius * 0.5;
+  let halfExtent = densityGridHalfExtent(uniforms);
 
   // Single-texel step in UVW space — gives higher spatial resolution than
   // the 2-texel stencil used by computeGradientFromGrid.
   let uvwStep = 1.0 / DENSITY_GRID_SIZE;
   let qpRotatedPos = applySampleRotation(pos);
-  let baseUVW = (qpRotatedPos + vec3f(bound)) * invDiameter;
+  let baseUVW = worldToDensityGridUVWFromRotated(qpRotatedPos, uniforms);
 
   // If the centre itself falls outside the grid, the voxel is meaningless.
   if (any(baseUVW < vec3f(0.0)) || any(baseUVW > vec3f(1.0))) {
@@ -366,14 +365,16 @@ fn computeQuantumPotentialFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -
   // for numerically-vacuum voxels.
   let Rc  = sqrt(max(rhoC,  1e-8));
 
-  // World half-step h = 2·bound / DENSITY_GRID_SIZE (one texel).
-  let h = (2.0 * bound) / DENSITY_GRID_SIZE;
-  let hSq = h * h;
+  // World half-step per axis h = 2·halfExtent / DENSITY_GRID_SIZE.
+  let h = (2.0 * halfExtent) / DENSITY_GRID_SIZE;
+  let invHSq = vec3f(1.0) / (h * h);
   // Fold the two divides (/hSq and /Rc) into a single reciprocal: Q = -0.5·(∇²R)/R
-  //   -0.5 · (Σneighbor − 6·Rc) / (hSq · max(Rc, 1e-4))
-  let invHSqRc = 1.0 / (hSq * max(Rc, 1e-4));
-  let neighborSum = Rxp + Rxn + Ryp + Ryn + Rzp + Rzn;
-  return -0.5 * (neighborSum - 6.0 * Rc) * invHSqRc;
+  let invRc = 1.0 / max(Rc, 1e-4);
+  let lap =
+    (Rxp + Rxn - 2.0 * Rc) * invHSq.x +
+    (Ryp + Ryn - 2.0 * Rc) * invHSq.y +
+    (Rzp + Rzn - 2.0 * Rc) * invHSq.z;
+  return -0.5 * lap * invRc;
 }
 
 // ------------------------------------------------------------------
@@ -428,10 +429,8 @@ fn plaquetteWindingFromPhases(p00: f32, p10: f32, p11: f32, p01: f32) -> f32 {
 fn computeVortexDensityFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> f32 {
   if (!DENSITY_GRID_HAS_PHASE) { return 0.0; }
 
-  let bound = uniforms.boundingRadius;
-  let invDiameter = uniforms.invBoundingRadius * 0.5;
   let vortexRotatedPos = applySampleRotation(pos);
-  let baseUVW = (vortexRotatedPos + vec3f(bound)) * invDiameter;
+  let baseUVW = worldToDensityGridUVWFromRotated(vortexRotatedPos, uniforms);
 
   // Quantise to the nearest texel corner. Phase must be read from discrete
   // texel centres via textureLoad; linear filtering across the ±pi branch

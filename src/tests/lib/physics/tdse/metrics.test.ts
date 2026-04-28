@@ -25,8 +25,10 @@ import {
 import {
   describeMetric,
   hasPeriodicBoundary,
+  isMetricAxisPeriodic,
   isTimeDependentMetric,
   type MetricKind,
+  metricPeriodicDimsMask,
 } from '@/lib/physics/tdse/metrics/types'
 
 // ───────────────────────── Flat ─────────────────────────
@@ -489,7 +491,7 @@ describe('isTimeDependentMetric', () => {
 })
 
 describe('hasPeriodicBoundary', () => {
-  it('returns true only for torus', () => {
+  it('returns true only when every active axis is periodic', () => {
     const table: Array<[MetricKind, boolean]> = [
       ['flat', false],
       ['morrisThorne', false],
@@ -503,6 +505,17 @@ describe('hasPeriodicBoundary', () => {
     for (const [kind, expected] of table) {
       expect(hasPeriodicBoundary(kind)).toBe(expected)
     }
+  })
+})
+
+describe('isMetricAxisPeriodic / metricPeriodicDimsMask', () => {
+  it('wraps only sphere2D phi axis and all torus axes', () => {
+    expect(isMetricAxisPeriodic('sphere2D', 0)).toBe(false)
+    expect(isMetricAxisPeriodic('sphere2D', 1)).toBe(false)
+    expect(isMetricAxisPeriodic('sphere2D', 2)).toBe(true)
+    expect(metricPeriodicDimsMask('sphere2D', 3)).toBe(1 << 2)
+    expect(metricPeriodicDimsMask('torus', 3)).toBe((1 << 0) | (1 << 1) | (1 << 2))
+    expect(metricPeriodicDimsMask('morrisThorne', 3)).toBe(0)
   })
 })
 

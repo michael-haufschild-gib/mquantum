@@ -20,6 +20,7 @@ export interface MeasurementReadbackState {
   /** Merged ψ buffer (array<vec2f>, totalSites * 8 bytes). */
   psiBuffer: GPUBuffer | null
   totalSites: number
+  simTime: number
 }
 
 /**
@@ -48,13 +49,14 @@ export function getPsiBufferInfo(
 export function requestMeasurementReadback(
   ctx: WebGPURenderContext,
   state: MeasurementReadbackState
-): Promise<{ re: Float32Array; im: Float32Array } | null> {
+): Promise<{ re: Float32Array; im: Float32Array; simTime: number } | null> {
   if (!state.psiBuffer || state.totalSites === 0) {
     return Promise.resolve(null)
   }
 
   const { device, encoder } = ctx
   const totalSites = state.totalSites
+  const capturedSimTime = state.simTime
   // Merged ψ stride = 8 bytes/site (vec2f).
   const byteSize = totalSites * 8
 
@@ -86,7 +88,7 @@ export function requestMeasurementReadback(
       staging.unmap()
       staging.destroy()
 
-      return { re, im }
+      return { re, im, simTime: capturedSimTime }
     })
     .catch((err) => {
       logger.error('[TDSE] Measurement readback failed:', err)

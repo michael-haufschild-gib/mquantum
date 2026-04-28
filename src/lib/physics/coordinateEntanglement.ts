@@ -15,6 +15,7 @@
  */
 
 import { computeStrides } from '@/lib/math/ndArray'
+import type { MetricConfig } from '@/lib/physics/tdse/metrics/types'
 import { wignerNegativityFromRDM } from '@/lib/physics/wigner/wignerFromRDM'
 import {
   computeJointRdmWasm,
@@ -69,6 +70,15 @@ export interface EntanglementOptions {
   computeBipartitions: boolean
   /** Compute Wigner negativity from each per-dimension RDM ρ_d. */
   computeWignerNegativity: boolean
+}
+
+/**
+ * Coordinate entanglement currently assumes the flat discrete product
+ * measure. Flat and torus metrics satisfy that convention; non-flat curved
+ * metrics need a weighted RDM definition before the entropy is physical.
+ */
+export function isCoordinateEntanglementMetricSupported(metric: MetricConfig | undefined): boolean {
+  return metric === undefined || metric.kind === 'flat' || metric.kind === 'torus'
 }
 
 // ─── Index Arithmetic ───────────────────────────────────────────────────────

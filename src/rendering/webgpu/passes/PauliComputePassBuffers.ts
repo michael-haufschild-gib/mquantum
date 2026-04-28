@@ -285,20 +285,8 @@ export interface PauliUniformParams {
   boundingRadius?: number
 }
 
-/**
- * Write the PauliUniforms struct into the given uniform buffer.
- *
- * @param device - WebGPU device
- * @param uniformBuffer - Target GPU buffer
- * @param uniformData - Backing ArrayBuffer (reused for zero-alloc writes)
- * @param uniformU32 - Uint32Array view of uniformData
- * @param uniformF32 - Float32Array view of uniformData
- * @param params - All values to write
- */
-export function writePauliUniforms(
-  device: GPUDevice,
-  uniformBuffer: GPUBuffer,
-  uniformData: ArrayBuffer,
+/** Fill the PauliUniforms struct into caller-owned typed-array views. */
+export function packPauliUniforms(
   uniformU32: Uint32Array,
   uniformF32: Float32Array,
   params: PauliUniformParams
@@ -486,6 +474,26 @@ export function writePauliUniforms(
     }
     f32[o + d] = pos
   }
+}
 
+/**
+ * Write the PauliUniforms struct into the given uniform buffer.
+ *
+ * @param device - WebGPU device
+ * @param uniformBuffer - Target GPU buffer
+ * @param uniformData - Backing ArrayBuffer (reused for zero-alloc writes)
+ * @param uniformU32 - Uint32Array view of uniformData
+ * @param uniformF32 - Float32Array view of uniformData
+ * @param params - All values to write
+ */
+export function writePauliUniforms(
+  device: GPUDevice,
+  uniformBuffer: GPUBuffer,
+  uniformData: ArrayBuffer,
+  uniformU32: Uint32Array,
+  uniformF32: Float32Array,
+  params: PauliUniformParams
+): void {
+  packPauliUniforms(uniformU32, uniformF32, params)
   device.queue.writeBuffer(uniformBuffer, 0, uniformData)
 }

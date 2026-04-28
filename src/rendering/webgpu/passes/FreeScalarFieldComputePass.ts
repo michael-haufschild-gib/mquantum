@@ -603,7 +603,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     const willReinitialize = !this.initialized || config.needsReset
     if (willReinitialize) {
       const cosmoOn = config.cosmology.enabled
-      this.simEta = cosmoOn ? (this.pendingLoadedSimEta ?? config.cosmology.eta0) : 0
+      const startEta = this.pendingLoadedSimEta ?? config.cosmology.eta0
+      this.simEta = cosmoOn ? projectSimEta(startEta, 0) : 0
       this.pendingLoadedSimEta = null
       // Preheating phase: restore from save if present, else anchor at
       // phase 0 for the current clock (sin(0) = 0 at the start).

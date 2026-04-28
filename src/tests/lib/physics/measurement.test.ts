@@ -17,6 +17,7 @@ import {
   computeFullCollapse,
   computePartialCollapse,
   extractAxisCoord,
+  normalizeWavefunctionInSamplingMeasure,
   sampleFromDensity,
   sampleFromMarginalDensity,
 } from '@/lib/physics/measurement'
@@ -441,6 +442,19 @@ describe('computeFullCollapse', () => {
       expect(Number.isFinite(re[i])).toBe(true)
     }
   })
+
+  it('uses local metric distance for curved-space full collapse', () => {
+    const flat = computeFullCollapse(3, [3], [1], [0], 1)[0]
+    const curved = computeFullCollapse(3, [3], [1], [0], 1, undefined, {
+      metric: { kind: 'deSitter', hubbleRate: Math.log(2) },
+      time: 1,
+    })[0]
+
+    expect(curved[1]).toBeCloseTo(flat[1]!, 6)
+    expect(curved[0]).toBeLessThan(flat[0]!)
+    expect(curved[2]).toBeLessThan(flat[2]!)
+    expect(curved[0]).toBeCloseTo(Math.exp(-2), 5)
+  })
 })
 
 // ── computePartialCollapse ───────────────────────────────────────────────
@@ -632,6 +646,26 @@ describe('computePartialCollapse', () => {
     expect(outRe[11]).toBeCloseTo(envEdge, 5)
   })
 
+  it('curved partial collapse uses local transverse metric for retained slices', () => {
+    // Morris-Thorne transverse line element is r(l)^2 dφ². Measuring the
+    // transverse axis should therefore be much narrower at |l|=1 than at the
+    // throat l=0. A single zero-filled metric center would incorrectly give
+    // every retained l-slice the throat width.
+    const gridSize = [3, 3]
+    const spacing = [1, 1]
+    const psiRe = new Float32Array(9).fill(1)
+    const psiIm = new Float32Array(9)
+
+    const [outRe] = computePartialCollapse(psiRe, psiIm, gridSize, spacing, 1, 0, 1, false, {
+      metric: { kind: 'morrisThorne', throatRadius: 0.1 },
+    })
+
+    const throatOffAxis = outRe[1 * 3 + 2]! // l=0, φ=+1
+    const edgeOffAxis = outRe[0 * 3 + 2]! // l=-1, φ=+1
+    expect(throatOffAxis).toBeGreaterThan(0.99)
+    expect(edgeOffAxis).toBeLessThan(0.7)
+  })
+
   it('compact axis wrapping in partial collapse uses shortest distance', () => {
     // 8-site 1D grid, collapse at position near left edge (-3.5),
     // with compact axis. Site at right edge (+3.5) should be close via wrapping.
@@ -662,5 +696,31 @@ describe('computePartialCollapse', () => {
 
     // Site 0 (at collapse position): same value regardless of wrapping
     expect(outWrap[0]).toBeCloseTo(outNoWrap[0]!, 5)
+  })
+})
+
+describe('normalizeWavefunctionInSamplingMeasure', () => {
+  it('normalizes flat wavefunctions in the same discrete measure used by sampling', () => {
+    const re = new Float32Array([3, 4])
+    const im = new Float32Array([0, 0])
+
+    normalizeWavefunctionInSamplingMeasure(re, im, [2], [1])
+
+    const norm = re[0]! * re[0]! + re[1]! * re[1]!
+    expect(norm).toBeCloseTo(1, 6)
+  })
+
+  it('normalizes curved wavefunctions with sqrt(|g|) weighting', () => {
+    const re = new Float32Array([1, 1])
+    const im = new Float32Array([0, 0])
+
+    normalizeWavefunctionInSamplingMeasure(re, im, [2], [1], {
+      metric: { kind: 'deSitter', hubbleRate: Math.log(2) },
+      time: 1,
+    })
+
+    const a = 2
+    const norm = (re[0]! * re[0]! + re[1]! * re[1]!) * a
+    expect(norm).toBeCloseTo(1, 6)
   })
 })

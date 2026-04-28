@@ -1,5 +1,5 @@
 /**
- * Pauli equation uniform struct for GPU compute shaders.
+ * Zeeman-Pauli spinor uniform struct for GPU compute shaders.
  *
  * Contains lattice parameters, physics constants (mass, hbar), magnetic field
  * configuration (uniform/gradient/rotating/quadrupole), spin state angles,

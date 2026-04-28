@@ -13,7 +13,11 @@
 import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
 import { fftNd } from '@/lib/math/fft'
 import { computeStrides, linearToNDCoordsInto } from '@/lib/math/ndArray'
-import { M_FLOOR, type VacuumDispersion } from '@/lib/physics/freeScalar/vacuumSpectrum'
+import {
+  type AnisotropicVacuumDispersion,
+  M_FLOOR,
+  type VacuumDispersion,
+} from '@/lib/physics/freeScalar/vacuumSpectrum'
 
 /**
  * Size of the 3D output density grid — re-exported from the shared constant
@@ -165,8 +169,39 @@ const MINKOWSKI_BASIS_COEFS: KSpaceBasisCoefs = { aKinetic: 1, aPotential: 1 }
  * @param dispersion - Mass-term dispatch (validated)
  * @param basisCoefs - Canonical-basis rescale coefficients (validated)
  */
-function validateVacuumInputs(dispersion: VacuumDispersion, basisCoefs: KSpaceBasisCoefs): void {
-  if (dispersion !== 'kgFloor' && !Number.isFinite(dispersion)) {
+function isAnisotropicDispersion(d: VacuumDispersion): d is AnisotropicVacuumDispersion {
+  return typeof d === 'object' && d !== null && 'axisPotentials' in d
+}
+
+function validateVacuumInputs(
+  dispersion: VacuumDispersion,
+  basisCoefs: KSpaceBasisCoefs,
+  latticeDim: number
+): void {
+  if (dispersion !== 'kgFloor' && typeof dispersion !== 'number') {
+    if (!isAnisotropicDispersion(dispersion)) {
+      throw new Error(`dispersion must be 'kgFloor', a finite number, or an anisotropic record`)
+    }
+    if (!Number.isFinite(dispersion.massSq)) {
+      throw new Error(`dispersion.massSq must be finite, got ${dispersion.massSq}`)
+    }
+    if (!Number.isFinite(dispersion.kineticScale) || dispersion.kineticScale <= 0) {
+      throw new Error(
+        `dispersion.kineticScale must be a finite positive number, got ${dispersion.kineticScale}`
+      )
+    }
+    if (dispersion.axisPotentials.length < latticeDim) {
+      throw new Error(
+        `dispersion.axisPotentials must provide at least ${latticeDim} entries, got ${dispersion.axisPotentials.length}`
+      )
+    }
+    for (let d = 0; d < latticeDim; d++) {
+      const v = dispersion.axisPotentials[d]!
+      if (!Number.isFinite(v) || v <= 0) {
+        throw new Error(`dispersion.axisPotentials[${d}] must be finite and positive, got ${v}`)
+      }
+    }
+  } else if (typeof dispersion === 'number' && !Number.isFinite(dispersion)) {
     throw new Error(`dispersion must be 'kgFloor' or a finite number, got ${String(dispersion)}`)
   }
   const { aKinetic, aPotential } = basisCoefs
@@ -220,10 +255,10 @@ export function computeRawKSpaceData(
   dispersion: VacuumDispersion = 'kgFloor',
   basisCoefs: KSpaceBasisCoefs = MINKOWSKI_BASIS_COEFS
 ): KSpaceRawData {
-  validateVacuumInputs(dispersion, basisCoefs)
   if (!Number.isInteger(latticeDim) || latticeDim < 1 || latticeDim > gridSize.length) {
     throw new Error(`latticeDim must be an integer in [1, ${gridSize.length}], got ${latticeDim}`)
   }
+  validateVacuumInputs(dispersion, basisCoefs, latticeDim)
 
   const activeDims = gridSize.slice(0, latticeDim)
   const totalSites = activeDims.reduce((a, b) => a * b, 1)
@@ -310,10 +345,10 @@ export function computeRawKSpaceDataFromComplex(
   dispersion: VacuumDispersion = 'kgFloor',
   basisCoefs: KSpaceBasisCoefs = MINKOWSKI_BASIS_COEFS
 ): KSpaceRawData {
-  validateVacuumInputs(dispersion, basisCoefs)
   if (!Number.isInteger(latticeDim) || latticeDim < 1 || latticeDim > gridSize.length) {
     throw new Error(`latticeDim must be an integer in [1, ${gridSize.length}], got ${latticeDim}`)
   }
+  validateVacuumInputs(dispersion, basisCoefs, latticeDim)
 
   const activeDims = gridSize.slice(0, latticeDim)
   const totalSites = activeDims.reduce((a, b) => a * b, 1)
@@ -416,35 +451,49 @@ function computeKSpaceOccupationInnerLoop(
   // `ω² ≥ floor²` in both modes, matching the original
   // `computeOmegaK(FromMassSq)` behaviour.
   const isKgFloor = dispersion === 'kgFloor'
-  const mTerm = isKgFloor ? Math.max(mass, M_FLOOR) ** 2 : (dispersion as number)
+  const anisotropic = isAnisotropicDispersion(dispersion)
+  const mTerm = isKgFloor
+    ? Math.max(mass, M_FLOOR) ** 2
+    : anisotropic
+      ? dispersion.massSq
+      : (dispersion as number)
   const floorSq = M_FLOOR * M_FLOOR
 
   // Canonical-basis variance rescale — identity in Minkowski, non-trivial
   // under FLRW. Hoisted out so the per-site loop has two multiplies and
   // no branches.
-  const { aKinetic, aPotential } = basisCoefs
+  const aKinetic = anisotropic ? dispersion.kineticScale : basisCoefs.aKinetic
+  const aPotential = basisCoefs.aPotential
 
   for (let i = 0; i < totalSites; i++) {
     linearToNDCoordsInto(i, activeDims, coords)
 
     // Lattice momentum ² — reused for both ω² and |k|.
     let kSq = 0
+    let weightedKStiffness = 0
     for (let d = 0; d < latticeDim; d++) {
       const N = activeDims[d]!
       if (N <= 1) continue
       const a = spacing[d]!
       const sinVal = Math.sin((Math.PI * coords[d]!) / N)
       const kLat = (2 * sinVal) / a
-      kSq += kLat * kLat
+      const kLatSq = kLat * kLat
+      kSq += kLatSq
+      if (anisotropic) {
+        weightedKStiffness += dispersion.axisPotentials[d]! * kLatSq
+      }
     }
     const kMagVal = Math.sqrt(kSq)
     kMag[i] = kMagVal
 
-    // ω² = k² + mTerm, clamped at the M_FLOOR² zero-mode floor. For the
-    // KG path this collapses to `max(mass, M_FLOOR)² + k²` which is the
-    // original `computeOmegaK` output; for the numeric path it collapses
-    // to `max(k² + massSq, M_FLOOR²)` matching `computeOmegaKFromMassSq`.
-    let omegaSq = kSq + mTerm
+    // Canonical oscillator:
+    //   H_k = 1/2 A |pi_k|^2 + 1/2 K |phi_k|^2
+    //   omega_k^2 = A*K
+    // Isotropic FLRW has K = B*(k^2 + m^2 a^2). Bianchi-I replaces the
+    // gradient term with per-axis B_d k_d^2 plus m^2 aFull.
+    const stiffnessRaw = anisotropic ? weightedKStiffness + mTerm : aPotential * (kSq + mTerm)
+    let omegaSq = aKinetic * stiffnessRaw
+    const stiffness = omegaSq < floorSq ? floorSq / aKinetic : stiffnessRaw
     if (omegaSq < floorSq) omegaSq = floorSq
     const omega = Math.sqrt(omegaSq)
     omegaArr[i] = omega
@@ -458,16 +507,16 @@ function computeKSpaceOccupationInnerLoop(
     const piKSq = piRe * piRe + piIm * piIm
 
     // Canonical number operator:
-    //   n_k = (aKinetic·|π_k|² + aPotential·ω²·|δφ_k|²) / (2·ω·N) − 1/2
+    //   n_k = (aKinetic·|π_k|² + K·|δφ_k|²) / (2·ω·N) − 1/2
     // In Minkowski/`kgFloor` we receive `(aKinetic, aPotential) = (1, 1)`
     // so this is bit-identical to the old `(|π|² + ω²|φ|²)/(2ωN) − ½`
     // formula. Under FLRW the coefficients are `(1/B, B)` and the formula
     // removes the `(B + 1/B)/4 − ½` bias that a naive Minkowski readout
-    // would produce on the canonical δφ samples. The factor `N` in the
-    // denominator is the FFT Parseval normalization. ω is already
-    // floored at `M_FLOOR`, so `2·ω` never divides by zero.
-    const nkVal =
-      (aKinetic * piKSq + aPotential * omegaSq * phiKSq) / (2 * omega * totalSites) - 0.5
+    // would produce on the canonical δφ samples. Bianchi-I uses the
+    // axis-weighted stiffness K from the same anisotropic vacuum sampler.
+    // The factor `N` in the denominator is the FFT Parseval normalization.
+    // ω is already floored at `M_FLOOR`, so `2·ω` never divides by zero.
+    const nkVal = (aKinetic * piKSq + stiffness * phiKSq) / (2 * omega * totalSites) - 0.5
     nk[i] = nkVal
 
     if (nkVal > nkMax) nkMax = nkVal

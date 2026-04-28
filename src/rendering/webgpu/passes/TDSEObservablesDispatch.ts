@@ -1,7 +1,7 @@
 /** TDSE Observables — Resource Management, Dispatch & Readback */
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
-import { computeEffectiveSpacing } from '@/lib/physics/compactification'
+import { computeTdseEffectiveSpacing } from '@/lib/physics/tdse/effectiveSpacing'
 import { NUM_ENERGY_BINS } from '@/rendering/webgpu/shaders/schroedinger/compute/energySpectralDensity.wgsl'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
@@ -147,14 +147,8 @@ export function writeObservablesUniforms(
   const res = state.obsResources
   if (!res) return
 
-  // Effective spacing accounts for KK compactification
-  const effSpacing = computeEffectiveSpacing(
-    config.gridSize,
-    config.spacing,
-    config.compactDims,
-    config.compactRadii,
-    config.latticeDim
-  )
+  // Effective spacing accounts for KK compactification and torus metrics.
+  const effSpacing = computeTdseEffectiveSpacing(config)
 
   const uniformSize = 16 + 12 * 4 * 3
   const obsBuf = new ArrayBuffer(uniformSize)

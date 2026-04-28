@@ -84,7 +84,7 @@ export const WheelerDeWittControls: React.FC = React.memo(() => {
         // wrapper erases the T generic at the type level.
         onChange={(v) => setWdwBoundaryCondition(v as WdwBoundaryCondition)}
         ariaLabel="Wheeler–DeWitt boundary condition"
-        tooltip="Hartle–Hawking: real Euclidean no-boundary proposal. Vilenkin: complex outgoing tunneling wave. DeWitt: χ(0,·)=0 hard node."
+        tooltip="Hartle–Hawking: real Euclidean no-boundary proposal. Vilenkin: complex outgoing tunneling wave. DeWitt: χ(0,·)=0 node with the solver's Gaussian derivative seed."
         fullWidth
         data-testid="wdw-bc-selector"
       />
@@ -121,7 +121,7 @@ export const WheelerDeWittControls: React.FC = React.memo(() => {
       />
       <Slider
         label="Cosmological constant Λ"
-        tooltip="Added to V(φ). Positive Λ produces a de-Sitter-like Lorentzian region for small φ; strongly negative Λ yields AdS-like unbounded oscillation. Range matches the setter's physical clamp so the curated presets (Λ = 0.8 deSitter, Λ = −0.5 antiDeSitter) land inside the visible slider track."
+        tooltip="Added to V(φ). Positive Λ produces a de-Sitter-like Lorentzian region for small φ; strongly negative Λ yields AdS-like unbounded oscillation. Large positive Λ can push columns above the Airy/Langer extraction ceiling, so Euclidean boundary-condition differences may be visually muted."
         min={-1}
         max={1}
         step={0.01}

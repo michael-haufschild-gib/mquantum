@@ -21,7 +21,12 @@ export interface SaveLoadState {
   psiBuffer: GPUBuffer | null
   totalSites: number
   saveMappingInFlight: boolean
-  pendingInjection: { re: Float32Array; im: Float32Array; isMeasurementCollapse?: boolean } | null
+  pendingInjection: {
+    re: Float32Array
+    im: Float32Array
+    isMeasurementCollapse?: boolean
+    targetNorm?: number
+  } | null
 }
 
 /**

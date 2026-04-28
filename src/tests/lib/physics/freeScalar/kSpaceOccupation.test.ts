@@ -452,6 +452,55 @@ describe('cosmological adiabatic-vacuum particle thermometer (integration)', () 
     expect(totals[totals.length - 1]!).toBeGreaterThan(100 * totals[0]!)
   })
 
+  it('uses axis-weighted Bianchi-I dispersion for the adiabatic vacuum thermometer', () => {
+    const base = makeKSpaceFsfConfig()
+    const config: FreeScalarConfig = {
+      ...base,
+      latticeDim: 3,
+      gridSize: [8, 8, 8],
+      spacing: [1, 1, 1],
+      mass: 0.5,
+      cosmology: {
+        enabled: true,
+        preset: 'bianchiKasner',
+        steepness: 5,
+        hubble: 1,
+        eta0: 2,
+        kasnerExponents: { p1: -1 / 3, p2: 2 / 3, p3: 2 / 3 },
+      },
+    }
+    const params = {
+      preset: 'bianchiKasner' as const,
+      spacetimeDim: config.latticeDim + 1,
+      kasnerExponents: config.cosmology.kasnerExponents,
+    }
+    const { phi, pi } = sampleAdiabaticVacuum(config, params, config.cosmology.eta0, 17)
+    const dispersion = computeFsfVacuumDispersion(config, config.cosmology.eta0)
+    const coefs = computeFsfCosmologyCoefs(config, config.cosmology.eta0)
+
+    if (dispersion === 'kgFloor' || typeof dispersion === 'number') {
+      throw new Error('Bianchi-I k-space reference must carry axis-weighted dispersion')
+    }
+
+    const raw = computeRawKSpaceData(
+      phi,
+      pi,
+      config.gridSize,
+      config.spacing,
+      config.mass,
+      config.latticeDim,
+      dispersion,
+      { aKinetic: coefs.aKinetic, aPotential: coefs.aPotential }
+    )
+    const total = computeTotalParticleNumber(raw)
+
+    // Matching the same anisotropic vacuum used for sampling should land
+    // at the ordinary clamped Gaussian noise floor, not a systematic
+    // Bianchi-axis bias.
+    expect(total).toBeGreaterThan(30)
+    expect(total).toBeLessThan(180)
+  })
+
   it('resolveVacuumDispersion and computeRawKSpaceData agree end-to-end on every preset', () => {
     // Integration anchor for the UI → FsfKSpaceManager → worker →
     // computeRawKSpaceData pipeline: the dispersion tag returned by

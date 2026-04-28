@@ -197,6 +197,40 @@ describe('computeFsfVacuumDispersion', () => {
     expect(dispersion).toBeCloseTo(0.0025, 15)
   })
 
+  it('returns an axis-weighted dispersion record under anisotropic Bianchi-I', () => {
+    const cfg = makeConfig({
+      mass: 0.5,
+      latticeDim: 3,
+      gridSize: [8, 8, 8],
+      spacing: [1, 1, 1],
+      cosmology: {
+        ...DEFAULT_COSMOLOGY_CONFIG,
+        enabled: true,
+        preset: 'bianchiKasner',
+        eta0: 2,
+        kasnerExponents: { p1: -1 / 3, p2: 2 / 3, p3: 2 / 3 },
+      },
+    })
+    const dispersion = computeFsfVacuumDispersion(cfg, 2)
+    const coefs = computeFsfCosmologyCoefs(cfg, 2)
+
+    if (dispersion === 'kgFloor' || typeof dispersion === 'number') {
+      throw new Error('Bianchi-I anisotropic vacuum dispersion must be axis-weighted')
+    }
+
+    expect(dispersion.massSq).toBeCloseTo(cfg.mass * cfg.mass * coefs.aFull, 12)
+    expect(dispersion.kineticScale).toBeCloseTo(coefs.aKinetic, 12)
+    expect(dispersion.axisPotentials[0]).toBeCloseTo(coefs.aPotential, 12)
+    expect(dispersion.axisPotentials[1]).toBeCloseTo(
+      coefs.aPotential * (coefs.aPotentialRatio1 ?? 1),
+      12
+    )
+    expect(dispersion.axisPotentials[2]).toBeCloseTo(
+      coefs.aPotential * (coefs.aPotentialRatio2 ?? 1),
+      12
+    )
+  })
+
   it("returns 'kgFloor' under invalid deSitter (hubble ≤ 0)", () => {
     const cfg = makeConfig({
       cosmology: {

@@ -19,13 +19,14 @@
  *   T      = tanh(L_box / (2·L_h))                       (edge value)
  *   φ(x)   = (m·v_max / ℏ) · [ L_h · ln(cosh(x/L_h)) − T · x² / L_box ]
  *   v_s(x) = v_max · tanh(x/L_h) − v_max · (2x / L_box) · T
- *   n(x)   = n₀ · (1 − Δn · sech²(x/L_h))
+ *   q_n(x) = (L_box / (π L_h)) · sin(πx/L_box)
+ *   n(x)   = n₀ · (1 − Δn · sech²(q_n(x)))
  *
- * By construction v_s(±L_box/2) = 0 exactly and φ is even in x, so
- * ψ(+L_box/2) = ψ(−L_box/2). κ no longer has a clean closed form under
- * the parabolic detrend, so `analyticSurfaceGravity` evaluates κ from a
- * symmetric finite difference of (c_s² − v_s²) at the numerical horizon
- * root.
+ * By construction v_s(±L_box/2) = 0 exactly, q_n'(±L_box/2) = 0, and φ is
+ * even in x, so ψ(+L_box/2) = ψ(−L_box/2) and ∂xψ is continuous across the
+ * FFT seam. κ no longer has a clean closed form under the parabolic
+ * detrend, so `analyticSurfaceGravity` evaluates κ from a symmetric finite
+ * difference of (c_s² − v_s²) at the numerical horizon root.
  *
  * @module lib/physics/bec/sonicHorizon
  */
@@ -84,6 +85,22 @@ export function waterfallEdgeTanh(p: Pick<WaterfallParams, 'lh' | 'lBox'>): numb
 }
 
 /**
+ * Periodic coordinate used by the density dip.
+ *
+ * Near the horizon, `q_n(x) = x/L_h + O(x^3)`, so the local waterfall shape
+ * is unchanged to leading order. At the FFT seam, `q_n'(±L_box/2) = 0`, so
+ * the amplitude derivative vanishes and the initialized wavefunction is C¹.
+ */
+export function waterfallDensityCoordinate(
+  x0: number,
+  p: Pick<WaterfallParams, 'lh' | 'lBox'>
+): number {
+  const lh = Math.max(Math.abs(p.lh), 1e-6)
+  const lBox = Math.max(Math.abs(p.lBox), 1e-6)
+  return (lBox / (Math.PI * lh)) * Math.sin((Math.PI * x0) / lBox)
+}
+
+/**
  * Evaluate the analytic (detrended) waterfall profile at a coordinate x₀.
  *
  * The velocity is v_s(x) = v_max·tanh(x/L_h) − v_max·(2x/L_box)·T, which
@@ -99,12 +116,8 @@ export function waterfallSample(x0: number, p: WaterfallParams): SonicSample {
   const lBox = Math.max(Math.abs(p.lBox), 1e-6)
   const T = Math.tanh(lBox / (2 * lh))
   const u = x0 / lh
-  // Periodize the sech density dip with the same parabolic detrend used for
-  // the velocity so that n'(±L_box/2) = 0 and ψ stays C¹ across the FFT wrap.
-  // Without this shift the density leaves a derivative seam at the periodic
-  // boundary and the GP nonlinearity amplifies the aliased discontinuity.
-  const uPeriod = u - ((2 * x0) / lBox) * T
-  const sech = 1 / Math.cosh(uPeriod)
+  const uDensity = waterfallDensityCoordinate(x0, { lh, lBox })
+  const sech = 1 / Math.cosh(uDensity)
   const n = Math.max(p.n0 * (1 - p.deltaN * sech * sech), 1e-12)
   const vsSigned = p.vMax * Math.tanh(u) - p.vMax * ((2 * x0) / lBox) * T
   const vs = Math.abs(vsSigned)

@@ -24,7 +24,7 @@ import type { FsfBindGroupResult, FsfPipelineResult } from './FreeScalarFieldCom
 import { FSF_DT_BYTE_OFFSET } from './FreeScalarFieldComputePassUniforms'
 import type { FsfKSpaceManager } from './FreeScalarFieldKSpace'
 import { getOrCreateFsfCosmoDebugBuffer } from './fsfCosmoDebug'
-import { writeFsfCosmologyCoefsSlot } from './fsfCosmologyStepping'
+import { projectSimEta, writeFsfCosmologyCoefsSlot } from './fsfCosmologyStepping'
 
 /**
  * State references needed by the field initialization logic.
@@ -167,11 +167,10 @@ export function initializeFsfField(
         // Evaluate cosmology coefs at the kickstart interval midpoint
         // without mutating `simEta` — the kickstart does not advance the
         // simulation clock. The main substep loop will advance from η₀
-        // on the first step. `advanceSimEta` adds `dt` regardless of the
-        // η sign (both η<0 FLRW and η>0 Bianchi branches advance by
-        // adding dt — see `projectSimEta`), so the midpoint is simply
-        // `simEta + midDt`.
-        const midEta = ic.simEta + midDt
+        // on the first step. Use the same floor/sign projection as the
+        // runtime clock so the kickstart cannot sample coefs inside
+        // |eta| < COSMOLOGY_ETA_FLOOR.
+        const midEta = projectSimEta(ic.simEta, midDt)
         const coefs = computeFsfCosmologyCoefs(config, midEta)
         aKinetic = coefs.aKinetic
         aPotential = coefs.aPotential

@@ -62,8 +62,15 @@ describe('computePMLSigmaMaxND (traversal formula)', () => {
     expect(computePMLSigmaMaxND(NaN, 0.2, [64], 0.005)).toBe(0)
     expect(computePMLSigmaMaxND(1e-6, 0.2, [64], 0)).toBe(0)
     expect(computePMLSigmaMaxND(1e-6, 0, [64], 0.005)).toBe(0)
-    expect(computePMLSigmaMaxND(1e-6, 0.5, [64], 0.005)).toBe(0)
+    expect(computePMLSigmaMaxND(1e-6, 0.5001, [64], 0.005)).toBe(0)
     expect(computePMLSigmaMaxND(1e-6, 0.2, [], 0.005)).toBe(0)
+  })
+
+  it('treats the UI maximum pmlWidth=0.5 as enabled', () => {
+    const sigma = computePMLSigmaMaxND(1e-6, 0.5, [64], 0.005, 3, 1)
+    expect(sigma).toBeGreaterThan(0)
+    const roundTrip = Math.exp((-2 * sigma * 0.005 * 32) / 4)
+    expect(roundTrip).toBeCloseTo(1e-6, 8)
   })
 })
 

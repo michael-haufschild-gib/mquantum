@@ -9,8 +9,9 @@
  *
  * The SRMT conjecture under test: the DeWitt-timelike clock (`clock = 'a'`)
  * should give a much lower `affineMatchQuality` (better fit) than either
- * `'phi1'` or `'phi2'`. The UI plots the two spectra side-by-side and
- * overlays `sliceK` on the φ-slice density field.
+ * `'phi1'` or `'phi2'`. The UI plots the true modular spectrum side-by-side
+ * with the HJ spectrum and overlays a normalized conditional density on the
+ * selected clock slice.
  *
  * @module lib/physics/srmt/diagnostic
  */
@@ -73,15 +74,17 @@ function slicePlaneFor(clock: SrmtConfig['clock']): SrmtSlicePlane {
 
 /**
  * Populate the 2D `sliceK` field rendered as a heatmap disk at the cut
- * plane.
+ * plane. The field name is retained for API compatibility with the
+ * renderer; the values are normalized conditional density on the selected
+ * slice, not modular-Hamiltonian eigenvalues. The true modular values are
+ * returned separately in `kSpectrum`.
  *
- * Physical content: the diagonal of the reduced density matrix
- * `ρ_A(x_slice) = |χ(x_clock = cut, x_slice)|²` on the slice
- * perpendicular to the selected clock axis. This is the scalar field
- * the modular Hamiltonian `K_A = −log ρ_A` acts upon; rendering it
- * shows *where* on the `(φ₁, φ₂) / (a, φ)` slice the reduced state has
- * support — the physically-meaningful 2D companion to the 1D
- * `kSpectrum` plotted in the side panel.
+ * Physical content: the conditional probability density
+ * `p(x_slice | x_clock = cut) ∝ |χ(x_clock = cut, x_slice)|²` on the slice
+ * perpendicular to the selected clock axis. Normalizing the slice removes
+ * arbitrary wavefunction-amplitude scale from the render overlay; otherwise
+ * multiplying `χ` by a constant would change the heatmap even though the
+ * physics state is equivalent after normalization.
  *
  * ## Shape contract
  *
@@ -111,8 +114,23 @@ function slicePlaneFor(clock: SrmtConfig['clock']): SrmtSlicePlane {
  * @param clock  - Clock axis selector.
  * @param cutIndex - Cut index along the clock axis (already validated
  *   by the caller to be strictly interior).
- * @returns Float32 `Nphi²` slab of slice-plane density values.
+ * @returns Float32 `Nphi²` slab of normalized slice-plane density values.
  */
+function normalizeSliceDensity(values: Float32Array): Float32Array {
+  let sum = 0
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i]!
+    if (Number.isFinite(v) && v > 0) sum += v
+  }
+  if (sum <= 0) return values
+  const inv = 1 / sum
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i]!
+    values[i] = Number.isFinite(v) && v > 0 ? v * inv : 0
+  }
+  return values
+}
+
 function buildSliceK(
   output: WheelerDeWittSolverOutput,
   clock: SrmtConfig['clock'],
@@ -133,7 +151,7 @@ function buildSliceK(
         out[i1 * Nphi + i2] = re * re + im * im
       }
     }
-    return out
+    return normalizeSliceDensity(out)
   }
 
   // φ-clock slice: natural shape (Na × Nphi). We bin-average into Nphi
@@ -197,7 +215,7 @@ function buildSliceK(
       }
     }
   }
-  return out
+  return normalizeSliceDensity(out)
 }
 
 /**

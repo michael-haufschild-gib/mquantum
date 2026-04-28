@@ -6,7 +6,7 @@
  * Physics checks anchor the numerical integrator against the derived
  * analytic closed-form stiff-fluid solution
  *
- *     ρ(τ) = ρ_c / (1 + γτ²),   γ = (n − 1)² · ρ_c / (3(n − 2))
+ *     ρ(τ) = ρ_c / (1 + γτ²),   γ = 2(n − 1) · ρ_c / (n − 2)
  *     a(τ) = a_B · (1 + γτ²)^(1 / (2(n − 1)))
  *
  * (see the module header of `lqcBounce.ts` for the derivation). All
@@ -51,6 +51,13 @@ describe('lqcHubbleMagnitude', () => {
   it('returns strictly positive H for 0 < ρ < ρ_c', () => {
     expect(lqcHubbleMagnitude(4, 1, 0.5)).toBeGreaterThan(0)
     expect(lqcHubbleMagnitude(4, 1, 0.99)).toBeGreaterThan(0)
+  })
+
+  it('has the correct 4D low-density Friedmann limit H² ≈ ρ/3 for 8πG=1', () => {
+    const rho = 1e-6
+    const rhoCritical = 1
+    const h = lqcHubbleMagnitude(4, rhoCritical, rho)
+    expect((h * h) / rho).toBeCloseTo(1 / 3, 6)
   })
 
   it('returns 0 for ρ > ρ_c (physically unreachable region)', () => {
@@ -193,7 +200,7 @@ describe('computeLqcBounceBackground — classical limit', () => {
     //
     // Concretely: start at (a_B=1, ρ=ρ_c=1e6) at the bounce instant
     // and integrate forward. After time τ the analytic Kasner solution
-    // gives ρ(τ) = ρ_c / (1 + γ·τ²)¹ where γ_Kasner = (n−1)²/(3(n−2))
+    // gives ρ(τ) = ρ_c / (1 + γ·τ²)¹ where γ_Kasner = 2(n−1)/(n−2)
     // — i.e. γ_LQC / ρ_c in the ρ_c → ∞ limit. We verify the LQC and
     // classical-Kasner trajectories agree to within 1% at τ = 2.5.
     const params: LqcBounceParams = {
@@ -347,11 +354,11 @@ describe('computeCosmologyAt dispatch — lqcBounce', () => {
 })
 
 describe('stiffFluidGamma', () => {
-  it('matches the derived formula (n−1)² · ρ_c / (3(n−2)) for several (n, ρ_c)', () => {
+  it('matches the derived formula 2(n−1) · ρ_c / (n−2) for several (n, ρ_c)', () => {
     for (const [n, rhoC, expected] of [
-      [4, 1, 9 / 6],
-      [3, 2, (4 * 2) / (3 * 1)],
-      [5, 0.5, (16 * 0.5) / (3 * 3)],
+      [4, 1, 3],
+      [3, 2, 8],
+      [5, 0.5, 4 / 3],
     ] as const) {
       expect(stiffFluidGamma(n, rhoC)).toBeCloseTo(expected, 12)
     }

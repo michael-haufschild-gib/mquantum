@@ -10,7 +10,7 @@
 
 import type { TdseConfig } from '@/lib/geometry/extended/tdse'
 import { logger } from '@/lib/logger'
-import { computeEffectiveSpacing } from '@/lib/physics/compactification'
+import { computeTdseEffectiveSpacing } from '@/lib/physics/tdse/effectiveSpacing'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useMeasurementStore } from '@/stores/measurementStore'
 
@@ -45,13 +45,7 @@ export function handleMeasurement(
   if (!mState.pendingMeasurement || mState.isCollapsing) return
 
   const gridSize = tdseConfig.gridSize.slice(0, tdseConfig.latticeDim)
-  const spacing = computeEffectiveSpacing(
-    tdseConfig.gridSize,
-    tdseConfig.spacing,
-    tdseConfig.compactDims,
-    tdseConfig.compactRadii,
-    tdseConfig.latticeDim
-  )
+  const spacing = computeTdseEffectiveSpacing(tdseConfig)
   const measureAxis = mState.measureAxis
   const collapseWidth = mState.collapseWidth
 
@@ -76,11 +70,11 @@ export function handleMeasurement(
         spacing,
         compactDims: tdseConfig.compactDims as boolean[] | undefined,
         metric: tdseConfig.metric,
-        time: tdsePass.simTime,
+        time: data.simTime,
       }
 
       const inject = (re: Float32Array, im: Float32Array) => {
-        tdsePass.setLoadedWavefunction(re, im, true)
+        tdsePass.setLoadedWavefunction(re, im, true, 1.0)
       }
       const record = (pos: number[], density: number, axis: number | null) => {
         useMeasurementStore.getState().completeMeasurement(pos, density, axis)

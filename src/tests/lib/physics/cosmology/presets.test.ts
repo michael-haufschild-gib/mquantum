@@ -411,11 +411,14 @@ describe('isValidPreset', () => {
   describe('bianchiKasner', () => {
     const vacuum = { p1: -1 / 3, p2: 2 / 3, p3: 2 / 3 }
 
-    it('accepts a vacuum-like Kasner triple at n ≥ 4', () => {
-      for (const n of [4, 5, 6, 7]) {
+    it('accepts a vacuum-like Kasner triple only in 3+1 dimensions', () => {
+      expect(
+        isValidPreset({ preset: 'bianchiKasner', spacetimeDim: 4, kasnerExponents: vacuum })
+      ).toBe(true)
+      for (const n of [5, 6, 7]) {
         expect(
           isValidPreset({ preset: 'bianchiKasner', spacetimeDim: n, kasnerExponents: vacuum })
-        ).toBe(true)
+        ).toBe(false)
       }
     })
 
@@ -432,13 +435,13 @@ describe('isValidPreset', () => {
       ).toBe(true)
     })
 
-    it('rejects n < 4 (Bianchi-I requires 3 spatial axes)', () => {
+    it('rejects n < 4 (Bianchi-I requires exactly 3 spatial axes)', () => {
       expect(
         isValidPreset({ preset: 'bianchiKasner', spacetimeDim: 3, kasnerExponents: vacuum })
       ).toBe(false)
     })
 
-    it('rejects n outside [MIN, MAX]', () => {
+    it('rejects n outside the 3+1 implementation contract', () => {
       expect(
         isValidPreset({ preset: 'bianchiKasner', spacetimeDim: 2, kasnerExponents: vacuum })
       ).toBe(false)

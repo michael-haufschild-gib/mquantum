@@ -151,9 +151,12 @@ export interface LqcBounceCoefs {
 
 /**
  * Analytic closed-form stiffness coefficient
- * `γ = (n − 1)² · ρ_c / (3(n − 2))` appearing in the stiff-fluid (`w = 1`)
+ * `γ = 2(n − 1) · ρ_c / (n − 2)` appearing in the stiff-fluid (`w = 1`)
  * analytic bounce solution `ρ(τ) = ρ_c / (1 + γτ²)`,
  * `a(τ) = a_B · (1 + γτ²)^(1 / (2(n − 1)))`.
+ *
+ * Units convention: `8πG = 1`, so the n-dimensional flat Friedmann limit is
+ * `H² = 2ρ / ((n − 1)(n − 2))`.
  *
  * Exposed for unit-test oracles; the numerical integrator does not consume it.
  *
@@ -164,13 +167,13 @@ export interface LqcBounceCoefs {
 export function stiffFluidGamma(spacetimeDim: number, rhoCritical: number): number {
   const nm1 = spacetimeDim - 1
   const nm2 = spacetimeDim - 2
-  return (nm1 * nm1 * rhoCritical) / (3 * nm2)
+  return (2 * nm1 * rhoCritical) / nm2
 }
 
 /**
  * Modified-Friedmann Hubble rate magnitude for LQC:
- * `|H| = √(ρ (1 − ρ/ρ_c) / (3(n − 2)))`. Returns `0` when the radicand is
- * non-positive (at or past the bounce).
+ * `|H| = √(2ρ (1 − ρ/ρ_c) / ((n − 1)(n − 2)))`. Returns `0` when the
+ * radicand is non-positive (at or past the bounce).
  *
  * @param spacetimeDim - Spacetime dimension `n`.
  * @param rhoCritical - Critical density `ρ_c`.
@@ -182,7 +185,7 @@ export function lqcHubbleMagnitude(spacetimeDim: number, rhoCritical: number, rh
   const ratio = rho / rhoCritical
   const factor = 1 - ratio
   if (!(factor > 0)) return 0
-  const h2 = (rho * factor) / (3 * (spacetimeDim - 2))
+  const h2 = (2 * rho * factor) / ((spacetimeDim - 1) * (spacetimeDim - 2))
   return h2 > 0 ? Math.sqrt(h2) : 0
 }
 
@@ -269,7 +272,7 @@ export function validateLqcBounceParams(params: LqcBounceParams): void {
 function resolveTHalfWidth(params: LqcBounceParams): number {
   if (params.tHalfWidth !== undefined) return params.tHalfWidth
   const w = params.equationOfState ?? 1
-  // General coefficient: γ_w = (n-1)²(1+w)²ρ_c / (12(n-2)).
+  // General coefficient: γ_w = (n-1)(1+w)²ρ_c / (2(n-2)).
   // stiffFluidGamma assumes w=1 → (1+w)²/4 = 1, so scale accordingly.
   const gamma = (stiffFluidGamma(params.spacetimeDim, params.rhoCritical) * ((1 + w) * (1 + w))) / 4
   const tStar = gamma > 0 ? Math.sqrt((1 / params.initialRhoRatio - 1) / gamma) : 5
@@ -564,7 +567,7 @@ export function computeLqcBounceBackground(params: LqcBounceParams): LqcBounceTa
   // is a degenerate fixed point of the ODE — RK4 would produce all-zero
   // derivatives and never leave it. Near the bounce the analytic
   // expansion gives `ρ(τ) = ρ_c − c·τ²` with
-  // `c = (n−1)²(1+w)²ρ_c² / (12(n−2))`, which matches `γ·ρ_c` in the
+  // `c = (n−1)(1+w)²ρ_c² / (2(n−2))`, which matches `γ·ρ_c` in the
   // stiff-fluid (`w = 1`) case and drops to zero smoothly as `w → −1`.
   // `a(τ) ≈ a_B` to leading order; the quadratic correction is subdominant.
   // We seed at `τ = ±stepSize` and RK4 takes over for the remaining
@@ -572,15 +575,12 @@ export function computeLqcBounceBackground(params: LqcBounceParams): LqcBounceTa
   const nm1_seed = spacetimeDim - 1
   const nm2_seed = spacetimeDim - 2
   const wPlus1 = 1 + equationOfState
-  const cCoef =
-    (nm1_seed * nm1_seed * wPlus1 * wPlus1 * rhoCritical * rhoCritical) / (12 * nm2_seed)
+  const cCoef = (nm1_seed * wPlus1 * wPlus1 * rhoCritical * rhoCritical) / (2 * nm2_seed)
   const tauSeed = stepSize
   const rhoSeed = Math.max(0, rhoCritical - cCoef * tauSeed * tauSeed)
-  // a(τ) from stiff-fluid continuity ρ·a^(2(n−1)) = const (exact for w=1)
-  // approximates the general-w case to O(τ⁴), which is well inside the
-  // RK4 truncation error for `stepSize = 5e−4`.
+  // a(τ) from continuity ρ·a^((n−1)(1+w)) = const.
   const aSeed =
-    rhoSeed > 0 ? aBounce * Math.pow(rhoCritical / rhoSeed, 1 / (2 * nm1_seed)) : aBounce
+    rhoSeed > 0 ? aBounce * Math.pow(rhoCritical / rhoSeed, 1 / (nm1_seed * wPlus1)) : aBounce
 
   // Contracting branch — seed at t = -stepSize with (aSeed, rhoSeed),
   // run the remaining `nSteps − 1` steps backward in cosmic time.

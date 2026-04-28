@@ -30,6 +30,7 @@ import {
   hawkingNoise,
   hawkingReadout,
   horizonWeight,
+  waterfallDensityCoordinate,
   waterfallEdgeTanh,
   type WaterfallParams,
   waterfallPhase,
@@ -106,7 +107,19 @@ describe('sonicHorizon — detrended waterfall profile', () => {
     expect(Math.abs(imHi - imLo)).toBeLessThan(1e-10)
   })
 
-  it('matches c_s(x) = √(g n(x)/m) with density dip n(x) = n0(1 − Δn·sech²)', () => {
+  it('density dip has zero edge slope so the wavefunction amplitude is C¹', () => {
+    const p = BASE_PARAMS
+    const edge = p.lBox / 2
+    const h = p.lBox * 1e-5
+    const dnHi = (waterfallSample(edge, p).n - waterfallSample(edge - h, p).n) / h
+    const dnLo = (waterfallSample(-edge + h, p).n - waterfallSample(-edge, p).n) / h
+    expect(Math.abs(dnHi)).toBeLessThan(1e-5)
+    expect(Math.abs(dnLo)).toBeLessThan(1e-5)
+    expect(waterfallDensityCoordinate(0, p)).toBeCloseTo(0, 12)
+    expect(Math.abs(waterfallDensityCoordinate(edge, p))).toBeGreaterThan(5)
+  })
+
+  it('matches c_s(x) = √(g n(x)/m) with the periodized density dip', () => {
     const s = waterfallSample(0, BASE_PARAMS)
     const nAt0 = BASE_PARAMS.n0 * (1 - BASE_PARAMS.deltaN)
     const csAt0 = Math.sqrt((BASE_PARAMS.g * nAt0) / BASE_PARAMS.mass)

@@ -15,12 +15,15 @@
  * the outer edges (matching the convention used by the WdW solver). The
  * operator has order `n = Nφ²` and is real symmetric by construction.
  *
- * For clocks `'φ₁'` / `'φ₂'` the slice state space spans `(a, φ_other)`
- * and the natural HJ operator is built by restricting the full WdW
- * operator to that plane. The discretisation is a second-order
- * finite-difference stencil of `−∂²_a + (1/a²) ∂²_{φ_other} + U(a, φ)` at
- * the chosen slice index in the clock axis — again real symmetric. The
- * order is `n = Na · Nφ`.
+ * For clocks `'φ₁'` / `'φ₂'` the slice state space spans `(a, φ_other)`.
+ * The HJ generator must isolate the chosen clock momentum from the reduced
+ * WdW Hamilton-Jacobi constraint:
+ *
+ *   `p_φclock² = a² p_a² − p_φother² − a² U(a, φ)`.
+ *
+ * We discretise this as `−∂_a(a² ∂_a) + ∂²_φother − a² U`, using a
+ * symmetric flux-form ordering for the `a² p_a²` term so the Lanczos
+ * operator remains self-adjoint. The order is `n = Na · Nφ`.
  *
  * The eigenvalues are returned sorted ascending, matching the convention
  * that K_n (modular) is also reported ascending.
@@ -206,6 +209,12 @@ interface SparseHjOperator {
    */
   offAxis1Variable: Float64Array | null
   /**
+   * Optional variable lower/upper axis-0 stencil coefficients. Used by
+   * φ-clock generators for the symmetric flux-form `−∂_a(a²∂_a)`.
+   */
+  offAxis0LowerVariable: Float64Array | null
+  offAxis0UpperVariable: Float64Array | null
+  /**
    * When true, out-of-bounds axis-0 neighbours inherit the centre cell's
    * value (Neumann / zero-flux ghost) — matches the WdW solver's updated
    * φ-edge treatment. When false, the missing-neighbour contribution is
@@ -306,6 +315,8 @@ function buildSparseOpA(inputs: HjOperatorInputs): SparseHjOperator {
     offAxis0: offKin,
     offAxis1: offKin,
     offAxis1Variable: null,
+    offAxis0LowerVariable: null,
+    offAxis0UpperVariable: null,
     neumannAxis0: true,
     neumannAxis1: true,
     infNorm,
@@ -314,9 +325,7 @@ function buildSparseOpA(inputs: HjOperatorInputs): SparseHjOperator {
 
 /**
  * Build the HJ operator's sparse representation for clock `'φ₁'` /
- * `'φ₂'` — on an `(a, φ_other)` slice at fixed `φ_clock`. The `a`-kinetic
- * stencil is axis-constant; the `φ`-kinetic stencil is position-dependent
- * through `1/a²`, stored in `offAxis1Variable`.
+ * `'φ₂'` — on an `(a, φ_other)` slice at fixed `φ_clock`.
  *
  * Index layout: `idx = ia · Nphi + io`, so `size0 = Na`, `size1 = Nphi`.
  */
@@ -354,58 +363,61 @@ function buildSparseOpPhi(inputs: HjOperatorInputs, clock: 'phi1' | 'phi2'): Spa
 
   const n = Na * Nphi
   const diag = new Float64Array(n)
+  const offAxis0LowerVariable = new Float64Array(n)
+  const offAxis0UpperVariable = new Float64Array(n)
   const offAxis1Variable = new Float64Array(n)
 
   for (let ia = 0; ia < Na; ia++) {
     const a = aMin + ia * da
-    const invAsq = 1 / (a * a)
-    // Off-diagonal φ coupling for this row of (ia, *): +1/(a² dφ²).
-    // Sign: from +(1/a²) ∂²_φ with discrete stencil (−2 diagonal, +1
-    // neighbour), scaled by 1/a².
-    const offPhi = invAsq * invDphi2
+    const aMinusFace = ia > 0 ? a - 0.5 * da : a
+    const aPlusFace = ia < Na - 1 ? a + 0.5 * da : a
+    const aMinusSq = aMinusFace * aMinusFace
+    const aPlusSq = aPlusFace * aPlusFace
+    const diagA = (aMinusSq + aPlusSq) * invDa2
+    const offALower = -aMinusSq * invDa2
+    const offAUpper = -aPlusSq * invDa2
+    // Off-diagonal φ_other coupling from +∂²_φ: +1/dφ².
+    const offPhi = invDphi2
     for (let io = 0; io < Nphi; io++) {
       const phiOther = -phiExtent + io * dphi
       const phi1 = clock === 'phi1' ? phiClock : phiOther
       const phi2 = clock === 'phi1' ? phiOther : phiClock
       const idx = ia * Nphi + io
+      const potential = wdwU(a, phi1, phi2, inflatonMass, cosmologicalConstant, asymmetry)
 
       // Diagonal:
-      //   from −∂²_a:    +2/da²
-      //   from (1/a²) ∂²_φ: −2/(a² dφ²)
-      //   plus U(a, φ)
-      diag[idx] =
-        2 * invDa2 -
-        2 * invAsq * invDphi2 +
-        wdwU(a, phi1, phi2, inflatonMass, cosmologicalConstant, asymmetry)
+      //   from −∂_a(a²∂_a): +(a²_{i−1/2}+a²_{i+1/2})/da²
+      //   from +∂²_φother:  −2/dφ²
+      //   from potential:   −a² U(a, φ)
+      diag[idx] = diagA - 2 * invDphi2 - a * a * potential
 
-      // Per-cell φ-kinetic off-diagonal. Positive (see sign note above).
+      offAxis0LowerVariable[idx] = offALower
+      offAxis0UpperVariable[idx] = offAUpper
       offAxis1Variable[idx] = offPhi
     }
   }
 
-  // infNorm estimate — worst-case absolute row sum. The a-neighbours
-  // contribute `2·invDa2` (two present for interior, one for edge); the
-  // φ-neighbours contribute `2·offPhi(a)` varying with `a`. Upper-bound
-  // by using the maximum invAsq on the grid.
-  let maxOffPhi = 0
+  // infNorm estimate — exact worst-case absolute row sum under the sparse
+  // stencil, including variable flux-form a-couplings.
+  let infNorm = 0
   for (let i = 0; i < n; i++) {
-    const v = Math.abs(offAxis1Variable[i]!)
-    if (v > maxOffPhi) maxOffPhi = v
+    const rowSum =
+      Math.abs(diag[i]!) +
+      Math.abs(offAxis0LowerVariable[i]!) +
+      Math.abs(offAxis0UpperVariable[i]!) +
+      2 * Math.abs(offAxis1Variable[i]!)
+    if (rowSum > infNorm) infNorm = rowSum
   }
-  let maxDiag = 0
-  for (let i = 0; i < n; i++) {
-    const v = Math.abs(diag[i]!)
-    if (v > maxDiag) maxDiag = v
-  }
-  const infNorm = maxDiag + 2 * invDa2 + 2 * maxOffPhi
 
   return {
     n,
     size1: Nphi,
     diag,
-    offAxis0: -invDa2,
+    offAxis0: 0,
     offAxis1: 0,
     offAxis1Variable,
+    offAxis0LowerVariable,
+    offAxis0UpperVariable,
     // Axis-0 is the `a` axis — no Neumann (HJ boundary treatment on `a`
     // is the same as before). Axis-1 is the φ-axis, which mirrors the
     // solver's Neumann (zero-flux) ghost — see `phiLaplacianAt` in
@@ -432,7 +444,18 @@ function buildSparseOpPhi(inputs: HjOperatorInputs, clock: 'phi1' | 'phi2'): Spa
  *              affine-fit quality the diagnostic reports.
  */
 function applySparseOperator(op: SparseHjOperator): LinearOperator {
-  const { n, size1, diag, offAxis0, offAxis1, offAxis1Variable, neumannAxis0, neumannAxis1 } = op
+  const {
+    n,
+    size1,
+    diag,
+    offAxis0,
+    offAxis1,
+    offAxis1Variable,
+    offAxis0LowerVariable,
+    offAxis0UpperVariable,
+    neumannAxis0,
+    neumannAxis1,
+  } = op
   const size0 = n / size1
   return (x, y) => {
     for (let i0 = 0; i0 < size0; i0++) {
@@ -442,8 +465,10 @@ function applySparseOperator(op: SparseHjOperator): LinearOperator {
         const xc = x[idx]!
         let acc = diag[idx]! * xc
         // Axis-0 neighbours.
-        acc += offAxis0 * (i0 > 0 ? x[idx - size1]! : neumannAxis0 ? xc : 0)
-        acc += offAxis0 * (i0 < size0 - 1 ? x[idx + size1]! : neumannAxis0 ? xc : 0)
+        const off0Lower = offAxis0LowerVariable !== null ? offAxis0LowerVariable[idx]! : offAxis0
+        const off0Upper = offAxis0UpperVariable !== null ? offAxis0UpperVariable[idx]! : offAxis0
+        acc += off0Lower * (i0 > 0 ? x[idx - size1]! : neumannAxis0 ? xc : 0)
+        acc += off0Upper * (i0 < size0 - 1 ? x[idx + size1]! : neumannAxis0 ? xc : 0)
         // Axis-1 neighbours (variable coefficient per cell when populated).
         const offRow = offAxis1Variable !== null ? offAxis1Variable[idx]! : offAxis1
         acc += offRow * (i1 > 0 ? x[idx - 1]! : neumannAxis1 ? xc : 0)

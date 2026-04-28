@@ -18,6 +18,7 @@ import {
   computeFullCollapse,
   computePartialCollapse,
   type DensitySamplingOptions,
+  normalizeWavefunctionInSamplingMeasure,
   sampleFromDensity,
   sampleFromMarginalDensity,
 } from './measurement'
@@ -81,7 +82,15 @@ export function executeFullMeasurement(
     spacing,
     result.position,
     collapseWidth,
-    compactDims
+    compactDims,
+    samplingOptions
+  )
+  normalizeWavefunctionInSamplingMeasure(
+    collapsedRe,
+    collapsedIm,
+    gridSize,
+    spacing,
+    samplingOptions
   )
 
   inject(collapsedRe, collapsedIm)
@@ -129,7 +138,15 @@ export function executePartialMeasurement(
     axis,
     result.axisPosition,
     collapseWidth,
-    compactDims?.[axis]
+    compactDims?.[axis],
+    samplingOptions
+  )
+  normalizeWavefunctionInSamplingMeasure(
+    collapsedRe,
+    collapsedIm,
+    gridSize,
+    spacing,
+    samplingOptions
   )
 
   inject(collapsedRe, collapsedIm)

@@ -11,9 +11,10 @@
  *   0 = flat, 1 = morrisThorne, 2 = schwarzschild, 3 = deSitter,
  *   4 = antiDeSitter, 5 = sphere2D, 6 = torus, 7 = doubleThroat.
  *
- * Discretization: staggered 2nd-order central differences with Dirichlet
- * boundaries (ψ = 0 outside the grid). Hermitian under the proper-volume
- * inner product on a uniform lattice (see CPU reference in
+ * Discretization: staggered 2nd-order central differences. Most chart axes
+ * use Dirichlet boundaries (ψ = 0 outside the grid); compact axes wrap
+ * periodically (torus axes, sphere2D φ axis). Hermitian under the
+ * proper-volume inner product on a uniform lattice (see CPU reference in
  * `lib/physics/tdse/metrics/curvedKineticRef.ts`).
  *
  * Time-dependent metrics (deSitter): the kinetic kernel reads the current
@@ -81,12 +82,12 @@ fn wrappedIndex(i: i32, N: u32, periodic: bool) -> i32 {
 }
 
 // Whether a given axis is periodic for the active metric kind.
-// v2a: only torus kind (6u). sphere2D φ periodicity is deferred (axis-wise
-// periodic flags would require broader plumbing). Torus routes to the FFT
-// path in v2a, so this helper is exposed for Wave 6 / future kinds but is
-// effectively Dirichlet throughout the kinetic kernel.
+// - torus: every axis, though torus normally routes to FFT.
+// - sphere2D: φ axis only (axis 2); θ remains a non-periodic chart coordinate.
 fn axisIsPeriodic(kind: u32, axis: u32) -> bool {
-  return kind == 6u;
+  if (kind == 6u) { return true; }
+  if (kind == 5u) { return axis == 2u; }
+  return false;
 }
 
 // Per-stage RK4 simulation time. stage ∈ {0,1,2,3} maps to stageTimeK{1..4}.
@@ -373,8 +374,6 @@ const curvedKineticBody = /* wgsl */ `
     let Naxis = params.gridSize[axis];
     let stride = params.strides[axis];
     let coordAxis = coords[axis];
-    // axisIsPeriodic is exposed for future kinds; in v2a all active metric
-    // kinds in this kernel use Dirichlet (torus is routed to FFT path).
     let periodic = axisIsPeriodic(kind, axis);
 
     // Plus neighbor ψ (Dirichlet: 0 outside grid; wrap when periodic).

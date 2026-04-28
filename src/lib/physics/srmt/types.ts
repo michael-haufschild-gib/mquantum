@@ -13,8 +13,8 @@
  * the chosen clock axis, extracts the resulting modular spectrum
  * `K_n = −log(s_n² + ε)`, constructs a Hamilton-Jacobi operator on a
  * fixed clock slice, and returns an affine-match quality metric together
- * with the two spectra side-by-side and a `sliceK` array used downstream
- * by the render overlay.
+ * with the two spectra side-by-side and a legacy-named `sliceK` array used
+ * downstream by the render overlay.
  *
  * Scope: pure functions only. No store access, no WebGPU, no UI.
  *
@@ -98,11 +98,11 @@ export interface SrmtResult {
   /** Orientation of the clock slice for render-time consumers. */
   slicePlane: SrmtSlicePlane
   /**
-   * `K_A` eigenvalue density on the slice. Length equals the active
-   * slice area: `Nphi²` for `'phi-phi'`, `Na * Nphi` for the `'a-phi1'`
-   * and `'a-phi2'` planes. Populated by projecting the Schmidt `K`
-   * spectrum onto the slice axis count and zero-padding if the rank is
-   * lower than the slice area. Used downstream by the render overlay.
+   * Normalized conditional density on the selected clock slice. Length is
+   * always `Nphi²` for renderer compatibility: natural `phi-phi` slices are
+   * stored directly, while `a-phi1` / `a-phi2` slices are compressed along
+   * the `a` axis before normalization. The field name is retained for API
+   * compatibility; modular-Hamiltonian eigenvalues live in `kSpectrum`.
    */
   sliceK: Float32Array
 }

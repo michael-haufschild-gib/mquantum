@@ -446,6 +446,7 @@ interface VacuumAutoScale {
    *   brightness on Kasner presets — see #62 review.
    */
   dispersion: VacuumDispersion
+  aKinetic: number
   aPotential: number
   aFull: number
 }
@@ -453,13 +454,14 @@ interface VacuumAutoScale {
 function resolveVacuumAutoScale(config: FreeScalarConfig): VacuumAutoScale {
   const cosmo = config.cosmology
   if (!cosmo.enabled || cosmo.preset === 'minkowski') {
-    return { dispersion: 'kgFloor', aPotential: 1, aFull: 1 }
+    return { dispersion: 'kgFloor', aKinetic: 1, aPotential: 1, aFull: 1 }
   }
   const coefs = computeFsfCosmologyCoefs(config, cosmo.eta0)
   // Guard against the identity-fallback path where coefs may carry the
   // Minkowski sentinels — treat those as "no rescale" and let the call
   // sites operate in the flat-space branch.
   const aPotential = coefs.aPotential > 0 ? coefs.aPotential : 1
+  const aKinetic = coefs.aKinetic > 0 ? coefs.aKinetic : 1
   const aFull = coefs.aFull > 0 ? coefs.aFull : 1
   const ratio1 = coefs.aPotentialRatio1 ?? 1
   const ratio2 = coefs.aPotentialRatio2 ?? 1
@@ -475,6 +477,7 @@ function resolveVacuumAutoScale(config: FreeScalarConfig): VacuumAutoScale {
       if (config.latticeDim > 2) axisPotentials[2] = aPotential * ratio2
       return {
         dispersion: { massSq: massSqEff, axisPotentials, kineticScale: coefs.aKinetic },
+        aKinetic,
         aPotential,
         aFull,
       }
@@ -483,6 +486,7 @@ function resolveVacuumAutoScale(config: FreeScalarConfig): VacuumAutoScale {
   const aSq = aFull / aPotential // a^n / a^(n−2) = a²
   return {
     dispersion: config.mass * config.mass * aSq,
+    aKinetic,
     aPotential,
     aFull,
   }
@@ -520,9 +524,9 @@ function resolveVacuumAutoScale(config: FreeScalarConfig): VacuumAutoScale {
  */
 export function computeFsfMaxPhiEstimate(config: FreeScalarConfig): number {
   if (config.initialCondition === 'vacuumNoise') {
-    const { dispersion, aPotential } = resolveVacuumAutoScale(config)
+    const { dispersion, aKinetic } = resolveVacuumAutoScale(config)
     const rawMaxPhi = estimateVacuumMaxPhi(config, dispersion)
-    return rawMaxPhi / Math.sqrt(aPotential)
+    return rawMaxPhi * Math.sqrt(aKinetic > 0 ? aKinetic : 1)
   }
   if (!config.autoScale) return 1.0
   if (config.initialCondition === 'kinkProfile') return config.selfInteractionVev
@@ -535,9 +539,9 @@ export function computeFsfMaxPhiEstimate(config: FreeScalarConfig): number {
  *
  * Under cosmology the vacuum branch forwards `m²·a²(η₀)` to the Minkowski
  * estimator and then applies the `B = a^(n−2)` rescale so the estimate
- * lines up with the canonical δφ variance. The non-vacuum branches use
- * the physical dispersion `ω² = k_lat² + m²·a²(η₀)` and apply the same
- * `aPotential` weight to the `π_δφ = aPotential·δφ·ω` initial kick.
+ * lines up with the canonical δφ variance. The non-vacuum branches mirror
+ * the shader oscillator `ω² = aKinetic·(Σ aPotential_d k_d² + m²aFull)`
+ * and the canonical kick `π_δφ = δφ·ω/aKinetic`.
  *
  * For the `energyDensity` view the shader renders the *proper* energy
  * density `ρ = T_{μν} u^μ u^ν = H_canonical / a^n` (a comoving observer's
@@ -567,7 +571,7 @@ export function estimateFsfMaxFieldValue(config: FreeScalarConfig, maxPhiEstimat
     return phi0
   }
 
-  const { dispersion, aPotential, aFull } = resolveVacuumAutoScale(config)
+  const { dispersion, aKinetic, aPotential, aFull } = resolveVacuumAutoScale(config)
 
   // wallDensity: V(phi) = lambda * (phi^2 - v^2)^2, max at phi=0 -> lambda * v^4.
   // The shader renders the bare potential `V(φ)` (no aFull weight — it
@@ -592,9 +596,9 @@ export function estimateFsfMaxFieldValue(config: FreeScalarConfig, maxPhiEstimat
   // bound. The exact sums give tight 3-sigma bounds.
   if (config.initialCondition === 'vacuumNoise') {
     if (config.fieldView === 'pi') {
-      // π_δφ variance = B · ω_k/2; π_M variance = ω_k/2; rescale by √B.
+      // π_δφ variance = ω_k/(2·aKinetic); π_M variance = ω_k/2.
       const rawMaxPi = estimateVacuumMaxPi(config, dispersion)
-      return rawMaxPi * Math.sqrt(aPotential)
+      return rawMaxPi / Math.sqrt(aKinetic > 0 ? aKinetic : 1)
     }
     // energyDensity (proper, per comoving observer): the spatial mean of the
     // canonical Hamiltonian density is `⟨E⟩ = meanOmega/2`. We normalize to
@@ -612,22 +616,21 @@ export function estimateFsfMaxFieldValue(config: FreeScalarConfig, maxPhiEstimat
     return canonicalEnergy / properEnergyScale
   }
 
-  // Non-vacuum modes (singleMode, gaussianPacket, kinkProfile):
-  // physical dispersion ω² = k_lat² + m²·a². Anisotropic Bianchi-I
-  // metadata is stripped here: per-mode ω for these initial conditions
-  // is computed downstream via `config.modeK` / `packetCenter`, so the
-  // axis-weighting isn't plumbed through this scalar estimator.
-  let scalarMassSq: number
+  // Non-vacuum modes (singleMode, gaussianPacket, kinkProfile): mirror the
+  // init shader's canonical oscillator, including Bianchi-I axis weights:
+  //   K = Σ_d aPotential_d k_d² + m²aFull,  ω² = aKinetic·K.
+  let stiffness: number
+  let kineticScale = aKinetic > 0 ? aKinetic : 1
+  let axisPotentials: readonly number[] | null = null
   if (dispersion === 'kgFloor') {
-    scalarMassSq = config.mass * config.mass
+    stiffness = config.mass * config.mass
   } else if (typeof dispersion === 'number') {
-    scalarMassSq = dispersion
+    stiffness = dispersion / kineticScale
   } else {
-    // Anisotropic record — collapse to the carried scalar massSq for
-    // the non-vacuum estimator's flat-mass term.
-    scalarMassSq = dispersion.massSq
+    stiffness = dispersion.massSq
+    kineticScale = dispersion.kineticScale ?? kineticScale
+    axisPotentials = dispersion.axisPotentials
   }
-  let omegaSq = scalarMassSq
   for (let d = 0; d < config.latticeDim; d++) {
     const N = config.gridSize[d]!
     const a = config.spacing[d]!
@@ -635,30 +638,21 @@ export function estimateFsfMaxFieldValue(config: FreeScalarConfig, maxPhiEstimat
     const latticeL = N * a
     const kPhys = (2 * Math.PI * (config.modeK[d] ?? 0)) / latticeL
     const sk = (2 * Math.sin(kPhys * a * 0.5)) / a
-    omegaSq += sk * sk
+    stiffness += (axisPotentials?.[d] ?? aPotential) * sk * sk
   }
+  const omegaSq = kineticScale * stiffness
   const omega = Math.sqrt(Math.max(omegaSq, 0))
 
   if (config.fieldView === 'pi') {
-    // π_δφ = aPotential · δφ · ω for the singleMode/gaussianPacket init
-    // kick (matches the shader). Without cosmology aPotential = 1.
-    return phi0 * omega * aPotential
+    // π_δφ = δφ'/aKinetic = δφ · ω/aKinetic for the init kick.
+    return (phi0 * omega) / kineticScale
   }
 
   // energyDensity (proper, per comoving observer): for a plane-wave / packet
-  // with peak amplitude φ₀ and frequency ω, the canonical Hamiltonian density
-  // time-averages to ½·aPotential·φ₀²·ω² — π = aPotential·φ₀·ω·sin(k·x) makes
-  // the kinetic term scale with aPotential rather than 1, and (using
-  // aKinetic·aPotential² = aPotential) the kinetic / gradient / mass pieces
-  // collapse into a single aPotential·ω² prefactor. Without the aPotential
-  // factor the estimator overshoots by ≈ 1/aPotential under cosmology (e.g.
-  // ~128× for de Sitter at η=-8, H=2, n=4), driving normRho near zero and
-  // making the field render as black. Divide by `aFull(η₀)` to land in the
-  // proper frame — no-op under Minkowski (aPotential = aFull = 1), correctly
-  // rescales under cosmology. Self-interaction carries the `aFull` weight
-  // from the action term before the same uniform division, which collapses
-  // it to the bare potential.
-  let canonicalEnergy = aPotential * phi0 * phi0 * omegaSq * 0.5
+  // with peak amplitude φ₀, canonical Hamiltonian density time-averages to
+  // ½·K·φ₀² where K = ω²/aKinetic. This stays valid for anisotropic Bianchi-I,
+  // unlike the old scalar `aPotential·ω²` shortcut.
+  let canonicalEnergy = phi0 * phi0 * stiffness * 0.5
   if (config.selfInteractionEnabled) {
     const v = config.selfInteractionVev
     canonicalEnergy += aFull * config.selfInteractionLambda * v * v * v * v

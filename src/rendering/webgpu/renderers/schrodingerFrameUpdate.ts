@@ -16,7 +16,7 @@ import {
   type QuantumPreset,
 } from '@/lib/geometry/extended/schroedinger/presets'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
-import { computeEffectiveSpacing } from '@/lib/physics/compactification'
+import { computeTdseEffectiveSpacing } from '@/lib/physics/tdse/effectiveSpacing'
 
 import type { WebGPURenderContext } from '../core/types'
 import {
@@ -337,15 +337,7 @@ function buildPackParams(
       const tdse = inputs.schroedinger?.tdse
       if (!tdse) return { branchPlaneThreshold: 0, branchTransitionWidth: 0.2 }
       const gridSize = tdse.gridSize ?? [64]
-      const spacing = tdse.spacing ?? [0.1]
-      const latDim = tdse.latticeDim ?? 3
-      const effSpacing = computeEffectiveSpacing(
-        gridSize,
-        spacing,
-        tdse.compactDims as boolean[] | undefined,
-        tdse.compactRadii as number[] | undefined,
-        latDim
-      )
+      const effSpacing = computeTdseEffectiveSpacing(tdse)
       const halfExtent = (gridSize[0] ?? 64) * (effSpacing[0] ?? 0.1) * 0.5
       return {
         branchPlaneThreshold: (tdse.branchPlanePosition ?? 0) * halfExtent,

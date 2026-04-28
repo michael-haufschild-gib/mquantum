@@ -35,8 +35,8 @@ The WdW equation is solved on the reduced amplitude
 
 where `Ψ` is the canonical Wheeler–DeWitt wavefunction. The `a^{3/2}`
 Jacobi factor (conformal-minimal ordering) removes the first-derivative
-in `a` from the WdW equation so the leapfrog integrator sees a pure
-second-order operator.
+in `a` from the WdW equation so the solver sees a pure second-order
+operator.
 
 Because `a^{3/2}` is real and positive for `a > 0`:
 
@@ -60,8 +60,10 @@ bunching region. The physical extractor lives in
 with
 
     U(a, φ) = −c_U · a² · (1 − (8πG/3) · a² · V(φ))
-    V(φ)   = ½ m² (φ₁² + φ₂²) + Λ
+    V(φ)   = ½ m² φ₁² + ½ (m·α)² φ₂² + Λ
     c_U    = 36 π²
+
+where `α = inflatonMassAsymmetry` defaults to `1`.
 
 ### Sign conventions
 
@@ -76,101 +78,92 @@ with
 
 ## Numerical integration
 
-The solver uses an **explicit second-order leapfrog in `a`** with
-second-order central-difference φ-Laplacian (ghost-zero Dirichlet).
+The first two `a` slabs are seeded by the boundary data and a Taylor
+step. The Taylor acceleration follows the reduced equation sign:
 
 ```text
-χ(a+da, φ) = 2 χ(a, φ) − χ(a−da, φ) + da² · [ (1/a²)·∇²_φ χ − U·χ ]
+χ₁ = χ₀ + da·χ′₀ + ½da² · [ (1/a₀²)·∇²_φχ₀ + U₀·χ₀ ]
 ```
 
-### Stability
+For slabs `ia ≥ 2`, Lorentzian bulk cells use a semi-implicit
+Crank-Nicolson update for the φ-Laplacian and keep `U·χ` explicit at
+the current slab:
 
-The explicit scheme has a CFL budget set by
+```text
+χ_next − (da²/2)·L_next·χ_next
+  = 2χ_cur − χ_prev + (da²/2)·L_prev·χ_prev + da²·U_cur·χ_cur
+L = (1/a²)·∇²_φ
+```
 
-    da² · (1/a_min²) · 8 / dφ²   ≤   WDW_CFL_BUDGET (= 4)
+The 2D solve is factorised by ADI into two 1D Thomas solves over
+Neumann-Laplacian rows/columns. This is unconditionally stable for the
+bulk homogeneous modes; the old CFL diagnostic remains only as an
+accuracy warning.
 
-When violated, a dev-only `logger.warn` is emitted (rate-limited through
-`WDW_CFL_WARN_BUDGET` so interactive slider sweeps do not spam the
-console). The default configuration stays comfortably below the budget;
-tests reset the budget via `resetCflWarningBudget()`.
+### φ boundaries
 
-### Euclidean region — split band strategy
+`∇²_φ` uses second-order central differences with zero-flux Neumann
+ghost cells:
 
-Inside the Euclidean region the explicit leapfrog would otherwise
-amplify the exponentially-growing WKB branch by ~10¹⁷ across a default
-march. The solver splits each φ-column's Euclidean portion at a WKB
-phase threshold and handles the two bands differently.
+```text
+χ_{-1,j} = χ_{0,j},   χ_{N,j} = χ_{N−1,j}
+χ_{i,-1} = χ_{i,0},   χ_{i,N} = χ_{i,N−1}
+```
 
-**Transition band** — cells with `0 < (2/3)·√α(φ)·(a−a_turn)^{3/2}
-< WDW_WKB_MATCH_PHASE_THRESHOLD` (= 2 by default), where
-`α(φ) = ∂_a U|_{a_turn} = 2·c_U·a_turn(φ)`. These cells are close
-enough to the turning surface that the WKB prefactor `U^{−1/4}`
-diverges and the Airy asymptotics do not apply. Numerical leapfrog +
-soft absorber `exp(−η·√U·da)` with `η = 1.0` handles them. The
-absorber is NOT branch-selective (it damps the physical decaying
-branch by the same rate as the growing branch), but inside the narrow
-transition band the amplitude mis-calibration is bounded because the
-band itself is shallow (≤ a few slabs thick) and `√U·da` is small.
+Edge cells evolve normally. They are not pinned to zero; the earlier
+ghost-zero Dirichlet rule is gone.
 
-**Deep band** — cells with WKB phase since turning `≥ 2`. On the first
-deep-band slab of each φ-column the solver captures the numerical
-χ as the match coefficient and freezes it. Deeper slabs receive the
-analytic one-dimensional WKB propagator
+### Euclidean region
+
+The Euclidean (`U > 0`) region is still split per φ-column.
+
+**Transition band** — cells between the turning surface and
+`WDW_WKB_MATCH_PHASE_THRESHOLD` use the explicit recurrence plus the
+soft absorber `exp(−η·√U·da)`. The absorber is not branch-selective and
+intentionally violates the raw PDE, so residual checks exclude these
+stencils.
+
+**Deep band / Stage 2** — at the first deep-band slab, the solver
+captures the current numerical `χ` as a match coefficient. Deeper slabs
+receive the analytic WKB tail
 
 ```text
 χ(a, φ) = χ_match(φ) · (U_match / U(a))^{1/4} · exp(−(S_E(a) − S_E_match))
 ```
 
-with `S_E(a, φ) = (3 / (4·V)) · (K·V·a² − 1)^{3/2}` in closed form
-(see `wdwEuclideanWkbAction` in `constants.ts`). The analytic
-propagator preserves whatever branch content the match cell captured
-(HH's real decaying, Vilenkin's complex outgoing-wave, DeWitt's
-linear-in-a) without numerical amplification. The match cell itself
-is not overwritten — it is the boundary condition for the analytic
-propagator downstream.
+This fallback is boundary-condition-agnostic: it preserves whatever
+branch mixture reached the match cell.
 
-This makes the scheme **boundary-condition-agnostic**: the match
-cell's complex value is the BC-specific branch mixture the numerical
-integration produced. No per-BC code path is required.
+**Stage 3 Airy/Langer overwrite** — after the march, each column with a
+turning surface and at least two Lorentzian asymptotic samples
+(`|ζ| ≥ AIRY_CONNECTION_LZETA_MIN`, currently `1.5`) is refit to the
+Langer basis and every Euclidean cell in that column is overwritten:
 
-**Residual validity**. `wdwOperatorResidual` accepts two kinds of
-stencil:
-- All three points Lorentzian → measures leapfrog fidelity in the
-  oscillating region.
-- All three points deep-band Euclidean → measures the deviation of
-  the analytic propagator from the full PDE (sub-leading WKB
-  corrections show up here, `O(1/U)` of the leading amplitude).
+```text
+χ(a) = (ζ/U)^{1/4} · [ c₁·Ai(ζ) + c₂·Bi(ζ) ]
+```
 
-Transition-band stencils are still excluded because the absorber
-there violates the raw PDE by construction.
+Branch policy: Hartle-Hawking and DeWitt discard `Bi` (`c₂ = 0`);
+Vilenkin enforces the outgoing combination (`c₂ = +i·c₁`). Columns with
+no viable extraction keep the Stage-2 values. This includes no-turning
+columns, turnings outside the grid, and high-Λ / low-`|ζ|` columns where
+the Lorentzian side is too shallow for asymptotic fitting.
 
-**Clamp thresholds are gone**. `WDW_CHI_CLAMP`, `WDW_CHI_SOFT_CLAMP`,
-`WDW_RESIDUAL_CLAMP_GUARD`, and the density-packer soft-clamp filter
-have all been removed. The deep-band analytic tail produces
-`|χ| ≲ O(1)` everywhere, bounded by the amplitude at the match cell.
-
-**Future work — Stage-3 Airy matching**. The current transition-band
-handler (numerical + absorber) is accurate to ~10% of the deep-band
-amplitude, which is sufficient for visualisation. A full Airy-function
-treatment in the transition band would deliver per-BC-correct branch
-weighting (HH's pure Ai, Vilenkin's outgoing Ai+iBi combination,
-DeWitt's linear-in-a matching). For a visualiser this level of
-fidelity is overkill; for quantitative downstream consumers (e.g.
-Bogoliubov-coefficient extraction, instanton action measurement) it
-would be the next correctness frontier.
+`WDW_CHI_CLAMP`, `WDW_CHI_SOFT_CLAMP`, `WDW_RESIDUAL_CLAMP_GUARD`, and
+the density-packer soft-clamp filter are removed.
 
 ## Boundary conditions
 
-| BC              | Key         | Interior `χ(a_min, φ)`                    | `∂_a χ(a_min, φ)`                           |
-| --------------- | ----------- | ----------------------------------------- | ------------------------------------------- |
-| Hartle–Hawking  | `noBoundary`| `exp(−\|S_E\|)` (Euclidean WKB amplitude) | `−(8πG/3)·a·√(1−(8πG/3)·a²V)·χ` (WKB decay) |
-| Vilenkin        | `tunneling` | Gaussian × `exp(i·S_L)`, `S_L ≈ a³V/3`    | `i·a²·V·χ` (outgoing Lorentzian wave)       |
-| DeWitt          | `deWitt`    | `a_min · exp(−½φ²)` (linear-in-a from 0)  | `χ(a_min) / a_min` (linear ramp from node)  |
+| BC              | Key          | Current seed at `a_min` |
+| --------------- | ------------ | ----------------------- |
+| Hartle–Hawking  | `noBoundary` | `V > 0`: Langer-uniform pure `Ai`; `V = 0`: `√a·J_{1/4}` with Gaussian gauge envelope; `V < 0`: real standing wave `|U|^{-1/4}·cos Φ_L` with Gaussian gauge envelope. |
+| Vilenkin        | `tunneling`  | `V > 0`: Langer-uniform `Ai + i·Bi`; `V = 0`: outgoing Hankel `H_{1/4}^{(1)}` with Gaussian gauge envelope; `V < 0`: outgoing WKB `|U|^{-1/4}·exp(+iΦ_L)`. |
+| DeWitt          | `deWitt`     | Implements `χ(0, φ) = 0`; bootstraps finite `a_min` with `χ(a_min, φ) = a_min·exp(−½(φ₁²+φ₂²))` and `∂_aχ(a_min, φ) = exp(−½(φ₁²+φ₂²))`. |
 
 Each generator lives in
-`src/lib/physics/wheelerDeWitt/boundaryConditions.ts`. They consume
-only the physical parameters `(m, Λ, a_min, phiExtent, Nphi)` so the
-solver re-uses them unchanged across configs.
+`src/lib/physics/wheelerDeWitt/boundaryConditions.ts`; HH/Vilenkin
+delegate to `hhLangerSeed.ts`. DeWitt is an enforced node plus Gaussian
+derivative seed, not a fully determined exact proposal.
 
 ## Rendering pipeline
 
@@ -183,16 +176,33 @@ solver re-uses them unchanged across configs.
    (streamlinesEnabled + streamlineDensity).
 3. **Density packer**: `packWdwDensityGrid` trilinear-samples `χ` into
    the shared 96³ rgba16float density texture. Channel layout:
-   - `R` = `|χ|² / max(|χ|²)` — normalised probability density
-   - `G` = `log(|χ|²)` — log-density for volumetric exposure
-   - `B` = `arg(χ)` — phase, used by the phase-density colour algorithm
-   - `A` = `max(streamline, SRMT)` — overlay channel
-   Both overlays fold into `R` and `G` as well so the raymarcher
-   actually renders them (the raymarcher does not consult the alpha
-   channel for visibility).
+   - `R` = clean `rhoNorm = clamp(|χ|² / maxRho_render, 0, 1)`.
+   - `G` = `log(R + 1e-10)`.
+   - `B` = `arg(χ)`.
+   - `A` = `max(streamlineAlpha, srmtAlpha)`.
+   `R` and `G` never include overlays. WKB/SRMT overlays are composited
+   by the WdW shader branch from positive `A`, before density alpha, so
+   density gain, contrast, adaptive stepping, and empty-space skipping
+   continue to operate on clean `|χ|²`.
 4. **SRMT coordinator**: when enabled, all three clocks are queued to
    a dedicated Web Worker sequentially — see the SRMT diagnostic
    section.
+
+World mapping: the renderer uses normalized display axes for WdW:
+
+```text
+densityGridHalfExtent = [ boundingRadius, boundingRadius, boundingRadius ]
+boundingRadius = max(0.25, aMax)
+```
+
+The texture coordinates still map to the physical solver ranges
+`a ∈ [aMin, aMax]` and `φ ∈ [-phiExtent, +phiExtent]`, but the displayed
+volume is intentionally normalized so the `a` axis does not collapse
+into a thin slab beside the wider `φ` ranges. This is a rendering
+normalization, not a metric-faithful embedding of minisuperspace.
+`inflatonMassAsymmetry` still changes the solver potential and cached
+`χ`; curated presets reset `α = 1`, and `α ≠ 1` remains an SRMT
+discriminator experiment.
 
 ## SRMT diagnostic
 
@@ -253,7 +263,12 @@ does not flicker under noise.
 src/lib/physics/wheelerDeWitt/
 ├── constants.ts            Physics constants, U, V (single source of truth)
 ├── boundaryConditions.ts   Hartle–Hawking / Vilenkin / DeWitt initial data
-├── solver.ts               Leapfrog integrator, operator residual
+├── hhLangerSeed.ts         HH / Vilenkin Langer-uniform seed dispatch
+├── exactColumnSolution.ts  Column reference solutions by sign of V
+├── implicitBulk.ts         Crank-Nicolson ADI Neumann bulk solve
+├── airyConnection.ts       Stage-3 Airy/Langer extraction + overwrite
+├── solver.ts               Solver orchestrator, bands, Stage-2 fallback
+├── solverDiagnostics.ts    Operator residual and output diagnostics
 ├── wkbStreamlines.ts       Trajectory integration, static + pulse overlays
 ├── densityGrid.ts          rgba16float packer with streamline + SRMT overlays
 └── presets.ts              Curated scenario presets

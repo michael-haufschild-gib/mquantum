@@ -1,11 +1,13 @@
 /**
- * Pauli Equation Compute Pass
+ * Zeeman-Pauli Spinor Compute Pass
  *
- * Implements the non-relativistic Pauli equation solver using split-operator
- * Strang splitting with Stockham FFT on the GPU. The spinor is always
- * 2-component (spin-up, spin-down) regardless of spatial dimension.
+ * Implements the non-relativistic two-component spinor solver using
+ * split-operator Strang splitting with Stockham FFT on the GPU. This is the
+ * Zeeman-only Pauli approximation: magnetic fields rotate spin through
+ * σ·B_eff(x), but the kinetic term is scalar p²/(2m). It does not implement
+ * gauge-covariant orbital coupling `(p - qA)^2/(2m)`.
  *
- * iℏ ∂ψ/∂t = [p²/(2m) + V(x) + μ_B σ·B(x)] ψ
+ * iℏ ∂ψ/∂t = [p²/(2m) + V(x) + σ·B_eff(x)] ψ
  *
  * Architecture:
  * - Single merged `spinor: array<vec2f>` storage buffer of length
@@ -50,6 +52,12 @@ import {
 } from './PauliComputePassBuffers'
 import type { PauliBindGroupResult, PauliPipelineResult } from './PauliComputePassSetup'
 import { buildPauliPipelines, rebuildPauliBindGroups } from './PauliComputePassSetup'
+import {
+  createPauliUniformStepStagingState,
+  disposePauliUniformStepStaging,
+  type PauliUniformStepStagingState,
+  prePackPauliFrameSnapshots,
+} from './PauliComputePassUniformStaging'
 import { requestStateSave as genericStateSave } from './stateSave'
 
 /** Number of f32 values in diagnostic result buffer:
@@ -97,6 +105,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   private simTime = 0
   private maxDensity = 1.0
   private stepAccumulator = 0
+  private uniformStepStaging: PauliUniformStepStagingState = createPauliUniformStepStagingState()
   /** Cached for async diagnostics readback — Larmor ω_L = μ_B·B₀/ℏ (μ_B=1 in natural units) */
   private cachedFieldStrength = 0
   private cachedHbar = 1
@@ -576,8 +585,33 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       this.stepAccumulator -= stepsThisFrame
 
       const fwdAxisCount = this.buf.fwdAxisCount
+      const uniformStaging = prePackPauliFrameSnapshots({
+        state: this.uniformStepStaging,
+        device,
+        config,
+        totalSites: this.buf.totalSites,
+        simTime: this.simTime,
+        stepsThisFrame,
+        maxDensity: this.maxDensity,
+        uniformU32: this.uniformU32,
+        uniformF32: this.uniformF32,
+        uniformData: this.uniformData,
+        basisX,
+        basisY,
+        basisZ,
+        boundingRadius,
+      })
 
       for (let step = 0; step < stepsThisFrame; step++) {
+        if (uniformStaging) {
+          ctx.encoder.copyBufferToBuffer(
+            uniformStaging,
+            step * PAULI_UNIFORM_SIZE,
+            this.buf.uniformBuffer,
+            0,
+            PAULI_UNIFORM_SIZE
+          )
+        }
         const strangPass = ctx.beginComputePass({ label: `pauli-strang-${step}` })
 
         // 1. Half-step V + Zeeman rotation
@@ -675,6 +709,15 @@ export class PauliComputePass extends WebGPUBaseComputePass {
 
         strangPass.end()
         this.simTime += config.dt
+      }
+      if (uniformStaging) {
+        ctx.encoder.copyBufferToBuffer(
+          uniformStaging,
+          stepsThisFrame * PAULI_UNIFORM_SIZE,
+          this.buf.uniformBuffer,
+          0,
+          PAULI_UNIFORM_SIZE
+        )
       }
     }
 
@@ -786,7 +829,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
               const coherenceMagnitude = Math.sqrt(
                 (sigmaX * sigmaX + sigmaY * sigmaY) / (safeTotalNorm * safeTotalNorm)
               )
-              const larmorFrequency = this.cachedFieldStrength / this.cachedHbar
+              const larmorFrequency = (2 * this.cachedFieldStrength) / this.cachedHbar
 
               if (this.initialNorm === 0 && totalNorm > 0) {
                 this.initialNorm = totalNorm
@@ -849,6 +892,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     }
     this.densityTexture?.destroy()
     this.bg?.renormalizeUniformBuffer?.destroy()
+    disposePauliUniformStepStaging(this.uniformStepStaging)
     super.dispose()
   }
 }
