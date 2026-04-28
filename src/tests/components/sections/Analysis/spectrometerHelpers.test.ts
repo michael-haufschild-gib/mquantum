@@ -45,8 +45,18 @@ describe('isHellerCompatiblePotential', () => {
     }
   })
 
-  it('exported set contains all 7 compatible potentials, no extras', () => {
-    expect(HELLER_COMPATIBLE_POTENTIALS.size).toBe(7)
+  it('exported set contains exactly the 7 compatible potentials, no extras or omissions', () => {
+    expect(HELLER_COMPATIBLE_POTENTIALS).toEqual(
+      new Set([
+        'harmonicTrap',
+        'becTrap',
+        'finiteWell',
+        'doubleWell',
+        'periodicLattice',
+        'radialDoubleWell',
+        'coupledAnharmonic',
+      ])
+    )
   })
 })
 

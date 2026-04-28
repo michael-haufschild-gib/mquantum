@@ -98,6 +98,7 @@ describe('spatialBranchPartition — input validation', () => {
     // planePosition=+0.99 (rightmost) puts both density sites in branch A.
     const right = spatialBranchPartition(psiRe, psiIm, [N], [1], 1, 0.99)
     expect(right.populationA).toBeGreaterThan(center.populationA)
+    expect(right.populationB).toBeLessThan(center.populationB)
   })
 
   it('total normalization equals sum of |ψ|² across the lattice', () => {

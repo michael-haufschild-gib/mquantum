@@ -14,7 +14,7 @@ This directory makes the validation **auditable** and **extensible**:
 
 ## Directory layout
 
-```
+```text
 docs/physics/validation/
   README.md              ← this file
   oracle-index.md        ← every claim → test → reference table (source of truth)

@@ -44,6 +44,19 @@ export function supportsFlatFourierObservables(config: Pick<TdseConfig, 'metric'
   return metricKind === 'flat' || metricKind === 'torus'
 }
 
+/** Clear observables GPU buffers, bind groups, enabled flag, and store state. */
+function teardownObservables(state: ObservablesState): void {
+  destroyObservablesBuffers(state.obsResources)
+  state.obsResources = null
+  state.obsPosReduceBG = null
+  state.obsPosFinalBG = null
+  state.obsMomReduceBG = null
+  state.obsMomFinalBG = null
+  state.esSpectrumBG = null
+  state.obsEnabled = false
+  useDiagnosticsStore.getState().resetObservables()
+}
+
 /**
  * Create or destroy observables GPU resources when observablesEnabled changes.
  */
@@ -61,15 +74,7 @@ export function updateObservablesResources(
       state.obsResources ||
       useDiagnosticsStore.getState().observables.hasData
     ) {
-      destroyObservablesBuffers(state.obsResources)
-      state.obsResources = null
-      state.obsPosReduceBG = null
-      state.obsPosFinalBG = null
-      state.obsMomReduceBG = null
-      state.obsMomFinalBG = null
-      state.esSpectrumBG = null
-      state.obsEnabled = false
-      useDiagnosticsStore.getState().resetObservables()
+      teardownObservables(state)
     }
     return
   }
@@ -77,15 +82,7 @@ export function updateObservablesResources(
   if (wantObs === state.obsEnabled && (state.obsResources || !wantObs)) return
 
   if (!wantObs) {
-    destroyObservablesBuffers(state.obsResources)
-    state.obsResources = null
-    state.obsPosReduceBG = null
-    state.obsPosFinalBG = null
-    state.obsMomReduceBG = null
-    state.obsMomFinalBG = null
-    state.esSpectrumBG = null
-    state.obsEnabled = false
-    useDiagnosticsStore.getState().resetObservables()
+    teardownObservables(state)
     return
   }
 

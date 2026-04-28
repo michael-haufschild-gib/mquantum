@@ -122,18 +122,16 @@ describe('ADS_PRESETS catalogue', () => {
 
   it('alternate quantization branch presets sit inside the BF/Klebanov-Witten window (m²L² ∈ (-(d-1)²/4, -(d-1)²/4 + 1])', () => {
     // Alternate quantization is only well-defined inside the KW window.
-    // Verify any preset claiming branch='alternate' satisfies it for its d.
+    // mL is signed: negative encodes imaginary mass, so the physically
+    // relevant quantity is signedM²L² = sign(mL) · mL². Compare it to the
+    // negative BF window directly so a regression that picks a positive-m²
+    // mass cannot pass.
     for (const p of ADS_PRESETS) {
       if (p.branch !== 'alternate') continue
-      const m2L2 = p.mL * p.mL * Math.sign(p.mL) * Math.sign(p.mL) // = mL² (mL is signed; we only need magnitude squared per BF convention)
-      // Implementation note: source comments state KW window is
-      // [-(d-1)²/4, -(d-1)²/4 + 1]; mL is signed (negative encodes
-      // imaginary mass), so the relevant quantity is sign(mL) · mL² when
-      // we want to compare to a negative window. We compare the squared
-      // magnitude to the BF bound; sign convention is outside the test
-      // scope.
-      const bfBound = ((p.d - 1) * (p.d - 1)) / 4
-      expect(m2L2).toBeLessThanOrEqual(bfBound + 1) // generous guard
+      const signedM2L2 = Math.sign(p.mL) * p.mL * p.mL
+      const bfLower = -((p.d - 1) * (p.d - 1)) / 4
+      expect(signedM2L2).toBeGreaterThan(bfLower)
+      expect(signedM2L2).toBeLessThanOrEqual(bfLower + 1)
     }
   })
 })

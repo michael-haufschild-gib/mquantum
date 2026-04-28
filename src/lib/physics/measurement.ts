@@ -74,9 +74,13 @@ function metricVolumeWeight(
 ): number {
   const metric = options?.metric
   if (!metric || metric.kind === 'flat' || metric.kind === 'torus') return 1
+  const time = options?.time ?? 0
+  if (!Number.isFinite(time)) {
+    throw new Error(`metricVolumeWeight: sampling time must be finite (got ${time})`)
+  }
 
   linearIndexToPosition(linearIndex, gridSize, spacing, latticeDim, positionScratch)
-  sampleMetricInto(metric, positionScratch, latticeDim, options?.time ?? 0, metricScratch)
+  sampleMetricInto(metric, positionScratch, latticeDim, time, metricScratch)
   return Number.isFinite(metricScratch.sqrtDet) && metricScratch.sqrtDet > 0
     ? metricScratch.sqrtDet
     : 0

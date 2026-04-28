@@ -68,9 +68,9 @@ anyone touches the rotation algorithms.
 
 **Process for each split**:
 1. Save reference output: `pnpm exec vitest run <relevant-tests>` baseline.
-2. Extract types/enums first (zero-risk).
-3. Extract pure helpers second (low-risk; covered by their own tests).
-4. Extract orchestrator helpers last (medium-risk; verify reference output).
+2. Start with types/enums extraction (zero-risk).
+3. Then move pure helpers (low-risk; covered by their own tests).
+4. Leave orchestrator-helper extraction for last (medium-risk; verify reference output).
 5. Re-run the full suite and compare numerically — `0` diffs allowed unless
    explicitly justified in the PR description.
 

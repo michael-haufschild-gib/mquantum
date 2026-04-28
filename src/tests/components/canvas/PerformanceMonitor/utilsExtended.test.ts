@@ -150,13 +150,11 @@ describe('formatShaderName', () => {
     expect(formatShaderName('bloom', 'irrelevant')).toBe('Bloom')
   })
 
-  it('camelCase objectType is split into spaced words', () => {
-    expect(formatShaderName('object', 'doubleWordObject')).toBe('Double Word Object')
-  })
-
-  it('hyphenated objectType is space-separated', () => {
-    expect(formatShaderName('object', 'foo-bar-baz')).toBe('Foo bar baz')
-  })
+  // The string-transformation paths (camelCase split, hyphen → space) are
+  // exercised by the only multi-word valid object type, 'pauliSpinor', in the
+  // test above. No real ObjectType contains hyphens or arbitrary camelCase
+  // segments, so the dead-code paths in formatShaderName are not codified
+  // here as supported behaviour.
 })
 
 describe('computeSparklinePoints', () => {

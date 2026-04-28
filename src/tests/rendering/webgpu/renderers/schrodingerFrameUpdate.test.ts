@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from 'vitest'
 
-import { quantizeBoundingRadius } from '@/rendering/webgpu/renderers/schrodingerFrameUpdate'
+import { quantizeBoundingRadius } from '@/rendering/webgpu/renderers/boundingRadiusQuantize'
 
 describe('quantizeBoundingRadius', () => {
   // Quant step = 0.05; rebuild threshold = 0.05.

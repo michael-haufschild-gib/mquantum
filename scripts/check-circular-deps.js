@@ -37,11 +37,11 @@ const ALLOWED_CYCLES = [
  * Check if a cycle is allowed (known acceptable pattern).
  */
 function isCycleAllowed(cycleFiles) {
-  const fileNames = cycleFiles.map((f) => f.split('/').pop())
-  const key = fileNames.join(',')
+  const fileNames = cycleFiles.map((f) => f.split('/').pop()).sort()
   return ALLOWED_CYCLES.some((allowed) => {
-    const allowedFiles = allowed.split(',')
-    return allowedFiles.every((af) => fileNames.includes(af))
+    const allowedFiles = allowed.split(',').sort()
+    if (allowedFiles.length !== fileNames.length) return false
+    return allowedFiles.every((af, i) => af === fileNames[i])
   })
 }
 

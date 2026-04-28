@@ -71,8 +71,7 @@ export const PRECOMPUTED_TERM_BYTE_OFFSET = SCHROEDINGER_LAYOUT.byteOffset.preco
  */
 export const PRECOMPUTED_TERM_BYTE_SIZE = SCHROEDINGER_LAYOUT.byteSize.precomputedTerm
 
-const BOUND_RADIUS_QUANT_STEP = 0.05
-const BOUND_RADIUS_REBUILD_THRESHOLD = 0.05
+import { quantizeBoundingRadius } from './boundingRadiusQuantize'
 
 /** Mutable per-frame state shared across update functions. */
 export interface SchrodingerFrameState {
@@ -107,15 +106,6 @@ export interface SchrodingerFrameState {
 
   // Bounding geometry
   boundingRadius: number
-}
-
-/** Quantize a raw bounding radius; returns new value if rebuild needed, null otherwise. */
-export function quantizeBoundingRadius(rawBoundR: number, currentBoundR: number): number | null {
-  const quantized = Math.ceil(rawBoundR / BOUND_RADIUS_QUANT_STEP) * BOUND_RADIUS_QUANT_STEP
-  if (Math.abs(quantized - currentBoundR) >= BOUND_RADIUS_REBUILD_THRESHOLD) {
-    return quantized
-  }
-  return null
 }
 
 /**

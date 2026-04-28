@@ -207,8 +207,11 @@ test.describe('TDSE curved space', () => {
     const diag = await readTdseDiagnostics(page)
 
     expect(
-      diag.hasData && diag.normDrift !== undefined && diag.normDrift !== null,
-      `TDSE diagnostics missing (hasData=${diag.hasData}, normDrift=${diag.normDrift}) — diagnostics must populate after 200 frames; investigate the diagnostics pipeline.`
+      diag.hasData &&
+        diag.normDrift !== undefined &&
+        diag.normDrift !== null &&
+        Number.isFinite(diag.normDrift),
+      `TDSE diagnostics missing or non-finite (hasData=${diag.hasData}, normDrift=${diag.normDrift}) — diagnostics must populate with finite values after 200 frames; investigate the diagnostics pipeline.`
     ).toBe(true)
 
     expect(

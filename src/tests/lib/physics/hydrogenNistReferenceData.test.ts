@@ -62,7 +62,7 @@ describe('hydrogen energy oracle (reference-data pattern)', () => {
 
   const tolerance = reference._meta.tolerance['value']
 
-  it.each(loadReference().values)(
+  it.each(reference.values)(
     'E(n=$n) matches reference within tolerance',
     ({ n, energy_hartree: expected }) => {
       const computed = hydrogenEnergy(n)

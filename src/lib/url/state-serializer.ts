@@ -43,7 +43,7 @@ import {
 
 // ─── Validation Sets ─────────────────────────────────────────────────────────
 
-const VALID_QUANTUM_MODES: SchroedingerQuantumMode[] = [
+export const VALID_QUANTUM_MODES: SchroedingerQuantumMode[] = [
   'harmonicOscillator',
   'hydrogenND',
   'hydrogenNDCoupled',

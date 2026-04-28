@@ -40,9 +40,9 @@ describe('DEFAULT_DISORDER_OVERLAY_CONFIG', () => {
     ])
   })
 
-  it('object is frozen-immutable in spirit (TypeScript-typed const cannot be mutated by callers without TS error — runtime sanity)', () => {
-    // Snapshot, mutate-attempt, restore — verify the singleton hasn't been
-    // mutated by another importer in the test suite.
+  it('runtime snapshot matches the documented default contract (no mid-suite drift)', () => {
+    // Clone-and-assert: detects whether a previous importer in the test
+    // suite has mutated the singleton, even though the TS type is `const`.
     const snapshot: DisorderOverlayConfig = { ...DEFAULT_DISORDER_OVERLAY_CONFIG }
     expect(snapshot.strength).toBe(0)
     expect(snapshot.seed).toBe(42)

@@ -203,7 +203,7 @@ describe('deserializeAds — clamping & rejection', () => {
     expect(out.adsDimension).toBeUndefined()
   })
 
-  it('rejects ads_qb out-of-range and out-of-set boolean encodings', () => {
+  it('clamps out-of-range ads_qb and rejects non-numeric encodings', () => {
     const out: AdsUrlState = {}
     deserializeAds(new URLSearchParams('ads_qb=2'), out)
     // 0..1 clamp would map 2→1, but ads_qb explicitly clamps before
@@ -223,7 +223,7 @@ describe('deserializeAds — clamping & rejection', () => {
     expect(out.adsBoundaryOverlay).toBeUndefined()
   })
 
-  it('rejects unknown HKLL source integers', () => {
+  it('clamps HKLL source integers into the supported enum range', () => {
     const out: AdsUrlState = {}
     deserializeAds(new URLSearchParams('ads_hkll_src=99'), out)
     // parseIntParam clamps 99 → 2, mapping to planeWave; verify that.

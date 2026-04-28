@@ -23,10 +23,10 @@ import {
 } from '@/lib/physics/wheelerDeWitt/implicitBulk'
 
 function maxAbsDiff(a: ArrayLike<number>, b: ArrayLike<number>): number {
+  if (a.length !== b.length) return Number.POSITIVE_INFINITY
   let m = 0
-  const n = Math.min(a.length, b.length)
-  for (let i = 0; i < n; i++) {
-    const d = Math.abs((a[i] ?? 0) - (b[i] ?? 0))
+  for (let i = 0; i < a.length; i++) {
+    const d = Math.abs(a[i]! - b[i]!)
     if (d > m) m = d
   }
   return m
@@ -116,19 +116,18 @@ describe('solveNeumannTridiag1D', () => {
     expect(r1).toBeCloseTo(2, 10)
   })
 
-  it('preserves linear ramps modulo the Neumann boundary asymmetry', () => {
-    // A linear ramp f(i) = a + b·i has L·f = 0 in the bulk; the Neumann
-    // ghost extends the ramp to (i = -1, N), so L is also zero there.
-    // Therefore (I − κL)·ramp = ramp.
+  it('does NOT preserve linear ramps — Neumann ghost breaks endpoint linearity', () => {
+    // The Neumann ghost rule (χ_{-1} = χ_0, χ_N = χ_{N-1}) extends a linear
+    // ramp non-linearly at the boundary, so L·ramp ≠ 0 there even though
+    // L·ramp = 0 in the bulk. A pure linear-in-φ mode is therefore *not*
+    // an eigenvector of (I − κL) under Neumann BCs, and the implicit solve
+    // does not return the ramp unchanged. We assert a small but non-zero
+    // endpoint error to lock in this contract — a regression that re-uses
+    // periodic ghost rules would silently make this assertion fail.
     const N = 24
     const { rhs, out, cPrime, work } = setup(N)
     for (let i = 0; i < N; i++) rhs[i] = 5 - 0.7 * i
     solveNeumannTridiag1D(rhs, out, N, 0.42, cPrime, work)
-    // The Neumann ghost rule says χ_{-1} = χ_0 and χ_N = χ_{N-1} — that
-    // BREAKS linearity at the boundary, so the implicit solve does NOT
-    // preserve a ramp exactly. Verify the error pattern is small but
-    // present at the endpoints — this documents that a true linear-in-φ
-    // mode is *not* an eigenvector of the Neumann operator.
     expect(maxAbsDiff(out, rhs)).toBeGreaterThan(1e-9)
   })
 })

@@ -33,6 +33,7 @@ import {
   refreshDensityDistribution,
   startPendingReadback,
 } from './DensityGridComputePassDispose'
+import type { DensityGridComputeConfig } from './DensityGridComputePassTypes'
 import { createGradientPipeline } from './DensityGridGradientSetup'
 
 // Default grid size (64^3 = 262,144 voxels)
@@ -43,7 +44,6 @@ const DEFAULT_WORLD_BOUND = 2.0
 
 // Workgroup size (must match shader @workgroup_size)
 const WORKGROUP_SIZE = 8
-import type { DensityGridComputeConfig } from './DensityGridComputePassTypes'
 
 export type { DensityGridComputeConfig }
 

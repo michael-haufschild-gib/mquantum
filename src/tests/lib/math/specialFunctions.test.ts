@@ -67,7 +67,7 @@ describe('lnFactorial', () => {
 
   it('matches Stirling approximation for large n within expected slack', () => {
     // Stirling: ln(n!) ≈ n·ln(n) − n + 0.5·ln(2πn). Asymptotic error is O(1/n)
-    // so 1e-3 absolute slack at n=170 is generous.
+    // so 1e-2 absolute slack at n=170 is generous.
     for (const n of [50, 100, 170]) {
       const stirling = n * Math.log(n) - n + 0.5 * Math.log(2 * Math.PI * n)
       expect(Math.abs(lnFactorial(n) - stirling)).toBeLessThan(1e-2)

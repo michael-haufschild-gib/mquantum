@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { SrmtUrlState } from '@/lib/url/srmtSerializer'
 import { deserializeSrmt, serializeSrmt, VALID_SRMT_CLOCKS } from '@/lib/url/srmtSerializer'
+import { VALID_QUANTUM_MODES } from '@/lib/url/state-serializer'
 
 describe('serializeSrmt — scope guard', () => {
   it('no-ops when quantumMode is undefined', () => {
@@ -21,16 +22,11 @@ describe('serializeSrmt — scope guard', () => {
   })
 
   it('no-ops when quantumMode is anything other than wheelerDeWitt', () => {
-    for (const mode of [
-      'harmonicOscillator',
-      'hydrogenND',
-      'tdseDynamics',
-      'becDynamics',
-      'diracEquation',
-      'antiDeSitter',
-      'freeScalarField',
-      'quantumWalk',
-    ]) {
+    // Derive the non-WdW set from the canonical mode list so adding a new
+    // quantumMode automatically widens the guard's coverage.
+    const nonWdwModes = VALID_QUANTUM_MODES.filter((m) => m !== 'wheelerDeWitt')
+    expect(nonWdwModes.length).toBeGreaterThan(0)
+    for (const mode of nonWdwModes) {
       const params = new URLSearchParams()
       serializeSrmt(params, mode, {
         wdwSrmtEnabled: true,

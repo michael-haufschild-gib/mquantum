@@ -62,6 +62,15 @@ fn tdseDiagVolumeWeight(idx: u32) -> f32 {
   if (params.metricKind == 0u || params.metricKind == 6u) { return 1.0; }
   let coords = tdseDiagWorldCoords(idx);
   let metricTime = select(params.simTime, params.stageTimeK4, params.metricKind == 3u);
+  // tdseCurvatureSqrtDet is finite-positive by construction: every metric
+  // branch clamps the dominant radial/scale factor to >= small positive
+  // (max(throatRadius, 0.1), max(adsRadius, 0.1), pole epsilon, etc.) so
+  // sqrt arguments stay positive and exp/products of finite positives stay
+  // finite. The CPU writer (writeTdseUniforms) further requires finite
+  // metric params before dispatch. The max(..., 0.0) below is a defensive
+  // floor against rare driver fast-math negative-zero artifacts; WGSL does
+  // not guarantee NaN propagation through max, and isFinite is unavailable
+  // for f32, so NaN/Inf prevention is enforced upstream.
   return max(tdseCurvatureSqrtDet(coords, params.latticeDim, metricTime), 0.0);
 }
 

@@ -72,13 +72,14 @@ describe('SoundManager state management', () => {
     const internal = soundManager as unknown as {
       ctx: { createBufferSource?: ReturnType<typeof vi.fn> } | null
     }
-    if (internal.ctx?.createBufferSource) {
+    if (internal.ctx && vi.isMockFunction(internal.ctx.createBufferSource)) {
       internal.ctx.createBufferSource.mockClear()
       soundManager.playClick()
       expect(internal.ctx.createBufferSource).not.toHaveBeenCalled()
     } else {
-      // ctx may be uninitialised at this point — disabled-state guard fires
-      // first so playClick is a no-op regardless. Just verify no throw.
+      // No mocked AudioContext available (uninitialised, or initialised with
+      // a real Web Audio API). The disabled-state guard fires first so
+      // playClick is a no-op regardless — verify no throw.
       expect(() => soundManager.playClick()).not.toThrow()
     }
   })
@@ -91,8 +92,12 @@ describe('SoundManager state management', () => {
         createOscillator?: ReturnType<typeof vi.fn>
       } | null
     }
-    if (!internal.ctx) {
-      // No audio context to inspect; smoke test: every method returns void.
+    if (
+      !internal.ctx ||
+      !vi.isMockFunction(internal.ctx.createBufferSource) ||
+      !vi.isMockFunction(internal.ctx.createOscillator)
+    ) {
+      // No mocked audio context to inspect; smoke test: every method returns void.
       expect(soundManager.playClick()).toBeUndefined()
       expect(soundManager.playHover()).toBeUndefined()
       expect(soundManager.playSnap()).toBeUndefined()
@@ -100,8 +105,8 @@ describe('SoundManager state management', () => {
       expect(soundManager.playSwish()).toBeUndefined()
       return
     }
-    internal.ctx.createBufferSource?.mockClear()
-    internal.ctx.createOscillator?.mockClear()
+    internal.ctx.createBufferSource.mockClear()
+    internal.ctx.createOscillator.mockClear()
     soundManager.playClick()
     soundManager.playHover()
     soundManager.playSnap()
