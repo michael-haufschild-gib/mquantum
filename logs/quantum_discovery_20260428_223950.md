@@ -183,6 +183,20 @@ Render gravitational memory as a time-nonlocal postprocess over the WebGPU quant
 
 ### Outcome
 
+- Commit: `faa88031` (`Add free-scalar freeze-out strain view`)
+- Reviewer result: PASS.
+- What renderer now draws: a new Free Scalar Field `Freeze` view that writes a bounded cosmological freeze-out strain scalar into the 3D density grid, using proper-frame kinetic, gradient, potential, preheating, and self-interaction terms already present in the compute shader.
+- Paths affected: Free Scalar Field write-grid compute shader and field-view UI/packing.
+- Verification:
+  - `pnpm exec vitest run src/tests/rendering/webgpu/passes/FreeScalarFieldComputePassUniforms.test.ts src/tests/rendering/webgpu/freeScalarCosmologyShaders.test.ts src/tests/components/sections/Geometry/SchroedingerControls/FreeScalarFieldControls.test.tsx` — PASS, 67 tests.
+  - `pnpm exec tsc --noEmit` — PASS.
+  - `pnpm run lint` — PASS.
+  - `pnpm test:shaders:fast` — PASS.
+  - `git diff --check` — PASS.
+- Follow-up threads: add freeze-out preset scenes; expose strain as analysis texture channel; compare local proxy against k-space occupation growth during preheating.
+
+### Outcome
+
 - Commit: `6441ff4f` (`Add causal horizon memory echo`)
 - Reviewer result: PASS.
 - What renderer now draws: a frame-history causal horizon memory pass where previous-frame luminance gradients refract the current frame, center-origin radial echo shells sample historical light, and rapid current-vs-history changes suppress memory persistence.
@@ -195,3 +209,44 @@ Render gravitational memory as a time-nonlocal postprocess over the WebGPU quant
   - `pnpm test:shaders:fast` — PASS.
   - `git diff --check` — PASS.
 - Follow-up threads: make horizon center follow brightest gravitational caustic; feed temporal reprojection velocity into echo decay; expose echo field as diagnostic overlay.
+
+## Round PRD: Free-Scalar Cosmological Freeze-Out Strain
+
+### Scientific Goal
+
+Render horizon-scale freeze-out in the free scalar field compute mode as a new density-grid field view. The observable should expose where local gradient stress has redshifted away while the field remains phase-space squeezed between kinetic and potential energy, giving a visual proxy for cosmological mode freeze-out and particle production.
+
+### Physics / Math
+
+- Add `freezeOutStrain` to `FreeScalarFieldView`.
+- Map `freezeOutStrain` to shader `fieldView = 4`.
+- In `freeScalarWriteGrid`:
+  - Reuse nearest-neighbor `φ`, `π`, and axis-weighted gradient energy already computed for energy/analysis paths.
+  - Compute proper-frame components:
+    - `K = 0.5 * aKinetic * π² / aFull`
+    - `G = 0.5 * gradEnergy / aFull`
+    - `V = 0.5 * m² * aFull * massSquaredScale * φ² / aFull + V_self`
+  - Define freeze-out gate `F = 1 - G / (K + G + V + eps)` so low-gradient, super-horizon-like regions activate.
+  - Define phase-space balance `B = 1 - |K - V| / (K + V + eps)` so pure kinetic or pure potential regions do not dominate.
+  - Define flux strain from `|π| * sqrt(gradEnergy)` normalized by local total energy so active fronts remain visible.
+  - Output `clamp(0.7 * F * B + 0.3 * fluxStrain, 0, 1)`.
+- Normalize this view with maxFieldValue `1.0`.
+- Keep existing field views bit-identical.
+
+### User Sees
+
+- Free Scalar Field controls gain a `Freeze` field-view option alongside `φ`, `π`, and `ε`.
+- Selecting it renders a bounded scalar field showing cosmological freeze-out strain. Under de Sitter, preheating, or Bianchi/Kasner runs, frozen domains and active fronts become visible in the 3D raymarched volume instead of requiring diagnostics.
+
+### Acceptance Bar
+
+- TypeScript compiles.
+- Unit/source tests cover:
+  - `freezeOutStrain` packs to fieldView enum `4`.
+  - Its max-field estimator returns `1.0`.
+  - `freeScalarWriteGrid` branch uses `aKinetic`, `aFull`, `gradEnergy`, `massSquaredScale`, `freezeOutGate`, `phaseSpaceBalance`, and `fluxStrain`.
+  - UI exposes the `freezeOutStrain` option.
+- `pnpm exec vitest run src/tests/rendering/webgpu/passes/FreeScalarFieldComputePassUniforms.test.ts src/tests/rendering/webgpu/freeScalarCosmologyShaders.test.ts src/tests/components/sections/Geometry/SchroedingerControls/FreeScalarFieldControls.test.tsx`
+- `pnpm exec tsc --noEmit`
+- `pnpm run lint`
+- `pnpm test:shaders:fast`

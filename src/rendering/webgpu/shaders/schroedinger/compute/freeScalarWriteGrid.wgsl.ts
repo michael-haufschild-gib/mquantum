@@ -288,7 +288,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   var gradEnergy: f32 = 0.0;
   var gradPhi: array<f32, 12>;
 
-  let needGrad = params.fieldView == 2u || hasAnalysis;
+  let needGrad = params.fieldView == 2u || params.fieldView == 4u || hasAnalysis;
   if (needGrad) {
     let hasPML = params.absorberEnabled != 0u;
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
@@ -354,6 +354,23 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let wdPhi2 = nnPhiVal * nnPhiVal;
     let wdDiff = wdPhi2 - wdV2;
     fieldValue = params.selfInteractionLambda * wdDiff * wdDiff;
+  } else if (params.fieldView == 4u) {
+    let invAFull = select(1.0 / params.aFull, 1.0, params.aFull <= 0.0);
+    let K = 0.5 * params.aKinetic * nnPiVal * nnPiVal * invAFull;
+    let G = 0.5 * gradEnergy * invAFull;
+    var V = 0.5 * drivenMassCoef * nnPhiVal * nnPhiVal * invAFull;
+    if (params.selfInteractionEnabled != 0u) {
+      let fsV2 = params.selfInteractionVev * params.selfInteractionVev;
+      let fsPhi2 = nnPhiVal * nnPhiVal;
+      let fsDiff = fsPhi2 - fsV2;
+      V += params.aFull * params.selfInteractionLambda * fsDiff * fsDiff * invAFull;
+    }
+
+    let localEnergy = max(K + G + V, 1e-12);
+    let freezeOutGate = 1.0 - clamp(G / localEnergy, 0.0, 1.0);
+    let phaseSpaceBalance = 1.0 - clamp(abs(K - V) / max(K + V, 1e-12), 0.0, 1.0);
+    let fluxStrain = clamp(abs(nnPiVal) * sqrt(max(gradEnergy, 0.0)) * invAFull / localEnergy, 0.0, 1.0);
+    fieldValue = clamp(0.7 * freezeOutGate * phaseSpaceBalance + 0.3 * fluxStrain, 0.0, 1.0);
   } else {
     // Physical Hamiltonian energy density in the canonical δφ variables:
     //   H_can(x) = ½ aKinetic π² + ½ aPotential (∇δφ)² + ½ mass²·aFull δφ²

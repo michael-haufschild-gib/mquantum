@@ -297,6 +297,22 @@ describe('writeFsfUniforms', () => {
     expect(new Uint32Array(uniformData)[41]).toBe(2)
   })
 
+  it('maps freezeOutStrain field view to shader enum 4', () => {
+    const uniformData = new ArrayBuffer(512)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
+      config: createConfig({ fieldView: 'freezeOutStrain' }),
+      totalSites: 32768,
+      maxFieldValue: 1.0,
+      simEta: 0,
+      preheatingTime: 0,
+      preheatingReferenceEta: 0,
+    })
+
+    expect(new Uint32Array(uniformData)[41]).toBe(4)
+  })
+
   it('uploads the buffer to the GPU via device.queue.writeBuffer', () => {
     const uniformData = new ArrayBuffer(512)
     const writeBuffer = vi.fn()
@@ -463,6 +479,15 @@ describe('estimateFsfMaxFieldValue with self-interaction', () => {
     })
 
     expect(estimateFsfMaxFieldValue(config, 1.0)).toBe(1.0)
+  })
+
+  it('returns 1.0 for bounded freezeOutStrain view', () => {
+    const config = createConfig({
+      fieldView: 'freezeOutStrain',
+      autoScale: true,
+    })
+
+    expect(estimateFsfMaxFieldValue(config, 123)).toBe(1.0)
   })
 
   it('adds λv⁴ to energy density estimate when SI is enabled', () => {

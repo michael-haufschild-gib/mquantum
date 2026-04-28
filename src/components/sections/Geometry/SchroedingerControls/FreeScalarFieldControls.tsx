@@ -86,6 +86,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
         { value: 'phi', label: 'φ' },
         { value: 'pi', label: 'π' },
         { value: 'energyDensity', label: 'ε' },
+        { value: 'freezeOutStrain', label: 'Freeze' },
       ]
       if (fs.selfInteractionEnabled) {
         opts.push({ value: 'wallDensity', label: 'V(φ)' })
