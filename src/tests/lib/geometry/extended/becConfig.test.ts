@@ -1,8 +1,8 @@
 /**
  * BEC config — analog Hawking extension tests.
  *
- * Verifies that the new union members (`'blackHoleAnalog'` initial condition
- * and `'machNumber'` field view) are accepted by `DEFAULT_BEC_CONFIG`
+ * Verifies that the analog-Hawking union members (`'blackHoleAnalog'` initial
+ * condition and horizon field views) are accepted by `DEFAULT_BEC_CONFIG`
  * clones and that the new hawking parameter defaults match the PRD.
  *
  * These tests guard against:
@@ -51,10 +51,13 @@ describe('BecInitialCondition / BecFieldView — union members', () => {
     expect(cfg.initialCondition).toBe('blackHoleAnalog')
   })
 
-  it("accepts 'machNumber' as a BecFieldView value", () => {
-    const fv: BecFieldView = 'machNumber'
-    const cfg: BecConfig = { ...DEFAULT_BEC_CONFIG, fieldView: fv }
-    expect(cfg.fieldView).toBe('machNumber')
+  it('accepts analog-horizon field views as BecFieldView values', () => {
+    const mach: BecFieldView = 'machNumber'
+    const flux: BecFieldView = 'hawkingFlux'
+    const machCfg: BecConfig = { ...DEFAULT_BEC_CONFIG, fieldView: mach }
+    const fluxCfg: BecConfig = { ...DEFAULT_BEC_CONFIG, fieldView: flux }
+    expect(machCfg.fieldView).toBe('machNumber')
+    expect(fluxCfg.fieldView).toBe('hawkingFlux')
   })
 })
 

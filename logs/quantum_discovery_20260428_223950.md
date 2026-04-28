@@ -183,6 +183,24 @@ Render gravitational memory as a time-nonlocal postprocess over the WebGPU quant
 
 ### Outcome
 
+- Commit: `Add BEC Hawking flux view` (amended with this outcome)
+- Reviewer result: PASS after fixing reviewer-blocking issues.
+- What renderer now draws: a new BEC `Hawking Flux κ/2π` field view that writes a bounded, density-gated, horizon-local scalar into the TDSE/BEC density grid. The scalar is tied to the evolved Mach crossing and the same detrended/periodized waterfall surface-gravity profile used by initialization.
+- Paths affected: BEC/TDSE field-view types, TDSE uniform packing, TDSE write-grid WGSL, BEC controls, and BEC store guardrails.
+- Review fixes:
+  - Replaced stale undetrended tanh κ estimate with `L_box`, `edgeT`, detrended `v_s`, periodized density coordinate, and `0.5 * |d(c_s² - v_s²)/dx| / c_s`.
+  - Added shader guard so non-`blackHoleAnalog` states render zero for `hawkingFlux`.
+  - Hid the UI option outside `blackHoleAnalog` and made the store reject/reset invalid `hawkingFlux` selections.
+- Verification:
+  - `pnpm exec vitest run src/tests/lib/geometry/extended/becConfig.test.ts src/tests/stores/extendedObjectStore.bec.test.ts src/tests/rendering/webgpu/passes/TDSEComputePassUniforms.test.ts src/tests/rendering/webgpu/tdseWriteGridHawkingFlux.test.ts src/tests/components/sections/Geometry/SchroedingerControls/BECControls.test.tsx` — PASS, 98 tests.
+  - `pnpm exec tsc --noEmit` — PASS.
+  - `pnpm run lint` — PASS.
+  - `pnpm test:shaders:fast` — PASS.
+  - `git diff --check` — PASS.
+- Follow-up threads: numeric CPU/WGSL parity for κ proxy; combine flux view with Page-curve island overlay; add a preset that starts directly in Hawking-flux view.
+
+### Outcome
+
 - Commit: `faa88031` (`Add free-scalar freeze-out strain view`)
 - Reviewer result: PASS.
 - What renderer now draws: a new Free Scalar Field `Freeze` view that writes a bounded cosmological freeze-out strain scalar into the 3D density grid, using proper-frame kinetic, gradient, potential, preheating, and self-interaction terms already present in the compute shader.
@@ -247,6 +265,51 @@ Render horizon-scale freeze-out in the free scalar field compute mode as a new d
   - `freeScalarWriteGrid` branch uses `aKinetic`, `aFull`, `gradEnergy`, `massSquaredScale`, `freezeOutGate`, `phaseSpaceBalance`, and `fluxStrain`.
   - UI exposes the `freezeOutStrain` option.
 - `pnpm exec vitest run src/tests/rendering/webgpu/passes/FreeScalarFieldComputePassUniforms.test.ts src/tests/rendering/webgpu/freeScalarCosmologyShaders.test.ts src/tests/components/sections/Geometry/SchroedingerControls/FreeScalarFieldControls.test.tsx`
+- `pnpm exec tsc --noEmit`
+- `pnpm run lint`
+- `pnpm test:shaders:fast`
+
+## Round PRD: BEC Analog-Horizon Hawking Flux View
+
+### Scientific Goal
+
+Render the analog black-hole sonic horizon as an emitted-flux field, not only as a Mach-number isosurface. The new view should make the local Hawking-temperature proxy visible where the condensate crosses `M = |v_s| / c_s = 1`, so the waterfall profile shows both the horizon location and the surface-gravity scale that drives phonon production.
+
+### Physics / Math
+
+- Add `hawkingFlux` to the BEC/TDSE field-view enum.
+- Map `hawkingFlux` to shader `fieldView = 7`.
+- In `tdseWriteGrid`:
+  - Reuse `computeSuperfluidVelocityMagSq` to compute local `v_s`.
+  - Compute local sound speed `c_s = sqrt(g |psi|^2 / m)`.
+  - Gate emission to the sonic horizon with `1 - smoothstep(0, 0.25, abs(M - 1))`.
+  - Estimate waterfall surface gravity from the same detrended/periodized profile used by initialization:
+    - `L_box = gridSize[0] * spacing[0]`
+    - `T = tanh(L_box / (2 L_h))`
+    - `v_s(x) = v_max (tanh(x/L_h) - 2xT/L_box)`
+    - `q_n(x) = L_box sin(pi x/L_box) / (pi L_h)`
+    - `n(x) = n0 (1 - deltaN sech^2(q_n))`
+    - `kappa = 0.5 * |d(c_s^2 - v_s^2)/dx| / c_s`
+  - Convert to a bounded flux/temperature proxy with `1 - exp(-kappa / 2π)`.
+  - Density-gate the result so empty voxels remain transparent.
+- Render zero when the active initial condition is not `blackHoleAnalog`.
+- Keep existing density, phase, current, potential, velocity, healing-length, and Mach views unchanged.
+
+### User Sees
+
+- BEC controls gain a `Hawking Flux κ/2π` field-view option.
+- Selecting it renders a bright, localized shell/sheet near the sonic horizon. Steeper waterfall profiles or larger `v_max` brighten the horizon; weaker/no horizon leaves little emission.
+
+### Acceptance Bar
+
+- TypeScript compiles.
+- Unit/source tests cover:
+  - `hawkingFlux` is accepted as a BEC field view.
+  - `hawkingFlux` packs to TDSE `fieldView = 7`.
+  - `tdseWriteGrid` contains the fieldView-7 analog-only branch using Mach, `hawkingVmax`, `hawkingLh`, `hawkingDeltaN`, `horizonGate`, detrended `edgeT`, periodized density derivative, and `surfaceGravity`.
+  - BEC UI exposes `Hawking Flux κ/2π` only for `blackHoleAnalog`.
+  - BEC store rejects non-analog `hawkingFlux` selection and resets it when leaving `blackHoleAnalog`.
+- `pnpm exec vitest run src/tests/lib/geometry/extended/becConfig.test.ts src/tests/stores/extendedObjectStore.bec.test.ts src/tests/rendering/webgpu/passes/TDSEComputePassUniforms.test.ts src/tests/rendering/webgpu/tdseWriteGridHawkingFlux.test.ts src/tests/components/sections/Geometry/SchroedingerControls/BECControls.test.tsx`
 - `pnpm exec tsc --noEmit`
 - `pnpm run lint`
 - `pnpm test:shaders:fast`

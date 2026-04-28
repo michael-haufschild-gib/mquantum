@@ -28,6 +28,7 @@ export type TdseFieldView =
   | 'superfluidVelocity'
   | 'healingLength'
   | 'machNumber'
+  | 'hawkingFlux'
 
 /**
  * Initial condition type for the TDSE wavepacket

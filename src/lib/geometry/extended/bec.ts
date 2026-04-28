@@ -39,6 +39,7 @@ export type BecInitialCondition =
  * - superfluidVelocity: v_s = (ℏ/m) ∇arg(ψ), shows vortex flow
  * - healingLength: local ξ(x) = ℏ/√(2m·g·|ψ|²)
  * - machNumber: M = |v_s|/c_s (analog black-hole Mach-number field; horizon at M=1)
+ * - hawkingFlux: horizon-local κ/2π proxy gated to M≈1 sonic-horizon voxels
  */
 export type BecFieldView =
   | 'density'
@@ -48,6 +49,7 @@ export type BecFieldView =
   | 'superfluidVelocity'
   | 'healingLength'
   | 'machNumber'
+  | 'hawkingFlux'
 
 // ============================================================================
 // BEC Config

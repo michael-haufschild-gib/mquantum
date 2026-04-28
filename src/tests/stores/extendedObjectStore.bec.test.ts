@@ -90,12 +90,29 @@ describe('BEC setters', () => {
       expect(bec().initialCondition).toBe('vortexImprint')
       expect(bec().needsReset).toBe(true)
     })
+
+    it('resets hawkingFlux when leaving blackHoleAnalog', () => {
+      store().setBecInitialCondition('blackHoleAnalog')
+      store().setBecFieldView('hawkingFlux')
+      store().setBecInitialCondition('thomasFermi')
+      expect(bec().initialCondition).toBe('thomasFermi')
+      expect(bec().fieldView).toBe('density')
+    })
   })
 
   describe('setBecFieldView', () => {
     it('sets field view', () => {
       store().setBecFieldView('phase')
       expect(bec().fieldView).toBe('phase')
+    })
+
+    it('allows hawkingFlux only for blackHoleAnalog', () => {
+      store().setBecFieldView('hawkingFlux')
+      expect(bec().fieldView).toBe('density')
+
+      store().setBecInitialCondition('blackHoleAnalog')
+      store().setBecFieldView('hawkingFlux')
+      expect(bec().fieldView).toBe('hawkingFlux')
     })
   })
 

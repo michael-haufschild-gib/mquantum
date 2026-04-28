@@ -158,6 +158,11 @@ describe('BECControls', () => {
     expect(screen.getByText(/sites/)).toBeInTheDocument()
   })
 
+  it('hides the Hawking flux field view option outside the analog horizon', () => {
+    render(<BECControls config={defaultConfig()} dimension={3} actions={createMockActions()} />)
+    expect(screen.queryByRole('option', { name: 'Hawking Flux κ/2π' })).not.toBeInTheDocument()
+  })
+
   describe('Hawking (Analog Horizon) controls', () => {
     function analogHorizonConfig() {
       const cfg = defaultConfig()
@@ -179,6 +184,13 @@ describe('BECControls', () => {
       expect(screen.getByTestId('bec-hawking-inject')).toBeInTheDocument()
       expect(screen.getByTestId('bec-hawking-rate')).toBeInTheDocument()
       expect(screen.getByTestId('bec-hawking-seed')).toBeInTheDocument()
+    })
+
+    it('exposes the Hawking flux field view option for blackHoleAnalog', () => {
+      render(
+        <BECControls config={analogHorizonConfig()} dimension={3} actions={createMockActions()} />
+      )
+      expect(screen.getByRole('option', { name: 'Hawking Flux κ/2π' })).toBeInTheDocument()
     })
 
     it('hides Hawking controls when initial condition is not blackHoleAnalog', () => {

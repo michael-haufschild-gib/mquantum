@@ -321,7 +321,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   // Determine if we use trilinear or NN for this field view
   // Trilinear: density (0), phase (1)
-  // NN: current (2), potential (3), velocity (4), healing (5)
+  // NN: current (2), potential (3), velocity (4), healing (5), Mach/Hawking (6+)
   let useTrilinear = params.fieldView <= 1u;
 
   var re: f32;
@@ -469,6 +469,55 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // separately differentiated — use the superfluidVelocity view for |v_s|.
     let machDisplay = clamp(mach, 0.0, 1.0);
     displayScalar = machDisplay * densityGate;
+  } else if (params.fieldView == 7u) {
+    if (params.initCondition != 7u) {
+      displayScalar = 0.0;
+    } else {
+      // Analog-Hawking flux proxy: local surface gravity kappa mapped through
+      // T_H = kappa / 2pi, then gated to the evolved M ~= 1 sonic horizon.
+      //
+      // The Mach gate comes from the actual wavefunction, while kappa mirrors
+      // the same C1-at-wrap waterfall profile used by tdseInit.wgsl and
+      // sonicHorizon.ts:
+      //   v_s = v_max(tanh(x/L_h) - 2xT/L_box)
+      //   n   = n0(1 - deltaN sech^2(q_n))
+      let vsMagSq = computeSuperfluidVelocityMagSq(idx, re, im, density, &nnCoords, &invSpacings);
+      let gAbs = max(abs(params.interactionStrength), 1e-10);
+      let csSq = max(gAbs * density / max(params.mass, 1e-6), 1e-12);
+      let vs = sqrt(vsMagSq);
+      let cs = sqrt(csSq);
+      let mach = vs / cs;
+      let horizonGate = 1.0 - smoothstep(0.0, 0.25, abs(mach - 1.0));
+
+      let lh = max(abs(params.hawkingLh), 1e-4);
+      let lBox = max(f32(params.gridSize[0]) * params.spacing[0], 1e-4);
+      let x0 = ndWorldPos[0];
+      let edgeT = tanh(lBox / (2.0 * lh));
+      let uFlow = x0 / lh;
+      let tanhFlow = tanh(uFlow);
+      let flowSech2 = max(0.0, 1.0 - tanhFlow * tanhFlow);
+      let flowSigned = params.hawkingVmax * (tanhFlow - (2.0 * x0 / lBox) * edgeT);
+      let flowGradient = params.hawkingVmax * (flowSech2 / lh - 2.0 * edgeT / lBox);
+
+      let dip = clamp(params.hawkingDeltaN, 0.0, 0.6);
+      let uDensity = (lBox / (TDSE_WG_PI * lh)) * sin(TDSE_WG_PI * x0 / lBox);
+      let densityTanh = tanh(uDensity);
+      let densitySech = 1.0 / cosh(uDensity);
+      let densitySech2 = densitySech * densitySech;
+      let densityDipFactor = max(1.0 - dip * densitySech2, 1e-3);
+      let duDensityDx = cos(TDSE_WG_PI * x0 / lBox) / lh;
+      let dDensityDipFactorDx = 2.0 * dip * densitySech2 * densityTanh * duDensityDx;
+      let dCsSqDx = csSq * dDensityDipFactorDx / densityDipFactor;
+      let dVsSqDx = 2.0 * flowSigned * flowGradient;
+      let acousticGradient = dCsSqDx - dVsSqDx;
+      let surfaceGravity = 0.5 * abs(acousticGradient) / max(cs, 1e-6);
+
+      let hawkingTemperatureProxy = surfaceGravity * TDSE_WG_INV_TAU;
+      let pairStimulus = 1.0
+        + f32(params.hawkingPairInjection) * 0.5 * clamp(params.hawkingInjectRate / 0.5, 0.0, 1.0);
+      let fluxProxy = (1.0 - exp(-hawkingTemperatureProxy)) * pairStimulus;
+      displayScalar = clamp(horizonGate * fluxProxy, 0.0, 1.0) * densityGate;
+    }
   } else if (params.fieldView == 3u) {
     // potential (NN)
     let potentialScale = getPotentialScale();

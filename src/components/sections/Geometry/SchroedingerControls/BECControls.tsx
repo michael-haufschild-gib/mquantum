@@ -48,6 +48,7 @@ const FIELD_VIEW_OPTIONS = [
   { value: 'superfluidVelocity', label: 'Superfluid Velocity' },
   { value: 'healingLength', label: 'Healing Length' },
   { value: 'machNumber', label: 'Mach Number M = |v_s|/c_s' },
+  { value: 'hawkingFlux', label: 'Hawking Flux κ/2π' },
 ]
 
 /**
@@ -96,6 +97,13 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
     const showSolitonControls = bec.initialCondition === 'darkSoliton'
     const showReconnectionControls = bec.initialCondition === 'vortexReconnection'
     const showAnalogHorizonControls = bec.initialCondition === 'blackHoleAnalog'
+    const fieldViewOptions = useMemo(
+      () =>
+        showAnalogHorizonControls
+          ? FIELD_VIEW_OPTIONS
+          : FIELD_VIEW_OPTIONS.filter((option) => option.value !== 'hawkingFlux'),
+      [showAnalogHorizonControls]
+    )
 
     // Build axis pair options for vortex plane selectors
     const axisPairOptions = useMemo(() => {
@@ -335,7 +343,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
             tooltip="Which physical observable to visualize: condensate density, phase, probability current, or potential."
             value={bec.fieldView}
             onChange={(v) => actions.setFieldView(v as BecFieldView)}
-            options={FIELD_VIEW_OPTIONS}
+            options={fieldViewOptions}
           />
         </ControlGroup>
 
