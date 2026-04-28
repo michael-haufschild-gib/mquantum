@@ -374,7 +374,9 @@ export function computeIncompressibleSpectrum(
 
   let voxelVolume = 1
   for (let d = 0; d < dim; d++) voxelVolume *= spacing[d]!
+  if (!Number.isFinite(voxelVolume) || voxelVolume <= 0) return zeroResult()
   const energyScale = 0.5 * mass * (voxelVolume / totalSites)
+  if (!Number.isFinite(energyScale)) return zeroResult()
 
   // Scale by physical Parseval factor and convert to Float32.
   const spectrumF32 = new Float32Array(numBins)

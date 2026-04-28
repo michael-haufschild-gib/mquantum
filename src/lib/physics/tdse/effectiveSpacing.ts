@@ -19,7 +19,13 @@ function clampFinite(value: number | undefined, min: number, max: number): numbe
 }
 
 /**
- *
+ * Inputs for TDSE effective spacing computation. `gridSize` and `spacing`
+ * carry one entry per render axis (length must agree with `latticeDim`,
+ * which is clamped to `[0, 3]` by the consumer). `compactDims`/`compactRadii`
+ * are parallel arrays describing per-axis compactification (length-matched
+ * with `gridSize`); when omitted the axis is treated as non-compact.
+ * `metric.kind === 'torus'` overrides `spacing[d] = torusPeriod[d] / N_d`
+ * on the first three axes.
  */
 export interface TdseSpacingConfig {
   gridSize: number[]
@@ -31,7 +37,11 @@ export interface TdseSpacingConfig {
 }
 
 /**
- *
+ * Override `spacing[d]` with `torusPeriod[d] / N_d` for the first three
+ * lattice axes when `metric.kind === 'torus'`. The torus period is clamped
+ * to `[MIN_TORUS_PERIOD, MAX_TORUS_PERIOD]`. Non-torus metrics return the
+ * input spacing unchanged. Axes with non-finite or non-positive `gridSize`
+ * are skipped.
  */
 export function applyTorusMetricSpacing(
   spacing: number[],
@@ -53,7 +63,11 @@ export function applyTorusMetricSpacing(
 }
 
 /**
+ * Compute effective lattice spacings for the TDSE host pipeline.
  *
+ * Pipeline: first apply `computeEffectiveSpacing` (compactification), then
+ * `applyTorusMetricSpacing` (torus-period override on the first three
+ * axes when the metric is a torus). Returns one spacing per axis.
  */
 export function computeTdseEffectiveSpacing(config: TdseSpacingConfig): number[] {
   const spacing = computeEffectiveSpacing(

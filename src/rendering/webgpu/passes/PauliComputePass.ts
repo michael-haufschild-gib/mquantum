@@ -106,7 +106,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   private maxDensity = 1.0
   private stepAccumulator = 0
   private uniformStepStaging: PauliUniformStepStagingState = createPauliUniformStepStagingState()
-  /** Cached for async diagnostics readback — Larmor ω_L = μ_B·B₀/ℏ (μ_B=1 in natural units) */
+  /** Cached for async diagnostics readback — Larmor ω_L = 2·B₀/ℏ for H = σ·B (μ_B=1 units) */
   private cachedFieldStrength = 0
   private cachedHbar = 1
   /** Initial total norm from first diagnostics readback (for relative drift) */
