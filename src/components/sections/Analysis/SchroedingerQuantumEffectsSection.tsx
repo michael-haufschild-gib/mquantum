@@ -18,6 +18,7 @@ import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/exten
 import { useGeometryStore } from '@/stores/geometryStore'
 
 import { SchroedingerEntropicTimeShearControls } from './SchroedingerEntropicTimeShearControls'
+import { SchroedingerSpectralDimensionFlowControls } from './SchroedingerSpectralDimensionFlowControls'
 
 const NODAL_DEFINITION_OPTIONS: { value: SchroedingerNodalDefinition; label: string }[] = [
   { value: 'psiAbs', label: '|ψ| (Nodal Envelope)' },
@@ -81,6 +82,11 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
       setEntropicTimeShearStrength: state.setSchroedingerEntropicTimeShearStrength,
       setEntropicTimeShearFilamentScale: state.setSchroedingerEntropicTimeShearFilamentScale,
       setEntropicTimeShearIrreversibility: state.setSchroedingerEntropicTimeShearIrreversibility,
+      setSpectralDimensionFlowEnabled: state.setSchroedingerSpectralDimensionFlowEnabled,
+      setSpectralDimensionFlowStrength: state.setSchroedingerSpectralDimensionFlowStrength,
+      setSpectralDimensionFlowUvDimension: state.setSchroedingerSpectralDimensionFlowUvDimension,
+      setSpectralDimensionFlowDiffusionScale:
+        state.setSchroedingerSpectralDimensionFlowDiffusionScale,
     }))
     const {
       config,
@@ -115,6 +121,10 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
       setEntropicTimeShearStrength,
       setEntropicTimeShearFilamentScale,
       setEntropicTimeShearIrreversibility,
+      setSpectralDimensionFlowEnabled,
+      setSpectralDimensionFlowStrength,
+      setSpectralDimensionFlowUvDimension,
+      setSpectralDimensionFlowDiffusionScale,
     } = useExtendedObjectStore(extendedObjectSelector)
 
     if (objectType !== 'schroedinger') {
@@ -470,6 +480,14 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
             setStrength={setEntropicTimeShearStrength}
             setFilamentScale={setEntropicTimeShearFilamentScale}
             setIrreversibility={setEntropicTimeShearIrreversibility}
+          />
+
+          <SchroedingerSpectralDimensionFlowControls
+            config={config}
+            setEnabled={setSpectralDimensionFlowEnabled}
+            setStrength={setSpectralDimensionFlowStrength}
+            setUvDimension={setSpectralDimensionFlowUvDimension}
+            setDiffusionScale={setSpectralDimensionFlowDiffusionScale}
           />
 
           {!isComputeMode && (

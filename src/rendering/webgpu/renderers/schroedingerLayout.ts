@@ -270,6 +270,12 @@ const SCHROEDINGER_FIELDS = [
   { name: 'entropicTimeShearStrength', type: 'f32' },
   { name: 'entropicTimeShearFilamentScale', type: 'f32' },
   { name: 'entropicTimeShearIrreversibility', type: 'f32' },
+
+  // --- Spectral-dimension flow lens ---
+  { name: 'spectralDimensionFlowEnabled', type: 'u32' },
+  { name: 'spectralDimensionFlowStrength', type: 'f32' },
+  { name: 'spectralDimensionFlowUvDimension', type: 'f32' },
+  { name: 'spectralDimensionFlowDiffusionScale', type: 'f32' },
 ] as const satisfies readonly StructFieldDef[]
 
 /** Computed struct layout for SchroedingerUniforms. */

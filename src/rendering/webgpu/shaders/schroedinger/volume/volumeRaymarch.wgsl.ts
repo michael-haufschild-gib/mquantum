@@ -75,6 +75,7 @@ fn volumeRaymarch(
   let backreactionActive = isQuantumBackreactionActive(uniforms);
   let bilocalBridgeActive = isBilocalERBridgeActive(uniforms);
   let entropyShearActive = isEntropicTimeShearActive(uniforms);
+  let spectralFlowActive = isSpectralDimensionFlowActive(uniforms);
 
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (i >= sampleCount) { break; }
@@ -196,6 +197,32 @@ fn volumeRaymarch(
       }
     }
 
+    var spectralEmissionGain = 1.0;
+    var spectralOpacityScale = 1.0;
+    if (spectralFlowActive && rho >= EMPTY_SKIP_THRESHOLD) {
+      var spectralGradient: vec3f;
+      if (USE_ANALYTICAL_GRADIENT) {
+        spectralGradient = computeAnalyticalGradient(samplePos, animTime, uniforms);
+      } else {
+        spectralGradient = computeGradientTetrahedral(samplePos, animTime, 0.05, uniforms);
+      }
+      let beforeSpectralFlow = samplePos;
+      let spectralFlow = applySpectralDimensionFlow(
+        samplePos, rayDir, rho, sCenter, spectralGradient, uniforms
+      );
+      samplePos = spectralFlow.position;
+      spectralEmissionGain = spectralFlow.emissionGain;
+      spectralOpacityScale = spectralFlow.opacityScale;
+      if (length(samplePos - beforeSpectralFlow) > 1e-6) {
+        let warpedDensityResult = sampleDensityWithPhaseAndFlow(samplePos, animTime, uniforms);
+        densityInfo = warpedDensityResult[0];
+        rawPsiVec = warpedDensityResult[1];
+        rho = densityInfo.x;
+        sCenter = densityInfo.y;
+        phase = densityInfo.z;
+      }
+    }
+
     let adaptiveStep = computeAdaptiveStep(sCenter, stepLen, remaining);
 
     // PERF: When nodal band mode is active, use the combined function that also computes
@@ -244,7 +271,7 @@ fn volumeRaymarch(
       compositeOverlay(rProbOverlay, adaptiveStep, invStepLen, 0.5, &transmittance, &accColor);
     }
 
-    let effectiveRho = computeEffectiveDensity(rho, phase, transmittance, uniforms);
+    let effectiveRho = computeEffectiveDensity(rho * spectralOpacityScale, phase, transmittance, uniforms);
     let alpha = computeAlpha(effectiveRho, adaptiveStep, uniforms.densityGain);
 
     if (alpha > 0.001) {
@@ -267,7 +294,7 @@ fn volumeRaymarch(
 
       // Compute emission with lighting (pass pre-computed log-density to avoid redundant log())
       let emission = computeEmissionLit(rho, sCenter, phase, samplePos, gradient, viewDir, uniforms)
-        * causticMultiplier * bridgeGain;
+        * causticMultiplier * bridgeGain * spectralEmissionGain;
       let entropyEmissionGain =
         1.0 + uniforms.entropicTimeShearStrength * max(entropyGain, 0.0) * 0.35;
 
@@ -339,6 +366,7 @@ fn volumeRaymarchHQ(
   let backreactionActive = isQuantumBackreactionActive(uniforms);
   let bilocalBridgeActive = isBilocalERBridgeActive(uniforms);
   let entropyShearActive = isEntropicTimeShearActive(uniforms);
+  let spectralFlowActive = isSpectralDimensionFlowActive(uniforms);
 
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (i >= sampleCount) { break; }
@@ -448,6 +476,29 @@ fn volumeRaymarchHQ(
         quickS = quickCheck.y;
       }
     }
+
+    var spectralEmissionGain = 1.0;
+    var spectralOpacityScale = 1.0;
+    if (spectralFlowActive && quickRho >= EMPTY_SKIP_THRESHOLD) {
+      var spectralGradient: vec3f;
+      if (USE_ANALYTICAL_GRADIENT) {
+        spectralGradient = computeAnalyticalGradient(samplePos, animTime, uniforms);
+      } else {
+        spectralGradient = computeGradientTetrahedral(samplePos, animTime, 0.05, uniforms);
+      }
+      let beforeSpectralFlow = samplePos;
+      let spectralFlow = applySpectralDimensionFlow(
+        samplePos, rayDir, quickRho, quickS, spectralGradient, uniforms
+      );
+      samplePos = spectralFlow.position;
+      spectralEmissionGain = spectralFlow.emissionGain;
+      spectralOpacityScale = spectralFlow.opacityScale;
+      if (length(samplePos - beforeSpectralFlow) > 1e-6) {
+        quickCheck = sampleDensityWithPhase(samplePos, animTime, uniforms);
+        quickRho = quickCheck.x;
+        quickS = quickCheck.y;
+      }
+    }
     skipGradient = (quickS < -15.0);
 
     // Hoisted so the nodal-band and main compositing paths share one computation
@@ -546,7 +597,7 @@ fn volumeRaymarchHQ(
       compositeOverlay(rProbOverlay, adaptiveStep, invStepLen, 0.5, &transmittance, &accColor);
     }
 
-    let effectiveRho = computeEffectiveDensity(rho, phase, transmittance, uniforms);
+    let effectiveRho = computeEffectiveDensity(rho * spectralOpacityScale, phase, transmittance, uniforms);
     let alpha = computeAlpha(effectiveRho, adaptiveStep, uniforms.densityGain);
 
     if (alpha > 0.001) {
@@ -557,7 +608,7 @@ fn volumeRaymarchHQ(
 
       // Compute emission with lighting (pass pre-computed log-density to avoid redundant log())
       let emission = computeEmissionLit(rho, sCenter, phase, samplePos, gradient, viewDir, uniforms)
-        * causticMultiplier * bridgeGain;
+        * causticMultiplier * bridgeGain * spectralEmissionGain;
       let entropyEmissionGain =
         1.0 + uniforms.entropicTimeShearStrength * max(entropyGain, 0.0) * 0.35;
 

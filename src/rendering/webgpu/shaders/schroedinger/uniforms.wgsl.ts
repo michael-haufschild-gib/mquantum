@@ -356,6 +356,13 @@ struct SchroedingerUniforms {
   entropicTimeShearStrength: f32,
   entropicTimeShearFilamentScale: f32,
   entropicTimeShearIrreversibility: f32,
+
+  // Spectral-dimension flow lens. When disabled, host packing writes all four
+  // fields as zero so the helper returns identity position, gain, and opacity.
+  spectralDimensionFlowEnabled: u32,
+  spectralDimensionFlowStrength: f32,
+  spectralDimensionFlowUvDimension: f32,
+  spectralDimensionFlowDiffusionScale: f32,
 }
 
 // ============================================

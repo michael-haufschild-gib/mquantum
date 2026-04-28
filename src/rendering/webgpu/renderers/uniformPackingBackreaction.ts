@@ -99,3 +99,39 @@ export function packEntropicTimeShear(
       )
     : 0.0
 }
+
+/**
+ * Pack spectral-dimension flow controls into the SchroedingerUniforms buffer.
+ * Disabled state deliberately zeroes every field so WGSL `isSpectralDimensionFlowActive`
+ * returns false and the helper is an exact identity. Strength ∈ [0, 2],
+ * UV dimension ∈ [1.2, 3.5], diffusion scale ∈ [0.05, 3].
+ */
+export function packSpectralDimensionFlow(
+  floatView: Float32Array,
+  intView: Int32Array,
+  schroedinger: Partial<SchroedingerConfig> | undefined
+): void {
+  const enabled = schroedinger?.spectralDimensionFlowEnabled ?? false
+  intView[I.spectralDimensionFlowEnabled] = enabled ? 1 : 0
+  floatView[I.spectralDimensionFlowStrength] = enabled
+    ? clamp(
+        schroedinger?.spectralDimensionFlowStrength ?? D.spectralDimensionFlowStrength,
+        0.0,
+        2.0
+      )
+    : 0.0
+  floatView[I.spectralDimensionFlowUvDimension] = enabled
+    ? clamp(
+        schroedinger?.spectralDimensionFlowUvDimension ?? D.spectralDimensionFlowUvDimension,
+        1.2,
+        3.5
+      )
+    : 0.0
+  floatView[I.spectralDimensionFlowDiffusionScale] = enabled
+    ? clamp(
+        schroedinger?.spectralDimensionFlowDiffusionScale ?? D.spectralDimensionFlowDiffusionScale,
+        0.05,
+        3.0
+      )
+    : 0.0
+}

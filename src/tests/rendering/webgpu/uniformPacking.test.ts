@@ -854,6 +854,46 @@ describe('packSchroedingerUniforms', () => {
     expect(floatView[index.entropicTimeShearIrreversibility]).toBe(1)
   })
 
+  it('zeroes spectral-dimension flow uniforms when disabled', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      schroedinger: {
+        spectralDimensionFlowEnabled: false,
+        spectralDimensionFlowStrength: 1.5,
+        spectralDimensionFlowUvDimension: 1.6,
+        spectralDimensionFlowDiffusionScale: 2.4,
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    const index = SCHROEDINGER_LAYOUT.index
+    expect(intView[index.spectralDimensionFlowEnabled]).toBe(0)
+    expect(floatView[index.spectralDimensionFlowStrength]).toBe(0)
+    expect(floatView[index.spectralDimensionFlowUvDimension]).toBe(0)
+    expect(floatView[index.spectralDimensionFlowDiffusionScale]).toBe(0)
+  })
+
+  it('packs clamped spectral-dimension flow controls when enabled', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      schroedinger: {
+        spectralDimensionFlowEnabled: true,
+        spectralDimensionFlowStrength: 9,
+        spectralDimensionFlowUvDimension: 0.5,
+        spectralDimensionFlowDiffusionScale: 9,
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    const index = SCHROEDINGER_LAYOUT.index
+    expect(intView[index.spectralDimensionFlowEnabled]).toBe(1)
+    expect(floatView[index.spectralDimensionFlowStrength]).toBe(2)
+    expect(floatView[index.spectralDimensionFlowUvDimension]).toBeCloseTo(1.2)
+    expect(floatView[index.spectralDimensionFlowDiffusionScale]).toBe(3)
+  })
+
   // Wheeler–DeWitt render-only phase rotation rate: 0 unless mode+enabled.
   it('writes wdwPhaseRotationRate = 0 for non-WdW modes even when flag set', () => {
     const { floatView, intView } = createBuffer(BUFFER_SIZE)

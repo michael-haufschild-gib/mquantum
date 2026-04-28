@@ -159,6 +159,10 @@ export interface SchroedingerSliceActions {
   setSchroedingerEntropicTimeShearStrength: (strength: number) => void
   setSchroedingerEntropicTimeShearFilamentScale: (scale: number) => void
   setSchroedingerEntropicTimeShearIrreversibility: (irreversibility: number) => void
+  setSchroedingerSpectralDimensionFlowEnabled: (enabled: boolean) => void
+  setSchroedingerSpectralDimensionFlowStrength: (strength: number) => void
+  setSchroedingerSpectralDimensionFlowUvDimension: (dimension: number) => void
+  setSchroedingerSpectralDimensionFlowDiffusionScale: (scale: number) => void
   // Physical Probability Current (j-field)
   setSchroedingerProbabilityCurrentEnabled: (enabled: boolean) => void
   setSchroedingerProbabilityCurrentStyle: (

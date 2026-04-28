@@ -163,6 +163,22 @@ export function createVisualEffectSetters(
       0.0,
       1.0
     ),
+    setSchroedingerSpectralDimensionFlowEnabled: valueSetter('spectralDimensionFlowEnabled'),
+    setSchroedingerSpectralDimensionFlowStrength: clampedSetter(
+      'spectralDimensionFlowStrength',
+      0.0,
+      2.0
+    ),
+    setSchroedingerSpectralDimensionFlowUvDimension: clampedSetter(
+      'spectralDimensionFlowUvDimension',
+      1.2,
+      3.5
+    ),
+    setSchroedingerSpectralDimensionFlowDiffusionScale: clampedSetter(
+      'spectralDimensionFlowDiffusionScale',
+      0.05,
+      3.0
+    ),
 
     // Probability current
     setSchroedingerProbabilityCurrentEnabled: valueSetter('probabilityCurrentEnabled'),
