@@ -125,6 +125,24 @@ export function createVisualEffectSetters(
     setSchroedingerInterferenceAmp: clampedSetter('interferenceAmp', 0.0, 1.0),
     setSchroedingerInterferenceFreq: clampedSetter('interferenceFreq', 1.0, 50.0),
     setSchroedingerInterferenceSpeed: clampedSetter('interferenceSpeed', 0.0, 10.0),
+    setSchroedingerQuantumBackreactionLensingEnabled: valueSetter(
+      'quantumBackreactionLensingEnabled'
+    ),
+    setSchroedingerQuantumBackreactionLensingStrength: clampedSetter(
+      'quantumBackreactionLensingStrength',
+      0.0,
+      3.0
+    ),
+    setSchroedingerQuantumBackreactionCausticGain: clampedSetter(
+      'quantumBackreactionCausticGain',
+      0.0,
+      2.0
+    ),
+    setSchroedingerQuantumBackreactionSoftening: clampedSetter(
+      'quantumBackreactionSoftening',
+      0.05,
+      2.0
+    ),
 
     // Probability current
     setSchroedingerProbabilityCurrentEnabled: valueSetter('probabilityCurrentEnabled'),

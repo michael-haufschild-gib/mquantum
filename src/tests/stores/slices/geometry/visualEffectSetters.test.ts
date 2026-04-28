@@ -77,6 +77,53 @@ describe('visualEffectSetters — compound logic', () => {
     })
   })
 
+  describe('quantum backreaction lensing controls', () => {
+    it('defaults to disabled with editable control defaults', () => {
+      const config = getSchroedinger()
+      expect(config.quantumBackreactionLensingEnabled).toBe(false)
+      expect(config.quantumBackreactionLensingStrength).toBe(1.0)
+      expect(config.quantumBackreactionCausticGain).toBe(0.6)
+      expect(config.quantumBackreactionSoftening).toBe(0.45)
+    })
+
+    it('toggles enabled and clamps strength, caustic gain, and softening', () => {
+      const store = useExtendedObjectStore.getState()
+
+      store.setSchroedingerQuantumBackreactionLensingEnabled(true)
+      store.setSchroedingerQuantumBackreactionLensingStrength(4)
+      store.setSchroedingerQuantumBackreactionCausticGain(3)
+      store.setSchroedingerQuantumBackreactionSoftening(0.01)
+
+      expect(getSchroedinger().quantumBackreactionLensingEnabled).toBe(true)
+      expect(getSchroedinger().quantumBackreactionLensingStrength).toBe(3)
+      expect(getSchroedinger().quantumBackreactionCausticGain).toBe(2)
+      expect(getSchroedinger().quantumBackreactionSoftening).toBe(0.05)
+
+      store.setSchroedingerQuantumBackreactionLensingStrength(-1)
+      store.setSchroedingerQuantumBackreactionCausticGain(-1)
+      store.setSchroedingerQuantumBackreactionSoftening(3)
+
+      expect(getSchroedinger().quantumBackreactionLensingStrength).toBe(0)
+      expect(getSchroedinger().quantumBackreactionCausticGain).toBe(0)
+      expect(getSchroedinger().quantumBackreactionSoftening).toBe(2)
+    })
+
+    it('rejects non-finite numeric inputs', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerQuantumBackreactionLensingStrength(1.5)
+      store.setSchroedingerQuantumBackreactionCausticGain(0.75)
+      store.setSchroedingerQuantumBackreactionSoftening(0.6)
+
+      store.setSchroedingerQuantumBackreactionLensingStrength(NaN)
+      store.setSchroedingerQuantumBackreactionCausticGain(Infinity)
+      store.setSchroedingerQuantumBackreactionSoftening(NaN)
+
+      expect(getSchroedinger().quantumBackreactionLensingStrength).toBe(1.5)
+      expect(getSchroedinger().quantumBackreactionCausticGain).toBe(0.75)
+      expect(getSchroedinger().quantumBackreactionSoftening).toBe(0.6)
+    })
+  })
+
   describe('cross-section plane normal normalization', () => {
     it('normalizes non-unit vectors to unit length', () => {
       useExtendedObjectStore.getState().setSchroedingerCrossSectionPlaneNormal([3, 4, 0])

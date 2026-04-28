@@ -734,6 +734,46 @@ describe('packSchroedingerUniforms', () => {
     expect(floatView[684 / 4]).toBeCloseTo(7.5)
   })
 
+  it('zeroes quantum backreaction lensing uniforms when disabled', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      schroedinger: {
+        quantumBackreactionLensingEnabled: false,
+        quantumBackreactionLensingStrength: 2.5,
+        quantumBackreactionCausticGain: 1.5,
+        quantumBackreactionSoftening: 0.3,
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    const index = SCHROEDINGER_LAYOUT.index
+    expect(intView[index.quantumBackreactionLensingEnabled]).toBe(0)
+    expect(floatView[index.quantumBackreactionLensingStrength]).toBe(0)
+    expect(floatView[index.quantumBackreactionCausticGain]).toBe(0)
+    expect(floatView[index.quantumBackreactionSoftening]).toBe(0)
+  })
+
+  it('packs clamped quantum backreaction lensing controls when enabled', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      schroedinger: {
+        quantumBackreactionLensingEnabled: true,
+        quantumBackreactionLensingStrength: 9,
+        quantumBackreactionCausticGain: 9,
+        quantumBackreactionSoftening: 0.01,
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    const index = SCHROEDINGER_LAYOUT.index
+    expect(intView[index.quantumBackreactionLensingEnabled]).toBe(1)
+    expect(floatView[index.quantumBackreactionLensingStrength]).toBe(3)
+    expect(floatView[index.quantumBackreactionCausticGain]).toBe(2)
+    expect(floatView[index.quantumBackreactionSoftening]).toBeCloseTo(0.05)
+  })
+
   // Wheeler–DeWitt render-only phase rotation rate: 0 unless mode+enabled.
   it('writes wdwPhaseRotationRate = 0 for non-WdW modes even when flag set', () => {
     const { floatView, intView } = createBuffer(BUFFER_SIZE)

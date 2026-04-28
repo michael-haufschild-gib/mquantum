@@ -88,6 +88,7 @@ fn volumeRaymarchGrid(
     uniforms.quantumMode == 3
     && uniforms.branchSeparation > 0.5
     && uniforms.branchTransitionWidth > 0.0;
+  let backreactionActive = isQuantumBackreactionActive(uniforms);
 
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (PROFILING_HALF_SAMPLES && i >= 64) { break; }
@@ -99,15 +100,16 @@ fn volumeRaymarchGrid(
     let remaining = tFar - t;
     if (shouldTerminateRay(transmittance, uniforms.densityGain, max(remaining, 0.0))) { break; }
 
-    let pos = rayOrigin + rayDir * t;
-    let gridSample = sampleDensityFromGrid(pos, uniforms);
+    let basePos = rayOrigin + rayDir * t;
+    var pos = basePos;
+    var gridSample = sampleDensityFromGrid(pos, uniforms);
     // Anti-de Sitter tachyon amplification: |ψ(t)|² = |ψ(0)|² · cosh²(γ·t).
     // adsAmplitudeSq is 1.0 outside AdS (all compute modes) — hoisted above.
     var rho = gridSample.r * adsAmplitudeSq;
-    let sCenter = gridSample.g;
+    var sCenter = gridSample.g;
     // wdwPhaseRotationRate rotates WdW; adsEnergy rotates AdS stable states
     // via phase' = B - E·t. phaseOffset is 0 for every compute mode (hoisted).
-    let phase = gridSample.b - phaseOffset;
+    var phase = gridSample.b - phaseOffset;
 
     // Dual-channel remap (Dirac particle/antiparticle, Pauli spin-up/down):
     // R = primary density, G = secondary density. The single-density path
@@ -124,6 +126,29 @@ fn volumeRaymarchGrid(
       colorRho = gridSample.r;
       colorS = gridSample.g;
       rho = rho + gridSample.g;
+    }
+
+    var causticMultiplier = 1.0;
+    if (backreactionActive && rho >= EMPTY_SKIP_THRESHOLD) {
+      let metricGradient = fetchGradient(pos, uniforms);
+      let metric = applyQuantumBackreactionMetric(
+        pos, rayDir, rho, sCenter, metricGradient, uniforms
+      );
+      pos = metric.position;
+      causticMultiplier = metric.caustic;
+      if (length(pos - basePos) > 1e-6) {
+        gridSample = sampleDensityFromGrid(pos, uniforms);
+        rho = gridSample.r * adsAmplitudeSq;
+        sCenter = gridSample.g;
+        phase = gridSample.b - phaseOffset;
+        colorRho = rho;
+        colorS = 0.0;
+        if (IS_DUAL_CHANNEL) {
+          colorRho = gridSample.r;
+          colorS = gridSample.g;
+          rho = rho + gridSample.g;
+        }
+      }
     }
 
     // Potential overlay: .a < 0 encodes -potOverlay from compute write-grid
@@ -235,6 +260,7 @@ fn volumeRaymarchGrid(
         } else {
           emission = computeEmissionLit(emissionRho, emissionS, phase, pos, gradient, viewDir, uniforms);
         }
+        emission *= causticMultiplier;
 
         // Branch coloring: compute from ray position (not density texture alpha).
         // branchColorActive hoisted above the loop (uniforms-only).
@@ -338,6 +364,7 @@ fn volumeRaymarchGrid(
     uniforms.quantumMode == 3
     && uniforms.branchSeparation > 0.5
     && uniforms.branchTransitionWidth > 0.0;
+  let backreactionActive = isQuantumBackreactionActive(uniforms);
 
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (PROFILING_HALF_SAMPLES && i >= 64) { break; }
@@ -348,12 +375,13 @@ fn volumeRaymarchGrid(
     let remaining = tFar - t;
     if (shouldTerminateRay(transmittance, uniforms.densityGain, max(remaining, 0.0))) { break; }
 
-    let pos = rayOrigin + rayDir * t;
+    let basePos = rayOrigin + rayDir * t;
+    var pos = basePos;
 
     // Sample density from pre-computed 3D grid texture
     // Returns (rho, logRho, spatialPhase, relativePhase) for rgba16float
     // Returns (rho, 0, 0, 0) for r16float
-    let gridSample = sampleDensityFromGrid(pos, uniforms);
+    var gridSample = sampleDensityFromGrid(pos, uniforms);
     // Anti-de Sitter tachyon amplification: |ψ(t)|² = |ψ(0)|² · cosh²(γ·t).
     // adsAmplitudeSq is 1.0 outside AdS — hoisted above the loop.
     // Applied to the R channel only (AdS is never dual-channel).
@@ -415,6 +443,50 @@ fn volumeRaymarchGrid(
       phase = select(rotatedB, gridSample.a, useRelPhase);
     } else {
       phase = 0.0;
+    }
+
+    var causticMultiplier = 1.0;
+    if (backreactionActive && rho >= EMPTY_SKIP_THRESHOLD) {
+      let metricGradient = fetchGradient(pos, uniforms);
+      let metric = applyQuantumBackreactionMetric(
+        pos, rayDir, rho, sCenter, metricGradient, uniforms
+      );
+      pos = metric.position;
+      causticMultiplier = metric.caustic;
+      if (length(pos - basePos) > 1e-6) {
+        gridSample = sampleDensityFromGrid(pos, uniforms);
+        rho = gridSample.r * adsAmplitudeSq;
+        colorRho = rho;
+        colorS = 0.0;
+        if (IS_DUAL_CHANNEL) {
+          colorS = gridSample.g;
+          sCenter = gridSample.g;
+          rho = rho + gridSample.g;
+          colorRho = gridSample.r;
+        } else if (DENSITY_GRID_HAS_PHASE) {
+          sCenter = gridSample.g;
+          colorS = sCenter;
+        } else {
+          if (rho > 1e-9) {
+            sCenter = log(rho);
+          } else {
+            sCenter = -20.0;
+          }
+          colorS = sCenter;
+        }
+
+        if (DENSITY_GRID_HAS_PHASE) {
+          let rotatedB = gridSample.b - phaseOffset;
+          let useRelPhase =
+            (COLOR_ALGORITHM == 10)
+            && (uniforms.quantumMode == 0
+                || uniforms.quantumMode == 1
+                || uniforms.quantumMode == 7);
+          phase = select(rotatedB, gridSample.a, useRelPhase);
+        } else {
+          phase = 0.0;
+        }
+      }
     }
 
     // Apply uncertainty boundary emphasis (matches inline sampleDensityWithPhase path)
@@ -589,6 +661,7 @@ fn volumeRaymarchGrid(
           // For other algos: colorRho == rho and colorS == sCenter (no difference).
           emission = computeEmissionLit(colorRho, colorS, phase, pos, gradient, viewDir, uniforms);
         }
+        emission *= causticMultiplier;
 
         // Branch coloring: when alpha encodes branch fraction (2.0 + frac),
         // tint emission toward branch A or branch B color.

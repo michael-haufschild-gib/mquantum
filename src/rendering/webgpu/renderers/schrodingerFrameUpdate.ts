@@ -368,6 +368,7 @@ export function computeSchroedingerUpdate(
     appearanceVersion: inputs.appearance?.appearanceVersion ?? 0,
     pbrVersion: inputs.pbr?.pbrVersion ?? 0,
     pauliSpinorVersion: inputs.extended?.pauliSpinorVersion ?? 0,
+    qualitySignature: (inputs.performance?.qualityMultiplier ?? 1.0).toFixed(4),
   }
 
   if (!isSchroedingerDirty(state.versions, storeVersions)) {

@@ -329,6 +329,13 @@ struct SchroedingerUniforms {
   densityGridHalfExtent: vec3f,
   _padDensityGridHalfExtent: f32,
 
+  // Quantum stress backreaction lensing. When disabled, host packing writes
+  // all four fields as zero so metric application is an exact no-op.
+  quantumBackreactionLensingEnabled: u32,
+  quantumBackreactionLensingStrength: f32,
+  quantumBackreactionCausticGain: f32,
+  quantumBackreactionSoftening: f32,
+
   // Host-precomputed HO superposition terms term_k = c_k * exp(-i * E_k * t)
   // for t = uniforms.time * uniforms.timeScale. Lifts 8 cos+sin and 8 cmul out
   // of every fragment shader invocation. Only .xy carries (Re, Im); .zw is

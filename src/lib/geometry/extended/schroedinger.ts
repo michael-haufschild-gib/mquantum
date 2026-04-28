@@ -341,6 +341,14 @@ export interface SchroedingerConfig {
   interferenceFreq: number
   /** Interference fringe animation speed (0.0-10.0) */
   interferenceSpeed: number
+  /** Enable probability-stress optical metric deformation */
+  quantumBackreactionLensingEnabled: boolean
+  /** Optical metric perturbation strength (0.0-3.0) */
+  quantumBackreactionLensingStrength: number
+  /** Caustic emission multiplier gain after coordinate deformation (0.0-2.0) */
+  quantumBackreactionCausticGain: number
+  /** Softening radius for probability-stress lensing (0.05-2.0) */
+  quantumBackreactionSoftening: number
 
   // === Physical Probability Current (j-field) ===
   /** Enable physical probability-current visualization (j = Im(conj(psi)∇psi)) */
@@ -635,6 +643,10 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   interferenceAmp: 0.5,
   interferenceFreq: 10.0,
   interferenceSpeed: 1.0,
+  quantumBackreactionLensingEnabled: false,
+  quantumBackreactionLensingStrength: 1.0,
+  quantumBackreactionCausticGain: 0.6,
+  quantumBackreactionSoftening: 0.45,
 
   // Physical Probability Current (j-field)
   probabilityCurrentEnabled: false,

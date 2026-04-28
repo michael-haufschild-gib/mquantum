@@ -248,6 +248,12 @@ const SCHROEDINGER_FIELDS = [
   { name: 'densityGridHalfExtent', type: 'vec3f' },
   { name: '_padDensityGridHalfExtent', type: 'f32' },
 
+  // --- Quantum stress backreaction lensing ---
+  { name: 'quantumBackreactionLensingEnabled', type: 'u32' },
+  { name: 'quantumBackreactionLensingStrength', type: 'f32' },
+  { name: 'quantumBackreactionCausticGain', type: 'f32' },
+  { name: 'quantumBackreactionSoftening', type: 'f32' },
+
   // --- Host-precomputed HO superposition terms ---
   // term_k = c_k * exp(-i * E_k * t) packed as (Re, Im, 0, 0) per vec4f slot.
   // Hot path replaces 8 cos/sin + 8 cmul per pixel with a single uniform read.

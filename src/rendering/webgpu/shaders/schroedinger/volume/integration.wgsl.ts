@@ -181,6 +181,56 @@ struct NodalWithGradient {
   s: f32,          // Average log-density
 }
 
+struct QuantumBackreactionMetric {
+  position: vec3f,
+  caustic: f32,
+}
+
+fn isQuantumBackreactionActive(uniforms: SchroedingerUniforms) -> bool {
+  return uniforms.quantumBackreactionLensingEnabled != 0u
+    && uniforms.quantumBackreactionLensingStrength > 0.0;
+}
+
+fn applyQuantumBackreactionMetric(
+  worldPosition: vec3f,
+  rayDirection: vec3f,
+  densityProxy: f32,
+  logDensityProxy: f32,
+  localGradient: vec3f,
+  uniforms: SchroedingerUniforms
+) -> QuantumBackreactionMetric {
+  if (!isQuantumBackreactionActive(uniforms)) {
+    return QuantumBackreactionMetric(worldPosition, 1.0);
+  }
+
+  let peakDensity = max(uniforms.peakDensity, 1e-6);
+  let densityStress = clamp(densityProxy / peakDensity, 0.0, 4.0);
+  let stressWindow = smoothstep(-14.0, -2.0, logDensityProxy);
+  let stressT00 = densityStress * stressWindow;
+  let softening = max(uniforms.quantumBackreactionSoftening, 0.0001);
+  let softening2 = softening * softening;
+  let r2 = dot(worldPosition, worldPosition);
+  let potentialPhi =
+    uniforms.quantumBackreactionLensingStrength * stressT00 / (r2 + softening2);
+
+  let rayN = normalize(rayDirection);
+  let transverseGradient = localGradient - rayN * dot(localGradient, rayN);
+  let gradLen = length(transverseGradient);
+  if (gradLen < 1e-5 || stressT00 <= 0.0) {
+    let causticOnly = 1.0 + uniforms.quantumBackreactionCausticGain * clamp(potentialPhi * 0.01, 0.0, 0.35);
+    return QuantumBackreactionMetric(worldPosition, causticOnly);
+  }
+
+  let bendDir = transverseGradient / gradLen;
+  let bendMagnitude = clamp(potentialPhi * softening * 0.08, 0.0, softening * 1.5);
+  let warpedPosition = worldPosition + bendDir * bendMagnitude;
+  let caustic =
+    1.0 + uniforms.quantumBackreactionCausticGain *
+    clamp(potentialPhi * clamp(gradLen * softening, 0.0, 4.0) * 0.02, 0.0, 2.0);
+
+  return QuantumBackreactionMetric(warpedPosition, caustic);
+}
+
 // Sample complex wavefunction ψ at world position.
 fn samplePsiWithFlow(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
   let xND = mapPosToND(pos, uniforms);

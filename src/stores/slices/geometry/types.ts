@@ -147,6 +147,10 @@ export interface SchroedingerSliceActions {
   setSchroedingerInterferenceAmp: (amp: number) => void
   setSchroedingerInterferenceFreq: (freq: number) => void
   setSchroedingerInterferenceSpeed: (speed: number) => void
+  setSchroedingerQuantumBackreactionLensingEnabled: (enabled: boolean) => void
+  setSchroedingerQuantumBackreactionLensingStrength: (strength: number) => void
+  setSchroedingerQuantumBackreactionCausticGain: (gain: number) => void
+  setSchroedingerQuantumBackreactionSoftening: (softening: number) => void
   // Physical Probability Current (j-field)
   setSchroedingerProbabilityCurrentEnabled: (enabled: boolean) => void
   setSchroedingerProbabilityCurrentStyle: (

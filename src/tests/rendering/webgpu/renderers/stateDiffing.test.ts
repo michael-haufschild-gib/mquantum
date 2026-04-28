@@ -32,6 +32,7 @@ describe('createVersionTracker', () => {
   it('initializes quality signature to empty string', () => {
     const t = createVersionTracker()
     expect(t.lastQualitySignature).toBe('')
+    expect(t.lastSchroedingerQualitySignature).toBe('')
   })
 })
 
@@ -41,6 +42,7 @@ describe('resetVersionTracker', () => {
     t.lastSchroedingerVersion = 5
     t.lastLightingVersion = 3
     t.lastQualitySignature = 'abc'
+    t.lastSchroedingerQualitySignature = 'xyz'
     t.lastBasisAnimationTime = 1.23
 
     resetVersionTracker(t)
@@ -48,6 +50,7 @@ describe('resetVersionTracker', () => {
     expect(t.lastSchroedingerVersion).toBe(-1)
     expect(t.lastLightingVersion).toBe(-1)
     expect(t.lastQualitySignature).toBe('')
+    expect(t.lastSchroedingerQualitySignature).toBe('')
     expect(Number.isNaN(t.lastBasisAnimationTime)).toBe(true)
   })
 
@@ -65,6 +68,7 @@ describe('resetVersionTracker', () => {
       appearanceVersion: 3,
       pbrVersion: 1,
       pauliSpinorVersion: 2,
+      qualitySignature: '1.0000',
     }
     updateSchroedingerVersions(t, versions)
     expect(isSchroedingerDirty(t, versions)).toBe(false)
@@ -77,43 +81,64 @@ describe('resetVersionTracker', () => {
 describe('isSchroedingerDirty', () => {
   it('reports dirty on a fresh tracker (version === -1)', () => {
     const t = createVersionTracker()
-    const v = { schroedingerVersion: 0, appearanceVersion: 0, pbrVersion: 0, pauliSpinorVersion: 0 }
+    const v = {
+      schroedingerVersion: 0,
+      appearanceVersion: 0,
+      pbrVersion: 0,
+      pauliSpinorVersion: 0,
+      qualitySignature: '1.0000',
+    }
     expect(isSchroedingerDirty(t, v)).toBe(true)
   })
 
   it('reports clean after stamping matching versions', () => {
     const t = createVersionTracker()
-    const v = { schroedingerVersion: 3, appearanceVersion: 2, pbrVersion: 1, pauliSpinorVersion: 0 }
+    const v = {
+      schroedingerVersion: 3,
+      appearanceVersion: 2,
+      pbrVersion: 1,
+      pauliSpinorVersion: 0,
+      qualitySignature: '1.0000',
+    }
     updateSchroedingerVersions(t, v)
     expect(isSchroedingerDirty(t, v)).toBe(false)
   })
 
   it('reports dirty when any single version changes', () => {
     const t = createVersionTracker()
-    const v = { schroedingerVersion: 3, appearanceVersion: 2, pbrVersion: 1, pauliSpinorVersion: 0 }
+    const v = {
+      schroedingerVersion: 3,
+      appearanceVersion: 2,
+      pbrVersion: 1,
+      pauliSpinorVersion: 0,
+      qualitySignature: '1.0000',
+    }
     updateSchroedingerVersions(t, v)
 
     expect(isSchroedingerDirty(t, { ...v, schroedingerVersion: 4 })).toBe(true)
     expect(isSchroedingerDirty(t, { ...v, appearanceVersion: 3 })).toBe(true)
     expect(isSchroedingerDirty(t, { ...v, pbrVersion: 2 })).toBe(true)
     expect(isSchroedingerDirty(t, { ...v, pauliSpinorVersion: 1 })).toBe(true)
+    expect(isSchroedingerDirty(t, { ...v, qualitySignature: '0.7500' })).toBe(true)
   })
 })
 
 describe('updateSchroedingerVersions', () => {
-  it('stamps all four version counters', () => {
+  it('stamps all schroedinger uniform counters', () => {
     const t = createVersionTracker()
     updateSchroedingerVersions(t, {
       schroedingerVersion: 10,
       appearanceVersion: 5,
       pbrVersion: 3,
       pauliSpinorVersion: 1,
+      qualitySignature: '0.5000',
     })
 
     expect(t.lastSchroedingerVersion).toBe(10)
     expect(t.lastSchroedingerAppearanceVersion).toBe(5)
     expect(t.lastSchroedingerPbrVersion).toBe(3)
     expect(t.lastPauliSpinorVersion).toBe(1)
+    expect(t.lastSchroedingerQualitySignature).toBe('0.5000')
   })
 })
 

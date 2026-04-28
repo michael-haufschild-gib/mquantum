@@ -34,6 +34,7 @@ import {
   REPRESENTATION_MODE_MAP,
 } from './schrodingerRendererTypes'
 import { SCHROEDINGER_LAYOUT } from './schroedingerLayout'
+import { packQuantumBackreaction } from './uniformPackingBackreaction'
 import { packDensityGridMapping } from './uniformPackingDensityGrid'
 import { packAdsTimeEvolution } from './uniformPackingSupport'
 
@@ -350,6 +351,7 @@ function packVisualFields(
   floatView[I.densityContrast] = schroedinger?.densityContrast ?? 1.8
   floatView[I.scatteringAnisotropy] = schroedinger?.scatteringAnisotropy ?? 0.0
   floatView[I.roughness] = pbr?.face?.roughness ?? 0.3
+  packQuantumBackreaction(floatView, intView, schroedinger)
 }
 
 /** Pack nodal fields, color algorithm, and cosine palette. */

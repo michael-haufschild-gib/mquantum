@@ -3,9 +3,11 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { SchroedingerQuantumEffectsSection } from '@/components/sections/Analysis/SchroedingerQuantumEffectsSection'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
 
 describe('SchroedingerQuantumEffectsSection physical nodal controls', () => {
   beforeEach(() => {
+    useGeometryStore.getState().reset()
     useExtendedObjectStore.getState().reset()
   })
 
@@ -110,5 +112,16 @@ describe('SchroedingerQuantumEffectsSection physical nodal controls', () => {
     expect(screen.queryByTestId('schroedinger-nodal-color-imag')).not.toBeInTheDocument()
     expect(screen.getByTestId('schroedinger-nodal-color-positive')).toBeInTheDocument()
     expect(screen.getByTestId('schroedinger-nodal-color-negative')).toBeInTheDocument()
+  })
+
+  it('keeps backreaction controls available in compute density-grid modes', () => {
+    useExtendedObjectStore.getState().setSchroedingerQuantumMode('freeScalarField')
+
+    render(<SchroedingerQuantumEffectsSection />)
+
+    expect(screen.getByTestId('schroedinger-quantum-backreaction-toggle')).toBeInTheDocument()
+    expect(screen.queryByTestId('schroedinger-nodal-toggle')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('schroedinger-uncertainty-boundary-toggle')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('schroedinger-phase-materiality-toggle')).not.toBeInTheDocument()
   })
 })
