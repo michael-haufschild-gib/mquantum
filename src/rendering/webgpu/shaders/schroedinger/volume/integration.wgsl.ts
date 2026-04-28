@@ -204,6 +204,14 @@ struct SpectralDimensionFlowResult {
   uvGate: f32,
 }
 
+struct VacuumBubbleLensResult {
+  position: vec3f,
+  emissionGain: f32,
+  opacityScale: f32,
+  wall: f32,
+  tunnelingGate: f32,
+}
+
 fn isQuantumBackreactionActive(uniforms: SchroedingerUniforms) -> bool {
   return uniforms.quantumBackreactionLensingEnabled != 0u
     && uniforms.quantumBackreactionLensingStrength > 0.0;
@@ -225,6 +233,55 @@ fn isSpectralDimensionFlowActive(uniforms: SchroedingerUniforms) -> bool {
   return uniforms.spectralDimensionFlowEnabled != 0u
     && uniforms.spectralDimensionFlowStrength > 0.0
     && uniforms.spectralDimensionFlowDiffusionScale > 0.0;
+}
+
+fn isVacuumBubbleLensActive(uniforms: SchroedingerUniforms) -> bool {
+  return uniforms.vacuumBubbleLensEnabled != 0u
+    && uniforms.vacuumBubbleLensStrength > 0.0
+    && uniforms.vacuumBubbleWallRadius > 0.0
+    && uniforms.vacuumBubbleWallThickness > 0.0;
+}
+
+fn applyVacuumBubbleLens(
+  worldPosition: vec3f,
+  rayDirection: vec3f,
+  uniforms: SchroedingerUniforms
+) -> VacuumBubbleLensResult {
+  if (!isVacuumBubbleLensActive(uniforms)) {
+    return VacuumBubbleLensResult(worldPosition, 1.0, 1.0, 0.0, 0.0);
+  }
+
+  let boundingRadius = max(uniforms.boundingRadius, 1e-4);
+  let strength = clamp(uniforms.vacuumBubbleLensStrength, 0.0, 2.0);
+  let strengthBound = clamp(strength, 0.0, 1.0);
+  let wallRadius = clamp(uniforms.vacuumBubbleWallRadius, 0.05, 1.5);
+  let wallThickness = clamp(uniforms.vacuumBubbleWallThickness, 0.02, 0.5);
+  let tension = clamp(uniforms.vacuumBubbleTension, 0.0, 3.0);
+  let bias = clamp(uniforms.vacuumBubbleBias, 0.0, 3.0);
+  let r = length(worldPosition);
+  let R = wallRadius * boundingRadius * (1.0 + 0.12 * sin(getVolumeTime(uniforms) * (0.35 + bias)));
+  let thickness = max(wallThickness * boundingRadius, 1e-4);
+  let wallCoordinate = (r - R) / thickness;
+  let wall = exp(-(wallCoordinate * wallCoordinate));
+  let inside = 1.0 - smoothstep(R - thickness, R + thickness, r);
+  let S_proxy = tension * R * R - bias * R * R * R;
+  let normalizedAction = S_proxy / max(boundingRadius * boundingRadius, 1e-4);
+  let tunnelingGate = clamp(
+    exp(-max(normalizedAction, 0.0)) * (1.0 + 0.35 * max(-normalizedAction, 0.0)),
+    0.0,
+    1.0
+  );
+  let radialNormal = select(
+    worldPosition / max(r, 1e-5),
+    normalize(-rayDirection),
+    r < 1e-5
+  );
+  let refraction = clamp(wall * strength * tunnelingGate * thickness * 0.65, 0.0, boundingRadius * 0.18);
+  let refractedPosition = worldPosition - radialNormal * refraction;
+  let opacityScale = mix(1.0, 0.55, clamp(inside * strengthBound, 0.0, 1.0));
+  let emissionGain = 1.0 + wall * tunnelingGate * strength;
+
+  return VacuumBubbleLensResult(refractedPosition, emissionGain, opacityScale, wall, tunnelingGate);
 }
 
 fn applySpectralDimensionFlow(

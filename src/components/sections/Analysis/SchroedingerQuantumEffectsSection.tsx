@@ -19,6 +19,7 @@ import { useGeometryStore } from '@/stores/geometryStore'
 
 import { SchroedingerEntropicTimeShearControls } from './SchroedingerEntropicTimeShearControls'
 import { SchroedingerSpectralDimensionFlowControls } from './SchroedingerSpectralDimensionFlowControls'
+import { SchroedingerVacuumBubbleLensControls } from './SchroedingerVacuumBubbleLensControls'
 
 const NODAL_DEFINITION_OPTIONS: { value: SchroedingerNodalDefinition; label: string }[] = [
   { value: 'psiAbs', label: '|ψ| (Nodal Envelope)' },
@@ -489,6 +490,8 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
             setUvDimension={setSpectralDimensionFlowUvDimension}
             setDiffusionScale={setSpectralDimensionFlowDiffusionScale}
           />
+
+          <SchroedingerVacuumBubbleLensControls config={config} />
 
           {!isComputeMode && (
             <div className="space-y-1 mt-2">

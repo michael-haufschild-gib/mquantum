@@ -100,6 +100,7 @@ fn volumeRaymarchGrid(
   let bilocalBridgeActive = isBilocalERBridgeActive(uniforms);
   let entropyShearActive = isEntropicTimeShearActive(uniforms);
   let spectralFlowActive = isSpectralDimensionFlowActive(uniforms);
+  let vacuumBubbleActive = isVacuumBubbleLensActive(uniforms);
 
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (PROFILING_HALF_SAMPLES && i >= 64) { break; }
@@ -409,6 +410,50 @@ fn volumeRaymarchGrid(
       }
     }
 
+    var vacuumBubbleEmissionGain = 1.0;
+    var vacuumBubbleOpacityScale = 1.0;
+    if (vacuumBubbleActive && rho >= EMPTY_SKIP_THRESHOLD) {
+      let beforeVacuumBubble = pos;
+      let vacuumBubble = applyVacuumBubbleLens(pos, rayDir, uniforms);
+      pos = vacuumBubble.position;
+      vacuumBubbleEmissionGain = vacuumBubble.emissionGain;
+      vacuumBubbleOpacityScale = vacuumBubble.opacityScale;
+      if (length(pos - beforeVacuumBubble) > 1e-6) {
+        gridSample = sampleDensityFromGrid(pos, uniforms);
+        rho = gridSample.r * adsAmplitudeSq;
+        colorRho = rho;
+        colorS = 0.0;
+        if (IS_DUAL_CHANNEL) {
+          colorS = gridSample.g;
+          sCenter = gridSample.g;
+          rho = rho + gridSample.g;
+          colorRho = gridSample.r;
+        } else if (DENSITY_GRID_HAS_PHASE) {
+          sCenter = gridSample.g;
+          colorS = sCenter;
+        } else {
+          if (rho > 1e-9) {
+            sCenter = log(rho);
+          } else {
+            sCenter = -20.0;
+          }
+          colorS = sCenter;
+        }
+
+        if (DENSITY_GRID_HAS_PHASE) {
+          let rotatedB = gridSample.b - phaseOffset;
+          let useRelPhase =
+            (COLOR_ALGORITHM == 10)
+            && (uniforms.quantumMode == 0
+                || uniforms.quantumMode == 1
+                || uniforms.quantumMode == 7);
+          phase = select(rotatedB, gridSample.a, useRelPhase);
+        } else {
+          phase = 0.0;
+        }
+      }
+    }
+
     // Apply uncertainty boundary emphasis (matches inline sampleDensityWithPhase path)
     // PERF: Only recompute log(rho) when emphasis actually modifies rho
     // Skip for dual-channel modes since sCenter is secondary density, not logRho.
@@ -551,7 +596,12 @@ fn volumeRaymarchGrid(
       compositeOverlay(rProbOverlay, adaptiveStep, invStepLen, 0.5, &transmittance, &accColor);
     }
 
-    let effectiveRho = computeEffectiveDensity(rho * spectralOpacityScale, phase, transmittance, uniforms);
+    let effectiveRho = computeEffectiveDensity(
+      rho * spectralOpacityScale * vacuumBubbleOpacityScale,
+      phase,
+      transmittance,
+      uniforms
+    );
     let alpha = computeAlpha(effectiveRho, adaptiveStep, uniforms.densityGain);
 
     if (alpha > 0.001) {
@@ -584,6 +634,7 @@ fn volumeRaymarchGrid(
         emission *= causticMultiplier;
         emission *= bridgeGain;
         emission *= spectralEmissionGain;
+        emission *= vacuumBubbleEmissionGain;
         emission *= 1.0 + uniforms.entropicTimeShearStrength * max(entropyGain, 0.0) * 0.35;
 
         // Branch coloring: when alpha encodes branch fraction (2.0 + frac),

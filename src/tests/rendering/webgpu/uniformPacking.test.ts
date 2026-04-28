@@ -894,6 +894,54 @@ describe('packSchroedingerUniforms', () => {
     expect(floatView[index.spectralDimensionFlowDiffusionScale]).toBe(3)
   })
 
+  it('zeroes vacuum bubble lens uniforms when disabled', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      schroedinger: {
+        vacuumBubbleLensEnabled: false,
+        vacuumBubbleLensStrength: 1.5,
+        vacuumBubbleWallRadius: 0.8,
+        vacuumBubbleWallThickness: 0.2,
+        vacuumBubbleTension: 1.1,
+        vacuumBubbleBias: 1.3,
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    const index = SCHROEDINGER_LAYOUT.index
+    expect(intView[index.vacuumBubbleLensEnabled]).toBe(0)
+    expect(floatView[index.vacuumBubbleLensStrength]).toBe(0)
+    expect(floatView[index.vacuumBubbleWallRadius]).toBe(0)
+    expect(floatView[index.vacuumBubbleWallThickness]).toBe(0)
+    expect(floatView[index.vacuumBubbleTension]).toBe(0)
+    expect(floatView[index.vacuumBubbleBias]).toBe(0)
+  })
+
+  it('packs clamped vacuum bubble lens controls when enabled', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      schroedinger: {
+        vacuumBubbleLensEnabled: true,
+        vacuumBubbleLensStrength: 9,
+        vacuumBubbleWallRadius: 0.01,
+        vacuumBubbleWallThickness: 9,
+        vacuumBubbleTension: 9,
+        vacuumBubbleBias: 9,
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    const index = SCHROEDINGER_LAYOUT.index
+    expect(intView[index.vacuumBubbleLensEnabled]).toBe(1)
+    expect(floatView[index.vacuumBubbleLensStrength]).toBe(2)
+    expect(floatView[index.vacuumBubbleWallRadius]).toBeCloseTo(0.05)
+    expect(floatView[index.vacuumBubbleWallThickness]).toBeCloseTo(0.5)
+    expect(floatView[index.vacuumBubbleTension]).toBe(3)
+    expect(floatView[index.vacuumBubbleBias]).toBe(3)
+  })
+
   // Wheeler–DeWitt render-only phase rotation rate: 0 unless mode+enabled.
   it('writes wdwPhaseRotationRate = 0 for non-WdW modes even when flag set', () => {
     const { floatView, intView } = createBuffer(BUFFER_SIZE)

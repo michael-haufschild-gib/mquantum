@@ -363,6 +363,15 @@ struct SchroedingerUniforms {
   spectralDimensionFlowStrength: f32,
   spectralDimensionFlowUvDimension: f32,
   spectralDimensionFlowDiffusionScale: f32,
+
+  // Coleman-De Luccia vacuum bubble lens. Disabled host packing writes all
+  // fields as zero so the helper returns identity position, gain, and opacity.
+  vacuumBubbleLensEnabled: u32,
+  vacuumBubbleLensStrength: f32,
+  vacuumBubbleWallRadius: f32,
+  vacuumBubbleWallThickness: f32,
+  vacuumBubbleTension: f32,
+  vacuumBubbleBias: f32,
 }
 
 // ============================================

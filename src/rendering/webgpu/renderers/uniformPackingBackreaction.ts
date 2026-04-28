@@ -135,3 +135,33 @@ export function packSpectralDimensionFlow(
       )
     : 0.0
 }
+
+/**
+ * Pack Coleman-De Luccia false-vacuum bubble lens controls. Disabled state
+ * zeroes all fields so WGSL `isVacuumBubbleLensActive` returns false and the
+ * helper is an exact identity. Strength ∈ [0, 2], wall radius ∈ [0.05, 1.5],
+ * wall thickness ∈ [0.02, 0.5], tension/bias ∈ [0, 3].
+ */
+export function packVacuumBubbleLens(
+  floatView: Float32Array,
+  intView: Int32Array,
+  schroedinger: Partial<SchroedingerConfig> | undefined
+): void {
+  const enabled = schroedinger?.vacuumBubbleLensEnabled ?? false
+  intView[I.vacuumBubbleLensEnabled] = enabled ? 1 : 0
+  floatView[I.vacuumBubbleLensStrength] = enabled
+    ? clamp(schroedinger?.vacuumBubbleLensStrength ?? D.vacuumBubbleLensStrength, 0.0, 2.0)
+    : 0.0
+  floatView[I.vacuumBubbleWallRadius] = enabled
+    ? clamp(schroedinger?.vacuumBubbleWallRadius ?? D.vacuumBubbleWallRadius, 0.05, 1.5)
+    : 0.0
+  floatView[I.vacuumBubbleWallThickness] = enabled
+    ? clamp(schroedinger?.vacuumBubbleWallThickness ?? D.vacuumBubbleWallThickness, 0.02, 0.5)
+    : 0.0
+  floatView[I.vacuumBubbleTension] = enabled
+    ? clamp(schroedinger?.vacuumBubbleTension ?? D.vacuumBubbleTension, 0.0, 3.0)
+    : 0.0
+  floatView[I.vacuumBubbleBias] = enabled
+    ? clamp(schroedinger?.vacuumBubbleBias ?? D.vacuumBubbleBias, 0.0, 3.0)
+    : 0.0
+}

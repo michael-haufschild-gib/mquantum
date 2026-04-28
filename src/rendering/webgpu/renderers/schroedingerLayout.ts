@@ -276,6 +276,14 @@ const SCHROEDINGER_FIELDS = [
   { name: 'spectralDimensionFlowStrength', type: 'f32' },
   { name: 'spectralDimensionFlowUvDimension', type: 'f32' },
   { name: 'spectralDimensionFlowDiffusionScale', type: 'f32' },
+
+  // --- Coleman-De Luccia vacuum bubble lens ---
+  { name: 'vacuumBubbleLensEnabled', type: 'u32' },
+  { name: 'vacuumBubbleLensStrength', type: 'f32' },
+  { name: 'vacuumBubbleWallRadius', type: 'f32' },
+  { name: 'vacuumBubbleWallThickness', type: 'f32' },
+  { name: 'vacuumBubbleTension', type: 'f32' },
+  { name: 'vacuumBubbleBias', type: 'f32' },
 ] as const satisfies readonly StructFieldDef[]
 
 /** Computed struct layout for SchroedingerUniforms. */

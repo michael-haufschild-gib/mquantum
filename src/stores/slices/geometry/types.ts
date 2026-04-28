@@ -163,6 +163,12 @@ export interface SchroedingerSliceActions {
   setSchroedingerSpectralDimensionFlowStrength: (strength: number) => void
   setSchroedingerSpectralDimensionFlowUvDimension: (dimension: number) => void
   setSchroedingerSpectralDimensionFlowDiffusionScale: (scale: number) => void
+  setSchroedingerVacuumBubbleLensEnabled: (enabled: boolean) => void
+  setSchroedingerVacuumBubbleLensStrength: (strength: number) => void
+  setSchroedingerVacuumBubbleWallRadius: (radius: number) => void
+  setSchroedingerVacuumBubbleWallThickness: (thickness: number) => void
+  setSchroedingerVacuumBubbleTension: (tension: number) => void
+  setSchroedingerVacuumBubbleBias: (bias: number) => void
   // Physical Probability Current (j-field)
   setSchroedingerProbabilityCurrentEnabled: (enabled: boolean) => void
   setSchroedingerProbabilityCurrentStyle: (

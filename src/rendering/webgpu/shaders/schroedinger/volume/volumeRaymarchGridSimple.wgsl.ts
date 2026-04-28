@@ -54,6 +54,7 @@ fn volumeRaymarchGrid(
   let bilocalBridgeActive = isBilocalERBridgeActive(uniforms);
   let entropyShearActive = isEntropicTimeShearActive(uniforms);
   let spectralFlowActive = isSpectralDimensionFlowActive(uniforms);
+  let vacuumBubbleActive = isVacuumBubbleLensActive(uniforms);
 
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (PROFILING_HALF_SAMPLES && i >= 64) { break; }
@@ -218,6 +219,29 @@ fn volumeRaymarchGrid(
       }
     }
 
+    var vacuumBubbleEmissionGain = 1.0;
+    var vacuumBubbleOpacityScale = 1.0;
+    if (vacuumBubbleActive && rho >= EMPTY_SKIP_THRESHOLD) {
+      let beforeVacuumBubble = pos;
+      let vacuumBubble = applyVacuumBubbleLens(pos, rayDir, uniforms);
+      pos = vacuumBubble.position;
+      vacuumBubbleEmissionGain = vacuumBubble.emissionGain;
+      vacuumBubbleOpacityScale = vacuumBubble.opacityScale;
+      if (length(pos - beforeVacuumBubble) > 1e-6) {
+        gridSample = sampleDensityFromGrid(pos, uniforms);
+        rho = gridSample.r * adsAmplitudeSq;
+        sCenter = gridSample.g;
+        phase = gridSample.b - phaseOffset;
+        colorRho = rho;
+        colorS = 0.0;
+        if (IS_DUAL_CHANNEL) {
+          colorRho = gridSample.r;
+          colorS = gridSample.g;
+          rho = rho + gridSample.g;
+        }
+      }
+    }
+
     let hasPotOverlay = DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01;
     let hasWdwOverlay = DENSITY_GRID_HAS_PHASE && isWdwMode && gridSample.a > 0.01;
 
@@ -267,7 +291,12 @@ fn volumeRaymarchGrid(
       transmittance *= (1.0 - overlayOpacity);
     }
 
-    let effectiveRho = computeEffectiveDensity(rho * spectralOpacityScale, phase, transmittance, uniforms);
+    let effectiveRho = computeEffectiveDensity(
+      rho * spectralOpacityScale * vacuumBubbleOpacityScale,
+      phase,
+      transmittance,
+      uniforms
+    );
     let alpha = computeAlpha(effectiveRho, adaptiveStep, uniforms.densityGain);
 
     let primaryHitThreshold: f32 = 0.01;
@@ -293,6 +322,7 @@ fn volumeRaymarchGrid(
         emission *= causticMultiplier;
         emission *= bridgeGain;
         emission *= spectralEmissionGain;
+        emission *= vacuumBubbleEmissionGain;
         emission *= 1.0 + uniforms.entropicTimeShearStrength * max(entropyGain, 0.0) * 0.35;
 
         if (branchColorActive) {

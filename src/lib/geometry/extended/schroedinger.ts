@@ -373,6 +373,18 @@ export interface SchroedingerConfig {
   spectralDimensionFlowUvDimension: number
   /** Diffusion scale for gradient-curvature heat-kernel proxy (0.05-3.0) */
   spectralDimensionFlowDiffusionScale: number
+  /** Enable Coleman-De Luccia false-vacuum bubble wall lensing */
+  vacuumBubbleLensEnabled: boolean
+  /** Bubble wall coordinate refraction and emission strength (0.0-2.0) */
+  vacuumBubbleLensStrength: number
+  /** Bubble wall radius as a fraction of bounding radius (0.05-1.5) */
+  vacuumBubbleWallRadius: number
+  /** Bubble wall thickness as a fraction of bounding radius (0.02-0.5) */
+  vacuumBubbleWallThickness: number
+  /** False-vacuum wall tension term in the CDL action proxy (0.0-3.0) */
+  vacuumBubbleTension: number
+  /** True-vacuum volume bias term in the CDL action proxy (0.0-3.0) */
+  vacuumBubbleBias: number
 
   // === Physical Probability Current (j-field) ===
   /** Enable physical probability-current visualization (j = Im(conj(psi)∇psi)) */
@@ -683,6 +695,12 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   spectralDimensionFlowStrength: 0.75,
   spectralDimensionFlowUvDimension: 2.0,
   spectralDimensionFlowDiffusionScale: 0.7,
+  vacuumBubbleLensEnabled: false,
+  vacuumBubbleLensStrength: 0.75,
+  vacuumBubbleWallRadius: 0.55,
+  vacuumBubbleWallThickness: 0.12,
+  vacuumBubbleTension: 0.9,
+  vacuumBubbleBias: 0.8,
 
   // Physical Probability Current (j-field)
   probabilityCurrentEnabled: false,

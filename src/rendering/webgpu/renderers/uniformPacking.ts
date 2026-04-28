@@ -33,6 +33,7 @@ import {
   packEntropicTimeShear,
   packQuantumBackreaction,
   packSpectralDimensionFlow,
+  packVacuumBubbleLens,
 } from './uniformPackingBackreaction'
 import {
   packRepresentationAndColorOverlays,
@@ -305,6 +306,7 @@ function packVisualFields(
   packBilocalERBridge(floatView, intView, schroedinger)
   packEntropicTimeShear(floatView, intView, schroedinger)
   packSpectralDimensionFlow(floatView, intView, schroedinger)
+  packVacuumBubbleLens(floatView, intView, schroedinger)
 }
 
 /** Pack nodal fields, color algorithm, and cosine palette. */

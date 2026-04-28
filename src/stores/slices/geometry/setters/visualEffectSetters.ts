@@ -179,6 +179,12 @@ export function createVisualEffectSetters(
       0.05,
       3.0
     ),
+    setSchroedingerVacuumBubbleLensEnabled: valueSetter('vacuumBubbleLensEnabled'),
+    setSchroedingerVacuumBubbleLensStrength: clampedSetter('vacuumBubbleLensStrength', 0.0, 2.0),
+    setSchroedingerVacuumBubbleWallRadius: clampedSetter('vacuumBubbleWallRadius', 0.05, 1.5),
+    setSchroedingerVacuumBubbleWallThickness: clampedSetter('vacuumBubbleWallThickness', 0.02, 0.5),
+    setSchroedingerVacuumBubbleTension: clampedSetter('vacuumBubbleTension', 0.0, 3.0),
+    setSchroedingerVacuumBubbleBias: clampedSetter('vacuumBubbleBias', 0.0, 3.0),
 
     // Probability current
     setSchroedingerProbabilityCurrentEnabled: valueSetter('probabilityCurrentEnabled'),

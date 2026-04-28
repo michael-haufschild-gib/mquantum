@@ -75,3 +75,64 @@ References used:
   - `pnpm run lint` — PASS.
   - `pnpm test:shaders:fast` — PASS.
 - Follow-up threads: expose measured `D_s` as optional diagnostic overlay; couple `D_s` to Wheeler-DeWitt WKB streamlines; derive diffusion scale from local lattice spacing in compute modes.
+
+## Round PRD: Coleman-De Luccia Vacuum Bubble Lens
+
+### Scientific Goal
+
+Render false-vacuum decay as a semiclassical tunneling geometry inside the existing WebGPU quantum volume renderer. The feature should show a true-vacuum bubble nucleating inside the quantum state: the instanton wall refracts samples, thins opacity inside the bubble, and emits a bright wall where a Euclidean action proxy favors tunneling.
+
+### Physics / Math
+
+- Add controls on `SchroedingerConfig`:
+  - `vacuumBubbleLensEnabled: boolean`
+  - `vacuumBubbleLensStrength: number` in `[0, 2]`, default `0.75`
+  - `vacuumBubbleWallRadius: number` in `[0.05, 1.5]`, default `0.55`
+  - `vacuumBubbleWallThickness: number` in `[0.02, 0.5]`, default `0.12`
+  - `vacuumBubbleTension: number` in `[0, 3]`, default `0.9`
+  - `vacuumBubbleBias: number` in `[0, 3]`, default `0.8`
+- In WGSL, define a Coleman-De Luccia bounce proxy:
+  - `r = length(worldPosition)`
+  - `R(t) = wallRadius * boundingRadius * (1 + 0.12 * sin(time * timeScale * (0.35 + bias)))`
+  - `wall = exp(-((r - R) / thickness)^2)`
+  - `inside = 1 - smoothstep(R - thickness, R + thickness, r)`
+  - `S_proxy = tension * R^2 - bias * R^3` clamped into a tunneling gate, with lower action producing brighter shell.
+- Use the proxy to alter rendered physics:
+  - Coordinate refraction across the wall: displace sample coordinates along radial normal by a bounded amount proportional to `wall * strength * tunnelingGate`.
+  - Opacity response: thin true-vacuum interior by multiplying density/effective alpha by `mix(1, 0.55, inside * strengthBound)`.
+  - Emission response: boost emission on the wall by `1 + wall * tunnelingGate * strength`.
+- Must work in:
+  - Analytic volume raymarch path.
+  - HQ volume raymarch path.
+  - Density-grid raymarch path.
+  - Simple density-grid raymarch path.
+- Disabled state must be exact no-op by writing all fields as zero or guards returning identity.
+
+### User Sees
+
+- Quantum Effects section gains "Vacuum Bubble Lens" switch with sliders for strength, radius, wall thickness, tension, and vacuum bias.
+- When enabled, the wavefunction develops a luminous instanton shell. The interior becomes visually thinner and the wall bends nearby structures, making vacuum decay visible as geometry rather than only color.
+
+### Acceptance Bar
+
+- TypeScript compiles.
+- Unit tests cover:
+  - Disabled uniforms zero.
+  - Enabled uniforms clamp to ranges.
+  - WGSL contains uniforms, active guard, CDL helper, and all raymarch paths resample after wall refraction and apply opacity/emission response.
+- `pnpm exec vitest run src/tests/rendering/webgpu/uniformPacking.test.ts src/tests/rendering/webgpu/structLayout.test.ts src/tests/rendering/webgpu/schroedingerVacuumBubbleLensWgsl.test.ts`
+- `pnpm run lint`
+- `pnpm test:shaders:fast`
+
+### Outcome
+
+- Commit: `7587d11e` (`Add Coleman-De Luccia bubble lens`)
+- Reviewer result: PASS.
+- What renderer now draws: an oscillating Coleman-De Luccia false-vacuum bubble lens with radial wall refraction, true-vacuum interior opacity thinning, and tunneling-wall emission gain.
+- Paths affected: analytic volume raymarch, HQ analytic raymarch, full density-grid raymarch, and simple density-grid raymarch.
+- Verification:
+  - `pnpm exec vitest run src/tests/rendering/webgpu/uniformPacking.test.ts src/tests/rendering/webgpu/structLayout.test.ts src/tests/rendering/webgpu/schroedingerVacuumBubbleLensWgsl.test.ts` — PASS, 97 tests.
+  - `pnpm exec tsc --noEmit` — PASS.
+  - `pnpm run lint` — PASS.
+  - `pnpm test:shaders:fast` — PASS.
+- Follow-up threads: make bubble center follow a Bohmian current streamline; couple bubble nucleation to FSF self-interaction potential minima; add two-bubble collision interference.
