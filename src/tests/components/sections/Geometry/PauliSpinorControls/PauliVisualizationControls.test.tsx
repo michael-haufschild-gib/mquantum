@@ -9,4 +9,10 @@ describe('PauliVisualizationControls', () => {
 
     expect(screen.getByRole('radio', { name: 'Spin Helicity' })).toBeInTheDocument()
   })
+
+  it('exposes Berry curvature as a field view', () => {
+    render(<PauliVisualizationControls fieldView="spinDensity" onFieldViewChange={vi.fn()} />)
+
+    expect(screen.getByRole('radio', { name: 'Berry Curvature' })).toBeInTheDocument()
+  })
 })

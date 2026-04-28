@@ -255,6 +255,7 @@ export const PAULI_FIELD_VIEW_TO_COLOR_ALGO: Record<PauliFieldView, ColorAlgorit
   spinExpectation: 'pauliSpinExpectation',
   coherence: 'pauliCoherence',
   spinHelicity: 'blackbody',
+  berryCurvature: 'blackbody',
 }
 
 /** Map Dirac field view to matching color algorithm for synchronized rendering. */

@@ -475,6 +475,7 @@ describe('pauliFieldViewForColorAlgorithm', () => {
 
   it('preserves spinHelicity when its paired generic algorithm is active', () => {
     expect(pauliFieldViewForColorAlgorithm('blackbody', 'spinHelicity')).toBe('spinHelicity')
+    expect(pauliFieldViewForColorAlgorithm('blackbody', 'berryCurvature')).toBe('berryCurvature')
     expect(pauliFieldViewForColorAlgorithm('blackbody', 'coherence')).toBe('totalDensity')
   })
 })

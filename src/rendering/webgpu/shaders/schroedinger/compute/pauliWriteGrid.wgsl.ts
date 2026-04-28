@@ -16,6 +16,7 @@
  *                        R+G = total density always; σ_z = (R-G)/(R+G) reconstructed by color algo
  *   3 coherence:       R = |ψ_up* ψ_down|, G = log(coh), B = phase, A = coherence
  *   4 spinHelicity:    R = |S·curl(S)|, G = log(|H|), B = phase, A = total
+ *   5 berryCurvature:  R = |Fij| pair-sum, G = signed two-form proxy, B = phase, A = total
  *
  * Output texture channels (rgba16float):
  *   R: primary display scalar
@@ -410,6 +411,47 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     } else {
       outR = 0.0;
       outG = log(1e-10);
+      outA = totalNorm;
+    }
+  } else if (params.fieldView == 5u) {
+    // berryCurvature: magnitude of the Bloch-sphere Berry two-form
+    // F_ij = 1/2 S · (∂iS × ∂jS), summed over all active lattice-axis pairs.
+    let total = totalDensityAt(nnSite, T);
+    let totalNorm = clamp(total * invScalePerp, 0.0, 1.0);
+    if (params.latticeDim >= 2u && total >= 1e-20) {
+      let spin = spinUnitAt(nnSite, T);
+      var spinGrad: array<vec3f, 12>;
+      var minSpacing: f32 = params.spacing[0];
+
+      for (var axis: u32 = 0u; axis < params.latticeDim; axis = axis + 1u) {
+        let plus = spinTextureNeighbor(nnSite, &nnCoords, axis, true);
+        let minus = spinTextureNeighbor(nnSite, &nnCoords, axis, false);
+        let spacing = max(params.spacing[axis], 1e-6);
+        minSpacing = min(minSpacing, spacing);
+        spinGrad[axis] = (spinUnitAt(plus, T) - spinUnitAt(minus, T)) / (2.0 * spacing);
+      }
+
+      var berryAbs: f32 = 0.0;
+      var berrySigned: f32 = 0.0;
+      for (var i: u32 = 0u; i < params.latticeDim; i = i + 1u) {
+        for (var j: u32 = i + 1u; j < params.latticeDim; j = j + 1u) {
+          let dSi = spinGrad[i];
+          let dSj = spinGrad[j];
+          let berryFij = 0.5 * dot(spin, cross(dSi, dSj));
+          berryAbs += abs(berryFij);
+          berrySigned += berryFij;
+        }
+      }
+
+      let curvatureArea = berryAbs * minSpacing * minSpacing;
+      let curvatureNorm = (1.0 - exp(-curvatureArea)) * totalNorm;
+      let signedProxy = 0.5 + 0.5 * tanh(berrySigned * minSpacing * minSpacing);
+      outR = curvatureNorm;
+      outG = signedProxy * totalNorm;
+      outA = totalNorm;
+    } else {
+      outR = 0.0;
+      outG = 0.0;
       outA = totalNorm;
     }
   }

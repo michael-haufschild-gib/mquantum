@@ -181,6 +181,8 @@ function colorAlgoForPauliFieldView(
       return 'pauliCoherence'
     case 'spinHelicity':
       return 'blackbody'
+    case 'berryCurvature':
+      return 'blackbody'
     case 'totalDensity':
       return 'blackbody'
     default:

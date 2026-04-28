@@ -27,6 +27,7 @@ export type PauliFieldType = 'uniform' | 'gradient' | 'rotating' | 'quadrupole'
  * - spinExpectation: Color-mapped by local ⟨σ_z⟩
  * - coherence: Off-diagonal |ψ↑* ψ↓| density matrix element
  * - spinHelicity: Magnitude of local spin-texture helicity |S · curl(S)|
+ * - berryCurvature: Magnitude of Berry two-form 0.5*S·(∂iS×∂jS)
  */
 export type PauliFieldView =
   | 'spinDensity'
@@ -34,6 +35,7 @@ export type PauliFieldView =
   | 'spinExpectation'
   | 'coherence'
   | 'spinHelicity'
+  | 'berryCurvature'
 
 /**
  * Initial wavepacket type for the Pauli spinor

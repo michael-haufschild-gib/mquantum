@@ -588,3 +588,57 @@ Render temporal memory as rotational causal geometry, not only scalar persistenc
   - `pnpm test:shaders:fast` — PASS.
   - `git diff --check` — PASS.
 - Follow-up threads: signed spin direction control; camera-space versus screen-space horizon centers; couple spin shear to black-hole analog Mach horizon output.
+
+## Round PRD: Pauli Berry-Curvature Two-Form View
+
+### Scientific Goal
+
+Render the Pauli spinor's local Berry curvature as an emergent gauge field. The view should show where normalized Bloch spin texture folds across space into monopole/skyrmion-like curvature, making spin topology visible as a volume scalar rather than an inferred color pattern.
+
+### Physics / Math
+
+- Add `berryCurvature` to `PauliFieldView`.
+- Map `berryCurvature` to Pauli `fieldView = 5`.
+- In `pauliWriteGrid`:
+  - Reuse `spinUnitAt(siteIdx, T)` for the normalized Bloch vector `S`.
+  - For each lattice axis `i`, compute central finite difference `∂i S` using `spinTextureNeighbor`, `params.spacing[i]`, and existing periodic/PML boundary behavior.
+  - For each axis pair `(i,j)` with `i < j`, compute Berry two-form component `Fij = 0.5 * S · (∂i S × ∂j S)`.
+  - Sum `abs(Fij)` across all pairs to support 3D and higher-dimensional slices.
+  - Normalize by `min(spacing)^2` and render a bounded scalar `1 - exp(-curvatureArea)`, density-gated by total density.
+  - Preserve alpha as total normalized density so raymarch opacity remains physically tied to probability density.
+- Existing Pauli field-view enum values must remain unchanged.
+- `spinHelicity` remains `fieldView = 4`.
+
+### User Sees
+
+- Pauli Spinor controls gain a `Berry Curvature` field-view option.
+- Selecting it renders bright sheets, knots, and monopole-like cores where spin orientation winds rapidly. In 4D+ views, changing slice positions changes the visible two-form curvature because all active lattice axis pairs contribute.
+
+### Acceptance Bar
+
+- TypeScript compiles.
+- Unit/source tests cover:
+  - `berryCurvature` is accepted as a Pauli field view.
+  - `berryCurvature` packs to Pauli `fieldView = 5` while `spinHelicity` remains `4`.
+  - `pauliWriteGrid` fieldView-5 branch computes `berryAbs`, `berrySigned`, `cross(dSi, dSj)`, `0.5 * dot(spin, ...)`, `minSpacing`, bounded curvature, and `outA = totalNorm`.
+  - Pauli UI exposes `Berry Curvature`.
+  - Scene pass field-view/color mapping preserves `berryCurvature` under `blackbody`.
+- `pnpm exec vitest run src/tests/rendering/webgpu/pauliSpinHelicityShader.test.ts src/tests/components/sections/Geometry/PauliSpinorControls/PauliVisualizationControls.test.tsx src/tests/rendering/webgpu/scenePassSetup.test.ts`
+- `pnpm exec tsc --noEmit`
+- `pnpm run lint`
+- `pnpm test:shaders:fast`
+
+### Outcome
+
+- Commit: `Add Pauli Berry curvature view`.
+- Reviewer result: PASS.
+- What renderer now draws: Pauli Spinor has a `Berry Curvature` field view that raymarches local Bloch-spin Berry two-form magnitude.
+- Physics implemented: `F_ij = 0.5 * S · (∂iS × ∂jS)` over every active lattice-axis pair, using existing spin-neighbor topology, PML/periodic boundaries, and density-gated alpha.
+- Paths affected: Pauli field-view type/UI/packing, Pauli write-grid WGSL, palette/scene field-view mapping, and focused tests.
+- Verification:
+  - `pnpm exec vitest run src/tests/rendering/webgpu/pauliSpinHelicityShader.test.ts src/tests/components/sections/Geometry/PauliSpinorControls/PauliVisualizationControls.test.tsx src/tests/rendering/webgpu/scenePassSetup.test.ts src/tests/lib/geometry/extended/pauliTypes.test.ts` — PASS, 69 tests.
+  - `pnpm exec tsc --noEmit` — PASS.
+  - `pnpm run lint` — PASS.
+  - `pnpm test:shaders:fast` — PASS.
+  - `git diff --check` — PASS.
+- Follow-up threads: signed Berry-curvature diverging palette; integrate curvature flux through moving slices; correlate curvature knots with Stern-Gerlach packet splitting.

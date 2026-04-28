@@ -117,7 +117,7 @@ struct PauliUniforms {
   _pad3: u32,                       // [75]
 
   // Display
-  fieldView: u32,                   // [76]  0=spinDensity, 1=totalDensity, 2=spinExpectation, 3=coherence, 4=spinHelicity
+  fieldView: u32,                   // [76]  0=spinDensity, 1=totalDensity, 2=spinExpectation, 3=coherence, 4=spinHelicity, 5=berryCurvature
   autoScale: u32,                   // [77]
   spinUpR: f32,                     // [78]
   spinUpG: f32,                     // [79]
