@@ -84,25 +84,78 @@ describe('writeVec3', () => {
   })
 })
 
+/**
+ * Named slot indices for the skybox uniform layout. Mirrors the layout
+ * documented in `skyboxVertexData.ts` so a future packing-layout change
+ * surfaces as a single-edit failure here instead of dozens of magic-number
+ * mismatches scattered across these tests.
+ */
+const SKYBOX_SLOT = {
+  // Core uniforms (16 floats, slots 0-15)
+  shaderMode: 0,
+  time: 1,
+  intensity: 2,
+  hue: 3,
+  saturation: 4,
+  scale: 5,
+  complexity: 6,
+  timeScale: 7,
+  evolution: 8,
+  pad9: 9,
+  animDistortion: 10,
+  turbulence: 12,
+  dualToneContrast: 13,
+  sunIntensity: 14,
+  // Mode settings (slots 40-51)
+  sunPositionX: 40,
+  sunPositionY: 41,
+  sunPositionZ: 42,
+  auroraCurtainHeight: 44,
+  auroraWaveFrequency: 45,
+  horizonGradientContrast: 46,
+  horizonSpotlightFocus: 47,
+  oceanCausticIntensity: 48,
+  oceanDepthGradient: 49,
+  oceanBubbleDensity: 50,
+  oceanSurfaceShimmer: 51,
+  // Palette coefficient slots
+  paletteA0: 16,
+  paletteA1: 20,
+  paletteB0: 24,
+  paletteB1: 28,
+  paletteC0: 32,
+  paletteC1: 33,
+  paletteC2: 34,
+  paletteD0: 36,
+  paletteD1: 37,
+  paletteD2: 38,
+  // Precomputed palette samples
+  precomputedAurora0: 52,
+  precomputedAurora1: 53,
+  precomputedAurora2: 54,
+  precomputedAuroraPad: 55,
+  precomputedHorizonFloor0: 80,
+} as const
+
 describe('packSkyboxCoreUniforms', () => {
   it('writes shaderMode/time/intensity/hue + per-setting defaults at slots 0-14', () => {
     const buf = new Float32Array(16)
     packSkyboxCoreUniforms(buf, 'aurora', undefined, 1.5, 0.8, 0.4, 0.2)
-    expect(buf[0]).toBe(1) // aurora numeric
-    expect(buf[1]).toBeCloseTo(1.5) // t
-    expect(buf[2]).toBeCloseTo(0.8) // intensity
-    expect(buf[3]).toBeCloseTo(0.4) // hue
-    expect(buf[4]).toBe(1.0) // saturation default
-    expect(buf[5]).toBe(1.0) // scale default
-    expect(buf[6]).toBe(0.5) // complexity default
-    expect(buf[7]).toBeCloseTo(0.2, 6) // timeScale default
-    expect(buf[8]).toBe(0.0) // evolution default
-    expect(buf[10]).toBeCloseTo(0.2, 6) // animDistortion
-    expect(buf[12]).toBeCloseTo(0.3, 6) // turbulence default
-    expect(buf[13]).toBe(0.5) // dualToneContrast default
-    expect(buf[14]).toBe(0.0) // sunIntensity default
+    expect(buf[SKYBOX_SLOT.shaderMode]).toBe(1) // aurora numeric
+    expect(buf[SKYBOX_SLOT.time]).toBeCloseTo(1.5)
+    expect(buf[SKYBOX_SLOT.intensity]).toBeCloseTo(0.8)
+    expect(buf[SKYBOX_SLOT.hue]).toBeCloseTo(0.4)
+    expect(buf[SKYBOX_SLOT.saturation]).toBe(1.0)
+    expect(buf[SKYBOX_SLOT.scale]).toBe(1.0)
+    expect(buf[SKYBOX_SLOT.complexity]).toBe(0.5)
+    expect(buf[SKYBOX_SLOT.timeScale]).toBeCloseTo(0.2, 6)
+    expect(buf[SKYBOX_SLOT.evolution]).toBe(0.0)
+    expect(buf[SKYBOX_SLOT.animDistortion]).toBeCloseTo(0.2, 6)
+    expect(buf[SKYBOX_SLOT.turbulence]).toBeCloseTo(0.3, 6)
+    expect(buf[SKYBOX_SLOT.dualToneContrast]).toBe(0.5)
+    expect(buf[SKYBOX_SLOT.sunIntensity]).toBe(0.0)
     // Slot 9 is intentionally left zero — it's a packing pad.
-    expect(buf[9]).toBe(0)
+    expect(buf[SKYBOX_SLOT.pad9]).toBe(0)
   })
 
   it('uses provided settings instead of defaults when present', () => {
@@ -125,14 +178,14 @@ describe('packSkyboxCoreUniforms', () => {
       0,
       0
     )
-    expect(buf[4]).toBeCloseTo(0.7)
-    expect(buf[5]).toBe(2.0)
-    expect(buf[6]).toBeCloseTo(0.9)
-    expect(buf[7]).toBeCloseTo(0.05)
-    expect(buf[8]).toBeCloseTo(0.3)
-    expect(buf[12]).toBeCloseTo(0.6)
-    expect(buf[13]).toBeCloseTo(0.8)
-    expect(buf[14]).toBeCloseTo(0.4)
+    expect(buf[SKYBOX_SLOT.saturation]).toBeCloseTo(0.7)
+    expect(buf[SKYBOX_SLOT.scale]).toBe(2.0)
+    expect(buf[SKYBOX_SLOT.complexity]).toBeCloseTo(0.9)
+    expect(buf[SKYBOX_SLOT.timeScale]).toBeCloseTo(0.05)
+    expect(buf[SKYBOX_SLOT.evolution]).toBeCloseTo(0.3)
+    expect(buf[SKYBOX_SLOT.turbulence]).toBeCloseTo(0.6)
+    expect(buf[SKYBOX_SLOT.dualToneContrast]).toBeCloseTo(0.8)
+    expect(buf[SKYBOX_SLOT.sunIntensity]).toBeCloseTo(0.4)
   })
 })
 
@@ -140,17 +193,17 @@ describe('packSkyboxModeSettings', () => {
   it('uses default sun position [10,10,10] and zero feature settings when settings absent', () => {
     const buf = new Float32Array(64)
     packSkyboxModeSettings(buf, undefined)
-    expect(buf[40]).toBe(10)
-    expect(buf[41]).toBe(10)
-    expect(buf[42]).toBe(10)
-    expect(buf[44]).toBe(0.5) // aurora curtainHeight default
-    expect(buf[45]).toBe(1.0) // waveFrequency default
-    expect(buf[46]).toBe(0.5) // horizonGradient.gradientContrast default
-    expect(buf[47]).toBe(0.5) // spotlightFocus default
-    expect(buf[48]).toBe(0.5) // ocean.causticIntensity default
-    expect(buf[49]).toBe(0.5) // ocean.depthGradient default
-    expect(buf[50]).toBeCloseTo(0.3) // ocean.bubbleDensity default
-    expect(buf[51]).toBeCloseTo(0.4) // ocean.surfaceShimmer default
+    expect(buf[SKYBOX_SLOT.sunPositionX]).toBe(10)
+    expect(buf[SKYBOX_SLOT.sunPositionY]).toBe(10)
+    expect(buf[SKYBOX_SLOT.sunPositionZ]).toBe(10)
+    expect(buf[SKYBOX_SLOT.auroraCurtainHeight]).toBe(0.5)
+    expect(buf[SKYBOX_SLOT.auroraWaveFrequency]).toBe(1.0)
+    expect(buf[SKYBOX_SLOT.horizonGradientContrast]).toBe(0.5)
+    expect(buf[SKYBOX_SLOT.horizonSpotlightFocus]).toBe(0.5)
+    expect(buf[SKYBOX_SLOT.oceanCausticIntensity]).toBe(0.5)
+    expect(buf[SKYBOX_SLOT.oceanDepthGradient]).toBe(0.5)
+    expect(buf[SKYBOX_SLOT.oceanBubbleDensity]).toBeCloseTo(0.3)
+    expect(buf[SKYBOX_SLOT.oceanSurfaceShimmer]).toBeCloseTo(0.4)
   })
 
   it('overrides defaults from nested mode settings', () => {
@@ -166,15 +219,15 @@ describe('packSkyboxModeSettings', () => {
         surfaceShimmer: 0.05,
       },
     } as never)
-    expect(buf[40]).toBe(3)
-    expect(buf[44]).toBeCloseTo(0.1)
-    expect(buf[45]).toBe(2.5)
-    expect(buf[46]).toBeCloseTo(0.9)
-    expect(buf[47]).toBeCloseTo(0.2)
-    expect(buf[48]).toBeCloseTo(0.1)
-    expect(buf[49]).toBeCloseTo(0.7)
-    expect(buf[50]).toBeCloseTo(0.8)
-    expect(buf[51]).toBeCloseTo(0.05)
+    expect(buf[SKYBOX_SLOT.sunPositionX]).toBe(3)
+    expect(buf[SKYBOX_SLOT.auroraCurtainHeight]).toBeCloseTo(0.1)
+    expect(buf[SKYBOX_SLOT.auroraWaveFrequency]).toBe(2.5)
+    expect(buf[SKYBOX_SLOT.horizonGradientContrast]).toBeCloseTo(0.9)
+    expect(buf[SKYBOX_SLOT.horizonSpotlightFocus]).toBeCloseTo(0.2)
+    expect(buf[SKYBOX_SLOT.oceanCausticIntensity]).toBeCloseTo(0.1)
+    expect(buf[SKYBOX_SLOT.oceanDepthGradient]).toBeCloseTo(0.7)
+    expect(buf[SKYBOX_SLOT.oceanBubbleDensity]).toBeCloseTo(0.8)
+    expect(buf[SKYBOX_SLOT.oceanSurfaceShimmer]).toBeCloseTo(0.05)
   })
 })
 
@@ -183,16 +236,16 @@ describe('packSkyboxPalette', () => {
     const buf = new Float32Array(40)
     packSkyboxPalette(buf, undefined)
     // a coeffs at slot 16 and slot 24
-    expect(buf[16]).toBe(0.5)
-    expect(buf[24]).toBe(0.5)
+    expect(buf[SKYBOX_SLOT.paletteA0]).toBe(0.5)
+    expect(buf[SKYBOX_SLOT.paletteB0]).toBe(0.5)
     // c coeffs at slot 32 default to (1,1,1)
-    expect(buf[32]).toBe(1.0)
-    expect(buf[33]).toBe(1.0)
-    expect(buf[34]).toBe(1.0)
+    expect(buf[SKYBOX_SLOT.paletteC0]).toBe(1.0)
+    expect(buf[SKYBOX_SLOT.paletteC1]).toBe(1.0)
+    expect(buf[SKYBOX_SLOT.paletteC2]).toBe(1.0)
     // d coeffs at slot 36 default to (0, 0.33, 0.67)
-    expect(buf[36]).toBe(0.0)
-    expect(buf[37]).toBeCloseTo(0.33)
-    expect(buf[38]).toBeCloseTo(0.67)
+    expect(buf[SKYBOX_SLOT.paletteD0]).toBe(0.0)
+    expect(buf[SKYBOX_SLOT.paletteD1]).toBeCloseTo(0.33)
+    expect(buf[SKYBOX_SLOT.paletteD2]).toBeCloseTo(0.67)
   })
 
   it('writes provided palette coefficients verbatim', () => {
@@ -203,12 +256,12 @@ describe('packSkyboxPalette', () => {
       c: [0.7, 0.8, 0.9],
       d: [0.11, 0.12, 0.13],
     })
-    expect(buf[16]).toBeCloseTo(0.1)
-    expect(buf[20]).toBeCloseTo(0.4)
-    expect(buf[24]).toBeCloseTo(0.1)
-    expect(buf[28]).toBeCloseTo(0.4)
-    expect(buf[32]).toBeCloseTo(0.7)
-    expect(buf[36]).toBeCloseTo(0.11)
+    expect(buf[SKYBOX_SLOT.paletteA0]).toBeCloseTo(0.1)
+    expect(buf[SKYBOX_SLOT.paletteA1]).toBeCloseTo(0.4)
+    expect(buf[SKYBOX_SLOT.paletteB0]).toBeCloseTo(0.1)
+    expect(buf[SKYBOX_SLOT.paletteB1]).toBeCloseTo(0.4)
+    expect(buf[SKYBOX_SLOT.paletteC0]).toBeCloseTo(0.7)
+    expect(buf[SKYBOX_SLOT.paletteD0]).toBeCloseTo(0.11)
   })
 })
 
@@ -222,11 +275,11 @@ describe('packSkyboxPrecomputedPalettes', () => {
     const expected0 = 0.5 + 0.5 * Math.cos(2 * Math.PI * (0.8 + 0))
     const expected1 = 0.5 + 0.5 * Math.cos(2 * Math.PI * (0.8 + 0.33))
     const expected2 = 0.5 + 0.5 * Math.cos(2 * Math.PI * (0.8 + 0.67))
-    expect(buf[52]).toBeCloseTo(expected0, 4)
-    expect(buf[53]).toBeCloseTo(expected1, 4)
-    expect(buf[54]).toBeCloseTo(expected2, 4)
+    expect(buf[SKYBOX_SLOT.precomputedAurora0]).toBeCloseTo(expected0, 4)
+    expect(buf[SKYBOX_SLOT.precomputedAurora1]).toBeCloseTo(expected1, 4)
+    expect(buf[SKYBOX_SLOT.precomputedAurora2]).toBeCloseTo(expected2, 4)
     // Slot 55 is vec3 padding — must remain 0 from initialization.
-    expect(buf[55]).toBe(0)
+    expect(buf[SKYBOX_SLOT.precomputedAuroraPad]).toBe(0)
   })
 
   it('shifts horizon samples by tempPulse derived from effectiveTime', () => {
@@ -239,7 +292,7 @@ describe('packSkyboxPrecomputedPalettes', () => {
     const tempPulse = Math.sin(5 * 0.12) * 0.08 + Math.sin(5 * 0.07) * 0.04
     const t = 0.1 + tempPulse * 0.1
     const expected = 0.5 + 0.5 * Math.cos(2 * Math.PI * (t + 0))
-    expect(buf[80]).toBeCloseTo(expected, 4)
+    expect(buf[SKYBOX_SLOT.precomputedHorizonFloor0]).toBeCloseTo(expected, 4)
   })
 })
 
