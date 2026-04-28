@@ -13,8 +13,6 @@
 import type { AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { DEFAULT_COSINE_COEFFICIENTS } from '@/rendering/shaders/palette'
-import type { AppearanceStoreState } from '@/stores/appearanceStore'
-import type { PBRSliceState } from '@/stores/slices/visual/pbrSlice'
 
 import { MAX_DIM, MAX_EXTRA_DIM, MAX_TERMS } from '../shaders/schroedinger/uniforms.wgsl'
 import { parseHexColorToLinearRgb, type Rgb } from '../utils/color'
@@ -41,6 +39,9 @@ import {
 } from './uniformPackingColorOverlays'
 import { packDensityGridMapping } from './uniformPackingDensityGrid'
 import { packAdsTimeEvolution } from './uniformPackingSupport'
+import type { SchroedingerPackParams } from './uniformPackingTypes'
+
+export type { FlattenedPreset, SchroedingerPackParams } from './uniformPackingTypes'
 
 // Field name → float32/int32 index (byte offset / 4)
 const I = SCHROEDINGER_LAYOUT.index
@@ -58,62 +59,6 @@ const parseColor = (hex: string): Rgb => parseHexColorToLinearRgb(hex)
 // =========================================================================
 // Schroedinger uniform buffer
 // =========================================================================
-
-/** Flattened preset arrays as produced by `flattenPresetForUniforms`. */
-export interface FlattenedPreset {
-  omega: Float32Array
-  quantum: Int32Array
-  coeff: Float32Array
-  energy: Float32Array
-}
-
-/** All values needed to pack the Schroedinger uniform buffer. */
-export interface SchroedingerPackParams {
-  // Mode classification
-  quantumModeInt: number
-  quantumModeStr: string
-  isUniformComputeMode: boolean
-  isDensityMatrixMode: boolean
-  dimension: number
-
-  // Preset data
-  presetTermCount: number
-  presetData: FlattenedPreset | null
-
-  // Renderer state
-  boundingRadius: number
-  canonicalDensityCompensation: number
-  cachedPeakDensity: number
-  colorAlgorithm: number
-  effectiveSampleCount: number
-  effectiveMomentumScale: number
-  hbar: number
-  animationTime: number
-  uncertaintyLogRhoThreshold: number
-  uncertaintyConfidenceMass: number
-  uncertaintyBoundaryWidth: number
-
-  // Store snapshots (accessed for individual field reads)
-  schroedinger: Partial<SchroedingerConfig> | undefined
-  appearance: AppearanceStoreState | undefined
-  pbr: PBRSliceState | undefined
-  pauliSpinor: { spinUpColor?: number[]; spinDownColor?: number[] } | undefined
-
-  // Renderer config subset
-  rendererOpenQuantumEnabled: boolean
-  rendererQuantumMode: string
-  rendererTermCount: number | undefined
-
-  // Decoherent branching colors [r, g, b] in 0–1 range
-  branchColorA?: [number, number, number]
-  branchColorB?: [number, number, number]
-  /** Branch separation metric: 0 = coherent (equal populations), 1 = fully separated */
-  branchSeparation?: number
-  /** Branch plane threshold in world-space (for fragment-shader branch fraction) */
-  branchPlaneThreshold?: number
-  /** Branch transition width in world-space (for fragment-shader smoothstep) */
-  branchTransitionWidth?: number
-}
 
 /**
  * Pack all Schroedinger uniform values into the pre-allocated typed-array views.

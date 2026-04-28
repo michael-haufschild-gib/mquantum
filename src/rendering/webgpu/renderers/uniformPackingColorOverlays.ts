@@ -6,7 +6,7 @@ import type { AppearanceStoreState } from '@/stores/appearanceStore'
 import { parseHexColorToLinearRgb, type Rgb } from '../utils/color'
 import { MOMENTUM_DISPLAY_MODE_MAP, REPRESENTATION_MODE_MAP } from './schrodingerRendererTypes'
 import { SCHROEDINGER_LAYOUT } from './schroedingerLayout'
-import type { SchroedingerPackParams } from './uniformPacking'
+import type { SchroedingerPackParams } from './uniformPackingTypes'
 
 const I = SCHROEDINGER_LAYOUT.index
 
