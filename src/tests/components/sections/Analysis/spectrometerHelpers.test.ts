@@ -140,6 +140,7 @@ describe('deriveStatusMessage', () => {
       potentialIncompatible: true,
     })
     expect(msg.label).toMatch(/no bound states/i)
+    expect(msg.detail).toMatch(/discrete spectrum/i)
     expect(msg.dotClass).toMatch(/warning/)
   })
 

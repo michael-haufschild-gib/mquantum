@@ -26,7 +26,12 @@ function maxAbsDiff(a: ArrayLike<number>, b: ArrayLike<number>): number {
   if (a.length !== b.length) return Number.POSITIVE_INFINITY
   let m = 0
   for (let i = 0; i < a.length; i++) {
-    const d = Math.abs(a[i]! - b[i]!)
+    const ai = a[i]!
+    const bi = b[i]!
+    if (!Number.isFinite(ai) || !Number.isFinite(bi)) {
+      return Number.POSITIVE_INFINITY
+    }
+    const d = Math.abs(ai - bi)
     if (d > m) m = d
   }
   return m

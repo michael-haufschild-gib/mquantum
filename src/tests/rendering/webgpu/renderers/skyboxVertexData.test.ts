@@ -118,17 +118,31 @@ const SKYBOX_SLOT = {
   oceanDepthGradient: 49,
   oceanBubbleDensity: 50,
   oceanSurfaceShimmer: 51,
-  // Palette coefficient slots
-  paletteA0: 16,
-  paletteA1: 20,
-  paletteB0: 24,
-  paletteB1: 28,
-  paletteC0: 32,
-  paletteC1: 33,
-  paletteC2: 34,
-  paletteD0: 36,
-  paletteD1: 37,
-  paletteD2: 38,
+  // Palette coefficient slots — packSkyboxPalette writes:
+  //   16..18 = color1 (a vec3 copy 1)
+  //   20..22 = color2 (b vec3 copy 1)
+  //   24..26 = palA   (a vec3 copy 2, used by cosinePalette)
+  //   28..30 = palB   (b vec3 copy 2, used by cosinePalette)
+  //   32..34 = palC   (c vec3)
+  //   36..38 = palD   (d vec3)
+  color1A0: 16,
+  color1A1: 17,
+  color1A2: 18,
+  color2B0: 20,
+  color2B1: 21,
+  color2B2: 22,
+  palA0: 24,
+  palA1: 25,
+  palA2: 26,
+  palB0: 28,
+  palB1: 29,
+  palB2: 30,
+  palC0: 32,
+  palC1: 33,
+  palC2: 34,
+  palD0: 36,
+  palD1: 37,
+  palD2: 38,
   // Precomputed palette samples
   precomputedAurora0: 52,
   precomputedAurora1: 53,
@@ -235,33 +249,57 @@ describe('packSkyboxPalette', () => {
   it('falls back to default palette coefficients when none provided', () => {
     const buf = new Float32Array(40)
     packSkyboxPalette(buf, undefined)
-    // a coeffs at slot 16 and slot 24
-    expect(buf[SKYBOX_SLOT.paletteA0]).toBe(0.5)
-    expect(buf[SKYBOX_SLOT.paletteB0]).toBe(0.5)
-    // c coeffs at slot 32 default to (1,1,1)
-    expect(buf[SKYBOX_SLOT.paletteC0]).toBe(1.0)
-    expect(buf[SKYBOX_SLOT.paletteC1]).toBe(1.0)
-    expect(buf[SKYBOX_SLOT.paletteC2]).toBe(1.0)
-    // d coeffs at slot 36 default to (0, 0.33, 0.67)
-    expect(buf[SKYBOX_SLOT.paletteD0]).toBe(0.0)
-    expect(buf[SKYBOX_SLOT.paletteD1]).toBeCloseTo(0.33)
-    expect(buf[SKYBOX_SLOT.paletteD2]).toBeCloseTo(0.67)
+    // a coeffs default to (0.5, 0.5, 0.5) at color1 (16) and palA (24)
+    expect(buf[SKYBOX_SLOT.color1A0]).toBe(0.5)
+    expect(buf[SKYBOX_SLOT.color1A1]).toBe(0.5)
+    expect(buf[SKYBOX_SLOT.color1A2]).toBe(0.5)
+    expect(buf[SKYBOX_SLOT.palA0]).toBe(0.5)
+    expect(buf[SKYBOX_SLOT.palA1]).toBe(0.5)
+    expect(buf[SKYBOX_SLOT.palA2]).toBe(0.5)
+    // b coeffs default to (0.5, 0.5, 0.5) at color2 (20) and palB (28)
+    expect(buf[SKYBOX_SLOT.color2B0]).toBe(0.5)
+    expect(buf[SKYBOX_SLOT.palB0]).toBe(0.5)
+    // c coeffs default to (1, 1, 1)
+    expect(buf[SKYBOX_SLOT.palC0]).toBe(1.0)
+    expect(buf[SKYBOX_SLOT.palC1]).toBe(1.0)
+    expect(buf[SKYBOX_SLOT.palC2]).toBe(1.0)
+    // d coeffs default to (0, 0.33, 0.67)
+    expect(buf[SKYBOX_SLOT.palD0]).toBe(0.0)
+    expect(buf[SKYBOX_SLOT.palD1]).toBeCloseTo(0.33)
+    expect(buf[SKYBOX_SLOT.palD2]).toBeCloseTo(0.67)
   })
 
-  it('writes provided palette coefficients verbatim', () => {
+  it('writes provided palette coefficients verbatim across every vec3 slot', () => {
     const buf = new Float32Array(40)
-    packSkyboxPalette(buf, {
-      a: [0.1, 0.2, 0.3],
-      b: [0.4, 0.5, 0.6],
-      c: [0.7, 0.8, 0.9],
-      d: [0.11, 0.12, 0.13],
-    })
-    expect(buf[SKYBOX_SLOT.paletteA0]).toBeCloseTo(0.1)
-    expect(buf[SKYBOX_SLOT.paletteA1]).toBeCloseTo(0.4)
-    expect(buf[SKYBOX_SLOT.paletteB0]).toBeCloseTo(0.1)
-    expect(buf[SKYBOX_SLOT.paletteB1]).toBeCloseTo(0.4)
-    expect(buf[SKYBOX_SLOT.paletteC0]).toBeCloseTo(0.7)
-    expect(buf[SKYBOX_SLOT.paletteD0]).toBeCloseTo(0.11)
+    const a = [0.1, 0.2, 0.3]
+    const b = [0.4, 0.5, 0.6]
+    const c = [0.7, 0.8, 0.9]
+    const d = [0.11, 0.12, 0.13]
+    packSkyboxPalette(buf, { a, b, c, d })
+    // color1 (16..18) = a
+    expect(buf[SKYBOX_SLOT.color1A0]).toBeCloseTo(a[0]!)
+    expect(buf[SKYBOX_SLOT.color1A1]).toBeCloseTo(a[1]!)
+    expect(buf[SKYBOX_SLOT.color1A2]).toBeCloseTo(a[2]!)
+    // color2 (20..22) = b
+    expect(buf[SKYBOX_SLOT.color2B0]).toBeCloseTo(b[0]!)
+    expect(buf[SKYBOX_SLOT.color2B1]).toBeCloseTo(b[1]!)
+    expect(buf[SKYBOX_SLOT.color2B2]).toBeCloseTo(b[2]!)
+    // palA (24..26) = a (second copy)
+    expect(buf[SKYBOX_SLOT.palA0]).toBeCloseTo(a[0]!)
+    expect(buf[SKYBOX_SLOT.palA1]).toBeCloseTo(a[1]!)
+    expect(buf[SKYBOX_SLOT.palA2]).toBeCloseTo(a[2]!)
+    // palB (28..30) = b (second copy)
+    expect(buf[SKYBOX_SLOT.palB0]).toBeCloseTo(b[0]!)
+    expect(buf[SKYBOX_SLOT.palB1]).toBeCloseTo(b[1]!)
+    expect(buf[SKYBOX_SLOT.palB2]).toBeCloseTo(b[2]!)
+    // palC (32..34) = c
+    expect(buf[SKYBOX_SLOT.palC0]).toBeCloseTo(c[0]!)
+    expect(buf[SKYBOX_SLOT.palC1]).toBeCloseTo(c[1]!)
+    expect(buf[SKYBOX_SLOT.palC2]).toBeCloseTo(c[2]!)
+    // palD (36..38) = d
+    expect(buf[SKYBOX_SLOT.palD0]).toBeCloseTo(d[0]!)
+    expect(buf[SKYBOX_SLOT.palD1]).toBeCloseTo(d[1]!)
+    expect(buf[SKYBOX_SLOT.palD2]).toBeCloseTo(d[2]!)
   })
 })
 

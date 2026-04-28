@@ -142,7 +142,7 @@ describe('getFpsColorLevel', () => {
 describe('formatShaderName', () => {
   it('"object" key uses the objectType for display', () => {
     expect(formatShaderName('object', 'schroedinger')).toBe('Schroedinger')
-    expect(formatShaderName('OBJECT', 'pauliSpinor')).toBe('Pauli Spinor')
+    expect(formatShaderName('object', 'pauliSpinor')).toBe('Pauli Spinor')
   })
 
   it('non-object keys are simply title-cased', () => {

@@ -90,6 +90,9 @@ describe('SoundManager state management', () => {
       ctx: {
         createBufferSource?: ReturnType<typeof vi.fn>
         createOscillator?: ReturnType<typeof vi.fn>
+        createBuffer?: ReturnType<typeof vi.fn>
+        createGain?: ReturnType<typeof vi.fn>
+        createBiquadFilter?: ReturnType<typeof vi.fn>
       } | null
     }
     if (
@@ -105,15 +108,20 @@ describe('SoundManager state management', () => {
       expect(soundManager.playSwish()).toBeUndefined()
       return
     }
-    internal.ctx.createBufferSource.mockClear()
-    internal.ctx.createOscillator.mockClear()
+    const mockedSpies = [
+      internal.ctx.createBufferSource,
+      internal.ctx.createOscillator,
+      internal.ctx.createBuffer,
+      internal.ctx.createGain,
+      internal.ctx.createBiquadFilter,
+    ].filter((s): s is ReturnType<typeof vi.fn> => Boolean(s) && vi.isMockFunction(s))
+    for (const spy of mockedSpies) spy.mockClear()
     soundManager.playClick()
     soundManager.playHover()
     soundManager.playSnap()
     soundManager.playSuccess()
     soundManager.playSwish()
-    expect(internal.ctx.createBufferSource).not.toHaveBeenCalled()
-    expect(internal.ctx.createOscillator).not.toHaveBeenCalled()
+    for (const spy of mockedSpies) expect(spy).not.toHaveBeenCalled()
   })
 })
 

@@ -75,10 +75,10 @@ describe('lnFactorial', () => {
   })
 
   it('extends past the LUT (n > 170) by iterative summation', () => {
-    // For n = 200, ln(200!) ≈ ln(170!) + sum(ln(171..200)).
-    let extra = 0
-    for (let i = 171; i <= 200; i++) extra += Math.log(i)
-    const expected = lnFactorial(170) + extra
+    // Independent reference: sum log(i) for i = 1..200 — does not depend on
+    // lnFactorial(170), so a corrupted LUT entry at n=170 cannot mask a regression.
+    let expected = 0
+    for (let i = 1; i <= 200; i++) expected += Math.log(i)
     expect(lnFactorial(200)).toBeCloseTo(expected, 12)
   })
 
