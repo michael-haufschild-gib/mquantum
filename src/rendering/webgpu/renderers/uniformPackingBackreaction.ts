@@ -10,7 +10,11 @@ const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(value, max))
 
 /**
- *
+ * Pack quantum backreaction lensing uniforms (lensing strength, caustic gain,
+ * softening) into the SchroedingerUniforms buffer. When the feature is
+ * disabled all associated floats are zeroed so the WGSL early-out test
+ * (`enabled && strength > 0`) takes the cheap path without reading stale
+ * fields. Strength ∈ [0, 3], caustic gain ∈ [0, 2], softening ∈ [0.05, 2].
  */
 export function packQuantumBackreaction(
   floatView: Float32Array,
@@ -39,7 +43,11 @@ export function packQuantumBackreaction(
 }
 
 /**
- *
+ * Pack bilocal ER-bridge topology uniforms (bridge strength, throat radius,
+ * phase-lock weight) into the SchroedingerUniforms buffer. When disabled all
+ * associated floats are zeroed so the WGSL `isBilocalERBridgeActive` guard
+ * short-circuits without reading stale fields. Strength ∈ [0, 2], throat
+ * radius ∈ [0.05, 2], phase-lock ∈ [0, 1].
  */
 export function packBilocalERBridge(
   floatView: Float32Array,
@@ -60,7 +68,11 @@ export function packBilocalERBridge(
 }
 
 /**
- *
+ * Pack entropic time-shear uniforms (shear strength, filament spatial scale,
+ * irreversibility blend) into the SchroedingerUniforms buffer. When disabled
+ * all associated floats are zeroed so the WGSL `isEntropicTimeShearActive`
+ * guard short-circuits without reading stale fields. Strength ∈ [0, 2],
+ * filament scale ∈ [0.1, 4], irreversibility ∈ [0, 1].
  */
 export function packEntropicTimeShear(
   floatView: Float32Array,
