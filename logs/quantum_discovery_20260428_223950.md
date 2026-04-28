@@ -479,3 +479,53 @@ Render the analog black-hole sonic horizon as an emitted-flux field, not only as
   - `pnpm test:shaders:fast` — PASS.
   - `git diff --check` — PASS.
 - Follow-up threads: color signed axial charge instead of magnitude; couple axial charge to a synthetic anomaly source; compare axial domains during Zitterbewegung versus Klein tunneling.
+
+## Round PRD: TDSE Madelung Quantum Pressure View
+
+### Scientific Goal
+
+Render the Madelung quantum-pressure / Bohm quantum-potential magnitude directly from the TDSE density grid. The view should expose where wavefunction amplitude curvature is large enough to behave like an effective stress/curvature source, especially near interference nodes, vortex cores, barriers, compact ringdown potentials, and analog horizons.
+
+### Physics / Math
+
+- Add `quantumPressure` to `TdseFieldView`.
+- Map `quantumPressure` to TDSE write-grid `fieldView = 8`.
+- In `tdseWriteGrid`:
+  - Compute `R = sqrt(|psi|^2)` at the nearest-neighbor voxel.
+  - Estimate `∇²R` with per-axis central finite differences using existing spacing/stride/PML-aware boundary conventions.
+  - Compute `Q = -(hbar^2 / 2m) * ∇²R / max(R, eps)`.
+  - Normalize by `hbar^2 / (2m dx_min^2)` and render `1 - exp(-abs(Q)/scale)`, density-gated by existing `densityGate`.
+  - Preserve alpha as raw normalized density and preserve potential overlay behavior.
+- Existing TDSE field-view enum values and BEC Hawking enum `7` must remain unchanged.
+
+### User Sees
+
+- TDSE controls gain a `Quantum Pressure Q` field-view option.
+- Selecting it renders bright sheets, shells, and filaments where amplitude curvature is high: interference fringes, nodal walls, vortex cores, and barrier-caustic regions.
+
+### Acceptance Bar
+
+- TypeScript compiles.
+- Unit/source tests cover:
+  - `quantumPressure` packs to TDSE fieldView enum `8` while `hawkingFlux` remains `7`.
+  - TDSE UI exposes `Quantum Pressure Q` and setter accepts it.
+  - `tdseWriteGrid` has a `fieldView == 8u` branch using `sqrt(max(density, ...))`, `laplacianR`, `hbar`, `mass`, `invSpacings`, `densityGate`, and `displayScalar` from a bounded pressure magnitude.
+- `pnpm exec vitest run src/tests/rendering/webgpu/passes/TDSEComputePassUniforms.test.ts src/tests/rendering/webgpu/tdseWriteGridQuantumPressure.test.ts src/tests/components/sections/Geometry/SchroedingerControls/TDSEControls.test.tsx src/tests/stores/tdseUiSetters.test.ts`
+- `pnpm exec tsc --noEmit`
+- `pnpm run lint`
+- `pnpm test:shaders:fast`
+
+### Outcome
+
+- Commit: `Add TDSE quantum pressure view` (amended with this outcome).
+- Reviewer result: PASS.
+- What renderer now draws: TDSE has a new `Quantum Pressure Q` view that raymarches bounded Madelung/Bohm quantum-potential magnitude from amplitude curvature.
+- Physics implemented: `Q = -(hbar^2 / 2m) * laplacian(sqrt(rho)) / sqrt(rho)`, normalized by the lattice curvature scale and density-gated, with PML-aware boundary handling.
+- Paths affected: TDSE field-view type/UI/packing, TDSE write-grid shader composition, new quantum-pressure WGSL helper, and focused tests.
+- Verification:
+  - `pnpm exec vitest run src/tests/rendering/webgpu/passes/TDSEComputePassUniforms.test.ts src/tests/rendering/webgpu/tdseWriteGridQuantumPressure.test.ts src/tests/components/sections/Geometry/SchroedingerControls/TDSEControls.test.tsx src/tests/stores/tdseUiSetters.test.ts` — PASS, 65 tests.
+  - `pnpm exec tsc --noEmit` — PASS.
+  - `pnpm run lint` — PASS.
+  - `pnpm test:shaders:fast` — PASS.
+  - `git diff --check` — PASS.
+- Follow-up threads: signed Q colormap; pressure-gradient force vectors; compare quantum-pressure shells with Regge-Wheeler ringdown potential caustics.

@@ -518,6 +518,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       let fluxProxy = (1.0 - exp(-hawkingTemperatureProxy)) * pairStimulus;
       displayScalar = clamp(horizonGate * fluxProxy, 0.0, 1.0) * densityGate;
     }
+  } else if (params.fieldView == 8u) {
+    let quantumPressure = tdseQuantumPressureAtSite(idx, density, &nnCoords, &invSpacings);
+    displayScalar = clamp(quantumPressure, 0.0, 1.0) * densityGate;
   } else if (params.fieldView == 3u) {
     // potential (NN)
     let potentialScale = getPotentialScale();

@@ -104,6 +104,7 @@ const VIEW_MAP: Record<string, number> = {
   healingLength: 5,
   machNumber: 6,
   hawkingFlux: 7,
+  quantumPressure: 8,
 }
 
 /** Enum maps for TDSE drive waveform types. */

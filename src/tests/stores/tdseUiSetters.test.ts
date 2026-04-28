@@ -79,6 +79,11 @@ describe('TDSE UI setters', () => {
       useExtendedObjectStore.getState().setTdseFieldView('phase')
       expect(getTdse().fieldView).toBe('phase')
     })
+
+    it('sets field view to quantum pressure', () => {
+      useExtendedObjectStore.getState().setTdseFieldView('quantumPressure')
+      expect(getTdse().fieldView).toBe('quantumPressure')
+    })
   })
 
   describe('boolean toggle setters', () => {

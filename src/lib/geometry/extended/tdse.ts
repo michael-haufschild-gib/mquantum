@@ -19,6 +19,7 @@ import type { DisorderDistribution } from './crossMode'
  * - phase: Wavefunction phase arg(psi)
  * - current: Probability current j = Im(psi* grad psi) / m
  * - potential: External potential V(x)
+ * - quantumPressure: Madelung quantum pressure Q = -(hbar²/2m)∇²√ρ/√ρ
  */
 export type TdseFieldView =
   | 'density'
@@ -29,6 +30,7 @@ export type TdseFieldView =
   | 'healingLength'
   | 'machNumber'
   | 'hawkingFlux'
+  | 'quantumPressure'
 
 /**
  * Initial condition type for the TDSE wavepacket
