@@ -13,7 +13,12 @@ import { QW_ABSORBER_UNIFORMS_SIZE } from '../shaders/schroedinger/compute/quant
 import { QW_WRITE_GRID_UNIFORMS_SIZE } from '../shaders/schroedinger/compute/qwWriteGrid.wgsl'
 import { writeSlicePositionsToF32 } from './computePassUtils'
 
-const FIELD_VIEW_MAP: Record<string, number> = { probability: 0, phase: 1, coinState: 2 }
+const FIELD_VIEW_MAP: Record<string, number> = {
+  probability: 0,
+  phase: 1,
+  coinState: 2,
+  coinEntropy: 3,
+}
 
 /**
  * Pack QW write-grid uniforms into an ArrayBuffer matching the WGSL struct layout.

@@ -10,7 +10,7 @@
  * and perpendicular Gaussian falloff for 1D/2D lattices.
  *
  * Output encoding (rgba16float):
- *   R: displayScalar          (field-view-dependent: probability, phase, or chirality)
+ *   R: displayScalar          (field-view-dependent: probability, phase, chirality, or entropy)
  *   G: log(R + ε)             (log-density for Beer-Lambert)
  *   B: arg(Σ_j c_j)           (phase of summed coin amplitude) [0, 2π]
  *   A: raw |ψ|²/max * falloff (always density — used by quantum carpet readback)
@@ -27,7 +27,7 @@ struct QWWriteGridUniforms {
   latticeDim: u32,           // offset 0
   totalSites: u32,           // offset 4
   numCoinStates: u32,        // offset 8  (= 2 * latticeDim)
-  fieldView: u32,            // offset 12 (0=probability, 1=phase, 2=coinState)
+  fieldView: u32,            // offset 12 (0=probability, 1=phase, 2=coinState, 3=coinEntropy)
 
   // Per-dimension arrays (48 bytes each)
   gridSize: array<u32, 12>,  // offset 16
@@ -160,6 +160,11 @@ fn sumCoinStates(site: u32) -> CoinSiteData {
   return data;
 }
 
+fn coinProbabilityAt(site: u32, coinIdx: u32) -> f32 {
+  let z = coinState[site * params.numCoinStates + coinIdx];
+  return dot(z, z);
+}
+
 @compute @workgroup_size(4, 4, 4)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let texDims = textureDimensions(outputTex);
@@ -242,6 +247,26 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Normalize chirality by blended probability (correct density-weighted average)
   let chirality = select(blendedChirality / max(blendedProb, 1e-20), 0.0, blendedProb < 1e-30);
 
+  var coinEntropy: f32 = 0.0;
+  if (params.fieldView == 3u && blendedProb >= 1e-30) {
+    let invBlendedProb = 1.0 / blendedProb;
+    var entropySum: f32 = 0.0;
+    for (var coinIdx: u32 = 0u; coinIdx < params.numCoinStates; coinIdx++) {
+      var blendedCoinProb: f32 = 0.0;
+      for (var corner: u32 = 0u; corner < numCorners; corner++) {
+        let w = cornerWeight(&fracs, corner);
+        if (w > 0.0) {
+          let sIdx = siteIndexForCorner(&coordsLo, &coordsHi, corner);
+          blendedCoinProb += w * coinProbabilityAt(sIdx, coinIdx);
+        }
+      }
+      let q = blendedCoinProb * invBlendedProb;
+      entropySum += -q * log(max(q, 1e-20));
+    }
+    let coinEntropyDenom = max(log(max(f32(params.numCoinStates), 2.0)), 1e-6);
+    coinEntropy = clamp(entropySum / coinEntropyDenom, 0.0, 1.0);
+  }
+
   // Track peak raw probability for next-frame normalization.
   // Use raw blendedProb (without perpFalloff) so normalization reflects actual
   // wavefunction amplitudes. perpFalloff is a visual effect applied at output only.
@@ -264,6 +289,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   } else if (params.fieldView == 2u) {
     // Coin state: chirality (net forward-backward bias), mapped to [0,1]
     displayScalar = (0.5 + 0.5 * chirality) * densityGate;
+  } else if (params.fieldView == 3u) {
+    // Coin entropy: normalized local Shannon spread across ±axis coin states
+    displayScalar = coinEntropy * densityGate;
   }
 
   let normDensity = displayScalar * perpFalloff;

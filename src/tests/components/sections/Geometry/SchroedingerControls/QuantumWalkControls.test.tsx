@@ -26,6 +26,11 @@ describe('QuantumWalkControls', () => {
     expect(screen.getByLabelText('Field view')).toBeInTheDocument()
   })
 
+  it('exposes coin entropy as a field view', () => {
+    render(<QuantumWalkControls />)
+    expect(screen.getByRole('radio', { name: 'Entropy' })).toBeInTheDocument()
+  })
+
   it('shows Grover coin selected by default', () => {
     render(<QuantumWalkControls />)
     const coinGroup = screen.getByLabelText('Coin operator type')
@@ -122,6 +127,21 @@ describe('QuantumWalkControls', () => {
     expect(setConfig).toHaveBeenCalledWith(
       expect.objectContaining({
         quantumWalk: expect.objectContaining({ stepsPerFrame: 8 }),
+      })
+    )
+  })
+
+  it('calls setSchroedingerConfig when entropy field view is selected', () => {
+    const setConfig = vi.fn()
+    useExtendedObjectStore.setState((s) => ({
+      ...s,
+      setSchroedingerConfig: setConfig,
+    }))
+    render(<QuantumWalkControls />)
+    fireEvent.click(screen.getByRole('radio', { name: 'Entropy' }))
+    expect(setConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quantumWalk: expect.objectContaining({ fieldView: 'coinEntropy' }),
       })
     )
   })

@@ -124,6 +124,59 @@ Render false-vacuum decay as a semiclassical tunneling geometry inside the exist
 - `pnpm run lint`
 - `pnpm test:shaders:fast`
 
+## Round PRD: Quantum-Walk Coin Entropy Field View
+
+### Scientific Goal
+
+Render local internal-state entropy in the N-D discrete quantum walk. The view should reveal where a walker is not merely present, but locally spread across its coin-direction Hilbert space, exposing information scrambling that position probability and chirality hide.
+
+### Physics / Math
+
+- Add `coinEntropy` to `QuantumWalkFieldView`.
+- Map `coinEntropy` to write-grid shader `fieldView = 3`.
+- In `qwWriteGrid`:
+  - For each lattice site and coin state, compute `p_j = |c_j|^2`.
+  - Trilinearly blend each coin-state probability into renderer-local `p_j`.
+  - Accumulate renderer-local total probability `P = Σ p_j`.
+  - Compute normalized Shannon entropy:
+    - `H = clamp((-Σ q_j log(max(q_j, eps))) / log(numCoinStates), 0, 1)` where `q_j = p_j / max(P, eps)`.
+  - Gate display by local density so empty volume remains transparent.
+  - Keep alpha as raw normalized probability, preserving quantum-carpet readback behavior.
+- Existing probability, phase, and coin-state views must remain unchanged.
+
+### User Sees
+
+- Quantum Walk controls gain an `Entropy` field-view option.
+- Selecting it renders bright regions where probability at a site is distributed across multiple coin directions, and dark regions where one direction dominates or density is absent.
+
+### Acceptance Bar
+
+- TypeScript compiles.
+- Unit/source tests cover:
+  - `coinEntropy` packs to write-grid enum `3`.
+  - `qwWriteGrid` blends each coin probability before entropy normalization, normalizes by `log(numCoinStates)`, and branches on `fieldView == 3u`.
+  - A regression case treats two interpolated pure coin corners as high entropy rather than zero.
+  - Quantum Walk UI exposes the entropy field view.
+- `pnpm exec vitest run src/tests/rendering/webgpu/quantumWalkCoinEntropy.test.ts src/tests/components/sections/Geometry/SchroedingerControls/QuantumWalkControls.test.tsx`
+- `pnpm exec tsc --noEmit`
+- `pnpm run lint`
+- `pnpm test:shaders:fast`
+
+### Outcome
+
+- Commit: `Add quantum-walk coin entropy view` (amended with this outcome).
+- Reviewer result: FAIL on first pass, PASS after fix.
+- What renderer now draws: Quantum Walk has a new `Entropy` field view that raymarches normalized local Shannon entropy of the interpolated coin-direction probability distribution.
+- Critical fix: entropy now blends each coin probability at the renderer voxel before computing `q_j = p_j / P`, so interpolated pure orthogonal coin corners render as high local entropy instead of zero.
+- Paths affected: QW type/config packing, QW write-grid shader, QW controls, and focused tests.
+- Verification:
+  - `pnpm exec vitest run src/tests/rendering/webgpu/quantumWalkCoinEntropy.test.ts src/tests/components/sections/Geometry/SchroedingerControls/QuantumWalkControls.test.tsx` — PASS, 17 tests.
+  - `pnpm exec tsc --noEmit` — PASS.
+  - `pnpm run lint` — PASS.
+  - `pnpm test:shaders:fast` — PASS.
+  - `git diff --check` — PASS.
+- Follow-up threads: use entropy as a decoherence-candidate isosurface; compare Grover localization entropy against DFT spreading; expose a combined entropy/chirality bivariate view.
+
 ### Outcome
 
 - Commit: `353352ea` (`Add Coleman-De Luccia bubble lens`)
