@@ -181,7 +181,7 @@ derivative seed, not a fully determined exact proposal.
    - `B` = `arg(χ)`.
    - `A` = `max(streamlineAlpha, srmtAlpha)`.
    `R` and `G` never include overlays. WKB/SRMT overlays are composited
-   by the WdW shader branch from positive `A`, before density alpha, so
+   by the WdW shader branch from positive `A`, after density-driven alpha, so
    density gain, contrast, adaptive stepping, and empty-space skipping
    continue to operate on clean `|χ|²`.
 4. **SRMT coordinator**: when enabled, all three clocks are queued to
