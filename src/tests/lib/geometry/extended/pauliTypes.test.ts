@@ -79,6 +79,7 @@ describe('PauliConfig type constraints', () => {
       'totalDensity',
       'spinExpectation',
       'coherence',
+      'spinHelicity',
     ]
     expect(validViews).toContain(DEFAULT_PAULI_CONFIG.fieldView)
   })

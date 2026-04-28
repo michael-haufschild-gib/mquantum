@@ -144,7 +144,11 @@ export function executeFrameAndCollectMetrics({
 // ============================================================================
 
 /** Map a color algorithm to the Pauli writeGrid fieldView that encodes matching channels. */
-export function pauliFieldViewForColorAlgorithm(algo: string): string {
+export function pauliFieldViewForColorAlgorithm(algo: string, currentFieldView?: string): string {
+  if (currentFieldView && colorAlgoForPauliFieldView(currentFieldView) === algo) {
+    return currentFieldView
+  }
+
   switch (algo) {
     case 'pauliSpinDensity':
       return 'spinDensity'
@@ -175,6 +179,8 @@ function colorAlgoForPauliFieldView(
       return 'pauliSpinExpectation'
     case 'coherence':
       return 'pauliCoherence'
+    case 'spinHelicity':
+      return 'blackbody'
     case 'totalDensity':
       return 'blackbody'
     default:

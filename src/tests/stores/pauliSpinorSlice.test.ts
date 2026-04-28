@@ -112,9 +112,9 @@ describe('pauliSpinorSlice', () => {
   it('setPauliFieldView updates without needsReset', () => {
     const { setPauliFieldView, clearPauliNeedsReset } = useExtendedObjectStore.getState()
     clearPauliNeedsReset()
-    setPauliFieldView('coherence')
+    setPauliFieldView('spinHelicity')
     const state = useExtendedObjectStore.getState().pauliSpinor
-    expect(state.fieldView).toBe('coherence')
+    expect(state.fieldView).toBe('spinHelicity')
     expect(state.needsReset).toBe(false)
   })
 

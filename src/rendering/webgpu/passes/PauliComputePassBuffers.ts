@@ -401,6 +401,7 @@ export function packPauliUniforms(
     totalDensity: 1,
     spinExpectation: 2,
     coherence: 3,
+    spinHelicity: 4,
   }
   u32[o++] = fvMap[config.fieldView] ?? 0
   u32[o++] = config.autoScale ? 1 : 0

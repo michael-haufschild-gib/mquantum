@@ -183,6 +183,23 @@ Render gravitational memory as a time-nonlocal postprocess over the WebGPU quant
 
 ### Outcome
 
+- Commit: `Add Pauli spin helicity view` (amended with this outcome)
+- Reviewer result: PASS after fixing renderer integration issues.
+- What renderer now draws: a new Pauli `Spin Helicity` field view that writes `|S · curl(S)|` into the density grid from the normalized local Bloch spin vector. The raymarcher colors from the helicity scalar while using preserved total density for opacity, empty-skip, and adaptive stepping.
+- Paths affected: Pauli field-view type/UI/packing, Pauli write-grid WGSL, Pauli field-view/color synchronization, simple and full grid raymarch opacity helpers, and focused tests.
+- Review fixes:
+  - Added Pauli non-dual alpha-density marching in both grid raymarch paths so helicity is not treated as opacity density.
+  - Added adaptive-step log-density helper so dense low-helicity regions do not get skipped with large empty-space steps.
+- Verification:
+  - `pnpm exec vitest run src/tests/rendering/webgpu/pauliSpinHelicityShader.test.ts src/tests/lib/geometry/extended/pauliTypes.test.ts src/tests/stores/pauliSpinorSlice.test.ts src/tests/components/sections/Geometry/PauliSpinorControls/PauliVisualizationControls.test.tsx src/tests/rendering/webgpu/scenePassSetup.test.ts src/tests/lib/physics/pauli/presets.test.ts` — PASS, 102 tests.
+  - `pnpm exec tsc --noEmit` — PASS.
+  - `pnpm run lint` — PASS.
+  - `pnpm test:shaders:fast` — PASS.
+  - `git diff --check` — PASS.
+- Follow-up threads: numeric CPU reference for uniform and analytic helical spin textures; Pauli-specific color algorithm for signed helicity; skyrmion-density view for `S · (∂xS × ∂yS)`.
+
+### Outcome
+
 - Commit: `Add BEC Hawking flux view` (amended with this outcome)
 - Reviewer result: PASS after fixing reviewer-blocking issues.
 - What renderer now draws: a new BEC `Hawking Flux κ/2π` field view that writes a bounded, density-gated, horizon-local scalar into the TDSE/BEC density grid. The scalar is tied to the evolved Mach crossing and the same detrended/periodized waterfall surface-gravity profile used by initialization.
@@ -198,6 +215,47 @@ Render gravitational memory as a time-nonlocal postprocess over the WebGPU quant
   - `pnpm test:shaders:fast` — PASS.
   - `git diff --check` — PASS.
 - Follow-up threads: numeric CPU/WGSL parity for κ proxy; combine flux view with Page-curve island overlay; add a preset that starts directly in Hawking-flux view.
+
+## Round PRD: Pauli Spin-Texture Helicity View
+
+### Scientific Goal
+
+Render local twisting of the Pauli spinor's Bloch-vector texture as a first-class volume observable. The Pauli mode already shows spin density, spin expectation, and coherence; it does not show whether the spin field forms chiral/knotted/twisted domains. A helicity view exposes where the normalized spin vector locally aligns with its curl.
+
+### Physics / Math
+
+- Add `spinHelicity` to `PauliFieldView`.
+- Map `spinHelicity` to Pauli shader `fieldView = 4`.
+- In `pauliWriteGrid`:
+  - Compute normalized local spin vector:
+    - `Sx = 2 Re(psi_up* psi_down) / rho`
+    - `Sy = 2 Im(psi_up* psi_down) / rho`
+    - `Sz = (|psi_up|² - |psi_down|²) / rho`
+  - Use nearest-neighbor central differences along visible x/y/z axes, with existing absorber-aware edge handling.
+  - Compute `curl(S)` and helicity `H = S · curl(S)`.
+  - Render `abs(tanh(0.15 * H))` as the display scalar, density-gated by total probability.
+  - Preserve total density in alpha for raymarch opacity.
+- Keep existing Pauli views unchanged.
+- Keep PauliStrategy from collapsing `spinHelicity` back to `totalDensity` when the paired generic color algorithm is active.
+
+### User Sees
+
+- Pauli visualization controls gain `Spin Helicity`.
+- Selecting it renders chiral spin-texture regions as bright volume structure. Stern-Gerlach/default states stay mostly dark unless spin precession or quadrupole fields twist the local Bloch texture.
+
+### Acceptance Bar
+
+- TypeScript compiles.
+- Unit/source tests cover:
+  - `spinHelicity` is a valid Pauli field view.
+  - Uniform packing maps `spinHelicity` to `fieldView = 4`.
+  - Pauli write-grid has helper math for normalized spin, central differences, curl, and `dot(spin, curl)`.
+  - UI exposes `Spin Helicity`.
+  - Pauli field-view/color-algorithm normalization preserves `spinHelicity` under its paired generic algorithm.
+- `pnpm exec vitest run src/tests/lib/geometry/extended/pauliTypes.test.ts src/tests/stores/pauliSpinorSlice.test.ts src/tests/rendering/webgpu/pauliSpinHelicityShader.test.ts src/tests/rendering/webgpu/scenePassSetup.test.ts`
+- `pnpm exec tsc --noEmit`
+- `pnpm run lint`
+- `pnpm test:shaders:fast`
 
 ### Outcome
 

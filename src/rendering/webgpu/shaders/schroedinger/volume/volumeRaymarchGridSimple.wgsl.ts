@@ -22,6 +22,27 @@ export function generateVolumeRaymarchGridSimpleBlock(usePrecomputedNormals = fa
 
 ${gradientFetchFn}
 
+fn gridOpacityDensity(gridSample: vec4f) -> f32 {
+  return select(
+    gridSample.r,
+    gridSample.a,
+    IS_PAULI && !IS_DUAL_CHANNEL && DENSITY_GRID_HAS_PHASE
+  );
+}
+
+fn gridSkipDensity(gridSample: vec4f) -> f32 {
+  let primaryDensity = gridOpacityDensity(gridSample);
+  return select(primaryDensity, gridSample.r + gridSample.g, IS_DUAL_CHANNEL);
+}
+
+fn gridAdaptiveLogDensity(rho: f32, sCenter: f32) -> f32 {
+  if (IS_DUAL_CHANNEL || (IS_PAULI && !IS_DUAL_CHANNEL && DENSITY_GRID_HAS_PHASE)) {
+    if (rho > 1e-9) { return log(rho); }
+    return -20.0;
+  }
+  return sCenter;
+}
+
 fn volumeRaymarchGrid(
   rayOrigin: vec3f,
   rayDir: vec3f,
@@ -67,11 +88,11 @@ fn volumeRaymarchGrid(
     let basePos = rayOrigin + rayDir * t;
     var pos = basePos;
     var gridSample = sampleDensityFromGrid(pos, uniforms);
-    var rho = gridSample.r * adsAmplitudeSq;
+    var rho = gridOpacityDensity(gridSample) * adsAmplitudeSq;
     var sCenter = gridSample.g;
     var phase = gridSample.b - phaseOffset;
 
-    var colorRho: f32 = rho;
+    var colorRho: f32 = gridSample.r * adsAmplitudeSq;
     var colorS: f32 = 0.0;
     if (IS_DUAL_CHANNEL) {
       colorRho = gridSample.r;
@@ -85,7 +106,7 @@ fn volumeRaymarchGrid(
       let remoteEndpoint = vec3f(-basePos.x, basePos.y, basePos.z);
       let remoteGridSample = sampleDensityFromGrid(remoteEndpoint, uniforms);
       // Match local rho amplitude scaling so AdS bridge locking compares like-for-like.
-      let remotePrimaryRho = remoteGridSample.r * adsAmplitudeSq;
+      let remotePrimaryRho = gridOpacityDensity(remoteGridSample) * adsAmplitudeSq;
       let remoteRho = select(remotePrimaryRho, remotePrimaryRho + remoteGridSample.g, IS_DUAL_CHANNEL);
       var localLogDensity = sCenter;
       var remoteLogDensity = remoteGridSample.g;
@@ -117,10 +138,10 @@ fn volumeRaymarchGrid(
       bridgeGain = bridge.gain;
       if (length(pos - basePos) > 1e-6) {
         gridSample = sampleDensityFromGrid(pos, uniforms);
-        rho = gridSample.r * adsAmplitudeSq;
+        rho = gridOpacityDensity(gridSample) * adsAmplitudeSq;
         sCenter = gridSample.g;
         phase = gridSample.b - phaseOffset;
-        colorRho = rho;
+        colorRho = gridSample.r * adsAmplitudeSq;
         colorS = 0.0;
         if (IS_DUAL_CHANNEL) {
           colorRho = gridSample.r;
@@ -140,10 +161,10 @@ fn volumeRaymarchGrid(
       causticMultiplier = metric.caustic;
       if (length(pos - beforeBackreaction) > 1e-6) {
         gridSample = sampleDensityFromGrid(pos, uniforms);
-        rho = gridSample.r * adsAmplitudeSq;
+        rho = gridOpacityDensity(gridSample) * adsAmplitudeSq;
         sCenter = gridSample.g;
         phase = gridSample.b - phaseOffset;
-        colorRho = rho;
+        colorRho = gridSample.r * adsAmplitudeSq;
         colorS = 0.0;
         if (IS_DUAL_CHANNEL) {
           colorRho = gridSample.r;
@@ -172,10 +193,10 @@ fn volumeRaymarchGrid(
       entropyGain = entropyShear.entropyGain;
       if (length(pos - beforeEntropyShear) > 1e-6) {
         gridSample = sampleDensityFromGrid(pos, uniforms);
-        rho = gridSample.r * adsAmplitudeSq;
+        rho = gridOpacityDensity(gridSample) * adsAmplitudeSq;
         sCenter = gridSample.g;
         phase = gridSample.b - phaseOffset;
-        colorRho = rho;
+        colorRho = gridSample.r * adsAmplitudeSq;
         colorS = 0.0;
         if (IS_DUAL_CHANNEL) {
           colorRho = gridSample.r;
@@ -206,10 +227,10 @@ fn volumeRaymarchGrid(
       spectralOpacityScale = spectralFlow.opacityScale;
       if (length(pos - beforeSpectralFlow) > 1e-6) {
         gridSample = sampleDensityFromGrid(pos, uniforms);
-        rho = gridSample.r * adsAmplitudeSq;
+        rho = gridOpacityDensity(gridSample) * adsAmplitudeSq;
         sCenter = gridSample.g;
         phase = gridSample.b - phaseOffset;
-        colorRho = rho;
+        colorRho = gridSample.r * adsAmplitudeSq;
         colorS = 0.0;
         if (IS_DUAL_CHANNEL) {
           colorRho = gridSample.r;
@@ -229,10 +250,10 @@ fn volumeRaymarchGrid(
       vacuumBubbleOpacityScale = vacuumBubble.opacityScale;
       if (length(pos - beforeVacuumBubble) > 1e-6) {
         gridSample = sampleDensityFromGrid(pos, uniforms);
-        rho = gridSample.r * adsAmplitudeSq;
+        rho = gridOpacityDensity(gridSample) * adsAmplitudeSq;
         sCenter = gridSample.g;
         phase = gridSample.b - phaseOffset;
-        colorRho = rho;
+        colorRho = gridSample.r * adsAmplitudeSq;
         colorS = 0.0;
         if (IS_DUAL_CHANNEL) {
           colorRho = gridSample.r;
@@ -251,7 +272,7 @@ fn volumeRaymarchGrid(
         let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms);
         let midHasPot = DENSITY_GRID_HAS_PHASE && probeMid.a < -0.01;
         let midHasWdwOverlay = DENSITY_GRID_HAS_PHASE && isWdwMode && probeMid.a > 0.01;
-        let midTotal = select(probeMid.r, probeMid.r + probeMid.g, IS_DUAL_CHANNEL);
+        let midTotal = gridSkipDensity(probeMid);
         if (midTotal < EMPTY_SKIP_THRESHOLD && !midHasPot && !midHasWdwOverlay) {
           t += skipDistance;
           continue;
@@ -261,16 +282,7 @@ fn volumeRaymarchGrid(
 
     var adaptiveStep: f32;
     if (!PROFILING_STRIP_ADAPTIVE_STEP) {
-      var logRhoForStep: f32;
-      if (IS_DUAL_CHANNEL) {
-        if (rho > 1e-9) {
-          logRhoForStep = log(rho);
-        } else {
-          logRhoForStep = -20.0;
-        }
-      } else {
-        logRhoForStep = sCenter;
-      }
+      let logRhoForStep = gridAdaptiveLogDensity(rho, sCenter);
       adaptiveStep = computeAdaptiveStep(logRhoForStep, stepLen, remaining);
     } else {
       adaptiveStep = min(stepLen, remaining);

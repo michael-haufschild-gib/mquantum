@@ -42,7 +42,13 @@ describe('PAULI_SCENARIO_PRESETS', () => {
   })
 
   it('all presets set fieldView to a valid PauliFieldView', () => {
-    const validViews = new Set(['spinDensity', 'totalDensity', 'spinExpectation', 'coherence'])
+    const validViews = new Set([
+      'spinDensity',
+      'totalDensity',
+      'spinExpectation',
+      'coherence',
+      'spinHelicity',
+    ])
     for (const preset of PAULI_SCENARIO_PRESETS) {
       if (preset.overrides.fieldView) {
         expect(validViews.has(preset.overrides.fieldView)).toBe(true)

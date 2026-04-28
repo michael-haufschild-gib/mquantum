@@ -87,7 +87,10 @@ export class PauliStrategy implements QuantumModeStrategy {
     // consistent (an inline ternary used to live here and could drift).
     const appearance = getStoreSnapshot<AppearanceStoreState>(ctx, 'appearance')
     const algo = appearance?.colorAlgorithm ?? 'pauliSpinDensity'
-    const pauliFieldView = pauliFieldViewForColorAlgorithm(algo) as PauliFieldView
+    const pauliFieldView = pauliFieldViewForColorAlgorithm(
+      algo,
+      pauliConfig.fieldView
+    ) as PauliFieldView
 
     const effectiveConfig = applySharedPml(
       { ...pauliConfig, fieldView: pauliFieldView },

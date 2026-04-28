@@ -15,6 +15,7 @@
  *   2 spinExpectation: R = spin-up fraction * density, G = spin-down fraction * density
  *                        R+G = total density always; σ_z = (R-G)/(R+G) reconstructed by color algo
  *   3 coherence:       R = |ψ_up* ψ_down|, G = log(coh), B = phase, A = coherence
+ *   4 spinHelicity:    R = |S·curl(S)|, G = log(|H|), B = phase, A = total
  *
  * Output texture channels (rgba16float):
  *   R: primary display scalar
@@ -59,6 +60,58 @@ fn upDownDensityAt(siteIdx: u32, T: u32) -> vec2f {
   let v0 = spinor[siteIdx];
   let v1 = spinor[T + siteIdx];
   return vec2f(v0.x * v0.x + v0.y * v0.y, v1.x * v1.x + v1.y * v1.y);
+}
+
+// Normalized Bloch spin vector S = <sigma> / rho at a lattice site.
+fn spinUnitAt(siteIdx: u32, T: u32) -> vec3f {
+  let up = spinor[siteIdx];
+  let down = spinor[T + siteIdx];
+  let upDensity = up.x * up.x + up.y * up.y;
+  let downDensity = down.x * down.x + down.y * down.y;
+  let total = upDensity + downDensity;
+  if (total < 1e-20) {
+    return vec3f(0.0);
+  }
+  let invTotal = 1.0 / total;
+  let sx = 2.0 * (up.x * down.x + up.y * down.y) * invTotal;
+  let sy = 2.0 * (up.x * down.y - up.y * down.x) * invTotal;
+  let sz = (upDensity - downDensity) * invTotal;
+  return vec3f(sx, sy, sz);
+}
+
+// Neighbor for spin-texture gradients. Absorbing boundaries clamp edge
+// samples; non-absorbing boundaries wrap, matching FFT topology.
+fn spinTextureNeighbor(
+  siteIdx: u32,
+  nnCoords: ptr<function, array<u32, 12>>,
+  axis: u32,
+  forward: bool
+) -> u32 {
+  let Nd = params.gridSize[axis];
+  if (Nd <= 1u) {
+    return siteIdx;
+  }
+  let coord = (*nnCoords)[axis];
+  let stride = params.strides[axis];
+  let hasPML = params.absorberEnabled != 0u;
+
+  if (forward) {
+    if (coord + 1u < Nd) {
+      return siteIdx + stride;
+    }
+    if (hasPML) {
+      return siteIdx;
+    }
+    return siteIdx - stride * (Nd - 1u);
+  }
+
+  if (coord > 0u) {
+    return siteIdx - stride;
+  }
+  if (hasPML) {
+    return siteIdx;
+  }
+  return siteIdx + stride * (Nd - 1u);
 }
 
 // Map precomputed fractional lattice coordinates to trilinear corners.
@@ -325,6 +378,40 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     outR = cohNorm;
     outG = log(cohNorm + 1e-10);
     outA = cohNorm;
+  } else if (params.fieldView == 4u) {
+    // spinHelicity: magnitude of H = S · curl(S) for normalized Bloch
+    // spin texture S(x). Uses nearest-neighbor central differences because
+    // gradients over trilinearly-blended spinors would smear topological
+    // texture and disagree with the lattice solver's site-local spinor state.
+    let total = totalDensityAt(nnSite, T);
+    let totalNorm = clamp(total * invScalePerp, 0.0, 1.0);
+    if (params.latticeDim >= 3u && total >= 1e-20) {
+      let spin = spinUnitAt(nnSite, T);
+      let xPlus = spinTextureNeighbor(nnSite, &nnCoords, 0u, true);
+      let xMinus = spinTextureNeighbor(nnSite, &nnCoords, 0u, false);
+      let yPlus = spinTextureNeighbor(nnSite, &nnCoords, 1u, true);
+      let yMinus = spinTextureNeighbor(nnSite, &nnCoords, 1u, false);
+      let zPlus = spinTextureNeighbor(nnSite, &nnCoords, 2u, true);
+      let zMinus = spinTextureNeighbor(nnSite, &nnCoords, 2u, false);
+
+      let dSdx = (spinUnitAt(xPlus, T) - spinUnitAt(xMinus, T)) / (2.0 * params.spacing[0]);
+      let dSdy = (spinUnitAt(yPlus, T) - spinUnitAt(yMinus, T)) / (2.0 * params.spacing[1]);
+      let dSdz = (spinUnitAt(zPlus, T) - spinUnitAt(zMinus, T)) / (2.0 * params.spacing[2]);
+      let curlS = vec3f(
+        dSdy.z - dSdz.y,
+        dSdz.x - dSdx.z,
+        dSdx.y - dSdy.x
+      );
+      let spinHelicity = dot(spin, curlS);
+      let helicityNorm = abs(tanh(0.15 * spinHelicity)) * totalNorm;
+      outR = helicityNorm;
+      outG = log(helicityNorm + 1e-10);
+      outA = totalNorm;
+    } else {
+      outR = 0.0;
+      outG = log(1e-10);
+      outA = totalNorm;
+    }
   }
 
   // Potential overlay: blend a translucent potential contour into the B channel
