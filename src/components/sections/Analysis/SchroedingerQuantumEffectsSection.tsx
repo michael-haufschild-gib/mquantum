@@ -17,6 +17,8 @@ import { isComputeQuantumType } from '@/lib/geometry/registry'
 import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
+import { SchroedingerEntropicTimeShearControls } from './SchroedingerEntropicTimeShearControls'
+
 const NODAL_DEFINITION_OPTIONS: { value: SchroedingerNodalDefinition; label: string }[] = [
   { value: 'psiAbs', label: '|ψ| (Nodal Envelope)' },
   { value: 'realPart', label: 'Re(ψ) = 0' },
@@ -71,6 +73,14 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
         state.setSchroedingerQuantumBackreactionLensingStrength,
       setQuantumBackreactionCausticGain: state.setSchroedingerQuantumBackreactionCausticGain,
       setQuantumBackreactionSoftening: state.setSchroedingerQuantumBackreactionSoftening,
+      setBilocalERBridgeEnabled: state.setSchroedingerBilocalERBridgeEnabled,
+      setBilocalERBridgeStrength: state.setSchroedingerBilocalERBridgeStrength,
+      setBilocalERBridgeThroatRadius: state.setSchroedingerBilocalERBridgeThroatRadius,
+      setBilocalERBridgePhaseLock: state.setSchroedingerBilocalERBridgePhaseLock,
+      setEntropicTimeShearEnabled: state.setSchroedingerEntropicTimeShearEnabled,
+      setEntropicTimeShearStrength: state.setSchroedingerEntropicTimeShearStrength,
+      setEntropicTimeShearFilamentScale: state.setSchroedingerEntropicTimeShearFilamentScale,
+      setEntropicTimeShearIrreversibility: state.setSchroedingerEntropicTimeShearIrreversibility,
     }))
     const {
       config,
@@ -97,6 +107,14 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
       setQuantumBackreactionLensingStrength,
       setQuantumBackreactionCausticGain,
       setQuantumBackreactionSoftening,
+      setBilocalERBridgeEnabled,
+      setBilocalERBridgeStrength,
+      setBilocalERBridgeThroatRadius,
+      setBilocalERBridgePhaseLock,
+      setEntropicTimeShearEnabled,
+      setEntropicTimeShearStrength,
+      setEntropicTimeShearFilamentScale,
+      setEntropicTimeShearIrreversibility,
     } = useExtendedObjectStore(extendedObjectSelector)
 
     if (objectType !== 'schroedinger') {
@@ -389,6 +407,70 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
               </div>
             )}
           </div>
+
+          <div className="space-y-1 mt-2">
+            <Switch
+              label="Bilocal ER Bridge"
+              tooltip="Warp raymarch sampling toward a mirrored nonlocal throat when local and remote wavefunction phases lock."
+              checked={config.bilocalERBridgeEnabled ?? false}
+              onCheckedChange={(checked) => setBilocalERBridgeEnabled(checked)}
+              data-testid="schroedinger-bilocal-er-bridge-toggle"
+            />
+            {config.bilocalERBridgeEnabled && (
+              <div className="ps-2 border-s border-border-default space-y-2">
+                <Slider
+                  label="Strength"
+                  tooltip="How strongly coherent mirrored endpoints bend sample coordinates through the bridge."
+                  min={0}
+                  max={2}
+                  step={0.05}
+                  value={
+                    config.bilocalERBridgeStrength ??
+                    DEFAULT_SCHROEDINGER_CONFIG.bilocalERBridgeStrength
+                  }
+                  onChange={setBilocalERBridgeStrength}
+                  showValue
+                  data-testid="schroedinger-bilocal-er-bridge-strength"
+                />
+                <Slider
+                  label="Throat Radius"
+                  tooltip="Softened radius of the transverse bridge throat around the mirror plane."
+                  min={0.05}
+                  max={2}
+                  step={0.05}
+                  value={
+                    config.bilocalERBridgeThroatRadius ??
+                    DEFAULT_SCHROEDINGER_CONFIG.bilocalERBridgeThroatRadius
+                  }
+                  onChange={setBilocalERBridgeThroatRadius}
+                  showValue
+                  data-testid="schroedinger-bilocal-er-bridge-throat-radius"
+                />
+                <Slider
+                  label="Phase Lock"
+                  tooltip="How strongly the bridge requires phase agreement between local and mirrored endpoints."
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={
+                    config.bilocalERBridgePhaseLock ??
+                    DEFAULT_SCHROEDINGER_CONFIG.bilocalERBridgePhaseLock
+                  }
+                  onChange={setBilocalERBridgePhaseLock}
+                  showValue
+                  data-testid="schroedinger-bilocal-er-bridge-phase-lock"
+                />
+              </div>
+            )}
+          </div>
+
+          <SchroedingerEntropicTimeShearControls
+            config={config}
+            setEnabled={setEntropicTimeShearEnabled}
+            setStrength={setEntropicTimeShearStrength}
+            setFilamentScale={setEntropicTimeShearFilamentScale}
+            setIrreversibility={setEntropicTimeShearIrreversibility}
+          />
 
           {!isComputeMode && (
             <div className="space-y-1 mt-2">

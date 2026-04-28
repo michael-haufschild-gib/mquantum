@@ -143,6 +143,26 @@ export function createVisualEffectSetters(
       0.05,
       2.0
     ),
+    setSchroedingerBilocalERBridgeEnabled: valueSetter('bilocalERBridgeEnabled'),
+    setSchroedingerBilocalERBridgeStrength: clampedSetter('bilocalERBridgeStrength', 0.0, 2.0),
+    setSchroedingerBilocalERBridgeThroatRadius: clampedSetter(
+      'bilocalERBridgeThroatRadius',
+      0.05,
+      2.0
+    ),
+    setSchroedingerBilocalERBridgePhaseLock: clampedSetter('bilocalERBridgePhaseLock', 0.0, 1.0),
+    setSchroedingerEntropicTimeShearEnabled: valueSetter('entropicTimeShearEnabled'),
+    setSchroedingerEntropicTimeShearStrength: clampedSetter('entropicTimeShearStrength', 0.0, 2.0),
+    setSchroedingerEntropicTimeShearFilamentScale: clampedSetter(
+      'entropicTimeShearFilamentScale',
+      0.1,
+      4.0
+    ),
+    setSchroedingerEntropicTimeShearIrreversibility: clampedSetter(
+      'entropicTimeShearIrreversibility',
+      0.0,
+      1.0
+    ),
 
     // Probability current
     setSchroedingerProbabilityCurrentEnabled: valueSetter('probabilityCurrentEnabled'),

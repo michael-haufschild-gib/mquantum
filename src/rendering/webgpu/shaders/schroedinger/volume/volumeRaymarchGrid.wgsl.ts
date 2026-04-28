@@ -22,275 +22,7 @@
  * @module rendering/webgpu/shaders/schroedinger/volume/volumeRaymarchGrid.wgsl
  */
 
-/**
- * Generate the simplified grid-only volume raymarching block.
- *
- * For compute modes (gridOnly=true), this variant removes all compile-time-dead
- * feature branches: nodal surfaces, uncertainty boundary, probability current,
- * radial probability, cross-section, dual-channel, and profiling overrides.
- * These branches are always false in compute modes but their presence in the
- * full function triggers a Metal shader compiler bug on Apple Silicon that
- * causes sampleDensityFromGrid to return zero within the loop body.
- */
-export function generateVolumeRaymarchGridSimpleBlock(usePrecomputedNormals = false): string {
-  const gradientFetchFn = usePrecomputedNormals
-    ? `fn fetchGradient(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
-  return sampleNormalFromGrid(pos, uniforms);
-}`
-    : `fn fetchGradient(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
-  return computeGradientFromGrid(pos, uniforms);
-}`
-
-  return /* wgsl */ `
-// ============================================
-// Grid-Based Volume Raymarching (Simplified — compute modes only)
-// ============================================
-
-${gradientFetchFn}
-
-fn volumeRaymarchGrid(
-  rayOrigin: vec3f,
-  rayDir: vec3f,
-  tNear: f32,
-  tFar: f32,
-  uniforms: SchroedingerUniforms
-) -> VolumeResult {
-  var accColor = vec3f(0.0);
-  var iterCount: i32 = 0;
-  var primaryHitT: f32 = -1.0;
-
-  let maxPathLen = 2.0 * uniforms.boundingRadius;
-  let sampleCount = max(i32(f32(max(uniforms.sampleCount, 1)) * (tFar - tNear) / maxPathLen), 4);
-  let stepLen = (tFar - tNear) / f32(sampleCount);
-  var t = tNear;
-  let viewDir = -rayDir;
-  var transmittance: f32 = 1.0;
-
-  // PERF: Hoist loop-invariant uniform computations out of the raymarch loop.
-  // These evaluate to identity values (1.0 for adsAmplitudeSq, 0.0 for phaseOffset)
-  // outside their owning modes — they are ZERO for every compute mode (BEC/TDSE/
-  // Dirac/FSF/QW) because adsGrowthRate, wdwPhaseRotationRate, and adsEnergy
-  // are all zero. Computing them once per ray instead of 128 times saves ~384
-  // ALU ops per pixel per frame on BEC/TDSE (one cosh + two muls per iter).
-  let adsCoshGamma = cosh(uniforms.adsGrowthRate * uniforms.time);
-  let adsAmplitudeSq = adsCoshGamma * adsCoshGamma;
-  let phaseOffset = (uniforms.wdwPhaseRotationRate + uniforms.adsEnergy) * uniforms.time;
-
-  // PERF: Pre-compute 1/stepLen for adaptive-step ratio (used in potential overlay
-  // opacity clamp). stepLen is constant per ray but the ratio is recomputed per
-  // iteration for both the potential overlay branch. Hoisting saves 128 divisions
-  // per pixel per frame in the worst case.
-  let invStepLen = 1.0 / max(stepLen, 1e-5);
-
-  // PERF: hoist mode-only uniforms out of the per-sample loop.
-  let isWdwMode = uniforms.quantumMode == 9;
-  let branchColorActive =
-    uniforms.quantumMode == 3
-    && uniforms.branchSeparation > 0.5
-    && uniforms.branchTransitionWidth > 0.0;
-  let backreactionActive = isQuantumBackreactionActive(uniforms);
-
-  for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
-    if (PROFILING_HALF_SAMPLES && i >= 64) { break; }
-    if (i >= sampleCount) { break; }
-    iterCount = i + 1;
-
-    // PERF: cache tFar - t once per iteration. Used for shouldTerminateRay,
-    // skipDistance ceiling, and adaptiveStep clamp (3+ subtracts otherwise).
-    let remaining = tFar - t;
-    if (shouldTerminateRay(transmittance, uniforms.densityGain, max(remaining, 0.0))) { break; }
-
-    let basePos = rayOrigin + rayDir * t;
-    var pos = basePos;
-    var gridSample = sampleDensityFromGrid(pos, uniforms);
-    // Anti-de Sitter tachyon amplification: |ψ(t)|² = |ψ(0)|² · cosh²(γ·t).
-    // adsAmplitudeSq is 1.0 outside AdS (all compute modes) — hoisted above.
-    var rho = gridSample.r * adsAmplitudeSq;
-    var sCenter = gridSample.g;
-    // wdwPhaseRotationRate rotates WdW; adsEnergy rotates AdS stable states
-    // via phase' = B - E·t. phaseOffset is 0 for every compute mode (hoisted).
-    var phase = gridSample.b - phaseOffset;
-
-    // Dual-channel remap (Dirac particle/antiparticle, Pauli spin-up/down):
-    // R = primary density, G = secondary density. The single-density path
-    // below uses rho for alpha + empty-skip + adaptive-step; a state with
-    // all probability in G (e.g. pure gaussianSpinDown: R=0, G=spin-down
-    // density) would otherwise evaluate alpha near zero at every sample
-    // and render blank. Mirror the full-variant fix: fold G into rho for
-    // the opacity pipeline while keeping raw R / G for the color function
-    // so algo 24 / 25 can still read the individual channels. Dead-code-
-    // eliminated when IS_DUAL_CHANNEL is false (TDSE/BEC/QW/FSF).
-    var colorRho: f32 = rho;
-    var colorS: f32 = 0.0;
-    if (IS_DUAL_CHANNEL) {
-      colorRho = gridSample.r;
-      colorS = gridSample.g;
-      rho = rho + gridSample.g;
-    }
-
-    var causticMultiplier = 1.0;
-    if (backreactionActive && rho >= EMPTY_SKIP_THRESHOLD) {
-      let metricGradient = fetchGradient(pos, uniforms);
-      let metric = applyQuantumBackreactionMetric(
-        pos, rayDir, rho, sCenter, metricGradient, uniforms
-      );
-      pos = metric.position;
-      causticMultiplier = metric.caustic;
-      if (length(pos - basePos) > 1e-6) {
-        gridSample = sampleDensityFromGrid(pos, uniforms);
-        rho = gridSample.r * adsAmplitudeSq;
-        sCenter = gridSample.g;
-        phase = gridSample.b - phaseOffset;
-        colorRho = rho;
-        colorS = 0.0;
-        if (IS_DUAL_CHANNEL) {
-          colorRho = gridSample.r;
-          colorS = gridSample.g;
-          rho = rho + gridSample.g;
-        }
-      }
-    }
-
-    // Potential overlay: .a < 0 encodes -potOverlay from compute write-grid
-    let hasPotOverlay = DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01;
-    // Wheeler-DeWitt overlay: A > 0 carries streamline / SRMT overlay alpha
-    // (packer stores max(streamlineAlpha, srmtAlpha) in [0, 1]). Gated
-    // by quantumMode so the free-scalar negative-encoding path on other
-    // compute modes is not disturbed. isWdwMode hoisted above.
-    let hasWdwOverlay = DENSITY_GRID_HAS_PHASE && isWdwMode && gridSample.a > 0.01;
-
-    // Empty-skip: jump ahead when density is negligible.
-    // Compute modes produce smoothly trilinearly-interpolated density fields on
-    // the fixed-resolution density grid (DENSITY_GRID_SIZE, see
-    // src/constants/densityGrid.ts). The density's spatial-frequency content
-    // is capped at the grid's Nyquist limit and further smeared by the
-    // sampler's trilinear filter, so a single midpoint probe is a faithful
-    // predictor of the full 10·stepLen segment being empty. Replacing the
-    // previous 2-probe scheme with 1-probe saves one texture fetch per skip
-    // attempt with no detectable correctness loss on BEC groundState /
-    // singleVortex / quantumTurbulence (measured via
-    // bec-raymarch-profile.spec.ts at DPR=2).
-    // rho already carries total density for dual-channel modes (see remap
-    // above), so the predicate reads the correct emptiness signal in both
-    // single- and dual-channel paths.
-    if (!PROFILING_STRIP_EMPTY_SKIP && rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay && !hasWdwOverlay) {
-      let skipDistance = min(stepLen * 10.0, max(remaining, 0.0));
-      if (skipDistance > stepLen) {
-        let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms);
-        let midHasPot = DENSITY_GRID_HAS_PHASE && probeMid.a < -0.01;
-        let midHasWdwOverlay = DENSITY_GRID_HAS_PHASE && isWdwMode && probeMid.a > 0.01;
-        let midTotal = select(probeMid.r, probeMid.r + probeMid.g, IS_DUAL_CHANNEL);
-        if (midTotal < EMPTY_SKIP_THRESHOLD && !midHasPot && !midHasWdwOverlay) {
-          t += skipDistance;
-          continue;
-        }
-      }
-    }
-
-    // Adaptive step — use log(total) for dual-channel so the multiplier
-    // thresholds compare against a log-density (mirrors the full variant).
-    // sCenter is raw G in dual-channel modes, not logRho, so feeding it
-    // directly would wedge the multiplier at 1.0 everywhere.
-    var adaptiveStep: f32;
-    if (!PROFILING_STRIP_ADAPTIVE_STEP) {
-      var logRhoForStep: f32;
-      if (IS_DUAL_CHANNEL) {
-        if (rho > 1e-9) {
-          logRhoForStep = log(rho);
-        } else {
-          logRhoForStep = -20.0;
-        }
-      } else {
-        logRhoForStep = sCenter;
-      }
-      adaptiveStep = computeAdaptiveStep(logRhoForStep, stepLen, remaining);
-    } else {
-      adaptiveStep = min(stepLen, remaining);
-    }
-
-    // Potential overlay rendering (TDSE / FSF negative-encoded).
-    // Reuse the hasPotOverlay boolean instead of re-evaluating the condition.
-    if (hasPotOverlay) {
-      let potColor = vec3f(0.35, 0.45, 0.55);
-      let potIntensity = abs(gridSample.a);
-      let potOpacity = clamp(potIntensity * 0.06 * transmittance * min(adaptiveStep * invStepLen, 2.0), 0.0, 0.2);
-      accColor += transmittance * potOpacity * potColor;
-      transmittance *= (1.0 - potOpacity);
-    }
-
-    // Wheeler-DeWitt overlay (streamlines + SRMT heatmap). Additive,
-    // composited BEFORE density so the overlay is visible even when
-    // rho = 0 at a cell. Fixed warm color; clamp keeps a single overlay
-    // voxel from saturating the frame when the overlay alpha is near 1.
-    if (hasWdwOverlay) {
-      let overlayColor = vec3f(0.96, 0.78, 0.28);
-      let overlayOpacity = clamp(gridSample.a * min(adaptiveStep * invStepLen, 2.0) * 0.5, 0.0, 0.35);
-      accColor += transmittance * overlayOpacity * overlayColor;
-      transmittance *= (1.0 - overlayOpacity);
-    }
-
-    // Density → alpha
-    let effectiveRho = computeEffectiveDensity(rho, phase, transmittance, uniforms);
-    let alpha = computeAlpha(effectiveRho, adaptiveStep, uniforms.densityGain);
-
-    let primaryHitThreshold: f32 = 0.01;
-    if (alpha > primaryHitThreshold) {
-      if (primaryHitT < 0.0) { primaryHitT = t; }
-
-      if (!PROFILING_STRIP_COMPOSITING) {
-        // Gradient + lit emission
-        var gradient: vec3f;
-        if (PROFILING_STRIP_GRADIENT) {
-          gradient = vec3f(0.0, 1.0, 0.0);
-        } else {
-          gradient = fetchGradient(pos, uniforms);
-        }
-
-        // Dual-channel path uses raw R (colorRho) and raw G (colorS) so algo
-        // 24 / 25 colour algorithms still see the individual spin / particle
-        // channels; single-channel path falls back to (rho, sCenter). rho was
-        // mutated above to total density for the alpha pipeline — feeding it
-        // back into computeBaseColor would collapse every dual-channel state
-        // onto the midpoint hue.
-        let emissionRho = select(rho, colorRho, IS_DUAL_CHANNEL);
-        let emissionS = select(sCenter, colorS, IS_DUAL_CHANNEL);
-        var emission: vec3f;
-        if (PROFILING_STRIP_LIGHTING) {
-          emission = computeBaseColor(emissionRho, emissionS, phase, pos, uniforms);
-        } else {
-          emission = computeEmissionLit(emissionRho, emissionS, phase, pos, gradient, viewDir, uniforms);
-        }
-        emission *= causticMultiplier;
-
-        // Branch coloring: compute from ray position (not density texture alpha).
-        // branchColorActive hoisted above the loop (uniforms-only).
-        if (branchColorActive) {
-          let branchFrac = smoothstep(
-            uniforms.branchPlaneThreshold - uniforms.branchTransitionWidth,
-            uniforms.branchPlaneThreshold + uniforms.branchTransitionWidth,
-            pos.x
-          );
-          let branchColor = mix(uniforms.branchColorA, uniforms.branchColorB, branchFrac);
-          let lum = dot(emission, LUMA_WEIGHTS);
-          emission = branchColor * lum;
-        }
-
-        accColor += transmittance * alpha * emission;
-      }
-      transmittance *= (1.0 - alpha);
-    }
-
-    t += adaptiveStep;
-  }
-
-  let finalAlpha = 1.0 - transmittance;
-  if (primaryHitT < 0.0) {
-    primaryHitT = (tNear + tFar) * 0.5;
-  }
-  return VolumeResult(accColor, finalAlpha, iterCount, primaryHitT);
-}
-`
-}
+export { generateVolumeRaymarchGridSimpleBlock } from './volumeRaymarchGridSimple.wgsl'
 
 /**
  * Generate the full-featured grid-based volume raymarching block.
@@ -365,6 +97,8 @@ fn volumeRaymarchGrid(
     && uniforms.branchSeparation > 0.5
     && uniforms.branchTransitionWidth > 0.0;
   let backreactionActive = isQuantumBackreactionActive(uniforms);
+  let bilocalBridgeActive = isBilocalERBridgeActive(uniforms);
+  let entropyShearActive = isEntropicTimeShearActive(uniforms);
 
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (PROFILING_HALF_SAMPLES && i >= 64) { break; }
@@ -446,14 +180,142 @@ fn volumeRaymarchGrid(
     }
 
     var causticMultiplier = 1.0;
+    var bridgeGain = 1.0;
+    if (bilocalBridgeActive && rho >= EMPTY_SKIP_THRESHOLD) {
+      let remoteEndpoint = vec3f(-basePos.x, basePos.y, basePos.z);
+      let remoteGridSample = sampleDensityFromGrid(remoteEndpoint, uniforms);
+      let remoteRho = select(remoteGridSample.r, remoteGridSample.r + remoteGridSample.g, IS_DUAL_CHANNEL);
+      var localLogDensity = sCenter;
+      var remoteLogDensity = remoteGridSample.g;
+      if (IS_DUAL_CHANNEL) {
+        if (rho > 1e-9) {
+          localLogDensity = log(rho);
+        } else {
+          localLogDensity = -20.0;
+        }
+        if (remoteRho > 1e-9) {
+          remoteLogDensity = log(remoteRho);
+        } else {
+          remoteLogDensity = -20.0;
+        }
+      }
+      var remotePhase: f32;
+      if (DENSITY_GRID_HAS_PHASE) {
+        remotePhase = remoteGridSample.b - phaseOffset;
+      } else {
+        remotePhase = 0.0;
+      }
+      let bridge = applyBilocalERBridgeTopology(
+        pos,
+        rayDir,
+        rho,
+        localLogDensity,
+        phase,
+        remoteRho,
+        remoteLogDensity,
+        remotePhase,
+        uniforms
+      );
+      pos = bridge.position;
+      bridgeGain = bridge.gain;
+      if (length(pos - basePos) > 1e-6) {
+        gridSample = sampleDensityFromGrid(pos, uniforms);
+        rho = gridSample.r * adsAmplitudeSq;
+        colorRho = rho;
+        colorS = 0.0;
+        if (IS_DUAL_CHANNEL) {
+          colorS = gridSample.g;
+          sCenter = gridSample.g;
+          rho = rho + gridSample.g;
+          colorRho = gridSample.r;
+        } else if (DENSITY_GRID_HAS_PHASE) {
+          sCenter = gridSample.g;
+          colorS = sCenter;
+        } else {
+          if (rho > 1e-9) {
+            sCenter = log(rho);
+          } else {
+            sCenter = -20.0;
+          }
+          colorS = sCenter;
+        }
+
+        if (DENSITY_GRID_HAS_PHASE) {
+          let rotatedB = gridSample.b - phaseOffset;
+          let useRelPhase =
+            (COLOR_ALGORITHM == 10)
+            && (uniforms.quantumMode == 0
+                || uniforms.quantumMode == 1
+                || uniforms.quantumMode == 7);
+          phase = select(rotatedB, gridSample.a, useRelPhase);
+        } else {
+          phase = 0.0;
+        }
+      }
+    }
+
     if (backreactionActive && rho >= EMPTY_SKIP_THRESHOLD) {
       let metricGradient = fetchGradient(pos, uniforms);
+      let beforeBackreaction = pos;
       let metric = applyQuantumBackreactionMetric(
-        pos, rayDir, rho, sCenter, metricGradient, uniforms
+        beforeBackreaction, rayDir, rho, sCenter, metricGradient, uniforms
       );
       pos = metric.position;
       causticMultiplier = metric.caustic;
-      if (length(pos - basePos) > 1e-6) {
+      if (length(pos - beforeBackreaction) > 1e-6) {
+        gridSample = sampleDensityFromGrid(pos, uniforms);
+        rho = gridSample.r * adsAmplitudeSq;
+        colorRho = rho;
+        colorS = 0.0;
+        if (IS_DUAL_CHANNEL) {
+          colorS = gridSample.g;
+          sCenter = gridSample.g;
+          rho = rho + gridSample.g;
+          colorRho = gridSample.r;
+        } else if (DENSITY_GRID_HAS_PHASE) {
+          sCenter = gridSample.g;
+          colorS = sCenter;
+        } else {
+          if (rho > 1e-9) {
+            sCenter = log(rho);
+          } else {
+            sCenter = -20.0;
+          }
+          colorS = sCenter;
+        }
+
+        if (DENSITY_GRID_HAS_PHASE) {
+          let rotatedB = gridSample.b - phaseOffset;
+          let useRelPhase =
+            (COLOR_ALGORITHM == 10)
+            && (uniforms.quantumMode == 0
+                || uniforms.quantumMode == 1
+                || uniforms.quantumMode == 7);
+          phase = select(rotatedB, gridSample.a, useRelPhase);
+        } else {
+          phase = 0.0;
+        }
+      }
+    }
+
+    var entropyGain = 0.0;
+    if (entropyShearActive && rho >= EMPTY_SKIP_THRESHOLD) {
+      let entropyGradient = fetchGradient(pos, uniforms);
+      var entropyLogDensity = sCenter;
+      if (IS_DUAL_CHANNEL) {
+        if (rho > 1e-9) {
+          entropyLogDensity = log(rho);
+        } else {
+          entropyLogDensity = -20.0;
+        }
+      }
+      let beforeEntropyShear = pos;
+      let entropyShear = applyEntropicTimeShear(
+        pos, rayDir, rho, entropyLogDensity, phase, entropyGradient, uniforms
+      );
+      pos = entropyShear.position;
+      entropyGain = entropyShear.entropyGain;
+      if (length(pos - beforeEntropyShear) > 1e-6) {
         gridSample = sampleDensityFromGrid(pos, uniforms);
         rho = gridSample.r * adsAmplitudeSq;
         colorRho = rho;
@@ -662,6 +524,8 @@ fn volumeRaymarchGrid(
           emission = computeEmissionLit(colorRho, colorS, phase, pos, gradient, viewDir, uniforms);
         }
         emission *= causticMultiplier;
+        emission *= bridgeGain;
+        emission *= 1.0 + uniforms.entropicTimeShearStrength * max(entropyGain, 0.0) * 0.35;
 
         // Branch coloring: when alpha encodes branch fraction (2.0 + frac),
         // tint emission toward branch A or branch B color.

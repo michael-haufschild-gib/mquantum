@@ -258,6 +258,18 @@ const SCHROEDINGER_FIELDS = [
   // term_k = c_k * exp(-i * E_k * t) packed as (Re, Im, 0, 0) per vec4f slot.
   // Hot path replaces 8 cos/sin + 8 cmul per pixel with a single uniform read.
   { name: 'precomputedTerm', type: arr('vec4f', 8) },
+
+  // --- Bilocal Einstein-Rosen bridge topology ---
+  { name: 'bilocalERBridgeEnabled', type: 'u32' },
+  { name: 'bilocalERBridgeStrength', type: 'f32' },
+  { name: 'bilocalERBridgeThroatRadius', type: 'f32' },
+  { name: 'bilocalERBridgePhaseLock', type: 'f32' },
+
+  // --- Entropic time-shear filaments ---
+  { name: 'entropicTimeShearEnabled', type: 'u32' },
+  { name: 'entropicTimeShearStrength', type: 'f32' },
+  { name: 'entropicTimeShearFilamentScale', type: 'f32' },
+  { name: 'entropicTimeShearIrreversibility', type: 'f32' },
 ] as const satisfies readonly StructFieldDef[]
 
 /** Computed struct layout for SchroedingerUniforms. */

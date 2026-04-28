@@ -342,6 +342,20 @@ struct SchroedingerUniforms {
   // 16-byte vec4f padding required by uniform-buffer array stride.
   // Updated every frame (including the partial-write path) by the host packer.
   precomputedTerm: array<vec4f, 8>,
+
+  // Bilocal Einstein-Rosen bridge topology. When disabled, host packing writes
+  // all four fields as zero so topology application is an exact no-op.
+  bilocalERBridgeEnabled: u32,
+  bilocalERBridgeStrength: f32,
+  bilocalERBridgeThroatRadius: f32,
+  bilocalERBridgePhaseLock: f32,
+
+  // Entropic time-shear filaments. When disabled, host packing writes all four
+  // fields as zero so shear application is an exact no-op.
+  entropicTimeShearEnabled: u32,
+  entropicTimeShearStrength: f32,
+  entropicTimeShearFilamentScale: f32,
+  entropicTimeShearIrreversibility: f32,
 }
 
 // ============================================

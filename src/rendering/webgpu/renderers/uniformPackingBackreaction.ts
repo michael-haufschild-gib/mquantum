@@ -27,3 +27,45 @@ export function packQuantumBackreaction(
     ? clamp(schroedinger?.quantumBackreactionSoftening ?? 0.45, 0.05, 2.0)
     : 0.0
 }
+
+/**
+ *
+ */
+export function packBilocalERBridge(
+  floatView: Float32Array,
+  intView: Int32Array,
+  schroedinger: Partial<SchroedingerConfig> | undefined
+): void {
+  const enabled = schroedinger?.bilocalERBridgeEnabled ?? false
+  intView[I.bilocalERBridgeEnabled] = enabled ? 1 : 0
+  floatView[I.bilocalERBridgeStrength] = enabled
+    ? clamp(schroedinger?.bilocalERBridgeStrength ?? 0.8, 0.0, 2.0)
+    : 0.0
+  floatView[I.bilocalERBridgeThroatRadius] = enabled
+    ? clamp(schroedinger?.bilocalERBridgeThroatRadius ?? 0.45, 0.05, 2.0)
+    : 0.0
+  floatView[I.bilocalERBridgePhaseLock] = enabled
+    ? clamp(schroedinger?.bilocalERBridgePhaseLock ?? 0.7, 0.0, 1.0)
+    : 0.0
+}
+
+/**
+ *
+ */
+export function packEntropicTimeShear(
+  floatView: Float32Array,
+  intView: Int32Array,
+  schroedinger: Partial<SchroedingerConfig> | undefined
+): void {
+  const enabled = schroedinger?.entropicTimeShearEnabled ?? false
+  intView[I.entropicTimeShearEnabled] = enabled ? 1 : 0
+  floatView[I.entropicTimeShearStrength] = enabled
+    ? clamp(schroedinger?.entropicTimeShearStrength ?? 0.8, 0.0, 2.0)
+    : 0.0
+  floatView[I.entropicTimeShearFilamentScale] = enabled
+    ? clamp(schroedinger?.entropicTimeShearFilamentScale ?? 1.25, 0.1, 4.0)
+    : 0.0
+  floatView[I.entropicTimeShearIrreversibility] = enabled
+    ? clamp(schroedinger?.entropicTimeShearIrreversibility ?? 0.6, 0.0, 1.0)
+    : 0.0
+}

@@ -349,6 +349,22 @@ export interface SchroedingerConfig {
   quantumBackreactionCausticGain: number
   /** Softening radius for probability-stress lensing (0.05-2.0) */
   quantumBackreactionSoftening: number
+  /** Enable bilocal Einstein-Rosen bridge topology between mirrored endpoints */
+  bilocalERBridgeEnabled: boolean
+  /** Coordinate warp strength for bilocal bridge sampling (0.0-2.0) */
+  bilocalERBridgeStrength: number
+  /** Bridge throat radius controlling transverse softening (0.05-2.0) */
+  bilocalERBridgeThroatRadius: number
+  /** Phase-coherence lock between local and mirrored endpoint (0.0-1.0) */
+  bilocalERBridgePhaseLock: number
+  /** Enable entropy-gradient time-shear filaments in the raymarch sampler */
+  entropicTimeShearEnabled: boolean
+  /** Time-shear coordinate deformation strength (0.0-2.0) */
+  entropicTimeShearStrength: number
+  /** Spatial coherence scale of entropy-shear filaments (0.1-4.0) */
+  entropicTimeShearFilamentScale: number
+  /** Bias toward monotone entropy gain instead of reversible signed shear (0.0-1.0) */
+  entropicTimeShearIrreversibility: number
 
   // === Physical Probability Current (j-field) ===
   /** Enable physical probability-current visualization (j = Im(conj(psi)∇psi)) */
@@ -647,6 +663,14 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   quantumBackreactionLensingStrength: 1.0,
   quantumBackreactionCausticGain: 0.6,
   quantumBackreactionSoftening: 0.45,
+  bilocalERBridgeEnabled: false,
+  bilocalERBridgeStrength: 0.8,
+  bilocalERBridgeThroatRadius: 0.45,
+  bilocalERBridgePhaseLock: 0.7,
+  entropicTimeShearEnabled: false,
+  entropicTimeShearStrength: 0.8,
+  entropicTimeShearFilamentScale: 1.25,
+  entropicTimeShearIrreversibility: 0.6,
 
   // Physical Probability Current (j-field)
   probabilityCurrentEnabled: false,

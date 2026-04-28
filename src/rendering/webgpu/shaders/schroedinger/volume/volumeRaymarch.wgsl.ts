@@ -73,6 +73,8 @@ fn volumeRaymarch(
   let radialProbEnabled = FEATURE_RADIAL_PROBABILITY && uniforms.radialProbabilityEnabled != 0u;
   let momentumRepresentation = uniforms.representationMode == REPRESENTATION_MOMENTUM;
   let backreactionActive = isQuantumBackreactionActive(uniforms);
+  let bilocalBridgeActive = isBilocalERBridgeActive(uniforms);
+  let entropyShearActive = isEntropicTimeShearActive(uniforms);
 
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (i >= sampleCount) { break; }
@@ -119,20 +121,72 @@ fn volumeRaymarch(
     }
 
     var samplePos = pos;
+    var bridgeGain = 1.0;
+    if (bilocalBridgeActive && rho >= EMPTY_SKIP_THRESHOLD) {
+      let remoteEndpoint = vec3f(-pos.x, pos.y, pos.z);
+      let remoteDensityInfo = sampleDensityWithPhase(remoteEndpoint, animTime, uniforms);
+      let bridge = applyBilocalERBridgeTopology(
+        pos,
+        rayDir,
+        rho,
+        sCenter,
+        phase,
+        remoteDensityInfo.x,
+        remoteDensityInfo.y,
+        remoteDensityInfo.z,
+        uniforms
+      );
+      samplePos = bridge.position;
+      bridgeGain = bridge.gain;
+      if (length(samplePos - pos) > 1e-6) {
+        let warpedDensityResult = sampleDensityWithPhaseAndFlow(samplePos, animTime, uniforms);
+        densityInfo = warpedDensityResult[0];
+        rawPsiVec = warpedDensityResult[1];
+        rho = densityInfo.x;
+        sCenter = densityInfo.y;
+        phase = densityInfo.z;
+      }
+    }
+
     var causticMultiplier = 1.0;
     if (backreactionActive && rho >= EMPTY_SKIP_THRESHOLD) {
       var metricGradient: vec3f;
       if (USE_ANALYTICAL_GRADIENT) {
-        metricGradient = computeAnalyticalGradient(pos, animTime, uniforms);
+        metricGradient = computeAnalyticalGradient(samplePos, animTime, uniforms);
       } else {
-        metricGradient = computeGradientTetrahedral(pos, animTime, 0.05, uniforms);
+        metricGradient = computeGradientTetrahedral(samplePos, animTime, 0.05, uniforms);
       }
+      let beforeBackreaction = samplePos;
       let metric = applyQuantumBackreactionMetric(
-        pos, rayDir, rho, sCenter, metricGradient, uniforms
+        beforeBackreaction, rayDir, rho, sCenter, metricGradient, uniforms
       );
       samplePos = metric.position;
       causticMultiplier = metric.caustic;
-      if (length(samplePos - pos) > 1e-6) {
+      if (length(samplePos - beforeBackreaction) > 1e-6) {
+        let warpedDensityResult = sampleDensityWithPhaseAndFlow(samplePos, animTime, uniforms);
+        densityInfo = warpedDensityResult[0];
+        rawPsiVec = warpedDensityResult[1];
+        rho = densityInfo.x;
+        sCenter = densityInfo.y;
+        phase = densityInfo.z;
+      }
+    }
+
+    var entropyGain = 0.0;
+    if (entropyShearActive && rho >= EMPTY_SKIP_THRESHOLD) {
+      var entropyGradient: vec3f;
+      if (USE_ANALYTICAL_GRADIENT) {
+        entropyGradient = computeAnalyticalGradient(samplePos, animTime, uniforms);
+      } else {
+        entropyGradient = computeGradientTetrahedral(samplePos, animTime, 0.05, uniforms);
+      }
+      let beforeEntropyShear = samplePos;
+      let entropyShear = applyEntropicTimeShear(
+        samplePos, rayDir, rho, sCenter, phase, entropyGradient, uniforms
+      );
+      samplePos = entropyShear.position;
+      entropyGain = entropyShear.entropyGain;
+      if (length(samplePos - beforeEntropyShear) > 1e-6) {
         let warpedDensityResult = sampleDensityWithPhaseAndFlow(samplePos, animTime, uniforms);
         densityInfo = warpedDensityResult[0];
         rawPsiVec = warpedDensityResult[1];
@@ -213,10 +267,12 @@ fn volumeRaymarch(
 
       // Compute emission with lighting (pass pre-computed log-density to avoid redundant log())
       let emission = computeEmissionLit(rho, sCenter, phase, samplePos, gradient, viewDir, uniforms)
-        * causticMultiplier;
+        * causticMultiplier * bridgeGain;
+      let entropyEmissionGain =
+        1.0 + uniforms.entropicTimeShearStrength * max(entropyGain, 0.0) * 0.35;
 
       // Front-to-back compositing (scalar path)
-      accColor += transmittance * alpha * emission;
+      accColor += transmittance * alpha * emission * entropyEmissionGain;
       transmittance *= (1.0 - alpha);
     }
 
@@ -281,6 +337,8 @@ fn volumeRaymarchHQ(
   let radialProbEnabled = FEATURE_RADIAL_PROBABILITY && uniforms.radialProbabilityEnabled != 0u;
   let momentumRepresentation = uniforms.representationMode == REPRESENTATION_MOMENTUM;
   let backreactionActive = isQuantumBackreactionActive(uniforms);
+  let bilocalBridgeActive = isBilocalERBridgeActive(uniforms);
+  let entropyShearActive = isEntropicTimeShearActive(uniforms);
 
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (i >= sampleCount) { break; }
@@ -326,20 +384,65 @@ fn volumeRaymarchHQ(
     }
 
     var samplePos = pos;
+    var bridgeGain = 1.0;
+    if (bilocalBridgeActive && quickRho >= EMPTY_SKIP_THRESHOLD) {
+      let remoteEndpoint = vec3f(-pos.x, pos.y, pos.z);
+      let remoteDensityInfo = sampleDensityWithPhase(remoteEndpoint, animTime, uniforms);
+      let bridge = applyBilocalERBridgeTopology(
+        pos,
+        rayDir,
+        quickRho,
+        quickS,
+        quickCheck.z,
+        remoteDensityInfo.x,
+        remoteDensityInfo.y,
+        remoteDensityInfo.z,
+        uniforms
+      );
+      samplePos = bridge.position;
+      bridgeGain = bridge.gain;
+      if (length(samplePos - pos) > 1e-6) {
+        quickCheck = sampleDensityWithPhase(samplePos, animTime, uniforms);
+        quickRho = quickCheck.x;
+        quickS = quickCheck.y;
+      }
+    }
+
     var causticMultiplier = 1.0;
     if (backreactionActive && quickRho >= EMPTY_SKIP_THRESHOLD) {
       var metricGradient: vec3f;
       if (USE_ANALYTICAL_GRADIENT) {
-        metricGradient = computeAnalyticalGradient(pos, animTime, uniforms);
+        metricGradient = computeAnalyticalGradient(samplePos, animTime, uniforms);
       } else {
-        metricGradient = computeGradientTetrahedral(pos, animTime, 0.05, uniforms);
+        metricGradient = computeGradientTetrahedral(samplePos, animTime, 0.05, uniforms);
       }
+      let beforeBackreaction = samplePos;
       let metric = applyQuantumBackreactionMetric(
-        pos, rayDir, quickRho, quickS, metricGradient, uniforms
+        beforeBackreaction, rayDir, quickRho, quickS, metricGradient, uniforms
       );
       samplePos = metric.position;
       causticMultiplier = metric.caustic;
-      if (length(samplePos - pos) > 1e-6) {
+      if (length(samplePos - beforeBackreaction) > 1e-6) {
+        quickCheck = sampleDensityWithPhase(samplePos, animTime, uniforms);
+        quickRho = quickCheck.x;
+        quickS = quickCheck.y;
+      }
+    }
+    var entropyGain = 0.0;
+    if (entropyShearActive && quickRho >= EMPTY_SKIP_THRESHOLD) {
+      var entropyGradient: vec3f;
+      if (USE_ANALYTICAL_GRADIENT) {
+        entropyGradient = computeAnalyticalGradient(samplePos, animTime, uniforms);
+      } else {
+        entropyGradient = computeGradientTetrahedral(samplePos, animTime, 0.05, uniforms);
+      }
+      let beforeEntropyShear = samplePos;
+      let entropyShear = applyEntropicTimeShear(
+        samplePos, rayDir, quickRho, quickS, quickCheck.z, entropyGradient, uniforms
+      );
+      samplePos = entropyShear.position;
+      entropyGain = entropyShear.entropyGain;
+      if (length(samplePos - beforeEntropyShear) > 1e-6) {
         quickCheck = sampleDensityWithPhase(samplePos, animTime, uniforms);
         quickRho = quickCheck.x;
         quickS = quickCheck.y;
@@ -454,10 +557,12 @@ fn volumeRaymarchHQ(
 
       // Compute emission with lighting (pass pre-computed log-density to avoid redundant log())
       let emission = computeEmissionLit(rho, sCenter, phase, samplePos, gradient, viewDir, uniforms)
-        * causticMultiplier;
+        * causticMultiplier * bridgeGain;
+      let entropyEmissionGain =
+        1.0 + uniforms.entropicTimeShearStrength * max(entropyGain, 0.0) * 0.35;
 
       // Front-to-back compositing
-      accColor += transmittance * alpha * emission;
+      accColor += transmittance * alpha * emission * entropyEmissionGain;
       transmittance *= (1.0 - alpha);
     }
 

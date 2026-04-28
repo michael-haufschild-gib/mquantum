@@ -774,6 +774,86 @@ describe('packSchroedingerUniforms', () => {
     expect(floatView[index.quantumBackreactionSoftening]).toBeCloseTo(0.05)
   })
 
+  it('zeroes bilocal ER bridge uniforms when disabled', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      schroedinger: {
+        bilocalERBridgeEnabled: false,
+        bilocalERBridgeStrength: 1.5,
+        bilocalERBridgeThroatRadius: 0.3,
+        bilocalERBridgePhaseLock: 0.8,
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    const index = SCHROEDINGER_LAYOUT.index
+    expect(intView[index.bilocalERBridgeEnabled]).toBe(0)
+    expect(floatView[index.bilocalERBridgeStrength]).toBe(0)
+    expect(floatView[index.bilocalERBridgeThroatRadius]).toBe(0)
+    expect(floatView[index.bilocalERBridgePhaseLock]).toBe(0)
+  })
+
+  it('packs clamped bilocal ER bridge controls when enabled', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      schroedinger: {
+        bilocalERBridgeEnabled: true,
+        bilocalERBridgeStrength: 9,
+        bilocalERBridgeThroatRadius: 0.01,
+        bilocalERBridgePhaseLock: 9,
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    const index = SCHROEDINGER_LAYOUT.index
+    expect(intView[index.bilocalERBridgeEnabled]).toBe(1)
+    expect(floatView[index.bilocalERBridgeStrength]).toBe(2)
+    expect(floatView[index.bilocalERBridgeThroatRadius]).toBeCloseTo(0.05)
+    expect(floatView[index.bilocalERBridgePhaseLock]).toBe(1)
+  })
+
+  it('zeroes entropic time-shear uniforms when disabled', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      schroedinger: {
+        entropicTimeShearEnabled: false,
+        entropicTimeShearStrength: 1.5,
+        entropicTimeShearFilamentScale: 2.5,
+        entropicTimeShearIrreversibility: 0.8,
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    const index = SCHROEDINGER_LAYOUT.index
+    expect(intView[index.entropicTimeShearEnabled]).toBe(0)
+    expect(floatView[index.entropicTimeShearStrength]).toBe(0)
+    expect(floatView[index.entropicTimeShearFilamentScale]).toBe(0)
+    expect(floatView[index.entropicTimeShearIrreversibility]).toBe(0)
+  })
+
+  it('packs clamped entropic time-shear controls when enabled', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      schroedinger: {
+        entropicTimeShearEnabled: true,
+        entropicTimeShearStrength: 9,
+        entropicTimeShearFilamentScale: 0.01,
+        entropicTimeShearIrreversibility: 9,
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    const index = SCHROEDINGER_LAYOUT.index
+    expect(intView[index.entropicTimeShearEnabled]).toBe(1)
+    expect(floatView[index.entropicTimeShearStrength]).toBe(2)
+    expect(floatView[index.entropicTimeShearFilamentScale]).toBeCloseTo(0.1)
+    expect(floatView[index.entropicTimeShearIrreversibility]).toBe(1)
+  })
+
   // Wheeler–DeWitt render-only phase rotation rate: 0 unless mode+enabled.
   it('writes wdwPhaseRotationRate = 0 for non-WdW modes even when flag set', () => {
     const { floatView, intView } = createBuffer(BUFFER_SIZE)

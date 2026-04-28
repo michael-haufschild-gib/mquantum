@@ -124,6 +124,100 @@ describe('visualEffectSetters — compound logic', () => {
     })
   })
 
+  describe('bilocal ER bridge controls', () => {
+    it('defaults to disabled with editable control defaults', () => {
+      const config = getSchroedinger()
+      expect(config.bilocalERBridgeEnabled).toBe(false)
+      expect(config.bilocalERBridgeStrength).toBe(0.8)
+      expect(config.bilocalERBridgeThroatRadius).toBe(0.45)
+      expect(config.bilocalERBridgePhaseLock).toBe(0.7)
+    })
+
+    it('toggles enabled and clamps strength, throat radius, and phase lock', () => {
+      const store = useExtendedObjectStore.getState()
+
+      store.setSchroedingerBilocalERBridgeEnabled(true)
+      store.setSchroedingerBilocalERBridgeStrength(3)
+      store.setSchroedingerBilocalERBridgeThroatRadius(0.01)
+      store.setSchroedingerBilocalERBridgePhaseLock(2)
+
+      expect(getSchroedinger().bilocalERBridgeEnabled).toBe(true)
+      expect(getSchroedinger().bilocalERBridgeStrength).toBe(2)
+      expect(getSchroedinger().bilocalERBridgeThroatRadius).toBe(0.05)
+      expect(getSchroedinger().bilocalERBridgePhaseLock).toBe(1)
+
+      store.setSchroedingerBilocalERBridgeStrength(-1)
+      store.setSchroedingerBilocalERBridgeThroatRadius(3)
+      store.setSchroedingerBilocalERBridgePhaseLock(-1)
+
+      expect(getSchroedinger().bilocalERBridgeStrength).toBe(0)
+      expect(getSchroedinger().bilocalERBridgeThroatRadius).toBe(2)
+      expect(getSchroedinger().bilocalERBridgePhaseLock).toBe(0)
+    })
+
+    it('rejects non-finite numeric inputs', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerBilocalERBridgeStrength(1.25)
+      store.setSchroedingerBilocalERBridgeThroatRadius(0.75)
+      store.setSchroedingerBilocalERBridgePhaseLock(0.35)
+
+      store.setSchroedingerBilocalERBridgeStrength(NaN)
+      store.setSchroedingerBilocalERBridgeThroatRadius(Infinity)
+      store.setSchroedingerBilocalERBridgePhaseLock(NaN)
+
+      expect(getSchroedinger().bilocalERBridgeStrength).toBe(1.25)
+      expect(getSchroedinger().bilocalERBridgeThroatRadius).toBe(0.75)
+      expect(getSchroedinger().bilocalERBridgePhaseLock).toBe(0.35)
+    })
+  })
+
+  describe('entropic time-shear controls', () => {
+    it('defaults to disabled with editable control defaults', () => {
+      const config = getSchroedinger()
+      expect(config.entropicTimeShearEnabled).toBe(false)
+      expect(config.entropicTimeShearStrength).toBe(0.8)
+      expect(config.entropicTimeShearFilamentScale).toBe(1.25)
+      expect(config.entropicTimeShearIrreversibility).toBe(0.6)
+    })
+
+    it('toggles enabled and clamps strength, filament scale, and irreversibility', () => {
+      const store = useExtendedObjectStore.getState()
+
+      store.setSchroedingerEntropicTimeShearEnabled(true)
+      store.setSchroedingerEntropicTimeShearStrength(3)
+      store.setSchroedingerEntropicTimeShearFilamentScale(0.01)
+      store.setSchroedingerEntropicTimeShearIrreversibility(2)
+
+      expect(getSchroedinger().entropicTimeShearEnabled).toBe(true)
+      expect(getSchroedinger().entropicTimeShearStrength).toBe(2)
+      expect(getSchroedinger().entropicTimeShearFilamentScale).toBe(0.1)
+      expect(getSchroedinger().entropicTimeShearIrreversibility).toBe(1)
+
+      store.setSchroedingerEntropicTimeShearStrength(-1)
+      store.setSchroedingerEntropicTimeShearFilamentScale(9)
+      store.setSchroedingerEntropicTimeShearIrreversibility(-1)
+
+      expect(getSchroedinger().entropicTimeShearStrength).toBe(0)
+      expect(getSchroedinger().entropicTimeShearFilamentScale).toBe(4)
+      expect(getSchroedinger().entropicTimeShearIrreversibility).toBe(0)
+    })
+
+    it('rejects non-finite numeric inputs', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerEntropicTimeShearStrength(1.25)
+      store.setSchroedingerEntropicTimeShearFilamentScale(2.5)
+      store.setSchroedingerEntropicTimeShearIrreversibility(0.35)
+
+      store.setSchroedingerEntropicTimeShearStrength(NaN)
+      store.setSchroedingerEntropicTimeShearFilamentScale(Infinity)
+      store.setSchroedingerEntropicTimeShearIrreversibility(NaN)
+
+      expect(getSchroedinger().entropicTimeShearStrength).toBe(1.25)
+      expect(getSchroedinger().entropicTimeShearFilamentScale).toBe(2.5)
+      expect(getSchroedinger().entropicTimeShearIrreversibility).toBe(0.35)
+    })
+  })
+
   describe('cross-section plane normal normalization', () => {
     it('normalizes non-unit vectors to unit length', () => {
       useExtendedObjectStore.getState().setSchroedingerCrossSectionPlaneNormal([3, 4, 0])
