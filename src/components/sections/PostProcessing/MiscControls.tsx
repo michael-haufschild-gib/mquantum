@@ -42,6 +42,14 @@ export const MiscControls: React.FC<MiscControlsProps> = React.memo(({ className
     setFrameBlendingEnabled: state.setFrameBlendingEnabled,
     frameBlendingFactor: state.frameBlendingFactor,
     setFrameBlendingFactor: state.setFrameBlendingFactor,
+    horizonMemoryEnabled: state.horizonMemoryEnabled,
+    setHorizonMemoryEnabled: state.setHorizonMemoryEnabled,
+    horizonMemoryStrength: state.horizonMemoryStrength,
+    setHorizonMemoryStrength: state.setHorizonMemoryStrength,
+    horizonMemoryRadius: state.horizonMemoryRadius,
+    setHorizonMemoryRadius: state.setHorizonMemoryRadius,
+    horizonMemoryEchoes: state.horizonMemoryEchoes,
+    setHorizonMemoryEchoes: state.setHorizonMemoryEchoes,
   }))
   const {
     antiAliasingMethod,
@@ -50,6 +58,14 @@ export const MiscControls: React.FC<MiscControlsProps> = React.memo(({ className
     setFrameBlendingEnabled,
     frameBlendingFactor,
     setFrameBlendingFactor,
+    horizonMemoryEnabled,
+    setHorizonMemoryEnabled,
+    horizonMemoryStrength,
+    setHorizonMemoryStrength,
+    horizonMemoryRadius,
+    setHorizonMemoryRadius,
+    horizonMemoryEchoes,
+    setHorizonMemoryEchoes,
   } = usePostProcessingStore(postProcessingSelector)
 
   return (
@@ -93,8 +109,58 @@ export const MiscControls: React.FC<MiscControlsProps> = React.memo(({ className
             data-testid="frame-blending-factor-slider"
           />
         </div>
+        <Switch
+          checked={horizonMemoryEnabled}
+          onCheckedChange={setHorizonMemoryEnabled}
+          label="Causal Horizon Memory"
+          tooltip="Uses previous-frame luminance gradients to bend current-frame samples and emit radial echo shells."
+          disabled={!frameBlendingEnabled}
+          data-testid="horizon-memory-switch"
+        />
+        <div
+          className={
+            !frameBlendingEnabled || !horizonMemoryEnabled ? 'opacity-50 pointer-events-none' : ''
+          }
+        >
+          <Slider
+            label="Memory Strength"
+            tooltip="Strength of history-driven UV refraction and echo emission."
+            min={0}
+            max={1.5}
+            step={0.05}
+            value={horizonMemoryStrength}
+            onChange={setHorizonMemoryStrength}
+            disabled={!frameBlendingEnabled || !horizonMemoryEnabled}
+            showValue
+            data-testid="horizon-memory-strength-slider"
+          />
+          <Slider
+            label="Echo Radius"
+            tooltip="Screen-space radius where center-origin memory shells accumulate."
+            min={0.05}
+            max={1.5}
+            step={0.05}
+            value={horizonMemoryRadius}
+            onChange={setHorizonMemoryRadius}
+            disabled={!frameBlendingEnabled || !horizonMemoryEnabled}
+            showValue
+            data-testid="horizon-memory-radius-slider"
+          />
+          <Slider
+            label="Echo Shells"
+            tooltip="Number of previous-frame radial shells accumulated into the memory echo."
+            min={1}
+            max={6}
+            step={1}
+            value={horizonMemoryEchoes}
+            onChange={setHorizonMemoryEchoes}
+            disabled={!frameBlendingEnabled || !horizonMemoryEnabled}
+            showValue
+            data-testid="horizon-memory-echoes-slider"
+          />
+        </div>
         <p className="text-xs text-text-secondary mt-1">
-          Blends frames for smoother motion. Higher values may cause ghosting.
+          Blends frames for smoother motion. Horizon memory adds history-driven causal echoes.
         </p>
       </ControlGroup>
     </div>

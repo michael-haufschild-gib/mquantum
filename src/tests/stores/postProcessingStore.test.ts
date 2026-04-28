@@ -251,5 +251,56 @@ describe('postProcessingStore', () => {
 
       expect(usePostProcessingStore.getState().frameBlendingFactor).toBe(0.4)
     })
+
+    it('sets horizon memory controls with clamping and rounded echo count', () => {
+      const {
+        setHorizonMemoryEnabled,
+        setHorizonMemoryStrength,
+        setHorizonMemoryRadius,
+        setHorizonMemoryEchoes,
+      } = usePostProcessingStore.getState()
+
+      setHorizonMemoryEnabled(true)
+      setHorizonMemoryStrength(0.75)
+      setHorizonMemoryRadius(0.8)
+      setHorizonMemoryEchoes(3.6)
+
+      expect(usePostProcessingStore.getState().horizonMemoryEnabled).toBe(true)
+      expect(usePostProcessingStore.getState().horizonMemoryStrength).toBe(0.75)
+      expect(usePostProcessingStore.getState().horizonMemoryRadius).toBe(0.8)
+      expect(usePostProcessingStore.getState().horizonMemoryEchoes).toBe(4)
+
+      setHorizonMemoryStrength(-1)
+      setHorizonMemoryRadius(0)
+      setHorizonMemoryEchoes(-10)
+      expect(usePostProcessingStore.getState().horizonMemoryStrength).toBe(0)
+      expect(usePostProcessingStore.getState().horizonMemoryRadius).toBe(0.05)
+      expect(usePostProcessingStore.getState().horizonMemoryEchoes).toBe(1)
+
+      setHorizonMemoryStrength(99)
+      setHorizonMemoryRadius(99)
+      setHorizonMemoryEchoes(99)
+      expect(usePostProcessingStore.getState().horizonMemoryStrength).toBe(1.5)
+      expect(usePostProcessingStore.getState().horizonMemoryRadius).toBe(1.5)
+      expect(usePostProcessingStore.getState().horizonMemoryEchoes).toBe(6)
+    })
+
+    it('ignores non-finite horizon memory updates', () => {
+      const { setHorizonMemoryStrength, setHorizonMemoryRadius, setHorizonMemoryEchoes } =
+        usePostProcessingStore.getState()
+
+      setHorizonMemoryStrength(0.5)
+      setHorizonMemoryRadius(0.9)
+      setHorizonMemoryEchoes(3)
+
+      setHorizonMemoryStrength(Number.NaN)
+      setHorizonMemoryRadius(Number.POSITIVE_INFINITY)
+      setHorizonMemoryEchoes(Number.NEGATIVE_INFINITY)
+
+      const state = usePostProcessingStore.getState()
+      expect(state.horizonMemoryStrength).toBe(0.5)
+      expect(state.horizonMemoryRadius).toBe(0.9)
+      expect(state.horizonMemoryEchoes).toBe(3)
+    })
   })
 })

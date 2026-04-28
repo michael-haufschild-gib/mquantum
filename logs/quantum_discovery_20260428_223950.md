@@ -64,7 +64,7 @@ References used:
 
 ### Outcome
 
-- Commit: `c02384ef` (`Add spectral-dimension flow lens`)
+- Commit: `7dbc4b49` (`Add spectral-dimension flow lens`)
 - Reviewer result: PASS after one fix cycle.
 - What renderer now draws: a spectral-dimension flow lens that contracts sample coordinates along local probability-gradient directions, thins opacity, and boosts caustic emission where a heat-kernel proxy drives `D_s` from the IR dimension toward the configured UV dimension.
 - Paths affected: analytic volume raymarch, HQ analytic raymarch, full density-grid raymarch, and simple density-grid raymarch.
@@ -126,7 +126,7 @@ Render false-vacuum decay as a semiclassical tunneling geometry inside the exist
 
 ### Outcome
 
-- Commit: `7587d11e` (`Add Coleman-De Luccia bubble lens`)
+- Commit: `353352ea` (`Add Coleman-De Luccia bubble lens`)
 - Reviewer result: PASS.
 - What renderer now draws: an oscillating Coleman-De Luccia false-vacuum bubble lens with radial wall refraction, true-vacuum interior opacity thinning, and tunneling-wall emission gain.
 - Paths affected: analytic volume raymarch, HQ analytic raymarch, full density-grid raymarch, and simple density-grid raymarch.
@@ -136,3 +136,62 @@ Render false-vacuum decay as a semiclassical tunneling geometry inside the exist
   - `pnpm run lint` — PASS.
   - `pnpm test:shaders:fast` — PASS.
 - Follow-up threads: make bubble center follow a Bohmian current streamline; couple bubble nucleation to FSF self-interaction potential minima; add two-bubble collision interference.
+
+## Round PRD: Causal Horizon Memory Echo
+
+### Scientific Goal
+
+Render gravitational memory as a time-nonlocal postprocess over the WebGPU quantum scene. The existing frame-history buffer should become a causal horizon field: prior-frame luminance gradients lens the current image, while radial echo shells expose where older light would remain trapped near a horizon-like screen.
+
+### Physics / Math
+
+- Add post-processing controls:
+  - `horizonMemoryEnabled: boolean`
+  - `horizonMemoryStrength: number` in `[0, 1.5]`, default `0.45`
+  - `horizonMemoryRadius: number` in `[0.05, 1.5]`, default `0.62`
+  - `horizonMemoryEchoes: number` in `[1, 6]`, default `3`
+- Extend `FrameBlendingPass` uniforms from one scalar to a 16-byte vector:
+  - `blendFactor`
+  - `horizonStrength`
+  - `horizonRadius`
+  - `horizonEchoes`
+- In WGSL:
+  - Compute previous-frame luminance around the current UV with finite differences.
+  - Convert the previous luminance gradient into a bounded screen-space refraction vector.
+  - Build echo shells around `uv = vec2(0.5, 0.5)` with radii separated by an inverse echo count.
+  - Gate echoes by current-vs-previous change so rapidly changing events leave shorter-lived memory.
+  - Sample current frame at the refracted UV, then blend current, history, echo emission, and alpha consistently.
+- Disabled state must preserve the current frame-blending output exactly.
+- First frame still copies current frame directly; memory starts only when history exists.
+
+### User Sees
+
+- FX controls gain a "Horizon Memory" switch and sliders for memory strength, horizon radius, and echo count.
+- With frame blending enabled, bright historical structures bend the current frame and form subtle echo rings around the center. The output changes geometry through UV refraction, not just color.
+
+### Acceptance Bar
+
+- TypeScript compiles.
+- Unit tests cover:
+  - Store defaults, clamping, and non-finite guard.
+  - WGSL exposes the memory uniforms and disabled no-op gate.
+  - Shader contract includes previous-frame gradient sampling, UV refraction, echo shell accumulation, and change-gated decay.
+- `pnpm exec vitest run src/tests/stores/postProcessingStore.test.ts src/tests/rendering/webgpu/passes/FrameBlendingPass.test.ts`
+- `pnpm exec tsc --noEmit`
+- `pnpm run lint`
+- `pnpm test:shaders:fast`
+
+### Outcome
+
+- Commit: `6441ff4f` (`Add causal horizon memory echo`)
+- Reviewer result: PASS.
+- What renderer now draws: a frame-history causal horizon memory pass where previous-frame luminance gradients refract the current frame, center-origin radial echo shells sample historical light, and rapid current-vs-history changes suppress memory persistence.
+- Paths affected: WebGPU frame-blending postprocess output when frame blending and horizon memory are enabled.
+- Local fix before review: inverted the current-vs-history change gate so fast changes shorten memory instead of amplifying it, and locked the WGSL contract with a regression assertion.
+- Verification:
+  - `pnpm exec vitest run src/tests/stores/postProcessingStore.test.ts src/tests/rendering/webgpu/passes/FrameBlendingPass.test.ts src/tests/stores/utils/presetNormalizationVisual.test.ts src/tests/stores/utils/presetNormalizationShared.test.ts` — PASS, 49 tests.
+  - `pnpm exec tsc --noEmit` — PASS.
+  - `pnpm run lint` — PASS.
+  - `pnpm test:shaders:fast` — PASS.
+  - `git diff --check` — PASS.
+- Follow-up threads: make horizon center follow brightest gravitational caustic; feed temporal reprojection velocity into echo decay; expose echo field as diagnostic overlay.

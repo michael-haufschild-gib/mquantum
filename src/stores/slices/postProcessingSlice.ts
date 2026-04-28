@@ -19,6 +19,10 @@ import {
   DEFAULT_BLOOM_THRESHOLD,
   DEFAULT_FRAME_BLENDING_ENABLED,
   DEFAULT_FRAME_BLENDING_FACTOR,
+  DEFAULT_HORIZON_MEMORY_ECHOES,
+  DEFAULT_HORIZON_MEMORY_ENABLED,
+  DEFAULT_HORIZON_MEMORY_RADIUS,
+  DEFAULT_HORIZON_MEMORY_STRENGTH,
   DEFAULT_PAPER_COLOR_BACK,
   DEFAULT_PAPER_COLOR_FRONT,
   DEFAULT_PAPER_CONTRAST,
@@ -113,6 +117,14 @@ export interface PostProcessingSliceState {
   frameBlendingEnabled: boolean
   /** Blend factor - how much previous frame is blended in (0-1) */
   frameBlendingFactor: number
+  /** Enables history-driven causal horizon echo distortion. */
+  horizonMemoryEnabled: boolean
+  /** Horizon memory refraction/emission strength (0-1.5). */
+  horizonMemoryStrength: number
+  /** Center-origin echo shell radius in UV units (0.05-1.5). */
+  horizonMemoryRadius: number
+  /** Number of previous-frame echo shells (1-6, rounded). */
+  horizonMemoryEchoes: number
 }
 
 /**
@@ -156,6 +168,10 @@ export interface PostProcessingSliceActions {
   // --- Frame Blending Actions ---
   setFrameBlendingEnabled: (enabled: boolean) => void
   setFrameBlendingFactor: (factor: number) => void
+  setHorizonMemoryEnabled: (enabled: boolean) => void
+  setHorizonMemoryStrength: (strength: number) => void
+  setHorizonMemoryRadius: (radius: number) => void
+  setHorizonMemoryEchoes: (echoes: number) => void
 }
 
 /**
@@ -205,6 +221,10 @@ export const POST_PROCESSING_INITIAL_STATE: PostProcessingSliceState = {
   // Frame Blending
   frameBlendingEnabled: DEFAULT_FRAME_BLENDING_ENABLED,
   frameBlendingFactor: DEFAULT_FRAME_BLENDING_FACTOR,
+  horizonMemoryEnabled: DEFAULT_HORIZON_MEMORY_ENABLED,
+  horizonMemoryStrength: DEFAULT_HORIZON_MEMORY_STRENGTH,
+  horizonMemoryRadius: DEFAULT_HORIZON_MEMORY_RADIUS,
+  horizonMemoryEchoes: DEFAULT_HORIZON_MEMORY_ECHOES,
 }
 
 // ============================================================================
@@ -414,5 +434,33 @@ export const createPostProcessingSlice: StateCreator<
       return
     }
     set({ frameBlendingFactor: Math.max(0, Math.min(1, factor)) })
+  },
+
+  setHorizonMemoryEnabled: (enabled: boolean) => {
+    set({ horizonMemoryEnabled: enabled })
+  },
+
+  setHorizonMemoryStrength: (strength: number) => {
+    if (!isFinitePostProcessingInput(strength)) {
+      logger.warn('[postProcessingSlice] Ignoring non-finite horizon memory strength:', strength)
+      return
+    }
+    set({ horizonMemoryStrength: clamp(strength, 0, 1.5) })
+  },
+
+  setHorizonMemoryRadius: (radius: number) => {
+    if (!isFinitePostProcessingInput(radius)) {
+      logger.warn('[postProcessingSlice] Ignoring non-finite horizon memory radius:', radius)
+      return
+    }
+    set({ horizonMemoryRadius: clamp(radius, 0.05, 1.5) })
+  },
+
+  setHorizonMemoryEchoes: (echoes: number) => {
+    if (!isFinitePostProcessingInput(echoes)) {
+      logger.warn('[postProcessingSlice] Ignoring non-finite horizon memory echoes:', echoes)
+      return
+    }
+    set({ horizonMemoryEchoes: clamp(Math.round(echoes), 1, 6) })
   },
 })
