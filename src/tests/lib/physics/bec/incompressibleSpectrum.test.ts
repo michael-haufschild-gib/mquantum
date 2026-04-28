@@ -6,6 +6,17 @@ import {
   NUM_SPECTRUM_BINS,
 } from '@/lib/physics/bec/incompressibleSpectrum'
 
+function withSpectrumWasmDisabled<T>(fn: () => T): T {
+  const g = globalThis as { __BEC_SPECTRUM_WASM_DISABLED__?: boolean }
+  const previous = g.__BEC_SPECTRUM_WASM_DISABLED__
+  g.__BEC_SPECTRUM_WASM_DISABLED__ = true
+  try {
+    return fn()
+  } finally {
+    g.__BEC_SPECTRUM_WASM_DISABLED__ = previous
+  }
+}
+
 describe('fftND', () => {
   it('preserves Parseval theorem for 1D', () => {
     const N = 16
@@ -234,6 +245,53 @@ describe('computeIncompressibleSpectrum', () => {
     }
     expect(result.totalIncompressible).toBeGreaterThanOrEqual(0)
     expect(result.totalCompressible).toBeGreaterThanOrEqual(0)
+  })
+
+  it('uses physical Parseval scaling instead of raw FFT power', () => {
+    withSpectrumWasmDisabled(() => {
+      const N = 32
+      const total = N * N
+      const makeVortex = () => {
+        const psiRe = new Float32Array(total)
+        const psiIm = new Float32Array(total)
+        for (let ix = 0; ix < N; ix++) {
+          for (let iy = 0; iy < N; iy++) {
+            const x = ix - N / 2 + 0.5
+            const y = iy - N / 2 + 0.5
+            const r = Math.sqrt(x * x + y * y)
+            const theta = Math.atan2(y, x)
+            const core = r / Math.sqrt(r * r + 4)
+            const idx = ix * N + iy
+            psiRe[idx] = core * Math.cos(theta)
+            psiIm[idx] = core * Math.sin(theta)
+          }
+        }
+        return { psiRe, psiIm }
+      }
+
+      const coarse = makeVortex()
+      const fine = makeVortex()
+      const eCoarse = computeIncompressibleSpectrum(
+        coarse.psiRe,
+        coarse.psiIm,
+        [N, N],
+        [0.5, 0.5],
+        1,
+        1
+      )
+      const eFine = computeIncompressibleSpectrum(
+        fine.psiRe,
+        fine.psiIm,
+        [N, N],
+        [0.25, 0.25],
+        1,
+        1
+      )
+
+      expect(eCoarse.totalIncompressible).toBeGreaterThan(0)
+      expect(eFine.totalIncompressible / eCoarse.totalIncompressible).toBeGreaterThan(0.85)
+      expect(eFine.totalIncompressible / eCoarse.totalIncompressible).toBeLessThan(1.15)
+    })
   })
 })
 

@@ -1,8 +1,10 @@
 /**
- * Pauli spinor equation type definitions.
+ * Zeeman-Pauli spinor equation type definitions.
  *
  * Config interface, field/potential/initial-condition types, and default constants
- * for the non-relativistic 2-component spinor solver.
+ * for the non-relativistic 2-component spinor solver. This mode models a
+ * spinor with scalar kinetic energy and Zeeman coupling only; it does not
+ * include gauge-covariant orbital magnetic coupling `(p - qA)^2`.
  */
 
 // ============================================================================
@@ -10,7 +12,7 @@
 // ============================================================================
 
 /**
- * Magnetic field configuration type for the Pauli equation.
+ * Magnetic field configuration type for the Zeeman-Pauli approximation.
  * - uniform: Constant B = B₀ n̂ — Larmor precession
  * - gradient: B = (B₀ + b'z) ẑ — Stern-Gerlach splitting
  * - rotating: B = B₀(cos(ωt), sin(ωt), 0) — Rabi oscillations
@@ -51,10 +53,15 @@ export type PauliPotentialType = 'none' | 'harmonicTrap' | 'barrier' | 'doubleWe
 // ============================================================================
 
 /**
- * Configuration for the Pauli spinor equation.
- * Non-relativistic 2-component spinor in an external magnetic field.
+ * Configuration for the Zeeman-Pauli spinor equation.
+ * Non-relativistic 2-component spinor in an external effective magnetic field.
  *
- * iℏ ∂ψ/∂t = [p²/(2m) + V(x) + μ_B σ·B(x)] ψ
+ * iℏ ∂ψ/∂t = [p²/(2m) + V(x) + σ·B_eff(x)] ψ
+ *
+ * Scope: spin precession / Stern-Gerlach / Rabi-style Zeeman dynamics.
+ * Out of scope until a vector-potential path is added: charged-particle
+ * orbital magnetic effects such as cyclotron motion, Landau levels, and
+ * gauge equivalence under A -> A + ∇χ.
  *
  * The spinor is always 2-component regardless of spatial dimension.
  * Magnetic coupling acts on the first 3 spatial dimensions.

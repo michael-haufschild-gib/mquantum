@@ -15,6 +15,7 @@ import {
   computeJointReducedDensityMatrix,
   computeReducedDensityMatrix,
   hermitianEigenvalues,
+  isCoordinateEntanglementMetricSupported,
   vonNeumannEntropy,
 } from '@/lib/physics/coordinateEntanglement'
 
@@ -48,6 +49,20 @@ function makeProductState(
 
   return { re, im }
 }
+
+describe('isCoordinateEntanglementMetricSupported', () => {
+  it('allows only flat product-measure metrics until weighted curved RDMs exist', () => {
+    expect(isCoordinateEntanglementMetricSupported(undefined)).toBe(true)
+    expect(isCoordinateEntanglementMetricSupported({ kind: 'flat' })).toBe(true)
+    expect(isCoordinateEntanglementMetricSupported({ kind: 'torus' })).toBe(true)
+    expect(isCoordinateEntanglementMetricSupported({ kind: 'deSitter', hubbleRate: 0.3 })).toBe(
+      false
+    )
+    expect(
+      isCoordinateEntanglementMetricSupported({ kind: 'morrisThorne', throatRadius: 0.5 })
+    ).toBe(false)
+  })
+})
 
 /** Normalize a Float32Array in place so Σ|ψ|² = 1. */
 function normalize(re: Float32Array, im: Float32Array): void {

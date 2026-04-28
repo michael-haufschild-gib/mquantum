@@ -103,6 +103,26 @@ describe('computeWdwTrajectoryHash', () => {
   })
 })
 
+describe('WheelerDeWittStrategy.computeBoundingRadius', () => {
+  it('uses the a-axis display radius for normalized WdW density-grid axes', () => {
+    const strategy = new WheelerDeWittStrategy()
+    const radius = strategy.computeBoundingRadius(
+      {
+        wheelerDeWitt: {
+          ...DEFAULT_WHEELER_DEWITT_CONFIG,
+          aMin: 0.1,
+          aMax: 1.5,
+          phiExtent: 3.5,
+        },
+      } as never,
+      3,
+      {} as never
+    )
+
+    expect(radius).toBeCloseTo(1.5)
+  })
+})
+
 // ---------------------------------------------------------------------------
 // (b) + (c) executeFrame: repack semantics
 // ---------------------------------------------------------------------------

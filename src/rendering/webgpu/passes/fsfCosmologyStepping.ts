@@ -217,8 +217,14 @@ export function computeAdiabaticSubsteps(
  * must pass `massSquaredScaleMax = 1 + |A|` (the worst-case peak of
  * `1 + A·sin(Ω·(η−η_ref))`) so the CFL check accounts for the
  * time-dependent mass amplification even under Minkowski where the FLRW
- * coefficients are all 1. Passing `1` is the cosmology-only path and
- * leaves the bare Klein-Gordon dispersion in place.
+ * coefficients are all 1. Passing `1` is the cosmology-only path and leaves
+ * the bare Klein-Gordon dispersion in place. The CFL frequency is computed
+ * from the actual canonical oscillator,
+ *
+ *   ω² = aKinetic · (Σ_d aPotential_d k_d² + m² aFull scale),
+ *
+ * so anisotropic Bianchi-I axes and non-unit drift coefficients are bounded
+ * by the same Hamiltonian the shaders evolve.
  *
  * Uses the maximum over active dimensions of `k_max_d = π/spacing[d]`
  * (Nyquist) as the effective cutoff — close enough to the discrete
@@ -242,23 +248,29 @@ export function computeFsfCflSubsteps(
   aFull: number,
   aPotential: number,
   capWarnedKeys: Set<string>,
-  massSquaredScaleMax: number = 1
+  massSquaredScaleMax: number = 1,
+  aKinetic: number = 1,
+  aPotentialRatio1: number = 1,
+  aPotentialRatio2: number = 1
 ): number {
-  // Physical dispersion uses m²·a²·massSquaredScale = m²·(aFull/aPotential)·scale.
-  const aSq = aPotential > 0 ? aFull / aPotential : 1
   const scale = massSquaredScaleMax > 1 ? massSquaredScaleMax : 1
-  const massSq = config.mass * config.mass * aSq * scale
+  const drift = Number.isFinite(aKinetic) && aKinetic > 0 ? aKinetic : 1
+  const massStiffness = config.mass * config.mass * Math.max(aFull, 0) * scale
 
-  let kMaxSq = 0
+  let stiffnessMax = massStiffness
   for (let d = 0; d < config.latticeDim; d++) {
     const spacing = config.spacing[d]!
     if (!(spacing > 0) || config.gridSize[d]! <= 1) continue
-    // Nyquist: k_max_d = π/a_d, contributing (π/a)² per dimension to k².
+    let axisPotential = aPotential
+    if (d === 1) axisPotential *= aPotentialRatio1
+    else if (d === 2) axisPotential *= aPotentialRatio2
+    if (!Number.isFinite(axisPotential) || axisPotential < 0) axisPotential = 1
+    // Nyquist: k_max_d = π/a_d, contributing B_d·(π/a_d)² to stiffness.
     const kmax = Math.PI / spacing
-    kMaxSq += kmax * kmax
+    stiffnessMax += axisPotential * kmax * kmax
   }
 
-  const omega = Math.sqrt(Math.max(kMaxSq + massSq, 0))
+  const omega = Math.sqrt(Math.max(drift * stiffnessMax, 0))
   const cflRatio = config.dt * omega
   if (!(cflRatio > COSMOLOGY_CFL_SAFETY)) return 1
 
@@ -519,14 +531,20 @@ export function computeFsfOuterStepSubsteps(
     coefsStart.aFull,
     coefsStart.aPotential,
     cflCapWarnedKeys,
-    massSquaredScaleMax
+    massSquaredScaleMax,
+    coefsStart.aKinetic,
+    coefsStart.aPotentialRatio1 ?? 1,
+    coefsStart.aPotentialRatio2 ?? 1
   )
   const nSubEnd = computeFsfCflSubsteps(
     config,
     coefsEnd.aFull,
     coefsEnd.aPotential,
     cflCapWarnedKeys,
-    massSquaredScaleMax
+    massSquaredScaleMax,
+    coefsEnd.aKinetic,
+    coefsEnd.aPotentialRatio1 ?? 1,
+    coefsEnd.aPotentialRatio2 ?? 1
   )
   const nSubCfl = nSubStart > nSubEnd ? nSubStart : nSubEnd
   const nSubAdiab = computeAdiabaticSubsteps(coefsStart, coefsEnd)

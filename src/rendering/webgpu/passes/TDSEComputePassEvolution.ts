@@ -163,6 +163,7 @@ export function runStrangEvolution(
   // where `dispatchCurvedRK4` wasn't injected — falls through to the
   // existing path unchanged (zero-regression guarantee).
   const metricKind = config.metric?.kind
+  const absorberEnabled = config.absorberEnabled === true && metricKind !== 'torus'
   const curvedBranch = metricKind !== undefined && metricKind !== 'flat' && metricKind !== 'torus'
   if (curvedBranch && res.dispatchCurvedRK4) {
     const { pl: curvedPl, bg: curvedBg, dc: curvedDc } = res
@@ -171,7 +172,7 @@ export function runStrangEvolution(
     state.stepAccumulator += scaledSteps
     const curvedSteps = Math.floor(state.stepAccumulator)
     state.stepAccumulator -= curvedSteps
-    const curvedAbsorberActive = config.absorberEnabled === true
+    const curvedAbsorberActive = absorberEnabled
     const curvedPerStepRenorm =
       config.imaginaryTimeEnabled || (config.stochasticEnabled && config.stochasticGamma > 0)
     // Per-step RK4 stage-time patch for time-dependent metrics (deSitter).
@@ -357,7 +358,7 @@ export function runStrangEvolution(
       // the PML damping AFTER the CSL kicks and we must preserve that operator
       // ordering for stochastic mode. When stochastic is active, absorber is
       // dispatched after the stochastic sub-step loop below.
-      const inlineAbsorber = config.absorberEnabled && !stochasticActive
+      const inlineAbsorber = absorberEnabled && !stochasticActive
       if (inlineAbsorber) {
         const absPl = res.siteDispatch.use3D ? pl.absorberPipeline3D : pl.absorberPipeline
         dc(
@@ -421,7 +422,7 @@ export function runStrangEvolution(
         )
       }
 
-      if (config.absorberEnabled && !stochasticActive) {
+      if (absorberEnabled && !stochasticActive) {
         const absPass = ctx.beginComputePass({ label: `tdse-absorber-${step}` })
         const absPl = res.siteDispatch.use3D ? pl.absorberPipeline3D : pl.absorberPipeline
         dc(absPass, absPl, [bg.initBG], res.siteDispatch.x, res.siteDispatch.y, res.siteDispatch.z)
@@ -453,7 +454,7 @@ export function runStrangEvolution(
     // active, PML must come AFTER the CSL kicks. The batched path above only
     // inlines absorber when stochastic is disabled, so we run the dispatch
     // here for the stochastic case.
-    if (config.absorberEnabled && stochasticActive) {
+    if (absorberEnabled && stochasticActive) {
       const absPass = ctx.beginComputePass({ label: `tdse-absorber-${step}` })
       const absPl = res.siteDispatch.use3D ? pl.absorberPipeline3D : pl.absorberPipeline
       dc(absPass, absPl, [bg.initBG], res.siteDispatch.x, res.siteDispatch.y, res.siteDispatch.z)
@@ -479,7 +480,7 @@ export function runStrangEvolution(
     const isImaginaryTime = config.imaginaryTimeEnabled
     const needsPerStepRenorm =
       isImaginaryTime || (config.stochasticEnabled && config.stochasticGamma > 0)
-    const needsFrameRenorm = !config.absorberEnabled && step === stepsThisFrame - 1
+    const needsFrameRenorm = !absorberEnabled && step === stepsThisFrame - 1
     if (needsPerStepRenorm || needsFrameRenorm) {
       const rPass = ctx.beginComputePass({ label: `tdse-renorm-reduce-${step}` })
       dc(rPass, pl.diagReducePipeline, [bg.diagReduceBG], res.diagNumWorkgroups)

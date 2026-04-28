@@ -210,4 +210,29 @@ describe('hjOperator.hjSpectrumOnSlice — φ clocks', () => {
       expect(spectrum[i]!).toBeGreaterThanOrEqual(spectrum[i - 1]! - 1e-6)
     }
   })
+
+  it('uses the isolated phi-clock generator, not the restricted WdW operator', () => {
+    const base = {
+      Na: 10,
+      Nphi: 6,
+      aMin: 0.2,
+      aMax: 1.2,
+      phiExtent: 1.5,
+      inflatonMass: 0.0,
+      sliceIndex: 3,
+    }
+    const lowLambda = hjSpectrumOnSlice('phi1', {
+      ...base,
+      cosmologicalConstant: 0.0,
+    }).spectrum
+    const highLambda = hjSpectrumOnSlice('phi1', {
+      ...base,
+      cosmologicalConstant: 0.2,
+    }).spectrum
+
+    // From p_phi^2 = a^2 p_a^2 - p_other^2 - a^2 U, and dU/dLambda > 0,
+    // increasing Lambda must lower the phi-clock generator spectrum. The old
+    // restricted-WdW operator used +U and moved this comparison the other way.
+    expect(highLambda[0]!).toBeLessThan(lowLambda[0]!)
+  })
 })

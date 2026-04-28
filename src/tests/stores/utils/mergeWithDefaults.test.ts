@@ -191,6 +191,33 @@ describe('mergeExtendedObjectStateForType — cosmology invariants', () => {
     expect(fs.needsReset).toBe(true)
   })
 
+  it('soft-disables Bianchi-I when loaded with more than three spatial axes', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'freeScalarField',
+        freeScalar: {
+          latticeDim: 4,
+          gridSize: [8, 8, 8, 8],
+          spacing: [0.25, 0.25, 0.25, 0.25],
+          mass: 0,
+          cosmology: {
+            enabled: true,
+            preset: 'bianchiKasner',
+            eta0: 2,
+            steepness: 5,
+            hubble: 1,
+            kasnerExponents: { p1: -1 / 3, p2: 2 / 3, p3: 2 / 3 },
+          },
+        },
+      },
+    }
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const fs = (merged.schroedinger as { freeScalar: Record<string, unknown> }).freeScalar
+    const cosmo = fs.cosmology as { enabled: boolean }
+    expect(cosmo.enabled).toBe(false)
+    expect(fs.needsReset).toBe(true)
+  })
+
   it('raises eta0 only when the loaded value is below the bare cosmetic floor', () => {
     // Under the canonical δφ formulation the adiabatic vacuum is well-
     // defined at any non-zero η₀ — the old Mukhanov-Sasaki `β(β−1)/η²`

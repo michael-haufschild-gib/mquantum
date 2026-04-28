@@ -553,6 +553,32 @@ describe('applyCurvedKineticRef — torus hermiticity (periodic)', () => {
 // ---------------------------------------------------------------------------
 
 describe('applyCurvedKineticRef — sphere2D hermiticity', () => {
+  it('wraps the sphere2D phi seam while keeping theta non-periodic', () => {
+    const N = 9
+    const dx = 0.25
+    const grid = makeGrid(N, dx, 3)
+    const metric: MetricConfig = { kind: 'sphere2D', sphereRadius: 1 }
+    const total = totalSites(grid)
+    const psiRe = new Float32Array(total).fill(1)
+    const psiIm = new Float32Array(total)
+    const T = applyCurvedKineticRef({
+      psiRe,
+      psiIm,
+      gridSize: grid.gridSize,
+      spacing: grid.spacing,
+      mass: 1,
+      hbar: 1,
+      latticeDim: 3,
+      metric,
+    })
+
+    const interiorThetaPhiSeam = flatIdx(4, 4, 0, grid.gridSize, grid.latticeDim)
+    const thetaBoundary = flatIdx(4, 0, 4, grid.gridSize, grid.latticeDim)
+    expect(Math.abs(T.re[interiorThetaPhiSeam]!)).toBeLessThan(1e-6)
+    expect(Math.abs(T.im[interiorThetaPhiSeam]!)).toBeLessThan(1e-6)
+    expect(Math.abs(T.re[thetaBoundary]!)).toBeGreaterThan(1e-3)
+  })
+
   it('⟨φ|Tψ⟩ = ⟨Tφ|ψ⟩ with packet at θ=π/2 (3D lattice, R=1)', () => {
     const N = 16
     const dx = 0.25

@@ -336,12 +336,12 @@ export function isValidPreset(params: CosmologyPresetParams): boolean {
     return true
   }
   if (params.preset === 'bianchiKasner') {
-    // Bianchi-I is only physically defined on the first three spatial
-    // axes, so we need `spacetimeDim ≥ 4` (spatial dim ≥ 3). Exponents
-    // must be finite but we do NOT enforce the two vacuum constraints —
-    // the user may deliberately load a non-vacuum Bianchi-I background.
-    if (!Number.isInteger(params.spacetimeDim) || params.spacetimeDim < 4) return false
-    if (params.spacetimeDim > MAX_SPACETIME_DIM) return false
+    // This implementation carries exactly three Kasner exponents and two
+    // axis-ratio uniforms. Treating latticeDim > 3 as "Bianchi-I plus
+    // isotropic extra axes" is a different higher-dimensional model, not this
+    // preset. Require spacetimeDim = 4 until a d-dimensional exponent vector
+    // and shader contract exist.
+    if (params.spacetimeDim !== 4) return false
     const exp = params.kasnerExponents
     if (!exp || !Number.isFinite(exp.p1) || !Number.isFinite(exp.p2) || !Number.isFinite(exp.p3)) {
       return false

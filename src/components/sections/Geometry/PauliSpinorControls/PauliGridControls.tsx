@@ -143,7 +143,7 @@ export const PauliGridControls: React.FC<PauliGridControlsProps> = React.memo(
 
         <Slider
           label="Mass m"
-          tooltip="Particle mass in natural units. Affects wavepacket dispersion rate and the Zeeman splitting magnitude."
+          tooltip="Particle mass in natural units. Affects wavepacket dispersion; Zeeman splitting is controlled by the effective field strength."
           value={mass}
           onChange={onMassChange}
           min={0.01}

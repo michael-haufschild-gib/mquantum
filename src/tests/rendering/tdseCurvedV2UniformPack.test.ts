@@ -118,8 +118,13 @@ describe('TDSE uniform pack — curved-space v2 metric block', () => {
 
   // ── Sphere radius to f32[215] ─────────────────────────────────────────
   it('writes sphere2D radius to f32[215]', () => {
-    const { f32 } = packAndCapture({ kind: 'sphere2D', sphereRadius: 1.5 })
+    const { f32, u32 } = packAndCapture({ kind: 'sphere2D', sphereRadius: 1.5 })
     expect(f32[215]).toBeCloseTo(1.5, 5)
+    // sphere2D is mixed topology: theta is bounded, phi (axis 2) is periodic.
+    // The absorber must therefore skip only the phi seam.
+    const compactMask = u32[184] ?? 0
+    expect(compactMask & (1 << 2)).toBe(1 << 2)
+    expect(compactMask & (1 << 1)).toBe(0)
   })
 
   // ── Double throat fields ──────────────────────────────────────────────

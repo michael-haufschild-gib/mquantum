@@ -183,7 +183,7 @@ const SrmtDiagnosticContent: React.FC = React.memo(() => {
 
         <Slider
           label="Overlay"
-          tooltip="Brightness of the SRMT `K_A` eigenvalue heatmap painted on the clock slice."
+          tooltip="Brightness of the SRMT conditional-density heatmap painted on the clock slice. The modular-Hamiltonian spectrum is shown in the panel below."
           min={0}
           max={1}
           step={0.05}

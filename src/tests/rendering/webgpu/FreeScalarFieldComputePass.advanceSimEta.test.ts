@@ -17,6 +17,7 @@ import { DEFAULT_FREE_SCALAR_CONFIG } from '@/lib/geometry/extended/freeScalar'
 import { FreeScalarFieldComputePass } from '@/rendering/webgpu/passes/FreeScalarFieldComputePass'
 import {
   computeAdiabaticSubsteps,
+  computeFsfCflSubsteps,
   projectSimEta,
   resolveFsfSubstepCoefs,
 } from '@/rendering/webgpu/passes/fsfCosmologyStepping'
@@ -135,6 +136,15 @@ describe('projectSimEta (pure CFL-preview helper)', () => {
     const projected = projectSimEta(-10, 5e-3)
     expect(projected).toBe(-9.995)
   })
+
+  it('clamps an initial runtime η already inside the forbidden floor', () => {
+    // Reinitialization normalizes config/load-provided eta via
+    // projectSimEta(eta, 0) before uniforms, vacuum sampling, and kickstart
+    // coefs are evaluated. Otherwise a saved state or Bianchi/LQC setter can
+    // start the first frame inside |η| < COSMOLOGY_ETA_FLOOR.
+    expect(projectSimEta(-5e-3, 0)).toBe(-1e-2)
+    expect(projectSimEta(5e-3, 0)).toBe(1e-2)
+  })
 })
 
 describe('computeAdiabaticSubsteps (scale-factor rate-of-change bound)', () => {
@@ -223,6 +233,28 @@ describe('computeAdiabaticSubsteps (scale-factor rate-of-change bound)', () => {
     // instantaneous ground state.
     const nSub = computeAdiabaticSubsteps(coefsFor(66.667), coefsFor(100))
     expect(nSub).toBeGreaterThanOrEqual(4)
+  })
+})
+
+describe('computeFsfCflSubsteps', () => {
+  it('bounds the actual Bianchi-I canonical oscillator frequency', () => {
+    const config = {
+      ...DEFAULT_FREE_SCALAR_CONFIG,
+      latticeDim: 3,
+      gridSize: [64, 64, 64],
+      spacing: [1000, 1000, 1000],
+      mass: 1,
+      dt: 0.6,
+      cosmology: { ...DEFAULT_FREE_SCALAR_CONFIG.cosmology, preset: 'bianchiKasner' as const },
+    }
+    const warned = new Set<string>()
+
+    // Old FLRW shortcut saw m²(aFull/aPotential)=0.25 and returned 1.
+    // Actual Bianchi oscillator: ω² = aKinetic · m²aFull = 0.25 · 16 = 4,
+    // so dt·ω = 1.2 and the CFL guard must split the step.
+    const substeps = computeFsfCflSubsteps(config, 16, 4, warned, 1, 0.25, 1, 1)
+
+    expect(substeps).toBe(2)
   })
 })
 

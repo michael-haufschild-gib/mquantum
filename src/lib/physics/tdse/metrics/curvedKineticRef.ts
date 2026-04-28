@@ -3,13 +3,11 @@
  * (Laplace–Beltrami discretization) and proper-volume norm.
  *
  * Uses the staggered (flux-form) 2nd-order central difference scheme.
- * Boundary conditions are chosen per metric kind:
- *   - `torus` → periodic wrap (index mod N) for both ψ fetches and half-point
- *     metric sampling; spec: the half-point *world coordinate* still uses the
- *     un-wrapped integer (so the cell adjacent to the seam sees world-coord
- *     + dx/2 on its `+` side, even though the neighbor's ψ comes from the
- *     wrapped index).
- *   - every other kind → Dirichlet (ψ = 0 outside the grid).
+ * Boundary conditions are chosen per metric axis:
+ *   - `torus` → periodic wrap on every active axis.
+ *   - `sphere2D` → periodic wrap on φ (axis 2) only; θ remains a
+ *     non-periodic chart coordinate.
+ *   - every other axis → Dirichlet (ψ = 0 outside the grid).
  *
  * Hermiticity of T under the proper-volume inner product
  * ⟨φ|ψ⟩ = Σ φ*·ψ·√|g|·Πdx is preserved to machine precision on uniform
@@ -21,7 +19,7 @@
 
 import { sampleMetricInto } from './evaluator'
 import type { MetricConfig, MetricSample } from './types'
-import { hasPeriodicBoundary } from './types'
+import { isMetricAxisPeriodic } from './types'
 
 /** Maximum supported spatial lattice dimension (1–3 at the moment). */
 const MAX_LATTICE_DIM = 3
@@ -153,10 +151,11 @@ function wrappedIndex(i: number, N: number, periodic: boolean): number {
 }
 
 /**
- * Fetch ψ[i, j, k] honoring the current boundary mode.
+ * Fetch ψ[i, j, k] honoring the boundary mode for the axis currently being
+ * differenced.
  *
- * - Periodic (`isPeriodic = true`): all three axes wrap modulo their grid size.
- * - Dirichlet (`isPeriodic = false`): out-of-range returns 0.
+ * Only `periodicAxis` may wrap. Other coordinates are expected to be in
+ * range because each flux term offsets one axis at a time.
  */
 function fetchPsi(
   arr: Float32Array,
@@ -165,26 +164,26 @@ function fetchPsi(
   k: number,
   N: readonly number[],
   dim: number,
-  isPeriodic: boolean
+  periodicAxis: number | null
 ): number {
   const N0 = N[0] as number
   let ii = i
   let jj = j
   let kk = k
-  if (isPeriodic) {
+  if (periodicAxis === 0) {
     ii = wrappedIndex(i, N0, true)
-    if (dim >= 2) jj = wrappedIndex(j, N[1] as number, true)
-    if (dim >= 3) kk = wrappedIndex(k, N[2] as number, true)
   } else {
     if (ii < 0 || ii >= N0) return 0
-    if (dim >= 2) {
-      const N1 = N[1] as number
-      if (jj < 0 || jj >= N1) return 0
-    }
-    if (dim >= 3) {
-      const N2 = N[2] as number
-      if (kk < 0 || kk >= N2) return 0
-    }
+  }
+  if (dim >= 2) {
+    const N1 = N[1] as number
+    if (periodicAxis === 1) jj = wrappedIndex(j, N1, true)
+    else if (jj < 0 || jj >= N1) return 0
+  }
+  if (dim >= 3) {
+    const N2 = N[2] as number
+    if (periodicAxis === 2) kk = wrappedIndex(k, N2, true)
+    else if (kk < 0 || kk >= N2) return 0
   }
   return arr[flatIndex(ii, jj, kk, N, dim)] as number
 }
@@ -235,8 +234,8 @@ function cellCoordsInto(
  *   T ψ = −(ℏ²/2m) · (1/√|g|) · Σ_μ ∂_μ [ √|g| · g^μμ · ∂_μ ψ ]
  *
  * Uses the staggered flux form with 2nd-order central differences. Boundary
- * conditions are periodic when `hasPeriodicBoundary(metric.kind)` is true
- * (currently only `torus`) and Dirichlet otherwise.
+ * conditions are per-axis: torus wraps every active axis, sphere2D wraps φ
+ * (axis 2), and other chart axes are Dirichlet.
  *
  * Hermitian under the proper-volume inner product for both boundary modes.
  *
@@ -267,8 +266,6 @@ export function applyCurvedKineticRef(
   const outRe = outBuffers?.re?.length === total ? outBuffers.re : new Float32Array(total)
   const outIm = outBuffers?.im?.length === total ? outBuffers.im : new Float32Array(total)
   const prefactor = -(hbar * hbar) / (2 * mass)
-  const isPeriodic = hasPeriodicBoundary(metric.kind)
-
   const iMax = N[0] as number
   const jMax = latticeDim >= 2 ? (N[1] as number) : 1
   const kMax = latticeDim >= 3 ? (N[2] as number) : 1
@@ -312,10 +309,11 @@ export function applyCurvedKineticRef(
           const jMinus = axis === 1 ? j - 1 : j
           const kMinus = axis === 2 ? k - 1 : k
 
-          const psiPlusRe = fetchPsi(psiRe, iPlus, jPlus, kPlus, N, latticeDim, isPeriodic)
-          const psiPlusIm = fetchPsi(psiIm, iPlus, jPlus, kPlus, N, latticeDim, isPeriodic)
-          const psiMinusRe = fetchPsi(psiRe, iMinus, jMinus, kMinus, N, latticeDim, isPeriodic)
-          const psiMinusIm = fetchPsi(psiIm, iMinus, jMinus, kMinus, N, latticeDim, isPeriodic)
+          const periodicAxis = isMetricAxisPeriodic(metric.kind, axis) ? axis : null
+          const psiPlusRe = fetchPsi(psiRe, iPlus, jPlus, kPlus, N, latticeDim, periodicAxis)
+          const psiPlusIm = fetchPsi(psiIm, iPlus, jPlus, kPlus, N, latticeDim, periodicAxis)
+          const psiMinusRe = fetchPsi(psiRe, iMinus, jMinus, kMinus, N, latticeDim, periodicAxis)
+          const psiMinusIm = fetchPsi(psiIm, iMinus, jMinus, kMinus, N, latticeDim, periodicAxis)
           const psiCenterRe = psiRe[idx] as number
           const psiCenterIm = psiIm[idx] as number
 

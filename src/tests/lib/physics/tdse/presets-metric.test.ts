@@ -173,6 +173,7 @@ describe('TDSE curved-space v2 presets', () => {
     expect(period?.[2]).toBeCloseTo(Math.PI, 5)
     // k = 2π·n/L = 2 → n = 1, resonant.
     expect(p.overrides.packetMomentum?.[0]).toBe(2.0)
+    expect(p.overrides.absorberEnabled).toBe(false)
   })
 
   it('adsBoundaryBounce launches packet toward the boundary (z→0)', () => {
@@ -183,8 +184,13 @@ describe('TDSE curved-space v2 presets', () => {
     expect(p.overrides.packetMomentum?.[0]).toBeLessThan(0)
   })
 
-  it('every v2 preset has absorber + diagnostics enabled', () => {
+  it('every non-compact v2 preset has absorber + diagnostics enabled', () => {
     for (const p of v2Presets) {
+      if (p.overrides.metric?.kind === 'torus') {
+        expect(p.overrides.absorberEnabled).toBe(false)
+        expect(p.overrides.diagnosticsEnabled).toBe(true)
+        continue
+      }
       expect(p.overrides.absorberEnabled).toBe(true)
       expect(p.overrides.absorberWidth).toBe(0.15)
       expect(p.overrides.diagnosticsEnabled).toBe(true)

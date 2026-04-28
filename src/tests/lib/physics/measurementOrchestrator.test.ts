@@ -12,7 +12,31 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   executeFullMeasurement,
   executePartialMeasurement,
+  type MeasurementGridConfig,
 } from '@/lib/physics/measurementOrchestrator'
+import { sampleMetric } from '@/lib/physics/tdse/metrics/evaluator'
+
+function samplingNorm(re: Float32Array, im: Float32Array, config: MeasurementGridConfig): number {
+  let total = 0
+  const latticeDim = config.latticeDim
+  for (let idx = 0; idx < re.length; idx++) {
+    let remaining = idx
+    const position = new Array<number>(latticeDim)
+    for (let d = latticeDim - 1; d >= 0; d--) {
+      const size = config.gridSize[d]!
+      const coordInt = remaining % size
+      remaining = (remaining - coordInt) / size
+      position[d] = (coordInt - size * 0.5 + 0.5) * config.spacing[d]!
+    }
+    const metric = config.metric
+    const volumeWeight =
+      metric && metric.kind !== 'flat' && metric.kind !== 'torus'
+        ? sampleMetric(metric, position, latticeDim, config.time ?? 0).sqrtDet
+        : 1
+    total += (re[idx]! * re[idx]! + im[idx]! * im[idx]!) * volumeWeight
+  }
+  return total
+}
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -77,10 +101,11 @@ describe('executeFullMeasurement', () => {
       }
     }
     expect(maxIdx).toBe(3)
-    expect(maxVal).toBeCloseTo(1.0) // exp(0) at center
+    expect(maxVal).toBeGreaterThan(0)
 
     // Verify Gaussian decay: site 4 should be less than site 3
     expect(collapsedRe[4]).toBeLessThan(collapsedRe[3])
+    expect(samplingNorm(collapsedRe, inject.mock.calls[0]![1], config)).toBeCloseTo(1, 6)
   })
 
   it('2D wavefunction produces correct position vector', () => {
@@ -136,6 +161,27 @@ describe('executeFullMeasurement', () => {
 
     expect(record.mock.calls[0]![0][0]).toBeCloseTo(-1)
     expect(record.mock.calls[0]![1]).toBeCloseTo(1)
+    const [collapsedRe, collapsedIm] = inject.mock.calls[0]!
+    expect(samplingNorm(collapsedRe, collapsedIm, config)).toBeCloseTo(1, 6)
+  })
+
+  it('normalizes de Sitter full-collapse output in the proper sampling measure', () => {
+    const psiRe = new Float32Array([1, 0, 0])
+    const psiIm = new Float32Array(3).fill(0)
+    const config = {
+      latticeDim: 1,
+      gridSize: [3],
+      spacing: [1],
+      metric: { kind: 'deSitter' as const, hubbleRate: 0.5 },
+      time: 2,
+    }
+    const inject = vi.fn()
+    const record = vi.fn()
+
+    executeFullMeasurement(psiRe, psiIm, config, 0.5, inject, record)
+
+    const [collapsedRe, collapsedIm] = inject.mock.calls[0]!
+    expect(samplingNorm(collapsedRe, collapsedIm, config)).toBeCloseTo(1, 6)
   })
 })
 
@@ -243,5 +289,27 @@ describe('executePartialMeasurement', () => {
     expect(position[0]).toBeCloseTo(-1)
     expect(density).toBeCloseTo(Math.sqrt(1.01))
     expect(measuredAxis).toBe(0)
+    const [collapsedRe, collapsedIm] = inject.mock.calls[0]!
+    expect(samplingNorm(collapsedRe, collapsedIm, config)).toBeCloseTo(1, 6)
+  })
+
+  it('normalizes de Sitter partial-collapse output in the proper sampling measure', () => {
+    const psiRe = new Float32Array([1, 1, 1])
+    const psiIm = new Float32Array(3).fill(0)
+    const config = {
+      latticeDim: 1,
+      gridSize: [3],
+      spacing: [1],
+      metric: { kind: 'deSitter' as const, hubbleRate: 0.5 },
+      time: 2,
+    }
+    const inject = vi.fn()
+    const record = vi.fn()
+
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    executePartialMeasurement(psiRe, psiIm, config, 0, 0.5, inject, record)
+
+    const [collapsedRe, collapsedIm] = inject.mock.calls[0]!
+    expect(samplingNorm(collapsedRe, collapsedIm, config)).toBeCloseTo(1, 6)
   })
 })

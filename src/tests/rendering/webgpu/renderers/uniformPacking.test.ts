@@ -98,6 +98,39 @@ describe('packSchroedingerUniforms — defaults', () => {
     expect(floatView[I.wdwPhaseRotationRate]).toBeCloseTo(1.7)
   })
 
+  it('writes normalized Wheeler–DeWitt density-grid display extents', () => {
+    const { floatView, intView } = makeBuffer()
+    packSchroedingerUniforms(floatView, intView, {
+      ...baseParams,
+      quantumModeStr: 'wheelerDeWitt',
+      boundingRadius: 3.5,
+      schroedinger: {
+        wheelerDeWitt: {
+          aMin: 0.1,
+          aMax: 1.5,
+          phiExtent: 3.5,
+          phaseRotationEnabled: false,
+        },
+      } as never,
+    })
+
+    expect(floatView[I.densityGridCenter]).toBe(0)
+    expect(floatView[I.densityGridCenter + 1]).toBe(0)
+    expect(floatView[I.densityGridCenter + 2]).toBe(0)
+    expect(floatView[I.densityGridHalfExtent]).toBeCloseTo(3.5)
+    expect(floatView[I.densityGridHalfExtent + 1]).toBeCloseTo(3.5)
+    expect(floatView[I.densityGridHalfExtent + 2]).toBeCloseTo(3.5)
+  })
+
+  it('defaults density-grid extents to the isotropic render cube for non-WdW modes', () => {
+    const { floatView, intView } = makeBuffer()
+    packSchroedingerUniforms(floatView, intView, { ...baseParams, boundingRadius: 2.25 })
+
+    expect(floatView[I.densityGridHalfExtent]).toBeCloseTo(2.25)
+    expect(floatView[I.densityGridHalfExtent + 1]).toBeCloseTo(2.25)
+    expect(floatView[I.densityGridHalfExtent + 2]).toBeCloseTo(2.25)
+  })
+
   it('zeros Wheeler–DeWitt phase rate when phaseRotationEnabled is false', () => {
     const { floatView, intView } = makeBuffer()
     packSchroedingerUniforms(floatView, intView, {

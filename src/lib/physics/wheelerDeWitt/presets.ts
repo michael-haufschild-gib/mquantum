@@ -68,7 +68,7 @@ export const WDW_SCENARIO_PRESETS: WdwScenarioPreset[] = [
     id: 'deWittOrigin',
     name: 'DeWitt χ(0,·) = 0',
     description:
-      'DeWitt boundary condition at the origin — wave function vanishes at the classical singularity',
+      "DeWitt node at the origin with the solver's Gaussian derivative seed — wave function vanishes at the classical singularity",
     overrides: {
       boundaryCondition: 'deWitt',
       inflatonMass: 0.3,

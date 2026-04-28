@@ -240,7 +240,15 @@ const SCHROEDINGER_FIELDS = [
   { name: 'pauliSpinDownColorHSL', type: 'vec3f' },
   { name: '_padPauliDownHSL', type: 'f32' },
 
-  // --- Host-precomputed HO superposition terms (offset 1680) ---
+  // --- Density-grid world mapping ---
+  // Defaults to the isotropic render cube. Kept explicit so future modes can
+  // opt into non-cubic grid placement without changing the uniform layout.
+  { name: 'densityGridCenter', type: 'vec3f' },
+  { name: '_padDensityGridCenter', type: 'f32' },
+  { name: 'densityGridHalfExtent', type: 'vec3f' },
+  { name: '_padDensityGridHalfExtent', type: 'f32' },
+
+  // --- Host-precomputed HO superposition terms ---
   // term_k = c_k * exp(-i * E_k * t) packed as (Re, Im, 0, 0) per vec4f slot.
   // Hot path replaces 8 cos/sin + 8 cmul per pixel with a single uniform read.
   { name: 'precomputedTerm', type: arr('vec4f', 8) },

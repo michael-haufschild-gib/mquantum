@@ -5,9 +5,11 @@
  *
  *   ψ̃_c(k) → exp(-i · ℏk² · dt / (2m)) · ψ̃_c(k)
  *
- * Since the Pauli kinetic term p²/(2m) is a scalar operator (identity in
- * spinor space), both spinor components receive the same phase rotation
- * independently. No inter-component mixing occurs.
+ * This mode uses the Zeeman-Pauli approximation: the kinetic term is the
+ * scalar p²/(2m), so both spinor components receive the same phase rotation
+ * independently. Orbital magnetic coupling `(p - qA)^2/(2m)` is not
+ * implemented here; magnetic fields enter only through the position-space
+ * Zeeman rotation.
  *
  * This shader operates on the FFT-transformed spinor buffers. The k² for
  * each mode is computed from the N-D FFT frequency ordering:

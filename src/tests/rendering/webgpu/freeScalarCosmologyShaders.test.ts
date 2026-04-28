@@ -7,8 +7,7 @@
  *   density matches the solver's instantaneous total energy under every
  *   cosmology preset.
  * - The init shader's singleMode / gaussianPacket initializers must use
- *   the physical dispersion `ω² = k_lat² + m²·a²` for their initial
- *   conjugate-momentum kick, reconstructing `a²` from `aFull/aPotential`.
+ *   the same canonical oscillator coefficients as evolution.
  *
  * Shader sources are plain template literals, so we can grep their text
  * without spinning up WebGPU. These assertions fail if a future edit
@@ -32,32 +31,48 @@ describe('free scalar canonical δφ integrator shader contracts', () => {
     expect(freeScalarWriteGridBlock).toContain('params.aFull')
   })
 
-  it('init shader single-mode + gaussian-packet branches use the physical dispersion', () => {
-    // The initial conjugate-momentum kick for singleMode and gaussianPacket
-    // starts with `omegaSq = massTerm` where `massTerm = mass² · a²`, then
-    // adds the lattice k² contributions on top. Both branches must consume
-    // the shared `massTerm` helper — pin the count.
-    expect(freeScalarInitBlock).not.toContain('params.mEffSq')
-    expect(freeScalarInitBlock).toContain('let massTerm = params.mass * params.mass * aSq;')
-    const massTermMatches = freeScalarInitBlock.match(/omegaSq: f32 = massTerm/g) ?? []
-    expect(massTermMatches.length).toBe(2)
+  it('writeGrid shader applies Bianchi-I axis ratios to gradient energy', () => {
+    // The integrator and CPU diagnostics weight axes 1 and 2 by the
+    // Bianchi-I potential ratios. Rendered energy density and K/G/V/E
+    // analysis must use the same axis-weighted stiffness, not the
+    // isotropic `aPotential * sum(grad^2)` shortcut.
+    expect(freeScalarWriteGridBlock).toContain('axisPotential *= params.aPotentialRatio1')
+    expect(freeScalarWriteGridBlock).toContain('axisPotential *= params.aPotentialRatio2')
+    expect(freeScalarWriteGridBlock).toContain('gradEnergy += axisPotential * fwdDiff * fwdDiff;')
+    expect(freeScalarWriteGridBlock).not.toContain('params.aPotential * gradEnergy')
   })
 
-  it('init shader reconstructs a² from aFull / aPotential (safe against divide-by-zero)', () => {
-    // The dispersion helper must guard aPotential > 0 so degenerate configs
-    // fall through to `aSq = 1` instead of producing NaN. Pin the exact
-    // select statement so a future edit doesn't silently drop the guard.
-    expect(freeScalarInitBlock).toContain(
-      'let aSq = select(1.0, params.aFull / params.aPotential, params.aPotential > 0.0);'
+  it('writeGrid shader uses bond-gradient energy so Nyquist modes are visible', () => {
+    expect(freeScalarWriteGridBlock).toContain('let fwdBondIdx = select(')
+    expect(freeScalarWriteGridBlock).toContain('let fwdDiff = (phi[fwdBondIdx] - nnPhiVal) * invA;')
+    expect(freeScalarWriteGridBlock).not.toContain(
+      'gradEnergy += axisPotential * gradPhi[d] * gradPhi[d];'
     )
   })
 
-  it('init shader scales the initial π kick by aPotential (canonical conjugate momentum)', () => {
-    // π_δφ = a^(n−2) · δφ' = aPotential · A · ω · sin(phase). Both
-    // single-mode and gaussian-packet branches apply this factor so the
-    // leapfrog state starts in the right canonical basis.
-    const piKickMatches =
-      freeScalarInitBlock.match(/piVal = params\.aPotential \*/g) ?? []
+  it('init shader single-mode + gaussian-packet branches use the canonical oscillator', () => {
+    // The initial conjugate-momentum kick for singleMode and gaussianPacket
+    // starts with `omegaSq = aKinetic·m²aFull`, then adds axis-weighted
+    // lattice stiffness. Both branches must consume the shared helper.
+    expect(freeScalarInitBlock).not.toContain('params.mEffSq')
+    expect(freeScalarInitBlock).toContain(
+      'let massStiffness = params.mass * params.mass * params.aFull * params.massSquaredScale;'
+    )
+    const massTermMatches =
+      freeScalarInitBlock.match(/omegaSq: f32 = safeAKinetic \* massStiffness/g) ?? []
+    expect(massTermMatches.length).toBe(2)
+  })
+
+  it('init shader guards aKinetic before dividing the initial π kick', () => {
+    expect(freeScalarInitBlock).toContain(
+      'let safeAKinetic = select(1.0, params.aKinetic, params.aKinetic > 0.0);'
+    )
+  })
+
+  it('init shader uses Bianchi-I axis ratios and π = δφ prime / aKinetic', () => {
+    expect(freeScalarInitBlock).toContain('axisPotential *= params.aPotentialRatio1')
+    expect(freeScalarInitBlock).toContain('axisPotential *= params.aPotentialRatio2')
+    const piKickMatches = freeScalarInitBlock.match(/piVal = \(omega \/ safeAKinetic\)/g) ?? []
     expect(piKickMatches.length).toBe(2)
   })
 

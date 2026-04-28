@@ -344,8 +344,13 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     slRequestSlice(ctx, this._slState, axis, gridSize, worldBound)
   }
 
-  setLoadedWavefunction(re: Float32Array, im: Float32Array, isMeasurementCollapse?: boolean): void {
-    this._slState.pendingInjection = { re, im, isMeasurementCollapse }
+  setLoadedWavefunction(
+    re: Float32Array,
+    im: Float32Array,
+    isMeasurementCollapse?: boolean,
+    targetNorm?: number
+  ): void {
+    this._slState.pendingInjection = { re, im, isMeasurementCollapse, targetNorm }
   }
   storeCurrentEigenstate(
     device: GPUDevice,
@@ -364,10 +369,11 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
 
   requestMeasurementReadback(
     ctx: WebGPURenderContext
-  ): Promise<{ re: Float32Array; im: Float32Array } | null> {
+  ): Promise<{ re: Float32Array; im: Float32Array; simTime: number } | null> {
     return extRequestMeasurementReadback(ctx, {
       psiBuffer: this.psiBuffer,
       totalSites: this.totalSites,
+      simTime: this.simTime,
     })
   }
 

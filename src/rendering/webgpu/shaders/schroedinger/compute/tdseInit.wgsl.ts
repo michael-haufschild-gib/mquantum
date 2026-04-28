@@ -279,7 +279,8 @@ const TDSE_INIT_BODY = /* wgsl */ `
   } else if (params.initCondition == 7u) {
     // Analog Hawking (waterfall) — detrended for periodic C¹ continuity at wrap.
     //
-    //   n(x₀) = n_bg · (1 − Δn · sech²(x₀/L_h))
+    //   q_n(x₀) = (L_box / (π L_h)) · sin(πx₀/L_box)
+    //   n(x₀)   = n_bg · (1 − Δn · sech²(q_n))
     //   T     = tanh(L_box / (2·L_h))
     //   φ(x₀) = (m v_max / ℏ) · [ L_h · ln(cosh(x₀/L_h)) − T · x₀² / L_box ]
     //   ⇒ v_s(x₀) = v_max · tanh(x₀/L_h) − v_max · (2x₀/L_box) · T
@@ -331,10 +332,11 @@ const TDSE_INIT_BODY = /* wgsl */ `
       nTf = max(0.0, (mu7 - V7) / g7);
     }
     let u7 = x0 / lh;
-    // Periodize the sech density dip with the same parabolic detrend used
-    // for the velocity so n'(±L_box/2) = 0 and ψ is C¹ across the FFT wrap.
-    let uPeriod7 = u7 - (2.0 * x0 / lBox) * T7;
-    let sech = 1.0 / cosh(uPeriod7);
+    // Periodize the sech density dip with a sine compact coordinate. It is
+    // locally x/L_h near the horizon and has zero derivative at both FFT
+    // seams, so the amplitude part of ψ is C¹ across the wrap.
+    let uDensity7 = (lBox / (3.141592653589793 * lh)) * sin(3.141592653589793 * x0 / lBox);
+    let sech = 1.0 / cosh(uDensity7);
     let n = max(nTf * (1.0 - deltaN * sech * sech), 0.0);
     // Numerically-stable ln(cosh(u)) = |u| − ln(2) + ln(1 + e^{−2|u|}).
     let au = abs(u7);

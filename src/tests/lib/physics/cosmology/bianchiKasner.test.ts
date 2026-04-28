@@ -310,11 +310,18 @@ describe('bianchiKasner preset plumbing', () => {
     expect(isValidPreset({ preset: 'bianchiKasner', spacetimeDim: 4 })).toBe(false)
   })
 
-  it('isValidPreset rejects bianchiKasner for spacetimeDim < 4 (Bianchi-I needs 3 spatial axes)', () => {
+  it('isValidPreset rejects bianchiKasner outside spacetimeDim = 4', () => {
     expect(
       isValidPreset({
         preset: 'bianchiKasner',
         spacetimeDim: 3,
+        kasnerExponents: kasnerSymmetricVacuum(),
+      })
+    ).toBe(false)
+    expect(
+      isValidPreset({
+        preset: 'bianchiKasner',
+        spacetimeDim: 5,
         kasnerExponents: kasnerSymmetricVacuum(),
       })
     ).toBe(false)

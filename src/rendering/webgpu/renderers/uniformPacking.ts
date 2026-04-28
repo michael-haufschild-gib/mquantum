@@ -34,10 +34,14 @@ import {
   REPRESENTATION_MODE_MAP,
 } from './schrodingerRendererTypes'
 import { SCHROEDINGER_LAYOUT } from './schroedingerLayout'
+import { packDensityGridMapping } from './uniformPackingDensityGrid'
 import { packAdsTimeEvolution } from './uniformPackingSupport'
 
 // Field name → float32/int32 index (byte offset / 4)
 const I = SCHROEDINGER_LAYOUT.index
+
+type AdSConfig = AntiDeSitterConfig | undefined
+type WdwPhaseConfig = { phaseRotationEnabled?: boolean; phaseRotationSpeed?: number }
 
 // ---------------------------------------------------------------------------
 // Shared helper
@@ -152,21 +156,17 @@ export function packSchroedingerUniforms(
   // Wheeler–DeWitt render-only phase rotation rate.
   // Active only when quantum mode is wheelerDeWitt AND the visual effect is enabled,
   // otherwise 0 (so the shader's `phase - rate*time` subtraction is a no-op).
-  const wdwCfg = p.schroedinger?.wheelerDeWitt as
-    | { phaseRotationEnabled?: boolean; phaseRotationSpeed?: number }
-    | undefined
+  const wdwCfg = p.schroedinger?.wheelerDeWitt as WdwPhaseConfig | undefined
   const wdwRate =
     p.quantumModeStr === 'wheelerDeWitt' && wdwCfg?.phaseRotationEnabled
       ? (wdwCfg.phaseRotationSpeed ?? 0)
       : 0
   floatView[I.wdwPhaseRotationRate] = wdwRate
 
+  packDensityGridMapping(floatView, p)
+
   // AdS time evolution — stable phase rotation at E or tachyon cosh growth at γ.
-  packAdsTimeEvolution(
-    floatView,
-    p.quantumModeStr,
-    p.schroedinger?.antiDeSitter as AntiDeSitterConfig | undefined
-  )
+  packAdsTimeEvolution(floatView, p.quantumModeStr, p.schroedinger?.antiDeSitter as AdSConfig)
 }
 
 // ---------------------------------------------------------------------------

@@ -72,8 +72,16 @@ export function maybeInitialize(
 
   // Measurement collapse: inject wavefunction without full reinit
   if (isMeasurementCollapse) {
+    const targetNorm = ic.slState.pendingInjection?.targetNorm
     injectLoadedWavefunction(device, ic.slState, ic.totalSites)
     ic.slState.pendingInjection = null
+    if (Number.isFinite(targetNorm) && targetNorm! > 0) {
+      ic.diagState.initialNorm = targetNorm!
+      ic.diagState.prevNorm = targetNorm!
+      if (ic.bg?.renormalizeUniformBuffer) {
+        device.queue.writeBuffer(ic.bg.renormalizeUniformBuffer, 4, new Float32Array([targetNorm!]))
+      }
+    }
     ic.diagState.maxDensity = 1.0
     ic.diagState.diagGeneration++
     return

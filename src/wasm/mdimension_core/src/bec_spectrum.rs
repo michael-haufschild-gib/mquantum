@@ -2,7 +2,9 @@
 //!
 //! Velocity-field finite differences, N-D FFT (via `fft::fft_nd`),
 //! Helmholtz projection, and log-spaced shell binning for the
-//! Nore/Bradley superfluid decomposition.  All four steps run entirely
+//! Nore/Bradley superfluid decomposition. The FFT is unnormalized, so
+//! energies include the physical Parseval factor `voxel_volume / N`.
+//! All four steps run entirely
 //! in Rust; the TypeScript caller invokes a single WASM entry point
 //! (`compute_incompressible_spectrum_wasm`) and unpacks the result.
 //!
@@ -245,17 +247,19 @@ pub fn compute_incompressible_spectrum(
         spectrum[bin] += incomp_sq;
     }
 
-    // Scale by ½m and pack the output.
-    let half_m = 0.5 * mass;
+    let voxel_volume: f64 = spacing.iter().product();
+    let energy_scale = 0.5 * mass * (voxel_volume / total_sites as f64);
+
+    // Scale by physical Parseval factor and pack the output.
     let mut result = Vec::with_capacity(2 * NUM_SPECTRUM_BINS + 2);
     for b in 0..NUM_SPECTRUM_BINS {
-        result.push(half_m * spectrum[b]);
+        result.push(energy_scale * spectrum[b]);
     }
     for b in 0..NUM_SPECTRUM_BINS {
         result.push(k_values[b]);
     }
-    result.push(half_m * total_incomp);
-    result.push(half_m * total_comp);
+    result.push(energy_scale * total_incomp);
+    result.push(energy_scale * total_comp);
     result
 }
 
@@ -378,6 +382,38 @@ mod tests {
         assert!(
             total_incomp > total_comp,
             "vortex should be dominantly incompressible (incomp={total_incomp}, comp={total_comp})"
+        );
+    }
+
+    #[test]
+    fn vortex_energy_uses_parseval_voxel_scaling() {
+        let n: usize = 16;
+        let total = n * n;
+        let mut psi_re = vec![0.0f32; total];
+        let mut psi_im = vec![0.0f32; total];
+        let center = (n as f64) * 0.5 - 0.5;
+        for j in 0..n {
+            for i in 0..n {
+                let idx = i * n + j;
+                let x = (i as f64) - center;
+                let y = (j as f64) - center;
+                let r = (x * x + y * y).sqrt();
+                let theta = y.atan2(x);
+                let amp = r / (r * r + 4.0).sqrt();
+                psi_re[idx] = (amp * theta.cos()) as f32;
+                psi_im[idx] = (amp * theta.sin()) as f32;
+            }
+        }
+        let grid = [n, n];
+        let coarse = compute_incompressible_spectrum(&psi_re, &psi_im, &grid, &[0.5, 0.5], 1.0, 1.0);
+        let fine = compute_incompressible_spectrum(&psi_re, &psi_im, &grid, &[0.25, 0.25], 1.0, 1.0);
+        let e_coarse = coarse[2 * NUM_SPECTRUM_BINS];
+        let e_fine = fine[2 * NUM_SPECTRUM_BINS];
+        assert!(e_coarse > 0.0);
+        let ratio = e_fine / e_coarse;
+        assert!(
+            (0.85..1.15).contains(&ratio),
+            "2D physical vortex energy should be stable under spacing rescale, got ratio {ratio}"
         );
     }
 }

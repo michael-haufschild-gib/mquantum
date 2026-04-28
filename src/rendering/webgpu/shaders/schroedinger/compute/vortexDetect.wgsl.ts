@@ -53,6 +53,15 @@ const VORTEX_INV_TAU: f32 = 0.15915494309189535;  // 1 / (2π)
 // without re-tuning the array size at every call site.
 const VORTEX_MAX_LATTICE_DIM: u32 = 16u;
 
+fn vortexPlusOneIndex(idx: u32, coord: u32, axis: u32) -> u32 {
+  let stride = tParams.strides[axis];
+  let n = tParams.gridSize[axis];
+  if (coord + 1u < n) {
+    return idx + stride;
+  }
+  return idx - (n - 1u) * stride;
+}
+
 @compute @workgroup_size(256)
 fn main(
   @builtin(global_invocation_id) gid: vec3u,
@@ -69,85 +78,79 @@ fn main(
   if (idx < vdParams.totalSites) {
     let coords = linearToND(idx, tParams.strides, tParams.gridSize, tParams.latticeDim);
 
-    // Check density: only look for vortices where density is low
     let z0 = psi[idx];
     let re0 = z0.x;
     let im0 = z0.y;
-    let density = re0 * re0 + im0 * im0;
-    let threshold = vdParams.densityThreshold * vdParams.maxDensity;
 
-    // Only check if density is below threshold (vortex core region)
-    if (density < threshold && density > 0.0) {
-      // Check plaquettes in all C(D,2) dimension pairs for N-D vortex detection.
-      // For D=3: planes (0,1), (0,2), (1,2) — standard 3D vortex lines.
-      // For D=4: adds (0,3), (1,3), (2,3) — detects vortex surfaces in all planes.
-      // For D=5+: all pairs — detects vortex volumes across all codimension-2 planes.
-      let totalDims = tParams.latticeDim;
+    // Check plaquettes in all C(D,2) dimension pairs for N-D vortex detection.
+    // Plaquette winding is topological; do not gate it on an arbitrary corner
+    // density, or off-grid / multi-charge cores can be missed.
+    let totalDims = tParams.latticeDim;
 
-      // PERF: phi at idx (the (0,0) corner of every plaquette) is invariant
-      // across all (da, db) iterations. Hoist the atan2 once instead of
-      // recomputing C(D,2) times per site (1× for D=2, 55× for D=11).
-      let phi00 = atan2(im0, re0);
+    // PERF: phi at idx (the (0,0) corner of every plaquette) is invariant
+    // across all (da, db) iterations. Hoist the atan2 once instead of
+    // recomputing C(D,2) times per site (1× for D=2, 55× for D=11).
+    let phi00 = atan2(im0, re0);
 
-      // PERF: phi at idx + strides[d] (the (1,0) corner along axis d, and the
-      // (0,1) corner along axis d when d is the second loop index) depends only
-      // on a single axis, not the (da, db) pair. Precompute once per axis and
-      // reuse: saves up to 88 atan2/site at D=11 (44 phi10 + 44 phi01).
-      // Sized for latticeDim up to VORTEX_MAX_LATTICE_DIM (current product
-      // max is 11). Entries past totalDims are never read; entries at
-      // boundary are zero-initialized and never read because the (da, db)
-      // loop skips boundary plaquettes.
-      var phiDim: array<f32, VORTEX_MAX_LATTICE_DIM>;
-      for (var d: u32 = 0u; d < totalDims; d++) {
-        if (coords[d] < tParams.gridSize[d] - 1u) {
-          let zd = psi[idx + tParams.strides[d]];
-          phiDim[d] = atan2(zd.y, zd.x);
-        }
+    // PERF: phi at idx + strides[d] (the (1,0) corner along axis d, and the
+    // (0,1) corner along axis d when d is the second loop index) depends only
+    // on a single axis, not the (da, db) pair. Precompute once per axis and
+    // reuse: saves up to 88 atan2/site at D=11 (44 phi10 + 44 phi01).
+    // Sized for latticeDim up to VORTEX_MAX_LATTICE_DIM (current product
+    // max is 11). Entries past totalDims are never read. Neighbor indices
+    // wrap across coordinate seams so periodic/compact vortices are counted
+    // topologically instead of disappearing at the last lattice cell.
+    var phiDim: array<f32, VORTEX_MAX_LATTICE_DIM>;
+    for (var d: u32 = 0u; d < totalDims; d++) {
+      if (tParams.gridSize[d] >= 2u) {
+        let zd = psi[vortexPlusOneIndex(idx, coords[d], d)];
+        phiDim[d] = atan2(zd.y, zd.x);
       }
+    }
 
-      for (var da: u32 = 0u; da < totalDims; da++) {
-        for (var db: u32 = da + 1u; db < totalDims; db++) {
-          // Skip if at boundary (can't form plaquette)
-          if (coords[da] >= tParams.gridSize[da] - 1u || coords[db] >= tParams.gridSize[db] - 1u) {
-            continue;
-          }
+    for (var da: u32 = 0u; da < totalDims; da++) {
+      for (var db: u32 = da + 1u; db < totalDims; db++) {
+        // Degenerate axes cannot form a plaquette. Boundary plaquettes wrap:
+        // vortices on periodic seams are physical and must be counted.
+        if (tParams.gridSize[da] < 2u || tParams.gridSize[db] < 2u) {
+          continue;
+        }
 
-          // Get phase at the other 3 plaquette corners: (1,0), (1,1), (0,1).
-          // phi10 and phi01 come from the precomputed per-axis array; phi11
-          // depends on both axes and must be computed per (da, db) pair.
-          let strideA = tParams.strides[da];
-          let strideB = tParams.strides[db];
+        // Get phase at the other 3 plaquette corners: (1,0), (1,1), (0,1).
+        // phi10 and phi01 come from the precomputed per-axis array; phi11
+        // depends on both axes and must be computed per (da, db) pair.
+        let idxA = vortexPlusOneIndex(idx, coords[da], da);
+        let idx11 = vortexPlusOneIndex(idxA, coords[db], db);
+        let z11 = psi[idx11];
+        let phi10 = phiDim[da];
+        let phi11 = atan2(z11.y, z11.x);
+        let phi01 = phiDim[db];
 
-          let z11 = psi[idx + strideA + strideB];
-          let phi10 = phiDim[da];
-          let phi11 = atan2(z11.y, z11.x);
-          let phi01 = phiDim[db];
+        // Phase circulation around plaquette. Classic identity:
+        //   wrap(x) = x − τ·round(x/τ)
+        // Around a closed 4-edge loop the unwrapped Δφ's sum to zero
+        // exactly, so circulation = −τ·Σround(Δφ/τ). Computing only the
+        // four rounds replaces 4×(mul+round+fma) wrapPhase calls with
+        // 4×(sub+mul+round) plus a single trailing fma — saves four
+        // fma's per plaquette per site (×D(D−1)/2 plaquettes ×N^D
+        // sites every detection frame).
+        let r0 = round((phi10 - phi00) * VORTEX_INV_TAU);
+        let r1 = round((phi11 - phi10) * VORTEX_INV_TAU);
+        let r2 = round((phi01 - phi11) * VORTEX_INV_TAU);
+        let r3 = round((phi00 - phi01) * VORTEX_INV_TAU);
+        let windingSum = r0 + r1 + r2 + r3;
 
-          // Phase circulation around plaquette. Classic identity:
-          //   wrap(x) = x − τ·round(x/τ)
-          // Around a closed 4-edge loop the unwrapped Δφ's sum to zero
-          // exactly, so circulation = −τ·Σround(Δφ/τ). Computing only the
-          // four rounds replaces 4×(mul+round+fma) wrapPhase calls with
-          // 4×(sub+mul+round) plus a single trailing fma — saves four
-          // fma's per plaquette per site (×D(D−1)/2 plaquettes ×N^D
-          // sites every detection frame).
-          let r0 = round((phi10 - phi00) * VORTEX_INV_TAU);
-          let r1 = round((phi11 - phi10) * VORTEX_INV_TAU);
-          let r2 = round((phi01 - phi11) * VORTEX_INV_TAU);
-          let r3 = round((phi00 - phi01) * VORTEX_INV_TAU);
-          let windingSum = r0 + r1 + r2 + r3;
-
-          // Vortex iff the rounded branch-cut count is non-zero.
-          // round() returns exact integer-valued f32, so compare exactly.
-          if (windingSum != 0.0) {
-            vCount += 1u;
-            // circulation = −τ·windingSum, so positive circulation
-            // corresponds to negative windingSum (and vice-versa).
-            if (windingSum < 0.0) {
-              posCount += 1u;
-            } else {
-              negCount += 1u;
-            }
+        // Vortex iff the rounded branch-cut count is non-zero.
+        // round() returns exact integer-valued f32, so compare exactly.
+        if (windingSum != 0.0) {
+          vCount += 1u;
+          let q = u32(abs(windingSum));
+          // circulation = −τ·windingSum, so positive circulation
+          // corresponds to negative windingSum (and vice-versa).
+          if (windingSum < 0.0) {
+            posCount += q;
+          } else {
+            negCount += q;
           }
         }
       }

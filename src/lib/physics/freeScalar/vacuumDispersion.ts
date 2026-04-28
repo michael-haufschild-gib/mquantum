@@ -218,5 +218,14 @@ export function computeFsfVacuumDispersion(
 ): VacuumDispersion {
   const snap = computeFsfCosmologySnapshot(config, eta)
   if (snap === undefined) return 'kgFloor'
+  const ratio1 = snap.aPotentialRatio1 ?? 1
+  const ratio2 = snap.aPotentialRatio2 ?? 1
+  if (ratio1 !== 1 || ratio2 !== 1) {
+    const massSq = config.mass * config.mass * snap.aFull
+    const axisPotentials = new Array<number>(config.latticeDim).fill(snap.aPotential)
+    if (config.latticeDim > 1) axisPotentials[1] = snap.aPotential * ratio1
+    if (config.latticeDim > 2) axisPotentials[2] = snap.aPotential * ratio2
+    return { massSq, axisPotentials, kineticScale: snap.aKinetic }
+  }
   return config.mass * config.mass * snap.a * snap.a
 }

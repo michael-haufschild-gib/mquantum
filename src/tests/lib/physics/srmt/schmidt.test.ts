@@ -10,6 +10,7 @@
 
 import { describe, expect, it } from 'vitest'
 
+import { modularSpectrum } from '@/lib/physics/srmt/modularHamiltonian'
 import {
   chiFrobeniusNormSq,
   computeVolumeElement,
@@ -215,7 +216,7 @@ describe('schmidt.schmidtValues', () => {
     }
   })
 
-  it('volume-weighted normalizedSchmidtValues scales singular values by 1/sqrt(dVol) relative to dVol=1 (task #8)', () => {
+  it('normalizedSchmidtValues keeps Schmidt probabilities independent of uniform dVol', () => {
     const Na = 6
     const Nphi = 4
     const rng = lcgRng(0xc0ffee02)
@@ -223,15 +224,14 @@ describe('schmidt.schmidtValues', () => {
     for (let i = 0; i < chi.length; i++) chi[i] = rng() - 0.5
     const dVol = 0.01
     const unit = normalizedSchmidtValues({ chi, gridSize: [Na, Nphi, Nphi] }, 'a', 1)
-    const volWeighted = normalizedSchmidtValues({ chi, gridSize: [Na, Nphi, Nphi] }, 'a', dVol)
-    const ratio = 1 / Math.sqrt(dVol)
-    expect(volWeighted.length).toBe(unit.length)
+    const withDVol = normalizedSchmidtValues({ chi, gridSize: [Na, Nphi, Nphi] }, 'a', dVol)
+    expect(withDVol.length).toBe(unit.length)
     for (let i = 0; i < unit.length; i++) {
-      expect(volWeighted[i]!).toBeCloseTo(unit[i]! * ratio, 10)
+      expect(withDVol[i]!).toBeCloseTo(unit[i]!, 14)
     }
   })
 
-  it('volume-weighted normalizedSchmidtValues enforces Σ s_n² · dVol = 1 (task #8)', () => {
+  it('normalizedSchmidtValues enforces dimensionless Σ s_n² = 1 for any uniform dVol', () => {
     const Na = 7
     const Nphi = 5
     const rng = lcgRng(0xc0ffee03)
@@ -240,11 +240,21 @@ describe('schmidt.schmidtValues', () => {
     for (const dVol of [0.5, 0.01, 1, 2.5]) {
       for (const clock of ['a', 'phi1', 'phi2'] as const) {
         const sv = normalizedSchmidtValues({ chi, gridSize: [Na, Nphi, Nphi] }, clock, dVol)
-        let integral = 0
-        for (let i = 0; i < sv.length; i++) integral += sv[i]! * sv[i]! * dVol
-        expect(integral).toBeCloseTo(1, 3)
+        let sumSq = 0
+        for (let i = 0; i < sv.length; i++) sumSq += sv[i]! * sv[i]!
+        expect(sumSq).toBeCloseTo(1, 3)
       }
     }
+  })
+
+  it('volumeElement does not create negative modular energies for fine grids', () => {
+    const Na = 4
+    const Nphi = 3
+    const chi = new Float32Array(2 * Na * Nphi * Nphi).fill(0)
+    chi[0] = 1
+    const sv = normalizedSchmidtValues({ chi, gridSize: [Na, Nphi, Nphi] }, 'a', 0.01)
+    const { spectrum } = modularSpectrum(sv)
+    for (const k of spectrum) expect(k).toBeGreaterThanOrEqual(-1e-10)
   })
 
   it('volume-weighted normalizedSchmidtValues with dVol=0 or negative falls back to Frobenius-only (task #8)', () => {

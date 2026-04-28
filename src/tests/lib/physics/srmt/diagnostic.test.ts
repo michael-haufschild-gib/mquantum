@@ -71,6 +71,18 @@ function makeSyntheticOutput(Na: number, Nphi: number): WheelerDeWittSolverOutpu
   }
 }
 
+function scaledOutput(output: WheelerDeWittSolverOutput, scale: number): WheelerDeWittSolverOutput {
+  const chi = new Float32Array(output.chi.length)
+  for (let i = 0; i < output.chi.length; i++) chi[i] = output.chi[i]! * scale
+  return {
+    ...output,
+    chi,
+    lorentzianMask: new Uint8Array(output.lorentzianMask),
+    bandKind: new Uint8Array(output.bandKind),
+    maxDensity: output.maxDensity * scale * scale,
+  }
+}
+
 describe('computeSrmtDiagnostic', () => {
   const Na = 20
   const Nphi = 6
@@ -138,6 +150,26 @@ describe('computeSrmtDiagnostic', () => {
     }).affineMatchQuality
     const maxSpread = Math.max(Math.abs(qa - qp1), Math.abs(qp1 - qp2), Math.abs(qa - qp2))
     expect(maxSpread).toBeGreaterThan(0)
+  })
+
+  it('normalizes slice heatmap density so global wavefunction scale cannot change it', () => {
+    const base = computeSrmtDiagnostic(output, {
+      clock: 'phi1',
+      cutIndex: 3,
+      rankCap,
+    }).sliceK
+    const scaled = computeSrmtDiagnostic(scaledOutput(output, 7), {
+      clock: 'phi1',
+      cutIndex: 3,
+      rankCap,
+    }).sliceK
+
+    let sum = 0
+    for (let i = 0; i < base.length; i++) {
+      sum += base[i]!
+      expect(scaled[i]!).toBeCloseTo(base[i]!, 6)
+    }
+    expect(sum).toBeCloseTo(1, 6)
   })
 
   it('rejects non-positive cutIndex', () => {

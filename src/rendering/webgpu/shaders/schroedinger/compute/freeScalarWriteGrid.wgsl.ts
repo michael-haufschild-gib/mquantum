@@ -284,7 +284,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   var fieldValue: f32 = 0.0;
 
-  // Compute gradient energy (for energy density view and analysis modes)
+  // Compute axis-weighted gradient stiffness (for energy density view and analysis modes)
   var gradEnergy: f32 = 0.0;
   var gradPhi: array<f32, 12>;
 
@@ -300,8 +300,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       let Nd = params.gridSize[d];
       let invA = invSpacings[d];
 
-      // Centered difference (second-order): (phi[i+1] - phi[i-1]) / (2a)
-      // At boundaries with PML: one-sided difference to avoid periodic wrap
+      // Centered derivative for flux display; forward bond energy for the
+      // Hamiltonian. A centered square makes the Nyquist mode invisible
+      // ((-1)^i has phi[i+1] == phi[i-1]), while the discrete Hamiltonian
+      // and CPU diagnostics use nearest-neighbor bonds.
+      // At boundaries with PML: one-sided derivative and no wrapped high-side
+      // bond, matching absorbing/open faces.
       let atLoBound = coord == 0u;
       let atHiBound = coord == Nd - 1u;
 
@@ -320,7 +324,17 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
         gradPhi[d] = (phi[fwdIdx] - phi[bwdIdx]) * (0.5 * invA);
       }
 
-      gradEnergy += gradPhi[d] * gradPhi[d];
+      var axisPotential = params.aPotential;
+      if (d == 1u) {
+        axisPotential *= params.aPotentialRatio1;
+      } else if (d == 2u) {
+        axisPotential *= params.aPotentialRatio2;
+      }
+      if (!hasPML || !atHiBound) {
+        let fwdBondIdx = select(nnIdx + stride, nnIdx - stride * (Nd - 1u), atHiBound);
+        let fwdDiff = (phi[fwdBondIdx] - nnPhiVal) * invA;
+        gradEnergy += axisPotential * fwdDiff * fwdDiff;
+      }
     }
   }
 
@@ -379,7 +393,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // expression is bit-identical to the prior form.
     var canonicalH = 0.5 * (
       params.aKinetic * nnPiVal * nnPiVal
-      + params.aPotential * gradEnergy
+      + gradEnergy
       + drivenMassCoef * nnPhiVal * nnPhiVal
     );
     // Self-interaction: canonical contribution is aFull · V(δφ) from the
@@ -418,7 +432,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // bit-identical to the canonical KG decomposition.
     let invAFull = select(1.0 / params.aFull, 1.0, params.aFull <= 0.0);
     let K = 0.5 * params.aKinetic * nnPiVal * nnPiVal * invAFull;
-    let G = 0.5 * params.aPotential * gradEnergy * invAFull;
+    let G = 0.5 * gradEnergy * invAFull;
     // Preheating: apply the same time-dependent mass² factor used in
     // freeScalarUpdatePi and the energyDensity view, so the K/G/V/E
     // decomposition reflects the Hamiltonian actually being integrated.

@@ -24,7 +24,8 @@
  * - `antiDeSitter`: Poincaré half-space chart, g_ij = (L/z)² δ_ij with
  *   z = axis 0 > 0. (Carroll §8.)
  * - `sphere2D`: 2-sphere metric on axes (θ,φ) = (1,2); requires latticeDim ≥ 3.
- *   (Carroll §3.7.)
+ *   The azimuthal φ axis is periodic, while θ remains a non-periodic chart
+ *   coordinate with pole regularization. (Carroll §3.7.)
  * - `torus`: flat metric, periodic boundaries handled by the integrator.
  * - `doubleThroat`: two Morris–Thorne-like throats separated along axis 0.
  */
@@ -141,13 +142,12 @@ export function isTimeDependentMetric(kind: MetricKind): boolean {
 
 /**
  * Returns true iff the metric kind imposes periodic boundary conditions on
- * the spatial lattice. Currently only `torus`.
+ * every active spatial axis. Currently only `torus`.
  *
  * Exhaustive switch for the same reason as `isTimeDependentMetric`:
- * downstream routing (the curved kinetic integrator's boundary-condition
- * branch) depends on a correct classification, and a silent `false`
- * fall-through would quietly apply Dirichlet BCs where periodic are
- * required.
+ * downstream routing depends on a correct all-axis classification. Mixed
+ * topology metrics such as `sphere2D` must use {@link isMetricAxisPeriodic}
+ * instead.
  */
 export function hasPeriodicBoundary(kind: MetricKind): boolean {
   switch (kind) {
@@ -162,6 +162,43 @@ export function hasPeriodicBoundary(kind: MetricKind): boolean {
     case 'doubleThroat':
       return false
   }
+}
+
+/**
+ * Returns true iff this metric imposes periodic boundary conditions on one
+ * specific lattice axis.
+ *
+ * Unlike {@link hasPeriodicBoundary}, this preserves mixed chart topology:
+ * `sphere2D` wraps only the azimuthal φ axis (axis 2) and keeps θ
+ * non-periodic; `torus` wraps every active axis.
+ */
+export function isMetricAxisPeriodic(kind: MetricKind, axis: number): boolean {
+  switch (kind) {
+    case 'torus':
+      return true
+    case 'sphere2D':
+      return axis === 2
+    case 'flat':
+    case 'morrisThorne':
+    case 'schwarzschild':
+    case 'deSitter':
+    case 'antiDeSitter':
+    case 'doubleThroat':
+      return false
+  }
+}
+
+/**
+ * Bitmask of metric-imposed periodic axes; bit `d` is 1 when axis `d`
+ * should skip boundary absorbers and use periodic neighbor fetches.
+ */
+export function metricPeriodicDimsMask(kind: MetricKind, latticeDim: number): number {
+  let mask = 0
+  const dim = Math.max(0, Math.min(12, Math.floor(latticeDim)))
+  for (let axis = 0; axis < dim; axis++) {
+    if (isMetricAxisPeriodic(kind, axis)) mask |= 1 << axis
+  }
+  return mask >>> 0
 }
 
 /**

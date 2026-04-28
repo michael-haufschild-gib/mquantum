@@ -64,7 +64,7 @@ export function computePMLSigmaMax(targetReflection: number, dt: number): number
  * where N_PML is the minimum PML width across active dimensions.
  *
  * @param targetReflection - Round-trip reflection coefficient (e.g. 1e-6)
- * @param pmlWidth - PML width as fraction of grid per side (0–0.5)
+ * @param pmlWidth - PML width as fraction of grid per side (0–0.5, inclusive)
  * @param gridSizes - Array of grid sizes per dimension
  * @param dt - Simulation timestep
  * @param order - Polynomial grading order (default 3 = cubic)
@@ -81,7 +81,7 @@ export function computePMLSigmaMaxND(
 ): number {
   if (targetReflection <= 0 || targetReflection >= 1 || !isFinite(targetReflection)) return 0
   if (dt <= 0 || !isFinite(dt)) return 0
-  if (pmlWidth <= 0 || pmlWidth >= 0.5) return 0
+  if (pmlWidth <= 0 || pmlWidth > 0.5) return 0
 
   const dims = latticeDim ?? gridSizes.length
   if (dims === 0 || gridSizes.length === 0) return 0

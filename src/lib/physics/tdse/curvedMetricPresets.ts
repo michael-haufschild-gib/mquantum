@@ -147,7 +147,7 @@ export const CURVED_METRIC_TDSE_PRESETS: TdseScenarioPreset[] = [
     id: 'sphereCompactification',
     name: '2-Sphere: Wavepacket on Compact Geometry',
     description:
-      'Wavepacket on a 2-sphere of radius R, visualized through the chart axis 1 = θ (polar) and axis 2 = φ (azimuthal). Dirichlet boundaries apply on every axis — the packet reflects off the φ walls rather than wrapping around, and bounces off the polar clamp ε=0.2 that keeps the metric non-singular. NOT a true compactification: the sphere is embedded as a coordinate chart in the 3-axis lattice and the azimuthal direction is treated as reflective rather than periodic. Just the Laplace–Beltrami operator on the (θ, φ) 2-sphere chart.',
+      'Wavepacket on a 2-sphere of radius R, visualized through chart axis 1 = θ (polar) and axis 2 = φ (azimuthal). The φ seam wraps periodically and skips PML damping; θ remains a bounded chart coordinate with a pole clamp ε=0.2 to keep the metric non-singular. NOT a full closed-sphere coordinate solver: the extra axis is flat embedding space, not a physical third spherical coordinate.',
     overrides: {
       latticeDim: 3,
       gridSize: [64, 64, 64],
@@ -194,7 +194,7 @@ export const CURVED_METRIC_TDSE_PRESETS: TdseScenarioPreset[] = [
         kind: 'torus',
         torusPeriod: [Math.PI, Math.PI, Math.PI],
       },
-      absorberEnabled: true,
+      absorberEnabled: false,
       absorberWidth: 0.15,
       diagnosticsEnabled: true,
       fieldView: 'density',

@@ -7,8 +7,9 @@
 
 import { normalizeTdseBlackHoleParams } from '@/lib/geometry/extended/tdse'
 import type { TdseConfig } from '@/lib/geometry/extended/types'
-import { buildCompactDimsMask, computeEffectiveSpacing } from '@/lib/physics/compactification'
+import { buildCompactDimsMask } from '@/lib/physics/compactification'
 import { sigmaMaxFromPmlConfig } from '@/lib/physics/pml/profile'
+import { computeTdseEffectiveSpacing } from '@/lib/physics/tdse/effectiveSpacing'
 import type { MetricKind } from '@/lib/physics/tdse/metrics/types'
 import {
   MAX_ADS_RADIUS,
@@ -18,6 +19,7 @@ import {
   MAX_SPHERE_RADIUS,
   MAX_THROAT_RADIUS,
   MAX_TORUS_PERIOD,
+  metricPeriodicDimsMask,
   MIN_ADS_RADIUS,
   MIN_DOUBLE_THROAT_SEPARATION,
   MIN_HUBBLE_RATE,
@@ -161,44 +163,8 @@ export function writeTdseUniforms(
   const f32 = uniformF32
   u32.fill(0)
 
-  // Pre-compute effective spacing (overrides compact dims with spacing from R)
-  const effSpacing = computeEffectiveSpacing(
-    config.gridSize,
-    config.spacing,
-    config.compactDims,
-    config.compactRadii,
-    config.latticeDim
-  )
-
-  // Torus metric override: the user-specified `torusPeriod[i]` is the
-  // authoritative spatial period of the compactified torus. The split-step
-  // FFT path uses `spacing[i]` to compute k_max = π/dx (and thus the quantized
-  // momenta k_n = 2π·n/(N·dx)); without this override the FFT wraps at the
-  // lattice extent N·spacing, not at the user-set period, and the "torusPeriod"
-  // UI field is ignored entirely. Remapping dx_eff = L/N makes k_n = 2π·n/L
-  // exactly, so `torusEigenstates` (packetMomentum = 2 on period π) becomes
-  // the fundamental mode n=1 as its description claims. Only the first three
-  // entries are stored (TDSE supports up to dim 3 for the curved path; higher
-  // dims on a torus use spacing unchanged).
-  if (config.metric?.kind === 'torus') {
-    const periods = config.metric.torusPeriod
-    if (periods && periods.length === 3) {
-      const overrideDims = Math.min(config.latticeDim, 3)
-      for (let d = 0; d < overrideDims; d++) {
-        // Clamp through the same window as the uniform write at f32[220..222]
-        // so the FFT k-grid and the shader's torusPeriod see identical values.
-        // Without this, an out-of-range period produces one spacing for the
-        // host-side effSpacing / FFT math and a different period in the
-        // uniform block, giving inconsistent quantized momenta vs. the period
-        // the shader actually reads.
-        const L = clampFinite(periods[d], MIN_TORUS_PERIOD, MAX_TORUS_PERIOD)
-        const N = config.gridSize[d]
-        if (Number.isFinite(N) && N! > 0) {
-          effSpacing[d] = L / N!
-        }
-      }
-    }
-  }
+  // Pre-compute effective spacing (compactification and torus metric period).
+  const effSpacing = computeTdseEffectiveSpacing(config)
 
   // Lattice params (0-15)
   u32[0] = config.latticeDim
@@ -338,8 +304,14 @@ export function writeTdseUniforms(
   // Coupled anharmonic coupling (offset 732, index 183)
   f32[183] = config.anharmonicLambda ?? 1.0
 
-  // KK compactification bitmask (offset 736, index 184)
-  u32[184] = buildCompactDimsMask(config.compactDims, config.latticeDim)
+  // Periodic-dimension bitmask (offset 736, index 184). User-selected KK
+  // compact dimensions and metric-imposed compact axes both skip PML damping.
+  // Example: sphere2D wraps φ (axis 2) even when the user did not toggle a
+  // generic Kaluza-Klein compactification flag.
+  const userCompactMask = buildCompactDimsMask(config.compactDims, config.latticeDim)
+  const metricCompactMask =
+    config.metric !== undefined ? metricPeriodicDimsMask(config.metric.kind, config.latticeDim) : 0
+  u32[184] = userCompactMask | metricCompactMask
 
   // Stochastic decoherence branching (offsets 740-744, indices 185-186)
   // branchingEnabled is always written as 0 in the TDSE compute uniform.

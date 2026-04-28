@@ -10,10 +10,12 @@
 import type { TdseConfig } from '@/lib/geometry/extended/tdse'
 import { logger } from '@/lib/logger'
 import { computeEffectiveSpacing } from '@/lib/physics/compactification'
+import { isCoordinateEntanglementMetricSupported } from '@/lib/physics/coordinateEntanglement'
 import type {
   EntanglementWorkerRequest,
   EntanglementWorkerResponse,
 } from '@/lib/physics/coordinateEntanglement.worker'
+import { computeTdseEffectiveSpacing } from '@/lib/physics/tdse/effectiveSpacing'
 import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useSimulationStateStore } from '@/stores/simulationStateStore'
@@ -136,13 +138,23 @@ export class TdseBecStrategy implements QuantumModeStrategy {
       config.quantumMode === 'becDynamics' ? schroedinger.bec : schroedinger.tdse
     if (!latticeConfig) return null
     const latDim = latticeConfig.latticeDim ?? 3
-    const effSpacing = computeEffectiveSpacing(
-      latticeConfig.gridSize ?? [32],
-      latticeConfig.spacing ?? [0.1],
-      latticeConfig.compactDims as boolean[] | undefined,
-      latticeConfig.compactRadii as number[] | undefined,
-      latDim
-    )
+    const effSpacing =
+      'metric' in latticeConfig
+        ? computeTdseEffectiveSpacing({
+            gridSize: latticeConfig.gridSize ?? [32],
+            spacing: latticeConfig.spacing ?? [0.1],
+            compactDims: latticeConfig.compactDims as boolean[] | undefined,
+            compactRadii: latticeConfig.compactRadii as number[] | undefined,
+            latticeDim: latDim,
+            metric: latticeConfig.metric as TdseConfig['metric'],
+          })
+        : computeEffectiveSpacing(
+            latticeConfig.gridSize ?? [32],
+            latticeConfig.spacing ?? [0.1],
+            latticeConfig.compactDims as boolean[] | undefined,
+            latticeConfig.compactRadii as number[] | undefined,
+            latDim
+          )
     return computeLatticeBoundingRadius(latDim, latticeConfig.gridSize ?? [32], effSpacing)
   }
 
@@ -412,6 +424,7 @@ export class TdseBecStrategy implements QuantumModeStrategy {
   ): void {
     const entStore = useCoordinateEntanglementStore.getState()
     if (!entStore.enabled || this.entanglementInFlight) return
+    if (!isCoordinateEntanglementMetricSupported(config.metric)) return
 
     this.entanglementFrameCounter++
     if (this.entanglementFrameCounter < ENTANGLEMENT_DECIMATION) return

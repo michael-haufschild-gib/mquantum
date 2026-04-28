@@ -45,10 +45,10 @@
  * so `t = (η·(n−2)/(n−1))^((n−1)/(n−2))` and `ã = t^(1/(n−1))`.
  * For n = 4 this reduces to `η = (3/2)·t^(2/3)`, `t = (2η/3)^(3/2)`.
  *
- * Bianchi-I is only defined on the first three spatial axes — lattice
- * dimensions `d ≥ 3` stay isotropic on the shader side (they use the bare
- * `aPotential` with no ratio factor), and the preset is marked unavailable
- * for `latticeDim < 3` at the UI layer.
+ * This implementation is the 3+1-dimensional Bianchi-I model. It carries
+ * exactly three Kasner exponents and two axis-ratio uniforms. Higher spatial
+ * dimensions would require a d-dimensional exponent vector and a wider shader
+ * contract, so validators reject `spacetimeDim !== 4`.
  *
  * @module lib/physics/cosmology/bianchiKasner
  */
@@ -274,9 +274,9 @@ export function computeBianchiKasnerCoefs(
       `computeBianchiKasnerCoefs requires eta > 0 (generalized conformal time), got ${eta}`
     )
   }
-  if (!Number.isFinite(spacetimeDim) || spacetimeDim < 3) {
+  if (spacetimeDim !== 4) {
     throw new RangeError(
-      `computeBianchiKasnerCoefs requires spacetimeDim >= 3 (Bianchi-I has three spatial axes), got ${spacetimeDim}`
+      `computeBianchiKasnerCoefs requires spacetimeDim = 4 (three spatial Kasner axes), got ${spacetimeDim}`
     )
   }
   if (!Number.isFinite(exp.p1) || !Number.isFinite(exp.p2) || !Number.isFinite(exp.p3)) {

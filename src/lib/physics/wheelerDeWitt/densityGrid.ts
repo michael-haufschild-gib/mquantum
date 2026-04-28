@@ -69,10 +69,11 @@ export interface WdwDensityUpload {
 /**
  * Optional SRMT (Superspace-Relational Modular Time) overlay input.
  *
- * `sliceK` is the diagnostic output of `computeSrmtDiagnostic`; it has
- * exactly `Nphi²` entries regardless of clock choice (the HJ spectrum for
- * `φ`-clocks is naturally `Na·Nphi` long but `buildSliceK` projects it
- * into `Nphi²` for a consistent render-time payload shape).
+ * `sliceK` is the legacy-named slice-density output of
+ * `computeSrmtDiagnostic`; it has exactly `Nphi²` entries regardless of
+ * clock choice. The true modular-Hamiltonian spectrum is carried separately
+ * as `kSpectrum`; this render overlay is the normalized conditional density
+ * on the selected clock slice.
  *
  * The overlay is broadcast only along the CLOCK axis at the cut plane —
  * voxels farther than ~1 density-texel from
@@ -375,7 +376,7 @@ function sampleOverlayTrilinear(
 
 /** Precomputed state for the SRMT overlay. `null` when SRMT is disabled. */
 interface SrmtOverlayState {
-  /** Log-normalised `sliceK` for O(1) per-voxel lookup. */
+  /** Log-normalised conditional slice density for O(1) per-voxel lookup. */
   norm: Float32Array
   /** Density-texture slice-plane type. */
   plane: WdwSrmtOverlay['slicePlane']
@@ -392,8 +393,8 @@ interface SrmtOverlayState {
 /**
  * Build the precomputed SRMT overlay state. Returns `null` when the
  * overlay is absent or empty (so the hot-loop skip is a single null
- * check). Log-normalising `sliceK` once turns the inner-loop lookup into
- * a single array read.
+ * check). Log-normalising the conditional slice density once turns the
+ * inner-loop lookup into a single array read.
  *
  * Clock → density-axis mapping (matching the packer's cut-plane detection):
  *
@@ -506,9 +507,9 @@ export interface WdwPackScratch {
  *
  * @param output - Dense solver output.
  * @param overlay - Optional WKB streamline intensity (may be `null`).
- * @param srmtOverlay - Optional SRMT `sliceK` overlay (may be
- *   `undefined`). When supplied, the modular spectrum is projected onto
- *   the cut plane only — voxels outside the cut disk are unaffected.
+ * @param srmtOverlay - Optional SRMT slice-density overlay (may be
+ *   `undefined`). When supplied, normalized conditional density is painted
+ *   onto the cut plane only — voxels outside the cut disk are unaffected.
  *   Blends via `max(streamline, srmt)` against the streamline overlay so
  *   the two can coexist without destroying either.
  * @param targetGridSize - Size of the output density grid.
