@@ -31,6 +31,11 @@ describe('QuantumWalkControls', () => {
     expect(screen.getByRole('radio', { name: 'Entropy' })).toBeInTheDocument()
   })
 
+  it('exposes Ricci theta as a field view', () => {
+    render(<QuantumWalkControls />)
+    expect(screen.getByRole('radio', { name: 'Ricci theta' })).toBeInTheDocument()
+  })
+
   it('shows Grover coin selected by default', () => {
     render(<QuantumWalkControls />)
     const coinGroup = screen.getByLabelText('Coin operator type')
@@ -142,6 +147,21 @@ describe('QuantumWalkControls', () => {
     expect(setConfig).toHaveBeenCalledWith(
       expect.objectContaining({
         quantumWalk: expect.objectContaining({ fieldView: 'coinEntropy' }),
+      })
+    )
+  })
+
+  it('calls setSchroedingerConfig when Ricci theta field view is selected', () => {
+    const setConfig = vi.fn()
+    useExtendedObjectStore.setState((s) => ({
+      ...s,
+      setSchroedingerConfig: setConfig,
+    }))
+    render(<QuantumWalkControls />)
+    fireEvent.click(screen.getByRole('radio', { name: 'Ricci theta' }))
+    expect(setConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quantumWalk: expect.objectContaining({ fieldView: 'causalCurvature' }),
       })
     )
   })

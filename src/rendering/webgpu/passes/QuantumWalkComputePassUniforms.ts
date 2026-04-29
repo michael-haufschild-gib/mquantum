@@ -18,6 +18,7 @@ const FIELD_VIEW_MAP: Record<string, number> = {
   phase: 1,
   coinState: 2,
   coinEntropy: 3,
+  causalCurvature: 4,
 }
 
 /**

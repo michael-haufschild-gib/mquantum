@@ -35,6 +35,11 @@ function normalizedCoinEntropy(corners: number[][], weights: number[]): number {
 }
 
 describe('QuantumWalk coin entropy field view', () => {
+  it('accepts causalCurvature as a quantum-walk field view', () => {
+    const fieldView: QuantumWalkConfig['fieldView'] = 'causalCurvature'
+    expect(configWithFieldView(fieldView).fieldView).toBe('causalCurvature')
+  })
+
   it('packs coinEntropy to write-grid fieldView enum 3', () => {
     const buf = packWriteGridUniforms(
       configWithFieldView('coinEntropy'),
@@ -47,6 +52,25 @@ describe('QuantumWalk coin entropy field view', () => {
       1
     )
     expect(new Uint32Array(buf)[3]).toBe(3)
+  })
+
+  it('packs causalCurvature to write-grid fieldView enum 4 without moving coinEntropy', () => {
+    const pack = (fieldView: QuantumWalkConfig['fieldView']) =>
+      new Uint32Array(
+        packWriteGridUniforms(
+          configWithFieldView(fieldView),
+          16 * 16 * 16,
+          1,
+          [16 * 16, 16, 1],
+          undefined,
+          undefined,
+          undefined,
+          1
+        )
+      )[3]
+
+    expect(pack('coinEntropy')).toBe(3)
+    expect(pack('causalCurvature')).toBe(4)
   })
 
   it('keeps existing quantum-walk field-view enums stable', () => {
@@ -82,6 +106,34 @@ describe('QuantumWalk coin entropy field view', () => {
     expect(qwWriteGridBlock).toContain('params.fieldView == 3u')
     expect(qwWriteGridBlock).toContain('displayScalar = coinEntropy * densityGate')
     expect(qwWriteGridBlock).not.toContain('entropyRaw')
+  })
+
+  it('writes causal Ricci theta from centered clamped coin-current expansion', () => {
+    expect(qwWriteGridBlock).toContain('fn coinAxisCurrentAt')
+    expect(qwWriteGridBlock).toContain('return dot(zPlus, zPlus) - dot(zMinus, zMinus)')
+    expect(qwWriteGridBlock).toContain('fn offsetSiteClamped')
+    expect(qwWriteGridBlock).toContain('clamp(i32((*coords)[axis]) + delta, 0, maxCoord)')
+    expect(qwWriteGridBlock).toContain('fn causalExpansionAt')
+    expect(qwWriteGridBlock).toContain(
+      'let centeredCurrentDiff = coinAxisCurrentAt(plusSite, d) - coinAxisCurrentAt(minusSite, d)'
+    )
+    expect(qwWriteGridBlock).toContain(
+      'theta += centeredCurrentDiff / (2.0 * max(params.spacing[d], 1e-12))'
+    )
+    expect(qwWriteGridBlock).toContain('fn causalCurvature')
+    expect(qwWriteGridBlock).toContain('theta / max(rho, 1e-20)')
+    expect(qwWriteGridBlock).toContain('1.0 - exp(-abs(')
+    expect(qwWriteGridBlock).toContain('params.fieldView == 4u')
+    expect(qwWriteGridBlock).toContain('nearestLatticeCoords(&coordsLo, &coordsHi, &fracs)')
+    expect(qwWriteGridBlock).toContain(
+      'let nnSite = ndToLinear(nnCoords, params.strides, params.latticeDim)'
+    )
+    expect(qwWriteGridBlock).toContain('let localRho = sumCoinStates(nnSite).prob')
+    expect(qwWriteGridBlock).toContain(
+      'let causalCurvatureValue = causalCurvature(&nnCoords, localRho)'
+    )
+    expect(qwWriteGridBlock).not.toContain('causalCurvature(&nnCoords, blendedProb)')
+    expect(qwWriteGridBlock).toContain('displayScalar = causalCurvatureValue * densityGate')
   })
 
   it('models interpolated pure coin corners as mixed renderer-local entropy', () => {

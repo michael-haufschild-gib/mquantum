@@ -164,6 +164,21 @@ Render local internal-state entropy in the N-D discrete quantum walk. The view s
 
 ### Outcome
 
+- Commit: `Add quantum walk causal Ricci view`.
+- Reviewer result: FAIL on first pass for interpolated-density denominator; fixed to normalize expansion by nearest-site `localRho`; re-review PASS.
+- What renderer now draws: Quantum Walk has a `Ricci theta` field view that raymarches current-focusing shells from coin-resolved probability flow.
+- Physics implemented: `J_d = |c_{+d}|^2 - |c_{-d}|^2`, centered clamped expansion `sum_d (J_d(x+e_d)-J_d(x-e_d))/(2 spacing_d)`, nearest-site probability normalization, exponential bounded magnitude, and density gating.
+- Paths affected: QW field-view type/UI/packing, QW write-grid WGSL, and focused QW tests.
+- Verification:
+  - `pnpm exec vitest run src/tests/rendering/webgpu/quantumWalkCoinEntropy.test.ts src/tests/components/sections/Geometry/SchroedingerControls/QuantumWalkControls.test.tsx` — PASS, 22 tests.
+  - `pnpm exec tsc --noEmit` — PASS.
+  - `pnpm run lint` — PASS.
+  - `pnpm test:shaders:fast` — PASS.
+  - `git diff --check` — PASS.
+- Follow-up threads: signed expansion palette; compare `Ricci theta` shells against coin entropy fronts; couple positive focusing to horizon-memory postprocess.
+
+### Outcome
+
 - Commit: `Add quantum-walk coin entropy view` (amended with this outcome).
 - Reviewer result: FAIL on first pass, PASS after fix.
 - What renderer now draws: Quantum Walk has a new `Entropy` field view that raymarches normalized local Shannon entropy of the interpolated coin-direction probability distribution.
@@ -698,3 +713,41 @@ Render quantized circulation as a phase-winding two-form so vortex defects appea
   - `pnpm test:shaders:fast` — PASS.
   - `git diff --check` — PASS.
 - Follow-up threads: signed circulation palette; vortex-line extraction from plaquette winding; compare BEC reconnection initial states against TDSE phase singularity statistics.
+
+## Round PRD: Quantum Walk Causal Ricci View
+
+### Scientific Goal
+
+Render causal focusing in the discrete-time quantum walk as an emergent curvature scalar. The view should turn the coin-resolved probability current into a local Raychaudhuri-like expansion signal so relativistic walk fronts, caustics, and trapped-shell analogs are visible as geometry rather than inferred from density.
+
+### Physics / Math
+
+- Add `causalCurvature` to `QuantumWalkFieldView`.
+- Map `causalCurvature` to QW write-grid `fieldView = 4`; keep `coinEntropy = 3`.
+- In `qwWriteGrid`:
+  - Interpret coin states `2d` and `2d+1` as outgoing current along `+axis_d` and `-axis_d`.
+  - Define local axis current `J_d(x) = |c_{+d}(x)|^2 - |c_{-d}(x)|^2`.
+  - Build a nearest lattice coordinate for the rendered voxel from existing interpolation coordinates.
+  - For every active axis, compute centered current expansion `theta = sum_d (J_d(x+e_d) - J_d(x-e_d)) / (2 * spacing_d)`.
+  - Clamp derivative neighbors at lattice edges to avoid drawing fake wraparound horizons at open/PML boundaries.
+  - Normalize by local probability `rho = sum_j |c_j(x)|^2` so the scalar encodes focusing per probability density.
+  - Render bounded focusing magnitude `1 - exp(-abs(theta / rho))`, density-gated by existing `densityGate`.
+- Existing probability, phase, coin, and entropy views remain unchanged.
+
+### User Sees
+
+- Quantum Walk controls gain `Ricci theta`.
+- Selecting it renders bright causal shells where coin current converges or diverges. In 4D+ walks, slice sliders expose different cross-sections of the N-D current-expansion field.
+
+### Acceptance Bar
+
+- TypeScript compiles.
+- Unit/source tests cover:
+  - `causalCurvature` is accepted as a `QuantumWalkFieldView`.
+  - `causalCurvature` packs to QW write-grid enum `4`; `coinEntropy` remains `3`.
+  - `qwWriteGrid` fieldView-4 branch uses `coinAxisCurrentAt`, `offsetSiteClamped`, `causalExpansionAt`, `causalCurvature`, centered current differences, spacing normalization, local probability normalization, and density gating.
+  - Quantum Walk UI exposes `Ricci theta` and selecting it writes `fieldView: 'causalCurvature'`.
+- `pnpm exec vitest run src/tests/rendering/webgpu/quantumWalkCoinEntropy.test.ts src/tests/components/sections/Geometry/SchroedingerControls/QuantumWalkControls.test.tsx`
+- `pnpm exec tsc --noEmit`
+- `pnpm run lint`
+- `pnpm test:shaders:fast`

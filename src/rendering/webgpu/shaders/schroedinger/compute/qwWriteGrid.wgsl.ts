@@ -27,7 +27,7 @@ struct QWWriteGridUniforms {
   latticeDim: u32,           // offset 0
   totalSites: u32,           // offset 4
   numCoinStates: u32,        // offset 8  (= 2 * latticeDim)
-  fieldView: u32,            // offset 12 (0=probability, 1=phase, 2=coinState, 3=coinEntropy)
+  fieldView: u32,            // offset 12 (0=probability, 1=phase, 2=coinState, 3=coinEntropy, 4=causalCurvature)
 
   // Per-dimension arrays (48 bytes each)
   gridSize: array<u32, 12>,  // offset 16
@@ -165,6 +165,56 @@ fn coinProbabilityAt(site: u32, coinIdx: u32) -> f32 {
   return dot(z, z);
 }
 
+fn coinAxisCurrentAt(site: u32, axis: u32) -> f32 {
+  let baseIdx = site * params.numCoinStates + (axis << 1u);
+  let zPlus = coinState[baseIdx];
+  let zMinus = coinState[baseIdx + 1u];
+  return dot(zPlus, zPlus) - dot(zMinus, zMinus);
+}
+
+fn nearestLatticeCoords(
+  coordsLo: ptr<function, array<u32, 12>>,
+  coordsHi: ptr<function, array<u32, 12>>,
+  fracs: ptr<function, array<f32, 12>>
+) -> array<u32, 12> {
+  var coords: array<u32, 12>;
+  let interpDims = min(params.latticeDim, 3u);
+  for (var d: u32 = 0u; d < params.latticeDim; d++) {
+    if (d < interpDims && (*fracs)[d] >= 0.5) {
+      coords[d] = (*coordsHi)[d];
+    } else {
+      coords[d] = (*coordsLo)[d];
+    }
+  }
+  return coords;
+}
+
+fn offsetSiteClamped(coords: ptr<function, array<u32, 12>>, axis: u32, delta: i32) -> u32 {
+  var shifted: array<u32, 12>;
+  for (var d: u32 = 0u; d < params.latticeDim; d++) {
+    shifted[d] = (*coords)[d];
+  }
+  let maxCoord = i32(params.gridSize[axis]) - 1;
+  shifted[axis] = u32(clamp(i32((*coords)[axis]) + delta, 0, maxCoord));
+  return ndToLinear(shifted, params.strides, params.latticeDim);
+}
+
+fn causalExpansionAt(coords: ptr<function, array<u32, 12>>) -> f32 {
+  var theta: f32 = 0.0;
+  for (var d: u32 = 0u; d < params.latticeDim; d++) {
+    let plusSite = offsetSiteClamped(coords, d, 1);
+    let minusSite = offsetSiteClamped(coords, d, -1);
+    let centeredCurrentDiff = coinAxisCurrentAt(plusSite, d) - coinAxisCurrentAt(minusSite, d);
+    theta += centeredCurrentDiff / (2.0 * max(params.spacing[d], 1e-12));
+  }
+  return theta;
+}
+
+fn causalCurvature(coords: ptr<function, array<u32, 12>>, rho: f32) -> f32 {
+  let theta = causalExpansionAt(coords);
+  return 1.0 - exp(-abs(theta / max(rho, 1e-20)));
+}
+
 @compute @workgroup_size(4, 4, 4)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let texDims = textureDimensions(outputTex);
@@ -292,6 +342,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   } else if (params.fieldView == 3u) {
     // Coin entropy: normalized local Shannon spread across ±axis coin states
     displayScalar = coinEntropy * densityGate;
+  } else if (params.fieldView == 4u) {
+    // Ricci theta: Raychaudhuri-like focusing magnitude from coin current expansion
+    var nnCoords = nearestLatticeCoords(&coordsLo, &coordsHi, &fracs);
+    let nnSite = ndToLinear(nnCoords, params.strides, params.latticeDim);
+    let localRho = sumCoinStates(nnSite).prob;
+    let causalCurvatureValue = causalCurvature(&nnCoords, localRho);
+    displayScalar = causalCurvatureValue * densityGate;
   }
 
   let normDensity = displayScalar * perpFalloff;
