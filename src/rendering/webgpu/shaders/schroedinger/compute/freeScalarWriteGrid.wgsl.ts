@@ -288,7 +288,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   var gradEnergy: f32 = 0.0;
   var gradPhi: array<f32, 12>;
 
-  let needGrad = params.fieldView == 2u || params.fieldView == 4u || hasAnalysis;
+  let needGrad = params.fieldView == 2u || params.fieldView == 4u || params.fieldView == 5u || hasAnalysis;
   if (needGrad) {
     let hasPML = params.absorberEnabled != 0u;
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
@@ -371,6 +371,23 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let phaseSpaceBalance = 1.0 - clamp(abs(K - V) / max(K + V, 1e-12), 0.0, 1.0);
     let fluxStrain = clamp(abs(nnPiVal) * sqrt(max(gradEnergy, 0.0)) * invAFull / localEnergy, 0.0, 1.0);
     fieldValue = clamp(0.7 * freezeOutGate * phaseSpaceBalance + 0.3 * fluxStrain, 0.0, 1.0);
+  } else if (params.fieldView == 5u) {
+    let invAFull = select(1.0 / params.aFull, 1.0, params.aFull <= 0.0);
+    let K = 0.5 * params.aKinetic * nnPiVal * nnPiVal * invAFull;
+    let G = 0.5 * gradEnergy * invAFull;
+    var V = 0.5 * drivenMassCoef * nnPhiVal * nnPhiVal * invAFull;
+    if (params.selfInteractionEnabled != 0u) {
+      let eosV2 = params.selfInteractionVev * params.selfInteractionVev;
+      let eosPhi2 = nnPhiVal * nnPhiVal;
+      let eosDiff = eosPhi2 - eosV2;
+      V += params.aFull * params.selfInteractionLambda * eosDiff * eosDiff * invAFull;
+    }
+
+    let localEnergy = max(K + G + V, 1e-12);
+    let spatialDim = max(f32(params.latticeDim), 1.0);
+    let pressure = K - V + (2.0 / spatialDim - 1.0) * G;
+    let wLocal = clamp(pressure / localEnergy, -1.0, 1.0);
+    fieldValue = wLocal;
   } else {
     // Physical Hamiltonian energy density in the canonical δφ variables:
     //   H_can(x) = ½ aKinetic π² + ½ aPotential (∇δφ)² + ½ mass²·aFull δφ²

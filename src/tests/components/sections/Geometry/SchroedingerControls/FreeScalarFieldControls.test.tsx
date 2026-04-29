@@ -197,6 +197,17 @@ describe('FreeScalarFieldControls', () => {
     expect(screen.getByTestId('field-view-selector-freezeOutStrain')).toBeInTheDocument()
   })
 
+  it('equationOfState option is available without self-interaction', () => {
+    render(
+      <FreeScalarFieldControls
+        config={makeFsConfig({ selfInteractionEnabled: false })}
+        dimension={3}
+        actions={createMockActions()}
+      />
+    )
+    expect(screen.getByTestId('field-view-selector-equationOfState')).toBeInTheDocument()
+  })
+
   it('does not show slice positions for 3D lattice', () => {
     render(
       <FreeScalarFieldControls

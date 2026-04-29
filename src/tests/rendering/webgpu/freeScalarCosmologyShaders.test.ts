@@ -52,7 +52,7 @@ describe('free scalar canonical δφ integrator shader contracts', () => {
 
   it('writeGrid shader renders a bounded cosmological freeze-out strain field view', () => {
     expect(freeScalarWriteGridBlock).toContain(
-      'let needGrad = params.fieldView == 2u || params.fieldView == 4u || hasAnalysis;'
+      'let needGrad = params.fieldView == 2u || params.fieldView == 4u || params.fieldView == 5u || hasAnalysis;'
     )
     expect(freeScalarWriteGridBlock).toContain('} else if (params.fieldView == 4u) {')
     expect(freeScalarWriteGridBlock).toContain(
@@ -68,6 +68,26 @@ describe('free scalar canonical δφ integrator shader contracts', () => {
     expect(freeScalarWriteGridBlock).toContain(
       'fieldValue = clamp(0.7 * freezeOutGate * phaseSpaceBalance + 0.3 * fluxStrain, 0.0, 1.0);'
     )
+  })
+
+  it('writeGrid shader renders local scalar-field equation of state', () => {
+    expect(freeScalarWriteGridBlock).toContain('} else if (params.fieldView == 5u) {')
+    expect(freeScalarWriteGridBlock).toContain(
+      'let K = 0.5 * params.aKinetic * nnPiVal * nnPiVal * invAFull;'
+    )
+    expect(freeScalarWriteGridBlock).toContain('let G = 0.5 * gradEnergy * invAFull;')
+    expect(freeScalarWriteGridBlock).toContain(
+      'var V = 0.5 * drivenMassCoef * nnPhiVal * nnPhiVal * invAFull;'
+    )
+    expect(freeScalarWriteGridBlock).toContain('let localEnergy = max(K + G + V, 1e-12);')
+    expect(freeScalarWriteGridBlock).toContain('let spatialDim = max(f32(params.latticeDim), 1.0);')
+    expect(freeScalarWriteGridBlock).toContain(
+      'let pressure = K - V + (2.0 / spatialDim - 1.0) * G;'
+    )
+    expect(freeScalarWriteGridBlock).toContain(
+      'let wLocal = clamp(pressure / localEnergy, -1.0, 1.0);'
+    )
+    expect(freeScalarWriteGridBlock).toContain('fieldValue = wLocal;')
   })
 
   it('init shader single-mode + gaussian-packet branches use the canonical oscillator', () => {

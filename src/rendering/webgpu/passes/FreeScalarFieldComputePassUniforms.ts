@@ -196,6 +196,7 @@ const FIELD_VIEW_MAP: Record<string, number> = {
   energyDensity: 2,
   wallDensity: 3,
   freezeOutStrain: 4,
+  equationOfState: 5,
 }
 
 /** Parameters for writing FreeScalarUniforms to a GPU buffer. */
@@ -587,7 +588,7 @@ export function estimateFsfMaxFieldValue(config: FreeScalarConfig, maxPhiEstimat
     return 1.0
   }
 
-  if (config.fieldView === 'freezeOutStrain') {
+  if (config.fieldView === 'freezeOutStrain' || config.fieldView === 'equationOfState') {
     return 1.0
   }
 

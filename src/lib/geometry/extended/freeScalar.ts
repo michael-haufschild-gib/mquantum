@@ -19,8 +19,15 @@ import type { CosmologyPreset } from '@/lib/physics/cosmology/presets'
  * - energyDensity: Local energy density (kinetic + gradient + mass)
  * - wallDensity: Self-interaction potential V(phi) — highlights domain walls (zero at vacua)
  * - freezeOutStrain: Bounded proxy for cosmological mode freeze-out / phase-space squeezing
+ * - equationOfState: Local scalar-field pressure ratio w = p/rho from stress-energy trace
  */
-export type FreeScalarFieldView = 'phi' | 'pi' | 'energyDensity' | 'wallDensity' | 'freezeOutStrain'
+export type FreeScalarFieldView =
+  | 'phi'
+  | 'pi'
+  | 'energyDensity'
+  | 'wallDensity'
+  | 'freezeOutStrain'
+  | 'equationOfState'
 
 /**
  * Initial condition type for the free scalar field

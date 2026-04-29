@@ -177,6 +177,50 @@ Render local internal-state entropy in the N-D discrete quantum walk. The view s
   - `git diff --check` — PASS.
 - Follow-up threads: signed expansion palette; compare `Ricci theta` shells against coin entropy fronts; couple positive focusing to horizon-memory postprocess.
 
+## Round PRD: Free-Scalar Stress-Energy Equation-of-State View
+
+### Scientific Goal
+
+Render the scalar field as a local gravitational source, not just as amplitude or energy. The view should expose where quantum/cosmological scalar dynamics drive inflation-like negative pressure, radiation-like gradient pressure, or matter-like oscillatory pressure, making the stress-energy tensor visible in the WebGPU volume.
+
+### Physics / Math
+
+- Add `equationOfState` to `FreeScalarFieldView`.
+- Map `equationOfState` to free-scalar write-grid `fieldView = 5`; keep `freezeOutStrain = 4`.
+- In `freeScalarWriteGrid`:
+  - Reuse the proper-frame terms already present in the energy/freeze-out paths:
+    - `K = 0.5 * aKinetic * pi^2 / aFull`
+    - `G = 0.5 * gradEnergy / aFull`
+    - `V = 0.5 * drivenMassCoef * phi^2 / aFull + selfInteraction`
+  - Compute local scalar-field pressure in `n = latticeDim` spatial dimensions:
+    - `p = K - V + (2/n - 1) * G`
+    - This is the spatial trace average of `T_ij` for a scalar field.
+  - Compute `w = clamp(p / max(K + G + V, eps), -1, 1)`.
+  - Write signed `w` as `fieldValue`; existing phase branch marks negative pressure with π phase while opacity uses `abs(w)`.
+  - Require gradients for fieldView 5.
+- Existing field views remain unchanged.
+- Auto-scale estimate for `equationOfState` returns `1.0` because `w` is bounded.
+
+### User Sees
+
+- Free Scalar display controls gain `w(x)`.
+- Negative-pressure regions render with the negative branch phase; gradient/radiation-pressure shells render with positive branch. In cosmology/preheating runs this separates inflating vacuum-like zones from reheating matter/radiation zones.
+
+### Acceptance Bar
+
+- TypeScript compiles.
+- Unit/source tests cover:
+  - `equationOfState` is accepted as a `FreeScalarFieldView`.
+  - `equationOfState` packs to shader enum `5`; `freezeOutStrain` remains `4`.
+  - Free Scalar UI exposes `w(x)` without requiring self-interaction.
+  - `freeScalarWriteGrid` fieldView-5 branch computes `K`, `G`, `V`, `pressure`, `wLocal`, uses `2.0 / max(f32(params.latticeDim), 1.0) - 1.0`, clamps `w` to `[-1, 1]`, and writes signed `fieldValue`.
+  - `needGrad` includes `params.fieldView == 5u`.
+  - `estimateFsfMaxFieldValue` returns `1.0` for `equationOfState`.
+- `pnpm exec vitest run src/tests/rendering/webgpu/freeScalarCosmologyShaders.test.ts src/tests/rendering/webgpu/passes/FreeScalarFieldComputePassUniforms.test.ts src/tests/components/sections/Geometry/SchroedingerControls/FreeScalarFieldControls.test.tsx`
+- `pnpm exec tsc --noEmit`
+- `pnpm run lint`
+- `pnpm test:shaders:fast`
+
 ### Outcome
 
 - Commit: `Add quantum-walk coin entropy view` (amended with this outcome).

@@ -313,6 +313,22 @@ describe('writeFsfUniforms', () => {
     expect(new Uint32Array(uniformData)[41]).toBe(4)
   })
 
+  it('maps equationOfState field view to shader enum 5', () => {
+    const uniformData = new ArrayBuffer(512)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
+      config: createConfig({ fieldView: 'equationOfState' }),
+      totalSites: 32768,
+      maxFieldValue: 1.0,
+      simEta: 0,
+      preheatingTime: 0,
+      preheatingReferenceEta: 0,
+    })
+
+    expect(new Uint32Array(uniformData)[41]).toBe(5)
+  })
+
   it('uploads the buffer to the GPU via device.queue.writeBuffer', () => {
     const uniformData = new ArrayBuffer(512)
     const writeBuffer = vi.fn()
@@ -484,6 +500,15 @@ describe('estimateFsfMaxFieldValue with self-interaction', () => {
   it('returns 1.0 for bounded freezeOutStrain view', () => {
     const config = createConfig({
       fieldView: 'freezeOutStrain',
+      autoScale: true,
+    })
+
+    expect(estimateFsfMaxFieldValue(config, 123)).toBe(1.0)
+  })
+
+  it('returns 1.0 for bounded equationOfState view', () => {
+    const config = createConfig({
+      fieldView: 'equationOfState',
       autoScale: true,
     })
 
