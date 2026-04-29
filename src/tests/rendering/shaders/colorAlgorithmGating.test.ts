@@ -219,7 +219,7 @@ describe('getAvailableColorAlgorithms — phase-dependent exclusion in DM mode',
   it('excludes quantumPotential and vortexDensity from freeScalarField', () => {
     // Free scalar is a classical field theory with no wavefunction ψ. The
     // write shader puts the selected fieldView's scalar into R (phi, pi,
-    // energyDensity, wallDensity) rather than a density, and stores only a
+    // energyDensity, wallDensity, freezeOutStrain) rather than a density, and stores only a
     // sign proxy (0 or π) in the phase channel. Neither the Bohmian quantum
     // potential nor plaquette U(1) winding is physically meaningful here, so
     // both must be hidden from the dropdown.

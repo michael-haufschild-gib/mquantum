@@ -116,4 +116,40 @@ export const PAULI_SCENARIO_PRESETS: PauliScenarioPreset[] = [
       stepsPerFrame: 4,
     },
   },
+  {
+    id: 'helicityTwist',
+    name: 'Helicity Twist',
+    description:
+      'Quadrupole field opened in the spin-helicity view — twisted Bloch texture lights up where the spin field aligns with its own curl',
+    overrides: {
+      fieldType: 'quadrupole',
+      fieldStrength: 2.0,
+      fieldDirection: [0, 0],
+      gradientStrength: 3.0,
+      initialSpinDirection: [Math.PI / 2, Math.PI / 4],
+      initialCondition: 'gaussianSuperposition',
+      potentialType: 'none',
+      fieldView: 'spinHelicity',
+      dt: 0.004,
+      stepsPerFrame: 4,
+    },
+  },
+  {
+    id: 'berryCurvatureMonopole',
+    name: 'Berry Curvature Monopole',
+    description:
+      'Stern-Gerlach gradient opened in the Berry-curvature two-form view — monopole-like cores appear where Bloch orientation winds rapidly',
+    overrides: {
+      fieldType: 'gradient',
+      fieldStrength: 2.0,
+      fieldDirection: [0, 0],
+      gradientStrength: 3.0,
+      initialSpinDirection: [Math.PI / 2, 0],
+      initialCondition: 'gaussianSuperposition',
+      potentialType: 'none',
+      fieldView: 'berryCurvature',
+      dt: 0.005,
+      stepsPerFrame: 4,
+    },
+  },
 ]

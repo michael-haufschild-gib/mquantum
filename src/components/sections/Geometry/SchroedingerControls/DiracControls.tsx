@@ -40,7 +40,12 @@ const FIELD_VIEW_OPTIONS: { value: DiracFieldView; label: string }[] = [
   { value: 'spinDensity', label: 'Spin Density |s|' },
   { value: 'currentDensity', label: 'Current Density |j|' },
   { value: 'phase', label: 'Phase arg(ψ₀)' },
+  { value: 'axialCharge', label: 'Axial |ψ†γ5ψ|' },
 ]
+
+// Field views that require ≥3 spatial dimensions. The 3+1D γ5 = -i α0α1α2 needs
+// at least three Clifford alphas, so the shader returns 0 below latticeDim 3.
+const FIELD_VIEWS_REQUIRING_3D: ReadonlySet<DiracFieldView> = new Set(['axialCharge'])
 
 const POTENTIAL_TYPE_OPTIONS: { value: DiracPotentialType; label: string }[] = [
   { value: 'none', label: 'Free Particle' },
@@ -64,6 +69,14 @@ const POTENTIAL_TYPE_OPTIONS: { value: DiracPotentialType; label: string }[] = [
 export const DiracControls = React.memo(({ config, dimension, actions }: DiracControlsProps) => {
   const dirac = config.dirac
   const latticeDim = dirac.latticeDim ?? dimension
+
+  const fieldViewOptions = useMemo(
+    () =>
+      latticeDim >= 3
+        ? FIELD_VIEW_OPTIONS
+        : FIELD_VIEW_OPTIONS.filter((opt) => !FIELD_VIEWS_REQUIRING_3D.has(opt.value)),
+    [latticeDim]
+  )
 
   // Compute grid size range (power of 2, limited by total sites + alignment)
   const maxPerDim = useMemo(
@@ -141,7 +154,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
           label="Field View"
           tooltip="Which spinor observable to visualize: total density, individual components, spin, or current."
           value={dirac.fieldView}
-          options={FIELD_VIEW_OPTIONS}
+          options={fieldViewOptions}
           onChange={(v) => actions.setFieldView(v as DiracFieldView)}
         />
       </ControlGroup>

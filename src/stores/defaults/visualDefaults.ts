@@ -119,6 +119,21 @@ export const DEFAULT_FRAME_BLENDING_ENABLED = false
 /** Blend factor - how much previous frame is blended in (0-1, higher = more ghosting) */
 export const DEFAULT_FRAME_BLENDING_FACTOR = 0.3
 
+/** Horizon memory echo disabled by default; frame blending remains exact linear mix. */
+export const DEFAULT_HORIZON_MEMORY_ENABLED = false
+
+/** History-driven UV refraction and echo emission strength (0-1.5). */
+export const DEFAULT_HORIZON_MEMORY_STRENGTH = 0.45
+
+/** Center-origin echo shell radius in screen UV units (0.05-1.5). */
+export const DEFAULT_HORIZON_MEMORY_RADIUS = 0.62
+
+/** Number of radial echo shells sampled from previous-frame history (1-6). */
+export const DEFAULT_HORIZON_MEMORY_ECHOES = 3
+
+/** Angular Kerr-like spin/shear applied to horizon memory echoes (0-1). */
+export const DEFAULT_HORIZON_MEMORY_SPIN = 0
+
 // ============================================================================
 // Lighting Defaults
 // ============================================================================

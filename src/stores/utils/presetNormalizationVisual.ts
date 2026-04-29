@@ -311,6 +311,17 @@ export function normalizePostProcessingLoadData(
   // Frame blending
   validateBooleanField(pp, 'frameBlendingEnabled')
   validateNumericField(pp, 'frameBlendingFactor', 0, 1)
+  validateBooleanField(pp, 'horizonMemoryEnabled')
+  validateNumericField(pp, 'horizonMemoryStrength', 0, 1.5)
+  validateNumericField(pp, 'horizonMemoryRadius', 0.05, 1.5)
+  validateNumericField(pp, 'horizonMemorySpin', 0, 1)
+  if ('horizonMemoryEchoes' in pp) {
+    if (typeof pp.horizonMemoryEchoes === 'number' && Number.isFinite(pp.horizonMemoryEchoes)) {
+      pp.horizonMemoryEchoes = clampToRange(Math.round(pp.horizonMemoryEchoes), 1, 6)
+    } else {
+      delete pp.horizonMemoryEchoes
+    }
+  }
 
   return pickKeys(pp, POST_PROCESSING_LOAD_KEYS)
 }

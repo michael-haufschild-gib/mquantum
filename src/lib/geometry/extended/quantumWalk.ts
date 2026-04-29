@@ -13,7 +13,12 @@ export type QuantumWalkCoinType = 'grover' | 'hadamard' | 'dft'
 export type QuantumWalkCoinInitial = 'real' | 'symmetric'
 
 /** Field view modes for quantum walk visualization. */
-export type QuantumWalkFieldView = 'probability' | 'phase' | 'coinState'
+export type QuantumWalkFieldView =
+  | 'probability'
+  | 'phase'
+  | 'coinState'
+  | 'coinEntropy'
+  | 'causalCurvature'
 
 /**
  * Configuration for discrete-time quantum walk simulation.

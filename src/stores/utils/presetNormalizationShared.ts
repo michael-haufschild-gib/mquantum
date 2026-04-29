@@ -84,6 +84,11 @@ export const POST_PROCESSING_LOAD_KEYS = [
   'paperIntensity',
   'frameBlendingEnabled',
   'frameBlendingFactor',
+  'horizonMemoryEnabled',
+  'horizonMemoryStrength',
+  'horizonMemoryRadius',
+  'horizonMemoryEchoes',
+  'horizonMemorySpin',
 ] as const
 
 export const APPEARANCE_LOAD_KEYS = [

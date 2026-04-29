@@ -188,12 +188,13 @@ export const Slider: React.FC<SliderProps> = React.memo(
 
     const handleRangeChange = useCallback(
       (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (disabled) return
         const val = Number(e.target.value)
         React.startTransition(() => {
           onChange(val)
         })
       },
-      [onChange]
+      [disabled, onChange]
     )
 
     const handleRangeMouseDown = useCallback(() => {

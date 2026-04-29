@@ -195,6 +195,8 @@ const FIELD_VIEW_MAP: Record<string, number> = {
   pi: 1,
   energyDensity: 2,
   wallDensity: 3,
+  freezeOutStrain: 4,
+  equationOfState: 5,
 }
 
 /** Parameters for writing FreeScalarUniforms to a GPU buffer. */
@@ -569,6 +571,13 @@ export function estimateFsfMaxFieldValue(config: FreeScalarConfig, maxPhiEstimat
 
   if (config.fieldView === 'phi') {
     return phi0
+  }
+
+  // freezeOutStrain / equationOfState are pre-normalized in the shader (no
+  // cosmology-dependent rescale needed), so short-circuit before the
+  // `resolveVacuumAutoScale` call to avoid the per-call dispersion/scale work.
+  if (config.fieldView === 'freezeOutStrain' || config.fieldView === 'equationOfState') {
+    return 1.0
   }
 
   const { dispersion, aKinetic, aPotential, aFull } = resolveVacuumAutoScale(config)

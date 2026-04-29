@@ -48,10 +48,18 @@ export function generateVolumeRaymarchGridBlock(usePrecomputedNormals: boolean):
 // Grid-Based Volume Raymarching
 // ============================================
 
-// Gradient fetch: delegates to precomputed normal grid or inline central differences.
-// Generated at shader composition time to avoid referencing undeclared bindings.
+// Gradient fetch: generated to avoid referencing undeclared normal-grid bindings.
 ${gradientFetchFn}
 
+fn gridOpacityDensity(gridSample: vec4f) -> f32 { return select(gridSample.r, gridSample.a, IS_PAULI && !IS_DUAL_CHANNEL && DENSITY_GRID_HAS_PHASE); }
+fn gridSkipDensity(gridSample: vec4f) -> f32 { return select(gridOpacityDensity(gridSample), gridSample.r + gridSample.g, IS_DUAL_CHANNEL); }
+fn gridAdaptiveLogDensity(rho: f32, sCenter: f32) -> f32 {
+  if (IS_DUAL_CHANNEL || (IS_PAULI && !IS_DUAL_CHANNEL && DENSITY_GRID_HAS_PHASE)) {
+    if (rho > 1e-9) { return log(rho); }
+    return -20.0;
+  }
+  return sCenter;
+}
 fn volumeRaymarchGrid(
   rayOrigin: vec3f,
   rayDir: vec3f,
@@ -99,6 +107,8 @@ fn volumeRaymarchGrid(
   let backreactionActive = isQuantumBackreactionActive(uniforms);
   let bilocalBridgeActive = isBilocalERBridgeActive(uniforms);
   let entropyShearActive = isEntropicTimeShearActive(uniforms);
+  let spectralFlowActive = isSpectralDimensionFlowActive(uniforms);
+  let vacuumBubbleActive = isVacuumBubbleLensActive(uniforms);
 
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (PROFILING_HALF_SAMPLES && i >= 64) { break; }
@@ -119,7 +129,7 @@ fn volumeRaymarchGrid(
     // Anti-de Sitter tachyon amplification: |ψ(t)|² = |ψ(0)|² · cosh²(γ·t).
     // adsAmplitudeSq is 1.0 outside AdS — hoisted above the loop.
     // Applied to the R channel only (AdS is never dual-channel).
-    var rho = gridSample.r * adsAmplitudeSq;
+    var rho = gridOpacityDensity(gridSample) * adsAmplitudeSq;
 
     // For dual-channel modes (Dirac particle/antiparticle, Pauli spin-up/down):
     //   R = primary density, G = secondary density (NOT logRho)
@@ -128,7 +138,7 @@ fn volumeRaymarchGrid(
     //   colorRho/colorS preserve the raw channels for computeBaseColor.
     // For all other modes: G = logRho as usual.
     var sCenter: f32;
-    var colorRho: f32 = rho;
+    var colorRho: f32 = gridSample.r * adsAmplitudeSq;
     var colorS: f32 = 0.0;
     if (IS_DUAL_CHANNEL) {
       colorS = gridSample.g;        // secondary density for computeBaseColor 's'
@@ -185,7 +195,7 @@ fn volumeRaymarchGrid(
       let remoteEndpoint = vec3f(-basePos.x, basePos.y, basePos.z);
       let remoteGridSample = sampleDensityFromGrid(remoteEndpoint, uniforms);
       // Match local rho amplitude scaling so AdS bridge locking compares like-for-like.
-      let remotePrimaryRho = remoteGridSample.r * adsAmplitudeSq;
+      let remotePrimaryRho = gridOpacityDensity(remoteGridSample) * adsAmplitudeSq;
       let remoteRho = select(remotePrimaryRho, remotePrimaryRho + remoteGridSample.g, IS_DUAL_CHANNEL);
       var localLogDensity = sCenter;
       var remoteLogDensity = remoteGridSample.g;
@@ -222,8 +232,8 @@ fn volumeRaymarchGrid(
       bridgeGain = bridge.gain;
       if (length(pos - basePos) > 1e-6) {
         gridSample = sampleDensityFromGrid(pos, uniforms);
-        rho = gridSample.r * adsAmplitudeSq;
-        colorRho = rho;
+        rho = gridOpacityDensity(gridSample) * adsAmplitudeSq;
+        colorRho = gridSample.r * adsAmplitudeSq;
         colorS = 0.0;
         if (IS_DUAL_CHANNEL) {
           colorS = gridSample.g;
@@ -266,8 +276,8 @@ fn volumeRaymarchGrid(
       causticMultiplier = metric.caustic;
       if (length(pos - beforeBackreaction) > 1e-6) {
         gridSample = sampleDensityFromGrid(pos, uniforms);
-        rho = gridSample.r * adsAmplitudeSq;
-        colorRho = rho;
+        rho = gridOpacityDensity(gridSample) * adsAmplitudeSq;
+        colorRho = gridSample.r * adsAmplitudeSq;
         colorS = 0.0;
         if (IS_DUAL_CHANNEL) {
           colorS = gridSample.g;
@@ -319,8 +329,107 @@ fn volumeRaymarchGrid(
       entropyGain = entropyShear.entropyGain;
       if (length(pos - beforeEntropyShear) > 1e-6) {
         gridSample = sampleDensityFromGrid(pos, uniforms);
-        rho = gridSample.r * adsAmplitudeSq;
-        colorRho = rho;
+        rho = gridOpacityDensity(gridSample) * adsAmplitudeSq;
+        colorRho = gridSample.r * adsAmplitudeSq;
+        colorS = 0.0;
+        if (IS_DUAL_CHANNEL) {
+          colorS = gridSample.g;
+          sCenter = gridSample.g;
+          rho = rho + gridSample.g;
+          colorRho = gridSample.r;
+        } else if (DENSITY_GRID_HAS_PHASE) {
+          sCenter = gridSample.g;
+          colorS = sCenter;
+        } else {
+          if (rho > 1e-9) {
+            sCenter = log(rho);
+          } else {
+            sCenter = -20.0;
+          }
+          colorS = sCenter;
+        }
+
+        if (DENSITY_GRID_HAS_PHASE) {
+          let rotatedB = gridSample.b - phaseOffset;
+          let useRelPhase =
+            (COLOR_ALGORITHM == 10)
+            && (uniforms.quantumMode == 0
+                || uniforms.quantumMode == 1
+                || uniforms.quantumMode == 7);
+          phase = select(rotatedB, gridSample.a, useRelPhase);
+        } else {
+          phase = 0.0;
+        }
+      }
+    }
+
+    var spectralEmissionGain = 1.0;
+    var spectralOpacityScale = 1.0;
+    if (spectralFlowActive && rho >= EMPTY_SKIP_THRESHOLD) {
+      let spectralGradient = fetchGradient(pos, uniforms);
+      var spectralLogDensity = sCenter;
+      if (IS_DUAL_CHANNEL) {
+        if (rho > 1e-9) {
+          spectralLogDensity = log(rho);
+        } else {
+          spectralLogDensity = -20.0;
+        }
+      }
+      let beforeSpectralFlow = pos;
+      let spectralFlow = applySpectralDimensionFlow(
+        pos, rayDir, rho, spectralLogDensity, spectralGradient, uniforms
+      );
+      pos = spectralFlow.position;
+      spectralEmissionGain = spectralFlow.emissionGain;
+      spectralOpacityScale = spectralFlow.opacityScale;
+      if (length(pos - beforeSpectralFlow) > 1e-6) {
+        gridSample = sampleDensityFromGrid(pos, uniforms);
+        rho = gridOpacityDensity(gridSample) * adsAmplitudeSq;
+        colorRho = gridSample.r * adsAmplitudeSq;
+        colorS = 0.0;
+        if (IS_DUAL_CHANNEL) {
+          colorS = gridSample.g;
+          sCenter = gridSample.g;
+          rho = rho + gridSample.g;
+          colorRho = gridSample.r;
+        } else if (DENSITY_GRID_HAS_PHASE) {
+          sCenter = gridSample.g;
+          colorS = sCenter;
+        } else {
+          if (rho > 1e-9) {
+            sCenter = log(rho);
+          } else {
+            sCenter = -20.0;
+          }
+          colorS = sCenter;
+        }
+
+        if (DENSITY_GRID_HAS_PHASE) {
+          let rotatedB = gridSample.b - phaseOffset;
+          let useRelPhase =
+            (COLOR_ALGORITHM == 10)
+            && (uniforms.quantumMode == 0
+                || uniforms.quantumMode == 1
+                || uniforms.quantumMode == 7);
+          phase = select(rotatedB, gridSample.a, useRelPhase);
+        } else {
+          phase = 0.0;
+        }
+      }
+    }
+
+    var vacuumBubbleEmissionGain = 1.0;
+    var vacuumBubbleOpacityScale = 1.0;
+    if (vacuumBubbleActive && rho >= EMPTY_SKIP_THRESHOLD) {
+      let beforeVacuumBubble = pos;
+      let vacuumBubble = applyVacuumBubbleLens(pos, rayDir, uniforms);
+      pos = vacuumBubble.position;
+      vacuumBubbleEmissionGain = vacuumBubble.emissionGain;
+      vacuumBubbleOpacityScale = vacuumBubble.opacityScale;
+      if (length(pos - beforeVacuumBubble) > 1e-6) {
+        gridSample = sampleDensityFromGrid(pos, uniforms);
+        rho = gridOpacityDensity(gridSample) * adsAmplitudeSq;
+        colorRho = gridSample.r * adsAmplitudeSq;
         colorS = 0.0;
         if (IS_DUAL_CHANNEL) {
           colorS = gridSample.g;
@@ -388,8 +497,8 @@ fn volumeRaymarchGrid(
         let midHasWdwOverlay = DENSITY_GRID_HAS_PHASE && isWdwMode && probeMid.a > 0.01;
         let farHasWdwOverlay = DENSITY_GRID_HAS_PHASE && isWdwMode && probeFar.a > 0.01;
         // For dual-channel modes, include secondary density (G channel) in skip check
-        let midTotal = select(probeMid.r, probeMid.r + probeMid.g, IS_DUAL_CHANNEL);
-        let farTotal = select(probeFar.r, probeFar.r + probeFar.g, IS_DUAL_CHANNEL);
+        let midTotal = gridSkipDensity(probeMid);
+        let farTotal = gridSkipDensity(probeFar);
         if (
           midTotal < EMPTY_SKIP_THRESHOLD && farTotal < EMPTY_SKIP_THRESHOLD
           && !midHasPot && !farHasPot
@@ -408,16 +517,7 @@ fn volumeRaymarchGrid(
     // (common in empty regions, where the raymarch spends most of its iterations).
     var adaptiveStep: f32;
     if (!PROFILING_STRIP_ADAPTIVE_STEP && !hasPotOverlay) {
-      var logRhoForStep: f32;
-      if (IS_DUAL_CHANNEL) {
-        if (rho > 1e-9) {
-          logRhoForStep = log(rho);
-        } else {
-          logRhoForStep = -20.0;
-        }
-      } else {
-        logRhoForStep = sCenter;
-      }
+      let logRhoForStep = gridAdaptiveLogDensity(rho, sCenter);
       adaptiveStep = computeAdaptiveStep(logRhoForStep, stepLen, remaining);
     } else {
       adaptiveStep = min(stepLen, remaining);
@@ -495,7 +595,12 @@ fn volumeRaymarchGrid(
       compositeOverlay(rProbOverlay, adaptiveStep, invStepLen, 0.5, &transmittance, &accColor);
     }
 
-    let effectiveRho = computeEffectiveDensity(rho, phase, transmittance, uniforms);
+    let effectiveRho = computeEffectiveDensity(
+      rho * spectralOpacityScale * vacuumBubbleOpacityScale,
+      phase,
+      transmittance,
+      uniforms
+    );
     let alpha = computeAlpha(effectiveRho, adaptiveStep, uniforms.densityGain);
 
     if (alpha > 0.001) {
@@ -527,6 +632,8 @@ fn volumeRaymarchGrid(
         }
         emission *= causticMultiplier;
         emission *= bridgeGain;
+        emission *= spectralEmissionGain;
+        emission *= vacuumBubbleEmissionGain;
         emission *= 1.0 + uniforms.entropicTimeShearStrength * max(entropyGain, 0.0) * 0.35;
 
         // Branch coloring: when alpha encodes branch fraction (2.0 + frac),

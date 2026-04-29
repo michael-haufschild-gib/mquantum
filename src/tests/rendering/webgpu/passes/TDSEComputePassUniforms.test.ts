@@ -245,6 +245,60 @@ describe('writeTdseUniforms', () => {
     expect(u32[175]).toBe(0)
   })
 
+  it('maps hawkingFlux fieldView to shader enum 7', () => {
+    const uniformData = new ArrayBuffer(UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({ config: createTdseConfig({ fieldView: 'hawkingFlux' }) })
+    )
+
+    expect(u32[71]).toBe(7)
+  })
+
+  it('maps quantumPressure fieldView to shader enum 8', () => {
+    const uniformData = new ArrayBuffer(UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({ config: createTdseConfig({ fieldView: 'quantumPressure' }) })
+    )
+
+    expect(u32[71]).toBe(8)
+  })
+
+  it('maps vorticity fieldView to shader enum 9', () => {
+    const uniformData = new ArrayBuffer(UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({ config: createTdseConfig({ fieldView: 'vorticity' }) })
+    )
+
+    expect(u32[71]).toBe(9)
+  })
+
   it('packs blackHoleRingdown BH params at f32[187..189] (offsets 748/752/756)', () => {
     const uniformData = new ArrayBuffer(UNIFORM_SIZE)
     const u32 = new Uint32Array(uniformData)

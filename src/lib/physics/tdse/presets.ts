@@ -559,6 +559,71 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
   // ── Curved-space TDSE v2 presets (Wave 5) — see curvedMetricPresets.ts
   ...CURVED_METRIC_TDSE_PRESETS,
   ...DECOHERENCE_PRESETS,
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Visualization-tuned presets that open directly in newer field views.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  {
+    id: 'quantumPressureDoubleSlit',
+    name: 'Madelung Q — Double Slit',
+    description:
+      'Double-slit interference opened in the Madelung quantum-pressure view — interference fringes, nodal walls, and barrier caustics light up as bright Q sheets',
+    overrides: {
+      latticeDim: 3,
+      gridSize: [64, 64, 64],
+      spacing: [0.15, 0.15, 0.15],
+      dt: 0.003,
+      stepsPerFrame: 8,
+      initialCondition: 'gaussianPacket',
+      packetCenter: [-2.0, 0, 0],
+      packetWidth: 0.6,
+      packetAmplitude: 1.0,
+      packetMomentum: [8.0, 0, 0],
+      potentialType: 'doubleSlit',
+      barrierCenter: -0.5,
+      slitSeparation: 1.6,
+      slitWidth: 0.4,
+      wallThickness: 0.3,
+      wallHeight: 100.0,
+      absorberEnabled: true,
+      absorberWidth: 0.2,
+      pmlTargetReflection: 1e-6,
+      diagnosticsEnabled: true,
+      diagnosticsInterval: 5,
+      fieldView: 'quantumPressure',
+      autoScale: true,
+      autoLoop: true,
+    },
+    renderingOverrides: { densityGain: 1.0, densityContrast: 1.4, autoScaleMaxGain: 12 },
+  },
+  {
+    id: 'circulationVortexImprint',
+    name: 'Circulation Ω — Vortex Imprint',
+    description:
+      'Imprinted vortex packet opened in the quantized-circulation view — phase-winding cores light up as cosmic-string-like topological defects',
+    overrides: {
+      latticeDim: 3,
+      gridSize: [64, 64, 64],
+      spacing: [0.1, 0.1, 0.1],
+      dt: 0.003,
+      stepsPerFrame: 6,
+      initialCondition: 'vortexImprint',
+      packetCenter: [0, 0, 0],
+      packetWidth: 0.5,
+      packetAmplitude: 1.0,
+      potentialType: 'free',
+      absorberEnabled: true,
+      absorberWidth: 0.2,
+      pmlTargetReflection: 1e-6,
+      diagnosticsEnabled: true,
+      diagnosticsInterval: 5,
+      fieldView: 'vorticity',
+      autoScale: true,
+      autoLoop: false,
+    },
+    renderingOverrides: { densityGain: 0.8, densityContrast: 1.4, autoScaleMaxGain: 12 },
+  },
 ]
 
 /** Lookup a preset by its id, merging default rendering overrides. */

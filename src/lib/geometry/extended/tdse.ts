@@ -19,6 +19,8 @@ import type { DisorderDistribution } from './crossMode'
  * - phase: Wavefunction phase arg(psi)
  * - current: Probability current j = Im(psi* grad psi) / m
  * - potential: External potential V(x)
+ * - quantumPressure: Madelung quantum pressure Q = -(hbar²/2m)∇²√ρ/√ρ
+ * - vorticity: Quantized plaquette phase circulation two-form
  */
 export type TdseFieldView =
   | 'density'
@@ -28,6 +30,9 @@ export type TdseFieldView =
   | 'superfluidVelocity'
   | 'healingLength'
   | 'machNumber'
+  | 'hawkingFlux'
+  | 'quantumPressure'
+  | 'vorticity'
 
 /**
  * Initial condition type for the TDSE wavepacket

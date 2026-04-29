@@ -424,4 +424,36 @@ export const FREE_SCALAR_PRESETS: FreeScalarScenarioPreset[] = [
     },
     renderingOverrides: { densityGain: 0.1, densityContrast: 2.0 },
   },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Visualization-tuned presets that open directly in newer field views.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  {
+    id: 'deSitterFreezeOut',
+    name: 'de Sitter — Freeze-Out View',
+    description:
+      'de Sitter Bunch–Davies vacuum opened in the cosmological freeze-out view: low-gradient super-horizon zones light up as frozen domains while reheating fronts stay bright.',
+    overrides: {
+      initialCondition: 'vacuumNoise',
+      vacuumSeed: 2026,
+      mass: 1.0,
+      dt: 0.005,
+      stepsPerFrame: 4,
+      selfInteractionEnabled: false,
+      absorberEnabled: false,
+      fieldView: 'freezeOutStrain',
+      autoScale: true,
+      diagnosticsEnabled: true,
+      diagnosticsInterval: 10,
+      cosmology: {
+        enabled: true,
+        preset: 'deSitter',
+        steepness: 5,
+        hubble: 1.0,
+        eta0: -10,
+      },
+    },
+    renderingOverrides: { densityGain: 0.6, densityContrast: 1.4 },
+  },
 ]

@@ -14,6 +14,7 @@ import {
   diracAbsorberBlock,
   diracAbsorberBlock3D,
 } from '../shaders/schroedinger/compute/diracAbsorber.wgsl'
+import { diracAxialChargeBlock } from '../shaders/schroedinger/compute/diracAxialCharge.wgsl'
 import {
   diracDiagNormFinalizeBlock,
   diracDiagNormReduceBlock,
@@ -225,7 +226,12 @@ export function composeDiracKineticShader3D(latticeDim: number = 3): string {
  * @param latticeDim - Spatial lattice dimension (1..11). Defaults to 3.
  */
 export function composeDiracWriteGridShader(latticeDim: number = 3): string {
-  return diracPrelude() + generateDiracSparseGammaBlock(latticeDim) + diracWriteGridBlock
+  return (
+    diracPrelude() +
+    generateDiracSparseGammaBlock(latticeDim) +
+    diracWriteGridBlock +
+    diracAxialChargeBlock
+  )
 }
 
 /** Pure WGSL for the Dirac diagnostics norm-reduce compute shader. */

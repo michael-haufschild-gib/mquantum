@@ -8,15 +8,6 @@
  * density output. Dims 4+ use nearest-neighbor (slice-fixed). Complex field views
  * (spin, current) use nearest-neighbor to avoid 8x gamma matrix work.
  *
- * Field view modes:
- *   0: totalDensity           — ρ = Σ_c |ψ_c|²
- *   1: particleDensity        — Σ_{c < S/2} |ψ_c|² (upper spinor)
- *   2: antiparticleDensity    — Σ_{c ≥ S/2} |ψ_c|² (lower spinor)
- *   3: particleAntiparticleSplit — R = particle, G = antiparticle (dual-channel)
- *   4: spinDensity            — |s| = √(Σ_k |ψ†Σ_k ψ|²) (S=2: Σ=α; S≥4 3D: Σ_k=-i·α_i·α_j cyclic)
- *   5: currentDensity         — |j| = c·√(Σ_k |ψ†α_k ψ|²)
- *   6: phase                  — arg(ψ₀) (phase of dominant component)
- *
  * Output encoding (rgba16float):
  *   R: display scalar (normalized density or selected observable)
  *   G: log-density for log-scale rendering
@@ -94,13 +85,6 @@ fn upperLowerDensityAt(siteIdx: u32, S: u32, T: u32) -> vec2f {
 }
 
 // Convert precomputed fractional lattice coordinates into interpolation corners.
-// Returns false if position is outside lattice bounds (with 0.5-cell margin for interpolation).
-// coordsLo/coordsHi: integer lattice coordinates for interpolation corners.
-// fracs: fractional part per dimension for blending weights.
-// For dims >= min(latticeDim, 3), uses nearest-neighbor (frac=0).
-// Caller passes coordFs[d] = (ndWorldPos[d] + N/2*dx)/dx - 0.5 so the same
-// value feeds both the interp branching and the nearest-neighbor round+clamp
-// used downstream — avoids a second per-dim mul/div/sub chain per voxel.
 fn worldToLatticeInterp(
   coordFs: ptr<function, array<f32, 12>>,
   coordsLo: ptr<function, array<u32, 12>>,
@@ -210,16 +194,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
 
-  // PERF: precompute baseIdxLo (coordsLo to linear index) once and the up-to-3
-  // visible-axis stride deltas, then derive each corner's index by adding up
-  // to 3 deltas. Replaces a per-corner ndToLinear scan over 12 dims with 1
-  // ndToLinear + 3 small subs + per-corner bit-tested adds. All trilinear
-  // and phase paths reuse this. Slice dims (d >= 3) always read coordsLo
-  // because corner
-  // bit (1u << d) is never set (numCorners caps at 1u << min(latticeDim, 3u)).
-  // Edge voxels remain bit-equivalent: when worldToLatticeInterp clamps lo
-  // and hi to the same value, deltaIdx[d] = 0 and the bit-add is a no-op,
-  // matching the original behavior.
+  // Precompute base index and visible-axis stride deltas for corner lookup.
   let baseIdxLo = ndToLinear(coordsLo, params.strides, params.latticeDim);
   let interpDimsTri = min(params.latticeDim, 3u);
   var deltaIdx: array<u32, 3>;
@@ -251,11 +226,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let matStride = S * S * 2u;
   let numCorners = 1u << min(params.latticeDim, 3u); // 2, 4, or 8
 
-  // Nearest-neighbor site for complex field views and phase. Derived from the
-  // coordF values computed above — round+clamp on the exact same fractional
-  // coordinate preserves boundary behavior bit-for-bit (deriving round from
-  // coordsLo/frac would disagree at grid edges where the interp clamps
-  // truncate loI=-1 and hiI=N to valid neighbors).
+  // Nearest-neighbor site for complex field views and phase.
   var nnCoords: array<u32, 12>;
   for (var d: u32 = 0u; d < params.latticeDim; d++) {
     nnCoords[d] = u32(clamp(i32(round(coordF[d])), 0, i32(params.gridSize[d]) - 1));
@@ -351,13 +322,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
 
   } else if (params.fieldView == 4u) {
-    // spinDensity: nearest-neighbor (expensive gamma matrix work).
-    // Preload spinor components at this site ONCE. The inner loops would
-    // otherwise re-read each component S times per row × S rows × nSpin axes.
-    //
-    // PERF: when DIRAC_USE_SPARSE_GAMMA is true, each α is monomial (1 non-zero
-    // per row), so the S-wide col loop collapses to a single lookup. IEEE
-    // bit-identical to the dense path (dense sum has S−1 exactly-zero terms).
+    // spinDensity: nearest-neighbor gamma matrix work.
     let siteIdx = nnSiteIdx;
     var psiSiteRe: array<f32, 64>;
     var psiSiteIm: array<f32, 64>;
@@ -559,6 +524,15 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let cFactor = params.speedOfLight;
     let rawCurrent = cFactor * sqrt(currentMag2);
     displayScalar = (rawCurrent * invDensityScale) * densityGate;
+
+  } else if (params.fieldView == 7u) {
+    // axialCharge: nearest-neighbor 3+1D chirality magnitude.
+    let totalDensity = totalDensityAt(nnSiteIdx, S, T);
+    let normDensityRaw = totalDensity * invDensityScale;
+    let densityGate = smoothstep(0.0, 0.02, normDensityRaw);
+    let axialCharge = diracAxialChargeAtSite(nnSiteIdx, S, T, matStride);
+    let axialNorm = select(abs(axialCharge) / max(totalDensity, 1e-20), 0.0, totalDensity < 1e-30);
+    displayScalar = clamp(axialNorm, 0.0, 1.0) * densityGate;
 
   } else if (params.fieldView == 6u) {
     // phase: trilinear-interpolated density for gating, NN for phase value.

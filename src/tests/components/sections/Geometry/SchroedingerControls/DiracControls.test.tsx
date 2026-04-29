@@ -55,6 +55,11 @@ describe('DiracControls', () => {
     expect(screen.getByTestId('control-group-dirac-numerics')).toBeInTheDocument()
   })
 
+  it('exposes axial charge as a field view', () => {
+    render(<DiracControls config={defaultConfig()} dimension={3} actions={createMockActions()} />)
+    expect(screen.getByText('Axial |ψ†γ5ψ|')).toBeInTheDocument()
+  })
+
   it('renders grid size selector after expanding numerics group', () => {
     render(<DiracControls config={defaultConfig()} dimension={3} actions={createMockActions()} />)
     const header = screen.getByTestId('control-group-dirac-numerics-header')
@@ -138,6 +143,14 @@ describe('DiracControls', () => {
     const select = screen.getByLabelText('Initial Condition')
     fireEvent.change(select, { target: { value: 'planeWave' } })
     expect(actions.setInitialCondition).toHaveBeenCalledWith('planeWave')
+  })
+
+  it('calls setFieldView when axial charge is selected', () => {
+    const actions = createMockActions()
+    render(<DiracControls config={defaultConfig()} dimension={3} actions={actions} />)
+    const select = screen.getByLabelText('Field View')
+    fireEvent.change(select, { target: { value: 'axialCharge' } })
+    expect(actions.setFieldView).toHaveBeenCalledWith('axialCharge')
   })
 
   it('calls setGridSize with array of uniform size when grid size changes', () => {

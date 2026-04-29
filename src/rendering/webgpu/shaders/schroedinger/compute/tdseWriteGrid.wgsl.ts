@@ -30,60 +30,6 @@ const TDSE_WG_PI:     f32 = 3.14159265358979323846;
 const TDSE_WG_TAU:    f32 = 6.28318530717958647692;
 const TDSE_WG_INV_TAU: f32 = 1.0 / TDSE_WG_TAU;
 
-// Compute the appropriate normalization scale for the active potential type.
-fn getPotentialScale() -> f32 {
-  if (params.potentialType == 1u || params.potentialType == 5u) {
-    return max(params.barrierHeight, 1.0);
-  } else if (params.potentialType == 2u) {
-    return max(params.stepHeight, 1.0);
-  } else if (params.potentialType == 3u) {
-    return max(abs(params.wellDepth), 1.0);
-  } else if (params.potentialType == 4u) {
-    let r = params.boundingRadius * 0.5;
-    return max(0.5 * params.mass * params.harmonicOmega * params.harmonicOmega * r * r, 1.0);
-  } else if (params.potentialType == 6u) {
-    return max(params.wallHeight, 1.0);
-  } else if (params.potentialType == 7u) {
-    return max(params.latticeDepth, 1.0);
-  } else if (params.potentialType == 8u) {
-    let a2 = params.doubleWellSeparation * params.doubleWellSeparation;
-    return max(params.doubleWellLambda * a2 * a2, 1.0);
-  } else if (params.potentialType == 9u) {
-    let r = params.boundingRadius * 0.5;
-    return max(0.5 * params.mass * params.harmonicOmega * params.harmonicOmega * r * r, 1.0);
-  } else if (params.potentialType == 10u) {
-    // Radial double well: V(r) = λ(r−r₁)²(r−r₂)² − ε·r
-    // Barrier peak between minima ≈ λ·((r₂−r₁)/2)⁴
-    let halfDr = (params.radialWellOuter - params.radialWellInner) * 0.5;
-    let h4 = halfDr * halfDr * halfDr * halfDr;
-    return max(params.radialWellDepth * h4, 1.0);
-  } else if (params.potentialType == 11u || params.potentialType == 12u) {
-    // Custom expression or Anderson disorder: max|V| computed JS-side and passed via uniform
-    return max(params.customPotentialScale, 1.0);
-  } else if (params.potentialType == 13u) {
-    // Coupled anharmonic: V = ½Σω²x² + λΣ_{i<j} x_i²x_j²
-    // Scale by harmonic contribution at half-bounding-radius (same as becTrap)
-    let r = params.boundingRadius * 0.5;
-    return max(0.5 * params.mass * params.harmonicOmega * params.harmonicOmega * r * r, 1.0);
-  } else if (params.potentialType == 14u) {
-    // Regge–Wheeler ringdown: closed-form leading-order peak near the photon
-    // sphere r = 3M is V_peak ≈ ℓ(ℓ+1)/(27·M²). Mirrors
-    // getPotentialPlotScale() in src/lib/physics/tdse/potentialProfile.ts so
-    // the GPU overlay and the CPU-side energy plot share a y-axis scale.
-    let Mbh = max(params.bhMass, 1e-4);
-    let ell = params.bhMultipoleL;
-    let s = params.bhSpin;
-    // Include the spin-dependent correction (1-s²)·2/(3M) at the photon
-    // sphere r=3M so the normalization reflects the actual peak height
-    // for all perturbation spins s ∈ {0, 1, 2}. abs() mirrors the CPU
-    // formula in potentialProfile.ts so the gravitational (s=2, ℓ=0)
-    // edge case doesn't collapse to the 0.02 floor.
-    let spinCorr = (1.0 - s * s) * 2.0 / 3.0;
-    return max(abs((ell * (ell + 1.0) + spinCorr) / (27.0 * Mbh * Mbh)), 0.02);
-  }
-  return 1.0;
-}
-
 // Convert precomputed fractional lattice coordinates to lo/hi/frac for trilinear
 // interpolation. Returns false if out of bounds. For visible dims
 // (< min(latticeDim,3)): lo/hi/frac. For slice dims (>= 3): nearest-neighbor
@@ -321,7 +267,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   // Determine if we use trilinear or NN for this field view
   // Trilinear: density (0), phase (1)
-  // NN: current (2), potential (3), velocity (4), healing (5)
+  // NN: current (2), potential (3), velocity (4), healing (5), Mach/Hawking (6+)
   let useTrilinear = params.fieldView <= 1u;
 
   var re: f32;
@@ -469,6 +415,71 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // separately differentiated — use the superfluidVelocity view for |v_s|.
     let machDisplay = clamp(mach, 0.0, 1.0);
     displayScalar = machDisplay * densityGate;
+  } else if (params.fieldView == 7u) {
+    if (params.initCondition != 7u) {
+      displayScalar = 0.0;
+    } else {
+      // Analog-Hawking flux proxy: local surface gravity kappa mapped through
+      // T_H = kappa / 2pi, then gated to the evolved M ~= 1 sonic horizon.
+      //
+      // The Mach gate comes from the actual wavefunction, while kappa mirrors
+      // the same C1-at-wrap waterfall profile used by tdseInit.wgsl and
+      // sonicHorizon.ts:
+      //   v_s = v_max(tanh(x/L_h) - 2xT/L_box)
+      //   n   = n0(1 - deltaN sech^2(q_n))
+      let vsMagSq = computeSuperfluidVelocityMagSq(idx, re, im, density, &nnCoords, &invSpacings);
+      let gAbs = max(abs(params.interactionStrength), 1e-10);
+      let csSq = max(gAbs * density / max(params.mass, 1e-6), 1e-12);
+      let vs = sqrt(vsMagSq);
+      let cs = sqrt(csSq);
+      let mach = vs / cs;
+      let horizonGate = 1.0 - smoothstep(0.0, 0.25, abs(mach - 1.0));
+
+      let lh = max(abs(params.hawkingLh), 1e-4);
+      let lBox = max(f32(params.gridSize[0]) * params.spacing[0], 1e-4);
+      let x0 = ndWorldPos[0];
+      let edgeT = tanh(lBox / (2.0 * lh));
+      let uFlow = x0 / lh;
+      let tanhFlow = tanh(uFlow);
+      let flowSech2 = max(0.0, 1.0 - tanhFlow * tanhFlow);
+      let flowSigned = params.hawkingVmax * (tanhFlow - (2.0 * x0 / lBox) * edgeT);
+      let flowGradient = params.hawkingVmax * (flowSech2 / lh - 2.0 * edgeT / lBox);
+
+      let dip = clamp(params.hawkingDeltaN, 0.0, 0.6);
+      let uDensity = (lBox / (TDSE_WG_PI * lh)) * sin(TDSE_WG_PI * x0 / lBox);
+      let densityTanh = tanh(uDensity);
+      let densitySech = 1.0 / cosh(uDensity);
+      let densitySech2 = densitySech * densitySech;
+      let densityDipFactor = max(1.0 - dip * densitySech2, 1e-3);
+      let duDensityDx = cos(TDSE_WG_PI * x0 / lBox) / lh;
+      let dDensityDipFactorDx = 2.0 * dip * densitySech2 * densityTanh * duDensityDx;
+      let dCsSqDx = csSq * dDensityDipFactorDx / densityDipFactor;
+      let dVsSqDx = 2.0 * flowSigned * flowGradient;
+      let acousticGradient = dCsSqDx - dVsSqDx;
+      let surfaceGravity = 0.5 * abs(acousticGradient) / max(cs, 1e-6);
+
+      let hawkingTemperatureProxy = surfaceGravity * TDSE_WG_INV_TAU;
+      let pairStimulus = 1.0
+        + f32(params.hawkingPairInjection) * 0.5 * clamp(params.hawkingInjectRate / 0.5, 0.0, 1.0);
+      let fluxProxy = (1.0 - exp(-hawkingTemperatureProxy)) * pairStimulus;
+      displayScalar = clamp(horizonGate * fluxProxy, 0.0, 1.0) * densityGate;
+    }
+  } else if (params.fieldView == 8u) {
+    let quantumPressure = tdseQuantumPressureAtSite(idx, density, &nnCoords, &invSpacings);
+    displayScalar = clamp(quantumPressure, 0.0, 1.0) * densityGate;
+  } else if (params.fieldView == 9u) {
+    var circulationAbs: f32 = 0.0;
+    if (params.latticeDim >= 2u && density >= 1e-20) {
+      for (var i: u32 = 0u; i < params.latticeDim; i = i + 1u) {
+        if (params.gridSize[i] <= 1u) { continue; }
+        for (var j: u32 = i + 1u; j < params.latticeDim; j = j + 1u) {
+          if (params.gridSize[j] <= 1u) { continue; }
+          let winding = plaquetteWinding(idx, &nnCoords, i, j);
+          circulationAbs += abs(winding);
+        }
+      }
+    }
+    displayScalar = clamp(1.0 - exp(-circulationAbs), 0.0, 1.0) * densityGate;
   } else if (params.fieldView == 3u) {
     // potential (NN)
     let potentialScale = getPotentialScale();

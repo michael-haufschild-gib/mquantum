@@ -86,6 +86,8 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
         { value: 'phi', label: 'φ' },
         { value: 'pi', label: 'π' },
         { value: 'energyDensity', label: 'ε' },
+        { value: 'freezeOutStrain', label: 'Freeze' },
+        { value: 'equationOfState', label: 'w(x)' },
       ]
       if (fs.selfInteractionEnabled) {
         opts.push({ value: 'wallDensity', label: 'V(φ)' })
@@ -461,8 +463,8 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
             ariaLabel="Field view"
             tooltip={
               fs.cosmology.enabled
-                ? 'Displayed field quantity: δφ (scalar field perturbation), π (conjugate momentum), or ε (proper energy density per comoving observer).'
-                : 'Displayed field quantity: φ (field value), π (conjugate momentum ∂φ/∂t), or ε (energy density).'
+                ? 'Displayed field quantity: δφ (perturbation), π (conjugate momentum), ε (proper energy density), Freeze (freeze-out strain), or w(x) (equation of state).'
+                : 'Displayed field quantity: φ (field), π (conjugate momentum ∂φ/∂t), ε (energy density), Freeze (freeze-out strain), or w(x) (equation of state).'
             }
             data-testid="field-view-selector"
           />

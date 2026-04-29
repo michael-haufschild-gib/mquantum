@@ -52,6 +52,8 @@ export const FIELD_VIEW_OPTIONS = [
   { value: 'phase', label: 'Phase arg(\u03C8)' },
   { value: 'current', label: 'Current |j|' },
   { value: 'potential', label: 'Potential V(x)' },
+  { value: 'quantumPressure', label: 'Quantum Pressure Q' },
+  { value: 'vorticity', label: 'Circulation Ω' },
 ]
 
 /**

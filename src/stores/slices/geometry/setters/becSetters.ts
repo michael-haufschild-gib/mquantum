@@ -159,14 +159,34 @@ export function createBecSetters(ctx: SetterContext): BecActions {
       })
     },
     setBecInitialCondition: (condition) => {
+      setWithVersion((state) => {
+        const bec = state.schroedinger.bec
+        const fieldView =
+          condition !== 'blackHoleAnalog' && bec.fieldView === 'hawkingFlux'
+            ? 'density'
+            : bec.fieldView
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            bec: { ...bec, initialCondition: condition, fieldView, needsReset: true },
+          },
+        }
+      })
+    },
+    setBecFieldView: (view) => {
+      if (
+        view === 'hawkingFlux' &&
+        ctx.get().schroedinger.bec.initialCondition !== 'blackHoleAnalog'
+      ) {
+        return
+      }
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, initialCondition: condition, needsReset: true },
+          bec: { ...state.schroedinger.bec, fieldView: view },
         },
       }))
     },
-    setBecFieldView: nestedValueSetter(ctx, D, 'fieldView'),
     setBecVortexCharge: (charge) => {
       const clamped = Math.max(-4, Math.min(4, Math.round(charge)))
       setWithVersion((state) => ({

@@ -103,6 +103,9 @@ const VIEW_MAP: Record<string, number> = {
   superfluidVelocity: 4,
   healingLength: 5,
   machNumber: 6,
+  hawkingFlux: 7,
+  quantumPressure: 8,
+  vorticity: 9,
 }
 
 /** Enum maps for TDSE drive waveform types. */

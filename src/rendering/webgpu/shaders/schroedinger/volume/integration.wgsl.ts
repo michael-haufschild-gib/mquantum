@@ -196,6 +196,22 @@ struct EntropicTimeShearResult {
   entropyGain: f32,
 }
 
+struct SpectralDimensionFlowResult {
+  position: vec3f,
+  emissionGain: f32,
+  opacityScale: f32,
+  spectralDimension: f32,
+  uvGate: f32,
+}
+
+struct VacuumBubbleLensResult {
+  position: vec3f,
+  emissionGain: f32,
+  opacityScale: f32,
+  wall: f32,
+  tunnelingGate: f32,
+}
+
 fn isQuantumBackreactionActive(uniforms: SchroedingerUniforms) -> bool {
   return uniforms.quantumBackreactionLensingEnabled != 0u
     && uniforms.quantumBackreactionLensingStrength > 0.0;
@@ -211,6 +227,115 @@ fn isEntropicTimeShearActive(uniforms: SchroedingerUniforms) -> bool {
   return uniforms.entropicTimeShearEnabled != 0u
     && uniforms.entropicTimeShearStrength > 0.0
     && uniforms.entropicTimeShearFilamentScale > 0.0;
+}
+
+fn isSpectralDimensionFlowActive(uniforms: SchroedingerUniforms) -> bool {
+  return uniforms.spectralDimensionFlowEnabled != 0u
+    && uniforms.spectralDimensionFlowStrength > 0.0
+    && uniforms.spectralDimensionFlowDiffusionScale > 0.0;
+}
+
+fn isVacuumBubbleLensActive(uniforms: SchroedingerUniforms) -> bool {
+  return uniforms.vacuumBubbleLensEnabled != 0u
+    && uniforms.vacuumBubbleLensStrength > 0.0
+    && uniforms.vacuumBubbleWallRadius > 0.0
+    && uniforms.vacuumBubbleWallThickness > 0.0;
+}
+
+fn applyVacuumBubbleLens(
+  worldPosition: vec3f,
+  rayDirection: vec3f,
+  uniforms: SchroedingerUniforms
+) -> VacuumBubbleLensResult {
+  if (!isVacuumBubbleLensActive(uniforms)) {
+    return VacuumBubbleLensResult(worldPosition, 1.0, 1.0, 0.0, 0.0);
+  }
+
+  let boundingRadius = max(uniforms.boundingRadius, 1e-4);
+  let strength = clamp(uniforms.vacuumBubbleLensStrength, 0.0, 2.0);
+  let strengthBound = clamp(strength, 0.0, 1.0);
+  let wallRadius = clamp(uniforms.vacuumBubbleWallRadius, 0.05, 1.5);
+  let wallThickness = clamp(uniforms.vacuumBubbleWallThickness, 0.02, 0.5);
+  let tension = clamp(uniforms.vacuumBubbleTension, 0.0, 3.0);
+  let bias = clamp(uniforms.vacuumBubbleBias, 0.0, 3.0);
+  let r = length(worldPosition);
+  let R = wallRadius * boundingRadius * (1.0 + 0.12 * sin(getVolumeTime(uniforms) * (0.35 + bias)));
+  let thickness = max(wallThickness * boundingRadius, 1e-4);
+  let wallCoordinate = (r - R) / thickness;
+  let wall = exp(-(wallCoordinate * wallCoordinate));
+  let inside = 1.0 - smoothstep(R - thickness, R + thickness, r);
+  let S_proxy = tension * R * R - bias * R * R * R;
+  let normalizedAction = S_proxy / max(boundingRadius * boundingRadius, 1e-4);
+  let tunnelingGate = clamp(
+    exp(-max(normalizedAction, 0.0)) * (1.0 + 0.35 * max(-normalizedAction, 0.0)),
+    0.0,
+    1.0
+  );
+  let radialNormal = select(
+    worldPosition / max(r, 1e-5),
+    normalize(-rayDirection),
+    r < 1e-5
+  );
+  let refraction = clamp(wall * strength * tunnelingGate * thickness * 0.65, 0.0, boundingRadius * 0.18);
+  let refractedPosition = worldPosition - radialNormal * refraction;
+  let opacityScale = mix(1.0, 0.55, clamp(inside * strengthBound, 0.0, 1.0));
+  let emissionGain = 1.0 + wall * tunnelingGate * strength;
+
+  return VacuumBubbleLensResult(refractedPosition, emissionGain, opacityScale, wall, tunnelingGate);
+}
+
+fn applySpectralDimensionFlow(
+  worldPosition: vec3f,
+  rayDirection: vec3f,
+  densityProxy: f32,
+  logDensityProxy: f32,
+  localGradient: vec3f,
+  uniforms: SchroedingerUniforms
+) -> SpectralDimensionFlowResult {
+  if (!isSpectralDimensionFlowActive(uniforms)) {
+    return SpectralDimensionFlowResult(worldPosition, 1.0, 1.0, 0.0, 0.0);
+  }
+
+  let peakRho = max(uniforms.peakDensity, 1e-6);
+  let strength = clamp(uniforms.spectralDimensionFlowStrength, 0.0, 2.0);
+  let diffusionScale = clamp(uniforms.spectralDimensionFlowDiffusionScale, 0.05, 3.0);
+  let gradientMagnitude = length(localGradient);
+  let gradientCurvature = log(1.0 + gradientMagnitude * diffusionScale);
+  let densityGate =
+    smoothstep(-14.0, -2.0, logDensityProxy) *
+    (1.0 - smoothstep(1.5, 8.0, densityProxy / peakRho));
+  let uvGate = clamp(densityGate * gradientCurvature * strength, 0.0, 1.0);
+
+  let isAnalyticMode =
+    uniforms.quantumMode == 0
+    || uniforms.quantumMode == 1
+    || uniforms.quantumMode == 7
+    || uniforms.quantumMode == 8;
+  let dIR = select(4.0, 3.0, isAnalyticMode);
+  let dUV = clamp(uniforms.spectralDimensionFlowUvDimension, 1.2, 3.5);
+  let spectralDimension = mix(dIR, dUV, uvGate);
+  let dimensionDrop = clamp((dIR - spectralDimension) / max(dIR, 1e-6), 0.0, 0.75);
+
+  let gradN = select(
+    localGradient / max(gradientMagnitude, 1e-6),
+    normalize(-rayDirection),
+    gradientMagnitude < 1e-6
+  );
+  let compressionFactor = clamp(dimensionDrop * (0.35 + 0.15 * strength), 0.0, 0.42);
+  let maxShift = diffusionScale * 0.32 + 0.08;
+  let projectedCoordinate = dot(worldPosition, gradN);
+  let compressionShift = clamp(projectedCoordinate * compressionFactor, -maxShift, maxShift);
+  let compressedPosition = worldPosition - gradN * compressionShift;
+
+  let emissionGain = 1.0 + dimensionDrop * strength * (0.45 + 0.35 * uvGate);
+  let opacityScale = clamp(1.0 - dimensionDrop * (0.35 + 0.25 * uvGate), 0.35, 1.0);
+  return SpectralDimensionFlowResult(
+    compressedPosition,
+    emissionGain,
+    opacityScale,
+    spectralDimension,
+    uvGate
+  );
 }
 
 fn entropyShearFilamentField(worldPosition: vec3f, phase: f32, uniforms: SchroedingerUniforms) -> vec3f {

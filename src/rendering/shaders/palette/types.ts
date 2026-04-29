@@ -254,6 +254,8 @@ export const PAULI_FIELD_VIEW_TO_COLOR_ALGO: Record<PauliFieldView, ColorAlgorit
   totalDensity: 'blackbody',
   spinExpectation: 'pauliSpinExpectation',
   coherence: 'pauliCoherence',
+  spinHelicity: 'blackbody',
+  berryCurvature: 'blackbody',
 }
 
 /** Map Dirac field view to matching color algorithm for synchronized rendering. */
@@ -265,6 +267,7 @@ export const DIRAC_FIELD_VIEW_TO_COLOR_ALGO: Record<DiracFieldView, ColorAlgorit
   spinDensity: 'blackbody',
   currentDensity: 'blackbody',
   phase: 'phaseCyclicUniform',
+  axialCharge: 'blackbody',
 }
 
 /**
@@ -421,7 +424,7 @@ export function getAvailableColorAlgorithms(
     // Free scalar field is a CLASSICAL field theory with no wavefunction ψ, so
     // the Bohmian quantum potential Q = -½·∇²√ρ/√ρ has no physical meaning in
     // this mode. The write-grid shader also populates the R channel from the
-    // selected fieldView (phi, pi, energyDensity, wallDensity) rather than a
+    // selected fieldView (phi, pi, energyDensity, wallDensity, freezeOutStrain, equationOfState) rather than a
     // density, and stores a sign-proxy (0 or π) in the phase channel, so the
     // plaquette vortex-winding helper cannot recover U(1) topological charges
     // even in principle. Availability for these algorithms is restricted to

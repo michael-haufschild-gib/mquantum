@@ -116,4 +116,26 @@ export const DIRAC_SCENARIO_PRESETS: DiracScenarioPreset[] = [
       fieldView: 'spinDensity',
     },
   },
+  {
+    id: 'axialChargeKlein',
+    name: 'Axial Charge (Klein Regime)',
+    description:
+      'Supercritical step-potential Klein scenario opened in the |ψ†γ5ψ| axial-charge view — bright regions reveal local left/right (chiral) imbalance accompanying pair creation',
+    overrides: {
+      spacing: [0.1],
+      mass: 1.0,
+      speedOfLight: 1.0,
+      potentialType: 'step',
+      potentialStrength: 3.0,
+      potentialCenter: 0.0,
+      initialCondition: 'gaussianPacket',
+      packetCenter: [-1.5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      packetWidth: 0.5,
+      packetMomentum: [5.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      positiveEnergyFraction: 0.7,
+      fieldView: 'axialCharge',
+      dt: 0.005,
+      stepsPerFrame: 4,
+    },
+  },
 ]

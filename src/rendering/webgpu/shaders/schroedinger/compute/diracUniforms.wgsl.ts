@@ -46,7 +46,7 @@ struct DiracUniforms {
   packetMomentum: array<f32, 12>, // offset 256
 
   // Display + simulation state (16 bytes)
-  fieldView: u32,                 // offset 304 (0=totalDensity, 1=particleDensity, 2=antiparticleDensity, 3=particleAntiparticleSplit, 4=spinDensity, 5=currentDensity, 6=phase)
+  fieldView: u32,                 // offset 304 (0=totalDensity, 1=particleDensity, 2=antiparticleDensity, 3=particleAntiparticleSplit, 4=spinDensity, 5=currentDensity, 6=phase, 7=axialCharge)
   autoScale: u32,                 // offset 308
   simTime: f32,                   // offset 312
   absorberEnabled: u32,           // offset 316

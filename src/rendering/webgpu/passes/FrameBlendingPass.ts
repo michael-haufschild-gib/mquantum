@@ -12,6 +12,31 @@ import { getStoreSnapshot } from '../core/storeAccess'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 
+const MIN_HORIZON_MEMORY_RADIUS = 0.05
+const MAX_HORIZON_MEMORY_RADIUS = 1.5
+const MAX_HORIZON_MEMORY_STRENGTH = 1.5
+const MAX_HORIZON_MEMORY_SPIN = 1
+const MIN_HORIZON_MEMORY_ECHOES = 1
+const MAX_HORIZON_MEMORY_ECHOES = 6
+
+function clampFinite(
+  value: number | undefined,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback
+  }
+  return Math.max(min, Math.min(max, value))
+}
+
+function clampEchoCount(value: number | undefined, fallback: number): number {
+  return Math.round(
+    clampFinite(value, fallback, MIN_HORIZON_MEMORY_ECHOES, MAX_HORIZON_MEMORY_ECHOES)
+  )
+}
+
 /**
  * Frame blending pass configuration.
  */
@@ -22,17 +47,26 @@ export interface FrameBlendingPassConfig {
   outputResource: string
   /** Blend factor (0 = current only, 1 = previous only) */
   blendFactor?: number
+  /** Horizon memory echo strength (0 = disabled, 1.5 = maximum) */
+  horizonMemoryStrength?: number
+  /** Center-origin echo radius in screen UV units */
+  horizonMemoryRadius?: number
+  /** Number of radial echo shells */
+  horizonMemoryEchoes?: number
+  /** Angular spin/shear applied to echo-shell sampling */
+  horizonMemorySpin?: number
 }
 
 /**
  * WGSL Frame Blending Fragment Shader
  */
-const FRAME_BLENDING_SHADER = /* wgsl */ `
+export const frameBlendingShader = /* wgsl */ `
 struct Uniforms {
   blendFactor: f32,
-  _pad0: f32,
-  _pad1: f32,
-  _pad2: f32,
+  horizonStrength: f32,
+  horizonRadius: f32,
+  horizonEchoes: f32,
+  horizonSpin: f32,
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -45,6 +79,10 @@ struct VertexOutput {
   @location(0) uv: vec2f,
 }
 
+fn luminance(color: vec3f) -> f32 {
+  return dot(color, vec3f(0.2126, 0.7152, 0.0722));
+}
+
 @fragment
 fn main(input: VertexOutput) -> @location(0) vec4f {
   let uv = input.uv;
@@ -52,11 +90,82 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   let current = textureSample(tCurrentFrame, texSampler, uv);
   let previous = textureSample(tPreviousFrame, texSampler, uv);
 
-  // Linear blend between current and previous frame
-  // blendFactor 0 = fully current, 1 = fully previous
-  // Defensive clamp to ensure valid range
   let blendFactor = clamp(uniforms.blendFactor, 0.0, 1.0);
-  return mix(current, previous, blendFactor);
+  let horizonStrength = clamp(uniforms.horizonStrength, 0.0, 1.5);
+  let horizonSpin = clamp(uniforms.horizonSpin, 0.0, 1.0);
+
+  // Disabled horizon memory path preserves exact historical frame blending.
+  if (horizonStrength <= 0.0001) {
+    return mix(current, previous, blendFactor);
+  }
+
+  let dims = vec2f(textureDimensions(tPreviousFrame));
+  let texel = 1.0 / max(dims, vec2f(1.0));
+  let lowerBound = texel;
+  let upperBound = vec2f(1.0) - texel;
+
+  let previousLum = luminance(previous.rgb);
+  let currentLum = luminance(current.rgb);
+  let changeGate = 1.0 - smoothstep(0.01, 0.25, abs(currentLum - previousLum));
+  let memoryStrength = horizonStrength * changeGate;
+
+  let prevLeft = textureSample(tPreviousFrame, texSampler, clamp(uv - vec2f(texel.x, 0.0), lowerBound, upperBound));
+  let prevRight = textureSample(tPreviousFrame, texSampler, clamp(uv + vec2f(texel.x, 0.0), lowerBound, upperBound));
+  let prevDown = textureSample(tPreviousFrame, texSampler, clamp(uv - vec2f(0.0, texel.y), lowerBound, upperBound));
+  let prevUp = textureSample(tPreviousFrame, texSampler, clamp(uv + vec2f(0.0, texel.y), lowerBound, upperBound));
+  let previousGradient = vec2f(
+    luminance(prevRight.rgb) - luminance(prevLeft.rgb),
+    luminance(prevUp.rgb) - luminance(prevDown.rgb)
+  );
+
+  let refractedUv = clamp(uv - previousGradient * (0.075 * memoryStrength), lowerBound, upperBound);
+  let center = vec2f(0.5);
+  let centered = uv - center;
+  let radialDistance = length(centered);
+  let radialDir = select(centered / max(radialDistance, 0.0001), vec2f(0.0, 1.0), radialDistance < 0.0001);
+  let tangentDir = vec2f(-radialDir.y, radialDir.x);
+  let gradientMagnitude = length(previousGradient);
+  let gradientOrientation = dot(previousGradient, tangentDir) / max(gradientMagnitude, 0.0001);
+  let tangentialShear = tangentDir * gradientOrientation * (0.045 * horizonSpin * memoryStrength);
+  let spunCurrentUv = clamp(refractedUv + tangentialShear, lowerBound, upperBound);
+  let refractedCurrent = textureSample(tCurrentFrame, texSampler, spunCurrentUv);
+
+  let horizonRadius = clamp(uniforms.horizonRadius, 0.05, 1.5);
+  let echoCount = i32(clamp(round(uniforms.horizonEchoes), 1.0, 6.0));
+  let shellWidth = max(horizonRadius * 0.075, 0.015);
+
+  var echoAccum = vec3f(0.0);
+  var shellAccum = 0.0;
+  for (var i = 1; i <= 6; i = i + 1) {
+    if (i <= echoCount) {
+      let echoIndex = f32(i);
+      let shellCenter = horizonRadius * (echoIndex / f32(echoCount));
+      let shellDelta = (radialDistance - shellCenter) / shellWidth;
+      let shell = exp(-shellDelta * shellDelta);
+      let shellWeight = shell / echoIndex;
+      let echoDistance = max(radialDistance - shellWidth * echoIndex, 0.0);
+      let spinDirection = select(sign(gradientOrientation), 1.0, abs(gradientOrientation) < 0.0001);
+      let spinAngle = horizonSpin * memoryStrength * spinDirection * shell * (0.65 / sqrt(echoIndex));
+      let spinSin = sin(spinAngle);
+      let spinCos = cos(spinAngle);
+      let spunDir = vec2f(
+        radialDir.x * spinCos - radialDir.y * spinSin,
+        radialDir.x * spinSin + radialDir.y * spinCos
+      );
+      let echoUv = clamp(center + spunDir * echoDistance, lowerBound, upperBound);
+      let echoSample = textureSample(tPreviousFrame, texSampler, echoUv);
+      echoAccum += echoSample.rgb * shellWeight;
+      shellAccum += shellWeight;
+    }
+  }
+
+  let echoColor = echoAccum / max(shellAccum, 0.0001);
+  let shellPresence = clamp(shellAccum, 0.0, 1.0);
+  let memoryBlend = clamp(blendFactor + 0.18 * memoryStrength, 0.0, 1.0);
+  let base = mix(refractedCurrent, previous, memoryBlend);
+  let emission = echoColor * shellPresence * memoryStrength * (0.42 + 0.35 * changeGate);
+
+  return vec4f(base.rgb + emission, base.a);
 }
 `
 
@@ -106,13 +215,17 @@ export class FrameBlendingPass extends WebGPUBasePass {
 
   // Uniform buffer
   private uniformBuffer: GPUBuffer | null = null
-  private uniformData = new Float32Array(4)
+  private uniformData = new Float32Array(5)
 
   // Sampler
   private sampler: GPUSampler | null = null
 
   // Configuration
   private blendFactor: number
+  private horizonMemoryStrength: number
+  private horizonMemoryRadius: number
+  private horizonMemoryEchoes: number
+  private horizonMemorySpin: number
 
   // Internal history buffer (ping-pong)
   private historyTexture: GPUTexture | null = null
@@ -121,6 +234,10 @@ export class FrameBlendingPass extends WebGPUBasePass {
   private lastWidth = 0
   private lastHeight = 0
   private lastBlendFactor = Number.NaN
+  private lastHorizonMemoryStrength = Number.NaN
+  private lastHorizonMemoryRadius = Number.NaN
+  private lastHorizonMemoryEchoes = Number.NaN
+  private lastHorizonMemorySpin = Number.NaN
 
   private blendBGCache = new BindGroupCache()
   private copyBGCache = new BindGroupCache()
@@ -137,7 +254,21 @@ export class FrameBlendingPass extends WebGPUBasePass {
     })
 
     this.passConfig = config
-    this.blendFactor = config.blendFactor ?? 0.3
+    this.blendFactor = clampFinite(config.blendFactor, 0.3, 0, 1)
+    this.horizonMemoryStrength = clampFinite(
+      config.horizonMemoryStrength,
+      0,
+      0,
+      MAX_HORIZON_MEMORY_STRENGTH
+    )
+    this.horizonMemoryRadius = clampFinite(
+      config.horizonMemoryRadius,
+      0.62,
+      MIN_HORIZON_MEMORY_RADIUS,
+      MAX_HORIZON_MEMORY_RADIUS
+    )
+    this.horizonMemoryEchoes = clampEchoCount(config.horizonMemoryEchoes, 3)
+    this.horizonMemorySpin = clampFinite(config.horizonMemorySpin, 0, 0, MAX_HORIZON_MEMORY_SPIN)
   }
 
   /**
@@ -195,7 +326,7 @@ export class FrameBlendingPass extends WebGPUBasePass {
     // Create blend fragment shader module
     const blendFragmentModule = this.createShaderModule(
       device,
-      FRAME_BLENDING_SHADER,
+      frameBlendingShader,
       'frame-blending-fragment'
     )
 
@@ -224,8 +355,8 @@ export class FrameBlendingPass extends WebGPUBasePass {
       { label: 'frame-blending-copy' }
     )
 
-    // Create uniform buffer (16 bytes aligned for vec4-like structure)
-    this.uniformBuffer = this.createUniformBuffer(device, 16, 'frame-blending-uniforms')
+    // Five scalar floats; helper aligns allocation to 16-byte boundary.
+    this.uniformBuffer = this.createUniformBuffer(device, 20, 'frame-blending-uniforms')
 
     // Create sampler
     this.sampler = device.createSampler({
@@ -275,6 +406,10 @@ export class FrameBlendingPass extends WebGPUBasePass {
     this.lastHeight = height
     this.historyInitialized = false
     this.lastBlendFactor = Number.NaN
+    this.lastHorizonMemoryStrength = Number.NaN
+    this.lastHorizonMemoryRadius = Number.NaN
+    this.lastHorizonMemoryEchoes = Number.NaN
+    this.lastHorizonMemorySpin = Number.NaN
     this.blendBGCache.invalidate()
   }
 
@@ -283,7 +418,7 @@ export class FrameBlendingPass extends WebGPUBasePass {
    * @param value Blend factor (0 = current only, 1 = previous only)
    */
   setBlendFactor(value: number): void {
-    this.blendFactor = value
+    this.blendFactor = clampFinite(value, this.blendFactor, 0, 1)
   }
 
   /**
@@ -293,10 +428,53 @@ export class FrameBlendingPass extends WebGPUBasePass {
   private updateFromStores(ctx: WebGPURenderContext): void {
     const postProcessing = getStoreSnapshot<{
       frameBlendingFactor?: number
+      horizonMemoryEnabled?: boolean
+      horizonMemoryStrength?: number
+      horizonMemoryRadius?: number
+      horizonMemoryEchoes?: number
+      horizonMemorySpin?: number
     }>(ctx, 'postProcessing')
 
     if (postProcessing?.frameBlendingFactor !== undefined) {
-      this.blendFactor = postProcessing.frameBlendingFactor
+      this.blendFactor = clampFinite(postProcessing.frameBlendingFactor, this.blendFactor, 0, 1)
+    }
+
+    if (postProcessing?.horizonMemoryRadius !== undefined) {
+      this.horizonMemoryRadius = clampFinite(
+        postProcessing.horizonMemoryRadius,
+        this.horizonMemoryRadius,
+        MIN_HORIZON_MEMORY_RADIUS,
+        MAX_HORIZON_MEMORY_RADIUS
+      )
+    }
+
+    if (postProcessing?.horizonMemoryEchoes !== undefined) {
+      this.horizonMemoryEchoes = clampEchoCount(
+        postProcessing.horizonMemoryEchoes,
+        this.horizonMemoryEchoes
+      )
+    }
+
+    if (postProcessing?.horizonMemoryStrength !== undefined) {
+      this.horizonMemoryStrength = clampFinite(
+        postProcessing.horizonMemoryStrength,
+        this.horizonMemoryStrength,
+        0,
+        MAX_HORIZON_MEMORY_STRENGTH
+      )
+    }
+
+    if (postProcessing?.horizonMemorySpin !== undefined) {
+      this.horizonMemorySpin = clampFinite(
+        postProcessing.horizonMemorySpin,
+        this.horizonMemorySpin,
+        0,
+        MAX_HORIZON_MEMORY_SPIN
+      )
+    }
+
+    if (postProcessing?.horizonMemoryEnabled === false) {
+      this.horizonMemoryStrength = 0
     }
   }
 
@@ -306,6 +484,10 @@ export class FrameBlendingPass extends WebGPUBasePass {
   resetHistory(): void {
     this.historyInitialized = false
     this.lastBlendFactor = Number.NaN
+    this.lastHorizonMemoryStrength = Number.NaN
+    this.lastHorizonMemoryRadius = Number.NaN
+    this.lastHorizonMemoryEchoes = Number.NaN
+    this.lastHorizonMemorySpin = Number.NaN
   }
 
   /**
@@ -316,6 +498,10 @@ export class FrameBlendingPass extends WebGPUBasePass {
     // Reset history when pass is re-enabled to avoid stale frame blending
     this.historyInitialized = false
     this.lastBlendFactor = Number.NaN
+    this.lastHorizonMemoryStrength = Number.NaN
+    this.lastHorizonMemoryRadius = Number.NaN
+    this.lastHorizonMemoryEchoes = Number.NaN
+    this.lastHorizonMemorySpin = Number.NaN
   }
 
   /**
@@ -395,10 +581,24 @@ export class FrameBlendingPass extends WebGPUBasePass {
       return
     }
 
-    if (this.blendFactor !== this.lastBlendFactor) {
+    if (
+      this.blendFactor !== this.lastBlendFactor ||
+      this.horizonMemoryStrength !== this.lastHorizonMemoryStrength ||
+      this.horizonMemoryRadius !== this.lastHorizonMemoryRadius ||
+      this.horizonMemoryEchoes !== this.lastHorizonMemoryEchoes ||
+      this.horizonMemorySpin !== this.lastHorizonMemorySpin
+    ) {
       this.uniformData[0] = this.blendFactor
+      this.uniformData[1] = this.horizonMemoryStrength
+      this.uniformData[2] = this.horizonMemoryRadius
+      this.uniformData[3] = this.horizonMemoryEchoes
+      this.uniformData[4] = this.horizonMemorySpin
       this.writeUniformBuffer(this.device, this.uniformBuffer, this.uniformData)
       this.lastBlendFactor = this.blendFactor
+      this.lastHorizonMemoryStrength = this.horizonMemoryStrength
+      this.lastHorizonMemoryRadius = this.horizonMemoryRadius
+      this.lastHorizonMemoryEchoes = this.horizonMemoryEchoes
+      this.lastHorizonMemorySpin = this.horizonMemorySpin
     }
 
     const blendBG = this.blendBGCache.get([colorView, this.historyView], () =>
@@ -431,7 +631,7 @@ export class FrameBlendingPass extends WebGPUBasePass {
 
     // If blendFactor is ~1.0 the output is already equivalent to history,
     // so copying back is redundant.
-    if (this.blendFactor < 0.9999) {
+    if (this.blendFactor < 0.9999 || this.horizonMemoryStrength > 0.0001) {
       ctx.encoder.copyTextureToTexture(
         { texture: outputTexture },
         { texture: this.historyTexture },
@@ -453,6 +653,10 @@ export class FrameBlendingPass extends WebGPUBasePass {
     this.lastWidth = 0
     this.lastHeight = 0
     this.lastBlendFactor = Number.NaN
+    this.lastHorizonMemoryStrength = Number.NaN
+    this.lastHorizonMemoryRadius = Number.NaN
+    this.lastHorizonMemoryEchoes = Number.NaN
+    this.lastHorizonMemorySpin = Number.NaN
     this.blendBGCache.invalidate()
     this.copyBGCache.invalidate()
   }
@@ -475,6 +679,10 @@ export class FrameBlendingPass extends WebGPUBasePass {
       this.historyView = null
     }
     this.lastBlendFactor = Number.NaN
+    this.lastHorizonMemoryStrength = Number.NaN
+    this.lastHorizonMemoryRadius = Number.NaN
+    this.lastHorizonMemoryEchoes = Number.NaN
+    this.lastHorizonMemorySpin = Number.NaN
     this.blendBGCache.invalidate()
     this.copyBGCache.invalidate()
 
