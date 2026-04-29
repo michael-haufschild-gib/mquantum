@@ -1,8 +1,13 @@
 /**
  * Dirac axial charge helper for write-grid rendering.
  *
- * Computes |ψ†γ5ψ|/ρ with γ5 = -i α0 α1 α2 in 3+1D. Requires
- * diracUniformsBlock, sparse gamma tables, and diracWriteGrid bindings.
+ * Computes the signed bilinear ψ†γ5ψ with γ5 = -i α0 α1 α2 in 3+1D — i.e.
+ * `diracAxialChargeAtSite()` returns the raw signed accumulated sum and does
+ * NOT take an absolute value or divide by ρ. Callers that want |ψ†γ5ψ|/ρ
+ * must apply `abs(...)` and divide by the local density themselves.
+ *
+ * Requires diracUniformsBlock, sparse gamma tables, and diracWriteGrid
+ * bindings.
  */
 
 export const diracAxialChargeBlock = /* wgsl */ `

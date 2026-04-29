@@ -113,6 +113,19 @@ export const minDiracGridPerDim = (dim: number): number => {
 }
 
 /**
+ * Normalize a Dirac fieldView for the given lattice dimension. axialCharge
+ * needs γ5 = -i α0 α1 α2 — undefined below 3 spatial dims — so any 1D/2D
+ * lattice that asks for it falls back to `totalDensity`. Centralized here
+ * so both direct setter calls and preset application share the same guard.
+ */
+function normalizeDiracFieldView(
+  latticeDim: number,
+  fieldView: DiracConfig['fieldView']
+): DiracConfig['fieldView'] {
+  return latticeDim < 3 && fieldView === 'axialCharge' ? 'totalDensity' : fieldView
+}
+
+/**
  * Resize Dirac arrays to match a new latticeDim, preserving existing values
  * where possible and filling new dimensions with defaults.
  */
@@ -141,8 +154,7 @@ export const resizeDiracArrays = (prev: DiracConfig, newDim: number): Partial<Di
     i < prev.slicePositions.length ? prev.slicePositions[i]! : 0
   )
   const newDt = clampDiracDt(spacing, prev.speedOfLight, prev.dt)
-  // axialCharge needs γ5 = -i α0 α1 α2 — undefined below 3 spatial dims.
-  const fieldView = newDim < 3 && prev.fieldView === 'axialCharge' ? 'totalDensity' : prev.fieldView
+  const fieldView = normalizeDiracFieldView(newDim, prev.fieldView)
   return {
     latticeDim: newDim,
     gridSize,
@@ -258,7 +270,8 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
         logger.warn(`[diracSetters] Ignoring invalid Dirac field view: ${String(view)}`)
         return
       }
-      if (view === 'axialCharge' && (ctx.get().schroedinger.dirac.latticeDim ?? 3) < 3) {
+      const latticeDim = ctx.get().schroedinger.dirac.latticeDim ?? 3
+      if (normalizeDiracFieldView(latticeDim, view) !== view) {
         return
       }
       setWithVersion((state) => ({
@@ -461,7 +474,14 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
             const dim = prev.latticeDim
 
             const { latticeDim: _ld, gridSize: _gs, ...safeOverrides } = preset.overrides
-            const merged = { ...prev, ...safeOverrides, needsReset: true }
+            // Drop any 'axialCharge' fieldView when the active lattice is <3D —
+            // a preset built for 3D+ would otherwise leave the session in an
+            // invalid state since the γ5 = -i α0 α1 α2 contraction is undefined.
+            const fieldView = normalizeDiracFieldView(
+              dim,
+              safeOverrides.fieldView ?? prev.fieldView
+            )
+            const merged = { ...prev, ...safeOverrides, fieldView, needsReset: true }
 
             if (safeOverrides.spacing) {
               const srcSpacing = safeOverrides.spacing
@@ -517,7 +537,12 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
           // preset leaves the stale 'particleAntiparticle' algorithm active, and
           // DiracStrategy forces the fieldView back to split.
           if (preset.overrides.fieldView) {
-            const expectedView = preset.overrides.fieldView
+            // Use the same dimension-normalized view that was actually written
+            // to the store, otherwise an axialCharge→totalDensity demotion on a
+            // <3D lattice would skip the color-algorithm sync entirely (the
+            // store guard below would reject it as stale).
+            const dim = ctx.get().schroedinger.dirac.latticeDim ?? 3
+            const expectedView = normalizeDiracFieldView(dim, preset.overrides.fieldView)
             void import('@/rendering/shaders/palette/types')
               .then(async ({ DIRAC_FIELD_VIEW_TO_COLOR_ALGO }) => {
                 // Guard: if a newer preset arrived while this chunk loaded,

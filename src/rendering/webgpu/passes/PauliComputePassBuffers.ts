@@ -20,6 +20,31 @@ import { buildFFTTwiddleTable, FFT_TWIDDLE_BYTES } from './FFTTwiddle'
 
 /** PauliUniforms struct size in bytes (640 = 160 indices × 4) */
 export const PAULI_UNIFORM_SIZE = 640
+
+/**
+ * U32 index of `params.fieldView` inside the packed PauliUniforms struct.
+ * Matches the absolute offset (`o = 76`) used by {@link packPauliUniforms}.
+ * Exported so callers (and tests) can read the encoded enum without
+ * hard-coding the numeric slot, which would silently drift if the layout
+ * is reshuffled. Single source of truth — the packer reads from here too.
+ */
+export const PAULI_FIELD_VIEW_U32_OFFSET = 76
+
+/**
+ * Mapping from `PauliConfig.fieldView` strings to the u32 enum value the
+ * shader expects in `params.fieldView`. Single source of truth — the
+ * packer reads from here so the value at `PAULI_FIELD_VIEW_U32_OFFSET`
+ * stays consistent with the shader's `params.fieldView == Nu` branches.
+ */
+export const PAULI_FIELD_VIEW_ENUM: Readonly<Record<PauliConfig['fieldView'], number>> = {
+  spinDensity: 0,
+  totalDensity: 1,
+  spinExpectation: 2,
+  coherence: 3,
+  spinHelicity: 4,
+  berryCurvature: 5,
+} as const
+
 /** Diagnostics workgroup size — must match @workgroup_size in pauliDiagnostics.wgsl.ts */
 const DIAG_WG = 64
 /** Number of f32 values in diagnostic result buffer:
@@ -394,17 +419,9 @@ export function packPauliUniforms(
   f32[o] = sigmaMaxFromPmlConfig(config)
   // o+1 would be pad slot; skipped since next section uses absolute offset
 
-  // Display (offset 76*4 = 304)
-  o = 76
-  const fvMap: Record<string, number> = {
-    spinDensity: 0,
-    totalDensity: 1,
-    spinExpectation: 2,
-    coherence: 3,
-    spinHelicity: 4,
-    berryCurvature: 5,
-  }
-  u32[o++] = fvMap[config.fieldView] ?? 0
+  // Display (offset PAULI_FIELD_VIEW_U32_OFFSET * 4 = 304)
+  o = PAULI_FIELD_VIEW_U32_OFFSET
+  u32[o++] = PAULI_FIELD_VIEW_ENUM[config.fieldView] ?? 0
   u32[o++] = config.autoScale ? 1 : 0
   f32[o++] = config.spinUpColor[0]
   f32[o++] = config.spinUpColor[1]

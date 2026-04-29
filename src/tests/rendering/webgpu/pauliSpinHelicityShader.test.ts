@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/pauli'
 import {
   packPauliUniforms,
+  PAULI_FIELD_VIEW_ENUM,
+  PAULI_FIELD_VIEW_U32_OFFSET,
   PAULI_UNIFORM_SIZE,
 } from '@/rendering/webgpu/passes/PauliComputePassBuffers'
 import { pauliWriteGridBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/pauliWriteGrid.wgsl'
@@ -12,7 +14,7 @@ import {
 } from '@/rendering/webgpu/shaders/schroedinger/volume/volumeRaymarchGrid.wgsl'
 
 describe('Pauli spin helicity render view', () => {
-  it('packs spinHelicity to fieldView enum 4', () => {
+  it('packs spinHelicity to its layout-mapped fieldView enum', () => {
     const uniformData = new ArrayBuffer(PAULI_UNIFORM_SIZE)
     const u32 = new Uint32Array(uniformData)
     const f32 = new Float32Array(uniformData)
@@ -26,10 +28,10 @@ describe('Pauli spin helicity render view', () => {
       boundingRadius: 5,
     })
 
-    expect(u32[76]).toBe(4)
+    expect(u32[PAULI_FIELD_VIEW_U32_OFFSET]).toBe(PAULI_FIELD_VIEW_ENUM.spinHelicity)
   })
 
-  it('packs berryCurvature to fieldView enum 5', () => {
+  it('packs berryCurvature to its layout-mapped fieldView enum', () => {
     const uniformData = new ArrayBuffer(PAULI_UNIFORM_SIZE)
     const u32 = new Uint32Array(uniformData)
     const f32 = new Float32Array(uniformData)
@@ -43,7 +45,7 @@ describe('Pauli spin helicity render view', () => {
       boundingRadius: 5,
     })
 
-    expect(u32[76]).toBe(5)
+    expect(u32[PAULI_FIELD_VIEW_U32_OFFSET]).toBe(PAULI_FIELD_VIEW_ENUM.berryCurvature)
   })
 
   it('adds shader math for normalized spin curl helicity', () => {
