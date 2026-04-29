@@ -48,6 +48,7 @@ describe('PAULI_SCENARIO_PRESETS', () => {
       'spinExpectation',
       'coherence',
       'spinHelicity',
+      'berryCurvature',
     ])
     for (const preset of PAULI_SCENARIO_PRESETS) {
       if (preset.overrides.fieldView) {

@@ -141,6 +141,8 @@ export const resizeDiracArrays = (prev: DiracConfig, newDim: number): Partial<Di
     i < prev.slicePositions.length ? prev.slicePositions[i]! : 0
   )
   const newDt = clampDiracDt(spacing, prev.speedOfLight, prev.dt)
+  // axialCharge needs γ5 = -i α0 α1 α2 — undefined below 3 spatial dims.
+  const fieldView = newDim < 3 && prev.fieldView === 'axialCharge' ? 'totalDensity' : prev.fieldView
   return {
     latticeDim: newDim,
     gridSize,
@@ -150,6 +152,7 @@ export const resizeDiracArrays = (prev: DiracConfig, newDim: number): Partial<Di
     slicePositions,
     dt: newDt,
     packetWidth: newPacketWidth,
+    fieldView,
   }
 }
 
@@ -253,6 +256,9 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
     setDiracFieldView: (view) => {
       if (!isDiracFieldView(view)) {
         logger.warn(`[diracSetters] Ignoring invalid Dirac field view: ${String(view)}`)
+        return
+      }
+      if (view === 'axialCharge' && (ctx.get().schroedinger.dirac.latticeDim ?? 3) < 3) {
         return
       }
       setWithVersion((state) => ({

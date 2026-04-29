@@ -54,6 +54,7 @@ describe('Schroedinger spectral-dimension flow WGSL composition', () => {
       'uniforms.quantumMode == 0',
       'uniforms.quantumMode == 1',
       'uniforms.quantumMode == 7',
+      'uniforms.quantumMode == 8',
       'let dIR = select(4.0, 3.0, isAnalyticMode)',
       'let dUV = clamp(uniforms.spectralDimensionFlowUvDimension, 1.2, 3.5)',
     ])
@@ -69,7 +70,8 @@ describe('Schroedinger spectral-dimension flow WGSL composition', () => {
       'spectralEmissionGain = spectralFlow.emissionGain',
       'spectralOpacityScale = spectralFlow.opacityScale',
       'sampleDensityWithPhaseAndFlow(samplePos, animTime, uniforms)',
-      'computeEffectiveDensity(rho * spectralOpacityScale',
+      'computeEffectiveDensity(',
+      'rho * spectralOpacityScale',
       'computeEmissionLit(rho, sCenter, phase, samplePos',
       'spectralEmissionGain',
     ])
@@ -86,7 +88,8 @@ describe('Schroedinger spectral-dimension flow WGSL composition', () => {
       'spectralOpacityScale = spectralFlow.opacityScale',
       'quickCheck = sampleDensityWithPhase(samplePos, animTime, uniforms)',
       'sampleDensityWithAnalyticalGradient(samplePos, animTime, uniforms)',
-      'computeEffectiveDensity(rho * spectralOpacityScale',
+      'computeEffectiveDensity(',
+      'rho * spectralOpacityScale',
       'computeEmissionLit(rho, sCenter, phase, samplePos',
       'spectralEmissionGain',
     ])
@@ -102,7 +105,8 @@ describe('Schroedinger spectral-dimension flow WGSL composition', () => {
       'spectralEmissionGain = spectralFlow.emissionGain',
       'spectralOpacityScale = spectralFlow.opacityScale',
       'gridSample = sampleDensityFromGrid(pos, uniforms)',
-      'computeEffectiveDensity(rho * spectralOpacityScale',
+      'computeEffectiveDensity(',
+      'rho * spectralOpacityScale',
       'computeEmissionLit(colorRho, colorS, phase, pos',
       'emission *= spectralEmissionGain',
     ])
@@ -118,7 +122,8 @@ describe('Schroedinger spectral-dimension flow WGSL composition', () => {
       'spectralEmissionGain = spectralFlow.emissionGain',
       'spectralOpacityScale = spectralFlow.opacityScale',
       'gridSample = sampleDensityFromGrid(pos, uniforms)',
-      'computeEffectiveDensity(rho * spectralOpacityScale',
+      'computeEffectiveDensity(',
+      'rho * spectralOpacityScale',
       'computeEmissionLit(emissionRho, emissionS, phase, pos',
       'emission *= spectralEmissionGain',
     ])

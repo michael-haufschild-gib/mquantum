@@ -276,6 +276,48 @@ export const BEC_SCENARIO_PRESETS: BecScenarioPreset[] = [
     },
     renderingOverrides: { densityGain: 5.0, densityContrast: 4.0 },
   },
+  {
+    id: 'hawkingHorizonView',
+    name: 'Hawking Flux Horizon',
+    description:
+      'Sonic horizon scene that opens directly in the κ/2π Hawking-flux view, lighting up the surface-gravity sheet',
+    minDim: 3,
+    overrides: {
+      interactionStrength: 500,
+      trapOmega: 1.0,
+      initialCondition: 'blackHoleAnalog',
+      fieldView: 'hawkingFlux',
+      hawkingVmax: 3.5,
+      hawkingLh: 0.6,
+      hawkingDeltaN: 0.15,
+      hawkingPairInjection: false,
+      hawkingInjectRate: 0.05,
+      hawkingSeed: 1337,
+      dt: 0.0005,
+      stepsPerFrame: 4,
+      absorberEnabled: true,
+      absorberWidth: 0.3,
+      autoScale: true,
+    },
+    renderingOverrides: { densityGain: 0.25, densityContrast: 1.2, autoScaleMaxGain: 6 },
+  },
+  {
+    id: 'vortexCirculationLattice',
+    name: 'Quantized Circulation',
+    description:
+      'Vortex lattice opened in the Ω circulation view — quantized phase-winding cores light up as topological defects',
+    overrides: {
+      interactionStrength: 800,
+      trapOmega: 0.5,
+      initialCondition: 'vortexLattice',
+      vortexLatticeCount: 6,
+      fieldView: 'vorticity',
+      dt: 0.001,
+      stepsPerFrame: 6,
+      autoScale: true,
+    },
+    renderingOverrides: { densityGain: 0.3, densityContrast: 1.4, autoScaleMaxGain: 12 },
+  },
 ]
 
 /**

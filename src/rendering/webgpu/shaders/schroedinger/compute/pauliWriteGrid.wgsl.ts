@@ -421,7 +421,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     if (params.latticeDim >= 2u && total >= 1e-20) {
       let spin = spinUnitAt(nnSite, T);
       var spinGrad: array<vec3f, 12>;
-      var minSpacing: f32 = params.spacing[0];
+      var minSpacing: f32 = max(params.spacing[0], 1e-6);
 
       for (var axis: u32 = 0u; axis < params.latticeDim; axis = axis + 1u) {
         let plus = spinTextureNeighbor(nnSite, &nnCoords, axis, true);

@@ -309,7 +309,8 @@ fn applySpectralDimensionFlow(
   let isAnalyticMode =
     uniforms.quantumMode == 0
     || uniforms.quantumMode == 1
-    || uniforms.quantumMode == 7;
+    || uniforms.quantumMode == 7
+    || uniforms.quantumMode == 8;
   let dIR = select(4.0, 3.0, isAnalyticMode);
   let dUV = clamp(uniforms.spectralDimensionFlowUvDimension, 1.2, 3.5);
   let spectralDimension = mix(dIR, dUV, uvGate);

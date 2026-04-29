@@ -118,4 +118,33 @@ export const QUANTUM_WALK_PRESETS: QuantumWalkScenarioPreset[] = [
       pmlTargetReflection: 1e-4,
     },
   },
+  {
+    id: 'coinEntropyScrambling',
+    name: 'Coin Entropy Scrambling',
+    description:
+      'DFT coin opened in the normalized Shannon entropy view — bright regions show information scrambling across coin directions',
+    overrides: {
+      coinType: 'dft',
+      coinBias: 0.5,
+      stepsPerFrame: 1,
+      fieldView: 'coinEntropy',
+      autoScale: true,
+      absorberEnabled: false,
+    },
+  },
+  {
+    id: 'causalCurvatureFront',
+    name: 'Causal Ricci Front',
+    description:
+      'Hadamard walk opened in the Raychaudhuri-like θ view — coin-current expansion reveals causal focusing shells at the relativistic walk front',
+    overrides: {
+      coinType: 'hadamard',
+      coinBias: 0.5,
+      coinInitial: 'symmetric',
+      stepsPerFrame: 1,
+      fieldView: 'causalCurvature',
+      autoScale: true,
+      absorberEnabled: false,
+    },
+  },
 ]
