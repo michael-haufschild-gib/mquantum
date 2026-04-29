@@ -18,6 +18,7 @@ describe('MiscControls', () => {
     render(<MiscControls />)
 
     const slider = screen.getByRole('slider', { name: 'Memory Spin' })
+    expect(slider).toBeEnabled()
     fireEvent.change(slider, { target: { value: '0.8' } })
 
     expect(usePostProcessingStore.getState().horizonMemorySpin).toBeCloseTo(0.8, 6)

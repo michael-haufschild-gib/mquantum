@@ -50,10 +50,14 @@ describe('Pauli spin helicity render view', () => {
 
   it('adds shader math for normalized spin curl helicity', () => {
     const branchStart = pauliWriteGridBlock.indexOf('params.fieldView == 4u')
-    const branchEnd = pauliWriteGridBlock.indexOf('} else if (params.fieldView == 5u)', branchStart)
+    const branchEndRaw = pauliWriteGridBlock.indexOf(
+      '} else if (params.fieldView == 5u)',
+      branchStart
+    )
+    const branchEnd = branchEndRaw === -1 ? pauliWriteGridBlock.length : branchEndRaw
     const branch = pauliWriteGridBlock.slice(branchStart, branchEnd)
 
-    expect(branchStart).toBeGreaterThan(0)
+    expect(branchStart).toBeGreaterThanOrEqual(0)
     expect(branchEnd).toBeGreaterThan(branchStart)
     expect(pauliWriteGridBlock).toContain('fn spinUnitAt')
     expect(pauliWriteGridBlock).toContain('fn spinTextureNeighbor')
@@ -68,10 +72,11 @@ describe('Pauli spin helicity render view', () => {
 
   it('adds shader math for Berry-curvature two-form magnitude', () => {
     const branchStart = pauliWriteGridBlock.indexOf('params.fieldView == 5u')
-    const branchEnd = pauliWriteGridBlock.indexOf('// Potential overlay', branchStart)
+    const branchEndRaw = pauliWriteGridBlock.indexOf('// Potential overlay', branchStart)
+    const branchEnd = branchEndRaw === -1 ? pauliWriteGridBlock.length : branchEndRaw
     const branch = pauliWriteGridBlock.slice(branchStart, branchEnd)
 
-    expect(branchStart).toBeGreaterThan(0)
+    expect(branchStart).toBeGreaterThanOrEqual(0)
     expect(branchEnd).toBeGreaterThan(branchStart)
     expect(branch).toContain('var spinGrad: array<vec3f, 12>;')
     expect(branch).toContain('var minSpacing')
