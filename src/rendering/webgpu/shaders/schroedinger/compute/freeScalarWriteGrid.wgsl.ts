@@ -103,6 +103,40 @@ fn cornerWeight(fracs: ptr<function, array<f32, 12>>, corner: u32) -> f32 {
   return w;
 }
 
+struct FreeScalarProperKgvEnergy {
+  k: f32,
+  g: f32,
+  v: f32,
+  e: f32,
+}
+
+fn computeProperKgvEnergy(
+  nnPhiVal: f32,
+  nnPiVal: f32,
+  gradEnergy: f32,
+  drivenMassCoef: f32
+) -> FreeScalarProperKgvEnergy {
+  // Proper-frame Hamiltonian density decomposition (K, G, V, E).
+  // The canonical triple is divided by aFull to convert from per unit
+  // comoving volume to per unit proper volume. Under Minkowski aFull = 1
+  // this is bit-identical to the canonical KG decomposition.
+  let invAFull = select(1.0 / params.aFull, 1.0, params.aFull <= 0.0);
+  let K = 0.5 * params.aKinetic * nnPiVal * nnPiVal * invAFull;
+  let G = 0.5 * gradEnergy * invAFull;
+  // Preheating: include the same time-dependent mass² factor used by
+  // freeScalarUpdatePi so the decomposition reflects the integrated
+  // Hamiltonian.
+  var V = 0.5 * drivenMassCoef * nnPhiVal * nnPhiVal * invAFull;
+  if (params.selfInteractionEnabled != 0u) {
+    let siV2 = params.selfInteractionVev * params.selfInteractionVev;
+    let siPhi2 = nnPhiVal * nnPhiVal;
+    let siDiff = siPhi2 - siV2;
+    V += params.aFull * params.selfInteractionLambda * siDiff * siDiff * invAFull;
+  }
+  let E = K + G + V;
+  return FreeScalarProperKgvEnergy(K, G, V, E);
+}
+
 @compute @workgroup_size(4, 4, 4)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let texDims = textureDimensions(outputTex);
@@ -356,15 +390,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     fieldValue = params.selfInteractionLambda * wdDiff * wdDiff;
   } else if (params.fieldView == 4u) {
     let invAFull = select(1.0 / params.aFull, 1.0, params.aFull <= 0.0);
-    let K = 0.5 * params.aKinetic * nnPiVal * nnPiVal * invAFull;
-    let G = 0.5 * gradEnergy * invAFull;
-    var V = 0.5 * drivenMassCoef * nnPhiVal * nnPhiVal * invAFull;
-    if (params.selfInteractionEnabled != 0u) {
-      let fsV2 = params.selfInteractionVev * params.selfInteractionVev;
-      let fsPhi2 = nnPhiVal * nnPhiVal;
-      let fsDiff = fsPhi2 - fsV2;
-      V += params.aFull * params.selfInteractionLambda * fsDiff * fsDiff * invAFull;
-    }
+    let kgv = computeProperKgvEnergy(nnPhiVal, nnPiVal, gradEnergy, drivenMassCoef);
+    let K = kgv.k;
+    let G = kgv.g;
+    let V = kgv.v;
 
     let localEnergy = max(K + G + V, 1e-12);
     let freezeOutGate = 1.0 - clamp(G / localEnergy, 0.0, 1.0);
@@ -372,16 +401,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let fluxStrain = clamp(abs(nnPiVal) * sqrt(max(gradEnergy, 0.0)) * invAFull / localEnergy, 0.0, 1.0);
     fieldValue = clamp(0.7 * freezeOutGate * phaseSpaceBalance + 0.3 * fluxStrain, 0.0, 1.0);
   } else if (params.fieldView == 5u) {
-    let invAFull = select(1.0 / params.aFull, 1.0, params.aFull <= 0.0);
-    let K = 0.5 * params.aKinetic * nnPiVal * nnPiVal * invAFull;
-    let G = 0.5 * gradEnergy * invAFull;
-    var V = 0.5 * drivenMassCoef * nnPhiVal * nnPhiVal * invAFull;
-    if (params.selfInteractionEnabled != 0u) {
-      let eosV2 = params.selfInteractionVev * params.selfInteractionVev;
-      let eosPhi2 = nnPhiVal * nnPhiVal;
-      let eosDiff = eosPhi2 - eosV2;
-      V += params.aFull * params.selfInteractionLambda * eosDiff * eosDiff * invAFull;
-    }
+    let kgv = computeProperKgvEnergy(nnPhiVal, nnPiVal, gradEnergy, drivenMassCoef);
+    let K = kgv.k;
+    let G = kgv.g;
+    let V = kgv.v;
 
     let localEnergy = max(K + G + V, 1e-12);
     let spatialDim = max(f32(params.latticeDim), 1.0);
@@ -456,29 +479,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   // Analysis texture output (educational color modes) — skip entirely when disabled
   if (params.analysisMode == 1u) {
-    // Proper-frame Hamiltonian density decomposition (K, G, V, E).
-    // The canonical triple (½ aKinetic π², ½ aPotential (∇φ)², ½ m²·aFull φ²)
-    // is the integrand of the conformal-time Hamiltonian; to match the
-    // proper-density convention used by the energyDensity view above,
-    // every term is divided by aFull = a^n to convert from "per unit
-    // comoving volume (conformal time)" to "per unit proper volume
-    // (comoving observer)". Under Minkowski aFull = 1 and this is
-    // bit-identical to the canonical KG decomposition.
-    let invAFull = select(1.0 / params.aFull, 1.0, params.aFull <= 0.0);
-    let K = 0.5 * params.aKinetic * nnPiVal * nnPiVal * invAFull;
-    let G = 0.5 * gradEnergy * invAFull;
-    // Preheating: apply the same time-dependent mass² factor used in
-    // freeScalarUpdatePi and the energyDensity view, so the K/G/V/E
-    // decomposition reflects the Hamiltonian actually being integrated.
-    var V = 0.5 * drivenMassCoef * nnPhiVal * nnPhiVal * invAFull;
-    if (params.selfInteractionEnabled != 0u) {
-      let siV2 = params.selfInteractionVev * params.selfInteractionVev;
-      let siPhi2 = nnPhiVal * nnPhiVal;
-      let siDiff = siPhi2 - siV2;
-      V += params.aFull * params.selfInteractionLambda * siDiff * siDiff * invAFull;
-    }
-    let E = K + G + V;
-    textureStore(analysisTex, gid, vec4f(K, G, V, E));
+    let kgv = computeProperKgvEnergy(nnPhiVal, nnPiVal, gradEnergy, drivenMassCoef);
+    textureStore(analysisTex, gid, vec4f(kgv.k, kgv.g, kgv.v, kgv.e));
   } else if (params.analysisMode == 2u) {
     var Sx: f32 = 0.0;
     var Sy: f32 = 0.0;

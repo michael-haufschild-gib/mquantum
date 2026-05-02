@@ -254,14 +254,6 @@ ${termsBlock}
 
   // Raw |ψ|² from eigenfunction product (used for both gradient and starting rho)
   let psiMag2 = psiRe * psiRe + psiIm * psiIm;
-  var rhoMod = psiMag2;
-
-  // Hydrogen ND density boost (matches sampleDensityWithPhaseAndFlow ordering;
-  // analytical gradient is HO-only today via useAnalyticalGradient, so this
-  // branch is dead in current configs — kept for forward-compat parity).
-  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
-    rhoMod *= uniforms.hydrogenNDBoost;
-  }
 
   let spatialPhase = atan2(spatIm, spatRe);
 
@@ -275,36 +267,15 @@ ${termsBlock}
     relativePhase = atan2(imagPart, realPart);
   }
 
-  if (FEATURE_UNCERTAINTY_BOUNDARY && !SKIP_DENSITY_EMPHASIS) {
-    let boundaryLogRho = log(rhoMod + DENSITY_EPS);
-    rhoMod = applyUncertaintyBoundaryEmphasis(rhoMod, boundaryLogRho, uniforms);
-  }
-
-  if (FEATURE_INTERFERENCE && uniforms.interferenceEnabled != 0u && uniforms.interferenceAmp > 0.0) {
-    let iTime = uniforms.time * uniforms.interferenceSpeed;
-    let fringe = 1.0 + uniforms.interferenceAmp * sin(spatialPhase * uniforms.interferenceFreq + iTime);
-    rhoMod *= fringe;
-    rhoMod = max(rhoMod, 0.0);
-  }
-
-  if (uniforms.phaseShimmerEnabled != 0u && uniforms.phaseShimmerStrength > 0.0) {
-    let pcfSpeedMod = 1.0 - clamp(rhoMod * 5.0, 0.0, 1.0);
-    let pcfTime = uniforms.time * uniforms.phaseShimmerSpeed;
-    let pcfOffset = pcfTime * pcfSpeedMod;
-    let invPsiLen = inverseSqrt(max(psiMag2, 1e-16));
-    let pcfCosP = psiRe * invPsiLen;
-    let pcfSinP = psiIm * invPsiLen;
-    let pcfNoise = gradientNoise(pos * 2.0 + vec3f(
-        pcfOffset + pcfCosP * 0.5,
-        pcfSinP * 0.5,
-        pcfOffset * 0.7 + pcfCosP * 0.3
-    ));
-    rhoMod *= (1.0 + pcfNoise * uniforms.phaseShimmerStrength * pcfSpeedMod);
-    rhoMod = max(rhoMod, 0.0);
-  }
-
-  let sMod = log(rhoMod + DENSITY_EPS);
-  let phaseForColor = select(spatialPhase, relativePhase, COLOR_ALGORITHM == 10);
+  let densityInfo = applyDensityPostModulation(
+    pos,
+    vec2f(psiRe, psiIm),
+    psiMag2,
+    spatialPhase,
+    relativePhase,
+    uniforms
+  );
+  let phaseForColor = select(densityInfo.z, densityInfo.w, COLOR_ALGORITHM == 10);
 ${basisProjectionPsi}
 
   // Gradient on raw rho (matches existing computeAnalyticalGradient semantics).
@@ -313,7 +284,7 @@ ${basisProjectionPsi}
   let gradS = (gradPsiRe * psiRe + gradPsiIm * psiIm) * twoInvRhoEps;
 
   return AnalyticalSample(
-    rhoMod, sMod, phaseForColor, gradS, vec2f(psiRe, psiIm),
+    densityInfo.x, densityInfo.y, phaseForColor, gradS, vec2f(psiRe, psiIm),
     gradPsiRe, gradPsiIm
   );
 }
