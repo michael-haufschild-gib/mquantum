@@ -1,3 +1,4 @@
+import { assembleShaderBlocks, type ShaderBlock } from '../../shared/compose-helpers'
 import { volumeRaymarchHQBlock } from './volumeRaymarchHQ.wgsl'
 
 /**
@@ -9,11 +10,11 @@ import { volumeRaymarchHQBlock } from './volumeRaymarchHQ.wgsl'
  */
 
 /**
- * Volume raymarching and HQ raymarching blocks.
- * Included after volumeIntegrationBlock in the shader assembly.
+ * Main volume raymarching block.
  */
-export const volumeRaymarchBlock =
-  /* wgsl */ `
+const volumeRaymarchMainBlock: ShaderBlock = {
+  name: 'Volume Raymarch Main',
+  content: /* wgsl */ `
 /**
  * Main volume raymarching function.
  * Supports lighting (matched to Mandelbulb behavior).
@@ -532,4 +533,16 @@ fn volumeRaymarch(
   return VolumeResult(accColor, finalAlpha, iterCount, primaryHitT);
 }
 
-` + volumeRaymarchHQBlock
+`,
+}
+
+const volumeRaymarchBlocks: ShaderBlock[] = [
+  volumeRaymarchMainBlock,
+  { name: 'Volume Raymarch HQ', content: volumeRaymarchHQBlock },
+]
+
+/**
+ * Volume raymarching and HQ raymarching blocks.
+ * Included after volumeIntegrationBlock in the shader assembly.
+ */
+export const volumeRaymarchBlock: string = assembleShaderBlocks(volumeRaymarchBlocks).wgsl
