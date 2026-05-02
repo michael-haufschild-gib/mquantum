@@ -12,12 +12,12 @@ import {
   DEFAULT_BEC_CONFIG,
   type TdseDisorderDistribution,
 } from '@/lib/geometry/extended/types'
-import { logger } from '@/lib/logger'
 import { reduceGridToFit } from '@/lib/math/ndArray'
 import { thomasFermiMuND, thomasFermiRadius } from '@/lib/physics/bec/chemicalPotential'
 import { clampKKState } from '@/lib/physics/compactification'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useGeometryStore } from '@/stores/geometryStore'
+import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
 
 import type { SchroedingerSliceActions } from '../types'
 import {
@@ -556,8 +556,11 @@ export function createBecSetters(ctx: SetterContext): BecActions {
       })
     },
     applyBecPreset: (presetId) => {
-      void import('@/lib/physics/bec/presets')
-        .then(({ getBecPreset }) => {
+      loadPresetModule(
+        () => import('@/lib/physics/bec/presets'),
+        'becSetters',
+        `BEC presets for '${presetId}'`,
+        ({ getBecPreset }) => {
           const preset = getBecPreset(presetId)
           if (!preset) return
           setWithVersion((state) => {
@@ -595,14 +598,8 @@ export function createBecSetters(ctx: SetterContext): BecActions {
             }
           })
           useDiagnosticsStore.getState().resetBec()
-        })
-        .catch((error) => {
-          // Dynamic import can fail (network error, chunk mismatch). Without a
-          // catch, the unhandled rejection would surface as a noisy console
-          // error with no context. Log and leave state untouched so the user
-          // keeps whatever config they had before the failed preset load.
-          logger.warn(`[becSetters] Failed to load BEC presets for '${presetId}':`, error)
-        })
+        }
+      )
     },
     resetBecField: () => {
       useDiagnosticsStore.getState().resetBec()

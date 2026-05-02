@@ -165,3 +165,29 @@ export function packVacuumBubbleLens(
     ? clamp(schroedinger?.vacuumBubbleBias ?? D.vacuumBubbleBias, 0.0, 3.0)
     : 0.0
 }
+
+/**
+ * Pack Born-null weave controls. The feature is analytic-volume only because it
+ * needs local ψ and j = Im(conj(ψ)∇ψ), so compute-grid modes force all fields
+ * to zero even if UI state is enabled. Disabled/strength-zero state is exact
+ * identity in WGSL. Strength ∈ [0, 2], node width ∈ [0.0001, 0.2],
+ * circulation ∈ [0, 8].
+ */
+export function packBornNullWeave(
+  floatView: Float32Array,
+  intView: Int32Array,
+  schroedinger: Partial<SchroedingerConfig> | undefined,
+  isUniformComputeMode = false
+): void {
+  const enabled = !isUniformComputeMode && (schroedinger?.bornNullWeaveEnabled ?? false)
+  intView[I.bornNullWeaveEnabled] = enabled ? 1 : 0
+  floatView[I.bornNullWeaveStrength] = enabled
+    ? clamp(schroedinger?.bornNullWeaveStrength ?? D.bornNullWeaveStrength, 0.0, 2.0)
+    : 0.0
+  floatView[I.bornNullWeaveNodeWidth] = enabled
+    ? clamp(schroedinger?.bornNullWeaveNodeWidth ?? D.bornNullWeaveNodeWidth, 0.0001, 0.2)
+    : 0.0
+  floatView[I.bornNullWeaveCirculation] = enabled
+    ? clamp(schroedinger?.bornNullWeaveCirculation ?? D.bornNullWeaveCirculation, 0.0, 8.0)
+    : 0.0
+}

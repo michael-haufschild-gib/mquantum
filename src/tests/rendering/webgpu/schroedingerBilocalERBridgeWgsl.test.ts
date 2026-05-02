@@ -72,7 +72,9 @@ describe('Schroedinger bilocal ER bridge WGSL composition', () => {
       'let remoteGridSample = sampleDensityFromGrid(remoteEndpoint, uniforms)',
       'let bridge = applyBilocalERBridgeTopology(',
       'pos = bridge.position',
-      'gridSample = sampleDensityFromGrid(pos, uniforms)',
+      // PERF (OPT-PERF-2): post-warp re-sample now invokes loadGridSampleState*
+      // helper instead of inlining sampleDensityFromGrid directly.
+      'loadGridSampleState',
       'if (backreactionActive && rho >= EMPTY_SKIP_THRESHOLD)',
       'emission *= causticMultiplier',
       'emission *= bridgeGain',
@@ -87,7 +89,9 @@ describe('Schroedinger bilocal ER bridge WGSL composition', () => {
       'let remoteGridSample = sampleDensityFromGrid(remoteEndpoint, uniforms)',
       'let bridge = applyBilocalERBridgeTopology(',
       'pos = bridge.position',
-      'gridSample = sampleDensityFromGrid(pos, uniforms)',
+      // PERF (OPT-PERF-2): post-warp re-sample now invokes loadGridSampleState*
+      // helper instead of inlining sampleDensityFromGrid directly.
+      'loadGridSampleState',
       'if (backreactionActive && rho >= EMPTY_SKIP_THRESHOLD)',
       'emission *= causticMultiplier',
       'emission *= bridgeGain',

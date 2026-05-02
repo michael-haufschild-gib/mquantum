@@ -59,6 +59,8 @@ describe('Schroedinger vacuum bubble lens WGSL composition', () => {
   it('resamples HQ analytic volume before gradient and emission', () => {
     const body = functionSlice(volumeRaymarchBlock, 'volumeRaymarchHQ')
 
+    // PERF: HQ now uses ensureGradient at the emission point (per-step cache
+    // shared with all spacetime effects) instead of sampleDensityWithAnalyticalGradient.
     expectOrdered(body, [
       'let vacuumBubbleActive = isVacuumBubbleLensActive(uniforms)',
       'let spectralFlow = applySpectralDimensionFlow(',
@@ -67,7 +69,7 @@ describe('Schroedinger vacuum bubble lens WGSL composition', () => {
       'vacuumBubbleEmissionGain = vacuumBubble.emissionGain',
       'vacuumBubbleOpacityScale = vacuumBubble.opacityScale',
       'quickCheck = sampleDensityWithPhase(samplePos, animTime, uniforms)',
-      'sampleDensityWithAnalyticalGradient(samplePos, animTime, uniforms)',
+      'gradient = ensureGradient(samplePos, animTime, uniforms, &gradCache)',
       'rho * spectralOpacityScale * vacuumBubbleOpacityScale',
       'vacuumBubbleEmissionGain',
     ])
@@ -83,7 +85,9 @@ describe('Schroedinger vacuum bubble lens WGSL composition', () => {
       'pos = vacuumBubble.position',
       'vacuumBubbleEmissionGain = vacuumBubble.emissionGain',
       'vacuumBubbleOpacityScale = vacuumBubble.opacityScale',
-      'gridSample = sampleDensityFromGrid(pos, uniforms)',
+      // PERF (OPT-PERF-2): post-warp re-sample now invokes loadGridSampleState*
+      // helper instead of inlining the sampleDensityFromGrid call directly.
+      'oadGridSampleState',
       'rho * spectralOpacityScale * vacuumBubbleOpacityScale',
       'emission *= vacuumBubbleEmissionGain',
     ])
@@ -99,7 +103,9 @@ describe('Schroedinger vacuum bubble lens WGSL composition', () => {
       'pos = vacuumBubble.position',
       'vacuumBubbleEmissionGain = vacuumBubble.emissionGain',
       'vacuumBubbleOpacityScale = vacuumBubble.opacityScale',
-      'gridSample = sampleDensityFromGrid(pos, uniforms)',
+      // PERF (OPT-PERF-2): post-warp re-sample now invokes loadGridSampleState*
+      // helper instead of inlining the sampleDensityFromGrid call directly.
+      'oadGridSampleState',
       'rho * spectralOpacityScale * vacuumBubbleOpacityScale',
       'emission *= vacuumBubbleEmissionGain',
     ])

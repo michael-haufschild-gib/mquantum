@@ -185,6 +185,10 @@ export function createVisualEffectSetters(
     setSchroedingerVacuumBubbleWallThickness: clampedSetter('vacuumBubbleWallThickness', 0.02, 0.5),
     setSchroedingerVacuumBubbleTension: clampedSetter('vacuumBubbleTension', 0.0, 3.0),
     setSchroedingerVacuumBubbleBias: clampedSetter('vacuumBubbleBias', 0.0, 3.0),
+    setSchroedingerBornNullWeaveEnabled: valueSetter('bornNullWeaveEnabled'),
+    setSchroedingerBornNullWeaveStrength: clampedSetter('bornNullWeaveStrength', 0.0, 2.0),
+    setSchroedingerBornNullWeaveNodeWidth: clampedSetter('bornNullWeaveNodeWidth', 0.0001, 0.2),
+    setSchroedingerBornNullWeaveCirculation: clampedSetter('bornNullWeaveCirculation', 0.0, 8.0),
 
     // Probability current
     setSchroedingerProbabilityCurrentEnabled: valueSetter('probabilityCurrentEnabled'),

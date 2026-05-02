@@ -19,6 +19,9 @@ pub fn start() {
 }
 
 mod animation;
+mod animation_matrix_unrolled;
+mod animation_projection;
+mod animation_vector_ops;
 mod bec_spectrum;
 mod clifford;
 mod collapse;

@@ -942,6 +942,91 @@ describe('packSchroedingerUniforms', () => {
     expect(floatView[index.vacuumBubbleBias]).toBe(3)
   })
 
+  it('zeroes born-null weave uniforms when disabled', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      schroedinger: {
+        bornNullWeaveEnabled: false,
+        bornNullWeaveStrength: 1.5,
+        bornNullWeaveNodeWidth: 0.04,
+        bornNullWeaveCirculation: 4,
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    const index = SCHROEDINGER_LAYOUT.index
+    expect(intView[index.bornNullWeaveEnabled]).toBe(0)
+    expect(floatView[index.bornNullWeaveStrength]).toBe(0)
+    expect(floatView[index.bornNullWeaveNodeWidth]).toBe(0)
+    expect(floatView[index.bornNullWeaveCirculation]).toBe(0)
+  })
+
+  it('packs clamped born-null weave controls when enabled for analytic raymarching', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      schroedinger: {
+        bornNullWeaveEnabled: true,
+        bornNullWeaveStrength: 9,
+        bornNullWeaveNodeWidth: 0.00001,
+        bornNullWeaveCirculation: 99,
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    const index = SCHROEDINGER_LAYOUT.index
+    expect(intView[index.bornNullWeaveEnabled]).toBe(1)
+    expect(floatView[index.bornNullWeaveStrength]).toBe(2)
+    expect(floatView[index.bornNullWeaveNodeWidth]).toBeCloseTo(0.0001)
+    expect(floatView[index.bornNullWeaveCirculation]).toBe(8)
+  })
+
+  it('forces born-null weave identity uniforms for density-grid compute modes', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      isUniformComputeMode: true,
+      schroedinger: {
+        bornNullWeaveEnabled: true,
+        bornNullWeaveStrength: 1.5,
+        bornNullWeaveNodeWidth: 0.04,
+        bornNullWeaveCirculation: 4,
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    const index = SCHROEDINGER_LAYOUT.index
+    expect(intView[index.bornNullWeaveEnabled]).toBe(0)
+    expect(floatView[index.bornNullWeaveStrength]).toBe(0)
+    expect(floatView[index.bornNullWeaveNodeWidth]).toBe(0)
+    expect(floatView[index.bornNullWeaveCirculation]).toBe(0)
+  })
+
+  it('forces born-null weave identity uniforms for density-grid-only cosmology modes', () => {
+    for (const quantumModeStr of ['wheelerDeWitt', 'antiDeSitter']) {
+      const { floatView, intView } = createBuffer(BUFFER_SIZE)
+      const params = makeBaseParams({
+        quantumModeStr,
+        isUniformComputeMode: false,
+        schroedinger: {
+          bornNullWeaveEnabled: true,
+          bornNullWeaveStrength: 1.5,
+          bornNullWeaveNodeWidth: 0.04,
+          bornNullWeaveCirculation: 4,
+        } as never,
+      })
+
+      packSchroedingerUniforms(floatView, intView, params)
+
+      const index = SCHROEDINGER_LAYOUT.index
+      expect(intView[index.bornNullWeaveEnabled]).toBe(0)
+      expect(floatView[index.bornNullWeaveStrength]).toBe(0)
+      expect(floatView[index.bornNullWeaveNodeWidth]).toBe(0)
+      expect(floatView[index.bornNullWeaveCirculation]).toBe(0)
+    }
+  })
+
   // Wheeler–DeWitt render-only phase rotation rate: 0 unless mode+enabled.
   it('writes wdwPhaseRotationRate = 0 for non-WdW modes even when flag set', () => {
     const { floatView, intView } = createBuffer(BUFFER_SIZE)

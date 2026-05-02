@@ -30,6 +30,7 @@ import {
 import { SCHROEDINGER_LAYOUT } from './schroedingerLayout'
 import {
   packBilocalERBridge,
+  packBornNullWeave,
   packEntropicTimeShear,
   packQuantumBackreaction,
   packSpectralDimensionFlow,
@@ -57,6 +58,9 @@ type WdwPhaseConfig = { phaseRotationEnabled?: boolean; phaseRotationSpeed?: num
 
 /** Parse hex color to linear RGB, defaulting to white on failure. */
 const parseColor = (hex: string): Rgb => parseHexColorToLinearRgb(hex)
+
+const isDensityGridOnlyMode = (mode: string): boolean =>
+  mode === 'wheelerDeWitt' || mode === 'antiDeSitter'
 
 // =========================================================================
 // Schroedinger uniform buffer
@@ -307,6 +311,12 @@ function packVisualFields(
   packEntropicTimeShear(floatView, intView, schroedinger)
   packSpectralDimensionFlow(floatView, intView, schroedinger)
   packVacuumBubbleLens(floatView, intView, schroedinger)
+  packBornNullWeave(
+    floatView,
+    intView,
+    schroedinger,
+    p.isUniformComputeMode || isDensityGridOnlyMode(p.quantumModeStr)
+  )
 }
 
 /** Pack nodal fields, color algorithm, and cosine palette. */

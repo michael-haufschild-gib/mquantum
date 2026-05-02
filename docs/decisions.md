@@ -1,6 +1,24 @@
 # Architecture Decision Records
 
-Key design decisions and their rationale. Each entry captures **why** a choice was made, not just what was chosen.
+Key design decisions and their rationale. Each entry captures **why** a
+choice was made, not just what was chosen.
+
+## Two ADR conventions in this repo
+
+This file is the **inline narrative log** — each ADR is a section here
+and reads top-to-bottom. The numbering below (`ADR-NNN`) is local to
+this file and does **not** correspond to the file names in
+`docs/adr/NNN-*.md`.
+
+The companion `docs/adr/` directory holds **standalone ADR files** that
+go into more depth on a single decision. Those files have their own
+numbering. Future ADRs should land as a new file in `docs/adr/` (with
+the next available number) and a one-line entry in this index when the
+decision affects more than one subsystem.
+
+The ID space split was already in use when this file was inherited; we
+are not renumbering historical entries, but new decisions go into
+`docs/adr/` only.
 
 ## ADR-001: Singleton WebGPUDevice
 

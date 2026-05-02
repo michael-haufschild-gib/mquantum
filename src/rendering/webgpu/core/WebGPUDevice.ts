@@ -10,7 +10,13 @@
 
 import { logger } from '@/lib/logger'
 
-import type { WebGPUCapabilities, WebGPUInitResult, WebGPUInitSuccess } from './types'
+import type {
+  WebGPUCapabilities,
+  WebGPUInitErrorCode,
+  WebGPUInitResult,
+  WebGPUInitSuccess,
+} from './types'
+import { WebGPUInitError } from './types'
 
 /** Internal type for raw init data (before wrapping with success flag) */
 type WebGPUInitData = Omit<WebGPUInitSuccess, 'success'>
@@ -102,25 +108,47 @@ export class WebGPUDevice {
         success: true as const,
         ...result,
       }))
-      .catch((error) => ({
-        success: false as const,
-        error: error instanceof Error ? error.message : String(error),
-      }))
+      .catch((error) => {
+        // `WebGPUInitError` carries an explicit failure code from the
+        // throw site so the boundary doesn't have to string-match. Any
+        // other thrown error collapses to `INTERNAL_ERROR`.
+        const code: WebGPUInitErrorCode =
+          error instanceof WebGPUInitError ? error.code : 'INTERNAL_ERROR'
+        const message = error instanceof Error ? error.message : String(error)
+        return {
+          success: false as const,
+          code,
+          error: message,
+          ...(error !== undefined && error !== null ? { cause: error } : {}),
+        }
+      })
     return this.initPromise
   }
 
   private async doInitialize(canvas: HTMLCanvasElement): Promise<WebGPUInitData> {
     if (!isWebGPUSupported()) {
-      throw new Error('WebGPU is not supported in this browser')
+      throw new WebGPUInitError('NO_NAVIGATOR_GPU', 'WebGPU is not supported in this browser')
     }
 
     // Request adapter with high-performance preference
-    const adapter = await navigator.gpu.requestAdapter({
-      powerPreference: 'high-performance',
-    })
+    let adapter: GPUAdapter | null
+    try {
+      adapter = await navigator.gpu.requestAdapter({
+        powerPreference: 'high-performance',
+      })
+    } catch (cause) {
+      throw new WebGPUInitError(
+        'ADAPTER_REQUEST_FAILED',
+        'navigator.gpu.requestAdapter() threw',
+        cause
+      )
+    }
 
     if (!adapter) {
-      throw new Error('Failed to get WebGPU adapter')
+      throw new WebGPUInitError(
+        'ADAPTER_REQUEST_FAILED',
+        'Failed to get WebGPU adapter (requestAdapter returned null)'
+      )
     }
 
     // Query adapter capabilities (use synchronous .info property - requestAdapterInfo() was removed)
@@ -141,20 +169,31 @@ export class WebGPUDevice {
     }
 
     // Request maximum limits
-    const device = await adapter.requestDevice({
-      requiredFeatures,
-      requiredLimits: {
-        maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
-        maxUniformBufferBindingSize: adapter.limits.maxUniformBufferBindingSize,
-        maxComputeWorkgroupSizeX: adapter.limits.maxComputeWorkgroupSizeX,
-        maxComputeWorkgroupSizeY: adapter.limits.maxComputeWorkgroupSizeY,
-        maxComputeWorkgroupSizeZ: adapter.limits.maxComputeWorkgroupSizeZ,
-        maxComputeInvocationsPerWorkgroup: adapter.limits.maxComputeInvocationsPerWorkgroup,
-        maxComputeWorkgroupStorageSize: adapter.limits.maxComputeWorkgroupStorageSize,
-        maxBindGroups: adapter.limits.maxBindGroups,
-        maxTextureDimension2D: adapter.limits.maxTextureDimension2D,
-      },
-    })
+    let device: GPUDevice
+    try {
+      device = await adapter.requestDevice({
+        requiredFeatures,
+        requiredLimits: {
+          maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
+          maxUniformBufferBindingSize: adapter.limits.maxUniformBufferBindingSize,
+          maxComputeWorkgroupSizeX: adapter.limits.maxComputeWorkgroupSizeX,
+          maxComputeWorkgroupSizeY: adapter.limits.maxComputeWorkgroupSizeY,
+          maxComputeWorkgroupSizeZ: adapter.limits.maxComputeWorkgroupSizeZ,
+          maxComputeInvocationsPerWorkgroup: adapter.limits.maxComputeInvocationsPerWorkgroup,
+          maxComputeWorkgroupStorageSize: adapter.limits.maxComputeWorkgroupStorageSize,
+          maxBindGroups: adapter.limits.maxBindGroups,
+          maxTextureDimension2D: adapter.limits.maxTextureDimension2D,
+        },
+      })
+    } catch (cause) {
+      throw new WebGPUInitError(
+        'DEVICE_REQUEST_FAILED',
+        cause instanceof Error
+          ? `adapter.requestDevice() rejected: ${cause.message}`
+          : 'adapter.requestDevice() rejected',
+        cause
+      )
+    }
 
     // Handle device loss
     void device.lost.then((info) => {
@@ -165,19 +204,32 @@ export class WebGPUDevice {
     // Configure canvas context
     const context = canvas.getContext('webgpu')
     if (!context) {
-      throw new Error('Failed to get WebGPU canvas context')
+      throw new WebGPUInitError(
+        'CONTEXT_CONFIGURE_FAILED',
+        'canvas.getContext("webgpu") returned null'
+      )
     }
 
     // Use preferred format (usually bgra8unorm on most platforms)
     const format = navigator.gpu.getPreferredCanvasFormat()
 
-    context.configure({
-      device,
-      format,
-      alphaMode: 'premultiplied',
-      // Required for screenshot capture via copyTextureToBuffer from the swapchain texture.
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
-    })
+    try {
+      context.configure({
+        device,
+        format,
+        alphaMode: 'premultiplied',
+        // Required for screenshot capture via copyTextureToBuffer from the swapchain texture.
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+      })
+    } catch (cause) {
+      throw new WebGPUInitError(
+        'CONTEXT_CONFIGURE_FAILED',
+        cause instanceof Error
+          ? `GPUCanvasContext.configure() threw: ${cause.message}`
+          : 'GPUCanvasContext.configure() threw',
+        cause
+      )
+    }
 
     // Store capabilities
     const capabilities: WebGPUCapabilities = {

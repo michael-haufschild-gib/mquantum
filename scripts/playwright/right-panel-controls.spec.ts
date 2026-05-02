@@ -141,13 +141,15 @@ test.describe('right panel: environment section', () => {
       if (hasHeader) await envHeader.click()
     }
 
-    // Try to find any skybox option
+    // The environment section MUST surface at least one skybox option.
+    // Previously this branch silently skipped when no option was visible —
+    // that masked a real product regression (controls disappeared) as a
+    // green test. Now hard-fail so the regression surfaces.
     const anyOption = page.locator('[data-testid^="skybox-option-"]').first()
-    const hasAny = await anyOption.isVisible({ timeout: 3000 }).catch(() => false)
-    if (!hasAny) {
-      test.skip(true, 'No skybox options visible in environment section')
-      return
-    }
+    await expect(
+      anyOption,
+      'environment section must expose at least one skybox option'
+    ).toBeVisible({ timeout: 5000 })
 
     // Click it and verify store updated
     const optionTestId = await anyOption.getAttribute('data-testid')

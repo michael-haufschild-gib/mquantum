@@ -17,9 +17,7 @@ import { isComputeQuantumType } from '@/lib/geometry/registry'
 import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
-import { SchroedingerEntropicTimeShearControls } from './SchroedingerEntropicTimeShearControls'
-import { SchroedingerSpectralDimensionFlowControls } from './SchroedingerSpectralDimensionFlowControls'
-import { SchroedingerVacuumBubbleLensControls } from './SchroedingerVacuumBubbleLensControls'
+import { SchroedingerSpacetimeLensControls } from './SchroedingerSpacetimeLensControls'
 
 const NODAL_DEFINITION_OPTIONS: { value: SchroedingerNodalDefinition; label: string }[] = [
   { value: 'psiAbs', label: '|ψ| (Nodal Envelope)' },
@@ -88,6 +86,10 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
       setSpectralDimensionFlowUvDimension: state.setSchroedingerSpectralDimensionFlowUvDimension,
       setSpectralDimensionFlowDiffusionScale:
         state.setSchroedingerSpectralDimensionFlowDiffusionScale,
+      setBornNullWeaveEnabled: state.setSchroedingerBornNullWeaveEnabled,
+      setBornNullWeaveStrength: state.setSchroedingerBornNullWeaveStrength,
+      setBornNullWeaveNodeWidth: state.setSchroedingerBornNullWeaveNodeWidth,
+      setBornNullWeaveCirculation: state.setSchroedingerBornNullWeaveCirculation,
     }))
     const {
       config,
@@ -126,6 +128,10 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
       setSpectralDimensionFlowStrength,
       setSpectralDimensionFlowUvDimension,
       setSpectralDimensionFlowDiffusionScale,
+      setBornNullWeaveEnabled,
+      setBornNullWeaveStrength,
+      setBornNullWeaveNodeWidth,
+      setBornNullWeaveCirculation,
     } = useExtendedObjectStore(extendedObjectSelector)
 
     if (objectType !== 'schroedinger') {
@@ -363,160 +369,32 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
             </>
           )}
 
-          <div className="space-y-1 mt-2">
-            <Switch
-              label="Quantum Backreaction Lensing"
-              tooltip="Bend raymarch sampling through a density-derived optical metric so coherent lobes lens nearby structure."
-              checked={config.quantumBackreactionLensingEnabled ?? false}
-              onCheckedChange={(checked) => setQuantumBackreactionLensingEnabled(checked)}
-              data-testid="schroedinger-quantum-backreaction-toggle"
-            />
-            {config.quantumBackreactionLensingEnabled && (
-              <div className="ps-2 border-s border-border-default space-y-2">
-                <Slider
-                  label="Strength"
-                  tooltip="How strongly probability density perturbs the sampling metric."
-                  min={0}
-                  max={3}
-                  step={0.05}
-                  value={
-                    config.quantumBackreactionLensingStrength ??
-                    DEFAULT_SCHROEDINGER_CONFIG.quantumBackreactionLensingStrength
-                  }
-                  onChange={setQuantumBackreactionLensingStrength}
-                  showValue
-                  data-testid="schroedinger-quantum-backreaction-strength"
-                />
-                <Slider
-                  label="Caustic Gain"
-                  tooltip="Emission lift from lens focusing after sample coordinates have been deformed."
-                  min={0}
-                  max={2}
-                  step={0.05}
-                  value={
-                    config.quantumBackreactionCausticGain ??
-                    DEFAULT_SCHROEDINGER_CONFIG.quantumBackreactionCausticGain
-                  }
-                  onChange={setQuantumBackreactionCausticGain}
-                  showValue
-                  data-testid="schroedinger-quantum-backreaction-caustic-gain"
-                />
-                <Slider
-                  label="Softening"
-                  tooltip="Radius that prevents singular metric spikes while setting the lensing range."
-                  min={0.05}
-                  max={2}
-                  step={0.05}
-                  value={
-                    config.quantumBackreactionSoftening ??
-                    DEFAULT_SCHROEDINGER_CONFIG.quantumBackreactionSoftening
-                  }
-                  onChange={setQuantumBackreactionSoftening}
-                  showValue
-                  data-testid="schroedinger-quantum-backreaction-softening"
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-1 mt-2">
-            <Switch
-              label="Bilocal ER Bridge"
-              tooltip="Warp raymarch sampling toward a mirrored nonlocal throat when local and remote wavefunction phases lock."
-              checked={config.bilocalERBridgeEnabled ?? false}
-              onCheckedChange={(checked) => setBilocalERBridgeEnabled(checked)}
-              data-testid="schroedinger-bilocal-er-bridge-toggle"
-            />
-            {config.bilocalERBridgeEnabled && (
-              <div className="ps-2 border-s border-border-default space-y-2">
-                <Slider
-                  label="Strength"
-                  tooltip="How strongly coherent mirrored endpoints bend sample coordinates through the bridge."
-                  min={0}
-                  max={2}
-                  step={0.05}
-                  value={
-                    config.bilocalERBridgeStrength ??
-                    DEFAULT_SCHROEDINGER_CONFIG.bilocalERBridgeStrength
-                  }
-                  onChange={setBilocalERBridgeStrength}
-                  showValue
-                  data-testid="schroedinger-bilocal-er-bridge-strength"
-                />
-                <Slider
-                  label="Throat Radius"
-                  tooltip="Softened radius of the transverse bridge throat around the mirror plane."
-                  min={0.05}
-                  max={2}
-                  step={0.05}
-                  value={
-                    config.bilocalERBridgeThroatRadius ??
-                    DEFAULT_SCHROEDINGER_CONFIG.bilocalERBridgeThroatRadius
-                  }
-                  onChange={setBilocalERBridgeThroatRadius}
-                  showValue
-                  data-testid="schroedinger-bilocal-er-bridge-throat-radius"
-                />
-                <Slider
-                  label="Phase Lock"
-                  tooltip="How strongly the bridge requires phase agreement between local and mirrored endpoints."
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  value={
-                    config.bilocalERBridgePhaseLock ??
-                    DEFAULT_SCHROEDINGER_CONFIG.bilocalERBridgePhaseLock
-                  }
-                  onChange={setBilocalERBridgePhaseLock}
-                  showValue
-                  data-testid="schroedinger-bilocal-er-bridge-phase-lock"
-                />
-              </div>
-            )}
-          </div>
-
-          <SchroedingerEntropicTimeShearControls
+          <SchroedingerSpacetimeLensControls
             config={config}
-            setEnabled={setEntropicTimeShearEnabled}
-            setStrength={setEntropicTimeShearStrength}
-            setFilamentScale={setEntropicTimeShearFilamentScale}
-            setIrreversibility={setEntropicTimeShearIrreversibility}
+            isComputeMode={isComputeMode}
+            setQuantumBackreactionLensingEnabled={setQuantumBackreactionLensingEnabled}
+            setQuantumBackreactionLensingStrength={setQuantumBackreactionLensingStrength}
+            setQuantumBackreactionCausticGain={setQuantumBackreactionCausticGain}
+            setQuantumBackreactionSoftening={setQuantumBackreactionSoftening}
+            setBilocalERBridgeEnabled={setBilocalERBridgeEnabled}
+            setBilocalERBridgeStrength={setBilocalERBridgeStrength}
+            setBilocalERBridgeThroatRadius={setBilocalERBridgeThroatRadius}
+            setBilocalERBridgePhaseLock={setBilocalERBridgePhaseLock}
+            setEntropicTimeShearEnabled={setEntropicTimeShearEnabled}
+            setEntropicTimeShearStrength={setEntropicTimeShearStrength}
+            setEntropicTimeShearFilamentScale={setEntropicTimeShearFilamentScale}
+            setEntropicTimeShearIrreversibility={setEntropicTimeShearIrreversibility}
+            setSpectralDimensionFlowEnabled={setSpectralDimensionFlowEnabled}
+            setSpectralDimensionFlowStrength={setSpectralDimensionFlowStrength}
+            setSpectralDimensionFlowUvDimension={setSpectralDimensionFlowUvDimension}
+            setSpectralDimensionFlowDiffusionScale={setSpectralDimensionFlowDiffusionScale}
+            setBornNullWeaveEnabled={setBornNullWeaveEnabled}
+            setBornNullWeaveStrength={setBornNullWeaveStrength}
+            setBornNullWeaveNodeWidth={setBornNullWeaveNodeWidth}
+            setBornNullWeaveCirculation={setBornNullWeaveCirculation}
+            setPhaseMaterialityEnabled={setPhaseMaterialityEnabled}
+            setPhaseMaterialityStrength={setPhaseMaterialityStrength}
           />
-
-          <SchroedingerSpectralDimensionFlowControls
-            config={config}
-            setEnabled={setSpectralDimensionFlowEnabled}
-            setStrength={setSpectralDimensionFlowStrength}
-            setUvDimension={setSpectralDimensionFlowUvDimension}
-            setDiffusionScale={setSpectralDimensionFlowDiffusionScale}
-          />
-
-          <SchroedingerVacuumBubbleLensControls config={config} />
-
-          {!isComputeMode && (
-            <div className="space-y-1 mt-2">
-              <Switch
-                label="Phase Materiality"
-                tooltip="Modulate material properties (roughness, metalness) based on the complex phase of the wavefunction, making phase visible through surface appearance."
-                checked={config.phaseMaterialityEnabled ?? false}
-                onCheckedChange={(checked) => setPhaseMaterialityEnabled(checked)}
-                data-testid="schroedinger-phase-materiality-toggle"
-              />
-              {config.phaseMaterialityEnabled && (
-                <Slider
-                  label="Strength"
-                  tooltip="How strongly the wavefunction phase modulates the surface material properties."
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  value={config.phaseMaterialityStrength ?? 1.0}
-                  onChange={setPhaseMaterialityStrength}
-                  showValue
-                  data-testid="schroedinger-phase-materiality-strength"
-                />
-              )}
-            </div>
-          )}
         </div>
       </Section>
     )

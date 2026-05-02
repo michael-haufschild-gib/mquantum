@@ -42,6 +42,15 @@ test.describe('GPU timing profiler', () => {
       await waitForRendererReady(page)
       await waitForShaderCompilation(page)
 
+      // The perf collector publishes pass timings only when the monitor is
+      // expanded — without this the test silently reports zeroed data.
+      await page.evaluate(() => {
+        const ui = window.__UI_STORE__
+        if (!ui) throw new Error('no UI store on window')
+        ui.getState().setShowPerfMonitor(true)
+        ui.getState().setPerfMonitorExpanded(true)
+      })
+
       // Let rendering stabilize for 2 seconds
       const fc = await getFrameCount(page)
       await waitForFrameAdvance(page, fc + 120)

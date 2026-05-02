@@ -4,6 +4,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
+import { logger } from '@/lib/logger'
 // Initialize WASM module for high-performance animation operations
 // This is async and non-blocking - functions fallback to JS until ready
 import { initAnimationWasm } from '@/lib/wasm'
@@ -80,8 +81,7 @@ if (import.meta.env.DEV) {
         window.__PAULI_SCENARIO_PRESETS__ = pauliPresets.PAULI_SCENARIO_PRESETS
       }
     )
-    // eslint-disable-next-line no-console
-    .catch((err) => console.error('[DEV] store bridge init failed:', err))
+    .catch((err) => logger.error('[DEV] store bridge init failed:', err))
 }
 
 const rootElement = document.getElementById('root')

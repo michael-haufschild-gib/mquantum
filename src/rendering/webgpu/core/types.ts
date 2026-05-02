@@ -51,17 +51,79 @@ export interface WebGPUInitSuccess {
 }
 
 /**
+ * Structured initialization failure codes.
+ *
+ * Each code identifies a distinct failure mode at the WebGPU init
+ * boundary. Tests, telemetry, and the in-app error overlay can all
+ * branch on the code without parsing the human-readable `message`.
+ *
+ * - `NO_NAVIGATOR_GPU`        — `navigator.gpu` is undefined. Browser /
+ *   environment lacks WebGPU support entirely (older browser, insecure
+ *   context, secure-context-required iframe, headless without flags).
+ * - `ADAPTER_REQUEST_FAILED`  — `navigator.gpu.requestAdapter()`
+ *   resolved to `null`. No GPU could be provisioned (driver missing,
+ *   blocklist hit, virtual machine without passthrough).
+ * - `DEVICE_REQUEST_FAILED`   — `adapter.requestDevice()` rejected or
+ *   threw. Adapter was provisioned but the device couldn't be created
+ *   (limits unsatisfiable, feature unavailable, OOM at allocation).
+ * - `CONTEXT_CONFIGURE_FAILED` — `canvas.getContext('webgpu')` returned
+ *   null or `context.configure()` threw. Canvas refused the device.
+ * - `INTERNAL_ERROR`          — anything else thrown during init.
+ */
+export type WebGPUInitErrorCode =
+  | 'NO_NAVIGATOR_GPU'
+  | 'ADAPTER_REQUEST_FAILED'
+  | 'DEVICE_REQUEST_FAILED'
+  | 'CONTEXT_CONFIGURE_FAILED'
+  | 'INTERNAL_ERROR'
+
+/**
  * WebGPU initialization failure result.
+ *
+ * `error` is a human-readable string for backwards compatibility and
+ * for surfacing through the `data-renderer-error` DOM attribute. New
+ * consumers should branch on `code` instead — that's the part the
+ * test suite + telemetry rely on.
  */
 export interface WebGPUInitFailure {
   success: false
+  /** Structured failure code; see {@link WebGPUInitErrorCode}. */
+  code: WebGPUInitErrorCode
+  /** Human-readable error message; safe to display to users. */
   error: string
+  /**
+   * Underlying cause when one is available (`adapter.requestDevice`
+   * rejection, `getContext` exception). Optional because some failure
+   * modes (e.g. adapter request returning `null`) don't carry one.
+   */
+  cause?: unknown
 }
 
 /**
  * WebGPU initialization result (discriminated union).
  */
 export type WebGPUInitResult = WebGPUInitSuccess | WebGPUInitFailure
+
+/**
+ * Typed initialization error class.
+ *
+ * Thrown internally by `WebGPUDevice.doInitialize` so the public
+ * `initialize()` `.catch` can map every failure mode to a specific
+ * `WebGPUInitErrorCode` without string-matching the message text.
+ * Other throw sites (raw `new Error(...)`) collapse to
+ * `INTERNAL_ERROR` at the boundary.
+ */
+export class WebGPUInitError extends Error {
+  readonly code: WebGPUInitErrorCode
+  override readonly cause?: unknown
+
+  constructor(code: WebGPUInitErrorCode, message: string, cause?: unknown) {
+    super(message)
+    this.name = 'WebGPUInitError'
+    this.code = code
+    if (cause !== undefined) this.cause = cause
+  }
+}
 
 // =============================================================================
 // Resource Types

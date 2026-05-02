@@ -24,6 +24,7 @@
  * @module lib/physics/entanglement/peschelWorker
  */
 
+import { logger } from '@/lib/logger'
 import type { CosmologyPresetParams } from '@/lib/physics/cosmology/presets'
 import {
   computeCosmologicalEntropyTrajectory,
@@ -126,6 +127,8 @@ export interface PeschelWorkerResponse {
   } | null
   /** Cosmological `S(L_A, η)` trajectory, or null if not requested. */
   trajectory: CosmologicalEntropyTrajectory | null
+  /** Non-null when trajectory was requested but computation failed. */
+  trajectoryError: string | null
 }
 
 /**
@@ -263,6 +266,7 @@ export function runPeschelCompute(req: PeschelWorkerRequest): PeschelWorkerRespo
   // the sub-payload (Minkowski / cosmology-disabled / invalid-preset
   // branches in the UI).
   let trajectory: CosmologicalEntropyTrajectory | null = null
+  let trajectoryError: string | null = null
   if (cosmology) {
     try {
       trajectory = computeCosmologicalEntropyTrajectory({
@@ -274,10 +278,11 @@ export function runPeschelCompute(req: PeschelWorkerRequest): PeschelWorkerRespo
         cosmology: cosmology.params,
         etaSweep: cosmology.etaSweep,
       })
-    } catch {
-      // Invalid subsystem length or lattice params — silently drop the
-      // trajectory; the main panel result still stands.
+    } catch (cause) {
+      const msg = cause instanceof Error ? cause.message : String(cause)
+      logger.warn('[peschelWorker] trajectory compute failed — returning trajectory=null', cause)
       trajectory = null
+      trajectoryError = msg
     }
   }
 
@@ -292,6 +297,7 @@ export function runPeschelCompute(req: PeschelWorkerRequest): PeschelWorkerRespo
     massSq,
     modular,
     trajectory,
+    trajectoryError,
   }
 }
 

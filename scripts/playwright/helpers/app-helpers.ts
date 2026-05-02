@@ -24,9 +24,31 @@ export async function waitForAppLoaded(page: Page): Promise<void> {
 
 /** Wait for WebGPU renderer to report "ready". */
 export async function waitForRendererReady(page: Page): Promise<void> {
-  await expect(
-    page.locator('[data-testid="webgpu-container"][data-renderer-state="ready"]')
-  ).toBeVisible({ timeout: RENDERER_READY_TIMEOUT })
+  const container = page.locator('[data-testid="webgpu-container"]')
+  try {
+    await expect(container.and(page.locator('[data-renderer-state="ready"]'))).toBeVisible({
+      timeout: RENDERER_READY_TIMEOUT,
+    })
+  } catch (timeoutErr) {
+    // Surface the structured failure code (NO_NAVIGATOR_GPU /
+    // ADAPTER_REQUEST_FAILED / DEVICE_REQUEST_FAILED /
+    // CONTEXT_CONFIGURE_FAILED / INTERNAL_ERROR) so test reports
+    // identify the failure mode without parsing the human-readable
+    // error message. Falls back to the message text + the renderer
+    // state attr if the container never reached the error state.
+    const state = await container.getAttribute('data-renderer-state').catch(() => null)
+    const code = await container.getAttribute('data-renderer-error-code').catch(() => null)
+    const msg = await container.getAttribute('data-renderer-error').catch(() => null)
+    if (code) {
+      throw new Error(
+        `waitForRendererReady: renderer reported error code ${code}` +
+          (msg ? `: ${msg}` : '') +
+          (state && state !== 'error' ? ` (state=${state})` : ''),
+        { cause: timeoutErr }
+      )
+    }
+    throw timeoutErr
+  }
 }
 
 /** Wait for the renderer to settle to "ready" or "error" — never stuck at "initializing". */
@@ -37,6 +59,21 @@ export async function waitForRendererSettled(page: Page): Promise<'ready' | 'err
     expect(['ready', 'error']).toContain(state)
   }).toPass({ timeout: RENDERER_READY_TIMEOUT })
   return (await container.getAttribute('data-renderer-state')) as 'ready' | 'error'
+}
+
+/**
+ * Read the structured WebGPU init error code (when the renderer is in
+ * the `error` state). Returns `null` if the renderer initialised
+ * successfully or if the failure didn't carry a code (legacy throw
+ * sites).
+ *
+ * The codes are: `NO_NAVIGATOR_GPU` / `ADAPTER_REQUEST_FAILED` /
+ * `DEVICE_REQUEST_FAILED` / `CONTEXT_CONFIGURE_FAILED` /
+ * `INTERNAL_ERROR` — see `src/rendering/webgpu/core/types.ts`.
+ */
+export async function getRendererErrorCode(page: Page): Promise<string | null> {
+  const container = page.locator('[data-testid="webgpu-container"]')
+  return container.getAttribute('data-renderer-error-code').catch(() => null)
 }
 
 /** Wait until data-frame-count > 0 on the canvas. */

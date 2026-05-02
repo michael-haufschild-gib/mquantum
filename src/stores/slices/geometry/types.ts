@@ -169,6 +169,10 @@ export interface SchroedingerSliceActions {
   setSchroedingerVacuumBubbleWallThickness: (thickness: number) => void
   setSchroedingerVacuumBubbleTension: (tension: number) => void
   setSchroedingerVacuumBubbleBias: (bias: number) => void
+  setSchroedingerBornNullWeaveEnabled: (enabled: boolean) => void
+  setSchroedingerBornNullWeaveStrength: (strength: number) => void
+  setSchroedingerBornNullWeaveNodeWidth: (width: number) => void
+  setSchroedingerBornNullWeaveCirculation: (circulation: number) => void
   // Physical Probability Current (j-field)
   setSchroedingerProbabilityCurrentEnabled: (enabled: boolean) => void
   setSchroedingerProbabilityCurrentStyle: (

@@ -20,6 +20,7 @@ import {
 } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
 import { useGeometryStore } from '@/stores/geometryStore'
+import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
 
 import { createAntiDeSitterSetters } from './setters/antiDeSitterSetters'
 import { createBecSetters, resizeBecArrays } from './setters/becSetters'
@@ -499,35 +500,41 @@ export const createSchroedingerSlice: StateCreator<
 
     // === Quantum Walk ===
     applyQuantumWalkPreset: (presetId) => {
-      void import('@/lib/physics/quantumWalk/presets').then(({ QUANTUM_WALK_PRESETS }) => {
-        const preset = QUANTUM_WALK_PRESETS.find((p) => p.id === presetId)
-        if (!preset) return
-        setWithVersion((state) => {
-          const globalDim = useGeometryStore.getState().dimension
-          const base = {
-            ...DEFAULT_QUANTUM_WALK_CONFIG,
-            ...preset.overrides,
-            slicePositions: state.schroedinger.quantumWalk.slicePositions,
-            steps: 0,
-            needsReset: true,
-          }
-          const resized = resizeQuantumWalkArrays(base, globalDim)
-          const parentAbsorber =
-            preset.overrides.absorberEnabled !== undefined
-              ? {
-                  absorberEnabled: preset.overrides.absorberEnabled,
-                  absorberWidth: preset.overrides.absorberWidth ?? state.schroedinger.absorberWidth,
-                }
-              : {}
-          return {
-            schroedinger: {
-              ...state.schroedinger,
-              ...parentAbsorber,
-              quantumWalk: { ...base, ...resized, needsReset: true },
-            },
-          }
-        })
-      })
+      loadPresetModule(
+        () => import('@/lib/physics/quantumWalk/presets'),
+        'schroedingerSlice',
+        `quantum-walk presets for '${presetId}'`,
+        ({ QUANTUM_WALK_PRESETS }) => {
+          const preset = QUANTUM_WALK_PRESETS.find((p) => p.id === presetId)
+          if (!preset) return
+          setWithVersion((state) => {
+            const globalDim = useGeometryStore.getState().dimension
+            const base = {
+              ...DEFAULT_QUANTUM_WALK_CONFIG,
+              ...preset.overrides,
+              slicePositions: state.schroedinger.quantumWalk.slicePositions,
+              steps: 0,
+              needsReset: true,
+            }
+            const resized = resizeQuantumWalkArrays(base, globalDim)
+            const parentAbsorber =
+              preset.overrides.absorberEnabled !== undefined
+                ? {
+                    absorberEnabled: preset.overrides.absorberEnabled,
+                    absorberWidth:
+                      preset.overrides.absorberWidth ?? state.schroedinger.absorberWidth,
+                  }
+                : {}
+            return {
+              schroedinger: {
+                ...state.schroedinger,
+                ...parentAbsorber,
+                quantumWalk: { ...base, ...resized, needsReset: true },
+              },
+            }
+          })
+        }
+      )
     },
     resetQuantumWalk: () => {
       set((state) => {

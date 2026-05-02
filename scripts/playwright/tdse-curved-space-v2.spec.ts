@@ -283,13 +283,14 @@ test.describe('TDSE curved space v2 — presets and render toggles', () => {
     await waitForFrameAdvance(page, fc + 140)
     const diagB = await readTdseDiagnostics(page)
 
-    if (!diagA.hasData || !diagB.hasData) {
-      test.skip(
-        true,
-        `deSitter diagnostics unavailable (A.hasData=${diagA.hasData}, B.hasData=${diagB.hasData}) — cannot assert stretching`
-      )
-      return
-    }
+    expect(
+      diagA.hasData,
+      `deSitter diagnostics must surface for early-time sample (A.hasData=${diagA.hasData})`
+    ).toBe(true)
+    expect(
+      diagB.hasData,
+      `deSitter diagnostics must surface for late-time sample (B.hasData=${diagB.hasData})`
+    ).toBe(true)
     expect(
       diagB.maxDensity,
       `Expanding-universe packet must spread: maxDensity(late=${diagB.maxDensity}) < maxDensity(early=${diagA.maxDensity})`
@@ -307,10 +308,10 @@ test.describe('TDSE curved space v2 — presets and render toggles', () => {
 
     await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', 30_000, 'tdse')
     const diag = await readTdseDiagnostics(page)
-    if (!diag.hasData) {
-      test.skip(true, 'sphere2D diagnostics unavailable — cannot check stability')
-      return
-    }
+    expect(
+      diag.hasData,
+      'sphere2D diagnostics must be present after waitForDiagnostics — missing implies the diagnostic emitter regressed'
+    ).toBe(true)
     expect(
       Number.isFinite(diag.maxDensity),
       `sphere preset maxDensity must stay finite (got ${diag.maxDensity})`

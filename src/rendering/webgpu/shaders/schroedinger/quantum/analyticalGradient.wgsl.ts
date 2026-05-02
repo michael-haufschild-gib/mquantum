@@ -168,11 +168,48 @@ ${Array.from({ length: dim }, (_, j) => {
   }).join('\n  ')}
   let gradS = gradWorld * uniforms.fieldScale;`
 
+  // OPT-14: project Re(ψ) and Im(ψ) ND-gradients to world space.
+  // These reuse the same basis components already loaded for gradS so the only
+  // new ALU is one multiply-add per (dim × component). For dim=3 that's 18 muls
+  // total — small change vs. skipping 4 full eigenfunction evals at the nodal
+  // band site (hundreds of muls per step in HO-3D termCount=4).
+  const basisProjectionPsi = `
+  // Project Re(ψ) and Im(ψ) ND-gradients to world space using the same basis.
+  var gradPsiReWorld = vec3f(0.0);
+  var gradPsiImWorld = vec3f(0.0);
+  ${Array.from({ length: dim }, (_, j) => {
+    return `{
+    let bx = getBasisComponent(basis.basisX, ${j});
+    let by = getBasisComponent(basis.basisY, ${j});
+    let bz = getBasisComponent(basis.basisZ, ${j});
+    let basisVec = vec3f(bx, by, bz);
+    gradPsiReWorld += dPsiRe[${j}] * basisVec;
+    gradPsiImWorld += dPsiIm[${j}] * basisVec;
+  }`
+  }).join('\n  ')}
+  let gradPsiRe = gradPsiReWorld * uniforms.fieldScale;
+  let gradPsiIm = gradPsiImWorld * uniforms.fieldScale;`
+
   return /* wgsl */ `
 // ============================================
 // Analytical Gradient from Eigenfunction Cache
 // Dimension: ${dim}, Terms: ${useUnrolledTerms ? tc : 'dynamic'}
 // ============================================
+
+// Extended sample carrying the density, phase, raw psi, and gradients that the
+// analytical nodal-band path needs from the same eigenfunction evaluation.
+//
+// OPT-14: also carries world-space Re/Im psi gradients so the nodal band can
+// be evaluated analytically — replaces 4 tetrahedral psi samples per step.
+struct AnalyticalSample {
+  rho: f32,
+  s: f32,
+  phase: f32,
+  gradient: vec3f,
+  psi: vec2f,
+  gradPsiRe: vec3f,
+  gradPsiIm: vec3f,
+}
 
 // Compute ψ, ∇ψ, ρ, and ∇(log ρ) analytically from cached 1D eigenfunctions.
 // Returns TetraSample (same interface as sampleWithTetrahedralGradient).
@@ -198,6 +235,87 @@ ${Array.from({ length: dim }, (_, j) => `  let dRhoHalfND_${j} = psiRe * dPsiRe[
 ${basisProjection}
 
   return TetraSample(rho, s, spatialPhase, gradS);
+}
+
+// Combined density + gradient + raw psi + post-modulation rho/s/phase.
+// PERF: replaces per-step pair { sampleDensityWithPhaseAndFlow, ensureGradient }
+// in the analytical inline raymarch — eliminates one full eigenfunction eval per
+// step when the eigenfunction cache is in use.
+//
+// Density modulations (hydrogenNDBoost, uncertainty boundary, interference,
+// phase shimmer) are applied IDENTICALLY to sampleDensityWithPhaseComponents /
+// sampleDensityWithPhaseAndFlow. Gradient is the raw ∇log(ρ_raw) — matching the
+// existing computeAnalyticalGradient contract (gradient direction is unchanged
+// by the multiplicative density modulations the renderer applies).
+fn sampleDensityWithAnalyticalGradientFlow(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> AnalyticalSample {
+  let xND = mapPosToND(pos, uniforms);
+
+${termsBlock}
+
+  // Raw |ψ|² from eigenfunction product (used for both gradient and starting rho)
+  let psiMag2 = psiRe * psiRe + psiIm * psiIm;
+  var rhoMod = psiMag2;
+
+  // Hydrogen ND density boost (matches sampleDensityWithPhaseAndFlow ordering;
+  // analytical gradient is HO-only today via useAnalyticalGradient, so this
+  // branch is dead in current configs — kept for forward-compat parity).
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
+    rhoMod *= uniforms.hydrogenNDBoost;
+  }
+
+  let spatialPhase = atan2(spatIm, spatRe);
+
+  // Relative phase via the HO formula:
+  // relativePhase = atan2(Im(ψ_spatial* · ψ_time), Re(ψ_spatial* · ψ_time))
+  let refNorm2 = spatRe * spatRe + spatIm * spatIm;
+  var relativePhase = spatialPhase;
+  if (refNorm2 > 1e-12 && psiMag2 > 1e-12) {
+    let imagPart = spatRe * psiIm - spatIm * psiRe;
+    let realPart = spatRe * psiRe + spatIm * psiIm;
+    relativePhase = atan2(imagPart, realPart);
+  }
+
+  if (FEATURE_UNCERTAINTY_BOUNDARY && !SKIP_DENSITY_EMPHASIS) {
+    let boundaryLogRho = log(rhoMod + DENSITY_EPS);
+    rhoMod = applyUncertaintyBoundaryEmphasis(rhoMod, boundaryLogRho, uniforms);
+  }
+
+  if (FEATURE_INTERFERENCE && uniforms.interferenceEnabled != 0u && uniforms.interferenceAmp > 0.0) {
+    let iTime = uniforms.time * uniforms.interferenceSpeed;
+    let fringe = 1.0 + uniforms.interferenceAmp * sin(spatialPhase * uniforms.interferenceFreq + iTime);
+    rhoMod *= fringe;
+    rhoMod = max(rhoMod, 0.0);
+  }
+
+  if (uniforms.phaseShimmerEnabled != 0u && uniforms.phaseShimmerStrength > 0.0) {
+    let pcfSpeedMod = 1.0 - clamp(rhoMod * 5.0, 0.0, 1.0);
+    let pcfTime = uniforms.time * uniforms.phaseShimmerSpeed;
+    let pcfOffset = pcfTime * pcfSpeedMod;
+    let invPsiLen = inverseSqrt(max(psiMag2, 1e-16));
+    let pcfCosP = psiRe * invPsiLen;
+    let pcfSinP = psiIm * invPsiLen;
+    let pcfNoise = gradientNoise(pos * 2.0 + vec3f(
+        pcfOffset + pcfCosP * 0.5,
+        pcfSinP * 0.5,
+        pcfOffset * 0.7 + pcfCosP * 0.3
+    ));
+    rhoMod *= (1.0 + pcfNoise * uniforms.phaseShimmerStrength * pcfSpeedMod);
+    rhoMod = max(rhoMod, 0.0);
+  }
+
+  let sMod = log(rhoMod + DENSITY_EPS);
+  let phaseForColor = select(spatialPhase, relativePhase, COLOR_ALGORITHM == 10);
+${basisProjectionPsi}
+
+  // Gradient on raw rho (matches existing computeAnalyticalGradient semantics).
+  // Reuse projected psi gradients instead of doing a second ND-to-world projection.
+  let twoInvRhoEps = 2.0 / (psiMag2 + 1e-8);
+  let gradS = (gradPsiRe * psiRe + gradPsiIm * psiIm) * twoInvRhoEps;
+
+  return AnalyticalSample(
+    rhoMod, sMod, phaseForColor, gradS, vec2f(psiRe, psiIm),
+    gradPsiRe, gradPsiIm
+  );
 }
 
 // Gradient-only (when density is already known)

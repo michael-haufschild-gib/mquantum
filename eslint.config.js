@@ -851,6 +851,22 @@ export default [
       'sonarjs/cognitive-complexity': ['error', 15],
       complexity: 'off',
       'max-depth': ['error', 4],
+      // Function-size ratchets — set above the largest existing function in
+      // the gated file set so today's code passes; lower as splits land.
+      // See `docs/refactoring-backlog.md` Item 7 for the ratchet plan.
+      'max-lines-per-function': [
+        'error',
+        { max: 200, skipBlankLines: true, skipComments: true, IIFEs: true },
+      ],
+      // Cyclomatic-statement ratchet. Sonar's cognitive-complexity above is
+      // a better proxy for "is this readable?" so we keep that as the
+      // primary gate; max-statements catches the additional case where a
+      // function is long-but-flat (a hundred sequential assignments) which
+      // cognitive-complexity does not penalise.
+      'max-statements': ['error', 80],
+      // No deeply-nested arrow chains in stores / components. Render
+      // passes and physics get exempted below.
+      'max-nested-callbacks': ['error', 4],
 
       // Custom project rules
       'project-rules/no-direct-asset-imports': 'error',
@@ -987,15 +1003,38 @@ export default [
   // Physics, rendering, and test code: exempt from cognitive complexity limits.
   // Physics functions are dictated by equations; rendering code branches on quantum
   // modes, representations, and GPU features; tests need freedom for thorough coverage.
+  // The function-size ratchets (`max-lines-per-function` / `max-statements`)
+  // are also relaxed on these paths — solver loops and GPU-uniform packing
+  // routines legitimately accumulate sequential assignments. The store /
+  // component layers stay under the strict caps from the main rule block.
   {
     files: [
       'src/lib/physics/**/*.ts',
       'src/rendering/**/*.ts',
       'src/tests/**/*.{ts,tsx}',
+      'scripts/playwright/**/*.ts',
     ],
     rules: {
       'sonarjs/cognitive-complexity': 'off',
       'max-depth': 'off',
+      'max-lines-per-function': 'off',
+      'max-statements': 'off',
+      'max-nested-callbacks': 'off',
+    },
+  },
+  // Component / store / hook code: relax the function-size ratchets to the
+  // current ceiling so today's code lints clean while tomorrow's growth is
+  // bounded. Lower these as long-function offenders are split.
+  // See `docs/refactoring-backlog.md` Item 7 for the ratchet plan.
+  {
+    files: ['src/components/**/*.{ts,tsx}', 'src/stores/**/*.ts', 'src/hooks/**/*.ts'],
+    rules: {
+      'max-lines-per-function': [
+        'error',
+        { max: 800, skipBlankLines: true, skipComments: true, IIFEs: true },
+      ],
+      'max-statements': ['error', 120],
+      'max-nested-callbacks': ['error', 6],
     },
   },
   // Rendering hooks (non-GPU, non-hot-path interaction/export code): standard limits apply.

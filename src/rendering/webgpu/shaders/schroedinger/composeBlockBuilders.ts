@@ -86,6 +86,7 @@ import {
 import { generateComputeBaseColor, generateEmissionPreBlock } from './volume/emission.wgsl'
 import { emissionPostBlock } from './volume/emissionLit.wgsl'
 import {
+  bornNullWeaveBlock,
   generateVolumeRaymarchGridBlock,
   generateVolumeRaymarchGridSimpleBlock,
   nodalSurfacesBlock,
@@ -437,7 +438,9 @@ export function buildVolumeBlocks(opts: {
         opts.gridOnly || !opts.useCache
           ? [
               '// Stubs: analytical gradient excluded (grid-only or no eigenfunction cache).',
+              'struct AnalyticalSample { rho: f32, s: f32, phase: f32, gradient: vec3f, psi: vec2f, gradPsiRe: vec3f, gradPsiIm: vec3f }',
               'fn sampleDensityWithAnalyticalGradient(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> TetraSample { return TetraSample(0.0, 0.0, 0.0, vec3f(0.0)); }',
+              'fn sampleDensityWithAnalyticalGradientFlow(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> AnalyticalSample { return AnalyticalSample(0.0, 0.0, 0.0, vec3f(0.0), vec2f(0.0), vec3f(0.0), vec3f(0.0)); }',
               'fn computeAnalyticalGradient(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec3f { return vec3f(0.0); }',
             ].join('\n')
           : generateAnalyticalGradientBlock(opts.actualDim, opts.termCount),
@@ -479,6 +482,11 @@ export function buildVolumeBlocks(opts: {
         ? probabilityCurrentBlock
         : probabilityCurrentStubBlock,
       condition: !opts.is2D,
+    },
+    {
+      name: 'Born-Null Weave',
+      content: bornNullWeaveBlock,
+      condition: !opts.is2D && !opts.gridOnly,
     },
     {
       name: 'Volume Raymarch',

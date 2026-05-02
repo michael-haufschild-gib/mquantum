@@ -10,6 +10,7 @@
  */
 
 import type { WdwBoundaryCondition, WdwSrmtClock } from '@/lib/geometry/extended/wheelerDeWitt'
+import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
 
 import {
   nestedClampedSetter,
@@ -244,8 +245,11 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
     setWdwSrmtRankCap: setSrmtRankCap,
     setWdwSrmtHeatmapIntensity: setSrmtHeatmapIntensity,
     applyWheelerDeWittPreset: (presetId) => {
-      void import('@/lib/physics/wheelerDeWitt/presets')
-        .then(({ getWdwPreset, WDW_PRESET_PHYSICS_FIELDS }) => {
+      loadPresetModule(
+        () => import('@/lib/physics/wheelerDeWitt/presets'),
+        'wheelerDeWittSetters',
+        `Wheeler–DeWitt presets for '${presetId}'`,
+        ({ getWdwPreset, WDW_PRESET_PHYSICS_FIELDS }) => {
           const preset = getWdwPreset(presetId)
           if (!preset) return
           ctx.setWithVersion((state) => {
@@ -271,13 +275,8 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
               },
             }
           })
-        })
-        .catch((error) => {
-          if (import.meta.env?.DEV) {
-            // eslint-disable-next-line no-console
-            console.warn('[wheelerDeWitt] applyWheelerDeWittPreset import failed', error)
-          }
-        })
+        }
+      )
     },
     triggerWdwRecompute: () => {
       ctx.setWithVersion((state) => ({

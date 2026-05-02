@@ -259,6 +259,22 @@ function gate(value: boolean, ...disablers: boolean[]): boolean {
   return disablers.some(Boolean) ? false : value
 }
 
+function needsEffectBundleShader(
+  config: PassConfig,
+  disableAnalytical: boolean,
+  disableQuantumEffect: boolean,
+  isCompute: boolean
+): boolean {
+  return (
+    gate(config.nodalEnabled, disableQuantumEffect) ||
+    gate(config.phaseMaterialityEnabled, disableQuantumEffect) ||
+    gate(config.interferenceEnabled, disableQuantumEffect) ||
+    gate(config.uncertaintyBoundaryEnabled, isCompute) ||
+    gate(config.crossSectionEnabled, disableAnalytical) ||
+    gate(config.probabilityCurrentEnabled, disableAnalytical)
+  )
+}
+
 /** @returns Normalized Schroedinger-specific config with compute-mode overrides applied. */
 export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {
   const isPauli = config.objectType === 'pauliSpinor'
@@ -273,39 +289,61 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
     ? (QUANTUM_TYPE_REGISTRY.get('pauliSpinor')?.dimensions.min ?? 3)
     : (QUANTUM_TYPE_REGISTRY.get(config.quantumMode)?.dimensions.min ?? 2)
   const effectiveDimension = isCompute ? Math.max(config.dimension, modeMinDim) : config.dimension
+  const colorAlgorithm = normalizeColorAlgorithmForQuantumMode(
+    config.quantumMode,
+    config.colorAlgorithm,
+    config.openQuantumEnabled,
+    config.diracFieldView,
+    isPauli ? config.pauliFieldView : undefined,
+    config.objectType,
+    {
+      dimension: effectiveDimension,
+      isosurface: config.isosurface,
+      representation: config.representation,
+    },
+    config.freeScalarInitialCondition
+  )
+  const compileEffectBundle = needsEffectBundleShader(
+    config,
+    disableAnalytical,
+    disableQuantumEffect,
+    isCompute
+  )
 
   return {
     objectType: config.objectType,
     dimension: effectiveDimension,
     quantumMode: config.quantumMode,
     termCount: isCompute ? 1 : config.termCount,
-    colorAlgorithm: normalizeColorAlgorithmForQuantumMode(
-      config.quantumMode,
-      config.colorAlgorithm,
-      config.openQuantumEnabled,
-      config.diracFieldView,
-      isPauli ? config.pauliFieldView : undefined,
-      config.objectType,
-      {
-        dimension: effectiveDimension,
-        isosurface: config.isosurface,
-        representation: config.representation,
-      },
-      config.freeScalarInitialCondition
-    ),
+    colorAlgorithm,
     isosurface: config.isosurface,
     representation: isCompute ? 'position' : config.representation,
     openQuantumEnabled: gate(config.openQuantumEnabled, isCompute),
-    nodalEnabled: gate(config.nodalEnabled, disableQuantumEffect),
-    phaseMaterialityEnabled: gate(config.phaseMaterialityEnabled, disableQuantumEffect),
-    interferenceEnabled: gate(config.interferenceEnabled, disableQuantumEffect),
-    uncertaintyBoundaryEnabled: gate(config.uncertaintyBoundaryEnabled, isCompute),
+    // Keep the default all-effects-off volumetric shader grid-only. Once any
+    // quantum effect is active, compile sibling runtime-gated blocks too so
+    // effect-to-effect toggles avoid repeated swaps within the full shader.
+    nodalEnabled: gate(config.nodalEnabled || compileEffectBundle, disableQuantumEffect),
+    phaseMaterialityEnabled: gate(
+      config.phaseMaterialityEnabled || compileEffectBundle,
+      disableQuantumEffect
+    ),
+    interferenceEnabled: gate(
+      config.interferenceEnabled || compileEffectBundle,
+      disableQuantumEffect
+    ),
+    uncertaintyBoundaryEnabled: gate(
+      config.uncertaintyBoundaryEnabled || compileEffectBundle,
+      isCompute
+    ),
     eigenfunctionCacheEnabled: gate(config.eigenfunctionCacheEnabled, disableAnalytical),
     analyticalGradientEnabled: gate(config.analyticalGradientEnabled, disableAnalytical),
     fastEigenInterpolationEnabled: gate(config.fastEigenInterpolationEnabled, disableAnalytical),
     temporalReprojectionEnabled: gate(config.temporalReprojectionEnabled, disableAnalytical),
-    crossSectionEnabled: gate(config.crossSectionEnabled, disableAnalytical),
-    probabilityCurrentEnabled: gate(config.probabilityCurrentEnabled, disableAnalytical),
+    crossSectionEnabled: gate(config.crossSectionEnabled || compileEffectBundle, disableAnalytical),
+    probabilityCurrentEnabled: gate(
+      config.probabilityCurrentEnabled || compileEffectBundle,
+      disableAnalytical
+    ),
     densityGridResolution: config.densityGridResolution,
   }
 }
