@@ -53,6 +53,9 @@ export function applyTransitionAbsorber(
  */
 export function propagateWkbTail(state: ColumnWkbState, S: number, U: number): ComplexPair {
   const uPrefactorAtA = Math.pow(Math.abs(U), 0.25)
+  if (uPrefactorAtA === 0) {
+    return { re: state.chiReAtMatch, im: state.chiImAtMatch }
+  }
   const prefactorRatio = state.uPrefactorAtMatch / uPrefactorAtA
   const damp = Math.exp(-(S - state.sEucAtMatch))
   return {

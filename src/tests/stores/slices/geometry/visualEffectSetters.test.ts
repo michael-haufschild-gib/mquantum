@@ -237,7 +237,7 @@ describe('visualEffectSetters — compound logic', () => {
 
       expect(getSchroedinger().bornNullWeaveEnabled).toBe(true)
       expect(getSchroedinger().bornNullWeaveStrength).toBe(2)
-      expect(getSchroedinger().bornNullWeaveNodeWidth).toBeCloseTo(0.0001)
+      expect(getSchroedinger().bornNullWeaveNodeWidth).toBeCloseTo(0.0001, 6)
       expect(getSchroedinger().bornNullWeaveCirculation).toBe(8)
 
       store.setSchroedingerBornNullWeaveStrength(-1)

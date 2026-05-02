@@ -68,12 +68,14 @@ worker.onerror = (event) => {
 
 ## Cancellation
 
-Workers that run long jobs (`srmtSweep`, `peschel`) accept an
-`epoch`-bumped cancel: the consumer increments the epoch on the next
-request, and the worker checks the epoch between iterations and
-short-circuits if it's no longer current. The drained-cancel pattern is
-preferred over `worker.terminate()` because terminating drops in-flight
-allocations.
+Workers that run long jobs (`srmtSweep`) accept an `epoch`-bumped
+cancel: the consumer increments the epoch on the next request, and the
+worker checks the epoch between iterations and short-circuits if it's
+no longer current. The drained-cancel pattern is preferred over
+`worker.terminate()` because terminating drops in-flight allocations.
+
+`peschel` echoes the epoch on its response so the consumer can drop
+stale results, but does not perform in-loop epoch cancellation.
 
 ## Known deviations / ratchet
 

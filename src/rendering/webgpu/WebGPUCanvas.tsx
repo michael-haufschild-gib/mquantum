@@ -12,6 +12,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { logger } from '@/lib/logger'
 import { useRendererStore } from '@/stores/rendererStore'
 
+import type { WebGPUInitErrorCode } from './core/types'
 import { WebGPUBasePass } from './core/WebGPUBasePass'
 import { WebGPUDevice } from './core/WebGPUDevice'
 import { WebGPURenderGraph } from './graph/WebGPURenderGraph'
@@ -87,7 +88,7 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
   const [context, setContext] = useState<WebGPUCanvasContext | null>(null)
   const [isInitialized, setIsInitialized] = useState(false)
   const [initError, setInitError] = useState<Error | null>(null)
-  const [initErrorCode, setInitErrorCode] = useState<string | null>(null)
+  const [initErrorCode, setInitErrorCode] = useState<WebGPUInitErrorCode | null>(null)
 
   // Derive renderer state for e2e test automation.
   // Tests use data-renderer-state to wait for "ready" deterministically.

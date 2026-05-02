@@ -477,10 +477,15 @@ fn computeNodalFromAnalyticalPsi(
     signValue = psiRe;
     colorMode = NODAL_DEFINITION_COMPLEX_INTERSECTION;
   } else {
-    // |ψ| mode: gradient via chain rule. When |ψ|≈0 (the actual node) the
-    // direction is degenerate — fall back to the magnitude of (Re·∇Re + Im·∇Im).
+    // |ψ| mode: gradient via chain rule ∇|ψ| = (Re·∇Re + Im·∇Im)/|ψ|.
+    // At a true node (Re≈0, Im≈0) the numerator vanishes and nodalBandMask
+    // returns 0 — the band disappears exactly at the node. Fall back to
+    // √(|∇Re|² + |∇Im|²) which stays nonzero at the node.
     let invPsiAbs = 1.0 / max(psiAbs, 1e-8);
-    let gradAbs = (gradPsiRe * psiRe + gradPsiIm * psiIm) * invPsiAbs;
+    let gradChain = (gradPsiRe * psiRe + gradPsiIm * psiIm) * invPsiAbs;
+    let chainLen = length(gradChain);
+    let fallbackLen = sqrt(dot(gradPsiRe, gradPsiRe) + dot(gradPsiIm, gradPsiIm));
+    let gradAbs = select(normalize(gradPsiRe + gradPsiIm) * fallbackLen, gradChain, chainLen > 1e-6);
     intensity = nodalBandMask(psiAbs, gradAbs, eps);
     signValue = psiRe;
     colorMode = NODAL_DEFINITION_PSI_ABS;

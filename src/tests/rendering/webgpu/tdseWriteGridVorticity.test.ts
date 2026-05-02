@@ -17,7 +17,8 @@ describe('tdseWriteGrid quantized circulation view', () => {
 
   it('adds a fieldView 9 branch for density-gated quantized circulation', () => {
     const branchStart = tdseWriteGridBlock.indexOf('params.fieldView == 9u')
-    const branchEnd = tdseWriteGridBlock.indexOf('} else if (params.fieldView == 3u)', branchStart)
+    const nextElseIf = tdseWriteGridBlock.indexOf('} else if (', branchStart + 1)
+    const branchEnd = nextElseIf === -1 ? tdseWriteGridBlock.length : nextElseIf
     const branch = tdseWriteGridBlock.slice(branchStart, branchEnd)
 
     expect(branchStart).toBeGreaterThan(0)

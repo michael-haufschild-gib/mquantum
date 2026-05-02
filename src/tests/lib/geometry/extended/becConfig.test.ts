@@ -77,14 +77,25 @@ describe('Sonic Horizon preset', () => {
 
   it('is reachable via getBecPreset and merges default rendering overrides', () => {
     const preset = getBecPreset('blackHoleAnalog')
-    // Preset id equality is a value check; the default-rendering merge
-    // should preserve the preset's explicit densityContrast of 1.2 and
-    // densityGain of 0.25. autoScaleMaxGain is lowered to 6 for Mach view
-    // sanity (Mach is already normalized to [0,1]; higher gains saturate
-    // the volume once density autoscales).
     expect(preset?.id).toBe('blackHoleAnalog')
     expect(preset?.renderingOverrides?.densityGain).toBeCloseTo(0.25)
     expect(preset?.renderingOverrides?.densityContrast).toBeCloseTo(1.2)
     expect(preset?.renderingOverrides?.autoScaleMaxGain).toBe(6)
+  })
+})
+
+describe('Hawking Horizon View preset', () => {
+  it('sets fieldView=hawkingFlux and is reachable via getBecPreset', () => {
+    const preset = getBecPreset('hawkingHorizonView')
+    expect(preset?.id).toBe('hawkingHorizonView')
+    expect(preset?.overrides.fieldView).toBe('hawkingFlux')
+  })
+})
+
+describe('Vortex Circulation Lattice preset', () => {
+  it('sets fieldView=vorticity and is reachable via getBecPreset', () => {
+    const preset = getBecPreset('vortexCirculationLattice')
+    expect(preset?.id).toBe('vortexCirculationLattice')
+    expect(preset?.overrides.fieldView).toBe('vorticity')
   })
 })

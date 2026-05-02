@@ -6,7 +6,7 @@
  * The modified Friedmann equation used throughout this module (setting
  * `8πG = 1` in sim units, matching the rest of the codebase's convention) is
  *
- *     H² = (1 / (3(n − 2))) · ρ · (1 − ρ/ρ_c),
+ *     H² = 2ρ · (1 − ρ/ρ_c) / ((n − 1)(n − 2)),
  *
  * where `n ≥ 3` is the spacetime dimension and `ρ_c > 0` is the critical
  * energy density at which the bounce occurs. At `ρ = ρ_c` the Hubble rate
@@ -24,13 +24,13 @@
  *
  *     ρ(t) = ρ_c / (1 + γ·τ²)
  *     a(t) = a_B · (1 + γ·τ²)^(1 / (2(n − 1)))
- *     γ    = (n − 1)² · ρ_c / (3(n − 2))
+ *     γ    = 2(n − 1) · ρ_c / (n − 2)
  *
  * Derivation: with `w = 1`, `ρ̇ = −2(n − 1)·H·ρ`, so
  * `H = −ρ̇ / (2(n − 1)·ρ)`. Substituting the analytic `ρ(τ)` gives
  * `H² = γ²·τ²·ρ² / ((n − 1)²·ρ_c²)`; equating to the Friedmann RHS
- * `ρ(1 − ρ/ρ_c) / (3(n − 2)) = γ·τ²·ρ² / (3(n − 2)·ρ_c)` pins
- * `γ = (n − 1)²·ρ_c / (3(n − 2))`. The scale factor follows from continuity
+ * `2ρ(1 − ρ/ρ_c) / ((n − 1)(n − 2)) = 2γ·τ²·ρ² / ((n − 1)(n − 2)·ρ_c)` pins
+ * `γ = 2(n − 1)·ρ_c / (n − 2)`. The scale factor follows from continuity
  * `ρ·a^(2(n − 1)) = const` (stiff fluid in n-dim spacetime → spatial dim n − 1).
  *
  * Note: this differs from the Round 2 PRD's stated `γ = 12 ρ_c/(n−2)` and

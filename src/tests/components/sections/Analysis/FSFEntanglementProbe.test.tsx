@@ -94,6 +94,7 @@ function fakeResponse(overrides: Partial<PeschelWorkerResponse> = {}): PeschelWo
     massSq: overrides.massSq ?? 0,
     modular: overrides.modular ?? null,
     trajectory: overrides.trajectory ?? null,
+    trajectoryError: overrides.trajectoryError ?? null,
   }
 }
 

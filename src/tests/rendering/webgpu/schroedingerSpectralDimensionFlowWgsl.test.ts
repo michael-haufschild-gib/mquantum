@@ -108,7 +108,7 @@ describe('Schroedinger spectral-dimension flow WGSL composition', () => {
       'spectralOpacityScale = spectralFlow.opacityScale',
       // PERF (OPT-PERF-2): post-warp re-sample is now consolidated into the
       // loadGridSampleState* helper.
-      'oadGridSampleState',
+      'loadGridSampleState',
       'computeEffectiveDensity(',
       'rho * spectralOpacityScale',
       'computeEmissionLit(colorRho, colorS, phase, pos',
@@ -127,7 +127,7 @@ describe('Schroedinger spectral-dimension flow WGSL composition', () => {
       'spectralOpacityScale = spectralFlow.opacityScale',
       // PERF (OPT-PERF-2): post-warp re-sample is now consolidated into the
       // loadGridSampleState* helper.
-      'oadGridSampleState',
+      'loadGridSampleState',
       'computeEffectiveDensity(',
       'rho * spectralOpacityScale',
       'computeEmissionLit(emissionRho, emissionS, phase, pos',

@@ -101,8 +101,8 @@ function listEmittedChunks() {
   let entries
   try {
     entries = readdirSync(DIST_ASSETS)
-  } catch {
-    console.error(`No dist/assets/ directory. Run "pnpm run build:web" first.`)
+  } catch (err) {
+    console.error(`Cannot read dist/assets/: ${err.message}. Run "pnpm run build:web" first.`)
     process.exit(1)
   }
   const chunks = new Map()

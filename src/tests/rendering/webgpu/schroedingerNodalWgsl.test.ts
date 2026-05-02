@@ -106,8 +106,9 @@ describe('Schroedinger nodal WGSL composition', () => {
       useDensityGrid: true,
     })
 
-    expect(wgsl).toContain('fn nodalBandMask(value: f32, gradient: vec3f, eps: f32) -> f32')
-    expect(wgsl).toContain('return 0.0;')
+    const stubFn =
+      'fn nodalBandMask(value: f32, gradient: vec3f, eps: f32) -> f32 {\n  return 0.0;\n}'
+    expect(wgsl).toContain(stubFn)
     expect(wgsl).toContain('fn computeGridPsiAbsNodalField(')
   })
 })

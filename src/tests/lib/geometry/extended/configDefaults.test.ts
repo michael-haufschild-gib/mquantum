@@ -235,6 +235,30 @@ describe('DEFAULT_SCHROEDINGER_CONFIG structural invariants', () => {
     expect(cfg.bornNullWeaveCirculation).toBeLessThanOrEqual(8)
   })
 
+  it('spectral dimension flow defaults are in shader control ranges', () => {
+    expect(cfg.spectralDimensionFlowEnabled).toBe(false)
+    expect(cfg.spectralDimensionFlowStrength).toBeGreaterThanOrEqual(0)
+    expect(cfg.spectralDimensionFlowStrength).toBeLessThanOrEqual(2)
+    expect(cfg.spectralDimensionFlowUvDimension).toBeGreaterThanOrEqual(1)
+    expect(cfg.spectralDimensionFlowUvDimension).toBeLessThanOrEqual(4)
+    expect(cfg.spectralDimensionFlowDiffusionScale).toBeGreaterThanOrEqual(0)
+    expect(cfg.spectralDimensionFlowDiffusionScale).toBeLessThanOrEqual(2)
+  })
+
+  it('vacuum bubble lens defaults are in shader control ranges', () => {
+    expect(cfg.vacuumBubbleLensEnabled).toBe(false)
+    expect(cfg.vacuumBubbleLensStrength).toBeGreaterThanOrEqual(0)
+    expect(cfg.vacuumBubbleLensStrength).toBeLessThanOrEqual(2)
+    expect(cfg.vacuumBubbleWallRadius).toBeGreaterThanOrEqual(0.05)
+    expect(cfg.vacuumBubbleWallRadius).toBeLessThanOrEqual(1)
+    expect(cfg.vacuumBubbleWallThickness).toBeGreaterThanOrEqual(0.01)
+    expect(cfg.vacuumBubbleWallThickness).toBeLessThanOrEqual(0.5)
+    expect(cfg.vacuumBubbleTension).toBeGreaterThanOrEqual(0)
+    expect(cfg.vacuumBubbleTension).toBeLessThanOrEqual(2)
+    expect(cfg.vacuumBubbleBias).toBeGreaterThanOrEqual(0)
+    expect(cfg.vacuumBubbleBias).toBeLessThanOrEqual(2)
+  })
+
   it('cosineParams has correct structure', () => {
     for (const key of ['a', 'b', 'c', 'd'] as const) {
       expect(cfg.cosineParams[key]).toHaveLength(3)

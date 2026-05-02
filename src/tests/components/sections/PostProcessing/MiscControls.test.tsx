@@ -55,4 +55,33 @@ describe('MiscControls', () => {
     fireEvent.change(slider, { target: { value: '0.8' } })
     expect(usePostProcessingStore.getState().horizonMemorySpin).toBe(before)
   })
+
+  it('wires Causal Horizon Memory toggle', () => {
+    usePostProcessingStore.setState({
+      frameBlendingEnabled: true,
+      horizonMemoryEnabled: false,
+    })
+
+    render(<MiscControls />)
+
+    const toggle = screen.getByRole('switch', { name: 'Causal Horizon Memory' })
+    fireEvent.click(toggle)
+
+    expect(usePostProcessingStore.getState().horizonMemoryEnabled).toBe(true)
+  })
+
+  it('wires Echo Shells slider when horizon memory is enabled', () => {
+    usePostProcessingStore.setState({
+      frameBlendingEnabled: true,
+      horizonMemoryEnabled: true,
+    })
+
+    render(<MiscControls />)
+
+    const slider = screen.getByRole('slider', { name: 'Echo Shells' })
+    expect(slider).toBeEnabled()
+    fireEvent.change(slider, { target: { value: '4' } })
+
+    expect(usePostProcessingStore.getState().horizonMemoryEchoes).toBe(4)
+  })
 })

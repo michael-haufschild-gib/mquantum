@@ -5,7 +5,8 @@ import { tdseWriteGridBlock } from '@/rendering/webgpu/shaders/schroedinger/comp
 describe('tdseWriteGrid Hawking flux view', () => {
   it('adds a fieldView 7 branch that gates surface gravity to the sonic horizon', () => {
     const branchStart = tdseWriteGridBlock.indexOf('params.fieldView == 7u')
-    const branchEnd = tdseWriteGridBlock.indexOf('} else if (params.fieldView == 3u)', branchStart)
+    const nextElseIf = tdseWriteGridBlock.indexOf('} else if (', branchStart + 1)
+    const branchEnd = nextElseIf === -1 ? tdseWriteGridBlock.length : nextElseIf
     const branch = tdseWriteGridBlock.slice(branchStart, branchEnd)
 
     expect(branchStart).toBeGreaterThan(0)

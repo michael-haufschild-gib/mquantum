@@ -62,14 +62,19 @@ export function phiLaplacianAt(
   // back to the centre-cell value so the stencil contribution is
   // `(c + c − 2c) = 0` on that side and the one-sided difference on
   // the other side dominates.
-  const pre1 = i1 > 0 ? (slab[slabBase + 2 * ((i1 - 1) * Nphi + i2)] ?? 0) : cre
-  const pim1 = i1 > 0 ? (slab[slabBase + 2 * ((i1 - 1) * Nphi + i2) + 1] ?? 0) : cim
-  const nre1 = i1 < Nphi - 1 ? (slab[slabBase + 2 * ((i1 + 1) * Nphi + i2)] ?? 0) : cre
-  const nim1 = i1 < Nphi - 1 ? (slab[slabBase + 2 * ((i1 + 1) * Nphi + i2) + 1] ?? 0) : cim
-  const pre2 = i2 > 0 ? (slab[slabBase + 2 * (i1 * Nphi + i2 - 1)] ?? 0) : cre
-  const pim2 = i2 > 0 ? (slab[slabBase + 2 * (i1 * Nphi + i2 - 1) + 1] ?? 0) : cim
-  const nre2 = i2 < Nphi - 1 ? (slab[slabBase + 2 * (i1 * Nphi + i2 + 1)] ?? 0) : cre
-  const nim2 = i2 < Nphi - 1 ? (slab[slabBase + 2 * (i1 * Nphi + i2 + 1) + 1] ?? 0) : cim
+  const prevIdx1 = i1 > 0 ? slabBase + 2 * ((i1 - 1) * Nphi + i2) : -1
+  const nextIdx1 = i1 < Nphi - 1 ? slabBase + 2 * ((i1 + 1) * Nphi + i2) : -1
+  const prevIdx2 = i2 > 0 ? slabBase + 2 * (i1 * Nphi + i2 - 1) : -1
+  const nextIdx2 = i2 < Nphi - 1 ? slabBase + 2 * (i1 * Nphi + i2 + 1) : -1
+
+  const pre1 = prevIdx1 >= 0 ? (slab[prevIdx1] ?? 0) : cre
+  const pim1 = prevIdx1 >= 0 ? (slab[prevIdx1 + 1] ?? 0) : cim
+  const nre1 = nextIdx1 >= 0 ? (slab[nextIdx1] ?? 0) : cre
+  const nim1 = nextIdx1 >= 0 ? (slab[nextIdx1 + 1] ?? 0) : cim
+  const pre2 = prevIdx2 >= 0 ? (slab[prevIdx2] ?? 0) : cre
+  const pim2 = prevIdx2 >= 0 ? (slab[prevIdx2 + 1] ?? 0) : cim
+  const nre2 = nextIdx2 >= 0 ? (slab[nextIdx2] ?? 0) : cre
+  const nim2 = nextIdx2 >= 0 ? (slab[nextIdx2 + 1] ?? 0) : cim
 
   return {
     re: (pre1 + nre1 - 2 * cre + pre2 + nre2 - 2 * cre) * invDphi2,

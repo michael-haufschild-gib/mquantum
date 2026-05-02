@@ -207,14 +207,14 @@ const NODAL_SURFACE_PLUS_BORN: EffectCase = {
   ],
 }
 
-const BACKREACTION_PLUS_BILOCAL_PLUS_ENTROPY: EffectCase = {
+const BACKREACTION_PLUS_ENTROPY_PLUS_SPECTRAL: EffectCase = {
   id: 'spacetime-stack',
-  label: 'Backreaction + Bilocal + Entropy',
-  setters: [...BACKREACTION_ON.setters, ...BILOCAL_ON.setters, ...ENTROPY_SHEAR_ON.setters],
+  label: 'Backreaction + Entropy + Spectral',
+  setters: [...BACKREACTION_ON.setters, ...ENTROPY_SHEAR_ON.setters, ...SPECTRAL_FLOW_ON.setters],
   reset: [
     { name: 'setSchroedingerQuantumBackreactionLensingEnabled', value: false },
-    { name: 'setSchroedingerBilocalERBridgeEnabled', value: false },
     { name: 'setSchroedingerEntropicTimeShearEnabled', value: false },
+    { name: 'setSchroedingerSpectralDimensionFlowEnabled', value: false },
   ],
 }
 
@@ -230,7 +230,7 @@ const ALL_CASES: EffectCase[] = [
   PHASE_MAT_ON,
   NODAL_PLUS_BORN,
   NODAL_SURFACE_PLUS_BORN,
-  BACKREACTION_PLUS_BILOCAL_PLUS_ENTROPY,
+  BACKREACTION_PLUS_ENTROPY_PLUS_SPECTRAL,
   ALL_EFFECTS_ON,
 ]
 
@@ -565,9 +565,9 @@ test.describe('Quantum effects performance', () => {
     const spectral = await measure(page, 6)
     await applySetters(page, SPECTRAL_FLOW_ON.reset)
 
-    await applySetters(page, BACKREACTION_PLUS_BILOCAL_PLUS_ENTROPY.setters)
+    await applySetters(page, BACKREACTION_PLUS_ENTROPY_PLUS_SPECTRAL.setters)
     const stacked = await measure(page, 6)
-    await applySetters(page, BACKREACTION_PLUS_BILOCAL_PLUS_ENTROPY.reset)
+    await applySetters(page, BACKREACTION_PLUS_ENTROPY_PLUS_SPECTRAL.reset)
 
     const dBack = back.schroedingerRenderMs - baseline.schroedingerRenderMs
     const dEntropy = entropy.schroedingerRenderMs - baseline.schroedingerRenderMs

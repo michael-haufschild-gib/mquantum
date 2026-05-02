@@ -74,7 +74,7 @@ describe('Schroedinger bilocal ER bridge WGSL composition', () => {
       'pos = bridge.position',
       // PERF (OPT-PERF-2): post-warp re-sample now invokes loadGridSampleState*
       // helper instead of inlining sampleDensityFromGrid directly.
-      'oadGridSampleState',
+      'loadGridSampleState',
       'if (backreactionActive && rho >= EMPTY_SKIP_THRESHOLD)',
       'emission *= causticMultiplier',
       'emission *= bridgeGain',
@@ -91,7 +91,7 @@ describe('Schroedinger bilocal ER bridge WGSL composition', () => {
       'pos = bridge.position',
       // PERF (OPT-PERF-2): post-warp re-sample now invokes loadGridSampleState*
       // helper instead of inlining sampleDensityFromGrid directly.
-      'oadGridSampleState',
+      'loadGridSampleState',
       'if (backreactionActive && rho >= EMPTY_SKIP_THRESHOLD)',
       'emission *= causticMultiplier',
       'emission *= bridgeGain',
