@@ -18,17 +18,16 @@ interface SchroedingerVacuumBubbleLensControlsProps {
  */
 export const SchroedingerVacuumBubbleLensControls: React.FC<SchroedingerVacuumBubbleLensControlsProps> =
   React.memo(({ config }) => {
+    const setterSelector = useShallow((state: ExtendedObjectState) => ({
+      setEnabled: state.setSchroedingerVacuumBubbleLensEnabled,
+      setStrength: state.setSchroedingerVacuumBubbleLensStrength,
+      setWallRadius: state.setSchroedingerVacuumBubbleWallRadius,
+      setWallThickness: state.setSchroedingerVacuumBubbleWallThickness,
+      setTension: state.setSchroedingerVacuumBubbleTension,
+      setBias: state.setSchroedingerVacuumBubbleBias,
+    }))
     const { setEnabled, setStrength, setWallRadius, setWallThickness, setTension, setBias } =
-      useExtendedObjectStore(
-        useShallow((state: ExtendedObjectState) => ({
-          setEnabled: state.setSchroedingerVacuumBubbleLensEnabled,
-          setStrength: state.setSchroedingerVacuumBubbleLensStrength,
-          setWallRadius: state.setSchroedingerVacuumBubbleWallRadius,
-          setWallThickness: state.setSchroedingerVacuumBubbleWallThickness,
-          setTension: state.setSchroedingerVacuumBubbleTension,
-          setBias: state.setSchroedingerVacuumBubbleBias,
-        }))
-      )
+      useExtendedObjectStore(setterSelector)
 
     return (
       <div className="space-y-1 mt-2">
