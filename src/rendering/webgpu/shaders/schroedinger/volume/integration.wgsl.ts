@@ -212,6 +212,38 @@ struct VacuumBubbleLensResult {
   tunnelingGate: f32,
 }
 
+// Per-step gradient cache used to share one computeAnalyticalGradient /
+// computeGradientTetrahedral call across multiple effects (backreaction,
+// entropy shear, spectral flow, born-null weave, final emission lighting).
+// The position-equality check is exact; any actual warp invalidates it
+// because samplePos is a fresh vec3f after each warp branch.
+struct GradientCache {
+  gradient: vec3f,
+  pos: vec3f,
+  valid: bool,
+}
+
+fn ensureGradient(
+  pos: vec3f,
+  animTime: f32,
+  uniforms: SchroedingerUniforms,
+  cache: ptr<function, GradientCache>,
+) -> vec3f {
+  if ((*cache).valid && all(pos == (*cache).pos)) {
+    return (*cache).gradient;
+  }
+  var grad: vec3f;
+  if (USE_ANALYTICAL_GRADIENT) {
+    grad = computeAnalyticalGradient(pos, animTime, uniforms);
+  } else {
+    grad = computeGradientTetrahedral(pos, animTime, 0.05, uniforms);
+  }
+  (*cache).gradient = grad;
+  (*cache).pos = pos;
+  (*cache).valid = true;
+  return grad;
+}
+
 fn isQuantumBackreactionActive(uniforms: SchroedingerUniforms) -> bool {
   return uniforms.quantumBackreactionLensingEnabled != 0u
     && uniforms.quantumBackreactionLensingStrength > 0.0;
@@ -502,6 +534,9 @@ export { nodalSurfacesBlock, nodalSurfacesStubBlock } from './nodalSurfaces.wgsl
 
 // Re-export probability current from dedicated module — extracted for file-size management
 export { probabilityCurrentBlock, probabilityCurrentStubBlock } from './probabilityCurrent.wgsl'
+
+// Re-export Born-Null Weave from dedicated module — extracted for file-size management
+export { bornNullWeaveBlock } from './bornNullWeave.wgsl'
 
 // Re-export raymarching block from dedicated module
 export { volumeRaymarchBlock } from './volumeRaymarch.wgsl'

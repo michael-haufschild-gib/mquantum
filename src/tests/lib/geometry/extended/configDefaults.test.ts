@@ -226,6 +226,13 @@ describe('DEFAULT_SCHROEDINGER_CONFIG structural invariants', () => {
     expect(cfg.entropicTimeShearFilamentScale).toBeLessThanOrEqual(4)
     expect(cfg.entropicTimeShearIrreversibility).toBeGreaterThanOrEqual(0)
     expect(cfg.entropicTimeShearIrreversibility).toBeLessThanOrEqual(1)
+    expect(cfg.bornNullWeaveEnabled).toBe(false)
+    expect(cfg.bornNullWeaveStrength).toBeGreaterThanOrEqual(0)
+    expect(cfg.bornNullWeaveStrength).toBeLessThanOrEqual(2)
+    expect(cfg.bornNullWeaveNodeWidth).toBeGreaterThanOrEqual(0.0001)
+    expect(cfg.bornNullWeaveNodeWidth).toBeLessThanOrEqual(0.2)
+    expect(cfg.bornNullWeaveCirculation).toBeGreaterThanOrEqual(0)
+    expect(cfg.bornNullWeaveCirculation).toBeLessThanOrEqual(8)
   })
 
   it('cosineParams has correct structure', () => {

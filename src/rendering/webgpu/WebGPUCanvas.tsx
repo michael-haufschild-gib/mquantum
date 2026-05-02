@@ -87,6 +87,7 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
   const [context, setContext] = useState<WebGPUCanvasContext | null>(null)
   const [isInitialized, setIsInitialized] = useState(false)
   const [initError, setInitError] = useState<Error | null>(null)
+  const [initErrorCode, setInitErrorCode] = useState<string | null>(null)
 
   // Derive renderer state for e2e test automation.
   // Tests use data-renderer-state to wait for "ready" deterministically.
@@ -112,6 +113,10 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
         }
 
         if (!result.success) {
+          // Surface the structured failure code to the test/telemetry
+          // boundary via state so the error overlay can emit it as a
+          // dedicated DOM attribute.
+          setInitErrorCode(result.code)
           throw new Error(result.error || 'Failed to initialize WebGPU')
         }
 
@@ -231,6 +236,12 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
         data-testid="webgpu-container"
         data-renderer-state="error"
         data-renderer-error={initError.message}
+        // `data-renderer-error-code` carries the structured failure code
+        // (NO_NAVIGATOR_GPU / ADAPTER_REQUEST_FAILED / DEVICE_REQUEST_FAILED /
+        // CONTEXT_CONFIGURE_FAILED / INTERNAL_ERROR) so e2e tests and
+        // telemetry can branch on the failure mode without parsing the
+        // human-readable message.
+        {...(initErrorCode ? { 'data-renderer-error-code': initErrorCode } : {})}
         style={{
           ...style,
           display: 'flex',
@@ -242,6 +253,15 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
         <div style={{ textAlign: 'center', padding: '20px' }}>
           <p>WebGPU initialization failed</p>
           <p style={{ fontSize: '0.875rem', opacity: 0.7 }}>{initError.message}</p>
+          {initErrorCode ? (
+            // Surface the structured failure code so a user copy-pasting
+            // into a support ticket carries the diagnostic identifier
+            // alongside the human-readable message. Same code that lands
+            // in `data-renderer-error-code` for e2e + telemetry.
+            <p style={{ fontSize: '0.75rem', opacity: 0.55, marginTop: '8px' }}>
+              code: <code>{initErrorCode}</code>
+            </p>
+          ) : null}
         </div>
       </div>
     )

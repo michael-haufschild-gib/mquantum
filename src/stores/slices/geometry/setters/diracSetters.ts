@@ -16,6 +16,7 @@ import {
 import { logger } from '@/lib/logger'
 import { reduceGridToFit } from '@/lib/math/ndArray'
 import { maxStableDt } from '@/lib/physics/dirac/scales'
+import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
 
 import type { SchroedingerSliceActions } from '../types'
 import {
@@ -465,8 +466,11 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
       })
     },
     applyDiracPreset: (presetId) => {
-      void import('@/lib/physics/dirac/presets')
-        .then(({ DIRAC_SCENARIO_PRESETS }) => {
+      loadPresetModule(
+        () => import('@/lib/physics/dirac/presets'),
+        'diracSetters',
+        `Dirac presets for '${presetId}'`,
+        ({ DIRAC_SCENARIO_PRESETS }) => {
           const preset = DIRAC_SCENARIO_PRESETS.find((p) => p.id === presetId)
           if (!preset) return
           setWithVersion((state) => {
@@ -543,8 +547,11 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
             // store guard below would reject it as stale).
             const dim = ctx.get().schroedinger.dirac.latticeDim ?? 3
             const expectedView = normalizeDiracFieldView(dim, preset.overrides.fieldView)
-            void import('@/rendering/shaders/palette/types')
-              .then(async ({ DIRAC_FIELD_VIEW_TO_COLOR_ALGO }) => {
+            loadPresetModule(
+              () => import('@/rendering/shaders/palette/types'),
+              'diracSetters',
+              `Dirac fieldView color algorithm for '${presetId}'`,
+              async ({ DIRAC_FIELD_VIEW_TO_COLOR_ALGO }) => {
                 // Guard: if a newer preset arrived while this chunk loaded,
                 // the fieldView in the store won't match — skip the stale write.
                 if (ctx.get().schroedinger.dirac.fieldView !== expectedView) return
@@ -553,22 +560,11 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
                   const { useAppearanceStore } = await import('@/stores/appearanceStore')
                   useAppearanceStore.getState().setColorAlgorithm(algo)
                 }
-              })
-              .catch((error) => {
-                logger.warn(
-                  `[diracSetters] Failed to sync Dirac fieldView color algorithm for '${presetId}':`,
-                  error
-                )
-              })
+              }
+            )
           }
-        })
-        .catch((error) => {
-          // Preset chunk failed to load (network error, chunk mismatch).
-          // Without a catch, the unhandled rejection would surface as a
-          // noisy console error with no context. Log and leave state as-is
-          // so the user keeps whatever config they had before the switch.
-          logger.warn(`[diracSetters] Failed to load Dirac presets for '${presetId}':`, error)
-        })
+        }
+      )
     },
   }
 }

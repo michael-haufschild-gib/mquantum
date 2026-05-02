@@ -170,7 +170,10 @@ fn findNodalSurfaceHit(
     return NodalSurfaceHit(0.0, -1.0, 0.0, uniforms.nodalDefinition, vec3f(0.0, 0.0, 1.0), 0.0);
   }
 
-  let stepCount = clamp(uniforms.sampleCount * 2, 48, NODAL_SURFACE_MAX_STEPS);
+  // Surface mode is an overlay on top of volume rendering. Keep the root search
+  // budget below the volume sample count; the previous 2x budget dominated frame
+  // time on high-DPI canvases.
+  let stepCount = clamp(uniforms.sampleCount / 2, 32, 96);
   let stepLen = span / f32(stepCount);
   let eps = max(uniforms.nodalTolerance, 1e-6);
   let strengthT = clamp(uniforms.nodalStrength * 0.5, 0.0, 1.0);
@@ -208,7 +211,7 @@ fn findNodalSurfaceHit(
 
       var lastMidT = (tLo + tHi) * 0.5;
       var lastMidSample = loSample;
-      for (var j: i32 = 0; j < 6; j++) {
+      for (var j: i32 = 0; j < 4; j++) {
         // Illinois method: interpolate root position from bracket values
         let denom = loSample.value - hiSample.value;
         var w = 0.5;
@@ -428,6 +431,71 @@ fn computePhysicalNodalFieldWithGradient(pos: vec3f, t: f32, uniforms: Schroedin
   return NodalWithGradient(nodalResult, densityGrad, avgRho, avgS);
 }
 
+// OPT-14: Compute nodal band from already-computed analytical psi + psi-gradient.
+// Skips the 4 tetrahedral psi evaluations of computePhysicalNodalFieldWithGradient
+// when USE_ANALYTICAL_GRADIENT is true. Used in the analytical inline raymarch
+// (HO 3D-11D with cached eigenfunctions) — the dominant hot path.
+//
+// Uses the exact center value and analytical gradient for the same local band
+// predicate that nodalBandMask applies to the tetrahedral gradient path.
+//
+// For NODAL_DEFINITION_PSI_ABS the gradient of |ψ| is (Re·∇Re + Im·∇Im) / |ψ|
+// (chain rule). For NODAL_DEFINITION_COMPLEX_INTERSECTION we evaluate two
+// separate band masks and combine them with sqrt() identically to the
+// tetrahedral path.
+//
+// Hydrogen family-filter is not handled here (analytical gradient is HO-only
+// today via composeConfig.useAnalyticalGradient && includeHarmonic).
+fn computeNodalFromAnalyticalPsi(
+  psi: vec2f,
+  gradPsiRe: vec3f,
+  gradPsiIm: vec3f,
+  uniforms: SchroedingerUniforms
+) -> NodalSample {
+  let eps = max(uniforms.nodalTolerance, 1e-6);
+  let psiRe = psi.x;
+  let psiIm = psi.y;
+  let psiMag2 = psiRe * psiRe + psiIm * psiIm;
+  let psiAbs = sqrt(max(psiMag2, 0.0));
+
+  var intensity = 0.0;
+  var signValue = psiRe;
+  var colorMode = uniforms.nodalDefinition;
+
+  if (uniforms.nodalDefinition == NODAL_DEFINITION_REAL) {
+    intensity = nodalBandMask(psiRe, gradPsiRe, eps);
+    signValue = psiRe;
+    colorMode = NODAL_DEFINITION_REAL;
+  } else if (uniforms.nodalDefinition == NODAL_DEFINITION_IMAG) {
+    intensity = nodalBandMask(psiIm, gradPsiIm, eps);
+    signValue = psiIm;
+    colorMode = NODAL_DEFINITION_IMAG;
+  } else if (uniforms.nodalDefinition == NODAL_DEFINITION_COMPLEX_INTERSECTION) {
+    let maskRe = nodalBandMask(psiRe, gradPsiRe, eps);
+    let maskIm = nodalBandMask(psiIm, gradPsiIm, eps);
+    intensity = sqrt(max(maskRe * maskIm, 0.0));
+    signValue = psiRe;
+    colorMode = NODAL_DEFINITION_COMPLEX_INTERSECTION;
+  } else {
+    // |ψ| mode: gradient via chain rule. When |ψ|≈0 (the actual node) the
+    // direction is degenerate — fall back to the magnitude of (Re·∇Re + Im·∇Im).
+    let invPsiAbs = 1.0 / max(psiAbs, 1e-8);
+    let gradAbs = (gradPsiRe * psiRe + gradPsiIm * psiIm) * invPsiAbs;
+    intensity = nodalBandMask(psiAbs, gradAbs, eps);
+    signValue = psiRe;
+    colorMode = NODAL_DEFINITION_PSI_ABS;
+  }
+
+  // Envelope: matches the tetrahedral path (suppress where amplitude is tiny).
+  // For analytical mode (HO only at present) we use raw |ψ| since hydrogenNDBoost
+  // is HO-only zero. Family-filter doesn't apply.
+  let envelopeFloor = max(eps * 0.4, 5e-5);
+  let envelopeCeil = max(eps * 2.0, envelopeFloor + 1e-4);
+  let envelopeWeight = smoothstep(envelopeFloor, envelopeCeil, psiAbs);
+
+  return NodalSample(clamp(intensity, 0.0, 1.0), signValue, colorMode, envelopeWeight);
+}
+
 // Compute physically grounded nodal intensity from psi, Re(psi), Im(psi), and hydrogen factors.
 fn computePhysicalNodalField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> NodalSample {
   let eps = max(uniforms.nodalTolerance, 1e-6);
@@ -550,11 +618,19 @@ fn computePhysicalNodalField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms)
 /** No-op stubs for nodal surface functions when FEATURE_NODAL is off. */
 export const nodalSurfacesStubBlock = /* wgsl */ `
 // Stubs: nodal surfaces disabled at compile time
+fn nodalBandMask(value: f32, gradient: vec3f, eps: f32) -> f32 {
+  return 0.0;
+}
 fn computePhysicalNodalField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> NodalSample {
   return NodalSample(0.0, 0.0, 0, 0.0);
 }
 fn computePhysicalNodalFieldWithGradient(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> NodalWithGradient {
   return NodalWithGradient(NodalSample(0.0, 0.0, 0, 0.0), vec3f(0.0), 0.0, 0.0);
+}
+fn computeNodalFromAnalyticalPsi(
+  psi: vec2f, gradPsiRe: vec3f, gradPsiIm: vec3f, uniforms: SchroedingerUniforms
+) -> NodalSample {
+  return NodalSample(0.0, 0.0, 0, 0.0);
 }
 fn selectPhysicalNodalColor(uniforms: SchroedingerUniforms, colorMode: i32, signValue: f32) -> vec3f {
   return vec3f(0.0);

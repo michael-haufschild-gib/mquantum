@@ -385,6 +385,14 @@ export interface SchroedingerConfig {
   vacuumBubbleTension: number
   /** True-vacuum volume bias term in the CDL action proxy (0.0-3.0) */
   vacuumBubbleBias: number
+  /** Enable Born-null weave nodal aperture lensing in analytic volumetric raymarching */
+  bornNullWeaveEnabled: boolean
+  /** Coordinate deformation/emission strength for null-aperture membranes (0.0-2.0) */
+  bornNullWeaveStrength: number
+  /** Born-density node width as fraction of peak density (0.0001-0.2) */
+  bornNullWeaveNodeWidth: number
+  /** Current-over-density circulation sensitivity (0.0-8.0) */
+  bornNullWeaveCirculation: number
 
   // === Physical Probability Current (j-field) ===
   /** Enable physical probability-current visualization (j = Im(conj(psi)∇psi)) */
@@ -701,6 +709,10 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   vacuumBubbleWallThickness: 0.12,
   vacuumBubbleTension: 0.9,
   vacuumBubbleBias: 0.8,
+  bornNullWeaveEnabled: false,
+  bornNullWeaveStrength: 0.9,
+  bornNullWeaveNodeWidth: 0.025,
+  bornNullWeaveCirculation: 2.0,
 
   // Physical Probability Current (j-field)
   probabilityCurrentEnabled: false,

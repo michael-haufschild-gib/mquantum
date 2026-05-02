@@ -80,6 +80,8 @@ describe('Schroedinger spectral-dimension flow WGSL composition', () => {
   it('resamples HQ analytic volume before gradient and emission', () => {
     const body = functionSlice(volumeRaymarchBlock, 'volumeRaymarchHQ')
 
+    // PERF: HQ now uses ensureGradient at the emission point (per-step cache
+    // shared with all spacetime effects) instead of sampleDensityWithAnalyticalGradient.
     expectOrdered(body, [
       'let entropyShear = applyEntropicTimeShear(',
       'let spectralFlow = applySpectralDimensionFlow(',
@@ -87,7 +89,7 @@ describe('Schroedinger spectral-dimension flow WGSL composition', () => {
       'spectralEmissionGain = spectralFlow.emissionGain',
       'spectralOpacityScale = spectralFlow.opacityScale',
       'quickCheck = sampleDensityWithPhase(samplePos, animTime, uniforms)',
-      'sampleDensityWithAnalyticalGradient(samplePos, animTime, uniforms)',
+      'gradient = ensureGradient(samplePos, animTime, uniforms, &gradCache)',
       'computeEffectiveDensity(',
       'rho * spectralOpacityScale',
       'computeEmissionLit(rho, sCenter, phase, samplePos',
@@ -104,7 +106,9 @@ describe('Schroedinger spectral-dimension flow WGSL composition', () => {
       'pos = spectralFlow.position',
       'spectralEmissionGain = spectralFlow.emissionGain',
       'spectralOpacityScale = spectralFlow.opacityScale',
-      'gridSample = sampleDensityFromGrid(pos, uniforms)',
+      // PERF (OPT-PERF-2): post-warp re-sample is now consolidated into the
+      // loadGridSampleState* helper.
+      'oadGridSampleState',
       'computeEffectiveDensity(',
       'rho * spectralOpacityScale',
       'computeEmissionLit(colorRho, colorS, phase, pos',
@@ -121,7 +125,9 @@ describe('Schroedinger spectral-dimension flow WGSL composition', () => {
       'pos = spectralFlow.position',
       'spectralEmissionGain = spectralFlow.emissionGain',
       'spectralOpacityScale = spectralFlow.opacityScale',
-      'gridSample = sampleDensityFromGrid(pos, uniforms)',
+      // PERF (OPT-PERF-2): post-warp re-sample is now consolidated into the
+      // loadGridSampleState* helper.
+      'oadGridSampleState',
       'computeEffectiveDensity(',
       'rho * spectralOpacityScale',
       'computeEmissionLit(emissionRho, emissionS, phase, pos',

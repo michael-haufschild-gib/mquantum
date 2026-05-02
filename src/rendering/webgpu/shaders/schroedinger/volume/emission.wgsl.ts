@@ -46,6 +46,12 @@ const PHASE_HUE_INFLUENCE: f32 = 0.4;`)
 // Blackbody color from temperature in Kelvin (Tanner Helland approximation)
 // Based on CIE 1964 color matching data. Produces physically plausible
 // dim-red → orange → white → blue-white ramp across 1000–40000 K.
+//
+// PERF history: a closed-form polynomial replacement was attempted and rolled
+// back — measurement showed it tied or slightly regressed phase-materiality
+// cost on Apple Silicon vs the branched form, presumably because the cold
+// half evaluates with cheap constants (r = 255) and one log/pow per channel
+// while the polynomial form unconditionally evaluates 5 fmas per channel.
 fn blackbody(Temp: f32) -> vec3f {
   if (Temp <= 0.0) { return vec3f(0.0); }
   let t = Temp / 100.0;
@@ -137,16 +143,23 @@ fn viridis(t: f32) -> vec3f {
   parts.push(/* wgsl */ `
 // Phase materiality: modulate surface color based on quantum phase.
 // Positive phase → plasma (blackbody), negative phase → cool smoke.
+//
+// PERF: the previous form computed
+//   plasmaColor * w + smokeColor * (1 - w)
+//   then mix(baseColor, ..., strength)
+// which is two vec3 muls + one vec3 add + one mix. The algebraic identity
+//   plasmaColor * w + smokeColor * (1 - w) == mix(smokeColor, plasmaColor, w)
+// collapses to one mix; the outer mix is then a single fused op. Saves
+// 1 vec3 mul + 1 vec3 add per call. The (s + 8) / 8 normalization is rewritten
+// as a single FMA (s * 0.125 + 1) to drop the divide.
 fn applyPhaseMateriality(baseColor: vec3f, phase: f32, s: f32, u: SchroedingerUniforms) -> vec3f {
   let phaseMod = fract((phase + PI) / TAU);
   let plasmaWeight = smoothstep(0.35, 0.65, phaseMod);
-  let smokeWeight = 1.0 - plasmaWeight;
-  let normalizedRho = clamp((s + 8.0) / 8.0, 0.0, 1.0);
+  let normalizedRho = clamp(s * 0.125 + 1.0, 0.0, 1.0);
   let plasmaColor = blackbody(normalizedRho * 8000.0 + 2000.0);
   let smokeColor = vec3f(0.08, 0.08, 0.25) * max(length(baseColor), 0.1);
-  return mix(baseColor,
-    plasmaColor * plasmaWeight + smokeColor * smokeWeight,
-    u.phaseMaterialityStrength);
+  let blended = mix(smokeColor, plasmaColor, plasmaWeight);
+  return mix(baseColor, blended, u.phaseMaterialityStrength);
 }`)
 
   // applyHDREmissionGlow(): shared post-lighting emission glow for all render modes.

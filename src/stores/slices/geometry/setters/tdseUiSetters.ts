@@ -9,6 +9,7 @@
  */
 
 import type { TdseDisorderDistribution, TdseFieldView } from '@/lib/geometry/extended/tdse'
+import { logger } from '@/lib/logger'
 import {
   DEFAULT_METRIC_CONFIG,
   MAX_ADS_RADIUS,
@@ -70,10 +71,7 @@ function clampOrFallback(
 ): number {
   if (value === undefined) return Math.max(min, Math.min(max, fallback))
   if (!Number.isFinite(value)) {
-    if (import.meta.env?.DEV) {
-      // eslint-disable-next-line no-console
-      console.warn(`metric.${fieldName}: non-finite ${value}, falling back to ${fallback}`)
-    }
+    logger.warn(`metric.${fieldName}: non-finite ${value}, falling back to ${fallback}`)
     return Math.max(min, Math.min(max, fallback))
   }
   return Math.max(min, Math.min(max, value))

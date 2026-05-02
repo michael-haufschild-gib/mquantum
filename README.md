@@ -8,7 +8,7 @@ An N-dimensional quantum physics visualizer running entirely in the browser via 
 
 This is a vibecoded project. I have no real understanding of the quantum mechanics math behind it. I don't know whether the rendered wavefunctions or the values displayed in the UI are physically correct. It looks cool, and that's about as far as my confidence goes.
 
-The project exists as an experiment in pushing the limits of vibecoding with Claude Code (Opus 4.5 / 4.6). The entire codebase -- ~1100 source files, 131 WGSL shaders, Rust/WASM math, 6300+ tests, and this README -- was written by Claude across ~400 commits. I described what I wanted, Claude wrote the code.
+The project exists as an experiment in pushing the limits of vibecoding with Claude Code (Opus 4.5 / 4.6). The entire codebase -- ~1500 source files, 149 WGSL shaders, Rust/WASM math, 9200+ tests, and this README -- was written by Claude across ~1100 commits. I described what I wanted, Claude wrote the code.
 
 ## What It Does
 
@@ -22,12 +22,12 @@ The project exists as an experiment in pushing the limits of vibecoding with Cla
 ## Tech Stack
 
 - **Rendering**: Custom WebGPU renderer (raw `GPUDevice` / `GPUCommandEncoder`)
-- **Shaders**: WGSL (83 shader modules, composed via `assembleShaderBlocks()`)
+- **Shaders**: WGSL (149 shader modules, composed via `assembleShaderBlocks()`)
 - **Frontend**: React 19 + TypeScript 5 + Vite 7
 - **State**: Zustand 5
 - **Styling**: Tailwind CSS 4
 - **Math**: Rust/WASM for rotation and projection math
-- **Testing**: Vitest (6300+ tests) + Playwright E2E (77 specs) + Stryker mutation testing
+- **Testing**: Vitest (9200+ tests) + Playwright E2E (103 specs) + Stryker mutation testing
 
 ## Prerequisites
 
@@ -134,10 +134,10 @@ src/
 ## Quality Gates
 
 - **TypeScript strict mode**: `noUncheckedIndexedAccess`, `strictNullChecks`, zero `any` types
-- **ESLint**: 9 custom project rules (no shallow test matchers, no hardcoded colors, no raw HTML controls, no DOM traversal in tests, ...)
+- **ESLint**: 10 custom project rules (no shallow test matchers, no hardcoded colors, no raw HTML controls, no DOM traversal in tests, ...)
 - **Stylelint**: oklch-only colors, logical properties, no breakpoint media queries
-- **Coverage ratchet**: thresholds auto-raise, can never regress
-- **Bundle size budgets**: per-chunk gzip limits enforced at build time
+- **Coverage ratchet**: thresholds auto-raise, can never regress (`scripts/check-coverage-ratchet.js`)
+- **Bundle size budgets**: per-chunk gzip limits enforced at build time (`scripts/check-bundle-size.js` + `scripts/bundle-size-budgets.json`)
 - **Chunk cycle detection**: circular dependency prevention (value imports only)
 - **Mutation testing**: Stryker on pure logic and state management
 
@@ -152,7 +152,7 @@ The quantum math implementations are validated by an extensive automated test su
 - **TDSE dynamics**: Energy conservation, probability normalization, potential evaluation
 - **BEC/Dirac/Pauli**: Mode-specific diagnostics and state evolution correctness
 
-Run `pnpm exec vitest run` to execute the full suite (6300+ tests, 385 test files).
+Run `pnpm exec vitest run` to execute the full suite (9000+ tests, 580+ test files).
 
 ## CI/CD
 

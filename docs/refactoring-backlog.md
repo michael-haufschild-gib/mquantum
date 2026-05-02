@@ -27,19 +27,25 @@ ban — see `src/.claude/rules/testing.md` "no trivial assertions" + memory
 
 ## Item 7 — Re-enable complexity limits
 
-**Current state**: `eslint.config.js` does not enforce `complexity`,
-`max-lines-per-function`, or `max-statements`. These are silently absent, not
-disabled with `0`.
+**Status (2026-05-01)**: Done for stores / components / hooks. Ratchet
+plan documented; physics + rendering deliberately exempted.
 
-**Blocked on**: item 8. The largest functions live in `solver.ts` and
-`animation.rs` and would all fail any reasonable threshold today.
+**What landed**:
+- `max-lines-per-function: 200` (default), 800 for stores / components /
+  hooks (today's ceiling), off for physics / rendering / tests / playwright.
+- `max-statements: 80` default, 120 for stores / components / hooks.
+- `max-nested-callbacks: 4` default, 6 for stores / components / hooks.
+- `complexity` (cyclomatic) intentionally `'off'` in favour of
+  `sonarjs/cognitive-complexity: 15`, which weights nesting + control-flow
+  rather than counting branches.
 
-**Approach for next session** (post item 8):
-1. Add ESLint rules with thresholds set to **current actuals + 1** (so
-   nothing starts failing). Then ratchet down as splits land.
-2. For the Rust crate, add `clippy::cognitive_complexity` to `lib.rs` `#![warn(...)]`
-   with a similarly conservative initial threshold.
-3. Document each cap in the rule justification, not just a number.
+**Ratchet plan**: lower the per-path thresholds in `eslint.config.js` as
+long-function offenders get split. Each step down should be paired with a
+PR that splits the specific function(s) it makes pass.
+
+**Rust** (deferred): the `animation.rs` split (Item 8) lands first; once
+the file is under 1000 lines per module, add `clippy::cognitive_complexity`
+to `lib.rs` `#![warn(...)]`.
 
 ## Item 8 — Split oversized files
 

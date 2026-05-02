@@ -218,6 +218,53 @@ describe('visualEffectSetters — compound logic', () => {
     })
   })
 
+  describe('born-null weave controls', () => {
+    it('defaults to disabled with editable control defaults', () => {
+      const config = getSchroedinger()
+      expect(config.bornNullWeaveEnabled).toBe(false)
+      expect(config.bornNullWeaveStrength).toBe(0.9)
+      expect(config.bornNullWeaveNodeWidth).toBe(0.025)
+      expect(config.bornNullWeaveCirculation).toBe(2.0)
+    })
+
+    it('toggles enabled and clamps strength, node width, and circulation', () => {
+      const store = useExtendedObjectStore.getState()
+
+      store.setSchroedingerBornNullWeaveEnabled(true)
+      store.setSchroedingerBornNullWeaveStrength(3)
+      store.setSchroedingerBornNullWeaveNodeWidth(0.00001)
+      store.setSchroedingerBornNullWeaveCirculation(12)
+
+      expect(getSchroedinger().bornNullWeaveEnabled).toBe(true)
+      expect(getSchroedinger().bornNullWeaveStrength).toBe(2)
+      expect(getSchroedinger().bornNullWeaveNodeWidth).toBeCloseTo(0.0001)
+      expect(getSchroedinger().bornNullWeaveCirculation).toBe(8)
+
+      store.setSchroedingerBornNullWeaveStrength(-1)
+      store.setSchroedingerBornNullWeaveNodeWidth(1)
+      store.setSchroedingerBornNullWeaveCirculation(-1)
+
+      expect(getSchroedinger().bornNullWeaveStrength).toBe(0)
+      expect(getSchroedinger().bornNullWeaveNodeWidth).toBe(0.2)
+      expect(getSchroedinger().bornNullWeaveCirculation).toBe(0)
+    })
+
+    it('rejects non-finite numeric inputs', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerBornNullWeaveStrength(1.25)
+      store.setSchroedingerBornNullWeaveNodeWidth(0.05)
+      store.setSchroedingerBornNullWeaveCirculation(3.5)
+
+      store.setSchroedingerBornNullWeaveStrength(NaN)
+      store.setSchroedingerBornNullWeaveNodeWidth(Infinity)
+      store.setSchroedingerBornNullWeaveCirculation(NaN)
+
+      expect(getSchroedinger().bornNullWeaveStrength).toBe(1.25)
+      expect(getSchroedinger().bornNullWeaveNodeWidth).toBe(0.05)
+      expect(getSchroedinger().bornNullWeaveCirculation).toBe(3.5)
+    })
+  })
+
   describe('cross-section plane normal normalization', () => {
     it('normalizes non-unit vectors to unit length', () => {
       useExtendedObjectStore.getState().setSchroedingerCrossSectionPlaneNormal([3, 4, 0])

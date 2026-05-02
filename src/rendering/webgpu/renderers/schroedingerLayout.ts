@@ -284,6 +284,12 @@ const SCHROEDINGER_FIELDS = [
   { name: 'vacuumBubbleWallThickness', type: 'f32' },
   { name: 'vacuumBubbleTension', type: 'f32' },
   { name: 'vacuumBubbleBias', type: 'f32' },
+
+  // --- Born-null weave nodal aperture lens ---
+  { name: 'bornNullWeaveEnabled', type: 'u32' },
+  { name: 'bornNullWeaveStrength', type: 'f32' },
+  { name: 'bornNullWeaveNodeWidth', type: 'f32' },
+  { name: 'bornNullWeaveCirculation', type: 'f32' },
 ] as const satisfies readonly StructFieldDef[]
 
 /** Computed struct layout for SchroedingerUniforms. */

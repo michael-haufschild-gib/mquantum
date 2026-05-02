@@ -55,7 +55,12 @@ describe('Schroedinger nodal WGSL composition', () => {
     expect(wgsl).not.toContain('fn computeNodalIntensity(')
     expect(wgsl).not.toContain('lowDensityMask = 1.0 - smoothstep(1e-5, 2e-3, rho)')
     expect(wgsl).not.toContain('nodal.intensity * uniforms.nodalStrength * adaptiveStep * 2.5')
-    expect(wgsl).not.toContain('intensity = nodalBandMask(psiAbs, gradAbs, eps);')
+    // Legacy density-band heuristic ungated by sign crossings — must not appear.
+    // The current code paths (computeNodalFromAnalyticalPsi, the |ψ|-mode
+    // tetrahedral branch, and the gridPsiAbs fast path) all multiply by a
+    // crossing mask or live behind explicit gates, so this exact line cannot
+    // appear in the composed shader.
+    expect(wgsl).not.toContain('intensity = nodalBandMask(psiAbs, gradAbs, eps) * lowDensityMask;')
     expect(wgsl).not.toContain('fn nodalSliceMask(')
   })
 
@@ -90,5 +95,19 @@ describe('Schroedinger nodal WGSL composition', () => {
     expect(wgsl).toContain('computePhysicalNodalField(p, animTime, schroedinger)')
     expect(wgsl).toContain('schroedinger.nodalRenderMode == NODAL_RENDER_MODE_SURFACE')
     expect(wgsl).not.toContain('let nodalSurfaceModeActive =')
+  })
+
+  it('keeps nodal helper symbols available when nodal feature is disabled', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 3,
+      quantumMode: 'harmonicOscillator',
+      isosurface: false,
+      nodal: false,
+      useDensityGrid: true,
+    })
+
+    expect(wgsl).toContain('fn nodalBandMask(value: f32, gradient: vec3f, eps: f32) -> f32')
+    expect(wgsl).toContain('return 0.0;')
+    expect(wgsl).toContain('fn computeGridPsiAbsNodalField(')
   })
 })

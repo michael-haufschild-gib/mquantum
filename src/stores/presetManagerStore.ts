@@ -385,7 +385,7 @@ export const usePresetManagerStore = create<PresetManagerState>()(
 
       importStyles: (jsonData) => {
         const existingNames = new Set(get().savedStyles.map((s) => s.name))
-        const result = parseAndValidateImport(
+        const result = parseAndValidateImport<SavedStyle['data'], SavedStyle>(
           jsonData,
           existingNames,
           STYLE_IMPORT_KEYS,
@@ -403,7 +403,7 @@ export const usePresetManagerStore = create<PresetManagerState>()(
           return false
         }
         set((state) => ({
-          savedStyles: [...state.savedStyles, ...(result.items as unknown as SavedStyle[])],
+          savedStyles: [...state.savedStyles, ...result.items],
         }))
         return true
       },
@@ -539,7 +539,7 @@ export const usePresetManagerStore = create<PresetManagerState>()(
 
       importScenes: (jsonData) => {
         const existingNames = new Set(get().savedScenes.map((s) => s.name))
-        const result = parseAndValidateImport(
+        const result = parseAndValidateImport<SavedScene['data'], SavedScene>(
           jsonData,
           existingNames,
           SCENE_IMPORT_KEYS,
@@ -557,7 +557,7 @@ export const usePresetManagerStore = create<PresetManagerState>()(
           return false
         }
         set((state) => ({
-          savedScenes: [...state.savedScenes, ...(result.items as unknown as SavedScene[])],
+          savedScenes: [...state.savedScenes, ...result.items],
         }))
         return true
       },

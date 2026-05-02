@@ -60,6 +60,8 @@ describe('Schroedinger entropic time-shear WGSL composition', () => {
   it('applies stable HQ analytic order and resamples before gradient/emission', () => {
     const body = functionSlice(volumeRaymarchBlock, 'volumeRaymarchHQ')
 
+    // PERF: HQ now uses ensureGradient at the emission point (per-step cache
+    // shared with all spacetime effects) instead of sampleDensityWithAnalyticalGradient.
     expectOrdered(body, [
       'let bridge = applyBilocalERBridgeTopology(',
       'quickCheck = sampleDensityWithPhase(samplePos, animTime, uniforms)',
@@ -70,7 +72,7 @@ describe('Schroedinger entropic time-shear WGSL composition', () => {
       'let entropyShear = applyEntropicTimeShear(',
       'samplePos = entropyShear.position',
       'quickCheck = sampleDensityWithPhase(samplePos, animTime, uniforms)',
-      'sampleDensityWithAnalyticalGradient(samplePos, animTime, uniforms)',
+      'gradient = ensureGradient(samplePos, animTime, uniforms, &gradCache)',
       'computeEmissionLit(rho, sCenter, phase, samplePos',
       'entropyEmissionGain',
     ])
@@ -79,16 +81,19 @@ describe('Schroedinger entropic time-shear WGSL composition', () => {
   it('applies stable full density-grid order', () => {
     const body = functionSlice(generateVolumeRaymarchGridBlock(false), 'volumeRaymarchGrid')
 
+    // PERF (OPT-PERF-2): post-warp re-samples consolidated into
+    // loadGridSampleState. Order assertions verify the warp/resample cadence
+    // through the helper invocations.
     expectOrdered(body, [
       'let bridge = applyBilocalERBridgeTopology(',
-      'gridSample = sampleDensityFromGrid(pos, uniforms)',
+      'loadGridSampleState(pos,',
       'let beforeBackreaction = pos',
       'let metric = applyQuantumBackreactionMetric(',
       'length(pos - beforeBackreaction) > 1e-6',
-      'gridSample = sampleDensityFromGrid(pos, uniforms)',
+      'loadGridSampleState(pos,',
       'let entropyShear = applyEntropicTimeShear(',
       'pos = entropyShear.position',
-      'gridSample = sampleDensityFromGrid(pos, uniforms)',
+      'loadGridSampleState(pos,',
       'computeEmissionLit(colorRho, colorS, phase, pos',
       'max(entropyGain, 0.0)',
     ])
@@ -99,14 +104,14 @@ describe('Schroedinger entropic time-shear WGSL composition', () => {
 
     expectOrdered(body, [
       'let bridge = applyBilocalERBridgeTopology(',
-      'gridSample = sampleDensityFromGrid(pos, uniforms)',
+      'loadGridSampleStateSimple(pos,',
       'let beforeBackreaction = pos',
       'let metric = applyQuantumBackreactionMetric(',
       'length(pos - beforeBackreaction) > 1e-6',
-      'gridSample = sampleDensityFromGrid(pos, uniforms)',
+      'loadGridSampleStateSimple(pos,',
       'let entropyShear = applyEntropicTimeShear(',
       'pos = entropyShear.position',
-      'gridSample = sampleDensityFromGrid(pos, uniforms)',
+      'loadGridSampleStateSimple(pos,',
       'computeEmissionLit(emissionRho, emissionS, phase, pos',
       'max(entropyGain, 0.0)',
     ])

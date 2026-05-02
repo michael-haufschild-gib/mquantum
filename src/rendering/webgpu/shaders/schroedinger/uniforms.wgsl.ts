@@ -372,6 +372,13 @@ struct SchroedingerUniforms {
   vacuumBubbleWallThickness: f32,
   vacuumBubbleTension: f32,
   vacuumBubbleBias: f32,
+
+  // Born-null weave. Disabled host packing writes all fields as zero, and
+  // compute-grid modes force disabled because the effect requires analytic ψ.
+  bornNullWeaveEnabled: u32,
+  bornNullWeaveStrength: f32,
+  bornNullWeaveNodeWidth: f32,
+  bornNullWeaveCirculation: f32,
 }
 
 // ============================================

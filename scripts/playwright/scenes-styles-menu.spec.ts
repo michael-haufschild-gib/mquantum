@@ -164,13 +164,17 @@ test.describe('Styles menu', () => {
     const topBar = new TopBar(page)
     await topBar.openScenesMenu()
 
-    // Click an example scene (last menu item is an example scene)
+    // Click an example scene (last menu item is an example scene).
+    // The Scenes menu always ships at least the bundled example scenes
+    // (Save Current + Manage + Examples header + ≥1 example item) so a
+    // count ≤ 3 means the example fixtures regressed — that is a bug,
+    // not a reason to skip silently.
     const menuItems = page.locator('[role="menuitem"]')
     const count = await menuItems.count()
-    if (count <= 3) {
-      test.skip(true, 'Not enough menu items to include example scenes')
-      return
-    }
+    expect(
+      count,
+      'Scenes menu must contain Save Current + Manage + Examples header + ≥1 bundled example scene'
+    ).toBeGreaterThan(3)
 
     await menuItems.nth(count - 1).click()
 

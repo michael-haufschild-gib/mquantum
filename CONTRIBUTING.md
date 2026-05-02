@@ -29,8 +29,8 @@ Follow the decision tree in [docs/architecture.md](docs/architecture.md). New fi
 Every change must pass the existing test suite:
 
 ```bash
-pnpm exec vitest run        # Must pass: 6300+ tests
-pnpm exec tsc -b --noEmit   # Must pass: zero type errors
+pnpm exec vitest run        # Must pass: 9000+ tests
+pnpm exec tsc -b            # Must pass: zero type errors
 pnpm run lint               # Must pass: zero warnings
 ```
 

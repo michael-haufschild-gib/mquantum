@@ -302,6 +302,84 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
   const needsFullRebuildRef = useRef(true)
   const lastGraphRef = useRef<typeof graph | null>(null)
 
+  const fullConfig: PassConfig = {
+    objectType,
+    dimension,
+    bloomEnabled: postProcessing.bloomEnabled,
+    antiAliasingMethod: postProcessing.antiAliasingMethod,
+    paperEnabled: postProcessing.paperEnabled,
+    frameBlendingEnabled: postProcessing.frameBlendingEnabled,
+    isosurface: schroedingerIsoEnabled,
+    quantumMode: schroedingerCompile.quantumMode,
+    termCount: schroedingerCompile.termCount,
+    nodalEnabled: schroedingerCompile.nodalEnabled,
+    phaseMaterialityEnabled: schroedingerCompile.phaseMaterialityEnabled,
+    interferenceEnabled: schroedingerCompile.interferenceEnabled,
+    uncertaintyBoundaryEnabled: schroedingerCompile.uncertaintyBoundaryEnabled,
+    temporalReprojectionEnabled:
+      // Temporal reprojection is incompatible with compute modes (they use density grids)
+      // and 2D pipelines (fullscreen triangle, no depth/MRT). Derive the
+      // compute-mode set from the registry so new compute modes (e.g.
+      // wheelerDeWitt) are gated automatically without editing this list.
+      isComputeQuantumType(schroedingerCompile.quantumMode) ||
+      objectType === 'pauliSpinor' ||
+      dimension === 2 ||
+      schroedingerCompile.representation === 'wigner'
+        ? false
+        : performance_.temporalReprojectionEnabled,
+    eigenfunctionCacheEnabled: performance_.eigenfunctionCacheEnabled,
+    analyticalGradientEnabled: performance_.analyticalGradientEnabled,
+    fastEigenInterpolationEnabled: performance_.fastEigenInterpolationEnabled,
+    renderResolutionScale,
+    colorAlgorithm: appearance.colorAlgorithm,
+    diracFieldView: schroedingerCompile.diracFieldView,
+    pauliFieldView:
+      objectType === 'pauliSpinor'
+        ? pauliFieldViewForColorAlgorithm(appearance.colorAlgorithm)
+        : schroedingerCompile.pauliFieldView,
+    freeScalarInitialCondition: schroedingerCompile.freeScalarInitialCondition,
+    representation: schroedingerCompile.representation,
+    openQuantumEnabled: schroedingerCompile.openQuantumEnabled,
+    crossSectionEnabled: schroedingerCompile.crossSectionEnabled,
+    probabilityCurrentEnabled: schroedingerCompile.probabilityCurrentEnabled,
+    densityGridResolution: performance_.densityGridResolution,
+    skyboxEnabled: environment.skyboxEnabled,
+    skyboxMode: environment.skyboxMode as SkyboxMode,
+    backgroundColor: environment.backgroundColor,
+  }
+  const schrodingerConfig = extractSchrodingerConfig(fullConfig)
+  const ppConfig = extractPPConfig(fullConfig)
+  const setupConfigKey = [
+    schrodingerConfig.objectType,
+    schrodingerConfig.dimension,
+    schrodingerConfig.quantumMode,
+    schrodingerConfig.termCount,
+    schrodingerConfig.colorAlgorithm,
+    schrodingerConfig.isosurface,
+    schrodingerConfig.nodalEnabled,
+    schrodingerConfig.phaseMaterialityEnabled,
+    schrodingerConfig.interferenceEnabled,
+    schrodingerConfig.uncertaintyBoundaryEnabled,
+    schrodingerConfig.representation,
+    schrodingerConfig.eigenfunctionCacheEnabled,
+    schrodingerConfig.analyticalGradientEnabled,
+    schrodingerConfig.fastEigenInterpolationEnabled,
+    schrodingerConfig.temporalReprojectionEnabled,
+    schrodingerConfig.openQuantumEnabled,
+    schrodingerConfig.crossSectionEnabled,
+    schrodingerConfig.probabilityCurrentEnabled,
+    schrodingerConfig.densityGridResolution,
+    ppConfig.bloomEnabled,
+    ppConfig.antiAliasingMethod,
+    ppConfig.paperEnabled,
+    ppConfig.frameBlendingEnabled,
+    ppConfig.skyboxEnabled,
+    ppConfig.skyboxMode,
+    ppConfig.temporalReprojectionEnabled,
+  ].join('|')
+  const latestSetupConfigRef = useRef({ fullConfig, schrodingerConfig, ppConfig })
+  latestSetupConfigRef.current = { fullConfig, schrodingerConfig, ppConfig }
+
   // Reset rebuild state when the graph instance changes (e.g. WebGPUCanvas re-init).
   // A new graph has an empty resource pool — warm swap would fail without a full rebuild.
   if (lastGraphRef.current !== graph) {
@@ -317,55 +395,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     const setupGeneration = ++setupGenerationRef.current
     const shouldAbortSetup = () => cancelled || setupGeneration !== setupGenerationRef.current
     const previousSetupTask = setupTaskRef.current
-
-    const fullConfig: PassConfig = {
-      objectType,
-      dimension,
-      bloomEnabled: postProcessing.bloomEnabled,
-      antiAliasingMethod: postProcessing.antiAliasingMethod,
-      paperEnabled: postProcessing.paperEnabled,
-      frameBlendingEnabled: postProcessing.frameBlendingEnabled,
-      isosurface: schroedingerIsoEnabled,
-      quantumMode: schroedingerCompile.quantumMode,
-      termCount: schroedingerCompile.termCount,
-      nodalEnabled: schroedingerCompile.nodalEnabled,
-      phaseMaterialityEnabled: schroedingerCompile.phaseMaterialityEnabled,
-      interferenceEnabled: schroedingerCompile.interferenceEnabled,
-      uncertaintyBoundaryEnabled: schroedingerCompile.uncertaintyBoundaryEnabled,
-      temporalReprojectionEnabled:
-        // Temporal reprojection is incompatible with compute modes (they use density grids)
-        // and 2D pipelines (fullscreen triangle, no depth/MRT). Derive the
-        // compute-mode set from the registry so new compute modes (e.g.
-        // wheelerDeWitt) are gated automatically without editing this list.
-        isComputeQuantumType(schroedingerCompile.quantumMode) ||
-        objectType === 'pauliSpinor' ||
-        dimension === 2 ||
-        schroedingerCompile.representation === 'wigner'
-          ? false
-          : performance_.temporalReprojectionEnabled,
-      eigenfunctionCacheEnabled: performance_.eigenfunctionCacheEnabled,
-      analyticalGradientEnabled: performance_.analyticalGradientEnabled,
-      fastEigenInterpolationEnabled: performance_.fastEigenInterpolationEnabled,
-      renderResolutionScale: usePerformanceStore.getState().renderResolutionScale,
-      colorAlgorithm: appearance.colorAlgorithm,
-      diracFieldView: schroedingerCompile.diracFieldView,
-      pauliFieldView:
-        objectType === 'pauliSpinor'
-          ? pauliFieldViewForColorAlgorithm(appearance.colorAlgorithm)
-          : schroedingerCompile.pauliFieldView,
-      freeScalarInitialCondition: schroedingerCompile.freeScalarInitialCondition,
-      representation: schroedingerCompile.representation,
-      openQuantumEnabled: schroedingerCompile.openQuantumEnabled,
-      crossSectionEnabled: schroedingerCompile.crossSectionEnabled,
-      probabilityCurrentEnabled: schroedingerCompile.probabilityCurrentEnabled,
-      densityGridResolution: performance_.densityGridResolution,
-      skyboxEnabled: environment.skyboxEnabled,
-      skyboxMode: environment.skyboxMode as SkyboxMode,
-      backgroundColor: environment.backgroundColor,
-    }
-
-    const schrodingerConfig = extractSchrodingerConfig(fullConfig)
-    const ppConfig = extractPPConfig(fullConfig)
+    const { fullConfig, schrodingerConfig, ppConfig } = latestSetupConfigRef.current
 
     const setupPasses = async () => {
       await previousSetupTask
@@ -382,7 +412,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       )
       const isFullRebuild = needsFullRebuildRef.current || forceFullRebuildForModeTransition
 
-      currentObjectTypeRef.current = objectType
+      currentObjectTypeRef.current = fullConfig.objectType
 
       const perfStore = usePerformanceStore.getState()
       perfStore.setShaderCompiling('pipeline', true)
@@ -398,10 +428,16 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       // partially-constructed (or cleared) graph.
       let graphTouched = false
 
+      // E2E testability: bump a separate "real recompile" counter ONLY when
+      // we actually rebuild Schroedinger passes (not for no-op useEffect
+      // re-runs). Tests use this to verify uniform-only toggles never trigger
+      // a recompile.
+      let recompiledThisPass = false
       try {
         if (isFullRebuild) {
           graph.clearPasses()
           graphTouched = true
+          recompiledThisPass = true
           if (shouldAbortSetup()) return
           setupSharedResources(graph, fullConfig)
           if (shouldAbortSetup()) return
@@ -411,6 +447,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
         } else if (schrodingerChanged && ppChanged) {
           ensureTemporalResources(graph, fullConfig)
           graphTouched = true
+          recompiledThisPass = true
           if (shouldAbortSetup()) return
           await warmSwapSchrodingerPasses(graph, fullConfig, shouldAbortSetup)
           if (shouldAbortSetup()) return
@@ -421,6 +458,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
         } else if (schrodingerChanged) {
           ensureTemporalResources(graph, fullConfig)
           graphTouched = true
+          recompiledThisPass = true
           if (shouldAbortSetup()) return
           await warmSwapSchrodingerPasses(graph, fullConfig, shouldAbortSetup)
           if (shouldAbortSetup()) return
@@ -429,6 +467,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
         } else if (ppChanged) {
           cleanupPPPasses(graph, fullConfig)
           graphTouched = true
+          recompiledThisPass = true
           if (shouldAbortSetup()) return
           await setupPPPasses(graph, fullConfig, shouldAbortSetup)
         }
@@ -468,6 +507,14 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       // E2E testability: expose pipeline generation on the canvas so tests can
       // wait for the new pipeline to be active instead of polling isShaderCompiling.
       canvas.setAttribute('data-pipeline-gen', String(setupGeneration))
+      // E2E testability: bump only on REAL recompiles (warmSwap or fullRebuild),
+      // not no-op useEffect re-runs. Tests use this to verify that toggling
+      // a runtime-only effect (e.g. nodalEnabled) does NOT recompile the
+      // pipeline.
+      if (recompiledThisPass) {
+        const prevRebuilds = parseInt(canvas.getAttribute('data-pipeline-rebuilds') ?? '0', 10)
+        canvas.setAttribute('data-pipeline-rebuilds', String(prevRebuilds + 1))
+      }
 
       logger.log(
         `[WebGPUScene] setup COMPLETE (gen=${setupGeneration}), isFullRebuild=${isFullRebuild}`
@@ -498,40 +545,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     return () => {
       cancelled = true
     }
-  }, [
-    graph,
-    objectType,
-    dimension,
-    postProcessing.bloomEnabled,
-    postProcessing.antiAliasingMethod,
-    postProcessing.paperEnabled,
-    postProcessing.frameBlendingEnabled,
-    canvas,
-    environment.skyboxEnabled,
-    environment.skyboxMode,
-    environment.backgroundColor,
-    appearance.colorAlgorithm,
-    schroedingerIsoEnabled,
-    schroedingerCompile.quantumMode,
-    schroedingerCompile.termCount,
-    schroedingerCompile.nodalEnabled,
-    schroedingerCompile.phaseMaterialityEnabled,
-    schroedingerCompile.interferenceEnabled,
-    schroedingerCompile.uncertaintyBoundaryEnabled,
-    schroedingerCompile.representation,
-    schroedingerCompile.crossSectionEnabled,
-    schroedingerCompile.probabilityCurrentEnabled,
-    schroedingerCompile.diracFieldView,
-    schroedingerCompile.pauliFieldView,
-    schroedingerCompile.freeScalarInitialCondition,
-    performance_.temporalReprojectionEnabled,
-    performance_.eigenfunctionCacheEnabled,
-    performance_.analyticalGradientEnabled,
-    performance_.fastEigenInterpolationEnabled,
-    performance_.densityGridResolution,
-    schroedingerCompile.openQuantumEnabled,
-    cameraRef,
-  ])
+  }, [graph, canvas, setupConfigKey, cameraRef])
 
   // ── Runtime scene clear-color update ──
   useEffect(() => {

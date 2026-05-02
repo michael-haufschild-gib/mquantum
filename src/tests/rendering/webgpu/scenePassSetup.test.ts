@@ -31,7 +31,7 @@ function makePassConfig(overrides: Partial<PassConfig> = {}): PassConfig {
     nodalEnabled: false,
     phaseMaterialityEnabled: false,
     interferenceEnabled: false,
-    uncertaintyBoundaryEnabled: true,
+    uncertaintyBoundaryEnabled: false,
     temporalReprojectionEnabled: true,
     eigenfunctionCacheEnabled: true,
     analyticalGradientEnabled: true,
@@ -322,6 +322,76 @@ describe('extractSchrodingerConfig', () => {
     expect(extracted.nodalEnabled).toBe(false)
     expect(extracted.phaseMaterialityEnabled).toBe(false)
     expect(extracted.interferenceEnabled).toBe(false)
+  })
+
+  it('keeps runtime-off effect flags false for the default grid-only eligible 3D shader', () => {
+    const extracted = extractSchrodingerConfig(
+      makePassConfig({
+        quantumMode: 'harmonicOscillator',
+        dimension: 3,
+        colorAlgorithm: 'radialDistance',
+        nodalEnabled: false,
+        phaseMaterialityEnabled: false,
+        interferenceEnabled: false,
+        uncertaintyBoundaryEnabled: false,
+        crossSectionEnabled: false,
+        probabilityCurrentEnabled: false,
+      })
+    )
+
+    expect(extracted.nodalEnabled).toBe(false)
+    expect(extracted.phaseMaterialityEnabled).toBe(false)
+    expect(extracted.interferenceEnabled).toBe(false)
+    expect(extracted.uncertaintyBoundaryEnabled).toBe(false)
+    expect(extracted.crossSectionEnabled).toBe(false)
+    expect(extracted.probabilityCurrentEnabled).toBe(false)
+  })
+
+  it('does not compile runtime-off effect flags just because a phase color algorithm is active', () => {
+    const extracted = extractSchrodingerConfig(
+      makePassConfig({
+        quantumMode: 'harmonicOscillator',
+        dimension: 3,
+        colorAlgorithm: 'phase',
+        nodalEnabled: false,
+        phaseMaterialityEnabled: false,
+        interferenceEnabled: false,
+        uncertaintyBoundaryEnabled: false,
+        crossSectionEnabled: false,
+        probabilityCurrentEnabled: false,
+      })
+    )
+
+    expect(extracted.colorAlgorithm).toBe('phase')
+    expect(extracted.nodalEnabled).toBe(false)
+    expect(extracted.phaseMaterialityEnabled).toBe(false)
+    expect(extracted.interferenceEnabled).toBe(false)
+    expect(extracted.uncertaintyBoundaryEnabled).toBe(false)
+    expect(extracted.crossSectionEnabled).toBe(false)
+    expect(extracted.probabilityCurrentEnabled).toBe(false)
+  })
+
+  it('compiles the full runtime-gated effect bundle once any eligible effect is active', () => {
+    const extracted = extractSchrodingerConfig(
+      makePassConfig({
+        quantumMode: 'harmonicOscillator',
+        dimension: 3,
+        colorAlgorithm: 'radialDistance',
+        nodalEnabled: true,
+        phaseMaterialityEnabled: false,
+        interferenceEnabled: false,
+        uncertaintyBoundaryEnabled: false,
+        crossSectionEnabled: false,
+        probabilityCurrentEnabled: false,
+      })
+    )
+
+    expect(extracted.nodalEnabled).toBe(true)
+    expect(extracted.phaseMaterialityEnabled).toBe(true)
+    expect(extracted.interferenceEnabled).toBe(true)
+    expect(extracted.uncertaintyBoundaryEnabled).toBe(true)
+    expect(extracted.crossSectionEnabled).toBe(true)
+    expect(extracted.probabilityCurrentEnabled).toBe(true)
   })
 })
 

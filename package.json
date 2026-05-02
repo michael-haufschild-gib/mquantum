@@ -12,7 +12,7 @@
     "dev": "vite --port 3000",
     "build": "pnpm wasm:build && node scripts/check-untracked-imports.js && node scripts/check-wgsl-backticks.js && tsc -b && vite build && pnpm build:check",
     "build:web": "node scripts/check-untracked-imports.js && node scripts/check-wgsl-backticks.js && tsc -b && vite build && pnpm build:check",
-    "build:check": "node scripts/check-chunk-cycles.js",
+    "build:check": "node scripts/check-chunk-cycles.js && node scripts/check-bundle-size.js",
     "wasm:build": "wasm-pack build ./src/wasm/mdimension_core --target web && rm -f ./src/wasm/mdimension_core/pkg/.gitignore",
     "wasm:build:validator": "wasm-pack build ./src/wasm/mdimension_core --target nodejs --out-dir pkg-validator --features wdw-validator && rm -f ./src/wasm/mdimension_core/pkg-validator/.gitignore",
     "preview": "vite preview",

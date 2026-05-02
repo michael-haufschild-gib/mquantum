@@ -44,9 +44,21 @@ function hasRequiredFields(
 
 /**
  * Result of an import attempt.
+ *
+ * `TItem` defaults to `Record<string, unknown>` so the legacy callers
+ * that import the union without a type argument keep working. Typed
+ * callers should pass their concrete preset interface (e.g.
+ * `ImportResult<SavedStyle>`) so downstream `state.savedStyles` spreads
+ * are typed without a `as unknown as` cast.
+ *
+ * The function returns items shaped like
+ * `{ ...rawItem, id, name, timestamp, data: sanitized }`. Callers must
+ * pass a `TItem` that is compatible with that shape; the type system
+ * does not statically prove field-name equivalence — that's the caller's
+ * contract — but it does prevent a brand-new `as unknown as` per call site.
  */
-export type ImportResult =
-  | { success: true; items: Array<Record<string, unknown>> }
+export type ImportResult<TItem = Record<string, unknown>> =
+  | { success: true; items: TItem[] }
   | { success: false; error: string }
 
 /**
@@ -59,13 +71,13 @@ export type ImportResult =
  * @param entityLabel - Human-readable label for error messages ("styles" or "scenes")
  * @returns Import result with processed items or error message
  */
-export function parseAndValidateImport<T>(
+export function parseAndValidateImport<T, TItem = Record<string, unknown>>(
   jsonData: string,
   existingNames: Set<string>,
   requiredDataKeys: readonly string[],
   sanitize: (data: T) => T,
   entityLabel: string
-): ImportResult {
+): ImportResult<TItem> {
   let imported: unknown
   try {
     imported = JSON.parse(jsonData)
@@ -106,7 +118,7 @@ export function parseAndValidateImport<T>(
       name: newName,
       timestamp: Date.now(),
       data: sanitize(item.data as T),
-    } as Record<string, unknown>
+    } as TItem
   })
 
   return { success: true, items: processed }

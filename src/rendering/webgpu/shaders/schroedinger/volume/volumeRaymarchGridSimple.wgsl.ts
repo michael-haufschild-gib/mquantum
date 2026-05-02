@@ -22,6 +22,22 @@ export function generateVolumeRaymarchGridSimpleBlock(usePrecomputedNormals = fa
 
 ${gradientFetchFn}
 
+// PERF: per-step grid-gradient cache. See volumeRaymarchGrid for rationale.
+fn ensureGridGradient(
+  pos: vec3f,
+  uniforms: SchroedingerUniforms,
+  cache: ptr<function, GradientCache>,
+) -> vec3f {
+  if ((*cache).valid && all(pos == (*cache).pos)) {
+    return (*cache).gradient;
+  }
+  let g = fetchGradient(pos, uniforms);
+  (*cache).gradient = g;
+  (*cache).pos = pos;
+  (*cache).valid = true;
+  return g;
+}
+
 fn gridOpacityDensity(gridSample: vec4f) -> f32 {
   return select(
     gridSample.r,
@@ -41,6 +57,40 @@ fn gridAdaptiveLogDensity(rho: f32, sCenter: f32) -> f32 {
     return -20.0;
   }
   return sCenter;
+}
+
+// PERF (OPT-PERF-2): consolidate 5 nearly-identical post-warp re-sample blocks
+// (bilocal/backreaction/entropy/spectral/vacuumBubble) into one helper function.
+// Compute modes never use useRelPhase (they don't write the relativePhase
+// channel), so the Simple variant always reads gridSample.b as the phase
+// source.
+struct GridSampleStateSimple {
+  rho: f32,
+  sCenter: f32,
+  colorRho: f32,
+  colorS: f32,
+  phase: f32,
+  gridSample: vec4f,
+}
+
+fn loadGridSampleStateSimple(
+  pos: vec3f,
+  phaseOffset: f32,
+  adsAmplitudeSq: f32,
+  uniforms: SchroedingerUniforms
+) -> GridSampleStateSimple {
+  let gridSample = sampleDensityFromGrid(pos, uniforms);
+  var rho = gridOpacityDensity(gridSample) * adsAmplitudeSq;
+  let sCenter = gridSample.g;
+  let phase = gridSample.b - phaseOffset;
+  var colorRho: f32 = gridSample.r * adsAmplitudeSq;
+  var colorS: f32 = 0.0;
+  if (IS_DUAL_CHANNEL) {
+    colorRho = gridSample.r;
+    colorS = gridSample.g;
+    rho = rho + gridSample.g;
+  }
+  return GridSampleStateSimple(rho, sCenter, colorRho, colorS, phase, gridSample);
 }
 
 fn volumeRaymarchGrid(
@@ -87,18 +137,18 @@ fn volumeRaymarchGrid(
 
     let basePos = rayOrigin + rayDir * t;
     var pos = basePos;
-    var gridSample = sampleDensityFromGrid(pos, uniforms);
-    var rho = gridOpacityDensity(gridSample) * adsAmplitudeSq;
-    var sCenter = gridSample.g;
-    var phase = gridSample.b - phaseOffset;
 
-    var colorRho: f32 = gridSample.r * adsAmplitudeSq;
-    var colorS: f32 = 0.0;
-    if (IS_DUAL_CHANNEL) {
-      colorRho = gridSample.r;
-      colorS = gridSample.g;
-      rho = rho + gridSample.g;
-    }
+    // PERF: per-step gradient cache shared across all spacetime effects.
+    var gradCache: GradientCache;
+    gradCache.valid = false;
+
+    var _state = loadGridSampleStateSimple(pos, phaseOffset, adsAmplitudeSq, uniforms);
+    var gridSample = _state.gridSample;
+    var rho = _state.rho;
+    var sCenter = _state.sCenter;
+    var phase = _state.phase;
+    var colorRho = _state.colorRho;
+    var colorS = _state.colorS;
 
     var causticMultiplier = 1.0;
     var bridgeGain = 1.0;
@@ -137,22 +187,19 @@ fn volumeRaymarchGrid(
       pos = bridge.position;
       bridgeGain = bridge.gain;
       if (length(pos - basePos) > 1e-6) {
-        gridSample = sampleDensityFromGrid(pos, uniforms);
-        rho = gridOpacityDensity(gridSample) * adsAmplitudeSq;
-        sCenter = gridSample.g;
-        phase = gridSample.b - phaseOffset;
-        colorRho = gridSample.r * adsAmplitudeSq;
-        colorS = 0.0;
-        if (IS_DUAL_CHANNEL) {
-          colorRho = gridSample.r;
-          colorS = gridSample.g;
-          rho = rho + gridSample.g;
-        }
+        // PERF (OPT-PERF-2): consolidated post-warp re-sample.
+        let _resampled = loadGridSampleStateSimple(pos, phaseOffset, adsAmplitudeSq, uniforms);
+        gridSample = _resampled.gridSample;
+        rho = _resampled.rho;
+        sCenter = _resampled.sCenter;
+        phase = _resampled.phase;
+        colorRho = _resampled.colorRho;
+        colorS = _resampled.colorS;
       }
     }
 
     if (backreactionActive && rho >= EMPTY_SKIP_THRESHOLD) {
-      let metricGradient = fetchGradient(pos, uniforms);
+      let metricGradient = ensureGridGradient(pos, uniforms, &gradCache);
       let beforeBackreaction = pos;
       let metric = applyQuantumBackreactionMetric(
         beforeBackreaction, rayDir, rho, sCenter, metricGradient, uniforms
@@ -160,23 +207,20 @@ fn volumeRaymarchGrid(
       pos = metric.position;
       causticMultiplier = metric.caustic;
       if (length(pos - beforeBackreaction) > 1e-6) {
-        gridSample = sampleDensityFromGrid(pos, uniforms);
-        rho = gridOpacityDensity(gridSample) * adsAmplitudeSq;
-        sCenter = gridSample.g;
-        phase = gridSample.b - phaseOffset;
-        colorRho = gridSample.r * adsAmplitudeSq;
-        colorS = 0.0;
-        if (IS_DUAL_CHANNEL) {
-          colorRho = gridSample.r;
-          colorS = gridSample.g;
-          rho = rho + gridSample.g;
-        }
+        // PERF (OPT-PERF-2): consolidated post-warp re-sample.
+        let _resampled = loadGridSampleStateSimple(pos, phaseOffset, adsAmplitudeSq, uniforms);
+        gridSample = _resampled.gridSample;
+        rho = _resampled.rho;
+        sCenter = _resampled.sCenter;
+        phase = _resampled.phase;
+        colorRho = _resampled.colorRho;
+        colorS = _resampled.colorS;
       }
     }
 
     var entropyGain = 0.0;
     if (entropyShearActive && rho >= EMPTY_SKIP_THRESHOLD) {
-      let entropyGradient = fetchGradient(pos, uniforms);
+      let entropyGradient = ensureGridGradient(pos, uniforms, &gradCache);
       var entropyLogDensity = sCenter;
       if (IS_DUAL_CHANNEL) {
         if (rho > 1e-9) {
@@ -192,24 +236,21 @@ fn volumeRaymarchGrid(
       pos = entropyShear.position;
       entropyGain = entropyShear.entropyGain;
       if (length(pos - beforeEntropyShear) > 1e-6) {
-        gridSample = sampleDensityFromGrid(pos, uniforms);
-        rho = gridOpacityDensity(gridSample) * adsAmplitudeSq;
-        sCenter = gridSample.g;
-        phase = gridSample.b - phaseOffset;
-        colorRho = gridSample.r * adsAmplitudeSq;
-        colorS = 0.0;
-        if (IS_DUAL_CHANNEL) {
-          colorRho = gridSample.r;
-          colorS = gridSample.g;
-          rho = rho + gridSample.g;
-        }
+        // PERF (OPT-PERF-2): consolidated post-warp re-sample.
+        let _resampled = loadGridSampleStateSimple(pos, phaseOffset, adsAmplitudeSq, uniforms);
+        gridSample = _resampled.gridSample;
+        rho = _resampled.rho;
+        sCenter = _resampled.sCenter;
+        phase = _resampled.phase;
+        colorRho = _resampled.colorRho;
+        colorS = _resampled.colorS;
       }
     }
 
     var spectralEmissionGain = 1.0;
     var spectralOpacityScale = 1.0;
     if (spectralFlowActive && rho >= EMPTY_SKIP_THRESHOLD) {
-      let spectralGradient = fetchGradient(pos, uniforms);
+      let spectralGradient = ensureGridGradient(pos, uniforms, &gradCache);
       var spectralLogDensity = sCenter;
       if (IS_DUAL_CHANNEL) {
         if (rho > 1e-9) {
@@ -226,17 +267,14 @@ fn volumeRaymarchGrid(
       spectralEmissionGain = spectralFlow.emissionGain;
       spectralOpacityScale = spectralFlow.opacityScale;
       if (length(pos - beforeSpectralFlow) > 1e-6) {
-        gridSample = sampleDensityFromGrid(pos, uniforms);
-        rho = gridOpacityDensity(gridSample) * adsAmplitudeSq;
-        sCenter = gridSample.g;
-        phase = gridSample.b - phaseOffset;
-        colorRho = gridSample.r * adsAmplitudeSq;
-        colorS = 0.0;
-        if (IS_DUAL_CHANNEL) {
-          colorRho = gridSample.r;
-          colorS = gridSample.g;
-          rho = rho + gridSample.g;
-        }
+        // PERF (OPT-PERF-2): consolidated post-warp re-sample.
+        let _resampled = loadGridSampleStateSimple(pos, phaseOffset, adsAmplitudeSq, uniforms);
+        gridSample = _resampled.gridSample;
+        rho = _resampled.rho;
+        sCenter = _resampled.sCenter;
+        phase = _resampled.phase;
+        colorRho = _resampled.colorRho;
+        colorS = _resampled.colorS;
       }
     }
 
@@ -249,17 +287,14 @@ fn volumeRaymarchGrid(
       vacuumBubbleEmissionGain = vacuumBubble.emissionGain;
       vacuumBubbleOpacityScale = vacuumBubble.opacityScale;
       if (length(pos - beforeVacuumBubble) > 1e-6) {
-        gridSample = sampleDensityFromGrid(pos, uniforms);
-        rho = gridOpacityDensity(gridSample) * adsAmplitudeSq;
-        sCenter = gridSample.g;
-        phase = gridSample.b - phaseOffset;
-        colorRho = gridSample.r * adsAmplitudeSq;
-        colorS = 0.0;
-        if (IS_DUAL_CHANNEL) {
-          colorRho = gridSample.r;
-          colorS = gridSample.g;
-          rho = rho + gridSample.g;
-        }
+        // PERF (OPT-PERF-2): consolidated post-warp re-sample.
+        let _resampled = loadGridSampleStateSimple(pos, phaseOffset, adsAmplitudeSq, uniforms);
+        gridSample = _resampled.gridSample;
+        rho = _resampled.rho;
+        sCenter = _resampled.sCenter;
+        phase = _resampled.phase;
+        colorRho = _resampled.colorRho;
+        colorS = _resampled.colorS;
       }
     }
 
@@ -320,7 +355,9 @@ fn volumeRaymarchGrid(
         if (PROFILING_STRIP_GRADIENT) {
           gradient = vec3f(0.0, 1.0, 0.0);
         } else {
-          gradient = fetchGradient(pos, uniforms);
+          // PERF: reuse the cached gradient when an upstream spacetime effect
+          // already fetched it at this position.
+          gradient = ensureGridGradient(pos, uniforms, &gradCache);
         }
 
         let emissionRho = select(rho, colorRho, IS_DUAL_CHANNEL);

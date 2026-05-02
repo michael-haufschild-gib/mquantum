@@ -199,6 +199,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
 
   // True nodal-surface ray-hit mode: trace f=0 directly and composite as a crisp surface.
   if (
+    finalAlpha >= 0.01 &&
     FEATURE_NODAL &&
     schroedinger.nodalEnabled != 0u &&
     schroedinger.nodalStrength > 0.0 &&
@@ -394,6 +395,7 @@ ${bayerJitterSection}
 
   // True nodal-surface ray-hit mode: trace f=0 directly and composite as a crisp surface.
   if (
+    finalAlpha >= 0.01 &&
     FEATURE_NODAL &&
     schroedinger.nodalEnabled != 0u &&
     schroedinger.nodalStrength > 0.0 &&

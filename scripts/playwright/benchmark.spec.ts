@@ -293,13 +293,18 @@ test.describe('performance benchmark', () => {
       .filter((r) => r.mode === 'harmonicOscillator')
       .sort((a, b) => a.dim - b.dim)
 
-    // Need at least dim=3 and dim=11 to check scaling
+    // The benchmark suite above runs HO at dim=3, 7, 11. If either anchor
+    // dimension is missing, an upstream benchmark crashed silently — that
+    // is a real regression, not a reason to skip the scaling analysis.
     const dim3 = hoResults.find((r) => r.dim === 3)
     const dim11 = hoResults.find((r) => r.dim === 11)
 
     if (!dim3 || !dim11) {
-      test.skip(true, 'HO dim=3 and dim=11 results not available')
-      return
+      throw new Error(
+        `HO scaling analysis: missing anchor benchmark — dim3=${dim3 ? 'present' : 'missing'}, ` +
+          `dim11=${dim11 ? 'present' : 'missing'}. An upstream HO benchmark crashed; ` +
+          `inspect prior test failures rather than skipping the scaling check.`
+      )
     }
 
     // Scaling sanity: dim=11 should not be catastrophically slower
@@ -335,8 +340,11 @@ test.describe('performance benchmark', () => {
     const dim11 = hResults.find((r) => r.dim === 11)
 
     if (!dim3 || !dim11) {
-      test.skip(true, 'Hydrogen dim=3 and dim=11 results not available')
-      return
+      throw new Error(
+        `Hydrogen scaling analysis: missing anchor benchmark — dim3=${dim3 ? 'present' : 'missing'}, ` +
+          `dim11=${dim11 ? 'present' : 'missing'}. An upstream Hydrogen benchmark crashed; ` +
+          `inspect prior test failures rather than skipping the scaling check.`
+      )
     }
 
     const ratio = dim11.meanFrameMs / Math.max(dim3.meanFrameMs, 0.1)

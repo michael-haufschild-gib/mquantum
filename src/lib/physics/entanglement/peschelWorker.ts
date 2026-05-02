@@ -24,6 +24,7 @@
  * @module lib/physics/entanglement/peschelWorker
  */
 
+import { logger } from '@/lib/logger'
 import type { CosmologyPresetParams } from '@/lib/physics/cosmology/presets'
 import {
   computeCosmologicalEntropyTrajectory,
@@ -274,9 +275,13 @@ export function runPeschelCompute(req: PeschelWorkerRequest): PeschelWorkerRespo
         cosmology: cosmology.params,
         etaSweep: cosmology.etaSweep,
       })
-    } catch {
-      // Invalid subsystem length or lattice params — silently drop the
-      // trajectory; the main panel result still stands.
+    } catch (cause) {
+      // Invalid subsystem length or lattice params — drop the
+      // trajectory; the main panel result still stands. Log a dev-only
+      // warning so a trajectory that comes back empty is diagnosable
+      // by the developer without re-deriving the failure path. The
+      // logger.warn is stripped in production builds.
+      logger.warn('[peschelWorker] trajectory compute failed — returning trajectory=null', cause)
       trajectory = null
     }
   }
