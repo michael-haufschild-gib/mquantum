@@ -61,6 +61,7 @@ export class WebGPUResourcePool {
 
     // Create default samplers
     this.linearSampler = device.createSampler({
+      label: 'resource-pool-linear-sampler',
       magFilter: 'linear',
       minFilter: 'linear',
       mipmapFilter: 'linear',

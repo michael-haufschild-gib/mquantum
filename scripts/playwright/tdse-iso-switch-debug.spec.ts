@@ -10,6 +10,7 @@ import {
   captureAndSamplePixels,
   getFrameCount,
   gotoModeWithParams,
+  requireWebGPU,
   waitForFirstFrame,
   waitForFrameAdvance,
   waitForRendererSettled,
@@ -78,17 +79,17 @@ async function readDensityCenter(page: import('@playwright/test').Page) {
 }
 
 test.describe('TDSE Decoherence Mode Switch', () => {
-  test('iso → volumetric with decoherence kills rendering', async ({ page }) => {
-    // Start in ISOSURFACE mode
+  test('iso → volumetric with decoherence kills rendering', async ({ page }, testInfo) => {
+    // Hard-fail on missing WebGPU upfront — silent skip would let an AI agent
+    // claim "all tests passed" while the GPU path was never exercised.
     await gotoModeWithParams(page, 'tdseDynamics', 3, { pot: 'harmonicTrap', diag: '1', iso: '1' })
+    await requireWebGPU(page, testInfo)
     const rs = await waitForRendererSettled(page)
     if (rs === 'error') {
       const errorMsg = await page
         .locator('[data-testid="webgpu-container"]')
         .getAttribute('data-renderer-error')
-      const isGpuUnavailable = !errorMsg || /webgpu|adapter|gpu.*not.*support/i.test(errorMsg)
-      test.skip(isGpuUnavailable, 'No WebGPU')
-      throw new Error(`Renderer error (not GPU-unavailable): ${errorMsg}`)
+      throw new Error(`Renderer error after WebGPU was confirmed available: ${errorMsg}`)
     }
     await waitForFirstFrame(page)
     await waitForShaderCompilation(page)
@@ -129,17 +130,16 @@ test.describe('TDSE Decoherence Mode Switch', () => {
     ).toBeGreaterThan(Math.max(pxBefore * 0.1, 20))
   })
 
-  test('vol → iso with decoherence kills rendering', async ({ page }) => {
+  test('vol → iso with decoherence kills rendering', async ({ page }, testInfo) => {
     // Start in VOLUMETRIC mode
     await gotoModeWithParams(page, 'tdseDynamics', 3, { pot: 'harmonicTrap', diag: '1' })
+    await requireWebGPU(page, testInfo)
     const rs = await waitForRendererSettled(page)
     if (rs === 'error') {
       const errorMsg = await page
         .locator('[data-testid="webgpu-container"]')
         .getAttribute('data-renderer-error')
-      const isGpuUnavailable = !errorMsg || /webgpu|adapter|gpu.*not.*support/i.test(errorMsg)
-      test.skip(isGpuUnavailable, 'No WebGPU')
-      throw new Error(`Renderer error (not GPU-unavailable): ${errorMsg}`)
+      throw new Error(`Renderer error after WebGPU was confirmed available: ${errorMsg}`)
     }
     await waitForFirstFrame(page)
     await waitForShaderCompilation(page)

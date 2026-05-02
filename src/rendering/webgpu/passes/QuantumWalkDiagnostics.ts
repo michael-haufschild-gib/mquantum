@@ -69,12 +69,18 @@ export class QwDiagnostics {
     ])
     this.reducePipeline = device.createComputePipeline({
       label: 'qw-diag-reduce-pipeline',
-      layout: device.createPipelineLayout({ bindGroupLayouts: [reduceBGL] }),
+      layout: device.createPipelineLayout({
+        label: 'qw-diag-reduce-layout',
+        bindGroupLayouts: [reduceBGL],
+      }),
       compute: { module: reduceModule, entryPoint: 'main' },
     })
     this.finalizePipeline = device.createComputePipeline({
       label: 'qw-diag-finalize-pipeline',
-      layout: device.createPipelineLayout({ bindGroupLayouts: [finalizeBGL] }),
+      layout: device.createPipelineLayout({
+        label: 'qw-diag-finalize-layout',
+        bindGroupLayouts: [finalizeBGL],
+      }),
       compute: { module: finalizeModule, entryPoint: 'main' },
     })
     this.uniformBuffer = device.createBuffer({

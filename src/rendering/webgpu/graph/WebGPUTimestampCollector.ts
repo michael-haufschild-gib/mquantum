@@ -49,11 +49,13 @@ export class WebGPUTimestampCollector {
     })
 
     this.resolveBuffer = device.createBuffer({
+      label: 'timestamp-collector-resolve',
       size: queryCount * 8,
       usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
     })
 
     this.readBuffer = device.createBuffer({
+      label: 'timestamp-collector-readback',
       size: queryCount * 8,
       usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
     })

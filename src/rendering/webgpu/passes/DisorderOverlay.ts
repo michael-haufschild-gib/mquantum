@@ -154,6 +154,7 @@ export function maybeDispatchDisorder(
   device.queue.writeBuffer(state.uniformBuffer, 0, buf)
 
   state.bg = device.createBindGroup({
+    label: 'disorder-overlay-bg',
     layout: state.bgl,
     entries: [
       { binding: 0, resource: { buffer: state.uniformBuffer } },

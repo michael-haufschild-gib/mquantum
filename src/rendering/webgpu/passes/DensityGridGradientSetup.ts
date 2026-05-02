@@ -70,7 +70,10 @@ export async function createGradientPipeline(
 
   const pipeline = await device.createComputePipelineAsync({
     label: 'gradient-grid-pipeline',
-    layout: device.createPipelineLayout({ bindGroupLayouts: [gradientBGL] }),
+    layout: device.createPipelineLayout({
+      label: 'density-gradient-layout',
+      bindGroupLayouts: [gradientBGL],
+    }),
     compute: {
       module: gradientModule,
       entryPoint: 'main',

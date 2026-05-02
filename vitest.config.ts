@@ -160,12 +160,22 @@ export default defineConfig({
         'src/components/layout/TimelineControls/AnimationSystemPanel.tsx',
         'src/components/layout/TimelineControls/PauliAnimationDrawer.tsx',
         'src/components/layout/TimelineControls/WheelerDeWittAnimationDrawer.tsx',
-        // animation-wasm.ts: WASM module is always disabled in test mode
+        // animation-wasm.ts and per-phase split (lib/wasm/animation/*): the
+        // WASM module is always disabled in test mode
         // (`import.meta.env.MODE === 'test'`), so every branch inside the
-        // `if (wasmReady && wasmModule)` guards is unreachable from Vitest.
-        // The WASM kernels themselves are validated by Rust unit tests
-        // (`pnpm test:rust`) and the wired-up paths by Playwright.
+        // `if (ready && module)` guards is unreachable from Vitest. The
+        // WASM kernels themselves are validated by Rust unit tests
+        // (`pnpm test:rust`) and the wired-up paths by Playwright. The
+        // barrel re-export file has no logic.
         'src/lib/wasm/animation-wasm.ts',
+        'src/lib/wasm/animation/runtime.ts',
+        'src/lib/wasm/animation/operations.ts',
+        'src/lib/wasm/animation/matrixVector.ts',
+        'src/lib/wasm/animation/fft.ts',
+        'src/lib/wasm/animation/entanglement.ts',
+        'src/lib/wasm/animation/complexMatrix.ts',
+        'src/lib/wasm/animation/tdseDiagnostics.ts',
+        'src/lib/wasm/animation/collapse.ts',
         // Sweep coordinator wraps a Web Worker and reads from a Zustand
         // store. The pure sweep math lives in lib/physics/srmt and is
         // tested there; this file is the worker glue.

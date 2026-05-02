@@ -61,6 +61,9 @@ jobs:
       - name: Circular dependency check
         run: node scripts/check-circular-deps.js
 
+      - name: Unused exports ratchet
+        run: node scripts/check-unused-exports.js
+
   # E2E / Playwright tests are PERMANENTLY excluded from CI.
   # GitHub Actions runners lack GPU/WebGPU support — the dev server hangs
   # indefinitely on WebGPU initialization. No replacement gate is needed:

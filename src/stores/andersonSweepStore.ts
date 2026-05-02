@@ -15,9 +15,6 @@ import { linearStepValue, type SweepStatus } from './utils/sweepUtils'
 
 export type { SweepStatus } from './utils/sweepUtils'
 
-/** Number of energy bins for spectral density histogram. */
-export const ENERGY_BINS = 32
-
 /** Configuration for a disorder sweep. */
 export interface SweepConfig {
   /** Minimum disorder strength */

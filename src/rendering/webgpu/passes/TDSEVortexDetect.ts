@@ -158,7 +158,10 @@ export function initVortexDetect(
 
   state.reducePipeline = device.createComputePipeline({
     label: 'vortex-detect-reduce-pipeline',
-    layout: device.createPipelineLayout({ bindGroupLayouts: [reduceLayout] }),
+    layout: device.createPipelineLayout({
+      label: 'tdse-vortex-detect-reduce-layout',
+      bindGroupLayouts: [reduceLayout],
+    }),
     compute: { module: reduceModule, entryPoint: 'main' },
   })
 
@@ -191,7 +194,10 @@ export function initVortexDetect(
 
   state.finalizePipeline = device.createComputePipeline({
     label: 'vortex-detect-finalize-pipeline',
-    layout: device.createPipelineLayout({ bindGroupLayouts: [finalizeLayout] }),
+    layout: device.createPipelineLayout({
+      label: 'tdse-vortex-detect-finalize-layout',
+      bindGroupLayouts: [finalizeLayout],
+    }),
     compute: { module: finalizeModule, entryPoint: 'main' },
   })
 

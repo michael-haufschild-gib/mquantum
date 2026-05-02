@@ -90,16 +90,6 @@ export function useIsMobile(): boolean {
 }
 
 /**
- * Hook to check if the device is tablet (md to lg)
- * @returns True if device is tablet
- */
-export function useIsTablet(): boolean {
-  const isMd = useMediaQuery(BREAKPOINTS.md)
-  const isLg = useMediaQuery(BREAKPOINTS.lg)
-  return isMd && !isLg
-}
-
-/**
  * Hook to check if the device is desktop (lg and above)
  * @returns True if device is desktop
  */

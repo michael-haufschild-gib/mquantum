@@ -89,7 +89,10 @@ export class MeasurementPointCloudPass extends WebGPUBasePass {
 
     this.renderPipeline = device.createRenderPipeline({
       label: 'measurement-pc-pipeline',
-      layout: device.createPipelineLayout({ bindGroupLayouts: [bgl] }),
+      layout: device.createPipelineLayout({
+        label: 'measurement-pc-layout',
+        bindGroupLayouts: [bgl],
+      }),
       vertex: { module: vertModule, entryPoint: 'main' },
       fragment: {
         module: fragModule,
@@ -121,6 +124,7 @@ export class MeasurementPointCloudPass extends WebGPUBasePass {
     })
 
     this.bindGroup = device.createBindGroup({
+      label: 'measurement-pc-bg',
       layout: bgl,
       entries: [
         { binding: 0, resource: { buffer: this.uniformBuffer } },
