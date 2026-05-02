@@ -33,7 +33,7 @@ Every worker MUST:
 | `srmtSweep.worker.ts` | yes (`type: 'error'`) | yes | reference implementation |
 | `srmtDiagnostic.worker.ts` | yes (`type: 'error'`) | yes | per-clock fan-out |
 | `bec/incompressibleSpectrum.worker.ts` | yes (`type: 'error'`) | yes | |
-| `peschelWorker.ts` | no | yes | swallow-then-fallback pattern |
+| `peschelWorker.ts` | partial (`trajectoryError`) | yes | trajectory failure surfaced in-band; top-level `type: 'error'` still missing |
 | `coordinateEntanglement.worker.ts` | no | yes (`TdseBecStrategy.ts:467`) | exceptions propagate |
 | `freeScalar/kSpaceWorker.ts` | no | yes | `FreeScalarFieldKSpace.ts:251` |
 | `dirac/diracAlgebraWorker.ts` | no | yes (`diracAlgebra.ts:48`) | catch + log + retry |
@@ -79,13 +79,16 @@ stale results, but does not perform in-loop epoch cancellation.
 
 ## Known deviations / ratchet
 
-`peschelWorker`, `coordinateEntanglement.worker`, `kSpaceWorker`, and
+`coordinateEntanglement.worker`, `kSpaceWorker`, and
 `diracAlgebraWorker` rely on out-of-band `onerror` only. They are
 acceptable today because each consumer pairs the worker with a
 graceful-fallback path (clear the in-flight flag, log, accept "no
-result for this frame"). The migration task is to add `type: 'error'`
-responses so the consumer doesn't have to listen on two channels — see
-`docs/refactoring-backlog.md` for the queue.
+result for this frame"). `peschelWorker` now surfaces trajectory
+failures via a `trajectoryError` field in `PeschelWorkerResponse`, but
+still lacks a top-level `{ type: 'error' }` variant for compute
+failures. The migration task is to add `type: 'error'` responses to
+all four workers so the consumer doesn't have to listen on two
+channels — see `docs/refactoring-backlog.md` for the queue.
 
 ## Tests
 

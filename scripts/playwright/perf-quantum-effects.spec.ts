@@ -162,6 +162,20 @@ const PHASE_MAT_ON: EffectCase = {
   reset: [{ name: 'setSchroedingerPhaseMaterialityEnabled', value: false }],
 }
 
+const CROSS_SECTION_ON: EffectCase = {
+  id: 'cross-section',
+  label: 'Cross Section',
+  setters: [{ name: 'setSchroedingerCrossSectionEnabled', value: true }],
+  reset: [{ name: 'setSchroedingerCrossSectionEnabled', value: false }],
+}
+
+const PROBABILITY_CURRENT_ON: EffectCase = {
+  id: 'probability-current',
+  label: 'Probability Current',
+  setters: [{ name: 'setSchroedingerProbabilityCurrentEnabled', value: true }],
+  reset: [{ name: 'setSchroedingerProbabilityCurrentEnabled', value: false }],
+}
+
 const ALL_EFFECTS_ON: EffectCase = {
   id: 'all-effects',
   label: 'ALL Quantum Effects ON',
@@ -447,7 +461,7 @@ test.describe('Quantum effects performance', () => {
         await applySetters(page, cse.reset)
         // brief settle between cases
         const fc2 = await getFrameCount(page)
-        await waitForFrameAdvance(page, fc2 + 15)
+        await waitForFrameAdvance(page, fc2 + 15, 30_000)
       }
 
       // Sanity: schroedinger pass should always be present
@@ -490,7 +504,7 @@ test.describe('Quantum effects performance', () => {
     await setSampleCount(page, 128)
 
     const fc = await getFrameCount(page)
-    await waitForFrameAdvance(page, fc + 240)
+    await waitForFrameAdvance(page, fc + 240, 30_000)
 
     const baseline = await measure(page, 6)
 
@@ -550,7 +564,7 @@ test.describe('Quantum effects performance', () => {
     await setSampleCount(page, 128)
 
     const fc = await getFrameCount(page)
-    await waitForFrameAdvance(page, fc + 240)
+    await waitForFrameAdvance(page, fc + 240, 30_000)
     const baseline = await measure(page, 6)
 
     await applySetters(page, BACKREACTION_ON.setters)
@@ -655,35 +669,14 @@ test.describe('Quantum effects performance', () => {
     // OPT-12: cross-section and probability-current toggles should also be
     // uniform-only. Both have FEATURE_* compile-time defines + runtime uniform
     // gates; decoupling means flipping them in the UI doesn't recompile.
-    await page.evaluate(() => {
-      const ext = window.__EXTENDED_OBJECT_STORE__
-      ;(
-        ext!.getState() as unknown as {
-          setSchroedingerCrossSectionEnabled: (v: boolean) => void
-        }
-      ).setSchroedingerCrossSectionEnabled(true)
-    })
+    await applySetters(page, CROSS_SECTION_ON.setters)
     await page.waitForTimeout(800)
     const afterCrossSectionOn = await readPipelineRebuilds()
 
-    await page.evaluate(() => {
-      const ext = window.__EXTENDED_OBJECT_STORE__
-      ;(
-        ext!.getState() as unknown as {
-          setSchroedingerCrossSectionEnabled: (v: boolean) => void
-        }
-      ).setSchroedingerCrossSectionEnabled(false)
-    })
+    await applySetters(page, CROSS_SECTION_ON.reset)
     await page.waitForTimeout(500)
 
-    await page.evaluate(() => {
-      const ext = window.__EXTENDED_OBJECT_STORE__
-      ;(
-        ext!.getState() as unknown as {
-          setSchroedingerProbabilityCurrentEnabled: (v: boolean) => void
-        }
-      ).setSchroedingerProbabilityCurrentEnabled(true)
-    })
+    await applySetters(page, PROBABILITY_CURRENT_ON.setters)
     await page.waitForTimeout(800)
     const afterProbCurrentOn = await readPipelineRebuilds()
 

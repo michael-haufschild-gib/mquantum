@@ -79,7 +79,7 @@ export interface LqcBounceParams {
   /** Critical density `ρ_c > 0` in sim units. */
   rhoCritical: number
   /** Equation-of-state parameter `w ∈ [0, 1]`. Default 1 = stiff fluid. */
-  equationOfState: number
+  equationOfState?: number
   /** Starting `ρ/ρ_c` ratio at the pre-bounce edge of the window, `(0, 1)`. */
   initialRhoRatio: number
   /**
@@ -202,7 +202,7 @@ export function lqcHubbleMagnitude(spacetimeDim: number, rhoCritical: number, rh
  * @throws {RangeError} On any invalid input.
  */
 export function validateLqcBounceParams(params: LqcBounceParams): void {
-  const { spacetimeDim, rhoCritical, equationOfState, initialRhoRatio } = params
+  const { spacetimeDim, rhoCritical, equationOfState = 1, initialRhoRatio } = params
   if (!Number.isFinite(spacetimeDim) || spacetimeDim < 3) {
     throw new RangeError(
       `LqcBounceParams.spacetimeDim must be a finite number >= 3, got ${spacetimeDim}`
@@ -531,7 +531,7 @@ export function computeLqcBounceBackground(params: LqcBounceParams): LqcBounceTa
   const {
     spacetimeDim,
     rhoCritical,
-    equationOfState,
+    equationOfState = 1,
     stepSize = 5e-4,
     etaBounceAnchor = 10,
   } = params
@@ -541,10 +541,14 @@ export function computeLqcBounceBackground(params: LqcBounceParams): LqcBounceTa
 
   const tHalfWidth = resolveLqcTHalfWidth(params)
 
+  const MAX_STEPS_PER_BRANCH = 1_000_000
+  const minStepSize = tHalfWidth / MAX_STEPS_PER_BRANCH
+  const effectiveStepSize = Math.max(stepSize, minStepSize)
+
   // How many RK4 steps per branch. Integer round-down so h stays exactly
-  // equal to stepSize (no end-point bias) and the branch terminates at or
-  // just inside the window edge.
-  const nSteps = Math.max(1, Math.floor(tHalfWidth / stepSize))
+  // equal to effectiveStepSize (no end-point bias) and the branch terminates
+  // at or just inside the window edge.
+  const nSteps = Math.max(1, Math.floor(tHalfWidth / effectiveStepSize))
 
   // Contracting branch: starts at ρ = ρ_c (bounce), integrates BACKWARD in
   // cosmic time. Need initial ρ for the backward branch — the physics
@@ -570,25 +574,25 @@ export function computeLqcBounceBackground(params: LqcBounceParams): LqcBounceTa
   // `c = (n−1)(1+w)²ρ_c² / (2(n−2))`, which matches `γ·ρ_c` in the
   // stiff-fluid (`w = 1`) case and drops to zero smoothly as `w → −1`.
   // `a(τ) ≈ a_B` to leading order; the quadratic correction is subdominant.
-  // We seed at `τ = ±stepSize` and RK4 takes over for the remaining
+  // We seed at `τ = ±effectiveStepSize` and RK4 takes over for the remaining
   // `nSteps - 1` steps on each branch.
   const nm1_seed = spacetimeDim - 1
   const nm2_seed = spacetimeDim - 2
   const wPlus1 = 1 + equationOfState
   const cCoef = (nm1_seed * wPlus1 * wPlus1 * rhoCritical * rhoCritical) / (2 * nm2_seed)
-  const tauSeed = stepSize
+  const tauSeed = effectiveStepSize
   const rhoSeed = Math.max(0, rhoCritical - cCoef * tauSeed * tauSeed)
   // a(τ) from continuity ρ·a^((n−1)(1+w)) = const.
   const aSeed =
     rhoSeed > 0 ? aBounce * Math.pow(rhoCritical / rhoSeed, 1 / (nm1_seed * wPlus1)) : aBounce
 
-  // Contracting branch — seed at t = -stepSize with (aSeed, rhoSeed),
+  // Contracting branch — seed at t = -effectiveStepSize with (aSeed, rhoSeed),
   // run the remaining `nSteps − 1` steps backward in cosmic time.
   const preInterior = integrateBranch(
     tBounce - tauSeed,
     aSeed,
     rhoSeed,
-    -stepSize,
+    -effectiveStepSize,
     nSteps - 1,
     spacetimeDim,
     rhoCritical,
@@ -611,13 +615,13 @@ export function computeLqcBounceBackground(params: LqcBounceParams): LqcBounceTa
     pre.rhos[i + 1] = preInterior.rhos[i]!
   }
 
-  // Post-bounce expanding branch — seed at t = +stepSize with (aSeed, rhoSeed),
+  // Post-bounce expanding branch — seed at t = +effectiveStepSize with (aSeed, rhoSeed),
   // run `nSteps − 1` steps forward.
   const postInterior = integrateBranch(
     tBounce + tauSeed,
     aSeed,
     rhoSeed,
-    stepSize,
+    effectiveStepSize,
     nSteps - 1,
     spacetimeDim,
     rhoCritical,

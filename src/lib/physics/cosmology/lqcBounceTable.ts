@@ -158,7 +158,7 @@ export function getOrComputeLqcBounceTable(params: LqcBounceParams): LqcBounceTa
   const key: LqcCacheKey = {
     spacetimeDim: params.spacetimeDim,
     rhoCritical: params.rhoCritical,
-    equationOfState: params.equationOfState,
+    equationOfState: params.equationOfState ?? 1,
     initialRhoRatio: params.initialRhoRatio,
     tHalfWidth: resolveLqcTHalfWidth(params),
     stepSize: params.stepSize ?? 5e-4,

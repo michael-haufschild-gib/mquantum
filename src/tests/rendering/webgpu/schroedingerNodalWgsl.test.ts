@@ -109,6 +109,7 @@ describe('Schroedinger nodal WGSL composition', () => {
     const stubFn =
       'fn nodalBandMask(value: f32, gradient: vec3f, eps: f32) -> f32 {\n  return 0.0;\n}'
     expect(wgsl).toContain(stubFn)
+    expect(wgsl).toContain('fn computeNodalFromAnalyticalPsi(')
     expect(wgsl).toContain('fn computeGridPsiAbsNodalField(')
   })
 })
