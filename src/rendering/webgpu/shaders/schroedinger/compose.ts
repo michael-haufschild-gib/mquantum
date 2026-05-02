@@ -37,6 +37,7 @@ import {
   buildShaderDefinesAndFeatures,
   canUseGridOnly,
   derivedShaderFlags,
+  removeDefaultNodalSpecializationOverrides,
   type SchroedingerWGSLShaderConfig,
   selectMainBlock,
 } from './composeConfig'
@@ -127,6 +128,10 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     quantumMode,
     isosurface,
     nodal,
+    nodalSpecializationEnabled: config.nodalSpecializationEnabled,
+    nodalDefinition: config.nodalDefinition,
+    nodalRenderMode: config.nodalRenderMode,
+    nodalFamilyFilter: config.nodalFamilyFilter,
     phaseMateriality,
     interference,
     uncertaintyBoundary,
@@ -268,7 +273,7 @@ struct VertexOutput {
     overrides.map((o) => ({ target: o.target, replacement: o.replacement }))
   )
 
-  return { wgsl, modules, features }
+  return { wgsl: removeDefaultNodalSpecializationOverrides(wgsl), modules, features }
 }
 
 // Re-export vertex shaders from dedicated module

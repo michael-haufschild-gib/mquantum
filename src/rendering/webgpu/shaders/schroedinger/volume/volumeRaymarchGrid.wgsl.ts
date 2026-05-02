@@ -398,7 +398,7 @@ fn volumeRaymarchGrid(
       FEATURE_NODAL &&
       uniforms.nodalEnabled != 0u &&
       uniforms.nodalStrength > 0.0 &&
-      uniforms.nodalRenderMode == NODAL_RENDER_MODE_BAND
+      activeNodalRenderMode(uniforms) == NODAL_RENDER_MODE_BAND
     ) {
       var nodal: NodalSample;
       if (canUseGridPsiAbsNodal(uniforms)) {

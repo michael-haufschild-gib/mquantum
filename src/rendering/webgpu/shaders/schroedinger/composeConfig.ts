@@ -11,6 +11,13 @@
  * @module rendering/webgpu/shaders/schroedinger/composeConfig
  */
 
+import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
+
+import {
+  NODAL_DEFINITION_MAP,
+  NODAL_FAMILY_MAP,
+  NODAL_RENDER_MODE_MAP,
+} from '../../renderers/schrodingerRendererTypes'
 import type { WGSLShaderConfig } from '../shared/compose-helpers'
 import {
   generateMainBlockIsosurface,
@@ -57,6 +64,14 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   useRobustEigenInterpolation?: boolean
   /** Compile-time specialization for uncertainty boundary emphasis. */
   uncertaintyBoundary?: boolean
+  /** Compile-time gate for nodal enum specialization. */
+  nodalSpecializationEnabled?: boolean
+  /** Compile-time nodal scalar definition specialization. */
+  nodalDefinition?: SchroedingerConfig['nodalDefinition']
+  /** Compile-time nodal render-mode specialization. */
+  nodalRenderMode?: SchroedingerConfig['nodalRenderMode']
+  /** Compile-time nodal family-filter specialization. */
+  nodalFamilyFilter?: SchroedingerConfig['nodalFamilyFilter']
   /** Wigner phase-space mode — forces 2D pipeline with phase-space evaluation. */
   isWigner?: boolean
   /** Use pre-computed Wigner cache texture instead of inline evaluation. */
@@ -226,6 +241,10 @@ export function buildShaderDefinesAndFeatures(flags: {
   quantumMode: string
   isosurface: boolean
   nodal: boolean
+  nodalSpecializationEnabled?: boolean
+  nodalDefinition?: SchroedingerConfig['nodalDefinition']
+  nodalRenderMode?: SchroedingerConfig['nodalRenderMode']
+  nodalFamilyFilter?: SchroedingerConfig['nodalFamilyFilter']
   phaseMateriality: boolean
   interference: boolean
   uncertaintyBoundary: boolean
@@ -318,6 +337,24 @@ export function buildShaderDefinesAndFeatures(flags: {
   if (!flags.is2D) features.push('Beer-Lambert')
 
   defines.push(`const FEATURE_NODAL: bool = ${flags.nodal};`)
+  defines.push(
+    `const NODAL_SPECIALIZATION_ENABLED: bool = ${flags.nodalSpecializationEnabled ?? false};`
+  )
+  defines.push(
+    `const NODAL_SPECIALIZED_DEFINITION: i32 = ${
+      NODAL_DEFINITION_MAP[flags.nodalDefinition ?? 'psiAbs'] ?? NODAL_DEFINITION_MAP.psiAbs
+    };`
+  )
+  defines.push(
+    `const NODAL_SPECIALIZED_RENDER_MODE: i32 = ${
+      NODAL_RENDER_MODE_MAP[flags.nodalRenderMode ?? 'band'] ?? NODAL_RENDER_MODE_MAP.band
+    };`
+  )
+  defines.push(
+    `const NODAL_SPECIALIZED_FAMILY_FILTER: i32 = ${
+      NODAL_FAMILY_MAP[flags.nodalFamilyFilter ?? 'all'] ?? NODAL_FAMILY_MAP.all
+    };`
+  )
   defines.push(`const FEATURE_PHASE_MATERIALITY: bool = ${flags.phaseMateriality};`)
   defines.push(`const FEATURE_INTERFERENCE: bool = ${flags.interference};`)
   defines.push(`const FEATURE_UNCERTAINTY_BOUNDARY: bool = ${flags.uncertaintyBoundary};`)
@@ -364,6 +401,15 @@ export function buildShaderDefinesAndFeatures(flags: {
   if (flags.sampleSpaceRotation) features.push('Sample-Space Rotation')
 
   return { defines, features }
+}
+
+/** Remove fallback nodal override declarations when compose-level defines provide values. */
+export function removeDefaultNodalSpecializationOverrides(wgsl: string): string {
+  return wgsl
+    .replace(/\noverride NODAL_SPECIALIZATION_ENABLED: bool = false;/g, '')
+    .replace(/\noverride NODAL_SPECIALIZED_DEFINITION: i32 = 0;/g, '')
+    .replace(/\noverride NODAL_SPECIALIZED_RENDER_MODE: i32 = 0;/g, '')
+    .replace(/\noverride NODAL_SPECIALIZED_FAMILY_FILTER: i32 = 0;/g, '')
 }
 
 /**

@@ -68,7 +68,7 @@ fn volumeRaymarch(
     FEATURE_NODAL &&
     uniforms.nodalEnabled != 0u &&
     uniforms.nodalStrength > 0.0 &&
-    uniforms.nodalRenderMode == NODAL_RENDER_MODE_BAND;
+    activeNodalRenderMode(uniforms) == NODAL_RENDER_MODE_BAND;
   let probCurrentEnabled =
     FEATURE_PROBABILITY_CURRENT &&
     uniforms.probabilityCurrentEnabled != 0u &&
@@ -392,14 +392,10 @@ fn volumeRaymarch(
 
     let adaptiveStep = computeAdaptiveStep(sCenter, stepLen, remaining);
 
-    // PERF: When nodal band mode is active, use the combined function that also computes
-    // the density gradient from the same tetrahedral samples. This eliminates 4 redundant
-    // psi evaluations when the gradient would otherwise be computed separately.
-    // PERF: Skip nodal computation when density is very low (sCenter < -10 → rho < 4.5e-5).
-    // The envelope weight drives nodal intensity to zero at low amplitude, so the 4 tetrahedral
-    // psi evaluations would produce an invisible result. Saves ~44% ALU per low-density step.
-    var nodalGradient = vec3f(0.0);
-    var hasNodalGradient = false;
+    // Two-stage nodal band gate:
+    // 1. density/log-density gate rejects invisible low-amplitude samples.
+    // 2. nodal-only sample gates color/composite work by faded band intensity.
+    // Density gradient stays lazy and is computed later only if emission survives.
     if (nodalBandEnabled && sCenter > -10.0) {
       // OPT-14: in analytical-cached mode (HO 3D-11D, the dominant hot path)
       // the analytical sample at samplePos already carries Re/Im psi-gradients,
@@ -426,11 +422,11 @@ fn volumeRaymarch(
           analyticalAtSamplePos.gradPsiIm,
           uniforms
         );
-        let fadedIntensity = nodalSample.intensity * nodalSample.envelopeWeight;
-        if (fadedIntensity > 1e-4) {
+        let nodalBandIntensity = nodalSample.intensity * nodalSample.envelopeWeight;
+        if (nodalBandIntensity > 1e-4) {
           let nodalColor = selectPhysicalNodalColor(uniforms, nodalSample.colorMode, nodalSample.signValue);
           compositeNodalBand(
-            fadedIntensity, uniforms.nodalStrength, nodalColor,
+            nodalBandIntensity, uniforms.nodalStrength, nodalColor,
             min(adaptiveStep, stepLen * 1.5), ambientLight,
             &transmittance, &accColor
           );
@@ -438,19 +434,12 @@ fn volumeRaymarch(
         // gradCache is populated by the lazy analytical nodal sample above;
         // emission lighting reuses it.
       } else {
-        let combined = computePhysicalNodalFieldWithGradient(samplePos, animTime, uniforms);
-        nodalGradient = combined.gradient;
-        hasNodalGradient = true;
-        // PERF: share with the per-step cache so the emission lighting path can
-        // skip a second gradient call when nodal already produced one.
-        gradCache.gradient = combined.gradient;
-        gradCache.pos = samplePos;
-        gradCache.valid = true;
-        let fadedIntensity = combined.nodal.intensity * combined.nodal.envelopeWeight;
-        if (fadedIntensity > 1e-4) {
-          let nodalColor = selectPhysicalNodalColor(uniforms, combined.nodal.colorMode, combined.nodal.signValue);
+        let nodalSample = computePhysicalNodalField(samplePos, animTime, uniforms);
+        let nodalBandIntensity = nodalSample.intensity * nodalSample.envelopeWeight;
+        if (nodalBandIntensity > 1e-4) {
+          let nodalColor = selectPhysicalNodalColor(uniforms, nodalSample.colorMode, nodalSample.signValue);
           compositeNodalBand(
-            fadedIntensity, uniforms.nodalStrength, nodalColor,
+            nodalBandIntensity, uniforms.nodalStrength, nodalColor,
             min(adaptiveStep, stepLen * 1.5), ambientLight,
             &transmittance, &accColor
           );
@@ -495,17 +484,10 @@ fn volumeRaymarch(
         primaryHitT = t;
       }
 
-      // Compute gradient for emission lighting.
-      // PERF: prefer nodal's gradient (already computed from shared tetrahedral
-      // samples), then the per-step cache (populated by any active spacetime
-      // effect at the same position). Fall back to fresh evaluation only when
-      // no upstream consumer needed a gradient.
-      var gradient: vec3f;
-      if (hasNodalGradient) {
-        gradient = nodalGradient;
-      } else {
-        gradient = ensureGradient(samplePos, animTime, uniforms, &gradCache);
-      }
+      // Compute gradient for emission lighting. The cache may already be populated
+      // by analytical density sampling or spacetime effects; otherwise this remains
+      // lazy until alpha survives.
+      let gradient = ensureGradient(samplePos, animTime, uniforms, &gradCache);
 
       // Compute emission with lighting (pass pre-computed log-density to avoid redundant log())
       let emission = computeEmissionLit(rho, sCenter, phase, samplePos, gradient, viewDir, uniforms)

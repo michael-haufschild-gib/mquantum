@@ -245,6 +245,12 @@ export interface SchrodingerRendererConfig {
   temporal?: boolean
   /** Compile-time specialization flag for nodal calculations. */
   nodalEnabled?: boolean
+  /** Compile-time nodal definition specialization. */
+  nodalDefinition?: SchroedingerConfig['nodalDefinition']
+  /** Compile-time nodal render-mode specialization. */
+  nodalRenderMode?: SchroedingerConfig['nodalRenderMode']
+  /** Compile-time nodal family-filter specialization. */
+  nodalFamilyFilter?: SchroedingerConfig['nodalFamilyFilter']
   /** Compile-time specialization flag for phase materiality. */
   phaseMaterialityEnabled?: boolean
   /** Compile-time specialization flag for interference. */

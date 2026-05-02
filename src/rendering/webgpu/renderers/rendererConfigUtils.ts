@@ -170,6 +170,7 @@ export function buildShaderConfig(
   const useRobustEigenInterpolation = computeMode
     ? false
     : !(rendererConfig.fastEigenInterpolationEnabled ?? true)
+  const nodal = computeMode ? false : (rendererConfig.nodalEnabled ?? true)
 
   const shaderQuantumMode: QuantumModeForShader = computeMode
     ? 'harmonicOscillator'
@@ -180,7 +181,11 @@ export function buildShaderConfig(
     isosurface: rendererConfig.isosurface,
     quantumMode: shaderQuantumMode,
     termCount: computeMode ? 1 : rendererConfig.termCount,
-    nodal: computeMode ? false : (rendererConfig.nodalEnabled ?? true),
+    nodal,
+    nodalSpecializationEnabled: nodal,
+    nodalDefinition: nodal ? (rendererConfig.nodalDefinition ?? 'psiAbs') : 'psiAbs',
+    nodalRenderMode: nodal ? (rendererConfig.nodalRenderMode ?? 'band') : 'band',
+    nodalFamilyFilter: nodal ? (rendererConfig.nodalFamilyFilter ?? 'all') : 'all',
     colorAlgorithm: rendererConfig.colorAlgorithm,
     temporalAccumulation: computeMode ? false : rendererConfig.temporal,
     phaseMateriality: computeMode ? false : (rendererConfig.phaseMaterialityEnabled ?? true),
@@ -274,6 +279,10 @@ export function computePipelineCacheKey(
     config.quantumMode ?? 'harmonicOscillator',
     config.termCount ?? -1,
     config.nodal ? 1 : 0,
+    config.nodalSpecializationEnabled ? 1 : 0,
+    config.nodalDefinition ?? 'psiAbs',
+    config.nodalRenderMode ?? 'band',
+    config.nodalFamilyFilter ?? 'all',
     config.phaseMateriality ? 1 : 0,
     config.interference ? 1 : 0,
     config.uncertaintyBoundary ? 1 : 0,

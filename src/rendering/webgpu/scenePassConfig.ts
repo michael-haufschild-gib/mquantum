@@ -9,6 +9,7 @@
 
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
 import type { FreeScalarInitialCondition } from '@/lib/geometry/extended/freeScalar'
+import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { QUANTUM_TYPE_REGISTRY } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
 import {
@@ -51,6 +52,9 @@ export interface PassConfig {
   quantumMode: SchroedingerQuantumMode
   termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   nodalEnabled: boolean
+  nodalDefinition?: SchroedingerConfig['nodalDefinition']
+  nodalRenderMode?: SchroedingerConfig['nodalRenderMode']
+  nodalFamilyFilter?: SchroedingerConfig['nodalFamilyFilter']
   phaseMaterialityEnabled: boolean
   interferenceEnabled: boolean
   uncertaintyBoundaryEnabled: boolean
@@ -92,6 +96,9 @@ export interface SchrodingerPassConfig {
   colorAlgorithm: PaletteColorAlgorithm
   isosurface: boolean
   nodalEnabled: boolean
+  nodalDefinition: SchroedingerConfig['nodalDefinition']
+  nodalRenderMode: SchroedingerConfig['nodalRenderMode']
+  nodalFamilyFilter: SchroedingerConfig['nodalFamilyFilter']
   phaseMaterialityEnabled: boolean
   interferenceEnabled: boolean
   uncertaintyBoundaryEnabled: boolean
@@ -323,6 +330,9 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
     // quantum effect is active, compile sibling runtime-gated blocks too so
     // effect-to-effect toggles avoid repeated swaps within the full shader.
     nodalEnabled: gate(config.nodalEnabled || compileEffectBundle, disableQuantumEffect),
+    nodalDefinition: config.nodalDefinition ?? 'psiAbs',
+    nodalRenderMode: config.nodalRenderMode ?? 'band',
+    nodalFamilyFilter: config.nodalFamilyFilter ?? 'all',
     phaseMaterialityEnabled: gate(
       config.phaseMaterialityEnabled || compileEffectBundle,
       disableQuantumEffect
