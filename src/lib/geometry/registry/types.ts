@@ -38,6 +38,31 @@ export type QuantumTypeKey = SchroedingerQuantumMode | 'pauliSpinor'
 export type QuantumTypeCategory = 'analytic' | 'compute'
 
 /**
+ * Runtime data path used by rendering and store orchestration.
+ * This is narrower than category: several compute modes still differ in
+ * texture/channel semantics and strategy ownership.
+ */
+export type QuantumTypeDataPath = 'analyticWavefunction' | 'densityGrid' | 'spinorGrid'
+
+/**
+ * Renderer strategy family for a quantum type. Values are intentionally
+ * framework-level names, not class names, so the registry stays decoupled
+ * from WebGPU implementation files.
+ */
+export type QuantumTypeStrategyKind =
+  | 'analytic'
+  | 'freeScalarField'
+  | 'tdseBec'
+  | 'dirac'
+  | 'quantumWalk'
+  | 'wheelerDeWitt'
+  | 'antiDeSitter'
+  | 'pauli'
+
+/** Analytic shader family used by HO / hydrogen-specific gates. */
+export type QuantumTypeAnalyticFamily = 'harmonicOscillator' | 'hydrogen'
+
+/**
  * Category classification for object types
  */
 export type ObjectCategory = 'quantum'
@@ -307,6 +332,34 @@ export interface QuantumTypeInternal {
 }
 
 /**
+ * Runtime metadata shared by renderer, persistence, and store orchestration.
+ *
+ * `shaderUniformId` and `stateSaveId` are deliberately separate namespaces:
+ * shader IDs are WGSL branch constants, while state IDs are append-only binary
+ * serialization IDs. Never infer one from the other.
+ */
+export interface QuantumTypeRuntimeMetadata {
+  /** Data path used by the renderer. */
+  dataPath: QuantumTypeDataPath
+  /** Strategy family responsible for mode-specific setup/frame behavior. */
+  strategy: QuantumTypeStrategyKind
+  /** Integer written to WGSL `uniforms.quantumMode` for shader runtime guards. */
+  shaderUniformId?: number
+  /** Append-only integer stored in `.mqstate` headers. */
+  stateSaveId?: number
+  /** True for modes whose shared uniform packing follows the legacy grid path. */
+  uniformComputeGrid?: boolean
+  /** Fallback color algorithm when the current selection is invalid. */
+  defaultColorAlgorithm: string
+  /** Analytic branch family for HO/hydrogen shader composition. */
+  analyticFamily?: QuantumTypeAnalyticFamily
+  /** True when sample space should rotate with camera/sample transform. */
+  sampleSpaceRotation?: boolean
+  /** True when the mode provides a precomputed normal texture. */
+  hasPrecomputedNormals?: boolean
+}
+
+/**
  * A single entry in the flat quantum type registry.
  *
  * Every user-visible type — Harmonic Oscillator, Hydrogen, TDSE, BEC,
@@ -333,6 +386,8 @@ export interface QuantumTypeEntry {
   ui: UiComponentMapping
   /** Bridge to internal ObjectType + QuantumMode plumbing */
   internal: QuantumTypeInternal
+  /** Runtime metadata shared by renderer, persistence, and stores */
+  runtime: QuantumTypeRuntimeMetadata
 }
 
 /**

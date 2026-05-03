@@ -14,6 +14,7 @@ import { create } from 'zustand'
 
 import type { SaveableQuantumMode } from '@/lib/export/simulationState'
 import type { PauliConfig } from '@/lib/geometry/extended/types'
+import { getQuantumTypeConfigSubKey } from '@/lib/geometry/registry'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
@@ -177,14 +178,7 @@ export const useSimulationStateStore = create<SimulationStateState>((set, get) =
             // and the loaded wavefunction is silently dropped. Build a new
             // config object with the reset flag forced into the correct
             // sub-config for each compute mode.
-            const MODE_TO_SUBCONFIG_KEY: Record<string, string> = {
-              freeScalarField: 'freeScalar',
-              tdseDynamics: 'tdse',
-              becDynamics: 'bec',
-              diracEquation: 'dirac',
-              quantumWalk: 'quantumWalk',
-            }
-            const subKey = MODE_TO_SUBCONFIG_KEY[result.quantumMode]
+            const subKey = getQuantumTypeConfigSubKey(result.quantumMode)
             const subConfig =
               subKey && typeof restConfig[subKey] === 'object' && restConfig[subKey] !== null
                 ? { ...(restConfig[subKey] as Record<string, unknown>), needsReset: true }

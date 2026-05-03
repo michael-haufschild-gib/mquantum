@@ -33,8 +33,11 @@ describe('EditorRightPanel tab layout', () => {
     const analysisTab = screen.getByRole('tab', { name: /analysis/i })
     await user.click(analysisTab)
 
+    // Both sections lazy-mount after the tab click. Use findByTestId for
+    // both — under worker-pool contention the second section may render
+    // slightly after the first, causing a sync getByTestId here to flake.
     expect(await screen.findByTestId('analysis-section')).toBeInTheDocument()
-    expect(screen.getByTestId('quantum-effects-section')).toBeInTheDocument()
+    expect(await screen.findByTestId('quantum-effects-section')).toBeInTheDocument()
   })
 
   it('does not render isosurface mode toggle in the right panel surface section', () => {

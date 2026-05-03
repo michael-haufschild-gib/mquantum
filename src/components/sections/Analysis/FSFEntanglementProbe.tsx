@@ -35,6 +35,7 @@ import type { CosmologicalEntropyTrajectory } from '@/lib/physics/entanglement/p
 import type {
   PeschelWorkerRequest,
   PeschelWorkerResponse,
+  PeschelWorkerResultMessage,
 } from '@/lib/physics/entanglement/peschelWorker'
 import {
   computeFsfCosmologySnapshot,
@@ -166,7 +167,11 @@ export const FSFEntanglementProbe: React.FC = React.memo(() => {
   // off.
   const workerRef = useRef<Worker | null>(null)
   const epochRef = useRef(0)
-  const [result, setResult] = useState<PeschelWorkerResponse | null>(null)
+  // The component only consumes the success branch; error responses are
+  // logged via the consumer below and do not feed any chart, so we narrow
+  // the result state to PeschelWorkerResultMessage and treat the error
+  // branch as a log-only signal that bumps `pending` back to false.
+  const [result, setResult] = useState<PeschelWorkerResultMessage | null>(null)
   const [pending, setPending] = useState(false)
 
   useEffect(() => {
@@ -199,6 +204,12 @@ export const FSFEntanglementProbe: React.FC = React.memo(() => {
       // request — the UI has moved on and a stale result would cause a
       // frame of wrong-parameter rendering.
       if (response.epoch !== epochRef.current) return
+      if (response.type === 'error') {
+        logger.warn('[FSFEntanglementProbe] worker compute failed:', response.message)
+        setResult(null)
+        setPending(false)
+        return
+      }
       setResult(response)
       setPending(false)
     }

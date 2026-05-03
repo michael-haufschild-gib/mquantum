@@ -4,6 +4,8 @@
  * @module rendering/webgpu/renderers/strategies/createStrategy
  */
 
+import { getQuantumTypeStrategyKind } from '@/lib/geometry/registry'
+
 import type { SchrodingerRendererConfig } from '../schrodingerRendererTypes'
 import { AnalyticModeStrategy } from './AnalyticModeStrategy'
 import { AntiDeSitterStrategy } from './AntiDeSitterStrategy'
@@ -27,13 +29,16 @@ export function createModeStrategy(config: SchrodingerRendererConfig): QuantumMo
     return new PauliStrategy()
   }
 
-  switch (config.quantumMode) {
+  const strategyKind = config.quantumMode
+    ? getQuantumTypeStrategyKind(config.quantumMode)
+    : undefined
+
+  switch (strategyKind) {
     case 'freeScalarField':
       return new FreeScalarFieldStrategy()
-    case 'tdseDynamics':
-    case 'becDynamics':
+    case 'tdseBec':
       return new TdseBecStrategy()
-    case 'diracEquation':
+    case 'dirac':
       return new DiracStrategy()
     case 'quantumWalk':
       return new QuantumWalkStrategy()
@@ -41,9 +46,7 @@ export function createModeStrategy(config: SchrodingerRendererConfig): QuantumMo
       return new WheelerDeWittStrategy()
     case 'antiDeSitter':
       return new AntiDeSitterStrategy()
-    case 'harmonicOscillator':
-    case 'hydrogenND':
-    case 'hydrogenNDCoupled':
+    case 'analytic':
     default:
       return new AnalyticModeStrategy()
   }

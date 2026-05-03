@@ -16,6 +16,7 @@ import {
   type QuantumPreset,
 } from '@/lib/geometry/extended/schroedinger/presets'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
+import { isUniformComputeGridQuantumType } from '@/lib/geometry/registry'
 import { computeTdseEffectiveSpacing } from '@/lib/physics/tdse/effectiveSpacing'
 
 import type { WebGPURenderContext } from '../core/types'
@@ -289,12 +290,7 @@ function readFrameInputs(
     uncertaintyConfidenceMass: schroedinger?.uncertaintyConfidenceMass ?? 0.68,
     uncertaintyBoundaryWidth: schroedinger?.uncertaintyBoundaryWidth ?? 0.3,
     branchSeparation,
-    isUniformComputeMode:
-      quantumModeStr === 'freeScalarField' ||
-      quantumModeStr === 'tdseDynamics' ||
-      quantumModeStr === 'becDynamics' ||
-      quantumModeStr === 'diracEquation' ||
-      quantumModeStr === 'quantumWalk',
+    isUniformComputeMode: isUniformComputeGridQuantumType(quantumModeStr),
     isDensityMatrixMode: config.openQuantumEnabled ?? false,
   }
 }

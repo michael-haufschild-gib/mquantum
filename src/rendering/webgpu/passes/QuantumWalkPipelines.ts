@@ -115,22 +115,34 @@ export function createQwPipelines(device: GPUDevice): QwPipelineResult {
   return {
     coinPipeline: device.createComputePipeline({
       label: 'qw-coin-pipeline',
-      layout: device.createPipelineLayout({ bindGroupLayouts: [coinBGL] }),
+      layout: device.createPipelineLayout({
+        label: 'qw-coin-layout',
+        bindGroupLayouts: [coinBGL],
+      }),
       compute: { module: coinModule, entryPoint: 'main' },
     }),
     shiftPipeline: device.createComputePipeline({
       label: 'qw-shift-pipeline',
-      layout: device.createPipelineLayout({ bindGroupLayouts: [shiftBGL] }),
+      layout: device.createPipelineLayout({
+        label: 'qw-shift-layout',
+        bindGroupLayouts: [shiftBGL],
+      }),
       compute: { module: shiftModule, entryPoint: 'main' },
     }),
     writeGridPipeline: device.createComputePipeline({
       label: 'qw-write-grid-pipeline',
-      layout: device.createPipelineLayout({ bindGroupLayouts: [writeGridBGL] }),
+      layout: device.createPipelineLayout({
+        label: 'qw-write-grid-layout',
+        bindGroupLayouts: [writeGridBGL],
+      }),
       compute: { module: writeGridModule, entryPoint: 'main' },
     }),
     absorberPipeline: device.createComputePipeline({
       label: 'qw-absorber-pipeline',
-      layout: device.createPipelineLayout({ bindGroupLayouts: [absorberBGL] }),
+      layout: device.createPipelineLayout({
+        label: 'qw-absorber-layout',
+        bindGroupLayouts: [absorberBGL],
+      }),
       compute: { module: absorberModule, entryPoint: 'main' },
     }),
     coinUniformBuffer: device.createBuffer({

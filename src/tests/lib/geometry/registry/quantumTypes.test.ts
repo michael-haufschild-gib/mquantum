@@ -29,6 +29,34 @@ describe('QUANTUM_TYPE_REGISTRY', () => {
     }
   })
 
+  it('every present shaderUniformId is unique', () => {
+    const ownersById = new Map<number, string>()
+    for (const [key, entry] of QUANTUM_TYPE_REGISTRY) {
+      const id = entry.runtime.shaderUniformId
+      if (id === undefined) continue
+
+      const existingOwner = ownersById.get(id)
+      expect(existingOwner, `${key}: shaderUniformId ${id} already used by ${existingOwner}`).toBe(
+        undefined
+      )
+      ownersById.set(id, key)
+    }
+  })
+
+  it('every present stateSaveId is unique', () => {
+    const ownersById = new Map<number, string>()
+    for (const [key, entry] of QUANTUM_TYPE_REGISTRY) {
+      const id = entry.runtime.stateSaveId
+      if (id === undefined) continue
+
+      const existingOwner = ownersById.get(id)
+      expect(existingOwner, `${key}: stateSaveId ${id} already used by ${existingOwner}`).toBe(
+        undefined
+      )
+      ownersById.set(id, key)
+    }
+  })
+
   it('every entry has valid dimension constraints (min <= max, min >= 1, max <= 11)', () => {
     for (const [key, entry] of QUANTUM_TYPE_REGISTRY) {
       const { min, max } = entry.dimensions

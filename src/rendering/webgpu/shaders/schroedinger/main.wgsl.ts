@@ -203,7 +203,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     FEATURE_NODAL &&
     schroedinger.nodalEnabled != 0u &&
     schroedinger.nodalStrength > 0.0 &&
-    schroedinger.nodalRenderMode == NODAL_RENDER_MODE_SURFACE
+    activeNodalRenderMode(schroedinger) == NODAL_RENDER_MODE_SURFACE
   ) {
     let animTime = getVolumeTime(schroedinger);
     let surfaceStrengthT = clamp(schroedinger.nodalStrength * 0.5, 0.0, 1.0);
@@ -399,7 +399,7 @@ ${bayerJitterSection}
     FEATURE_NODAL &&
     schroedinger.nodalEnabled != 0u &&
     schroedinger.nodalStrength > 0.0 &&
-    schroedinger.nodalRenderMode == NODAL_RENDER_MODE_SURFACE
+    activeNodalRenderMode(schroedinger) == NODAL_RENDER_MODE_SURFACE
   ) {
     let animTime = getVolumeTime(schroedinger);
     let surfaceStrengthT = clamp(schroedinger.nodalStrength * 0.5, 0.0, 1.0);

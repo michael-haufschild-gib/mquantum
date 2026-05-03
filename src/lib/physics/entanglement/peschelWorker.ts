@@ -88,7 +88,7 @@ export interface PeschelWorkerRequest {
  * plain `number[]` so the consumer can use them directly in React renders
  * without needing a TypedArray detour.
  */
-export interface PeschelWorkerResponse {
+export interface PeschelWorkerResultMessage {
   type: 'result'
   /** Echo of the request epoch — used by the consumer to drop stale jobs. */
   epoch: number
@@ -130,6 +130,20 @@ export interface PeschelWorkerResponse {
   /** Non-null when trajectory was requested but computation failed. */
   trajectoryError: string | null
 }
+
+/**
+ * In-band failure message for a top-level compute failure (distinct from
+ * the per-trajectory `trajectoryError` field above, which signals a
+ * partial failure within an otherwise successful sweep).
+ */
+export interface PeschelWorkerErrorMessage {
+  type: 'error'
+  epoch: number
+  message: string
+}
+
+/** Outbound message from the Peschel entanglement worker. */
+export type PeschelWorkerResponse = PeschelWorkerResultMessage | PeschelWorkerErrorMessage
 
 /**
  * Cache for the expensive length-sweep outputs.
@@ -193,7 +207,7 @@ export function resetPeschelCacheForTests(): void {
  * @param req - Request payload
  * @returns Response payload with the full sweep + modular readout
  */
-export function runPeschelCompute(req: PeschelWorkerRequest): PeschelWorkerResponse {
+export function runPeschelCompute(req: PeschelWorkerRequest): PeschelWorkerResultMessage {
   const { gridSize, spacing, latticeDim, massSq, subsystemLength, cosmology } = req
   const N0 = gridSize[0] ?? 0
   const half = Math.floor(N0 / 2)
@@ -240,7 +254,7 @@ export function runPeschelCompute(req: PeschelWorkerRequest): PeschelWorkerRespo
   // Modular spectrum at the currently selected subsystem length. Reuses
   // the already-built correlators so the O(N²) Toeplitz fill is not
   // duplicated (the old main-thread probe ran it twice).
-  let modular: PeschelWorkerResponse['modular'] = null
+  let modular: PeschelWorkerResultMessage['modular'] = null
   if (subsystemLength >= 2 && subsystemLength <= half) {
     const XA = extractSubsystem(correlators.X, N0, 0, subsystemLength)
     const PA = extractSubsystem(correlators.P, N0, 0, subsystemLength)
@@ -323,7 +337,18 @@ if (typeof self !== 'undefined' && typeof (self as unknown as Worker).postMessag
   scope.onmessage = (e: MessageEvent<PeschelWorkerRequest>) => {
     const req = e.data
     if (req.type !== 'compute') return
-    const response = runPeschelCompute(req)
-    scope.postMessage(response)
+    try {
+      const response = runPeschelCompute(req)
+      scope.postMessage(response)
+    } catch (err) {
+      // In-band error per docs/operability/workers.md.
+      const message = err instanceof Error ? err.message : String(err)
+      const errResponse: PeschelWorkerErrorMessage = {
+        type: 'error',
+        epoch: req.epoch,
+        message,
+      }
+      scope.postMessage(errResponse)
+    }
   }
 }

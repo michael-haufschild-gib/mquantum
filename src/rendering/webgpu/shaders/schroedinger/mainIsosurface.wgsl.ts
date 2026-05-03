@@ -340,7 +340,8 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
     schroedinger.nodalEnabled != 0u &&
     schroedinger.nodalStrength > 0.0
   ) {
-    if (schroedinger.nodalRenderMode == NODAL_RENDER_MODE_BAND) {
+    let nodalRenderMode = activeNodalRenderMode(schroedinger);
+    if (nodalRenderMode == NODAL_RENDER_MODE_BAND) {
       let nodal = computePhysicalNodalField(p, animTime, schroedinger);
       let nodalIntensity = nodal.intensity * nodal.envelopeWeight;
       if (nodalIntensity > 1e-4) {
@@ -348,7 +349,7 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
         let nodalMix = clamp(nodalIntensity * schroedinger.nodalStrength, 0.0, 0.85);
         col = mix(col, nodalColor, nodalMix);
       }
-    } else if (schroedinger.nodalRenderMode == NODAL_RENDER_MODE_SURFACE) {
+    } else if (nodalRenderMode == NODAL_RENDER_MODE_SURFACE) {
       let surfaceStrengthT = clamp(schroedinger.nodalStrength * 0.5, 0.0, 1.0);
       let localSpan = stepLen * mix(3.0, 8.0, surfaceStrengthT);
       let localNear = max(tNear, hitT - localSpan);

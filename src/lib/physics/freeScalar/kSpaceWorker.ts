@@ -50,8 +50,8 @@ export interface KSpaceWorkerRequest {
   includeTextures?: boolean
 }
 
-/** Outbound result from the k-space web worker with computed display textures. */
-export interface KSpaceWorkerResponse {
+/** Successful compute result. */
+export interface KSpaceWorkerResultMessage {
   type: 'result'
   epoch: number
   density?: Uint16Array
@@ -60,42 +60,63 @@ export interface KSpaceWorkerResponse {
   totalParticles: number
 }
 
+/** In-band compute failure. */
+export interface KSpaceWorkerErrorMessage {
+  type: 'error'
+  epoch: number
+  message: string
+}
+
+/** Outbound message from the k-space web worker. */
+export type KSpaceWorkerResponse = KSpaceWorkerResultMessage | KSpaceWorkerErrorMessage
+
 self.onmessage = (e: MessageEvent<KSpaceWorkerRequest>) => {
   const msg = e.data
   if (msg.type !== 'compute') return
 
-  const raw = computeRawKSpaceDataFromComplex(
-    msg.phiComplex,
-    msg.piComplex,
-    msg.gridSize,
-    msg.spacing,
-    msg.mass,
-    msg.latticeDim,
-    msg.dispersion ?? 'kgFloor',
-    msg.basisCoefs
-  )
-
-  const totalParticles = computeTotalParticleNumber(raw)
-
-  const response: KSpaceWorkerResponse = {
-    type: 'result',
-    epoch: msg.epoch,
-    totalParticles,
-  }
-
-  if (msg.includeTextures !== false) {
-    const { density, analysis } = buildKSpaceDisplayTextures(
-      raw,
-      msg.kSpaceViz,
-      true,
-      msg.outputGridSize
+  try {
+    const raw = computeRawKSpaceDataFromComplex(
+      msg.phiComplex,
+      msg.piComplex,
+      msg.gridSize,
+      msg.spacing,
+      msg.mass,
+      msg.latticeDim,
+      msg.dispersion ?? 'kgFloor',
+      msg.basisCoefs
     )
-    response.density = density
-    response.analysis = analysis
-    // Transfer ownership of the typed array buffers back to main thread.
-    self.postMessage(response, { transfer: [density.buffer, analysis.buffer] })
-    return
-  }
 
-  self.postMessage(response)
+    const totalParticles = computeTotalParticleNumber(raw)
+
+    const response: KSpaceWorkerResultMessage = {
+      type: 'result',
+      epoch: msg.epoch,
+      totalParticles,
+    }
+
+    if (msg.includeTextures !== false) {
+      const { density, analysis } = buildKSpaceDisplayTextures(
+        raw,
+        msg.kSpaceViz,
+        true,
+        msg.outputGridSize
+      )
+      response.density = density
+      response.analysis = analysis
+      // Transfer ownership of the typed array buffers back to main thread.
+      self.postMessage(response, { transfer: [density.buffer, analysis.buffer] })
+      return
+    }
+
+    self.postMessage(response)
+  } catch (err) {
+    // In-band error per docs/operability/workers.md.
+    const message = err instanceof Error ? err.message : String(err)
+    const errResponse: KSpaceWorkerErrorMessage = {
+      type: 'error',
+      epoch: msg.epoch,
+      message,
+    }
+    self.postMessage(errResponse)
+  }
 }

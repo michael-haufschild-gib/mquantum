@@ -26,6 +26,13 @@ describe('Schroedinger nodal WGSL composition', () => {
     expect(wgsl).toContain('fn computePhysicalNodalField(')
     expect(wgsl).toContain('fn findNodalSurfaceHit(')
     expect(wgsl).toContain('fn resolveSurfaceNodalDefinition(')
+    expect(wgsl).toContain('struct NodalFieldJet')
+    expect(wgsl).toContain('fn activeNodalDefinition(')
+    expect(wgsl).toContain('fn activeNodalRenderMode(')
+    expect(wgsl).toContain('fn activeNodalFamilyFilter(')
+    expect(wgsl).toContain('fn selectNodalPsiFieldJet(')
+    expect(wgsl).toContain('fn selectHydrogenFamilyFieldJet(')
+    expect(wgsl).toContain('fn evaluateNodalSurfaceFieldJet(')
     expect(wgsl).toContain('amplitude: f32')
     expect(wgsl).toContain('let minAmplitudeScale = mix(5.5, 2.0, strengthT);')
     expect(wgsl).toContain('let minAmplitudeFloor = mix(8e-4, 2e-4, strengthT);')
@@ -33,9 +40,8 @@ describe('Schroedinger nodal WGSL composition', () => {
       'let minAmplitude = max(uniforms.nodalTolerance * minAmplitudeScale, minAmplitudeFloor) * ampThresholdScale;'
     )
     expect(wgsl).toContain('if (max(prevSample.amplitude, currSample.amplitude) < minAmplitude)')
-    expect(wgsl).toContain(
-      'if (uniforms.nodalDefinition == NODAL_DEFINITION_PSI_ABS) {\n    return NODAL_DEFINITION_REAL;'
-    )
+    expect(wgsl).toContain('let definition = activeNodalDefinition(uniforms);')
+    expect(wgsl).toContain('if (definition == NODAL_DEFINITION_PSI_ABS)')
     expect(wgsl).toContain('fn nodalCrossingMask(')
     expect(wgsl).toContain(
       'hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius);'
@@ -44,22 +50,26 @@ describe('Schroedinger nodal WGSL composition', () => {
     expect(wgsl).toContain('let nodalScattered = mix(nodalColor, nodalColor * ambientLight, 0.35);')
     expect(wgsl).toContain('transmittance *= (1.0 - nodalAlpha * 0.6);')
     expect(wgsl).toContain('if (minAbs <= epsSafe && span >= epsSafe * 0.5)')
-    expect(wgsl).toContain('intensity = nodalBandMask(psiCenter.x, gradRe, eps) * crossingRe;')
-    expect(wgsl).toContain('intensity = nodalBandMask(psiCenter.y, gradIm, eps) * crossingIm;')
-    expect(wgsl).toContain('let crossingAny = max(max(crossingRe, crossingIm), crossingAbs);')
-    expect(wgsl).toContain('intensity = nodalBandMask(psiAbsCenter, gradAbs, eps) * crossingAny;')
     expect(wgsl).toContain(
-      'let envelopeWeight = smoothstep(envelopeFloor, envelopeCeil, envelopeAmp);'
+      'return makeNodalFieldJet(psiRe, psiRe, amplitude, NODAL_DEFINITION_REAL, gradRe, crossingRe, eps);'
     )
+    expect(wgsl).toContain(
+      'return makeNodalFieldJet(psiIm, psiIm, amplitude, NODAL_DEFINITION_IMAG, gradIm, crossingIm, eps);'
+    )
+    expect(wgsl).toContain('let crossingAny = max(max(crossingRe, crossingIm), crossingAbs);')
+    expect(wgsl).toContain(
+      'return makeNodalFieldJet(psiAbs, psiRe, amplitude, NODAL_DEFINITION_PSI_ABS, gradAbs, crossingAny, eps);'
+    )
+    expect(wgsl).toContain('fn nodalEnvelopeWeightFromAmplitude(')
+    expect(wgsl).toContain('let envelopeWeight = nodalEnvelopeWeightFromAmplitude(amplitude, eps);')
 
     expect(wgsl).not.toContain('fn computeNodalIntensity(')
     expect(wgsl).not.toContain('lowDensityMask = 1.0 - smoothstep(1e-5, 2e-3, rho)')
     expect(wgsl).not.toContain('nodal.intensity * uniforms.nodalStrength * adaptiveStep * 2.5')
     // Legacy density-band heuristic ungated by sign crossings — must not appear.
-    // The current code paths (computeNodalFromAnalyticalPsi, the |ψ|-mode
-    // tetrahedral branch, and the gridPsiAbs fast path) all multiply by a
-    // crossing mask or live behind explicit gates, so this exact line cannot
-    // appear in the composed shader.
+    // The current tetrahedral and grid paths gate through explicit crossing
+    // helpers, and the analytical path goes through the centralized Field Jet
+    // selector instead of the old low-density heuristic.
     expect(wgsl).not.toContain('intensity = nodalBandMask(psiAbs, gradAbs, eps) * lowDensityMask;')
     expect(wgsl).not.toContain('fn nodalSliceMask(')
   })
@@ -93,7 +103,8 @@ describe('Schroedinger nodal WGSL composition', () => {
       'findNodalSurfaceHit(ro, rd, localNear, localFar, animTime, schroedinger)'
     )
     expect(wgsl).toContain('computePhysicalNodalField(p, animTime, schroedinger)')
-    expect(wgsl).toContain('schroedinger.nodalRenderMode == NODAL_RENDER_MODE_SURFACE')
+    expect(wgsl).toContain('let nodalRenderMode = activeNodalRenderMode(schroedinger);')
+    expect(wgsl).toContain('nodalRenderMode == NODAL_RENDER_MODE_SURFACE')
     expect(wgsl).not.toContain('let nodalSurfaceModeActive =')
   })
 

@@ -2,7 +2,7 @@
  * Tests for quantum walk rendering integration.
  *
  * Verifies:
- * - QUANTUM_MODE_MAP includes quantumWalk with correct integer value
+ * - QUANTUM_MODE_MAP mirrors registry shader-uniform metadata
  * - Strategy factory creates QuantumWalkStrategy for 'quantumWalk' mode
  * - QuantumWalkStrategy reports isComputeMode=true
  * - computeLatticeBoundingRadius produces correct values for quantum walk grids
@@ -10,10 +10,13 @@
 
 import { describe, expect, it } from 'vitest'
 
+import { getQuantumTypeShaderUniformIdMap } from '@/lib/geometry/registry'
 import { QUANTUM_MODE_MAP } from '@/rendering/webgpu/renderers/schrodingerRendererTypes'
 import { computeLatticeBoundingRadius } from '@/rendering/webgpu/renderers/strategies/computeGridUtils'
 import { createModeStrategy } from '@/rendering/webgpu/renderers/strategies/createStrategy'
+import { PauliStrategy } from '@/rendering/webgpu/renderers/strategies/PauliStrategy'
 import { QuantumWalkStrategy } from '@/rendering/webgpu/renderers/strategies/QuantumWalkStrategy'
+import { TdseBecStrategy } from '@/rendering/webgpu/renderers/strategies/TdseBecStrategy'
 
 describe('QUANTUM_MODE_MAP', () => {
   it('includes quantumWalk with a unique integer value', () => {
@@ -25,19 +28,11 @@ describe('QUANTUM_MODE_MAP', () => {
     expect(new Set(values).size).toBe(values.length)
   })
 
-  it('covers all seven quantum modes', () => {
-    const expected = [
-      'harmonicOscillator',
-      'hydrogenND',
-      'freeScalarField',
-      'tdseDynamics',
-      'becDynamics',
-      'diracEquation',
-      'quantumWalk',
-    ]
-    for (const mode of expected) {
-      expect(QUANTUM_MODE_MAP).toHaveProperty(mode)
-    }
+  it('matches registry shader-uniform metadata', () => {
+    expect(QUANTUM_MODE_MAP).toEqual(getQuantumTypeShaderUniformIdMap())
+    expect(QUANTUM_MODE_MAP).toHaveProperty('wheelerDeWitt', 9)
+    expect(QUANTUM_MODE_MAP).toHaveProperty('antiDeSitter', 8)
+    expect(QUANTUM_MODE_MAP).not.toHaveProperty('pauliSpinor')
   })
 })
 
@@ -45,6 +40,16 @@ describe('createModeStrategy', () => {
   it('returns QuantumWalkStrategy for quantumWalk mode', () => {
     const strategy = createModeStrategy({ quantumMode: 'quantumWalk' })
     expect(strategy).toBeInstanceOf(QuantumWalkStrategy)
+  })
+
+  it('uses shared TDSE/BEC strategy metadata', () => {
+    expect(createModeStrategy({ quantumMode: 'tdseDynamics' })).toBeInstanceOf(TdseBecStrategy)
+    expect(createModeStrategy({ quantumMode: 'becDynamics' })).toBeInstanceOf(TdseBecStrategy)
+  })
+
+  it('keeps Pauli priority over quantumMode', () => {
+    const strategy = createModeStrategy({ quantumMode: 'quantumWalk', isPauli: true })
+    expect(strategy).toBeInstanceOf(PauliStrategy)
   })
 
   it('QuantumWalkStrategy reports isComputeMode=true', () => {

@@ -16,6 +16,8 @@ import {
   isComputeQuantumMode,
   isPipeline2D,
 } from '@/rendering/webgpu/renderers/rendererConfigUtils'
+import { composeSchroedingerShader } from '@/rendering/webgpu/shaders/schroedinger/compose'
+import { removeDefaultNodalSpecializationOverrides } from '@/rendering/webgpu/shaders/schroedinger/composeConfig'
 
 describe('isComputeQuantumMode', () => {
   it('returns true for compute-mode quantum types (TDSE, BEC, Dirac, FSF, etc.)', () => {
@@ -164,6 +166,10 @@ describe('buildShaderConfig', () => {
     expect(cfg.uncertaintyBoundary).toBe(false)
     expect(cfg.useEigenfunctionCache).toBe(false)
     expect(cfg.useAnalyticalGradient).toBe(false)
+    expect(cfg.nodalSpecializationEnabled).toBe(false)
+    expect(cfg.nodalDefinition).toBe('psiAbs')
+    expect(cfg.nodalRenderMode).toBe('band')
+    expect(cfg.nodalFamilyFilter).toBe('all')
     // Compute mode → quantumMode flagged as harmonicOscillator at the shader
     // level so the inline analytic path is unused.
     expect(cfg.quantumMode).toBe('harmonicOscillator')
@@ -231,6 +237,56 @@ describe('buildShaderConfig', () => {
     expect(ho.isAds).toBe(false)
     expect(ho.sampleSpaceRotation).toBe(false)
   })
+
+  it('threads nodal specialization fields into shader config for analytic nodal mode', () => {
+    const cfg = buildShaderConfig({
+      dimension: 3,
+      quantumMode: 'hydrogenND',
+      nodalEnabled: true,
+      nodalDefinition: 'imagPart',
+      nodalRenderMode: 'surface',
+      nodalFamilyFilter: 'angular',
+    } as never)
+
+    expect(cfg.nodal).toBe(true)
+    expect(cfg.nodalSpecializationEnabled).toBe(true)
+    expect(cfg.nodalDefinition).toBe('imagPart')
+    expect(cfg.nodalRenderMode).toBe('surface')
+    expect(cfg.nodalFamilyFilter).toBe('angular')
+  })
+
+  it('emits nodal specialization WGSL defines', () => {
+    const cfg = buildShaderConfig({
+      dimension: 3,
+      quantumMode: 'hydrogenND',
+      nodalEnabled: true,
+      nodalDefinition: 'imagPart',
+      nodalRenderMode: 'surface',
+      nodalFamilyFilter: 'angular',
+    } as never)
+    const { wgsl } = composeSchroedingerShader(cfg)
+
+    expect(wgsl).toContain('const NODAL_SPECIALIZATION_ENABLED: bool = true;')
+    expect(wgsl).toContain('const NODAL_SPECIALIZED_DEFINITION: i32 = 2;')
+    expect(wgsl).toContain('const NODAL_SPECIALIZED_RENDER_MODE: i32 = 1;')
+    expect(wgsl).toContain('const NODAL_SPECIALIZED_FAMILY_FILTER: i32 = 2;')
+    expect(wgsl).not.toContain('override NODAL_SPECIALIZATION_ENABLED')
+  })
+
+  it('removes fallback nodal specialization overrides by symbol', () => {
+    const wgsl = removeDefaultNodalSpecializationOverrides(`
+const NODAL_SPECIALIZATION_ENABLED: bool = true;
+  override   NODAL_SPECIALIZATION_ENABLED : bool = false;
+override NODAL_SPECIALIZED_DEFINITION: i32 = 0;
+override NODAL_SPECIALIZED_RENDER_MODE: i32 = 1;
+override NODAL_SPECIALIZED_FAMILY_FILTER: i32 = 2;
+fn keep() -> bool { return NODAL_SPECIALIZATION_ENABLED; }
+`)
+
+    expect(wgsl).toContain('const NODAL_SPECIALIZATION_ENABLED: bool = true;')
+    expect(wgsl).toContain('fn keep() -> bool')
+    expect(wgsl).not.toContain('override NODAL_SPECIAL')
+  })
 })
 
 describe('buildPipelineOutputs', () => {
@@ -282,6 +338,10 @@ describe('computePipelineCacheKey', () => {
       quantumMode: 'harmonicOscillator',
       termCount: 4,
       nodal: true,
+      nodalSpecializationEnabled: true,
+      nodalDefinition: 'psiAbs',
+      nodalRenderMode: 'band',
+      nodalFamilyFilter: 'all',
       colorAlgorithm: 0,
       temporalAccumulation: false,
       phaseMateriality: true,
@@ -343,6 +403,22 @@ describe('computePipelineCacheKey', () => {
     const cfg = makeShaderConfig()
     const k1 = computePipelineCacheKey(cfg, { dimension: 3, representation: 'position' } as never)
     const k2 = computePipelineCacheKey(cfg, { dimension: 3, representation: 'wigner' } as never)
+    expect(k1).not.toBe(k2)
+  })
+
+  it('changes when nodal specialization fields change', () => {
+    const cfg = makeShaderConfig()
+    const k1 = computePipelineCacheKey(cfg, { dimension: 3 } as never)
+    const k2 = computePipelineCacheKey(
+      {
+        ...cfg,
+        nodalDefinition: 'imagPart',
+        nodalRenderMode: 'surface',
+        nodalFamilyFilter: 'angular',
+      },
+      { dimension: 3 } as never
+    )
+
     expect(k1).not.toBe(k2)
   })
 })

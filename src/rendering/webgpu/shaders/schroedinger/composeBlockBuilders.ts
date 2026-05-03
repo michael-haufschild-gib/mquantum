@@ -89,6 +89,8 @@ import {
   bornNullWeaveBlock,
   generateVolumeRaymarchGridBlock,
   generateVolumeRaymarchGridSimpleBlock,
+  nodalFieldJetBlock,
+  nodalFieldJetStubBlock,
   nodalSurfacesBlock,
   nodalSurfacesStubBlock,
   probabilityCurrentBlock,
@@ -471,6 +473,11 @@ export function buildVolumeBlocks(opts: {
     },
     { name: 'Volume Integration', content: volumeIntegrationBlock, condition: !opts.is2D },
     { name: 'Volume Compositing', content: volumeCompositingBlock, condition: !opts.is2D },
+    {
+      name: 'Nodal Field Jet',
+      content: opts.nodal ? nodalFieldJetBlock : nodalFieldJetStubBlock,
+      condition: !opts.is2D,
+    },
     {
       name: 'Nodal Surfaces',
       content: opts.nodal ? nodalSurfacesBlock : nodalSurfacesStubBlock,

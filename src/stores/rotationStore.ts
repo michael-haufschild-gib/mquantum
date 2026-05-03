@@ -30,12 +30,6 @@ function getValidPlanesSet(dimension: number): Set<string> {
   return cached
 }
 
-/** Minimum rotation angle in radians (0 degrees) */
-export const MIN_ROTATION = 0
-
-/** Maximum rotation angle in radians (360 degrees) */
-export const MAX_ROTATION = 2 * Math.PI
-
 /**
  * Threshold for lazy angle normalization (radians).
  * Angles are only normalized when they exceed this value to prevent

@@ -22,14 +22,24 @@ export interface DiracAlgebraRequest {
   spatialDim: number
 }
 
-/** Outbound result with packed gamma matrices ready for GPU upload. */
-export interface DiracAlgebraResponse {
+/** Successful gamma-matrix generation. */
+export interface DiracAlgebraResultMessage {
   type: 'result'
   epoch: number
   /** Packed gamma matrices: [spinorSize_bits, alpha_1..., alpha_N..., beta...] */
   gammaData: Float32Array
   spinorSize: number
 }
+
+/** In-band compute failure. */
+export interface DiracAlgebraErrorMessage {
+  type: 'error'
+  epoch: number
+  message: string
+}
+
+/** Outbound message from the Dirac-algebra web worker. */
+export type DiracAlgebraResponse = DiracAlgebraResultMessage | DiracAlgebraErrorMessage
 
 // ---------------------------------------------------------------------------
 // WASM initialization — attempt once, fall back to JS on failure
@@ -83,14 +93,25 @@ self.onmessage = async (e: MessageEvent<DiracAlgebraRequest>) => {
   // Wait for WASM init on first message (no-op if already resolved)
   await wasmReady
 
-  const result = generateMatrices(msg.spatialDim)
+  try {
+    const result = generateMatrices(msg.spatialDim)
 
-  const response: DiracAlgebraResponse = {
-    type: 'result',
-    epoch: msg.epoch,
-    gammaData: result.gammaData,
-    spinorSize: result.spinorSize,
+    const response: DiracAlgebraResultMessage = {
+      type: 'result',
+      epoch: msg.epoch,
+      gammaData: result.gammaData,
+      spinorSize: result.spinorSize,
+    }
+
+    self.postMessage(response, { transfer: [result.gammaData.buffer] })
+  } catch (err) {
+    // In-band error per docs/operability/workers.md.
+    const message = err instanceof Error ? err.message : String(err)
+    const errResponse: DiracAlgebraErrorMessage = {
+      type: 'error',
+      epoch: msg.epoch,
+      message,
+    }
+    self.postMessage(errResponse)
   }
-
-  self.postMessage(response, { transfer: [result.gammaData.buffer] })
 }

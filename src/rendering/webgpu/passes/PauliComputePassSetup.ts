@@ -306,13 +306,19 @@ export async function buildPauliPipelines(device: GPUDevice): Promise<PauliPipel
   // `array<vec2f>` spinor buffer (Item 1 of the perf batch — collapses the
   // prior two split f32 bindings into one 8-byte vec2f binding).
   const spinorBGL = createComputeBGL(device, 'pauli-spinor-bgl', ['read-only-storage', 'storage'])
-  const spinorLayout = device.createPipelineLayout({ bindGroupLayouts: [spinorBGL] })
+  const spinorLayout = device.createPipelineLayout({
+    label: 'pauli-spinor-layout',
+    bindGroupLayouts: [spinorBGL],
+  })
 
   const potentialBGL = createComputeBGL(device, 'pauli-potential-bgl', [
     'read-only-storage',
     'storage',
   ])
-  const potentialLayout = device.createPipelineLayout({ bindGroupLayouts: [potentialBGL] })
+  const potentialLayout = device.createPipelineLayout({
+    label: 'pauli-potential-layout',
+    bindGroupLayouts: [potentialBGL],
+  })
 
   // Potential half-step + Zeeman rotation. Separate 3-binding BGL so that
   // init/kinetic/absorber (which never read V) stay on the lean 2-binding
@@ -324,6 +330,7 @@ export async function buildPauliPipelines(device: GPUDevice): Promise<PauliPipel
     'read-only-storage',
   ])
   const potentialHalfLayout = device.createPipelineLayout({
+    label: 'pauli-potential-half-layout',
     bindGroupLayouts: [potentialHalfBGL],
   })
 
@@ -438,37 +445,52 @@ export async function buildPauliPipelines(device: GPUDevice): Promise<PauliPipel
     issuePipeline('pauli-kinetic-3d', spinorLayout, composePauliKinetic3DShader()),
     issuePipeline(
       'pauli-renormalize',
-      device.createPipelineLayout({ bindGroupLayouts: [renormalizeBGL] }),
+      device.createPipelineLayout({
+        label: 'pauli-renormalize-layout',
+        bindGroupLayouts: [renormalizeBGL],
+      }),
       composePauliRenormalizeShader()
     ),
     issuePipeline(
       'pauli-write-grid',
-      device.createPipelineLayout({ bindGroupLayouts: [writeGridBGL] }),
+      device.createPipelineLayout({
+        label: 'pauli-write-grid-layout',
+        bindGroupLayouts: [writeGridBGL],
+      }),
       composePauliWriteGridShader()
     ),
     issuePipeline(
       'pauli-pack',
-      device.createPipelineLayout({ bindGroupLayouts: [packBGL] }),
+      device.createPipelineLayout({ label: 'pauli-pack-layout', bindGroupLayouts: [packBGL] }),
       composePauliPackShader()
     ),
     issuePipeline(
       'pauli-unpack',
-      device.createPipelineLayout({ bindGroupLayouts: [unpackBGL] }),
+      device.createPipelineLayout({ label: 'pauli-unpack-layout', bindGroupLayouts: [unpackBGL] }),
       composePauliUnpackShader()
     ),
     issuePipeline(
       'pauli-fft-shared-mem',
-      device.createPipelineLayout({ bindGroupLayouts: [fftSharedMemBGL] }),
+      device.createPipelineLayout({
+        label: 'pauli-fft-shared-mem-layout',
+        bindGroupLayouts: [fftSharedMemBGL],
+      }),
       composePauliFftSharedMemShader()
     ),
     issuePipeline(
       'pauli-diag-reduce',
-      device.createPipelineLayout({ bindGroupLayouts: [diagReduceBGL] }),
+      device.createPipelineLayout({
+        label: 'pauli-diag-reduce-layout',
+        bindGroupLayouts: [diagReduceBGL],
+      }),
       composePauliDiagReduceShader()
     ),
     issuePipeline(
       'pauli-diag-finalize',
-      device.createPipelineLayout({ bindGroupLayouts: [diagFinalizeBGL] }),
+      device.createPipelineLayout({
+        label: 'pauli-diag-finalize-layout',
+        bindGroupLayouts: [diagFinalizeBGL],
+      }),
       composePauliDiagFinalizeShader()
     ),
   ])

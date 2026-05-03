@@ -322,6 +322,7 @@ export function dispatchGramSchmidt(
     // Write reduce uniforms: { totalElements, numWorkgroups, 0, 0 }
     device.queue.writeBuffer(state.gsUniformBuffer!, 0, reduceUnifBuf)
     const reduceBG = device.createBindGroup({
+      label: 'tdse-gs-reduce-bg',
       layout: state.pl.gsReduceBGL,
       entries: [
         { binding: 0, resource: { buffer: state.gsUniformBuffer } },
@@ -336,6 +337,7 @@ export function dispatchGramSchmidt(
     rPass.end()
 
     const finalizeBG = device.createBindGroup({
+      label: 'tdse-gs-finalize-bg',
       layout: state.pl.gsFinalizeBGL,
       entries: [
         { binding: 0, resource: { buffer: state.gsUniformBuffer } },
@@ -356,6 +358,7 @@ export function dispatchGramSchmidt(
     device.queue.writeBuffer(state.gsUniformBuffer!, 0, subtractUnifBuf)
 
     const subtractBG = device.createBindGroup({
+      label: 'tdse-gs-subtract-bg',
       layout: state.pl.gsSubtractBGL,
       entries: [
         { binding: 0, resource: { buffer: state.gsUniformBuffer } },

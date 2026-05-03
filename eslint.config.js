@@ -666,6 +666,98 @@ const projectRulesPlugin = {
       },
     },
 
+    // ---- require-gpu-labels ----
+    // WebGPU objects (buffers, textures, bind groups, pipelines, shader modules,
+    // samplers) must carry a `label` property. Labels are surfaced in dev-tools
+    // GPU-error reports and validation messages, turning a debugging-from-RIP
+    // moment into a five-second triage. Per .claude/rules/rendering.md:
+    // "All GPU objects must have descriptive `label` properties".
+    //
+    // Scope: src/rendering/webgpu/. Other directories are off-limits to direct
+    // GPU API calls anyway (enforced socially), so a global rule would only
+    // produce false positives on test mocks.
+    'require-gpu-labels': {
+      meta: {
+        type: 'problem',
+        docs: {
+          description:
+            'WebGPU object creation calls must include a `label` for diagnostic output',
+        },
+        messages: {
+          missingLabel:
+            'GPUDevice.{{ method }}() must include a `label` property — labels are essential for diagnosing GPU validation errors and timeline-debugger output.',
+        },
+        schema: [],
+      },
+      create(context) {
+        const fp = normalizePath(context.filename)
+        if (!fp.includes('src/rendering/webgpu/')) return {}
+        if (fp.includes('.test.') || fp.includes('.spec.') || fp.includes('__mocks__')) return {}
+
+        // Methods on GPUDevice that produce labelable resources. WebGPU
+        // surfaces these labels in validation-error messages and in the
+        // browser timeline-debugger. Per .claude/rules/rendering.md and
+        // ADR-005-style audits, every GPUDevice.create* call that takes a
+        // descriptor must include a label so the failure mode is
+        // diagnosable from a stack trace alone — a useful contract on a
+        // codebase with 30 render passes and 9 compute passes.
+        const LABELABLE_METHODS = new Set([
+          'createBuffer',
+          'createTexture',
+          'createBindGroup',
+          'createBindGroupLayout',
+          'createPipelineLayout',
+          'createComputePipeline',
+          'createComputePipelineAsync',
+          'createRenderPipeline',
+          'createRenderPipelineAsync',
+          'createShaderModule',
+          'createSampler',
+        ])
+
+        function descriptorHasLabel(arg) {
+          if (!arg || arg.type !== 'ObjectExpression') return true // allow spreads / vars (assume labeled by source)
+          for (const prop of arg.properties) {
+            if (prop.type === 'SpreadElement') return true // spread may inject label
+            if (
+              prop.type === 'Property' &&
+              ((prop.key.type === 'Identifier' && prop.key.name === 'label') ||
+                (prop.key.type === 'Literal' && prop.key.value === 'label'))
+            ) {
+              return true
+            }
+          }
+          return false
+        }
+
+        return {
+          CallExpression(node) {
+            if (
+              node.callee.type !== 'MemberExpression' ||
+              node.callee.property.type !== 'Identifier'
+            ) {
+              return
+            }
+            const method = node.callee.property.name
+            if (!LABELABLE_METHODS.has(method)) return
+            // The receiver is typically `device` or a destructured ctx.device.
+            // We accept any receiver as long as the method matches — false
+            // positives on non-GPU receivers (e.g. a custom class wrapping a
+            // method named `createBuffer`) are exceedingly rare in this code.
+            const arg = node.arguments[0]
+            if (!arg) return
+            if (!descriptorHasLabel(arg)) {
+              context.report({
+                node: node.callee.property,
+                messageId: 'missingLabel',
+                data: { method },
+              })
+            }
+          },
+        }
+      },
+    },
+
     // ---- no-raw-html-controls ----
     'no-raw-html-controls': {
       meta: {
@@ -876,6 +968,7 @@ export default [
       'project-rules/no-shallow-matchers': 'error',
       'project-rules/no-dom-node-access': 'error',
       'project-rules/no-behavioral-string-test': 'error',
+      'project-rules/require-gpu-labels': 'error',
     },
   },
 

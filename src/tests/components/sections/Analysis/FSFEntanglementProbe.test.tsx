@@ -81,8 +81,16 @@ function latestWorker(): MockWorkerInstance {
   return w
 }
 
+/**
+ * Successful-result branch of the worker response. After making
+ * PeschelWorkerResponse a discriminated union with an error variant, we
+ * key the test fixture builder on the result branch so existing call
+ * sites that pass `subsystemLength` / `lengths` / etc. keep compiling.
+ */
+type PeschelWorkerResultResponse = Extract<PeschelWorkerResponse, { type: 'result' }>
+
 /** Build a dummy worker response that matches the real shape. */
-function fakeResponse(overrides: Partial<PeschelWorkerResponse> = {}): PeschelWorkerResponse {
+function fakeResponse(overrides: Partial<PeschelWorkerResultResponse> = {}): PeschelWorkerResponse {
   return {
     type: 'result',
     epoch: overrides.epoch ?? 1,
@@ -100,8 +108,8 @@ function fakeResponse(overrides: Partial<PeschelWorkerResponse> = {}): PeschelWo
 
 /** Build a modular-spectrum payload for the "stale L_A" regression tests. */
 function fakeModular(
-  overrides: Partial<NonNullable<PeschelWorkerResponse['modular']>> = {}
-): NonNullable<PeschelWorkerResponse['modular']> {
+  overrides: Partial<NonNullable<PeschelWorkerResultResponse['modular']>> = {}
+): NonNullable<PeschelWorkerResultResponse['modular']> {
   return {
     nu: overrides.nu ?? [0.51, 0.7, 1.0, 1.5],
     epsilon: overrides.epsilon ?? [-1, -0.5, 0, 0.5],
@@ -232,6 +240,67 @@ describe('FSFEntanglementProbe — epoch discipline', () => {
 
     // Chart renders — the result was applied.
     expect(await screen.findByTestId('entanglement-probe-chart')).toBeInTheDocument()
+  })
+
+  it('handles a worker `type: "error"` reply by clearing pending state without rendering a chart', async () => {
+    // Regression contract for the in-band worker error path
+    // (docs/operability/workers.md). When the worker posts
+    // `{ type: 'error', epoch, message }` the consumer must:
+    //   1. Drop the spinner (pending = false).
+    //   2. Skip rendering any chart from the implicit absence of a result.
+    //   3. Not throw.
+    // Prior to this contract the consumer would sit on a stale spinner
+    // forever because the only failure signal was `worker.onerror`, which
+    // a synchronous worker-side throw bypasses.
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<FSFEntanglementProbe />)
+    await user.click(screen.getByTestId('entanglement-probe-toggle'))
+
+    await vi.advanceTimersByTimeAsync(200)
+    expect(recordedMessages.length).toBe(1)
+    const epoch = recordedMessages[0]!.epoch
+
+    // Spinner is up while we wait.
+    expect(screen.getByTestId('entanglement-probe-pending')).toBeInTheDocument()
+
+    act(() => {
+      latestWorker().emit({ type: 'error', epoch, message: 'simulated worker failure' })
+    })
+
+    // Pending cleared, no chart rendered, no thrown error.
+    expect(screen.queryByTestId('entanglement-probe-pending')).toBeNull()
+    expect(screen.queryByTestId('entanglement-probe-chart')).toBeNull()
+  })
+
+  it('clears a previously rendered result when the next worker reply is an error', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<FSFEntanglementProbe />)
+    await user.click(screen.getByTestId('entanglement-probe-toggle'))
+
+    await vi.advanceTimersByTimeAsync(200)
+    const firstEpoch = recordedMessages[0]!.epoch
+    act(() => {
+      latestWorker().emit(fakeResponse({ epoch: firstEpoch }))
+    })
+    expect(await screen.findByTestId('entanglement-probe-chart')).toBeInTheDocument()
+
+    useExtendedObjectStore.setState((state) => ({
+      schroedinger: {
+        ...state.schroedinger,
+        freeScalar: { ...state.schroedinger.freeScalar, mass: 4 },
+      },
+    }))
+
+    await vi.advanceTimersByTimeAsync(200)
+    const secondEpoch = recordedMessages[1]!.epoch
+    act(() => {
+      latestWorker().emit({ type: 'error', epoch: secondEpoch, message: 'simulated failure' })
+    })
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('entanglement-probe-chart')).toBeNull()
+    })
+    expect(screen.queryByTestId('entanglement-probe-pending')).toBeNull()
   })
 
   it('labels modular metrics with the L_A the worker actually computed them for', async () => {

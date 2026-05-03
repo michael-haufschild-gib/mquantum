@@ -93,6 +93,7 @@ export function updateObservablesResources(
   const res = state.obsResources
 
   state.obsPosReduceBG = device.createBindGroup({
+    label: 'tdse-obs-pos-reduce-bg',
     layout: state.pl.obsPosReduceBGL,
     entries: [
       { binding: 0, resource: { buffer: res.posUniformBuffer } },
@@ -102,6 +103,7 @@ export function updateObservablesResources(
     ],
   })
   state.obsPosFinalBG = device.createBindGroup({
+    label: 'tdse-obs-pos-final-bg',
     layout: state.pl.obsPosFinalBGL,
     entries: [
       { binding: 0, resource: { buffer: res.posUniformBuffer } },
@@ -110,6 +112,7 @@ export function updateObservablesResources(
     ],
   })
   state.obsMomReduceBG = device.createBindGroup({
+    label: 'tdse-obs-mom-reduce-bg',
     layout: state.pl.obsMomReduceBGL,
     entries: [
       { binding: 0, resource: { buffer: res.momUniformBuffer } },
@@ -118,6 +121,7 @@ export function updateObservablesResources(
     ],
   })
   state.obsMomFinalBG = device.createBindGroup({
+    label: 'tdse-obs-mom-final-bg',
     layout: state.pl.obsMomFinalBGL,
     entries: [
       { binding: 0, resource: { buffer: res.momUniformBuffer } },

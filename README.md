@@ -6,9 +6,11 @@ An N-dimensional quantum physics visualizer running entirely in the browser via 
 
 ## Honest Disclaimer
 
-This is a vibecoded project. I have no real understanding of the quantum mechanics math behind it. I don't know whether the rendered wavefunctions or the values displayed in the UI are physically correct. It looks cool, and that's about as far as my confidence goes.
+This project was developed via "vibecoding" with Claude Code (Opus 4.5 / 4.6): the maintainer described intent and Claude produced ~1500 source files, 149 WGSL shaders, Rust/WASM math, 9200+ tests, and this README across ~1100 commits.
 
-The project exists as an experiment in pushing the limits of vibecoding with Claude Code (Opus 4.5 / 4.6). The entire codebase -- ~1500 source files, 149 WGSL shaders, Rust/WASM math, 9200+ tests, and this README -- was written by Claude across ~1100 commits. I described what I wanted, Claude wrote the code.
+Whether the rendered values are physically correct varies by mode. See [Physics Validation Status](docs/physics/validation-status.md) for a per-mode matrix of what has analytical / reference-data / property / convergence evidence behind it, and what does not. Some modes (harmonic oscillator, hydrogen, AdS) have strong analytical oracles; others (Pauli spinor) have only regression-fixture coverage. Modes with weaker evidence are explicitly flagged.
+
+If you are evaluating this for research use, read the validation-status doc first.
 
 ## What It Does
 

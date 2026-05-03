@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from 'vitest'
 
+import { getWasmRuntime } from '@/lib/wasm/animation/runtime'
 import {
   composeRotationsIndexedWasm,
   dotProductWasm,
@@ -59,6 +60,14 @@ describe('animation-wasm helpers', () => {
       await initAnimationWasm()
       await initAnimationWasm()
       // Both calls resolve without error — WASM skips init in test mode
+    })
+
+    it('keeps a stable runtime snapshot object for wrapper hot paths', async () => {
+      const runtime = getWasmRuntime()
+      await initAnimationWasm()
+      expect(getWasmRuntime()).toBe(runtime)
+      expect(runtime.ready).toBe(false)
+      expect(runtime.module).toBeNull()
     })
   })
 

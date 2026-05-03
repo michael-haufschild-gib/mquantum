@@ -111,6 +111,9 @@ const schroedingerCompileSelector = (state: ReturnType<typeof useExtendedObjectS
     quantumMode,
     termCount: (s?.termCount ?? 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8,
     nodalEnabled: s?.nodalEnabled ?? false,
+    nodalDefinition: s?.nodalDefinition ?? 'psiAbs',
+    nodalRenderMode: s?.nodalRenderMode ?? 'band',
+    nodalFamilyFilter: s?.nodalFamilyFilter ?? 'all',
     phaseMaterialityEnabled: s?.phaseMaterialityEnabled ?? false,
     interferenceEnabled: s?.interferenceEnabled ?? false,
     uncertaintyBoundaryEnabled: s?.uncertaintyBoundaryEnabled ?? false,
@@ -313,6 +316,9 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     quantumMode: schroedingerCompile.quantumMode,
     termCount: schroedingerCompile.termCount,
     nodalEnabled: schroedingerCompile.nodalEnabled,
+    nodalDefinition: schroedingerCompile.nodalDefinition,
+    nodalRenderMode: schroedingerCompile.nodalRenderMode,
+    nodalFamilyFilter: schroedingerCompile.nodalFamilyFilter,
     phaseMaterialityEnabled: schroedingerCompile.phaseMaterialityEnabled,
     interferenceEnabled: schroedingerCompile.interferenceEnabled,
     uncertaintyBoundaryEnabled: schroedingerCompile.uncertaintyBoundaryEnabled,
@@ -357,6 +363,9 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     schrodingerConfig.colorAlgorithm,
     schrodingerConfig.isosurface,
     schrodingerConfig.nodalEnabled,
+    schrodingerConfig.nodalDefinition,
+    schrodingerConfig.nodalRenderMode,
+    schrodingerConfig.nodalFamilyFilter,
     schrodingerConfig.phaseMaterialityEnabled,
     schrodingerConfig.interferenceEnabled,
     schrodingerConfig.uncertaintyBoundaryEnabled,
@@ -508,9 +517,8 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       // wait for the new pipeline to be active instead of polling isShaderCompiling.
       canvas.setAttribute('data-pipeline-gen', String(setupGeneration))
       // E2E testability: bump only on REAL recompiles (warmSwap or fullRebuild),
-      // not no-op useEffect re-runs. Tests use this to verify that toggling
-      // a runtime-only effect (e.g. nodalEnabled) does NOT recompile the
-      // pipeline.
+      // not no-op useEffect re-runs. Tests use this to distinguish pass-config
+      // changes from runtime-uniform changes.
       if (recompiledThisPass) {
         const prevRebuilds = parseInt(canvas.getAttribute('data-pipeline-rebuilds') ?? '0', 10)
         canvas.setAttribute('data-pipeline-rebuilds', String(prevRebuilds + 1))

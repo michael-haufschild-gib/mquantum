@@ -68,7 +68,7 @@ fn volumeRaymarchHQ(
     FEATURE_NODAL &&
     uniforms.nodalEnabled != 0u &&
     uniforms.nodalStrength > 0.0 &&
-    uniforms.nodalRenderMode == NODAL_RENDER_MODE_BAND;
+    activeNodalRenderMode(uniforms) == NODAL_RENDER_MODE_BAND;
   let useAnalyticalDensitySample = USE_ANALYTICAL_GRADIENT && nodalBandEnabled;
 
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
@@ -332,13 +332,11 @@ fn volumeRaymarchHQ(
     var phase: f32;
     var gradient: vec3f;
 
-    // PERF: When nodal band mode is active and gradient is needed, use the combined
-    // nodalFieldWithGradient function that computes BOTH from the same 4 tetrahedral
-    // psi samples — eliminating 4 redundant psi evaluations per ray step.
-    // PERF: Also gate on density — skip nodal at very low density where envelope → 0.
+    // Two-stage nodal band gate:
+    // 1. density/log-density gate rejects invisible low-amplitude samples.
+    // 2. nodal-only sample gates color/composite work by faded band intensity.
+    // Density gradient stays lazy and is computed later only if downstream work needs it.
     let nodalBandActive = nodalBandEnabled && quickS > -10.0;
-
-    var nodalHandled = false;
 
     if (skipGradient) {
       rho = quickRho;
@@ -368,61 +366,33 @@ fn volumeRaymarchHQ(
         analyticalAtSamplePos.gradPsiIm,
         uniforms
       );
-      let fadedIntensityHQ = nodalSample.intensity * nodalSample.envelopeWeight;
-      if (fadedIntensityHQ > 1e-4) {
+      let nodalBandIntensityHQ = nodalSample.intensity * nodalSample.envelopeWeight;
+      if (nodalBandIntensityHQ > 1e-4) {
         let nodalColor = selectPhysicalNodalColor(uniforms, nodalSample.colorMode, nodalSample.signValue);
         compositeNodalBand(
-          fadedIntensityHQ, uniforms.nodalStrength, nodalColor,
+          nodalBandIntensityHQ, uniforms.nodalStrength, nodalColor,
           min(adaptiveStep, stepLen * 1.5), ambientLight,
           &transmittance, &accColor
         );
       }
-      nodalHandled = true;
-    } else if (nodalBandActive) {
-      // Combined path: nodal detection + density gradient from shared tetrahedral samples.
-      // Saves 4 psi evaluations per step compared to separate computePhysicalNodalField + gradient.
-      let combined = computePhysicalNodalFieldWithGradient(samplePos, animTime, uniforms);
-      gradient = combined.gradient;
-      // PERF: feed nodal's gradient back into the per-step cache so anything
-      // downstream at the same position (currently nothing in HQ; cheap noop)
-      // can share it.
-      gradCache.gradient = combined.gradient;
-      gradCache.pos = samplePos;
-      gradCache.valid = true;
-      // Use center density from the quick check (more accurate single-point value for compositing)
-      rho = quickRho;
-      sCenter = quickS;
-      phase = quickCheck.z;
-      // Process nodal contribution inline (avoid duplicate call)
-      let fadedIntensityHQ = combined.nodal.intensity * combined.nodal.envelopeWeight;
-      if (fadedIntensityHQ > 1e-4) {
-        let nodalColor = selectPhysicalNodalColor(uniforms, combined.nodal.colorMode, combined.nodal.signValue);
-        compositeNodalBand(
-          fadedIntensityHQ, uniforms.nodalStrength, nodalColor,
-          min(adaptiveStep, stepLen * 1.5), ambientLight,
-          &transmittance, &accColor
-        );
-      }
-      nodalHandled = true;
     } else {
       rho = quickRho;
       sCenter = quickS;
       phase = quickCheck.z;
       // Lazy: emission lighting only needs this gradient if alpha survives.
       gradient = vec3f(0.0);
-    }
 
-    // Nodal band processing (only if not already handled by the combined path above)
-    if (!nodalHandled && nodalBandActive) {
-      let nodal = computePhysicalNodalField(samplePos, animTime, uniforms);
-      let fadedIntensityHQ = nodal.intensity * nodal.envelopeWeight;
-      if (fadedIntensityHQ > 1e-4) {
-        let nodalColor = selectPhysicalNodalColor(uniforms, nodal.colorMode, nodal.signValue);
-        compositeNodalBand(
-          fadedIntensityHQ, uniforms.nodalStrength, nodalColor,
-          min(adaptiveStep, stepLen * 1.5), ambientLight,
-          &transmittance, &accColor
-        );
+      if (nodalBandActive) {
+        let nodalSample = computePhysicalNodalField(samplePos, animTime, uniforms);
+        let nodalBandIntensityHQ = nodalSample.intensity * nodalSample.envelopeWeight;
+        if (nodalBandIntensityHQ > 1e-4) {
+          let nodalColor = selectPhysicalNodalColor(uniforms, nodalSample.colorMode, nodalSample.signValue);
+          compositeNodalBand(
+            nodalBandIntensityHQ, uniforms.nodalStrength, nodalColor,
+            min(adaptiveStep, stepLen * 1.5), ambientLight,
+            &transmittance, &accColor
+          );
+        }
       }
     }
 

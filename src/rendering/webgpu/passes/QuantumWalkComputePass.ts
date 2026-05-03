@@ -294,6 +294,7 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
     // Each step: coin reads A → writes B, then shift reads B → writes A.
     // Result always returns to A — no ping-pong needed.
     this.coinBG = device.createBindGroup({
+      label: 'qw-coin-bg',
       layout: coinBGL,
       entries: [
         { binding: 0, resource: { buffer: this.coinUniformBuffer } },
@@ -302,6 +303,7 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
       ],
     })
     this.shiftBG = device.createBindGroup({
+      label: 'qw-shift-bg',
       layout: shiftBGL,
       entries: [
         { binding: 0, resource: { buffer: this.shiftUniformBuffer } },
@@ -322,6 +324,7 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
 
     const writeGridBGL = this.writeGridPipeline!.getBindGroupLayout(0)
     this.writeGridBG = device.createBindGroup({
+      label: 'qw-write-grid-bg',
       layout: writeGridBGL,
       entries: [
         { binding: 0, resource: { buffer: this.writeGridUniformBuffer } },
@@ -337,6 +340,7 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
 
     const absorberBGL = this.absorberPipeline.getBindGroupLayout(0)
     this.absorberBG = device.createBindGroup({
+      label: 'qw-absorber-bg',
       layout: absorberBGL,
       entries: [
         { binding: 0, resource: { buffer: this.absorberUniformBuffer } },

@@ -38,8 +38,8 @@ fn gridAdaptiveLogDensity(rho: f32, sCenter: f32) -> f32 {
 }
 
 fn canUseGridPsiAbsNodal(uniforms: SchroedingerUniforms) -> bool {
-  return uniforms.nodalDefinition == NODAL_DEFINITION_PSI_ABS
-    && uniforms.nodalFamilyFilter == NODAL_FAMILY_ALL
+  return activeNodalDefinition(uniforms) == NODAL_DEFINITION_PSI_ABS
+    && activeNodalFamilyFilter(uniforms) == NODAL_FAMILY_ALL
     && uniforms.nodalLobeColoringEnabled == 0u;
 }
 

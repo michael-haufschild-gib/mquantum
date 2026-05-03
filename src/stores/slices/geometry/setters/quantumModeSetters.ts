@@ -19,6 +19,7 @@ import {
 import {
   getQuantumTypeEntry,
   isComputeQuantumType,
+  isHydrogenFamilyQuantumType,
   QUANTUM_MODES_3D_ONLY,
 } from '@/lib/geometry/registry'
 import type { QuantumTypeKey } from '@/lib/geometry/registry/types'
@@ -168,7 +169,7 @@ function buildRepresentationOverrides(
     return overrides
   }
 
-  const isHydrogen2D = dim === 2 && (mode === 'hydrogenND' || mode === 'hydrogenNDCoupled')
+  const isHydrogen2D = dim === 2 && isHydrogenFamilyQuantumType(mode)
   if (isHydrogen2D && currentRepr !== 'position') {
     overrides.representation = 'position'
   }
@@ -397,7 +398,7 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
         const qm = get().schroedinger.quantumMode
         const dim = useGeometryStore.getState().dimension
         // Block non-position for hydrogen at dim=2 (not yet implemented)
-        if (dim === 2 && (qm === 'hydrogenND' || qm === 'hydrogenNDCoupled')) return
+        if (dim === 2 && isHydrogenFamilyQuantumType(qm)) return
         // Block momentum for coupled hydrogen ND (shader is position-only)
         if (value === 'momentum' && qm === 'hydrogenNDCoupled') return
       }

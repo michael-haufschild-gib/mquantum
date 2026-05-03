@@ -250,7 +250,17 @@ export class FsfKSpaceManager {
       )
       this.kSpaceWorker.onmessage = (e: MessageEvent) => {
         const msg = e.data
-        if (msg.type === 'result' && msg.epoch === this.kSpaceReadbackEpoch) {
+        // Stale reply from a previous epoch: drop on the floor.
+        if (msg.epoch !== this.kSpaceReadbackEpoch) {
+          this.kSpacePending = false
+          return
+        }
+        if (msg.type === 'error') {
+          logger.warn('[FreeScalarFieldComputePass] k-space worker compute failed:', msg.message)
+          this.kSpacePending = false
+          return
+        }
+        if (msg.type === 'result') {
           // Number.isFinite (not `typeof === 'number'`) so a NaN or
           // ±Infinity from a worker-side numerical failure falls back
           // cleanly to 0 instead of poisoning `pendingKSpaceData` and

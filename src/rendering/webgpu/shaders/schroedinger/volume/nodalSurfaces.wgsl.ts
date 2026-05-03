@@ -1,16 +1,15 @@
 /**
  * WGSL Nodal surface visualization for Schrödinger wavefunctions
  *
- * Provides classification, ray-hit tracing, and band rendering for
- * nodal surfaces (where ψ = 0). Supports Re/Im/|ψ| decompositions
- * and hydrogen radial/angular node-family filtering.
- *
- * Extracted from integration.wgsl.ts for modularity.
+ * Provides ray-hit tracing, band rendering, and field computation for
+ * nodal surfaces (where ψ = 0). Primitive helpers (NodalFieldJet struct,
+ * specialization dispatch, crossing/band masks, color selection) live in
+ * nodalFieldJet.wgsl.ts — always assembled before this block.
  *
  * @module rendering/webgpu/shaders/schroedinger/volume/nodalSurfaces.wgsl
  */
 
-/** Nodal surface functions: classification, ray-hit, band rendering. */
+/** Nodal surface computation: scalar field eval, ray-hit, tetrahedral sampling. */
 export const nodalSurfacesBlock = /* wgsl */ `
 // ============================================
 // Physical Nodal Classification
@@ -54,85 +53,23 @@ fn sampleHydrogenNodeFactorsWithFlow(pos: vec3f, t: f32, uniforms: SchroedingerU
 // |psi| is nonnegative and often yields no crossings, so we map psiAbs -> Re(psi)
 // for the ray-hit branch while keeping volumetric band behavior unchanged.
 fn resolveSurfaceNodalDefinition(uniforms: SchroedingerUniforms) -> i32 {
-  if (uniforms.nodalDefinition == NODAL_DEFINITION_PSI_ABS) {
+  let definition = activeNodalDefinition(uniforms);
+  if (definition == NODAL_DEFINITION_PSI_ABS) {
     return NODAL_DEFINITION_REAL;
   }
-  return uniforms.nodalDefinition;
-}
-
-// Convert a zero-crossing scalar field into a nodal intensity.
-fn nodalBandMask(value: f32, gradient: vec3f, eps: f32) -> f32 {
-  let epsSafe = max(eps, 1e-6);
-  let gradMag = length(gradient);
-  if (gradMag < 1e-6) { return 0.0; }
-
-  // First-order distance to the nodal manifold: d ~= |f| / |grad f|
-  let signedDistance = abs(value) / gradMag;
-  // Adaptive width: tighten where gradients are strong to avoid broad planar bands.
-  let gradFactor = clamp(gradMag, 0.35, 4.0);
-  let width = epsSafe / gradFactor;
-  return 1.0 - smoothstep(width, width * 2.5, signedDistance);
-}
-
-// Gate nodal response to neighborhoods that actually straddle f=0.
-// Uses strict sign changes when present, with a near-zero fallback for fields that are
-// nonnegative by construction (for example |Y_lm| in complex-orbital angular mode).
-fn nodalCrossingMask(f0: f32, f1: f32, f2: f32, f3: f32, eps: f32) -> f32 {
-  let minF = min(min(f0, f1), min(f2, f3));
-  let maxF = max(max(f0, f1), max(f2, f3));
-  if (minF < 0.0 && maxF > 0.0) {
-    return 1.0;
-  }
-  let epsSafe = max(eps, 1e-6);
-  let minAbs = min(min(abs(f0), abs(f1)), min(abs(f2), abs(f3)));
-  let span = maxF - minF;
-  if (minAbs <= epsSafe && span >= epsSafe * 0.5) {
-    return 1.0;
-  }
-  return 0.0;
-}
-
-// Pairwise zero-crossing test for ray-segment stepping.
-fn nodalCrossingPair(fPrev: f32, fCurr: f32, eps: f32) -> bool {
-  if ((fPrev < 0.0 && fCurr > 0.0) || (fPrev > 0.0 && fCurr < 0.0)) {
-    return true;
-  }
-  let epsSafe = max(eps, 1e-6);
-  let minAbs = min(abs(fPrev), abs(fCurr));
-  let span = abs(fCurr - fPrev);
-  return minAbs <= epsSafe && span >= epsSafe * 0.35;
-}
-
-// Select nodal color based on active mode and lobe-coloring options.
-fn selectPhysicalNodalColor(uniforms: SchroedingerUniforms, colorMode: i32, signValue: f32) -> vec3f {
-  if (uniforms.nodalLobeColoringEnabled != 0u) {
-    if (signValue >= 0.0) {
-      return uniforms.nodalColorPositive;
-    }
-    return uniforms.nodalColorNegative;
-  }
-
-  if (colorMode == NODAL_DEFINITION_REAL) {
-    return uniforms.nodalColorReal;
-  }
-  if (colorMode == NODAL_DEFINITION_IMAG) {
-    return uniforms.nodalColorImag;
-  }
-  if (colorMode == NODAL_DEFINITION_COMPLEX_INTERSECTION) {
-    return 0.5 * (uniforms.nodalColorReal + uniforms.nodalColorImag);
-  }
-  return uniforms.nodalColor;
+  return definition;
 }
 
 // Evaluate the scalar field used for nodal-surface ray-hit tracking.
 fn evaluateNodalScalarField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> NodalScalarSample {
   let surfaceDefinition = resolveSurfaceNodalDefinition(uniforms);
+  let familyFilter = activeNodalFamilyFilter(uniforms);
   let psi = samplePsiWithFlow(pos, t, uniforms);
   let psiAbs = length(psi);
 
-  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND && uniforms.nodalFamilyFilter != NODAL_FAMILY_ALL) {
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND && familyFilter != NODAL_FAMILY_ALL) {
     let factors = sampleHydrogenNodeFactorsWithFlow(pos, t, uniforms);
-    if (uniforms.nodalFamilyFilter == NODAL_FAMILY_RADIAL) {
+    if (familyFilter == NODAL_FAMILY_RADIAL) {
       return NodalScalarSample(factors.x, factors.x, psiAbs, NODAL_DEFINITION_PSI_ABS);
     }
     return NodalScalarSample(factors.y, factors.y, psiAbs, NODAL_DEFINITION_PSI_ABS);
@@ -155,6 +92,27 @@ fn evaluateNodalScalarField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) 
   return NodalScalarSample(psi.x, psi.x, psiAbs, NODAL_DEFINITION_REAL);
 }
 
+fn evaluateNodalSurfaceFieldJet(pos: vec3f, t: f32, uniforms: SchroedingerUniforms, delta: f32) -> NodalFieldJet {
+  let eps = max(uniforms.nodalTolerance, 1e-6);
+  let center = evaluateNodalScalarField(pos, t, uniforms);
+  let s0 = evaluateNodalScalarField(pos + TETRA_V0 * delta, t, uniforms);
+  let s1 = evaluateNodalScalarField(pos + TETRA_V1 * delta, t, uniforms);
+  let s2 = evaluateNodalScalarField(pos + TETRA_V2 * delta, t, uniforms);
+  let s3 = evaluateNodalScalarField(pos + TETRA_V3 * delta, t, uniforms);
+  let gradient = (TETRA_V0 * s0.value + TETRA_V1 * s1.value +
+                  TETRA_V2 * s2.value + TETRA_V3 * s3.value) * (0.75 / delta);
+  let crossing = nodalCrossingMask(s0.value, s1.value, s2.value, s3.value, eps);
+  return makeNodalFieldJet(
+    center.value,
+    center.signValue,
+    center.amplitude,
+    center.colorMode,
+    gradient,
+    crossing,
+    eps
+  );
+}
+
 // Trace a true nodal surface along the ray and refine the intersection.
 fn findNodalSurfaceHit(
   rayOrigin: vec3f,
@@ -167,7 +125,7 @@ fn findNodalSurfaceHit(
   const NODAL_SURFACE_MAX_STEPS: i32 = 192;
   let span = max(tFar - tNear, 0.0);
   if (span <= 1e-5) {
-    return NodalSurfaceHit(0.0, -1.0, 0.0, uniforms.nodalDefinition, vec3f(0.0, 0.0, 1.0), 0.0);
+    return NodalSurfaceHit(0.0, -1.0, 0.0, activeNodalDefinition(uniforms), vec3f(0.0, 0.0, 1.0), 0.0);
   }
 
   // Surface mode is an overlay on top of volume rendering. Keep the root search
@@ -232,9 +190,31 @@ fn findNodalSurfaceHit(
         }
       }
 
-      let hitT = lastMidT;
+      var refinedHitT = lastMidT;
+      var refinedHitSample = lastMidSample;
+      let jetDelta = clamp(max(stepLen * 0.5, 0.005), 0.005, max(0.05 * uniforms.boundingRadius, 0.02));
+      let initialJet = evaluateNodalSurfaceFieldJet(rayOrigin + rayDir * refinedHitT, animTime, uniforms, jetDelta);
+      let initialJetGradLen2 = dot(initialJet.gradient, initialJet.gradient);
+      if (initialJetGradLen2 > 1e-12) {
+        let rayDerivative = dot(initialJet.gradient, rayDir);
+        if (abs(rayDerivative) > 1e-8) {
+          let candidateT = clamp(refinedHitT - initialJet.value / rayDerivative, tLo, tHi);
+          if (candidateT > tLo && candidateT < tHi) {
+            let candidateSample = evaluateNodalScalarField(rayOrigin + rayDir * candidateT, animTime, uniforms);
+            let improvesResidual = abs(candidateSample.value) <= abs(refinedHitSample.value);
+            let keepsBracket = nodalCrossingPair(loSample.value, candidateSample.value, eps)
+              || nodalCrossingPair(candidateSample.value, hiSample.value, eps);
+            if (candidateSample.amplitude >= minAmplitude && (improvesResidual || keepsBracket)) {
+              refinedHitT = candidateT;
+              refinedHitSample = candidateSample;
+            }
+          }
+        }
+      }
+
+      let hitT = refinedHitT;
       let hitPos = rayOrigin + rayDir * hitT;
-      let hitSample = lastMidSample;
+      let hitSample = refinedHitSample;
       if (hitSample.amplitude < minAmplitude) {
         prevSample = currSample;
         continue;
@@ -268,7 +248,13 @@ fn findNodalSurfaceHit(
       let t2Grad = (t2Val - hitVal) / gradDelta;
 
       // Combine ray-directional and tangent-plane gradients
-      let grad = rayDir * rayGrad + tangent1 * t1Grad + tangent2 * t2Grad;
+      let bracketGrad = rayDir * rayGrad + tangent1 * t1Grad + tangent2 * t2Grad;
+
+      let hitJet = evaluateNodalSurfaceFieldJet(hitPos, animTime, uniforms, jetDelta);
+      var grad = hitJet.gradient;
+      if (dot(grad, grad) < 1e-10) {
+        grad = bracketGrad;
+      }
 
       var normal = normalize(grad);
       if (dot(grad, grad) < 1e-10) {
@@ -285,7 +271,7 @@ fn findNodalSurfaceHit(
     prevSample = currSample;
   }
 
-  return NodalSurfaceHit(0.0, -1.0, 0.0, uniforms.nodalDefinition, vec3f(0.0, 0.0, 1.0), 0.0);
+  return NodalSurfaceHit(0.0, -1.0, 0.0, activeNodalDefinition(uniforms), vec3f(0.0, 0.0, 1.0), 0.0);
 }
 
 // Combined nodal field + density gradient computation.
@@ -304,9 +290,7 @@ fn computePhysicalNodalFieldWithGradient(pos: vec3f, t: f32, uniforms: Schroedin
   // reciprocal per call instead of one per gradient combine (up to 5× below).
   let invGradDelta = 0.75 / delta;
 
-  var intensity = 0.0;
-  var signValue = 0.0;
-  var colorMode = uniforms.nodalDefinition;
+  var nodalJet = makeNodalFieldJet(0.0, 0.0, 0.0, activeNodalDefinition(uniforms), vec3f(0.0), 0.0, eps);
   var maxAbsPsi = 0.0;
   var densityGrad = vec3f(0.0);
   var avgRho = 0.0;
@@ -315,7 +299,7 @@ fn computePhysicalNodalFieldWithGradient(pos: vec3f, t: f32, uniforms: Schroedin
   var maxBoostedRho = 0.0;
 
   // Hydrogen node-family filtering branch
-  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND && uniforms.nodalFamilyFilter != NODAL_FAMILY_ALL) {
+  if (isActiveHydrogenFamilyNodal(uniforms)) {
     let psiC = samplePsiWithFlow(pos, t, uniforms);
     maxAbsPsi = length(psiC);
 
@@ -324,28 +308,31 @@ fn computePhysicalNodalFieldWithGradient(pos: vec3f, t: f32, uniforms: Schroedin
     let h2 = sampleHydrogenNodeFactorsWithFlow(pos + TETRA_V2 * delta, t, uniforms);
     let h3 = sampleHydrogenNodeFactorsWithFlow(pos + TETRA_V3 * delta, t, uniforms);
 
-    var f0 = 0.0;
-    var f1 = 0.0;
-    var f2 = 0.0;
-    var f3 = 0.0;
-    if (uniforms.nodalFamilyFilter == NODAL_FAMILY_RADIAL) {
-      f0 = h0.x; f1 = h1.x; f2 = h2.x; f3 = h3.x;
-    } else {
-      f0 = h0.y; f1 = h1.y; f2 = h2.y; f3 = h3.y;
-    }
-
     // For family-filter envelope: use max |factor| from tetrahedral samples.
     // Raw |ψ| is zero at the node by definition, but the individual factor
     // (radial/angular) at offset positions has reasonable magnitude.
-    let maxFactor = max(max(abs(f0), abs(f1)), max(abs(f2), abs(f3)));
+    let maxRadialFactor = max(max(abs(h0.x), abs(h1.x)), max(abs(h2.x), abs(h3.x)));
+    let maxAngularFactor = max(max(abs(h0.y), abs(h1.y)), max(abs(h2.y), abs(h3.y)));
+    let maxFactor = select(maxAngularFactor, maxRadialFactor, activeNodalFamilyFilter(uniforms) == NODAL_FAMILY_RADIAL);
     maxBoostedRho = maxFactor * maxFactor * uniforms.hydrogenNDBoost;
 
-    let fCenter = (f0 + f1 + f2 + f3) * 0.25;
-    let fGrad = (TETRA_V0 * f0 + TETRA_V1 * f1 + TETRA_V2 * f2 + TETRA_V3 * f3) * invGradDelta;
-    let crossing = nodalCrossingMask(f0, f1, f2, f3, eps);
-    intensity = nodalBandMask(fCenter, fGrad, eps) * crossing;
-    signValue = fCenter;
-    colorMode = NODAL_DEFINITION_PSI_ABS;
+    let radialCenter = (h0.x + h1.x + h2.x + h3.x) * 0.25;
+    let angularCenter = (h0.y + h1.y + h2.y + h3.y) * 0.25;
+    let gradRadial = (TETRA_V0 * h0.x + TETRA_V1 * h1.x + TETRA_V2 * h2.x + TETRA_V3 * h3.x) * invGradDelta;
+    let gradAngular = (TETRA_V0 * h0.y + TETRA_V1 * h1.y + TETRA_V2 * h2.y + TETRA_V3 * h3.y) * invGradDelta;
+    let crossingRadial = nodalCrossingMask(h0.x, h1.x, h2.x, h3.x, eps);
+    let crossingAngular = nodalCrossingMask(h0.y, h1.y, h2.y, h3.y, eps);
+    nodalJet = selectHydrogenFamilyFieldJet(
+      radialCenter,
+      angularCenter,
+      gradRadial,
+      gradAngular,
+      crossingRadial,
+      crossingAngular,
+      sqrt(max(maxBoostedRho, 0.0)),
+      eps,
+      uniforms
+    );
 
     // For hydrogen family filter, density gradient needs separate samples
     // (hydrogen factors don't directly give us density at offset positions)
@@ -390,44 +377,30 @@ fn computePhysicalNodalFieldWithGradient(pos: vec3f, t: f32, uniforms: Schroedin
     let crossingRe = nodalCrossingMask(re0, re1, re2, re3, eps);
     let crossingIm = nodalCrossingMask(im0, im1, im2, im3, eps);
 
-    if (uniforms.nodalDefinition == NODAL_DEFINITION_REAL) {
-      intensity = nodalBandMask(psiCenter.x, gradRe, eps) * crossingRe;
-      signValue = psiCenter.x;
-      colorMode = NODAL_DEFINITION_REAL;
-    } else if (uniforms.nodalDefinition == NODAL_DEFINITION_IMAG) {
-      intensity = nodalBandMask(psiCenter.y, gradIm, eps) * crossingIm;
-      signValue = psiCenter.y;
-      colorMode = NODAL_DEFINITION_IMAG;
-    } else if (uniforms.nodalDefinition == NODAL_DEFINITION_COMPLEX_INTERSECTION) {
-      let maskRe = nodalBandMask(psiCenter.x, gradRe, eps);
-      let maskIm = nodalBandMask(psiCenter.y, gradIm, eps);
-      intensity = sqrt(maskRe * maskIm) * crossingRe * crossingIm;
-      signValue = psiCenter.x;
-      colorMode = NODAL_DEFINITION_COMPLEX_INTERSECTION;
-    } else {
-      let psiAbsCenter = 0.25 * (abs0 + abs1 + abs2 + abs3);
-      let gradAbs = (TETRA_V0 * abs0 + TETRA_V1 * abs1 + TETRA_V2 * abs2 + TETRA_V3 * abs3) * invGradDelta;
-      let crossingAbs = nodalCrossingMask(abs0, abs1, abs2, abs3, eps);
-      let crossingAny = max(max(crossingRe, crossingIm), crossingAbs);
-      intensity = nodalBandMask(psiAbsCenter, gradAbs, eps) * crossingAny;
-      signValue = psiCenter.x;
-      colorMode = NODAL_DEFINITION_PSI_ABS;
+    let psiAbsCenter = 0.25 * (abs0 + abs1 + abs2 + abs3);
+    let gradAbs = (TETRA_V0 * abs0 + TETRA_V1 * abs1 + TETRA_V2 * abs2 + TETRA_V3 * abs3) * invGradDelta;
+    let crossingAbs = nodalCrossingMask(abs0, abs1, abs2, abs3, eps);
+    var envelopeAmp = maxAbsPsi;
+    if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
+      envelopeAmp = sqrt(max(maxBoostedRho, 0.0));
     }
+    nodalJet = selectNodalPsiFieldJet(
+      psiCenter.x,
+      psiCenter.y,
+      psiAbsCenter,
+      envelopeAmp,
+      gradRe,
+      gradIm,
+      gradAbs,
+      crossingRe,
+      crossingIm,
+      crossingAbs,
+      eps,
+      uniforms
+    );
   }
 
-  // Envelope: suppress nodal bands where the wavefunction is negligibly small.
-  // For hydrogen, raw |ψ| is orders of magnitude smaller than HO due to different
-  // normalization (compensated by hydrogenNDBoost for density but not for raw ψ).
-  // Use sqrt(boosted density) for hydrogen so the threshold matches visual significance.
-  let envelopeFloor = max(eps * 0.4, 5e-5);
-  let envelopeCeil = max(eps * 2.0, envelopeFloor + 1e-4);
-  var envelopeAmp = maxAbsPsi;
-  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
-    envelopeAmp = sqrt(max(maxBoostedRho, 0.0));
-  }
-  let envelopeWeight = smoothstep(envelopeFloor, envelopeCeil, envelopeAmp);
-
-  let nodalResult = NodalSample(clamp(intensity, 0.0, 1.0), signValue, colorMode, envelopeWeight);
+  let nodalResult = nodalSampleFromFieldJet(nodalJet);
   return NodalWithGradient(nodalResult, densityGrad, avgRho, avgS);
 }
 
@@ -458,47 +431,30 @@ fn computeNodalFromAnalyticalPsi(
   let psiMag2 = psiRe * psiRe + psiIm * psiIm;
   let psiAbs = sqrt(max(psiMag2, 0.0));
 
-  var intensity = 0.0;
-  var signValue = psiRe;
-  var colorMode = uniforms.nodalDefinition;
-
-  if (uniforms.nodalDefinition == NODAL_DEFINITION_REAL) {
-    intensity = nodalBandMask(psiRe, gradPsiRe, eps);
-    signValue = psiRe;
-    colorMode = NODAL_DEFINITION_REAL;
-  } else if (uniforms.nodalDefinition == NODAL_DEFINITION_IMAG) {
-    intensity = nodalBandMask(psiIm, gradPsiIm, eps);
-    signValue = psiIm;
-    colorMode = NODAL_DEFINITION_IMAG;
-  } else if (uniforms.nodalDefinition == NODAL_DEFINITION_COMPLEX_INTERSECTION) {
-    let maskRe = nodalBandMask(psiRe, gradPsiRe, eps);
-    let maskIm = nodalBandMask(psiIm, gradPsiIm, eps);
-    intensity = sqrt(max(maskRe * maskIm, 0.0));
-    signValue = psiRe;
-    colorMode = NODAL_DEFINITION_COMPLEX_INTERSECTION;
-  } else {
-    // |ψ| mode: gradient via chain rule ∇|ψ| = (Re·∇Re + Im·∇Im)/|ψ|.
-    // At a true node (Re≈0, Im≈0) the numerator vanishes and nodalBandMask
-    // returns 0 — the band disappears exactly at the node. Fall back to
-    // √(|∇Re|² + |∇Im|²) which stays nonzero at the node.
-    let invPsiAbs = 1.0 / max(psiAbs, 1e-8);
-    let gradChain = (gradPsiRe * psiRe + gradPsiIm * psiIm) * invPsiAbs;
-    let chainLen = length(gradChain);
-    let fallbackLen = sqrt(dot(gradPsiRe, gradPsiRe) + dot(gradPsiIm, gradPsiIm));
-    let gradAbs = select(normalize(gradPsiRe + gradPsiIm) * fallbackLen, gradChain, chainLen > 1e-6);
-    intensity = nodalBandMask(psiAbs, gradAbs, eps);
-    signValue = psiRe;
-    colorMode = NODAL_DEFINITION_PSI_ABS;
-  }
-
-  // Envelope: matches the tetrahedral path (suppress where amplitude is tiny).
-  // For analytical mode (HO only at present) we use raw |ψ| since hydrogenNDBoost
-  // is HO-only zero. Family-filter doesn't apply.
-  let envelopeFloor = max(eps * 0.4, 5e-5);
-  let envelopeCeil = max(eps * 2.0, envelopeFloor + 1e-4);
-  let envelopeWeight = smoothstep(envelopeFloor, envelopeCeil, psiAbs);
-
-  return NodalSample(clamp(intensity, 0.0, 1.0), signValue, colorMode, envelopeWeight);
+  // |ψ| mode: gradient via chain rule ∇|ψ| = (Re·∇Re + Im·∇Im)/|ψ|.
+  // At a true node (Re≈0, Im≈0) the numerator vanishes and nodalBandMask
+  // returns 0 — the band disappears exactly at the node. Fall back to
+  // √(|∇Re|² + |∇Im|²) which stays nonzero at the node.
+  let invPsiAbs = 1.0 / max(psiAbs, 1e-8);
+  let gradChain = (gradPsiRe * psiRe + gradPsiIm * psiIm) * invPsiAbs;
+  let chainLen = length(gradChain);
+  let fallbackLen = sqrt(dot(gradPsiRe, gradPsiRe) + dot(gradPsiIm, gradPsiIm));
+  let gradAbs = select(normalize(gradPsiRe + gradPsiIm) * fallbackLen, gradChain, chainLen > 1e-6);
+  let jet = selectNodalPsiFieldJet(
+    psiRe,
+    psiIm,
+    psiAbs,
+    psiAbs,
+    gradPsiRe,
+    gradPsiIm,
+    gradAbs,
+    1.0,
+    1.0,
+    1.0,
+    eps,
+    uniforms
+  );
+  return nodalSampleFromFieldJet(jet);
 }
 
 // Compute physically grounded nodal intensity from psi, Re(psi), Im(psi), and hydrogen factors.
@@ -508,15 +464,13 @@ fn computePhysicalNodalField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms)
   let delta = 0.05 * max(uniforms.boundingRadius / 3.0, 1.0);
   let invGradDelta = 0.75 / delta;
 
-  var intensity = 0.0;
-  var signValue = 0.0;
-  var colorMode = uniforms.nodalDefinition;
+  var nodalJet = makeNodalFieldJet(0.0, 0.0, 0.0, activeNodalDefinition(uniforms), vec3f(0.0), 0.0, eps);
   var maxAbsPsi = 0.0;
 
   // Hydrogen node-family filtering: only needs hydrogen factors + center amplitude
   // Track max factor magnitude for envelope (raw |ψ| is zero at the node itself).
   var maxFamilyFactor = 0.0;
-  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND && uniforms.nodalFamilyFilter != NODAL_FAMILY_ALL) {
+  if (isActiveHydrogenFamilyNodal(uniforms)) {
     let psiC = samplePsiWithFlow(pos, t, uniforms);
     maxAbsPsi = length(psiC);
 
@@ -525,30 +479,27 @@ fn computePhysicalNodalField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms)
     let h2 = sampleHydrogenNodeFactorsWithFlow(pos + TETRA_V2 * delta, t, uniforms);
     let h3 = sampleHydrogenNodeFactorsWithFlow(pos + TETRA_V3 * delta, t, uniforms);
 
-    var f0 = 0.0;
-    var f1 = 0.0;
-    var f2 = 0.0;
-    var f3 = 0.0;
-    if (uniforms.nodalFamilyFilter == NODAL_FAMILY_RADIAL) {
-      f0 = h0.x;
-      f1 = h1.x;
-      f2 = h2.x;
-      f3 = h3.x;
-    } else {
-      f0 = h0.y;
-      f1 = h1.y;
-      f2 = h2.y;
-      f3 = h3.y;
-    }
+    let maxRadialFactor = max(max(abs(h0.x), abs(h1.x)), max(abs(h2.x), abs(h3.x)));
+    let maxAngularFactor = max(max(abs(h0.y), abs(h1.y)), max(abs(h2.y), abs(h3.y)));
+    maxFamilyFactor = select(maxAngularFactor, maxRadialFactor, activeNodalFamilyFilter(uniforms) == NODAL_FAMILY_RADIAL);
 
-    maxFamilyFactor = max(max(abs(f0), abs(f1)), max(abs(f2), abs(f3)));
-
-    let fCenter = (f0 + f1 + f2 + f3) * 0.25;
-    let fGrad = (TETRA_V0 * f0 + TETRA_V1 * f1 + TETRA_V2 * f2 + TETRA_V3 * f3) * invGradDelta;
-    let crossing = nodalCrossingMask(f0, f1, f2, f3, eps);
-    intensity = nodalBandMask(fCenter, fGrad, eps) * crossing;
-    signValue = fCenter;
-    colorMode = NODAL_DEFINITION_PSI_ABS;
+    let radialCenter = (h0.x + h1.x + h2.x + h3.x) * 0.25;
+    let angularCenter = (h0.y + h1.y + h2.y + h3.y) * 0.25;
+    let gradRadial = (TETRA_V0 * h0.x + TETRA_V1 * h1.x + TETRA_V2 * h2.x + TETRA_V3 * h3.x) * invGradDelta;
+    let gradAngular = (TETRA_V0 * h0.y + TETRA_V1 * h1.y + TETRA_V2 * h2.y + TETRA_V3 * h3.y) * invGradDelta;
+    let crossingRadial = nodalCrossingMask(h0.x, h1.x, h2.x, h3.x, eps);
+    let crossingAngular = nodalCrossingMask(h0.y, h1.y, h2.y, h3.y, eps);
+    nodalJet = selectHydrogenFamilyFieldJet(
+      radialCenter,
+      angularCenter,
+      gradRadial,
+      gradAngular,
+      crossingRadial,
+      crossingAngular,
+      sqrt(max(maxFamilyFactor * maxFamilyFactor * uniforms.hydrogenNDBoost, 0.0)),
+      eps,
+      uniforms
+    );
   } else {
     // Full tetrahedral psi sampling for Re/Im/|psi| nodal modes
     let p0 = samplePsiWithFlow(pos + TETRA_V0 * delta, t, uniforms);
@@ -576,56 +527,37 @@ fn computePhysicalNodalField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms)
     let crossingRe = nodalCrossingMask(re0, re1, re2, re3, eps);
     let crossingIm = nodalCrossingMask(im0, im1, im2, im3, eps);
 
-    if (uniforms.nodalDefinition == NODAL_DEFINITION_REAL) {
-      intensity = nodalBandMask(psiCenter.x, gradRe, eps) * crossingRe;
-      signValue = psiCenter.x;
-      colorMode = NODAL_DEFINITION_REAL;
-    } else if (uniforms.nodalDefinition == NODAL_DEFINITION_IMAG) {
-      intensity = nodalBandMask(psiCenter.y, gradIm, eps) * crossingIm;
-      signValue = psiCenter.y;
-      colorMode = NODAL_DEFINITION_IMAG;
-    } else if (uniforms.nodalDefinition == NODAL_DEFINITION_COMPLEX_INTERSECTION) {
-      let maskRe = nodalBandMask(psiCenter.x, gradRe, eps);
-      let maskIm = nodalBandMask(psiCenter.y, gradIm, eps);
-      intensity = sqrt(maskRe * maskIm) * crossingRe * crossingIm;
-      signValue = psiCenter.x;
-      colorMode = NODAL_DEFINITION_COMPLEX_INTERSECTION;
-    } else {
-      // |psi| mode: near-zero envelope, gated by sign changes or near-zero contact.
-      let psiAbsCenter = 0.25 * (abs0 + abs1 + abs2 + abs3);
-      let gradAbs = (TETRA_V0 * abs0 + TETRA_V1 * abs1 + TETRA_V2 * abs2 + TETRA_V3 * abs3) * invGradDelta;
-      let crossingAbs = nodalCrossingMask(abs0, abs1, abs2, abs3, eps);
-      let crossingAny = max(max(crossingRe, crossingIm), crossingAbs);
-      intensity = nodalBandMask(psiAbsCenter, gradAbs, eps) * crossingAny;
-      signValue = psiCenter.x;
-      colorMode = NODAL_DEFINITION_PSI_ABS;
+    // |psi| mode: near-zero envelope, gated by sign changes or near-zero contact.
+    let psiAbsCenter = 0.25 * (abs0 + abs1 + abs2 + abs3);
+    let gradAbs = (TETRA_V0 * abs0 + TETRA_V1 * abs1 + TETRA_V2 * abs2 + TETRA_V3 * abs3) * invGradDelta;
+    let crossingAbs = nodalCrossingMask(abs0, abs1, abs2, abs3, eps);
+    var envelopeAmp = maxAbsPsi;
+    if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
+      envelopeAmp = sqrt(max(maxAbsPsi * maxAbsPsi * uniforms.hydrogenNDBoost, 0.0));
     }
+    nodalJet = selectNodalPsiFieldJet(
+      psiCenter.x,
+      psiCenter.y,
+      psiAbsCenter,
+      envelopeAmp,
+      gradRe,
+      gradIm,
+      gradAbs,
+      crossingRe,
+      crossingIm,
+      crossingAbs,
+      eps,
+      uniforms
+    );
   }
 
-  // Hydrogen envelope correction: raw |ψ| is much smaller than HO due to
-  // normalization differences. Scale by sqrt(hydrogenNDBoost) to match the
-  // effective amplitude used in density visualization.
-  // For family-filter mode, use the factor magnitude instead of raw |ψ|
-  // (at a node, |ψ| is zero but the individual factor has nonzero magnitude at offsets).
-  let envelopeFloor = max(eps * 0.4, 5e-5);
-  let envelopeCeil = max(eps * 2.0, envelopeFloor + 1e-4);
-  var envelopeAmp = maxAbsPsi;
-  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
-    let baseAmp = select(maxAbsPsi, maxFamilyFactor, maxFamilyFactor > 0.0);
-    envelopeAmp = sqrt(baseAmp * baseAmp * uniforms.hydrogenNDBoost);
-  }
-  let envelopeWeight = smoothstep(envelopeFloor, envelopeCeil, envelopeAmp);
-
-  return NodalSample(clamp(intensity, 0.0, 1.0), signValue, colorMode, envelopeWeight);
+  return nodalSampleFromFieldJet(nodalJet);
 }
 `
 
 /** No-op stubs for nodal surface functions when FEATURE_NODAL is off. */
 export const nodalSurfacesStubBlock = /* wgsl */ `
 // Stubs: nodal surfaces disabled at compile time
-fn nodalBandMask(value: f32, gradient: vec3f, eps: f32) -> f32 {
-  return 0.0;
-}
 fn computePhysicalNodalField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> NodalSample {
   return NodalSample(0.0, 0.0, 0, 0.0);
 }
@@ -636,9 +568,6 @@ fn computeNodalFromAnalyticalPsi(
   psi: vec2f, gradPsiRe: vec3f, gradPsiIm: vec3f, uniforms: SchroedingerUniforms
 ) -> NodalSample {
   return NodalSample(0.0, 0.0, 0, 0.0);
-}
-fn selectPhysicalNodalColor(uniforms: SchroedingerUniforms, colorMode: i32, signValue: f32) -> vec3f {
-  return vec3f(0.0);
 }
 fn findNodalSurfaceHit(
   rayOrigin: vec3f, rayDir: vec3f, tNear: f32, tFar: f32, animTime: f32, uniforms: SchroedingerUniforms

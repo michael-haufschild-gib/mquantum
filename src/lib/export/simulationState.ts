@@ -23,6 +23,10 @@
  */
 
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
+import {
+  getQuantumTypeKeyByStateSaveIdMap,
+  getQuantumTypeStateSaveIdMap,
+} from '@/lib/geometry/registry'
 
 /** Quantum modes that can be saved/loaded, including pauliSpinor (separate object type). */
 export type SaveableQuantumMode = SchroedingerQuantumMode | 'pauliSpinor'
@@ -43,27 +47,12 @@ const MAGIC = 'MQST'
 const VERSION = 1
 const HEADER_SIZE = 64
 
-const QUANTUM_MODE_INDEX: Record<string, number> = {
-  harmonicOscillator: 0,
-  hydrogenND: 1,
-  freeScalarField: 2,
-  tdseDynamics: 3,
-  becDynamics: 4,
-  diracEquation: 5,
-  quantumWalk: 6,
-  pauliSpinor: 7,
-}
-
-const INDEX_TO_QUANTUM_MODE: Record<number, SaveableQuantumMode> = {
-  0: 'harmonicOscillator',
-  1: 'hydrogenND',
-  2: 'freeScalarField',
-  3: 'tdseDynamics',
-  4: 'becDynamics',
-  5: 'diracEquation',
-  6: 'quantumWalk',
-  7: 'pauliSpinor',
-}
+const STATE_SAVE_ID_BY_MODE = getQuantumTypeStateSaveIdMap() as Partial<
+  Record<SaveableQuantumMode, number>
+>
+const MODE_BY_STATE_SAVE_ID = getQuantumTypeKeyByStateSaveIdMap() as Partial<
+  Record<number, SaveableQuantumMode>
+>
 
 /**
  * Serialize simulation state to a downloadable Blob.
@@ -118,7 +107,7 @@ export async function serializeSimulationState(
   hView.setUint32(4, VERSION, true)
 
   // Mode metadata
-  hU8[8] = QUANTUM_MODE_INDEX[quantumMode] ?? 0
+  hU8[8] = STATE_SAVE_ID_BY_MODE[quantumMode] ?? 0
   hU8[9] = gridSize.length
   hU8[10] = wavefunction.componentCount
   hU8[11] = isCompressed ? 1 : 0
@@ -209,7 +198,7 @@ export async function deserializeSimulationState(data: ArrayBuffer): Promise<{
   const psiRe = wavData.slice(0, totalElements)
   const psiIm = wavData.slice(totalElements, totalElements * 2)
 
-  const quantumMode = INDEX_TO_QUANTUM_MODE[modeIndex] ?? 'tdseDynamics'
+  const quantumMode = MODE_BY_STATE_SAVE_ID[modeIndex] ?? 'tdseDynamics'
 
   // Backward compat: files saved before pauliSpinor was a separate mode
   // stored quantumMode='tdseDynamics' with a 'pauli' key in config.

@@ -529,6 +529,9 @@ fn samplePsiWithFlow(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec2
 // Re-export compositing helpers — shared by all three raymarching functions
 export { volumeCompositingBlock } from './volumeCompositing.wgsl'
 
+// Re-export nodal field jet primitives (always included before nodal surfaces)
+export { nodalFieldJetBlock, nodalFieldJetStubBlock } from './nodalFieldJet.wgsl'
+
 // Re-export nodal surfaces from dedicated module — extracted for file-size management
 export { nodalSurfacesBlock, nodalSurfacesStubBlock } from './nodalSurfaces.wgsl'
 

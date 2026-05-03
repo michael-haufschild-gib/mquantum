@@ -38,12 +38,15 @@ export class DiracAlgebraBridge {
         type: 'module',
       })
       this.worker.onmessage = (e: MessageEvent<DiracAlgebraResponse>) => {
-        const { epoch, gammaData, spinorSize } = e.data
+        const { epoch } = e.data
         const p = this.pending.get(epoch)
-        if (p) {
-          this.pending.delete(epoch)
-          p.resolve({ gammaData, spinorSize })
+        if (!p) return
+        this.pending.delete(epoch)
+        if (e.data.type === 'error') {
+          p.reject(new Error(`Dirac algebra worker compute failed: ${e.data.message}`))
+          return
         }
+        p.resolve({ gammaData: e.data.gammaData, spinorSize: e.data.spinorSize })
       }
       this.worker.onerror = (e) => {
         for (const [, p] of this.pending) {
