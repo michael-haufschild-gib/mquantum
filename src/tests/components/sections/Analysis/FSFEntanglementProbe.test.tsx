@@ -272,6 +272,37 @@ describe('FSFEntanglementProbe — epoch discipline', () => {
     expect(screen.queryByTestId('entanglement-probe-chart')).toBeNull()
   })
 
+  it('clears a previously rendered result when the next worker reply is an error', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<FSFEntanglementProbe />)
+    await user.click(screen.getByTestId('entanglement-probe-toggle'))
+
+    await vi.advanceTimersByTimeAsync(200)
+    const firstEpoch = recordedMessages[0]!.epoch
+    act(() => {
+      latestWorker().emit(fakeResponse({ epoch: firstEpoch }))
+    })
+    expect(await screen.findByTestId('entanglement-probe-chart')).toBeInTheDocument()
+
+    useExtendedObjectStore.setState((state) => ({
+      schroedinger: {
+        ...state.schroedinger,
+        freeScalar: { ...state.schroedinger.freeScalar, mass: 4 },
+      },
+    }))
+
+    await vi.advanceTimersByTimeAsync(200)
+    const secondEpoch = recordedMessages[1]!.epoch
+    act(() => {
+      latestWorker().emit({ type: 'error', epoch: secondEpoch, message: 'simulated failure' })
+    })
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('entanglement-probe-chart')).toBeNull()
+    })
+    expect(screen.queryByTestId('entanglement-probe-pending')).toBeNull()
+  })
+
   it('labels modular metrics with the L_A the worker actually computed them for', async () => {
     // Regression for round-4 review finding: the worker response did not
     // echo `subsystemLength`, so after an L_A change the previous modular

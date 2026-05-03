@@ -206,6 +206,7 @@ export const FSFEntanglementProbe: React.FC = React.memo(() => {
       if (response.epoch !== epochRef.current) return
       if (response.type === 'error') {
         logger.warn('[FSFEntanglementProbe] worker compute failed:', response.message)
+        setResult(null)
         setPending(false)
         return
       }

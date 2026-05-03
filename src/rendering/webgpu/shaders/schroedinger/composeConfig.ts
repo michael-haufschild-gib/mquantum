@@ -403,13 +403,12 @@ export function buildShaderDefinesAndFeatures(flags: {
   return { defines, features }
 }
 
+const NODAL_SPECIALIZATION_OVERRIDE_PATTERN =
+  /(^|\n)[ \t]*override\s+(NODAL_SPECIALIZATION_ENABLED|NODAL_SPECIALIZED_DEFINITION|NODAL_SPECIALIZED_RENDER_MODE|NODAL_SPECIALIZED_FAMILY_FILTER)\s*:[^;\n]+;[ \t]*(?=\n|$)/g
+
 /** Remove fallback nodal override declarations when compose-level defines provide values. */
 export function removeDefaultNodalSpecializationOverrides(wgsl: string): string {
-  return wgsl
-    .replace(/\noverride NODAL_SPECIALIZATION_ENABLED: bool = false;/g, '')
-    .replace(/\noverride NODAL_SPECIALIZED_DEFINITION: i32 = 0;/g, '')
-    .replace(/\noverride NODAL_SPECIALIZED_RENDER_MODE: i32 = 0;/g, '')
-    .replace(/\noverride NODAL_SPECIALIZED_FAMILY_FILTER: i32 = 0;/g, '')
+  return wgsl.replace(NODAL_SPECIALIZATION_OVERRIDE_PATTERN, '$1')
 }
 
 /**

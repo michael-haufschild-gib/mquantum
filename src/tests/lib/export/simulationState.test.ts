@@ -16,6 +16,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { deserializeSimulationState, serializeSimulationState } from '@/lib/export/simulationState'
+import { getQuantumTypeStateSaveIdMap } from '@/lib/geometry/registry'
 
 /**
  * Convert a Blob to ArrayBuffer reliably in happy-dom.
@@ -180,22 +181,45 @@ describe('simulationState serialization', () => {
     const modes = [
       'harmonicOscillator',
       'hydrogenND',
+      'hydrogenNDCoupled',
       'freeScalarField',
       'tdseDynamics',
       'becDynamics',
       'diracEquation',
       'quantumWalk',
+      'wheelerDeWitt',
+      'antiDeSitter',
       'pauliSpinor',
     ] as const
+    const stateSaveIds = getQuantumTypeStateSaveIdMap()
 
     for (const mode of modes) {
       const wf = makeWavefunction(4, 1)
       const config = { quantumMode: mode }
       const blob = await serializeSimulationState(config, wf, mode, [4])
       const data = await blobToArrayBuffer(blob)
+      expect(new Uint8Array(data)[8]).toBe(stateSaveIds[mode])
       const result = await deserializeSimulationState(data)
       expect(result.quantumMode).toBe(mode)
     }
+  })
+
+  it('preserves append-only binary save IDs for legacy modes', async () => {
+    const legacyStateSaveIds = {
+      harmonicOscillator: 0,
+      hydrogenND: 1,
+      freeScalarField: 2,
+      tdseDynamics: 3,
+      becDynamics: 4,
+      diracEquation: 5,
+      quantumWalk: 6,
+      pauliSpinor: 7,
+    } as const
+    const stateSaveIds = getQuantumTypeStateSaveIdMap()
+
+    expect(
+      Object.fromEntries(Object.keys(legacyStateSaveIds).map((mode) => [mode, stateSaveIds[mode]]))
+    ).toEqual(legacyStateSaveIds)
   })
 
   it('round-trips Pauli spinor state (2-component)', async () => {

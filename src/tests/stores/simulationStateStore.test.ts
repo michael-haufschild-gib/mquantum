@@ -337,6 +337,39 @@ describe('simulationStateStore', () => {
       expect(pushed.tdse.needsReset).toBe(true)
     })
 
+    it.each([
+      ['wheelerDeWitt', 'wheelerDeWitt'],
+      ['antiDeSitter', 'antiDeSitter'],
+    ] as const)(
+      'loadFromFile forces needsReset on the registry sub-config for %s',
+      async (quantumMode, subKey) => {
+        deserializeMock.mockImplementationOnce(async () => ({
+          quantumMode,
+          latticeDim: 3,
+          componentCount: 1,
+          gridSize: [8, 8, 8],
+          totalSites: 512,
+          config: {
+            quantumMode,
+            [subKey]: { stepsPerFrame: 2, needsReset: false },
+          },
+          psiRe: new Float32Array(512),
+          psiIm: new Float32Array(512),
+        }))
+
+        const file = new File([new ArrayBuffer(128)], `${quantumMode}.mqstate`, {
+          type: 'application/octet-stream',
+        })
+        useSimulationStateStore.getState().loadFromFile(file)
+        await vi.waitFor(() => {
+          expect(setSchroedingerConfigSpy).toHaveBeenCalledTimes(1)
+        })
+        const pushed = setSchroedingerConfigSpy.mock.calls[0]![0] as Record<string, unknown>
+        expect(pushed.quantumMode).toBe(quantumMode)
+        expect((pushed[subKey] as { needsReset: boolean }).needsReset).toBe(true)
+      }
+    )
+
     it('guards Pauli mqstate restore so object-type initialization cannot clobber loaded config', async () => {
       setObjectTypeSpy.mockImplementationOnce(() => {
         expect(performanceState.isLoadingScene).toBe(true)

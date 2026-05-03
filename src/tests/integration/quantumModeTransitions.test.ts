@@ -11,32 +11,55 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
+import { isComputeQuantumType, QUANTUM_TYPE_REGISTRY } from '@/lib/geometry/registry'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
 
-const ALL_MODES: SchroedingerQuantumMode[] = [
-  'harmonicOscillator',
-  'hydrogenND',
-  'freeScalarField',
-  'tdseDynamics',
-  'becDynamics',
-  'diracEquation',
-  'quantumWalk',
-]
+function getRegistrySchroedingerModes(): SchroedingerQuantumMode[] {
+  const modes: SchroedingerQuantumMode[] = []
+  for (const [, entry] of QUANTUM_TYPE_REGISTRY) {
+    if (entry.internal.objectType === 'schroedinger' && entry.internal.quantumMode) {
+      modes.push(entry.internal.quantumMode)
+    }
+  }
+  return modes
+}
 
-const COMPUTE_MODES: SchroedingerQuantumMode[] = [
-  'freeScalarField',
-  'tdseDynamics',
-  'becDynamics',
-  'diracEquation',
-]
+const ALL_MODES = getRegistrySchroedingerModes()
+const COMPUTE_MODES = ALL_MODES.filter((mode) => isComputeQuantumType(mode))
 
 describe('quantum mode state machine transitions', () => {
   beforeEach(() => {
     useGeometryStore.getState().reset()
     useExtendedObjectStore.getState().reset()
     useGeometryStore.getState().setDimension(3)
+  })
+
+  describe('registry-derived coverage', () => {
+    it('transition sweeps include every registered Schroedinger mode', () => {
+      expect(ALL_MODES).toEqual([
+        'harmonicOscillator',
+        'hydrogenND',
+        'hydrogenNDCoupled',
+        'freeScalarField',
+        'tdseDynamics',
+        'becDynamics',
+        'diracEquation',
+        'quantumWalk',
+        'wheelerDeWitt',
+        'antiDeSitter',
+      ])
+      expect(COMPUTE_MODES).toEqual([
+        'freeScalarField',
+        'tdseDynamics',
+        'becDynamics',
+        'diracEquation',
+        'quantumWalk',
+        'wheelerDeWitt',
+        'antiDeSitter',
+      ])
+    })
   })
 
   describe('dimension constraints', () => {

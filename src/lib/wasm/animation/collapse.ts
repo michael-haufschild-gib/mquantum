@@ -84,9 +84,9 @@ export function generateDisorderPotentialWasm(
 /**
  * Full Gaussian measurement collapse via WASM.
  *
- * Returns `[psiRe, psiIm]` as separate Float32Array views; the WASM side packs
- * `[re..., im...]` and this helper splits without copying by constructing
- * subarrays over the shared ArrayBuffer.
+ * Returns `[psiRe, psiIm]` as separate caller-owned Float32Array copies. The
+ * WASM side packs `[re..., im...]`; this helper copies each half into an
+ * independent buffer so later WASM memory growth cannot invalidate callers.
  *
  * @param gridSize - Per-axis grid sizes
  * @param spacing - Per-axis spacings

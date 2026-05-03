@@ -315,11 +315,17 @@ describe('extractSchrodingerConfig', () => {
         quantumMode: 'harmonicOscillator',
         openQuantumEnabled: true,
         nodalEnabled: true,
+        nodalDefinition: 'imagPart',
+        nodalRenderMode: 'surface',
+        nodalFamilyFilter: 'angular',
         phaseMaterialityEnabled: true,
         interferenceEnabled: true,
       })
     )
     expect(extracted.nodalEnabled).toBe(false)
+    expect(extracted.nodalDefinition).toBe('psiAbs')
+    expect(extracted.nodalRenderMode).toBe('band')
+    expect(extracted.nodalFamilyFilter).toBe('all')
     expect(extracted.phaseMaterialityEnabled).toBe(false)
     expect(extracted.interferenceEnabled).toBe(false)
   })

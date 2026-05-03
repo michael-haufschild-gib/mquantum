@@ -17,10 +17,13 @@
 export type {
   AvailableQuantumTypeInfo,
   QuantumTypeCategory,
+  QuantumTypeDataPath,
   QuantumTypeEntry,
   QuantumTypeInternal,
   QuantumTypeKey,
   QuantumTypeRegistry,
+  QuantumTypeRuntimeMetadata,
+  QuantumTypeStrategyKind,
 } from './types'
 
 // Types — legacy model (still used by internal plumbing)
@@ -40,11 +43,22 @@ export { OBJECT_TYPE_REGISTRY } from './registry'
 // Helper functions — flat model
 export {
   getAvailableQuantumTypes,
+  getQuantumTypeConfigSubKey,
+  getQuantumTypeDefaultColorAlgorithm,
   getQuantumTypeEntry,
+  getQuantumTypeKeyByStateSaveIdMap,
   getQuantumTypeName,
+  getQuantumTypeRuntime,
+  getQuantumTypeShaderUniformId,
+  getQuantumTypeShaderUniformIdMap,
   getQuantumTypesRequiringDimensionAbove,
+  getQuantumTypeStateSaveId,
+  getQuantumTypeStateSaveIdMap,
+  getQuantumTypeStrategyKind,
   isAnalyticQuantumType,
   isComputeQuantumType,
+  isHydrogenFamilyQuantumType,
+  isUniformComputeGridQuantumType,
   QUANTUM_MODES_3D_ONLY,
   resolveQuantumTypeKey,
 } from './helpers'

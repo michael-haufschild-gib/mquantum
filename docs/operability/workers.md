@@ -3,7 +3,7 @@
 This project uses Web Workers to offload CPU-intensive physics off the
 main thread. Each worker has a strict request/response shape and a
 specific error-propagation contract. This document is the source of
-truth for what a *good* worker looks like in this codebase, and where
+truth for what a _good_ worker looks like in this codebase, and where
 the current set deviates.
 
 ## Invariants
@@ -28,15 +28,15 @@ Every worker MUST:
 
 ## Workers in this project
 
-| Worker | In-band error? | `worker.onerror`? | Notes |
-|---|---|---|---|
-| `srmtSweep.worker.ts` | yes (`type: 'error'`) | yes | reference implementation |
-| `srmtDiagnostic.worker.ts` | yes (`type: 'error'`) | yes | per-clock fan-out |
-| `bec/incompressibleSpectrum.worker.ts` | yes (`type: 'error'`) | yes | |
-| `peschelWorker.ts` | yes (`type: 'error'`) | yes | top-level `type: 'error'` upgraded 2026-05-03; `trajectoryError` for partial failures |
-| `coordinateEntanglement.worker.ts` | yes (`type: 'error'`) | yes (`TdseBecStrategy.ts:467`) | upgraded 2026-05-03 |
-| `freeScalar/kSpaceWorker.ts` | yes (`type: 'error'`) | yes | upgraded 2026-05-03 |
-| `dirac/diracAlgebraWorker.ts` | yes (`type: 'error'`) | yes (`diracAlgebra.ts:48`) | upgraded 2026-05-03; catch + log + retry |
+| Worker                                 | In-band error?        | `worker.onerror`?              | Notes                                                                                 |
+| -------------------------------------- | --------------------- | ------------------------------ | ------------------------------------------------------------------------------------- |
+| `srmtSweep.worker.ts`                  | yes (`type: 'error'`) | yes                            | reference implementation                                                              |
+| `srmtDiagnostic.worker.ts`             | yes (`type: 'error'`) | yes                            | per-clock fan-out                                                                     |
+| `bec/incompressibleSpectrum.worker.ts` | yes (`type: 'error'`) | yes                            |                                                                                       |
+| `peschelWorker.ts`                     | yes (`type: 'error'`) | yes                            | top-level `type: 'error'` upgraded 2026-05-02; `trajectoryError` for partial failures |
+| `coordinateEntanglement.worker.ts`     | yes (`type: 'error'`) | yes (`TdseBecStrategy.ts:467`) | upgraded 2026-05-02                                                                   |
+| `freeScalar/kSpaceWorker.ts`           | yes (`type: 'error'`) | yes                            | upgraded 2026-05-02                                                                   |
+| `dirac/diracAlgebraWorker.ts`          | yes (`type: 'error'`) | yes (`diracAlgebra.ts:48`)     | upgraded 2026-05-02; catch + log + retry                                              |
 
 ## Reference implementation: srmtSweep
 
@@ -55,9 +55,15 @@ Consumer pattern:
 worker.onmessage = (e: MessageEvent<Response>) => {
   if (e.data.epoch !== currentEpoch) return // drop stale
   switch (e.data.type) {
-    case 'progress': onPoint(e.data.point); break
-    case 'done':     onComplete(); break
-    case 'error':    onError(e.data.message); break
+    case 'progress':
+      onPoint(e.data.point)
+      break
+    case 'done':
+      onComplete()
+      break
+    case 'error':
+      onError(e.data.message)
+      break
   }
 }
 worker.onerror = (event) => {
@@ -89,12 +95,12 @@ belt-and-suspenders for uncaught throws that escape the worker's
 The migration was completed across two waves:
 
 - **2026-04-28**: `srmtSweep`, `srmtDiagnostic`, `bec/incompressibleSpectrum`.
-- **2026-05-03**: `coordinateEntanglement`, `freeScalar/kSpaceWorker`,
+- **2026-05-02**: `coordinateEntanglement`, `freeScalar/kSpaceWorker`,
   `dirac/diracAlgebraWorker`, `entanglement/peschelWorker`.
 
 `peschelWorker`'s pre-existing `trajectoryError` field now coexists
 with the top-level `type: 'error'` variant. `trajectoryError` signals
-*partial* failure — the worker built a sweep + modular result but the
+_partial_ failure — the worker built a sweep + modular result but the
 optional cosmology trajectory threw — and is meant for the UI to fall
 back to the Minkowski view. Top-level `type: 'error'` signals a hard
 failure where no result was produced and the consumer should drop the
@@ -103,7 +109,7 @@ spinner without rendering anything.
 ## Tests
 
 Worker behaviour is validated by `*.test.ts` siblings that import the
-*pure* compute function the worker delegates to (e.g.
+_pure_ compute function the worker delegates to (e.g.
 `computeCoordinateEntanglement`, `runCutSweep`). The Vitest happy-dom
 environment cannot drive the worker glue itself; the `Dispatch.test.ts`
 files (e.g. `kSpaceWorkerDispatch.test.ts`) document this gap and

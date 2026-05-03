@@ -19,6 +19,8 @@ import type {
   ObjectTypeEntry,
   QuantumTypeEntry,
   QuantumTypeKey,
+  QuantumTypeRuntimeMetadata,
+  QuantumTypeStrategyKind,
 } from './types'
 
 // ============================================================================
@@ -195,6 +197,82 @@ export function getConfigStoreKey(type: ObjectType): string | undefined {
  */
 export function getQuantumTypeEntry(key: QuantumTypeKey): QuantumTypeEntry | undefined {
   return QUANTUM_TYPE_REGISTRY.get(key)
+}
+
+/** Gets runtime metadata for a quantum type. */
+export function getQuantumTypeRuntime(key: QuantumTypeKey): QuantumTypeRuntimeMetadata | undefined {
+  return QUANTUM_TYPE_REGISTRY.get(key)?.runtime
+}
+
+/** Gets the renderer strategy family for a quantum type. */
+export function getQuantumTypeStrategyKind(
+  key: QuantumTypeKey
+): QuantumTypeStrategyKind | undefined {
+  return getQuantumTypeRuntime(key)?.strategy
+}
+
+/** Gets the mode-specific sub-config key used under `schroedinger`, if any. */
+export function getQuantumTypeConfigSubKey(key: QuantumTypeKey): string | undefined {
+  return QUANTUM_TYPE_REGISTRY.get(key)?.internal.configSubKey
+}
+
+/** Gets the WGSL runtime mode id for `uniforms.quantumMode`, if the mode uses one. */
+export function getQuantumTypeShaderUniformId(key: QuantumTypeKey): number | undefined {
+  return getQuantumTypeRuntime(key)?.shaderUniformId
+}
+
+/** Gets the append-only `.mqstate` serialization id for a saveable quantum type. */
+export function getQuantumTypeStateSaveId(key: QuantumTypeKey): number | undefined {
+  return getQuantumTypeRuntime(key)?.stateSaveId
+}
+
+/** Gets the fallback color algorithm for a quantum type. */
+export function getQuantumTypeDefaultColorAlgorithm(key: QuantumTypeKey): string | undefined {
+  return getQuantumTypeRuntime(key)?.defaultColorAlgorithm
+}
+
+/** Checks if the type belongs to the hydrogen analytic shader family. */
+export function isHydrogenFamilyQuantumType(key: QuantumTypeKey): boolean {
+  return getQuantumTypeRuntime(key)?.analyticFamily === 'hydrogen'
+}
+
+/**
+ * Checks if the type uses the shared density-grid uniform packing path.
+ * This is deliberately separate from `isComputeQuantumType`: WdW and AdS are
+ * compute strategies but do not use the legacy uniform compute grid branch.
+ */
+export function isUniformComputeGridQuantumType(key: QuantumTypeKey): boolean {
+  return getQuantumTypeRuntime(key)?.uniformComputeGrid === true
+}
+
+/** Builds a shader uniform id map for renderer hot paths. */
+export function getQuantumTypeShaderUniformIdMap(): Record<string, number> {
+  const result: Record<string, number> = {}
+  for (const [key, entry] of QUANTUM_TYPE_REGISTRY) {
+    const id = entry.runtime.shaderUniformId
+    if (id !== undefined) result[key] = id
+  }
+  return result
+}
+
+/** Builds an append-only save id map for `.mqstate` serialization. */
+export function getQuantumTypeStateSaveIdMap(): Record<string, number> {
+  const result: Record<string, number> = {}
+  for (const [key, entry] of QUANTUM_TYPE_REGISTRY) {
+    const id = entry.runtime.stateSaveId
+    if (id !== undefined) result[key] = id
+  }
+  return result
+}
+
+/** Builds the reverse `.mqstate` id lookup map. */
+export function getQuantumTypeKeyByStateSaveIdMap(): Record<number, QuantumTypeKey> {
+  const result: Record<number, QuantumTypeKey> = {}
+  for (const [key, entry] of QUANTUM_TYPE_REGISTRY) {
+    const id = entry.runtime.stateSaveId
+    if (id !== undefined) result[id] = key
+  }
+  return result
 }
 
 /**

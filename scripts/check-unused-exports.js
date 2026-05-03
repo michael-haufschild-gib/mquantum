@@ -24,7 +24,7 @@
  * @module scripts/check-unused-exports
  */
 
-import { execSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -33,7 +33,7 @@ const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const BASELINE_PATH = join(ROOT, 'scripts', 'unused-exports-baseline.json')
 
 function runTsPrune() {
-  const output = execSync('npx ts-prune', {
+  const output = execFileSync('pnpm', ['exec', 'ts-prune'], {
     cwd: ROOT,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -80,6 +80,11 @@ try {
 } catch {
   console.error(`Baseline file missing: ${BASELINE_PATH}`)
   console.error('Run `node scripts/check-unused-exports.js --update` to create it.')
+  process.exit(2)
+}
+
+if (baseline === null || typeof baseline !== 'object' || Array.isArray(baseline)) {
+  console.error(`Baseline ${BASELINE_PATH} is missing a numeric "count" field.`)
   process.exit(2)
 }
 

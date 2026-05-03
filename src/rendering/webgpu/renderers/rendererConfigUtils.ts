@@ -7,7 +7,12 @@
  * @module rendering/webgpu/renderers/rendererConfigUtils
  */
 
-import { getQuantumTypeEntry, isComputeQuantumType } from '@/lib/geometry/registry'
+import {
+  getQuantumTypeEntry,
+  getQuantumTypeRuntime,
+  isComputeQuantumType,
+  isHydrogenFamilyQuantumType,
+} from '@/lib/geometry/registry'
 
 import type {
   QuantumModeForShader,
@@ -133,16 +138,17 @@ export function buildShaderConfig(
   rendererConfig: SchrodingerRendererConfig
 ): SchroedingerWGSLShaderConfig {
   const dim = rendererConfig.dimension ?? 3
-  const isFreeScalar = rendererConfig.quantumMode === 'freeScalarField'
   const isPauli = rendererConfig.isPauli === true
+  const modeKey = isPauli ? 'pauliSpinor' : rendererConfig.quantumMode
+  const runtime = modeKey ? getQuantumTypeRuntime(modeKey) : undefined
+  const strategyKind = runtime?.strategy
+  const isFreeScalarField = strategyKind === 'freeScalarField'
   const computeMode = isComputeQuantumMode(rendererConfig)
   const isWigner = rendererConfig.representation === 'wigner'
   const pipelineIs2D = !computeMode && (dim === 2 || isWigner)
 
   const enableCache = rendererConfig.eigenfunctionCacheEnabled ?? !pipelineIs2D
-  const isHydrogen =
-    rendererConfig.quantumMode === 'hydrogenND' ||
-    rendererConfig.quantumMode === 'hydrogenNDCoupled'
+  const isHydrogen = modeKey ? isHydrogenFamilyQuantumType(modeKey) : false
   const isosurface = rendererConfig.isosurface ?? false
   const openQuantumEnabled = rendererConfig.openQuantumEnabled ?? false
 
@@ -206,17 +212,17 @@ export function buildShaderConfig(
     // "true FSF" from "any compute mode". WdW writes continuous phase
     // and must NOT be classified binary-sign.
     isFreeScalar: computeMode,
-    isFreeScalarField: isFreeScalar,
-    hasPrecomputedNormals: isFreeScalar,
-    isQuantumWalk: rendererConfig.quantumMode === 'quantumWalk',
+    isFreeScalarField,
+    hasPrecomputedNormals: runtime?.hasPrecomputedNormals === true,
+    isQuantumWalk: strategyKind === 'quantumWalk',
     isPauli,
-    isAds: rendererConfig.quantumMode === 'antiDeSitter',
+    isAds: strategyKind === 'antiDeSitter',
     freeScalarAnalysis:
-      isFreeScalar && isFreeScalarAnalysisAlgorithm(rendererConfig.colorAlgorithm),
+      isFreeScalarField && isFreeScalarAnalysisAlgorithm(rendererConfig.colorAlgorithm),
     useDensityMatrix: rendererConfig.openQuantumEnabled ?? false,
     crossSectionEnabled: rendererConfig.crossSectionEnabled ?? true,
     probabilityCurrentEnabled: rendererConfig.probabilityCurrentEnabled ?? true,
-    sampleSpaceRotation: rendererConfig.quantumMode === 'antiDeSitter',
+    sampleSpaceRotation: runtime?.sampleSpaceRotation === true,
     // Profiling strip flags: read from window global (set by A/B benchmark tests)
     profilingStrip:
       typeof globalThis !== 'undefined'

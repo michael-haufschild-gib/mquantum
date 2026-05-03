@@ -10,7 +10,11 @@
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
 import type { FreeScalarInitialCondition } from '@/lib/geometry/extended/freeScalar'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
-import { QUANTUM_TYPE_REGISTRY } from '@/lib/geometry/registry'
+import {
+  getQuantumTypeDefaultColorAlgorithm,
+  getQuantumTypeEntry,
+  isComputeQuantumType,
+} from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
 import {
   COLOR_ALGORITHM_TO_INT,
@@ -238,28 +242,9 @@ export function normalizeColorAlgorithmForQuantumMode(
     if (matched) return matched
     return 'pauliSpinDensity'
   }
-  // Quantum Walk: default to phase-only coloring (constant brightness from Oklab L=0.72).
-  // Density-based algorithms use the standard log-compressed brightness path.
-  if (quantumMode === 'quantumWalk') return 'phaseCyclicUniform'
-  if (
-    quantumMode === 'tdseDynamics' ||
-    quantumMode === 'becDynamics' ||
-    quantumMode === 'freeScalarField' ||
-    quantumMode === 'diracEquation' ||
-    quantumMode === 'wheelerDeWitt' ||
-    quantumMode === 'antiDeSitter'
-  ) {
-    return 'phaseDensity'
-  }
-  return 'radialDistance'
+  return (getQuantumTypeDefaultColorAlgorithm(quantumMode) ??
+    'radialDistance') as PaletteColorAlgorithm
 }
-
-/** Compute/2D modes that are GPU-lattice or low-dim: disable analytical features. */
-const COMPUTE_MODES = new Set(
-  Array.from(QUANTUM_TYPE_REGISTRY.entries())
-    .filter(([, e]) => e.category === 'compute' && e.internal.objectType === 'schroedinger')
-    .map(([key]) => key)
-)
 
 /** Gate a config flag: return false if any disabling condition is true, otherwise pass through. */
 function gate(value: boolean, ...disablers: boolean[]): boolean {
@@ -285,7 +270,7 @@ function needsEffectBundleShader(
 /** @returns Normalized Schroedinger-specific config with compute-mode overrides applied. */
 export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {
   const isPauli = config.objectType === 'pauliSpinor'
-  const isCompute = COMPUTE_MODES.has(config.quantumMode) || isPauli
+  const isCompute = isComputeQuantumType(config.quantumMode) || isPauli
   const is2D = !isCompute && (config.dimension === 2 || config.representation === 'wigner')
   const disableAnalytical = isCompute || is2D
   const disableQuantumEffect = isCompute || config.openQuantumEnabled
@@ -293,8 +278,8 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
   // Clamp dimension to the mode's minimum from the quantum type registry.
   // All compute modes require 3D+ (no 2D density grid rendering path exists).
   const modeMinDim = isPauli
-    ? (QUANTUM_TYPE_REGISTRY.get('pauliSpinor')?.dimensions.min ?? 3)
-    : (QUANTUM_TYPE_REGISTRY.get(config.quantumMode)?.dimensions.min ?? 2)
+    ? (getQuantumTypeEntry('pauliSpinor')?.dimensions.min ?? 3)
+    : (getQuantumTypeEntry(config.quantumMode)?.dimensions.min ?? 2)
   const effectiveDimension = isCompute ? Math.max(config.dimension, modeMinDim) : config.dimension
   const colorAlgorithm = normalizeColorAlgorithmForQuantumMode(
     config.quantumMode,
@@ -316,6 +301,7 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
     disableQuantumEffect,
     isCompute
   )
+  const nodalEnabled = gate(config.nodalEnabled || compileEffectBundle, disableQuantumEffect)
 
   return {
     objectType: config.objectType,
@@ -329,10 +315,10 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
     // Keep the default all-effects-off volumetric shader grid-only. Once any
     // quantum effect is active, compile sibling runtime-gated blocks too so
     // effect-to-effect toggles avoid repeated swaps within the full shader.
-    nodalEnabled: gate(config.nodalEnabled || compileEffectBundle, disableQuantumEffect),
-    nodalDefinition: config.nodalDefinition ?? 'psiAbs',
-    nodalRenderMode: config.nodalRenderMode ?? 'band',
-    nodalFamilyFilter: config.nodalFamilyFilter ?? 'all',
+    nodalEnabled,
+    nodalDefinition: nodalEnabled ? (config.nodalDefinition ?? 'psiAbs') : 'psiAbs',
+    nodalRenderMode: nodalEnabled ? (config.nodalRenderMode ?? 'band') : 'band',
+    nodalFamilyFilter: nodalEnabled ? (config.nodalFamilyFilter ?? 'all') : 'all',
     phaseMaterialityEnabled: gate(
       config.phaseMaterialityEnabled || compileEffectBundle,
       disableQuantumEffect
@@ -390,7 +376,7 @@ export function shouldForceFullRebuildForQuantumModeTransition(
   if (!previous) return false
   if (previous.objectType !== next.objectType) return true
   if (previous.quantumMode === next.quantumMode) return false
-  return COMPUTE_MODES.has(previous.quantumMode) || COMPUTE_MODES.has(next.quantumMode)
+  return isComputeQuantumType(previous.quantumMode) || isComputeQuantumType(next.quantumMode)
 }
 
 // ============================================================================

@@ -82,8 +82,8 @@ test.describe('TDSE Decoherence Mode Switch', () => {
   test('iso → volumetric with decoherence kills rendering', async ({ page }, testInfo) => {
     // Hard-fail on missing WebGPU upfront — silent skip would let an AI agent
     // claim "all tests passed" while the GPU path was never exercised.
-    await gotoModeWithParams(page, 'tdseDynamics', 3, { pot: 'harmonicTrap', diag: '1', iso: '1' })
     await requireWebGPU(page, testInfo)
+    await gotoModeWithParams(page, 'tdseDynamics', 3, { pot: 'harmonicTrap', diag: '1', iso: '1' })
     const rs = await waitForRendererSettled(page)
     if (rs === 'error') {
       const errorMsg = await page
@@ -132,8 +132,8 @@ test.describe('TDSE Decoherence Mode Switch', () => {
 
   test('vol → iso with decoherence kills rendering', async ({ page }, testInfo) => {
     // Start in VOLUMETRIC mode
-    await gotoModeWithParams(page, 'tdseDynamics', 3, { pot: 'harmonicTrap', diag: '1' })
     await requireWebGPU(page, testInfo)
+    await gotoModeWithParams(page, 'tdseDynamics', 3, { pot: 'harmonicTrap', diag: '1' })
     const rs = await waitForRendererSettled(page)
     if (rs === 'error') {
       const errorMsg = await page

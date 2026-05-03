@@ -18,6 +18,7 @@ import {
   SchroedingerPresetName,
   type TdseConfig,
 } from '@/lib/geometry/extended/types'
+import { isHydrogenFamilyQuantumType } from '@/lib/geometry/registry'
 import { logger } from '@/lib/logger'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
@@ -54,9 +55,7 @@ function buildHydrogenDimUpdate(
   current: SchroedingerConfig
 ): Record<string, unknown> {
   if (dimension !== 2) return {}
-  const isHydrogen =
-    current.quantumMode === 'hydrogenND' || current.quantumMode === 'hydrogenNDCoupled'
-  if (!isHydrogen) return {}
+  if (!isHydrogenFamilyQuantumType(current.quantumMode)) return {}
 
   const update: Record<string, unknown> = {}
   // In 2D hydrogen, l is not independent — it equals |m|.

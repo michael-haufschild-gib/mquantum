@@ -17,6 +17,7 @@ import {
   isPipeline2D,
 } from '@/rendering/webgpu/renderers/rendererConfigUtils'
 import { composeSchroedingerShader } from '@/rendering/webgpu/shaders/schroedinger/compose'
+import { removeDefaultNodalSpecializationOverrides } from '@/rendering/webgpu/shaders/schroedinger/composeConfig'
 
 describe('isComputeQuantumMode', () => {
   it('returns true for compute-mode quantum types (TDSE, BEC, Dirac, FSF, etc.)', () => {
@@ -270,6 +271,21 @@ describe('buildShaderConfig', () => {
     expect(wgsl).toContain('const NODAL_SPECIALIZED_RENDER_MODE: i32 = 1;')
     expect(wgsl).toContain('const NODAL_SPECIALIZED_FAMILY_FILTER: i32 = 2;')
     expect(wgsl).not.toContain('override NODAL_SPECIALIZATION_ENABLED')
+  })
+
+  it('removes fallback nodal specialization overrides by symbol', () => {
+    const wgsl = removeDefaultNodalSpecializationOverrides(`
+const NODAL_SPECIALIZATION_ENABLED: bool = true;
+  override   NODAL_SPECIALIZATION_ENABLED : bool = false;
+override NODAL_SPECIALIZED_DEFINITION: i32 = 0;
+override NODAL_SPECIALIZED_RENDER_MODE: i32 = 1;
+override NODAL_SPECIALIZED_FAMILY_FILTER: i32 = 2;
+fn keep() -> bool { return NODAL_SPECIALIZATION_ENABLED; }
+`)
+
+    expect(wgsl).toContain('const NODAL_SPECIALIZATION_ENABLED: bool = true;')
+    expect(wgsl).toContain('fn keep() -> bool')
+    expect(wgsl).not.toContain('override NODAL_SPECIAL')
   })
 })
 

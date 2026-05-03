@@ -9,6 +9,7 @@
 
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
+import { getQuantumTypeShaderUniformIdMap } from '@/lib/geometry/registry'
 import type { HydrogenBasisState } from '@/lib/physics/openQuantum'
 import type { AnimationState } from '@/stores/animationStore'
 import type { AppearanceStoreState } from '@/stores/appearanceStore'
@@ -59,19 +60,7 @@ export const BAYER_OFFSETS: [number, number][] = [
  * (HO), and any shader guard newly keyed to `== 0` would fire
  * spuriously for WdW's density grid.
  */
-export const QUANTUM_MODE_MAP: Record<string, number> = {
-  harmonicOscillator: 0,
-  hydrogenND: 1,
-  hydrogenNDCoupled: 7,
-  freeScalarField: 2,
-  tdseDynamics: 3,
-  becDynamics: 4,
-  diracEquation: 5,
-  quantumWalk: 6,
-  // 7 = hydrogenNDCoupled (pre-existing). AdS takes the next free slot.
-  antiDeSitter: 8,
-  wheelerDeWitt: 9,
-}
+export const QUANTUM_MODE_MAP: Record<string, number> = getQuantumTypeShaderUniformIdMap()
 
 /** Maps color algorithm names to shader integer constants */
 export const COLOR_ALGORITHM_MAP: Record<string, number> = {

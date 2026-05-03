@@ -8,8 +8,8 @@
  * fall through to JS implementations without paying for a failed
  * `import()`.
  *
- * Initialization is idempotent: a second call returns the in-flight
- * promise rather than re-importing.
+ * Initialization is idempotent while ready or in-flight. Failed attempts clear
+ * the in-flight promise so later calls can retry the loader.
  *
  * @module lib/wasm/animation/runtime
  */
@@ -21,6 +21,10 @@ import type { WasmModule } from './types'
 let wasmModule: WasmModule | null = null
 let wasmInitPromise: Promise<void> | null = null
 let wasmReady = false
+const wasmRuntimeSnapshot: { ready: boolean; module: WasmModule | null } = {
+  ready: false,
+  module: null,
+}
 
 /**
  * Snapshot of the WASM runtime exposed to per-phase wrappers.
@@ -38,14 +42,14 @@ export interface WasmRuntime {
  * path: callers should destructure or check `ready` directly).
  */
 export function getWasmRuntime(): WasmRuntime {
-  return { ready: wasmReady, module: wasmModule }
+  return wasmRuntimeSnapshot
 }
 
 /**
  * Initialize the animation WASM module.
  *
  * Safe to call multiple times — concurrent callers see the same in-flight
- * promise and the second-call no-op once initialization has completed.
+ * promise, ready calls no-op, and failed calls can retry later.
  * Skipped in Vitest (`MODE === 'test'`) so the JS fallbacks are exercised
  * instead of the WASM kernels.
  *
@@ -74,12 +78,22 @@ export async function initAnimationWasm(): Promise<void> {
       await wasm.default()
       wasmModule = wasm as unknown as WasmModule
       wasmReady = true
+      wasmRuntimeSnapshot.module = wasmModule
+      wasmRuntimeSnapshot.ready = true
       logger.log('[AnimationWASM] Initialized successfully')
     } catch (err) {
+      wasmModule = null
+      wasmReady = false
+      wasmRuntimeSnapshot.module = null
+      wasmRuntimeSnapshot.ready = false
       const wasmError = err instanceof Error ? err : new Error(String(err))
       logger.warn('[AnimationWASM] Initialization failed, using JS fallback:', wasmError.message)
     }
-  })()
+  })().finally(() => {
+    if (!wasmReady) {
+      wasmInitPromise = null
+    }
+  })
 
   return wasmInitPromise
 }

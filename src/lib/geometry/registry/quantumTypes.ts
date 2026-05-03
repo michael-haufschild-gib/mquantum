@@ -55,6 +55,9 @@ const SLICE_ANIMATION = {
 
 const QUALITY_PRESETS = ['draft', 'standard', 'high', 'ultra']
 
+const DEFAULT_ANALYTIC_COLOR_ALGORITHM = 'radialDistance'
+const DEFAULT_COMPUTE_COLOR_ALGORITHM = 'phaseDensity'
+
 /** The flat Quantum Type Registry — single source of truth for all type metadata. */
 export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey, QuantumTypeEntry>(
   [
@@ -67,6 +70,14 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         name: 'Harmonic Oscillator',
         description: 'N-dimensional quantum superposition states.',
         category: 'analytic',
+        runtime: {
+          dataPath: 'analyticWavefunction',
+          strategy: 'analytic',
+          shaderUniformId: 0,
+          stateSaveId: 0,
+          defaultColorAlgorithm: DEFAULT_ANALYTIC_COLOR_ALGORITHM,
+          analyticFamily: 'harmonicOscillator',
+        },
         dimensions: {
           min: 2,
           max: 11,
@@ -102,6 +113,14 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         name: 'Hydrogen Orbitals',
         description: 'N-dimensional hydrogen atom in 3D space.',
         category: 'analytic',
+        runtime: {
+          dataPath: 'analyticWavefunction',
+          strategy: 'analytic',
+          shaderUniformId: 1,
+          stateSaveId: 1,
+          defaultColorAlgorithm: DEFAULT_ANALYTIC_COLOR_ALGORITHM,
+          analyticFamily: 'hydrogen',
+        },
         dimensions: {
           min: 2,
           max: 11,
@@ -137,6 +156,14 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         name: 'Hydrogen ND (Coupled)',
         description: 'True D-dimensional Coulomb problem with hyperspherical harmonics.',
         category: 'analytic',
+        runtime: {
+          dataPath: 'analyticWavefunction',
+          strategy: 'analytic',
+          shaderUniformId: 7,
+          stateSaveId: 8,
+          defaultColorAlgorithm: DEFAULT_ANALYTIC_COLOR_ALGORITHM,
+          analyticFamily: 'hydrogen',
+        },
         dimensions: {
           min: 2,
           max: 11,
@@ -174,6 +201,15 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         name: 'Free Scalar Field',
         description: 'Klein-Gordon field on a lattice with real-time evolution.',
         category: 'compute',
+        runtime: {
+          dataPath: 'densityGrid',
+          strategy: 'freeScalarField',
+          shaderUniformId: 2,
+          stateSaveId: 2,
+          uniformComputeGrid: true,
+          defaultColorAlgorithm: DEFAULT_COMPUTE_COLOR_ALGORITHM,
+          hasPrecomputedNormals: true,
+        },
         dimensions: {
           min: 3,
           max: 6,
@@ -210,6 +246,14 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         name: 'TDSE Dynamics',
         description: 'Time-dependent Schroedinger equation: wavepackets, tunneling, scattering.',
         category: 'compute',
+        runtime: {
+          dataPath: 'densityGrid',
+          strategy: 'tdseBec',
+          shaderUniformId: 3,
+          stateSaveId: 3,
+          uniformComputeGrid: true,
+          defaultColorAlgorithm: DEFAULT_COMPUTE_COLOR_ALGORITHM,
+        },
         dimensions: {
           min: 3,
           max: 6,
@@ -246,6 +290,14 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         name: 'Bose-Einstein Condensate',
         description: 'Gross-Pitaevskii equation: superfluid dynamics, vortices, solitons.',
         category: 'compute',
+        runtime: {
+          dataPath: 'densityGrid',
+          strategy: 'tdseBec',
+          shaderUniformId: 4,
+          stateSaveId: 4,
+          uniformComputeGrid: true,
+          defaultColorAlgorithm: DEFAULT_COMPUTE_COLOR_ALGORITHM,
+        },
         dimensions: {
           min: 3,
           max: 6,
@@ -283,6 +335,14 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         description:
           'Relativistic Dirac equation: spinor dynamics, Zitterbewegung, Klein tunneling.',
         category: 'compute',
+        runtime: {
+          dataPath: 'densityGrid',
+          strategy: 'dirac',
+          shaderUniformId: 5,
+          stateSaveId: 5,
+          uniformComputeGrid: true,
+          defaultColorAlgorithm: DEFAULT_COMPUTE_COLOR_ALGORITHM,
+        },
         dimensions: {
           min: 3,
           max: 6,
@@ -320,6 +380,14 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         description:
           'Discrete-time quantum walk on N-D lattice: Grover search, interference topology.',
         category: 'compute',
+        runtime: {
+          dataPath: 'densityGrid',
+          strategy: 'quantumWalk',
+          shaderUniformId: 6,
+          stateSaveId: 6,
+          uniformComputeGrid: true,
+          defaultColorAlgorithm: 'phaseCyclicUniform',
+        },
         dimensions: {
           min: 3,
           max: 7,
@@ -357,6 +425,13 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         description:
           'Wavefunction of the universe in 3D minisuperspace: Hartle–Hawking vs Vilenkin vs DeWitt.',
         category: 'compute',
+        runtime: {
+          dataPath: 'densityGrid',
+          strategy: 'wheelerDeWitt',
+          shaderUniformId: 9,
+          stateSaveId: 9,
+          defaultColorAlgorithm: DEFAULT_COMPUTE_COLOR_ALGORITHM,
+        },
         dimensions: {
           min: 3,
           max: 3,
@@ -393,6 +468,14 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         name: 'Anti-de Sitter',
         description: 'Closed-form bulk scalar eigenstates on AdS_d (d=3..7) in the Poincaré ball.',
         category: 'compute',
+        runtime: {
+          dataPath: 'densityGrid',
+          strategy: 'antiDeSitter',
+          shaderUniformId: 8,
+          stateSaveId: 10,
+          defaultColorAlgorithm: DEFAULT_COMPUTE_COLOR_ALGORITHM,
+          sampleSpaceRotation: true,
+        },
         dimensions: {
           min: 3,
           max: 7,
@@ -432,6 +515,12 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         description:
           'Two-component spinor in a magnetic field: spin precession, Stern-Gerlach splitting.',
         category: 'compute',
+        runtime: {
+          dataPath: 'spinorGrid',
+          strategy: 'pauli',
+          stateSaveId: 7,
+          defaultColorAlgorithm: 'pauliSpinDensity',
+        },
         dimensions: {
           min: 3,
           max: 6,
