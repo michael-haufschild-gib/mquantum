@@ -57,9 +57,14 @@ const BASIS_TIME_BUCKET_MODULO = BASIS_VERSION_MIXER
  * `accumulatedTime`, so we bucketize time at 120 Hz to drive uniform-buffer rewrites
  * while still letting the dirty-flag short-circuit static frames.
  *
- * The bucket is wrapped modulo `BASIS_VERSION_MIXER` so long-running sessions cannot
- * overflow into the rotationVersion range and cause dirty-check key collisions.
- * `accumulatedTime` is always ≥ 0, so a single modulo is sufficient.
+ * The bucket is wrapped to `[0, BASIS_VERSION_MIXER)` via `((x%M)+M)%M` so:
+ *   1. Long-running sessions cannot overflow into the rotationVersion range and
+ *      cause dirty-check key collisions.
+ *   2. Negative `accumulatedTime` (possible if `direction = -1` is exposed via the
+ *      animation store's `toggleDirection`) cannot produce a negative remainder
+ *      that collides with the previous rotationVersion bucket — JS `%` preserves
+ *      sign, so e.g. `-120 % M === -120`, which equals `(N-1)*M + (M-120)` and
+ *      would silently skip a needed `updateBasisUniforms` write.
  */
 function computeBasisVersion(
   rotationVersion: number,
@@ -68,7 +73,8 @@ function computeBasisVersion(
   accumulatedTime: number
 ): number {
   const rawBucket = sliceAnimationEnabled && dimension > 3 ? Math.floor(accumulatedTime * 120.0) : 0
-  const basisTimeBucket = rawBucket % BASIS_TIME_BUCKET_MODULO
+  const basisTimeBucket =
+    ((rawBucket % BASIS_TIME_BUCKET_MODULO) + BASIS_TIME_BUCKET_MODULO) % BASIS_TIME_BUCKET_MODULO
   return rotationVersion * BASIS_VERSION_MIXER + basisTimeBucket
 }
 

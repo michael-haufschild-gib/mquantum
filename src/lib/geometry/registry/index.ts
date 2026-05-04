@@ -17,8 +17,10 @@
 export type {
   AvailableQuantumTypeInfo,
   QuantumTypeCategory,
+  QuantumTypeCompileContextField,
   QuantumTypeDataPath,
   QuantumTypeEntry,
+  QuantumTypeEvolutionResetKind,
   QuantumTypeInternal,
   QuantumTypeKey,
   QuantumTypeRegistry,
@@ -43,9 +45,11 @@ export { OBJECT_TYPE_REGISTRY } from './registry'
 // Helper functions — flat model
 export {
   getAvailableQuantumTypes,
+  getQuantumTypeCompileContextFields,
   getQuantumTypeConfigSubKey,
   getQuantumTypeDefaultColorAlgorithm,
   getQuantumTypeEntry,
+  getQuantumTypeEvolutionResetKind,
   getQuantumTypeKeyByStateSaveIdMap,
   getQuantumTypeName,
   getQuantumTypeRuntime,
@@ -60,7 +64,9 @@ export {
   isHydrogenFamilyQuantumType,
   isUniformComputeGridQuantumType,
   QUANTUM_MODES_3D_ONLY,
+  quantumTypeHasCompileContextField,
   resolveQuantumTypeKey,
+  supportsOpenQuantumForQuantumType,
 } from './helpers'
 
 // Helper functions — legacy model (still used by stores, URL serializer, etc.)

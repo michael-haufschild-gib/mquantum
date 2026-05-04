@@ -155,8 +155,8 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
    *
    * @param ctx - Render context with device and command encoder
    */
-  requestStateSave(ctx: WebGPURenderContext): void {
-    if (!this.coinStateA || this.saveMappingInFlight || this.totalSites === 0) return
+  requestStateSave(ctx: WebGPURenderContext): boolean {
+    if (!this.coinStateA || this.saveMappingInFlight || this.totalSites === 0) return false
     const coinStates = 2 * this.latticeDim
     const totalElements = this.totalSites * coinStates
     const latDim = this.latticeDim
@@ -185,6 +185,7 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
         this.saveMappingInFlight = false
       },
     })
+    return true
   }
 
   protected async createPipeline(_ctx: WebGPUSetupContext): Promise<void> {

@@ -277,7 +277,11 @@ export class WheelerDeWittSrmtSweepCoordinator {
       const store = useSrmtSweepStore.getState()
       switch (msg.type) {
         case 'progress':
-          store.appendPoint(msg.point)
+          // Pass the worker's predicted `total` so the store reconciles its
+          // initial `totalPoints` (per-kind cap stamped at startSweep)
+          // against grid-aware dedup. Otherwise progress UI never reaches
+          // 100% on cut / gridNphiCoupled sweeps where dedup runs.
+          store.appendPoint(msg.point, msg.total)
           break
         case 'solveStart':
           store.setSolveStart(msg.index)

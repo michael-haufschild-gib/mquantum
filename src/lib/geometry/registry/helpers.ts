@@ -17,7 +17,9 @@ import type {
   AvailableTypeInfo,
   DimensionConstraints,
   ObjectTypeEntry,
+  QuantumTypeCompileContextField,
   QuantumTypeEntry,
+  QuantumTypeEvolutionResetKind,
   QuantumTypeKey,
   QuantumTypeRuntimeMetadata,
   QuantumTypeStrategyKind,
@@ -211,6 +213,13 @@ export function getQuantumTypeStrategyKind(
   return getQuantumTypeRuntime(key)?.strategy
 }
 
+/** Gets the store-side evolution reset behavior for a quantum type. */
+export function getQuantumTypeEvolutionResetKind(
+  key: QuantumTypeKey
+): QuantumTypeEvolutionResetKind | undefined {
+  return getQuantumTypeRuntime(key)?.evolutionReset
+}
+
 /** Gets the mode-specific sub-config key used under `schroedinger`, if any. */
 export function getQuantumTypeConfigSubKey(key: QuantumTypeKey): string | undefined {
   return QUANTUM_TYPE_REGISTRY.get(key)?.internal.configSubKey
@@ -234,6 +243,26 @@ export function getQuantumTypeDefaultColorAlgorithm(key: QuantumTypeKey): string
 /** Checks if the type belongs to the hydrogen analytic shader family. */
 export function isHydrogenFamilyQuantumType(key: QuantumTypeKey): boolean {
   return getQuantumTypeRuntime(key)?.analyticFamily === 'hydrogen'
+}
+
+/** Checks if a quantum type supports open-quantum density-matrix evolution. */
+export function supportsOpenQuantumForQuantumType(key: QuantumTypeKey): boolean {
+  return getQuantumTypeRuntime(key)?.supportsOpenQuantum === true
+}
+
+/** Gets compile-time selector fields required by this quantum type. */
+export function getQuantumTypeCompileContextFields(
+  key: QuantumTypeKey
+): readonly QuantumTypeCompileContextField[] {
+  return getQuantumTypeRuntime(key)?.compileContextFields ?? []
+}
+
+/** Checks if a quantum type needs a specific compile-time selector field. */
+export function quantumTypeHasCompileContextField(
+  key: QuantumTypeKey,
+  field: QuantumTypeCompileContextField
+): boolean {
+  return getQuantumTypeCompileContextFields(key).includes(field)
 }
 
 /**

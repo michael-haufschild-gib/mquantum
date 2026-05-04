@@ -150,7 +150,12 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
   var potAccColor = vec3f(0.0);
   var potAccAlpha: f32 = 0.0;
   if (IS_FREE_SCALAR && !IS_PAULI && USE_DENSITY_GRID && DENSITY_GRID_HAS_PHASE) {
-    let potStepLen = stepLen * 0.5;
+    // Size the potential step so the 128-iteration cap below always reaches
+    // potEnd in either quality mode. The previous half-stepLen only fit
+    // when maxSteps == 64 (fast mode); in normal mode it left the back
+    // half of the ray unsampled, so a no-hit ray rendered the potential
+    // overlay only over the front [tNear, (tNear+tFar)/2] segment.
+    let potStepLen = (tFar - tNear) / 128.0;
     var potT = tNear;
     var potTransmittance: f32 = 1.0;
     for (var pi = 0; pi < 128; pi++) {

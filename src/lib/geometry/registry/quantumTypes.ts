@@ -73,10 +73,12 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         runtime: {
           dataPath: 'analyticWavefunction',
           strategy: 'analytic',
+          evolutionReset: 'schroedingerAnalytic',
           shaderUniformId: 0,
           stateSaveId: 0,
           defaultColorAlgorithm: DEFAULT_ANALYTIC_COLOR_ALGORITHM,
           analyticFamily: 'harmonicOscillator',
+          supportsOpenQuantum: true,
         },
         dimensions: {
           min: 2,
@@ -116,10 +118,12 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         runtime: {
           dataPath: 'analyticWavefunction',
           strategy: 'analytic',
+          evolutionReset: 'schroedingerAnalytic',
           shaderUniformId: 1,
           stateSaveId: 1,
           defaultColorAlgorithm: DEFAULT_ANALYTIC_COLOR_ALGORITHM,
           analyticFamily: 'hydrogen',
+          supportsOpenQuantum: true,
         },
         dimensions: {
           min: 2,
@@ -159,10 +163,12 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         runtime: {
           dataPath: 'analyticWavefunction',
           strategy: 'analytic',
+          evolutionReset: 'schroedingerAnalytic',
           shaderUniformId: 7,
           stateSaveId: 8,
           defaultColorAlgorithm: DEFAULT_ANALYTIC_COLOR_ALGORITHM,
           analyticFamily: 'hydrogen',
+          supportsOpenQuantum: true,
         },
         dimensions: {
           min: 2,
@@ -204,10 +210,12 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         runtime: {
           dataPath: 'densityGrid',
           strategy: 'freeScalarField',
+          evolutionReset: 'freeScalarField',
           shaderUniformId: 2,
           stateSaveId: 2,
           uniformComputeGrid: true,
           defaultColorAlgorithm: DEFAULT_COMPUTE_COLOR_ALGORITHM,
+          compileContextFields: ['freeScalarInitialCondition'],
           hasPrecomputedNormals: true,
         },
         dimensions: {
@@ -249,6 +257,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         runtime: {
           dataPath: 'densityGrid',
           strategy: 'tdseBec',
+          evolutionReset: 'tdse',
           shaderUniformId: 3,
           stateSaveId: 3,
           uniformComputeGrid: true,
@@ -293,6 +302,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         runtime: {
           dataPath: 'densityGrid',
           strategy: 'tdseBec',
+          evolutionReset: 'bec',
           shaderUniformId: 4,
           stateSaveId: 4,
           uniformComputeGrid: true,
@@ -338,10 +348,12 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         runtime: {
           dataPath: 'densityGrid',
           strategy: 'dirac',
+          evolutionReset: 'dirac',
           shaderUniformId: 5,
           stateSaveId: 5,
           uniformComputeGrid: true,
           defaultColorAlgorithm: DEFAULT_COMPUTE_COLOR_ALGORITHM,
+          compileContextFields: ['diracFieldView'],
         },
         dimensions: {
           min: 3,
@@ -383,6 +395,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         runtime: {
           dataPath: 'densityGrid',
           strategy: 'quantumWalk',
+          evolutionReset: 'quantumWalk',
           shaderUniformId: 6,
           stateSaveId: 6,
           uniformComputeGrid: true,
@@ -428,6 +441,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         runtime: {
           dataPath: 'densityGrid',
           strategy: 'wheelerDeWitt',
+          evolutionReset: 'wheelerDeWitt',
           shaderUniformId: 9,
           stateSaveId: 9,
           defaultColorAlgorithm: DEFAULT_COMPUTE_COLOR_ALGORITHM,
@@ -471,6 +485,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         runtime: {
           dataPath: 'densityGrid',
           strategy: 'antiDeSitter',
+          evolutionReset: 'antiDeSitter',
           shaderUniformId: 8,
           stateSaveId: 10,
           defaultColorAlgorithm: DEFAULT_COMPUTE_COLOR_ALGORITHM,
@@ -518,6 +533,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         runtime: {
           dataPath: 'spinorGrid',
           strategy: 'pauli',
+          evolutionReset: 'pauli',
           stateSaveId: 7,
           defaultColorAlgorithm: 'pauliSpinDensity',
         },

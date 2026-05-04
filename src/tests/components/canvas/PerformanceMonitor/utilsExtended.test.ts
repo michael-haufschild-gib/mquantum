@@ -85,6 +85,24 @@ describe('formatBytes', () => {
     expect(formatBytes(1024, 3)).toBe('1.000 KB')
     expect(formatBytes(1500, 0)).toBe('1 KB')
   })
+
+  it('formats TB and PB at 1024⁴ / 1024⁵ boundaries', () => {
+    expect(formatBytes(1024 ** 4)).toBe('1.0 TB')
+    expect(formatBytes(2 * 1024 ** 4)).toBe('2.0 TB')
+    expect(formatBytes(1024 ** 5)).toBe('1.0 PB')
+  })
+
+  it('clamps multi-petabyte values to PB instead of producing "undefined"', () => {
+    // 1 EB = 1024 PB. The previous implementation fell off the size-table
+    // and rendered "1.0 undefined" for any value beyond the GB bucket.
+    expect(formatBytes(1024 ** 6)).toBe('1024.0 PB')
+  })
+
+  it('returns a placeholder for non-finite or negative byte counts', () => {
+    expect(formatBytes(Number.NaN)).toBe('—')
+    expect(formatBytes(Infinity)).toBe('—')
+    expect(formatBytes(-1)).toBe('—')
+  })
 })
 
 describe('getHealthColor', () => {

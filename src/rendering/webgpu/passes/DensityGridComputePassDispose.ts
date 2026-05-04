@@ -95,10 +95,24 @@ export function refreshDensityDistribution(
  * half-float data, and unmaps. Uses queueMicrotask to avoid holding
  * the buffer in "pending map" state during synchronous queue.submit().
  *
+ * The microtask runs after the caller's synchronous `applyState` has already
+ * copied flag values back to the pass, so its own mutations of `state` would
+ * be orphaned in a snapshot. `applyState` is invoked again from the microtask
+ * (in `.finally`) so `readbackInFlight = false` actually reaches the pass —
+ * without it the readback flag is stuck at `true` forever after the first
+ * frame and every subsequent `refreshDensityDistribution` is skipped, freezing
+ * the confidence-mass threshold at frame-0 density values.
+ *
  * @param state - Mutable readback state
  * @param device - GPU device (for stale-buffer detection)
+ * @param applyState - Optional callback invoked after the microtask resolves
+ *                     so flag mutations propagate back to the pass instance
  */
-export function startPendingReadback(state: DensityReadbackState, device: GPUDevice | null): void {
+export function startPendingReadback(
+  state: DensityReadbackState,
+  device: GPUDevice | null,
+  applyState?: (state: DensityReadbackState) => void
+): void {
   if (!state.readbackPendingSubmit || !device || !state.densityReadbackBuffer) {
     return
   }
@@ -136,6 +150,7 @@ export function startPendingReadback(state: DensityReadbackState, device: GPUDev
       })
       .finally(() => {
         state.readbackInFlight = false
+        applyState?.(state)
       })
   )
 }

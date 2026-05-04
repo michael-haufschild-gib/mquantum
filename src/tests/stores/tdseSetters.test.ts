@@ -77,6 +77,24 @@ describe('TDSE dynamics setters', () => {
     expect(getTdse().dt).toBe(0.05)
   })
 
+  it('setTdseDt CFL bound respects effective spacing under compactification', () => {
+    const s = useExtendedObjectStore.getState()
+    // Switching one axis to a tight compact dim drops effective spacing far
+    // below raw, so the CFL-limited dt must drop below the slider's 0.02 max.
+    s.setTdseCompactDim(0, true)
+    s.setTdseCompactRadius(0, 0.05)
+    expect(getTdse().compactDims[0]).toBe(true)
+
+    s.setTdseDt(0.02)
+    const dtAfter = getTdse().dt
+    expect(Number.isFinite(dtAfter)).toBe(true)
+    expect(dtAfter).toBeGreaterThan(0)
+    // Effective CFL with compact spacing drives dt to ~0.005 — strictly below
+    // the slider's 0.02 ceiling. If the setter ignored compactification the
+    // user could leave dt at 0.02 and crash the integrator.
+    expect(dtAfter).toBeLessThan(0.015)
+  })
+
   it('clamps stepsPerFrame to integer [1, 16]', () => {
     const s = useExtendedObjectStore.getState()
     s.setTdseStepsPerFrame(0)

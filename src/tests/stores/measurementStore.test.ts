@@ -138,6 +138,27 @@ describe('measurementStore', () => {
       expect(state.positionMean[0]).toBeCloseTo(1)
       expect(state.positionMean[1]).toBeCloseTo(15)
     })
+
+    it('skips empty-position records (failed readbacks) without poisoning stats', () => {
+      // TdseBecMeasurement signals readback failure via
+      // `completeMeasurement([], 0, null)`. Without filtering these records
+      // out, computeStats picks dims from the first record and accesses
+      // `m.position[d]` on the empty record → undefined → NaN propagates
+      // through the entire mean/std accumulator, surfacing as `NaN` in the
+      // UI stats table.
+      const store = useMeasurementStore.getState()
+      store.addMeasurement([1, 2, 3], 0.1)
+      store.completeMeasurement([], 0, null) // simulate failed readback
+      store.addMeasurement([3, 4, 5], 0.1)
+
+      const state = useMeasurementStore.getState()
+      expect(state.measurements).toHaveLength(3)
+      expect(Number.isNaN(state.positionMean[0]!)).toBe(false)
+      expect(state.positionMean[0]!).toBeCloseTo(2) // mean of 1,3
+      expect(state.positionMean[1]!).toBeCloseTo(3)
+      expect(state.positionMean[2]!).toBeCloseTo(4)
+      expect(Number.isNaN(state.positionStd[0]!)).toBe(false)
+    })
   })
 
   describe('clearMeasurements', () => {

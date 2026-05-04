@@ -11,7 +11,9 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { Select } from '@/components/ui/Select'
 import type { AdsPresetName, AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
+import { type BecConfig, DEFAULT_BEC_CONFIG } from '@/lib/geometry/extended/bec'
 import type { SchroedingerPresetName } from '@/lib/geometry/extended/common'
+import type { FreeScalarConfig } from '@/lib/geometry/extended/freeScalar'
 import type { PauliConfig } from '@/lib/geometry/extended/pauli'
 import type { HydrogenNDPresetName, SchroedingerConfig } from '@/lib/geometry/extended/schroedinger'
 import { getHydrogenNDPresetsWithKeysByDimension } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
@@ -32,6 +34,7 @@ import { PAULI_FIELD_VIEW_TO_COLOR_ALGO } from '@/rendering/shaders/palette/type
 import { useAppearanceStore } from '@/stores/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
+import { resizeBecArrays } from '@/stores/slices/geometry/setters/becSetters'
 import { resizeTdseArrays } from '@/stores/slices/geometry/setters/tdseSetters'
 
 import { getScenarioPresetOptions as getTdsePresetOptions } from './SchroedingerControls/tdseControlsConstants'
@@ -96,7 +99,51 @@ function findScenarioPresetId<TConfig extends object>(
   return null
 }
 
+function countPresetOverrideLeaves(value: unknown): number {
+  if (Array.isArray(value)) {
+    return value.reduce((total, item) => total + countPresetOverrideLeaves(item), 0)
+  }
+  if (isRecord(value)) {
+    return Object.values(value).reduce<number>(
+      (total, item) => total + countPresetOverrideLeaves(item),
+      0
+    )
+  }
+  return 1
+}
+
+function findMostSpecificScenarioPresetId<TConfig extends object>(
+  config: TConfig,
+  presets: readonly ScenarioPreset<Partial<TConfig>>[]
+): string | null {
+  const configRecord = config as Record<string, unknown>
+  let bestMatch: { id: string; specificity: number } | null = null
+
+  for (const preset of presets) {
+    const entries = Object.entries(preset.overrides as Record<string, unknown>)
+    const matches = entries.every(([key, value]) => presetValueEquals(configRecord[key], value))
+    if (!matches) continue
+
+    const specificity = countPresetOverrideLeaves(preset.overrides)
+    if (bestMatch === null || specificity > bestMatch.specificity) {
+      bestMatch = { id: preset.id, specificity }
+    }
+  }
+
+  return bestMatch?.id ?? null
+}
+
 function tdseConfigMatches(current: TdseConfig, expected: TdseConfig): boolean {
+  const ignored = new Set(['needsReset', 'slicePositions'])
+  return Object.keys(expected).every((key) => {
+    if (ignored.has(key)) return true
+    const currentValue = (current as unknown as Record<string, unknown>)[key]
+    const expectedValue = (expected as unknown as Record<string, unknown>)[key]
+    return presetValueEquals(currentValue, expectedValue)
+  })
+}
+
+function becConfigMatches(current: BecConfig, expected: BecConfig): boolean {
   const ignored = new Set(['needsReset', 'slicePositions'])
   return Object.keys(expected).every((key) => {
     if (ignored.has(key)) return true
@@ -126,6 +173,29 @@ function findTdsePresetId(config: TdseConfig, dimension: number): string | null 
   return null
 }
 
+function findBecPresetId(config: BecConfig, dimension: number): string | null {
+  for (const preset of BEC_SCENARIO_PRESETS) {
+    const {
+      latticeDim: _presetDim,
+      gridSize: _presetGrid,
+      spacing: _presetSpacing,
+      trapAnisotropy: _presetAniso,
+      slicePositions: _presetSlice,
+      ...safeOverrides
+    } = preset.overrides
+    const merged = {
+      ...DEFAULT_BEC_CONFIG,
+      ...safeOverrides,
+      slicePositions: config.slicePositions,
+      needsReset: true,
+    }
+    const resized = resizeBecArrays(merged, dimension)
+    const expected = { ...merged, ...resized, needsReset: true }
+    if (becConfigMatches(config, expected)) return preset.id
+  }
+  return null
+}
+
 function findPauliPresetId(config: PauliConfig): string | null {
   return findScenarioPresetId(config, PAULI_SCENARIO_PRESETS)
 }
@@ -141,11 +211,14 @@ function findActiveScenarioPresetId(
     case 'tdseDynamics':
       return findTdsePresetId(schroedinger.tdse, dimension)
     case 'becDynamics':
-      return findScenarioPresetId(schroedinger.bec, BEC_SCENARIO_PRESETS)
+      return findBecPresetId(schroedinger.bec, dimension)
     case 'diracEquation':
       return findScenarioPresetId(schroedinger.dirac, DIRAC_SCENARIO_PRESETS)
     case 'freeScalarField':
-      return findScenarioPresetId(schroedinger.freeScalar, FREE_SCALAR_PRESETS)
+      return findMostSpecificScenarioPresetId(
+        schroedinger.freeScalar as FreeScalarConfig,
+        FREE_SCALAR_PRESETS
+      )
     case 'quantumWalk':
       return findScenarioPresetId(schroedinger.quantumWalk, QUANTUM_WALK_PRESETS)
     case 'wheelerDeWitt':
@@ -181,10 +254,14 @@ const PAULI_PRESET_OPTIONS = PAULI_SCENARIO_PRESETS.map((p) => ({ value: p.id, l
 
 /* ── Free Scalar Field options ─────────────────────────────── */
 
-const FREE_SCALAR_PRESET_OPTIONS = FREE_SCALAR_PRESETS.map((p) => ({
-  value: p.id,
-  label: p.name,
-}))
+function getFreeScalarPresetOptions(dimension: number) {
+  return FREE_SCALAR_PRESETS.filter(
+    (p) => p.overrides.latticeDim === undefined || p.overrides.latticeDim === dimension
+  ).map((p) => ({
+    value: p.id,
+    label: p.name,
+  }))
+}
 
 /* ── Quantum Walk options ──────────────────────────────────── */
 
@@ -305,7 +382,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       case 'diracEquation':
         return DIRAC_PRESET_OPTIONS
       case 'freeScalarField':
-        return FREE_SCALAR_PRESET_OPTIONS
+        return getFreeScalarPresetOptions(dimension)
       case 'quantumWalk':
         return QUANTUM_WALK_PRESET_OPTIONS
       case 'wheelerDeWitt':

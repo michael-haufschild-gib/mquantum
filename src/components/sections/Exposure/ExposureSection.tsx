@@ -258,13 +258,36 @@ ExposureSectionInner.displayName = 'ExposureSectionInner'
 /**
  * Read-only indicator showing the effective auto-scale gain.
  * The raw gain is 1/maxDensity; the effective gain is capped at autoScaleMaxGain.
+ *
+ * Reads `maxDensity` from the channel matching the active quantum mode —
+ * the previous version always read `s.tdse.maxDensity`, which displayed
+ * stale TDSE data for BEC/Dirac/FSF/Pauli sessions and froze at "—" for
+ * QW (which doesn't track maxDensity in its channel).
  */
 const ExposureIndicator: React.FC = React.memo(() => {
+  const objectType = useGeometryStore((s) => s.objectType)
+  const quantumMode = useExtendedObjectStore((s) => s.schroedinger.quantumMode)
   const { maxDensity, hasData } = useDiagnosticsStore(
-    useShallow((s) => ({
-      maxDensity: s.tdse.maxDensity,
-      hasData: s.tdse.hasData,
-    }))
+    useShallow((s) => {
+      if (objectType === 'pauliSpinor') {
+        return { maxDensity: s.pauli.maxDensity, hasData: s.pauli.hasData }
+      }
+      switch (quantumMode) {
+        case 'becDynamics':
+          return { maxDensity: s.bec.maxDensity, hasData: s.bec.hasData }
+        case 'diracEquation':
+          return { maxDensity: s.dirac.maxDensity, hasData: s.dirac.hasData }
+        case 'freeScalarField':
+          return { maxDensity: s.fsf.maxPhi, hasData: s.fsf.hasData }
+        case 'quantumWalk':
+          // QwChannelData doesn't currently expose maxDensity, so the
+          // gain indicator can't report a meaningful value. Render the
+          // "—" placeholder by reporting hasData=false.
+          return { maxDensity: 0, hasData: false }
+        default:
+          return { maxDensity: s.tdse.maxDensity, hasData: s.tdse.hasData }
+      }
+    })
   )
 
   const autoScaleMaxGain = useExtendedObjectStore((s) => s.schroedinger.autoScaleMaxGain ?? 20)

@@ -37,8 +37,8 @@ export interface SaveLoadState {
  * interleaved consumer used by quantum walk), then maps async after GPU
  * submit.
  */
-export function requestStateSave(ctx: WebGPURenderContext, state: SaveLoadState): void {
-  if (!state.psiBuffer || state.saveMappingInFlight) return
+export function requestStateSave(ctx: WebGPURenderContext, state: SaveLoadState): boolean {
+  if (!state.psiBuffer || state.saveMappingInFlight) return false
   // Merged ψ stride: 8 bytes/site (vec2f = 2 × f32 interleaved).
   const byteSize = state.totalSites * 8
 
@@ -73,6 +73,7 @@ export function requestStateSave(ctx: WebGPURenderContext, state: SaveLoadState)
       state.saveMappingInFlight = false
     },
   })
+  return true
 }
 
 /**
@@ -92,8 +93,12 @@ export function requestSliceCapture(
   axis: 'x' | 'y' | 'z',
   gridSize: number[],
   worldBound: number
-): void {
-  if (!state.psiBuffer || state.saveMappingInFlight) return
+): boolean {
+  // Returns false when a previous save/slice readback is still in flight
+  // (sharing `saveMappingInFlight`) so the caller can leave the request
+  // flag set and retry next frame instead of silently dropping the user's
+  // capture request.
+  if (!state.psiBuffer || state.saveMappingInFlight) return false
   const { device, encoder } = ctx
   // Merged ψ stride: 8 bytes/site (vec2f, interleaved [Re,Im,...]).
   const byteSize = state.totalSites * 8
@@ -168,6 +173,7 @@ export function requestSliceCapture(
       staging.destroy()
       state.saveMappingInFlight = false
     })
+  return true
 }
 
 /**

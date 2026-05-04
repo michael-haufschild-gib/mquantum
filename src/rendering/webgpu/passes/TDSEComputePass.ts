@@ -206,6 +206,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     psiBuffer: null,
     totalSites: 0,
     pl: null,
+    eigenstateGeneration: 0,
   }
 
   // Save/load state (shared mutable object for extracted module)
@@ -331,8 +332,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   getDiagnosticsHistory(): readonly TdseDiagnosticsSnapshot[] {
     return this._diagState.diagHistory.getHistory()
   }
-  requestStateSave(ctx: WebGPURenderContext): void {
-    slRequestSave(ctx, this._slState)
+  requestStateSave(ctx: WebGPURenderContext): boolean {
+    return slRequestSave(ctx, this._slState)
   }
 
   requestSliceCapture(
@@ -340,8 +341,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     axis: 'x' | 'y' | 'z',
     gridSize: number[],
     worldBound: number
-  ): void {
-    slRequestSlice(ctx, this._slState, axis, gridSize, worldBound)
+  ): boolean {
+    return slRequestSlice(ctx, this._slState, axis, gridSize, worldBound)
   }
 
   setLoadedWavefunction(

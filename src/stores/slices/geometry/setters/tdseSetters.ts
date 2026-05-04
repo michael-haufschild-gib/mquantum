@@ -9,13 +9,14 @@
 
 import { DEFAULT_TDSE_CONFIG, type TdseConfig } from '@/lib/geometry/extended/types'
 import { reduceGridToFit } from '@/lib/math/ndArray'
-import { clampKKState } from '@/lib/physics/compactification'
+import { clampKKState, computeEffectiveSpacing } from '@/lib/physics/compactification'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
 import type { SchroedingerSliceActions } from '../types'
 import {
   clampDtWithCfl,
+  computeCflLimit,
   defaultTdseGridPerDim,
   nestedClampedSetter,
   nestedIntSetter,
@@ -299,7 +300,36 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
       })
     },
     setTdseHbar: nestedClampedSetter(ctx, D, 'hbar', 0.01, 10.0),
-    setTdseDt: nestedClampedSetter(ctx, D, 'dt', 0.0001, 0.05),
+    setTdseDt: (dt) => {
+      if (!isFinite(dt)) {
+        warnNonFinite('tdse.dt', dt)
+        return
+      }
+      setWithVersion((state) => {
+        const td = state.schroedinger.tdse
+        // CFL must be evaluated on the EFFECTIVE spacing (2π·R/N for compact
+        // dims). With small compactRadii the effective spacing is far below
+        // raw, so the actual stability bound is much tighter — clamping
+        // against [0.0001, 0.05] alone lets the user push dt above the real
+        // CFL once a compact dim is active and the integrator goes unstable.
+        const effSpacing = computeEffectiveSpacing(
+          td.gridSize,
+          td.spacing,
+          td.compactDims,
+          td.compactRadii,
+          td.latticeDim
+        )
+        const cflLimit = computeCflLimit(effSpacing, td.latticeDim, td.mass)
+        const maxDt = Math.min(0.05, cflLimit * 0.9)
+        const clamped = Math.max(0.0001, Math.min(maxDt, dt))
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            tdse: { ...td, dt: clamped },
+          },
+        }
+      })
+    },
     setTdseStepsPerFrame: nestedIntSetter(ctx, D, 'stepsPerFrame', 1, 16, 'floor'),
     setTdseInitialCondition: (condition) => {
       setWithVersion((state) => ({

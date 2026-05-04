@@ -437,7 +437,12 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
 
   postFrame(): void {
     const rbState = this.getReadbackState()
-    startPendingReadback(rbState, this.device)
+    // The microtask scheduled inside startPendingReadback runs AFTER the
+    // synchronous applyReadbackState below, so it must call back into the
+    // pass to propagate `readbackInFlight = false` once mapAsync resolves —
+    // otherwise the flag is stuck at true and every subsequent
+    // refreshDensityDistribution is silently skipped.
+    startPendingReadback(rbState, this.device, (s) => this.applyReadbackState(s))
     this.applyReadbackState(rbState)
   }
 

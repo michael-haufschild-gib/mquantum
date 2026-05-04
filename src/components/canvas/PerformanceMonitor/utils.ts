@@ -19,9 +19,14 @@ export function formatMetric(value: number, unit = '', decimals = 1): string {
  */
 export function formatBytes(bytes: number, decimals = 1): string {
   if (bytes === 0) return '0 B'
+  if (!Number.isFinite(bytes) || bytes < 0) return '—'
   const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+  // Clamp the index so a multi-petabyte value (or float-rounding overshoot
+  // at exact 1 TB / 1 PB boundaries where `Math.log` lands a hair above the
+  // intended bucket) does not index past the table and render "X undefined".
+  const rawIdx = Math.floor(Math.log(bytes) / Math.log(k))
+  const i = Math.max(0, Math.min(sizes.length - 1, rawIdx))
   return `${(bytes / Math.pow(k, i)).toFixed(decimals)} ${sizes[i]}`
 }
 

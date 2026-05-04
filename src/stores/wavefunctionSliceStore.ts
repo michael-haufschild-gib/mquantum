@@ -36,7 +36,16 @@ interface WavefunctionSliceState {
 
   /** Request a slice capture for the given axis */
   requestCapture: (axis: SliceAxis) => void
-  /** Called by the render loop to deliver captured slice data */
+  /**
+   * Called by the render loop to deliver captured slice data.
+   *
+   * Does NOT clear `captureRequested` — clearing that flag is the
+   * responsibility of the render loop (`clearRequest`), called only
+   * when a new capture has actually been scheduled. Otherwise a request
+   * arriving while a previous capture's readback is still in flight
+   * would be silently dropped when the previous capture's
+   * `fulfillCapture` resolves.
+   */
   fulfillCapture: (data: {
     sliceData: Float32Array
     axis: SliceAxis
@@ -80,7 +89,6 @@ export const useWavefunctionSliceStore = create<WavefunctionSliceState>((set) =>
       sliceGridSize: data.gridSize,
       sliceWorldBound: data.worldBound,
       hasData: true,
-      captureRequested: false,
     }),
 
   clearRequest: () => set({ captureRequested: false }),

@@ -97,11 +97,22 @@ export const Knob: React.FC<KnobProps> = React.memo(
       onChange(min)
     }, [min, onChange])
 
-    // Keyboard navigation handler
+    // Keyboard navigation handler. role="slider" requires that the four
+    // ARIA arrow keys be consumed by the control rather than the browser —
+    // without preventDefault, ArrowUp/ArrowDown on a focused knob scrolls
+    // the surrounding page (the knob is wrapped in a tabIndex=0 div but is
+    // not a native form control, so the browser's slider-style key handling
+    // doesn't apply). Tested with the Knob inside a tall scroll container
+    // where every keypress would otherwise jump the page.
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent) => {
-        if (e.key === 'ArrowUp' || e.key === 'ArrowRight') onChange(Math.min(value + step, max))
-        if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') onChange(Math.max(value - step, min))
+        if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
+          e.preventDefault()
+          onChange(Math.min(value + step, max))
+        } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
+          e.preventDefault()
+          onChange(Math.max(value - step, min))
+        }
       },
       [value, step, min, max, onChange]
     )

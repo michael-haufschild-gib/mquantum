@@ -127,4 +127,26 @@ describe('MeasurementControls', () => {
     expect(screen.getByText('mean')).toBeInTheDocument()
     expect(screen.getByText('std')).toBeInTheDocument()
   })
+
+  it('toggle-on collapseWidth derives from BEC lattice in BEC mode (not TDSE)', async () => {
+    const user = userEvent.setup()
+    // Distinct lattices so the auto-derived width is unambiguously BEC's:
+    // BEC half-extent = 16 * 0.5 * 0.5 = 4.0 → width ≈ 4.0 * 0.2 = 0.80
+    // TDSE half-extent = 32 * 0.05 * 0.5 = 0.8 → width ≈ 0.8 * 0.2 = 0.16
+    useExtendedObjectStore.setState((s) => ({
+      schroedinger: {
+        ...s.schroedinger,
+        quantumMode: 'becDynamics',
+        tdse: { ...s.schroedinger.tdse, gridSize: [32, 32, 32], spacing: [0.05, 0.05, 0.05] },
+        bec: { ...s.schroedinger.bec, gridSize: [16, 16, 16], spacing: [0.5, 0.5, 0.5] },
+      },
+    }))
+    render(<MeasurementControls />)
+    await openGroup(user)
+    await user.click(screen.getByTestId('measurement-toggle'))
+    // Expected: ~0.80 (BEC), not ~0.16 (TDSE).
+    const w = useMeasurementStore.getState().collapseWidth
+    expect(w).toBeGreaterThan(0.5)
+    expect(w).toBeLessThan(1.0)
+  })
 })

@@ -178,10 +178,10 @@ export class PauliComputePass extends WebGPUBaseComputePass {
    *
    * @param ctx - Render context (device + encoder)
    */
-  requestStateSave(ctx: WebGPURenderContext): void {
-    if (!this.buf?.spinorBuffer || this.saveMappingInFlight) return
+  requestStateSave(ctx: WebGPURenderContext): boolean {
+    if (!this.buf?.spinorBuffer || this.saveMappingInFlight) return false
     const totalSites = this.buf.totalSites ?? 0
-    if (totalSites === 0) return
+    if (totalSites === 0) return false
     const elementCount = 2 * totalSites
     const byteSize = elementCount * 2 * Float32Array.BYTES_PER_ELEMENT
 
@@ -208,6 +208,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
         this.saveMappingInFlight = false
       },
     })
+    return true
   }
 
   // ============================================================================

@@ -154,7 +154,11 @@ ${bayerJitterSection}
   var potAccColor = vec3f(0.0);
   var potAccAlpha: f32 = 0.0;
   if (IS_FREE_SCALAR && !IS_PAULI && USE_DENSITY_GRID && DENSITY_GRID_HAS_PHASE) {
-    let potStepLen = stepLen * 0.5;
+    // See mainIsosurface.wgsl.ts: stepLen * 0.5 only covered half the ray
+    // when maxSteps == 128 (normal quality), leaving the back half of a
+    // no-hit ray without potential sampling. Sizing the step from
+    // (tFar - tNear) directly always reaches potEnd in 128 iterations.
+    let potStepLen = (tFar - tNear) / 128.0;
     var potT = tNear;
     var potTransmittance: f32 = 1.0;
     for (var pi = 0; pi < 128; pi++) {

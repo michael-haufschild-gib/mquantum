@@ -112,8 +112,16 @@ export interface SrmtSweepState {
   ) => void
   /** Abort a running sweep (returns to idle, keeps results around). */
   abortSweep: () => void
-  /** Append a progress point (must be called in ascending `index` order). */
-  appendPoint: (point: SrmtSweepPoint) => void
+  /**
+   * Append a progress point (must be called in ascending `index` order).
+   * The optional `total` is the worker's predicted sweep count — used to
+   * reconcile the store's `totalPoints` against grid-aware dedup (cut and
+   * gridNphiCoupled kinds clamp the raw `config.points` against the actual
+   * φ-grid, so the worker's prediction can be lower than the per-kind cap
+   * `totalPointsFor` stamped at `startSweep`). Only the first non-zero
+   * `total` is honoured; subsequent progress messages reuse the same total.
+   */
+  appendPoint: (point: SrmtSweepPoint, total?: number) => void
   /** Record that a per-point solver re-run is starting (mass/bc). */
   setSolveStart: (index: number) => void
   /** Finalise the sweep. */
@@ -237,7 +245,7 @@ export const useSrmtSweepStore = create<SrmtSweepState>((set) => ({
     })
   },
 
-  appendPoint: (point) => {
+  appendPoint: (point, total) => {
     set((s) => {
       if (s.status !== 'running') return s
       if (point.index !== s.points.length) {
@@ -245,9 +253,19 @@ export const useSrmtSweepStore = create<SrmtSweepState>((set) => ({
         // guarantees sequential delivery, so this branch is defensive.)
         return s
       }
+      // Adopt the worker's predicted total when it differs from the per-kind
+      // cap stamped at startSweep — necessary for cut / gridNphiCoupled
+      // sweeps whose worker-side dedup against the active grid produces
+      // fewer points than `config.points`. Without this the progress UI
+      // never reaches 100% even after the worker emits `done`.
+      const nextTotal =
+        typeof total === 'number' && Number.isFinite(total) && total > 0 && total !== s.totalPoints
+          ? total
+          : s.totalPoints
       return {
         points: [...s.points, point],
         lastPointIndex: point.index,
+        totalPoints: nextTotal,
         version: s.version + 1,
       }
     })

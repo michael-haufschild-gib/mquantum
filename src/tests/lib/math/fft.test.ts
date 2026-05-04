@@ -565,6 +565,36 @@ describe('fft — minimal N=2 edge case', () => {
   })
 })
 
+describe('fftNd / ifftNd input validation', () => {
+  // Regression: previously the WASM fast-path (Float64Array, total >= 256) skipped
+  // validation, and Rust's validate_fft_nd would silently return an empty Vec for
+  // bad input — leaving the buffer untouched while the function reported success.
+  // The JS fallback path threw via assertValidGridSize. The two paths must agree.
+
+  it('fftNd throws on non-power-of-2 axis (regardless of WASM readiness)', () => {
+    // Use total >= WASM_ND_MIN_SITES (256) so the WASM path would be taken if ready.
+    // 3 * 4 * 24 = 288 sites; axis 0 (=3) is not power-of-2.
+    const data = new Float64Array(2 * 288)
+    expect(() => fftNd(data, [3, 4, 24])).toThrow(/power-of-2/)
+  })
+
+  it('ifftNd throws on non-power-of-2 axis (regardless of WASM readiness)', () => {
+    const data = new Float64Array(2 * 288)
+    expect(() => ifftNd(data, [3, 4, 24])).toThrow(/power-of-2/)
+  })
+
+  it('fftNd throws when data buffer is too small for the grid', () => {
+    // gridSize valid, but data.length < 2 * total (4 * 4 * 4 = 64 sites need 128 floats).
+    const data = new Float64Array(50)
+    expect(() => fftNd(data, [4, 4, 4])).toThrow(/data length too small/)
+  })
+
+  it('ifftNd throws when data buffer is too small for the grid', () => {
+    const data = new Float64Array(50)
+    expect(() => ifftNd(data, [4, 4, 4])).toThrow(/data length too small/)
+  })
+})
+
 describe('fft — large N accuracy', () => {
   it('roundtrips a 1024-point signal with < 1e-10 error', () => {
     const n = 1024

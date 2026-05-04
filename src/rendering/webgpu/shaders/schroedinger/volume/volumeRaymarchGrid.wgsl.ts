@@ -161,7 +161,16 @@ fn volumeRaymarchGrid(
       let remoteRho = select(remotePrimaryRho, remotePrimaryRho + remoteGridSample.g, IS_DUAL_CHANNEL);
       var localLogDensity = sCenter;
       var remoteLogDensity = remoteGridSample.g;
-      if (IS_DUAL_CHANNEL) {
+      // Recompute when the G channel is NOT a trusted log-density source:
+      //   IS_DUAL_CHANNEL → G is the secondary linear density (Dirac/Pauli upper/lower).
+      //   !DENSITY_GRID_HAS_PHASE → analytic modes write zero into G when the storage
+      //     texture is r16float (the common case for HO/hydrogen). Reading G as logRho
+      //     would saturate the smoothstep log-window to 1.0 and bypass the
+      //     low-density gate on the remote endpoint, biasing the bridge gain in
+      //     empty regions. localLogDensity already takes the same path via
+      //     loadGridSampleState's fallback, so the local recompute here is a
+      //     no-op (sCenter == log(rho)) — symmetry keeps the two sides aligned.
+      if (IS_DUAL_CHANNEL || !DENSITY_GRID_HAS_PHASE) {
         if (rho > 1e-9) {
           localLogDensity = log(rho);
         } else {
@@ -175,7 +184,17 @@ fn volumeRaymarchGrid(
       }
       var remotePhase: f32;
       if (DENSITY_GRID_HAS_PHASE) {
-        remotePhase = remoteGridSample.b - phaseOffset;
+        // Mirror loadGridSampleState's local-phase channel pick: when the
+        // analytical mode runs Diverging (color alg 10), local phase comes from
+        // relativePhase (= channel A). The remote endpoint must read from the
+        // same channel, otherwise phaseAgreement compares relativePhase against
+        // spatialPhase — which makes the cos(localPhase - remotePhase) gating
+        // meaningless and leaves the bridge gain biased by an unphysical
+        // mismatch. Subtract phaseOffset only for the spatial channel because
+        // relativePhase is invariant under the global rotation (the reference
+        // state rotates with ψ).
+        let rotatedRemoteB = remoteGridSample.b - phaseOffset;
+        remotePhase = select(rotatedRemoteB, remoteGridSample.a, useRelPhaseGlobal);
       } else {
         remotePhase = 0.0;
       }

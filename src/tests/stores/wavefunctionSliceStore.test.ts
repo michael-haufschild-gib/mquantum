@@ -37,10 +37,19 @@ describe('wavefunctionSliceStore', () => {
     expect(s.requestedAxis).toBe('z') // axis preserved
   })
 
-  it('fulfillCapture delivers slice data and clears request', () => {
+  it('fulfillCapture delivers slice data without clearing the request flag', () => {
+    // Regression: clearing `captureRequested` from `fulfillCapture` would
+    // silently drop a NEW request that arrived while the in-flight readback
+    // was resolving. The render loop owns flag clearing via
+    // `clearRequest`, called only when a capture has actually been
+    // scheduled. `fulfillCapture` therefore must NOT touch the flag.
     useWavefunctionSliceStore.getState().requestCapture('x')
-    const data = new Float32Array([0.1, 0.5, 0.9, 0.5, 0.1])
+    // Render loop schedules — clears the request flag itself.
+    useWavefunctionSliceStore.getState().clearRequest()
+    // While X readback is mid-flight, user requests Y.
+    useWavefunctionSliceStore.getState().requestCapture('y')
 
+    const data = new Float32Array([0.1, 0.5, 0.9, 0.5, 0.1])
     useWavefunctionSliceStore.getState().fulfillCapture({
       sliceData: data,
       axis: 'x',
@@ -49,7 +58,10 @@ describe('wavefunctionSliceStore', () => {
     })
 
     const s = useWavefunctionSliceStore.getState()
-    expect(s.captureRequested).toBe(false)
+    // Y request survives the X fulfillment.
+    expect(s.captureRequested).toBe(true)
+    expect(s.requestedAxis).toBe('y')
+    // X data is delivered.
     expect(s.hasData).toBe(true)
     expect(s.sliceData).toBe(data)
     expect(s.sliceAxis).toBe('x')

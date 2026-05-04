@@ -81,6 +81,37 @@ describe('Schroedinger bilocal ER bridge WGSL composition', () => {
     ])
   })
 
+  it('full grid raymarcher selects remote phase from the same channel as local phase under useRelPhaseGlobal', () => {
+    // Regression: the local phase comes from `select(B - phaseOffset, A, useRelPhaseGlobal)`
+    // (loadGridSampleState), so when the Diverging color algorithm activates relativePhase
+    // (channel A) for HO/hydrogen, the remote endpoint must also read from A. Reading the
+    // remote from B while the local came from A makes phaseAgreement = cos(rel - spatial),
+    // which is physically meaningless and biases the bridge gain. The fix mirrors the local
+    // select for the remote sample.
+    const body = functionSlice(generateVolumeRaymarchGridBlock(false), 'volumeRaymarchGrid')
+
+    expectOrdered(body, [
+      'remotePhase = select(rotatedRemoteB, remoteGridSample.a, useRelPhaseGlobal)',
+    ])
+  })
+
+  it('full grid raymarcher recomputes remoteLogDensity from log(remoteRho) when DENSITY_GRID_HAS_PHASE is false', () => {
+    // Regression: in r16float storage (analytic modes, common case for HO/hydrogen
+    // when the device supports r16float), `remoteGridSample.g` returns 0, so the
+    // smoothstep log-window in applyBilocalERBridgeTopology saturates to 1.0 and
+    // bypasses the low-density gate on the remote side. The recompute branch must
+    // include the !DENSITY_GRID_HAS_PHASE case so both local and remote take the
+    // log(rho) fallback path that loadGridSampleState already uses for sCenter.
+    const body = functionSlice(generateVolumeRaymarchGridBlock(false), 'volumeRaymarchGrid')
+
+    expect(body).toContain('if (IS_DUAL_CHANNEL || !DENSITY_GRID_HAS_PHASE) {')
+    expectOrdered(body, [
+      'var remoteLogDensity = remoteGridSample.g',
+      'if (IS_DUAL_CHANNEL || !DENSITY_GRID_HAS_PHASE) {',
+      'remoteLogDensity = log(remoteRho)',
+    ])
+  })
+
   it('applies topology in simple compute-grid raymarcher before backreaction and emission', () => {
     const body = functionSlice(generateVolumeRaymarchGridSimpleBlock(), 'volumeRaymarchGrid')
 

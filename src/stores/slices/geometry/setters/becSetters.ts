@@ -14,7 +14,7 @@ import {
 } from '@/lib/geometry/extended/types'
 import { reduceGridToFit } from '@/lib/math/ndArray'
 import { thomasFermiMuND, thomasFermiRadius } from '@/lib/physics/bec/chemicalPotential'
-import { clampKKState } from '@/lib/physics/compactification'
+import { clampKKState, computeEffectiveSpacing } from '@/lib/physics/compactification'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
@@ -33,46 +33,10 @@ import {
 
 type BecActions = Pick<
   SchroedingerSliceActions,
-  | 'setBecInteractionStrength'
-  | 'setBecTrapOmega'
-  | 'setBecTrapAnisotropy'
-  | 'setBecInitialCondition'
-  | 'setBecFieldView'
-  | 'setBecVortexCharge'
-  | 'setBecVortexLatticeCount'
-  | 'setBecVortexPlane1'
-  | 'setBecVortexPlane2'
-  | 'setBecVortexSeparation'
-  | 'setBecVortexPairCount'
-  | 'setBecSolitonDepth'
-  | 'setBecSolitonVelocity'
-  | 'setBecHawkingVmax'
-  | 'setBecHawkingLh'
-  | 'setBecHawkingDeltaN'
-  | 'setBecHawkingPairInjection'
-  | 'setBecHawkingInjectRate'
-  | 'setBecHawkingSeed'
-  | 'setBecDisorderStrength'
-  | 'setBecDisorderSeed'
-  | 'setBecDisorderDistribution'
-  | 'setBecAutoScale'
-  | 'setBecAbsorberEnabled'
-  | 'setBecAbsorberWidth'
-  | 'setBecPmlTargetReflection'
-  | 'setBecDiagnosticsEnabled'
-  | 'setBecDiagnosticsInterval'
-  | 'setBecDt'
-  | 'setBecStepsPerFrame'
-  | 'setBecMass'
-  | 'setBecHbar'
-  | 'setBecGridSize'
-  | 'setBecSpacing'
-  | 'setBecSlicePosition'
-  | 'setBecCompactDim'
-  | 'setBecCompactRadius'
-  | 'applyBecPreset'
-  | 'resetBecField'
-  | 'clearBecNeedsReset'
+  Extract<
+    keyof SchroedingerSliceActions,
+    `setBec${string}` | 'applyBecPreset' | 'resetBecField' | 'clearBecNeedsReset'
+  >
 >
 
 /**
@@ -383,8 +347,21 @@ export function createBecSetters(ctx: SetterContext): BecActions {
         return
       }
       setWithVersion((state) => {
-        const { spacing, latticeDim, mass } = state.schroedinger.bec
-        const cflLimit = computeCflLimit(spacing, latticeDim, mass)
+        const { gridSize, spacing, compactDims, compactRadii, latticeDim, mass } =
+          state.schroedinger.bec
+        // CFL must be evaluated on the EFFECTIVE spacing (2π·R/N for compact
+        // dims), not the raw user-set spacing. With small compactRadii the
+        // effective spacing is far below raw, so the actual stability bound
+        // is much tighter — using raw spacing here lets the user push dt
+        // above the real CFL and the GP integrator goes unstable.
+        const effSpacing = computeEffectiveSpacing(
+          gridSize,
+          spacing,
+          compactDims,
+          compactRadii,
+          latticeDim
+        )
+        const cflLimit = computeCflLimit(effSpacing, latticeDim, mass)
         const maxDt = Math.min(0.05, cflLimit * 0.9)
         const clamped = Math.max(0.0001, Math.min(maxDt, dt))
         return {

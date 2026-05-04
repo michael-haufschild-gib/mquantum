@@ -277,7 +277,10 @@ export class WebGPUStatsCollector {
     this.accumulated.memHistory.shift()
     this.accumulated.memHistory.push(heapMB)
 
-    const vramMB = graph.getVRAMUsage() / (1024 * 1024)
+    // VRAMStats is consumed by formatBytes() in the UI, which expects raw
+    // bytes — the previous bytes→MB conversion here turned "1 GB of VRAM"
+    // into "1.0 KB" on the System tab.
+    const vramBytes = graph.getVRAMUsage()
 
     // Build GPU stats (averaged per frame)
     const gpuStats: GPUStats = {
@@ -303,9 +306,9 @@ export class WebGPUStatsCollector {
         heap: heapMB,
       },
       vram: {
-        geometries: vramMB,
+        geometries: vramBytes,
         textures: 0,
-        total: vramMB,
+        total: vramBytes,
       },
       viewport: {
         width: size.width,

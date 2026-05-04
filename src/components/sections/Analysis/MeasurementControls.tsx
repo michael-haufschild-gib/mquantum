@@ -28,20 +28,30 @@ function computeLatticeHalfExtent(lattice: { gridSize: number[]; spacing: number
   return lattice.gridSize[0] * lattice.spacing[0] * 0.5
 }
 
+/**
+ * Pick the active lattice config based on quantumMode. Both `tdse` and `bec`
+ * are unconditionally populated by `createDefaultSchroedingerConfig`, so a
+ * `?? ` fallback always resolves to the first operand and silently ignores
+ * BEC's grid/spacing — the slider scaling and auto-collapseWidth would then
+ * be derived from TDSE's lattice while the user is interacting with BEC.
+ */
+function pickActiveLattice(sch: {
+  quantumMode: string
+  tdse: { gridSize: number[]; spacing: number[] }
+  bec: { gridSize: number[]; spacing: number[] }
+}): { gridSize: number[]; spacing: number[] } {
+  return sch.quantumMode === 'becDynamics' ? sch.bec : sch.tdse
+}
+
 /** Reactive hook for the half-extent of the active lattice grid (TDSE or BEC). */
 function useLatticeHalfExtent(): number {
-  return useExtendedObjectStore((s) => {
-    const sch = s.schroedinger
-    const lattice = sch.tdse ?? sch.bec
-    return computeLatticeHalfExtent(lattice)
-  })
+  return useExtendedObjectStore((s) => computeLatticeHalfExtent(pickActiveLattice(s.schroedinger)))
 }
 
 /** Compute the half-extent imperatively (for callbacks where subscription is not needed). */
 function getLatticeHalfExtent(): number {
   const sch = useExtendedObjectStore.getState().schroedinger
-  const lattice = sch.tdse ?? sch.bec
-  return computeLatticeHalfExtent(lattice)
+  return computeLatticeHalfExtent(pickActiveLattice(sch))
 }
 
 /**
@@ -158,7 +168,16 @@ export const MeasurementControls: React.FC = React.memo(() => {
               label="Measure Axis"
               tooltip="Full: measure all axes and collapse to a point. Partial: measure one axis, preserving the conditional wavefunction in other dimensions."
               options={axisOptions}
-              value={measureAxis === null ? 'full' : String(measureAxis)}
+              // measureAxis persists across dimension changes; if the stored
+              // axis is no longer in range (e.g. user picked axis 4 in 6D and
+              // shrank to 3D) display 'All axes' instead of a phantom value
+              // that has no matching option. The orchestrator already falls
+              // back to a full measurement in this case (TdseBecMeasurement
+              // checks `measureAxis < gridSize.length`), so showing the
+              // out-of-range axis would mislead the user.
+              value={
+                measureAxis === null || measureAxis >= dimension ? 'full' : String(measureAxis)
+              }
               onChange={handleAxisChange}
               data-testid="measurement-axis"
             />

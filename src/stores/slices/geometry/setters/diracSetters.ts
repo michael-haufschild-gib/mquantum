@@ -332,10 +332,23 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
           const limit = halfExtent * 0.9
           return Math.max(-limit, Math.min(limit, v))
         })
+        // Shrinking the grid tightens the lattice extent — re-clamp packetWidth
+        // against the new minimum half-extent so a wide packet doesn't bleed
+        // past the periodic boundary (where the FFT would wrap it onto itself
+        // and corrupt the initial state). Mirrors the formula used in
+        // resizeDiracArrays + applyDiracPreset.
+        const minHalfExtent = Math.min(...snapped.map((g, i) => g * (newSpacing[i] ?? 0.15) * 0.5))
+        const packetWidth = Math.min(minHalfExtent * 0.4, prevDirac.packetWidth)
         return {
           schroedinger: {
             ...state.schroedinger,
-            dirac: { ...prevDirac, gridSize: snapped, packetCenter, needsReset: true },
+            dirac: {
+              ...prevDirac,
+              gridSize: snapped,
+              packetCenter,
+              packetWidth,
+              needsReset: true,
+            },
           },
         }
       })
@@ -362,6 +375,13 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
           const kMax = Math.PI / (clamped[d] ?? 0.15)
           return Math.max(-kMax, Math.min(kMax, v))
         })
+        // Tightening spacing shrinks the lattice extent — re-clamp packetWidth
+        // so a wide packet doesn't wrap around the periodic boundary under FFT.
+        // Mirrors the formula used in resizeDiracArrays + applyDiracPreset.
+        const minHalfExtent = Math.min(
+          ...prevDirac.gridSize.map((g, i) => g * (clamped[i] ?? 0.15) * 0.5)
+        )
+        const packetWidth = Math.min(minHalfExtent * 0.4, prevDirac.packetWidth)
         // Decreasing min(spacing) shrinks the Dirac CFL ceiling, so re-clamp
         // dt to keep the lattice stable after the user tightens the grid.
         const dt = clampDiracDt(clamped, prevDirac.speedOfLight, prevDirac.dt)
@@ -373,6 +393,7 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
               spacing: clamped,
               packetCenter,
               packetMomentum,
+              packetWidth,
               dt,
               needsReset: true,
             },

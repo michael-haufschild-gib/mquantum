@@ -207,8 +207,8 @@ export class DiracComputePass extends WebGPUBaseComputePass {
    *
    * @param ctx - Render context (device + encoder)
    */
-  requestStateSave(ctx: WebGPURenderContext): void {
-    if (!this.spinorBuffer || this.saveMappingInFlight) return
+  requestStateSave(ctx: WebGPURenderContext): boolean {
+    if (!this.spinorBuffer || this.saveMappingInFlight) return false
     // Merged layout: one buffer of S*totalSites vec2f (8 bytes each).
     // The generic 'interleaved' path de-interleaves [re, im, re, im, ...]
     // into separate re[n] / im[n] Float32Arrays for the serializer —
@@ -240,6 +240,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
         this.saveMappingInFlight = false
       },
     })
+    return true
   }
   getDensityTexture(): GPUTexture | null {
     return this.densityTexture
