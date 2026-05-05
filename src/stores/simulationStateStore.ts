@@ -134,6 +134,9 @@ export const useSimulationStateStore = create<SimulationStateState>((set, get) =
   storedEigenstateCount: 0,
 
   requestSave: () => {
+    const { status, pendingLoadData } = get()
+    if (status === 'loading' || pendingLoadData) return
+
     const objectType = useGeometryStore.getState().objectType
     const mode: SaveableQuantumMode | null =
       objectType === 'pauliSpinor'
