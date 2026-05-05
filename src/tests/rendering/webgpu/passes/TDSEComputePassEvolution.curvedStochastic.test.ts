@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 import type { WebGPURenderContext } from '@/rendering/webgpu/core/types'
@@ -140,17 +140,31 @@ function makeResources(events: string[], stochasticState: StochasticLocState): E
   }
 }
 
+const hadGPUBufferUsage = 'GPUBufferUsage' in globalThis
+
 beforeAll(() => {
-  if (!('GPUBufferUsage' in globalThis)) {
+  if (!hadGPUBufferUsage) {
     Object.defineProperty(globalThis, 'GPUBufferUsage', {
       configurable: true,
       value: {
+        MAP_READ: 0x0001,
+        MAP_WRITE: 0x0002,
         COPY_SRC: 0x0004,
         COPY_DST: 0x0008,
+        INDEX: 0x0010,
+        VERTEX: 0x0020,
         UNIFORM: 0x0040,
         STORAGE: 0x0080,
+        INDIRECT: 0x0100,
+        QUERY_RESOLVE: 0x0200,
       },
     })
+  }
+})
+
+afterAll(() => {
+  if (!hadGPUBufferUsage) {
+    delete (globalThis as Record<string, unknown>).GPUBufferUsage
   }
 })
 
