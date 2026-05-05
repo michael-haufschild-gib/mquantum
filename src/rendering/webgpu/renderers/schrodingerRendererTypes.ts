@@ -10,7 +10,7 @@
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { getQuantumTypeShaderUniformIdMap } from '@/lib/geometry/registry'
-import type { HydrogenBasisState } from '@/lib/physics/openQuantum'
+import type { HydrogenBasisState } from '@/lib/physics/openQuantum/hydrogenBasis'
 import type { AnimationState } from '@/stores/animationStore'
 import type { AppearanceStoreState } from '@/stores/appearanceStore'
 import type { GeometryState } from '@/stores/geometryStore'

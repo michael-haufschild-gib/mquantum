@@ -67,9 +67,6 @@ export interface KSpaceWorkerErrorMessage {
   message: string
 }
 
-/** Outbound message from the k-space web worker. */
-export type KSpaceWorkerResponse = KSpaceWorkerResultMessage | KSpaceWorkerErrorMessage
-
 self.onmessage = (e: MessageEvent<KSpaceWorkerRequest>) => {
   const msg = e.data
   if (msg.type !== 'compute') return

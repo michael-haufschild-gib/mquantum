@@ -478,37 +478,3 @@ export const hydrogenNDGen8dBlock = generateHydrogenNDBlock(8)
 export const hydrogenNDGen9dBlock = generateHydrogenNDBlock(9)
 export const hydrogenNDGen10dBlock = generateHydrogenNDBlock(10)
 export const hydrogenNDGen11dBlock = generateHydrogenNDBlock(11)
-
-/**
- * Get the generated block for a specific dimension.
- *
- * @param dimension - The dimension (2-11)
- * @returns WGSL code for the hydrogen ND function
- */
-export function getHydrogenNDBlockForDimension(dimension: number): string {
-  const dim = Math.min(Math.max(dimension, 2), 11)
-  switch (dim) {
-    case 2:
-      return hydrogenNDGen2dBlock
-    case 3:
-      return hydrogenNDGen3dBlock
-    case 4:
-      return hydrogenNDGen4dBlock
-    case 5:
-      return hydrogenNDGen5dBlock
-    case 6:
-      return hydrogenNDGen6dBlock
-    case 7:
-      return hydrogenNDGen7dBlock
-    case 8:
-      return hydrogenNDGen8dBlock
-    case 9:
-      return hydrogenNDGen9dBlock
-    case 10:
-      return hydrogenNDGen10dBlock
-    case 11:
-      return hydrogenNDGen11dBlock
-    default:
-      return hydrogenNDGen11dBlock
-  }
-}

@@ -181,9 +181,6 @@ export function computeWormholeCoherence(
   return (numRe * numRe) / denom
 }
 
-/** Maximum mirror-axis enum value accepted by the public API. */
-export const MAX_WORMHOLE_MIRROR_AXIS = 2
-
 /** Type guard for the mirror-axis enum used by the store and URL layer. */
 export function isValidMirrorAxis(v: unknown): v is MirrorAxis {
   return v === 0 || v === 1 || v === 2

@@ -152,37 +152,3 @@ fn hoNDOptimized(xND: array<f32, 11>, termIdx: i32, uniforms: SchroedingerUnifor
 }
 `
 }
-
-/**
- * Get the generated block for a specific dimension.
- *
- * @param dimension - The dimension (3-11)
- * @returns WGSL code for the hoND function
- */
-export function getHoNDBlockForDimension(dimension: number): string {
-  const dim = Math.min(Math.max(dimension, 2), 11)
-  switch (dim) {
-    case 2:
-      return hoND2dBlock
-    case 3:
-      return hoND3dBlock
-    case 4:
-      return hoND4dBlock
-    case 5:
-      return hoND5dBlock
-    case 6:
-      return hoND6dBlock
-    case 7:
-      return hoND7dBlock
-    case 8:
-      return hoND8dBlock
-    case 9:
-      return hoND9dBlock
-    case 10:
-      return hoND10dBlock
-    case 11:
-      return hoND11dBlock
-    default:
-      return hoND11dBlock
-  }
-}

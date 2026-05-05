@@ -18,7 +18,7 @@ import {
 } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
-import { useRotationUpdates } from '@/rendering/renderers/base'
+import { useRotationUpdates } from '@/rendering/renderers/base/useRotationUpdates'
 import { useAppearanceStore } from '@/stores/appearanceStore'
 import type { SkyboxMode } from '@/stores/defaults/visualDefaults'
 import { useEnvironmentStore } from '@/stores/environmentStore'
@@ -673,5 +673,3 @@ import {
   warmSwapSchrodingerPasses,
 } from './scenePassSetup'
 import { raycastCanvas } from './utils/raycasting'
-
-export default WebGPUScene

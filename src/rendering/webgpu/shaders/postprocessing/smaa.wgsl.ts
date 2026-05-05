@@ -466,10 +466,3 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   return vec4f(result, 1.0);
 }
 `
-
-// Export all shaders with entry point names for use by the pass
-export const smaaShaders = {
-  edgeDetection: smaaEdgeDetectionShader,
-  blendingWeight: smaaBlendingWeightShader,
-  neighborhoodBlending: smaaNeighborhoodBlendingShader,
-}

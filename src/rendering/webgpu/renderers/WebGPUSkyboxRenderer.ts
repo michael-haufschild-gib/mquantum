@@ -18,12 +18,8 @@ import type { AnimationSnapshot, CameraSnapshot } from '../core/storeAccess'
 import { getStoreSnapshot } from '../core/storeAccess'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
-import {
-  composeSkyboxFragmentShader,
-  composeSkyboxVertexShader,
-  SKYBOX_BIND_GROUPS,
-  type SkyboxMode as ShaderSkyboxMode,
-} from '../shaders/skybox'
+import { composeSkyboxFragmentShader, composeSkyboxVertexShader } from '../shaders/skybox/compose'
+import { SKYBOX_BIND_GROUPS, type SkyboxMode as ShaderSkyboxMode } from '../shaders/skybox/types'
 import { generateSkyboxCubeVertices, loadSkyboxKTX2Texture } from './skyboxVertexData'
 
 /**

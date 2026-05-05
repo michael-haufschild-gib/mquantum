@@ -324,12 +324,3 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
 )
 
 SchroedingerControls.displayName = 'SchroedingerControls'
-
-// Re-export sub-components for direct imports if needed
-export { BECControls } from './BECControls'
-export { FreeScalarFieldControls } from './FreeScalarFieldControls'
-export { HarmonicOscillatorControls } from './HarmonicOscillatorControls'
-export { HydrogenNDControls } from './HydrogenNDControls'
-export { TDSEControls } from './TDSEControls'
-export type * from './types'
-export { WignerControls } from './WignerControls'

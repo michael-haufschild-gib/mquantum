@@ -225,16 +225,6 @@ export function getQuantumTypeConfigSubKey(key: QuantumTypeKey): string | undefi
   return QUANTUM_TYPE_REGISTRY.get(key)?.internal.configSubKey
 }
 
-/** Gets the WGSL runtime mode id for `uniforms.quantumMode`, if the mode uses one. */
-export function getQuantumTypeShaderUniformId(key: QuantumTypeKey): number | undefined {
-  return getQuantumTypeRuntime(key)?.shaderUniformId
-}
-
-/** Gets the append-only `.mqstate` serialization id for a saveable quantum type. */
-export function getQuantumTypeStateSaveId(key: QuantumTypeKey): number | undefined {
-  return getQuantumTypeRuntime(key)?.stateSaveId
-}
-
 /** Gets the fallback color algorithm for a quantum type. */
 export function getQuantumTypeDefaultColorAlgorithm(key: QuantumTypeKey): string | undefined {
   return getQuantumTypeRuntime(key)?.defaultColorAlgorithm
@@ -255,14 +245,6 @@ export function getQuantumTypeCompileContextFields(
   key: QuantumTypeKey
 ): readonly QuantumTypeCompileContextField[] {
   return getQuantumTypeRuntime(key)?.compileContextFields ?? []
-}
-
-/** Checks if a quantum type needs a specific compile-time selector field. */
-export function quantumTypeHasCompileContextField(
-  key: QuantumTypeKey,
-  field: QuantumTypeCompileContextField
-): boolean {
-  return getQuantumTypeCompileContextFields(key).includes(field)
 }
 
 /**

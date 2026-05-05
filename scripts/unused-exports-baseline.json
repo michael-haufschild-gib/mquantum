@@ -1,5 +1,5 @@
 {
   "_": "Unused-export count baseline. Updated by `node scripts/check-unused-exports.js --update`. Lower values are better; CI fails if the count grows.",
-  "_measured": "2026-05-03",
-  "count": 759
+  "_measured": "2026-05-05",
+  "count": 7
 }

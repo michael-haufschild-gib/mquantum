@@ -9,7 +9,7 @@
 
 import type { SkyboxMode, SkyboxProceduralSettings } from '@/stores/defaults/visualDefaults'
 
-import type { SkyboxMode as ShaderSkyboxMode } from '../shaders/skybox'
+import type { SkyboxMode as ShaderSkyboxMode } from '../shaders/skybox/types'
 
 /**
  * Resolved KTX2 cubemap asset URLs (eagerly resolved by Vite).

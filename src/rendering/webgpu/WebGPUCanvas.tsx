@@ -298,5 +298,3 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
     </div>
   )
 }
-
-export default WebGPUCanvas

@@ -9,6 +9,8 @@
 import React, { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+import { Button } from '@/components/ui/Button'
+import { Icon } from '@/components/ui/Icon'
 import { Select } from '@/components/ui/Select'
 import type { AdsPresetName, AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
 import { type BecConfig, DEFAULT_BEC_CONFIG } from '@/lib/geometry/extended/bec'
@@ -310,6 +312,57 @@ function getHydrogenCoupledOptions(dimension: number) {
   }))
 }
 
+/* ── Description lookup ────────────────────────────────────── */
+
+function findPresetDescriptionById(
+  presets: readonly { id: string; description: string }[],
+  id: string
+): string | null {
+  return presets.find((p) => p.id === id)?.description ?? null
+}
+
+function findHydrogenNDDescription(key: string): string | null {
+  const groups = getHydrogenNDPresetsWithKeysByDimension()
+  for (const presets of Object.values(groups)) {
+    const match = presets.find(([presetKey]) => presetKey === key)
+    if (match) return match[1].description
+  }
+  return null
+}
+
+const ID_PRESET_TABLES: Record<string, readonly { id: string; description: string }[]> = {
+  hydrogenNDCoupled: HYDROGEN_COUPLED_PRESETS,
+  tdseDynamics: TDSE_SCENARIO_PRESETS,
+  becDynamics: BEC_SCENARIO_PRESETS,
+  diracEquation: DIRAC_SCENARIO_PRESETS,
+  freeScalarField: FREE_SCALAR_PRESETS,
+  quantumWalk: QUANTUM_WALK_PRESETS,
+  wheelerDeWitt: WDW_SCENARIO_PRESETS,
+  pauliSpinor: PAULI_SCENARIO_PRESETS,
+}
+
+function findActiveDescription(
+  mode: string,
+  activeValue: string,
+  ho: string,
+  hyd: string,
+  ads: string | undefined
+): string | null {
+  if (mode === 'harmonicOscillator') {
+    return ho ? (SCHROEDINGER_NAMED_PRESETS[ho]?.description ?? null) : null
+  }
+  if (mode === 'hydrogenND') {
+    return hyd ? findHydrogenNDDescription(hyd) : null
+  }
+  if (mode === 'antiDeSitter') {
+    if (!ads || ads === 'custom') return null
+    return ADS_PRESETS.find((p) => p.id === ads)?.description ?? null
+  }
+  const table = ID_PRESET_TABLES[mode]
+  if (!table || !activeValue) return null
+  return findPresetDescriptionById(table, activeValue)
+}
+
 /**
  * Unified scenario selector displayed in the left panel header.
  *
@@ -423,6 +476,12 @@ export const ScenarioSelector: React.FC = React.memo(() => {
     return [{ value: '', label: 'Custom' }, ...options]
   }, [options, activeValue])
 
+  const activeDescription = useMemo(
+    () =>
+      findActiveDescription(mode, activeValue, presetName ?? '', hydrogenNDPreset ?? '', adsPreset),
+    [mode, activeValue, presetName, hydrogenNDPreset, adsPreset]
+  )
+
   // Dispatch change to the correct store action
   const handleChange = useCallback(
     (value: string) => {
@@ -494,6 +553,20 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       value={activeValue}
       onChange={handleChange}
       data-testid="scenario-selector"
+      endAdornment={
+        activeDescription ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            tooltip={activeDescription}
+            ariaLabel="Show scenario description"
+            data-testid="scenario-description-info"
+            className="!p-1.5 shrink-0"
+          >
+            <Icon name="info" size={14} />
+          </Button>
+        ) : undefined
+      }
     />
   )
 })

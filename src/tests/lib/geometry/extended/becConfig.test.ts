@@ -78,9 +78,9 @@ describe('Sonic Horizon preset', () => {
   it('is reachable via getBecPreset and merges default rendering overrides', () => {
     const preset = getBecPreset('blackHoleAnalog')
     expect(preset?.id).toBe('blackHoleAnalog')
-    expect(preset?.renderingOverrides?.densityGain).toBeCloseTo(0.25)
-    expect(preset?.renderingOverrides?.densityContrast).toBeCloseTo(1.2)
-    expect(preset?.renderingOverrides?.autoScaleMaxGain).toBe(6)
+    expect(preset?.renderingOverrides?.densityGain).toBeCloseTo(0.5)
+    expect(preset?.renderingOverrides?.densityContrast).toBeCloseTo(1.0)
+    expect(preset?.renderingOverrides?.autoScaleMaxGain).toBe(4)
   })
 })
 

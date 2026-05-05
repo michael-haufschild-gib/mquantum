@@ -7,20 +7,16 @@
  * @module rendering/webgpu/renderers/strategies/analyticOpenQuantum
  */
 
-import type {
-  HydrogenBasisState,
-  OpenQuantumConfig,
-  TransitionRate,
-} from '@/lib/physics/openQuantum'
 import { buildLindbladChannels } from '@/lib/physics/openQuantum/channels'
 import type { ComplexMatrix } from '@/lib/physics/openQuantum/complexMatrix'
 import {
   basisEnergies,
   basisLabels,
   buildHydrogenBasis,
+  type HydrogenBasisState,
 } from '@/lib/physics/openQuantum/hydrogenBasis'
 import { buildHydrogenChannels } from '@/lib/physics/openQuantum/hydrogenChannels'
-import { buildTransitionRates } from '@/lib/physics/openQuantum/hydrogenRates'
+import { buildTransitionRates, type TransitionRate } from '@/lib/physics/openQuantum/hydrogenRates'
 import { densityMatrixFromCoefficients } from '@/lib/physics/openQuantum/integrator'
 import { buildLiouvillian } from '@/lib/physics/openQuantum/liouvillian'
 import { computeMetrics } from '@/lib/physics/openQuantum/metrics'
@@ -30,7 +26,11 @@ import {
   createPackedBuffer,
   packForGPU,
 } from '@/lib/physics/openQuantum/statePacking'
-import type { DensityMatrix, LindbladChannel } from '@/lib/physics/openQuantum/types'
+import type {
+  DensityMatrix,
+  LindbladChannel,
+  OpenQuantumConfig,
+} from '@/lib/physics/openQuantum/types'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import type { WebGPURenderContext } from '../../core/types'

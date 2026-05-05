@@ -408,12 +408,19 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let vs = sqrt(vsMagSq);
     let cs = sqrt(csSq);
     let mach = vs / cs;
-    // machNumber display mapping: identity-clamp so M = 1 → 1.0 exactly.
-    // This gives the Analog-Horizon preset an unambiguous isosurface contract:
-    // an iso-threshold of 1.0 in the Mach view lies precisely on the horizon
-    // (c_s = v_s). Supersonic voxels saturate at 1.0 rather than being
-    // separately differentiated — use the superfluidVelocity view for |v_s|.
-    let machDisplay = clamp(mach, 0.0, 1.0);
+    // Horizon-emphasis mapping: bright peak at M=1 (the sonic horizon),
+    // dark supersonic interior, dim subsonic exterior.
+    // Isosurface contract preserved: displayScalar=1.0 ↔ M=1.0.
+    //
+    // Asymmetric Gaussian tuned to the detrended waterfall profile
+    // (peak M ≈ 0.999, L_box ≈ 9.3, 64³ grid). σ_sub=0.10 keeps M<0.75
+    // invisible through a full-depth Beer-Lambert ray while tolerating
+    // the Mach drift that occurs as GP dynamics disrupt the initial
+    // tanh profile. σ_sup=0.06 makes any supersonic interior dark.
+    let mDist = mach - 1.0;
+    let sigma = select(0.10, 0.06, mDist > 0.0);
+    let horizonGlow = exp(-0.5 * mDist * mDist / (sigma * sigma));
+    let machDisplay = horizonGlow;
     displayScalar = machDisplay * densityGate;
   } else if (params.fieldView == 7u) {
     if (params.initCondition != 7u) {

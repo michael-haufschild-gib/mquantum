@@ -1,48 +1,33 @@
 /**
- * Object Type Registry — Barrel Export
+ * Object Type Registry — Public API.
  *
- * Provides both the legacy ObjectType registry (for internal plumbing)
- * and the flat QuantumType registry (for user-facing type selection).
+ * Re-exports the actually-imported subset of the registry. Names that
+ * are only used internally (within `helpers.ts` / `quantumTypes.ts` /
+ * `registry.ts`) deliberately do not appear here so the public surface
+ * matches what consumers actually depend on.
  *
  * @example
  * ```typescript
  * import {
  *   getAvailableQuantumTypes,
  *   getQuantumTypeEntry,
- * } from '@/lib/geometry/registry';
+ * } from '@/lib/geometry/registry'
  * ```
  */
 
-// Types — flat model
+// Types
 export type {
-  AvailableQuantumTypeInfo,
-  QuantumTypeCategory,
-  QuantumTypeCompileContextField,
-  QuantumTypeDataPath,
-  QuantumTypeEntry,
-  QuantumTypeEvolutionResetKind,
-  QuantumTypeInternal,
-  QuantumTypeKey,
-  QuantumTypeRegistry,
-  QuantumTypeRuntimeMetadata,
-  QuantumTypeStrategyKind,
-} from './types'
-
-// Types — legacy model (still used by internal plumbing)
-export type {
-  AnimationCapabilities,
   AnimationSystemDef,
-  AvailableTypeInfo,
-  DimensionConstraints,
-  ObjectTypeEntry,
-  RenderingCapabilities,
+  AvailableQuantumTypeInfo,
+  QuantumTypeEvolutionResetKind,
+  QuantumTypeKey,
 } from './types'
 
 // Registries
 export { QUANTUM_TYPE_REGISTRY } from './quantumTypes'
 export { OBJECT_TYPE_REGISTRY } from './registry'
 
-// Helper functions — flat model
+// Helpers — flat quantum-type API
 export {
   getAvailableQuantumTypes,
   getQuantumTypeCompileContextFields,
@@ -53,10 +38,7 @@ export {
   getQuantumTypeKeyByStateSaveIdMap,
   getQuantumTypeName,
   getQuantumTypeRuntime,
-  getQuantumTypeShaderUniformId,
   getQuantumTypeShaderUniformIdMap,
-  getQuantumTypesRequiringDimensionAbove,
-  getQuantumTypeStateSaveId,
   getQuantumTypeStateSaveIdMap,
   getQuantumTypeStrategyKind,
   isAnalyticQuantumType,
@@ -64,12 +46,11 @@ export {
   isHydrogenFamilyQuantumType,
   isUniformComputeGridQuantumType,
   QUANTUM_MODES_3D_ONLY,
-  quantumTypeHasCompileContextField,
   resolveQuantumTypeKey,
   supportsOpenQuantumForQuantumType,
 } from './helpers'
 
-// Helper functions — legacy model (still used by stores, URL serializer, etc.)
+// Helpers — legacy object-type API
 export {
   getAvailableTypesForDimension,
   getConfigStoreKey,

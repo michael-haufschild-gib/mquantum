@@ -67,16 +67,6 @@ export const MAX_LIGHTS = 4
 export const MIN_LIGHTS = 0
 
 /**
- * Light type to WGSL shader integer mapping.
- * Must match constants in shader code.
- */
-export const LIGHT_TYPE_TO_INT: Record<LightType, number> = {
-  point: 1,
-  directional: 2,
-  spot: 3,
-} as const
-
-/**
  * Default values for new lights by type.
  * range: 0 = infinite (no falloff), decay: 2 = physically accurate inverse square
  */
@@ -135,31 +125,6 @@ export function createDefaultLight(): LightSource {
     intensity: 1.0,
     coneAngle: 30,
     penumbra: 0.5,
-    range: 100,
-    decay: 2.0, // Physically correct inverse-square falloff
-  }
-}
-
-/**
- * Create a default spot light positioned opposite to the main point light.
- * Points toward the origin.
- * @returns A new default spot light configuration
- */
-export function createDefaultSpotLight(): LightSource {
-  const position: [number, number, number] = [-5, 5, 5]
-  const rotation = calculateRotationTowardOrigin(position)
-
-  return {
-    id: 'light-default-spot',
-    name: 'Spot Light',
-    type: 'spot',
-    enabled: true,
-    position,
-    rotation,
-    color: '#FFFFFF',
-    intensity: 1.0,
-    coneAngle: 30,
-    penumbra: 0.2,
     range: 100,
     decay: 2.0, // Physically correct inverse-square falloff
   }

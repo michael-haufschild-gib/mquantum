@@ -85,17 +85,24 @@ const SONIC_HORIZON_BASE_OVERRIDES: Partial<BecConfig> = {
 }
 
 /**
- * Shared rendering overrides for sonic-horizon BEC scenes. The Mach and
- * Hawking-flux views are already normalized to [0, 1], so a 20× autoscale
- * gain is pathological once the density saturates: `densityGate ≈ 1`
- * everywhere and the field pegs at 1 everywhere. 6× keeps the autoscaler
- * gentle while still letting the underlying density respond to moderate
- * underexposure.
+ * Shared rendering overrides for sonic-horizon BEC scenes.
+ *
+ * Tuned to the detrended waterfall profile on a 64³ grid (L_box ≈ 9.3):
+ *
+ *   gain=0.50: Beer-Lambert through 64 voxels at the horizon (display ≈ 1.0)
+ *   gives α ≈ 0.99 (opaque). M=0.85 approach (display ≈ 0.25) → α ≈ 0.69
+ *   (bright glow). M<0.75 invisible (α < 3%).
+ *
+ *   contrast=1.0: the Gaussian (σ=0.10/0.06) provides selectivity; higher
+ *   contrast amplifies mid-range values and washes out the horizon.
+ *
+ *   autoScaleMaxGain=4: limits autoscaler so densityGate stays well-behaved
+ *   on the uniform-density condensate.
  */
 const SONIC_HORIZON_BASE_RENDERING: Required<BecRenderingOverrides> = {
-  densityGain: 0.25,
-  densityContrast: 1.2,
-  autoScaleMaxGain: 6,
+  densityGain: 0.5,
+  densityContrast: 1.0,
+  autoScaleMaxGain: 4,
 }
 
 /**
@@ -272,6 +279,20 @@ export const BEC_SCENARIO_PRESETS: BecScenarioPreset[] = [
       'Superflow crosses the speed of sound — an analog black-hole horizon at M=1 in the BEC',
     minDim: 3,
     overrides: { ...SONIC_HORIZON_BASE_OVERRIDES, fieldView: 'machNumber' },
+    renderingOverrides: { ...SONIC_HORIZON_BASE_RENDERING },
+  },
+  {
+    id: 'blackHoleLaser',
+    name: 'Black Hole Laser',
+    description:
+      'Superradiant amplification between sonic horizons on a periodic grid — the Corley-Jacobson (1999) black hole laser instability',
+    minDim: 3,
+    overrides: {
+      ...SONIC_HORIZON_BASE_OVERRIDES,
+      hawkingVmax: 4.0,
+      absorberEnabled: false,
+      fieldView: 'machNumber',
+    },
     renderingOverrides: { ...SONIC_HORIZON_BASE_RENDERING },
   },
   {
