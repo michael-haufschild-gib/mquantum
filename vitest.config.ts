@@ -157,7 +157,6 @@ export default defineConfig({
         // UI shells with no testable branches (decorative drawers, GPU
         // overlays). Verified by Playwright e2e where they matter.
         'src/components/overlays/WormholeCoherencePanel.tsx',
-        'src/components/layout/TimelineControls/AnimationSystemPanel.tsx',
         'src/components/layout/TimelineControls/PauliAnimationDrawer.tsx',
         'src/components/layout/TimelineControls/WheelerDeWittAnimationDrawer.tsx',
         // animation-wasm.ts and per-phase split (lib/wasm/animation/*): the

@@ -1,0 +1,15 @@
+{
+  "_": "Pure-barrel `index.ts(x)` allowlist. Updated by `node scripts/check-no-new-barrels.js --update`. Adding new entries requires explicit re-baseline; CI rejects silent growth.",
+  "_measured": "2026-05-05",
+  "barrels": [
+    "src/components/canvas/gizmos/index.ts",
+    "src/components/canvas/index.ts",
+    "src/components/sections/Advanced/index.ts",
+    "src/components/sections/Performance/index.ts",
+    "src/components/ui/DropdownMenu/index.ts",
+    "src/lib/geometry/registry/index.ts",
+    "src/lib/math/index.ts",
+    "src/lib/wasm/index.ts",
+    "src/rendering/shaders/palette/index.ts"
+  ]
+}

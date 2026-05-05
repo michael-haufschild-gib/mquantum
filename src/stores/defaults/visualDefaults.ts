@@ -27,10 +27,6 @@ export const DEFAULT_EDGE_COLOR = '#19e697'
 export const DEFAULT_FACE_COLOR = '#33cc9e'
 export const DEFAULT_BACKGROUND_COLOR = '#232323'
 
-// Unified PBR properties
-export const DEFAULT_ROUGHNESS = 0.3
-export const DEFAULT_METALLIC = 0.0
-
 // ============================================================================
 // Bloom Defaults (Progressive Downsample/Upsample)
 // ============================================================================
@@ -149,7 +145,6 @@ export const DEFAULT_SPECULAR_INTENSITY = 0.8
 export const DEFAULT_SHOW_LIGHT_INDICATOR = false
 
 // Enhanced lighting
-export const DEFAULT_SPECULAR_COLOR = '#FFFFFF'
 export const DEFAULT_LIGHT_STRENGTH = 1.0
 export const DEFAULT_TONE_MAPPING_ENABLED = true
 export const DEFAULT_TONE_MAPPING_ALGORITHM: ToneMappingAlgorithm = 'aces'

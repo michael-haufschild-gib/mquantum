@@ -54,6 +54,26 @@ test(stores): add edge case tests for dimension clamping
 docs(physics): document BEC chemical potential calculation
 ```
 
+## Quality Ratchets
+
+CI runs a set of count-based ratchets that fail when a metric regresses.
+Each baseline lives next to its check script in `scripts/`:
+
+| Check | Baseline | What it enforces |
+|---|---|---|
+| `check-bundle-size.js` | `bundle-size-budgets.json` | Per-chunk gzip-size budgets |
+| `check-coverage-ratchet.js` | (in `vitest.config.ts`) | Branch / line / statement coverage floors |
+| `check-unused-exports.js` | `unused-exports-baseline.json` | Count of unused exports may not grow |
+| `check-no-new-barrels.js` | `no-new-barrels-baseline.json` | Pure-barrel `index.ts(x)` files may not multiply |
+| `check-circular-deps.js` | (cycle allowlist in script) | No new circular module dependencies |
+| `check-chunk-cycles.js` | (chunk graph) | Manual chunks form a DAG |
+| `check-untracked-imports.js` | (none — pure check) | Tracked files cannot import untracked files |
+| `check-wgsl-backticks.js` | (none — pure check) | `/* wgsl */` template literals stay backtick-clean |
+
+When a ratchet fires, fix the underlying issue rather than re-baselining
+unless the new value is an intentional, justified change. Re-baselining
+silently is a path to L6-and-falling.
+
 ## Architecture Decisions
 
 Significant design changes should be documented as an ADR in `docs/adr/`. See [docs/decisions.md](docs/decisions.md) for the existing records and format.

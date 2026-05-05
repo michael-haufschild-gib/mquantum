@@ -98,9 +98,6 @@ export function generateDensityGridBindingsBlock(
   return wgsl
 }
 
-// Backward-compatible default bindings block (rgba16float payload)
-export const densityGridBindingsBlock = generateDensityGridBindingsBlock()
-
 /**
  * Main compute shader entry point
  *

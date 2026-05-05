@@ -10,10 +10,15 @@
 import React, { useCallback, useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-import { isComputeQuantumType } from '@/lib/geometry/registry'
+import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
+import {
+  getQuantumTypeCompileContextFields,
+  isComputeQuantumType,
+  supportsOpenQuantumForQuantumType,
+} from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
-import { useRotationUpdates } from '@/rendering/renderers/base'
+import { useRotationUpdates } from '@/rendering/renderers/base/useRotationUpdates'
 import { useAppearanceStore } from '@/stores/appearanceStore'
 import type { SkyboxMode } from '@/stores/defaults/visualDefaults'
 import { useEnvironmentStore } from '@/stores/environmentStore'
@@ -89,23 +94,18 @@ const schroedingerIsoSelector = (state: ReturnType<typeof useExtendedObjectStore
 
 /** Resolves open-quantum support based on quantum mode and representation. */
 function isOpenQuantumSupported(
-  quantumMode: string,
+  quantumMode: SchroedingerQuantumMode,
   representation: string,
   enabled: boolean
 ): boolean {
-  return (
-    enabled &&
-    (quantumMode === 'harmonicOscillator' ||
-      quantumMode === 'hydrogenND' ||
-      quantumMode === 'hydrogenNDCoupled') &&
-    representation !== 'wigner'
-  )
+  return enabled && supportsOpenQuantumForQuantumType(quantumMode) && representation !== 'wigner'
 }
 
 const schroedingerCompileSelector = (state: ReturnType<typeof useExtendedObjectStore.getState>) => {
   const s = state.schroedinger
-  const quantumMode = s?.quantumMode ?? 'harmonicOscillator'
+  const quantumMode = (s?.quantumMode ?? 'harmonicOscillator') as SchroedingerQuantumMode
   const representation = (s?.representation ?? 'position') as 'position' | 'momentum' | 'wigner'
+  const compileContextFields = getQuantumTypeCompileContextFields(quantumMode)
 
   return {
     quantumMode,
@@ -125,15 +125,17 @@ const schroedingerCompileSelector = (state: ReturnType<typeof useExtendedObjectS
       representation,
       s?.openQuantum?.enabled ?? false
     ),
-    diracFieldView:
-      quantumMode === 'diracEquation' ? (s?.dirac?.fieldView ?? 'totalDensity') : undefined,
+    diracFieldView: compileContextFields.includes('diracFieldView')
+      ? (s?.dirac?.fieldView ?? 'totalDensity')
+      : undefined,
     pauliFieldView: state.pauliSpinor?.fieldView ?? 'spinDensity',
     // Expose freeScalar.initialCondition so the normalization path can hide
     // kSpaceOccupation for `freeScalarField + vacuumNoise` (exact vacuum has
     // n_k = 0 everywhere → blank map). Without this, preset or stale state
     // carrying kSpaceOccupation would leak past normalization and render.
-    freeScalarInitialCondition:
-      quantumMode === 'freeScalarField' ? s?.freeScalar?.initialCondition : undefined,
+    freeScalarInitialCondition: compileContextFields.includes('freeScalarInitialCondition')
+      ? s?.freeScalar?.initialCondition
+      : undefined,
   }
 }
 
@@ -587,13 +589,17 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       const clickY = e.clientY - rect.top
 
       const matrices = cam.getMatrices()
-      // Estimate bounding radius from TDSE grid config, or use default
+      // Estimate bounding radius from the active lattice, or use default.
+      // Both `tdse` and `bec` are unconditionally populated by
+      // `createDefaultSchroedingerConfig`, so a `?? ` fallback always picks
+      // TDSE and silently ignores BEC's grid/spacing — the click→world raycast
+      // would then use the wrong bounding-box scale in BEC mode.
       const schState = useExtendedObjectStore.getState().schroedinger
-      const tdse = schState?.tdse ?? schState?.bec
+      const lattice = schState?.quantumMode === 'becDynamics' ? schState?.bec : schState?.tdse
       let br = 2.0
-      if (tdse?.gridSize && tdse?.spacing) {
+      if (lattice?.gridSize && lattice?.spacing) {
         // Half-extent of the computational domain
-        const halfExtent = tdse.gridSize[0]! * tdse.spacing[0]! * 0.5
+        const halfExtent = lattice.gridSize[0]! * lattice.spacing[0]! * 0.5
         br = Math.max(halfExtent, 1.0)
       }
 
@@ -667,5 +673,3 @@ import {
   warmSwapSchrodingerPasses,
 } from './scenePassSetup'
 import { raycastCanvas } from './utils/raycasting'
-
-export default WebGPUScene

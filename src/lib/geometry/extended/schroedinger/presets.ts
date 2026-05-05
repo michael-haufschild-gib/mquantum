@@ -302,23 +302,6 @@ export function getNamedPreset(name: string, dimension: number): QuantumPreset |
 }
 
 /**
- * Generate a random preset with the given seed
- * @param seed - Random seed
- * @param dimension - Number of dimensions
- * @returns Generated QuantumPreset
- */
-export function generateRandomPreset(seed: number, dimension: number): QuantumPreset {
-  const rng = mulberry32(seed)
-
-  // Randomize parameters within reasonable ranges
-  const termCount = Math.floor(rng() * 4) + 2 // 2-5
-  const maxN = Math.floor(rng() * 4) + 2 // 2-5
-  const frequencySpread = rng() * 0.045 + 0.005 // 0.005-0.05
-
-  return generateQuantumPreset(seed, dimension, termCount, maxN, frequencySpread)
-}
-
-/**
  * Flatten quantum preset data for GPU uniforms
  * @param preset - The preset to flatten
  * @returns Object containing typed arrays for GPU uniforms

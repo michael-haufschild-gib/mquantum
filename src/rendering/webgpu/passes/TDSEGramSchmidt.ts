@@ -60,6 +60,14 @@ export interface GramSchmidtState {
   psiBuffer: GPUBuffer | null
   totalSites: number
   pl: TdsePipelineResult | null
+  /**
+   * Monotonic generation counter incremented on every {@link clearEigenstates}.
+   * Async eigenstate-diagnostic readbacks captured at store time check this
+   * counter before applying their result so a clear+re-store sequence cannot
+   * let the OLD eigenstate's IPR/orbit-correlation overwrite the NEW
+   * eigenstate's slot in the diagnostics store.
+   */
+  eigenstateGeneration: number
 }
 
 /**
@@ -133,8 +141,11 @@ export function storeCurrentEigenstate(
   }
   state.gsEigenstates.push(eigenstateEntry)
 
-  // Async readback: compute IPR and orbit correlation from eigenstate wavefunction on CPU
+  // Async readback: compute IPR and orbit correlation from eigenstate wavefunction on CPU.
+  // Capture the generation counter so a stale readback (after clearEigenstates +
+  // re-store) cannot apply old data to the new eigenstate's slot.
   const eigIdx = state.gsEigenstates.length - 1
+  const capturedGeneration = state.eigenstateGeneration
   void computeEigenstateDiagnosticsAsync(
     device,
     psiCopy,
@@ -142,6 +153,12 @@ export function storeCurrentEigenstate(
     energy,
     tdseConfig
   ).then((diag) => {
+    if (state.eigenstateGeneration !== capturedGeneration) {
+      // Stored eigenstates were cleared while this readback was in flight;
+      // the diagnostics store has already been reset and any current entry
+      // at `eigIdx` belongs to a fresh sweep, not this one.
+      return
+    }
     eigenstateEntry.ipr = diag.ipr
     // Push orbit correlation back to the diagnostics store
     void import('@/stores/diagnosticsStore').then((m) => {
@@ -257,6 +274,10 @@ export function clearEigenstates(state: GramSchmidtState): void {
     es.psi.destroy()
   }
   state.gsEigenstates = []
+  // Bump the generation so any in-flight async eigenstate-diagnostic
+  // readback discards its result instead of clobbering the next sweep's
+  // slot 0 with values computed from the just-destroyed wavefunction.
+  state.eigenstateGeneration++
 }
 
 /** Destroy GS GPU buffers. */

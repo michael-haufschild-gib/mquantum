@@ -70,6 +70,8 @@ interface SimulationStateState {
 
   /** True when UI has requested a save; cleared by the render loop after initiating readback */
   saveRequested: boolean
+  /** Quantum mode that was active when the save was requested; prevents cross-mode consumption */
+  saveRequestedForMode: SaveableQuantumMode | null
   /** Loaded data waiting to be injected into GPU buffers */
   pendingLoadData: PendingLoadData | null
 
@@ -126,11 +128,22 @@ export const useSimulationStateStore = create<SimulationStateState>((set, get) =
   status: 'idle',
   error: null,
   saveRequested: false,
+  saveRequestedForMode: null,
   pendingLoadData: null,
   storeEigenstateRequested: false,
   storedEigenstateCount: 0,
 
-  requestSave: () => set({ saveRequested: true, status: 'saving', error: null }),
+  requestSave: () => {
+    const { status, pendingLoadData } = get()
+    if (status === 'loading' || pendingLoadData) return
+
+    const objectType = useGeometryStore.getState().objectType
+    const mode: SaveableQuantumMode | null =
+      objectType === 'pauliSpinor'
+        ? 'pauliSpinor'
+        : (useExtendedObjectStore.getState().schroedinger?.quantumMode ?? null)
+    set({ saveRequested: true, saveRequestedForMode: mode, status: 'saving', error: null })
+  },
 
   loadFromFile: (file: File) => {
     // Block overlapping load attempts. The async deserialize/restore chain
@@ -216,9 +229,10 @@ export const useSimulationStateStore = create<SimulationStateState>((set, get) =
       })
   },
 
-  clearSaveRequest: () => set({ saveRequested: false }),
-  setSaveComplete: () => set({ status: 'done', saveRequested: false }),
-  setSaveError: (error) => set({ status: 'error', error, saveRequested: false }),
+  clearSaveRequest: () => set({ saveRequested: false, saveRequestedForMode: null }),
+  setSaveComplete: () => set({ status: 'done', saveRequested: false, saveRequestedForMode: null }),
+  setSaveError: (error) =>
+    set({ status: 'error', error, saveRequested: false, saveRequestedForMode: null }),
   clearLoadData: () => set({ pendingLoadData: null, status: 'done' }),
   setLoadError: (error) => set({ status: 'error', error, pendingLoadData: null }),
 
@@ -232,6 +246,7 @@ export const useSimulationStateStore = create<SimulationStateState>((set, get) =
       status: 'idle',
       error: null,
       saveRequested: false,
+      saveRequestedForMode: null,
       pendingLoadData: null,
       storeEigenstateRequested: false,
       storedEigenstateCount: 0,

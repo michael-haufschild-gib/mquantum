@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { QUANTUM_TYPE_REGISTRY } from '@/lib/geometry/registry/quantumTypes'
+import {
+  getQuantumTypeCompileContextFields,
+  getQuantumTypeEvolutionResetKind,
+  QUANTUM_TYPE_REGISTRY,
+  supportsOpenQuantumForQuantumType,
+} from '@/lib/geometry/registry'
 
 describe('QUANTUM_TYPE_REGISTRY', () => {
   it('contains exactly the expected quantum type keys', () => {
@@ -55,6 +60,54 @@ describe('QUANTUM_TYPE_REGISTRY', () => {
       )
       ownersById.set(id, key)
     }
+  })
+
+  it('declares evolution reset behavior for every entry', () => {
+    const resetKinds = Object.fromEntries(
+      [...QUANTUM_TYPE_REGISTRY.keys()].map((key) => [key, getQuantumTypeEvolutionResetKind(key)])
+    )
+
+    expect(resetKinds).toEqual({
+      harmonicOscillator: 'schroedingerAnalytic',
+      hydrogenND: 'schroedingerAnalytic',
+      hydrogenNDCoupled: 'schroedingerAnalytic',
+      freeScalarField: 'freeScalarField',
+      tdseDynamics: 'tdse',
+      becDynamics: 'bec',
+      diracEquation: 'dirac',
+      quantumWalk: 'quantumWalk',
+      wheelerDeWitt: 'wheelerDeWitt',
+      antiDeSitter: 'antiDeSitter',
+      pauliSpinor: 'pauli',
+    })
+  })
+
+  it('marks open-quantum support only for analytic density-matrix modes', () => {
+    const supportedKeys = [...QUANTUM_TYPE_REGISTRY.keys()].filter((key) =>
+      supportsOpenQuantumForQuantumType(key)
+    )
+
+    expect(supportedKeys).toEqual(['harmonicOscillator', 'hydrogenND', 'hydrogenNDCoupled'])
+  })
+
+  it('maps compile-context fields only to modes that need selector state', () => {
+    const compileContextByKey = Object.fromEntries(
+      [...QUANTUM_TYPE_REGISTRY.keys()].map((key) => [key, getQuantumTypeCompileContextFields(key)])
+    )
+
+    expect(compileContextByKey).toEqual({
+      harmonicOscillator: [],
+      hydrogenND: [],
+      hydrogenNDCoupled: [],
+      freeScalarField: ['freeScalarInitialCondition'],
+      tdseDynamics: [],
+      becDynamics: [],
+      diracEquation: ['diracFieldView'],
+      quantumWalk: [],
+      wheelerDeWitt: [],
+      antiDeSitter: [],
+      pauliSpinor: [],
+    })
   })
 
   it('every entry has valid dimension constraints (min <= max, min >= 1, max <= 11)', () => {

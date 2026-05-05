@@ -164,6 +164,7 @@ export function runStrangEvolution(
   // existing path unchanged (zero-regression guarantee).
   const metricKind = config.metric?.kind
   const absorberEnabled = config.absorberEnabled === true && metricKind !== 'torus'
+  const stochasticActive = config.stochasticEnabled && config.stochasticGamma > 0
   const curvedBranch = metricKind !== undefined && metricKind !== 'flat' && metricKind !== 'torus'
   if (curvedBranch && res.dispatchCurvedRK4) {
     const { pl: curvedPl, bg: curvedBg, dc: curvedDc } = res
@@ -173,8 +174,7 @@ export function runStrangEvolution(
     const curvedSteps = Math.floor(state.stepAccumulator)
     state.stepAccumulator -= curvedSteps
     const curvedAbsorberActive = absorberEnabled
-    const curvedPerStepRenorm =
-      config.imaginaryTimeEnabled || (config.stochasticEnabled && config.stochasticGamma > 0)
+    const curvedPerStepRenorm = config.imaginaryTimeEnabled || stochasticActive
     // Per-step RK4 stage-time patch for time-dependent metrics (deSitter).
     // The frame-start `stageTimeK{1..4}` values in TDSEUniforms are only
     // correct for step 0; without a per-step rewrite, step i uses t_start
@@ -190,11 +190,35 @@ export function runStrangEvolution(
     if (curvedTimeDep && curvedSteps > 0 && res.prepareCurvedStageTimes) {
       res.prepareCurvedStageTimes(ctx.device, state.simTime, curvedSteps)
     }
+    if (stochasticActive && res.stochasticState && curvedSteps > 0) {
+      prepareStochasticStaging(
+        ctx.device,
+        config,
+        res.stochasticState,
+        curvedSteps,
+        res.boundingRadius
+      )
+    }
     for (let step = 0; step < curvedSteps; step++) {
       if (curvedTimeDep && res.applyCurvedStageTimesForStep) {
         res.applyCurvedStageTimesForStep(ctx.encoder, step)
       }
       res.dispatchCurvedRK4(ctx)
+      if (stochasticActive && res.stochasticState) {
+        const cslSub = computeCSLSubsteps(config.stochasticGamma, config.dt)
+        for (let sub = 0; sub < cslSub; sub++) {
+          maybeDispatchStochasticLoc(
+            ctx.device,
+            ctx,
+            config,
+            res.stochasticState,
+            res.siteDispatch,
+            res.totalSites,
+            step * cslSub + sub,
+            curvedDc
+          )
+        }
+      }
       state.simTime += config.dt
       // PML absorber: ψ damping at boundaries. Uses the same pipeline +
       // init-bind-group as the flat path; operates on ψ regardless of metric.
@@ -250,8 +274,6 @@ export function runStrangEvolution(
 
   const { pl, bg, dc } = res
   const linearWG = Math.ceil(res.totalSites / LINEAR_WG)
-
-  const stochasticActive = config.stochasticEnabled && config.stochasticGamma > 0
 
   // Compute speed-scaled step count using fractional accumulator.
   // This preserves dt (critical for numerical stability) while allowing

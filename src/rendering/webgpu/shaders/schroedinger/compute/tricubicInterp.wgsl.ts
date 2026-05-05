@@ -30,26 +30,6 @@ export const TRICUBIC_MAX_N = 16
 export const TRICUBIC_MAX_SLICE_SITES = 4096
 
 /**
- * WGSL function computing Catmull-Rom basis weights.
- *
- * Returns vec4f(w0, w1, w2, w3) for parameter t ∈ [0,1].
- * The stencil samples points at indices (base-1, base, base+1, base+2)
- * where base = floor(coordF) and t = coordF - floor(coordF).
- */
-export const catmullRomWeightsBlock = /* wgsl */ `
-fn catmullRomWeights(t: f32) -> vec4f {
-  let t2 = t * t;
-  let t3 = t2 * t;
-  return vec4f(
-    -0.5 * t3 + t2 - 0.5 * t,
-     1.5 * t3 - 2.5 * t2 + 1.0,
-    -1.5 * t3 + 2.0 * t2 + 0.5 * t,
-     0.5 * t3 - 0.5 * t2
-  );
-}
-`
-
-/**
  * Determine whether the visible 3D slice is coarse enough to benefit
  * from tricubic interpolation.
  *

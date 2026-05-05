@@ -34,14 +34,3 @@ export const SKYBOX_BIND_GROUPS = {
   UNIFORMS: 0,
   TEXTURES: 1,
 } as const
-
-/**
- * Binding indices within each bind group
- */
-export const SKYBOX_BINDINGS = {
-  // Group 0: Uniforms
-  UNIFORM_BUFFER: 0,
-  // Group 1: Textures
-  CUBE_TEXTURE: 0,
-  CUBE_SAMPLER: 1,
-} as const

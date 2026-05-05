@@ -171,6 +171,12 @@ describe('WebGPUStatsCollector', () => {
       screen: { width: 1920, height: 1080 },
     })
 
+    // VRAMStats must remain in raw bytes — formatBytes() in SystemTab is
+    // the sole consumer and a unit conversion here would silently mislabel
+    // 1 GB of textures as "1.0 KB" on the System tab.
+    expect(metrics.vram.total).toBe(10 * 1024 * 1024)
+    expect(metrics.vram.geometries).toBe(10 * 1024 * 1024)
+
     nowSpy.mockRestore()
   })
 

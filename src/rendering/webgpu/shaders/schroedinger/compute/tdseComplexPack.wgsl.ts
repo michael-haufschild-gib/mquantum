@@ -1,11 +1,11 @@
 /**
  * Complex packing/unpacking compute shaders for TDSE FFT pipeline.
  *
- * Pack: Interleaves separate psiRe[] and psiIm[] buffers into a single
- *       complex[] buffer [re0, im0, re1, im1, ...] for FFT input.
+ * Pack: Reads a merged `psi: array<vec2f>` buffer and writes an interleaved
+ *       `complex[]` buffer [re0, im0, re1, im1, ...] for FFT input.
  *
- * Unpack: Deinterleaves complex[] buffer back to separate psiRe[] and psiIm[].
- *         Applies 1/N normalization for inverse FFT.
+ * Unpack: Reads the interleaved `complex[]` buffer back into
+ *         `psi: array<vec2f>` and applies 1/N normalization for inverse FFT.
  *
  * @workgroup_size(64)
  * @module
@@ -24,70 +24,12 @@ struct PackUniforms {
 `
 
 /**
- * Pack shader: psiRe + psiIm -> interleaved complex buffer
- *
- * Bind group layout:
- *   @group(0) @binding(0) uniforms { totalElements: u32, invN: f32 }
- *   @group(0) @binding(1) psiRe: array<f32> (read)
- *   @group(0) @binding(2) psiIm: array<f32> (read)
- *   @group(0) @binding(3) complexBuf: array<f32> (write)
- */
-export const tdseComplexPackBlock = /* wgsl */ `
-@group(0) @binding(0) var<uniform> packUni: PackUniforms;
-@group(0) @binding(1) var<storage, read> psiRe: array<f32>;
-@group(0) @binding(2) var<storage, read> psiIm: array<f32>;
-@group(0) @binding(3) var<storage, read_write> complexBuf: array<f32>;
-
-@compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) gid: vec3u) {
-  let idx = gid.x;
-  if (idx >= packUni.totalElements) {
-    return;
-  }
-  let c = idx << 1u;
-  complexBuf[c] = psiRe[idx];
-  complexBuf[c + 1u] = psiIm[idx];
-}
-`
-
-/**
- * Unpack shader: interleaved complex buffer -> psiRe + psiIm
- * Applies 1/N normalization for inverse FFT output.
- *
- * Bind group layout:
- *   @group(0) @binding(0) uniforms { totalElements: u32, invN: f32 }
- *   @group(0) @binding(1) complexBuf: array<f32> (read)
- *   @group(0) @binding(2) psiRe: array<f32> (write)
- *   @group(0) @binding(3) psiIm: array<f32> (write)
- */
-export const tdseComplexUnpackBlock = /* wgsl */ `
-@group(0) @binding(0) var<uniform> packUni: PackUniforms;
-@group(0) @binding(1) var<storage, read> complexBuf: array<f32>;
-@group(0) @binding(2) var<storage, read_write> psiRe: array<f32>;
-@group(0) @binding(3) var<storage, read_write> psiIm: array<f32>;
-
-@compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) gid: vec3u) {
-  let idx = gid.x;
-  if (idx >= packUni.totalElements) {
-    return;
-  }
-  // Apply 1/N normalization from inverse FFT
-  let c = idx << 1u;
-  let invN = packUni.invN;
-  psiRe[idx] = complexBuf[c] * invN;
-  psiIm[idx] = complexBuf[c + 1u] * invN;
-}
-`
-
-/**
  * Vec2f pack variant: reads a single `psi: array<vec2f>` buffer (merged
  * Re+Im, 8-byte stride) and writes the interleaved complex FFT buffer.
  * Used by the TDSE path, which merged its split psiRe/psiIm into one
- * vec2f buffer for bandwidth savings. Dirac/Pauli keep using the split
- * form via {@link tdseComplexPackBlock} because their spinor buffers are
- * S-component, and the split representation is still the most convenient
- * way to index components at byte-offset-based subranges.
+ * vec2f buffer for bandwidth savings. Pauli has its own pack/unpack
+ * blocks in `pauliPack.wgsl.ts` because its spinor buffers are
+ * S-component and need a different layout.
  *
  * Bind group layout:
  *   @group(0) @binding(0) uniforms { totalElements: u32, invN: f32 }
@@ -140,18 +82,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 export const tdsePackUniformsShaderBlock: ShaderBlock = {
   name: 'tdse-pack-uniforms',
   content: tdsePackUniformsBlock,
-}
-
-/** Complex pack shader as a ShaderBlock. */
-export const tdseComplexPackShaderBlock: ShaderBlock = {
-  name: 'tdse-complex-pack',
-  content: tdseComplexPackBlock,
-}
-
-/** Complex unpack shader as a ShaderBlock. */
-export const tdseComplexUnpackShaderBlock: ShaderBlock = {
-  name: 'tdse-complex-unpack',
-  content: tdseComplexUnpackBlock,
 }
 
 /** Vec2f-psi pack shader as a ShaderBlock (TDSE-only). */

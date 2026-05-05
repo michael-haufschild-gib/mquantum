@@ -90,5 +90,3 @@ export const AnimationDrawerContainer: React.FC<AnimationDrawerContainerProps> =
 )
 
 AnimationDrawerContainer.displayName = 'AnimationDrawerContainer'
-
-export default AnimationDrawerContainer

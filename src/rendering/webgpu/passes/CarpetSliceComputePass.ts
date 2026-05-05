@@ -282,7 +282,13 @@ export class CarpetSliceComputePass {
     computePass.dispatchWorkgroups(Math.ceil(densityGridSize / WORKGROUP_SIZE))
     computePass.end()
 
-    // Throttled readback — capture writeHead/totalFrames at submission time
+    // Throttled readback — capture writeHead/totalFrames at submission time.
+    // We just queued a write at row `writeHead`, so the carpet texture has one
+    // more filled row than `params.totalFrames` reports (the renderer
+    // increments `totalFrames` via `advanceHead` AFTER this dispatch). Pass
+    // `totalFrames + 1` so the painter's `filledRows = min(totalFrames, hist)`
+    // correctly counts the just-written row — without the +1, the painter
+    // silently drops the oldest carpet row during the partial-ring-fill phase.
     this.framesSinceReadback++
     if (this.framesSinceReadback >= READBACK_INTERVAL && !this.readbackInFlight) {
       this.performReadback(
@@ -290,7 +296,7 @@ export class CarpetSliceComputePass {
         historyLength,
         densityGridSize,
         writeHead,
-        params.totalFrames,
+        params.totalFrames + 1,
         onReadback
       )
       this.framesSinceReadback = 0

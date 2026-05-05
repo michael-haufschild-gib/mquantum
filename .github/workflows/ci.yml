@@ -64,6 +64,9 @@ jobs:
       - name: Unused exports ratchet
         run: node scripts/check-unused-exports.js
 
+      - name: No-new-barrels ratchet
+        run: node scripts/check-no-new-barrels.js
+
   # E2E / Playwright tests are PERMANENTLY excluded from CI.
   # GitHub Actions runners lack GPU/WebGPU support — the dev server hangs
   # indefinitely on WebGPU initialization. No replacement gate is needed:

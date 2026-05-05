@@ -85,6 +85,8 @@ export interface SrmtSweepState {
   lastPointIndex: number
   /** Total number of sweep points expected (driven by config). */
   totalPoints: number
+  /** True after the first valid worker-reported total is adopted. */
+  workerTotalLocked: boolean
   /** Index of the current `solveStart` step (mass/BC sweeps only). */
   currentSolveIndex: number
   /** Wall-clock ms at `startSweep`. 0 when idle. */
@@ -112,8 +114,16 @@ export interface SrmtSweepState {
   ) => void
   /** Abort a running sweep (returns to idle, keeps results around). */
   abortSweep: () => void
-  /** Append a progress point (must be called in ascending `index` order). */
-  appendPoint: (point: SrmtSweepPoint) => void
+  /**
+   * Append a progress point (must be called in ascending `index` order).
+   * The optional `total` is the worker's predicted sweep count — used to
+   * reconcile the store's `totalPoints` against grid-aware dedup (cut and
+   * gridNphiCoupled kinds clamp the raw `config.points` against the actual
+   * φ-grid, so the worker's prediction can be lower than the per-kind cap
+   * `totalPointsFor` stamped at `startSweep`). Only the first positive
+   * `total` is adopted; subsequent progress messages cannot change it.
+   */
+  appendPoint: (point: SrmtSweepPoint, total?: number) => void
   /** Record that a per-point solver re-run is starting (mass/bc). */
   setSolveStart: (index: number) => void
   /** Finalise the sweep. */
@@ -170,6 +180,7 @@ function idleState(): Omit<
     wdwConfigSnapshot: null,
     lastPointIndex: -1,
     totalPoints: 0,
+    workerTotalLocked: false,
     currentSolveIndex: -1,
     startedAt: 0,
     points: [],
@@ -211,6 +222,7 @@ export const useSrmtSweepStore = create<SrmtSweepState>((set) => ({
       config,
       wdwConfigSnapshot,
       totalPoints: totalPointsFor(config),
+      workerTotalLocked: false,
       startedAt: nowMs(),
       landmarks,
       version: s.version + 1,
@@ -237,7 +249,7 @@ export const useSrmtSweepStore = create<SrmtSweepState>((set) => ({
     })
   },
 
-  appendPoint: (point) => {
+  appendPoint: (point, total) => {
     set((s) => {
       if (s.status !== 'running') return s
       if (point.index !== s.points.length) {
@@ -245,9 +257,18 @@ export const useSrmtSweepStore = create<SrmtSweepState>((set) => ({
         // guarantees sequential delivery, so this branch is defensive.)
         return s
       }
+      // Adopt the worker's predicted total exactly once — necessary for cut /
+      // gridNphiCoupled sweeps whose worker-side dedup against the active grid
+      // produces fewer points than `config.points`. Without this the progress
+      // UI never reaches 100% even after the worker emits `done`.
+      const canAdopt =
+        !s.workerTotalLocked && typeof total === 'number' && Number.isFinite(total) && total > 0
+      const nextTotal = canAdopt ? total : s.totalPoints
       return {
         points: [...s.points, point],
         lastPointIndex: point.index,
+        totalPoints: nextTotal,
+        workerTotalLocked: s.workerTotalLocked || canAdopt,
         version: s.version + 1,
       }
     })

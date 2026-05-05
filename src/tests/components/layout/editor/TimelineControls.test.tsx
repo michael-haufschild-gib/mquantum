@@ -127,12 +127,14 @@ describe('TimelineControls', () => {
     mockExtendedState.schroedinger.interferenceEnabled = false
     mockExtendedState.schroedinger.phaseShimmerEnabled = false
     mockExtendedState.schroedinger.probabilityCurrentEnabled = false
+    mockExtendedState.schroedinger.phaseAnimationEnabled = false
     mockExtendedState.schroedinger.quantumMode = 'harmonicOscillator'
     mockExtendedState.schroedinger.representation = 'position'
     mockExtendedState.schroedinger.openQuantum.enabled = false
     mockExtendedState.schroedinger.openQuantum.dephasingEnabled = true
     mockExtendedState.schroedinger.openQuantum.relaxationEnabled = false
     mockExtendedState.schroedinger.openQuantum.thermalEnabled = false
+    delete (mockExtendedState.schroedinger as Record<string, unknown>).tdse
     mockRandomizePlanes.mockClear()
     mockResetSchroedingerParameters.mockClear()
     mockResetFreeScalarField.mockClear()
@@ -370,4 +372,37 @@ describe('TimelineControls', () => {
       expect(button).toHaveTextContent('1')
     }
   )
+
+  it('Effects badge in TDSE mode counts autoLoop and ignores analytic-only flags', () => {
+    mockGeometryState.objectType = 'schroedinger'
+    mockExtendedState.schroedinger.quantumMode = 'tdseDynamics'
+    // Stale analytic-only flags from a prior preset/URL — must NOT inflate the
+    // TDSE badge because the drawer hides these controls in compute modes and
+    // the renderer suppresses the effects via `!isComputeMode` gates.
+    mockExtendedState.schroedinger.interferenceEnabled = true
+    mockExtendedState.schroedinger.phaseShimmerEnabled = true
+    mockExtendedState.schroedinger.probabilityCurrentEnabled = true
+    mockExtendedState.schroedinger.phaseAnimationEnabled = true
+    mockExtendedState.schroedinger.sliceAnimationEnabled = false
+    ;(mockExtendedState.schroedinger as { tdse?: { autoLoop: boolean } }).tdse = { autoLoop: true }
+
+    render(<TimelineControls />)
+
+    const button = screen.getByRole('button', { name: /toggle animations drawer/i })
+    // 1 = autoLoop on; analytic-only flags excluded.
+    expect((button.textContent ?? '').replace(/\s+/g, '')).toContain('Effects1')
+  })
+
+  it('Effects badge in TDSE mode counts both autoLoop and slice animation', () => {
+    mockGeometryState.objectType = 'schroedinger'
+    mockGeometryState.dimension = 4
+    mockExtendedState.schroedinger.quantumMode = 'tdseDynamics'
+    mockExtendedState.schroedinger.sliceAnimationEnabled = true
+    ;(mockExtendedState.schroedinger as { tdse?: { autoLoop: boolean } }).tdse = { autoLoop: true }
+
+    render(<TimelineControls />)
+
+    const button = screen.getByRole('button', { name: /toggle animations drawer/i })
+    expect((button.textContent ?? '').replace(/\s+/g, '')).toContain('Effects2')
+  })
 })

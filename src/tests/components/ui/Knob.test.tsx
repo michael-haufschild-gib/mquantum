@@ -61,4 +61,21 @@ describe('Knob', () => {
     fireEvent.keyDown(screen.getByRole('slider'), { key: 'ArrowLeft' })
     expect(onChange).toHaveBeenCalledWith(49)
   })
+
+  it('preventsDefault on arrow keys to stop page scroll', () => {
+    // Regression: the Knob is wrapped in a tabIndex=0 div, not a native
+    // input, so ArrowUp/ArrowDown without preventDefault scrolls the
+    // surrounding page. ARIA convention for role="slider" requires the
+    // control consume arrow keys.
+    const onChange = vi.fn()
+    render(<Knob value={50} min={0} max={100} onChange={onChange} />)
+
+    for (const key of ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']) {
+      const result = fireEvent.keyDown(screen.getByRole('slider'), { key })
+      // fireEvent.keyDown returns false when the dispatched event was canceled
+      // (preventDefault was called). React's synthetic event preventDefault
+      // bubbles back to the native event, so this returns false on success.
+      expect(result, `${key} must call preventDefault`).toBe(false)
+    }
+  })
 })

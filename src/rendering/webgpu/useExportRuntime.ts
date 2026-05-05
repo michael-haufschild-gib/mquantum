@@ -15,7 +15,8 @@ import {
   ensureEvenDimensions,
   resolveExportDimensions,
 } from '@/lib/export/videoExportPlanning'
-import { getConfigStoreKey } from '@/lib/geometry/registry'
+import type { QuantumTypeEvolutionResetKind } from '@/lib/geometry/registry'
+import { getQuantumTypeEvolutionResetKind, resolveQuantumTypeKey } from '@/lib/geometry/registry'
 import { useExportStore } from '@/stores/exportStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
@@ -99,59 +100,45 @@ function configureExportCanvas(
 // Wave evolution reset (mirrors TimelineControls handleReset)
 // ============================================================================
 
+type ExtendedObjectStoreState = ReturnType<typeof useExtendedObjectStore.getState>
+
+const WAVE_EVOLUTION_RESET_HANDLERS: Record<
+  QuantumTypeEvolutionResetKind,
+  (state: ExtendedObjectStoreState) => void
+> = {
+  schroedingerAnalytic: (state) => {
+    state.resetSchroedingerParameters()
+    state.requestOpenQuantumStateReset()
+  },
+  freeScalarField: (state) => state.resetFreeScalarField(),
+  tdse: (state) => state.resetTdseField(),
+  bec: (state) => state.resetBecField(),
+  dirac: (state) => state.setDiracNeedsReset(),
+  quantumWalk: (state) => state.resetQuantumWalk(),
+  wheelerDeWitt: (state) => state.triggerWdwRecompute(),
+  antiDeSitter: (state) => state.triggerAdsRecompute(),
+  pauli: (state) => state.resetPauliField(),
+}
+
 /**
  * Reset the wavefunction/evolution to its initial state.
  *
  * Dispatches the same reset actions as the timeline reset button,
  * reading the current object type and quantum mode imperatively.
  */
-function resetWaveEvolution(): void {
+export function resetWaveEvolution(): void {
   const { objectType } = useGeometryStore.getState()
-  const configStoreKey = getConfigStoreKey(objectType)
   const state = useExtendedObjectStore.getState()
+  const quantumTypeKey = resolveQuantumTypeKey(
+    objectType,
+    objectType === 'schroedinger' ? state.schroedinger.quantumMode : undefined
+  )
+  if (!quantumTypeKey) return
 
-  if (configStoreKey === 'pauliSpinor') {
-    state.resetPauliField()
-    return
-  }
+  const resetKind = getQuantumTypeEvolutionResetKind(quantumTypeKey)
+  if (!resetKind) return
 
-  if (configStoreKey !== 'schroedinger') return
-
-  const { quantumMode } = state.schroedinger
-
-  switch (quantumMode) {
-    case 'harmonicOscillator':
-    case 'hydrogenND':
-    case 'hydrogenNDCoupled':
-      state.resetSchroedingerParameters()
-      state.requestOpenQuantumStateReset()
-      break
-    case 'freeScalarField':
-      state.resetFreeScalarField()
-      break
-    case 'tdseDynamics':
-      state.resetTdseField()
-      break
-    case 'becDynamics':
-      state.resetBecField()
-      break
-    case 'diracEquation':
-      state.setDiracNeedsReset()
-      break
-    case 'quantumWalk':
-      state.resetQuantumWalk()
-      break
-    case 'wheelerDeWitt':
-      state.triggerWdwRecompute()
-      break
-    case 'antiDeSitter':
-      state.triggerAdsRecompute()
-      break
-    default: {
-      const _exhaustive: never = quantumMode
-      void _exhaustive
-    }
-  }
+  WAVE_EVOLUTION_RESET_HANDLERS[resetKind](state)
 }
 
 // ============================================================================

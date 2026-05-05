@@ -83,33 +83,3 @@ export function applyRotationInPlace(
     out[i] = sum
   }
 }
-
-/**
- * State for tracking rotation changes and caching rotation matrices.
- * Used by useRotationUpdates hook.
- */
-export interface RotationState {
-  /** Version number of the rotation store (for change detection) */
-  prevVersion: number
-  /** Cached rotation matrix (recomputed when rotations change) */
-  cachedMatrix: MatrixND | null
-  /** Previous dimension (for detecting dimension changes) */
-  prevDimension: number | null
-  /** Previous parameter values (for detecting parameter changes) */
-  prevParamValues: number[] | null
-  /** Flag indicating basis vectors need recomputation */
-  basisVectorsDirty: boolean
-}
-
-/**
- * State for tracking quality mode during user interactions.
- * Used by useQualityTracking hook.
- */
-export interface QualityState {
-  /** Whether fast mode is currently active */
-  fastMode: boolean
-  /** Timeout handle for restoring quality after interaction stops */
-  restoreTimeout: ReturnType<typeof setTimeout> | null
-  /** Previous rotation version for change detection */
-  prevVersion: number
-}

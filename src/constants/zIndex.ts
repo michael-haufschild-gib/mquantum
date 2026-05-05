@@ -29,6 +29,3 @@ export const Z_INDEX = {
   /** Tooltips and popovers */
   TOOLTIP: 400,
 } as const
-
-/** Type for z-index values */
-export type ZIndexKey = keyof typeof Z_INDEX

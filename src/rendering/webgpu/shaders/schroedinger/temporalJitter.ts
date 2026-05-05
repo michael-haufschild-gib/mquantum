@@ -9,14 +9,6 @@
  */
 
 /**
- * Configuration for Bayer jitter code generation.
- */
-export interface BayerJitterConfig {
-  /** Enable Bayer jitter — when false, returns empty string and uses input.vPosition */
-  bayerJitter: boolean
-}
-
-/**
  * Generate the WGSL Bayer sub-pixel jitter block.
  *
  * Produces `jitteredVPosition` (vec3f) from `input.vPosition` and camera uniforms.

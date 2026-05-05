@@ -49,6 +49,7 @@ function createGSState(overrides: Partial<GramSchmidtState> = {}): GramSchmidtSt
     psiBuffer: null,
     totalSites: 0,
     pl: null,
+    eigenstateGeneration: 0,
     ...overrides,
   }
 }
@@ -173,6 +174,20 @@ describe('clearEigenstates', () => {
     expect(buf1.destroy).toHaveBeenCalled()
     expect(buf2.destroy).toHaveBeenCalled()
     expect(state.gsEigenstates).toHaveLength(0)
+  })
+
+  it('bumps eigenstateGeneration so in-flight async readbacks invalidate', () => {
+    // The async eigenstate-diagnostic readback in storeCurrentEigenstate
+    // captures eigenstateGeneration at submit time and compares against the
+    // current value at resolve time. Without bumping on clear, a stale
+    // readback overwrites the next sweep's slot 0 with values computed from
+    // the just-destroyed wavefunction.
+    const state = createGSState()
+    expect(state.eigenstateGeneration).toBe(0)
+    clearEigenstates(state)
+    expect(state.eigenstateGeneration).toBe(1)
+    clearEigenstates(state)
+    expect(state.eigenstateGeneration).toBe(2)
   })
 })
 

@@ -23,7 +23,20 @@ import { COLOR_ALGORITHM_TO_INT } from '@/rendering/shaders/palette/types'
 import { generateBayerJitterSection, getRayDirSource } from './temporalJitter'
 
 // Phase-dependent color algorithms that require direct wavefunction sampling
-// (cannot use pre-computed density grid because they need complex phase information).
+// when the bound density grid does not carry phase data (DENSITY_GRID_HAS_PHASE
+// = false). Analytic modes (HO / hydrogen) write phase into the grid via the
+// `densityGridWithPhaseComputeBlock` shader (forceRgba=true forces rgba16float)
+// but report `densityGridHasPhase=undefined` to the composer, so the WGSL
+// `loadGridSampleState` short-circuits phase to 0 — for any algorithm that
+// reads `phase` from emission.wgsl, the rendering collapses to a constant hue
+// unless the algorithm is listed here so `requiresDirectSampling` flips on.
+//
+// Keep this list in sync with WheelerDeWittAnimationDrawer's
+// PHASE_SENSITIVE_COLOR_ALGORITHMS and with every emission.wgsl `case` that
+// references the `phase` argument inside its WGSL body. Missing entries
+// produce silent no-op renders that are indistinguishable from a broken
+// shader; the drift between this list and the one in emission.wgsl is the
+// exact failure mode the WdW comment warns about.
 export const PHASE_COLOR_ALGS = [
   COLOR_ALGORITHM_TO_INT.phase,
   COLOR_ALGORITHM_TO_INT.mixed,
@@ -32,6 +45,7 @@ export const PHASE_COLOR_ALGS = [
   COLOR_ALGORITHM_TO_INT.domainColoringPsi,
   COLOR_ALGORITHM_TO_INT.diverging,
   COLOR_ALGORITHM_TO_INT.relativePhase,
+  COLOR_ALGORITHM_TO_INT.phaseDensity,
 ] as const
 
 /**

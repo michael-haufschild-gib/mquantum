@@ -135,6 +135,32 @@ describe('BEC setters', () => {
     expect(Number.isFinite(dtAfter)).toBe(true)
   })
 
+  it('setBecDt CFL bound respects effective spacing under compactification', () => {
+    const s = useExtendedObjectStore.getState()
+    // Tight compactification: R = 0.05, gridSize ≈ 32 → effective spacing
+    // 2π·0.05/32 ≈ 0.0098, ~10× tighter than the 0.1 raw spacing default.
+    // The setter must clamp dt against the EFFECTIVE-spacing CFL bound, not
+    // the raw-spacing one — otherwise the slider can drive the GP integrator
+    // unstable when a compact dim is switched on.
+    s.setBecCompactDim(0, true)
+    s.setBecCompactRadius(0, 0.05)
+
+    const bec = getBec()
+    // Sanity: compactRadii actually got set (may be clamped, but should be
+    // far below the raw-spacing equivalent of 0.1·N/(2π)).
+    expect(bec.compactDims[0]).toBe(true)
+
+    // Drive dt above what raw-spacing CFL alone would have permitted.
+    s.setBecDt(0.02)
+    const dtAfter = getBec().dt
+    expect(Number.isFinite(dtAfter)).toBe(true)
+    expect(dtAfter).toBeGreaterThan(0)
+    // Effective CFL with compact spacing ≈ 0.0098 across one axis caps dt
+    // strictly below 0.02 (the slider's hard ceiling). Concrete bound:
+    // omega_max ≥ 2/0.0098 → cflLimit ≤ ~0.0098, so 0.9·cflLimit < 0.009.
+    expect(dtAfter).toBeLessThan(0.015)
+  })
+
   describe('applyBecPreset — stale rendering field regression', () => {
     // Regression: BEC presets had heterogeneous renderingOverrides keys. Some
     // set autoScaleMaxGain explicitly, others omitted it. Switching from the

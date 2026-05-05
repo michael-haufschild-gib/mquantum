@@ -7,13 +7,11 @@ import { useUIStore } from '@/stores/uiStore'
 
 import { Icons } from './icons'
 import { Sparkline } from './subcomponents'
-import {
-  BuffersTabContent,
-  PassesTabContent,
-  ShaderTabContent,
-  StatsTabContent,
-  SystemTabContent,
-} from './tabs'
+import { BuffersTabContent } from './tabs/BuffersTab'
+import { PassesTabContent } from './tabs/PassesTab'
+import { ShaderTabContent } from './tabs/ShaderTab'
+import { StatsTabContent } from './tabs/StatsTab'
+import { SystemTabContent } from './tabs/SystemTab'
 import { formatFpsBound, getHealthColor } from './utils'
 
 // ============================================================================

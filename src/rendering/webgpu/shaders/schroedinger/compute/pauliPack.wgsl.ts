@@ -23,8 +23,6 @@
  * @module
  */
 
-import type { ShaderBlock } from '../../shared/compose-helpers'
-
 /**
  * Pack shader: merged vec2f spinor (single-component slice) -> interleaved complex buffer.
  *
@@ -92,15 +90,3 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   psi[idx] = complexBuf[idx] * packUni.invN;
 }
 `
-
-/** ShaderBlock form of the Pauli pack shader. */
-export const pauliComplexPackShaderBlock: ShaderBlock = {
-  name: 'pauli-complex-pack',
-  content: pauliComplexPackBlock,
-}
-
-/** ShaderBlock form of the Pauli unpack shader. */
-export const pauliComplexUnpackShaderBlock: ShaderBlock = {
-  name: 'pauli-complex-unpack',
-  content: pauliComplexUnpackBlock,
-}

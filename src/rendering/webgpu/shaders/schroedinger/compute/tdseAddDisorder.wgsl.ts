@@ -45,9 +45,3 @@ export const disorderOverlayShaderBlock: ShaderBlock = {
   name: 'disorder-overlay',
   content: disorderOverlayBlock,
 }
-
-/**
- * Back-compat alias. Prefer {@link disorderOverlayBlock} — the block is
- * mode-agnostic and is now used by BEC through the shared TDSE pipeline.
- */
-export const tdseAddDisorderBlock = disorderOverlayBlock

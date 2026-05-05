@@ -69,6 +69,29 @@ describe('useSrmtSweepStore', () => {
     expect(s.version).toBe(v0 + 2)
   })
 
+  it('appendPoint adopts worker total when smaller than the per-kind stamp', () => {
+    // Regression: cut sweep with config.points=64 stamps totalPoints=64 at
+    // startSweep, but the worker's predictCutSweepCount can dedup against the
+    // active φ-grid and emit fewer points (e.g. 24 unique cuts on Nphi=24).
+    // Before the fix the progress UI never reached 100%.
+    const { startSweep, appendPoint } = useSrmtSweepStore.getState()
+    const cfg = { ...cutConfig(), points: 64 }
+    startSweep(cfg, DEFAULT_WHEELER_DEWITT_CONFIG, [])
+    expect(useSrmtSweepStore.getState().totalPoints).toBe(64)
+    appendPoint(mkPoint(0), 24)
+    expect(useSrmtSweepStore.getState().totalPoints).toBe(24)
+  })
+
+  it('appendPoint ignores zero / non-finite total values', () => {
+    const { startSweep, appendPoint } = useSrmtSweepStore.getState()
+    startSweep(cutConfig(), DEFAULT_WHEELER_DEWITT_CONFIG, [])
+    const initialTotal = useSrmtSweepStore.getState().totalPoints
+    appendPoint(mkPoint(0), 0)
+    expect(useSrmtSweepStore.getState().totalPoints).toBe(initialTotal)
+    appendPoint(mkPoint(1), Number.NaN)
+    expect(useSrmtSweepStore.getState().totalPoints).toBe(initialTotal)
+  })
+
   it('appendPoint ignores out-of-order delivery', () => {
     const { startSweep, appendPoint } = useSrmtSweepStore.getState()
     startSweep(cutConfig(), DEFAULT_WHEELER_DEWITT_CONFIG, [])

@@ -127,5 +127,3 @@ export const WebGPUFallbackNotification: React.FC = () => {
     </div>
   )
 }
-
-export default WebGPUFallbackNotification

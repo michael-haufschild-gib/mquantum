@@ -305,8 +305,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
    *
    * @param ctx - Render context (device + encoder)
    */
-  requestStateSave(ctx: WebGPURenderContext): void {
-    if (!this.phiBuffer || !this.piBuffer || this.saveMappingInFlight) return
+  requestStateSave(ctx: WebGPURenderContext): boolean {
+    if (!this.phiBuffer || !this.piBuffer || this.saveMappingInFlight) return false
     const byteSize = this.totalSites * 4
     this.saveMappingInFlight = true
     // Snapshot runtime scalars AND the live FSF config synchronously so
@@ -332,6 +332,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         this.saveMappingInFlight = false
       },
     })
+    return true
   }
 
   /**

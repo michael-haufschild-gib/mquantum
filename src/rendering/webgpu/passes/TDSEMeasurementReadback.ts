@@ -24,19 +24,6 @@ export interface MeasurementReadbackState {
 }
 
 /**
- * Get psi buffer references and grid info for measurement readback.
- *
- * @param state - Current buffer state
- * @returns Buffer info or null if not initialized
- */
-export function getPsiBufferInfo(
-  state: MeasurementReadbackState
-): { psiBuffer: GPUBuffer; totalSites: number } | null {
-  if (!state.psiBuffer || state.totalSites === 0) return null
-  return { psiBuffer: state.psiBuffer, totalSites: state.totalSites }
-}
-
-/**
  * Request async readback of the current wavefunction for measurement.
  * Copies the merged ψ buffer to one staging buffer within the current
  * command encoder, maps it asynchronously after GPU submit, then

@@ -23,9 +23,6 @@ export interface SurfaceSettings {
   specularIntensity: number
 }
 
-/** Union type for all shader settings */
-export type ShaderSettings = WireframeSettings | SurfaceSettings
-
 /** Complete shader settings object for all shader types */
 export interface AllShaderSettings {
   wireframe: WireframeSettings

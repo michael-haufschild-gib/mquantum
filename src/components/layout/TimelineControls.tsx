@@ -42,6 +42,47 @@ const WheelerDeWittAnimationDrawer = lazy(() =>
   }))
 )
 
+interface TimelineAnimationConfig {
+  quantumMode: string
+  sliceAnimationEnabled: boolean
+  interferenceEnabled: boolean
+  phaseShimmerEnabled: boolean
+  probabilityCurrentEnabled: boolean
+  phaseAnimationEnabled: boolean
+  tdseAutoLoopEnabled: boolean
+  wdwPhaseRotationEnabled: boolean
+  wdwWorldlineEnabled: boolean
+}
+
+const countEnabled = (values: readonly boolean[]): number => values.filter(Boolean).length
+
+const countSchroedingerAnimations = (config: TimelineAnimationConfig, isWdW: boolean): number => {
+  if (isWdW) {
+    return countEnabled([config.wdwPhaseRotationEnabled, config.wdwWorldlineEnabled])
+  }
+  if (config.quantumMode === 'tdseDynamics') {
+    return countEnabled([config.sliceAnimationEnabled, config.tdseAutoLoopEnabled])
+  }
+  return countEnabled([
+    config.sliceAnimationEnabled,
+    config.interferenceEnabled,
+    config.phaseShimmerEnabled,
+    config.probabilityCurrentEnabled,
+    config.phaseAnimationEnabled,
+  ])
+}
+
+const countActiveAnimations = (
+  configStoreKey: string | undefined,
+  config: TimelineAnimationConfig,
+  isWdW: boolean,
+  pauliSliceAnimationEnabled: boolean
+): number => {
+  if (configStoreKey === 'schroedinger') return countSchroedingerAnimations(config, isWdW)
+  if (configStoreKey === 'pauliSpinor') return pauliSliceAnimationEnabled ? 1 : 0
+  return 0
+}
+
 export const TimelineControls: FC = () => {
   const objectType = useGeometryStore((state: GeometryState) => state.objectType)
 
@@ -72,6 +113,9 @@ export const TimelineControls: FC = () => {
       // the wheelerDeWitt sub-state when they mock schroedinger partially.
       wdwPhaseRotationEnabled: state.schroedinger.wheelerDeWitt?.phaseRotationEnabled ?? false,
       wdwWorldlineEnabled: state.schroedinger.wheelerDeWitt?.worldlineEnabled ?? false,
+      // TDSE Auto-Loop is the only effect surfaced in the TDSE drawer aside from
+      // the shared dimensional sweeps. Defensive `?` for partial test mocks.
+      tdseAutoLoopEnabled: state.schroedinger.tdse?.autoLoop ?? false,
     }))
   )
 
@@ -127,38 +171,11 @@ export const TimelineControls: FC = () => {
 
   const hasEffectsDrawerContent = !isEffectlessComputeMode
 
-  const activeAnimationCount = useMemo(() => {
-    if (configStoreKey === 'schroedinger') {
-      if (isWdW) {
-        return (
-          (schroedingerConfig.wdwPhaseRotationEnabled ? 1 : 0) +
-          (schroedingerConfig.wdwWorldlineEnabled ? 1 : 0)
-        )
-      }
-      return [
-        schroedingerConfig.sliceAnimationEnabled,
-        schroedingerConfig.interferenceEnabled,
-        schroedingerConfig.phaseShimmerEnabled,
-        schroedingerConfig.probabilityCurrentEnabled,
-        schroedingerConfig.phaseAnimationEnabled,
-      ].filter(Boolean).length
-    }
-    if (configStoreKey === 'pauliSpinor') {
-      return pauliSliceAnimationEnabled ? 1 : 0
-    }
-    return 0
-  }, [
-    configStoreKey,
-    isWdW,
-    schroedingerConfig.sliceAnimationEnabled,
-    schroedingerConfig.interferenceEnabled,
-    schroedingerConfig.phaseShimmerEnabled,
-    schroedingerConfig.probabilityCurrentEnabled,
-    schroedingerConfig.phaseAnimationEnabled,
-    schroedingerConfig.wdwPhaseRotationEnabled,
-    schroedingerConfig.wdwWorldlineEnabled,
-    pauliSliceAnimationEnabled,
-  ])
+  const activeAnimationCount = useMemo(
+    () =>
+      countActiveAnimations(configStoreKey, schroedingerConfig, isWdW, pauliSliceAnimationEnabled),
+    [configStoreKey, schroedingerConfig, isWdW, pauliSliceAnimationEnabled]
+  )
 
   const isHydrogen =
     schroedingerConfig.quantumMode === 'hydrogenND' ||

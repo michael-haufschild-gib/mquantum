@@ -271,16 +271,20 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     // Simulation state save/load
     handleSimulationStateIO(ctx, tdsePass, ['tdseDynamics', 'becDynamics'])
 
-    // Wavefunction slice capture
+    // Wavefunction slice capture. Only clear the request flag once the
+    // capture has actually been scheduled — `requestSliceCapture` returns
+    // `false` when a previous save/slice readback is still in flight, in
+    // which case the request must persist so the next frame can retry
+    // instead of dropping the user's click.
     const sliceStore = useWavefunctionSliceStore.getState()
     if (sliceStore.captureRequested) {
-      sliceStore.clearRequest()
-      tdsePass.requestSliceCapture(
+      const scheduled = tdsePass.requestSliceCapture(
         ctx,
         sliceStore.requestedAxis,
         tdseConfig.gridSize ?? [64],
         shared.boundingRadius
       )
+      if (scheduled) sliceStore.clearRequest()
     }
 
     // Eigenstate storage for Gram-Schmidt + scar analysis

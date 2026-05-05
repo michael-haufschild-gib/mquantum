@@ -372,6 +372,50 @@ describe('Dirac setters', () => {
     expect(dtAfter).toBeGreaterThan(0)
   })
 
+  it('re-clamps packetWidth when spacing tightens past the lattice-extent ceiling', () => {
+    // Tightening spacing shrinks the lattice extent — a wide packet that fits
+    // at coarse spacing must be re-bounded so it doesn't wrap around the
+    // periodic FFT boundary. Mirrors the formula used by resizeDiracArrays
+    // and applyDiracPreset (max σ = 0.4 × min half-extent).
+    const s = useExtendedObjectStore.getState()
+    s.setDiracSpacing([0.5, 0.5, 0.5])
+    s.setDiracPacketWidth(2.0) // safe at spacing=0.5: maxSigma = 64*0.5*0.5*0.4 = 6.4
+    const widthBefore = getDirac().packetWidth
+    expect(widthBefore).toBe(2.0)
+
+    s.setDiracSpacing([0.01, 0.01, 0.01]) // half-extent shrinks to 0.32 → maxSigma = 0.128
+    const widthAfter = getDirac().packetWidth
+    expect(widthAfter).toBeLessThanOrEqual(0.128 + 1e-9)
+    expect(widthAfter).toBeGreaterThan(0)
+  })
+
+  it('leaves packetWidth untouched when spacing widens (lattice extent grows)', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setDiracSpacing([0.05, 0.05, 0.05])
+    s.setDiracPacketWidth(0.5)
+    const widthBefore = getDirac().packetWidth
+    expect(widthBefore).toBe(0.5)
+
+    s.setDiracSpacing([0.5, 0.5, 0.5]) // looser — looser ceiling, no re-clamp needed
+    expect(getDirac().packetWidth).toBe(widthBefore)
+  })
+
+  it('re-clamps packetWidth when grid size shrinks past the lattice-extent ceiling', () => {
+    // Same invariant as the spacing test, but driven via gridSize instead.
+    // setDiracGridSize snaps to power-of-2 so we use [4, 4, 4] (the floor for
+    // latticeDim=3 from minDiracGridPerDim).
+    const s = useExtendedObjectStore.getState()
+    s.setDiracSpacing([0.15, 0.15, 0.15])
+    s.setDiracPacketWidth(1.5) // OK at gridSize=64: maxSigma = 64*0.15*0.5*0.4 = 1.92
+    const widthBefore = getDirac().packetWidth
+    expect(widthBefore).toBe(1.5)
+
+    s.setDiracGridSize([4, 4, 4]) // half-extent shrinks → maxSigma = 4*0.15*0.5*0.4 = 0.12
+    const widthAfter = getDirac().packetWidth
+    expect(widthAfter).toBeLessThanOrEqual(0.12 + 1e-9)
+    expect(widthAfter).toBeGreaterThan(0)
+  })
+
   it('rejects NaN for clamped numeric setters', () => {
     const s = useExtendedObjectStore.getState()
     const beforeWidth = getDirac().potentialWidth

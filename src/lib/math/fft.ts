@@ -460,6 +460,21 @@ function ndTransform(
  * ```
  */
 export function ifftNd(data: FFTArray, gridSize: readonly number[]): void {
+  // Validate up-front so the WASM fast-path and the JS fallback share the
+  // same invariants. Without this, Rust's `validate_fft_nd` rejects bad
+  // input by returning an empty Vec, which the bridge silently passes
+  // through as an empty Float32Array — `tryWasmIfftNd` then does a no-op
+  // `data.set(empty)` and returns `true`, so the caller sees "success"
+  // with unchanged data. The JS path's `assertValidGridSize` /
+  // `assertComplexDataLength` (called inside `ndTransform`) would have
+  // thrown loudly. Hoisting them here keeps both paths fail-fast and
+  // matches what every production caller already expects.
+  if (gridSize.length > 0) {
+    assertValidGridSize(gridSize)
+    const totalSitesValidate = gridSize.reduce((a, b) => a * b, 1)
+    assertComplexDataLength(data, totalSitesValidate)
+  }
+
   // Try N-D WASM path for Float64Array with sufficient total sites
   if (data instanceof Float64Array && isAnimationWasmReady()) {
     const totalSites = gridSize.reduce((a, b) => a * b, 1)
@@ -478,6 +493,17 @@ export function ifftNd(data: FFTArray, gridSize: readonly number[]): void {
  * @param gridSize - Array of grid sizes per dimension (each must be power of 2)
  */
 export function fftNd(data: FFTArray, gridSize: readonly number[]): void {
+  // See `ifftNd` for why both paths must validate up-front: the Rust
+  // `validate_fft_nd` rejects bad input with an empty Vec, the JS bridge
+  // returns an empty Float32Array, and `tryWasmFftNd` reports success
+  // even though the buffer was never transformed. Throwing here keeps
+  // the WASM-ready branch and the JS fallback path equally fail-fast.
+  if (gridSize.length > 0) {
+    assertValidGridSize(gridSize)
+    const totalSitesValidate = gridSize.reduce((a, b) => a * b, 1)
+    assertComplexDataLength(data, totalSitesValidate)
+  }
+
   // Try N-D WASM path for Float64Array with sufficient total sites
   if (data instanceof Float64Array && isAnimationWasmReady()) {
     const totalSites = gridSize.reduce((a, b) => a * b, 1)

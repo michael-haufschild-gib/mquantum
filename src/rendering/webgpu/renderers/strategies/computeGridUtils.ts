@@ -155,7 +155,14 @@ export function createDensityTextureBindings(
 
 /** Minimal interface for compute passes that support state save/load. */
 export interface StateSaveLoadPass {
-  requestStateSave(ctx: WebGPURenderContext): void
+  /**
+   * Schedule an async state save. Returns `true` when the readback was
+   * scheduled, `false` when a previous save (or, for modes that share the
+   * `saveMappingInFlight` flag with slice capture, a previous slice
+   * readback) is still in flight. Callers must defer clearing the
+   * pending-save request flag until this returns `true`.
+   */
+  requestStateSave(ctx: WebGPURenderContext): boolean
   setLoadedWavefunction(re: Float32Array, im: Float32Array): void
   /**
    * Optional: restore mode-specific runtime scalars (e.g. the Free Scalar
@@ -191,8 +198,19 @@ export function handleSimulationStateIO(
   const simState = useSimulationStateStore.getState()
 
   if (simState.saveRequested) {
-    pass.requestStateSave(ctx)
-    simState.clearSaveRequest()
+    // Only consume the save request if it originated from a mode this
+    // strategy handles — prevents a deferred save from being consumed
+    // by the wrong strategy after a mode switch.
+    const forMode = simState.saveRequestedForMode
+    if (!forMode || acceptedModes.includes(forMode)) {
+      // Only clear the request once the save has actually been scheduled.
+      // `requestStateSave` returns `false` when a previous save (or slice
+      // readback that shares the in-flight flag) is still mapping; in that
+      // case the request must persist so the next frame can retry instead
+      // of silently dropping the user's "Save State" click.
+      const scheduled = pass.requestStateSave(ctx)
+      if (scheduled) simState.clearSaveRequest()
+    }
   }
 
   if (simState.pendingLoadData) {

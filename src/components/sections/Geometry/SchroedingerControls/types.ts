@@ -6,13 +6,6 @@ import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 import type { ExtendedObjectState } from '@/stores/extendedObjectStore'
 
 /**
- * Common actions shared across all physics mode components
- */
-export interface SchroedingerCommonActions {
-  setScale: ExtendedObjectState['setSchroedingerScale']
-}
-
-/**
  * Shared shape for every per-mode controls component in the
  * Schroedinger panel: current config, current simulation dimension, and
  * the mode-specific `actions` surface. Each mode's `XControlsProps` is a

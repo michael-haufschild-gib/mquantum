@@ -62,6 +62,21 @@ export type QuantumTypeStrategyKind =
 /** Analytic shader family used by HO / hydrogen-specific gates. */
 export type QuantumTypeAnalyticFamily = 'harmonicOscillator' | 'hydrogen'
 
+/** Store-side evolution reset behavior used by timeline/export orchestration. */
+export type QuantumTypeEvolutionResetKind =
+  | 'schroedingerAnalytic'
+  | 'freeScalarField'
+  | 'tdse'
+  | 'bec'
+  | 'dirac'
+  | 'quantumWalk'
+  | 'wheelerDeWitt'
+  | 'antiDeSitter'
+  | 'pauli'
+
+/** Optional compile-time selector fields required by renderer shader config. */
+export type QuantumTypeCompileContextField = 'diracFieldView' | 'freeScalarInitialCondition'
+
 /**
  * Category classification for object types
  */
@@ -343,6 +358,8 @@ export interface QuantumTypeRuntimeMetadata {
   dataPath: QuantumTypeDataPath
   /** Strategy family responsible for mode-specific setup/frame behavior. */
   strategy: QuantumTypeStrategyKind
+  /** Store-side reset behavior for timeline/export evolution resets. */
+  evolutionReset: QuantumTypeEvolutionResetKind
   /** Integer written to WGSL `uniforms.quantumMode` for shader runtime guards. */
   shaderUniformId?: number
   /** Append-only integer stored in `.mqstate` headers. */
@@ -353,6 +370,10 @@ export interface QuantumTypeRuntimeMetadata {
   defaultColorAlgorithm: string
   /** Analytic branch family for HO/hydrogen shader composition. */
   analyticFamily?: QuantumTypeAnalyticFamily
+  /** True when this mode can run open-quantum density-matrix evolution. */
+  supportsOpenQuantum?: boolean
+  /** Optional store fields that participate in shader compile-context keys. */
+  compileContextFields?: readonly QuantumTypeCompileContextField[]
   /** True when sample space should rotate with camera/sample transform. */
   sampleSpaceRotation?: boolean
   /** True when the mode provides a precomputed normal texture. */

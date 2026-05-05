@@ -85,20 +85,29 @@ function computeStats(measurements: MeasurementRecord[]): {
   positionMean: number[]
   positionStd: number[]
 } {
-  if (measurements.length === 0) return { positionMean: [], positionStd: [] }
+  // Failed readbacks (TdseBecMeasurement → completeMeasurement([], 0, null))
+  // append a record with `position: []`. Pick the latticeDim from the FIRST
+  // valid record and skip any record whose position length doesn't match —
+  // otherwise `m.position[d]` returns undefined for the empty record and NaN
+  // poisons every accumulator, surfacing as `NaN` in the stats table.
+  const firstValid = measurements.find((m) => m.position.length > 0)
+  if (!firstValid) return { positionMean: [], positionStd: [] }
 
-  const dims = measurements[0]!.position.length
+  const dims = firstValid.position.length
   const mean = new Array<number>(dims).fill(0)
   const sq = new Array<number>(dims).fill(0)
+  let n = 0
 
   for (const m of measurements) {
+    if (m.position.length !== dims) continue
     for (let d = 0; d < dims; d++) {
       mean[d]! += m.position[d]!
       sq[d]! += m.position[d]! * m.position[d]!
     }
+    n += 1
   }
 
-  const n = measurements.length
+  if (n === 0) return { positionMean: [], positionStd: [] }
   const positionMean = mean.map((s) => s / n)
   const positionStd = sq.map((s2, d) => {
     const variance = s2 / n - positionMean[d]! * positionMean[d]!
