@@ -5,7 +5,7 @@ Continuation after central runtime registry refactor. Added explicit registry tr
 - `QuantumTypeEvolutionResetKind` and `runtime.evolutionReset` for every `QUANTUM_TYPE_REGISTRY` entry.
 - `QuantumTypeCompileContextField` and `runtime.compileContextFields` for mode-specific compile selector fields.
 - `runtime.supportsOpenQuantum` for open-quantum capability; deliberately explicit, not derived from analytic category.
-- Helpers: `getQuantumTypeEvolutionResetKind`, `supportsOpenQuantumForQuantumType`, `getQuantumTypeCompileContextFields`, `quantumTypeHasCompileContextField`.
+- Helpers: `getQuantumTypeEvolutionResetKind`, `supportsOpenQuantumForQuantumType`, `getQuantumTypeCompileContextFields`.
 
 Migrated call sites:
 - `src/rendering/webgpu/useExportRuntime.ts`: `resetWaveEvolution` now resolves object/mode through registry and dispatches via reset-kind handler table instead of switching on all modes.

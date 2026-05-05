@@ -103,12 +103,22 @@ function isReExportSite(file, lineNum) {
     }
     if (/^\s*export\b/.test(line) || /^\s*import\b/.test(line)) break
   }
-  // If the file contains a wildcard `export * from './x'` for any
-  // module, the symbol may originate there with this same line number
-  // — also noise.
+  // If the file is purely re-exports (no own definitions) and contains a
+  // wildcard `export * from './x'`, the symbol may originate there with
+  // this same line number — also noise. Only skip if the file has no own
+  // export definitions (mixed files with both `export *` and own exports
+  // must still report their own unused symbols).
+  let hasWildcard = false
+  let hasOwnExport = false
   for (const line of lines) {
-    if (/^\s*export\s+(?:type\s+)?\*\s+from\s+['"][^'"]+['"]/.test(line)) return true
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) continue
+    if (/^export\s+(?:type\s+)?\*\s+from\s+['"]/.test(trimmed)) { hasWildcard = true; continue }
+    if (/^export\s+(?:type\s+)?(?:\{|default).*\bfrom\s+['"]/.test(trimmed)) continue
+    if (/^import\b/.test(trimmed)) continue
+    if (/^export\b/.test(trimmed)) { hasOwnExport = true; break }
   }
+  if (hasWildcard && !hasOwnExport) return true
   return false
 }
 

@@ -85,6 +85,8 @@ export interface SrmtSweepState {
   lastPointIndex: number
   /** Total number of sweep points expected (driven by config). */
   totalPoints: number
+  /** True after the first valid worker-reported total is adopted. */
+  workerTotalLocked: boolean
   /** Index of the current `solveStart` step (mass/BC sweeps only). */
   currentSolveIndex: number
   /** Wall-clock ms at `startSweep`. 0 when idle. */
@@ -118,8 +120,8 @@ export interface SrmtSweepState {
    * reconcile the store's `totalPoints` against grid-aware dedup (cut and
    * gridNphiCoupled kinds clamp the raw `config.points` against the actual
    * φ-grid, so the worker's prediction can be lower than the per-kind cap
-   * `totalPointsFor` stamped at `startSweep`). Only the first non-zero
-   * `total` is honoured; subsequent progress messages reuse the same total.
+   * `totalPointsFor` stamped at `startSweep`). Only the first positive
+   * `total` is adopted; subsequent progress messages cannot change it.
    */
   appendPoint: (point: SrmtSweepPoint, total?: number) => void
   /** Record that a per-point solver re-run is starting (mass/bc). */
@@ -178,6 +180,7 @@ function idleState(): Omit<
     wdwConfigSnapshot: null,
     lastPointIndex: -1,
     totalPoints: 0,
+    workerTotalLocked: false,
     currentSolveIndex: -1,
     startedAt: 0,
     points: [],
@@ -219,6 +222,7 @@ export const useSrmtSweepStore = create<SrmtSweepState>((set) => ({
       config,
       wdwConfigSnapshot,
       totalPoints: totalPointsFor(config),
+      workerTotalLocked: false,
       startedAt: nowMs(),
       landmarks,
       version: s.version + 1,
@@ -253,19 +257,18 @@ export const useSrmtSweepStore = create<SrmtSweepState>((set) => ({
         // guarantees sequential delivery, so this branch is defensive.)
         return s
       }
-      // Adopt the worker's predicted total when it differs from the per-kind
-      // cap stamped at startSweep — necessary for cut / gridNphiCoupled
-      // sweeps whose worker-side dedup against the active grid produces
-      // fewer points than `config.points`. Without this the progress UI
-      // never reaches 100% even after the worker emits `done`.
-      const nextTotal =
-        typeof total === 'number' && Number.isFinite(total) && total > 0 && total !== s.totalPoints
-          ? total
-          : s.totalPoints
+      // Adopt the worker's predicted total exactly once — necessary for cut /
+      // gridNphiCoupled sweeps whose worker-side dedup against the active grid
+      // produces fewer points than `config.points`. Without this the progress
+      // UI never reaches 100% even after the worker emits `done`.
+      const canAdopt =
+        !s.workerTotalLocked && typeof total === 'number' && Number.isFinite(total) && total > 0
+      const nextTotal = canAdopt ? total : s.totalPoints
       return {
         points: [...s.points, point],
         lastPointIndex: point.index,
         totalPoints: nextTotal,
+        workerTotalLocked: s.workerTotalLocked || canAdopt,
         version: s.version + 1,
       }
     })

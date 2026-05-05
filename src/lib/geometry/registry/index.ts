@@ -19,6 +19,7 @@
 export type {
   AnimationSystemDef,
   AvailableQuantumTypeInfo,
+  QuantumTypeCompileContextField,
   QuantumTypeEvolutionResetKind,
   QuantumTypeKey,
 } from './types'

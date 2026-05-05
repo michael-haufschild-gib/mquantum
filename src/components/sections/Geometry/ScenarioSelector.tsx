@@ -177,6 +177,8 @@ function findTdsePresetId(config: TdseConfig, dimension: number): string | null 
 
 function findBecPresetId(config: BecConfig, dimension: number): string | null {
   for (const preset of BEC_SCENARIO_PRESETS) {
+    if ((preset.minDim ?? 2) > dimension) continue
+
     const {
       latticeDim: _presetDim,
       gridSize: _presetGrid,

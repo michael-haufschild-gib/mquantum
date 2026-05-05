@@ -84,6 +84,15 @@ describe('Sonic Horizon preset', () => {
   })
 })
 
+describe('Black Hole Laser preset', () => {
+  it('diverges from blackHoleAnalog with hawkingVmax=4.0 and absorberEnabled=false', () => {
+    const preset = getBecPreset('blackHoleLaser')
+    expect(preset?.id).toBe('blackHoleLaser')
+    expect(preset?.overrides.hawkingVmax).toBe(4.0)
+    expect(preset?.overrides.absorberEnabled).toBe(false)
+  })
+})
+
 describe('Hawking Horizon View preset', () => {
   it('sets fieldView=hawkingFlux and is reachable via getBecPreset', () => {
     const preset = getBecPreset('hawkingHorizonView')

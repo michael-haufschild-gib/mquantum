@@ -279,13 +279,11 @@ const ExposureIndicator: React.FC = React.memo(() => {
           return { maxDensity: s.dirac.maxDensity, hasData: s.dirac.hasData }
         case 'freeScalarField':
           return { maxDensity: s.fsf.maxPhi, hasData: s.fsf.hasData }
-        case 'quantumWalk':
-          // QwChannelData doesn't currently expose maxDensity, so the
-          // gain indicator can't report a meaningful value. Render the
-          // "—" placeholder by reporting hasData=false.
-          return { maxDensity: 0, hasData: false }
-        default:
+        case 'tdseDynamics':
           return { maxDensity: s.tdse.maxDensity, hasData: s.tdse.hasData }
+        case 'quantumWalk':
+        default:
+          return { maxDensity: 0, hasData: false }
       }
     })
   )

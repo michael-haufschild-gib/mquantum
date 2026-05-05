@@ -1,11 +1,11 @@
 /**
  * Complex packing/unpacking compute shaders for TDSE FFT pipeline.
  *
- * Pack: Interleaves separate psiRe[] and psiIm[] buffers into a single
- *       complex[] buffer [re0, im0, re1, im1, ...] for FFT input.
+ * Pack: Reads a merged `psi: array<vec2f>` buffer and writes an interleaved
+ *       `complex[]` buffer [re0, im0, re1, im1, ...] for FFT input.
  *
- * Unpack: Deinterleaves complex[] buffer back to separate psiRe[] and psiIm[].
- *         Applies 1/N normalization for inverse FFT.
+ * Unpack: Reads the interleaved `complex[]` buffer back into
+ *         `psi: array<vec2f>` and applies 1/N normalization for inverse FFT.
  *
  * @workgroup_size(64)
  * @module

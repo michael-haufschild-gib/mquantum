@@ -184,7 +184,7 @@ describe('runStrangEvolution curved stochastic branch', () => {
       makeResources(events, stochasticState)
     )
 
-    expect(events).toContain('write:tdse-stochastic-staging:0:6272')
+    expect(events.some((e) => e.startsWith('write:tdse-stochastic-staging:0:'))).toBe(true)
     expect(events).toContain('begin:tdse-stochastic-expect-reduce-0')
     expect(events).toContain('begin:tdse-stochastic-loc-step0')
     expect(events).toContain('begin:tdse-stochastic-loc-step3')

@@ -127,12 +127,14 @@ describe('TimelineControls', () => {
     mockExtendedState.schroedinger.interferenceEnabled = false
     mockExtendedState.schroedinger.phaseShimmerEnabled = false
     mockExtendedState.schroedinger.probabilityCurrentEnabled = false
+    mockExtendedState.schroedinger.phaseAnimationEnabled = false
     mockExtendedState.schroedinger.quantumMode = 'harmonicOscillator'
     mockExtendedState.schroedinger.representation = 'position'
     mockExtendedState.schroedinger.openQuantum.enabled = false
     mockExtendedState.schroedinger.openQuantum.dephasingEnabled = true
     mockExtendedState.schroedinger.openQuantum.relaxationEnabled = false
     mockExtendedState.schroedinger.openQuantum.thermalEnabled = false
+    delete (mockExtendedState.schroedinger as Record<string, unknown>).tdse
     mockRandomizePlanes.mockClear()
     mockResetSchroedingerParameters.mockClear()
     mockResetFreeScalarField.mockClear()

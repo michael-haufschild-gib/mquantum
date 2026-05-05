@@ -53,37 +53,44 @@ function isPureBarrel(absPath) {
     return false
   }
   if (!source.trim()) return false
-  let inBlock = false
+  let inCommentBlock = false
+  let inExportBlock = false
   for (const rawLine of source.split('\n')) {
     let line = rawLine.trim()
     if (!line) continue
-    if (inBlock) {
+    if (inCommentBlock) {
       const close = line.indexOf('*/')
       if (close === -1) continue
       line = line.slice(close + 2).trim()
-      inBlock = false
+      inCommentBlock = false
       if (!line) continue
     }
     if (line.startsWith('//')) continue
     if (line.startsWith('/*')) {
       const close = line.indexOf('*/')
       if (close === -1) {
-        inBlock = true
+        inCommentBlock = true
         continue
       }
       line = line.slice(close + 2).trim()
       if (!line) continue
     }
     if (line.startsWith('*')) continue
-    // Allowed: import, export-from, plain `}` continuation
-    if (/^import\b/.test(line)) continue
+    // Allowed: named/type imports with `from` (not side-effect imports)
+    if (/^import\s+(?:type\s+)?[\w*\s{},]+\s+from\s+['"]/.test(line)) continue
     if (/^export\s+(?:type\s+)?(?:\{|\*|default).*\bfrom\s+['"]/.test(line)) continue
-    if (/^export\s+(?:type\s+)?\{[^}]*$/.test(line)) continue // start of multi-line block
-    if (/^[A-Za-z0-9_,\s/'"-]+,?\s*$/.test(line)) continue // continuation tokens inside `{ ... }`
-    if (/^\}\s*from\s+['"]/.test(line)) continue
+    if (/^export\s+(?:type\s+)?\{[^}]*$/.test(line)) {
+      inExportBlock = true
+      continue
+    }
+    if (inExportBlock && /^[A-Za-z0-9_,\s/'"-]+,?\s*$/.test(line)) continue
+    if (inExportBlock && /^\}\s*from\s+['"]/.test(line)) {
+      inExportBlock = false
+      continue
+    }
     return false
   }
-  return true
+  return !inExportBlock
 }
 
 const args = process.argv.slice(2)

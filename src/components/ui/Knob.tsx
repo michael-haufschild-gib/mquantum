@@ -108,10 +108,12 @@ export const Knob: React.FC<KnobProps> = React.memo(
       (e: React.KeyboardEvent) => {
         if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
           e.preventDefault()
-          onChange(Math.min(value + step, max))
+          const next = Math.min(value + step, max)
+          if (next !== value) onChange(next)
         } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
           e.preventDefault()
-          onChange(Math.max(value - step, min))
+          const next = Math.max(value - step, min)
+          if (next !== value) onChange(next)
         }
       },
       [value, step, min, max, onChange]
