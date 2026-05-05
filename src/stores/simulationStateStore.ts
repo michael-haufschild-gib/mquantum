@@ -71,7 +71,7 @@ interface SimulationStateState {
   /** True when UI has requested a save; cleared by the render loop after initiating readback */
   saveRequested: boolean
   /** Quantum mode that was active when the save was requested; prevents cross-mode consumption */
-  saveRequestedForMode: string | null
+  saveRequestedForMode: SaveableQuantumMode | null
   /** Loaded data waiting to be injected into GPU buffers */
   pendingLoadData: PendingLoadData | null
 
@@ -134,7 +134,11 @@ export const useSimulationStateStore = create<SimulationStateState>((set, get) =
   storedEigenstateCount: 0,
 
   requestSave: () => {
-    const mode = useExtendedObjectStore.getState().schroedinger?.quantumMode ?? null
+    const objectType = useGeometryStore.getState().objectType
+    const mode: SaveableQuantumMode | null =
+      objectType === 'pauliSpinor'
+        ? 'pauliSpinor'
+        : (useExtendedObjectStore.getState().schroedinger?.quantumMode ?? null)
     set({ saveRequested: true, saveRequestedForMode: mode, status: 'saving', error: null })
   },
 

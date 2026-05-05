@@ -26,7 +26,7 @@
  */
 
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join, relative } from 'node:path'
+import { dirname, join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
@@ -98,7 +98,7 @@ const updateMode = args.includes('--update')
 
 const barrels = []
 for (const path of walk(SRC)) {
-  if (isPureBarrel(path)) barrels.push(relative(ROOT, path))
+  if (isPureBarrel(path)) barrels.push(relative(ROOT, path).split(sep).join('/'))
 }
 barrels.sort()
 

@@ -40,7 +40,7 @@ const BASELINE_PATH = join(ROOT, 'scripts', 'unused-exports-baseline.json')
  *   counts; treating these files as "noise" keeps the ratchet
  *   measuring code we author.
  */
-const TS_PRUNE_IGNORE = '^src/wasm/mdimension_core/pkg'
+const TS_PRUNE_IGNORE = '^src/wasm/mdimension_core/pkg(?:-validator)?(?:/|$)'
 
 /**
  * ts-prune attributes a consumer's import to the original source
@@ -83,8 +83,11 @@ function isReExportSite(file, lineNum) {
   if (!lines) return false
   // ts-prune attributes `export * from './x'` re-exports to the
   // barrel path but uses the *source* line number, which can exceed
-  // the barrel's own length. Treat any out-of-range line as noise.
-  if (lineNum > lines.length) return true
+  // the barrel's own length. Only suppress if the file actually has
+  // a wildcard re-export (the known cause of out-of-range entries).
+  if (lineNum > lines.length) {
+    return lines.some((line) => /^\s*export\s+(?:type\s+)?\*\s+from\s+['"]/.test(line))
+  }
   const idx = Math.max(0, lineNum - 1)
   if (RE_EXPORT_LINE_RE.test(lines[idx])) return true
   // Walk back through the file looking for the start of a multi-line
