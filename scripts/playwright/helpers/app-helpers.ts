@@ -1180,6 +1180,44 @@ export async function applyDiracPreset(page: Page, presetId: string): Promise<vo
     }
     await extStore.getState().applyDiracPreset(id)
   }, presetId)
+
+  await page.waitForFunction(
+    async (id: string) => {
+      const extStore = window.__EXTENDED_OBJECT_STORE__
+      if (!extStore) return false
+      const { DIRAC_SCENARIO_PRESETS } = await import('/src/lib/physics/dirac/presets.ts')
+      const preset = DIRAC_SCENARIO_PRESETS.find(
+        (p: { id: string; overrides?: Record<string, unknown> }) => p.id === id
+      ) as { id: string; overrides?: Record<string, unknown> } | undefined
+      if (!preset?.overrides) return false
+
+      const skippedOverrideKeys = new Set([
+        'latticeDim',
+        'gridSize',
+        'spacing',
+        'packetCenter',
+        'packetMomentum',
+      ])
+      const matches = (actual: unknown, expected: unknown): boolean => {
+        if (Array.isArray(expected)) {
+          return (
+            Array.isArray(actual) &&
+            actual.length === expected.length &&
+            expected.every((value, index) => actual[index] === value)
+          )
+        }
+        return actual === expected
+      }
+
+      const dirac = extStore.getState().schroedinger.dirac as Record<string, unknown>
+      for (const [key, value] of Object.entries(preset.overrides)) {
+        if (!skippedOverrideKeys.has(key) && !matches(dirac[key], value)) return false
+      }
+      return true
+    },
+    presetId,
+    { timeout: UI_SETTLE_TIMEOUT }
+  )
 }
 
 /** Apply a Pauli preset via setPauliConfig. */

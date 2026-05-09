@@ -172,6 +172,7 @@ async function readTimestampTimings(
   }
   internals.enabled = true
   internals.readBuffer = readBuffer
+  collector.setCollectionActive(true)
 
   collector.scheduleReadback(device, passIds.length, passIds, phases)
   await vi.waitFor(() => expect(readBuffer.unmap).toHaveBeenCalledTimes(1))
@@ -259,6 +260,49 @@ describe('WebGPUTimestampCollector readback parsing', () => {
 
     expect(timings.get('scene')).toEqual({ total: 1, compute: 0, render: 1 })
     expect(timings.get('schroedinger')).toEqual({ total: 5, compute: 2, render: 3 })
+  })
+
+  it('discards in-flight readback when collection toggles off before resolve', async () => {
+    const { WebGPUTimestampCollector } =
+      await import('@/rendering/webgpu/graph/WebGPUTimestampCollector')
+    vi.stubGlobal('GPUMapMode', { READ: 1 })
+
+    const timestampValues = new BigUint64Array([0n, 0n, 100_000_000n, 101_000_000n])
+    let resolveWorkDone!: () => void
+    const workDonePromise = new Promise<void>((r) => {
+      resolveWorkDone = r
+    })
+
+    const readBuffer = {
+      mapAsync: vi.fn().mockResolvedValue(undefined),
+      getMappedRange: vi.fn(() => timestampValues.buffer),
+      unmap: vi.fn(),
+    } as unknown as GPUBuffer
+
+    const device = {
+      queue: { onSubmittedWorkDone: vi.fn(() => workDonePromise) },
+    } as unknown as GPUDevice
+
+    const collector = new WebGPUTimestampCollector()
+    const internals = collector as unknown as {
+      enabled: boolean
+      readBuffer: GPUBuffer
+      readbackInFlight: boolean
+    }
+    internals.enabled = true
+    internals.readBuffer = readBuffer
+    collector.setCollectionActive(true)
+
+    collector.scheduleReadback(device, 1, ['scene'], [{ hasCompute: false, hasRender: true }])
+
+    collector.setCollectionActive(false)
+    expect(collector.getLastTimings().size).toBe(0)
+
+    resolveWorkDone()
+    await vi.waitFor(() => expect(internals.readbackInFlight).toBe(false))
+
+    expect(collector.getLastTimings().size).toBe(0)
+    expect(readBuffer.mapAsync).not.toHaveBeenCalled()
   })
 
   it('clears stale timings when timestamp collection toggles', async () => {
