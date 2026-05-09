@@ -55,6 +55,7 @@ const FACTORIAL = [1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880, 3628800, 39916
 /** Spherical harmonic normalization K_l^m — mirrors sphericalHarmonics.wgsl.ts */
 function sphericalHarmonicNorm(l: number, m: number): number {
   const absM = Math.abs(m)
+  if (l < 0 || absM > l) return 0
   const front = (2 * l + 1) / (4 * Math.PI)
   const factRatio = FACTORIAL[l - absM]! / FACTORIAL[l + absM]!
   return Math.sqrt(front * factRatio)
@@ -87,6 +88,7 @@ function fastRealSphericalHarmonicCartesian(
   ny: number,
   nz: number
 ): number {
+  if (l < 0 || Math.abs(m) > l) return 0
   if (l === 0) return 0.28209479
   if (l === 1) {
     const norm = 0.48860251
@@ -112,6 +114,7 @@ function fastRealSphericalHarmonicDirect(
   st: number,
   phi: number
 ): number {
+  if (l < 0 || Math.abs(m) > l) return 0
   if (l === 0) return 0.28209479
   if (l === 1) {
     const norm = 0.48860251
@@ -174,6 +177,20 @@ describe('spherical harmonic normalization constants — exact verification', ()
     const exact = Math.sqrt(3 / (4 * Math.PI))
     expect(0.48860251).toBeCloseTo(exact, 7)
     expect(sphericalHarmonicNorm(1, 0)).toBeCloseTo(exact, 10)
+  })
+
+  it('invalid |m| > l returns zero instead of reading factorials out of range', () => {
+    expect(sphericalHarmonicNorm(1, 2)).toBe(0)
+    expect(sphericalHarmonic(1, 2, Math.PI / 3, Math.PI / 4)).toEqual([0, 0])
+    expect(fastRealSphericalHarmonicDirect(1, 2, 0.5, Math.sqrt(0.75), 0.25)).toBe(0)
+    expect(fastRealSphericalHarmonicCartesian(1, 2, 0.3, 0.4, 0.5)).toBe(0)
+  })
+
+  it('invalid l < 0 returns zero', () => {
+    expect(sphericalHarmonicNorm(-1, 0)).toBe(0)
+    expect(sphericalHarmonic(-1, 0, Math.PI / 3, Math.PI / 4)).toEqual([0, 0])
+    expect(fastRealSphericalHarmonicDirect(-1, 0, 0.5, Math.sqrt(0.75), 0.25)).toBe(0)
+    expect(fastRealSphericalHarmonicCartesian(-1, 0, 0.3, 0.4, 0.5)).toBe(0)
   })
 
   it('Y_20 constant: K_2^0 / 2 = √(5/(16π)) = 0.31539157... (absorbs P_2 factor)', () => {

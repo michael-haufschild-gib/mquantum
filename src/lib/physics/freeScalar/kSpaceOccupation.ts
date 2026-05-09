@@ -61,13 +61,33 @@ export function float32ToFloat16(val: number): number {
     // Denormalized or underflow
     if (newExp < -10) return sign << 15 // Too small → ±0
     // Shift the 24-bit significand (implicit 1 + 23-bit frac) right to produce
-    // a 10-bit subnormal mantissa. Total shift = (1 - newExp) denormal offset + 13
-    // to go from 24-bit to 10-bit, i.e. >> (14 - newExp).
-    const mantissa = (frac | 0x800000) >> (14 - newExp)
+    // a 10-bit subnormal mantissa. Round discarded bits to nearest-even so CPU
+    // packing matches GPU half-float conversion semantics instead of truncating.
+    const shift = 14 - newExp
+    const significand = frac | 0x800000
+    let mantissa = significand >> shift
+    const remainder = significand & ((1 << shift) - 1)
+    const halfway = 1 << (shift - 1)
+    if (remainder > halfway || (remainder === halfway && (mantissa & 1) === 1)) {
+      mantissa++
+    }
     return (sign << 15) | mantissa
   }
 
-  return (sign << 15) | (newExp << 10) | (frac >> 13)
+  let mantissa = frac >> 13
+  const remainder = frac & 0x1fff
+  if (remainder > 0x1000 || (remainder === 0x1000 && (mantissa & 1) === 1)) {
+    mantissa++
+    if (mantissa === 0x400) {
+      mantissa = 0
+      newExp++
+      if (newExp >= 0x1f) {
+        return (sign << 15) | 0x7c00
+      }
+    }
+  }
+
+  return (sign << 15) | (newExp << 10) | mantissa
 }
 
 /** Pack 4 floats as rgba16float into a Uint16Array at the given pixel offset. */

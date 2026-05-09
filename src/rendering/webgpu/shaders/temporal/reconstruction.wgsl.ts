@@ -108,11 +108,11 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   // PERF: input.position.xy is the rasterizer-derived pixel center (0.5, 1.5, …);
   // truncating to i32 yields exact pixel coords without the uv*fullRes mul + clamp.
   let fullCoord = vec2i(input.position.xy);
-  let quarterCoord = fullCoord / 2;
 
   // Get quarter-res texture dimensions
   let quarterDims = vec2i(textureDimensions(quarterColor));
   let quarterDimsF = vec2f(quarterDims);
+  let quarterCoord = clamp(fullCoord / 2, vec2i(0), quarterDims - vec2i(1));
 
   // Load the exact center texel ONCE. Reused as (a) the bilinear-coincident sample
   // for the Bayer-aligned (rendered) pixel and (b) the centerSample fed into the

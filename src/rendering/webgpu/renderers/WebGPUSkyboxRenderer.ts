@@ -157,7 +157,10 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
    */
   private async createPipelineForMode(device: GPUDevice, mode: ShaderSkyboxMode): Promise<void> {
     // Compose shaders (non-MRT: single color output for skybox)
-    const effects = { sun: this.skyboxConfig.sun, vignette: this.skyboxConfig.vignette }
+    const effects = {
+      sun: this.skyboxConfig.sun && mode !== 'classic',
+      vignette: this.skyboxConfig.vignette,
+    }
     const { wgsl: fragmentShader } = composeSkyboxFragmentShader({
       mode,
       effects,
@@ -370,12 +373,15 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       ],
     })
 
-    // Texture bind group (placeholder for now)
+    const textureForBindGroup = this.loadedCubeTexture ?? this.placeholderCubeTexture
+
+    // Texture bind group. If a classic cubemap was already loaded, preserve it
+    // across pipeline/bind-group recreation instead of falling back to placeholder.
     this.textureBindGroup = device.createBindGroup({
       label: 'skybox-texture-bg',
       layout: this.textureBindGroupLayout,
       entries: [
-        { binding: 0, resource: this.placeholderCubeTexture.createView({ dimension: 'cube' }) },
+        { binding: 0, resource: textureForBindGroup.createView({ dimension: 'cube' }) },
         { binding: 1, resource: this.placeholderCubeSampler },
       ],
     })

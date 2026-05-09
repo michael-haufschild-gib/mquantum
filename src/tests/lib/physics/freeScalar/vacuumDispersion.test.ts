@@ -231,6 +231,29 @@ describe('computeFsfVacuumDispersion', () => {
     )
   })
 
+  it("returns 'kgFloor' when Bianchi-I coefficients cannot be evaluated", () => {
+    const cfg = makeConfig({
+      mass: 0.5,
+      latticeDim: 3,
+      gridSize: [8, 8, 8],
+      spacing: [1, 1, 1],
+      cosmology: {
+        ...DEFAULT_COSMOLOGY_CONFIG,
+        enabled: true,
+        preset: 'bianchiKasner',
+        eta0: 1.5,
+        kasnerExponents: { p1: 1.15, p2: 1.15, p3: 1.15 },
+      },
+    })
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {})
+    __resetFsfCosmologyWarnDedupForTests()
+    try {
+      expect(computeFsfVacuumDispersion(cfg, 1.5)).toBe('kgFloor')
+    } finally {
+      warnSpy.mockRestore()
+    }
+  })
+
   it("returns 'kgFloor' under invalid deSitter (hubble ≤ 0)", () => {
     const cfg = makeConfig({
       cosmology: {

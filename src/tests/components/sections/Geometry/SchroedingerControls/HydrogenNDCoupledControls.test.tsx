@@ -88,6 +88,18 @@ describe('HydrogenNDCoupledControls', () => {
     expect(chainLabels.length).toBeGreaterThanOrEqual(2)
   })
 
+  it('uses |m| as the lower bound for angular-chain sliders', () => {
+    const config = {
+      ...DEFAULT_SCHROEDINGER_CONFIG,
+      principalQuantumNumber: 5,
+      azimuthalQuantumNumber: 3,
+      magneticQuantumNumber: -2,
+      angularChain: [0, 0, 0, 0, 0, 0, 0, 0],
+    }
+    render(<HydrogenNDCoupledControls config={config} dimension={4} actions={makeMockActions()} />)
+    expect(screen.getByText('l₂ (2–3)')).toBeInTheDocument()
+  })
+
   it('renders orbital shape letters in the angular momentum select', () => {
     render(
       <HydrogenNDCoupledControls

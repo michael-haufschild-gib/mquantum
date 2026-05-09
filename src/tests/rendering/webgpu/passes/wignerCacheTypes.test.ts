@@ -286,6 +286,27 @@ describe('computeReconstructCoefficients', () => {
     }
   })
 
+  it('crossTermsEnabled=false clears stale pair data and writes numPairs=0', () => {
+    const { crossPairs } = buildCrossPairMap(3)
+    const sch = makeSchroedingerData(
+      [
+        [0.5, 0],
+        [0.5, 0],
+        [0.5, 0],
+      ],
+      [0, 1, 2]
+    )
+    const { f32, u32 } = allocReconstructBuffers()
+    f32.fill(123)
+
+    computeReconstructCoefficients(crossPairs, sch, 0, 1, f32, u32, false)
+
+    expect(u32[0]).toBe(0)
+    for (let i = 4; i < f32.length; i++) {
+      expect(f32[i]).toBe(0)
+    }
+  })
+
   it('throws when crossPairs.length > MAX_WIGNER_CROSS_PAIRS (capacity guard)', () => {
     // Build a synthetic oversized array — this simulates a future refactor
     // that widens the termCount literal union without updating the WGSL

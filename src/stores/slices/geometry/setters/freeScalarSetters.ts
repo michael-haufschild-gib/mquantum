@@ -9,6 +9,7 @@
 
 import { DEFAULT_FREE_SCALAR_CONFIG } from '@/lib/geometry/extended/freeScalar'
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
+import { nearestPow2 } from '@/lib/math/ndArray'
 import { useGeometryStore } from '@/stores/geometryStore'
 
 import type { SchroedingerSliceActions } from '../types'
@@ -142,18 +143,11 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
       }
       setWithVersion((state) => {
         const fs = state.schroedinger.freeScalar
-        const { latticeDim, initialCondition } = fs
-        const needsPow2 = initialCondition === 'vacuumNoise'
+        const { latticeDim } = fs
         const maxPerDim = defaultGridPerDim(latticeDim)
-        const snap = (v: number, min: number, max: number) => {
-          const clamped = Math.max(min, Math.min(max, Math.round(v)))
-          if (!needsPow2) return clamped
-          const log2 = Math.round(Math.log2(clamped))
-          return Math.max(min, Math.min(max, 2 ** log2))
-        }
         const clamped = Array.from({ length: latticeDim }, (_, i) => {
           const s = i < size.length ? size[i]! : 1
-          return i < latticeDim ? snap(s, 2, maxPerDim) : 1
+          return nearestPow2(s, 2, maxPerDim)
         })
         while (clamped.reduce((a, b) => a * b, 1) > MAX_TOTAL_SITES) {
           let maxIdx = 0
@@ -161,7 +155,7 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
             if (clamped[j]! > clamped[maxIdx]!) maxIdx = j
           }
           if (clamped[maxIdx]! <= 2) break
-          clamped[maxIdx] = needsPow2 ? clamped[maxIdx]! / 2 : Math.max(2, clamped[maxIdx]! - 1)
+          clamped[maxIdx] = clamped[maxIdx]! / 2
         }
         const staged = { ...fs, gridSize: clamped, needsReset: true }
         const reconciled = reconcileCosmologyInvariants(staged)
@@ -232,15 +226,15 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
     setFreeScalarInitialCondition: (condition) => {
       setWithVersion((state) => {
         const fs = state.schroedinger.freeScalar
-        let gridSize = fs.gridSize
-
-        if (condition === 'vacuumNoise') {
-          const maxPerDim = defaultGridPerDim(fs.latticeDim)
-          gridSize = gridSize.map((s) => {
-            const clamped = Math.max(2, Math.min(maxPerDim, s))
-            const log2 = Math.round(Math.log2(clamped))
-            return Math.max(2, Math.min(maxPerDim, 2 ** log2))
-          })
+        const maxPerDim = defaultGridPerDim(fs.latticeDim)
+        const gridSize = fs.gridSize.map((s) => nearestPow2(s, 2, maxPerDim))
+        while (gridSize.reduce((a, b) => a * b, 1) > MAX_TOTAL_SITES) {
+          let maxIdx = 0
+          for (let i = 1; i < gridSize.length; i++) {
+            if (gridSize[i]! > gridSize[maxIdx]!) maxIdx = i
+          }
+          if (gridSize[maxIdx]! <= 2) break
+          gridSize[maxIdx] = gridSize[maxIdx]! / 2
         }
 
         const staged = { ...fs, initialCondition: condition, gridSize, needsReset: true }

@@ -271,6 +271,14 @@ function resolveOmegaEvaluator(
         `vacuum sampler anisotropic dispersion requires axisPotentials.length ≥ latticeDim (${latticeDim}), got ${axisPotentials.length}`
       )
     }
+    for (let d = 0; d < latticeDim; d++) {
+      const axisPotential = axisPotentials[d]!
+      if (!Number.isFinite(axisPotential) || axisPotential <= 0) {
+        throw new RangeError(
+          `vacuum sampler anisotropic dispersion requires finite positive axisPotentials[${d}], got ${axisPotential}`
+        )
+      }
+    }
     return (coords, dims) =>
       computeOmegaKAnisotropic(
         coords,

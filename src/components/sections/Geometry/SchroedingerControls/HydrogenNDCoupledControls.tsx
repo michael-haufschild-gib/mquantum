@@ -17,6 +17,7 @@ import {
   maxAzimuthalForPrincipal,
   orbitalShapeLetter,
 } from '@/lib/geometry/extended/schroedinger/hydrogenPresets'
+import { normalizeHydrogenCoupledAngularChain } from '@/lib/physics/hydrogenCoupled/presets'
 
 import type { HydrogenNDCoupledControlsProps } from './types'
 
@@ -36,6 +37,7 @@ export const HydrogenNDCoupledControls: React.FC<HydrogenNDCoupledControlsProps>
 
     const maxL = maxAzimuthalForPrincipal(config.principalQuantumNumber)
     const maxM = config.azimuthalQuantumNumber
+    const minChainL = Math.min(maxM, Math.abs(config.magneticQuantumNumber))
 
     // Number of angular chain values needed: D-3 (l₂ through l_{D-2})
     // l₁ = azimuthalQuantumNumber, m = magneticQuantumNumber, l_{D-1} = |m|
@@ -69,20 +71,23 @@ export const HydrogenNDCoupledControls: React.FC<HydrogenNDCoupledControlsProps>
       [setAngularChainValue]
     )
 
-    // Compute upper bounds for each chain value.
-    // Physics constraint: l₁ >= l₂ >= l₃ >= ... >= |m|.
-    // Each l_{k+1} is bounded above by l_k (the previous element in the chain).
-    // Slider min is always 0 — the store setter enforces the |m| constraint.
+    // Derive slider upper bounds from the shared normalizer so the UI cascade
+    // stays in sync with the store/shader invariant (l₁ >= l₂ >= ... >= |m|).
     const chainBounds = useMemo(() => {
-      const bounds: number[] = [] // max for each slot
-      let prevL = config.azimuthalQuantumNumber // l₁
-      for (let i = 0; i < chainLength; i++) {
-        bounds.push(prevL)
-        // Next element's max is this element's current value (cascade)
-        prevL = Math.min(prevL, config.angularChain[i] ?? 0)
-      }
+      const normalized = normalizeHydrogenCoupledAngularChain(config.angularChain, {
+        l1: config.azimuthalQuantumNumber,
+        magneticM: config.magneticQuantumNumber,
+        length: chainLength,
+      })
+      const bounds: number[] = [config.azimuthalQuantumNumber]
+      for (let i = 1; i < chainLength; i++) bounds.push(normalized[i - 1]!)
       return bounds
-    }, [config.azimuthalQuantumNumber, config.angularChain, chainLength])
+    }, [
+      config.azimuthalQuantumNumber,
+      config.magneticQuantumNumber,
+      config.angularChain,
+      chainLength,
+    ])
 
     return (
       <div className="space-y-3">
@@ -123,17 +128,21 @@ export const HydrogenNDCoupledControls: React.FC<HydrogenNDCoupledControlsProps>
             </p>
             {Array.from({ length: chainLength }, (_, i) => {
               const chainMaxL = chainBounds[i] ?? 0
+              const displayMaxL = Math.max(chainMaxL, minChainL)
               const subscript = String.fromCodePoint(0x2080 + i + 2) // ₂, ₃, ₄, ...
               return (
                 <Slider
                   key={i}
-                  label={`l${subscript} (0\u2013${chainMaxL})`}
-                  value={Math.min(config.angularChain[i] ?? 0, Math.max(chainMaxL, 0))}
+                  label={`l${subscript} (${minChainL}\u2013${displayMaxL})`}
+                  value={Math.max(
+                    minChainL,
+                    Math.min(config.angularChain[i] ?? minChainL, displayMaxL)
+                  )}
                   onChange={handleChainChange(i)}
-                  min={0}
-                  max={Math.max(chainMaxL, 0)}
+                  min={minChainL}
+                  max={displayMaxL}
                   step={1}
-                  disabled={chainMaxL <= 0}
+                  disabled={displayMaxL <= minChainL}
                 />
               )
             })}

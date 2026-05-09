@@ -51,4 +51,25 @@ describe('ExportPresetCard', () => {
 
     expect(screen.getByRole('button')).not.toHaveAccessibleName(/Instagram Instagram/)
   })
+
+  it('renders preset icon as a current-color mask instead of a standalone image', () => {
+    render(
+      <ExportPresetCard
+        id="high-q"
+        label="High quality"
+        description="Maximum quality export"
+        isActive={true}
+        onClick={vi.fn()}
+      />
+    )
+
+    const icon = screen.getByTestId('export-preset-icon-high-q')
+    const style = icon.getAttribute('style') ?? ''
+
+    expect(icon).toHaveAttribute('aria-hidden', 'true')
+    expect(icon).toHaveClass('bg-current')
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    expect(style).toContain('mask:')
+    expect(style).toContain('center / contain no-repeat')
+  })
 })

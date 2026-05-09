@@ -42,6 +42,7 @@ const FACTORIAL_LUT: array<f32, 13> = array<f32, 13>(
  */
 fn sphericalHarmonicNorm(l: i32, m: i32) -> f32 {
   let absM = abs(m);
+  if (l < 0 || absM > l) { return 0.0; }
 
   // (2l+1) / (4π)
   let front = f32(2 * l + 1) / (4.0 * PI);
@@ -157,6 +158,8 @@ fn fastRealSphericalHarmonic(l: i32, m: i32, theta: f32, phi: f32) -> f32 {
  * cosTheta = z/r, sinTheta = sqrt(x²+y²)/r (precomputed by caller).
  */
 fn fastRealSphericalHarmonicDirect(l: i32, m: i32, ct: f32, st: f32, phi: f32) -> f32 {
+  if (l < 0 || abs(m) > l) { return 0.0; }
+
   // s orbital (l=0)
   if (l == 0) {
     return SH_Y00;
@@ -241,6 +244,8 @@ fn fastRealSphericalHarmonicDirect(l: i32, m: i32, ct: f32, st: f32, phi: f32) -
  *   cos(θ)        = z/r = nz
  */
 fn fastRealSphericalHarmonicCartesian(l: i32, m: i32, nx: f32, ny: f32, nz: f32) -> f32 {
+  if (l < 0 || abs(m) > l) { return 0.0; }
+
   // s orbital (l=0)
   if (l == 0) {
     return SH_Y00;

@@ -183,6 +183,26 @@ export const resizeTdseArrays = (prev: TdseConfig, newDim: number): Partial<Tdse
   }
 }
 
+const normalizeTdseVector = (
+  values: number[],
+  fallback: readonly number[],
+  latticeDim: number
+): number[] => {
+  const dim = Math.max(
+    1,
+    Math.min(
+      11,
+      Math.floor(Number.isFinite(latticeDim) ? latticeDim : DEFAULT_TDSE_CONFIG.latticeDim)
+    )
+  )
+  return Array.from({ length: dim }, (_, i) => {
+    const next = values[i]
+    if (Number.isFinite(next)) return next!
+    const prev = fallback[i]
+    return Number.isFinite(prev) ? prev! : 0
+  })
+}
+
 /**
  * Creates all TDSE-related setter actions for the schroedingerSlice.
  * @param ctx - Shared setter context with set/get and validation helpers
@@ -340,12 +360,23 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
       }))
     },
     setTdsePacketCenter: (center) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, packetCenter: center, needsReset: true },
-        },
-      }))
+      if (!Array.isArray(center) || !hasOnlyFinite(center)) {
+        warnNonFinite('tdse.packetCenter', center)
+        return
+      }
+      setWithVersion((state) => {
+        const td = state.schroedinger.tdse
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            tdse: {
+              ...td,
+              packetCenter: normalizeTdseVector(center, td.packetCenter, td.latticeDim),
+              needsReset: true,
+            },
+          },
+        }
+      })
     },
     setTdsePacketWidth: (width) => {
       if (!isFinite(width)) {
@@ -374,12 +405,23 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
       }))
     },
     setTdsePacketMomentum: (momentum) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, packetMomentum: momentum, needsReset: true },
-        },
-      }))
+      if (!Array.isArray(momentum) || !hasOnlyFinite(momentum)) {
+        warnNonFinite('tdse.packetMomentum', momentum)
+        return
+      }
+      setWithVersion((state) => {
+        const td = state.schroedinger.tdse
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            tdse: {
+              ...td,
+              packetMomentum: normalizeTdseVector(momentum, td.packetMomentum, td.latticeDim),
+              needsReset: true,
+            },
+          },
+        }
+      })
     },
     setTdsePotentialType: (potentialType) => {
       setWithVersion((state) => {

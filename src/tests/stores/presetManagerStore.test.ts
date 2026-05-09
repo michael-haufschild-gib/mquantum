@@ -860,6 +860,100 @@ describe('presetManagerStore (invariants)', () => {
       expect(usePBRStore.getState().face).toEqual(DEFAULT_FACE_PBR)
     })
 
+    it('merges extended scene payload using the validated geometry objectType', () => {
+      const importedScene = {
+        id: 'scene-id',
+        name: 'Invalid Object Type Scene',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {},
+          postProcessing: {},
+          environment: { skyboxEnabled: false },
+          geometry: { dimension: 3, objectType: 'not-real' },
+          extended: { schroedinger: { quantumMode: 'freeScalarField' } },
+          transform: { uniformScale: 1 },
+          rotation: { rotations: {} },
+          animation: { speed: 1, animatingPlanes: ['XY'] },
+          camera: { position: [0, 0, 5], target: [0, 0, 0] },
+          ui: {},
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importScenes(JSON.stringify([importedScene]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedScenes
+      usePresetManagerStore.getState().loadScene(saved!.id)
+
+      expect(useGeometryStore.getState().objectType).toBe('schroedinger')
+      expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('freeScalarField')
+    })
+
+    it('merges extended scene payload after dimension/objectType fallback', () => {
+      const importedScene = {
+        id: 'scene-id',
+        name: 'Dimension Fallback Scene',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {},
+          postProcessing: {},
+          environment: { skyboxEnabled: false },
+          geometry: { dimension: 7, objectType: 'pauliSpinor' },
+          extended: { schroedinger: { quantumMode: 'freeScalarField' } },
+          transform: { uniformScale: 1 },
+          rotation: { rotations: {} },
+          animation: { speed: 1, animatingPlanes: ['XY'] },
+          camera: { position: [0, 0, 5], target: [0, 0, 0] },
+          ui: {},
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importScenes(JSON.stringify([importedScene]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedScenes
+      usePresetManagerStore.getState().loadScene(saved!.id)
+
+      expect(useGeometryStore.getState().dimension).toBe(7)
+      expect(useGeometryStore.getState().objectType).toBe('schroedinger')
+      expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('freeScalarField')
+    })
+
+    it('does not throw when an objectType-only scene has corrupt geometry', () => {
+      useGeometryStore.getState().setDimension(5)
+
+      const importedScene = {
+        id: 'scene-id',
+        name: 'Object Type Only Corrupt Scene',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {},
+          postProcessing: {},
+          environment: { skyboxEnabled: false },
+          geometry: { objectType: 'not-real' },
+          extended: { schroedinger: { quantumMode: 'freeScalarField' } },
+          transform: { uniformScale: 1 },
+          rotation: { rotations: {} },
+          animation: { speed: 1, animatingPlanes: ['XY'] },
+          camera: { position: [0, 0, 5], target: [0, 0, 0] },
+          ui: {},
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importScenes(JSON.stringify([importedScene]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedScenes
+      expect(() => usePresetManagerStore.getState().loadScene(saved!.id)).not.toThrow()
+
+      expect(useGeometryStore.getState().dimension).toBe(5)
+      expect(useGeometryStore.getState().objectType).toBe('schroedinger')
+      expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('freeScalarField')
+    })
+
     it('should save and load a scene with rotation Map', () => {
       // Setup rotation state
       const rotStore = useRotationStore.getState()

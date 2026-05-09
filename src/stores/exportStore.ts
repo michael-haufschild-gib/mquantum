@@ -73,6 +73,7 @@ interface ExportStore {
   estimatedSizeMB: number
   completionDetails: CompletionDetails | null
   canvasAspectRatio: number // Current canvas width/height ratio for dynamic crop presets
+  lastAppliedPreset: string | null
 
   // Actions
   setModalOpen: (isOpen: boolean) => void
@@ -376,6 +377,20 @@ const autoAdjustBitrate = (
   }
 }
 
+const resolveSettingsUpdate = (
+  currentSettings: ExportSettings,
+  rawSettings: Partial<ExportSettings>
+): ExportSettings => {
+  const newSettings: Partial<ExportSettings> = { ...rawSettings }
+
+  sanitizeSettingsPatch(newSettings)
+
+  const updatedSettings = mergeSettingsWithDeepNested(currentSettings, newSettings)
+  autoAdjustBitrate(currentSettings, newSettings, updatedSettings)
+
+  return updatedSettings
+}
+
 export const useExportStore = create<ExportStore>()(
   persist(
     (set, get) => ({
@@ -397,6 +412,7 @@ export const useExportStore = create<ExportStore>()(
       estimatedSizeMB: 0,
       completionDetails: null,
       canvasAspectRatio: 16 / 9, // Default assumption
+      lastAppliedPreset: null,
 
       setModalOpen: (isOpen) => {
         set({ isModalOpen: isOpen })
@@ -437,14 +453,9 @@ export const useExportStore = create<ExportStore>()(
         const currentSettings = get().settings
         const rawNewSettings =
           typeof newSettingsOrFn === 'function' ? newSettingsOrFn(currentSettings) : newSettingsOrFn
-        const newSettings: Partial<ExportSettings> = { ...rawNewSettings }
+        const updatedSettings = resolveSettingsUpdate(currentSettings, rawNewSettings)
 
-        sanitizeSettingsPatch(newSettings)
-
-        const updatedSettings = mergeSettingsWithDeepNested(currentSettings, newSettings)
-        autoAdjustBitrate(currentSettings, newSettings, updatedSettings)
-
-        set({ settings: updatedSettings })
+        set({ settings: updatedSettings, lastAppliedPreset: null })
       },
       setExportModeOverride: (mode) => {
         set({ exportModeOverride: mode, exportMode: mode ?? 'in-memory' })
@@ -558,7 +569,8 @@ export const useExportStore = create<ExportStore>()(
           ? { ...defaults.crop, enabled: true, ...calculateCropForRatio(cropRatio) }
           : { ...defaults.crop, enabled: false }
 
-        get().updateSettings({ ...settings, crop })
+        const updatedSettings = resolveSettingsUpdate(get().settings, { ...settings, crop })
+        set({ settings: updatedSettings, lastAppliedPreset: presetName })
       },
 
       reset: () =>
@@ -581,6 +593,7 @@ export const useExportStore = create<ExportStore>()(
             // So we should reset it here if reset() is called on close.
             exportModeOverride: null,
             completionDetails: null,
+            lastAppliedPreset: null,
           }
         }),
     }),

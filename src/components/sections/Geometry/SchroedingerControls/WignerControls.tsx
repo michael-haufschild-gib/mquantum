@@ -53,8 +53,13 @@ export const WignerControls: React.FC<WignerControlsProps> = React.memo(
       return opts
     }, [dimension, isHydrogenMode])
 
-    // Clamp dimension index to valid range
-    const currentDimIdx = String(Math.min(config.wignerDimensionIndex, dimension - 1))
+    // Hydrogen core dims 0-2 all route to the same radial Wigner path, but the
+    // selector exposes that path as a single option. Map loaded/core indices
+    // back to "0" so the native select never receives a value absent from
+    // its option list.
+    const clampedDimIdx = Math.max(0, Math.min(config.wignerDimensionIndex, dimension - 1))
+    const effectiveDimIdx = isHydrogenMode && clampedDimIdx < 3 ? 0 : clampedDimIdx
+    const currentDimIdx = String(effectiveDimIdx)
 
     return (
       <div className="space-y-3" data-testid="wigner-controls">
@@ -117,7 +122,7 @@ export const WignerControls: React.FC<WignerControlsProps> = React.memo(
         )}
 
         {/* Quadrature points (hydrogen radial Wigner only) */}
-        {isHydrogenMode && config.wignerDimensionIndex < 3 && (
+        {isHydrogenMode && effectiveDimIdx === 0 && (
           <Slider
             label="Quadrature Points"
             tooltip="Number of Gauss-Laguerre quadrature points for the radial Wigner transform integral. More points increase numerical accuracy."

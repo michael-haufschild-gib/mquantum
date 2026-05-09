@@ -10,7 +10,9 @@
 
 import type { StoreApi } from 'zustand'
 
+import { FREE_SCALAR_MAX_TOTAL_SITES } from '@/lib/geometry/extended/freeScalar'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
+import { computeDefaultPow2GridPerDim } from '@/lib/math/ndArray'
 
 import type { ExtendedObjectSlice } from '../types'
 
@@ -86,7 +88,7 @@ export const TDSE_MAX_TOTAL_SITES = 262144 // 64^3
 export const DIRAC_MAX_TOTAL_SITES = 262144 // 64^3
 
 /** Maximum total free scalar lattice sites (~8MB for phi+pi buffers) */
-export const MAX_TOTAL_SITES = 1048576
+export const MAX_TOTAL_SITES = FREE_SCALAR_MAX_TOTAL_SITES
 
 /**
  * Compute the largest power-of-2 grid size per dimension that keeps total
@@ -97,15 +99,7 @@ export const MAX_TOTAL_SITES = 1048576
  * @returns Power-of-2 grid size per dimension, clamped to [2, 128]
  */
 export const computeDefaultGridPerDim = (d: number, maxTotalSites: number): number => {
-  const safeD = Number.isFinite(d) && d >= 1 ? Math.floor(d) : 1
-  const safeBudget = Number.isFinite(maxTotalSites) && maxTotalSites >= 1 ? maxTotalSites : 1
-  const raw = Math.round(Math.pow(safeBudget, 1 / safeD))
-  let pow2 = 2 ** Math.floor(Math.log2(Math.max(2, raw)))
-  pow2 = Math.max(2, Math.min(128, pow2))
-  while (pow2 > 2 && Math.pow(pow2, d) > maxTotalSites) {
-    pow2 = pow2 / 2
-  }
-  return pow2
+  return computeDefaultPow2GridPerDim(d, maxTotalSites)
 }
 
 /**

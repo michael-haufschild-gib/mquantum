@@ -190,6 +190,13 @@ describe('FACTORIAL_LUT in sphericalHarmonics.wgsl.ts', () => {
       expect(factorials[k]!).toBe(factorial(k))
     })
   }
+
+  it('guards sphericalHarmonicNorm before indexing factorials', () => {
+    expect(sphericalHarmonicsBlock).toContain('if (l < 0 || absM > l) { return 0.0; }')
+    expect(
+      sphericalHarmonicsBlock.match(/if \(l < 0 \|\| abs\(m\) > l\) \{ return 0\.0; \}/g)
+    ).toHaveLength(2)
+  })
 })
 
 describe('LN_FACTORIAL_LUT in hydrogenRadial.wgsl.ts', () => {

@@ -20,6 +20,7 @@ import {
   waitForFirstFrame,
   waitForRendererReady,
 } from './helpers/app-helpers'
+import { splitSrmtSweepCsv } from './helpers/srmt-csv'
 
 test.setTimeout(180_000)
 
@@ -84,24 +85,20 @@ test.describe('Wheeler–DeWitt — SRMT sweep', () => {
     if (!path) throw new Error('Playwright returned no download path')
     const fs = await import('node:fs/promises')
     const contents = await fs.readFile(path, 'utf-8')
-    const lines = contents.trim().split('\n')
+    const { main } = splitSrmtSweepCsv(contents)
+    const lines = main.trim().split('\n')
     expect(lines[0]!).toMatch(/^# SRMT sweep, kind=cut$/)
     // Column header line appears after the leading `#` metadata comments.
-    const headerIdx = lines.findIndex((l) =>
-      l.startsWith(
-        'index,sweepValue,sweepValueBc,cutNormalized,q_a,q_a_sigma,q_phi1,q_phi1_sigma,q_phi2,q_phi2_sigma,computeMs'
-      )
-    )
+    const headerIdx = lines.findIndex((l) => l.startsWith('index,sweepValue,sweepValueBc,'))
     expect(headerIdx).toBeGreaterThanOrEqual(1)
     const dataRows = lines.slice(headerIdx + 1).filter((l) => l.length > 0 && !l.startsWith('#'))
     // At least 2 data rows (plot requires ≥2; sweep may dedup below N=5).
     expect(dataRows.length).toBeGreaterThanOrEqual(2)
     for (const row of dataRows) {
       const cells = row.split(',')
-      // 11 columns: index, sweepValue, sweepValueBc, cutNormalized, then
-      // (q,q_sigma) per clock × 3, then computeMs. Adding error bars to
-      // each `q_*` is the Tier-1 publication-readiness requirement.
-      expect(cells).toHaveLength(11)
+      // Current export is the publication-grade 30-column table. Older
+      // columns stay ordered; new diagnostics append before computeMs.
+      expect(cells).toHaveLength(30)
     }
   })
 })

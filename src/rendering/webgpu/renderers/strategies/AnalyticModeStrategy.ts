@@ -507,7 +507,7 @@ export class AnalyticModeStrategy implements QuantumModeStrategy {
     )
     wignerPass.updateGridParams(ctx.device, xMin, xMax, -pRange, pRange)
 
-    if (isAnimating) wignerPass.updateTimeOnly(ctx.device, ctx.frame?.time ?? 0)
+    if (isAnimating) wignerPass.updateTimeOnly(ctx.device, accTime)
 
     const crossTermsEnabled = schroedinger?.wignerCrossTermsEnabled ?? false
     const termCount = shared.rendererConfig.termCount ?? 1
@@ -524,8 +524,9 @@ export class AnalyticModeStrategy implements QuantumModeStrategy {
         wignerPass.updateReconstructParams(
           ctx.device,
           shared.schroedingerUniformData,
-          ctx.frame?.time ?? 0,
-          shared.schroedingerFloatView[I.timeScale] ?? 0.8
+          accTime,
+          shared.schroedingerFloatView[I.timeScale] ?? 0.8,
+          crossTermsEnabled
         )
         wignerPass.executeReconstruct(ctx)
       }

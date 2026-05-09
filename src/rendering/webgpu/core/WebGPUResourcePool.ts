@@ -398,9 +398,12 @@ export class WebGPUResourcePool {
 
       case 'fraction': {
         const fraction = size.fraction ?? 1
+        // Fractional render targets must cover every source pixel block. For
+        // half-res temporal buffers, floor(odd / 2) leaves the right/bottom
+        // full-res edge with no corresponding quarter-res texel.
         return {
-          width: Math.max(1, Math.floor((this.width || 1) * fraction)),
-          height: Math.max(1, Math.floor((this.height || 1) * fraction)),
+          width: Math.max(1, Math.ceil((this.width || 1) * fraction)),
+          height: Math.max(1, Math.ceil((this.height || 1) * fraction)),
         }
       }
 

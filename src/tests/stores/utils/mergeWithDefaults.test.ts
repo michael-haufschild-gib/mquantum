@@ -164,6 +164,23 @@ describe('mergeExtendedObjectStateForType — schroedinger', () => {
 })
 
 describe('mergeExtendedObjectStateForType — cosmology invariants', () => {
+  it('snaps loaded freeScalar grids to powers of two before store restore', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'freeScalarField',
+        freeScalar: {
+          latticeDim: 3,
+          gridSize: [48, 48, 48],
+          spacing: [0.25, 0.25, 0.25],
+          mass: 0,
+        },
+      },
+    }
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const fs = (merged.schroedinger as { freeScalar: Record<string, unknown> }).freeScalar
+    expect(fs.gridSize).toEqual([64, 64, 64])
+  })
+
   it('soft-disables cosmology when the loaded latticeDim is out of the supported range', () => {
     // L7 audit: scenes saved with cosmology enabled at latticeDim ∈ [2,6]
     // and loaded onto an unsupported lattice (e.g. 1D after a manual edit)

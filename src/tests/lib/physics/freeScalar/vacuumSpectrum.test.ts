@@ -152,6 +152,30 @@ describe('sampleVacuumSpectrum', () => {
     expect(() => sampleVacuumSpectrum(config, 42, 'kgFloor')).toThrow('spacing')
   })
 
+  it('throws on non-positive or non-finite anisotropic axis stiffness', () => {
+    const config = makeConfig({
+      latticeDim: 3,
+      gridSize: [4, 4, 4],
+      spacing: [1, 1, 1],
+    })
+    const invalidAxisPotentials = [
+      [1, 0, 1],
+      [1, -1, 1],
+      [1, Number.NaN, 1],
+      [1, Number.POSITIVE_INFINITY, 1],
+    ]
+
+    for (const axisPotentials of invalidAxisPotentials) {
+      expect(() =>
+        sampleVacuumSpectrum(config, 42, {
+          massSq: 0,
+          axisPotentials,
+          kineticScale: 1,
+        })
+      ).toThrow(/axisPotentials\[1\]/)
+    }
+  })
+
   it('works with 1D and 2D lattice dimensions', () => {
     const config1d = makeConfig({ latticeDim: 1, gridSize: [16, 1, 1] })
     const result1d = sampleVacuumSpectrum(config1d, 42, 'kgFloor')

@@ -196,7 +196,7 @@ describe('packSchroedingerUniforms — defaults', () => {
 })
 
 describe('packSchroedingerUniforms — hydrogen modes', () => {
-  it('hydrogenNDCoupled writes angular chain into extraDimN slots', () => {
+  it('hydrogenNDCoupled writes valid angular chain into extraDimN slots', () => {
     const { floatView, intView } = makeBuffer()
     packSchroedingerUniforms(floatView, intView, {
       ...baseParams,
@@ -207,11 +207,33 @@ describe('packSchroedingerUniforms — hydrogen modes', () => {
         principalQuantumNumber: 3,
         azimuthalQuantumNumber: 2,
         magneticQuantumNumber: 1,
-        angularChain: [1, 0],
+        angularChain: [2, 1],
       } as never,
     })
-    expect(intView[I.extraDimN + 0]).toBe(1)
-    expect(intView[I.extraDimN + 1]).toBe(0)
+    expect(intView[I.extraDimN + 0]).toBe(2)
+    expect(intView[I.extraDimN + 1]).toBe(1)
+  })
+
+  it('hydrogenNDCoupled normalizes invalid angular chains before packing GPU uniforms', () => {
+    const { floatView, intView } = makeBuffer()
+    packSchroedingerUniforms(floatView, intView, {
+      ...baseParams,
+      dimension: 5,
+      quantumModeStr: 'hydrogenNDCoupled',
+      rendererQuantumMode: 'hydrogenNDCoupled',
+      schroedinger: {
+        principalQuantumNumber: 4,
+        azimuthalQuantumNumber: 3,
+        magneticQuantumNumber: -2,
+        angularChain: [0, 0],
+      } as never,
+    })
+
+    expect(intView[I.magneticM]).toBe(-2)
+    expect(intView[I.extraDimN + 0]).toBe(2)
+    expect(intView[I.extraDimN + 1]).toBe(2)
+    expect(Number.isFinite(floatView[I.coupledNorms + 1])).toBe(true)
+    expect(Number.isFinite(floatView[I.coupledNorms + 2])).toBe(true)
   })
 
   it('hydrogenND writes extra-dimension HO numbers (not the angular chain)', () => {

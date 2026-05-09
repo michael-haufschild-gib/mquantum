@@ -237,7 +237,7 @@ describe('extendedObjectStore — free scalar field actions', () => {
     })
   })
 
-  describe('power-of-2 grid snapping for vacuumNoise', () => {
+  describe('power-of-2 grid snapping', () => {
     it('snaps grid size to nearest power of 2 when vacuumNoise is selected', () => {
       useExtendedObjectStore.getState().setFreeScalarInitialCondition('vacuumNoise')
       useExtendedObjectStore.getState().setFreeScalarGridSize([48, 48, 48])
@@ -246,11 +246,11 @@ describe('extendedObjectStore — free scalar field actions', () => {
       expect(fs.gridSize[0]).toBe(64)
     })
 
-    it('does not snap grid size for non-vacuum initial conditions', () => {
+    it('snaps grid size for non-vacuum initial conditions too', () => {
       useExtendedObjectStore.getState().setFreeScalarInitialCondition('singleMode')
       useExtendedObjectStore.getState().setFreeScalarGridSize([48, 48, 48])
       const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
-      expect(fs.gridSize[0]).toBe(48)
+      expect(fs.gridSize[0]).toBe(64)
     })
   })
 

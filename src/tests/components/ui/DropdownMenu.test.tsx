@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { MouseEvent } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Button } from '@/components/ui/Button'
@@ -65,6 +66,42 @@ describe('DropdownMenu (invariants)', () => {
       expect(useDropdownStore.getState().openDropdownId).toBe('test-menu')
 
       await user.click(screen.getByText('Open Menu'))
+      expect(useDropdownStore.getState().openDropdownId).toBeNull()
+    })
+
+    it('preserves the trigger onClick handler when toggling the dropdown', async () => {
+      const user = userEvent.setup()
+      const onTriggerClick = vi.fn()
+
+      render(
+        <DropdownMenu
+          trigger={<Button onClick={onTriggerClick}>Open Menu</Button>}
+          items={mockItems}
+          id="test-menu"
+        />
+      )
+
+      await user.click(screen.getByText('Open Menu'))
+
+      expect(onTriggerClick).toHaveBeenCalledTimes(1)
+      expect(useDropdownStore.getState().openDropdownId).toBe('test-menu')
+    })
+
+    it('does not toggle when the trigger onClick prevents default', async () => {
+      const user = userEvent.setup()
+      const onTriggerClick = vi.fn((event: MouseEvent) => event.preventDefault())
+
+      render(
+        <DropdownMenu
+          trigger={<Button onClick={onTriggerClick}>Open Menu</Button>}
+          items={mockItems}
+          id="test-menu"
+        />
+      )
+
+      await user.click(screen.getByText('Open Menu'))
+
+      expect(onTriggerClick).toHaveBeenCalledTimes(1)
       expect(useDropdownStore.getState().openDropdownId).toBeNull()
     })
   })
@@ -291,6 +328,27 @@ describe('DropdownMenu (invariants)', () => {
       await user.click(screen.getByText('Open Menu'))
       expect(handleClose).toHaveBeenCalledTimes(1)
     })
+
+    it('clears open dropdown state and calls onClose when unmounted while open', async () => {
+      const handleClose = vi.fn()
+      const user = userEvent.setup()
+      const { unmount } = render(
+        <DropdownMenu
+          trigger={<Button>Open Menu</Button>}
+          items={mockItems}
+          id="test-menu"
+          onClose={handleClose}
+        />
+      )
+
+      await user.click(screen.getByText('Open Menu'))
+      expect(useDropdownStore.getState().openDropdownId).toBe('test-menu')
+
+      unmount()
+
+      expect(useDropdownStore.getState().openDropdownId).toBeNull()
+      expect(handleClose).toHaveBeenCalledTimes(1)
+    })
   })
 
   describe('separators and headers', () => {
@@ -346,6 +404,56 @@ describe('DropdownMenu (invariants)', () => {
       // Should show arrow indicator for submenu
       expect(screen.getByRole('menuitem', { name: /Has Submenu/ })).toBeInTheDocument()
       expect(screen.getByText('›')).toBeInTheDocument()
+    })
+
+    it('does not open a disabled submenu on hover', async () => {
+      const items: DropdownMenuItem[] = [
+        {
+          label: 'Unavailable Submenu',
+          disabled: true,
+          items: [{ label: 'Hidden Action', onClick: vi.fn() }],
+        },
+      ]
+
+      const user = userEvent.setup()
+      render(<DropdownMenu trigger={<Button>Open Menu</Button>} items={items} id="test-menu" />)
+
+      await user.click(screen.getByText('Open Menu'))
+      const disabledSubmenu = screen.getByRole('menuitem', { name: /Unavailable Submenu/ })
+      expect(disabledSubmenu).toBeDisabled()
+
+      fireEvent.mouseEnter(disabledSubmenu)
+
+      expect(screen.queryByText('Hidden Action')).not.toBeInTheDocument()
+    })
+
+    it('opens a submenu from the keyboard and moves focus into it', async () => {
+      const subItemClick = vi.fn()
+      const items: DropdownMenuItem[] = [
+        {
+          label: 'Has Submenu',
+          items: [
+            { label: 'Sub Item 1', onClick: subItemClick },
+            { label: 'Sub Item 2', onClick: vi.fn() },
+          ],
+        },
+      ]
+
+      const user = userEvent.setup()
+      render(<DropdownMenu trigger={<Button>Open Menu</Button>} items={items} id="test-menu" />)
+
+      await user.click(screen.getByText('Open Menu'))
+      const submenuTrigger = screen.getByRole('menuitem', { name: /Has Submenu/ })
+      await vi.waitFor(() => expect(submenuTrigger).toHaveFocus())
+
+      await user.keyboard('{Enter}')
+      const firstSubItem = await screen.findByRole('menuitem', { name: 'Sub Item 1' })
+
+      await vi.waitFor(() => expect(firstSubItem).toHaveFocus())
+      await user.keyboard('{Enter}')
+
+      expect(subItemClick).toHaveBeenCalledTimes(1)
+      expect(useDropdownStore.getState().openDropdownId).toBeNull()
     })
   })
 

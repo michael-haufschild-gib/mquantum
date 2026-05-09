@@ -27,6 +27,12 @@ import { TDSEPotentialControls } from './TDSEPotentialControls'
 import type { TdseControlsProps } from './types'
 import { WormholeControls } from './WormholeControls'
 
+const denseTdseVector = (values: readonly number[], length: number, fallback: number): number[] =>
+  Array.from({ length }, (_, i) => {
+    const value = values[i]
+    return Number.isFinite(value) ? value! : fallback
+  })
+
 /**
  * TDSE Dynamics configuration panel.
  *
@@ -52,29 +58,29 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
 
     const handleSpacingChange = useCallback(
       (dimIdx: number, value: number) => {
-        const newSpacing = [...td.spacing]
+        const newSpacing = denseTdseVector(td.spacing, activeDims, 0.1)
         newSpacing[dimIdx] = value
         actions.setSpacing(newSpacing)
       },
-      [td.spacing, actions]
+      [td.spacing, activeDims, actions]
     )
 
     const handlePacketCenterChange = useCallback(
       (dimIdx: number, value: number) => {
-        const newCenter = [...td.packetCenter]
+        const newCenter = denseTdseVector(td.packetCenter, activeDims, 0)
         newCenter[dimIdx] = value
         actions.setPacketCenter(newCenter)
       },
-      [td.packetCenter, actions]
+      [td.packetCenter, activeDims, actions]
     )
 
     const handlePacketMomentumChange = useCallback(
       (dimIdx: number, value: number) => {
-        const newMom = [...td.packetMomentum]
+        const newMom = denseTdseVector(td.packetMomentum, activeDims, 0)
         newMom[dimIdx] = value
         actions.setPacketMomentum(newMom)
       },
-      [td.packetMomentum, actions]
+      [td.packetMomentum, activeDims, actions]
     )
 
     // Filter grid options by budget: at high D, large grid sizes exceed TDSE_MAX_TOTAL_SITES

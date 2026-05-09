@@ -190,6 +190,39 @@ describe('simulationStateStore', () => {
       expect(pushed.freeScalar.needsReset).toBe(true)
     })
 
+    it('loadFromFile snaps freeScalar grids to the compute power-of-2 invariant', async () => {
+      deserializeMock.mockImplementationOnce(async () => ({
+        quantumMode: 'freeScalarField' as const,
+        latticeDim: 3,
+        componentCount: 1,
+        gridSize: [48, 48, 48],
+        totalSites: 64 * 64 * 64,
+        config: {
+          quantumMode: 'freeScalarField',
+          freeScalar: {
+            latticeDim: 3,
+            gridSize: [48, 48, 48],
+            needsReset: false,
+          },
+        },
+        psiRe: new Float32Array(64 * 64 * 64),
+        psiIm: new Float32Array(64 * 64 * 64),
+      }))
+
+      const file = new File([new ArrayBuffer(128)], 'fsf_nonpow2.mqstate', {
+        type: 'application/octet-stream',
+      })
+      useSimulationStateStore.getState().loadFromFile(file)
+      await vi.waitFor(() => {
+        expect(setSchroedingerConfigSpy).toHaveBeenCalledTimes(1)
+      })
+      const pushed = setSchroedingerConfigSpy.mock.calls[0]![0] as {
+        freeScalar: { gridSize: number[]; needsReset: boolean }
+      }
+      expect(pushed.freeScalar.gridSize).toEqual([64, 64, 64])
+      expect(pushed.freeScalar.needsReset).toBe(true)
+    })
+
     it('loadFromFile extracts simEta from _runtimeMeta into pendingLoadData.runtimeMeta', async () => {
       // L7 audit regression: the cosmological FSF save format carries
       // `simEta` in a sibling `_runtimeMeta` record so the compute pass can

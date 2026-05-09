@@ -12,6 +12,7 @@
 
 import type { AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
+import { normalizeHydrogenCoupledAngularChain } from '@/lib/physics/hydrogenCoupled/presets'
 import { DEFAULT_COSINE_COEFFICIENTS } from '@/rendering/shaders/palette'
 
 import { MAX_DIM, MAX_EXTRA_DIM, MAX_TERMS } from '../shaders/schroedinger/uniforms.wgsl'
@@ -225,8 +226,15 @@ function packHydrogenAndExtraDims(
   // For coupled hydrogen ND, these slots carry the angular chain (l₂, l₃, ...)
   // instead of HO quantum numbers. The shader's getAngularChainL() reads from here.
   const isCoupled = p.quantumModeStr === 'hydrogenNDCoupled'
+  const coupledAngularChain = isCoupled
+    ? normalizeHydrogenCoupledAngularChain(schroedinger?.angularChain as number[] | undefined, {
+        l1: validL,
+        magneticM: validM,
+        length: MAX_EXTRA_DIM,
+      })
+    : undefined
   const extraDimSource = isCoupled
-    ? (schroedinger?.angularChain as number[] | undefined)
+    ? coupledAngularChain
     : (schroedinger?.extraDimQuantumNumbers as number[] | undefined)
   for (let i = 0; i < MAX_EXTRA_DIM; i++) {
     intView[I.extraDimN + i] = extraDimSource?.[i] ?? 0

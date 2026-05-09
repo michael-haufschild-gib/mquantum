@@ -13,8 +13,10 @@
 import { create } from 'zustand'
 
 import type { SaveableQuantumMode } from '@/lib/export/simulationState'
+import { FREE_SCALAR_MAX_TOTAL_SITES } from '@/lib/geometry/extended/freeScalar'
 import type { PauliConfig } from '@/lib/geometry/extended/types'
 import { getQuantumTypeConfigSubKey } from '@/lib/geometry/registry'
+import { sanitizePowerOfTwoGridSizes } from '@/lib/math/ndArray'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
@@ -116,6 +118,23 @@ function scheduleClearLoadingFlag(): void {
   }
 }
 
+function normalizeLoadedFreeScalarSubConfig(
+  subConfig: Record<string, unknown>
+): Record<string, unknown> {
+  const { gridSize, latticeDim } = subConfig
+  if (
+    !Array.isArray(gridSize) ||
+    !gridSize.every((v) => typeof v === 'number') ||
+    typeof latticeDim !== 'number'
+  ) {
+    return subConfig
+  }
+  return sanitizePowerOfTwoGridSizes(
+    { ...subConfig, gridSize: [...gridSize] as number[], latticeDim },
+    { maxTotalSites: FREE_SCALAR_MAX_TOTAL_SITES }
+  )
+}
+
 /**
  * Zustand store for simulation state save/load operations.
  *
@@ -192,10 +211,14 @@ export const useSimulationStateStore = create<SimulationStateState>((set, get) =
             // config object with the reset flag forced into the correct
             // sub-config for each compute mode.
             const subKey = getQuantumTypeConfigSubKey(result.quantumMode)
-            const subConfig =
+            const loadedSubConfig =
               subKey && typeof restConfig[subKey] === 'object' && restConfig[subKey] !== null
                 ? { ...(restConfig[subKey] as Record<string, unknown>), needsReset: true }
                 : undefined
+            const subConfig =
+              result.quantumMode === 'freeScalarField' && loadedSubConfig
+                ? normalizeLoadedFreeScalarSubConfig(loadedSubConfig)
+                : loadedSubConfig
             const pushed: Record<string, unknown> = {
               ...restConfig,
               quantumMode: result.quantumMode,

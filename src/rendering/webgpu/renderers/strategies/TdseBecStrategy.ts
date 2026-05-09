@@ -453,6 +453,12 @@ export class TdseBecStrategy implements QuantumModeStrategy {
           return
         }
 
+        const currentEntStore = useCoordinateEntanglementStore.getState()
+        if (!currentEntStore.enabled) {
+          this.entanglementInFlight = false
+          return
+        }
+
         try {
           // Lazy-initialize the worker
           if (!this.entanglementWorker) {
@@ -470,7 +476,9 @@ export class TdseBecStrategy implements QuantumModeStrategy {
                 return
               }
               if (e.data.type !== 'result') return
-              useCoordinateEntanglementStore.getState().pushResult(e.data.result)
+              const latestEntStore = useCoordinateEntanglementStore.getState()
+              if (!latestEntStore.enabled) return
+              latestEntStore.pushResult(e.data.result)
             }
             this.entanglementWorker.onerror = () => {
               this.entanglementInFlight = false
@@ -485,9 +493,9 @@ export class TdseBecStrategy implements QuantumModeStrategy {
             psiIm: result.im,
             gridSize,
             options: {
-              computePairwiseMI: entStore.computePairwiseMI,
-              computeBipartitions: entStore.computeBipartitions,
-              computeWignerNegativity: entStore.computeWignerNegativity,
+              computePairwiseMI: currentEntStore.computePairwiseMI,
+              computeBipartitions: currentEntStore.computeBipartitions,
+              computeWignerNegativity: currentEntStore.computeWignerNegativity,
             },
           }
 

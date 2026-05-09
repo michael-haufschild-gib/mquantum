@@ -349,20 +349,14 @@ export function computeCosmologyAt(eta: number, params: CosmologyPresetParams): 
     // `η = (3/2)·t^(2/3)`. computeBianchiKasnerCoefs throws on non-finite
     // / non-positive η — the message matches the acceptance-bar behaviour.
     const b = computeBianchiKasnerCoefs(eta, exp, params.spacetimeDim)
-    // Conformal Hubble rate `ℋ = ã'/ã` isn't a closed-form `q/η` here —
-    // we use the analytic form derived from `ã = t^(1/(n−1))` and
-    // `dη/dt = 1/ã`. Then `ã' = (1/(n−1))·t^(1/(n−1)−1)·dt/dη =
-    // ã²/((n−1)·t)` and `ℋ = ã'/ã = ã/((n−1)·t)`. The `tProper` formula
-    // below assumes the vacuum constraint `Σp_i = 1` (so `dη/dt = 1/ã`
-    // integrates to `η = ((n−1)/(n−2))·t^((n−2)/(n−1))`); non-vacuum
-    // triples set `ã` correctly inside `computeBianchiKasnerCoefs` but the
-    // analysis-only ℋ here would need a per-caller Σp to stay exact.
-    // Only consumed by the analysis readout, never by the integrator.
+    // Conformal Hubble rate `ℋ = ã'/ã` under the generalized gauge
+    // `dη = dt/ã`. With `ã = t^(Σp/(n−1))`, `ℋ = Σp·ã / ((n−1)·t)`.
+    // Vacuum triples reduce to the older `ã / ((n−1)·t)` form because
+    // `Σp = 1`; accepted non-vacuum triples such as (0,0,0) need the
+    // explicit Σp factor for the analysis readout to stay physical.
     const n = params.spacetimeDim
-    const nm1 = n - 1
-    const nm2 = n - 2
-    const tProper = Math.pow((eta * nm2) / nm1, nm1 / nm2)
-    const hubble = tProper > 0 ? b.a / ((n - 1) * tProper) : 0
+    const sumP = exp.p1 + exp.p2 + exp.p3
+    const hubble = (sumP * b.a) / ((n - 1) * b.tProper)
     return {
       a: b.a,
       hubble,

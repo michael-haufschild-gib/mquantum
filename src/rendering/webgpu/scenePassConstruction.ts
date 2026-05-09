@@ -55,7 +55,7 @@ export function constructPPPasses(config: PassConfig): LabeledPass[] {
   // Scene / skybox
   passes.push({
     pass: config.skyboxEnabled
-      ? new WebGPUSkyboxRenderer({ mode: config.skyboxMode, sun: false, vignette: false })
+      ? new WebGPUSkyboxRenderer({ mode: config.skyboxMode, sun: true, vignette: false })
       : new ScenePass({
           outputResource: 'scene-render',
           mode: 'clear',

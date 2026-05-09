@@ -323,6 +323,26 @@ describe('computeCosmologyAt — Bianchi-Kasner', () => {
     expect(snap.a).toBeCloseTo(1, 12)
     expect(snap.hubble).toBeCloseTo(1 / 3, 12)
   })
+
+  it('rejects finite triples outside the positive-η Bianchi gauge', () => {
+    expect(() =>
+      computeCosmologyAt(1.5, {
+        preset: 'bianchiKasner',
+        spacetimeDim: n,
+        kasnerExponents: { p1: 1.15, p2: 1.15, p3: 1.15 },
+      })
+    ).toThrow(/positive-η gauge|positive real proper time/)
+  })
+
+  it('uses the generalized exponent sum for non-vacuum Bianchi hubble', () => {
+    const snap = computeCosmologyAt(2, {
+      preset: 'bianchiKasner',
+      spacetimeDim: n,
+      kasnerExponents: { p1: 0, p2: 0, p3: 0 },
+    })
+    expect(snap.a).toBeCloseTo(1, 12)
+    expect(snap.hubble).toBeCloseTo(0, 12)
+  })
 })
 
 // ───────────────────────────────────────────────────────────────────────────

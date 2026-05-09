@@ -20,6 +20,7 @@ import { isUniformComputeGridQuantumType } from '@/lib/geometry/registry'
 import { computeTdseEffectiveSpacing } from '@/lib/physics/tdse/effectiveSpacing'
 
 import type { WebGPURenderContext } from '../core/types'
+import { advanceTemporalBayerCycle } from '../shaders/schroedinger/temporalJitter'
 import {
   type AnimationState,
   type AppearanceStoreState,
@@ -90,6 +91,8 @@ export interface SchrodingerFrameState {
   temporalBayerIndex: number
   prevTemporalAnimTime: number
   prevTemporalVPMatrix: Float32Array
+  prevTemporalWidth: number
+  prevTemporalHeight: number
   completedTemporalCycle: boolean
 
   // Quantum preset caching
@@ -135,6 +138,11 @@ export function computeCameraUpdate(
   const animationTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
   const is2D = (config.dimension ?? 3) === 2 || config.representation === 'wigner'
 
+  // Pack the phase used by this draw, then advance state for the next frame.
+  // WebGPUTemporalCloudPass follows the same use-then-advance contract; changing
+  // this order makes reconstruction interpret quarter-res samples with stale phase.
+  const bayerOffset = BAYER_OFFSETS[state.temporalBayerIndex]!
+
   // Temporal Bayer offset: advance only when scene content changes
   const animTimeChanged = animationTime !== state.prevTemporalAnimTime
   let cameraChanged = false
@@ -148,18 +156,20 @@ export function computeCameraUpdate(
     }
     state.prevTemporalVPMatrix.set(vpElems)
   }
-  const sceneChanged = animTimeChanged || cameraChanged
+  const resolutionChanged =
+    ctx.size.width !== state.prevTemporalWidth || ctx.size.height !== state.prevTemporalHeight
+  state.prevTemporalWidth = ctx.size.width
+  state.prevTemporalHeight = ctx.size.height
 
-  if (sceneChanged) {
-    state.temporalBayerIndex = (state.temporalBayerIndex + 1) % 4
-    state.completedTemporalCycle = false
-  } else if (!state.completedTemporalCycle) {
-    const nextIndex = (state.temporalBayerIndex + 1) % 4
-    state.temporalBayerIndex = nextIndex
-    if (nextIndex === 0) {
-      state.completedTemporalCycle = true
-    }
-  }
+  const sceneChanged = animTimeChanged || cameraChanged || resolutionChanged
+
+  const nextBayer = advanceTemporalBayerCycle(
+    state.temporalBayerIndex,
+    state.completedTemporalCycle,
+    sceneChanged
+  )
+  state.temporalBayerIndex = nextBayer.index
+  state.completedTemporalCycle = nextBayer.completedFullCycle
   state.prevTemporalAnimTime = animationTime
 
   const transform = is2D ? undefined : getStoreSnapshot<TransformSnapshot>(ctx, 'transform')
@@ -169,7 +179,7 @@ export function computeCameraUpdate(
     animationTime,
     is2D,
     transform,
-    bayerOffset: BAYER_OFFSETS[state.temporalBayerIndex]!,
+    bayerOffset,
     size: ctx.size,
     frameDelta: ctx.frame?.delta || 0.016,
     frameNumber: ctx.frame?.frameNumber || 0,

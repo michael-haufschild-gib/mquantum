@@ -415,12 +415,12 @@ describe('visualEffectSetters — compound logic', () => {
       expect(getSchroedinger().wignerQuadPoints).toBe(13)
     })
 
-    it('clamps to [8, 64]', () => {
+    it('clamps to [8, 96]', () => {
       useExtendedObjectStore.getState().setSchroedingerWignerQuadPoints(2)
       expect(getSchroedinger().wignerQuadPoints).toBe(8)
 
       useExtendedObjectStore.getState().setSchroedingerWignerQuadPoints(200)
-      expect(getSchroedinger().wignerQuadPoints).toBe(64)
+      expect(getSchroedinger().wignerQuadPoints).toBe(96)
     })
 
     it('rejects NaN', () => {

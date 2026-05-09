@@ -27,19 +27,8 @@ import type { packLightingUniforms } from '../utils/lighting'
 // ---------------------------------------------------------------------------
 
 /** Total byte size of the SchroedingerUniforms GPU buffer (derived from layout) */
+export { BAYER_OFFSETS } from '../shaders/schroedinger/temporalJitter'
 export { SCHROEDINGER_UNIFORM_SIZE } from './schroedingerLayout'
-
-// ---------------------------------------------------------------------------
-// Temporal jitter pattern
-// ---------------------------------------------------------------------------
-
-/** Bayer pattern offsets for 4-frame temporal jitter cycle */
-export const BAYER_OFFSETS: [number, number][] = [
-  [0, 0],
-  [1, 1],
-  [1, 0],
-  [0, 1],
-]
 
 // ---------------------------------------------------------------------------
 // String → integer enum maps for GPU uniform packing

@@ -54,6 +54,12 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
     const triggerRef = useRef<HTMLDivElement>(null)
     const [coords, setCoords] = useState({ top: 0, left: 0 })
     const offset = 4
+    const originalTriggerOnClick =
+      typeof trigger.props.onClick === 'function'
+        ? (trigger.props.onClick as (event: React.MouseEvent) => void)
+        : undefined
+    const latestOnCloseRef = useRef(onClose)
+    latestOnCloseRef.current = onClose
 
     // Track previous isOpen state to call onClose callback
     const prevIsOpenRef = useRef(isOpen)
@@ -63,6 +69,14 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
       }
       prevIsOpenRef.current = isOpen
     }, [isOpen, onClose])
+
+    useEffect(() => {
+      return () => {
+        if (useDropdownStore.getState().openDropdownId !== dropdownId) return
+        closeDropdown(dropdownId)
+        latestOnCloseRef.current?.()
+      }
+    }, [closeDropdown, dropdownId])
 
     // Sync popover visibility with store state
     // Guarded: Popover API requires Safari 17+, Chrome 114+, Firefox 125+.
@@ -173,6 +187,9 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
 
     const handleToggle = useCallback(
       (e: React.MouseEvent) => {
+        originalTriggerOnClick?.(e)
+        if (e.defaultPrevented) return
+
         if (!isOpen) {
           soundManager.playSwish()
         } else {
@@ -181,7 +198,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
         toggleDropdown(dropdownId)
         e.stopPropagation()
       },
-      [isOpen, toggleDropdown, dropdownId]
+      [originalTriggerOnClick, isOpen, toggleDropdown, dropdownId]
     )
 
     const closeMenu = useCallback(() => {

@@ -79,6 +79,8 @@ export interface KasnerExponents {
  * enlarging the uniform struct.
  */
 export interface BianchiKasnerCoefs {
+  /** Positive proper time `t` corresponding to the requested generalized conformal time. */
+  tProper: number
   /** Effective scalar scale factor `ã = (a₁·a₂·a₃)^(1/(n−1))`. */
   a: number
   /** `ã^(−(n−2))` — drift coefficient for `δφ' = aKinetic · π`. */
@@ -300,6 +302,11 @@ export function computeBianchiKasnerCoefs(
   const nm1 = spacetimeDim - 1 // n - 1
   const sumP = exp.p1 + exp.p2 + exp.p3
   const alpha = nm1 - sumP // n - 1 - Σp
+  if (alpha < -1e-12) {
+    throw new RangeError(
+      `computeBianchiKasnerCoefs requires Σp ≤ n - 1 in the positive-η gauge, got Σp=${sumP}`
+    )
+  }
 
   let t: number
   if (Math.abs(alpha) < 1e-12) {
@@ -308,6 +315,11 @@ export function computeBianchiKasnerCoefs(
   } else {
     // General case: t = (η · alpha / (n-1))^((n-1)/alpha)
     t = Math.pow((eta * alpha) / nm1, nm1 / alpha)
+  }
+  if (!Number.isFinite(t) || t <= 0) {
+    throw new RangeError(
+      `computeBianchiKasnerCoefs requires positive real proper time, got t=${t} (eta=${eta}, Σp=${sumP})`
+    )
   }
 
   const a1 = Math.pow(t, exp.p1)
@@ -335,8 +347,27 @@ export function computeBianchiKasnerCoefs(
   // under `(1/3, 1/3, 1/3)` and the shader collapses to the pre-change form.
   const aPotentialRatio1 = aPot1 / aPot0
   const aPotentialRatio2 = aPot2 / aPot0
+  const positiveCoefs = [
+    ['a1', a1],
+    ['a2', a2],
+    ['a3', a3],
+    ['a', a],
+    ['aKinetic', aKinetic],
+    ['aPotential', aPot0],
+    ['aFull', aFull],
+    ['aPotentialRatio1', aPotentialRatio1],
+    ['aPotentialRatio2', aPotentialRatio2],
+  ] as const
+  for (const [label, value] of positiveCoefs) {
+    if (!Number.isFinite(value) || value <= 0) {
+      throw new RangeError(
+        `computeBianchiKasnerCoefs produced invalid ${label}=${value} (eta=${eta}, Σp=${sumP})`
+      )
+    }
+  }
 
   return {
+    tProper: t,
     a,
     aKinetic,
     aPotential: aPot0,

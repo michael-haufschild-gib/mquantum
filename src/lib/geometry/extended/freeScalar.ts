@@ -42,6 +42,9 @@ export type FreeScalarInitialCondition =
   | 'gaussianPacket'
   | 'kinkProfile'
 
+/** Maximum total free scalar lattice sites (~8MB for phi+pi buffers). */
+export const FREE_SCALAR_MAX_TOTAL_SITES = 1048576
+
 // ============================================================================
 // k-Space Visualization Config
 // ============================================================================
