@@ -237,9 +237,7 @@ describe('Dirac setters — extended coverage', () => {
 
   describe('applyDiracPreset', () => {
     it('applies kleinParadox preset without crashing', async () => {
-      store().applyDiracPreset('kleinParadox')
-      // Preset application is async (dynamic import), wait a tick
-      await new Promise((r) => setTimeout(r, 50))
+      await store().applyDiracPreset('kleinParadox')
       expect(dirac().needsReset).toBe(true)
     })
   })

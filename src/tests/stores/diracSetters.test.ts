@@ -5,7 +5,7 @@
  * mass/hbar/c clamping, and potential parameter setters.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
@@ -286,13 +286,10 @@ describe('Dirac setters', () => {
     expect(getDirac().needsReset).toBe(false)
 
     const s = useExtendedObjectStore.getState()
-    s.applyDiracPreset('kleinParadox')
-    // Preset application uses dynamic import — poll until both postconditions resolve
-    await vi.waitFor(() => {
-      expect(getDirac().needsReset).toBe(true)
-      // kleinParadox preset sets stepsPerFrame: 4 (default is 2)
-      expect(getDirac().stepsPerFrame).toBe(4)
-    })
+    await s.applyDiracPreset('kleinParadox')
+    expect(getDirac().needsReset).toBe(true)
+    // kleinParadox preset sets stepsPerFrame: 4 (default is 2)
+    expect(getDirac().stepsPerFrame).toBe(4)
   })
 
   it('syncs color algorithm to particleAntiparticle when preset uses split fieldView', async () => {
@@ -303,28 +300,24 @@ describe('Dirac setters', () => {
     const s = useExtendedObjectStore.getState()
     // kleinParadox preset sets fieldView='particleAntiparticleSplit' which requires
     // the matching color algorithm so the renderer reads R/G as upper/lower spinor.
-    s.applyDiracPreset('kleinParadox')
+    await s.applyDiracPreset('kleinParadox')
 
-    await vi.waitFor(() => {
-      expect(getDirac().fieldView).toBe('particleAntiparticleSplit')
-      expect(useAppearanceStore.getState().colorAlgorithm).toBe('particleAntiparticle')
-    })
+    expect(getDirac().fieldView).toBe('particleAntiparticleSplit')
+    expect(useAppearanceStore.getState().colorAlgorithm).toBe('particleAntiparticle')
   })
 
-  it('does not change color algorithm for presets without split fieldView', async () => {
+  it('syncs color algorithm to blackbody when preset uses totalDensity fieldView', async () => {
     const { useAppearanceStore } = await import('@/stores/appearanceStore')
     useAppearanceStore.getState().setColorAlgorithm('viridis')
     expect(useAppearanceStore.getState().colorAlgorithm).toBe('viridis')
 
     const s = useExtendedObjectStore.getState()
-    // diracBarrierTunneling preset uses fieldView='totalDensity' — no algo override needed
-    s.applyDiracPreset('diracBarrierTunneling')
+    // diracBarrierTunneling preset uses fieldView='totalDensity', which needs a
+    // single-channel density palette after split-view presets have used R/G.
+    await s.applyDiracPreset('diracBarrierTunneling')
 
-    await vi.waitFor(() => {
-      expect(getDirac().fieldView).toBe('totalDensity')
-    })
-    // viridis preserved — preset application should NOT clobber unrelated color choices
-    expect(useAppearanceStore.getState().colorAlgorithm).toBe('viridis')
+    expect(getDirac().fieldView).toBe('totalDensity')
+    expect(useAppearanceStore.getState().colorAlgorithm).toBe('blackbody')
   })
 
   it('re-clamps dt when speedOfLight rises above the new CFL ceiling', () => {

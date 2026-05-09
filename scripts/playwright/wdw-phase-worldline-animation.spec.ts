@@ -3,7 +3,7 @@
  *
  * Confirms (with the solver playing):
  *   1. `wdwPhaseRotationEnabled + speed > 0` produces temporal pixel drift
- *      on phase-keyed color algorithms (3, 4, 6, 8, 10, 22). The hue ring
+ *      on every WdW-selectable phase-keyed color algorithm. The hue ring
  *      should cycle as `phaseOffset = speed · t` advances.
  *   2. `wdwWorldlineEnabled + speed > 0` produces temporal pixel drift on
  *      a density-keyed algorithm (e.g. inferno). The worldline pulse
@@ -93,7 +93,7 @@ async function configureScene(
     play: boolean
   }
 ) {
-  await page.evaluate((c) => {
+  await page.evaluate(async (c) => {
     const extStore = window.__EXTENDED_OBJECT_STORE__
     const appearance = window.__APPEARANCE_STORE__
     const anim = window.__ANIMATION_STORE__
@@ -103,9 +103,9 @@ async function configureScene(
     const ext = extStore.getState() as Record<string, unknown>
     const app = appearance.getState() as Record<string, unknown>
     const animS = anim.getState() as Record<string, unknown>
-    const apply = ext.applyWheelerDeWittPreset as ((id: string) => void) | undefined
+    const apply = ext.applyWheelerDeWittPreset as ((id: string) => Promise<void>) | undefined
     if (!apply) throw new Error('applyWheelerDeWittPreset missing')
-    apply('noBoundaryBaseline')
+    await apply('noBoundaryBaseline')
     ;(app.setColorAlgorithm as (a: string) => void)(c.algo)
     ;(ext.setWdwPhaseRotationEnabled as (v: boolean) => void)(c.phaseRotation)
     ;(ext.setWdwPhaseRotationSpeed as (v: number) => void)(c.phaseRotationSpeed)
@@ -128,6 +128,16 @@ interface Row {
   meanAbsDiff: number
   errors: string[]
 }
+
+const WDW_PHASE_ROTATION_ALGORITHMS = [
+  'phase',
+  'mixed',
+  'phaseCyclicUniform',
+  'phaseDiverging',
+  'domainColoringPsi',
+  'diverging',
+  'phaseDensity',
+] as const
 
 test.describe('WdW phase rotation + worldline pulse (animated)', () => {
   test('phase rotation and worldline pulse both produce temporal frame deltas', async ({
@@ -178,7 +188,7 @@ test.describe('WdW phase rotation + worldline pulse (animated)', () => {
     }
 
     // ─── Phase rotation ON, playing, phase-keyed algo — frames should drift.
-    for (const algo of ['phase', 'mixed', 'phaseCyclicUniform', 'phaseDensity'] as const) {
+    for (const algo of WDW_PHASE_ROTATION_ALGORITHMS) {
       await configureScene(page, {
         algo,
         phaseRotation: true,
@@ -259,7 +269,7 @@ test.describe('WdW phase rotation + worldline pulse (animated)', () => {
 
     // Every phase-rotation row must have distinctly more drift than the
     // paused control — at least 5× noise floor.
-    for (const algo of ['phase', 'mixed', 'phaseCyclicUniform', 'phaseDensity']) {
+    for (const algo of WDW_PHASE_ROTATION_ALGORITHMS) {
       const row = rows.find((r) => r.label === `phaseRotation-${algo}`)!
       expect(
         row.changedPixels,

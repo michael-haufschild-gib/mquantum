@@ -3,10 +3,15 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { EditorRightPanel } from '@/components/layout/EditorRightPanel'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
+import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
 
 describe('EditorRightPanel tab layout', () => {
   beforeEach(() => {
+    localStorage.clear()
+    useExtendedObjectStore.getState().reset()
+    useWavefunctionSliceStore.getState().reset()
     useGeometryStore.setState({
       dimension: 3,
       objectType: 'schroedinger',
@@ -49,5 +54,26 @@ describe('EditorRightPanel tab layout', () => {
 
     expect(screen.queryByTestId('schroedinger-iso-toggle')).not.toBeInTheDocument()
     expect(screen.queryByTestId('schroedinger-iso-threshold')).not.toBeInTheDocument()
+  })
+
+  it('does not expose a stale wavefunction slice export captured in another compute mode', async () => {
+    const user = userEvent.setup()
+    useExtendedObjectStore.setState((s) => ({
+      schroedinger: { ...s.schroedinger, quantumMode: 'tdseDynamics' },
+    }))
+    useWavefunctionSliceStore.getState().fulfillCapture({
+      sliceData: new Float32Array([0.2, 0.8, 0.2]),
+      axis: 'x',
+      sourceMode: 'becDynamics',
+      gridSize: 3,
+      worldBound: 1,
+    })
+
+    render(<EditorRightPanel />)
+    await user.click(screen.getByRole('tab', { name: /analysis/i }))
+    await user.click(await screen.findByTestId('data-export-group-header'))
+
+    expect(screen.getByTestId('capture-slice')).toBeInTheDocument()
+    expect(screen.queryByTestId('export-wf-slice-csv')).not.toBeInTheDocument()
   })
 })

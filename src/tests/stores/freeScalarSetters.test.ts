@@ -16,6 +16,28 @@ describe('free scalar field setters', () => {
   })
 
   const getFSF = () => useExtendedObjectStore.getState().schroedinger.freeScalar
+  const patchFreeScalar = (
+    patch: Partial<ReturnType<typeof getFSF>>,
+    cosmologyPatch: Partial<ReturnType<typeof getFSF>['cosmology']> = {}
+  ) => {
+    useExtendedObjectStore.setState((state) => {
+      const fs = state.schroedinger.freeScalar
+      return {
+        ...state,
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: {
+            ...fs,
+            ...patch,
+            cosmology: {
+              ...fs.cosmology,
+              ...cosmologyPatch,
+            },
+          },
+        },
+      }
+    })
+  }
 
   it('clamps latticeDim to [1, 11]', () => {
     const s = useExtendedObjectStore.getState()
@@ -291,6 +313,132 @@ describe('free scalar field setters', () => {
       // floating-point tolerance — not strictly greater.
       expect(reclamped).toBeCloseTo(baseline, 12)
       expect(getFSF().needsReset).toBe(true)
+    })
+
+    it('stores Bianchi exponents but resets only for vacuum Kasner triples on Bianchi preset', () => {
+      const s = useExtendedObjectStore.getState()
+      patchFreeScalar({ needsReset: false }, { preset: 'bianchiKasner' })
+
+      s.setFreeScalarCosmologyBianchiExponents(0.2, 0.3, 0.4)
+      expect(getFSF().cosmology.kasnerExponents).toEqual({ p1: 0.2, p2: 0.3, p3: 0.4 })
+      expect(getFSF().needsReset).toBe(false)
+
+      s.setFreeScalarCosmologyBianchiExponents(-1 / 3, 2 / 3, 2 / 3)
+      expect(getFSF().cosmology.kasnerExponents).toEqual({
+        p1: -1 / 3,
+        p2: 2 / 3,
+        p3: 2 / 3,
+      })
+      expect(getFSF().needsReset).toBe(true)
+    })
+
+    it('rejects non-finite Bianchi exponents without clobbering the current triple', () => {
+      const s = useExtendedObjectStore.getState()
+      const before = getFSF().cosmology.kasnerExponents
+
+      s.setFreeScalarCosmologyBianchiExponents(Number.NaN, 2 / 3, 2 / 3)
+      expect(getFSF().cosmology.kasnerExponents).toEqual(before)
+      expect(getFSF().needsReset).toBe(false)
+    })
+
+    it('clamps Hubble to the physical slider range and only resets de Sitter fields', () => {
+      const s = useExtendedObjectStore.getState()
+
+      patchFreeScalar({ needsReset: false }, { preset: 'minkowski' })
+      s.setFreeScalarCosmologyHubble(0)
+      expect(getFSF().cosmology.hubble).toBe(0.01)
+      expect(getFSF().needsReset).toBe(false)
+
+      s.setFreeScalarCosmologyHubble(200)
+      expect(getFSF().cosmology.hubble).toBe(100)
+
+      s.setFreeScalarCosmologyHubble(Number.POSITIVE_INFINITY)
+      expect(getFSF().cosmology.hubble).toBe(100)
+
+      patchFreeScalar({ needsReset: false }, { preset: 'deSitter' })
+      s.setFreeScalarCosmologyHubble(2)
+      expect(getFSF().cosmology.hubble).toBe(2)
+      expect(getFSF().needsReset).toBe(true)
+    })
+
+    it('rejects zero and non-finite eta0 but stores eta0 verbatim outside cosmology dims', () => {
+      const s = useExtendedObjectStore.getState()
+      const before = getFSF().cosmology.eta0
+
+      s.setFreeScalarCosmologyEta0(0)
+      expect(getFSF().cosmology.eta0).toBe(before)
+
+      s.setFreeScalarCosmologyEta0(Number.NaN)
+      expect(getFSF().cosmology.eta0).toBe(before)
+
+      s.setFreeScalarLatticeDim(1)
+      s.setFreeScalarCosmologyEta0(0.25)
+      expect(getFSF().cosmology.eta0).toBe(0.25)
+      expect(getFSF().needsReset).toBe(true)
+    })
+
+    it('switches eta0 gauge when moving between LQC/Bianchi and FLRW presets', () => {
+      const s = useExtendedObjectStore.getState()
+
+      s.setFreeScalarCosmologyEta0(-200)
+      s.setFreeScalarCosmologyPreset('lqcBounce')
+      expect(getFSF().cosmology.eta0).toBe(19)
+
+      s.setFreeScalarCosmologyPreset('deSitter')
+      expect(getFSF().cosmology.eta0).toBeLessThan(0)
+
+      s.setFreeScalarCosmologyEta0(-0.2)
+      s.setFreeScalarCosmologyPreset('lqcBounce')
+      expect(getFSF().cosmology.eta0).toBe(1)
+    })
+
+    it('clamps LQC bounce parameters and resets only while LQC is active', () => {
+      const s = useExtendedObjectStore.getState()
+
+      patchFreeScalar({ needsReset: false }, { preset: 'minkowski' })
+      s.setFreeScalarCosmologyLqcRhoCritical(2)
+      expect(getFSF().cosmology.lqcRhoCritical).toBe(2)
+      expect(getFSF().needsReset).toBe(false)
+
+      patchFreeScalar({ needsReset: false }, { preset: 'lqcBounce' })
+      s.setFreeScalarCosmologyLqcRhoCritical(0)
+      expect(getFSF().cosmology.lqcRhoCritical).toBe(0.1)
+      expect(getFSF().needsReset).toBe(true)
+
+      patchFreeScalar({ needsReset: false })
+      s.setFreeScalarCosmologyLqcRhoCritical(20)
+      expect(getFSF().cosmology.lqcRhoCritical).toBe(10)
+
+      s.setFreeScalarCosmologyLqcEquationOfState(-1)
+      expect(getFSF().cosmology.lqcEquationOfState).toBe(0)
+      s.setFreeScalarCosmologyLqcEquationOfState(2)
+      expect(getFSF().cosmology.lqcEquationOfState).toBe(1)
+
+      s.setFreeScalarCosmologyLqcInitialRhoRatio(0)
+      expect(getFSF().cosmology.lqcInitialRhoRatio).toBe(0.001)
+      s.setFreeScalarCosmologyLqcInitialRhoRatio(1)
+      expect(getFSF().cosmology.lqcInitialRhoRatio).toBe(0.999)
+    })
+
+    it('ignores non-finite LQC parameter edits', () => {
+      const s = useExtendedObjectStore.getState()
+      patchFreeScalar(
+        { needsReset: false },
+        {
+          lqcRhoCritical: 3,
+          lqcEquationOfState: 0.25,
+          lqcInitialRhoRatio: 0.2,
+        }
+      )
+
+      s.setFreeScalarCosmologyLqcRhoCritical(Number.NaN)
+      s.setFreeScalarCosmologyLqcEquationOfState(Number.POSITIVE_INFINITY)
+      s.setFreeScalarCosmologyLqcInitialRhoRatio(Number.NEGATIVE_INFINITY)
+
+      expect(getFSF().cosmology.lqcRhoCritical).toBe(3)
+      expect(getFSF().cosmology.lqcEquationOfState).toBe(0.25)
+      expect(getFSF().cosmology.lqcInitialRhoRatio).toBe(0.2)
+      expect(getFSF().needsReset).toBe(false)
     })
   })
 })

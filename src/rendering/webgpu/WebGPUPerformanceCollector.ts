@@ -91,6 +91,7 @@ interface AccumulatedStats {
 export class WebGPUStatsCollector {
   private gpuName = 'WebGPU'
   private measurementTier = TIER_HIDDEN
+  private previousMeasurementTier = TIER_HIDDEN
   private lastPublishTime = 0
   private lastFrameTime = 0
   private smoothedFps: number | null = null
@@ -185,6 +186,14 @@ export class WebGPUStatsCollector {
     // Only TIER_FULL_STATS consumes per-pass GPU timing; skip the per-frame
     // onSubmittedWorkDone fence + buffer readback otherwise.
     graph.setTimestampCollectionActive(this.measurementTier === TIER_FULL_STATS)
+
+    if (
+      this.measurementTier !== TIER_FULL_STATS &&
+      this.previousMeasurementTier === TIER_FULL_STATS
+    ) {
+      this.clearPublishedFullStats()
+    }
+    this.previousMeasurementTier = this.measurementTier
 
     // Skip if hidden
     if (this.measurementTier === TIER_HIDDEN) {
@@ -335,21 +344,19 @@ export class WebGPUStatsCollector {
       updateBufferStats(bufferStats)
 
       // Publish per-pass timing data
-      if (this.latestPassTimings.length > 0) {
-        let totalGpuMs = 0
-        const entries: PassTimingEntry[] = this.latestPassTimings.map((pt) => {
-          totalGpuMs += pt.gpuTimeMs
-          return {
-            passId: pt.passId,
-            gpuTimeMs: pt.gpuTimeMs,
-            computeGpuTimeMs: pt.computeGpuTimeMs,
-            renderGpuTimeMs: pt.renderGpuTimeMs,
-            cpuTimeMs: pt.cpuTimeMs,
-            skipped: pt.skipped,
-          }
-        })
-        updatePassTimings(entries, totalGpuMs)
-      }
+      let totalGpuMs = 0
+      const entries: PassTimingEntry[] = this.latestPassTimings.map((pt) => {
+        totalGpuMs += pt.gpuTimeMs
+        return {
+          passId: pt.passId,
+          gpuTimeMs: pt.gpuTimeMs,
+          computeGpuTimeMs: pt.computeGpuTimeMs,
+          renderGpuTimeMs: pt.renderGpuTimeMs,
+          cpuTimeMs: pt.cpuTimeMs,
+          skipped: pt.skipped,
+        }
+      })
+      updatePassTimings(entries, totalGpuMs)
 
       // Publish CPU breakdown
       updateCpuBreakdown(this.latestCpuBreakdown)
@@ -368,10 +375,19 @@ export class WebGPUStatsCollector {
     this.accumulated.points = 0
   }
 
+  private clearPublishedFullStats(): void {
+    this.latestPassTimings = []
+    this.latestCpuBreakdown = { setupMs: 0, passesMs: 0, submitMs: 0 }
+    const { updatePassTimings, updateCpuBreakdown } = usePerformanceMetricsStore.getState()
+    updatePassTimings([], 0)
+    updateCpuBreakdown(this.latestCpuBreakdown)
+  }
+
   /**
    * Reset the collector state.
    */
   reset(): void {
+    this.previousMeasurementTier = TIER_HIDDEN
     this.lastPublishTime = 0
     this.lastFrameTime = 0
     this.smoothedFps = null

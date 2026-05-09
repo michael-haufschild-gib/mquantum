@@ -21,11 +21,10 @@ import { Button } from '@/components/ui/Button'
 import { NumberInput } from '@/components/ui/NumberInput'
 import { Select } from '@/components/ui/Select'
 import { Tooltip } from '@/components/ui/Tooltip'
+import { useAnySweepRunning } from '@/hooks/useAnySweepRunning'
 import { downloadAtlasCSV, downloadAtlasJSON } from '@/lib/export/dataExport'
-import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
-import { useMonitoringSweepStore } from '@/stores/monitoringSweepStore'
 import {
   type AtlasSweepConfig,
   DEFAULT_ATLAS_CONFIG,
@@ -112,11 +111,7 @@ const QuantumnessAtlasContent: React.FC<{ defaultOpen: boolean }> = React.memo(
     }))
     const { status, progress, results, config } = useQuantumnessAtlasStore(atlasSelector)
 
-    const entanglementSweepRunning = useCoordinateEntanglementStore(
-      (s) => s.sweepStatus === 'running'
-    )
-    const monitoringSweepRunning = useMonitoringSweepStore((s) => s.status === 'running')
-    const otherSweepRunning = entanglementSweepRunning || monitoringSweepRunning
+    const otherSweepRunning = useAnySweepRunning()
 
     const { handleStartAtlasSweep, handleAbortAtlasSweep } = useAtlasSweepController()
 

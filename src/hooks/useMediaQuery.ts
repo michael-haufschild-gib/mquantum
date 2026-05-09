@@ -23,14 +23,14 @@ export const BREAKPOINTS: Record<Breakpoint, string> = {
  */
 export function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(() => {
-    if (typeof window === 'undefined') {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
       return false
     }
     return window.matchMedia(query).matches
   })
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
       return
     }
 

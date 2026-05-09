@@ -9,26 +9,29 @@
  * Usage: node scripts/check-chunk-cycles.js
  */
 
-import { execSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 
 const CIRCULAR_RE = /Circular chunk:/gi
 const COLLISION_RE = /name collision/gi
 
-let output
-try {
-  output = execSync('pnpm exec vite build', {
-    cwd: import.meta.dirname + '/..',
-    encoding: 'utf-8',
-    stdio: ['pipe', 'pipe', 'pipe'],
-    timeout: 120_000,
-  })
-} catch (err) {
-  // vite build may exit 0 even with warnings, but if it crashes capture stderr
-  output = (err.stdout || '') + '\n' + (err.stderr || '')
-  if (!output.includes('built in')) {
-    console.error('vite build failed:\n', output)
-    process.exit(1)
-  }
+const result = spawnSync('pnpm', ['exec', 'vite', 'build'], {
+  cwd: import.meta.dirname + '/..',
+  encoding: 'utf-8',
+  maxBuffer: 20 * 1024 * 1024,
+  timeout: 120_000,
+})
+
+const output = `${result.stdout || ''}\n${result.stderr || ''}`
+
+if (result.error) {
+  console.error('vite build failed:\n', output)
+  console.error(result.error.message)
+  process.exit(1)
+}
+
+if (result.status !== 0) {
+  console.error('vite build failed:\n', output)
+  process.exit(result.status ?? 1)
 }
 
 const combined = output

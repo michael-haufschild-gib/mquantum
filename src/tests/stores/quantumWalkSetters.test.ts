@@ -97,6 +97,25 @@ describe('Quantum walk store setters', () => {
     expect(qw.stepsPerFrame).toBe(4)
   })
 
+  it('setSchroedingerConfig sanitizes quantum walk grids for shader invariants', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setSchroedingerConfig({
+      quantumWalk: {
+        ...getQW(),
+        latticeDim: 3,
+        gridSize: [30, 17, 999],
+        spacing: [0.1, Number.NaN, 0.2],
+        initialPosition: [99, -4, 300],
+        needsReset: false,
+      },
+    })
+    const qw = getQW()
+    expect(qw.gridSize).toEqual([32, 16, 128])
+    expect(qw.spacing).toEqual([0.1, 0.1, 0.2])
+    expect(qw.initialPosition).toEqual([31, 0, 127])
+    expect(qw.needsReset).toBe(true)
+  })
+
   it('total sites stay within limits for high dimensions', () => {
     const s = useExtendedObjectStore.getState()
     s.setSchroedingerQuantumMode('quantumWalk')

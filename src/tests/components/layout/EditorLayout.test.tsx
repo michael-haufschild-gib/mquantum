@@ -2,11 +2,13 @@
  * Tests for EditorLayout — main application layout with panels.
  */
 
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { EditorLayout } from '@/components/layout/EditorLayout'
 import { ToastProvider } from '@/contexts/ToastContext'
+import { BREAKPOINTS } from '@/hooks/useMediaQuery'
+import { useLayoutStore } from '@/stores/layoutStore'
 
 function renderLayout() {
   return render(
@@ -19,6 +21,29 @@ function renderLayout() {
 }
 
 describe('EditorLayout', () => {
+  const originalMatchMedia = window.matchMedia
+
+  beforeEach(() => {
+    useLayoutStore.getState().reset()
+  })
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia
+    useLayoutStore.getState().reset()
+    vi.restoreAllMocks()
+  })
+
+  function mockDesktopViewport(matchesDesktop: boolean) {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === BREAKPOINTS.lg ? matchesDesktop : false,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
+  }
+
   it('renders children in the canvas area', () => {
     renderLayout()
     expect(screen.getByTestId('child-content')).toBeInTheDocument()
@@ -35,5 +60,18 @@ describe('EditorLayout', () => {
         </ToastProvider>
       )
     }).not.toThrow()
+  })
+
+  it('honors persisted closed panel state on desktop mount', async () => {
+    mockDesktopViewport(true)
+    useLayoutStore.setState({ showLeftPanel: false, isCollapsed: true, isCinematicMode: false })
+
+    renderLayout()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('top-bar')).toBeInTheDocument()
+    })
+    expect(useLayoutStore.getState().showLeftPanel).toBe(false)
+    expect(useLayoutStore.getState().isCollapsed).toBe(true)
   })
 })

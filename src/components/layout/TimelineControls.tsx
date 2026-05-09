@@ -255,6 +255,13 @@ export const TimelineControls: FC = () => {
     if (!hasEffectsDrawerContent && activeDrawer === 'anim') setActiveDrawer(null)
   }, [hasEffectsDrawerContent, activeDrawer])
 
+  // Close the open-quantum drawer when switching to a mode/representation
+  // where those controls are unavailable. Otherwise a hidden `openQ` state
+  // can reappear later when the user returns to a supported mode.
+  useEffect(() => {
+    if (!supportsOpenQuantumControls && activeDrawer === 'openQ') setActiveDrawer(null)
+  }, [supportsOpenQuantumControls, activeDrawer])
+
   const showRotationDrawer = activeDrawer === 'rotation'
   const showAnimDrawer = activeDrawer === 'anim'
   const effectiveShowOpenQDrawer = activeDrawer === 'openQ' && supportsOpenQuantumControls

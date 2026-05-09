@@ -14,7 +14,10 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_QUANTUM_WALK_CONFIG,
   type QuantumWalkConfig,
+  QW_MAX_LATTICE_DIM,
+  QW_MAX_TOTAL_SITES,
   resizeQuantumWalkArrays,
+  sanitizeQuantumWalkConfig,
 } from '@/lib/geometry/extended/quantumWalk'
 
 describe('DEFAULT_QUANTUM_WALK_CONFIG', () => {
@@ -106,5 +109,65 @@ describe('resizeQuantumWalkArrays', () => {
     const totalSites = result.gridSize!.reduce((a, b) => a * b, 1)
     expect(totalSites).toBeGreaterThan(0)
     expect(totalSites).toBeLessThanOrEqual(65535 * 64)
+  })
+})
+
+describe('sanitizeQuantumWalkConfig', () => {
+  it('snaps active grid sizes to powers of two and clamps initial positions', () => {
+    const cfg = sanitizeQuantumWalkConfig({
+      ...DEFAULT_QUANTUM_WALK_CONFIG,
+      latticeDim: 3,
+      gridSize: [30, 17, 999],
+      spacing: [0.1, Number.NaN, 0.2],
+      initialPosition: [99, -4, 300],
+      slicePositions: [1, 2],
+      needsReset: false,
+    })
+
+    expect(cfg.gridSize).toEqual([32, 16, 128])
+    expect(cfg.spacing).toEqual([0.1, 0.1, 0.2])
+    expect(cfg.initialPosition).toEqual([31, 0, 127])
+    expect(cfg.slicePositions).toEqual([])
+    expect(cfg.needsReset).toBe(true)
+  })
+
+  it('caps malformed dimensions to the shader-supported 11D range', () => {
+    const cfg = sanitizeQuantumWalkConfig({
+      ...DEFAULT_QUANTUM_WALK_CONFIG,
+      latticeDim: 99,
+      gridSize: Array.from({ length: 99 }, () => 128),
+      spacing: Array.from({ length: 99 }, () => 0.1),
+      initialPosition: Array.from({ length: 99 }, () => 64),
+      slicePositions: Array.from({ length: 96 }, () => 0),
+      needsReset: false,
+    })
+    const totalSites = cfg.gridSize.reduce((acc, value) => acc * value, 1)
+
+    expect(cfg.latticeDim).toBe(QW_MAX_LATTICE_DIM)
+    expect(cfg.gridSize).toHaveLength(QW_MAX_LATTICE_DIM)
+    expect(cfg.slicePositions).toHaveLength(QW_MAX_LATTICE_DIM - 3)
+    expect(totalSites).toBeLessThanOrEqual(QW_MAX_TOTAL_SITES)
+    expect(cfg.gridSize.every((g) => Math.log2(g) % 1 === 0)).toBe(true)
+    expect(cfg.needsReset).toBe(true)
+  })
+
+  it('pads missing active axes when latticeDim grows through a direct config merge', () => {
+    const cfg = sanitizeQuantumWalkConfig({
+      ...DEFAULT_QUANTUM_WALK_CONFIG,
+      latticeDim: 5,
+      gridSize: [64, 64],
+      spacing: [0.2],
+      initialPosition: [3],
+      needsReset: false,
+    })
+    const totalSites = cfg.gridSize.reduce((acc, value) => acc * value, 1)
+
+    expect(cfg.latticeDim).toBe(5)
+    expect(cfg.gridSize).toHaveLength(5)
+    expect(cfg.spacing).toEqual([0.2, 0.1, 0.1, 0.1, 0.1])
+    expect(cfg.initialPosition).toHaveLength(5)
+    expect(totalSites).toBeLessThanOrEqual(QW_MAX_TOTAL_SITES)
+    expect(cfg.gridSize.every((g) => Math.log2(g) % 1 === 0)).toBe(true)
+    expect(cfg.needsReset).toBe(true)
   })
 })

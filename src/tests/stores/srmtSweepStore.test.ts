@@ -148,9 +148,10 @@ describe('useSrmtSweepStore', () => {
     expect(useSrmtSweepStore.getState().errorMessage).toBe('solver crashed')
   })
 
-  it('abortSweep clears transient fields but preserves partial points for inspection', () => {
+  it('abortSweep clears active progress but preserves partial points and run metadata', () => {
     const { startSweep, appendPoint, abortSweep } = useSrmtSweepStore.getState()
-    startSweep(cutConfig(), DEFAULT_WHEELER_DEWITT_CONFIG, [])
+    const config: SrmtSweepConfig = { ...cutConfig(), kind: 'gridNphi', sweepMin: 32, sweepMax: 64 }
+    startSweep(config, DEFAULT_WHEELER_DEWITT_CONFIG, [])
     useSrmtSweepStore.getState().setSolveStart(3)
     appendPoint(mkPoint(0))
     appendPoint(mkPoint(1))
@@ -159,9 +160,11 @@ describe('useSrmtSweepStore', () => {
     expect(s.status).toBe('idle')
     expect(s.errorMessage).toBeNull()
     expect(s.currentSolveIndex).toBe(-1)
-    expect(s.config).toBeNull()
-    // Points survive so the user can still inspect partial results.
+    // Points and their config survive together so post-abort plots keep the
+    // correct x-axis kind instead of falling back to the UI's selected kind.
     expect(s.points).toHaveLength(2)
+    expect(s.config?.kind).toBe('gridNphi')
+    expect(s.wdwConfigSnapshot).toBe(DEFAULT_WHEELER_DEWITT_CONFIG)
   })
 
   it('setSolveStart records index updates without status change', () => {

@@ -27,6 +27,7 @@ export interface PassGPUTiming {
 export class WebGPUTimestampCollector {
   private enabled = false
   private collectionActive = false
+  private collectionEpoch = 0
   private querySet: GPUQuerySet | null = null
   private resolveBuffer: GPUBuffer | null = null
   private readBuffer: GPUBuffer | null = null
@@ -75,6 +76,10 @@ export class WebGPUTimestampCollector {
    * @param active - Whether a consumer (e.g. expanded perf monitor) needs GPU timing data
    */
   setCollectionActive(active: boolean): void {
+    if (this.collectionActive !== active) {
+      this.lastPassTimings.clear()
+      this.collectionEpoch++
+    }
     this.collectionActive = active
   }
 
@@ -137,13 +142,14 @@ export class WebGPUTimestampCollector {
     const readBuffer = this.readBuffer
     const passIds = timedPassIds.slice(0, measuredPassCount)
     const phases = timedPassPhases.slice(0, measuredPassCount)
+    const epoch = this.collectionEpoch
     this.readbackInFlight = true
 
     device.queue
       .onSubmittedWorkDone()
       .then(async () => {
-        // Guard against disposal during async gap
-        if (this.readBuffer !== readBuffer) return
+        // Guard against disposal or collection toggle during async gap
+        if (this.readBuffer !== readBuffer || this.collectionEpoch !== epoch) return
         await readBuffer.mapAsync(GPUMapMode.READ, 0, byteLength)
         try {
           const range = readBuffer.getMappedRange(0, byteLength)
@@ -216,7 +222,9 @@ export class WebGPUTimestampCollector {
             nextTimings.set(passIds[i]!, { total: totalMs, compute: computeMs, render: renderMs })
           }
 
-          this.lastPassTimings = nextTimings
+          if (this.collectionActive && this.collectionEpoch === epoch) {
+            this.lastPassTimings = nextTimings
+          }
         } finally {
           readBuffer.unmap()
         }

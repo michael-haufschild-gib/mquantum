@@ -339,6 +339,27 @@ describe('mergeExtendedObjectStateForType — compute-mode lattice arrays', () =
     expect(qw.coinType).toBe('dft')
   })
 
+  it('sanitizes loaded quantumWalk grids before direct scene restore reaches shaders', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'quantumWalk',
+        quantumWalk: {
+          latticeDim: 3,
+          gridSize: [30, 17, 999],
+          spacing: [0.1, Number.NaN, 0.2],
+          initialPosition: [99, -4, 300],
+          needsReset: false,
+        },
+      },
+    }
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const qw = (merged.schroedinger as { quantumWalk: Record<string, unknown> }).quantumWalk
+    expect(qw.gridSize).toEqual([32, 16, 128])
+    expect(qw.spacing).toEqual([0.1, 0.1, 0.2])
+    expect(qw.initialPosition).toEqual([31, 0, 127])
+    expect(qw.needsReset).toBe(true)
+  })
+
   it('preserves higher-dim tdse arrays when loaded latticeDim > default', () => {
     const loaded = {
       schroedinger: {

@@ -16,6 +16,7 @@ import {
 import { logger } from '@/lib/logger'
 import { reduceGridToFit } from '@/lib/math/ndArray'
 import { maxStableDt } from '@/lib/physics/dirac/scales'
+import { useAppearanceStore } from '@/stores/appearanceStore'
 import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
 
 import type { SchroedingerSliceActions } from '../types'
@@ -487,11 +488,11 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
       })
     },
     applyDiracPreset: (presetId) => {
-      loadPresetModule(
+      return loadPresetModule(
         () => import('@/lib/physics/dirac/presets'),
         'diracSetters',
         `Dirac presets for '${presetId}'`,
-        ({ DIRAC_SCENARIO_PRESETS }) => {
+        async ({ DIRAC_SCENARIO_PRESETS }) => {
           const preset = DIRAC_SCENARIO_PRESETS.find((p) => p.id === presetId)
           if (!preset) return
           setWithVersion((state) => {
@@ -568,7 +569,7 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
             // store guard below would reject it as stale).
             const dim = ctx.get().schroedinger.dirac.latticeDim ?? 3
             const expectedView = normalizeDiracFieldView(dim, preset.overrides.fieldView)
-            loadPresetModule(
+            await loadPresetModule(
               () => import('@/rendering/shaders/palette/types'),
               'diracSetters',
               `Dirac fieldView color algorithm for '${presetId}'`,
@@ -578,7 +579,6 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
                 if (ctx.get().schroedinger.dirac.fieldView !== expectedView) return
                 const algo = DIRAC_FIELD_VIEW_TO_COLOR_ALGO[expectedView]
                 if (algo) {
-                  const { useAppearanceStore } = await import('@/stores/appearanceStore')
                   useAppearanceStore.getState().setColorAlgorithm(algo)
                 }
               }

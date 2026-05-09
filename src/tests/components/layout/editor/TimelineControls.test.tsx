@@ -264,6 +264,36 @@ describe('TimelineControls', () => {
     ).not.toBeInTheDocument()
   })
 
+  it('clears stale Open Q drawer state when representation stops supporting it', async () => {
+    mockGeometryState.objectType = 'schroedinger'
+    mockExtendedState.schroedinger.quantumMode = 'harmonicOscillator'
+    mockExtendedState.schroedinger.representation = 'position'
+
+    const { rerender } = render(<TimelineControls />)
+
+    const openQButton = screen.getByRole('button', { name: /toggle open quantum drawer/i })
+    fireEvent.click(openQButton)
+    expect(openQButton).toHaveAttribute('aria-pressed', 'true')
+
+    mockExtendedState.schroedinger.representation = 'wigner'
+    rerender(<TimelineControls />)
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('button', { name: /toggle open quantum drawer/i })
+      ).not.toBeInTheDocument()
+    })
+
+    mockExtendedState.schroedinger.representation = 'position'
+    rerender(<TimelineControls />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /toggle open quantum drawer/i })).toHaveAttribute(
+        'aria-pressed',
+        'false'
+      )
+    })
+  })
+
   it('renders restart button before play/pause', () => {
     render(<TimelineControls />)
 

@@ -18,10 +18,12 @@
 import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
 import type { WheelerDeWittConfig } from '@/lib/geometry/extended/wheelerDeWitt'
 import {
-  applyWdwPulseAlpha,
+  applyWdwPulseAlphaRows,
   clampWdwHeadroom,
   packWdwDensityGrid,
+  resetWdwPulseAlphaRows,
   WDW_EUCLIDEAN_RENDER_HEADROOM,
+  type WdwPulseAlphaScratch,
 } from '@/lib/physics/wheelerDeWitt/densityGrid'
 import {
   buildPulseOverlay,
@@ -53,6 +55,8 @@ import { WheelerDeWittSrmtSweepCoordinator } from './WheelerDeWittSrmtSweepCoord
 // Re-export the hash helpers so existing imports keep resolving.
 export { computeWdwConfigHash, computeWdwTrajectoryHash } from './WheelerDeWittPhysicsCache'
 export { computeWdwSrmtComputeHash, computeWdwSrmtRenderHash } from './WheelerDeWittSrmtCoordinator'
+
+const WORLDLINE_PULSE_UPDATE_INTERVAL_SECONDS = 1 / 20
 
 /**
  * Strategy owning a CPU-solved Wheeler–DeWitt density texture.
@@ -128,8 +132,11 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
   private baselineDensity: Uint16Array | null = null
   private baselineAlpha: Float32Array | null = null
   private pulseIntensityScratch: Float32Array | null = null
+  private pulseActiveScratch: number[] = []
+  private pulseAlphaScratch: WdwPulseAlphaScratch = {}
   private pulseIntensityGridSig = ''
   private baselineGridSize = 0
+  private lastPulseUpdateTime = Number.NEGATIVE_INFINITY
 
   configureShader(_shader: SchroedingerWGSLShaderConfig, _config: SchrodingerRendererConfig): void {
     // Compute-mode overrides are applied by the renderer constructor.
@@ -195,9 +202,10 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
 
     const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
     const isPlaying = animation?.isPlaying ?? false
+    const pulseClock = animation?.accumulatedTime ?? 0
     const worldlineEnabled = !!wdw.worldlineEnabled
-    const worldlineAnimating =
-      worldlineEnabled && isPlaying && (physicsTick.trajectories?.length ?? 0) > 0
+    const worldlineVisible = worldlineEnabled && (physicsTick.trajectories?.length ?? 0) > 0
+    const worldlineAnimating = worldlineVisible && isPlaying
     const worldlineToggled = worldlineEnabled !== this.lastWorldlineEnabled
 
     const headroom = clampWdwHeadroom(wdw.renderDynamicRange ?? WDW_EUCLIDEAN_RENDER_HEADROOM)
@@ -230,7 +238,12 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
       headroomChanged ||
       resolutionChanged ||
       this.baselineDensity === null
-    const animationOnlyDirty = !baselineDirty && worldlineAnimating
+    const pulseUpdateDue =
+      baselineDirty ||
+      !Number.isFinite(this.lastPulseUpdateTime) ||
+      pulseClock < this.lastPulseUpdateTime ||
+      pulseClock - this.lastPulseUpdateTime >= WORLDLINE_PULSE_UPDATE_INTERVAL_SECONDS
+    const animationOnlyDirty = !baselineDirty && worldlineAnimating && pulseUpdateDue
 
     if (!baselineDirty && !animationOnlyDirty) return
 
@@ -260,9 +273,11 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
       )
       // Snapshot baseline for subsequent animation-only ticks.
       this.baselineDensity!.set(this.workingDensity!)
+      resetWdwPulseAlphaRows(this.pulseAlphaScratch)
     }
 
-    if (worldlineAnimating) {
+    let dirtyRows: readonly number[] | null = null
+    if (worldlineVisible) {
       const pulseOverlay = this.buildPulseOverlayScratch(
         wdw,
         physicsTick.trajectories!,
@@ -270,28 +285,34 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
         animation
       )
       if (pulseOverlay) {
-        applyWdwPulseAlpha(
+        dirtyRows = applyWdwPulseAlphaRows(
           this.baselineDensity!,
           this.baselineAlpha!,
           pulseOverlay,
           physicsTick.output.gridSize,
           N,
-          this.workingDensity!
+          this.workingDensity!,
+          this.pulseAlphaScratch
         )
+        this.lastPulseUpdateTime = pulseClock
       }
     }
 
     const density = this.workingDensity!
-    ctx.device.queue.writeTexture(
-      { texture: this.densityTexture },
-      density.buffer,
-      {
-        offset: density.byteOffset,
-        bytesPerRow: N * 8,
-        rowsPerImage: N,
-      },
-      { width: N, height: N, depthOrArrayLayers: N }
-    )
+    if (animationOnlyDirty && dirtyRows) {
+      this.uploadDensityRows(ctx, N, density, dirtyRows)
+    } else {
+      ctx.device.queue.writeTexture(
+        { texture: this.densityTexture },
+        density.buffer,
+        {
+          offset: density.byteOffset,
+          bytesPerRow: N * 8,
+          rowsPerImage: N,
+        },
+        { width: N, height: N, depthOrArrayLayers: N }
+      )
+    }
 
     this.lastWorldlineEnabled = worldlineEnabled
     this.lastRenderDynamicRange = headroom
@@ -338,8 +359,33 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
       wdw.worldlinePulseWidth,
       DEFAULT_STREAMLINE_INPUT.splatRadius,
       gridSize,
-      this.pulseIntensityScratch!
+      this.pulseIntensityScratch!,
+      this.pulseActiveScratch
     )
+  }
+
+  private uploadDensityRows(
+    ctx: WebGPURenderContext,
+    N: number,
+    density: Uint16Array,
+    dirtyRows: readonly number[]
+  ): void {
+    const bytesPerRow = N * 8
+    const rowStride = N * 4
+    for (const row of dirtyRows) {
+      const y = row % N
+      const z = Math.floor(row / N)
+      ctx.device.queue.writeTexture(
+        { texture: this.densityTexture!, origin: { x: 0, y, z } },
+        density.buffer,
+        {
+          offset: density.byteOffset + row * rowStride * 2,
+          bytesPerRow,
+          rowsPerImage: 1,
+        },
+        { width: N, height: 1, depthOrArrayLayers: 1 }
+      )
+    }
   }
 
   /** Expose the canonical clock order for tests + debugging. */
@@ -370,12 +416,18 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     this.baselineDensity = source.baselineDensity
     this.baselineAlpha = source.baselineAlpha
     this.pulseIntensityScratch = source.pulseIntensityScratch
+    this.pulseActiveScratch = source.pulseActiveScratch
+    this.pulseAlphaScratch = source.pulseAlphaScratch
     this.pulseIntensityGridSig = source.pulseIntensityGridSig
     this.baselineGridSize = source.baselineGridSize
+    this.lastPulseUpdateTime = source.lastPulseUpdateTime
     source.workingDensity = null
     source.baselineDensity = null
     source.baselineAlpha = null
     source.pulseIntensityScratch = null
+    source.pulseActiveScratch = []
+    source.pulseAlphaScratch = {}
+    source.lastPulseUpdateTime = Number.NEGATIVE_INFINITY
     source.densityTexture = null
     source.densityTextureView = null
     source.transferredOut = true
@@ -398,8 +450,11 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     this.baselineDensity = null
     this.baselineAlpha = null
     this.pulseIntensityScratch = null
+    this.pulseActiveScratch = []
+    this.pulseAlphaScratch = {}
     this.pulseIntensityGridSig = ''
     this.baselineGridSize = 0
+    this.lastPulseUpdateTime = Number.NEGATIVE_INFINITY
   }
 
   /** Accessor for UI + tests that need to trigger a sweep via the coordinator. */

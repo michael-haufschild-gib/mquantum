@@ -73,6 +73,17 @@ describe('useMediaQuery', () => {
 
     expect(removeEventListenerSpy).toHaveBeenCalled()
   })
+
+  it('returns false when matchMedia is unavailable', () => {
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      writable: true,
+      value: undefined,
+    })
+
+    const { result } = renderHook(() => useMediaQuery('(min-width: 768px)'))
+    expect(result.current).toBe(false)
+  })
 })
 
 describe('useBreakpoint', () => {

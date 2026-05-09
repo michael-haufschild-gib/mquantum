@@ -11,7 +11,10 @@
  * @module rendering/webgpu/passes/QuantumWalkComputePass
  */
 
-import type { QuantumWalkConfig } from '@/lib/geometry/extended/quantumWalk'
+import {
+  type QuantumWalkConfig,
+  sanitizeQuantumWalkConfig,
+} from '@/lib/geometry/extended/quantumWalk'
 import { logger } from '@/lib/logger'
 import { computePMLSigmaMaxND } from '@/lib/physics/pml/profile'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
@@ -375,18 +378,19 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
     const { device } = ctx
     this.buildPipelines(device)
     if (!this.pipelinesCreated) return
+    const safeConfig = sanitizeQuantumWalkConfig(config)
 
     // Check for config changes requiring reinitialization
-    const hash = `${config.latticeDim}|${config.gridSize.join(',')}|${config.coinType}|${config.coinBias}|${config.coinInitial}`
-    if (hash !== this.lastConfigHash || !this.initialized || config.needsReset) {
+    const hash = `${safeConfig.latticeDim}|${safeConfig.gridSize.join(',')}|${safeConfig.coinType}|${safeConfig.coinBias}|${safeConfig.coinInitial}`
+    if (hash !== this.lastConfigHash || !this.initialized || safeConfig.needsReset) {
       this.lastConfigHash = hash
-      this.initializeState(device, config)
+      this.initializeState(device, safeConfig)
     }
 
     // Inject loaded wavefunction (re-interleave separate re/im into coin state format)
     if (this.pendingInjection && this.coinStateA) {
       const { re, im } = this.pendingInjection
-      const coinStates = 2 * config.latticeDim
+      const coinStates = 2 * safeConfig.latticeDim
       const totalElements = Math.min(re.length, this.totalSites * coinStates)
       const interleaved = new Float32Array(totalElements * 2)
       for (let i = 0; i < totalElements; i++) {
@@ -404,44 +408,44 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
     const coinTypeMap: Record<string, number> = { grover: 0, hadamard: 1, dft: 2 }
     const coinData = new Uint32Array([
       this.totalSites,
-      config.latticeDim,
-      coinTypeMap[config.coinType] ?? 0,
+      safeConfig.latticeDim,
+      coinTypeMap[safeConfig.coinType] ?? 0,
       0,
     ])
     const coinF32 = new Float32Array(coinData.buffer)
-    coinF32[3] = config.coinBias
+    coinF32[3] = safeConfig.coinBias
     device.queue.writeBuffer(this.coinUniformBuffer!, 0, coinData)
 
     // Shift uniforms
     const shiftData = new ArrayBuffer(16 + 12 * 4 * 2)
     const shiftU32 = new Uint32Array(shiftData)
     shiftU32[0] = this.totalSites
-    shiftU32[1] = config.latticeDim
-    shiftU32[2] = config.absorberEnabled ? 1 : 0
-    const strides = computeStrides(config.gridSize.slice(0, config.latticeDim))
-    for (let d = 0; d < config.latticeDim; d++) {
-      shiftU32[4 + d] = config.gridSize[d] ?? 64
+    shiftU32[1] = safeConfig.latticeDim
+    shiftU32[2] = safeConfig.absorberEnabled ? 1 : 0
+    const strides = computeStrides(safeConfig.gridSize.slice(0, safeConfig.latticeDim))
+    for (let d = 0; d < safeConfig.latticeDim; d++) {
+      shiftU32[4 + d] = safeConfig.gridSize[d] ?? 64
     }
-    for (let d = 0; d < config.latticeDim; d++) {
+    for (let d = 0; d < safeConfig.latticeDim; d++) {
       shiftU32[16 + d] = strides[d] ?? 1
     }
     device.queue.writeBuffer(this.shiftUniformBuffer!, 0, shiftData)
 
     // Update absorber uniforms (needed even if paused for density grid pass)
-    const sigmaMax = config.absorberEnabled
+    const sigmaMax = safeConfig.absorberEnabled
       ? computePMLSigmaMaxND(
-          config.pmlTargetReflection,
-          config.absorberWidth,
-          config.gridSize.slice(0, config.latticeDim),
+          safeConfig.pmlTargetReflection,
+          safeConfig.absorberWidth,
+          safeConfig.gridSize.slice(0, safeConfig.latticeDim),
           1.0,
           3,
-          config.latticeDim
+          safeConfig.latticeDim
         )
       : 0
     device.queue.writeBuffer(
       this.absorberUniformBuffer!,
       0,
-      packAbsorberUniforms(config, this.totalSites, strides, sigmaMax)
+      packAbsorberUniforms(safeConfig, this.totalSites, strides, sigmaMax)
     )
 
     // Dispatch coin+shift+absorber steps, scaled by animation speed.
@@ -449,7 +453,7 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
     // correctly skips frames instead of clamping to 1 step/frame.
     if (isPlaying) {
       const linearWG = Math.ceil(this.totalSites / COIN_WG)
-      this.stepAccumulator += config.stepsPerFrame * speed
+      this.stepAccumulator += safeConfig.stepsPerFrame * speed
       const stepsThisFrame = Math.floor(this.stepAccumulator)
       this.stepAccumulator -= stepsThisFrame
 
@@ -465,7 +469,7 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
         shiftPass.end()
 
         // Absorber: damp amplitudes near boundaries (after shift, per step)
-        if (config.absorberEnabled && this.absorberPipeline && this.absorberBG) {
+        if (safeConfig.absorberEnabled && this.absorberPipeline && this.absorberBG) {
           const absPass = ctx.beginComputePass({ label: `qw-absorber-${step}` })
           this.dispatchCompute(absPass, this.absorberPipeline, [this.absorberBG], linearWG)
           absPass.end()
@@ -482,7 +486,7 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
           this.totalSites,
           this.latticeDim,
           this.lastGridSize0,
-          config.stepsPerFrame,
+          safeConfig.stepsPerFrame,
           speed,
           this.stepCount
         )
@@ -494,7 +498,7 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
       this.writeGridUniformBuffer!,
       0,
       packWriteGridUniforms(
-        config,
+        safeConfig,
         this.totalSites,
         this.gpuMaxDensity,
         strides,

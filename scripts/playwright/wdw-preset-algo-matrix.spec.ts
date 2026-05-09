@@ -174,9 +174,9 @@ async function applyPresetAndAlgo(
       if (!appearanceStore) throw new Error('__APPEARANCE_STORE__ bridge missing')
       // Apply WdW preset (physics fields)
       const s = extStore.getState() as Record<string, unknown>
-      const apply = s.applyWheelerDeWittPreset as ((id: string) => void) | undefined
+      const apply = s.applyWheelerDeWittPreset as ((id: string) => Promise<void>) | undefined
       if (!apply) throw new Error('applyWheelerDeWittPreset setter not on store')
-      apply(pid)
+      await apply(pid)
       // Keep browser screenshots readable across sparse WdW presets.
       // These are render-only exposure controls; they do not change preset physics.
       const setDensityGain = s.setSchroedingerDensityGain as ((gain: number) => void) | undefined

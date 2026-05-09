@@ -14,6 +14,7 @@
 
 import { test } from './fixtures'
 import {
+  applyBecPreset,
   getFrameCount,
   getPerformanceMetrics,
   gotoMode,
@@ -64,23 +65,13 @@ async function applyTdsePreset(page: import('@playwright/test').Page, presetId: 
   }, presetId)
 }
 
-/** Apply a BEC preset. */
-async function applyBecPreset(page: import('@playwright/test').Page, presetId: string) {
-  await page.evaluate(async (id: string) => {
-    const store =
-      window.__EXTENDED_OBJECT_STORE__ ??
-      (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
-    ;(store.getState() as Record<string, (...a: unknown[]) => void>).applyBecPreset(id)
-  }, presetId)
-}
-
 /** Apply a Dirac preset. */
 async function applyDiracPreset(page: import('@playwright/test').Page, presetId: string) {
   await page.evaluate(async (id: string) => {
     const store =
       window.__EXTENDED_OBJECT_STORE__ ??
       (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
-    ;(store.getState() as Record<string, (...a: unknown[]) => void>).applyDiracPreset(id)
+    await (store.getState() as Record<string, (...a: unknown[]) => unknown>).applyDiracPreset(id)
   }, presetId)
 }
 

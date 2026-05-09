@@ -199,6 +199,25 @@ function assertFiniteMatrix(A: Float64Array, size: number): void {
 }
 
 /**
+ * Copy an input matrix into a fresh symmetric scratch buffer.
+ *
+ * Averaging as `a / 2 + b / 2` avoids overflowing when two large finite
+ * asymmetric entries have a finite mathematical mean.
+ */
+function copySymmetrizedMatrix(A: Float64Array, n: number): Float64Array {
+  const M = new Float64Array(n * n)
+  for (let i = 0; i < n; i++) {
+    M[i * n + i] = A[i * n + i]!
+    for (let j = i + 1; j < n; j++) {
+      const avg = 0.5 * A[i * n + j]! + 0.5 * A[j * n + i]!
+      M[i * n + j] = avg
+      M[j * n + i] = avg
+    }
+  }
+  return M
+}
+
+/**
  * Sort eigenvalues descending and permute eigenvectors to match.
  *
  * @param values - Eigenvalues to be sorted in place
@@ -285,13 +304,7 @@ export function jacobiEigenvalues(
     return out
   }
 
-  const M = new Float64Array(n * n)
-  // Symmetrize: M_ij = (A_ij + A_ji) / 2
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      M[i * n + j] = 0.5 * (A[i * n + j]! + A[j * n + i]!)
-    }
-  }
+  const M = copySymmetrizedMatrix(A, n)
 
   jacobiDiagonalizeInPlace(M, n, null, maxSweeps)
 
@@ -356,12 +369,7 @@ export function jacobiEigendecompose(
     return { values, vectors }
   }
 
-  const M = new Float64Array(n * n)
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      M[i * n + j] = 0.5 * (A[i * n + j]! + A[j * n + i]!)
-    }
-  }
+  const M = copySymmetrizedMatrix(A, n)
   const V = new Float64Array(n * n)
 
   jacobiDiagonalizeInPlace(M, n, V, maxSweeps)

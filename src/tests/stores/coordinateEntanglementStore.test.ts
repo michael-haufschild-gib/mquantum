@@ -188,6 +188,16 @@ describe('useCoordinateEntanglementStore', () => {
       expect(results[0]!.entropy).toBeCloseTo(0.6)
     })
 
+    it('completeSweepStep records NaN when no finite measurement samples were accepted', () => {
+      useCoordinateEntanglementStore.getState().startSweep(sweepConfig)
+      useCoordinateEntanglementStore.getState().recordSweepSample(Number.NaN)
+      useCoordinateEntanglementStore.getState().recordSweepSample(Infinity)
+      useCoordinateEntanglementStore.getState().completeSweepStep()
+      const results = useCoordinateEntanglementStore.getState().sweepResults
+      expect(results).toHaveLength(1)
+      expect(Number.isNaN(results[0]!.entropy)).toBe(true)
+    })
+
     it('advanceSweepStep moves to next (lambda, dim) pair', () => {
       useCoordinateEntanglementStore.getState().startSweep(sweepConfig)
       const next = useCoordinateEntanglementStore.getState().advanceSweepStep()

@@ -394,7 +394,8 @@ function applyWdwParams(
  * section can auto-dispatch it once the Wheeler–DeWitt strategy has
  * produced its first solver output. No-op when `sw` is absent.
  */
-function applySrmtSweepParams(urlState: ParsedShareableState): void {
+function applySrmtSweepParams(urlState: ParsedShareableState, effectiveQuantumMode: string): void {
+  if (effectiveQuantumMode !== 'wheelerDeWitt') return
   if (!urlState.srmtSweepKind) return
   void import('@/stores/srmtSweepStore').then(({ useSrmtSweepStore }) => {
     useSrmtSweepStore.getState().setPendingSweep({
@@ -524,7 +525,7 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
     applyCosmologyParams(urlState, ext)
     applyWdwParams(urlState, ext)
     applyAdsParams(urlState, ext)
-    applySrmtSweepParams(urlState)
+    applySrmtSweepParams(urlState, ext.schroedinger.quantumMode)
   } catch (error) {
     logger.warn('[useUrlState] Failed to apply URL state:', error)
   } finally {

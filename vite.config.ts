@@ -85,6 +85,10 @@ const SOURCE_CHUNKS: [string, string][] = [
   // Stores
   ['/stores/', 'stores'],
   // Components — panels are lazy-loaded after first frame
+  // Right-panel tab bodies must precede the parent panel match.
+  ['/components/layout/EditorRightPanel/AnalysisTabContent', 'components-analysis-deferred'],
+  ['/components/layout/EditorRightPanel/SceneTabContent', 'components-scene-system-deferred'],
+  ['/components/layout/EditorRightPanel/SystemTabContent', 'components-scene-system-deferred'],
   ['/components/layout/EditorLeftPanel', 'components-panels'],
   ['/components/layout/EditorRightPanel', 'components-panels'],
   ['/components/layout/EditorBottomPanel', 'components-panels'],
@@ -93,6 +97,9 @@ const SOURCE_CHUNKS: [string, string][] = [
   ['/components/sections/Geometry/SchroedingerControls/tdseControlsConstants', 'components-panels'],
   ['/components/sections/Geometry/SchroedingerControls/', 'components-geometry-deferred'],
   ['/components/sections/Geometry/PauliSpinorControls/', 'components-geometry-deferred'],
+  // Shared section primitives are used by deferred section chunks.
+  ['/components/sections/Section', 'components'],
+  ['/components/sections/UnavailableSection', 'components'],
   ['/components/sections/Analysis/', 'components-analysis-deferred'],
   ['/components/sections/Environment/', 'components-scene-system-deferred'],
   ['/components/sections/Lights/', 'components-scene-system-deferred'],
@@ -203,6 +210,9 @@ export default defineConfig((_env) => ({
     sourcemap: false,
     target: 'esnext',
     minify: 'esbuild',
+    // Wire-size budgets are enforced by scripts/check-bundle-size.js.
+    // Keep Vite's uncompressed warning above intentional shader chunks.
+    chunkSizeWarningLimit: 900,
     rollupOptions: {
       output: {
         manualChunks: assignChunk,

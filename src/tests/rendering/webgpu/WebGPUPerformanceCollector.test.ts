@@ -317,4 +317,83 @@ describe('WebGPUStatsCollector', () => {
     expect(graph.setTimestampCollectionActive).toHaveBeenCalledWith(false)
     nowSpy.mockRestore()
   })
+
+  it('clears stale pass timings when full-stats publish has no pass timing data', () => {
+    useUIStore.setState({ showPerfMonitor: true, perfMonitorExpanded: true })
+    usePerformanceMetricsStore.getState().updatePassTimings(
+      [
+        {
+          passId: 'stale-pass',
+          gpuTimeMs: 7,
+          computeGpuTimeMs: 0,
+          renderGpuTimeMs: 7,
+          cpuTimeMs: 1,
+          skipped: false,
+        },
+      ],
+      7
+    )
+
+    const collector = new WebGPUStatsCollector()
+    const graph = createGraphMock()
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(1000)
+
+    collector.recordFrame(
+      4,
+      createFrameStats({ passTiming: [] }),
+      graph as unknown as WebGPURenderGraph,
+      { width: 800, height: 600 },
+      1
+    )
+
+    const metrics = usePerformanceMetricsStore.getState()
+    expect(metrics.passTimings).toEqual([])
+    expect(metrics.totalGpuTimeMs).toBe(0)
+    nowSpy.mockRestore()
+  })
+
+  it('clears stale pass timings when leaving expanded perf monitor mode', () => {
+    useUIStore.setState({ showPerfMonitor: true, perfMonitorExpanded: true })
+
+    const collector = new WebGPUStatsCollector()
+    const graph = createGraphMock()
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(1000)
+
+    collector.recordFrame(
+      4,
+      createFrameStats({
+        passTiming: [
+          {
+            passId: 'scene',
+            gpuTimeMs: 3,
+            computeGpuTimeMs: 0,
+            renderGpuTimeMs: 3,
+            cpuTimeMs: 1,
+            skipped: false,
+          },
+        ],
+      }),
+      graph as unknown as WebGPURenderGraph,
+      { width: 800, height: 600 },
+      1
+    )
+    expect(usePerformanceMetricsStore.getState().passTimings).toHaveLength(1)
+
+    useUIStore.setState({ showPerfMonitor: true, perfMonitorExpanded: false })
+    nowSpy.mockReturnValue(1001)
+
+    collector.recordFrame(
+      4,
+      createFrameStats(),
+      graph as unknown as WebGPURenderGraph,
+      { width: 800, height: 600 },
+      1
+    )
+
+    const metrics = usePerformanceMetricsStore.getState()
+    expect(metrics.passTimings).toEqual([])
+    expect(metrics.totalGpuTimeMs).toBe(0)
+    expect(metrics.cpuBreakdown).toEqual({ setupMs: 0, passesMs: 0, submitMs: 0 })
+    nowSpy.mockRestore()
+  })
 })

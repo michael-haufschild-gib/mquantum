@@ -205,4 +205,22 @@ describe('AtlasHeatmap', () => {
     await user.hover(cells[0]!)
     expect(screen.getByText(/Nearly separable/)).toBeInTheDocument()
   })
+
+  it('renders invalid entropy cells as no-data instead of near-separable zeros', async () => {
+    const user = userEvent.setup()
+    render(
+      <AtlasHeatmap
+        results={[
+          { lambda: 1, dim: 3, entropy: Number.NaN },
+          { lambda: 2, dim: 3, entropy: 0.6 },
+        ]}
+      />
+    )
+
+    expect(screen.getByText(/need at least 2 finite points/)).toBeInTheDocument()
+    const cells = screen.getAllByTestId('atlas-cell')
+    await user.hover(cells[0]!)
+    expect(screen.getByText(/S̄\/S_max = no finite samples/i)).toBeInTheDocument()
+    expect(screen.getByText(/No finite samples/)).toBeInTheDocument()
+  })
 })

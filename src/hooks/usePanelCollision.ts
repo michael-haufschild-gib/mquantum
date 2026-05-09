@@ -13,11 +13,12 @@ import { useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { useIsDesktop } from '@/hooks/useMediaQuery'
+import { shouldShowMobileBottomPanel } from '@/hooks/useMobileBottomPanel'
 import { useLayoutStore } from '@/stores/layoutStore'
 
 const SIDEBAR_WIDTH = 320
 const TOP_BAR_HEIGHT = 48
-const BOTTOM_BAR_HEIGHT = 48
+const BOTTOM_BAR_HEIGHT = 56
 const GAP = 16 // Minimum gap between UI and monitor
 const SPRING_CONFIG = { damping: 25, stiffness: 200 }
 
@@ -45,14 +46,25 @@ export function usePanelCollision(
 
   // 1. Get Layout States
   const { showLeftPanel, isRightPanelOpen, showTopBar, showBottomPanel } = useLayoutStore(
-    useShallow((state) => ({
-      showLeftPanel: state.showLeftPanel && !state.isCinematicMode,
-      // Right panel is open if NOT collapsed AND NOT cinematic
-      isRightPanelOpen: !state.isCollapsed && !state.isCinematicMode,
-      // Top/Bottom bars are visible if NOT cinematic
-      showTopBar: !state.isCinematicMode,
-      showBottomPanel: !state.isCinematicMode && isDesktop, // Bottom panel only on desktop
-    }))
+    useShallow((state) => {
+      const uiVisible = !state.isCinematicMode
+      const mobileBottomPanelVisible = shouldShowMobileBottomPanel({
+        isDesktop,
+        isCollapsed: state.isCollapsed,
+        showLeftPanel: state.showLeftPanel,
+        isCinematicMode: state.isCinematicMode,
+      })
+
+      return {
+        showLeftPanel: state.showLeftPanel && uiVisible,
+        // Right panel is open if NOT collapsed AND NOT cinematic
+        isRightPanelOpen: !state.isCollapsed && uiVisible,
+        // Top bar is visible whenever not cinematic. Bottom bar is visible on
+        // desktop, and on mobile only when both side panels are closed.
+        showTopBar: uiVisible,
+        showBottomPanel: uiVisible && (isDesktop || mobileBottomPanelVisible),
+      }
+    })
   )
 
   // 2. Simulate Animations (0 -> 1)

@@ -14,13 +14,47 @@ import { describe, expect, it } from 'vitest'
 
 const ROOT = resolve(fileURLToPath(import.meta.url), '../../../..')
 const config = readFileSync(resolve(ROOT, 'eslint.config.js'), 'utf8')
+const IDENTIFIER_RULE_NAME_RE = /^[A-Za-z_$][\w$]*$/
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function countRuleDefinitions(ruleName: string, source = config): number {
+  const escapedRuleName = escapeRegExp(ruleName)
+  const quotedRuleKey = `['"]${escapedRuleName}['"]`
+  const computedRuleKey = `\\[\\s*${quotedRuleKey}\\s*\\]`
+  const keyPattern = IDENTIFIER_RULE_NAME_RE.test(ruleName)
+    ? `(?:${escapedRuleName}|${quotedRuleKey}|${computedRuleKey})`
+    : `(?:${quotedRuleKey}|${computedRuleKey})`
+
+  return [...source.matchAll(new RegExp(`^\\s+${keyPattern}\\s*:`, 'gm'))].length
+}
 
 describe('eslint config: no per-file exemptions for structural quality rules', () => {
+  it('rule definition counter recognizes quoted and unquoted rule keys', () => {
+    const sample = `
+      complexity: 'off',
+      'complexity': 'off',
+      "complexity": 'off',
+      ['complexity']: 'off',
+      'no-console': 'off',
+      "no-console": 'off',
+      ["no-console"]: 'off',
+      'sonarjs/cognitive-complexity': 'off',
+      "sonarjs/cognitive-complexity": 'off',
+      ['sonarjs/cognitive-complexity']: 'off',
+    `
+
+    expect(countRuleDefinitions('complexity', sample)).toBe(4)
+    expect(countRuleDefinitions('no-console', sample)).toBe(3)
+    expect(countRuleDefinitions('sonarjs/cognitive-complexity', sample)).toBe(3)
+  })
+
   it('complexity rule is defined exactly once (off — sonarjs/cognitive-complexity is the active rule)', () => {
     // Base config: complexity: 'off' (disabled in favor of sonarjs/cognitive-complexity).
     // If this fails, someone added a per-file complexity override — use sonarjs/cognitive-complexity instead.
-    const matches = [...config.matchAll(/^\s+complexity\s*:/gm)]
-    expect(matches).toHaveLength(1)
+    expect(countRuleDefinitions('complexity')).toBe(1)
   })
 
   it('sonarjs/cognitive-complexity has exactly 3 definitions (base + off for physics/rendering/tests + re-enable for rendering hooks)', () => {
@@ -28,23 +62,20 @@ describe('eslint config: no per-file exemptions for structural quality rules', (
     // Exclusion: off for src/lib/physics, src/rendering, src/tests.
     // Re-enable: error at 15 for rendering hooks (useExportRuntime, useGizmoInteraction, gizmoHitTesting).
     // If this fails, someone added a per-file override — refactor the file instead.
-    const matches = [...config.matchAll(/^\s+'sonarjs\/cognitive-complexity'\s*:/gm)]
-    expect(matches).toHaveLength(3)
+    expect(countRuleDefinitions('sonarjs/cognitive-complexity')).toBe(3)
   })
 
   it('max-lines rule is defined exactly twice (tsx at 500 + ts at 600)', () => {
     // Two occurrences: .tsx files at 500 (error) and .ts files at 600 (warn).
     // If this fails, someone added a per-file max-lines override — split the file instead.
-    const matches = [...config.matchAll(/^\s+'max-lines'\s*:/gm)]
-    expect(matches).toHaveLength(2)
+    expect(countRuleDefinitions('max-lines')).toBe(2)
   })
 
   it('no-console rule is defined with exactly 4 occurrences', () => {
     // Base config enables no-console as error.
     // 3 off overrides: logger.ts, ErrorBoundary files, unit test files, and e2e spec files.
     // If this fails, someone broadened the exemption — use logger instead.
-    const ruleMatches = [...config.matchAll(/^\s+'no-console'\s*:/gm)]
-    expect(ruleMatches).toHaveLength(4) // 1 enable + 3 off overrides
+    expect(countRuleDefinitions('no-console')).toBe(4) // 1 enable + 3 off overrides
   })
 
   it('no-restricted-imports boundary exists for render passes with exactly one block', () => {
@@ -52,7 +83,6 @@ describe('eslint config: no per-file exemptions for structural quality rules', (
     // Single enforcement block with negation patterns for known exemptions
     // (diagnostic stores, simulationStateStore, performanceStore, defaults).
     // If this test fails, someone added a second override — consolidate into the existing block.
-    const ruleMatches = [...config.matchAll(/^\s+'no-restricted-imports'\s*:/gm)]
-    expect(ruleMatches).toHaveLength(1)
+    expect(countRuleDefinitions('no-restricted-imports')).toBe(1)
   })
 })

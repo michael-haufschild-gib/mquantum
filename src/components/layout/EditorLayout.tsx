@@ -1,5 +1,5 @@
 import { AnimatePresence, m } from 'motion/react'
-import React, { Suspense, useEffect } from 'react'
+import React, { Suspense, useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 // Lazy-load overlays — only fetched when user opens them
@@ -102,6 +102,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
   )
 
   const isDesktop = useIsDesktop()
+  const desktopPanelStateRef = useRef<{ showLeftPanel: boolean; isCollapsed: boolean } | null>(null)
 
   // Apply theme
   useEffect(() => {
@@ -148,14 +149,29 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
     }
   }
 
-  // Auto-collapse on mobile init
+  // Auto-collapse on mobile while preserving the previous desktop panel
+  // preference. Do not force-open panels on desktop mount: layoutStore
+  // persists those choices and desktop reloads must honor them.
   useEffect(() => {
     if (!isDesktop) {
+      if (desktopPanelStateRef.current === null) {
+        const layout = useLayoutStore.getState()
+        desktopPanelStateRef.current = {
+          showLeftPanel: layout.showLeftPanel,
+          isCollapsed: layout.isCollapsed,
+        }
+      }
       setLeftPanel(false)
       setCollapsed(true)
-    } else {
-      setLeftPanel(true)
-      setCollapsed(false)
+      return
+    }
+
+    if (desktopPanelStateRef.current) {
+      const { showLeftPanel: previousShowLeftPanel, isCollapsed: previousIsCollapsed } =
+        desktopPanelStateRef.current
+      setLeftPanel(previousShowLeftPanel)
+      setCollapsed(previousIsCollapsed)
+      desktopPanelStateRef.current = null
     }
   }, [isDesktop, setCollapsed, setLeftPanel])
 

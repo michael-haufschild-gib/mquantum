@@ -12,6 +12,7 @@ import { parseCurrentUrl } from '@/lib/url/state-serializer'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { usePresetManagerStore } from '@/stores/presetManagerStore'
+import { useSrmtSweepStore } from '@/stores/srmtSweepStore'
 
 vi.mock('@/lib/url/state-serializer', async () => {
   const actual = await vi.importActual<typeof import('@/lib/url/state-serializer')>(
@@ -40,6 +41,8 @@ describe('useUrlState', () => {
     mockedApplySceneExample.mockReset()
     useGeometryStore.getState().reset()
     useExtendedObjectStore.getState().reset()
+    useSrmtSweepStore.getState().setPendingSweep(null)
+    useSrmtSweepStore.getState().reset()
   })
 
   it('applies dimension and objectType from parsed URL state', async () => {
@@ -237,5 +240,51 @@ describe('useUrlState', () => {
     })
 
     hasHydratedSpy.mockRestore()
+  })
+
+  it('queues SRMT sweep params only when qm=wheelerDeWitt', async () => {
+    mockedParseCurrentUrl.mockReturnValue({
+      objectType: 'schroedinger',
+      dimension: 3,
+      quantumMode: 'wheelerDeWitt',
+      srmtSweepKind: 'gridNphi',
+      srmtSweepPoints: 5,
+      srmtSweepMin: 32,
+      srmtSweepMax: 64,
+      srmtSweepPhiRef: -0.5,
+      srmtSweepCutAnchor: 0.5,
+    })
+
+    renderHook(() => useUrlState())
+
+    await waitFor(() => {
+      expect(useSrmtSweepStore.getState().pendingSweep).toMatchObject({
+        kind: 'gridNphi',
+        points: 5,
+        sweepMin: 32,
+        sweepMax: 64,
+        phiRef: -0.5,
+        cutAnchor: 0.5,
+      })
+    })
+  })
+
+  it('ignores orphan SRMT sweep params when qm is not wheelerDeWitt', async () => {
+    mockedParseCurrentUrl.mockReturnValue({
+      objectType: 'schroedinger',
+      dimension: 3,
+      quantumMode: 'tdseDynamics',
+      srmtSweepKind: 'gridNphi',
+      srmtSweepPoints: 5,
+      srmtSweepMin: 32,
+      srmtSweepMax: 64,
+    })
+
+    renderHook(() => useUrlState())
+
+    await waitFor(() => {
+      expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('tdseDynamics')
+    })
+    expect(useSrmtSweepStore.getState().pendingSweep).toBeNull()
   })
 })

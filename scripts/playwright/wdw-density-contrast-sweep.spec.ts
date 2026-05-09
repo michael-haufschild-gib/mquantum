@@ -82,10 +82,10 @@ function delta(a: Crop, b: Crop) {
 }
 
 async function applyPreset(page: import('@playwright/test').Page, presetId: string) {
-  await page.evaluate((id) => {
+  await page.evaluate(async (id) => {
     const extStore = window.__EXTENDED_OBJECT_STORE__!
     const s = extStore.getState() as Record<string, unknown>
-    ;(s.applyWheelerDeWittPreset as (i: string) => void)(id)
+    await (s.applyWheelerDeWittPreset as (i: string) => Promise<void>)(id)
   }, presetId)
 }
 

@@ -340,9 +340,10 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     ctx: WebGPURenderContext,
     axis: 'x' | 'y' | 'z',
     gridSize: number[],
-    worldBound: number
+    worldBound: number,
+    sourceMode?: import('@/stores/wavefunctionSliceStore').WavefunctionSliceSourceMode
   ): boolean {
-    return slRequestSlice(ctx, this._slState, axis, gridSize, worldBound)
+    return slRequestSlice(ctx, this._slState, axis, gridSize, worldBound, sourceMode)
   }
 
   setLoadedWavefunction(

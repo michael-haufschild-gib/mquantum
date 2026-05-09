@@ -8,7 +8,6 @@
  */
 
 import { AXIS_LABELS } from '@/constants/dimension'
-import { generateTimestampFilename } from '@/lib/export/image'
 import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import type { AtlasPoint } from '@/stores/quantumnessAtlasStore'
@@ -269,6 +268,7 @@ function readSliceSource(
   }
   const state = useWavefunctionSliceStore.getState()
   if (!state.hasData || !state.sliceData || state.sliceGridSize === 0) return null
+  if (state.sliceAxis !== axis) return null
   return { data: state.sliceData, gridSize: state.sliceGridSize, worldBound: state.sliceWorldBound }
 }
 
@@ -485,6 +485,7 @@ function appendWavefunctionSlices(payload: Record<string, unknown>): void {
   if (wfSlice.hasData && wfSlice.sliceData) {
     payload.wavefunctionSlice = {
       axis: wfSlice.sliceAxis,
+      quantumMode: wfSlice.sliceSourceMode,
       gridSize: wfSlice.sliceGridSize,
       worldBound: wfSlice.sliceWorldBound,
       positions: buildGridPositions(wfSlice.sliceGridSize, wfSlice.sliceWorldBound),
@@ -583,7 +584,9 @@ export function downloadFile(
  * @returns Formatted filename
  */
 export function exportFilename(prefix: string, extension: string): string {
-  return `${generateTimestampFilename(prefix)}.${extension}`
+  const now = new Date()
+  const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19)
+  return `${prefix}-${timestamp}.${extension}`
 }
 
 // ─── Quantumness Atlas Export ───────────────────────────────────────────────

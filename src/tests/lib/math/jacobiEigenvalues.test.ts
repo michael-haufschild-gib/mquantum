@@ -62,6 +62,23 @@ describe('jacobiEigenvalues — happy path', () => {
     const eig = jacobiEigenvalues(A, 0)
     expect(eig.length).toBe(0)
   })
+
+  it('does not overflow while symmetrizing large finite asymmetric entries', () => {
+    const A = new Float64Array([0, Number.MAX_VALUE, Number.MAX_VALUE / 2, 0])
+    const eig = jacobiEigenvalues(A, 2)
+    expect(Number.isFinite(eig[0]!)).toBe(true)
+    expect(Number.isFinite(eig[1]!)).toBe(true)
+    expect(eig[0]! / Number.MAX_VALUE).toBeCloseTo(0.75, 12)
+    expect(eig[1]! / Number.MAX_VALUE).toBeCloseTo(-0.75, 12)
+  })
+
+  it('applies the same overflow-safe symmetrization to eigenvectors', () => {
+    const A = new Float64Array([0, Number.MAX_VALUE, Number.MAX_VALUE / 2, 0])
+    const { values, vectors } = jacobiEigendecompose(A, 2)
+    expect(values[0]! / Number.MAX_VALUE).toBeCloseTo(0.75, 12)
+    expect(values[1]! / Number.MAX_VALUE).toBeCloseTo(-0.75, 12)
+    for (const value of vectors) expect(Number.isFinite(value)).toBe(true)
+  })
 })
 
 describe('jacobiEigenvalues — non-convergence throws loudly', () => {

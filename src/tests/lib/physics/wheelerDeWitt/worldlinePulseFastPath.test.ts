@@ -21,7 +21,11 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { applyWdwPulseAlpha, packWdwDensityGrid } from '@/lib/physics/wheelerDeWitt/densityGrid'
+import {
+  applyWdwPulseAlpha,
+  applyWdwPulseAlphaRows,
+  packWdwDensityGrid,
+} from '@/lib/physics/wheelerDeWitt/densityGrid'
 import type { WheelerDeWittSolverOutput } from '@/lib/physics/wheelerDeWitt/solver'
 import {
   buildPulseOverlay,
@@ -98,6 +102,41 @@ describe('Wheeler-DeWitt worldline pulse — fast path byte-equivalence', () => 
     applyWdwPulseAlpha(baselineDensity, baselineAlpha, pulse, [Na, Nphi, Nphi], N, workingBuffer)
 
     expect(workingBuffer).toEqual(legacy.density)
+  })
+
+  it('row-delta updater matches the dense animation-tick path', () => {
+    const activeIndices: number[] = []
+    const pulse = buildPulseOverlay(
+      trajectories,
+      0.37,
+      0.12,
+      0.8,
+      [Na, Nphi, Nphi],
+      undefined,
+      activeIndices
+    )
+
+    const baselineDensity = new Uint16Array(4 * N * N * N)
+    const baselineAlpha = new Float32Array(N * N * N)
+    packWdwDensityGrid(output, null, undefined, N, 100, {
+      density: baselineDensity,
+      baselineAlpha,
+    })
+    const denseBuffer = new Uint16Array(4 * N * N * N)
+    const rowBuffer = new Uint16Array(baselineDensity)
+    applyWdwPulseAlpha(baselineDensity, baselineAlpha, pulse, [Na, Nphi, Nphi], N, denseBuffer)
+    const dirtyRows = applyWdwPulseAlphaRows(
+      baselineDensity,
+      baselineAlpha,
+      pulse,
+      [Na, Nphi, Nphi],
+      N,
+      rowBuffer,
+      {}
+    )
+
+    expect(dirtyRows.length).toBeGreaterThan(0)
+    expect(rowBuffer).toEqual(denseBuffer)
   })
 
   it('animation-tick with null pulse equals the baseline byte-for-byte', () => {

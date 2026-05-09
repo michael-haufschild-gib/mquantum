@@ -11,15 +11,19 @@ node scripts/check-no-prettier-check.js
 # Takes ~4s — acceptable for pre-commit since type safety is a core quality gate.
 pnpm exec tsc -b
 
-# Check for circular chunk dependencies when chunk config changes
-if git diff --cached --name-only | grep -q 'vite.config.ts'; then
-  echo "vite.config.ts changed — checking for circular chunk dependencies..."
-  node scripts/check-chunk-cycles.js
+STAGED_FILES="$(git diff --cached --name-only)"
+
+# Bundle-size budgets run locally before commit, not later in PR CI. Run a
+# fresh web build first so the budget check cannot pass against stale dist/.
+if printf '%s\n' "$STAGED_FILES" | grep -Eq '^(src/|scripts/|vite\.config\.ts|package\.json|pnpm-lock\.yaml)'; then
+  echo "Bundle-impacting files changed — running web build and bundle-size budget..."
+  pnpm run build:web
+  pnpm run bundle:check
 fi
 
 # Clippy on the Rust crate when any file in it is staged. CI rejects warnings
 # (-D warnings); catching it here saves the round-trip.
-if git diff --cached --name-only | grep -q '^src/wasm/mdimension_core/'; then
+if printf '%s\n' "$STAGED_FILES" | grep -q '^src/wasm/mdimension_core/'; then
   echo "src/wasm/mdimension_core/ changed — running cargo clippy..."
   cargo clippy --manifest-path src/wasm/mdimension_core/Cargo.toml --target wasm32-unknown-unknown -- -D warnings
 fi

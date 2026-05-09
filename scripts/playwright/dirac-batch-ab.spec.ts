@@ -58,8 +58,8 @@ async function configureDirac(
         const store =
           window.__EXTENDED_OBJECT_STORE__ ??
           (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
-        const s = store.getState() as Record<string, (...a: unknown[]) => void>
-        s.applyDiracPreset(presetId)
+        const s = store.getState() as Record<string, (...a: unknown[]) => unknown>
+        await (s.applyDiracPreset as (id: string) => Promise<void>)(presetId)
       }
 
       const anim = await import('/src/stores/animationStore.ts')

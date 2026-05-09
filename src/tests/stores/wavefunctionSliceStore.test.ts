@@ -20,13 +20,16 @@ describe('wavefunctionSliceStore', () => {
     expect(s.hasData).toBe(false)
     expect(s.sliceData).toBeNull()
     expect(s.requestedAxis).toBe('x')
+    expect(s.requestedSourceMode).toBeNull()
+    expect(s.sliceSourceMode).toBeNull()
   })
 
   it('requestCapture sets the flag and axis', () => {
-    useWavefunctionSliceStore.getState().requestCapture('y')
+    useWavefunctionSliceStore.getState().requestCapture('y', 'tdseDynamics')
     const s = useWavefunctionSliceStore.getState()
     expect(s.captureRequested).toBe(true)
     expect(s.requestedAxis).toBe('y')
+    expect(s.requestedSourceMode).toBe('tdseDynamics')
   })
 
   it('clearRequest removes the flag without affecting data', () => {
@@ -65,8 +68,29 @@ describe('wavefunctionSliceStore', () => {
     expect(s.hasData).toBe(true)
     expect(s.sliceData).toBe(data)
     expect(s.sliceAxis).toBe('x')
+    expect(s.sliceSourceMode).toBeNull()
     expect(s.sliceGridSize).toBe(5)
     expect(s.sliceWorldBound).toBe(2.0)
+  })
+
+  it('fulfillCapture records the mode that scheduled the readback, not a newer request', () => {
+    useWavefunctionSliceStore.getState().requestCapture('x', 'tdseDynamics')
+    useWavefunctionSliceStore.getState().clearRequest()
+    useWavefunctionSliceStore.getState().requestCapture('y', 'becDynamics')
+
+    useWavefunctionSliceStore.getState().fulfillCapture({
+      sliceData: new Float32Array([0.1, 0.2]),
+      axis: 'x',
+      sourceMode: 'tdseDynamics',
+      gridSize: 2,
+      worldBound: 1,
+    })
+
+    const s = useWavefunctionSliceStore.getState()
+    expect(s.captureRequested).toBe(true)
+    expect(s.requestedSourceMode).toBe('becDynamics')
+    expect(s.sliceAxis).toBe('x')
+    expect(s.sliceSourceMode).toBe('tdseDynamics')
   })
 
   it('reset clears all state', () => {
@@ -82,6 +106,8 @@ describe('wavefunctionSliceStore', () => {
     expect(s.hasData).toBe(false)
     expect(s.sliceData).toBeNull()
     expect(s.captureRequested).toBe(false)
+    expect(s.requestedSourceMode).toBeNull()
+    expect(s.sliceSourceMode).toBeNull()
     expect(s.sliceGridSize).toBe(0)
   })
 })

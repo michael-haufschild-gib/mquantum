@@ -13,6 +13,19 @@ export interface SectionProps {
   'data-testid'?: string
 }
 
+function readSectionOpenState(storageKey: string, defaultOpen: boolean): boolean {
+  try {
+    const stored = localStorage.getItem(storageKey)
+    if (stored === null) {
+      return defaultOpen
+    }
+    const parsed: unknown = JSON.parse(stored)
+    return typeof parsed === 'boolean' ? parsed : defaultOpen
+  } catch {
+    return defaultOpen
+  }
+}
+
 export const Section: React.FC<SectionProps> = React.memo(
   ({
     title,
@@ -37,37 +50,41 @@ export const Section: React.FC<SectionProps> = React.memo(
       }
     }, [])
 
-    const [isOpen, setIsOpen] = useState(() => {
-      try {
-        const stored = localStorage.getItem(storageKey)
-        if (stored === null) {
-          return defaultOpen
-        }
-        const parsed: unknown = JSON.parse(stored)
-        return typeof parsed === 'boolean' ? parsed : defaultOpen
-      } catch {
-        return defaultOpen
+    const [openState, setOpenState] = useState(() => {
+      return {
+        storageKey,
+        isOpen: readSectionOpenState(storageKey, defaultOpen),
       }
     })
+    const isOpen =
+      openState.storageKey === storageKey
+        ? openState.isOpen
+        : readSectionOpenState(storageKey, defaultOpen)
 
     useEffect(() => {
-      localStorage.setItem(storageKey, JSON.stringify(isOpen))
-    }, [isOpen, storageKey])
+      if (openState.storageKey === storageKey) return
+      setOpenState({
+        storageKey,
+        isOpen: readSectionOpenState(storageKey, defaultOpen),
+      })
+    }, [defaultOpen, openState.storageKey, storageKey])
 
-    // Sync open state to parent when callback identity changes
-    // (covers initial mount AND quantum mode switches). Toggles notify via
-    // handleToggle; isOpen is read through a ref so this effect only fires on
-    // callback identity changes.
-    const isOpenRef = useRef(isOpen)
-    isOpenRef.current = isOpen
     useEffect(() => {
-      onOpenChange?.(isOpenRef.current)
-    }, [onOpenChange])
+      if (openState.storageKey !== storageKey) return
+      localStorage.setItem(storageKey, JSON.stringify(openState.isOpen))
+    }, [openState.isOpen, openState.storageKey, storageKey])
+
+    // Sync open state to parent after state has been reconciled with the
+    // current title-derived storage key. This avoids mode-switch callbacks
+    // receiving the previous section title's open state.
+    useEffect(() => {
+      if (openState.storageKey !== storageKey) return
+      onOpenChange?.(openState.isOpen)
+    }, [onOpenChange, openState.isOpen, openState.storageKey, storageKey])
 
     const handleToggle = useCallback(() => {
       const willOpen = !isOpen
-      setIsOpen(willOpen)
-      onOpenChange?.(willOpen)
+      setOpenState({ storageKey, isOpen: willOpen })
       if (willOpen && sectionRef.current) {
         // Clear any pending scroll timer
         if (scrollTimerRef.current !== null) {
@@ -79,7 +96,7 @@ export const Section: React.FC<SectionProps> = React.memo(
           scrollTimerRef.current = null
         }, 100)
       }
-    }, [isOpen, onOpenChange])
+    }, [isOpen, storageKey])
 
     const handleResetClick = useCallback(
       (e: React.MouseEvent) => {

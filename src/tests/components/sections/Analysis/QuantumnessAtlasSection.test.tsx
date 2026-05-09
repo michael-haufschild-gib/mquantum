@@ -15,6 +15,7 @@ import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { useMonitoringSweepStore } from '@/stores/monitoringSweepStore'
 import { useQuantumnessAtlasStore } from '@/stores/quantumnessAtlasStore'
+import { useSrmtSweepStore } from '@/stores/srmtSweepStore'
 
 vi.mock('@/lib/export/dataExport', () => ({
   downloadAtlasCSV: vi.fn(),
@@ -53,6 +54,7 @@ describe('QuantumnessAtlasSection — guard conditions', () => {
     })
     useMonitoringSweepStore.getState().reset()
     useCoordinateEntanglementStore.getState().abortSweep()
+    useSrmtSweepStore.setState({ status: 'idle' })
   })
 
   it('shows UnavailableSection when mode is not tdseDynamics', () => {
@@ -89,6 +91,7 @@ describe('QuantumnessAtlasSection — idle state', () => {
     })
     useMonitoringSweepStore.getState().reset()
     useCoordinateEntanglementStore.getState().abortSweep()
+    useSrmtSweepStore.setState({ status: 'idle' })
     setTdseDynamicsMode()
   })
 
@@ -110,6 +113,12 @@ describe('QuantumnessAtlasSection — idle state', () => {
     expect(screen.getByRole('button', { name: /Start Sweep/i })).toBeDisabled()
   })
 
+  it('disables Start Sweep when an SRMT sweep is running', () => {
+    useSrmtSweepStore.setState({ status: 'running' })
+    render(<QuantumnessAtlasSection defaultOpen />)
+    expect(screen.getByRole('button', { name: /Start Sweep/i })).toBeDisabled()
+  })
+
   it('enables Start Sweep when no other sweep is running', () => {
     render(<QuantumnessAtlasSection defaultOpen />)
     expect(screen.getByRole('button', { name: /Start Sweep/i })).not.toBeDisabled()
@@ -122,6 +131,7 @@ describe('QuantumnessAtlasSection — running state', () => {
     useGeometryStore.setState({ dimension: 3 })
     useMonitoringSweepStore.getState().reset()
     useCoordinateEntanglementStore.getState().abortSweep()
+    useSrmtSweepStore.setState({ status: 'idle' })
     setTdseDynamicsMode()
     useQuantumnessAtlasStore.setState({
       status: 'running',
@@ -191,6 +201,7 @@ describe('QuantumnessAtlasSection — complete state with results', () => {
     useGeometryStore.setState({ dimension: 3 })
     useMonitoringSweepStore.getState().reset()
     useCoordinateEntanglementStore.getState().abortSweep()
+    useSrmtSweepStore.setState({ status: 'idle' })
     setTdseDynamicsMode()
     useQuantumnessAtlasStore.setState({
       status: 'complete',

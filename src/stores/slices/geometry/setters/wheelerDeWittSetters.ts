@@ -57,7 +57,7 @@ export interface WheelerDeWittSetters {
   setWdwSrmtCutNormalized: (cut: number) => void
   setWdwSrmtRankCap: (cap: number) => void
   setWdwSrmtHeatmapIntensity: (intensity: number) => void
-  applyWheelerDeWittPreset: (presetId: string) => void
+  applyWheelerDeWittPreset: (presetId: string) => Promise<void>
   triggerWdwRecompute: () => void
   clearWdwNeedsReset: () => void
 }
@@ -245,7 +245,7 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
     setWdwSrmtRankCap: setSrmtRankCap,
     setWdwSrmtHeatmapIntensity: setSrmtHeatmapIntensity,
     applyWheelerDeWittPreset: (presetId) => {
-      loadPresetModule(
+      return loadPresetModule(
         () => import('@/lib/physics/wheelerDeWitt/presets'),
         'wheelerDeWittSetters',
         `Wheeler–DeWitt presets for '${presetId}'`,

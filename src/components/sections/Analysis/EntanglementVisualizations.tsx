@@ -226,6 +226,7 @@ function fmtLambda(v: number): string {
 }
 
 function entropyLabel(frac: number): string {
+  if (!Number.isFinite(frac)) return 'No finite samples'
   if (frac < 0.1) return 'Nearly separable'
   if (frac < 0.3) return 'Weak entanglement'
   if (frac < 0.6) return 'Moderate entanglement'
@@ -234,6 +235,9 @@ function entropyLabel(frac: number): string {
 }
 
 function entropyDesc(frac: number): string {
+  if (!Number.isFinite(frac)) {
+    return 'No finite normalized entropy was recorded for this configuration.'
+  }
   if (frac < 0.1) return 'Dimensions evolve almost independently — close to a product state.'
   if (frac < 0.3)
     return 'Some inter-dimensional coupling, but each dimension retains most of its identity.'
@@ -248,14 +252,17 @@ function atlasInsight(
   results: { lambda: number; dim: number; entropy: number }[],
   maxE: number
 ): string {
-  if (results.length < 2) return 'Collecting data — need at least 2 points for analysis.'
-  const sorted = [...results].sort((a, b) => a.entropy - b.entropy)
+  const finiteResults = results.filter((r) => Number.isFinite(r.entropy))
+  if (finiteResults.length < 2) {
+    return 'Collecting data — need at least 2 finite points for analysis.'
+  }
+  const sorted = [...finiteResults].sort((a, b) => a.entropy - b.entropy)
   const lo = sorted[0]!,
     hi = sorted[sorted.length - 1]!
   const rangePct = maxE > 0 ? (((hi.entropy - lo.entropy) / maxE) * 100).toFixed(0) : '0'
 
   const byDim = new Map<number, { lambda: number; entropy: number }[]>()
-  for (const r of results) {
+  for (const r of finiteResults) {
     const arr = byDim.get(r.dim) ?? []
     arr.push(r)
     byDim.set(r.dim, arr)
@@ -276,6 +283,10 @@ function atlasInsight(
         : 'No clear λ-dependence at this resolution.'
 
   return `Range: ${rangePct}% of S_max. Peak at λ=${fmtLambda(hi.lambda)}, ${hi.dim}D. ${trend}`
+}
+
+function entropyValueText(entropy: number): string {
+  return Number.isFinite(entropy) ? `${(entropy * 100).toFixed(1)}%` : 'no finite samples'
 }
 
 interface HoveredAtlasCell {
@@ -344,8 +355,12 @@ export const AtlasHeatmap: React.FC<{
             const li = lambdas.indexOf(r.lambda)
             const di = dims.indexOf(r.dim)
             if (li < 0 || di < 0) return null
-            const frac = Number.isFinite(r.entropy) ? r.entropy / maxEntropy : 0
-            const lightness = 0.95 - 0.55 * frac
+            const hasFiniteEntropy = Number.isFinite(r.entropy)
+            const frac = hasFiniteEntropy ? r.entropy / maxEntropy : Number.NaN
+            const visualFrac = hasFiniteEntropy ? Math.max(0, Math.min(frac, 1)) : 0
+            const lightness = 0.95 - 0.55 * visualFrac
+            // eslint-disable-next-line project-rules/no-hardcoded-colors
+            const finiteFill = `oklch(${lightness} ${0.18 * visualFrac} 30)`
             const active = hovered?.lambda === r.lambda && hovered?.dim === r.dim
             return (
               <g
@@ -370,10 +385,16 @@ export const AtlasHeatmap: React.FC<{
                   y={ATLAS.pad.top + di * cellH}
                   width={Math.max(cellW - 1, 2)}
                   height={Math.max(cellH - 1, 2)}
-                  fill={`oklch(${lightness} ${0.18 * frac} 30)`} // eslint-disable-line project-rules/no-hardcoded-colors
+                  fill={hasFiniteEntropy ? finiteFill : 'var(--bg-elevated)'}
                   rx={1}
-                  stroke={active ? 'var(--text-primary)' : 'none'}
-                  strokeWidth={active ? 0.8 : 0}
+                  stroke={
+                    active
+                      ? 'var(--text-primary)'
+                      : hasFiniteEntropy
+                        ? 'none'
+                        : 'var(--border-subtle)'
+                  }
+                  strokeWidth={active || !hasFiniteEntropy ? 0.8 : 0}
                 />
               </g>
             )
@@ -448,7 +469,7 @@ export const AtlasHeatmap: React.FC<{
             λ = {hovered.lambda.toFixed(2)}, N = {hovered.dim}
           </div>
           <div className="text-xs text-text-secondary mt-0.5">
-            S̄/S_max = {(hovered.entropy * 100).toFixed(1)}% — {entropyLabel(hovered.entropy)}
+            S̄/S_max = {entropyValueText(hovered.entropy)} — {entropyLabel(hovered.entropy)}
           </div>
           <div className="text-xs text-text-tertiary mt-0.5 leading-snug">
             {entropyDesc(hovered.entropy)}

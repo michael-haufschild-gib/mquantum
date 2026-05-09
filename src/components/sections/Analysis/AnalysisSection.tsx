@@ -276,7 +276,9 @@ const DataExportButtons: React.FC<{
   const densitySliceAvailable = useDiagnosticsStore(
     (s) => s.density.sliceX !== null && s.density.sliceGridSize > 0
   )
-  const wfSliceHasData = useWavefunctionSliceStore((s) => s.hasData)
+  const wfSliceHasData = useWavefunctionSliceStore(
+    (s) => s.hasData && s.sliceAxis === 'x' && s.sliceSourceMode === quantumMode
+  )
 
   // Entanglement export availability
   const entEnabled = useCoordinateEntanglementStore((s) => s.enabled)
@@ -388,7 +390,7 @@ const DataExportButtons: React.FC<{
             variant="ghost"
             size="sm"
             onClick={() => {
-              useWavefunctionSliceStore.getState().requestCapture('x')
+              useWavefunctionSliceStore.getState().requestCapture('x', quantumMode)
             }}
             data-testid="capture-slice"
           >

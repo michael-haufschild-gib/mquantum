@@ -148,6 +148,27 @@ describe('useAtlasSweepController', () => {
     expect(useGeometryStore.getState().dimension).toBe(4)
   })
 
+  it('preserves the original pre-sweep snapshot when start is invoked twice while running', async () => {
+    setupKnownTdseState()
+    configureMinimalSweep()
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<TestHarness />)
+
+    await user.click(screen.getByRole('button', { name: 'Start' }))
+    expect(useQuantumnessAtlasStore.getState().status).toBe('running')
+    expect(useExtendedObjectStore.getState().schroedinger.tdse.potentialType).toBe(
+      'coupledAnharmonic'
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Start' }))
+    await user.click(screen.getByRole('button', { name: 'Abort' }))
+
+    expect(useExtendedObjectStore.getState().schroedinger.tdse.potentialType).toBe('harmonicTrap')
+    expect(useExtendedObjectStore.getState().schroedinger.tdse.anharmonicLambda).toBe(7)
+    expect(useGeometryStore.getState().dimension).toBe(4)
+  })
+
   it('restores pre-sweep stochasticGamma on abort', async () => {
     setupKnownTdseState() // stochasticGamma = 2.5
     configureMinimalSweep() // gammas = [0]

@@ -96,6 +96,7 @@ interface DiagnosticsState {
     totalIncomp: number,
     totalComp: number
   ) => void
+  clearBecIncompressibleSpectrum: () => void
   resetBec: () => void
 
   // Dirac actions
@@ -243,6 +244,27 @@ export const useDiagnosticsStore = create<DiagnosticsState>((set, get) => ({
         totalCompressibleEnergy: totalComp,
       },
     }))
+  },
+
+  clearBecIncompressibleSpectrum: () => {
+    set((state) => {
+      const ch = state.bec
+      const alreadyClear =
+        ch.totalIncompressibleEnergy === 0 &&
+        ch.totalCompressibleEnergy === 0 &&
+        ch.incompressibleSpectrum.every((value) => value === 0) &&
+        ch.spectrumKValues.every((value) => value === 0)
+      if (alreadyClear) return state
+      return {
+        bec: {
+          ...ch,
+          incompressibleSpectrum: new Float32Array(NUM_SPECTRUM_BINS),
+          spectrumKValues: new Float32Array(NUM_SPECTRUM_BINS),
+          totalIncompressibleEnergy: 0,
+          totalCompressibleEnergy: 0,
+        },
+      }
+    })
   },
 
   resetBec: () => {

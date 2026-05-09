@@ -102,6 +102,27 @@ describe('diagnosticsStore', () => {
       expect(ch.totalCompressibleEnergy).toBe(2.0)
     })
 
+    it('clearBecIncompressibleSpectrum drops stale spectrum without clearing BEC readbacks', () => {
+      const store = useDiagnosticsStore.getState()
+      store.updateBec({ totalNorm: 0.99 })
+      store.setBecIncompressibleSpectrum(
+        new Float32Array([1, 2]),
+        new Float32Array([0.1, 0.2]),
+        5,
+        2
+      )
+
+      store.clearBecIncompressibleSpectrum()
+
+      const ch = useDiagnosticsStore.getState().bec
+      expect(ch.hasData).toBe(true)
+      expect(ch.totalNorm).toBe(0.99)
+      expect(ch.totalIncompressibleEnergy).toBe(0)
+      expect(ch.totalCompressibleEnergy).toBe(0)
+      expect(ch.incompressibleSpectrum.every((value) => value === 0)).toBe(true)
+      expect(ch.spectrumKValues.every((value) => value === 0)).toBe(true)
+    })
+
     it('resetBec clears data', () => {
       useDiagnosticsStore.getState().updateBec({ totalNorm: 0.99 })
       useDiagnosticsStore.getState().resetBec()

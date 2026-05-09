@@ -27,6 +27,18 @@ export function createBecSpectrumWorkerState(): BecSpectrumWorkerState {
   return { worker: null, epoch: 0, inFlight: false, disposed: false }
 }
 
+/**
+ * Invalidate pending spectrum work after a discontinuous field reset.
+ *
+ * The measurement readback and worker compute both resolve asynchronously.
+ * Bumping the epoch prevents a pre-reset result from repopulating the
+ * diagnostics store after resetBec() has already cleared it.
+ */
+export function invalidateBecSpectrumWorkerState(state: BecSpectrumWorkerState): void {
+  state.epoch++
+  state.inFlight = false
+}
+
 /** Lazy-construct the worker and wire its message/error handlers. */
 function ensureWorker(state: BecSpectrumWorkerState): Worker {
   if (state.worker) return state.worker
