@@ -10,7 +10,10 @@
 
 import { logger } from '@/lib/logger'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
+import {
+  useWavefunctionSliceStore,
+  type WavefunctionSliceSourceMode,
+} from '@/stores/wavefunctionSliceStore'
 
 import type { WebGPURenderContext } from '../core/types'
 import { requestStateSave as genericStateSave } from './stateSave'
@@ -86,13 +89,15 @@ export function requestStateSave(ctx: WebGPURenderContext, state: SaveLoadState)
  * @param axis - Axis to slice along ('x', 'y', or 'z')
  * @param gridSize - Per-dimension grid sizes
  * @param worldBound - World-space half-extent
+ * @param sourceMode - Quantum mode that scheduled this capture
  */
 export function requestSliceCapture(
   ctx: WebGPURenderContext,
   state: SaveLoadState,
   axis: 'x' | 'y' | 'z',
   gridSize: number[],
-  worldBound: number
+  worldBound: number,
+  sourceMode: WavefunctionSliceSourceMode = null
 ): boolean {
   // Returns false when a previous save/slice readback is still in flight
   // (sharing `saveMappingInFlight`) so the caller can leave the request
@@ -163,6 +168,7 @@ export function requestSliceCapture(
       useWavefunctionSliceStore.getState().fulfillCapture({
         sliceData,
         axis,
+        sourceMode,
         gridSize: sliceSize,
         worldBound,
       })

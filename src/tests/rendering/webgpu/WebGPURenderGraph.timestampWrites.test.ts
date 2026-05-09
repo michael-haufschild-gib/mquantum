@@ -179,6 +179,41 @@ async function readTimestampTimings(
   return collector.getLastTimings()
 }
 
+async function createTimestampCollectorWithReadback(
+  values: bigint[],
+  passIds: string[],
+  phases: Array<{ hasCompute: boolean; hasRender: boolean }>
+) {
+  const { WebGPUTimestampCollector } =
+    await import('@/rendering/webgpu/graph/WebGPUTimestampCollector')
+  vi.stubGlobal('GPUMapMode', { READ: 1 })
+
+  const timestampValues = new BigUint64Array(values)
+  const readBuffer = {
+    mapAsync: vi.fn().mockResolvedValue(undefined),
+    getMappedRange: vi.fn(() => timestampValues.buffer),
+    unmap: vi.fn(),
+  } as unknown as GPUBuffer
+
+  const device = {
+    queue: {
+      onSubmittedWorkDone: vi.fn().mockResolvedValue(undefined),
+    },
+  } as unknown as GPUDevice
+
+  const collector = new WebGPUTimestampCollector()
+  const internals = collector as unknown as {
+    enabled: boolean
+    readBuffer: GPUBuffer
+  }
+  internals.enabled = true
+  internals.readBuffer = readBuffer
+  collector.setCollectionActive(true)
+  collector.scheduleReadback(device, passIds.length, passIds, phases)
+  await vi.waitFor(() => expect(readBuffer.unmap).toHaveBeenCalledTimes(1))
+  return collector
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
 })
@@ -224,6 +259,19 @@ describe('WebGPUTimestampCollector readback parsing', () => {
 
     expect(timings.get('scene')).toEqual({ total: 1, compute: 0, render: 1 })
     expect(timings.get('schroedinger')).toEqual({ total: 5, compute: 2, render: 3 })
+  })
+
+  it('clears stale timings when timestamp collection toggles', async () => {
+    const collector = await createTimestampCollectorWithReadback(
+      [0n, 0n, 100_000_000n, 101_000_000n],
+      ['scene'],
+      [{ hasCompute: false, hasRender: true }]
+    )
+
+    expect(collector.getLastTimings().get('scene')).toEqual({ total: 1, compute: 0, render: 1 })
+
+    collector.setCollectionActive(false)
+    expect(collector.getLastTimings().size).toBe(0)
   })
 })
 

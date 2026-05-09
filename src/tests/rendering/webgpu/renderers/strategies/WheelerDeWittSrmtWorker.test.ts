@@ -146,6 +146,33 @@ describe('WheelerDeWittSrmtWorker (dispatcher)', () => {
     expect(useSrmtDiagnosticStore.getState().computing).toBe(true)
   })
 
+  it('resets stale store quality when a fresh single-clock dispatch starts', () => {
+    useSrmtDiagnosticStore.getState().setDiagnostic(
+      {
+        clock: 'phi1',
+        slicePlane: 'a-phi2',
+        cutIndex: 2,
+        rankCap: 16,
+        kSpectrum: Float32Array.from([0.2, 0.4, 0.6]),
+        hjSpectrum: Float32Array.from([0.1, 0.3, 0.5]),
+        affineMatchQuality: 0.12,
+        computeTimeMs: 9,
+      },
+      { a: 0.05, phi1: 0.12, phi2: 0.22 }
+    )
+    const staleSnapshot = useSrmtDiagnosticStore.getState().snapshot
+    if (staleSnapshot === null) throw new Error('expected snapshot populated')
+
+    dispatchSrmtCompute(state, baseArgs('fresh'))
+
+    const pending = useSrmtDiagnosticStore.getState()
+    expect(pending.snapshot).toBe(staleSnapshot)
+    expect(pending.computing).toBe(true)
+    expect(Number.isNaN(pending.clockAffineQuality.a)).toBe(true)
+    expect(Number.isNaN(pending.clockAffineQuality.phi1)).toBe(true)
+    expect(Number.isNaN(pending.clockAffineQuality.phi2)).toBe(true)
+  })
+
   it('includes chi + mask buffers in the transfer list (zero-copy)', () => {
     dispatchSrmtCompute(state, baseArgs())
     const worker = FakeWorker.instances[0]!
@@ -203,6 +230,19 @@ describe('WheelerDeWittSrmtWorker (dispatcher)', () => {
     expect(worker.messages).toHaveLength(2)
     expect(state.epoch).toBe(2)
     expect(state.lastDispatchedHash.a).toBe('second')
+  })
+
+  it('does not let a superseded clock hash suppress a later real dispatch', () => {
+    const phi1Args = { ...baseArgs('same-phi1'), clock: 'phi1' as const, cutIndex: 2 }
+    dispatchSrmtCompute(state, phi1Args)
+    dispatchSrmtCompute(state, baseArgs('a-replacement'))
+    dispatchSrmtCompute(state, phi1Args)
+
+    const worker = FakeWorker.instances[0]!
+    expect(worker.messages).toHaveLength(3)
+    expect(state.epoch).toBe(3)
+    expect(state.lastDispatchedHash.a).toBeNull()
+    expect(state.lastDispatchedHash.phi1).toBe('same-phi1')
   })
 
   it('drops a result whose epoch no longer matches', () => {

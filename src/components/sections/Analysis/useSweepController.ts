@@ -36,6 +36,7 @@ export function useSweepController(): {
 } {
   const sweepTickRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const stepStartNRef = useRef(0)
+  const lastRecordedNRef = useRef(0)
   const preSweepRef = useRef<PreSweepSnapshot | null>(null)
 
   const sweepStatus = useCoordinateEntanglementStore((s) => s.sweepStatus)
@@ -82,6 +83,7 @@ export function useSweepController(): {
     entStore.clearHistory()
     entStore.startSweep(config)
     stepStartNRef.current = 0
+    lastRecordedNRef.current = 0
 
     const firstLambda = lambdaForStep(config, 0)
     ext.setTdsePotentialType('coupledAnharmonic')
@@ -112,8 +114,12 @@ export function useSweepController(): {
         const samplesSinceStart = entStore.longTimeN - stepStartNRef.current
         const totalNeeded = SWEEP_EVOLVE_ENTRIES + SWEEP_MEASURE_ENTRIES
 
-        if (samplesSinceStart >= SWEEP_EVOLVE_ENTRIES) {
+        if (
+          samplesSinceStart >= SWEEP_EVOLVE_ENTRIES &&
+          entStore.longTimeN > lastRecordedNRef.current
+        ) {
           entStore.recordSweepSample(entStore.currentNormalizedEntropy)
+          lastRecordedNRef.current = entStore.longTimeN
         }
 
         if (samplesSinceStart >= totalNeeded) {
@@ -122,6 +128,7 @@ export function useSweepController(): {
 
           if (next) {
             stepStartNRef.current = entStore.longTimeN
+            lastRecordedNRef.current = entStore.longTimeN
             const ext = useExtendedObjectStore.getState()
             ext.setTdseAnharmonicLambda(next.lambda)
             const currentDim = useGeometryStore.getState().dimension

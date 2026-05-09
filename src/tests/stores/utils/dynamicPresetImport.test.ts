@@ -4,7 +4,8 @@
  *
  * The helper has two public guarantees:
  * 1. The handler runs with the resolved module exports.
- * 2. Failures (rejected import or thrown handler) are swallowed and a
+ * 2. The returned promise settles after the handler has completed.
+ * 3. Failures (rejected import or thrown handler) are swallowed and a
  *    contextual `logger.warn` is emitted; nothing escapes as an
  *    unhandled rejection.
  */
@@ -29,12 +30,7 @@ describe('loadPresetModule', () => {
     const fakeModule = { somePresets: ['a', 'b'] }
     const handler = vi.fn()
 
-    loadPresetModule(() => Promise.resolve(fakeModule), 'testLabel', 'fake presets', handler)
-
-    // Wait two microtask ticks so both the import resolution and the
-    // handler invocation flush.
-    await Promise.resolve()
-    await Promise.resolve()
+    await loadPresetModule(() => Promise.resolve(fakeModule), 'testLabel', 'fake presets', handler)
 
     expect(handler).toHaveBeenCalledTimes(1)
     expect(handler).toHaveBeenCalledWith(fakeModule)
@@ -45,10 +41,7 @@ describe('loadPresetModule', () => {
     const cause = new Error('chunk load failed')
     const handler = vi.fn()
 
-    loadPresetModule(() => Promise.reject(cause), 'testLabel', 'fake presets', handler)
-
-    await Promise.resolve()
-    await Promise.resolve()
+    await loadPresetModule(() => Promise.reject(cause), 'testLabel', 'fake presets', handler)
 
     expect(handler).not.toHaveBeenCalled()
     expect(warnSpy).toHaveBeenCalledTimes(1)
@@ -63,10 +56,7 @@ describe('loadPresetModule', () => {
       throw handlerErr
     })
 
-    loadPresetModule(() => Promise.resolve({}), 'testLabel', 'fake presets', handler)
-
-    await Promise.resolve()
-    await Promise.resolve()
+    await loadPresetModule(() => Promise.resolve({}), 'testLabel', 'fake presets', handler)
 
     expect(handler).toHaveBeenCalledTimes(1)
     expect(warnSpy).toHaveBeenCalledTimes(1)
@@ -78,15 +68,31 @@ describe('loadPresetModule', () => {
     const handlerErr = new Error('async handler blew up')
     const handler = vi.fn(() => Promise.reject(handlerErr))
 
-    loadPresetModule(() => Promise.resolve({}), 'testLabel', 'fake presets', handler)
-
-    await Promise.resolve()
-    await Promise.resolve()
-    await Promise.resolve()
+    await loadPresetModule(() => Promise.resolve({}), 'testLabel', 'fake presets', handler)
 
     expect(handler).toHaveBeenCalledTimes(1)
     expect(warnSpy).toHaveBeenCalledTimes(1)
     const [, errorArg] = warnSpy.mock.calls[0] ?? []
     expect(errorArg).toBe(handlerErr)
+  })
+
+  it('resolves only after an async handler finishes', async () => {
+    const events: string[] = []
+
+    const result = loadPresetModule(
+      () => Promise.resolve({}),
+      'testLabel',
+      'fake presets',
+      async () => {
+        events.push('handler:start')
+        await Promise.resolve()
+        events.push('handler:end')
+      }
+    )
+
+    expect(events).toEqual([])
+    await result
+    expect(events).toEqual(['handler:start', 'handler:end'])
+    expect(warnSpy).not.toHaveBeenCalled()
   })
 })

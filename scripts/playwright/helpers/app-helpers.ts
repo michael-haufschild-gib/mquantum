@@ -1120,23 +1120,65 @@ export async function applyTdsePreset(page: Page, presetId: string): Promise<voi
 
 /** Apply a BEC preset via store injection. */
 export async function applyBecPreset(page: Page, presetId: string): Promise<void> {
-  await page.evaluate((id: string) => {
+  await page.evaluate(async (id: string) => {
     const extStore = window.__EXTENDED_OBJECT_STORE__
     if (!extStore) {
       throw new Error('__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered')
     }
-    extStore.getState().applyBecPreset(id)
+    await extStore.getState().applyBecPreset(id)
   }, presetId)
+
+  await page.waitForFunction(
+    async (id: string) => {
+      const extStore = window.__EXTENDED_OBJECT_STORE__
+      if (!extStore) return false
+      const { getBecPreset } = await import('/src/lib/physics/bec/presets.ts')
+      const preset = getBecPreset(id)
+      if (!preset) return false
+
+      const skippedOverrideKeys = new Set([
+        'latticeDim',
+        'gridSize',
+        'spacing',
+        'trapAnisotropy',
+        'slicePositions',
+      ])
+      const matches = (actual: unknown, expected: unknown): boolean => {
+        if (Array.isArray(expected)) {
+          return (
+            Array.isArray(actual) &&
+            actual.length === expected.length &&
+            expected.every((value, index) => actual[index] === value)
+          )
+        }
+        return actual === expected
+      }
+
+      const schroedinger = extStore.getState().schroedinger
+      const bec = schroedinger.bec as Record<string, unknown>
+      for (const [key, value] of Object.entries(preset.overrides)) {
+        if (!skippedOverrideKeys.has(key) && !matches(bec[key], value)) return false
+      }
+      for (const [key, value] of Object.entries(preset.renderingOverrides ?? {})) {
+        if (!matches((schroedinger as unknown as Record<string, unknown>)[key], value)) {
+          return false
+        }
+      }
+      return true
+    },
+    presetId,
+    { timeout: UI_SETTLE_TIMEOUT }
+  )
 }
 
 /** Apply a Dirac preset via store injection. */
 export async function applyDiracPreset(page: Page, presetId: string): Promise<void> {
-  await page.evaluate((id: string) => {
+  await page.evaluate(async (id: string) => {
     const extStore = window.__EXTENDED_OBJECT_STORE__
     if (!extStore) {
       throw new Error('__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered')
     }
-    extStore.getState().applyDiracPreset(id)
+    await extStore.getState().applyDiracPreset(id)
   }, presetId)
 }
 

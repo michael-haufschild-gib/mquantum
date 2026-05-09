@@ -42,6 +42,7 @@ import { getCurrentEigenstateEnergy, handleMeasurement } from './TdseBecMeasurem
 import {
   createBecSpectrumWorkerState,
   dispatchBecSpectrumComputation,
+  invalidateBecSpectrumWorkerState,
 } from './TdseBecSpectrumWorker'
 import { applyIslandOverlay } from './tdseIslandOverlay'
 import type {
@@ -282,7 +283,8 @@ export class TdseBecStrategy implements QuantumModeStrategy {
         ctx,
         sliceStore.requestedAxis,
         tdseConfig.gridSize ?? [64],
-        shared.boundingRadius
+        shared.boundingRadius,
+        sliceStore.requestedSourceMode ?? quantumMode ?? null
       )
       if (scheduled) sliceStore.clearRequest()
     }
@@ -371,7 +373,20 @@ export class TdseBecStrategy implements QuantumModeStrategy {
   ): void {
     const bec = extended?.schroedinger?.bec
     const g = bec?.interactionStrength ?? 0
-    if (g <= 0 || !bec || this.spectrumWorkerState.inFlight) return
+    if (bec?.needsReset) {
+      invalidateBecSpectrumWorkerState(this.spectrumWorkerState)
+      this.spectrumCounter = 0
+      return
+    }
+    if (!bec || g <= 0) {
+      if (this.spectrumWorkerState.inFlight) {
+        invalidateBecSpectrumWorkerState(this.spectrumWorkerState)
+      }
+      this.spectrumCounter = 0
+      useDiagnosticsStore.getState().clearBecIncompressibleSpectrum()
+      return
+    }
+    if (this.spectrumWorkerState.inFlight) return
 
     this.spectrumCounter++
     if (this.spectrumCounter < SPECTRUM_INTERVAL) return

@@ -150,6 +150,47 @@ describe('queueSrmtCompute — sequential per-clock cross-clock queue', () => {
     expect(tailClocks).toEqual(['a', 'phi2'])
   })
 
+  it('clears stale quality progress when a fresh batch starts', () => {
+    useSrmtDiagnosticStore.getState().setDiagnostic(
+      {
+        clock: 'phi2',
+        slicePlane: 'a-phi1',
+        cutIndex: 2,
+        rankCap: 16,
+        kSpectrum: Float32Array.from([0.3, 0.5, 0.7]),
+        hjSpectrum: Float32Array.from([0.2, 0.4, 0.6]),
+        affineMatchQuality: 0.22,
+        computeTimeMs: 8,
+      },
+      { a: 0.05, phi1: 0.15, phi2: 0.22 }
+    )
+    const staleSnapshot = useSrmtDiagnosticStore.getState().snapshot
+    if (staleSnapshot === null) throw new Error('expected snapshot populated')
+
+    queueSrmtCompute(state, makeArgsByClock('hash-v2'), 'a')
+
+    const pending = useSrmtDiagnosticStore.getState()
+    expect(pending.snapshot).toBe(staleSnapshot)
+    expect(pending.computing).toBe(true)
+    expect(Number.isNaN(pending.clockAffineQuality.a)).toBe(true)
+    expect(Number.isNaN(pending.clockAffineQuality.phi1)).toBe(true)
+    expect(Number.isNaN(pending.clockAffineQuality.phi2)).toBe(true)
+
+    const worker = FakeWorker.instances[0]!
+    worker.simulate({
+      type: 'result',
+      epoch: 1,
+      result: makeResult(0.09),
+      clock: 'a',
+      cutIndex: 4,
+      computeTimeMs: 1,
+    })
+    const current = useSrmtDiagnosticStore.getState().clockAffineQuality
+    expect(current.a).toBeCloseTo(0.09, 6)
+    expect(Number.isNaN(current.phi1)).toBe(true)
+    expect(Number.isNaN(current.phi2)).toBe(true)
+  })
+
   it('fires the next clock automatically when the current reply arrives', () => {
     queueSrmtCompute(state, makeArgsByClock(), 'a')
     const worker = FakeWorker.instances[0]!

@@ -54,6 +54,8 @@ export interface StreamlineOverlay {
   intensity: Float32Array
   /** Maximum intensity in the overlay — useful for normalization on the consumer side. */
   maxIntensity: number
+  /** Solver-grid cells touched while building this overlay, when caller requested tracking. */
+  activeIndices?: number[]
 }
 
 /** Configuration for the streamline integrator. */
@@ -89,6 +91,38 @@ const STALL_DELTA_THRESHOLD = 1e-4
 
 /** Splat weight threshold below which we skip writing (saves Math.exp calls). */
 const SPLAT_WEIGHT_EPSILON = 1e-6
+
+interface SplatKernelEntry {
+  da: number
+  d1: number
+  d2: number
+  weight: number
+}
+
+const splatKernelCache = new Map<string, SplatKernelEntry[]>()
+
+function getSplatKernel(radius: number): SplatKernelEntry[] {
+  const safeRadius = Math.max(1e-6, radius)
+  const key = safeRadius.toFixed(4)
+  const cached = splatKernelCache.get(key)
+  if (cached) return cached
+
+  const entries: SplatKernelEntry[] = []
+  const r = Math.ceil(safeRadius * 2.5)
+  const sigma2 = safeRadius * safeRadius
+  for (let ka = -r; ka <= r; ka++) {
+    for (let k1 = -r; k1 <= r; k1++) {
+      for (let k2 = -r; k2 <= r; k2++) {
+        const dist2 = ka * ka + k1 * k1 + k2 * k2
+        const weight = Math.exp(-0.5 * (dist2 / sigma2))
+        if (weight < SPLAT_WEIGHT_EPSILON) continue
+        entries.push({ da: ka, d1: k1, d2: k2, weight })
+      }
+    }
+  }
+  splatKernelCache.set(key, entries)
+  return entries
+}
 
 /**
  * Precomputed `arg(χ)` lookup table indexed `[ia, i1, i2]` row-major. A
@@ -304,30 +338,26 @@ function splat(
   i1: number,
   i2: number,
   radius: number,
-  weight: number
+  weight: number,
+  activeIndices?: number[]
 ): void {
   const [Na, Nphi] = gridSize
-  const r = Math.ceil(radius * 2.5)
   const iaC = Math.round(ia)
   const i1C = Math.round(i1)
   const i2C = Math.round(i2)
-  const sigma2 = Math.max(1e-6, radius * radius)
-  for (let ka = -r; ka <= r; ka++) {
-    const iap = iaC + ka
+  const kernel = getSplatKernel(radius)
+  for (const entry of kernel) {
+    const iap = iaC + entry.da
     if (iap < 0 || iap >= Na) continue
-    for (let k1 = -r; k1 <= r; k1++) {
-      const i1p = i1C + k1
-      if (i1p < 0 || i1p >= Nphi) continue
-      for (let k2 = -r; k2 <= r; k2++) {
-        const i2p = i2C + k2
-        if (i2p < 0 || i2p >= Nphi) continue
-        const dist2 = ka * ka + k1 * k1 + k2 * k2
-        const w = weight * Math.exp(-0.5 * (dist2 / sigma2))
-        if (w < SPLAT_WEIGHT_EPSILON) continue
-        const idx = iap * Nphi * Nphi + i1p * Nphi + i2p
-        intensity[idx] = (intensity[idx] ?? 0) + w
-      }
-    }
+    const i1p = i1C + entry.d1
+    if (i1p < 0 || i1p >= Nphi) continue
+    const i2p = i2C + entry.d2
+    if (i2p < 0 || i2p >= Nphi) continue
+    const w = weight * entry.weight
+    if (w < SPLAT_WEIGHT_EPSILON) continue
+    const idx = iap * Nphi * Nphi + i1p * Nphi + i2p
+    if (activeIndices && intensity[idx] === 0) activeIndices.push(idx)
+    intensity[idx] = (intensity[idx] ?? 0) + w
   }
 }
 
@@ -492,11 +522,13 @@ export function buildPulseOverlay(
   pulseWidth: number,
   splatRadius: number,
   gridSize: [number, number, number],
-  out?: Float32Array
+  out?: Float32Array,
+  activeOut?: number[]
 ): StreamlineOverlay {
   const [Na, Nphi] = gridSize
   const total = Na * Nphi * Nphi
   const intensity = pickOverlayBuffer(out, total)
+  if (activeOut) activeOut.length = 0
   const invW = 1 / Math.max(1e-6, pulseWidth)
 
   for (const traj of trajectories) {
@@ -508,11 +540,13 @@ export function buildPulseOverlay(
       const x = (tp - animTime) * invW
       const weight = Math.exp(-x * x)
       if (weight < SPLAT_WEIGHT_EPSILON) continue
-      splat(intensity, gridSize, ia, i1, i2, splatRadius, weight)
+      splat(intensity, gridSize, ia, i1, i2, splatRadius, weight, activeOut)
     }
   }
 
-  return { intensity, maxIntensity: 1.0 }
+  return activeOut
+    ? { intensity, maxIntensity: 1.0, activeIndices: activeOut }
+    : { intensity, maxIntensity: 1.0 }
 }
 
 /**

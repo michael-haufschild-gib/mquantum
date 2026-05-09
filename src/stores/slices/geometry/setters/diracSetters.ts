@@ -487,11 +487,11 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
       })
     },
     applyDiracPreset: (presetId) => {
-      loadPresetModule(
+      return loadPresetModule(
         () => import('@/lib/physics/dirac/presets'),
         'diracSetters',
         `Dirac presets for '${presetId}'`,
-        ({ DIRAC_SCENARIO_PRESETS }) => {
+        async ({ DIRAC_SCENARIO_PRESETS }) => {
           const preset = DIRAC_SCENARIO_PRESETS.find((p) => p.id === presetId)
           if (!preset) return
           setWithVersion((state) => {
@@ -568,7 +568,7 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
             // store guard below would reject it as stale).
             const dim = ctx.get().schroedinger.dirac.latticeDim ?? 3
             const expectedView = normalizeDiracFieldView(dim, preset.overrides.fieldView)
-            loadPresetModule(
+            await loadPresetModule(
               () => import('@/rendering/shaders/palette/types'),
               'diracSetters',
               `Dirac fieldView color algorithm for '${presetId}'`,

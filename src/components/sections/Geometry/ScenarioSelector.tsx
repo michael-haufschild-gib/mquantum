@@ -504,21 +504,21 @@ export const ScenarioSelector: React.FC = React.memo(() => {
           applyTdsePreset(value)
           break
         case 'becDynamics':
-          applyBecPreset(value)
+          void applyBecPreset(value)
           break
         case 'diracEquation':
           // applyDiracPreset internally syncs color algorithm for fieldViews like
           // 'particleAntiparticleSplit' that require a specific color algo.
-          applyDiracPreset(value)
+          void applyDiracPreset(value)
           break
         case 'freeScalarField':
           applyFreeScalarPreset(value)
           break
         case 'quantumWalk':
-          applyQuantumWalkPreset(value)
+          void applyQuantumWalkPreset(value)
           break
         case 'wheelerDeWitt':
-          applyWheelerDeWittPreset(value)
+          void applyWheelerDeWittPreset(value)
           break
         case 'pauliSpinor':
           applyPauliPresetById(value, setPauliConfig)

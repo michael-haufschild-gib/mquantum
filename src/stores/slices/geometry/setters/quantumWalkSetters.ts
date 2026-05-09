@@ -32,7 +32,7 @@ export function createQuantumWalkSetters(ctx: SetterContext): QuantumWalkSetters
 
   return {
     applyQuantumWalkPreset: (presetId) => {
-      loadPresetModule(
+      return loadPresetModule(
         () => import('@/lib/physics/quantumWalk/presets'),
         'schroedingerSlice',
         `quantum-walk presets for '${presetId}'`,

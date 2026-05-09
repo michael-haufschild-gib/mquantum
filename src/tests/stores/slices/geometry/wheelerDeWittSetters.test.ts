@@ -185,8 +185,7 @@ describe('wheelerDeWittSetters — applyWheelerDeWittPreset', () => {
   })
 
   it('writes physics fields from the preset and flips needsReset', async () => {
-    useExtendedObjectStore.getState().applyWheelerDeWittPreset('deSitterLargeLambda')
-    await new Promise((r) => setTimeout(r, 0))
+    await useExtendedObjectStore.getState().applyWheelerDeWittPreset('deSitterLargeLambda')
 
     expect(getWdw().boundaryCondition).toBe('noBoundary')
     expect(getWdw().cosmologicalConstant).toBeCloseTo(0.8)
@@ -201,8 +200,7 @@ describe('wheelerDeWittSetters — applyWheelerDeWittPreset', () => {
     useExtendedObjectStore.getState().setWdwStreamlinesEnabled(false)
     useExtendedObjectStore.getState().setWdwStreamlineDensity(12)
 
-    useExtendedObjectStore.getState().applyWheelerDeWittPreset('vilenkinTunneling')
-    await new Promise((r) => setTimeout(r, 0))
+    await useExtendedObjectStore.getState().applyWheelerDeWittPreset('vilenkinTunneling')
 
     expect(getWdw().boundaryCondition).toBe('tunneling')
     expect(getWdw().cosmologicalConstant).toBeCloseTo(0.3)
@@ -215,8 +213,7 @@ describe('wheelerDeWittSetters — applyWheelerDeWittPreset', () => {
 
   it('ignores unknown preset ids', async () => {
     const before = getWdw()
-    useExtendedObjectStore.getState().applyWheelerDeWittPreset('doesNotExist')
-    await new Promise((r) => setTimeout(r, 0))
+    await useExtendedObjectStore.getState().applyWheelerDeWittPreset('doesNotExist')
     const after = getWdw()
 
     expect(after.boundaryCondition).toBe(before.boundaryCondition)
@@ -230,8 +227,7 @@ describe('wheelerDeWittSetters — applyWheelerDeWittPreset', () => {
     useExtendedObjectStore.getState().clearWdwNeedsReset()
     const before = getWdw()
 
-    useExtendedObjectStore.getState().applyWheelerDeWittPreset('inflationHighMass')
-    await new Promise((r) => setTimeout(r, 0))
+    await useExtendedObjectStore.getState().applyWheelerDeWittPreset('inflationHighMass')
 
     expect(getWdw().gridNa).toBe(before.gridNa)
     expect(getWdw().gridNphi).toBe(before.gridNphi)
@@ -290,8 +286,7 @@ describe('wheelerDeWittSetters — applyWheelerDeWittPreset', () => {
 
   for (const preset of CURATED_PRESET_EXPECTATIONS) {
     it(`applies preset '${preset.id}' to the three physics fields`, async () => {
-      useExtendedObjectStore.getState().applyWheelerDeWittPreset(preset.id)
-      await new Promise((r) => setTimeout(r, 0))
+      await useExtendedObjectStore.getState().applyWheelerDeWittPreset(preset.id)
       const after = getWdw()
       expect(after.boundaryCondition).toBe(preset.boundaryCondition)
       expect(after.inflatonMass).toBeCloseTo(preset.inflatonMass, 6)

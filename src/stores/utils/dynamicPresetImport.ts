@@ -5,7 +5,7 @@
  * (`@/lib/physics/bec/presets`, `@/lib/physics/dirac/presets`, etc.) all
  * shared the same shape:
  *
- *   void import('@/...')
+ *   return import('@/...')
  *     .then(handler)
  *     .catch(err => logger.warn(`[label] Failed to load X for 'id':`, err))
  *
@@ -31,7 +31,9 @@ import { logger } from '@/lib/logger'
 
 /**
  * Lazy-load a preset module, run the handler, swallow load failures
- * with a contextual warn.
+ * with a contextual warn. The returned promise settles after the handler
+ * completes, so tests and scripted flows can await preset application instead
+ * of racing the dynamic import queue.
  *
  * @param importThunk - `() => import('@/lib/physics/.../presets')`. The
  *   literal `import(…)` MUST sit inside this thunk so Vite's bundler
@@ -50,8 +52,8 @@ export function loadPresetModule<T>(
   label: string,
   description: string,
   onModule: (mod: T) => void | Promise<void>
-): void {
-  void (async () => {
+): Promise<void> {
+  return (async () => {
     try {
       const mod = await importThunk()
       await onModule(mod)

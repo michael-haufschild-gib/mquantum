@@ -54,6 +54,19 @@ test.describe('GPU timing profiler', () => {
       // Let rendering stabilize for 2 seconds
       const fc = await getFrameCount(page)
       await waitForFrameAdvance(page, fc + 120)
+      await page.waitForFunction(
+        () => {
+          const store = window.__PERFORMANCE_METRICS_STORE__
+          if (!store) return false
+          const metrics = store.getState()
+          return (
+            metrics.passTimings.some((p) => !p.skipped && p.cpuTimeMs > 0) &&
+            metrics.cpuBreakdown.passesMs > 0
+          )
+        },
+        undefined,
+        { timeout: 10_000 }
+      )
 
       // Read GPU timings
       const data = await getPerformanceMetrics(page)
@@ -80,6 +93,26 @@ test.describe('GPU timing profiler', () => {
 
       // Sanity check
       expect(data.fps).toBeGreaterThan(0)
+      expect(
+        data.passTimings.length,
+        'expanded perf monitor must publish pass timings'
+      ).toBeGreaterThan(0)
+      expect(
+        data.passTimings.some((p) => !p.skipped && p.cpuTimeMs > 0),
+        'at least one active pass must report CPU timing'
+      ).toBe(true)
+      expect(
+        data.cpuBreakdown.passesMs,
+        'render-pass CPU breakdown must be populated'
+      ).toBeGreaterThan(0)
+      if (data.passTimings.some((p) => p.gpuTimeMs > 0)) {
+        expect(
+          data.totalGpuTimeMs,
+          'total GPU time must match non-zero pass GPU timings'
+        ).toBeGreaterThan(0)
+      } else {
+        console.log('  GPU timestamps unavailable or not yet populated; CPU pass timing verified')
+      }
     })
   }
 })

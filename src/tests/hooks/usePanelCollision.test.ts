@@ -64,7 +64,7 @@ function makeMotionValue(initial: number) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 // Constants from the hook (duplicated here to make test math explicit):
-// SIDEBAR_WIDTH=320, TOP_BAR_HEIGHT=48, BOTTOM_BAR_HEIGHT=48, GAP=16
+// SIDEBAR_WIDTH=320, TOP_BAR_HEIGHT=48, BOTTOM_BAR_HEIGHT=56, GAP=16
 // ANCHOR_TOP=80, ANCHOR_LEFT=16
 
 function resetLayout() {
@@ -145,11 +145,11 @@ describe('usePanelCollision', () => {
   it('clamps y above the bottom bar on desktop', () => {
     useLayoutStore.setState({ isCinematicMode: false })
     mockIsDesktop = true
-    // bottomBarHeight = 48, maxY = (800 - 48 - 16) - 80 - 50 = 606
+    // bottomBarHeight = 56, maxY = (800 - 56 - 16) - 80 - 50 = 598
     const x = makeMotionValue(200)
     const y = makeMotionValue(700) // below maxY
     renderHook(() => usePanelCollision(x as never, y as never, 100, 50, false))
-    expect(y.get()).toBe(606)
+    expect(y.get()).toBe(598)
   })
 
   // ── Cinematic mode: all constraints removed ────────────────────────────────
@@ -190,7 +190,7 @@ describe('usePanelCollision', () => {
     Object.defineProperty(window, 'innerHeight', { value: 120, writable: true, configurable: true })
     useLayoutStore.setState({ isCinematicMode: false })
     // topBarHeight=48, minY=48+16-80=-16
-    // bottomBarHeight=48, maxY=(120-48-16)-80-200=-224  → minY > maxY → newY = minY = -16
+    // bottomBarHeight=56, maxY=(120-56-16)-80-200=-232  → minY > maxY → newY = minY = -16
     const x = makeMotionValue(200)
     const y = makeMotionValue(0)
     renderHook(() => usePanelCollision(x as never, y as never, 100, 200, false))
@@ -216,14 +216,33 @@ describe('usePanelCollision', () => {
     expect(x.get()).toBe(320)
   })
 
-  // ── No bottom bar on mobile ────────────────────────────────────────────────
-  it('does not apply bottom bar constraint on mobile', () => {
+  // ── Mobile bottom bar follows mobile timeline visibility ──────────────────
+  it('applies bottom bar constraint on mobile when timeline controls are visible', () => {
     mockIsDesktop = false
-    useLayoutStore.setState({ isCinematicMode: false })
-    // bottomSpring = 0 (showBottomPanel = false on mobile)
+    useLayoutStore.setState({
+      isCinematicMode: false,
+      showLeftPanel: false,
+      isCollapsed: true,
+    })
+    // mobile timeline visible → bottomBarHeight = 56
+    // maxY = (800 - 56 - 16) - 80 - 50 = 598
+    const x = makeMotionValue(200)
+    const y = makeMotionValue(700)
+    renderHook(() => usePanelCollision(x as never, y as never, 100, 50, false))
+    expect(y.get()).toBe(598)
+  })
+
+  it('does not apply bottom bar constraint on mobile when a side panel hides timeline controls', () => {
+    mockIsDesktop = false
+    useLayoutStore.setState({
+      isCinematicMode: false,
+      showLeftPanel: true,
+      isCollapsed: true,
+    })
+    // mobile timeline hidden by left panel → bottomBarHeight = 0
     // maxY = (800 - 0 - 16) - 80 - 50 = 654
     const x = makeMotionValue(200)
-    const y = makeMotionValue(700) // above maxY=654 only if bottom bar is active
+    const y = makeMotionValue(700)
     renderHook(() => usePanelCollision(x as never, y as never, 100, 50, false))
     expect(y.get()).toBe(654)
   })

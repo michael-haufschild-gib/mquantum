@@ -19,6 +19,7 @@ import {
   DEFAULT_PREHEATING_CONFIG,
   FREE_SCALAR_MAX_TOTAL_SITES,
 } from '@/lib/geometry/extended/freeScalar'
+import { sanitizeQuantumWalkConfig } from '@/lib/geometry/extended/quantumWalk'
 import { normalizeTdseBlackHoleParams } from '@/lib/geometry/extended/tdse'
 import {
   DEFAULT_PAULI_CONFIG,
@@ -244,6 +245,14 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged
   }
   normalized = sanitizeComputeLatticeDims(normalized)
   normalized = normalizeDiracEnums(normalized)
+
+  const qw = normalized.quantumWalk
+  if (qw && typeof qw === 'object' && !Array.isArray(qw)) {
+    normalized = {
+      ...normalized,
+      quantumWalk: sanitizeQuantumWalkConfig(qw as typeof DEFAULT_SCHROEDINGER_CONFIG.quantumWalk),
+    }
+  }
 
   // Enforce the ℓ ≥ s physical invariant on TDSE black-hole parameters for
   // legacy scenes. The BH setters promote ℓ whenever the user raises s, but

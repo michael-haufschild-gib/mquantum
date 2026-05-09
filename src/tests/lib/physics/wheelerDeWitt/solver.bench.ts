@@ -19,11 +19,18 @@
 import { bench, describe } from 'vitest'
 
 import {
+  applyWdwPulseAlpha,
+  applyWdwPulseAlphaRows,
+  packWdwDensityGrid,
+  WDW_EUCLIDEAN_RENDER_HEADROOM,
+} from '@/lib/physics/wheelerDeWitt/densityGrid'
+import {
   solveWheelerDeWitt,
   type WheelerDeWittSolverInput,
 } from '@/lib/physics/wheelerDeWitt/solver'
 import { wdwOperatorResidual } from '@/lib/physics/wheelerDeWitt/solverDiagnostics'
 import {
+  buildPulseOverlay,
   buildStaticOverlay,
   DEFAULT_STREAMLINE_INPUT,
   integrateWkbTrajectories,
@@ -113,6 +120,80 @@ describe('Wheeler–DeWitt downstream — trajectory + overlay', () => {
     'Static overlay splat (default config)',
     () => {
       buildStaticOverlay(trajectories, DEFAULT_STREAMLINE_INPUT.splatRadius, out.gridSize)
+    },
+    { time: 500, warmupIterations: 3 }
+  )
+
+  const densityGridSize = 96
+  const pulseIntensityScratch = new Float32Array(
+    out.gridSize[0] * out.gridSize[1] * out.gridSize[2]
+  )
+  const pulseActiveScratch: number[] = []
+  const baselineDensity = new Uint16Array(4 * densityGridSize * densityGridSize * densityGridSize)
+  const baselineAlpha = new Float32Array(densityGridSize * densityGridSize * densityGridSize)
+  const workingDensity = new Uint16Array(4 * densityGridSize * densityGridSize * densityGridSize)
+  const rowDensity = new Uint16Array(4 * densityGridSize * densityGridSize * densityGridSize)
+  const pulseRowScratch = {}
+  packWdwDensityGrid(out, null, undefined, densityGridSize, WDW_EUCLIDEAN_RENDER_HEADROOM, {
+    density: baselineDensity,
+    baselineAlpha,
+  })
+  rowDensity.set(baselineDensity)
+
+  bench(
+    'Worldline pulse splat (default config)',
+    () => {
+      buildPulseOverlay(
+        trajectories,
+        0.37,
+        0.08,
+        DEFAULT_STREAMLINE_INPUT.splatRadius,
+        out.gridSize,
+        pulseIntensityScratch,
+        pulseActiveScratch
+      )
+    },
+    { time: 500, warmupIterations: 3 }
+  )
+
+  const pulseActiveIndices: number[] = []
+  const pulse = buildPulseOverlay(
+    trajectories,
+    0.37,
+    0.08,
+    DEFAULT_STREAMLINE_INPUT.splatRadius,
+    out.gridSize,
+    new Float32Array(out.gridSize[0] * out.gridSize[1] * out.gridSize[2]),
+    pulseActiveIndices
+  )
+
+  bench(
+    'Worldline alpha animation tick (96^3 density texture)',
+    () => {
+      applyWdwPulseAlpha(
+        baselineDensity,
+        baselineAlpha,
+        pulse,
+        out.gridSize,
+        densityGridSize,
+        workingDensity
+      )
+    },
+    { time: 500, warmupIterations: 3 }
+  )
+
+  bench(
+    'Worldline row-delta animation tick (96^3 density texture)',
+    () => {
+      applyWdwPulseAlphaRows(
+        baselineDensity,
+        baselineAlpha,
+        pulse,
+        out.gridSize,
+        densityGridSize,
+        rowDensity,
+        pulseRowScratch
+      )
     },
     { time: 500, warmupIterations: 3 }
   )

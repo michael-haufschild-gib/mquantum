@@ -15,6 +15,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  clampUiStateToPhiExtent,
   computeChampionFlips,
   SRMT_SWEEP_SPECTRA_TAIL_HEADER,
   SRMT_SWEEP_SPECTRA_TAIL_MARKER,
@@ -55,6 +56,55 @@ function mkPoint(
     computeMs: 15,
   }
 }
+
+describe('clampUiStateToPhiExtent', () => {
+  it('preserves negative phiRef values inside the symmetric phi domain', () => {
+    const state = {
+      kind: 'cut' as const,
+      points: 17,
+      sweepMin: 0.1,
+      sweepMax: 0.9,
+      phiRef: -0.75,
+      cutAnchor: 0.5,
+    }
+
+    expect(clampUiStateToPhiExtent(state, 1.0)).toBe(state)
+  })
+
+  it('clamps negative phiRef to -phiExtent after the phi window shrinks', () => {
+    const clamped = clampUiStateToPhiExtent(
+      {
+        kind: 'cut',
+        points: 17,
+        sweepMin: 0.1,
+        sweepMax: 0.9,
+        phiRef: -1.4,
+        cutAnchor: 0.5,
+      },
+      1.0
+    )
+
+    expect(clamped.phiRef).toBe(-1)
+  })
+
+  it('clamps phiRef sweep bounds symmetrically around zero', () => {
+    const clamped = clampUiStateToPhiExtent(
+      {
+        kind: 'phiRef',
+        points: 11,
+        sweepMin: -1.4,
+        sweepMax: 1.3,
+        phiRef: -1.2,
+        cutAnchor: 0.5,
+      },
+      1.0
+    )
+
+    expect(clamped.sweepMin).toBe(-1)
+    expect(clamped.sweepMax).toBe(1)
+    expect(clamped.phiRef).toBe(-1)
+  })
+})
 
 describe('SrmtSweepSection visibility', () => {
   beforeEach(() => {

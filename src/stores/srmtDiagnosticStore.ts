@@ -112,9 +112,15 @@ export interface SrmtDiagnosticState {
    */
   setClockQuality: (clock: SrmtClock, affineMatchQuality: number) => void
   /**
-   * Set the `computing` flag. Called from the worker dispatcher at batch
-   * start (`true`) and on final result / error / cancel (`false`). Bumps
-   * `version` so `useShallow` selectors re-render.
+   * Begin a fresh worker batch. Preserves the most recent snapshot for the
+   * faded stale-result view, but resets per-clock quality to the pending
+   * sentinel so progress reflects only the current batch.
+   */
+  beginSrmtComputing: () => void
+  /**
+   * Set the `computing` flag. Called from worker final result / error /
+   * cancel paths. Leaves snapshot + quality untouched. Bumps `version` so
+   * `useShallow` selectors re-render.
    */
   setSrmtComputing: (computing: boolean) => void
   /** Clear everything back to the initial state (bumps version). */
@@ -159,6 +165,14 @@ export const useSrmtDiagnosticStore = create<SrmtDiagnosticState>((set) => ({
         version: s.version + 1,
       }
     })
+  },
+
+  beginSrmtComputing: () => {
+    set((s) => ({
+      clockAffineQuality: createPendingClockQuality(),
+      computing: true,
+      version: s.version + 1,
+    }))
   },
 
   setSrmtComputing: (computing) => {

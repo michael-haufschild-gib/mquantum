@@ -308,19 +308,19 @@ function applyFirstPreset(
       store.applyTdsePreset(presetId)
       break
     case 'becDynamics':
-      store.applyBecPreset(presetId)
+      void store.applyBecPreset(presetId)
       break
     case 'diracEquation':
-      store.applyDiracPreset(presetId)
+      void store.applyDiracPreset(presetId)
       break
     case 'freeScalarField':
       store.applyFreeScalarPreset(presetId)
       break
     case 'quantumWalk':
-      store.applyQuantumWalkPreset(presetId)
+      void store.applyQuantumWalkPreset(presetId)
       break
     case 'wheelerDeWitt':
-      store.applyWheelerDeWittPreset(presetId)
+      void store.applyWheelerDeWittPreset(presetId)
       break
     case 'antiDeSitter':
       store.setAdsPreset(presetId as import('@/lib/geometry/extended/antiDeSitter').AdsPresetName)

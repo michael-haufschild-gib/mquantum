@@ -269,6 +269,7 @@ function readSliceSource(
   }
   const state = useWavefunctionSliceStore.getState()
   if (!state.hasData || !state.sliceData || state.sliceGridSize === 0) return null
+  if (state.sliceAxis !== axis) return null
   return { data: state.sliceData, gridSize: state.sliceGridSize, worldBound: state.sliceWorldBound }
 }
 
@@ -485,6 +486,7 @@ function appendWavefunctionSlices(payload: Record<string, unknown>): void {
   if (wfSlice.hasData && wfSlice.sliceData) {
     payload.wavefunctionSlice = {
       axis: wfSlice.sliceAxis,
+      quantumMode: wfSlice.sliceSourceMode,
       gridSize: wfSlice.sliceGridSize,
       worldBound: wfSlice.sliceWorldBound,
       positions: buildGridPositions(wfSlice.sliceGridSize, wfSlice.sliceWorldBound),

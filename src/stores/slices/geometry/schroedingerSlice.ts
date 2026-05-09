@@ -1,6 +1,9 @@
 import { StateCreator } from 'zustand'
 
-import { resizeQuantumWalkArrays } from '@/lib/geometry/extended/quantumWalk'
+import {
+  resizeQuantumWalkArrays,
+  sanitizeQuantumWalkConfig,
+} from '@/lib/geometry/extended/quantumWalk'
 import { SCHROEDINGER_PALETTE_DEFINITIONS } from '@/lib/geometry/extended/schroedinger/palettes'
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
 import {
@@ -521,6 +524,10 @@ export const createSchroedingerSlice: StateCreator<
           })
           const reconciled = reconcileCosmologyInvariants(sizedFreeScalar)
           schroedinger.freeScalar = { ...sizedFreeScalar, ...reconciled }
+        }
+        if (config.quantumWalk) {
+          const mergedQuantumWalk = { ...state.schroedinger.quantumWalk, ...config.quantumWalk }
+          schroedinger.quantumWalk = sanitizeQuantumWalkConfig(mergedQuantumWalk)
         }
         if (schroedinger.quantumMode === 'hydrogenNDCoupled' || config.angularChain) {
           schroedinger.angularChain = normalizeHydrogenCoupledAngularChain(

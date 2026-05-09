@@ -353,7 +353,7 @@ export function lanczosTopKOp(
 
     actualSteps = j + 1
 
-    if (b < betaFloor || j + 1 === maxIters) {
+    if (b <= betaFloor || j + 1 === maxIters) {
       // Either the Krylov subspace is exhausted (invariant subspace hit)
       // or we've reached the iteration cap. Either way, stop.
       break

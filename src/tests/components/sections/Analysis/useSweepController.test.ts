@@ -202,6 +202,58 @@ describe('useSweepController — poll interval', () => {
     expect(getEnt().sweepStatus).toBe('running')
     intervalSpy.mockRestore()
   })
+
+  it('records at most one sweep sample per new entanglement result', () => {
+    const { result } = renderHook(() => useSweepController())
+    act(() => {
+      result.current.handleStartSweep()
+    })
+
+    act(() => {
+      useCoordinateEntanglementStore.setState({
+        longTimeN: 20,
+        currentNormalizedEntropy: 0.25,
+      })
+      vi.advanceTimersByTime(500)
+    })
+    expect(getEnt().sweepEntropySamples).toBe(1)
+    expect(getEnt().sweepEntropyAccumulator).toBeCloseTo(0.25)
+
+    act(() => {
+      vi.advanceTimersByTime(500)
+    })
+    expect(getEnt().sweepEntropySamples).toBe(1)
+    expect(getEnt().sweepEntropyAccumulator).toBeCloseTo(0.25)
+
+    act(() => {
+      useCoordinateEntanglementStore.setState({
+        longTimeN: 21,
+        currentNormalizedEntropy: 0.75,
+      })
+      vi.advanceTimersByTime(500)
+    })
+    expect(getEnt().sweepEntropySamples).toBe(2)
+    expect(getEnt().sweepEntropyAccumulator).toBeCloseTo(1)
+  })
+
+  it('does not coerce an all-invalid measurement window into zero entropy', () => {
+    const { result } = renderHook(() => useSweepController())
+    act(() => {
+      result.current.handleStartSweep()
+    })
+
+    act(() => {
+      useCoordinateEntanglementStore.setState({
+        longTimeN: 30,
+        currentNormalizedEntropy: Number.NaN,
+      })
+      vi.advanceTimersByTime(500)
+    })
+
+    const sweepResults = getEnt().sweepResults
+    expect(sweepResults).toHaveLength(1)
+    expect(Number.isNaN(sweepResults[0]!.entropy)).toBe(true)
+  })
 })
 
 describe('useSweepController — unmount cleanup', () => {

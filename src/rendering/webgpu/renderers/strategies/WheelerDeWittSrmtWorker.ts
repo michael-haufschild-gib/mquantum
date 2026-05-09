@@ -441,7 +441,7 @@ export function queueSrmtCompute(
   for (const clock of ordered) {
     state.queue.push(argsByClock[clock])
   }
-  useSrmtDiagnosticStore.getState().setSrmtComputing(true)
+  useSrmtDiagnosticStore.getState().beginSrmtComputing()
   dispatchNextInQueue(state)
 }
 
@@ -484,13 +484,14 @@ export function dispatchSrmtCompute(state: SrmtWorkerState, args: SrmtDispatchAr
   state.queue = []
   state.selectedClock = null
   state.resultsByClock = createEmptyResultsByClock()
+  state.lastDispatchedHash = createEmptyLastDispatchedHash()
   state.lastDispatchedRankCap = createEmptyLastDispatchedRankCap()
   // Bump epoch so any stale in-flight reply for a different hash drops.
   state.epoch += 1
   state.inFlight = true
   state.lastDispatchedHash[args.clock] = args.hash
   state.lastDispatchedRankCap[args.clock] = args.rankCap
-  useSrmtDiagnosticStore.getState().setSrmtComputing(true)
+  useSrmtDiagnosticStore.getState().beginSrmtComputing()
   try {
     const worker = ensureWorker(state)
     const chiCopy = new Float32Array(args.output.chi)

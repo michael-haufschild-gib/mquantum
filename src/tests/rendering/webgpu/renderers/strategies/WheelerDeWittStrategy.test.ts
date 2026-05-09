@@ -7,8 +7,9 @@
  *       `worldlineSpeed`, or `worldlinePulseWidth` must never change the hash.
  *   (b) `executeFrame` re-packs the density texture every frame the worldline
  *       pulse is animating, even when the solver output is unchanged.
- *   (c) No re-pack while the worldline is enabled but playback is paused, and
- *       (b) does not short-circuit when the solver is genuinely dirty.
+ *   (c) Paused worldline draws a frozen pulse on dirty frames but does not
+ *       re-pack after the frame settles, and (b) does not short-circuit when
+ *       the solver is genuinely dirty.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -165,6 +166,17 @@ function makeContext(
   return { setupCtx: ctxShape, renderCtx: ctxShape }
 }
 
+function latestUploadAlphaCount(writeTexture: ReturnType<typeof vi.fn>): number {
+  const upload = writeTexture.mock.calls.at(-1)?.[1]
+  expect(upload).toBeInstanceOf(ArrayBuffer)
+  const density = new Uint16Array(upload as ArrayBuffer)
+  let nonZeroAlpha = 0
+  for (let i = 3; i < density.length; i += 4) {
+    if (density[i] !== 0) nonZeroAlpha++
+  }
+  return nonZeroAlpha
+}
+
 /** Fresh wdw config with worldline enabled and a modest grid to keep solver fast. */
 function smallWdwConfig(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -230,7 +242,7 @@ describe('WheelerDeWittStrategy.executeFrame', () => {
 
     // Second frame: solver is cached (hash unchanged, needsReset false),
     // but the worldline pulse is animating — expect a fresh repack.
-    render()
+    render({ accumulatedTime: 1.32 })
     expect(writeTexture.mock.calls.length).toBeGreaterThan(firstFrameWrites)
   })
 
@@ -238,10 +250,14 @@ describe('WheelerDeWittStrategy.executeFrame', () => {
     const wdw = smallWdwConfig({ worldlineEnabled: true })
     const { render } = setup(wdw, /* isPlaying */ false)
 
-    // First frame: solver runs + initial pack + one-shot worldline-toggle repack.
-    render()
+    // First frame: solver runs and packs the frozen pulse at the current
+    // accumulated time. Regression guard: this used to omit both the static
+    // streamline and travelling pulse when playback was paused, leaving a
+    // blank overlay until the user pressed play.
+    render({ accumulatedTime: 0 })
     const settledWrites = writeTexture.mock.calls.length
     expect(settledWrites).toBeGreaterThanOrEqual(1)
+    expect(latestUploadAlphaCount(writeTexture)).toBeGreaterThan(0)
 
     // Subsequent paused frames: no repack — solver clean, not animating,
     // and worldlineEnabled has not changed.

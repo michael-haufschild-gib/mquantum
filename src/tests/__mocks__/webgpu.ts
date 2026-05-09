@@ -297,9 +297,16 @@ function createWebGPUMock() {
     }),
     createTexture: vi.fn((desc) => {
       const t = trackedCreateTexture()
+      const size = desc.size
+      const width = Array.isArray(size) ? size[0] : (size.width ?? size)
+      const height = Array.isArray(size) ? (size[1] ?? 1) : (size.height ?? 1)
+      const depthOrArrayLayers = Array.isArray(size)
+        ? (size[2] ?? 1)
+        : (size.depthOrArrayLayers ?? 1)
       Object.assign(t, {
-        width: desc.size.width ?? desc.size,
-        height: desc.size.height ?? 1,
+        width,
+        height,
+        depthOrArrayLayers,
         format: desc.format,
         usage: desc.usage,
       })

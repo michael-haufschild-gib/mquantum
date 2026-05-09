@@ -173,14 +173,14 @@ describe('BEC setters', () => {
       // groundState → autoScaleMaxGain = 15 (explicit in renderingOverrides).
       // applyBecPreset is async (dynamic import); `vi.waitFor` polls until
       // the expected state appears, instead of racing a fixed 10ms sleep.
-      s.applyBecPreset('groundState')
+      await s.applyBecPreset('groundState')
       await vi.waitFor(() => {
         expect(useExtendedObjectStore.getState().schroedinger.autoScaleMaxGain).toBe(15)
       })
 
       // singleVortex does NOT declare autoScaleMaxGain — should fall back to
       // BEC_DEFAULT_RENDERING (20), not carry the stale 15 from groundState.
-      s.applyBecPreset('singleVortex')
+      await s.applyBecPreset('singleVortex')
       await vi.waitFor(() => {
         expect(useExtendedObjectStore.getState().schroedinger.autoScaleMaxGain).toBe(20)
       })
@@ -188,7 +188,7 @@ describe('BEC setters', () => {
 
     it('resets densityGain and densityContrast to preset values', async () => {
       const s = useExtendedObjectStore.getState()
-      s.applyBecPreset('singleVortex')
+      await s.applyBecPreset('singleVortex')
       await vi.waitFor(() => {
         const sc = useExtendedObjectStore.getState().schroedinger
         expect(sc.densityGain).toBe(0.2)

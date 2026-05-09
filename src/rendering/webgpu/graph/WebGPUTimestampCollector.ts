@@ -75,6 +75,9 @@ export class WebGPUTimestampCollector {
    * @param active - Whether a consumer (e.g. expanded perf monitor) needs GPU timing data
    */
   setCollectionActive(active: boolean): void {
+    if (this.collectionActive !== active) {
+      this.lastPassTimings.clear()
+    }
     this.collectionActive = active
   }
 

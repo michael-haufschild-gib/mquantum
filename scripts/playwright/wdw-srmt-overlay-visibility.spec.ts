@@ -144,10 +144,10 @@ test.describe('WdW SRMT overlay visibility (A-channel composited)', () => {
       const extStore = window.__EXTENDED_OBJECT_STORE__
       if (!extStore) throw new Error('__EXTENDED_OBJECT_STORE__ bridge missing')
       const s = extStore.getState() as Record<string, unknown>
-      const apply = s.applyWheelerDeWittPreset as ((id: string) => void) | undefined
+      const apply = s.applyWheelerDeWittPreset as ((id: string) => Promise<void>) | undefined
       const setEnabled = s.setWdwSrmtEnabled as ((v: boolean) => void) | undefined
       if (!apply) throw new Error('applyWheelerDeWittPreset missing')
-      apply('noBoundaryBaseline')
+      await apply('noBoundaryBaseline')
       if (setEnabled) setEnabled(false)
     })
     const frame0 = await getFrameCount(page)

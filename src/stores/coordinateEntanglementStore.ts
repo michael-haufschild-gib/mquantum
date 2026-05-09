@@ -391,7 +391,9 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
   completeSweepStep: () => {
     const state = get()
     const avg =
-      state.sweepEntropySamples > 0 ? state.sweepEntropyAccumulator / state.sweepEntropySamples : 0
+      state.sweepEntropySamples > 0
+        ? state.sweepEntropyAccumulator / state.sweepEntropySamples
+        : Number.NaN
 
     const point: AtlasSweepPoint = {
       lambda: state.sweepCurrentLambda,

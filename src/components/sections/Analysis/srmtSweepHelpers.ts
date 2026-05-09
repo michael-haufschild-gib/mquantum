@@ -410,12 +410,12 @@ export interface SrmtSweepUiState {
 
 /**
  * Return a UI-state clamped so `phiRef` (and, for `kind='phiRef'`, the
- * sweep bounds) stay inside `[0, phiExtent]`. Returns the original state
+ * sweep bounds) stay inside `[-phiExtent, phiExtent]`. Returns the original state
  * reference when no field changes, so React.useState short-circuits the
  * re-render when phiExtent grew rather than shrank.
  */
 export function clampUiStateToPhiExtent(s: SrmtSweepUiState, phiExtent: number): SrmtSweepUiState {
-  const clamp = (v: number): number => Math.min(Math.max(v, 0), phiExtent)
+  const clamp = (v: number): number => Math.min(Math.max(v, -phiExtent), phiExtent)
   const phiRef = clamp(s.phiRef)
   if (s.kind !== 'phiRef') {
     return phiRef === s.phiRef ? s : { ...s, phiRef }

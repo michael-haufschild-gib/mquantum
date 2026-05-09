@@ -233,17 +233,15 @@ export const useSrmtSweepStore = create<SrmtSweepState>((set) => ({
     set((s) => {
       if (s.status !== 'running') return s
       // Preserve accumulated points so the user can still inspect partial
-      // results after aborting. Clear transient fields (errorMessage,
-      // currentSolveIndex, config, wdwConfigSnapshot) so a subsequent
-      // startSweep doesn't carry stale state, and so an error banner from
-      // before cannot resurface.
+      // results after aborting. Keep the run metadata with those points so
+      // the plot/export labels cannot fall back to the currently selected UI
+      // kind and misdescribe the partial sweep. A subsequent startSweep
+      // replaces all of this state from idleState().
       return {
         status: 'idle',
         startedAt: 0,
         errorMessage: null,
         currentSolveIndex: -1,
-        config: null,
-        wdwConfigSnapshot: null,
         version: s.version + 1,
       }
     })

@@ -464,7 +464,7 @@ export interface SchroedingerSliceActions {
   setBecSlicePosition: (dimIndex: number, value: number) => void
   setBecCompactDim: (dimIndex: number, compact: boolean) => void
   setBecCompactRadius: (dimIndex: number, radius: number) => void
-  applyBecPreset: (presetId: string) => void
+  applyBecPreset: (presetId: string) => Promise<void>
   resetBecField: () => void
   clearBecNeedsReset: () => void
 
@@ -501,7 +501,7 @@ export interface SchroedingerSliceActions {
   setDiracNeedsReset: () => void
   clearDiracNeedsReset: () => void
   setDiracSlicePosition: (dimIndex: number, value: number) => void
-  applyDiracPreset: (presetId: string) => void
+  applyDiracPreset: (presetId: string) => Promise<void>
 
   // Wheeler–DeWitt Minisuperspace Configuration
   setWdwBoundaryCondition: (
@@ -527,7 +527,7 @@ export interface SchroedingerSliceActions {
   setWdwSrmtCutNormalized: (cut: number) => void
   setWdwSrmtRankCap: (cap: number) => void
   setWdwSrmtHeatmapIntensity: (intensity: number) => void
-  applyWheelerDeWittPreset: (presetId: string) => void
+  applyWheelerDeWittPreset: (presetId: string) => Promise<void>
   triggerWdwRecompute: () => void
   clearWdwNeedsReset: () => void
 
@@ -559,7 +559,7 @@ export interface SchroedingerSliceActions {
   applyFreeScalarPreset: (presetId: string) => void
 
   // Quantum Walk
-  applyQuantumWalkPreset: (presetId: string) => void
+  applyQuantumWalkPreset: (presetId: string) => Promise<void>
   resetQuantumWalk: () => void
   clearQuantumWalkNeedsReset: () => void
   setQwAutoScale: (autoScale: boolean) => void

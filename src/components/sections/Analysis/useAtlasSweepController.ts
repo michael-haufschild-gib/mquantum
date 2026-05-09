@@ -137,6 +137,11 @@ export function useAtlasSweepController(): {
 
   const handleStartAtlasSweep = (configOverride?: Partial<AtlasSweepConfig>) => {
     const atlasStore = useQuantumnessAtlasStore.getState()
+    // Guard against programmatic re-entry or a fast double-click before the
+    // UI reflects `running`. `startSweep()` itself no-ops while running, but
+    // the controller would still overwrite `snapshotRef` with mid-sweep
+    // physics and clear diagnostics before reaching that no-op.
+    if (atlasStore.status === 'running') return
     if (configOverride) {
       atlasStore.setConfig(configOverride)
     }

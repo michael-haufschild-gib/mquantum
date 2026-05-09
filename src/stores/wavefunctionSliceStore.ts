@@ -17,16 +17,23 @@ import { create } from 'zustand'
 /** Axis along which to extract the 1D slice. */
 export type SliceAxis = 'x' | 'y' | 'z'
 
+/** Quantum mode that produced or requested a captured wavefunction slice. */
+export type WavefunctionSliceSourceMode = string | null
+
 interface WavefunctionSliceState {
   /** Whether a slice capture has been requested by the UI */
   captureRequested: boolean
   /** Which axis to slice along */
   requestedAxis: SliceAxis
+  /** Quantum mode active when the request was made. */
+  requestedSourceMode: WavefunctionSliceSourceMode
 
   /** Captured slice data (|ψ|² along the requested axis at center of other axes) */
   sliceData: Float32Array | null
   /** Axis of the captured slice */
   sliceAxis: SliceAxis
+  /** Quantum mode that produced the captured data. */
+  sliceSourceMode: WavefunctionSliceSourceMode
   /** Number of grid points in the slice */
   sliceGridSize: number
   /** World-space half-extent for coordinate mapping */
@@ -35,7 +42,7 @@ interface WavefunctionSliceState {
   hasData: boolean
 
   /** Request a slice capture for the given axis */
-  requestCapture: (axis: SliceAxis) => void
+  requestCapture: (axis: SliceAxis, sourceMode?: WavefunctionSliceSourceMode) => void
   /**
    * Called by the render loop to deliver captured slice data.
    *
@@ -49,6 +56,7 @@ interface WavefunctionSliceState {
   fulfillCapture: (data: {
     sliceData: Float32Array
     axis: SliceAxis
+    sourceMode?: WavefunctionSliceSourceMode
     gridSize: number
     worldBound: number
   }) => void
@@ -73,19 +81,23 @@ interface WavefunctionSliceState {
 export const useWavefunctionSliceStore = create<WavefunctionSliceState>((set) => ({
   captureRequested: false,
   requestedAxis: 'x',
+  requestedSourceMode: null,
 
   sliceData: null,
   sliceAxis: 'x',
+  sliceSourceMode: null,
   sliceGridSize: 0,
   sliceWorldBound: 0,
   hasData: false,
 
-  requestCapture: (axis) => set({ captureRequested: true, requestedAxis: axis }),
+  requestCapture: (axis, sourceMode = null) =>
+    set({ captureRequested: true, requestedAxis: axis, requestedSourceMode: sourceMode }),
 
   fulfillCapture: (data) =>
     set({
       sliceData: data.sliceData,
       sliceAxis: data.axis,
+      sliceSourceMode: data.sourceMode ?? null,
       sliceGridSize: data.gridSize,
       sliceWorldBound: data.worldBound,
       hasData: true,
@@ -97,8 +109,10 @@ export const useWavefunctionSliceStore = create<WavefunctionSliceState>((set) =>
     set({
       captureRequested: false,
       requestedAxis: 'x',
+      requestedSourceMode: null,
       sliceData: null,
       sliceAxis: 'x',
+      sliceSourceMode: null,
       sliceGridSize: 0,
       sliceWorldBound: 0,
       hasData: false,

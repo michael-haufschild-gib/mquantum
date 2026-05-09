@@ -21,7 +21,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { jacobiEigendecompose } from '@/lib/math/jacobiEigenvalues'
-import { lanczosTopK } from '@/lib/physics/srmt/lanczos'
+import { lanczosTopK, lanczosTopKOp } from '@/lib/physics/srmt/lanczos'
 
 /** Deterministic LCG used for random test matrices. */
 function lcgRng(seed: number): () => number {
@@ -202,6 +202,19 @@ describe('lanczosTopK — edge cases', () => {
       expect(clipped[i]!).toBeGreaterThanOrEqual(0.5 - 1e-3)
       expect(clipped[i]!).toBeLessThanOrEqual(5 + 1e-3)
     }
+  })
+
+  it('stops on exact Krylov breakdown even when tolerance is zero', () => {
+    const out = lanczosTopKOp(
+      (_x, y) => {
+        y.fill(0)
+      },
+      5,
+      3,
+      0,
+      { tolerance: 0 }
+    )
+    expect(Array.from(out)).toEqual([0])
   })
 
   it('clips k to n when k > n', () => {

@@ -429,6 +429,7 @@ describe('exportWavefunctionSliceCSV', () => {
     useWavefunctionSliceStore.getState().fulfillCapture({
       sliceData: new Float32Array([0.2, 0.8, 0.2]),
       axis: 'y',
+      sourceMode: 'tdseDynamics',
       gridSize: 3,
       worldBound: 1.5,
     })
@@ -437,6 +438,18 @@ describe('exportWavefunctionSliceCSV', () => {
     const lines = csv.split('\n')
     expect(lines[0]).toBe('position_y,density')
     expect(lines).toHaveLength(4)
+  })
+
+  it('does not export a captured wavefunction slice under the wrong axis label', () => {
+    useWavefunctionSliceStore.getState().fulfillCapture({
+      sliceData: new Float32Array([0.2, 0.8, 0.2]),
+      axis: 'y',
+      sourceMode: 'tdseDynamics',
+      gridSize: 3,
+      worldBound: 1.5,
+    })
+
+    expect(exportWavefunctionSliceCSV('wavefunction', 'x')).toBe('')
   })
 })
 

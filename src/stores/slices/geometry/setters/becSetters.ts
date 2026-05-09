@@ -533,7 +533,7 @@ export function createBecSetters(ctx: SetterContext): BecActions {
       })
     },
     applyBecPreset: (presetId) => {
-      loadPresetModule(
+      return loadPresetModule(
         () => import('@/lib/physics/bec/presets'),
         'becSetters',
         `BEC presets for '${presetId}'`,

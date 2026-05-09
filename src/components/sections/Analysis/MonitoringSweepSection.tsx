@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/Button'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { NumberInput } from '@/components/ui/NumberInput'
 import { Sparkline } from '@/components/ui/Sparkline'
-import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
+import { useAnySweepRunning } from '@/hooks/useAnySweepRunning'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import {
@@ -27,7 +27,6 @@ import {
   type MonitoringSweepConfig,
   useMonitoringSweepStore,
 } from '@/stores/monitoringSweepStore'
-import { useQuantumnessAtlasStore } from '@/stores/quantumnessAtlasStore'
 
 /** Monitoring sweep controls and IPR display. */
 export const MonitoringSweepSection: React.FC = React.memo(() => {
@@ -186,11 +185,7 @@ export const MonitoringSweepSection: React.FC = React.memo(() => {
     return arr
   }, [results])
 
-  const entanglementSweepRunning = useCoordinateEntanglementStore(
-    (s) => s.sweepStatus === 'running'
-  )
-  const quantumnessAtlasSweepRunning = useQuantumnessAtlasStore((s) => s.status === 'running')
-  const otherSweepRunning = entanglementSweepRunning || quantumnessAtlasSweepRunning
+  const otherSweepRunning = useAnySweepRunning()
 
   if (!tdse?.stochasticEnabled) return null
 
@@ -224,7 +219,7 @@ export const MonitoringSweepSection: React.FC = React.memo(() => {
         collapsible
         defaultOpen
         data-testid="control-group-monitoring-sweep"
-        className={isRunning ? 'pointer-events-none opacity-70' : ''}
+        className={isRunning ? 'opacity-70' : ''}
         rightElement={
           <span className="font-mono text-xs">
             {isRunning && `${currentStep}/${config.steps}`}

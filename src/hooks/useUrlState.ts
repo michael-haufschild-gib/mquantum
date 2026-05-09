@@ -395,6 +395,7 @@ function applyWdwParams(
  * produced its first solver output. No-op when `sw` is absent.
  */
 function applySrmtSweepParams(urlState: ParsedShareableState): void {
+  if (urlState.quantumMode !== 'wheelerDeWitt') return
   if (!urlState.srmtSweepKind) return
   void import('@/stores/srmtSweepStore').then(({ useSrmtSweepStore }) => {
     useSrmtSweepStore.getState().setPendingSweep({

@@ -584,7 +584,7 @@ const projectRulesPlugin = {
         const fp = normalizePath(context.filename)
         if (!fp.includes('.test.')) return {}
         // Only apply to shader-related test files
-        if (!fp.includes('/shaders/') && !fp.includes('Wgsl')) return {}
+        if (!fp.includes('/shaders/') && !fp.toLowerCase().includes('/wgsl/')) return {}
 
         // Behavioral verbs that imply the test checks computation, not structure
         const BEHAVIORAL_RE = /\b(applies|computes|calculates|evaluates|produces|uses|operates|reads|writes)\b/i

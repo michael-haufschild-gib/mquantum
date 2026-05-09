@@ -15,6 +15,7 @@ import { MonitoringSweepSection } from '@/components/sections/Analysis/Monitorin
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useMonitoringSweepStore } from '@/stores/monitoringSweepStore'
+import { useSrmtSweepStore } from '@/stores/srmtSweepStore'
 
 const PRE_SWEEP_GAMMA = 2.5
 
@@ -38,6 +39,7 @@ describe('MonitoringSweepSection — snapshot and restore', () => {
   beforeEach(() => {
     useExtendedObjectStore.setState(useExtendedObjectStore.getInitialState())
     useMonitoringSweepStore.getState().reset()
+    useSrmtSweepStore.setState({ status: 'idle' })
     setupPreSweepTdse()
   })
 
@@ -58,6 +60,9 @@ describe('MonitoringSweepSection — snapshot and restore', () => {
     const user = userEvent.setup()
     render(<MonitoringSweepSection />)
     await user.click(screen.getByRole('button', { name: /^Start Sweep$/i }))
+    expect(screen.getByTestId('control-group-monitoring-sweep')).not.toHaveClass(
+      'pointer-events-none'
+    )
     await user.click(screen.getByRole('button', { name: /^Abort$/i }))
 
     expect(useMonitoringSweepStore.getState().status).toBe('idle')
@@ -78,12 +83,19 @@ describe('MonitoringSweepSection — snapshot and restore', () => {
     expect(getTdse().diagnosticsEnabled).toBe(false)
     expect(getTdse().stochasticGamma).toBe(PRE_SWEEP_GAMMA)
   })
+
+  it('disables Start Sweep when an SRMT sweep is running', () => {
+    useSrmtSweepStore.setState({ status: 'running' })
+    render(<MonitoringSweepSection />)
+    expect(screen.getByRole('button', { name: /^Start Sweep$/i })).toBeDisabled()
+  })
 })
 
 describe('MonitoringSweepSection — sweep tick dedup by readbackGeneration', () => {
   beforeEach(() => {
     useExtendedObjectStore.setState(useExtendedObjectStore.getInitialState())
     useMonitoringSweepStore.getState().reset()
+    useSrmtSweepStore.setState({ status: 'idle' })
     useDiagnosticsStore.getState().resetTdse()
     setupPreSweepTdse()
     vi.useFakeTimers({ shouldAdvanceTime: true })
