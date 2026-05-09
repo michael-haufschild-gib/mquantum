@@ -113,6 +113,22 @@ describe('andersonSweepStore', () => {
       expect(advanceResult).toBeCloseTo(wForStep(testConfig, 1))
       expect(useAndersonSweepStore.getState().currentStep).toBe(1)
     })
+
+    it('does not record non-finite or negative IPR diagnostics as sweep results', () => {
+      useAndersonSweepStore.getState().startSweep(testConfig)
+      useAndersonSweepStore.getState().tick(1.0, 0.01, 0.0001)
+
+      expect(useAndersonSweepStore.getState().tick(2.1, Number.NaN, 0.0001)).toBeNull()
+      expect(
+        useAndersonSweepStore.getState().tick(2.1, Number.POSITIVE_INFINITY, 0.0001)
+      ).toBeNull()
+      expect(useAndersonSweepStore.getState().tick(2.1, -0.01, 0.0001)).toBeNull()
+      expect(useAndersonSweepStore.getState().tick(2.1, 0.02, Number.NaN)).toBeNull()
+
+      const state = useAndersonSweepStore.getState()
+      expect(state.results).toEqual([])
+      expect(state.currentStep).toBe(0)
+    })
   })
 
   describe('abort', () => {

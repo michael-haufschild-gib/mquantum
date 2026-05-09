@@ -295,6 +295,7 @@ export const DiagnosticScatter: React.FC<{ results: AtlasPoint[] }> = React.memo
             r={2.5}
             fill={dimColor(r.dim, dims)}
             opacity={0.7}
+            data-testid="diagnostic-scatter-point"
           />
         ))}
         <line

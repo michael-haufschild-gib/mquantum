@@ -5,13 +5,40 @@
  * live observable readout, norm drift warning, characteristic scales.
  */
 
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { DiracAnalysisContent } from '@/components/sections/Analysis/DiracAnalysisSection'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+
+function setLiveDiracDiagnostics(
+  overrides: Partial<ReturnType<typeof useDiagnosticsStore.getState>['dirac']> = {}
+) {
+  useDiagnosticsStore.setState((s) => ({
+    dirac: {
+      ...s.dirac,
+      hasData: true,
+      particleFraction: 0.75,
+      antiparticleFraction: 0.25,
+      totalNorm: 0.9998,
+      normDrift: 0.002,
+      maxDensity: 0.0345,
+      comptonWavelength: 0.628,
+      zitterbewegungFreq: 3.14,
+      kleinThreshold: 2.0,
+      ...overrides,
+    },
+  }))
+}
+
+function parseSvgPoints(points: string): Array<{ x: number; y: number }> {
+  return points.split(' ').map((point) => {
+    const [x, y] = point.split(',').map(Number)
+    return { x: x!, y: y! }
+  })
+}
 
 describe('DiracAnalysisContent — diagnostics interval slider', () => {
   beforeEach(() => {
@@ -38,9 +65,19 @@ describe('DiracAnalysisContent — diagnostics interval slider', () => {
     await user.clear(numInput)
     await user.type(numInput, '25')
     await user.tab()
-    const interval = useExtendedObjectStore.getState().schroedinger.dirac.diagnosticsInterval
-    expect(interval).toBeGreaterThanOrEqual(1)
-    expect(interval).toBeLessThanOrEqual(60)
+    expect(useExtendedObjectStore.getState().schroedinger.dirac.diagnosticsInterval).toBe(25)
+  })
+
+  it('clamps number input edits to slider bounds on blur', async () => {
+    const user = userEvent.setup()
+    render(<DiracAnalysisContent />)
+    const numInput = screen.getByLabelText('Diagnostics Interval (frames) value')
+
+    await user.clear(numInput)
+    await user.type(numInput, '0')
+    await user.tab()
+
+    expect(useExtendedObjectStore.getState().schroedinger.dirac.diagnosticsInterval).toBe(1)
   })
 })
 
@@ -74,8 +111,7 @@ describe('DiracAnalysisContent — dispersion diagram', () => {
 
   it('renders k axis label', () => {
     render(<DiracAnalysisContent />)
-    const kLabels = screen.getAllByText('k')
-    expect(kLabels.length).toBeGreaterThan(0)
+    expect(within(screen.getByTestId('dirac-dispersion-svg')).getByText('k')).toBeInTheDocument()
   })
 
   it('renders E(k) axis label', () => {
@@ -91,6 +127,34 @@ describe('DiracAnalysisContent — dispersion diagram', () => {
   it('renders 2mc² mass gap label', () => {
     render(<DiracAnalysisContent />)
     expect(screen.getByText(/2mc²/)).toBeInTheDocument()
+  })
+
+  it('samples symmetric positive and negative dispersion branches around zero energy', () => {
+    render(<DiracAnalysisContent />)
+    const positive = parseSvgPoints(
+      screen.getByTestId('dirac-branch-positive').getAttribute('points') ?? ''
+    )
+    const negative = parseSvgPoints(
+      screen.getByTestId('dirac-branch-negative').getAttribute('points') ?? ''
+    )
+    const zeroLine = screen.getByTestId('dirac-zero-energy-line')
+    const zeroY = Number(zeroLine?.getAttribute('y1'))
+
+    expect(positive).toHaveLength(80)
+    expect(negative).toHaveLength(80)
+    expect(Number.isFinite(zeroY)).toBe(true)
+
+    for (let i = 1; i < positive.length; i++) {
+      expect(positive[i]!.x).toBeGreaterThan(positive[i - 1]!.x)
+      expect(negative[i]!.x).toBeGreaterThan(negative[i - 1]!.x)
+      expect(negative[i]!.x).toBeCloseTo(positive[i]!.x, 6)
+    }
+
+    const center = Math.floor(positive.length / 2)
+    expect(positive[center]!.y).toBeLessThan(zeroY)
+    expect(negative[center]!.y).toBeGreaterThan(zeroY)
+    expect(positive[0]!.y).toBeCloseTo(positive.at(-1)!.y, 6)
+    expect(negative[0]!.y).toBeCloseTo(negative.at(-1)!.y, 6)
   })
 })
 
@@ -111,20 +175,7 @@ describe('DiracAnalysisContent — diagnostics readout', () => {
   })
 
   it('renders live Dirac observables when hasData is true', () => {
-    useDiagnosticsStore.setState((s) => ({
-      dirac: {
-        ...s.dirac,
-        hasData: true,
-        particleFraction: 0.75,
-        antiparticleFraction: 0.25,
-        totalNorm: 0.9998,
-        normDrift: 0.002,
-        maxDensity: 0.0345,
-        comptonWavelength: 0.628,
-        zitterbewegungFreq: 3.14,
-        kleinThreshold: 2.0,
-      },
-    }))
+    setLiveDiracDiagnostics()
     render(<DiracAnalysisContent />)
     expect(screen.getByText(/Upper=75\.0%/)).toBeInTheDocument()
     expect(screen.getByText(/Lower=25\.0%/)).toBeInTheDocument()
@@ -135,40 +186,14 @@ describe('DiracAnalysisContent — diagnostics readout', () => {
   })
 
   it('shows norm drift in danger style when |drift| > 1%', () => {
-    useDiagnosticsStore.setState((s) => ({
-      dirac: {
-        ...s.dirac,
-        hasData: true,
-        particleFraction: 0.9,
-        antiparticleFraction: 0.1,
-        totalNorm: 0.95,
-        normDrift: -0.05,
-        maxDensity: 0.01,
-        comptonWavelength: 0.5,
-        zitterbewegungFreq: 1.0,
-        kleinThreshold: 1.0,
-      },
-    }))
+    setLiveDiracDiagnostics({ totalNorm: 0.95, normDrift: -0.05 })
     render(<DiracAnalysisContent />)
     const driftEl = screen.getByText(/Δ=-5\.00%/)
     expect(driftEl).toHaveClass('text-danger')
   })
 
   it('shows norm drift without danger when |drift| <= 1%', () => {
-    useDiagnosticsStore.setState((s) => ({
-      dirac: {
-        ...s.dirac,
-        hasData: true,
-        particleFraction: 0.9,
-        antiparticleFraction: 0.1,
-        totalNorm: 1.005,
-        normDrift: 0.005,
-        maxDensity: 0.01,
-        comptonWavelength: 0.5,
-        zitterbewegungFreq: 1.0,
-        kleinThreshold: 1.0,
-      },
-    }))
+    setLiveDiracDiagnostics({ totalNorm: 1.005, normDrift: 0.005 })
     render(<DiracAnalysisContent />)
     const driftEl = screen.getByText(/Δ=\+0\.50%/)
     expect(driftEl).not.toHaveClass('text-danger')

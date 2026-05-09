@@ -8,15 +8,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MIN_DIMENSION } from '@/constants/dimension'
 import { getShortcutLabel, SHORTCUTS, useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useAnimationStore } from '@/stores/animationStore'
+import { useCameraStore } from '@/stores/cameraStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { useLayoutStore } from '@/stores/layoutStore'
+import { useLightingStore } from '@/stores/lightingStore'
 import { useRotationStore } from '@/stores/rotationStore'
 
 describe('useKeyboardShortcuts', () => {
   beforeEach(() => {
     useAnimationStore.getState().reset()
+    useCameraStore.getState().registerCamera(null)
     useGeometryStore.getState().reset()
     useLayoutStore.getState().reset()
+    useLightingStore.getState().reset()
     useRotationStore.getState().resetAllRotations()
   })
 
@@ -130,6 +134,87 @@ describe('useKeyboardShortcuts', () => {
     })
 
     expect(useLayoutStore.getState().isCommandPaletteOpen).toBe(true)
+  })
+
+  it('toggles sidebars from the physical backslash key even when event.key is layout-specific', () => {
+    renderHook(() => useKeyboardShortcuts({ enabled: true }))
+
+    const rightEvent = new KeyboardEvent('keydown', {
+      key: 'ß',
+      code: 'Backslash',
+      cancelable: true,
+    })
+    window.dispatchEvent(rightEvent)
+    expect(rightEvent.defaultPrevented).toBe(true)
+    expect(useLayoutStore.getState().isCollapsed).toBe(true)
+
+    const leftEvent = new KeyboardEvent('keydown', {
+      key: '>',
+      code: 'IntlBackslash',
+      shiftKey: true,
+      cancelable: true,
+    })
+    window.dispatchEvent(leftEvent)
+    expect(leftEvent.defaultPrevented).toBe(true)
+    expect(useLayoutStore.getState().showLeftPanel).toBe(false)
+  })
+
+  it('routes selected-light shortcuts before global shortcuts', () => {
+    const firstAddedId = useLightingStore.getState().addLight('point')
+    expect(firstAddedId).toBe(useLightingStore.getState().selectedLightId)
+    if (firstAddedId === null) {
+      throw new Error('expected addLight to create a selected light for shortcut test')
+    }
+    renderHook(() => useKeyboardShortcuts({ enabled: true }))
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'e' }))
+    })
+    expect(useLightingStore.getState().transformMode).toBe('rotate')
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w' }))
+    })
+    expect(useLightingStore.getState().transformMode).toBe('translate')
+
+    const countBeforeDuplicate = useLightingStore.getState().lights.length
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd' }))
+    })
+    expect(useLightingStore.getState().lights).toHaveLength(countBeforeDuplicate + 1)
+    expect(useLightingStore.getState().selectedLightId).not.toBe(firstAddedId)
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete' }))
+    })
+    expect(useLightingStore.getState().lights).toHaveLength(countBeforeDuplicate)
+    expect(useLightingStore.getState().selectedLightId).toBeNull()
+  })
+
+  it('blocks camera reset while a light is selected, then restores it after deselect', () => {
+    const calls: string[] = []
+    useCameraStore.getState().registerCamera({
+      getState: () => ({ position: [1, 2, 3], target: [4, 5, 6] }),
+      setPosition: (x, y, z) => calls.push(`position:${x},${y},${z}`),
+      setTarget: (x, y, z) => calls.push(`target:${x},${y},${z}`),
+    })
+    useLightingStore.getState().addLight('spot')
+    renderHook(() => useKeyboardShortcuts({ enabled: true }))
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'r' }))
+    })
+    expect(calls).toEqual([])
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    })
+    expect(useLightingStore.getState().selectedLightId).toBeNull()
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'r' }))
+    })
+    expect(calls).toEqual(['position:0,3.125,7.5', 'target:0,0,0'])
   })
 })
 

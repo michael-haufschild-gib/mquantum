@@ -204,6 +204,8 @@ export const AndersonSweepSection: React.FC = React.memo(() => {
   }, [])
 
   const handleStart = useCallback(() => {
+    if (useAndersonSweepStore.getState().status !== 'idle') return
+
     const sweepConfig: SweepConfig = {
       wMin,
       wMax,
@@ -254,6 +256,20 @@ export const AndersonSweepSection: React.FC = React.memo(() => {
   const handleReset = useCallback(() => {
     useAndersonSweepStore.getState().reset()
     restoreTdseFields()
+  }, [restoreTdseFields])
+
+  useEffect(() => {
+    if (status === 'complete') restoreTdseFields()
+  }, [restoreTdseFields, status])
+
+  useEffect(() => {
+    return () => {
+      const sweepStatus = useAndersonSweepStore.getState().status
+      if (sweepStatus === 'running') {
+        useAndersonSweepStore.getState().abort()
+      }
+      restoreTdseFields()
+    }
   }, [restoreTdseFields])
 
   // Tick the sweep state machine when diagnostics update

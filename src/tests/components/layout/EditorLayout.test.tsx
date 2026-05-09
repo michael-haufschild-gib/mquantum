@@ -3,12 +3,14 @@
  */
 
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { EditorLayout } from '@/components/layout/EditorLayout'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { BREAKPOINTS } from '@/hooks/useMediaQuery'
 import { useLayoutStore } from '@/stores/layoutStore'
+import { useThemeStore } from '@/stores/themeStore'
 
 function renderLayout() {
   return render(
@@ -25,6 +27,7 @@ describe('EditorLayout', () => {
 
   beforeEach(() => {
     useLayoutStore.getState().reset()
+    useThemeStore.setState({ mode: 'dark', accent: 'magenta' })
   })
 
   afterEach(() => {
@@ -73,5 +76,45 @@ describe('EditorLayout', () => {
     })
     expect(useLayoutStore.getState().showLeftPanel).toBe(false)
     expect(useLayoutStore.getState().isCollapsed).toBe(true)
+  })
+
+  it('applies theme mode and accent to the document root', async () => {
+    mockDesktopViewport(true)
+    useThemeStore.setState({ mode: 'light', accent: 'green' })
+
+    renderLayout()
+
+    await waitFor(() => {
+      expect(document.documentElement).toHaveAttribute('data-mode', 'light')
+    })
+    expect(document.documentElement).toHaveAttribute('data-accent', 'green')
+  })
+
+  it('clears cinematic mode when fullscreen exits', async () => {
+    mockDesktopViewport(true)
+    useLayoutStore.setState({ isCinematicMode: true })
+    renderLayout()
+
+    expect(useLayoutStore.getState().isCinematicMode).toBe(true)
+    document.dispatchEvent(new Event('fullscreenchange'))
+
+    await waitFor(() => {
+      expect(useLayoutStore.getState().isCinematicMode).toBe(false)
+    })
+  })
+
+  it('cinematic mode hides top bar and exit button restores chrome', async () => {
+    mockDesktopViewport(true)
+    const user = userEvent.setup()
+    useLayoutStore.setState({ isCinematicMode: true })
+    renderLayout()
+
+    expect(screen.queryByTestId('top-bar')).not.toBeInTheDocument()
+    await user.click(screen.getByTestId('exit-cinematic'))
+
+    expect(useLayoutStore.getState().isCinematicMode).toBe(false)
+    await waitFor(() => {
+      expect(screen.getByTestId('top-bar')).toBeInTheDocument()
+    })
   })
 })

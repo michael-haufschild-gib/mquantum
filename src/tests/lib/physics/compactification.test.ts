@@ -263,13 +263,14 @@ describe('KK cross-function consistency', () => {
     const compactDims: boolean[] = [false, true]
     const rawRadii = [0.15, 5.0] // dim 1 will be clamped
 
-    const result = clampKKState(
-      0.01, gridSize, spacing, compactDims, rawRadii, 2, 1.0,
-      (dt) => dt
-    )
+    const result = clampKKState(0.01, gridSize, spacing, compactDims, rawRadii, 2, 1.0, (dt) => dt)
 
     const effSpacing = computeEffectiveSpacing(
-      gridSize, spacing, compactDims, result.compactRadii, 2
+      gridSize,
+      spacing,
+      compactDims,
+      result.compactRadii,
+      2
     )
 
     // Compact dim spacing should reflect the clamped radius, not the raw one
@@ -288,34 +289,19 @@ describe('KK cross-function consistency', () => {
 describe('computeMaxCompactRadius', () => {
   it('returns max extended extent / (2π) for mixed compact/extended dims', () => {
     // Extended dim 0: 64 * 0.1 = 6.4, dim 1 is compact, dim 2: 64 * 0.2 = 12.8
-    const rMax = computeMaxCompactRadius(
-      [64, 64, 64],
-      [0.1, 0.1, 0.2],
-      [false, true, false],
-      3
-    )
+    const rMax = computeMaxCompactRadius([64, 64, 64], [0.1, 0.1, 0.2], [false, true, false], 3)
     // max extended extent = 12.8, rMax = 12.8 / (2π)
     expect(rMax).toBeCloseTo(12.8 / (2 * Math.PI), 10)
   })
 
   it('uses grid0 fallback when all dims are compact', () => {
-    const rMax = computeMaxCompactRadius(
-      [32, 32, 32],
-      [0.1, 0.1, 0.1],
-      [true, true, true],
-      3
-    )
+    const rMax = computeMaxCompactRadius([32, 32, 32], [0.1, 0.1, 0.1], [true, true, true], 3)
     // All compact → fallback: (32 * 0.1) / (2π)
     expect(rMax).toBeCloseTo((32 * 0.1) / (2 * Math.PI), 10)
   })
 
   it('returns result based on no compact dims (all extended)', () => {
-    const rMax = computeMaxCompactRadius(
-      [64, 64],
-      [0.1, 0.15],
-      [false, false],
-      2
-    )
+    const rMax = computeMaxCompactRadius([64, 64], [0.1, 0.15], [false, false], 2)
     // Max extent = 64 * 0.15 = 9.6
     expect(rMax).toBeCloseTo(9.6 / (2 * Math.PI), 10)
   })
@@ -382,16 +368,7 @@ describe('clampKKState', () => {
       capturedSpacing.push([...spacing])
       return dt
     }
-    clampKKState(
-      0.01,
-      [64, 64],
-      [0.1, 0.1],
-      [false, true],
-      [0.15, 0.2],
-      2,
-      1.0,
-      captureDt
-    )
+    clampKKState(0.01, [64, 64], [0.1, 0.1], [false, true], [0.15, 0.2], 2, 1.0, captureDt)
     // Dim 0: extended → spacing = 0.1
     expect(capturedSpacing[0]![0]).toBe(0.1)
     // Dim 1: compact with R=0.2 → spacing = 2π*0.2/64

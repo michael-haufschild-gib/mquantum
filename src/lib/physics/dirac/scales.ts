@@ -70,4 +70,3 @@ export function maxStableDt(spacing: number[], c: number): number {
   const minSpacing = Math.min(...spacing)
   return minSpacing / (c * Math.sqrt(n))
 }
-

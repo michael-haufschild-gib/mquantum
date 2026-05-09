@@ -20,7 +20,6 @@ import { isAnalyticQuantumType } from '@/lib/geometry/registry'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
-
 /**
  * Selects the shared absorber state and setters.
  *

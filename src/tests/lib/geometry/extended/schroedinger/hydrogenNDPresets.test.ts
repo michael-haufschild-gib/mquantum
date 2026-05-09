@@ -17,34 +17,25 @@ import {
 describe('Hydrogen ND Presets', () => {
   describe('HYDROGEN_ND_PRESETS', () => {
     it('should have all expected ND presets', () => {
-      // 2D presets
-      expect(HYDROGEN_ND_PRESETS['1s_2d']).toHaveProperty('n')
-      expect(HYDROGEN_ND_PRESETS['2s_2d']).toHaveProperty('n')
-      expect(HYDROGEN_ND_PRESETS['2p_2d']).toHaveProperty('n')
-
-      // 3D presets
-      expect(HYDROGEN_ND_PRESETS['1s_3d']).toHaveProperty('n')
-      expect(HYDROGEN_ND_PRESETS['2s_3d']).toHaveProperty('n')
-      expect(HYDROGEN_ND_PRESETS['2pz_3d']).toHaveProperty('n')
-      expect(HYDROGEN_ND_PRESETS['3dz2_3d']).toHaveProperty('n')
-      expect(HYDROGEN_ND_PRESETS['3dxy_3d']).toHaveProperty('n')
-      expect(HYDROGEN_ND_PRESETS['4fz3_3d']).toHaveProperty('n')
-
-      // 4D presets
-      expect(HYDROGEN_ND_PRESETS['2pz_4d']).toHaveProperty('n')
-      expect(HYDROGEN_ND_PRESETS['3dz2_4d']).toHaveProperty('n')
-
-      // 5D presets
-      expect(HYDROGEN_ND_PRESETS['2pz_5d']).toHaveProperty('n')
-      expect(HYDROGEN_ND_PRESETS['3dz2_5d']).toHaveProperty('n')
-
-      // 6D presets
-      expect(HYDROGEN_ND_PRESETS['2pz_6d']).toHaveProperty('n')
-      expect(HYDROGEN_ND_PRESETS['3dz2_6d']).toHaveProperty('n')
-      expect(HYDROGEN_ND_PRESETS['4fz3_6d']).toHaveProperty('n')
-
-      // Custom
-      expect(HYDROGEN_ND_PRESETS['custom']).toHaveProperty('n')
+      expect(Object.keys(HYDROGEN_ND_PRESETS)).toEqual([
+        '1s_2d',
+        '2s_2d',
+        '2p_2d',
+        '1s_3d',
+        '2s_3d',
+        '2pz_3d',
+        '3dz2_3d',
+        '3dxy_3d',
+        '4fz3_3d',
+        '2pz_4d',
+        '3dz2_4d',
+        '2pz_5d',
+        '3dz2_5d',
+        '2pz_6d',
+        '3dz2_6d',
+        '4fz3_6d',
+        'custom',
+      ])
     })
 
     it('should have valid 3D quantum numbers for all presets', () => {
@@ -183,6 +174,24 @@ describe('Hydrogen ND Presets', () => {
   })
 
   describe('getHydrogenNDPresetsWithKeysByDimension', () => {
+    it('returns exact keys per dimension in registry order', () => {
+      const groups = getHydrogenNDPresetsWithKeysByDimension()
+
+      expect(Object.keys(groups).map(Number)).toEqual([2, 3, 4, 5, 6])
+      expect(groups[2]?.map(([key]) => key)).toEqual(['1s_2d', '2s_2d', '2p_2d'])
+      expect(groups[3]?.map(([key]) => key)).toEqual([
+        '1s_3d',
+        '2s_3d',
+        '2pz_3d',
+        '3dz2_3d',
+        '3dxy_3d',
+        '4fz3_3d',
+      ])
+      expect(groups[4]?.map(([key]) => key)).toEqual(['2pz_4d', '3dz2_4d'])
+      expect(groups[5]?.map(([key]) => key)).toEqual(['2pz_5d', '3dz2_5d'])
+      expect(groups[6]?.map(([key]) => key)).toEqual(['2pz_6d', '3dz2_6d', '4fz3_6d'])
+    })
+
     it('should return presets with their keys grouped by dimension', () => {
       const groups = getHydrogenNDPresetsWithKeysByDimension()
 
@@ -220,20 +229,28 @@ describe('Hydrogen ND Presets', () => {
   })
 
   describe('getPresetsForDimension', () => {
-    it('should return presets for exact dimension', () => {
-      const presets4d = getPresetsForDimension(4)
-
-      // Should include 4D presets
-      expect(presets4d.some((p) => p.name.includes('4D'))).toBe(true)
+    it('returns exact preset names up through the requested dimension', () => {
+      expect(getPresetsForDimension(4).map((p) => p.name)).toEqual([
+        '1s (Ground State)',
+        '2s',
+        '2px',
+        '1s (Ground State)',
+        '2s',
+        '2pz',
+        '3dz²',
+        '3dx²-y²',
+        '4fz³',
+        '2pz + 4D Ground',
+        '3dz² + 4D Ground',
+      ])
     })
 
     it('should return presets for lower dimensions too', () => {
       const presets6d = getPresetsForDimension(6)
 
-      // Should include 4D, 5D, and 6D presets
-      expect(presets6d.some((p) => p.dimension === 4)).toBe(true)
-      expect(presets6d.some((p) => p.dimension === 5)).toBe(true)
-      expect(presets6d.some((p) => p.dimension === 6)).toBe(true)
+      expect(presets6d.map((p) => p.dimension)).toEqual([
+        2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 5, 5, 6, 6, 6,
+      ])
     })
 
     it('should not include presets for higher dimensions', () => {

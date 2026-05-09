@@ -11,6 +11,12 @@ const DRAG_SENSITIVITY_PRECISE = 0.05
 /** Pixels of mouse movement to traverse full range */
 const DRAG_PIXELS_TO_FULL_RANGE = 200
 
+function snapToValidStep(value: number, step: number): number {
+  if (!Number.isFinite(step) || step <= 0) return value
+  const snapped = Math.round(value / step) * step
+  return Number.isFinite(snapped) ? snapped : value
+}
+
 /** Props for the {@link Slider} range input component. */
 export interface SliderProps {
   label: string
@@ -119,10 +125,7 @@ export const Slider: React.FC<SliderProps> = React.memo(
           const change = delta * (range / DRAG_PIXELS_TO_FULL_RANGE) * sensitivity
           let newValue = startValue + change
 
-          // Step snapping
-          if (step) {
-            newValue = Math.round(newValue / step) * step
-          }
+          newValue = snapToValidStep(newValue, step)
 
           newValue = Math.min(Math.max(newValue, min), max)
 

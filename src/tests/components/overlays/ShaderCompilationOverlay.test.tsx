@@ -38,9 +38,7 @@ describe('ShaderCompilationOverlay', () => {
       vi.advanceTimersByTime(1)
     })
 
-    // AnimatePresence may render multiple status elements during transition
-    const statuses = screen.getAllByRole('status')
-    expect(statuses.length).toBeGreaterThan(0)
+    expect(screen.getByTestId('shader-compilation-overlay')).toBeInTheDocument()
     expect(screen.getByText('Building HO 3D shader...')).toBeInTheDocument()
     expect(screen.getByText('This may take a moment')).toBeInTheDocument()
   })
@@ -70,7 +68,7 @@ describe('ShaderCompilationOverlay', () => {
     act(() => {
       vi.advanceTimersByTime(1)
     })
-    expect(screen.queryAllByRole('status').length).toBeGreaterThan(0)
+    expect(screen.getByTestId('shader-compilation-overlay')).toBeInTheDocument()
 
     // End compiling after 100ms (less than MIN_DISPLAY_TIME_MS=600)
     act(() => {
@@ -80,13 +78,13 @@ describe('ShaderCompilationOverlay', () => {
     rerender(<ShaderCompilationOverlay />)
 
     // Should still be visible (minimum display time not elapsed)
-    // AnimatePresence may render multiple status elements during transition
-    expect(screen.queryAllByRole('status').length).toBeGreaterThan(0)
+    expect(screen.getByTestId('shader-compilation-overlay')).toBeInTheDocument()
 
     // After remaining minimum time, should eventually hide
     act(() => {
       vi.advanceTimersByTime(600)
     })
+    expect(screen.queryByTestId('shader-compilation-overlay')).not.toBeInTheDocument()
   })
 
   it('updates message while compiling', () => {

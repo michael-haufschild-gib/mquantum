@@ -22,10 +22,17 @@ import {
 } from '@/lib/geometry/registry/helpers'
 
 describe('getObjectTypeEntry', () => {
-  it('returns entry for schroedinger', () => {
-    const entry = getObjectTypeEntry('schroedinger')
-    expect(entry).not.toBeUndefined()
-    expect(entry!.name).toContain('chr')
+  it('returns exact entries for registered object types', () => {
+    expect(getObjectTypeEntry('schroedinger')).toMatchObject({
+      type: 'schroedinger',
+      name: 'Schrödinger Slices',
+      configStoreKey: 'schroedinger',
+    })
+    expect(getObjectTypeEntry('pauliSpinor')).toMatchObject({
+      type: 'pauliSpinor',
+      name: 'Pauli Spinor',
+      configStoreKey: 'pauliSpinor',
+    })
   })
 
   it('returns undefined for invalid type', () => {
@@ -35,45 +42,45 @@ describe('getObjectTypeEntry', () => {
 })
 
 describe('isRaymarchingType', () => {
-  it('schroedinger uses raymarching', () => {
+  it('all registered object types use raymarching', () => {
     expect(isRaymarchingType('schroedinger')).toBe(true)
+    expect(isRaymarchingType('pauliSpinor')).toBe(true)
   })
 })
 
 describe('dimension constraints', () => {
-  it('schroedinger has valid dimension range', () => {
-    const constraints = getDimensionConstraints('schroedinger')
-    expect(constraints).not.toBeUndefined()
-    expect(constraints!.min).toBeGreaterThanOrEqual(1)
-    expect(constraints!.max).toBeLessThanOrEqual(11)
-    expect(constraints!.min).toBeLessThanOrEqual(constraints!.max)
+  it('returns exact dimension ranges', () => {
+    expect(getDimensionConstraints('schroedinger')).toMatchObject({
+      min: 2,
+      max: 11,
+      recommended: 4,
+    })
+    expect(getDimensionConstraints('pauliSpinor')).toMatchObject({
+      min: 3,
+      max: 6,
+      recommended: 3,
+    })
   })
 
-  it('getRecommendedDimension returns a value within range', () => {
-    const recommended = getRecommendedDimension('schroedinger')
-    const constraints = getDimensionConstraints('schroedinger')
-    expect(recommended).not.toBeUndefined()
-    expect(recommended!).toBeGreaterThanOrEqual(constraints!.min)
-    expect(recommended!).toBeLessThanOrEqual(constraints!.max)
+  it('returns exact recommended dimensions', () => {
+    expect(getRecommendedDimension('schroedinger')).toBe(4)
+    expect(getRecommendedDimension('pauliSpinor')).toBe(3)
   })
 })
 
 describe('isAvailableForDimension', () => {
-  it('returns true within valid range', () => {
-    const constraints = getDimensionConstraints('schroedinger')!
-    for (let d = constraints.min; d <= constraints.max; d++) {
-      expect(isAvailableForDimension('schroedinger', d)).toBe(true)
-    }
+  it('returns true at inclusive bounds for each object type', () => {
+    expect(isAvailableForDimension('schroedinger', 2)).toBe(true)
+    expect(isAvailableForDimension('schroedinger', 11)).toBe(true)
+    expect(isAvailableForDimension('pauliSpinor', 3)).toBe(true)
+    expect(isAvailableForDimension('pauliSpinor', 6)).toBe(true)
   })
 
-  it('returns false below min dimension', () => {
-    const constraints = getDimensionConstraints('schroedinger')!
-    expect(isAvailableForDimension('schroedinger', constraints.min - 1)).toBe(false)
-  })
-
-  it('returns false above max dimension', () => {
-    const constraints = getDimensionConstraints('schroedinger')!
-    expect(isAvailableForDimension('schroedinger', constraints.max + 1)).toBe(false)
+  it('returns false outside each range', () => {
+    expect(isAvailableForDimension('schroedinger', 1)).toBe(false)
+    expect(isAvailableForDimension('schroedinger', 12)).toBe(false)
+    expect(isAvailableForDimension('pauliSpinor', 2)).toBe(false)
+    expect(isAvailableForDimension('pauliSpinor', 7)).toBe(false)
   })
 
   it('returns false for invalid type', () => {
@@ -85,16 +92,17 @@ describe('isAvailableForDimension', () => {
 describe('getUnavailabilityReason', () => {
   it('returns undefined when available', () => {
     expect(getUnavailabilityReason('schroedinger', 4)).toBeUndefined()
+    expect(getUnavailabilityReason('pauliSpinor', 3)).toBeUndefined()
   })
 
-  it('returns reason when below min', () => {
-    const reason = getUnavailabilityReason('schroedinger', 1)
-    expect(reason).toContain('Requires')
+  it('returns exact lower-bound reason', () => {
+    expect(getUnavailabilityReason('schroedinger', 1)).toBe('Requires 2D+')
+    expect(getUnavailabilityReason('pauliSpinor', 2)).toBe('Requires 3D+')
   })
 
-  it('returns reason when above max', () => {
-    const reason = getUnavailabilityReason('schroedinger', 99)
-    expect(reason).toContain('Max')
+  it('returns exact upper-bound reason', () => {
+    expect(getUnavailabilityReason('schroedinger', 12)).toBe('Max 11D')
+    expect(getUnavailabilityReason('pauliSpinor', 7)).toBe('Max 6D')
   })
 
   it('returns reason for unknown type', () => {
@@ -105,25 +113,44 @@ describe('getUnavailabilityReason', () => {
 })
 
 describe('getAvailableTypesForDimension', () => {
-  it('returns at least one type for dimension 4', () => {
-    const types = getAvailableTypesForDimension(4)
-    expect(types.length).toBeGreaterThan(0)
-    expect(types.some((t) => t.type === 'schroedinger' && t.available)).toBe(true)
+  it('returns exact availability and disabled reasons at 2D', () => {
+    expect(getAvailableTypesForDimension(2)).toEqual([
+      {
+        type: 'schroedinger',
+        name: 'Schrödinger Slices',
+        description: 'Organic volumes from an N-dimensional wavefunction.',
+        available: true,
+        disabledReason: undefined,
+      },
+      {
+        type: 'pauliSpinor',
+        name: 'Pauli Spinor',
+        description:
+          'Two-component spinor wavefunction in a magnetic field. Visualizes spin precession and Stern-Gerlach splitting.',
+        available: false,
+        disabledReason: 'Requires 3D+',
+      },
+    ])
   })
 
-  it('each entry has required fields', () => {
-    const types = getAvailableTypesForDimension(5)
-    for (const t of types) {
-      expect(t.type).toEqual(expect.any(String))
-      expect(t.name).toEqual(expect.any(String))
-      expect([true, false]).toContain(t.available)
-    }
+  it('returns exact availability and disabled reasons above Pauli Spinor max', () => {
+    expect(
+      getAvailableTypesForDimension(7).map(({ type, available, disabledReason }) => ({
+        type,
+        available,
+        disabledReason,
+      }))
+    ).toEqual([
+      { type: 'schroedinger', available: true, disabledReason: undefined },
+      { type: 'pauliSpinor', available: false, disabledReason: 'Max 6D' },
+    ])
   })
 })
 
 describe('isValidObjectType', () => {
-  it('validates schroedinger', () => {
+  it('validates registered object types', () => {
     expect(isValidObjectType('schroedinger')).toBe(true)
+    expect(isValidObjectType('pauliSpinor')).toBe(true)
   })
 
   it('rejects invalid types', () => {
@@ -134,15 +161,18 @@ describe('isValidObjectType', () => {
 })
 
 describe('UI helpers', () => {
-  it('schroedinger has a controls component key', () => {
-    expect(getControlsComponentKey('schroedinger')).toEqual(expect.any(String))
+  it('returns exact controls component keys', () => {
+    expect(getControlsComponentKey('schroedinger')).toBe('SchroedingerControls')
+    expect(getControlsComponentKey('pauliSpinor')).toBe('PauliSpinorControls')
   })
 
-  it('schroedinger has timeline controls', () => {
-    expect([true, false]).toContain(hasTimelineControls('schroedinger'))
+  it('returns exact timeline-control support', () => {
+    expect(hasTimelineControls('schroedinger')).toBe(true)
+    expect(hasTimelineControls('pauliSpinor')).toBe(true)
   })
 
-  it('schroedinger has a config store key', () => {
+  it('returns exact config store keys', () => {
     expect(getConfigStoreKey('schroedinger')).toBe('schroedinger')
+    expect(getConfigStoreKey('pauliSpinor')).toBe('pauliSpinor')
   })
 })

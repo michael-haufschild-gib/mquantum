@@ -25,6 +25,7 @@ import {
   applyWdwPulseAlpha,
   applyWdwPulseAlphaRows,
   packWdwDensityGrid,
+  resetWdwPulseAlphaRows,
 } from '@/lib/physics/wheelerDeWitt/densityGrid'
 import type { WheelerDeWittSolverOutput } from '@/lib/physics/wheelerDeWitt/solver'
 import {
@@ -67,6 +68,39 @@ function makeOutput(Na: number, Nphi: number): WheelerDeWittSolverOutput {
     maxDensity: 1,
     columnAiry: [],
   }
+}
+
+function makeBaselineDensity(targetGridSize: number): {
+  baselineDensity: Uint16Array
+  baselineAlpha: Float32Array
+} {
+  const voxelCount = targetGridSize ** 3
+  const baselineDensity = new Uint16Array(4 * voxelCount)
+  for (let i = 0; i < baselineDensity.length; i++) {
+    baselineDensity[i] = (i * 37 + 11) & 0xffff
+  }
+  const baselineAlpha = new Float32Array(voxelCount).fill(0.05)
+  return { baselineDensity, baselineAlpha }
+}
+
+function solverIndex(
+  ia: number,
+  iPhi1: number,
+  iPhi2: number,
+  solverGridSize: [number, number, number]
+): number {
+  const [, Nphi] = solverGridSize
+  return ia * Nphi * Nphi + iPhi1 * Nphi + iPhi2
+}
+
+function makeSparsePulse(
+  activeIndex: number,
+  solverGridSize: [number, number, number]
+): { intensity: Float32Array; maxIntensity: number; activeIndices: number[] } {
+  const [Na, Nphi] = solverGridSize
+  const intensity = new Float32Array(Na * Nphi * Nphi)
+  intensity[activeIndex] = 1
+  return { intensity, maxIntensity: 1, activeIndices: [activeIndex] }
 }
 
 describe('Wheeler-DeWitt worldline pulse — fast path byte-equivalence', () => {
@@ -137,6 +171,94 @@ describe('Wheeler-DeWitt worldline pulse — fast path byte-equivalence', () => 
 
     expect(dirtyRows.length).toBeGreaterThan(0)
     expect(rowBuffer).toEqual(denseBuffer)
+  })
+
+  it('row-delta updater restores rows from the previous sparse pulse before applying a moved pulse', () => {
+    const solverGridSize: [number, number, number] = [8, 8, 8]
+    const targetGridSize = 8
+    const { baselineDensity, baselineAlpha } = makeBaselineDensity(targetGridSize)
+    const firstPulse = makeSparsePulse(solverIndex(1, 1, 1, solverGridSize), solverGridSize)
+    const movedPulse = makeSparsePulse(solverIndex(6, 6, 6, solverGridSize), solverGridSize)
+    const scratch = {}
+    const rowBuffer = new Uint16Array(baselineDensity)
+
+    const firstDirtyRows = [
+      ...applyWdwPulseAlphaRows(
+        baselineDensity,
+        baselineAlpha,
+        firstPulse,
+        solverGridSize,
+        targetGridSize,
+        rowBuffer,
+        scratch
+      ),
+    ]
+    expect(firstDirtyRows.length).toBeGreaterThan(0)
+
+    const denseMovedPulse = new Uint16Array(baselineDensity.length)
+    applyWdwPulseAlpha(
+      baselineDensity,
+      baselineAlpha,
+      movedPulse,
+      solverGridSize,
+      targetGridSize,
+      denseMovedPulse
+    )
+    const movedDirtyRows = [
+      ...applyWdwPulseAlphaRows(
+        baselineDensity,
+        baselineAlpha,
+        movedPulse,
+        solverGridSize,
+        targetGridSize,
+        rowBuffer,
+        scratch
+      ),
+    ]
+
+    expect(movedDirtyRows).toEqual(expect.arrayContaining(firstDirtyRows))
+    expect(new Set(movedDirtyRows).size).toBe(movedDirtyRows.length)
+    expect(movedDirtyRows.length).toBeGreaterThan(firstDirtyRows.length)
+    expect(rowBuffer).toEqual(denseMovedPulse)
+  })
+
+  it('resetWdwPulseAlphaRows clears stale row tracking after a full baseline upload', () => {
+    const solverGridSize: [number, number, number] = [8, 8, 8]
+    const targetGridSize = 8
+    const { baselineDensity, baselineAlpha } = makeBaselineDensity(targetGridSize)
+    const pulse = makeSparsePulse(solverIndex(1, 1, 1, solverGridSize), solverGridSize)
+    const scratch = {}
+    const rowBuffer = new Uint16Array(baselineDensity)
+
+    const dirtyRows = [
+      ...applyWdwPulseAlphaRows(
+        baselineDensity,
+        baselineAlpha,
+        pulse,
+        solverGridSize,
+        targetGridSize,
+        rowBuffer,
+        scratch
+      ),
+    ]
+    expect(dirtyRows.length).toBeGreaterThan(0)
+
+    resetWdwPulseAlphaRows(scratch)
+    rowBuffer.set(baselineDensity)
+    const postResetDirtyRows = [
+      ...applyWdwPulseAlphaRows(
+        baselineDensity,
+        baselineAlpha,
+        null,
+        solverGridSize,
+        targetGridSize,
+        rowBuffer,
+        scratch
+      ),
+    ]
+
+    expect(postResetDirtyRows).toEqual([])
+    expect(rowBuffer).toEqual(baselineDensity)
   })
 
   it('animation-tick with null pulse equals the baseline byte-for-byte', () => {

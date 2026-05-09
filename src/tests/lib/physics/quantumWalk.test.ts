@@ -526,9 +526,7 @@ describe('1D Hadamard walk: Konno limit distribution (Konno 2005)', () => {
     // Tolerance 5% accounts for O(1/t) corrections to the weak limit.
     const relError = Math.abs(scaledSecondMoment - konnoExpected) / konnoExpected
     expect(relError).toBeLessThan(0.05)
-  }, // can spike above the 5s default when the suite is parallelized. Bump // 1000 Hadamard steps on a 2048 grid runs ~4s under no contention and
-  // to 30s so the benchmark never times out during normal test runs.
-  30_000)
+  }, 30_000)
 
   it('E[X²/t²] convergence improves with more steps', () => {
     const gridSize = 2048
@@ -553,12 +551,7 @@ describe('1D Hadamard walk: Konno limit distribution (Konno 2005)', () => {
 
     // At t=1000 the error should be well below 5%
     expect(errors[2]).toBeLessThan(0.05)
-  }, // 2048-site lattice (200 + 500 + 1000 steps) and measures their second // Raised from the 5s default: this test runs three Hadamard walks on a
-  // moment, which is genuinely over the default budget on a cold cache.
-  // The prior "converges to …" test above runs a single 1000-step walk
-  // and already hits ~4s; stacking three walks here pushes it past 5s
-  // whenever anything else on the machine is contending for cycles.
-  30_000)
+  }, 30_000)
 
   it('symmetric initial state produces zero first moment (no drift)', () => {
     const gridSize = 2048

@@ -24,6 +24,52 @@ function setAudioConstructors(AudioContextCtor: unknown, webkitCtor: unknown): v
   })
 }
 
+const mockAudioParam = () => ({
+  value: 0,
+  setValueAtTime: vi.fn().mockReturnThis(),
+  linearRampToValueAtTime: vi.fn().mockReturnThis(),
+  exponentialRampToValueAtTime: vi.fn().mockReturnThis(),
+})
+
+class MinimalAudioContext {
+  sampleRate = 44100
+  currentTime = 0
+  destination = {}
+  state: AudioContext['state'] | 'interrupted' = 'running'
+  resume = vi.fn().mockResolvedValue(undefined)
+  createGain = vi.fn().mockReturnValue({
+    gain: mockAudioParam(),
+    connect: vi.fn(),
+  })
+  createOscillator = vi.fn().mockReturnValue({
+    connect: vi.fn(),
+    start: vi.fn(),
+    stop: vi.fn(),
+    frequency: mockAudioParam(),
+    type: 'sine',
+    onended: null,
+  })
+  createBuffer = vi.fn().mockImplementation((_ch: number, len: number, sr: number) => ({
+    numberOfChannels: 1,
+    length: len,
+    sampleRate: sr,
+    getChannelData: vi.fn().mockReturnValue(new Float32Array(len)),
+  }))
+  createBufferSource = vi.fn().mockReturnValue({
+    buffer: null,
+    connect: vi.fn(),
+    start: vi.fn(),
+    stop: vi.fn(),
+    onended: null,
+  })
+  createBiquadFilter = vi.fn().mockReturnValue({
+    type: 'lowpass',
+    frequency: mockAudioParam(),
+    Q: mockAudioParam(),
+    connect: vi.fn(),
+  })
+}
+
 describe('SoundManager state management', () => {
   beforeEach(() => {
     soundManager.toggle(true)
@@ -130,52 +176,8 @@ describe('SoundManager throttling', () => {
   const savedAudioContext = (window as WindowWithAudio).AudioContext
   const savedWebkitAudioContext = (window as WindowWithAudio).webkitAudioContext
 
-  const mockAudioParam = () => ({
-    value: 0,
-    setValueAtTime: vi.fn().mockReturnThis(),
-    linearRampToValueAtTime: vi.fn().mockReturnThis(),
-    exponentialRampToValueAtTime: vi.fn().mockReturnThis(),
-  })
-
   beforeEach(async () => {
     // Provide a minimal AudioContext so init() succeeds and play methods reach throttle logic
-    class MinimalAudioContext {
-      sampleRate = 44100
-      currentTime = 0
-      destination = {}
-      createGain = vi.fn().mockReturnValue({
-        gain: mockAudioParam(),
-        connect: vi.fn(),
-      })
-      createOscillator = vi.fn().mockReturnValue({
-        connect: vi.fn(),
-        start: vi.fn(),
-        stop: vi.fn(),
-        frequency: mockAudioParam(),
-        type: 'sine',
-        onended: null,
-      })
-      createBuffer = vi.fn().mockImplementation((_ch: number, len: number, sr: number) => ({
-        numberOfChannels: 1,
-        length: len,
-        sampleRate: sr,
-        getChannelData: vi.fn().mockReturnValue(new Float32Array(len)),
-      }))
-      createBufferSource = vi.fn().mockReturnValue({
-        buffer: null,
-        connect: vi.fn(),
-        start: vi.fn(),
-        stop: vi.fn(),
-        onended: null,
-      })
-      createBiquadFilter = vi.fn().mockReturnValue({
-        type: 'lowpass',
-        frequency: mockAudioParam(),
-        Q: mockAudioParam(),
-        connect: vi.fn(),
-      })
-    }
-
     setAudioConstructors(MinimalAudioContext, undefined)
 
     vi.resetModules()
@@ -274,6 +276,122 @@ describe('SoundManager initialization', () => {
     expect(() => manager.init()).not.toThrow()
     expect(manager.initialized).toBe(false)
     expect(manager.ctx).toBeNull()
+    expect(() => soundManager.playClick()).not.toThrow()
+  })
+
+  it('initializes on the first playClick call so the triggering click can produce audio', async () => {
+    setAudioConstructors(MinimalAudioContext, undefined)
+
+    const { soundManager } = await import('@/lib/audio/SoundManager')
+    const manager = soundManager as unknown as {
+      initialized: boolean
+      ctx: MinimalAudioContext | null
+    }
+
+    expect(manager.initialized).toBe(false)
+    soundManager.playClick()
+
+    expect(manager.initialized).toBe(true)
+    expect(manager.ctx?.createBufferSource).toHaveBeenCalledTimes(1)
+  })
+
+  it('initializes on the first playHover call instead of waiting for click or keydown', async () => {
+    setAudioConstructors(MinimalAudioContext, undefined)
+
+    const { soundManager } = await import('@/lib/audio/SoundManager')
+    const manager = soundManager as unknown as {
+      initialized: boolean
+      ctx: MinimalAudioContext | null
+    }
+
+    expect(manager.initialized).toBe(false)
+    soundManager.playHover()
+
+    expect(manager.initialized).toBe(true)
+    expect(manager.ctx?.createOscillator).toHaveBeenCalledTimes(1)
+  })
+
+  it('resumes suspended audio contexts before scheduling playback', async () => {
+    class SuspendedAudioContext extends MinimalAudioContext {
+      override state: AudioContext['state'] | 'interrupted' = 'suspended'
+      override resume = vi.fn().mockImplementation(() => {
+        this.state = 'running'
+        return Promise.resolve()
+      })
+    }
+
+    setAudioConstructors(SuspendedAudioContext, undefined)
+
+    const { soundManager } = await import('@/lib/audio/SoundManager')
+    const manager = soundManager as unknown as { ctx: SuspendedAudioContext | null }
+
+    soundManager.playClick()
+
+    expect(manager.ctx?.resume).toHaveBeenCalledTimes(1)
+    expect(manager.ctx?.createBufferSource).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not initialize audio while muted', async () => {
+    const constructorSpy = vi.fn()
+
+    class TrackingAudioContext extends MinimalAudioContext {
+      constructor() {
+        super()
+        constructorSpy()
+      }
+    }
+
+    setAudioConstructors(TrackingAudioContext, undefined)
+
+    const { soundManager } = await import('@/lib/audio/SoundManager')
+
+    soundManager.toggle(false)
+    soundManager.playClick()
+
+    expect(constructorSpy).not.toHaveBeenCalled()
+  })
+
+  it('drops a closed context without creating playback nodes', async () => {
+    const instances: MinimalAudioContext[] = []
+
+    class ClosedAudioContext extends MinimalAudioContext {
+      override state: AudioContext['state'] | 'interrupted' = 'closed'
+
+      constructor() {
+        super()
+        instances.push(this)
+      }
+    }
+
+    setAudioConstructors(ClosedAudioContext, undefined)
+
+    const { soundManager } = await import('@/lib/audio/SoundManager')
+    const manager = soundManager as unknown as {
+      initialized: boolean
+      ctx: ClosedAudioContext | null
+    }
+
+    expect(() => soundManager.playClick()).not.toThrow()
+
+    expect(instances).toHaveLength(1)
+    const closedContext = instances[0]
+    if (!closedContext) throw new Error('Expected closed audio context instance')
+    expect(closedContext.createBufferSource).not.toHaveBeenCalled()
+    expect(manager.initialized).toBe(false)
+    expect(manager.ctx).toBeNull()
+  })
+
+  it('does not let optional audio node failures break UI handlers', async () => {
+    class ThrowingAudioContext extends MinimalAudioContext {
+      override createBuffer = vi.fn().mockImplementation(() => {
+        throw new DOMException('audio backend unavailable', 'InvalidStateError')
+      })
+    }
+
+    setAudioConstructors(ThrowingAudioContext, undefined)
+
+    const { soundManager } = await import('@/lib/audio/SoundManager')
+
     expect(() => soundManager.playClick()).not.toThrow()
   })
 

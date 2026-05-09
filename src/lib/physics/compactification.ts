@@ -126,7 +126,13 @@ export function clampKKState(
     const r = compactRadii?.[d] ?? 0.15
     return compactDims?.[d] ? Math.max(0.01, Math.min(rMax, r)) : r
   })
-  const effSpacing = computeEffectiveSpacing(gridSize, spacing, compactDims, clampedRadii, latticeDim)
+  const effSpacing = computeEffectiveSpacing(
+    gridSize,
+    spacing,
+    compactDims,
+    clampedRadii,
+    latticeDim
+  )
   return { dt: clampDtFn(dt, effSpacing, latticeDim, mass), compactRadii: clampedRadii }
 }
 

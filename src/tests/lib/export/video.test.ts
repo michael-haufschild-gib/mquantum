@@ -16,22 +16,41 @@ vi.mock('mediabunny', () => {
 
   // Accept chunked options for StreamTarget
   class MockStreamTarget {
-    constructor(_writable: unknown, _options?: { chunked?: boolean; chunkSize?: number }) {}
+    writable: unknown
+    options?: { chunked?: boolean; chunkSize?: number }
+
+    constructor(writable: unknown, options?: { chunked?: boolean; chunkSize?: number }) {
+      this.writable = writable
+      this.options = options
+    }
   }
 
   // Accept fastStart option for Mp4OutputFormat
   class MockMp4OutputFormat {
-    constructor(_options?: { fastStart?: 'in-memory' | 'fragmented' | false }) {}
+    options?: { fastStart?: 'in-memory' | 'reserve' | 'fragmented' | false }
+
+    constructor(options?: { fastStart?: 'in-memory' | 'reserve' | 'fragmented' | false }) {
+      this.options = options
+    }
   }
 
   // Accept appendOnly option for WebMOutputFormat
   class MockWebMOutputFormat {
-    constructor(_options?: { appendOnly?: boolean }) {}
+    options?: { appendOnly?: boolean }
+
+    constructor(options?: { appendOnly?: boolean }) {
+      this.options = options
+    }
   }
 
   class MockOutput {
     private started = false
     private canceled = false
+    options: unknown
+
+    constructor(options: unknown) {
+      this.options = options
+    }
 
     addVideoTrack = vi.fn()
 
@@ -56,8 +75,12 @@ vi.mock('mediabunny', () => {
 
   class MockCanvasSource {
     private initialized = false
+    canvas: HTMLCanvasElement
+    config: unknown
 
-    constructor(_canvas: HTMLCanvasElement, _config: unknown) {
+    constructor(canvas: HTMLCanvasElement, config: unknown) {
+      this.canvas = canvas
+      this.config = config
       this.initialized = true
     }
 
@@ -107,6 +130,38 @@ describe('VideoRecorder', () => {
   describe('initialize', () => {
     it('should initialize recorder successfully', async () => {
       await expect(recorder.initialize()).resolves.not.toThrow()
+    })
+
+    it('normalizes encoder settings and track metadata before starting output', async () => {
+      const recorderWithInvalidEnums = new VideoRecorder(canvas, {
+        ...defaultOptions,
+        fps: 24,
+        format: 'webm',
+        codec: 'bogus-codec' as never,
+        bitrateMode: 'bogus-mode' as never,
+        hardwareAcceleration: 'bogus-hardware' as never,
+        rotation: 45 as never,
+      })
+
+      await recorderWithInvalidEnums.initialize()
+
+      const internal = recorderWithInvalidEnums as unknown as {
+        source: { canvas: HTMLCanvasElement; config: Record<string, unknown> }
+        output: { addVideoTrack: ReturnType<typeof vi.fn> }
+      }
+      expect(internal.source.canvas).toBe(canvas)
+      expect(internal.source.config).toMatchObject({
+        codec: 'vp9',
+        bitrate: 12_000_000,
+        bitrateMode: 'variable',
+        latencyMode: 'quality',
+        keyFrameInterval: 48,
+        hardwareAcceleration: 'prefer-software',
+      })
+      expect(internal.output.addVideoTrack).toHaveBeenCalledWith(internal.source, {
+        frameRate: 24,
+        rotation: 0,
+      })
     })
 
     it('should set isRecording to true after initialize', async () => {
@@ -234,6 +289,59 @@ describe('VideoRecorder', () => {
       expect(args?.[3]).toBe(canvas.width)
       expect(args?.[4]).toBe(canvas.height)
     })
+
+    it('clamps valid crop coordinates and letterboxes the cropped scene into export bounds', async () => {
+      canvas.width = 1000
+      canvas.height = 500
+      const recorderWithCrop = new VideoRecorder(canvas, {
+        ...defaultOptions,
+        width: 100,
+        height: 100,
+        crop: {
+          enabled: true,
+          x: -0.1,
+          y: 0.25,
+          width: 1.5,
+          height: 0.5,
+        },
+      })
+
+      await recorderWithCrop.initialize()
+
+      const drawImage = vi.fn()
+      ;(
+        recorderWithCrop as unknown as {
+          compositionCanvas: HTMLCanvasElement | null
+          compositionCtx: CanvasRenderingContext2D | null
+        }
+      ).compositionCanvas = document.createElement('canvas')
+      ;(
+        recorderWithCrop as unknown as {
+          compositionCanvas: HTMLCanvasElement | null
+          compositionCtx: CanvasRenderingContext2D | null
+        }
+      ).compositionCtx = {
+        globalCompositeOperation: 'source-over',
+        fillStyle: '#000000',
+        filter: 'none',
+        fillRect: vi.fn(),
+        drawImage,
+      } as unknown as CanvasRenderingContext2D
+
+      await recorderWithCrop.captureFrame(0, 1 / 60)
+
+      expect(drawImage).toHaveBeenCalledTimes(1)
+      const args = drawImage.mock.calls[0]
+      expect(args?.[0]).toBe(canvas)
+      expect(args?.[1]).toBe(0)
+      expect(args?.[2]).toBe(125)
+      expect(args?.[3]).toBe(1000)
+      expect(args?.[4]).toBe(250)
+      expect(args?.[5]).toBe(0)
+      expect(args?.[6]).toBeCloseTo(37.5, 12)
+      expect(args?.[7]).toBe(100)
+      expect(args?.[8]).toBeCloseTo(25, 12)
+    })
   })
 
   describe('finalize', () => {
@@ -320,6 +428,29 @@ describe('VideoRecorder', () => {
   })
 
   describe('streaming mode cleanup', () => {
+    it('finalize returns null for stream targets and explicitly closes the writable stream', async () => {
+      const closeFn = vi.fn().mockResolvedValue(undefined)
+      const mockWritable = { close: closeFn } as unknown as FileSystemWritableFileStream
+      const mockHandle = {
+        createWritable: vi.fn().mockResolvedValue(mockWritable),
+      } as unknown as FileSystemFileHandle
+
+      const streamRecorder = new VideoRecorder(canvas, {
+        ...defaultOptions,
+        streamHandle: mockHandle,
+      })
+
+      await streamRecorder.initialize()
+      await streamRecorder.captureFrame(0, 1 / 60)
+
+      await expect(streamRecorder.finalize()).resolves.toBeNull()
+      expect(mockHandle.createWritable).toHaveBeenCalledTimes(1)
+      expect(closeFn).toHaveBeenCalledTimes(1)
+      await expect(streamRecorder.captureFrame(1 / 60, 1 / 60)).rejects.toThrow(
+        'Recorder not initialized or not recording'
+      )
+    })
+
     it('should close writable stream on dispose', async () => {
       const closeFn = vi.fn().mockResolvedValue(undefined)
       const mockWritable = { close: closeFn } as unknown as FileSystemWritableFileStream

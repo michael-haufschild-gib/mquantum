@@ -125,6 +125,28 @@ describe('useCurrentBreakpoint', () => {
     const { result } = renderHook(() => useCurrentBreakpoint())
     expect(result.current).toBe(null)
   })
+
+  it('returns the largest matching breakpoint when multiple lower breakpoints also match', () => {
+    const matches = new Set([BREAKPOINTS.sm, BREAKPOINTS.md, BREAKPOINTS.lg])
+    window.matchMedia = vi
+      .fn()
+      .mockImplementation((query: string) => mockMatchMedia(matches.has(query)))
+
+    const { result } = renderHook(() => useCurrentBreakpoint())
+
+    expect(result.current).toBe('lg')
+  })
+
+  it('does not skip xl when 2xl is false but all lower breakpoints match', () => {
+    const matches = new Set([BREAKPOINTS.sm, BREAKPOINTS.md, BREAKPOINTS.lg, BREAKPOINTS.xl])
+    window.matchMedia = vi
+      .fn()
+      .mockImplementation((query: string) => mockMatchMedia(matches.has(query)))
+
+    const { result } = renderHook(() => useCurrentBreakpoint())
+
+    expect(result.current).toBe('xl')
+  })
 })
 
 describe('useIsMobile', () => {

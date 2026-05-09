@@ -22,7 +22,13 @@ import { createIdentityMatrix, multiplyMatrices, multiplyMatrixVector } from '@/
 import { composeRotations, createRotationMatrix, getRotationPlanes } from '@/lib/math/rotation'
 import { fcos, fsin } from '@/lib/math/trig'
 import { dotProduct, magnitude, normalize, subtractVectors } from '@/lib/math/vector'
-import { arbAngle, arbDim, arbMatrix, arbNonZeroVector, arbVector } from '@/tests/lib/math/arbitraries'
+import {
+  arbAngle,
+  arbDim,
+  arbMatrix,
+  arbNonZeroVector,
+  arbVector,
+} from '@/tests/lib/math/arbitraries'
 
 // ---------------------------------------------------------------------------
 // Helpers

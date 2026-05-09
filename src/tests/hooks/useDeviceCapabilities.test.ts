@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useDeviceCapabilities } from '@/hooks/useDeviceCapabilities'
 import { MOBILE_DEFAULT_MAX_FPS, MOBILE_DEFAULT_RESOLUTION_SCALE } from '@/lib/deviceCapabilities'
+import { useLightingStore } from '@/stores/lightingStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
 
 // Mock the deviceCapabilities module
@@ -36,6 +37,7 @@ describe('useDeviceCapabilities', () => {
       renderResolutionScale: 1.0,
       maxFps: 60,
     })
+    useLightingStore.getState().reset()
   })
 
   afterEach(() => {
@@ -112,6 +114,55 @@ describe('useDeviceCapabilities', () => {
       MOBILE_DEFAULT_RESOLUTION_SCALE
     )
     expect(usePerformanceStore.getState().maxFps).toBe(MOBILE_DEFAULT_MAX_FPS)
+  })
+
+  it('preserves explicit performance preferences on mobile GPUs', async () => {
+    localStorage.setItem('mdim_render_resolution_scale', '0.72')
+    localStorage.setItem('mdim_max_fps', '48')
+    usePerformanceStore.setState({
+      renderResolutionScale: 0.72,
+      maxFps: 48,
+    })
+
+    vi.mocked(detectDeviceCapabilities).mockResolvedValue({
+      gpuTier: 1,
+      isMobileGPU: true,
+      gpuName: 'adreno mobile gpu',
+      detectionType: 'BENCHMARK',
+      estimatedFps: 28,
+    })
+
+    renderHook(() => useDeviceCapabilities())
+
+    await waitFor(() => {
+      expect(usePerformanceStore.getState().deviceCapabilitiesDetected).toBe(true)
+    })
+
+    expect(usePerformanceStore.getState().renderResolutionScale).toBe(0.72)
+    expect(usePerformanceStore.getState().maxFps).toBe(48)
+  })
+
+  it('removes spotlights on mobile GPUs while preserving the default point light', async () => {
+    const spotId = useLightingStore.getState().addLight('spot')
+    expect(spotId).toBe(useLightingStore.getState().selectedLightId)
+    expect(useLightingStore.getState().lights.map((light) => light.type)).toEqual(['point', 'spot'])
+
+    vi.mocked(detectDeviceCapabilities).mockResolvedValue({
+      gpuTier: 1,
+      isMobileGPU: true,
+      gpuName: 'mali mobile gpu',
+      detectionType: 'BENCHMARK',
+      estimatedFps: 24,
+    })
+
+    renderHook(() => useDeviceCapabilities())
+
+    await waitFor(() => {
+      expect(usePerformanceStore.getState().deviceCapabilitiesDetected).toBe(true)
+    })
+
+    expect(useLightingStore.getState().lights.map((light) => light.type)).toEqual(['point'])
+    expect(useLightingStore.getState().selectedLightId).toBeNull()
   })
 
   it('should handle detect-gpu failure gracefully (tier 3 fallback)', async () => {

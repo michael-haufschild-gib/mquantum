@@ -9,6 +9,8 @@ export interface SelectOption<T extends string = string> {
   value: T
   /** The label displayed to the user */
   label: string
+  /** Whether this specific option should be unselectable */
+  disabled?: boolean
 }
 
 /** Props for the Select component */
@@ -110,6 +112,7 @@ export const Select = React.memo(
                 <option
                   key={option.value}
                   value={option.value}
+                  disabled={option.disabled}
                   className="bg-background text-text-primary"
                 >
                   {option.label}

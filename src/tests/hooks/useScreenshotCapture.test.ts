@@ -1,6 +1,7 @@
+import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { captureScreenshotAsync } from '@/hooks/useScreenshotCapture'
+import { captureScreenshotAsync, useScreenshotCapture } from '@/hooks/useScreenshotCapture'
 import { useScreenshotCaptureStore } from '@/stores/screenshotCaptureStore'
 
 describe('captureScreenshotAsync', () => {
@@ -90,5 +91,65 @@ describe('captureScreenshotAsync', () => {
     // The genuine completion (matching id) finally resolves the promise.
     useScreenshotCaptureStore.getState().setCapturedImage('data:image/png;base64,RIGHT', requestId)
     await expect(promise).resolves.toBe('data:image/png;base64,RIGHT')
+  })
+})
+
+describe('useScreenshotCapture', () => {
+  beforeEach(() => {
+    useScreenshotCaptureStore.setState({
+      status: 'idle',
+      capturedImage: null,
+      error: null,
+      requestId: 0,
+    })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('subscribes React callers to status, image, and error changes', () => {
+    const { result } = renderHook(() => useScreenshotCapture())
+
+    expect(result.current.status).toBe('idle')
+    expect(result.current.capturedImage).toBeNull()
+    expect(result.current.error).toBeNull()
+
+    let requestId = 0
+    act(() => {
+      requestId = useScreenshotCaptureStore.getState().requestCapture()
+    })
+    expect(result.current.status).toBe('capturing')
+
+    act(() => {
+      useScreenshotCaptureStore.getState().setCapturedImage('data:image/png;base64,HOOK', requestId)
+    })
+    expect(result.current.status).toBe('ready')
+    expect(result.current.capturedImage).toBe('data:image/png;base64,HOOK')
+    expect(result.current.error).toBeNull()
+  })
+
+  it('captureScreenshot resolves through the hook and leaves hook state ready', async () => {
+    const { result } = renderHook(() => useScreenshotCapture())
+
+    let promise: Promise<string> | null = null
+    act(() => {
+      promise = result.current.captureScreenshot()
+    })
+    if (promise === null) {
+      throw new Error('expected hook captureScreenshot to return a promise')
+    }
+    const requestId = useScreenshotCaptureStore.getState().requestId
+    expect(result.current.status).toBe('capturing')
+
+    act(() => {
+      useScreenshotCaptureStore
+        .getState()
+        .setCapturedImage('data:image/png;base64,HOOK-CALL', requestId)
+    })
+
+    await expect(promise).resolves.toBe('data:image/png;base64,HOOK-CALL')
+    expect(result.current.status).toBe('ready')
+    expect(result.current.capturedImage).toBe('data:image/png;base64,HOOK-CALL')
   })
 })

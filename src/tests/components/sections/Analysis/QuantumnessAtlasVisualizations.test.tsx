@@ -115,9 +115,13 @@ describe('DiagnosticScatter', () => {
     expect(screen.getByText(/● 5D/)).toBeInTheDocument()
   })
 
-  it('handles non-finite wigner negativity without crashing', () => {
+  it('keeps scatter coordinates finite when wigner negativity is non-finite', () => {
     const results = [makeAtlasPoint({ avgWignerNegativity: Infinity })]
-    expect(() => render(<DiagnosticScatter results={results} />)).not.toThrow()
+    render(<DiagnosticScatter results={results} />)
+
+    const [point] = screen.getAllByTestId('diagnostic-scatter-point') as [HTMLElement]
+    expect(point).toHaveAttribute('cx', expect.stringMatching(/^-?(?:\d+|\d*\.\d+)$/))
+    expect(point).toHaveAttribute('cy', expect.stringMatching(/^-?(?:\d+|\d*\.\d+)$/))
   })
 })
 
