@@ -1,7 +1,7 @@
 {
   "_": "Per-chunk gzip-size budgets in bytes. Match key is the chunk file name minus its 8-char content hash and `.js` extension (e.g. `shaders-schroedinger-DZSrQAL0.js` → `shaders-schroedinger`). The check script `scripts/check-bundle-size.js` enforces actuals <= budget for every observed chunk; budgets with no observed chunk also fail (catches stale entries) and chunks with no budget also fail (catches accidental new chunks).",
   "_lastMeasured": "2026-05-01",
-  "_methodology": "Run `pnpm run build:web` then `node scripts/check-bundle-size.js`. Headroom rule: large chunks (>10 kB) get ~10 % above the current actual; small chunks (1–10 kB) get ~15 % or +600 bytes (whichever is larger); tiny chunks (<1 kB) get an absolute 800-byte floor. The asymmetric rule prevents tiny chunks from ratcheting to 5×–10× their actual byte count just because absolute headroom needs a sane minimum.",
+  "_methodology": "Run `pnpm run build:web` then `pnpm run bundle:check`. Pre-commit runs this for bundle-impacting staged files so PR CI does not spend time failing late on bundle budgets. Headroom rule: large chunks (>10 kB) get ~10 % above the current actual; small chunks (1–10 kB) get ~15 % or +600 bytes (whichever is larger); tiny chunks (<1 kB) get an absolute 800-byte floor. The asymmetric rule prevents tiny chunks from ratcheting to 5×–10× their actual byte count just because absolute headroom needs a sane minimum.",
   "_ratchet": "Raise a budget only when the chunk grows for an intentional reason and you can name it in the PR description. Do not raise budgets to silence the alarm. Lower budgets opportunistically when chunks shrink so the headroom does not bloat over time.",
   "chunks": {
     "shaders-schroedinger": { "gzip": 215000 },
@@ -33,6 +33,7 @@
     "zustand": { "gzip": 2400 },
     "simulationState": { "gzip": 1800 },
     "diracAlgebraWorker": { "gzip": 1800 },
+    "image": { "gzip": 800 },
     "core-utils": { "gzip": 800 }
   }
 }

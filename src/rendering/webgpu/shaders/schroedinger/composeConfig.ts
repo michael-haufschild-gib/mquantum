@@ -13,11 +13,6 @@
 
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 
-import {
-  NODAL_DEFINITION_MAP,
-  NODAL_FAMILY_MAP,
-  NODAL_RENDER_MODE_MAP,
-} from '../../renderers/schrodingerRendererTypes'
 import type { WGSLShaderConfig } from '../shared/compose-helpers'
 import {
   generateMainBlockIsosurface,
@@ -28,6 +23,7 @@ import {
 } from './main.wgsl'
 import { generateMainBlock2D, generateMainBlock2DIsolines } from './main2D.wgsl'
 import { generateMainBlockWigner2D } from './mainWigner2D.wgsl'
+import { NODAL_DEFINITION_MAP, NODAL_FAMILY_MAP, NODAL_RENDER_MODE_MAP } from './temporalJitter'
 
 /** Quantum physics mode for Schrödinger visualization */
 export type QuantumModeForShader = 'harmonicOscillator' | 'hydrogenND' | 'hydrogenNDCoupled'

@@ -8,7 +8,6 @@
  */
 
 import { AXIS_LABELS } from '@/constants/dimension'
-import { generateTimestampFilename } from '@/lib/export/image'
 import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import type { AtlasPoint } from '@/stores/quantumnessAtlasStore'
@@ -585,7 +584,9 @@ export function downloadFile(
  * @returns Formatted filename
  */
 export function exportFilename(prefix: string, extension: string): string {
-  return `${generateTimestampFilename(prefix)}.${extension}`
+  const now = new Date()
+  const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19)
+  return `${prefix}-${timestamp}.${extension}`
 }
 
 // ─── Quantumness Atlas Export ───────────────────────────────────────────────

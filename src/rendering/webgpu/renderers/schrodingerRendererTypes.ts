@@ -28,6 +28,11 @@ import type { packLightingUniforms } from '../utils/lighting'
 
 /** Total byte size of the SchroedingerUniforms GPU buffer (derived from layout) */
 export { BAYER_OFFSETS } from '../shaders/schroedinger/temporalJitter'
+export {
+  NODAL_DEFINITION_MAP,
+  NODAL_FAMILY_MAP,
+  NODAL_RENDER_MODE_MAP,
+} from '../shaders/schroedinger/temporalJitter'
 export { SCHROEDINGER_UNIFORM_SIZE } from './schroedingerLayout'
 
 // ---------------------------------------------------------------------------
@@ -94,27 +99,6 @@ export function isFreeScalarAnalysisAlgorithm(algo: number | undefined): boolean
     algo >= COLOR_ALGORITHM_MAP.hamiltonianDecomposition! &&
     algo <= COLOR_ALGORITHM_MAP.kSpaceOccupation!
   )
-}
-
-/** Maps nodal line definition names to shader integer constants */
-export const NODAL_DEFINITION_MAP: Record<string, number> = {
-  psiAbs: 0,
-  realPart: 1,
-  imagPart: 2,
-  complexIntersection: 3,
-}
-
-/** Maps nodal family names to shader integer constants */
-export const NODAL_FAMILY_MAP: Record<string, number> = {
-  all: 0,
-  radial: 1,
-  angular: 2,
-}
-
-/** Maps nodal render mode names to shader integer constants */
-export const NODAL_RENDER_MODE_MAP: Record<string, number> = {
-  band: 0,
-  surface: 1,
 }
 
 /** Maps cross-section composite mode names to shader integer constants */

@@ -1,5 +1,5 @@
 /**
- * Temporal Sub-Pixel Jitter
+ * Schroedinger shader constants and temporal sub-pixel jitter.
  *
  * Shared WGSL code generator for Bayer-pattern sub-pixel jitter used by
  * temporal rendering modes. In quarter-res rendering, each pixel covers a
@@ -15,6 +15,27 @@ export const BAYER_OFFSETS: [number, number][] = [
   [1, 0],
   [0, 1],
 ]
+
+/** Maps nodal line definition names to shader integer constants. */
+export const NODAL_DEFINITION_MAP: Record<string, number> = {
+  psiAbs: 0,
+  realPart: 1,
+  imagPart: 2,
+  complexIntersection: 3,
+}
+
+/** Maps nodal family names to shader integer constants. */
+export const NODAL_FAMILY_MAP: Record<string, number> = {
+  all: 0,
+  radial: 1,
+  angular: 2,
+}
+
+/** Maps nodal render mode names to shader integer constants. */
+export const NODAL_RENDER_MODE_MAP: Record<string, number> = {
+  band: 0,
+  surface: 1,
+}
 
 /** Advance temporal Bayer state after the current frame has used `currentIndex`. */
 export function advanceTemporalBayerCycle(

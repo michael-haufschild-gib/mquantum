@@ -16,6 +16,7 @@ import {
 import { logger } from '@/lib/logger'
 import { reduceGridToFit } from '@/lib/math/ndArray'
 import { maxStableDt } from '@/lib/physics/dirac/scales'
+import { useAppearanceStore } from '@/stores/appearanceStore'
 import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
 
 import type { SchroedingerSliceActions } from '../types'
@@ -578,7 +579,6 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
                 if (ctx.get().schroedinger.dirac.fieldView !== expectedView) return
                 const algo = DIRAC_FIELD_VIEW_TO_COLOR_ALGO[expectedView]
                 if (algo) {
-                  const { useAppearanceStore } = await import('@/stores/appearanceStore')
                   useAppearanceStore.getState().setColorAlgorithm(algo)
                 }
               }
