@@ -263,15 +263,12 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
     const currentBipartitionEntropies = state.computeBipartitions ? result.bipartitionEntropies : []
     const mutualInfoMatrix = state.computePairwiseMI ? result.mutualInfo : null
     const currentWignerNegativities = state.computeWignerNegativity ? result.wignerNegativities : []
-    const currentAverageWignerNegativity = state.computeWignerNegativity
-      ? result.averageWignerNegativity
-      : 0
+    const hasComputedWigner =
+      state.computeWignerNegativity && result.wignerNegativities.some((v) => v !== null)
+    const currentAverageWignerNegativity = hasComputedWigner ? result.averageWignerNegativity : 0
 
     state.historyAverage[head] = result.averageEntropy
-    state.historyWignerNegativity[head] =
-      state.computeWignerNegativity && result.wignerNegativities.some((v) => v !== null)
-        ? result.averageWignerNegativity
-        : NaN
+    state.historyWignerNegativity[head] = hasComputedWigner ? result.averageWignerNegativity : NaN
 
     const newHead = (head + 1) % HISTORY_LENGTH
     const newCount = Math.min(state.historyCount + 1, HISTORY_LENGTH)

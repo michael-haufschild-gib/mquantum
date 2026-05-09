@@ -49,19 +49,20 @@ export function createQuantumWalkSetters(ctx: SetterContext): QuantumWalkSetters
               needsReset: true,
             }
             const resized = resizeQuantumWalkArrays(base, globalDim)
+            const appliedQuantumWalk = { ...base, ...resized, needsReset: true }
             const parentAbsorber =
               preset.overrides.absorberEnabled !== undefined
                 ? {
                     absorberEnabled: preset.overrides.absorberEnabled,
                     absorberWidth:
-                      preset.overrides.absorberWidth ?? state.schroedinger.absorberWidth,
+                      preset.overrides.absorberWidth ?? appliedQuantumWalk.absorberWidth,
                   }
                 : {}
             return {
               schroedinger: {
                 ...state.schroedinger,
                 ...parentAbsorber,
-                quantumWalk: { ...base, ...resized, needsReset: true },
+                quantumWalk: appliedQuantumWalk,
               },
             }
           })

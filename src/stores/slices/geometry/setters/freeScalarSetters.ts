@@ -228,6 +228,14 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
         const fs = state.schroedinger.freeScalar
         const maxPerDim = defaultGridPerDim(fs.latticeDim)
         const gridSize = fs.gridSize.map((s) => nearestPow2(s, 2, maxPerDim))
+        while (gridSize.reduce((a, b) => a * b, 1) > MAX_TOTAL_SITES) {
+          let maxIdx = 0
+          for (let i = 1; i < gridSize.length; i++) {
+            if (gridSize[i]! > gridSize[maxIdx]!) maxIdx = i
+          }
+          if (gridSize[maxIdx]! <= 2) break
+          gridSize[maxIdx] = gridSize[maxIdx]! / 2
+        }
 
         const staged = { ...fs, initialCondition: condition, gridSize, needsReset: true }
         const reconciled = reconcileCosmologyInvariants(staged)

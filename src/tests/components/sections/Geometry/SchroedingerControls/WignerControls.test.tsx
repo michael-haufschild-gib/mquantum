@@ -17,6 +17,23 @@ function makeActions() {
 }
 
 describe('WignerControls', () => {
+  it('maps loaded hydrogen-coupled core dimension indices back to the radial option', () => {
+    render(
+      <WignerControls
+        config={{
+          ...DEFAULT_SCHROEDINGER_CONFIG,
+          quantumMode: 'hydrogenNDCoupled',
+          representation: 'wigner',
+          wignerDimensionIndex: 2,
+        }}
+        dimension={5}
+        actions={makeActions()}
+      />
+    )
+
+    expect(screen.getByTestId('wigner-dimension-select')).toHaveValue('0')
+  })
+
   it('maps loaded hydrogen core dimension indices back to the radial option', () => {
     render(
       <WignerControls

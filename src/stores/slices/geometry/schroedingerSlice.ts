@@ -509,7 +509,13 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => {
         const schroedinger = { ...state.schroedinger, ...config }
         if (config.freeScalar) {
-          const mergedFreeScalar = { ...state.schroedinger.freeScalar, ...config.freeScalar }
+          let mergedFreeScalar = { ...state.schroedinger.freeScalar, ...config.freeScalar }
+          if (mergedFreeScalar.latticeDim !== state.schroedinger.freeScalar.latticeDim) {
+            mergedFreeScalar = {
+              ...mergedFreeScalar,
+              ...resizeFreeScalarArrays(mergedFreeScalar, mergedFreeScalar.latticeDim),
+            }
+          }
           const sizedFreeScalar = sanitizePowerOfTwoGridSizes(mergedFreeScalar, {
             maxTotalSites: FREE_SCALAR_MAX_TOTAL_SITES,
           })
