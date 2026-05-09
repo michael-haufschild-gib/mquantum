@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 
 // Dynamic imports of the renderer tree (scenePassSetup → WebGPUSchrodingerRenderer)
-// require module resolution through 100+ transitive dependencies. The default 5s
-// timeout is insufficient for the cold import; cached imports in subsequent tests are fast.
-vi.setConfig({ testTimeout: 10_000 })
+// require module resolution through 100+ transitive dependencies. Full-suite
+// worker contention can push the first cold import past 10s; cached imports in
+// subsequent tests are fast.
+vi.setConfig({ testTimeout: 30_000 })
 
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
 import type { WebGPURenderPass } from '@/rendering/webgpu/core/types'

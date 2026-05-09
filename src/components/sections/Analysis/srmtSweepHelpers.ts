@@ -18,14 +18,102 @@ import type {
 /**
  * Delimiter line marking the start of the per-point spectra tail block
  * emitted by {@link sweepPointsToCsv}. Legacy parsers that only consume
- * the main 29-column table should stop row accumulation when this line
+ * the main 30-column table should stop row accumulation when this line
  * appears — the rows that follow have a different schema (4 cells) and
- * would otherwise trip a `cells.length !== 29` guard.
+ * would otherwise trip fixed-width column guards.
  */
 export const SRMT_SWEEP_SPECTRA_TAIL_MARKER = '# ---- spectra tail ----'
 
 /** Column header for the tail block: one row per (point, clock, kind). */
 export const SRMT_SWEEP_SPECTRA_TAIL_HEADER = 'point,clock,kind,values'
+
+function isLineEnd(csv: string, idx: number): boolean {
+  if (idx >= csv.length) return true
+  const next = csv[idx]
+  return next === '\n' || next === '\r'
+}
+
+interface CsvScanStep {
+  inQuotedCell: boolean
+  lineStart: boolean
+  nextIndex: number
+}
+
+function tailMarkerStartsAt(
+  csv: string,
+  idx: number,
+  lineStart: boolean,
+  inQuotedCell: boolean
+): boolean {
+  if (inQuotedCell || !lineStart || !csv.startsWith(SRMT_SWEEP_SPECTRA_TAIL_MARKER, idx)) {
+    return false
+  }
+  const afterMarker = idx + SRMT_SWEEP_SPECTRA_TAIL_MARKER.length
+  return isLineEnd(csv, afterMarker)
+}
+
+function advanceQuoteScan(csv: string, idx: number, inQuotedCell: boolean): CsvScanStep {
+  if (inQuotedCell && csv[idx + 1] === '"') {
+    return { inQuotedCell, lineStart: false, nextIndex: idx + 1 }
+  }
+  return { inQuotedCell: !inQuotedCell, lineStart: false, nextIndex: idx }
+}
+
+function advanceLineBreakScan(csv: string, idx: number, inQuotedCell: boolean): CsvScanStep {
+  if (inQuotedCell) return { inQuotedCell, lineStart: false, nextIndex: idx }
+  const nextIndex = csv[idx] === '\r' && csv[idx + 1] === '\n' ? idx + 1 : idx
+  return { inQuotedCell, lineStart: true, nextIndex }
+}
+
+function advanceTailMarkerScan(csv: string, idx: number, inQuotedCell: boolean): CsvScanStep {
+  const ch = csv[idx]
+  if (ch === '"') return advanceQuoteScan(csv, idx, inQuotedCell)
+  if (ch === '\n' || ch === '\r') return advanceLineBreakScan(csv, idx, inQuotedCell)
+  return { inQuotedCell, lineStart: false, nextIndex: idx }
+}
+
+function findTailMarkerLine(csv: string): number {
+  let lineStart = true
+  let inQuotedCell = false
+  for (let i = 0; i < csv.length; i++) {
+    if (tailMarkerStartsAt(csv, i, lineStart, inQuotedCell)) return i
+    const next = advanceTailMarkerScan(csv, i, inQuotedCell)
+    inQuotedCell = next.inQuotedCell
+    lineStart = next.lineStart
+    i = next.nextIndex
+  }
+  return -1
+}
+
+function lineBreakLengthEndingAt(csv: string, idx: number): number {
+  if (idx <= 0) return 0
+  const prev = csv[idx - 1]
+  if (prev === '\n') return idx > 1 && csv[idx - 2] === '\r' ? 2 : 1
+  return prev === '\r' ? 1 : 0
+}
+
+function stripBlankSeparatorLine(csv: string, markerIdx: number): number {
+  const markerPrefixBreak = lineBreakLengthEndingAt(csv, markerIdx)
+  if (markerPrefixBreak === 0) return markerIdx
+  const separatorStart = markerIdx - markerPrefixBreak
+  const separatorPrefixBreak = lineBreakLengthEndingAt(csv, separatorStart)
+  return separatorPrefixBreak > 0 ? separatorStart : markerIdx
+}
+
+/**
+ * Split a full SRMT sweep CSV into its main-table text and optional
+ * spectra-tail text. Marker detection is structural: the marker must be
+ * an unquoted full line, so manifest text or RFC-4180 quoted cells that
+ * happen to contain the marker bytes do not truncate the main table.
+ */
+export function splitSrmtSweepCsv(csv: string): { main: string; tail: string | null } {
+  const markerIdx = findTailMarkerLine(csv)
+  if (markerIdx < 0) return { main: csv, tail: null }
+  const cutoff = stripBlankSeparatorLine(csv, markerIdx)
+  const main = csv.slice(0, cutoff)
+  const tail = csv.slice(markerIdx)
+  return { main, tail }
+}
 
 const SRMT_CLOCKS_IN_TAIL_ORDER: readonly SrmtClock[] = ['a', 'phi1', 'phi2']
 
@@ -138,7 +226,7 @@ function csvCell(value: string): string {
  *
  * ## Spectra tail block
  *
- * After the main 29-column table, a secondary table is appended:
+ * After the main 30-column table, a secondary table is appended:
  *
  * ```
  * # ---- spectra tail ----

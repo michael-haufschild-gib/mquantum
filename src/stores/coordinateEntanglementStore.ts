@@ -230,9 +230,23 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
   // ── Actions ─────────────────────────────────────────────────────────────
 
   setEnabled: (v) => set({ enabled: v }),
-  setComputePairwiseMI: (v) => set({ computePairwiseMI: v }),
-  setComputeBipartitions: (v) => set({ computeBipartitions: v }),
-  setComputeWignerNegativity: (v) => set({ computeWignerNegativity: v }),
+  setComputePairwiseMI: (v) =>
+    set((state) => ({
+      computePairwiseMI: v,
+      mutualInfoMatrix: v ? state.mutualInfoMatrix : null,
+    })),
+  setComputeBipartitions: (v) =>
+    set((state) => ({
+      computeBipartitions: v,
+      currentBipartitionEntropies: v ? state.currentBipartitionEntropies : [],
+    })),
+  setComputeWignerNegativity: (v) =>
+    set((state) => ({
+      computeWignerNegativity: v,
+      currentWignerNegativities: v ? state.currentWignerNegativities : [],
+      currentAverageWignerNegativity: v ? state.currentAverageWignerNegativity : 0,
+      historyWignerNegativity: v ? state.historyWignerNegativity : new Float64Array(HISTORY_LENGTH),
+    })),
 
   pushResult: (result) => {
     const state = get()
@@ -244,10 +258,18 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
     for (let d = 0; d < N && d < MAX_DIMS; d++) {
       state.historyEntropies[d]![head] = result.entropies[d] ?? NaN
     }
-    state.historyAverage[head] = result.averageEntropy
-    state.historyWignerNegativity[head] = result.wignerNegativities.some((v) => v !== null)
+    const currentBipartitionEntropies = state.computeBipartitions ? result.bipartitionEntropies : []
+    const mutualInfoMatrix = state.computePairwiseMI ? result.mutualInfo : null
+    const currentWignerNegativities = state.computeWignerNegativity ? result.wignerNegativities : []
+    const currentAverageWignerNegativity = state.computeWignerNegativity
       ? result.averageWignerNegativity
-      : NaN
+      : 0
+
+    state.historyAverage[head] = result.averageEntropy
+    state.historyWignerNegativity[head] =
+      state.computeWignerNegativity && result.wignerNegativities.some((v) => v !== null)
+        ? result.averageWignerNegativity
+        : NaN
 
     const newHead = (head + 1) % HISTORY_LENGTH
     const newCount = Math.min(state.historyCount + 1, HISTORY_LENGTH)
@@ -279,10 +301,10 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
       currentNormalizedEntropy: result.normalizedEntropy,
       currentMaxEntropies: result.maxEntropies,
       currentSpectrum: result.spectrum,
-      currentBipartitionEntropies: result.bipartitionEntropies,
-      currentWignerNegativities: result.wignerNegativities,
-      currentAverageWignerNegativity: result.averageWignerNegativity,
-      mutualInfoMatrix: result.mutualInfo,
+      currentBipartitionEntropies,
+      currentWignerNegativities,
+      currentAverageWignerNegativity,
+      mutualInfoMatrix,
       longTimeN: newLtN,
       longTimeAverage: newLtAvg,
       longTimeM2: newLtM2,

@@ -6,7 +6,8 @@
  * dispatch bookkeeping.
  */
 
-import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
+import { FREE_SCALAR_MAX_TOTAL_SITES, type FreeScalarConfig } from '@/lib/geometry/extended/types'
+import { sanitizePowerOfTwoGridSizes } from '@/lib/math/ndArray'
 
 /**
  * Runtime scalars captured at the save-request site. The three fields must
@@ -56,7 +57,9 @@ export function composeFsfSaveMetadata(runtime: FsfSaveRuntime): {
   gridSize: number[]
   componentCount: number
 } {
-  const fsfConfigSnapshot = runtime.freeScalar
+  const fsfConfigSnapshot = sanitizePowerOfTwoGridSizes(runtime.freeScalar, {
+    maxTotalSites: FREE_SCALAR_MAX_TOTAL_SITES,
+  })
   const gridSize = fsfConfigSnapshot.gridSize?.slice(0, fsfConfigSnapshot.latticeDim ?? 3) ?? [64]
   return {
     quantumMode: 'freeScalarField',

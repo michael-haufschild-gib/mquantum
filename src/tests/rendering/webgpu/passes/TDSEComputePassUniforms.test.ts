@@ -152,6 +152,34 @@ describe('writeTdseUniforms', () => {
     expect(u32[10]).toBe(128)
   })
 
+  it('sanitizes non-finite packet vectors before GPU upload', () => {
+    const uniformData = new ArrayBuffer(UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({
+        config: createTdseConfig({
+          packetCenter: [Number.NaN, Number.POSITIVE_INFINITY, -1],
+          packetMomentum: [4, Number.NaN, Number.NEGATIVE_INFINITY],
+        }),
+      })
+    )
+
+    expect(f32[44]).toBe(0)
+    expect(f32[45]).toBe(0)
+    expect(f32[46]).toBe(-1)
+    expect(f32[56]).toBe(4)
+    expect(f32[57]).toBe(0)
+    expect(f32[58]).toBe(0)
+  })
+
   it('computes kGridScale = 2π/(N·a) for each dimension', () => {
     const uniformData = new ArrayBuffer(UNIFORM_SIZE)
     const u32 = new Uint32Array(uniformData)

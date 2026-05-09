@@ -304,6 +304,8 @@ export function validateSpacetimeDim(spacetimeDim: number): void {
  *   `scaleFactorAmplitude` — see `background.ts`). Without this check the
  *   compute pass could crash at reset time despite `isValidPreset` returning
  *   `true`, because `qExponent` only consults `spacetimeDim` for de Sitter.
+ * - **Bianchi-Kasner:** requires 3+1 dimensions, finite exponents, and a
+ *   positive-η gauge that maps to positive real proper time (`Σp ≤ n−1`).
  * - **ekpyrotic:** covered by `qExponent` (requires `steepness > s_c(n)`).
  * - **kasner / minkowski:** no extra parameters.
  *
@@ -346,7 +348,7 @@ export function isValidPreset(params: CosmologyPresetParams): boolean {
     if (!exp || !Number.isFinite(exp.p1) || !Number.isFinite(exp.p2) || !Number.isFinite(exp.p3)) {
       return false
     }
-    return true
+    return exp.p1 + exp.p2 + exp.p3 <= params.spacetimeDim - 1 + 1e-12
   }
   try {
     qExponent(params)

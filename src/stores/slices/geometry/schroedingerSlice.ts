@@ -11,6 +11,7 @@ import {
   createDefaultSchroedingerConfig,
   DEFAULT_SCHROEDINGER_CONFIG,
   type DiracConfig,
+  FREE_SCALAR_MAX_TOTAL_SITES,
   type FreeScalarConfig,
   SCHROEDINGER_QUALITY_PRESETS,
   SchroedingerColorMode,
@@ -20,6 +21,8 @@ import {
 } from '@/lib/geometry/extended/types'
 import { isHydrogenFamilyQuantumType } from '@/lib/geometry/registry'
 import { logger } from '@/lib/logger'
+import { sanitizePowerOfTwoGridSizes } from '@/lib/math/ndArray'
+import { normalizeHydrogenCoupledAngularChain } from '@/lib/physics/hydrogenCoupled/presets'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
 
@@ -197,7 +200,10 @@ export const createSchroedingerSlice: StateCreator<
 
   const isFiniteSchroedingerInput = (value: number): boolean => Number.isFinite(value)
   const hasOnlyFiniteNumbers = (values: number[]): boolean =>
-    values.every((value) => Number.isFinite(value))
+    Array.isArray(values) &&
+    Array.from({ length: values.length }, (_, i) => values[i]).every((value) =>
+      Number.isFinite(value)
+    )
 
   const warnNonFiniteSchroedingerInput = (name: string, value: unknown): void => {
     logger.warn(`[schroedingerSlice] Ignoring non-finite input for ${name}:`, value)
@@ -612,9 +618,27 @@ export const createSchroedingerSlice: StateCreator<
 
     // === Config Operations ===
     setSchroedingerConfig: (config) => {
-      setWithVersion((state) => ({
-        schroedinger: { ...state.schroedinger, ...config },
-      }))
+      setWithVersion((state) => {
+        const schroedinger = { ...state.schroedinger, ...config }
+        if (config.freeScalar) {
+          const mergedFreeScalar = { ...state.schroedinger.freeScalar, ...config.freeScalar }
+          const sizedFreeScalar = sanitizePowerOfTwoGridSizes(mergedFreeScalar, {
+            maxTotalSites: FREE_SCALAR_MAX_TOTAL_SITES,
+          })
+          const reconciled = reconcileCosmologyInvariants(sizedFreeScalar)
+          schroedinger.freeScalar = { ...sizedFreeScalar, ...reconciled }
+        }
+        if (schroedinger.quantumMode === 'hydrogenNDCoupled' || config.angularChain) {
+          schroedinger.angularChain = normalizeHydrogenCoupledAngularChain(
+            schroedinger.angularChain,
+            {
+              l1: schroedinger.azimuthalQuantumNumber,
+              magneticM: schroedinger.magneticQuantumNumber,
+            }
+          )
+        }
+        return { schroedinger }
+      })
     },
 
     initializeSchroedingerForDimension: (dimension) => {

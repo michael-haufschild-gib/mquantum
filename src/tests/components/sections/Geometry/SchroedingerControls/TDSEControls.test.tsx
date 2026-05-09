@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { TDSEControls } from '@/components/sections/Geometry/SchroedingerControls/TDSEControls'
@@ -188,6 +188,36 @@ describe('TDSEControls', () => {
     const select = screen.getByTestId('tdse-grid-size')
     fireEvent.change(select, { target: { value: '32' } })
     expect(actions.setGridSize).toHaveBeenCalledWith([32, 32, 32])
+  })
+
+  it('emits dense vectors when loaded TDSE arrays are shorter than latticeDim', () => {
+    const actions = createMockActions()
+    const cfg = defaultConfig()
+    cfg.tdse = {
+      ...DEFAULT_TDSE_CONFIG,
+      latticeDim: 3,
+      gridSize: [16, 16, 16],
+      spacing: [0.2],
+      packetCenter: [1],
+      packetMomentum: [2],
+    }
+    render(<TDSEControls config={cfg} dimension={3} actions={actions} />)
+
+    fireEvent.change(within(screen.getByTestId('tdse-center-2')).getByRole('slider'), {
+      target: { value: '3' },
+    })
+    expect(actions.setPacketCenter).toHaveBeenCalledWith([1, 0, 3])
+
+    fireEvent.change(within(screen.getByTestId('tdse-momentum-2')).getByRole('slider'), {
+      target: { value: '4' },
+    })
+    expect(actions.setPacketMomentum).toHaveBeenCalledWith([2, 0, 4])
+
+    fireEvent.click(screen.getByTestId('control-group-tdse-numerics-header'))
+    fireEvent.change(within(screen.getByTestId('tdse-spacing-2')).getByRole('slider'), {
+      target: { value: '0.3' },
+    })
+    expect(actions.setSpacing).toHaveBeenCalledWith([0.2, 0.1, 0.3])
   })
 
   it('shows memory estimate text in numerics group', () => {

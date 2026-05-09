@@ -28,10 +28,50 @@ export type HydrogenCoupledPresetOverride = Partial<
 >
 
 /** A named coupled-hydrogen scenario preset. */
-export interface HydrogenCoupledScenarioPreset
-  extends ScenarioPreset<HydrogenCoupledPresetOverride> {
+export interface HydrogenCoupledScenarioPreset extends ScenarioPreset<HydrogenCoupledPresetOverride> {
   /** Minimum geometry dimension required. */
   minDim: number
+}
+
+/** Store/GPU capacity for l2..l(D-2), covering dimensions 4..11. */
+export const MAX_HYDROGEN_COUPLED_CHAIN_LENGTH = 8
+
+/** Boundary values used to normalize the coupled-hydrogen angular chain. */
+export interface NormalizeHydrogenCoupledAngularChainOptions {
+  /** Overall angular momentum l1. */
+  l1: number
+  /** Magnetic quantum number m; normalized chain entries must be >= |m|. */
+  magneticM: number
+  /** Number of chain entries to return. Defaults to MAX_HYDROGEN_COUPLED_CHAIN_LENGTH. */
+  length?: number
+}
+
+const finiteInteger = (value: number, fallback: number): number =>
+  Number.isFinite(value) ? Math.floor(value) : fallback
+
+/** Clamp l2..l(D-2) into a descending chain whose deepest layer is >= |m|. */
+export function normalizeHydrogenCoupledAngularChain(
+  chain: readonly number[] | undefined,
+  options: NormalizeHydrogenCoupledAngularChainOptions
+): number[] {
+  const length = Math.max(
+    0,
+    Math.min(MAX_HYDROGEN_COUPLED_CHAIN_LENGTH, options.length ?? MAX_HYDROGEN_COUPLED_CHAIN_LENGTH)
+  )
+  const l1 = Math.max(0, finiteInteger(options.l1, 0))
+  const minAngularMomentum = Math.min(l1, Math.abs(finiteInteger(options.magneticM, 0)))
+  const normalized: number[] = []
+  let upperBound = l1
+
+  for (let i = 0; i < length; i++) {
+    const raw = chain?.[i]
+    const next = finiteInteger(raw ?? minAngularMomentum, minAngularMomentum)
+    const clamped = Math.max(minAngularMomentum, Math.min(upperBound, next))
+    normalized.push(clamped)
+    upperBound = clamped
+  }
+
+  return normalized
 }
 
 export const HYDROGEN_COUPLED_PRESETS: HydrogenCoupledScenarioPreset[] = [

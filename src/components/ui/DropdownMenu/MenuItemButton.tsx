@@ -16,6 +16,7 @@ export const MenuItemButton = React.memo(
     isSubmenuOpen,
     onItemClick,
     onMouseEnter,
+    onKeyDown,
     itemRef,
   }: {
     item: DropdownMenuItem
@@ -23,6 +24,7 @@ export const MenuItemButton = React.memo(
     isSubmenuOpen: boolean
     onItemClick: () => void
     onMouseEnter: () => void
+    onKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>) => void
     itemRef: (el: HTMLButtonElement | null) => void
   }) => {
     const isMobile = useIsMobile()
@@ -35,7 +37,10 @@ export const MenuItemButton = React.memo(
         tabIndex={-1}
         onClick={onItemClick}
         onMouseEnter={onMouseEnter}
+        onKeyDown={onKeyDown}
         disabled={item.disabled}
+        aria-haspopup={hasSubmenu ? 'menu' : undefined}
+        aria-expanded={hasSubmenu ? isSubmenuOpen : undefined}
         className={`
         w-full text-left px-3 py-1.5 text-sm flex items-center justify-between group
         outline-none focus-visible:bg-[var(--bg-hover)] focus-visible:text-[var(--text-primary)]

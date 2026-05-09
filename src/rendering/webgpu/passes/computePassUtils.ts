@@ -7,7 +7,9 @@ import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
 import { logger } from '@/lib/logger'
 import {
   computeStrides as computeStridesBase,
+  nearestPow2 as nearestPow2Base,
   reduceGridToFit as reduceGridToFitBase,
+  sanitizePowerOfTwoGridSizes,
 } from '@/lib/math/ndArray'
 
 /** 1D dispatch workgroup size — must match @workgroup_size in 1D compute shaders */
@@ -214,8 +216,7 @@ export const DIAG_DECIMATION = 5
  * @returns Nearest power of 2 in [2, 128]
  */
 export function nearestPow2(v: number): number {
-  const p = Math.max(2, 2 ** Math.round(Math.log2(Math.max(1, v))))
-  return Math.min(128, p)
+  return nearestPow2Base(v)
 }
 
 /**
@@ -287,13 +288,12 @@ export function computeStridesPadded(gridSize: number[], latticeDim: number): nu
 export function sanitizeGridSizes<T extends { gridSize: number[]; latticeDim: number }>(
   config: T
 ): T {
-  const pow2Grid = config.gridSize.map((g) => nearestPow2(g))
-  const activeGrid = pow2Grid.slice(0, config.latticeDim)
-  const fittedActive = reduceGridToFit(activeGrid)
-  const fixed = [...fittedActive, ...pow2Grid.slice(config.latticeDim)]
-  if (fixed.every((g, i) => g === config.gridSize[i])) return config
-  logger.warn(`[compute] Grid sizes sanitized: ${config.gridSize} -> ${fixed}`)
-  return { ...config, gridSize: fixed }
+  const sanitized = sanitizePowerOfTwoGridSizes(config, {
+    maxTotalSites: MAX_LINEAR_DISPATCH_SITES,
+  })
+  if (sanitized === config) return config
+  logger.warn(`[compute] Grid sizes sanitized: ${config.gridSize} -> ${sanitized.gridSize}`)
+  return sanitized
 }
 
 /**

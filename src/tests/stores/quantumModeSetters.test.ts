@@ -85,6 +85,46 @@ describe('quantum number interdependency clamping', () => {
     expect(s.magneticQuantumNumber).toBe(0)
   })
 
+  it('raising |m| raises coupled-hydrogen angular chain entries to keep l(D-2) >= |m|', () => {
+    const store = useExtendedObjectStore.getState()
+    store.setSchroedingerPrincipalQuantumNumber(5)
+    store.setSchroedingerAzimuthalQuantumNumber(3)
+    store.setSchroedingerAngularChainValue(0, 1)
+    store.setSchroedingerAngularChainValue(1, 0)
+
+    store.setSchroedingerMagneticQuantumNumber(-2)
+
+    const s = useExtendedObjectStore.getState().schroedinger
+    expect(s.magneticQuantumNumber).toBe(-2)
+    expect(s.angularChain.slice(0, 2)).toEqual([2, 2])
+  })
+
+  it('refuses to lower coupled-hydrogen angular chain below |m|', () => {
+    const store = useExtendedObjectStore.getState()
+    store.setSchroedingerPrincipalQuantumNumber(5)
+    store.setSchroedingerAzimuthalQuantumNumber(3)
+    store.setSchroedingerMagneticQuantumNumber(2)
+
+    store.setSchroedingerAngularChainValue(0, 0)
+    store.setSchroedingerAngularChainValue(1, 0)
+
+    expect(useExtendedObjectStore.getState().schroedinger.angularChain.slice(0, 2)).toEqual([2, 2])
+  })
+
+  it('normalizes coupled-hydrogen angular chain through bulk config updates', () => {
+    const store = useExtendedObjectStore.getState()
+    store.setSchroedingerQuantumMode('hydrogenNDCoupled')
+
+    store.setSchroedingerConfig({
+      principalQuantumNumber: 5,
+      azimuthalQuantumNumber: 3,
+      magneticQuantumNumber: 2,
+      angularChain: [1, 0],
+    })
+
+    expect(useExtendedObjectStore.getState().schroedinger.angularChain.slice(0, 2)).toEqual([2, 2])
+  })
+
   it('maintains invariant after arbitrary sequence of quantum number changes', () => {
     const store = useExtendedObjectStore.getState()
     const sequence: Array<[string, number]> = [

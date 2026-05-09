@@ -100,6 +100,21 @@ function projectDirect3D(
   const activeDims = raw.gridSize
   const shift = config.fftShiftEnabled
 
+  if (activeDims.some((N) => N > G)) {
+    projectDirect3DResampled(
+      raw,
+      config,
+      nk,
+      kNorm,
+      omegaNorm,
+      nkOmega,
+      kNormFactor,
+      oNormFactor,
+      G
+    )
+    return
+  }
+
   const gridDims = [activeDims[0] ?? 1, activeDims[1] ?? 1, activeDims[2] ?? 1]
 
   // Pre-compute offsets and centers (invariant across voxels)
@@ -192,6 +207,64 @@ function projectDirect3D(
   }
 }
 
+function mapRawKIndexToOutputCoord(rawIndex: number, N: number, G: number, shift: boolean): number {
+  if (N <= 1) return Math.floor(G / 2)
+  const displayIndex = shift ? (rawIndex + Math.floor(N / 2)) % N : rawIndex
+  if (N <= G) return Math.floor((G - N) / 2) + displayIndex
+  return Math.min(G - 1, Math.max(0, Math.floor(((displayIndex + 0.5) * G) / N)))
+}
+
+function projectDirect3DResampled(
+  raw: KSpaceRawData,
+  config: KSpaceVizConfig,
+  nk: Float64Array,
+  kNorm: Float64Array,
+  omegaNorm: Float64Array,
+  nkOmega: Float64Array,
+  kNormFactor: number,
+  oNormFactor: number,
+  G: number
+): void {
+  const activeDims = raw.gridSize
+  const shift = config.fftShiftEnabled
+  const outputTotal = G ** 3
+  const kMagWeightedSum = new Float64Array(outputTotal)
+  const omegaWeightedSum = new Float64Array(outputTotal)
+  const coords = new Array<number>(activeDims.length).fill(0)
+  const outCoords = [0, 0, 0]
+
+  for (let i = 0; i < raw.totalSites; i++) {
+    let remaining = i
+    for (let d = activeDims.length - 1; d >= 0; d--) {
+      coords[d] = remaining % activeDims[d]!
+      remaining = Math.floor(remaining / activeDims[d]!)
+    }
+
+    for (let d = 0; d < 3; d++) {
+      const N = activeDims[d] ?? 1
+      const rawIndex = d < raw.latticeDim ? coords[d]! : 0
+      outCoords[d] = mapRawKIndexToOutputCoord(rawIndex, N, G, shift)
+    }
+
+    const outIdx = (outCoords[2]! * G + outCoords[1]!) * G + outCoords[0]!
+    const n = Math.max(raw.nk[i]!, 0)
+    if (n <= 0) continue
+
+    nk[outIdx]! += n
+    kMagWeightedSum[outIdx]! += n * raw.kMag[i]!
+    omegaWeightedSum[outIdx]! += n * raw.omega[i]!
+  }
+
+  const eps = 1e-20
+  for (let i = 0; i < outputTotal; i++) {
+    const n = nk[i]!
+    if (n <= eps) continue
+    kNorm[i] = kMagWeightedSum[i]! / n / kNormFactor
+    omegaNorm[i] = omegaWeightedSum[i]! / n / oNormFactor
+    nkOmega[i] = omegaWeightedSum[i]!
+  }
+}
+
 /**
  * N-D marginalization projection for latticeDim > 3.
  * Sums over extra dimensions and maps first 3 dims to the output grid.
@@ -230,13 +303,7 @@ function projectMarginalize(
     let valid = true
     for (let d = 0; d < 3; d++) {
       const N = activeDims[d]!
-      let kIdx = coords[d]!
-      // Apply FFT shift to first 3 dims
-      if (shift) {
-        kIdx = (kIdx + Math.floor(N / 2)) % N
-      }
-      const offset = Math.floor((G - N) / 2)
-      const oCoord = kIdx + offset
+      const oCoord = mapRawKIndexToOutputCoord(coords[d]!, N, G, shift)
       if (oCoord < 0 || oCoord >= G) {
         valid = false
         break
@@ -359,6 +426,8 @@ function histogramPercentile(values: Float64Array, count: number, percentile: nu
     if (v < min) min = v
     if (v > max) max = v
   }
+  if (percentile <= 0) return min
+  if (percentile >= 100) return max
   if (max - min < 1e-30) return min
 
   const BINS = 4096

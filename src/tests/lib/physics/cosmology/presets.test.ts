@@ -425,7 +425,7 @@ describe('isValidPreset', () => {
     it('accepts a non-vacuum finite triple — constraint enforcement is a UI concern', () => {
       // The store deliberately allows non-vacuum Bianchi-I backgrounds so the
       // user can explore Kasner-violating anisotropy. isValidPreset must not
-      // reject them.
+      // reject positive-η-evaluable triples.
       expect(
         isValidPreset({
           preset: 'bianchiKasner',
@@ -433,6 +433,16 @@ describe('isValidPreset', () => {
           kasnerExponents: { p1: 0, p2: 0, p3: 0 },
         })
       ).toBe(true)
+    })
+
+    it('rejects finite triples outside the positive-η gauge', () => {
+      expect(
+        isValidPreset({
+          preset: 'bianchiKasner',
+          spacetimeDim: 4,
+          kasnerExponents: { p1: 1.15, p2: 1.15, p3: 1.15 },
+        })
+      ).toBe(false)
     })
 
     it('rejects n < 4 (Bianchi-I requires exactly 3 spatial axes)', () => {

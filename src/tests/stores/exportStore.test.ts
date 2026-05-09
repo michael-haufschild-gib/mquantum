@@ -91,6 +91,14 @@ describe('exportStore (invariants)', () => {
       expect(settings.bitrate).toBe(50)
     })
 
+    it('tracks applied preset until settings are edited manually', () => {
+      useExportStore.getState().applyPreset('twitter-video')
+      expect(useExportStore.getState().lastAppliedPreset).toBe('twitter-video')
+
+      useExportStore.getState().updateSettings({ fps: 60 })
+      expect(useExportStore.getState().lastAppliedPreset).toBeNull()
+    })
+
     it('should preserve other settings', () => {
       const originalDuration = useExportStore.getState().settings.duration
       useExportStore.getState().updateSettings({ fps: 30 })

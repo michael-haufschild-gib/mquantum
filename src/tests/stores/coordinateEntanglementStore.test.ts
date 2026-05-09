@@ -65,6 +65,7 @@ describe('useCoordinateEntanglementStore', () => {
     useCoordinateEntanglementStore.getState().setEnabled(false)
     useCoordinateEntanglementStore.getState().setComputePairwiseMI(false)
     useCoordinateEntanglementStore.getState().setComputeBipartitions(false)
+    useCoordinateEntanglementStore.getState().setComputeWignerNegativity(false)
   })
 
   describe('feature toggles', () => {
@@ -81,6 +82,29 @@ describe('useCoordinateEntanglementStore', () => {
     it('toggles bipartitions', () => {
       useCoordinateEntanglementStore.getState().setComputeBipartitions(true)
       expect(useCoordinateEntanglementStore.getState().computeBipartitions).toBe(true)
+    })
+
+    it('clears optional diagnostic snapshots when their toggles are disabled', () => {
+      const store = useCoordinateEntanglementStore.getState()
+      store.setComputePairwiseMI(true)
+      store.setComputeBipartitions(true)
+      store.setComputeWignerNegativity(true)
+      store.pushResult(
+        makeResult({
+          wignerNegativities: [0.2, 0.1, 0.05],
+          averageWignerNegativity: 0.116,
+        })
+      )
+
+      useCoordinateEntanglementStore.getState().setComputePairwiseMI(false)
+      useCoordinateEntanglementStore.getState().setComputeBipartitions(false)
+      useCoordinateEntanglementStore.getState().setComputeWignerNegativity(false)
+
+      const state = useCoordinateEntanglementStore.getState()
+      expect(state.mutualInfoMatrix).toBeNull()
+      expect(state.currentBipartitionEntropies).toEqual([])
+      expect(state.currentWignerNegativities).toEqual([])
+      expect(state.currentAverageWignerNegativity).toBe(0)
     })
   })
 

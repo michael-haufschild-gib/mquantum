@@ -45,6 +45,15 @@ describe('float32ToFloat16', () => {
     // 0.5 = 0x3800 in half float
     expect(f16).toBe(0x3800)
   })
+
+  it('rounds normal values to nearest-even instead of truncating', () => {
+    expect(float32ToFloat16(1 + 2 ** -11)).toBe(0x3c00)
+    expect(float32ToFloat16(1.00075)).toBe(0x3c01)
+  })
+
+  it('rounds subnormal values to nearest-even instead of truncating', () => {
+    expect(float32ToFloat16(1.5 * 2 ** -24)).toBe(0x0002)
+  })
 })
 
 describe('k-space energy conservation', () => {

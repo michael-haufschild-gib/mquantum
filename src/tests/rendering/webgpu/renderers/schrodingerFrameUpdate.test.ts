@@ -1,16 +1,61 @@
 /**
- * Pure-function tests for schrodingerFrameUpdate.
+ * Focused tests for schrodingerFrameUpdate helpers and low-GPU frame state.
  *
- * Most of the file is GPU-coupled (computeCameraUpdate, computeBasisUpdate,
- * computeSchroedingerUpdate read store snapshots from a WebGPURenderContext),
- * but `quantizeBoundingRadius` is pure and drives the geometry-rebuild
- * threshold. A bug here would either thrash the GPU pipeline (rebuild on
- * every micro-change in radius) or cause stale geometry (rebuild never
- * fires).
+ * `quantizeBoundingRadius` drives geometry-rebuild thresholds. The temporal
+ * Bayer tests use a minimal WebGPURenderContext because phase order is a
+ * CPU-side contract between the renderer and temporal reconstruction pass.
  */
 import { describe, expect, it } from 'vitest'
 
+import type { WebGPURenderContext } from '@/rendering/webgpu/core/types'
 import { quantizeBoundingRadius } from '@/rendering/webgpu/renderers/boundingRadiusQuantize'
+import {
+  computeCameraUpdate,
+  type SchrodingerFrameState,
+} from '@/rendering/webgpu/renderers/schrodingerFrameUpdate'
+import { advanceTemporalBayerCycle } from '@/rendering/webgpu/shaders/schroedinger/temporalJitter'
+
+const IDENTITY_4X4 = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
+
+function makeTemporalFrameState(): SchrodingerFrameState {
+  return {
+    versions: {} as SchrodingerFrameState['versions'],
+    temporalBayerIndex: 0,
+    prevTemporalAnimTime: Number.NaN,
+    prevTemporalVPMatrix: new Float32Array(16),
+    prevTemporalWidth: 0,
+    prevTemporalHeight: 0,
+    completedTemporalCycle: false,
+    cachedPreset: null,
+    cachedPresetConfig: null,
+    flattenedPreset: null,
+    canonicalDensityCompensation: 1,
+    cachedPeakDensity: 0.1,
+    boundingRadius: 2,
+  }
+}
+
+function makeTemporalCtx(
+  accumulatedTime: number,
+  size = { width: 64, height: 64 }
+): WebGPURenderContext {
+  return {
+    size,
+    frame: {
+      frameNumber: Math.round(accumulatedTime * 60),
+      delta: 1 / 60,
+      time: accumulatedTime,
+      size,
+      stores: {
+        camera: {
+          viewProjectionMatrix: { elements: IDENTITY_4X4 },
+          position: { x: 0, y: 0, z: 4 },
+        },
+        animation: { accumulatedTime },
+      },
+    },
+  } as unknown as WebGPURenderContext
+}
 
 describe('quantizeBoundingRadius', () => {
   // Quant step = 0.05; rebuild threshold = 0.05.
@@ -41,5 +86,79 @@ describe('quantizeBoundingRadius', () => {
   it('handles a downward shrink: smaller raw than current, rebuild only if outside threshold', () => {
     // raw 1.95 ceil → 1.95; current 2.10 → diff 0.15 ≥ 0.05 → rebuild.
     expect(quantizeBoundingRadius(1.95, 2.1)).toBeCloseTo(1.95, 6)
+  })
+})
+
+describe('computeCameraUpdate temporal Bayer phase', () => {
+  it('advances static scenes through one full Bayer cycle and then freezes', () => {
+    let index = 0
+    let completedFullCycle = false
+
+    for (const expected of [1, 2, 3, 0]) {
+      const next = advanceTemporalBayerCycle(index, completedFullCycle, false)
+      index = next.index
+      completedFullCycle = next.completedFullCycle
+      expect(index).toBe(expected)
+    }
+
+    expect(completedFullCycle).toBe(true)
+    expect(advanceTemporalBayerCycle(index, completedFullCycle, false)).toEqual({
+      index: 0,
+      completedFullCycle: true,
+    })
+    expect(advanceTemporalBayerCycle(index, completedFullCycle, true)).toEqual({
+      index: 1,
+      completedFullCycle: false,
+    })
+  })
+
+  it('packs the current Bayer phase before advancing state for the next frame', () => {
+    const state = makeTemporalFrameState()
+    const data = new Float32Array(132)
+    const dataView = new DataView(data.buffer)
+
+    computeCameraUpdate(makeTemporalCtx(0), { dimension: 4 }, state, data, dataView)
+
+    expect([data[124], data[125]]).toEqual([0, 0])
+    expect(state.temporalBayerIndex).toBe(1)
+
+    computeCameraUpdate(makeTemporalCtx(1 / 60), { dimension: 4 }, state, data, dataView)
+
+    expect([data[124], data[125]]).toEqual([1, 1])
+    expect(state.temporalBayerIndex).toBe(2)
+  })
+
+  it('restarts Bayer cycling when render resolution changes after a completed static cycle', () => {
+    const state = makeTemporalFrameState()
+    const data = new Float32Array(132)
+    const dataView = new DataView(data.buffer)
+
+    computeCameraUpdate(makeTemporalCtx(0), { dimension: 4 }, state, data, dataView)
+    computeCameraUpdate(makeTemporalCtx(0), { dimension: 4 }, state, data, dataView)
+    computeCameraUpdate(makeTemporalCtx(0), { dimension: 4 }, state, data, dataView)
+    computeCameraUpdate(makeTemporalCtx(0), { dimension: 4 }, state, data, dataView)
+    expect([data[124], data[125]]).toEqual([0, 1])
+    expect(state.completedTemporalCycle).toBe(true)
+
+    computeCameraUpdate(makeTemporalCtx(0), { dimension: 4 }, state, data, dataView)
+    expect([data[124], data[125]]).toEqual([0, 0])
+
+    computeCameraUpdate(
+      makeTemporalCtx(0, { width: 96, height: 64 }),
+      { dimension: 4 },
+      state,
+      data,
+      dataView
+    )
+    expect([data[124], data[125]]).toEqual([0, 0])
+
+    computeCameraUpdate(
+      makeTemporalCtx(0, { width: 96, height: 64 }),
+      { dimension: 4 },
+      state,
+      data,
+      dataView
+    )
+    expect([data[124], data[125]]).toEqual([1, 1])
   })
 })

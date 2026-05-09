@@ -46,9 +46,21 @@ export interface ValidationReport {
   durationMs: number
 }
 
+/** Progress snapshot emitted after completed naga batches. */
+export interface ValidationProgress {
+  batches: number
+  unique: number
+  passed: number
+  failures: number
+  knownDeviations: number
+  durationMs: number
+}
+
 interface ValidateOptions {
-  /** Batch size for `naga --bulk-validate`. Default 256. */
+  /** Batch size for `naga --bulk-validate`. Default 512. */
   batchSize?: number
+  /** Timeout for one naga subprocess invocation. Default 120 seconds. */
+  nagaTimeoutMs?: number
   /**
    * Base directory under which a unique scratch subdir is created. We never
    * write into the directory the caller passes — only into a freshly-created
@@ -67,6 +79,10 @@ interface ValidateOptions {
    * just classified as `knownDeviations` instead of `failures`.
    */
   knownDeviations?: readonly RegExp[]
+  /** Emit `onProgress` every N completed batches. Default 0 (disabled). */
+  progressEveryBatches?: number
+  /** Optional progress callback for long full-suite validation runs. */
+  onProgress?: (progress: ValidationProgress) => void
 }
 
 /**
@@ -78,8 +94,9 @@ interface ValidateOptions {
  * - Each unique payload is written to a temp file named `{index}.wgsl`;
  *   a reverse map associates the file path back to the record for error
  *   attribution.
- * - Batches avoid OS argv limits. With 256 files/batch and ~150KB shaders,
- *   argv size stays under ~200KB of path strings.
+ * - Batches avoid OS argv limits and keep memory bounded. The driver streams
+ *   shader payloads through temp files instead of holding all WGSL strings at
+ *   once; only SHA keys and the current batch stay resident.
  *
  * @param records Stream of shader records (from any enumerator).
  * @param opts Tuning knobs.
@@ -89,7 +106,14 @@ export function validateWithNaga(
   records: Iterable<ShaderRecord>,
   opts: ValidateOptions = {}
 ): ValidationReport {
-  const { batchSize = 256, keepTempFiles = false, knownDeviations = [] } = opts
+  const {
+    batchSize = 512,
+    keepTempFiles = false,
+    knownDeviations = [],
+    nagaTimeoutMs = 120_000,
+    progressEveryBatches = 0,
+    onProgress,
+  } = opts
   const start = Date.now()
 
   // Always allocate a fresh scratch subdir under the chosen base so cleanup
@@ -101,77 +125,113 @@ export function validateWithNaga(
 
   try {
     let total = 0
-    const deduped = new Map<string, ShaderRecord>()
-    for (const rec of records) {
-      total++
-      if (!deduped.has(rec.sha256)) deduped.set(rec.sha256, rec)
-    }
-
-    const byPath = new Map<string, ShaderRecord>()
+    let unique = 0
+    let passed = 0
     let idx = 0
-    for (const rec of deduped.values()) {
-      const path = join(dir, `${idx}.wgsl`)
-      writeFileSync(path, rec.wgsl)
-      byPath.set(path, rec)
-      idx++
-    }
-
-    const paths = [...byPath.keys()]
+    const seen = new Set<string>()
     const failures: ShaderFailure[] = []
     const deviations: ShaderFailure[] = []
-    let passed = 0
+    let batches = 0
+    let batchPaths: string[] = []
+    let batchByPath = new Map<string, ShaderRecord>()
 
-    for (let i = 0; i < paths.length; i += batchSize) {
-      const batch = paths.slice(i, i + batchSize)
-      const result = spawnSync('naga', ['--bulk-validate', ...batch], {
-        encoding: 'utf8',
-        maxBuffer: 256 * 1024 * 1024,
-        // Force no ANSI output so signature normalization is stable. naga emits
-        // color when stderr is a TTY; vitest's capture path looks TTY-shaped.
-        env: {
-          ...process.env,
-          NO_COLOR: '1',
-          CLICOLOR: '0',
-          CLICOLOR_FORCE: '0',
-        },
-      })
+    const flushBatch = () => {
+      if (batchPaths.length === 0) return
 
-      if (result.error) {
-        throw new Error(
-          `[validateWithNaga] naga subprocess failed to spawn: ${result.error.message}. ` +
-            `Is naga-cli installed? Run: cargo install naga-cli`
-        )
+      const paths = batchPaths
+      const byPath = batchByPath
+      batchPaths = []
+      batchByPath = new Map<string, ShaderRecord>()
+
+      try {
+        const result = spawnSync('naga', ['--bulk-validate', ...paths], {
+          encoding: 'utf8',
+          maxBuffer: 256 * 1024 * 1024,
+          timeout: nagaTimeoutMs,
+          // Force no ANSI output so signature normalization is stable. naga emits
+          // color when stderr is a TTY; vitest's capture path looks TTY-shaped.
+          env: {
+            ...process.env,
+            NO_COLOR: '1',
+            CLICOLOR: '0',
+            CLICOLOR_FORCE: '0',
+          },
+        })
+
+        if (result.error) {
+          throw new Error(
+            `[validateWithNaga] naga subprocess failed or timed out: ${result.error.message}. ` +
+              `Is naga-cli installed? Run: cargo install naga-cli`
+          )
+        }
+
+        // Exit code 0 = all files in batch passed. Nonzero = at least one failure.
+        // Parse stderr regardless (naga prints diagnostics on stderr).
+        const stderr = result.stderr ?? ''
+        const batchFailures = parseNagaBulkStderr(stderr, paths, byPath)
+
+        // If naga exited non-zero (or was signaled) but we couldn't attribute
+        // any per-file diagnostic, the process crashed or emitted unexpected
+        // stderr. Treat that as a hard failure rather than counting every
+        // file in the batch as `passed` — silent green here would mask broken
+        // tooling. Status `0` with empty diagnostics is the legitimate
+        // all-passed path and stays untouched.
+        if ((result.status !== 0 || result.signal !== null) && batchFailures.length === 0) {
+          throw new Error(
+            `[validateWithNaga] naga exited unexpectedly (status=${result.status}, signal=${result.signal ?? 'none'}) with no per-file diagnostics. stderr:\n${stderr}`
+          )
+        }
+
+        for (const f of batchFailures) {
+          const deviation = knownDeviations.some((re) => re.test(f.signature))
+          if (deviation) deviations.push(f)
+          else failures.push(f)
+        }
+
+        passed += paths.length - batchFailures.length
+        batches++
+
+        if (
+          progressEveryBatches > 0 &&
+          batches % progressEveryBatches === 0 &&
+          onProgress !== undefined
+        ) {
+          onProgress({
+            batches,
+            unique,
+            passed,
+            failures: failures.length,
+            knownDeviations: deviations.length,
+            durationMs: Date.now() - start,
+          })
+        }
+      } finally {
+        if (!keepTempFiles) {
+          for (const filePath of paths) rmSync(filePath, { force: true })
+        }
       }
-
-      // Exit code 0 = all files in batch passed. Nonzero = at least one failure.
-      // Parse stderr regardless (naga prints diagnostics on stderr).
-      const stderr = result.stderr ?? ''
-      const batchFailures = parseNagaBulkStderr(stderr, batch, byPath)
-
-      // If naga exited non-zero (or was signaled) but we couldn't attribute
-      // any per-file diagnostic, the process crashed or emitted unexpected
-      // stderr. Treat that as a hard failure rather than counting every
-      // file in the batch as `passed` — silent green here would mask broken
-      // tooling. Status `0` with empty diagnostics is the legitimate
-      // all-passed path and stays untouched.
-      if ((result.status !== 0 || result.signal !== null) && batchFailures.length === 0) {
-        throw new Error(
-          `[validateWithNaga] naga exited unexpectedly (status=${result.status}, signal=${result.signal ?? 'none'}) with no per-file diagnostics. stderr:\n${stderr}`
-        )
-      }
-
-      for (const f of batchFailures) {
-        const deviation = knownDeviations.some((re) => re.test(f.signature))
-        if (deviation) deviations.push(f)
-        else failures.push(f)
-      }
-
-      passed += batch.length - batchFailures.length
     }
+
+    for (const rec of records) {
+      total++
+      if (seen.has(rec.sha256)) continue
+      seen.add(rec.sha256)
+      unique++
+
+      const shaderPath = join(dir, `${idx}.wgsl`)
+      idx++
+      writeFileSync(shaderPath, rec.wgsl)
+      batchByPath.set(shaderPath, rec)
+      batchPaths.push(shaderPath)
+
+      if (batchPaths.length >= batchSize) flushBatch()
+    }
+
+    flushBatch()
 
     return {
       total,
-      unique: deduped.size,
+      unique,
       passed,
       failures,
       knownDeviations: deviations,

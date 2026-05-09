@@ -241,17 +241,33 @@ const isPresetActive = (presetId: ExportPresetCardId, settings: ExportSettings):
   return settings.crop.enabled === matcher.cropEnabled
 }
 
+const isKnownPresetId = (value: string | null): value is ExportPresetCardId =>
+  value !== null &&
+  (DESKTOP_PRESETS.some((preset) => preset.id === value) ||
+    MOBILE_PRESETS.some((preset) => preset.id === value))
+
 export const ExportPresets = () => {
-  const { applyPreset, settings } = useExportStore(
-    useShallow((s) => ({ applyPreset: s.applyPreset, settings: s.settings }))
+  const { applyPreset, settings, lastAppliedPreset } = useExportStore(
+    useShallow((s) => ({
+      applyPreset: s.applyPreset,
+      settings: s.settings,
+      lastAppliedPreset: s.lastAppliedPreset,
+    }))
   )
   const isMobileGPU = usePerformanceStore((s) => s.isMobileGPU)
 
   const presets = useMemo(() => (isMobileGPU ? MOBILE_PRESETS : DESKTOP_PRESETS), [isMobileGPU])
-  const activePresetId = useMemo(
-    () => presets.find((preset) => isPresetActive(preset.id, settings))?.id ?? null,
-    [presets, settings]
-  )
+  const activePresetId = useMemo(() => {
+    if (
+      isKnownPresetId(lastAppliedPreset) &&
+      presets.some((preset) => preset.id === lastAppliedPreset) &&
+      isPresetActive(lastAppliedPreset, settings)
+    ) {
+      return lastAppliedPreset
+    }
+
+    return presets.find((preset) => isPresetActive(preset.id, settings))?.id ?? null
+  }, [lastAppliedPreset, presets, settings])
 
   const handleSelect = (id: ExportPresetCardId) => {
     applyPreset(id)

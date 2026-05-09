@@ -119,7 +119,8 @@ export function computeReconstructCoefficients(
   time: number,
   timeScale: number,
   outF32: Float32Array,
-  outU32: Uint32Array
+  outU32: Uint32Array,
+  crossTermsEnabled = true
 ): void {
   if (crossPairs.length > MAX_WIGNER_CROSS_PAIRS) {
     // The WGSL `WignerReconstructParams.pairData` is `array<vec4f, 29>` and
@@ -138,6 +139,10 @@ export function computeReconstructCoefficients(
   }
   const floatView = new Float32Array(schroedingerData)
   outF32.fill(0)
+  if (!crossTermsEnabled) {
+    outU32[0] = 0
+    return
+  }
   outU32[0] = crossPairs.length
 
   const t = time * timeScale

@@ -89,6 +89,19 @@ describe('WebGPUResourcePool', () => {
     expect(resource!.height).toBe(300)
   })
 
+  it('rounds fraction-sized resources up so odd viewports keep edge coverage', () => {
+    pool.setSize(801, 601)
+    pool.addResource({
+      id: 'half-odd',
+      type: 'renderTarget',
+      size: { mode: 'fraction', fraction: 0.5 },
+    })
+    const resource = pool.getResource('half-odd')
+
+    expect(resource!.width).toBe(401)
+    expect(resource!.height).toBe(301)
+  })
+
   it('enables and manages ping-pong resources', () => {
     pool.addResource({ id: 'pp', ...screenConfig })
     pool.enablePingPong('pp')

@@ -15,7 +15,10 @@ import {
   isDiracInitialCondition,
   isDiracPotentialType,
 } from '@/lib/geometry/extended/dirac'
-import { DEFAULT_PREHEATING_CONFIG } from '@/lib/geometry/extended/freeScalar'
+import {
+  DEFAULT_PREHEATING_CONFIG,
+  FREE_SCALAR_MAX_TOTAL_SITES,
+} from '@/lib/geometry/extended/freeScalar'
 import { normalizeTdseBlackHoleParams } from '@/lib/geometry/extended/tdse'
 import {
   DEFAULT_PAULI_CONFIG,
@@ -24,6 +27,7 @@ import {
 } from '@/lib/geometry/extended/types'
 import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
+import { sanitizePowerOfTwoGridSizes } from '@/lib/math/ndArray'
 
 import { reconcileCosmologyInvariants } from '../slices/geometry/setters/freeScalarCosmologySetters'
 import { OBJECT_TYPE_TO_CONFIG_KEY } from './presetSerialization'
@@ -268,6 +272,12 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged
         ...normalized,
         freeScalar: { ...fsRecord, preheating: { ...DEFAULT_PREHEATING_CONFIG } },
       }
+    }
+    normalized = {
+      ...normalized,
+      freeScalar: sanitizePowerOfTwoGridSizes(normalized.freeScalar as FreeScalarConfig, {
+        maxTotalSites: FREE_SCALAR_MAX_TOTAL_SITES,
+      }),
     }
     const reconciled = reconcileCosmologyInvariants(
       (normalized.freeScalar as FreeScalarConfig) ?? (fs as FreeScalarConfig)

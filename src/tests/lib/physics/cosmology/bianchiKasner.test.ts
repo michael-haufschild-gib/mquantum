@@ -105,6 +105,7 @@ describe('computeBianchiKasnerCoefs', () => {
     expect(coefs.aFull).toBeCloseTo(1, 12)
     expect(coefs.aPotentialRatio1).toBeCloseTo(1, 12)
     expect(coefs.aPotentialRatio2).toBeCloseTo(1, 12)
+    expect(coefs.tProper).toBeCloseTo(1, 12)
   })
 
   it('(g) matches the closed-form scale factors at η = 6 (t = 8): aPot_0 = 64, aFull = 16, aKinetic = 0.25, ratios = 1/64', () => {
@@ -143,6 +144,13 @@ describe('computeBianchiKasnerCoefs', () => {
   it('throws for spacetimeDim < 3', () => {
     const exp = kasnerSymmetricVacuum()
     expect(() => computeBianchiKasnerCoefs(1.5, exp, 2)).toThrow(RangeError)
+  })
+
+  it('throws when a finite triple has no positive-real proper-time map', () => {
+    const exp = { p1: 1.15, p2: 1.15, p3: 1.15 }
+    expect(() => computeBianchiKasnerCoefs(1.5, exp, 4)).toThrow(
+      /positive-η gauge|positive real proper time/
+    )
   })
 })
 
@@ -308,6 +316,16 @@ describe('bianchiKasner preset plumbing', () => {
 
   it('isValidPreset rejects bianchiKasner without kasnerExponents', () => {
     expect(isValidPreset({ preset: 'bianchiKasner', spacetimeDim: 4 })).toBe(false)
+  })
+
+  it('isValidPreset rejects triples outside the positive-η gauge', () => {
+    expect(
+      isValidPreset({
+        preset: 'bianchiKasner',
+        spacetimeDim: 4,
+        kasnerExponents: { p1: 1.15, p2: 1.15, p3: 1.15 },
+      })
+    ).toBe(false)
   })
 
   it('isValidPreset rejects bianchiKasner outside spacetimeDim = 4', () => {

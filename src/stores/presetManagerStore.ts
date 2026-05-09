@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 import { showConditionalMsgBox } from '@/hooks/useConditionalMsgBox'
-import { isComputeQuantumType } from '@/lib/geometry/registry'
+import { isComputeQuantumType, isValidObjectType } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
 
@@ -165,8 +165,6 @@ function restoreGeometryAndExtended(data: SavedScene['data']): void {
     dimension?: number
     objectType?: string
   }
-  const loadedObjectType = (geometryData.objectType ??
-    useGeometryStore.getState().objectType) as ObjectType
 
   if (geometryData.dimension !== undefined && geometryData.objectType !== undefined) {
     useGeometryStore
@@ -175,9 +173,16 @@ function restoreGeometryAndExtended(data: SavedScene['data']): void {
   } else if (geometryData.dimension !== undefined) {
     useGeometryStore.getState().setDimension(geometryData.dimension)
   } else if (geometryData.objectType !== undefined) {
-    useGeometryStore.getState().setObjectType(geometryData.objectType as ObjectType)
+    if (isValidObjectType(geometryData.objectType)) {
+      useGeometryStore.getState().setObjectType(geometryData.objectType)
+    } else {
+      useGeometryStore
+        .getState()
+        .loadGeometry(useGeometryStore.getState().dimension, geometryData.objectType as ObjectType)
+    }
   }
 
+  const loadedObjectType = useGeometryStore.getState().objectType
   useExtendedObjectStore.setState(
     mergeExtendedObjectStateForType(sanitizeExtendedLoadedState(data.extended), loadedObjectType)
   )

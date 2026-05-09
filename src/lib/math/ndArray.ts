@@ -29,6 +29,48 @@ export function computeStrides(gridSize: readonly number[]): number[] {
   return strides
 }
 
+export const MIN_POWER_OF_TWO_GRID_SIZE = 2
+export const MAX_POWER_OF_TWO_GRID_SIZE = 128
+
+/**
+ * Snap a numeric lattice axis size to the nearest power of two.
+ *
+ * @param value - Requested axis size
+ * @param min - Minimum axis size, expected to be a power of two
+ * @param max - Maximum axis size, expected to be a power of two
+ */
+export function nearestPow2(
+  value: number,
+  min = MIN_POWER_OF_TWO_GRID_SIZE,
+  max = MAX_POWER_OF_TWO_GRID_SIZE
+): number {
+  const safe = Number.isFinite(value) ? value : min
+  const clamped = Math.max(min, Math.min(max, Math.round(safe)))
+  const snapped = 2 ** Math.round(Math.log2(Math.max(1, clamped)))
+  return Math.max(min, Math.min(max, snapped))
+}
+
+/**
+ * Compute largest power-of-two per-axis size that keeps `size^d` within budget.
+ */
+export function computeDefaultPow2GridPerDim(
+  dimension: number,
+  maxTotalSites: number,
+  maxGridSize = MAX_POWER_OF_TWO_GRID_SIZE,
+  minGridSize = MIN_POWER_OF_TWO_GRID_SIZE
+): number {
+  const safeD = Number.isFinite(dimension) && dimension >= 1 ? Math.floor(dimension) : 1
+  const safeBudget =
+    Number.isFinite(maxTotalSites) && maxTotalSites >= 1 ? maxTotalSites : minGridSize
+  const raw = Math.round(Math.pow(safeBudget, 1 / safeD))
+  let pow2 = 2 ** Math.floor(Math.log2(Math.max(minGridSize, raw)))
+  pow2 = Math.max(minGridSize, Math.min(maxGridSize, pow2))
+  while (pow2 > minGridSize && Math.pow(pow2, safeD) > safeBudget) {
+    pow2 = pow2 / 2
+  }
+  return pow2
+}
+
 /**
  * Reduce a per-dimension grid array so the total product fits within a budget.
  * Repeatedly halves the largest dimension until the product is within bounds.
@@ -53,6 +95,28 @@ export function reduceGridToFit(grid: number[], maxTotal: number, minPerDim = 2)
     grid[maxIdx] = Math.floor(grid[maxIdx]! / 2)
   }
   return grid
+}
+
+/**
+ * Snap active lattice axes to powers of two, then shrink largest axes until
+ * the active-grid product fits within `maxTotalSites`.
+ */
+export function sanitizePowerOfTwoGridSizes<T extends { gridSize: number[]; latticeDim: number }>(
+  config: T,
+  options: {
+    maxTotalSites: number
+    maxGridSize?: number
+    minGridSize?: number
+  }
+): T {
+  const minGridSize = options.minGridSize ?? MIN_POWER_OF_TWO_GRID_SIZE
+  const maxGridSize = options.maxGridSize ?? MAX_POWER_OF_TWO_GRID_SIZE
+  const pow2Grid = config.gridSize.map((g) => nearestPow2(g, minGridSize, maxGridSize))
+  const activeGrid = pow2Grid.slice(0, config.latticeDim)
+  const fittedActive = reduceGridToFit([...activeGrid], options.maxTotalSites, minGridSize)
+  const fixed = [...fittedActive, ...pow2Grid.slice(config.latticeDim)]
+  if (fixed.every((g, i) => g === config.gridSize[i])) return config
+  return { ...config, gridSize: fixed }
 }
 
 /**

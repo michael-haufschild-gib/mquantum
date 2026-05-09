@@ -350,7 +350,7 @@ export function createVisualEffectSetters(
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          wignerQuadPoints: Math.max(8, Math.min(Math.round(points), 64)),
+          wignerQuadPoints: Math.max(8, Math.min(Math.round(points), 96)),
         },
       }))
     },

@@ -9,6 +9,10 @@
  *   WGSL_SUBSET   comma-list of surface names (default: all surfaces)
  *   WGSL_MODE     harmonicOscillator | hydrogenND | hydrogenNDCoupled
  *   WGSL_MAX      cap on unique shader count
+ *   WGSL_BATCH_SIZE         naga files per subprocess batch (default: 512)
+ *   WGSL_PROGRESS_EVERY     log every N completed batches (default: 100)
+ *   WGSL_NAGA_TIMEOUT_MS    timeout for one naga subprocess (default: 120000)
+ *   WGSL_TEST_TIMEOUT_MS    Vitest timeout for full run (default: 3600000)
  *
  * @module tests/rendering/wgsl/wgslValidation.test
  */
@@ -23,6 +27,16 @@ import { validateWithNaga } from './validateWithNaga'
 
 const RUN = process.env.WGSL_VALIDATE === '1'
 
+function parsePositiveIntEnv(name: string, defaultValue: number): number {
+  const raw = process.env[name]
+  if (raw === undefined || raw === '') return defaultValue
+  const parsed = Number.parseInt(raw, 10)
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`[wgsl] ${name} must be a positive integer, got: ${String(raw)}`)
+  }
+  return parsed
+}
+
 /**
  * Floor assertion on unique shader count — fails loud if a future refactor
  * silently shrinks enumerator coverage. Measured baseline: establish on
@@ -35,6 +49,10 @@ const RUN = process.env.WGSL_VALIDATE === '1'
 const rawMinUnique = process.env.WGSL_MIN_UNIQUE
 const MIN_UNIQUE_SHADERS =
   rawMinUnique === undefined || rawMinUnique === '' ? 0 : Number.parseInt(rawMinUnique, 10)
+const WGSL_BATCH_SIZE = parsePositiveIntEnv('WGSL_BATCH_SIZE', 512)
+const WGSL_PROGRESS_EVERY = parsePositiveIntEnv('WGSL_PROGRESS_EVERY', 100)
+const WGSL_NAGA_TIMEOUT_MS = parsePositiveIntEnv('WGSL_NAGA_TIMEOUT_MS', 120_000)
+const WGSL_TEST_TIMEOUT_MS = parsePositiveIntEnv('WGSL_TEST_TIMEOUT_MS', 60 * 60 * 1000)
 
 if (!Number.isInteger(MIN_UNIQUE_SHADERS) || MIN_UNIQUE_SHADERS < 0) {
   throw new Error(
@@ -50,6 +68,14 @@ describe.skipIf(!RUN)('WGSL validation (naga bulk-validate)', () => {
 
       const report = validateWithNaga(enumerateAll(opts), {
         knownDeviations: KNOWN_DEVIATIONS,
+        batchSize: WGSL_BATCH_SIZE,
+        nagaTimeoutMs: WGSL_NAGA_TIMEOUT_MS,
+        progressEveryBatches: WGSL_PROGRESS_EVERY,
+        onProgress: (progress) => {
+          console.log(
+            `[wgsl] batches=${progress.batches}, unique=${progress.unique}, passed=${progress.passed}, failed=${progress.failures}, known=${progress.knownDeviations}, elapsed=${progress.durationMs}ms`
+          )
+        },
       })
 
       console.log(
@@ -73,6 +99,6 @@ describe.skipIf(!RUN)('WGSL validation (naga bulk-validate)', () => {
 
       expect(report.failures).toEqual([])
     },
-    30 * 60 * 1000
-  ) // 30-min ceiling — enumerator full walk is bounded, not unbounded.
+    WGSL_TEST_TIMEOUT_MS
+  ) // Full all-surface validation is exhaustive and can take >30 minutes locally.
 })

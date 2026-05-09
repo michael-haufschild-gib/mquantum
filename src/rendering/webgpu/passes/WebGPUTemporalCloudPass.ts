@@ -18,6 +18,7 @@ import type { AnimationSnapshot, CameraSnapshot } from '../core/storeAccess'
 import { getStoreSnapshot } from '../core/storeAccess'
 import type { WebGPURenderContext, WebGPURenderPassConfig, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
+import { advanceTemporalBayerCycle, BAYER_OFFSETS } from '../shaders/schroedinger/temporalJitter'
 import { writeInvertMat4 } from '../utils/mat4'
 import {
   buildTemporalPipelines,
@@ -37,14 +38,6 @@ export interface TemporalCloudPassConfig {
   /** History weight for blending (default: 0.85) */
   historyWeight?: number
 }
-
-/** Bayer pattern offsets for 4-frame cycle */
-const BAYER_OFFSETS: [number, number][] = [
-  [0.0, 0.0],
-  [1.0, 1.0],
-  [1.0, 0.0],
-  [0.0, 1.0],
-]
 
 /**
  * Temporal accumulation pass for volumetric rendering.
@@ -168,6 +161,7 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     this.lastWidth = width
     this.lastHeight = height
     this.hasValidHistory = false
+    this.completedFullCycle = false
     this.bgCache.reset()
   }
 
@@ -252,6 +246,8 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     const outputView = ctx.getWriteTarget(this.passConfig.outputResource)
 
     if (!quarterColorView || !quarterPositionView || !outputView) {
+      this.hasValidHistory = false
+      this.completedFullCycle = false
       logger.warn(
         `TemporalCloudPass: Missing textures — qColor=${!!quarterColorView} qPos=${!!quarterPositionView} out=${!!outputView}`
       )
@@ -271,6 +267,7 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
 
       if (this.hasValidHistory && this.detectCameraCut(cameraPosition)) {
         this.hasValidHistory = false
+        this.completedFullCycle = false
       }
     } else {
       viewProjectionMatrix = this._fallbackIdentityMatrix
@@ -294,6 +291,7 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
       currentAnimTime !== undefined && currentAnimTime !== this.prevAnimationTime
     if (this.hasValidHistory && animTimeChanged) {
       this.hasValidHistory = false
+      this.completedFullCycle = false
     }
 
     const readAccumulationView =
@@ -403,16 +401,13 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     // overwrote prevViewProjectionMatrix with the current frame's matrix.
     const sceneChanged = animTimeChanged || cameraChanged
 
-    if (sceneChanged) {
-      this.frameIndex = (this.frameIndex + 1) % 4
-      this.completedFullCycle = false
-    } else if (!this.completedFullCycle) {
-      const nextIndex = (this.frameIndex + 1) % 4
-      this.frameIndex = nextIndex
-      if (nextIndex === 0) {
-        this.completedFullCycle = true
-      }
-    }
+    const nextBayer = advanceTemporalBayerCycle(
+      this.frameIndex,
+      this.completedFullCycle,
+      sceneChanged
+    )
+    this.frameIndex = nextBayer.index
+    this.completedFullCycle = nextBayer.completedFullCycle
     if (currentAnimTime !== undefined) {
       this.prevAnimationTime = currentAnimTime
     }
@@ -444,6 +439,7 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     this.lastWidth = 0
     this.lastHeight = 0
     this.hasValidHistory = false
+    this.completedFullCycle = false
     this.bgCache.reset()
   }
 

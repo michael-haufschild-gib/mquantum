@@ -58,6 +58,7 @@ export const ExportPresetCard = ({
   onClick,
 }: ExportPresetCardProps) => {
   const iconSrc = PRESET_ICON_BY_ID[id]
+  const iconMask = `url(${iconSrc}) center / contain no-repeat`
 
   return (
     <button
@@ -76,7 +77,12 @@ export const ExportPresetCard = ({
       <div
         className={`p-1.5 sm:p-2 rounded-md lg:rounded-lg shrink-0 ${isActive ? 'bg-accent text-text-inverse' : 'bg-[var(--bg-active)] text-text-secondary group-hover:text-text-primary'}`}
       >
-        <img src={iconSrc} className="w-4 h-4 sm:w-5 sm:h-5" alt="" aria-hidden="true" />
+        <span
+          className="block w-4 h-4 sm:w-5 sm:h-5 bg-current"
+          style={{ mask: iconMask, WebkitMask: iconMask }}
+          aria-hidden="true"
+          data-testid={`export-preset-icon-${id}`}
+        />
       </div>
 
       <div className="min-w-0 flex-1">

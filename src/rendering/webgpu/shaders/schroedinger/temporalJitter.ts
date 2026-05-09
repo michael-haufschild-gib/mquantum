@@ -8,6 +8,32 @@
  * @module rendering/webgpu/shaders/schroedinger/temporalJitter
  */
 
+/** Bayer pattern offsets for the 4-frame temporal jitter cycle. */
+export const BAYER_OFFSETS: [number, number][] = [
+  [0, 0],
+  [1, 1],
+  [1, 0],
+  [0, 1],
+]
+
+/** Advance temporal Bayer state after the current frame has used `currentIndex`. */
+export function advanceTemporalBayerCycle(
+  currentIndex: number,
+  completedFullCycle: boolean,
+  sceneChanged: boolean
+): { index: number; completedFullCycle: boolean } {
+  if (sceneChanged) {
+    return { index: (currentIndex + 1) % BAYER_OFFSETS.length, completedFullCycle: false }
+  }
+
+  if (!completedFullCycle) {
+    const nextIndex = (currentIndex + 1) % BAYER_OFFSETS.length
+    return { index: nextIndex, completedFullCycle: nextIndex === 0 }
+  }
+
+  return { index: currentIndex, completedFullCycle }
+}
+
 /**
  * Generate the WGSL Bayer sub-pixel jitter block.
  *

@@ -121,6 +121,44 @@ describe('TDSE dynamics setters', () => {
     expect(t.packetCenter[1]).toBe(-0.5)
   })
 
+  it('normalizes packet vectors to lattice dimensionality', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setTdseLatticeDim(3)
+
+    s.setTdsePacketCenter([1, 2, 3])
+    s.setTdsePacketCenter([4])
+    expect(getTdse().packetCenter).toEqual([4, 2, 3])
+
+    s.setTdsePacketMomentum([1, 2, 3, 4])
+    expect(getTdse().packetMomentum).toEqual([1, 2, 3])
+  })
+
+  it('rejects non-finite packet vectors', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setTdseLatticeDim(3)
+    s.setTdsePacketCenter([1, 2, 3])
+    s.setTdsePacketMomentum([4, 5, 6])
+
+    s.setTdsePacketCenter([7, Number.NaN, 9])
+    expect(getTdse().packetCenter).toEqual([1, 2, 3])
+
+    s.setTdsePacketMomentum([7, Number.POSITIVE_INFINITY, 9])
+    expect(getTdse().packetMomentum).toEqual([4, 5, 6])
+  })
+
+  it('rejects sparse numeric arrays before they can write NaN', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setTdseLatticeDim(3)
+    s.setTdseSpacing([0.2, 0.2, 0.2])
+    const before = getTdse().spacing
+    const sparse = new Array<number>(3)
+    sparse[2] = 0.3
+
+    s.setTdseSpacing(sparse)
+
+    expect(getTdse().spacing).toEqual(before)
+  })
+
   it('sets initial condition type', () => {
     const s = useExtendedObjectStore.getState()
     // @ts-expect-error intentional invalid input

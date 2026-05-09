@@ -120,6 +120,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     temporalBayerIndex: 0,
     prevTemporalAnimTime: Number.NaN,
     prevTemporalVPMatrix: new Float32Array(16),
+    prevTemporalWidth: 0,
+    prevTemporalHeight: 0,
     completedTemporalCycle: false,
     cachedPreset: null,
     cachedPresetConfig: null,

@@ -23,7 +23,10 @@ import {
   QUANTUM_MODES_3D_ONLY,
 } from '@/lib/geometry/registry'
 import type { QuantumTypeKey } from '@/lib/geometry/registry/types'
-import { HYDROGEN_COUPLED_PRESETS } from '@/lib/physics/hydrogenCoupled/presets'
+import {
+  HYDROGEN_COUPLED_PRESETS,
+  normalizeHydrogenCoupledAngularChain,
+} from '@/lib/physics/hydrogenCoupled/presets'
 import { getFirstPresetId } from '@/lib/physics/presetDefaults'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
@@ -418,12 +421,17 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
       const newL = Math.min(currentL, clamped - 1)
       // `|| 0` normalizes JS -0 to 0 (Math.max(-0, ...) can produce -0 when bounds are 0)
       const newM = Math.max(-newL, Math.min(newL, currentM)) || 0
+      const newChain = normalizeHydrogenCoupledAngularChain(get().schroedinger.angularChain, {
+        l1: newL,
+        magneticM: newM,
+      })
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
           principalQuantumNumber: clamped,
           azimuthalQuantumNumber: newL,
           magneticQuantumNumber: newM,
+          angularChain: newChain,
           hydrogenNDPreset: 'custom',
         },
       }))
@@ -439,13 +447,10 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
       const clamped = Math.max(0, Math.min(currentN - 1, Math.floor(l)))
       // `|| 0` normalizes JS -0 to 0 (Math.max(-0, ...) can produce -0 when bounds are 0)
       const newM = Math.max(-clamped, Math.min(clamped, currentM)) || 0
-      // Auto-clamp angular chain: each element must be <= l₁, cascade downward
-      const chain = [...get().schroedinger.angularChain]
-      let prevMax = clamped
-      for (let i = 0; i < chain.length; i++) {
-        chain[i] = Math.min(chain[i]!, prevMax)
-        prevMax = chain[i]!
-      }
+      const chain = normalizeHydrogenCoupledAngularChain(get().schroedinger.angularChain, {
+        l1: clamped,
+        magneticM: newM,
+      })
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
@@ -465,10 +470,15 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
       const currentL = get().schroedinger.azimuthalQuantumNumber
       // `|| 0` normalizes JS -0 to 0 (Math.max(-0, ...) can produce -0 when bounds are 0)
       const clamped = Math.max(-currentL, Math.min(currentL, Math.floor(m))) || 0
+      const chain = normalizeHydrogenCoupledAngularChain(get().schroedinger.angularChain, {
+        l1: currentL,
+        magneticM: clamped,
+      })
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
           magneticQuantumNumber: clamped,
+          angularChain: chain,
           hydrogenNDPreset: 'custom',
         },
       }))
@@ -561,16 +571,13 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
       }
       const state = get().schroedinger
       const chain = [...state.angularChain]
-      // Upper bound: previous element (or l₁ for the first)
-      const upperBound =
-        chainIndex === 0 ? state.azimuthalQuantumNumber : (chain[chainIndex - 1] ?? 0)
-      chain[chainIndex] = Math.max(0, Math.min(upperBound, Math.floor(value)))
-      // Cascade: clamp all subsequent elements to be <= this one
-      for (let i = chainIndex + 1; i < chain.length; i++) {
-        chain[i] = Math.min(chain[i]!, chain[i - 1]!)
-      }
+      chain[chainIndex] = Math.floor(value)
+      const normalizedChain = normalizeHydrogenCoupledAngularChain(chain, {
+        l1: state.azimuthalQuantumNumber,
+        magneticM: state.magneticQuantumNumber,
+      })
       setWithVersion((s) => ({
-        schroedinger: { ...s.schroedinger, angularChain: chain },
+        schroedinger: { ...s.schroedinger, angularChain: normalizedChain },
       }))
     },
 

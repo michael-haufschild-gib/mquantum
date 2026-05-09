@@ -53,8 +53,14 @@ export const WignerControls: React.FC<WignerControlsProps> = React.memo(
       return opts
     }, [dimension, isHydrogenMode])
 
-    // Clamp dimension index to valid range
-    const currentDimIdx = String(Math.min(config.wignerDimensionIndex, dimension - 1))
+    // Hydrogen core dims 0-2 all route to the same radial Wigner path, but the
+    // selector exposes that path as a single option. Map loaded/core indices
+    // back to "0" so the native select never receives a value absent from
+    // its option list.
+    const currentDimIdx =
+      isHydrogenMode && config.wignerDimensionIndex < 3
+        ? '0'
+        : String(Math.min(config.wignerDimensionIndex, dimension - 1))
 
     return (
       <div className="space-y-3" data-testid="wigner-controls">

@@ -261,6 +261,32 @@ describe('projectToDisplayGrid — low dimensions', () => {
     expect(grid.nk[yNeighborIdx]).toBe(0)
   })
 
+  it('preserves all 1D occupation when the lattice axis exceeds the display grid', () => {
+    const N = 128
+    const G = OUTPUT_GRID_SIZE
+    expect(N).toBeGreaterThan(G)
+
+    const raw: KSpaceRawData = {
+      nk: new Float64Array(N).fill(1),
+      kMag: new Float64Array(N),
+      omega: new Float64Array(N).fill(1),
+      nkMax: 1,
+      kMagMax: 1,
+      omegaMax: 1,
+      totalSites: N,
+      gridSize: [N],
+      strides: [1],
+      latticeDim: 1,
+      spacing: [1],
+    }
+
+    const grid = projectToDisplayGrid(raw, { ...PASSTHROUGH_KSPACE_VIZ, fftShiftEnabled: false })
+
+    let sum = 0
+    for (let i = 0; i < grid.nk.length; i++) sum += grid.nk[i]!
+    expect(sum).toBe(N)
+  })
+
   it('2D field produces non-zero values only in the center Z plane', () => {
     const N = 4
     const gridSize = [N, N]
@@ -320,6 +346,31 @@ describe('applyExposureTransfer', () => {
       expect(grid.nk[i]).toBeGreaterThanOrEqual(0)
       expect(grid.nk[i]).toBeLessThanOrEqual(1.001) // small tolerance for float
     }
+  })
+
+  it('maps 0/100 percentile endpoints to exact output bounds', () => {
+    const G = OUTPUT_GRID_SIZE
+    const nk = new Float64Array(G ** 3)
+    nk[0] = 1
+    nk[1] = 2
+    const grid = {
+      nk,
+      kNorm: new Float64Array(G ** 3),
+      omegaNorm: new Float64Array(G ** 3),
+      nkOmega: new Float64Array(G ** 3),
+      nkMax: 2,
+    }
+
+    applyExposureTransfer(grid, {
+      ...PASSTHROUGH_KSPACE_VIZ,
+      exposureMode: 'linear',
+      lowPercentile: 0,
+      highPercentile: 100,
+      gamma: 1,
+    })
+
+    expect(grid.nk[0]).toBe(0)
+    expect(grid.nk[1]).toBe(1)
   })
 
   it('log mode produces monotonically increasing output for increasing input', () => {

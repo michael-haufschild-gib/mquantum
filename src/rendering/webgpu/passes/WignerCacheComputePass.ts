@@ -265,7 +265,8 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
     device: GPUDevice,
     schroedingerData: ArrayBuffer,
     time: number,
-    timeScale: number
+    timeScale: number,
+    crossTermsEnabled: boolean
   ): void {
     if (!this.reconstruct?.reconstructParamsBuffer || !this.twoPhaseActive) return
 
@@ -275,7 +276,8 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
       time,
       timeScale,
       this.reconstructParamsF32View,
-      this.reconstructParamsU32View
+      this.reconstructParamsU32View,
+      crossTermsEnabled
     )
 
     device.queue.writeBuffer(
