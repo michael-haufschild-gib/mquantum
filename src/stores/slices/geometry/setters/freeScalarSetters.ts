@@ -147,7 +147,7 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
         const maxPerDim = defaultGridPerDim(latticeDim)
         const clamped = Array.from({ length: latticeDim }, (_, i) => {
           const s = i < size.length ? size[i]! : 1
-          return i < latticeDim ? nearestPow2(s, 2, maxPerDim) : 1
+          return nearestPow2(s, 2, maxPerDim)
         })
         while (clamped.reduce((a, b) => a * b, 1) > MAX_TOTAL_SITES) {
           let maxIdx = 0

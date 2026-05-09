@@ -33,4 +33,21 @@ describe('WignerControls', () => {
 
     expect(screen.getByTestId('wigner-dimension-select')).toHaveValue('0')
   })
+
+  it('maps out-of-range hydrogen indices back to the radial option when dimension is 3', () => {
+    render(
+      <WignerControls
+        config={{
+          ...DEFAULT_SCHROEDINGER_CONFIG,
+          quantumMode: 'hydrogenND',
+          representation: 'wigner',
+          wignerDimensionIndex: 99,
+        }}
+        dimension={3}
+        actions={makeActions()}
+      />
+    )
+
+    expect(screen.getByTestId('wigner-dimension-select')).toHaveValue('0')
+  })
 })

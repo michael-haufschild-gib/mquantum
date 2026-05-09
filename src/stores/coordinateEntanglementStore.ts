@@ -245,7 +245,9 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
       computeWignerNegativity: v,
       currentWignerNegativities: v ? state.currentWignerNegativities : [],
       currentAverageWignerNegativity: v ? state.currentAverageWignerNegativity : 0,
-      historyWignerNegativity: v ? state.historyWignerNegativity : new Float64Array(HISTORY_LENGTH),
+      historyWignerNegativity: v
+        ? state.historyWignerNegativity
+        : new Float64Array(HISTORY_LENGTH).fill(NaN),
     })),
 
   pushResult: (result) => {

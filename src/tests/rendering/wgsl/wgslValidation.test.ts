@@ -27,12 +27,15 @@ import { validateWithNaga } from './validateWithNaga'
 
 const RUN = process.env.WGSL_VALIDATE === '1'
 
-function parsePositiveIntEnv(name: string, defaultValue: number): number {
+function parseIntEnv(name: string, defaultValue: number, min: number): number {
   const raw = process.env[name]
   if (raw === undefined || raw === '') return defaultValue
+  if (!/^-?\d+$/.test(raw)) {
+    throw new Error(`[wgsl] ${name} must be a whole integer, got: ${String(raw)}`)
+  }
   const parsed = Number.parseInt(raw, 10)
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error(`[wgsl] ${name} must be a positive integer, got: ${String(raw)}`)
+  if (parsed < min) {
+    throw new Error(`[wgsl] ${name} must be >= ${min}, got: ${parsed}`)
   }
   return parsed
 }
@@ -49,10 +52,10 @@ function parsePositiveIntEnv(name: string, defaultValue: number): number {
 const rawMinUnique = process.env.WGSL_MIN_UNIQUE
 const MIN_UNIQUE_SHADERS =
   rawMinUnique === undefined || rawMinUnique === '' ? 0 : Number.parseInt(rawMinUnique, 10)
-const WGSL_BATCH_SIZE = parsePositiveIntEnv('WGSL_BATCH_SIZE', 512)
-const WGSL_PROGRESS_EVERY = parsePositiveIntEnv('WGSL_PROGRESS_EVERY', 100)
-const WGSL_NAGA_TIMEOUT_MS = parsePositiveIntEnv('WGSL_NAGA_TIMEOUT_MS', 120_000)
-const WGSL_TEST_TIMEOUT_MS = parsePositiveIntEnv('WGSL_TEST_TIMEOUT_MS', 60 * 60 * 1000)
+const WGSL_BATCH_SIZE = parseIntEnv('WGSL_BATCH_SIZE', 512, 1)
+const WGSL_PROGRESS_EVERY = parseIntEnv('WGSL_PROGRESS_EVERY', 100, 0)
+const WGSL_NAGA_TIMEOUT_MS = parseIntEnv('WGSL_NAGA_TIMEOUT_MS', 120_000, 1)
+const WGSL_TEST_TIMEOUT_MS = parseIntEnv('WGSL_TEST_TIMEOUT_MS', 60 * 60 * 1000, 1)
 
 if (!Number.isInteger(MIN_UNIQUE_SHADERS) || MIN_UNIQUE_SHADERS < 0) {
   throw new Error(

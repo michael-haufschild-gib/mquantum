@@ -99,6 +99,14 @@ describe('exportStore (invariants)', () => {
       expect(useExportStore.getState().lastAppliedPreset).toBeNull()
     })
 
+    it('reset() clears preset provenance', () => {
+      useExportStore.getState().applyPreset('twitter-video')
+      expect(useExportStore.getState().lastAppliedPreset).toBe('twitter-video')
+
+      useExportStore.getState().reset()
+      expect(useExportStore.getState().lastAppliedPreset).toBeNull()
+    })
+
     it('should preserve other settings', () => {
       const originalDuration = useExportStore.getState().settings.duration
       useExportStore.getState().updateSettings({ fps: 30 })

@@ -109,6 +109,11 @@ function stripBlankSeparatorLine(csv: string, markerIdx: number): number {
 export function splitSrmtSweepCsv(csv: string): { main: string; tail: string | null } {
   const markerIdx = findTailMarkerLine(csv)
   if (markerIdx < 0) return { main: csv, tail: null }
+  const afterMarker = markerIdx + SRMT_SWEEP_SPECTRA_TAIL_MARKER.length
+  const headerStart = csv[afterMarker] === '\r' ? afterMarker + 2 : afterMarker + 1
+  if (!csv.startsWith(SRMT_SWEEP_SPECTRA_TAIL_HEADER, headerStart)) {
+    return { main: csv, tail: null }
+  }
   const cutoff = stripBlankSeparatorLine(csv, markerIdx)
   const main = csv.slice(0, cutoff)
   const tail = csv.slice(markerIdx)

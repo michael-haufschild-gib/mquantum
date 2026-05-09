@@ -17,6 +17,7 @@ import {
   maxAzimuthalForPrincipal,
   orbitalShapeLetter,
 } from '@/lib/geometry/extended/schroedinger/hydrogenPresets'
+import { normalizeHydrogenCoupledAngularChain } from '@/lib/physics/hydrogenCoupled/presets'
 
 import type { HydrogenNDCoupledControlsProps } from './types'
 
@@ -70,20 +71,23 @@ export const HydrogenNDCoupledControls: React.FC<HydrogenNDCoupledControlsProps>
       [setAngularChainValue]
     )
 
-    // Compute upper bounds for each chain value.
-    // Physics constraint: l₁ >= l₂ >= l₃ >= ... >= |m|.
-    // Each l_{k+1} is bounded above by l_k (the previous element in the chain).
-    // Slider min is |m| so the displayed controls match the store/shader invariant.
+    // Derive slider upper bounds from the shared normalizer so the UI cascade
+    // stays in sync with the store/shader invariant (l₁ >= l₂ >= ... >= |m|).
     const chainBounds = useMemo(() => {
-      const bounds: number[] = [] // max for each slot
-      let prevL = config.azimuthalQuantumNumber // l₁
-      for (let i = 0; i < chainLength; i++) {
-        bounds.push(prevL)
-        // Next element's max is this element's current value (cascade)
-        prevL = Math.max(minChainL, Math.min(prevL, config.angularChain[i] ?? minChainL))
-      }
+      const normalized = normalizeHydrogenCoupledAngularChain(config.angularChain, {
+        l1: config.azimuthalQuantumNumber,
+        magneticM: config.magneticQuantumNumber,
+        length: chainLength,
+      })
+      const bounds: number[] = [config.azimuthalQuantumNumber]
+      for (let i = 1; i < chainLength; i++) bounds.push(normalized[i - 1]!)
       return bounds
-    }, [config.azimuthalQuantumNumber, config.angularChain, chainLength, minChainL])
+    }, [
+      config.azimuthalQuantumNumber,
+      config.magneticQuantumNumber,
+      config.angularChain,
+      chainLength,
+    ])
 
     return (
       <div className="space-y-3">

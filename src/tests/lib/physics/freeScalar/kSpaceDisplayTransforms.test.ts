@@ -287,6 +287,32 @@ describe('projectToDisplayGrid — low dimensions', () => {
     expect(sum).toBe(N)
   })
 
+  it('preserves all 1D occupation when the lattice axis exceeds the display grid (shifted)', () => {
+    const N = 128
+    const G = OUTPUT_GRID_SIZE
+    expect(N).toBeGreaterThan(G)
+
+    const raw: KSpaceRawData = {
+      nk: new Float64Array(N).fill(1),
+      kMag: new Float64Array(N),
+      omega: new Float64Array(N).fill(1),
+      nkMax: 1,
+      kMagMax: 1,
+      omegaMax: 1,
+      totalSites: N,
+      gridSize: [N],
+      strides: [1],
+      latticeDim: 1,
+      spacing: [1],
+    }
+
+    const grid = projectToDisplayGrid(raw, { ...PASSTHROUGH_KSPACE_VIZ, fftShiftEnabled: true })
+
+    let sum = 0
+    for (let i = 0; i < grid.nk.length; i++) sum += grid.nk[i]!
+    expect(sum).toBe(N)
+  })
+
   it('2D field produces non-zero values only in the center Z plane', () => {
     const N = 4
     const gridSize = [N, N]

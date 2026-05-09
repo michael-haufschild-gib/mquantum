@@ -175,10 +175,6 @@ function restoreGeometryAndExtended(data: SavedScene['data']): void {
   } else if (geometryData.objectType !== undefined) {
     if (isValidObjectType(geometryData.objectType)) {
       useGeometryStore.getState().setObjectType(geometryData.objectType)
-    } else {
-      useGeometryStore
-        .getState()
-        .loadGeometry(useGeometryStore.getState().dimension, geometryData.objectType as ObjectType)
     }
   }
 

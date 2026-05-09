@@ -87,6 +87,7 @@ describe('quantum number interdependency clamping', () => {
 
   it('raising |m| raises coupled-hydrogen angular chain entries to keep l(D-2) >= |m|', () => {
     const store = useExtendedObjectStore.getState()
+    store.setSchroedingerQuantumMode('hydrogenNDCoupled')
     store.setSchroedingerPrincipalQuantumNumber(5)
     store.setSchroedingerAzimuthalQuantumNumber(3)
     store.setSchroedingerAngularChainValue(0, 1)
@@ -101,6 +102,7 @@ describe('quantum number interdependency clamping', () => {
 
   it('refuses to lower coupled-hydrogen angular chain below |m|', () => {
     const store = useExtendedObjectStore.getState()
+    store.setSchroedingerQuantumMode('hydrogenNDCoupled')
     store.setSchroedingerPrincipalQuantumNumber(5)
     store.setSchroedingerAzimuthalQuantumNumber(3)
     store.setSchroedingerMagneticQuantumNumber(2)

@@ -186,6 +186,13 @@ describe('spherical harmonic normalization constants — exact verification', ()
     expect(fastRealSphericalHarmonicCartesian(1, 2, 0.3, 0.4, 0.5)).toBe(0)
   })
 
+  it('invalid l < 0 returns zero', () => {
+    expect(sphericalHarmonicNorm(-1, 0)).toBe(0)
+    expect(sphericalHarmonic(-1, 0, Math.PI / 3, Math.PI / 4)).toEqual([0, 0])
+    expect(fastRealSphericalHarmonicDirect(-1, 0, 0.5, Math.sqrt(0.75), 0.25)).toBe(0)
+    expect(fastRealSphericalHarmonicCartesian(-1, 0, 0.3, 0.4, 0.5)).toBe(0)
+  })
+
   it('Y_20 constant: K_2^0 / 2 = √(5/(16π)) = 0.31539157... (absorbs P_2 factor)', () => {
     // The fast-path computes K_2^0 * P_2(x) = K_2^0 * (3x²-1)/2 as
     // 0.31539157 * (3x²-1), folding the 1/2 into the constant.

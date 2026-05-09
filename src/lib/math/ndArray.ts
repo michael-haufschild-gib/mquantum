@@ -111,10 +111,11 @@ export function sanitizePowerOfTwoGridSizes<T extends { gridSize: number[]; latt
 ): T {
   const minGridSize = options.minGridSize ?? MIN_POWER_OF_TWO_GRID_SIZE
   const maxGridSize = options.maxGridSize ?? MAX_POWER_OF_TWO_GRID_SIZE
-  const pow2Grid = config.gridSize.map((g) => nearestPow2(g, minGridSize, maxGridSize))
-  const activeGrid = pow2Grid.slice(0, config.latticeDim)
+  const activeGrid = config.gridSize
+    .slice(0, config.latticeDim)
+    .map((g) => nearestPow2(g, minGridSize, maxGridSize))
   const fittedActive = reduceGridToFit([...activeGrid], options.maxTotalSites, minGridSize)
-  const fixed = [...fittedActive, ...pow2Grid.slice(config.latticeDim)]
+  const fixed = [...fittedActive, ...config.gridSize.slice(config.latticeDim)]
   if (fixed.every((g, i) => g === config.gridSize[i])) return config
   return { ...config, gridSize: fixed }
 }

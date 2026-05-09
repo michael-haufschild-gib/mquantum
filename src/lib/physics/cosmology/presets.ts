@@ -348,6 +348,14 @@ export function isValidPreset(params: CosmologyPresetParams): boolean {
     if (!exp || !Number.isFinite(exp.p1) || !Number.isFinite(exp.p2) || !Number.isFinite(exp.p3)) {
       return false
     }
+    const maxMagnitude = 20
+    if (
+      Math.abs(exp.p1) > maxMagnitude ||
+      Math.abs(exp.p2) > maxMagnitude ||
+      Math.abs(exp.p3) > maxMagnitude
+    ) {
+      return false
+    }
     return exp.p1 + exp.p2 + exp.p3 <= params.spacetimeDim - 1 + 1e-12
   }
   try {

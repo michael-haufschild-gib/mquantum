@@ -57,10 +57,8 @@ export const WignerControls: React.FC<WignerControlsProps> = React.memo(
     // selector exposes that path as a single option. Map loaded/core indices
     // back to "0" so the native select never receives a value absent from
     // its option list.
-    const currentDimIdx =
-      isHydrogenMode && config.wignerDimensionIndex < 3
-        ? '0'
-        : String(Math.min(config.wignerDimensionIndex, dimension - 1))
+    const clampedDimIdx = Math.max(0, Math.min(config.wignerDimensionIndex, dimension - 1))
+    const currentDimIdx = isHydrogenMode && clampedDimIdx < 3 ? '0' : String(clampedDimIdx)
 
     return (
       <div className="space-y-3" data-testid="wigner-controls">

@@ -1,9 +1,6 @@
 import { StateCreator } from 'zustand'
 
-import {
-  DEFAULT_QUANTUM_WALK_CONFIG,
-  resizeQuantumWalkArrays,
-} from '@/lib/geometry/extended/quantumWalk'
+import { resizeQuantumWalkArrays } from '@/lib/geometry/extended/quantumWalk'
 import { SCHROEDINGER_PALETTE_DEFINITIONS } from '@/lib/geometry/extended/schroedinger/palettes'
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
 import {
@@ -23,8 +20,6 @@ import { isHydrogenFamilyQuantumType } from '@/lib/geometry/registry'
 import { logger } from '@/lib/logger'
 import { sanitizePowerOfTwoGridSizes } from '@/lib/math/ndArray'
 import { normalizeHydrogenCoupledAngularChain } from '@/lib/physics/hydrogenCoupled/presets'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
 
 import { createAntiDeSitterSetters } from './setters/antiDeSitterSetters'
 import { createBecSetters, resizeBecArrays } from './setters/becSetters'
@@ -33,6 +28,7 @@ import { reconcileCosmologyInvariants } from './setters/freeScalarCosmologySette
 import { createFreeScalarSetters, resizeFreeScalarArrays } from './setters/freeScalarSetters'
 import { createOpenQuantumSetters } from './setters/openQuantumSetters'
 import { createQuantumModeSetters } from './setters/quantumModeSetters'
+import { createQuantumWalkSetters } from './setters/quantumWalkSetters'
 import type { SetterContext } from './setters/sliceSetterUtils'
 import { clampDtWithCfl } from './setters/sliceSetterUtils'
 import { createTdseSetters, resizeTdseArrays } from './setters/tdseSetters'
@@ -199,11 +195,13 @@ export const createSchroedingerSlice: StateCreator<
   // === Validation Helpers ===
 
   const isFiniteSchroedingerInput = (value: number): boolean => Number.isFinite(value)
-  const hasOnlyFiniteNumbers = (values: number[]): boolean =>
-    Array.isArray(values) &&
-    Array.from({ length: values.length }, (_, i) => values[i]).every((value) =>
-      Number.isFinite(value)
-    )
+  const hasOnlyFiniteNumbers = (values: number[]): boolean => {
+    if (!Array.isArray(values)) return false
+    for (let i = 0; i < values.length; i++) {
+      if (!Number.isFinite(values[i])) return false
+    }
+    return true
+  }
 
   const warnNonFiniteSchroedingerInput = (name: string, value: unknown): void => {
     logger.warn(`[schroedingerSlice] Ignoring non-finite input for ${name}:`, value)
@@ -504,117 +502,7 @@ export const createSchroedingerSlice: StateCreator<
     ...createAntiDeSitterSetters(ctx),
 
     // === Quantum Walk ===
-    applyQuantumWalkPreset: (presetId) => {
-      loadPresetModule(
-        () => import('@/lib/physics/quantumWalk/presets'),
-        'schroedingerSlice',
-        `quantum-walk presets for '${presetId}'`,
-        ({ QUANTUM_WALK_PRESETS }) => {
-          const preset = QUANTUM_WALK_PRESETS.find((p) => p.id === presetId)
-          if (!preset) return
-          setWithVersion((state) => {
-            const globalDim = useGeometryStore.getState().dimension
-            const base = {
-              ...DEFAULT_QUANTUM_WALK_CONFIG,
-              ...preset.overrides,
-              slicePositions: state.schroedinger.quantumWalk.slicePositions,
-              steps: 0,
-              needsReset: true,
-            }
-            const resized = resizeQuantumWalkArrays(base, globalDim)
-            const parentAbsorber =
-              preset.overrides.absorberEnabled !== undefined
-                ? {
-                    absorberEnabled: preset.overrides.absorberEnabled,
-                    absorberWidth:
-                      preset.overrides.absorberWidth ?? state.schroedinger.absorberWidth,
-                  }
-                : {}
-            return {
-              schroedinger: {
-                ...state.schroedinger,
-                ...parentAbsorber,
-                quantumWalk: { ...base, ...resized, needsReset: true },
-              },
-            }
-          })
-        }
-      )
-    },
-    resetQuantumWalk: () => {
-      set((state) => {
-        const qw = state.schroedinger.quantumWalk
-        const initialPosition = qw.gridSize.map((s) => Math.floor(s / 2))
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            quantumWalk: { ...qw, steps: 0, initialPosition, needsReset: true },
-          },
-        }
-      })
-    },
-    clearQuantumWalkNeedsReset: () => {
-      set((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          quantumWalk: { ...state.schroedinger.quantumWalk, needsReset: false },
-        },
-      }))
-    },
-    setQwAutoScale: (autoScale) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          quantumWalk: { ...state.schroedinger.quantumWalk, autoScale },
-        },
-      }))
-    },
-    setQwAbsorberEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          quantumWalk: { ...state.schroedinger.quantumWalk, absorberEnabled: enabled },
-        },
-      }))
-    },
-    setQwAbsorberWidth: (width) => {
-      if (!isFinite(width)) return
-      const clamped = Math.max(0.05, Math.min(0.5, width))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          quantumWalk: { ...state.schroedinger.quantumWalk, absorberWidth: clamped },
-        },
-      }))
-    },
-    setQwPmlTargetReflection: (r) => {
-      if (!isFinite(r)) return
-      const clamped = Math.max(1e-12, Math.min(0.999, r))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          quantumWalk: { ...state.schroedinger.quantumWalk, pmlTargetReflection: clamped },
-        },
-      }))
-    },
-    setQwSlicePosition: (dimIndex: number, value: number) => {
-      if (!isFinite(value)) return
-      setWithVersion((state) => {
-        const qw = state.schroedinger.quantumWalk
-        const slicePositions = [...qw.slicePositions]
-        if (dimIndex >= 0 && dimIndex < slicePositions.length) {
-          const halfExtent =
-            (qw.gridSize[dimIndex + 3] ?? 1) * (qw.spacing[dimIndex + 3] ?? 0.1) * 0.5
-          slicePositions[dimIndex] = Math.max(-halfExtent, Math.min(halfExtent, value))
-        }
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            quantumWalk: { ...qw, slicePositions },
-          },
-        }
-      })
-    },
+    ...createQuantumWalkSetters(ctx),
 
     // === Config Operations ===
     setSchroedingerConfig: (config) => {
