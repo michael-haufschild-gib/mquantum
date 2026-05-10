@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 
 const ROOT = resolve(fileURLToPath(import.meta.url), '../../../..')
 const SRC_ROOT = resolve(ROOT, 'src')
@@ -45,8 +45,13 @@ function collectSvgAssetImports(): SvgAssetImport[] {
 }
 
 describe('SVG asset imports', () => {
+  let importedAssets: SvgAssetImport[]
+
+  beforeAll(() => {
+    importedAssets = collectSvgAssetImports()
+  })
+
   it('do not carry active content, legacy external references, or hard-coded black paint', () => {
-    const importedAssets = collectSvgAssetImports()
     expect(importedAssets.length).toBeGreaterThan(0)
 
     for (const { asset } of importedAssets) {
@@ -56,7 +61,7 @@ describe('SVG asset imports', () => {
   })
 
   it('keep React icon imports colorable through currentColor paint', () => {
-    const reactIconAssets = collectSvgAssetImports().filter(
+    const reactIconAssets = importedAssets.filter(
       ({ asset, isReactComponent }) => isReactComponent && asset.startsWith('icons/')
     )
     expect(reactIconAssets.length).toBeGreaterThan(0)

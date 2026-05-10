@@ -56,7 +56,9 @@ const DEFAULT_FREQUENCY_SPREAD = 0.02
 const MAX_QUANTUM_NUMBER = 6
 
 function finiteOr(value: number | undefined, fallback: number): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
+  const f32 = Math.fround(value)
+  return Number.isFinite(f32) ? f32 : fallback
 }
 
 /**

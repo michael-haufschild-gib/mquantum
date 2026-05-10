@@ -73,10 +73,13 @@ describe('srmtDiagnosticStore', () => {
       phi1: 0.25,
       phi2: Number.NaN,
     })
+    const snapshot = useSrmtDiagnosticStore.getState().snapshot
+    if (snapshot === null) throw new Error('expected snapshot to be populated')
     const q = useSrmtDiagnosticStore.getState().clockAffineQuality
     expect(Number.isNaN(q.a)).toBe(true)
     expect(q.phi1).toBeCloseTo(0.25, 6)
     expect(Number.isNaN(q.phi2)).toBe(true)
+    expect(Number.isNaN(snapshot.affineMatchQuality)).toBe(true)
   })
 
   it('clear resets snapshot + quality + bumps version', () => {

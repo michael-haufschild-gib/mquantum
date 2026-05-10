@@ -4,6 +4,7 @@ import {
   parseBoolParam,
   parseEnumParam,
   parseFloatParam,
+  parseFloatParamSci,
   parseIntParam,
   setBoolParam,
   setFloatParam,
@@ -42,6 +43,20 @@ describe('URL param helpers', () => {
     expect(parseFloatParam(params, 'nan', 0, 10)).toBeUndefined()
     expect(parseFloatParam(params, 'inf', 0, 10)).toBeUndefined()
     expect(parseFloatParam(params, 'junk', 0, 10)).toBeUndefined()
+  })
+
+  it('parses scientific floats and clamps only valid finite tokens', () => {
+    const params = new URLSearchParams(
+      'small=1e-3&big=2.5E%2B10&neg=-3E2&nan=NaN&inf=Infinity&junk=1e-3ms'
+    )
+
+    expect(parseFloatParamSci(params, 'small', 0, 1)).toBeCloseTo(0.001)
+    expect(parseFloatParamSci(params, 'big', 0, 100)).toBe(100)
+    expect(parseFloatParamSci(params, 'neg', -500, 0)).toBe(-300)
+    expect(parseFloatParamSci(params, 'nan', 0, 1)).toBeUndefined()
+    expect(parseFloatParamSci(params, 'inf', 0, 1)).toBeUndefined()
+    expect(parseFloatParamSci(params, 'junk', 0, 1)).toBeUndefined()
+    expect(parseFloatParamSci(params, 'missing', 0, 1)).toBeUndefined()
   })
 
   it('accepts only canonical 0/1 booleans', () => {

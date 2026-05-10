@@ -121,6 +121,17 @@ describe('buildBecConfig — vortex momentum encoding', () => {
     expect(config.packetMomentum[4]).toBe(1.0)
   })
 
+  it('falls back malformed vortexAlternateCharge before encoding mom[4]', () => {
+    const { config } = buildBecConfig(
+      minimalBec({
+        initialCondition: 'vortexLattice',
+        vortexAlternateCharge: 'false' as unknown as boolean,
+      }),
+      undefined
+    )
+    expect(config.packetMomentum[4]).toBe(0.0)
+  })
+
   it('encodes soliton depth in mom[1] for darkSoliton', () => {
     const { config } = buildBecConfig(
       minimalBec({ initialCondition: 'darkSoliton', solitonDepth: 0.8, solitonVelocity: 0.1 }),
@@ -264,14 +275,27 @@ describe('buildBecConfig — malformed BEC ingress', () => {
 
     expect(config.latticeDim).toBe(11)
     expect(config.gridSize).toHaveLength(11)
-    expect(config.gridSize[0]).toBe(16)
-    expect(config.gridSize[10]).toBe(8)
+    expect(config.gridSize.reduce((acc, size) => acc * size, 1)).toBeLessThanOrEqual(262144)
     expect(config.spacing).toHaveLength(11)
     expect(config.trapAnisotropy).toHaveLength(11)
     expect(config.compactDims).toHaveLength(11)
     expect(config.compactRadii).toHaveLength(11)
     expect(config.slicePositions).toHaveLength(8)
     expect(config.slicePositions[0]).toBe(0)
+  })
+
+  it('reduces high-dimensional fallback grids to the TDSE total-site budget', () => {
+    const { config } = buildBecConfig(
+      minimalBec({
+        latticeDim: 11,
+        gridSize: [],
+      }),
+      undefined
+    )
+
+    const totalSites = config.gridSize.reduce((acc, size) => acc * size, 1)
+    expect(config.gridSize).toHaveLength(11)
+    expect(totalSites).toBeLessThanOrEqual(262144)
   })
 
   it('sanitizes malformed physics scalars and cross-mode overrides', () => {

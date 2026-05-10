@@ -155,9 +155,13 @@ export const useSrmtDiagnosticStore = create<SrmtDiagnosticState>((set) => ({
   version: 0,
 
   setDiagnostic: (snapshot, quality) => {
+    const clockAffineQuality = sanitizeClockQuality(quality)
     set((s) => ({
-      snapshot,
-      clockAffineQuality: sanitizeClockQuality(quality),
+      snapshot: {
+        ...snapshot,
+        affineMatchQuality: clockAffineQuality[snapshot.clock],
+      },
+      clockAffineQuality,
       version: s.version + 1,
     }))
   },

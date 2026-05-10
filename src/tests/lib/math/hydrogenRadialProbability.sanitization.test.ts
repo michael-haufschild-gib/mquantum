@@ -29,6 +29,9 @@ describe('computeRadialProbabilityNorm input sanitization', () => {
     const safe2D = computeRadialProbabilityNorm(2, 1, 1.0, 2)
     const safe11D = computeRadialProbabilityNorm(2, 1, 1.0, 11)
 
+    expect(safe2D).not.toBeCloseTo(safe3D, 12)
+    expect(safe11D).not.toBeCloseTo(safe3D, 12)
+
     expect(computeRadialProbabilityNorm(2, 1, 1.0, Number.NaN)).toBeCloseTo(safe3D, 10)
     expect(computeRadialProbabilityNorm(2, 1, 1.0, 1)).toBeCloseTo(safe2D, 10)
     expect(computeRadialProbabilityNorm(2, 1, 1.0, 99)).toBeCloseTo(safe11D, 10)

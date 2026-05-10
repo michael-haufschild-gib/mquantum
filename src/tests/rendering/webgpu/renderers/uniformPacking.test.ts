@@ -227,6 +227,26 @@ describe('packSchroedingerUniforms — defaults', () => {
     expect(floatView[I.branchColorB + 2]).toBe(1)
   })
 
+  it('sanitizes scalar branch and WdW phase uniforms before writing shader uniforms', () => {
+    const { floatView, intView } = makeBuffer()
+    packSchroedingerUniforms(floatView, intView, {
+      ...baseParams,
+      quantumModeStr: 'wheelerDeWitt',
+      branchSeparation: Number.POSITIVE_INFINITY,
+      branchPlaneThreshold: Number.NaN,
+      schroedinger: {
+        wheelerDeWitt: {
+          phaseRotationEnabled: true,
+          phaseRotationSpeed: Number.POSITIVE_INFINITY,
+        },
+      } as never,
+    })
+
+    expect(floatView[I.branchSeparation]).toBe(0)
+    expect(floatView[I.branchPlaneThreshold]).toBe(0)
+    expect(floatView[I.wdwPhaseRotationRate]).toBe(0)
+  })
+
   it('falls back branchTransitionWidth to 0.2 when input is non-finite or non-positive', () => {
     const cases: Array<number | undefined> = [undefined, NaN, -1, 0]
     for (const w of cases) {

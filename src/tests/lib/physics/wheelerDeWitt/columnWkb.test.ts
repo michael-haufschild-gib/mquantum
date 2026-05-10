@@ -101,10 +101,23 @@ describe('Wheeler-DeWitt column WKB helpers', () => {
 
     captureMatch(state, 1.8, 0.1, -0.2, 0.5, 0.3, 1.2, 9, -2, 4)
 
+    const first = {
+      sEucAtMatch: state.sEucAtMatch,
+      uPrefactorAtMatch: state.uPrefactorAtMatch,
+      chiReAtMatch: state.chiReAtMatch,
+      chiImAtMatch: state.chiImAtMatch,
+    }
+
+    captureMatch(state, 9.9, 1, 1, 1, 1, 1, 16, 123, 456)
+
     expect(state.matched).toBe(true)
-    expect(state.sEucAtMatch).toBeCloseTo(wdwEuclideanWkbAction(1.8, 0.1, -0.2, 0.5, 0.3, 1.2))
-    expect(state.uPrefactorAtMatch).toBeCloseTo(Math.pow(9, 0.25), 12)
-    expect(state.chiReAtMatch).toBe(-2)
-    expect(state.chiImAtMatch).toBe(4)
+    expect(first.sEucAtMatch).toBeCloseTo(wdwEuclideanWkbAction(1.8, 0.1, -0.2, 0.5, 0.3, 1.2))
+    expect(first.uPrefactorAtMatch).toBeCloseTo(Math.pow(9, 0.25), 12)
+    expect(first.chiReAtMatch).toBe(-2)
+    expect(first.chiImAtMatch).toBe(4)
+    expect(state.sEucAtMatch).toBe(first.sEucAtMatch)
+    expect(state.uPrefactorAtMatch).toBe(first.uPrefactorAtMatch)
+    expect(state.chiReAtMatch).toBe(first.chiReAtMatch)
+    expect(state.chiImAtMatch).toBe(first.chiImAtMatch)
   })
 })

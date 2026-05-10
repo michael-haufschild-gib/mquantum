@@ -55,6 +55,7 @@ export function clampFiniteInteger(
   max: number,
   mode: 'round' | 'floor' = 'round'
 ): number {
+  if (!Number.isFinite(value)) return fallback
   const clamped = clampFinite(value, fallback, min, max)
   return mode === 'floor' ? Math.floor(clamped) : Math.round(clamped)
 }

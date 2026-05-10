@@ -154,9 +154,10 @@ export function computeScarCorrelation(
   for (let d = dim - 2; d >= 0; d--) strides[d] = strides[d + 1]! * gridSize[d + 1]!
 
   const invTwoEpsSq = 1.0 / (2.0 * tubeWidth * tubeWidth)
+  const activeSpacing = spacing.slice(0, dim)
   // Kernel radius in grid cells per dimension
   // 3σ captures ~99.7% of the Gaussian kernel weight
-  const kernelRadius = Math.max(1, Math.ceil((3 * tubeWidth) / Math.min(...spacing)))
+  const kernelRadius = Math.max(1, Math.ceil((3 * tubeWidth) / Math.min(...activeSpacing)))
 
   const orbitCorrelations: number[] = []
 
@@ -328,7 +329,7 @@ function tryScarCorrelationWasm(
   }
 
   const gridSizesU32 = new Uint32Array(gridSize)
-  const spacingsF64 = new Float64Array(spacing)
+  const spacingsF64 = new Float64Array(spacing.slice(0, dim))
 
   const packed = computeScarCorrelationWasm(
     densityRe,

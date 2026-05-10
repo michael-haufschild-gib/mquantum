@@ -130,6 +130,18 @@ describe('computeScarCorrelation', () => {
     expect(badTube.orbitCorrelations).toEqual([0])
   })
 
+  it('ignores trailing spacing entries outside the active dimension', () => {
+    const re = new Float32Array(16).fill(1)
+    const im = new Float32Array(16)
+    const orbit = makeTrajectory([makePoint([0, 0])])
+
+    const base = computeScarCorrelation(re, im, [orbit], [4, 4], [1, 1], 1.0)
+    const trailing = computeScarCorrelation(re, im, [orbit], [4, 4], [1, 1, 0], 1.0)
+
+    expect(trailing.maxCorrelation).toBeCloseTo(base.maxCorrelation, 12)
+    expect(trailing.meanCorrelation).toBeCloseTo(base.meanCorrelation, 12)
+  })
+
   it('treats non-finite density samples as zero instead of returning NaN metrics', () => {
     const re = new Float32Array(16)
     re[5] = Number.POSITIVE_INFINITY

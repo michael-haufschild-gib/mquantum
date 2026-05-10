@@ -49,7 +49,7 @@ function assertPackedBufferSize(caller: string, length: number, label = 'buffer'
 /** Clamp optional shader loop basis size to the packed matrix domain. */
 function normalizeActiveK(activeK: number | undefined, K: number): number {
   if (activeK === undefined || !Number.isFinite(activeK)) return K
-  return Math.max(1, Math.min(MAX_K, Math.floor(activeK)))
+  return Math.max(1, Math.min(K, Math.floor(activeK)))
 }
 
 /**
@@ -134,7 +134,7 @@ export function computeActiveK(rho: DensityMatrix, populationThreshold = 0.01, m
   }
   const el = rho.elements
   const threshold = Number.isFinite(populationThreshold) ? populationThreshold : 0.01
-  const minActiveK = Number.isFinite(minK) ? Math.max(1, Math.floor(minK)) : 1
+  const minActiveK = Number.isFinite(minK) ? Math.max(2, Math.floor(minK)) : 2
 
   // Find the last index with significant population
   let lastActive = 0

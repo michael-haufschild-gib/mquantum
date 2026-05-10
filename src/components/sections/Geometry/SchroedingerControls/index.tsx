@@ -58,9 +58,17 @@ interface ModeControlsProps {
   harmonicActions: HarmonicOscillatorActions
 }
 
-/** Dispatch the per-mode controls block by quantum mode. Default: HO. */
+/** Dispatch the per-mode controls block by quantum mode. */
 function renderModeControls(p: ModeControlsProps): React.ReactNode {
   switch (p.config.quantumMode) {
+    case 'harmonicOscillator':
+      return (
+        <HarmonicOscillatorControls
+          config={p.config}
+          dimension={p.dimension}
+          actions={p.harmonicActions}
+        />
+      )
     case 'antiDeSitter':
       return <AntiDeSitterControls />
     case 'wheelerDeWitt':
@@ -108,13 +116,7 @@ function renderModeControls(p: ModeControlsProps): React.ReactNode {
         />
       )
     default:
-      return (
-        <HarmonicOscillatorControls
-          config={p.config}
-          dimension={p.dimension}
-          actions={p.harmonicActions}
-        />
-      )
+      throw new Error(`Unhandled quantum mode: ${String(p.config.quantumMode)}`)
   }
 }
 

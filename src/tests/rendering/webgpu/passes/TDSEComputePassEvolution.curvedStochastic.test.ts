@@ -208,6 +208,30 @@ describe('runStrangEvolution curved stochastic branch', () => {
     }
   })
 
+  it('clears staged slot availability when fractional frame steps floor to zero', () => {
+    const events: string[] = []
+    const ctx = makeContext(events)
+    const stochasticState = makeStochasticState()
+    stochasticState.stagingBuffer = buffer('previous-staging')
+    stochasticState.stagingSlotCount = 4
+    const config = {
+      stochasticEnabled: true,
+      stochasticGamma: 2,
+      stochasticSigma: 1,
+      stochasticNumSites: 2,
+      stochasticSeed: 1234,
+      dt: 0.02,
+      latticeDim: 1,
+      gridSize: [16],
+      spacing: [0.1],
+    } as unknown as TdseConfig
+
+    prepareStochasticStaging(ctx.device, config, stochasticState, 0.5, 2)
+
+    expect(events).toEqual([])
+    expect(stochasticState.stagingSlotCount).toBe(0)
+  })
+
   it('dispatches CSL localization before curved stochastic renormalization', () => {
     const events: string[] = []
     const ctx = makeContext(events)

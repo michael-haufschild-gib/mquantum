@@ -32,10 +32,17 @@ const SUMMARY_PATH = join(ROOT, 'coverage', 'coverage-summary.json')
 function readCoverageSummary() {
   try {
     return JSON.parse(readFileSync(SUMMARY_PATH, 'utf-8'))
-  } catch {
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+      throw new Error(
+        'coverage/coverage-summary.json not found.\n' +
+          'Run `pnpm exec vitest run --coverage` first to generate coverage data.'
+      )
+    }
     throw new Error(
-      'coverage/coverage-summary.json not found.\n' +
-        'Run `pnpm exec vitest run --coverage` first to generate coverage data.'
+      `Failed to read or parse coverage/coverage-summary.json: ${
+        error instanceof Error ? error.message : String(error)
+      }`
     )
   }
 }
@@ -186,7 +193,13 @@ function runCli() {
     process.exit(1)
   }
 
-  const thresholds = extractThresholds(readVitestConfig())
+  let thresholds
+  try {
+    thresholds = extractThresholds(readVitestConfig())
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    process.exit(1)
+  }
   const { missing, violations } = evaluateCoverageRatchet(actuals, thresholds)
 
   if (missing.length > 0) {

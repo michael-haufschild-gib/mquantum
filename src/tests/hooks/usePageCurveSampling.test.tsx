@@ -106,9 +106,18 @@ describe('usePageCurveSampling', () => {
     expect(usePageCurveStore.getState().lastSTherm).toBe(0)
   })
 
-  it('does not push samples when disabled or outside BEC dynamics', () => {
+  it('does not push samples when disabled', () => {
+    const { result } = renderHook(() => usePageCurveSampling(waterfallInputs({ enabled: false })))
+
+    setBecGeneration(1)
+
+    expect(result.current).toEqual({ isBec: false, horizonPresent: false, cs0: 0 })
+    expect(usePageCurveStore.getState().buffer.count).toBe(0)
+  })
+
+  it('does not push samples outside BEC dynamics', () => {
     const { result } = renderHook(() =>
-      usePageCurveSampling(waterfallInputs({ enabled: false, quantumMode: 'tdseDynamics' }))
+      usePageCurveSampling(waterfallInputs({ quantumMode: 'tdseDynamics' }))
     )
 
     setBecGeneration(1)

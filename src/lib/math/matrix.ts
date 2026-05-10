@@ -117,6 +117,9 @@ export function multiplyMatrices(a: MatrixND, b: MatrixND, out?: MatrixND): Matr
       `Output matrix dimensions incompatible: expected length ${len}, received ${out.length}`
     )
   }
+  if (out && (out === a || out === b)) {
+    throw new Error('Output matrix cannot alias input matrices; use multiplyMatricesInto instead')
+  }
 
   // Use provided output matrix or allocate new one
   const result = out ?? new Float32Array(len)

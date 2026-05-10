@@ -309,7 +309,11 @@ pub fn compute_scar_correlation(
     let inv_two_eps_sq = 1.0 / (2.0 * sigma * sigma);
 
     // Kernel radius: 3σ in grid cells
-    let min_spacing = spacings.iter().copied().fold(f64::INFINITY, f64::min);
+    let min_spacing = spacings
+        .iter()
+        .take(dim)
+        .copied()
+        .fold(f64::INFINITY, f64::min);
     let kernel_radius = if min_spacing > 0.0 {
         (3.0 * sigma / min_spacing).ceil().max(1.0) as i32
     } else {

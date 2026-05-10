@@ -96,7 +96,7 @@ function parseStrictPersistedNumber(raw: string): number | null {
  * Load persisted render resolution scale from localStorage.
  * @returns The persisted value, or null if not set
  */
-function loadPersistedResolutionScale(): number | null {
+export function loadPersistedResolutionScale(): number | null {
   try {
     const stored = localStorage.getItem(RESOLUTION_SCALE_KEY)
     if (stored !== null) {
@@ -135,7 +135,7 @@ export function hasPersistedResolutionScale(): boolean {
  * Load persisted max FPS from localStorage.
  * @returns The persisted value, or null if not set
  */
-function loadPersistedMaxFps(): number | null {
+export function loadPersistedMaxFps(): number | null {
   try {
     const stored = localStorage.getItem(MAX_FPS_KEY)
     if (stored !== null) {

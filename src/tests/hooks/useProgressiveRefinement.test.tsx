@@ -55,9 +55,16 @@ describe('useProgressiveRefinement', () => {
   })
 
   it('advances low to medium to high to final after interaction stops', () => {
+    act(() => {
+      usePerformanceStore.getState().setIsInteracting(true)
+    })
     renderHook(() => useProgressiveRefinement())
 
     expect(usePerformanceStore.getState().refinementStage).toBe('low')
+
+    act(() => {
+      usePerformanceStore.getState().setIsInteracting(false)
+    })
 
     act(() => {
       vi.advanceTimersByTime(100)

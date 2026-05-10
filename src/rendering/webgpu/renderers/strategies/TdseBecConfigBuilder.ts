@@ -17,6 +17,7 @@ import {
   type TdseInitialCondition,
 } from '@/lib/geometry/extended/tdse'
 import { clampFinite, clampFiniteArray, clampFiniteInteger } from '@/lib/math/clamp'
+import { reduceGridToFit } from '@/lib/math/ndArray'
 import { thomasFermiMuND } from '@/lib/physics/bec/chemicalPotential'
 import {
   computeWaterfallBackgroundDensity,
@@ -52,18 +53,20 @@ const BEC_FIELD_VIEWS = new Set<BecFieldView>([
   'hawkingFlux',
   'vorticity',
 ])
+const BEC_TDSE_MAX_TOTAL_SITES = 262144
 
 function sanitizeBecLatticeDim(value: number | undefined): number {
   return clampFiniteInteger(value, DEFAULT_BEC_CONFIG.latticeDim, MIN_DIMENSION, MAX_DIMENSION)
 }
 
 function sanitizeGridSizeArray(values: readonly number[] | undefined, latDim: number): number[] {
-  return Array.from({ length: latDim }, (_, i) => {
+  const grid = Array.from({ length: latDim }, (_, i) => {
     const raw = values?.[i]
     const clamped = clampFinite(raw, 8, 2, 128)
     const snapped = 2 ** Math.round(Math.log2(clamped))
     return Math.max(2, Math.min(128, snapped))
   })
+  return reduceGridToFit(grid, BEC_TDSE_MAX_TOTAL_SITES)
 }
 
 function sanitizeBooleanArray(values: readonly boolean[] | undefined, latDim: number): boolean[] {
@@ -133,7 +136,9 @@ function prepareBecInitCondition(bec: BecConfig, g: number, latDim: number) {
         1,
         16
       )
-      mom[4] = bec.vortexAlternateCharge ? 1.0 : 0.0
+      mom[4] = booleanOr(bec.vortexAlternateCharge, DEFAULT_BEC_CONFIG.vortexAlternateCharge)
+        ? 1.0
+        : 0.0
     }
   }
   if (initCond === 'vortexReconnection') {

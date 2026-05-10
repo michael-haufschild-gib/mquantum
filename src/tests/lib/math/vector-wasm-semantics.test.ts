@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { EPSILON } from '@/lib/math/types'
+
 type NormalizeWasmImpl = (v: Float64Array) => Float64Array
 
 async function loadVectorWithWasm(normalizeImpl: NormalizeWasmImpl) {
@@ -42,7 +44,7 @@ describe('normalize WASM semantics', () => {
       () => new Float64Array([1, 0, 0])
     )
 
-    expect(() => normalize([1e-8, 0, 0])).toThrow('Cannot normalize zero vector')
+    expect(() => normalize([EPSILON / 2, 0, 0])).toThrow('Cannot normalize zero vector')
     expect(normalizeVectorWasm).not.toHaveBeenCalled()
   })
 

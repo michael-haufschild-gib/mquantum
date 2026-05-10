@@ -119,10 +119,6 @@ describe('useDeviceCapabilities', () => {
   it('preserves explicit performance preferences on mobile GPUs', async () => {
     localStorage.setItem('mdim_render_resolution_scale', '0.72')
     localStorage.setItem('mdim_max_fps', '48')
-    usePerformanceStore.setState({
-      renderResolutionScale: 0.72,
-      maxFps: 48,
-    })
 
     vi.mocked(detectDeviceCapabilities).mockResolvedValue({
       gpuTier: 1,

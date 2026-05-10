@@ -134,13 +134,11 @@ export function packSchroedingerUniforms(
   floatView[I.branchColorA] = branchA[0]
   floatView[I.branchColorA + 1] = branchA[1]
   floatView[I.branchColorA + 2] = branchA[2]
-  floatView[I.branchSeparation] = params.branchSeparation ?? 0
+  floatView[I.branchSeparation] = finiteClamped(params.branchSeparation, 0, 0, 1)
   floatView[I.branchColorB] = branchB[0]
   floatView[I.branchColorB + 1] = branchB[1]
   floatView[I.branchColorB + 2] = branchB[2]
-  floatView[I.branchPlaneThreshold] = Number.isFinite(params.branchPlaneThreshold)
-    ? params.branchPlaneThreshold!
-    : 0
+  floatView[I.branchPlaneThreshold] = finiteOrDefault(params.branchPlaneThreshold, 0)
   const rawTransitionWidth = params.branchTransitionWidth ?? 0.2
   floatView[I.branchTransitionWidth] =
     Number.isFinite(rawTransitionWidth) && rawTransitionWidth > 0 ? rawTransitionWidth : 0.2
@@ -151,7 +149,7 @@ export function packSchroedingerUniforms(
   const wdwCfg = params.schroedinger?.wheelerDeWitt as WdwPhaseConfig | undefined
   const wdwRate =
     params.quantumModeStr === 'wheelerDeWitt' && wdwCfg?.phaseRotationEnabled
-      ? (wdwCfg.phaseRotationSpeed ?? 0)
+      ? finiteClamped(wdwCfg.phaseRotationSpeed, 0, 0, 5)
       : 0
   floatView[I.wdwPhaseRotationRate] = wdwRate
 

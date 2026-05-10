@@ -84,8 +84,8 @@ describe('packForGPU / unpackFromGPU round-trip', () => {
     expect(buf[RHO_FLOATS + 4]).toBeCloseTo(0.9, 4) // groundPopulation
   })
 
-  it('packs activeK into buffer when provided', () => {
-    const rho = densityMatrixFromCoefficients([1], [0], 1)
+  it('clamps activeK to the physical density-matrix basis size', () => {
+    const rho = densityMatrixFromCoefficients([1, 0], [0, 0], 2)
     const metrics: OpenQuantumMetrics = {
       purity: 1,
       linearEntropy: 0,
@@ -97,7 +97,7 @@ describe('packForGPU / unpackFromGPU round-trip', () => {
     const buf = createPackedBuffer()
     packForGPU(rho, metrics, buf, 5)
     // maxK slot at RHO_FLOATS + 5
-    expect(buf[RHO_FLOATS + 5]).toBe(5)
+    expect(buf[RHO_FLOATS + 5]).toBe(2)
   })
 
   it('rejects density matrices larger than the fixed GPU layout', () => {
@@ -193,6 +193,14 @@ describe('computeActiveK', () => {
     elements[0] = 1
     const rho = { K, elements }
     expect(computeActiveK(rho)).toBe(1)
+  })
+
+  it('uses the documented minK floor when minK is non-finite', () => {
+    const K = 5
+    const elements = new Float64Array(K * K * 2)
+    elements[0] = 1
+    const rho = { K, elements }
+    expect(computeActiveK(rho, 0.01, Number.NaN)).toBe(2)
   })
 })
 

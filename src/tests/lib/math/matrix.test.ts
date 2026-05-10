@@ -119,6 +119,20 @@ describe('Matrix Operations', () => {
       const flat2 = new Float32Array(6)
       expect(() => multiplyMatrices(flat, flat2)).toThrow()
     })
+
+    it('rejects output buffers that alias either input matrix', () => {
+      const A = mat([
+        [1, 2],
+        [3, 4],
+      ])
+      const B = mat([
+        [5, 6],
+        [7, 8],
+      ])
+
+      expect(() => multiplyMatrices(A, B, A)).toThrow('Output matrix cannot alias input matrices')
+      expect(() => multiplyMatrices(A, B, B)).toThrow('Output matrix cannot alias input matrices')
+    })
   })
 
   describe('multiplyMatricesInto', () => {

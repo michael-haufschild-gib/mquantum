@@ -105,7 +105,7 @@ export interface DiracDestroyableBuffers {
  * variant (`@workgroup_size(64)`, decodes coords via `linearToND`) and a 3-D
  * dispatch variant (`@workgroup_size(4, 4, 4)`, reads coords directly from
  * `gid.xyz`). The `use3DSiteDispatch` flag indicates which variant the
- * `*Pipeline` field references — `true` when `latticeDim ≤ 3`. The 3-D path
+ * `*Pipeline` field references — `true` when `latticeDim === 3`. The 3-D path
  * eliminates the per-thread `linearToND` decode (a few shifts + masks +
  * `firstTrailingBit` calls per dim, since strides are pow-of-2). Bind group
  * layouts are unchanged between variants, so bind groups built from this

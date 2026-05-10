@@ -407,6 +407,10 @@ export function prepareStochasticStaging(
   }
 
   const safeStepsThisFrame = Math.floor(stepsThisFrame)
+  if (safeStepsThisFrame <= 0) {
+    state.stagingSlotCount = 0
+    return
+  }
   const nLoc = runtimeConfig.stochasticNumSites
   const cslSubsteps = computeCSLSubsteps(runtimeConfig.stochasticGamma, runtimeConfig.dt)
   const totalSlots = safeStepsThisFrame * cslSubsteps

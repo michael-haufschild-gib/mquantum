@@ -143,7 +143,9 @@ type DomainKey =
   | 'antiDeSitter'
 
 /** Config keys whose nested object carries a `needsReset` flag under `schroedinger.*`. */
-export type ResettableConfigKey = Exclude<DomainKey, 'openQuantum'>
+export type ResettableConfigKey = {
+  [K in DomainKey]: SchroedingerConfig[K] extends { needsReset: boolean } ? K : never
+}[DomainKey]
 
 /**
  * Clear `needsReset` on a `schroedinger` sub-config without version bump.

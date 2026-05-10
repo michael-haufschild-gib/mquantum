@@ -100,8 +100,8 @@ function useResetField(objectType: string): () => void {
     }
   })
   return useMemo(() => {
-    if (stableAction) return stableAction
     if (objectType === 'pauliSpinor') return () => markComputeNeedsReset('pauliSpinor')
+    if (stableAction) return stableAction
     if (quantumMode === 'diracEquation') return () => markComputeNeedsReset('dirac')
     return noop
   }, [stableAction, quantumMode, markComputeNeedsReset, objectType])
