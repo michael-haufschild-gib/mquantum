@@ -13,8 +13,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { applyUrlStateParams } from '@/hooks/useUrlState'
 import { deserializeState, serializeState } from '@/lib/url/state-serializer'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 /** Deserialize a URL string and apply the result to stores. */
 function applyUrlStateToStores(urlString: string): void {

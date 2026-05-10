@@ -10,7 +10,7 @@ import { Section } from '@/components/sections/Section'
 import { Button } from '@/components/ui/Button'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { useToast } from '@/hooks/useToast'
-import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
+import { useDismissedDialogsStore } from '@/stores/ui/dismissedDialogsStore'
 
 /** Props for the application settings section. */
 export interface SettingsSectionProps {

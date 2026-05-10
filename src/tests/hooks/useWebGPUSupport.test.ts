@@ -10,7 +10,7 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useWebGPUSupport } from '@/hooks/useWebGPUSupport'
-import { useRendererStore } from '@/stores/rendererStore'
+import { useRendererStore } from '@/stores/runtime/rendererStore'
 
 interface MockAdapterOptions {
   vendor?: string

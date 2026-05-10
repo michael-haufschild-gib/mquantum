@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- Intentional consolidation of four resource-management modules. */
 /**
  * TDSE Compute Pass — Resource Management
  *
@@ -12,9 +11,10 @@
  */
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useHellerSpectrometerStore } from '@/stores/hellerSpectrometerStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { useHellerSpectrometerStore } from '@/stores/diagnostics/hellerSpectrometerStore'
 
+import { destroyGpuResources } from '../utils/gpuResourceHelpers'
 import { assertPow2Log2, FFT_UNIFORM_SIZE, PACK_UNIFORM_SIZE } from './computePassUtils'
 import { buildFFTTwiddleTable, FFT_TWIDDLE_BYTES } from './FFTTwiddle'
 import type { DisorderState } from './TDSEComputePassDisorder'
@@ -30,6 +30,7 @@ import {
 import { disposeObservables, type ObservablesState } from './TDSEObservablesDispatch'
 import type { SaveLoadState } from './TDSEStateSaveLoad'
 import { disposeStochasticLoc, type StochasticLocState } from './TDSEStochasticLocalization'
+import { TDSE_UNIFORMS_LAYOUT } from './tdseUniformsLayout'
 import { disposeVortexDetect, type VortexDetectState } from './TDSEVortexDetect'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -231,14 +232,16 @@ export interface TdseBindGroupInputs {
  *   - invSpacing:              array<f32,12> @ 928 (host-precomputed 1/max(dx,1e-12))
  *   - invSpacing2:             array<f32,12> @ 976 (invSpacing^2; saves a mul per cell)
  *
- * Total = 832 + 16 + 64 + 16 + 48 + 48 = 1024. Update both this constant and
- * the WGSL struct if you add new fields, and keep this comment in sync.
+ * Total = 832 + 16 + 64 + 16 + 48 + 48 = 1024. The constants below are now
+ * derived from `TDSE_UNIFORMS_LAYOUT` (which mirrors the WGSL struct
+ * field-by-field), so adding a field to the layout automatically updates
+ * both `TDSE_UNIFORM_SIZE` and `TDSE_UNIFORM_OFFSET_STAGE_TIME_K1`.
  *
  * Exported as `TDSE_UNIFORM_SIZE` so tests that validate struct packing
  * offsets can import the canonical size instead of hardcoding a literal
  * that silently drifts from the WGSL definition.
  */
-export const TDSE_UNIFORM_SIZE = 1024
+export const TDSE_UNIFORM_SIZE = TDSE_UNIFORMS_LAYOUT.totalSize
 const UNIFORM_SIZE = TDSE_UNIFORM_SIZE
 
 /**
@@ -251,7 +254,7 @@ const UNIFORM_SIZE = TDSE_UNIFORM_SIZE
  * next field insertion in `TDSEUniforms` would silently redirect copies
  * into the wrong slots otherwise.
  */
-export const TDSE_UNIFORM_OFFSET_STAGE_TIME_K1 = 896
+export const TDSE_UNIFORM_OFFSET_STAGE_TIME_K1 = TDSE_UNIFORMS_LAYOUT.byteOffset.stageTimeK1
 /** Diagnostics workgroup size (must match @workgroup_size in diagnostic shaders) */
 const DIAG_WG = 256
 /** DiagReduceUniforms struct size (32 bytes) */
@@ -354,29 +357,31 @@ export function rebuildTdseBuffers(
   helpers: TdseBufferHelpers
 ): TdseBufferResult {
   // Destroy old buffers
-  old.psiBuffer?.destroy()
-  old.potentialBuffer?.destroy()
-  old.fftScratchA?.destroy()
-  old.fftScratchB?.destroy()
-  old.uniformBuffer?.destroy()
-  old.fftUniformBuffer?.destroy()
-  old.fftStagingBuffer?.destroy()
-  old.fftAxisUniformBuffer?.destroy()
-  old.fftAxisStagingBuffer?.destroy()
+  destroyGpuResources(
+    old.psiBuffer,
+    old.potentialBuffer,
+    old.fftScratchA,
+    old.fftScratchB,
+    old.uniformBuffer,
+    old.fftUniformBuffer,
+    old.fftStagingBuffer,
+    old.fftAxisUniformBuffer,
+    old.fftAxisStagingBuffer,
+    old.fftTwiddleBuffer,
+    old.packUniformBuffer,
+    old.omegaStagingBuffer,
+    old.diagUniformBuffer,
+    old.diagPartialSumsBuffer,
+    old.diagPartialMaxBuffer,
+    old.diagPartialLeftBuffer,
+    old.diagPartialRightBuffer,
+    old.diagPartialIprBuffer,
+    old.diagResultBuffer,
+    old.diagStagingBuffer
+  )
   if (old.fftAxisUniformBuffers) {
     for (const b of old.fftAxisUniformBuffers) b.destroy()
   }
-  old.fftTwiddleBuffer?.destroy()
-  old.packUniformBuffer?.destroy()
-  old.omegaStagingBuffer?.destroy()
-  old.diagUniformBuffer?.destroy()
-  old.diagPartialSumsBuffer?.destroy()
-  old.diagPartialMaxBuffer?.destroy()
-  old.diagPartialLeftBuffer?.destroy()
-  old.diagPartialRightBuffer?.destroy()
-  old.diagPartialIprBuffer?.destroy()
-  old.diagResultBuffer?.destroy()
-  old.diagStagingBuffer?.destroy()
 
   let totalSites = 1
   for (let d = 0; d < config.latticeDim; d++) totalSites *= config.gridSize[d]!
@@ -983,7 +988,7 @@ export interface TdsePassGpuSnapshot {
  * Mutates `fields` in place.
  */
 export function destroyTdsePassGpu(fields: TdsePassGpuSnapshot): void {
-  const bufs: (GPUBuffer | GPUTexture | null | undefined)[] = [
+  destroyGpuResources(
     fields.psiBuffer,
     fields.potentialBuffer,
     fields.fftScratchA,
@@ -1003,9 +1008,8 @@ export function destroyTdsePassGpu(fields: TdsePassGpuSnapshot): void {
     fields.diagPartialLeftBuffer,
     fields.diagPartialRightBuffer,
     fields.diagPartialIprBuffer,
-    fields.bg?.renormalizeUniformBuffer,
-  ]
-  for (const b of bufs) b?.destroy()
+    fields.bg?.renormalizeUniformBuffer
+  )
   if (fields.fftAxisUniformBuffers) {
     for (const b of fields.fftAxisUniformBuffers) b.destroy()
   }

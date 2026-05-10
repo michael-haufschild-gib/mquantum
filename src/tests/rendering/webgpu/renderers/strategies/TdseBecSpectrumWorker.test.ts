@@ -6,7 +6,7 @@ import {
   invalidateBecSpectrumWorkerState,
 } from '@/rendering/webgpu/renderers/strategies/TdseBecSpectrumWorker'
 import { TdseBecStrategy } from '@/rendering/webgpu/renderers/strategies/TdseBecStrategy'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
 describe('BEC spectrum worker state', () => {
   beforeEach(() => {

@@ -8,12 +8,12 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { useAnimationStore } from '@/stores/animationStore'
-import { useAppearanceStore } from '@/stores/appearanceStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { useLightingStore } from '@/stores/lightingStore'
-import { useRotationStore } from '@/stores/rotationStore'
+import { useAnimationStore } from '@/stores/scene/animationStore'
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { useLightingStore } from '@/stores/scene/lightingStore'
+import { useRotationStore } from '@/stores/scene/rotationStore'
 
 describe('Geometry → Rotation → Animation dimension synchronization', () => {
   beforeEach(() => {

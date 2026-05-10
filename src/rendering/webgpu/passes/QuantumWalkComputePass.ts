@@ -17,7 +17,7 @@ import {
 } from '@/lib/geometry/extended/quantumWalk'
 import { logger } from '@/lib/logger'
 import { computePMLSigmaMaxND } from '@/lib/physics/pml/profile'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'

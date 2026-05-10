@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ExportPreview } from '@/components/overlays/export/ExportPreview'
-import { useExportStore } from '@/stores/exportStore'
+import { useExportStore } from '@/stores/runtime/exportStore'
 
 vi.mock('@/components/ui/Icon', () => ({
   Icon: ({ name }: { name: string }) => <span data-testid={`icon-${name}`}>{name}</span>,

@@ -14,10 +14,10 @@ import { useEffect, useRef } from 'react'
 import { logger } from '@/lib/logger'
 import { applySceneExample, findSceneByName } from '@/lib/sceneExamples'
 import { parseCurrentUrl, type ParsedShareableState } from '@/lib/url/state-serializer'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
-import { usePresetManagerStore } from '@/stores/presetManagerStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
+import { usePresetManagerStore } from '@/stores/runtime/presetManagerStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 /**
  * Apply TDSE-specific URL state params.
@@ -397,7 +397,7 @@ function applyWdwParams(
 function applySrmtSweepParams(urlState: ParsedShareableState, effectiveQuantumMode: string): void {
   if (effectiveQuantumMode !== 'wheelerDeWitt') return
   if (!urlState.srmtSweepKind) return
-  void import('@/stores/srmtSweepStore').then(({ useSrmtSweepStore }) => {
+  void import('@/stores/diagnostics/srmtSweepStore').then(({ useSrmtSweepStore }) => {
     useSrmtSweepStore.getState().setPendingSweep({
       kind: urlState.srmtSweepKind!,
       points: urlState.srmtSweepPoints,
@@ -413,16 +413,18 @@ function applySrmtSweepParams(urlState: ParsedShareableState, effectiveQuantumMo
 function applyEntanglementParams(urlState: ParsedShareableState): void {
   if (urlState.entanglementEnabled === undefined) return
 
-  void import('@/stores/coordinateEntanglementStore').then(({ useCoordinateEntanglementStore }) => {
-    const entStore = useCoordinateEntanglementStore.getState()
-    entStore.setEnabled(urlState.entanglementEnabled!)
-    if (urlState.entanglementPairwiseMI !== undefined) {
-      entStore.setComputePairwiseMI(urlState.entanglementPairwiseMI)
+  void import('@/stores/diagnostics/coordinateEntanglementStore').then(
+    ({ useCoordinateEntanglementStore }) => {
+      const entStore = useCoordinateEntanglementStore.getState()
+      entStore.setEnabled(urlState.entanglementEnabled!)
+      if (urlState.entanglementPairwiseMI !== undefined) {
+        entStore.setComputePairwiseMI(urlState.entanglementPairwiseMI)
+      }
+      if (urlState.entanglementBipartitions !== undefined) {
+        entStore.setComputeBipartitions(urlState.entanglementBipartitions)
+      }
     }
-    if (urlState.entanglementBipartitions !== undefined) {
-      entStore.setComputeBipartitions(urlState.entanglementBipartitions)
-    }
-  })
+  )
 }
 
 /**

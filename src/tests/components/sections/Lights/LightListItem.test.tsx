@@ -7,7 +7,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AMBIENT_LIGHT_ID, LightListItem } from '@/components/sections/Lights/LightListItem'
-import type { LightSource } from '@/rendering/lights/types'
+import type { LightSource } from '@/lib/lighting/lightSource'
 
 function makeLight(overrides: Partial<LightSource> = {}): LightSource {
   return {

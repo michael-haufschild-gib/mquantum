@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
 import { isExportRuntimeActive } from '@/rendering/webgpu/sceneExportRuntime'
 import { resetWaveEvolution } from '@/rendering/webgpu/useExportRuntime'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 type ExtendedObjectStoreState = ReturnType<typeof useExtendedObjectStore.getState>
 

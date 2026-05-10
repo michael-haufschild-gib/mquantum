@@ -31,7 +31,7 @@ import type {
   LindbladChannel,
   OpenQuantumConfig,
 } from '@/lib/physics/openQuantum/types'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
 import type { WebGPURenderContext } from '../../core/types'
 import type { DensityGridComputePass } from '../../passes/DensityGridComputePass'

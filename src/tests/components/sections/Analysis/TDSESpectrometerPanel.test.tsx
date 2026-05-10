@@ -24,8 +24,8 @@ import {
   HELLER_DEFAULT_MIN_SAMPLES,
   pushAutocorrelationSample,
 } from '@/lib/physics/tdse/heller'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useHellerSpectrometerStore } from '@/stores/hellerSpectrometerStore'
+import { useHellerSpectrometerStore } from '@/stores/diagnostics/hellerSpectrometerStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 /**
  * Build a TDSE config seeded from {@link DEFAULT_TDSE_CONFIG} with

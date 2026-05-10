@@ -11,11 +11,14 @@ import {
   getQuantumTypeEntry,
   resolveQuantumTypeKey,
 } from '@/lib/geometry/registry'
-import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
-import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { type GeometryState, useGeometryStore } from '@/stores/geometryStore'
-import { useMonitoringSweepStore } from '@/stores/monitoringSweepStore'
-import { useQuantumnessAtlasStore } from '@/stores/quantumnessAtlasStore'
+import { useCoordinateEntanglementStore } from '@/stores/diagnostics/coordinateEntanglementStore'
+import { useMonitoringSweepStore } from '@/stores/diagnostics/monitoringSweepStore'
+import { useQuantumnessAtlasStore } from '@/stores/diagnostics/quantumnessAtlasStore'
+import {
+  type ExtendedObjectState,
+  useExtendedObjectStore,
+} from '@/stores/scene/extendedObjectStore'
+import { type GeometryState, useGeometryStore } from '@/stores/scene/geometryStore'
 
 export const ObjectTypeExplorer: React.FC = React.memo(() => {
   const { objectType, dimension, setObjectType } = useGeometryStore(

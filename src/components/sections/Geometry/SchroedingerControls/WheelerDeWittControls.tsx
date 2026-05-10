@@ -14,7 +14,7 @@ import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import type { WdwBoundaryCondition } from '@/lib/geometry/extended/wheelerDeWitt'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import {
   WDW_GRID_PRESETS,
   type WdwGridPreset,

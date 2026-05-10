@@ -43,7 +43,7 @@ import {
   type SrmtClockQuality,
   type SrmtSnapshot,
   useSrmtDiagnosticStore,
-} from '@/stores/srmtDiagnosticStore'
+} from '@/stores/diagnostics/srmtDiagnosticStore'
 
 /** The three SRMT clocks in canonical dispatch order. */
 export const SRMT_CLOCKS: readonly SrmtClock[] = ['a', 'phi1', 'phi2']

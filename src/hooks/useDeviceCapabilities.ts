@@ -20,14 +20,14 @@ import {
   MOBILE_DEFAULT_RESOLUTION_SCALE,
 } from '@/lib/deviceCapabilities'
 import { logger } from '@/lib/logger'
-import { useLightingStore } from '@/stores/lightingStore'
 import {
   hasPersistedMaxFps,
   hasPersistedResolutionScale,
   loadPersistedMaxFps,
   loadPersistedResolutionScale,
   usePerformanceStore,
-} from '@/stores/performanceStore'
+} from '@/stores/runtime/performanceStore'
+import { useLightingStore } from '@/stores/scene/lightingStore'
 
 /**
  * Hook to detect device capabilities and apply mobile defaults.

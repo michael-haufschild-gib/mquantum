@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { EigenfunctionCacheControls } from '@/components/sections/Performance/EigenfunctionCacheControls'
-import { usePerformanceStore } from '@/stores/performanceStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
 
 describe('EigenfunctionCacheControls', () => {
   beforeEach(() => {

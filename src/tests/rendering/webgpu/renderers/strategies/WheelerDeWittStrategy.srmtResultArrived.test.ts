@@ -21,7 +21,7 @@ import { DEFAULT_WHEELER_DEWITT_CONFIG } from '@/lib/geometry/extended/wheelerDe
 import type { SrmtClock, SrmtResult } from '@/lib/physics/srmt'
 import type { SrmtClockCacheEntry } from '@/rendering/webgpu/renderers/strategies/WheelerDeWittSrmtWorker'
 import { WheelerDeWittStrategy } from '@/rendering/webgpu/renderers/strategies/WheelerDeWittStrategy'
-import { useSrmtDiagnosticStore } from '@/stores/srmtDiagnosticStore'
+import { useSrmtDiagnosticStore } from '@/stores/diagnostics/srmtDiagnosticStore'
 import { mockWebGPU } from '@/tests/__mocks__/webgpu'
 
 // ---------------------------------------------------------------------------

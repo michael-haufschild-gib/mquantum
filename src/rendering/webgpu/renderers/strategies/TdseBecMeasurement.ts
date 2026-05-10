@@ -11,8 +11,8 @@
 import type { TdseConfig } from '@/lib/geometry/extended/tdse'
 import { logger } from '@/lib/logger'
 import { computeTdseEffectiveSpacing } from '@/lib/physics/tdse/effectiveSpacing'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useMeasurementStore } from '@/stores/measurementStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { useMeasurementStore } from '@/stores/diagnostics/measurementStore'
 
 import type { WebGPURenderContext } from '../../core/types'
 import type { TDSEComputePass } from '../../passes/TDSEComputePass'

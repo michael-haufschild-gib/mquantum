@@ -9,7 +9,7 @@
  */
 
 import { logger } from '@/lib/logger'
-import { useSimulationStateStore } from '@/stores/simulationStateStore'
+import { useSimulationStateStore } from '@/stores/runtime/simulationStateStore'
 
 import type { WebGPURenderContext } from '../../core/types'
 import type { ModeSetupResult } from './types'

@@ -14,7 +14,7 @@
 
 import { logger } from '@/lib/logger'
 import { CarpetSliceComputePass } from '@/rendering/webgpu/passes/CarpetSliceComputePass'
-import { useCarpetStore } from '@/stores/carpetStore'
+import { useCarpetStore } from '@/stores/diagnostics/carpetStore'
 
 import type { WebGPURenderContext, WebGPURenderPass, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
@@ -442,36 +442,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // ============================================
     // QUANTUM CARPET SLICE (after density texture is populated)
     // ============================================
-    const carpetState = useCarpetStore.getState()
-    if (carpetState.enabled && !carpetState.paused) {
-      // After clear(), skip one frame of accumulation so totalFrames=0 is visible
-      if (carpetState.needsReset) {
-        useCarpetStore.setState({ needsReset: false })
-      } else {
-        const densityView = this.strategy.getDensityTextureView?.()
-        if (densityView && this.device) {
-          if (!this.carpetSlicePass) {
-            this.carpetSlicePass = new CarpetSliceComputePass()
-            this.carpetSlicePass.initialize(this.device)
-          }
-          // Analytic modes (HO, hydrogen) store density in .r; compute modes store it in .a
-          const computeMode = isComputeQuantumMode(this.rendererConfig)
-          this.carpetSlicePass.dispatch(
-            ctx.encoder,
-            densityView,
-            {
-              ...carpetState,
-              readAlpha: computeMode,
-              densityGridSize: this.shaderConfig.densityGridSize ?? 96,
-            },
-            (data, gridSize, wh, tf) => {
-              useCarpetStore.getState().setCarpetData(data, gridSize, wh, tf)
-            }
-          )
-          carpetState.advanceHead(ctx.frame?.delta ?? 0.016)
-        }
-      }
-    }
+    this.dispatchQuantumCarpetSlice(ctx)
 
     // ============================================
     // RENDER PASS ENCODING (delegated)
@@ -496,6 +467,49 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
   getDrawStats(): import('../core/types').WebGPUPassDrawStats {
     return this.lastDrawStats
+  }
+
+  /**
+   * Dispatch the quantum carpet slice pass when active. The carpet records a
+   * 2D space×time slice of the density grid for diagnostics; it runs after
+   * the strategy's frame compute has populated the density texture.
+   *
+   * Skips entirely when the carpet is disabled or paused, swallows the
+   * post-clear frame so `totalFrames=0` is visible to the UI, and lazily
+   * initializes the carpet slice pass on first use.
+   */
+  private dispatchQuantumCarpetSlice(ctx: WebGPURenderContext): void {
+    const carpetState = useCarpetStore.getState()
+    if (!carpetState.enabled || carpetState.paused) return
+
+    // After clear(), skip one frame of accumulation so totalFrames=0 is visible
+    if (carpetState.needsReset) {
+      useCarpetStore.setState({ needsReset: false })
+      return
+    }
+
+    const densityView = this.strategy.getDensityTextureView?.()
+    if (!densityView || !this.device) return
+
+    if (!this.carpetSlicePass) {
+      this.carpetSlicePass = new CarpetSliceComputePass()
+      this.carpetSlicePass.initialize(this.device)
+    }
+    // Analytic modes (HO, hydrogen) store density in .r; compute modes store it in .a
+    const computeMode = isComputeQuantumMode(this.rendererConfig)
+    this.carpetSlicePass.dispatch(
+      ctx.encoder,
+      densityView,
+      {
+        ...carpetState,
+        readAlpha: computeMode,
+        densityGridSize: this.shaderConfig.densityGridSize ?? 96,
+      },
+      (data, gridSize, wh, tf) => {
+        useCarpetStore.getState().setCarpetData(data, gridSize, wh, tf)
+      }
+    )
+    carpetState.advanceHead(ctx.frame?.delta ?? 0.016)
   }
 
   /** Expose the density texture view for external consumers (e.g. quantum carpet). */

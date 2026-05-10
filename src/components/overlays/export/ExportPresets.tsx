@@ -3,9 +3,9 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { ExportPresetCard, type ExportPresetCardId } from '@/components/ui/ExportPresetCard'
 import { soundManager } from '@/lib/audio/SoundManager'
-import type { ExportSettings } from '@/stores/exportStore'
-import { useExportStore } from '@/stores/exportStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
+import type { ExportSettings } from '@/stores/runtime/exportStore'
+import { useExportStore } from '@/stores/runtime/exportStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
 
 interface PresetDefinition {
   id: ExportPresetCardId

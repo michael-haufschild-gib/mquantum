@@ -24,7 +24,7 @@ import {
   MIN_THROAT_RADIUS,
   MIN_TORUS_PERIOD,
 } from '@/lib/physics/tdse/metrics/types'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 describe('setTdseMetric', () => {
   beforeEach(() => {

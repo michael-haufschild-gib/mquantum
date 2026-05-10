@@ -2,10 +2,13 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Button } from '@/components/ui/Button'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { type BufferStats, usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
-import { useUIStore } from '@/stores/uiStore'
+import {
+  type BufferStats,
+  usePerformanceMetricsStore,
+} from '@/stores/diagnostics/performanceMetricsStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { useUIStore } from '@/stores/ui/uiStore'
 
 import { Icons } from '../icons'
 import { BufferRow, DebugToggle, SectionHeader } from '../subcomponents'

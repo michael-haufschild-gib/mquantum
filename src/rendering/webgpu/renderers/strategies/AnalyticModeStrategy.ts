@@ -39,6 +39,86 @@ function isHydrogenQuantumMode(mode: SchroedingerQuantumMode | undefined): boole
   return mode === 'hydrogenND' || mode === 'hydrogenNDCoupled'
 }
 
+/** Derived setup-time flags shared by every subsystem helper in `setup()`. */
+interface AnalyticSetupEnv {
+  dim: number
+  isHydrogen: boolean
+  isWigner: boolean
+  pipelineIs2D: boolean
+  isosurface: boolean
+  useDensityGrid: boolean
+  openQuantumEnabled: boolean
+}
+
+/** Refs captured at setup() call time and consumed by the deferred `getBindGroupEntries`. */
+interface AnalyticBindGroupRefs {
+  eigenCacheRef: EigenfunctionCacheComputePass | null
+  wignerCacheRef: WignerCacheComputePass | null
+  densityGridRef: DensityGridComputePass | null
+  densityGridSamplerRef: GPUSampler | null
+  useDensityGrid: boolean
+}
+
+/** Compute the derived flags driving each subsystem in `AnalyticModeStrategy.setup`. */
+function computeAnalyticSetupEnv(config: SchrodingerRendererConfig): AnalyticSetupEnv {
+  const dim = config.dimension ?? 3
+  const isHydrogen = isHydrogenQuantumMode(config.quantumMode)
+  const openQuantumEnabled = config.openQuantumEnabled ?? false
+  const isWigner = config.representation === 'wigner'
+  const pipelineIs2D = dim === 2 || isWigner
+  const isosurface = config.isosurface ?? false
+  // Use density grid for all 3D+ volumetric modes (non-isosurface, non-2D)
+  const useDensityGrid = !isosurface && !pipelineIs2D
+  return { dim, isHydrogen, isWigner, pipelineIs2D, isosurface, useDensityGrid, openQuantumEnabled }
+}
+
+/**
+ * Build the deferred `getBindGroupEntries` payload from refs captured at setup() time.
+ *
+ * Pure function over the captured refs — keeps the strategy class free of glue logic
+ * and makes the per-subsystem entry order auditable in one place.
+ */
+function buildAnalyticBindGroupEntries(refs: AnalyticBindGroupRefs): GPUBindGroupEntry[] {
+  const { eigenCacheRef, wignerCacheRef, densityGridRef, densityGridSamplerRef, useDensityGrid } =
+    refs
+  const entries: GPUBindGroupEntry[] = []
+
+  // Eigencache buffer + metadata (available after init)
+  if (eigenCacheRef) {
+    const cacheBuffer = eigenCacheRef.getCacheBuffer()
+    const metaBuffer = eigenCacheRef.getMetadataBuffer()
+    if (cacheBuffer && metaBuffer) {
+      entries.push(
+        { binding: 2, resource: { buffer: cacheBuffer } },
+        { binding: 3, resource: { buffer: metaBuffer } }
+      )
+    }
+  }
+
+  // Wigner cache texture + sampler (available after init)
+  if (wignerCacheRef) {
+    const cacheView = wignerCacheRef.getCacheTextureView()
+    const cacheSampler = wignerCacheRef.getCacheSampler()
+    if (cacheView && cacheSampler) {
+      entries.push({ binding: 2, resource: cacheView }, { binding: 3, resource: cacheSampler })
+    }
+  }
+
+  // Density grid texture + sampler (created during async init)
+  if (useDensityGrid && densityGridRef && densityGridSamplerRef) {
+    const view = densityGridRef.getDensityTextureView()
+    if (view) {
+      entries.push({ binding: 4, resource: view }, { binding: 5, resource: densityGridSamplerRef })
+      // Pre-computed gradient normal texture; fall back to density view
+      // to avoid bind group layout/entry mismatch
+      const normalView = densityGridRef.getNormalTextureView()
+      entries.push({ binding: 7, resource: normalView ?? view })
+    }
+  }
+
+  return entries
+}
+
 /**
  * Stride for packing rotation version and animation-time bucket into a single JS number.
  * A prime near 2^24 keeps both ranges disjoint for long sessions while leaving
@@ -104,107 +184,159 @@ export class AnalyticModeStrategy implements QuantumModeStrategy {
   }
 
   setup(ctx: WebGPUSetupContext, config: SchrodingerRendererConfig): ModeSetupResult {
-    const { device } = ctx
-    const dim = config.dimension ?? 3
-    const isHydrogen = isHydrogenQuantumMode(config.quantumMode)
-    const openQuantumEnabled = config.openQuantumEnabled ?? false
-    const isWigner = config.representation === 'wigner'
-    const pipelineIs2D = dim === 2 || isWigner
+    const env = computeAnalyticSetupEnv(config)
 
     // Reset open quantum state on pipeline rebuild
     this.openQuantumExecutor.reset()
 
     const initPromises: Promise<void>[] = []
-    const additionalLayoutEntries: GPUBindGroupLayoutEntry[] = []
+    this.setupDensityGridPass(ctx, config, env, initPromises)
+    this.setupEigenCachePass(ctx, config, env, initPromises)
+    this.setupWignerCachePass(ctx, config, env, initPromises)
 
+    const additionalLayoutEntries = this.buildAnalyticLayoutEntries(ctx, env)
+
+    // Capture refs for the deferred getBindGroupEntries callback. Local consts
+    // (not `this.*` reads) so the callback returns the references that existed
+    // at setup() call time even if a later setup() overwrites them.
+    const eigenCacheRef = this.eigenCachePass
+    const wignerCacheRef = this.wignerCachePass
+    const densityGridRef = this.densityGridPass
+    const densityGridSamplerRef = this.densityGridSampler
+
+    return {
+      initPromises,
+      additionalLayoutEntries,
+      getBindGroupEntries: () =>
+        buildAnalyticBindGroupEntries({
+          eigenCacheRef,
+          wignerCacheRef,
+          densityGridRef,
+          densityGridSamplerRef,
+          useDensityGrid: env.useDensityGrid,
+        }),
+    }
+  }
+
+  /** Dispose any prior density-grid pass and create a new one when not in 2D pipeline mode. */
+  private setupDensityGridPass(
+    ctx: WebGPUSetupContext,
+    config: SchrodingerRendererConfig,
+    env: AnalyticSetupEnv,
+    initPromises: Promise<void>[]
+  ): void {
     // ── Density grid compute pass ──
     this.densityGridPass?.dispose()
     this.densityGridPass = null
     this.densityGridInitialized = false
 
-    const isosurface = config.isosurface ?? false
-    // Use density grid for all 3D+ volumetric modes (non-isosurface, non-2D)
-    const useDensityGrid = !isosurface && !pipelineIs2D
+    if (env.pipelineIs2D) return
 
-    if (!pipelineIs2D) {
-      const forceRgba = useDensityGrid || dim > 3 || openQuantumEnabled || isHydrogen
-      const isHydrogenOQ = openQuantumEnabled && isHydrogen
+    const { dim, isHydrogen, openQuantumEnabled, useDensityGrid } = env
+    const forceRgba = useDensityGrid || dim > 3 || openQuantumEnabled || isHydrogen
+    const isHydrogenOQ = openQuantumEnabled && isHydrogen
 
-      // User-selected grid resolution (fallback to dimension-adaptive default).
-      const baseDensityGridSize = config.densityGridResolution ?? (dim <= 5 ? 96 : 128)
-      const estimatedK = openQuantumEnabled ? (isHydrogen ? 10 : (config.termCount ?? 4)) : 0
-      const densityGridSize = openQuantumEnabled
-        ? AnalyticOpenQuantumExecutor.computeGridSize(baseDensityGridSize, estimatedK)
-        : baseDensityGridSize
+    // User-selected grid resolution (fallback to dimension-adaptive default).
+    const baseDensityGridSize = config.densityGridResolution ?? (dim <= 5 ? 96 : 128)
+    const estimatedK = openQuantumEnabled ? (isHydrogen ? 10 : (config.termCount ?? 4)) : 0
+    const densityGridSize = openQuantumEnabled
+      ? AnalyticOpenQuantumExecutor.computeGridSize(baseDensityGridSize, estimatedK)
+      : baseDensityGridSize
 
-      this.densityGridPass = new DensityGridComputePass({
-        dimension: dim,
-        quantumMode: config.quantumMode as
-          | 'harmonicOscillator'
-          | 'hydrogenND'
-          | 'hydrogenNDCoupled',
-        termCount: config.termCount,
-        gridSize: densityGridSize,
-        forceRgba,
-        useDensityMatrix: openQuantumEnabled,
-        useHydrogenBasis: isHydrogenOQ,
+    this.densityGridPass = new DensityGridComputePass({
+      dimension: dim,
+      quantumMode: config.quantumMode as 'harmonicOscillator' | 'hydrogenND' | 'hydrogenNDCoupled',
+      termCount: config.termCount,
+      gridSize: densityGridSize,
+      forceRgba,
+      useDensityMatrix: openQuantumEnabled,
+      useHydrogenBasis: isHydrogenOQ,
+    })
+    initPromises.push(
+      this.densityGridPass.initialize(ctx).then(() => {
+        this.densityGridInitialized = true
       })
-      initPromises.push(
-        this.densityGridPass.initialize(ctx).then(() => {
-          this.densityGridInitialized = true
-        })
-      )
+    )
 
-      // getDensityTextureView() is consumed lazily in getBindGroupEntries() below
-    }
+    // getDensityTextureView() is consumed lazily in getBindGroupEntries() below
+  }
 
+  /** Dispose any prior eigenfunction cache pass and create a new one when caching is enabled. */
+  private setupEigenCachePass(
+    ctx: WebGPUSetupContext,
+    config: SchrodingerRendererConfig,
+    env: AnalyticSetupEnv,
+    initPromises: Promise<void>[]
+  ): void {
     // ── Eigenfunction cache compute pass ──
     this.eigenCachePass?.dispose()
     this.eigenCachePass = null
     this.eigenCacheInitialized = false
 
+    const { dim, isHydrogen, pipelineIs2D } = env
     const enableCache = config.eigenfunctionCacheEnabled ?? !pipelineIs2D
     // Cache is created alongside the density grid (bindings 2/3 vs 4/5 — disjoint).
     // The grid serves non-phase color algorithms; phase algorithms fall back to
     // the inline raymarcher which uses the cache for fast per-step evaluation.
     const useEigenfunctionCache = pipelineIs2D ? false : enableCache
 
-    if (!pipelineIs2D && useEigenfunctionCache) {
-      this.eigenCachePass = new EigenfunctionCacheComputePass({
-        dimension: dim,
-        isHydrogenND: isHydrogen,
-      })
-      initPromises.push(
-        this.eigenCachePass.initialize(ctx).then(() => {
-          this.eigenCacheInitialized = true
-        })
-      )
-    }
+    if (pipelineIs2D || !useEigenfunctionCache) return
 
+    this.eigenCachePass = new EigenfunctionCacheComputePass({
+      dimension: dim,
+      isHydrogenND: isHydrogen,
+    })
+    initPromises.push(
+      this.eigenCachePass.initialize(ctx).then(() => {
+        this.eigenCacheInitialized = true
+      })
+    )
+  }
+
+  /** Dispose any prior Wigner cache pass and create a new one when in Wigner representation. */
+  private setupWignerCachePass(
+    ctx: WebGPUSetupContext,
+    config: SchrodingerRendererConfig,
+    env: AnalyticSetupEnv,
+    initPromises: Promise<void>[]
+  ): void {
     // ── Wigner cache compute pass ──
     this.wignerCachePass?.dispose()
     this.wignerCachePass = null
     this.wignerCacheInitialized = false
 
-    if (isWigner) {
-      this.wignerCachePass = new WignerCacheComputePass({
-        dimension: dim,
-        quantumMode: config.quantumMode as 'harmonicOscillator' | 'hydrogenND',
-        termCount: config.termCount,
+    if (!env.isWigner) return
+
+    this.wignerCachePass = new WignerCacheComputePass({
+      dimension: env.dim,
+      quantumMode: config.quantumMode as 'harmonicOscillator' | 'hydrogenND',
+      termCount: config.termCount,
+    })
+    // Reset stale resolution tracker. The new pass starts at the constructor
+    // default (256), but the strategy instance is reused across pipeline
+    // rebuilds, so a previously-cached value (e.g. 512 from a prior rebuild)
+    // would make syncWignerCacheResolution short-circuit and silently leave
+    // the user's chosen resolution unapplied — the cache would render at 256
+    // even though the Cache Resolution dropdown still showed 512.
+    this.lastWignerCacheResolution = NaN
+    initPromises.push(
+      this.wignerCachePass.initialize(ctx).then(() => {
+        this.wignerCacheInitialized = true
       })
-      // Reset stale resolution tracker. The new pass starts at the constructor
-      // default (256), but the strategy instance is reused across pipeline
-      // rebuilds, so a previously-cached value (e.g. 512 from a prior rebuild)
-      // would make syncWignerCacheResolution short-circuit and silently leave
-      // the user's chosen resolution unapplied — the cache would render at 256
-      // even though the Cache Resolution dropdown still showed 512.
-      this.lastWignerCacheResolution = NaN
-      initPromises.push(
-        this.wignerCachePass.initialize(ctx).then(() => {
-          this.wignerCacheInitialized = true
-        })
-      )
-    }
+    )
+  }
+
+  /**
+   * Build the bind group layout entries declared by whichever subsystems setup() activated.
+   * Side effect: creates `this.densityGridSampler` when the density grid path is active —
+   * the sampler is then captured by `getBindGroupEntries` along with the other refs.
+   */
+  private buildAnalyticLayoutEntries(
+    ctx: WebGPUSetupContext,
+    env: AnalyticSetupEnv
+  ): GPUBindGroupLayoutEntry[] {
+    const { device } = ctx
+    const additionalLayoutEntries: GPUBindGroupLayoutEntry[] = []
 
     // ── Build additional bind group layout entries (metadata only, no GPU resources) ──
 
@@ -241,7 +373,7 @@ export class AnalyticModeStrategy implements QuantumModeStrategy {
     }
 
     // Density grid texture + sampler (always declare if useDensityGrid — texture created during init)
-    if (useDensityGrid) {
+    if (env.useDensityGrid) {
       this.densityGridSampler = device.createSampler({
         label: 'density-grid-sampler',
         magFilter: 'linear',
@@ -266,60 +398,7 @@ export class AnalyticModeStrategy implements QuantumModeStrategy {
       )
     }
 
-    // Capture references for the deferred getBindGroupEntries callback
-    const eigenCacheRef = this.eigenCachePass
-    const wignerCacheRef = this.wignerCachePass
-    const densityGridRef = this.densityGridPass
-    const densityGridSamplerRef = this.densityGridSampler
-
-    return {
-      initPromises,
-      additionalLayoutEntries,
-      getBindGroupEntries: () => {
-        const entries: GPUBindGroupEntry[] = []
-
-        // Eigencache buffer + metadata (available after init)
-        if (eigenCacheRef) {
-          const cacheBuffer = eigenCacheRef.getCacheBuffer()
-          const metaBuffer = eigenCacheRef.getMetadataBuffer()
-          if (cacheBuffer && metaBuffer) {
-            entries.push(
-              { binding: 2, resource: { buffer: cacheBuffer } },
-              { binding: 3, resource: { buffer: metaBuffer } }
-            )
-          }
-        }
-
-        // Wigner cache texture + sampler (available after init)
-        if (wignerCacheRef) {
-          const cacheView = wignerCacheRef.getCacheTextureView()
-          const cacheSampler = wignerCacheRef.getCacheSampler()
-          if (cacheView && cacheSampler) {
-            entries.push(
-              { binding: 2, resource: cacheView },
-              { binding: 3, resource: cacheSampler }
-            )
-          }
-        }
-
-        // Density grid texture + sampler (created during async init)
-        if (useDensityGrid && densityGridRef && densityGridSamplerRef) {
-          const view = densityGridRef.getDensityTextureView()
-          if (view) {
-            entries.push(
-              { binding: 4, resource: view },
-              { binding: 5, resource: densityGridSamplerRef }
-            )
-            // Pre-computed gradient normal texture; fall back to density view
-            // to avoid bind group layout/entry mismatch
-            const normalView = densityGridRef.getNormalTextureView()
-            entries.push({ binding: 7, resource: normalView ?? view })
-          }
-        }
-
-        return entries
-      },
-    }
+    return additionalLayoutEntries
   }
 
   computeBoundingRadius(

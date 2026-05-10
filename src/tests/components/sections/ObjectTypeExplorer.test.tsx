@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { SchroedingerControls } from '@/components/sections/Geometry/SchroedingerControls'
 import { ObjectTypeExplorer } from '@/components/sections/ObjectTypes/ObjectTypeExplorer'
 import { ToastProvider } from '@/contexts/ToastContext'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 describe('ObjectTypeExplorer quantum mode entries', () => {
   beforeEach(() => {

@@ -11,7 +11,7 @@ import {
   kleinThreshold,
   zitterbewegungFrequency,
 } from '@/lib/physics/dirac/scales'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
 import type { WebGPURenderContext } from '../core/types'
 import { assertPow2Log2, FFT_UNIFORM_SIZE, LINEAR_WG } from './computePassUtils'

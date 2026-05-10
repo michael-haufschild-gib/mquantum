@@ -9,7 +9,7 @@ import React, { useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Slider } from '@/components/ui/Slider'
-import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/scene/appearanceStore'
 
 /** Props for the color distribution parameter controls. */
 export interface DistributionControlsProps {

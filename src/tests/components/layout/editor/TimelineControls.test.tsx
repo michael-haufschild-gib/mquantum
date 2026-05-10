@@ -8,7 +8,7 @@ const mockGeometryState = {
   objectType: 'schroedinger',
 }
 
-vi.mock('@/stores/geometryStore', () => ({
+vi.mock('@/stores/scene/geometryStore', () => ({
   useGeometryStore: vi.fn((selector) => {
     return selector ? selector(mockGeometryState) : mockGeometryState
   }),
@@ -52,7 +52,7 @@ const mockExtendedState = {
   requestOpenQuantumStateReset: mockRequestOpenQuantumStateReset,
 }
 
-vi.mock('@/stores/animationStore', () => ({
+vi.mock('@/stores/scene/animationStore', () => ({
   useAnimationStore: vi.fn((selector) => {
     const state = {
       isPlaying: false,
@@ -75,7 +75,7 @@ vi.mock('@/stores/animationStore', () => ({
   MAX_SPEED: 5,
 }))
 
-vi.mock('@/stores/uiStore', () => ({
+vi.mock('@/stores/ui/uiStore', () => ({
   useUIStore: vi.fn((selector) => {
     const state = {
       animationBias: 0,
@@ -90,7 +90,7 @@ vi.mock('@/stores/defaults/visualDefaults', () => ({
   MAX_ANIMATION_BIAS: 1,
 }))
 
-vi.mock('@/stores/appearanceStore', () => ({
+vi.mock('@/stores/scene/appearanceStore', () => ({
   useAppearanceStore: vi.fn((selector) => {
     const state = {
       colorAlgorithm: 'blackbody',
@@ -100,7 +100,7 @@ vi.mock('@/stores/appearanceStore', () => ({
   }),
 }))
 
-vi.mock('@/stores/extendedObjectStore', () => ({
+vi.mock('@/stores/scene/extendedObjectStore', () => ({
   useExtendedObjectStore: vi.fn((selector) => {
     return selector ? selector(mockExtendedState) : mockExtendedState
   }),

@@ -15,7 +15,7 @@
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import type { CosmologyCoefs } from '@/lib/physics/cosmology/background'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
 /**
  * Single cosmology snapshot captured by the debug ring buffer. Wire-compatible

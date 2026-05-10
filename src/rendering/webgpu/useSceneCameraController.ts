@@ -10,8 +10,8 @@
 import type { RefObject } from 'react'
 import { useCallback, useEffect, useRef } from 'react'
 
-import { useCameraStore } from '@/stores/cameraStore'
-import { INTERACTION_RESTORE_DELAY, usePerformanceStore } from '@/stores/performanceStore'
+import { INTERACTION_RESTORE_DELAY, usePerformanceStore } from '@/stores/runtime/performanceStore'
+import { useCameraStore } from '@/stores/scene/cameraStore'
 
 import { WebGPUCamera } from './core/WebGPUCamera'
 

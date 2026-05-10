@@ -1,7 +1,7 @@
 import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
+import { usePerformanceMetricsStore } from '@/stores/diagnostics/performanceMetricsStore'
 
 import { Icons } from '../icons'
 import { SectionHeader } from '../subcomponents'

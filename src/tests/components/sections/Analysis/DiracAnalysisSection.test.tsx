@@ -10,8 +10,8 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { DiracAnalysisContent } from '@/components/sections/Analysis/DiracAnalysisSection'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 function setLiveDiracDiagnostics(
   overrides: Partial<ReturnType<typeof useDiagnosticsStore.getState>['dirac']> = {}

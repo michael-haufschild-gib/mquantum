@@ -15,8 +15,8 @@ import {
   GRAPH_POINTS,
   type PassTimingEntry,
   usePerformanceMetricsStore,
-} from '@/stores/performanceMetricsStore'
-import { useUIStore } from '@/stores/uiStore'
+} from '@/stores/diagnostics/performanceMetricsStore'
+import { useUIStore } from '@/stores/ui/uiStore'
 
 import type { WebGPUFrameStats, WebGPUPassTiming } from './core/types'
 import type { WebGPURenderGraph } from './graph/WebGPURenderGraph'

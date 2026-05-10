@@ -13,11 +13,14 @@ import { Button } from '@/components/ui/Button'
 import { useToast } from '@/hooks/useToast'
 import { soundManager } from '@/lib/audio/SoundManager'
 import { isComputeQuantumType } from '@/lib/geometry/registry'
-import { useAnimationStore } from '@/stores/animationStore'
-import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { type LayoutStore, useLayoutStore } from '@/stores/layoutStore'
-import { type UISlice, useUIStore } from '@/stores/uiStore'
+import { useAnimationStore } from '@/stores/scene/animationStore'
+import {
+  type ExtendedObjectState,
+  useExtendedObjectStore,
+} from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { type LayoutStore, useLayoutStore } from '@/stores/ui/layoutStore'
+import { type UISlice, useUIStore } from '@/stores/ui/uiStore'
 
 interface TopBarControlsProps {
   compact?: boolean

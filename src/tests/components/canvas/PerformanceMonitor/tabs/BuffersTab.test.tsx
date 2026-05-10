@@ -10,10 +10,10 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { BuffersTabContent } from '@/components/canvas/PerformanceMonitor/tabs/BuffersTab'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
-import { useUIStore } from '@/stores/uiStore'
+import { usePerformanceMetricsStore } from '@/stores/diagnostics/performanceMetricsStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { useUIStore } from '@/stores/ui/uiStore'
 
 const initialMetrics = usePerformanceMetricsStore.getState()
 const initialPerf = usePerformanceStore.getState()

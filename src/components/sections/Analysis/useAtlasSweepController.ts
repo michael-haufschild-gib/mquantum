@@ -23,15 +23,15 @@ import { useEffect, useRef } from 'react'
 
 import type { TdsePotentialType } from '@/lib/geometry/extended/tdse'
 import { logger } from '@/lib/logger'
-import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useCoordinateEntanglementStore } from '@/stores/diagnostics/coordinateEntanglementStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 import {
   type AtlasSweepConfig,
   lambdaForStep,
   useQuantumnessAtlasStore,
-} from '@/stores/quantumnessAtlasStore'
+} from '@/stores/diagnostics/quantumnessAtlasStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 /** Polling interval for sweep progress (ms). */
 const POLL_MS = 400

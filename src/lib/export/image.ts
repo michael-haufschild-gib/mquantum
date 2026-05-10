@@ -5,8 +5,8 @@
 
 import { captureScreenshotAsync } from '@/hooks/useScreenshotCapture'
 import { logger } from '@/lib/logger'
-import { useMsgBoxStore } from '@/stores/msgBoxStore'
-import { useScreenshotStore } from '@/stores/screenshotStore'
+import { useScreenshotStore } from '@/stores/runtime/screenshotStore'
+import { useMsgBoxStore } from '@/stores/ui/msgBoxStore'
 
 /**
  * Options for PNG export capture requests.

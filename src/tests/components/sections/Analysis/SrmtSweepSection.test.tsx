@@ -23,8 +23,8 @@ import {
 } from '@/components/sections/Analysis/srmtSweepHelpers'
 import { SrmtSweepSection } from '@/components/sections/Analysis/SrmtSweepSection'
 import type { SrmtSweepPoint } from '@/lib/physics/srmt/sweepTypes'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useSrmtSweepStore } from '@/stores/srmtSweepStore'
+import { useSrmtSweepStore } from '@/stores/diagnostics/srmtSweepStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 function resetStores(): void {
   localStorage.clear()

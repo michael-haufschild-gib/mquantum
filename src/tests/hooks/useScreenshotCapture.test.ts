@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { captureScreenshotAsync, useScreenshotCapture } from '@/hooks/useScreenshotCapture'
-import { useScreenshotCaptureStore } from '@/stores/screenshotCaptureStore'
+import { useScreenshotCaptureStore } from '@/stores/runtime/screenshotCaptureStore'
 
 describe('captureScreenshotAsync', () => {
   beforeEach(() => {

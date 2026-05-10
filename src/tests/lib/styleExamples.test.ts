@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { applyStyleExample, findStyleByName, getStyleExamples } from '@/lib/styleExamples'
-import { usePresetManagerStore } from '@/stores/presetManagerStore'
+import { usePresetManagerStore } from '@/stores/runtime/presetManagerStore'
 
 describe('styleExamples', () => {
   beforeEach(() => {

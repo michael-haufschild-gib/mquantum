@@ -14,10 +14,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useAtlasSweepController } from '@/components/sections/Analysis/useAtlasSweepController'
 import { Button } from '@/components/ui/Button'
-import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { useQuantumnessAtlasStore } from '@/stores/quantumnessAtlasStore'
+import { useCoordinateEntanglementStore } from '@/stores/diagnostics/coordinateEntanglementStore'
+import { useQuantumnessAtlasStore } from '@/stores/diagnostics/quantumnessAtlasStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 // ─── Thin wrapper component ───────────────────────────────────────────────────
 

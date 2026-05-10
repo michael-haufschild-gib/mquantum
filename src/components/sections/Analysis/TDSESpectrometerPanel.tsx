@@ -45,12 +45,12 @@ import {
   HELLER_DEFAULT_MIN_SAMPLES,
   type HellerSpectrum,
 } from '@/lib/physics/tdse/heller'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import {
   HELLER_MAX_SAMPLE_INTERVAL,
   HELLER_MIN_SAMPLE_INTERVAL,
   useHellerSpectrometerStore,
-} from '@/stores/hellerSpectrometerStore'
+} from '@/stores/diagnostics/hellerSpectrometerStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 import { MetricRow } from './AnalysisPrimitives'
 import {

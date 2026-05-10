@@ -7,9 +7,9 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { CommandPalette } from '@/components/layout/CommandPalette'
-import { useCameraStore } from '@/stores/cameraStore'
-import { useLayoutStore } from '@/stores/layoutStore'
-import { useThemeStore } from '@/stores/themeStore'
+import { useCameraStore } from '@/stores/scene/cameraStore'
+import { useLayoutStore } from '@/stores/ui/layoutStore'
+import { useThemeStore } from '@/stores/ui/themeStore'
 
 describe('CommandPalette', () => {
   beforeEach(() => {

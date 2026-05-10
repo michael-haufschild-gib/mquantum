@@ -9,8 +9,8 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ExpandedContent } from '@/components/canvas/PerformanceMonitor/ExpandedContent'
-import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
-import { useUIStore } from '@/stores/uiStore'
+import { usePerformanceMetricsStore } from '@/stores/diagnostics/performanceMetricsStore'
+import { useUIStore } from '@/stores/ui/uiStore'
 
 const initialUIState = useUIStore.getState()
 const initialMetricsState = usePerformanceMetricsStore.getState()

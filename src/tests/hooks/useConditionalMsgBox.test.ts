@@ -13,8 +13,8 @@ import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { showConditionalMsgBox, useConditionalMsgBox } from '@/hooks/useConditionalMsgBox'
-import { DismissedDialogsState, useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
-import { useMsgBoxStore } from '@/stores/msgBoxStore'
+import { DismissedDialogsState, useDismissedDialogsStore } from '@/stores/ui/dismissedDialogsStore'
+import { useMsgBoxStore } from '@/stores/ui/msgBoxStore'
 
 // localStorage is provided globally by installDOMMocks() in src/tests/setup.ts.
 

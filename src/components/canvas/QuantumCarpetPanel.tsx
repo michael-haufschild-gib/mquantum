@@ -28,10 +28,10 @@ import { ToggleButton } from '@/components/ui/ToggleButton'
 import { useIsDesktop } from '@/hooks/useMediaQuery'
 import { usePanelCollision } from '@/hooks/usePanelCollision'
 import { getColormapLUT, paintCarpetToCanvas } from '@/lib/physics/colormaps'
-import type { CarpetColormap } from '@/stores/carpetStore'
-import { useCarpetStore } from '@/stores/carpetStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { useLayoutStore } from '@/stores/layoutStore'
+import type { CarpetColormap } from '@/stores/diagnostics/carpetStore'
+import { useCarpetStore } from '@/stores/diagnostics/carpetStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { useLayoutStore } from '@/stores/ui/layoutStore'
 
 // ── Constants ──
 const PANEL_W = 480

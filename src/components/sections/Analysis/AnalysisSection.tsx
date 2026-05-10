@@ -46,13 +46,13 @@ import {
   isComputeQuantumType,
   type QuantumTypeKey,
 } from '@/lib/geometry/registry'
-import { useCarpetStore } from '@/stores/carpetStore'
-import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { useSimulationStateStore } from '@/stores/simulationStateStore'
-import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
+import { useCarpetStore } from '@/stores/diagnostics/carpetStore'
+import { useCoordinateEntanglementStore } from '@/stores/diagnostics/coordinateEntanglementStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { useWavefunctionSliceStore } from '@/stores/diagnostics/wavefunctionSliceStore'
+import { useSimulationStateStore } from '@/stores/runtime/simulationStateStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 /**
  * Props for AnalysisSection.

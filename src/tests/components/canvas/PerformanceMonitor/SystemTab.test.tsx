@@ -2,8 +2,8 @@ import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { SystemTabContent } from '@/components/canvas/PerformanceMonitor/tabs/SystemTab'
-import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
-import { useRendererStore } from '@/stores/rendererStore'
+import { usePerformanceMetricsStore } from '@/stores/diagnostics/performanceMetricsStore'
+import { useRendererStore } from '@/stores/runtime/rendererStore'
 
 function seedSystemMetrics(): void {
   usePerformanceMetricsStore.setState({

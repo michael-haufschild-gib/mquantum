@@ -9,8 +9,8 @@ import React, { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Select } from '@/components/ui/Select'
-import { LCH_PRESET_OPTIONS } from '@/rendering/shaders/palette'
-import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
+import { LCH_PRESET_OPTIONS } from '@/lib/colors/palette'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/scene/appearanceStore'
 
 /** Props for the LCH color space preset selector. */
 export interface LchPresetSelectorProps {

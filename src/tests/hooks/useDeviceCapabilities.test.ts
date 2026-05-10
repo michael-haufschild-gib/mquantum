@@ -9,8 +9,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useDeviceCapabilities } from '@/hooks/useDeviceCapabilities'
 import { MOBILE_DEFAULT_MAX_FPS, MOBILE_DEFAULT_RESOLUTION_SCALE } from '@/lib/deviceCapabilities'
-import { useLightingStore } from '@/stores/lightingStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
+import { useLightingStore } from '@/stores/scene/lightingStore'
 
 // Mock the deviceCapabilities module
 vi.mock('@/lib/deviceCapabilities', async () => {

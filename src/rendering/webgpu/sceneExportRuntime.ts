@@ -6,8 +6,8 @@
 
 import type React from 'react'
 
-import type { ExportMode, ExportSettings } from '@/stores/exportStore'
-import { useExportStore } from '@/stores/exportStore'
+import type { ExportMode, ExportSettings } from '@/stores/runtime/exportStore'
+import { useExportStore } from '@/stores/runtime/exportStore'
 
 import type { WebGPUCamera } from './core/WebGPUCamera'
 import type { WebGPUDevice } from './core/WebGPUDevice'

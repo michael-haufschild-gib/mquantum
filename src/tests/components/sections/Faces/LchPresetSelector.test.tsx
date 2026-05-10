@@ -7,8 +7,8 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { LchPresetSelector } from '@/components/sections/Faces/LchPresetSelector'
-import { LCH_PRESET_OPTIONS } from '@/rendering/shaders/palette'
-import { useAppearanceStore } from '@/stores/appearanceStore'
+import { LCH_PRESET_OPTIONS } from '@/lib/colors/palette'
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 
 describe('LchPresetSelector', () => {
   beforeEach(() => {

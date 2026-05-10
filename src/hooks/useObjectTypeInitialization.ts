@@ -12,8 +12,8 @@
 import { useEffect } from 'react'
 
 import type { ObjectType } from '@/lib/geometry/types'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 /**
  * Hook to initialize object type-specific settings.

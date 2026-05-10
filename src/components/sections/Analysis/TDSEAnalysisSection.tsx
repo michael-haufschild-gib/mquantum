@@ -26,8 +26,8 @@ import {
   getPotentialPlotScale,
   samplePotentialProfile,
 } from '@/lib/physics/tdse/potentialProfile'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 /* ── SVG layout constants ── */
 const WIDTH = 260

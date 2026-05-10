@@ -10,7 +10,7 @@
 
 import { useEffect } from 'react'
 
-import { useThemeStore } from '@/stores/themeStore'
+import { useThemeStore } from '@/stores/ui/themeStore'
 
 /** Generate and set a dynamic favicon based on the current theme accent. */
 export const useDynamicFavicon = () => {

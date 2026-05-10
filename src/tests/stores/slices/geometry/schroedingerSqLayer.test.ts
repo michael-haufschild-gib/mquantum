@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 describe('Schroedinger SQ Layer — dimension change clamping', () => {
   it('clamps sqLayerSelectedModeIndex when dimension decreases', () => {

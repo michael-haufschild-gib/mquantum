@@ -15,8 +15,8 @@
 
 import React, { useCallback, useEffect, useRef } from 'react'
 
-import { directionToRotation } from '@/rendering/lights/types'
-import { useLightingStore } from '@/stores/lightingStore'
+import { directionToRotation } from '@/lib/lighting/lightSource'
+import { useLightingStore } from '@/stores/scene/lightingStore'
 
 import type { WebGPUCamera } from './core/WebGPUCamera'
 import {

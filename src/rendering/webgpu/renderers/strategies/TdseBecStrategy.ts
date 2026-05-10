@@ -16,10 +16,10 @@ import type {
   EntanglementWorkerResponse,
 } from '@/lib/physics/coordinateEntanglement.worker'
 import { computeTdseEffectiveSpacing } from '@/lib/physics/tdse/effectiveSpacing'
-import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useSimulationStateStore } from '@/stores/simulationStateStore'
-import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
+import { useCoordinateEntanglementStore } from '@/stores/diagnostics/coordinateEntanglementStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { useWavefunctionSliceStore } from '@/stores/diagnostics/wavefunctionSliceStore'
+import { useSimulationStateStore } from '@/stores/runtime/simulationStateStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../../core/types'
 import { TDSEComputePass } from '../../passes/TDSEComputePass'

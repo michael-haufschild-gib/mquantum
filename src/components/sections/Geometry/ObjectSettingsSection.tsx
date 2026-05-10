@@ -16,7 +16,7 @@ import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { getControlsComponent, hasControlsComponent } from '@/lib/geometry/registry/components'
 import { getControlsComponentKey } from '@/lib/geometry/registry/helpers'
 import { type ObjectType } from '@/lib/geometry/types'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 /** Props for the quantum mode-specific settings panel. */
 export interface ObjectSettingsSectionProps {

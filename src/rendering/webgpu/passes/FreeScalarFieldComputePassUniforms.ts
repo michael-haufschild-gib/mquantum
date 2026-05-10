@@ -10,23 +10,29 @@
 // Uniform layout — single source of truth for FreeScalarUniforms struct
 // ───────────────────────────────────────────────────────────────────────────
 
+import { FSF_UNIFORMS_LAYOUT, FSF_UNIFORMS_SIZE } from './fsfUniformsLayout'
+
+/** Float32Array index alias for layout-derived field access. */
+const I = FSF_UNIFORMS_LAYOUT.index
+
 /**
- * Total size of the FreeScalarUniforms struct in bytes. Must match the
- * struct definition in
+ * Total size of the FreeScalarUniforms struct in bytes. Derived from the
+ * declarative struct layout in `fsfUniformsLayout.ts`, which mirrors the
+ * WGSL struct in
  * `src/rendering/webgpu/shaders/schroedinger/compute/freeScalarInit.wgsl.ts`.
  *
  * Canonical δφ layout: the last 32 bytes hold the three cosmology
- * coefficients `(aKinetic, aPotential, aFull)` plus three words of
- * alignment padding.
+ * coefficients `(aKinetic, aPotential, aFull)` plus the preheating drive
+ * scalar and two Bianchi-I anisotropy ratios.
  */
-export const FSF_UNIFORM_SIZE = 528
+export const FSF_UNIFORM_SIZE = FSF_UNIFORMS_SIZE
 
 /**
  * Byte offset of the `dt` field in FreeScalarUniforms. Used by the per-step
  * leapfrog kickstart to overwrite only the dt slot without re-uploading the
  * full struct.
  */
-export const FSF_DT_BYTE_OFFSET = 12
+export const FSF_DT_BYTE_OFFSET = FSF_UNIFORMS_LAYOUT.byteOffset.dt
 
 /**
  * Byte offset of the `aKinetic` field in FreeScalarUniforms. The six
@@ -40,14 +46,15 @@ export const FSF_DT_BYTE_OFFSET = 12
  * `1 + A·sin(Ω·(η−η_ref))`; the last two carry the Bianchi-I anisotropy
  * per-axis ratios `aPot_1/aPot_0` and `aPot_2/aPot_0`.
  */
-export const FSF_COSMO_COEFS_BYTE_OFFSET = 504
+export const FSF_COSMO_COEFS_BYTE_OFFSET = FSF_UNIFORMS_LAYOUT.byteOffset.aKinetic
 
 /**
  * Number of f32 entries in the per-substep coefficient slot
  * `(aKinetic, aPotential, aFull, massSquaredScale, aPotentialRatio1,
- *   aPotentialRatio2)`. Six — the Bianchi-I Kasner round repurposed the
- * two trailing `_padCosmo1`/`_padCosmo2` words at offsets 520/524 as
- * anisotropy ratios, keeping the total struct size at 528 bytes.
+ *   aPotentialRatio2)`. Six contiguous f32 fields — the Bianchi-I Kasner
+ * round repurposed the two trailing `_padCosmo1`/`_padCosmo2` words at
+ * offsets 520/524 as anisotropy ratios, keeping the total struct size at
+ * 528 bytes.
  */
 export const FSF_COSMO_COEFS_F32_COUNT = 6
 
@@ -56,16 +63,10 @@ export const FSF_COSMO_COEFS_BYTE_SIZE = FSF_COSMO_COEFS_F32_COUNT * 4
 
 /**
  * Index of the `aKinetic` field in the Float32Array view of the uniform
- * buffer (i.e. `FSF_COSMO_COEFS_BYTE_OFFSET / 4`). Derived once so the byte
- * and f32 offsets cannot drift.
+ * buffer (i.e. `FSF_COSMO_COEFS_BYTE_OFFSET / 4`). Derived from the layout
+ * so the byte and f32 offsets cannot drift.
  */
-export const FSF_COSMO_COEFS_F32_INDEX = FSF_COSMO_COEFS_BYTE_OFFSET / 4
-
-if (!Number.isInteger(FSF_COSMO_COEFS_F32_INDEX)) {
-  throw new Error(
-    `FSF_COSMO_COEFS_BYTE_OFFSET (${FSF_COSMO_COEFS_BYTE_OFFSET}) must be a multiple of 4 to fit a Float32Array index`
-  )
-}
+export const FSF_COSMO_COEFS_F32_INDEX = FSF_UNIFORMS_LAYOUT.index.aKinetic
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import type { CosmologyCoefs } from '@/lib/physics/cosmology/background'
@@ -273,86 +274,86 @@ export function writeFsfUniforms(
 
   const strides = computeStridesPadded(config.gridSize, config.latticeDim)
 
-  // Scalars (offset 0-15, 4 u32s)
-  u32[0] = config.latticeDim // offset 0
-  u32[1] = totalSites // offset 4
-  f32[2] = config.mass // offset 8
-  f32[3] = config.dt // offset 12
+  // Scalars (offset 0-15, 4 u32/f32 slots)
+  u32[I.latticeDim] = config.latticeDim
+  u32[I.totalSites] = totalSites
+  f32[I.mass] = config.mass
+  f32[I.dt] = config.dt
 
-  // gridSize: array<u32, 12> (offset 16, indices 4-15)
+  // gridSize: array<u32, 12>
   for (let d = 0; d < config.latticeDim; d++) {
-    u32[4 + d] = config.gridSize[d]!
+    u32[I.gridSize + d] = config.gridSize[d]!
   }
 
-  // strides: array<u32, 12> (offset 64, indices 16-27)
+  // strides: array<u32, 12>
   for (let d = 0; d < config.latticeDim; d++) {
-    u32[16 + d] = strides[d]!
+    u32[I.strides + d] = strides[d]!
   }
 
-  // spacing: array<f32, 12> (offset 112, indices 28-39)
+  // spacing: array<f32, 12>
   for (let d = 0; d < config.latticeDim; d++) {
-    f32[28 + d] = config.spacing[d]!
+    f32[I.spacing + d] = config.spacing[d]!
   }
 
-  // Init/display scalars (offset 160-191, indices 40-47)
-  u32[40] = INIT_CONDITION_MAP[config.initialCondition] ?? 2 // offset 160
-  u32[41] = FIELD_VIEW_MAP[config.fieldView] ?? 0 // offset 164
-  u32[42] = config.stepsPerFrame // offset 168
-  f32[43] = config.packetWidth // offset 172
-  f32[44] = config.packetAmplitude // offset 176
+  // Init/display scalars
+  u32[I.initCondition] = INIT_CONDITION_MAP[config.initialCondition] ?? 2
+  u32[I.fieldView] = FIELD_VIEW_MAP[config.fieldView] ?? 0
+  u32[I.stepsPerFrame] = config.stepsPerFrame
+  f32[I.packetWidth] = config.packetWidth
+  f32[I.packetAmplitude] = config.packetAmplitude
   const maxField = params.maxFieldValue
-  f32[45] = maxField // offset 180
-  f32[46] = boundingRadius ?? 2.0 // offset 184
-  // analysisMode at index 47 (offset 188): 0=off, 1=hamiltonian/character, 2=flux, 3=kSpace
+  f32[I.maxFieldValue] = maxField
+  f32[I.boundingRadius] = boundingRadius ?? 2.0
+  // analysisMode: 0=off, 1=hamiltonian/character, 2=flux, 3=kSpace
   // Derived from the numeric color algorithm: 12/13 -> mode 1, 14 -> mode 2, 15 -> mode 3
   const alg = colorAlgorithm ?? 0
-  u32[47] = alg === 12 || alg === 13 ? 1 : alg === 14 ? 2 : alg === 15 ? 3 : 0
+  u32[I.analysisMode] = alg === 12 || alg === 13 ? 1 : alg === 14 ? 2 : alg === 15 ? 3 : 0
 
-  // packetCenter: array<f32, 12> (offset 192, indices 48-59)
+  // packetCenter: array<f32, 12>
   for (let d = 0; d < config.latticeDim; d++) {
-    f32[48 + d] = config.packetCenter[d] ?? 0
+    f32[I.packetCenter + d] = config.packetCenter[d] ?? 0
   }
 
-  // modeK: array<i32, 12> (offset 240, indices 60-71)
+  // modeK: array<i32, 12>
   for (let d = 0; d < config.latticeDim; d++) {
-    i32[60 + d] = config.modeK[d] ?? 0
+    i32[I.modeK + d] = config.modeK[d] ?? 0
   }
 
-  // slicePositions: array<f32, 12> (offset 288, indices 72-83)
-  writeSlicePositionsToF32(f32, 72, config.slicePositions)
+  // slicePositions: array<f32, 12>
+  writeSlicePositionsToF32(f32, I.slicePositions, config.slicePositions)
 
-  // basisX: array<f32, 12> (offset 336, indices 84-95)
+  // basisX: array<f32, 12>
   if (basisX) {
     for (let d = 0; d < Math.min(basisX.length, MAX_DIM); d++) {
-      f32[84 + d] = basisX[d]!
+      f32[I.basisX + d] = basisX[d]!
     }
   } else {
     // Default identity: basisX = [1,0,0,...], basisY = [0,1,0,...], basisZ = [0,0,1,...]
-    f32[84] = 1.0
+    f32[I.basisX] = 1.0
   }
 
-  // basisY: array<f32, 12> (offset 384, indices 96-107)
+  // basisY: array<f32, 12>
   if (basisY) {
     for (let d = 0; d < Math.min(basisY.length, MAX_DIM); d++) {
-      f32[96 + d] = basisY[d]!
+      f32[I.basisY + d] = basisY[d]!
     }
   } else {
-    f32[97] = 1.0
+    f32[I.basisY + 1] = 1.0
   }
 
-  // basisZ: array<f32, 12> (offset 432, indices 108-119)
+  // basisZ: array<f32, 12>
   if (basisZ) {
     for (let d = 0; d < Math.min(basisZ.length, MAX_DIM); d++) {
-      f32[108 + d] = basisZ[d]!
+      f32[I.basisZ + d] = basisZ[d]!
     }
   } else {
-    f32[110] = 1.0
+    f32[I.basisZ + 2] = 1.0
   }
 
-  // Self-interaction params (offset 480, indices 120-123)
-  u32[120] = config.selfInteractionEnabled ? 1 : 0 // offset 480
-  f32[121] = config.selfInteractionLambda // offset 484
-  f32[122] = config.selfInteractionVev // offset 488
+  // Self-interaction params
+  u32[I.selfInteractionEnabled] = config.selfInteractionEnabled ? 1 : 0
+  f32[I.selfInteractionLambda] = config.selfInteractionLambda
+  f32[I.selfInteractionVev] = config.selfInteractionVev
   // absorberEnabled mode: 0 = off, 1 = damp toward φ=0, 2 = damp toward
   // φ = sign(x₀−center)·vev (kink-aware). The kink-aware branch preserves
   // the domain-wall asymptotes at the PML boundary instead of dragging
@@ -365,19 +366,19 @@ export function writeFsfUniforms(
     config.absorberEnabled &&
     config.initialCondition === 'kinkProfile' &&
     config.selfInteractionEnabled
-  u32[123] = config.absorberEnabled ? (useKinkAwarePml ? 2 : 1) : 0 // offset 492
+  u32[I.absorberEnabled] = config.absorberEnabled ? (useKinkAwarePml ? 2 : 1) : 0
 
-  // PML absorber parameters (offset 496-511, indices 124-127).
+  // PML absorber parameters.
   // `absorberWidth` is typed non-optional but FSF historically carried a
   // `?? 0.2` belt-and-braces default — preserve it on the uniform write
   // so migrated presets missing the field still get a usable width, and
   // feed the resolved value into sigmaMaxFromPmlConfig so both writes
   // agree bit-for-bit with the legacy ternary block.
   const effectiveAbsorberWidth = config.absorberWidth ?? 0.2
-  f32[124] = effectiveAbsorberWidth // offset 496
+  f32[I.absorberWidth] = effectiveAbsorberWidth
   // Pass the resolved width as an override so the per-frame writer doesn't
   // allocate a spread-clone of `config` on every upload.
-  f32[125] = sigmaMaxFromPmlConfig(config, effectiveAbsorberWidth) // offset 500 (sigma_max)
+  f32[I.absorberStrength] = sigmaMaxFromPmlConfig(config, effectiveAbsorberWidth) // sigma_max
 
   // Cosmology coefficients at the current conformal time. Under Minkowski
   // or cosmology-disabled configs these collapse to (1, 1, 1), so the
@@ -385,9 +386,9 @@ export function writeFsfUniforms(
   // Klein-Gordon bit-identically. The offsets match the per-substep
   // partial write in `FreeScalarFieldComputePass.writeCosmologyCoefsSlot`.
   const coefs = computeFsfCosmologyCoefs(config, params.simEta)
-  f32[FSF_COSMO_COEFS_F32_INDEX] = coefs.aKinetic // offset 504
-  f32[FSF_COSMO_COEFS_F32_INDEX + 1] = coefs.aPotential // offset 508
-  f32[FSF_COSMO_COEFS_F32_INDEX + 2] = coefs.aFull // offset 512
+  f32[I.aKinetic] = coefs.aKinetic
+  f32[I.aPotential] = coefs.aPotential
+  f32[I.aFull] = coefs.aFull
   // massSquaredScale — evaluate the *live* drive phase so a paused run,
   // a load-from-save, or the initial half-step kickstart all see the
   // correct `1 + A·sin(Ω·(clock − ref))` rather than the identity. The
@@ -403,13 +404,13 @@ export function writeFsfUniforms(
     config.preheating,
     params.preheatingReferenceEta
   )
-  f32[FSF_COSMO_COEFS_F32_INDEX + 3] = liveMassSquaredScale // offset 516 (massSquaredScale)
+  f32[I.massSquaredScale] = liveMassSquaredScale
   // Bianchi-I per-axis kinetic ratios. Default to 1 for every isotropic
   // preset — the pi-update shader's correction terms
   // `(ratio − 1) · axialLap` evaluate to exactly 0 so the output reduces
   // bit-identically to the pre-Bianchi single-coef form.
-  f32[FSF_COSMO_COEFS_F32_INDEX + 4] = coefs.aPotentialRatio1 ?? 1 // offset 520
-  f32[FSF_COSMO_COEFS_F32_INDEX + 5] = coefs.aPotentialRatio2 ?? 1 // offset 524
+  f32[I.aPotentialRatio1] = coefs.aPotentialRatio1 ?? 1
+  f32[I.aPotentialRatio2] = coefs.aPotentialRatio2 ?? 1
 
   device.queue.writeBuffer(uniformBuffer, 0, uniformData)
 

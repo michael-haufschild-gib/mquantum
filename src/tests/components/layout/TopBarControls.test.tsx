@@ -3,9 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { TopBarControls } from '@/components/layout/TopBarControls'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useLayoutStore } from '@/stores/layoutStore'
-import { useUIStore } from '@/stores/uiStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useLayoutStore } from '@/stores/ui/layoutStore'
+import { useUIStore } from '@/stores/ui/uiStore'
 
 vi.mock('@/hooks/useToast', () => ({
   useToast: () => ({

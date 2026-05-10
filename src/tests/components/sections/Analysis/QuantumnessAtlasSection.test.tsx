@@ -10,12 +10,12 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { QuantumnessAtlasSection } from '@/components/sections/Analysis/QuantumnessAtlasSection'
-import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { useMonitoringSweepStore } from '@/stores/monitoringSweepStore'
-import { useQuantumnessAtlasStore } from '@/stores/quantumnessAtlasStore'
-import { useSrmtSweepStore } from '@/stores/srmtSweepStore'
+import { useCoordinateEntanglementStore } from '@/stores/diagnostics/coordinateEntanglementStore'
+import { useMonitoringSweepStore } from '@/stores/diagnostics/monitoringSweepStore'
+import { useQuantumnessAtlasStore } from '@/stores/diagnostics/quantumnessAtlasStore'
+import { useSrmtSweepStore } from '@/stores/diagnostics/srmtSweepStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 vi.mock('@/lib/export/dataExport', () => ({
   downloadAtlasCSV: vi.fn(),

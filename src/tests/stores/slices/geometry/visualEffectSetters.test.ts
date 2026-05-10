@@ -9,7 +9,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { RAYMARCH_QUALITY_TO_SAMPLES } from '@/lib/geometry/extended/types'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 const getSchroedinger = () => useExtendedObjectStore.getState().schroedinger
 

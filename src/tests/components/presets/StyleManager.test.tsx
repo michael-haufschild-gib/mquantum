@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { StyleManager } from '@/components/presets/StyleManager'
 import { ToastProvider } from '@/contexts/ToastContext'
-import { usePresetManagerStore } from '@/stores/presetManagerStore'
+import { usePresetManagerStore } from '@/stores/runtime/presetManagerStore'
 import type { SavedStyle } from '@/stores/utils/presetTypes'
 
 function renderWithProviders(ui: React.ReactElement) {

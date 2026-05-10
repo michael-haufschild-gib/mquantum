@@ -7,7 +7,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 describe('Dirac setters', () => {
   beforeEach(() => {
@@ -293,7 +293,7 @@ describe('Dirac setters', () => {
   })
 
   it('syncs color algorithm to particleAntiparticle when preset uses split fieldView', async () => {
-    const { useAppearanceStore } = await import('@/stores/appearanceStore')
+    const { useAppearanceStore } = await import('@/stores/scene/appearanceStore')
     useAppearanceStore.getState().setColorAlgorithm('blackbody')
     expect(useAppearanceStore.getState().colorAlgorithm).toBe('blackbody')
 
@@ -307,7 +307,7 @@ describe('Dirac setters', () => {
   })
 
   it('syncs color algorithm to blackbody when preset uses totalDensity fieldView', async () => {
-    const { useAppearanceStore } = await import('@/stores/appearanceStore')
+    const { useAppearanceStore } = await import('@/stores/scene/appearanceStore')
     useAppearanceStore.getState().setColorAlgorithm('viridis')
     expect(useAppearanceStore.getState().colorAlgorithm).toBe('viridis')
 

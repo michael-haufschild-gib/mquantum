@@ -10,8 +10,8 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { ShaderTabContent } from '@/components/canvas/PerformanceMonitor/tabs/ShaderTab'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 const initialPerf = usePerformanceStore.getState()
 const initialGeom = useGeometryStore.getState()

@@ -7,7 +7,7 @@ import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
-import { useExportStore } from '@/stores/exportStore'
+import { useExportStore } from '@/stores/runtime/exportStore'
 
 export const ExportTextTab = () => {
   const { settings, updateSettings } = useExportStore(

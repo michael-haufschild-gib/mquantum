@@ -8,7 +8,7 @@ import { act, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { CollapsedView } from '@/components/canvas/PerformanceMonitor/CollapsedView'
-import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
+import { usePerformanceMetricsStore } from '@/stores/diagnostics/performanceMetricsStore'
 
 describe('CollapsedView', () => {
   beforeEach(() => {

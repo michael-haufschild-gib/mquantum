@@ -7,7 +7,7 @@
  * @module rendering/webgpu/utils/gizmoHitTesting
  */
 
-import { rotationToDirection } from '@/rendering/lights/types'
+import { rotationToDirection } from '@/lib/lighting/lightSource'
 
 import {
   calculateGroundIntersection,

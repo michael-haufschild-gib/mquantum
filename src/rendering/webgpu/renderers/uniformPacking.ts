@@ -10,6 +10,7 @@
  * @module rendering/webgpu/renderers/uniformPacking
  */
 
+import { DEFAULT_COSINE_COEFFICIENTS } from '@/lib/colors/palette'
 import type { AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
 import { sanitizeTdseBranchColor, type TdseBranchColor } from '@/lib/geometry/extended/tdse'
 import {
@@ -18,7 +19,6 @@ import {
   type SchroedingerConfig,
 } from '@/lib/geometry/extended/types'
 import { normalizeHydrogenCoupledAngularChain } from '@/lib/physics/hydrogenCoupled/presets'
-import { DEFAULT_COSINE_COEFFICIENTS } from '@/rendering/shaders/palette'
 
 import { MAX_DIM, MAX_EXTRA_DIM, MAX_TERMS } from '../shaders/schroedinger/uniforms.wgsl'
 import { zeroReservedFields } from '../utils/structLayout'

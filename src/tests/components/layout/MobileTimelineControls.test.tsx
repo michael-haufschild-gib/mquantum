@@ -11,7 +11,7 @@ import { renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useMobileBottomPanel } from '@/hooks/useMobileBottomPanel'
-import { useLayoutStore } from '@/stores/layoutStore'
+import { useLayoutStore } from '@/stores/ui/layoutStore'
 
 let mockIsDesktop = false
 

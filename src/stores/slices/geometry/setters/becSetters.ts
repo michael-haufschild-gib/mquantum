@@ -17,8 +17,8 @@ import {
 import { reduceGridToFit } from '@/lib/math/ndArray'
 import { thomasFermiMuND, thomasFermiRadius } from '@/lib/physics/bec/chemicalPotential'
 import { clampKKState, computeEffectiveSpacing } from '@/lib/physics/compactification'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
 
 import {

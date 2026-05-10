@@ -9,12 +9,12 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { useAppearanceStore } from '@/stores/appearanceStore'
-import { useLightingStore } from '@/stores/lightingStore'
-import { usePresetManagerStore } from '@/stores/presetManagerStore'
+import { usePresetManagerStore } from '@/stores/runtime/presetManagerStore'
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
+import { useLightingStore } from '@/stores/scene/lightingStore'
 
 // Mock msgBoxStore to prevent actual dialog displays
-vi.mock('@/stores/msgBoxStore', () => ({
+vi.mock('@/stores/ui/msgBoxStore', () => ({
   useMsgBoxStore: {
     getState: () => ({
       showMsgBox: vi.fn(),

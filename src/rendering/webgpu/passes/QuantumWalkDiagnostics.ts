@@ -7,7 +7,7 @@
  * @module rendering/webgpu/passes/QuantumWalkDiagnostics
  */
 
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
 import type { WebGPURenderContext } from '../core/types'
 import {

@@ -9,11 +9,11 @@
  */
 
 import { logger } from '@/lib/logger'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import {
   useWavefunctionSliceStore,
   type WavefunctionSliceSourceMode,
-} from '@/stores/wavefunctionSliceStore'
+} from '@/stores/diagnostics/wavefunctionSliceStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 import type { WebGPURenderContext } from '../core/types'
 import { requestStateSave as genericStateSave } from './stateSave'

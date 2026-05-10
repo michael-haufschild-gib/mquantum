@@ -11,8 +11,8 @@ import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { CropEditor } from '@/components/overlays/CropEditor'
-import { useExportStore } from '@/stores/exportStore'
-import { useLayoutStore } from '@/stores/layoutStore'
+import { useExportStore } from '@/stores/runtime/exportStore'
+import { useLayoutStore } from '@/stores/ui/layoutStore'
 
 const MOTION_FILTER_KEYS = new Set([
   'initial',

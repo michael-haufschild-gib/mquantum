@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 describe('pauliSpinorSlice', () => {
   beforeEach(() => {

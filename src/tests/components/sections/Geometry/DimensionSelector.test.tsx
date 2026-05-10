@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { DimensionSelector } from '@/components/sections/Geometry/DimensionSelector'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 describe('DimensionSelector', () => {
   beforeEach(() => {

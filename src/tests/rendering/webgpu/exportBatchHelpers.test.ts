@@ -26,7 +26,7 @@ import {
   updateExportEta,
 } from '@/rendering/webgpu/exportBatchHelpers'
 import type { ExportLoopState, ExportRuntimeState } from '@/rendering/webgpu/sceneExportRuntime'
-import { useExportStore } from '@/stores/exportStore'
+import { useExportStore } from '@/stores/runtime/exportStore'
 
 // ============================================================================
 // Helpers

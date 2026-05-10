@@ -27,8 +27,8 @@ import {
   disposeSrmtWorker,
   type SrmtWorkerState,
 } from '@/rendering/webgpu/renderers/strategies/WheelerDeWittSrmtWorker'
-import type { SrmtClockQuality, SrmtSnapshot } from '@/stores/srmtDiagnosticStore'
-import { useSrmtDiagnosticStore } from '@/stores/srmtDiagnosticStore'
+import type { SrmtClockQuality, SrmtSnapshot } from '@/stores/diagnostics/srmtDiagnosticStore'
+import { useSrmtDiagnosticStore } from '@/stores/diagnostics/srmtDiagnosticStore'
 
 // ---------------------------------------------------------------------------
 // Fake Worker

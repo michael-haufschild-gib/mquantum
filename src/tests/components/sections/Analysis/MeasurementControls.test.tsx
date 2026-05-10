@@ -7,9 +7,9 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { MeasurementControls } from '@/components/sections/Analysis/MeasurementControls'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { useMeasurementStore } from '@/stores/measurementStore'
+import { useMeasurementStore } from '@/stores/diagnostics/measurementStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 function resetStores() {
   useExtendedObjectStore.getState().reset()

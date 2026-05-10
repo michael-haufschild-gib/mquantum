@@ -4,11 +4,11 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { Button } from '@/components/ui/Button'
 import { soundManager } from '@/lib/audio/SoundManager'
-import { supportsPopover } from '@/lib/dom/popoverSupport'
 import { getModifierSymbols } from '@/lib/platform'
-import { useCameraStore } from '@/stores/cameraStore'
-import { useDropdownStore } from '@/stores/dropdownStore'
-import { type LayoutStore, useLayoutStore } from '@/stores/layoutStore'
+import { supportsPopover } from '@/lib/popoverSupport'
+import { useCameraStore } from '@/stores/scene/cameraStore'
+import { useDropdownStore } from '@/stores/ui/dropdownStore'
+import { type LayoutStore, useLayoutStore } from '@/stores/ui/layoutStore'
 
 const DROPDOWN_ID = 'canvas-context-menu'
 

@@ -17,10 +17,10 @@ import {
 } from '@/lib/export/videoExportPlanning'
 import type { QuantumTypeEvolutionResetKind } from '@/lib/geometry/registry'
 import { getQuantumTypeEvolutionResetKind, resolveQuantumTypeKey } from '@/lib/geometry/registry'
-import { useExportStore } from '@/stores/exportStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
+import { useExportStore } from '@/stores/runtime/exportStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 import {
   acquireStreamHandle,

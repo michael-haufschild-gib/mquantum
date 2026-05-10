@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/useToast'
 import { soundManager } from '@/lib/audio/SoundManager'
 import { downloadFile } from '@/lib/export/dataExport'
 import { logger } from '@/lib/logger'
-import { useScreenshotStore } from '@/stores/screenshotStore'
+import { useScreenshotStore } from '@/stores/runtime/screenshotStore'
 
 import { CropBox, CropValues } from './CropBox'
 

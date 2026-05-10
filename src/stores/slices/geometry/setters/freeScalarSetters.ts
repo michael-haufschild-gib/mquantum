@@ -14,7 +14,7 @@ import type {
   FreeScalarInitialCondition,
 } from '@/lib/geometry/extended/types'
 import { nearestPow2 } from '@/lib/math/ndArray'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 import {
   createFreeScalarCosmologySetters,

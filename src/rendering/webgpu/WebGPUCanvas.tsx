@@ -10,7 +10,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 
 import { logger } from '@/lib/logger'
-import { useRendererStore } from '@/stores/rendererStore'
+import { useRendererStore } from '@/stores/runtime/rendererStore'
 
 import type { WebGPUInitErrorCode } from './core/types'
 import { WebGPUBasePass } from './core/WebGPUBasePass'

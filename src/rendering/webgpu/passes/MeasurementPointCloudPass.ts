@@ -9,7 +9,7 @@
  */
 
 import { logger } from '@/lib/logger'
-import type { MeasurementRecord } from '@/stores/measurementStore'
+import type { MeasurementRecord } from '@/stores/diagnostics/measurementStore'
 
 import type { CameraSnapshot } from '../core/storeAccess'
 import { getStoreSnapshot } from '../core/storeAccess'

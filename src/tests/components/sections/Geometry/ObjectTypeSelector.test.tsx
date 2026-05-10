@@ -9,8 +9,8 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { ObjectTypeSelector } from '@/components/sections/Geometry/ObjectTypeSelector'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { useRotationStore } from '@/stores/rotationStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { useRotationStore } from '@/stores/scene/rotationStore'
 
 describe('ObjectTypeSelector', () => {
   beforeEach(() => {

@@ -18,7 +18,7 @@
  * @module rendering/webgpu/shaders/schroedinger/main.wgsl
  */
 
-import { COLOR_ALGORITHM_TO_INT } from '@/rendering/shaders/palette/types'
+import { COLOR_ALGORITHM_TO_INT } from '@/lib/colors/palette/types'
 
 import { generateBayerJitterSection, getRayDirSource } from './temporalJitter'
 

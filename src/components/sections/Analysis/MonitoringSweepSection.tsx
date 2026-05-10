@@ -20,13 +20,13 @@ import { ControlGroup } from '@/components/ui/ControlGroup'
 import { NumberInput } from '@/components/ui/NumberInput'
 import { Sparkline } from '@/components/ui/Sparkline'
 import { useAnySweepRunning } from '@/hooks/useAnySweepRunning'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 import {
   gammaForStep,
   type MonitoringSweepConfig,
   useMonitoringSweepStore,
-} from '@/stores/monitoringSweepStore'
+} from '@/stores/diagnostics/monitoringSweepStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 /** Monitoring sweep controls and IPR display. */
 export const MonitoringSweepSection: React.FC = React.memo(() => {

@@ -2,7 +2,7 @@ import { AnimatePresence, m } from 'motion/react'
 import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 
 import { soundManager } from '@/lib/audio/SoundManager'
-import { supportsPopover } from '@/lib/dom/popoverSupport'
+import { supportsPopover } from '@/lib/popoverSupport'
 
 /** Props for the Popover component */
 export interface PopoverProps {

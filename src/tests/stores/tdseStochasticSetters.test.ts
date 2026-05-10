@@ -8,7 +8,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { MAX_STOCHASTIC_SITES } from '@/lib/physics/stochastic/localizationKernel'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 describe('TDSE stochastic setters', () => {
   beforeEach(() => {

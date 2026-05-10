@@ -6,13 +6,13 @@ import type {
   DomainColoringSettings,
   MultiSourceWeights,
   PhaseDivergingSettings,
-} from '@/rendering/shaders/palette'
+} from '@/lib/colors/palette'
 import type {
   AllShaderSettings,
   ShaderType,
   SurfaceSettings,
   WireframeSettings,
-} from '@/rendering/shaders/types'
+} from '@/lib/rendering/shaderTypes'
 
 // ============================================================================
 // Color Slice

@@ -33,7 +33,7 @@ import {
   tachyonGrowthRate,
 } from '@/lib/physics/antiDeSitter/math'
 import { ADS_PRESETS } from '@/lib/physics/antiDeSitter/presets'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { ADS_LIMITS } from '@/stores/slices/geometry/setters/antiDeSitterSetters'
 
 import { AntiDeSitterBtzControls } from './AntiDeSitterBtzControls'

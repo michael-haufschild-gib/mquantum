@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { LightEditor } from '@/components/sections/Lights/LightEditor'
 import { AMBIENT_LIGHT_ID } from '@/components/sections/Lights/LightListItem'
-import { useLightingStore } from '@/stores/lightingStore'
+import { useLightingStore } from '@/stores/scene/lightingStore'
 import { LIGHTING_INITIAL_STATE } from '@/stores/slices/lightingSlice'
 
 vi.mock('@/components/ui/Icon', () => ({

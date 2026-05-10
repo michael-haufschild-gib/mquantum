@@ -12,10 +12,10 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { MonitoringSweepSection } from '@/components/sections/Analysis/MonitoringSweepSection'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useMonitoringSweepStore } from '@/stores/monitoringSweepStore'
-import { useSrmtSweepStore } from '@/stores/srmtSweepStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { useMonitoringSweepStore } from '@/stores/diagnostics/monitoringSweepStore'
+import { useSrmtSweepStore } from '@/stores/diagnostics/srmtSweepStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 const PRE_SWEEP_GAMMA = 2.5
 

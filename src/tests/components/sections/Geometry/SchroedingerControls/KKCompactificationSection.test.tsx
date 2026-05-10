@@ -6,8 +6,8 @@ import { DEFAULT_BEC_CONFIG } from '@/lib/geometry/extended/bec'
 import { DEFAULT_DIRAC_CONFIG } from '@/lib/geometry/extended/dirac'
 import { DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/schroedinger'
 import { DEFAULT_TDSE_CONFIG } from '@/lib/geometry/extended/tdse'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 function setMode(quantumMode: string) {
   useExtendedObjectStore.setState((s) => ({

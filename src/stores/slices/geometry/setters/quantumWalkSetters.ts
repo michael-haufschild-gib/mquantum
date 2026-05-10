@@ -8,7 +8,7 @@ import {
   DEFAULT_QUANTUM_WALK_CONFIG,
   resizeQuantumWalkArrays,
 } from '@/lib/geometry/extended/quantumWalk'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
 
 import type { SetterContext } from './sliceSetterUtils'

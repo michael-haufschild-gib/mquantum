@@ -12,8 +12,8 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { ResizeHandle } from '@/components/layout/ResizeHandle'
 import { Button } from '@/components/ui/Button'
-import type { LayoutMode } from '@/stores/layoutStore'
-import { useLayoutStore } from '@/stores/layoutStore'
+import type { LayoutMode } from '@/stores/ui/layoutStore'
+import { useLayoutStore } from '@/stores/ui/layoutStore'
 
 /** Props for the main control panel that aggregates sidebar sections. */
 export interface ControlPanelProps {

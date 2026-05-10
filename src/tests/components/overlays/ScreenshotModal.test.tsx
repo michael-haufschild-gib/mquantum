@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ScreenshotModal } from '@/components/overlays/ScreenshotModal'
 import { ToastProvider } from '@/contexts/ToastContext'
-import { useScreenshotStore } from '@/stores/screenshotStore'
+import { useScreenshotStore } from '@/stores/runtime/screenshotStore'
 
 function renderWithProviders(ui: React.ReactElement) {
   return render(<ToastProvider>{ui}</ToastProvider>)

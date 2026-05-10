@@ -8,8 +8,8 @@ import React, { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Select } from '@/components/ui/Select'
-import { COSINE_PRESET_OPTIONS } from '@/rendering/shaders/palette'
-import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
+import { COSINE_PRESET_OPTIONS } from '@/lib/colors/palette'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/scene/appearanceStore'
 
 /** Props for the color preset selector dropdown. */
 export interface PresetSelectorProps {

@@ -8,13 +8,13 @@ import React, { useCallback, useEffect, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Select } from '@/components/ui/Select'
+import { type ColorAlgorithm, getAvailableColorAlgorithms } from '@/lib/colors/palette'
 import type { DiracFieldView } from '@/lib/geometry/extended/dirac'
 import type { PauliFieldView } from '@/lib/geometry/extended/pauli'
-import { type ColorAlgorithm, getAvailableColorAlgorithms } from '@/rendering/shaders/palette'
 import { pauliFieldViewForColorAlgorithm } from '@/rendering/webgpu/scenePassConfig'
-import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/scene/appearanceStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 /** Props for the color algorithm selection dropdown. */
 export interface ColorAlgorithmSelectorProps {

@@ -4,7 +4,10 @@ import { useShallow } from 'zustand/react/shallow'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { DEFAULT_SCHROEDINGER_CONFIG, type SchroedingerConfig } from '@/lib/geometry/extended/types'
-import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import {
+  type ExtendedObjectState,
+  useExtendedObjectStore,
+} from '@/stores/scene/extendedObjectStore'
 
 interface SchroedingerVacuumBubbleLensControlsProps {
   config: SchroedingerConfig

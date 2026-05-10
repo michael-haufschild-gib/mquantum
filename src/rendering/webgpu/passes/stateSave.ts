@@ -250,7 +250,7 @@ async function serializeAndDownload(
 ): Promise<void> {
   const { serializeSimulationState } = await import('@/lib/export/simulationState')
   const { downloadFile, exportFilename } = await import('@/lib/export/dataExport')
-  const { useSimulationStateStore } = await import('@/stores/simulationStateStore')
+  const { useSimulationStateStore } = await import('@/stores/runtime/simulationStateStore')
 
   const blob = await serializeSimulationState(
     meta.config,
@@ -265,7 +265,7 @@ async function serializeAndDownload(
 /** Report save error to the simulation state store. */
 function reportSaveError(err: unknown): void {
   logger.error('[stateSave] Save failed:', err)
-  void import('@/stores/simulationStateStore').then(({ useSimulationStateStore }) => {
+  void import('@/stores/runtime/simulationStateStore').then(({ useSimulationStateStore }) => {
     useSimulationStateStore.getState().setSaveError(String(err))
   })
 }

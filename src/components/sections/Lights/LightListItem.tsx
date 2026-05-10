@@ -18,7 +18,7 @@ import LightToggleOffIcon from '@/assets/icons/light-toggle-off.svg?react'
 import LightToggleOnIcon from '@/assets/icons/light-toggle-on.svg?react'
 import TrashIcon from '@/assets/icons/trash.svg?react'
 import { Button } from '@/components/ui/Button'
-import type { LightSource, LightType } from '@/rendering/lights/types'
+import type { LightSource, LightType } from '@/lib/lighting/lightSource'
 
 /** Special ID for the virtual ambient light entry */
 export const AMBIENT_LIGHT_ID = '__ambient__'

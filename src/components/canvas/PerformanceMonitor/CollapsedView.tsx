@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react'
 
-import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
+import { usePerformanceMetricsStore } from '@/stores/diagnostics/performanceMetricsStore'
 
 import { computeSparklinePoints, FPS_COLORS, type FpsColorLevel, getFpsColorLevel } from './utils'
 

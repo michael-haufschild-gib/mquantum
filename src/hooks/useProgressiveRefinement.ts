@@ -6,14 +6,14 @@
 import { useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-import { useEnvironmentStore } from '@/stores/environmentStore'
-import { useExportStore } from '@/stores/exportStore'
+import { useExportStore } from '@/stores/runtime/exportStore'
 import {
   REFINEMENT_STAGE_TIMING,
   REFINEMENT_STAGES,
   type RefinementStage,
   usePerformanceStore,
-} from '@/stores/performanceStore'
+} from '@/stores/runtime/performanceStore'
+import { useEnvironmentStore } from '@/stores/scene/environmentStore'
 
 /** Options for the {@link useProgressiveRefinement} hook. */
 export interface UseProgressiveRefinementOptions {

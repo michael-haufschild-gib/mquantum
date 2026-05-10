@@ -9,7 +9,7 @@ type StreamTarget = InstanceType<MediaBunnySubset['StreamTarget']>
 type CanvasSource = InstanceType<MediaBunnySubset['CanvasSource']>
 
 import { logger } from '@/lib/logger'
-import { CropSettings, TextOverlaySettings, VideoCodec } from '@/stores/exportStore'
+import { CropSettings, TextOverlaySettings, VideoCodec } from '@/stores/runtime/exportStore'
 
 let _mediabunny: MediaBunnySubset | null = null
 async function loadMediaBunny(): Promise<MediaBunnySubset> {

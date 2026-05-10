@@ -10,8 +10,8 @@
 import { useEffect, useRef } from 'react'
 
 import { logger } from '@/lib/logger'
-import type { WebGPUAdapterMode, WebGPUCapabilityInfo } from '@/stores/rendererStore'
-import { useRendererStore } from '@/stores/rendererStore'
+import type { WebGPUAdapterMode, WebGPUCapabilityInfo } from '@/stores/runtime/rendererStore'
+import { useRendererStore } from '@/stores/runtime/rendererStore'
 
 // ============================================================================
 // Types

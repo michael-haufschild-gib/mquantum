@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { hasControlsComponent } from '@/lib/geometry/registry/components'
 import { isExtendedObjectType } from '@/lib/geometry/types'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 describe('pauliSpinor integration', () => {
   beforeEach(() => {

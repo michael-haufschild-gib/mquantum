@@ -14,7 +14,7 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { useIsDesktop } from '@/hooks/useMediaQuery'
 import { shouldShowMobileBottomPanel } from '@/hooks/useMobileBottomPanel'
-import { useLayoutStore } from '@/stores/layoutStore'
+import { useLayoutStore } from '@/stores/ui/layoutStore'
 
 const SIDEBAR_WIDTH = 320
 const TOP_BAR_HEIGHT = 48

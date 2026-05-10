@@ -3,8 +3,8 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { Button } from '@/components/ui/Button'
 import { Switch } from '@/components/ui/Switch'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 import { Icons } from '../icons'
 import { InfoCard, SectionHeader } from '../subcomponents'

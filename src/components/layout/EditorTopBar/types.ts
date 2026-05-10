@@ -2,7 +2,7 @@
  * Shared types for EditorTopBar components
  */
 
-import type { SavedScene, SavedStyle } from '@/stores/presetManagerStore'
+import type { SavedScene, SavedStyle } from '@/stores/runtime/presetManagerStore'
 
 /**
  * Menu item that can be used in dropdown menus

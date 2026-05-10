@@ -34,12 +34,12 @@ import { useToast } from '@/hooks/useToast'
 import { soundManager } from '@/lib/audio/SoundManager'
 import { getQuantumTypeName, resolveQuantumTypeKey } from '@/lib/geometry/registry'
 import { logger } from '@/lib/logger'
-import { useExportStore } from '@/stores/exportStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { type LayoutStore, useLayoutStore } from '@/stores/layoutStore'
-import { type PresetManagerState, usePresetManagerStore } from '@/stores/presetManagerStore'
-import { useThemeStore } from '@/stores/themeStore'
+import { useExportStore } from '@/stores/runtime/exportStore'
+import { type PresetManagerState, usePresetManagerStore } from '@/stores/runtime/presetManagerStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { type LayoutStore, useLayoutStore } from '@/stores/ui/layoutStore'
+import { useThemeStore } from '@/stores/ui/themeStore'
 
 import {
   useFileMenuItems,

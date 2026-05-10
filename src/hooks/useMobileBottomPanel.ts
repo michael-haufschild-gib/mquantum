@@ -1,5 +1,5 @@
 import { useIsDesktop } from '@/hooks/useMediaQuery'
-import { useLayoutStore } from '@/stores/layoutStore'
+import { useLayoutStore } from '@/stores/ui/layoutStore'
 
 /** State required to decide whether mobile timeline controls are visible. */
 export interface MobileBottomPanelVisibilityState {

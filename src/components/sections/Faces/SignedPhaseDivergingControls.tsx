@@ -2,7 +2,7 @@ import React, { useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { ColorPicker } from '@/components/ui/ColorPicker'
-import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/scene/appearanceStore'
 
 /** Controls for the signed phase diverging colormap: neutral, positive, and negative wing colors. */
 export const SignedPhaseDivergingControls: React.FC = React.memo(() => {

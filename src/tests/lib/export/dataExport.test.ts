@@ -28,9 +28,9 @@ import {
   exportWavefunctionSliceCSV,
   readRingBuffer,
 } from '@/lib/export/dataExport'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import type { AtlasPoint } from '@/stores/quantumnessAtlasStore'
-import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import type { AtlasPoint } from '@/stores/diagnostics/quantumnessAtlasStore'
+import { useWavefunctionSliceStore } from '@/stores/diagnostics/wavefunctionSliceStore'
 
 beforeEach(() => {
   useDiagnosticsStore.getState().resetTdse()

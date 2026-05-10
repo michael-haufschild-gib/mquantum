@@ -14,7 +14,7 @@ import {
   ErosionCurves,
   TripleHeatmap,
 } from '@/components/sections/Analysis/QuantumnessAtlasVisualizations'
-import type { AtlasPoint } from '@/stores/quantumnessAtlasStore'
+import type { AtlasPoint } from '@/stores/diagnostics/quantumnessAtlasStore'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

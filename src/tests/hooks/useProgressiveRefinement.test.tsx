@@ -2,9 +2,9 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useProgressiveRefinement } from '@/hooks/useProgressiveRefinement'
-import { useEnvironmentStore } from '@/stores/environmentStore'
-import { useExportStore } from '@/stores/exportStore'
-import { REFINEMENT_STAGE_QUALITY, usePerformanceStore } from '@/stores/performanceStore'
+import { useExportStore } from '@/stores/runtime/exportStore'
+import { REFINEMENT_STAGE_QUALITY, usePerformanceStore } from '@/stores/runtime/performanceStore'
+import { useEnvironmentStore } from '@/stores/scene/environmentStore'
 
 function resetStores(): void {
   usePerformanceStore.setState(usePerformanceStore.getInitialState())

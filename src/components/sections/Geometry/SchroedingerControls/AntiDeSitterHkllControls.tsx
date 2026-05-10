@@ -26,7 +26,7 @@ import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import type { AdsHkllSource, AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
 import { defaultHkllParams, hkllSampleCount } from '@/lib/physics/antiDeSitter/hkll'
 import { resolveDelta } from '@/lib/physics/antiDeSitter/math'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { ADS_LIMITS } from '@/stores/slices/geometry/setters/antiDeSitterSetters'
 
 const SOURCE_OPTIONS: Array<{ value: AdsHkllSource; label: string }> = [

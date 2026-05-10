@@ -12,8 +12,8 @@
 
 import { describe, expect, it } from 'vitest'
 
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 import { HISTORY_LENGTH } from '@/stores/diagnostics/types'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 interface RingBufferTestConfig {
   /** Channel key on the store state, e.g. 'tdse'. */

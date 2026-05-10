@@ -14,9 +14,10 @@ import { sampleAdiabaticVacuum } from '@/lib/physics/cosmology/adiabaticVacuum'
 import { computeMassSquaredScale } from '@/lib/physics/cosmology/preheating'
 import { computeFsfCosmologyCoefs } from '@/lib/physics/freeScalar/vacuumDispersion'
 import { sampleVacuumSpectrum } from '@/lib/physics/freeScalar/vacuumSpectrum'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
 import type { WebGPURenderContext } from '../core/types'
+import { destroyGpuResources } from '../utils/gpuResourceHelpers'
 import { LINEAR_WG as LINEAR_WORKGROUP_SIZE } from './computePassUtils'
 import type { FsfBindGroupResult, FsfPipelineResult } from './FreeScalarFieldComputePassSetup'
 import {
@@ -194,11 +195,14 @@ export function disposeFsfPassGpu(fields: FsfGpuFields, kSpace: FsfKSpaceManager
   // Invalidate in-flight async gradient pipeline results
   fields.pipelineGeneration++
 
-  const gpuBuffers: (GPUBuffer | null)[] = [fields.phiBuffer, fields.piBuffer, fields.uniformBuffer]
-  for (const buf of gpuBuffers) buf?.destroy()
-  fields.densityTexture?.destroy()
-  fields.analysisTexture?.destroy()
-  fields.normalTexture?.destroy()
+  destroyGpuResources(
+    fields.phiBuffer,
+    fields.piBuffer,
+    fields.uniformBuffer,
+    fields.densityTexture,
+    fields.analysisTexture,
+    fields.normalTexture
+  )
   for (const buf of fields.pendingStagingBuffers) buf.destroy()
   fields.pendingStagingBuffers.length = 0
 

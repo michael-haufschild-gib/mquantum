@@ -36,7 +36,7 @@ import {
   scheduleHellerReadback,
   tickHellerStep,
 } from '@/rendering/webgpu/passes/TDSEHellerReadback'
-import { useHellerSpectrometerStore } from '@/stores/hellerSpectrometerStore'
+import { useHellerSpectrometerStore } from '@/stores/diagnostics/hellerSpectrometerStore'
 import {
   createMockBuffer,
   createMockCommandEncoder,

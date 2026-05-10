@@ -48,8 +48,8 @@ import {
   landmarkInputsFromConfig,
 } from '@/lib/physics/srmt/turningPointLandmark'
 import type { WheelerDeWittSolverOutput } from '@/lib/physics/wheelerDeWitt/solver'
-import type { PendingSrmtSweep } from '@/stores/srmtSweepStore'
-import { useSrmtSweepStore } from '@/stores/srmtSweepStore'
+import type { PendingSrmtSweep } from '@/stores/diagnostics/srmtSweepStore'
+import { useSrmtSweepStore } from '@/stores/diagnostics/srmtSweepStore'
 
 import { computeWdwConfigHash } from './WheelerDeWittPhysicsCache'
 

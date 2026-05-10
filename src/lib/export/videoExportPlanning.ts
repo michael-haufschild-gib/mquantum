@@ -1,4 +1,4 @@
-import type { CropSettings, ExportResolution } from '@/stores/exportStore'
+import type { CropSettings, ExportResolution } from '@/stores/runtime/exportStore'
 
 /**
  * Pixel dimensions in width/height order.

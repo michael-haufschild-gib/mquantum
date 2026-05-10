@@ -3,10 +3,10 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { CanvasContextMenu } from '@/components/layout/CanvasContextMenu'
-import { useDropdownStore } from '@/stores/dropdownStore'
+import { useDropdownStore } from '@/stores/ui/dropdownStore'
 
 // Mock the stores
-vi.mock('@/stores/layoutStore', () => ({
+vi.mock('@/stores/ui/layoutStore', () => ({
   useLayoutStore: vi.fn((selector) =>
     selector({
       toggleCinematicMode: vi.fn(),
@@ -16,7 +16,7 @@ vi.mock('@/stores/layoutStore', () => ({
   ),
 }))
 
-vi.mock('@/stores/cameraStore', () => ({
+vi.mock('@/stores/scene/cameraStore', () => ({
   useCameraStore: vi.fn((selector) =>
     selector({
       reset: vi.fn(),

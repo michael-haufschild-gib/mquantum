@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Button } from '@/components/ui/Button'
 import { DropdownMenu, type DropdownMenuItem } from '@/components/ui/DropdownMenu'
-import { useDropdownStore } from '@/stores/dropdownStore'
+import { useDropdownStore } from '@/stores/ui/dropdownStore'
 
 // Mock the sound manager
 vi.mock('@/lib/audio/SoundManager', () => ({

@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { Slider } from '@/components/ui/Slider'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
-import { useExportStore, VideoCodec } from '@/stores/exportStore'
+import { useExportStore, VideoCodec } from '@/stores/runtime/exportStore'
 
 export const ExportAdvancedTab = () => {
   const { settings, updateSettings } = useExportStore(

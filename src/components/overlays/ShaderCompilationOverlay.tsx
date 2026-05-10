@@ -19,7 +19,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Z_INDEX } from '@/constants/zIndex'
-import { usePerformanceStore } from '@/stores/performanceStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
 
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 

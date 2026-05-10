@@ -23,9 +23,9 @@ import { GlobalProgress } from '@/components/ui/GlobalProgress'
 import { useIsDesktop } from '@/hooks/useMediaQuery'
 import { useMobileBottomPanel } from '@/hooks/useMobileBottomPanel'
 import { soundManager } from '@/lib/audio/SoundManager'
-import { useExportStore } from '@/stores/exportStore'
-import { type LayoutStore, useLayoutStore } from '@/stores/layoutStore'
-import { useThemeStore } from '@/stores/themeStore'
+import { useExportStore } from '@/stores/runtime/exportStore'
+import { type LayoutStore, useLayoutStore } from '@/stores/ui/layoutStore'
+import { useThemeStore } from '@/stores/ui/themeStore'
 
 import { EditorTopBar } from './EditorTopBar'
 

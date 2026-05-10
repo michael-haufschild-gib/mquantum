@@ -13,7 +13,10 @@ import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import type { KSpaceDisplayMode, KSpaceExposureMode } from '@/lib/geometry/extended/types'
-import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import {
+  type ExtendedObjectState,
+  useExtendedObjectStore,
+} from '@/stores/scene/extendedObjectStore'
 
 /** k-Space display mode toggle options */
 const DISPLAY_MODE_OPTIONS = [

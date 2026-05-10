@@ -23,11 +23,12 @@ import type { DiracConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
 import { spinorSize } from '@/lib/physics/dirac/cliffordAlgebraFallback'
 import { DiracAlgebraBridge } from '@/lib/physics/dirac/diracAlgebra'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
+import { destroyGpuResources } from '../utils/gpuResourceHelpers'
 import {
   computeConfigHash,
   computeStridesPadded,
@@ -57,6 +58,7 @@ import {
 } from './DiracComputePassSetup'
 import { runBatchedStrangStep, runLegacyStrangStep } from './DiracComputePassStrang'
 import { buildDiracFFTStagingData, writeDiracUniforms } from './DiracComputePassUniforms'
+import { DIRAC_UNIFORM_SIZE } from './diracUniformsLayout'
 import { requestStateSave as genericStateSave } from './stateSave'
 
 /**
@@ -152,9 +154,8 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   // Dirac algebra bridge (generates gamma matrices off main thread)
   private readonly algebraBridge = new DiracAlgebraBridge()
 
-  // Pre-allocated uniform views
-  /** DiracUniforms struct: 592 bytes (includes kGridScale) */
-  private readonly uniformData = new ArrayBuffer(592)
+  // Pre-allocated uniform views — size derived from the WGSL struct layout.
+  private readonly uniformData = new ArrayBuffer(DIRAC_UNIFORM_SIZE)
   private readonly uniformU32 = new Uint32Array(this.uniformData)
   private readonly uniformF32 = new Float32Array(this.uniformData)
 
@@ -783,22 +784,33 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       this.diagStagingBuffer.unmap()
       this.diagMappingInFlight = false
     }
-    // prettier-ignore
-    const gpuBuffers: (GPUBuffer | null | undefined)[] = [
-      this.spinorBuffer, this.potentialBuffer, this.gammaBuffer,
-      this.fftScratchA, this.fftScratchB, this.uniformBuffer, this.fftUniformBuffer,
-      this.fftStagingBuffer, this.fftAxisUniformBuffer, this.fftAxisStagingBuffer,
+    destroyGpuResources(
+      this.spinorBuffer,
+      this.potentialBuffer,
+      this.gammaBuffer,
+      this.fftScratchA,
+      this.fftScratchB,
+      this.uniformBuffer,
+      this.fftUniformBuffer,
+      this.fftStagingBuffer,
+      this.fftAxisUniformBuffer,
+      this.fftAxisStagingBuffer,
       this.fftTwiddleBuffer,
-      this.packUniformBuffer, this.packUniformBufferNoNorm,
-      this.diagUniformBuffer, this.diagPartialNormBuffer, this.diagPartialMaxBuffer,
-      this.diagPartialParticleBuffer, this.diagPartialAntiBuffer,
-      this.diagResultBuffer, this.diagStagingBuffer, this.bg?.renormalizeUniformBuffer,
-    ]
-    for (const buf of gpuBuffers) buf?.destroy()
+      this.packUniformBuffer,
+      this.packUniformBufferNoNorm,
+      this.diagUniformBuffer,
+      this.diagPartialNormBuffer,
+      this.diagPartialMaxBuffer,
+      this.diagPartialParticleBuffer,
+      this.diagPartialAntiBuffer,
+      this.diagResultBuffer,
+      this.diagStagingBuffer,
+      this.bg?.renormalizeUniformBuffer,
+      this.densityTexture
+    )
     if (this.fftAxisUniformBuffers) {
       for (const b of this.fftAxisUniformBuffers) b.destroy()
     }
-    this.densityTexture?.destroy()
 
     this.spinorBuffer = this.potentialBuffer = this.gammaBuffer = null
     this.fftScratchA = this.fftScratchB = this.uniformBuffer = this.fftUniformBuffer = null

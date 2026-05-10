@@ -25,8 +25,8 @@ import {
   computeFsfCosmologySnapshot,
   computeFsfVacuumDispersion,
 } from '@/lib/physics/freeScalar/vacuumDispersion'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 import { MetricRow, SparklineRow } from './AnalysisPrimitives'
 import { FSFEntanglementProbe } from './FSFEntanglementProbe'

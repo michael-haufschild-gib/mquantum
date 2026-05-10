@@ -10,7 +10,7 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { usePanelCollision } from '@/hooks/usePanelCollision'
-import { useLayoutStore } from '@/stores/layoutStore'
+import { useLayoutStore } from '@/stores/ui/layoutStore'
 
 // ── Spring mock ──────────────────────────────────────────────────────────────
 // Replace motion springs with synchronous MotionValue stand-ins.

@@ -6,9 +6,12 @@ import { ColorPicker } from '@/components/ui/ColorPicker'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
-import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
-import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/scene/appearanceStore'
+import {
+  type ExtendedObjectState,
+  useExtendedObjectStore,
+} from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 /** Advanced rendering controls: SSS, emission & rim, and volume effects. */
 export const AdvancedObjectControls: React.FC = React.memo(() => {

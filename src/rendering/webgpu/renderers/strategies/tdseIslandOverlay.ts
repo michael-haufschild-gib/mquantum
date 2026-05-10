@@ -21,7 +21,7 @@ import type { BecConfig } from '@/lib/geometry/extended/bec'
 import type { TdseConfig } from '@/lib/geometry/extended/tdse'
 import { hawkingReadout } from '@/lib/physics/bec/sonicHorizon'
 import { buildWaterfallParams } from '@/lib/physics/bec/waterfallParams'
-import { usePageCurveStore } from '@/stores/pageCurveStore'
+import { usePageCurveStore } from '@/stores/diagnostics/pageCurveStore'
 
 /** Island-overlay snapshot as read from the page-curve store. */
 export interface IslandOverlaySnapshot {

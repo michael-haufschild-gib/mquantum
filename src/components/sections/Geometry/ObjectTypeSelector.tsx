@@ -15,8 +15,8 @@ import { Tooltip } from '@/components/ui/Tooltip'
 import { useObjectTypeInitialization } from '@/hooks/useObjectTypeInitialization'
 import { getAvailableTypesForDimension } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
-import { type GeometryState, useGeometryStore } from '@/stores/geometryStore'
-import { useRotationStore } from '@/stores/rotationStore'
+import { type GeometryState, useGeometryStore } from '@/stores/scene/geometryStore'
+import { useRotationStore } from '@/stores/scene/rotationStore'
 
 /** Props for the object type selection cards. */
 export interface ObjectTypeSelectorProps {

@@ -18,8 +18,8 @@ import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { DEFAULT_SB_COEFFICIENT } from '@/lib/physics/bec/pageCurve'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { usePageCurveStore } from '@/stores/pageCurveStore'
+import { usePageCurveStore } from '@/stores/diagnostics/pageCurveStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 const SECTION_TITLE = 'Page Curve & Island'
 

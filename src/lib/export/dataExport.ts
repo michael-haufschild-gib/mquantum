@@ -8,10 +8,10 @@
  */
 
 import { AXIS_LABELS } from '@/constants/dimension'
-import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import type { AtlasPoint } from '@/stores/quantumnessAtlasStore'
-import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
+import { useCoordinateEntanglementStore } from '@/stores/diagnostics/coordinateEntanglementStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import type { AtlasPoint } from '@/stores/diagnostics/quantumnessAtlasStore'
+import { useWavefunctionSliceStore } from '@/stores/diagnostics/wavefunctionSliceStore'
 
 // ─── Ring buffer utility ──────────────────────────────────────────────────
 

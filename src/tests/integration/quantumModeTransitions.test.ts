@@ -12,9 +12,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
 import { isComputeQuantumType, QUANTUM_TYPE_REGISTRY } from '@/lib/geometry/registry'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 function getRegistrySchroedingerModes(): SchroedingerQuantumMode[] {
   const modes: SchroedingerQuantumMode[] = []

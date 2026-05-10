@@ -116,6 +116,7 @@ const projectRulesPlugin = {
           fp.includes('src/tests/factories/') ||
           fp.includes('src/lib/colors/') ||
           fp.includes('src/lib/geometry/') ||
+          fp.includes('src/lib/lighting/') ||
           fp.includes('src/lib/export/') ||
           fp.includes('useDynamicFavicon')
         )) {
@@ -995,6 +996,35 @@ export default [
       'max-lines': ['error', { max: 600, skipBlankLines: true, skipComments: true }],
     },
   },
+  // Compute-pass orchestrators legitimately own ~30 GPU buffers, ~5 pipelines,
+  // init/execute/dispose lifecycles, and multiple feature integrations
+  // (CSL, Hawking, wormhole, disorder, custom potential, …). The 600-line
+  // cap forced cosmetic fragmentation across helper files passing typed
+  // *Fields interface bags of class internals — fake decomposition that
+  // increased coupling without lowering complexity. A compute pass is the
+  // natural unit of cohesion; allow it to be as large as it needs to be.
+  // Cohesion is enforced by code review, not line count.
+  {
+    files: [
+      'src/rendering/webgpu/passes/**/*.ts',
+      'src/rendering/webgpu/renderers/**/*.ts',
+    ],
+    rules: {
+      'max-lines': 'off',
+    },
+  },
+  // Physics solvers (Wheeler–DeWitt, AdS density grid, coordinate entanglement,
+  // k-space transforms, LQC bounce, etc.) are thick numerical methods. The
+  // 600-line cap forced helper-file extraction that scattered single-purpose
+  // math across three or four files. Permit physics modules up to 1500 lines —
+  // generous enough for a complete solver with its types and validation
+  // helpers, still tight enough to flag truly oversized files.
+  {
+    files: ['src/lib/physics/**/*.ts'],
+    rules: {
+      'max-lines': ['error', { max: 1500, skipBlankLines: true, skipComments: true }],
+    },
+  },
   // ─── Test files: anti-slop rules for AI coding agents ─────────────────────
   {
     files: ['src/tests/**/*.{test,spec}.{ts,tsx}'],
@@ -1156,18 +1186,7 @@ export default [
     rules: {
       'no-restricted-imports': ['error', {
         patterns: [{
-          group: [
-            '@/stores/*',
-            '!@/stores/defaults',
-            '!@/stores/defaults/*',
-            '!@/stores/*DiagnosticsStore',
-            '!@/stores/simulationStateStore',
-            '!@/stores/hellerSpectrometerStore',
-            '!@/stores/performanceStore',
-            '!@/stores/extendedObjectStore',
-            '!@/stores/wormholeCoherenceStore',
-            '!@/stores/wavefunctionSliceStore',
-          ],
+          regex: '^@/stores/(?!defaults(?:/|$)|diagnostics/(?:diagnosticsStore|.*DiagnosticsStore|hellerSpectrometerStore|wormholeCoherenceStore|wavefunctionSliceStore)$|runtime/(?:simulationStateStore|performanceStore)$|scene/extendedObjectStore$)',
           allowTypeImports: true,
           message: 'Render passes access stores via ctx.stores. Only diagnostic stores (write-direction), simulationStateStore, hellerSpectrometerStore, performanceStore, wormholeCoherenceStore (HUD write-direction), wavefunctionSliceStore (write-direction slice readback fulfillment, used only by TDSEStateSaveLoad.ts), and defaults/* are exempt.',
         }],

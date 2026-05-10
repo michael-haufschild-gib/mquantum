@@ -23,14 +23,14 @@ import { Select } from '@/components/ui/Select'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { useAnySweepRunning } from '@/hooks/useAnySweepRunning'
 import { downloadAtlasCSV, downloadAtlasJSON } from '@/lib/export/dataExport'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
 import {
   type AtlasSweepConfig,
   DEFAULT_ATLAS_CONFIG,
   lambdaForStep,
   useQuantumnessAtlasStore,
-} from '@/stores/quantumnessAtlasStore'
+} from '@/stores/diagnostics/quantumnessAtlasStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 import {
   DIAG_COLORS,

@@ -1,8 +1,8 @@
 import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
-import { useRendererStore } from '@/stores/rendererStore'
+import { usePerformanceMetricsStore } from '@/stores/diagnostics/performanceMetricsStore'
+import { useRendererStore } from '@/stores/runtime/rendererStore'
 
 import { Icons } from '../icons'
 import { InfoCard, ProgressBar, SectionHeader } from '../subcomponents'

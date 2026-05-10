@@ -7,14 +7,19 @@
 
 import type { DiracConfig } from '@/lib/geometry/extended/dirac'
 import { spinorSize } from '@/lib/physics/dirac/cliffordAlgebraFallback'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
+import { destroyGpuResources } from '../utils/gpuResourceHelpers'
 import {
   assertPow2Log2,
   FFT_UNIFORM_SIZE,
   PACK_UNIFORM_SIZE,
   packFFTAxisUniforms,
 } from './computePassUtils'
+// DiracUniforms struct size — single source of truth derived from the WGSL
+// field layout. Aliased to UNIFORM_SIZE so existing buffer-creation call sites
+// stay unchanged.
+import { DIRAC_UNIFORM_SIZE as UNIFORM_SIZE } from './diracUniformsLayout'
 import { buildFFTTwiddleTable, FFT_TWIDDLE_BYTES } from './FFTTwiddle'
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -219,8 +224,6 @@ export interface DiracPassHelpers {
 // Buffer creation
 // ───────────────────────────────────────────────────────────────────────────
 
-/** DiracUniforms struct size in bytes (592 — includes kGridScale) */
-const UNIFORM_SIZE = 592
 /** Diagnostics workgroup size */
 const DIAG_WG = 256
 /** DiracDiagUniforms struct size (16 bytes: totalSites, numWorkgroups, spinorSize, pad) */
@@ -247,29 +250,31 @@ export function rebuildDiracBuffers(
   buildFFTStagingData: (config: DiracConfig, totalSites: number) => ArrayBuffer
 ): DiracBufferResult {
   // Destroy old buffers
-  old.spinorBuffer?.destroy()
-  old.potentialBuffer?.destroy()
-  old.gammaBuffer?.destroy()
-  old.fftScratchA?.destroy()
-  old.fftScratchB?.destroy()
-  old.uniformBuffer?.destroy()
-  old.fftUniformBuffer?.destroy()
-  old.fftStagingBuffer?.destroy()
-  old.fftAxisUniformBuffer?.destroy()
-  old.fftAxisStagingBuffer?.destroy()
+  destroyGpuResources(
+    old.spinorBuffer,
+    old.potentialBuffer,
+    old.gammaBuffer,
+    old.fftScratchA,
+    old.fftScratchB,
+    old.uniformBuffer,
+    old.fftUniformBuffer,
+    old.fftStagingBuffer,
+    old.fftAxisUniformBuffer,
+    old.fftAxisStagingBuffer,
+    old.fftTwiddleBuffer,
+    old.packUniformBuffer,
+    old.packUniformBufferNoNorm,
+    old.diagUniformBuffer,
+    old.diagPartialNormBuffer,
+    old.diagPartialMaxBuffer,
+    old.diagPartialParticleBuffer,
+    old.diagPartialAntiBuffer,
+    old.diagResultBuffer,
+    old.diagStagingBuffer
+  )
   if (old.fftAxisUniformBuffers) {
     for (const b of old.fftAxisUniformBuffers) b.destroy()
   }
-  old.fftTwiddleBuffer?.destroy()
-  old.packUniformBuffer?.destroy()
-  old.packUniformBufferNoNorm?.destroy()
-  old.diagUniformBuffer?.destroy()
-  old.diagPartialNormBuffer?.destroy()
-  old.diagPartialMaxBuffer?.destroy()
-  old.diagPartialParticleBuffer?.destroy()
-  old.diagPartialAntiBuffer?.destroy()
-  old.diagResultBuffer?.destroy()
-  old.diagStagingBuffer?.destroy()
 
   // Compute dimensions
   let totalSites = 1

@@ -19,8 +19,8 @@ import {
 import { reduceGridToFit } from '@/lib/math/ndArray'
 import { clampKKState, computeEffectiveSpacing } from '@/lib/physics/compactification'
 import type { MetricConfig } from '@/lib/physics/tdse/metrics/types'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 import {
   clampDtWithCfl,

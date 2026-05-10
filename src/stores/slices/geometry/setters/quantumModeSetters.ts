@@ -31,8 +31,8 @@ import {
   normalizeHydrogenCoupledAngularChain,
 } from '@/lib/physics/hydrogenCoupled/presets'
 import { getFirstPresetId } from '@/lib/physics/presetDefaults'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 import type { ExtendedObjectSlice } from '../types'
 import { reconcileCosmologyInvariants } from './freeScalarCosmologySetters'

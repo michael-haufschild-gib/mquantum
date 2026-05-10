@@ -2,8 +2,8 @@ import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Tabs } from '@/components/ui/Tabs'
-import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
-import { useUIStore } from '@/stores/uiStore'
+import { usePerformanceMetricsStore } from '@/stores/diagnostics/performanceMetricsStore'
+import { useUIStore } from '@/stores/ui/uiStore'
 
 import { Icons } from './icons'
 import { Sparkline } from './subcomponents'

@@ -1,7 +1,7 @@
 import { rgbUnitToHsl } from '@/lib/colors/colorUtils'
 import { DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'
 import { computeRadialProbabilityNorm } from '@/lib/math/hydrogenRadialProbability'
-import type { AppearanceStoreState } from '@/stores/appearanceStore'
+import type { AppearanceStoreState } from '@/stores/scene/appearanceStore'
 
 import { parseHexColorToLinearRgb, type Rgb } from '../utils/color'
 import { MOMENTUM_DISPLAY_MODE_MAP, REPRESENTATION_MODE_MAP } from './schrodingerRendererTypes'

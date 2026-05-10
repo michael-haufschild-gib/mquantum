@@ -161,7 +161,7 @@ export function storeCurrentEigenstate(
     }
     eigenstateEntry.ipr = diag.ipr
     // Push orbit correlation back to the diagnostics store
-    void import('@/stores/diagnosticsStore').then((m) => {
+    void import('@/stores/diagnostics/diagnosticsStore').then((m) => {
       m.useDiagnosticsStore.getState().updateEigenstateIPR(eigIdx, diag.ipr)
       if (Number.isFinite(diag.orbitCorrelation)) {
         m.useDiagnosticsStore

@@ -29,11 +29,12 @@
 
 import type { PauliConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 import type { WebGPURenderContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
+import { destroyGpuResources } from '../utils/gpuResourceHelpers'
 import {
   computeStridesPadded,
   createDensityTexture,
@@ -882,21 +883,22 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       this.diagMappingInFlight = false
     }
     if (this.buf) {
-      this.buf.spinorBuffer.destroy()
-      this.buf.fftScratchA.destroy()
-      this.buf.uniformBuffer.destroy()
+      destroyGpuResources(
+        this.buf.spinorBuffer,
+        this.buf.fftScratchA,
+        this.buf.uniformBuffer,
+        this.buf.fftTwiddleBuffer,
+        this.buf.packUniformBuffer,
+        this.buf.packUniformBufferNoNorm,
+        this.buf.potentialBuffer,
+        this.buf.diagUniformBuffer,
+        this.buf.diagPartialBuffer,
+        this.buf.diagResultBuffer,
+        this.buf.diagStagingBuffer
+      )
       for (const b of this.buf.fftAxisUniformBuffers) b.destroy()
-      this.buf.fftTwiddleBuffer.destroy()
-      this.buf.packUniformBuffer.destroy()
-      this.buf.packUniformBufferNoNorm.destroy()
-      this.buf.potentialBuffer.destroy()
-      this.buf.diagUniformBuffer.destroy()
-      this.buf.diagPartialBuffer.destroy()
-      this.buf.diagResultBuffer.destroy()
-      this.buf.diagStagingBuffer.destroy()
     }
-    this.densityTexture?.destroy()
-    this.bg?.renormalizeUniformBuffer?.destroy()
+    destroyGpuResources(this.densityTexture, this.bg?.renormalizeUniformBuffer)
     disposePauliUniformStepStaging(this.uniformStepStaging)
     super.dispose()
   }

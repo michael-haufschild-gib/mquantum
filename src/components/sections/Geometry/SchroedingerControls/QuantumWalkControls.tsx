@@ -21,8 +21,8 @@ import {
   type QuantumWalkFieldView,
   QW_MAX_TOTAL_SITES,
 } from '@/lib/geometry/extended/quantumWalk'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 const COIN_TYPE_OPTIONS = [
   { value: 'grover', label: 'Grover' },

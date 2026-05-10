@@ -9,8 +9,7 @@
 
 import type { StateCreator } from 'zustand'
 
-import { logger } from '@/lib/logger'
-import type { LightSource, LightType, TransformMode } from '@/rendering/lights/types'
+import type { LightSource, LightType, TransformMode } from '@/lib/lighting/lightSource'
 import {
   clampConeAngle,
   clampDecay,
@@ -22,8 +21,9 @@ import {
   MAX_LIGHTS,
   MIN_LIGHTS,
   normalizeRotationTupleSigned,
-} from '@/rendering/lights/types'
-import type { ToneMappingAlgorithm } from '@/rendering/shaders/types'
+} from '@/lib/lighting/lightSource'
+import { logger } from '@/lib/logger'
+import type { ToneMappingAlgorithm } from '@/lib/rendering/shaderTypes'
 
 import {
   DEFAULT_AMBIENT_COLOR,

@@ -8,7 +8,7 @@
 import scenesData from '@/assets/defaults/scenes.json'
 import { soundManager } from '@/lib/audio/SoundManager'
 import { logger } from '@/lib/logger'
-import { usePresetManagerStore } from '@/stores/presetManagerStore'
+import { usePresetManagerStore } from '@/stores/runtime/presetManagerStore'
 
 /**
  * Bundled scene example metadata exposed to UI menus.

@@ -1,6 +1,5 @@
 import type { StateCreator } from 'zustand'
 
-import { logger } from '@/lib/logger'
 import type {
   ColorAlgorithm,
   CosineCoefficients,
@@ -9,7 +8,8 @@ import type {
   DomainColoringSettings,
   MultiSourceWeights,
   PhaseDivergingSettings,
-} from '@/rendering/shaders/palette'
+} from '@/lib/colors/palette'
+import { logger } from '@/lib/logger'
 import {
   DEFAULT_COLOR_ALGORITHM,
   DEFAULT_COSINE_COEFFICIENTS,

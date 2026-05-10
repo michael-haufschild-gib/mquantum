@@ -18,16 +18,23 @@ import {
   resolveDelta as resolveAdsDelta,
   tachyonGrowthRate as computeAdsGrowthRate,
 } from '@/lib/physics/antiDeSitter/math'
-import type { AppearanceStoreState } from '@/stores/appearanceStore'
+import type { AppearanceStoreState } from '@/stores/scene/appearanceStore'
 import type { PBRSliceState } from '@/stores/slices/visual/pbrSlice'
 
 import { MAX_DIM, MAX_TERMS } from '../shaders/schroedinger/uniforms.wgsl'
 import { parseHexColorToLinearRgb, type Rgb } from '../utils/color'
 import { sanitizePixelExtent } from '../utils/sceneMath'
+import { zeroReservedFields } from '../utils/structLayout'
+import { CAMERA_UNIFORMS_LAYOUT } from './cameraLayout'
+import { MATERIAL_UNIFORMS_LAYOUT } from './materialLayout'
+import { QUALITY_UNIFORMS_LAYOUT } from './qualityLayout'
 import type { CameraSnapshot, TransformSnapshot } from './schrodingerRendererTypes'
 import { SCHROEDINGER_LAYOUT } from './schroedingerLayout'
 
 const I = SCHROEDINGER_LAYOUT.index
+const CL = CAMERA_UNIFORMS_LAYOUT.index
+const ML = MATERIAL_UNIFORMS_LAYOUT.index
+const QL = QUALITY_UNIFORMS_LAYOUT.index
 const DEFAULT_COMPENSATION_DIMENSION = 3
 const DEFAULT_COMPENSATION_BOUNDING_RADIUS = 2.0
 
@@ -140,11 +147,13 @@ export function packCameraUniforms(
   const { camera, animationTime, is2D, transform, bayerOffset, size, frameDelta, frameNumber } = p
 
   // Matrices at correct offsets (each mat4x4f = 16 floats)
-  if (camera.viewMatrix) data.set(camera.viewMatrix.elements, 0)
-  if (camera.projectionMatrix) data.set(camera.projectionMatrix.elements, 16)
-  if (camera.viewProjectionMatrix) data.set(camera.viewProjectionMatrix.elements, 32)
-  if (camera.inverseViewMatrix) data.set(camera.inverseViewMatrix.elements, 48)
-  if (camera.inverseProjectionMatrix) data.set(camera.inverseProjectionMatrix.elements, 64)
+  if (camera.viewMatrix) data.set(camera.viewMatrix.elements, CL.viewMatrix)
+  if (camera.projectionMatrix) data.set(camera.projectionMatrix.elements, CL.projectionMatrix)
+  if (camera.viewProjectionMatrix)
+    data.set(camera.viewProjectionMatrix.elements, CL.viewProjectionMatrix)
+  if (camera.inverseViewMatrix) data.set(camera.inverseViewMatrix.elements, CL.inverseViewMatrix)
+  if (camera.inverseProjectionMatrix)
+    data.set(camera.inverseProjectionMatrix.elements, CL.inverseProjectionMatrix)
 
   // Model matrix computation
   let scale: number
@@ -172,64 +181,67 @@ export function packCameraUniforms(
     posZ = position[2] ?? 0
   }
 
-  // modelMatrix (offset 80, column-major)
-  data[80] = scale
-  data[81] = 0
-  data[82] = 0
-  data[83] = 0
-  data[84] = 0
-  data[85] = scale
-  data[86] = 0
-  data[87] = 0
-  data[88] = 0
-  data[89] = 0
-  data[90] = scale
-  data[91] = 0
-  data[92] = posX
-  data[93] = posY
-  data[94] = posZ
-  data[95] = 1.0
+  // modelMatrix (column-major). Float index = CL.modelMatrix + col*4 + row.
+  const mm = CL.modelMatrix
+  data[mm + 0] = scale
+  data[mm + 1] = 0
+  data[mm + 2] = 0
+  data[mm + 3] = 0
+  data[mm + 4] = 0
+  data[mm + 5] = scale
+  data[mm + 6] = 0
+  data[mm + 7] = 0
+  data[mm + 8] = 0
+  data[mm + 9] = 0
+  data[mm + 10] = scale
+  data[mm + 11] = 0
+  data[mm + 12] = posX
+  data[mm + 13] = posY
+  data[mm + 14] = posZ
+  data[mm + 15] = 1.0
 
-  // inverseModelMatrix (offset 96)
+  // inverseModelMatrix
   const invScale = scale !== 0 ? 1.0 / scale : 1.0
-  data[96] = invScale
-  data[97] = 0
-  data[98] = 0
-  data[99] = 0
-  data[100] = 0
-  data[101] = invScale
-  data[102] = 0
-  data[103] = 0
-  data[104] = 0
-  data[105] = 0
-  data[106] = invScale
-  data[107] = 0
-  data[108] = -posX * invScale
-  data[109] = -posY * invScale
-  data[110] = -posZ * invScale
-  data[111] = 1.0
+  const im = CL.inverseModelMatrix
+  data[im + 0] = invScale
+  data[im + 1] = 0
+  data[im + 2] = 0
+  data[im + 3] = 0
+  data[im + 4] = 0
+  data[im + 5] = invScale
+  data[im + 6] = 0
+  data[im + 7] = 0
+  data[im + 8] = 0
+  data[im + 9] = 0
+  data[im + 10] = invScale
+  data[im + 11] = 0
+  data[im + 12] = -posX * invScale
+  data[im + 13] = -posY * invScale
+  data[im + 14] = -posZ * invScale
+  data[im + 15] = 1.0
 
-  // Camera position (offset 112). Zero before the conditional so a frame
-  // without `camera.position` doesn't leak prior-frame values into the
-  // world-space camera position OR the cameraPositionModel derived below
-  // (data is reused across frames).
-  data[112] = 0
-  data[113] = 0
-  data[114] = 0
+  // Camera position. Zero before the conditional so a frame without
+  // `camera.position` doesn't leak prior-frame values into the world-space
+  // camera position OR the cameraPositionModel derived below (data is
+  // reused across frames).
+  const cp = CL.cameraPosition
+  data[cp + 0] = 0
+  data[cp + 1] = 0
+  data[cp + 2] = 0
   if (camera.position) {
-    data[112] = camera.position.x
-    data[113] = camera.position.y
-    data[114] = camera.position.z
+    data[cp + 0] = camera.position.x
+    data[cp + 1] = camera.position.y
+    data[cp + 2] = camera.position.z
   }
-  data[115] = camera.near || 0.1
-  data[116] = camera.far || 10000
-  data[117] = ((camera.fov || 50) * Math.PI) / 180 // radians
+  data[CL.cameraNear] = camera.near || 0.1
+  data[CL.cameraFar] = camera.far || 10000
+  data[CL.fov] = ((camera.fov || 50) * Math.PI) / 180 // radians
   const safeWidth = sanitizePixelExtent(size.width)
   const safeHeight = sanitizePixelExtent(size.height)
   const safeAspect = safeWidth / safeHeight
-  data[118] = safeWidth
-  data[119] = safeHeight
-  data[120] = safeAspect
+  data[CL.resolution + 0] = safeWidth
+  data[CL.resolution + 1] = safeHeight
+  data[CL.aspectRatio] = safeAspect
 
   // DEV diagnostic
   if (import.meta.env.DEV && camera.projectionMatrix?.elements) {
@@ -241,33 +253,42 @@ export function packCameraUniforms(
     }
   }
 
-  data[121] = animationTime
-  data[122] = frameDelta
-  dataView.setUint32(123 * 4, frameNumber, true)
+  data[CL.time] = animationTime
+  data[CL.deltaTime] = frameDelta
+  dataView.setUint32(CAMERA_UNIFORMS_LAYOUT.byteOffset.frameNumber, frameNumber, true)
 
-  data[124] = bayerOffset[0]
-  data[125] = bayerOffset[1]
-  data[126] = 0
-  data[127] = 0
+  data[CL.bayerOffset + 0] = bayerOffset[0]
+  data[CL.bayerOffset + 1] = bayerOffset[1]
+  data[CL._padding + 0] = 0
+  data[CL._padding + 1] = 0
 
   // PERF: Precompute `cameraPositionModel = inverseModelMatrix * (cameraPosition, 1)`.
-  // inverseModelMatrix starts at float index 96 (column-major, w-column at 108..111).
-  // cameraPosition is at float indices 112..114.
-  // Writing result to float indices 128..130 (WGSL struct offset 512, vec3f-aligned).
-  const cx = data[112] ?? 0
-  const cy = data[113] ?? 0
-  const cz = data[114] ?? 0
+  // Reads inverseModelMatrix and cameraPosition from the slots written above
+  // and writes the result to cameraPositionModel (vec3f).
+  const cx = data[cp + 0] ?? 0
+  const cy = data[cp + 1] ?? 0
+  const cz = data[cp + 2] ?? 0
   // Column-major mat4 * vec4(cx, cy, cz, 1):
   //   out.x = M[0]*cx + M[4]*cy + M[8]*cz  + M[12]
   //   out.y = M[1]*cx + M[5]*cy + M[9]*cz  + M[13]
   //   out.z = M[2]*cx + M[6]*cy + M[10]*cz + M[14]
-  data[128] =
-    (data[96] ?? 0) * cx + (data[100] ?? 0) * cy + (data[104] ?? 0) * cz + (data[108] ?? 0)
-  data[129] =
-    (data[97] ?? 0) * cx + (data[101] ?? 0) * cy + (data[105] ?? 0) * cz + (data[109] ?? 0)
-  data[130] =
-    (data[98] ?? 0) * cx + (data[102] ?? 0) * cy + (data[106] ?? 0) * cz + (data[110] ?? 0)
-  data[131] = 0
+  const cpm = CL.cameraPositionModel
+  data[cpm + 0] =
+    (data[im + 0] ?? 0) * cx +
+    (data[im + 4] ?? 0) * cy +
+    (data[im + 8] ?? 0) * cz +
+    (data[im + 12] ?? 0)
+  data[cpm + 1] =
+    (data[im + 1] ?? 0) * cx +
+    (data[im + 5] ?? 0) * cy +
+    (data[im + 9] ?? 0) * cz +
+    (data[im + 13] ?? 0)
+  data[cpm + 2] =
+    (data[im + 2] ?? 0) * cx +
+    (data[im + 6] ?? 0) * cy +
+    (data[im + 10] ?? 0) * cz +
+    (data[im + 14] ?? 0)
+  data[CL._paddingEnd] = 0
 }
 
 // =========================================================================
@@ -294,64 +315,65 @@ export function packMaterialUniforms(
 ): void {
   const { appearance, pbr } = p
 
-  // baseColor: vec4f (idx 0-3)
+  // baseColor: vec4f
   const faceColor = parseColor(appearance?.faceColor ?? '#ffffff')
-  data[0] = faceColor[0]
-  data[1] = faceColor[1]
-  data[2] = faceColor[2]
-  data[3] = 1.0
+  const bc = ML.baseColor
+  data[bc + 0] = faceColor[0]
+  data[bc + 1] = faceColor[1]
+  data[bc + 2] = faceColor[2]
+  data[bc + 3] = 1.0
 
-  // metallic, roughness, reflectance, ao (idx 4-7)
-  data[4] = pbr?.face?.metallic ?? 0.0
-  data[5] = pbr?.face?.roughness ?? 0.5
-  data[6] = pbr?.face?.reflectance ?? 0.5
-  data[7] = 1.0
+  // metallic, roughness, reflectance, ao
+  data[ML.metallic] = pbr?.face?.metallic ?? 0.0
+  data[ML.roughness] = pbr?.face?.roughness ?? 0.5
+  data[ML.reflectance] = pbr?.face?.reflectance ?? 0.5
+  data[ML.ao] = 1.0
 
-  // emissive + emissiveIntensity (idx 8-11)
+  // emissive + emissiveIntensity
   const faceEmission = appearance?.faceEmission ?? 0.0
-  data[8] = faceColor[0]
-  data[9] = faceColor[1]
-  data[10] = faceColor[2]
-  data[11] = faceEmission
+  const em = ML.emissive
+  data[em + 0] = faceColor[0]
+  data[em + 1] = faceColor[1]
+  data[em + 2] = faceColor[2]
+  data[ML.emissiveIntensity] = faceEmission
 
-  // ior, transmission, thickness (idx 12-14)
-  data[12] = pbr?.face?.ior ?? 1.5
-  data[13] = pbr?.face?.transmission ?? 0.0
-  data[14] = pbr?.face?.thickness ?? 1.0
+  // ior, transmission, thickness
+  data[ML.ior] = pbr?.face?.ior ?? 1.5
+  data[ML.transmission] = pbr?.face?.transmission ?? 0.0
+  data[ML.thickness] = pbr?.face?.thickness ?? 1.0
 
-  // sssEnabled: u32 (idx 15)
+  // sssEnabled: u32
   const sssEnabled = appearance?.sssEnabled ?? false
-  dataView.setUint32(15 * 4, sssEnabled ? 1 : 0, true)
+  dataView.setUint32(MATERIAL_UNIFORMS_LAYOUT.byteOffset.sssEnabled, sssEnabled ? 1 : 0, true)
 
-  // sssIntensity (idx 16)
-  data[16] = appearance?.sssIntensity ?? 1.0
+  // sssIntensity
+  data[ML.sssIntensity] = appearance?.sssIntensity ?? 1.0
 
-  // sssColor: vec3f (idx 20-22, aligned to byte 80)
+  // sssColor: vec3f (vec3f alignment leaves an implicit 12-byte pad gap before)
   const sssColor = parseColor(appearance?.sssColor ?? '#ff8844')
-  data[20] = sssColor[0]
-  data[21] = sssColor[1]
-  data[22] = sssColor[2]
+  const sc = ML.sssColor
+  data[sc + 0] = sssColor[0]
+  data[sc + 1] = sssColor[1]
+  data[sc + 2] = sssColor[2]
 
-  // sssThickness, sssJitter (idx 23-24)
-  data[23] = appearance?.sssThickness ?? 1.0
-  data[24] = appearance?.sssJitter ?? 0.2
+  // sssThickness, sssJitter
+  data[ML.sssThickness] = appearance?.sssThickness ?? 1.0
+  data[ML.sssJitter] = appearance?.sssJitter ?? 0.2
 
-  // Reserved (Fresnel rim removed, idx 25-31)
-  data[25] = 0.0
-  data[26] = 0.0
-  data[28] = 0.0
-  data[29] = 0.0
-  data[30] = 0.0
-  data[31] = 0.0
+  // Reserved Fresnel rim slots (kept for buffer-layout compatibility) and
+  // explicit `_padding2` are zeroed declaratively. Zero is safe for both
+  // f32 (+0.0) and u32/i32 since the bit pattern is all-zeros.
+  zeroReservedFields(data, MATERIAL_UNIFORMS_LAYOUT)
 
-  // specularIntensity (idx 32)
-  data[32] = pbr?.face?.specularIntensity ?? 0.8
+  // specularIntensity
+  data[ML.specularIntensity] = pbr?.face?.specularIntensity ?? 0.8
 
-  // specularColor: vec3f (idx 36-38, aligned to byte 144)
+  // specularColor: vec3f (vec3f alignment leaves an implicit 12-byte pad gap before)
   const specularColor = parseColor(pbr?.face?.specularColor ?? '#ffffff')
-  data[36] = specularColor[0]
-  data[37] = specularColor[1]
-  data[38] = specularColor[2]
+  const sp = ML.specularColor
+  data[sp + 0] = specularColor[0]
+  data[sp + 1] = specularColor[1]
+  data[sp + 2] = specularColor[2]
 }
 
 // =========================================================================
@@ -370,17 +392,20 @@ export function packQualityUniforms(
   dataView: DataView,
   qualityMultiplier: number
 ): void {
-  data[1] = 0.001 / qualityMultiplier
-  data[3] = 0
-  data[6] = 0
-  data[7] = 0
-  data[8] = qualityMultiplier
+  // Live fields. Reserved (`_`-prefixed) slots are zeroed below in one pass
+  // — keeps the buffer-layout-compat zeros declarative.
+  data[QL.sdfSurfaceDistance] = 0.001 / qualityMultiplier
+  data[QL.qualityMultiplier] = qualityMultiplier
 
-  dataView.setInt32(0 * 4, Math.floor(128 * qualityMultiplier), true)
-  dataView.setInt32(2 * 4, 0, true)
-  dataView.setInt32(4 * 4, 0, true)
-  dataView.setInt32(5 * 4, 0, true)
-  dataView.setInt32(9 * 4, 0, true)
+  dataView.setInt32(
+    QUALITY_UNIFORMS_LAYOUT.byteOffset.sdfMaxIterations,
+    Math.floor(128 * qualityMultiplier),
+    true
+  )
+
+  // Bulk-zero every reserved (`_`-prefixed) slot. Zero is safe for both
+  // f32 (+0.0) and i32 (0x00000000) — the bit pattern is identical.
+  zeroReservedFields(data, QUALITY_UNIFORMS_LAYOUT)
 }
 
 // =========================================================================

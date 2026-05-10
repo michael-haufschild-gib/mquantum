@@ -6,7 +6,10 @@
 import { useShallow } from 'zustand/react/shallow'
 
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
-import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import {
+  type ExtendedObjectState,
+  useExtendedObjectStore,
+} from '@/stores/scene/extendedObjectStore'
 
 import type {
   BecActions,

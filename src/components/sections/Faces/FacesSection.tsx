@@ -16,12 +16,15 @@ import { Button } from '@/components/ui/Button'
 import { ColorPicker } from '@/components/ui/ColorPicker'
 import { Slider } from '@/components/ui/Slider'
 import { Tabs } from '@/components/ui/Tabs'
-import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
 import { DEFAULT_FACE_PBR } from '@/stores/defaults/visualDefaults'
-import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { type LightingSlice, useLightingStore } from '@/stores/lightingStore'
-import { type PBRSlice, usePBRStore } from '@/stores/pbrStore'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/scene/appearanceStore'
+import {
+  type ExtendedObjectState,
+  useExtendedObjectStore,
+} from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { type LightingSlice, useLightingStore } from '@/stores/scene/lightingStore'
+import { type PBRSlice, usePBRStore } from '@/stores/scene/pbrStore'
 
 import { ColorAlgorithmSelector } from './ColorAlgorithmSelector'
 import { ColorPreview } from './ColorPreview'

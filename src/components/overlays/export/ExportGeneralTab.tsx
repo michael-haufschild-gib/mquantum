@@ -8,8 +8,8 @@ import { NumberInput } from '@/components/ui/NumberInput'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
-import { ExportResolution, useExportStore, VideoCodec } from '@/stores/exportStore'
-import { useLayoutStore } from '@/stores/layoutStore'
+import { ExportResolution, useExportStore, VideoCodec } from '@/stores/runtime/exportStore'
+import { useLayoutStore } from '@/stores/ui/layoutStore'
 
 export const ExportGeneralTab = () => {
   const { settings, updateSettings, setCropEditorOpen, setModalOpen } = useExportStore(

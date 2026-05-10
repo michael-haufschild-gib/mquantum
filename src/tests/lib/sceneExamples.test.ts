@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import scenesData from '@/assets/defaults/scenes.json'
 import { findSceneByName, getSceneExamples } from '@/lib/sceneExamples'
-import { type SavedScene, usePresetManagerStore } from '@/stores/presetManagerStore'
+import { type SavedScene, usePresetManagerStore } from '@/stores/runtime/presetManagerStore'
 
 describe('sceneExamples', () => {
   beforeEach(() => {

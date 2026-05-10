@@ -14,8 +14,8 @@ import {
   getCurrentEigenstateEnergy,
   handleMeasurement,
 } from '@/rendering/webgpu/renderers/strategies/TdseBecMeasurement'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useMeasurementStore } from '@/stores/measurementStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { useMeasurementStore } from '@/stores/diagnostics/measurementStore'
 
 vi.mock('@/lib/physics/measurementOrchestrator', () => ({
   executeFullMeasurement: vi.fn((_re, _im, _config, _width, inject, record) => {

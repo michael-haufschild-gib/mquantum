@@ -5,7 +5,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/Button'
 import { getShortcutLabel, SHORTCUTS } from '@/hooks/useKeyboardShortcuts'
 import { useIsMobile } from '@/hooks/useMediaQuery'
-import { type LayoutStore, useLayoutStore } from '@/stores/layoutStore'
+import { type LayoutStore, useLayoutStore } from '@/stores/ui/layoutStore'
 
 export const ShortcutsOverlay: React.FC = React.memo(() => {
   const isMobile = useIsMobile()

@@ -10,6 +10,7 @@
 import React, { useCallback, useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+import { useRotationUpdates } from '@/hooks/useRotationUpdates'
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
 import {
   getQuantumTypeCompileContextFields,
@@ -18,15 +19,14 @@ import {
 } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
-import { useRotationUpdates } from '@/rendering/renderers/base/useRotationUpdates'
-import { useAppearanceStore } from '@/stores/appearanceStore'
 import type { SkyboxMode } from '@/stores/defaults/visualDefaults'
-import { useEnvironmentStore } from '@/stores/environmentStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useMeasurementStore } from '@/stores/measurementStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
-import { usePostProcessingStore } from '@/stores/postProcessingStore'
-import { useScreenshotCaptureStore } from '@/stores/screenshotCaptureStore'
+import { useMeasurementStore } from '@/stores/diagnostics/measurementStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
+import { useScreenshotCaptureStore } from '@/stores/runtime/screenshotCaptureStore'
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
+import { useEnvironmentStore } from '@/stores/scene/environmentStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { usePostProcessingStore } from '@/stores/scene/postProcessingStore'
 
 import {
   createInitialExportRuntimeState,

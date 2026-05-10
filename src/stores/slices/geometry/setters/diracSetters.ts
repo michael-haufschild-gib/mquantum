@@ -19,7 +19,7 @@ import {
 import { logger } from '@/lib/logger'
 import { reduceGridToFit } from '@/lib/math/ndArray'
 import { maxStableDt } from '@/lib/physics/dirac/scales'
-import { useAppearanceStore } from '@/stores/appearanceStore'
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
 
 import {
@@ -554,7 +554,7 @@ export function createDiracSetters(ctx: SetterContext): DiracSetters {
             const dim = ctx.get().schroedinger.dirac.latticeDim ?? 3
             const expectedView = normalizeDiracFieldView(dim, preset.overrides.fieldView)
             await loadPresetModule(
-              () => import('@/rendering/shaders/palette/types'),
+              () => import('@/lib/colors/palette/types'),
               'diracSetters',
               `Dirac fieldView color algorithm for '${presetId}'`,
               async ({ DIRAC_FIELD_VIEW_TO_COLOR_ALGO }) => {

@@ -7,6 +7,12 @@
  * @module rendering/webgpu/scenePassConfig
  */
 
+import {
+  COLOR_ALGORITHM_TO_INT,
+  type ColorAlgorithm as PaletteColorAlgorithm,
+  type ColorAlgorithmAvailabilityOptions,
+  getAvailableColorAlgorithms,
+} from '@/lib/colors/palette/types'
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
 import type { FreeScalarInitialCondition } from '@/lib/geometry/extended/freeScalar'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
@@ -16,12 +22,6 @@ import {
   isComputeQuantumType,
 } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
-import {
-  COLOR_ALGORITHM_TO_INT,
-  type ColorAlgorithm as PaletteColorAlgorithm,
-  type ColorAlgorithmAvailabilityOptions,
-  getAvailableColorAlgorithms,
-} from '@/rendering/shaders/palette/types'
 import type { SkyboxMode } from '@/stores/defaults/visualDefaults'
 
 import type { WebGPUFrameStats } from './core/types'
@@ -175,7 +175,7 @@ export function pauliFieldViewForColorAlgorithm(algo: string, currentFieldView?:
 /**
  * Map a Pauli field view to its matching color algorithm. Matches the
  * inverse PAULI_FIELD_VIEW_TO_COLOR_ALGO map exported from
- * `rendering/shaders/palette/types.ts`. Kept inline so this module has
+ * `lib/colors/palette/types.ts`. Kept inline so this module has
  * no cross-module dependency on that file's symbol layout.
  *
  * @internal

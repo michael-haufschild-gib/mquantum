@@ -7,12 +7,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { MIN_DIMENSION } from '@/constants/dimension'
 import { getShortcutLabel, SHORTCUTS, useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
-import { useAnimationStore } from '@/stores/animationStore'
-import { useCameraStore } from '@/stores/cameraStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { useLayoutStore } from '@/stores/layoutStore'
-import { useLightingStore } from '@/stores/lightingStore'
-import { useRotationStore } from '@/stores/rotationStore'
+import { useAnimationStore } from '@/stores/scene/animationStore'
+import { useCameraStore } from '@/stores/scene/cameraStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { useLightingStore } from '@/stores/scene/lightingStore'
+import { useRotationStore } from '@/stores/scene/rotationStore'
+import { useLayoutStore } from '@/stores/ui/layoutStore'
 
 describe('useKeyboardShortcuts', () => {
   beforeEach(() => {

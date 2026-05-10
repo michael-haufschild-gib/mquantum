@@ -26,7 +26,7 @@ import {
   type SrmtDispatchArgs,
   type SrmtWorkerState,
 } from '@/rendering/webgpu/renderers/strategies/WheelerDeWittSrmtWorker'
-import { useSrmtDiagnosticStore } from '@/stores/srmtDiagnosticStore'
+import { useSrmtDiagnosticStore } from '@/stores/diagnostics/srmtDiagnosticStore'
 
 // ---------------------------------------------------------------------------
 // FakeWorker: identical to the one in the Phase-4 dispatcher tests, with a

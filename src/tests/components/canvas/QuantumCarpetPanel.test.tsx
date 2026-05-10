@@ -10,9 +10,9 @@ import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { QuantumCarpetPanel } from '@/components/canvas/QuantumCarpetPanel'
-import { useCarpetStore } from '@/stores/carpetStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { useLayoutStore } from '@/stores/layoutStore'
+import { useCarpetStore } from '@/stores/diagnostics/carpetStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { useLayoutStore } from '@/stores/ui/layoutStore'
 
 // Mock motion/react — draggable m.div and m.button with useMotionValue
 vi.mock('motion/react', () => {

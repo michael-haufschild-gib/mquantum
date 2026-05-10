@@ -17,7 +17,10 @@
 | `src/components/presets/` | Scene/style preset managers | `PascalCase.tsx` |
 | `src/constants/` | Shared constants (dimension limits, z-index) | `camelCase.ts` |
 | `src/hooks/` | React hooks | `useCamelCase.ts` |
-| `src/stores/` | Zustand stores | `camelCaseStore.ts` |
+| `src/stores/scene/` | Scene state read by the renderer (geometry, animation, camera, lighting, pbr, postProcessing, environment, transform, rotation, appearance, extendedObject) | `camelCaseStore.ts` |
+| `src/stores/ui/` | UI plumbing (layout, dropdown, dismissedDialogs, msgBox, theme, ui) | `camelCaseStore.ts` |
+| `src/stores/diagnostics/` | Analysis / measurement / observation overlays (sweep stores, srmt, heller, atlas, wormhole, page-curve, carpet, wavefunction-slice, performance-metrics, etc.) | `camelCaseStore.ts` |
+| `src/stores/runtime/` | Operational state (presetManager, export, screenshot, screenshotCapture, renderer, performance, simulationState) | `camelCaseStore.ts` |
 | `src/stores/slices/` | Store slices | `camelCaseSlice.ts` |
 | `src/stores/slices/visual/` | Material, color, render, PBR slices | `camelCaseSlice.ts` |
 | `src/stores/slices/geometry/` | Schroedinger slice | `camelCaseSlice.ts` |
@@ -55,7 +58,11 @@ Is it a React hook?
   └── src/hooks/useCamelCase.ts
 
 Is it state management?
-  ├── New store → src/stores/camelCaseStore.ts
+  ├── New store — pick a purpose subfolder:
+  │     ├── Scene state read by the renderer → src/stores/scene/{name}Store.ts
+  │     ├── UI plumbing (panels, modals, theme) → src/stores/ui/{name}Store.ts
+  │     ├── Analysis / diagnostic / sweep overlay → src/stores/diagnostics/{name}Store.ts
+  │     └── Operational / runtime concern (presets, export, perf) → src/stores/runtime/{name}Store.ts
   ├── Slice for existing store → src/stores/slices/{domain}/camelCaseSlice.ts
   └── Default values → src/stores/defaults/
 
@@ -87,7 +94,8 @@ Is it a test?
 | Abstraction | Location | Extend When |
 |-------------|----------|-------------|
 | `WebGPUBasePass` | `src/rendering/webgpu/core/WebGPUBasePass.ts` | Adding a new post-processing pass |
-| Zustand store | `src/stores/*.ts` | Adding new global state domain |
+| `SinglePassComputeStrategy` | `src/rendering/webgpu/renderers/strategies/SinglePassComputeStrategy.ts` | Adding a new single-pass compute quantum mode (Pauli/Dirac/QW/FSF pattern). Implement `createPass`, `getConfig`, `stateIOModeKeys`, `configSubKey`, `executePass`. Override `deriveEffectiveConfig` for color-algorithm field-view tweaks, `augmentSetup` for extra bind-group entries, `afterExecute` for diagnostics, `stateIOOrder='before'` for FSF-style early IO. |
+| Zustand store | `src/stores/{scene,ui,diagnostics,runtime}/*.ts` | Adding new global state domain — pick the subfolder by purpose |
 | Zustand slice | `src/stores/slices/**/*.ts` | Adding sub-state to existing domain |
 | `assembleShaderBlocks()` | `src/rendering/webgpu/shaders/shared/compose-helpers.ts` | Composing WGSL shaders |
 | Render graph | `src/rendering/webgpu/graph/` | Adding pass dependencies |
@@ -138,10 +146,66 @@ Wire the new pass through `src/rendering/webgpu/scenePassConstruction.ts`
 (Schroedinger passes), depending on the family. Registration is centralised
 in those modules — `WebGPUScene.ts` only triggers the setup task.
 
+## Template: New Single-Pass Compute Strategy
+
+For new compute quantum modes that own a single `WebGPUBaseComputePass`
+(Pauli/Dirac/QuantumWalk/FreeScalarField pattern), extend
+`SinglePassComputeStrategy<TPass, TConfig>`. The base provides setup,
+per-frame dispatch, simulation state IO, compute-pass adoption, and disposal
+uniformly; concrete subclasses provide a small set of mode-specific hooks.
+
+```typescript
+// src/rendering/webgpu/renderers/strategies/{Mode}Strategy.ts
+export class {Mode}Strategy extends SinglePassComputeStrategy<{Mode}ComputePass, {Mode}Config> {
+  protected createPass(densityGridResolution: number): {Mode}ComputePass {
+    return new {Mode}ComputePass(densityGridResolution)
+  }
+
+  protected getConfig(extended: ExtendedStoreSnapshot | undefined): {Mode}Config | undefined {
+    return extended?.schroedinger?.{configKey} as {Mode}Config | undefined
+  }
+
+  protected get stateIOModeKeys(): string[] { return ['{quantumModeKey}'] }
+  protected get configSubKey(): string { return '{configKey}' }
+
+  // Optional: override for color-algorithm derived fieldView swaps.
+  protected override deriveEffectiveConfig(
+    config: {Mode}Config, ctx: WebGPURenderContext, schroedinger: SchroedingerSnapshot | undefined
+  ): {Mode}Config { … }
+
+  // Optional: override for lattice-based bounding radius (otherwise null = renderer default).
+  override computeBoundingRadius(s, _d, _c) { … }
+
+  // Optional: override for extra bind-group entries beyond density texture (FSF binding 6, 7).
+  protected override augmentSetup(ctx, config, bindings) { … }
+
+  // Optional: 'before' for FSF-style early IO; default is 'after'.
+  protected override stateIOOrder: 'before' | 'after' = 'after'
+
+  // Optional: post-execute diagnostic hook.
+  protected override afterExecute(ctx, pass, config, args) { … }
+
+  protected executePass(
+    pass: {Mode}ComputePass,
+    ctx: WebGPURenderContext,
+    config: {Mode}Config,
+    args: SinglePassFrameArgs
+  ): void {
+    pass.execute{Mode}(ctx, config, args.isPlaying, args.speed,
+      args.basisX, args.basisY, args.basisZ, args.boundingRadius)
+  }
+}
+```
+
+Wire the new strategy through `createModeStrategy` in
+`src/rendering/webgpu/renderers/strategies/createStrategy.ts` and add the
+mode entry to `QUANTUM_TYPE_REGISTRY` in
+`src/lib/geometry/registry/quantumTypes.ts`.
+
 ## Template: New Zustand Store
 
 ```typescript
-// src/stores/camelCaseStore.ts
+// src/stores/{scene|ui|diagnostics|runtime}/camelCaseStore.ts
 import { create } from 'zustand'
 
 interface CamelCaseState {

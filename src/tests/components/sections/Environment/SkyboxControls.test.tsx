@@ -7,7 +7,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { SkyboxControls } from '@/components/sections/Environment/SkyboxControls'
-import { useEnvironmentStore } from '@/stores/environmentStore'
+import { useEnvironmentStore } from '@/stores/scene/environmentStore'
 
 function resetStore() {
   useEnvironmentStore.setState({

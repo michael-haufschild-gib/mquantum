@@ -10,7 +10,7 @@
 
 import type { SrmtClock } from '@/lib/physics/srmt'
 import { DEFAULT_CHAMPION_TIE_TOLERANCE, findChampionClock } from '@/lib/physics/srmt'
-import type { SrmtClockQuality } from '@/stores/srmtDiagnosticStore'
+import type { SrmtClockQuality } from '@/stores/diagnostics/srmtDiagnosticStore'
 
 /** Discrete visual tier mapped from a numeric quality score. */
 export type SrmtQualityTier = 'good' | 'marginal' | 'poor' | 'pending'

@@ -13,7 +13,10 @@ import { ColorPicker } from '@/components/ui/ColorPicker'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import type { PaperQuality } from '@/stores/defaults/visualDefaults'
-import { type PostProcessingSlice, usePostProcessingStore } from '@/stores/postProcessingStore'
+import {
+  type PostProcessingSlice,
+  usePostProcessingStore,
+} from '@/stores/scene/postProcessingStore'
 
 import { PostProcessingSectionHeader as SectionHeader } from './SectionHeader'
 

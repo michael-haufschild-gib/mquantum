@@ -7,7 +7,7 @@
  * @module stores/utils/presetNormalizationVisual
  */
 
-import { useAppearanceStore } from '../appearanceStore'
+import { useAppearanceStore } from '../scene/appearanceStore'
 import {
   APPEARANCE_LOAD_KEYS,
   clampFiniteOrFallback,

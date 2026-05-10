@@ -12,7 +12,7 @@
 
 import React from 'react'
 
-import type { AtlasPoint } from '@/stores/quantumnessAtlasStore'
+import type { AtlasPoint } from '@/stores/diagnostics/quantumnessAtlasStore'
 
 // ─── SVG constants ───────────────────────────────────────────────────────────
 

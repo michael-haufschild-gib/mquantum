@@ -11,8 +11,8 @@ import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { HydrogenEnergyDiagram } from '@/components/sections/Analysis/HydrogenEnergyDiagram'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 describe('HydrogenEnergyDiagram', () => {
   beforeEach(() => {
