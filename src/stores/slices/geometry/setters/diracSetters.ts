@@ -1,14 +1,17 @@
 /**
  * Dirac Equation setter factory.
  *
- * Extracts all `setDirac*`, `applyDiracPreset`, `clearDiracNeedsReset`,
- * and `setDiracNeedsReset` methods from the schroedingerSlice.
+ * Extracts all `setDirac*` and `applyDiracPreset` methods from the
+ * schroedingerSlice.
  *
  * @module stores/slices/geometry/setters/diracSetters
  */
 
 import {
   type DiracConfig,
+  type DiracFieldView,
+  type DiracInitialCondition,
+  type DiracPotentialType,
   isDiracFieldView,
   isDiracInitialCondition,
   isDiracPotentialType,
@@ -19,7 +22,6 @@ import { maxStableDt } from '@/lib/physics/dirac/scales'
 import { useAppearanceStore } from '@/stores/appearanceStore'
 import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
 
-import type { SchroedingerSliceActions } from '../types'
 import {
   defaultDiracGridPerDim,
   DIRAC_MAX_TOTAL_SITES,
@@ -29,42 +31,40 @@ import {
   type SetterContext,
 } from './sliceSetterUtils'
 
-type DiracActions = Pick<
-  SchroedingerSliceActions,
-  | 'setDiracMass'
-  | 'setDiracSpeedOfLight'
-  | 'setDiracHbar'
-  | 'setDiracDt'
-  | 'setDiracStepsPerFrame'
-  | 'setDiracPotentialType'
-  | 'setDiracPotentialStrength'
-  | 'setDiracPotentialWidth'
-  | 'setDiracPotentialCenter'
-  | 'setDiracHarmonicOmega'
-  | 'setDiracCoulombZ'
-  | 'setDiracInitialCondition'
-  | 'setDiracPacketWidth'
-  | 'setDiracPositiveEnergyFraction'
-  | 'setDiracFieldView'
-  | 'setDiracAutoScale'
-  | 'setDiracShowPotential'
-  | 'setDiracAbsorberEnabled'
-  | 'setDiracAbsorberWidth'
-  | 'setDiracPmlTargetReflection'
-  | 'setDiracGridSize'
-  | 'setDiracSpacing'
-  | 'setDiracPacketCenter'
-  | 'setDiracPacketMomentum'
-  | 'setDiracSpinDirection'
-  | 'setDiracParticleColor'
-  | 'setDiracAntiparticleColor'
-  | 'setDiracDiagnosticsEnabled'
-  | 'setDiracDiagnosticsInterval'
-  | 'setDiracNeedsReset'
-  | 'clearDiracNeedsReset'
-  | 'setDiracSlicePosition'
-  | 'applyDiracPreset'
->
+/** Actions exposed by the Dirac equation setter bundle. */
+export interface DiracSetters {
+  setDiracMass: (mass: number) => void
+  setDiracSpeedOfLight: (c: number) => void
+  setDiracHbar: (hbar: number) => void
+  setDiracDt: (dt: number) => void
+  setDiracStepsPerFrame: (steps: number) => void
+  setDiracPotentialType: (type: DiracPotentialType) => void
+  setDiracPotentialStrength: (strength: number) => void
+  setDiracPotentialWidth: (width: number) => void
+  setDiracPotentialCenter: (center: number) => void
+  setDiracHarmonicOmega: (omega: number) => void
+  setDiracCoulombZ: (z: number) => void
+  setDiracInitialCondition: (condition: DiracInitialCondition) => void
+  setDiracPacketWidth: (width: number) => void
+  setDiracPositiveEnergyFraction: (fraction: number) => void
+  setDiracFieldView: (view: DiracFieldView) => void
+  setDiracAutoScale: (autoScale: boolean) => void
+  setDiracShowPotential: (showPotential: boolean) => void
+  setDiracAbsorberEnabled: (enabled: boolean) => void
+  setDiracAbsorberWidth: (width: number) => void
+  setDiracPmlTargetReflection: (r: number) => void
+  setDiracGridSize: (size: number[]) => void
+  setDiracSpacing: (spacing: number[]) => void
+  setDiracPacketCenter: (dimIndex: number, value: number) => void
+  setDiracPacketMomentum: (dimIndex: number, value: number) => void
+  setDiracSpinDirection: (dimIndex: number, value: number) => void
+  setDiracParticleColor: (color: [number, number, number]) => void
+  setDiracAntiparticleColor: (color: [number, number, number]) => void
+  setDiracDiagnosticsEnabled: (enabled: boolean) => void
+  setDiracDiagnosticsInterval: (interval: number) => void
+  setDiracSlicePosition: (dimIndex: number, value: number) => void
+  applyDiracPreset: (presetId: string) => Promise<void>
+}
 
 /**
  * WebGPU minStorageBufferOffsetAlignment is 256 bytes.
@@ -174,8 +174,8 @@ export const resizeDiracArrays = (prev: DiracConfig, newDim: number): Partial<Di
  * Creates all Dirac equation setter actions for the schroedingerSlice.
  * @param ctx - Shared setter context with set/get and validation helpers
  */
-export function createDiracSetters(ctx: SetterContext): DiracActions {
-  const { setWithVersion, set, isFinite, warnNonFinite, hasOnlyFinite } = ctx
+export function createDiracSetters(ctx: SetterContext): DiracSetters {
+  const { setWithVersion, isFinite, warnNonFinite, hasOnlyFinite } = ctx
   const D = 'dirac' as const
 
   return {
@@ -456,22 +456,6 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
     setDiracAntiparticleColor: nestedValueSetter(ctx, D, 'antiparticleColor'),
     setDiracDiagnosticsEnabled: nestedValueSetter(ctx, D, 'diagnosticsEnabled'),
     setDiracDiagnosticsInterval: nestedIntSetter(ctx, D, 'diagnosticsInterval', 1, 60),
-    setDiracNeedsReset: () => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, needsReset: true },
-        },
-      }))
-    },
-    clearDiracNeedsReset: () => {
-      set((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, needsReset: false },
-        },
-      }))
-    },
     setDiracSlicePosition: (dimIndex, value) => {
       if (!isFinite(value)) return
       setWithVersion((state) => {

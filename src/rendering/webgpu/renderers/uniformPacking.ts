@@ -21,7 +21,6 @@ import { normalizeHydrogenCoupledAngularChain } from '@/lib/physics/hydrogenCoup
 import { DEFAULT_COSINE_COEFFICIENTS } from '@/rendering/shaders/palette'
 
 import { MAX_DIM, MAX_EXTRA_DIM, MAX_TERMS } from '../shaders/schroedinger/uniforms.wgsl'
-import { parseHexColorToLinearRgb, type Rgb } from '../utils/color'
 import { zeroReservedFields } from '../utils/structLayout'
 import {
   CROSS_SECTION_COMPOSITE_MODE_MAP,
@@ -43,8 +42,10 @@ import {
   packVacuumBubbleLens,
 } from './uniformPackingBackreaction'
 import {
+  packColorRgba,
   packRepresentationAndColorOverlays,
   packWignerAndPauliFields,
+  parseColor,
 } from './uniformPackingColorOverlays'
 import { packDensityGridMapping } from './uniformPackingDensityGrid'
 import { packAdsTimeEvolution } from './uniformPackingSupport'
@@ -57,13 +58,6 @@ const I = SCHROEDINGER_LAYOUT.index
 
 type AdSConfig = AntiDeSitterConfig | undefined
 type WdwPhaseConfig = { phaseRotationEnabled?: boolean; phaseRotationSpeed?: number }
-
-// ---------------------------------------------------------------------------
-// Shared helper
-// ---------------------------------------------------------------------------
-
-/** Parse hex color to linear RGB, defaulting to white on failure. */
-const parseColor = (hex: string): Rgb => parseHexColorToLinearRgb(hex)
 
 const isDensityGridOnlyMode = (mode: string): boolean =>
   mode === 'wheelerDeWitt' || mode === 'antiDeSitter'
@@ -584,14 +578,6 @@ function packCrossSectionAndCurrent(
     p.isDensityMatrixMode,
     p.schroedinger
   )
-}
-
-function packColorRgba(floatView: Float32Array, idx: number, hex: string): void {
-  const rgb = parseColor(hex)
-  floatView[idx] = rgb[0]
-  floatView[idx + 1] = rgb[1]
-  floatView[idx + 2] = rgb[2]
-  floatView[idx + 3] = 0.0
 }
 
 function packVec4Color(

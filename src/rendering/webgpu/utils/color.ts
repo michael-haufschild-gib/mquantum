@@ -8,14 +8,12 @@
  * @module rendering/webgpu/utils/color
  */
 
+import { clamp01 } from '@/lib/math/clamp'
+
 /** RGB triplet with channels normalized to [0, 1]. */
 export type Rgb = readonly [number, number, number]
 const LINEAR_COLOR_CACHE_MAX_ENTRIES = 512
 const linearColorCache = new Map<string, Rgb>()
-
-function clamp01(value: number): number {
-  return Math.min(1, Math.max(0, value))
-}
 
 /**
  * Convert a single sRGB channel to linear using the standard sRGB transfer function

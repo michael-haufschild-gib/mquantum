@@ -8,6 +8,7 @@
 import type { StateCreator } from 'zustand'
 
 import { logger } from '@/lib/logger'
+import { clamp } from '@/lib/math/clamp'
 
 import {
   type AntiAliasingMethod,
@@ -42,10 +43,6 @@ import {
   DEFAULT_PAPER_SEED,
   type PaperQuality,
 } from '../defaults/visualDefaults'
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value))
-}
 
 function isFinitePostProcessingInput(value: number): boolean {
   return Number.isFinite(value)

@@ -31,15 +31,14 @@
  * @module stores/slices/geometry/setters/freeScalarPreheatingSetters
  */
 
-import type { SchroedingerSliceActions } from '../types'
 import type { SetterContext } from './sliceSetterUtils'
 
-type PreheatingActions = Pick<
-  SchroedingerSliceActions,
-  | 'setFreeScalarPreheatingEnabled'
-  | 'setFreeScalarPreheatingAmplitude'
-  | 'setFreeScalarPreheatingFrequency'
->
+/** Actions exposed by the free-scalar preheating setter bundle. */
+export interface FreeScalarPreheatingSetters {
+  setFreeScalarPreheatingEnabled: (enabled: boolean) => void
+  setFreeScalarPreheatingAmplitude: (amplitude: number) => void
+  setFreeScalarPreheatingFrequency: (frequency: number) => void
+}
 
 /**
  * Build the three parametric-resonance setter actions.
@@ -47,7 +46,7 @@ type PreheatingActions = Pick<
  * @param ctx - Shared setter context with set/get and validation helpers
  * @returns Partial action object containing the preheating setters
  */
-export function createFreeScalarPreheatingSetters(ctx: SetterContext): PreheatingActions {
+export function createFreeScalarPreheatingSetters(ctx: SetterContext): FreeScalarPreheatingSetters {
   const { setWithVersion, isFinite, warnNonFinite } = ctx
 
   return {

@@ -28,7 +28,6 @@ import {
   sCritical,
 } from '@/lib/physics/cosmology/presets'
 
-import type { SchroedingerSliceActions } from '../types'
 import type { SetterContext } from './sliceSetterUtils'
 
 /**
@@ -232,18 +231,38 @@ function resolvePresetSwitchSubstate(
   return { eta0, kasnerExponents }
 }
 
-type CosmologyActions = Pick<
-  SchroedingerSliceActions,
-  | 'setFreeScalarCosmologyEnabled'
-  | 'setFreeScalarCosmologyPreset'
-  | 'setFreeScalarCosmologySteepness'
-  | 'setFreeScalarCosmologyHubble'
-  | 'setFreeScalarCosmologyEta0'
-  | 'setFreeScalarCosmologyBianchiExponents'
-  | 'setFreeScalarCosmologyLqcRhoCritical'
-  | 'setFreeScalarCosmologyLqcEquationOfState'
-  | 'setFreeScalarCosmologyLqcInitialRhoRatio'
->
+/** Actions exposed by the free-scalar cosmology setter bundle. */
+export interface FreeScalarCosmologySetters {
+  setFreeScalarCosmologyEnabled: (enabled: boolean) => void
+  setFreeScalarCosmologyPreset: (
+    preset: import('@/lib/physics/cosmology/presets').CosmologyPreset
+  ) => void
+  setFreeScalarCosmologySteepness: (s: number) => void
+  setFreeScalarCosmologyHubble: (h: number) => void
+  setFreeScalarCosmologyEta0: (eta0: number) => void
+  /**
+   * Set the Bianchi-I Kasner exponent triple `(p₁, p₂, p₃)`. Only
+   * consulted when `cosmology.preset === 'bianchiKasner'`; the other
+   * presets keep the stored value through serialization but do not read
+   * it. Non-finite inputs are rejected with a dev warning.
+   */
+  setFreeScalarCosmologyBianchiExponents: (p1: number, p2: number, p3: number) => void
+  /**
+   * Set the LQC critical density `ρ_c > 0` (clamped to `[0.1, 10]`). Only
+   * consulted when `cosmology.preset === 'lqcBounce'`.
+   */
+  setFreeScalarCosmologyLqcRhoCritical: (rhoCritical: number) => void
+  /**
+   * Set the LQC matter equation-of-state `w ∈ [0, 1]`. Only consulted
+   * when `cosmology.preset === 'lqcBounce'`.
+   */
+  setFreeScalarCosmologyLqcEquationOfState: (w: number) => void
+  /**
+   * Set the LQC starting `ρ/ρ_c` ratio (clamped to `(0, 1)`). Only
+   * consulted when `cosmology.preset === 'lqcBounce'`.
+   */
+  setFreeScalarCosmologyLqcInitialRhoRatio: (ratio: number) => void
+}
 
 /**
  * Build the five cosmology setter actions.
@@ -251,7 +270,7 @@ type CosmologyActions = Pick<
  * @param ctx - Shared setter context with set/get and validation helpers
  * @returns Partial action object containing the cosmology setters
  */
-export function createFreeScalarCosmologySetters(ctx: SetterContext): CosmologyActions {
+export function createFreeScalarCosmologySetters(ctx: SetterContext): FreeScalarCosmologySetters {
   const { setWithVersion, isFinite, warnNonFinite } = ctx
 
   return {

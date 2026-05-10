@@ -7,6 +7,8 @@
  * include gauge-covariant orbital magnetic coupling `(p - qA)^2`.
  */
 
+import type { PmlAbsorberConfig } from './crossMode'
+
 // ============================================================================
 // Pauli Types
 // ============================================================================
@@ -74,7 +76,7 @@ export type PauliPotentialType = 'none' | 'harmonicTrap' | 'barrier' | 'doubleWe
  * The spinor is always 2-component regardless of spatial dimension.
  * Magnetic coupling acts on the first 3 spatial dimensions.
  */
-export interface PauliConfig {
+export interface PauliConfig extends PmlAbsorberConfig {
   // === Lattice ===
   /** Spatial dimensionality (synced from global dimension) */
   latticeDim: number
@@ -140,14 +142,6 @@ export interface PauliConfig {
   spinDownColor: [number, number, number]
   /** Auto-scale density normalization */
   autoScale: boolean
-
-  // === Absorber (PML) ===
-  /** Enable absorbing boundary (PML) */
-  absorberEnabled: boolean
-  /** PML layer width (fraction of grid per side) */
-  absorberWidth: number
-  /** Target round-trip reflection coefficient for PML */
-  pmlTargetReflection: number
 
   // === Diagnostics ===
   /** Enable diagnostic readback */

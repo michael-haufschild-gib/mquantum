@@ -1,14 +1,16 @@
 /**
  * BEC (Gross-Pitaevskii) setter factory.
  *
- * Extracts all `setBec*`, `applyBecPreset`, `resetBecField`, and
- * `clearBecNeedsReset` methods from the schroedingerSlice.
+ * Extracts all `setBec*`, `applyBecPreset`, and `resetBecField`
+ * methods from the schroedingerSlice.
  *
  * @module stores/slices/geometry/setters/becSetters
  */
 
 import {
   type BecConfig,
+  type BecFieldView,
+  type BecInitialCondition,
   DEFAULT_BEC_CONFIG,
   type TdseDisorderDistribution,
 } from '@/lib/geometry/extended/types'
@@ -19,7 +21,6 @@ import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
 
-import type { SchroedingerSliceActions } from '../types'
 import {
   clampDtWithCfl,
   computeCflLimit,
@@ -31,13 +32,48 @@ import {
   TDSE_MAX_TOTAL_SITES,
 } from './sliceSetterUtils'
 
-type BecActions = Pick<
-  SchroedingerSliceActions,
-  Extract<
-    keyof SchroedingerSliceActions,
-    `setBec${string}` | 'applyBecPreset' | 'resetBecField' | 'clearBecNeedsReset'
-  >
->
+/** Actions exposed by the BEC (Gross-Pitaevskii) setter bundle. */
+export interface BecSetters {
+  setBecInteractionStrength: (g: number) => void
+  setBecTrapOmega: (omega: number) => void
+  setBecTrapAnisotropy: (dimIndex: number, ratio: number) => void
+  setBecInitialCondition: (condition: BecInitialCondition) => void
+  setBecFieldView: (view: BecFieldView) => void
+  setBecVortexCharge: (charge: number) => void
+  setBecVortexLatticeCount: (count: number) => void
+  setBecVortexPlane1: (plane: [number, number]) => void
+  setBecVortexPlane2: (plane: [number, number]) => void
+  setBecVortexSeparation: (sep: number) => void
+  setBecVortexPairCount: (count: number) => void
+  setBecSolitonDepth: (depth: number) => void
+  setBecSolitonVelocity: (velocity: number) => void
+  setBecHawkingVmax: (v: number) => void
+  setBecHawkingLh: (lh: number) => void
+  setBecHawkingDeltaN: (dn: number) => void
+  setBecHawkingPairInjection: (enabled: boolean) => void
+  setBecHawkingInjectRate: (rate: number) => void
+  setBecHawkingSeed: (seed: number) => void
+  setBecDisorderStrength: (strength: number) => void
+  setBecDisorderSeed: (seed: number) => void
+  setBecDisorderDistribution: (distribution: TdseDisorderDistribution) => void
+  setBecAutoScale: (autoScale: boolean) => void
+  setBecAbsorberEnabled: (enabled: boolean) => void
+  setBecAbsorberWidth: (width: number) => void
+  setBecPmlTargetReflection: (r: number) => void
+  setBecDiagnosticsEnabled: (enabled: boolean) => void
+  setBecDiagnosticsInterval: (interval: number) => void
+  setBecDt: (dt: number) => void
+  setBecStepsPerFrame: (steps: number) => void
+  setBecMass: (mass: number) => void
+  setBecHbar: (hbar: number) => void
+  setBecGridSize: (size: number[]) => void
+  setBecSpacing: (spacing: number[]) => void
+  setBecSlicePosition: (dimIndex: number, value: number) => void
+  setBecCompactDim: (dimIndex: number, compact: boolean) => void
+  setBecCompactRadius: (dimIndex: number, radius: number) => void
+  applyBecPreset: (presetId: string) => Promise<void>
+  resetBecField: () => void
+}
 
 /**
  * Resize BEC arrays to match a new latticeDim, computing TF-aware spacing.
@@ -96,8 +132,8 @@ export const resizeBecArrays = (prev: BecConfig, newDim: number): Partial<BecCon
  * Creates all BEC setter actions for the schroedingerSlice.
  * @param ctx - Shared setter context with set/get and validation helpers
  */
-export function createBecSetters(ctx: SetterContext): BecActions {
-  const { setWithVersion, set, isFinite, warnNonFinite, hasOnlyFinite } = ctx
+export function createBecSetters(ctx: SetterContext): BecSetters {
+  const { setWithVersion, isFinite, warnNonFinite, hasOnlyFinite } = ctx
   const D = 'bec' as const
 
   return {
@@ -584,14 +620,6 @@ export function createBecSetters(ctx: SetterContext): BecActions {
         schroedinger: {
           ...state.schroedinger,
           bec: { ...state.schroedinger.bec, needsReset: true },
-        },
-      }))
-    },
-    clearBecNeedsReset: () => {
-      set((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, needsReset: false },
         },
       }))
     },

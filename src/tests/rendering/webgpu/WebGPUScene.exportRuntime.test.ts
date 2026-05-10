@@ -82,37 +82,37 @@ describe('resetWaveEvolution', () => {
   it.each([
     {
       mode: 'freeScalarField',
-      clear: (state: ExtendedObjectStoreState) => state.clearFreeScalarNeedsReset(),
+      clear: (state: ExtendedObjectStoreState) => state.clearComputeNeedsReset('freeScalar'),
       read: (state: ExtendedObjectStoreState) => state.schroedinger.freeScalar.needsReset,
     },
     {
       mode: 'tdseDynamics',
-      clear: (state: ExtendedObjectStoreState) => state.clearTdseNeedsReset(),
+      clear: (state: ExtendedObjectStoreState) => state.clearComputeNeedsReset('tdse'),
       read: (state: ExtendedObjectStoreState) => state.schroedinger.tdse.needsReset,
     },
     {
       mode: 'becDynamics',
-      clear: (state: ExtendedObjectStoreState) => state.clearBecNeedsReset(),
+      clear: (state: ExtendedObjectStoreState) => state.clearComputeNeedsReset('bec'),
       read: (state: ExtendedObjectStoreState) => state.schroedinger.bec.needsReset,
     },
     {
       mode: 'diracEquation',
-      clear: (state: ExtendedObjectStoreState) => state.clearDiracNeedsReset(),
+      clear: (state: ExtendedObjectStoreState) => state.clearComputeNeedsReset('dirac'),
       read: (state: ExtendedObjectStoreState) => state.schroedinger.dirac.needsReset,
     },
     {
       mode: 'quantumWalk',
-      clear: (state: ExtendedObjectStoreState) => state.clearQuantumWalkNeedsReset(),
+      clear: (state: ExtendedObjectStoreState) => state.clearComputeNeedsReset('quantumWalk'),
       read: (state: ExtendedObjectStoreState) => state.schroedinger.quantumWalk.needsReset,
     },
     {
       mode: 'wheelerDeWitt',
-      clear: (state: ExtendedObjectStoreState) => state.clearWdwNeedsReset(),
+      clear: (state: ExtendedObjectStoreState) => state.clearComputeNeedsReset('wheelerDeWitt'),
       read: (state: ExtendedObjectStoreState) => state.schroedinger.wheelerDeWitt.needsReset,
     },
     {
       mode: 'antiDeSitter',
-      clear: (state: ExtendedObjectStoreState) => state.clearAdsNeedsReset(),
+      clear: (state: ExtendedObjectStoreState) => state.clearComputeNeedsReset('antiDeSitter'),
       read: (state: ExtendedObjectStoreState) => state.schroedinger.antiDeSitter.needsReset,
     },
   ] satisfies {
@@ -133,7 +133,7 @@ describe('resetWaveEvolution', () => {
   it('resets Pauli field when Pauli spinor is the active object type', () => {
     useGeometryStore.setState({ objectType: 'pauliSpinor' })
     const store = useExtendedObjectStore.getState()
-    store.clearPauliNeedsReset()
+    store.clearComputeNeedsReset('pauliSpinor')
     expect(useExtendedObjectStore.getState().pauliSpinor.needsReset).toBe(false)
 
     resetWaveEvolution()

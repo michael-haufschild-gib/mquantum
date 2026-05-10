@@ -13,11 +13,157 @@ import {
   DEFAULT_SCHROEDINGER_CONFIG,
   RAYMARCH_QUALITY_TO_SAMPLES,
   type RaymarchQuality,
+  type SchroedingerConfig,
+  type SecondQuantizationMode,
 } from '@/lib/geometry/extended/types'
 
 import type { SetterContext } from './sliceSetterUtils'
 
 type SchrodingerKey = keyof typeof DEFAULT_SCHROEDINGER_CONFIG
+
+/** Actions exposed by the visual-effect setter bundle. */
+export interface VisualEffectSetters {
+  // Volume Rendering Parameters
+  setSchroedingerTimeScale: (scale: number) => void
+  setSchroedingerFieldScale: (scale: number) => void
+  setSchroedingerDensityGain: (gain: number) => void
+  setSchroedingerDensityContrast: (contrast: number) => void
+  setSchroedingerAutoScaleMaxGain: (gain: number) => void
+  setSchroedingerPowderScale: (scale: number) => void
+  setSchroedingerSampleCount: (count: number) => void
+  // Emission Settings
+  setSchroedingerEmissionIntensity: (intensity: number) => void
+  setSchroedingerEmissionThreshold: (threshold: number) => void
+  setSchroedingerEmissionColorShift: (shift: number) => void
+  setSchroedingerScatteringAnisotropy: (anisotropy: number) => void
+  setSchroedingerRoughness: (roughness: number) => void
+  // PML Absorbing Boundary (shared)
+  setSchroedingerAbsorberEnabled: (enabled: boolean) => void
+  setSchroedingerAbsorberWidth: (width: number) => void
+  setSchroedingerPmlTargetReflection: (r: number) => void
+  // Raymarching Quality
+  setSchroedingerRaymarchQuality: (quality: RaymarchQuality) => void
+  // Quantum Effects
+  setSchroedingerNodalEnabled: (enabled: boolean) => void
+  setSchroedingerNodalColor: (color: string) => void
+  setSchroedingerNodalStrength: (strength: number) => void
+  setSchroedingerNodalDefinition: (definition: SchroedingerConfig['nodalDefinition']) => void
+  setSchroedingerNodalTolerance: (tolerance: number) => void
+  setSchroedingerNodalFamilyFilter: (filter: SchroedingerConfig['nodalFamilyFilter']) => void
+  setSchroedingerNodalRenderMode: (mode: SchroedingerConfig['nodalRenderMode']) => void
+  setSchroedingerNodalLobeColoringEnabled: (enabled: boolean) => void
+  setSchroedingerNodalColorReal: (color: string) => void
+  setSchroedingerNodalColorImag: (color: string) => void
+  setSchroedingerNodalColorPositive: (color: string) => void
+  setSchroedingerNodalColorNegative: (color: string) => void
+  setSchroedingerUncertaintyBoundaryEnabled: (enabled: boolean) => void
+  setSchroedingerUncertaintyBoundaryStrength: (strength: number) => void
+  setSchroedingerUncertaintyConfidenceMass: (mass: number) => void
+  setSchroedingerUncertaintyBoundaryWidth: (width: number) => void
+  setSchroedingerPhaseMaterialityEnabled: (enabled: boolean) => void
+  setSchroedingerPhaseMaterialityStrength: (strength: number) => void
+  setSchroedingerInterferenceEnabled: (enabled: boolean) => void
+  setSchroedingerInterferenceAmp: (amp: number) => void
+  setSchroedingerInterferenceFreq: (freq: number) => void
+  setSchroedingerInterferenceSpeed: (speed: number) => void
+  setSchroedingerQuantumBackreactionLensingEnabled: (enabled: boolean) => void
+  setSchroedingerQuantumBackreactionLensingStrength: (strength: number) => void
+  setSchroedingerQuantumBackreactionCausticGain: (gain: number) => void
+  setSchroedingerQuantumBackreactionSoftening: (softening: number) => void
+  setSchroedingerBilocalERBridgeEnabled: (enabled: boolean) => void
+  setSchroedingerBilocalERBridgeStrength: (strength: number) => void
+  setSchroedingerBilocalERBridgeThroatRadius: (radius: number) => void
+  setSchroedingerBilocalERBridgePhaseLock: (phaseLock: number) => void
+  setSchroedingerEntropicTimeShearEnabled: (enabled: boolean) => void
+  setSchroedingerEntropicTimeShearStrength: (strength: number) => void
+  setSchroedingerEntropicTimeShearFilamentScale: (scale: number) => void
+  setSchroedingerEntropicTimeShearIrreversibility: (irreversibility: number) => void
+  setSchroedingerSpectralDimensionFlowEnabled: (enabled: boolean) => void
+  setSchroedingerSpectralDimensionFlowStrength: (strength: number) => void
+  setSchroedingerSpectralDimensionFlowUvDimension: (dimension: number) => void
+  setSchroedingerSpectralDimensionFlowDiffusionScale: (scale: number) => void
+  setSchroedingerVacuumBubbleLensEnabled: (enabled: boolean) => void
+  setSchroedingerVacuumBubbleLensStrength: (strength: number) => void
+  setSchroedingerVacuumBubbleWallRadius: (radius: number) => void
+  setSchroedingerVacuumBubbleWallThickness: (thickness: number) => void
+  setSchroedingerVacuumBubbleTension: (tension: number) => void
+  setSchroedingerVacuumBubbleBias: (bias: number) => void
+  setSchroedingerBornNullWeaveEnabled: (enabled: boolean) => void
+  setSchroedingerBornNullWeaveStrength: (strength: number) => void
+  setSchroedingerBornNullWeaveNodeWidth: (width: number) => void
+  setSchroedingerBornNullWeaveCirculation: (circulation: number) => void
+  // Physical Probability Current (j-field)
+  setSchroedingerProbabilityCurrentEnabled: (enabled: boolean) => void
+  setSchroedingerProbabilityCurrentStyle: (
+    style: SchroedingerConfig['probabilityCurrentStyle']
+  ) => void
+  setSchroedingerProbabilityCurrentPlacement: (
+    placement: SchroedingerConfig['probabilityCurrentPlacement']
+  ) => void
+  setSchroedingerProbabilityCurrentColorMode: (
+    mode: SchroedingerConfig['probabilityCurrentColorMode']
+  ) => void
+  setSchroedingerProbabilityCurrentScale: (scale: number) => void
+  setSchroedingerProbabilityCurrentSpeed: (speed: number) => void
+  setSchroedingerProbabilityCurrentDensityThreshold: (threshold: number) => void
+  setSchroedingerProbabilityCurrentMagnitudeThreshold: (threshold: number) => void
+  setSchroedingerProbabilityCurrentLineDensity: (density: number) => void
+  setSchroedingerProbabilityCurrentStepSize: (stepSize: number) => void
+  setSchroedingerProbabilityCurrentSteps: (steps: number) => void
+  setSchroedingerProbabilityCurrentOpacity: (opacity: number) => void
+  // Phase Shimmer
+  setSchroedingerPhaseShimmerEnabled: (enabled: boolean) => void
+  setSchroedingerPhaseShimmerSpeed: (speed: number) => void
+  setSchroedingerPhaseShimmerStrength: (strength: number) => void
+  // Radial Probability Overlay (hydrogen)
+  setSchroedingerRadialProbabilityEnabled: (enabled: boolean) => void
+  setSchroedingerRadialProbabilityOpacity: (opacity: number) => void
+  setSchroedingerRadialProbabilityColor: (color: string) => void
+  // Isosurface Mode
+  setSchroedingerIsoEnabled: (enabled: boolean) => void
+  setSchroedingerIsoThreshold: (threshold: number) => void
+  // Cross-Section Slice
+  setSchroedingerCrossSectionEnabled: (enabled: boolean) => void
+  setSchroedingerCrossSectionCompositeMode: (
+    mode: SchroedingerConfig['crossSectionCompositeMode']
+  ) => void
+  setSchroedingerCrossSectionScalar: (scalar: SchroedingerConfig['crossSectionScalar']) => void
+  setSchroedingerCrossSectionPlaneMode: (mode: SchroedingerConfig['crossSectionPlaneMode']) => void
+  setSchroedingerCrossSectionAxis: (axis: SchroedingerConfig['crossSectionAxis']) => void
+  setSchroedingerCrossSectionPlaneNormal: (normal: [number, number, number]) => void
+  setSchroedingerCrossSectionPlaneOffset: (offset: number) => void
+  setSchroedingerCrossSectionOpacity: (opacity: number) => void
+  setSchroedingerCrossSectionThickness: (thickness: number) => void
+  setSchroedingerCrossSectionPlaneColor: (color: string) => void
+  setSchroedingerCrossSectionAutoWindow: (enabled: boolean) => void
+  setSchroedingerCrossSectionWindowMin: (min: number) => void
+  setSchroedingerCrossSectionWindowMax: (max: number) => void
+  // Slice Animation (4D+ only)
+  setSchroedingerSliceAnimationEnabled: (enabled: boolean) => void
+  setSchroedingerSliceSpeed: (speed: number) => void
+  setSchroedingerSliceAmplitude: (amplitude: number) => void
+  // Phase Animation (Hydrogen ND only)
+  setSchroedingerPhaseAnimationEnabled: (enabled: boolean) => void
+  // Wigner Phase-Space Visualization
+  setSchroedingerWignerDimensionIndex: (index: number) => void
+  setSchroedingerWignerAutoRange: (enabled: boolean) => void
+  setSchroedingerWignerXRange: (range: number) => void
+  setSchroedingerWignerPRange: (range: number) => void
+  setSchroedingerWignerCrossTermsEnabled: (enabled: boolean) => void
+  setSchroedingerWignerQuadPoints: (points: number) => void
+  setSchroedingerWignerCacheResolution: (resolution: number) => void
+  // Second Quantization Educational Layer
+  setSchroedingerSqLayerEnabled: (enabled: boolean) => void
+  setSchroedingerSqLayerMode: (mode: SecondQuantizationMode) => void
+  setSchroedingerSqLayerSelectedModeIndex: (index: number) => void
+  setSchroedingerSqLayerFockQuantumNumber: (n: number) => void
+  setSchroedingerSqLayerShowOccupation: (show: boolean) => void
+  setSchroedingerSqLayerShowUncertainty: (show: boolean) => void
+  setSchroedingerSqLayerCoherentAlphaRe: (re: number) => void
+  setSchroedingerSqLayerCoherentAlphaIm: (im: number) => void
+  setSchroedingerSqLayerSqueezeR: (r: number) => void
+  setSchroedingerSqLayerSqueezeTheta: (theta: number) => void
+}
 
 /**
  * Normalize a 3D plane normal vector. Falls back to [0,0,1] for degenerate input.

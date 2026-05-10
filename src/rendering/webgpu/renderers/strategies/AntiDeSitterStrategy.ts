@@ -190,7 +190,7 @@ export class AntiDeSitterStrategy implements QuantumModeStrategy {
     this.computePass.updateAdsConfig(ctx.device, ads)
     if (ads.needsReset) {
       this.computePass.markDirty()
-      extended?.clearAdsNeedsReset?.()
+      extended?.clearComputeNeedsReset?.('antiDeSitter')
     }
 
     this.computePass.execute(ctx)
@@ -227,7 +227,7 @@ export class AntiDeSitterStrategy implements QuantumModeStrategy {
     )
 
     this.lastCpuConfigHash = hash
-    if (ads.needsReset) extended?.clearAdsNeedsReset?.()
+    if (ads.needsReset) extended?.clearComputeNeedsReset?.('antiDeSitter')
   }
 
   adoptComputeState(source: QuantumModeStrategy, nextConfig?: SchrodingerRendererConfig): boolean {

@@ -1,18 +1,10 @@
 import {
-  type BecFieldView,
-  type BecInitialCondition,
-  type DiracFieldView,
-  type DiracInitialCondition,
-  type DiracPotentialType,
-  type FreeScalarFieldView,
-  type FreeScalarInitialCondition,
   HydrogenNDPresetName,
   type PauliConfig,
   type PauliFieldType,
   type PauliFieldView,
   type PauliInitialCondition,
   type PauliPotentialType,
-  RaymarchQuality,
   SchroedingerColorMode,
   SchroedingerConfig,
   SchroedingerPalette,
@@ -20,14 +12,16 @@ import {
   SchroedingerQualityPreset,
   SchroedingerQuantumMode,
   SchroedingerRenderStyle,
-  SecondQuantizationMode,
-  type TdseDisorderDistribution,
-  type TdseDriveWaveform,
-  type TdseFieldView,
-  type TdseInitialCondition,
-  type TdsePotentialType,
 } from '@/lib/geometry/extended/types'
 import type { OpenQuantumVisualizationMode } from '@/lib/physics/openQuantum/types'
+import type { AntiDeSitterSetters } from '@/stores/slices/geometry/setters/antiDeSitterSetters'
+import type { BecSetters } from '@/stores/slices/geometry/setters/becSetters'
+import type { DiracSetters } from '@/stores/slices/geometry/setters/diracSetters'
+import type { FreeScalarSetters } from '@/stores/slices/geometry/setters/freeScalarSetters'
+import type { QuantumWalkSetters } from '@/stores/slices/geometry/setters/quantumWalkSetters'
+import type { TdseSetters } from '@/stores/slices/geometry/setters/tdseSetters'
+import type { VisualEffectSetters } from '@/stores/slices/geometry/setters/visualEffectSetters'
+import type { WheelerDeWittSetters } from '@/stores/slices/geometry/setters/wheelerDeWittSetters'
 
 // ============================================================================
 // Schroedinger Slice
@@ -38,7 +32,16 @@ export interface SchroedingerSliceState {
 }
 
 /** Mutation actions for the Schroedinger quantum configuration. */
-export interface SchroedingerSliceActions {
+export interface SchroedingerSliceActions
+  extends
+    WheelerDeWittSetters,
+    AntiDeSitterSetters,
+    BecSetters,
+    DiracSetters,
+    FreeScalarSetters,
+    TdseSetters,
+    QuantumWalkSetters,
+    VisualEffectSetters {
   // Geometry Settings
   setSchroedingerScale: (scale: number) => void
 
@@ -100,473 +103,10 @@ export interface SchroedingerSliceActions {
   setSchroedingerExtraDimOmegaAll: (omegas: number[]) => void
   setSchroedingerExtraDimFrequencySpread: (spread: number) => void
 
-  // Volume Rendering Parameters
-  setSchroedingerTimeScale: (scale: number) => void
-  setSchroedingerFieldScale: (scale: number) => void
-  setSchroedingerDensityGain: (gain: number) => void
-  setSchroedingerDensityContrast: (contrast: number) => void
-  setSchroedingerAutoScaleMaxGain: (gain: number) => void
-  setSchroedingerPowderScale: (scale: number) => void
-  setSchroedingerSampleCount: (count: number) => void
-
-  // Emission Settings
-  setSchroedingerEmissionIntensity: (intensity: number) => void
-  setSchroedingerEmissionThreshold: (threshold: number) => void
-  setSchroedingerEmissionColorShift: (shift: number) => void
-  setSchroedingerScatteringAnisotropy: (anisotropy: number) => void
-  setSchroedingerRoughness: (roughness: number) => void
-
-  // PML Absorbing Boundary (shared)
-  setSchroedingerAbsorberEnabled: (enabled: boolean) => void
-  setSchroedingerAbsorberWidth: (width: number) => void
-  setSchroedingerPmlTargetReflection: (r: number) => void
-
-  // Raymarching Quality
-  setSchroedingerRaymarchQuality: (quality: RaymarchQuality) => void
-
-  // Quantum Effects
-  setSchroedingerNodalEnabled: (enabled: boolean) => void
-  setSchroedingerNodalColor: (color: string) => void
-  setSchroedingerNodalStrength: (strength: number) => void
-  setSchroedingerNodalDefinition: (definition: SchroedingerConfig['nodalDefinition']) => void
-  setSchroedingerNodalTolerance: (tolerance: number) => void
-  setSchroedingerNodalFamilyFilter: (filter: SchroedingerConfig['nodalFamilyFilter']) => void
-  setSchroedingerNodalRenderMode: (mode: SchroedingerConfig['nodalRenderMode']) => void
-  setSchroedingerNodalLobeColoringEnabled: (enabled: boolean) => void
-  setSchroedingerNodalColorReal: (color: string) => void
-  setSchroedingerNodalColorImag: (color: string) => void
-  setSchroedingerNodalColorPositive: (color: string) => void
-  setSchroedingerNodalColorNegative: (color: string) => void
-  setSchroedingerUncertaintyBoundaryEnabled: (enabled: boolean) => void
-  setSchroedingerUncertaintyBoundaryStrength: (strength: number) => void
-  setSchroedingerUncertaintyConfidenceMass: (mass: number) => void
-  setSchroedingerUncertaintyBoundaryWidth: (width: number) => void
-  setSchroedingerPhaseMaterialityEnabled: (enabled: boolean) => void
-  setSchroedingerPhaseMaterialityStrength: (strength: number) => void
-  setSchroedingerInterferenceEnabled: (enabled: boolean) => void
-  setSchroedingerInterferenceAmp: (amp: number) => void
-  setSchroedingerInterferenceFreq: (freq: number) => void
-  setSchroedingerInterferenceSpeed: (speed: number) => void
-  setSchroedingerQuantumBackreactionLensingEnabled: (enabled: boolean) => void
-  setSchroedingerQuantumBackreactionLensingStrength: (strength: number) => void
-  setSchroedingerQuantumBackreactionCausticGain: (gain: number) => void
-  setSchroedingerQuantumBackreactionSoftening: (softening: number) => void
-  setSchroedingerBilocalERBridgeEnabled: (enabled: boolean) => void
-  setSchroedingerBilocalERBridgeStrength: (strength: number) => void
-  setSchroedingerBilocalERBridgeThroatRadius: (radius: number) => void
-  setSchroedingerBilocalERBridgePhaseLock: (phaseLock: number) => void
-  setSchroedingerEntropicTimeShearEnabled: (enabled: boolean) => void
-  setSchroedingerEntropicTimeShearStrength: (strength: number) => void
-  setSchroedingerEntropicTimeShearFilamentScale: (scale: number) => void
-  setSchroedingerEntropicTimeShearIrreversibility: (irreversibility: number) => void
-  setSchroedingerSpectralDimensionFlowEnabled: (enabled: boolean) => void
-  setSchroedingerSpectralDimensionFlowStrength: (strength: number) => void
-  setSchroedingerSpectralDimensionFlowUvDimension: (dimension: number) => void
-  setSchroedingerSpectralDimensionFlowDiffusionScale: (scale: number) => void
-  setSchroedingerVacuumBubbleLensEnabled: (enabled: boolean) => void
-  setSchroedingerVacuumBubbleLensStrength: (strength: number) => void
-  setSchroedingerVacuumBubbleWallRadius: (radius: number) => void
-  setSchroedingerVacuumBubbleWallThickness: (thickness: number) => void
-  setSchroedingerVacuumBubbleTension: (tension: number) => void
-  setSchroedingerVacuumBubbleBias: (bias: number) => void
-  setSchroedingerBornNullWeaveEnabled: (enabled: boolean) => void
-  setSchroedingerBornNullWeaveStrength: (strength: number) => void
-  setSchroedingerBornNullWeaveNodeWidth: (width: number) => void
-  setSchroedingerBornNullWeaveCirculation: (circulation: number) => void
-  // Physical Probability Current (j-field)
-  setSchroedingerProbabilityCurrentEnabled: (enabled: boolean) => void
-  setSchroedingerProbabilityCurrentStyle: (
-    style: SchroedingerConfig['probabilityCurrentStyle']
-  ) => void
-  setSchroedingerProbabilityCurrentPlacement: (
-    placement: SchroedingerConfig['probabilityCurrentPlacement']
-  ) => void
-  setSchroedingerProbabilityCurrentColorMode: (
-    mode: SchroedingerConfig['probabilityCurrentColorMode']
-  ) => void
-  setSchroedingerProbabilityCurrentScale: (scale: number) => void
-  setSchroedingerProbabilityCurrentSpeed: (speed: number) => void
-  setSchroedingerProbabilityCurrentDensityThreshold: (threshold: number) => void
-  setSchroedingerProbabilityCurrentMagnitudeThreshold: (threshold: number) => void
-  setSchroedingerProbabilityCurrentLineDensity: (density: number) => void
-  setSchroedingerProbabilityCurrentStepSize: (stepSize: number) => void
-  setSchroedingerProbabilityCurrentSteps: (steps: number) => void
-  setSchroedingerProbabilityCurrentOpacity: (opacity: number) => void
-  // Phase Shimmer
-  setSchroedingerPhaseShimmerEnabled: (enabled: boolean) => void
-  setSchroedingerPhaseShimmerSpeed: (speed: number) => void
-  setSchroedingerPhaseShimmerStrength: (strength: number) => void
-
-  // Radial Probability Overlay (hydrogen)
-  setSchroedingerRadialProbabilityEnabled: (enabled: boolean) => void
-  setSchroedingerRadialProbabilityOpacity: (opacity: number) => void
-  setSchroedingerRadialProbabilityColor: (color: string) => void
-
-  // Isosurface Mode
-  setSchroedingerIsoEnabled: (enabled: boolean) => void
-  setSchroedingerIsoThreshold: (threshold: number) => void
-
-  // Cross-Section Slice
-  setSchroedingerCrossSectionEnabled: (enabled: boolean) => void
-  setSchroedingerCrossSectionCompositeMode: (
-    mode: SchroedingerConfig['crossSectionCompositeMode']
-  ) => void
-  setSchroedingerCrossSectionScalar: (scalar: SchroedingerConfig['crossSectionScalar']) => void
-  setSchroedingerCrossSectionPlaneMode: (mode: SchroedingerConfig['crossSectionPlaneMode']) => void
-  setSchroedingerCrossSectionAxis: (axis: SchroedingerConfig['crossSectionAxis']) => void
-  setSchroedingerCrossSectionPlaneNormal: (normal: [number, number, number]) => void
-  setSchroedingerCrossSectionPlaneOffset: (offset: number) => void
-  setSchroedingerCrossSectionOpacity: (opacity: number) => void
-  setSchroedingerCrossSectionThickness: (thickness: number) => void
-  setSchroedingerCrossSectionPlaneColor: (color: string) => void
-  setSchroedingerCrossSectionAutoWindow: (enabled: boolean) => void
-  setSchroedingerCrossSectionWindowMin: (min: number) => void
-  setSchroedingerCrossSectionWindowMax: (max: number) => void
-
-  // Slice Animation (4D+ only)
-  setSchroedingerSliceAnimationEnabled: (enabled: boolean) => void
-  setSchroedingerSliceSpeed: (speed: number) => void
-  setSchroedingerSliceAmplitude: (amplitude: number) => void
-
-  // Phase Animation (Hydrogen ND only)
-  setSchroedingerPhaseAnimationEnabled: (enabled: boolean) => void
-
-  // Wigner Phase-Space Visualization
-  setSchroedingerWignerDimensionIndex: (index: number) => void
-  setSchroedingerWignerAutoRange: (enabled: boolean) => void
-  setSchroedingerWignerXRange: (range: number) => void
-  setSchroedingerWignerPRange: (range: number) => void
-  setSchroedingerWignerCrossTermsEnabled: (enabled: boolean) => void
-  setSchroedingerWignerQuadPoints: (points: number) => void
-  setSchroedingerWignerCacheResolution: (resolution: number) => void
-
-  // Second Quantization Educational Layer
-  setSchroedingerSqLayerEnabled: (enabled: boolean) => void
-  setSchroedingerSqLayerMode: (mode: SecondQuantizationMode) => void
-  setSchroedingerSqLayerSelectedModeIndex: (index: number) => void
-  setSchroedingerSqLayerFockQuantumNumber: (n: number) => void
-  setSchroedingerSqLayerShowOccupation: (show: boolean) => void
-  setSchroedingerSqLayerShowUncertainty: (show: boolean) => void
-  setSchroedingerSqLayerCoherentAlphaRe: (re: number) => void
-  setSchroedingerSqLayerCoherentAlphaIm: (im: number) => void
-  setSchroedingerSqLayerSqueezeR: (r: number) => void
-  setSchroedingerSqLayerSqueezeTheta: (theta: number) => void
-
-  // Free Scalar Field Configuration
-  setFreeScalarLatticeDim: (dim: number) => void
-  setFreeScalarGridSize: (size: number[]) => void
-  setFreeScalarSpacing: (spacing: number[]) => void
-  setFreeScalarMass: (mass: number) => void
-  setFreeScalarDt: (dt: number) => void
-  setFreeScalarStepsPerFrame: (steps: number) => void
-  setFreeScalarInitialCondition: (condition: FreeScalarInitialCondition) => void
-  setFreeScalarFieldView: (view: FreeScalarFieldView) => void
-  setFreeScalarPacketCenter: (center: number[]) => void
-  setFreeScalarPacketWidth: (width: number) => void
-  setFreeScalarPacketAmplitude: (amplitude: number) => void
-  setFreeScalarModeK: (k: number[]) => void
-  setFreeScalarAutoScale: (autoScale: boolean) => void
-  setFreeScalarVacuumSeed: (seed: number) => void
-  setFreeScalarSlicePosition: (dimIndex: number, value: number) => void
-  resetFreeScalarField: () => void
-  clearFreeScalarNeedsReset: () => void
-
-  // Self-Interaction
-  setFreeScalarSelfInteractionEnabled: (enabled: boolean) => void
-  setFreeScalarSelfInteractionLambda: (lambda: number) => void
-  setFreeScalarSelfInteractionVev: (vev: number) => void
-
-  // PML Absorber
-  setFreeScalarAbsorberEnabled: (enabled: boolean) => void
-  setFreeScalarAbsorberWidth: (width: number) => void
-  setFreeScalarPmlTargetReflection: (r: number) => void
-
-  // Diagnostics
-  setFreeScalarDiagnosticsEnabled: (enabled: boolean) => void
-  setFreeScalarDiagnosticsInterval: (interval: number) => void
-
-  // Cosmological Background (Mukhanov-Sasaki bridge)
-  setFreeScalarCosmologyEnabled: (enabled: boolean) => void
-  setFreeScalarCosmologyPreset: (
-    preset: import('@/lib/physics/cosmology/presets').CosmologyPreset
-  ) => void
-  setFreeScalarCosmologySteepness: (s: number) => void
-  setFreeScalarCosmologyHubble: (h: number) => void
-  setFreeScalarCosmologyEta0: (eta0: number) => void
-  /**
-   * Set the Bianchi-I Kasner exponent triple `(p₁, p₂, p₃)`. Only
-   * consulted when `cosmology.preset === 'bianchiKasner'`; the other
-   * presets keep the stored value through serialization but do not read
-   * it. Non-finite inputs are rejected with a dev warning.
-   */
-  setFreeScalarCosmologyBianchiExponents: (p1: number, p2: number, p3: number) => void
-  /**
-   * Set the LQC critical density `ρ_c > 0` (clamped to `[0.1, 10]`). Only
-   * consulted when `cosmology.preset === 'lqcBounce'`.
-   */
-  setFreeScalarCosmologyLqcRhoCritical: (rhoCritical: number) => void
-  /**
-   * Set the LQC matter equation-of-state `w ∈ [0, 1]`. Only consulted
-   * when `cosmology.preset === 'lqcBounce'`.
-   */
-  setFreeScalarCosmologyLqcEquationOfState: (w: number) => void
-  /**
-   * Set the LQC starting `ρ/ρ_c` ratio (clamped to `(0, 1)`). Only
-   * consulted when `cosmology.preset === 'lqcBounce'`.
-   */
-  setFreeScalarCosmologyLqcInitialRhoRatio: (ratio: number) => void
-
-  // Parametric Resonance / Preheating
-  setFreeScalarPreheatingEnabled: (enabled: boolean) => void
-  setFreeScalarPreheatingAmplitude: (amplitude: number) => void
-  setFreeScalarPreheatingFrequency: (frequency: number) => void
-
-  // k-Space Visualization Display Transforms
-  setFreeScalarKSpaceDisplayMode: (
-    mode: import('@/lib/geometry/extended/types').KSpaceDisplayMode
-  ) => void
-  setFreeScalarKSpaceFftShift: (enabled: boolean) => void
-  setFreeScalarKSpaceExposureMode: (
-    mode: import('@/lib/geometry/extended/types').KSpaceExposureMode
-  ) => void
-  setFreeScalarKSpaceLowPercentile: (value: number) => void
-  setFreeScalarKSpaceHighPercentile: (value: number) => void
-  setFreeScalarKSpaceGamma: (value: number) => void
-  setFreeScalarKSpaceBroadeningEnabled: (enabled: boolean) => void
-  setFreeScalarKSpaceBroadeningRadius: (value: number) => void
-  setFreeScalarKSpaceBroadeningSigma: (value: number) => void
-  setFreeScalarKSpaceRadialBinCount: (value: number) => void
-
-  // TDSE (Time-Dependent Schroedinger Equation) Configuration
-  setTdseLatticeDim: (dim: number) => void
-  setTdseGridSize: (size: number[]) => void
-  setTdseSpacing: (spacing: number[]) => void
-  setTdseMass: (mass: number) => void
-  setTdseHbar: (hbar: number) => void
-  setTdseDt: (dt: number) => void
-  setTdseStepsPerFrame: (steps: number) => void
-  setTdseInitialCondition: (condition: TdseInitialCondition) => void
-  setTdsePacketCenter: (center: number[]) => void
-  setTdsePacketWidth: (width: number) => void
-  setTdsePacketAmplitude: (amplitude: number) => void
-  setTdsePacketMomentum: (momentum: number[]) => void
-  setTdsePotentialType: (type: TdsePotentialType) => void
-  setTdseBarrierHeight: (height: number) => void
-  setTdseBarrierWidth: (width: number) => void
-  setTdseBarrierCenter: (center: number) => void
-  setTdseWellDepth: (depth: number) => void
-  setTdseWellWidth: (width: number) => void
-  setTdseHarmonicOmega: (omega: number) => void
-  setTdseStepHeight: (height: number) => void
-  setTdseSlitSeparation: (separation: number) => void
-  setTdseSlitWidth: (width: number) => void
-  setTdseWallThickness: (thickness: number) => void
-  setTdseWallHeight: (height: number) => void
-  setTdseLatticeDepth: (depth: number) => void
-  setTdseLatticePeriod: (period: number) => void
-  setTdseDoubleWellLambda: (lambda: number) => void
-  setTdseDoubleWellSeparation: (separation: number) => void
-  setTdseDoubleWellAsymmetry: (asymmetry: number) => void
-  setTdseRadialWellInner: (r: number) => void
-  setTdseRadialWellOuter: (r: number) => void
-  setTdseRadialWellDepth: (depth: number) => void
-  setTdseRadialWellTilt: (tilt: number) => void
-  setTdseAnharmonicLambda: (lambda: number) => void
-  setTdseBhMass: (mass: number) => void
-  setTdseBhMultipoleL: (ell: number) => void
-  setTdseBhSpin: (spin: number) => void
-  setTdseDisorderStrength: (strength: number) => void
-  setTdseDisorderSeed: (seed: number) => void
-  setTdseDriveEnabled: (enabled: boolean) => void
-  setTdseDriveWaveform: (waveform: TdseDriveWaveform) => void
-  setTdseDriveFrequency: (frequency: number) => void
-  setTdseDriveAmplitude: (amplitude: number) => void
-  setTdseDisorderDistribution: (distribution: TdseDisorderDistribution) => void
-  setTdseAbsorberEnabled: (enabled: boolean) => void
-  setTdseAbsorberWidth: (width: number) => void
-  setTdsePmlTargetReflection: (r: number) => void
-  setTdseFieldView: (view: TdseFieldView) => void
-  setTdseAutoScale: (autoScale: boolean) => void
-  setTdseShowPotential: (show: boolean) => void
-  setTdseAutoLoop: (autoLoop: boolean) => void
-  setTdseDiagnosticsEnabled: (enabled: boolean) => void
-  setTdseDiagnosticsInterval: (interval: number) => void
-  setTdseObservablesEnabled: (enabled: boolean) => void
-  setTdseImaginaryTimeEnabled: (enabled: boolean) => void
-  setTdseCustomPotentialExpression: (expression: string) => void
-  setTdseSlicePosition: (dimIndex: number, value: number) => void
-  setTdseCompactDim: (dimIndex: number, compact: boolean) => void
-  setTdseCompactRadius: (dimIndex: number, radius: number) => void
-  applyTdsePreset: (presetId: string) => void
-  resetTdseField: () => void
-  clearTdseNeedsReset: () => void
-
-  // Stochastic Decoherence
-  setTdseStochasticEnabled: (enabled: boolean) => void
-  setTdseStochasticGamma: (gamma: number) => void
-  setTdseStochasticSigma: (sigma: number) => void
-  setTdseStochasticNumSites: (numSites: number) => void
-  setTdseStochasticSeed: (seed: number) => void
-  setTdseBranchingEnabled: (enabled: boolean) => void
-  setTdseBranchPlanePosition: (position: number) => void
-  setTdseBranchColorA: (color: [number, number, number]) => void
-  setTdseBranchColorB: (color: [number, number, number]) => void
-
-  // ER=EPR Double-trace Wormhole Coupling
-  setTdseWormholeEnabled: (enabled: boolean) => void
-  setTdseWormholeG: (g: number) => void
-  setTdseWormholeAxis: (axis: 0 | 1 | 2) => void
-  setTdseWormholeHudEnabled: (enabled: boolean) => void
-
-  // Curved-space kinetic operator (Laplace–Beltrami)
-  setTdseMetric: (cfg: import('@/lib/physics/tdse/metrics/types').MetricConfig) => void
-
-  // Curved-space TDSE v2 — Wave 6 visualization (render-only)
-  setShowCurvatureOverlay: (enabled: boolean) => void
-  setDensityView: (view: 'coordinate' | 'proper') => void
-  setCurvatureOverlayOpacity: (opacity: number) => void
-
-  // BEC (Gross-Pitaevskii Equation) Configuration
-  setBecInteractionStrength: (g: number) => void
-  setBecTrapOmega: (omega: number) => void
-  setBecTrapAnisotropy: (dimIndex: number, ratio: number) => void
-  setBecInitialCondition: (condition: BecInitialCondition) => void
-  setBecFieldView: (view: BecFieldView) => void
-  setBecVortexCharge: (charge: number) => void
-  setBecVortexLatticeCount: (count: number) => void
-  setBecVortexPlane1: (plane: [number, number]) => void
-  setBecVortexPlane2: (plane: [number, number]) => void
-  setBecVortexSeparation: (sep: number) => void
-  setBecVortexPairCount: (count: number) => void
-  setBecSolitonDepth: (depth: number) => void
-  setBecSolitonVelocity: (velocity: number) => void
-  setBecHawkingVmax: (v: number) => void
-  setBecHawkingLh: (lh: number) => void
-  setBecHawkingDeltaN: (dn: number) => void
-  setBecHawkingPairInjection: (enabled: boolean) => void
-  setBecHawkingInjectRate: (rate: number) => void
-  setBecHawkingSeed: (seed: number) => void
-  setBecDisorderStrength: (strength: number) => void
-  setBecDisorderSeed: (seed: number) => void
-  setBecDisorderDistribution: (distribution: TdseDisorderDistribution) => void
-  setBecAutoScale: (autoScale: boolean) => void
-  setBecAbsorberEnabled: (enabled: boolean) => void
-  setBecAbsorberWidth: (width: number) => void
-  setBecPmlTargetReflection: (r: number) => void
-  setBecDiagnosticsEnabled: (enabled: boolean) => void
-  setBecDiagnosticsInterval: (interval: number) => void
-  setBecDt: (dt: number) => void
-  setBecStepsPerFrame: (steps: number) => void
-  setBecMass: (mass: number) => void
-  setBecHbar: (hbar: number) => void
-  setBecGridSize: (size: number[]) => void
-  setBecSpacing: (spacing: number[]) => void
-  setBecSlicePosition: (dimIndex: number, value: number) => void
-  setBecCompactDim: (dimIndex: number, compact: boolean) => void
-  setBecCompactRadius: (dimIndex: number, radius: number) => void
-  applyBecPreset: (presetId: string) => Promise<void>
-  resetBecField: () => void
-  clearBecNeedsReset: () => void
-
-  // Dirac Equation Configuration
-  setDiracMass: (mass: number) => void
-  setDiracSpeedOfLight: (c: number) => void
-  setDiracHbar: (hbar: number) => void
-  setDiracDt: (dt: number) => void
-  setDiracStepsPerFrame: (steps: number) => void
-  setDiracPotentialType: (type: DiracPotentialType) => void
-  setDiracPotentialStrength: (strength: number) => void
-  setDiracPotentialWidth: (width: number) => void
-  setDiracPotentialCenter: (center: number) => void
-  setDiracHarmonicOmega: (omega: number) => void
-  setDiracCoulombZ: (z: number) => void
-  setDiracInitialCondition: (condition: DiracInitialCondition) => void
-  setDiracPacketWidth: (width: number) => void
-  setDiracPositiveEnergyFraction: (fraction: number) => void
-  setDiracFieldView: (view: DiracFieldView) => void
-  setDiracAutoScale: (autoScale: boolean) => void
-  setDiracShowPotential: (showPotential: boolean) => void
-  setDiracAbsorberEnabled: (enabled: boolean) => void
-  setDiracAbsorberWidth: (width: number) => void
-  setDiracPmlTargetReflection: (r: number) => void
-  setDiracGridSize: (size: number[]) => void
-  setDiracSpacing: (spacing: number[]) => void
-  setDiracPacketCenter: (dimIndex: number, value: number) => void
-  setDiracPacketMomentum: (dimIndex: number, value: number) => void
-  setDiracSpinDirection: (dimIndex: number, value: number) => void
-  setDiracParticleColor: (color: [number, number, number]) => void
-  setDiracAntiparticleColor: (color: [number, number, number]) => void
-  setDiracDiagnosticsEnabled: (enabled: boolean) => void
-  setDiracDiagnosticsInterval: (interval: number) => void
-  setDiracNeedsReset: () => void
-  clearDiracNeedsReset: () => void
-  setDiracSlicePosition: (dimIndex: number, value: number) => void
-  applyDiracPreset: (presetId: string) => Promise<void>
-
-  // Wheeler–DeWitt Minisuperspace Configuration
-  setWdwBoundaryCondition: (
-    bc: import('@/lib/geometry/extended/wheelerDeWitt').WdwBoundaryCondition
-  ) => void
-  setWdwInflatonMass: (m: number) => void
-  setWdwInflatonMassAsymmetry: (ratio: number) => void
-  setWdwCosmologicalConstant: (lambda: number) => void
-  setWdwGridSize: (
-    preset: import('@/stores/slices/geometry/setters/wheelerDeWittSetters').WdwGridPreset
-  ) => void
-  setWdwGridDimensions: (gridNa: number, gridNphi: number) => void
-  setWdwStreamlinesEnabled: (enabled: boolean) => void
-  setWdwStreamlineDensity: (density: number) => void
-  setWdwPhaseRotationEnabled: (enabled: boolean) => void
-  setWdwPhaseRotationSpeed: (speed: number) => void
-  setWdwWorldlineEnabled: (enabled: boolean) => void
-  setWdwWorldlineSpeed: (speed: number) => void
-  setWdwWorldlinePulseWidth: (w: number) => void
-  setWdwRenderDynamicRange: (range: number) => void
-  setWdwSrmtEnabled: (enabled: boolean) => void
-  setWdwSrmtClock: (clock: import('@/lib/geometry/extended/wheelerDeWitt').WdwSrmtClock) => void
-  setWdwSrmtCutNormalized: (cut: number) => void
-  setWdwSrmtRankCap: (cap: number) => void
-  setWdwSrmtHeatmapIntensity: (intensity: number) => void
-  applyWheelerDeWittPreset: (presetId: string) => Promise<void>
-  triggerWdwRecompute: () => void
-  clearWdwNeedsReset: () => void
-
-  // Anti-de Sitter Bound-State Configuration (Stage 1)
-  setAdsDimension: (d: number) => void
-  setAdsRadialQuantumNumber: (n: number) => void
-  setAdsAngularQuantumNumber: (l: number) => void
-  setAdsMagneticQuantumNumber: (m: number) => void
-  setAdsMassParameter: (mL: number) => void
-  setAdsQuantizationBranch: (
-    branch: import('@/lib/geometry/extended/antiDeSitter').AdsQuantizationBranch
-  ) => void
-  setAdsBoundaryOverlay: (enabled: boolean) => void
-  setAdsPreset: (name: import('@/lib/geometry/extended/antiDeSitter').AdsPresetName) => void
-  setAdsBtzEnabled: (enabled: boolean) => void
-  setAdsBtzHorizonRadius: (r: number) => void
-  setAdsBtzOmega: (omega: number) => void
-  setAdsBtzAngularM: (m: number) => void
-  setAdsHkllEnabled: (enabled: boolean) => void
-  setAdsHkllBoundarySource: (
-    source: import('@/lib/geometry/extended/antiDeSitter').AdsHkllSource
-  ) => void
-  setAdsHkllSourceSigma: (sigma: number) => void
-  setAdsHkllPlaneWaveM: (m: number) => void
-  triggerAdsRecompute: () => void
-  clearAdsNeedsReset: () => void
-
-  // Free Scalar Field Presets
-  applyFreeScalarPreset: (presetId: string) => void
-
-  // Quantum Walk
-  applyQuantumWalkPreset: (presetId: string) => Promise<void>
-  resetQuantumWalk: () => void
-  clearQuantumWalkNeedsReset: () => void
-  setQwAutoScale: (autoScale: boolean) => void
-  setQwAbsorberEnabled: (enabled: boolean) => void
-  setQwAbsorberWidth: (width: number) => void
-  setQwPmlTargetReflection: (r: number) => void
-  setQwSlicePosition: (dimIndex: number, value: number) => void
+  /** Clear needsReset on any schroedinger sub-config (no version bump). */
+  clearComputeNeedsReset: (configKey: string) => void
+  /** Mark needsReset on any schroedinger sub-config (with version bump). */
+  markComputeNeedsReset: (configKey: string) => void
 
   // Open Quantum System
   setOpenQuantumEnabled: (enabled: boolean) => void
@@ -670,8 +210,6 @@ export interface PauliSpinorSliceActions {
   setPauliSliceAmplitude: (amplitude: number) => void
 
   // Lifecycle
-  setPauliNeedsReset: () => void
-  clearPauliNeedsReset: () => void
   resetPauliField: () => void
   setPauliConfig: (config: Partial<PauliConfig>) => void
   initializePauliForDimension: (dimension: number) => void

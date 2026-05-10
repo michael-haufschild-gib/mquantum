@@ -113,7 +113,7 @@ const WAVE_EVOLUTION_RESET_HANDLERS: Record<
   freeScalarField: (state) => state.resetFreeScalarField(),
   tdse: (state) => state.resetTdseField(),
   bec: (state) => state.resetBecField(),
-  dirac: (state) => state.setDiracNeedsReset(),
+  dirac: (state) => state.markComputeNeedsReset('dirac'),
   quantumWalk: (state) => state.resetQuantumWalk(),
   wheelerDeWitt: (state) => state.triggerWdwRecompute(),
   antiDeSitter: (state) => state.triggerAdsRecompute(),

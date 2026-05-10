@@ -12,6 +12,7 @@ import {
   SCHROEDINGER_MAX_DIM as MAX_DIM,
   SCHROEDINGER_MAX_TERMS as MAX_TERMS,
 } from '@/constants/quantum'
+import { clampFinite, clampFiniteInteger } from '@/lib/math/clamp'
 import { mulberry32 } from '@/lib/math/rng'
 
 /**
@@ -53,16 +54,6 @@ const DEFAULT_TERM_COUNT = 3
 const DEFAULT_MAX_N = 5
 const DEFAULT_FREQUENCY_SPREAD = 0.02
 const MAX_QUANTUM_NUMBER = 6
-
-function clampFiniteInteger(value: number, fallback: number, min: number, max: number): number {
-  const finite = Number.isFinite(value) ? value : fallback
-  return Math.floor(Math.max(min, Math.min(max, finite)))
-}
-
-function clampFiniteNumber(value: number, fallback: number, min: number, max: number): number {
-  const finite = Number.isFinite(value) ? value : fallback
-  return Math.max(min, Math.min(max, finite))
-}
 
 function finiteOr(value: number | undefined, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback
@@ -159,10 +150,10 @@ export function generateQuantumPreset(
 ): QuantumPreset {
   // Clamp parameters to valid ranges
   const safeSeed = Number.isFinite(seed) ? Math.trunc(seed) : 0
-  const dim = clampFiniteInteger(dimension, DEFAULT_DIMENSION, 3, MAX_DIM)
-  const terms = clampFiniteInteger(termCount, DEFAULT_TERM_COUNT, 1, MAX_TERMS)
-  const nMax = clampFiniteInteger(maxN, DEFAULT_MAX_N, 1, MAX_QUANTUM_NUMBER)
-  const spread = clampFiniteNumber(frequencySpread, DEFAULT_FREQUENCY_SPREAD, 0, 0.5)
+  const dim = clampFiniteInteger(dimension, DEFAULT_DIMENSION, 3, MAX_DIM, 'floor')
+  const terms = clampFiniteInteger(termCount, DEFAULT_TERM_COUNT, 1, MAX_TERMS, 'floor')
+  const nMax = clampFiniteInteger(maxN, DEFAULT_MAX_N, 1, MAX_QUANTUM_NUMBER, 'floor')
+  const spread = clampFinite(frequencySpread, DEFAULT_FREQUENCY_SPREAD, 0, 0.5)
 
   // Omega uses the base seed — independent of term count
   const omegaRng = mulberry32(safeSeed)

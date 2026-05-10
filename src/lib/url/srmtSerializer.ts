@@ -22,6 +22,8 @@
 
 import type { WdwSrmtClock } from '@/lib/geometry/extended/wheelerDeWitt'
 
+import { parseBoolParam, parseFloatParam, parseIntParam } from './paramHelpers'
+
 /** Valid SRMT clock axes, as accepted / emitted in URLs. */
 export const VALID_SRMT_CLOCKS = ['a', 'phi1', 'phi2'] as const satisfies readonly WdwSrmtClock[]
 /** URL-side clock type alias (mirrors `WdwSrmtClock`). */
@@ -34,42 +36,6 @@ export interface SrmtUrlState {
   wdwSrmtCutNormalized?: number
   wdwSrmtRankCap?: number
   wdwSrmtHeatmapIntensity?: number
-}
-
-const INTEGER_RE = /^-?\d+$/
-const FLOAT_RE = /^-?(?:\d+\.?\d*|\.\d+)$/
-
-function parseIntClamped(
-  params: URLSearchParams,
-  key: string,
-  min: number,
-  max: number
-): number | undefined {
-  const raw = params.get(key)
-  if (!raw || !INTEGER_RE.test(raw)) return undefined
-  const v = Number(raw)
-  if (!Number.isSafeInteger(v)) return undefined
-  return Math.max(min, Math.min(max, v))
-}
-
-function parseFloatClamped(
-  params: URLSearchParams,
-  key: string,
-  min: number,
-  max: number
-): number | undefined {
-  const raw = params.get(key)
-  if (!raw || !FLOAT_RE.test(raw)) return undefined
-  const v = Number(raw)
-  if (!Number.isFinite(v)) return undefined
-  return Math.max(min, Math.min(max, v))
-}
-
-function parseBool(params: URLSearchParams, key: string): boolean | undefined {
-  const raw = params.get(key)
-  if (raw === '1') return true
-  if (raw === '0') return false
-  return undefined
 }
 
 /**
@@ -105,13 +71,13 @@ export function serializeSrmt(
  * @param state - Mutable parsed state (SRMT fields added in-place).
  */
 export function deserializeSrmt(params: URLSearchParams, state: SrmtUrlState): void {
-  state.wdwSrmtEnabled = parseBool(params, 'srmt')
+  state.wdwSrmtEnabled = parseBoolParam(params, 'srmt')
   const clockRaw = params.get('srmt_c')
   state.wdwSrmtClock =
     clockRaw && (VALID_SRMT_CLOCKS as readonly string[]).includes(clockRaw)
       ? (clockRaw as UrlWdwSrmtClock)
       : undefined
-  state.wdwSrmtCutNormalized = parseFloatClamped(params, 'srmt_x', 0.1, 0.9)
-  state.wdwSrmtRankCap = parseIntClamped(params, 'srmt_r', 8, 256)
-  state.wdwSrmtHeatmapIntensity = parseFloatClamped(params, 'srmt_h', 0, 1)
+  state.wdwSrmtCutNormalized = parseFloatParam(params, 'srmt_x', 0.1, 0.9)
+  state.wdwSrmtRankCap = parseIntParam(params, 'srmt_r', 8, 256)
+  state.wdwSrmtHeatmapIntensity = parseFloatParam(params, 'srmt_h', 0, 1)
 }

@@ -189,11 +189,11 @@ describe('TDSE store slice', () => {
     expect(useExtendedObjectStore.getState().schroedinger.tdse.needsReset).toBe(true)
   })
 
-  it('clearTdseNeedsReset clears needsReset without version bump', () => {
+  it('clearComputeNeedsReset(tdse) clears needsReset without version bump', () => {
     const store = useExtendedObjectStore.getState()
     store.setTdseInitialCondition('planeWave') // sets needsReset = true
     const versionBefore = useExtendedObjectStore.getState().schroedingerVersion
-    store.clearTdseNeedsReset()
+    store.clearComputeNeedsReset('tdse')
     expect(useExtendedObjectStore.getState().schroedinger.tdse.needsReset).toBe(false)
     expect(useExtendedObjectStore.getState().schroedingerVersion).toBe(versionBefore)
   })

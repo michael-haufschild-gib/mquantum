@@ -16,8 +16,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import type { DensityDistributionAnalyzer } from '@/rendering/webgpu/passes/DensityDistributionAnalysis'
-import type { DensityReadbackState } from '@/rendering/webgpu/passes/DensityGridComputePassDispose'
-import { startPendingReadback } from '@/rendering/webgpu/passes/DensityGridComputePassDispose'
+import type { DensityReadbackState } from '@/rendering/webgpu/passes/DensityGridComputePassResources'
+import { startPendingReadback } from '@/rendering/webgpu/passes/DensityGridComputePassResources'
 
 function createMockState(): DensityReadbackState {
   const fakeBuffer = {

@@ -8,6 +8,8 @@
 import type { KasnerExponents } from '@/lib/physics/cosmology/bianchiKasner'
 import type { CosmologyPreset } from '@/lib/physics/cosmology/presets'
 
+import type { PmlAbsorberConfig } from './crossMode'
+
 // ============================================================================
 // Field View & Initial Conditions
 // ============================================================================
@@ -315,7 +317,7 @@ export const DEFAULT_PREHEATING_CONFIG: PreheatingConfig = {
  * Configuration for the free scalar field (Klein-Gordon) lattice simulation.
  * Controls lattice geometry, physics parameters, initial conditions, and visualization.
  */
-export interface FreeScalarConfig {
+export interface FreeScalarConfig extends PmlAbsorberConfig {
   /** Spatial dimensionality of the lattice (3-6), enforced by the quantum type registry */
   latticeDim: number
   /** Lattice grid size per dimension — length equals latticeDim */
@@ -362,14 +364,6 @@ export interface FreeScalarConfig {
   selfInteractionLambda: number
   /** Vacuum expectation value v (field minima at phi = +/-v) */
   selfInteractionVev: number
-
-  // === Absorber (PML) ===
-  /** Enable absorbing boundary (PML) — prevents periodic wrap-around */
-  absorberEnabled: boolean
-  /** PML layer width (fraction of grid per side) */
-  absorberWidth: number
-  /** Target round-trip reflection coefficient for PML */
-  pmlTargetReflection: number
 
   // === Diagnostics ===
   /** Enable diagnostic readback (norm, energy, field statistics) */

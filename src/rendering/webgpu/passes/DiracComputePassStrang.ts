@@ -20,7 +20,7 @@ import type { DiracConfig } from '@/lib/geometry/extended/types'
 
 import type { WebGPURenderContext } from '../core/types'
 import type { SiteDispatch } from './computePassUtils'
-import type { DiracBindGroupResult, DiracPipelineResult } from './DiracComputePassTypes'
+import type { DiracBindGroupResult, DiracPipelineResult } from './DiracComputePassResources'
 
 /** Function shape matching WebGPUBasePass.dispatchCompute. */
 export type DispatchComputeFn = (

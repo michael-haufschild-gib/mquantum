@@ -16,6 +16,7 @@ import {
   type TdseConfig,
   type TdseInitialCondition,
 } from '@/lib/geometry/extended/tdse'
+import { clampFinite, clampFiniteArray, clampFiniteInteger } from '@/lib/math/clamp'
 import { thomasFermiMuND } from '@/lib/physics/bec/chemicalPotential'
 import {
   computeWaterfallBackgroundDensity,
@@ -52,27 +53,8 @@ const BEC_FIELD_VIEWS = new Set<BecFieldView>([
   'vorticity',
 ])
 
-function clampFinite(
-  value: number | undefined,
-  fallback: number,
-  min: number,
-  max: number
-): number {
-  if (!Number.isFinite(value)) return fallback
-  return Math.max(min, Math.min(max, value!))
-}
-
-function clampInteger(
-  value: number | undefined,
-  fallback: number,
-  min: number,
-  max: number
-): number {
-  return Math.round(clampFinite(value, fallback, min, max))
-}
-
 function sanitizeBecLatticeDim(value: number | undefined): number {
-  return clampInteger(value, DEFAULT_BEC_CONFIG.latticeDim, MIN_DIMENSION, MAX_DIMENSION)
+  return clampFiniteInteger(value, DEFAULT_BEC_CONFIG.latticeDim, MIN_DIMENSION, MAX_DIMENSION)
 }
 
 function sanitizeGridSizeArray(values: readonly number[] | undefined, latDim: number): number[] {
@@ -82,16 +64,6 @@ function sanitizeGridSizeArray(values: readonly number[] | undefined, latDim: nu
     const snapped = 2 ** Math.round(Math.log2(clamped))
     return Math.max(2, Math.min(128, snapped))
   })
-}
-
-function sanitizeFiniteArray(
-  values: readonly number[] | undefined,
-  latDim: number,
-  fallback: number,
-  min: number,
-  max: number
-): number[] {
-  return Array.from({ length: latDim }, (_, i) => clampFinite(values?.[i], fallback, min, max))
 }
 
 function sanitizeBooleanArray(values: readonly boolean[] | undefined, latDim: number): boolean[] {
@@ -115,8 +87,8 @@ function sanitizeVortexPlane(
   fallback: readonly [number, number],
   latDim: number
 ): [number, number] {
-  const a = clampInteger(value?.[0], fallback[0], 0, latDim - 1)
-  const b = clampInteger(value?.[1], fallback[1], 0, latDim - 1)
+  const a = clampFiniteInteger(value?.[0], fallback[0], 0, latDim - 1)
+  const b = clampFiniteInteger(value?.[1], fallback[1], 0, latDim - 1)
   return a === b ? [0, Math.min(1, latDim - 1)] : [a, b]
 }
 
@@ -153,14 +125,19 @@ function prepareBecInitCondition(bec: BecConfig, g: number, latDim: number) {
   // Build momentum vector — encode BEC-specific params
   const mom = new Array(Math.max(latDim, 5)).fill(0) as number[]
   if (initCond === 'vortexImprint' || initCond === 'vortexLattice') {
-    mom[0] = clampInteger(bec.vortexCharge, DEFAULT_BEC_CONFIG.vortexCharge, -4, 4)
+    mom[0] = clampFiniteInteger(bec.vortexCharge, DEFAULT_BEC_CONFIG.vortexCharge, -4, 4)
     if (initCond === 'vortexLattice') {
-      mom[3] = clampInteger(bec.vortexLatticeCount, DEFAULT_BEC_CONFIG.vortexLatticeCount, 1, 16)
+      mom[3] = clampFiniteInteger(
+        bec.vortexLatticeCount,
+        DEFAULT_BEC_CONFIG.vortexLatticeCount,
+        1,
+        16
+      )
       mom[4] = bec.vortexAlternateCharge ? 1.0 : 0.0
     }
   }
   if (initCond === 'vortexReconnection') {
-    mom[0] = clampInteger(bec.vortexCharge, DEFAULT_BEC_CONFIG.vortexCharge, -4, 4)
+    mom[0] = clampFiniteInteger(bec.vortexCharge, DEFAULT_BEC_CONFIG.vortexCharge, -4, 4)
   }
   if (initCond === 'darkSoliton') {
     mom[1] = clampFinite(bec.solitonDepth, DEFAULT_BEC_CONFIG.solitonDepth, 0, 1)
@@ -182,7 +159,7 @@ export function buildBecConfig(
 ): { config: TdseConfig } {
   const latDim = sanitizeBecLatticeDim(bec.latticeDim)
   const gridSize = sanitizeGridSizeArray(bec.gridSize, latDim)
-  const spacing = sanitizeFiniteArray(bec.spacing, latDim, 0.15, 0.01, 1)
+  const spacing = clampFiniteArray(bec.spacing, latDim, 0.15, 0.01, 1)
   const g = clampFinite(
     bec.interactionStrength,
     DEFAULT_BEC_CONFIG.interactionStrength,
@@ -191,11 +168,16 @@ export function buildBecConfig(
   )
   const omega = clampFinite(bec.trapOmega, DEFAULT_BEC_CONFIG.trapOmega, 0.01, 10)
   const initOmega = clampFinite(bec.initTrapOmega, omega, 0.01, 10)
-  const anisotropy = sanitizeFiniteArray(bec.trapAnisotropy, latDim, 1, 0.1, 10)
+  const anisotropy = clampFiniteArray(bec.trapAnisotropy, latDim, 1, 0.1, 10)
   const hbar = clampFinite(bec.hbar, DEFAULT_TDSE_CONFIG.hbar, 0.1, 10)
   const dt = clampFinite(bec.dt, DEFAULT_BEC_CONFIG.dt, 0.0001, 0.05)
-  const stepsPerFrame = clampInteger(bec.stepsPerFrame, DEFAULT_BEC_CONFIG.stepsPerFrame, 1, 16)
-  const diagnosticsInterval = clampInteger(
+  const stepsPerFrame = clampFiniteInteger(
+    bec.stepsPerFrame,
+    DEFAULT_BEC_CONFIG.stepsPerFrame,
+    1,
+    16
+  )
+  const diagnosticsInterval = clampFiniteInteger(
     bec.diagnosticsInterval,
     DEFAULT_BEC_CONFIG.diagnosticsInterval,
     1,
@@ -289,7 +271,12 @@ export function buildBecConfig(
       // that don't set it. Re-using the existing TDSE field names keeps
       // the schema flat — no BEC-only branch in the compute pass.
       disorderStrength: clampFinite(bec.disorderStrength, 0, 0, 100),
-      disorderSeed: clampInteger(bec.disorderSeed, DEFAULT_TDSE_CONFIG.disorderSeed, 0, 0xffffffff),
+      disorderSeed: clampFiniteInteger(
+        bec.disorderSeed,
+        DEFAULT_TDSE_CONFIG.disorderSeed,
+        0,
+        0xffffffff
+      ),
       disorderDistribution:
         bec.disorderDistribution === 'gaussian' || bec.disorderDistribution === 'uniform'
           ? bec.disorderDistribution
@@ -313,7 +300,7 @@ export function buildBecConfig(
       diagnosticsEnabled: booleanOr(bec.diagnosticsEnabled, true),
       diagnosticsInterval,
       needsReset: booleanOr(bec.needsReset, false),
-      slicePositions: sanitizeFiniteArray(bec.slicePositions, Math.max(0, latDim - 3), 0, -1, 1),
+      slicePositions: clampFiniteArray(bec.slicePositions, Math.max(0, latDim - 3), 0, -1, 1),
       interactionStrength: g,
       customPotentialExpression: '',
       observablesEnabled: booleanOr(bec.observablesEnabled, false),
@@ -322,10 +309,10 @@ export function buildBecConfig(
       vortexPlane1: sanitizeVortexPlane(bec.vortexPlane1, [0, 1], latDim),
       vortexPlane2: sanitizeVortexPlane(bec.vortexPlane2, [0, 1], latDim),
       vortexSeparation: clampFinite(bec.vortexSeparation, 0, 0, 5),
-      vortexPairCount: clampInteger(bec.vortexPairCount, 2, 1, 2),
+      vortexPairCount: clampFiniteInteger(bec.vortexPairCount, 2, 1, 2),
       // Kaluza-Klein compactification (pass through from BEC config)
       compactDims: sanitizeBooleanArray(bec.compactDims, latDim),
-      compactRadii: sanitizeFiniteArray(bec.compactRadii, latDim, 0.15, 0.01, 10),
+      compactRadii: clampFiniteArray(bec.compactRadii, latDim, 0.15, 0.01, 10),
       // Stochastic decoherence: disabled for BEC mode
       stochasticEnabled: false,
       stochasticGamma: 0,
@@ -350,7 +337,12 @@ export function buildBecConfig(
         0,
         0.5
       ),
-      hawkingSeed: clampInteger(bec.hawkingSeed, DEFAULT_BEC_CONFIG.hawkingSeed, 0, 0xffffffff),
+      hawkingSeed: clampFiniteInteger(
+        bec.hawkingSeed,
+        DEFAULT_BEC_CONFIG.hawkingSeed,
+        0,
+        0xffffffff
+      ),
     },
   }
 }

@@ -26,7 +26,7 @@ import { describe, expect, it } from 'vitest'
 import type { TdseConfig } from '@/lib/geometry/extended/tdse'
 import { DEFAULT_TDSE_CONFIG } from '@/lib/geometry/extended/tdse'
 import type { MetricConfig } from '@/lib/physics/tdse/metrics/types'
-import { TDSE_UNIFORM_SIZE } from '@/rendering/webgpu/passes/TDSEComputePassBuffers'
+import { TDSE_UNIFORM_SIZE } from '@/rendering/webgpu/passes/TDSEComputePassResources'
 import { writeTdseUniforms } from '@/rendering/webgpu/passes/TDSEComputePassUniforms'
 
 /** Capture the uniform ArrayBuffer that writeTdseUniforms hands to the GPU queue. */

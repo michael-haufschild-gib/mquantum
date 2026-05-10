@@ -8,7 +8,7 @@
 import { MAX_STOCHASTIC_SITES } from '@/lib/physics/stochastic/localizationKernel'
 import type { MetricConfig } from '@/lib/physics/tdse/metrics/types'
 
-import type { DisorderDistribution } from './crossMode'
+import type { DisorderDistribution, PmlAbsorberConfig } from './crossMode'
 
 // ============================================================================
 // TDSE Types
@@ -110,7 +110,7 @@ export type TdseDisorderDistribution = DisorderDistribution
  * Configuration for the TDSE (time-dependent Schroedinger equation) solver.
  * Uses split-operator Strang splitting with Stockham FFT on the GPU.
  */
-export interface TdseConfig {
+export interface TdseConfig extends PmlAbsorberConfig {
   /** Spatial dimensionality of the lattice (1-3 active, up to 11 with slicing) */
   latticeDim: number
   /** Lattice grid size per dimension — length equals latticeDim */
@@ -221,13 +221,6 @@ export interface TdseConfig {
   driveFrequency: number
   /** Drive oscillation amplitude */
   driveAmplitude: number
-
-  /** Enable absorbing boundary (PML) at domain boundaries */
-  absorberEnabled: boolean
-  /** PML absorption region width (fraction of domain per side, 0.05-0.5) */
-  absorberWidth: number
-  /** Target round-trip reflection coefficient for PML (e.g. 1e-6) */
-  pmlTargetReflection: number
 
   /** Which field quantity to render */
   fieldView: TdseFieldView

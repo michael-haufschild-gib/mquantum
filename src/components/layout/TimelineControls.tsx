@@ -129,7 +129,7 @@ export const TimelineControls: FC = () => {
       resetFreeScalarField: state.resetFreeScalarField,
       resetTdseField: state.resetTdseField,
       resetBecField: state.resetBecField,
-      setDiracNeedsReset: state.setDiracNeedsReset,
+      markComputeNeedsReset: state.markComputeNeedsReset,
       resetQuantumWalk: state.resetQuantumWalk,
       resetPauliField: state.resetPauliField,
       requestOpenQuantumStateReset: state.requestOpenQuantumStateReset,
@@ -232,7 +232,7 @@ export const TimelineControls: FC = () => {
         resetActions.resetBecField()
         break
       case 'diracEquation':
-        resetActions.setDiracNeedsReset()
+        resetActions.markComputeNeedsReset('dirac')
         break
       case 'quantumWalk':
         resetActions.resetQuantumWalk()

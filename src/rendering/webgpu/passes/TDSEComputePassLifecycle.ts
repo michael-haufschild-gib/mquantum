@@ -14,10 +14,10 @@
  */
 
 import type { DisorderState } from './TDSEComputePassDisorder'
-import type { TdsePassGpuSnapshot } from './TDSEComputePassDispose'
-import { disposeFullPass } from './TDSEComputePassDispose'
 import type { HawkingInjectState } from './TDSEComputePassHawking'
 import { disposeHawkingInject } from './TDSEComputePassHawking'
+import type { TdsePassGpuSnapshot } from './TDSEComputePassResources'
+import { disposeFullPass } from './TDSEComputePassResources'
 import type { TdseBindGroupResult, TdsePipelineResult } from './TDSEComputePassSetup'
 import type { WormholePipelineResources } from './TDSEComputePassWormhole'
 import type { DiagReadbackState } from './TDSEDiagnosticsReadback'

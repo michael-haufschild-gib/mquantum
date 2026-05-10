@@ -4,7 +4,7 @@
  * Validates:
  * - Mode selection wires quantum walk config correctly
  * - Dimension changes resize quantum walk arrays
- * - clearQuantumWalkNeedsReset clears the flag
+ * - clearComputeNeedsReset('quantumWalk') clears the flag
  * - setSchroedingerConfig patch merges correctly
  * - Representation is forced to position for compute modes including quantumWalk
  */
@@ -78,12 +78,12 @@ describe('Quantum walk store setters', () => {
     expect(getQW().gridSize).toEqual(originalGridSize)
   })
 
-  it('clearQuantumWalkNeedsReset clears the needsReset flag', () => {
+  it('clearComputeNeedsReset(quantumWalk) clears the needsReset flag', () => {
     const s = useExtendedObjectStore.getState()
     s.setSchroedingerConfig({ quantumWalk: { ...getQW(), needsReset: true } })
     expect(getQW().needsReset).toBe(true)
 
-    s.clearQuantumWalkNeedsReset()
+    s.clearComputeNeedsReset('quantumWalk')
     expect(getQW().needsReset).toBe(false)
   })
 

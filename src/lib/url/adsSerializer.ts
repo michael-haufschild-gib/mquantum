@@ -15,6 +15,15 @@ import type {
 } from '@/lib/geometry/extended/antiDeSitter'
 import { ADS_PRESET_MAP } from '@/lib/physics/antiDeSitter/presets'
 
+import {
+  parseBoolParam,
+  parseFloatParam,
+  parseIntParam,
+  setBoolParam,
+  setFloatParam,
+  setIntParam,
+} from './paramHelpers'
+
 /** URL-side branch type (mirrors the store enum). */
 export type UrlAdsBranch = AdsQuantizationBranch
 
@@ -63,59 +72,6 @@ const HKLL_SOURCE_TO_INT: Readonly<Record<UrlAdsHkllSource, number>> = {
   planeWave: 2,
 }
 
-const INTEGER_RE = /^-?\d+$/
-const FLOAT_RE = /^-?(?:\d+\.?\d*|\.\d+)$/
-
-function parseIntParam(
-  params: URLSearchParams,
-  key: string,
-  min: number,
-  max: number
-): number | undefined {
-  const raw = params.get(key)
-  if (!raw || !INTEGER_RE.test(raw)) return undefined
-  const v = Number(raw)
-  if (!Number.isSafeInteger(v)) return undefined
-  return Math.max(min, Math.min(max, v))
-}
-
-function parseFloatParam(
-  params: URLSearchParams,
-  key: string,
-  min: number,
-  max: number
-): number | undefined {
-  const raw = params.get(key)
-  if (!raw || !FLOAT_RE.test(raw)) return undefined
-  const v = Number(raw)
-  if (!Number.isFinite(v)) return undefined
-  return Math.max(min, Math.min(max, v))
-}
-
-function parseBoolParam(params: URLSearchParams, key: string): boolean | undefined {
-  const raw = params.get(key)
-  if (raw === '1') return true
-  if (raw === '0') return false
-  return undefined
-}
-
-function setIntParam(params: URLSearchParams, key: string, value: number | undefined): void {
-  if (value !== undefined) params.set(key, value.toString())
-}
-
-function setFloatParam(
-  params: URLSearchParams,
-  key: string,
-  value: number | undefined,
-  precision = 3
-): void {
-  if (value !== undefined) params.set(key, value.toFixed(precision))
-}
-
-function setBoolParam(params: URLSearchParams, key: string, value: boolean | undefined): void {
-  if (value !== undefined) params.set(key, value ? '1' : '0')
-}
-
 /**
  * Emit the `ads_*` sub-block. Callers gate on
  * `state.quantumMode === 'antiDeSitter'`.
@@ -126,6 +82,12 @@ function setBoolParam(params: URLSearchParams, key: string, value: boolean | und
  *     toggle itself is also emitted only when true (dormant `ads_btz=0`
  *     would otherwise pollute canonical bound-state links).
  *   - HKLL sub-fields follow the same rule keyed off `adsHkllEnabled`.
+ *
+ * Float emit precision: every `setFloatParam` call here pins precision to 3
+ * (`false, 3`) — the canonical helper defaults to 2 but the AdS wire format
+ * has historically used 3 decimals for `ads_mL`, `ads_btz_r`, `ads_btz_omega`,
+ * and `ads_hkll_sigma`. Tests pin the 3-decimal form (e.g. `'-1.235'`,
+ * `'1.234'`, `'6.700'`, `'0.123'`) so the override preserves shareable links.
  */
 export function serializeAds(params: URLSearchParams, state: AdsUrlState): void {
   if (state.adsPreset !== undefined && state.adsPreset !== 'custom') {
@@ -135,15 +97,15 @@ export function serializeAds(params: URLSearchParams, state: AdsUrlState): void 
   setIntParam(params, 'ads_n', state.adsRadial)
   setIntParam(params, 'ads_l', state.adsAngular)
   setIntParam(params, 'ads_m', state.adsMagnetic)
-  setFloatParam(params, 'ads_mL', state.adsMassParameter)
+  setFloatParam(params, 'ads_mL', state.adsMassParameter, false, 3)
   if (state.adsBranch !== undefined) {
     params.set('ads_qb', state.adsBranch === 'alternate' ? '1' : '0')
   }
   setBoolParam(params, 'ads_bo', state.adsBoundaryOverlay)
   if (state.adsBtzEnabled === true) {
     params.set('ads_btz', '1')
-    setFloatParam(params, 'ads_btz_r', state.adsBtzHorizonRadius)
-    setFloatParam(params, 'ads_btz_omega', state.adsBtzOmega)
+    setFloatParam(params, 'ads_btz_r', state.adsBtzHorizonRadius, false, 3)
+    setFloatParam(params, 'ads_btz_omega', state.adsBtzOmega, false, 3)
     setIntParam(params, 'ads_btz_mA', state.adsBtzAngularM)
   }
   if (state.adsHkllEnabled === true) {
@@ -151,7 +113,7 @@ export function serializeAds(params: URLSearchParams, state: AdsUrlState): void 
     if (state.adsHkllBoundarySource !== undefined) {
       params.set('ads_hkll_src', HKLL_SOURCE_TO_INT[state.adsHkllBoundarySource].toString())
     }
-    setFloatParam(params, 'ads_hkll_sigma', state.adsHkllSourceSigma)
+    setFloatParam(params, 'ads_hkll_sigma', state.adsHkllSourceSigma, false, 3)
     setIntParam(params, 'ads_hkll_mb', state.adsHkllPlaneWaveM)
   }
 }

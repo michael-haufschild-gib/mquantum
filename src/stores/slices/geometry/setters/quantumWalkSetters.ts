@@ -11,20 +11,18 @@ import {
 import { useGeometryStore } from '@/stores/geometryStore'
 import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
 
-import type { SchroedingerSlice } from '../types'
 import type { SetterContext } from './sliceSetterUtils'
 
-type QuantumWalkSetters = Pick<
-  SchroedingerSlice,
-  | 'applyQuantumWalkPreset'
-  | 'resetQuantumWalk'
-  | 'clearQuantumWalkNeedsReset'
-  | 'setQwAutoScale'
-  | 'setQwAbsorberEnabled'
-  | 'setQwAbsorberWidth'
-  | 'setQwPmlTargetReflection'
-  | 'setQwSlicePosition'
->
+/** Actions exposed by the quantum-walk setter bundle. */
+export interface QuantumWalkSetters {
+  applyQuantumWalkPreset: (presetId: string) => Promise<void>
+  resetQuantumWalk: () => void
+  setQwAutoScale: (autoScale: boolean) => void
+  setQwAbsorberEnabled: (enabled: boolean) => void
+  setQwAbsorberWidth: (width: number) => void
+  setQwPmlTargetReflection: (r: number) => void
+  setQwSlicePosition: (dimIndex: number, value: number) => void
+}
 
 /** Create all quantum-walk-related setters. */
 export function createQuantumWalkSetters(ctx: SetterContext): QuantumWalkSetters {
@@ -81,15 +79,6 @@ export function createQuantumWalkSetters(ctx: SetterContext): QuantumWalkSetters
           },
         }
       })
-    },
-
-    clearQuantumWalkNeedsReset: () => {
-      set((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          quantumWalk: { ...state.schroedinger.quantumWalk, needsReset: false },
-        },
-      }))
     },
 
     setQwAutoScale: (autoScale) => {

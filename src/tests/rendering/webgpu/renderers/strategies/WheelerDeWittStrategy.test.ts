@@ -206,11 +206,11 @@ describe('WheelerDeWittStrategy.executeFrame', () => {
   ): {
     render: (overrides?: { accumulatedTime?: number }) => void
   } {
-    const clearWdwNeedsReset = vi.fn()
+    const clearComputeNeedsReset = vi.fn()
     const stores: Record<string, unknown> = {
       extended: {
         schroedinger: { quantumMode: 'wheelerDeWitt', wheelerDeWitt: wdw },
-        clearWdwNeedsReset,
+        clearComputeNeedsReset,
       },
       animation: { isPlaying, accumulatedTime: 1.25 },
     }

@@ -68,7 +68,6 @@ export interface AntiDeSitterSetters {
   setAdsHkllSourceSigma: (sigma: number) => void
   setAdsHkllPlaneWaveM: (m: number) => void
   triggerAdsRecompute: () => void
-  clearAdsNeedsReset: () => void
 }
 
 /** Apply a single field mutation and flag `needsReset`. */
@@ -281,14 +280,6 @@ export function createAntiDeSitterSetters(ctx: SetterContext): AntiDeSitterSette
         schroedinger: {
           ...state.schroedinger,
           antiDeSitter: { ...state.schroedinger.antiDeSitter, needsReset: true },
-        },
-      }))
-    },
-    clearAdsNeedsReset: () => {
-      ctx.set((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          antiDeSitter: { ...state.schroedinger.antiDeSitter, needsReset: false },
         },
       }))
     },

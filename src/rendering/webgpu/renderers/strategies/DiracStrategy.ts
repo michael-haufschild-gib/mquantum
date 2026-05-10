@@ -119,7 +119,7 @@ export class DiracStrategy implements QuantumModeStrategy {
     )
 
     if (diracConfig.needsReset) {
-      extended?.clearDiracNeedsReset?.()
+      extended?.clearComputeNeedsReset?.('dirac')
     }
 
     handleSimulationStateIO(ctx, diracPass, ['diracEquation'])

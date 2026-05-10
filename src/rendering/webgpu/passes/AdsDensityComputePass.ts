@@ -17,7 +17,7 @@ import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
 import { SCHROEDINGER_UNIFORM_SIZE } from '../renderers/schroedingerLayout'
 import { composeAdsDensityComputeShader } from '../shaders/schroedinger/compute/composeAds'
-import { GRID_PARAMS_SIZE, writeGridParams } from './DensityGridComputePassBuffers'
+import { GRID_PARAMS_SIZE, writeGridParams } from './DensityGridComputePassResources'
 
 const WORKGROUP_SIZE = 8
 

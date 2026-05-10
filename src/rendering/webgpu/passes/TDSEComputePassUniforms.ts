@@ -7,6 +7,7 @@
 
 import { normalizeTdseBlackHoleParams } from '@/lib/geometry/extended/tdse'
 import type { TdseConfig } from '@/lib/geometry/extended/types'
+import { clampFinite } from '@/lib/math/clamp'
 import { buildCompactDimsMask } from '@/lib/physics/compactification'
 import { sigmaMaxFromPmlConfig } from '@/lib/physics/pml/profile'
 import { computeTdseEffectiveSpacing } from '@/lib/physics/tdse/effectiveSpacing'
@@ -125,12 +126,6 @@ const METRIC_KIND_MAP: Record<MetricKind, number> = {
   sphere2D: 5,
   torus: 6,
   doubleThroat: 7,
-}
-
-/** Clamp `v` into `[lo, hi]`; non-finite input returns `lo`. */
-function clampFinite(v: number | undefined, lo: number, hi: number): number {
-  if (v === undefined || !Number.isFinite(v)) return lo
-  return Math.min(hi, Math.max(lo, v))
 }
 
 function finiteOrZero(v: number | undefined): number {
@@ -357,8 +352,8 @@ export function writeTdseUniforms(
   // Clamp through clampFinite so a transient NaN/Infinity in either field
   // (e.g. malformed saved state) cannot leak into the trig and contaminate
   // the wormhole kernel. Default to (0, 0) → cos=1, sin=0 (no coupling).
-  const wormholeG = clampFinite(config.wormholeCouplingG, 0, Number.POSITIVE_INFINITY)
-  const wormholeTau = 0.5 * clampFinite(config.dt, 0, Number.POSITIVE_INFINITY)
+  const wormholeG = clampFinite(config.wormholeCouplingG, 0, 0, Number.POSITIVE_INFINITY)
+  const wormholeTau = 0.5 * clampFinite(config.dt, 0, 0, Number.POSITIVE_INFINITY)
   f32[198] = Math.cos(wormholeTau * wormholeG)
   f32[199] = Math.sin(wormholeTau * wormholeG)
 
@@ -397,7 +392,7 @@ export function writeTdseUniforms(
   // shared b₀). Clamp to its physical bounds; zero when not relevant.
   const wantsThroat = kind === 'morrisThorne' || kind === 'doubleThroat'
   f32[209] = wantsThroat
-    ? clampFinite(metric?.throatRadius, MIN_THROAT_RADIUS, MAX_THROAT_RADIUS)
+    ? clampFinite(metric?.throatRadius, MIN_THROAT_RADIUS, MIN_THROAT_RADIUS, MAX_THROAT_RADIUS)
     : 0
 
   // Curved-space TDSE v2 metric block (offsets 848-911, indices 212-227).
@@ -405,20 +400,30 @@ export function writeTdseUniforms(
   // clamped to its bounds from `lib/physics/tdse/metrics/types.ts`.
   f32[212] =
     kind === 'schwarzschild'
-      ? clampFinite(metric?.schwarzschildMass, MIN_SCHWARZSCHILD_MASS, MAX_SCHWARZSCHILD_MASS)
+      ? clampFinite(
+          metric?.schwarzschildMass,
+          MIN_SCHWARZSCHILD_MASS,
+          MIN_SCHWARZSCHILD_MASS,
+          MAX_SCHWARZSCHILD_MASS
+        )
       : 0
   f32[213] =
-    kind === 'deSitter' ? clampFinite(metric?.hubbleRate, MIN_HUBBLE_RATE, MAX_HUBBLE_RATE) : 0
+    kind === 'deSitter'
+      ? clampFinite(metric?.hubbleRate, MIN_HUBBLE_RATE, MIN_HUBBLE_RATE, MAX_HUBBLE_RATE)
+      : 0
   f32[214] =
-    kind === 'antiDeSitter' ? clampFinite(metric?.adsRadius, MIN_ADS_RADIUS, MAX_ADS_RADIUS) : 0
+    kind === 'antiDeSitter'
+      ? clampFinite(metric?.adsRadius, MIN_ADS_RADIUS, MIN_ADS_RADIUS, MAX_ADS_RADIUS)
+      : 0
   f32[215] =
     kind === 'sphere2D'
-      ? clampFinite(metric?.sphereRadius, MIN_SPHERE_RADIUS, MAX_SPHERE_RADIUS)
+      ? clampFinite(metric?.sphereRadius, MIN_SPHERE_RADIUS, MIN_SPHERE_RADIUS, MAX_SPHERE_RADIUS)
       : 0
   f32[216] =
     kind === 'doubleThroat'
       ? clampFinite(
           metric?.doubleThroatSeparation,
+          MIN_DOUBLE_THROAT_SEPARATION,
           MIN_DOUBLE_THROAT_SEPARATION,
           MAX_DOUBLE_THROAT_SEPARATION
         )
@@ -429,6 +434,7 @@ export function writeTdseUniforms(
       ? clampFinite(
           metric?.doubleThroatRadius ?? metric?.throatRadius,
           MIN_THROAT_RADIUS,
+          MIN_THROAT_RADIUS,
           MAX_THROAT_RADIUS
         )
       : 0
@@ -437,9 +443,9 @@ export function writeTdseUniforms(
   // torusPeriod (3 × f32 at indices 220-222). Zero when not torus.
   if (kind === 'torus') {
     const periods = metric?.torusPeriod
-    f32[220] = clampFinite(periods?.[0], MIN_TORUS_PERIOD, MAX_TORUS_PERIOD)
-    f32[221] = clampFinite(periods?.[1], MIN_TORUS_PERIOD, MAX_TORUS_PERIOD)
-    f32[222] = clampFinite(periods?.[2], MIN_TORUS_PERIOD, MAX_TORUS_PERIOD)
+    f32[220] = clampFinite(periods?.[0], MIN_TORUS_PERIOD, MIN_TORUS_PERIOD, MAX_TORUS_PERIOD)
+    f32[221] = clampFinite(periods?.[1], MIN_TORUS_PERIOD, MIN_TORUS_PERIOD, MAX_TORUS_PERIOD)
+    f32[222] = clampFinite(periods?.[2], MIN_TORUS_PERIOD, MIN_TORUS_PERIOD, MAX_TORUS_PERIOD)
   }
   // index 223 is _padV2c.
 

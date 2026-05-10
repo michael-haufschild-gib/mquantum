@@ -2,7 +2,10 @@
  * Tests for the object type registry helper functions.
  *
  * Verifies lookups, dimension constraint checking, and validation
- * for the single 'schroedinger' object type.
+ * for the supported ObjectTypes ('schroedinger', 'pauliSpinor').
+ *
+ * The per-ObjectType view is derived from QUANTUM_TYPE_REGISTRY by helpers
+ * — there is no separate ObjectType registry constant.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -12,7 +15,6 @@ import {
   getConfigStoreKey,
   getControlsComponentKey,
   getDimensionConstraints,
-  getObjectTypeEntry,
   getRecommendedDimension,
   getUnavailabilityReason,
   hasTimelineControls,
@@ -21,23 +23,24 @@ import {
   isValidObjectType,
 } from '@/lib/geometry/registry/helpers'
 
-describe('getObjectTypeEntry', () => {
-  it('returns exact entries for registered object types', () => {
-    expect(getObjectTypeEntry('schroedinger')).toMatchObject({
-      type: 'schroedinger',
-      name: 'Schrödinger Slices',
-      configStoreKey: 'schroedinger',
-    })
-    expect(getObjectTypeEntry('pauliSpinor')).toMatchObject({
-      type: 'pauliSpinor',
-      name: 'Pauli Spinor',
-      configStoreKey: 'pauliSpinor',
-    })
+describe('per-ObjectType helper aggregation', () => {
+  it('returns derived facts for registered object types', () => {
+    expect(getDimensionConstraints('schroedinger')).toMatchObject({ min: 2, max: 11 })
+    expect(getControlsComponentKey('schroedinger')).toBe('SchroedingerControls')
+    expect(getConfigStoreKey('schroedinger')).toBe('schroedinger')
+
+    expect(getDimensionConstraints('pauliSpinor')).toMatchObject({ min: 3, max: 6 })
+    expect(getControlsComponentKey('pauliSpinor')).toBe('PauliSpinorControls')
+    expect(getConfigStoreKey('pauliSpinor')).toBe('pauliSpinor')
   })
 
   it('returns undefined for invalid type', () => {
     // @ts-expect-error intentional invalid type
-    expect(getObjectTypeEntry('invalid')).toBeUndefined()
+    expect(getDimensionConstraints('invalid')).toBeUndefined()
+    // @ts-expect-error intentional invalid type
+    expect(getControlsComponentKey('invalid')).toBeUndefined()
+    // @ts-expect-error intentional invalid type
+    expect(getConfigStoreKey('invalid')).toBeUndefined()
   })
 })
 

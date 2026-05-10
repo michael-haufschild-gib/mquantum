@@ -2,22 +2,29 @@
  * Free Scalar Field setter factory.
  *
  * Extracts all `setFreeScalar*`, `resetFreeScalarField`, and
- * `clearFreeScalarNeedsReset` methods from the schroedingerSlice.
+ * `resetFreeScalarField` methods from the schroedingerSlice.
  *
  * @module stores/slices/geometry/setters/freeScalarSetters
  */
 
 import { DEFAULT_FREE_SCALAR_CONFIG } from '@/lib/geometry/extended/freeScalar'
-import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
+import type {
+  FreeScalarConfig,
+  FreeScalarFieldView,
+  FreeScalarInitialCondition,
+} from '@/lib/geometry/extended/types'
 import { nearestPow2 } from '@/lib/math/ndArray'
 import { useGeometryStore } from '@/stores/geometryStore'
 
-import type { SchroedingerSliceActions } from '../types'
 import {
   createFreeScalarCosmologySetters,
+  type FreeScalarCosmologySetters,
   reconcileCosmologyInvariants,
 } from './freeScalarCosmologySetters'
-import { createFreeScalarPreheatingSetters } from './freeScalarPreheatingSetters'
+import {
+  createFreeScalarPreheatingSetters,
+  type FreeScalarPreheatingSetters,
+} from './freeScalarPreheatingSetters'
 import {
   clampDtWithCfl,
   defaultGridPerDim,
@@ -28,57 +35,53 @@ import {
   type SetterContext,
 } from './sliceSetterUtils'
 
-type FreeScalarActions = Pick<
-  SchroedingerSliceActions,
-  | 'setFreeScalarLatticeDim'
-  | 'setFreeScalarGridSize'
-  | 'setFreeScalarSpacing'
-  | 'setFreeScalarMass'
-  | 'setFreeScalarDt'
-  | 'setFreeScalarStepsPerFrame'
-  | 'setFreeScalarInitialCondition'
-  | 'setFreeScalarFieldView'
-  | 'setFreeScalarPacketCenter'
-  | 'setFreeScalarPacketWidth'
-  | 'setFreeScalarPacketAmplitude'
-  | 'setFreeScalarModeK'
-  | 'setFreeScalarAutoScale'
-  | 'setFreeScalarVacuumSeed'
-  | 'setFreeScalarSlicePosition'
-  | 'resetFreeScalarField'
-  | 'clearFreeScalarNeedsReset'
-  | 'setFreeScalarSelfInteractionEnabled'
-  | 'setFreeScalarSelfInteractionLambda'
-  | 'setFreeScalarSelfInteractionVev'
-  | 'setFreeScalarAbsorberEnabled'
-  | 'setFreeScalarAbsorberWidth'
-  | 'setFreeScalarPmlTargetReflection'
-  | 'setFreeScalarDiagnosticsEnabled'
-  | 'setFreeScalarDiagnosticsInterval'
-  | 'setFreeScalarKSpaceDisplayMode'
-  | 'setFreeScalarKSpaceFftShift'
-  | 'setFreeScalarKSpaceExposureMode'
-  | 'setFreeScalarKSpaceLowPercentile'
-  | 'setFreeScalarKSpaceHighPercentile'
-  | 'setFreeScalarKSpaceGamma'
-  | 'setFreeScalarKSpaceBroadeningEnabled'
-  | 'setFreeScalarKSpaceBroadeningRadius'
-  | 'setFreeScalarKSpaceBroadeningSigma'
-  | 'setFreeScalarKSpaceRadialBinCount'
-  | 'setFreeScalarCosmologyEnabled'
-  | 'setFreeScalarCosmologyPreset'
-  | 'setFreeScalarCosmologySteepness'
-  | 'setFreeScalarCosmologyHubble'
-  | 'setFreeScalarCosmologyEta0'
-  | 'setFreeScalarCosmologyBianchiExponents'
-  | 'setFreeScalarCosmologyLqcRhoCritical'
-  | 'setFreeScalarCosmologyLqcEquationOfState'
-  | 'setFreeScalarCosmologyLqcInitialRhoRatio'
-  | 'setFreeScalarPreheatingEnabled'
-  | 'setFreeScalarPreheatingAmplitude'
-  | 'setFreeScalarPreheatingFrequency'
-  | 'applyFreeScalarPreset'
->
+/** Actions exposed by the free-scalar field setter bundle. */
+export interface FreeScalarSetters extends FreeScalarCosmologySetters, FreeScalarPreheatingSetters {
+  setFreeScalarLatticeDim: (dim: number) => void
+  setFreeScalarGridSize: (size: number[]) => void
+  setFreeScalarSpacing: (spacing: number[]) => void
+  setFreeScalarMass: (mass: number) => void
+  setFreeScalarDt: (dt: number) => void
+  setFreeScalarStepsPerFrame: (steps: number) => void
+  setFreeScalarInitialCondition: (condition: FreeScalarInitialCondition) => void
+  setFreeScalarFieldView: (view: FreeScalarFieldView) => void
+  setFreeScalarPacketCenter: (center: number[]) => void
+  setFreeScalarPacketWidth: (width: number) => void
+  setFreeScalarPacketAmplitude: (amplitude: number) => void
+  setFreeScalarModeK: (k: number[]) => void
+  setFreeScalarAutoScale: (autoScale: boolean) => void
+  setFreeScalarVacuumSeed: (seed: number) => void
+  setFreeScalarSlicePosition: (dimIndex: number, value: number) => void
+  resetFreeScalarField: () => void
+  // Self-Interaction
+  setFreeScalarSelfInteractionEnabled: (enabled: boolean) => void
+  setFreeScalarSelfInteractionLambda: (lambda: number) => void
+  setFreeScalarSelfInteractionVev: (vev: number) => void
+  // PML Absorber
+  setFreeScalarAbsorberEnabled: (enabled: boolean) => void
+  setFreeScalarAbsorberWidth: (width: number) => void
+  setFreeScalarPmlTargetReflection: (r: number) => void
+  // Diagnostics
+  setFreeScalarDiagnosticsEnabled: (enabled: boolean) => void
+  setFreeScalarDiagnosticsInterval: (interval: number) => void
+  // k-Space Visualization Display Transforms
+  setFreeScalarKSpaceDisplayMode: (
+    mode: import('@/lib/geometry/extended/types').KSpaceDisplayMode
+  ) => void
+  setFreeScalarKSpaceFftShift: (enabled: boolean) => void
+  setFreeScalarKSpaceExposureMode: (
+    mode: import('@/lib/geometry/extended/types').KSpaceExposureMode
+  ) => void
+  setFreeScalarKSpaceLowPercentile: (value: number) => void
+  setFreeScalarKSpaceHighPercentile: (value: number) => void
+  setFreeScalarKSpaceGamma: (value: number) => void
+  setFreeScalarKSpaceBroadeningEnabled: (enabled: boolean) => void
+  setFreeScalarKSpaceBroadeningRadius: (value: number) => void
+  setFreeScalarKSpaceBroadeningSigma: (value: number) => void
+  setFreeScalarKSpaceRadialBinCount: (value: number) => void
+  // Presets
+  applyFreeScalarPreset: (presetId: string) => void
+}
 
 /**
  * Resize free scalar arrays to match a new latticeDim, preserving existing values
@@ -110,7 +113,7 @@ export const resizeFreeScalarArrays = (
  * Creates all Free Scalar Field setter actions for the schroedingerSlice.
  * @param ctx - Shared setter context with set/get and validation helpers
  */
-export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
+export function createFreeScalarSetters(ctx: SetterContext): FreeScalarSetters {
   const { setWithVersion, set, isFinite, warnNonFinite, hasOnlyFinite } = ctx
   const D = 'freeScalar' as const
 
@@ -395,14 +398,6 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
           },
         }
       })
-    },
-    clearFreeScalarNeedsReset: () => {
-      set((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, needsReset: false },
-        },
-      }))
     },
     setFreeScalarDiagnosticsEnabled: (enabled) => {
       set((state) => ({

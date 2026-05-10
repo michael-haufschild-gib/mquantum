@@ -59,7 +59,6 @@ export interface WheelerDeWittSetters {
   setWdwSrmtHeatmapIntensity: (intensity: number) => void
   applyWheelerDeWittPreset: (presetId: string) => Promise<void>
   triggerWdwRecompute: () => void
-  clearWdwNeedsReset: () => void
 }
 
 /**
@@ -283,14 +282,6 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
         schroedinger: {
           ...state.schroedinger,
           wheelerDeWitt: { ...state.schroedinger.wheelerDeWitt, needsReset: true },
-        },
-      }))
-    },
-    clearWdwNeedsReset: () => {
-      ctx.set((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          wheelerDeWitt: { ...state.schroedinger.wheelerDeWitt, needsReset: false },
         },
       }))
     },

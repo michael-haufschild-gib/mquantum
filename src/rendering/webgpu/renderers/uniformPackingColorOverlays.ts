@@ -16,7 +16,20 @@ interface HydrogenResult {
   bohrRadius: number
 }
 
-const parseColor = (hex: string): Rgb => parseHexColorToLinearRgb(hex)
+/** Parse a hex color string to a linear-space RGB triplet. */
+export const parseColor = (hex: string): Rgb => parseHexColorToLinearRgb(hex)
+
+/**
+ * Pack a hex color into a 4-float RGBA slot in a uniform Float32Array.
+ * Alpha is hardcoded to 0 — uniform color slots use alpha as padding.
+ */
+export function packColorRgba(floatView: Float32Array, idx: number, hex: string): void {
+  const rgb = parseColor(hex)
+  floatView[idx] = rgb[0]
+  floatView[idx + 1] = rgb[1]
+  floatView[idx + 2] = rgb[2]
+  floatView[idx + 3] = 0.0
+}
 
 /** Pack representation, radial probability, domain coloring, and diverging. */
 export function packRepresentationAndColorOverlays(
@@ -201,12 +214,4 @@ function getWignerRangeBasis(
     if (qn > maxN) maxN = qn
   }
   return { selectedOmega: floatView[I.omega + dimIdx] ?? 1.0, maxN }
-}
-
-function packColorRgba(floatView: Float32Array, idx: number, hex: string): void {
-  const rgb = parseColor(hex)
-  floatView[idx] = rgb[0]
-  floatView[idx + 1] = rgb[1]
-  floatView[idx + 2] = rgb[2]
-  floatView[idx + 3] = 0.0
 }

@@ -11,7 +11,7 @@
  * @module components/sections/Exposure/ExposureSection
  */
 
-import React, { useCallback } from 'react'
+import React, { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Section } from '@/components/sections/Section'
@@ -84,8 +84,8 @@ function useAutoScaleSetter(objectType: string): (v: boolean) => void {
  */
 function useResetField(objectType: string): () => void {
   const quantumMode = useExtendedObjectStore((s) => s.schroedinger.quantumMode)
-  return useExtendedObjectStore((s) => {
-    if (objectType === 'pauliSpinor') return s.setPauliNeedsReset
+  const markComputeNeedsReset = useExtendedObjectStore((s) => s.markComputeNeedsReset)
+  const stableAction = useExtendedObjectStore((s) => {
     switch (quantumMode) {
       case 'tdseDynamics':
         return s.resetTdseField
@@ -93,14 +93,18 @@ function useResetField(objectType: string): () => void {
         return s.resetBecField
       case 'freeScalarField':
         return s.resetFreeScalarField
-      case 'diracEquation':
-        return s.setDiracNeedsReset
       case 'quantumWalk':
         return s.resetQuantumWalk
       default:
-        return noop
+        return undefined
     }
   })
+  return useMemo(() => {
+    if (stableAction) return stableAction
+    if (objectType === 'pauliSpinor') return () => markComputeNeedsReset('pauliSpinor')
+    if (quantumMode === 'diracEquation') return () => markComputeNeedsReset('dirac')
+    return noop
+  }, [stableAction, quantumMode, markComputeNeedsReset, objectType])
 }
 
 /** Selects density gain, contrast, and max gain from the schroedinger config. */

@@ -38,7 +38,7 @@ describe('Pauli spinor setters — extended', () => {
   })
 
   it('setPauliInitialCondition triggers needsReset', () => {
-    store().clearPauliNeedsReset()
+    store().clearComputeNeedsReset('pauliSpinor')
     store().setPauliInitialCondition('planeWaveSpinor')
     expect(pauli().initialCondition).toBe('planeWaveSpinor')
     expect(pauli().needsReset).toBe(true)
@@ -72,7 +72,7 @@ describe('Pauli spinor setters — extended', () => {
   })
 
   it('setPauliPotentialType triggers needsReset', () => {
-    store().clearPauliNeedsReset()
+    store().clearComputeNeedsReset('pauliSpinor')
     store().setPauliPotentialType('harmonicTrap')
     expect(pauli().potentialType).toBe('harmonicTrap')
     expect(pauli().needsReset).toBe(true)
@@ -158,10 +158,10 @@ describe('Pauli spinor setters — extended', () => {
     expect(pauli().sliceAmplitude).toBe(0.5)
   })
 
-  it('setPauliNeedsReset / clearPauliNeedsReset lifecycle', () => {
-    store().clearPauliNeedsReset()
+  it('markComputeNeedsReset / clearComputeNeedsReset pauliSpinor lifecycle', () => {
+    store().clearComputeNeedsReset('pauliSpinor')
     expect(pauli().needsReset).toBe(false)
-    store().setPauliNeedsReset()
+    store().markComputeNeedsReset('pauliSpinor')
     expect(pauli().needsReset).toBe(true)
   })
 })

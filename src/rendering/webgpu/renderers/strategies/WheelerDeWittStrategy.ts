@@ -193,7 +193,9 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     const wdw = extended?.schroedinger?.wheelerDeWitt as WheelerDeWittConfig | undefined
     if (!wdw) return
 
-    const physicsTick = this.physics.update(wdw, () => extended?.clearWdwNeedsReset?.())
+    const physicsTick = this.physics.update(wdw, () =>
+      extended?.clearComputeNeedsReset?.('wheelerDeWitt')
+    )
     if (!physicsTick.output) return
 
     const srmtTick = this.srmt.update(wdw, physicsTick.output, physicsTick.solverDirty)

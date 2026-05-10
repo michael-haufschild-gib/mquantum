@@ -157,7 +157,7 @@ export class FreeScalarFieldStrategy implements QuantumModeStrategy {
 
     // Clear needsReset after processing
     if (freeScalarConfig.needsReset) {
-      extended?.clearFreeScalarNeedsReset?.()
+      extended?.clearComputeNeedsReset?.('freeScalar')
     }
 
     // FSF diagnostic: log state changes once per second (dev only)

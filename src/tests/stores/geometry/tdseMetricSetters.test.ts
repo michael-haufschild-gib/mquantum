@@ -207,7 +207,7 @@ describe('setTdseMetric', () => {
     it('idempotent write does NOT set needsReset', () => {
       set()({ kind: 'morrisThorne', throatRadius: 0.7 })
       // Clear the flag the first write set.
-      useExtendedObjectStore.getState().clearTdseNeedsReset()
+      useExtendedObjectStore.getState().clearComputeNeedsReset('tdse')
       expect(tdse().needsReset).toBe(false)
       // Same input → no diff → no reset.
       set()({ kind: 'morrisThorne', throatRadius: 0.7 })
@@ -216,21 +216,21 @@ describe('setTdseMetric', () => {
 
     it('different param value DOES set needsReset', () => {
       set()({ kind: 'morrisThorne', throatRadius: 0.7 })
-      useExtendedObjectStore.getState().clearTdseNeedsReset()
+      useExtendedObjectStore.getState().clearComputeNeedsReset('tdse')
       set()({ kind: 'morrisThorne', throatRadius: 0.9 })
       expect(tdse().needsReset).toBe(true)
     })
 
     it('different kind DOES set needsReset', () => {
       set()({ kind: 'flat' })
-      useExtendedObjectStore.getState().clearTdseNeedsReset()
+      useExtendedObjectStore.getState().clearComputeNeedsReset('tdse')
       set()({ kind: 'morrisThorne', throatRadius: 0.5 })
       expect(tdse().needsReset).toBe(true)
     })
 
     it('idempotent torus write (same array contents) does NOT reset', () => {
       set()({ kind: 'torus', torusPeriod: [2, 3, 4] })
-      useExtendedObjectStore.getState().clearTdseNeedsReset()
+      useExtendedObjectStore.getState().clearComputeNeedsReset('tdse')
       set()({ kind: 'torus', torusPeriod: [2, 3, 4] })
       expect(tdse().needsReset).toBe(false)
     })
@@ -241,7 +241,7 @@ describe('setTdseMetric', () => {
         doubleThroatSeparation: 4,
         doubleThroatRadius: 0.4,
       })
-      useExtendedObjectStore.getState().clearTdseNeedsReset()
+      useExtendedObjectStore.getState().clearComputeNeedsReset('tdse')
       set()({
         kind: 'doubleThroat',
         doubleThroatSeparation: 4,

@@ -11,6 +11,7 @@
  * 10 render passes, 0 compute passes. All rgba16float fragment shaders.
  */
 
+import { clamp } from '@/lib/math/clamp'
 import {
   DEFAULT_BLOOM_GAIN,
   DEFAULT_BLOOM_KNEE,
@@ -33,10 +34,6 @@ import {
 const NUM_DOWN_MIPS = 5
 /** Number of upsample mip levels. */
 const NUM_UP_MIPS = 4
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value))
-}
 
 interface BloomStoreState {
   bloomGain?: number

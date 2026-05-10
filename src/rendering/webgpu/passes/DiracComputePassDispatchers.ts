@@ -15,7 +15,7 @@ import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import type { WebGPURenderContext } from '../core/types'
 import { assertPow2Log2, FFT_UNIFORM_SIZE, LINEAR_WG } from './computePassUtils'
-import type { DiracBindGroupResult, DiracPipelineResult } from './DiracComputePassTypes'
+import type { DiracBindGroupResult, DiracPipelineResult } from './DiracComputePassResources'
 
 /** DiracDiagUniforms struct size (16 bytes: totalSites, numWorkgroups, spinorSize, pad) */
 export const DIAG_UNIFORM_SIZE = 16

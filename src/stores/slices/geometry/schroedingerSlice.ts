@@ -36,7 +36,12 @@ import { createOpenQuantumSetters } from './setters/openQuantumSetters'
 import { createQuantumModeSetters } from './setters/quantumModeSetters'
 import { createQuantumWalkSetters } from './setters/quantumWalkSetters'
 import type { SetterContext } from './setters/sliceSetterUtils'
-import { clampDtWithCfl } from './setters/sliceSetterUtils'
+import {
+  clampDtWithCfl,
+  clearSchrodingerModeNeedsReset,
+  markSchrodingerModeNeedsReset,
+  type ResettableConfigKey,
+} from './setters/sliceSetterUtils'
 import { createTdseSetters, resizeTdseArrays } from './setters/tdseSetters'
 import { createVisualEffectSetters } from './setters/visualEffectSetters'
 import { createWheelerDeWittSetters } from './setters/wheelerDeWittSetters'
@@ -509,6 +514,27 @@ export const createSchroedingerSlice: StateCreator<
 
     // === Quantum Walk ===
     ...createQuantumWalkSetters(ctx),
+
+    // === Generic Compute Reset ===
+    clearComputeNeedsReset: (configKey: string) => {
+      if (configKey === 'pauliSpinor') {
+        set((state) => ({
+          pauliSpinor: { ...state.pauliSpinor, needsReset: false },
+        }))
+      } else {
+        clearSchrodingerModeNeedsReset(set, configKey as ResettableConfigKey)
+      }
+    },
+    markComputeNeedsReset: (configKey: string) => {
+      if (configKey === 'pauliSpinor') {
+        setWithVersion((state) => ({
+          pauliSpinorVersion: state.pauliSpinorVersion + 1,
+          pauliSpinor: { ...state.pauliSpinor, needsReset: true },
+        }))
+      } else {
+        markSchrodingerModeNeedsReset(setWithVersion, configKey as ResettableConfigKey)
+      }
+    },
 
     // === Config Operations ===
     setSchroedingerConfig: (config) => {

@@ -159,16 +159,10 @@ export const MOMENTUM_DISPLAY_MODE_MAP: Record<string, number> = {
 export interface ExtendedStoreSnapshot {
   schroedinger?: Partial<SchroedingerConfig>
   schroedingerVersion?: number
-  clearFreeScalarNeedsReset?: () => void
-  clearTdseNeedsReset?: () => void
-  clearBecNeedsReset?: () => void
-  clearDiracNeedsReset?: () => void
-  clearQuantumWalkNeedsReset?: () => void
-  clearWdwNeedsReset?: () => void
-  clearAdsNeedsReset?: () => void
+  /** Generic clear for any schroedinger sub-config needsReset flag (no version bump). */
+  clearComputeNeedsReset?: (configKey: string) => void
   pauliSpinor?: import('@/lib/geometry/extended/types').PauliConfig
   pauliSpinorVersion?: number
-  clearPauliNeedsReset?: () => void
 }
 
 /** Object transform snapshot */

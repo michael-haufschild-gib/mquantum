@@ -10,6 +10,7 @@
 import { useAppearanceStore } from '../appearanceStore'
 import {
   APPEARANCE_LOAD_KEYS,
+  clampFiniteOrFallback,
   clampToRange,
   COLOR_ALGORITHM_SET,
   DIVERGING_COMPONENT_SET,
@@ -17,18 +18,8 @@ import {
   normalizeCosineVector,
   POST_PROCESSING_LOAD_KEYS,
   SHADER_TYPE_SET,
+  validateBooleanField,
 } from './presetNormalizationShared'
-
-// ---------------------------------------------------------------------------
-// Shared helpers
-// ---------------------------------------------------------------------------
-
-function clampFiniteOrFallback(value: unknown, min: number, max: number, fallback: number): number {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return clampToRange(value, min, max)
-  }
-  return fallback
-}
 
 /** Validate a numeric field: clamp if finite, delete if not. */
 function validateNumericField(
@@ -47,12 +38,6 @@ function validateNumericField(
 }
 
 /** Validate a boolean field: delete if not boolean. */
-function validateBooleanField(obj: Record<string, unknown>, key: string): void {
-  if (key in obj && typeof obj[key] !== 'boolean') {
-    delete obj[key]
-  }
-}
-
 /** Validate a string field: delete if not string. */
 function validateStringField(obj: Record<string, unknown>, key: string): void {
   if (key in obj && typeof obj[key] !== 'string') {

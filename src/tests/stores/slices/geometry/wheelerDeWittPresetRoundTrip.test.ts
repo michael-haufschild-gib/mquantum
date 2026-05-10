@@ -18,7 +18,7 @@ const getWdw = () => useExtendedObjectStore.getState().schroedinger.wheelerDeWit
 describe('Wheeler–DeWitt grid preset — publication round trip', () => {
   beforeEach(() => {
     useExtendedObjectStore.getState().reset()
-    useExtendedObjectStore.getState().clearWdwNeedsReset()
+    useExtendedObjectStore.getState().clearComputeNeedsReset('wheelerDeWitt')
   })
 
   it('registry entry equals the documented (256, 48) tuple', () => {

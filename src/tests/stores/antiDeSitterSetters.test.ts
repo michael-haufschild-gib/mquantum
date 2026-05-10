@@ -17,7 +17,7 @@ import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 describe('anti-de Sitter setters', () => {
   beforeEach(() => {
     useExtendedObjectStore.getState().reset()
-    useExtendedObjectStore.getState().clearAdsNeedsReset()
+    useExtendedObjectStore.getState().clearComputeNeedsReset('antiDeSitter')
   })
 
   it('setAdsDimension clamps to [3, 7] and flags needsReset', () => {
@@ -28,7 +28,7 @@ describe('anti-de Sitter setters', () => {
     expect(afterUpper.needsReset).toBe(true)
     expect(afterUpper.preset).toBe('custom')
 
-    useExtendedObjectStore.getState().clearAdsNeedsReset()
+    useExtendedObjectStore.getState().clearComputeNeedsReset('antiDeSitter')
     store.setAdsDimension(1)
     expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.d).toBe(3)
   })
@@ -75,7 +75,7 @@ describe('anti-de Sitter setters', () => {
     const store = useExtendedObjectStore.getState()
     store.setAdsDimension(4)
     store.setAdsMassParameter(0)
-    useExtendedObjectStore.getState().clearAdsNeedsReset()
+    useExtendedObjectStore.getState().clearComputeNeedsReset('antiDeSitter')
 
     store.setAdsDimension(Number.NaN)
     store.setAdsMassParameter(Number.POSITIVE_INFINITY)
@@ -104,7 +104,7 @@ describe('anti-de Sitter setters', () => {
   it('setAdsPreset(custom) only flips the label, not the params', () => {
     const store = useExtendedObjectStore.getState()
     store.setAdsPreset('adsFourQuadrupole')
-    useExtendedObjectStore.getState().clearAdsNeedsReset()
+    useExtendedObjectStore.getState().clearComputeNeedsReset('antiDeSitter')
     const before = { ...useExtendedObjectStore.getState().schroedinger.antiDeSitter }
     store.setAdsPreset('custom')
     const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
@@ -130,7 +130,7 @@ describe('anti-de Sitter setters', () => {
   it('triggerAdsRecompute flips needsReset without touching physics fields', () => {
     const store = useExtendedObjectStore.getState()
     store.setAdsPreset('adsFourGround')
-    useExtendedObjectStore.getState().clearAdsNeedsReset()
+    useExtendedObjectStore.getState().clearComputeNeedsReset('antiDeSitter')
     const before = { ...useExtendedObjectStore.getState().schroedinger.antiDeSitter }
     store.triggerAdsRecompute()
     const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
@@ -139,11 +139,11 @@ describe('anti-de Sitter setters', () => {
     expect(after.mL).toBe(before.mL)
   })
 
-  it('clearAdsNeedsReset flips needsReset off', () => {
+  it('clearComputeNeedsReset(antiDeSitter) flips needsReset off', () => {
     const store = useExtendedObjectStore.getState()
     store.triggerAdsRecompute()
     expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.needsReset).toBe(true)
-    store.clearAdsNeedsReset()
+    store.clearComputeNeedsReset('antiDeSitter')
     expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.needsReset).toBe(false)
   })
 
@@ -195,7 +195,7 @@ describe('anti-de Sitter setters', () => {
       store.setAdsBtzHorizonRadius(0.4)
       store.setAdsBtzOmega(1.3)
       store.setAdsBtzAngularM(2)
-      useExtendedObjectStore.getState().clearAdsNeedsReset()
+      useExtendedObjectStore.getState().clearComputeNeedsReset('antiDeSitter')
 
       store.setAdsBtzHorizonRadius(Number.NaN)
       store.setAdsBtzOmega(Number.POSITIVE_INFINITY)
@@ -310,7 +310,7 @@ describe('anti-de Sitter setters', () => {
       const afterA = useExtendedObjectStore.getState().schroedinger.antiDeSitter
       expect(afterA.hkllBoundarySource).toBe('localized')
       expect(afterA.needsReset).toBe(true)
-      useExtendedObjectStore.getState().clearAdsNeedsReset()
+      useExtendedObjectStore.getState().clearComputeNeedsReset('antiDeSitter')
       store.setAdsHkllBoundarySource('planeWave')
       expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.hkllBoundarySource).toBe(
         'planeWave'
@@ -321,7 +321,7 @@ describe('anti-de Sitter setters', () => {
       const store = useExtendedObjectStore.getState()
       store.setAdsHkllSourceSigma(0.4)
       store.setAdsHkllPlaneWaveM(3)
-      useExtendedObjectStore.getState().clearAdsNeedsReset()
+      useExtendedObjectStore.getState().clearComputeNeedsReset('antiDeSitter')
 
       store.setAdsHkllSourceSigma(Number.NaN)
       store.setAdsHkllPlaneWaveM(Number.POSITIVE_INFINITY)

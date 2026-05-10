@@ -26,7 +26,6 @@ export type {
 
 // Registries
 export { QUANTUM_TYPE_REGISTRY } from './quantumTypes'
-export { OBJECT_TYPE_REGISTRY } from './registry'
 
 // Helpers — flat quantum-type API
 export {
@@ -51,13 +50,12 @@ export {
   supportsOpenQuantumForQuantumType,
 } from './helpers'
 
-// Helpers — legacy object-type API
+// Helpers — per-ObjectType API derived from QUANTUM_TYPE_REGISTRY
 export {
   getAvailableTypesForDimension,
   getConfigStoreKey,
   getControlsComponentKey,
   getDimensionConstraints,
-  getObjectTypeEntry,
   getRecommendedDimension,
   getUnavailabilityReason,
   hasTimelineControls,

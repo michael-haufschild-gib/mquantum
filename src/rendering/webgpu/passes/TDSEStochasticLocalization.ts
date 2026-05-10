@@ -18,6 +18,7 @@
  */
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
+import { clamp } from '@/lib/math/clamp'
 import { gaussianPair, mulberry32 } from '@/lib/math/rng'
 import { MAX_STOCHASTIC_SITES } from '@/lib/physics/stochastic/localizationKernel'
 
@@ -56,10 +57,6 @@ const STOCHASTIC_UNIFORM_SIZE = 1568
 
 /** Size of the expectation finalize uniform buffer (16 bytes). */
 const EXPECT_FINALIZE_UNIFORM_SIZE = 16
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value))
-}
 
 function sanitizeStochasticRuntimeConfig(config: TdseConfig): TdseConfig | null {
   const gamma = config.stochasticGamma

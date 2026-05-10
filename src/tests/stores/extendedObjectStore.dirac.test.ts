@@ -105,7 +105,7 @@ describe('Dirac store slice', () => {
     expect(useExtendedObjectStore.getState().schroedinger.dirac.spacing[1]).toBe(0.25)
   })
 
-  it('setDiracNeedsReset sets needsReset flag', () => {
+  it('markComputeNeedsReset(dirac) sets needsReset flag', () => {
     const store = useExtendedObjectStore.getState()
     // Reset first
     useExtendedObjectStore.setState({
@@ -116,7 +116,7 @@ describe('Dirac store slice', () => {
     })
     expect(useExtendedObjectStore.getState().schroedinger.dirac.needsReset).toBe(false)
 
-    store.setDiracNeedsReset()
+    store.markComputeNeedsReset('dirac')
     expect(useExtendedObjectStore.getState().schroedinger.dirac.needsReset).toBe(true)
   })
 
