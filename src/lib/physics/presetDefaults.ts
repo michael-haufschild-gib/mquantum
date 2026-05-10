@@ -3,13 +3,15 @@
  *
  * When switching quantum mode, the first dimension-compatible scenario
  * preset is auto-applied instead of using a hardcoded default config.
- * This module provides the lookup logic for every mode.
+ *
+ * Each mode declares its own one-line resolver in {@link PRESET_RESOLVERS};
+ * dispatch is a single map lookup keyed by {@link QuantumTypeKey}.
  *
  * @module lib/physics/presetDefaults
  */
 
-import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
 import { getHydrogenNDPresetsWithKeysByDimension } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
+import type { QuantumTypeKey } from '@/lib/geometry/registry'
 
 import { ADS_PRESETS } from './antiDeSitter/presets'
 import { BEC_SCENARIO_PRESETS } from './bec/presets'
@@ -21,85 +23,49 @@ import { QUANTUM_WALK_PRESETS } from './quantumWalk/presets'
 import { TDSE_SCENARIO_PRESETS } from './tdse/presets'
 import { WDW_SCENARIO_PRESETS } from './wheelerDeWitt/presets'
 
+type FirstPresetResolver = (dimension: number) => string | undefined
+
 /**
- * Returns the first dimension-compatible preset ID for a given quantum mode.
- *
- * Each mode has its own dimension-filtering logic:
- * - TDSE: `latticeDim` in overrides must be ≤ current dimension
- * - BEC: `minDim` (default 2) must be ≤ current dimension
- * - HydrogenND Coupled: `minDim` must be ≤ current dimension
- * - All others: presets are dimension-agnostic (first preset always works)
- *
- * @returns Preset ID string, or undefined if no compatible preset exists
+ * The hydrogen-ND resolver picks the highest dimension group ≤ current
+ * dimension and returns that group's ground-state preset key.
  */
-export function getFirstPresetId(
-  mode: SchroedingerQuantumMode | 'pauliSpinor',
-  dimension: number
-): string | undefined {
-  switch (mode) {
-    case 'harmonicOscillator':
-      // HO named presets are dimension-agnostic — first key
-      return 'groundState'
+function resolveHydrogenND(dimension: number): string | undefined {
+  const groups = getHydrogenNDPresetsWithKeysByDimension()
+  const bestDim = Object.keys(groups)
+    .map(Number)
+    .filter((d) => d <= dimension)
+    .sort((a, b) => b - a)[0]
+  if (bestDim === undefined) return undefined
+  return groups[bestDim]?.[0]?.[0]
+}
 
-    case 'hydrogenND': {
-      // HydrogenND presets are dimension-grouped; pick the ground state for the current dim.
-      const groups = getHydrogenNDPresetsWithKeysByDimension()
-      // Find the highest dimension group ≤ current dimension and return its first preset.
-      const matchingDims = Object.keys(groups)
-        .map(Number)
-        .filter((d) => d <= dimension)
-        .sort((a, b) => b - a)
-      const bestDim = matchingDims[0]
-      if (bestDim !== undefined) {
-        const presets = groups[bestDim]
-        const first = presets?.[0]
-        if (first) return first[0]
-      }
-      return undefined
-    }
+/**
+ * Per-mode resolvers. Each one is the dimension-filter idiom for that mode's
+ * preset catalog — most are one line. Adding a new mode means adding one
+ * entry here and importing its preset array above.
+ */
+const PRESET_RESOLVERS: Readonly<Record<QuantumTypeKey, FirstPresetResolver>> = {
+  harmonicOscillator: () => 'groundState',
+  hydrogenND: resolveHydrogenND,
+  hydrogenNDCoupled: (d) => HYDROGEN_COUPLED_PRESETS.find((p) => p.minDim <= d)?.id,
+  tdseDynamics: (d) =>
+    TDSE_SCENARIO_PRESETS.find((p) => {
+      const min = p.overrides.latticeDim
+      return min === undefined || min <= d
+    })?.id,
+  becDynamics: (d) => BEC_SCENARIO_PRESETS.find((p) => (p.minDim ?? 2) <= d)?.id,
+  diracEquation: () => DIRAC_SCENARIO_PRESETS[0]?.id,
+  freeScalarField: () => FREE_SCALAR_PRESETS[0]?.id,
+  quantumWalk: () => QUANTUM_WALK_PRESETS[0]?.id,
+  pauliSpinor: () => PAULI_SCENARIO_PRESETS[0]?.id,
+  wheelerDeWitt: () => WDW_SCENARIO_PRESETS[0]?.id,
+  antiDeSitter: (d) => (ADS_PRESETS.find((p) => p.d <= d) ?? ADS_PRESETS[0])?.id,
+}
 
-    case 'hydrogenNDCoupled': {
-      const preset = HYDROGEN_COUPLED_PRESETS.find((p) => p.minDim <= dimension)
-      return preset?.id
-    }
-
-    case 'tdseDynamics': {
-      const preset = TDSE_SCENARIO_PRESETS.find((p) => {
-        const presetDim = p.overrides.latticeDim
-        return presetDim === undefined || presetDim <= dimension
-      })
-      return preset?.id
-    }
-
-    case 'becDynamics': {
-      const preset = BEC_SCENARIO_PRESETS.find((p) => (p.minDim ?? 2) <= dimension)
-      return preset?.id
-    }
-
-    case 'diracEquation':
-      return DIRAC_SCENARIO_PRESETS[0]?.id
-
-    case 'freeScalarField':
-      return FREE_SCALAR_PRESETS[0]?.id
-
-    case 'quantumWalk':
-      return QUANTUM_WALK_PRESETS[0]?.id
-
-    case 'pauliSpinor':
-      return PAULI_SCENARIO_PRESETS[0]?.id
-
-    case 'wheelerDeWitt':
-      return WDW_SCENARIO_PRESETS[0]?.id
-
-    case 'antiDeSitter': {
-      // Honour dimension: find the lowest-d preset compatible with the
-      // active global dimension. Falls back to the first preset if none
-      // match (the strategy clamps d against the registry min anyway).
-      const preset = ADS_PRESETS.find((p) => p.d <= dimension) ?? ADS_PRESETS[0]
-      return preset?.id
-    }
-
-    default:
-      return undefined
-  }
+/**
+ * Returns the first dimension-compatible preset ID for a given quantum mode,
+ * or undefined if no compatible preset exists for the requested dimension.
+ */
+export function getFirstPresetId(mode: QuantumTypeKey, dimension: number): string | undefined {
+  return PRESET_RESOLVERS[mode]?.(dimension)
 }

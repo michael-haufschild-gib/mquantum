@@ -393,6 +393,26 @@ export async function setupRenderPasses(
   await setupPPPasses(graph, config, shouldAbort)
 }
 
+/** Pauli spinor uses the TDSE lattice engine with all analytic features disabled. */
+const PAULI_RENDERER_OVERRIDES = {
+  isosurface: false,
+  quantumMode: 'tdseDynamics' as const,
+  termCount: 1 as const,
+  nodalEnabled: false,
+  phaseMaterialityEnabled: false,
+  interferenceEnabled: false,
+  uncertaintyBoundaryEnabled: false,
+  temporal: false,
+  eigenfunctionCacheEnabled: false,
+  analyticalGradientEnabled: false,
+  fastEigenInterpolationEnabled: false,
+  representation: 'position' as const,
+  openQuantumEnabled: false,
+  isPauli: true,
+  crossSectionEnabled: false,
+  probabilityCurrentEnabled: false,
+}
+
 /**
  * Create the appropriate object renderer based on object type.
  *
@@ -447,24 +467,9 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
     case 'pauliSpinor':
       return new WebGPUSchrodingerRenderer({
         dimension,
-        isosurface: false,
-        quantumMode: 'tdseDynamics',
-        termCount: 1,
         colorAlgorithm,
-        nodalEnabled: false,
-        phaseMaterialityEnabled: false,
-        interferenceEnabled: false,
-        uncertaintyBoundaryEnabled: false,
-        temporal: false,
-        eigenfunctionCacheEnabled: false,
-        analyticalGradientEnabled: false,
-        fastEigenInterpolationEnabled: false,
-        representation: 'position',
-        openQuantumEnabled: false,
-        isPauli: true,
-        crossSectionEnabled: false,
-        probabilityCurrentEnabled: false,
         densityGridResolution: config.densityGridResolution,
+        ...PAULI_RENDERER_OVERRIDES,
       })
 
     default:

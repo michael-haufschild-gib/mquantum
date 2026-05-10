@@ -21,19 +21,19 @@ import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
 import { composeDensityGridComputeShader } from '../shaders/schroedinger/compute/compose'
 import { DensityDistributionAnalyzer } from './DensityDistributionAnalysis'
+import type {
+  DensityGridComputeConfig,
+  DensityReadbackState,
+} from './DensityGridComputePassResources'
 import {
   createDensityGridResources,
-  GRID_PARAMS_SIZE,
-  selectGridTextureFormat,
-  writeGridParams,
-} from './DensityGridComputePassBuffers'
-import type { DensityReadbackState } from './DensityGridComputePassDispose'
-import {
   disposeDensityGridResources,
+  GRID_PARAMS_SIZE,
   refreshDensityDistribution,
+  selectGridTextureFormat,
   startPendingReadback,
-} from './DensityGridComputePassDispose'
-import type { DensityGridComputeConfig } from './DensityGridComputePassTypes'
+  writeGridParams,
+} from './DensityGridComputePassResources'
 import { createGradientPipeline } from './DensityGridGradientSetup'
 
 // Default grid size (64^3 = 262,144 voxels)

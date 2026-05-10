@@ -56,7 +56,7 @@ export interface GramSchmidtState {
   gsPartialImBuffer: GPUBuffer | null
   gsResultBuffer: GPUBuffer | null
   gsNumWorkgroups: number
-  /** Merged ψ buffer (array<vec2f>) — see TDSEComputePassBuffers. */
+  /** Merged ψ buffer (array<vec2f>) — see TDSEComputePassResources. */
   psiBuffer: GPUBuffer | null
   totalSites: number
   pl: TdsePipelineResult | null

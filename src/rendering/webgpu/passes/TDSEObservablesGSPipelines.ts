@@ -26,7 +26,7 @@ import {
   observablesPositionReduceBlock,
 } from '../shaders/schroedinger/compute/observablesPositionReduce.wgsl'
 import { createComputeBGL } from '../utils/computeBindGroupLayout'
-import type { ObsGSPipelineResult, TdsePassHelpers } from './TDSEComputePassTypes'
+import type { ObsGSPipelineResult, TdsePassHelpers } from './TDSEComputePassResources'
 
 export type { ObsGSPipelineResult }
 

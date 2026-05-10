@@ -1,4 +1,4 @@
-import { render, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { WebGPUCanvas } from '@/rendering/webgpu/WebGPUCanvas'
@@ -110,5 +110,29 @@ describe('WebGPUCanvas', () => {
       expect(graphInstances[0]!.setSize).toHaveBeenCalledWith(100, 50)
       expect(initializeMock).toHaveBeenCalledTimes(1)
     })
+  })
+
+  it('clamps zero-sized containers and non-finite DPR to a 1x1 backing canvas', async () => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get: () => 0,
+    })
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+      configurable: true,
+      get: () => 0,
+    })
+    initializeMock.mockResolvedValue({ success: true })
+    const onError = vi.fn()
+
+    render(<WebGPUCanvas dpr={Number.NaN} onError={onError} />)
+
+    await waitFor(() => {
+      expect(initializeMock).toHaveBeenCalledTimes(1)
+      expect(graphInstances).toHaveLength(1)
+      expect(graphInstances[0]!.setSize).toHaveBeenCalledWith(1, 1)
+    })
+    const canvas = screen.getByTestId('webgpu-canvas') as HTMLCanvasElement
+    expect(canvas.width).toBe(1)
+    expect(canvas.height).toBe(1)
   })
 })

@@ -4,7 +4,7 @@
  * Config interface, initial-condition/field-view types, and default constants.
  */
 
-import type { DisorderDistribution } from './crossMode'
+import type { DisorderDistribution, PmlAbsorberConfig } from './crossMode'
 
 // ============================================================================
 // BEC Types
@@ -60,7 +60,7 @@ export type BecFieldView =
 /**
  * Configuration for the BEC (Gross-Pitaevskii) solver.
  */
-export interface BecConfig {
+export interface BecConfig extends PmlAbsorberConfig {
   // === Lattice ===
   /** Spatial dimensionality (2-11, synced from global dimension) */
   latticeDim: number
@@ -123,12 +123,6 @@ export interface BecConfig {
   fieldView: BecFieldView
   /** Auto-scale density normalization */
   autoScale: boolean
-
-  // === Absorber (PML) ===
-  absorberEnabled: boolean
-  absorberWidth: number
-  /** Target round-trip reflection coefficient for PML */
-  pmlTargetReflection: number
 
   // === Diagnostics ===
   diagnosticsEnabled: boolean

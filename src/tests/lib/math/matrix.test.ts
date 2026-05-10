@@ -119,6 +119,20 @@ describe('Matrix Operations', () => {
       const flat2 = new Float32Array(6)
       expect(() => multiplyMatrices(flat, flat2)).toThrow()
     })
+
+    it('rejects output buffers that alias either input matrix', () => {
+      const A = mat([
+        [1, 2],
+        [3, 4],
+      ])
+      const B = mat([
+        [5, 6],
+        [7, 8],
+      ])
+
+      expect(() => multiplyMatrices(A, B, A)).toThrow('Output matrix cannot alias input matrices')
+      expect(() => multiplyMatrices(A, B, B)).toThrow('Output matrix cannot alias input matrices')
+    })
   })
 
   describe('multiplyMatricesInto', () => {
@@ -444,6 +458,24 @@ describe('Matrix Operations', () => {
       expect(result[1]).toBeCloseTo(22, 5)
       expect(result[2]).toBeCloseTo(43, 5)
       expect(result[3]).toBeCloseTo(50, 5)
+    })
+
+    it('throws when out parameter is not the matrix size', () => {
+      const a = mat([
+        [1, 2],
+        [3, 4],
+      ])
+      const b = mat([
+        [5, 6],
+        [7, 8],
+      ])
+
+      expect(() => multiplyMatrices(a, b, new Float32Array(3))).toThrow(
+        'Output matrix dimensions incompatible'
+      )
+      expect(() => multiplyMatrices(a, b, new Float32Array(5))).toThrow(
+        'Output matrix dimensions incompatible'
+      )
     })
   })
 

@@ -9,7 +9,9 @@ import type {
   TdsePipelineResult,
 } from '@/rendering/webgpu/passes/TDSEComputePassSetup'
 import {
+  computeCSLSubsteps,
   createStochasticLocState,
+  prepareStochasticStaging,
   type StochasticLocState,
 } from '@/rendering/webgpu/passes/TDSEStochasticLocalization'
 
@@ -169,6 +171,67 @@ afterAll(() => {
 })
 
 describe('runStrangEvolution curved stochastic branch', () => {
+  it.each([
+    { gamma: Number.NaN, dt: 0.02 },
+    { gamma: Number.POSITIVE_INFINITY, dt: 0.02 },
+    { gamma: 2, dt: Number.NaN },
+    { gamma: 2, dt: 0 },
+  ])('treats invalid CSL substep inputs as one safe substep: %o', ({ gamma, dt }) => {
+    expect(computeCSLSubsteps(gamma, dt)).toBe(1)
+  })
+
+  it('does not stage stochastic uniforms when gamma or dt is non-finite', () => {
+    for (const invalid of [
+      { stochasticGamma: Number.NaN, dt: 0.02 },
+      { stochasticGamma: Number.POSITIVE_INFINITY, dt: 0.02 },
+      { stochasticGamma: 2, dt: Number.NaN },
+    ]) {
+      const events: string[] = []
+      const ctx = makeContext(events)
+      const stochasticState = makeStochasticState()
+      const config = {
+        stochasticEnabled: true,
+        stochasticGamma: invalid.stochasticGamma,
+        stochasticSigma: 1,
+        stochasticNumSites: 2,
+        stochasticSeed: 1234,
+        dt: invalid.dt,
+        latticeDim: 1,
+        gridSize: [16],
+        spacing: [0.1],
+      } as unknown as TdseConfig
+
+      prepareStochasticStaging(ctx.device, config, stochasticState, 1, 2)
+
+      expect(events).toEqual([])
+      expect(stochasticState.stagingBuffer).toBeNull()
+    }
+  })
+
+  it('clears staged slot availability when fractional frame steps floor to zero', () => {
+    const events: string[] = []
+    const ctx = makeContext(events)
+    const stochasticState = makeStochasticState()
+    stochasticState.stagingBuffer = buffer('previous-staging')
+    stochasticState.stagingSlotCount = 4
+    const config = {
+      stochasticEnabled: true,
+      stochasticGamma: 2,
+      stochasticSigma: 1,
+      stochasticNumSites: 2,
+      stochasticSeed: 1234,
+      dt: 0.02,
+      latticeDim: 1,
+      gridSize: [16],
+      spacing: [0.1],
+    } as unknown as TdseConfig
+
+    prepareStochasticStaging(ctx.device, config, stochasticState, 0.5, 2)
+
+    expect(events).toEqual([])
+    expect(stochasticState.stagingSlotCount).toBe(0)
+  })
+
   it('dispatches CSL localization before curved stochastic renormalization', () => {
     const events: string[] = []
     const ctx = makeContext(events)

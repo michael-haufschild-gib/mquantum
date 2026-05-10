@@ -236,7 +236,7 @@ export function dispatchDiagnostics(
           esP,
           p.pl.energySpectrumPipeline,
           [os.esSpectrumBG],
-          Math.ceil(p.totalSites / LINEAR_WG)
+          Math.ceil(os.obsResources.totalSites / LINEAR_WG)
         )
         esP.end()
       }

@@ -7,6 +7,8 @@
  * @module rendering/webgpu/passes/FrameBlendingPass
  */
 
+import { clampFinite } from '@/lib/math/clamp'
+
 import { BindGroupCache } from '../core/BindGroupCache'
 import { getStoreSnapshot } from '../core/storeAccess'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
@@ -18,18 +20,6 @@ const MAX_HORIZON_MEMORY_STRENGTH = 1.5
 const MAX_HORIZON_MEMORY_SPIN = 1
 const MIN_HORIZON_MEMORY_ECHOES = 1
 const MAX_HORIZON_MEMORY_ECHOES = 6
-
-function clampFinite(
-  value: number | undefined,
-  fallback: number,
-  min: number,
-  max: number
-): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return fallback
-  }
-  return Math.max(min, Math.min(max, value))
-}
 
 function clampEchoCount(value: number | undefined, fallback: number): number {
   return Math.round(

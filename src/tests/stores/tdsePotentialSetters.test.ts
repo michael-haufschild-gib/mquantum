@@ -140,17 +140,17 @@ describe('TDSE potential setters', () => {
     it('triggers needsReset when BH params change while BH potential is active', () => {
       const s = useExtendedObjectStore.getState()
       s.setTdsePotentialType('blackHoleRingdown')
-      s.clearTdseNeedsReset()
+      s.clearComputeNeedsReset('tdse')
       expect(getTdse().needsReset).toBe(false)
 
       s.setTdseBhMass(2.5)
       expect(getTdse().needsReset).toBe(true)
 
-      s.clearTdseNeedsReset()
+      s.clearComputeNeedsReset('tdse')
       s.setTdseBhMultipoleL(3)
       expect(getTdse().needsReset).toBe(true)
 
-      s.clearTdseNeedsReset()
+      s.clearComputeNeedsReset('tdse')
       s.setTdseBhSpin(1)
       expect(getTdse().needsReset).toBe(true)
     })
@@ -158,7 +158,7 @@ describe('TDSE potential setters', () => {
     it('does NOT trigger needsReset when BH params change under a non-BH potential', () => {
       const s = useExtendedObjectStore.getState()
       s.setTdsePotentialType('barrier')
-      s.clearTdseNeedsReset()
+      s.clearComputeNeedsReset('tdse')
       s.setTdseBhMass(3.0)
       expect(getTdse().needsReset).toBe(false)
     })
@@ -175,7 +175,7 @@ describe('TDSE potential setters', () => {
       s.setTdseBhMass(2.0)
       s.setTdseBhSpin(1)
       s.setTdseBhMultipoleL(3)
-      s.clearTdseNeedsReset()
+      s.clearComputeNeedsReset('tdse')
       expect(getTdse().needsReset).toBe(false)
 
       // Same-value reassignment → no reset.
@@ -191,7 +191,7 @@ describe('TDSE potential setters', () => {
       s.setTdseBhMass(1000) // clamps to 5
       expect(getTdse().bhMass).toBe(5)
       expect(getTdse().needsReset).toBe(true)
-      s.clearTdseNeedsReset()
+      s.clearComputeNeedsReset('tdse')
       s.setTdseBhMass(1000) // still clamps to 5 — now idempotent
       expect(getTdse().needsReset).toBe(false)
       s.setTdseBhMass(2e6) // different raw input, same clamped output

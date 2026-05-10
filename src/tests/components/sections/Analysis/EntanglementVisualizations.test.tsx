@@ -46,9 +46,20 @@ describe('PerDimensionBars', () => {
     expect(screen.getByText('2')).toBeInTheDocument()
   })
 
-  it('renders a bar even when maxEntropy is 0 (zero-division guard)', () => {
-    // Should not throw — fraction clamps to 0 instead of NaN/Infinity
-    expect(() => render(<PerDimensionBars entropies={[0.5]} maxEntropies={[0]} />)).not.toThrow()
+  it('clamps maxEntropy=0 to a finite one-pixel foreground bar', () => {
+    render(<PerDimensionBars entropies={[0.5]} maxEntropies={[0]} />)
+    const rects = [
+      screen.getByTestId('per-dimension-bar-track'),
+      screen.getByTestId('per-dimension-bar-fill'),
+    ]
+
+    expect(rects).toHaveLength(2)
+    for (const rect of rects) {
+      for (const attr of ['x', 'y', 'width', 'height']) {
+        expect(rect, attr).toHaveAttribute(attr, expect.stringMatching(/^-?(?:\d+|\d*\.\d+)$/))
+      }
+    }
+    expect(screen.getByTestId('per-dimension-bar-fill')).toHaveAttribute('width', '1')
   })
 })
 
@@ -107,9 +118,22 @@ describe('MutualInfoHeatmap', () => {
     expect(oneLabels.length).toBeGreaterThanOrEqual(2)
   })
 
-  it('handles NaN matrix entries without throwing', () => {
+  it('renders NaN matrix entries as neutral cells while finite entries remain heatmapped', () => {
     const matrix = new Float64Array([NaN, 0.5, 0.5, NaN])
-    expect(() => render(<MutualInfoHeatmap matrix={matrix} N={2} />)).not.toThrow()
+    render(<MutualInfoHeatmap matrix={matrix} N={2} />)
+
+    const cells = screen.getAllByTestId('mutualinfo-cell')
+    expect(cells).toHaveLength(4)
+    const [firstCell, secondCell, thirdCell, fourthCell] = cells as [
+      HTMLElement,
+      HTMLElement,
+      HTMLElement,
+      HTMLElement,
+    ]
+    expect(firstCell).toHaveAttribute('fill', 'var(--bg-elevated)')
+    expect(fourthCell).toHaveAttribute('fill', 'var(--bg-elevated)')
+    expect(secondCell).toHaveAttribute('fill', expect.stringMatching(/^oklch\(/))
+    expect(thirdCell).toHaveAttribute('fill', expect.stringMatching(/^oklch\(/))
   })
 })
 

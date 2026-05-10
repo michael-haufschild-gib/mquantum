@@ -306,12 +306,15 @@ describe('queueSrmtCompute — sequential per-clock cross-clock queue', () => {
     })
     // Simulate compute-hash change — strategy calls queueSrmtCompute again.
     queueSrmtCompute(state, makeArgsByClock('hash-v2'), 'phi1')
+    expect(worker.terminated).toBe(true)
+    expect(FakeWorker.instances).toHaveLength(2)
     // Cache wiped.
     expect(state.resultsByClock.a).toBeNull()
     expect(state.resultsByClock.phi1).toBeNull()
     expect(state.resultsByClock.phi2).toBeNull()
     // New head is the new selected clock.
-    const lastMsg = worker.messages.at(-1)!.message as { config: { clock: SrmtClock } }
+    const newWorker = FakeWorker.instances[1]!
+    const lastMsg = newWorker.messages.at(-1)!.message as { config: { clock: SrmtClock } }
     expect(lastMsg.config.clock).toBe('phi1')
     // Epoch has advanced past any stale in-flight reply.
     expect(state.epoch).toBeGreaterThanOrEqual(3)
@@ -352,6 +355,30 @@ describe('qualityFromResults / findChampionClock', () => {
     expect(Number.isNaN(q.phi1)).toBe(true)
     expect(Number.isNaN(q.phi2)).toBe(true)
     expect(findChampionClock(q)).toBeNull()
+  })
+
+  it('maps non-finite cached quality to pending NaN', () => {
+    const state = createSrmtWorkerState()
+    const result = makeResult(Number.POSITIVE_INFINITY)
+    state.resultsByClock.a = {
+      result,
+      snapshot: {
+        clock: 'a',
+        slicePlane: result.slicePlane,
+        cutIndex: 4,
+        rankCap: 16,
+        kSpectrum: result.kSpectrum,
+        hjSpectrum: result.hjSpectrum,
+        affineMatchQuality: result.affineMatchQuality,
+        computeTimeMs: 1,
+      },
+      cutIndex: 4,
+      generation: 1,
+    }
+
+    const q = qualityFromResults(state.resultsByClock)
+
+    expect(Number.isNaN(q.a)).toBe(true)
   })
 
   it('picks the minimum quality when all three are present and the margin is wide', () => {

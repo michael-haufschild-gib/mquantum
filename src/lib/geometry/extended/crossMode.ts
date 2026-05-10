@@ -99,3 +99,24 @@ export const DEFAULT_DISORDER_OVERLAY_CONFIG: DisorderOverlayConfig = {
   seed: 42,
   distribution: 'uniform',
 }
+
+/**
+ * Perfectly-Matched Layer (PML) absorbing boundary configuration.
+ *
+ * Shared by every compute mode that supports outgoing-wave absorption at
+ * the grid edge: TDSE, BEC, Dirac, Free-Scalar, Quantum Walk, Pauli.
+ * The absorber is implemented as a quartic σ(x) ramp inside the boundary
+ * region of width `absorberWidth` (fraction of grid extent), tuned so the
+ * outer-edge damping per timestep equals `pmlTargetReflection`.
+ *
+ * Per-mode interfaces SHOULD extend this rather than redeclaring the
+ * triplet inline.
+ */
+export interface PmlAbsorberConfig {
+  /** Whether the absorber is active. */
+  absorberEnabled: boolean
+  /** PML layer width as a fraction of grid extent (typical 0.05–0.50). */
+  absorberWidth: number
+  /** Per-step damping at outer edge — exp(-σ_max·dt) = pmlTargetReflection. */
+  pmlTargetReflection: number
+}

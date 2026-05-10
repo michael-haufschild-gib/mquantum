@@ -392,6 +392,13 @@ export function composeRotations(
 ): MatrixND {
   assertRotationDimension(dimension)
 
+  const matrixSize = dimension * dimension
+  if (out && out.length !== matrixSize) {
+    throw new Error(
+      `Output matrix dimensions incompatible: expected length ${matrixSize}, received ${out.length}`
+    )
+  }
+
   // Use provided output or allocate new matrix
   const result = out ?? createIdentityMatrix(dimension)
 

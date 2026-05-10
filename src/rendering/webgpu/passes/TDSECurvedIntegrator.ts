@@ -41,7 +41,7 @@ import {
 import { tdseUniformsBlock } from '../shaders/schroedinger/compute/tdseUniforms.wgsl'
 import { createComputeBGL } from '../utils/computeBindGroupLayout'
 import type { SiteDispatch } from './computePassUtils'
-import { TDSE_UNIFORM_OFFSET_STAGE_TIME_K1 } from './TDSEComputePassBuffers'
+import { TDSE_UNIFORM_OFFSET_STAGE_TIME_K1 } from './TDSEComputePassResources'
 
 /** Workgroup size — must match `@workgroup_size` in all curved kernels. */
 const CURVED_WG = 64

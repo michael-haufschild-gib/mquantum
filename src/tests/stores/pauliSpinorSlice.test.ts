@@ -52,8 +52,8 @@ describe('pauliSpinorSlice', () => {
   // === Magnetic field setters ===
 
   it('setPauliFieldType triggers needsReset', () => {
-    const { setPauliFieldType, clearPauliNeedsReset } = useExtendedObjectStore.getState()
-    clearPauliNeedsReset()
+    const { setPauliFieldType, clearComputeNeedsReset } = useExtendedObjectStore.getState()
+    clearComputeNeedsReset('pauliSpinor')
     expect(useExtendedObjectStore.getState().pauliSpinor.needsReset).toBe(false)
     setPauliFieldType('gradient')
     expect(useExtendedObjectStore.getState().pauliSpinor.fieldType).toBe('gradient')
@@ -78,8 +78,9 @@ describe('pauliSpinorSlice', () => {
   // === Initial spin state ===
 
   it('setPauliInitialSpinDirection triggers needsReset', () => {
-    const { setPauliInitialSpinDirection, clearPauliNeedsReset } = useExtendedObjectStore.getState()
-    clearPauliNeedsReset()
+    const { setPauliInitialSpinDirection, clearComputeNeedsReset } =
+      useExtendedObjectStore.getState()
+    clearComputeNeedsReset('pauliSpinor')
     setPauliInitialSpinDirection([Math.PI / 4, Math.PI / 2])
     const state = useExtendedObjectStore.getState().pauliSpinor
     expect(state.initialSpinDirection).toEqual([Math.PI / 4, Math.PI / 2])
@@ -110,8 +111,8 @@ describe('pauliSpinorSlice', () => {
   // === Visualization ===
 
   it('setPauliFieldView updates without needsReset', () => {
-    const { setPauliFieldView, clearPauliNeedsReset } = useExtendedObjectStore.getState()
-    clearPauliNeedsReset()
+    const { setPauliFieldView, clearComputeNeedsReset } = useExtendedObjectStore.getState()
+    clearComputeNeedsReset('pauliSpinor')
     setPauliFieldView('spinHelicity')
     const state = useExtendedObjectStore.getState().pauliSpinor
     expect(state.fieldView).toBe('spinHelicity')

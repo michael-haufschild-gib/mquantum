@@ -31,6 +31,7 @@
 
 import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
 import type { AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
+import { clamp01 } from '@/lib/math/clamp'
 import { packRGBA16F } from '@/lib/physics/freeScalar/kSpaceOccupation'
 
 import { BTZ_AMPLITUDE_CEILING, btzScalarDelta, btzTemperature, btzThermalAmplitude } from './btz'
@@ -111,12 +112,6 @@ export function createAdsPackerScratch(gridSize: number = DENSITY_GRID_SIZE): Ad
 
 const BOUNDARY_SHELL_MIN = 0.975
 const BOUNDARY_SHELL_MAX = 0.995
-
-function clamp01(v: number): number {
-  if (v < 0) return 0
-  if (v > 1) return 1
-  return v
-}
 
 /**
  * Pack the AdS configuration into the density texture bytes.

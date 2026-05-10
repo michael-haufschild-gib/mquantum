@@ -10,6 +10,8 @@
  * @module rendering/webgpu/shaders/schroedinger/quantum/hoSuperpositionVariants.wgsl
  */
 
+import { sanitizeShaderTermCount } from '../../shared/compose-helpers'
+
 /**
  * Generate unrolled HO superposition evaluation for a specific term count.
  *
@@ -168,7 +170,7 @@ export function getHOUnrolledBlocks(termCount: number): {
   spatial: string
   combined: string
 } {
-  const tc = Math.min(Math.max(termCount, 1), 8)
+  const tc = sanitizeShaderTermCount(termCount) ?? 1
   const superpositionBlocks: string[] = [
     hoSuperposition1Block,
     hoSuperposition2Block,
@@ -213,7 +215,7 @@ export function getHOUnrolledBlocks(termCount: number): {
  * @returns WGSL dispatch code
  */
 export function generateHODispatchBlock(termCount: number): string {
-  const tc = Math.min(Math.max(termCount, 1), 8)
+  const tc = sanitizeShaderTermCount(termCount) ?? 1
   return `
 // ============================================
 // HO Superposition Dispatch (${tc} term${tc > 1 ? 's' : ''}, unrolled)

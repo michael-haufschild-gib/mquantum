@@ -4,7 +4,8 @@
  * Verifies: renders with current object type, shows available types for dimension,
  * type change calls setObjectType + resetAllRotations, disabled types are not selectable.
  */
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { ObjectTypeSelector } from '@/components/sections/Geometry/ObjectTypeSelector'
@@ -33,11 +34,31 @@ describe('ObjectTypeSelector', () => {
     expect(screen.getByTestId('object-type-selector')).toBeInTheDocument()
   })
 
-  it('renders without errors with store interaction', () => {
-    useGeometryStore.setState({ objectType: 'schroedinger', dimension: 3 })
+  it('marks dimension-incompatible object types as disabled and ignores forced changes', () => {
+    useGeometryStore.setState({ objectType: 'schroedinger', dimension: 2 })
     render(<ObjectTypeSelector />)
-    // Component should render the select and description without crashing
-    expect(screen.getByTestId('object-type-selector')).toBeInTheDocument()
+
+    const spinorOption = screen.getByRole('option', { name: /pauli spinor \(requires 3d\+\)/i })
+    expect(spinorOption).toBeDisabled()
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'pauliSpinor' } })
+
+    expect(useGeometryStore.getState().objectType).toBe('schroedinger')
+  })
+
+  it('selecting an available object type resets stale rotations before switching type', async () => {
+    const user = userEvent.setup()
+    useGeometryStore.setState({ objectType: 'schroedinger', dimension: 3 })
+    useRotationStore.getState().setDimension(3)
+    useRotationStore.getState().setRotation('XY', 1.25)
+    expect(useRotationStore.getState().rotations.get('XY')).toBe(1.25)
+
+    render(<ObjectTypeSelector />)
+
+    await user.selectOptions(screen.getByRole('combobox'), 'pauliSpinor')
+
+    expect(useGeometryStore.getState().objectType).toBe('pauliSpinor')
+    expect(useRotationStore.getState().rotations.size).toBe(0)
   })
 
   it('passes disabled prop to the select control', () => {

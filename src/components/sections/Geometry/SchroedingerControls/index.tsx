@@ -46,19 +46,9 @@ export interface SchroedingerControlsProps {
   className?: string
 }
 
-/** Extracted to reduce main component complexity. */
-function renderModeControls(p: {
+interface ModeControlsProps {
   config: SchroedingerConfig
   dimension: number
-  isQuantumWalk: boolean
-  isWheelerDeWitt: boolean
-  isAntiDeSitter: boolean
-  isDiracEquation: boolean
-  isBecDynamics: boolean
-  isTdseDynamics: boolean
-  isFreeScalarField: boolean
-  isHydrogenCoupled: boolean
-  isHydrogenNDMode: boolean
   diracActions: DiracActions
   becActions: BecActions
   tdseActions: TdseActions
@@ -66,53 +56,68 @@ function renderModeControls(p: {
   hydrogenNDCoupledActions: HydrogenNDCoupledActions
   hydrogenNDActions: HydrogenNDActions
   harmonicActions: HarmonicOscillatorActions
-}): React.ReactNode {
-  if (p.isAntiDeSitter) return <AntiDeSitterControls />
-  if (p.isWheelerDeWitt) return <WheelerDeWittControls />
-  if (p.isQuantumWalk) return <QuantumWalkControls />
-  if (p.isDiracEquation)
-    return <DiracControls config={p.config} dimension={p.dimension} actions={p.diracActions} />
-  if (p.isBecDynamics)
-    return (
-      <>
-        <BECControls config={p.config} dimension={p.dimension} actions={p.becActions} />
-        <KKCompactificationSection defaultOpen={false} />
-      </>
-    )
-  if (p.isTdseDynamics)
-    return (
-      <>
-        <TDSEControls config={p.config} dimension={p.dimension} actions={p.tdseActions} />
-        <KKCompactificationSection defaultOpen={false} />
-      </>
-    )
-  if (p.isFreeScalarField)
-    return (
-      <FreeScalarFieldControls
-        config={p.config}
-        dimension={p.dimension}
-        actions={p.freeScalarActions}
-      />
-    )
-  if (p.isHydrogenCoupled)
-    return (
-      <HydrogenNDCoupledControls
-        config={p.config}
-        dimension={p.dimension}
-        actions={p.hydrogenNDCoupledActions}
-      />
-    )
-  if (p.isHydrogenNDMode)
-    return (
-      <HydrogenNDControls config={p.config} dimension={p.dimension} actions={p.hydrogenNDActions} />
-    )
-  return (
-    <HarmonicOscillatorControls
-      config={p.config}
-      dimension={p.dimension}
-      actions={p.harmonicActions}
-    />
-  )
+}
+
+/** Dispatch the per-mode controls block by quantum mode. */
+function renderModeControls(p: ModeControlsProps): React.ReactNode {
+  switch (p.config.quantumMode) {
+    case 'harmonicOscillator':
+      return (
+        <HarmonicOscillatorControls
+          config={p.config}
+          dimension={p.dimension}
+          actions={p.harmonicActions}
+        />
+      )
+    case 'antiDeSitter':
+      return <AntiDeSitterControls />
+    case 'wheelerDeWitt':
+      return <WheelerDeWittControls />
+    case 'quantumWalk':
+      return <QuantumWalkControls />
+    case 'diracEquation':
+      return <DiracControls config={p.config} dimension={p.dimension} actions={p.diracActions} />
+    case 'becDynamics':
+      return (
+        <>
+          <BECControls config={p.config} dimension={p.dimension} actions={p.becActions} />
+          <KKCompactificationSection defaultOpen={false} />
+        </>
+      )
+    case 'tdseDynamics':
+      return (
+        <>
+          <TDSEControls config={p.config} dimension={p.dimension} actions={p.tdseActions} />
+          <KKCompactificationSection defaultOpen={false} />
+        </>
+      )
+    case 'freeScalarField':
+      return (
+        <FreeScalarFieldControls
+          config={p.config}
+          dimension={p.dimension}
+          actions={p.freeScalarActions}
+        />
+      )
+    case 'hydrogenNDCoupled':
+      return (
+        <HydrogenNDCoupledControls
+          config={p.config}
+          dimension={p.dimension}
+          actions={p.hydrogenNDCoupledActions}
+        />
+      )
+    case 'hydrogenND':
+      return (
+        <HydrogenNDControls
+          config={p.config}
+          dimension={p.dimension}
+          actions={p.hydrogenNDActions}
+        />
+      )
+    default:
+      throw new Error(`Unhandled quantum mode: ${String(p.config.quantumMode)}`)
+  }
 }
 
 /**
@@ -143,16 +148,15 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
     const dimension = useGeometryStore((state) => state.dimension)
     const isoEnabled = useExtendedObjectStore((state) => state.schroedinger?.isoEnabled ?? false)
 
-    const isHydrogenNDMode =
-      config.quantumMode === 'hydrogenND' || config.quantumMode === 'hydrogenNDCoupled'
-    const isHydrogenCoupled = config.quantumMode === 'hydrogenNDCoupled'
-    const isFreeScalarField = config.quantumMode === 'freeScalarField'
-    const isTdseDynamics = config.quantumMode === 'tdseDynamics'
-    const isBecDynamics = config.quantumMode === 'becDynamics'
-    const isDiracEquation = config.quantumMode === 'diracEquation'
-    const isQuantumWalk = config.quantumMode === 'quantumWalk'
-    const isWheelerDeWitt = config.quantumMode === 'wheelerDeWitt'
-    const isAntiDeSitter = config.quantumMode === 'antiDeSitter'
+    const mode = config.quantumMode
+    const isHydrogenNDMode = mode === 'hydrogenND' || mode === 'hydrogenNDCoupled'
+    const isFreeScalarField = mode === 'freeScalarField'
+    const isTdseDynamics = mode === 'tdseDynamics'
+    const isBecDynamics = mode === 'becDynamics'
+    const isDiracEquation = mode === 'diracEquation'
+    const isQuantumWalk = mode === 'quantumWalk'
+    const isWheelerDeWitt = mode === 'wheelerDeWitt'
+    const isAntiDeSitter = mode === 'antiDeSitter'
 
     return (
       <div className={className} data-testid="schroedinger-controls">
@@ -253,15 +257,6 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
           {renderModeControls({
             config,
             dimension,
-            isQuantumWalk,
-            isWheelerDeWitt,
-            isAntiDeSitter,
-            isDiracEquation,
-            isBecDynamics,
-            isTdseDynamics,
-            isFreeScalarField,
-            isHydrogenCoupled,
-            isHydrogenNDMode,
             diracActions,
             becActions,
             tdseActions,

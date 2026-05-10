@@ -224,7 +224,7 @@ export function useSchroedingerActions(): SchroedingerActionsResult {
     setDiracDiagnosticsEnabled: state.setDiracDiagnosticsEnabled,
     setDiracDiagnosticsInterval: state.setDiracDiagnosticsInterval,
     setDiracSlicePosition: state.setDiracSlicePosition,
-    setDiracNeedsReset: state.setDiracNeedsReset,
+    markComputeNeedsReset: state.markComputeNeedsReset,
     applyDiracPreset: state.applyDiracPreset,
   }))
 
@@ -425,7 +425,7 @@ export function useSchroedingerActions(): SchroedingerActionsResult {
     setDiagnosticsEnabled: s.setDiracDiagnosticsEnabled,
     setDiagnosticsInterval: s.setDiracDiagnosticsInterval,
     setSlicePosition: s.setDiracSlicePosition,
-    setNeedsReset: s.setDiracNeedsReset,
+    setNeedsReset: () => s.markComputeNeedsReset('dirac'),
     applyPreset: s.applyDiracPreset,
   }
 

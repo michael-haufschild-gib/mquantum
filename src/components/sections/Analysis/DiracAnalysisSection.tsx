@@ -136,6 +136,7 @@ const DiracDispersionDiagram: React.FC<DiracDispersionDiagramProps> = React.memo
               stroke="var(--text-tertiary)"
               strokeWidth={0.5}
               strokeDasharray="2,2"
+              data-testid="dirac-zero-energy-line"
             />
 
             {/* Mass gap lines ±mc² */}

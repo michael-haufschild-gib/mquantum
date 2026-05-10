@@ -120,11 +120,11 @@ describe('WheelerDeWittStrategy — Phase 5 queue wiring', () => {
   })
 
   function setup(wdw: Record<string, unknown>) {
-    const clearWdwNeedsReset = vi.fn()
+    const clearComputeNeedsReset = vi.fn()
     const stores: Record<string, unknown> = {
       extended: {
         schroedinger: { quantumMode: 'wheelerDeWitt', wheelerDeWitt: wdw },
-        clearWdwNeedsReset,
+        clearComputeNeedsReset,
       },
       animation: { isPlaying: false, accumulatedTime: 0 },
     }

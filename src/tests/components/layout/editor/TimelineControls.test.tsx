@@ -20,7 +20,7 @@ const mockResetSchroedingerParameters = vi.fn()
 const mockResetFreeScalarField = vi.fn()
 const mockResetTdseField = vi.fn()
 const mockResetBecField = vi.fn()
-const mockSetDiracNeedsReset = vi.fn()
+const mockMarkComputeNeedsReset = vi.fn()
 const mockResetPauliField = vi.fn()
 const mockRequestOpenQuantumStateReset = vi.fn()
 
@@ -47,7 +47,7 @@ const mockExtendedState = {
   resetFreeScalarField: mockResetFreeScalarField,
   resetTdseField: mockResetTdseField,
   resetBecField: mockResetBecField,
-  setDiracNeedsReset: mockSetDiracNeedsReset,
+  markComputeNeedsReset: mockMarkComputeNeedsReset,
   resetPauliField: mockResetPauliField,
   requestOpenQuantumStateReset: mockRequestOpenQuantumStateReset,
 }
@@ -140,7 +140,7 @@ describe('TimelineControls', () => {
     mockResetFreeScalarField.mockClear()
     mockResetTdseField.mockClear()
     mockResetBecField.mockClear()
-    mockSetDiracNeedsReset.mockClear()
+    mockMarkComputeNeedsReset.mockClear()
     mockResetPauliField.mockClear()
     mockRequestOpenQuantumStateReset.mockClear()
   })
@@ -354,14 +354,14 @@ describe('TimelineControls', () => {
     expect(mockResetBecField).toHaveBeenCalledOnce()
   })
 
-  it('calls setDiracNeedsReset when restart clicked in Dirac mode', () => {
+  it('calls markComputeNeedsReset(dirac) when restart clicked in Dirac mode', () => {
     mockGeometryState.objectType = 'schroedinger'
     mockExtendedState.schroedinger.quantumMode = 'diracEquation'
 
     render(<TimelineControls />)
 
     fireEvent.click(screen.getByRole('button', { name: /reset wavefunction/i }))
-    expect(mockSetDiracNeedsReset).toHaveBeenCalledOnce()
+    expect(mockMarkComputeNeedsReset).toHaveBeenCalledWith('dirac')
   })
 
   it('shows Open Quantum badge with 0 when disabled', () => {

@@ -189,6 +189,46 @@ describe('generateQuantumPreset', () => {
         expect(Number.isFinite(o)).toBe(true)
       }
     })
+
+    it('falls back for non-finite parameters instead of leaking NaN into preset state', () => {
+      const preset = generateQuantumPreset(
+        Number.NaN,
+        Number.NaN,
+        Number.POSITIVE_INFINITY,
+        Number.NaN,
+        Number.NaN
+      )
+
+      expect(preset.termCount).toBe(3)
+      expect(preset.omega).toHaveLength(3)
+      expect(preset.quantumNumbers).toHaveLength(3)
+      expect(preset.coefficients).toHaveLength(3)
+      expect(preset.energies).toHaveLength(3)
+
+      for (const value of [
+        ...preset.omega,
+        ...preset.quantumNumbers.flat(),
+        ...preset.coefficients.flat(),
+        ...preset.energies,
+      ]) {
+        expect(Number.isFinite(value)).toBe(true)
+      }
+    })
+
+    it('floors fractional structural parameters before allocating preset arrays', () => {
+      const preset = generateQuantumPreset(0, 4.9, 2.9, 3.9, 0.1)
+
+      expect(preset.omega).toHaveLength(4)
+      expect(preset.termCount).toBe(2)
+      expect(preset.quantumNumbers).toHaveLength(2)
+      for (const term of preset.quantumNumbers) {
+        expect(term).toHaveLength(4)
+        for (const n of term) {
+          expect(Number.isInteger(n)).toBe(true)
+          expect(n).toBeLessThanOrEqual(3)
+        }
+      }
+    })
   })
 
   describe('structural invariants', () => {

@@ -137,15 +137,19 @@ fn fit_brody_parameter(spacings: &mut [f64]) -> f64 {
 /// # Arguments
 /// * `energies` - Eigenvalue array (at least 3 elements for meaningful results)
 pub fn compute_level_spacing(energies: &[f64]) -> Vec<f64> {
-    let n = energies.len();
+    let mut sorted = energies
+        .iter()
+        .copied()
+        .filter(|v| v.is_finite())
+        .collect::<Vec<f64>>();
+    let n = sorted.len();
     if n < 2 {
         // Return empty spacings + beta=0, mean=0, classification=0 (poisson)
         return vec![0.0, 0.0, 0.0];
     }
 
     // Sort energies ascending
-    let mut sorted = energies.to_vec();
-    sorted.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    sorted.sort_unstable_by(f64::total_cmp);
 
     // Nearest-neighbor spacings
     let num_spacings = n - 1;
@@ -232,13 +236,18 @@ pub fn compute_scar_correlation(
 ) -> Vec<f64> {
     let dim = dim as usize;
     let num_orbits = orbit_lengths.len();
-    if dim == 0 {
+    if dim == 0 || !sigma.is_finite() || sigma <= 0.0 {
         return vec![0.0; num_orbits + 4];
     }
 
     // Validate grid_sizes has enough dimensions
     if grid_sizes.len() < dim || spacings.len() < dim {
         return vec![0.0; num_orbits + 4];
+    }
+    for &dx in spacings.iter().take(dim) {
+        if !dx.is_finite() || dx <= 0.0 {
+            return vec![0.0; num_orbits + 4];
+        }
     }
 
     // Compute total grid sites
@@ -259,8 +268,16 @@ pub fn compute_scar_correlation(
     let mut density = vec![0.0f64; total_sites];
     let mut total_density: f64 = 0.0;
     for i in 0..total_sites {
-        let re = density_re[i] as f64;
-        let im = density_im[i] as f64;
+        let re = if density_re[i].is_finite() {
+            density_re[i] as f64
+        } else {
+            0.0
+        };
+        let im = if density_im[i].is_finite() {
+            density_im[i] as f64
+        } else {
+            0.0
+        };
         let rho = re * re + im * im;
         density[i] = rho;
         total_density += rho;
@@ -289,14 +306,14 @@ pub fn compute_scar_correlation(
         }
     }
 
-    if sigma <= 0.0 {
-        // Invalid sigma — return zeros to avoid Inf/NaN in Gaussian weights
-        return vec![0.0; num_orbits + 4];
-    }
     let inv_two_eps_sq = 1.0 / (2.0 * sigma * sigma);
 
     // Kernel radius: 3σ in grid cells
-    let min_spacing = spacings.iter().copied().fold(f64::INFINITY, f64::min);
+    let min_spacing = spacings
+        .iter()
+        .take(dim)
+        .copied()
+        .fold(f64::INFINITY, f64::min);
     let kernel_radius = if min_spacing > 0.0 {
         (3.0 * sigma / min_spacing).ceil().max(1.0) as i32
     } else {
@@ -650,6 +667,21 @@ mod tests {
         assert!((result[0] - 1.0).abs() < 1e-10); // single unfolded spacing = 1.0
     }
 
+    #[test]
+    fn test_level_spacing_filters_non_finite_energies() {
+        let result = compute_level_spacing(&[f64::NAN, 3.0, f64::INFINITY, 1.0, 2.0]);
+        assert_eq!(result.len(), 5); // 2 spacings + 3 metadata
+        assert!((result[0] - 1.0).abs() < 1e-10);
+        assert!((result[1] - 1.0).abs() < 1e-10);
+        assert!((result[3] - 1.0).abs() < 1e-10); // mean spacing
+    }
+
+    #[test]
+    fn test_level_spacing_non_finite_only_returns_finite_empty_metadata() {
+        let result = compute_level_spacing(&[f64::NAN, f64::INFINITY]);
+        assert_eq!(result, vec![0.0, 0.0, 0.0]);
+    }
+
     // ── Scar correlation tests ──
 
     #[test]
@@ -679,6 +711,65 @@ mod tests {
         assert_eq!(result.len(), 5);
         assert!((result[0]).abs() < 1e-10, "correlation should be 0");
         assert!((result[1]).abs() < 1e-10, "max should be 0");
+    }
+
+    #[test]
+    fn test_scar_rejects_invalid_spacing_or_sigma() {
+        let density_re = vec![1.0f32; 16];
+        let density_im = vec![0.0f32; 16];
+        let grid_sizes = vec![4u32, 4];
+        let orbit_points = vec![0.0f64, 0.0];
+        let orbit_lengths = vec![1u32];
+
+        let bad_spacing = compute_scar_correlation(
+            &density_re,
+            &density_im,
+            &grid_sizes,
+            &[1.0, 0.0],
+            &orbit_points,
+            &orbit_lengths,
+            1.0,
+            2,
+        );
+        let bad_sigma = compute_scar_correlation(
+            &density_re,
+            &density_im,
+            &grid_sizes,
+            &[1.0, 1.0],
+            &orbit_points,
+            &orbit_lengths,
+            f64::NAN,
+            2,
+        );
+
+        assert_eq!(bad_spacing, vec![0.0; 5]);
+        assert_eq!(bad_sigma, vec![0.0; 5]);
+    }
+
+    #[test]
+    fn test_scar_treats_non_finite_density_as_zero() {
+        let mut density_re = vec![0.0f32; 16];
+        density_re[5] = f32::INFINITY;
+        density_re[10] = 1.0;
+        let mut density_im = vec![0.0f32; 16];
+        density_im[6] = f32::NAN;
+        let grid_sizes = vec![4u32, 4];
+        let spacings = vec![1.0f64, 1.0];
+        let orbit_points = vec![0.0f64, 0.0];
+        let orbit_lengths = vec![1u32];
+
+        let result = compute_scar_correlation(
+            &density_re,
+            &density_im,
+            &grid_sizes,
+            &spacings,
+            &orbit_points,
+            &orbit_lengths,
+            1.0,
+            2,
+        );
+
+        assert!(result.iter().all(|v| v.is_finite()));
     }
 
     #[test]

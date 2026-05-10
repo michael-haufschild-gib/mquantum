@@ -109,17 +109,21 @@ describe('computePartialCollapse — TS fallback', () => {
     }
   })
 
-  it('rejects out-of-range axis without throwing', () => {
+  it('rejects out-of-range axis as a finite no-op copy', () => {
     const gridSize = [4, 4]
     const spacing = [0.1, 0.1]
     const total = 16
     const psiRe = new Float32Array(total).fill(1)
     const psiIm = new Float32Array(total)
-    // Legacy TS path: the JS loop asks for envelope[axisCoord] with axisCoord
-    // from a possibly-oversize axis index. The TS fallback itself doesn't
-    // guard; bridge path returns null (empty output from Rust's validator).
-    // This test pins the current TS-fallback behaviour — if we later make
-    // the TS path strict too, update accordingly.
-    expect(() => computePartialCollapse(psiRe, psiIm, gridSize, spacing, 0, 0.0, 1.0)).not.toThrow()
+    psiIm[3] = 0.25
+
+    const [outRe, outIm] = computePartialCollapse(psiRe, psiIm, gridSize, spacing, 2, 0.0, 1.0)
+
+    expect(outRe).toEqual(psiRe)
+    expect(outIm).toEqual(psiIm)
+    expect(outRe).not.toBe(psiRe)
+    expect(outIm).not.toBe(psiIm)
+    expect(outRe.every(Number.isFinite)).toBe(true)
+    expect(outIm.every(Number.isFinite)).toBe(true)
   })
 })

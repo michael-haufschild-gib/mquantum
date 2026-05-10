@@ -40,6 +40,7 @@ import type { TdseConfig } from '@/lib/geometry/extended/tdse'
 import { DEFAULT_TDSE_CONFIG } from '@/lib/geometry/extended/tdse'
 import { MAX_SLICE_POSITIONS_WRITE_COUNT } from '@/rendering/webgpu/passes/computePassUtils'
 import { packWriteGridUniforms } from '@/rendering/webgpu/passes/QuantumWalkComputePassUniforms'
+import { TDSE_UNIFORM_SIZE } from '@/rendering/webgpu/passes/TDSEComputePassResources'
 import { writeTdseUniforms } from '@/rendering/webgpu/passes/TDSEComputePassUniforms'
 
 function mkQwConfig(slicePositions: number[]): QuantumWalkConfig {
@@ -157,10 +158,7 @@ describe('slicePositions write clamp: TDSE (observable overflow)', () => {
     return {} as GPUBuffer
   }
 
-  // 800 bytes / 4 — struct grew by 32 bytes (one 16-byte-aligned row) when
-  // the analog Hawking block was appended after the black-hole Regge–Wheeler
-  // slots. See TDSE_UNIFORM_SIZE in TDSEComputePassBuffers.ts.
-  const TDSE_UNIFORM_F32_COUNT = 200
+  const TDSE_UNIFORM_F32_COUNT = TDSE_UNIFORM_SIZE / Float32Array.BYTES_PER_ELEMENT
 
   function callWriteTdseUniforms(config: TdseConfig): Float32Array {
     const uniformData = new ArrayBuffer(TDSE_UNIFORM_F32_COUNT * 4)

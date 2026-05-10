@@ -16,6 +16,7 @@ export {
   SKYBOX_SELECTION_SET,
   SKYBOX_TEXTURE_SET,
 } from './presetNormalizationShared'
+import { normalizeOpaqueHexColor } from '@/lib/colors/colorUtils'
 import type { LightSource, LightType } from '@/rendering/lights/types'
 import {
   clampConeAngle,
@@ -33,9 +34,11 @@ import type { SkyboxMode, SkyboxSelection, SkyboxTexture } from '../defaults/vis
 import { usePBRStore } from '../pbrStore'
 import {
   clampToRange,
+  isFiniteVec3,
   PROCEDURAL_SKYBOX_MODE_SET,
   SKYBOX_SELECTION_SET,
   SKYBOX_TEXTURE_SET,
+  validateBooleanField,
 } from './presetNormalizationShared'
 
 export const LIGHTING_LOAD_KEYS = [
@@ -177,6 +180,15 @@ export function normalizeEnvironmentLoadData(
     }
   }
 
+  if ('backgroundColor' in normalized) {
+    const normalizedBackgroundColor = normalizeOpaqueHexColor(normalized.backgroundColor)
+    if (normalizedBackgroundColor) {
+      normalized.backgroundColor = normalizedBackgroundColor
+    } else {
+      delete normalized.backgroundColor
+    }
+  }
+
   return {
     ...normalized,
     skyboxSelection: selection,
@@ -186,14 +198,6 @@ export function normalizeEnvironmentLoadData(
 
 function isLightType(value: unknown): value is LightType {
   return value === 'point' || value === 'directional' || value === 'spot'
-}
-
-function isFiniteVec3(value: unknown): value is [number, number, number] {
-  return (
-    Array.isArray(value) &&
-    value.length === 3 &&
-    value.every((component) => typeof component === 'number' && Number.isFinite(component))
-  )
 }
 
 /** Validate and normalize a single light source from imported preset data. */
@@ -259,12 +263,6 @@ function clampNumericField(
  * Validate a boolean field in a record. If the field exists but is not boolean,
  * delete it.
  */
-function validateBooleanField(obj: Record<string, unknown>, key: string): void {
-  if (key in obj && typeof obj[key] !== 'boolean') {
-    delete obj[key]
-  }
-}
-
 /** Parse and validate the raw lights array, returning valid lights or null. */
 function parseLightsArray(rawLights: unknown): LightSource[] | null {
   if (!Array.isArray(rawLights)) return null

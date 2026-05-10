@@ -442,6 +442,10 @@ export function computePartialCollapse(
   const totalSites = psiRe.length
   const curvedMetric = usesCurvedMetric(options)
 
+  if (!Number.isInteger(axis) || axis < 0 || axis >= latticeDim) {
+    return [new Float32Array(psiRe), new Float32Array(psiIm)]
+  }
+
   if (isAnimationWasmReady() && !curvedMetric) {
     const wasmResult = computePartialCollapseWasm(
       psiRe,

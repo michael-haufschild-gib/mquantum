@@ -164,6 +164,22 @@ function createEmptyLastDispatchedRankCap(): SrmtLastDispatchedRankCap {
   return { a: 0, phi1: 0, phi2: 0 }
 }
 
+/** Return a finite affine quality or the pending sentinel. */
+function qualityFromEntry(entry: SrmtClockCacheEntry | null): number {
+  const quality = entry?.result.affineMatchQuality ?? Number.NaN
+  return Number.isFinite(quality) ? quality : Number.NaN
+}
+
+/** Terminate the current worker instance without marking dispatcher state disposed. */
+function terminateCurrentWorker(state: SrmtWorkerState): void {
+  if (state.worker) {
+    state.worker.onmessage = null
+    state.worker.onerror = null
+    state.worker.terminate()
+  }
+  state.worker = null
+}
+
 /** Construct an idle SRMT worker state. */
 export function createSrmtWorkerState(): SrmtWorkerState {
   return {
@@ -186,9 +202,9 @@ export function createSrmtWorkerState(): SrmtWorkerState {
  */
 export function qualityFromResults(results: SrmtResultsByClock): SrmtClockQuality {
   return {
-    a: results.a ? results.a.result.affineMatchQuality : Number.NaN,
-    phi1: results.phi1 ? results.phi1.result.affineMatchQuality : Number.NaN,
-    phi2: results.phi2 ? results.phi2.result.affineMatchQuality : Number.NaN,
+    a: qualityFromEntry(results.a),
+    phi1: qualityFromEntry(results.phi1),
+    phi2: qualityFromEntry(results.phi2),
   }
 }
 
@@ -250,6 +266,7 @@ function ensureWorker(state: SrmtWorkerState): Worker {
     if (state.disposed) return
     state.inFlight = false
     state.queue = []
+    terminateCurrentWorker(state)
     logger.warn('[SRMT] Worker onerror:', ev)
     useSrmtDiagnosticStore.getState().setSrmtComputing(false)
   }
@@ -386,6 +403,7 @@ function postArgsToWorker(state: SrmtWorkerState, args: SrmtDispatchArgs): void 
   } catch (err) {
     state.inFlight = false
     state.queue = []
+    terminateCurrentWorker(state)
     logger.warn('[SRMT] Failed to dispatch diagnostic to worker:', err)
     useSrmtDiagnosticStore.getState().setSrmtComputing(false)
   }
@@ -425,6 +443,9 @@ export function queueSrmtCompute(
   selectedClock: SrmtClock
 ): void {
   if (state.disposed) return
+  if (state.inFlight) {
+    terminateCurrentWorker(state)
+  }
   // Clear in-flight state + cache before re-queueing. We intentionally do
   // NOT bump epoch here — `postArgsToWorker` bumps it on each post, so
   // any stale reply from a previous batch would be dropped by that next
@@ -474,6 +495,9 @@ export function queueSrmtCompute(
 export function dispatchSrmtCompute(state: SrmtWorkerState, args: SrmtDispatchArgs): void {
   if (state.disposed) return
   if (state.inFlight && state.lastDispatchedHash[args.clock] === args.hash) return
+  if (state.inFlight) {
+    terminateCurrentWorker(state)
+  }
   // Detach from any prior batch: a lingering `queue` or `selectedClock`
   // from a previous `queueSrmtCompute` would cause the reply handler to
   // auto-dispatch the next queued clock AND gate `setDiagnostic` on the
@@ -520,16 +544,17 @@ export function dispatchSrmtCompute(state: SrmtWorkerState, args: SrmtDispatchAr
     worker.postMessage(request, [chiCopy.buffer, maskCopy.buffer])
   } catch (err) {
     state.inFlight = false
+    terminateCurrentWorker(state)
     logger.warn('[SRMT] Failed to dispatch diagnostic to worker:', err)
     useSrmtDiagnosticStore.getState().setSrmtComputing(false)
   }
 }
 
 /**
- * Cancel any in-flight dispatch without tearing down the worker. Used when
- * `srmtEnabled` toggles off or the compute hash changes mid-queue. Clears
- * the per-clock cache so downstream consumers see an empty state on the
- * next frame.
+ * Cancel any in-flight dispatch and tear down the worker so stale heavy
+ * compute cannot block the next fresh request behind it. Used when
+ * `srmtEnabled` toggles off. Clears the per-clock cache so downstream
+ * consumers see an empty state on the next frame.
  */
 export function cancelSrmtCompute(state: SrmtWorkerState): void {
   if (state.disposed) return
@@ -541,6 +566,7 @@ export function cancelSrmtCompute(state: SrmtWorkerState): void {
   state.lastDispatchedRankCap = createEmptyLastDispatchedRankCap()
   state.selectedClock = null
   state.resultGeneration = 0
+  terminateCurrentWorker(state)
   // Without this the "Computing…" strip can stay live after the user
   // flips SRMT off mid-batch.
   useSrmtDiagnosticStore.getState().setSrmtComputing(false)

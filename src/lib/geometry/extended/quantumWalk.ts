@@ -8,6 +8,8 @@
 
 import { sanitizePowerOfTwoGridSizes } from '@/lib/math/ndArray'
 
+import type { PmlAbsorberConfig } from './crossMode'
+
 /** Coin operator type for the quantum walk. */
 export type QuantumWalkCoinType = 'grover' | 'hadamard' | 'dft'
 
@@ -25,7 +27,7 @@ export type QuantumWalkFieldView =
 /**
  * Configuration for discrete-time quantum walk simulation.
  */
-export interface QuantumWalkConfig {
+export interface QuantumWalkConfig extends PmlAbsorberConfig {
   /** Lattice dimensionality (driven by global dimension selector) */
   latticeDim: number
   /** Per-dimension grid sizes (power of 2) */
@@ -50,12 +52,6 @@ export interface QuantumWalkConfig {
   spacing: number[]
   /** Runtime flag to trigger re-initialization */
   needsReset: boolean
-  /** Enable absorbing boundaries (amplitude damping near edges) */
-  absorberEnabled: boolean
-  /** Fraction of grid per side used for absorbing layer (0–0.5) */
-  absorberWidth: number
-  /** Per-step damping target at outer edge (e.g. 1e-6) */
-  pmlTargetReflection: number
   /** Slice positions for extra dimensions (d>3) — length equals max(0, latticeDim - 3) */
   slicePositions: number[]
 }

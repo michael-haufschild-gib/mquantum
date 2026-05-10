@@ -109,7 +109,7 @@ export class QuantumWalkStrategy implements QuantumModeStrategy {
 
     // Clear needsReset after processing
     if (qwConfig.needsReset) {
-      extended?.clearQuantumWalkNeedsReset?.()
+      extended?.clearComputeNeedsReset?.('quantumWalk')
     }
 
     handleSimulationStateIO(ctx, qwPass, ['quantumWalk'])

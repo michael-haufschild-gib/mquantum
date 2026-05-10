@@ -164,8 +164,6 @@ export const createPauliSpinorSlice: StateCreator<ExtendedObjectSlice, [], [], P
     setPauliSliceAmplitude: (amplitude) => setPauliClamped('sliceAmplitude', amplitude, 0.1, 1.0),
 
     // === Lifecycle ===
-    setPauliNeedsReset: () => setPauliField('needsReset', true),
-    clearPauliNeedsReset: () => setPauliField('needsReset', false),
     resetPauliField: () => {
       setWithVersion((state) => ({
         pauliSpinor: { ...state.pauliSpinor, needsReset: true },

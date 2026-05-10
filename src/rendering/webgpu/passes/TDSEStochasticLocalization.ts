@@ -18,6 +18,7 @@
  */
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
+import { clamp } from '@/lib/math/clamp'
 import { gaussianPair, mulberry32 } from '@/lib/math/rng'
 import { MAX_STOCHASTIC_SITES } from '@/lib/physics/stochastic/localizationKernel'
 
@@ -37,6 +38,10 @@ import type { SiteDispatch } from './computePassUtils'
 
 /** Maximum collapse centers per dispatch (mirrors physics constant). */
 const MAX_CENTERS_PER_DISPATCH = MAX_STOCHASTIC_SITES
+const STOCHASTIC_SIGMA_MIN = 0.5
+const STOCHASTIC_SIGMA_MAX = 5.0
+const STOCHASTIC_SEED_MAX = 999999
+const DEFAULT_SIGMA = 2.0
 
 /** Workgroup size for expectation reduction shaders (must match @workgroup_size in WGSL). */
 export const EXPECT_WG = 256
@@ -52,6 +57,33 @@ const STOCHASTIC_UNIFORM_SIZE = 1568
 
 /** Size of the expectation finalize uniform buffer (16 bytes). */
 const EXPECT_FINALIZE_UNIFORM_SIZE = 16
+
+function sanitizeStochasticRuntimeConfig(config: TdseConfig): TdseConfig | null {
+  const gamma = config.stochasticGamma
+  const dt = config.dt
+  if (!Number.isFinite(gamma) || gamma <= 0 || !Number.isFinite(dt) || dt <= 0) {
+    return null
+  }
+
+  const sigma = Number.isFinite(config.stochasticSigma)
+    ? clamp(config.stochasticSigma, STOCHASTIC_SIGMA_MIN, STOCHASTIC_SIGMA_MAX)
+    : DEFAULT_SIGMA
+  const numSites = Number.isFinite(config.stochasticNumSites)
+    ? Math.floor(clamp(config.stochasticNumSites, 1, MAX_CENTERS_PER_DISPATCH))
+    : 1
+  const seed = Number.isFinite(config.stochasticSeed)
+    ? Math.floor(clamp(config.stochasticSeed, 0, STOCHASTIC_SEED_MAX))
+    : 0
+
+  return {
+    ...config,
+    stochasticGamma: gamma,
+    stochasticSigma: sigma,
+    stochasticNumSites: numSites,
+    stochasticSeed: seed,
+    dt,
+  }
+}
 
 /** Pure WGSL composition for the stochastic-localization apply-kick compute shader (1-D variant). */
 export function composeTdseStochasticLocShader(): string {
@@ -351,6 +383,7 @@ function packStochasticUniforms(
  * Auto-computed: M = ceil(γ·dt / 0.01), clamped [1, 8].
  */
 export function computeCSLSubsteps(gamma: number, dt: number): number {
+  if (!Number.isFinite(gamma) || gamma <= 0 || !Number.isFinite(dt) || dt <= 0) return 1
   return Math.max(1, Math.min(8, Math.ceil((gamma * dt) / 0.01)))
 }
 
@@ -362,18 +395,25 @@ export function prepareStochasticStaging(
   stepsThisFrame: number,
   boundingRadius = 2.0
 ): void {
+  const runtimeConfig = sanitizeStochasticRuntimeConfig(config)
   if (
     !config.stochasticEnabled ||
-    config.stochasticGamma <= 0 ||
+    !runtimeConfig ||
     !state.uniformBuffer ||
+    !Number.isFinite(stepsThisFrame) ||
     stepsThisFrame <= 0
   ) {
     return
   }
 
-  const nLoc = Math.max(1, Math.min(MAX_CENTERS_PER_DISPATCH, config.stochasticNumSites))
-  const cslSubsteps = computeCSLSubsteps(config.stochasticGamma, config.dt)
-  const totalSlots = stepsThisFrame * cslSubsteps
+  const safeStepsThisFrame = Math.floor(stepsThisFrame)
+  if (safeStepsThisFrame <= 0) {
+    state.stagingSlotCount = 0
+    return
+  }
+  const nLoc = runtimeConfig.stochasticNumSites
+  const cslSubsteps = computeCSLSubsteps(runtimeConfig.stochasticGamma, runtimeConfig.dt)
+  const totalSlots = safeStepsThisFrame * cslSubsteps
 
   if (!state.stagingBuffer || state.stagingSlotCount < totalSlots) {
     state.stagingBuffer?.destroy()
@@ -386,13 +426,17 @@ export function prepareStochasticStaging(
     state.stagingSlotCount = slotCount
   }
 
+  const safeBoundingRadius =
+    Number.isFinite(boundingRadius) && boundingRadius > 0 ? boundingRadius : 2.0
   const placementRadius = Math.max(
-    boundingRadius + config.stochasticSigma,
-    config.stochasticSigma * 2
+    safeBoundingRadius + runtimeConfig.stochasticSigma,
+    runtimeConfig.stochasticSigma * 2
   )
 
   const subConfig: TdseConfig =
-    cslSubsteps > 1 ? { ...config, stochasticGamma: config.stochasticGamma / cslSubsteps } : config
+    cslSubsteps > 1
+      ? { ...runtimeConfig, stochasticGamma: runtimeConfig.stochasticGamma / cslSubsteps }
+      : runtimeConfig
 
   const totalSize = totalSlots * STOCHASTIC_UNIFORM_SIZE
   const combined = new ArrayBuffer(totalSize)
@@ -433,7 +477,7 @@ export function maybeDispatchStochasticLoc(
 ): void {
   if (
     !config.stochasticEnabled ||
-    config.stochasticGamma <= 0 ||
+    !sanitizeStochasticRuntimeConfig(config) ||
     !state.pipeline ||
     !state.bg ||
     !state.uniformBuffer ||

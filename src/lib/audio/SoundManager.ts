@@ -46,8 +46,9 @@ class SoundManager {
     window.removeEventListener('keydown', this.init)
   }
 
-  private init = (): void => {
-    if (this.initialized || typeof window === 'undefined') return
+  private init = (): boolean => {
+    if (this.initialized) return true
+    if (typeof window === 'undefined') return false
 
     const AudioContextCtor =
       window.AudioContext ||
@@ -55,7 +56,7 @@ class SoundManager {
     if (!AudioContextCtor) {
       // Browser does not support Web Audio; stop trying to initialize.
       this.detachInitListeners()
-      return
+      return false
     }
 
     try {
@@ -68,156 +69,233 @@ class SoundManager {
       this.masterGain = masterGain
       this.initialized = true
       this.detachInitListeners()
+      return true
     } catch {
       // Keep listeners attached so we can retry on a later user gesture.
+      return false
     }
   }
 
-  public playClick(): void {
-    if (!this.ctx || !this.masterGain || !this.enabled) return
-    if (!this.throttle('click', 50)) return
+  private resetClosedContext(ctx: AudioContext): void {
+    if (this.ctx !== ctx) return
+    this.ctx = null
+    this.masterGain = null
+    this.initialized = false
+    if (typeof window !== 'undefined') this.attachInitListeners()
+  }
 
-    const now = this.ctx.currentTime
-    const duration = 0.02
-    const sampleRate = this.ctx.sampleRate
-    const bufferSize = Math.floor(sampleRate * duration)
+  private resumePausedContext(ctx: AudioContext): void {
+    const state = ctx.state as AudioContext['state'] | 'interrupted'
+    if (state !== 'suspended' && state !== 'interrupted') return
 
-    // Create short noise burst
-    const buffer = this.ctx.createBuffer(1, bufferSize, sampleRate)
-    const data = buffer.getChannelData(0)
+    void ctx.resume().catch(() => {
+      const currentState = ctx.state as AudioContext['state'] | 'interrupted'
+      if (currentState === 'closed') this.resetClosedContext(ctx)
+    })
+  }
 
-    // Sharp attack, fast decay - like a soft tap
-    for (let i = 0; i < bufferSize; i++) {
-      const t = i / bufferSize
-      const envelope = Math.pow(1 - t, 3)
-      data[i] = (Math.random() * 2 - 1) * envelope
+  private handlePlaybackError(ctx: AudioContext): void {
+    const state = ctx.state as AudioContext['state'] | 'interrupted'
+    if (state === 'closed') this.resetClosedContext(ctx)
+  }
+
+  private disconnectNode(node: AudioNode): void {
+    try {
+      node.disconnect()
+    } catch {
+      // Cleanup failures should never break the next UI interaction.
+    }
+  }
+
+  private preparePlayback(): { ctx: AudioContext; masterGain: GainNode } | null {
+    if (!this.enabled) return null
+    if (!this.initialized) this.init()
+
+    const ctx = this.ctx
+    const masterGain = this.masterGain
+    if (!ctx || !masterGain) return null
+
+    const state = ctx.state as AudioContext['state'] | 'interrupted'
+    if (state === 'closed') {
+      this.resetClosedContext(ctx)
+      return null
     }
 
-    const source = this.ctx.createBufferSource()
-    source.buffer = buffer
+    this.resumePausedContext(ctx)
+    return { ctx, masterGain }
+  }
 
-    // Bandpass to give it body without being harsh
-    const filter = this.ctx.createBiquadFilter()
-    filter.type = 'bandpass'
-    filter.frequency.value = 1000
-    filter.Q.value = 0.5
+  public playClick(): void {
+    const playback = this.preparePlayback()
+    if (!playback) return
+    if (!this.throttle('click', 50)) return
+    const { ctx, masterGain } = playback
 
-    const gain = this.ctx.createGain()
-    gain.gain.value = 0.15
+    try {
+      const now = ctx.currentTime
+      const duration = 0.02
+      const sampleRate = ctx.sampleRate
+      const bufferSize = Math.floor(sampleRate * duration)
 
-    source.connect(filter)
-    filter.connect(gain)
-    gain.connect(this.masterGain)
+      // Create short noise burst
+      const buffer = ctx.createBuffer(1, bufferSize, sampleRate)
+      const data = buffer.getChannelData(0)
 
-    source.start(now)
-    source.stop(now + duration)
-    source.onended = () => {
-      filter.disconnect()
-      gain.disconnect()
+      // Sharp attack, fast decay - like a soft tap
+      for (let i = 0; i < bufferSize; i++) {
+        const t = i / bufferSize
+        const envelope = Math.pow(1 - t, 3)
+        data[i] = (Math.random() * 2 - 1) * envelope
+      }
+
+      const source = ctx.createBufferSource()
+      source.buffer = buffer
+
+      // Bandpass to give it body without being harsh
+      const filter = ctx.createBiquadFilter()
+      filter.type = 'bandpass'
+      filter.frequency.value = 1000
+      filter.Q.value = 0.5
+
+      const gain = ctx.createGain()
+      gain.gain.value = 0.15
+
+      source.connect(filter)
+      filter.connect(gain)
+      gain.connect(masterGain)
+
+      source.start(now)
+      source.stop(now + duration)
+      source.onended = () => {
+        this.disconnectNode(source)
+        this.disconnectNode(filter)
+        this.disconnectNode(gain)
+      }
+    } catch {
+      this.handlePlaybackError(ctx)
     }
   }
 
   public playHover(): void {
-    if (!this.ctx || !this.masterGain || !this.enabled) return
+    const playback = this.preparePlayback()
+    if (!playback) return
     if (!this.throttle('hover', 100)) return
+    const { ctx, masterGain } = playback
 
-    const osc = this.ctx.createOscillator()
-    const gain = this.ctx.createGain()
+    try {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
 
-    osc.type = 'triangle'
-    osc.frequency.setValueAtTime(200, this.ctx.currentTime)
+      osc.type = 'triangle'
+      osc.frequency.setValueAtTime(200, ctx.currentTime)
 
-    gain.gain.setValueAtTime(0, this.ctx.currentTime)
-    gain.gain.linearRampToValueAtTime(0.05, this.ctx.currentTime + 0.01)
-    gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.05)
+      gain.gain.setValueAtTime(0, ctx.currentTime)
+      gain.gain.linearRampToValueAtTime(0.05, ctx.currentTime + 0.01)
+      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.05)
 
-    const filter = this.ctx.createBiquadFilter()
-    filter.type = 'lowpass'
-    filter.frequency.value = 400
+      const filter = ctx.createBiquadFilter()
+      filter.type = 'lowpass'
+      filter.frequency.value = 400
 
-    osc.connect(filter)
-    filter.connect(gain)
-    gain.connect(this.masterGain)
+      osc.connect(filter)
+      filter.connect(gain)
+      gain.connect(masterGain)
 
-    osc.start()
-    osc.stop(this.ctx.currentTime + 0.05)
-    osc.onended = () => {
-      filter.disconnect()
-      gain.disconnect()
+      osc.start()
+      osc.stop(ctx.currentTime + 0.05)
+      osc.onended = () => {
+        this.disconnectNode(osc)
+        this.disconnectNode(filter)
+        this.disconnectNode(gain)
+      }
+    } catch {
+      this.handlePlaybackError(ctx)
     }
   }
 
   public playSnap(): void {
-    if (!this.ctx || !this.masterGain || !this.enabled) return
+    const playback = this.preparePlayback()
+    if (!playback) return
     if (!this.throttle('snap', 50)) return
+    const { ctx, masterGain } = playback
 
-    const now = this.ctx.currentTime
-    const duration = 0.025
-    const sampleRate = this.ctx.sampleRate
-    const bufferSize = Math.floor(sampleRate * duration)
+    try {
+      const now = ctx.currentTime
+      const duration = 0.025
+      const sampleRate = ctx.sampleRate
+      const bufferSize = Math.floor(sampleRate * duration)
 
-    // Short low-frequency thud
-    const buffer = this.ctx.createBuffer(1, bufferSize, sampleRate)
-    const data = buffer.getChannelData(0)
+      // Short low-frequency thud
+      const buffer = ctx.createBuffer(1, bufferSize, sampleRate)
+      const data = buffer.getChannelData(0)
 
-    for (let i = 0; i < bufferSize; i++) {
-      const t = i / bufferSize
-      const envelope = Math.pow(1 - t, 4)
-      data[i] = (Math.random() * 2 - 1) * envelope
-    }
+      for (let i = 0; i < bufferSize; i++) {
+        const t = i / bufferSize
+        const envelope = Math.pow(1 - t, 4)
+        data[i] = (Math.random() * 2 - 1) * envelope
+      }
 
-    const source = this.ctx.createBufferSource()
-    source.buffer = buffer
+      const source = ctx.createBufferSource()
+      source.buffer = buffer
 
-    // Low bandpass for soft thud
-    const filter = this.ctx.createBiquadFilter()
-    filter.type = 'lowpass'
-    filter.frequency.value = 400
+      // Low bandpass for soft thud
+      const filter = ctx.createBiquadFilter()
+      filter.type = 'lowpass'
+      filter.frequency.value = 400
 
-    const gain = this.ctx.createGain()
-    gain.gain.value = 0.1
+      const gain = ctx.createGain()
+      gain.gain.value = 0.1
 
-    source.connect(filter)
-    filter.connect(gain)
-    gain.connect(this.masterGain)
+      source.connect(filter)
+      filter.connect(gain)
+      gain.connect(masterGain)
 
-    source.start(now)
-    source.stop(now + duration)
-    source.onended = () => {
-      filter.disconnect()
-      gain.disconnect()
+      source.start(now)
+      source.stop(now + duration)
+      source.onended = () => {
+        this.disconnectNode(source)
+        this.disconnectNode(filter)
+        this.disconnectNode(gain)
+      }
+    } catch {
+      this.handlePlaybackError(ctx)
     }
   }
 
   public playSuccess(): void {
-    if (!this.ctx || !this.masterGain || !this.enabled) return
+    const playback = this.preparePlayback()
+    if (!playback) return
     if (!this.throttle('success', 200)) return
-    const ctx = this.ctx
-    const masterGain = this.masterGain
+    const { ctx, masterGain } = playback
 
     const now = ctx.currentTime
 
-    // Arpeggio
-    ;[440, 554, 659].forEach((freq, i) => {
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
+    try {
+      // Arpeggio
+      ;[440, 554, 659].forEach((freq, i) => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
 
-      osc.type = 'sine'
-      osc.frequency.value = freq
+        osc.type = 'sine'
+        osc.frequency.value = freq
 
-      gain.gain.setValueAtTime(0, now + i * 0.05)
-      gain.gain.linearRampToValueAtTime(0.1, now + i * 0.05 + 0.05)
-      gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.05 + 0.4)
+        gain.gain.setValueAtTime(0, now + i * 0.05)
+        gain.gain.linearRampToValueAtTime(0.1, now + i * 0.05 + 0.05)
+        gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.05 + 0.4)
 
-      osc.connect(gain)
-      gain.connect(masterGain)
+        osc.connect(gain)
+        gain.connect(masterGain)
 
-      osc.start(now + i * 0.05)
-      osc.stop(now + i * 0.05 + 0.4)
-      osc.onended = () => {
-        gain.disconnect()
-      }
-    })
+        osc.start(now + i * 0.05)
+        osc.stop(now + i * 0.05 + 0.4)
+        osc.onended = () => {
+          this.disconnectNode(osc)
+          this.disconnectNode(gain)
+        }
+      })
+    } catch {
+      this.handlePlaybackError(ctx)
+    }
   }
 
   /**
@@ -225,47 +303,54 @@ class SoundManager {
    * Very subtle - like a whisper of air.
    */
   public playSwish(): void {
-    if (!this.ctx || !this.masterGain || !this.enabled) return
+    const playback = this.preparePlayback()
+    if (!playback) return
     if (!this.throttle('swish', 100)) return
+    const { ctx, masterGain } = playback
 
-    const now = this.ctx.currentTime
-    const duration = 0.08
-    const sampleRate = this.ctx.sampleRate
-    const bufferSize = Math.floor(sampleRate * duration)
+    try {
+      const now = ctx.currentTime
+      const duration = 0.08
+      const sampleRate = ctx.sampleRate
+      const bufferSize = Math.floor(sampleRate * duration)
 
-    // Create noise buffer
-    const buffer = this.ctx.createBuffer(1, bufferSize, sampleRate)
-    const data = buffer.getChannelData(0)
+      // Create noise buffer
+      const buffer = ctx.createBuffer(1, bufferSize, sampleRate)
+      const data = buffer.getChannelData(0)
 
-    // Very gentle rise and fall
-    for (let i = 0; i < bufferSize; i++) {
-      const t = i / bufferSize
-      // Sine-shaped envelope for smoothness
-      const envelope = Math.sin(t * Math.PI) * 0.5
-      data[i] = (Math.random() * 2 - 1) * envelope
-    }
+      // Very gentle rise and fall
+      for (let i = 0; i < bufferSize; i++) {
+        const t = i / bufferSize
+        // Sine-shaped envelope for smoothness
+        const envelope = Math.sin(t * Math.PI) * 0.5
+        data[i] = (Math.random() * 2 - 1) * envelope
+      }
 
-    const source = this.ctx.createBufferSource()
-    source.buffer = buffer
+      const source = ctx.createBufferSource()
+      source.buffer = buffer
 
-    // Soft bandpass - lower frequency, wider Q
-    const filter = this.ctx.createBiquadFilter()
-    filter.type = 'bandpass'
-    filter.frequency.value = 1500
-    filter.Q.value = 0.3
+      // Soft bandpass - lower frequency, wider Q
+      const filter = ctx.createBiquadFilter()
+      filter.type = 'bandpass'
+      filter.frequency.value = 1500
+      filter.Q.value = 0.3
 
-    const gain = this.ctx.createGain()
-    gain.gain.value = 0.06
+      const gain = ctx.createGain()
+      gain.gain.value = 0.06
 
-    source.connect(filter)
-    filter.connect(gain)
-    gain.connect(this.masterGain)
+      source.connect(filter)
+      filter.connect(gain)
+      gain.connect(masterGain)
 
-    source.start(now)
-    source.stop(now + duration)
-    source.onended = () => {
-      filter.disconnect()
-      gain.disconnect()
+      source.start(now)
+      source.stop(now + duration)
+      source.onended = () => {
+        this.disconnectNode(source)
+        this.disconnectNode(filter)
+        this.disconnectNode(gain)
+      }
+    } catch {
+      this.handlePlaybackError(ctx)
     }
   }
 

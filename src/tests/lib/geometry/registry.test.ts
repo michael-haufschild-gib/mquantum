@@ -15,8 +15,6 @@ import {
   getControlsComponentKey,
   // Dimension constraints
   getDimensionConstraints,
-  // Core lookups
-  getObjectTypeEntry,
   getQuantumTypeEntry,
   getQuantumTypeName,
   getRecommendedDimension,
@@ -29,7 +27,6 @@ import {
   // Validation
   isValidObjectType,
   // Registry data
-  OBJECT_TYPE_REGISTRY,
   QUANTUM_MODES_3D_ONLY,
   QUANTUM_TYPE_REGISTRY,
   resolveQuantumTypeKey,
@@ -38,31 +35,32 @@ import { getControlsComponent, hasControlsComponent } from '@/lib/geometry/regis
 
 describe('Object Type Registry', () => {
   describe('Registry Structure', () => {
-    it('contains schroedinger and pauliSpinor object types', () => {
-      const types = Array.from(OBJECT_TYPE_REGISTRY.keys())
+    it('exposes exactly two ObjectTypes via the per-dimension helper', () => {
+      // The helper enumerates every ObjectType backed by at least one
+      // QUANTUM_TYPE_REGISTRY entry — there is no separate ObjectType registry.
+      const types = getAvailableTypesForDimension(11).map((t) => t.type)
       expect(types).toHaveLength(2)
       expect(types).toContain('schroedinger')
       expect(types).toContain('pauliSpinor')
     })
 
-    it('returns valid entry for schroedinger', () => {
-      const entry = getObjectTypeEntry('schroedinger')
-      expect(entry).toMatchObject({ type: 'schroedinger' })
-      expect(entry?.name).toBe('Schrödinger Slices')
-      expect(entry?.description.length).toBeGreaterThan(10)
+    it('returns derived facts for schroedinger', () => {
+      expect(getDimensionConstraints('schroedinger')).toMatchObject({ min: 2, max: 11 })
+      expect(getControlsComponentKey('schroedinger')).toBe('SchroedingerControls')
+      expect(getConfigStoreKey('schroedinger')).toBe('schroedinger')
     })
 
-    it('returns undefined for invalid object type', () => {
-      const entry = getObjectTypeEntry('invalid-type' as never)
-      expect(entry).toBeUndefined()
+    it('returns undefined facts for invalid object type', () => {
+      expect(getDimensionConstraints('invalid-type' as never)).toBeUndefined()
+      expect(getControlsComponentKey('invalid-type' as never)).toBeUndefined()
+      expect(getConfigStoreKey('invalid-type' as never)).toBeUndefined()
     })
   })
 
   describe('pauliSpinor entry', () => {
-    it('returns valid entry for pauliSpinor', () => {
-      const entry = getObjectTypeEntry('pauliSpinor')
-      expect(entry).toMatchObject({ type: 'pauliSpinor' })
-      expect(entry?.configStoreKey).toBe('pauliSpinor')
+    it('returns derived facts for pauliSpinor', () => {
+      expect(getDimensionConstraints('pauliSpinor')).toMatchObject({ min: 3, max: 6 })
+      expect(getConfigStoreKey('pauliSpinor')).toBe('pauliSpinor')
     })
 
     it('pauliSpinor recommends 3D', () => {
@@ -286,20 +284,16 @@ describe('Quantum Type Registry (Flat Model)', () => {
   })
 })
 
-describe('Cross-Registry Consistency', () => {
-  it('pauliSpinor dimension constraints match between both registries', () => {
-    const legacy = getObjectTypeEntry('pauliSpinor')
+describe('Per-ObjectType helpers derive the dimension envelope', () => {
+  it('pauliSpinor dimension constraints match the sole quantum entry', () => {
+    const derived = getDimensionConstraints('pauliSpinor')
     const flat = getQuantumTypeEntry('pauliSpinor')
-    expect(legacy?.type).toBe('pauliSpinor')
-    expect(flat?.key).toBe('pauliSpinor')
-    expect(legacy!.dimensions.min).toBe(flat!.dimensions.min)
-    expect(legacy!.dimensions.max).toBe(flat!.dimensions.max)
+    expect(derived?.min).toBe(flat!.dimensions.min)
+    expect(derived?.max).toBe(flat!.dimensions.max)
   })
 
   it('schroedinger dimension constraints match the widest quantum type range', () => {
-    const legacy = getObjectTypeEntry('schroedinger')
-    expect(legacy?.type).toBe('schroedinger')
-    // schroedinger wraps all quantum modes — its range must be the union
+    // schroedinger wraps all quantum modes — its envelope must be the union.
     let minOfAllModes = Infinity
     let maxOfAllModes = -Infinity
     for (const [, entry] of QUANTUM_TYPE_REGISTRY) {
@@ -308,7 +302,8 @@ describe('Cross-Registry Consistency', () => {
         maxOfAllModes = Math.max(maxOfAllModes, entry.dimensions.max)
       }
     }
-    expect(legacy!.dimensions.min).toBe(minOfAllModes)
-    expect(legacy!.dimensions.max).toBe(maxOfAllModes)
+    const derived = getDimensionConstraints('schroedinger')
+    expect(derived?.min).toBe(minOfAllModes)
+    expect(derived?.max).toBe(maxOfAllModes)
   })
 })

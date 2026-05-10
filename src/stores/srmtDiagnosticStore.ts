@@ -132,6 +132,18 @@ export function createPendingClockQuality(): SrmtClockQuality {
   return { a: Number.NaN, phi1: Number.NaN, phi2: Number.NaN }
 }
 
+function sanitizeQualityValue(value: number): number {
+  return Number.isFinite(value) ? value : Number.NaN
+}
+
+function sanitizeClockQuality(quality: SrmtClockQuality): SrmtClockQuality {
+  return {
+    a: sanitizeQualityValue(quality.a),
+    phi1: sanitizeQualityValue(quality.phi1),
+    phi2: sanitizeQualityValue(quality.phi2),
+  }
+}
+
 /**
  * Create the SRMT diagnostic Zustand store. Initial state: no snapshot,
  * all-NaN quality, version 0.
@@ -143,19 +155,23 @@ export const useSrmtDiagnosticStore = create<SrmtDiagnosticState>((set) => ({
   version: 0,
 
   setDiagnostic: (snapshot, quality) => {
+    const clockAffineQuality = sanitizeClockQuality(quality)
     set((s) => ({
-      snapshot,
-      clockAffineQuality: { ...quality },
+      snapshot: {
+        ...snapshot,
+        affineMatchQuality: clockAffineQuality[snapshot.clock],
+      },
+      clockAffineQuality,
       version: s.version + 1,
     }))
   },
 
   setClockQuality: (clock, affineMatchQuality) => {
     set((s) => {
-      // NaN = pending sentinel; keep the previous value and skip the version
-      // bump so callers can't accidentally regress a finite quality back to
-      // "pending" or trigger a wasted re-render.
-      if (Number.isNaN(affineMatchQuality)) return s
+      // Non-finite = pending sentinel; keep the previous value and skip the
+      // version bump so callers can't accidentally regress a finite quality
+      // back to "pending" or trigger a wasted re-render.
+      if (!Number.isFinite(affineMatchQuality)) return s
       if (s.clockAffineQuality[clock] === affineMatchQuality) return s
       return {
         clockAffineQuality: {

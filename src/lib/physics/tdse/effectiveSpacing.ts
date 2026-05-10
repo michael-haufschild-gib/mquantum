@@ -6,17 +6,13 @@
  * period, so every host-side TDSE path must use dx = L / N.
  */
 
+import { clampFinite } from '@/lib/math/clamp'
 import { computeEffectiveSpacing } from '@/lib/physics/compactification'
 import {
   MAX_TORUS_PERIOD,
   type MetricConfig,
   MIN_TORUS_PERIOD,
 } from '@/lib/physics/tdse/metrics/types'
-
-function clampFinite(value: number | undefined, min: number, max: number): number {
-  if (!Number.isFinite(value)) return min
-  return Math.min(max, Math.max(min, value!))
-}
 
 /**
  * Inputs for TDSE effective spacing computation. `gridSize` and `spacing`
@@ -56,7 +52,12 @@ export function applyTorusMetricSpacing(
   for (let d = 0; d < overrideDims; d++) {
     const n = gridSize[d]
     if (!Number.isFinite(n) || n! <= 0) continue
-    const period = clampFinite(metric.torusPeriod[d], MIN_TORUS_PERIOD, MAX_TORUS_PERIOD)
+    const period = clampFinite(
+      metric.torusPeriod[d],
+      MIN_TORUS_PERIOD,
+      MIN_TORUS_PERIOD,
+      MAX_TORUS_PERIOD
+    )
     result[d] = period / n!
   }
   return result

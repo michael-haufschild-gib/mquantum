@@ -45,17 +45,17 @@ import {
   dispatchFFTAxisSharedMem,
   SHARED_MEM_FFT_MAX_AXIS,
 } from './DiracComputePassDispatchers'
+import type {
+  DiracBindGroupResult,
+  DiracPassHelpers,
+  DiracPipelineResult,
+} from './DiracComputePassResources'
 import {
   buildDiracPipelines,
   rebuildDiracBindGroups,
   rebuildDiracBuffers,
 } from './DiracComputePassSetup'
 import { runBatchedStrangStep, runLegacyStrangStep } from './DiracComputePassStrang'
-import type {
-  DiracBindGroupResult,
-  DiracPassHelpers,
-  DiracPipelineResult,
-} from './DiracComputePassTypes'
 import { buildDiracFFTStagingData, writeDiracUniforms } from './DiracComputePassUniforms'
 import { requestStateSave as genericStateSave } from './stateSave'
 

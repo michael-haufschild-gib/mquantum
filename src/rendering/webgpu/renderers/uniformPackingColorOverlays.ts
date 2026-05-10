@@ -16,7 +16,20 @@ interface HydrogenResult {
   bohrRadius: number
 }
 
-const parseColor = (hex: string): Rgb => parseHexColorToLinearRgb(hex)
+/** Parse a hex color string to a linear-space RGB triplet. */
+export const parseColor = (hex: string): Rgb => parseHexColorToLinearRgb(hex)
+
+/**
+ * Pack a hex color into a 4-float RGBA slot in a uniform Float32Array.
+ * Alpha is hardcoded to 0 — uniform color slots use alpha as padding.
+ */
+export function packColorRgba(floatView: Float32Array, idx: number, hex: string): void {
+  const rgb = parseColor(hex)
+  floatView[idx] = rgb[0]
+  floatView[idx + 1] = rgb[1]
+  floatView[idx + 2] = rgb[2]
+  floatView[idx + 3] = 0.0
+}
 
 /** Pack representation, radial probability, domain coloring, and diverging. */
 export function packRepresentationAndColorOverlays(
@@ -74,7 +87,8 @@ export function packRepresentationAndColorOverlays(
 export function packWignerAndPauliFields(
   floatView: Float32Array,
   intView: Int32Array,
-  p: SchroedingerPackParams
+  p: SchroedingerPackParams,
+  hydrogen: HydrogenResult
 ): void {
   const { schroedinger, pauliSpinor, dimension } = p
   const wignerDimIdx = schroedinger?.wignerDimensionIndex ?? 0
@@ -83,7 +97,7 @@ export function packWignerAndPauliFields(
   intView[I.wignerCrossTermsEnabled] = schroedinger?.wignerCrossTermsEnabled ? 1 : 0
 
   if (schroedinger?.wignerAutoRange ?? true) {
-    packWignerAutoRange(floatView, intView, p, clampedWignerDimIdx)
+    packWignerAutoRange(floatView, intView, p, clampedWignerDimIdx, hydrogen)
   } else {
     floatView[I.wignerXRange] = schroedinger?.wignerXRange ?? 6.0
     floatView[I.wignerPRange] = schroedinger?.wignerPRange ?? 6.0
@@ -155,15 +169,15 @@ function packWignerAutoRange(
   floatView: Float32Array,
   intView: Int32Array,
   p: SchroedingerPackParams,
-  wignerDimIdx: number
+  wignerDimIdx: number,
+  hydrogen: HydrogenResult
 ): void {
-  const { schroedinger } = p
   const isHydrogenMode =
     p.rendererQuantumMode === 'hydrogenND' || p.rendererQuantumMode === 'hydrogenNDCoupled'
 
   if (isHydrogenMode && wignerDimIdx < 3) {
-    const n = schroedinger?.principalQuantumNumber ?? 2
-    const a0 = schroedinger?.bohrRadiusScale ?? 1.0
+    const n = hydrogen.validN
+    const a0 = hydrogen.bohrRadius
     const rCenter = n * n * a0
     const rMax = rCenter * 2.5
     floatView[I.wignerXRange] = Math.max(rCenter, rMax - rCenter)
@@ -200,12 +214,4 @@ function getWignerRangeBasis(
     if (qn > maxN) maxN = qn
   }
   return { selectedOmega: floatView[I.omega + dimIdx] ?? 1.0, maxN }
-}
-
-function packColorRgba(floatView: Float32Array, idx: number, hex: string): void {
-  const rgb = parseColor(hex)
-  floatView[idx] = rgb[0]
-  floatView[idx + 1] = rgb[1]
-  floatView[idx + 2] = rgb[2]
-  floatView[idx + 3] = 0.0
 }

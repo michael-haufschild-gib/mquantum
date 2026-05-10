@@ -153,13 +153,13 @@ describe('extendedObjectStore — free scalar field actions', () => {
     expect(v2).toBeGreaterThan(v1)
   })
 
-  it('clearFreeScalarNeedsReset clears flag without bumping version', () => {
+  it('clearComputeNeedsReset(freeScalar) clears flag without bumping version', () => {
     // First, set the flag
     useExtendedObjectStore.getState().resetFreeScalarField()
     expect(useExtendedObjectStore.getState().schroedinger.freeScalar.needsReset).toBe(true)
 
     const vBefore = useExtendedObjectStore.getState().schroedingerVersion
-    useExtendedObjectStore.getState().clearFreeScalarNeedsReset()
+    useExtendedObjectStore.getState().clearComputeNeedsReset('freeScalar')
     const vAfter = useExtendedObjectStore.getState().schroedingerVersion
 
     expect(useExtendedObjectStore.getState().schroedinger.freeScalar.needsReset).toBe(false)
@@ -350,7 +350,7 @@ describe('extendedObjectStore — free scalar field actions', () => {
     it('sets needsReset when on vacuumNoise even if not previously set', () => {
       useExtendedObjectStore.getState().setFreeScalarInitialCondition('vacuumNoise')
       // Clear the needsReset from initialCondition change
-      useExtendedObjectStore.getState().clearFreeScalarNeedsReset()
+      useExtendedObjectStore.getState().clearComputeNeedsReset('freeScalar')
       expect(useExtendedObjectStore.getState().schroedinger.freeScalar.needsReset).toBe(false)
 
       // Mass change on vacuumNoise should trigger needsReset

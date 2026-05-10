@@ -49,6 +49,7 @@
  */
 
 import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
+import { clamp01 } from '@/lib/math/clamp'
 import { packRGBA16F } from '@/lib/physics/freeScalar/kSpaceOccupation'
 
 import type { WheelerDeWittSolverOutput } from './solver'
@@ -239,12 +240,6 @@ export function computeWdwRenderMaxRho(
   // to clamp and the packer should use the genuine max (which is what
   // the legacy packer did for every HH / DeWitt / low-Λ preset).
   return Math.max(Math.min(capped, globalMax), DENSITY_MAX_FLOOR)
-}
-
-function clamp01(v: number): number {
-  if (v < 0) return 0
-  if (v > 1) return 1
-  return v
 }
 
 /**

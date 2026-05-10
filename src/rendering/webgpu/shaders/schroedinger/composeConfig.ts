@@ -13,7 +13,12 @@
 
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 
-import type { WGSLShaderConfig } from '../shared/compose-helpers'
+import {
+  sanitizeShaderDimension,
+  sanitizeShaderTermCount,
+  type ShaderTermCount,
+  type WGSLShaderConfig,
+} from '../shared/compose-helpers'
 import {
   generateMainBlockIsosurface,
   generateMainBlockIsosurfaceTemporal,
@@ -147,6 +152,7 @@ export interface DerivedShaderFlags {
   includeHarmonic: boolean
   hydrogenNDDimension: number
   useUnrolledHO: boolean
+  termCount: ShaderTermCount | undefined
   useCache: boolean
   useAnalyticalGradient: boolean
   useRobustEigenInterpolation: boolean
@@ -177,17 +183,19 @@ export function derivedShaderFlags(config: SchroedingerWGSLShaderConfig): Derive
     useDensityGrid = false,
     termCount,
   } = config
-  const is2D = dimension === 2 || isWigner
+  const actualDim = sanitizeShaderDimension(dimension, {
+    min: isWigner ? 3 : 2,
+    fallback: 3,
+  })
+  const is2D = actualDim === 2 || isWigner
   const isHydrogenFamily = quantumMode === 'hydrogenND' || quantumMode === 'hydrogenNDCoupled'
   const isHydrogenCoupled = quantumMode === 'hydrogenNDCoupled'
-  const actualDim = isWigner
-    ? Math.min(Math.max(dimension, 3), 11)
-    : Math.min(Math.max(dimension, 2), 11)
   const includeHydrogen = isHydrogenFamily
   const includeHydrogenND = isHydrogenFamily
   const includeHarmonic = !isHydrogenFamily
   const hydrogenNDDimension = includeHydrogenND ? actualDim : 0
-  const useUnrolledHO = includeHarmonic && termCount !== undefined
+  const shaderTermCount = sanitizeShaderTermCount(termCount)
+  const useUnrolledHO = includeHarmonic && shaderTermCount !== undefined
   const useCache = useEigenfunctionCache && !is2D
   const useAnalyticalGradient = useCache && includeHarmonic && useAnalyticalGradientFlag
   const useRobustEigenInterpolation = useCache && useRobustEigenInterpolationFlag
@@ -208,6 +216,7 @@ export function derivedShaderFlags(config: SchroedingerWGSLShaderConfig): Derive
     includeHarmonic,
     hydrogenNDDimension,
     useUnrolledHO,
+    termCount: shaderTermCount,
     useCache,
     useAnalyticalGradient,
     useRobustEigenInterpolation,
@@ -230,7 +239,7 @@ export function buildShaderDefinesAndFeatures(flags: {
   includeHydrogenND: boolean
   hydrogenNDDimension: number
   useUnrolledHO: boolean
-  termCount: number | undefined
+  termCount: ShaderTermCount | undefined
   useCache: boolean
   useAnalyticalGradient: boolean
   useRobustEigenInterpolation: boolean
@@ -272,7 +281,7 @@ export function buildShaderDefinesAndFeatures(flags: {
   defines.push(`const ACTUAL_DIM: i32 = ${flags.actualDim};`)
   defines.push(`const IS_2D: bool = ${flags.is2D};`)
   defines.push(`const IS_WIGNER: bool = ${flags.isWigner};`)
-  features.push(`${flags.dimension}D Quantum`)
+  features.push(`${flags.actualDim}D Quantum`)
 
   if (flags.enableTemporal) {
     defines.push('const TEMPORAL_ENABLED: bool = true;')

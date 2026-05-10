@@ -4,8 +4,10 @@ import {
   resizeQuantumWalkArrays,
   sanitizeQuantumWalkConfig,
 } from '@/lib/geometry/extended/quantumWalk'
+import { normalizeHydrogenNDPresetName } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import { SCHROEDINGER_PALETTE_DEFINITIONS } from '@/lib/geometry/extended/schroedinger/palettes'
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
+import { sanitizeTdseStochasticFields } from '@/lib/geometry/extended/tdse'
 import {
   type BecConfig,
   createDefaultSchroedingerConfig,
@@ -13,6 +15,7 @@ import {
   type DiracConfig,
   FREE_SCALAR_MAX_TOTAL_SITES,
   type FreeScalarConfig,
+  sanitizeHydrogenQuantumState,
   SCHROEDINGER_QUALITY_PRESETS,
   SchroedingerColorMode,
   type SchroedingerConfig,
@@ -33,7 +36,12 @@ import { createOpenQuantumSetters } from './setters/openQuantumSetters'
 import { createQuantumModeSetters } from './setters/quantumModeSetters'
 import { createQuantumWalkSetters } from './setters/quantumWalkSetters'
 import type { SetterContext } from './setters/sliceSetterUtils'
-import { clampDtWithCfl } from './setters/sliceSetterUtils'
+import {
+  clampDtWithCfl,
+  clearSchrodingerModeNeedsReset,
+  markSchrodingerModeNeedsReset,
+  type ResettableConfigKey,
+} from './setters/sliceSetterUtils'
 import { createTdseSetters, resizeTdseArrays } from './setters/tdseSetters'
 import { createVisualEffectSetters } from './setters/visualEffectSetters'
 import { createWheelerDeWittSetters } from './setters/wheelerDeWittSetters'
@@ -507,10 +515,39 @@ export const createSchroedingerSlice: StateCreator<
     // === Quantum Walk ===
     ...createQuantumWalkSetters(ctx),
 
+    // === Generic Compute Reset ===
+    clearComputeNeedsReset: (configKey: string) => {
+      if (configKey === 'pauliSpinor') {
+        set((state) => ({
+          pauliSpinor: { ...state.pauliSpinor, needsReset: false },
+        }))
+      } else {
+        clearSchrodingerModeNeedsReset(set, configKey as ResettableConfigKey)
+      }
+    },
+    markComputeNeedsReset: (configKey: string) => {
+      if (configKey === 'pauliSpinor') {
+        setWithVersion((state) => ({
+          pauliSpinorVersion: state.pauliSpinorVersion + 1,
+          pauliSpinor: { ...state.pauliSpinor, needsReset: true },
+        }))
+      } else {
+        markSchrodingerModeNeedsReset(setWithVersion, configKey as ResettableConfigKey)
+      }
+    },
+
     // === Config Operations ===
     setSchroedingerConfig: (config) => {
       setWithVersion((state) => {
+        const hasHydrogenPreset = Object.prototype.hasOwnProperty.call(config, 'hydrogenNDPreset')
         const schroedinger = { ...state.schroedinger, ...config }
+        Object.assign(schroedinger, sanitizeHydrogenQuantumState(schroedinger, state.schroedinger))
+        if (hasHydrogenPreset) {
+          schroedinger.hydrogenNDPreset = normalizeHydrogenNDPresetName(
+            config.hydrogenNDPreset,
+            'custom'
+          )
+        }
         if (config.freeScalar) {
           let mergedFreeScalar = { ...state.schroedinger.freeScalar, ...config.freeScalar }
           if (mergedFreeScalar.latticeDim !== state.schroedinger.freeScalar.latticeDim) {
@@ -524,6 +561,10 @@ export const createSchroedingerSlice: StateCreator<
           })
           const reconciled = reconcileCosmologyInvariants(sizedFreeScalar)
           schroedinger.freeScalar = { ...sizedFreeScalar, ...reconciled }
+        }
+        if (config.tdse) {
+          const mergedTdse = { ...state.schroedinger.tdse, ...config.tdse }
+          schroedinger.tdse = sanitizeTdseStochasticFields(mergedTdse, state.schroedinger.tdse)
         }
         if (config.quantumWalk) {
           const mergedQuantumWalk = { ...state.schroedinger.quantumWalk, ...config.quantumWalk }

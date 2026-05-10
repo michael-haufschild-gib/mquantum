@@ -286,13 +286,42 @@ export const HYDROGEN_ND_PRESETS: Record<HydrogenNDPresetName, HydrogenNDPreset>
   },
 }
 
+function freezeHydrogenNDPreset(preset: HydrogenNDPreset): void {
+  Object.freeze(preset.extraDimN)
+  Object.freeze(preset.extraDimOmega)
+  Object.freeze(preset)
+}
+
+for (const preset of Object.values(HYDROGEN_ND_PRESETS)) {
+  freezeHydrogenNDPreset(preset)
+}
+Object.freeze(HYDROGEN_ND_PRESETS)
+
+const FALLBACK_HYDROGEN_ND_PRESET: HydrogenNDPresetName = '2pz_4d'
+
+/** Return whether a runtime value names a known Hydrogen ND preset. */
+export function isHydrogenNDPresetName(name: unknown): name is HydrogenNDPresetName {
+  return typeof name === 'string' && Object.prototype.hasOwnProperty.call(HYDROGEN_ND_PRESETS, name)
+}
+
+/** Normalize runtime preset input to a valid Hydrogen ND preset id. */
+export function normalizeHydrogenNDPresetName(
+  name: unknown,
+  fallback: HydrogenNDPresetName = FALLBACK_HYDROGEN_ND_PRESET
+): HydrogenNDPresetName {
+  if (isHydrogenNDPresetName(name)) return name
+  if (isHydrogenNDPresetName(fallback)) return fallback
+  return FALLBACK_HYDROGEN_ND_PRESET
+}
+
 /**
  * Get a hydrogen ND preset by name
  * @param name - The preset name
  * @returns The preset configuration
  */
-export function getHydrogenNDPreset(name: HydrogenNDPresetName): HydrogenNDPreset {
-  return HYDROGEN_ND_PRESETS[name] ?? HYDROGEN_ND_PRESETS['2pz_4d']
+export function getHydrogenNDPreset(name: unknown): HydrogenNDPreset {
+  const presetName = normalizeHydrogenNDPresetName(name)
+  return HYDROGEN_ND_PRESETS[presetName]
 }
 
 /**

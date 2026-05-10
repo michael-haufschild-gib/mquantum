@@ -199,8 +199,11 @@ describe('SRMT dispatcher state machine', () => {
   it('mid-queue re-queue (e.g. hash change during drain) flushes cache + re-queues', () => {
     queueSrmtCompute(state, makeArgsByClock('h1'), 'a')
     postReplyThroughFake(state, replyFor('a', 1, 0.05))
+    const staleWorker = state.worker as unknown as FakeWorker
     // Re-queue with a different hash — e.g. user changed rank cap.
     queueSrmtCompute(state, makeArgsByClock('h2'), 'phi1')
+    expect(staleWorker.terminated).toBe(true)
+    expect(state.worker).not.toBe(staleWorker)
     // All cached results should have been flushed.
     expect(state.resultsByClock.a).toBeNull()
     expect(state.resultsByClock.phi1).toBeNull()

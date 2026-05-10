@@ -53,6 +53,7 @@ export const PerDimensionBars: React.FC<{
                   height={h}
                   fill="var(--bg-elevated)"
                   rx={1}
+                  data-testid="per-dimension-bar-track"
                 />
                 {skipped ? (
                   <text
@@ -73,6 +74,7 @@ export const PerDimensionBars: React.FC<{
                     height={h}
                     fill="var(--chart-pass-2)"
                     rx={1}
+                    data-testid="per-dimension-bar-fill"
                   />
                 )}
                 <text

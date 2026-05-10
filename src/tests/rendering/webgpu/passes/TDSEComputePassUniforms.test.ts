@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { DEFAULT_TDSE_CONFIG } from '@/lib/geometry/extended/tdse'
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { FFT_UNIFORM_SIZE } from '@/rendering/webgpu/passes/computePassUtils'
-import { TDSE_UNIFORM_SIZE } from '@/rendering/webgpu/passes/TDSEComputePassBuffers'
+import { TDSE_UNIFORM_SIZE } from '@/rendering/webgpu/passes/TDSEComputePassResources'
 import {
   buildTdseFFTStagingData,
   type TdseUniformParams,

@@ -1,19 +1,27 @@
 /**
  * TDSE (Time-Dependent Schroedinger Equation) setter factory.
  *
- * Extracts all `setTdse*`, `applyTdsePreset`, `resetTdseField`, and
- * `clearTdseNeedsReset` methods from the schroedingerSlice.
+ * Extracts all `setTdse*`, `applyTdsePreset`, and `resetTdseField`
+ * methods from the schroedingerSlice.
  *
  * @module stores/slices/geometry/setters/tdseSetters
  */
 
-import { DEFAULT_TDSE_CONFIG, type TdseConfig } from '@/lib/geometry/extended/types'
+import {
+  DEFAULT_TDSE_CONFIG,
+  type TdseConfig,
+  type TdseDisorderDistribution,
+  type TdseDriveWaveform,
+  type TdseFieldView,
+  type TdseInitialCondition,
+  type TdsePotentialType,
+} from '@/lib/geometry/extended/types'
 import { reduceGridToFit } from '@/lib/math/ndArray'
 import { clampKKState, computeEffectiveSpacing } from '@/lib/physics/compactification'
+import type { MetricConfig } from '@/lib/physics/tdse/metrics/types'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
-import type { SchroedingerSliceActions } from '../types'
 import {
   clampDtWithCfl,
   computeCflLimit,
@@ -24,91 +32,84 @@ import {
   TDSE_MAX_TOTAL_SITES,
 } from './sliceSetterUtils'
 import { createTdsePotentialSetters } from './tdsePotentialSetters'
-import { createTdseStochasticSetters } from './tdseStochasticSetters'
+import { createTdseStochasticSetters, type TdseStochasticSetters } from './tdseStochasticSetters'
 import { createTdseUiSetters } from './tdseUiSetters'
 
-type TdseActions = Pick<
-  SchroedingerSliceActions,
-  | 'setTdseLatticeDim'
-  | 'setTdseGridSize'
-  | 'setTdseSpacing'
-  | 'setTdseMass'
-  | 'setTdseHbar'
-  | 'setTdseDt'
-  | 'setTdseStepsPerFrame'
-  | 'setTdseInitialCondition'
-  | 'setTdsePacketCenter'
-  | 'setTdsePacketWidth'
-  | 'setTdsePacketAmplitude'
-  | 'setTdsePacketMomentum'
-  | 'setTdsePotentialType'
-  | 'setTdseBarrierHeight'
-  | 'setTdseBarrierWidth'
-  | 'setTdseBarrierCenter'
-  | 'setTdseWellDepth'
-  | 'setTdseWellWidth'
-  | 'setTdseHarmonicOmega'
-  | 'setTdseStepHeight'
-  | 'setTdseSlitSeparation'
-  | 'setTdseSlitWidth'
-  | 'setTdseWallThickness'
-  | 'setTdseWallHeight'
-  | 'setTdseLatticeDepth'
-  | 'setTdseLatticePeriod'
-  | 'setTdseDoubleWellLambda'
-  | 'setTdseDoubleWellSeparation'
-  | 'setTdseDoubleWellAsymmetry'
-  | 'setTdseRadialWellInner'
-  | 'setTdseRadialWellOuter'
-  | 'setTdseRadialWellDepth'
-  | 'setTdseRadialWellTilt'
-  | 'setTdseAnharmonicLambda'
-  | 'setTdseBhMass'
-  | 'setTdseBhMultipoleL'
-  | 'setTdseBhSpin'
-  | 'setTdseDisorderStrength'
-  | 'setTdseDisorderSeed'
-  | 'setTdseDisorderDistribution'
-  | 'setTdseDriveEnabled'
-  | 'setTdseDriveWaveform'
-  | 'setTdseDriveFrequency'
-  | 'setTdseDriveAmplitude'
-  | 'setTdseAbsorberEnabled'
-  | 'setTdseAbsorberWidth'
-  | 'setTdsePmlTargetReflection'
-  | 'setTdseFieldView'
-  | 'setTdseAutoScale'
-  | 'setTdseShowPotential'
-  | 'setTdseAutoLoop'
-  | 'setTdseDiagnosticsEnabled'
-  | 'setTdseDiagnosticsInterval'
-  | 'setTdseObservablesEnabled'
-  | 'setTdseImaginaryTimeEnabled'
-  | 'setTdseCustomPotentialExpression'
-  | 'setTdseSlicePosition'
-  | 'setTdseCompactDim'
-  | 'setTdseCompactRadius'
-  | 'applyTdsePreset'
-  | 'resetTdseField'
-  | 'clearTdseNeedsReset'
-  | 'setTdseStochasticEnabled'
-  | 'setTdseStochasticGamma'
-  | 'setTdseStochasticSigma'
-  | 'setTdseStochasticNumSites'
-  | 'setTdseStochasticSeed'
-  | 'setTdseBranchingEnabled'
-  | 'setTdseBranchPlanePosition'
-  | 'setTdseBranchColorA'
-  | 'setTdseBranchColorB'
-  | 'setTdseWormholeEnabled'
-  | 'setTdseWormholeG'
-  | 'setTdseWormholeAxis'
-  | 'setTdseWormholeHudEnabled'
-  | 'setTdseMetric'
-  | 'setShowCurvatureOverlay'
-  | 'setDensityView'
-  | 'setCurvatureOverlayOpacity'
->
+/** Actions exposed by the TDSE setter bundle (including stochastic, potential, UI sub-bundles). */
+export interface TdseSetters extends TdseStochasticSetters {
+  setTdseLatticeDim: (dim: number) => void
+  setTdseGridSize: (size: number[]) => void
+  setTdseSpacing: (spacing: number[]) => void
+  setTdseMass: (mass: number) => void
+  setTdseHbar: (hbar: number) => void
+  setTdseDt: (dt: number) => void
+  setTdseStepsPerFrame: (steps: number) => void
+  setTdseInitialCondition: (condition: TdseInitialCondition) => void
+  setTdsePacketCenter: (center: number[]) => void
+  setTdsePacketWidth: (width: number) => void
+  setTdsePacketAmplitude: (amplitude: number) => void
+  setTdsePacketMomentum: (momentum: number[]) => void
+  setTdsePotentialType: (type: TdsePotentialType) => void
+  setTdseBarrierHeight: (height: number) => void
+  setTdseBarrierWidth: (width: number) => void
+  setTdseBarrierCenter: (center: number) => void
+  setTdseWellDepth: (depth: number) => void
+  setTdseWellWidth: (width: number) => void
+  setTdseHarmonicOmega: (omega: number) => void
+  setTdseStepHeight: (height: number) => void
+  setTdseSlitSeparation: (separation: number) => void
+  setTdseSlitWidth: (width: number) => void
+  setTdseWallThickness: (thickness: number) => void
+  setTdseWallHeight: (height: number) => void
+  setTdseLatticeDepth: (depth: number) => void
+  setTdseLatticePeriod: (period: number) => void
+  setTdseDoubleWellLambda: (lambda: number) => void
+  setTdseDoubleWellSeparation: (separation: number) => void
+  setTdseDoubleWellAsymmetry: (asymmetry: number) => void
+  setTdseRadialWellInner: (r: number) => void
+  setTdseRadialWellOuter: (r: number) => void
+  setTdseRadialWellDepth: (depth: number) => void
+  setTdseRadialWellTilt: (tilt: number) => void
+  setTdseAnharmonicLambda: (lambda: number) => void
+  setTdseBhMass: (mass: number) => void
+  setTdseBhMultipoleL: (ell: number) => void
+  setTdseBhSpin: (spin: number) => void
+  setTdseDisorderStrength: (strength: number) => void
+  setTdseDisorderSeed: (seed: number) => void
+  setTdseDriveEnabled: (enabled: boolean) => void
+  setTdseDriveWaveform: (waveform: TdseDriveWaveform) => void
+  setTdseDriveFrequency: (frequency: number) => void
+  setTdseDriveAmplitude: (amplitude: number) => void
+  setTdseDisorderDistribution: (distribution: TdseDisorderDistribution) => void
+  setTdseAbsorberEnabled: (enabled: boolean) => void
+  setTdseAbsorberWidth: (width: number) => void
+  setTdsePmlTargetReflection: (r: number) => void
+  setTdseFieldView: (view: TdseFieldView) => void
+  setTdseAutoScale: (autoScale: boolean) => void
+  setTdseShowPotential: (show: boolean) => void
+  setTdseAutoLoop: (autoLoop: boolean) => void
+  setTdseDiagnosticsEnabled: (enabled: boolean) => void
+  setTdseDiagnosticsInterval: (interval: number) => void
+  setTdseObservablesEnabled: (enabled: boolean) => void
+  setTdseImaginaryTimeEnabled: (enabled: boolean) => void
+  setTdseCustomPotentialExpression: (expression: string) => void
+  setTdseSlicePosition: (dimIndex: number, value: number) => void
+  setTdseCompactDim: (dimIndex: number, compact: boolean) => void
+  setTdseCompactRadius: (dimIndex: number, radius: number) => void
+  applyTdsePreset: (presetId: string) => void
+  resetTdseField: () => void
+  // ER=EPR Double-trace Wormhole Coupling
+  setTdseWormholeEnabled: (enabled: boolean) => void
+  setTdseWormholeG: (g: number) => void
+  setTdseWormholeAxis: (axis: 0 | 1 | 2) => void
+  setTdseWormholeHudEnabled: (enabled: boolean) => void
+  // Curved-space kinetic operator (Laplace–Beltrami)
+  setTdseMetric: (cfg: MetricConfig) => void
+  // Curved-space TDSE v2 — Wave 6 visualization (render-only)
+  setShowCurvatureOverlay: (enabled: boolean) => void
+  setDensityView: (view: 'coordinate' | 'proper') => void
+  setCurvatureOverlayOpacity: (opacity: number) => void
+}
 
 /**
  * Resize TDSE arrays to match a new latticeDim, preserving existing values
@@ -207,8 +208,8 @@ const normalizeTdseVector = (
  * Creates all TDSE-related setter actions for the schroedingerSlice.
  * @param ctx - Shared setter context with set/get and validation helpers
  */
-export function createTdseSetters(ctx: SetterContext): TdseActions {
-  const { setWithVersion, set, isFinite, warnNonFinite, hasOnlyFinite } = ctx
+export function createTdseSetters(ctx: SetterContext): TdseSetters {
+  const { setWithVersion, isFinite, warnNonFinite, hasOnlyFinite } = ctx
   const D = 'tdse' as const
 
   return {
@@ -456,7 +457,7 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
     },
     // Potential and drive parameter setters (data-driven, extracted to tdsePotentialSetters.ts)
     ...(createTdsePotentialSetters(ctx) as unknown as Pick<
-      TdseActions,
+      TdseSetters,
       | 'setTdseBarrierHeight'
       | 'setTdseBarrierWidth'
       | 'setTdseBarrierCenter'
@@ -611,14 +612,6 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
         schroedinger: {
           ...state.schroedinger,
           tdse: { ...state.schroedinger.tdse, needsReset: true },
-        },
-      }))
-    },
-    clearTdseNeedsReset: () => {
-      set((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, needsReset: false },
         },
       }))
     },

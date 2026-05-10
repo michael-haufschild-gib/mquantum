@@ -10,7 +10,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ShortcutsOverlay } from '@/components/layout/ShortcutsOverlay'
-import { SHORTCUTS } from '@/hooks/useKeyboardShortcuts'
+import { getShortcutLabel, SHORTCUTS } from '@/hooks/useKeyboardShortcuts'
 import { useLayoutStore } from '@/stores/layoutStore'
 
 describe('ShortcutsOverlay', () => {
@@ -56,6 +56,50 @@ describe('ShortcutsOverlay', () => {
     // Each shortcut should have a <kbd> element for the key
     const kbdElements = screen.getAllByText(/./, { selector: 'kbd' })
     expect(kbdElements.length).toBeGreaterThan(0)
+  })
+
+  it('renders every documented shortcut description and key segment', () => {
+    useLayoutStore.setState({ showShortcuts: true })
+    render(<ShortcutsOverlay />)
+
+    const expectedKeySegmentCount = SHORTCUTS.reduce(
+      (sum, shortcut) => sum + getShortcutLabel(shortcut).split(' ').length,
+      0
+    )
+    const expectedSegmentCounts = new Map<string, number>()
+    for (const shortcut of SHORTCUTS) {
+      for (const segment of getShortcutLabel(shortcut).split(' ')) {
+        expectedSegmentCounts.set(segment, (expectedSegmentCounts.get(segment) ?? 0) + 1)
+      }
+    }
+    expectedSegmentCounts.set('?', (expectedSegmentCounts.get('?') ?? 0) + 1)
+
+    for (const shortcut of SHORTCUTS) {
+      expect(screen.getByText(shortcut.description)).toBeInTheDocument()
+    }
+    for (const [segment, count] of expectedSegmentCounts) {
+      expect(screen.getAllByText(segment, { selector: 'kbd' })).toHaveLength(count)
+    }
+    expect(screen.getAllByText(/./, { selector: 'kbd' })).toHaveLength(expectedKeySegmentCount + 1)
+  })
+
+  it('renders nothing on mobile even when the store flag is true', () => {
+    matchMediaSpy.mockImplementation((query: string) => ({
+      matches: !query.includes('min-width'),
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
+    useLayoutStore.setState({ showShortcuts: true })
+
+    render(<ShortcutsOverlay />)
+
+    expect(screen.queryByTestId('shortcuts-overlay')).not.toBeInTheDocument()
+    expect(useLayoutStore.getState().showShortcuts).toBe(true)
   })
 
   it('close button sets showShortcuts to false', async () => {

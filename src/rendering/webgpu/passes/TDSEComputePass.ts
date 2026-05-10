@@ -38,17 +38,17 @@ import {
   LINEAR_WG,
   type SiteDispatch,
 } from './computePassUtils'
+import { type DiagFrameState } from './TDSEComputePassEvolution'
+import { runTdseExecute, type TdseExecuteFields } from './TDSEComputePassExecute'
+import { dispatchFFTAxisExternal, dispatchFFTAxisInPassExternal } from './TDSEComputePassGradient'
+import { runTdseDispose, type TdseDisposeFields } from './TDSEComputePassLifecycle'
 import {
   applyBufferResult,
   collectOldBuffers,
   rebuildTdseBuffers,
   TDSE_UNIFORM_SIZE,
   type TdsePassBufferFields,
-} from './TDSEComputePassBuffers'
-import { type DiagFrameState } from './TDSEComputePassEvolution'
-import { runTdseExecute, type TdseExecuteFields } from './TDSEComputePassExecute'
-import { dispatchFFTAxisExternal, dispatchFFTAxisInPassExternal } from './TDSEComputePassGradient'
-import { runTdseDispose, type TdseDisposeFields } from './TDSEComputePassLifecycle'
+} from './TDSEComputePassResources'
 import type {
   TdseBindGroupInputs,
   TdseBindGroupResult,
@@ -62,7 +62,7 @@ import { type ObservablesState } from './TDSEObservablesDispatch'
  *
  * Mirrors the layout in `tdseUniforms.wgsl.ts` (authoritative source).
  * Total = 1024 bytes (16-byte aligned). Update `TDSE_UNIFORM_SIZE` in
- * `TDSEComputePassBuffers.ts` and the WGSL struct together when adding
+ * `TDSEComputePassResources.ts` and the WGSL struct together when adding
  * new fields.
  */
 const UNIFORM_SIZE = TDSE_UNIFORM_SIZE

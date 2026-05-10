@@ -25,6 +25,7 @@ import type { WebGPURenderGraph } from './graph/WebGPURenderGraph'
 import { type ExportRuntimeState, isExportRuntimeActive } from './sceneExportRuntime'
 import { executeFrameAndCollectMetrics, type FrameMetricsArgs } from './scenePassConfig'
 import { evaluateFpsLimit } from './utils/fpsLimiter'
+import { resolveCanvasPixelSize } from './utils/sceneMath'
 import { WebGPUStatsCollector } from './WebGPUPerformanceCollector'
 
 // Stable empty array to avoid new reference on every render when parameterValues is undefined
@@ -171,8 +172,7 @@ export function useSceneFrameCallbacks(deps: SceneFrameCallbackDeps): SceneFrame
         if (cw > 0 && ch > 0) {
           const renderScale = usePerformanceStore.getState().renderResolutionScale
           const dpr = window.devicePixelRatio * renderScale
-          const targetW = Math.floor(cw * dpr)
-          const targetH = Math.floor(ch * dpr)
+          const { width: targetW, height: targetH } = resolveCanvasPixelSize(cw, ch, dpr)
           if (canvas.width !== targetW || canvas.height !== targetH) {
             canvas.width = targetW
             canvas.height = targetH

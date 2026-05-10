@@ -67,6 +67,21 @@ describe('srmtDiagnosticStore', () => {
     expect(s.clockAffineQuality.a).toBeCloseTo(0.5, 6)
   })
 
+  it('setDiagnostic sanitizes non-finite quality entries to pending sentinels', () => {
+    useSrmtDiagnosticStore.getState().setDiagnostic(makeSnapshot(), {
+      a: Number.POSITIVE_INFINITY,
+      phi1: 0.25,
+      phi2: Number.NaN,
+    })
+    const snapshot = useSrmtDiagnosticStore.getState().snapshot
+    if (snapshot === null) throw new Error('expected snapshot to be populated')
+    const q = useSrmtDiagnosticStore.getState().clockAffineQuality
+    expect(Number.isNaN(q.a)).toBe(true)
+    expect(q.phi1).toBeCloseTo(0.25, 6)
+    expect(Number.isNaN(q.phi2)).toBe(true)
+    expect(Number.isNaN(snapshot.affineMatchQuality)).toBe(true)
+  })
+
   it('clear resets snapshot + quality + bumps version', () => {
     useSrmtDiagnosticStore.getState().setDiagnostic(makeSnapshot(), {
       a: 0.2,
@@ -116,10 +131,11 @@ describe('srmtDiagnosticStore', () => {
     expect(useSrmtDiagnosticStore.getState().snapshot).toBe(before)
   })
 
-  it('setClockQuality treats NaN as a true no-op — prior finite value is preserved and version is not bumped', () => {
+  it('setClockQuality treats non-finite values as no-ops — prior finite value is preserved and version is not bumped', () => {
     useSrmtDiagnosticStore.getState().setClockQuality('a', 0.25)
     const v0 = useSrmtDiagnosticStore.getState().version
     useSrmtDiagnosticStore.getState().setClockQuality('a', Number.NaN)
+    useSrmtDiagnosticStore.getState().setClockQuality('a', Number.POSITIVE_INFINITY)
     const s = useSrmtDiagnosticStore.getState()
     expect(s.clockAffineQuality.a).toBeCloseTo(0.25, 6)
     expect(s.version).toBe(v0)

@@ -163,5 +163,60 @@ describe('TDSE stochastic setters', () => {
       useExtendedObjectStore.getState().setTdseBranchColorB([0.0, 0.5, 1.0])
       expect(getTdse().branchColorB).toEqual([0.0, 0.5, 1.0])
     })
+
+    it('clamps branch colors to the RGB unit range', () => {
+      useExtendedObjectStore.getState().setTdseBranchColorA([-0.25, 0.5, 1.25])
+      useExtendedObjectStore.getState().setTdseBranchColorB([1.5, -1, 0.25])
+      expect(getTdse().branchColorA).toEqual([0, 0.5, 1])
+      expect(getTdse().branchColorB).toEqual([1, 0, 0.25])
+    })
+
+    it('rejects malformed or non-finite branch colors', () => {
+      useExtendedObjectStore.getState().setTdseBranchColorA([0.1, 0.2, 0.3])
+      useExtendedObjectStore.getState().setTdseBranchColorB([0.7, 0.8, 0.9])
+
+      useExtendedObjectStore
+        .getState()
+        .setTdseBranchColorA([0.4, Number.NaN, 0.6] as [number, number, number])
+      useExtendedObjectStore
+        .getState()
+        .setTdseBranchColorB([0.4, 0.5] as unknown as [number, number, number])
+
+      expect(getTdse().branchColorA).toEqual([0.1, 0.2, 0.3])
+      expect(getTdse().branchColorB).toEqual([0.7, 0.8, 0.9])
+    })
+  })
+
+  describe('setSchroedingerConfig TDSE stochastic sanitization', () => {
+    it('sanitizes stochastic fields that bypass individual setters', () => {
+      useExtendedObjectStore.getState().setTdseStochasticGamma(2)
+      useExtendedObjectStore.getState().setTdseStochasticSigma(1)
+      useExtendedObjectStore.getState().setTdseStochasticNumSites(8)
+      useExtendedObjectStore.getState().setTdseStochasticSeed(123)
+      useExtendedObjectStore.getState().setTdseBranchPlanePosition(0.25)
+      useExtendedObjectStore.getState().setTdseBranchColorA([0.1, 0.2, 0.3])
+      useExtendedObjectStore.getState().setTdseBranchColorB([0.7, 0.8, 0.9])
+
+      useExtendedObjectStore.getState().setSchroedingerConfig({
+        tdse: {
+          ...getTdse(),
+          stochasticGamma: Number.POSITIVE_INFINITY,
+          stochasticSigma: Number.NaN,
+          stochasticNumSites: 99,
+          stochasticSeed: -5,
+          branchPlanePosition: 2,
+          branchColorA: [0.4, Number.NaN, 0.6],
+          branchColorB: [-1, 0.5, 2],
+        },
+      })
+
+      expect(getTdse().stochasticGamma).toBe(2)
+      expect(getTdse().stochasticSigma).toBe(1)
+      expect(getTdse().stochasticNumSites).toBe(MAX_STOCHASTIC_SITES)
+      expect(getTdse().stochasticSeed).toBe(0)
+      expect(getTdse().branchPlanePosition).toBe(1)
+      expect(getTdse().branchColorA).toEqual([0.1, 0.2, 0.3])
+      expect(getTdse().branchColorB).toEqual([0, 0.5, 1])
+    })
   })
 })

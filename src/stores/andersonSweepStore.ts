@@ -118,6 +118,14 @@ export const useAndersonSweepStore = create<AndersonSweepState>((set, get) => ({
   tick: (simTime, ipr, normDrift) => {
     const state = get()
     if (state.status !== 'running') return null
+    if (
+      !Number.isFinite(simTime) ||
+      !Number.isFinite(ipr) ||
+      ipr < 0 ||
+      !Number.isFinite(normDrift)
+    ) {
+      return null
+    }
 
     // On first tick of a new step, record the start time
     if (state.stepStartTime === 0 && simTime > 0) {

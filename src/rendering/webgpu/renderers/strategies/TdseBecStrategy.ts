@@ -189,12 +189,12 @@ export class TdseBecStrategy implements QuantumModeStrategy {
 
     // Build TDSE config — either direct from store or mapped from BEC
     let tdseConfig = extended?.schroedinger?.tdse
-    let clearReset: (() => void) | undefined = extended?.clearTdseNeedsReset
+    let clearReset: (() => void) | undefined = () => extended?.clearComputeNeedsReset?.('tdse')
 
     if (isBecMode && extended?.schroedinger?.bec) {
       const result = buildBecConfig(extended.schroedinger.bec, extended?.schroedinger)
       tdseConfig = result.config
-      clearReset = extended?.clearBecNeedsReset
+      clearReset = () => extended?.clearComputeNeedsReset?.('bec')
     }
 
     if (!tdseConfig) return

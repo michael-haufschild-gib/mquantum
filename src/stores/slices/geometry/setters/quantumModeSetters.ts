@@ -9,7 +9,10 @@
 
 import type { SchroedingerPresetName } from '@/lib/geometry/extended/common'
 import { resizeQuantumWalkArrays } from '@/lib/geometry/extended/quantumWalk'
-import { getHydrogenNDPreset } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
+import {
+  getHydrogenNDPreset,
+  normalizeHydrogenNDPresetName,
+} from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import {
   DEFAULT_SCHROEDINGER_CONFIG,
   type FreeScalarConfig,
@@ -507,17 +510,18 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
 
     // Hydrogen ND presets
     setSchroedingerHydrogenNDPreset: (preset: HydrogenNDPresetName) => {
-      if (preset === 'custom') {
+      const presetName = normalizeHydrogenNDPresetName(preset)
+      if (presetName === 'custom') {
         setWithVersion((state) => ({
-          schroedinger: { ...state.schroedinger, hydrogenNDPreset: preset },
+          schroedinger: { ...state.schroedinger, hydrogenNDPreset: presetName },
         }))
         return
       }
-      const presetData = getHydrogenNDPreset(preset)
+      const presetData = getHydrogenNDPreset(presetName)
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          hydrogenNDPreset: preset,
+          hydrogenNDPreset: presetName,
           principalQuantumNumber: presetData.n,
           azimuthalQuantumNumber: presetData.l,
           magneticQuantumNumber: presetData.m,

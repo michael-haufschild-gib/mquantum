@@ -1,12 +1,11 @@
 /**
- * Free Scalar Field Compute Pass -- Field Initialization
+ * Free Scalar Field Compute Pass -- Resources
  *
- * Handles initial condition setup (vacuum noise, GPU init, save injection)
- * and leapfrog kickstart for the FSF compute pass. Extracted from
- * FreeScalarFieldComputePass to keep individual files under the
- * project's 600-line ESLint limit.
+ * Buffer management, resource disposal, and field initialization for the
+ * FSF compute pass. Consolidated from FreeScalarFieldComputePassBuffers,
+ * FreeScalarFieldComputePassDispose, and FreeScalarFieldComputePassInit.
  *
- * @module rendering/webgpu/passes/FreeScalarFieldComputePassInit
+ * @module rendering/webgpu/passes/FreeScalarFieldComputePassResources
  */
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
@@ -19,12 +18,206 @@ import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import type { WebGPURenderContext } from '../core/types'
 import { LINEAR_WG as LINEAR_WORKGROUP_SIZE } from './computePassUtils'
-import { createDtStagingBuffer } from './FreeScalarFieldComputePassBuffers'
 import type { FsfBindGroupResult, FsfPipelineResult } from './FreeScalarFieldComputePassSetup'
-import { FSF_DT_BYTE_OFFSET } from './FreeScalarFieldComputePassUniforms'
+import {
+  computeFsfConfigHash,
+  FSF_DT_BYTE_OFFSET,
+  FSF_UNIFORM_SIZE,
+} from './FreeScalarFieldComputePassUniforms'
 import type { FsfKSpaceManager } from './FreeScalarFieldKSpace'
 import { getOrCreateFsfCosmoDebugBuffer } from './fsfCosmoDebug'
 import { projectSimEta, writeFsfCosmologyCoefsSlot } from './fsfCosmologyStepping'
+
+// ---------------------------------------------------------------------------
+// Buffer Management
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a 4-byte COPY_SRC staging buffer pre-populated with a single f32
+ * `dt` value. Used by the leapfrog kickstart to stage `dt/2` and `dt` into
+ * the uniform buffer's DT slot via `encoder.copyBufferToBuffer`.
+ *
+ * @param device - GPU device
+ * @param label - Human-readable label suffix ('half' or 'full')
+ * @param dt - Time step value to store
+ * @returns A mapped-at-creation staging buffer containing the dt value
+ */
+export function createDtStagingBuffer(
+  device: GPUDevice,
+  label: 'half' | 'full',
+  dt: number
+): GPUBuffer {
+  const staging = device.createBuffer({
+    label: `free-scalar-${label}-dt-staging`,
+    size: 4,
+    usage: GPUBufferUsage.COPY_SRC,
+    mappedAtCreation: true,
+  })
+  new Float32Array(staging.getMappedRange()).set([dt])
+  staging.unmap()
+  return staging
+}
+
+/**
+ * Result of rebuilding the FSF field buffers. All GPU resources are
+ * non-null after a successful call.
+ */
+export interface FsfBufferResult {
+  phiBuffer: GPUBuffer
+  piBuffer: GPUBuffer
+  uniformBuffer: GPUBuffer
+  totalSites: number
+  configHash: string
+}
+
+/**
+ * Old buffer references to destroy before rebuilding.
+ */
+export interface FsfDestroyableBuffers {
+  phiBuffer: GPUBuffer | null
+  piBuffer: GPUBuffer | null
+  uniformBuffer: GPUBuffer | null
+}
+
+/**
+ * Rebuild phi/pi storage buffers and uniform buffer when grid size changes.
+ * The density texture is NOT recreated here -- its size is set at construction
+ * and persists across lattice grid size changes to avoid invalidating the renderer's bind group.
+ *
+ * @param device - GPU device
+ * @param config - Current free scalar config
+ * @param old - Old buffers to destroy
+ * @param kSpace - K-space manager whose staging buffers must be rebuilt
+ * @returns Newly created buffers and derived state
+ */
+export function rebuildFsfFieldBuffers(
+  device: GPUDevice,
+  config: FreeScalarConfig,
+  old: FsfDestroyableBuffers,
+  kSpace: FsfKSpaceManager
+): FsfBufferResult {
+  // Destroy old k-space staging buffers and invalidate in-flight jobs
+  kSpace.destroyBuffers()
+
+  // Destroy old field buffers
+  old.phiBuffer?.destroy()
+  old.piBuffer?.destroy()
+  old.uniformBuffer?.destroy()
+
+  // Compute total sites as product of all active dimensions
+  let totalSites = 1
+  for (let d = 0; d < config.latticeDim; d++) {
+    totalSites *= config.gridSize[d]!
+  }
+  const bufferSize = totalSites * 4 // f32 per site
+
+  // Create phi and pi storage buffers (COPY_SRC needed for k-space readback)
+  const phiBuffer = device.createBuffer({
+    label: 'free-scalar-phi',
+    size: bufferSize,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+  })
+
+  const piBuffer = device.createBuffer({
+    label: 'free-scalar-pi',
+    size: bufferSize,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+  })
+
+  // Create k-space and diagnostics staging buffers
+  kSpace.createBuffers(device, bufferSize)
+
+  // Create params buffer as STORAGE (not UNIFORM) because `FreeScalarUniforms`
+  // embeds scalar arrays that are spec-forbidden in uniform address space.
+  // See `freeScalarInit.wgsl.ts` for the full rationale and matching binding
+  // decl. Labelled "uniforms" to preserve the existing name.
+  const uniformBuffer = device.createBuffer({
+    label: 'free-scalar-uniforms',
+    size: FSF_UNIFORM_SIZE,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  })
+
+  const configHash = computeFsfConfigHash(config)
+
+  return {
+    phiBuffer,
+    piBuffer,
+    uniformBuffer,
+    totalSites,
+    configHash,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Disposal
+// ---------------------------------------------------------------------------
+
+/**
+ * Mutable GPU resource fields on FreeScalarFieldComputePass that must be
+ * destroyed and nulled during disposal. Mirrors the private field
+ * declarations on the class.
+ */
+export interface FsfGpuFields {
+  phiBuffer: GPUBuffer | null
+  piBuffer: GPUBuffer | null
+  uniformBuffer: GPUBuffer | null
+  densityTexture: GPUTexture | null
+  densityTextureView: GPUTextureView | null
+  analysisTexture: GPUTexture | null
+  analysisTextureView: GPUTextureView | null
+  normalTexture: GPUTexture | null
+  normalTextureView: GPUTextureView | null
+  gradientPipeline: GPUComputePipeline | null
+  gradientBindGroup: GPUBindGroup | null
+  pipelineGeneration: number
+  pl: FsfPipelineResult | null
+  bg: FsfBindGroupResult | null
+  initialized: boolean
+  lastConfigHash: string
+  lastInitHash: string | null
+  pendingStagingBuffers: GPUBuffer[]
+}
+
+/**
+ * Destroy all GPU buffers, textures, and pipeline references owned by
+ * the FSF compute pass, then null every field so stale references
+ * cannot be used after disposal.
+ *
+ * The caller passes a mutable snapshot of the class's GPU fields so
+ * field accesses stay visible to `--noUnusedLocals`. After return the
+ * caller writes the nulled fields back via `Object.assign(this, fields)`.
+ *
+ * @param fields - Mutable pass GPU fields to destroy and null
+ * @param kSpace - K-space manager instance to dispose
+ */
+export function disposeFsfPassGpu(fields: FsfGpuFields, kSpace: FsfKSpaceManager): void {
+  // Invalidate in-flight async gradient pipeline results
+  fields.pipelineGeneration++
+
+  const gpuBuffers: (GPUBuffer | null)[] = [fields.phiBuffer, fields.piBuffer, fields.uniformBuffer]
+  for (const buf of gpuBuffers) buf?.destroy()
+  fields.densityTexture?.destroy()
+  fields.analysisTexture?.destroy()
+  fields.normalTexture?.destroy()
+  for (const buf of fields.pendingStagingBuffers) buf.destroy()
+  fields.pendingStagingBuffers.length = 0
+
+  fields.phiBuffer = fields.piBuffer = fields.uniformBuffer = null
+  fields.densityTexture = fields.analysisTexture = fields.normalTexture = null
+  fields.densityTextureView = fields.analysisTextureView = fields.normalTextureView = null
+  fields.gradientPipeline = null
+  fields.gradientBindGroup = null
+  kSpace.dispose()
+  fields.pl = null
+  fields.bg = null
+  fields.initialized = false
+  fields.lastConfigHash = ''
+  fields.lastInitHash = null
+}
+
+// ---------------------------------------------------------------------------
+// Field Initialization
+// ---------------------------------------------------------------------------
 
 /**
  * State references needed by the field initialization logic.

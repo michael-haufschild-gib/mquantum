@@ -5,9 +5,10 @@
  * for the split-operator GPU solver.
  */
 
+import { MAX_STOCHASTIC_SITES } from '@/lib/physics/stochastic/localizationKernel'
 import type { MetricConfig } from '@/lib/physics/tdse/metrics/types'
 
-import type { DisorderDistribution } from './crossMode'
+import type { DisorderDistribution, PmlAbsorberConfig } from './crossMode'
 
 // ============================================================================
 // TDSE Types
@@ -109,7 +110,7 @@ export type TdseDisorderDistribution = DisorderDistribution
  * Configuration for the TDSE (time-dependent Schroedinger equation) solver.
  * Uses split-operator Strang splitting with Stockham FFT on the GPU.
  */
-export interface TdseConfig {
+export interface TdseConfig extends PmlAbsorberConfig {
   /** Spatial dimensionality of the lattice (1-3 active, up to 11 with slicing) */
   latticeDim: number
   /** Lattice grid size per dimension — length equals latticeDim */
@@ -220,13 +221,6 @@ export interface TdseConfig {
   driveFrequency: number
   /** Drive oscillation amplitude */
   driveAmplitude: number
-
-  /** Enable absorbing boundary (PML) at domain boundaries */
-  absorberEnabled: boolean
-  /** PML absorption region width (fraction of domain per side, 0.05-0.5) */
-  absorberWidth: number
-  /** Target round-trip reflection coefficient for PML (e.g. 1e-6) */
-  pmlTargetReflection: number
 
   /** Which field quantity to render */
   fieldView: TdseFieldView
@@ -372,9 +366,9 @@ export interface TdseConfig {
   /** Normalized branch plane position along axis 0 (-1.0 to 1.0, 0 = center) */
   branchPlanePosition: number
   /** Branch A color as [r, g, b] in 0–1 range */
-  branchColorA: [number, number, number]
+  branchColorA: TdseBranchColor
   /** Branch B color as [r, g, b] in 0–1 range */
-  branchColorB: [number, number, number]
+  branchColorB: TdseBranchColor
 
   // === ER=EPR Double-trace Wormhole Coupling ===
   /**
@@ -389,6 +383,78 @@ export interface TdseConfig {
   wormholeMirrorAxis: 0 | 1 | 2
   /** Toggle for the WormholeCoherencePanel SVG HUD overlay. */
   wormholeCoherenceHudEnabled: boolean
+}
+
+/** Branch visualization RGB triple in 0–1 display-linear units. */
+export type TdseBranchColor = [number, number, number]
+
+/** Clamp a numeric value into an inclusive range. */
+function clampRange(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value))
+}
+
+/** Clamp one color channel into the supported shader RGB range. */
+function clampUnit(value: number): number {
+  return clampRange(value, 0, 1)
+}
+
+/**
+ * Validate and clamp a TDSE branch color.
+ * Returns null for malformed or non-finite input so callers can preserve prior state.
+ */
+export function normalizeTdseBranchColor(value: unknown): TdseBranchColor | null {
+  if (!Array.isArray(value) || value.length !== 3) return null
+  if (!value.every((channel) => typeof channel === 'number' && Number.isFinite(channel))) {
+    return null
+  }
+  return [clampUnit(value[0]), clampUnit(value[1]), clampUnit(value[2])]
+}
+
+/** Validate and clamp a TDSE branch color, falling back when input is malformed. */
+export function sanitizeTdseBranchColor(
+  value: unknown,
+  fallback: TdseBranchColor
+): TdseBranchColor {
+  return normalizeTdseBranchColor(value) ?? [...fallback]
+}
+
+/** Clamp finite scalar input or preserve fallback when input is non-finite. */
+function sanitizeFiniteRange(value: number, min: number, max: number, fallback: number): number {
+  return Number.isFinite(value) ? clampRange(value, min, max) : fallback
+}
+
+/** Clamp integer scalar input or preserve fallback when input is non-finite. */
+function sanitizeIntegerRange(value: number, min: number, max: number, fallback: number): number {
+  return Number.isFinite(value) ? Math.floor(clampRange(value, min, max)) : fallback
+}
+
+/** Sanitize TDSE stochastic/decoherence fields for bulk config loads. */
+export function sanitizeTdseStochasticFields(config: TdseConfig, fallback: TdseConfig): TdseConfig {
+  return {
+    ...config,
+    stochasticGamma: sanitizeFiniteRange(config.stochasticGamma, 0, 10, fallback.stochasticGamma),
+    stochasticSigma: sanitizeFiniteRange(
+      config.stochasticSigma,
+      0.5,
+      5.0,
+      fallback.stochasticSigma
+    ),
+    stochasticNumSites: sanitizeIntegerRange(
+      config.stochasticNumSites,
+      1,
+      MAX_STOCHASTIC_SITES,
+      fallback.stochasticNumSites
+    ),
+    stochasticSeed: sanitizeIntegerRange(config.stochasticSeed, 0, 999999, fallback.stochasticSeed),
+    branchPlanePosition: sanitizeFiniteRange(
+      config.branchPlanePosition,
+      -1.0,
+      1.0,
+      fallback.branchPlanePosition
+    ),
+    branchColorA: sanitizeTdseBranchColor(config.branchColorA, fallback.branchColorA),
+    branchColorB: sanitizeTdseBranchColor(config.branchColorB, fallback.branchColorB),
+  }
 }
 
 /**

@@ -214,7 +214,15 @@ export function normalize(v: VectorND, out?: VectorND): VectorND {
   // Try WASM path if available (only when no out buffer, as WASM allocates)
   if (isAnimationWasmReady() && !out) {
     const vF64 = getScratch(scratchVectorA, v.length)
-    for (let i = 0; i < v.length; i++) vF64[i] = v[i]!
+    let sumSquares = 0
+    for (let i = 0; i < v.length; i++) {
+      const value = v[i]!
+      vF64[i] = value
+      sumSquares += value * value
+    }
+    if (sumSquares < EPSILON * EPSILON) {
+      throw new Error('Cannot normalize zero vector')
+    }
     const wasmResult = normalizeVectorWasm(vF64)
     if (wasmResult) {
       return float64ToVector(wasmResult)

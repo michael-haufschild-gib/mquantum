@@ -51,7 +51,7 @@ import type {
   TdseBindGroupResult,
   TdsePassHelpers,
   TdsePipelineResult,
-} from './TDSEComputePassTypes'
+} from './TDSEComputePassResources'
 import { buildObsGSPipelines } from './TDSEObservablesGSPipelines'
 
 export type {
@@ -416,5 +416,5 @@ export async function buildTdsePipelines(
   }
 }
 
-// Bind group creation extracted to TDSEComputePassBindGroups.ts
-export { rebuildTdseBindGroups } from './TDSEComputePassBindGroups'
+// Bind group creation extracted to TDSEComputePassResources.ts
+export { rebuildTdseBindGroups } from './TDSEComputePassResources'

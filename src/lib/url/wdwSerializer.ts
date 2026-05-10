@@ -2,11 +2,17 @@
  * Wheeler–DeWitt URL sub-block serializer / deserializer.
  *
  * Extracted from `state-serializer.ts` to keep the main serializer under
- * its per-file `max-lines` budget. Uses its own local parse/set helpers
- * to avoid re-exporting state-serializer internals.
+ * its per-file `max-lines` budget.
+ *
+ * Float parsing here uses {@link parseFloatParamSci} (the lenient variant
+ * that accepts scientific notation) instead of the canonical strict
+ * {@link parseFloatParam}: the wdw test suite locks in `wdw_m=1e0 → 1`,
+ * which the strict regex deliberately rejects.
  *
  * @module lib/url/wdwSerializer
  */
+
+import { parseFloatParamSci, parseIntParam } from './paramHelpers'
 
 export const VALID_WDW_BOUNDARY_CONDITIONS = ['noBoundary', 'tunneling', 'deWitt'] as const
 /** URL-accepted Wheeler–DeWitt boundary-condition proposals. */
@@ -31,35 +37,6 @@ export interface WdwUrlState {
   wdwWorldlinePulseWidth?: number
   /** R-channel headroom slider (1..10 000). See `densityGrid.packWdwDensityGrid`. */
   wdwRenderDynamicRange?: number
-}
-
-const INTEGER_RE = /^-?\d+$/
-const FLOAT_RE = /^-?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/
-
-function parseIntParam(
-  params: URLSearchParams,
-  key: string,
-  min: number,
-  max: number
-): number | undefined {
-  const raw = params.get(key)
-  if (!raw || !INTEGER_RE.test(raw)) return undefined
-  const v = Number(raw)
-  if (!Number.isSafeInteger(v)) return undefined
-  return Math.max(min, Math.min(max, v))
-}
-
-function parseFloatParam(
-  params: URLSearchParams,
-  key: string,
-  min: number,
-  max: number
-): number | undefined {
-  const raw = params.get(key)
-  if (!raw || !FLOAT_RE.test(raw)) return undefined
-  const v = Number(raw)
-  if (!Number.isFinite(v)) return undefined
-  return Math.max(min, Math.min(max, v))
 }
 
 function parseBoolParam(params: URLSearchParams, key: string): boolean | undefined {
@@ -141,11 +118,11 @@ export function serializeWdw(params: URLSearchParams, state: WdwUrlState): void 
 /** Parse Wheeler–DeWitt URL params into the shared state object. */
 export function deserializeWdw(params: URLSearchParams, state: WdwUrlState): void {
   state.wdwBoundaryCondition = parseEnumParam(params, 'wdw_bc', VALID_WDW_BOUNDARY_CONDITIONS)
-  state.wdwInflatonMass = parseFloatParam(params, 'wdw_m', 0, 2.0)
+  state.wdwInflatonMass = parseFloatParamSci(params, 'wdw_m', 0, 2.0)
   // [0.1, 10]: α < 0.1 makes the φ₂ axis nearly massless (numerical
   // instability); α > 10 makes it so stiff the grid can't resolve it.
-  state.wdwInflatonMassAsymmetry = parseFloatParam(params, 'wdw_ma', 0.1, 10)
-  state.wdwCosmologicalConstant = parseFloatParam(params, 'wdw_lambda', -1, 1)
+  state.wdwInflatonMassAsymmetry = parseFloatParamSci(params, 'wdw_ma', 0.1, 10)
+  state.wdwCosmologicalConstant = parseFloatParamSci(params, 'wdw_lambda', -1, 1)
   // Grid bounds match the solver's hard minima (≥ 3 per axis) and the
   // publication preset's max of (256, 48); we leave headroom above that
   // for power-user experiments while keeping the serializer cheap to
@@ -155,9 +132,9 @@ export function deserializeWdw(params: URLSearchParams, state: WdwUrlState): voi
   state.wdwStreamlinesEnabled = parseBoolParam(params, 'wdw_sl')
   state.wdwStreamlineDensity = parseIntParam(params, 'wdw_sld', 2, 16)
   state.wdwPhaseRotationEnabled = parseBoolParam(params, 'wdw_pr')
-  state.wdwPhaseRotationSpeed = parseFloatParam(params, 'wdw_prs', 0, 5)
+  state.wdwPhaseRotationSpeed = parseFloatParamSci(params, 'wdw_prs', 0, 5)
   state.wdwWorldlineEnabled = parseBoolParam(params, 'wdw_wl')
-  state.wdwWorldlineSpeed = parseFloatParam(params, 'wdw_wls', 0.1, 3)
-  state.wdwWorldlinePulseWidth = parseFloatParam(params, 'wdw_wlw', 0.02, 0.3)
-  state.wdwRenderDynamicRange = parseFloatParam(params, 'wdw_dr', 1, 10_000)
+  state.wdwWorldlineSpeed = parseFloatParamSci(params, 'wdw_wls', 0.1, 3)
+  state.wdwWorldlinePulseWidth = parseFloatParamSci(params, 'wdw_wlw', 0.02, 0.3)
+  state.wdwRenderDynamicRange = parseFloatParamSci(params, 'wdw_dr', 1, 10_000)
 }

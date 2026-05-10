@@ -8,12 +8,16 @@
  * @module rendering/webgpu/renderers/strategies/TdseBecConfigBuilder
  */
 
-import type { BecConfig } from '@/lib/geometry/extended/bec'
+import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
+import type { BecConfig, BecFieldView, BecInitialCondition } from '@/lib/geometry/extended/bec'
+import { DEFAULT_BEC_CONFIG } from '@/lib/geometry/extended/bec'
 import {
   DEFAULT_TDSE_CONFIG,
   type TdseConfig,
   type TdseInitialCondition,
 } from '@/lib/geometry/extended/tdse'
+import { clampFinite, clampFiniteArray, clampFiniteInteger } from '@/lib/math/clamp'
+import { reduceGridToFit } from '@/lib/math/ndArray'
 import { thomasFermiMuND } from '@/lib/physics/bec/chemicalPotential'
 import {
   computeWaterfallBackgroundDensity,
@@ -28,9 +32,72 @@ interface BecSchoedingerOverrides {
   autoScaleMaxGain?: number
 }
 
+const BEC_INITIAL_CONDITIONS = new Set<BecInitialCondition>([
+  'thomasFermi',
+  'gaussianPacket',
+  'vortexImprint',
+  'vortexLattice',
+  'darkSoliton',
+  'vortexReconnection',
+  'blackHoleAnalog',
+])
+
+const BEC_FIELD_VIEWS = new Set<BecFieldView>([
+  'density',
+  'phase',
+  'current',
+  'potential',
+  'superfluidVelocity',
+  'healingLength',
+  'machNumber',
+  'hawkingFlux',
+  'vorticity',
+])
+const BEC_TDSE_MAX_TOTAL_SITES = 262144
+
+function sanitizeBecLatticeDim(value: number | undefined): number {
+  return clampFiniteInteger(value, DEFAULT_BEC_CONFIG.latticeDim, MIN_DIMENSION, MAX_DIMENSION)
+}
+
+function sanitizeGridSizeArray(values: readonly number[] | undefined, latDim: number): number[] {
+  const grid = Array.from({ length: latDim }, (_, i) => {
+    const raw = values?.[i]
+    const clamped = clampFinite(raw, 8, 2, 128)
+    const snapped = 2 ** Math.round(Math.log2(clamped))
+    return Math.max(2, Math.min(128, snapped))
+  })
+  return reduceGridToFit(grid, BEC_TDSE_MAX_TOTAL_SITES)
+}
+
+function sanitizeBooleanArray(values: readonly boolean[] | undefined, latDim: number): boolean[] {
+  return Array.from({ length: latDim }, (_, i) => values?.[i] === true)
+}
+
+function booleanOr(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback
+}
+
+function sanitizeInitialCondition(value: BecConfig['initialCondition']): BecInitialCondition {
+  return BEC_INITIAL_CONDITIONS.has(value) ? value : DEFAULT_BEC_CONFIG.initialCondition
+}
+
+function sanitizeFieldView(value: BecConfig['fieldView']): BecFieldView {
+  return BEC_FIELD_VIEWS.has(value) ? value : DEFAULT_BEC_CONFIG.fieldView
+}
+
+function sanitizeVortexPlane(
+  value: readonly number[] | undefined,
+  fallback: readonly [number, number],
+  latDim: number
+): [number, number] {
+  const a = clampFiniteInteger(value?.[0], fallback[0], 0, latDim - 1)
+  const b = clampFiniteInteger(value?.[1], fallback[1], 0, latDim - 1)
+  return a === b ? [0, Math.min(1, latDim - 1)] : [a, b]
+}
+
 /** Validate BEC initial condition and compute mapped init type + momentum params. */
 function prepareBecInitCondition(bec: BecConfig, g: number, latDim: number) {
-  let initCond = bec.initialCondition ?? 'thomasFermi'
+  let initCond = sanitizeInitialCondition(bec.initialCondition)
 
   // Attractive BEC (g < 0): Thomas-Fermi doesn't apply → force Gaussian.
   // blackHoleAnalog also needs g > 0 because its background density comes from
@@ -61,18 +128,25 @@ function prepareBecInitCondition(bec: BecConfig, g: number, latDim: number) {
   // Build momentum vector — encode BEC-specific params
   const mom = new Array(Math.max(latDim, 5)).fill(0) as number[]
   if (initCond === 'vortexImprint' || initCond === 'vortexLattice') {
-    mom[0] = bec.vortexCharge ?? 1
+    mom[0] = clampFiniteInteger(bec.vortexCharge, DEFAULT_BEC_CONFIG.vortexCharge, -4, 4)
     if (initCond === 'vortexLattice') {
-      mom[3] = bec.vortexLatticeCount ?? 4
-      mom[4] = bec.vortexAlternateCharge ? 1.0 : 0.0
+      mom[3] = clampFiniteInteger(
+        bec.vortexLatticeCount,
+        DEFAULT_BEC_CONFIG.vortexLatticeCount,
+        1,
+        16
+      )
+      mom[4] = booleanOr(bec.vortexAlternateCharge, DEFAULT_BEC_CONFIG.vortexAlternateCharge)
+        ? 1.0
+        : 0.0
     }
   }
   if (initCond === 'vortexReconnection') {
-    mom[0] = bec.vortexCharge ?? 1
+    mom[0] = clampFiniteInteger(bec.vortexCharge, DEFAULT_BEC_CONFIG.vortexCharge, -4, 4)
   }
   if (initCond === 'darkSoliton') {
-    mom[1] = bec.solitonDepth ?? 1.0
-    mom[2] = bec.solitonVelocity ?? 0.0
+    mom[1] = clampFinite(bec.solitonDepth, DEFAULT_BEC_CONFIG.solitonDepth, 0, 1)
+    mom[2] = clampFinite(bec.solitonVelocity, DEFAULT_BEC_CONFIG.solitonVelocity, -1, 1)
   }
   return { mappedInit, mom }
 }
@@ -88,11 +162,32 @@ export function buildBecConfig(
   bec: BecConfig,
   schroedinger: BecSchoedingerOverrides | undefined
 ): { config: TdseConfig } {
-  const g = bec.interactionStrength ?? 500
-  const omega = bec.trapOmega ?? 1.0
-  const latDim = bec.latticeDim ?? 3
-  const initOmega = bec.initTrapOmega ?? omega
-  const anisotropy = bec.trapAnisotropy ?? (new Array(latDim).fill(1.0) as number[])
+  const latDim = sanitizeBecLatticeDim(bec.latticeDim)
+  const gridSize = sanitizeGridSizeArray(bec.gridSize, latDim)
+  const spacing = clampFiniteArray(bec.spacing, latDim, 0.15, 0.01, 1)
+  const g = clampFinite(
+    bec.interactionStrength,
+    DEFAULT_BEC_CONFIG.interactionStrength,
+    -1000,
+    10000
+  )
+  const omega = clampFinite(bec.trapOmega, DEFAULT_BEC_CONFIG.trapOmega, 0.01, 10)
+  const initOmega = clampFinite(bec.initTrapOmega, omega, 0.01, 10)
+  const anisotropy = clampFiniteArray(bec.trapAnisotropy, latDim, 1, 0.1, 10)
+  const hbar = clampFinite(bec.hbar, DEFAULT_TDSE_CONFIG.hbar, 0.1, 10)
+  const dt = clampFinite(bec.dt, DEFAULT_BEC_CONFIG.dt, 0.0001, 0.05)
+  const stepsPerFrame = clampFiniteInteger(
+    bec.stepsPerFrame,
+    DEFAULT_BEC_CONFIG.stepsPerFrame,
+    1,
+    16
+  )
+  const diagnosticsInterval = clampFiniteInteger(
+    bec.diagnosticsInterval,
+    DEFAULT_BEC_CONFIG.diagnosticsInterval,
+    1,
+    60
+  )
 
   // Chemical potential for init shader
   let effectiveInitOmega = initOmega
@@ -106,7 +201,11 @@ export function buildBecConfig(
   let mu =
     g > 0 ? thomasFermiMuND(latDim, g, effectiveInitOmega) : Math.pow(1 / (2 * Math.PI), latDim / 4)
 
-  const { mappedInit, mom } = prepareBecInitCondition(bec, g, latDim)
+  const { mappedInit, mom } = prepareBecInitCondition(
+    { ...bec, initialCondition: sanitizeInitialCondition(bec.initialCondition) },
+    g,
+    latDim
+  )
 
   // Analog Hawking (waterfall) uses a uniform background density set by μ/g,
   // not a trap profile. A near-zero trap (ω → 0) drives the TF μ to near zero
@@ -132,12 +231,12 @@ export function buildBecConfig(
     config: {
       ...DEFAULT_TDSE_CONFIG,
       latticeDim: latDim,
-      gridSize: bec.gridSize ?? new Array(latDim).fill(8),
-      spacing: bec.spacing ?? new Array(latDim).fill(0.15),
+      gridSize,
+      spacing,
       mass: resolveBecMass(bec),
-      hbar: bec.hbar ?? DEFAULT_TDSE_CONFIG.hbar,
-      dt: bec.dt ?? 0.002,
-      stepsPerFrame: bec.stepsPerFrame ?? DEFAULT_TDSE_CONFIG.stepsPerFrame,
+      hbar,
+      dt,
+      stepsPerFrame,
       initialCondition: mappedInit,
       packetCenter: new Array(latDim).fill(0),
       packetWidth: 1.0,
@@ -176,9 +275,17 @@ export function buildBecConfig(
       // BEC defaults to 0, matching the pre-existing behavior for presets
       // that don't set it. Re-using the existing TDSE field names keeps
       // the schema flat — no BEC-only branch in the compute pass.
-      disorderStrength: bec.disorderStrength ?? 0,
-      disorderSeed: bec.disorderSeed ?? DEFAULT_TDSE_CONFIG.disorderSeed,
-      disorderDistribution: bec.disorderDistribution ?? DEFAULT_TDSE_CONFIG.disorderDistribution,
+      disorderStrength: clampFinite(bec.disorderStrength, 0, 0, 100),
+      disorderSeed: clampFiniteInteger(
+        bec.disorderSeed,
+        DEFAULT_TDSE_CONFIG.disorderSeed,
+        0,
+        0xffffffff
+      ),
+      disorderDistribution:
+        bec.disorderDistribution === 'gaussian' || bec.disorderDistribution === 'uniform'
+          ? bec.disorderDistribution
+          : DEFAULT_TDSE_CONFIG.disorderDistribution,
       driveEnabled: false,
       driveFrequency: 0,
       driveAmplitude: 0,
@@ -187,30 +294,30 @@ export function buildBecConfig(
       // already provide a physically-valid (ℓ ≥ s) triple. Duplicating
       // them here would invite silent drift on schema changes.
       trapAnisotropy: anisotropy,
-      absorberEnabled: schroedinger?.absorberEnabled ?? false,
-      absorberWidth: schroedinger?.absorberWidth ?? 0.2,
-      pmlTargetReflection: schroedinger?.pmlTargetReflection ?? 1e-6,
-      fieldView: bec.fieldView ?? 'density',
-      autoScale: bec.autoScale ?? true,
-      autoScaleMaxGain: schroedinger?.autoScaleMaxGain ?? 20,
+      absorberEnabled: booleanOr(schroedinger?.absorberEnabled, false),
+      absorberWidth: clampFinite(schroedinger?.absorberWidth, 0.2, 0.05, 0.5),
+      pmlTargetReflection: clampFinite(schroedinger?.pmlTargetReflection, 1e-6, 1e-12, 0.999),
+      fieldView: sanitizeFieldView(bec.fieldView),
+      autoScale: booleanOr(bec.autoScale, true),
+      autoScaleMaxGain: clampFinite(schroedinger?.autoScaleMaxGain, 20, 1, 100),
       showPotential: false,
       autoLoop: false,
-      diagnosticsEnabled: bec.diagnosticsEnabled ?? true,
-      diagnosticsInterval: bec.diagnosticsInterval ?? 5,
-      needsReset: bec.needsReset ?? false,
-      slicePositions: bec.slicePositions ?? [],
+      diagnosticsEnabled: booleanOr(bec.diagnosticsEnabled, true),
+      diagnosticsInterval,
+      needsReset: booleanOr(bec.needsReset, false),
+      slicePositions: clampFiniteArray(bec.slicePositions, Math.max(0, latDim - 3), 0, -1, 1),
       interactionStrength: g,
       customPotentialExpression: '',
-      observablesEnabled: bec.observablesEnabled ?? false,
+      observablesEnabled: booleanOr(bec.observablesEnabled, false),
       imaginaryTimeEnabled: false,
       // N-D vortex reconnection plane configuration
-      vortexPlane1: bec.vortexPlane1 ?? [0, 1],
-      vortexPlane2: bec.vortexPlane2 ?? [2, 3],
-      vortexSeparation: bec.vortexSeparation ?? 0.0,
-      vortexPairCount: bec.vortexPairCount ?? 2,
+      vortexPlane1: sanitizeVortexPlane(bec.vortexPlane1, [0, 1], latDim),
+      vortexPlane2: sanitizeVortexPlane(bec.vortexPlane2, [0, 1], latDim),
+      vortexSeparation: clampFinite(bec.vortexSeparation, 0, 0, 5),
+      vortexPairCount: clampFiniteInteger(bec.vortexPairCount, 2, 1, 2),
       // Kaluza-Klein compactification (pass through from BEC config)
-      compactDims: bec.compactDims ?? (new Array(latDim).fill(false) as boolean[]),
-      compactRadii: bec.compactRadii ?? (new Array(latDim).fill(1.0) as number[]),
+      compactDims: sanitizeBooleanArray(bec.compactDims, latDim),
+      compactRadii: clampFiniteArray(bec.compactRadii, latDim, 0.15, 0.01, 10),
       // Stochastic decoherence: disabled for BEC mode
       stochasticEnabled: false,
       stochasticGamma: 0,
@@ -225,12 +332,22 @@ export function buildBecConfig(
       // mappedInit === 'blackHoleAnalog' and by the pair-injection kernel
       // when hawkingPairInjection is true. Passed through verbatim; the
       // TdseConfig treats them as optional scalars.
-      hawkingVmax: bec.hawkingVmax,
-      hawkingLh: bec.hawkingLh,
-      hawkingDeltaN: bec.hawkingDeltaN,
-      hawkingPairInjection: bec.hawkingPairInjection,
-      hawkingInjectRate: bec.hawkingInjectRate,
-      hawkingSeed: bec.hawkingSeed,
+      hawkingVmax: clampFinite(bec.hawkingVmax, DEFAULT_BEC_CONFIG.hawkingVmax, 0.5, 5),
+      hawkingLh: clampFinite(bec.hawkingLh, DEFAULT_BEC_CONFIG.hawkingLh, 0.1, 1.5),
+      hawkingDeltaN: clampFinite(bec.hawkingDeltaN, DEFAULT_BEC_CONFIG.hawkingDeltaN, 0, 0.6),
+      hawkingPairInjection: booleanOr(bec.hawkingPairInjection, false),
+      hawkingInjectRate: clampFinite(
+        bec.hawkingInjectRate,
+        DEFAULT_BEC_CONFIG.hawkingInjectRate,
+        0,
+        0.5
+      ),
+      hawkingSeed: clampFiniteInteger(
+        bec.hawkingSeed,
+        DEFAULT_BEC_CONFIG.hawkingSeed,
+        0,
+        0xffffffff
+      ),
     },
   }
 }

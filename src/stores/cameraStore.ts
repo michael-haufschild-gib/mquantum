@@ -11,6 +11,8 @@ import { create } from 'zustand'
 
 import { logger } from '@/lib/logger'
 
+import { isFiniteVec3 } from './utils/presetNormalizationShared'
+
 /** Default camera position and target (matches WebGPUCamera constructor defaults) */
 const DEFAULT_POSITION: [number, number, number] = [0, 3.125, 7.5]
 const DEFAULT_TARGET: [number, number, number] = [0, 0, 0]
@@ -31,14 +33,6 @@ interface CameraInstance {
 export interface CameraState {
   position: [number, number, number]
   target: [number, number, number]
-}
-
-function isFiniteVec3(value: unknown): value is [number, number, number] {
-  return (
-    Array.isArray(value) &&
-    value.length === 3 &&
-    value.every((component) => typeof component === 'number' && Number.isFinite(component))
-  )
 }
 
 function normalizeCameraState(state: CameraState | null | undefined): CameraState | null {

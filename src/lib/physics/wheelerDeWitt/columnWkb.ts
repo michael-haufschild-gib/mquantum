@@ -128,6 +128,7 @@ export function captureMatch(
   chiRe: number,
   chiIm: number
 ): void {
+  if (state.matched) return
   state.matched = true
   state.sEucAtMatch = wdwEuclideanWkbAction(a, phi1, phi2, m, lambda, asymmetry)
   state.uPrefactorAtMatch = Math.pow(Math.abs(U), 0.25)

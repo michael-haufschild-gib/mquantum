@@ -299,7 +299,7 @@ export interface DiracActions {
   setDiagnosticsEnabled: ExtendedObjectState['setDiracDiagnosticsEnabled']
   setDiagnosticsInterval: ExtendedObjectState['setDiracDiagnosticsInterval']
   setSlicePosition: ExtendedObjectState['setDiracSlicePosition']
-  setNeedsReset: ExtendedObjectState['setDiracNeedsReset']
+  setNeedsReset: () => void
   applyPreset: ExtendedObjectState['applyDiracPreset']
 }
 

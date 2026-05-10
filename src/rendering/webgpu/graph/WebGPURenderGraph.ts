@@ -23,6 +23,7 @@ import type {
 } from '../core/types'
 import { WebGPUDevice } from '../core/WebGPUDevice'
 import { WebGPUResourcePool } from '../core/WebGPUResourcePool'
+import { sanitizePixelSize } from '../utils/sceneMath'
 import { handleDisabledPassthrough } from './disabledPassthrough'
 import { RenderContextImpl, SetupContextImpl } from './RenderGraphContexts'
 import { computePassOrder } from './topologicalSort'
@@ -153,10 +154,11 @@ export class WebGPURenderGraph {
   }
 
   setSize(width: number, height: number): void {
-    if (this.width === width && this.height === height) return
-    this.width = width
-    this.height = height
-    this.pool.setSize(width, height)
+    const safeSize = sanitizePixelSize(width, height)
+    if (this.width === safeSize.width && this.height === safeSize.height) return
+    this.width = safeSize.width
+    this.height = safeSize.height
+    this.pool.setSize(safeSize.width, safeSize.height)
     this.compiled = false
   }
 

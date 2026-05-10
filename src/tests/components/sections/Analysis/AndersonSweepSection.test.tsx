@@ -7,7 +7,7 @@
  * sweep's last state instead of returning to the user's pre-sweep config.
  */
 
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
@@ -88,6 +88,19 @@ describe('AndersonSweepSection — snapshot and restore', () => {
     expect(getTdse().diagnosticsEnabled).toBe(false)
   })
 
+  it('restores the user TDSE fields as soon as the sweep completes', async () => {
+    const user = userEvent.setup()
+    render(<AndersonSweepSection />)
+    await user.click(screen.getByTestId('sweep-start'))
+
+    useAndersonSweepStore.setState({ status: 'complete' })
+
+    await waitFor(() => expect(getTdse().disorderStrength).toBe(PRE_SWEEP_W))
+    expect(getTdse().disorderSeed).toBe(PRE_SWEEP_SEED)
+    expect(getTdse().absorberEnabled).toBe(true)
+    expect(getTdse().diagnosticsEnabled).toBe(false)
+  })
+
   it('does not restore stale TDSE fields if the user starts a second sweep', async () => {
     const user = userEvent.setup()
     render(<AndersonSweepSection />)
@@ -109,5 +122,34 @@ describe('AndersonSweepSection — snapshot and restore', () => {
     await user.click(screen.getByTestId('sweep-abort'))
     expect(getTdse().disorderStrength).toBe(12)
     expect(getTdse().absorberEnabled).toBe(false)
+  })
+
+  it('keeps the original snapshot if a rapid second start event fires before rerender', async () => {
+    const user = userEvent.setup()
+    render(<AndersonSweepSection />)
+    const start = screen.getByTestId('sweep-start')
+
+    fireEvent.click(start)
+    fireEvent.click(start)
+    await user.click(screen.getByTestId('sweep-abort'))
+
+    expect(getTdse().disorderStrength).toBe(PRE_SWEEP_W)
+    expect(getTdse().disorderSeed).toBe(PRE_SWEEP_SEED)
+    expect(getTdse().absorberEnabled).toBe(true)
+    expect(getTdse().diagnosticsEnabled).toBe(false)
+  })
+
+  it('aborts and restores TDSE fields if the section unmounts mid-sweep', async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(<AndersonSweepSection />)
+    await user.click(screen.getByTestId('sweep-start'))
+
+    unmount()
+
+    expect(useAndersonSweepStore.getState().status).toBe('idle')
+    expect(getTdse().disorderStrength).toBe(PRE_SWEEP_W)
+    expect(getTdse().disorderSeed).toBe(PRE_SWEEP_SEED)
+    expect(getTdse().absorberEnabled).toBe(true)
+    expect(getTdse().diagnosticsEnabled).toBe(false)
   })
 })

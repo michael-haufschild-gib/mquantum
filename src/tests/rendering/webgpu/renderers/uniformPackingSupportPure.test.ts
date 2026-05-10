@@ -409,6 +409,24 @@ describe('packCameraUniforms', () => {
     expect(buf[94]).toBe(0) // posZ forced to 0 in 2D
   })
 
+  it('sanitizes zero/non-finite render sizes before writing shader resolution uniforms', () => {
+    const buf = new Float32Array(132)
+    const dv = new DataView(buf.buffer)
+    packCameraUniforms(buf, dv, {
+      camera: makeIdentityCamera() as never,
+      animationTime: 0,
+      is2D: true,
+      transform: undefined,
+      bayerOffset: noBayer,
+      size: { width: Number.POSITIVE_INFINITY, height: 0 },
+      frameDelta: 0.016,
+      frameNumber: 0,
+    })
+    expect(buf[118]).toBe(1)
+    expect(buf[119]).toBe(1)
+    expect(buf[120]).toBe(1)
+  })
+
   it('falls back to scale=1 when camera-to-target distance is zero', () => {
     const buf = new Float32Array(132)
     const dv = new DataView(buf.buffer)

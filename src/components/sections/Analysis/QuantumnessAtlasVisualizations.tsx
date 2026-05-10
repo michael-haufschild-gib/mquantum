@@ -41,12 +41,13 @@ const DIM_COLORS = [
 
 /** Extract unique sorted values. */
 function uniqueSorted(arr: number[]): number[] {
-  return [...new Set(arr)].sort((a, b) => a - b)
+  return [...new Set(arr.filter(Number.isFinite))].sort((a, b) => a - b)
 }
 
 /** Normalize a value to [0, 1] given a max. */
 function norm(v: number, max: number): number {
-  return max > 0 ? Math.min(v / max, 1) : 0
+  if (!Number.isFinite(v) || !Number.isFinite(max) || max <= 0) return 0
+  return Math.max(0, Math.min(v / max, 1))
 }
 
 /** NaN/Infinity-safe max — returns floor when all values are non-finite. */
@@ -68,6 +69,10 @@ interface DiagPoint {
   ipr: number
 }
 
+function hasFiniteDiagnostic(d: DiagPoint): boolean {
+  return Number.isFinite(d.entanglement) || Number.isFinite(d.wigner) || Number.isFinite(d.ipr)
+}
+
 /** Shared SVG chart rendering three normalized diagnostic curves with dots. */
 function ThreeDiagChart<T extends DiagPoint>({
   data,
@@ -80,19 +85,20 @@ function ThreeDiagChart<T extends DiagPoint>({
   xLabel: string
   formatTick: (v: number) => string
 }): React.ReactElement {
-  const xs = data.map(xAccessor)
-  const xMin = Math.min(...xs)
-  const xMax = Math.max(...xs)
+  const plotted = data.filter((d) => Number.isFinite(xAccessor(d)) && hasFiniteDiagnostic(d))
+  const xs = plotted.map(xAccessor)
+  const xMin = xs.length > 0 ? Math.min(...xs) : 0
+  const xMax = xs.length > 0 ? Math.max(...xs) : 1
   const xRange = xMax - xMin || 1
 
-  const maxE = finiteMax(data.map((d) => d.entanglement))
-  const maxW = finiteMax(data.map((d) => d.wigner))
-  const maxI = finiteMax(data.map((d) => d.ipr))
+  const maxE = finiteMax(plotted.map((d) => d.entanglement))
+  const maxW = finiteMax(plotted.map((d) => d.wigner))
+  const maxI = finiteMax(plotted.map((d) => d.ipr))
 
   const xOf = (v: number) => PAD.left + ((v - xMin) / xRange) * PW
   const yOf = (v: number) => PAD.top + (1 - v) * PH
 
-  const sorted = [...data].sort((a, b) => xAccessor(a) - xAccessor(b))
+  const sorted = [...plotted].sort((a, b) => xAccessor(a) - xAccessor(b))
   const polyline = (key: 'entanglement' | 'wigner' | 'ipr', maxVal: number) =>
     sorted
       .filter((d) => Number.isFinite(d[key]))
@@ -149,7 +155,7 @@ function ThreeDiagChart<T extends DiagPoint>({
       >
         {xLabel}
       </text>
-      {data.map((d, i) => (
+      {plotted.map((d, i) => (
         <text
           key={i}
           x={xOf(xAccessor(d))}
@@ -182,21 +188,32 @@ function ThreeDiagChart<T extends DiagPoint>({
         strokeWidth={1.5}
         data-testid="diag-polyline"
       />
-      {data.map((d, i) => (
+      {plotted.map((d, i) => (
         <React.Fragment key={i}>
-          <circle
-            cx={xOf(xAccessor(d))}
-            cy={yOf(norm(d.entanglement, maxE))}
-            r={2}
-            fill={DIAG_COLORS.entanglement}
-          />
-          <circle
-            cx={xOf(xAccessor(d))}
-            cy={yOf(norm(d.wigner, maxW))}
-            r={2}
-            fill={DIAG_COLORS.wigner}
-          />
-          <circle cx={xOf(xAccessor(d))} cy={yOf(norm(d.ipr, maxI))} r={2} fill={DIAG_COLORS.ipr} />
+          {Number.isFinite(d.entanglement) && (
+            <circle
+              cx={xOf(xAccessor(d))}
+              cy={yOf(norm(d.entanglement, maxE))}
+              r={2}
+              fill={DIAG_COLORS.entanglement}
+            />
+          )}
+          {Number.isFinite(d.wigner) && (
+            <circle
+              cx={xOf(xAccessor(d))}
+              cy={yOf(norm(d.wigner, maxW))}
+              r={2}
+              fill={DIAG_COLORS.wigner}
+            />
+          )}
+          {Number.isFinite(d.ipr) && (
+            <circle
+              cx={xOf(xAccessor(d))}
+              cy={yOf(norm(d.ipr, maxI))}
+              r={2}
+              fill={DIAG_COLORS.ipr}
+            />
+          )}
         </React.Fragment>
       ))}
     </svg>
@@ -217,10 +234,13 @@ const fmtGamma = (v: number): string => (v < 1 ? v.toFixed(1) : v.toFixed(0))
 
 /** SVG overlay of three diagnostic curves vs γ at fixed (λ, N). */
 export const ErosionCurves: React.FC<{ data: ErosionCurveData[] }> = React.memo(({ data }) => {
-  if (data.length < 2) {
+  const plotted = data.filter((d) => Number.isFinite(d.gamma) && hasFiniteDiagnostic(d))
+  if (plotted.length < 2) {
     return <p className="text-xs text-text-tertiary italic">Need ≥ 2 γ points for curves</p>
   }
-  return <ThreeDiagChart data={data} xAccessor={(d) => d.gamma} xLabel="γ" formatTick={fmtGamma} />
+  return (
+    <ThreeDiagChart data={plotted} xAccessor={(d) => d.gamma} xLabel="γ" formatTick={fmtGamma} />
+  )
 })
 ErosionCurves.displayName = 'ErosionCurves'
 
@@ -228,11 +248,17 @@ ErosionCurves.displayName = 'ErosionCurves'
 
 /** SVG scatter of S̄ vs N̄_W, colored by dimension. */
 export const DiagnosticScatter: React.FC<{ results: AtlasPoint[] }> = React.memo(({ results }) => {
-  if (results.length === 0) return null
+  const plotted = results.filter(
+    (r) =>
+      Number.isFinite(r.dim) &&
+      Number.isFinite(r.avgNormalizedEntropy) &&
+      Number.isFinite(r.avgWignerNegativity)
+  )
+  if (plotted.length === 0) return null
 
-  const maxE = finiteMax(results.map((r) => r.avgNormalizedEntropy))
-  const maxW = finiteMax(results.map((r) => r.avgWignerNegativity))
-  const dims = uniqueSorted(results.map((r) => r.dim))
+  const maxE = finiteMax(plotted.map((r) => r.avgNormalizedEntropy))
+  const maxW = finiteMax(plotted.map((r) => r.avgWignerNegativity))
+  const dims = uniqueSorted(plotted.map((r) => r.dim))
 
   const xOf = (e: number) => PAD.left + norm(e, maxE) * PW
   const yOf = (w: number) => PAD.top + (1 - norm(w, maxW)) * PH
@@ -287,7 +313,7 @@ export const DiagnosticScatter: React.FC<{ results: AtlasPoint[] }> = React.memo
         >
           N̄_W
         </text>
-        {results.map((r, i) => (
+        {plotted.map((r, i) => (
           <circle
             key={i}
             cx={xOf(r.avgNormalizedEntropy)}
@@ -295,6 +321,7 @@ export const DiagnosticScatter: React.FC<{ results: AtlasPoint[] }> = React.memo
             r={2.5}
             fill={dimColor(r.dim, dims)}
             opacity={0.7}
+            data-testid="diagnostic-scatter-point"
           />
         ))}
         <line
@@ -328,9 +355,12 @@ const DiagHeatmap: React.FC<{
 }> = React.memo(({ results, accessor, label, color }) => {
   if (results.length === 0) return null
 
-  const lambdas = uniqueSorted(results.map((r) => r.lambda))
-  const dims = uniqueSorted(results.map((r) => r.dim))
-  const maxVal = finiteMax(results.map(accessor))
+  const plotted = results.filter((r) => Number.isFinite(r.lambda) && Number.isFinite(r.dim))
+  if (plotted.length === 0) return null
+
+  const lambdas = uniqueSorted(plotted.map((r) => r.lambda))
+  const dims = uniqueSorted(plotted.map((r) => r.dim))
+  const maxVal = finiteMax(plotted.map(accessor))
 
   const cellW = HM_PW / lambdas.length
   const cellH = HM_PH / dims.length
@@ -341,7 +371,7 @@ const DiagHeatmap: React.FC<{
         {label}
       </p>
       <svg width="100%" viewBox={`0 0 ${HM_SIZE} ${HM_SIZE}`} className="block">
-        {results.map((r) => {
+        {plotted.map((r) => {
           const li = lambdas.indexOf(r.lambda)
           const di = dims.indexOf(r.dim)
           const val = accessor(r)
@@ -356,6 +386,7 @@ const DiagHeatmap: React.FC<{
               height={Math.max(cellH - 0.5, 1)}
               fill={color}
               opacity={0.15 + 0.85 * frac}
+              data-testid="diag-heatmap-cell"
             />
           )
         })}
@@ -389,7 +420,9 @@ DiagHeatmap.displayName = 'DiagHeatmap'
 /** Three side-by-side heatmaps at a fixed γ. */
 export const TripleHeatmap: React.FC<{ results: AtlasPoint[]; gamma: number }> = React.memo(
   ({ results, gamma }) => {
-    const filtered = results.filter((r) => r.gamma === gamma)
+    const filtered = results.filter(
+      (r) => r.gamma === gamma && Number.isFinite(r.lambda) && Number.isFinite(r.dim)
+    )
     if (filtered.length === 0)
       return <p className="text-xs text-text-tertiary italic">No data at γ = {gamma}</p>
 
@@ -431,12 +464,13 @@ export interface DimCompareData {
 
 /** Three diagnostic values vs dimension N at fixed (λ, γ). */
 export const DimensionComparison: React.FC<{ data: DimCompareData[] }> = React.memo(({ data }) => {
-  if (data.length < 2) {
+  const plotted = data.filter((d) => Number.isFinite(d.dim) && hasFiniteDiagnostic(d))
+  if (plotted.length < 2) {
     return <p className="text-xs text-text-tertiary italic">Need ≥ 2 dimensions for comparison</p>
   }
   return (
     <ThreeDiagChart
-      data={data}
+      data={plotted}
       xAccessor={(d) => d.dim}
       xLabel="dimension N"
       formatTick={(v) => String(v)}

@@ -259,7 +259,7 @@ test.describe('Dirac equation: control response', () => {
         (...args: unknown[]) => void
       >
       store.setDiracMass(5.0)
-      store.setDiracNeedsReset()
+      store.markComputeNeedsReset('dirac')
     })
     await waitForShaderCompilation(page)
     const fc2 = await getFrameCount(page)

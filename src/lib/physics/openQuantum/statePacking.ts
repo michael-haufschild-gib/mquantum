@@ -29,6 +29,29 @@ export const OPEN_QUANTUM_BUFFER_FLOATS = RHO_FLOATS + 8 // 392 + 8 = 400
 /** Total buffer size in bytes */
 export const OPEN_QUANTUM_BUFFER_BYTES = OPEN_QUANTUM_BUFFER_FLOATS * 4
 
+/** Validate basis size against the fixed GPU packing layout. */
+function assertValidBasisSize(caller: string, K: number): void {
+  if (!Number.isInteger(K) || K < 1) {
+    throw new Error(`${caller}: K must be a positive integer, got ${K}`)
+  }
+  if (K > MAX_K) {
+    throw new Error(`${caller}: K=${K} exceeds MAX_K=${MAX_K}`)
+  }
+}
+
+/** Validate that a typed-array buffer can hold the full Open Quantum payload. */
+function assertPackedBufferSize(caller: string, length: number, label = 'buffer'): void {
+  if (length < OPEN_QUANTUM_BUFFER_FLOATS) {
+    throw new Error(`${caller}: ${label} too small (expected >= ${OPEN_QUANTUM_BUFFER_FLOATS})`)
+  }
+}
+
+/** Clamp optional shader loop basis size to the packed matrix domain. */
+function normalizeActiveK(activeK: number | undefined, K: number): number {
+  if (activeK === undefined || !Number.isFinite(activeK)) return K
+  return Math.max(1, Math.min(K, Math.floor(activeK)))
+}
+
 /**
  * Create a preallocated GPU upload buffer.
  *
@@ -56,6 +79,12 @@ export function packForGPU(
   activeK?: number
 ): void {
   const K = rho.K
+  assertValidBasisSize('packForGPU', K)
+  assertPackedBufferSize('packForGPU', out.length, 'output buffer')
+  const expectedElements = K * K * 2
+  if (rho.elements.length < expectedElements) {
+    throw new Error(`packForGPU: rho.elements too small (expected >= ${expectedElements})`)
+  }
   const el = rho.elements
 
   // Zero the matrix portion (handles K < MAX_K padding)
@@ -77,7 +106,7 @@ export function packForGPU(
   out[RHO_FLOATS + 2] = metrics.vonNeumannEntropy
   out[RHO_FLOATS + 3] = metrics.coherenceMagnitude
   out[RHO_FLOATS + 4] = metrics.groundPopulation
-  out[RHO_FLOATS + 5] = activeK ?? K
+  out[RHO_FLOATS + 5] = normalizeActiveK(activeK, K)
   out[RHO_FLOATS + 6] = 0
   out[RHO_FLOATS + 7] = 0
 }
@@ -98,17 +127,24 @@ export function packForGPU(
  */
 export function computeActiveK(rho: DensityMatrix, populationThreshold = 0.01, minK = 2): number {
   const K = rho.K
+  assertValidBasisSize('computeActiveK', K)
+  const expectedElements = K * K * 2
+  if (rho.elements.length < expectedElements) {
+    throw new Error(`computeActiveK: rho.elements too small (expected >= ${expectedElements})`)
+  }
   const el = rho.elements
+  const threshold = Number.isFinite(populationThreshold) ? populationThreshold : 0.01
+  const minActiveK = Number.isFinite(minK) ? Math.max(2, Math.floor(minK)) : 2
 
   // Find the last index with significant population
   let lastActive = 0
   for (let k = 0; k < K; k++) {
-    if (el[2 * (k * K + k)]! > populationThreshold) {
+    if (el[2 * (k * K + k)]! > threshold) {
       lastActive = k
     }
   }
 
-  return Math.max(minK, lastActive + 1)
+  return Math.min(K, Math.max(minActiveK, lastActive + 1))
 }
 
 /**
@@ -119,6 +155,8 @@ export function computeActiveK(rho: DensityMatrix, populationThreshold = 0.01, m
  * @returns Density matrix with Float64 precision
  */
 export function unpackFromGPU(buf: Float32Array, K: number): DensityMatrix {
+  assertValidBasisSize('unpackFromGPU', K)
+  assertPackedBufferSize('unpackFromGPU', buf.length)
   const elements = new Float64Array(K * K * 2)
   for (let k = 0; k < K; k++) {
     for (let l = 0; l < K; l++) {

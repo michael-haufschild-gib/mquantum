@@ -196,6 +196,7 @@ export const HydrogenEnergyDiagram: React.FC = React.memo(() => {
               stroke={WAVE_COLOR}
               strokeWidth={1}
               opacity={0.5}
+              data-testid="hydrogen-node-marker"
             />
           ))}
 

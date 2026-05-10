@@ -24,6 +24,8 @@ import { useLightingStore } from '@/stores/lightingStore'
 import {
   hasPersistedMaxFps,
   hasPersistedResolutionScale,
+  loadPersistedMaxFps,
+  loadPersistedResolutionScale,
   usePerformanceStore,
 } from '@/stores/performanceStore'
 
@@ -50,14 +52,20 @@ export function useDeviceCapabilities(): void {
       // Apply mobile defaults if detected AND user hasn't set a preference
       // This ensures user's explicit choices are preserved across page loads
       if (capabilities.isMobileGPU) {
+        const persistedResolutionScale = loadPersistedResolutionScale()
+        const persistedMaxFps = loadPersistedMaxFps()
         const userHasResolutionPreference = hasPersistedResolutionScale()
         const userHasFpsPreference = hasPersistedMaxFps()
         const perfStore = usePerformanceStore.getState()
 
-        if (!userHasResolutionPreference) {
+        if (persistedResolutionScale !== null) {
+          perfStore.setRenderResolutionScale(persistedResolutionScale)
+        } else {
           perfStore.setRenderResolutionScale(MOBILE_DEFAULT_RESOLUTION_SCALE)
         }
-        if (!userHasFpsPreference) {
+        if (persistedMaxFps !== null) {
+          perfStore.setMaxFps(persistedMaxFps)
+        } else {
           perfStore.setMaxFps(MOBILE_DEFAULT_MAX_FPS)
         }
 

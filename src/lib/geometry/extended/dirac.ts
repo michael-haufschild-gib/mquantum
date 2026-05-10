@@ -5,6 +5,8 @@
  * and default constants for the relativistic spinor solver.
  */
 
+import type { PmlAbsorberConfig } from './crossMode'
+
 // ============================================================================
 // Dirac Types
 // ============================================================================
@@ -111,7 +113,7 @@ export function isDiracPotentialType(value: unknown): value is DiracPotentialTyp
  * components in N spatial dimensions. Uses split-operator method with
  * matrix exponentials exploiting the Clifford algebra identity H² = E²·I.
  */
-export interface DiracConfig {
+export interface DiracConfig extends PmlAbsorberConfig {
   // === Lattice ===
   /** Spatial dimensionality (1-11, synced from global dimension).
    *  S = 2^(⌊(N+1)/2⌋) spinor components are allocated. */
@@ -173,12 +175,6 @@ export interface DiracConfig {
   autoScale: boolean
   /** Show potential V(x) as a faint overlay in the 3D volume */
   showPotential: boolean
-
-  // === Absorber (PML) ===
-  absorberEnabled: boolean
-  absorberWidth: number
-  /** Target round-trip reflection coefficient for PML */
-  pmlTargetReflection: number
 
   // === Diagnostics ===
   diagnosticsEnabled: boolean

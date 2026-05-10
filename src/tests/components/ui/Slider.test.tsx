@@ -218,12 +218,36 @@ describe('Slider', () => {
       ).not.toThrow()
     })
 
+    it('keeps label-drag output finite when step=NaN', () => {
+      const onChange = vi.fn()
+      render(
+        <Slider label="Scale" value={5} min={0} max={10} step={Number.NaN} onChange={onChange} />
+      )
+
+      fireEvent.mouseDown(screen.getByText('Scale'), { clientX: 0 })
+      fireEvent.mouseMove(window, { clientX: 100 })
+      fireEvent.mouseUp(window)
+
+      expect(onChange).toHaveBeenCalledWith(6)
+    })
+
     it('renders without throwing when step is a pathologically small positive value', () => {
       // step=1e-200 would push ceil(-log10(step)) past toFixed's 100
       // digits-max; the 100-cap keeps the call inside the spec bound.
       expect(() =>
         render(<Slider label="Scale" value={5} min={0} max={10} step={1e-200} onChange={vi.fn()} />)
       ).not.toThrow()
+    })
+
+    it('does not snap label-drag output to max when tiny step overflows division', () => {
+      const onChange = vi.fn()
+      render(<Slider label="Scale" value={5} min={0} max={10} step={1e-309} onChange={onChange} />)
+
+      fireEvent.mouseDown(screen.getByText('Scale'), { clientX: 0 })
+      fireEvent.mouseMove(window, { clientX: 100 })
+      fireEvent.mouseUp(window)
+
+      expect(onChange).toHaveBeenCalledWith(6)
     })
   })
 })

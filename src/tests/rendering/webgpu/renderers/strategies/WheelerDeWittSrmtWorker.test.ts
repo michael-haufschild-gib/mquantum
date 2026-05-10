@@ -225,10 +225,13 @@ describe('WheelerDeWittSrmtWorker (dispatcher)', () => {
 
   it('bumps epoch and re-dispatches when the hash changes while in-flight', () => {
     dispatchSrmtCompute(state, baseArgs('first'))
+    const staleWorker = FakeWorker.instances[0]!
     dispatchSrmtCompute(state, baseArgs('second'))
-    const worker = FakeWorker.instances[0]!
-    expect(worker.messages).toHaveLength(2)
+    const freshWorker = FakeWorker.instances[1]!
+    expect(staleWorker.terminated).toBe(true)
+    expect(freshWorker.messages).toHaveLength(1)
     expect(state.epoch).toBe(2)
+    expect(state.worker).toBe(freshWorker as unknown as Worker)
     expect(state.lastDispatchedHash.a).toBe('second')
   })
 
@@ -238,8 +241,11 @@ describe('WheelerDeWittSrmtWorker (dispatcher)', () => {
     dispatchSrmtCompute(state, baseArgs('a-replacement'))
     dispatchSrmtCompute(state, phi1Args)
 
-    const worker = FakeWorker.instances[0]!
-    expect(worker.messages).toHaveLength(3)
+    expect(FakeWorker.instances).toHaveLength(3)
+    expect(FakeWorker.instances[0]!.terminated).toBe(true)
+    expect(FakeWorker.instances[1]!.terminated).toBe(true)
+    const postCount = FakeWorker.instances.reduce((sum, worker) => sum + worker.messages.length, 0)
+    expect(postCount).toBe(3)
     expect(state.epoch).toBe(3)
     expect(state.lastDispatchedHash.a).toBeNull()
     expect(state.lastDispatchedHash.phi1).toBe('same-phi1')
@@ -313,13 +319,15 @@ describe('WheelerDeWittSrmtWorker (dispatcher)', () => {
 
   it('cancelSrmtCompute bumps epoch and clears cached result', () => {
     dispatchSrmtCompute(state, baseArgs('only'))
+    const worker = FakeWorker.instances[0]!
     cancelSrmtCompute(state)
     expect(state.inFlight).toBe(false)
+    expect(worker.terminated).toBe(true)
+    expect(state.worker).toBeNull()
     expect(state.resultsByClock.a).toBeNull()
     expect(state.resultsByClock.phi1).toBeNull()
     expect(state.resultsByClock.phi2).toBeNull()
     // Any late reply from the pre-cancel request is dropped.
-    const worker = FakeWorker.instances[0]!
     worker.simulate({
       type: 'result',
       epoch: 1,

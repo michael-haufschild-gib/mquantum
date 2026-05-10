@@ -17,6 +17,7 @@
 
 import { create } from 'zustand'
 
+import { clampFinite } from '@/lib/math/clamp'
 import {
   accumulateThermalEntropy,
   bekensteinHawkingEntropy,
@@ -130,8 +131,7 @@ export const PAGE_CURVE_DEFAULTS = {
 }
 
 function clamp(value: number, min: number, max: number): number {
-  if (!Number.isFinite(value)) return min
-  return value < min ? min : value > max ? max : value
+  return clampFinite(value, min, min, max)
 }
 
 /**

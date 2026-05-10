@@ -7,6 +7,7 @@
  * @module stores/utils/presetNormalizationShared
  */
 
+import { clampFiniteUnknown } from '@/lib/math/clamp'
 import { COLOR_ALGORITHM_OPTIONS, type ColorAlgorithm } from '@/rendering/shaders/palette'
 
 import type { SkyboxMode, SkyboxSelection, SkyboxTexture } from '../defaults/visualDefaults'
@@ -125,17 +126,46 @@ export function clampToRange(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
 }
 
-/** Clamp to range or return fallback if value is not a finite number. */
+/**
+ * Type guard: value is a 3-tuple of finite numbers. Used by every
+ * preset/URL importer that loads a 3D coordinate (camera position/target,
+ * light position, packet center) from untrusted JSON.
+ */
+export function isFiniteVec3(value: unknown): value is [number, number, number] {
+  return (
+    Array.isArray(value) &&
+    value.length === 3 &&
+    value.every((component) => typeof component === 'number' && Number.isFinite(component))
+  )
+}
+
+/**
+ * Delete `obj[key]` if it's present but not a boolean. Use during preset
+ * import to drop fields that came in as strings, numbers, or other
+ * non-boolean garbage so the downstream merge sees a clean shape.
+ */
+export function validateBooleanField(obj: Record<string, unknown>, key: string): void {
+  if (key in obj && typeof obj[key] !== 'boolean') {
+    delete obj[key]
+  }
+}
+
+/**
+ * Clamp to range or return fallback if value is not a finite number.
+ *
+ * Backward-compat wrapper around {@link clampFiniteUnknown} that preserves
+ * this module's historical `(value, min, max, fallback)` argument order.
+ * New code should prefer {@link clampFiniteUnknown} from `@/lib/math/clamp`,
+ * which uses the canonical `(value, fallback, min, max)` order shared with
+ * the other clamp helpers.
+ */
 export function clampFiniteOrFallback(
   value: unknown,
   min: number,
   max: number,
   fallback: number
 ): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return fallback
-  }
-  return clampToRange(value, min, max)
+  return clampFiniteUnknown(value, fallback, min, max)
 }
 
 /** Validate a cosine palette vector, returning fallback if invalid. */

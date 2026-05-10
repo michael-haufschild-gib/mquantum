@@ -19,6 +19,7 @@ import {
   hsvToHex8,
   hsvToRgb,
   isValidHex,
+  normalizeOpaqueHexColor,
   parseColorToHsv,
   rgbToHex,
   rgbToHsv,
@@ -320,6 +321,19 @@ describe('isValidHex', () => {
     expect(isValidHex('#FF00')).toBe(true) // 4-digit is valid
     expect(isValidHex('#FF00000')).toBe(false) // 7 digits
     expect(isValidHex('#FF000000F')).toBe(false) // 9 digits
+  })
+})
+
+describe('normalizeOpaqueHexColor', () => {
+  it('normalizes opaque 3- and 6-digit hex colors', () => {
+    expect(normalizeOpaqueHexColor('#0F8')).toBe('#00ff88')
+    expect(normalizeOpaqueHexColor('  #ABCDEF  ')).toBe('#abcdef')
+  })
+
+  it('rejects invalid and alpha-bearing colors', () => {
+    expect(normalizeOpaqueHexColor('red')).toBeNull()
+    expect(normalizeOpaqueHexColor('#abcd')).toBeNull()
+    expect(normalizeOpaqueHexColor('#abcdef80')).toBeNull()
   })
 })
 

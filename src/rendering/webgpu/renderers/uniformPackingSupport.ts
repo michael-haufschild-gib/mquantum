@@ -23,10 +23,13 @@ import type { PBRSliceState } from '@/stores/slices/visual/pbrSlice'
 
 import { MAX_DIM, MAX_TERMS } from '../shaders/schroedinger/uniforms.wgsl'
 import { parseHexColorToLinearRgb, type Rgb } from '../utils/color'
+import { sanitizePixelExtent } from '../utils/sceneMath'
 import type { CameraSnapshot, TransformSnapshot } from './schrodingerRendererTypes'
 import { SCHROEDINGER_LAYOUT } from './schroedingerLayout'
 
 const I = SCHROEDINGER_LAYOUT.index
+const DEFAULT_COMPENSATION_DIMENSION = 3
+const DEFAULT_COMPENSATION_BOUNDING_RADIUS = 2.0
 
 // ---------------------------------------------------------------------------
 // Shared helper
@@ -221,17 +224,19 @@ export function packCameraUniforms(
   data[115] = camera.near || 0.1
   data[116] = camera.far || 10000
   data[117] = ((camera.fov || 50) * Math.PI) / 180 // radians
-  data[118] = size.width
-  data[119] = size.height
-  data[120] = size.width / size.height
+  const safeWidth = sanitizePixelExtent(size.width)
+  const safeHeight = sanitizePixelExtent(size.height)
+  const safeAspect = safeWidth / safeHeight
+  data[118] = safeWidth
+  data[119] = safeHeight
+  data[120] = safeAspect
 
   // DEV diagnostic
   if (import.meta.env.DEV && camera.projectionMatrix?.elements) {
     const projAspect = camera.projectionMatrix.elements[5]! / camera.projectionMatrix.elements[0]!
-    const ctxAspect = size.width / size.height
-    if (Math.abs(projAspect - ctxAspect) > 0.01) {
+    if (Math.abs(projAspect - safeAspect) > 0.01) {
       logger.warn(
-        `[Schrodinger] ASPECT MISMATCH! projection: ${projAspect.toFixed(4)}, ctx.size: ${ctxAspect.toFixed(4)} (${size.width}x${size.height})`
+        `[Schrodinger] ASPECT MISMATCH! projection: ${projAspect.toFixed(4)}, ctx.size: ${safeAspect.toFixed(4)} (${safeWidth}x${safeHeight})`
       )
     }
   }
@@ -474,16 +479,22 @@ export function computeCanonicalCompensation(
   dimension: number,
   boundingRadius: number
 ): { compensation: number; peakDensity: number } {
-  if (preset.termCount === 0) return { compensation: 1.0, peakDensity: 0.1 }
+  const termCount =
+    Number.isFinite(preset.termCount) && preset.termCount > 0
+      ? Math.min(MAX_TERMS, Math.floor(preset.termCount))
+      : 0
+  if (termCount === 0) return { compensation: 1.0, peakDensity: 0.1 }
 
   // Find the dominant term (largest |c_k|^2)
   let dominantIdx = 0
   let maxCoeffMag = 0
-  for (let k = 0; k < preset.termCount; k++) {
+  for (let k = 0; k < termCount; k++) {
     const coeff = preset.coefficients[k]
     if (!coeff) continue
     const [cRe, cIm] = coeff
+    if (!Number.isFinite(cRe) || !Number.isFinite(cIm)) continue
     const mag = cRe * cRe + cIm * cIm
+    if (!Number.isFinite(mag)) continue
     if (mag > maxCoeffMag) {
       maxCoeffMag = mag
       dominantIdx = k
@@ -492,15 +503,25 @@ export function computeCanonicalCompensation(
 
   const qn = preset.quantumNumbers[dominantIdx]
   if (!qn) return { compensation: 1.0, peakDensity: 0.1 }
-  const dim = Math.min(dimension, qn.length)
+  if (maxCoeffMag <= 0) return { compensation: 1.0, peakDensity: 0.1 }
+  const requestedDim =
+    Number.isFinite(dimension) && dimension > 0
+      ? Math.floor(dimension)
+      : Math.min(DEFAULT_COMPENSATION_DIMENSION, qn.length)
+  const dim = Math.max(0, Math.min(MAX_DIM, qn.length, requestedDim))
 
   // Compute peak |psi|^2 = |c_dominant|^2 * prod_i peak_1D(n_i, omega_i)
   let peakDensity = maxCoeffMag
   for (let j = 0; j < dim; j++) {
     const nRaw = qn[j]
     if (nRaw == null) continue
-    const n = Math.max(0, Math.min(6, Math.round(nRaw)))
-    const omega = Math.max(preset.omega[j] ?? 1.0, 0.01)
+    const n =
+      typeof nRaw === 'number' && Number.isFinite(nRaw)
+        ? Math.max(0, Math.min(6, Math.round(nRaw)))
+        : 0
+    const omegaRaw = preset.omega[j]
+    const omega =
+      typeof omegaRaw === 'number' && Number.isFinite(omegaRaw) ? Math.max(omegaRaw, 0.01) : 1.0
 
     // Find max of H_n^2(u) * exp(-u^2) numerically over u in [0, 5]
     let maxHermiteSq = 0
@@ -513,16 +534,28 @@ export function computeCanonicalCompensation(
 
     const twoN_nFact = Math.pow(2, n) * factorial(n)
     const peak1D = (Math.sqrt(omega / Math.PI) / twoN_nFact) * maxHermiteSq
+    if (!Number.isFinite(peak1D) || peak1D <= 0) continue
     peakDensity *= peak1D
+    if (!Number.isFinite(peakDensity)) return { compensation: 1.0, peakDensity: 0.1 }
   }
 
-  if (peakDensity <= 0) return { compensation: 1.0, peakDensity: 0.1 }
+  if (!Number.isFinite(peakDensity) || peakDensity <= 0) {
+    return { compensation: 1.0, peakDensity: 0.1 }
+  }
 
   const TARGET_ALPHA = 0.7
   const DEFAULT_DENSITY_GAIN = 2.0
   const TYPICAL_SAMPLES = 32
-  const estimatedStepLen = (2 * boundingRadius) / TYPICAL_SAMPLES
+  const safeBoundingRadius =
+    Number.isFinite(boundingRadius) && boundingRadius > 0
+      ? boundingRadius
+      : DEFAULT_COMPENSATION_BOUNDING_RADIUS
+  const estimatedStepLen = (2 * safeBoundingRadius) / TYPICAL_SAMPLES
   const neededGain = -Math.log(1 - TARGET_ALPHA) / (peakDensity * estimatedStepLen)
+
+  if (!Number.isFinite(neededGain) || neededGain <= 0) {
+    return { compensation: 1.0, peakDensity: 0.1 }
+  }
 
   return {
     compensation: neededGain / DEFAULT_DENSITY_GAIN,

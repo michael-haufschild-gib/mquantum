@@ -247,11 +247,11 @@ describe('Dirac setters', () => {
     expect(getDirac().diagnosticsInterval).toBe(60)
   })
 
-  it('setDiracNeedsReset and clearDiracNeedsReset toggle the flag', () => {
+  it('markComputeNeedsReset(dirac) and clearComputeNeedsReset(dirac) toggle the flag', () => {
     const s = useExtendedObjectStore.getState()
-    s.setDiracNeedsReset()
+    s.markComputeNeedsReset('dirac')
     expect(getDirac().needsReset).toBe(true)
-    s.clearDiracNeedsReset()
+    s.clearComputeNeedsReset('dirac')
     expect(getDirac().needsReset).toBe(false)
   })
 

@@ -1,11 +1,11 @@
 /**
  * Object Type Registry - Type Definitions
  *
- * Central type definitions for the object type registry.
+ * Central type definitions for the quantum type registry.
  * This file defines interfaces for object capabilities, animation systems,
  * rendering methods, and UI configuration.
  *
- * @see src/lib/geometry/registry/registry.ts for the actual registry data
+ * @see src/lib/geometry/registry/quantumTypes.ts for the actual registry data
  */
 
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
@@ -76,11 +76,6 @@ export type QuantumTypeEvolutionResetKind =
 
 /** Optional compile-time selector fields required by renderer shader config. */
 export type QuantumTypeCompileContextField = 'diracFieldView' | 'freeScalarInitialCondition'
-
-/**
- * Category classification for object types
- */
-export type ObjectCategory = 'quantum'
 
 /**
  * Render method determines which renderer handles the object
@@ -249,65 +244,6 @@ export interface UiComponentMapping {
    */
   qualityPresets?: string[]
 }
-
-// ============================================================================
-// Complete Registry Entry
-// ============================================================================
-
-/**
- * Complete Object Type Registry Entry
- *
- * Single source of truth for all metadata and capabilities of an object type.
- * Adding a new object type requires only adding an entry here plus
- * implementation files.
- */
-export interface ObjectTypeEntry {
-  // === Metadata ===
-
-  /** Object type identifier (matches ObjectType union) */
-  type: ObjectType
-  /** Display name for UI */
-  name: string
-  /** User-facing description */
-  description: string
-  /** Category classification */
-  category: ObjectCategory
-
-  // === Constraints ===
-
-  /** Dimension constraints */
-  dimensions: DimensionConstraints
-
-  // === Capabilities ===
-
-  /** Rendering capabilities */
-  rendering: RenderingCapabilities
-  /** Animation capabilities */
-  animation: AnimationCapabilities
-
-  // === Configuration ===
-
-  /** URL serialization config */
-  urlSerialization: UrlSerializationConfig
-  /** UI component mapping */
-  ui: UiComponentMapping
-
-  /**
-   * Key for the config object in extendedObjectStore.
-   * e.g., "schroedinger" → store.schroedinger
-   */
-  configStoreKey: string
-}
-
-// ============================================================================
-// Registry Type
-// ============================================================================
-
-/**
- * The Object Type Registry type.
- * A readonly Map from ObjectType to ObjectTypeEntry.
- */
-export type ObjectTypeRegistry = ReadonlyMap<ObjectType, ObjectTypeEntry>
 
 // ============================================================================
 // Helper Result Types

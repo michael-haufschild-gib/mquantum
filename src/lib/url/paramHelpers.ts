@@ -48,6 +48,27 @@ export function parseFloatParam(
   return Math.max(min, Math.min(max, v))
 }
 
+const FLOAT_SCI_RE = /^-?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/
+
+/**
+ * Parse a URL param as a clamped float, ALLOWING scientific notation
+ * (e.g. `1e-3`, `2.5E+10`). For user-typed URLs prefer the strict
+ * {@link parseFloatParam} which rejects exponent notation. Use this only
+ * when programmatic state restoration may emit numbers in exponent form.
+ */
+export function parseFloatParamSci(
+  params: URLSearchParams,
+  key: string,
+  min: number,
+  max: number
+): number | undefined {
+  const raw = params.get(key)
+  if (!raw || !FLOAT_SCI_RE.test(raw)) return undefined
+  const v = Number(raw)
+  if (!Number.isFinite(v)) return undefined
+  return Math.max(min, Math.min(max, v))
+}
+
 /** Parse a URL param as a boolean (0/1). Returns undefined on invalid input. */
 export function parseBoolParam(params: URLSearchParams, key: string): boolean | undefined {
   const raw = params.get(key)

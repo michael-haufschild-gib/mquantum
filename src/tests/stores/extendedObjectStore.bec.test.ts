@@ -125,7 +125,7 @@ describe('BEC setters', () => {
     })
 
     it('triggers needsReset', () => {
-      store().clearBecNeedsReset()
+      store().clearComputeNeedsReset('bec')
       store().setBecVortexCharge(1)
       expect(bec().needsReset).toBe(true)
     })
@@ -299,7 +299,7 @@ describe('BEC setters', () => {
     })
 
     it('triggers needsReset', () => {
-      store().clearBecNeedsReset()
+      store().clearComputeNeedsReset('bec')
       store().setBecGridSize([32, 32, 32])
       expect(bec().needsReset).toBe(true)
     })
@@ -349,18 +349,18 @@ describe('BEC setters', () => {
 
   describe('resetBecField', () => {
     it('sets needsReset to true', () => {
-      store().clearBecNeedsReset()
+      store().clearComputeNeedsReset('bec')
       expect(bec().needsReset).toBe(false)
       store().resetBecField()
       expect(bec().needsReset).toBe(true)
     })
   })
 
-  describe('clearBecNeedsReset', () => {
+  describe('clearComputeNeedsReset(bec)', () => {
     it('sets needsReset to false', () => {
       store().resetBecField()
       expect(bec().needsReset).toBe(true)
-      store().clearBecNeedsReset()
+      store().clearComputeNeedsReset('bec')
       expect(bec().needsReset).toBe(false)
     })
   })

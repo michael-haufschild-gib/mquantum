@@ -22,6 +22,7 @@ import type {
   SchroedingerQuantumMode,
   SchroedingerRenderStyle,
 } from './common'
+import type { PmlAbsorberConfig } from './crossMode'
 import type { DiracConfig } from './dirac'
 import { DEFAULT_DIRAC_CONFIG } from './dirac'
 import type { FreeScalarConfig } from './freeScalar'
@@ -140,163 +141,11 @@ export type HydrogenNDPresetName =
   | 'custom'
 
 // ============================================================================
-// SchroedingerConfig
+// SchroedingerConfig Sub-Interfaces
 // ============================================================================
 
-/**
- * Configuration for n-dimensional Schroedinger set generation
- *
- * Supports:
- * - 3D: Schroedinger (spherical coordinates)
- * - 4D-11D: Schroedinger (hyperspherical coordinates)
- */
-export interface SchroedingerConfig {
-  // === Geometry Settings ===
-  /** Overall scale of the rendered object (0.1-2.0) */
-  scale: number
-
-  // === Quality Settings ===
-  /** Quality preset (affects sample count and resolution) */
-  qualityPreset: SchroedingerQualityPreset
-  /** Samples per axis in the 3D grid (16-128) */
-  resolution: number
-
-  // === Visualization Axes ===
-  /** Indices of dimensions to map to X, Y, Z */
-  visualizationAxes: [number, number, number]
-  /** Fixed values for dimensions not being visualized (slice position) */
-  parameterValues: number[]
-
-  // === Navigation ===
-  /** Center coordinates in N-dimensional space */
-  center: number[]
-  /** Extent (zoom level) - half-width of viewing region */
-  extent: number
-
-  // === Color Settings ===
-  /** Color mode for visualization */
-  colorMode: SchroedingerColorMode
-  /** Color palette preset */
-  palette: SchroedingerPalette
-  /** Custom palette colors (used when palette='custom') */
-  customPalette: { start: string; mid: string; end: string }
-  /** Cosine gradient coefficients (a, b, c, d) for palette mode */
-  cosineParams: {
-    a: [number, number, number]
-    b: [number, number, number]
-    c: [number, number, number]
-    d: [number, number, number]
-  }
-  /** Whether to invert color mapping */
-  invertColors: boolean
-
-  // === Rendering Style ===
-  /** How to render the volume */
-  renderStyle: SchroedingerRenderStyle
-
-  // === Quantum Mode Selection ===
-  /** Physics mode: harmonic oscillator vs hydrogen ND */
-  quantumMode: SchroedingerQuantumMode
-
-  // === Representation Selection ===
-  /** Position-space ψ(x) or momentum-space φ(k) */
-  representation: SchroedingerRepresentation
-  /** How momentum-space axes/labels are interpreted in the UI */
-  momentumDisplayUnits: SchroedingerMomentumDisplayUnits
-  /** Reciprocal-space zoom factor applied before momentum evaluation */
-  momentumScale: number
-  /** Effective reduced Planck constant used for p = ħk display conversions */
-  momentumHbar: number
-
-  // === Harmonic Oscillator Configuration (when quantumMode === 'harmonicOscillator') ===
-  /** Named preset or 'custom' */
-  presetName: SchroedingerPresetName
-  /** Random seed for preset generation */
-  seed: number
-  /** Number of superposition terms (1-8) */
-  termCount: number
-  /** Maximum quantum number per dimension (2-6) */
-  maxQuantumNumber: number
-  /** Variation in per-dimension frequencies (0-0.5) */
-  frequencySpread: number
-
-  // === Hydrogen Configuration (shared with hydrogenND mode) ===
-  /** Principal quantum number n (1-7) - determines shell and energy */
-  principalQuantumNumber: number
-  /** Azimuthal quantum number l (0 to n-1) - determines orbital shape (s,p,d,f) */
-  azimuthalQuantumNumber: number
-  /** Magnetic quantum number m (-l to +l) - determines orbital orientation */
-  magneticQuantumNumber: number
-  /** Use real spherical harmonics (px/py/pz) vs complex (m=-1,0,+1) */
-  useRealOrbitals: boolean
-  /** Bohr radius scale factor (affects orbital size, 0.5-3.0) */
-  bohrRadiusScale: number
-
-  // === Hydrogen ND Configuration (when quantumMode === 'hydrogenND') ===
-  /** Named hydrogen ND preset */
-  hydrogenNDPreset: HydrogenNDPresetName
-  /** Quantum numbers for extra dimensions (dims 4-11), array of length 8 */
-  extraDimQuantumNumbers: number[]
-  /** Frequencies for extra dimensions (dims 4-11), array of length 8 */
-  extraDimOmega: number[]
-  /** Energy spread factor for extra dimensions (0-0.5) */
-  extraDimFrequencySpread: number
-
-  // === Hydrogen ND Coupled Configuration (when quantumMode === 'hydrogenNDCoupled') ===
-  /**
-   * Angular momentum chain for D-dimensional hyperspherical harmonics.
-   * Length D-2 (indices 0..D-3): l_1 >= l_2 >= ... >= l_{D-2} >= 0.
-   * l_1 maps to azimuthalQuantumNumber, m maps to magneticQuantumNumber.
-   * Intermediate values l_2..l_{D-3} are stored here (indices 1..D-3).
-   * Maximum length 8 (for D=11: 9 angles, chain length 9, but l_1 and |m| stored separately).
-   */
-  angularChain: number[]
-
-  // === Volume Rendering Parameters ===
-  /** Time evolution speed multiplier (0.1-2.0) */
-  timeScale: number
-  /** Coordinate scale into HO basis (0.5-2.0) */
-  fieldScale: number
-  /** Absorption coefficient for Beer-Lambert (0.1-5.0) */
-  densityGain: number
-  /** Power-curve exponent for lobe sharpening (1.0=linear, >1=sharper lobes, default 1.8) */
-  densityContrast: number
-  /** Maximum auto-scale amplification factor (1-100). Prevents negligible residuals from being amplified to full brightness. */
-  autoScaleMaxGain: number
-  /** Multiple scattering "powder" effect strength (0.0-2.0) */
-  powderScale: number
-  /** Samples per ray (32-128) */
-  sampleCount: number
-
-  // === Emission Settings ===
-  /** HDR emission intensity (0.0-5.0) */
-  emissionIntensity: number
-  /** Density threshold for emission (0.0-1.0) */
-  emissionThreshold: number
-  /** Emission color temperature shift (-1.0 to 1.0) */
-  emissionColorShift: number
-  /** Scattering anisotropy (-0.9 to 0.9) */
-  scatteringAnisotropy: number
-  /** Surface roughness for specular highlights (0.0-1.0) */
-  roughness: number
-
-  // === PML Absorbing Boundary (shared across all dynamic modes) ===
-  /** Enable PML absorbing boundary layer */
-  absorberEnabled: boolean
-  /** PML layer width as fraction of grid (0.05-0.50) */
-  absorberWidth: number
-  /** Per-step damping at outer edge — exp(-σ_max·dt) = pmlTargetReflection */
-  pmlTargetReflection: number
-
-  // === Raymarching Quality ===
-  /** Unified raymarching quality preset (affects sample count) */
-  raymarchQuality: RaymarchQuality
-
-  // SSS state lives on the appearance store (`sssEnabled`, `sssIntensity`,
-  // `sssColor`, `sssThickness`, `sssJitter`). The renderer reads from there
-  // exclusively — no schroedinger-scoped duplicates.
-
-  // === Quantum Effects ===
+/** Nodal surface highlighting configuration. */
+export interface SchroedingerNodalConfig {
   /** Enable nodal surface highlighting */
   nodalEnabled: boolean
   /** Nodal surface color (hex string) */
@@ -321,6 +170,118 @@ export interface SchroedingerConfig {
   nodalColorPositive: string
   /** Color for negative lobe/phase sign */
   nodalColorNegative: string
+}
+
+/** Physical probability-current (j-field) overlay configuration. */
+export interface SchroedingerProbabilityCurrentConfig {
+  /** Enable physical probability-current visualization (j = Im(conj(psi)∇psi)) */
+  probabilityCurrentEnabled: boolean
+  /** Current-field visualization style */
+  probabilityCurrentStyle: SchroedingerProbabilityCurrentStyle
+  /** Overlay placement for current visualization */
+  probabilityCurrentPlacement: SchroedingerProbabilityCurrentPlacement
+  /** Color mapping mode for current overlays */
+  probabilityCurrentColorMode: SchroedingerProbabilityCurrentColorMode
+  /** Visual scale multiplier for current magnitude */
+  probabilityCurrentScale: number
+  /** Animation/advection speed for current patterns */
+  probabilityCurrentSpeed: number
+  /** Minimum density required to show current overlays */
+  probabilityCurrentDensityThreshold: number
+  /** Minimum |j| required to show current overlays */
+  probabilityCurrentMagnitudeThreshold: number
+  /** Pattern/glyph density for arrows/LIC/streamlines */
+  probabilityCurrentLineDensity: number
+  /** Integration/sample step size for LIC/streamline styles */
+  probabilityCurrentStepSize: number
+  /** Integration/sample step count for LIC/streamline styles */
+  probabilityCurrentSteps: number
+  /** Overlay opacity for current visualization */
+  probabilityCurrentOpacity: number
+}
+
+/** 2D cross-section slice visualization configuration. */
+export interface SchroedingerCrossSectionConfig {
+  /** Enable 2D plane slice visualization of the current 3D projection */
+  crossSectionEnabled: boolean
+  /** Whether to overlay on volume/surface or render slice only */
+  crossSectionCompositeMode: SchroedingerCrossSectionCompositeMode
+  /** Scalar sampled on the plane: |psi|^2, Re(psi), or Im(psi) */
+  crossSectionScalar: SchroedingerCrossSectionScalar
+  /** Plane orientation mode (axis preset vs free normal vector) */
+  crossSectionPlaneMode: SchroedingerCrossSectionPlaneMode
+  /** Axis preset when crossSectionPlaneMode='axisAligned' */
+  crossSectionAxis: SchroedingerCrossSectionAxis
+  /** Unit normal vector for free-plane mode */
+  crossSectionPlaneNormal: [number, number, number]
+  /** Offset along plane normal in normalized object radius units (-1 to 1) */
+  crossSectionPlaneOffset: number
+  /** Slice alpha contribution (0.0-1.0) */
+  crossSectionOpacity: number
+  /** Slab half-thickness in normalized radius units (0.0-0.2) */
+  crossSectionThickness: number
+  /** Visual tint color for the slice plane surface */
+  crossSectionPlaneColor: string
+  /** Auto-scale scalar window based on scalar type */
+  crossSectionAutoWindow: boolean
+  /** Manual window minimum when auto-window is disabled */
+  crossSectionWindowMin: number
+  /** Manual window maximum when auto-window is disabled */
+  crossSectionWindowMax: number
+}
+
+/** Wigner phase-space visualization configuration. */
+export interface SchroedingerWignerConfig {
+  /** Which dimension index to display in Wigner phase space (0-based) */
+  wignerDimensionIndex: number
+  /** Auto-compute axis ranges from physics (bounding radius, omega) */
+  wignerAutoRange: boolean
+  /** Manual x-axis range (position units) when autoRange is off */
+  wignerXRange: number
+  /** Manual p-axis range (momentum units) when autoRange is off */
+  wignerPRange: number
+  /** Include cross terms in HO superposition Wigner function */
+  wignerCrossTermsEnabled: boolean
+  /** Number of quadrature points for hydrogen numerical Wigner transform */
+  wignerQuadPoints: number
+  /** Resolution of the pre-computed Wigner cache texture (128-1024) */
+  wignerCacheResolution: number
+}
+
+/** Volume rendering parameters (density, sampling, scaling). */
+export interface SchroedingerVolumeConfig {
+  /** Time evolution speed multiplier (0.1-2.0) */
+  timeScale: number
+  /** Coordinate scale into HO basis (0.5-2.0) */
+  fieldScale: number
+  /** Absorption coefficient for Beer-Lambert (0.1-5.0) */
+  densityGain: number
+  /** Power-curve exponent for lobe sharpening (1.0=linear, >1=sharper lobes, default 1.8) */
+  densityContrast: number
+  /** Maximum auto-scale amplification factor (1-100). Prevents negligible residuals from being amplified to full brightness. */
+  autoScaleMaxGain: number
+  /** Multiple scattering "powder" effect strength (0.0-2.0) */
+  powderScale: number
+  /** Samples per ray (32-128) */
+  sampleCount: number
+}
+
+/** HDR emission and scattering configuration. */
+export interface SchroedingerEmissionConfig {
+  /** HDR emission intensity (0.0-5.0) */
+  emissionIntensity: number
+  /** Density threshold for emission (0.0-1.0) */
+  emissionThreshold: number
+  /** Emission color temperature shift (-1.0 to 1.0) */
+  emissionColorShift: number
+  /** Scattering anisotropy (-0.9 to 0.9) */
+  scatteringAnisotropy: number
+  /** Surface roughness for specular highlights (0.0-1.0) */
+  roughness: number
+}
+
+/** Quantum visual-effect overlays (uncertainty, phase materiality, interference, lensing, topology). */
+export interface SchroedingerQuantumEffectsConfig {
   /** Enable physically-derived uncertainty boundary emphasis */
   uncertaintyBoundaryEnabled: boolean
   /** Visual strength of uncertainty boundary emphasis (0.0-1.0) */
@@ -393,32 +354,186 @@ export interface SchroedingerConfig {
   bornNullWeaveNodeWidth: number
   /** Current-over-density circulation sensitivity (0.0-8.0) */
   bornNullWeaveCirculation: number
+}
 
-  // === Physical Probability Current (j-field) ===
-  /** Enable physical probability-current visualization (j = Im(conj(psi)∇psi)) */
-  probabilityCurrentEnabled: boolean
-  /** Current-field visualization style */
-  probabilityCurrentStyle: SchroedingerProbabilityCurrentStyle
-  /** Overlay placement for current visualization */
-  probabilityCurrentPlacement: SchroedingerProbabilityCurrentPlacement
-  /** Color mapping mode for current overlays */
-  probabilityCurrentColorMode: SchroedingerProbabilityCurrentColorMode
-  /** Visual scale multiplier for current magnitude */
-  probabilityCurrentScale: number
-  /** Animation/advection speed for current patterns */
-  probabilityCurrentSpeed: number
-  /** Minimum density required to show current overlays */
-  probabilityCurrentDensityThreshold: number
-  /** Minimum |j| required to show current overlays */
-  probabilityCurrentMagnitudeThreshold: number
-  /** Pattern/glyph density for arrows/LIC/streamlines */
-  probabilityCurrentLineDensity: number
-  /** Integration/sample step size for LIC/streamline styles */
-  probabilityCurrentStepSize: number
-  /** Integration/sample step count for LIC/streamline styles */
-  probabilityCurrentSteps: number
-  /** Overlay opacity for current visualization */
-  probabilityCurrentOpacity: number
+/** Second-quantization educational layer configuration. */
+export interface SchroedingerSecondQuantConfig {
+  /** Master toggle for second-quantization interpretation overlay */
+  sqLayerEnabled: boolean
+  /** Interpretation mode: Fock, coherent, or squeezed */
+  sqLayerMode: SecondQuantizationMode
+  /** Which HO dimension mode index to inspect (0-based) */
+  sqLayerSelectedModeIndex: number
+  /** Fock-state quantum number n for educational number-state interpretation */
+  sqLayerFockQuantumNumber: number
+  /** Show occupation number table */
+  sqLayerShowOccupation: boolean
+  /** Show uncertainty metrics card */
+  sqLayerShowUncertainty: boolean
+  /** Re(alpha) for coherent state preset */
+  sqLayerCoherentAlphaRe: number
+  /** Im(alpha) for coherent state preset */
+  sqLayerCoherentAlphaIm: number
+  /** Squeeze parameter r */
+  sqLayerSqueezeR: number
+  /** Squeeze angle theta */
+  sqLayerSqueezeTheta: number
+}
+
+/** Wavefunction representation space and momentum-space display options. */
+export interface SchroedingerRepresentationConfig {
+  /** Position-space ψ(x) or momentum-space φ(k) */
+  representation: SchroedingerRepresentation
+  /** How momentum-space axes/labels are interpreted in the UI */
+  momentumDisplayUnits: SchroedingerMomentumDisplayUnits
+  /** Reciprocal-space zoom factor applied before momentum evaluation */
+  momentumScale: number
+  /** Effective reduced Planck constant used for p = ħk display conversions */
+  momentumHbar: number
+}
+
+/** Harmonic oscillator superposition configuration (when quantumMode === 'harmonicOscillator'). */
+export interface SchroedingerHOConfig {
+  /** Named preset or 'custom' */
+  presetName: SchroedingerPresetName
+  /** Random seed for preset generation */
+  seed: number
+  /** Number of superposition terms (1-8) */
+  termCount: number
+  /** Maximum quantum number per dimension (2-6) */
+  maxQuantumNumber: number
+  /** Variation in per-dimension frequencies (0-0.5) */
+  frequencySpread: number
+}
+
+/** Hydrogen orbital configuration (shared across hydrogen, hydrogenND, and hydrogenND coupled modes). */
+export interface SchroedingerHydrogenConfig {
+  /** Principal quantum number n (1-7) - determines shell and energy */
+  principalQuantumNumber: number
+  /** Azimuthal quantum number l (0 to n-1) - determines orbital shape (s,p,d,f) */
+  azimuthalQuantumNumber: number
+  /** Magnetic quantum number m (-l to +l) - determines orbital orientation */
+  magneticQuantumNumber: number
+  /** Use real spherical harmonics (px/py/pz) vs complex (m=-1,0,+1) */
+  useRealOrbitals: boolean
+  /** Bohr radius scale factor (affects orbital size, 0.5-3.0) */
+  bohrRadiusScale: number
+  /** Named hydrogen ND preset */
+  hydrogenNDPreset: HydrogenNDPresetName
+  /** Quantum numbers for extra dimensions (dims 4-11), array of length 8 */
+  extraDimQuantumNumbers: number[]
+  /** Frequencies for extra dimensions (dims 4-11), array of length 8 */
+  extraDimOmega: number[]
+  /** Energy spread factor for extra dimensions (0-0.5) */
+  extraDimFrequencySpread: number
+  /**
+   * Angular momentum chain for D-dimensional hyperspherical harmonics.
+   * Length D-2 (indices 0..D-3): l_1 >= l_2 >= ... >= l_{D-2} >= 0.
+   * l_1 maps to azimuthalQuantumNumber, m maps to magneticQuantumNumber.
+   * Intermediate values l_2..l_{D-3} are stored here (indices 1..D-3).
+   * Maximum length 8 (for D=11: 9 angles, chain length 9, but l_1 and |m| stored separately).
+   */
+  angularChain: number[]
+}
+
+// ============================================================================
+// SchroedingerConfig
+// ============================================================================
+
+/**
+ * Configuration for n-dimensional Schroedinger set generation
+ *
+ * Supports:
+ * - 3D: Schroedinger (spherical coordinates)
+ * - 4D-11D: Schroedinger (hyperspherical coordinates)
+ */
+export interface SchroedingerConfig
+  extends
+    PmlAbsorberConfig,
+    SchroedingerNodalConfig,
+    SchroedingerProbabilityCurrentConfig,
+    SchroedingerCrossSectionConfig,
+    SchroedingerWignerConfig,
+    SchroedingerVolumeConfig,
+    SchroedingerEmissionConfig,
+    SchroedingerQuantumEffectsConfig,
+    SchroedingerSecondQuantConfig,
+    SchroedingerRepresentationConfig,
+    SchroedingerHOConfig,
+    SchroedingerHydrogenConfig {
+  // === Geometry Settings ===
+  /** Overall scale of the rendered object (0.1-2.0) */
+  scale: number
+
+  // === Quality Settings ===
+  /** Quality preset (affects sample count and resolution) */
+  qualityPreset: SchroedingerQualityPreset
+  /** Samples per axis in the 3D grid (16-128) */
+  resolution: number
+
+  // === Visualization Axes ===
+  /** Indices of dimensions to map to X, Y, Z */
+  visualizationAxes: [number, number, number]
+  /** Fixed values for dimensions not being visualized (slice position) */
+  parameterValues: number[]
+
+  // === Navigation ===
+  /** Center coordinates in N-dimensional space */
+  center: number[]
+  /** Extent (zoom level) - half-width of viewing region */
+  extent: number
+
+  // === Color Settings ===
+  /** Color mode for visualization */
+  colorMode: SchroedingerColorMode
+  /** Color palette preset */
+  palette: SchroedingerPalette
+  /** Custom palette colors (used when palette='custom') */
+  customPalette: { start: string; mid: string; end: string }
+  /** Cosine gradient coefficients (a, b, c, d) for palette mode */
+  cosineParams: {
+    a: [number, number, number]
+    b: [number, number, number]
+    c: [number, number, number]
+    d: [number, number, number]
+  }
+  /** Whether to invert color mapping */
+  invertColors: boolean
+
+  // === Rendering Style ===
+  /** How to render the volume */
+  renderStyle: SchroedingerRenderStyle
+
+  // === Quantum Mode Selection ===
+  /** Physics mode: harmonic oscillator vs hydrogen ND */
+  quantumMode: SchroedingerQuantumMode
+
+  // Representation — see SchroedingerRepresentationConfig
+
+  // Harmonic Oscillator — see SchroedingerHOConfig
+
+  // Hydrogen — see SchroedingerHydrogenConfig
+
+  // Volume rendering — see SchroedingerVolumeConfig
+
+  // Emission — see SchroedingerEmissionConfig
+
+  // === PML Absorbing Boundary (shared across all dynamic modes; fields
+  // declared on PmlAbsorberConfig in crossMode.ts) ===
+
+  // === Raymarching Quality ===
+  /** Unified raymarching quality preset (affects sample count) */
+  raymarchQuality: RaymarchQuality
+
+  // SSS state lives on the appearance store (`sssEnabled`, `sssIntensity`,
+  // `sssColor`, `sssThickness`, `sssJitter`). The renderer reads from there
+  // exclusively — no schroedinger-scoped duplicates.
+
+  // === Quantum Effects ===
+  // Nodal — see SchroedingerNodalConfig
+  // Quantum effect overlays — see SchroedingerQuantumEffectsConfig
+
+  // Physical Probability Current — see SchroedingerProbabilityCurrentConfig
 
   // === Phase Shimmer ===
   /** Enable legacy density-modulated flow-noise animation */
@@ -434,33 +549,7 @@ export interface SchroedingerConfig {
   /** Log-density threshold for isosurface (-6 to 0) */
   isoThreshold: number
 
-  // === 2D Cross-Section Slice ===
-  /** Enable 2D plane slice visualization of the current 3D projection */
-  crossSectionEnabled: boolean
-  /** Whether to overlay on volume/surface or render slice only */
-  crossSectionCompositeMode: SchroedingerCrossSectionCompositeMode
-  /** Scalar sampled on the plane: |psi|^2, Re(psi), or Im(psi) */
-  crossSectionScalar: SchroedingerCrossSectionScalar
-  /** Plane orientation mode (axis preset vs free normal vector) */
-  crossSectionPlaneMode: SchroedingerCrossSectionPlaneMode
-  /** Axis preset when crossSectionPlaneMode='axisAligned' */
-  crossSectionAxis: SchroedingerCrossSectionAxis
-  /** Unit normal vector for free-plane mode */
-  crossSectionPlaneNormal: [number, number, number]
-  /** Offset along plane normal in normalized object radius units (-1 to 1) */
-  crossSectionPlaneOffset: number
-  /** Slice alpha contribution (0.0-1.0) */
-  crossSectionOpacity: number
-  /** Slab half-thickness in normalized radius units (0.0-0.2) */
-  crossSectionThickness: number
-  /** Visual tint color for the slice plane surface */
-  crossSectionPlaneColor: string
-  /** Auto-scale scalar window based on scalar type */
-  crossSectionAutoWindow: boolean
-  /** Manual window minimum when auto-window is disabled */
-  crossSectionWindowMin: number
-  /** Manual window maximum when auto-window is disabled */
-  crossSectionWindowMax: number
+  // 2D Cross-Section Slice — see SchroedingerCrossSectionConfig
 
   // === Slice Animation (4D+ only) ===
   /** Enable slice animation through extra dimensions */
@@ -482,43 +571,9 @@ export interface SchroedingerConfig {
   /** Shell color (CSS hex) */
   radialProbabilityColor: string
 
-  // === Wigner Phase-Space Visualization ===
-  /** Which dimension index to display in Wigner phase space (0-based) */
-  wignerDimensionIndex: number
-  /** Auto-compute axis ranges from physics (bounding radius, omega) */
-  wignerAutoRange: boolean
-  /** Manual x-axis range (position units) when autoRange is off */
-  wignerXRange: number
-  /** Manual p-axis range (momentum units) when autoRange is off */
-  wignerPRange: number
-  /** Include cross terms in HO superposition Wigner function */
-  wignerCrossTermsEnabled: boolean
-  /** Number of quadrature points for hydrogen numerical Wigner transform */
-  wignerQuadPoints: number
-  /** Resolution of the pre-computed Wigner cache texture (128-1024) */
-  wignerCacheResolution: number
+  // Wigner Phase-Space — see SchroedingerWignerConfig
 
-  // === Second Quantization Educational Layer ===
-  /** Master toggle for second-quantization interpretation overlay */
-  sqLayerEnabled: boolean
-  /** Interpretation mode: Fock, coherent, or squeezed */
-  sqLayerMode: SecondQuantizationMode
-  /** Which HO dimension mode index to inspect (0-based) */
-  sqLayerSelectedModeIndex: number
-  /** Fock-state quantum number n for educational number-state interpretation */
-  sqLayerFockQuantumNumber: number
-  /** Show occupation number table */
-  sqLayerShowOccupation: boolean
-  /** Show uncertainty metrics card */
-  sqLayerShowUncertainty: boolean
-  /** Re(alpha) for coherent state preset */
-  sqLayerCoherentAlphaRe: number
-  /** Im(alpha) for coherent state preset */
-  sqLayerCoherentAlphaIm: number
-  /** Squeeze parameter r */
-  sqLayerSqueezeR: number
-  /** Squeeze angle theta */
-  sqLayerSqueezeTheta: number
+  // Second quantization — see SchroedingerSecondQuantConfig
 
   // === Free Scalar Field Configuration (when quantumMode === 'freeScalarField') ===
   /** Klein-Gordon lattice field configuration */
@@ -815,6 +870,78 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
 
   // Open Quantum System
   openQuantum: DEFAULT_OPEN_QUANTUM_CONFIG,
+}
+
+/** Sanitized hydrogen quantum fields safe for store state and GPU uniforms. */
+export interface SanitizedHydrogenQuantumState {
+  principalQuantumNumber: number
+  azimuthalQuantumNumber: number
+  magneticQuantumNumber: number
+  bohrRadiusScale: number
+}
+
+type HydrogenQuantumStateInput = Partial<SanitizedHydrogenQuantumState>
+
+function finiteOrFallback(
+  value: number | undefined,
+  fallback: number,
+  defaultValue: number
+): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (Number.isFinite(fallback)) return fallback
+  return defaultValue
+}
+
+function clampFloored(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, Math.floor(value)))
+}
+
+/**
+ * Normalize hydrogen quantum fields shared by store bulk updates and GPU packing.
+ *
+ * Direct UI setters reject non-finite values; bulk scene/preset loads and tests
+ * can bypass those setters, so callers use previous state as fallback.
+ */
+export function sanitizeHydrogenQuantumState(
+  input: HydrogenQuantumStateInput | null | undefined,
+  fallback: HydrogenQuantumStateInput = DEFAULT_SCHROEDINGER_CONFIG
+): SanitizedHydrogenQuantumState {
+  const defaultState = DEFAULT_SCHROEDINGER_CONFIG
+  const rawN = finiteOrFallback(
+    input?.principalQuantumNumber,
+    fallback.principalQuantumNumber ?? defaultState.principalQuantumNumber,
+    defaultState.principalQuantumNumber
+  )
+  const principalQuantumNumber = clampFloored(rawN, 1, 7)
+
+  const rawL = finiteOrFallback(
+    input?.azimuthalQuantumNumber,
+    fallback.azimuthalQuantumNumber ?? defaultState.azimuthalQuantumNumber,
+    defaultState.azimuthalQuantumNumber
+  )
+  const azimuthalQuantumNumber = clampFloored(rawL, 0, principalQuantumNumber - 1)
+
+  const rawM = finiteOrFallback(
+    input?.magneticQuantumNumber,
+    fallback.magneticQuantumNumber ?? defaultState.magneticQuantumNumber,
+    defaultState.magneticQuantumNumber
+  )
+  const magneticQuantumNumber =
+    Math.max(-azimuthalQuantumNumber, Math.min(azimuthalQuantumNumber, Math.floor(rawM))) || 0
+
+  const rawBohrRadius = finiteOrFallback(
+    input?.bohrRadiusScale,
+    fallback.bohrRadiusScale ?? defaultState.bohrRadiusScale,
+    defaultState.bohrRadiusScale
+  )
+  const bohrRadiusScale = Math.max(0.5, Math.min(3.0, rawBohrRadius))
+
+  return {
+    principalQuantumNumber,
+    azimuthalQuantumNumber,
+    magneticQuantumNumber,
+    bohrRadiusScale,
+  }
 }
 
 /**

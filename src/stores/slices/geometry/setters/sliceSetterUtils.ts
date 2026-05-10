@@ -142,6 +142,47 @@ type DomainKey =
   | 'wheelerDeWitt'
   | 'antiDeSitter'
 
+/** Config keys whose nested object carries a `needsReset` flag under `schroedinger.*`. */
+export type ResettableConfigKey = {
+  [K in DomainKey]: SchroedingerConfig[K] extends { needsReset: boolean } ? K : never
+}[DomainKey]
+
+/**
+ * Clear `needsReset` on a `schroedinger` sub-config without version bump.
+ *
+ * Used by the generic `clearComputeNeedsReset` store action so each mode's
+ * clear logic doesn't need its own dedicated setter.
+ */
+export function clearSchrodingerModeNeedsReset(
+  set: ZustandSet,
+  configKey: ResettableConfigKey
+): void {
+  set((state) => ({
+    schroedinger: {
+      ...state.schroedinger,
+      [configKey]: { ...state.schroedinger[configKey], needsReset: false },
+    },
+  }))
+}
+
+/**
+ * Mark `needsReset` on a `schroedinger` sub-config WITH version bump.
+ *
+ * Used by the generic `markComputeNeedsReset` store action so each mode's
+ * mark-dirty logic doesn't need its own dedicated setter.
+ */
+export function markSchrodingerModeNeedsReset(
+  setWithVersion: ZustandSet,
+  configKey: ResettableConfigKey
+): void {
+  setWithVersion((state) => ({
+    schroedinger: {
+      ...state.schroedinger,
+      [configKey]: { ...state.schroedinger[configKey], needsReset: true },
+    },
+  }))
+}
+
 /**
  * Create a setter that validates, clamps, and writes a single numeric field
  * on a nested domain config (e.g. `schroedinger.bec.trapOmega`).

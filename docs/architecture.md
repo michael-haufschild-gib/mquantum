@@ -94,30 +94,49 @@ Is it a test?
 
 ## Template: New Render Pass
 
+Inputs/outputs are declared via the `super()` call; the render graph reads
+`config.inputs` / `config.outputs` to compute pass order. Implement
+`createPipeline()` (called once during `initialize()`) and `execute()` (called
+each frame).
+
 ```typescript
 // src/rendering/webgpu/passes/{Name}Pass.ts
-import { WebGPUBasePass } from '@/rendering/webgpu/core/WebGPUBasePass'
+import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
+import { WebGPUBasePass } from '../core/WebGPUBasePass'
+
+/** Configuration for the {Name} pass. */
+export interface {Name}PassOptions {
+  colorInput?: string
+  outputResource?: string
+}
 
 export class {Name}Pass extends WebGPUBasePass {
-  static declare() {
-    return {
-      inputs: ['scene-color'],           // Resources this pass reads
-      outputs: ['{name}-output'],         // Resources this pass writes
-      enabled: (ctx) => true,             // Condition to enable
-    }
+  constructor(options?: {Name}PassOptions) {
+    const colorInput = options?.colorInput ?? 'scene-color'
+    const outputResource = options?.outputResource ?? '{name}-output'
+
+    super({
+      id: '{name}',
+      priority: 800, // Lower = earlier; see other passes for the band
+      inputs: [{ resourceId: colorInput, access: 'read', binding: 0 }],
+      outputs: [{ resourceId: outputResource, access: 'write', binding: 0 }],
+    })
   }
 
-  async setup(ctx: WebGPUSetupContext) {
-    // Create pipeline, bind groups, buffers
+  protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
+    // Create pipeline, bind groups, uniform buffers
   }
 
-  render(ctx: WebGPURenderContext, encoder: GPUCommandEncoder) {
-    const store = getStore(ctx, 'postProcessing')
-    // Render pass implementation
+  execute(ctx: WebGPURenderContext): void {
+    // Read store state via ctx.frame.stores; encode the pass
   }
 }
-// Register in WebGPUScene.ts → setupRenderPasses()
 ```
+
+Wire the new pass through `src/rendering/webgpu/scenePassConstruction.ts`
+(post-processing passes) or `src/rendering/webgpu/scenePassSetup.ts`
+(Schroedinger passes), depending on the family. Registration is centralised
+in those modules — `WebGPUScene.ts` only triggers the setup task.
 
 ## Template: New Zustand Store
 

@@ -1,22 +1,22 @@
 /**
  * Object Type Registry - Helper Functions
  *
- * Helper functions that provide O(1) lookups from the registry
- * for the single 'schroedinger' object type.
+ * Helper functions that provide O(1) lookups derived from
+ * {@link QUANTUM_TYPE_REGISTRY}. There is no separate ObjectType registry —
+ * the per-ObjectType envelope (name, description, dimension union, render
+ * method, etc.) is computed from the flat quantum-type registry below.
  *
- * @see src/lib/geometry/registry/registry.ts for the registry data
+ * @see src/lib/geometry/registry/quantumTypes.ts for the underlying data
  */
 
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
 
 import type { ObjectType } from '../types'
 import { QUANTUM_TYPE_REGISTRY } from './quantumTypes'
-import { OBJECT_TYPE_REGISTRY } from './registry'
 import type {
   AvailableQuantumTypeInfo,
   AvailableTypeInfo,
   DimensionConstraints,
-  ObjectTypeEntry,
   QuantumTypeCompileContextField,
   QuantumTypeEntry,
   QuantumTypeEvolutionResetKind,
@@ -26,18 +26,91 @@ import type {
 } from './types'
 
 // ============================================================================
-// Core Lookups
+// Curated Per-ObjectType Display Strings
 // ============================================================================
 
 /**
- * Gets the registry entry for an object type.
- * O(1) lookup via Map.
+ * Display strings and recommended dimensions per ObjectType.
  *
- * @param type - The object type to look up
- * @returns The registry entry, or undefined if not found
+ * The flat {@link QUANTUM_TYPE_REGISTRY} has per-mode display strings; an
+ * ObjectType wraps potentially many modes (`schroedinger` wraps ten different
+ * quantum modes), so the per-ObjectType label/description and recommended
+ * default cannot be aggregated unambiguously and are curated here instead.
+ *
+ * `recommended` represents the typical default dimension for that ObjectType
+ * — `schroedinger=4` (rich quantum interference patterns with good
+ * performance, matches harmonicOscillator's default), `pauliSpinor=3`
+ * (intuitive spin dynamics in physical 3-space).
  */
-export function getObjectTypeEntry(type: ObjectType): ObjectTypeEntry | undefined {
-  return OBJECT_TYPE_REGISTRY.get(type)
+const OBJECT_TYPE_DISPLAY: Readonly<
+  Record<
+    ObjectType,
+    {
+      readonly name: string
+      readonly description: string
+      readonly recommended: number
+      readonly recommendedReason: string
+    }
+  >
+> = {
+  schroedinger: {
+    name: 'Schrödinger Slices',
+    description: 'Organic volumes from an N-dimensional wavefunction.',
+    recommended: 4,
+    recommendedReason: '4D provides rich quantum interference patterns with good performance',
+  },
+  pauliSpinor: {
+    name: 'Pauli Spinor',
+    description:
+      'Two-component spinor wavefunction in a magnetic field. Visualizes spin precession and Stern-Gerlach splitting.',
+    recommended: 3,
+    recommendedReason: '3D provides intuitive spin dynamics with magnetic field in physical space',
+  },
+}
+
+/** All ObjectType values that have at least one entry in QUANTUM_TYPE_REGISTRY. */
+const VALID_OBJECT_TYPES: ReadonlySet<ObjectType> = (() => {
+  const out = new Set<ObjectType>()
+  for (const [, entry] of QUANTUM_TYPE_REGISTRY) {
+    out.add(entry.internal.objectType)
+  }
+  return out
+})()
+
+/**
+ * Aggregate the dimension envelope for an ObjectType across every
+ * QUANTUM_TYPE_REGISTRY entry whose `internal.objectType` matches.
+ *
+ * `min` is the tightest lower bound any wrapped mode supports; `max` is the
+ * loosest upper bound. The result is the union of all wrapped modes' ranges
+ * — i.e. the set of dimensions for which AT LEAST ONE wrapped mode renders.
+ */
+function aggregateDimensions(type: ObjectType): DimensionConstraints | undefined {
+  let min = Infinity
+  let max = -Infinity
+  let found = false
+  for (const [, entry] of QUANTUM_TYPE_REGISTRY) {
+    if (entry.internal.objectType !== type) continue
+    if (entry.dimensions.min < min) min = entry.dimensions.min
+    if (entry.dimensions.max > max) max = entry.dimensions.max
+    found = true
+  }
+  if (!found) return undefined
+  const display = OBJECT_TYPE_DISPLAY[type]
+  return {
+    min,
+    max,
+    recommended: display?.recommended,
+    recommendedReason: display?.recommendedReason,
+  }
+}
+
+/** Return the first QUANTUM_TYPE_REGISTRY entry whose internal.objectType matches. */
+function firstEntryFor(type: ObjectType): QuantumTypeEntry | undefined {
+  for (const [, entry] of QUANTUM_TYPE_REGISTRY) {
+    if (entry.internal.objectType === type) return entry
+  }
+  return undefined
 }
 
 // ============================================================================
@@ -48,10 +121,14 @@ export function getObjectTypeEntry(type: ObjectType): ObjectTypeEntry | undefine
  * Checks if an object type uses raymarching.
  *
  * @param type - The object type
- * @returns true if the type uses raymarching
+ * @returns true if any wrapped quantum mode uses raymarching
  */
 export function isRaymarchingType(type: ObjectType): boolean {
-  return getObjectTypeEntry(type)?.rendering.renderMethod === 'raymarch'
+  for (const [, entry] of QUANTUM_TYPE_REGISTRY) {
+    if (entry.internal.objectType !== type) continue
+    if (entry.rendering.renderMethod === 'raymarch') return true
+  }
+  return false
 }
 
 // ============================================================================
@@ -59,23 +136,25 @@ export function isRaymarchingType(type: ObjectType): boolean {
 // ============================================================================
 
 /**
- * Gets dimension constraints for an object type.
+ * Gets dimension constraints for an object type, computed as the union of
+ * all wrapped quantum modes' dimension ranges.
  *
  * @param type - The object type
- * @returns The dimension constraints
+ * @returns The dimension constraints, or undefined if the ObjectType has no
+ *   QUANTUM_TYPE_REGISTRY entries
  */
 export function getDimensionConstraints(type: ObjectType): DimensionConstraints | undefined {
-  return getObjectTypeEntry(type)?.dimensions
+  return aggregateDimensions(type)
 }
 
 /**
  * Gets the recommended dimension for an object type.
  *
  * @param type - The object type
- * @returns The recommended dimension, or undefined
+ * @returns The curated recommended dimension, or undefined when unknown
  */
 export function getRecommendedDimension(type: ObjectType): number | undefined {
-  return getObjectTypeEntry(type)?.dimensions.recommended
+  return OBJECT_TYPE_DISPLAY[type]?.recommended
 }
 
 /**
@@ -112,25 +191,31 @@ export function getUnavailabilityReason(type: ObjectType, dimension: number): st
 }
 
 /**
- * Gets all available object types for a dimension.
+ * Gets all available object types for a dimension. Iteration order matches
+ * the QUANTUM_TYPE_REGISTRY insertion order — Schrödinger modes appear before
+ * the Pauli Spinor entry, so the resulting list is `[schroedinger, pauliSpinor]`.
  *
  * @param dimension - The current dimension
  * @returns Array of type info with availability status
  */
 export function getAvailableTypesForDimension(dimension: number): AvailableTypeInfo[] {
+  const seen = new Set<ObjectType>()
   const result: AvailableTypeInfo[] = []
-
-  for (const [type, entry] of OBJECT_TYPE_REGISTRY) {
+  for (const [, entry] of QUANTUM_TYPE_REGISTRY) {
+    const type = entry.internal.objectType
+    if (seen.has(type)) continue
+    seen.add(type)
+    const display = OBJECT_TYPE_DISPLAY[type]
+    if (!display) continue
     const available = isAvailableForDimension(type, dimension)
     result.push({
       type,
-      name: entry.name,
-      description: entry.description,
+      name: display.name,
+      description: display.description,
       available,
       disabledReason: available ? undefined : getUnavailabilityReason(type, dimension),
     })
   }
-
   return result
 }
 
@@ -142,20 +227,25 @@ export function getAvailableTypesForDimension(dimension: number): AvailableTypeI
  * Gets the controls component key for an object type.
  *
  * @param type - The object type
- * @returns The component key for dynamic loading
+ * @returns The component key for dynamic loading, or undefined
  */
 export function getControlsComponentKey(type: ObjectType): string | undefined {
-  return getObjectTypeEntry(type)?.ui.controlsComponentKey
+  return firstEntryFor(type)?.ui.controlsComponentKey
 }
 
 /**
- * Checks if an object type has timeline controls.
+ * Checks if an object type has timeline controls. Returns true when ANY
+ * wrapped quantum mode opts into the TimelineControls drawer.
  *
  * @param type - The object type
  * @returns true if the type shows in TimelineControls animation drawer
  */
 export function hasTimelineControls(type: ObjectType): boolean {
-  return getObjectTypeEntry(type)?.ui.hasTimelineControls ?? false
+  for (const [, entry] of QUANTUM_TYPE_REGISTRY) {
+    if (entry.internal.objectType !== type) continue
+    if (entry.ui.hasTimelineControls) return true
+  }
+  return false
 }
 
 // ============================================================================
@@ -170,7 +260,7 @@ export function hasTimelineControls(type: ObjectType): boolean {
  * @returns true if the string is a valid ObjectType
  */
 export function isValidObjectType(type: string): type is ObjectType {
-  return OBJECT_TYPE_REGISTRY.has(type as ObjectType)
+  return VALID_OBJECT_TYPES.has(type as ObjectType)
 }
 
 // ============================================================================
@@ -180,11 +270,16 @@ export function isValidObjectType(type: string): type is ObjectType {
 /**
  * Gets the config store key for an object type.
  *
+ * Every QUANTUM_TYPE_REGISTRY entry asserts `internal.configStoreKey ===
+ * internal.objectType` (validated by registry tests), so the ObjectType
+ * itself doubles as the store key.
+ *
  * @param type - The object type
  * @returns The key used in extendedObjectStore (e.g., 'schroedinger')
  */
 export function getConfigStoreKey(type: ObjectType): string | undefined {
-  return getObjectTypeEntry(type)?.configStoreKey
+  if (!VALID_OBJECT_TYPES.has(type)) return undefined
+  return type
 }
 
 // ============================================================================

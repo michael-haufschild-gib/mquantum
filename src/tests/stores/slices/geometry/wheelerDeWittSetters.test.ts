@@ -20,7 +20,7 @@ describe('wheelerDeWittSetters — render-only animation effects', () => {
     // observable as a transition from false → true (any render-only setter
     // must NOT flip it, so we expect false after calling each one).
     useExtendedObjectStore.getState().reset()
-    useExtendedObjectStore.getState().clearWdwNeedsReset()
+    useExtendedObjectStore.getState().clearComputeNeedsReset('wheelerDeWitt')
     expect(getWdw().needsReset).toBe(false)
   })
 
@@ -180,7 +180,7 @@ describe('wheelerDeWittSetters — render-only animation effects', () => {
 describe('wheelerDeWittSetters — applyWheelerDeWittPreset', () => {
   beforeEach(() => {
     useExtendedObjectStore.getState().reset()
-    useExtendedObjectStore.getState().clearWdwNeedsReset()
+    useExtendedObjectStore.getState().clearComputeNeedsReset('wheelerDeWitt')
     expect(getWdw().needsReset).toBe(false)
   })
 
@@ -224,7 +224,7 @@ describe('wheelerDeWittSetters — applyWheelerDeWittPreset', () => {
 
   it('leaves grid and range parameters at their pre-apply values', async () => {
     useExtendedObjectStore.getState().setWdwGridSize('high')
-    useExtendedObjectStore.getState().clearWdwNeedsReset()
+    useExtendedObjectStore.getState().clearComputeNeedsReset('wheelerDeWitt')
     const before = getWdw()
 
     await useExtendedObjectStore.getState().applyWheelerDeWittPreset('inflationHighMass')

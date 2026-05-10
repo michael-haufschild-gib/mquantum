@@ -71,7 +71,7 @@ export interface AntiDeSitterConfig {
   /** Preset identifier for UI dropdown. `custom` = user-edited state. */
   preset: AdsPresetName
   /** Runtime dirty flag — strategy re-packs the density texture on the next
-   * frame when true. Cleared via `clearAdsNeedsReset`. */
+   * frame when true. Cleared via `clearComputeNeedsReset('antiDeSitter')`. */
   needsReset: boolean
 
   // ── Stage 2A: BTZ black-hole thermal state ─────────────────────────────

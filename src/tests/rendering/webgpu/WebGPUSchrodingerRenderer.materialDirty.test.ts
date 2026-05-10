@@ -170,7 +170,9 @@ describe('WebGPUSchrodingerRenderer color algorithm uniform consistency', () => 
       ctx as unknown as Parameters<WebGPUSchrodingerRenderer['updateSchroedingerUniforms']>[0]
     )
 
-    expect((renderer['schroedingerIntView'] as Int32Array)[SCHROEDINGER_LAYOUT.index.colorAlgorithm]).toBe(9)
+    expect(
+      (renderer['schroedingerIntView'] as Int32Array)[SCHROEDINGER_LAYOUT.index.colorAlgorithm]
+    ).toBe(9)
   })
 
   it('keeps compile-time k-space algorithm in free scalar uniforms even if appearance is relative phase', () => {
@@ -191,7 +193,9 @@ describe('WebGPUSchrodingerRenderer color algorithm uniform consistency', () => 
       ctx as unknown as Parameters<WebGPUSchrodingerRenderer['updateSchroedingerUniforms']>[0]
     )
 
-    expect((renderer['schroedingerIntView'] as Int32Array)[SCHROEDINGER_LAYOUT.index.colorAlgorithm]).toBe(15)
+    expect(
+      (renderer['schroedingerIntView'] as Int32Array)[SCHROEDINGER_LAYOUT.index.colorAlgorithm]
+    ).toBe(15)
   })
 })
 

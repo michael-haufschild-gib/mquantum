@@ -109,7 +109,7 @@ export class PauliStrategy implements QuantumModeStrategy {
     )
 
     if (pauliConfig.needsReset) {
-      extended?.clearPauliNeedsReset?.()
+      extended?.clearComputeNeedsReset?.('pauliSpinor')
     }
 
     handleSimulationStateIO(ctx, pauliPass, ['pauliSpinor'])

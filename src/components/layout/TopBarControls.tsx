@@ -78,7 +78,6 @@ const REPRESENTATION_LABELS: Record<string, string> = {
   wigner: 'Wigner',
 }
 
-
 function getRepresentationLabel(representation: string): string {
   return REPRESENTATION_LABELS[representation] ?? 'Position'
 }

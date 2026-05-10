@@ -30,6 +30,7 @@ export interface ObservablesResources {
   momPartialBuffer: GPUBuffer
   momResultBuffer: GPUBuffer
   momStagingBuffer: GPUBuffer
+  totalSites: number
   numWorkgroups: number
   /** Position channels: 2 + 2 * latticeDim (includes ⟨V⟩) */
   posNumChannels: number
@@ -41,6 +42,22 @@ export interface ObservablesResources {
   esBinsBuffer: GPUBuffer
   /** Energy spectrum staging buffer for readback */
   esStagingBuffer: GPUBuffer
+}
+
+/**
+ * Clamp observable lattice dimensions to the fixed GPU channel layout.
+ */
+export function sanitizeObservablesLatticeDim(latticeDim: number): number {
+  if (!Number.isFinite(latticeDim)) return 1
+  return Math.max(1, Math.min(MAX_DIMENSION, Math.floor(latticeDim)))
+}
+
+/**
+ * Clamp observable site counts before sizing buffers or writing uniforms.
+ */
+export function sanitizeObservablesTotalSites(totalSites: number): number {
+  if (!Number.isFinite(totalSites)) return 1
+  return Math.max(1, Math.floor(totalSites))
 }
 
 /**
@@ -56,9 +73,11 @@ export function createObservablesBuffers(
   totalSites: number,
   latticeDim: number
 ): ObservablesResources {
-  const posNumChannels = 2 + 2 * latticeDim
-  const momNumChannels = 1 + 2 * latticeDim
-  const wgCount = Math.max(1, Math.ceil(totalSites / 256))
+  const safeLatticeDim = sanitizeObservablesLatticeDim(latticeDim)
+  const safeTotalSites = sanitizeObservablesTotalSites(totalSites)
+  const posNumChannels = 2 + 2 * safeLatticeDim
+  const momNumChannels = 1 + 2 * safeLatticeDim
+  const wgCount = Math.max(1, Math.ceil(safeTotalSites / 256))
 
   const uniformSize = 16 + 12 * 4 * 3 // ObsReduceUniforms: 4 scalars + 3 arrays of 12
   const posPartialSize = wgCount * posNumChannels * 4
@@ -105,6 +124,7 @@ export function createObservablesBuffers(
       resultSize,
       GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST
     ),
+    totalSites: safeTotalSites,
     numWorkgroups: wgCount,
     posNumChannels,
     momNumChannels,
@@ -165,10 +185,16 @@ export function processObservablesReadback(
   hbar: number,
   mass = 1
 ): ObservablesSnapshot | null {
+  if (!Number.isFinite(hbar) || hbar <= 0) return null
+  if (!Number.isFinite(mass) || mass <= 0) return null
+
+  const safeLatticeDim = sanitizeObservablesLatticeDim(latticeDim)
   const posNorm = posData[0]!
   const momNorm = momData[0]!
 
-  if (posNorm <= 0 || momNorm <= 0) return null
+  if (!Number.isFinite(posNorm) || !Number.isFinite(momNorm) || posNorm <= 0 || momNorm <= 0) {
+    return null
+  }
 
   const positionMean = new Float64Array(MAX_DIMENSION)
   const positionVariance = new Float64Array(MAX_DIMENSION)
@@ -178,7 +204,7 @@ export function processObservablesReadback(
 
   let kineticEnergy = 0
 
-  for (let d = 0; d < latticeDim; d++) {
+  for (let d = 0; d < safeLatticeDim; d++) {
     const meanX = posData[1 + d * 2]! / posNorm
     const meanX2 = posData[2 + d * 2]! / posNorm
     const varX = Math.max(0, meanX2 - meanX * meanX)
@@ -187,22 +213,38 @@ export function processObservablesReadback(
     const meanK2 = momData[2 + d * 2]! / momNorm
     const varK = Math.max(0, meanK2 - meanK * meanK)
     const varP = varK * hbar * hbar
+    const momentum = meanK * hbar
+    const uncertainty = Math.sqrt(varX) * Math.sqrt(varP)
+
+    if (
+      !Number.isFinite(meanX) ||
+      !Number.isFinite(varX) ||
+      !Number.isFinite(momentum) ||
+      !Number.isFinite(varP) ||
+      !Number.isFinite(uncertainty) ||
+      !Number.isFinite(meanK2)
+    ) {
+      return null
+    }
 
     positionMean[d] = meanX
     positionVariance[d] = varX
-    momentumMean[d] = meanK * hbar
+    momentumMean[d] = momentum
     momentumVariance[d] = varP
-    uncertaintyProduct[d] = Math.sqrt(varX) * Math.sqrt(varP)
+    uncertaintyProduct[d] = uncertainty
 
     kineticEnergy += (hbar * hbar * meanK2) / (2 * mass)
   }
 
   // Potential energy: last channel in position data = Σ V(x)|ψ|² dV
-  const potentialEnergyRaw = posData[1 + 2 * latticeDim]
+  const potentialEnergyRaw = posData[1 + 2 * safeLatticeDim]
+  if (potentialEnergyRaw != null && !Number.isFinite(potentialEnergyRaw)) return null
   const potentialEnergy = potentialEnergyRaw != null ? potentialEnergyRaw / posNorm : 0
+  const totalEnergy = kineticEnergy + potentialEnergy
+  if (!Number.isFinite(totalEnergy)) return null
 
   const minUncertainty = hbar / 2
-  for (let d = 0; d < latticeDim; d++) {
+  for (let d = 0; d < safeLatticeDim; d++) {
     if (uncertaintyProduct[d]! < minUncertainty * 0.9) {
       logger.warn(
         `[Observables] ΔxΔp[${d}] = ${uncertaintyProduct[d]!.toFixed(4)} < ℏ/2 = ${minUncertainty.toFixed(4)} — numerical issue`
@@ -211,13 +253,13 @@ export function processObservablesReadback(
   }
 
   return {
-    activeDims: latticeDim,
+    activeDims: safeLatticeDim,
     positionMean,
     positionVariance,
     momentumMean,
     momentumVariance,
     uncertaintyProduct,
-    totalEnergy: kineticEnergy + potentialEnergy,
+    totalEnergy,
     positionNorm: posNorm,
     momentumNorm: momNorm,
   }

@@ -53,7 +53,13 @@ import {
 } from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
 import { assembleShaderBlocks } from '../shaders/shared/compose-helpers'
 import { createComputeBGL } from '../utils/computeBindGroupLayout'
-export { rebuildDiracBuffers } from './DiracComputePassBuffers'
+import type {
+  DiracBindGroupInputs,
+  DiracBindGroupResult,
+  DiracPassHelpers,
+  DiracPipelineResult,
+} from './DiracComputePassResources'
+
 export type {
   DiracBindGroupInputs,
   DiracBindGroupResult,
@@ -61,13 +67,8 @@ export type {
   DiracDestroyableBuffers,
   DiracPassHelpers,
   DiracPipelineResult,
-} from './DiracComputePassTypes'
-import type {
-  DiracBindGroupInputs,
-  DiracBindGroupResult,
-  DiracPassHelpers,
-  DiracPipelineResult,
-} from './DiracComputePassTypes'
+} from './DiracComputePassResources'
+export { rebuildDiracBuffers } from './DiracComputePassResources'
 
 // ───────────────────────────────────────────────────────────────────────────
 // rebuildDiracBuffers

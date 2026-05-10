@@ -1,5 +1,5 @@
 /**
- * Scene-level matrix utilities for gizmo hit testing and camera projection.
+ * Scene-level math helpers for sizing, gizmo hit testing, and camera projection.
  *
  * Delegates to {@link @/rendering/webgpu/utils/mat4} for core mat4 operations.
  * No WebGPU dependencies.
@@ -8,6 +8,31 @@
  */
 
 import { writeInvertMat4, writeMultiplyMat4 } from './mat4'
+
+/** Sanitizes one pixel extent for GPU texture/canvas use. */
+export function sanitizePixelExtent(value: number): number {
+  return Number.isFinite(value) && value > 0 ? Math.max(1, Math.floor(value)) : 1
+}
+
+/** Sanitizes a width/height pair for GPU texture/canvas use. */
+export function sanitizePixelSize(
+  width: number,
+  height: number
+): { width: number; height: number } {
+  return {
+    width: sanitizePixelExtent(width),
+    height: sanitizePixelExtent(height),
+  }
+}
+
+/** Resolves CSS dimensions and DPR into a non-zero integer backing size. */
+export function resolveCanvasPixelSize(
+  cssWidth: number,
+  cssHeight: number,
+  devicePixelRatio: number
+): { width: number; height: number } {
+  return sanitizePixelSize(cssWidth * devicePixelRatio, cssHeight * devicePixelRatio)
+}
 
 /**
  * Multiply two column-major 4x4 matrices.

@@ -28,9 +28,12 @@ import {
   LINEAR_WG as LINEAR_WORKGROUP_SIZE,
   sanitizeGridSizes,
 } from './computePassUtils'
-import { rebuildFsfFieldBuffers } from './FreeScalarFieldComputePassBuffers'
-import { disposeFsfPassGpu, type FsfGpuFields } from './FreeScalarFieldComputePassDispose'
-import { initializeFsfField } from './FreeScalarFieldComputePassInit'
+import {
+  disposeFsfPassGpu,
+  type FsfGpuFields,
+  initializeFsfField,
+  rebuildFsfFieldBuffers,
+} from './FreeScalarFieldComputePassResources'
 import type {
   FsfBindGroupResult,
   FsfPassHelpers,
