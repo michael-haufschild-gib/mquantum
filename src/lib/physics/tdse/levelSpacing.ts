@@ -45,22 +45,43 @@ export interface LevelSpacingResult {
  * 1. Sort energies in ascending order
  * 2. Compute nearest-neighbor spacings
  * 3. Unfold: normalize spacings by their mean so ⟨s⟩ = 1
- * 4. Fit Brody parameter via maximum likelihood
+ * 4. Fit Brody parameter by minimizing the KS statistic
  * 5. Classify
  *
- * @param energies - Array of eigenvalues (at least 3)
+ * @param energies - Array of eigenvalues. Non-finite entries are ignored.
  * @param iprs - Optional array of IPR values (same length as energies)
  * @returns Level spacing statistics and classification
  */
 export function computeLevelSpacing(energies: number[], iprs?: number[]): LevelSpacingResult {
+  const finiteEnergies: number[] = []
+  const finiteEnergyIpRs: number[] | undefined = iprs ? [] : undefined
+  for (let i = 0; i < energies.length; i++) {
+    const energy = energies[i]!
+    if (!Number.isFinite(energy)) continue
+    finiteEnergies.push(energy)
+    if (finiteEnergyIpRs && Number.isFinite(iprs![i])) finiteEnergyIpRs.push(iprs![i]!)
+  }
+  const meanIPR = computeMeanFinite(finiteEnergyIpRs)
+
+  if (finiteEnergies.length < 2) {
+    return {
+      energies: [...finiteEnergies].sort((a, b) => a - b),
+      spacings: [],
+      meanSpacing: 0,
+      brodyBeta: 0,
+      classification: 'poisson',
+      meanIPR,
+    }
+  }
+
   // ── WASM fast path ──────────────────────────────────────────────────
-  if (energies.length >= WASM_LEVEL_SPACING_MIN_ENERGIES && isAnimationWasmReady()) {
-    const wasmResult = tryLevelSpacingWasm(energies, iprs)
+  if (finiteEnergies.length >= WASM_LEVEL_SPACING_MIN_ENERGIES && isAnimationWasmReady()) {
+    const wasmResult = tryLevelSpacingWasm(finiteEnergies, meanIPR)
     if (wasmResult) return wasmResult
   }
 
   // ── JS fallback ─────────────────────────────────────────────────────
-  const sorted = [...energies].sort((a, b) => a - b)
+  const sorted = [...finiteEnergies].sort((a, b) => a - b)
 
   // Nearest-neighbor spacings
   const rawSpacings: number[] = []
@@ -81,11 +102,6 @@ export function computeLevelSpacing(energies: number[], iprs?: number[]): LevelS
   else if (brodyBeta > 0.7) classification = 'wigner-dyson'
   else classification = 'intermediate'
 
-  // Mean IPR
-  const validIPRs = iprs?.filter((v) => Number.isFinite(v)) ?? []
-  const meanIPR =
-    validIPRs.length > 0 ? validIPRs.reduce((a, b) => a + b, 0) / validIPRs.length : NaN
-
   return {
     energies: sorted,
     spacings,
@@ -94,6 +110,11 @@ export function computeLevelSpacing(energies: number[], iprs?: number[]): LevelS
     classification,
     meanIPR,
   }
+}
+
+function computeMeanFinite(values: number[] | undefined): number {
+  const finite = values?.filter(Number.isFinite) ?? []
+  return finite.length > 0 ? finite.reduce((a, b) => a + b, 0) / finite.length : NaN
 }
 
 /**
@@ -240,7 +261,7 @@ const CLASSIFICATION_MAP: LevelSpacingResult['classification'][] = [
  *
  * @returns LevelSpacingResult if WASM succeeded, null otherwise
  */
-function tryLevelSpacingWasm(energies: number[], iprs?: number[]): LevelSpacingResult | null {
+function tryLevelSpacingWasm(energies: number[], meanIPR: number): LevelSpacingResult | null {
   const energiesF64 = new Float64Array(energies)
   const packed = computeLevelSpacingWasm(energiesF64)
 
@@ -279,11 +300,6 @@ function tryLevelSpacingWasm(energies: number[], iprs?: number[]): LevelSpacingR
 
   // Sort energies (same as JS path)
   const sorted = [...energies].sort((a, b) => a - b)
-
-  // Mean IPR (computed in TS — trivial operation)
-  const validIPRs = iprs?.filter((v) => Number.isFinite(v)) ?? []
-  const meanIPR =
-    validIPRs.length > 0 ? validIPRs.reduce((a, b) => a + b, 0) / validIPRs.length : NaN
 
   return {
     energies: sorted,

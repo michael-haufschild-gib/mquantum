@@ -12,6 +12,8 @@
  * @module rendering/webgpu/shaders/schroedinger/quantum/analyticalGradient.wgsl
  */
 
+import { sanitizeShaderDimension, sanitizeShaderTermCount } from '../../shared/compose-helpers'
+
 /**
  * Generate the analytical gradient block for a specific dimension.
  * Unrolled loops for compile-time dimension specialization.
@@ -21,9 +23,10 @@
  * @returns WGSL code for analytical gradient computation
  */
 export function generateAnalyticalGradientBlock(dimension: number, termCount?: number): string {
-  const dim = Math.min(Math.max(dimension, 3), 11)
-  const useUnrolledTerms = termCount !== undefined && termCount >= 1 && termCount <= 8
-  const tc = useUnrolledTerms ? Math.min(Math.max(termCount!, 1), 8) : 0
+  const dim = sanitizeShaderDimension(dimension, { min: 3, fallback: 3 })
+  const sanitizedTermCount = sanitizeShaderTermCount(termCount)
+  const useUnrolledTerms = sanitizedTermCount !== undefined
+  const tc = sanitizedTermCount ?? 0
 
   // Generate unrolled phi loading for all dims
   function genLoadPhis(kExpr: string): string {

@@ -37,6 +37,61 @@ export interface WGSLShaderConfig {
   overrides?: Array<{ target: string; replacement: string }>
 }
 
+/** Valid compile-time HO specialization term count. */
+export type ShaderTermCount = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
+
+/** Density-grid storage texture formats supported by the shader composer. */
+export type DensityGridStorageFormat = 'r16float' | 'rgba16float'
+
+/** Bounds for compile-time integer shader dimensions. */
+interface ShaderDimensionOptions {
+  min?: number
+  max?: number
+  fallback?: number
+}
+
+/**
+ * Convert runtime dimension input into a finite integer WGSL specialization value.
+ * @param dimension - Runtime dimension candidate.
+ * @param options - Dimension bounds and fallback.
+ * @returns Integer dimension clamped to the configured range.
+ */
+export function sanitizeShaderDimension(
+  dimension: number,
+  options: ShaderDimensionOptions = {}
+): number {
+  const min = options.min ?? 2
+  const max = options.max ?? 11
+  const fallback = options.fallback ?? min
+  const finiteDimension = Number.isFinite(dimension) ? dimension : fallback
+  return Math.max(min, Math.min(max, Math.floor(finiteDimension)))
+}
+
+/**
+ * Convert runtime HO term-count input into a valid unrolled specialization.
+ * @param termCount - Runtime term-count candidate.
+ * @returns Clamped term count, or undefined when specialization should be disabled.
+ */
+export function sanitizeShaderTermCount(termCount: unknown): ShaderTermCount | undefined {
+  if (typeof termCount !== 'number' || !Number.isFinite(termCount)) return undefined
+  const wholeTermCount = Math.floor(termCount)
+  if (wholeTermCount < 1) return undefined
+  return Math.min(wholeTermCount, 8) as ShaderTermCount
+}
+
+/**
+ * Restrict density-grid storage format to composer-supported WGSL texture formats.
+ * @param storageFormat - Runtime storage format candidate.
+ * @param fallback - Safe format used when input is invalid.
+ * @returns Supported storage texture format.
+ */
+export function sanitizeDensityGridStorageFormat(
+  storageFormat: unknown,
+  fallback: DensityGridStorageFormat = 'r16float'
+): DensityGridStorageFormat {
+  return storageFormat === 'r16float' || storageFormat === 'rgba16float' ? storageFormat : fallback
+}
+
 /**
  * Assemble shader blocks into complete WGSL source.
  * @param blocks

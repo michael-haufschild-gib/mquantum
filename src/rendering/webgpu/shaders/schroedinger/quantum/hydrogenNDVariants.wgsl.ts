@@ -12,6 +12,8 @@
  * @module rendering/webgpu/shaders/schroedinger/quantum/hydrogenNDVariants.wgsl
  */
 
+import { sanitizeShaderDimension } from '../../shared/compose-helpers'
+
 /**
  * Early-exit threshold for extra dimensions.
  * Uses 3-sigma threshold: sum of squared scaled coords > 18 means contribution < 1e-8
@@ -257,7 +259,7 @@ ${extraDimEnergy}
  * @returns WGSL dispatch block code
  */
 export function generateHydrogenNDDispatchBlock(dimension: number): string {
-  const dim = Math.min(Math.max(dimension, 2), 11)
+  const dim = sanitizeShaderDimension(dimension, { min: 2, fallback: 3 })
   return `
 // ============================================
 // Hydrogen ND - Compile-time Dispatch
@@ -386,7 +388,7 @@ ${extraDimEnergy}
  * @returns WGSL dispatch block code
  */
 export function generateHydrogenNDCachedDispatchBlock(dimension: number): string {
-  const dim = Math.min(Math.max(dimension, 2), 11)
+  const dim = sanitizeShaderDimension(dimension, { min: 2, fallback: 3 })
   if (dim <= 3) {
     // 2D/3D hydrogen has no extra dimensions to cache, fall back to non-cached
     return generateHydrogenNDDispatchBlock(dim)

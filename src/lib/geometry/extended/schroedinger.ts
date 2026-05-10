@@ -817,6 +817,78 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   openQuantum: DEFAULT_OPEN_QUANTUM_CONFIG,
 }
 
+/** Sanitized hydrogen quantum fields safe for store state and GPU uniforms. */
+export interface SanitizedHydrogenQuantumState {
+  principalQuantumNumber: number
+  azimuthalQuantumNumber: number
+  magneticQuantumNumber: number
+  bohrRadiusScale: number
+}
+
+type HydrogenQuantumStateInput = Partial<SanitizedHydrogenQuantumState>
+
+function finiteOrFallback(
+  value: number | undefined,
+  fallback: number,
+  defaultValue: number
+): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (Number.isFinite(fallback)) return fallback
+  return defaultValue
+}
+
+function clampFloored(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, Math.floor(value)))
+}
+
+/**
+ * Normalize hydrogen quantum fields shared by store bulk updates and GPU packing.
+ *
+ * Direct UI setters reject non-finite values; bulk scene/preset loads and tests
+ * can bypass those setters, so callers use previous state as fallback.
+ */
+export function sanitizeHydrogenQuantumState(
+  input: HydrogenQuantumStateInput | null | undefined,
+  fallback: HydrogenQuantumStateInput = DEFAULT_SCHROEDINGER_CONFIG
+): SanitizedHydrogenQuantumState {
+  const defaultState = DEFAULT_SCHROEDINGER_CONFIG
+  const rawN = finiteOrFallback(
+    input?.principalQuantumNumber,
+    fallback.principalQuantumNumber ?? defaultState.principalQuantumNumber,
+    defaultState.principalQuantumNumber
+  )
+  const principalQuantumNumber = clampFloored(rawN, 1, 7)
+
+  const rawL = finiteOrFallback(
+    input?.azimuthalQuantumNumber,
+    fallback.azimuthalQuantumNumber ?? defaultState.azimuthalQuantumNumber,
+    defaultState.azimuthalQuantumNumber
+  )
+  const azimuthalQuantumNumber = clampFloored(rawL, 0, principalQuantumNumber - 1)
+
+  const rawM = finiteOrFallback(
+    input?.magneticQuantumNumber,
+    fallback.magneticQuantumNumber ?? defaultState.magneticQuantumNumber,
+    defaultState.magneticQuantumNumber
+  )
+  const magneticQuantumNumber =
+    Math.max(-azimuthalQuantumNumber, Math.min(azimuthalQuantumNumber, Math.floor(rawM))) || 0
+
+  const rawBohrRadius = finiteOrFallback(
+    input?.bohrRadiusScale,
+    fallback.bohrRadiusScale ?? defaultState.bohrRadiusScale,
+    defaultState.bohrRadiusScale
+  )
+  const bohrRadiusScale = Math.max(0.5, Math.min(3.0, rawBohrRadius))
+
+  return {
+    principalQuantumNumber,
+    azimuthalQuantumNumber,
+    magneticQuantumNumber,
+    bohrRadiusScale,
+  }
+}
+
 /**
  * Create a fresh copy of the default Schroedinger config.
  *

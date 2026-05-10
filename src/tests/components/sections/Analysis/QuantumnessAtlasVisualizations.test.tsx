@@ -80,6 +80,18 @@ describe('ErosionCurves', () => {
     )
     expect(screen.getAllByTestId('diag-polyline').length).toBe(3)
   })
+
+  it('falls back when fewer than 2 finite gamma points are plottable', () => {
+    render(
+      <ErosionCurves
+        data={[
+          { gamma: Number.NaN, entanglement: 0.3, wigner: 0.2, ipr: 0.1 },
+          { gamma: 0.5, entanglement: 0.6, wigner: 0.4, ipr: 0.3 },
+        ]}
+      />
+    )
+    expect(screen.getByText(/Need ≥ 2 γ points for curves/)).toBeInTheDocument()
+  })
 })
 
 // ─── DiagnosticScatter ───────────────────────────────────────────────────────
@@ -115,13 +127,18 @@ describe('DiagnosticScatter', () => {
     expect(screen.getByText(/● 5D/)).toBeInTheDocument()
   })
 
-  it('keeps scatter coordinates finite when wigner negativity is non-finite', () => {
-    const results = [makeAtlasPoint({ avgWignerNegativity: Infinity })]
+  it('skips scatter points with non-finite plotted metrics', () => {
+    const results = [
+      makeAtlasPoint({ dim: 3, avgNormalizedEntropy: 0.4, avgWignerNegativity: 0.2 }),
+      makeAtlasPoint({ dim: 4, avgWignerNegativity: Infinity }),
+      makeAtlasPoint({ dim: 5, avgNormalizedEntropy: Number.NaN }),
+    ]
     render(<DiagnosticScatter results={results} />)
 
     const [point] = screen.getAllByTestId('diagnostic-scatter-point') as [HTMLElement]
     expect(point).toHaveAttribute('cx', expect.stringMatching(/^-?(?:\d+|\d*\.\d+)$/))
     expect(point).toHaveAttribute('cy', expect.stringMatching(/^-?(?:\d+|\d*\.\d+)$/))
+    expect(screen.getAllByTestId('diagnostic-scatter-point')).toHaveLength(1)
   })
 })
 
@@ -154,6 +171,28 @@ describe('TripleHeatmap', () => {
     expect(screen.getByText('S̄/logM')).toBeInTheDocument()
     expect(screen.getByText('N̄_W')).toBeInTheDocument()
     expect(screen.getByText('IPR')).toBeInTheDocument()
+  })
+
+  it('skips heatmap cells with non-finite axes or diagnostic values', () => {
+    render(
+      <TripleHeatmap
+        gamma={0}
+        results={[
+          makeAtlasPoint({ gamma: 0, lambda: 1, dim: 3 }),
+          makeAtlasPoint({ gamma: 0, lambda: Number.NaN, dim: 3 }),
+          makeAtlasPoint({ gamma: 0, lambda: 2, dim: Infinity }),
+          makeAtlasPoint({ gamma: 0, lambda: 3, dim: 4, avgIPR: Number.NaN }),
+        ]}
+      />
+    )
+
+    const rects = screen.getAllByTestId('diag-heatmap-cell')
+    expect(rects).toHaveLength(5)
+    for (const rect of rects) {
+      expect(rect).toHaveAttribute('x', expect.stringMatching(/^-?(?:\d+|\d*\.\d+)$/))
+      expect(rect).toHaveAttribute('y', expect.stringMatching(/^-?(?:\d+|\d*\.\d+)$/))
+      expect(rect).toHaveAttribute('opacity', expect.stringMatching(/^-?(?:\d+|\d*\.\d+)$/))
+    }
   })
 })
 
@@ -213,5 +252,17 @@ describe('DimensionComparison', () => {
     )
     expect(screen.getByText('3')).toBeInTheDocument()
     expect(screen.getByText('7')).toBeInTheDocument()
+  })
+
+  it('falls back when fewer than 2 finite dimensions are plottable', () => {
+    render(
+      <DimensionComparison
+        data={[
+          { dim: Number.NaN, entanglement: 0.3, wigner: 0.2, ipr: 0.1 },
+          { dim: 7, entanglement: 0.8, wigner: 0.5, ipr: 0.4 },
+        ]}
+      />
+    )
+    expect(screen.getByText(/Need ≥ 2 dimensions for comparison/)).toBeInTheDocument()
   })
 })

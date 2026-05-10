@@ -12,6 +12,7 @@ import {
   MAX_OBS_CHANNELS,
   type ObservablesResources,
   processObservablesReadback,
+  sanitizeObservablesLatticeDim,
 } from './ObservablesComputeSetup'
 import type { TdsePipelineResult } from './TDSEComputePassSetup'
 
@@ -150,35 +151,51 @@ export function writeObservablesUniforms(
 ): void {
   const res = state.obsResources
   if (!res) return
+  const latticeDim = sanitizeObservablesLatticeDim(config.latticeDim)
+  const totalSites = res.totalSites
+  const hbar = Number.isFinite(config.hbar) && config.hbar > 0 ? config.hbar : 1
+  const mass = Number.isFinite(config.mass) && config.mass > 0 ? config.mass : 1
+  const gridAt = (d: number): number => {
+    const value = config.gridSize[d]
+    return Number.isFinite(value) && value! > 0 ? Math.floor(value!) : 64
+  }
+  const strideAt = (d: number): number => {
+    const value = strides[d]
+    return Number.isFinite(value) && value! > 0 ? Math.floor(value!) : 1
+  }
+  const spacingAt = (d: number): number => {
+    const value = effSpacing[d]
+    return Number.isFinite(value) && value! > 0 ? value! : 0.1
+  }
 
   // Effective spacing accounts for KK compactification and torus metrics.
-  const effSpacing = computeTdseEffectiveSpacing(config)
+  const effSpacing = computeTdseEffectiveSpacing({ ...config, latticeDim })
 
   const uniformSize = 16 + 12 * 4 * 3
   const obsBuf = new ArrayBuffer(uniformSize)
   const obsU32 = new Uint32Array(obsBuf)
   const obsF32 = new Float32Array(obsBuf)
-  obsU32[0] = state.totalSites
+  obsU32[0] = totalSites
   obsU32[1] = res.numWorkgroups
-  obsU32[2] = config.latticeDim
+  obsU32[2] = latticeDim
   obsU32[3] = res.posNumChannels
-  for (let d = 0; d < config.latticeDim; d++) obsU32[4 + d] = config.gridSize[d] ?? 64
-  for (let d = 0; d < config.latticeDim; d++) obsU32[16 + d] = strides[d] ?? 1
-  for (let d = 0; d < config.latticeDim; d++) obsF32[28 + d] = effSpacing[d] ?? 0.1
+  for (let d = 0; d < latticeDim; d++) obsU32[4 + d] = gridAt(d)
+  for (let d = 0; d < latticeDim; d++) obsU32[16 + d] = strideAt(d)
+  for (let d = 0; d < latticeDim; d++) obsF32[28 + d] = spacingAt(d)
   device.queue.writeBuffer(res.posUniformBuffer, 0, obsBuf)
 
   const momBuf = new ArrayBuffer(uniformSize)
   const momU32 = new Uint32Array(momBuf)
   const momF32 = new Float32Array(momBuf)
-  momU32[0] = state.totalSites
+  momU32[0] = totalSites
   momU32[1] = res.numWorkgroups
-  momU32[2] = config.latticeDim
+  momU32[2] = latticeDim
   momU32[3] = res.momNumChannels
-  for (let d = 0; d < config.latticeDim; d++) momU32[4 + d] = config.gridSize[d] ?? 64
-  for (let d = 0; d < config.latticeDim; d++) momU32[16 + d] = strides[d] ?? 1
-  for (let d = 0; d < config.latticeDim; d++) {
-    const Nd = config.gridSize[d] ?? 64
-    const ad = effSpacing[d] ?? 0.1
+  for (let d = 0; d < latticeDim; d++) momU32[4 + d] = gridAt(d)
+  for (let d = 0; d < latticeDim; d++) momU32[16 + d] = strideAt(d)
+  for (let d = 0; d < latticeDim; d++) {
+    const Nd = gridAt(d)
+    const ad = spacingAt(d)
     momF32[28 + d] = (2 * Math.PI) / (Nd * ad)
   }
   device.queue.writeBuffer(res.momUniformBuffer, 0, momBuf)
@@ -188,26 +205,26 @@ export function writeObservablesUniforms(
   const esBuf = new ArrayBuffer(176)
   const esU32 = new Uint32Array(esBuf)
   const esF32 = new Float32Array(esBuf)
-  esU32[0] = state.totalSites
+  esU32[0] = totalSites
   esU32[1] = NUM_ENERGY_BINS
   // Auto-compute energy range from lattice: E_max = ℏ²/(2m) * (π/a_min)² * D
-  const aMin = Math.min(...effSpacing.slice(0, config.latticeDim))
+  const aMin = Math.min(...Array.from({ length: latticeDim }, (_, d) => spacingAt(d)))
   const kMax = Math.PI / aMin
-  const eMaxAuto = (config.hbar * config.hbar * kMax * kMax * config.latticeDim) / (2 * config.mass)
+  const eMaxAuto = (hbar * hbar * kMax * kMax * latticeDim) / (2 * mass)
   esF32[2] = 0 // eMin
   esF32[3] = eMaxAuto // eMax
-  esF32[4] = config.hbar
-  esF32[5] = config.mass
-  esU32[6] = config.latticeDim
+  esF32[4] = hbar
+  esF32[5] = mass
+  esU32[6] = latticeDim
   esU32[7] = 0 // pad
   // gridSize at offset 32 (index 8)
-  for (let d = 0; d < config.latticeDim; d++) esU32[8 + d] = config.gridSize[d] ?? 64
+  for (let d = 0; d < latticeDim; d++) esU32[8 + d] = gridAt(d)
   // strides at offset 80 (index 20)
-  for (let d = 0; d < config.latticeDim; d++) esU32[20 + d] = strides[d] ?? 1
+  for (let d = 0; d < latticeDim; d++) esU32[20 + d] = strideAt(d)
   // kGridScale at offset 128 (index 32)
-  for (let d = 0; d < config.latticeDim; d++) {
-    const Nd = config.gridSize[d] ?? 64
-    const ad = effSpacing[d] ?? 0.1
+  for (let d = 0; d < latticeDim; d++) {
+    const Nd = gridAt(d)
+    const ad = spacingAt(d)
     esF32[32 + d] = (2 * Math.PI) / (Nd * ad)
   }
   device.queue.writeBuffer(res.esUniformBuffer, 0, esBuf)
@@ -249,7 +266,7 @@ export function dispatchObservablesReadback(
   const posStaging = res.posStagingBuffer
   const momStaging = res.momStagingBuffer
   const esStaging = res.esStagingBuffer
-  const latticeDim = config.latticeDim
+  const latticeDim = sanitizeObservablesLatticeDim(config.latticeDim)
   const hbar = config.hbar
   const mass = config.mass ?? 1
   const gen = state.diagGeneration

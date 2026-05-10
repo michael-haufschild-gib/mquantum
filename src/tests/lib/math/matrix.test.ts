@@ -445,6 +445,24 @@ describe('Matrix Operations', () => {
       expect(result[2]).toBeCloseTo(43, 5)
       expect(result[3]).toBeCloseTo(50, 5)
     })
+
+    it('throws when out parameter is not the matrix size', () => {
+      const a = mat([
+        [1, 2],
+        [3, 4],
+      ])
+      const b = mat([
+        [5, 6],
+        [7, 8],
+      ])
+
+      expect(() => multiplyMatrices(a, b, new Float32Array(3))).toThrow(
+        'Output matrix dimensions incompatible'
+      )
+      expect(() => multiplyMatrices(a, b, new Float32Array(5))).toThrow(
+        'Output matrix dimensions incompatible'
+      )
+    })
   })
 
   describe('multiplyMatricesInto (5x5 generic path)', () => {

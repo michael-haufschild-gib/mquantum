@@ -176,4 +176,37 @@ describe('flattenPresetForUniforms', () => {
       expect(energy[k]).toBe(0)
     }
   })
+
+  it('sanitizes malformed preset values before GPU upload arrays', () => {
+    const preset: QuantumPreset = {
+      termCount: 2,
+      omega: [Number.NaN, Number.POSITIVE_INFINITY, 0.5],
+      quantumNumbers: [[Number.NaN, Number.POSITIVE_INFINITY, -2, 6.4], [2]],
+      coefficients: [
+        [Number.NaN, 0.25],
+        [Number.NEGATIVE_INFINITY, 0.5],
+      ],
+      energies: [Number.NaN, Number.POSITIVE_INFINITY],
+    }
+
+    const { omega, quantum, coeff, energy } = flattenPresetForUniforms(preset)
+
+    expect(Array.from(omega)).toEqual([1, 1, 0.5, 0, 0, 0, 0, 0, 0, 0, 0])
+    expect(quantum[0]).toBe(0)
+    expect(quantum[1]).toBe(0)
+    expect(quantum[2]).toBe(0)
+    expect(quantum[3]).toBe(6)
+    expect(quantum[MAX_DIM]).toBe(2)
+    expect(Array.from(coeff.slice(0, 4))).toEqual([0, 0.25, 0, 0.5])
+    expect(Array.from(energy.slice(0, 2))).toEqual([0, 0])
+
+    for (const value of [
+      ...Array.from(omega),
+      ...Array.from(quantum),
+      ...Array.from(coeff),
+      ...Array.from(energy),
+    ]) {
+      expect(Number.isFinite(value)).toBe(true)
+    }
+  })
 })

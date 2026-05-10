@@ -594,6 +594,11 @@ export function exportFilename(prefix: string, extension: string): string {
 const ATLAS_CSV_HEADER =
   'dim,lambda,gamma,avg_normalized_entropy,var_normalized_entropy,avg_wigner_negativity,var_wigner_negativity,avg_ipr,var_ipr,grid_size,total_samples,measurement_samples'
 
+/** Serialize one atlas numeric CSV cell, leaving missing/non-finite metrics blank. */
+function atlasCsvNumber(value: number): string {
+  return Number.isFinite(value) ? String(value) : ''
+}
+
 /**
  * Serialize atlas sweep results to CSV.
  *
@@ -603,18 +608,18 @@ const ATLAS_CSV_HEADER =
 export function atlasResultsToCSV(results: AtlasPoint[]): string {
   const rows = results.map((p) =>
     [
-      p.dim,
-      p.lambda,
-      p.gamma,
-      p.avgNormalizedEntropy,
-      p.varNormalizedEntropy,
-      p.avgWignerNegativity,
-      p.varWignerNegativity,
-      p.avgIPR,
-      p.varIPR,
-      p.gridSizePerDim,
-      p.totalSamples,
-      p.measurementSamples,
+      atlasCsvNumber(p.dim),
+      atlasCsvNumber(p.lambda),
+      atlasCsvNumber(p.gamma),
+      atlasCsvNumber(p.avgNormalizedEntropy),
+      atlasCsvNumber(p.varNormalizedEntropy),
+      atlasCsvNumber(p.avgWignerNegativity),
+      atlasCsvNumber(p.varWignerNegativity),
+      atlasCsvNumber(p.avgIPR),
+      atlasCsvNumber(p.varIPR),
+      atlasCsvNumber(p.gridSizePerDim),
+      atlasCsvNumber(p.totalSamples),
+      atlasCsvNumber(p.measurementSamples),
     ].join(',')
   )
   return [ATLAS_CSV_HEADER, ...rows].join('\n')

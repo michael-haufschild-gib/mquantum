@@ -16,6 +16,7 @@ export {
   SKYBOX_SELECTION_SET,
   SKYBOX_TEXTURE_SET,
 } from './presetNormalizationShared'
+import { normalizeOpaqueHexColor } from '@/lib/colors/colorUtils'
 import type { LightSource, LightType } from '@/rendering/lights/types'
 import {
   clampConeAngle,
@@ -174,6 +175,15 @@ export function normalizeEnvironmentLoadData(
   for (const key of ENVIRONMENT_LOAD_KEYS) {
     if (key in environment) {
       normalized[key] = environment[key]
+    }
+  }
+
+  if ('backgroundColor' in normalized) {
+    const normalizedBackgroundColor = normalizeOpaqueHexColor(normalized.backgroundColor)
+    if (normalizedBackgroundColor) {
+      normalized.backgroundColor = normalizedBackgroundColor
+    } else {
+      delete normalized.backgroundColor
     }
   }
 

@@ -116,6 +116,34 @@ describe('computeScarCorrelation', () => {
     const result = computeScarCorrelation(re, im, [orbit], gridSize, spacing, 1.5)
     expect(result.maxCorrelation).toBeGreaterThan(0)
   })
+
+  it('returns finite zeros for invalid geometry or tube width', () => {
+    const re = new Float32Array(16).fill(1)
+    const im = new Float32Array(16)
+    const orbit = makeTrajectory([makePoint([0, 0])])
+
+    const badSpacing = computeScarCorrelation(re, im, [orbit], [4, 4], [1, 0], 1.0)
+    const badTube = computeScarCorrelation(re, im, [orbit], [4, 4], [1, 1], Number.NaN)
+
+    expect(badSpacing.maxCorrelation).toBe(0)
+    expect(badTube.maxCorrelation).toBe(0)
+    expect(badTube.orbitCorrelations).toEqual([0])
+  })
+
+  it('treats non-finite density samples as zero instead of returning NaN metrics', () => {
+    const re = new Float32Array(16)
+    re[5] = Number.POSITIVE_INFINITY
+    re[10] = 1
+    const im = new Float32Array(16)
+    im[6] = Number.NaN
+    const orbit = makeTrajectory([makePoint([0.5, 0.5])])
+
+    const result = computeScarCorrelation(re, im, [orbit], [4, 4], [1, 1], 1.0)
+
+    expect(Number.isFinite(result.maxCorrelation)).toBe(true)
+    expect(Number.isFinite(result.meanCorrelation)).toBe(true)
+    expect(Number.isFinite(result.orbitCorrelation)).toBe(true)
+  })
 })
 
 // ---------------------------------------------------------------------------

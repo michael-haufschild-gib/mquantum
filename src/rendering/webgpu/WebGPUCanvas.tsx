@@ -17,6 +17,7 @@ import { WebGPUBasePass } from './core/WebGPUBasePass'
 import { WebGPUDevice } from './core/WebGPUDevice'
 import { WebGPURenderGraph } from './graph/WebGPURenderGraph'
 import { WebGPUSchrodingerRenderer } from './renderers/WebGPUSchrodingerRenderer'
+import { resolveCanvasPixelSize } from './utils/sceneMath'
 import { type WebGPUCanvasContext, WebGPUContext } from './WebGPUContext'
 
 // ============================================================================
@@ -128,8 +129,11 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
         const container = containerRef.current
         if (container) {
           const devicePixelRatio = dprRef.current ?? window.devicePixelRatio
-          const width = Math.floor(container.clientWidth * devicePixelRatio)
-          const height = Math.floor(container.clientHeight * devicePixelRatio)
+          const { width, height } = resolveCanvasPixelSize(
+            container.clientWidth,
+            container.clientHeight,
+            devicePixelRatio
+          )
 
           canvas.width = width
           canvas.height = height
@@ -200,8 +204,11 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
       if (!canvas || !graph) return
 
       const devicePixelRatio = dpr ?? window.devicePixelRatio
-      const width = Math.floor(container.clientWidth * devicePixelRatio)
-      const height = Math.floor(container.clientHeight * devicePixelRatio)
+      const { width, height } = resolveCanvasPixelSize(
+        container.clientWidth,
+        container.clientHeight,
+        devicePixelRatio
+      )
 
       if (canvas.width !== width || canvas.height !== height) {
         canvas.width = width

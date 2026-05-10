@@ -18,6 +18,8 @@
  * @module rendering/webgpu/shaders/schroedinger/quantum/singleBasis.wgsl
  */
 
+import { sanitizeShaderDimension } from '../../shared/compose-helpers'
+
 /**
  * Generates WGSL block providing evaluateSingleBasis(xND, t, k, uniforms) -> vec2f.
  *
@@ -30,7 +32,7 @@ export function generateSingleBasisBlock(
   dimension?: number
 ): string {
   if (quantumMode === 'hydrogenND' || quantumMode === 'hydrogenNDCoupled') {
-    const dim = Math.min(Math.max(dimension ?? 3, 2), 11)
+    const dim = sanitizeShaderDimension(dimension ?? 3, { min: 2, fallback: 3 })
 
     // 2D hydrogen: circular harmonics, |m| as effective l, 2D radius
     if (dim === 2) {

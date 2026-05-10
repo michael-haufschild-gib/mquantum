@@ -38,6 +38,7 @@ import { useGizmoInteraction } from './useGizmoInteraction'
 import { useSceneCameraController } from './useSceneCameraController'
 import { useSceneFrameCallbacks, useSceneFrameLoop } from './useSceneFrameLoop'
 import { useSceneStoreWiring } from './useSceneStoreWiring'
+import { resolveCanvasPixelSize } from './utils/sceneMath'
 import { WebGPUCanvasCapture } from './utils/WebGPUCanvasCapture'
 import { useWebGPU } from './WebGPUContext'
 import { WebGPUStatsCollector } from './WebGPUPerformanceCollector'
@@ -533,8 +534,11 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       if (canvas.clientWidth > 0 && canvas.clientHeight > 0) {
         const renderScale = usePerformanceStore.getState().renderResolutionScale
         const effectiveDpr = window.devicePixelRatio * renderScale
-        const w = Math.floor(canvas.clientWidth * effectiveDpr)
-        const h = Math.floor(canvas.clientHeight * effectiveDpr)
+        const { width: w, height: h } = resolveCanvasPixelSize(
+          canvas.clientWidth,
+          canvas.clientHeight,
+          effectiveDpr
+        )
         canvas.width = w
         canvas.height = h
         graph.setSize(w, h)

@@ -4,8 +4,10 @@ import {
   resizeQuantumWalkArrays,
   sanitizeQuantumWalkConfig,
 } from '@/lib/geometry/extended/quantumWalk'
+import { normalizeHydrogenNDPresetName } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import { SCHROEDINGER_PALETTE_DEFINITIONS } from '@/lib/geometry/extended/schroedinger/palettes'
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
+import { sanitizeTdseStochasticFields } from '@/lib/geometry/extended/tdse'
 import {
   type BecConfig,
   createDefaultSchroedingerConfig,
@@ -13,6 +15,7 @@ import {
   type DiracConfig,
   FREE_SCALAR_MAX_TOTAL_SITES,
   type FreeScalarConfig,
+  sanitizeHydrogenQuantumState,
   SCHROEDINGER_QUALITY_PRESETS,
   SchroedingerColorMode,
   type SchroedingerConfig,
@@ -510,7 +513,15 @@ export const createSchroedingerSlice: StateCreator<
     // === Config Operations ===
     setSchroedingerConfig: (config) => {
       setWithVersion((state) => {
+        const hasHydrogenPreset = Object.prototype.hasOwnProperty.call(config, 'hydrogenNDPreset')
         const schroedinger = { ...state.schroedinger, ...config }
+        Object.assign(schroedinger, sanitizeHydrogenQuantumState(schroedinger, state.schroedinger))
+        if (hasHydrogenPreset) {
+          schroedinger.hydrogenNDPreset = normalizeHydrogenNDPresetName(
+            config.hydrogenNDPreset,
+            'custom'
+          )
+        }
         if (config.freeScalar) {
           let mergedFreeScalar = { ...state.schroedinger.freeScalar, ...config.freeScalar }
           if (mergedFreeScalar.latticeDim !== state.schroedinger.freeScalar.latticeDim) {
@@ -524,6 +535,10 @@ export const createSchroedingerSlice: StateCreator<
           })
           const reconciled = reconcileCosmologyInvariants(sizedFreeScalar)
           schroedinger.freeScalar = { ...sizedFreeScalar, ...reconciled }
+        }
+        if (config.tdse) {
+          const mergedTdse = { ...state.schroedinger.tdse, ...config.tdse }
+          schroedinger.tdse = sanitizeTdseStochasticFields(mergedTdse, state.schroedinger.tdse)
         }
         if (config.quantumWalk) {
           const mergedQuantumWalk = { ...state.schroedinger.quantumWalk, ...config.quantumWalk }

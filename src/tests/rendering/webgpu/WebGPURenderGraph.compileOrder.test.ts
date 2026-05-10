@@ -4,6 +4,16 @@ import type { WebGPURenderPass } from '@/rendering/webgpu/core/types'
 import { createMockPass } from '@/tests/factories'
 
 describe('WebGPURenderGraph compile ordering', () => {
+  it('sanitizes invalid render sizes at the graph boundary', async () => {
+    const { WebGPURenderGraph } = await import('@/rendering/webgpu/graph/WebGPURenderGraph')
+    const graph = new WebGPURenderGraph()
+
+    graph.setSize(0, Number.POSITIVE_INFINITY)
+
+    expect(graph.getWidth()).toBe(1)
+    expect(graph.getHeight()).toBe(1)
+  })
+
   it('keeps producer passes before dependent consumers even with conflicting priorities', async () => {
     const { WebGPURenderGraph } = await import('@/rendering/webgpu/graph/WebGPURenderGraph')
     const graph = new WebGPURenderGraph()

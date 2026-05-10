@@ -8,7 +8,7 @@
  * @module rendering/webgpu/shaders/schroedinger/compute/composeWignerSpatial
  */
 
-import { assembleShaderBlocks } from '../../shared/compose-helpers'
+import { assembleShaderBlocks, sanitizeShaderDimension } from '../../shared/compose-helpers'
 // Core blocks
 import { constantsBlock } from '../../shared/core/constants.wgsl'
 // Quantum math blocks
@@ -68,10 +68,10 @@ export function composeWignerSpatialComputeShader(config: WignerSpatialComputeCo
 
   // Compile-time dimension (Wigner is always ND, min 3). Only ACTUAL_DIM
   // is emitted — see composeWignerCache.ts for the rationale.
-  const actualDim = Math.min(Math.max(dimension, 3), 11)
+  const actualDim = sanitizeShaderDimension(dimension, { min: 3, fallback: 3 })
 
   defines.push(`const ACTUAL_DIM: i32 = ${actualDim};`)
-  features.push(`${dimension}D Wigner Spatial`)
+  features.push(`${actualDim}D Wigner Spatial`)
 
   const isHydrogenFamily = quantumMode === 'hydrogenND' || quantumMode === 'hydrogenNDCoupled'
   const includeHydrogen = isHydrogenFamily

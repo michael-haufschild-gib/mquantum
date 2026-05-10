@@ -12,6 +12,8 @@
  * @module rendering/webgpu/shaders/schroedinger/quantum/density.wgsl
  */
 
+import { sanitizeShaderDimension } from '../../shared/compose-helpers'
+
 /**
  * First part of density block - noise and flow functions (before mapPosToND)
  */
@@ -84,7 +86,7 @@ export function generateMapPosToND(
   dimension: number,
   options?: { coupledNodalOffset?: boolean }
 ): string {
-  const dim = Math.min(Math.max(dimension, 2), 11)
+  const dim = sanitizeShaderDimension(dimension, { min: 2, fallback: 3 })
   const coupled = options?.coupledNodalOffset ?? false
   const extraDimCount = dim - 3
 

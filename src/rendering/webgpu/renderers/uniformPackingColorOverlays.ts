@@ -74,7 +74,8 @@ export function packRepresentationAndColorOverlays(
 export function packWignerAndPauliFields(
   floatView: Float32Array,
   intView: Int32Array,
-  p: SchroedingerPackParams
+  p: SchroedingerPackParams,
+  hydrogen: HydrogenResult
 ): void {
   const { schroedinger, pauliSpinor, dimension } = p
   const wignerDimIdx = schroedinger?.wignerDimensionIndex ?? 0
@@ -83,7 +84,7 @@ export function packWignerAndPauliFields(
   intView[I.wignerCrossTermsEnabled] = schroedinger?.wignerCrossTermsEnabled ? 1 : 0
 
   if (schroedinger?.wignerAutoRange ?? true) {
-    packWignerAutoRange(floatView, intView, p, clampedWignerDimIdx)
+    packWignerAutoRange(floatView, intView, p, clampedWignerDimIdx, hydrogen)
   } else {
     floatView[I.wignerXRange] = schroedinger?.wignerXRange ?? 6.0
     floatView[I.wignerPRange] = schroedinger?.wignerPRange ?? 6.0
@@ -155,15 +156,15 @@ function packWignerAutoRange(
   floatView: Float32Array,
   intView: Int32Array,
   p: SchroedingerPackParams,
-  wignerDimIdx: number
+  wignerDimIdx: number,
+  hydrogen: HydrogenResult
 ): void {
-  const { schroedinger } = p
   const isHydrogenMode =
     p.rendererQuantumMode === 'hydrogenND' || p.rendererQuantumMode === 'hydrogenNDCoupled'
 
   if (isHydrogenMode && wignerDimIdx < 3) {
-    const n = schroedinger?.principalQuantumNumber ?? 2
-    const a0 = schroedinger?.bohrRadiusScale ?? 1.0
+    const n = hydrogen.validN
+    const a0 = hydrogen.bohrRadius
     const rCenter = n * n * a0
     const rMax = rCenter * 2.5
     floatView[I.wignerXRange] = Math.max(rCenter, rMax - rCenter)

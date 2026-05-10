@@ -48,6 +48,25 @@ export interface NamedPresetConfig {
  * affect the quantum numbers or coefficients of other terms.
  */
 const TERM_RNG_PRIME = 0x9e3779b9 // ≈ 2^32 × golden ratio, Knuth multiplicative hash
+const DEFAULT_DIMENSION = 3
+const DEFAULT_TERM_COUNT = 3
+const DEFAULT_MAX_N = 5
+const DEFAULT_FREQUENCY_SPREAD = 0.02
+const MAX_QUANTUM_NUMBER = 6
+
+function clampFiniteInteger(value: number, fallback: number, min: number, max: number): number {
+  const finite = Number.isFinite(value) ? value : fallback
+  return Math.floor(Math.max(min, Math.min(max, finite)))
+}
+
+function clampFiniteNumber(value: number, fallback: number, min: number, max: number): number {
+  const finite = Number.isFinite(value) ? value : fallback
+  return Math.max(min, Math.min(max, finite))
+}
+
+function finiteOr(value: number | undefined, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
 
 /**
  * Sample a biased quantum number for one dimension.
@@ -139,13 +158,14 @@ export function generateQuantumPreset(
   frequencySpread: number = 0.02
 ): QuantumPreset {
   // Clamp parameters to valid ranges
-  const dim = Math.min(Math.max(dimension, 3), MAX_DIM)
-  const terms = Math.min(Math.max(termCount, 1), MAX_TERMS)
-  const nMax = Math.min(Math.max(maxN, 1), 6)
-  const spread = Math.min(Math.max(frequencySpread, 0), 0.5)
+  const safeSeed = Number.isFinite(seed) ? Math.trunc(seed) : 0
+  const dim = clampFiniteInteger(dimension, DEFAULT_DIMENSION, 3, MAX_DIM)
+  const terms = clampFiniteInteger(termCount, DEFAULT_TERM_COUNT, 1, MAX_TERMS)
+  const nMax = clampFiniteInteger(maxN, DEFAULT_MAX_N, 1, MAX_QUANTUM_NUMBER)
+  const spread = clampFiniteNumber(frequencySpread, DEFAULT_FREQUENCY_SPREAD, 0, 0.5)
 
   // Omega uses the base seed — independent of term count
-  const omegaRng = mulberry32(seed)
+  const omegaRng = mulberry32(safeSeed)
   const omega: number[] = []
   for (let j = 0; j < dim; j++) {
     const baseFreq = 0.8 + omegaRng() * spread * 2
@@ -158,7 +178,7 @@ export function generateQuantumPreset(
   const energies: number[] = []
 
   for (let k = 0; k < terms; k++) {
-    const termRng = mulberry32((seed + (k + 1) * TERM_RNG_PRIME) | 0)
+    const termRng = mulberry32((safeSeed + (k + 1) * TERM_RNG_PRIME) | 0)
     const n = generateTermQuantumNumbers(termRng, dim, nMax)
     quantumNumbers.push(n)
 
@@ -314,35 +334,37 @@ export function flattenPresetForUniforms(preset: QuantumPreset): {
 } {
   // Omega array (padded to MAX_DIM)
   const omega = new Float32Array(MAX_DIM)
-  for (let j = 0; j < preset.omega.length; j++) {
-    omega[j] = preset.omega[j] ?? 1.0
+  for (let j = 0; j < Math.min(preset.omega.length, MAX_DIM); j++) {
+    omega[j] = finiteOr(preset.omega[j], 1.0)
   }
 
   // Quantum numbers (flattened, padded to MAX_TERMS * MAX_DIM)
   const quantum = new Int32Array(MAX_TERMS * MAX_DIM)
-  for (let k = 0; k < preset.quantumNumbers.length; k++) {
+  for (let k = 0; k < Math.min(preset.quantumNumbers.length, MAX_TERMS); k++) {
     const row = preset.quantumNumbers[k]
     if (row) {
-      for (let j = 0; j < row.length; j++) {
-        quantum[k * MAX_DIM + j] = row[j] ?? 0
+      for (let j = 0; j < Math.min(row.length, MAX_DIM); j++) {
+        quantum[k * MAX_DIM + j] = Math.round(
+          Math.max(0, Math.min(MAX_QUANTUM_NUMBER, finiteOr(row[j], 0)))
+        )
       }
     }
   }
 
   // Coefficients (interleaved re, im)
   const coeff = new Float32Array(MAX_TERMS * 2)
-  for (let k = 0; k < preset.coefficients.length; k++) {
+  for (let k = 0; k < Math.min(preset.coefficients.length, MAX_TERMS); k++) {
     const pair = preset.coefficients[k]
     if (pair) {
-      coeff[k * 2] = pair[0] ?? 0
-      coeff[k * 2 + 1] = pair[1] ?? 0
+      coeff[k * 2] = finiteOr(pair[0], 0)
+      coeff[k * 2 + 1] = finiteOr(pair[1], 0)
     }
   }
 
   // Energies
   const energy = new Float32Array(MAX_TERMS)
-  for (let k = 0; k < preset.energies.length; k++) {
-    energy[k] = preset.energies[k] ?? 0
+  for (let k = 0; k < Math.min(preset.energies.length, MAX_TERMS); k++) {
+    energy[k] = finiteOr(preset.energies[k], 0)
   }
 
   return { omega, quantum, coeff, energy }

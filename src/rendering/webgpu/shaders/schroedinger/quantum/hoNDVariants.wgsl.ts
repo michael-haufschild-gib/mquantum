@@ -9,6 +9,8 @@
  * @module rendering/webgpu/shaders/schroedinger/quantum/hoNDVariants.wgsl
  */
 
+import { sanitizeShaderDimension } from '../../shared/compose-helpers'
+
 /**
  * Generate a dimension-specific hoND function for WGSL.
  *
@@ -83,7 +85,7 @@ export const hoND11dBlock = generateHoNDBlock(11)
  * @returns WGSL dispatch block code
  */
 export function generateHoNDDispatchBlock(dimension: number): string {
-  const dim = Math.min(Math.max(dimension, 2), 11)
+  const dim = sanitizeShaderDimension(dimension, { min: 2, fallback: 3 })
   return `
 // ============================================
 // Harmonic Oscillator ND - Compile-time Dispatch
@@ -106,11 +108,12 @@ fn hoNDOptimized(xND: array<f32, 11>, termIdx: i32, uniforms: SchroedingerUnifor
  * @returns WGSL function code for cached hoND{dimension}D
  */
 export function generateHoNDCachedBlock(dimension: number): string {
-  const ho1DCachedChain = Array.from({ length: dimension }, (_, i) => {
+  const dim = sanitizeShaderDimension(dimension, { min: 2, fallback: 3 })
+  const ho1DCachedChain = Array.from({ length: dim }, (_, i) => {
     if (i === 0) {
       return `  var p = ho1DCached(getEigenFuncIdx(termIdx, 0), xND[0]);
   if (abs(p) < 1e-10) { return 0.0; }`
-    } else if (i === dimension - 1) {
+    } else if (i === dim - 1) {
       return `
   p *= ho1DCached(getEigenFuncIdx(termIdx, ${i}), xND[${i}]);
   return p;`
@@ -123,10 +126,10 @@ export function generateHoNDCachedBlock(dimension: number): string {
 
   return `
 // ============================================
-// Harmonic Oscillator ND - ${dimension}D (Cached, Unrolled)
+// Harmonic Oscillator ND - ${dim}D (Cached, Unrolled)
 // ============================================
 
-fn hoND${dimension}DCached(xND: array<f32, 11>, termIdx: i32, uniforms: SchroedingerUniforms) -> f32 {
+fn hoND${dim}DCached(xND: array<f32, 11>, termIdx: i32, uniforms: SchroedingerUniforms) -> f32 {
 ${ho1DCachedChain}
 }
 `
@@ -140,7 +143,7 @@ ${ho1DCachedChain}
  * @returns WGSL dispatch block code
  */
 export function generateHoNDCachedDispatchBlock(dimension: number): string {
-  const dim = Math.min(Math.max(dimension, 2), 11)
+  const dim = sanitizeShaderDimension(dimension, { min: 2, fallback: 3 })
   return `
 // ============================================
 // Harmonic Oscillator ND - Cached Compile-time Dispatch

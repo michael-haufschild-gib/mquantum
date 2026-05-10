@@ -702,6 +702,22 @@ describe('atlasResultsToCSV', () => {
     const lines = csv.split('\n')
     expect(lines).toHaveLength(3) // header + 2 data
   })
+
+  it('serializes non-finite atlas numbers as blank cells', () => {
+    const csv = atlasResultsToCSV([
+      {
+        ...POINT,
+        avgNormalizedEntropy: Number.NaN,
+        avgWignerNegativity: Infinity,
+        avgIPR: -Infinity,
+      },
+    ])
+    const line = csv.split('\n')[1]!
+
+    expect(line).toBe('3,1.5,0.3,,0.01,,0.002,,0.003,64,200,10')
+    expect(line).not.toContain('NaN')
+    expect(line).not.toContain('Infinity')
+  })
 })
 
 describe('atlasResultsToJSON', () => {

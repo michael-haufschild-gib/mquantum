@@ -7,15 +7,11 @@
  * @module stores/slices/geometry/setters/tdseStochasticSetters
  */
 
+import { normalizeTdseBranchColor, type TdseBranchColor } from '@/lib/geometry/extended/tdse'
 import { MAX_STOCHASTIC_SITES } from '@/lib/physics/stochastic/localizationKernel'
 
 import type { SchroedingerSliceActions } from '../types'
-import {
-  nestedClampedSetter,
-  nestedIntSetter,
-  nestedValueSetter,
-  type SetterContext,
-} from './sliceSetterUtils'
+import { nestedClampedSetter, nestedIntSetter, type SetterContext } from './sliceSetterUtils'
 
 type StochasticActions = Pick<
   SchroedingerSliceActions,
@@ -29,6 +25,27 @@ type StochasticActions = Pick<
   | 'setTdseBranchColorA'
   | 'setTdseBranchColorB'
 >
+
+type BranchColorField = 'branchColorA' | 'branchColorB'
+
+function branchColorSetter(
+  ctx: SetterContext,
+  field: BranchColorField
+): (value: TdseBranchColor) => void {
+  return (value: TdseBranchColor) => {
+    const color = normalizeTdseBranchColor(value)
+    if (!color) {
+      ctx.warnNonFinite(`tdse.${field}`, value)
+      return
+    }
+    ctx.setWithVersion((state) => ({
+      schroedinger: {
+        ...state.schroedinger,
+        tdse: { ...state.schroedinger.tdse, [field]: color },
+      },
+    }))
+  }
+}
 
 /**
  * Creates stochastic decoherence setter actions for the schroedingerSlice.
@@ -75,7 +92,7 @@ export function createTdseStochasticSetters(ctx: SetterContext): StochasticActio
       }))
     },
     setTdseBranchPlanePosition: nestedClampedSetter(ctx, D, 'branchPlanePosition', -1.0, 1.0),
-    setTdseBranchColorA: nestedValueSetter(ctx, D, 'branchColorA'),
-    setTdseBranchColorB: nestedValueSetter(ctx, D, 'branchColorB'),
+    setTdseBranchColorA: branchColorSetter(ctx, 'branchColorA'),
+    setTdseBranchColorB: branchColorSetter(ctx, 'branchColorB'),
   }
 }

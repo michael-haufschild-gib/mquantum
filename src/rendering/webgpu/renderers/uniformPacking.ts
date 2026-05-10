@@ -11,7 +11,12 @@
  */
 
 import type { AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
-import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
+import { sanitizeTdseBranchColor, type TdseBranchColor } from '@/lib/geometry/extended/tdse'
+import {
+  DEFAULT_SCHROEDINGER_CONFIG,
+  sanitizeHydrogenQuantumState,
+  type SchroedingerConfig,
+} from '@/lib/geometry/extended/types'
 import { normalizeHydrogenCoupledAngularChain } from '@/lib/physics/hydrogenCoupled/presets'
 import { DEFAULT_COSINE_COEFFICIENTS } from '@/rendering/shaders/palette'
 
@@ -63,6 +68,39 @@ const parseColor = (hex: string): Rgb => parseHexColorToLinearRgb(hex)
 const isDensityGridOnlyMode = (mode: string): boolean =>
   mode === 'wheelerDeWitt' || mode === 'antiDeSitter'
 
+const DEFAULT_BRANCH_COLOR_A: TdseBranchColor = [0, 1, 1]
+const DEFAULT_BRANCH_COLOR_B: TdseBranchColor = [1, 0, 1]
+const MIN_DIM = 2
+const DEFAULT_DIM = 3
+
+function sanitizePackingDimension(dimension: number): number {
+  if (!Number.isFinite(dimension)) return DEFAULT_DIM
+  return Math.max(MIN_DIM, Math.min(MAX_DIM, Math.floor(dimension)))
+}
+
+function finiteClamped(
+  value: number | undefined,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  const finite = typeof value === 'number' && Number.isFinite(value) ? value : fallback
+  return Math.max(min, Math.min(max, finite))
+}
+
+function finiteOrDefault(value: number | undefined, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function finiteClampedInt(
+  value: number | undefined,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  return Math.floor(finiteClamped(value, fallback, min, max))
+}
+
 // =========================================================================
 // Schroedinger uniform buffer
 // =========================================================================
@@ -78,52 +116,59 @@ export function packSchroedingerUniforms(
   intView: Int32Array,
   p: SchroedingerPackParams
 ): void {
+  const sanitizedDimension = sanitizePackingDimension(p.dimension)
+  const params = sanitizedDimension === p.dimension ? p : { ...p, dimension: sanitizedDimension }
+
   // Zero all reserved and padding fields in one declarative pass
   zeroReservedFields(floatView, SCHROEDINGER_LAYOUT)
 
-  intView[I.quantumMode] = p.quantumModeInt
-  intView[I.termCount] = p.presetTermCount
+  intView[I.quantumMode] = params.quantumModeInt
+  intView[I.termCount] = params.presetTermCount
 
-  packQuantumArrays(floatView, intView, p)
-  const hydrogenResult = packHydrogenAndExtraDims(floatView, intView, p)
-  packVisualFields(floatView, intView, p)
-  packNodalAndColorSystem(floatView, intView, p)
-  packOverlayControls(floatView, intView, p)
-  packCrossSectionAndCurrent(floatView, intView, p)
-  packRepresentationAndColorOverlays(floatView, intView, p, hydrogenResult)
-  packWignerAndPauliFields(floatView, intView, p)
+  packQuantumArrays(floatView, intView, params)
+  const hydrogenResult = packHydrogenAndExtraDims(floatView, intView, params)
+  packVisualFields(floatView, intView, params)
+  packNodalAndColorSystem(floatView, intView, params)
+  packOverlayControls(floatView, intView, params)
+  packCrossSectionAndCurrent(floatView, intView, params)
+  packRepresentationAndColorOverlays(floatView, intView, params, hydrogenResult)
+  packWignerAndPauliFields(floatView, intView, params, hydrogenResult)
 
   // Decoherent branching colors + separation metric
-  const branchA = p.branchColorA ?? [0, 1, 1]
-  const branchB = p.branchColorB ?? [1, 0, 1]
+  const branchA = sanitizeTdseBranchColor(params.branchColorA, DEFAULT_BRANCH_COLOR_A)
+  const branchB = sanitizeTdseBranchColor(params.branchColorB, DEFAULT_BRANCH_COLOR_B)
   floatView[I.branchColorA] = branchA[0]
   floatView[I.branchColorA + 1] = branchA[1]
   floatView[I.branchColorA + 2] = branchA[2]
-  floatView[I.branchSeparation] = p.branchSeparation ?? 0
+  floatView[I.branchSeparation] = params.branchSeparation ?? 0
   floatView[I.branchColorB] = branchB[0]
   floatView[I.branchColorB + 1] = branchB[1]
   floatView[I.branchColorB + 2] = branchB[2]
-  floatView[I.branchPlaneThreshold] = Number.isFinite(p.branchPlaneThreshold)
-    ? p.branchPlaneThreshold!
+  floatView[I.branchPlaneThreshold] = Number.isFinite(params.branchPlaneThreshold)
+    ? params.branchPlaneThreshold!
     : 0
-  const rawTransitionWidth = p.branchTransitionWidth ?? 0.2
+  const rawTransitionWidth = params.branchTransitionWidth ?? 0.2
   floatView[I.branchTransitionWidth] =
     Number.isFinite(rawTransitionWidth) && rawTransitionWidth > 0 ? rawTransitionWidth : 0.2
 
   // Wheeler–DeWitt render-only phase rotation rate.
   // Active only when quantum mode is wheelerDeWitt AND the visual effect is enabled,
   // otherwise 0 (so the shader's `phase - rate*time` subtraction is a no-op).
-  const wdwCfg = p.schroedinger?.wheelerDeWitt as WdwPhaseConfig | undefined
+  const wdwCfg = params.schroedinger?.wheelerDeWitt as WdwPhaseConfig | undefined
   const wdwRate =
-    p.quantumModeStr === 'wheelerDeWitt' && wdwCfg?.phaseRotationEnabled
+    params.quantumModeStr === 'wheelerDeWitt' && wdwCfg?.phaseRotationEnabled
       ? (wdwCfg.phaseRotationSpeed ?? 0)
       : 0
   floatView[I.wdwPhaseRotationRate] = wdwRate
 
-  packDensityGridMapping(floatView, p)
+  packDensityGridMapping(floatView, params)
 
   // AdS time evolution — stable phase rotation at E or tachyon cosh growth at γ.
-  packAdsTimeEvolution(floatView, p.quantumModeStr, p.schroedinger?.antiDeSitter as AdSConfig)
+  packAdsTimeEvolution(
+    floatView,
+    params.quantumModeStr,
+    params.schroedinger?.antiDeSitter as AdSConfig
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -179,14 +224,11 @@ function packHydrogenAndExtraDims(
 ): HydrogenResult {
   const { schroedinger, dimension } = p
 
-  const principalN = schroedinger?.principalQuantumNumber ?? 2
-  const azimuthalL = schroedinger?.azimuthalQuantumNumber ?? 1
-  const magneticM = schroedinger?.magneticQuantumNumber ?? 0
-  const bohrRadius = schroedinger?.bohrRadiusScale ?? 1.0
-
-  const validN = Math.max(1, principalN)
-  const validL = Math.max(0, Math.min(azimuthalL, validN - 1))
-  const validM = Math.max(-validL, Math.min(magneticM, validL))
+  const hydrogen = sanitizeHydrogenQuantumState(schroedinger)
+  const validN = hydrogen.principalQuantumNumber
+  const validL = hydrogen.azimuthalQuantumNumber
+  const validM = hydrogen.magneticQuantumNumber
+  const bohrRadius = hydrogen.bohrRadiusScale
 
   intView[I.principalN] = validN
   intView[I.azimuthalL] = validL
@@ -202,9 +244,16 @@ function packHydrogenAndExtraDims(
   // hydrogenNDBoost: compensate for HO normalization in extra dimensions
   const numExtraDims = Math.max(0, dimension - 3)
   let normCompensation = 1.0
+  const extraDimOmega = schroedinger?.extraDimOmega as number[] | undefined
+  const extraDimFrequencySpread = finiteClamped(
+    schroedinger?.extraDimFrequencySpread,
+    DEFAULT_SCHROEDINGER_CONFIG.extraDimFrequencySpread,
+    0,
+    0.5
+  )
   for (let i = 0; i < numExtraDims; i++) {
-    const baseOmega = (schroedinger?.extraDimOmega as number[] | undefined)?.[i] ?? 1.0
-    const spread = 1.0 + (i - 3.5) * (schroedinger?.extraDimFrequencySpread ?? 0)
+    const baseOmega = finiteOrDefault(extraDimOmega?.[i], 1.0)
+    const spread = 1.0 + (i - 3.5) * extraDimFrequencySpread
     const effectiveOmega = Math.max(baseOmega * spread, 0.01)
     normCompensation *= Math.sqrt(Math.PI / effectiveOmega)
   }
@@ -237,16 +286,16 @@ function packHydrogenAndExtraDims(
     ? coupledAngularChain
     : (schroedinger?.extraDimQuantumNumbers as number[] | undefined)
   for (let i = 0; i < MAX_EXTRA_DIM; i++) {
-    intView[I.extraDimN + i] = extraDimSource?.[i] ?? 0
+    intView[I.extraDimN + i] = isCoupled
+      ? (extraDimSource?.[i] ?? 0)
+      : finiteClampedInt(extraDimSource?.[i], 0, 0, 6)
   }
 
   // extraDimOmega: 2 vec4f = 8 floats
-  const extraDimOmega = schroedinger?.extraDimOmega as number[] | undefined
-  const extraDimFrequencySpread = schroedinger?.extraDimFrequencySpread ?? 0
   for (let i = 0; i < MAX_EXTRA_DIM; i++) {
-    const baseOmega = extraDimOmega?.[i] ?? 1.0
+    const baseOmega = finiteOrDefault(extraDimOmega?.[i], 1.0)
     const spread = 1.0 + (i - 3.5) * extraDimFrequencySpread
-    floatView[I.extraDimOmega + i] = baseOmega * spread
+    floatView[I.extraDimOmega + i] = Math.max(baseOmega * spread, 0.01)
   }
 
   // Precompute normalization constants for coupled hydrogen ND

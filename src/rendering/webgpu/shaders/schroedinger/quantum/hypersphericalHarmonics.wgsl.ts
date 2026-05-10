@@ -21,6 +21,8 @@
  * @module rendering/webgpu/shaders/schroedinger/quantum/hypersphericalHarmonics.wgsl
  */
 
+import { sanitizeShaderDimension } from '../../shared/compose-helpers'
+
 /**
  * Log-gamma for half-integer arguments via LUT.
  *
@@ -120,7 +122,7 @@ struct HypersphericalCoords {
  * @param dimension - Spatial dimension D (3-11)
  */
 export function generateHypersphericalConversion(dimension: number): string {
-  const D = Math.min(Math.max(dimension, 3), 11)
+  const D = sanitizeShaderDimension(dimension, { min: 3, fallback: 3 })
   const numTheta = D - 2 // Number of θ angles (D-1 total angles: D-2 theta + 1 phi)
 
   // Build partial sum of squares from x_1 upward
@@ -257,7 +259,7 @@ fn lnHypersphericalLayerNorm(lk: i32, lkp1: i32, D: i32, k: i32) -> f32 {
  * @param dimension - Spatial dimension D (3-11)
  */
 export function generateHypersphericalHarmonicBlock(dimension: number): string {
-  const D = Math.min(Math.max(dimension, 3), 11)
+  const D = sanitizeShaderDimension(dimension, { min: 3, fallback: 3 })
   const numTheta = D - 2
 
   if (D === 3) {
@@ -380,7 +382,7 @@ fn evalHypersphericalHarmonic${D}D(
  * @param dimension - Spatial dimension D (3-11)
  */
 export function generateHydrogenNDCoupledBlock(dimension: number): string {
-  const D = Math.min(Math.max(dimension, 3), 11)
+  const D = sanitizeShaderDimension(dimension, { min: 3, fallback: 3 })
 
   return `
 // ============================================
@@ -423,7 +425,7 @@ fn evalHydrogenNDCoupledPsi${D}D(xND: array<f32, 11>, t: f32, uniforms: Schroedi
  * @param dimension - The dimension to dispatch to
  */
 export function generateHydrogenNDCoupledDispatchBlock(dimension: number): string {
-  const dim = Math.min(Math.max(dimension, 3), 11)
+  const dim = sanitizeShaderDimension(dimension, { min: 3, fallback: 3 })
   return `
 // ============================================
 // Hydrogen ND Coupled — Compile-time Dispatch
@@ -480,7 +482,7 @@ export function getHydrogenNDCoupledBlocks(dimension: number): {
   coupled: string
   dispatch: string
 } {
-  const dim = Math.min(Math.max(dimension, 3), 11)
+  const dim = sanitizeShaderDimension(dimension, { min: 3, fallback: 3 })
 
   const convMap: Record<number, string> = {
     3: hypersphericalConv3d,

@@ -8,7 +8,12 @@
  * @module rendering/webgpu/shaders/schroedinger/compute/compose
  */
 
-import { assembleShaderBlocks } from '../../shared/compose-helpers'
+import {
+  assembleShaderBlocks,
+  sanitizeDensityGridStorageFormat,
+  sanitizeShaderDimension,
+  sanitizeShaderTermCount,
+} from '../../shared/compose-helpers'
 // Core blocks
 import { constantsBlock } from '../../shared/core/constants.wgsl'
 // Quantum math blocks
@@ -112,6 +117,8 @@ interface ComputeShaderFlags {
   includeHarmonic: boolean
   hydrogenNDDimension: number
   useUnrolledHO: boolean
+  termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | undefined
+  storageFormat: 'r16float' | 'rgba16float'
 }
 
 /** Generate WGSL compile-time defines and feature tags for the compute shader. */
@@ -119,8 +126,8 @@ function generateComputeDefines(config: DensityGridComputeConfig): ComputeShader
   const {
     dimension,
     quantumMode = 'harmonicOscillator',
-    termCount,
-    storageFormat = 'r16float',
+    termCount: rawTermCount,
+    storageFormat: rawStorageFormat = 'r16float',
     useDensityMatrix = false,
   } = config
 
@@ -129,10 +136,12 @@ function generateComputeDefines(config: DensityGridComputeConfig): ComputeShader
   // Only ACTUAL_DIM (clamped) is emitted — see composeWignerCache.ts for
   // the rationale. The previously emitted un-clamped `const DIMENSION`
   // was never read by any WGSL shader.
-  const actualDim = Math.min(Math.max(dimension, 3), 11)
+  const actualDim = sanitizeShaderDimension(dimension, { min: 3, fallback: 3 })
+  const termCount = sanitizeShaderTermCount(rawTermCount)
+  const storageFormat = sanitizeDensityGridStorageFormat(rawStorageFormat)
 
   defines.push(`const ACTUAL_DIM: i32 = ${actualDim};`)
-  features.push(`${dimension}D Quantum`)
+  features.push(`${actualDim}D Quantum`)
 
   const isHydrogenFamily = quantumMode === 'hydrogenND' || quantumMode === 'hydrogenNDCoupled'
   const isHydrogenCoupled = quantumMode === 'hydrogenNDCoupled'
@@ -194,6 +203,8 @@ function generateComputeDefines(config: DensityGridComputeConfig): ComputeShader
     includeHarmonic,
     hydrogenNDDimension,
     useUnrolledHO,
+    termCount,
+    storageFormat,
   }
 }
 
@@ -211,12 +222,7 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
   modules: string[]
   features: string[]
 } {
-  const {
-    quantumMode = 'harmonicOscillator',
-    termCount,
-    storageFormat = 'r16float',
-    useDensityMatrix = false,
-  } = config
+  const { quantumMode = 'harmonicOscillator', useDensityMatrix = false } = config
 
   const {
     defines,
@@ -229,6 +235,8 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
     includeHarmonic,
     hydrogenNDDimension,
     useUnrolledHO,
+    termCount,
+    storageFormat,
   } = generateComputeDefines(config)
 
   // Get dimension-specific blocks

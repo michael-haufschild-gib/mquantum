@@ -355,6 +355,17 @@ describe('Rotation Operations', () => {
       }
     })
 
+    it('throws when out parameter is not the rotation matrix size', () => {
+      const angles = new Map([['XY', Math.PI / 4]])
+
+      expect(() => composeRotations(3, angles, new Float32Array(8))).toThrow(
+        'Output matrix dimensions incompatible'
+      )
+      expect(() => composeRotations(3, new Map(), new Float32Array(10))).toThrow(
+        'Output matrix dimensions incompatible'
+      )
+    })
+
     it('produces correct planes for 11D (maximum dimension)', () => {
       const planes = getRotationPlanes(11)
       expect(planes).toHaveLength((11 * 10) / 2) // 55

@@ -23,4 +23,14 @@ describe('computeRadialProbabilityNorm input sanitization', () => {
 
     expect(nanA0).toBeCloseTo(safe, 10)
   })
+
+  it('sanitizes dimension before using D-dimensional hydrogen math', () => {
+    const safe3D = computeRadialProbabilityNorm(2, 1, 1.0, 3)
+    const safe2D = computeRadialProbabilityNorm(2, 1, 1.0, 2)
+    const safe11D = computeRadialProbabilityNorm(2, 1, 1.0, 11)
+
+    expect(computeRadialProbabilityNorm(2, 1, 1.0, Number.NaN)).toBeCloseTo(safe3D, 10)
+    expect(computeRadialProbabilityNorm(2, 1, 1.0, 1)).toBeCloseTo(safe2D, 10)
+    expect(computeRadialProbabilityNorm(2, 1, 1.0, 99)).toBeCloseTo(safe11D, 10)
+  })
 })

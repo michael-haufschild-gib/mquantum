@@ -10,7 +10,7 @@
  * @module rendering/webgpu/shaders/schroedinger/compute/composeWignerCache
  */
 
-import { assembleShaderBlocks } from '../../shared/compose-helpers'
+import { assembleShaderBlocks, sanitizeShaderDimension } from '../../shared/compose-helpers'
 // Core blocks
 import { constantsBlock } from '../../shared/core/constants.wgsl'
 // Quantum math blocks
@@ -72,10 +72,10 @@ export function composeWignerCacheComputeShader(config: WignerCacheComputeConfig
   // never referenced by any WGSL file; every shader read `ACTUAL_DIM`
   // directly. Kept only the used constant to avoid confusion over which
   // dimension value the shaders actually consume.
-  const actualDim = Math.min(Math.max(dimension, 3), 11)
+  const actualDim = sanitizeShaderDimension(dimension, { min: 3, fallback: 3 })
 
   defines.push(`const ACTUAL_DIM: i32 = ${actualDim};`)
-  features.push(`${dimension}D Wigner Cache`)
+  features.push(`${actualDim}D Wigner Cache`)
 
   const isHydrogenFamily = quantumMode === 'hydrogenND' || quantumMode === 'hydrogenNDCoupled'
   const includeHydrogen = isHydrogenFamily

@@ -99,6 +99,39 @@ describe('packForGPU / unpackFromGPU round-trip', () => {
     // maxK slot at RHO_FLOATS + 5
     expect(buf[RHO_FLOATS + 5]).toBe(5)
   })
+
+  it('rejects density matrices larger than the fixed GPU layout', () => {
+    const K = MAX_K + 1
+    const rho = { K, elements: new Float64Array(K * K * 2) }
+    const metrics: OpenQuantumMetrics = {
+      purity: 1,
+      linearEntropy: 0,
+      vonNeumannEntropy: 0,
+      coherenceMagnitude: 0,
+      groundPopulation: 1,
+      trace: 1,
+    }
+
+    expect(() => packForGPU(rho, metrics, createPackedBuffer())).toThrow(
+      `packForGPU: K=${K} exceeds MAX_K=${MAX_K}`
+    )
+  })
+
+  it('rejects undersized output buffers', () => {
+    const rho = densityMatrixFromCoefficients([1, 0], [0, 0], 2)
+    const metrics: OpenQuantumMetrics = {
+      purity: 1,
+      linearEntropy: 0,
+      vonNeumannEntropy: 0,
+      coherenceMagnitude: 0,
+      groundPopulation: 1,
+      trace: 1,
+    }
+
+    expect(() => packForGPU(rho, metrics, new Float32Array(16))).toThrow(
+      `packForGPU: output buffer too small (expected >= ${OPEN_QUANTUM_BUFFER_FLOATS})`
+    )
+  })
 })
 
 describe('computeActiveK', () => {
@@ -152,5 +185,27 @@ describe('computeActiveK', () => {
     const rho = { K, elements }
     // lastActive=0, returns max(minK, 1) = minK
     expect(computeActiveK(rho, 0.01, 4)).toBe(4)
+  })
+
+  it('does not return an active basis larger than rho.K', () => {
+    const K = 1
+    const elements = new Float64Array(K * K * 2)
+    elements[0] = 1
+    const rho = { K, elements }
+    expect(computeActiveK(rho)).toBe(1)
+  })
+})
+
+describe('unpackFromGPU', () => {
+  it('rejects K larger than the fixed GPU layout', () => {
+    expect(() => unpackFromGPU(createPackedBuffer(), MAX_K + 1)).toThrow(
+      `unpackFromGPU: K=${MAX_K + 1} exceeds MAX_K=${MAX_K}`
+    )
+  })
+
+  it('rejects undersized packed buffers', () => {
+    expect(() => unpackFromGPU(new Float32Array(16), 2)).toThrow(
+      `unpackFromGPU: buffer too small (expected >= ${OPEN_QUANTUM_BUFFER_FLOATS})`
+    )
   })
 })

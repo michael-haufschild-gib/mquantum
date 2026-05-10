@@ -1,5 +1,6 @@
 import type { StateCreator } from 'zustand'
 
+import { normalizeOpaqueHexColor } from '@/lib/colors/colorUtils'
 import { logger } from '@/lib/logger'
 
 import {
@@ -361,7 +362,14 @@ export const createSkyboxSlice: StateCreator<SkyboxSlice, [], [], SkyboxSlice> =
       }
     }),
   setClassicCubeTexture: (texture: unknown | null) => set({ classicCubeTexture: texture }),
-  setBackgroundColor: (color: string) => set({ backgroundColor: color }),
+  setBackgroundColor: (color: string) => {
+    const normalized = normalizeOpaqueHexColor(color)
+    if (!normalized) {
+      logger.warn('[skyboxSlice] Ignoring invalid background color:', color)
+      return
+    }
+    set({ backgroundColor: normalized })
+  },
   resetSkyboxSettings: () =>
     set({
       skyboxSelection: DEFAULT_SKYBOX_SELECTION,

@@ -79,6 +79,38 @@ describe('packSchroedingerUniforms — defaults', () => {
     expect(intView[I.magneticM]).toBe(0) // m clamped into [−l, l] = {0}
   })
 
+  it('sanitizes non-finite hydrogen parameters before they reach GPU uniforms', () => {
+    const { floatView, intView } = makeBuffer()
+    packSchroedingerUniforms(floatView, intView, {
+      ...baseParams,
+      dimension: Number.NaN,
+      quantumModeStr: 'hydrogenND',
+      rendererQuantumMode: 'hydrogenND',
+      schroedinger: {
+        principalQuantumNumber: Number.NaN,
+        azimuthalQuantumNumber: Number.POSITIVE_INFINITY,
+        magneticQuantumNumber: Number.NEGATIVE_INFINITY,
+        bohrRadiusScale: Number.NaN,
+        radialProbabilityEnabled: true,
+      } as never,
+    })
+
+    expect(intView[I.principalN]).toBe(2)
+    expect(intView[I.azimuthalL]).toBe(1)
+    expect(intView[I.magneticM]).toBe(0)
+    expect(floatView[I.bohrRadius]).toBe(1)
+
+    for (const idx of [
+      I.hydrogenBoost,
+      I.hydrogenNDBoost,
+      I.hydrogenRadialThreshold,
+      I.hydrogenRadialNorm,
+      I.radialProbabilityNorm,
+    ]) {
+      expect(Number.isFinite(floatView[idx]), `uniform index ${idx}`).toBe(true)
+    }
+  })
+
   it('writes hydrogenBoost = 50·n²·3^l for the default configuration (n=2, l=1)', () => {
     const { floatView, intView } = makeBuffer()
     packSchroedingerUniforms(floatView, intView, { ...baseParams })
@@ -177,6 +209,22 @@ describe('packSchroedingerUniforms — defaults', () => {
     expect(floatView[I.branchColorA + 2]).toBeCloseTo(0.6)
     expect(floatView[I.branchColorB + 1]).toBeCloseTo(0.8)
     expect(floatView[I.branchSeparation]).toBeCloseTo(0.42)
+  })
+
+  it('sanitizes branch colors before writing shader uniforms', () => {
+    const { floatView, intView } = makeBuffer()
+    packSchroedingerUniforms(floatView, intView, {
+      ...baseParams,
+      branchColorA: [-1, 0.4, 2],
+      branchColorB: [Number.NaN, 0.8, 0.9],
+    })
+
+    expect(floatView[I.branchColorA]).toBe(0)
+    expect(floatView[I.branchColorA + 1]).toBeCloseTo(0.4)
+    expect(floatView[I.branchColorA + 2]).toBe(1)
+    expect(floatView[I.branchColorB]).toBe(1)
+    expect(floatView[I.branchColorB + 1]).toBe(0)
+    expect(floatView[I.branchColorB + 2]).toBe(1)
   })
 
   it('falls back branchTransitionWidth to 0.2 when input is non-finite or non-positive', () => {

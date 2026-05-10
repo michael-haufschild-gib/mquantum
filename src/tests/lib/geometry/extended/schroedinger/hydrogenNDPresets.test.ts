@@ -12,6 +12,7 @@ import {
   HYDROGEN_ND_PRESETS,
   type HydrogenNDPreset,
   hydrogenNDToLabel,
+  normalizeHydrogenNDPresetName,
 } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 
 describe('Hydrogen ND Presets', () => {
@@ -107,6 +108,44 @@ describe('Hydrogen ND Presets', () => {
       expect(HYDROGEN_ND_PRESETS['3dz2_6d'].dimension).toBe(6)
       expect(HYDROGEN_ND_PRESETS['4fz3_6d'].dimension).toBe(6)
     })
+
+    it('freezes presets and nested arrays to prevent registry corruption', () => {
+      const preset = HYDROGEN_ND_PRESETS['2pz_4d']
+
+      expect(Object.isFrozen(HYDROGEN_ND_PRESETS)).toBe(true)
+      expect(Object.isFrozen(preset)).toBe(true)
+      expect(Object.isFrozen(preset.extraDimN)).toBe(true)
+      expect(Object.isFrozen(preset.extraDimOmega)).toBe(true)
+    })
+
+    it('rejects runtime mutation through returned preset references', () => {
+      const preset = getHydrogenNDPreset('2pz_4d')
+      const originalN = preset.n
+      const originalExtra = preset.extraDimN[0]!
+      let scalarThrew = false
+      let arrayThrew = false
+
+      try {
+        preset.n = 7
+      } catch {
+        scalarThrew = true
+      } finally {
+        if (!scalarThrew) preset.n = originalN
+      }
+
+      try {
+        preset.extraDimN[0] = 6
+      } catch {
+        arrayThrew = true
+      } finally {
+        if (!arrayThrew) preset.extraDimN[0] = originalExtra
+      }
+
+      expect(scalarThrew).toBe(true)
+      expect(arrayThrew).toBe(true)
+      expect(HYDROGEN_ND_PRESETS['2pz_4d'].n).toBe(originalN)
+      expect(HYDROGEN_ND_PRESETS['2pz_4d'].extraDimN[0]).toBe(originalExtra)
+    })
   })
 
   describe('getHydrogenNDPreset', () => {
@@ -130,6 +169,18 @@ describe('Hydrogen ND Presets', () => {
       expect(preset.l).toBe(1)
       expect(preset.m).toBe(0)
       expect(preset.dimension).toBe(4)
+    })
+  })
+
+  describe('normalizeHydrogenNDPresetName', () => {
+    it('preserves known preset ids', () => {
+      expect(normalizeHydrogenNDPresetName('3dz2_6d')).toBe('3dz2_6d')
+      expect(normalizeHydrogenNDPresetName('custom')).toBe('custom')
+    })
+
+    it('uses the requested fallback for unknown runtime values', () => {
+      expect(normalizeHydrogenNDPresetName('unknown', 'custom')).toBe('custom')
+      expect(normalizeHydrogenNDPresetName(undefined, '1s_3d')).toBe('1s_3d')
     })
   })
 

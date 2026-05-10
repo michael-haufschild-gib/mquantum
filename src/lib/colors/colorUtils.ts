@@ -349,6 +349,25 @@ export const isValidHex = (hex: string): boolean => {
 }
 
 /**
+ * Normalize an opaque CSS hex color to lowercase #rrggbb.
+ * Rejects alpha-bearing hex so CSS background and WebGPU clear color stay in sync.
+ * @param value - Runtime color input.
+ * @returns Normalized opaque hex color, or null when invalid/translucent.
+ */
+export const normalizeOpaqueHexColor = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  const shortMatch = trimmed.match(/^#([0-9a-fA-F]{3})$/)
+  if (shortMatch) {
+    const [r, g, b] = shortMatch[1]!
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase()
+  }
+  const longMatch = trimmed.match(/^#([0-9a-fA-F]{6})$/)
+  if (longMatch) return `#${longMatch[1]!.toLowerCase()}`
+  return null
+}
+
+/**
  * Generates Tints and Shades.
  * @param h - Hue.
  * @param s - Saturation.

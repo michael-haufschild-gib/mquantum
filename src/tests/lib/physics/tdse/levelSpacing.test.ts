@@ -57,6 +57,31 @@ describe('computeLevelSpacing', () => {
     expect(result.brodyBeta).toBeLessThanOrEqual(1)
   })
 
+  it('filters non-finite energies before spacing analysis', () => {
+    const result = computeLevelSpacing([Number.NaN, 3, Number.POSITIVE_INFINITY, 1, 2])
+    expect(result.energies).toEqual([1, 2, 3])
+    expect(result.spacings).toEqual([1, 1])
+    expect(result.meanSpacing).toBe(1)
+  })
+
+  it('returns finite empty metadata when fewer than two finite energies remain', () => {
+    const result = computeLevelSpacing([Number.NaN, Number.POSITIVE_INFINITY], [0.1, Number.NaN])
+    expect(result.energies).toEqual([])
+    expect(result.spacings).toEqual([])
+    expect(result.meanSpacing).toBe(0)
+    expect(result.brodyBeta).toBe(0)
+    expect(result.classification).toBe('poisson')
+    expect(result.meanIPR).toBeNaN()
+  })
+
+  it('averages only IPRs paired with finite energies', () => {
+    const result = computeLevelSpacing(
+      [1, Number.NaN, 2, Number.POSITIVE_INFINITY, 3],
+      [0.1, 99, 0.2, 88, 0.3]
+    )
+    expect(result.meanIPR).toBeCloseTo(0.2, 10)
+  })
+
   it('returns NaN meanIPR when no IPRs provided', () => {
     const result = computeLevelSpacing([1, 2, 3])
     expect(result.meanIPR).toBeNaN()

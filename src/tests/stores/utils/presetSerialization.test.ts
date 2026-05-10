@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { normalizeEnvironmentLoadData } from '@/stores/utils/presetNormalization'
 import {
   sanitizeExtendedLoadedState,
   sanitizeLoadedState,
@@ -37,6 +38,33 @@ describe('sanitizeLoadedState', () => {
       skyboxEnabled: false,
       backgroundColor: '#101010',
     })
+  })
+})
+
+describe('normalizeEnvironmentLoadData', () => {
+  it('normalizes shorthand background colors during scene/style load', () => {
+    expect(
+      normalizeEnvironmentLoadData({
+        backgroundColor: '#0f8',
+        skyboxEnabled: false,
+      }).backgroundColor
+    ).toBe('#00ff88')
+  })
+
+  it('drops invalid or translucent background colors during scene/style load', () => {
+    expect(
+      normalizeEnvironmentLoadData({
+        backgroundColor: 'not-a-color',
+        skyboxEnabled: false,
+      })
+    ).not.toHaveProperty('backgroundColor')
+
+    expect(
+      normalizeEnvironmentLoadData({
+        backgroundColor: '#12345680',
+        skyboxEnabled: false,
+      })
+    ).not.toHaveProperty('backgroundColor')
   })
 })
 

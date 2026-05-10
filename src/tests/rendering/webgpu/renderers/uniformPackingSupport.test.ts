@@ -49,4 +49,45 @@ describe('computeCanonicalCompensation — Hermite convention lock', () => {
     expect(compensation).toBeGreaterThan(0)
     expect(Number.isFinite(compensation)).toBe(true)
   })
+
+  it('keeps compensation finite for malformed runtime preset values', () => {
+    const preset: QuantumPreset = {
+      termCount: Number.POSITIVE_INFINITY,
+      omega: [Number.NaN, Number.POSITIVE_INFINITY, -1],
+      quantumNumbers: [[Number.NaN, 2, 99]],
+      coefficients: [[1, 0]],
+      energies: [Number.NaN],
+    }
+
+    const { compensation, peakDensity } = computeCanonicalCompensation(
+      preset,
+      Number.NaN,
+      Number.NaN
+    )
+
+    expect(compensation).toBeGreaterThan(0)
+    expect(Number.isFinite(compensation)).toBe(true)
+    expect(peakDensity).toBeGreaterThan(0)
+    expect(Number.isFinite(peakDensity)).toBe(true)
+  })
+
+  it('ignores non-finite dominant coefficients instead of returning NaN gain', () => {
+    const preset: QuantumPreset = {
+      termCount: 2,
+      omega: [1],
+      quantumNumbers: [[0], [1]],
+      coefficients: [
+        [Number.POSITIVE_INFINITY, 0],
+        [1, 0],
+      ],
+      energies: [0, 0],
+    }
+
+    const { compensation, peakDensity } = computeCanonicalCompensation(preset, 1, 2.0)
+
+    expect(compensation).toBeGreaterThan(0)
+    expect(Number.isFinite(compensation)).toBe(true)
+    expect(peakDensity).toBeGreaterThan(0)
+    expect(Number.isFinite(peakDensity)).toBe(true)
+  })
 })

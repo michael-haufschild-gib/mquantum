@@ -93,6 +93,34 @@ describe('Hydrogen ND Store Actions', () => {
       expect(useExtendedObjectStore.getState().schroedinger.principalQuantumNumber).toBe(3)
       expect(useExtendedObjectStore.getState().schroedinger.azimuthalQuantumNumber).toBe(2)
     })
+
+    it('falls back to a valid preset id when runtime input is unknown', () => {
+      const store = useExtendedObjectStore.getState()
+
+      store.setSchroedingerHydrogenNDPreset('not-a-preset' as never)
+
+      const config = useExtendedObjectStore.getState().schroedinger
+      expect(config.hydrogenNDPreset).toBe('2pz_4d')
+      expect(config.principalQuantumNumber).toBe(HYDROGEN_ND_PRESETS['2pz_4d'].n)
+      expect(config.azimuthalQuantumNumber).toBe(HYDROGEN_ND_PRESETS['2pz_4d'].l)
+    })
+
+    it('marks bulk-loaded unknown preset ids as custom', () => {
+      const store = useExtendedObjectStore.getState()
+
+      store.setSchroedingerConfig({
+        hydrogenNDPreset: 'not-a-preset' as never,
+        principalQuantumNumber: 4,
+        azimuthalQuantumNumber: 3,
+        magneticQuantumNumber: 2,
+      })
+
+      const config = useExtendedObjectStore.getState().schroedinger
+      expect(config.hydrogenNDPreset).toBe('custom')
+      expect(config.principalQuantumNumber).toBe(4)
+      expect(config.azimuthalQuantumNumber).toBe(3)
+      expect(config.magneticQuantumNumber).toBe(2)
+    })
   })
 
   describe('setSchroedingerExtraDimQuantumNumber', () => {

@@ -112,6 +112,12 @@ export function multiplyMatrices(a: MatrixND, b: MatrixND, out?: MatrixND): Matr
 
   const dim = squareDimensionFromLength(len)
 
+  if (out && out.length !== len) {
+    throw new Error(
+      `Output matrix dimensions incompatible: expected length ${len}, received ${out.length}`
+    )
+  }
+
   // Use provided output matrix or allocate new one
   const result = out ?? new Float32Array(len)
 

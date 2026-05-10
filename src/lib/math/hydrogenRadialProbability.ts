@@ -92,9 +92,12 @@ export function computeRadialProbabilityNorm(
   const validLRaw = Number.isFinite(l) ? Math.floor(l) : 0
   const validL = Math.max(0, Math.min(validLRaw, validN - 1))
   const validA0 = Number.isFinite(a0) ? Math.max(a0, 0.001) : 0.001
+  const validDimension = Number.isFinite(dimension)
+    ? Math.max(2, Math.min(11, Math.floor(dimension)))
+    : 3
 
   // Use n_eff for scan range when D > 3
-  const nEff = validN + (dimension - 3) / 2
+  const nEff = validN + (validDimension - 3) / 2
   const rMax = (nEff * nEff + nEff + 2) * validA0 * 2.0
   const steps = 500
   const dr = rMax / steps
@@ -103,8 +106,8 @@ export function computeRadialProbabilityNorm(
   for (let i = 1; i <= steps; i++) {
     const r = i * dr
     const R =
-      dimension !== 3
-        ? hydrogenRadialND(validN, validL, r, validA0, dimension)
+      validDimension !== 3
+        ? hydrogenRadialND(validN, validL, r, validA0, validDimension)
         : hydrogenRadial(validN, validL, r, validA0)
     const P = 4.0 * Math.PI * r * r * R * R
     if (P > maxP) maxP = P

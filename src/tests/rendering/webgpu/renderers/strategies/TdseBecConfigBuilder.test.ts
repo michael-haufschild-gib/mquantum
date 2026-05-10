@@ -229,6 +229,108 @@ describe('buildBecConfig — lattice passthrough', () => {
   })
 })
 
+describe('buildBecConfig — malformed BEC ingress', () => {
+  it('falls back from non-finite lattice inputs without throwing or writing NaN config', () => {
+    const { config } = buildBecConfig(
+      minimalBec({
+        latticeDim: Number.NaN,
+        gridSize: [Number.NaN, -3, 7],
+        spacing: [Number.NaN, 0, Number.POSITIVE_INFINITY],
+        trapAnisotropy: [Number.NaN, 0, Number.POSITIVE_INFINITY],
+      } as Partial<BecConfig>),
+      undefined
+    )
+
+    expect(config.latticeDim).toBe(DEFAULT_BEC_CONFIG.latticeDim)
+    expect(config.gridSize).toEqual([8, 2, 8])
+    expect(config.spacing).toEqual([0.15, 0.01, 0.15])
+    expect(config.trapAnisotropy).toEqual([1, 0.1, 1])
+    expect(Number.isFinite(config.packetAmplitude)).toBe(true)
+  })
+
+  it('clamps out-of-range lattice dimensions and resizes dependent arrays', () => {
+    const { config } = buildBecConfig(
+      minimalBec({
+        latticeDim: 99,
+        gridSize: [16],
+        spacing: [0.2],
+        trapAnisotropy: [2],
+        compactDims: [true],
+        compactRadii: [0.5],
+        slicePositions: [Number.NaN, 0.25],
+      } as Partial<BecConfig>),
+      undefined
+    )
+
+    expect(config.latticeDim).toBe(11)
+    expect(config.gridSize).toHaveLength(11)
+    expect(config.gridSize[0]).toBe(16)
+    expect(config.gridSize[10]).toBe(8)
+    expect(config.spacing).toHaveLength(11)
+    expect(config.trapAnisotropy).toHaveLength(11)
+    expect(config.compactDims).toHaveLength(11)
+    expect(config.compactRadii).toHaveLength(11)
+    expect(config.slicePositions).toHaveLength(8)
+    expect(config.slicePositions[0]).toBe(0)
+  })
+
+  it('sanitizes malformed physics scalars and cross-mode overrides', () => {
+    const { config } = buildBecConfig(
+      minimalBec({
+        interactionStrength: Number.NaN,
+        trapOmega: Number.NaN,
+        initTrapOmega: Number.POSITIVE_INFINITY,
+        hbar: Number.NaN,
+        mass: Number.NaN,
+        dt: Number.POSITIVE_INFINITY,
+        stepsPerFrame: Number.NaN,
+        diagnosticsInterval: Number.NaN,
+        disorderStrength: Number.NaN,
+        disorderSeed: Number.NaN,
+        disorderDistribution: 'bogus' as BecConfig['disorderDistribution'],
+        initialCondition: 'bogus' as BecConfig['initialCondition'],
+        fieldView: 'bogus' as BecConfig['fieldView'],
+        vortexPlane1: [Number.NaN, Number.NaN],
+        autoScale: 'yes' as unknown as boolean,
+        diagnosticsEnabled: 'yes' as unknown as boolean,
+        needsReset: 'yes' as unknown as boolean,
+        observablesEnabled: 'yes' as unknown as boolean,
+        hawkingPairInjection: 'yes' as unknown as boolean,
+      } as Partial<BecConfig>),
+      {
+        absorberEnabled: 'yes' as unknown as boolean,
+        absorberWidth: Number.NaN,
+        pmlTargetReflection: Number.POSITIVE_INFINITY,
+        autoScaleMaxGain: Number.NaN,
+      }
+    )
+
+    expect(config.initialCondition).toBe(DEFAULT_BEC_CONFIG.initialCondition)
+    expect(config.fieldView).toBe(DEFAULT_BEC_CONFIG.fieldView)
+    expect(config.interactionStrength).toBe(DEFAULT_BEC_CONFIG.interactionStrength)
+    expect(config.harmonicOmega).toBe(DEFAULT_BEC_CONFIG.trapOmega)
+    expect(config.hbar).toBe(DEFAULT_TDSE_CONFIG.hbar)
+    expect(config.mass).toBe(DEFAULT_TDSE_CONFIG.mass)
+    expect(config.dt).toBe(DEFAULT_BEC_CONFIG.dt)
+    expect(config.stepsPerFrame).toBe(DEFAULT_BEC_CONFIG.stepsPerFrame)
+    expect(config.diagnosticsInterval).toBe(DEFAULT_BEC_CONFIG.diagnosticsInterval)
+    expect(config.disorderStrength).toBe(0)
+    expect(config.disorderSeed).toBe(DEFAULT_TDSE_CONFIG.disorderSeed)
+    expect(config.disorderDistribution).toBe(DEFAULT_TDSE_CONFIG.disorderDistribution)
+    expect(config.absorberWidth).toBe(0.2)
+    expect(config.pmlTargetReflection).toBe(1e-6)
+    expect(config.autoScaleMaxGain).toBe(20)
+    expect(config.vortexPlane1).toEqual([0, 1])
+    expect(config.absorberEnabled).toBe(false)
+    expect(config.autoScale).toBe(true)
+    expect(config.diagnosticsEnabled).toBe(true)
+    expect(config.needsReset).toBe(false)
+    expect(config.observablesEnabled).toBe(false)
+    expect(config.hawkingPairInjection).toBe(false)
+    expect(Number.isFinite(config.packetAmplitude)).toBe(true)
+  })
+})
+
 describe('buildBecConfig — fixed BEC overrides', () => {
   it('disables stochastic decoherence', () => {
     const { config } = buildBecConfig(minimalBec(), undefined)

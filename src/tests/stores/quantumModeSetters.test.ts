@@ -127,6 +127,40 @@ describe('quantum number interdependency clamping', () => {
     expect(useExtendedObjectStore.getState().schroedinger.angularChain.slice(0, 2)).toEqual([2, 2])
   })
 
+  it('sanitizes hydrogen quantum fields through bulk config updates', () => {
+    const store = useExtendedObjectStore.getState()
+    store.setSchroedingerPrincipalQuantumNumber(4)
+    store.setSchroedingerAzimuthalQuantumNumber(2)
+    store.setSchroedingerMagneticQuantumNumber(-1)
+    store.setSchroedingerBohrRadiusScale(1.5)
+
+    store.setSchroedingerConfig({
+      principalQuantumNumber: Number.NaN,
+      azimuthalQuantumNumber: Number.POSITIVE_INFINITY,
+      magneticQuantumNumber: Number.NEGATIVE_INFINITY,
+      bohrRadiusScale: Number.NaN,
+    })
+
+    let s = useExtendedObjectStore.getState().schroedinger
+    expect(s.principalQuantumNumber).toBe(4)
+    expect(s.azimuthalQuantumNumber).toBe(2)
+    expect(s.magneticQuantumNumber).toBe(-1)
+    expect(s.bohrRadiusScale).toBe(1.5)
+
+    store.setSchroedingerConfig({
+      principalQuantumNumber: 99,
+      azimuthalQuantumNumber: 99,
+      magneticQuantumNumber: -99,
+      bohrRadiusScale: -1,
+    })
+
+    s = useExtendedObjectStore.getState().schroedinger
+    expect(s.principalQuantumNumber).toBe(7)
+    expect(s.azimuthalQuantumNumber).toBe(6)
+    expect(s.magneticQuantumNumber).toBe(-6)
+    expect(s.bohrRadiusScale).toBe(0.5)
+  })
+
   it('maintains invariant after arbitrary sequence of quantum number changes', () => {
     const store = useExtendedObjectStore.getState()
     const sequence: Array<[string, number]> = [

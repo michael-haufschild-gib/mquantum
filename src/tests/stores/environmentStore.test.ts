@@ -261,6 +261,25 @@ describe('environmentStore', () => {
         setBackgroundColor('#00ff00')
         expect(useEnvironmentStore.getState().backgroundColor).toBe('#00ff00')
       })
+
+      it('should normalize shorthand background colors', () => {
+        const { setBackgroundColor } = useEnvironmentStore.getState()
+
+        setBackgroundColor('#0f8')
+
+        expect(useEnvironmentStore.getState().backgroundColor).toBe('#00ff88')
+      })
+
+      it('should reject invalid or translucent background colors', () => {
+        const { setBackgroundColor } = useEnvironmentStore.getState()
+
+        setBackgroundColor('#123456')
+        setBackgroundColor('not-a-color')
+        expect(useEnvironmentStore.getState().backgroundColor).toBe('#123456')
+
+        setBackgroundColor('#12345680')
+        expect(useEnvironmentStore.getState().backgroundColor).toBe('#123456')
+      })
     })
 
     describe('version tracking', () => {

@@ -51,6 +51,16 @@ export interface ScarResult {
   strongestOrbitIndex: number
 }
 
+function emptyScarResult(orbits: ClassicalTrajectory[]): ScarResult {
+  return {
+    orbitCorrelations: orbits.map(() => 0),
+    maxCorrelation: 0,
+    meanCorrelation: 0,
+    orbitCorrelation: 0,
+    strongestOrbitIndex: 0,
+  }
+}
+
 /**
  * Compute scar correlation between an eigenstate density and classical orbits.
  *
@@ -78,7 +88,21 @@ export function computeScarCorrelation(
 ): ScarResult {
   const dim = gridSize.length
   let totalSites = 1
-  for (let d = 0; d < dim; d++) totalSites *= gridSize[d]!
+  if (dim === 0 || spacing.length < dim || !Number.isFinite(tubeWidth) || tubeWidth <= 0) {
+    return emptyScarResult(orbits)
+  }
+  for (let d = 0; d < dim; d++) {
+    const size = gridSize[d]!
+    const dx = spacing[d]!
+    if (!Number.isInteger(size) || size <= 0 || !Number.isFinite(dx) || dx <= 0) {
+      return emptyScarResult(orbits)
+    }
+    totalSites *= size
+    if (!Number.isSafeInteger(totalSites)) return emptyScarResult(orbits)
+  }
+  if (densityRe.length < totalSites || densityIm.length < totalSites) {
+    return emptyScarResult(orbits)
+  }
 
   // ── WASM fast path ──────────────────────────────────────────────────
   if (orbits.length > 0 && totalSites >= WASM_SCAR_MIN_SITES && isAnimationWasmReady()) {
@@ -101,8 +125,10 @@ export function computeScarCorrelation(
   const density = new Float64Array(totalSites)
   let totalDensity = 0
   for (let i = 0; i < totalSites; i++) {
-    const re = densityRe[i]!
-    const im = densityIm[i]!
+    const reRaw = densityRe[i]!
+    const imRaw = densityIm[i]!
+    const re = Number.isFinite(reRaw) ? reRaw : 0
+    const im = Number.isFinite(imRaw) ? imRaw : 0
     const rho = re * re + im * im
     density[i] = rho
     totalDensity += rho
@@ -317,6 +343,9 @@ function tryScarCorrelationWasm(
 
   if (!packed || packed.length < orbits.length + 4) {
     return null
+  }
+  for (let i = 0; i < orbits.length + 4; i++) {
+    if (!Number.isFinite(packed[i]!)) return null
   }
 
   // Unpack: [corr_0, ..., corr_N, max, mean, orbit_correlation, strongest_idx]
