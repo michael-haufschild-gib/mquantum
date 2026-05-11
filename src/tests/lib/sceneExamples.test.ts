@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import scenesData from '@/assets/defaults/scenes.json'
-import { findSceneByName, getSceneExamples } from '@/lib/sceneExamples'
+import { applySceneExample, findSceneByName, getSceneExamples } from '@/lib/sceneExamples'
 import { type SavedScene, usePresetManagerStore } from '@/stores/runtime/presetManagerStore'
 
 describe('sceneExamples', () => {
@@ -22,29 +22,54 @@ describe('sceneExamples', () => {
     expect(result).toEqual({ id: 'custom-id', source: 'saved' })
   })
 
-  it('example apply callbacks stage bundled scenes before invoking loadScene', () => {
+  it('example apply callbacks stage bundled scenes before invoking loadScene', async () => {
+    const originalLoadScene = usePresetManagerStore.getState().loadScene
     vi.useFakeTimers()
+    let hadSceneWhenLoadCalled = false
+
+    try {
+      const examples = getSceneExamples()
+      expect(examples.length).toBeGreaterThan(0)
+
+      const example = examples[0]!
+      usePresetManagerStore.setState({
+        loadScene: ((id: string) => {
+          hadSceneWhenLoadCalled = usePresetManagerStore
+            .getState()
+            .savedScenes.some((scene) => scene.id === id)
+        }) as typeof originalLoadScene,
+      })
+
+      await example.apply()
+      expect(hadSceneWhenLoadCalled).toBe(true)
+    } finally {
+      vi.runOnlyPendingTimers()
+      vi.useRealTimers()
+      usePresetManagerStore.setState({ loadScene: originalLoadScene })
+    }
+  })
+
+  it('cleans up staged bundled scenes when loadScene throws', async () => {
     const examples = getSceneExamples()
     expect(examples.length).toBeGreaterThan(0)
 
     const example = examples[0]!
-    let hadSceneWhenLoadCalled = false
     const originalLoadScene = usePresetManagerStore.getState().loadScene
 
     usePresetManagerStore.setState({
-      loadScene: ((id: string) => {
-        hadSceneWhenLoadCalled = usePresetManagerStore
-          .getState()
-          .savedScenes.some((scene) => scene.id === id)
+      loadScene: (() => {
+        throw new Error('load failed')
       }) as typeof originalLoadScene,
     })
 
-    example.apply()
-    expect(hadSceneWhenLoadCalled).toBe(true)
-
-    vi.runOnlyPendingTimers()
-    vi.useRealTimers()
-    usePresetManagerStore.setState({ loadScene: originalLoadScene })
+    try {
+      await expect(applySceneExample(example.id)).resolves.toBe(false)
+      expect(
+        usePresetManagerStore.getState().savedScenes.some((scene) => scene.id === example.id)
+      ).toBe(false)
+    } finally {
+      usePresetManagerStore.setState({ loadScene: originalLoadScene })
+    }
   })
 
   it('findSceneByName returns null for empty string', () => {

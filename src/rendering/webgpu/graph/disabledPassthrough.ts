@@ -30,7 +30,7 @@ const warnedPassthroughMismatch = new Set<string>()
  * @param pass - The disabled render pass
  * @param passId - Pass identifier for logging
  * @param encoder - Active command encoder for copy commands
- * @param passTimings - Mutable timing map (set to 0 for skipped passes)
+ * @param passTimings - Mutable timing map (set to 0 for skipped passes), or null when metrics are disabled
  * @param writtenByEnabledPass - Set of resource IDs already written this frame
  * @param shouldLog - Whether to emit debug log messages
  */
@@ -40,7 +40,7 @@ export function handleDisabledPassthrough(
   pass: WebGPURenderPass,
   passId: string,
   encoder: GPUCommandEncoder,
-  passTimings: Map<string, number>,
+  passTimings: Map<string, number> | null,
   writtenByEnabledPass: Set<string>,
   shouldLog: boolean
 ): void {
@@ -48,7 +48,7 @@ export function handleDisabledPassthrough(
   const outputs = pass.config.outputs ?? []
 
   if (inputs.length < 1 || outputs.length < 1) {
-    passTimings.set(passId, 0)
+    passTimings?.set(passId, 0)
     return
   }
 
@@ -56,7 +56,7 @@ export function handleDisabledPassthrough(
   const outputId = outputs[0]!.resourceId
 
   if (writtenByEnabledPass.has(outputId)) {
-    passTimings.set(passId, 0)
+    passTimings?.set(passId, 0)
     if (shouldLog)
       logger.log(`[WebGPU RenderGraph] Pass '${passId}' skipped (output already written)`)
     return
@@ -110,5 +110,5 @@ export function handleDisabledPassthrough(
     }
   }
 
-  passTimings.set(passId, 0)
+  passTimings?.set(passId, 0)
 }

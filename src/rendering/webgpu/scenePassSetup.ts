@@ -255,7 +255,7 @@ async function setupPPPassesSequential(
   config: PassConfig,
   shouldAbort?: () => boolean
 ): Promise<void> {
-  const passes = constructPPPasses(config)
+  const passes = await constructPPPasses(config)
 
   for (const { pass, label, resource } of passes) {
     if (shouldAbort?.()) return
@@ -292,20 +292,26 @@ export async function setupPPPasses(
     return setupPPPassesSequential(graph, config, shouldAbort)
   }
 
-  const passes = constructPPPasses(config)
+  const passes = await constructPPPasses(config)
 
   // Phase 1: Pre-initialize all passes in parallel (shader compilation)
-  if (!shouldAbort?.()) {
-    await Promise.all(passes.map(({ pass, label }) => preInitPass(pass, setupCtx, label)))
-  }
+  const initializedPasses = !shouldAbort?.()
+    ? await Promise.all(passes.map(({ pass, label }) => preInitPass(pass, setupCtx, label)))
+    : []
 
   if (shouldAbort?.()) {
     passes.forEach(({ pass }) => pass.dispose())
     return
   }
 
+  const initializedSet = new Set(
+    initializedPasses.filter((pass): pass is WebGPURenderPass => pass !== null)
+  )
+  const readyPasses = passes.filter(({ pass }) => initializedSet.has(pass))
+  if (readyPasses.length === 0) return
+
   // Phase 2: Register in pipeline order
-  registerPasses(graph, passes)
+  registerPasses(graph, readyPasses)
 }
 
 /** Remove Schroedinger-group passes that should no longer exist. */
@@ -411,6 +417,11 @@ const PAULI_RENDERER_OVERRIDES = {
   isPauli: true,
   crossSectionEnabled: false,
   probabilityCurrentEnabled: false,
+  quantumBackreactionLensingEnabled: false,
+  bilocalERBridgeEnabled: false,
+  entropicTimeShearEnabled: false,
+  spectralDimensionFlowEnabled: false,
+  vacuumBubbleLensEnabled: false,
 }
 
 /**
@@ -461,6 +472,11 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
         openQuantumEnabled: config.openQuantumEnabled,
         crossSectionEnabled: config.crossSectionEnabled,
         probabilityCurrentEnabled: config.probabilityCurrentEnabled,
+        quantumBackreactionLensingEnabled: config.quantumBackreactionLensingEnabled,
+        bilocalERBridgeEnabled: config.bilocalERBridgeEnabled,
+        entropicTimeShearEnabled: config.entropicTimeShearEnabled,
+        spectralDimensionFlowEnabled: config.spectralDimensionFlowEnabled,
+        vacuumBubbleLensEnabled: config.vacuumBubbleLensEnabled,
         densityGridResolution: config.densityGridResolution,
       })
 

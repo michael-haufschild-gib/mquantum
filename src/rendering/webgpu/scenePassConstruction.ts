@@ -9,20 +9,14 @@
 
 import type { WebGPURenderPass } from './core/types'
 import { WebGPURenderGraph } from './graph/WebGPURenderGraph'
-import { BloomPass } from './passes/BloomPass'
 import { BufferPreviewPass } from './passes/BufferPreviewPass'
 import { DebugOverlayPass } from './passes/DebugOverlayPass'
 import { EnvironmentCompositePass } from './passes/EnvironmentCompositePass'
-import { FrameBlendingPass } from './passes/FrameBlendingPass'
-import { FXAAPass } from './passes/FXAAPass'
 import { LightGizmoPass } from './passes/LightGizmoPass'
 import { MeasurementPointCloudPass } from './passes/MeasurementPointCloudPass'
-import { PaperTexturePass } from './passes/PaperTexturePass'
 import { ScenePass } from './passes/ScenePass'
-import { SMAAPass } from './passes/SMAAPass'
 import { ToneMappingCinematicPass } from './passes/ToneMappingCinematicPass'
 import { ToScreenPass } from './passes/ToScreenPass'
-import { WebGPUSkyboxRenderer } from './renderers/WebGPUSkyboxRenderer'
 import { computeCasSharpnessFromRenderScale, type PassConfig } from './scenePassConfig'
 import { parseHexColorToLinearRgb } from './utils/color'
 
@@ -35,7 +29,7 @@ export interface LabeledPass {
 }
 
 /** Construct all PP passes from config, returning them in pipeline order. */
-export function constructPPPasses(config: PassConfig): LabeledPass[] {
+export async function constructPPPasses(config: PassConfig): Promise<LabeledPass[]> {
   const backgroundLinear = parseHexColorToLinearRgb(config.backgroundColor, [0, 0, 0])
   const useTemporalCloud =
     config.objectType === 'schroedinger' && config.temporalReprojectionEnabled
@@ -53,19 +47,29 @@ export function constructPPPasses(config: PassConfig): LabeledPass[] {
   const passes: LabeledPass[] = []
 
   // Scene / skybox
+  let scenePass: WebGPURenderPass
+  if (config.skyboxEnabled) {
+    const { WebGPUSkyboxRenderer } = await import('./renderers/WebGPUSkyboxRenderer')
+    scenePass = new WebGPUSkyboxRenderer({
+      mode: config.skyboxMode,
+      sun: true,
+      vignette: false,
+    })
+  } else {
+    scenePass = new ScenePass({
+      outputResource: 'scene-render',
+      mode: 'clear',
+      clearColor: {
+        r: backgroundLinear[0],
+        g: backgroundLinear[1],
+        b: backgroundLinear[2],
+        a: 1,
+      },
+    })
+  }
+
   passes.push({
-    pass: config.skyboxEnabled
-      ? new WebGPUSkyboxRenderer({ mode: config.skyboxMode, sun: true, vignette: false })
-      : new ScenePass({
-          outputResource: 'scene-render',
-          mode: 'clear',
-          clearColor: {
-            r: backgroundLinear[0],
-            g: backgroundLinear[1],
-            b: backgroundLinear[2],
-            a: 1,
-          },
-        }),
+    pass: scenePass,
     label: config.skyboxEnabled ? 'skybox' : 'scene-pass',
     resource: null,
   })
@@ -90,6 +94,7 @@ export function constructPPPasses(config: PassConfig): LabeledPass[] {
 
   // Bloom (optional)
   if (config.bloomEnabled) {
+    const { BloomPass } = await import('./passes/BloomPass')
     passes.push({
       pass: new BloomPass({
         inputResource: 'hdr-color',
@@ -103,6 +108,7 @@ export function constructPPPasses(config: PassConfig): LabeledPass[] {
 
   // Frame blending (optional)
   if (config.frameBlendingEnabled) {
+    const { FrameBlendingPass } = await import('./passes/FrameBlendingPass')
     passes.push({
       pass: new FrameBlendingPass({
         colorInput: config.bloomEnabled ? 'bloom-output' : 'hdr-color',
@@ -127,6 +133,7 @@ export function constructPPPasses(config: PassConfig): LabeledPass[] {
 
   // Paper texture (optional)
   if (config.paperEnabled) {
+    const { PaperTexturePass } = await import('./passes/PaperTexturePass')
     passes.push({
       pass: new PaperTexturePass({ colorInput: 'ldr-color', outputResource: 'paper-output' }),
       label: 'paper-texture',
@@ -136,6 +143,7 @@ export function constructPPPasses(config: PassConfig): LabeledPass[] {
 
   // Anti-aliasing (optional, mutually exclusive)
   if (config.antiAliasingMethod === 'fxaa') {
+    const { FXAAPass } = await import('./passes/FXAAPass')
     passes.push({
       pass: new FXAAPass({
         colorInput: aaInput,
@@ -146,6 +154,7 @@ export function constructPPPasses(config: PassConfig): LabeledPass[] {
       resource: null,
     })
   } else if (config.antiAliasingMethod === 'smaa') {
+    const { SMAAPass } = await import('./passes/SMAAPass')
     passes.push({
       pass: new SMAAPass({
         colorInput: aaInput,

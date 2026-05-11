@@ -269,8 +269,13 @@ export const computeStrides = computeStridesBase
  * @param latticeDim - Number of active lattice dimensions
  * @returns Stride array of length MAX_DIM
  */
-export function computeStridesPadded(gridSize: number[], latticeDim: number): number[] {
-  const strides = new Array(MAX_DIM).fill(0) as number[]
+export function computeStridesPadded(
+  gridSize: number[],
+  latticeDim: number,
+  target?: number[]
+): number[] {
+  const strides = target ?? new Array(MAX_DIM)
+  for (let d = 0; d < MAX_DIM; d++) strides[d] = 0
   if (latticeDim > 0) {
     strides[latticeDim - 1] = 1
     for (let d = latticeDim - 2; d >= 0; d--) {

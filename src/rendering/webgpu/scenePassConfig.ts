@@ -85,6 +85,11 @@ export interface PassConfig {
   openQuantumEnabled: boolean
   crossSectionEnabled: boolean
   probabilityCurrentEnabled: boolean
+  quantumBackreactionLensingEnabled: boolean
+  bilocalERBridgeEnabled: boolean
+  entropicTimeShearEnabled: boolean
+  spectralDimensionFlowEnabled: boolean
+  vacuumBubbleLensEnabled: boolean
   densityGridResolution: number
   skyboxEnabled: boolean
   skyboxMode: SkyboxMode
@@ -114,6 +119,11 @@ export interface SchrodingerPassConfig {
   openQuantumEnabled: boolean
   crossSectionEnabled: boolean
   probabilityCurrentEnabled: boolean
+  quantumBackreactionLensingEnabled: boolean
+  bilocalERBridgeEnabled: boolean
+  entropicTimeShearEnabled: boolean
+  spectralDimensionFlowEnabled: boolean
+  vacuumBubbleLensEnabled: boolean
   densityGridResolution: number
 }
 
@@ -143,8 +153,15 @@ export function executeFrameAndCollectMetrics({
   size,
   dpr,
 }: FrameMetricsArgs): WebGPUFrameStats {
+  const metricsMode = collector.beginFrame(graph)
+  if (metricsMode === 'none') {
+    const frameStats = graph.execute(deltaTime, metricsMode)
+    collector.recordFrame(0, frameStats, graph, size, dpr)
+    return frameStats
+  }
+
   const cpuStartMs = performance.now()
-  const frameStats = graph.execute(deltaTime)
+  const frameStats = graph.execute(deltaTime, metricsMode)
   const cpuTimeMs = performance.now() - cpuStartMs
   collector.recordFrame(cpuTimeMs, frameStats, graph, size, dpr)
   return frameStats
@@ -340,6 +357,11 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
       config.probabilityCurrentEnabled || compileEffectBundle,
       disableAnalytical
     ),
+    quantumBackreactionLensingEnabled: config.quantumBackreactionLensingEnabled,
+    bilocalERBridgeEnabled: config.bilocalERBridgeEnabled,
+    entropicTimeShearEnabled: config.entropicTimeShearEnabled,
+    spectralDimensionFlowEnabled: config.spectralDimensionFlowEnabled,
+    vacuumBubbleLensEnabled: config.vacuumBubbleLensEnabled,
     densityGridResolution: config.densityGridResolution,
   }
 }

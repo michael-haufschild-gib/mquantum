@@ -229,6 +229,16 @@ export interface SchrodingerRendererConfig {
   crossSectionEnabled?: boolean
   /** Compile-time gate for probability current j-field. */
   probabilityCurrentEnabled?: boolean
+  /** Compile-time gate for probability-stress optical metric branches. */
+  quantumBackreactionLensingEnabled?: boolean
+  /** Compile-time gate for bilocal ER bridge branches. */
+  bilocalERBridgeEnabled?: boolean
+  /** Compile-time gate for entropy-gradient time-shear branches. */
+  entropicTimeShearEnabled?: boolean
+  /** Compile-time gate for spectral-dimension flow branches. */
+  spectralDimensionFlowEnabled?: boolean
+  /** Compile-time gate for false-vacuum bubble lens branches. */
+  vacuumBubbleLensEnabled?: boolean
   /** Density grid resolution per axis (64/96/128/256). */
   densityGridResolution?: number
 }

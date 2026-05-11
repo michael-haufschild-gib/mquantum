@@ -39,6 +39,7 @@ import {
   createDensityTexture,
   DENSITY_GRID_SIZE,
   LINEAR_WG,
+  MAX_DIM,
   pickSiteDispatch,
   sanitizeGridSizes,
   type SiteDispatch,
@@ -306,6 +307,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
   readonly uniformU32 = new Uint32Array(this.uniformData)
   readonly uniformF32 = new Float32Array(this.uniformData)
+  readonly strideScratch = new Array<number>(MAX_DIM).fill(0)
 
   /** Adapter: wraps base dispatchCompute with optional y/z defaulting to 1. */
   readonly dc = (
@@ -318,6 +320,18 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   ): void => {
     this.dispatchCompute(pe, p, b, x, y ?? 1, z ?? 1)
   }
+
+  readonly dispatchFFTAxisCallback = (
+    c: WebGPURenderContext,
+    axisDim: number,
+    slot: number
+  ): number => this.dispatchFFTAxis(c, axisDim, slot)
+
+  readonly dispatchFFTAxisInPassCallback = (
+    passEncoder: GPUComputePassEncoder,
+    axisDim: number,
+    slot: number
+  ): void => this.dispatchFFTAxisInPass(passEncoder, axisDim, slot)
 
   readonly densityGridSize: number
 
@@ -899,7 +913,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
           maxDensity: this._diagState.maxDensity,
           initialMaxDensity: this._diagState.initialMaxDensity,
           autoScaleMaxGain: config.autoScaleMaxGain ?? 20,
-          strides: computeStridesPadded(config.gridSize, config.latticeDim),
+          strides: computeStridesPadded(config.gridSize, config.latticeDim, this.strideScratch),
           needsInit: !this.initialized || config.needsReset || this._diagState.pendingAutoReset,
           basisX,
           basisY,
@@ -962,7 +976,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
             this.potentialBuffer,
             this.totalSites,
             linearWG,
-            this.dispatchCompute.bind(this)
+            this.dc
           )
         }
       }
@@ -1028,9 +1042,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         wormholeBG: this.wormholeBG,
         siteDispatch,
         dc: this.dc,
-        dispatchFFTAxis: (c, axisDim, slot) => this.dispatchFFTAxis(c, axisDim, slot),
-        dispatchFFTAxisInPass: (passEncoder, axisDim, slot) =>
-          this.dispatchFFTAxisInPass(passEncoder, axisDim, slot),
+        dispatchFFTAxis: this.dispatchFFTAxisCallback,
+        dispatchFFTAxisInPass: this.dispatchFFTAxisInPassCallback,
         dispatchCurvedRK4,
         prepareCurvedStageTimes,
         applyCurvedStageTimesForStep,
@@ -1047,7 +1060,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         this.uniformBuffer,
         this.psiBuffer,
         linearWG,
-        this.dispatchCompute.bind(this)
+        this.dc
       )
     }
 
@@ -1080,7 +1093,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       obsState: this._obsState,
       vdState: this._vdState,
       dispatchCompute: this.dc,
-      dispatchFFTAxis: (c, axisDim, slot) => this.dispatchFFTAxis(c, axisDim, slot),
+      dispatchFFTAxis: this.dispatchFFTAxisCallback,
       densityGridSize: this.densityGridSize,
     })
   }

@@ -238,6 +238,8 @@ export interface FsfUniformParams {
    * last recorded — the uniforms writer does not recompute it.
    */
   preheatingReferenceEta: number
+  /** Optional caller-owned scratch reused for padded grid strides. */
+  strideScratch?: number[]
 }
 
 /**
@@ -272,7 +274,7 @@ export function writeFsfUniforms(
   // Zero out the entire buffer first (ensures unused array slots are 0)
   u32.fill(0)
 
-  const strides = computeStridesPadded(config.gridSize, config.latticeDim)
+  const strides = computeStridesPadded(config.gridSize, config.latticeDim, params.strideScratch)
 
   // Scalars (offset 0-15, 4 u32/f32 slots)
   u32[I.latticeDim] = config.latticeDim

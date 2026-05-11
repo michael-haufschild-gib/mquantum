@@ -222,6 +222,22 @@ export function buildShaderConfig(
     useDensityMatrix: rendererConfig.openQuantumEnabled ?? false,
     crossSectionEnabled: rendererConfig.crossSectionEnabled ?? true,
     probabilityCurrentEnabled: rendererConfig.probabilityCurrentEnabled ?? true,
+    // Compute-grid modes already precompute density/phase into textures. Their
+    // default object signal is the simulated field, not scene light response, so
+    // use ambient emission and avoid per-hit gradient fetches plus light loops.
+    fastGridEmission: computeMode,
+    quantumBackreactionLensing: rendererConfig.quantumBackreactionLensingEnabled ?? true,
+    bilocalERBridge: rendererConfig.bilocalERBridgeEnabled ?? true,
+    entropicTimeShear: rendererConfig.entropicTimeShearEnabled ?? true,
+    spectralDimensionFlow: rendererConfig.spectralDimensionFlowEnabled ?? true,
+    vacuumBubbleLens: rendererConfig.vacuumBubbleLensEnabled ?? true,
+    negativeAlphaPotentialOverlay:
+      rendererConfig.quantumMode === 'tdseDynamics' ||
+      rendererConfig.quantumMode === 'diracEquation',
+    wdwOverlay: strategyKind === 'wheelerDeWitt',
+    tdseBranchColor: rendererConfig.quantumMode === 'tdseDynamics',
+    adsAmplitude: strategyKind === 'antiDeSitter',
+    gridPhaseOffset: strategyKind === 'antiDeSitter' || strategyKind === 'wheelerDeWitt',
     sampleSpaceRotation: runtime?.sampleSpaceRotation === true,
     // Profiling strip flags: read from window global (set by A/B benchmark tests)
     profilingStrip:
@@ -310,6 +326,17 @@ export function computePipelineCacheKey(
     config.useDensityMatrix ? 1 : 0,
     config.crossSectionEnabled ? 1 : 0,
     config.probabilityCurrentEnabled ? 1 : 0,
+    config.fastGridEmission ? 1 : 0,
+    config.quantumBackreactionLensing ? 1 : 0,
+    config.bilocalERBridge ? 1 : 0,
+    config.entropicTimeShear ? 1 : 0,
+    config.spectralDimensionFlow ? 1 : 0,
+    config.vacuumBubbleLens ? 1 : 0,
+    config.negativeAlphaPotentialOverlay ? 1 : 0,
+    config.wdwOverlay ? 1 : 0,
+    config.tdseBranchColor ? 1 : 0,
+    config.adsAmplitude ? 1 : 0,
+    config.gridPhaseOffset ? 1 : 0,
     config.isPauli ? 1 : 0,
     config.sampleSpaceRotation ? 1 : 0,
   ].join(':')

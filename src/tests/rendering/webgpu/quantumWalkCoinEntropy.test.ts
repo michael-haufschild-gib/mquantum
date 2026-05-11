@@ -4,7 +4,10 @@ import {
   DEFAULT_QUANTUM_WALK_CONFIG,
   type QuantumWalkConfig,
 } from '@/lib/geometry/extended/quantumWalk'
-import { packWriteGridUniforms } from '@/rendering/webgpu/passes/QuantumWalkComputePassUniforms'
+import {
+  packAbsorberUniforms,
+  packWriteGridUniforms,
+} from '@/rendering/webgpu/passes/QuantumWalkComputePassUniforms'
 import { qwWriteGridBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/qwWriteGrid.wgsl'
 
 function configWithFieldView(fieldView: QuantumWalkConfig['fieldView']): QuantumWalkConfig {
@@ -91,6 +94,56 @@ describe('QuantumWalk coin entropy field view', () => {
     expect(pack('probability')).toBe(0)
     expect(pack('phase')).toBe(1)
     expect(pack('coinState')).toBe(2)
+  })
+
+  it('reuses and clears write-grid uniform target buffers', () => {
+    const first = packWriteGridUniforms(
+      configWithFieldView('probability'),
+      16 * 16 * 16,
+      1,
+      [16 * 16, 16, 1],
+      undefined,
+      undefined,
+      undefined,
+      1
+    )
+    const stale = new Uint32Array(first)
+    stale[6] = 123
+
+    const second = packWriteGridUniforms(
+      { ...configWithFieldView('phase'), latticeDim: 1, gridSize: [16], spacing: [0.1] },
+      16,
+      1,
+      [1],
+      undefined,
+      undefined,
+      undefined,
+      1,
+      first
+    )
+
+    expect(second).toBe(first)
+    expect(new Uint32Array(second)[3]).toBe(1)
+    expect(new Uint32Array(second)[6]).toBe(0)
+  })
+
+  it('reuses and clears absorber uniform target buffers', () => {
+    const config = configWithFieldView('probability')
+    const first = packAbsorberUniforms(config, 16 * 16 * 16, [16 * 16, 16, 1], 0.75)
+    const stale = new Uint32Array(first)
+    stale[8] = 123
+
+    const second = packAbsorberUniforms(
+      { ...config, latticeDim: 1, gridSize: [16], spacing: [0.1] },
+      16,
+      [1],
+      0.5,
+      first
+    )
+
+    expect(second).toBe(first)
+    expect(new Uint32Array(second)[1]).toBe(1)
+    expect(new Uint32Array(second)[8]).toBe(0)
   })
 
   it('writes normalized local coin Shannon entropy in the QW write-grid shader', () => {

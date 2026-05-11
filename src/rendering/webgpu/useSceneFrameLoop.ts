@@ -143,16 +143,20 @@ export function useSceneFrameCallbacks(deps: SceneFrameCallbackDeps): SceneFrame
           schroedingerBasisCacheRef.current.basisZ.set(basisZ)
         }
 
-        const paramValues =
-          useExtendedObjectStore.getState().schroedinger?.parameterValues ?? EMPTY_PARAM_VALUES
-        const originValues = originValuesWorkRef.current
-        originValues.fill(0)
-        for (let i = 3; i < dimension; i++) {
-          originValues[i] = paramValues[i - 3] ?? 0
-        }
-        const { origin, changed: originChanged } = schroedingerRotation.getOrigin(originValues)
-        if (originChanged || changed) {
-          schroedingerBasisCacheRef.current.origin.set(origin)
+        if (dimension > 3 || changed) {
+          const originValues = originValuesWorkRef.current
+          originValues.fill(0)
+          if (dimension > 3) {
+            const paramValues =
+              useExtendedObjectStore.getState().schroedinger?.parameterValues ?? EMPTY_PARAM_VALUES
+            for (let i = 3; i < dimension; i++) {
+              originValues[i] = paramValues[i - 3] ?? 0
+            }
+          }
+          const { origin, changed: originChanged } = schroedingerRotation.getOrigin(originValues)
+          if (originChanged || changed) {
+            schroedingerBasisCacheRef.current.origin.set(origin)
+          }
         }
       }
     },

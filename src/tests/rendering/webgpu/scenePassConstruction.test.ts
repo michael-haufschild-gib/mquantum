@@ -27,6 +27,11 @@ function makePassConfig(overrides: Partial<PassConfig> = {}): PassConfig {
     openQuantumEnabled: false,
     crossSectionEnabled: false,
     probabilityCurrentEnabled: false,
+    quantumBackreactionLensingEnabled: false,
+    bilocalERBridgeEnabled: false,
+    entropicTimeShearEnabled: false,
+    spectralDimensionFlowEnabled: false,
+    vacuumBubbleLensEnabled: false,
     densityGridResolution: 96,
     skyboxEnabled: false,
     skyboxMode: 'classic',
@@ -43,8 +48,8 @@ type SkyboxPassInternals = {
 }
 
 describe('constructPPPasses', () => {
-  it('enables skybox sun effect so procedural sunIntensity reaches the shader', () => {
-    const passes = constructPPPasses(
+  it('enables skybox sun effect so procedural sunIntensity reaches the shader', async () => {
+    const passes = await constructPPPasses(
       makePassConfig({
         skyboxEnabled: true,
         skyboxMode: 'procedural_twilight',

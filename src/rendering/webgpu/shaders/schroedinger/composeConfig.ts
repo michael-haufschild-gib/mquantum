@@ -118,6 +118,28 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   crossSectionEnabled?: boolean
   /** Compile-time gate for probability current j-field (default: true). */
   probabilityCurrentEnabled?: boolean
+  /** Use ambient-only emission in grid-only compute raymarchers. */
+  fastGridEmission?: boolean
+  /** Compile-time gate for probability-stress optical metric branches. */
+  quantumBackreactionLensing?: boolean
+  /** Compile-time gate for bilocal ER bridge branches. */
+  bilocalERBridge?: boolean
+  /** Compile-time gate for entropy-gradient time-shear branches. */
+  entropicTimeShear?: boolean
+  /** Compile-time gate for spectral-dimension flow branches. */
+  spectralDimensionFlow?: boolean
+  /** Compile-time gate for false-vacuum bubble lens branches. */
+  vacuumBubbleLens?: boolean
+  /** Compile-time gate for TDSE/Dirac negative-alpha potential overlays. */
+  negativeAlphaPotentialOverlay?: boolean
+  /** Compile-time gate for Wheeler-DeWitt positive-alpha overlays. */
+  wdwOverlay?: boolean
+  /** Compile-time gate for TDSE branch-color mixing. */
+  tdseBranchColor?: boolean
+  /** Compile-time gate for AdS amplitude growth in density-grid raymarching. */
+  adsAmplitude?: boolean
+  /** Compile-time gate for WdW/AdS phase rotation in density-grid raymarching. */
+  gridPhaseOffset?: boolean
   /** Apply basis-vector rotation to density grid sample positions (AdS modes). */
   sampleSpaceRotation?: boolean
   /**
@@ -267,11 +289,32 @@ export function buildShaderDefinesAndFeatures(flags: {
   useWignerCache: boolean
   crossSectionEnabled: boolean
   probabilityCurrentEnabled: boolean
+  fastGridEmission?: boolean
+  quantumBackreactionLensing?: boolean
+  bilocalERBridge?: boolean
+  entropicTimeShear?: boolean
+  spectralDimensionFlow?: boolean
+  vacuumBubbleLens?: boolean
+  negativeAlphaPotentialOverlay?: boolean
+  wdwOverlay?: boolean
+  tdseBranchColor?: boolean
+  adsAmplitude?: boolean
+  gridPhaseOffset?: boolean
   sampleSpaceRotation?: boolean
   profilingStrip?: SchroedingerWGSLShaderConfig['profilingStrip']
 }): { defines: string[]; features: string[] } {
   const defines: string[] = []
   const features: string[] = []
+  const featureQuantumBackreaction = flags.quantumBackreactionLensing ?? true
+  const featureBilocalBridge = flags.bilocalERBridge ?? true
+  const featureEntropicShear = flags.entropicTimeShear ?? true
+  const featureSpectralFlow = flags.spectralDimensionFlow ?? true
+  const featureVacuumBubble = flags.vacuumBubbleLens ?? true
+  const featureNegativeAlphaPotentialOverlay = flags.negativeAlphaPotentialOverlay ?? true
+  const featureWdwOverlay = flags.wdwOverlay ?? true
+  const featureTdseBranchColor = flags.tdseBranchColor ?? true
+  const featureAdsAmplitude = flags.adsAmplitude ?? true
+  const featureGridPhaseOffset = flags.gridPhaseOffset ?? true
 
   // Only ACTUAL_DIM (clamped) is emitted — the previously-emitted
   // un-clamped `const DIMENSION` was never read by any WGSL shader.
@@ -317,6 +360,19 @@ export function buildShaderDefinesAndFeatures(flags: {
   defines.push(`const FEATURE_RADIAL_PROBABILITY: bool = ${flags.includeHydrogen};`)
   defines.push(`const FEATURE_CROSS_SECTION: bool = ${flags.crossSectionEnabled};`)
   defines.push(`const FEATURE_PROBABILITY_CURRENT: bool = ${flags.probabilityCurrentEnabled};`)
+  defines.push(`const FAST_GRID_EMISSION: bool = ${flags.fastGridEmission ?? false};`)
+  defines.push(`const FEATURE_QUANTUM_BACKREACTION_LENSING: bool = ${featureQuantumBackreaction};`)
+  defines.push(`const FEATURE_BILOCAL_ER_BRIDGE: bool = ${featureBilocalBridge};`)
+  defines.push(`const FEATURE_ENTROPIC_TIME_SHEAR: bool = ${featureEntropicShear};`)
+  defines.push(`const FEATURE_SPECTRAL_DIMENSION_FLOW: bool = ${featureSpectralFlow};`)
+  defines.push(`const FEATURE_VACUUM_BUBBLE_LENS: bool = ${featureVacuumBubble};`)
+  defines.push(
+    `const FEATURE_NEGATIVE_ALPHA_POTENTIAL_OVERLAY: bool = ${featureNegativeAlphaPotentialOverlay};`
+  )
+  defines.push(`const FEATURE_WDW_OVERLAY: bool = ${featureWdwOverlay};`)
+  defines.push(`const FEATURE_TDSE_BRANCH_COLOR: bool = ${featureTdseBranchColor};`)
+  defines.push(`const FEATURE_ADS_AMPLITUDE: bool = ${featureAdsAmplitude};`)
+  defines.push(`const FEATURE_GRID_PHASE_OFFSET: bool = ${featureGridPhaseOffset};`)
 
   if (flags.quantumMode === 'hydrogenNDCoupled') {
     defines.push('const QUANTUM_MODE_DEFAULT: i32 = 2;')
@@ -404,6 +460,17 @@ export function buildShaderDefinesAndFeatures(flags: {
   if (flags.useDensityGrid) features.push('Density Grid Raymarching')
   if (flags.isWigner && flags.useWignerCache) features.push('Wigner Cache')
   if (flags.sampleSpaceRotation) features.push('Sample-Space Rotation')
+  if (flags.fastGridEmission) features.push('Fast Grid Emission')
+  if (featureQuantumBackreaction) features.push('Quantum Backreaction Lens')
+  if (featureBilocalBridge) features.push('Bilocal ER Bridge')
+  if (featureEntropicShear) features.push('Entropic Time Shear')
+  if (featureSpectralFlow) features.push('Spectral Dimension Flow')
+  if (featureVacuumBubble) features.push('Vacuum Bubble Lens')
+  if (featureNegativeAlphaPotentialOverlay) features.push('Negative-Alpha Potential Overlay')
+  if (featureWdwOverlay) features.push('WdW Overlay')
+  if (featureTdseBranchColor) features.push('TDSE Branch Color')
+  if (featureAdsAmplitude) features.push('AdS Amplitude')
+  if (featureGridPhaseOffset) features.push('Grid Phase Offset')
 
   return { defines, features }
 }

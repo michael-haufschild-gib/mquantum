@@ -13,16 +13,6 @@
 import { getHydrogenNDPresetsWithKeysByDimension } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import type { QuantumTypeKey } from '@/lib/geometry/registry'
 
-import { ADS_PRESETS } from './antiDeSitter/presets'
-import { BEC_SCENARIO_PRESETS } from './bec/presets'
-import { DIRAC_SCENARIO_PRESETS } from './dirac/presets'
-import { FREE_SCALAR_PRESETS } from './freeScalar/presets'
-import { HYDROGEN_COUPLED_PRESETS } from './hydrogenCoupled/presets'
-import { PAULI_SCENARIO_PRESETS } from './pauli/presets'
-import { QUANTUM_WALK_PRESETS } from './quantumWalk/presets'
-import { TDSE_SCENARIO_PRESETS } from './tdse/presets'
-import { WDW_SCENARIO_PRESETS } from './wheelerDeWitt/presets'
-
 type FirstPresetResolver = (dimension: number) => string | undefined
 
 /**
@@ -40,26 +30,60 @@ function resolveHydrogenND(dimension: number): string | undefined {
 }
 
 /**
+ * First compatible preset IDs for modes whose first-preset choice is stable.
+ *
+ * Keep this resolver lightweight: importing every full preset catalogue here
+ * pulls all mode-specific physics preset data into the initial `physics`
+ * chunk even though preset application already lazy-loads those modules.
+ */
+const FIRST_PRESET_IDS = {
+  harmonicOscillator: 'groundState',
+  hydrogenNDCoupled: '1s_ground',
+  tdseDynamics: 'classicTunneling',
+  becDynamics: 'groundState',
+  diracEquation: 'kleinParadox',
+  freeScalarField: 'gaussianPacket',
+  quantumWalk: 'groverSearch',
+  pauliSpinor: 'larmorPrecession',
+  wheelerDeWitt: 'noBoundaryBaseline',
+  antiDeSitterDefault: 'adsFourGround',
+  antiDeSitter3D: 'adsThreeGround',
+} as const
+
+function resolveHydrogenCoupled(dimension: number): string | undefined {
+  return dimension >= 2 ? FIRST_PRESET_IDS.hydrogenNDCoupled : undefined
+}
+
+function resolveTdse(dimension: number): string | undefined {
+  return dimension >= 3 ? FIRST_PRESET_IDS.tdseDynamics : undefined
+}
+
+function resolveBec(dimension: number): string | undefined {
+  return dimension >= 2 ? FIRST_PRESET_IDS.becDynamics : undefined
+}
+
+function resolveAntiDeSitter(dimension: number): string {
+  if (dimension === 3) return FIRST_PRESET_IDS.antiDeSitter3D
+  return FIRST_PRESET_IDS.antiDeSitterDefault
+}
+
+/**
  * Per-mode resolvers. Each one is the dimension-filter idiom for that mode's
- * preset catalog — most are one line. Adding a new mode means adding one
- * entry here and importing its preset array above.
+ * preset catalog. Adding a new mode means adding one lightweight resolver
+ * here; avoid importing full preset arrays into this file.
  */
 const PRESET_RESOLVERS: Readonly<Record<QuantumTypeKey, FirstPresetResolver>> = {
-  harmonicOscillator: () => 'groundState',
+  harmonicOscillator: () => FIRST_PRESET_IDS.harmonicOscillator,
   hydrogenND: resolveHydrogenND,
-  hydrogenNDCoupled: (d) => HYDROGEN_COUPLED_PRESETS.find((p) => p.minDim <= d)?.id,
-  tdseDynamics: (d) =>
-    TDSE_SCENARIO_PRESETS.find((p) => {
-      const min = p.overrides.latticeDim
-      return min === undefined || min <= d
-    })?.id,
-  becDynamics: (d) => BEC_SCENARIO_PRESETS.find((p) => (p.minDim ?? 2) <= d)?.id,
-  diracEquation: () => DIRAC_SCENARIO_PRESETS[0]?.id,
-  freeScalarField: () => FREE_SCALAR_PRESETS[0]?.id,
-  quantumWalk: () => QUANTUM_WALK_PRESETS[0]?.id,
-  pauliSpinor: () => PAULI_SCENARIO_PRESETS[0]?.id,
-  wheelerDeWitt: () => WDW_SCENARIO_PRESETS[0]?.id,
-  antiDeSitter: (d) => (ADS_PRESETS.find((p) => p.d <= d) ?? ADS_PRESETS[0])?.id,
+  hydrogenNDCoupled: resolveHydrogenCoupled,
+  tdseDynamics: resolveTdse,
+  becDynamics: resolveBec,
+  diracEquation: () => FIRST_PRESET_IDS.diracEquation,
+  freeScalarField: () => FIRST_PRESET_IDS.freeScalarField,
+  quantumWalk: () => FIRST_PRESET_IDS.quantumWalk,
+  pauliSpinor: () => FIRST_PRESET_IDS.pauliSpinor,
+  wheelerDeWitt: () => FIRST_PRESET_IDS.wheelerDeWitt,
+  antiDeSitter: resolveAntiDeSitter,
 }
 
 /**

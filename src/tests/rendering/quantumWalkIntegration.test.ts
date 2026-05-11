@@ -37,18 +37,22 @@ describe('QUANTUM_MODE_MAP', () => {
 })
 
 describe('createModeStrategy', () => {
-  it('returns QuantumWalkStrategy for quantumWalk mode', () => {
-    const strategy = createModeStrategy({ quantumMode: 'quantumWalk' })
+  it('returns QuantumWalkStrategy for quantumWalk mode', async () => {
+    const strategy = await createModeStrategy({ quantumMode: 'quantumWalk' })
     expect(strategy).toBeInstanceOf(QuantumWalkStrategy)
   })
 
-  it('uses shared TDSE/BEC strategy metadata', () => {
-    expect(createModeStrategy({ quantumMode: 'tdseDynamics' })).toBeInstanceOf(TdseBecStrategy)
-    expect(createModeStrategy({ quantumMode: 'becDynamics' })).toBeInstanceOf(TdseBecStrategy)
+  it('uses shared TDSE/BEC strategy metadata', async () => {
+    await expect(createModeStrategy({ quantumMode: 'tdseDynamics' })).resolves.toBeInstanceOf(
+      TdseBecStrategy
+    )
+    await expect(createModeStrategy({ quantumMode: 'becDynamics' })).resolves.toBeInstanceOf(
+      TdseBecStrategy
+    )
   })
 
-  it('keeps Pauli priority over quantumMode', () => {
-    const strategy = createModeStrategy({ quantumMode: 'quantumWalk', isPauli: true })
+  it('keeps Pauli priority over quantumMode', async () => {
+    const strategy = await createModeStrategy({ quantumMode: 'quantumWalk', isPauli: true })
     expect(strategy).toBeInstanceOf(PauliStrategy)
   })
 

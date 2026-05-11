@@ -81,11 +81,23 @@ export function applySharedPml<
       }
     | undefined
 ): T {
+  const absorberEnabled = schroedinger?.absorberEnabled ?? config.absorberEnabled ?? true
+  const absorberWidth = schroedinger?.absorberWidth ?? config.absorberWidth
+  const pmlTargetReflection = schroedinger?.pmlTargetReflection ?? config.pmlTargetReflection
+
+  if (
+    config.absorberEnabled === absorberEnabled &&
+    config.absorberWidth === absorberWidth &&
+    config.pmlTargetReflection === pmlTargetReflection
+  ) {
+    return config
+  }
+
   return {
     ...config,
-    absorberEnabled: schroedinger?.absorberEnabled ?? config.absorberEnabled ?? true,
-    absorberWidth: schroedinger?.absorberWidth ?? config.absorberWidth,
-    pmlTargetReflection: schroedinger?.pmlTargetReflection ?? config.pmlTargetReflection,
+    absorberEnabled,
+    absorberWidth,
+    pmlTargetReflection,
   }
 }
 

@@ -9,7 +9,7 @@ import {
   resizeQuantumWalkArrays,
 } from '@/lib/geometry/extended/quantumWalk'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
-import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
+import { beginDynamicPresetApply, loadPresetModule } from '@/stores/utils/dynamicPresetImport'
 
 import type { SetterContext } from './sliceSetterUtils'
 
@@ -30,11 +30,13 @@ export function createQuantumWalkSetters(ctx: SetterContext): QuantumWalkSetters
 
   return {
     applyQuantumWalkPreset: (presetId) => {
+      const isCurrentPresetApply = beginDynamicPresetApply()
       return loadPresetModule(
         () => import('@/lib/physics/quantumWalk/presets'),
         'schroedingerSlice',
         `quantum-walk presets for '${presetId}'`,
         ({ QUANTUM_WALK_PRESETS }) => {
+          if (!isCurrentPresetApply()) return
           const preset = QUANTUM_WALK_PRESETS.find((p) => p.id === presetId)
           if (!preset) return
           setWithVersion((state) => {

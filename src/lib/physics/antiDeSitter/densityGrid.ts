@@ -32,7 +32,7 @@
 import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
 import type { AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
 import { clamp01 } from '@/lib/math/clamp'
-import { packRGBA16F } from '@/lib/physics/freeScalar/kSpaceOccupation'
+import { packRGBA16F } from '@/lib/physics/freeScalar/halfFloatPacking'
 
 import { BTZ_AMPLITUDE_CEILING, btzScalarDelta, btzTemperature, btzThermalAmplitude } from './btz'
 import {

@@ -540,19 +540,23 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
  * Searches both saved scenes (user's custom) and example scenes (bundled).
  * @param sceneName - Scene name to search for (case-insensitive)
  */
-function loadSceneByName(sceneName: string): void {
-  const result = findSceneByName(sceneName)
+async function loadSceneByName(sceneName: string): Promise<void> {
+  try {
+    const result = findSceneByName(sceneName)
 
-  if (result) {
-    if (result.source === 'saved') {
-      usePresetManagerStore.getState().loadScene(result.id)
-      logger.log(`[useUrlState] Loaded saved scene: "${sceneName}"`)
+    if (result) {
+      if (result.source === 'saved') {
+        usePresetManagerStore.getState().loadScene(result.id)
+        logger.log(`[useUrlState] Loaded saved scene: "${sceneName}"`)
+      } else {
+        const loaded = await applySceneExample(result.id)
+        if (loaded) logger.log(`[useUrlState] Loaded example scene: "${sceneName}"`)
+      }
     } else {
-      applySceneExample(result.id)
-      logger.log(`[useUrlState] Loaded example scene: "${sceneName}"`)
+      logger.warn(`[useUrlState] Scene "${sceneName}" not found in saved or example scenes`)
     }
-  } else {
-    logger.warn(`[useUrlState] Scene "${sceneName}" not found in saved or example scenes`)
+  } catch (error) {
+    logger.error(`[useUrlState] Failed to load scene "${sceneName}":`, error)
   }
 }
 
@@ -581,10 +585,10 @@ export function useUrlState(): void {
       const sceneName = urlState.scene
 
       if (usePresetManagerStore.persist.hasHydrated()) {
-        loadSceneByName(sceneName)
+        void loadSceneByName(sceneName)
       } else {
         usePresetManagerStore.persist.onFinishHydration(() => {
-          loadSceneByName(sceneName)
+          void loadSceneByName(sceneName)
         })
       }
       return

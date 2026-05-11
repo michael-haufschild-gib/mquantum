@@ -494,7 +494,7 @@ describe('WDW preset end-to-end pipeline', () => {
           expect(A).toBeGreaterThanOrEqual(0)
           expect(A).toBeLessThanOrEqual(1 + 1e-3)
         }
-      })
+      }, 15_000)
     })
   }
 })

@@ -5,10 +5,36 @@
  * compatible with the menu system.
  */
 
-import scenesData from '@/assets/defaults/scenes.json'
 import { soundManager } from '@/lib/audio/SoundManager'
 import { logger } from '@/lib/logger'
-import { usePresetManagerStore } from '@/stores/runtime/presetManagerStore'
+import { type SavedScene, usePresetManagerStore } from '@/stores/runtime/presetManagerStore'
+
+const SCENE_EXAMPLE_METADATA = [
+  { id: 'af65b7e6-54c2-4a3e-89dc-c3f3ff55d6af', name: '6D Harmonic Oscillator' },
+  {
+    id: '7cfb4f5b-45fc-4849-b9a5-e58b973f0c24',
+    name: '3D Harmonic Oscillator — Nodal Surfaces',
+  },
+  {
+    id: 'a4bf1959-f15c-492a-b23c-08a3fe1fd39c',
+    name: '2D Harmonic Oscillator — Nodal Cross Section',
+  },
+  { id: '27cc4c7e-2582-4996-878c-57f933c43d64', name: '2D Hydrogen Orbital' },
+  {
+    id: 'f56f3162-d527-4634-bea7-bdb592f6335e',
+    name: 'Scalar Field Kasner - Overblowing density',
+  },
+  { id: 'ca7c1ce7-c3bf-4e69-a1eb-78f7c4ac93c4', name: 'Attractive BEC Collapse' },
+  { id: '7fcbcd15-24f7-489d-9de7-1cc4cf634fe4', name: 'Self-Interacting Scalar Field' },
+  { id: 'dadde8d8-0944-4c92-b221-bbc17080ad71', name: 'Scalar Field de Sitter' },
+  { id: '70227819-0e7f-420d-a9fe-5df416e17f2e', name: 'Quantum Walk' },
+  { id: 'ac1fcf3c-dc1c-479a-9fee-9f20105af4d5', name: 'Wave hitting Black Hole Boundary' },
+] as const
+
+async function loadSceneData(): Promise<SavedScene[]> {
+  const module = await import('@/assets/defaults/scenes.json')
+  return module.default as SavedScene[]
+}
 
 /**
  * Bundled scene example metadata exposed to UI menus.
@@ -17,7 +43,7 @@ export interface SceneExample {
   id: string
   name: string
   description?: string
-  apply: () => void
+  apply: () => Promise<boolean>
 }
 
 /**
@@ -49,7 +75,7 @@ export function findSceneByName(name: string): SceneLookupResult | null {
   }
 
   // Search example scenes (bundled with the app)
-  const exampleMatch = scenesData.find((s) => s.name.toLowerCase() === lowerName)
+  const exampleMatch = SCENE_EXAMPLE_METADATA.find((s) => s.name.toLowerCase() === lowerName)
   if (exampleMatch) {
     return { id: exampleMatch.id, source: 'example' }
   }
@@ -62,18 +88,14 @@ export function findSceneByName(name: string): SceneLookupResult | null {
  * @returns Array of scene examples with apply functions, sorted alphabetically by name
  */
 export function getSceneExamples(): SceneExample[] {
-  return scenesData
-    .map((scene) => ({
-      id: scene.id,
-      name: scene.name,
-      description: `Load ${scene.name} example scene`,
-      apply: () => {
-        // Reuse the bundled-example path so loading works even when examples
-        // are not present in savedScenes.
-        applySceneExample(scene.id)
-      },
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name))
+  return SCENE_EXAMPLE_METADATA.map((scene) => ({
+    id: scene.id,
+    name: scene.name,
+    description: `Load ${scene.name} example scene`,
+    // Reuse the bundled-example path so loading works even when examples
+    // are not present in savedScenes.
+    apply: () => applySceneExample(scene.id),
+  })).sort((a, b) => a.name.localeCompare(b.name))
 }
 
 /**
@@ -81,39 +103,39 @@ export function getSceneExamples(): SceneExample[] {
  * @param id - The unique identifier of the scene to load
  * @returns True if the scene was found and loaded, false otherwise
  */
-export function applySceneExample(id: string): boolean {
-  const scene = scenesData.find((s) => s.id === id)
-  if (!scene) {
-    logger.warn(`Scene example with id "${id}" not found`)
+export async function applySceneExample(id: string): Promise<boolean> {
+  let stagedId: string | null = null
+
+  try {
+    const scenesData = await loadSceneData()
+    const scene = scenesData.find((s) => s.id === id)
+    if (!scene) {
+      logger.warn(`Scene example with id "${id}" not found`)
+      return false
+    }
+
+    const existingScene = usePresetManagerStore
+      .getState()
+      .savedScenes.some((s) => s.id === scene.id)
+
+    if (!existingScene) {
+      usePresetManagerStore.setState((state) => ({
+        savedScenes: [...state.savedScenes, scene],
+      }))
+      stagedId = scene.id
+    }
+
+    await usePresetManagerStore.getState().loadScene(scene.id)
+    soundManager.playClick()
+    return true
+  } catch (error) {
+    logger.error('[sceneExamples] Failed to apply scene example:', error)
     return false
+  } finally {
+    if (stagedId) {
+      usePresetManagerStore.setState((state) => ({
+        savedScenes: state.savedScenes.filter((s) => s.id !== stagedId),
+      }))
+    }
   }
-
-  // Load the scene using preset manager
-  // We need to temporarily add it to savedScenes, load it, then remove it
-  const presetManager = usePresetManagerStore.getState()
-
-  // Check if scene is already in savedScenes
-  const existingScene = presetManager.savedScenes.find((s) => s.id === scene.id)
-
-  if (!existingScene) {
-    // Temporarily add to savedScenes
-    usePresetManagerStore.setState((state) => ({
-      savedScenes: [...state.savedScenes, scene],
-    }))
-  }
-
-  // Load the scene (synchronous — reads from savedScenes then applies state)
-  presetManager.loadScene(scene.id)
-
-  // Remove it from savedScenes immediately after load completes.
-  // loadScene is synchronous, so the scene data has already been read
-  // and applied by the time we reach this line.
-  if (!existingScene) {
-    usePresetManagerStore.setState((state) => ({
-      savedScenes: state.savedScenes.filter((s) => s.id !== scene.id),
-    }))
-  }
-
-  soundManager.playClick()
-  return true
 }

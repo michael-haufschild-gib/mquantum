@@ -9,7 +9,7 @@
 
 import type { PauliConfig } from '@/lib/geometry/extended/types'
 
-import { computeStridesPadded } from './computePassUtils'
+import { computeStridesPadded, MAX_DIM } from './computePassUtils'
 import { packPauliUniforms, PAULI_UNIFORM_SIZE } from './PauliComputePassBuffers'
 
 /**
@@ -20,11 +20,12 @@ import { packPauliUniforms, PAULI_UNIFORM_SIZE } from './PauliComputePassBuffers
 export interface PauliUniformStepStagingState {
   buffer: GPUBuffer | null
   size: number
+  strides: number[]
 }
 
 /** Create a fresh, empty staging-state record. */
 export function createPauliUniformStepStagingState(): PauliUniformStepStagingState {
-  return { buffer: null, size: 0 }
+  return { buffer: null, size: 0, strides: new Array<number>(MAX_DIM).fill(0) }
 }
 
 /**
@@ -86,7 +87,11 @@ export function prePackPauliFrameSnapshots(params: PrePackPauliSnapshotsParams):
     params.device,
     (params.stepsThisFrame + 1) * PAULI_UNIFORM_SIZE
   )
-  const strides = computeStridesPadded(params.config.gridSize, params.config.latticeDim)
+  const strides = computeStridesPadded(
+    params.config.gridSize,
+    params.config.latticeDim,
+    params.state.strides
+  )
   for (let step = 0; step <= params.stepsThisFrame; step++) {
     packPauliUniforms(params.uniformU32, params.uniformF32, {
       config: params.config,

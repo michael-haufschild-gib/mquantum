@@ -20,7 +20,7 @@ import { logger } from '@/lib/logger'
 import { reduceGridToFit } from '@/lib/math/ndArray'
 import { maxStableDt } from '@/lib/physics/dirac/scales'
 import { useAppearanceStore } from '@/stores/scene/appearanceStore'
-import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
+import { beginDynamicPresetApply, loadPresetModule } from '@/stores/utils/dynamicPresetImport'
 
 import {
   defaultDiracGridPerDim,
@@ -472,11 +472,13 @@ export function createDiracSetters(ctx: SetterContext): DiracSetters {
       })
     },
     applyDiracPreset: (presetId) => {
+      const isCurrentPresetApply = beginDynamicPresetApply()
       return loadPresetModule(
         () => import('@/lib/physics/dirac/presets'),
         'diracSetters',
         `Dirac presets for '${presetId}'`,
         async ({ DIRAC_SCENARIO_PRESETS }) => {
+          if (!isCurrentPresetApply()) return
           const preset = DIRAC_SCENARIO_PRESETS.find((p) => p.id === presetId)
           if (!preset) return
           setWithVersion((state) => {
