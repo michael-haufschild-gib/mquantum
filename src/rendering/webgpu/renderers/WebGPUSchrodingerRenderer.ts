@@ -13,8 +13,6 @@
  */
 
 import { logger } from '@/lib/logger'
-import { CarpetSliceComputePass } from '@/rendering/webgpu/passes/CarpetSliceComputePass'
-import { useCarpetStore } from '@/stores/diagnostics/carpetStore'
 
 import type { WebGPURenderContext, WebGPURenderPass, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
@@ -35,6 +33,7 @@ import {
   computeSchroedingerUpdate,
   PRECOMPUTED_TERM_BYTE_OFFSET,
   PRECOMPUTED_TERM_BYTE_SIZE,
+  qualitySignatureKey,
   type SchrodingerFrameState,
   type SchroedingerUpdateResult,
   TIME_FIELD_OFFSET,
@@ -60,10 +59,14 @@ import {
   type SchrodingerRenderResources,
 } from './schrodingerRenderPass'
 import { createVersionTracker, resetVersionTracker } from './stateDiffing'
-import { createModeStrategy } from './strategies/createStrategy'
-import type { ModeFrameContext, QuantumModeStrategy } from './strategies/types'
+import { createInitialModeStrategy, createModeStrategy } from './strategies/createStrategy'
+import type { CachedPresetData, ModeFrameContext, QuantumModeStrategy } from './strategies/types'
 import { packMaterialUniforms, packQualityUniforms } from './uniformPacking'
 export type { SchrodingerRendererConfig } from './schrodingerRendererTypes'
+
+type CarpetSliceComputePassInstance =
+  import('@/rendering/webgpu/passes/CarpetSliceComputePass').CarpetSliceComputePass
+type QuantumCarpetRuntime = typeof import('./quantumCarpetRuntime')
 
 /**
  * WebGPU renderer for quantum wavefunctions.
@@ -96,7 +99,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private strategy: QuantumModeStrategy
 
   // Quantum carpet slice compute (dispatched after strategy executeFrame)
-  private carpetSlicePass: CarpetSliceComputePass | null = null
+  private carpetRuntime: QuantumCarpetRuntime | null = null
+  private carpetRuntimePromise: Promise<void> | null = null
+  private carpetSlicePass: CarpetSliceComputePassInstance | null = null
 
   // Configuration
   private rendererConfig: SchrodingerRendererConfig
@@ -146,6 +151,64 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private readonly clearValueTransparent = { r: 0, g: 0, b: 0, a: 0 }
   private readonly clearValueInvalidPos = { r: 0, g: 0, b: 0, a: -1 }
   private cameraDataView = new DataView(this.cameraUniformData.buffer)
+  private readonly cachedPresetFrame: CachedPresetData = {
+    preset: null as unknown as CachedPresetData['preset'],
+    config: null,
+  }
+  private modeFrameContext!: ModeFrameContext
+  private readonly primaryColorAttachment: GPURenderPassColorAttachment = {
+    view: null as unknown as GPUTextureView,
+    loadOp: 'clear',
+    storeOp: 'store',
+    clearValue: this.clearValueTransparent,
+  }
+  private readonly secondaryColorAttachment: GPURenderPassColorAttachment = {
+    view: null as unknown as GPUTextureView,
+    loadOp: 'clear',
+    storeOp: 'store',
+    clearValue: this.clearValueInvalidPos,
+  }
+  private readonly singleColorAttachments: [GPURenderPassColorAttachment] = [
+    this.primaryColorAttachment,
+  ]
+  private readonly dualColorAttachments: [
+    GPURenderPassColorAttachment,
+    GPURenderPassColorAttachment,
+  ] = [this.primaryColorAttachment, this.secondaryColorAttachment]
+  private readonly renderPassDescriptor: GPURenderPassDescriptor = {
+    label: 'schroedinger-render',
+    colorAttachments: this.singleColorAttachments,
+  }
+  private readonly renderResources: SchrodingerRenderResources = {
+    renderPipeline: null as unknown as GPURenderPipeline,
+    cameraBindGroup: null as unknown as GPUBindGroup,
+    lightingBindGroup: null as unknown as GPUBindGroup,
+    objectBindGroup: null as unknown as GPUBindGroup,
+    vertexBuffer: null,
+    indexBuffer: null,
+    indexCount: 0,
+    clearValueTransparent: this.clearValueTransparent,
+    clearValueInvalidPos: this.clearValueInvalidPos,
+    primaryColorAttachment: this.primaryColorAttachment,
+    secondaryColorAttachment: this.secondaryColorAttachment,
+    singleColorAttachments: this.singleColorAttachments,
+    dualColorAttachments: this.dualColorAttachments,
+    renderPassDescriptor: this.renderPassDescriptor,
+  }
+
+  private readonly rebuildObjectBindGroup = (additionalEntries: GPUBindGroupEntry[]): void => {
+    if (this.objectBindGroupLayout && this.schroedingerUniformBuffer && this.basisUniformBuffer) {
+      this.objectBindGroup = this.device!.createBindGroup({
+        label: 'schroedinger-object-bg',
+        layout: this.objectBindGroupLayout,
+        entries: [
+          { binding: 0, resource: { buffer: this.schroedingerUniformBuffer } },
+          { binding: 1, resource: { buffer: this.basisUniformBuffer } },
+          ...additionalEntries,
+        ],
+      })
+    }
+  }
 
   constructor(config?: SchrodingerRendererConfig) {
     super({
@@ -156,9 +219,21 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     })
 
     this.rendererConfig = applyModeOverrides(config)
-    this.strategy = createModeStrategy(this.rendererConfig)
+    this.strategy = createInitialModeStrategy()
     this.shaderConfig = buildShaderConfig(this.rendererConfig)
     this.strategy.configureShader(this.shaderConfig, this.rendererConfig)
+    this.modeFrameContext = {
+      device: null as unknown as GPUDevice,
+      rendererConfig: this.rendererConfig,
+      schroedingerUniformData: this.schroedingerUniformData,
+      basisUniformData: this.basisUniformData,
+      schroedingerFloatView: this.schroedingerFloatView,
+      schroedingerIntView: this.schroedingerIntView,
+      boundingRadius: this.frameState.boundingRadius,
+      colorAlgorithm: 0,
+      cachedPreset: null,
+      rebuildObjectBindGroup: this.rebuildObjectBindGroup,
+    }
   }
 
   setDimension(dimension: number): void {
@@ -194,7 +269,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // If a predecessor strategy was stashed (via adoptFrom), transfer its compute
     // state to the new strategy before setup, preserving simulation state.
     this.strategy.dispose()
-    this.strategy = createModeStrategy(this.rendererConfig)
+    this.strategy = await createModeStrategy(this.rendererConfig)
+    this.strategy.configureShader(this.shaderConfig, this.rendererConfig)
     if (this.predecessorStrategy) {
       this.strategy.adoptComputeState?.(this.predecessorStrategy, this.rendererConfig)
       this.predecessorStrategy = null
@@ -335,7 +411,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     if (!this.device || !this.qualityUniformBuffer) return
     const performance = getStoreSnapshot<PerformanceSnapshot>(ctx, 'performance')
     const qualityMultiplier = performance?.qualityMultiplier ?? 1.0
-    const qualitySignature = qualityMultiplier.toFixed(4)
+    const qualitySignature = qualitySignatureKey(qualityMultiplier)
     if (qualitySignature === this.frameState.versions.lastQualitySignature) return
     this.frameState.versions.lastQualitySignature = qualitySignature
     packQualityUniforms(this.qualityUniformData, this.qualityDataView, qualityMultiplier)
@@ -404,38 +480,16 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       COLOR_ALGORITHM_MAP[appearance?.colorAlgorithm ?? 'radialDistance'] ??
       11
 
-    const frameContext: ModeFrameContext = {
-      device: this.device,
-      rendererConfig: this.rendererConfig,
-      schroedingerUniformData: this.schroedingerUniformData,
-      basisUniformData: this.basisUniformData,
-      schroedingerFloatView: this.schroedingerFloatView,
-      schroedingerIntView: this.schroedingerIntView,
-      boundingRadius: this.frameState.boundingRadius,
-      colorAlgorithm,
-      cachedPreset: this.frameState.cachedPreset
-        ? {
-            preset: this.frameState.cachedPreset,
-            config: this.frameState.cachedPresetConfig,
-          }
-        : null,
-      rebuildObjectBindGroup: (additionalEntries) => {
-        if (
-          this.objectBindGroupLayout &&
-          this.schroedingerUniformBuffer &&
-          this.basisUniformBuffer
-        ) {
-          this.objectBindGroup = this.device!.createBindGroup({
-            label: 'schroedinger-object-bg',
-            layout: this.objectBindGroupLayout,
-            entries: [
-              { binding: 0, resource: { buffer: this.schroedingerUniformBuffer } },
-              { binding: 1, resource: { buffer: this.basisUniformBuffer } },
-              ...additionalEntries,
-            ],
-          })
-        }
-      },
+    const frameContext = this.modeFrameContext
+    frameContext.device = this.device
+    frameContext.boundingRadius = this.frameState.boundingRadius
+    frameContext.colorAlgorithm = colorAlgorithm
+    if (this.frameState.cachedPreset) {
+      this.cachedPresetFrame.preset = this.frameState.cachedPreset
+      this.cachedPresetFrame.config = this.frameState.cachedPresetConfig
+      frameContext.cachedPreset = this.cachedPresetFrame
+    } else {
+      frameContext.cachedPreset = null
     }
     this.strategy.executeFrame(ctx, frameContext)
 
@@ -447,19 +501,22 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // ============================================
     // RENDER PASS ENCODING (delegated)
     // ============================================
-    const renderResources: SchrodingerRenderResources = {
-      renderPipeline: this.renderPipeline,
-      cameraBindGroup: this.cameraBindGroup,
-      lightingBindGroup: this.lightingBindGroup,
-      objectBindGroup: this.objectBindGroup,
-      vertexBuffer: this.vertexBuffer,
-      indexBuffer: this.indexBuffer,
-      indexCount: this.indexCount,
-      clearValueTransparent: this.clearValueTransparent,
-      clearValueInvalidPos: this.clearValueInvalidPos,
-    }
+    const renderResources = this.renderResources
+    renderResources.renderPipeline = this.renderPipeline
+    renderResources.cameraBindGroup = this.cameraBindGroup
+    renderResources.lightingBindGroup = this.lightingBindGroup
+    renderResources.objectBindGroup = this.objectBindGroup
+    renderResources.vertexBuffer = this.vertexBuffer
+    renderResources.indexBuffer = this.indexBuffer
+    renderResources.indexCount = this.indexCount
 
-    const drawStats = encodeSchrodingerRenderPass(ctx, this.rendererConfig, renderResources, is2D)
+    const drawStats = encodeSchrodingerRenderPass(
+      ctx,
+      this.rendererConfig,
+      renderResources,
+      is2D,
+      this.lastDrawStats
+    )
     if (drawStats) {
       this.lastDrawStats = drawStats
     }
@@ -479,6 +536,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
    * initializes the carpet slice pass on first use.
    */
   private dispatchQuantumCarpetSlice(ctx: WebGPURenderContext): void {
+    if (!this.carpetRuntime) {
+      this.loadQuantumCarpetRuntime()
+      return
+    }
+
+    const { CarpetSliceComputePass, useCarpetStore } = this.carpetRuntime
     const carpetState = useCarpetStore.getState()
     if (!carpetState.enabled || carpetState.paused) return
 
@@ -510,6 +573,19 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       }
     )
     carpetState.advanceHead(ctx.frame?.delta ?? 0.016)
+  }
+
+  private loadQuantumCarpetRuntime(): void {
+    if (this.carpetRuntime || this.carpetRuntimePromise) return
+
+    this.carpetRuntimePromise = import('./quantumCarpetRuntime')
+      .then((runtime) => {
+        this.carpetRuntime = runtime
+      })
+      .catch((error: unknown) => {
+        this.carpetRuntimePromise = null
+        logger.error('[WebGPUSchrodingerRenderer] quantum carpet runtime load failed:', error)
+      })
   }
 
   /** Expose the density texture view for external consumers (e.g. quantum carpet). */

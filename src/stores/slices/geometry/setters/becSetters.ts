@@ -19,7 +19,7 @@ import { thomasFermiMuND, thomasFermiRadius } from '@/lib/physics/bec/chemicalPo
 import { clampKKState, computeEffectiveSpacing } from '@/lib/physics/compactification'
 import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
-import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
+import { beginDynamicPresetApply, loadPresetModule } from '@/stores/utils/dynamicPresetImport'
 
 import {
   clampDtWithCfl,
@@ -569,11 +569,13 @@ export function createBecSetters(ctx: SetterContext): BecSetters {
       })
     },
     applyBecPreset: (presetId) => {
+      const isCurrentPresetApply = beginDynamicPresetApply()
       return loadPresetModule(
         () => import('@/lib/physics/bec/presets'),
         'becSetters',
         `BEC presets for '${presetId}'`,
         ({ getBecPreset }) => {
+          if (!isCurrentPresetApply()) return
           const preset = getBecPreset(presetId)
           if (!preset) return
           setWithVersion((state) => {

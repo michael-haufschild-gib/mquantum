@@ -109,8 +109,9 @@ export function buildExampleSceneItems(
   return sceneExamples.map((scene) => ({
     label: scene.name,
     onClick: () => {
-      applySceneExample(scene.id)
-      addToast(`Loaded example: ${scene.name}`, 'info')
+      void applySceneExample(scene.id).then((loaded) => {
+        if (loaded) addToast(`Loaded example: ${scene.name}`, 'info')
+      })
     },
   }))
 }
@@ -187,8 +188,9 @@ export function buildExampleStyleItems(
   return styleExamples.map((style) => ({
     label: style.name,
     onClick: () => {
-      applyStyleExample(style.id)
-      addToast(`Applied preset: ${style.name}`, 'info')
+      void applyStyleExample(style.id).then((applied) => {
+        if (applied) addToast(`Applied preset: ${style.name}`, 'info')
+      })
     },
   }))
 }

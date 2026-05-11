@@ -16,6 +16,11 @@ import { readFileSync } from 'node:fs'
 
 const MARKER_START = 'BENCHMARK_JSON_START'
 const MARKER_END = 'BENCHMARK_JSON_END'
+const ANSI_ESCAPE_RE = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g
+
+function stripAnsi(text) {
+  return text.replace(ANSI_ESCAPE_RE, '')
+}
 
 function median(arr) {
   const s = [...arr].sort((a, b) => a - b)
@@ -56,21 +61,25 @@ function extractMarkedBlocks(text) {
 
 /** Parse a file as either pure JSON or stdout containing marked blocks. Returns flat array of results. */
 function parseFile(path) {
-  const raw = readFileSync(path, 'utf8')
+  const raw = stripAnsi(readFileSync(path, 'utf8'))
   const trimmed = raw.trimStart()
 
-  // Pure JSON array/object fast-path.
+  // Pure JSON array/object fast-path. Playwright stdout can also begin
+  // with bracketed log prefixes like "[global-setup]", so fall through to
+  // marker extraction if the JSON parse fails.
   if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : [parsed]
+    try {
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed : [parsed]
+    } catch {
+      // Not a pure JSON file; continue with marked stdout parsing below.
+    }
   }
 
   // Extract marked blocks from stdout-style files.
   const blocks = extractMarkedBlocks(raw)
   if (blocks.length === 0) {
-    throw new Error(
-      `${path}: no JSON array found and no BENCHMARK_JSON_START/END markers detected`
-    )
+    throw new Error(`${path}: no JSON array found and no BENCHMARK_JSON_START/END markers detected`)
   }
   const results = []
   for (const block of blocks) {

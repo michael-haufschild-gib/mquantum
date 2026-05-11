@@ -7,6 +7,7 @@
  * @module rendering/webgpu/renderers/strategies/TdseBecStrategy
  */
 
+import type { BecConfig } from '@/lib/geometry/extended/bec'
 import type { TdseConfig } from '@/lib/geometry/extended/tdse'
 import { logger } from '@/lib/logger'
 import { computeEffectiveSpacing } from '@/lib/physics/compactification'
@@ -87,6 +88,16 @@ export class TdseBecStrategy implements QuantumModeStrategy {
   private readonly spectrumWorkerState = createBecSpectrumWorkerState()
   /** Set on dispose to prevent late async callbacks from resurrecting resources. */
   private disposed = false
+  private becConfigCache: {
+    bec: BecConfig
+    version: number | undefined
+    needsReset: boolean | undefined
+    absorberEnabled: boolean | undefined
+    absorberWidth: number | undefined
+    pmlTargetReflection: number | undefined
+    autoScaleMaxGain: number | undefined
+    result: { config: TdseConfig }
+  } | null = null
 
   configureShader(_shader: SchroedingerWGSLShaderConfig, _config: SchrodingerRendererConfig): void {
     // Compute mode overrides applied by renderer constructor
@@ -162,6 +173,45 @@ export class TdseBecStrategy implements QuantumModeStrategy {
   private warnedTdsePassNull = false
   private warnedDensityNull = false
 
+  private buildBecConfigForFrame(
+    bec: BecConfig,
+    schroedinger: ExtendedStoreSnapshot['schroedinger'],
+    version: number | undefined
+  ): { config: TdseConfig } {
+    const needsReset = bec.needsReset
+    const absorberEnabled = schroedinger?.absorberEnabled
+    const absorberWidth = schroedinger?.absorberWidth
+    const pmlTargetReflection = schroedinger?.pmlTargetReflection
+    const autoScaleMaxGain = schroedinger?.autoScaleMaxGain
+    const cached = this.becConfigCache
+
+    if (
+      cached &&
+      cached.bec === bec &&
+      cached.version === version &&
+      cached.needsReset === needsReset &&
+      cached.absorberEnabled === absorberEnabled &&
+      cached.absorberWidth === absorberWidth &&
+      cached.pmlTargetReflection === pmlTargetReflection &&
+      cached.autoScaleMaxGain === autoScaleMaxGain
+    ) {
+      return cached.result
+    }
+
+    const result = buildBecConfig(bec, schroedinger)
+    this.becConfigCache = {
+      bec,
+      version,
+      needsReset,
+      absorberEnabled,
+      absorberWidth,
+      pmlTargetReflection,
+      autoScaleMaxGain,
+      result,
+    }
+    return result
+  }
+
   executeFrame(ctx: WebGPURenderContext, shared: ModeFrameContext): void {
     const tdsePass = this.tdsePass
     if (!tdsePass) {
@@ -192,7 +242,11 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     let clearReset: (() => void) | undefined = () => extended?.clearComputeNeedsReset?.('tdse')
 
     if (isBecMode && extended?.schroedinger?.bec) {
-      const result = buildBecConfig(extended.schroedinger.bec, extended?.schroedinger)
+      const result = this.buildBecConfigForFrame(
+        extended.schroedinger.bec as BecConfig,
+        extended.schroedinger,
+        extended.schroedingerVersion
+      )
       tdseConfig = result.config
       clearReset = () => extended?.clearComputeNeedsReset?.('bec')
     }

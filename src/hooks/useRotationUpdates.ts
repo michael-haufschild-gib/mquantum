@@ -137,12 +137,14 @@ export function useRotationUpdates(options: UseRotationUpdatesOptions): UseRotat
 
   // Cached rotation matrix and basis vectors - only recomputed when needed
   const cachedRotationMatrixRef = useRef<MatrixND | null>(null)
+  const matrixGenerationRef = useRef(0)
   const prevDimensionRef = useRef<number | null>(null)
   const prevParamValuesRef = useRef<number[] | null>(null)
   const basisVectorsDirtyRef = useRef(true)
 
   // Track last computed origin for change detection
   const prevOriginValuesRef = useRef<number[] | null>(null)
+  const originMatrixGenerationRef = useRef(-1)
 
   // Subscription refs for rotations - updated reactively via Zustand subscribe
   // This avoids getState() calls during callbacks
@@ -199,6 +201,7 @@ export function useRotationUpdates(options: UseRotationUpdatesOptions): UseRotat
 
       // Compute rotation matrix only when needed
       cachedRotationMatrixRef.current = composeRotations(dimension, rotations)
+      matrixGenerationRef.current++
 
       // Prepare unit vectors in pre-allocated arrays (no allocation)
       // Clear and set up unitX = [1, 0, 0, ...]
@@ -236,14 +239,22 @@ export function useRotationUpdates(options: UseRotationUpdatesOptions): UseRotat
     const work = workingArraysRef.current
 
     // Check if origin values changed
-    const originChanged =
-      !prevOriginValuesRef.current ||
-      prevOriginValuesRef.current.length !== originValues.length ||
-      originValues.some((v, i) => prevOriginValuesRef.current![i] !== v)
+    const previousOrigin = prevOriginValuesRef.current
+    let originChanged = previousOrigin === null
+    if (previousOrigin) {
+      for (let i = 0; i < MAX_DIMENSION; i++) {
+        if ((originValues[i] ?? 0) !== previousOrigin[i]) {
+          originChanged = true
+          break
+        }
+      }
+    }
 
-    // Always recompute origin if we have a rotation matrix
-    // (origin often changes every frame for animations)
-    if (cachedRotationMatrixRef.current) {
+    const matrixChanged =
+      cachedRotationMatrixRef.current !== null &&
+      originMatrixGenerationRef.current !== matrixGenerationRef.current
+
+    if (cachedRotationMatrixRef.current && (originChanged || matrixChanged)) {
       // Set up origin values
       for (let i = 0; i < MAX_DIMENSION; i++) {
         work.origin[i] = originValues[i] ?? 0
@@ -258,12 +269,17 @@ export function useRotationUpdates(options: UseRotationUpdatesOptions): UseRotat
       )
 
       // Update tracking ref
-      prevOriginValuesRef.current = [...originValues]
+      const nextPrevious = previousOrigin ?? new Array<number>(MAX_DIMENSION).fill(0)
+      for (let i = 0; i < MAX_DIMENSION; i++) {
+        nextPrevious[i] = originValues[i] ?? 0
+      }
+      prevOriginValuesRef.current = nextPrevious
+      originMatrixGenerationRef.current = matrixGenerationRef.current
     }
 
     return {
       origin: work.rotatedOrigin,
-      changed: originChanged,
+      changed: originChanged || matrixChanged,
     }
   }
 

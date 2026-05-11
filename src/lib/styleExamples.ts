@@ -5,17 +5,26 @@
  * compatible with the menu system.
  */
 
-import stylesData from '@/assets/defaults/styles.json'
 import { soundManager } from '@/lib/audio/SoundManager'
 import { logger } from '@/lib/logger'
-import { usePresetManagerStore } from '@/stores/runtime/presetManagerStore'
+import { type SavedStyle, usePresetManagerStore } from '@/stores/runtime/presetManagerStore'
+
+const STYLE_EXAMPLE_METADATA = [
+  { id: '5915b891-95f3-4675-9182-4e8802d66614', name: 'Aquarell' },
+  { id: '12373cde-c7fa-4f6a-881d-24d2324b0b79', name: 'Default' },
+] as const
+
+async function loadStyleData(): Promise<SavedStyle[]> {
+  const module = await import('@/assets/defaults/styles.json')
+  return module.default as SavedStyle[]
+}
 
 /** Built-in style preset examples for the preset manager. */
 export interface StyleExample {
   id: string
   name: string
   description?: string
-  apply: () => void
+  apply: () => Promise<boolean>
 }
 
 /**
@@ -47,7 +56,7 @@ export function findStyleByName(name: string): StyleLookupResult | null {
   }
 
   // Search example styles (bundled with the app)
-  const exampleMatch = stylesData.find((s) => s.name.toLowerCase() === lowerName)
+  const exampleMatch = STYLE_EXAMPLE_METADATA.find((s) => s.name.toLowerCase() === lowerName)
   if (exampleMatch) {
     return { id: exampleMatch.id, source: 'example' }
   }
@@ -60,16 +69,12 @@ export function findStyleByName(name: string): StyleLookupResult | null {
  * @returns Array of style examples with apply functions, sorted alphabetically by name
  */
 export function getStyleExamples(): StyleExample[] {
-  return stylesData
-    .map((style) => ({
-      id: style.id,
-      name: style.name,
-      description: `Apply ${style.name} style preset`,
-      apply: () => {
-        applyStyleExample(style.id)
-      },
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name))
+  return STYLE_EXAMPLE_METADATA.map((style) => ({
+    id: style.id,
+    name: style.name,
+    description: `Apply ${style.name} style preset`,
+    apply: () => applyStyleExample(style.id),
+  })).sort((a, b) => a.name.localeCompare(b.name))
 }
 
 /**
@@ -77,7 +82,8 @@ export function getStyleExamples(): StyleExample[] {
  * @param id - The unique identifier of the style to load
  * @returns True if the style was found and loaded, false otherwise
  */
-export function applyStyleExample(id: string): boolean {
+export async function applyStyleExample(id: string): Promise<boolean> {
+  const stylesData = await loadStyleData()
   const style = stylesData.find((s) => s.id === id)
   if (!style) {
     logger.warn(`Style example with id "${id}" not found`)

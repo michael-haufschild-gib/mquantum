@@ -49,7 +49,9 @@ export class PauliStrategy extends SinglePassComputeStrategy<PauliComputePass, P
     const appearance = getStoreSnapshot<AppearanceStoreState>(ctx, 'appearance')
     const algo = appearance?.colorAlgorithm ?? 'pauliSpinDensity'
     const pauliFieldView = pauliFieldViewForColorAlgorithm(algo, config.fieldView) as PauliFieldView
-    return applySharedPml({ ...config, fieldView: pauliFieldView }, schroedinger) as PauliConfig
+    const pmlConfig = applySharedPml(config, schroedinger) as PauliConfig
+    if (pmlConfig.fieldView === pauliFieldView) return pmlConfig
+    return { ...pmlConfig, fieldView: pauliFieldView } as PauliConfig
   }
 
   protected executePass(

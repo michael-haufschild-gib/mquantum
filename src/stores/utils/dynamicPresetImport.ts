@@ -29,6 +29,21 @@
 
 import { logger } from '@/lib/logger'
 
+let dynamicPresetApplyGeneration = 0
+
+/**
+ * Start a dynamic preset apply and return a guard for stale async completions.
+ */
+export function beginDynamicPresetApply(): () => boolean {
+  const generation = dynamicPresetApplyGeneration
+  return () => generation === dynamicPresetApplyGeneration
+}
+
+/** Invalidate in-flight dynamic preset applies after store/session reset. */
+export function invalidateDynamicPresetApplies(): void {
+  dynamicPresetApplyGeneration += 1
+}
+
 /**
  * Lazy-load a preset module, run the handler, swallow load failures
  * with a contextual warn. The returned promise settles after the handler

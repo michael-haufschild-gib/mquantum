@@ -49,9 +49,9 @@ async function configureDirac(
     async ([presetId]: [string | null]) => {
       const perfStore =
         window.__PERFORMANCE_STORE__ ??
-        (await import('/src/stores/performanceStore.ts')).usePerformanceStore
+        (await import('/src/stores/runtime/performanceStore.ts')).usePerformanceStore
       perfStore.getState().setMaxFps(0)
-      const uiStore = window.__UI_STORE__ ?? (await import('/src/stores/uiStore.ts')).useUIStore
+      const uiStore = window.__UI_STORE__ ?? (await import('/src/stores/ui/uiStore.ts')).useUIStore
       uiStore.setState({ showPerfMonitor: true, perfMonitorExpanded: true })
 
       if (presetId) {
@@ -62,8 +62,11 @@ async function configureDirac(
         await (s.applyDiracPreset as (id: string) => Promise<void>)(presetId)
       }
 
-      const anim = await import('/src/stores/animationStore.ts')
-      anim.useAnimationStore.getState().play()
+      const animationStore = window.__ANIMATION_STORE__
+      if (!animationStore) {
+        throw new Error('__ANIMATION_STORE__ missing on window — DEV bridge not registered')
+      }
+      animationStore.getState().play()
     },
     [preset]
   )
@@ -86,9 +89,9 @@ async function collectSample(page: import('@playwright/test').Page): Promise<Per
   await waitForFrameAdvance(page, measureStart + MEASURE_FRAMES)
   try {
     await page.waitForFunction(
-      async () => {
-        const mod = await import('/src/stores/performanceMetricsStore.ts')
-        return mod.usePerformanceMetricsStore.getState().fps > 0
+      () => {
+        const store = window.__PERFORMANCE_METRICS_STORE__
+        return !!store && store.getState().fps > 0
       },
       { timeout: 5_000 }
     )
@@ -98,9 +101,9 @@ async function collectSample(page: import('@playwright/test').Page): Promise<Per
     // frame counters and the current store snapshot so the log pinpoints
     // collectSample / getPerformanceMetrics as the stall site.
     const fps = await page
-      .evaluate(async () => {
-        const mod = await import('/src/stores/performanceMetricsStore.ts')
-        return mod.usePerformanceMetricsStore.getState().fps
+      .evaluate(() => {
+        const store = window.__PERFORMANCE_METRICS_STORE__
+        return store?.getState().fps ?? 'unavailable'
       })
       .catch(() => 'unavailable')
     throw new Error(

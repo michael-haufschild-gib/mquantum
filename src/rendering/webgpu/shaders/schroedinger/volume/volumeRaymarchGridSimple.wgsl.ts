@@ -111,21 +111,27 @@ fn volumeRaymarchGrid(
   let viewDir = -rayDir;
   var transmittance: f32 = 1.0;
 
-  let adsCoshGamma = cosh(uniforms.adsGrowthRate * uniforms.time);
-  let adsAmplitudeSq = adsCoshGamma * adsCoshGamma;
-  let phaseOffset = (uniforms.wdwPhaseRotationRate + uniforms.adsEnergy) * uniforms.time;
+  var adsAmplitudeSq = 1.0;
+  if (FEATURE_ADS_AMPLITUDE) {
+    let adsCoshGamma = cosh(uniforms.adsGrowthRate * uniforms.time);
+    adsAmplitudeSq = adsCoshGamma * adsCoshGamma;
+  }
+  var phaseOffset = 0.0;
+  if (FEATURE_GRID_PHASE_OFFSET) {
+    phaseOffset = (uniforms.wdwPhaseRotationRate + uniforms.adsEnergy) * uniforms.time;
+  }
   let invStepLen = 1.0 / max(stepLen, 1e-5);
 
-  let isWdwMode = uniforms.quantumMode == 9;
   let branchColorActive =
-    uniforms.quantumMode == 3
+    FEATURE_TDSE_BRANCH_COLOR
     && uniforms.branchSeparation > 0.5
     && uniforms.branchTransitionWidth > 0.0;
-  let backreactionActive = isQuantumBackreactionActive(uniforms);
-  let bilocalBridgeActive = isBilocalERBridgeActive(uniforms);
-  let entropyShearActive = isEntropicTimeShearActive(uniforms);
-  let spectralFlowActive = isSpectralDimensionFlowActive(uniforms);
-  let vacuumBubbleActive = isVacuumBubbleLensActive(uniforms);
+  let backreactionActive = isQuantumBackreactionActive(uniforms)
+    && FEATURE_QUANTUM_BACKREACTION_LENSING;
+  let bilocalBridgeActive = isBilocalERBridgeActive(uniforms) && FEATURE_BILOCAL_ER_BRIDGE;
+  let entropyShearActive = isEntropicTimeShearActive(uniforms) && FEATURE_ENTROPIC_TIME_SHEAR;
+  let spectralFlowActive = isSpectralDimensionFlowActive(uniforms) && FEATURE_SPECTRAL_DIMENSION_FLOW;
+  let vacuumBubbleActive = isVacuumBubbleLensActive(uniforms) && FEATURE_VACUUM_BUBBLE_LENS;
 
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (PROFILING_HALF_SAMPLES && i >= 64) { break; }
@@ -298,15 +304,18 @@ fn volumeRaymarchGrid(
       }
     }
 
-    let hasPotOverlay = DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01;
-    let hasWdwOverlay = DENSITY_GRID_HAS_PHASE && isWdwMode && gridSample.a > 0.01;
+    let hasPotOverlay =
+      FEATURE_NEGATIVE_ALPHA_POTENTIAL_OVERLAY && DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01;
+    let hasWdwOverlay = FEATURE_WDW_OVERLAY && DENSITY_GRID_HAS_PHASE && gridSample.a > 0.01;
 
     if (!PROFILING_STRIP_EMPTY_SKIP && rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay && !hasWdwOverlay) {
       let skipDistance = min(stepLen * 10.0, max(remaining, 0.0));
       if (skipDistance > stepLen) {
         let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms);
-        let midHasPot = DENSITY_GRID_HAS_PHASE && probeMid.a < -0.01;
-        let midHasWdwOverlay = DENSITY_GRID_HAS_PHASE && isWdwMode && probeMid.a > 0.01;
+        let midHasPot =
+          FEATURE_NEGATIVE_ALPHA_POTENTIAL_OVERLAY && DENSITY_GRID_HAS_PHASE && probeMid.a < -0.01;
+        let midHasWdwOverlay =
+          FEATURE_WDW_OVERLAY && DENSITY_GRID_HAS_PHASE && probeMid.a > 0.01;
         let midTotal = gridSkipDensity(probeMid);
         if (midTotal < EMPTY_SKIP_THRESHOLD && !midHasPot && !midHasWdwOverlay) {
           t += skipDistance;
@@ -351,21 +360,22 @@ fn volumeRaymarchGrid(
       if (primaryHitT < 0.0 && alpha > primaryHitThreshold) { primaryHitT = t; }
 
       if (!PROFILING_STRIP_COMPOSITING) {
-        var gradient: vec3f;
-        if (PROFILING_STRIP_GRADIENT) {
-          gradient = vec3f(0.0, 1.0, 0.0);
-        } else {
-          // PERF: reuse the cached gradient when an upstream spacetime effect
-          // already fetched it at this position.
-          gradient = ensureGridGradient(pos, uniforms, &gradCache);
-        }
-
         let emissionRho = select(rho, colorRho, IS_DUAL_CHANNEL);
         let emissionS = select(sCenter, colorS, IS_DUAL_CHANNEL);
         var emission: vec3f;
         if (PROFILING_STRIP_LIGHTING) {
           emission = computeBaseColor(emissionRho, emissionS, phase, pos, uniforms);
+        } else if (FAST_GRID_EMISSION) {
+          emission = computeEmission(emissionRho, emissionS, phase, pos, uniforms);
         } else {
+          var gradient: vec3f;
+          if (PROFILING_STRIP_GRADIENT) {
+            gradient = vec3f(0.0, 1.0, 0.0);
+          } else {
+            // PERF: reuse cached gradient when an upstream spacetime effect
+            // already fetched it at this position.
+            gradient = ensureGridGradient(pos, uniforms, &gradCache);
+          }
           emission = computeEmissionLit(emissionRho, emissionS, phase, pos, gradient, viewDir, uniforms);
         }
         emission *= causticMultiplier;

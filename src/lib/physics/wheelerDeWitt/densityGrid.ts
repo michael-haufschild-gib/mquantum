@@ -50,7 +50,7 @@
 
 import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
 import { clamp01 } from '@/lib/math/clamp'
-import { packRGBA16F } from '@/lib/physics/freeScalar/kSpaceOccupation'
+import { packRGBA16F } from '@/lib/physics/freeScalar/halfFloatPacking'
 
 import type { WheelerDeWittSolverOutput } from './solver'
 import type { StreamlineOverlay } from './wkbStreamlines'

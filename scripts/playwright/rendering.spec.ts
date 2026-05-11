@@ -265,8 +265,11 @@ test.describe('VRAM stability', () => {
 
     // Enable perf monitor so VRAM tracking is active
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/uiStore.ts')
-      mod.useUIStore.setState({ showPerfMonitor: true, perfMonitorExpanded: true })
+      const store = window.__UI_STORE__ ?? (await import('/src/stores/ui/uiStore.ts')).useUIStore
+      if (!store) {
+        throw new Error('UI store unavailable')
+      }
+      store.setState({ showPerfMonitor: true, perfMonitorExpanded: true })
     })
 
     // Baseline: measure VRAM after initial HO 3D render

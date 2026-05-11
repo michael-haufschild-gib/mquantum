@@ -15,6 +15,7 @@ import type {
 } from '@/lib/geometry/extended/types'
 import { nearestPow2 } from '@/lib/math/ndArray'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { beginDynamicPresetApply } from '@/stores/utils/dynamicPresetImport'
 
 import {
   createFreeScalarCosmologySetters,
@@ -565,7 +566,9 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarSetters {
     ...createFreeScalarPreheatingSetters(ctx),
     ...createFreeScalarCosmologySetters(ctx),
     applyFreeScalarPreset: (presetId) => {
+      const isCurrentPresetApply = beginDynamicPresetApply()
       void import('@/lib/physics/freeScalar/presets').then(({ FREE_SCALAR_PRESETS }) => {
+        if (!isCurrentPresetApply()) return
         const preset = FREE_SCALAR_PRESETS.find((p) => p.id === presetId)
         if (!preset) return
         setWithVersion((state) => {

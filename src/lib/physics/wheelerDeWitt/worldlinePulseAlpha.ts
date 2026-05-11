@@ -8,7 +8,7 @@
  * @module lib/physics/wheelerDeWitt/worldlinePulseAlpha
  */
 
-import { float32ToFloat16 } from '@/lib/physics/freeScalar/kSpaceOccupation'
+import { float32ToFloat16 } from '@/lib/physics/freeScalar/halfFloatPacking'
 
 import type { StreamlineOverlay } from './wkbStreamlines'
 

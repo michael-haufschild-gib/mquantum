@@ -42,6 +42,7 @@ import {
   DIAG_DECIMATION,
   GRID_WG,
   LINEAR_WG,
+  MAX_DIM,
   pickSiteDispatch,
   sanitizeGridSizes,
 } from './computePassUtils'
@@ -101,8 +102,15 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   // State
   private initialized = false
   private lastConfigHash = ''
-  /** Hash of V(x)-shaping parameters — dirty check for potentialPipeline dispatch. */
-  private lastPotentialHash = ''
+  /** Cached V(x)-shaping parameters — dirty check for potentialPipeline dispatch. */
+  private lastPotentialType: PauliConfig['potentialType'] | null = null
+  private lastPotentialHarmonicOmega = NaN
+  private lastPotentialWellDepth = NaN
+  private lastPotentialWellWidth = NaN
+  private lastPotentialMass = NaN
+  private lastPotentialLatticeDim = 0
+  private readonly lastPotentialGridSize = new Array<number>(MAX_DIM).fill(NaN)
+  private readonly lastPotentialSpacing = new Array<number>(MAX_DIM).fill(NaN)
   private simTime = 0
   private maxDensity = 1.0
   private stepAccumulator = 0
@@ -121,6 +129,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   private readonly uniformData = new ArrayBuffer(PAULI_UNIFORM_SIZE)
   private readonly uniformU32 = new Uint32Array(this.uniformData)
   private readonly uniformF32 = new Float32Array(this.uniformData)
+  private readonly strideScratch = new Array<number>(MAX_DIM).fill(0)
 
   private readonly densityGridSize: number
 
@@ -228,7 +237,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   }
 
   /**
-   * Hash V(x)-shaping parameters. A difference here triggers a single
+   * Check V(x)-shaping parameters. A difference here triggers a single
    * pauliPotential dispatch before the next Strang loop so the substep kernel
    * reads a fresh potential[idx] without recomputing V per voxel.
    *
@@ -236,17 +245,42 @@ export class PauliComputePass extends WebGPUBaseComputePass {
    * Grid topology and spacing are included because they define the physical
    * position (f32(coord) − N/2 + 0.5)·spacing used by every V formula.
    */
-  private computePauliPotentialHash(config: PauliConfig): string {
-    return [
-      config.potentialType,
-      config.harmonicOmega,
-      config.wellDepth,
-      config.wellWidth,
-      config.mass,
-      config.latticeDim,
-      config.gridSize.slice(0, config.latticeDim).join(','),
-      config.spacing.slice(0, config.latticeDim).join(','),
-    ].join('|')
+  private consumePauliPotentialDirty(config: PauliConfig): boolean {
+    let dirty =
+      this.lastPotentialType !== config.potentialType ||
+      this.lastPotentialHarmonicOmega !== config.harmonicOmega ||
+      this.lastPotentialWellDepth !== config.wellDepth ||
+      this.lastPotentialWellWidth !== config.wellWidth ||
+      this.lastPotentialMass !== config.mass ||
+      this.lastPotentialLatticeDim !== config.latticeDim
+
+    for (let d = 0; d < config.latticeDim; d++) {
+      if (
+        this.lastPotentialGridSize[d] !== config.gridSize[d] ||
+        this.lastPotentialSpacing[d] !== config.spacing[d]
+      ) {
+        dirty = true
+        break
+      }
+    }
+
+    if (!dirty) return false
+
+    this.lastPotentialType = config.potentialType
+    this.lastPotentialHarmonicOmega = config.harmonicOmega
+    this.lastPotentialWellDepth = config.wellDepth
+    this.lastPotentialWellWidth = config.wellWidth
+    this.lastPotentialMass = config.mass
+    this.lastPotentialLatticeDim = config.latticeDim
+    for (let d = 0; d < config.latticeDim; d++) {
+      this.lastPotentialGridSize[d] = config.gridSize[d]!
+      this.lastPotentialSpacing[d] = config.spacing[d]!
+    }
+    return true
+  }
+
+  private invalidatePauliPotential(): void {
+    this.lastPotentialType = null
   }
 
   // ============================================================================
@@ -287,7 +321,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     // Freshly-created potentialBuffer holds uninitialized memory — force the
     // next executePauli to fire the potential fill kernel before the Strang
     // loop reads from it (otherwise potentialHalf would see garbage).
-    this.lastPotentialHash = ''
+    this.invalidatePauliPotential()
   }
 
   /** Create the 3D density texture for spin-resolved rendering */
@@ -414,7 +448,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
         totalSites: this.buf.totalSites,
         simTime: this.simTime,
         maxDensity: this.maxDensity,
-        strides: computeStridesPadded(config.gridSize, config.latticeDim),
+        strides: computeStridesPadded(config.gridSize, config.latticeDim, this.strideScratch),
         basisX,
         basisY,
         basisZ,
@@ -560,9 +594,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     // Refresh scalar potential V(x) only when its shaping parameters change.
     // Uniforms are written above, so the fill kernel reads the current
     // potentialType / harmonicOmega / wellDepth / wellWidth / mass values.
-    const potHash = this.computePauliPotentialHash(config)
-    if (potHash !== this.lastPotentialHash) {
-      this.lastPotentialHash = potHash
+    if (this.consumePauliPotentialDirty(config)) {
       const p = ctx.beginComputePass({ label: 'pauli-potential-fill' })
       dispatchSite(p, this.pl.potentialPipeline, this.pl.potential3DPipeline, [this.bg.potentialBG])
       p.end()

@@ -22,7 +22,7 @@ describe('sceneExamples', () => {
     expect(result).toEqual({ id: 'custom-id', source: 'saved' })
   })
 
-  it('example apply callbacks stage bundled scenes before invoking loadScene', () => {
+  it('example apply callbacks stage bundled scenes before invoking loadScene', async () => {
     vi.useFakeTimers()
     const examples = getSceneExamples()
     expect(examples.length).toBeGreaterThan(0)
@@ -39,7 +39,7 @@ describe('sceneExamples', () => {
       }) as typeof originalLoadScene,
     })
 
-    example.apply()
+    await example.apply()
     expect(hadSceneWhenLoadCalled).toBe(true)
 
     vi.runOnlyPendingTimers()

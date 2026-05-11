@@ -8,14 +8,12 @@ import { getQuantumTypeStrategyKind } from '@/lib/geometry/registry'
 
 import type { SchrodingerRendererConfig } from '../schrodingerRendererTypes'
 import { AnalyticModeStrategy } from './AnalyticModeStrategy'
-import { AntiDeSitterStrategy } from './AntiDeSitterStrategy'
-import { DiracStrategy } from './DiracStrategy'
-import { FreeScalarFieldStrategy } from './FreeScalarFieldStrategy'
-import { PauliStrategy } from './PauliStrategy'
-import { QuantumWalkStrategy } from './QuantumWalkStrategy'
-import { TdseBecStrategy } from './TdseBecStrategy'
 import type { QuantumModeStrategy } from './types'
-import { WheelerDeWittStrategy } from './WheelerDeWittStrategy'
+
+/** Lightweight placeholder used before async pipeline setup selects the real strategy. */
+export function createInitialModeStrategy(): QuantumModeStrategy {
+  return new AnalyticModeStrategy()
+}
 
 /**
  * Create the appropriate quantum mode strategy for the given renderer configuration.
@@ -23,9 +21,12 @@ import { WheelerDeWittStrategy } from './WheelerDeWittStrategy'
  * @param config - Renderer configuration with quantum mode and feature flags
  * @returns Strategy instance that handles mode-specific compute passes and bounding radius
  */
-export function createModeStrategy(config: SchrodingerRendererConfig): QuantumModeStrategy {
+export async function createModeStrategy(
+  config: SchrodingerRendererConfig
+): Promise<QuantumModeStrategy> {
   // Pauli takes priority (isPauli flag overrides quantumMode)
   if (config.isPauli) {
+    const { PauliStrategy } = await import('./PauliStrategy')
     return new PauliStrategy()
   }
 
@@ -34,18 +35,30 @@ export function createModeStrategy(config: SchrodingerRendererConfig): QuantumMo
     : undefined
 
   switch (strategyKind) {
-    case 'freeScalarField':
+    case 'freeScalarField': {
+      const { FreeScalarFieldStrategy } = await import('./FreeScalarFieldStrategy')
       return new FreeScalarFieldStrategy()
-    case 'tdseBec':
+    }
+    case 'tdseBec': {
+      const { TdseBecStrategy } = await import('./TdseBecStrategy')
       return new TdseBecStrategy()
-    case 'dirac':
+    }
+    case 'dirac': {
+      const { DiracStrategy } = await import('./DiracStrategy')
       return new DiracStrategy()
-    case 'quantumWalk':
+    }
+    case 'quantumWalk': {
+      const { QuantumWalkStrategy } = await import('./QuantumWalkStrategy')
       return new QuantumWalkStrategy()
-    case 'wheelerDeWitt':
+    }
+    case 'wheelerDeWitt': {
+      const { WheelerDeWittStrategy } = await import('./WheelerDeWittStrategy')
       return new WheelerDeWittStrategy()
-    case 'antiDeSitter':
+    }
+    case 'antiDeSitter': {
+      const { AntiDeSitterStrategy } = await import('./AntiDeSitterStrategy')
       return new AntiDeSitterStrategy()
+    }
     case 'analytic':
     default:
       return new AnalyticModeStrategy()

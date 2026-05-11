@@ -514,4 +514,62 @@ describe('WebGPURenderGraph timestampWrites wiring', () => {
     graph.execute(1 / 60)
     expect(hook).toHaveBeenCalledTimes(1)
   })
+
+  it('skips detailed stats work when execute runs without diagnostics', async () => {
+    const getDrawStats = vi.fn(() => ({
+      calls: 1,
+      triangles: 2,
+      vertices: 3,
+      lines: 4,
+      points: 5,
+    }))
+    const pass: WebGPURenderPass = {
+      id: 'no-diagnostics-pass',
+      config: createRenderPassConfig('no-diagnostics-pass', [
+        { resourceId: 'out', access: 'write', binding: 0 },
+      ]),
+      initialize: vi.fn().mockResolvedValue(undefined),
+      execute: (ctx) => {
+        const passEncoder = ctx.beginRenderPass({
+          label: 'no-diagnostics',
+          colorAttachments: [
+            {
+              view: ctx.getWriteTarget('out')!,
+              loadOp: 'clear',
+              storeOp: 'store',
+              clearValue: { r: 0, g: 0, b: 0, a: 1 },
+            },
+          ],
+        })
+        passEncoder.end()
+      },
+      getDrawStats,
+      dispose: vi.fn(),
+    }
+
+    const { graph, beginRenderPass, resolveQuerySet, copyBufferToBuffer } =
+      await createGraphHarness(pass)
+    const nowSpy = vi.spyOn(performance, 'now')
+
+    const stats = graph.execute(1 / 60, 'none')
+
+    expect(beginRenderPass).toHaveBeenCalledTimes(1)
+    expect(beginRenderPass.mock.calls[0]?.[0].timestampWrites).toBeUndefined()
+    expect(resolveQuerySet).not.toHaveBeenCalled()
+    expect(copyBufferToBuffer).not.toHaveBeenCalled()
+    expect(getDrawStats).not.toHaveBeenCalled()
+    expect(stats.passTiming).toEqual([])
+    expect(stats.vramUsage).toBe(0)
+    expect(stats.drawStats).toEqual({
+      calls: 0,
+      triangles: 0,
+      vertices: 0,
+      lines: 0,
+      points: 0,
+    })
+    expect(stats.cpuBreakdown).toEqual({ setupMs: 0, passesMs: 0, submitMs: 0 })
+    expect(performance.now).not.toHaveBeenCalled()
+
+    nowSpy.mockRestore()
+  })
 })

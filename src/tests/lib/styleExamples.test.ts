@@ -61,14 +61,14 @@ describe('styleExamples', () => {
   })
 
   describe('applyStyleExample', () => {
-    it('returns false for unknown style ID', () => {
-      expect(applyStyleExample('nonexistent-id')).toBe(false)
+    it('returns false for unknown style ID', async () => {
+      await expect(applyStyleExample('nonexistent-id')).resolves.toBe(false)
     })
 
-    it('returns true for a valid style ID', () => {
+    it('returns true for a valid style ID', async () => {
       const examples = getStyleExamples()
       if (examples.length === 0) return
-      const result = applyStyleExample(examples[0]!.id)
+      const result = await applyStyleExample(examples[0]!.id)
       expect(result).toBe(true)
     })
   })

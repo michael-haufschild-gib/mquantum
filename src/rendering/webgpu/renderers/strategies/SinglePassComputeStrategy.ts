@@ -93,6 +93,15 @@ export abstract class SinglePassComputeStrategy<
    * across every subclass so tests can poke it uniformly.
    */
   protected pass: TPass | null = null
+  private readonly frameArgs: SinglePassFrameArgs = {
+    isPlaying: false,
+    speed: 1,
+    basisX: undefined,
+    basisY: undefined,
+    basisZ: undefined,
+    boundingRadius: 0,
+    colorAlgorithm: 0,
+  }
 
   // ── Subclass hooks (abstract) ───────────────────────────────────────────
 
@@ -213,20 +222,20 @@ export abstract class SinglePassComputeStrategy<
     const speed = animation?.speed ?? 1.0
     const schroedinger = extended?.schroedinger as SchroedingerSnapshot | undefined
     const effectiveConfig = this.deriveEffectiveConfig(config, ctx, schroedinger)
+    const args = this.frameArgs
+    args.isPlaying = isPlaying
+    args.speed = speed
+    args.basisX = schroedinger?.basisX as Float32Array | undefined
+    args.basisY = schroedinger?.basisY as Float32Array | undefined
+    args.basisZ = schroedinger?.basisZ as Float32Array | undefined
+    args.boundingRadius = shared.boundingRadius
+    args.colorAlgorithm = shared.colorAlgorithm
 
     if (this.stateIOOrder === 'before') {
       handleSimulationStateIO(ctx, pass, this.stateIOModeKeys)
     }
 
-    this.executePass(pass, ctx, effectiveConfig, {
-      isPlaying,
-      speed,
-      basisX: schroedinger?.basisX as Float32Array | undefined,
-      basisY: schroedinger?.basisY as Float32Array | undefined,
-      basisZ: schroedinger?.basisZ as Float32Array | undefined,
-      boundingRadius: shared.boundingRadius,
-      colorAlgorithm: shared.colorAlgorithm,
-    })
+    this.executePass(pass, ctx, effectiveConfig, args)
 
     if (config.needsReset) {
       extended?.clearComputeNeedsReset?.(this.configSubKey)
@@ -236,15 +245,7 @@ export abstract class SinglePassComputeStrategy<
       handleSimulationStateIO(ctx, pass, this.stateIOModeKeys)
     }
 
-    this.afterExecute(ctx, pass, effectiveConfig, {
-      isPlaying,
-      speed,
-      basisX: schroedinger?.basisX as Float32Array | undefined,
-      basisY: schroedinger?.basisY as Float32Array | undefined,
-      basisZ: schroedinger?.basisZ as Float32Array | undefined,
-      boundingRadius: shared.boundingRadius,
-      colorAlgorithm: shared.colorAlgorithm,
-    })
+    this.afterExecute(ctx, pass, effectiveConfig, args)
   }
 
   /**

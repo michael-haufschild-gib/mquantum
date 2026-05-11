@@ -83,9 +83,15 @@ fn volumeRaymarchGrid(
   // identity values (1.0 for adsAmplitudeSq, 0.0 for phaseOffset) for every
   // non-AdS analytical mode because adsGrowthRate, wdwPhaseRotationRate, and
   // adsEnergy are zero outside their owning quantum modes.
-  let adsCoshGamma = cosh(uniforms.adsGrowthRate * uniforms.time);
-  let adsAmplitudeSq = adsCoshGamma * adsCoshGamma;
-  let phaseOffset = (uniforms.wdwPhaseRotationRate + uniforms.adsEnergy) * uniforms.time;
+  var adsAmplitudeSq = 1.0;
+  if (FEATURE_ADS_AMPLITUDE) {
+    let adsCoshGamma = cosh(uniforms.adsGrowthRate * uniforms.time);
+    adsAmplitudeSq = adsCoshGamma * adsCoshGamma;
+  }
+  var phaseOffset = 0.0;
+  if (FEATURE_GRID_PHASE_OFFSET) {
+    phaseOffset = (uniforms.wdwPhaseRotationRate + uniforms.adsEnergy) * uniforms.time;
+  }
 
   // PERF: Hoist 1/stepLen for the potential-overlay opacity clamp (mirrors
   // Simple variant). stepLen is constant per ray; the per-iteration division
@@ -93,16 +99,16 @@ fn volumeRaymarchGrid(
   let invStepLen = 1.0 / max(stepLen, 1e-5);
 
   // PERF: hoist mode-only uniforms out of the per-sample loop.
-  let isWdwMode = uniforms.quantumMode == 9;
   let branchColorActive =
-    uniforms.quantumMode == 3
+    FEATURE_TDSE_BRANCH_COLOR
     && uniforms.branchSeparation > 0.5
     && uniforms.branchTransitionWidth > 0.0;
-  let backreactionActive = isQuantumBackreactionActive(uniforms);
-  let bilocalBridgeActive = isBilocalERBridgeActive(uniforms);
-  let entropyShearActive = isEntropicTimeShearActive(uniforms);
-  let spectralFlowActive = isSpectralDimensionFlowActive(uniforms);
-  let vacuumBubbleActive = isVacuumBubbleLensActive(uniforms);
+  let backreactionActive = isQuantumBackreactionActive(uniforms)
+    && FEATURE_QUANTUM_BACKREACTION_LENSING;
+  let bilocalBridgeActive = isBilocalERBridgeActive(uniforms) && FEATURE_BILOCAL_ER_BRIDGE;
+  let entropyShearActive = isEntropicTimeShearActive(uniforms) && FEATURE_ENTROPIC_TIME_SHEAR;
+  let spectralFlowActive = isSpectralDimensionFlowActive(uniforms) && FEATURE_SPECTRAL_DIMENSION_FLOW;
+  let vacuumBubbleActive = isVacuumBubbleLensActive(uniforms) && FEATURE_VACUUM_BUBBLE_LENS;
 
   // PERF (OPT-PERF-1): hoist useRelPhase out of the per-step loop. Loop-invariant —
   // depends on compile-time COLOR_ALGORITHM and the current quantumMode uniform.
@@ -343,20 +349,37 @@ fn volumeRaymarchGrid(
     // Compute mode alpha dual-encoding: .a >= 0 → raw density, .a < 0 → -potOverlay.
     // For HO/hydrogen modes, alpha is relativePhase (always >= 0).
     // Pauli spinor: alpha is total density — skip potential check.
-    let hasPotOverlay = IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01;
+    let hasPotOverlay =
+      FEATURE_NEGATIVE_ALPHA_POTENTIAL_OVERLAY
+      && IS_FREE_SCALAR
+      && !IS_PAULI
+      && DENSITY_GRID_HAS_PHASE
+      && gridSample.a < -0.01;
     // Wheeler-DeWitt overlay: A > 0 carries streamline / SRMT overlay alpha
     // (packer stores the max of the two alphas in [0, 1]). Must protect
-    // overlay cells from empty-skip when rho = 0. isWdwMode hoisted above.
-    let hasWdwOverlay = DENSITY_GRID_HAS_PHASE && isWdwMode && gridSample.a > 0.01;
+    // overlay cells from empty-skip when rho = 0.
+    let hasWdwOverlay = FEATURE_WDW_OVERLAY && DENSITY_GRID_HAS_PHASE && gridSample.a > 0.01;
     if (!PROFILING_STRIP_EMPTY_SKIP && rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay && !hasWdwOverlay) {
       let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(remaining, 0.0));
       if (skipDistance > stepLen) {
         let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms);
         let probeFar = sampleDensityFromGrid(pos + rayDir * skipDistance, uniforms);
-        let midHasPot = IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && probeMid.a < -0.01;
-        let farHasPot = IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && probeFar.a < -0.01;
-        let midHasWdwOverlay = DENSITY_GRID_HAS_PHASE && isWdwMode && probeMid.a > 0.01;
-        let farHasWdwOverlay = DENSITY_GRID_HAS_PHASE && isWdwMode && probeFar.a > 0.01;
+        let midHasPot =
+          FEATURE_NEGATIVE_ALPHA_POTENTIAL_OVERLAY
+          && IS_FREE_SCALAR
+          && !IS_PAULI
+          && DENSITY_GRID_HAS_PHASE
+          && probeMid.a < -0.01;
+        let farHasPot =
+          FEATURE_NEGATIVE_ALPHA_POTENTIAL_OVERLAY
+          && IS_FREE_SCALAR
+          && !IS_PAULI
+          && DENSITY_GRID_HAS_PHASE
+          && probeFar.a < -0.01;
+        let midHasWdwOverlay =
+          FEATURE_WDW_OVERLAY && DENSITY_GRID_HAS_PHASE && probeMid.a > 0.01;
+        let farHasWdwOverlay =
+          FEATURE_WDW_OVERLAY && DENSITY_GRID_HAS_PHASE && probeFar.a > 0.01;
         // For dual-channel modes, include secondary density (G channel) in skip check
         let midTotal = gridSkipDensity(probeMid);
         let farTotal = gridSkipDensity(probeFar);

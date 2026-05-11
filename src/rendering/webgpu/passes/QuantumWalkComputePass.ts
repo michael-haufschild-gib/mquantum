@@ -21,18 +21,14 @@ import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
-import {
-  computeStrides,
-  createDensityTexture,
-  DENSITY_GRID_SIZE,
-  GRID_WG,
-} from './computePassUtils'
+import { createDensityTexture, DENSITY_GRID_SIZE, GRID_WG, MAX_DIM } from './computePassUtils'
 import { packAbsorberUniforms, packWriteGridUniforms } from './QuantumWalkComputePassUniforms'
 import { QwDiagnostics } from './QuantumWalkDiagnostics'
 import { createQwPipelines } from './QuantumWalkPipelines'
 import { requestStateSave as genericStateSave } from './stateSave'
 
 const COIN_WG = 64
+const QW_COIN_TYPE_MAP: Record<string, number> = { grover: 0, hadamard: 1, dft: 2 }
 
 /**
  * Compute pass for discrete-time quantum walk simulation.
@@ -89,13 +85,26 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
 
   // Diagnostics subsystem (extracted)
   private readonly diag = new QwDiagnostics()
+  private readonly coinUniformData = new ArrayBuffer(16)
+  private readonly coinUniformU32 = new Uint32Array(this.coinUniformData)
+  private readonly coinUniformF32 = new Float32Array(this.coinUniformData)
+  private readonly shiftUniformData = new ArrayBuffer(16 + 12 * 4 * 2)
+  private readonly shiftUniformU32 = new Uint32Array(this.shiftUniformData)
+  private readonly strideScratch = new Array<number>(MAX_DIM).fill(0)
+  private readonly zeroU32 = new Uint32Array(1)
+  private absorberUniformData: ArrayBuffer | undefined
+  private writeGridUniformData: ArrayBuffer | undefined
 
   // State
   private initialized = false
   private pipelinesCreated = false
   private totalSites = 0
   private latticeDim = 0
-  private lastConfigHash = ''
+  private lastConfigLatticeDim = 0
+  private lastConfigCoinType: QuantumWalkConfig['coinType'] | null = null
+  private lastConfigCoinBias = NaN
+  private lastConfigCoinInitial: QuantumWalkConfig['coinInitial'] | null = null
+  private readonly lastConfigGridSize = new Array<number>(MAX_DIM).fill(NaN)
   private stepCount = 0
   private stepAccumulator = 0
   private lastGridSize0 = 64
@@ -140,6 +149,44 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
   /** Get the configured density grid resolution. */
   getDensityGridSize(): number {
     return this.densityGridSize
+  }
+
+  private updateStrideScratch(gridSize: number[], latticeDim: number): number[] {
+    const strides = this.strideScratch
+    for (let d = 0; d < MAX_DIM; d++) strides[d] = 0
+    if (latticeDim > 0) {
+      strides[latticeDim - 1] = 1
+      for (let d = latticeDim - 2; d >= 0; d--) {
+        strides[d] = strides[d + 1]! * gridSize[d + 1]!
+      }
+    }
+    return strides
+  }
+
+  private consumeConfigDirty(config: QuantumWalkConfig): boolean {
+    let dirty =
+      this.lastConfigLatticeDim !== config.latticeDim ||
+      this.lastConfigCoinType !== config.coinType ||
+      this.lastConfigCoinBias !== config.coinBias ||
+      this.lastConfigCoinInitial !== config.coinInitial
+
+    for (let d = 0; d < config.latticeDim; d++) {
+      if (this.lastConfigGridSize[d] !== config.gridSize[d]) {
+        dirty = true
+        break
+      }
+    }
+
+    if (!dirty) return false
+
+    this.lastConfigLatticeDim = config.latticeDim
+    this.lastConfigCoinType = config.coinType
+    this.lastConfigCoinBias = config.coinBias
+    this.lastConfigCoinInitial = config.coinInitial
+    for (let d = 0; d < config.latticeDim; d++) {
+      this.lastConfigGridSize[d] = config.gridSize[d]!
+    }
+    return true
   }
 
   /**
@@ -381,9 +428,7 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
     const safeConfig = sanitizeQuantumWalkConfig(config)
 
     // Check for config changes requiring reinitialization
-    const hash = `${safeConfig.latticeDim}|${safeConfig.gridSize.join(',')}|${safeConfig.coinType}|${safeConfig.coinBias}|${safeConfig.coinInitial}`
-    if (hash !== this.lastConfigHash || !this.initialized || safeConfig.needsReset) {
-      this.lastConfigHash = hash
+    if (this.consumeConfigDirty(safeConfig) || !this.initialized || safeConfig.needsReset) {
       this.initializeState(device, safeConfig)
     }
 
@@ -405,48 +450,48 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
     if (!this.coinPipeline || !this.shiftPipeline) return
 
     // Update coin uniforms
-    const coinTypeMap: Record<string, number> = { grover: 0, hadamard: 1, dft: 2 }
-    const coinData = new Uint32Array([
-      this.totalSites,
-      safeConfig.latticeDim,
-      coinTypeMap[safeConfig.coinType] ?? 0,
-      0,
-    ])
-    const coinF32 = new Float32Array(coinData.buffer)
-    coinF32[3] = safeConfig.coinBias
-    device.queue.writeBuffer(this.coinUniformBuffer!, 0, coinData)
+    const coinData = this.coinUniformU32
+    coinData[0] = this.totalSites
+    coinData[1] = safeConfig.latticeDim
+    coinData[2] = QW_COIN_TYPE_MAP[safeConfig.coinType] ?? 0
+    coinData[3] = 0
+    this.coinUniformF32[3] = safeConfig.coinBias
+    device.queue.writeBuffer(this.coinUniformBuffer!, 0, this.coinUniformData)
 
     // Shift uniforms
-    const shiftData = new ArrayBuffer(16 + 12 * 4 * 2)
-    const shiftU32 = new Uint32Array(shiftData)
+    const shiftU32 = this.shiftUniformU32
+    shiftU32.fill(0)
     shiftU32[0] = this.totalSites
     shiftU32[1] = safeConfig.latticeDim
     shiftU32[2] = safeConfig.absorberEnabled ? 1 : 0
-    const strides = computeStrides(safeConfig.gridSize.slice(0, safeConfig.latticeDim))
+    const strides = this.updateStrideScratch(safeConfig.gridSize, safeConfig.latticeDim)
     for (let d = 0; d < safeConfig.latticeDim; d++) {
       shiftU32[4 + d] = safeConfig.gridSize[d] ?? 64
     }
     for (let d = 0; d < safeConfig.latticeDim; d++) {
       shiftU32[16 + d] = strides[d] ?? 1
     }
-    device.queue.writeBuffer(this.shiftUniformBuffer!, 0, shiftData)
+    device.queue.writeBuffer(this.shiftUniformBuffer!, 0, this.shiftUniformData)
 
     // Update absorber uniforms (needed even if paused for density grid pass)
     const sigmaMax = safeConfig.absorberEnabled
       ? computePMLSigmaMaxND(
           safeConfig.pmlTargetReflection,
           safeConfig.absorberWidth,
-          safeConfig.gridSize.slice(0, safeConfig.latticeDim),
+          safeConfig.gridSize,
           1.0,
           3,
           safeConfig.latticeDim
         )
       : 0
-    device.queue.writeBuffer(
-      this.absorberUniformBuffer!,
-      0,
-      packAbsorberUniforms(safeConfig, this.totalSites, strides, sigmaMax)
+    this.absorberUniformData = packAbsorberUniforms(
+      safeConfig,
+      this.totalSites,
+      strides,
+      sigmaMax,
+      this.absorberUniformData
     )
+    device.queue.writeBuffer(this.absorberUniformBuffer!, 0, this.absorberUniformData)
 
     // Dispatch coin+shift+absorber steps, scaled by animation speed.
     // Uses fractional accumulator (matching TDSE pattern) so speed < 1
@@ -494,24 +539,22 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
     }
 
     // Write density grid uniforms (bind group is stable — rebuilt only in initializeState)
-    device.queue.writeBuffer(
-      this.writeGridUniformBuffer!,
-      0,
-      packWriteGridUniforms(
-        safeConfig,
-        this.totalSites,
-        this.gpuMaxDensity,
-        strides,
-        basisX,
-        basisY,
-        basisZ,
-        boundingRadius
-      )
+    this.writeGridUniformData = packWriteGridUniforms(
+      safeConfig,
+      this.totalSites,
+      this.gpuMaxDensity,
+      strides,
+      basisX,
+      basisY,
+      basisZ,
+      boundingRadius,
+      this.writeGridUniformData
     )
+    device.queue.writeBuffer(this.writeGridUniformBuffer!, 0, this.writeGridUniformData)
     if (this.writeGridPipeline && this.writeGridBG) {
       // Clear atomic max buffer before write-grid dispatch
       if (this.maxDensityAtomicBuffer) {
-        device.queue.writeBuffer(this.maxDensityAtomicBuffer, 0, new Uint32Array([0]))
+        device.queue.writeBuffer(this.maxDensityAtomicBuffer, 0, this.zeroU32)
       }
 
       const gridWG = Math.ceil(this.densityGridSize / GRID_WG)
@@ -569,7 +612,7 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
           const mapped = readbackBuf.getMappedRange()
           // The shader stores bitcast<u32>(f32) via atomicMax.
           // Reinterpret the u32 bytes as f32 to recover the peak density.
-          const peakDensity = new Float32Array(mapped.slice(0))[0]!
+          const peakDensity = new Float32Array(mapped)[0]!
           readbackBuf.unmap()
           this.readbackPending = false
 

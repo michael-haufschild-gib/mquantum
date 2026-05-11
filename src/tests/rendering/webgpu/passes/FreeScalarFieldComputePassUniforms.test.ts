@@ -230,6 +230,35 @@ describe('writeFsfUniforms', () => {
     expect(u32[6]).toBe(64)
   })
 
+  it('reuses caller-owned stride scratch and clears inactive dimensions', () => {
+    const config = createConfig({ gridSize: [16, 32], latticeDim: 2 })
+    const uniformData = new ArrayBuffer(512)
+    const strideScratch = new Array<number>(12)
+    strideScratch.fill(999)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
+      config,
+      totalSites: 16 * 32,
+      maxFieldValue: 1.0,
+      simEta: 0,
+      preheatingTime: 0,
+      preheatingReferenceEta: 0,
+      strideScratch,
+    })
+
+    expect(strideScratch[0]).toBe(32)
+    expect(strideScratch[1]).toBe(1)
+    for (let d = 2; d < strideScratch.length; d++) {
+      expect(strideScratch[d]).toBe(0)
+    }
+
+    const u32 = new Uint32Array(uniformData)
+    // strides start at byte offset 64, u32 index 16.
+    expect(u32[16]).toBe(32)
+    expect(u32[17]).toBe(1)
+  })
+
   it('packs spacing array starting at offset 112', () => {
     const config = createConfig({ spacing: [0.1, 0.2, 0.3], latticeDim: 3 })
     const uniformData = new ArrayBuffer(512)

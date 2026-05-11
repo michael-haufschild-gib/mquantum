@@ -188,6 +188,18 @@ describe('useRotationUpdates', () => {
       expect(changed).toBe(false)
     })
 
+    it('returns changed=true when the rotation matrix changes with the same origin values', () => {
+      const { result } = renderHook(() => useRotationUpdates({ dimension: 3, parameterValues: [] }))
+      result.current.getBasisVectors(false)
+      result.current.getOrigin([1, 0, 0])
+      act(() => {
+        useRotationStore.setState((s) => ({ version: s.version + 1 }))
+      })
+      result.current.getBasisVectors(false)
+      const { changed } = result.current.getOrigin([1, 0, 0])
+      expect(changed).toBe(true)
+    })
+
     it('pads short originValues with zeros for higher dimensions', () => {
       const { result } = renderHook(() => useRotationUpdates({ dimension: 4, parameterValues: [] }))
       result.current.getBasisVectors(false)

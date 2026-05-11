@@ -24,14 +24,26 @@ const RAW_HTML_CONTROLS = new Set(['input', 'select', 'button', 'textarea'])
 // DOM traversal methods and properties that bypass testing-library's
 // user-centric query model, coupling tests to implementation details.
 const DOM_TRAVERSAL_METHODS = new Set([
-  'querySelector', 'querySelectorAll', 'closest',
-  'getElementsByClassName', 'getElementsByTagName', 'getElementById',
+  'querySelector',
+  'querySelectorAll',
+  'closest',
+  'getElementsByClassName',
+  'getElementsByTagName',
+  'getElementById',
 ])
 const DOM_TRAVERSAL_PROPS = new Set([
-  'parentElement', 'parentNode',
-  'children', 'childNodes',
-  'firstChild', 'lastChild', 'firstElementChild', 'lastElementChild',
-  'nextSibling', 'previousSibling', 'nextElementSibling', 'previousElementSibling',
+  'parentElement',
+  'parentNode',
+  'children',
+  'childNodes',
+  'firstChild',
+  'lastChild',
+  'firstElementChild',
+  'lastElementChild',
+  'nextSibling',
+  'previousSibling',
+  'nextElementSibling',
+  'previousElementSibling',
 ])
 
 // Matchers that assert existence/type but not correctness — they catch zero real bugs.
@@ -42,7 +54,8 @@ const DOM_TRAVERSAL_PROPS = new Set([
 const SHALLOW_MATCHERS = {
   toBeDefined: 'Asserts existence, not correctness. Assert the specific expected value.',
   toBeTruthy: 'Too loose — passes for any truthy value. Assert the specific expected value.',
-  toBeFalsy: 'Too loose — passes for any falsy value. Use toBe(false), toBe(null), or assert a specific outcome.',
+  toBeFalsy:
+    'Too loose — passes for any falsy value. Use toBe(false), toBe(null), or assert a specific outcome.',
 }
 
 function normalizePath(filename) {
@@ -110,16 +123,17 @@ const projectRulesPlugin = {
         // .ts files in rendering, stores, color/geometry/export libraries,
         // test factories, and canvas-based hooks define canonical defaults
         // or operate below Tailwind.
-        if (fp.endsWith('.ts') && (
-          fp.includes('src/rendering/') ||
-          fp.includes('src/stores/') ||
-          fp.includes('src/tests/factories/') ||
-          fp.includes('src/lib/colors/') ||
-          fp.includes('src/lib/geometry/') ||
-          fp.includes('src/lib/lighting/') ||
-          fp.includes('src/lib/export/') ||
-          fp.includes('useDynamicFavicon')
-        )) {
+        if (
+          fp.endsWith('.ts') &&
+          (fp.includes('src/rendering/') ||
+            fp.includes('src/stores/') ||
+            fp.includes('src/tests/factories/') ||
+            fp.includes('src/lib/colors/') ||
+            fp.includes('src/lib/geometry/') ||
+            fp.includes('src/lib/lighting/') ||
+            fp.includes('src/lib/export/') ||
+            fp.includes('useDynamicFavicon'))
+        ) {
           return {}
         }
 
@@ -206,7 +220,10 @@ const projectRulesPlugin = {
               const arg = node.arguments[0]
               if (arg) {
                 if (arg.type === 'UnaryExpression' && arg.operator === 'typeof') {
-                  report(node, 'expect(typeof x) asserts a type string, not a value. Assert the specific expected value.')
+                  report(
+                    node,
+                    'expect(typeof x) asserts a type string, not a value. Assert the specific expected value.'
+                  )
                   return
                 }
                 if (
@@ -215,11 +232,17 @@ const projectRulesPlugin = {
                   arg.callee.object.name === 'Array' &&
                   arg.callee.property.name === 'isArray'
                 ) {
-                  report(node, 'expect(Array.isArray(...)) asserts a boolean. Assert the specific array contents instead.')
+                  report(
+                    node,
+                    'expect(Array.isArray(...)) asserts a boolean. Assert the specific array contents instead.'
+                  )
                   return
                 }
                 if (arg.type === 'UnaryExpression' && arg.operator === '!') {
-                  report(node, 'expect(!x) or expect(!!x) coerces to boolean — too loose. Assert the specific expected value.')
+                  report(
+                    node,
+                    'expect(!x) or expect(!!x) coerces to boolean — too loose. Assert the specific expected value.'
+                  )
                   return
                 }
                 if (
@@ -227,21 +250,30 @@ const projectRulesPlugin = {
                   arg.callee.type === 'Identifier' &&
                   arg.callee.name === 'Boolean'
                 ) {
-                  report(node, 'expect(Boolean(x)) coerces to boolean — too loose. Assert the specific expected value.')
+                  report(
+                    node,
+                    'expect(Boolean(x)) coerces to boolean — too loose. Assert the specific expected value.'
+                  )
                   return
                 }
                 if (
                   arg.type === 'BinaryExpression' &&
                   ['!==', '!=', '===', '==', 'in'].includes(arg.operator)
                 ) {
-                  report(node, 'expect(x === y) passes a boolean to expect instead of the actual value. Use expect(x).toBe(y) for meaningful diffs.')
+                  report(
+                    node,
+                    'expect(x === y) passes a boolean to expect instead of the actual value. Use expect(x).toBe(y) for meaningful diffs.'
+                  )
                   return
                 }
                 if (
                   arg.type === 'MemberExpression' &&
                   (arg.property.name === 'tagName' || arg.property.name === 'nodeName')
                 ) {
-                  report(node, 'expect(el.tagName) asserts a DOM tag string. Assert rendered content or accessible roles instead.')
+                  report(
+                    node,
+                    'expect(el.tagName) asserts a DOM tag string. Assert rendered content or accessible roles instead.'
+                  )
                   return
                 }
               }
@@ -263,7 +295,8 @@ const projectRulesPlugin = {
             if (SHALLOW_MATCHERS[methodName]) {
               shallowMessage = SHALLOW_MATCHERS[methodName]
             } else if (methodName === 'toBeNull' && isNot) {
-              shallowMessage = '.not.toBeNull() asserts existence, not a specific value. Assert the expected value.'
+              shallowMessage =
+                '.not.toBeNull() asserts existence, not a specific value. Assert the expected value.'
             } else if (methodName === 'toBe' && node.arguments.length === 1) {
               const arg = node.arguments[0]
               // toBe('string') etc. — only meaningful after typeof, which is already
@@ -371,15 +404,19 @@ const projectRulesPlugin = {
 
         // Property access patterns inside expect() that should use jest-dom matchers
         const DOM_PROPERTY_MATCHERS = {
-          textContent: 'Use expect(element).toHaveTextContent() instead of accessing .textContent directly.',
-          innerHTML: 'Use expect(element).toContainHTML() or toHaveTextContent() instead of accessing .innerHTML.',
+          textContent:
+            'Use expect(element).toHaveTextContent() instead of accessing .textContent directly.',
+          innerHTML:
+            'Use expect(element).toContainHTML() or toHaveTextContent() instead of accessing .innerHTML.',
           className: 'Use expect(element).toHaveClass() instead of accessing .className directly.',
           value: 'Use expect(element).toHaveValue() instead of accessing .value directly.',
-          disabled: 'Use expect(element).toBeDisabled() / toBeEnabled() instead of accessing .disabled directly.',
+          disabled:
+            'Use expect(element).toBeDisabled() / toBeEnabled() instead of accessing .disabled directly.',
           checked: 'Use expect(element).toBeChecked() instead of accessing .checked directly.',
           selected: 'Use expect(element).toBeChecked() instead of accessing .selected directly.',
           required: 'Use expect(element).toBeRequired() instead of accessing .required directly.',
-          readOnly: 'Use expect(element).toHaveAttribute("readonly") instead of accessing .readOnly directly.',
+          readOnly:
+            'Use expect(element).toHaveAttribute("readonly") instead of accessing .readOnly directly.',
         }
 
         // classList.contains('x') → toHaveClass('x')
@@ -405,7 +442,10 @@ const projectRulesPlugin = {
                 }
                 // expect(el.classList.contains('x')).toBe(true) → toHaveClass
                 if (propName === 'classList') {
-                  report(arg.property, 'Use expect(element).toHaveClass() instead of accessing .classList directly.')
+                  report(
+                    arg.property,
+                    'Use expect(element).toHaveClass() instead of accessing .classList directly.'
+                  )
                 }
               }
               // expect(el.classList.contains('x')) — nested call
@@ -436,7 +476,10 @@ const projectRulesPlugin = {
                 arg.object.property.type === 'Identifier' &&
                 arg.object.property.name === 'style'
               ) {
-                report(arg, 'Use expect(element).toHaveStyle() instead of accessing .style directly.')
+                report(
+                  arg,
+                  'Use expect(element).toHaveStyle() instead of accessing .style directly.'
+                )
               }
               // expect(document.activeElement).toBe(el) → toHaveFocus
               if (
@@ -446,7 +489,10 @@ const projectRulesPlugin = {
                 arg.property.type === 'Identifier' &&
                 arg.property.name === 'activeElement'
               ) {
-                report(arg, 'Use expect(element).toHaveFocus() instead of checking document.activeElement.')
+                report(
+                  arg,
+                  'Use expect(element).toHaveFocus() instead of checking document.activeElement.'
+                )
               }
             }
           },
@@ -460,7 +506,9 @@ const projectRulesPlugin = {
     'no-flaky-click-selectors': {
       meta: {
         type: 'problem',
-        docs: { description: 'E2E click targets must use getByTestId, not text/role/label selectors' },
+        docs: {
+          description: 'E2E click targets must use getByTestId, not text/role/label selectors',
+        },
         messages: {
           noFlakyClick:
             '.click() target must be obtained via getByTestId(). Using {{ method }}() produces flaky selectors that break on text or DOM changes.',
@@ -473,8 +521,12 @@ const projectRulesPlugin = {
 
         // Methods that produce flaky locators when used as click targets
         const FLAKY_METHODS = new Set([
-          'getByText', 'getByRole', 'getByLabel', 'getByPlaceholder',
-          'getByAltText', 'getByTitle',
+          'getByText',
+          'getByRole',
+          'getByLabel',
+          'getByPlaceholder',
+          'getByAltText',
+          'getByTitle',
         ])
 
         return {
@@ -484,7 +536,8 @@ const projectRulesPlugin = {
               node.callee.type !== 'MemberExpression' ||
               node.callee.property.type !== 'Identifier' ||
               node.callee.property.name !== 'click'
-            ) return
+            )
+              return
 
             // Walk back through the chain to find the query method
             let obj = node.callee.object
@@ -547,7 +600,8 @@ const projectRulesPlugin = {
               node.callee.property.type !== 'Identifier' ||
               node.callee.property.name !== 'skip' ||
               node.arguments.length === 0
-            ) return
+            )
+              return
 
             const arg = node.arguments[0]
             const src = context.sourceCode.getText(arg)
@@ -588,7 +642,8 @@ const projectRulesPlugin = {
         if (!fp.includes('/shaders/') && !fp.toLowerCase().includes('/wgsl/')) return {}
 
         // Behavioral verbs that imply the test checks computation, not structure
-        const BEHAVIORAL_RE = /\b(applies|computes|calculates|evaluates|produces|uses|operates|reads|writes)\b/i
+        const BEHAVIORAL_RE =
+          /\b(applies|computes|calculates|evaluates|produces|uses|operates|reads|writes)\b/i
 
         // Track: for each it() call, record its description and all matchers used
         const testStack = []
@@ -681,8 +736,7 @@ const projectRulesPlugin = {
       meta: {
         type: 'problem',
         docs: {
-          description:
-            'WebGPU object creation calls must include a `label` for diagnostic output',
+          description: 'WebGPU object creation calls must include a `label` for diagnostic output',
         },
         messages: {
           missingLabel:
@@ -790,7 +844,18 @@ const projectRulesPlugin = {
 
 export default [
   {
-    ignores: ['dist', 'coverage', 'node_modules', 'scripts/!(playwright)/**', 'playwright.config.ts', 'playwright.benchmark.config.ts', 'src/wasm/**/pkg/**', 'src/wasm/**/pkg-validator/**', '.claude/worktrees/**'],
+    ignores: [
+      'dist',
+      'coverage',
+      'logs',
+      'node_modules',
+      'scripts/!(playwright)/**',
+      'playwright.config.ts',
+      'playwright.benchmark.config.ts',
+      'src/wasm/**/pkg/**',
+      'src/wasm/**/pkg-validator/**',
+      '.claude/worktrees/**',
+    ],
   },
 
   // @eslint-react strict-typescript: registers all @eslint-react/* plugins + sets strict rule
@@ -900,10 +965,10 @@ export default [
 
       // Disable inapplicable rules: this is a Vite SPA, hooks-only, React 19
       '@eslint-react/rsc/function-definition': 'off', // not a React Server Components project
-      '@eslint-react/no-use-context': 'off',          // using useContext directly is fine
-      '@eslint-react/no-context-provider': 'off',     // React 19 <Ctx> syntax is opt-in
-      '@eslint-react/no-forward-ref': 'off',          // forwardRef is legitimate in this codebase
-      '@eslint-react/no-clone-element': 'off',         // single use in DropdownMenu trigger injection — intentional pattern
+      '@eslint-react/no-use-context': 'off', // using useContext directly is fine
+      '@eslint-react/no-context-provider': 'off', // React 19 <Ctx> syntax is opt-in
+      '@eslint-react/no-forward-ref': 'off', // forwardRef is legitimate in this codebase
+      '@eslint-react/no-clone-element': 'off', // single use in DropdownMenu trigger injection — intentional pattern
 
       // Disable rules that generate noise for legitimate patterns in this codebase
       // set-state-in-effect: 40 components sync external data (GPU state, subscriptions,
@@ -911,8 +976,8 @@ export default [
       // conditionally guarded. Scoping to 40 individual file overrides would add config
       // noise without catching bugs; the pattern is architecturally pervasive here.
       '@eslint-react/set-state-in-effect': 'off',
-      '@eslint-react/naming-convention/ref-name': 'off',  // cosmetic; large existing ref surface
-      '@eslint-react/use-state': 'off',                   // setter naming convention is cosmetic
+      '@eslint-react/naming-convention/ref-name': 'off', // cosmetic; large existing ref surface
+      '@eslint-react/use-state': 'off', // setter naming convention is cosmetic
 
       // JSDoc
       'jsdoc/require-jsdoc': [
@@ -1005,10 +1070,7 @@ export default [
   // natural unit of cohesion; allow it to be as large as it needs to be.
   // Cohesion is enforced by code review, not line count.
   {
-    files: [
-      'src/rendering/webgpu/passes/**/*.ts',
-      'src/rendering/webgpu/renderers/**/*.ts',
-    ],
+    files: ['src/rendering/webgpu/passes/**/*.ts', 'src/rendering/webgpu/renderers/**/*.ts'],
     rules: {
       'max-lines': 'off',
     },
@@ -1102,11 +1164,14 @@ export default [
   {
     files: ['src/lib/**/*.ts'],
     rules: {
-      '@typescript-eslint/explicit-function-return-type': ['error', {
-        allowExpressions: true,
-        allowTypedFunctionExpressions: true,
-        allowHigherOrderFunctions: true,
-      }],
+      '@typescript-eslint/explicit-function-return-type': [
+        'error',
+        {
+          allowExpressions: true,
+          allowTypedFunctionExpressions: true,
+          allowHigherOrderFunctions: true,
+        },
+      ],
     },
   },
   // Disable no-useless-assignment in GPU compute passes and shader files
@@ -1184,13 +1249,20 @@ export default [
   {
     files: ['src/rendering/webgpu/passes/**/*.ts'],
     rules: {
-      'no-restricted-imports': ['error', {
-        patterns: [{
-          regex: '^@/stores/(?!defaults(?:/|$)|diagnostics/(?:diagnosticsStore|.*DiagnosticsStore|hellerSpectrometerStore|wormholeCoherenceStore|wavefunctionSliceStore)$|runtime/(?:simulationStateStore|performanceStore)$|scene/extendedObjectStore$)',
-          allowTypeImports: true,
-          message: 'Render passes access stores via ctx.stores. Only diagnostic stores (write-direction), simulationStateStore, hellerSpectrometerStore, performanceStore, wormholeCoherenceStore (HUD write-direction), wavefunctionSliceStore (write-direction slice readback fulfillment, used only by TDSEStateSaveLoad.ts), and defaults/* are exempt.',
-        }],
-      }],
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex:
+                '^@/stores/(?!defaults(?:/|$)|diagnostics/(?:diagnosticsStore|.*DiagnosticsStore|hellerSpectrometerStore|wormholeCoherenceStore|wavefunctionSliceStore)$|runtime/(?:simulationStateStore|performanceStore)$|scene/extendedObjectStore$)',
+              allowTypeImports: true,
+              message:
+                'Render passes access stores via ctx.stores. Only diagnostic stores (write-direction), simulationStateStore, hellerSpectrometerStore, performanceStore, wormholeCoherenceStore (HUD write-direction), wavefunctionSliceStore (write-direction slice readback fulfillment, used only by TDSEStateSaveLoad.ts), and defaults/* are exempt.',
+            },
+          ],
+        },
+      ],
     },
   },
   // Static render lists (ticks, swatches, menu items, energy diagrams, key bindings)

@@ -77,10 +77,9 @@ export class DiracStrategy extends SinglePassComputeStrategy<DiracComputePass, D
     } else {
       diracFieldView = config.fieldView
     }
-    return {
-      ...applySharedPml(config, schroedinger),
-      fieldView: diracFieldView,
-    } as DiracConfig
+    const pmlConfig = applySharedPml(config, schroedinger) as DiracConfig
+    if (pmlConfig.fieldView === diracFieldView) return pmlConfig
+    return { ...pmlConfig, fieldView: diracFieldView } as DiracConfig
   }
 
   protected executePass(

@@ -1,59 +1,27 @@
-import { AnimatePresence, m } from 'motion/react'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { Suspense, useEffect, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-import { Button } from '@/components/ui/Button'
 import { soundManager } from '@/lib/audio/SoundManager'
-import { getModifierSymbols } from '@/lib/platform'
-import { supportsPopover } from '@/lib/popoverSupport'
-import { useCameraStore } from '@/stores/scene/cameraStore'
 import { useDropdownStore } from '@/stores/ui/dropdownStore'
-import { type LayoutStore, useLayoutStore } from '@/stores/ui/layoutStore'
+
+const CanvasContextMenuContent = React.lazy(() =>
+  import('@/components/layout/CanvasContextMenuContent').then((m) => ({
+    default: m.CanvasContextMenuContent,
+  }))
+)
 
 const DROPDOWN_ID = 'canvas-context-menu'
 
-interface MenuItem {
-  label: string
-  shortcut?: string
-  action?: () => void
-  type?: 'separator'
-}
-
 export const CanvasContextMenu: React.FC = React.memo(() => {
-  const popoverRef = useRef<HTMLDivElement>(null)
   const [position, setPosition] = useState({ x: 0, y: 0 })
 
-  const { isOpen, openDropdown, closeDropdown } = useDropdownStore(
+  const { isOpen, openDropdown } = useDropdownStore(
     useShallow((state) => ({
       isOpen: state.openDropdownId === DROPDOWN_ID,
       openDropdown: state.openDropdown,
-      closeDropdown: state.closeDropdown,
     }))
   )
 
-  const layoutSelector = useShallow((state: LayoutStore) => ({
-    toggleCinematicMode: state.toggleCinematicMode,
-    toggleCollapsed: state.toggleCollapsed,
-    toggleLeftPanel: state.toggleLeftPanel,
-  }))
-  const { toggleCinematicMode, toggleCollapsed, toggleLeftPanel } = useLayoutStore(layoutSelector)
-  const resetCamera = useCameraStore((state) => state.reset)
-
-  // Sync popover visibility with store state
-  // Guarded: Popover API requires Safari 17+, Chrome 114+, Firefox 125+.
-  useEffect(() => {
-    if (!supportsPopover) return
-    const popover = popoverRef.current
-    if (!popover) return
-
-    if (isOpen && !popover.matches(':popover-open')) {
-      popover.showPopover()
-    } else if (!isOpen && popover.matches(':popover-open')) {
-      popover.hidePopover()
-    }
-  }, [isOpen])
-
-  // Handle right-click to open context menu
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
       const target = e.target as HTMLElement
@@ -74,112 +42,12 @@ export const CanvasContextMenu: React.FC = React.memo(() => {
     return () => window.removeEventListener('contextmenu', handleContextMenu)
   }, [openDropdown])
 
-  // Manual light-dismiss: close on click outside or Escape key
-  // We use popover="manual" because contextmenu events (right-click) don't
-  // interact well with popover="auto" light-dismiss timing
-  useEffect(() => {
-    if (!isOpen) return
-
-    const handleClickOutside = (e: MouseEvent) => {
-      const popover = popoverRef.current
-      if (popover && !popover.contains(e.target as Node)) {
-        closeDropdown(DROPDOWN_ID)
-      }
-    }
-
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        closeDropdown(DROPDOWN_ID)
-      }
-    }
-
-    // Delay adding click listener to avoid the opening click triggering close
-    const timeoutId = setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside)
-    }, 0)
-    document.addEventListener('keydown', handleEscape)
-
-    return () => {
-      clearTimeout(timeoutId)
-      document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('keydown', handleEscape)
-    }
-  }, [isOpen, closeDropdown])
-
-  const items: MenuItem[] = useMemo(() => {
-    const mod = getModifierSymbols()
-    return [
-      { label: 'Reset Camera', shortcut: 'R', action: resetCamera },
-      { label: 'Toggle Cinematic Mode', shortcut: 'C', action: toggleCinematicMode },
-      { type: 'separator', label: '' },
-      { label: 'Toggle Left Panel', shortcut: `${mod.shift}+\\`, action: toggleLeftPanel },
-      { label: 'Toggle Right Panel', shortcut: '\\', action: toggleCollapsed },
-    ]
-  }, [resetCamera, toggleCinematicMode, toggleLeftPanel, toggleCollapsed])
-
-  const handleItemClick = useCallback(
-    (action?: () => void) => {
-      soundManager.playClick()
-      if (action) action()
-      closeDropdown(DROPDOWN_ID)
-    },
-    [closeDropdown]
-  )
-
-  const handleItemHover = () => {
-    soundManager.playHover()
-  }
+  if (!isOpen) return null
 
   return (
-    <div
-      ref={popoverRef}
-      {...(supportsPopover ? { popover: 'manual' } : {})}
-      id={DROPDOWN_ID}
-      data-testid="canvas-context-menu"
-      className="fixed z-50 m-0 p-0 border-none bg-transparent"
-      style={{ top: position.y, left: position.x }}
-    >
-      <AnimatePresence>
-        {isOpen && (
-          <m.div
-            initial={{ opacity: 0, scale: 0.9, x: -10, y: -10 }}
-            animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-            className="min-w-[180px] glass-panel rounded-lg shadow-xl overflow-hidden py-1"
-          >
-            {items.map((item, index) => {
-              if (item.type === 'separator') {
-                return (
-                  <div
-                    key={index}
-                    role="separator"
-                    className="h-[1px] bg-[var(--border-subtle)] my-1 mx-2"
-                  />
-                )
-              }
-              return (
-                <Button
-                  key={index}
-                  onClick={() => handleItemClick(item.action)}
-                  onMouseEnter={handleItemHover}
-                  className="w-full text-left px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex justify-between items-center transition-colors group rounded-none border-none bg-transparent"
-                  size="sm"
-                  variant="ghost"
-                >
-                  <span>{item.label}</span>
-                  {item.shortcut && (
-                    <span className="text-xs font-mono text-text-tertiary group-hover:text-text-secondary">
-                      {item.shortcut}
-                    </span>
-                  )}
-                </Button>
-              )
-            })}
-          </m.div>
-        )}
-      </AnimatePresence>
-    </div>
+    <Suspense fallback={null}>
+      <CanvasContextMenuContent dropdownId={DROPDOWN_ID} position={position} />
+    </Suspense>
   )
 })
 

@@ -255,7 +255,7 @@ async function setupPPPassesSequential(
   config: PassConfig,
   shouldAbort?: () => boolean
 ): Promise<void> {
-  const passes = constructPPPasses(config)
+  const passes = await constructPPPasses(config)
 
   for (const { pass, label, resource } of passes) {
     if (shouldAbort?.()) return
@@ -292,7 +292,7 @@ export async function setupPPPasses(
     return setupPPPassesSequential(graph, config, shouldAbort)
   }
 
-  const passes = constructPPPasses(config)
+  const passes = await constructPPPasses(config)
 
   // Phase 1: Pre-initialize all passes in parallel (shader compilation)
   if (!shouldAbort?.()) {
@@ -411,6 +411,11 @@ const PAULI_RENDERER_OVERRIDES = {
   isPauli: true,
   crossSectionEnabled: false,
   probabilityCurrentEnabled: false,
+  quantumBackreactionLensingEnabled: false,
+  bilocalERBridgeEnabled: false,
+  entropicTimeShearEnabled: false,
+  spectralDimensionFlowEnabled: false,
+  vacuumBubbleLensEnabled: false,
 }
 
 /**
@@ -461,6 +466,11 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
         openQuantumEnabled: config.openQuantumEnabled,
         crossSectionEnabled: config.crossSectionEnabled,
         probabilityCurrentEnabled: config.probabilityCurrentEnabled,
+        quantumBackreactionLensingEnabled: config.quantumBackreactionLensingEnabled,
+        bilocalERBridgeEnabled: config.bilocalERBridgeEnabled,
+        entropicTimeShearEnabled: config.entropicTimeShearEnabled,
+        spectralDimensionFlowEnabled: config.spectralDimensionFlowEnabled,
+        vacuumBubbleLensEnabled: config.vacuumBubbleLensEnabled,
         densityGridResolution: config.densityGridResolution,
       })
 

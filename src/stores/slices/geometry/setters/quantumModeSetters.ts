@@ -33,6 +33,7 @@ import {
 import { getFirstPresetId } from '@/lib/physics/presetDefaults'
 import { usePerformanceStore } from '@/stores/runtime/performanceStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { invalidateDynamicPresetApplies } from '@/stores/utils/dynamicPresetImport'
 
 import type { ExtendedObjectSlice } from '../types'
 import { reconcileCosmologyInvariants } from './freeScalarCosmologySetters'
@@ -78,6 +79,7 @@ export function resetModeSessionCaches(): void {
   modeSettingsCache.clear()
   visitedModes.clear()
   visitedModes.add('harmonicOscillator')
+  invalidateDynamicPresetApplies()
 }
 
 /** Per-mode rendering defaults. Modes not listed fall back to DEFAULT_SCHROEDINGER_CONFIG values. */
