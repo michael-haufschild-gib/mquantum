@@ -25,6 +25,10 @@ interface CanvasContextMenuContentProps {
   }
 }
 
+const handleItemHover = () => {
+  soundManager.playHover()
+}
+
 export const CanvasContextMenuContent: React.FC<CanvasContextMenuContentProps> = React.memo(
   ({ dropdownId, position }) => {
     const popoverRef = useRef<HTMLDivElement>(null)
@@ -99,10 +103,6 @@ export const CanvasContextMenuContent: React.FC<CanvasContextMenuContentProps> =
       },
       [dropdownId, closeDropdown]
     )
-
-    const handleItemHover = () => {
-      soundManager.playHover()
-    }
 
     return (
       <div

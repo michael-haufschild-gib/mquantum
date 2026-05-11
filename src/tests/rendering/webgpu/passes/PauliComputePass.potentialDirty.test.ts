@@ -23,7 +23,7 @@ describe('PauliComputePass potential dirty tracking', () => {
     const config = createConfig()
 
     expect(pass.consumePauliPotentialDirty(config)).toBe(true)
-    expect(pass.consumePauliPotentialDirty(config)).toBe(false)
+    expect(pass.consumePauliPotentialDirty(createConfig())).toBe(false)
   })
 
   it('detects potential scalar, grid, spacing, and explicit invalidation changes', () => {
@@ -34,17 +34,25 @@ describe('PauliComputePass potential dirty tracking', () => {
     expect(pass.consumePauliPotentialDirty({ ...config, wellDepth: config.wellDepth + 1 })).toBe(
       true
     )
-    expect(pass.consumePauliPotentialDirty({ ...config, wellDepth: config.wellDepth + 1 })).toBe(
+    expect(pass.consumePauliPotentialDirty(createConfig({ wellDepth: config.wellDepth + 1 }))).toBe(
       false
     )
 
     const changedGrid = createConfig({ gridSize: [32, 64, 64], spacing: [0.15, 0.15, 0.15] })
     expect(pass.consumePauliPotentialDirty(changedGrid)).toBe(true)
-    expect(pass.consumePauliPotentialDirty(changedGrid)).toBe(false)
+    expect(
+      pass.consumePauliPotentialDirty(
+        createConfig({ gridSize: [32, 64, 64], spacing: [0.15, 0.15, 0.15] })
+      )
+    ).toBe(false)
 
     const changedSpacing = createConfig({ gridSize: [32, 64, 64], spacing: [0.2, 0.15, 0.15] })
     expect(pass.consumePauliPotentialDirty(changedSpacing)).toBe(true)
-    expect(pass.consumePauliPotentialDirty(changedSpacing)).toBe(false)
+    expect(
+      pass.consumePauliPotentialDirty(
+        createConfig({ gridSize: [32, 64, 64], spacing: [0.2, 0.15, 0.15] })
+      )
+    ).toBe(false)
 
     pass.invalidatePauliPotential()
     expect(pass.consumePauliPotentialDirty(changedSpacing)).toBe(true)

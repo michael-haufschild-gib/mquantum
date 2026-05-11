@@ -27,7 +27,7 @@ describe('QuantumWalkComputePass config dirty tracking', () => {
     const config = createConfig()
 
     expect(pass.consumeConfigDirty(config)).toBe(true)
-    expect(pass.consumeConfigDirty(config)).toBe(false)
+    expect(pass.consumeConfigDirty(createConfig())).toBe(false)
   })
 
   it('detects grid, lattice, coin type, coin bias, and coin initial changes', () => {
@@ -54,6 +54,15 @@ describe('QuantumWalkComputePass config dirty tracking', () => {
       initialPosition: [16, 16, 16],
     })
     expect(pass.consumeConfigDirty(changedDim)).toBe(true)
-    expect(pass.consumeConfigDirty(changedDim)).toBe(false)
+    expect(
+      pass.consumeConfigDirty(
+        createConfig({
+          latticeDim: 3,
+          gridSize: [32, 32, 32],
+          spacing: [0.1, 0.1, 0.1],
+          initialPosition: [16, 16, 16],
+        })
+      )
+    ).toBe(false)
   })
 })

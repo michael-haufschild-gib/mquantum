@@ -29,7 +29,7 @@ describe('createVersionTracker', () => {
     expect(Number.isNaN(t.lastBasisAnimationTime)).toBe(true)
   })
 
-  it('initializes quality signature to empty string', () => {
+  it('initializes quality signatures to -1 sentinels', () => {
     const t = createVersionTracker()
     expect(t.lastQualitySignature).toBe(-1)
     expect(t.lastSchroedingerQualitySignature).toBe(-1)

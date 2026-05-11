@@ -193,11 +193,16 @@ describe('useRotationUpdates', () => {
       result.current.getBasisVectors(false)
       result.current.getOrigin([1, 0, 0])
       act(() => {
-        useRotationStore.setState((s) => ({ version: s.version + 1 }))
+        useRotationStore.setState((s) => ({
+          rotations: new Map([['XY', Math.PI / 2]]),
+          version: s.version + 1,
+        }))
       })
       result.current.getBasisVectors(false)
-      const { changed } = result.current.getOrigin([1, 0, 0])
+      const { changed, origin } = result.current.getOrigin([1, 0, 0])
       expect(changed).toBe(true)
+      expect(Math.abs(origin[0] ?? 0)).toBeLessThan(1e-5)
+      expect(Math.abs(origin[1] ?? 0)).toBeCloseTo(1)
     })
 
     it('pads short originValues with zeros for higher dimensions', () => {

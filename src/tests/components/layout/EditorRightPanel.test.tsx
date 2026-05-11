@@ -8,6 +8,9 @@ import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 describe('EditorRightPanel tab layout', () => {
+  const findLazyAnalysisElement = (testId: string) =>
+    screen.findByTestId(testId, undefined, { timeout: 10_000 })
+
   beforeEach(() => {
     localStorage.clear()
     useExtendedObjectStore.getState().reset()
@@ -41,13 +44,9 @@ describe('EditorRightPanel tab layout', () => {
     // Both sections lazy-mount after the tab click. Use findByTestId for
     // both — under worker-pool contention the second section may render
     // slightly after the first, causing a sync getByTestId here to flake.
-    expect(
-      await screen.findByTestId('analysis-section', undefined, { timeout: 5000 })
-    ).toBeInTheDocument()
-    expect(
-      await screen.findByTestId('quantum-effects-section', undefined, { timeout: 5000 })
-    ).toBeInTheDocument()
-  })
+    expect(await findLazyAnalysisElement('analysis-section')).toBeInTheDocument()
+    expect(await findLazyAnalysisElement('quantum-effects-section')).toBeInTheDocument()
+  }, 15_000)
 
   it('does not render isosurface mode toggle in the right panel surface section', () => {
     render(<EditorRightPanel />)
@@ -71,9 +70,10 @@ describe('EditorRightPanel tab layout', () => {
 
     render(<EditorRightPanel />)
     await user.click(screen.getByRole('tab', { name: /analysis/i }))
-    await user.click(await screen.findByTestId('data-export-group-header'))
+    await findLazyAnalysisElement('analysis-section')
+    await user.click(await findLazyAnalysisElement('data-export-group-header'))
 
     expect(screen.getByTestId('capture-slice')).toBeInTheDocument()
     expect(screen.queryByTestId('export-wf-slice-csv')).not.toBeInTheDocument()
-  })
+  }, 15_000)
 })

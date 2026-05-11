@@ -81,14 +81,14 @@ export function packRGBA16F(
   out[base + 3] = float32ToFloat16(a)
 }
 
-/** Pack only R and G channels, leaving B and A as zero. */
+/** Pack only R and G channels; B and A indices are left unchanged. */
 export function packRG16F(out: Uint16Array, pixelIdx: number, r: number, g: number): void {
   const base = pixelIdx * 4
   out[base] = float32ToFloat16(r)
   out[base + 1] = float32ToFloat16(g)
 }
 
-/** Pack only R channel, leaving G, B, A as zero. */
+/** Pack only R channel; G, B, A indices are left unchanged. */
 export function packR16F(out: Uint16Array, pixelIdx: number, r: number): void {
   out[pixelIdx * 4] = float32ToFloat16(r)
 }

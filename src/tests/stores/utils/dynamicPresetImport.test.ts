@@ -13,7 +13,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { logger } from '@/lib/logger'
-import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
+import {
+  beginDynamicPresetApply,
+  invalidateDynamicPresetApplies,
+  loadPresetModule,
+} from '@/stores/utils/dynamicPresetImport'
+
+describe('beginDynamicPresetApply', () => {
+  it('invalidates older guards when a newer preset apply starts', () => {
+    const firstGuard = beginDynamicPresetApply()
+    const secondGuard = beginDynamicPresetApply()
+
+    expect(firstGuard()).toBe(false)
+    expect(secondGuard()).toBe(true)
+
+    invalidateDynamicPresetApplies()
+    expect(secondGuard()).toBe(false)
+  })
+})
 
 describe('loadPresetModule', () => {
   let warnSpy: ReturnType<typeof vi.spyOn>

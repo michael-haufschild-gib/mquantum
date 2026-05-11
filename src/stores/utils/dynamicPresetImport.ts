@@ -35,7 +35,7 @@ let dynamicPresetApplyGeneration = 0
  * Start a dynamic preset apply and return a guard for stale async completions.
  */
 export function beginDynamicPresetApply(): () => boolean {
-  const generation = dynamicPresetApplyGeneration
+  const generation = ++dynamicPresetApplyGeneration
   return () => generation === dynamicPresetApplyGeneration
 }
 
