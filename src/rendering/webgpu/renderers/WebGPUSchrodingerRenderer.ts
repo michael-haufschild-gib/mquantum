@@ -269,7 +269,15 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // If a predecessor strategy was stashed (via adoptFrom), transfer its compute
     // state to the new strategy before setup, preserving simulation state.
     this.strategy.dispose()
-    this.strategy = await createModeStrategy(this.rendererConfig)
+    try {
+      this.strategy = await createModeStrategy(this.rendererConfig)
+    } catch (error) {
+      logger.error(
+        `[WebGPUSchrodingerRenderer] Failed to create mode strategy for quantumMode="${this.rendererConfig.quantumMode}" isPauli=${this.rendererConfig.isPauli}:`,
+        error
+      )
+      this.strategy = createInitialModeStrategy()
+    }
     this.strategy.configureShader(this.shaderConfig, this.rendererConfig)
     if (this.predecessorStrategy) {
       this.strategy.adoptComputeState?.(this.predecessorStrategy, this.rendererConfig)

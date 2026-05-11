@@ -104,39 +104,38 @@ export function getSceneExamples(): SceneExample[] {
  * @returns True if the scene was found and loaded, false otherwise
  */
 export async function applySceneExample(id: string): Promise<boolean> {
-  const scenesData = await loadSceneData()
-  const scene = scenesData.find((s) => s.id === id)
-  if (!scene) {
-    logger.warn(`Scene example with id "${id}" not found`)
+  let stagedId: string | null = null
+
+  try {
+    const scenesData = await loadSceneData()
+    const scene = scenesData.find((s) => s.id === id)
+    if (!scene) {
+      logger.warn(`Scene example with id "${id}" not found`)
+      return false
+    }
+
+    const existingScene = usePresetManagerStore
+      .getState()
+      .savedScenes.some((s) => s.id === scene.id)
+
+    if (!existingScene) {
+      usePresetManagerStore.setState((state) => ({
+        savedScenes: [...state.savedScenes, scene],
+      }))
+      stagedId = scene.id
+    }
+
+    await usePresetManagerStore.getState().loadScene(scene.id)
+    soundManager.playClick()
+    return true
+  } catch (error) {
+    logger.error('[sceneExamples] Failed to apply scene example:', error)
     return false
+  } finally {
+    if (stagedId) {
+      usePresetManagerStore.setState((state) => ({
+        savedScenes: state.savedScenes.filter((s) => s.id !== stagedId),
+      }))
+    }
   }
-
-  // Load the scene using preset manager
-  // We need to temporarily add it to savedScenes, load it, then remove it
-  const presetManager = usePresetManagerStore.getState()
-
-  // Check if scene is already in savedScenes
-  const existingScene = presetManager.savedScenes.find((s) => s.id === scene.id)
-
-  if (!existingScene) {
-    // Temporarily add to savedScenes
-    usePresetManagerStore.setState((state) => ({
-      savedScenes: [...state.savedScenes, scene],
-    }))
-  }
-
-  // Load the scene (synchronous — reads from savedScenes then applies state)
-  presetManager.loadScene(scene.id)
-
-  // Remove it from savedScenes immediately after load completes.
-  // loadScene is synchronous, so the scene data has already been read
-  // and applied by the time we reach this line.
-  if (!existingScene) {
-    usePresetManagerStore.setState((state) => ({
-      savedScenes: state.savedScenes.filter((s) => s.id !== scene.id),
-    }))
-  }
-
-  soundManager.playClick()
-  return true
 }

@@ -83,39 +83,38 @@ export function getStyleExamples(): StyleExample[] {
  * @returns True if the style was found and loaded, false otherwise
  */
 export async function applyStyleExample(id: string): Promise<boolean> {
-  const stylesData = await loadStyleData()
-  const style = stylesData.find((s) => s.id === id)
-  if (!style) {
-    logger.warn(`Style example with id "${id}" not found`)
+  let stagedId: string | null = null
+
+  try {
+    const stylesData = await loadStyleData()
+    const style = stylesData.find((s) => s.id === id)
+    if (!style) {
+      logger.warn(`Style example with id "${id}" not found`)
+      return false
+    }
+
+    const existingStyle = usePresetManagerStore
+      .getState()
+      .savedStyles.some((s) => s.id === style.id)
+
+    if (!existingStyle) {
+      usePresetManagerStore.setState((state) => ({
+        savedStyles: [...state.savedStyles, style],
+      }))
+      stagedId = style.id
+    }
+
+    await usePresetManagerStore.getState().loadStyle(style.id)
+    soundManager.playClick()
+    return true
+  } catch (error) {
+    logger.error('[styleExamples] Failed to apply style example:', error)
     return false
+  } finally {
+    if (stagedId) {
+      usePresetManagerStore.setState((state) => ({
+        savedStyles: state.savedStyles.filter((s) => s.id !== stagedId),
+      }))
+    }
   }
-
-  // Load the style using preset manager
-  // We need to temporarily add it to savedStyles, load it, then remove it
-  const presetManager = usePresetManagerStore.getState()
-
-  // Check if style is already in savedStyles
-  const existingStyle = presetManager.savedStyles.find((s) => s.id === style.id)
-
-  if (!existingStyle) {
-    // Temporarily add to savedStyles
-    usePresetManagerStore.setState((state) => ({
-      savedStyles: [...state.savedStyles, style],
-    }))
-  }
-
-  // Load the style (synchronous — reads from savedStyles then applies state)
-  presetManager.loadStyle(style.id)
-
-  // Remove it from savedStyles immediately after load completes.
-  // loadStyle is synchronous, so the style data has already been read
-  // and applied by the time we reach this line.
-  if (!existingStyle) {
-    usePresetManagerStore.setState((state) => ({
-      savedStyles: state.savedStyles.filter((s) => s.id !== style.id),
-    }))
-  }
-
-  soundManager.playClick()
-  return true
 }

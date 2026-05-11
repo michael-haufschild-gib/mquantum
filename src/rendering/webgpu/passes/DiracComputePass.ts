@@ -530,8 +530,8 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   }
 
   /** Initialize spinor wavepacket and potential if needed. */
-  private maybeInitialize(ctx: WebGPURenderContext, config: DiracConfig): void {
-    if (this.initialized && !config.needsReset) return
+  private maybeInitialize(ctx: WebGPURenderContext, config: DiracConfig): boolean {
+    if (this.initialized && !config.needsReset) return false
     const { device } = ctx
 
     // Site-dispatch shape covers init + potential-fill. pickSiteDispatch picks
@@ -560,7 +560,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       // Init kernel + potential fill both need the compiled pipelines and
       // their bind groups. Defer marking `initialized` until they exist —
       // otherwise we'd permanently skip init when the async compile lands.
-      if (!this.pl || !this.bg) return
+      if (!this.pl || !this.bg) return false
 
       const initPass = ctx.beginComputePass({ label: 'dirac-init-pass' })
       this.dispatchCompute(
@@ -574,6 +574,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       initPass.end()
     }
 
+    let potentialFilled = false
     // Always fill potential (needed for both init and load)
     if (this.pl && this.bg) {
       const potPass = ctx.beginComputePass({ label: 'dirac-potential-fill' })
@@ -586,6 +587,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
         siteDispatch.z
       )
       potPass.end()
+      potentialFilled = true
     }
 
     this.maxDensity = 1.0
@@ -596,6 +598,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     // Invalidate in-flight readbacks before resetting diagnostics store
     this.diagGeneration++
     useDiagnosticsStore.getState().resetDirac()
+    return potentialFilled
   }
 
   private updateUniforms(
@@ -692,8 +695,8 @@ export class DiracComputePass extends WebGPUBaseComputePass {
 
     this.flushGammaUpload(device)
     this.updateUniforms(device, config, basisX, basisY, basisZ, boundingRadius)
-    this.maybeInitialize(ctx, config)
-    this.refreshPotentialIfDirty(ctx, config)
+    const initializedThisFrame = this.maybeInitialize(ctx, config)
+    if (!initializedThisFrame) this.refreshPotentialIfDirty(ctx, config)
 
     const { pl, bg } = this
     if (!pl || !bg) return

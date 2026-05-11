@@ -71,5 +71,28 @@ describe('styleExamples', () => {
       const result = await applyStyleExample(examples[0]!.id)
       expect(result).toBe(true)
     })
+
+    it('cleans up staged bundled styles when loadStyle throws', async () => {
+      const examples = getStyleExamples()
+      if (examples.length === 0) return
+
+      const example = examples[0]!
+      const originalLoadStyle = usePresetManagerStore.getState().loadStyle
+
+      usePresetManagerStore.setState({
+        loadStyle: (() => {
+          throw new Error('load failed')
+        }) as typeof originalLoadStyle,
+      })
+
+      try {
+        await expect(applyStyleExample(example.id)).resolves.toBe(false)
+        expect(
+          usePresetManagerStore.getState().savedStyles.some((style) => style.id === example.id)
+        ).toBe(false)
+      } finally {
+        usePresetManagerStore.setState({ loadStyle: originalLoadStyle })
+      }
+    })
   })
 })

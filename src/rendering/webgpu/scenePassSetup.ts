@@ -295,17 +295,23 @@ export async function setupPPPasses(
   const passes = await constructPPPasses(config)
 
   // Phase 1: Pre-initialize all passes in parallel (shader compilation)
-  if (!shouldAbort?.()) {
-    await Promise.all(passes.map(({ pass, label }) => preInitPass(pass, setupCtx, label)))
-  }
+  const initializedPasses = !shouldAbort?.()
+    ? await Promise.all(passes.map(({ pass, label }) => preInitPass(pass, setupCtx, label)))
+    : []
 
   if (shouldAbort?.()) {
     passes.forEach(({ pass }) => pass.dispose())
     return
   }
 
+  const initializedSet = new Set(
+    initializedPasses.filter((pass): pass is WebGPURenderPass => pass !== null)
+  )
+  const readyPasses = passes.filter(({ pass }) => initializedSet.has(pass))
+  if (readyPasses.length === 0) return
+
   // Phase 2: Register in pipeline order
-  registerPasses(graph, passes)
+  registerPasses(graph, readyPasses)
 }
 
 /** Remove Schroedinger-group passes that should no longer exist. */

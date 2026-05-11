@@ -351,6 +351,7 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
       const currentMode = get().schroedinger.quantumMode
       if (currentMode !== mode) {
         modeSettingsCache.set(currentMode, snapshotRenderingSettings(get().schroedinger))
+        invalidateDynamicPresetApplies()
       }
 
       enforceDimensionConstraints(mode)
