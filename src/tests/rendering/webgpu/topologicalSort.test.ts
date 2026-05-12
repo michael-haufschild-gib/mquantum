@@ -188,4 +188,33 @@ describe('computePassOrder', () => {
     const result = computePassOrder(passMap(pass))
     expect(result).toEqual(['consumer'])
   })
+
+  it('orders in-place read/write overlays after all other producers of the same resource', async () => {
+    const computePassOrder = await getComputePassOrder()
+    const scene = createMockPass({
+      id: 'scene',
+      priority: 100,
+      inputs: [],
+      outputs: [{ resourceId: 'scene-render', access: 'write', binding: 0 }],
+    })
+    const overlay = createMockPass({
+      id: 'measurement-point-cloud',
+      priority: 0,
+      inputs: [{ resourceId: 'scene-render', access: 'read', binding: 0 }],
+      outputs: [{ resourceId: 'scene-render', access: 'write', binding: 0 }],
+    })
+    const composite = createMockPass({
+      id: 'environment-composite',
+      priority: 200,
+      inputs: [{ resourceId: 'scene-render', access: 'read', binding: 0 }],
+      outputs: [{ resourceId: 'hdr-color', access: 'write', binding: 0 }],
+    })
+
+    const result = computePassOrder(passMap(overlay, composite, scene))
+
+    expect(result.indexOf('scene')).toBeLessThan(result.indexOf('measurement-point-cloud'))
+    expect(result.indexOf('measurement-point-cloud')).toBeLessThan(
+      result.indexOf('environment-composite')
+    )
+  })
 })

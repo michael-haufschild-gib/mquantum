@@ -27,6 +27,7 @@ import {
   TdseDiagnosticsHistory,
   type TdseDiagnosticsSnapshot,
 } from '@/lib/physics/tdse/diagnostics'
+import { normalizeMetricForLattice } from '@/lib/physics/tdse/metrics/types'
 import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 import { useHellerSpectrometerStore } from '@/stores/diagnostics/hellerSpectrometerStore'
 import { useSimulationStateStore } from '@/stores/runtime/simulationStateStore'
@@ -1009,9 +1010,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       // metrics invoke the curved-space RK4 integrator. This preserves the
       // v1 zero-regression guarantee for flat and adds torus as a
       // zero-curvature periodic case — FFT wraps natively on a uniform grid.
-      const metricKind = config.metric?.kind
-      const curvedActive =
-        metricKind !== undefined && metricKind !== 'flat' && metricKind !== 'torus'
+      const metricKind = normalizeMetricForLattice(config.metric, config.latticeDim).kind
+      const curvedActive = metricKind !== 'flat' && metricKind !== 'torus'
       const dispatchCurvedRK4 = curvedActive
         ? (curvedCtx: WebGPURenderContext) =>
             this.runCurvedFrame(curvedCtx.device, curvedCtx.encoder, siteDispatch)

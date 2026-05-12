@@ -263,6 +263,39 @@ describe('useGizmoInteraction — camera drag (pointer events with capture)', ()
     expect(upEvent.currentTarget.releasePointerCapture).toHaveBeenCalledWith(3)
   })
 
+  it('ignores pointerup when no pointerdown opened an interaction', () => {
+    const { handlers, overlayEl, scheduleEndInteraction } = baseSetup
+    const upEvent = makePointerEvent(overlayEl, { clientX: 0, clientY: 0, pointerId: 9 })
+
+    handlers.handlePointerUp(upEvent as unknown as React.PointerEvent)
+
+    expect(upEvent.currentTarget.releasePointerCapture).not.toHaveBeenCalled()
+    expect(scheduleEndInteraction).not.toHaveBeenCalled()
+  })
+
+  it('ignores non-primary pointerdown without starting a drag', () => {
+    const { handlers, cameraRef, overlayEl, startInteraction } = baseSetup
+    const downEvent = makePointerEvent(overlayEl, {
+      clientX: 100,
+      clientY: 100,
+      pointerId: 4,
+      button: 2,
+    })
+
+    handlers.handlePointerDown(downEvent as unknown as React.PointerEvent)
+    handlers.handlePointerMove(
+      makePointerEvent(overlayEl, {
+        clientX: 140,
+        clientY: 120,
+        pointerId: 4,
+      }) as unknown as React.PointerEvent
+    )
+
+    expect(downEvent.currentTarget.setPointerCapture).not.toHaveBeenCalled()
+    expect(startInteraction).not.toHaveBeenCalled()
+    expect(cameraRef.current!.orbit).not.toHaveBeenCalled()
+  })
+
   it('orbit math gracefully tolerates a missing capture API (e.g., happy-dom)', () => {
     const { handlers, cameraRef, overlayEl } = baseSetup
     const ev = makePointerEvent(overlayEl, { clientX: 100, clientY: 100 })

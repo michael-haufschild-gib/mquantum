@@ -55,6 +55,11 @@ const VIEW_MAP: Record<string, number> = {
   axialCharge: 7,
 }
 
+/** Physics potential is disabled when the UI potential switch is off. */
+export function effectiveDiracPotentialType(config: DiracConfig): DiracConfig['potentialType'] {
+  return config.showPotential ? config.potentialType : 'none'
+}
+
 /** Float/u32 indices of every DiracUniforms field (byteOffset / 4). */
 const I = DIRAC_UNIFORMS_LAYOUT.index
 
@@ -96,7 +101,7 @@ export function writeDiracUniforms(
   f32[I.hbar] = config.hbar
   f32[I.dt] = config.dt
   u32[I.spinorSize] = currentSpinorSize
-  u32[I.potentialType] = POT_MAP[config.potentialType] ?? 0
+  u32[I.potentialType] = POT_MAP[effectiveDiracPotentialType(config)] ?? 0
 
   // Potential parameters
   f32[I.potentialStrength] = config.potentialStrength

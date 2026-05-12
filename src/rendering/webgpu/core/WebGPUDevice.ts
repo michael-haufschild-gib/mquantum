@@ -10,13 +10,14 @@
 
 import { logger } from '@/lib/logger'
 
-import type {
-  WebGPUCapabilities,
-  WebGPUInitErrorCode,
-  WebGPUInitResult,
-  WebGPUInitSuccess,
+import { buildWebGPUDeviceDescriptor, requestsWebGPUFeature } from './deviceDescriptor'
+import {
+  type WebGPUCapabilities,
+  WebGPUInitError,
+  type WebGPUInitErrorCode,
+  type WebGPUInitResult,
+  type WebGPUInitSuccess,
 } from './types'
-import { WebGPUInitError } from './types'
 
 /** Internal type for raw init data (before wrapping with success flag) */
 type WebGPUInitData = Omit<WebGPUInitSuccess, 'success'>
@@ -29,7 +30,7 @@ type WebGPUInitData = Omit<WebGPUInitSuccess, 'success'>
  * Check if WebGPU is supported in the current environment.
  */
 function isWebGPUSupported(): boolean {
-  return typeof navigator !== 'undefined' && 'gpu' in navigator
+  return typeof navigator !== 'undefined' && typeof navigator.gpu?.requestAdapter === 'function'
 }
 
 // =============================================================================
@@ -153,38 +154,16 @@ export class WebGPUDevice {
 
     // Query adapter capabilities (use synchronous .info property - requestAdapterInfo() was removed)
     const adapterInfo = adapter.info
-    const adapterInfoString = `${adapterInfo.vendor} ${adapterInfo.architecture} ${adapterInfo.device}`
-
-    // Request device with optional features (only those the adapter supports)
-    const requiredFeatures: GPUFeatureName[] = []
-    const optionalFeatures: GPUFeatureName[] = [
-      'timestamp-query',
-      'texture-compression-bc',
-      'texture-compression-astc',
-    ]
-    for (const feature of optionalFeatures) {
-      if (adapter.features.has(feature)) {
-        requiredFeatures.push(feature)
-      }
-    }
+    const adapterInfoString =
+      [adapterInfo?.vendor, adapterInfo?.architecture, adapterInfo?.device]
+        .filter((value): value is string => typeof value === 'string' && value.length > 0)
+        .join(' ') || 'Unknown GPU Adapter'
+    const deviceDescriptor = buildWebGPUDeviceDescriptor(adapter)
 
     // Request maximum limits
     let device: GPUDevice
     try {
-      device = await adapter.requestDevice({
-        requiredFeatures,
-        requiredLimits: {
-          maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
-          maxUniformBufferBindingSize: adapter.limits.maxUniformBufferBindingSize,
-          maxComputeWorkgroupSizeX: adapter.limits.maxComputeWorkgroupSizeX,
-          maxComputeWorkgroupSizeY: adapter.limits.maxComputeWorkgroupSizeY,
-          maxComputeWorkgroupSizeZ: adapter.limits.maxComputeWorkgroupSizeZ,
-          maxComputeInvocationsPerWorkgroup: adapter.limits.maxComputeInvocationsPerWorkgroup,
-          maxComputeWorkgroupStorageSize: adapter.limits.maxComputeWorkgroupStorageSize,
-          maxBindGroups: adapter.limits.maxBindGroups,
-          maxTextureDimension2D: adapter.limits.maxTextureDimension2D,
-        },
-      })
+      device = await adapter.requestDevice(deviceDescriptor)
     } catch (cause) {
       throw new WebGPUInitError(
         'DEVICE_REQUEST_FAILED',
@@ -195,15 +174,31 @@ export class WebGPUDevice {
       )
     }
 
-    // Handle device loss
-    void device.lost.then((info) => {
-      logger.error('WebGPU device lost:', info.message, 'reason:', info.reason)
-      this.handleDeviceLost(info.reason)
-    })
+    const destroyDeviceAfterInitFailure = () => {
+      try {
+        device.destroy()
+      } catch (cleanupError) {
+        logger.warn('[WebGPU] Failed to destroy device after init failure:', cleanupError)
+      }
+    }
 
     // Configure canvas context
-    const context = canvas.getContext('webgpu')
+    let context: GPUCanvasContext | null
+    try {
+      context = canvas.getContext('webgpu')
+    } catch (cause) {
+      destroyDeviceAfterInitFailure()
+      throw new WebGPUInitError(
+        'CONTEXT_CONFIGURE_FAILED',
+        cause instanceof Error
+          ? `canvas.getContext("webgpu") threw: ${cause.message}`
+          : 'canvas.getContext("webgpu") threw',
+        cause
+      )
+    }
+
     if (!context) {
+      destroyDeviceAfterInitFailure()
       throw new WebGPUInitError(
         'CONTEXT_CONFIGURE_FAILED',
         'canvas.getContext("webgpu") returned null'
@@ -211,7 +206,13 @@ export class WebGPUDevice {
     }
 
     // Use preferred format (usually bgra8unorm on most platforms)
-    const format = navigator.gpu.getPreferredCanvasFormat()
+    let format: GPUTextureFormat
+    try {
+      format = navigator.gpu.getPreferredCanvasFormat()
+    } catch (cause) {
+      destroyDeviceAfterInitFailure()
+      throw cause
+    }
 
     try {
       context.configure({
@@ -222,6 +223,7 @@ export class WebGPUDevice {
         usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
       })
     } catch (cause) {
+      destroyDeviceAfterInitFailure()
       throw new WebGPUInitError(
         'CONTEXT_CONFIGURE_FAILED',
         cause instanceof Error
@@ -241,7 +243,7 @@ export class WebGPUDevice {
       maxComputeWorkgroupSizeZ: device.limits.maxComputeWorkgroupSizeZ,
       maxComputeInvocationsPerWorkgroup: device.limits.maxComputeInvocationsPerWorkgroup,
       maxBindGroups: device.limits.maxBindGroups,
-      timestampQuery: requiredFeatures.includes('timestamp-query'),
+      timestampQuery: requestsWebGPUFeature(deviceDescriptor, 'timestamp-query'),
       adapterInfo: adapterInfoString,
     }
 
@@ -252,10 +254,17 @@ export class WebGPUDevice {
     this.format = format
     this.capabilities = capabilities
 
+    // Handle device loss after refs are published so a pre-resolved lost
+    // promise cannot race with initialization and leave stale live refs.
+    void device.lost.then((info) => {
+      logger.error('WebGPU device lost:', info.message, 'reason:', info.reason)
+      this.handleDeviceLost(info.reason)
+    })
+
     logger.log('[WebGPU] Initialized:', {
       adapter: adapterInfoString,
       format,
-      timestampQuery: requiredFeatures.includes('timestamp-query'),
+      timestampQuery: requestsWebGPUFeature(deviceDescriptor, 'timestamp-query'),
     })
 
     return { adapter, device, context, format, capabilities }
@@ -278,9 +287,16 @@ export class WebGPUDevice {
     // Attempt automatic recovery
     if (this.canvas && reason !== 'destroyed') {
       logger.log('[WebGPU] Attempting device recovery...')
-      this.initialize(this.canvas).catch((err) => {
-        logger.error('[WebGPU] Recovery failed:', err)
-      })
+      void this.initialize(this.canvas).then(
+        (result) => {
+          if (!result.success) {
+            logger.error('[WebGPU] Recovery failed:', result.error)
+          }
+        },
+        (err) => {
+          logger.error('[WebGPU] Recovery failed:', err)
+        }
+      )
     }
   }
 

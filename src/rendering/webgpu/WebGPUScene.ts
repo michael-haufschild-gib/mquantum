@@ -12,6 +12,7 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { useRotationUpdates } from '@/hooks/useRotationUpdates'
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
+import { getNamedPresetStoreControls } from '@/lib/geometry/extended/schroedinger/presets'
 import {
   getQuantumTypeCompileContextFields,
   isComputeQuantumType,
@@ -107,10 +108,11 @@ const schroedingerCompileSelector = (state: ReturnType<typeof useExtendedObjectS
   const quantumMode = (s?.quantumMode ?? 'harmonicOscillator') as SchroedingerQuantumMode
   const representation = (s?.representation ?? 'position') as 'position' | 'momentum' | 'wigner'
   const compileContextFields = getQuantumTypeCompileContextFields(quantumMode)
+  const presetControls = getNamedPresetStoreControls(s?.presetName)
 
   return {
     quantumMode,
-    termCount: (s?.termCount ?? 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8,
+    termCount: (presetControls?.termCount ?? s?.termCount ?? 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8,
     nodalEnabled: s?.nodalEnabled ?? false,
     nodalDefinition: s?.nodalDefinition ?? 'psiAbs',
     nodalRenderMode: s?.nodalRenderMode ?? 'band',
@@ -401,7 +403,6 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     ppConfig.paperEnabled,
     ppConfig.frameBlendingEnabled,
     ppConfig.skyboxEnabled,
-    ppConfig.skyboxMode,
     ppConfig.temporalReprojectionEnabled,
   ].join('|')
   const latestSetupConfigRef = useRef({ fullConfig, schrodingerConfig, ppConfig })

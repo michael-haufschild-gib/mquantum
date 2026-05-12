@@ -652,7 +652,6 @@ describe('extractPPConfig', () => {
       paperEnabled: true,
       frameBlendingEnabled: true,
       skyboxEnabled: true,
-      skyboxMode: 'procedural_aurora',
       temporalReprojectionEnabled: false,
     })
 
@@ -664,13 +663,13 @@ describe('extractPPConfig', () => {
       paperEnabled: true,
       frameBlendingEnabled: true,
       skyboxEnabled: true,
-      skyboxMode: 'procedural_aurora',
       temporalReprojectionEnabled: false,
     })
 
     // Should not contain Schroedinger fields
     expect(Object.keys(pp)).not.toContain('dimension')
     expect(Object.keys(pp)).not.toContain('quantumMode')
+    expect(Object.keys(pp)).not.toContain('skyboxMode')
   })
 })
 

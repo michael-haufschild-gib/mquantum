@@ -84,6 +84,23 @@ describe('WebGPUDevice.initialize() error contract', () => {
     expect(result.cause).toBeInstanceOf(Error)
   })
 
+  it('returns NO_NAVIGATOR_GPU when navigator.gpu exists but is undefined', async () => {
+    Object.defineProperty(navigator, 'gpu', {
+      writable: true,
+      configurable: true,
+      value: undefined,
+    })
+
+    const device = WebGPUDevice.getInstance()
+    const canvas = document.createElement('canvas')
+    const result = await device.initialize(canvas)
+
+    expect(result.success).toBe(false)
+    if (result.success) return
+    expect(result.code).toBe('NO_NAVIGATOR_GPU')
+    expect(result.error).toContain('WebGPU is not supported')
+  })
+
   it('caches the same failure result across repeated calls with the same canvas', async () => {
     uninstallWebGPUMock()
 
@@ -171,6 +188,58 @@ describe('WebGPUDevice.initialize() error contract', () => {
     if (result.success) return
     expect(result.code).toBe('DEVICE_REQUEST_FAILED')
     expect(result.error).toContain('device request rejected by mock')
+  })
+
+  it('destroys the provisional device when context configuration fails', async () => {
+    const fakeLimits = {
+      maxStorageBufferBindingSize: 134217728,
+      maxUniformBufferBindingSize: 65536,
+      maxComputeWorkgroupSizeX: 256,
+      maxComputeWorkgroupSizeY: 256,
+      maxComputeWorkgroupSizeZ: 64,
+      maxComputeInvocationsPerWorkgroup: 256,
+      maxComputeWorkgroupStorageSize: 16384,
+      maxBindGroups: 4,
+      maxTextureDimension2D: 8192,
+    }
+    const destroy = vi.fn()
+    const fakeDevice = {
+      lost: new Promise(() => {}),
+      limits: fakeLimits,
+      features: new Set<GPUFeatureName>(),
+      queue: { writeBuffer: vi.fn() },
+      destroy,
+    }
+    const fakeAdapter = {
+      features: new Set<GPUFeatureName>(),
+      limits: fakeLimits,
+      info: { vendor: 'fake', architecture: 'fake', device: 'fake' },
+      isFallbackAdapter: false,
+      requestDevice: vi.fn(async () => fakeDevice),
+    }
+    installFakeGpu(() => fakeAdapter)
+
+    const configure = vi.fn(() => {
+      throw new Error('configure rejected by mock')
+    })
+    const fakeContext = {
+      configure,
+    } as unknown as GPUCanvasContext
+    const canvas = document.createElement('canvas')
+    Object.defineProperty(canvas, 'getContext', {
+      configurable: true,
+      value: vi.fn((contextId: string) => (contextId === 'webgpu' ? fakeContext : null)),
+    })
+
+    const device = WebGPUDevice.getInstance()
+    const result = await device.initialize(canvas)
+
+    expect(result.success).toBe(false)
+    if (result.success) return
+    expect(result.code).toBe('CONTEXT_CONFIGURE_FAILED')
+    expect(result.error).toContain('configure rejected by mock')
+    expect(configure).toHaveBeenCalledTimes(1)
+    expect(destroy).toHaveBeenCalledTimes(1)
   })
 
   it('returns INTERNAL_ERROR for unexpected throws inside doInitialize', async () => {

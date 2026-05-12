@@ -26,13 +26,14 @@ function generateHOSuperpositionBlock(termCount: number): string {
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
   let term${k} = uniforms.precomputedTerm[${k}].xy;
   var psi = cscale(spatial${k}, term${k});`
-    } else {
-      return `
+    }
+    return `
+  if (${k} < uniforms.termCount) {
   // Term ${k}
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
   let term${k} = uniforms.precomputedTerm[${k}].xy;
-  psi += cscale(spatial${k}, term${k});`
-    }
+  psi += cscale(spatial${k}, term${k});
+  }`
   }).join('\n')
 
   // The 't' parameter is retained for ABI stability with the dispatch block but
@@ -63,11 +64,12 @@ function generateHOSpatialBlock(termCount: number): string {
       return `
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
   var psi = cscale(spatial${k}, getCoeff(uniforms, ${k}));`
-    } else {
-      return `
-  let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
-  psi += cscale(spatial${k}, getCoeff(uniforms, ${k}));`
     }
+    return `
+  if (${k} < uniforms.termCount) {
+  let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
+  psi += cscale(spatial${k}, getCoeff(uniforms, ${k}));
+  }`
   }).join('\n')
 
   return `
@@ -101,15 +103,16 @@ function generateHOCombinedBlock(termCount: number): string {
   // Time-dependent accumulation (uses host-precomputed term)
   let term${k} = uniforms.precomputedTerm[${k}].xy;
   var psiTime = cscale(spatial${k}, term${k});`
-    } else {
-      return `
+    }
+    return `
+  if (${k} < uniforms.termCount) {
   // Term ${k}
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
   let coeff${k} = getCoeff(uniforms, ${k});
   psiSpatial += cscale(spatial${k}, coeff${k});
   let term${k} = uniforms.precomputedTerm[${k}].xy;
-  psiTime += cscale(spatial${k}, term${k});`
-    }
+  psiTime += cscale(spatial${k}, term${k});
+  }`
   }).join('\n')
 
   // The 't' parameter is retained for ABI stability; the time dependence has

@@ -134,7 +134,6 @@ export interface PPPassConfig {
   paperEnabled: boolean
   frameBlendingEnabled: boolean
   skyboxEnabled: boolean
-  skyboxMode: SkyboxMode
   temporalReprojectionEnabled: boolean
 }
 
@@ -374,7 +373,6 @@ export function extractPPConfig(config: PassConfig): PPPassConfig {
     paperEnabled: config.paperEnabled,
     frameBlendingEnabled: config.frameBlendingEnabled,
     skyboxEnabled: config.skyboxEnabled,
-    skyboxMode: config.skyboxMode,
     temporalReprojectionEnabled: config.temporalReprojectionEnabled,
   }
 }

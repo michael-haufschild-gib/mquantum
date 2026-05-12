@@ -14,6 +14,7 @@
  */
 
 import { logger } from '@/lib/logger'
+import { clampFinite } from '@/lib/math/clamp'
 
 import { BindGroupCache } from '../core/BindGroupCache'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
@@ -37,6 +38,16 @@ export interface ToScreenPassConfig {
 
   /** CAS sharpening intensity (0-1, 0 = disabled) */
   sharpness?: number
+}
+
+/** Clamp screen-pass exposure to values the tone mapper can handle. */
+function sanitizeExposure(value: number | undefined, fallback: number): number {
+  return clampFinite(value, fallback, 0, Number.POSITIVE_INFINITY)
+}
+
+/** Clamp CAS sharpness to shader-supported bounds. */
+function sanitizeSharpness(value: number | undefined, fallback: number): number {
+  return clampFinite(value, fallback, 0, 1)
 }
 
 /**
@@ -189,8 +200,8 @@ export class ToScreenPass extends WebGPUBasePass {
     this.passConfig = config
     this.gammaCorrection = config.gammaCorrection ?? false
     this.toneMapping = config.toneMapping ?? false
-    this.exposure = config.exposure ?? 1.0
-    this.sharpness = config.sharpness ?? 0.0
+    this.exposure = sanitizeExposure(config.exposure, 1.0)
+    this.sharpness = sanitizeSharpness(config.sharpness, 0.0)
   }
 
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
@@ -335,7 +346,7 @@ export class ToScreenPass extends WebGPUBasePass {
    * @param exposure
    */
   setExposure(exposure: number): void {
-    this.exposure = exposure
+    this.exposure = sanitizeExposure(exposure, this.exposure)
     this.updateUniformBuffer()
   }
 
@@ -352,7 +363,7 @@ export class ToScreenPass extends WebGPUBasePass {
    * @param sharpness - Sharpening intensity (0-1, 0 = disabled)
    */
   setSharpness(sharpness: number): void {
-    this.sharpness = Math.max(0, Math.min(1, sharpness))
+    this.sharpness = sanitizeSharpness(sharpness, this.sharpness)
     this.updateUniformBuffer()
   }
 

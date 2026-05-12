@@ -27,6 +27,7 @@ import { hermiteBlock } from '../quantum/hermite.wgsl'
 import { ho1dBlock } from '../quantum/ho1d.wgsl'
 import {
   generateHoNDDispatchBlock,
+  hoND2dBlock,
   hoND3dBlock,
   hoND4dBlock,
   hoND5dBlock,
@@ -44,6 +45,7 @@ import {
 import { hydrogenNDCommonBlock } from '../quantum/hydrogenNDCommon.wgsl'
 import {
   generateHydrogenNDDispatchBlock,
+  hydrogenNDGen2dBlock,
   hydrogenNDGen3dBlock,
   hydrogenNDGen4dBlock,
   hydrogenNDGen5dBlock,
@@ -93,7 +95,7 @@ export type ComputeQuantumMode = 'harmonicOscillator' | 'hydrogenND' | 'hydrogen
  * Configuration for density grid compute shader
  */
 export interface DensityGridComputeConfig {
-  /** Number of dimensions (3-11) */
+  /** Number of dimensions (2-11) */
   dimension: number
   /** Quantum mode */
   quantumMode?: ComputeQuantumMode
@@ -136,7 +138,7 @@ function generateComputeDefines(config: DensityGridComputeConfig): ComputeShader
   // Only ACTUAL_DIM (clamped) is emitted — see composeWignerCache.ts for
   // the rationale. The previously emitted un-clamped `const DIMENSION`
   // was never read by any WGSL shader.
-  const actualDim = sanitizeShaderDimension(dimension, { min: 3, fallback: 3 })
+  const actualDim = sanitizeShaderDimension(dimension, { min: 2, fallback: 3 })
   const termCount = sanitizeShaderTermCount(rawTermCount)
   const storageFormat = sanitizeDensityGridStorageFormat(rawStorageFormat)
 
@@ -241,6 +243,7 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
 
   // Get dimension-specific blocks
   const hoNDBlockMap: Record<number, string> = {
+    2: hoND2dBlock,
     3: hoND3dBlock,
     4: hoND4dBlock,
     5: hoND5dBlock,
@@ -254,6 +257,7 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
   const hoNDBlock = hoNDBlockMap[actualDim] || hoND3dBlock
 
   const hydrogenNDBlockMap: Record<number, string> = {
+    2: hydrogenNDGen2dBlock,
     3: hydrogenNDGen3dBlock,
     4: hydrogenNDGen4dBlock,
     5: hydrogenNDGen5dBlock,
@@ -272,7 +276,8 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
   // so the grid is correctly populated for non-degenerate orientations.
   // An automatic extra-dimension rotation offset ensures the initial slice
   // avoids Gegenbauer nodal planes (cos θ_k = 0 for odd-degree layers).
-  const selectedPsiBlock = isHydrogenCoupled
+  const useCoupledHydrogenEvaluator = isHydrogenCoupled && hydrogenNDDimension > 2
+  const selectedPsiBlock = useCoupledHydrogenEvaluator
     ? psiBlockHydrogenNDCoupled
     : isHydrogenFamily
       ? psiBlockHydrogenND
@@ -346,16 +351,16 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
     {
       name: `Hydrogen ND ${hydrogenNDDimension}D`,
       content: hydrogenNDBlock,
-      condition: includeHydrogenND && !isHydrogenCoupled && hydrogenNDBlock.length > 0,
+      condition: includeHydrogenND && !useCoupledHydrogenEvaluator && hydrogenNDBlock.length > 0,
     },
     {
       name: 'Hydrogen ND Dispatch',
       content: generateHydrogenNDDispatchBlock(hydrogenNDDimension),
-      condition: includeHydrogenND && !isHydrogenCoupled,
+      condition: includeHydrogenND && !useCoupledHydrogenEvaluator,
     },
 
     // Coupled hydrogen ND: hyperspherical harmonics + Gegenbauer chain
-    ...(isHydrogenCoupled && hydrogenNDDimension >= 3
+    ...(useCoupledHydrogenEvaluator
       ? (() => {
           const coupled = getHydrogenNDCoupledBlocks(hydrogenNDDimension)
           return [

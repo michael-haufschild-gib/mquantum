@@ -14,6 +14,7 @@
  * @module rendering/webgpu/passes/PaperTexturePass
  */
 
+import { clampFinite, clampFiniteInteger } from '@/lib/math/clamp'
 import type { PaperQuality } from '@/stores/defaults/visualDefaults'
 
 import { BindGroupCache } from '../core/BindGroupCache'
@@ -186,6 +187,38 @@ function generatePaperNoiseData(size: number): Uint8Array {
 /** Default paper white in linear sRGB. */
 const DEFAULT_FRONT: Rgb = [0.96, 0.96, 0.86]
 const DEFAULT_BACK: Rgb = [1.0, 1.0, 1.0]
+const DEFAULT_CONTRAST = 0.5
+const DEFAULT_ROUGHNESS = 0.3
+const DEFAULT_FIBER = 0.4
+const DEFAULT_FIBER_SIZE = 0.5
+const DEFAULT_CRUMPLES = 0.2
+const DEFAULT_CRUMPLE_SIZE = 0.5
+const DEFAULT_FOLDS = 0.1
+const DEFAULT_FOLD_COUNT = 5
+const DEFAULT_DROPS = 0
+const DEFAULT_FADE = 0
+const DEFAULT_SEED = 42
+const DEFAULT_INTENSITY = 1
+
+/** Clamp unit interval paper controls while preserving prior value for non-finite input. */
+function clampUnit(value: number | undefined, fallback: number): number {
+  return clampFinite(value, fallback, 0, 1)
+}
+
+/** Clamp paper texture scale controls to shader-supported bounds. */
+function clampPaperScale(value: number | undefined, fallback: number): number {
+  return clampFinite(value, fallback, 0.1, 2)
+}
+
+/** Clamp fold count to the integer range used by the WGSL loop. */
+function clampFoldCount(value: number | undefined, fallback: number): number {
+  return clampFiniteInteger(value, fallback, 1, 15)
+}
+
+/** Clamp deterministic paper-noise seed to the persisted UI range. */
+function clampPaperSeed(value: number | undefined, fallback: number): number {
+  return clampFinite(value, fallback, 0, 1000)
+}
 
 /**
  * Converts quality level to numeric value.
@@ -260,19 +293,19 @@ export class PaperTexturePass extends WebGPUBasePass {
     this.passConfig = config
 
     // Initialize parameters
-    this.contrast = config.contrast ?? 0.5
-    this.roughness = config.roughness ?? 0.3
-    this.fiber = config.fiber ?? 0.4
-    this.fiberSize = config.fiberSize ?? 0.5
-    this.crumples = config.crumples ?? 0.2
-    this.crumpleSize = config.crumpleSize ?? 0.5
-    this.folds = config.folds ?? 0.1
-    this.foldCount = config.foldCount ?? 5
-    this.drops = config.drops ?? 0.0
-    this.fade = config.fade ?? 0.0
-    this.seed = config.seed ?? 42
+    this.contrast = clampUnit(config.contrast, DEFAULT_CONTRAST)
+    this.roughness = clampUnit(config.roughness, DEFAULT_ROUGHNESS)
+    this.fiber = clampUnit(config.fiber, DEFAULT_FIBER)
+    this.fiberSize = clampPaperScale(config.fiberSize, DEFAULT_FIBER_SIZE)
+    this.crumples = clampUnit(config.crumples, DEFAULT_CRUMPLES)
+    this.crumpleSize = clampPaperScale(config.crumpleSize, DEFAULT_CRUMPLE_SIZE)
+    this.folds = clampUnit(config.folds, DEFAULT_FOLDS)
+    this.foldCount = clampFoldCount(config.foldCount, DEFAULT_FOLD_COUNT)
+    this.drops = clampUnit(config.drops, DEFAULT_DROPS)
+    this.fade = clampUnit(config.fade, DEFAULT_FADE)
+    this.seed = clampPaperSeed(config.seed, DEFAULT_SEED)
     this.quality = qualityToNumber(config.quality ?? 'medium')
-    this.intensity = config.intensity ?? 1.0
+    this.intensity = clampUnit(config.intensity, DEFAULT_INTENSITY)
 
     // Set colors
     this.colorFront = config.colorFront
@@ -381,47 +414,47 @@ export class PaperTexturePass extends WebGPUBasePass {
   // ============================================================================
 
   setContrast(value: number): void {
-    this.contrast = value
+    this.contrast = clampUnit(value, this.contrast)
   }
 
   setRoughness(value: number): void {
-    this.roughness = value
+    this.roughness = clampUnit(value, this.roughness)
   }
 
   setFiber(value: number): void {
-    this.fiber = value
+    this.fiber = clampUnit(value, this.fiber)
   }
 
   setFiberSize(value: number): void {
-    this.fiberSize = value
+    this.fiberSize = clampPaperScale(value, this.fiberSize)
   }
 
   setCrumples(value: number): void {
-    this.crumples = value
+    this.crumples = clampUnit(value, this.crumples)
   }
 
   setCrumpleSize(value: number): void {
-    this.crumpleSize = value
+    this.crumpleSize = clampPaperScale(value, this.crumpleSize)
   }
 
   setFolds(value: number): void {
-    this.folds = value
+    this.folds = clampUnit(value, this.folds)
   }
 
   setFoldCount(value: number): void {
-    this.foldCount = value
+    this.foldCount = clampFoldCount(value, this.foldCount)
   }
 
   setDrops(value: number): void {
-    this.drops = value
+    this.drops = clampUnit(value, this.drops)
   }
 
   setFade(value: number): void {
-    this.fade = value
+    this.fade = clampUnit(value, this.fade)
   }
 
   setSeed(value: number): void {
-    this.seed = value
+    this.seed = clampPaperSeed(value, this.seed)
   }
 
   /**
@@ -448,40 +481,40 @@ export class PaperTexturePass extends WebGPUBasePass {
     }>(ctx, 'postProcessing')
 
     if (postProcessing?.paperIntensity !== undefined) {
-      this.intensity = postProcessing.paperIntensity
+      this.intensity = clampUnit(postProcessing.paperIntensity, this.intensity)
     }
     if (postProcessing?.paperRoughness !== undefined) {
-      this.roughness = postProcessing.paperRoughness
+      this.roughness = clampUnit(postProcessing.paperRoughness, this.roughness)
     }
     if (postProcessing?.paperContrast !== undefined) {
-      this.contrast = postProcessing.paperContrast
+      this.contrast = clampUnit(postProcessing.paperContrast, this.contrast)
     }
     if (postProcessing?.paperFiber !== undefined) {
-      this.fiber = postProcessing.paperFiber
+      this.fiber = clampUnit(postProcessing.paperFiber, this.fiber)
     }
     if (postProcessing?.paperFiberSize !== undefined) {
-      this.fiberSize = postProcessing.paperFiberSize
+      this.fiberSize = clampPaperScale(postProcessing.paperFiberSize, this.fiberSize)
     }
     if (postProcessing?.paperCrumples !== undefined) {
-      this.crumples = postProcessing.paperCrumples
+      this.crumples = clampUnit(postProcessing.paperCrumples, this.crumples)
     }
     if (postProcessing?.paperCrumpleSize !== undefined) {
-      this.crumpleSize = postProcessing.paperCrumpleSize
+      this.crumpleSize = clampPaperScale(postProcessing.paperCrumpleSize, this.crumpleSize)
     }
     if (postProcessing?.paperFolds !== undefined) {
-      this.folds = postProcessing.paperFolds
+      this.folds = clampUnit(postProcessing.paperFolds, this.folds)
     }
     if (postProcessing?.paperFoldCount !== undefined) {
-      this.foldCount = postProcessing.paperFoldCount
+      this.foldCount = clampFoldCount(postProcessing.paperFoldCount, this.foldCount)
     }
     if (postProcessing?.paperDrops !== undefined) {
-      this.drops = postProcessing.paperDrops
+      this.drops = clampUnit(postProcessing.paperDrops, this.drops)
     }
     if (postProcessing?.paperFade !== undefined) {
-      this.fade = postProcessing.paperFade
+      this.fade = clampUnit(postProcessing.paperFade, this.fade)
     }
     if (postProcessing?.paperSeed !== undefined) {
-      this.seed = postProcessing.paperSeed
+      this.seed = clampPaperSeed(postProcessing.paperSeed, this.seed)
     }
     if (postProcessing?.paperColorFront !== undefined) {
       this.colorFront = parseHexColorToLinearRgb(postProcessing.paperColorFront, DEFAULT_FRONT)
@@ -507,7 +540,7 @@ export class PaperTexturePass extends WebGPUBasePass {
   }
 
   setIntensity(value: number): void {
-    this.intensity = value
+    this.intensity = clampUnit(value, this.intensity)
   }
 
   /**

@@ -35,11 +35,15 @@ const I = TDSE_UNIFORMS_LAYOUT.index
 /** Capture the uniform ArrayBuffer that writeTdseUniforms hands to the GPU queue. */
 function packAndCapture(
   metric: MetricConfig | undefined,
-  opts?: { simTime?: number; dt?: number }
+  opts?: { simTime?: number; dt?: number; latticeDim?: number }
 ): { u32: Uint32Array; f32: Float32Array; size: number } {
   const base: TdseConfig =
     metric === undefined ? { ...DEFAULT_TDSE_CONFIG } : { ...DEFAULT_TDSE_CONFIG, metric }
-  const config: TdseConfig = opts?.dt !== undefined ? { ...base, dt: opts.dt } : base
+  const config: TdseConfig = {
+    ...base,
+    ...(opts?.dt !== undefined ? { dt: opts.dt } : {}),
+    ...(opts?.latticeDim !== undefined ? { latticeDim: opts.latticeDim } : {}),
+  }
   const data = new ArrayBuffer(TDSE_UNIFORM_SIZE)
   const u32 = new Uint32Array(data)
   const f32 = new Float32Array(data)
@@ -53,7 +57,7 @@ function packAndCapture(
   }
   writeTdseUniforms(stub as unknown as GPUDevice, {} as unknown as GPUBuffer, data, u32, f32, {
     config,
-    totalSites: config.gridSize.reduce((a, b) => a * b, 1),
+    totalSites: config.gridSize.slice(0, config.latticeDim).reduce((a, b) => a * b, 1),
     simTime: opts?.simTime ?? 0,
     maxDensity: 1,
     initialMaxDensity: 1,
@@ -128,6 +132,17 @@ describe('TDSE uniform pack — curved-space v2 metric block', () => {
     const compactMask = u32[I.compactDimsMask] ?? 0
     expect(compactMask & (1 << 2)).toBe(1 << 2)
     expect(compactMask & (1 << 1)).toBe(0)
+  })
+
+  it('canonicalizes dimension-degenerate metrics to flat before packing', () => {
+    const sphere2D = packAndCapture({ kind: 'sphere2D', sphereRadius: 1.5 }, { latticeDim: 2 })
+    expect(sphere2D.u32[I.metricKind]).toBe(0)
+    expect(sphere2D.f32[I.sphereRadius]).toBe(0)
+    expect((sphere2D.u32[I.compactDimsMask] ?? 0) & (1 << 2)).toBe(0)
+
+    const morris1D = packAndCapture({ kind: 'morrisThorne', throatRadius: 0.7 }, { latticeDim: 1 })
+    expect(morris1D.u32[I.metricKind]).toBe(0)
+    expect(morris1D.f32[I.throatRadius]).toBe(0)
   })
 
   // ── Double throat fields ──────────────────────────────────────────────
