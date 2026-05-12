@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -7,9 +7,13 @@ import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useLayoutStore } from '@/stores/ui/layoutStore'
 import { useUIStore } from '@/stores/ui/uiStore'
 
+const { addToastMock } = vi.hoisted(() => ({
+  addToastMock: vi.fn(),
+}))
+
 vi.mock('@/hooks/useToast', () => ({
   useToast: () => ({
-    addToast: vi.fn(),
+    addToast: addToastMock,
   }),
 }))
 
@@ -28,6 +32,7 @@ describe('TopBarControls', () => {
   beforeEach(() => {
     useExtendedObjectStore.getState().reset()
     useUIStore.getState().setShowPerfMonitor(false)
+    addToastMock.mockClear()
     if (useLayoutStore.getState().isCinematicMode) {
       useLayoutStore.getState().toggleCinematicMode()
     }
@@ -112,5 +117,29 @@ describe('TopBarControls', () => {
     const initialRep = useExtendedObjectStore.getState().schroedinger.representation
     await user.click(toggle)
     expect(useExtendedObjectStore.getState().schroedinger.representation).toBe(initialRep)
+  })
+
+  it('reports fullscreen request failures without leaving an unhandled rejection', async () => {
+    const user = userEvent.setup()
+    const originalRequestFullscreen = document.documentElement.requestFullscreen
+    Object.defineProperty(document.documentElement, 'requestFullscreen', {
+      configurable: true,
+      value: vi.fn().mockRejectedValue(new Error('fullscreen blocked')),
+    })
+
+    try {
+      render(<TopBarControls compact={false} />)
+
+      await user.click(screen.getByLabelText('Fullscreen'))
+
+      await waitFor(() => {
+        expect(addToastMock).toHaveBeenCalledWith('Fullscreen unavailable', 'error')
+      })
+    } finally {
+      Object.defineProperty(document.documentElement, 'requestFullscreen', {
+        configurable: true,
+        value: originalRequestFullscreen,
+      })
+    }
   })
 })

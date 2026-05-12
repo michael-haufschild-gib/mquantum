@@ -26,6 +26,20 @@ export interface PopoverProps {
 
 const VIEWPORT_MARGIN = 8
 
+type TriggerElementProps = React.HTMLAttributes<HTMLElement> & {
+  className?: string
+  ref?: React.Ref<HTMLElement>
+}
+
+function assignRef<T>(ref: React.Ref<T> | undefined, value: T | null): void {
+  if (!ref) return
+  if (typeof ref === 'function') {
+    ref(value)
+    return
+  }
+  ;(ref as React.MutableRefObject<T | null>).current = value
+}
+
 /** Computes the horizontal position based on alignment. */
 function computeHorizontalPosition(
   align: 'start' | 'end' | 'center',
@@ -110,7 +124,7 @@ export const Popover: React.FC<PopoverProps> = React.memo(
     offset = 4,
   }) => {
     const popoverRef = useRef<HTMLDivElement>(null)
-    const triggerRef = useRef<HTMLDivElement>(null)
+    const triggerRef = useRef<HTMLElement>(null)
     const popoverId = useId()
 
     const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
@@ -141,6 +155,10 @@ export const Popover: React.FC<PopoverProps> = React.memo(
     const handleTriggerClick = useCallback(() => {
       handleOpenChange(!isOpen)
     }, [handleOpenChange, isOpen])
+
+    const setTriggerRef = useCallback((element: HTMLElement | null) => {
+      triggerRef.current = element
+    }, [])
 
     // Sync popover visibility with React state
     // Guarded: Popover API requires Safari 17+, Chrome 114+, Firefox 125+.
@@ -235,18 +253,39 @@ export const Popover: React.FC<PopoverProps> = React.memo(
       }
     }, [isOpen, side, align, offset])
 
+    const triggerNode = React.isValidElement<TriggerElementProps>(trigger) ? (
+      React.cloneElement(trigger, {
+        ref: (element: HTMLElement | null) => {
+          setTriggerRef(element)
+          assignRef(trigger.props.ref, element)
+        },
+        onClick: (event: React.MouseEvent<HTMLElement>) => {
+          trigger.props.onClick?.(event)
+          if (event.defaultPrevented) return
+          handleTriggerClick()
+        },
+        className: [trigger.props.className, className].filter(Boolean).join(' '),
+        'aria-haspopup': 'dialog',
+        'aria-expanded': isOpen,
+        'aria-controls': popoverId,
+      })
+    ) : (
+      <button
+        ref={setTriggerRef as React.Ref<HTMLButtonElement>}
+        type="button"
+        onClick={handleTriggerClick}
+        className={`inline-flex cursor-pointer appearance-none border-0 bg-transparent p-0 ${className}`}
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        aria-controls={popoverId}
+      >
+        {trigger}
+      </button>
+    )
+
     return (
       <>
-        <div
-          ref={triggerRef}
-          onClick={handleTriggerClick}
-          className={`inline-block cursor-pointer ${className}`}
-          role="button"
-          aria-haspopup="dialog"
-          aria-expanded={isOpen}
-        >
-          {trigger}
-        </div>
+        {triggerNode}
 
         <div
           ref={popoverRef}

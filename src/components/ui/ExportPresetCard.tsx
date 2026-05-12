@@ -9,6 +9,7 @@ import iconSparkles from '@/assets/icons/sparkles.svg'
 import { soundManager } from '@/lib/audio/SoundManager'
 
 import { Icon } from './Icon'
+import { TileButton } from './TileButton'
 
 /**
  * Supported export preset identifiers.
@@ -61,8 +62,9 @@ export const ExportPresetCard = ({
   const iconMask = `url(${iconSrc}) center / contain no-repeat`
 
   return (
-    <button
-      type="button"
+    <TileButton
+      ariaLabel={`${label}: ${description}`}
+      pressed={isActive}
       onClick={onClick}
       onMouseEnter={() => soundManager.playHover()}
       className={`
@@ -91,6 +93,6 @@ export const ExportPresetCard = ({
       </div>
 
       {isActive && <Icon name="check" className="w-4 h-4 text-accent shrink-0" />}
-    </button>
+    </TileButton>
   )
 }

@@ -104,12 +104,13 @@ describe('Popover', () => {
   })
 
   describe('accessibility', () => {
-    it('should have correct aria attributes on trigger', () => {
+    it('should put aria attributes on the actual trigger', () => {
       render(<Popover trigger={<Button>Open</Button>} content={<div>Content</div>} />)
 
-      const buttons = screen.getAllByRole('button', { name: 'Open' })
-      const trigger = buttons.find((el) => el.getAttribute('aria-haspopup') === 'dialog')!
+      const trigger = screen.getByRole('button', { name: 'Open' })
       expect(trigger).toHaveAttribute('aria-expanded', 'false')
+      expect(trigger).toHaveAttribute('aria-haspopup', 'dialog')
+      expect(trigger).toHaveAttribute('aria-controls')
     })
 
     it('should update aria-expanded when open', async () => {
@@ -118,9 +119,23 @@ describe('Popover', () => {
 
       await user.click(screen.getByText('Open'))
 
-      const buttons = screen.getAllByRole('button', { name: 'Open' })
-      const trigger = buttons.find((el) => el.getAttribute('aria-haspopup') === 'dialog')!
+      const trigger = screen.getByRole('button', { name: 'Open' })
       expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    })
+
+    it('should open from native keyboard activation', async () => {
+      const user = userEvent.setup()
+      render(
+        <Popover
+          trigger={<Button>Open</Button>}
+          content={<div data-testid="content">Content</div>}
+        />
+      )
+
+      screen.getByRole('button', { name: 'Open' }).focus()
+      await user.keyboard('{Enter}')
+
+      expect(screen.getByTestId('content')).toBeInTheDocument()
     })
   })
 
@@ -220,10 +235,8 @@ describe('Popover', () => {
         />
       )
 
-      // The trigger wrapper (aria-haspopup) should have the custom class
-      const buttons = screen.getAllByRole('button', { name: 'Open' })
-      const triggerWrapper = buttons.find((el) => el.getAttribute('aria-haspopup') === 'dialog')!
-      expect(triggerWrapper).toHaveClass('custom-class')
+      const trigger = screen.getByRole('button', { name: 'Open' })
+      expect(trigger).toHaveClass('custom-class')
     })
   })
 })

@@ -88,6 +88,7 @@ describe('DiracControls', () => {
     cfg.dirac = { ...DEFAULT_DIRAC_CONFIG, showPotential: true, potentialType: 'harmonicTrap' }
     render(<DiracControls config={cfg} dimension={3} actions={createMockActions()} />)
     expect(screen.getByText('Trap Frequency ω')).toBeInTheDocument()
+    expect(screen.queryByText('Potential Strength V₀')).not.toBeInTheDocument()
     expect(screen.queryByText('Potential Width')).not.toBeInTheDocument()
   })
 
@@ -96,6 +97,7 @@ describe('DiracControls', () => {
     cfg.dirac = { ...DEFAULT_DIRAC_CONFIG, showPotential: true, potentialType: 'coulomb' }
     render(<DiracControls config={cfg} dimension={3} actions={createMockActions()} />)
     expect(screen.getByText('Charge Z')).toBeInTheDocument()
+    expect(screen.queryByText('Potential Strength V₀')).not.toBeInTheDocument()
   })
 
   it('shows potential center for step potential', () => {
@@ -104,6 +106,22 @@ describe('DiracControls', () => {
     render(<DiracControls config={cfg} dimension={3} actions={createMockActions()} />)
     expect(screen.getByText('Potential Center')).toBeInTheDocument()
     expect(screen.queryByText('Potential Width')).not.toBeInTheDocument()
+  })
+
+  it('bounds potential center by the primary-axis extent', () => {
+    const cfg = defaultConfig()
+    cfg.dirac = {
+      ...DEFAULT_DIRAC_CONFIG,
+      showPotential: true,
+      potentialType: 'step',
+      gridSize: [32, 32, 32],
+      spacing: [0.1, 1, 1],
+    }
+    render(<DiracControls config={cfg} dimension={3} actions={createMockActions()} />)
+
+    const slider = screen.getByLabelText('Potential Center')
+    expect(slider).toHaveAttribute('min', '-1.6')
+    expect(slider).toHaveAttribute('max', '1.6')
   })
 
   it('renders momentum sliders up to min(latticeDim, 3)', () => {
