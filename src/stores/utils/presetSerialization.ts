@@ -167,10 +167,14 @@ function warnDroppedNonFinitePresetValue(path: string, value: number): void {
 }
 
 /** Sanitize an array value, returning undefined if any element is non-finite. */
-function sanitizeFiniteArray(value: unknown[], path: string): unknown[] | undefined {
+function sanitizeFiniteArray(
+  value: unknown[],
+  path: string,
+  seen: WeakSet<object>
+): unknown[] | undefined {
   const sanitizedArray: unknown[] = []
   for (let index = 0; index < value.length; index += 1) {
-    const sanitizedItem = sanitizeFiniteLoadedValue(value[index], `${path}[${index}]`)
+    const sanitizedItem = sanitizeFiniteLoadedValue(value[index], `${path}[${index}]`, seen)
     // Preserve array shape invariants by dropping the whole array when any item is invalid.
     if (sanitizedItem === undefined) return undefined
     sanitizedArray.push(sanitizedItem)
@@ -181,19 +185,29 @@ function sanitizeFiniteArray(value: unknown[], path: string): unknown[] | undefi
 /** Sanitize a record value, dropping keys whose values are non-finite. */
 function sanitizeFiniteRecord(
   value: Record<string, unknown>,
-  path: string
+  path: string,
+  seen: WeakSet<object>
 ): Record<string, unknown> {
+  if (seen.has(value)) {
+    throw new TypeError(`Cannot sanitize cyclic preset value at "${path}"`)
+  }
+  seen.add(value)
   const sanitizedRecord: Record<string, unknown> = {}
   for (const [key, candidateValue] of Object.entries(value)) {
-    const sanitizedChild = sanitizeFiniteLoadedValue(candidateValue, `${path}.${key}`)
+    const sanitizedChild = sanitizeFiniteLoadedValue(candidateValue, `${path}.${key}`, seen)
     if (sanitizedChild !== undefined) {
       sanitizedRecord[key] = sanitizedChild
     }
   }
+  seen.delete(value)
   return sanitizedRecord
 }
 
-function sanitizeFiniteLoadedValue(value: unknown, path: string): unknown | undefined {
+function sanitizeFiniteLoadedValue(
+  value: unknown,
+  path: string,
+  seen: WeakSet<object> = new WeakSet()
+): unknown | undefined {
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
       warnDroppedNonFinitePresetValue(path, value)
@@ -202,9 +216,9 @@ function sanitizeFiniteLoadedValue(value: unknown, path: string): unknown | unde
     return value
   }
 
-  if (Array.isArray(value)) return sanitizeFiniteArray(value, path)
+  if (Array.isArray(value)) return sanitizeFiniteArray(value, path, seen)
   if (value && typeof value === 'object')
-    return sanitizeFiniteRecord(value as Record<string, unknown>, path)
+    return sanitizeFiniteRecord(value as Record<string, unknown>, path, seen)
   return value
 }
 
@@ -215,7 +229,11 @@ function sanitizeFiniteLoadedValue(value: unknown, path: string): unknown | unde
  * @returns A JSON-serializable version of the state.
  */
 export const serializeState = <T extends object>(state: T): Record<string, unknown> => {
-  return JSON.parse(JSON.stringify(stripTransientFields(state as Record<string, unknown>)))
+  const stripped = stripTransientFields(state as Record<string, unknown>)
+  const sanitized = sanitizeFiniteLoadedValue(stripped, 'state')
+  const serializable =
+    sanitized && typeof sanitized === 'object' && !Array.isArray(sanitized) ? sanitized : {}
+  return JSON.parse(JSON.stringify(serializable))
 }
 
 /**
@@ -309,7 +327,7 @@ export const serializeExtendedState = <T extends object>(
  * @returns A sanitized copy with transient fields removed.
  */
 export const sanitizeLoadedState = <T extends Record<string, unknown>>(state: T): T => {
-  const clean = { ...state }
+  const clean: Record<string, unknown> = { ...state }
   for (const field of TRANSIENT_FIELDS) {
     delete clean[field]
   }
@@ -318,7 +336,14 @@ export const sanitizeLoadedState = <T extends Record<string, unknown>>(state: T)
   const shaderSettings = clean.shaderSettings as Record<string, unknown> | undefined
   const surfaceSettings = shaderSettings?.surface as Record<string, unknown> | undefined
   if (surfaceSettings && typeof surfaceSettings === 'object' && 'faceOpacity' in surfaceSettings) {
-    delete surfaceSettings.faceOpacity
+    const sanitizedShaderSettings = {
+      ...shaderSettings,
+      surface: {
+        ...surfaceSettings,
+      },
+    }
+    delete (sanitizedShaderSettings.surface as Record<string, unknown>).faceOpacity
+    clean.shaderSettings = sanitizedShaderSettings
   }
 
   const sanitized = sanitizeFiniteLoadedValue(clean, 'state')

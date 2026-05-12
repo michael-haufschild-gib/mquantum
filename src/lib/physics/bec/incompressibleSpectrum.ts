@@ -121,6 +121,23 @@ export function computeIncompressibleSpectrum(
   numBins = NUM_SPECTRUM_BINS
 ): IncompressibleSpectrumResult {
   const dim = gridSize.length
+  const binCount = Number.isInteger(numBins) && numBins > 0 ? numBins : 0
+  const zeroResult = (): IncompressibleSpectrumResult => ({
+    spectrum: new Float32Array(binCount),
+    kValues: new Float32Array(binCount),
+    totalIncompressible: 0,
+    totalCompressible: 0,
+  })
+
+  if (
+    binCount === 0 ||
+    !Number.isFinite(hbar) ||
+    hbar <= 0 ||
+    !Number.isFinite(mass) ||
+    mass <= 0
+  ) {
+    return zeroResult()
+  }
 
   // PERF: WASM fast-path. Rust `compute_incompressible_spectrum_wasm`
   // (src/wasm/mdimension_core/src/bec_spectrum.rs) covers the full residual
@@ -173,18 +190,13 @@ export function computeIncompressibleSpectrum(
   // TS fallback validation (mirrors the WASM input rejection above).
   // Without these guards, invalid grid/spacing would produce NaN/Infinity
   // energies and spectrum values via the Parseval scaling at the end.
-  const zeroResult = (): IncompressibleSpectrumResult => ({
-    spectrum: new Float32Array(numBins),
-    kValues: new Float32Array(numBins),
-    totalIncompressible: 0,
-    totalCompressible: 0,
-  })
-
   if (dim === 0 || spacing.length !== dim) return zeroResult()
   for (let d = 0; d < dim; d++) {
     const n = gridSize[d]!
     const dx = spacing[d]!
-    if (!Number.isFinite(n) || n < 2 || (n & (n - 1)) !== 0) return zeroResult()
+    if (!Number.isFinite(n) || !Number.isInteger(n) || n < 2 || (n & (n - 1)) !== 0) {
+      return zeroResult()
+    }
     if (!Number.isFinite(dx) || dx <= 0) return zeroResult()
   }
 
@@ -277,15 +289,15 @@ export function computeIncompressibleSpectrum(
     kGridScale[d] = (2 * Math.PI) / (gridSize[d]! * spacing[d]!)
   }
 
-  // Determine k range for logarithmic binning
-  // k_min = min nonzero |k|, k_max = Nyquist
+  // Determine k range for logarithmic binning:
+  // k_min = min nonzero |k|, k_max = Euclidean Nyquist corner.
   let kMinSq = Infinity
   let kMaxSq = 0
   for (let d = 0; d < dim; d++) {
     const dk = kGridScale[d]!
     kMinSq = Math.min(kMinSq, dk * dk)
     const kNyquist = Math.PI / spacing[d]!
-    kMaxSq = Math.max(kMaxSq, kNyquist * kNyquist * dim)
+    kMaxSq += kNyquist * kNyquist
   }
   const kMin = Math.sqrt(kMinSq)
   const kMax = Math.sqrt(kMaxSq)
@@ -294,6 +306,7 @@ export function computeIncompressibleSpectrum(
   const logKMin = Math.log(kMin)
   const logKMax = Math.log(kMax)
   const logRange = logKMax - logKMin
+  if (!Number.isFinite(logRange) || logRange <= 0) return zeroResult()
 
   const spectrum = new Float64Array(numBins)
   const kValues = new Float32Array(numBins)
@@ -368,7 +381,7 @@ export function computeIncompressibleSpectrum(
     // Logarithmic bin assignment
     const kMag = Math.sqrt(kSq)
     const logK = Math.log(kMag)
-    const bin = Math.min(((logK - logKMin) * binInvLogRange) | 0, numBins - 1)
+    const bin = Math.min(Math.max(((logK - logKMin) * binInvLogRange) | 0, 0), numBins - 1)
     spectrum[bin] = spectrum[bin]! + incompSq
   }
 

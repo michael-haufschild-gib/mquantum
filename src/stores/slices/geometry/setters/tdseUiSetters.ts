@@ -27,6 +27,7 @@ import {
   MIN_SPHERE_RADIUS,
   MIN_THROAT_RADIUS,
   MIN_TORUS_PERIOD,
+  normalizeMetricForLattice,
 } from '@/lib/physics/tdse/metrics/types'
 
 import {
@@ -389,7 +390,10 @@ export function createTdseUiSetters(ctx: SetterContext) {
     setTdseMetric: (cfg: MetricConfig) => {
       ctx.setWithVersion((state) => {
         const prev: MetricConfig = state.schroedinger.tdse.metric ?? DEFAULT_METRIC_CONFIG
-        const next = normalizeMetricConfig(cfg, prev)
+        const next = normalizeMetricForLattice(
+          normalizeMetricConfig(cfg, prev),
+          state.schroedinger.tdse.latticeDim
+        )
         if (metricsEqual(prev, next)) return state
         return {
           schroedinger: {

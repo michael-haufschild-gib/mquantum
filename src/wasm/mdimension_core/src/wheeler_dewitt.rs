@@ -175,7 +175,15 @@ fn wdw_dzeta_da(a: f64, phi1: f64, phi2: f64, mass: f64, lambda: f64, mass_asymm
 #[inline]
 fn langer_prefactor(zeta: f64, u: f64) -> f64 {
     const EPS: f64 = 1e-30;
-    let denom = if u == 0.0 { if u >= 0.0 { EPS } else { -EPS } } else { u };
+    let denom = if u == 0.0 {
+        if u >= 0.0 {
+            EPS
+        } else {
+            -EPS
+        }
+    } else {
+        u
+    };
     let ratio = zeta / denom;
     if ratio < 0.0 {
         f64::NAN
@@ -350,10 +358,10 @@ fn column_seed_zero_v(
 
     let chi_re = sqrt_a * (a_re * j + b_re * y);
     let chi_im = sqrt_a * (a_im * j + b_im * y);
-    let dchi_re = inv_2_sqrt_a * (a_re * j + b_re * y)
-        + sqrt_a * six_pi_a * (a_re * jp + b_re * yp);
-    let dchi_im = inv_2_sqrt_a * (a_im * j + b_im * y)
-        + sqrt_a * six_pi_a * (a_im * jp + b_im * yp);
+    let dchi_re =
+        inv_2_sqrt_a * (a_re * j + b_re * y) + sqrt_a * six_pi_a * (a_re * jp + b_re * yp);
+    let dchi_im =
+        inv_2_sqrt_a * (a_im * j + b_im * y) + sqrt_a * six_pi_a * (a_im * jp + b_im * yp);
     ((chi_re, chi_im), (dchi_re, dchi_im))
 }
 
@@ -447,7 +455,14 @@ fn hartle_hawking_boundary(
                 // envelope — the Ai decay past the turning surface IS the
                 // HH amplitude profile.
                 let (cre, dre) = column_seed_positive_v(
-                    a_min, phi1, phi2, mass, lambda, mass_asymmetry, 1.0, 0.0,
+                    a_min,
+                    phi1,
+                    phi2,
+                    mass,
+                    lambda,
+                    mass_asymmetry,
+                    1.0,
+                    0.0,
                 );
                 chi[2 * idx] = cre;
                 chi[2 * idx + 1] = 0.0;
@@ -522,10 +537,24 @@ fn vilenkin_boundary(
                 // twice with `(c1=1, c2=0)` and `(c1=0, c2=1)` and
                 // stitching.
                 let (re_chi, re_dchi) = column_seed_positive_v(
-                    a_min, phi1, phi2, mass, lambda, mass_asymmetry, 1.0, 0.0,
+                    a_min,
+                    phi1,
+                    phi2,
+                    mass,
+                    lambda,
+                    mass_asymmetry,
+                    1.0,
+                    0.0,
                 );
                 let (im_chi, im_dchi) = column_seed_positive_v(
-                    a_min, phi1, phi2, mass, lambda, mass_asymmetry, 0.0, 1.0,
+                    a_min,
+                    phi1,
+                    phi2,
+                    mass,
+                    lambda,
+                    mass_asymmetry,
+                    0.0,
+                    1.0,
                 );
                 chi[2 * idx] = re_chi;
                 chi[2 * idx + 1] = im_chi;
@@ -861,13 +890,7 @@ pub fn solve_leapfrog(input: WdwSolverInput) -> WdwSolverOutput {
         }
 
         // Step B — ADI solve.
-        solve_adi_laplacian_neumann_2d(
-            &adi_rhs,
-            &mut adi_out,
-            nphi,
-            kappa_next,
-            &mut adi_scratch,
-        );
+        solve_adi_laplacian_neumann_2d(&adi_rhs, &mut adi_out, nphi, kappa_next, &mut adi_scratch);
 
         // Step C — Lorentzian branch: copy ADI output into the slab
         // with per-cell f32 quantisation.
@@ -1007,8 +1030,7 @@ mod tests {
         let abs_u = -u0;
         let wkb_phase_rate = abs_u.sqrt();
         assert!(
-            dchi_over_chi_im > 0.5 * wkb_phase_rate
-                && dchi_over_chi_im < 2.0 * wkb_phase_rate,
+            dchi_over_chi_im > 0.5 * wkb_phase_rate && dchi_over_chi_im < 2.0 * wkb_phase_rate,
             "Im(χ'/χ) at φ=0: got {dchi_over_chi_im}, expected ≈ +√|U| = {wkb_phase_rate}"
         );
     }

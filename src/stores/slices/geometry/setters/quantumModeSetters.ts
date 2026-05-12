@@ -310,7 +310,7 @@ function applyFirstPreset(
       break
     }
     case 'tdseDynamics':
-      store.applyTdsePreset(presetId)
+      void store.applyTdsePreset(presetId)
       break
     case 'becDynamics':
       void store.applyBecPreset(presetId)

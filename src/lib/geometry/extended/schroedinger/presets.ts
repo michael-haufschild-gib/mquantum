@@ -43,6 +43,14 @@ export interface NamedPresetConfig {
   frequencySpread: number
 }
 
+/** Store controls derived from a named Schroedinger preset. */
+export interface NamedPresetStoreControls {
+  seed: number
+  termCount: number
+  maxQuantumNumber: number
+  frequencySpread: number
+}
+
 /**
  * Per-term RNG offset prime — used to create independent PRNG sequences
  * for each superposition term so that adding/removing terms does not
@@ -295,6 +303,23 @@ export const SCHROEDINGER_NAMED_PRESETS: Record<string, NamedPresetConfig> = {
   },
 }
 
+/** Resolve a named Schroedinger preset config from persisted or UI state. */
+export function getNamedPresetConfig(name: unknown): NamedPresetConfig | null {
+  return typeof name === 'string' ? (SCHROEDINGER_NAMED_PRESETS[name] ?? null) : null
+}
+
+/** Resolve store control values for a named Schroedinger preset. */
+export function getNamedPresetStoreControls(name: unknown): NamedPresetStoreControls | null {
+  const config = getNamedPresetConfig(name)
+  if (!config) return null
+  return {
+    seed: config.seed,
+    termCount: config.termCount,
+    maxQuantumNumber: config.maxN,
+    frequencySpread: config.frequencySpread,
+  }
+}
+
 /**
  * Get a preset by name
  * @param name - Name of the preset
@@ -302,7 +327,7 @@ export const SCHROEDINGER_NAMED_PRESETS: Record<string, NamedPresetConfig> = {
  * @returns QuantumPreset or null if not found
  */
 export function getNamedPreset(name: string, dimension: number): QuantumPreset | null {
-  const config = SCHROEDINGER_NAMED_PRESETS[name]
+  const config = getNamedPresetConfig(name)
   if (!config) return null
 
   return generateQuantumPreset(

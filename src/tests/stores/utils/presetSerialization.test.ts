@@ -9,7 +9,7 @@ import {
 
 describe('sanitizeLoadedState', () => {
   it('removes legacy faceOpacity fields from appearance payloads', () => {
-    const sanitized = sanitizeLoadedState({
+    const payload = {
       faceOpacity: 0.5,
       shaderSettings: {
         wireframe: { lineThickness: 1 },
@@ -18,13 +18,18 @@ describe('sanitizeLoadedState', () => {
           specularIntensity: 0.8,
         },
       },
-    })
+    }
+    const before = JSON.parse(JSON.stringify(payload))
+
+    const sanitized = sanitizeLoadedState(payload)
+
     expect(sanitized).toEqual({
       shaderSettings: {
         wireframe: { lineThickness: 1 },
         surface: { specularIntensity: 0.8 },
       },
     })
+    expect(payload).toEqual(before)
   })
 
   it('removes legacy classicSkyboxType from environment payloads', () => {

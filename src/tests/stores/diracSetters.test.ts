@@ -124,12 +124,29 @@ describe('Dirac setters', () => {
     expect(getDirac().potentialWidth).toBe(10)
   })
 
-  it('clamps potentialCenter to [-10, 10]', () => {
+  it('clamps potentialCenter to the axis-0 lattice half-extent', () => {
     const s = useExtendedObjectStore.getState()
     s.setDiracPotentialCenter(-20)
-    expect(getDirac().potentialCenter).toBe(-10)
+    expect(getDirac().potentialCenter).toBeCloseTo(-4.8)
     s.setDiracPotentialCenter(20)
-    expect(getDirac().potentialCenter).toBe(10)
+    expect(getDirac().potentialCenter).toBeCloseTo(4.8)
+  })
+
+  it('clamps potentialCenter against axis 0, not the widest anisotropic axis', () => {
+    useExtendedObjectStore.setState({
+      schroedinger: {
+        ...useExtendedObjectStore.getState().schroedinger,
+        dirac: {
+          ...getDirac(),
+          gridSize: [32, 32, 32],
+          spacing: [0.1, 1, 1],
+        },
+      },
+    })
+
+    useExtendedObjectStore.getState().setDiracPotentialCenter(10)
+
+    expect(getDirac().potentialCenter).toBeCloseTo(1.6)
   })
 
   it('clamps harmonicOmega to [0.01, 10]', () => {
@@ -290,6 +307,21 @@ describe('Dirac setters', () => {
     expect(getDirac().needsReset).toBe(true)
     // kleinParadox preset sets stepsPerFrame: 4 (default is 2)
     expect(getDirac().stepsPerFrame).toBe(4)
+    expect(getDirac().showPotential).toBe(true)
+  })
+
+  it('disables potential physics when applying a free-particle preset', async () => {
+    useExtendedObjectStore.setState({
+      schroedinger: {
+        ...useExtendedObjectStore.getState().schroedinger,
+        dirac: { ...getDirac(), showPotential: true, potentialType: 'barrier' },
+      },
+    })
+
+    await useExtendedObjectStore.getState().applyDiracPreset('zitterbewegung')
+
+    expect(getDirac().potentialType).toBe('none')
+    expect(getDirac().showPotential).toBe(false)
   })
 
   it('syncs color algorithm to particleAntiparticle when preset uses split fieldView', async () => {
@@ -393,6 +425,17 @@ describe('Dirac setters', () => {
     expect(getDirac().packetWidth).toBe(widthBefore)
   })
 
+  it('re-clamps potentialCenter when spacing tightens the primary-axis extent', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setDiracSpacing([0.5, 0.5, 0.5])
+    s.setDiracPotentialCenter(10)
+    expect(getDirac().potentialCenter).toBe(10)
+
+    s.setDiracSpacing([0.01, 0.01, 0.01])
+
+    expect(getDirac().potentialCenter).toBeCloseTo(0.32)
+  })
+
   it('re-clamps packetWidth when grid size shrinks past the lattice-extent ceiling', () => {
     // Same invariant as the spacing test, but driven via gridSize instead.
     // setDiracGridSize snaps to power-of-2 so we use [4, 4, 4] (the floor for
@@ -407,6 +450,17 @@ describe('Dirac setters', () => {
     const widthAfter = getDirac().packetWidth
     expect(widthAfter).toBeLessThanOrEqual(0.12 + 1e-9)
     expect(widthAfter).toBeGreaterThan(0)
+  })
+
+  it('re-clamps potentialCenter when grid size shrinks the primary-axis extent', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setDiracSpacing([0.15, 0.15, 0.15])
+    s.setDiracPotentialCenter(4)
+    expect(getDirac().potentialCenter).toBe(4)
+
+    s.setDiracGridSize([4, 4, 4])
+
+    expect(getDirac().potentialCenter).toBeCloseTo(0.3)
   })
 
   it('rejects NaN for clamped numeric setters', () => {

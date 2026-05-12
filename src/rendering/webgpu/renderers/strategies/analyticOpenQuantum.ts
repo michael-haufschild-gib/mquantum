@@ -37,6 +37,7 @@ import type { WebGPURenderContext } from '../../core/types'
 import type { DensityGridComputePass } from '../../passes/DensityGridComputePass'
 import { packHydrogenBasisForGPU } from '../schrodingerRendererTypes'
 import {
+  type AnimationState,
   type ExtendedStoreSnapshot,
   getStoreSnapshot,
   type PerformanceSnapshot,
@@ -56,6 +57,7 @@ export class AnalyticOpenQuantumExecutor {
   private resetTokenSeen = -1
   private updateTick = 0
   private lastSchroedingerVersion = -1
+  private wasPaused = false
   /**
    * Tracks whether the previous frame saw `oqConfig.enabled === false` so we
    * can detect a disable→re-enable transition and flush stale diagnostics
@@ -99,6 +101,8 @@ export class AnalyticOpenQuantumExecutor {
       return
     }
     if (!shared.cachedPreset) return
+    const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
+    const isPlaying = animation?.isPlaying ?? true
 
     if (this.wasDisabled) {
       // Disable→re-enable transition: clear in-memory caches and stale
@@ -118,6 +122,10 @@ export class AnalyticOpenQuantumExecutor {
       this.resetTokenSeen = resetToken
       forceUpdate = true
     }
+    if (this.wasPaused && isPlaying) {
+      forceUpdate = true
+    }
+    this.wasPaused = !isPlaying
 
     const isHydrogenOQ =
       shared.rendererConfig.quantumMode === 'hydrogenND' ||
@@ -131,7 +139,8 @@ export class AnalyticOpenQuantumExecutor {
         oqConfig,
         schroedingerVersion,
         performance,
-        forceUpdate
+        forceUpdate,
+        isPlaying
       )
     } else {
       this.executeHO(
@@ -142,7 +151,8 @@ export class AnalyticOpenQuantumExecutor {
         shared.cachedPreset.config,
         schroedingerVersion,
         performance,
-        forceUpdate
+        forceUpdate,
+        isPlaying
       )
     }
   }
@@ -154,7 +164,8 @@ export class AnalyticOpenQuantumExecutor {
     oqConfig: OpenQuantumConfig,
     schroedingerVersion: number,
     performance: PerformanceSnapshot | undefined,
-    forceUpdate: boolean
+    forceUpdate: boolean,
+    isPlaying: boolean
   ): void {
     const dim = shared.rendererConfig.dimension ?? 3
     const maxN = oqConfig.hydrogenBasisMaxN ?? 2
@@ -213,9 +224,18 @@ export class AnalyticOpenQuantumExecutor {
       stateReinitialized = true
     }
 
-    if (!this.shouldUpdateThisFrame(performance, K, forceUpdate || stateReinitialized)) return
+    if (
+      !this.shouldPublishOpenQuantumFrame(
+        performance,
+        K,
+        forceUpdate || stateReinitialized,
+        isPlaying
+      )
+    ) {
+      return
+    }
 
-    evolvePropagatorStep(this.hydrogenPropagator!, this.state)
+    if (isPlaying) evolvePropagatorStep(this.hydrogenPropagator!, this.state)
     this.publishMetricsAndPack(K, gridPass, shared, schroedingerVersion, performance)
     gridPass.updateHydrogenBasisUniforms(shared.device, this.hydrogenBasisPackedBuffer!)
   }
@@ -228,25 +248,10 @@ export class AnalyticOpenQuantumExecutor {
     cachedPresetConfig: CachedPresetData['config'],
     schroedingerVersion: number,
     performance: PerformanceSnapshot | undefined,
-    forceUpdate: boolean
+    forceUpdate: boolean,
+    isPlaying: boolean
   ): void {
     const K = cachedPreset.termCount
-
-    let stateReinitialized = false
-    if (!this.state || this.state.K !== K || !this.initialized) {
-      const coeffsRe = new Float64Array(K)
-      const coeffsIm = new Float64Array(K)
-      for (let k = 0; k < K; k++) {
-        const pair = cachedPreset.coefficients[k]
-        coeffsRe[k] = pair?.[0] ?? 0
-        coeffsIm[k] = pair?.[1] ?? 0
-      }
-      this.state = densityMatrixFromCoefficients(coeffsRe, coeffsIm, K)
-      this.initialized = true
-      this.frameCounter = 0
-      this.lastVonNeumann = 0
-      stateReinitialized = true
-    }
 
     const presetKey = cachedPresetConfig
       ? `${cachedPresetConfig.presetName}:${cachedPresetConfig.seed}:${cachedPresetConfig.termCount}:${cachedPresetConfig.dimension}`
@@ -279,9 +284,34 @@ export class AnalyticOpenQuantumExecutor {
       forceUpdate = true
     }
 
-    if (!this.shouldUpdateThisFrame(performance, K, forceUpdate || stateReinitialized)) return
+    let stateReinitialized = false
+    if (!this.state || this.state.K !== K || !this.initialized) {
+      const coeffsRe = new Float64Array(K)
+      const coeffsIm = new Float64Array(K)
+      for (let k = 0; k < K; k++) {
+        const pair = cachedPreset.coefficients[k]
+        coeffsRe[k] = pair?.[0] ?? 0
+        coeffsIm[k] = pair?.[1] ?? 0
+      }
+      this.state = densityMatrixFromCoefficients(coeffsRe, coeffsIm, K)
+      this.initialized = true
+      this.frameCounter = 0
+      this.lastVonNeumann = 0
+      stateReinitialized = true
+    }
 
-    evolvePropagatorStep(this.hoPropagator!, this.state)
+    if (
+      !this.shouldPublishOpenQuantumFrame(
+        performance,
+        K,
+        forceUpdate || stateReinitialized,
+        isPlaying
+      )
+    ) {
+      return
+    }
+
+    if (isPlaying) evolvePropagatorStep(this.hoPropagator!, this.state)
 
     this.publishMetricsAndPack(K, gridPass, shared, schroedingerVersion, performance)
   }
@@ -363,6 +393,19 @@ export class AnalyticOpenQuantumExecutor {
     return this.updateTick === 0
   }
 
+  private shouldPublishOpenQuantumFrame(
+    performance: PerformanceSnapshot | undefined,
+    basisK: number,
+    forceUpdate: boolean,
+    isPlaying: boolean
+  ): boolean {
+    if (!isPlaying) {
+      this.updateTick = 0
+      return forceUpdate
+    }
+    return this.shouldUpdateThisFrame(performance, basisK, forceUpdate)
+  }
+
   private computeFrameStride(performance: PerformanceSnapshot | undefined, basisK: number): number {
     const qualityMultiplier = performance?.qualityMultiplier ?? 1.0
     const interacting = performance?.isInteracting ?? false
@@ -420,6 +463,7 @@ export class AnalyticOpenQuantumExecutor {
     this.resetTokenSeen = -1
     this.updateTick = 0
     this.lastSchroedingerVersion = -1
+    this.wasPaused = false
     this.hoCacheKey = ''
     this.hoChannels = []
     this.hoEnergies = null

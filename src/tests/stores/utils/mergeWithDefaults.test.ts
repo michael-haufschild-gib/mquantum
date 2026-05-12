@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from 'vitest'
 
+import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
 import { DEFAULT_PAULI_CONFIG, DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
 import { mergeExtendedObjectStateForType } from '@/stores/utils/mergeWithDefaults'
 
@@ -52,6 +53,25 @@ describe('mergeExtendedObjectStateForType — schroedinger', () => {
       expect(schroedinger.densityGain).toBe(5.0)
     })
 
+    it('does not apply default named-preset controls when saved presetName is missing', () => {
+      const savedState = {
+        schroedinger: {
+          quantumMode: 'harmonicOscillator',
+          termCount: 4,
+          maxQuantumNumber: 6,
+          frequencySpread: 0.5,
+        },
+      }
+
+      const merged = mergeExtendedObjectStateForType(savedState, 'schroedinger')
+      const schroedinger = merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
+
+      expect(schroedinger.presetName).toBe(DEFAULT_SCHROEDINGER_CONFIG.presetName)
+      expect(schroedinger.termCount).toBe(4)
+      expect(schroedinger.maxQuantumNumber).toBe(6)
+      expect(schroedinger.frequencySpread).toBe(0.5)
+    })
+
     it('drops unknown loaded keys that are not part of defaults', () => {
       const savedState = {
         schroedinger: {
@@ -72,6 +92,28 @@ describe('mergeExtendedObjectStateForType — schroedinger', () => {
       const cosineParams = schroedinger.cosineParams as Record<string, unknown>
       expect(cosineParams.a).toEqual([0.1, 0.2, 0.3])
       expect(cosineParams.mysteryNested).toBeUndefined()
+    })
+
+    it('reconciles named preset controls that bypassed store setters', () => {
+      const savedState = {
+        schroedinger: {
+          quantumMode: 'harmonicOscillator',
+          presetName: 'groundState',
+          seed: 999,
+          termCount: 8,
+          maxQuantumNumber: 6,
+          frequencySpread: 0.5,
+        },
+      }
+
+      const merged = mergeExtendedObjectStateForType(savedState, 'schroedinger')
+      const schroedinger = merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
+      const preset = SCHROEDINGER_NAMED_PRESETS.groundState!
+
+      expect(schroedinger.seed).toBe(preset.seed)
+      expect(schroedinger.termCount).toBe(preset.termCount)
+      expect(schroedinger.maxQuantumNumber).toBe(preset.maxN)
+      expect(schroedinger.frequencySpread).toBe(preset.frequencySpread)
     })
   })
 

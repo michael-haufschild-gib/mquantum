@@ -127,6 +127,17 @@ function normalizeDiracFieldView(
   return latticeDim < 3 && fieldView === 'axialCharge' ? 'totalDensity' : fieldView
 }
 
+/** Half-extent of the primary Dirac potential axis. */
+function diracAxis0HalfExtent(gridSize: number[], spacing: number[]): number {
+  return (gridSize[0] ?? 32) * (spacing[0] ?? 0.15) * 0.5
+}
+
+/** Keep step/barrier/well centers inside the axis-0 lattice domain. */
+function clampDiracPotentialCenter(gridSize: number[], spacing: number[], center: number): number {
+  const halfExtent = diracAxis0HalfExtent(gridSize, spacing)
+  return Math.max(-halfExtent, Math.min(halfExtent, center))
+}
+
 /**
  * Resize Dirac arrays to match a new latticeDim, preserving existing values
  * where possible and filling new dimensions with defaults.
@@ -157,6 +168,7 @@ export const resizeDiracArrays = (prev: DiracConfig, newDim: number): Partial<Di
   )
   const newDt = clampDiracDt(spacing, prev.speedOfLight, prev.dt)
   const fieldView = normalizeDiracFieldView(newDim, prev.fieldView)
+  const potentialCenter = clampDiracPotentialCenter(gridSize, spacing, prev.potentialCenter)
   return {
     latticeDim: newDim,
     gridSize,
@@ -166,6 +178,7 @@ export const resizeDiracArrays = (prev: DiracConfig, newDim: number): Partial<Di
     slicePositions,
     dt: newDt,
     packetWidth: newPacketWidth,
+    potentialCenter,
     fieldView,
   }
 }
@@ -232,7 +245,22 @@ export function createDiracSetters(ctx: SetterContext): DiracSetters {
     },
     setDiracPotentialStrength: nestedClampedSetter(ctx, D, 'potentialStrength', -100, 100),
     setDiracPotentialWidth: nestedClampedSetter(ctx, D, 'potentialWidth', 0.01, 10),
-    setDiracPotentialCenter: nestedClampedSetter(ctx, D, 'potentialCenter', -10, 10),
+    setDiracPotentialCenter: (center) => {
+      if (!isFinite(center)) {
+        warnNonFinite('dirac.potentialCenter', center)
+        return
+      }
+      setWithVersion((state) => {
+        const prev = state.schroedinger.dirac
+        const clamped = clampDiracPotentialCenter(prev.gridSize, prev.spacing, center)
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            dirac: { ...prev, potentialCenter: clamped },
+          },
+        }
+      })
+    },
     setDiracHarmonicOmega: nestedClampedSetter(ctx, D, 'harmonicOmega', 0.01, 10),
     setDiracCoulombZ: nestedIntSetter(ctx, D, 'coulombZ', 1, 137),
     setDiracInitialCondition: (condition) => {
@@ -340,6 +368,11 @@ export function createDiracSetters(ctx: SetterContext): DiracSetters {
         // resizeDiracArrays + applyDiracPreset.
         const minHalfExtent = Math.min(...snapped.map((g, i) => g * (newSpacing[i] ?? 0.15) * 0.5))
         const packetWidth = Math.min(minHalfExtent * 0.4, prevDirac.packetWidth)
+        const potentialCenter = clampDiracPotentialCenter(
+          snapped,
+          newSpacing,
+          prevDirac.potentialCenter
+        )
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -348,6 +381,7 @@ export function createDiracSetters(ctx: SetterContext): DiracSetters {
               gridSize: snapped,
               packetCenter,
               packetWidth,
+              potentialCenter,
               needsReset: true,
             },
           },
@@ -386,6 +420,11 @@ export function createDiracSetters(ctx: SetterContext): DiracSetters {
         // Decreasing min(spacing) shrinks the Dirac CFL ceiling, so re-clamp
         // dt to keep the lattice stable after the user tightens the grid.
         const dt = clampDiracDt(clamped, prevDirac.speedOfLight, prevDirac.dt)
+        const potentialCenter = clampDiracPotentialCenter(
+          prevDirac.gridSize,
+          clamped,
+          prevDirac.potentialCenter
+        )
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -396,6 +435,7 @@ export function createDiracSetters(ctx: SetterContext): DiracSetters {
               packetMomentum,
               packetWidth,
               dt,
+              potentialCenter,
               needsReset: true,
             },
           },
@@ -493,7 +533,12 @@ export function createDiracSetters(ctx: SetterContext): DiracSetters {
               dim,
               safeOverrides.fieldView ?? prev.fieldView
             )
-            const merged = { ...prev, ...safeOverrides, fieldView, needsReset: true }
+            const showPotential =
+              safeOverrides.showPotential ??
+              (safeOverrides.potentialType !== undefined
+                ? safeOverrides.potentialType !== 'none'
+                : prev.showPotential)
+            const merged = { ...prev, ...safeOverrides, fieldView, showPotential, needsReset: true }
 
             if (safeOverrides.spacing) {
               const srcSpacing = safeOverrides.spacing
@@ -523,6 +568,11 @@ export function createDiracSetters(ctx: SetterContext): DiracSetters {
 
             const minHalfExt = Math.min(...gs.map((g, i) => g * (sp[i] ?? 0.15) * 0.5))
             merged.packetWidth = Math.min(minHalfExt * 0.4, merged.packetWidth)
+            merged.potentialCenter = clampDiracPotentialCenter(
+              merged.gridSize,
+              merged.spacing,
+              merged.potentialCenter
+            )
 
             merged.dt = clampDiracDt(merged.spacing, merged.speedOfLight, merged.dt)
 
