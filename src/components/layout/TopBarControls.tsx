@@ -294,11 +294,12 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
 
   const toggleFullscreen = () => {
     soundManager.playClick()
-    if (!document.fullscreenElement) {
-      void document.documentElement.requestFullscreen()
-    } else {
-      void document.exitFullscreen()
-    }
+    const fullscreenPromise = !document.fullscreenElement
+      ? document.documentElement.requestFullscreen()
+      : document.exitFullscreen()
+    void fullscreenPromise.catch(() => {
+      addToast('Fullscreen unavailable', 'error')
+    })
   }
 
   const toggleRepresentation = () => {

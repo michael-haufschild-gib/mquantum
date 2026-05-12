@@ -177,4 +177,15 @@ describe('TDSE dynamics setters', () => {
     s.resetTdseField()
     expect(getTdse().needsReset).toBe(true)
   })
+
+  it('returns a settled promise for dynamic preset application', async () => {
+    const s = useExtendedObjectStore.getState()
+    const result = s.applyTdsePreset('classicTunneling') as unknown
+
+    expect(result).toBeInstanceOf(Promise)
+    await result
+
+    expect(getTdse().potentialType).toBe('barrier')
+    expect(getTdse().needsReset).toBe(true)
+  })
 })

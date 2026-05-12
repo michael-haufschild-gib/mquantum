@@ -48,6 +48,13 @@ function isFinitePostProcessingInput(value: number): boolean {
   return Number.isFinite(value)
 }
 
+const ANTI_ALIASING_METHODS = new Set<AntiAliasingMethod>(['none', 'fxaa', 'smaa'])
+
+/** Runtime guard for anti-aliasing methods crossing untyped boundaries. */
+function isAntiAliasingMethod(value: unknown): value is AntiAliasingMethod {
+  return typeof value === 'string' && ANTI_ALIASING_METHODS.has(value as AntiAliasingMethod)
+}
+
 // ============================================================================
 // State Interface
 // ============================================================================
@@ -280,6 +287,10 @@ export const createPostProcessingSlice: StateCreator<
 
   // --- Anti-aliasing Actions ---
   setAntiAliasingMethod: (method: AntiAliasingMethod) => {
+    if (!isAntiAliasingMethod(method)) {
+      logger.warn('[postProcessingSlice] Ignoring invalid anti-aliasing method:', method)
+      return
+    }
     set({ antiAliasingMethod: method })
   },
 

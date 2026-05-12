@@ -99,6 +99,15 @@ describe('postProcessingStore', () => {
       setAntiAliasingMethod('none')
       expect(usePostProcessingStore.getState().antiAliasingMethod).toBe('none')
     })
+
+    it('ignores invalid anti-aliasing methods at runtime', () => {
+      const { setAntiAliasingMethod } = usePostProcessingStore.getState()
+
+      setAntiAliasingMethod('fxaa')
+      setAntiAliasingMethod('bad-method' as never)
+
+      expect(usePostProcessingStore.getState().antiAliasingMethod).toBe('fxaa')
+    })
   })
 
   describe('cinematic', () => {

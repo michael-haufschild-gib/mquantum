@@ -41,6 +41,9 @@ pub fn compute_incompressible_spectrum(
     if dim == 0 || dim != spacing.len() {
         return Vec::new();
     }
+    if !hbar.is_finite() || hbar <= 0.0 || !mass.is_finite() || mass <= 0.0 {
+        return Vec::new();
+    }
     // Reject non-finite or non-positive spacing up front.
     for &s in spacing {
         if !s.is_finite() || s <= 0.0 {
@@ -53,7 +56,12 @@ pub fn compute_incompressible_spectrum(
             return Vec::new();
         }
     }
-    let total_sites: usize = grid_size.iter().product();
+    let Some(total_sites) = grid_size
+        .iter()
+        .try_fold(1usize, |acc, &n| acc.checked_mul(n))
+    else {
+        return Vec::new();
+    };
     if total_sites == 0 || psi_re.len() != total_sites || psi_im.len() != total_sites {
         return Vec::new();
     }
@@ -149,14 +157,14 @@ pub fn compute_incompressible_spectrum(
         .map(|d| 2.0 * std::f64::consts::PI / (grid_size[d] as f64 * spacing[d]))
         .collect();
 
-    // k_min (smallest non-zero |k|) and k_max (up to √D · Nyquist).
+    // k_min (smallest non-zero |k|) and k_max (Euclidean Nyquist corner).
     let mut k_min_sq = f64::INFINITY;
     let mut k_max_sq = 0.0f64;
     for d in 0..dim {
         let dk = k_grid_scale[d];
         k_min_sq = k_min_sq.min(dk * dk);
         let k_nyquist = std::f64::consts::PI / spacing[d];
-        k_max_sq = k_max_sq.max(k_nyquist * k_nyquist * dim as f64);
+        k_max_sq += k_nyquist * k_nyquist;
     }
     let k_min = k_min_sq.sqrt();
     let k_max = k_max_sq.sqrt();
@@ -248,7 +256,13 @@ pub fn compute_incompressible_spectrum(
     }
 
     let voxel_volume: f64 = spacing.iter().product();
+    if !voxel_volume.is_finite() || voxel_volume <= 0.0 {
+        return Vec::new();
+    }
     let energy_scale = 0.5 * mass * (voxel_volume / total_sites as f64);
+    if !energy_scale.is_finite() {
+        return Vec::new();
+    }
 
     // Scale by physical Parseval factor and pack the output.
     let mut result = Vec::with_capacity(2 * NUM_SPECTRUM_BINS + 2);
@@ -344,6 +358,71 @@ mod tests {
         }
     }
 
+    #[test]
+    fn rejects_invalid_physical_constants() {
+        let n: usize = 8;
+        let total = n * n;
+        let psi_re = vec![1.0f32; total];
+        let psi_im = vec![0.0f32; total];
+        let grid = [n, n];
+        let sp = [0.5f64; 2];
+
+        assert!(
+            compute_incompressible_spectrum(&psi_re, &psi_im, &grid, &sp, f64::NAN, 1.0).is_empty()
+        );
+        assert!(compute_incompressible_spectrum(&psi_re, &psi_im, &grid, &sp, 1.0, 0.0).is_empty());
+        assert!(
+            compute_incompressible_spectrum(&psi_re, &psi_im, &grid, &sp, 1.0, f64::INFINITY)
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn rejects_overflowed_voxel_volume() {
+        let n: usize = 2;
+        let total = n * n;
+        let psi_re = vec![1.0f32; total];
+        let psi_im = vec![0.0f32; total];
+        let grid = [n, n];
+        let sp = [1.0e308f64, 1.0e308f64];
+
+        assert!(compute_incompressible_spectrum(&psi_re, &psi_im, &grid, &sp, 1.0, 1.0).is_empty());
+    }
+
+    #[test]
+    fn anisotropic_bins_use_euclidean_nyquist_corner() {
+        let grid = [8usize, 8usize, 8usize];
+        let spacing = [0.25f64, 0.5f64, 1.0f64];
+        let total = grid.iter().product();
+        let psi_re = vec![1.0f32; total];
+        let psi_im = vec![0.0f32; total];
+
+        let out = compute_incompressible_spectrum(&psi_re, &psi_im, &grid, &spacing, 1.0, 1.0);
+        assert_eq!(out.len(), 2 * NUM_SPECTRUM_BINS + 2);
+
+        let k_min = grid
+            .iter()
+            .enumerate()
+            .map(|(d, n)| 2.0 * std::f64::consts::PI / (*n as f64 * spacing[d]))
+            .fold(f64::INFINITY, f64::min);
+        let k_max = spacing
+            .iter()
+            .map(|dx| (std::f64::consts::PI / dx).powi(2))
+            .sum::<f64>()
+            .sqrt();
+        let log_k_min = k_min.ln();
+        let log_range = k_max.ln() - log_k_min;
+        let expected_last = (log_k_min
+            + ((NUM_SPECTRUM_BINS as f64 - 0.5) * log_range) / NUM_SPECTRUM_BINS as f64)
+            .exp();
+        let actual_last = out[2 * NUM_SPECTRUM_BINS - 1];
+
+        assert!(
+            (actual_last - expected_last).abs() < 1e-10,
+            "expected last k bin {expected_last}, got {actual_last}"
+        );
+    }
+
     /// Vortex ψ = √ρ₀ · exp(i·θ) around z-axis has a phase gradient that is
     /// divergence-free → all kinetic energy must be INCOMPRESSIBLE. We check
     /// that total_incompressible > 0 and exceeds total_compressible.
@@ -405,8 +484,10 @@ mod tests {
             }
         }
         let grid = [n, n];
-        let coarse = compute_incompressible_spectrum(&psi_re, &psi_im, &grid, &[0.5, 0.5], 1.0, 1.0);
-        let fine = compute_incompressible_spectrum(&psi_re, &psi_im, &grid, &[0.25, 0.25], 1.0, 1.0);
+        let coarse =
+            compute_incompressible_spectrum(&psi_re, &psi_im, &grid, &[0.5, 0.5], 1.0, 1.0);
+        let fine =
+            compute_incompressible_spectrum(&psi_re, &psi_im, &grid, &[0.25, 0.25], 1.0, 1.0);
         let e_coarse = coarse[2 * NUM_SPECTRUM_BINS];
         let e_fine = fine[2 * NUM_SPECTRUM_BINS];
         assert!(e_coarse > 0.0);

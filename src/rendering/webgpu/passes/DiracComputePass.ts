@@ -58,7 +58,11 @@ import {
   rebuildDiracBuffers,
 } from './DiracComputePassSetup'
 import { runBatchedStrangStep, runLegacyStrangStep } from './DiracComputePassStrang'
-import { buildDiracFFTStagingData, writeDiracUniforms } from './DiracComputePassUniforms'
+import {
+  buildDiracFFTStagingData,
+  effectiveDiracPotentialType,
+  writeDiracUniforms,
+} from './DiracComputePassUniforms'
 import { DIRAC_UNIFORM_SIZE } from './diracUniformsLayout'
 import { requestStateSave as genericStateSave } from './stateSave'
 
@@ -482,8 +486,9 @@ export class DiracComputePass extends WebGPUBaseComputePass {
 
   /** Refresh potential buffer when physics parameters change. */
   private consumePotentialDirty(config: DiracConfig): boolean {
+    const potentialType = effectiveDiracPotentialType(config)
     let dirty =
-      this.lastPotentialType !== config.potentialType ||
+      this.lastPotentialType !== potentialType ||
       this.lastPotentialStrength !== config.potentialStrength ||
       this.lastPotentialWidth !== config.potentialWidth ||
       this.lastPotentialCenter !== config.potentialCenter ||
@@ -501,7 +506,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
 
     if (!dirty) return false
 
-    this.lastPotentialType = config.potentialType
+    this.lastPotentialType = potentialType
     this.lastPotentialStrength = config.potentialStrength
     this.lastPotentialWidth = config.potentialWidth
     this.lastPotentialCenter = config.potentialCenter
@@ -638,7 +643,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     slotOffset: number
   ): number {
     if (!this.pl || !this.bg || !this.fftAxisUniformBuffer || !this.fftAxisStagingBuffer) {
-      return slotOffset
+      throw new Error('[Dirac FFT] resources not ready')
     }
     const params: FFTAxisSharedMemParams = {
       pl: this.pl,

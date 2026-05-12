@@ -8,6 +8,7 @@ type PotentialDirtyHarness = {
   consumePotentialDirty(config: DiracConfig): boolean
   invalidatePotential(): void
   refreshPotentialIfDirty(ctx: WebGPURenderContext, config: DiracConfig): void
+  dispatchFFTAxisDelegated(ctx: WebGPURenderContext, axisDim: number, slotOffset: number): number
 }
 
 function createConfig(overrides: Partial<DiracConfig> = {}): DiracConfig {
@@ -56,11 +57,31 @@ describe('DiracComputePass potential dirty tracking', () => {
     expect(pass.consumePotentialDirty(changedDim)).toBe(true)
   })
 
+  it('detects showPotential toggles so the physics potential buffer is refilled', () => {
+    const pass = new DiracComputePass() as unknown as PotentialDirtyHarness
+    const enabled = createConfig({ potentialType: 'barrier', showPotential: true })
+    const disabled = { ...enabled, showPotential: false }
+
+    expect(pass.consumePotentialDirty(enabled)).toBe(true)
+    expect(pass.consumePotentialDirty(enabled)).toBe(false)
+    expect(pass.consumePotentialDirty(disabled)).toBe(true)
+    expect(pass.consumePotentialDirty(disabled)).toBe(false)
+    expect(pass.consumePotentialDirty(enabled)).toBe(true)
+  })
+
   it('does not consume dirty state while GPU bind groups are unavailable', () => {
     const pass = new DiracComputePass() as unknown as PotentialDirtyHarness
     const config = createConfig()
 
     pass.refreshPotentialIfDirty({} as WebGPURenderContext, config)
     expect(pass.consumePotentialDirty(config)).toBe(true)
+  })
+
+  it('fails fast instead of skipping a legacy FFT axis when resources are unavailable', () => {
+    const pass = new DiracComputePass() as unknown as PotentialDirtyHarness
+
+    expect(() => pass.dispatchFFTAxisDelegated({} as WebGPURenderContext, 64, 0)).toThrow(
+      '[Dirac FFT] resources not ready'
+    )
   })
 })

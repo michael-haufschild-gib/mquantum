@@ -11,8 +11,11 @@ import type { WebGPURenderContext } from '@/rendering/webgpu/core/types'
 import { quantizeBoundingRadius } from '@/rendering/webgpu/renderers/boundingRadiusQuantize'
 import {
   computeCameraUpdate,
+  computeSchroedingerUpdate,
   type SchrodingerFrameState,
 } from '@/rendering/webgpu/renderers/schrodingerFrameUpdate'
+import { SCHROEDINGER_LAYOUT } from '@/rendering/webgpu/renderers/schroedingerLayout'
+import type { QuantumModeStrategy } from '@/rendering/webgpu/renderers/strategies/types'
 import { advanceTemporalBayerCycle } from '@/rendering/webgpu/shaders/schroedinger/temporalJitter'
 
 const IDENTITY_4X4 = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
@@ -55,6 +58,21 @@ function makeTemporalCtx(
       },
     },
   } as unknown as WebGPURenderContext
+}
+
+function makeAnalyticStrategy(): QuantumModeStrategy {
+  return {
+    isComputeMode: false,
+    configureShader: () => undefined,
+    setup: () => ({
+      initPromises: [],
+      additionalLayoutEntries: [],
+      getBindGroupEntries: () => [],
+    }),
+    computeBoundingRadius: () => null,
+    executeFrame: () => undefined,
+    dispose: () => undefined,
+  } as QuantumModeStrategy
 }
 
 describe('quantizeBoundingRadius', () => {
@@ -160,5 +178,50 @@ describe('computeCameraUpdate temporal Bayer phase', () => {
       dataView
     )
     expect([data[124], data[125]]).toEqual([1, 1])
+  })
+})
+
+describe('computeSchroedingerUpdate preset invariants', () => {
+  it('canonicalizes named preset cache metadata before packing uniforms', () => {
+    const state = makeTemporalFrameState()
+    const buffer = new ArrayBuffer(SCHROEDINGER_LAYOUT.totalSize)
+    const floatView = new Float32Array(buffer)
+    const intView = new Int32Array(buffer)
+    const ctx = {
+      frame: {
+        time: 0,
+        stores: {
+          geometry: { dimension: 3 },
+          animation: { accumulatedTime: 0 },
+          appearance: { colorAlgorithm: 'radialDistance', appearanceVersion: 1 },
+          performance: { qualityMultiplier: 1 },
+          pbr: { pbrVersion: 0 },
+          extended: {
+            schroedingerVersion: 1,
+            schroedinger: {
+              quantumMode: 'harmonicOscillator',
+              presetName: 'groundState',
+              seed: 999,
+              termCount: 8,
+              maxQuantumNumber: 6,
+              frequencySpread: 0.5,
+            },
+          },
+        },
+      },
+    } as unknown as WebGPURenderContext
+
+    computeSchroedingerUpdate(
+      ctx,
+      { dimension: 3, quantumMode: 'harmonicOscillator', termCount: 8 },
+      makeAnalyticStrategy(),
+      state,
+      floatView,
+      intView
+    )
+
+    expect(state.cachedPreset?.termCount).toBe(1)
+    expect(state.cachedPresetConfig?.termCount).toBe(1)
+    expect(intView[SCHROEDINGER_LAYOUT.index.termCount]).toBe(1)
   })
 })

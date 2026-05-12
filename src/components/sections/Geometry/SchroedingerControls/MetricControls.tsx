@@ -20,6 +20,7 @@ import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import type { TdseConfig } from '@/lib/geometry/extended/tdse'
 import {
   describeMetric,
+  isMetricAvailableForLattice,
   isTimeDependentMetric,
   MAX_ADS_RADIUS,
   MAX_DOUBLE_THROAT_SEPARATION,
@@ -37,6 +38,7 @@ import {
   MIN_SPHERE_RADIUS,
   MIN_THROAT_RADIUS,
   MIN_TORUS_PERIOD,
+  normalizeMetricForLattice,
 } from '@/lib/physics/tdse/metrics/types'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
@@ -85,8 +87,13 @@ export function MetricControls({ td }: { td: TdseConfig }): React.ReactElement {
       }))
     )
 
-  const metric: MetricConfig = td.metric ?? { kind: 'flat' }
+  const metric: MetricConfig = normalizeMetricForLattice(td.metric, td.latticeDim)
   const kind: MetricKind = metric.kind
+  const metricOptions = React.useMemo(
+    () =>
+      METRIC_OPTIONS.filter((option) => isMetricAvailableForLattice(option.value, td.latticeDim)),
+    [td.latticeDim]
+  )
 
   // Each kind reads its own field from the (possibly previous) metric so the
   // slider initial value reflects state. Where the field is absent we use
@@ -149,7 +156,7 @@ export function MetricControls({ td }: { td: TdseConfig }): React.ReactElement {
       <Select
         label="Metric"
         tooltip="Spatial metric used by the TDSE kinetic operator. Each non-flat option routes to the curved Laplace–Beltrami integrator (RK4 in real time) instead of the split-step FFT."
-        options={METRIC_OPTIONS}
+        options={metricOptions}
         value={kind}
         onChange={(v) => onKindChange(v as MetricKind)}
         data-testid="tdse-metric-kind"

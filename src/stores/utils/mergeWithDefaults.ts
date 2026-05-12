@@ -20,6 +20,7 @@ import {
   FREE_SCALAR_MAX_TOTAL_SITES,
 } from '@/lib/geometry/extended/freeScalar'
 import { sanitizeQuantumWalkConfig } from '@/lib/geometry/extended/quantumWalk'
+import { getNamedPresetStoreControls } from '@/lib/geometry/extended/schroedinger/presets'
 import { normalizeTdseBlackHoleParams } from '@/lib/geometry/extended/tdse'
 import {
   DEFAULT_PAULI_CONFIG,
@@ -238,10 +239,28 @@ function sanitizeComputeLatticeDims(normalized: Record<string, unknown>): Record
   return out
 }
 
-function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged: T): T {
+function hasOwnLoadedKey(loaded: unknown, key: string): boolean {
+  return (
+    loaded !== null &&
+    typeof loaded === 'object' &&
+    !Array.isArray(loaded) &&
+    Object.prototype.hasOwnProperty.call(loaded, key)
+  )
+}
+
+function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(
+  merged: T,
+  loaded: unknown
+): T {
   let normalized = merged as unknown as Record<string, unknown>
   if (normalized.quantumMode === 'hydrogenOrbital') {
     normalized = { ...normalized, quantumMode: 'hydrogenND' }
+  }
+  if (hasOwnLoadedKey(loaded, 'presetName')) {
+    const presetControls = getNamedPresetStoreControls(normalized.presetName)
+    if (presetControls) {
+      normalized = { ...normalized, ...presetControls }
+    }
   }
   normalized = sanitizeComputeLatticeDims(normalized)
   normalized = normalizeDiracEnums(normalized)
@@ -442,7 +461,10 @@ export function mergeExtendedObjectStateForType(
   const mergedConfig = deepMerge(effectiveDefault, migratedLoadedConfig)
   const normalizedConfig =
     configKey === 'schroedinger'
-      ? normalizeSchroedingerConfig(mergedConfig as unknown as typeof DEFAULT_SCHROEDINGER_CONFIG)
+      ? normalizeSchroedingerConfig(
+          mergedConfig as unknown as typeof DEFAULT_SCHROEDINGER_CONFIG,
+          migratedLoadedConfig
+        )
       : mergedConfig
 
   return {

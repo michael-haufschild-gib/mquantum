@@ -315,7 +315,7 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     // BEC diagnostics
     if (isBecMode) {
       this.updateBecDiagnostics(tdsePass, extended)
-      this.maybeComputeSpectrum(ctx, tdsePass, extended)
+      this.maybeComputeSpectrum(ctx, tdsePass, tdseConfig)
     }
 
     // Coordinate entanglement diagnostics (TDSE mode only)
@@ -423,16 +423,15 @@ export class TdseBecStrategy implements QuantumModeStrategy {
   private maybeComputeSpectrum(
     ctx: WebGPURenderContext,
     tdsePass: TDSEComputePass,
-    extended: ExtendedStoreSnapshot | undefined
+    config: TdseConfig | undefined
   ): void {
-    const bec = extended?.schroedinger?.bec
-    const g = bec?.interactionStrength ?? 0
-    if (bec?.needsReset) {
+    const g = config?.interactionStrength ?? 0
+    if (config?.needsReset) {
       invalidateBecSpectrumWorkerState(this.spectrumWorkerState)
       this.spectrumCounter = 0
       return
     }
-    if (!bec || g <= 0) {
+    if (!config || g <= 0) {
       if (this.spectrumWorkerState.inFlight) {
         invalidateBecSpectrumWorkerState(this.spectrumWorkerState)
       }
@@ -447,19 +446,27 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     this.spectrumCounter = 0
     this.spectrumWorkerState.inFlight = true
 
-    const gridSize = bec.gridSize.slice(0, bec.latticeDim)
+    const gridSize = config.gridSize.slice(0, config.latticeDim)
     const spacingArr = computeEffectiveSpacing(
-      bec.gridSize as number[],
-      bec.spacing as number[],
-      bec.compactDims as boolean[] | undefined,
-      bec.compactRadii as number[] | undefined,
-      bec.latticeDim as number
+      config.gridSize,
+      config.spacing,
+      config.compactDims,
+      config.compactRadii,
+      config.latticeDim
     )
-    const hbar = bec.hbar ?? 1.0
-    const mass = bec.mass ?? 1.0
+    const hbar = config.hbar
+    const mass = config.mass
     const epoch = ++this.spectrumWorkerState.epoch
+    let readbackPromise: ReturnType<TDSEComputePass['requestMeasurementReadback']>
+    try {
+      readbackPromise = tdsePass.requestMeasurementReadback(ctx)
+    } catch (err) {
+      this.spectrumWorkerState.inFlight = false
+      logger.warn('[BEC] Failed to request spectrum readback:', err)
+      return
+    }
 
-    void tdsePass.requestMeasurementReadback(ctx).then(
+    void readbackPromise.then(
       (result) => {
         if (this.disposed || this.transferredOut) {
           this.spectrumWorkerState.inFlight = false

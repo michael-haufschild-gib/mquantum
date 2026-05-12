@@ -79,9 +79,34 @@ interface IconProps extends React.SVGProps<SVGSVGElement> {
 }
 
 export const Icon: React.FC<IconProps> = React.memo(
-  ({ name, className = '', size = 16, ...props }) => {
+  ({
+    name,
+    className = '',
+    size = 16,
+    'aria-label': ariaLabel,
+    'aria-labelledby': ariaLabelledBy,
+    'aria-hidden': ariaHidden,
+    focusable,
+    ...props
+  }) => {
     const IconComponent = icons[name]
-    return <IconComponent width={size} height={size} className={className} {...props} />
+    const resolvedAriaHidden =
+      ariaHidden ?? (ariaLabel === undefined && ariaLabelledBy === undefined ? true : undefined)
+    const ariaHiddenAttr: React.AriaAttributes['aria-hidden'] =
+      resolvedAriaHidden === undefined ? undefined : resolvedAriaHidden ? 'true' : 'false'
+
+    return (
+      <IconComponent
+        width={size}
+        height={size}
+        className={className}
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
+        aria-hidden={ariaHiddenAttr}
+        focusable={focusable ?? 'false'}
+        {...props}
+      />
+    )
   }
 )
 

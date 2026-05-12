@@ -66,7 +66,9 @@ export const LightListItem: React.FC<LightListItemProps> = memo(function LightLi
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
+      if (e.currentTarget !== e.target) return
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
         onSelect()
       }
     },
@@ -106,6 +108,7 @@ export const LightListItem: React.FC<LightListItemProps> = memo(function LightLi
       tabIndex={0}
       onKeyDown={handleKeyDown}
       aria-pressed={isSelected}
+      aria-label={`Select ${light.name}`}
     >
       {/* Light type icon with color */}
       <span

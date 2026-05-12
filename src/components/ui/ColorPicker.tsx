@@ -75,8 +75,11 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
           onOpenChange={handleOpenChange}
           offset={8}
           trigger={
-            <div
-              className={`flex items-center gap-2 group p-1 rounded-md hover:bg-[var(--bg-hover)] transition-colors ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
+            <button
+              type="button"
+              disabled={disabled}
+              aria-label={label ? `${label} color picker` : 'Color picker'}
+              className={`flex items-center gap-2 group p-1 rounded-md appearance-none border-0 bg-transparent cursor-pointer hover:bg-[var(--bg-hover)] transition-colors focus:outline-none focus:ring-1 focus:ring-accent/60 disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {/* Trigger Swatch */}
               <div className="relative w-8 h-5 rounded overflow-hidden shadow-sm ring-1 ring-border-default group-hover:ring-border-strong transition-[box-shadow]">
@@ -86,7 +89,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                 />
                 <div className="absolute inset-0 z-10" style={{ backgroundColor: value }} />
               </div>
-            </div>
+            </button>
           }
           content={
             <div className="w-[260px] p-3 flex flex-col gap-3 select-none text-text-primary">

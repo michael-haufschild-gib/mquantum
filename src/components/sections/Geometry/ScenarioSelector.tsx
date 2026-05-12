@@ -501,7 +501,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
           break
         }
         case 'tdseDynamics':
-          applyTdsePreset(value)
+          void applyTdsePreset(value)
           break
         case 'becDynamics':
           void applyBecPreset(value)

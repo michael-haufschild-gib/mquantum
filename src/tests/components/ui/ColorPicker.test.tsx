@@ -92,6 +92,16 @@ describe('ColorPicker', () => {
       // Tooltip wraps the label text
       expect(screen.getByText('Color')).toBeInTheDocument()
     })
+
+    it('renders a named button for the trigger swatch', () => {
+      render(<ColorPicker value="#ff0000" onChange={vi.fn()} label="Background" />)
+      expect(screen.getByRole('button', { name: 'Background color picker' })).toBeInTheDocument()
+    })
+
+    it('disables the trigger swatch when disabled', () => {
+      render(<ColorPicker value="#ff0000" onChange={vi.fn()} label="Background" disabled />)
+      expect(screen.getByRole('button', { name: 'Background color picker' })).toBeDisabled()
+    })
   })
 
   describe('HEX input interaction', () => {

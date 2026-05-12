@@ -53,6 +53,23 @@ describe('serializeState', () => {
     expect(cleaned).toEqual({ value: 7 })
   })
 
+  it('drops non-finite values before JSON serialization can turn them into null', () => {
+    const cleaned = serializeState({
+      stable: 1,
+      badTopLevel: NaN,
+      nested: { good: 2, bad: Infinity },
+      validVector: [0, 1, 2],
+      invalidVector: [0, Number.NEGATIVE_INFINITY, 2],
+    })
+
+    expect(cleaned).toEqual({
+      stable: 1,
+      nested: { good: 2 },
+      validVector: [0, 1, 2],
+    })
+    expect(JSON.stringify(cleaned)).not.toContain('null')
+  })
+
   it('throws when the input contains a circular reference (JSON.stringify behavior)', () => {
     const cyclic: Record<string, unknown> = { a: 1 }
     cyclic.self = cyclic

@@ -96,4 +96,49 @@ describe('WebGPURenderGraph compile ordering', () => {
       graphInternals.passOrder.indexOf('priority-300')
     )
   })
+
+  it('keeps in-place overlay passes after the scene producer they read', async () => {
+    const { WebGPURenderGraph } = await import('@/rendering/webgpu/graph/WebGPURenderGraph')
+    const graph = new WebGPURenderGraph()
+    const graphInternals = graph as unknown as {
+      passes: Map<string, WebGPURenderPass>
+      passOrder: string[]
+      compiled: boolean
+    }
+
+    const scene = createMockPass({
+      id: 'scene',
+      priority: 100,
+      inputs: [],
+      outputs: [{ resourceId: 'scene-render', access: 'write', binding: 0 }],
+    })
+    const measurementOverlay = createMockPass({
+      id: 'measurement-point-cloud',
+      priority: 0,
+      inputs: [{ resourceId: 'scene-render', access: 'read', binding: 0 }],
+      outputs: [{ resourceId: 'scene-render', access: 'write', binding: 0 }],
+    })
+    const composite = createMockPass({
+      id: 'environment-composite',
+      priority: 200,
+      inputs: [{ resourceId: 'scene-render', access: 'read', binding: 0 }],
+      outputs: [{ resourceId: 'hdr-color', access: 'write', binding: 0 }],
+    })
+
+    graphInternals.passes = new Map([
+      [measurementOverlay.id, measurementOverlay],
+      [composite.id, composite],
+      [scene.id, scene],
+    ])
+    graphInternals.compiled = false
+
+    graph.compile()
+
+    expect(graphInternals.passOrder.indexOf('scene')).toBeLessThan(
+      graphInternals.passOrder.indexOf('measurement-point-cloud')
+    )
+    expect(graphInternals.passOrder.indexOf('measurement-point-cloud')).toBeLessThan(
+      graphInternals.passOrder.indexOf('environment-composite')
+    )
+  })
 })

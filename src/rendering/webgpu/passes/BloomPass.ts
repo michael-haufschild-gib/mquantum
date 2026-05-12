@@ -11,7 +11,7 @@
  * 10 render passes, 0 compute passes. All rgba16float fragment shaders.
  */
 
-import { clamp } from '@/lib/math/clamp'
+import { clampFinite } from '@/lib/math/clamp'
 import {
   DEFAULT_BLOOM_GAIN,
   DEFAULT_BLOOM_KNEE,
@@ -148,11 +148,12 @@ export class BloomPass extends WebGPUBasePass {
     this.bloomInputResource = bloomInputResource
     this.outputResource = outputResource
 
-    if (options?.gain !== undefined) this.gain = clamp(options.gain, 0, 3)
-    if (options?.threshold !== undefined) this.threshold = clamp(options.threshold, 0, 5)
-    if (options?.knee !== undefined) this.knee = clamp(options.knee, 0, 5)
+    if (options?.gain !== undefined) this.gain = clampFinite(options.gain, this.gain, 0, 3)
+    if (options?.threshold !== undefined)
+      this.threshold = clampFinite(options.threshold, this.threshold, 0, 5)
+    if (options?.knee !== undefined) this.knee = clampFinite(options.knee, this.knee, 0, 5)
     if (options?.filterRadius !== undefined)
-      this.filterRadius = clamp(options.filterRadius, 0.25, 4)
+      this.filterRadius = clampFinite(options.filterRadius, this.filterRadius, 0.25, 4)
   }
 
   private updateFromStores(ctx: WebGPURenderContext): void {
@@ -160,16 +161,16 @@ export class BloomPass extends WebGPUBasePass {
     if (!postProcessing) return
 
     if (postProcessing.bloomGain !== undefined) {
-      this.gain = clamp(postProcessing.bloomGain, 0, 3)
+      this.gain = clampFinite(postProcessing.bloomGain, this.gain, 0, 3)
     }
     if (postProcessing.bloomThreshold !== undefined) {
-      this.threshold = clamp(postProcessing.bloomThreshold, 0, 5)
+      this.threshold = clampFinite(postProcessing.bloomThreshold, this.threshold, 0, 5)
     }
     if (postProcessing.bloomKnee !== undefined) {
-      this.knee = clamp(postProcessing.bloomKnee, 0, 5)
+      this.knee = clampFinite(postProcessing.bloomKnee, this.knee, 0, 5)
     }
     if (postProcessing.bloomRadius !== undefined) {
-      this.filterRadius = clamp(postProcessing.bloomRadius, 0.25, 4)
+      this.filterRadius = clampFinite(postProcessing.bloomRadius, this.filterRadius, 0.25, 4)
     }
   }
 

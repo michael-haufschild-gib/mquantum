@@ -17,6 +17,8 @@ interface MockAdapterOptions {
   architecture?: string
   device?: string
   description?: string
+  features?: GPUFeatureName[]
+  limits?: Partial<Record<keyof GPUSupportedLimits, number>>
   adapterFallbackFlag?: boolean
   infoFallbackFlag?: boolean
 }
@@ -26,6 +28,8 @@ function createMockAdapter({
   architecture = 'Mock Architecture',
   device = 'Mock Device',
   description = 'Mock WebGPU Adapter',
+  features = [],
+  limits = {},
   adapterFallbackFlag,
   infoFallbackFlag,
 }: MockAdapterOptions = {}): GPUAdapter {
@@ -41,8 +45,8 @@ function createMockAdapter({
   }
 
   const adapter = {
-    features: new Set() as GPUSupportedFeatures,
-    limits: {} as GPUSupportedLimits,
+    features: new Set(features) as GPUSupportedFeatures,
+    limits: limits as unknown as GPUSupportedLimits,
     info,
     requestDevice: vi.fn().mockResolvedValue({
       destroy: vi.fn(),
@@ -68,6 +72,32 @@ describe('useWebGPUSupport', () => {
   })
 
   describe('WebGPU detection', () => {
+    it('reports not_in_browser when navigator.gpu exists but is undefined', async () => {
+      const originalGpu = navigator.gpu
+      Object.defineProperty(navigator, 'gpu', {
+        writable: true,
+        configurable: true,
+        value: undefined,
+      })
+
+      try {
+        const { result } = renderHook(() => useWebGPUSupport())
+
+        await waitFor(() => {
+          expect(result.current.isComplete).toBe(true)
+        })
+
+        expect(result.current.isSupported).toBe(false)
+        expect(result.current.capabilities?.unavailableReason).toBe('not_in_browser')
+      } finally {
+        Object.defineProperty(navigator, 'gpu', {
+          writable: true,
+          configurable: true,
+          value: originalGpu,
+        })
+      }
+    })
+
     it('detects WebGPU support when navigator.gpu exists', async () => {
       // The mock from setup.ts provides navigator.gpu
       const { result } = renderHook(() => useWebGPUSupport())
@@ -99,6 +129,45 @@ describe('useWebGPUSupport', () => {
       })
 
       expect(result.current.capabilities?.supported).toBe(true)
+    })
+
+    it('probes WebGPU support with the production device descriptor', async () => {
+      const adapter = createMockAdapter({
+        features: ['timestamp-query', 'texture-compression-bc'],
+        limits: {
+          maxStorageBufferBindingSize: 134217728,
+          maxUniformBufferBindingSize: 65536,
+          maxComputeWorkgroupSizeX: 256,
+          maxComputeWorkgroupSizeY: 256,
+          maxComputeWorkgroupSizeZ: 64,
+          maxComputeInvocationsPerWorkgroup: 256,
+          maxComputeWorkgroupStorageSize: 16384,
+          maxBindGroups: 4,
+          maxTextureDimension2D: 8192,
+        },
+      })
+      vi.mocked(navigator.gpu.requestAdapter).mockResolvedValueOnce(adapter)
+
+      const { result } = renderHook(() => useWebGPUSupport())
+
+      await waitFor(() => {
+        expect(result.current.isComplete).toBe(true)
+      })
+
+      expect(adapter.requestDevice).toHaveBeenCalledWith({
+        requiredFeatures: ['timestamp-query', 'texture-compression-bc'],
+        requiredLimits: {
+          maxStorageBufferBindingSize: 134217728,
+          maxUniformBufferBindingSize: 65536,
+          maxComputeWorkgroupSizeX: 256,
+          maxComputeWorkgroupSizeY: 256,
+          maxComputeWorkgroupSizeZ: 64,
+          maxComputeInvocationsPerWorkgroup: 256,
+          maxComputeWorkgroupStorageSize: 16384,
+          maxBindGroups: 4,
+          maxTextureDimension2D: 8192,
+        },
+      })
     })
 
     it('uses explicit adapter fallback flag when available', async () => {

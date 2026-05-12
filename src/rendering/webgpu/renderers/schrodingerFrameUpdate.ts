@@ -13,6 +13,7 @@ import {
   flattenPresetForUniforms,
   generateQuantumPreset,
   getNamedPreset,
+  getNamedPresetStoreControls,
   type QuantumPreset,
 } from '@/lib/geometry/extended/schroedinger/presets'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
@@ -541,12 +542,17 @@ function maybeRegeneratePreset(
   const termCount = schroedinger?.termCount ?? 1
   const maxQuantumNumber = schroedinger?.maxQuantumNumber ?? 6
   const frequencySpread = schroedinger?.frequencySpread ?? 0.01
+  const presetControls = getNamedPresetStoreControls(presetName)
+  const effectiveSeed = presetControls?.seed ?? seed
+  const effectiveTermCount = presetControls?.termCount ?? termCount
+  const effectiveMaxQuantumNumber = presetControls?.maxQuantumNumber ?? maxQuantumNumber
+  const effectiveFrequencySpread = presetControls?.frequencySpread ?? frequencySpread
   const currentConfig = {
     presetName,
-    seed,
-    termCount,
-    maxQuantumNumber,
-    frequencySpread,
+    seed: effectiveSeed,
+    termCount: effectiveTermCount,
+    maxQuantumNumber: effectiveMaxQuantumNumber,
+    frequencySpread: effectiveFrequencySpread,
     dimension,
   }
 
@@ -566,11 +572,23 @@ function maybeRegeneratePreset(
 
   let preset: QuantumPreset
   if (presetName === 'custom') {
-    preset = generateQuantumPreset(seed, dimension, termCount, maxQuantumNumber, frequencySpread)
+    preset = generateQuantumPreset(
+      effectiveSeed,
+      dimension,
+      effectiveTermCount,
+      effectiveMaxQuantumNumber,
+      effectiveFrequencySpread
+    )
   } else {
     preset =
       getNamedPreset(presetName, dimension) ??
-      generateQuantumPreset(seed, dimension, termCount, maxQuantumNumber, frequencySpread)
+      generateQuantumPreset(
+        effectiveSeed,
+        dimension,
+        effectiveTermCount,
+        effectiveMaxQuantumNumber,
+        effectiveFrequencySpread
+      )
   }
   state.cachedPreset = preset
   state.cachedPresetConfig = { ...currentConfig }

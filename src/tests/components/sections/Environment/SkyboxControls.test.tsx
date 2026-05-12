@@ -75,10 +75,36 @@ describe('SkyboxControls', () => {
   it('handles keyboard selection of skybox tile with Enter key', async () => {
     const user = userEvent.setup()
     render(<SkyboxControls />)
-    const tile = screen.getByTestId('skybox-option-space_red')
+    const tile = screen.getByRole('button', {
+      name: 'Red Giant: Warm, intense red space',
+    })
     tile.focus()
     await user.keyboard('{Enter}')
     expect(useEnvironmentStore.getState().skyboxSelection).toBe('space_red')
+  })
+
+  it('handles keyboard selection of skybox tile with Space key', async () => {
+    const user = userEvent.setup()
+    render(<SkyboxControls />)
+    const tile = screen.getByRole('button', {
+      name: 'Red Giant: Warm, intense red space',
+    })
+    tile.focus()
+    await user.keyboard(' ')
+    expect(useEnvironmentStore.getState().skyboxSelection).toBe('space_red')
+  })
+
+  it('exposes selected skybox state to assistive tech', async () => {
+    const user = userEvent.setup()
+    render(<SkyboxControls />)
+    const tile = screen.getByRole('button', {
+      name: 'Red Giant: Warm, intense red space',
+    })
+    expect(tile).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(tile)
+
+    expect(tile).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('pre-selects the current skybox selection from store', () => {

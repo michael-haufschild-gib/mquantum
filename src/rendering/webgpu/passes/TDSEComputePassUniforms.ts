@@ -28,6 +28,7 @@ import {
   MIN_SPHERE_RADIUS,
   MIN_THROAT_RADIUS,
   MIN_TORUS_PERIOD,
+  normalizeMetricForLattice,
 } from '@/lib/physics/tdse/metrics/types'
 
 import {
@@ -330,8 +331,8 @@ export function writeTdseUniforms(
   // wraps φ (axis 2) even when the user did not toggle a generic
   // Kaluza-Klein compactification flag.
   const userCompactMask = buildCompactDimsMask(config.compactDims, config.latticeDim)
-  const metricCompactMask =
-    config.metric !== undefined ? metricPeriodicDimsMask(config.metric.kind, config.latticeDim) : 0
+  const metric = normalizeMetricForLattice(config.metric, config.latticeDim)
+  const metricCompactMask = metricPeriodicDimsMask(metric.kind, config.latticeDim)
   u32[I.compactDimsMask] = userCompactMask | metricCompactMask
 
   // Stochastic decoherence branching.
@@ -402,15 +403,14 @@ export function writeTdseUniforms(
   // 4=antiDeSitter, 5=sphere2D, 6=torus, 7=doubleThroat.
   // The curved RK4 integrator evaluates the metric analytically from these
   // fields + the v2 block below. Pad slots stay 0 from the u32.fill(0) at top.
-  const metric = config.metric
-  const kind: MetricKind = metric?.kind ?? 'flat'
+  const kind: MetricKind = metric.kind
   const metricKind = METRIC_KIND_MAP[kind] ?? 0
   u32[I.metricKind] = metricKind
   // throatRadius is consumed by both morrisThorne and doubleThroat (as the
   // shared b₀). Clamp to its physical bounds; zero when not relevant.
   const wantsThroat = kind === 'morrisThorne' || kind === 'doubleThroat'
   f32[I.throatRadius] = wantsThroat
-    ? clampFinite(metric?.throatRadius, MIN_THROAT_RADIUS, MIN_THROAT_RADIUS, MAX_THROAT_RADIUS)
+    ? clampFinite(metric.throatRadius, MIN_THROAT_RADIUS, MIN_THROAT_RADIUS, MAX_THROAT_RADIUS)
     : 0
 
   // Curved-space TDSE v2 metric block.
@@ -419,7 +419,7 @@ export function writeTdseUniforms(
   f32[I.schwarzschildMass] =
     kind === 'schwarzschild'
       ? clampFinite(
-          metric?.schwarzschildMass,
+          metric.schwarzschildMass,
           MIN_SCHWARZSCHILD_MASS,
           MIN_SCHWARZSCHILD_MASS,
           MAX_SCHWARZSCHILD_MASS
@@ -427,20 +427,20 @@ export function writeTdseUniforms(
       : 0
   f32[I.hubbleRate] =
     kind === 'deSitter'
-      ? clampFinite(metric?.hubbleRate, MIN_HUBBLE_RATE, MIN_HUBBLE_RATE, MAX_HUBBLE_RATE)
+      ? clampFinite(metric.hubbleRate, MIN_HUBBLE_RATE, MIN_HUBBLE_RATE, MAX_HUBBLE_RATE)
       : 0
   f32[I.adsRadius] =
     kind === 'antiDeSitter'
-      ? clampFinite(metric?.adsRadius, MIN_ADS_RADIUS, MIN_ADS_RADIUS, MAX_ADS_RADIUS)
+      ? clampFinite(metric.adsRadius, MIN_ADS_RADIUS, MIN_ADS_RADIUS, MAX_ADS_RADIUS)
       : 0
   f32[I.sphereRadius] =
     kind === 'sphere2D'
-      ? clampFinite(metric?.sphereRadius, MIN_SPHERE_RADIUS, MIN_SPHERE_RADIUS, MAX_SPHERE_RADIUS)
+      ? clampFinite(metric.sphereRadius, MIN_SPHERE_RADIUS, MIN_SPHERE_RADIUS, MAX_SPHERE_RADIUS)
       : 0
   f32[I.doubleThroatSep] =
     kind === 'doubleThroat'
       ? clampFinite(
-          metric?.doubleThroatSeparation,
+          metric.doubleThroatSeparation,
           MIN_DOUBLE_THROAT_SEPARATION,
           MIN_DOUBLE_THROAT_SEPARATION,
           MAX_DOUBLE_THROAT_SEPARATION
@@ -450,7 +450,7 @@ export function writeTdseUniforms(
   f32[I.doubleThroatRad] =
     kind === 'doubleThroat'
       ? clampFinite(
-          metric?.doubleThroatRadius ?? metric?.throatRadius,
+          metric.doubleThroatRadius ?? metric.throatRadius,
           MIN_THROAT_RADIUS,
           MIN_THROAT_RADIUS,
           MAX_THROAT_RADIUS
@@ -460,7 +460,7 @@ export function writeTdseUniforms(
 
   // torusPeriod (3 × f32). Zero when not torus.
   if (kind === 'torus') {
-    const periods = metric?.torusPeriod
+    const periods = metric.torusPeriod
     f32[I.torusPeriod + 0] = clampFinite(
       periods?.[0],
       MIN_TORUS_PERIOD,

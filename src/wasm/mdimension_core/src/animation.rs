@@ -134,11 +134,9 @@ fn multiply_matrices_into(out: &mut [f64], a: &[f64], b: &[f64], dimension: usiz
     }
 }
 
-
 // Unrolled NxN multiplications (4..=11) live in `animation_matrix_unrolled.rs`.
 // `multiply_matrices_into` above dispatches to those functions; see that module's
 // doc-comment for the rationale of the split.
-
 
 /// Resets a matrix to identity in-place
 fn reset_to_identity(matrix: &mut [f64], dimension: usize) {

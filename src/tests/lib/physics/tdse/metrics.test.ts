@@ -25,10 +25,13 @@ import {
 import {
   describeMetric,
   hasPeriodicBoundary,
+  isMetricAvailableForLattice,
   isMetricAxisPeriodic,
   isTimeDependentMetric,
   type MetricKind,
   metricPeriodicDimsMask,
+  minLatticeDimForMetric,
+  normalizeMetricForLattice,
 } from '@/lib/physics/tdse/metrics/types'
 
 // ───────────────────────── Flat ─────────────────────────
@@ -516,6 +519,33 @@ describe('isMetricAxisPeriodic / metricPeriodicDimsMask', () => {
     expect(metricPeriodicDimsMask('sphere2D', 3)).toBe(1 << 2)
     expect(metricPeriodicDimsMask('torus', 3)).toBe((1 << 0) | (1 << 1) | (1 << 2))
     expect(metricPeriodicDimsMask('morrisThorne', 3)).toBe(0)
+  })
+})
+
+describe('metric lattice compatibility', () => {
+  it('classifies metrics that degenerate to flat below their minimum dimension', () => {
+    expect(minLatticeDimForMetric('morrisThorne')).toBe(2)
+    expect(minLatticeDimForMetric('doubleThroat')).toBe(2)
+    expect(minLatticeDimForMetric('sphere2D')).toBe(3)
+    expect(isMetricAvailableForLattice('morrisThorne', 1)).toBe(false)
+    expect(isMetricAvailableForLattice('doubleThroat', 1)).toBe(false)
+    expect(isMetricAvailableForLattice('sphere2D', 2)).toBe(false)
+    expect(isMetricAvailableForLattice('sphere2D', 3)).toBe(true)
+    expect(isMetricAvailableForLattice('schwarzschild', 1)).toBe(true)
+    expect(isMetricAvailableForLattice('torus', 1)).toBe(true)
+  })
+
+  it('canonicalizes incompatible metric configs to flat', () => {
+    expect(normalizeMetricForLattice({ kind: 'sphere2D', sphereRadius: 2 }, 2)).toEqual({
+      kind: 'flat',
+    })
+    expect(normalizeMetricForLattice({ kind: 'morrisThorne', throatRadius: 0.5 }, 1)).toEqual({
+      kind: 'flat',
+    })
+    expect(normalizeMetricForLattice({ kind: 'sphere2D', sphereRadius: 2 }, 3)).toEqual({
+      kind: 'sphere2D',
+      sphereRadius: 2,
+    })
   })
 })
 

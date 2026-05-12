@@ -195,6 +195,20 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     expect(wgsl).not.toContain('return hydrogenNDOptimized(xND, t, uniforms);')
   })
 
+  it('specializes 2D harmonic-oscillator render shader with matching helper and dispatch', () => {
+    const { wgsl, modules } = composeSchroedingerShader({
+      dimension: 2,
+      temporal: false,
+      quantumMode: 'harmonicOscillator',
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(modules).toContain('HO ND 2D')
+    expect(wgsl).toContain('fn hoND2D(')
+    expect(wgsl).toContain('return hoND2D(xND, termIdx, uniforms);')
+    expect(wgsl).not.toContain('fn hoND3D(')
+  })
+
   it('specializes hydrogen-ND family by excluding HO ND modules', () => {
     const { wgsl, modules } = composeSchroedingerShader({
       dimension: 7,
@@ -971,6 +985,19 @@ describe('WGSL Shader Compilation - Schroedinger Density Grid Compute', () => {
     expect(wgsl).not.toContain('return hydrogenNDOptimized(xND, t, uniforms);')
   })
 
+  it('specializes 2D harmonic-oscillator density compute shader with matching helper and dispatch', () => {
+    const { wgsl, modules } = composeDensityGridComputeShader({
+      dimension: 2,
+      quantumMode: 'harmonicOscillator',
+    })
+
+    verifyWgslCompute(wgsl)
+    expect(modules).toContain('HO ND 2D')
+    expect(wgsl).toContain('fn hoND2D(')
+    expect(wgsl).toContain('return hoND2D(xND, termIdx, uniforms);')
+    expect(wgsl).not.toContain('fn hoND3D(')
+  })
+
   it('specializes compute hydrogen-ND family by excluding HO ND modules', () => {
     const { wgsl, modules } = composeDensityGridComputeShader({
       dimension: 8,
@@ -984,6 +1011,20 @@ describe('WGSL Shader Compilation - Schroedinger Density Grid Compute', () => {
     expect(modules).not.toContain('HO ND Dispatch')
     expect(wgsl).toContain('return hydrogenNDOptimized(xND, t, uniforms);')
     expect(wgsl).not.toContain('fn evalHarmonicOscillatorPsi(')
+  })
+
+  it('uses uncoupled hydrogen evaluator for 2D coupled density compute shader', () => {
+    const { wgsl, modules } = composeDensityGridComputeShader({
+      dimension: 2,
+      quantumMode: 'hydrogenNDCoupled',
+    })
+
+    verifyWgslCompute(wgsl)
+    expect(modules).toContain('Hydrogen ND 2D')
+    expect(modules).toContain('Hydrogen ND Dispatch')
+    expect(wgsl).toContain('const ACTUAL_DIM: i32 = 2;')
+    expect(wgsl).toContain('evalHydrogenNDPsi2D')
+    expect(wgsl).not.toContain('cartesianToHyperspherical')
   })
 
   it('supports unrolled HO superposition', () => {
@@ -1097,7 +1138,26 @@ describe('WGSL Shader Compilation - Eigenfunction Cache', () => {
       expect(modules).toContain(`HO ND 3D`)
       // Cached variant should use hoNDOptimized which routes through cache
       expect(wgsl).toContain('hoND3DCached')
+      if (termCount > 1) {
+        expect(wgsl).toContain(`if (${termCount - 1} < uniforms.termCount)`)
+      }
     }
+  })
+
+  it('guards inactive cached analytical-gradient terms in unrolled shaders', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 3,
+      temporal: false,
+
+      quantumMode: 'harmonicOscillator',
+      useEigenfunctionCache: true,
+      useAnalyticalGradient: true,
+      termCount: 4,
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(wgsl).toContain('if (1 < uniforms.termCount) { // Term 1')
+    expect(wgsl).toContain('if (3 < uniforms.termCount) { // Term 3')
   })
 
   it('composes HO shader with cache across all dimensions', () => {

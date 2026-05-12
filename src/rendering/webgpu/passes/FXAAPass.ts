@@ -6,6 +6,8 @@
  * @module rendering/webgpu/passes/FXAAPass
  */
 
+import { clampFinite } from '@/lib/math/clamp'
+
 import { BindGroupCache } from '../core/BindGroupCache'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
@@ -20,6 +22,16 @@ export interface FXAAPassOptions {
   subpixelQuality?: number
   edgeThreshold?: number
   edgeThresholdMin?: number
+}
+
+/** Clamp FXAA subpixel quality to shader-supported bounds. */
+function sanitizeSubpixelQuality(value: number | undefined, fallback: number): number {
+  return clampFinite(value, fallback, 0, 1)
+}
+
+/** Prevent non-finite or negative contrast thresholds from reaching WGSL uniforms. */
+function sanitizeThreshold(value: number | undefined, fallback: number): number {
+  return clampFinite(value, fallback, 0, Number.POSITIVE_INFINITY)
 }
 
 /**
@@ -57,17 +69,21 @@ export class FXAAPass extends WebGPUBasePass {
     this.colorInputId = colorInput
     this.outputResourceId = outputResource
 
-    if (options?.subpixelQuality !== undefined) this.subpixelQuality = options.subpixelQuality
-    if (options?.edgeThreshold !== undefined) this.edgeThreshold = options.edgeThreshold
-    if (options?.edgeThresholdMin !== undefined) this.edgeThresholdMin = options.edgeThresholdMin
+    this.subpixelQuality = sanitizeSubpixelQuality(options?.subpixelQuality, this.subpixelQuality)
+    this.edgeThreshold = sanitizeThreshold(options?.edgeThreshold, this.edgeThreshold)
+    this.edgeThresholdMin = sanitizeThreshold(options?.edgeThresholdMin, this.edgeThresholdMin)
   }
 
   setSubpixelQuality(value: number): void {
-    this.subpixelQuality = value
+    this.subpixelQuality = sanitizeSubpixelQuality(value, this.subpixelQuality)
   }
 
   setEdgeThreshold(value: number): void {
-    this.edgeThreshold = value
+    this.edgeThreshold = sanitizeThreshold(value, this.edgeThreshold)
+  }
+
+  setEdgeThresholdMin(value: number): void {
+    this.edgeThresholdMin = sanitizeThreshold(value, this.edgeThresholdMin)
   }
 
   private updateUniforms(width: number, height: number): void {

@@ -41,12 +41,8 @@ describe('BEC spectrum worker state', () => {
       {},
       {},
       {
-        schroedinger: {
-          bec: {
-            interactionStrength: 0,
-            needsReset: false,
-          },
-        },
+        interactionStrength: 0,
+        needsReset: false,
       }
     )
 
@@ -58,5 +54,37 @@ describe('BEC spectrum worker state', () => {
     expect(bec.spectrumKValues.every((value) => value === 0)).toBe(true)
     expect(bec.totalIncompressibleEnergy).toBe(0)
     expect(bec.totalCompressibleEnergy).toBe(0)
+  })
+
+  it('clears in-flight flag when spectrum readback request throws synchronously', () => {
+    const strategy = new TdseBecStrategy()
+    const subject = strategy as unknown as {
+      spectrumWorkerState: ReturnType<typeof createBecSpectrumWorkerState>
+      spectrumCounter: number
+      maybeComputeSpectrum: (ctx: unknown, pass: unknown, extended: unknown) => void
+    }
+    subject.spectrumCounter = 3
+
+    subject.maybeComputeSpectrum(
+      {},
+      {
+        requestMeasurementReadback: () => {
+          throw new Error('device lost')
+        },
+      },
+      {
+        interactionStrength: 1,
+        needsReset: false,
+        gridSize: [8, 8, 8],
+        spacing: [0.5, 0.5, 0.5],
+        compactDims: [false, false, false],
+        compactRadii: [0.15, 0.15, 0.15],
+        latticeDim: 3,
+        hbar: 1,
+        mass: 1,
+      }
+    )
+
+    expect(subject.spectrumWorkerState.inFlight).toBe(false)
   })
 })
