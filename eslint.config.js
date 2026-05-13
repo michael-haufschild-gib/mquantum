@@ -1002,15 +1002,17 @@ export default [
   // cap forced cosmetic fragmentation across helper files passing typed
   // *Fields interface bags of class internals — fake decomposition that
   // increased coupling without lowering complexity. A compute pass is the
-  // natural unit of cohesion; allow it to be as large as it needs to be.
-  // Cohesion is enforced by code review, not line count.
+  // natural unit of cohesion. Cap at 2000 (matching the spirit of the 1500
+  // physics-solver cap below) so genuinely cohesive passes pass while
+  // truly oversized files are still flagged. Cohesion within the cap is
+  // enforced by code review, not line count.
   {
     files: [
       'src/rendering/webgpu/passes/**/*.ts',
       'src/rendering/webgpu/renderers/**/*.ts',
     ],
     rules: {
-      'max-lines': 'off',
+      'max-lines': ['error', { max: 2000, skipBlankLines: true, skipComments: true }],
     },
   },
   // Physics solvers (Wheeler–DeWitt, AdS density grid, coordinate entanglement,

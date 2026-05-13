@@ -142,7 +142,7 @@ export function generateDiracSparseGammaBlock(
   latticeDim: number,
   maxSparseDim: number = DIRAC_SPARSE_MAX_DIM
 ): string {
-  if (latticeDim % 1 || latticeDim < 1 || latticeDim > maxSparseDim) {
+  if (!Number.isInteger(latticeDim) || latticeDim < 1 || latticeDim > maxSparseDim) {
     return `
 // Dirac sparse gamma disabled for latticeDim=${latticeDim} (uses dense path).
 const DIRAC_USE_SPARSE_GAMMA: bool = false;
