@@ -12,8 +12,9 @@ import { Section } from '@/components/sections/Section'
 import { Slider } from '@/components/ui/Slider'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { supportsSchroedingerSurfaceMode } from '@/lib/geometry/registry'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 import { AntiDeSitterControls } from './AntiDeSitterControls'
 import { BECControls } from './BECControls'
@@ -146,9 +147,23 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
     } = useSchroedingerActions()
 
     const dimension = useGeometryStore((state) => state.dimension)
+    const objectType = useGeometryStore((state) => state.objectType)
     const isoEnabled = useExtendedObjectStore((state) => state.schroedinger?.isoEnabled ?? false)
 
     const mode = config.quantumMode
+    const effectiveIsoEnabled =
+      isoEnabled &&
+      supportsSchroedingerSurfaceMode({
+        objectType,
+        quantumMode: mode,
+        dimension,
+        representation: config.representation,
+      })
+    const renderingModeLabel = effectiveIsoEnabled
+      ? dimension === 2
+        ? 'Isolines'
+        : 'Isosurface (Marching Cubes)'
+      : 'Volumetric (Beer-Lambert)'
     const isHydrogenNDMode = mode === 'hydrogenND' || mode === 'hydrogenNDCoupled'
     const isFreeScalarField = mode === 'freeScalarField'
     const isTdseDynamics = mode === 'tdseDynamics'
@@ -269,9 +284,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
 
         {/* Render Mode Info */}
         <div className="px-4 py-2 text-xs text-text-secondary border-t border-border-subtle">
-          <p>
-            Rendering: {isoEnabled ? 'Isosurface (Marching Cubes)' : 'Volumetric (Beer-Lambert)'}
-          </p>
+          <p>Rendering: {renderingModeLabel}</p>
           {isHydrogenNDMode && (
             <p className="text-text-tertiary mt-1">{dimension}D hydrogen atom viewed in 3D space</p>
           )}

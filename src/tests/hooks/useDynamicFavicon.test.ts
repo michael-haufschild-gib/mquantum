@@ -6,7 +6,7 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useDynamicFavicon } from '@/hooks/useDynamicFavicon'
-import { useThemeStore } from '@/stores/themeStore'
+import { useThemeStore } from '@/stores/ui/themeStore'
 
 // Mock canvas context
 const mockFill = vi.fn()

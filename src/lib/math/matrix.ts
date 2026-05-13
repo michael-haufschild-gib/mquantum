@@ -6,7 +6,6 @@
  * Uses WASM acceleration when available for improved performance.
  */
 
-import { logger } from '@/lib/logger'
 import { isAnimationWasmReady, multiplyMatricesWasm, multiplyMatrixVectorWasm } from '@/lib/wasm'
 
 import type { MatrixND, VectorND } from './types'
@@ -370,13 +369,7 @@ export function multiplyMatrixVector(m: MatrixND, v: VectorND, out?: VectorND): 
   }
 
   const result: VectorND = out ?? new Array(dim)
-
-  // If reusing array, ensure it has correct length (caller should manage this for perf)
-  if (out && out.length < dim && import.meta.env.DEV) {
-    logger.warn(
-      `multiplyMatrixVector: Output array length (${out.length}) is smaller than result rows (${dim}). Results may be truncated.`
-    )
-  }
+  result.length = dim
 
   // Try WASM path if available, then JS fallback
   if (!isAnimationWasmReady() || !tryWasmMatrixVector(result, m, v, dim)) {
@@ -498,6 +491,11 @@ export function matricesEqual(a: MatrixND, b: MatrixND, epsilon = EPSILON): bool
  */
 export function copyMatrix(m: MatrixND, out?: MatrixND): MatrixND {
   const len = m.length
+  if (out && out.length !== len) {
+    throw new Error(
+      `Output matrix dimensions incompatible: expected length ${len}, received ${out.length}`
+    )
+  }
   const result = out ?? new Float32Array(len)
   result.set(m)
   return result

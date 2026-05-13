@@ -13,8 +13,8 @@ import React, { useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'
-import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/scene/appearanceStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 import { renderColorGradient } from './colorPreviewGradient'
 

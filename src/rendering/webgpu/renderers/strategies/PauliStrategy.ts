@@ -6,131 +6,69 @@
 
 import type { PauliConfig, PauliFieldView } from '@/lib/geometry/extended/types'
 
-import type { WebGPURenderContext, WebGPUSetupContext } from '../../core/types'
+import type { WebGPURenderContext } from '../../core/types'
 import { PauliComputePass } from '../../passes/PauliComputePass'
 import { pauliFieldViewForColorAlgorithm } from '../../scenePassConfig'
-import type { SchroedingerWGSLShaderConfig } from '../../shaders/schroedinger/compose'
-import type { SchrodingerRendererConfig } from '../schrodingerRendererTypes'
 import {
-  type AnimationState,
   type AppearanceStoreState,
   type ExtendedStoreSnapshot,
   getStoreSnapshot,
 } from '../schrodingerRendererTypes'
-import {
-  applySharedPml,
-  createDensityTextureBindings,
-  handleSimulationStateIO,
-} from './computeGridUtils'
-import type {
-  ModeFrameContext,
-  ModeSetupResult,
-  QuantumModeStrategy,
-  SchroedingerSnapshot,
-} from './types'
+import { applySharedPml } from './computeGridUtils'
+import { SinglePassComputeStrategy, type SinglePassFrameArgs } from './SinglePassComputeStrategy'
+import type { SchroedingerSnapshot } from './types'
 
 /** Strategy for the Pauli spinor mode using two-component spin compute dispatch. */
-export class PauliStrategy implements QuantumModeStrategy {
-  readonly isComputeMode = true
-
-  private pauliPass: PauliComputePass | null = null
-
-  configureShader(_shader: SchroedingerWGSLShaderConfig, _config: SchrodingerRendererConfig): void {
-    // Compute mode overrides applied by renderer constructor
+export class PauliStrategy extends SinglePassComputeStrategy<PauliComputePass, PauliConfig> {
+  protected createPass(densityGridResolution: number): PauliComputePass {
+    return new PauliComputePass(densityGridResolution)
   }
 
-  setup(ctx: WebGPUSetupContext, config: SchrodingerRendererConfig): ModeSetupResult {
-    // Recreate the compute pass when the density grid resolution changes
-    // in-place — otherwise the existing PauliComputePass keeps its old
-    // texture/buffer sizes and the new resolution silently has no effect.
-    if (!this.pauliPass || this.pauliPass.getDensityGridSize() !== config.densityGridResolution) {
-      this.pauliPass?.dispose()
-      this.pauliPass = new PauliComputePass(config.densityGridResolution)
-      this.pauliPass.initializeDensityTexture(ctx.device)
-    }
-
-    const bindings = createDensityTextureBindings(
-      ctx.device,
-      this.pauliPass.getDensityTextureView() ?? null
-    )
-    return { initPromises: [], ...bindings }
+  protected getConfig(extended: ExtendedStoreSnapshot | undefined): PauliConfig | undefined {
+    return extended?.pauliSpinor
   }
 
-  computeBoundingRadius(
-    _schroedinger: SchroedingerSnapshot,
-    _dimension: number,
-    _config: SchrodingerRendererConfig
-  ): number | null {
-    // Pauli uses pauliSpinor config, not schroedinger.dirac/tdse
-    // The store snapshot path is different — handled via extended.pauliSpinor
-    // But the bounding radius needs the same lattice extent computation
-    // We'll return null and let the renderer handle it if pauliSpinor isn't on schroedinger
-    return null
+  protected get stateIOModeKeys(): string[] {
+    return ['pauliSpinor']
   }
 
-  executeFrame(ctx: WebGPURenderContext, shared: ModeFrameContext): void {
-    const pauliPass = this.pauliPass
-    if (!pauliPass) return
+  protected get configSubKey(): string {
+    return 'pauliSpinor'
+  }
 
-    const extended = getStoreSnapshot<ExtendedStoreSnapshot>(ctx, 'extended')
-    const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
-    const isPlaying = animation?.isPlaying ?? false
-    const speed = animation?.speed ?? 1.0
-    const pauliConfig = extended?.pauliSpinor
-
-    if (!pauliConfig) return
-
-    const schroedinger = extended?.schroedinger
-    // Derive fieldView from the color algorithm. Single source of truth lives
-    // in scenePassConfig#pauliFieldViewForColorAlgorithm so the per-frame
-    // strategy override and the UI's ColorAlgorithmSelector → store sync stay
-    // consistent (an inline ternary used to live here and could drift).
+  protected override deriveEffectiveConfig(
+    config: PauliConfig,
+    ctx: WebGPURenderContext,
+    schroedinger: SchroedingerSnapshot | undefined
+  ): PauliConfig {
+    // Derive fieldView from the color algorithm. Single source of truth
+    // lives in scenePassConfig#pauliFieldViewForColorAlgorithm so the
+    // per-frame strategy override and the UI's ColorAlgorithmSelector →
+    // store sync stay consistent (an inline ternary used to live here and
+    // could drift).
     const appearance = getStoreSnapshot<AppearanceStoreState>(ctx, 'appearance')
     const algo = appearance?.colorAlgorithm ?? 'pauliSpinDensity'
-    const pauliFieldView = pauliFieldViewForColorAlgorithm(
-      algo,
-      pauliConfig.fieldView
-    ) as PauliFieldView
+    const pauliFieldView = pauliFieldViewForColorAlgorithm(algo, config.fieldView) as PauliFieldView
+    const pmlConfig = applySharedPml(config, schroedinger) as PauliConfig
+    if (pmlConfig.fieldView === pauliFieldView) return pmlConfig
+    return { ...pmlConfig, fieldView: pauliFieldView } as PauliConfig
+  }
 
-    const effectiveConfig = applySharedPml(
-      { ...pauliConfig, fieldView: pauliFieldView },
-      schroedinger
-    ) as PauliConfig
-
-    pauliPass.executePauli(
+  protected executePass(
+    pass: PauliComputePass,
+    ctx: WebGPURenderContext,
+    config: PauliConfig,
+    args: SinglePassFrameArgs
+  ): void {
+    pass.executePauli(
       ctx,
-      effectiveConfig,
-      isPlaying,
-      speed,
-      schroedinger?.basisX as Float32Array | undefined,
-      schroedinger?.basisY as Float32Array | undefined,
-      schroedinger?.basisZ as Float32Array | undefined,
-      shared.boundingRadius
+      config,
+      args.isPlaying,
+      args.speed,
+      args.basisX,
+      args.basisY,
+      args.basisZ,
+      args.boundingRadius
     )
-
-    if (pauliConfig.needsReset) {
-      extended?.clearComputeNeedsReset?.('pauliSpinor')
-    }
-
-    handleSimulationStateIO(ctx, pauliPass, ['pauliSpinor'])
-  }
-
-  adoptComputeState(source: QuantumModeStrategy, nextConfig?: SchrodingerRendererConfig): boolean {
-    if (!(source instanceof PauliStrategy) || !source.pauliPass) return false
-    const nextN = nextConfig?.densityGridResolution
-    if (nextN && source.pauliPass.getDensityGridSize() !== nextN) return false
-    this.pauliPass?.dispose()
-    this.pauliPass = source.pauliPass
-    source.pauliPass = null
-    return true
-  }
-
-  getDensityTextureView(): GPUTextureView | null {
-    return this.pauliPass?.getDensityTextureView() ?? null
-  }
-
-  dispose(): void {
-    this.pauliPass?.dispose()
-    this.pauliPass = null
   }
 }

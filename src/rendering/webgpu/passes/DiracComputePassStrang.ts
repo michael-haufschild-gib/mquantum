@@ -70,6 +70,41 @@ export interface LegacyStrangStepParams extends StrangStepCommon {
   dispatchFFTAxisDelegated: DispatchFFTAxisFn
 }
 
+function requireBindGroup(bindGroup: GPUBindGroup | null | undefined, name: string): GPUBindGroup {
+  if (!bindGroup) {
+    throw new Error(`[Dirac] Missing BG ${name}`)
+  }
+  return bindGroup
+}
+
+function validateComponentBindGroups(bg: DiracBindGroupResult, S: number): void {
+  for (let c = 0; c < S; c++) {
+    requireBindGroup(bg.cachedPackBGs[c], `cachedPackBGs[${c}]`)
+    requireBindGroup(bg.cachedUnpackBGsNoNorm[c], `cachedUnpackBGsNoNorm[${c}]`)
+    requireBindGroup(bg.cachedUnpackBGs[c], `cachedUnpackBGs[${c}]`)
+  }
+}
+
+function validateCommonBindGroups(bg: DiracBindGroupResult, config: DiracConfig, S: number): void {
+  requireBindGroup(bg.potentialHalfBG, 'potentialHalfBG')
+  requireBindGroup(bg.kineticBG, 'kineticBG')
+  if (config.absorberEnabled) requireBindGroup(bg.initBG, 'initBG')
+  validateComponentBindGroups(bg, S)
+}
+
+function validateBatchedBindGroups(bg: DiracBindGroupResult, config: DiracConfig, S: number): void {
+  validateCommonBindGroups(bg, config, S)
+  const slotCount = config.latticeDim * 2
+  for (let slot = 0; slot < slotCount; slot++) {
+    requireBindGroup(bg.fftSharedMemBGs[slot], `fftSharedMemBGs[${slot}]`)
+  }
+}
+
+function validateLegacyBindGroups(bg: DiracBindGroupResult, config: DiracConfig, S: number): void {
+  validateCommonBindGroups(bg, config, S)
+  requireBindGroup(bg.fftSharedMemBG, 'fftSharedMemBG')
+}
+
 /**
  * Run one Strang substep inside a single compute pass.
  *
@@ -97,6 +132,7 @@ export function runBatchedStrangStep(p: BatchedStrangStepParams): void {
     ifftSlotOffset,
     totalSites,
   } = p
+  validateBatchedBindGroups(bg, config, S)
   const strangPass = ctx.beginComputePass({ label: `dirac-strang-${step}` })
 
   // 1. Half-step potential (per-component phase rotation) — always 1-D.
@@ -104,8 +140,7 @@ export function runBatchedStrangStep(p: BatchedStrangStepParams): void {
 
   // 2. Forward FFT for each spinor component: pack → 3 axes → unpack (no-norm)
   for (let c = 0; c < S; c++) {
-    const packBG = bg.cachedPackBGs[c]
-    if (packBG) dispatchCompute(strangPass, pl.packPipeline, [packBG], linearWG)
+    dispatchCompute(strangPass, pl.packPipeline, [bg.cachedPackBGs[c]!], linearWG)
     strangPass.setPipeline(pl.fftSharedMemPipeline)
     let fftSlot = 0
     for (let d = config.latticeDim - 1; d >= 0; d--) {
@@ -114,8 +149,7 @@ export function runBatchedStrangStep(p: BatchedStrangStepParams): void {
       strangPass.dispatchWorkgroups(totalSites / axisDim)
       fftSlot++
     }
-    const unpackBG = bg.cachedUnpackBGsNoNorm[c]
-    if (unpackBG) dispatchCompute(strangPass, pl.unpackPipeline, [unpackBG], linearWG)
+    dispatchCompute(strangPass, pl.unpackPipeline, [bg.cachedUnpackBGsNoNorm[c]!], linearWG)
   }
 
   // 3. Free Dirac propagator in k-space.
@@ -133,8 +167,7 @@ export function runBatchedStrangStep(p: BatchedStrangStepParams): void {
 
   // 4. Inverse FFT per component: pack → 3 axes → unpack (with 1/N norm)
   for (let c = 0; c < S; c++) {
-    const packBG = bg.cachedPackBGs[c]
-    if (packBG) dispatchCompute(strangPass, pl.packPipeline, [packBG], linearWG)
+    dispatchCompute(strangPass, pl.packPipeline, [bg.cachedPackBGs[c]!], linearWG)
     strangPass.setPipeline(pl.fftSharedMemPipeline)
     let fftSlot = ifftSlotOffset
     for (let d = config.latticeDim - 1; d >= 0; d--) {
@@ -143,8 +176,7 @@ export function runBatchedStrangStep(p: BatchedStrangStepParams): void {
       strangPass.dispatchWorkgroups(totalSites / axisDim)
       fftSlot++
     }
-    const unpackBG = bg.cachedUnpackBGs[c]
-    if (unpackBG) dispatchCompute(strangPass, pl.unpackPipeline, [unpackBG], linearWG)
+    dispatchCompute(strangPass, pl.unpackPipeline, [bg.cachedUnpackBGs[c]!], linearWG)
   }
 
   // 5. Second half-step potential
@@ -194,27 +226,22 @@ export function runLegacyStrangStep(p: LegacyStrangStepParams): void {
     dispatchFFTAxisDelegated,
   } = p
 
+  validateLegacyBindGroups(bg, config, S)
   const vHalf = ctx.beginComputePass({ label: `dirac-V-half-1-${step}` })
   dispatchCompute(vHalf, pl.potentialHalfPipeline, [bg.potentialHalfBG!], linearWG)
   vHalf.end()
 
   for (let c = 0; c < S; c++) {
-    const packBG = bg.cachedPackBGs[c]
-    if (packBG) {
-      const pass = ctx.beginComputePass({ label: `dirac-pack-c${c}-${step}` })
-      dispatchCompute(pass, pl.packPipeline, [packBG], linearWG)
-      pass.end()
-    }
+    const pass = ctx.beginComputePass({ label: `dirac-pack-c${c}-${step}` })
+    dispatchCompute(pass, pl.packPipeline, [bg.cachedPackBGs[c]!], linearWG)
+    pass.end()
     let fftSlot = 0
     for (let d = config.latticeDim - 1; d >= 0; d--) {
       fftSlot = dispatchFFTAxisDelegated(ctx, config.gridSize[d]!, fftSlot)
     }
-    const unpackBG = bg.cachedUnpackBGsNoNorm[c]
-    if (unpackBG) {
-      const pass = ctx.beginComputePass({ label: `dirac-fft-unpack-c${c}-${step}` })
-      dispatchCompute(pass, pl.unpackPipeline, [unpackBG], linearWG)
-      pass.end()
-    }
+    const unpackPass = ctx.beginComputePass({ label: `dirac-fft-unpack-c${c}-${step}` })
+    dispatchCompute(unpackPass, pl.unpackPipeline, [bg.cachedUnpackBGsNoNorm[c]!], linearWG)
+    unpackPass.end()
   }
 
   const kinPass = ctx.beginComputePass({ label: `dirac-kinetic-${step}` })
@@ -230,22 +257,16 @@ export function runLegacyStrangStep(p: LegacyStrangStepParams): void {
   kinPass.end()
 
   for (let c = 0; c < S; c++) {
-    const packBG = bg.cachedPackBGs[c]
-    if (packBG) {
-      const pass = ctx.beginComputePass({ label: `dirac-ifft-pack-c${c}-${step}` })
-      dispatchCompute(pass, pl.packPipeline, [packBG], linearWG)
-      pass.end()
-    }
+    const pass = ctx.beginComputePass({ label: `dirac-ifft-pack-c${c}-${step}` })
+    dispatchCompute(pass, pl.packPipeline, [bg.cachedPackBGs[c]!], linearWG)
+    pass.end()
     let fftSlot = fwdStageCount
     for (let d = config.latticeDim - 1; d >= 0; d--) {
       fftSlot = dispatchFFTAxisDelegated(ctx, config.gridSize[d]!, fftSlot)
     }
-    const unpackBG = bg.cachedUnpackBGs[c]
-    if (unpackBG) {
-      const pass = ctx.beginComputePass({ label: `dirac-ifft-unpack-c${c}-${step}` })
-      dispatchCompute(pass, pl.unpackPipeline, [unpackBG], linearWG)
-      pass.end()
-    }
+    const unpackPass = ctx.beginComputePass({ label: `dirac-ifft-unpack-c${c}-${step}` })
+    dispatchCompute(unpackPass, pl.unpackPipeline, [bg.cachedUnpackBGs[c]!], linearWG)
+    unpackPass.end()
   }
 
   const vHalf2 = ctx.beginComputePass({ label: `dirac-V-half-2-${step}` })

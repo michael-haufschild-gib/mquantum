@@ -13,11 +13,14 @@ import { Button } from '@/components/ui/Button'
 import { useToast } from '@/hooks/useToast'
 import { soundManager } from '@/lib/audio/SoundManager'
 import { isComputeQuantumType } from '@/lib/geometry/registry'
-import { useAnimationStore } from '@/stores/animationStore'
-import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { type LayoutStore, useLayoutStore } from '@/stores/layoutStore'
-import { type UISlice, useUIStore } from '@/stores/uiStore'
+import { useAnimationStore } from '@/stores/scene/animationStore'
+import {
+  type ExtendedObjectState,
+  useExtendedObjectStore,
+} from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { type LayoutStore, useLayoutStore } from '@/stores/ui/layoutStore'
+import { type UISlice, useUIStore } from '@/stores/ui/uiStore'
 
 interface TopBarControlsProps {
   compact?: boolean
@@ -291,11 +294,12 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
 
   const toggleFullscreen = () => {
     soundManager.playClick()
-    if (!document.fullscreenElement) {
-      void document.documentElement.requestFullscreen()
-    } else {
-      void document.exitFullscreen()
-    }
+    const fullscreenPromise = !document.fullscreenElement
+      ? document.documentElement.requestFullscreen()
+      : document.exitFullscreen()
+    void fullscreenPromise.catch(() => {
+      addToast('Fullscreen unavailable', 'error')
+    })
   }
 
   const toggleRepresentation = () => {

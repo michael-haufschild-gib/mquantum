@@ -15,9 +15,9 @@ import {
   type AtlasSweepConfig,
   lambdaForStep,
   useCoordinateEntanglementStore,
-} from '@/stores/coordinateEntanglementStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+} from '@/stores/diagnostics/coordinateEntanglementStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 const SWEEP_EVOLVE_ENTRIES = 20
 const SWEEP_MEASURE_ENTRIES = 10

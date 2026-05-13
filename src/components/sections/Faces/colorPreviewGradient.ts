@@ -16,7 +16,7 @@ import {
   type DomainColoringSettings,
   getCosinePaletteColorTS,
   type PhaseDivergingSettings,
-} from '@/rendering/shaders/palette'
+} from '@/lib/colors/palette'
 
 // ---------------------------------------------------------------------------
 // Color conversion helpers

@@ -20,8 +20,8 @@ import {
   computeWaterfallBackgroundDensity,
   resolveBecMass,
 } from '@/lib/physics/bec/waterfallParams'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 import { NormDriftRow } from './AnalysisPrimitives'
 

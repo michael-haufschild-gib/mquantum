@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { colormapRGBA, getColormapLUT, paintCarpetToCanvas } from '@/lib/physics/colormaps'
-import type { CarpetColormap } from '@/stores/carpetStore'
+import type { CarpetColormap } from '@/stores/diagnostics/carpetStore'
 
 const ALL_COLORMAPS: CarpetColormap[] = ['viridis', 'inferno', 'magma', 'plasma']
 

@@ -28,7 +28,7 @@ import type {
   PeschelWorkerRequest,
   PeschelWorkerResponse,
 } from '@/lib/physics/entanglement/peschelWorker'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 // ─── Worker mock ─────────────────────────────────────────────────────────
 

@@ -6,10 +6,9 @@ import {
   arr,
   computeStructLayout,
   type StructFieldDef,
-  type WGSLFieldType,
-  type WGSLVecType,
   zeroReservedFields,
 } from '@/rendering/webgpu/utils/structLayout'
+import { parseStructFields, typesEqual } from '@/tests/rendering/webgpu/utils/wgslStructParser'
 
 // ---------------------------------------------------------------------------
 // Unit tests for the layout engine
@@ -161,55 +160,8 @@ describe('zeroReservedFields', () => {
 // WGSL struct validation — ensures TypeScript layout matches the shader
 // ---------------------------------------------------------------------------
 
-/** Parse a WGSL type string into a WGSLFieldType. */
-function parseWGSLType(typeStr: string): WGSLFieldType {
-  const t = typeStr.trim()
-
-  if (t === 'i32' || t === 'u32' || t === 'f32') return t
-
-  if (/^vec[234](?:f|<(?:i32|u32|f32)>)$/.test(t)) return t as WGSLVecType
-
-  // array<element, count> — greedy `.+` backtracks to find the last `,`
-  const arrayMatch = t.match(/^array<(.+),\s*(\d+)>$/)
-  if (arrayMatch) {
-    const element = parseWGSLType(arrayMatch[1]!) as WGSLVecType
-    const count = parseInt(arrayMatch[2]!, 10)
-    return arr(element, count)
-  }
-
-  throw new Error(`Unknown WGSL type: ${t}`)
-}
-
-/** Extract field definitions from a WGSL struct block. */
-function parseWGSLStructFields(wgsl: string): Array<{ name: string; type: WGSLFieldType }> {
-  const structMatch = wgsl.match(/struct\s+SchroedingerUniforms\s*\{([\s\S]*?)\n\}/)
-  if (!structMatch) throw new Error('Could not find SchroedingerUniforms struct')
-
-  const fields: Array<{ name: string; type: WGSLFieldType }> = []
-  for (const line of structMatch[1]!.split('\n')) {
-    const noComment = line.replace(/\/\/.*$/, '').trim()
-    if (!noComment) continue
-
-    // Match: fieldName: type,
-    const match = noComment.match(/^(\w+)\s*:\s*(.+?)\s*,?\s*$/)
-    if (!match) continue
-
-    fields.push({ name: match[1]!, type: parseWGSLType(match[2]!) })
-  }
-  return fields
-}
-
-/** Compare two WGSLFieldType values for equality. */
-function typesEqual(a: WGSLFieldType, b: WGSLFieldType): boolean {
-  if (typeof a === 'string' && typeof b === 'string') return a === b
-  if (typeof a === 'object' && typeof b === 'object') {
-    return a.element === b.element && a.count === b.count
-  }
-  return false
-}
-
 describe('SchroedingerUniforms WGSL validation', () => {
-  const wgslFields = parseWGSLStructFields(schroedingerUniformsBlock)
+  const wgslFields = parseStructFields(schroedingerUniformsBlock, 'SchroedingerUniforms')
   const tsLayout = SCHROEDINGER_LAYOUT
 
   it('has the same number of fields as the WGSL struct', () => {

@@ -144,12 +144,15 @@ async function measure(
   await page.evaluate(async () => {
     const perfStore =
       window.__PERFORMANCE_STORE__ ??
-      (await import('/src/stores/performanceStore.ts')).usePerformanceStore
+      (await import('/src/stores/runtime/performanceStore.ts')).usePerformanceStore
     perfStore.getState().setMaxFps(0)
-    const uiStore = window.__UI_STORE__ ?? (await import('/src/stores/uiStore.ts')).useUIStore
+    const uiStore = window.__UI_STORE__ ?? (await import('/src/stores/ui/uiStore.ts')).useUIStore
     uiStore.setState({ showPerfMonitor: true, perfMonitorExpanded: true })
-    const anim = await import('/src/stores/animationStore.ts')
-    anim.useAnimationStore.getState().play()
+    const animationStore = window.__ANIMATION_STORE__
+    if (!animationStore) {
+      throw new Error('__ANIMATION_STORE__ missing on window — DEV bridge not registered')
+    }
+    animationStore.getState().play()
   })
 
   const warmupStart = await getFrameCount(page)
@@ -157,9 +160,9 @@ async function measure(
   await waitForSimulationFrames(page, SIM_WARMUP_FRAMES)
 
   await page.waitForFunction(
-    async () => {
-      const mod = await import('/src/stores/performanceMetricsStore.ts')
-      return mod.usePerformanceMetricsStore.getState().fps > 0
+    () => {
+      const store = window.__PERFORMANCE_METRICS_STORE__
+      return !!store && store.getState().fps > 0
     },
     { timeout: 10_000 }
   )
@@ -168,9 +171,12 @@ async function measure(
   await waitForFrameAdvance(page, measureStart + MEASURE_FRAMES)
 
   const metrics = await getPerformanceMetrics(page)
-  const viewport = await page.evaluate(async () => {
-    const mod = await import('/src/stores/performanceMetricsStore.ts')
-    const s = mod.usePerformanceMetricsStore.getState()
+  const viewport = await page.evaluate(() => {
+    const store = window.__PERFORMANCE_METRICS_STORE__
+    if (!store) {
+      throw new Error('__PERFORMANCE_METRICS_STORE__ missing on window — DEV bridge not registered')
+    }
+    const s = store.getState()
     return { width: s.viewport.width, height: s.viewport.height }
   })
   const schrod = metrics.passTimings.find((p) => p.passId === 'schroedinger')

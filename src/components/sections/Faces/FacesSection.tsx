@@ -16,12 +16,16 @@ import { Button } from '@/components/ui/Button'
 import { ColorPicker } from '@/components/ui/ColorPicker'
 import { Slider } from '@/components/ui/Slider'
 import { Tabs } from '@/components/ui/Tabs'
-import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
+import { supportsSchroedingerSurfaceMode } from '@/lib/geometry/registry'
 import { DEFAULT_FACE_PBR } from '@/stores/defaults/visualDefaults'
-import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { type LightingSlice, useLightingStore } from '@/stores/lightingStore'
-import { type PBRSlice, usePBRStore } from '@/stores/pbrStore'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/scene/appearanceStore'
+import {
+  type ExtendedObjectState,
+  useExtendedObjectStore,
+} from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { type LightingSlice, useLightingStore } from '@/stores/scene/lightingStore'
+import { type PBRSlice, usePBRStore } from '@/stores/scene/pbrStore'
 
 import { ColorAlgorithmSelector } from './ColorAlgorithmSelector'
 import { ColorPreview } from './ColorPreview'
@@ -60,9 +64,11 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
   // Isosurface mode controls (drives material tab availability and rendering mode)
   const schroedingerIsoSelector = useShallow((state: ExtendedObjectState) => ({
     isoEnabled: state.schroedinger?.isoEnabled ?? false,
+    quantumMode: state.schroedinger?.quantumMode ?? 'harmonicOscillator',
     representation: state.schroedinger?.representation ?? 'position',
   }))
-  const { isoEnabled, representation } = useExtendedObjectStore(schroedingerIsoSelector)
+  const { isoEnabled, quantumMode, representation } =
+    useExtendedObjectStore(schroedingerIsoSelector)
 
   // Appearance settings
   const appearanceSelector = useShallow((state: AppearanceSlice) => ({
@@ -123,8 +129,14 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
 
   // Material tab only enabled in isosurface mode and 3D+ (PBR has no effect on volumetric clouds, 2D, or Wigner).
   // Pauli spinor always uses volumetric rendering — no isosurface, no material tab.
+  const surfaceModeSupported = supportsSchroedingerSurfaceMode({
+    objectType,
+    quantumMode,
+    dimension,
+    representation,
+  })
   const materialTabEnabled =
-    objectType !== 'pauliSpinor' && isoEnabled && dimension > 2 && representation !== 'wigner'
+    surfaceModeSupported && isoEnabled && dimension > 2 && representation !== 'wigner'
 
   // Reset to colors tab if material tab becomes disabled while selected
   React.useEffect(() => {

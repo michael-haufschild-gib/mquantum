@@ -18,7 +18,7 @@
 
 import React, { useMemo } from 'react'
 
-import type { SrmtSnapshot } from '@/stores/srmtDiagnosticStore'
+import type { SrmtSnapshot } from '@/stores/diagnostics/srmtDiagnosticStore'
 
 const CHART_WIDTH = 240
 const CHART_HEIGHT = 90

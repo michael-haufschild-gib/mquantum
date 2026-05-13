@@ -16,7 +16,7 @@
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
@@ -26,6 +26,7 @@ import {
   DENSITY_GRID_SIZE,
   GRID_WG as GRID_WORKGROUP_SIZE,
   LINEAR_WG as LINEAR_WORKGROUP_SIZE,
+  MAX_DIM,
   sanitizeGridSizes,
 } from './computePassUtils'
 import {
@@ -172,6 +173,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   // Pre-allocated uniform data (reused each frame to avoid GC pressure)
   private readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
   private readonly uniformU32 = new Uint32Array(this.uniformData)
+  private readonly strideScratch = new Array<number>(MAX_DIM).fill(0)
 
   /**
    * Pre-allocated scratch for the per-leapfrog-step partial uniform upload
@@ -183,6 +185,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
    * CFL sub-stepping.
    */
   private readonly cosmoCoefsScratch = new Float32Array(FSF_COSMO_COEFS_F32_COUNT)
+
+  private readonly advanceSimEtaCallback = (dt: number): number => this.advanceSimEta(dt)
 
   /**
    * Dedup set for the "sub-step cap reached" warning so the adaptive-CFL
@@ -522,6 +526,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       // the identity. On fresh resets both are 0, matching `sin(0) = 0`.
       preheatingTime: this.preheatingTime,
       preheatingReferenceEta: this.preheatingReferenceEta,
+      strideScratch: this.strideScratch,
     })
   }
 
@@ -686,7 +691,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
               cosmologyActive,
               preheatingActive,
               {
-                advanceSimEta: (dt: number) => this.advanceSimEta(dt),
+                advanceSimEta: this.advanceSimEtaCallback,
                 preheatingTime: this.preheatingTime,
                 preheatingReferenceEta: this.preheatingReferenceEta,
               },

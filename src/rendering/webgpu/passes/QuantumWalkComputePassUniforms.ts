@@ -42,11 +42,16 @@ export function packWriteGridUniforms(
   basisX: Float32Array | undefined,
   basisY: Float32Array | undefined,
   basisZ: Float32Array | undefined,
-  boundingRadius: number
+  boundingRadius: number,
+  target?: ArrayBuffer
 ): ArrayBuffer {
-  const buf = new ArrayBuffer(QW_WRITE_GRID_UNIFORMS_SIZE)
+  const buf =
+    target?.byteLength === QW_WRITE_GRID_UNIFORMS_SIZE
+      ? target
+      : new ArrayBuffer(QW_WRITE_GRID_UNIFORMS_SIZE)
   const u32 = new Uint32Array(buf)
   const f32 = new Float32Array(buf)
+  u32.fill(0)
 
   const numCoinStates = 2 * config.latticeDim
 
@@ -112,11 +117,16 @@ export function packAbsorberUniforms(
   config: QuantumWalkConfig,
   totalSites: number,
   strides: number[],
-  sigmaMax: number
+  sigmaMax: number,
+  target?: ArrayBuffer
 ): ArrayBuffer {
-  const buf = new ArrayBuffer(QW_ABSORBER_UNIFORMS_SIZE)
+  const buf =
+    target?.byteLength === QW_ABSORBER_UNIFORMS_SIZE
+      ? target
+      : new ArrayBuffer(QW_ABSORBER_UNIFORMS_SIZE)
   const u32 = new Uint32Array(buf)
   const f32 = new Float32Array(buf)
+  u32.fill(0)
 
   u32[0] = totalSites
   u32[1] = config.latticeDim

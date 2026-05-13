@@ -76,11 +76,12 @@ fn volumeRaymarch(
   let probCurrentDensityThreshold = max(uniforms.probabilityCurrentDensityThreshold, 0.0);
   let radialProbEnabled = FEATURE_RADIAL_PROBABILITY && uniforms.radialProbabilityEnabled != 0u;
   let momentumRepresentation = uniforms.representationMode == REPRESENTATION_MOMENTUM;
-  let backreactionActive = isQuantumBackreactionActive(uniforms);
-  let bilocalBridgeActive = isBilocalERBridgeActive(uniforms);
-  let entropyShearActive = isEntropicTimeShearActive(uniforms);
-  let spectralFlowActive = isSpectralDimensionFlowActive(uniforms);
-  let vacuumBubbleActive = isVacuumBubbleLensActive(uniforms);
+  let backreactionActive = isQuantumBackreactionActive(uniforms)
+    && FEATURE_QUANTUM_BACKREACTION_LENSING;
+  let bilocalBridgeActive = isBilocalERBridgeActive(uniforms) && FEATURE_BILOCAL_ER_BRIDGE;
+  let entropyShearActive = isEntropicTimeShearActive(uniforms) && FEATURE_ENTROPIC_TIME_SHEAR;
+  let spectralFlowActive = isSpectralDimensionFlowActive(uniforms) && FEATURE_SPECTRAL_DIMENSION_FLOW;
+  let vacuumBubbleActive = isVacuumBubbleLensActive(uniforms) && FEATURE_VACUUM_BUBBLE_LENS;
   let bornNullWeaveActive = isBornNullWeaveActive(uniforms);
 
   // PERF (OPT-NODAL-DEDUP): when nodal band + analytical-gradient mode is

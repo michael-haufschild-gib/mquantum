@@ -1,7 +1,10 @@
 import { m, PanInfo } from 'motion/react'
 import React, { useCallback, useId } from 'react'
 
+import { clampKnobValue, normalizeKnobValue } from '@/components/ui/knobValue'
 import { Tooltip } from '@/components/ui/Tooltip'
+
+const DEFAULT_KNOB_LABEL = 'Knob'
 
 /** Props for the rotary {@link Knob} control. */
 export interface KnobProps {
@@ -32,13 +35,16 @@ export const Knob: React.FC<KnobProps> = React.memo(
     tooltip,
   }) => {
     const id = useId()
+    const accessibleLabel = label ?? DEFAULT_KNOB_LABEL
 
     // Constants for visual representation
     const minRotation = -145 // degrees
     const maxRotation = 145
 
     // Normalize value to 0-1 range for visual rotation
-    const normalizedValue = (Math.min(Math.max(value, min), max) - min) / (max - min)
+    const range = max - min
+    const clampedValue = clampKnobValue(value, min, max)
+    const normalizedValue = range > 0 ? (clampedValue - min) / range : 0
     const rotation = minRotation + normalizedValue * (maxRotation - minRotation)
 
     // Calculate arc path
@@ -61,9 +67,21 @@ export const Knob: React.FC<KnobProps> = React.memo(
 
     const indicatorPath = `M ${startPoint.x} ${startPoint.y} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${endPoint.x} ${endPoint.y}`
 
+    const commitClampedValue = useCallback(
+      (nextValue: number) => {
+        const clampedNextValue = clampKnobValue(nextValue, min, max)
+        if (clampedNextValue !== value) {
+          onChange(clampedNextValue)
+        }
+      },
+      [value, min, max, onChange]
+    )
+
     // Pan Handler (Motion)
     const handlePan = useCallback(
       (_: PointerEvent, info: PanInfo) => {
+        if (range <= 0) return
+
         // Negative deltaY means moving up, which should increase value
         const deltaY = -info.delta.y
 
@@ -71,25 +89,16 @@ export const Knob: React.FC<KnobProps> = React.memo(
         // sensitivity determines how "fast" it moves.
         // Range = max - min.
         // 100 pixels drag = full range?
-        const range = max - min
         const pixelRange = 200 // Pixels to traverse full range
         const change = (deltaY / pixelRange) * range * sensitivity
 
-        let newValue = value + change
-
-        // Clamp
-        newValue = Math.min(Math.max(newValue, min), max)
-
-        // Step
-        if (step) {
-          newValue = Math.round(newValue / step) * step
-        }
+        const newValue = normalizeKnobValue(value + change, min, max, step)
 
         if (newValue !== value) {
           onChange(newValue)
         }
       },
-      [value, min, max, step, onChange, sensitivity]
+      [value, min, max, step, onChange, sensitivity, range]
     )
 
     // Double click reset
@@ -106,17 +115,29 @@ export const Knob: React.FC<KnobProps> = React.memo(
     // where every keypress would otherwise jump the page.
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent) => {
+        const keyStep = Number.isFinite(step) && step > 0 ? step : 1
+
         if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
           e.preventDefault()
-          const next = Math.min(value + step, max)
-          if (next !== value) onChange(next)
+          commitClampedValue(value + keyStep)
         } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
           e.preventDefault()
-          const next = Math.max(value - step, min)
-          if (next !== value) onChange(next)
+          commitClampedValue(value - keyStep)
+        } else if (e.key === 'PageUp') {
+          e.preventDefault()
+          commitClampedValue(value + keyStep * 10)
+        } else if (e.key === 'PageDown') {
+          e.preventDefault()
+          commitClampedValue(value - keyStep * 10)
+        } else if (e.key === 'Home') {
+          e.preventDefault()
+          commitClampedValue(min)
+        } else if (e.key === 'End') {
+          e.preventDefault()
+          commitClampedValue(max)
         }
       },
-      [value, step, min, max, onChange]
+      [value, step, min, max, commitClampedValue]
     )
 
     // Generate tick marks
@@ -149,8 +170,8 @@ export const Knob: React.FC<KnobProps> = React.memo(
           role="slider"
           aria-valuemin={min}
           aria-valuemax={max}
-          aria-valuenow={value}
-          aria-label={label}
+          aria-valuenow={clampedValue}
+          aria-label={accessibleLabel}
           tabIndex={0}
           onKeyDown={handleKeyDown}
           whileTap={{ scale: 0.95 }}

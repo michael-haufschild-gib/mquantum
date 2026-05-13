@@ -15,10 +15,10 @@ import {
   GRAPH_POINTS,
   type PassTimingEntry,
   usePerformanceMetricsStore,
-} from '@/stores/performanceMetricsStore'
-import { useUIStore } from '@/stores/uiStore'
+} from '@/stores/diagnostics/performanceMetricsStore'
+import { useUIStore } from '@/stores/ui/uiStore'
 
-import type { WebGPUFrameStats, WebGPUPassTiming } from './core/types'
+import type { WebGPUFrameMetricsMode, WebGPUFrameStats, WebGPUPassTiming } from './core/types'
 import type { WebGPURenderGraph } from './graph/WebGPURenderGraph'
 
 // ============================================================================
@@ -95,6 +95,9 @@ export class WebGPUStatsCollector {
   private lastPublishTime = 0
   private lastFrameTime = 0
   private smoothedFps: number | null = null
+  private framePrepared = false
+  private timestampCollectionActive: boolean | null = null
+  private timestampCollectionGraph: WebGPURenderGraph | null = null
 
   // Latest per-pass timing snapshot (published at 2Hz, not accumulated)
   private latestPassTimings: WebGPUPassTiming[] = []
@@ -163,6 +166,40 @@ export class WebGPUStatsCollector {
   }
 
   /**
+   * Prepare graph instrumentation before executing a frame.
+   *
+   * This lets the render graph skip expensive per-pass diagnostics when the
+   * monitor is hidden or collapsed, instead of discovering that only after the
+   * frame already paid those costs.
+   */
+  beginFrame(graph: WebGPURenderGraph): WebGPUFrameMetricsMode {
+    this.updateMeasurementTier()
+
+    const timestampActive = this.measurementTier === TIER_FULL_STATS
+    if (
+      this.timestampCollectionGraph !== graph ||
+      this.timestampCollectionActive !== timestampActive
+    ) {
+      graph.setTimestampCollectionActive(timestampActive)
+      this.timestampCollectionGraph = graph
+      this.timestampCollectionActive = timestampActive
+    }
+
+    if (
+      this.measurementTier !== TIER_FULL_STATS &&
+      this.previousMeasurementTier === TIER_FULL_STATS
+    ) {
+      this.clearPublishedFullStats()
+    }
+    this.previousMeasurementTier = this.measurementTier
+    this.framePrepared = true
+
+    if (this.measurementTier === TIER_HIDDEN) return 'none'
+    if (this.measurementTier === TIER_FPS_ONLY) return 'fps'
+    return 'full'
+  }
+
+  /**
    * Record a frame's statistics.
    *
    * @param cpuTimeMs CPU time for the frame in milliseconds
@@ -180,20 +217,10 @@ export class WebGPUStatsCollector {
     size: { width: number; height: number },
     dpr: number
   ): void {
-    this.updateMeasurementTier()
-
-    // Tell the render graph whether to collect GPU timestamps on the next frame.
-    // Only TIER_FULL_STATS consumes per-pass GPU timing; skip the per-frame
-    // onSubmittedWorkDone fence + buffer readback otherwise.
-    graph.setTimestampCollectionActive(this.measurementTier === TIER_FULL_STATS)
-
-    if (
-      this.measurementTier !== TIER_FULL_STATS &&
-      this.previousMeasurementTier === TIER_FULL_STATS
-    ) {
-      this.clearPublishedFullStats()
+    if (!this.framePrepared) {
+      this.beginFrame(graph)
     }
-    this.previousMeasurementTier = this.measurementTier
+    this.framePrepared = false
 
     // Skip if hidden
     if (this.measurementTier === TIER_HIDDEN) {
@@ -387,10 +414,14 @@ export class WebGPUStatsCollector {
    * Reset the collector state.
    */
   reset(): void {
+    this.measurementTier = TIER_HIDDEN
     this.previousMeasurementTier = TIER_HIDDEN
     this.lastPublishTime = 0
     this.lastFrameTime = 0
     this.smoothedFps = null
+    this.framePrepared = false
+    this.timestampCollectionActive = null
+    this.timestampCollectionGraph = null
     this.latestPassTimings = []
     this.latestCpuBreakdown = { setupMs: 0, passesMs: 0, submitMs: 0 }
     this.accumulated = {

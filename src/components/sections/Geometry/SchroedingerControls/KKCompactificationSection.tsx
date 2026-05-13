@@ -20,8 +20,8 @@ import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { AXIS_LABELS } from '@/constants/dimension'
 import { computeKKSpectrum, computeMaxCompactRadius } from '@/lib/physics/compactification'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 /* ── SVG layout constants ── */
 const WIDTH = 260

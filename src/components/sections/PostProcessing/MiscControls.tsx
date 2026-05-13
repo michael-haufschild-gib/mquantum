@@ -17,7 +17,10 @@ import { Select, type SelectOption } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { type AntiAliasingMethod } from '@/stores/defaults/visualDefaults'
-import { type PostProcessingSlice, usePostProcessingStore } from '@/stores/postProcessingStore'
+import {
+  type PostProcessingSlice,
+  usePostProcessingStore,
+} from '@/stores/scene/postProcessingStore'
 
 /** Props for miscellaneous post-processing controls (AA, frame blending). */
 export interface MiscControlsProps {

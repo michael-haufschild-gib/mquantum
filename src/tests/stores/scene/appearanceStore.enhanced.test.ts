@@ -1,0 +1,429 @@
+/**
+ * Consolidated “high-signal” tests for visual/appearance-related stores.
+ *
+ * We focus on invariants and coupling logic that can break rendering badly,
+ * not superficial “setter sets value” checks.
+ */
+
+import { beforeEach, describe, expect, it } from 'vitest'
+
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
+import { useLightingStore } from '@/stores/scene/lightingStore'
+import { usePostProcessingStore } from '@/stores/scene/postProcessingStore'
+import { APPEARANCE_INITIAL_STATE } from '@/stores/slices/appearanceSlice'
+import { LIGHTING_INITIAL_STATE } from '@/stores/slices/lightingSlice'
+import { POST_PROCESSING_INITIAL_STATE } from '@/stores/slices/postProcessingSlice'
+
+describe('Enhanced Features Stores (invariants)', () => {
+  beforeEach(() => {
+    useAppearanceStore.setState(APPEARANCE_INITIAL_STATE)
+    useLightingStore.setState(LIGHTING_INITIAL_STATE)
+    usePostProcessingStore.setState(POST_PROCESSING_INITIAL_STATE)
+  })
+
+  describe('Appearance coupling invariants', () => {
+    it('setShaderType switches between wireframe and surface modes', () => {
+      useAppearanceStore.getState().setShaderType('surface')
+      expect(useAppearanceStore.getState().shaderType).toBe('surface')
+      useAppearanceStore.getState().setShaderType('wireframe')
+      expect(useAppearanceStore.getState().shaderType).toBe('wireframe')
+    })
+
+    it('clamps domain-coloring contour settings to safe ranges', () => {
+      useAppearanceStore.getState().setDomainColoringSettings({
+        contourDensity: 999,
+        contourWidth: 0,
+        contourStrength: 2,
+      })
+
+      expect(useAppearanceStore.getState().domainColoring.contourDensity).toBe(32)
+      expect(useAppearanceStore.getState().domainColoring.contourWidth).toBe(0.005)
+      expect(useAppearanceStore.getState().domainColoring.contourStrength).toBe(1)
+
+      useAppearanceStore.getState().setDomainColoringSettings({
+        contourDensity: 0,
+        contourWidth: 1,
+        contourStrength: -1,
+      })
+
+      expect(useAppearanceStore.getState().domainColoring.contourDensity).toBe(1)
+      expect(useAppearanceStore.getState().domainColoring.contourWidth).toBe(0.25)
+      expect(useAppearanceStore.getState().domainColoring.contourStrength).toBe(0)
+    })
+
+    it('updates diverging real/imag midpoint settings and clamps intensity floor', () => {
+      const appearance = useAppearanceStore.getState() as unknown as {
+        divergingPsi: {
+          neutralColor: string
+          positiveColor: string
+          negativeColor: string
+          intensityFloor: number
+        }
+        setDivergingPsiSettings: (settings: {
+          neutralColor?: string
+          positiveColor?: string
+          negativeColor?: string
+          intensityFloor?: number
+        }) => void
+      }
+
+      appearance.setDivergingPsiSettings({
+        neutralColor: '#d9d9d9',
+        positiveColor: '#e83b3b',
+        negativeColor: '#3166f5',
+        intensityFloor: -1,
+      })
+
+      const next = useAppearanceStore.getState() as unknown as typeof appearance
+      expect(next.divergingPsi.neutralColor).toBe('#d9d9d9')
+      expect(next.divergingPsi.positiveColor).toBe('#e83b3b')
+      expect(next.divergingPsi.negativeColor).toBe('#3166f5')
+      expect(next.divergingPsi.intensityFloor).toBe(0)
+
+      next.setDivergingPsiSettings({ intensityFloor: 2 })
+      expect(
+        (useAppearanceStore.getState() as unknown as typeof appearance).divergingPsi.intensityFloor
+      ).toBe(1)
+    })
+
+    it('keeps signed phase diverging palette independent from Re/Im diverging settings', () => {
+      useAppearanceStore.getState().setDivergingPsiSettings({
+        neutralColor: '#d9d9d9',
+        positiveColor: '#e83b3b',
+        negativeColor: '#3166f5',
+        intensityFloor: 0.42,
+        component: 'imag',
+      })
+
+      useAppearanceStore.getState().setPhaseDivergingSettings({
+        neutralColor: '#fafafa',
+        positiveColor: '#ff5500',
+        negativeColor: '#0033ff',
+      })
+
+      const next = useAppearanceStore.getState()
+      expect(next.phaseDiverging.neutralColor).toBe('#fafafa')
+      expect(next.phaseDiverging.positiveColor).toBe('#ff5500')
+      expect(next.phaseDiverging.negativeColor).toBe('#0033ff')
+
+      expect(next.divergingPsi.neutralColor).toBe('#d9d9d9')
+      expect(next.divergingPsi.positiveColor).toBe('#e83b3b')
+      expect(next.divergingPsi.negativeColor).toBe('#3166f5')
+      expect(next.divergingPsi.intensityFloor).toBe(0.42)
+      expect(next.divergingPsi.component).toBe('imag')
+    })
+
+    it('normalizes diverging palette colors and rejects invalid color strings', () => {
+      const store = useAppearanceStore.getState()
+      store.setEdgeColor('#ABC')
+      store.setFaceColor('  #12ABef  ')
+      store.setPhaseDivergingSettings({
+        neutralColor: '#FAFAFA',
+        positiveColor: '#F50',
+        negativeColor: '#0033ff',
+      })
+      store.setDivergingPsiSettings({
+        neutralColor: '#101010',
+        positiveColor: '#202020',
+        negativeColor: '#303030',
+        component: 'imag',
+      })
+
+      store.setEdgeColor('red')
+      store.setFaceColor('#abcdef80')
+      store.setPhaseDivergingSettings({
+        neutralColor: 'not-a-color',
+        positiveColor: '#abcd',
+      })
+      store.setDivergingPsiSettings({
+        positiveColor: 'rgb(255, 0, 0)',
+        negativeColor: '#12345678',
+        component: 'phase' as never,
+      })
+
+      const next = useAppearanceStore.getState()
+      expect(next.edgeColor).toBe('#aabbcc')
+      expect(next.faceColor).toBe('#12abef')
+      expect(next.phaseDiverging).toEqual({
+        neutralColor: '#fafafa',
+        positiveColor: '#ff5500',
+        negativeColor: '#0033ff',
+      })
+      expect(next.divergingPsi.neutralColor).toBe('#101010')
+      expect(next.divergingPsi.positiveColor).toBe('#202020')
+      expect(next.divergingPsi.negativeColor).toBe('#303030')
+      expect(next.divergingPsi.component).toBe('imag')
+    })
+
+    it('rejects invalid color algorithm identifiers at the store boundary', () => {
+      const store = useAppearanceStore.getState()
+
+      store.setColorAlgorithm('phaseDiverging')
+      store.setColorAlgorithm('shader-injection' as never)
+
+      expect(useAppearanceStore.getState().colorAlgorithm).toBe('phaseDiverging')
+    })
+
+    it('preserves all color-algorithm settings when switching algorithms', () => {
+      const store = useAppearanceStore.getState()
+
+      store.setCosineCoefficients({
+        a: [0.9, 0.1, 0.4],
+        b: [0.2, 0.8, 0.6],
+        c: [1.2, 0.7, 0.5],
+        d: [0.33, 0.2, 0.1],
+      })
+      store.setDistribution({ power: 2.2, cycles: 3.3, offset: 0.44 })
+      store.setLchLightness(0.41)
+      store.setLchChroma(0.29)
+      store.setMultiSourceWeights({ depth: 0.2, orbitTrap: 0.5, normal: 0.3 })
+      store.setDomainColoringSettings({
+        modulusMode: 'logPsiAbs',
+        contoursEnabled: false,
+        contourDensity: 7.5,
+        contourWidth: 0.11,
+        contourStrength: 0.66,
+      })
+      store.setPhaseDivergingSettings({
+        neutralColor: '#121212',
+        positiveColor: '#ef5400',
+        negativeColor: '#0f3fff',
+      })
+      store.setDivergingPsiSettings({
+        neutralColor: '#cccccc',
+        positiveColor: '#ff4400',
+        negativeColor: '#003cff',
+        intensityFloor: 0.37,
+        component: 'imag',
+      })
+
+      store.setColorAlgorithm('phaseDiverging')
+      store.setColorAlgorithm('domainColoringPsi')
+      store.setColorAlgorithm('diverging')
+      store.setColorAlgorithm('lch')
+      store.setColorAlgorithm('mixed')
+
+      const next = useAppearanceStore.getState()
+      expect(next.cosineCoefficients).toEqual({
+        a: [0.9, 0.1, 0.4],
+        b: [0.2, 0.8, 0.6],
+        c: [1.2, 0.7, 0.5],
+        d: [0.33, 0.2, 0.1],
+      })
+      expect(next.distribution).toEqual({ power: 2.2, cycles: 3.3, offset: 0.44 })
+      expect(next.lchLightness).toBe(0.41)
+      expect(next.lchChroma).toBe(0.29)
+      expect(next.multiSourceWeights).toEqual({ depth: 0.2, orbitTrap: 0.5, normal: 0.3 })
+      expect(next.domainColoring).toEqual({
+        modulusMode: 'logPsiAbs',
+        contoursEnabled: false,
+        contourDensity: 7.5,
+        contourWidth: 0.11,
+        contourStrength: 0.66,
+      })
+      expect(next.phaseDiverging).toEqual({
+        neutralColor: '#121212',
+        positiveColor: '#ef5400',
+        negativeColor: '#0f3fff',
+      })
+      expect(next.divergingPsi).toEqual({
+        neutralColor: '#cccccc',
+        positiveColor: '#ff4400',
+        negativeColor: '#003cff',
+        intensityFloor: 0.37,
+        component: 'imag',
+      })
+    })
+  })
+
+  describe('Clamping behavior (prevents invalid uniforms)', () => {
+    it('clamps wireframe lineThickness to [1, 5]', () => {
+      const cases: Array<{ input: number; expected: number }> = [
+        { input: -100, expected: 1 },
+        { input: 0, expected: 1 },
+        { input: 1, expected: 1 },
+        { input: 4, expected: 4 },
+        { input: 5, expected: 5 },
+        { input: 6, expected: 5 },
+        { input: 999, expected: 5 },
+      ]
+
+      for (const { input, expected } of cases) {
+        useAppearanceStore.setState(APPEARANCE_INITIAL_STATE)
+        useAppearanceStore.getState().setWireframeSettings({ lineThickness: input })
+        expect(useAppearanceStore.getState().shaderSettings.wireframe.lineThickness).toBe(expected)
+      }
+    })
+
+    it('clamps surface specularIntensity to [0, 2]', () => {
+      useAppearanceStore.getState().setSurfaceSettings({
+        specularIntensity: 10,
+      })
+      expect(useAppearanceStore.getState().shaderSettings.surface.specularIntensity).toBe(2)
+
+      useAppearanceStore.getState().setSurfaceSettings({
+        specularIntensity: -5,
+      })
+      expect(useAppearanceStore.getState().shaderSettings.surface.specularIntensity).toBe(0)
+    })
+
+    it('ignores non-finite render numeric setting updates', () => {
+      const store = useAppearanceStore.getState()
+
+      store.setWireframeSettings({ lineThickness: 2.5 })
+      store.setSurfaceSettings({ specularIntensity: 0.9 })
+
+      store.setWireframeSettings({ lineThickness: Number.NaN })
+      store.setSurfaceSettings({ specularIntensity: Number.POSITIVE_INFINITY })
+
+      const next = useAppearanceStore.getState()
+      expect(next.shaderSettings.wireframe.lineThickness).toBe(2.5)
+      expect(next.shaderSettings.surface.specularIntensity).toBe(0.9)
+    })
+
+    it('ignores non-finite material emission controls', () => {
+      const store = useAppearanceStore.getState()
+
+      store.setFaceEmission(1.4)
+      store.setFaceEmissionThreshold(0.35)
+      store.setFaceEmissionColorShift(0.2)
+
+      store.setFaceEmission(Number.NaN)
+      store.setFaceEmissionThreshold(Number.POSITIVE_INFINITY)
+      store.setFaceEmissionColorShift(Number.NEGATIVE_INFINITY)
+
+      const next = useAppearanceStore.getState()
+      expect(next.faceEmission).toBe(1.4)
+      expect(next.faceEmissionThreshold).toBe(0.35)
+      expect(next.faceEmissionColorShift).toBe(0.2)
+    })
+
+    it('ignores non-finite color-slice numeric updates', () => {
+      const store = useAppearanceStore.getState()
+
+      store.setDistribution({ power: 2.5, cycles: 3.0, offset: 0.6 })
+      store.setMultiSourceWeights({ depth: 0.4, orbitTrap: 0.3, normal: 0.2 })
+      store.setLchLightness(0.7)
+      store.setLchChroma(0.2)
+      store.setDomainColoringSettings({
+        contourDensity: 6,
+        contourWidth: 0.08,
+        contourStrength: 0.45,
+      })
+      store.setDivergingPsiSettings({ intensityFloor: 0.33 })
+
+      store.setDistribution({
+        power: Number.NaN,
+        cycles: Number.POSITIVE_INFINITY,
+        offset: Number.NEGATIVE_INFINITY,
+      })
+      store.setMultiSourceWeights({
+        depth: Number.NaN,
+        orbitTrap: Number.POSITIVE_INFINITY,
+        normal: Number.NEGATIVE_INFINITY,
+      })
+      store.setLchLightness(Number.NaN)
+      store.setLchChroma(Number.POSITIVE_INFINITY)
+      store.setDomainColoringSettings({
+        contourDensity: Number.NaN,
+        contourWidth: Number.POSITIVE_INFINITY,
+        contourStrength: Number.NEGATIVE_INFINITY,
+      })
+      store.setDivergingPsiSettings({ intensityFloor: Number.NaN })
+
+      const next = useAppearanceStore.getState()
+      expect(next.distribution).toEqual({ power: 2.5, cycles: 3.0, offset: 0.6 })
+      expect(next.multiSourceWeights).toEqual({ depth: 0.4, orbitTrap: 0.3, normal: 0.2 })
+      expect(next.lchLightness).toBe(0.7)
+      expect(next.lchChroma).toBe(0.2)
+      expect(next.domainColoring.contourDensity).toBe(6)
+      expect(next.domainColoring.contourWidth).toBe(0.08)
+      expect(next.domainColoring.contourStrength).toBe(0.45)
+      expect(next.divergingPsi.intensityFloor).toBe(0.33)
+    })
+
+    it('ignores invalid cosine coefficient updates', () => {
+      const store = useAppearanceStore.getState()
+
+      store.setCosineCoefficients({
+        a: [0.4, 0.5, 0.6],
+        b: [0.2, 0.2, 0.2],
+        c: [1, 1, 1],
+        d: [0, 0, 0],
+      })
+      store.setCosineCoefficient('a', 1, 1.25)
+      store.setCosineCoefficient('a', 1, Number.NaN)
+      store.setCosineCoefficient('a', 99, 0.5)
+      store.setCosineCoefficient('a', -1, 0.5)
+      store.setCosineCoefficient('a', 1.5, 0.5)
+
+      const next = useAppearanceStore.getState()
+      expect(next.cosineCoefficients.a).toEqual([0.4, 1.25, 0.6])
+      expect(next.cosineCoefficients.a).toHaveLength(3)
+    })
+
+    it('clamps advanced SSS controls to shader-safe ranges', () => {
+      const store = useAppearanceStore.getState()
+
+      store.setSssIntensity(999)
+      store.setSssThickness(-5)
+      store.setSssJitter(3)
+
+      const next = useAppearanceStore.getState()
+      expect(next.sssIntensity).toBe(2)
+      expect(next.sssThickness).toBe(0.1)
+      expect(next.sssJitter).toBe(1)
+    })
+
+    it('ignores non-finite advanced SSS updates', () => {
+      const store = useAppearanceStore.getState()
+
+      store.setSssIntensity(1.4)
+      store.setSssThickness(1.8)
+      store.setSssJitter(0.3)
+
+      store.setSssIntensity(Number.NaN)
+      store.setSssThickness(Number.POSITIVE_INFINITY)
+      store.setSssJitter(Number.NEGATIVE_INFINITY)
+
+      const next = useAppearanceStore.getState()
+      expect(next.sssIntensity).toBe(1.4)
+      expect(next.sssThickness).toBe(1.8)
+      expect(next.sssJitter).toBe(0.3)
+    })
+
+    it('clamps bloom controls to safe ranges', () => {
+      usePostProcessingStore.getState().setBloomGain(999)
+      expect(usePostProcessingStore.getState().bloomGain).toBe(3)
+      usePostProcessingStore.getState().setBloomGain(-1)
+      expect(usePostProcessingStore.getState().bloomGain).toBe(0)
+
+      usePostProcessingStore.getState().setBloomThreshold(999)
+      expect(usePostProcessingStore.getState().bloomThreshold).toBe(5)
+      usePostProcessingStore.getState().setBloomThreshold(-999)
+      expect(usePostProcessingStore.getState().bloomThreshold).toBe(0)
+
+      usePostProcessingStore.getState().setBloomKnee(999)
+      expect(usePostProcessingStore.getState().bloomKnee).toBe(5)
+      usePostProcessingStore.getState().setBloomKnee(-999)
+      expect(usePostProcessingStore.getState().bloomKnee).toBe(0)
+
+      usePostProcessingStore.getState().setBloomRadius(999)
+      expect(usePostProcessingStore.getState().bloomRadius).toBe(4)
+      usePostProcessingStore.getState().setBloomRadius(-999)
+      expect(usePostProcessingStore.getState().bloomRadius).toBe(0.25)
+    })
+
+    it('normalizes/clamps lighting angles to prevent invalid light vectors', () => {
+      useLightingStore.getState().setLightHorizontalAngle(400)
+      expect(useLightingStore.getState().lightHorizontalAngle).toBe(40)
+      useLightingStore.getState().setLightHorizontalAngle(-90)
+      expect(useLightingStore.getState().lightHorizontalAngle).toBe(270)
+
+      useLightingStore.getState().setLightVerticalAngle(120)
+      expect(useLightingStore.getState().lightVerticalAngle).toBe(90)
+      useLightingStore.getState().setLightVerticalAngle(-120)
+      expect(useLightingStore.getState().lightVerticalAngle).toBe(-90)
+    })
+  })
+})

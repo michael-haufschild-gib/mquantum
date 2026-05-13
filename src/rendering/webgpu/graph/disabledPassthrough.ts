@@ -12,6 +12,7 @@ import { logger } from '@/lib/logger'
 
 import type { WebGPURenderPass } from '../core/types'
 import type { WebGPUResourcePool } from '../core/WebGPUResourcePool'
+import { resolveResourceAlias } from './resourceAliases'
 
 /**
  * Seen mismatch signatures for passthrough warnings. A stable mismatch would
@@ -30,7 +31,7 @@ const warnedPassthroughMismatch = new Set<string>()
  * @param pass - The disabled render pass
  * @param passId - Pass identifier for logging
  * @param encoder - Active command encoder for copy commands
- * @param passTimings - Mutable timing map (set to 0 for skipped passes)
+ * @param passTimings - Mutable timing map (set to 0 for skipped passes), or null when metrics are disabled
  * @param writtenByEnabledPass - Set of resource IDs already written this frame
  * @param shouldLog - Whether to emit debug log messages
  */
@@ -40,7 +41,7 @@ export function handleDisabledPassthrough(
   pass: WebGPURenderPass,
   passId: string,
   encoder: GPUCommandEncoder,
-  passTimings: Map<string, number>,
+  passTimings: Map<string, number> | null,
   writtenByEnabledPass: Set<string>,
   shouldLog: boolean
 ): void {
@@ -48,15 +49,16 @@ export function handleDisabledPassthrough(
   const outputs = pass.config.outputs ?? []
 
   if (inputs.length < 1 || outputs.length < 1) {
-    passTimings.set(passId, 0)
+    passTimings?.set(passId, 0)
     return
   }
 
   const inputId = inputs[0]!.resourceId
   const outputId = outputs[0]!.resourceId
+  const resolvedInputId = resolveResourceAlias(resourceAliases, inputId)
 
   if (writtenByEnabledPass.has(outputId)) {
-    passTimings.set(passId, 0)
+    passTimings?.set(passId, 0)
     if (shouldLog)
       logger.log(`[WebGPU RenderGraph] Pass '${passId}' skipped (output already written)`)
     return
@@ -65,11 +67,11 @@ export function handleDisabledPassthrough(
   const skipPassthrough = pass.config.skipPassthrough ?? false
 
   if (skipPassthrough) {
-    resourceAliases.set(outputId, inputId)
+    resourceAliases.set(outputId, resolvedInputId)
     if (shouldLog)
-      logger.log(`[WebGPU RenderGraph] Pass '${passId}' aliasing ${outputId} → ${inputId}`)
+      logger.log(`[WebGPU RenderGraph] Pass '${passId}' aliasing ${outputId} → ${resolvedInputId}`)
   } else {
-    const inputTexture = pool.getTexture(inputId)
+    const inputTexture = pool.getTexture(resolvedInputId)
     const outputTexture = pool.getTexture(outputId)
 
     if (inputTexture && outputTexture) {
@@ -95,20 +97,20 @@ export function handleDisabledPassthrough(
           // values. Log a warning so the renderer author can mark the pass with
           // skipPassthrough=true (intentional alias) or fix the format mismatch.
           const warnKey =
-            `${passId}:${inputId}→${outputId}:` +
+            `${passId}:${resolvedInputId}→${outputId}:` +
             `${inputTexture.format}:${inputTexture.width}×${inputTexture.height}→` +
             `${outputTexture.format}:${outputTexture.width}×${outputTexture.height}`
           if (!warnedPassthroughMismatch.has(warnKey)) {
             warnedPassthroughMismatch.add(warnKey)
             logger.warn(
-              `[WebGPU RenderGraph] Disabled pass '${passId}' falling back to alias because ${inputId} (${inputTexture.format} ${inputTexture.width}×${inputTexture.height}) does not match ${outputId} (${outputTexture.format} ${outputTexture.width}×${outputTexture.height}). Add skipPassthrough=true to the pass config if aliasing is intentional.`
+              `[WebGPU RenderGraph] Disabled pass '${passId}' falling back to alias because ${resolvedInputId} (${inputTexture.format} ${inputTexture.width}×${inputTexture.height}) does not match ${outputId} (${outputTexture.format} ${outputTexture.width}×${outputTexture.height}). Add skipPassthrough=true to the pass config if aliasing is intentional.`
             )
           }
-          resourceAliases.set(outputId, inputId)
+          resourceAliases.set(outputId, resolvedInputId)
         }
       }
     }
   }
 
-  passTimings.set(passId, 0)
+  passTimings?.set(passId, 0)
 }

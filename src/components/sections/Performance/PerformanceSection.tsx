@@ -8,7 +8,7 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { Section } from '@/components/sections/Section'
 import { Slider } from '@/components/ui/Slider'
-import { usePerformanceStore } from '@/stores/performanceStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
 
 import { EigenfunctionCacheControls } from './EigenfunctionCacheControls'
 import { ProgressiveRefinementControls } from './ProgressiveRefinementControls'

@@ -7,7 +7,7 @@
  * @module rendering/webgpu/passes/DensityDistributionAnalysis
  */
 
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
 // PERF: Precomputed 2^(exponent-15) lookup table for Float16 decoding.
 // Exponents 0..30 (31 is Inf/NaN handled separately). Avoids Math.pow per voxel.

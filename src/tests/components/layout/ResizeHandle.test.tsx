@@ -9,7 +9,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ResizeHandle } from '@/components/layout/ResizeHandle'
-import { useLayoutStore } from '@/stores/layoutStore'
+import { useLayoutStore } from '@/stores/ui/layoutStore'
 
 vi.mock('@/lib/audio/SoundManager', () => ({
   soundManager: { playClick: vi.fn(), playHover: vi.fn() },

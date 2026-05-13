@@ -10,8 +10,9 @@
 import React, { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+import { TileButton } from '@/components/ui/TileButton'
 import { SkyboxSelection } from '@/stores/defaults/visualDefaults'
-import { type EnvironmentStore, useEnvironmentStore } from '@/stores/environmentStore'
+import { type EnvironmentStore, useEnvironmentStore } from '@/stores/scene/environmentStore'
 
 import { AuroraControls } from './skybox/AuroraControls'
 import { HorizonControls } from './skybox/HorizonControls'
@@ -183,18 +184,12 @@ export const SkyboxControls: React.FC = React.memo(() => {
         {ALL_SKYBOX_OPTIONS.map((option) => {
           const isSelected = skyboxSelection === option.id
           return (
-            <a
+            <TileButton
               key={option.id}
-              role="button"
-              tabIndex={0}
               data-testid={`skybox-option-${option.id}`}
               onClick={() => handleSkyboxSelect(option.id)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  handleSkyboxSelect(option.id)
-                }
-              }}
+              pressed={isSelected}
+              ariaLabel={`${option.name}: ${option.description}`}
               className={`
                 group relative aspect-square rounded-xl overflow-hidden border-2 cursor-pointer
                 transition-[transform,border-color,box-shadow] duration-200 ease-out
@@ -224,7 +219,7 @@ export const SkyboxControls: React.FC = React.memo(() => {
               <div className="absolute bottom-0 inset-x-0 p-1 bg-[var(--bg-overlay)] text-center">
                 <span className="text-xs font-medium text-white block">{option.name}</span>
               </div>
-            </a>
+            </TileButton>
           )
         })}
       </div>

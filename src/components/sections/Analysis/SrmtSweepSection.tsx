@@ -29,14 +29,14 @@ import { Section } from '@/components/sections/Section'
 import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { Button } from '@/components/ui/Button'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
-import { getGitSha } from '@/lib/build/buildInfo'
+import { getGitSha } from '@/lib/buildInfo'
 import { downloadFile, exportFilename } from '@/lib/export/dataExport'
 import { SRMT_DIAGNOSTIC_VERSION } from '@/lib/physics/srmt'
 import { buildSrmtSweepManifest } from '@/lib/physics/srmt/sweepManifest'
 import type { SrmtSweepKind } from '@/lib/physics/srmt/sweepTypes'
 import { WDW_SOLVER_VERSION } from '@/lib/physics/wheelerDeWitt/solver'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useSrmtSweepStore } from '@/stores/srmtSweepStore'
+import { useSrmtSweepStore } from '@/stores/diagnostics/srmtSweepStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 import {
   clampUiStateToPhiExtent,

@@ -50,7 +50,7 @@ Existing sections: Advanced, Environment, Export, Faces, Geometry, Lights, Objec
 
 ```tsx
 import { useShallow } from 'zustand/react/shallow'
-import { useAppearanceStore } from '@/stores/appearanceStore'
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 
 // Single value — individual selector
 const opacity = useAppearanceStore((s) => s.opacity)
@@ -68,32 +68,40 @@ const { opacity, setOpacity } = useAppearanceStore(
 const appearance = getStore(ctx, 'appearance')
 
 // FORBIDDEN in WebGPU passes:
-import { useAppearanceStore } from '@/stores/appearanceStore'
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 ```
 
 ## Stores Reference
 
-| Store | Domain |
-|-------|--------|
-| `geometryStore` | Dimensions, object type |
-| `appearanceStore` | Visual appearance |
-| `animationStore` | Animation state |
-| `cameraStore` | Camera position/target |
-| `lightingStore` | Light sources |
-| `postProcessingStore` | Bloom, SSAO, SSR, etc. |
-| `rendererStore` | Render quality, resolution |
-| `environmentStore` | Skybox, ground plane |
-| `exportStore` | Screenshot/video export |
-| `uiStore` | UI state (panels, dialogs) |
-| `themeStore` | Theme/accent colors |
-| `performanceStore` | GPU tier, quality presets |
-| `rotationStore` | N-dimensional rotation |
-| `transformStore` | Object transforms |
-| `pbrStore` | PBR material settings |
-| `extendedObjectStore` | Object-specific extended state |
-| `presetManagerStore` | Scene/style preset management |
-| `layoutStore` | Panel layout state |
-| `screenshotStore` | Screenshot settings |
+Stores are grouped by purpose. Import path: `@/stores/{group}/{name}Store`.
+
+| Store | Group | Domain |
+|-------|-------|--------|
+| `geometryStore` | scene | Dimensions, object type |
+| `appearanceStore` | scene | Visual appearance |
+| `animationStore` | scene | Animation state |
+| `cameraStore` | scene | Camera position/target |
+| `lightingStore` | scene | Light sources |
+| `postProcessingStore` | scene | Bloom, SSAO, SSR, etc. |
+| `environmentStore` | scene | Skybox, ground plane |
+| `rotationStore` | scene | N-dimensional rotation |
+| `transformStore` | scene | Object transforms |
+| `pbrStore` | scene | PBR material settings |
+| `extendedObjectStore` | scene | Object-specific extended state |
+| `uiStore` | ui | UI state (panels, dialogs) |
+| `themeStore` | ui | Theme/accent colors |
+| `layoutStore` | ui | Panel layout state |
+| `dropdownStore` | ui | Dropdown coordination |
+| `dismissedDialogsStore` | ui | Dismissed-dialog memory |
+| `msgBoxStore` | ui | Message box state |
+| `rendererStore` | runtime | Render quality, resolution |
+| `performanceStore` | runtime | GPU tier, quality presets |
+| `exportStore` | runtime | Screenshot/video export |
+| `screenshotStore` | runtime | Screenshot settings |
+| `screenshotCaptureStore` | runtime | Screenshot capture coordination |
+| `presetManagerStore` | runtime | Scene/style preset management |
+| `simulationStateStore` | runtime | Simulation state save/load |
+| `diagnosticsStore`, `performanceMetricsStore`, `measurementStore`, `coordinateEntanglementStore`, `wavefunctionSliceStore`, `srmtDiagnosticStore`, `srmtSweepStore`, `andersonSweepStore`, `monitoringSweepStore`, `hellerSpectrometerStore`, `quantumnessAtlasStore`, `wormholeCoherenceStore`, `pageCurveStore`, `carpetStore` | diagnostics | Analysis / measurement / observation overlays |
 
 ## Theme System
 
@@ -110,7 +118,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { Section } from '@/components/sections/Section'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
-import { useSomeStore } from '@/stores/someStore'
+import { useSomeStore } from '@/stores/scene/someStore'
 
 /**
  * Controls for {feature description}.

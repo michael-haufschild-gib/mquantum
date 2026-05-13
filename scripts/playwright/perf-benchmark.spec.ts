@@ -10,6 +10,7 @@
 
 import { test } from './fixtures'
 import {
+  getPerformanceMetrics,
   gotoMode,
   type PassTimingSnapshot,
   requireWebGPU,
@@ -37,6 +38,67 @@ interface BenchmarkResult {
   dimension: number
   label: string
   sample: BenchmarkSample
+}
+
+async function enablePerfCollection(page: import('@playwright/test').Page): Promise<void> {
+  await page.evaluate(() => {
+    const perfStore = window.__PERFORMANCE_STORE__
+    const uiStore = window.__UI_STORE__
+    if (!perfStore || !uiStore) {
+      throw new Error(
+        '__PERFORMANCE_STORE__/__UI_STORE__ missing on window — DEV bridge not registered'
+      )
+    }
+    perfStore.getState().setMaxFps(0)
+    uiStore.setState({ showPerfMonitor: true, perfMonitorExpanded: true })
+  })
+}
+
+async function startAnimation(page: import('@playwright/test').Page): Promise<void> {
+  await page.evaluate(() => {
+    const animationStore = window.__ANIMATION_STORE__
+    if (!animationStore) {
+      throw new Error('__ANIMATION_STORE__ missing on window — DEV bridge not registered')
+    }
+    animationStore.getState().play()
+  })
+}
+
+async function waitForPerfStats(
+  page: import('@playwright/test').Page,
+  timeout = 10_000
+): Promise<void> {
+  await page.waitForFunction(
+    () => {
+      const store = window.__PERFORMANCE_METRICS_STORE__
+      return !!store && store.getState().fps > 0
+    },
+    { timeout }
+  )
+}
+
+async function collectBenchmarkSample(
+  page: import('@playwright/test').Page
+): Promise<BenchmarkSample> {
+  const metrics = await getPerformanceMetrics(page)
+  const viewport = await page.evaluate(() => {
+    const store = window.__PERFORMANCE_METRICS_STORE__
+    if (!store) {
+      throw new Error('__PERFORMANCE_METRICS_STORE__ missing on window — DEV bridge not registered')
+    }
+    const s = store.getState()
+    return { width: s.viewport.width, height: s.viewport.height }
+  })
+  return {
+    fps: metrics.fps,
+    frameTimeMs: metrics.frameTime,
+    cpuTimeMs: metrics.cpuTime,
+    totalGpuTimeMs: metrics.totalGpuTimeMs,
+    passTimings: metrics.passTimings,
+    cpuBreakdown: { ...metrics.cpuBreakdown },
+    vramMB: metrics.vramMB,
+    viewport,
+  }
 }
 
 test.setTimeout(300_000) // 5 min per test
@@ -70,18 +132,10 @@ test.describe('render performance benchmark', () => {
       await waitForShaderCompilation(page)
 
       // Uncap FPS + enable performance monitor for timing collection
-      await page.evaluate(async () => {
-        const perfStore = (await import('/src/stores/performanceStore.ts')).usePerformanceStore
-        perfStore.getState().setMaxFps(0)
-        const mod = await import('/src/stores/uiStore.ts')
-        mod.useUIStore.setState({ showPerfMonitor: true, perfMonitorExpanded: true })
-      })
+      await enablePerfCollection(page)
 
       // Start animation for dynamic scenes
-      await page.evaluate(async () => {
-        const mod = await import('/src/stores/animationStore.ts')
-        mod.useAnimationStore.getState().play()
-      })
+      await startAnimation(page)
 
       // Warmup: let the renderer settle, GPU caches warm, perf monitor activate
       await page.waitForFunction(
@@ -94,13 +148,7 @@ test.describe('render performance benchmark', () => {
       )
 
       // Wait for the perf collector to publish at least one stats cycle (fps > 0)
-      await page.waitForFunction(
-        async () => {
-          const mod = await import('/src/stores/performanceMetricsStore.ts')
-          return mod.usePerformanceMetricsStore.getState().fps > 0
-        },
-        { timeout: 10_000 }
-      )
+      await waitForPerfStats(page)
 
       // Wait for measurement frames
       const startFrame = await page.evaluate(() => {
@@ -118,36 +166,10 @@ test.describe('render performance benchmark', () => {
       )
 
       // Wait for final stats to publish (fps > 0 from the measurement window)
-      await page.waitForFunction(
-        async () => {
-          const mod = await import('/src/stores/performanceMetricsStore.ts')
-          return mod.usePerformanceMetricsStore.getState().fps > 0
-        },
-        { timeout: 5_000 }
-      )
+      await waitForPerfStats(page, 5_000)
 
       // Collect metrics from performanceMetricsStore
-      const sample = await page.evaluate(async (): Promise<BenchmarkSample> => {
-        const mod = await import('/src/stores/performanceMetricsStore.ts')
-        const s = mod.usePerformanceMetricsStore.getState()
-        return {
-          fps: s.fps,
-          frameTimeMs: s.frameTime,
-          cpuTimeMs: s.cpuTime,
-          totalGpuTimeMs: s.totalGpuTimeMs,
-          passTimings: s.passTimings.map((pt) => ({
-            passId: pt.passId,
-            gpuTimeMs: pt.gpuTimeMs,
-            computeGpuTimeMs: pt.computeGpuTimeMs ?? 0,
-            renderGpuTimeMs: pt.renderGpuTimeMs ?? 0,
-            cpuTimeMs: pt.cpuTimeMs,
-            skipped: pt.skipped,
-          })),
-          cpuBreakdown: { ...s.cpuBreakdown },
-          vramMB: s.vram.total,
-          viewport: { width: s.viewport.width, height: s.viewport.height },
-        }
-      })
+      const sample = await collectBenchmarkSample(page)
 
       const result: BenchmarkResult = { mode, dimension: dim, label, sample }
       allResults.push(result)
@@ -229,17 +251,9 @@ test.describe('render performance benchmark @2x', () => {
       await waitForRendererReady(page)
       await waitForShaderCompilation(page)
 
-      await page.evaluate(async () => {
-        const perfStore = (await import('/src/stores/performanceStore.ts')).usePerformanceStore
-        perfStore.getState().setMaxFps(0)
-        const mod = await import('/src/stores/uiStore.ts')
-        mod.useUIStore.setState({ showPerfMonitor: true, perfMonitorExpanded: true })
-      })
+      await enablePerfCollection(page)
 
-      await page.evaluate(async () => {
-        const mod = await import('/src/stores/animationStore.ts')
-        mod.useAnimationStore.getState().play()
-      })
+      await startAnimation(page)
 
       await page.waitForFunction(
         (warmupFrames: number) => {
@@ -250,13 +264,7 @@ test.describe('render performance benchmark @2x', () => {
         { timeout: 30_000 }
       )
 
-      await page.waitForFunction(
-        async () => {
-          const mod = await import('/src/stores/performanceMetricsStore.ts')
-          return mod.usePerformanceMetricsStore.getState().fps > 0
-        },
-        { timeout: 10_000 }
-      )
+      await waitForPerfStats(page)
 
       const startFrame = await page.evaluate(() => {
         const canvas = document.querySelector('[data-testid="webgpu-canvas"]')
@@ -275,27 +283,7 @@ test.describe('render performance benchmark @2x', () => {
       // Collect a full BenchmarkSample so the @2x entries flow through the
       // same BENCHMARK_JSON pipeline as the primary scenarios and can be
       // aggregated by scripts/bench-summary.js.
-      const sample = await page.evaluate(async (): Promise<BenchmarkSample> => {
-        const mod = await import('/src/stores/performanceMetricsStore.ts')
-        const s = mod.usePerformanceMetricsStore.getState()
-        return {
-          fps: s.fps,
-          frameTimeMs: s.frameTime,
-          cpuTimeMs: s.cpuTime,
-          totalGpuTimeMs: s.totalGpuTimeMs,
-          passTimings: s.passTimings.map((pt) => ({
-            passId: pt.passId,
-            gpuTimeMs: pt.gpuTimeMs,
-            computeGpuTimeMs: pt.computeGpuTimeMs ?? 0,
-            renderGpuTimeMs: pt.renderGpuTimeMs ?? 0,
-            cpuTimeMs: pt.cpuTimeMs,
-            skipped: pt.skipped,
-          })),
-          cpuBreakdown: { ...s.cpuBreakdown },
-          vramMB: s.vram.total,
-          viewport: { width: s.viewport.width, height: s.viewport.height },
-        }
-      })
+      const sample = await collectBenchmarkSample(page)
 
       const schrod = sample.passTimings.find((p) => p.passId === 'schroedinger')
       const result: BenchmarkResult = { mode, dimension: dim, label, sample }

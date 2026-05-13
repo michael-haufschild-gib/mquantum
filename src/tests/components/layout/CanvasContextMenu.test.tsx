@@ -3,10 +3,10 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { CanvasContextMenu } from '@/components/layout/CanvasContextMenu'
-import { useDropdownStore } from '@/stores/dropdownStore'
+import { useDropdownStore } from '@/stores/ui/dropdownStore'
 
 // Mock the stores
-vi.mock('@/stores/layoutStore', () => ({
+vi.mock('@/stores/ui/layoutStore', () => ({
   useLayoutStore: vi.fn((selector) =>
     selector({
       toggleCinematicMode: vi.fn(),
@@ -16,7 +16,7 @@ vi.mock('@/stores/layoutStore', () => ({
   ),
 }))
 
-vi.mock('@/stores/cameraStore', () => ({
+vi.mock('@/stores/scene/cameraStore', () => ({
   useCameraStore: vi.fn((selector) =>
     selector({
       reset: vi.fn(),
@@ -76,6 +76,8 @@ describe('CanvasContextMenu (invariants)', () => {
     return { canvas, container }
   }
 
+  const findResetCameraItem = () => screen.findByText('Reset Camera', undefined, { timeout: 5_000 })
+
   describe('invariant: opens only on canvas right-click with correct positioning', () => {
     it('should open when right-clicking on canvas', () => {
       render(<CanvasContextMenu />)
@@ -102,18 +104,18 @@ describe('CanvasContextMenu (invariants)', () => {
       expect(useDropdownStore.getState().openDropdownId).toBeNull()
     })
 
-    it('should render menu items when open', () => {
+    it('should render menu items when open', async () => {
       render(<CanvasContextMenu />)
 
       rightClickCanvas()
 
-      expect(screen.getByText('Reset Camera')).toBeInTheDocument()
+      expect(await findResetCameraItem()).toBeInTheDocument()
       expect(screen.getByText('Toggle Cinematic Mode')).toBeInTheDocument()
       expect(screen.getByText('Toggle Left Panel')).toBeInTheDocument()
       expect(screen.getByText('Toggle Right Panel')).toBeInTheDocument()
     })
 
-    it('should position menu at click coordinates', () => {
+    it('should position menu at click coordinates', async () => {
       render(<CanvasContextMenu />)
 
       const container = document.createElement('div')
@@ -129,7 +131,7 @@ describe('CanvasContextMenu (invariants)', () => {
         clientY: 250,
       })
 
-      const menu = screen.getByTestId('canvas-context-menu')
+      const menu = await screen.findByTestId('canvas-context-menu')
       expect(menu).toHaveStyle({ top: '250px', left: '150px' })
     })
   })
@@ -142,7 +144,7 @@ describe('CanvasContextMenu (invariants)', () => {
       rightClickCanvas()
       expect(useDropdownStore.getState().openDropdownId).toBe(DROPDOWN_ID)
 
-      await user.click(screen.getByText('Reset Camera'))
+      await user.click(await findResetCameraItem())
 
       expect(useDropdownStore.getState().openDropdownId).toBeNull()
     })
@@ -153,6 +155,7 @@ describe('CanvasContextMenu (invariants)', () => {
 
       rightClickCanvas()
       expect(useDropdownStore.getState().openDropdownId).toBe(DROPDOWN_ID)
+      expect(await findResetCameraItem()).toBeInTheDocument()
 
       await user.keyboard('{Escape}')
 
@@ -161,12 +164,13 @@ describe('CanvasContextMenu (invariants)', () => {
   })
 
   describe('invariant: mutual exclusion with other dropdowns', () => {
-    it('should close when another dropdown opens', () => {
+    it('should close when another dropdown opens', async () => {
       render(<CanvasContextMenu />)
 
       // Open canvas context menu
       rightClickCanvas()
       expect(useDropdownStore.getState().openDropdownId).toBe(DROPDOWN_ID)
+      expect(await findResetCameraItem()).toBeInTheDocument()
 
       // Simulate another dropdown opening (e.g., topbar menu)
       act(() => {
@@ -194,20 +198,20 @@ describe('CanvasContextMenu (invariants)', () => {
   })
 
   describe('menu items', () => {
-    it('should render separator between items', () => {
+    it('should render separator between items', async () => {
       render(<CanvasContextMenu />)
 
       rightClickCanvas()
 
-      expect(screen.getByRole('separator')).toBeInTheDocument()
+      expect(await screen.findByRole('separator')).toBeInTheDocument()
     })
 
-    it('should display keyboard shortcuts', () => {
+    it('should display keyboard shortcuts', async () => {
       render(<CanvasContextMenu />)
 
       rightClickCanvas()
 
-      expect(screen.getByText('R')).toBeInTheDocument()
+      expect(await screen.findByText('R')).toBeInTheDocument()
       expect(screen.getByText('C')).toBeInTheDocument()
       expect(screen.getByText('Shift+\\')).toBeInTheDocument()
       expect(screen.getByText('\\')).toBeInTheDocument()

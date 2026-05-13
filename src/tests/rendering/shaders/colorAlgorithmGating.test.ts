@@ -3,10 +3,7 @@
  */
 import { describe, expect, it } from 'vitest'
 
-import {
-  COLOR_ALGORITHM_TO_INT,
-  getAvailableColorAlgorithms,
-} from '@/rendering/shaders/palette/types'
+import { COLOR_ALGORITHM_TO_INT, getAvailableColorAlgorithms } from '@/lib/colors/palette/types'
 
 describe('COLOR_ALGORITHM_TO_INT open quantum entries', () => {
   it('maps purityMap to 16', () => {

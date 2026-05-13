@@ -7,7 +7,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { LightList } from '@/components/sections/Lights/LightList'
-import { useLightingStore } from '@/stores/lightingStore'
+import { useLightingStore } from '@/stores/scene/lightingStore'
 
 function resetStore() {
   useLightingStore.setState({

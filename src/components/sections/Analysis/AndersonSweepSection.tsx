@@ -12,10 +12,14 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { Button } from '@/components/ui/Button'
 import { Slider } from '@/components/ui/Slider'
-import type { SweepConfig, SweepResult } from '@/stores/andersonSweepStore'
-import { seedForStep, useAndersonSweepStore, wForStep } from '@/stores/andersonSweepStore'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import type { SweepConfig, SweepResult } from '@/stores/diagnostics/andersonSweepStore'
+import {
+  seedForStep,
+  useAndersonSweepStore,
+  wForStep,
+} from '@/stores/diagnostics/andersonSweepStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 /** SVG layout for the sweep results scatter plot. */
 const SVG_W = 260

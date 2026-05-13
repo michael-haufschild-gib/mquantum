@@ -2,7 +2,7 @@ import { render, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ColorPreview } from '@/components/sections/Faces/ColorPreview'
-import { useAppearanceStore } from '@/stores/appearanceStore'
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 
 describe('ColorPreview', () => {
   beforeEach(() => {

@@ -7,7 +7,7 @@ import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { ColorPicker } from '@/components/ui/ColorPicker'
-import { type EnvironmentStore, useEnvironmentStore } from '@/stores/environmentStore'
+import { type EnvironmentStore, useEnvironmentStore } from '@/stores/scene/environmentStore'
 
 export const BackgroundColorControls: React.FC = React.memo(() => {
   const backgroundSelector = useShallow((state: EnvironmentStore) => ({

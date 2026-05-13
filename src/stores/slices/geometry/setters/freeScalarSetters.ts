@@ -14,7 +14,13 @@ import type {
   FreeScalarInitialCondition,
 } from '@/lib/geometry/extended/types'
 import { nearestPow2 } from '@/lib/math/ndArray'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import {
+  canApplyPresetRequest,
+  createLatestPresetRequestGuard,
+  loadPresetModule,
+  type SchroedingerPresetApplyOptions,
+} from '@/stores/utils/dynamicPresetImport'
 
 import {
   createFreeScalarCosmologySetters,
@@ -80,7 +86,10 @@ export interface FreeScalarSetters extends FreeScalarCosmologySetters, FreeScala
   setFreeScalarKSpaceBroadeningSigma: (value: number) => void
   setFreeScalarKSpaceRadialBinCount: (value: number) => void
   // Presets
-  applyFreeScalarPreset: (presetId: string) => void
+  applyFreeScalarPreset: (
+    presetId: string,
+    options?: SchroedingerPresetApplyOptions
+  ) => Promise<void>
 }
 
 /**
@@ -116,6 +125,7 @@ export const resizeFreeScalarArrays = (
 export function createFreeScalarSetters(ctx: SetterContext): FreeScalarSetters {
   const { setWithVersion, set, isFinite, warnNonFinite, hasOnlyFinite } = ctx
   const D = 'freeScalar' as const
+  const beginPresetRequest = createLatestPresetRequestGuard()
 
   return {
     setFreeScalarLatticeDim: (dim) => {
@@ -564,53 +574,63 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarSetters {
     },
     ...createFreeScalarPreheatingSetters(ctx),
     ...createFreeScalarCosmologySetters(ctx),
-    applyFreeScalarPreset: (presetId) => {
-      void import('@/lib/physics/freeScalar/presets').then(({ FREE_SCALAR_PRESETS }) => {
-        const preset = FREE_SCALAR_PRESETS.find((p) => p.id === presetId)
-        if (!preset) return
-        setWithVersion((state) => {
-          const globalDim = useGeometryStore.getState().dimension
-          const base: FreeScalarConfig = {
-            ...DEFAULT_FREE_SCALAR_CONFIG,
-            ...preset.overrides,
-            kSpaceViz: state.schroedinger.freeScalar.kSpaceViz,
-            slicePositions: state.schroedinger.freeScalar.slicePositions,
-            needsReset: true,
-          }
-          const resized = resizeFreeScalarArrays(base, globalDim)
-          // The global dimension may fall outside the cosmology-supported
-          // range [2, 6] (spacetimeDim ∈ [3, 7]). Even when it's in range,
-          // the preset's eta0 may be below the safe threshold at the
-          // resized lattice shape. Reconcile so presets either run cleanly
-          // or soft-disable cosmology with a logger warning.
-          const staged: FreeScalarConfig = {
-            ...base,
-            ...resized,
-            needsReset: true,
-          }
-          const reconciled = reconcileCosmologyInvariants(staged)
-          // Propagate absorber state to the parent SchroedingerConfig — the
-          // AbsorptionSection reads `schroedinger.absorberEnabled`, not the
-          // per-mode child field.
-          const parentAbsorber =
-            preset.overrides.absorberEnabled !== undefined
-              ? {
-                  absorberEnabled: preset.overrides.absorberEnabled,
-                  absorberWidth: preset.overrides.absorberWidth ?? state.schroedinger.absorberWidth,
-                  pmlTargetReflection:
-                    preset.overrides.pmlTargetReflection ?? state.schroedinger.pmlTargetReflection,
-                }
-              : {}
-          return {
-            schroedinger: {
-              ...state.schroedinger,
-              ...preset.renderingOverrides,
-              ...parentAbsorber,
-              freeScalar: { ...staged, ...reconciled },
-            },
-          }
-        })
-      })
+    applyFreeScalarPreset: (presetId, options) => {
+      const isLatestRequest = beginPresetRequest()
+      return loadPresetModule(
+        () => import('@/lib/physics/freeScalar/presets'),
+        'freeScalarSetters',
+        `free-scalar presets for '${presetId}'`,
+        ({ FREE_SCALAR_PRESETS }) => {
+          if (!canApplyPresetRequest(isLatestRequest, ctx.get().schroedinger.quantumMode, options))
+            return
+          const preset = FREE_SCALAR_PRESETS.find((p) => p.id === presetId)
+          if (!preset) return
+          setWithVersion((state) => {
+            const globalDim = useGeometryStore.getState().dimension
+            const base: FreeScalarConfig = {
+              ...DEFAULT_FREE_SCALAR_CONFIG,
+              ...preset.overrides,
+              kSpaceViz: state.schroedinger.freeScalar.kSpaceViz,
+              slicePositions: state.schroedinger.freeScalar.slicePositions,
+              needsReset: true,
+            }
+            const resized = resizeFreeScalarArrays(base, globalDim)
+            // The global dimension may fall outside the cosmology-supported
+            // range [2, 6] (spacetimeDim ∈ [3, 7]). Even when it's in range,
+            // the preset's eta0 may be below the safe threshold at the
+            // resized lattice shape. Reconcile so presets either run cleanly
+            // or soft-disable cosmology with a logger warning.
+            const staged: FreeScalarConfig = {
+              ...base,
+              ...resized,
+              needsReset: true,
+            }
+            const reconciled = reconcileCosmologyInvariants(staged)
+            // Propagate absorber state to the parent SchroedingerConfig — the
+            // AbsorptionSection reads `schroedinger.absorberEnabled`, not the
+            // per-mode child field.
+            const parentAbsorber =
+              preset.overrides.absorberEnabled !== undefined
+                ? {
+                    absorberEnabled: preset.overrides.absorberEnabled,
+                    absorberWidth:
+                      preset.overrides.absorberWidth ?? state.schroedinger.absorberWidth,
+                    pmlTargetReflection:
+                      preset.overrides.pmlTargetReflection ??
+                      state.schroedinger.pmlTargetReflection,
+                  }
+                : {}
+            return {
+              schroedinger: {
+                ...state.schroedinger,
+                ...preset.renderingOverrides,
+                ...parentAbsorber,
+                freeScalar: { ...staged, ...reconciled },
+              },
+            }
+          })
+        }
+      )
     },
   }
 }

@@ -17,8 +17,11 @@ import type {
   SchroedingerCrossSectionScalar,
 } from '@/lib/geometry/extended/types'
 import { DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
-import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import {
+  type ExtendedObjectState,
+  useExtendedObjectStore,
+} from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 const CROSS_SECTION_COMPOSITE_OPTIONS: {
   value: SchroedingerCrossSectionCompositeMode

@@ -7,7 +7,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AMBIENT_LIGHT_ID, LightListItem } from '@/components/sections/Lights/LightListItem'
-import type { LightSource } from '@/rendering/lights/types'
+import type { LightSource } from '@/lib/lighting/lightSource'
 
 function makeLight(overrides: Partial<LightSource> = {}): LightSource {
   return {
@@ -43,6 +43,7 @@ describe('LightListItem', () => {
       />
     )
     expect(screen.getByText('My Point')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Select My Point' })).toBeInTheDocument()
   })
 
   it('shows enabled/disable toggle button', () => {
@@ -166,9 +167,48 @@ describe('LightListItem', () => {
         onRemove={vi.fn()}
       />
     )
-    const item = screen.getByText('Keyboard Light')
+    const item = screen.getByRole('button', { name: /Keyboard Light/i })
     item.focus()
     await user.keyboard('{Enter}')
     expect(onSelect).toHaveBeenCalledTimes(1)
+  })
+
+  it('calls onSelect on Space keypress', async () => {
+    const onSelect = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <LightListItem
+        light={makeLight({ name: 'Space Light' })}
+        isSelected={false}
+        onSelect={onSelect}
+        onToggle={vi.fn()}
+        onRemove={vi.fn()}
+      />
+    )
+    const item = screen.getByRole('button', { name: /Space Light/i })
+    item.focus()
+    await user.keyboard(' ')
+    expect(onSelect).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not select row when nested toggle button is keyboard-activated', async () => {
+    const onSelect = vi.fn()
+    const onToggle = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <LightListItem
+        light={makeLight()}
+        isSelected={false}
+        onSelect={onSelect}
+        onToggle={onToggle}
+        onRemove={vi.fn()}
+      />
+    )
+
+    screen.getByRole('button', { name: /disable light/i }).focus()
+    await user.keyboard('{Enter}')
+
+    expect(onToggle).toHaveBeenCalledTimes(1)
+    expect(onSelect).not.toHaveBeenCalled()
   })
 })

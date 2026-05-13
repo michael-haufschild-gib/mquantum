@@ -16,9 +16,9 @@ import { useObjectTypeInitialization } from '@/hooks/useObjectTypeInitialization
 import { useUrlState } from '@/hooks/useUrlState'
 import type { ShareableState } from '@/lib/url/state-serializer'
 import { parseCurrentUrl } from '@/lib/url/state-serializer'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 vi.mock('@/lib/url/state-serializer', async () => {
   const actual = await vi.importActual<typeof import('@/lib/url/state-serializer')>(

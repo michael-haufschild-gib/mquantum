@@ -99,8 +99,19 @@ describe('applyModeOverrides', () => {
       ...BASE_CONFIG,
       quantumMode: 'tdseDynamics',
       temporal: true,
+      isosurface: true,
     })
     expect(result.temporal).toBe(false)
+    expect(result.isosurface).toBe(false)
+  })
+
+  it('preserves analytic 2D isosurface requests for isolines', () => {
+    const result = applyModeOverrides({
+      ...BASE_CONFIG,
+      dimension: 2,
+      isosurface: true,
+    })
+    expect(result.isosurface).toBe(true)
   })
 
   it('forces dimension >= 3 for BEC and Dirac', () => {
@@ -176,7 +187,12 @@ describe('buildPipelineOutputs', () => {
 
 describe('buildShaderConfig', () => {
   it('disables analytic features for compute modes', () => {
-    const config = buildShaderConfig({ ...BASE_CONFIG, quantumMode: 'tdseDynamics' })
+    const config = buildShaderConfig({
+      ...BASE_CONFIG,
+      quantumMode: 'tdseDynamics',
+      isosurface: true,
+    })
+    expect(config.isosurface).toBe(false)
     expect(config.nodal).toBe(false)
     expect(config.phaseMateriality).toBe(false)
     expect(config.interference).toBe(false)
@@ -186,6 +202,51 @@ describe('buildShaderConfig', () => {
     // `isFreeScalarField` = strictly the FSF mode — must be false for TDSE.
     expect(config.isFreeScalar).toBe(true)
     expect(config.isFreeScalarField).toBe(false)
+    expect(config.fastGridEmission).toBe(true)
+  })
+
+  it('keeps spacetime lens compile flags off when toggles are off', () => {
+    const config = buildShaderConfig({
+      ...BASE_CONFIG,
+      quantumMode: 'tdseDynamics',
+      quantumBackreactionLensingEnabled: false,
+      bilocalERBridgeEnabled: false,
+      entropicTimeShearEnabled: false,
+      spectralDimensionFlowEnabled: false,
+      vacuumBubbleLensEnabled: false,
+    })
+
+    expect(config.quantumBackreactionLensing).toBe(false)
+    expect(config.bilocalERBridge).toBe(false)
+    expect(config.entropicTimeShear).toBe(false)
+    expect(config.spectralDimensionFlow).toBe(false)
+    expect(config.vacuumBubbleLens).toBe(false)
+  })
+
+  it('specializes compute-grid overlay flags by mode', () => {
+    const tdse = buildShaderConfig({ ...BASE_CONFIG, quantumMode: 'tdseDynamics' })
+    const bec = buildShaderConfig({ ...BASE_CONFIG, quantumMode: 'becDynamics' })
+    const wdw = buildShaderConfig({ ...BASE_CONFIG, quantumMode: 'wheelerDeWitt' })
+
+    expect(tdse.negativeAlphaPotentialOverlay).toBe(true)
+    expect(tdse.tdseBranchColor).toBe(true)
+    expect(bec.negativeAlphaPotentialOverlay).toBe(false)
+    expect(bec.tdseBranchColor).toBe(false)
+    expect(wdw.wdwOverlay).toBe(true)
+    expect(wdw.gridPhaseOffset).toBe(true)
+  })
+
+  it('keeps fast grid emission scoped to compute-grid modes', () => {
+    expect(buildShaderConfig(BASE_CONFIG).fastGridEmission).toBe(false)
+    expect(buildShaderConfig({ ...BASE_CONFIG, quantumMode: 'hydrogenND' }).fastGridEmission).toBe(
+      false
+    )
+    expect(
+      buildShaderConfig({ ...BASE_CONFIG, quantumMode: 'freeScalarField' }).fastGridEmission
+    ).toBe(true)
+    expect(
+      buildShaderConfig({ ...BASE_CONFIG, quantumMode: 'diracEquation' }).fastGridEmission
+    ).toBe(true)
   })
 
   it('separates compute-grid flag from the true FSF semantic', () => {
@@ -217,6 +278,11 @@ describe('buildShaderConfig', () => {
     expect(config.isWigner).toBe(true)
     expect(config.useWignerCache).toBe(true)
   })
+
+  it('keeps analytic 2D isosurface requests for isoline shaders', () => {
+    const config = buildShaderConfig({ ...BASE_CONFIG, dimension: 2, isosurface: true })
+    expect(config.isosurface).toBe(true)
+  })
 })
 
 describe('computePipelineCacheKey', () => {
@@ -241,6 +307,20 @@ describe('computePipelineCacheKey', () => {
     const configH = buildShaderConfig({ ...BASE_CONFIG, quantumMode: 'hydrogenND' })
     expect(computePipelineCacheKey(configHO, BASE_CONFIG)).not.toBe(
       computePipelineCacheKey(configH, { ...BASE_CONFIG, quantumMode: 'hydrogenND' })
+    )
+  })
+
+  it('produces different keys when a spacetime lens compile flag changes', () => {
+    const offConfig = {
+      ...BASE_CONFIG,
+      quantumBackreactionLensingEnabled: false,
+    }
+    const onConfig = {
+      ...BASE_CONFIG,
+      quantumBackreactionLensingEnabled: true,
+    }
+    expect(computePipelineCacheKey(buildShaderConfig(offConfig), offConfig)).not.toBe(
+      computePipelineCacheKey(buildShaderConfig(onConfig), onConfig)
     )
   })
 })

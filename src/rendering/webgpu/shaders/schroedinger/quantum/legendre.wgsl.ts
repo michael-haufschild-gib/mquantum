@@ -47,8 +47,9 @@ const LEGENDRE_INV_K: array<f32, 8> = array<f32, 8>(
 fn legendre(l: i32, m: i32, x: f32) -> f32 {
   let absM = abs(m);
 
-  // Validate: |m| must be <= l
-  if (absM > l) { return 0.0; }
+  // Validate supported domain. The recurrence tables are generated only up to
+  // MAX_LEGENDRE_L; higher l must not silently return the l=MAX value.
+  if (l < 0 || l > MAX_LEGENDRE_L || absM > l) { return 0.0; }
 
   // Clamp x to valid range to avoid numerical issues
   let xClamped = clamp(x, -1.0, 1.0);

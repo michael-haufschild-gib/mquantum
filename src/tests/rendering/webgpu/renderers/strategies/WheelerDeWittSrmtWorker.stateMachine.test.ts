@@ -24,7 +24,7 @@ import {
   type SrmtDispatchArgs,
   type SrmtWorkerState,
 } from '@/rendering/webgpu/renderers/strategies/WheelerDeWittSrmtWorker'
-import { useSrmtDiagnosticStore } from '@/stores/srmtDiagnosticStore'
+import { useSrmtDiagnosticStore } from '@/stores/diagnostics/srmtDiagnosticStore'
 
 // Fake worker — minimal so we can assert on state transitions without
 // exercising the real worker's heavy compute.

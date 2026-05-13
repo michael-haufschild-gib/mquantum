@@ -10,7 +10,9 @@
 import React, { useCallback, useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+import { useRotationUpdates } from '@/hooks/useRotationUpdates'
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
+import { getNamedPresetStoreControls } from '@/lib/geometry/extended/schroedinger/presets'
 import {
   getQuantumTypeCompileContextFields,
   isComputeQuantumType,
@@ -18,15 +20,14 @@ import {
 } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
-import { useRotationUpdates } from '@/rendering/renderers/base/useRotationUpdates'
-import { useAppearanceStore } from '@/stores/appearanceStore'
 import type { SkyboxMode } from '@/stores/defaults/visualDefaults'
-import { useEnvironmentStore } from '@/stores/environmentStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useMeasurementStore } from '@/stores/measurementStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
-import { usePostProcessingStore } from '@/stores/postProcessingStore'
-import { useScreenshotCaptureStore } from '@/stores/screenshotCaptureStore'
+import { useMeasurementStore } from '@/stores/diagnostics/measurementStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
+import { useScreenshotCaptureStore } from '@/stores/runtime/screenshotCaptureStore'
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
+import { useEnvironmentStore } from '@/stores/scene/environmentStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { usePostProcessingStore } from '@/stores/scene/postProcessingStore'
 
 import {
   createInitialExportRuntimeState,
@@ -107,10 +108,11 @@ const schroedingerCompileSelector = (state: ReturnType<typeof useExtendedObjectS
   const quantumMode = (s?.quantumMode ?? 'harmonicOscillator') as SchroedingerQuantumMode
   const representation = (s?.representation ?? 'position') as 'position' | 'momentum' | 'wigner'
   const compileContextFields = getQuantumTypeCompileContextFields(quantumMode)
+  const presetControls = getNamedPresetStoreControls(s?.presetName)
 
   return {
     quantumMode,
-    termCount: (s?.termCount ?? 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8,
+    termCount: (presetControls?.termCount ?? s?.termCount ?? 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8,
     nodalEnabled: s?.nodalEnabled ?? false,
     nodalDefinition: s?.nodalDefinition ?? 'psiAbs',
     nodalRenderMode: s?.nodalRenderMode ?? 'band',
@@ -120,6 +122,11 @@ const schroedingerCompileSelector = (state: ReturnType<typeof useExtendedObjectS
     uncertaintyBoundaryEnabled: s?.uncertaintyBoundaryEnabled ?? false,
     crossSectionEnabled: s?.crossSectionEnabled ?? false,
     probabilityCurrentEnabled: s?.probabilityCurrentEnabled ?? false,
+    quantumBackreactionLensingEnabled: s?.quantumBackreactionLensingEnabled ?? false,
+    bilocalERBridgeEnabled: s?.bilocalERBridgeEnabled ?? false,
+    entropicTimeShearEnabled: s?.entropicTimeShearEnabled ?? false,
+    spectralDimensionFlowEnabled: s?.spectralDimensionFlowEnabled ?? false,
+    vacuumBubbleLensEnabled: s?.vacuumBubbleLensEnabled ?? false,
     representation,
     openQuantumEnabled: isOpenQuantumSupported(
       quantumMode,
@@ -351,6 +358,11 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     openQuantumEnabled: schroedingerCompile.openQuantumEnabled,
     crossSectionEnabled: schroedingerCompile.crossSectionEnabled,
     probabilityCurrentEnabled: schroedingerCompile.probabilityCurrentEnabled,
+    quantumBackreactionLensingEnabled: schroedingerCompile.quantumBackreactionLensingEnabled,
+    bilocalERBridgeEnabled: schroedingerCompile.bilocalERBridgeEnabled,
+    entropicTimeShearEnabled: schroedingerCompile.entropicTimeShearEnabled,
+    spectralDimensionFlowEnabled: schroedingerCompile.spectralDimensionFlowEnabled,
+    vacuumBubbleLensEnabled: schroedingerCompile.vacuumBubbleLensEnabled,
     densityGridResolution: performance_.densityGridResolution,
     skyboxEnabled: environment.skyboxEnabled,
     skyboxMode: environment.skyboxMode as SkyboxMode,
@@ -380,13 +392,17 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     schrodingerConfig.openQuantumEnabled,
     schrodingerConfig.crossSectionEnabled,
     schrodingerConfig.probabilityCurrentEnabled,
+    schrodingerConfig.quantumBackreactionLensingEnabled,
+    schrodingerConfig.bilocalERBridgeEnabled,
+    schrodingerConfig.entropicTimeShearEnabled,
+    schrodingerConfig.spectralDimensionFlowEnabled,
+    schrodingerConfig.vacuumBubbleLensEnabled,
     schrodingerConfig.densityGridResolution,
     ppConfig.bloomEnabled,
     ppConfig.antiAliasingMethod,
     ppConfig.paperEnabled,
     ppConfig.frameBlendingEnabled,
     ppConfig.skyboxEnabled,
-    ppConfig.skyboxMode,
     ppConfig.temporalReprojectionEnabled,
   ].join('|')
   const latestSetupConfigRef = useRef({ fullConfig, schrodingerConfig, ppConfig })

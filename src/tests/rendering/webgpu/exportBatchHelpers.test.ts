@@ -26,7 +26,7 @@ import {
   updateExportEta,
 } from '@/rendering/webgpu/exportBatchHelpers'
 import type { ExportLoopState, ExportRuntimeState } from '@/rendering/webgpu/sceneExportRuntime'
-import { useExportStore } from '@/stores/exportStore'
+import { useExportStore } from '@/stores/runtime/exportStore'
 
 // ============================================================================
 // Helpers
@@ -62,6 +62,7 @@ function makeRuntime(loopOverrides: Partial<ExportLoopState> = {}): ExportRuntim
     settings: null,
     recorder: null,
     rotationSnapshot: null,
+    environmentCaptured: true,
     originalCanvasWidth: 1920,
     originalCanvasHeight: 1080,
     originalCameraAspect: 16 / 9,

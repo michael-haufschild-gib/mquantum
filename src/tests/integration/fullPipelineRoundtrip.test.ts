@@ -25,17 +25,17 @@ import {
   serializeState,
   type ShareableState,
 } from '@/lib/url/state-serializer'
-import { useAnimationStore } from '@/stores/animationStore'
-import { useAppearanceStore } from '@/stores/appearanceStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { useLightingStore } from '@/stores/lightingStore'
-import { usePresetManagerStore } from '@/stores/presetManagerStore'
-import { useRotationStore } from '@/stores/rotationStore'
-import { useTransformStore } from '@/stores/transformStore'
+import { usePresetManagerStore } from '@/stores/runtime/presetManagerStore'
+import { useAnimationStore } from '@/stores/scene/animationStore'
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { useLightingStore } from '@/stores/scene/lightingStore'
+import { useRotationStore } from '@/stores/scene/rotationStore'
+import { useTransformStore } from '@/stores/scene/transformStore'
 
 // Mock msgBoxStore to prevent dialog calls
-vi.mock('@/stores/msgBoxStore', () => ({
+vi.mock('@/stores/ui/msgBoxStore', () => ({
   useMsgBoxStore: {
     getState: () => ({
       showMsgBox: vi.fn(),

@@ -9,9 +9,12 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
-import { TONE_MAPPING_OPTIONS, type ToneMappingAlgorithm } from '@/rendering/shaders/types'
-import { type LightingSlice, useLightingStore } from '@/stores/lightingStore'
-import { type PostProcessingSlice, usePostProcessingStore } from '@/stores/postProcessingStore'
+import { TONE_MAPPING_OPTIONS, type ToneMappingAlgorithm } from '@/lib/rendering/shaderTypes'
+import { type LightingSlice, useLightingStore } from '@/stores/scene/lightingStore'
+import {
+  type PostProcessingSlice,
+  usePostProcessingStore,
+} from '@/stores/scene/postProcessingStore'
 
 import { PostProcessingSectionHeader as SectionHeader } from './SectionHeader'
 

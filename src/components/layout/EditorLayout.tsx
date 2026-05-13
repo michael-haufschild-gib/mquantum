@@ -2,10 +2,9 @@ import { AnimatePresence, m } from 'motion/react'
 import React, { Suspense, useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+import { CanvasContextMenu } from '@/components/layout/CanvasContextMenu'
+
 // Lazy-load overlays — only fetched when user opens them
-const CanvasContextMenu = React.lazy(() =>
-  import('@/components/layout/CanvasContextMenu').then((m) => ({ default: m.CanvasContextMenu }))
-)
 const CommandPalette = React.lazy(() =>
   import('@/components/layout/CommandPalette').then((m) => ({ default: m.CommandPalette }))
 )
@@ -23,9 +22,9 @@ import { GlobalProgress } from '@/components/ui/GlobalProgress'
 import { useIsDesktop } from '@/hooks/useMediaQuery'
 import { useMobileBottomPanel } from '@/hooks/useMobileBottomPanel'
 import { soundManager } from '@/lib/audio/SoundManager'
-import { useExportStore } from '@/stores/exportStore'
-import { type LayoutStore, useLayoutStore } from '@/stores/layoutStore'
-import { useThemeStore } from '@/stores/themeStore'
+import { useExportStore } from '@/stores/runtime/exportStore'
+import { type LayoutStore, useLayoutStore } from '@/stores/ui/layoutStore'
+import { useThemeStore } from '@/stores/ui/themeStore'
 
 import { EditorTopBar } from './EditorTopBar'
 

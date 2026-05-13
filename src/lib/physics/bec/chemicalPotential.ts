@@ -6,6 +6,17 @@
  * @module
  */
 
+const MIN_TF_DIMENSION = 2
+const MAX_TF_DIMENSION = 11
+
+function isPositiveFinite(value: number): boolean {
+  return Number.isFinite(value) && value > 0
+}
+
+function isSupportedTfDimension(D: number): boolean {
+  return Number.isInteger(D) && D >= MIN_TF_DIMENSION && D <= MAX_TF_DIMENSION
+}
+
 /**
  * Thomas-Fermi chemical potential for a 3D isotropic harmonic trap.
  *
@@ -21,7 +32,7 @@
  * ```
  */
 export function thomasFermiMu3D(g: number, omega: number): number {
-  if (g <= 0) return 0
+  if (!isPositiveFinite(g) || !isPositiveFinite(omega)) return 0
   return 0.5 * Math.pow((15 * g) / (4 * Math.PI), 2 / 5) * Math.pow(omega, 6 / 5)
 }
 
@@ -50,7 +61,7 @@ export function thomasFermiMu3D(g: number, omega: number): number {
  * ```
  */
 export function thomasFermiMuND(D: number, g: number, omega: number): number {
-  if (g <= 0 || D < 2) return 0
+  if (!isSupportedTfDimension(D) || !isPositiveFinite(g) || !isPositiveFinite(omega)) return 0
   // μ_D = [D(D+2) · ω^D · g̃ · Γ(D/2) / (2^(D/2+2) · π^(D/2))]^(2/(D+2))
   const halfD = D / 2
   const numerator = D * (D + 2) * Math.pow(omega, D) * g * gammaHalf(D)
@@ -96,8 +107,8 @@ function gammaHalf(D: number): number {
  * ```
  */
 export function thomasFermiRadius(mu: number, mass: number, omega: number): number {
+  if (!isPositiveFinite(mu) || !isPositiveFinite(mass) || !isPositiveFinite(omega)) return 0
   const denom = mass * omega * omega
-  if (denom <= 0 || mu <= 0) return 0
   return Math.sqrt((2 * mu) / denom)
 }
 
@@ -118,8 +129,9 @@ export function thomasFermiRadius(mu: number, mass: number, omega: number): numb
  * ```
  */
 export function healingLength(hbar: number, mass: number, g: number, density: number): number {
+  if (!isPositiveFinite(hbar) || !isPositiveFinite(mass) || !isPositiveFinite(g)) return Infinity
+  if (!isPositiveFinite(density)) return Infinity
   const denom = 2 * mass * g * density
-  if (denom <= 0) return Infinity
   return hbar / Math.sqrt(denom)
 }
 
@@ -139,7 +151,7 @@ export function healingLength(hbar: number, mass: number, g: number, density: nu
  * ```
  */
 export function soundSpeed(g: number, density: number, mass: number): number {
+  if (!isPositiveFinite(g) || !isPositiveFinite(density) || !isPositiveFinite(mass)) return 0
   const val = (g * density) / mass
-  if (val <= 0) return 0
   return Math.sqrt(val)
 }

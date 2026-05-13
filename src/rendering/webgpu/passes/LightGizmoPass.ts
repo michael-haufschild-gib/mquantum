@@ -14,8 +14,8 @@
  * @module rendering/webgpu/passes/LightGizmoPass
  */
 
-import type { LightSource, TransformMode } from '@/rendering/lights/types'
-import { rotationToDirection } from '@/rendering/lights/types'
+import type { LightSource, TransformMode } from '@/lib/lighting/lightSource'
+import { rotationToDirection } from '@/lib/lighting/lightSource'
 
 import type { CameraSnapshot } from '../core/storeAccess'
 import { getStoreSnapshot } from '../core/storeAccess'

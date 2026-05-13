@@ -18,7 +18,7 @@ export interface VersionTracker {
   lastSchroedingerAppearanceVersion: number
   lastSchroedingerPbrVersion: number
   lastPauliSpinorVersion: number
-  lastSchroedingerQualitySignature: string
+  lastSchroedingerQualitySignature: number
 
   // Lighting uniform buffer
   lastLightingVersion: number
@@ -28,7 +28,7 @@ export interface VersionTracker {
   lastPbrVersion: number
 
   // Quality (signature-based)
-  lastQualitySignature: string
+  lastQualitySignature: number
 
   // Basis vectors
   lastBasisRotationVersion: number
@@ -44,11 +44,11 @@ export function createVersionTracker(): VersionTracker {
     lastSchroedingerAppearanceVersion: -1,
     lastSchroedingerPbrVersion: -1,
     lastPauliSpinorVersion: -1,
-    lastSchroedingerQualitySignature: '',
+    lastSchroedingerQualitySignature: -1,
     lastLightingVersion: -1,
     lastAppearanceVersion: -1,
     lastPbrVersion: -1,
-    lastQualitySignature: '',
+    lastQualitySignature: -1,
     lastBasisRotationVersion: -1,
     lastBasisSchroedingerVersion: -1,
     lastBasisDimension: -1,
@@ -71,7 +71,7 @@ export interface SchroedingerVersions {
   appearanceVersion: number
   pbrVersion: number
   pauliSpinorVersion: number
-  qualitySignature: string
+  qualitySignature: number
 }
 
 /**

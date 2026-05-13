@@ -3,7 +3,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 function pauli() {
   return useExtendedObjectStore.getState().pauliSpinor

@@ -224,6 +224,72 @@ describe('computeIncompressibleSpectrum', () => {
     }
   })
 
+  it('uses Euclidean Nyquist corner for anisotropic k-bin range', () => {
+    withSpectrumWasmDisabled(() => {
+      const gridSize = [8, 8, 8]
+      const spacing = [0.25, 0.5, 1.0]
+      const total = gridSize.reduce((acc, n) => acc * n, 1)
+      const psiRe = new Float32Array(total)
+      const psiIm = new Float32Array(total)
+      psiRe.fill(1.0)
+
+      const result = computeIncompressibleSpectrum(psiRe, psiIm, gridSize, spacing, 1.0, 1.0)
+
+      const kMin = Math.min(...gridSize.map((n, d) => (2 * Math.PI) / (n * spacing[d]!)))
+      const kMax = Math.sqrt(spacing.reduce((acc, dx) => acc + (Math.PI / dx) ** 2, 0))
+      const logKMin = Math.log(kMin)
+      const logRange = Math.log(kMax) - logKMin
+      const lastCenter = Math.exp(
+        logKMin + ((NUM_SPECTRUM_BINS - 0.5) * logRange) / NUM_SPECTRUM_BINS
+      )
+
+      expect(result.kValues[NUM_SPECTRUM_BINS - 1]).toBeCloseTo(lastCenter, 5)
+    })
+  })
+
+  it('rejects invalid physical constants and bin counts without NaN diagnostics', () => {
+    withSpectrumWasmDisabled(() => {
+      const psiRe = new Float32Array(8 * 8)
+      const psiIm = new Float32Array(8 * 8)
+      psiRe.fill(1.0)
+
+      for (const [hbar, mass, bins] of [
+        [Number.NaN, 1, NUM_SPECTRUM_BINS],
+        [1, 0, NUM_SPECTRUM_BINS],
+        [1, Number.POSITIVE_INFINITY, NUM_SPECTRUM_BINS],
+        [1, 1, -1],
+      ] as const) {
+        const result = computeIncompressibleSpectrum(
+          psiRe,
+          psiIm,
+          [8, 8],
+          [0.5, 0.5],
+          hbar,
+          mass,
+          bins
+        )
+        expect(result.totalIncompressible).toBe(0)
+        expect(result.totalCompressible).toBe(0)
+        expect([...result.spectrum].every(Number.isFinite)).toBe(true)
+        expect([...result.kValues].every(Number.isFinite)).toBe(true)
+      }
+    })
+  })
+
+  it('rejects non-integer grid sizes before bitwise power-of-two coercion', () => {
+    withSpectrumWasmDisabled(() => {
+      const psiRe = new Float32Array(18)
+      const psiIm = new Float32Array(18)
+      psiRe.fill(1.0)
+
+      const result = computeIncompressibleSpectrum(psiRe, psiIm, [4.5, 4], [0.5, 0.5], 1, 1)
+
+      expect(result.totalIncompressible).toBe(0)
+      expect(result.totalCompressible).toBe(0)
+      expect(result.spectrum.every((value) => value === 0)).toBe(true)
+    })
+  })
+
   it('spectrum values are non-negative', () => {
     // Random wavefunction
     const N = 8

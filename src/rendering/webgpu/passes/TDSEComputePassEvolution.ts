@@ -16,7 +16,7 @@
  */
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
-import { isTimeDependentMetric } from '@/lib/physics/tdse/metrics/types'
+import { isTimeDependentMetric, normalizeMetricForLattice } from '@/lib/physics/tdse/metrics/types'
 
 import type { WebGPURenderContext } from '../core/types'
 import {
@@ -162,10 +162,10 @@ export function runStrangEvolution(
   // is guarded so that any flat or missing-metric config — plus any build
   // where `dispatchCurvedRK4` wasn't injected — falls through to the
   // existing path unchanged (zero-regression guarantee).
-  const metricKind = config.metric?.kind
+  const metricKind = normalizeMetricForLattice(config.metric, config.latticeDim).kind
   const absorberEnabled = config.absorberEnabled === true && metricKind !== 'torus'
   const stochasticActive = config.stochasticEnabled && config.stochasticGamma > 0
-  const curvedBranch = metricKind !== undefined && metricKind !== 'flat' && metricKind !== 'torus'
+  const curvedBranch = metricKind !== 'flat' && metricKind !== 'torus'
   if (curvedBranch && res.dispatchCurvedRK4) {
     const { pl: curvedPl, bg: curvedBg, dc: curvedDc } = res
     const curvedLinearWG = Math.ceil(res.totalSites / LINEAR_WG)
@@ -183,7 +183,6 @@ export function runStrangEvolution(
     // metric actually reads the stage time (`deSitter`), and (c) the frame
     // executes at least one step.
     const curvedTimeDep =
-      metricKind !== undefined &&
       isTimeDependentMetric(metricKind) &&
       res.prepareCurvedStageTimes !== undefined &&
       res.applyCurvedStageTimesForStep !== undefined

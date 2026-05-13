@@ -7,8 +7,10 @@
  * @module rendering/webgpu/renderers/strategies/TdseBecStrategy
  */
 
+import type { BecConfig } from '@/lib/geometry/extended/bec'
 import type { TdseConfig } from '@/lib/geometry/extended/tdse'
 import { logger } from '@/lib/logger'
+import { healingLength, soundSpeed, thomasFermiRadius } from '@/lib/physics/bec/chemicalPotential'
 import { computeEffectiveSpacing } from '@/lib/physics/compactification'
 import { isCoordinateEntanglementMetricSupported } from '@/lib/physics/coordinateEntanglement'
 import type {
@@ -16,10 +18,10 @@ import type {
   EntanglementWorkerResponse,
 } from '@/lib/physics/coordinateEntanglement.worker'
 import { computeTdseEffectiveSpacing } from '@/lib/physics/tdse/effectiveSpacing'
-import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useSimulationStateStore } from '@/stores/simulationStateStore'
-import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
+import { useCoordinateEntanglementStore } from '@/stores/diagnostics/coordinateEntanglementStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { useWavefunctionSliceStore } from '@/stores/diagnostics/wavefunctionSliceStore'
+import { useSimulationStateStore } from '@/stores/runtime/simulationStateStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../../core/types'
 import { TDSEComputePass } from '../../passes/TDSEComputePass'
@@ -58,6 +60,25 @@ const SPECTRUM_INTERVAL = 4
 /** Interval (in frames) between entanglement readbacks. */
 const ENTANGLEMENT_DECIMATION = 10
 
+function computeBecEffectiveTrapOmega(
+  omega: number,
+  anisotropy: readonly number[],
+  latDim: number
+): number {
+  if (!Number.isFinite(omega) || omega <= 0 || !Number.isInteger(latDim) || latDim <= 0) {
+    return 0
+  }
+
+  let logSum = 0
+  for (let d = 0; d < latDim; d++) {
+    const effectiveOmega = omega * (anisotropy[d] ?? 1.0)
+    if (!Number.isFinite(effectiveOmega) || effectiveOmega <= 0) return 0
+    logSum += Math.log(effectiveOmega)
+  }
+
+  return Math.exp(logSum / latDim)
+}
+
 /** Strategy for TDSE and BEC dynamics modes using split-operator compute dispatch. */
 export class TdseBecStrategy implements QuantumModeStrategy {
   readonly isComputeMode = true
@@ -87,6 +108,16 @@ export class TdseBecStrategy implements QuantumModeStrategy {
   private readonly spectrumWorkerState = createBecSpectrumWorkerState()
   /** Set on dispose to prevent late async callbacks from resurrecting resources. */
   private disposed = false
+  private becConfigCache: {
+    bec: BecConfig
+    version: number | undefined
+    needsReset: boolean | undefined
+    absorberEnabled: boolean | undefined
+    absorberWidth: number | undefined
+    pmlTargetReflection: number | undefined
+    autoScaleMaxGain: number | undefined
+    result: { config: TdseConfig }
+  } | null = null
 
   configureShader(_shader: SchroedingerWGSLShaderConfig, _config: SchrodingerRendererConfig): void {
     // Compute mode overrides applied by renderer constructor
@@ -162,6 +193,45 @@ export class TdseBecStrategy implements QuantumModeStrategy {
   private warnedTdsePassNull = false
   private warnedDensityNull = false
 
+  private buildBecConfigForFrame(
+    bec: BecConfig,
+    schroedinger: ExtendedStoreSnapshot['schroedinger'],
+    version: number | undefined
+  ): { config: TdseConfig } {
+    const needsReset = bec.needsReset
+    const absorberEnabled = schroedinger?.absorberEnabled
+    const absorberWidth = schroedinger?.absorberWidth
+    const pmlTargetReflection = schroedinger?.pmlTargetReflection
+    const autoScaleMaxGain = schroedinger?.autoScaleMaxGain
+    const cached = this.becConfigCache
+
+    if (
+      cached &&
+      cached.bec === bec &&
+      cached.version === version &&
+      cached.needsReset === needsReset &&
+      cached.absorberEnabled === absorberEnabled &&
+      cached.absorberWidth === absorberWidth &&
+      cached.pmlTargetReflection === pmlTargetReflection &&
+      cached.autoScaleMaxGain === autoScaleMaxGain
+    ) {
+      return cached.result
+    }
+
+    const result = buildBecConfig(bec, schroedinger)
+    this.becConfigCache = {
+      bec,
+      version,
+      needsReset,
+      absorberEnabled,
+      absorberWidth,
+      pmlTargetReflection,
+      autoScaleMaxGain,
+      result,
+    }
+    return result
+  }
+
   executeFrame(ctx: WebGPURenderContext, shared: ModeFrameContext): void {
     const tdsePass = this.tdsePass
     if (!tdsePass) {
@@ -192,7 +262,11 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     let clearReset: (() => void) | undefined = () => extended?.clearComputeNeedsReset?.('tdse')
 
     if (isBecMode && extended?.schroedinger?.bec) {
-      const result = buildBecConfig(extended.schroedinger.bec, extended?.schroedinger)
+      const result = this.buildBecConfigForFrame(
+        extended.schroedinger.bec as BecConfig,
+        extended.schroedinger,
+        extended.schroedingerVersion
+      )
       tdseConfig = result.config
       clearReset = () => extended?.clearComputeNeedsReset?.('bec')
     }
@@ -261,7 +335,7 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     // BEC diagnostics
     if (isBecMode) {
       this.updateBecDiagnostics(tdsePass, extended)
-      this.maybeComputeSpectrum(ctx, tdsePass, extended)
+      this.maybeComputeSpectrum(ctx, tdsePass, tdseConfig)
     }
 
     // Coordinate entanglement diagnostics (TDSE mode only)
@@ -325,20 +399,12 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     const aniso = bec?.trapAnisotropy ?? []
     const latDim = bec?.latticeDim ?? 3
 
-    // Geometric mean of effective trap frequencies for anisotropic R_TF
-    let omegaProd = 1.0
-    for (let d = 0; d < latDim; d++) {
-      omegaProd *= omega * (aniso[d] ?? 1.0)
-    }
-    const omegaEff = Math.pow(omegaProd, 1 / latDim)
-    const peakN = diag.maxDensity
-    const mu = g * peakN
-    const xiDenom = 2 * mass * g * peakN
-    const xi = xiDenom > 0 ? hbar / Math.sqrt(xiDenom) : Infinity
-    const csVal = (g * peakN) / mass
-    const cs = csVal > 0 ? Math.sqrt(csVal) : 0
-    const rtfDenom = mass * omegaEff * omegaEff
-    const rtf = rtfDenom > 0 && mu > 0 ? Math.sqrt((2 * mu) / rtfDenom) : 0
+    const omegaEff = computeBecEffectiveTrapOmega(omega, aniso, latDim)
+    const peakN = Number.isFinite(diag.maxDensity) && diag.maxDensity > 0 ? diag.maxDensity : 0
+    const mu = Number.isFinite(g) ? g * peakN : 0
+    const xi = healingLength(hbar, mass, g, peakN)
+    const cs = soundSpeed(g, peakN, mass)
+    const rtf = thomasFermiRadius(mu, mass, omegaEff)
 
     // Vortex count from plaquette-based phase singularity detection
     const [vortexPlaquettes, posCharge, negCharge] = tdsePass.getVortexCounts()
@@ -369,16 +435,15 @@ export class TdseBecStrategy implements QuantumModeStrategy {
   private maybeComputeSpectrum(
     ctx: WebGPURenderContext,
     tdsePass: TDSEComputePass,
-    extended: ExtendedStoreSnapshot | undefined
+    config: TdseConfig | undefined
   ): void {
-    const bec = extended?.schroedinger?.bec
-    const g = bec?.interactionStrength ?? 0
-    if (bec?.needsReset) {
+    const g = config?.interactionStrength ?? 0
+    if (config?.needsReset) {
       invalidateBecSpectrumWorkerState(this.spectrumWorkerState)
       this.spectrumCounter = 0
       return
     }
-    if (!bec || g <= 0) {
+    if (!config || g <= 0) {
       if (this.spectrumWorkerState.inFlight) {
         invalidateBecSpectrumWorkerState(this.spectrumWorkerState)
       }
@@ -393,19 +458,27 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     this.spectrumCounter = 0
     this.spectrumWorkerState.inFlight = true
 
-    const gridSize = bec.gridSize.slice(0, bec.latticeDim)
+    const gridSize = config.gridSize.slice(0, config.latticeDim)
     const spacingArr = computeEffectiveSpacing(
-      bec.gridSize as number[],
-      bec.spacing as number[],
-      bec.compactDims as boolean[] | undefined,
-      bec.compactRadii as number[] | undefined,
-      bec.latticeDim as number
+      config.gridSize,
+      config.spacing,
+      config.compactDims,
+      config.compactRadii,
+      config.latticeDim
     )
-    const hbar = bec.hbar ?? 1.0
-    const mass = bec.mass ?? 1.0
+    const hbar = config.hbar
+    const mass = config.mass
     const epoch = ++this.spectrumWorkerState.epoch
+    let readbackPromise: ReturnType<TDSEComputePass['requestMeasurementReadback']>
+    try {
+      readbackPromise = tdsePass.requestMeasurementReadback(ctx)
+    } catch (err) {
+      this.spectrumWorkerState.inFlight = false
+      logger.warn('[BEC] Failed to request spectrum readback:', err)
+      return
+    }
 
-    void tdsePass.requestMeasurementReadback(ctx).then(
+    void readbackPromise.then(
       (result) => {
         if (this.disposed || this.transferredOut) {
           this.spectrumWorkerState.inFlight = false

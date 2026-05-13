@@ -22,7 +22,7 @@
 
 import { logger } from '@/lib/logger'
 import { computeWormholeCoherence } from '@/lib/physics/tdse/wormholeCoupling'
-import { useWormholeCoherenceStore } from '@/stores/wormholeCoherenceStore'
+import { useWormholeCoherenceStore } from '@/stores/diagnostics/wormholeCoherenceStore'
 
 /** Mutable per-pass readback state for the wormhole HUD. */
 export interface WormholeReadbackState {

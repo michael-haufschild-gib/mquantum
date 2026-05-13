@@ -18,8 +18,8 @@ import { Button } from '@/components/ui/Button'
 import { Sparkline } from '@/components/ui/Sparkline'
 import { Switch } from '@/components/ui/Switch'
 import { useAnySweepRunning } from '@/hooks/useAnySweepRunning'
-import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useCoordinateEntanglementStore } from '@/stores/diagnostics/coordinateEntanglementStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 import {
   AtlasHeatmap,

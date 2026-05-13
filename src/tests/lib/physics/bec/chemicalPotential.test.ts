@@ -32,6 +32,13 @@ describe('thomasFermiMu3D', () => {
     expect(thomasFermiMu3D(-10, 1.0)).toBe(0)
   })
 
+  it('returns 0 for non-positive or non-finite trap frequency', () => {
+    expect(thomasFermiMu3D(100, 0)).toBe(0)
+    expect(thomasFermiMu3D(100, -1)).toBe(0)
+    expect(thomasFermiMu3D(100, Number.NaN)).toBe(0)
+    expect(thomasFermiMu3D(Number.POSITIVE_INFINITY, 1)).toBe(0)
+  })
+
   it('scales with ω^(6/5)', () => {
     const mu1 = thomasFermiMu3D(100, 1.0)
     const mu2 = thomasFermiMu3D(100, 2.0)
@@ -72,6 +79,14 @@ describe('thomasFermiMuND', () => {
   it('returns 0 for D < 2', () => {
     expect(thomasFermiMuND(1, 100, 1.0)).toBe(0)
     expect(thomasFermiMuND(0, 100, 1.0)).toBe(0)
+  })
+
+  it('returns 0 for unsupported or non-finite dimensions and inputs', () => {
+    expect(thomasFermiMuND(12, 100, 1.0)).toBe(0)
+    expect(thomasFermiMuND(2.5, 100, 1.0)).toBe(0)
+    expect(thomasFermiMuND(Number.NaN, 100, 1.0)).toBe(0)
+    expect(thomasFermiMuND(3, Number.NaN, 1.0)).toBe(0)
+    expect(thomasFermiMuND(3, 100, Number.NEGATIVE_INFINITY)).toBe(0)
   })
 
   it('produces positive finite results for all dimensions 2-11', () => {
@@ -164,6 +179,12 @@ describe('thomasFermiRadius', () => {
     expect(thomasFermiRadius(10, 1, 0)).toBe(0)
   })
 
+  it('returns 0 for non-finite inputs', () => {
+    expect(thomasFermiRadius(Number.NaN, 1, 1)).toBe(0)
+    expect(thomasFermiRadius(10, Number.POSITIVE_INFINITY, 1)).toBe(0)
+    expect(thomasFermiRadius(10, 1, Number.NaN)).toBe(0)
+  })
+
   it('scales with 1/ω', () => {
     const R1 = thomasFermiRadius(10, 1, 1)
     const R2 = thomasFermiRadius(10, 1, 2)
@@ -189,6 +210,12 @@ describe('healingLength', () => {
     expect(healingLength(1, 1, -10, 0.1)).toBe(Infinity)
   })
 
+  it('returns Infinity for invalid physical inputs instead of NaN', () => {
+    expect(healingLength(Number.NaN, 1, 500, 0.1)).toBe(Infinity)
+    expect(healingLength(1, Number.NaN, 500, 0.1)).toBe(Infinity)
+    expect(healingLength(1, 1, 500, Number.POSITIVE_INFINITY)).toBe(Infinity)
+  })
+
   it('decreases as density increases (denser → shorter healing length)', () => {
     const xi1 = healingLength(1, 1, 100, 0.01)
     const xi2 = healingLength(1, 1, 100, 0.1)
@@ -212,6 +239,12 @@ describe('soundSpeed', () => {
 
   it('returns 0 for negative interaction strength', () => {
     expect(soundSpeed(-10, 0.1, 1)).toBe(0)
+  })
+
+  it('returns 0 for non-finite inputs instead of NaN', () => {
+    expect(soundSpeed(Number.NaN, 0.1, 1)).toBe(0)
+    expect(soundSpeed(100, Number.POSITIVE_INFINITY, 1)).toBe(0)
+    expect(soundSpeed(100, 0.1, Number.NaN)).toBe(0)
   })
 
   it('increases with interaction strength', () => {

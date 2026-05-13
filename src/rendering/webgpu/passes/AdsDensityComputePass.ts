@@ -22,12 +22,94 @@ import { GRID_PARAMS_SIZE, writeGridParams } from './DensityGridComputePassResou
 const WORKGROUP_SIZE = 8
 
 /** Byte size of the AdsConfig WGSL struct (8 fields × 4 bytes = 32). */
-const ADS_CONFIG_SIZE = 32
+export const ADS_CONFIG_SIZE = 32
 
 /** Basis vectors buffer size: 4 arrays of 3×vec4f = 192 bytes.
  *  Required by the bind group layout even though the compute shader
  *  doesn't read it (rotation is in the fragment shader). */
 const BASIS_BUFFER_SIZE = 192
+
+interface SanitizedAdsConfig {
+  d: number
+  n: number
+  l: number
+  m: number
+  mL: number
+  branch: 'standard' | 'alternate'
+  boundaryOverlay: boolean
+}
+
+function clampInt(value: number, min: number, max: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback
+  return Math.max(min, Math.min(max, Math.floor(value)))
+}
+
+function clampFloat(value: number, min: number, max: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback
+  return Math.max(min, Math.min(max, value))
+}
+
+function sanitizeAdsConfig(ads: AntiDeSitterConfig): SanitizedAdsConfig {
+  const d = clampInt(ads.d, 3, 7, 4)
+  const n = clampInt(ads.n, 0, 4, 0)
+  const l = clampInt(ads.l, 0, 3, 0)
+  const rawM = clampInt(ads.m, -l, l, 0)
+  const m = rawM === 0 ? 0 : rawM
+  return {
+    d,
+    n,
+    l,
+    m,
+    mL: clampFloat(ads.mL, -3, 3, 0),
+    branch: ads.branch === 'alternate' ? 'alternate' : 'standard',
+    boundaryOverlay: ads.boundaryOverlay === true,
+  }
+}
+
+/** Stable dirty-check key for the GPU AdS bound-state uniform payload. */
+export function computeAdsDensityConfigHash(ads: AntiDeSitterConfig): string {
+  const safe = sanitizeAdsConfig(ads)
+  return [
+    safe.d,
+    safe.n,
+    safe.l,
+    safe.m,
+    safe.mL.toFixed(6),
+    safe.branch,
+    safe.boundaryOverlay ? 1 : 0,
+  ].join('|')
+}
+
+/**
+ * Write finite AdS bound-state parameters into the WGSL AdsConfig layout.
+ *
+ * @returns The stable config hash for the sanitized payload.
+ */
+export function writeAdsDensityConfigData(target: ArrayBuffer, ads: AntiDeSitterConfig): string {
+  if (target.byteLength < ADS_CONFIG_SIZE) {
+    throw new Error(`AdsConfig buffer too small: ${target.byteLength} bytes`)
+  }
+
+  const safe = sanitizeAdsConfig(ads)
+  const resolved = resolveDelta(safe.d, safe.mL, safe.branch)
+  const delta = Number.isFinite(resolved.delta) ? resolved.delta : (safe.d - 1) / 2
+  const norm = radialNorm(safe.n, safe.l, delta, safe.d)
+
+  const i32 = new Int32Array(target)
+  const f32 = new Float32Array(target)
+  const u32 = new Uint32Array(target)
+
+  i32[0] = safe.d
+  i32[1] = safe.n
+  i32[2] = safe.l
+  i32[3] = safe.m
+  f32[4] = safe.mL
+  f32[5] = delta
+  u32[6] = safe.boundaryOverlay ? 1 : 0
+  f32[7] = Number.isFinite(norm) ? norm : 0
+
+  return computeAdsDensityConfigHash(ads)
+}
 
 /**
  * Configuration for initializing the AdS compute pass.
@@ -177,26 +259,14 @@ export class AdsDensityComputePass extends WebGPUBaseComputePass {
   updateAdsConfig(device: GPUDevice, ads: AntiDeSitterConfig): void {
     if (!this.adsConfigBuffer) return
 
-    const hash = `${ads.d}|${ads.n}|${ads.l}|${ads.m}|${ads.mL.toFixed(6)}|${ads.branch}|${ads.boundaryOverlay ? 1 : 0}`
+    const hash = computeAdsDensityConfigHash(ads)
     if (hash === this.lastAdsConfigHash && !ads.needsReset) return
 
-    const resolved = resolveDelta(ads.d, ads.mL, ads.branch)
-    const i32 = new Int32Array(this.adsConfigData)
-    const f32 = new Float32Array(this.adsConfigData)
-    const u32 = new Uint32Array(this.adsConfigData)
-
-    i32[0] = ads.d
-    i32[1] = ads.n
-    i32[2] = ads.l
-    i32[3] = ads.m
-    f32[4] = ads.mL
-    f32[5] = resolved.delta
-    u32[6] = ads.boundaryOverlay ? 1 : 0
     // Radial normalization N(n, l, delta, d) precomputed here — the compute
     // shader reads it as a uniform instead of running lgamma/lnFactorial
     // per voxel. Same (n, l, delta, d) dependency as the hash above, so
     // the buffer write is already dirty-gated.
-    f32[7] = radialNorm(ads.n, ads.l, resolved.delta, ads.d)
+    writeAdsDensityConfigData(this.adsConfigData, ads)
 
     device.queue.writeBuffer(this.adsConfigBuffer, 0, this.adsConfigData)
     this.needsRecompute = true

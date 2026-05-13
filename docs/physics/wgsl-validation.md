@@ -8,6 +8,7 @@
 cargo install naga-cli              # one-time — naga v29+ recommended
 pnpm test:shaders:fast              # smoke run (2000 shaders, ~5s)
 pnpm test:shaders                   # full run
+pnpm test:shaders:tint              # curated Chrome/Tint shader-module tier
 ```
 
 ## What's covered
@@ -27,9 +28,9 @@ pnpm test:shaders                   # full run
 | Surface | Why |
 |---|---|
 | `overrides` parameter variants on `SchroedingerWGSLShaderConfig` | Caller-specific runtime substitutions; no finite set to enumerate. |
-| Bind group layout compatibility (shader ↔ pipeline state mismatch) | naga validates shader internals only. Caught by the Phase 5 Tint tier via real `device.createShaderModule` + `getCompilationInfo()`. |
-| Render target format vs shader output | Same as above — pipeline state, not shader validation. |
-| Chrome-specific Tint rejections | naga ≠ Tint. See Phase 5. |
+| Bind group layout compatibility (shader ↔ pipeline state mismatch) | Requires real pipeline creation against the renderer's bind-group layouts. Neither naga nor the Phase 5 Tint shader-module tier proves this. Covered only by renderer/e2e paths today. |
+| Render target format vs shader output | Pipeline state, not shader-module validation. Covered only by renderer/e2e paths today. |
+| Chrome-specific WGSL/Tint shader-module rejections | naga ≠ Tint. See Phase 5. |
 
 ## How it works
 
@@ -39,6 +40,7 @@ pnpm test:shaders                   # full run
 4. `validateWithNaga` writes each unique shader to a temp file and runs `naga --bulk-validate` in batches of 256.
 5. Failures are normalized into stable signatures (paths + line numbers stripped) and grouped by `groupFailures`.
 6. Formatted triage report prints top-N signatures, example labels, and example diagnostics.
+7. Optional Phase 5 runs a curated, surface-balanced shader subset through Chrome/Tint via `device.createShaderModule()` + `getCompilationInfo()`.
 
 Timing: 4.5s for 2000 shaders on a single naga process (2.25ms/shader amortized). Linear scale: 50k shaders ≈ 2 min. No parallelism needed at current scale.
 
@@ -49,7 +51,8 @@ Timing: 4.5s for 2000 shaders on a single naga process (2.25ms/shader amortized)
 | `WGSL_VALIDATE=1` | Required to run the validation test (otherwise skipped in `pnpm test`). |
 | `WGSL_SUBSET` | Comma-list ∈ {schroedinger-vertex, schroedinger-analytic, schroedinger-compute, profiling-strip, skybox, ads, wigner, passes}. Default: all surfaces. Unknown values throw. |
 | `WGSL_MODE` | Restrict analytic walker: `harmonicOscillator` \| `hydrogenND` \| `hydrogenNDCoupled`. |
-| `WGSL_MAX` | Cap unique shader count (for smoke runs). |
+| `WGSL_MAX` | Positive integer cap on unique shader count (for smoke runs). |
+| `WGSL_TINT_MAX` | Cap Chrome/Tint shader-module records (default 500). Combined conservatively with `WGSL_MAX`. |
 | `WGSL_MIN_UNIQUE` | Drift-guard floor. Fails if enumerator emits fewer unique shaders than this. Seed after first green run, then raise each time coverage grows. |
 
 ## Drift guard
@@ -76,7 +79,8 @@ Follow `enumerateSchroedingerAnalytic.ts`:
 
 ## Known caveats
 
-- **naga ≠ Tint.** Chrome uses Tint; naga is what wgpu-rs/Firefox use. Shaders that pass naga may still be rejected by Chrome for reasons naga doesn't check. The Phase 5 Tint tier is the final gate before release.
+- **naga ≠ Tint.** Chrome uses Tint; naga is what wgpu-rs/Firefox use. Shaders that pass naga may still be rejected by Chrome for reasons naga doesn't check. The Phase 5 Tint tier is the Chrome shader-module gate.
+- **Shader module ≠ pipeline.** Phase 5 compiles shader modules in Chrome. It does not validate bind-group layouts, vertex-buffer layouts, render-target formats, or entry-point compatibility against production pipeline descriptors.
 - **Dead code paths may slip through.** naga only catches what it can parse + type-check. Logic errors in a shader that compiles but renders wrong require the existing e2e rendering tests.
 - **Enumerator ≠ runtime coverage.** An enumerated shader is a shader the composer *can* produce. A shader the renderer *will* produce at runtime is a subset. We validate the superset deliberately — if a combination composes, it should compile, even if it's never reached.
 

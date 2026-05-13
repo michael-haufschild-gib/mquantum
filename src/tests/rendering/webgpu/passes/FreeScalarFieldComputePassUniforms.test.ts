@@ -66,6 +66,39 @@ describe('computeFsfInitHash', () => {
     expect(h1).not.toBe(h2)
   })
 
+  it('changes when spacing changes because initialization uses physical coordinates', () => {
+    const h1 = computeFsfInitHash(createConfig({ spacing: [0.1, 0.1, 0.1] }))
+    const h2 = computeFsfInitHash(createConfig({ spacing: [0.2, 0.2, 0.2] }))
+    expect(h1).not.toBe(h2)
+  })
+
+  it('changes when reset-critical preheating fields change', () => {
+    const base = createConfig({
+      preheating: { enabled: false, amplitude: 0.3, frequency: 2 },
+    })
+    const enabled = computeFsfInitHash({
+      ...base,
+      preheating: { ...base.preheating, enabled: true },
+    })
+    const frequency = computeFsfInitHash({
+      ...base,
+      preheating: { ...base.preheating, enabled: true, frequency: 4 },
+    })
+
+    expect(computeFsfInitHash(base)).not.toBe(enabled)
+    expect(enabled).not.toBe(frequency)
+  })
+
+  it('does not change for preheating amplitude because amplitude is live-tunable', () => {
+    const h1 = computeFsfInitHash(
+      createConfig({ preheating: { enabled: true, amplitude: 0.2, frequency: 2 } })
+    )
+    const h2 = computeFsfInitHash(
+      createConfig({ preheating: { enabled: true, amplitude: 0.8, frequency: 2 } })
+    )
+    expect(h1).toBe(h2)
+  })
+
   it('includes self-interaction params when enabled', () => {
     const hash = computeFsfInitHash(
       createConfig({
@@ -175,11 +208,28 @@ describe('computeStridesPadded (used by FSF uniform packing)', () => {
 })
 
 describe('writeFsfUniforms', () => {
+  it('rejects stale 512-byte buffers now that the FSF layout is 528 bytes', () => {
+    const mockDevice = {
+      queue: { writeBuffer: vi.fn() },
+    } as unknown as GPUDevice
+
+    expect(() =>
+      writeFsfUniforms(mockDevice, {} as GPUBuffer, new ArrayBuffer(512), {
+        config: createConfig(),
+        totalSites: 32768,
+        maxFieldValue: 1.0,
+        simEta: 0,
+        preheatingTime: 0,
+        preheatingReferenceEta: 0,
+      })
+    ).toThrow('writeFsfUniforms expected 528 bytes, got 512')
+  })
+
   it('packs latticeDim, totalSites, mass, dt into correct offsets', () => {
     const config = createConfig({ latticeDim: 3, mass: 0.5, dt: 0.01 })
     const totalSites = 32 * 32 * 32
 
-    const uniformData = new ArrayBuffer(512)
+    const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
     const mockDevice = {
       queue: { writeBuffer: vi.fn() },
     } as unknown as GPUDevice
@@ -209,7 +259,7 @@ describe('writeFsfUniforms', () => {
 
   it('packs gridSize array starting at offset 16', () => {
     const config = createConfig({ gridSize: [16, 32, 64], latticeDim: 3 })
-    const uniformData = new ArrayBuffer(512)
+    const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
     const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
 
     writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
@@ -230,9 +280,38 @@ describe('writeFsfUniforms', () => {
     expect(u32[6]).toBe(64)
   })
 
+  it('reuses caller-owned stride scratch and clears inactive dimensions', () => {
+    const config = createConfig({ gridSize: [16, 32], latticeDim: 2 })
+    const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
+    const strideScratch = new Array<number>(12)
+    strideScratch.fill(999)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
+      config,
+      totalSites: 16 * 32,
+      maxFieldValue: 1.0,
+      simEta: 0,
+      preheatingTime: 0,
+      preheatingReferenceEta: 0,
+      strideScratch,
+    })
+
+    expect(strideScratch[0]).toBe(32)
+    expect(strideScratch[1]).toBe(1)
+    for (let d = 2; d < strideScratch.length; d++) {
+      expect(strideScratch[d]).toBe(0)
+    }
+
+    const u32 = new Uint32Array(uniformData)
+    // strides start at byte offset 64, u32 index 16.
+    expect(u32[16]).toBe(32)
+    expect(u32[17]).toBe(1)
+  })
+
   it('packs spacing array starting at offset 112', () => {
     const config = createConfig({ spacing: [0.1, 0.2, 0.3], latticeDim: 3 })
-    const uniformData = new ArrayBuffer(512)
+    const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
     const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
 
     writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
@@ -252,7 +331,7 @@ describe('writeFsfUniforms', () => {
   })
 
   it('maps vacuumNoise initial condition to shader enum 0', () => {
-    const uniformData = new ArrayBuffer(512)
+    const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
     const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
 
     writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
@@ -267,7 +346,7 @@ describe('writeFsfUniforms', () => {
   })
 
   it('maps gaussianPacket initial condition to shader enum 2', () => {
-    const uniformData = new ArrayBuffer(512)
+    const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
     const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
 
     writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
@@ -282,7 +361,7 @@ describe('writeFsfUniforms', () => {
   })
 
   it('maps field view string to correct shader enum', () => {
-    const uniformData = new ArrayBuffer(512)
+    const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
     const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
 
     writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
@@ -298,7 +377,7 @@ describe('writeFsfUniforms', () => {
   })
 
   it('maps freezeOutStrain field view to shader enum 4', () => {
-    const uniformData = new ArrayBuffer(512)
+    const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
     const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
 
     writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
@@ -314,7 +393,7 @@ describe('writeFsfUniforms', () => {
   })
 
   it('maps equationOfState field view to shader enum 5', () => {
-    const uniformData = new ArrayBuffer(512)
+    const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
     const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
 
     writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
@@ -330,7 +409,7 @@ describe('writeFsfUniforms', () => {
   })
 
   it('uploads the buffer to the GPU via device.queue.writeBuffer', () => {
-    const uniformData = new ArrayBuffer(512)
+    const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
     const writeBuffer = vi.fn()
     const mockDevice = { queue: { writeBuffer } } as unknown as GPUDevice
     const mockBuffer = {} as GPUBuffer
@@ -353,7 +432,7 @@ describe('writeFsfUniforms', () => {
       selfInteractionLambda: 2.5,
       selfInteractionVev: 1.5,
     })
-    const uniformData = new ArrayBuffer(512)
+    const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
     const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
 
     writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
@@ -376,9 +455,45 @@ describe('writeFsfUniforms', () => {
     expect(f32[122]).toBeCloseTo(1.5)
   })
 
+  it('packs trailing cosmology, preheating, and Bianchi-I slots through offset 524', () => {
+    const simEta = 2
+    const config = createConfig({
+      cosmology: {
+        ...DEFAULT_FREE_SCALAR_CONFIG.cosmology,
+        enabled: true,
+        preset: 'bianchiKasner',
+        eta0: simEta,
+        kasnerExponents: { p1: -1 / 3, p2: 2 / 3, p3: 2 / 3 },
+      },
+      preheating: { enabled: true, amplitude: 0.5, frequency: 2 },
+    })
+    const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
+      config,
+      totalSites: 32768,
+      maxFieldValue: 1.0,
+      simEta,
+      preheatingTime: 0,
+      preheatingReferenceEta: 1,
+    })
+
+    const f32 = new Float32Array(uniformData)
+    const coefs = computeFsfCosmologyCoefs(config, simEta)
+    const expectedMassScale = 1 + 0.5 * Math.sin(2 * (simEta - 1))
+
+    expect(f32[126]).toBeCloseTo(coefs.aKinetic)
+    expect(f32[127]).toBeCloseTo(coefs.aPotential)
+    expect(f32[128]).toBeCloseTo(coefs.aFull)
+    expect(f32[129]).toBeCloseTo(expectedMassScale)
+    expect(f32[130]).toBeCloseTo(coefs.aPotentialRatio1 ?? 1)
+    expect(f32[131]).toBeCloseTo(coefs.aPotentialRatio2 ?? 1)
+  })
+
   it('packs selfInteractionEnabled=0 when disabled', () => {
     const config = createConfig({ selfInteractionEnabled: false })
-    const uniformData = new ArrayBuffer(512)
+    const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
     const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
 
     writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {

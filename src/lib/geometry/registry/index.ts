@@ -48,6 +48,7 @@ export {
   QUANTUM_MODES_3D_ONLY,
   resolveQuantumTypeKey,
   supportsOpenQuantumForQuantumType,
+  supportsSchroedingerSurfaceMode,
 } from './helpers'
 
 // Helpers — per-ObjectType API derived from QUANTUM_TYPE_REGISTRY

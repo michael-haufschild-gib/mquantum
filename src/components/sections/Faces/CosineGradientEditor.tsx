@@ -10,8 +10,8 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { Button } from '@/components/ui/Button'
 import { Slider } from '@/components/ui/Slider'
-import { DEFAULT_COSINE_COEFFICIENTS } from '@/rendering/shaders/palette'
-import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
+import { DEFAULT_COSINE_COEFFICIENTS } from '@/lib/colors/palette'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/scene/appearanceStore'
 
 /** Props for the cosine gradient coefficient editor. */
 export interface CosineGradientEditorProps {

@@ -175,4 +175,3 @@ fn project_vertices_nd(
         positions[out_idx + 2] = (z * scale) as f32;
     }
 }
-

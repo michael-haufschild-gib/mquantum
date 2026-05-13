@@ -15,8 +15,8 @@
 
 import React, { useCallback, useEffect, useRef } from 'react'
 
-import { directionToRotation } from '@/rendering/lights/types'
-import { useLightingStore } from '@/stores/lightingStore'
+import { directionToRotation } from '@/lib/lighting/lightSource'
+import { useLightingStore } from '@/stores/scene/lightingStore'
 
 import type { WebGPUCamera } from './core/WebGPUCamera'
 import {
@@ -130,6 +130,7 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
   // ── pointerDown: capture pointer, test gizmo hit or enter camera drag ──
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
+      if (e.button !== 0) return
       // Ignore secondary contacts while a drag is already in flight.
       if (activePointerIdRef.current !== null) return
 
@@ -164,12 +165,11 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
   // ── pointerUp: release capture, commit gizmo drag or handle click-to-select ──
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
+      if (activePointerIdRef.current === null) return
       // Ignore secondary contacts — only the pointer that opened the drag
       // ends it. A stray pointerup from a competing finger/stylus would
       // otherwise terminate the in-flight drag mid-gesture.
-      if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) {
-        return
-      }
+      if (e.pointerId !== activePointerIdRef.current) return
       try {
         e.currentTarget.releasePointerCapture(e.pointerId)
       } catch {
@@ -206,10 +206,9 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
   // ── pointerCancel: capture interrupted (focus loss, OS gesture). Abort drag. ──
   const handlePointerCancel = useCallback(
     (e: React.PointerEvent) => {
+      if (activePointerIdRef.current === null) return
       // Cancel only when the active pointer is the one being cancelled.
-      if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) {
-        return
-      }
+      if (e.pointerId !== activePointerIdRef.current) return
       try {
         e.currentTarget.releasePointerCapture(e.pointerId)
       } catch {

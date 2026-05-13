@@ -13,7 +13,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { ColorPicker } from '@/components/ui/ColorPicker'
 import { hexToSrgbTuple, rgbToHex } from '@/lib/colors/colorUtils'
 import { DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 /** Convert 0-1 RGB tuple to hex string for ColorPicker. */
 function tupleToHex(c: [number, number, number]): string {

@@ -15,6 +15,7 @@ import { logger } from '@/lib/logger'
 import type {
   ResourceSize,
   WebGPUFrameContext,
+  WebGPUFrameMetricsMode,
   WebGPUFrameStats,
   WebGPUPassTiming,
   WebGPURenderPass,
@@ -52,6 +53,7 @@ export class WebGPURenderGraph {
   private pool: WebGPUResourcePool
   private passes: Map<string, WebGPURenderPass> = new Map()
   private passOrder: string[] = []
+  private postFramePasses: WebGPURenderPass[] = []
   private resources: Map<string, WebGPURenderResourceConfig> = new Map()
 
   // State tracking
@@ -266,6 +268,13 @@ export class WebGPURenderGraph {
     if (this.compiled) return
 
     this.passOrder = computePassOrder(this.passes)
+    this.postFramePasses.length = 0
+    for (const passId of this.passOrder) {
+      const pass = this.passes.get(passId)
+      if (pass?.postFrame) {
+        this.postFramePasses.push(pass)
+      }
+    }
 
     // Identify ping-pong resources
     for (const pass of this.passes.values()) {
@@ -302,6 +311,7 @@ export class WebGPURenderGraph {
       try {
         stores[key] = getter()
       } catch (e) {
+        delete stores[key]
         logger.error(`Failed to capture store '${key}':`, e)
       }
     }
@@ -332,7 +342,7 @@ export class WebGPURenderGraph {
     }
   }
 
-  execute(delta: number): WebGPUFrameStats {
+  execute(delta: number, metricsMode: WebGPUFrameMetricsMode = 'full'): WebGPUFrameStats {
     if (!this.initialized) {
       return {
         totalTimeMs: 0,
@@ -348,7 +358,8 @@ export class WebGPURenderGraph {
       this.compile()
     }
 
-    const cpuSetupStart = performance.now()
+    const collectDetailedStats = metricsMode === 'full'
+    const cpuSetupStart = collectDetailedStats ? performance.now() : 0
 
     this.elapsedTime += delta
     this.frameNumber++
@@ -400,19 +411,19 @@ export class WebGPURenderGraph {
       this._reusableRenderCtx = ctx
     }
 
-    const cpuPassesStart = performance.now()
-    const cpuSetupMs = cpuPassesStart - cpuSetupStart
+    const cpuPassesStart = collectDetailedStats ? performance.now() : 0
+    const cpuSetupMs = collectDetailedStats ? cpuPassesStart - cpuSetupStart : 0
 
-    const passTimings = this._framePassTimings
-    passTimings.clear()
-    const cpuPassTimings = this._frameCpuPassTimings
-    cpuPassTimings.clear()
+    const passTimings = collectDetailedStats ? this._framePassTimings : null
+    passTimings?.clear()
+    const cpuPassTimings = collectDetailedStats ? this._frameCpuPassTimings : null
+    cpuPassTimings?.clear()
     let timestampIndex = 0
     const timedPassIds = this._frameTimedPassIds
     timedPassIds.length = 0
     const timedPassPhases = this._frameTimedPassPhases
     timedPassPhases.length = 0
-    const canCollectGpuTimings = this.timestampCollector.canCollect()
+    const canCollectGpuTimings = collectDetailedStats && this.timestampCollector.canCollect()
 
     const now = Date.now()
     const shouldLog = import.meta.env.DEV && (!this._lastPassLog || now - this._lastPassLog > 1000)
@@ -422,16 +433,8 @@ export class WebGPURenderGraph {
 
     const writtenByEnabledPass = this._frameWrittenByEnabledPass
     writtenByEnabledPass.clear()
-    const passEnabledMemo = this._framePassEnabledMemo
-    passEnabledMemo.clear()
-
-    const getPassEnabled = (pass: WebGPURenderPass, passId: string): boolean => {
-      const cached = passEnabledMemo.get(passId)
-      if (cached !== undefined) return cached
-      const enabled = pass.config.enabled?.(this.frameContext) ?? true
-      passEnabledMemo.set(passId, enabled)
-      return enabled
-    }
+    const passEnabledMemo = collectDetailedStats ? this._framePassEnabledMemo : null
+    passEnabledMemo?.clear()
 
     // Draw stats — accumulated during main loop to avoid second iteration
     let totalCalls = 0
@@ -447,7 +450,8 @@ export class WebGPURenderGraph {
         continue
       }
 
-      const enabled = getPassEnabled(pass, passId)
+      const enabled = pass.config.enabled?.(this.frameContext) ?? true
+      passEnabledMemo?.set(passId, enabled)
       this.trackPassDisableState(pass, passId, enabled)
 
       if (!enabled) {
@@ -472,13 +476,15 @@ export class WebGPURenderGraph {
         ctx.setPassTimestampWrites(this.timestampCollector.getQuerySet()!, timestampIndex * 4)
       }
 
-      const passCpuStart = performance.now()
+      const passCpuStart = collectDetailedStats ? performance.now() : 0
       try {
         pass.execute(ctx)
       } catch (e) {
         logger.error(`[WebGPU RenderGraph] Error executing pass '${passId}':`, e)
       } finally {
-        cpuPassTimings.set(passId, performance.now() - passCpuStart)
+        if (collectDetailedStats) {
+          cpuPassTimings?.set(passId, performance.now() - passCpuStart)
+        }
         if (canCollectGpuTimings) {
           const usedTimestampWrites = ctx.consumePassUsedTimestampWrites()
           const phases = ctx.getPassPhases()
@@ -500,18 +506,20 @@ export class WebGPURenderGraph {
       }
 
       // Accumulate draw stats during main loop (avoids second iteration)
-      const passStats = pass.getDrawStats?.()
-      if (passStats) {
-        totalCalls += passStats.calls
-        totalTriangles += passStats.triangles
-        totalVertices += passStats.vertices
-        totalLines += passStats.lines
-        totalPoints += passStats.points
+      if (collectDetailedStats) {
+        const passStats = pass.getDrawStats?.()
+        if (passStats) {
+          totalCalls += passStats.calls
+          totalTriangles += passStats.triangles
+          totalVertices += passStats.vertices
+          totalLines += passStats.lines
+          totalPoints += passStats.points
+        }
       }
     }
 
-    const cpuSubmitStart = performance.now()
-    const cpuPassesMs = cpuSubmitStart - cpuPassesStart
+    const cpuSubmitStart = collectDetailedStats ? performance.now() : 0
+    const cpuPassesMs = collectDetailedStats ? cpuSubmitStart - cpuPassesStart : 0
 
     if (canCollectGpuTimings) {
       this.timestampCollector.resolveAndCopy(encoder, timestampIndex)
@@ -543,21 +551,21 @@ export class WebGPURenderGraph {
     device.queue.submit([commandBuffer])
     this.timestampCollector.scheduleReadback(device, timestampIndex, timedPassIds, timedPassPhases)
 
-    for (const pass of this.passes.values()) {
-      pass.postFrame?.()
+    for (let i = 0; i < this.postFramePasses.length; i++) {
+      this.postFramePasses[i]!.postFrame!()
     }
 
-    for (const [id] of this.resources) {
+    for (const id of this.resources.keys()) {
       this.pool.swapPingPong(id)
     }
 
-    const cpuSubmitMs = performance.now() - cpuSubmitStart
+    const cpuSubmitMs = collectDetailedStats ? performance.now() - cpuSubmitStart : 0
 
     return {
       totalTimeMs: delta * 1000,
-      passTiming: this.buildPassTimingResult(passEnabledMemo),
+      passTiming: collectDetailedStats ? this.buildPassTimingResult(passEnabledMemo!) : [],
       commandBufferCount: 1,
-      vramUsage: this.pool.getVRAMUsage(),
+      vramUsage: collectDetailedStats ? this.pool.getVRAMUsage() : 0,
       drawStats: {
         calls: totalCalls,
         triangles: totalTriangles,
@@ -639,8 +647,11 @@ export class WebGPURenderGraph {
     }
     this.passes.clear()
     this.passOrder = []
+    this.postFramePasses = []
     this.resources.clear()
     this.beforeSubmitHooks.clear()
+    this.passStateTracking.clear()
+    this.resourceAliases.clear()
 
     this.pool.dispose()
     this.timestampCollector.dispose()

@@ -2,7 +2,7 @@
  * Regression tests for computed scenario selection in Schroedinger compute modes.
  */
 
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
@@ -14,9 +14,9 @@ import { FREE_SCALAR_PRESETS } from '@/lib/physics/freeScalar/presets'
 import { QUANTUM_WALK_PRESETS } from '@/lib/physics/quantumWalk/presets'
 import { TDSE_SCENARIO_PRESETS } from '@/lib/physics/tdse/presets'
 import { WDW_SCENARIO_PRESETS } from '@/lib/physics/wheelerDeWitt/presets'
-import { useAppearanceStore } from '@/stores/appearanceStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 function resetStores(): void {
   useAppearanceStore.setState(useAppearanceStore.getInitialState())
@@ -105,7 +105,9 @@ describe('ScenarioSelector - compute mode presets', () => {
   })
 
   afterEach(() => {
-    resetStores()
+    act(() => {
+      resetStores()
+    })
   })
 
   it('shows a matching restored compute preset from current config', () => {

@@ -5,14 +5,14 @@
  * a known preset, and is hidden when the config is custom (no preset match).
  */
 
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { ScenarioSelector } from '@/components/sections/Geometry/ScenarioSelector'
 import { TDSE_SCENARIO_PRESETS } from '@/lib/physics/tdse/presets'
-import { useAppearanceStore } from '@/stores/appearanceStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 function resetStores(): void {
   useAppearanceStore.setState(useAppearanceStore.getInitialState())
@@ -26,7 +26,9 @@ describe('ScenarioSelector - description info icon', () => {
   })
 
   afterEach(() => {
-    resetStores()
+    act(() => {
+      resetStores()
+    })
   })
 
   it('renders the info icon with the matching preset description when state matches', () => {

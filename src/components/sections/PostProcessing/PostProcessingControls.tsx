@@ -3,7 +3,10 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { Switch } from '@/components/ui/Switch'
 import { Tabs } from '@/components/ui/Tabs'
-import { type PostProcessingSlice, usePostProcessingStore } from '@/stores/postProcessingStore'
+import {
+  type PostProcessingSlice,
+  usePostProcessingStore,
+} from '@/stores/scene/postProcessingStore'
 
 import { BloomControls } from './BloomControls'
 import { CinematicControls } from './CinematicControls'

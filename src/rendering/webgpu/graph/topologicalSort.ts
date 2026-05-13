@@ -18,8 +18,10 @@ import type { WebGPURenderPass } from '../core/types'
  * @returns Sorted array of pass IDs respecting producer→consumer dependencies
  */
 export function computePassOrder(passes: Map<string, WebGPURenderPass>): string[] {
-  // Build output → producer lookup
-  const outputToPass = new Map<string, string>()
+  // Build output → producers lookup. Multiple passes may write the same
+  // target sequentially (for example overlays compositing into scene-render),
+  // so consumers must wait for every producer except themselves.
+  const outputToPasses = new Map<string, string[]>()
 
   for (const [id, pass] of passes) {
     if (!pass.config.outputs || !Array.isArray(pass.config.outputs)) {
@@ -27,7 +29,12 @@ export function computePassOrder(passes: Map<string, WebGPURenderPass>): string[
       continue
     }
     for (const output of pass.config.outputs) {
-      outputToPass.set(output.resourceId, id)
+      const producers = outputToPasses.get(output.resourceId)
+      if (producers) {
+        producers.push(id)
+      } else {
+        outputToPasses.set(output.resourceId, [id])
+      }
     }
   }
 
@@ -55,15 +62,19 @@ export function computePassOrder(passes: Map<string, WebGPURenderPass>): string[
       continue
     }
     for (const input of pass.config.inputs) {
-      const producer = outputToPass.get(input.resourceId)
-      if (!producer || producer === id) continue
+      const producers = outputToPasses.get(input.resourceId)
+      if (!producers) continue
 
-      const producerDependents = dependents.get(producer)
-      if (!producerDependents) continue
+      for (const producer of producers) {
+        if (producer === id) continue
 
-      if (producerDependents.has(id)) continue
-      producerDependents.add(id)
-      indegree.set(id, (indegree.get(id) ?? 0) + 1)
+        const producerDependents = dependents.get(producer)
+        if (!producerDependents) continue
+
+        if (producerDependents.has(id)) continue
+        producerDependents.add(id)
+        indegree.set(id, (indegree.get(id) ?? 0) + 1)
+      }
     }
   }
 

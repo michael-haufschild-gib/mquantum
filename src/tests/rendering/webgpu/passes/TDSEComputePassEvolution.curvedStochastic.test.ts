@@ -111,6 +111,11 @@ function makeResources(events: string[], stochasticState: StochasticLocState): E
     renormalizePipeline: pipeline('renormalize'),
     absorberPipeline: pipeline('absorber'),
     absorberPipeline3D: pipeline('absorber-3d'),
+    fusedPotentialPackPipeline: pipeline('fused-potential-pack'),
+    fftSharedMemPipeline: pipeline('fft-shared-mem'),
+    kineticPipeline: pipeline('kinetic'),
+    kineticPipeline3D: pipeline('kinetic-3d'),
+    fusedUnpackPotentialPipeline: pipeline('fused-unpack-potential'),
   } as unknown as TdsePipelineResult
 
   const bg = {
@@ -118,6 +123,15 @@ function makeResources(events: string[], stochasticState: StochasticLocState): E
     diagFinalizeBG: bindGroup('diag-finalize-bg'),
     renormalizeBG: bindGroup('renormalize-bg'),
     initBG: bindGroup('init-bg'),
+    fusedPotentialPackBG: bindGroup('fused-potential-pack-bg'),
+    fftSharedMemBGs: [
+      bindGroup('fft-shared-mem-fwd-0'),
+      bindGroup('fft-shared-mem-inv-0'),
+      bindGroup('fft-shared-mem-fwd-1'),
+      bindGroup('fft-shared-mem-inv-1'),
+    ],
+    kineticBG: bindGroup('kinetic-bg'),
+    fusedUnpackPotentialBG: bindGroup('fused-unpack-potential-bg'),
   } as unknown as TdseBindGroupResult
 
   return {
@@ -247,9 +261,9 @@ describe('runStrangEvolution curved stochastic branch', () => {
       stochasticSeed: 1234,
       dt: 0.02,
       stepsPerFrame: 1,
-      latticeDim: 1,
-      gridSize: [16],
-      spacing: [0.1],
+      latticeDim: 2,
+      gridSize: [4, 4],
+      spacing: [0.1, 0.1],
       wormholeCouplingEnabled: false,
     } as unknown as TdseConfig
 
@@ -275,5 +289,35 @@ describe('runStrangEvolution curved stochastic branch', () => {
     expect(locStep0Index).toBeGreaterThan(expectReduceIndex)
     expect(locStep3Index).toBeGreaterThan(locStep0Index)
     expect(renormIndex).toBeGreaterThan(locStep3Index)
+  })
+
+  it('routes a dimension-degenerate metric through the flat Strang path', () => {
+    const events: string[] = []
+    const ctx = makeContext(events)
+    const stochasticState = makeStochasticState()
+    const config = {
+      metric: { kind: 'morrisThorne', throatRadius: 0.5 },
+      absorberEnabled: false,
+      imaginaryTimeEnabled: false,
+      stochasticEnabled: false,
+      stochasticGamma: 0,
+      dt: 0.02,
+      stepsPerFrame: 1,
+      latticeDim: 1,
+      gridSize: [16],
+      spacing: [0.1],
+      wormholeCouplingEnabled: false,
+    } as unknown as TdseConfig
+
+    runStrangEvolution(
+      ctx,
+      config,
+      1,
+      { simTime: 0, stepAccumulator: 0 },
+      makeResources(events, stochasticState)
+    )
+
+    expect(events).not.toContain('curved-rk4')
+    expect(events).toContain('begin:tdse-strang-0')
   })
 })

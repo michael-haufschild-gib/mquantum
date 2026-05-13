@@ -10,6 +10,14 @@ import {
   bloomUpsampleShader,
 } from '@/rendering/webgpu/shaders/postprocessing/bloom.wgsl'
 
+type BloomInternals = {
+  gain: number
+  threshold: number
+  knee: number
+  filterRadius: number
+  updateFromStores: (ctx: WebGPURenderContext) => void
+}
+
 function primeInternals(pass: BloomPass): Record<string, unknown> {
   const internals = pass as unknown as Record<string, unknown>
 
@@ -50,6 +58,47 @@ function primeInternals(pass: BloomPass): Record<string, unknown> {
 }
 
 describe('BloomPass (progressive downsample/upsample)', () => {
+  it('keeps constructor numeric options finite', () => {
+    const pass = new BloomPass({
+      gain: Number.NaN,
+      threshold: Number.POSITIVE_INFINITY,
+      knee: Number.NEGATIVE_INFINITY,
+      filterRadius: Number.NaN,
+    }) as unknown as BloomInternals
+
+    expect(pass.gain).toBe(0.8)
+    expect(pass.threshold).toBe(1)
+    expect(pass.knee).toBe(0.2)
+    expect(pass.filterRadius).toBe(1)
+  })
+
+  it('ignores non-finite store values during runtime sync', () => {
+    const pass = new BloomPass({
+      gain: 1.2,
+      threshold: 2,
+      knee: 0.5,
+      filterRadius: 1.5,
+    }) as unknown as BloomInternals
+
+    pass.updateFromStores({
+      frame: {
+        stores: {
+          postProcessing: {
+            bloomGain: Number.NaN,
+            bloomThreshold: Number.POSITIVE_INFINITY,
+            bloomKnee: Number.NEGATIVE_INFINITY,
+            bloomRadius: Number.NaN,
+          },
+        },
+      },
+    } as unknown as WebGPURenderContext)
+
+    expect(pass.gain).toBe(1.2)
+    expect(pass.threshold).toBe(2)
+    expect(pass.knee).toBe(0.5)
+    expect(pass.filterRadius).toBe(1.5)
+  })
+
   it('prefilter shader uses luminance instead of max(r,g,b)', () => {
     expect(bloomPrefilterShader).toContain('fn luminance(c: vec3f) -> f32')
     expect(bloomPrefilterShader).toContain('dot(c, vec3f(0.2126, 0.7152, 0.0722))')

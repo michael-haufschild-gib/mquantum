@@ -3,7 +3,7 @@
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { computeTdseEffectiveSpacing } from '@/lib/physics/tdse/effectiveSpacing'
 import { NUM_ENERGY_BINS } from '@/rendering/webgpu/shaders/schroedinger/compute/energySpectralDensity.wgsl'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
 import { DIAG_DECIMATION } from './computePassUtils'
 import {
@@ -14,7 +14,7 @@ import {
   processObservablesReadback,
   sanitizeObservablesLatticeDim,
 } from './ObservablesComputeSetup'
-import type { TdsePipelineResult } from './TDSEComputePassSetup'
+import type { TdsePipelineResult } from './TDSEComputePassPipelineTypes'
 
 /** Mutable state for observables resources. */
 export interface ObservablesState {

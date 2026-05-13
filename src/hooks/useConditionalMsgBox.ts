@@ -8,8 +8,8 @@
 
 import { useMemo } from 'react'
 
-import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
-import { type MsgBoxAction, type MsgBoxType, useMsgBoxStore } from '@/stores/msgBoxStore'
+import { useDismissedDialogsStore } from '@/stores/ui/dismissedDialogsStore'
+import { type MsgBoxAction, type MsgBoxType, useMsgBoxStore } from '@/stores/ui/msgBoxStore'
 
 /** Return type for the {@link useConditionalMsgBox} hook. */
 export interface UseConditionalMsgBoxResult {

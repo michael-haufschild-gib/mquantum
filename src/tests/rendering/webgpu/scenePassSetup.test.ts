@@ -41,6 +41,11 @@ function makePassConfig(overrides: Partial<PassConfig> = {}): PassConfig {
     openQuantumEnabled: false,
     crossSectionEnabled: false,
     probabilityCurrentEnabled: false,
+    quantumBackreactionLensingEnabled: false,
+    bilocalERBridgeEnabled: false,
+    entropicTimeShearEnabled: false,
+    spectralDimensionFlowEnabled: false,
+    vacuumBubbleLensEnabled: false,
     densityGridResolution: 96,
     skyboxEnabled: false,
     skyboxMode: 'classic',
@@ -132,10 +137,23 @@ describe('extractSchrodingerConfig', () => {
 
   it('forces compute mode overrides for tdseDynamics', () => {
     const extracted = extractSchrodingerConfig(
-      makePassConfig({ quantumMode: 'tdseDynamics', nodalEnabled: true })
+      makePassConfig({ quantumMode: 'tdseDynamics', isosurface: true, nodalEnabled: true })
     )
+    expect(extracted.isosurface).toBe(false)
     expect(extracted.nodalEnabled).toBe(false)
     expect(extracted.termCount).toBe(1)
+  })
+
+  it('keeps analytic 2D isosurface requests as isolines', () => {
+    const extracted = extractSchrodingerConfig(
+      makePassConfig({
+        quantumMode: 'harmonicOscillator',
+        dimension: 2,
+        isosurface: true,
+      })
+    )
+
+    expect(extracted.isosurface).toBe(true)
   })
 
   it('forces compute mode overrides for becDynamics', () => {
@@ -647,7 +665,6 @@ describe('extractPPConfig', () => {
       paperEnabled: true,
       frameBlendingEnabled: true,
       skyboxEnabled: true,
-      skyboxMode: 'procedural_aurora',
       temporalReprojectionEnabled: false,
     })
 
@@ -659,13 +676,13 @@ describe('extractPPConfig', () => {
       paperEnabled: true,
       frameBlendingEnabled: true,
       skyboxEnabled: true,
-      skyboxMode: 'procedural_aurora',
       temporalReprojectionEnabled: false,
     })
 
     // Should not contain Schroedinger fields
     expect(Object.keys(pp)).not.toContain('dimension')
     expect(Object.keys(pp)).not.toContain('quantumMode')
+    expect(Object.keys(pp)).not.toContain('skyboxMode')
   })
 })
 

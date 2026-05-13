@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { MiscControls } from '@/components/sections/PostProcessing/MiscControls'
-import { usePostProcessingStore } from '@/stores/postProcessingStore'
+import { usePostProcessingStore } from '@/stores/scene/postProcessingStore'
 
 describe('MiscControls', () => {
   beforeEach(() => {

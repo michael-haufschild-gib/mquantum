@@ -7,8 +7,8 @@
  * @module stores/utils/presetNormalizationShared
  */
 
+import { COLOR_ALGORITHM_OPTIONS, type ColorAlgorithm } from '@/lib/colors/palette'
 import { clampFiniteUnknown } from '@/lib/math/clamp'
-import { COLOR_ALGORITHM_OPTIONS, type ColorAlgorithm } from '@/rendering/shaders/palette'
 
 import type { SkyboxMode, SkyboxSelection, SkyboxTexture } from '../defaults/visualDefaults'
 

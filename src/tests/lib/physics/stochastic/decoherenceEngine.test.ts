@@ -28,7 +28,7 @@ import {
   computeParticipationRatio,
   renormalize,
 } from '@/lib/physics/stochastic/localizationOperator'
-import { gammaForStep, useMonitoringSweepStore } from '@/stores/monitoringSweepStore'
+import { gammaForStep, useMonitoringSweepStore } from '@/stores/diagnostics/monitoringSweepStore'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

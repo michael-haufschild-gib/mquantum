@@ -51,7 +51,7 @@ import {
   pushAutocorrelationSample,
   resetHellerBuffer,
 } from '@/lib/physics/tdse/heller'
-import { useHellerSpectrometerStore } from '@/stores/hellerSpectrometerStore'
+import { useHellerSpectrometerStore } from '@/stores/diagnostics/hellerSpectrometerStore'
 
 /**
  * Mutable state container shared between the TDSE compute pass and this

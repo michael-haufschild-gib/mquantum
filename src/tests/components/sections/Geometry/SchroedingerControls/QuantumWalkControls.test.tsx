@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { QuantumWalkControls } from '@/components/sections/Geometry/SchroedingerControls/QuantumWalkControls'
 import { DEFAULT_QUANTUM_WALK_CONFIG } from '@/lib/geometry/extended/quantumWalk'
 import { DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/schroedinger'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 beforeEach(() => {
   useGeometryStore.setState({ dimension: 3 })

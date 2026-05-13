@@ -5,7 +5,7 @@
  * onChange called with updated tuple, displayMultiplier applied for display,
  * invalid input resets to actual value on blur, label and unit rendered.
  */
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -120,6 +120,35 @@ describe('Vector3Input', () => {
     await user.type(xInput, 'abc')
     await user.tab() // blur
     // After blur with invalid input, resets to '1.0'
+    expect(xInput).toHaveValue(1)
+  })
+
+  it('does not emit non-finite numeric input', () => {
+    const onChange = vi.fn()
+    render(<Vector3Input label="Position" value={[1, 2, 3]} onChange={onChange} />)
+
+    fireEvent.change(screen.getByLabelText('Position X'), { target: { value: 'Infinity' } })
+
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('does not parse numeric-prefix junk as a valid edit', () => {
+    const onChange = vi.fn()
+    render(<Vector3Input label="Position" value={[1, 2, 3]} onChange={onChange} />)
+
+    fireEvent.change(screen.getByLabelText('Position X'), { target: { value: '1abc' } })
+
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('resets non-finite input on blur', () => {
+    const onChange = vi.fn()
+    render(<Vector3Input label="Position" value={[1, 2, 3]} onChange={onChange} />)
+    const xInput = screen.getByLabelText('Position X')
+
+    fireEvent.change(xInput, { target: { value: 'Infinity' } })
+    fireEvent.blur(xInput)
+
     expect(xInput).toHaveValue(1)
   })
 

@@ -12,9 +12,9 @@ import React, { memo, useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Select, type SelectOption } from '@/components/ui/Select'
-import type { LightSource, LightType } from '@/rendering/lights/types'
-import { MAX_LIGHTS } from '@/rendering/lights/types'
-import { type LightingSlice, useLightingStore } from '@/stores/lightingStore'
+import type { LightSource, LightType } from '@/lib/lighting/lightSource'
+import { MAX_LIGHTS } from '@/lib/lighting/lightSource'
+import { type LightingSlice, useLightingStore } from '@/stores/scene/lightingStore'
 
 import { AMBIENT_LIGHT_ID, LightListItem } from './LightListItem'
 

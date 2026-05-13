@@ -18,7 +18,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { PauliSpinorControls } from '@/components/sections/Geometry/PauliSpinorControls'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 describe('PauliSpinorControls — slice position wiring', () => {
   /**

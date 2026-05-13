@@ -465,3 +465,6 @@ export interface WebGPUFrameStats {
   /** CPU time breakdown by frame phase */
   cpuBreakdown: WebGPUCpuBreakdown
 }
+
+/** Amount of frame instrumentation requested by the active diagnostics UI. */
+export type WebGPUFrameMetricsMode = 'none' | 'fps' | 'full'

@@ -2,15 +2,15 @@
  * Regression tests for Pauli scenario selection.
  */
 
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { ScenarioSelector } from '@/components/sections/Geometry/ScenarioSelector'
 import { PAULI_SCENARIO_PRESETS } from '@/lib/physics/pauli/presets'
-import { useAppearanceStore } from '@/stores/appearanceStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 function enterPauliMode(): void {
   useGeometryStore.getState().setObjectType('pauliSpinor')
@@ -29,7 +29,9 @@ describe('ScenarioSelector - Pauli presets', () => {
   })
 
   afterEach(() => {
-    resetStores()
+    act(() => {
+      resetStores()
+    })
   })
 
   it('shows the matching default Pauli preset without mutating the config on mount', () => {

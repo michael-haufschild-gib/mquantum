@@ -21,6 +21,7 @@ import {
   disposeDisorder as disposeDisorderGeneric,
   maybeDispatchDisorder as maybeDispatchDisorderGeneric,
 } from './DisorderOverlay'
+import { computeTdseDisorderScaling } from './TDSEDisorderScaling'
 
 export type { DisorderState } from './DisorderOverlay'
 
@@ -78,17 +79,13 @@ export function maybeDispatchDisorder(
     wgX: number
   ) => void
 ): void {
-  const dx = config.spacing[0] ?? 0.1
-  const hbar = config.hbar ?? 1
-  const mass = config.mass ?? 1
-  const tEff = (hbar * hbar) / (2 * mass * dx * dx)
-  const amplitude = config.disorderStrength * tEff
+  const { effectiveStrength } = computeTdseDisorderScaling(config)
 
   maybeDispatchDisorderGeneric(
     device,
     ctx,
     {
-      amplitude,
+      amplitude: effectiveStrength,
       seed: config.disorderSeed,
       distribution: config.disorderDistribution,
     },

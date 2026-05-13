@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { type PageCurveSamplingInputs, usePageCurveSampling } from '@/hooks/usePageCurveSampling'
 import { DEFAULT_BEC_CONFIG } from '@/lib/geometry/extended/bec'
 import { getPageCurveSample } from '@/lib/physics/bec/pageCurve'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { usePageCurveStore } from '@/stores/pageCurveStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { usePageCurveStore } from '@/stores/diagnostics/pageCurveStore'
 
 function resetStores(): void {
   useDiagnosticsStore.setState(useDiagnosticsStore.getInitialState())

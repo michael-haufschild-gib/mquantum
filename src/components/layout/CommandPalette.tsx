@@ -4,9 +4,9 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { useCameraStore } from '@/stores/cameraStore'
-import { type LayoutStore, useLayoutStore } from '@/stores/layoutStore'
-import { useThemeStore } from '@/stores/themeStore'
+import { useCameraStore } from '@/stores/scene/cameraStore'
+import { type LayoutStore, useLayoutStore } from '@/stores/ui/layoutStore'
+import { useThemeStore } from '@/stores/ui/themeStore'
 
 interface Command {
   id: string

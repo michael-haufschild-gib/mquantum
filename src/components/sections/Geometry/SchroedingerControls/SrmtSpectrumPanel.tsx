@@ -29,7 +29,7 @@ import {
   type SrmtClockQuality,
   type SrmtSnapshot,
   useSrmtDiagnosticStore,
-} from '@/stores/srmtDiagnosticStore'
+} from '@/stores/diagnostics/srmtDiagnosticStore'
 
 import { SrmtClockTable } from './SrmtClockTable'
 import { SrmtComputingStrip } from './SrmtComputingStrip'

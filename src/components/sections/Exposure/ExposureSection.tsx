@@ -18,9 +18,9 @@ import { Section } from '@/components/sections/Section'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { isAnalyticQuantumType } from '@/lib/geometry/registry'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 const noop = () => {}
 

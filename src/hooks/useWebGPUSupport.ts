@@ -10,8 +10,9 @@
 import { useEffect, useRef } from 'react'
 
 import { logger } from '@/lib/logger'
-import type { WebGPUAdapterMode, WebGPUCapabilityInfo } from '@/stores/rendererStore'
-import { useRendererStore } from '@/stores/rendererStore'
+import { buildWebGPUDeviceDescriptor } from '@/rendering/webgpu/core/deviceDescriptor'
+import type { WebGPUAdapterMode, WebGPUCapabilityInfo } from '@/stores/runtime/rendererStore'
+import { useRendererStore } from '@/stores/runtime/rendererStore'
 
 // ============================================================================
 // Types
@@ -39,7 +40,7 @@ export interface UseWebGPUSupportResult {
  * Check if WebGPU is available in the current browser.
  */
 function isWebGPUInBrowser(): boolean {
-  return typeof navigator !== 'undefined' && 'gpu' in navigator
+  return typeof navigator !== 'undefined' && typeof navigator.gpu?.requestAdapter === 'function'
 }
 
 interface AdapterModeDetectionResult {
@@ -127,7 +128,7 @@ async function detectWebGPUCapabilities(): Promise<WebGPUCapabilityInfo> {
 
     // Try to create a device to verify full support
     try {
-      const device = await adapter.requestDevice()
+      const device = await adapter.requestDevice(buildWebGPUDeviceDescriptor(adapter))
 
       // Device created successfully - WebGPU is fully supported
       // Destroy the test device immediately

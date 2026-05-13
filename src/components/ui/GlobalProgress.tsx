@@ -2,8 +2,8 @@ import { AnimatePresence, m } from 'motion/react'
 import React, { useEffect, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-import { useEnvironmentStore } from '@/stores/environmentStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
+import { useEnvironmentStore } from '@/stores/scene/environmentStore'
 
 export const GlobalProgress: React.FC = React.memo(() => {
   const { sceneTransitioning, refinementProgress } = usePerformanceStore(

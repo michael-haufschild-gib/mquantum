@@ -13,8 +13,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { applyUrlStateParams } from '@/hooks/useUrlState'
 import { deserializeState, serializeState } from '@/lib/url/state-serializer'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 /** Deserialize a URL string and apply the result to stores. */
 function applyUrlStateToStores(urlString: string): void {
@@ -61,6 +61,14 @@ describe('URL params -> store state integration', () => {
     expect(sch.isoThreshold).toBeCloseTo(-3.0)
     expect(sch.densityGain).toBeCloseTo(2.5)
     expect(sch.scale).toBeCloseTo(1.5)
+  })
+
+  it('rejects isosurface from URL when representation is Wigner', () => {
+    applyUrlStateToStores('d=4&t=schroedinger&repr=wigner&iso=1')
+
+    const sch = useExtendedObjectStore.getState().schroedinger
+    expect(sch.representation).toBe('wigner')
+    expect(sch.isoEnabled).toBe(false)
   })
 
   it('applies representation param from URL', () => {

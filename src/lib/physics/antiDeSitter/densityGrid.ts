@@ -32,7 +32,7 @@
 import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
 import type { AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
 import { clamp01 } from '@/lib/math/clamp'
-import { packRGBA16F } from '@/lib/physics/freeScalar/kSpaceOccupation'
+import { packRGBA16F } from '@/lib/physics/freeScalar/halfFloatPacking'
 
 import { BTZ_AMPLITUDE_CEILING, btzScalarDelta, btzTemperature, btzThermalAmplitude } from './btz'
 import {
@@ -113,6 +113,46 @@ export function createAdsPackerScratch(gridSize: number = DENSITY_GRID_SIZE): Ad
 const BOUNDARY_SHELL_MIN = 0.975
 const BOUNDARY_SHELL_MAX = 0.995
 
+function finiteClamped(value: number, min: number, max: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback
+  return Math.max(min, Math.min(max, value))
+}
+
+function finiteIntClamped(value: number, min: number, max: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback
+  return Math.max(min, Math.min(max, Math.floor(value)))
+}
+
+function sanitizeAdsPackerConfig(config: AntiDeSitterConfig): AntiDeSitterConfig {
+  const d = finiteIntClamped(config.d, 3, 7, 4)
+  const n = finiteIntClamped(config.n, 0, 4, 0)
+  const l = finiteIntClamped(config.l, 0, 3, 0)
+  const rawM = finiteIntClamped(config.m, -l, l, 0)
+  const m = rawM === 0 ? 0 : rawM
+  const hkllBoundarySource =
+    config.hkllBoundarySource === 'localized' || config.hkllBoundarySource === 'planeWave'
+      ? config.hkllBoundarySource
+      : 'eigenstate'
+  return {
+    ...config,
+    d,
+    n,
+    l,
+    m,
+    mL: finiteClamped(config.mL, -3, 3, 0),
+    branch: config.branch === 'alternate' ? 'alternate' : 'standard',
+    boundaryOverlay: config.boundaryOverlay === true,
+    btzEnabled: config.btzEnabled === true,
+    btzHorizonRadius: finiteClamped(config.btzHorizonRadius, 0.05, 2, 0.3),
+    btzOmega: finiteClamped(config.btzOmega, 0.1, 10, 1),
+    btzAngularM: finiteIntClamped(config.btzAngularM, -5, 5, 0),
+    hkllEnabled: config.hkllEnabled === true,
+    hkllBoundarySource,
+    hkllSourceSigma: finiteClamped(config.hkllSourceSigma, 0.05, 1.5, 0.3),
+    hkllPlaneWaveM: finiteIntClamped(config.hkllPlaneWaveM, 0, 8, 2),
+  }
+}
+
 /**
  * Pack the AdS configuration into the density texture bytes.
  *
@@ -157,29 +197,31 @@ export function packAntiDeSitterDensityGrid(
   scratch?: AdsPackerScratch,
   targetGridSize: number = DENSITY_GRID_SIZE
 ): AdsDensityUpload {
+  const safeConfig = sanitizeAdsPackerConfig(config)
   // HKLL takes precedence (Stage 2B). The UI setters also enforce mutex so
   // both flags should not be true simultaneously, but in case they are, the
   // HKLL reconstruction wins because it's the more specialised story.
-  if (config.hkllEnabled) {
-    return packHkllReconstructedDensityGrid(config, scratch, targetGridSize)
+  if (safeConfig.hkllEnabled) {
+    return packHkllReconstructedDensityGrid(safeConfig, scratch, targetGridSize)
   }
-  if (config.btzEnabled && config.d === 3) {
-    return packBtzThermalDensityGrid(config, scratch, targetGridSize)
+  if (safeConfig.btzEnabled && safeConfig.d === 3) {
+    return packBtzThermalDensityGrid(safeConfig, scratch, targetGridSize)
   }
   const N = targetGridSize
   const total = N * N * N
   const useScratch = !!scratch && isScratchCompatible(scratch, total)
   const density = useScratch ? scratch!.density : new Uint16Array(total * 4)
 
-  const resolved = resolveDelta(config.d, config.mL, config.branch)
+  const ads = safeConfig
+  const resolved = resolveDelta(ads.d, ads.mL, ads.branch)
   const delta = resolved.delta
-  const half = (config.d - 1) / 2
-  const disc = half * half + (config.mL >= 0 ? config.mL * config.mL : -(config.mL * config.mL))
+  const half = (ads.d - 1) / 2
+  const disc = half * half + (ads.mL >= 0 ? ads.mL * ads.mL : -(ads.mL * ads.mL))
   const isTachyon = disc < 0
 
-  const alpha = config.l + (config.d - 3) / 2
-  const beta = delta - (config.d - 1) / 2
-  const norm = radialNorm(config.n, config.l, delta, config.d)
+  const alpha = ads.l + (ads.d - 3) / 2
+  const beta = delta - (ads.d - 1) / 2
+  const norm = radialNorm(ads.n, ads.l, delta, ads.d)
 
   // First pass: compute bulk density at every voxel and track peak.
   // Bound-state eigenstates are real at t=0 — the complex time factor
@@ -218,21 +260,21 @@ export function packAntiDeSitterDensityGrid(
         const cosRho = Math.cos(rho)
         const sinRho = Math.sin(rho)
         const cosPow = Math.pow(cosRho, delta)
-        const sinPow = config.l === 0 ? 1 : Math.pow(sinRho, config.l)
-        const jacobi = jacobiP(config.n, alpha, beta, Math.cos(2 * rho))
+        const sinPow = ads.l === 0 ? 1 : Math.pow(sinRho, ads.l)
+        const jacobi = jacobiP(ads.n, alpha, beta, Math.cos(2 * rho))
         const R = norm * cosPow * sinPow * jacobi
 
         // Angular part. d=3 routes through adsAngularHarmonic's S¹ branch so
         // the AdS₃ bulk is z-invariant (cylindrical); d≥4 evaluates Y_ℓm on
         // the visible 2-sphere. For l=0 the S² case reduces to a constant.
         let Y: number
-        if (config.l === 0 && config.d >= 4) {
+        if (ads.l === 0 && ads.d >= 4) {
           Y = 1 / Math.sqrt(4 * Math.PI)
         } else {
           const invR = rCompact > 1e-10 ? 1 / rCompact : 0
           const theta = Math.acos(Math.max(-1, Math.min(1, wz * invR)))
           const phi = Math.atan2(wy, wx)
-          Y = adsAngularHarmonic(config.l, config.m, config.d, theta, phi)
+          Y = adsAngularHarmonic(ads.l, ads.m, ads.d, theta, phi)
         }
 
         const psi = R * Y
@@ -254,7 +296,7 @@ export function packAntiDeSitterDensityGrid(
   // visualise.
   let boundary: Float32Array | null = null
   let peakBoundary = 0
-  if (config.boundaryOverlay) {
+  if (ads.boundaryOverlay) {
     if (useScratch) {
       boundary = scratch!.boundary
       boundary.fill(0)
@@ -274,18 +316,18 @@ export function packAntiDeSitterDensityGrid(
           const rho = 2 * Math.atan(rCompact)
           if (rho <= 0 || rho >= Math.PI / 2) continue
           const sinRho = Math.sin(rho)
-          const sin2l = config.l === 0 ? 1 : Math.pow(sinRho, 2 * config.l)
-          const jacobi = jacobiP(config.n, alpha, beta, Math.cos(2 * rho))
+          const sin2l = ads.l === 0 ? 1 : Math.pow(sinRho, 2 * ads.l)
+          const jacobi = jacobiP(ads.n, alpha, beta, Math.cos(2 * rho))
           // Angular part — same dimension-aware routing as the bulk pass so
           // the overlay stays aligned with the bulk angular structure at d=3.
           let Y: number
-          if (config.l === 0 && config.d >= 4) {
+          if (ads.l === 0 && ads.d >= 4) {
             Y = 1 / Math.sqrt(4 * Math.PI)
           } else {
             const invR = rCompact > 1e-10 ? 1 / rCompact : 0
             const theta = Math.acos(Math.max(-1, Math.min(1, wz * invR)))
             const phi = Math.atan2(wy, wx)
-            Y = adsAngularHarmonic(config.l, config.m, config.d, theta, phi)
+            Y = adsAngularHarmonic(ads.l, ads.m, ads.d, theta, phi)
           }
           const value = norm2 * sin2l * jacobi * jacobi * Y * Y
           boundary[pixelIdx] = value
@@ -341,12 +383,24 @@ const BTZ_HORIZON_SHELL = 0.04
  */
 const BTZ_VISIBLE_HORIZON_MIN = 0.1
 const BTZ_VISIBLE_HORIZON_MAX = 0.55
+const BTZ_DEFAULT_HORIZON_RADIUS = 0.3
+const BTZ_DEFAULT_OMEGA = 1
 
 function btzVisibleHorizon(rplus: number): number {
-  const raw = 0.066 + 0.68 * rplus
+  const safeRplus = Number.isFinite(rplus) && rplus > 0 ? rplus : BTZ_DEFAULT_HORIZON_RADIUS
+  const raw = 0.066 + 0.68 * safeRplus
   if (raw < BTZ_VISIBLE_HORIZON_MIN) return BTZ_VISIBLE_HORIZON_MIN
   if (raw > BTZ_VISIBLE_HORIZON_MAX) return BTZ_VISIBLE_HORIZON_MAX
   return raw
+}
+
+function finiteAtLeast(value: number, fallback: number, min: number): number {
+  const finite = Number.isFinite(value) ? value : fallback
+  return Math.max(finite, min)
+}
+
+function finiteRoundedOr(value: number, fallback: number): number {
+  return Number.isFinite(value) ? Math.round(value) : fallback
 }
 /** Lower floor on the BTZ compactification coordinate u = r_+/r; below
  * this the mapping r = r_+/u would blow up. u_min = 0.05 ⇒ r_max = 20 r_+. */
@@ -385,6 +439,7 @@ export function packBtzThermalDensityGrid(
   scratch?: AdsPackerScratch,
   targetGridSize: number = DENSITY_GRID_SIZE
 ): AdsDensityUpload {
+  const ads = sanitizeAdsPackerConfig(config)
   const N = targetGridSize
   const total = N * N * N
   const useScratch = !!scratch && isScratchCompatible(scratch, total)
@@ -397,11 +452,11 @@ export function packBtzThermalDensityGrid(
     bulk = new Float32Array(total)
   }
 
-  const rplus = Math.max(config.btzHorizonRadius, 1e-3)
+  const rplus = finiteAtLeast(ads.btzHorizonRadius, BTZ_DEFAULT_HORIZON_RADIUS, 1e-3)
   const L = 1
-  const omega = Math.max(config.btzOmega, 1e-3)
-  const delta = btzScalarDelta(config.mL)
-  const mA = Math.round(config.btzAngularM)
+  const omega = finiteAtLeast(ads.btzOmega, BTZ_DEFAULT_OMEGA, 1e-3)
+  const delta = btzScalarDelta(ads.mL)
+  const mA = finiteRoundedOr(ads.btzAngularM, 0)
   const T = btzTemperature(rplus, L)
   const beta = T > 1e-8 ? 1 / T : 1e8
 
@@ -525,24 +580,25 @@ export function packHkllReconstructedDensityGrid(
   scratch?: AdsPackerScratch,
   targetGridSize: number = DENSITY_GRID_SIZE
 ): AdsDensityUpload {
+  const ads = sanitizeAdsPackerConfig(config)
   const N = targetGridSize
   const total = N * N * N
   const useScratch = !!scratch && scratch.density.length >= total * 4
   const density = useScratch ? scratch!.density : new Uint16Array(total * 4)
 
-  const resolved = resolveDelta(config.d, config.mL, config.branch)
+  const resolved = resolveDelta(ads.d, ads.mL, ads.branch)
   const delta = resolved.delta
-  const params: HkllParams = defaultHkllParams(config.d, delta)
+  const params: HkllParams = defaultHkllParams(ads.d, delta)
   const profile = createBoundaryProfile({
-    mode: config.hkllBoundarySource,
-    d: config.d,
+    mode: ads.hkllBoundarySource,
+    d: ads.d,
     delta,
-    n: config.n,
-    l: config.l,
-    m: config.m,
-    branch: config.branch,
-    sourceSigma: config.hkllSourceSigma,
-    planeWaveM: config.hkllPlaneWaveM,
+    n: ads.n,
+    l: ads.l,
+    m: ads.m,
+    branch: ads.branch,
+    sourceSigma: ads.hkllSourceSigma,
+    planeWaveM: ads.hkllPlaneWaveM,
   })
 
   // Coarse buffers: Re(ψ), Im(ψ). The density |ψ|² is derived from the
@@ -550,7 +606,7 @@ export function packHkllReconstructedDensityGrid(
   // own would produce rho² · trilinear ≠ |re·trilinear|² + |im·trilinear|²
   // at points between opposite-phase voxels (finite density + random phase
   // from quantisation noise = visible sparkle near nodal surfaces).
-  const C = config.d <= 3 ? HKLL_COARSE_SIZE_S1 : HKLL_COARSE_SIZE_S2
+  const C = ads.d <= 3 ? HKLL_COARSE_SIZE_S1 : HKLL_COARSE_SIZE_S2
   const coarseTotal = C ** 3
   let reField: Float32Array
   let imField: Float32Array

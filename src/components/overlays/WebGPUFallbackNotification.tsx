@@ -11,7 +11,7 @@ import React, { useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/Button'
 import { Z_INDEX } from '@/constants/zIndex'
-import { useRendererStore } from '@/stores/rendererStore'
+import { useRendererStore } from '@/stores/runtime/rendererStore'
 
 // ============================================================================
 // Component

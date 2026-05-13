@@ -20,6 +20,10 @@ import {
   type TdseUniformParams,
   writeTdseUniforms,
 } from '@/rendering/webgpu/passes/TDSEComputePassUniforms'
+import { TDSE_UNIFORMS_LAYOUT } from '@/rendering/webgpu/passes/tdseUniformsLayout'
+
+/** Named float32/uint32 slot indices into the TDSEUniforms struct. */
+const I = TDSE_UNIFORMS_LAYOUT.index
 
 function createTdseConfig(overrides: Partial<TdseConfig> = {}): TdseConfig {
   return { ...DEFAULT_TDSE_CONFIG, ...overrides }
@@ -63,10 +67,10 @@ describe('writeTdseUniforms', () => {
       uniformParams({ config, totalSites })
     )
 
-    expect(u32[0]).toBe(3) // latticeDim
-    expect(u32[1]).toBe(262144) // totalSites = 64^3
-    expect(f32[2]).toBeCloseTo(0.005) // dt
-    expect(f32[3]).toBeCloseTo(1.0) // hbar
+    expect(u32[I.latticeDim]).toBe(3)
+    expect(u32[I.totalSites]).toBe(262144) // 64^3
+    expect(f32[I.dt]).toBeCloseTo(0.005)
+    expect(f32[I.hbar]).toBeCloseTo(1.0)
   })
 
   it('maps potentialType to correct shader enum', () => {
@@ -83,7 +87,7 @@ describe('writeTdseUniforms', () => {
       f32,
       uniformParams({ config: createTdseConfig({ potentialType: 'barrier' }) })
     )
-    expect(u32[7]).toBe(1) // barrier → 1
+    expect(u32[I.potentialType]).toBe(1) // barrier → 1
 
     u32.fill(0)
     writeTdseUniforms(
@@ -94,7 +98,7 @@ describe('writeTdseUniforms', () => {
       f32,
       uniformParams({ config: createTdseConfig({ potentialType: 'doubleSlit' }) })
     )
-    expect(u32[7]).toBe(6) // doubleSlit → 6
+    expect(u32[I.potentialType]).toBe(6) // doubleSlit → 6
 
     u32.fill(0)
     writeTdseUniforms(
@@ -105,10 +109,10 @@ describe('writeTdseUniforms', () => {
       f32,
       uniformParams({ config: createTdseConfig({ potentialType: 'custom' }) })
     )
-    expect(u32[7]).toBe(11) // custom → 11
+    expect(u32[I.potentialType]).toBe(11) // custom → 11
   })
 
-  it('writes customPotentialScale at index 176', () => {
+  it('writes customPotentialScale at customPotentialScale slot (offset 704)', () => {
     const uniformData = new ArrayBuffer(UNIFORM_SIZE)
     const u32 = new Uint32Array(uniformData)
     const f32 = new Float32Array(uniformData)
@@ -125,10 +129,10 @@ describe('writeTdseUniforms', () => {
         customPotentialScale: 42.5,
       })
     )
-    expect(f32[176]).toBeCloseTo(42.5)
+    expect(f32[I.customPotentialScale]).toBeCloseTo(42.5)
   })
 
-  it('packs gridSize starting at index 8', () => {
+  it('packs gridSize at the gridSize array slot', () => {
     const uniformData = new ArrayBuffer(UNIFORM_SIZE)
     const u32 = new Uint32Array(uniformData)
     const f32 = new Float32Array(uniformData)
@@ -147,9 +151,9 @@ describe('writeTdseUniforms', () => {
       })
     )
 
-    expect(u32[8]).toBe(32)
-    expect(u32[9]).toBe(64)
-    expect(u32[10]).toBe(128)
+    expect(u32[I.gridSize + 0]).toBe(32)
+    expect(u32[I.gridSize + 1]).toBe(64)
+    expect(u32[I.gridSize + 2]).toBe(128)
   })
 
   it('sanitizes non-finite packet vectors before GPU upload', () => {
@@ -172,12 +176,12 @@ describe('writeTdseUniforms', () => {
       })
     )
 
-    expect(f32[44]).toBe(0)
-    expect(f32[45]).toBe(0)
-    expect(f32[46]).toBe(-1)
-    expect(f32[56]).toBe(4)
-    expect(f32[57]).toBe(0)
-    expect(f32[58]).toBe(0)
+    expect(f32[I.packetCenter + 0]).toBe(0)
+    expect(f32[I.packetCenter + 1]).toBe(0)
+    expect(f32[I.packetCenter + 2]).toBe(-1)
+    expect(f32[I.packetMomentum + 0]).toBe(4)
+    expect(f32[I.packetMomentum + 1]).toBe(0)
+    expect(f32[I.packetMomentum + 2]).toBe(0)
   })
 
   it('computes kGridScale = 2π/(N·a) for each dimension', () => {
@@ -199,9 +203,9 @@ describe('writeTdseUniforms', () => {
 
     // kGridScale = 2π / (64 * 0.1) = 2π / 6.4 ≈ 0.9817
     const expected = (2 * Math.PI) / (64 * 0.1)
-    expect(f32[136]).toBeCloseTo(expected, 4)
-    expect(f32[137]).toBeCloseTo(expected, 4)
-    expect(f32[138]).toBeCloseTo(expected, 4)
+    expect(f32[I.kGridScale + 0]).toBeCloseTo(expected, 4)
+    expect(f32[I.kGridScale + 1]).toBeCloseTo(expected, 4)
+    expect(f32[I.kGridScale + 2]).toBeCloseTo(expected, 4)
   })
 
   it('sets absorberEnabled flag and computes sigma_max', () => {
@@ -219,8 +223,8 @@ describe('writeTdseUniforms', () => {
       uniformParams({ config: createTdseConfig({ absorberEnabled: true, absorberWidth: 0.2 }) })
     )
 
-    expect(u32[79]).toBe(1) // absorberEnabled
-    expect(f32[81]).toBeGreaterThan(0) // sigma_max > 0
+    expect(u32[I.absorberEnabled]).toBe(1)
+    expect(f32[I.absorberStrength]).toBeGreaterThan(0) // sigma_max > 0
   })
 
   it('uploads buffer to GPU', () => {
@@ -236,7 +240,7 @@ describe('writeTdseUniforms', () => {
     expect(writeBuffer).toHaveBeenCalledWith(mockBuffer, 0, uniformData)
   })
 
-  it('sets imaginaryTime flag at u32[175] when enabled', () => {
+  it('sets imaginaryTime flag (offset 700) when enabled', () => {
     const uniformData = new ArrayBuffer(UNIFORM_SIZE)
     const u32 = new Uint32Array(uniformData)
     const f32 = new Float32Array(uniformData)
@@ -251,11 +255,10 @@ describe('writeTdseUniforms', () => {
       uniformParams({ config: createTdseConfig({ imaginaryTimeEnabled: true }) })
     )
 
-    // Offset 700 / 4 = index 175
-    expect(u32[175]).toBe(1)
+    expect(u32[I.imaginaryTime]).toBe(1)
   })
 
-  it('clears imaginaryTime flag at u32[175] when disabled', () => {
+  it('clears imaginaryTime flag when disabled', () => {
     const uniformData = new ArrayBuffer(UNIFORM_SIZE)
     const u32 = new Uint32Array(uniformData)
     const f32 = new Float32Array(uniformData)
@@ -270,7 +273,7 @@ describe('writeTdseUniforms', () => {
       uniformParams({ config: createTdseConfig({ imaginaryTimeEnabled: false }) })
     )
 
-    expect(u32[175]).toBe(0)
+    expect(u32[I.imaginaryTime]).toBe(0)
   })
 
   it('maps hawkingFlux fieldView to shader enum 7', () => {
@@ -288,7 +291,7 @@ describe('writeTdseUniforms', () => {
       uniformParams({ config: createTdseConfig({ fieldView: 'hawkingFlux' }) })
     )
 
-    expect(u32[71]).toBe(7)
+    expect(u32[I.fieldView]).toBe(7)
   })
 
   it('maps quantumPressure fieldView to shader enum 8', () => {
@@ -306,7 +309,7 @@ describe('writeTdseUniforms', () => {
       uniformParams({ config: createTdseConfig({ fieldView: 'quantumPressure' }) })
     )
 
-    expect(u32[71]).toBe(8)
+    expect(u32[I.fieldView]).toBe(8)
   })
 
   it('maps vorticity fieldView to shader enum 9', () => {
@@ -324,10 +327,10 @@ describe('writeTdseUniforms', () => {
       uniformParams({ config: createTdseConfig({ fieldView: 'vorticity' }) })
     )
 
-    expect(u32[71]).toBe(9)
+    expect(u32[I.fieldView]).toBe(9)
   })
 
-  it('packs blackHoleRingdown BH params at f32[187..189] (offsets 748/752/756)', () => {
+  it('packs blackHoleRingdown BH params at bhMass/bhMultipoleL/bhSpin (offsets 748/752/756)', () => {
     const uniformData = new ArrayBuffer(UNIFORM_SIZE)
     const u32 = new Uint32Array(uniformData)
     const f32 = new Float32Array(uniformData)
@@ -349,16 +352,16 @@ describe('writeTdseUniforms', () => {
       })
     )
 
-    expect(u32[7]).toBe(14) // blackHoleRingdown → 14
-    expect(f32[187]).toBeCloseTo(2.5) // bhMass at offset 748
-    expect(f32[188]).toBeCloseTo(3) // bhMultipoleL at offset 752
-    expect(f32[189]).toBeCloseTo(1) // bhSpin at offset 756
-    // Offsets 760+ now host the analog Hawking block. The previous two-slot
-    // _padBh pad has been consumed by hawkingVmax (f32[190]) and hawkingLh
-    // (f32[191]). The writer seeds them from DEFAULT_TDSE_CONFIG; verify
-    // those defaults land in the right slot rather than asserting zero.
-    expect(f32[190]).toBeCloseTo(2.0) // hawkingVmax @ 760
-    expect(f32[191]).toBeCloseTo(0.6) // hawkingLh @ 764
+    expect(u32[I.potentialType]).toBe(14) // blackHoleRingdown → 14
+    expect(f32[I.bhMass]).toBeCloseTo(2.5)
+    expect(f32[I.bhMultipoleL]).toBeCloseTo(3)
+    expect(f32[I.bhSpin]).toBeCloseTo(1)
+    // The hawkingVmax/hawkingLh slots that follow are now seeded from
+    // DEFAULT_TDSE_CONFIG (the previous two-slot _padBh has been consumed
+    // by the analog-Hawking block). Verify the defaults land here rather
+    // than asserting zero, so future default changes don't make this stale.
+    expect(f32[I.hawkingVmax]).toBeCloseTo(2.0)
+    expect(f32[I.hawkingLh]).toBeCloseTo(0.6)
   })
 
   it('normalizes corrupted blackHoleRingdown BH params before uniform packing', () => {
@@ -383,12 +386,12 @@ describe('writeTdseUniforms', () => {
       })
     )
 
-    expect(f32[187]).toBeCloseTo(1)
-    expect(f32[188]).toBeCloseTo(2)
-    expect(f32[189]).toBeCloseTo(2)
+    expect(f32[I.bhMass]).toBeCloseTo(1)
+    expect(f32[I.bhMultipoleL]).toBeCloseTo(2)
+    expect(f32[I.bhSpin]).toBeCloseTo(2)
   })
 
-  it('packs analog-Hawking fields at f32[190..196] (offsets 760-784)', () => {
+  it('packs analog-Hawking fields (offsets 760-784)', () => {
     const uniformData = new ArrayBuffer(UNIFORM_SIZE)
     const u32 = new Uint32Array(uniformData)
     const f32 = new Float32Array(uniformData)
@@ -413,22 +416,22 @@ describe('writeTdseUniforms', () => {
       })
     )
 
-    expect(f32[190]).toBeCloseTo(2.5) // hawkingVmax
-    expect(f32[191]).toBeCloseTo(0.4) // hawkingLh
-    expect(f32[192]).toBeCloseTo(0.2) // hawkingDeltaN (clamp preserves 0.2)
-    expect(f32[193]).toBeCloseTo(0.07) // hawkingInjectRate
-    expect(u32[194]).toBe(1) // hawkingPairInjection
-    expect(u32[195]).toBe(4242) // hawkingSeed
-    expect(u32[196]).toBe(12345) // hawkingStepIndex
-    // _padHawk0 (offset 788) stays zero. Slots 198/199 (offsets 792/796) host
-    // the host-precomputed wormhole trig cache. Derive tauG from the same
+    expect(f32[I.hawkingVmax]).toBeCloseTo(2.5)
+    expect(f32[I.hawkingLh]).toBeCloseTo(0.4)
+    expect(f32[I.hawkingDeltaN]).toBeCloseTo(0.2) // clamp preserves 0.2
+    expect(f32[I.hawkingInjectRate]).toBeCloseTo(0.07)
+    expect(u32[I.hawkingPairInjection]).toBe(1)
+    expect(u32[I.hawkingSeed]).toBe(4242)
+    expect(u32[I.hawkingStepIndex]).toBe(12345)
+    // _padHawk0 stays zero. wormholeCosTau / wormholeSinTau host the
+    // host-precomputed wormhole trig cache. Derive tauG from the same
     // config that drove writeTdseUniforms() so future default changes don't
     // make the assertion stale even though the packing is still correct.
-    expect(u32[197]).toBe(0)
+    expect(u32[I._padHawk0]).toBe(0)
     const trigConfig = DEFAULT_TDSE_CONFIG
     const tauG = 0.5 * trigConfig.dt * Math.max(0, trigConfig.wormholeCouplingG ?? 0)
-    expect(f32[198]).toBeCloseTo(Math.cos(tauG), 6)
-    expect(f32[199]).toBeCloseTo(Math.sin(tauG), 6)
+    expect(f32[I.wormholeCosTau]).toBeCloseTo(Math.cos(tauG), 6)
+    expect(f32[I.wormholeSinTau]).toBeCloseTo(Math.sin(tauG), 6)
   })
 
   it('clamps hawkingDeltaN into [0, 0.6]', () => {
@@ -445,7 +448,7 @@ describe('writeTdseUniforms', () => {
       f32,
       uniformParams({ config: createTdseConfig({ hawkingDeltaN: 2.0 }) })
     )
-    expect(f32[192]).toBeCloseTo(0.6) // clamped from 2.0 → 0.6
+    expect(f32[I.hawkingDeltaN]).toBeCloseTo(0.6) // clamped from 2.0 → 0.6
   })
 
   it('clamps negative hawkingDeltaN to 0.0', () => {
@@ -462,7 +465,7 @@ describe('writeTdseUniforms', () => {
       f32,
       uniformParams({ config: createTdseConfig({ hawkingDeltaN: -1.0 }) })
     )
-    expect(f32[192]).toBe(0.0)
+    expect(f32[I.hawkingDeltaN]).toBe(0.0)
   })
 
   it('clamps negative hawkingInjectRate to 0.0', () => {
@@ -479,7 +482,7 @@ describe('writeTdseUniforms', () => {
       f32,
       uniformParams({ config: createTdseConfig({ hawkingInjectRate: -0.1 }) })
     )
-    expect(f32[193]).toBe(0.0)
+    expect(f32[I.hawkingInjectRate]).toBe(0.0)
   })
 
   it('clamps hawkingInjectRate above 0.5 back to 0.5', () => {
@@ -496,7 +499,7 @@ describe('writeTdseUniforms', () => {
       f32,
       uniformParams({ config: createTdseConfig({ hawkingInjectRate: 5.0 }) })
     )
-    expect(f32[193]).toBeCloseTo(0.5)
+    expect(f32[I.hawkingInjectRate]).toBeCloseTo(0.5)
   })
 })
 

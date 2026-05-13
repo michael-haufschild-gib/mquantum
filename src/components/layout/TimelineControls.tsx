@@ -12,9 +12,9 @@ import {
   MAX_SPEED,
   MIN_SPEED,
   useAnimationStore,
-} from '@/stores/animationStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { type GeometryState, useGeometryStore } from '@/stores/geometryStore'
+} from '@/stores/scene/animationStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { type GeometryState, useGeometryStore } from '@/stores/scene/geometryStore'
 
 const PauliAnimationDrawer = lazy(() =>
   import('./TimelineControls/PauliAnimationDrawer').then((m) => ({

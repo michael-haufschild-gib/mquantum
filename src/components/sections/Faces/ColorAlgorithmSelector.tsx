@@ -8,13 +8,14 @@ import React, { useCallback, useEffect, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Select } from '@/components/ui/Select'
+import { type ColorAlgorithm, getAvailableColorAlgorithms } from '@/lib/colors/palette'
 import type { DiracFieldView } from '@/lib/geometry/extended/dirac'
 import type { PauliFieldView } from '@/lib/geometry/extended/pauli'
-import { type ColorAlgorithm, getAvailableColorAlgorithms } from '@/rendering/shaders/palette'
+import { supportsSchroedingerSurfaceMode } from '@/lib/geometry/registry'
 import { pauliFieldViewForColorAlgorithm } from '@/rendering/webgpu/scenePassConfig'
-import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/scene/appearanceStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 /** Props for the color algorithm selection dropdown. */
 export interface ColorAlgorithmSelectorProps {
@@ -58,6 +59,14 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
         quantumMode === 'hydrogenND' ||
         quantumMode === 'hydrogenNDCoupled') &&
       representation !== 'wigner'
+    const effectiveIsosurfaceEnabled =
+      isosurfaceEnabled &&
+      supportsSchroedingerSurfaceMode({
+        objectType,
+        quantumMode,
+        dimension,
+        representation,
+      })
 
     const availableOptions = useMemo(
       () =>
@@ -68,7 +77,7 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
           quantumMode === 'freeScalarField' ? freeScalarInitialCondition : undefined,
           {
             dimension,
-            isosurface: isosurfaceEnabled,
+            isosurface: effectiveIsosurfaceEnabled,
             representation,
           }
         ),
@@ -78,7 +87,7 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
         objectType,
         freeScalarInitialCondition,
         dimension,
-        isosurfaceEnabled,
+        effectiveIsosurfaceEnabled,
         representation,
       ]
     )

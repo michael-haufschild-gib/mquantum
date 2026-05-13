@@ -12,6 +12,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
 import { Select } from '@/components/ui/Select'
+import { PAULI_FIELD_VIEW_TO_COLOR_ALGO } from '@/lib/colors/palette/types'
 import type { AdsPresetName, AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
 import { type BecConfig, DEFAULT_BEC_CONFIG } from '@/lib/geometry/extended/bec'
 import type { SchroedingerPresetName } from '@/lib/geometry/extended/common'
@@ -32,11 +33,10 @@ import type { ScenarioPreset } from '@/lib/physics/presetTypes'
 import { QUANTUM_WALK_PRESETS } from '@/lib/physics/quantumWalk/presets'
 import { TDSE_SCENARIO_PRESETS } from '@/lib/physics/tdse/presets'
 import { WDW_SCENARIO_PRESETS } from '@/lib/physics/wheelerDeWitt/presets'
-import { PAULI_FIELD_VIEW_TO_COLOR_ALGO } from '@/rendering/shaders/palette/types'
-import { useAppearanceStore } from '@/stores/appearanceStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { resizeBecArrays } from '@/stores/slices/geometry/setters/becSetters'
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { resizeBecArrays } from '@/stores/slices/geometry/setters/becResize'
 import { resizeTdseArrays } from '@/stores/slices/geometry/setters/tdseSetters'
 
 import { getScenarioPresetOptions as getTdsePresetOptions } from './SchroedingerControls/tdseControlsConstants'
@@ -501,24 +501,24 @@ export const ScenarioSelector: React.FC = React.memo(() => {
           break
         }
         case 'tdseDynamics':
-          applyTdsePreset(value)
+          void applyTdsePreset(value, { expectedQuantumMode: mode })
           break
         case 'becDynamics':
-          void applyBecPreset(value)
+          void applyBecPreset(value, { expectedQuantumMode: mode })
           break
         case 'diracEquation':
           // applyDiracPreset internally syncs color algorithm for fieldViews like
           // 'particleAntiparticleSplit' that require a specific color algo.
-          void applyDiracPreset(value)
+          void applyDiracPreset(value, { expectedQuantumMode: mode })
           break
         case 'freeScalarField':
-          applyFreeScalarPreset(value)
+          void applyFreeScalarPreset(value, { expectedQuantumMode: mode })
           break
         case 'quantumWalk':
-          void applyQuantumWalkPreset(value)
+          void applyQuantumWalkPreset(value, { expectedQuantumMode: mode })
           break
         case 'wheelerDeWitt':
-          void applyWheelerDeWittPreset(value)
+          void applyWheelerDeWittPreset(value, { expectedQuantumMode: mode })
           break
         case 'pauliSpinor':
           applyPauliPresetById(value, setPauliConfig)

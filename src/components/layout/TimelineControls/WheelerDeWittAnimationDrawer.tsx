@@ -18,8 +18,11 @@ import React, { useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Slider } from '@/components/ui/Slider'
-import { useAppearanceStore } from '@/stores/appearanceStore'
-import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
+import {
+  type ExtendedObjectState,
+  useExtendedObjectStore,
+} from '@/stores/scene/extendedObjectStore'
 
 import { AnimationDrawerContainer } from './AnimationDrawerContainer'
 import { DrawerSection } from './DrawerSection'

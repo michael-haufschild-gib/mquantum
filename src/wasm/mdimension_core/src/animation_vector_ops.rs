@@ -73,5 +73,3 @@ pub fn subtract_vectors(a: &[f64], b: &[f64]) -> Vec<f64> {
     }
     result
 }
-
-

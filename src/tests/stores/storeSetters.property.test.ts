@@ -14,9 +14,9 @@ import fc from 'fast-check'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { useRotationStore } from '@/stores/rotationStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { useRotationStore } from '@/stores/scene/rotationStore'
 
 describe('geometry store — property-based invariants', () => {
   beforeEach(() => {

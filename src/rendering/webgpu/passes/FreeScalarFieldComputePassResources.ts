@@ -14,9 +14,10 @@ import { sampleAdiabaticVacuum } from '@/lib/physics/cosmology/adiabaticVacuum'
 import { computeMassSquaredScale } from '@/lib/physics/cosmology/preheating'
 import { computeFsfCosmologyCoefs } from '@/lib/physics/freeScalar/vacuumDispersion'
 import { sampleVacuumSpectrum } from '@/lib/physics/freeScalar/vacuumSpectrum'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
 import type { WebGPURenderContext } from '../core/types'
+import { destroyGpuResources } from '../utils/gpuResourceHelpers'
 import { LINEAR_WG as LINEAR_WORKGROUP_SIZE } from './computePassUtils'
 import type { FsfBindGroupResult, FsfPipelineResult } from './FreeScalarFieldComputePassSetup'
 import {
@@ -27,6 +28,7 @@ import {
 import type { FsfKSpaceManager } from './FreeScalarFieldKSpace'
 import { getOrCreateFsfCosmoDebugBuffer } from './fsfCosmoDebug'
 import { projectSimEta, writeFsfCosmologyCoefsSlot } from './fsfCosmologyStepping'
+import { assertStateInjectionLength } from './stateSave'
 
 // ---------------------------------------------------------------------------
 // Buffer Management
@@ -194,11 +196,14 @@ export function disposeFsfPassGpu(fields: FsfGpuFields, kSpace: FsfKSpaceManager
   // Invalidate in-flight async gradient pipeline results
   fields.pipelineGeneration++
 
-  const gpuBuffers: (GPUBuffer | null)[] = [fields.phiBuffer, fields.piBuffer, fields.uniformBuffer]
-  for (const buf of gpuBuffers) buf?.destroy()
-  fields.densityTexture?.destroy()
-  fields.analysisTexture?.destroy()
-  fields.normalTexture?.destroy()
+  destroyGpuResources(
+    fields.phiBuffer,
+    fields.piBuffer,
+    fields.uniformBuffer,
+    fields.densityTexture,
+    fields.analysisTexture,
+    fields.normalTexture
+  )
   for (const buf of fields.pendingStagingBuffers) buf.destroy()
   fields.pendingStagingBuffers.length = 0
 
@@ -291,14 +296,17 @@ export function initializeFsfField(
 
   // Check for pending loaded wavefunction data -- skip init and inject directly
   if (ic.pendingInjection && ic.phiBuffer && ic.piBuffer) {
+    try {
+      assertStateInjectionLength('FSF', ic.pendingInjection, ic.totalSites)
+    } catch (err) {
+      ic.pendingInjection = null
+      throw err
+    }
     const { re, im } = ic.pendingInjection
-    const elementCount = Math.min(re.length, ic.totalSites)
-    const reData = re.slice(0, elementCount)
-    const imData = im.slice(0, elementCount)
-    device.queue.writeBuffer(ic.phiBuffer, 0, reData)
-    device.queue.writeBuffer(ic.piBuffer, 0, imData)
+    device.queue.writeBuffer(ic.phiBuffer, 0, re as Float32Array<ArrayBuffer>)
+    device.queue.writeBuffer(ic.piBuffer, 0, im as Float32Array<ArrayBuffer>)
     injectedFromSave = true
-    logger.log(`[FSF] Injected loaded field state (${elementCount} sites)`)
+    logger.log(`[FSF] Injected loaded field state (${ic.totalSites} sites)`)
   } else if (config.initialCondition === 'vacuumNoise') {
     // Sample the adiabatic vacuum or Minkowski vacuum spectrum
     const { phi, pi } = config.cosmology.enabled

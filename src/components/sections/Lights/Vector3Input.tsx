@@ -9,6 +9,12 @@ import React, { memo, useCallback, useEffect, useRef, useState } from 'react'
 
 import { Input } from '@/components/ui/Input'
 
+function parseFiniteInputValue(inputValue: string): number | null {
+  if (inputValue.trim() === '') return null
+  const parsed = Number(inputValue)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 /** Props for the 3D vector (x, y, z) input group. */
 export interface Vector3InputProps {
   label: string
@@ -78,8 +84,8 @@ export const Vector3Input: React.FC<Vector3InputProps> = memo(function Vector3In
       setLocalValues(newLocal)
 
       // Parse and update if valid
-      const parsed = parseFloat(inputValue)
-      if (!isNaN(parsed)) {
+      const parsed = parseFiniteInputValue(inputValue)
+      if (parsed !== null) {
         const newValue = [...value] as [number, number, number]
         newValue[index] = parsed / displayMultiplier
         onChange(newValue)
@@ -94,8 +100,8 @@ export const Vector3Input: React.FC<Vector3InputProps> = memo(function Vector3In
 
       // Reset to actual value on blur if invalid
       const localValue = localValues[index]
-      const parsed = parseFloat(localValue)
-      if (isNaN(parsed)) {
+      const parsed = parseFiniteInputValue(localValue)
+      if (parsed === null) {
         const newLocal = [...localValues] as [string, string, string]
         newLocal[index] = (value[index] * displayMultiplier).toFixed(1)
         setLocalValues(newLocal)

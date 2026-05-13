@@ -10,7 +10,7 @@ import {
   type PresetManagerState,
   type SavedStyle,
   usePresetManagerStore,
-} from '@/stores/presetManagerStore'
+} from '@/stores/runtime/presetManagerStore'
 
 /**
  * Format a timestamp to a readable date string

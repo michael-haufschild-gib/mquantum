@@ -7,7 +7,7 @@
  * @module rendering/webgpu/passes/QuantumWalkDiagnostics
  */
 
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
 import type { WebGPURenderContext } from '../core/types'
 import {
@@ -38,6 +38,7 @@ export class QwDiagnostics {
   private mappingInFlight = false
   private stepAccumulator = 0
   private epoch = 0
+  private readonly uniformData = new Uint32Array(8)
 
   /**
    * Create diagnostic compute pipelines and fixed-size buffers.
@@ -182,11 +183,15 @@ export class QwDiagnostics {
     // stride0 = totalSites / gridSize0 = product of all other dim sizes
     // For 1D: stride0 = 1. For 2D [64,64]: stride0 = 64.
     const stride0 = gridSize0 > 0 ? Math.floor(totalSites / gridSize0) : 1
-    device.queue.writeBuffer(
-      this.uniformBuffer,
-      0,
-      new Uint32Array([totalSites, numCoinStates, numWG, gridSize0, stride0, 0, 0, 0])
-    )
+    this.uniformData[0] = totalSites
+    this.uniformData[1] = numCoinStates
+    this.uniformData[2] = numWG
+    this.uniformData[3] = gridSize0
+    this.uniformData[4] = stride0
+    this.uniformData[5] = 0
+    this.uniformData[6] = 0
+    this.uniformData[7] = 0
+    device.queue.writeBuffer(this.uniformBuffer, 0, this.uniformData)
 
     this.reduceBG = device.createBindGroup({
       label: 'qw-diag-reduce-bg',
@@ -251,7 +256,7 @@ export class QwDiagnostics {
               this.mappingInFlight = false
               return
             }
-            const data = new Float32Array(staging.getMappedRange().slice(0))
+            const data = new Float32Array(staging.getMappedRange())
             const totalNorm = data[0]!
             const posSum = data[1]!
             const posSqSum = data[2]!

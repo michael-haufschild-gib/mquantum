@@ -10,7 +10,7 @@
  */
 
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
-import type { AppearanceStoreState } from '@/stores/appearanceStore'
+import type { AppearanceStoreState } from '@/stores/scene/appearanceStore'
 import type { PBRSliceState } from '@/stores/slices/visual/pbrSlice'
 
 /** Flattened preset arrays as produced by `flattenPresetForUniforms`. */

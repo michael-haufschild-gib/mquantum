@@ -5,9 +5,8 @@
  * Renders Schroedinger quantum wavefunctions using WebGPU.
  */
 
-import { Analytics } from '@vercel/analytics/react'
 import { domMax, LazyMotion, MotionConfig } from 'motion/react'
-import React, { Suspense, useCallback, useMemo, useState } from 'react'
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { RefinementIndicator } from '@/components/canvas/RefinementIndicator'
 import { EditorLayout } from '@/components/layout/EditorLayout'
@@ -21,22 +20,11 @@ const PerformanceMonitor = React.lazy(() =>
 const ScreenshotModal = React.lazy(() =>
   import('@/components/overlays/ScreenshotModal').then((m) => ({ default: m.ScreenshotModal }))
 )
-// Lazy-load opt-in HUD panels (off by default). Each panel's own store flag
-// drives a parent gate (usePageCurveStore / useCarpetStore /
-// wormholeCoherenceHudEnabled), so when the flag is off the lazy chunk is
-// never fetched.
-const QuantumCarpetPanel = React.lazy(() =>
-  import('@/components/canvas/QuantumCarpetPanel').then((m) => ({ default: m.QuantumCarpetPanel }))
+const HudPanelGates = React.lazy(() =>
+  import('@/components/canvas/HudPanelGates').then((m) => ({ default: m.HudPanelGates }))
 )
-const HawkingPageCurvePanel = React.lazy(() =>
-  import('@/components/overlays/HawkingPageCurvePanel').then((m) => ({
-    default: m.HawkingPageCurvePanel,
-  }))
-)
-const WormholeCoherencePanel = React.lazy(() =>
-  import('@/components/overlays/WormholeCoherencePanel').then((m) => ({
-    default: m.WormholeCoherencePanel,
-  }))
+const Analytics = React.lazy(() =>
+  import('@vercel/analytics/react').then((m) => ({ default: m.Analytics }))
 )
 import { Button } from '@/components/ui/Button'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
@@ -50,14 +38,11 @@ import { useWebGPUSupport } from '@/hooks/useWebGPUSupport'
 import { logger } from '@/lib/logger'
 import { WebGPUCanvas } from '@/rendering/webgpu/WebGPUCanvas'
 import { WebGPUScene } from '@/rendering/webgpu/WebGPUScene'
-import { useCarpetStore } from '@/stores/carpetStore'
-import { useEnvironmentStore } from '@/stores/environmentStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { usePageCurveStore } from '@/stores/pageCurveStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
-import { useScreenshotStore } from '@/stores/screenshotStore'
-import { useUIStore } from '@/stores/uiStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
+import { useScreenshotStore } from '@/stores/runtime/screenshotStore'
+import { useEnvironmentStore } from '@/stores/scene/environmentStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { useUIStore } from '@/stores/ui/uiStore'
 
 /**
  * Detect Safari — includes Safari on iOS (Chrome/Firefox on iOS also use WebKit).
@@ -114,7 +99,7 @@ function AppContent() {
   // Dynamic Favicon
   useDynamicFavicon()
 
-  // Detect device capabilities (GPU tier) and apply mobile defaults
+  // Detect device capabilities (GPU tier) and apply constrained defaults
   useDeviceCapabilities()
 
   // Detect WebGPU support
@@ -140,14 +125,6 @@ function AppContent() {
   const showPerfMonitor = useUIStore((state) => state.showPerfMonitor)
   const renderResolutionScale = usePerformanceStore((state) => state.renderResolutionScale)
   const screenshotModalOpen = useScreenshotStore((state) => state.isOpen)
-
-  // Opt-in HUD panel gates — reading the flag here lets React.lazy defer the
-  // panel chunk until a user enables the HUD.
-  const carpetEnabled = useCarpetStore((s) => s.enabled)
-  const pageCurveHudEnabled = usePageCurveStore((s) => s.pageCurveHudEnabled)
-  const wormholeHudEnabled = useExtendedObjectStore(
-    (s) => !!s.schroedinger?.tdse?.wormholeCoherenceHudEnabled
-  )
 
   const baseDpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio
   const scaledDpr = baseDpr * renderResolutionScale
@@ -287,26 +264,7 @@ function AppContent() {
           </Suspense>
         )}
 
-        {/* Quantum Carpet Panel (off by default; lazy-loaded when user enables HUD) */}
-        {carpetEnabled && (
-          <Suspense fallback={null}>
-            <QuantumCarpetPanel />
-          </Suspense>
-        )}
-
-        {/* Analog Hawking Page Curve Panel (off by default; lazy-loaded) */}
-        {pageCurveHudEnabled && (
-          <Suspense fallback={null}>
-            <HawkingPageCurvePanel />
-          </Suspense>
-        )}
-
-        {/* ER=EPR Wormhole Coherence Panel (off by default; lazy-loaded) */}
-        {wormholeHudEnabled && (
-          <Suspense fallback={null}>
-            <WormholeCoherencePanel />
-          </Suspense>
-        )}
+        <DeferredHudPanelGates />
 
         {/* Screenshot Preview Modal */}
         {screenshotModalOpen && (
@@ -322,6 +280,48 @@ function AppContent() {
   )
 }
 
+function useIdleEnabled(timeout: number, fallbackMs: number) {
+  const [enabled, setEnabled] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    if ('requestIdleCallback' in window) {
+      const id = window.requestIdleCallback(() => setEnabled(true), { timeout })
+      return () => window.cancelIdleCallback(id)
+    }
+
+    const id = globalThis.setTimeout(() => setEnabled(true), fallbackMs)
+    return () => globalThis.clearTimeout(id)
+  }, [fallbackMs, timeout])
+
+  return enabled
+}
+
+function DeferredHudPanelGates() {
+  const enabled = useIdleEnabled(2500, 1500)
+
+  if (!enabled) return null
+
+  return (
+    <Suspense fallback={null}>
+      <HudPanelGates />
+    </Suspense>
+  )
+}
+
+function DeferredAnalytics() {
+  const enabled = useIdleEnabled(3000, 2000)
+
+  if (!enabled) return null
+
+  return (
+    <Suspense fallback={null}>
+      <Analytics />
+    </Suspense>
+  )
+}
+
 /**
  * Main App Container
  * @returns The root application component wrapped in providers
@@ -334,7 +334,7 @@ function App() {
           <AppContent />
         </ToastProvider>
       </MotionConfig>
-      <Analytics />
+      <DeferredAnalytics />
     </LazyMotion>
   )
 }

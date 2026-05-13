@@ -13,7 +13,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
-import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/scene/appearanceStore'
 
 const MODULUS_MODE_OPTIONS = [
   { value: 'logPsiAbsSquared', label: 'log(|psi|^2)' },

@@ -45,14 +45,14 @@ describe('QuantumWalkStrategy.adoptComputeState', () => {
     source = new QuantumWalkStrategy()
     target = new QuantumWalkStrategy()
     fakePass = makeFakePass('qw')
-    ;(source as unknown as { qwPass: FakeComputePass }).qwPass = fakePass
+    ;(source as unknown as { pass: FakeComputePass }).pass = fakePass
   })
 
   it('transfers compute pass ownership from source to target', () => {
     const ok = target.adoptComputeState(source)
     expect(ok).toBe(true)
-    expect((target as unknown as { qwPass: unknown }).qwPass).toBe(fakePass)
-    expect((source as unknown as { qwPass: unknown }).qwPass).toBeNull()
+    expect((target as unknown as { pass: unknown }).pass).toBe(fakePass)
+    expect((source as unknown as { pass: unknown }).pass).toBeNull()
   })
 
   it('source dispose is a no-op after transfer (ownership moved)', () => {
@@ -72,8 +72,8 @@ describe('QuantumWalkStrategy.adoptComputeState', () => {
     // Warm-swap abort path: reverse the transfer
     const reverted = source.adoptComputeState(target)
     expect(reverted).toBe(true)
-    expect((source as unknown as { qwPass: unknown }).qwPass).toBe(fakePass)
-    expect((target as unknown as { qwPass: unknown }).qwPass).toBeNull()
+    expect((source as unknown as { pass: unknown }).pass).toBe(fakePass)
+    expect((target as unknown as { pass: unknown }).pass).toBeNull()
     // Target dispose is now a no-op — pass survived the round trip
     target.dispose()
     expect(fakePass.disposed).toBe(false)
@@ -114,11 +114,11 @@ describe('FreeScalarFieldStrategy.adoptComputeState', () => {
     const source = new FreeScalarFieldStrategy()
     const target = new FreeScalarFieldStrategy()
     const fake = makeFakePass('fsf')
-    ;(source as unknown as { freeScalarFieldPass: FakeComputePass }).freeScalarFieldPass = fake
+    ;(source as unknown as { pass: FakeComputePass }).pass = fake
 
     expect(target.adoptComputeState(source)).toBe(true)
     expect(source.adoptComputeState(target)).toBe(true)
-    expect((source as unknown as { freeScalarFieldPass: unknown }).freeScalarFieldPass).toBe(fake)
+    expect((source as unknown as { pass: unknown }).pass).toBe(fake)
     target.dispose()
     expect(fake.disposed).toBe(false)
   })
@@ -129,11 +129,11 @@ describe('DiracStrategy.adoptComputeState', () => {
     const source = new DiracStrategy()
     const target = new DiracStrategy()
     const fake = makeFakePass('dirac')
-    ;(source as unknown as { diracPass: FakeComputePass }).diracPass = fake
+    ;(source as unknown as { pass: FakeComputePass }).pass = fake
 
     expect(target.adoptComputeState(source)).toBe(true)
     expect(source.adoptComputeState(target)).toBe(true)
-    expect((source as unknown as { diracPass: unknown }).diracPass).toBe(fake)
+    expect((source as unknown as { pass: unknown }).pass).toBe(fake)
     target.dispose()
     expect(fake.disposed).toBe(false)
   })
@@ -144,11 +144,11 @@ describe('PauliStrategy.adoptComputeState', () => {
     const source = new PauliStrategy()
     const target = new PauliStrategy()
     const fake = makeFakePass('pauli')
-    ;(source as unknown as { pauliPass: FakeComputePass }).pauliPass = fake
+    ;(source as unknown as { pass: FakeComputePass }).pass = fake
 
     expect(target.adoptComputeState(source)).toBe(true)
     expect(source.adoptComputeState(target)).toBe(true)
-    expect((source as unknown as { pauliPass: unknown }).pauliPass).toBe(fake)
+    expect((source as unknown as { pass: unknown }).pass).toBe(fake)
     target.dispose()
     expect(fake.disposed).toBe(false)
   })

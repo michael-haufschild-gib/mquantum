@@ -65,10 +65,17 @@ describe('eslint config: no per-file exemptions for structural quality rules', (
     expect(countRuleDefinitions('sonarjs/cognitive-complexity')).toBe(3)
   })
 
-  it('max-lines rule is defined exactly twice (tsx at 500 + ts at 600)', () => {
-    // Two occurrences: .tsx files at 500 (error) and .ts files at 600 (warn).
-    // If this fails, someone added a per-file max-lines override — split the file instead.
-    expect(countRuleDefinitions('max-lines')).toBe(2)
+  it('max-lines rule has exactly 4 definitions (tsx 500 + ts 600 + compute passes off + physics 1500)', () => {
+    // Four occurrences:
+    //   1. .tsx files at 500 (error).
+    //   2. .ts files at 600 (error).
+    //   3. src/rendering/webgpu/passes & renderers off — compute passes are
+    //      cohesive units; the 600-line cap forced fake decomposition into
+    //      helper files passing typed *Fields interface bags.
+    //   4. src/lib/physics at 1500 — thick numerical solvers.
+    // If this fails, someone added a per-file max-lines override outside these
+    // categories — split the file instead, or document the new directory.
+    expect(countRuleDefinitions('max-lines')).toBe(4)
   })
 
   it('no-console rule is defined with exactly 4 occurrences', () => {

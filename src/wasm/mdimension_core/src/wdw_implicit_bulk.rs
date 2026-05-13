@@ -56,16 +56,34 @@ pub fn solve_neumann_tridiag_1d(
     c_prime: &mut [f64],
     work: &mut [f64],
 ) {
-    debug_assert!(kappa >= 0.0, "solve_neumann_tridiag_1d: kappa must be >= 0, got {kappa}");
-    debug_assert!(rhs.len() >= n, "solve_neumann_tridiag_1d: rhs.len()={} < n={}", rhs.len(), n);
-    debug_assert!(out.len() >= n, "solve_neumann_tridiag_1d: out.len()={} < n={}", out.len(), n);
+    debug_assert!(
+        kappa >= 0.0,
+        "solve_neumann_tridiag_1d: kappa must be >= 0, got {kappa}"
+    );
+    debug_assert!(
+        rhs.len() >= n,
+        "solve_neumann_tridiag_1d: rhs.len()={} < n={}",
+        rhs.len(),
+        n
+    );
+    debug_assert!(
+        out.len() >= n,
+        "solve_neumann_tridiag_1d: out.len()={} < n={}",
+        out.len(),
+        n
+    );
     debug_assert!(
         c_prime.len() >= n,
         "solve_neumann_tridiag_1d: c_prime.len()={} < n={}",
         c_prime.len(),
         n
     );
-    debug_assert!(work.len() >= n, "solve_neumann_tridiag_1d: work.len()={} < n={}", work.len(), n);
+    debug_assert!(
+        work.len() >= n,
+        "solve_neumann_tridiag_1d: work.len()={} < n={}",
+        work.len(),
+        n
+    );
     if n < 2 {
         if n == 1 {
             out[0] = rhs[0];

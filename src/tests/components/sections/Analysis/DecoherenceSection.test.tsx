@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { DecoherenceSection } from '@/components/sections/Analysis/DecoherenceSection'
 import { DEFAULT_TDSE_CONFIG } from '@/lib/geometry/extended/types'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 function setTdseMode() {
   useExtendedObjectStore.setState((state) => ({

@@ -102,9 +102,10 @@ describe('MyComponent', () => {
 ## Template: Store Test
 
 ```typescript
-// src/tests/stores/{name}Store.test.ts
+// src/tests/stores/{group}/{name}Store.test.ts
+// {group} is one of: scene, ui, diagnostics, runtime
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useSomeStore } from '@/stores/someStore'
+import { useSomeStore } from '@/stores/scene/someStore'
 
 describe('someStore', () => {
   beforeEach(() => {
@@ -171,7 +172,7 @@ await expect(toggle).toHaveAttribute('aria-expanded', 'true')
 **Read store state** — use `page.evaluate` with dynamic import:
 ```typescript
 const dim = await page.evaluate(async () => {
-  const mod = await import('/src/stores/geometryStore.ts')
+  const mod = await import('/src/stores/scene/geometryStore.ts')
   return mod.useGeometryStore.getState().dimension
 })
 ```

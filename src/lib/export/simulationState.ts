@@ -46,6 +46,7 @@ export interface WavefunctionReadbackResult {
 const MAGIC = 'MQST'
 const VERSION = 1
 const HEADER_SIZE = 64
+const MAX_GRID_DIMENSIONS = 11
 
 const STATE_SAVE_ID_BY_MODE = getQuantumTypeStateSaveIdMap() as Partial<
   Record<SaveableQuantumMode, number>
@@ -53,6 +54,16 @@ const STATE_SAVE_ID_BY_MODE = getQuantumTypeStateSaveIdMap() as Partial<
 const MODE_BY_STATE_SAVE_ID = getQuantumTypeKeyByStateSaveIdMap() as Partial<
   Record<number, SaveableQuantumMode>
 >
+
+interface StateHeader {
+  modeIndex: number
+  latticeDim: number
+  componentCount: number
+  compressed: boolean
+  gridSize: number[]
+  totalSites: number
+  configLength: number
+}
 
 /**
  * Serialize simulation state to a downloadable Blob.
@@ -69,6 +80,8 @@ export async function serializeSimulationState(
   quantumMode: SaveableQuantumMode,
   gridSize: number[]
 ): Promise<Blob> {
+  validateSerializableState(wavefunction, gridSize)
+
   const configJSON = JSON.stringify(config)
   const configBytes = new TextEncoder().encode(configJSON)
 
@@ -113,7 +126,7 @@ export async function serializeSimulationState(
   hU8[11] = isCompressed ? 1 : 0
 
   // Grid sizes (up to 11 dimensions)
-  for (let d = 0; d < Math.min(gridSize.length, 11); d++) {
+  for (let d = 0; d < gridSize.length; d++) {
     hView.setUint32(12 + d * 4, gridSize[d]!, true)
   }
 
@@ -143,56 +156,16 @@ export async function deserializeSimulationState(data: ArrayBuffer): Promise<{
   psiRe: Float32Array
   psiIm: Float32Array
 }> {
-  const view = new DataView(data)
-  const u8 = new Uint8Array(data)
-
-  // Validate magic
-  const magic = String.fromCharCode(u8[0]!, u8[1]!, u8[2]!, u8[3]!)
-  if (magic !== MAGIC) throw new Error(`Invalid .mqstate file: bad magic "${magic}"`)
-
-  const version = view.getUint32(4, true)
-  if (version !== VERSION) throw new Error(`Unsupported .mqstate version: ${version}`)
-
-  const modeIndex = u8[8]!
-  const latticeDim = u8[9]!
-  const componentCount = u8[10]!
-  const compressed = u8[11]! === 1
-
-  const gridSize: number[] = []
-  for (let d = 0; d < latticeDim; d++) {
-    gridSize.push(view.getUint32(12 + d * 4, true))
-  }
-
-  const totalSites = view.getUint32(56, true)
-  const configLength = view.getUint32(60, true)
+  const header = parseStateHeader(data)
+  const { modeIndex, latticeDim, componentCount, gridSize, totalSites, configLength } = header
 
   // Parse config JSON
-  const configBytes = new Uint8Array(data, HEADER_SIZE, configLength)
-  const configJSON = new TextDecoder().decode(configBytes)
-  const configRaw: unknown = JSON.parse(configJSON)
-  const config: Record<string, unknown> =
-    typeof configRaw === 'object' && configRaw !== null
-      ? (configRaw as Record<string, unknown>)
-      : {}
+  const config = parseStateConfig(data, configLength)
 
   // Parse wavefunction data
-  const wavStart = HEADER_SIZE + configLength
-  let wavBytes = new Uint8Array(data, wavStart)
-  if (compressed) {
-    wavBytes = await decompressGzip(wavBytes)
-  }
-
   const totalElements = componentCount * totalSites
-
-  // Ensure 4-byte alignment for Float32Array view.
-  // When configLength is not a multiple of 4, wavBytes.byteOffset is misaligned.
-  let alignedBytes: Uint8Array<ArrayBuffer>
-  if (wavBytes.byteOffset % 4 !== 0) {
-    alignedBytes = new Uint8Array(wavBytes.length)
-    alignedBytes.set(wavBytes)
-  } else {
-    alignedBytes = wavBytes as Uint8Array<ArrayBuffer>
-  }
+  const wavBytes = await readWavefunctionPayload(data, header, totalElements)
+  const alignedBytes = alignWavefunctionBytes(wavBytes)
 
   const wavData = new Float32Array(alignedBytes.buffer, alignedBytes.byteOffset, totalElements * 2)
   const psiRe = wavData.slice(0, totalElements)
@@ -218,6 +191,136 @@ export async function deserializeSimulationState(data: ArrayBuffer): Promise<{
 }
 
 // ─── Compression utilities ────────────────────────────────────────────────
+
+function parseStateHeader(data: ArrayBuffer): StateHeader {
+  if (data.byteLength < HEADER_SIZE) {
+    throw new Error(`Invalid .mqstate file: header too short (${data.byteLength} bytes)`)
+  }
+
+  const view = new DataView(data)
+  const u8 = new Uint8Array(data)
+  const magic = String.fromCharCode(u8[0]!, u8[1]!, u8[2]!, u8[3]!)
+  if (magic !== MAGIC) throw new Error(`Invalid .mqstate file: bad magic "${magic}"`)
+
+  const version = view.getUint32(4, true)
+  if (version !== VERSION) throw new Error(`Unsupported .mqstate version: ${version}`)
+
+  const latticeDim = u8[9]!
+  const componentCount = u8[10]!
+  assertHeaderShape(
+    data,
+    latticeDim,
+    componentCount,
+    view.getUint32(56, true),
+    view.getUint32(60, true)
+  )
+
+  const gridSize: number[] = []
+  for (let d = 0; d < latticeDim; d++) gridSize.push(view.getUint32(12 + d * 4, true))
+
+  return {
+    modeIndex: u8[8]!,
+    latticeDim,
+    componentCount,
+    compressed: u8[11]! === 1,
+    gridSize,
+    totalSites: view.getUint32(56, true),
+    configLength: view.getUint32(60, true),
+  }
+}
+
+function assertHeaderShape(
+  data: ArrayBuffer,
+  latticeDim: number,
+  componentCount: number,
+  totalSites: number,
+  configLength: number
+): void {
+  if (latticeDim < 1 || latticeDim > MAX_GRID_DIMENSIONS) {
+    throw new Error(`Invalid .mqstate file: latticeDim must be 1..11, got ${latticeDim}`)
+  }
+  if (componentCount < 1) {
+    throw new Error(`Invalid .mqstate file: componentCount must be >= 1, got ${componentCount}`)
+  }
+  if (totalSites < 1) {
+    throw new Error(`Invalid .mqstate file: totalSites must be >= 1, got ${totalSites}`)
+  }
+  if (HEADER_SIZE + configLength > data.byteLength) {
+    throw new Error(
+      `Invalid .mqstate file: config length ${configLength} exceeds file size ${data.byteLength}`
+    )
+  }
+}
+
+function parseStateConfig(data: ArrayBuffer, configLength: number): Record<string, unknown> {
+  const configBytes = new Uint8Array(data, HEADER_SIZE, configLength)
+  const configJSON = new TextDecoder().decode(configBytes)
+  const configRaw: unknown = JSON.parse(configJSON)
+  return typeof configRaw === 'object' && configRaw !== null
+    ? (configRaw as Record<string, unknown>)
+    : {}
+}
+
+async function readWavefunctionPayload(
+  data: ArrayBuffer,
+  header: StateHeader,
+  totalElements: number
+): Promise<Uint8Array<ArrayBuffer>> {
+  const wavStart = HEADER_SIZE + header.configLength
+  let wavBytes: Uint8Array<ArrayBuffer> = new Uint8Array(data, wavStart)
+  if (header.compressed) {
+    if (typeof DecompressionStream === 'undefined') {
+      throw new Error('Compressed .mqstate files require DecompressionStream support')
+    }
+    wavBytes = await decompressGzip(wavBytes)
+  }
+
+  const expectedWavBytes = totalElements * 2 * Float32Array.BYTES_PER_ELEMENT
+  if (wavBytes.byteLength !== expectedWavBytes) {
+    throw new Error(
+      `Invalid .mqstate file: expected wavefunction payload ${expectedWavBytes} bytes, got ${wavBytes.byteLength}`
+    )
+  }
+  return wavBytes
+}
+
+function alignWavefunctionBytes(wavBytes: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> {
+  // Ensure 4-byte alignment for Float32Array view.
+  // When configLength is not a multiple of 4, wavBytes.byteOffset is misaligned.
+  if (wavBytes.byteOffset % 4 === 0) return wavBytes
+
+  const alignedBytes = new Uint8Array(wavBytes.length)
+  alignedBytes.set(wavBytes)
+  return alignedBytes
+}
+
+function validateSerializableState(
+  wavefunction: WavefunctionReadbackResult,
+  gridSize: number[]
+): void {
+  if (gridSize.length < 1 || gridSize.length > MAX_GRID_DIMENSIONS) {
+    throw new Error(
+      `Cannot serialize .mqstate: gridSize length must be 1..11, got ${gridSize.length}`
+    )
+  }
+  if (
+    !Number.isSafeInteger(wavefunction.totalSites) ||
+    wavefunction.totalSites < 1 ||
+    !Number.isSafeInteger(wavefunction.componentCount) ||
+    wavefunction.componentCount < 1
+  ) {
+    throw new Error(
+      `Cannot serialize .mqstate: invalid shape totalSites=${wavefunction.totalSites}, componentCount=${wavefunction.componentCount}`
+    )
+  }
+
+  const expected = wavefunction.totalSites * wavefunction.componentCount
+  if (wavefunction.re.length !== expected || wavefunction.im.length !== expected) {
+    throw new Error(
+      `Cannot serialize .mqstate: expected re=im=${expected} (totalSites=${wavefunction.totalSites} × componentCount=${wavefunction.componentCount}), got re=${wavefunction.re.length}, im=${wavefunction.im.length}`
+    )
+  }
+}
 
 async function compressGzip(input: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
   const cs = new CompressionStream('gzip')

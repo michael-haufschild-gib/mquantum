@@ -17,8 +17,8 @@ import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { isAnalyticQuantumType } from '@/lib/geometry/registry'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 /**
  * Selects the shared absorber state and setters.

@@ -7,8 +7,8 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { CoordinateEntanglementSection } from '@/components/sections/Analysis/CoordinateEntanglementSection'
-import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useCoordinateEntanglementStore } from '@/stores/diagnostics/coordinateEntanglementStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 function setTdseMode() {
   useExtendedObjectStore.setState((s) => ({

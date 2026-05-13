@@ -7,8 +7,9 @@
  * @module rendering/webgpu/utils/lighting
  */
 
-import type { LightSource } from '../../lights/types'
-import { rotationToDirection } from '../../lights/types'
+import type { LightSource } from '@/lib/lighting/lightSource'
+import { rotationToDirection } from '@/lib/lighting/lightSource'
+
 import { parseHexColorToLinearRgb } from './color'
 
 /**

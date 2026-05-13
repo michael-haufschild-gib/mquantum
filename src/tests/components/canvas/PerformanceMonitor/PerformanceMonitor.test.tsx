@@ -10,7 +10,7 @@ import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { PerformanceMonitor } from '@/components/canvas/PerformanceMonitor'
-import { useUIStore } from '@/stores/uiStore'
+import { useUIStore } from '@/stores/ui/uiStore'
 
 // Mock LazyMotion/m.div — render children as plain divs
 vi.mock('motion/react', () => {

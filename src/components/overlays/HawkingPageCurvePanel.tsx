@@ -28,10 +28,10 @@ import { Icon } from '@/components/ui/Icon'
 import { useIsDesktop } from '@/hooks/useMediaQuery'
 import { usePageCurveSampling } from '@/hooks/usePageCurveSampling'
 import { usePanelCollision } from '@/hooks/usePanelCollision'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { useLayoutStore } from '@/stores/layoutStore'
-import { usePageCurveStore } from '@/stores/pageCurveStore'
+import { usePageCurveStore } from '@/stores/diagnostics/pageCurveStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { useLayoutStore } from '@/stores/ui/layoutStore'
 
 /** Outer panel frame width in CSS px (includes padding for the SVG). */
 const PANEL_W = PAGE_CURVE_WIDTH + 16

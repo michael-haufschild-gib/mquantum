@@ -3,7 +3,7 @@
  */
 
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
-import type { ExtendedObjectState } from '@/stores/extendedObjectStore'
+import type { ExtendedObjectState } from '@/stores/scene/extendedObjectStore'
 
 /**
  * Shared shape for every per-mode controls component in the

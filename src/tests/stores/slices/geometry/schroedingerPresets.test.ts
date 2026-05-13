@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 describe('Schroedinger Store Presets', () => {
   it('should update configuration parameters when preset is selected', () => {

@@ -7,7 +7,7 @@
  * @module stores/slices/geometry/setters/tdsePotentialSetters
  */
 
-import type { TdseConfig } from '@/lib/geometry/extended/types'
+import { isTdseDriveWaveform, type TdseConfig } from '@/lib/geometry/extended/types'
 
 import type { SetterContext } from './sliceSetterUtils'
 
@@ -190,17 +190,18 @@ export function createTdsePotentialSetters(
 
   // Boolean/enum setters
   result.setTdseDriveEnabled = (enabled: unknown) => {
+    if (typeof enabled !== 'boolean') return
     setWithVersion((state) => ({
       schroedinger: {
         ...state.schroedinger,
-        tdse: { ...state.schroedinger.tdse, driveEnabled: Boolean(enabled) },
+        tdse: { ...state.schroedinger.tdse, driveEnabled: enabled },
       },
     }))
   }
 
   result.setTdseDriveWaveform = (waveform: unknown) => {
-    const w = waveform as string
-    if (w !== 'sine' && w !== 'pulse' && w !== 'chirp') return
+    if (!isTdseDriveWaveform(waveform)) return
+    const w = waveform
     type DriveWaveform = 'sine' | 'pulse' | 'chirp'
     setWithVersion(
       (state) =>

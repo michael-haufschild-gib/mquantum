@@ -201,6 +201,17 @@ describe('computeStridesPadded', () => {
       expect(strides[i]).toBe(0)
     }
   })
+
+  it('reuses and clears a provided target array', () => {
+    const target = new Array<number>(MAX_DIM).fill(99)
+    const strides = computeStridesPadded([4, 8], 2, target)
+    expect(strides).toBe(target)
+    expect(strides[0]).toBe(8)
+    expect(strides[1]).toBe(1)
+    for (let i = 2; i < MAX_DIM; i++) {
+      expect(strides[i]).toBe(0)
+    }
+  })
 })
 
 // ============================================================================

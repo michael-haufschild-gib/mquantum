@@ -126,9 +126,20 @@ describe('applyModeOverrides', () => {
       dimension: 2,
       quantumMode: 'tdseDynamics',
       temporal: true,
+      isosurface: true,
     } as never)
     expect(cfg.temporal).toBe(false)
+    expect(cfg.isosurface).toBe(false)
     expect(cfg.dimension).toBeGreaterThanOrEqual(3)
+  })
+
+  it('preserves analytic 2D isosurface requests for isolines', () => {
+    const cfg = applyModeOverrides({
+      dimension: 2,
+      quantumMode: 'harmonicOscillator',
+      isosurface: true,
+    } as never)
+    expect(cfg.isosurface).toBe(true)
   })
 
   it('does not mutate the caller-supplied config', () => {
@@ -159,7 +170,9 @@ describe('buildShaderConfig', () => {
       uncertaintyBoundaryEnabled: true,
       analyticalGradientEnabled: true,
       fastEigenInterpolationEnabled: true,
+      isosurface: true,
     } as never)
+    expect(cfg.isosurface).toBe(false)
     expect(cfg.nodal).toBe(false)
     expect(cfg.phaseMateriality).toBe(false)
     expect(cfg.interference).toBe(false)
@@ -174,6 +187,72 @@ describe('buildShaderConfig', () => {
     // level so the inline analytic path is unused.
     expect(cfg.quantumMode).toBe('harmonicOscillator')
     expect(cfg.termCount).toBe(1)
+    expect(cfg.fastGridEmission).toBe(true)
+  })
+
+  it('enables fast grid emission for every compute-grid shader and leaves analytic modes lit', () => {
+    const ho = buildShaderConfig({ dimension: 3, quantumMode: 'harmonicOscillator' } as never)
+    const hydrogen = buildShaderConfig({ dimension: 3, quantumMode: 'hydrogenND' } as never)
+    const tdse = buildShaderConfig({ dimension: 3, quantumMode: 'tdseDynamics' } as never)
+    const dirac = buildShaderConfig({ dimension: 3, quantumMode: 'diracEquation' } as never)
+    const fsf = buildShaderConfig({ dimension: 3, quantumMode: 'freeScalarField' } as never)
+
+    expect(ho.fastGridEmission).toBe(false)
+    expect(hydrogen.fastGridEmission).toBe(false)
+    expect(tdse.fastGridEmission).toBe(true)
+    expect(dirac.fastGridEmission).toBe(true)
+    expect(fsf.fastGridEmission).toBe(true)
+  })
+
+  it('threads spacetime lens toggles into shader compile flags', () => {
+    const disabled = buildShaderConfig({
+      dimension: 3,
+      quantumMode: 'tdseDynamics',
+      quantumBackreactionLensingEnabled: false,
+      bilocalERBridgeEnabled: false,
+      entropicTimeShearEnabled: false,
+      spectralDimensionFlowEnabled: false,
+      vacuumBubbleLensEnabled: false,
+    } as never)
+    expect(disabled.quantumBackreactionLensing).toBe(false)
+    expect(disabled.bilocalERBridge).toBe(false)
+    expect(disabled.entropicTimeShear).toBe(false)
+    expect(disabled.spectralDimensionFlow).toBe(false)
+    expect(disabled.vacuumBubbleLens).toBe(false)
+
+    const enabled = buildShaderConfig({
+      dimension: 3,
+      quantumMode: 'tdseDynamics',
+      quantumBackreactionLensingEnabled: true,
+      bilocalERBridgeEnabled: true,
+      entropicTimeShearEnabled: true,
+      spectralDimensionFlowEnabled: true,
+      vacuumBubbleLensEnabled: true,
+    } as never)
+    expect(enabled.quantumBackreactionLensing).toBe(true)
+    expect(enabled.bilocalERBridge).toBe(true)
+    expect(enabled.entropicTimeShear).toBe(true)
+    expect(enabled.spectralDimensionFlow).toBe(true)
+    expect(enabled.vacuumBubbleLens).toBe(true)
+  })
+
+  it('specializes compute-grid overlay branches by quantum mode', () => {
+    const tdse = buildShaderConfig({ dimension: 3, quantumMode: 'tdseDynamics' } as never)
+    const bec = buildShaderConfig({ dimension: 3, quantumMode: 'becDynamics' } as never)
+    const dirac = buildShaderConfig({ dimension: 3, quantumMode: 'diracEquation' } as never)
+    const wdw = buildShaderConfig({ dimension: 3, quantumMode: 'wheelerDeWitt' } as never)
+    const ads = buildShaderConfig({ dimension: 3, quantumMode: 'antiDeSitter' } as never)
+
+    expect(tdse.negativeAlphaPotentialOverlay).toBe(true)
+    expect(tdse.tdseBranchColor).toBe(true)
+    expect(bec.negativeAlphaPotentialOverlay).toBe(false)
+    expect(bec.tdseBranchColor).toBe(false)
+    expect(dirac.negativeAlphaPotentialOverlay).toBe(true)
+    expect(dirac.tdseBranchColor).toBe(false)
+    expect(wdw.wdwOverlay).toBe(true)
+    expect(wdw.gridPhaseOffset).toBe(true)
+    expect(ads.adsAmplitude).toBe(true)
+    expect(ads.gridPhaseOffset).toBe(true)
   })
 
   it('enables eigenfunction cache + analytical gradient by default in 3D analytic modes', () => {
@@ -183,6 +262,15 @@ describe('buildShaderConfig', () => {
     } as never)
     expect(cfg.useEigenfunctionCache).toBe(true)
     expect(cfg.useAnalyticalGradient).toBe(true)
+  })
+
+  it('keeps analytic 2D isosurface requests for isoline shaders', () => {
+    const cfg = buildShaderConfig({
+      dimension: 2,
+      quantumMode: 'harmonicOscillator',
+      isosurface: true,
+    } as never)
+    expect(cfg.isosurface).toBe(true)
   })
 
   it('flags isWigner true for analytic Wigner mode and false in compute modes', () => {
@@ -271,6 +359,32 @@ describe('buildShaderConfig', () => {
     expect(wgsl).toContain('const NODAL_SPECIALIZED_RENDER_MODE: i32 = 1;')
     expect(wgsl).toContain('const NODAL_SPECIALIZED_FAMILY_FILTER: i32 = 2;')
     expect(wgsl).not.toContain('override NODAL_SPECIALIZATION_ENABLED')
+  })
+
+  it('emits compile-time spacetime lens feature defines', () => {
+    const cfg = buildShaderConfig({
+      dimension: 3,
+      quantumMode: 'tdseDynamics',
+      quantumBackreactionLensingEnabled: false,
+      bilocalERBridgeEnabled: false,
+      entropicTimeShearEnabled: false,
+      spectralDimensionFlowEnabled: false,
+      vacuumBubbleLensEnabled: false,
+    } as never)
+    const { wgsl } = composeSchroedingerShader(cfg)
+
+    expect(wgsl).toContain('const FEATURE_QUANTUM_BACKREACTION_LENSING: bool = false;')
+    expect(wgsl).toContain('const FEATURE_BILOCAL_ER_BRIDGE: bool = false;')
+    expect(wgsl).toContain('const FEATURE_ENTROPIC_TIME_SHEAR: bool = false;')
+    expect(wgsl).toContain('const FEATURE_SPECTRAL_DIMENSION_FLOW: bool = false;')
+    expect(wgsl).toContain('const FEATURE_VACUUM_BUBBLE_LENS: bool = false;')
+    expect(wgsl).toContain('const FEATURE_NEGATIVE_ALPHA_POTENTIAL_OVERLAY: bool = true;')
+    expect(wgsl).toContain('const FEATURE_WDW_OVERLAY: bool = false;')
+    expect(wgsl).toContain('const FEATURE_TDSE_BRANCH_COLOR: bool = true;')
+    expect(wgsl).toContain('const FEATURE_ADS_AMPLITUDE: bool = false;')
+    expect(wgsl).toContain('const FEATURE_GRID_PHASE_OFFSET: bool = false;')
+    expect(wgsl).toContain('let backreactionActive = isQuantumBackreactionActive(uniforms)')
+    expect(wgsl).toContain('&& FEATURE_QUANTUM_BACKREACTION_LENSING;')
   })
 
   it('removes fallback nodal specialization overrides by symbol', () => {

@@ -947,19 +947,11 @@ export function sanitizeHydrogenQuantumState(
 /**
  * Create a fresh copy of the default Schroedinger config.
  *
- * Clones mutable typed arrays (basisX/Y/Z, origin) to prevent shared
- * references between store instances and the global default constant.
+ * Deep-clones mutable nested configs, arrays, and typed arrays to prevent
+ * shared references between store instances and the global default constant.
  * Use this instead of `{ ...DEFAULT_SCHROEDINGER_CONFIG }` in store
  * factories and reset actions.
  */
 export function createDefaultSchroedingerConfig(): SchroedingerConfig {
-  return {
-    ...DEFAULT_SCHROEDINGER_CONFIG,
-    wheelerDeWitt: { ...DEFAULT_SCHROEDINGER_CONFIG.wheelerDeWitt },
-    antiDeSitter: { ...DEFAULT_SCHROEDINGER_CONFIG.antiDeSitter },
-    basisX: Float32Array.from(DEFAULT_SCHROEDINGER_CONFIG.basisX),
-    basisY: Float32Array.from(DEFAULT_SCHROEDINGER_CONFIG.basisY),
-    basisZ: Float32Array.from(DEFAULT_SCHROEDINGER_CONFIG.basisZ),
-    origin: Float32Array.from(DEFAULT_SCHROEDINGER_CONFIG.origin),
-  }
+  return structuredClone(DEFAULT_SCHROEDINGER_CONFIG)
 }

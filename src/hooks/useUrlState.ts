@@ -14,10 +14,10 @@ import { useEffect, useRef } from 'react'
 import { logger } from '@/lib/logger'
 import { applySceneExample, findSceneByName } from '@/lib/sceneExamples'
 import { parseCurrentUrl, type ParsedShareableState } from '@/lib/url/state-serializer'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
-import { usePresetManagerStore } from '@/stores/presetManagerStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
+import { usePresetManagerStore } from '@/stores/runtime/presetManagerStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 /**
  * Apply TDSE-specific URL state params.
@@ -397,7 +397,7 @@ function applyWdwParams(
 function applySrmtSweepParams(urlState: ParsedShareableState, effectiveQuantumMode: string): void {
   if (effectiveQuantumMode !== 'wheelerDeWitt') return
   if (!urlState.srmtSweepKind) return
-  void import('@/stores/srmtSweepStore').then(({ useSrmtSweepStore }) => {
+  void import('@/stores/diagnostics/srmtSweepStore').then(({ useSrmtSweepStore }) => {
     useSrmtSweepStore.getState().setPendingSweep({
       kind: urlState.srmtSweepKind!,
       points: urlState.srmtSweepPoints,
@@ -413,16 +413,18 @@ function applySrmtSweepParams(urlState: ParsedShareableState, effectiveQuantumMo
 function applyEntanglementParams(urlState: ParsedShareableState): void {
   if (urlState.entanglementEnabled === undefined) return
 
-  void import('@/stores/coordinateEntanglementStore').then(({ useCoordinateEntanglementStore }) => {
-    const entStore = useCoordinateEntanglementStore.getState()
-    entStore.setEnabled(urlState.entanglementEnabled!)
-    if (urlState.entanglementPairwiseMI !== undefined) {
-      entStore.setComputePairwiseMI(urlState.entanglementPairwiseMI)
+  void import('@/stores/diagnostics/coordinateEntanglementStore').then(
+    ({ useCoordinateEntanglementStore }) => {
+      const entStore = useCoordinateEntanglementStore.getState()
+      entStore.setEnabled(urlState.entanglementEnabled!)
+      if (urlState.entanglementPairwiseMI !== undefined) {
+        entStore.setComputePairwiseMI(urlState.entanglementPairwiseMI)
+      }
+      if (urlState.entanglementBipartitions !== undefined) {
+        entStore.setComputeBipartitions(urlState.entanglementBipartitions)
+      }
     }
-    if (urlState.entanglementBipartitions !== undefined) {
-      entStore.setComputeBipartitions(urlState.entanglementBipartitions)
-    }
-  })
+  )
 }
 
 /**
@@ -538,19 +540,23 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
  * Searches both saved scenes (user's custom) and example scenes (bundled).
  * @param sceneName - Scene name to search for (case-insensitive)
  */
-function loadSceneByName(sceneName: string): void {
-  const result = findSceneByName(sceneName)
+async function loadSceneByName(sceneName: string): Promise<void> {
+  try {
+    const result = findSceneByName(sceneName)
 
-  if (result) {
-    if (result.source === 'saved') {
-      usePresetManagerStore.getState().loadScene(result.id)
-      logger.log(`[useUrlState] Loaded saved scene: "${sceneName}"`)
+    if (result) {
+      if (result.source === 'saved') {
+        usePresetManagerStore.getState().loadScene(result.id)
+        logger.log(`[useUrlState] Loaded saved scene: "${sceneName}"`)
+      } else {
+        const loaded = await applySceneExample(result.id)
+        if (loaded) logger.log(`[useUrlState] Loaded example scene: "${sceneName}"`)
+      }
     } else {
-      applySceneExample(result.id)
-      logger.log(`[useUrlState] Loaded example scene: "${sceneName}"`)
+      logger.warn(`[useUrlState] Scene "${sceneName}" not found in saved or example scenes`)
     }
-  } else {
-    logger.warn(`[useUrlState] Scene "${sceneName}" not found in saved or example scenes`)
+  } catch (error) {
+    logger.error(`[useUrlState] Failed to load scene "${sceneName}":`, error)
   }
 }
 
@@ -579,10 +585,10 @@ export function useUrlState(): void {
       const sceneName = urlState.scene
 
       if (usePresetManagerStore.persist.hasHydrated()) {
-        loadSceneByName(sceneName)
+        void loadSceneByName(sceneName)
       } else {
         usePresetManagerStore.persist.onFinishHydration(() => {
-          loadSceneByName(sceneName)
+          void loadSceneByName(sceneName)
         })
       }
       return

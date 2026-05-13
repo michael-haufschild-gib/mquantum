@@ -30,7 +30,7 @@ import {
   btzTemperature,
   DEFAULT_BTZ_G_NEWTON,
 } from '@/lib/physics/antiDeSitter/btz'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { ADS_LIMITS } from '@/stores/slices/geometry/setters/antiDeSitterSetters'
 
 /**

@@ -15,8 +15,8 @@ import { act, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { SrmtSpectrumPanel } from '@/components/sections/Geometry/SchroedingerControls/SrmtSpectrumPanel'
-import type { SrmtClockQuality, SrmtSnapshot } from '@/stores/srmtDiagnosticStore'
-import { useSrmtDiagnosticStore } from '@/stores/srmtDiagnosticStore'
+import type { SrmtClockQuality, SrmtSnapshot } from '@/stores/diagnostics/srmtDiagnosticStore'
+import { useSrmtDiagnosticStore } from '@/stores/diagnostics/srmtDiagnosticStore'
 
 function setState(
   snapshot: SrmtSnapshot | null,

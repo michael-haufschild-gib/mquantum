@@ -34,6 +34,11 @@ interface ScenePassConfig {
   openQuantumEnabled: boolean
   crossSectionEnabled: boolean
   probabilityCurrentEnabled: boolean
+  quantumBackreactionLensingEnabled: boolean
+  bilocalERBridgeEnabled: boolean
+  entropicTimeShearEnabled: boolean
+  spectralDimensionFlowEnabled: boolean
+  vacuumBubbleLensEnabled: boolean
   densityGridResolution: number
   colorAlgorithm:
     | 'lch'
@@ -87,6 +92,11 @@ function createPassConfig(overrides: Partial<ScenePassConfig> = {}): ScenePassCo
     openQuantumEnabled: false,
     crossSectionEnabled: false,
     probabilityCurrentEnabled: false,
+    quantumBackreactionLensingEnabled: false,
+    bilocalERBridgeEnabled: false,
+    entropicTimeShearEnabled: false,
+    spectralDimensionFlowEnabled: false,
+    vacuumBubbleLensEnabled: false,
     densityGridResolution: 96,
     colorAlgorithm: 'radialDistance',
     skyboxEnabled: false,

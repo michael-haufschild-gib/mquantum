@@ -17,7 +17,7 @@ import {
   computeIslandOverlayFields,
   type IslandOverlaySnapshot,
 } from '@/rendering/webgpu/renderers/strategies/tdseIslandOverlay'
-import { usePageCurveStore } from '@/stores/pageCurveStore'
+import { usePageCurveStore } from '@/stores/diagnostics/pageCurveStore'
 
 function mkBec(overrides: Partial<BecConfig> = {}): BecConfig {
   // Canonical "Sonic Horizon (Waterfall)" params — kept in lock-step with

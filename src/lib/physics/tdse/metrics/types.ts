@@ -78,6 +78,46 @@ export interface MetricSample {
 /** Default metric — flat, used when no override is supplied. */
 export const DEFAULT_METRIC_CONFIG: MetricConfig = { kind: 'flat' }
 
+/**
+ * Minimum active lattice dimension needed for a metric to have the physics its
+ * UI label promises. Below these dimensions the evaluator degenerates to flat,
+ * so callers should canonicalize to `flat` before choosing solver paths.
+ */
+export function minLatticeDimForMetric(kind: MetricKind): number {
+  switch (kind) {
+    case 'morrisThorne':
+    case 'doubleThroat':
+      return 2
+    case 'sphere2D':
+      return 3
+    case 'flat':
+    case 'schwarzschild':
+    case 'deSitter':
+    case 'antiDeSitter':
+    case 'torus':
+      return 1
+  }
+}
+
+/** True when `kind` is meaningful for the active lattice dimension. */
+export function isMetricAvailableForLattice(kind: MetricKind, latticeDim: number): boolean {
+  const dim = Number.isFinite(latticeDim) ? Math.floor(latticeDim) : 0
+  return dim >= minLatticeDimForMetric(kind)
+}
+
+/**
+ * Canonicalize metric config for a lattice dimension. Incompatible metric kinds
+ * become `flat`, matching evaluator semantics and preventing curved-solver
+ * routing for metrics that would sample as flat.
+ */
+export function normalizeMetricForLattice(
+  metric: MetricConfig | undefined,
+  latticeDim: number
+): MetricConfig {
+  const cfg = metric ?? DEFAULT_METRIC_CONFIG
+  return isMetricAvailableForLattice(cfg.kind, latticeDim) ? cfg : DEFAULT_METRIC_CONFIG
+}
+
 // ── Clamp bounds ─────────────────────────────────────────────────────────
 
 /** Minimum allowed Morris–Thorne throat radius b₀. */

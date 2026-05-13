@@ -13,7 +13,7 @@ import { computeScarCorrelation } from '@/lib/physics/tdse/scarMetric'
 
 import type { WebGPURenderContext } from '../core/types'
 import { LINEAR_WG } from './computePassUtils'
-import type { TdsePipelineResult } from './TDSEComputePassSetup'
+import type { TdsePipelineResult } from './TDSEComputePassPipelineTypes'
 
 /** Dispatch function interface for compute passes. */
 export type DispatchComputeFn = (
@@ -161,7 +161,7 @@ export function storeCurrentEigenstate(
     }
     eigenstateEntry.ipr = diag.ipr
     // Push orbit correlation back to the diagnostics store
-    void import('@/stores/diagnosticsStore').then((m) => {
+    void import('@/stores/diagnostics/diagnosticsStore').then((m) => {
       m.useDiagnosticsStore.getState().updateEigenstateIPR(eigIdx, diag.ipr)
       if (Number.isFinite(diag.orbitCorrelation)) {
         m.useDiagnosticsStore

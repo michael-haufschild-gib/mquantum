@@ -11,6 +11,15 @@ import type { WebGPURenderResourceConfig } from '@/rendering/webgpu/core/types'
 import { WebGPUResourcePool } from '@/rendering/webgpu/core/WebGPUResourcePool'
 import { mockWebGPU } from '@/tests/__mocks__/webgpu'
 
+function descriptorDepthOrArrayLayers(size: GPUTextureDescriptor['size']): number {
+  if (typeof size === 'number') return 1
+  if (Array.isArray(size)) return size[2] ?? 1
+  if (Symbol.iterator in Object(size)) {
+    return [...(size as Iterable<number>)][2] ?? 1
+  }
+  return (size as { depthOrArrayLayers?: number }).depthOrArrayLayers ?? 1
+}
+
 describe('WebGPUResourcePool', () => {
   let pool: WebGPUResourcePool
   let device: GPUDevice
@@ -44,6 +53,39 @@ describe('WebGPUResourcePool', () => {
     expect(r1).toBe(r2)
   })
 
+  it('reallocates an allocated resource when its allocation config changes', () => {
+    pool.addResource({ id: 'test', ...screenConfig })
+    const first = pool.getResource('test')
+    const destroySpy = first!.texture.destroy
+
+    pool.addResource({
+      id: 'test',
+      type: 'texture',
+      size: { mode: 'fixed', width: 64, height: 32 },
+      format: 'r8unorm',
+    })
+    const second = pool.getResource('test')
+
+    expect(destroySpy).toHaveBeenCalled()
+    expect(second).not.toBe(first)
+    expect(second!.config.format).toBe('r8unorm')
+    expect(second!.width).toBe(64)
+    expect(second!.height).toBe(32)
+  })
+
+  it('does not reallocate when the same allocation config is re-added', () => {
+    pool.addResource({ id: 'test', ...screenConfig })
+    pool.getResource('test')
+    const callsBefore = (device.createTexture as ReturnType<typeof import('vitest').vi.fn>).mock
+      .calls.length
+
+    pool.addResource({ id: 'test', ...screenConfig, persistent: true })
+
+    const callsAfter = (device.createTexture as ReturnType<typeof import('vitest').vi.fn>).mock
+      .calls.length
+    expect(callsAfter).toBe(callsBefore)
+  })
+
   it('returns null for unknown resource IDs', () => {
     expect(pool.getResource('nonexistent')).toBe(null)
     expect(pool.getTexture('nonexistent')).toBe(null)
@@ -60,6 +102,16 @@ describe('WebGPUResourcePool', () => {
 
     expect(resource!.width).toBe(1920)
     expect(resource!.height).toBe(1080)
+  })
+
+  it('sanitizes invalid viewport dimensions before allocating screen resources', () => {
+    pool.setSize(Number.NaN, Number.POSITIVE_INFINITY)
+    pool.addResource({ id: 'screen', ...screenConfig })
+
+    const resource = pool.getResource('screen')
+
+    expect(resource!.width).toBe(1)
+    expect(resource!.height).toBe(1)
   })
 
   it('does not reallocate fixed-size resources on viewport resize', () => {
@@ -102,6 +154,82 @@ describe('WebGPUResourcePool', () => {
     expect(resource!.height).toBe(301)
   })
 
+  it('sanitizes invalid fixed resource dimensions before texture allocation', () => {
+    pool.addResource({
+      id: 'invalid-fixed',
+      type: 'texture',
+      size: { mode: 'fixed', width: Number.NaN, height: -4 },
+    })
+
+    const resource = pool.getResource('invalid-fixed')
+
+    expect(resource!.width).toBe(1)
+    expect(resource!.height).toBe(1)
+  })
+
+  it('falls back to full screen size for invalid fraction resource scales', () => {
+    pool.addResource({
+      id: 'invalid-fraction',
+      type: 'renderTarget',
+      size: { mode: 'fraction', fraction: Number.POSITIVE_INFINITY },
+    })
+
+    const resource = pool.getResource('invalid-fraction')
+
+    expect(resource!.width).toBe(800)
+    expect(resource!.height).toBe(600)
+  })
+
+  it('sanitizes invalid texture allocation counts before createTexture', () => {
+    pool.addResource({
+      id: 'invalid-counts',
+      type: 'texture',
+      size: { mode: 'fixed', width: 8, height: 8 },
+      sampleCount: 2,
+      mipLevelCount: Number.NaN,
+      arrayLayerCount: -6,
+    })
+
+    pool.getResource('invalid-counts')
+
+    const createTexture = device.createTexture as ReturnType<typeof import('vitest').vi.fn>
+    const descriptor = createTexture.mock.calls.at(-1)?.[0] as GPUTextureDescriptor
+    expect(descriptor.sampleCount).toBe(1)
+    expect(descriptor.mipLevelCount).toBe(1)
+    expect(descriptorDepthOrArrayLayers(descriptor.size)).toBe(1)
+  })
+
+  it('allocates cubemap resources with six array layers by default', () => {
+    pool.addResource({
+      id: 'default-cubemap',
+      type: 'cubemap',
+      size: { mode: 'fixed', width: 16, height: 16 },
+      format: 'rgba8unorm',
+    })
+
+    pool.getResource('default-cubemap')
+
+    const createTexture = device.createTexture as ReturnType<typeof import('vitest').vi.fn>
+    const descriptor = createTexture.mock.calls.at(-1)?.[0] as GPUTextureDescriptor
+    expect(descriptorDepthOrArrayLayers(descriptor.size)).toBe(6)
+    expect(pool.getVRAMUsage()).toBe(16 * 16 * 4 * 6)
+  })
+
+  it('adds storage binding usage for storageTexture resources by default', () => {
+    pool.addResource({
+      id: 'storage',
+      type: 'storageTexture',
+      size: { mode: 'fixed', width: 8, height: 8 },
+    })
+
+    pool.getResource('storage')
+
+    const createTexture = device.createTexture as ReturnType<typeof import('vitest').vi.fn>
+    const descriptor = createTexture.mock.calls.at(-1)?.[0] as GPUTextureDescriptor
+    expect(descriptor.usage & GPUTextureUsage.STORAGE_BINDING).toBe(GPUTextureUsage.STORAGE_BINDING)
+    expect(descriptor.usage & GPUTextureUsage.TEXTURE_BINDING).toBe(GPUTextureUsage.TEXTURE_BINDING)
+  })
+
   it('enables and manages ping-pong resources', () => {
     pool.addResource({ id: 'pp', ...screenConfig })
     pool.enablePingPong('pp')
@@ -116,6 +244,31 @@ describe('WebGPUResourcePool', () => {
     pool.swapPingPong('pp')
     const readView2 = pool.getReadTextureView('pp')
     expect(readView2).toBe(writeView)
+  })
+
+  it('returns the current ping-pong read resource from generic resource access', () => {
+    pool.addResource({ id: 'pp', ...screenConfig })
+    pool.enablePingPong('pp')
+
+    const createTexture = device.createTexture as ReturnType<typeof import('vitest').vi.fn>
+    const callsAfterEnable = createTexture.mock.calls.length
+    const readBefore = pool.getReadTextureView('pp')
+    const resourceBefore = pool.getResource('pp')
+    const textureBefore = pool.getTexture('pp')
+    const viewBefore = pool.getTextureView('pp')
+    const callsAfterGenericAccess = createTexture.mock.calls.length
+
+    expect(resourceBefore?.view).toBe(readBefore)
+    expect(textureBefore).toBe(resourceBefore?.texture)
+    expect(viewBefore).toBe(readBefore)
+    expect(callsAfterGenericAccess).toBe(callsAfterEnable)
+
+    pool.swapPingPong('pp')
+
+    const readAfter = pool.getReadTextureView('pp')
+    const resourceAfter = pool.getResource('pp')
+    expect(resourceAfter?.view).toBe(readAfter)
+    expect(resourceAfter).not.toBe(resourceBefore)
   })
 
   it('reports VRAM usage > 0 after allocation', () => {
@@ -133,6 +286,30 @@ describe('WebGPUResourcePool', () => {
     const v1 = pool.getVRAMUsage()
     const v2 = pool.getVRAMUsage()
     expect(v1).toBe(v2)
+  })
+
+  it('counts array layers, mip levels, and sample count in VRAM usage', () => {
+    pool.addResource({
+      id: 'cubemap',
+      type: 'cubemap',
+      size: { mode: 'fixed', width: 64, height: 32 },
+      format: 'r8unorm',
+      arrayLayerCount: 6,
+      mipLevelCount: 3,
+    })
+    pool.addResource({
+      id: 'msaa',
+      type: 'renderTarget',
+      size: { mode: 'fixed', width: 10, height: 10 },
+      format: 'rgba8unorm',
+      sampleCount: 4,
+    })
+    pool.getResource('cubemap')
+    pool.getResource('msaa')
+
+    const cubemapBytes = (64 * 32 + 32 * 16 + 16 * 8) * 6
+    const msaaBytes = 10 * 10 * 4 * 4
+    expect(pool.getVRAMUsage()).toBe(cubemapBytes + msaaBytes)
   })
 
   it('removes resources and frees GPU memory', () => {
@@ -190,6 +367,23 @@ describe('WebGPUResourcePool', () => {
     // Verify dimensions are correct via getAllResourceDimensions
     const dims = pool.getAllResourceDimensions()
     expect(dims.get('pp')).toEqual({ width: 1920, height: 1080 })
+  })
+
+  it('reallocates ping-pong buffers when their allocation config changes', () => {
+    pool.addResource({ id: 'pp', ...screenConfig })
+    pool.enablePingPong('pp')
+    const readViewBefore = pool.getReadTextureView('pp')
+
+    pool.addResource({
+      id: 'pp',
+      type: 'renderTarget',
+      size: { mode: 'fixed', width: 96, height: 48 },
+      format: 'rgba8unorm',
+    })
+
+    const readViewAfter = pool.getReadTextureView('pp')
+    expect(readViewAfter).not.toBe(readViewBefore)
+    expect(pool.getAllResourceDimensions().get('pp')).toEqual({ width: 96, height: 48 })
   })
 
   it('removeResource cleans up ping-pong buffers', () => {

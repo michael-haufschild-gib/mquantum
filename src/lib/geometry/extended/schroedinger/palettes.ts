@@ -1,4 +1,4 @@
-import type { CosineCoefficients } from '@/rendering/shaders/palette/types'
+import type { CosineCoefficients } from '@/lib/colors/palette/types'
 
 import { SchroedingerPalette } from '../types'
 

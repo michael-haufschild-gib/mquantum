@@ -13,6 +13,7 @@ import {
   flattenPresetForUniforms,
   generateQuantumPreset,
   getNamedPreset,
+  getNamedPresetStoreControls,
   type QuantumPreset,
 } from '@/lib/geometry/extended/schroedinger/presets'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
@@ -41,6 +42,7 @@ import { SCHROEDINGER_LAYOUT } from './schroedingerLayout'
 import {
   isBasisDirty,
   isSchroedingerDirty,
+  type SchroedingerVersions,
   updateBasisVersions,
   updateSchroedingerVersions,
   type VersionTracker,
@@ -57,12 +59,15 @@ import {
 } from './uniformPacking'
 
 /**
- * Decimal precision used when stringifying `qualityMultiplier` into the
- * Schrödinger dirty-flag signature. Held as a named constant so frame-update
- * logic and any test/state-diffing checks that depend on the same rounding
- * stay in sync.
+ * Four-decimal integer key for `qualityMultiplier` dirty checks. Avoids
+ * per-frame `toFixed()` allocations while preserving the previous tolerance.
  */
-const QUALITY_SIGNATURE_PRECISION = 4
+const QUALITY_SIGNATURE_SCALE = 10000
+
+/** Convert `qualityMultiplier` to a stable four-decimal dirty-check key. */
+export function qualitySignatureKey(qualityMultiplier: number): number {
+  return Math.round(qualityMultiplier * QUALITY_SIGNATURE_SCALE)
+}
 
 /** Byte offset of the time field in the SchroedingerUniforms buffer. */
 export const TIME_FIELD_OFFSET = SCHROEDINGER_LAYOUT.byteOffset.time
@@ -249,21 +254,29 @@ export interface SchroedingerUpdateResult {
   newBoundingRadius?: number
 }
 
-/** Read store snapshots and compute derived frame values. */
-function readFrameInputs(
+interface SchrodingerDirtyInputs {
+  extended: ExtendedStoreSnapshot | undefined
+  schroedinger: ExtendedStoreSnapshot['schroedinger'] | undefined
+  pbr: PBRSliceState | undefined
+  appearance: AppearanceStoreState | undefined
+  performance: PerformanceSnapshot | undefined
+  animationTime: number
+  uncertaintyLogRhoThreshold: number
+  storeVersions: SchroedingerVersions
+}
+
+/** Read only data needed to choose the partial-vs-full uniform update path. */
+function readDirtyInputs(
   ctx: WebGPURenderContext,
-  config: SchrodingerRendererConfig,
   strategy: QuantumModeStrategy
-) {
+): SchrodingerDirtyInputs {
   const extended = getStoreSnapshot<ExtendedStoreSnapshot>(ctx, 'extended')
   const schroedinger = extended?.schroedinger
   const pbr = getStoreSnapshot<PBRSliceState>(ctx, 'pbr')
   const appearance = getStoreSnapshot<AppearanceStoreState>(ctx, 'appearance')
   const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
-  const animationTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
-  const geometry = getStoreSnapshot<GeometryState>(ctx, 'geometry')
-  const dimension = geometry?.dimension ?? config.dimension ?? 3
   const performance = getStoreSnapshot<PerformanceSnapshot>(ctx, 'performance')
+  const animationTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
 
   let uncertaintyLogRhoThreshold = -2.0
   if (strategy.setUncertaintyConfidenceMass) {
@@ -272,6 +285,39 @@ function readFrameInputs(
     )
     if (threshold !== null) uncertaintyLogRhoThreshold = threshold
   }
+
+  return {
+    extended,
+    schroedinger,
+    pbr,
+    appearance,
+    performance,
+    animationTime,
+    uncertaintyLogRhoThreshold,
+    storeVersions: {
+      schroedingerVersion: extended?.schroedingerVersion ?? 0,
+      appearanceVersion: appearance?.appearanceVersion ?? 0,
+      pbrVersion: pbr?.pbrVersion ?? 0,
+      pauliSpinorVersion: extended?.pauliSpinorVersion ?? 0,
+      qualitySignature: qualitySignatureKey(performance?.qualityMultiplier ?? 1.0),
+    },
+  }
+}
+
+/** Read store snapshots and compute derived frame values for full uniform packing. */
+function readFrameInputs(
+  ctx: WebGPURenderContext,
+  config: SchrodingerRendererConfig,
+  dirtyInputs: SchrodingerDirtyInputs
+) {
+  const extended = dirtyInputs.extended
+  const schroedinger = dirtyInputs.schroedinger
+  const pbr = dirtyInputs.pbr
+  const appearance = dirtyInputs.appearance
+  const animationTime = dirtyInputs.animationTime
+  const geometry = getStoreSnapshot<GeometryState>(ctx, 'geometry')
+  const dimension = geometry?.dimension ?? config.dimension ?? 3
+  const performance = dirtyInputs.performance
 
   const quantumModeStr = schroedinger?.quantumMode ?? 'harmonicOscillator'
 
@@ -294,7 +340,7 @@ function readFrameInputs(
     animationTime,
     dimension,
     performance,
-    uncertaintyLogRhoThreshold,
+    uncertaintyLogRhoThreshold: dirtyInputs.uncertaintyLogRhoThreshold,
     quantumModeStr,
     quantumModeInt: QUANTUM_MODE_MAP[quantumModeStr] ?? 0,
     uncertaintyConfidenceMass: schroedinger?.uncertaintyConfidenceMass ?? 0.68,
@@ -315,6 +361,12 @@ function buildPackParams(
   effectiveSampleCount: number,
   colorAlgorithm: number
 ) {
+  const isoEnabled = config.isosurface ?? inputs.schroedinger?.isoEnabled ?? false
+  const schroedinger =
+    inputs.schroedinger?.isoEnabled === isoEnabled
+      ? inputs.schroedinger
+      : { ...(inputs.schroedinger ?? {}), isoEnabled }
+
   return {
     quantumModeInt: inputs.quantumModeInt,
     quantumModeStr: inputs.quantumModeStr,
@@ -334,7 +386,7 @@ function buildPackParams(
     uncertaintyLogRhoThreshold: inputs.uncertaintyLogRhoThreshold,
     uncertaintyConfidenceMass: inputs.uncertaintyConfidenceMass,
     uncertaintyBoundaryWidth: inputs.uncertaintyBoundaryWidth,
-    schroedinger: inputs.schroedinger,
+    schroedinger,
     appearance: inputs.appearance,
     pbr: inputs.pbr,
     pauliSpinor: inputs.extended?.pauliSpinor,
@@ -374,35 +426,26 @@ export function computeSchroedingerUpdate(
   floatView: Float32Array,
   intView: Int32Array
 ): SchroedingerUpdateResult {
-  const inputs = readFrameInputs(ctx, config, strategy)
+  const dirtyInputs = readDirtyInputs(ctx, strategy)
 
-  // === DIRTY-FLAG OPTIMIZATION ===
-  const storeVersions = {
-    schroedingerVersion: inputs.extended?.schroedingerVersion ?? 0,
-    appearanceVersion: inputs.appearance?.appearanceVersion ?? 0,
-    pbrVersion: inputs.pbr?.pbrVersion ?? 0,
-    pauliSpinorVersion: inputs.extended?.pauliSpinorVersion ?? 0,
-    qualitySignature: (inputs.performance?.qualityMultiplier ?? 1.0).toFixed(
-      QUALITY_SIGNATURE_PRECISION
-    ),
-  }
-
-  if (!isSchroedingerDirty(state.versions, storeVersions)) {
+  if (!isSchroedingerDirty(state.versions, dirtyInputs.storeVersions)) {
     // Even on the partial-write fast path the time advances every frame, so
     // term_k = c_k * exp(-i * E_k * t) must be recomputed and uploaded — the
     // shader reads it unconditionally for the HO superposition path. Reads
     // post-momentum-rotated coeff[k] from floatView, which is correct because
     // any change to coeff/energy/termCount would have bumped a tracked version
     // and routed us into the full-write branch instead.
-    const partialTimeScale = inputs.schroedinger?.timeScale ?? 0.8
-    packPrecomputedHOTerms(floatView, intView, inputs.animationTime, partialTimeScale)
+    const partialTimeScale = dirtyInputs.schroedinger?.timeScale ?? 0.8
+    packPrecomputedHOTerms(floatView, intView, dirtyInputs.animationTime, partialTimeScale)
     return {
       writeMode: 'partial',
-      partialTime: inputs.animationTime,
-      partialUncertaintyThreshold: inputs.uncertaintyLogRhoThreshold,
+      partialTime: dirtyInputs.animationTime,
+      partialUncertaintyThreshold: dirtyInputs.uncertaintyLogRhoThreshold,
     }
   }
-  updateSchroedingerVersions(state.versions, storeVersions)
+  updateSchroedingerVersions(state.versions, dirtyInputs.storeVersions)
+
+  const inputs = readFrameInputs(ctx, config, dirtyInputs)
 
   // Quantum preset generation
   const needsPresetRegen = maybeRegeneratePreset(
@@ -505,12 +548,17 @@ function maybeRegeneratePreset(
   const termCount = schroedinger?.termCount ?? 1
   const maxQuantumNumber = schroedinger?.maxQuantumNumber ?? 6
   const frequencySpread = schroedinger?.frequencySpread ?? 0.01
+  const presetControls = getNamedPresetStoreControls(presetName)
+  const effectiveSeed = presetControls?.seed ?? seed
+  const effectiveTermCount = presetControls?.termCount ?? termCount
+  const effectiveMaxQuantumNumber = presetControls?.maxQuantumNumber ?? maxQuantumNumber
+  const effectiveFrequencySpread = presetControls?.frequencySpread ?? frequencySpread
   const currentConfig = {
     presetName,
-    seed,
-    termCount,
-    maxQuantumNumber,
-    frequencySpread,
+    seed: effectiveSeed,
+    termCount: effectiveTermCount,
+    maxQuantumNumber: effectiveMaxQuantumNumber,
+    frequencySpread: effectiveFrequencySpread,
     dimension,
   }
 
@@ -530,11 +578,23 @@ function maybeRegeneratePreset(
 
   let preset: QuantumPreset
   if (presetName === 'custom') {
-    preset = generateQuantumPreset(seed, dimension, termCount, maxQuantumNumber, frequencySpread)
+    preset = generateQuantumPreset(
+      effectiveSeed,
+      dimension,
+      effectiveTermCount,
+      effectiveMaxQuantumNumber,
+      effectiveFrequencySpread
+    )
   } else {
     preset =
       getNamedPreset(presetName, dimension) ??
-      generateQuantumPreset(seed, dimension, termCount, maxQuantumNumber, frequencySpread)
+      generateQuantumPreset(
+        effectiveSeed,
+        dimension,
+        effectiveTermCount,
+        effectiveMaxQuantumNumber,
+        effectiveFrequencySpread
+      )
   }
   state.cachedPreset = preset
   state.cachedPresetConfig = { ...currentConfig }

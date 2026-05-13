@@ -194,6 +194,8 @@ export interface CachedPresetData {
     presetName: string
     seed: number
     termCount: number
+    maxQuantumNumber: number
+    frequencySpread: number
     dimension: number
   } | null
 }

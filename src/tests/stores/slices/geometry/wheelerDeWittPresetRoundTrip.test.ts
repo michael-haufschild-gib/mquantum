@@ -10,7 +10,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { WDW_GRID_PRESETS } from '@/stores/slices/geometry/setters/wheelerDeWittSetters'
 
 const getWdw = () => useExtendedObjectStore.getState().schroedinger.wheelerDeWitt

@@ -27,7 +27,16 @@
  * @module stores/utils/dynamicPresetImport
  */
 
+import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
+
+/** Optional guard used when a preset should apply only while a quantum mode is still active. */
+export interface PresetApplyOptions<Mode extends string = string> {
+  expectedQuantumMode?: Mode
+}
+
+/** Preset apply guard options for Schroedinger compute-mode setters. */
+export type SchroedingerPresetApplyOptions = PresetApplyOptions<SchroedingerConfig['quantumMode']>
 
 /**
  * Lazy-load a preset module, run the handler, swallow load failures
@@ -64,4 +73,29 @@ export function loadPresetModule<T>(
       logger.warn(`[${label}] Failed to load ${description}:`, error)
     }
   })()
+}
+
+/**
+ * Returns a per-setter request guard. Each `begin()` call invalidates every
+ * earlier guard, so delayed dynamic imports cannot apply stale presets after
+ * a newer selection has already been made.
+ */
+export function createLatestPresetRequestGuard(): () => () => boolean {
+  let latestRequest = 0
+  return () => {
+    const requestId = ++latestRequest
+    return () => requestId === latestRequest
+  }
+}
+
+/** True when the request is newest and the optional expected mode still matches. */
+export function canApplyPresetRequest(
+  isLatestRequest: () => boolean,
+  currentQuantumMode: SchroedingerConfig['quantumMode'],
+  options?: SchroedingerPresetApplyOptions
+): boolean {
+  return (
+    isLatestRequest() &&
+    (!options?.expectedQuantumMode || currentQuantumMode === options.expectedQuantumMode)
+  )
 }

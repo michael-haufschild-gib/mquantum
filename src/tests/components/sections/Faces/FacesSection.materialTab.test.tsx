@@ -3,8 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { FacesSection } from '@/components/sections/Faces/FacesSection'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 describe('FacesSection material tab availability', () => {
   beforeEach(() => {
@@ -38,5 +38,21 @@ describe('FacesSection material tab availability', () => {
     expect(materialTab).toBeInTheDocument()
     expect(materialTab).not.toBeDisabled()
     expect(materialTab).not.toHaveAttribute('aria-disabled')
+  })
+
+  it('disables Material tab for compute modes even if iso state is stale', () => {
+    useExtendedObjectStore.setState((state) => ({
+      schroedinger: {
+        ...state.schroedinger,
+        quantumMode: 'tdseDynamics',
+        isoEnabled: true,
+      },
+    }))
+
+    render(<FacesSection defaultOpen />)
+
+    const materialTab = screen.getByRole('tab', { name: 'Material' })
+    expect(materialTab).toBeDisabled()
+    expect(materialTab).toHaveAttribute('aria-disabled', 'true')
   })
 })

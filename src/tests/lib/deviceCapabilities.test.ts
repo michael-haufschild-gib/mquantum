@@ -63,10 +63,28 @@ describe('deviceCapabilities', () => {
 
       const result = await detectDeviceCapabilities()
 
-      // Should fall back to tier 3 desktop
-      expect(result.gpuTier).toBe(3)
+      // Should fail closed so detection errors do not unlock high-cost paths.
+      expect(result.gpuTier).toBe(0)
       expect(result.isMobileGPU).toBe(false)
       expect(result.detectionType).toBe('error')
+    })
+
+    it('should normalize malformed detect-gpu payloads to safe defaults', async () => {
+      vi.mocked(getGPUTier).mockResolvedValue({
+        tier: 99,
+        isMobile: undefined,
+        type: undefined as unknown as 'BENCHMARK',
+        gpu: '',
+        fps: Number.NaN,
+      })
+
+      const result = await detectDeviceCapabilities()
+
+      expect(result.gpuTier).toBe(0)
+      expect(result.isMobileGPU).toBe(false)
+      expect(result.gpuName).toBe('unknown')
+      expect(result.detectionType).toBe('unknown')
+      expect(result.estimatedFps).toBeUndefined()
     })
 
     it('should handle undefined isMobile gracefully', async () => {

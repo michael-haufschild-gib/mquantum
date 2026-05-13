@@ -22,6 +22,10 @@ import type { TdseConfig } from '@/lib/geometry/extended/tdse'
 import { DEFAULT_TDSE_CONFIG } from '@/lib/geometry/extended/tdse'
 import { TDSE_UNIFORM_SIZE } from '@/rendering/webgpu/passes/TDSEComputePassResources'
 import { writeTdseUniforms } from '@/rendering/webgpu/passes/TDSEComputePassUniforms'
+import { TDSE_UNIFORMS_LAYOUT } from '@/rendering/webgpu/passes/tdseUniformsLayout'
+
+/** Named float32/uint32 slot indices into the TDSEUniforms struct. */
+const I = TDSE_UNIFORMS_LAYOUT.index
 
 interface CapturedPack {
   enabled: number
@@ -60,10 +64,10 @@ function packAndCapture(overrides: Partial<TdseConfig>): CapturedPack {
   const cu32 = new Uint32Array(capBuf)
   const cf32 = new Float32Array(capBuf)
   return {
-    enabled: cu32[204] ?? 0,
-    centerX0: cf32[205] ?? 0,
-    radius: cf32[206] ?? 0,
-    boost: cf32[207] ?? 0,
+    enabled: cu32[I.islandOverlayEnabled] ?? 0,
+    centerX0: cf32[I.islandCenterX0] ?? 0,
+    radius: cf32[I.islandRadiusWs] ?? 0,
+    boost: cf32[I.islandBoost] ?? 0,
     size: capBuf.byteLength,
   }
 }

@@ -73,7 +73,7 @@ export function generateAnalyticalGradientBlock(dimension: number, termCount?: n
   // For the unrolled path, generate one complete term block
   function genTerm(k: number, isFirst: boolean): string {
     const lines: string[] = []
-    lines.push(`  { // Term ${k}`)
+    lines.push(isFirst ? `  { // Term ${k}` : `  if (${k} < uniforms.termCount) { // Term ${k}`)
     lines.push(genLoadPhis(String(k)))
     lines.push(genPrefixSuffix())
     lines.push(`    let spatial_k = ${spatialProductExpr()};`)

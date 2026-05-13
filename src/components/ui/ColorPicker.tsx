@@ -1,7 +1,7 @@
 import React from 'react'
 
 import { Tooltip } from '@/components/ui/Tooltip'
-import { hsvToHex, isValidHex, parseColorToHsv, rgbToHex } from '@/lib/colors/colorUtils'
+import { hsvToHex, isValidHex, parseColorToHsv, rgbToHsv } from '@/lib/colors/colorUtils'
 
 import { CopyIcon, EyeDropperIcon } from './colorPickerIcons'
 import { CHECKERBOARD_BG, HUE_GRADIENT, NOISE_BG } from './colorPickerUtils'
@@ -75,8 +75,11 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
           onOpenChange={handleOpenChange}
           offset={8}
           trigger={
-            <div
-              className={`flex items-center gap-2 group p-1 rounded-md hover:bg-[var(--bg-hover)] transition-colors ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
+            <button
+              type="button"
+              disabled={disabled}
+              aria-label={label ? `${label} color picker` : 'Color picker'}
+              className="flex items-center gap-2 group p-1 rounded-md appearance-none border-0 bg-transparent cursor-pointer hover:bg-[var(--bg-hover)] transition-colors focus:outline-none focus:ring-1 focus:ring-accent/60 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {/* Trigger Swatch */}
               <div className="relative w-8 h-5 rounded overflow-hidden shadow-sm ring-1 ring-border-default group-hover:ring-border-strong transition-[box-shadow]">
@@ -86,7 +89,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                 />
                 <div className="absolute inset-0 z-10" style={{ backgroundColor: value }} />
               </div>
-            </div>
+            </button>
           }
           content={
             <div className="w-[260px] p-3 flex flex-col gap-3 select-none text-text-primary">
@@ -114,6 +117,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                       type="button"
                       onClick={handleEyedropper}
                       className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-text-tertiary hover:text-text-primary transition-colors"
+                      aria-label="Pick color"
                       title="Pick color"
                     >
                       <EyeDropperIcon />
@@ -124,6 +128,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                     type="button"
                     onClick={handleCopy}
                     className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-text-tertiary hover:text-text-primary transition-colors"
+                    aria-label="Copy to clipboard"
                     title="Copy to clipboard"
                   >
                     <CopyIcon />
@@ -252,7 +257,13 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                         onChange={(e) => {
                           const val = '#' + e.target.value
                           setHexInput(val)
-                          if (isValidHex(val)) handleHsvChange(parseColorToHsv(val))
+                          if (isValidHex(val)) {
+                            const parsed = parseColorToHsv(val)
+                            const hexLength = val.trim().replace('#', '').length
+                            const nextHsv =
+                              hexLength === 3 || hexLength === 6 ? { ...parsed, a: hsv.a } : parsed
+                            handleHsvChange(nextHsv)
+                          }
                         }}
                         onBlur={() => !isValidHex(hexInput) && setHexInput(value)}
                         onFocus={(e) => e.target.select()}
@@ -301,7 +312,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                             const val = Math.min(255, Math.max(0, parseInt(e.target.value) || 0))
                             const newRgb = { ...rgbInput, [c]: val }
                             setRgbInput(newRgb)
-                            handleHsvChange(parseColorToHsv(rgbToHex(newRgb.r, newRgb.g, newRgb.b)))
+                            handleHsvChange(rgbToHsv(newRgb.r, newRgb.g, newRgb.b, hsv.a))
                           }}
                           className="w-full bg-transparent text-xs font-mono text-text-primary outline-none text-right [&::-webkit-inner-spin-button]:appearance-none"
                         />
@@ -322,6 +333,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                       onClick={() => handleHsvChange(parseColorToHsv(c))}
                       className="w-6 h-6 rounded-md border border-border-subtle hover:scale-110 hover:border-border-strong transition-transform shadow-sm"
                       style={{ backgroundColor: c }}
+                      aria-label={`Use palette color ${c}`}
                       title={c}
                     />
                   ))}
@@ -336,6 +348,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                         type="button"
                         onClick={() => handleHsvChange(parseColorToHsv(c))}
                         className="w-5 h-5 rounded-full border border-border-default hover:scale-110 hover:border-border-strong transition-transform shadow-sm relative overflow-hidden"
+                        aria-label={`Use recent color ${c}`}
                         title="History"
                       >
                         <div

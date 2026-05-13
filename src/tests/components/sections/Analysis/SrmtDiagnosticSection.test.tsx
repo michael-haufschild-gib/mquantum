@@ -10,7 +10,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { SrmtDiagnosticSection } from '@/components/sections/Analysis/SrmtDiagnosticSection'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 function wdw() {
   return useExtendedObjectStore.getState().schroedinger.wheelerDeWitt

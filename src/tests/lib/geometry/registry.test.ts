@@ -30,6 +30,7 @@ import {
   QUANTUM_MODES_3D_ONLY,
   QUANTUM_TYPE_REGISTRY,
   resolveQuantumTypeKey,
+  supportsSchroedingerSurfaceMode,
 } from '@/lib/geometry/registry'
 import { getControlsComponent, hasControlsComponent } from '@/lib/geometry/registry/components'
 
@@ -226,6 +227,52 @@ describe('Quantum Type Registry (Flat Model)', () => {
         // Exactly one must be true — XOR
         expect(isAnalytic).not.toBe(isCompute)
       }
+    })
+  })
+
+  describe('supportsSchroedingerSurfaceMode', () => {
+    it('allows analytic Schroedinger modes in 2D+ non-Wigner representations', () => {
+      expect(
+        supportsSchroedingerSurfaceMode({
+          objectType: 'schroedinger',
+          quantumMode: 'harmonicOscillator',
+          dimension: 2,
+          representation: 'position',
+        })
+      ).toBe(true)
+      expect(
+        supportsSchroedingerSurfaceMode({
+          objectType: 'schroedinger',
+          quantumMode: 'hydrogenND',
+          dimension: 3,
+          representation: 'momentum',
+        })
+      ).toBe(true)
+    })
+
+    it('blocks compute modes, Wigner representation, and Pauli spinors', () => {
+      expect(
+        supportsSchroedingerSurfaceMode({
+          objectType: 'schroedinger',
+          quantumMode: 'tdseDynamics',
+          dimension: 3,
+          representation: 'position',
+        })
+      ).toBe(false)
+      expect(
+        supportsSchroedingerSurfaceMode({
+          objectType: 'schroedinger',
+          quantumMode: 'harmonicOscillator',
+          dimension: 3,
+          representation: 'wigner',
+        })
+      ).toBe(false)
+      expect(
+        supportsSchroedingerSurfaceMode({
+          objectType: 'pauliSpinor',
+          dimension: 3,
+        })
+      ).toBe(false)
     })
   })
 

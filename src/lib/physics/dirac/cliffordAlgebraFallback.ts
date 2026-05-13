@@ -10,7 +10,14 @@
  * Compute spinor dimension: S = 2^(⌊(N+1)/2⌋), minimum 2.
  */
 export function spinorSize(spatialDim: number): number {
+  assertSupportedSpatialDim(spatialDim)
   return Math.max(2, 1 << Math.floor((spatialDim + 1) / 2))
+}
+
+function assertSupportedSpatialDim(spatialDim: number): void {
+  if (!Number.isInteger(spatialDim) || spatialDim < 1 || spatialDim > 11) {
+    throw new RangeError(`spatialDim must be an integer in [1, 11], got ${spatialDim}`)
+  }
 }
 
 // Complex S×S matrix as Float32Array, re/im interleaved, row-major.
@@ -151,6 +158,7 @@ function generateDiracMatricesInternal(spatialDim: number): {
   alphas: Float32Array[]
   beta: Float32Array
 } {
+  assertSupportedSpatialDim(spatialDim)
   if (spatialDim === 1) {
     return { alphas: [sigma1()], beta: sigma3() }
   }

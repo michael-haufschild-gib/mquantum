@@ -19,7 +19,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Z_INDEX } from '@/constants/zIndex'
-import { usePerformanceStore } from '@/stores/performanceStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
 
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 
@@ -65,34 +65,37 @@ export const ShaderCompilationOverlay: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false)
   const [displayMessage, setDisplayMessage] = useState('')
 
-  // Handle visibility with minimum display time
+  // Show when compilation starts. Message sync is separate so phase label
+  // changes do not reset the minimum-display clock.
   useEffect(() => {
-    if (isCompiling) {
-      // Show immediately when compilation starts
-      showStartTimeRef.current = Date.now()
-      const showTimer = window.setTimeout(() => {
-        setIsVisible(true)
-        setDisplayMessage(message)
-      }, 0)
-      return () => clearTimeout(showTimer)
+    if (!isCompiling) {
+      return undefined
     }
 
-    if (isVisible) {
-      // When compilation ends, ensure minimum display time
-      const elapsed = Date.now() - showStartTimeRef.current
-      const remaining = Math.max(0, MIN_DISPLAY_TIME_MS - elapsed)
+    showStartTimeRef.current = Date.now()
+    const showTimer = window.setTimeout(() => {
+      setIsVisible(true)
+    }, 0)
+    return () => clearTimeout(showTimer)
+  }, [isCompiling])
 
-      const timer = setTimeout(() => {
-        setIsVisible(false)
-      }, remaining)
-
-      return () => clearTimeout(timer)
+  // Hide after compilation ends, honoring the original start time.
+  useEffect(() => {
+    if (isCompiling || !isVisible) {
+      return undefined
     }
 
-    return
-  }, [isCompiling, isVisible, message])
+    const elapsed = Date.now() - showStartTimeRef.current
+    const remaining = Math.max(0, MIN_DISPLAY_TIME_MS - elapsed)
 
-  // Update message while visible (in case shader name changes)
+    const timer = window.setTimeout(() => {
+      setIsVisible(false)
+    }, remaining)
+
+    return () => clearTimeout(timer)
+  }, [isCompiling, isVisible])
+
+  // Update message while compiling (in case shader name changes)
   useEffect(() => {
     if (isCompiling && message) {
       const messageSyncTimer = window.setTimeout(() => {

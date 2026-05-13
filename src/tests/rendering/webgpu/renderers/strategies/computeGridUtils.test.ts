@@ -56,6 +56,19 @@ describe('applySharedPml', () => {
     expect(result.pmlTargetReflection).toBe(1e-5)
   })
 
+  it('returns the same object when shared PML does not change effective values', () => {
+    const config = { absorberEnabled: true, absorberWidth: 0.15, pmlTargetReflection: 1e-5 }
+    const result = applySharedPml(config, undefined)
+    expect(result).toBe(config)
+  })
+
+  it('allocates a replacement only when shared PML changes effective values', () => {
+    const config = { absorberEnabled: true, absorberWidth: 0.15, pmlTargetReflection: 1e-5 }
+    const result = applySharedPml(config, { absorberEnabled: false })
+    expect(result).not.toBe(config)
+    expect(result.absorberEnabled).toBe(false)
+  })
+
   it('preserves extra config fields', () => {
     const config = { absorberEnabled: true, absorberWidth: 0.1, dt: 0.01, mass: 1.0 }
     const result = applySharedPml(config, { absorberEnabled: false })

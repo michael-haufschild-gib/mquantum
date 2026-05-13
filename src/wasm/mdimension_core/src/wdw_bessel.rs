@@ -172,8 +172,8 @@ fn bessel_asymptotic(z: f64, nu: f64) -> Asymptotic {
     // d(arg)/dz = 1.
     let jp = -amp * (p_sum * s + q_sum * c) - (1.0 / (2.0 * z)) * j
         + amp * (pp_deriv * c - qp_deriv * s);
-    let yp = amp * (p_sum * c - q_sum * s) - (1.0 / (2.0 * z)) * y
-        + amp * (pp_deriv * s + qp_deriv * c);
+    let yp =
+        amp * (p_sum * c - q_sum * s) - (1.0 / (2.0 * z)) * y + amp * (pp_deriv * s + qp_deriv * c);
 
     Asymptotic { j, y, jp, yp }
 }

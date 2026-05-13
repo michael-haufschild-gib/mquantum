@@ -13,6 +13,8 @@
  * @module rendering/webgpu/passes/SMAAPass
  */
 
+import { clampFinite, clampFiniteInteger } from '@/lib/math/clamp'
+
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import {
@@ -32,6 +34,11 @@ export interface SMAAPassOptions {
   /** Maximum search steps (default: 16, range: 4-32) */
   maxSearchSteps?: number
 }
+
+const MIN_SMAA_THRESHOLD = 0.05
+const MAX_SMAA_THRESHOLD = 0.5
+const MIN_SMAA_SEARCH_STEPS = 4
+const MAX_SMAA_SEARCH_STEPS = 32
 
 /**
  * SMAA (Subpixel Morphological Anti-Aliasing) pass.
@@ -99,8 +106,19 @@ export class SMAAPass extends WebGPUBasePass {
     this.colorInputId = colorInput
     this.outputResourceId = outputResource
 
-    if (options?.threshold !== undefined) this.threshold = options.threshold
-    if (options?.maxSearchSteps !== undefined) this.maxSearchSteps = options.maxSearchSteps
+    this.threshold = clampFinite(
+      options?.threshold,
+      this.threshold,
+      MIN_SMAA_THRESHOLD,
+      MAX_SMAA_THRESHOLD
+    )
+    this.maxSearchSteps = clampFiniteInteger(
+      options?.maxSearchSteps,
+      this.maxSearchSteps,
+      MIN_SMAA_SEARCH_STEPS,
+      MAX_SMAA_SEARCH_STEPS,
+      'floor'
+    )
   }
 
   /**
@@ -108,7 +126,7 @@ export class SMAAPass extends WebGPUBasePass {
    * Lower values detect more edges but may introduce artifacts.
    */
   setThreshold(value: number): void {
-    this.threshold = Math.max(0.05, Math.min(0.5, value))
+    this.threshold = clampFinite(value, this.threshold, MIN_SMAA_THRESHOLD, MAX_SMAA_THRESHOLD)
   }
 
   /**
@@ -116,7 +134,13 @@ export class SMAAPass extends WebGPUBasePass {
    * Higher values improve quality but increase cost.
    */
   setMaxSearchSteps(value: number): void {
-    this.maxSearchSteps = Math.max(4, Math.min(32, value))
+    this.maxSearchSteps = clampFiniteInteger(
+      value,
+      this.maxSearchSteps,
+      MIN_SMAA_SEARCH_STEPS,
+      MAX_SMAA_SEARCH_STEPS,
+      'floor'
+    )
   }
 
   /**

@@ -4,7 +4,8 @@
  * Computes P(r) = 4πr²|R_nl(r)|² and renders it as semi-transparent
  * spherical shell emission during volume raymarching.
  *
- * Uses the existing hydrogenRadial() function from the quantum math blocks.
+ * Uses the existing hydrogenRadial()/hydrogenRadialND() functions from the
+ * quantum math blocks.
  *
  * @module rendering/webgpu/shaders/schroedinger/volume/radialProbability.wgsl
  */
@@ -32,8 +33,20 @@ fn computeRadialProbabilityOverlay(pos: vec3f, uniforms: SchroedingerUniforms) -
     return vec4f(0.0);
   }
 
-  // Evaluate R_nl(r) using existing hydrogen radial function
-  let R = hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, r, uniforms.bohrRadius);
+  // Evaluate the same radial model used by CPU normalization. HYDROGEN_ND_DIMENSION
+  // is a compile-time constant emitted for hydrogen modes by the shader composer.
+  var R: f32;
+  if (HYDROGEN_ND_DIMENSION == 3) {
+    R = hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, r, uniforms.bohrRadius);
+  } else {
+    R = hydrogenRadialND(
+      uniforms.principalN,
+      uniforms.azimuthalL,
+      r,
+      uniforms.bohrRadius,
+      HYDROGEN_ND_DIMENSION
+    );
+  }
 
   // P(r) = 4π r² |R_nl(r)|² * norm, rewritten as 4π*(r*R)^2 * norm so we do
   // ONE multiply + ONE square instead of (r*r*R*R) = 3 muls.

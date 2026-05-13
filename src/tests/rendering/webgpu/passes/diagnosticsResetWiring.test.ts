@@ -26,7 +26,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { DensityDistributionAnalyzer } from '@/rendering/webgpu/passes/DensityDistributionAnalysis'
 import { AnalyticOpenQuantumExecutor } from '@/rendering/webgpu/renderers/strategies/analyticOpenQuantum'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
 describe('DensityDistributionAnalyzer.reset() — diagnostics wiring', () => {
   beforeEach(() => {

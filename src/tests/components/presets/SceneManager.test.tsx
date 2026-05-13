@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { SceneManager } from '@/components/presets/SceneManager'
 import { ToastProvider } from '@/contexts/ToastContext'
-import { type SavedScene, usePresetManagerStore } from '@/stores/presetManagerStore'
+import { type SavedScene, usePresetManagerStore } from '@/stores/runtime/presetManagerStore'
 
 /** Wrap component with required providers. */
 function renderWithProviders(ui: React.ReactElement) {

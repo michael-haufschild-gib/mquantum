@@ -24,7 +24,7 @@ import {
   MIN_THROAT_RADIUS,
   MIN_TORUS_PERIOD,
 } from '@/lib/physics/tdse/metrics/types'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 describe('setTdseMetric', () => {
   beforeEach(() => {
@@ -32,6 +32,7 @@ describe('setTdseMetric', () => {
   })
 
   const set = () => useExtendedObjectStore.getState().setTdseMetric
+  const setDim = () => useExtendedObjectStore.getState().setTdseLatticeDim
   const metric = () => useExtendedObjectStore.getState().schroedinger.tdse.metric
   const tdse = () => useExtendedObjectStore.getState().schroedinger.tdse
 
@@ -111,6 +112,34 @@ describe('setTdseMetric', () => {
       expect(metric()).toEqual({ kind: 'sphere2D', sphereRadius: MAX_SPHERE_RADIUS })
       set()({ kind: 'sphere2D', sphereRadius: 0 })
       expect(metric()).toEqual({ kind: 'sphere2D', sphereRadius: MIN_SPHERE_RADIUS })
+    })
+  })
+
+  describe('lattice compatibility', () => {
+    it('rejects sphere2D when latticeDim < 3', () => {
+      setDim()(2)
+      set()({ kind: 'sphere2D', sphereRadius: 2 })
+      expect(metric()).toEqual({ kind: 'flat' })
+    })
+
+    it('rejects throat metrics in 1D where they evaluate as flat', () => {
+      setDim()(1)
+      set()({ kind: 'morrisThorne', throatRadius: 0.7 })
+      expect(metric()).toEqual({ kind: 'flat' })
+      set()({
+        kind: 'doubleThroat',
+        doubleThroatSeparation: 4,
+        doubleThroatRadius: 0.5,
+      })
+      expect(metric()).toEqual({ kind: 'flat' })
+    })
+
+    it('canonicalizes an active metric when latticeDim drops below its minimum', () => {
+      setDim()(3)
+      set()({ kind: 'sphere2D', sphereRadius: 1.5 })
+      expect(metric()).toEqual({ kind: 'sphere2D', sphereRadius: 1.5 })
+      setDim()(2)
+      expect(metric()).toEqual({ kind: 'flat' })
     })
   })
 

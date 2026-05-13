@@ -73,6 +73,57 @@ describe('mergeExtendedObjectStateForType — schroedinger', () => {
       expect(cosineParams.a).toEqual([0.1, 0.2, 0.3])
       expect(cosineParams.mysteryNested).toBeUndefined()
     })
+
+    it('sanitizes loaded harmonic oscillator scalar controls before restore', () => {
+      const savedState = {
+        schroedinger: {
+          seed: 42.9,
+          termCount: 99,
+          maxQuantumNumber: 99,
+          frequencySpread: -2,
+        },
+      }
+
+      const merged = mergeExtendedObjectStateForType(savedState, 'schroedinger')
+      const schroedinger = merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
+
+      expect(schroedinger.seed).toBe(42)
+      expect(schroedinger.termCount).toBe(8)
+      expect(schroedinger.maxQuantumNumber).toBe(6)
+      expect(schroedinger.frequencySpread).toBe(0)
+    })
+  })
+
+  describe('surface-mode invariants', () => {
+    it('clears loaded isosurface mode for Wigner representation', () => {
+      const savedState = {
+        schroedinger: {
+          representation: 'wigner',
+          isoEnabled: true,
+        },
+      }
+
+      const merged = mergeExtendedObjectStateForType(savedState, 'schroedinger')
+      const schroedinger = merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
+
+      expect(schroedinger.representation).toBe('wigner')
+      expect(schroedinger.isoEnabled).toBe(false)
+    })
+
+    it('clears loaded isosurface mode for compute-backed quantum modes', () => {
+      const savedState = {
+        schroedinger: {
+          quantumMode: 'tdseDynamics',
+          isoEnabled: true,
+        },
+      }
+
+      const merged = mergeExtendedObjectStateForType(savedState, 'schroedinger')
+      const schroedinger = merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
+
+      expect(schroedinger.quantumMode).toBe('tdseDynamics')
+      expect(schroedinger.isoEnabled).toBe(false)
+    })
   })
 
   describe('legacy uncertainty shimmer migration', () => {
@@ -474,6 +525,58 @@ describe('mergeExtendedObjectStateForType — Dirac enum invariants', () => {
   })
 })
 
+describe('mergeExtendedObjectStateForType — TDSE enum invariants', () => {
+  it('normalizes invalid loaded TDSE enums before store setters are bypassed', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'tdseDynamics',
+        tdse: {
+          potentialType: 'harmonic',
+          initialCondition: 'gaussian',
+          fieldView: 'spin',
+          driveWaveform: 'saw',
+          disorderDistribution: 'lorentzian',
+          densityView: 'weighted',
+        },
+      },
+    }
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const tdse = (merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG).tdse
+
+    expect(tdse.potentialType).toBe(DEFAULT_SCHROEDINGER_CONFIG.tdse.potentialType)
+    expect(tdse.initialCondition).toBe(DEFAULT_SCHROEDINGER_CONFIG.tdse.initialCondition)
+    expect(tdse.fieldView).toBe(DEFAULT_SCHROEDINGER_CONFIG.tdse.fieldView)
+    expect(tdse.driveWaveform).toBe(DEFAULT_SCHROEDINGER_CONFIG.tdse.driveWaveform)
+    expect(tdse.disorderDistribution).toBe(DEFAULT_SCHROEDINGER_CONFIG.tdse.disorderDistribution)
+    expect(tdse.densityView).toBe(DEFAULT_SCHROEDINGER_CONFIG.tdse.densityView)
+  })
+
+  it('preserves valid loaded TDSE enums', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'tdseDynamics',
+        tdse: {
+          potentialType: 'andersonDisorder',
+          initialCondition: 'planeWave',
+          fieldView: 'quantumPressure',
+          driveWaveform: 'chirp',
+          disorderDistribution: 'gaussian',
+          densityView: 'proper',
+        },
+      },
+    }
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const tdse = (merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG).tdse
+
+    expect(tdse.potentialType).toBe('andersonDisorder')
+    expect(tdse.initialCondition).toBe('planeWave')
+    expect(tdse.fieldView).toBe('quantumPressure')
+    expect(tdse.driveWaveform).toBe('chirp')
+    expect(tdse.disorderDistribution).toBe('gaussian')
+    expect(tdse.densityView).toBe('proper')
+  })
+})
+
 describe('mergeExtendedObjectStateForType — pauliSpinor', () => {
   it('fills missing Pauli fields with defaults', () => {
     const loaded = {
@@ -534,11 +637,27 @@ describe('mergeExtendedObjectStateForType — adversarial inputs', () => {
     const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
     const s = merged.schroedinger as Record<string, unknown>
 
-    // deepMerge replaces values by key — the wrong type will be passed through.
-    // The key assertion is that no exception is thrown and the rest of the
-    // config still has correct defaults for the untouched fields.
+    // Wrong primitive types are dropped so corrupted scene JSON cannot inject
+    // strings/booleans into numeric renderer fields.
     expect(s.scale).toBe(DEFAULT_SCHROEDINGER_CONFIG.scale)
     expect(s.quantumMode).toBe(DEFAULT_SCHROEDINGER_CONFIG.quantumMode)
+    expect(s.sampleCount).toBe(DEFAULT_SCHROEDINGER_CONFIG.sampleCount)
+    expect(s.densityGain).toBe(DEFAULT_SCHROEDINGER_CONFIG.densityGain)
+  })
+
+  it('normalizes invalid quality enum ids from loaded scenes', () => {
+    const loaded = {
+      schroedinger: {
+        qualityPreset: 'cinematic',
+        raymarchQuality: 'cinematic',
+      },
+    }
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const s = merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
+
+    expect(s.qualityPreset).toBe(DEFAULT_SCHROEDINGER_CONFIG.qualityPreset)
+    expect(s.raymarchQuality).toBe(DEFAULT_SCHROEDINGER_CONFIG.raymarchQuality)
+    expect(s.sampleCount).toBe(DEFAULT_SCHROEDINGER_CONFIG.sampleCount)
   })
 
   it('handles empty object for schroedinger (no fields at all)', () => {
@@ -549,6 +668,24 @@ describe('mergeExtendedObjectStateForType — adversarial inputs', () => {
     expect(s.sampleCount).toBe(DEFAULT_SCHROEDINGER_CONFIG.sampleCount)
     expect(s.scale).toBe(DEFAULT_SCHROEDINGER_CONFIG.scale)
     expect(s.densityGain).toBe(DEFAULT_SCHROEDINGER_CONFIG.densityGain)
+  })
+
+  it('returns mutation-isolated default sub-configs for sparse schroedinger scenes', () => {
+    const first = mergeExtendedObjectStateForType({ schroedinger: {} }, 'schroedinger')
+      .schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
+    const second = mergeExtendedObjectStateForType({ schroedinger: {} }, 'schroedinger')
+      .schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
+
+    expect(first.tdse).not.toBe(DEFAULT_SCHROEDINGER_CONFIG.tdse)
+    expect(first.tdse).not.toBe(second.tdse)
+    expect(first.tdse.gridSize).not.toBe(DEFAULT_SCHROEDINGER_CONFIG.tdse.gridSize)
+    expect(first.cosineParams.a).not.toBe(DEFAULT_SCHROEDINGER_CONFIG.cosineParams.a)
+
+    first.tdse.gridSize[0] = 128
+    first.cosineParams.a[0] = 1.5
+
+    expect(second.tdse.gridSize[0]).toBe(DEFAULT_SCHROEDINGER_CONFIG.tdse.gridSize[0])
+    expect(second.cosineParams.a[0]).toBe(DEFAULT_SCHROEDINGER_CONFIG.cosineParams.a[0])
   })
 
   it('preserves default cosineParams when loaded value is a number instead of object', () => {

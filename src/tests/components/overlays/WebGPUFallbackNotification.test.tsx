@@ -10,7 +10,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { WebGPUFallbackNotification } from '@/components/overlays/WebGPUFallbackNotification'
-import { useRendererStore } from '@/stores/rendererStore'
+import { useRendererStore } from '@/stores/runtime/rendererStore'
 
 describe('WebGPUFallbackNotification', () => {
   beforeEach(() => {

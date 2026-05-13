@@ -6,9 +6,13 @@ import { ColorPicker } from '@/components/ui/ColorPicker'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
-import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
-import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { supportsSchroedingerSurfaceMode } from '@/lib/geometry/registry'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/scene/appearanceStore'
+import {
+  type ExtendedObjectState,
+  useExtendedObjectStore,
+} from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 /** Advanced rendering controls: SSS, emission & rim, and volume effects. */
 export const AdvancedObjectControls: React.FC = React.memo(() => {
@@ -16,11 +20,12 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
     useShallow((state) => ({ dimension: state.dimension, objectType: state.objectType }))
   )
 
-  const isoEnabled = useExtendedObjectStore(
-    (state: ExtendedObjectState) => state.schroedinger?.isoEnabled ?? false
-  )
-  const representation = useExtendedObjectStore(
-    (state: ExtendedObjectState) => state.schroedinger?.representation ?? 'position'
+  const { isoEnabled, quantumMode, representation } = useExtendedObjectStore(
+    useShallow((state: ExtendedObjectState) => ({
+      isoEnabled: state.schroedinger?.isoEnabled ?? false,
+      quantumMode: state.schroedinger?.quantumMode ?? 'harmonicOscillator',
+      representation: state.schroedinger?.representation ?? 'position',
+    }))
   )
 
   const { powderScale, scatteringAnisotropy, setPowderScale, setScatteringAnisotropy } =
@@ -82,7 +87,16 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
   }
 
   const isPauli = objectType === 'pauliSpinor'
-  const showVolumetric = isPauli || (!isoEnabled && dimension > 2 && representation !== 'wigner')
+  const effectiveIsoEnabled =
+    isoEnabled &&
+    supportsSchroedingerSurfaceMode({
+      objectType,
+      quantumMode,
+      dimension,
+      representation,
+    })
+  const showVolumetric =
+    isPauli || (!effectiveIsoEnabled && dimension > 2 && representation !== 'wigner')
 
   return (
     <Section title="Advanced Rendering" defaultOpen={true} data-testid="advanced-object-controls">

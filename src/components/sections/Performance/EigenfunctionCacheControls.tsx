@@ -7,7 +7,7 @@ import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Switch } from '@/components/ui/Switch'
-import { usePerformanceStore } from '@/stores/performanceStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
 
 /**
  * Eigenfunction cache controls for the Performance section.

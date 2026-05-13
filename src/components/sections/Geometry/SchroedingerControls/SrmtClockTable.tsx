@@ -13,7 +13,7 @@ import React from 'react'
 
 import { Tooltip } from '@/components/ui/Tooltip'
 import type { SrmtClock } from '@/lib/physics/srmt'
-import type { SrmtClockQuality } from '@/stores/srmtDiagnosticStore'
+import type { SrmtClockQuality } from '@/stores/diagnostics/srmtDiagnosticStore'
 
 import { countCompletedClocks, qualityTier, selectChampionClock } from './srmtPanelHelpers'
 import { SrmtQualityChip } from './SrmtQualityChip'

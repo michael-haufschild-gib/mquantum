@@ -12,8 +12,8 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { AndersonSweepSection } from '@/components/sections/Analysis/AndersonSweepSection'
-import { useAndersonSweepStore } from '@/stores/andersonSweepStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useAndersonSweepStore } from '@/stores/diagnostics/andersonSweepStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 const PRE_SWEEP_W = 7.5
 const PRE_SWEEP_SEED = 0xdeadbeef

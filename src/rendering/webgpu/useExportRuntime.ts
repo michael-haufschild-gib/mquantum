@@ -17,10 +17,10 @@ import {
 } from '@/lib/export/videoExportPlanning'
 import type { QuantumTypeEvolutionResetKind } from '@/lib/geometry/registry'
 import { getQuantumTypeEvolutionResetKind, resolveQuantumTypeKey } from '@/lib/geometry/registry'
-import { useExportStore } from '@/stores/exportStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
+import { useExportStore } from '@/stores/runtime/exportStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 import {
   acquireStreamHandle,
@@ -177,6 +177,7 @@ export function useExportRuntime({
       runtime.settings = null
       runtime.recorder = null
       runtime.rotationSnapshot = null
+      runtime.environmentCaptured = false
       runtime.originalCanvasWidth = 0
       runtime.originalCanvasHeight = 0
       runtime.originalCameraAspect = 1
@@ -198,6 +199,10 @@ export function useExportRuntime({
   // --------------------------------------------------------------------------
   const restoreRuntimeState = useCallback(() => {
     const runtime = exportRuntimeRef.current
+    if (!runtime.environmentCaptured) {
+      runtime.rotationSnapshot = null
+      return
+    }
 
     const restoreWidth = runtime.originalCanvasWidth > 0 ? runtime.originalCanvasWidth : size.width
     const restoreHeight =
@@ -309,7 +314,7 @@ export function useExportRuntime({
       runtime.recorder = await teardownRecorder(runtime.recorder)
     } finally {
       restoreRuntimeState()
-      resetExportRuntime()
+      resetExportRuntime(true)
       exportStore.setStatus('idle')
     }
   }, [exportRuntimeRef, resetExportRuntime, restoreRuntimeState])
@@ -359,6 +364,11 @@ export function useExportRuntime({
         }
       } else {
         exportStore.setStatus('rendering')
+      }
+
+      if (runtime.abortRequested) {
+        resetExportRuntime()
+        return
       }
 
       captureExportEnvironment(runtime, canvas, cameraRef, size)
@@ -540,7 +550,7 @@ export function useExportRuntime({
     }
     if (shouldRestoreRuntime) {
       restoreRuntimeState()
-      resetExportRuntime()
+      resetExportRuntime(true)
     }
   }, [exportRuntimeRef, resetExportRuntime, restoreRuntimeState])
 

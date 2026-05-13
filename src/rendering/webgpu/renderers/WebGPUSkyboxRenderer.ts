@@ -34,6 +34,13 @@ export interface SkyboxRendererConfig {
   vignette?: boolean
 }
 
+import {
+  SKYBOX_TOTAL_BUFFER_SIZE,
+  SKYBOX_UNIFORMS_BIND_SIZE,
+  SKYBOX_VERTEX_UNIFORMS_BIND_SIZE,
+  SKYBOX_VERTEX_UNIFORMS_LAYOUT,
+  SKYBOX_VERTEX_UNIFORMS_OFFSET,
+} from './skyboxLayout'
 // Skybox helper functions extracted to skyboxVertexData.ts
 import {
   computeSkyboxAnimationEffects,
@@ -43,6 +50,8 @@ import {
   packSkyboxPalette,
   packSkyboxPrecomputedPalettes,
 } from './skyboxVertexData'
+
+const VERTEX_INDEX = SKYBOX_VERTEX_UNIFORMS_LAYOUT.index
 
 /**
  * WebGPU renderer for procedural skybox backgrounds.
@@ -97,11 +106,12 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
   private loadedCubeTexture: GPUTexture | null = null
 
   // Reused uniform packing buffers to avoid per-frame allocations.
-  // SkyboxUniforms grew from 256 → 512 bytes when 14 dispatch-uniform palette
-  // samples were hoisted off the per-pixel hot path (see skyboxVertexData.ts
-  // packSkyboxPrecomputedPalettes). 128 floats = 512 bytes.
-  private skyboxUniformData = new Float32Array(128)
-  private skyboxVertexUniformData = new Float32Array(64)
+  // Sized from the layout-driven bind sizes: SkyboxUniforms is 512 bytes
+  // (128 floats) since the 14 dispatch-uniform palette samples were hoisted
+  // off the per-pixel hot path (see skyboxVertexData.ts
+  // packSkyboxPrecomputedPalettes). VertexUniforms is 256 bytes (64 floats).
+  private skyboxUniformData = new Float32Array(SKYBOX_UNIFORMS_BIND_SIZE / 4)
+  private skyboxVertexUniformData = new Float32Array(SKYBOX_VERTEX_UNIFORMS_BIND_SIZE / 4)
 
   constructor(config?: SkyboxRendererConfig) {
     super({
@@ -247,10 +257,14 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     })
 
     // Create uniform buffer
-    // SkyboxUniforms: 512 bytes + VertexUniforms: 256 bytes = 768 bytes total.
-    // SkyboxUniforms grew from 256 → 512 to host CPU-precomputed palette samples
-    // hoisted off the per-pixel skybox shader hot path.
-    this.uniformBuffer = this.createUniformBuffer(device, 768, 'skybox-uniforms')
+    // Layout-driven sizes: SkyboxUniforms slot + VertexUniforms slot.
+    // SkyboxUniforms slot was widened from 256 → 512 to host CPU-precomputed
+    // palette samples hoisted off the per-pixel skybox shader hot path.
+    this.uniformBuffer = this.createUniformBuffer(
+      device,
+      SKYBOX_TOTAL_BUFFER_SIZE,
+      'skybox-uniforms'
+    )
 
     // Create bind groups (will be recreated when textures change)
     this.recreateBindGroups(device)
@@ -367,9 +381,23 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       label: 'skybox-uniform-bg',
       layout: this.uniformBindGroupLayout,
       entries: [
-        // binding 0 = SkyboxUniforms (512 bytes); binding 1 = VertexUniforms (256 bytes at offset 512)
-        { binding: 0, resource: { buffer: this.uniformBuffer, offset: 0, size: 512 } },
-        { binding: 1, resource: { buffer: this.uniformBuffer, offset: 512, size: 256 } },
+        // binding 0 = SkyboxUniforms; binding 1 = VertexUniforms at SKYBOX_VERTEX_UNIFORMS_OFFSET.
+        {
+          binding: 0,
+          resource: {
+            buffer: this.uniformBuffer,
+            offset: 0,
+            size: SKYBOX_UNIFORMS_BIND_SIZE,
+          },
+        },
+        {
+          binding: 1,
+          resource: {
+            buffer: this.uniformBuffer,
+            offset: SKYBOX_VERTEX_UNIFORMS_OFFSET,
+            size: SKYBOX_VERTEX_UNIFORMS_BIND_SIZE,
+          },
+        },
       ],
     })
 
@@ -481,7 +509,7 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       animFx.distortion
     )
 
-    // Update vertex uniforms (offset 256)
+    // Update vertex uniforms (written at SKYBOX_VERTEX_UNIFORMS_OFFSET)
     this.updateVertexUniforms(ctx)
   }
 
@@ -567,82 +595,87 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     const data = this.skyboxVertexUniformData
     data.fill(0)
 
+    const modelIdx = VERTEX_INDEX.modelMatrix
+    const modelViewIdx = VERTEX_INDEX.modelViewMatrix
+    const projIdx = VERTEX_INDEX.projectionMatrix
+    const rotIdx = VERTEX_INDEX.rotationMatrix
+
     // modelMatrix (4x4 rotation matrix, column-major)
-    data[0] = m00
-    data[1] = m10
-    data[2] = m20
-    data[3] = 0
-    data[4] = m01
-    data[5] = m11
-    data[6] = m21
-    data[7] = 0
-    data[8] = m02
-    data[9] = m12
-    data[10] = m22
-    data[11] = 0
-    data[12] = 0
-    data[13] = 0
-    data[14] = 0
-    data[15] = 1
+    data[modelIdx + 0] = m00
+    data[modelIdx + 1] = m10
+    data[modelIdx + 2] = m20
+    data[modelIdx + 3] = 0
+    data[modelIdx + 4] = m01
+    data[modelIdx + 5] = m11
+    data[modelIdx + 6] = m21
+    data[modelIdx + 7] = 0
+    data[modelIdx + 8] = m02
+    data[modelIdx + 9] = m12
+    data[modelIdx + 10] = m22
+    data[modelIdx + 11] = 0
+    data[modelIdx + 12] = 0
+    data[modelIdx + 13] = 0
+    data[modelIdx + 14] = 0
+    data[modelIdx + 15] = 1
 
     // modelViewMatrix (copy view matrix, ignoring translation for skybox)
     if (camera?.viewMatrix?.elements && camera.viewMatrix.elements.length >= 16) {
       const vm = camera.viewMatrix.elements
       // Remove translation from view matrix for skybox
-      data[16] = vm[0]!
-      data[17] = vm[1]!
-      data[18] = vm[2]!
-      data[19] = 0
-      data[20] = vm[4]!
-      data[21] = vm[5]!
-      data[22] = vm[6]!
-      data[23] = 0
-      data[24] = vm[8]!
-      data[25] = vm[9]!
-      data[26] = vm[10]!
-      data[27] = 0
-      data[28] = 0
-      data[29] = 0
-      data[30] = 0
-      data[31] = 1
+      data[modelViewIdx + 0] = vm[0]!
+      data[modelViewIdx + 1] = vm[1]!
+      data[modelViewIdx + 2] = vm[2]!
+      data[modelViewIdx + 3] = 0
+      data[modelViewIdx + 4] = vm[4]!
+      data[modelViewIdx + 5] = vm[5]!
+      data[modelViewIdx + 6] = vm[6]!
+      data[modelViewIdx + 7] = 0
+      data[modelViewIdx + 8] = vm[8]!
+      data[modelViewIdx + 9] = vm[9]!
+      data[modelViewIdx + 10] = vm[10]!
+      data[modelViewIdx + 11] = 0
+      data[modelViewIdx + 12] = 0
+      data[modelViewIdx + 13] = 0
+      data[modelViewIdx + 14] = 0
+      data[modelViewIdx + 15] = 1
     } else {
       // Identity
-      data[16] = 1
-      data[21] = 1
-      data[26] = 1
-      data[31] = 1
+      data[modelViewIdx + 0] = 1
+      data[modelViewIdx + 5] = 1
+      data[modelViewIdx + 10] = 1
+      data[modelViewIdx + 15] = 1
     }
 
     // projectionMatrix
     if (camera?.projectionMatrix?.elements) {
-      data.set(camera.projectionMatrix.elements, 32)
+      data.set(camera.projectionMatrix.elements, projIdx)
     } else {
       // Identity
-      data[32] = 1
-      data[37] = 1
-      data[42] = 1
-      data[47] = 1
+      data[projIdx + 0] = 1
+      data[projIdx + 5] = 1
+      data[projIdx + 10] = 1
+      data[projIdx + 15] = 1
     }
 
     // rotationMatrix (mat3x3 stored as 3 columns with 16-byte alignment each)
     // Uses the same composed rotation as modelMatrix
-    data[48] = m00
-    data[49] = m10
-    data[50] = m20
-    data[51] = 0 // padding
+    data[rotIdx + 0] = m00
+    data[rotIdx + 1] = m10
+    data[rotIdx + 2] = m20
+    data[rotIdx + 3] = 0 // padding
 
-    data[52] = m01
-    data[53] = m11
-    data[54] = m21
-    data[55] = 0 // padding
+    data[rotIdx + 4] = m01
+    data[rotIdx + 5] = m11
+    data[rotIdx + 6] = m21
+    data[rotIdx + 7] = 0 // padding
 
-    data[56] = m02
-    data[57] = m12
-    data[58] = m22
-    data[59] = 0 // padding
+    data[rotIdx + 8] = m02
+    data[rotIdx + 9] = m12
+    data[rotIdx + 10] = m22
+    data[rotIdx + 11] = 0 // padding
 
-    // VertexUniforms now live at offset 512 (was 256) since SkyboxUniforms grew.
-    this.writeUniformBuffer(this.device, this.uniformBuffer, data, 512)
+    // VertexUniforms live at SKYBOX_VERTEX_UNIFORMS_OFFSET inside the shared buffer.
+    this.writeUniformBuffer(this.device, this.uniformBuffer, data, SKYBOX_VERTEX_UNIFORMS_OFFSET)
   }
 
   execute(ctx: WebGPURenderContext): void {

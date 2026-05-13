@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ShortcutsOverlay } from '@/components/layout/ShortcutsOverlay'
 import { getShortcutLabel, SHORTCUTS } from '@/hooks/useKeyboardShortcuts'
-import { useLayoutStore } from '@/stores/layoutStore'
+import { useLayoutStore } from '@/stores/ui/layoutStore'
 
 describe('ShortcutsOverlay', () => {
   let matchMediaSpy: ReturnType<typeof vi.spyOn>

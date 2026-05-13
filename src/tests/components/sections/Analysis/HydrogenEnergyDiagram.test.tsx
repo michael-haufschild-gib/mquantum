@@ -7,12 +7,12 @@
  * higher dimension, or drawing the wrong node count for the selected orbital.
  */
 
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { HydrogenEnergyDiagram } from '@/components/sections/Analysis/HydrogenEnergyDiagram'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 describe('HydrogenEnergyDiagram', () => {
   beforeEach(() => {
@@ -58,10 +58,26 @@ describe('HydrogenEnergyDiagram', () => {
     const { rerender } = render(<HydrogenEnergyDiagram />)
     expect(screen.getAllByTestId('hydrogen-node-marker')).toHaveLength(1)
 
-    ext.setSchroedingerAzimuthalQuantumNumber(2)
+    act(() => {
+      ext.setSchroedingerAzimuthalQuantumNumber(2)
+    })
     rerender(<HydrogenEnergyDiagram />)
 
     expect(screen.getByText('n=3, l=2')).toBeInTheDocument()
     expect(screen.queryAllByTestId('hydrogen-node-marker')).toHaveLength(0)
+  })
+
+  it('positions radial nodes with the D-dimensional radial equation', () => {
+    useGeometryStore.getState().setDimension(2)
+    const ext = useExtendedObjectStore.getState()
+    ext.setSchroedingerQuantumMode('hydrogenND')
+    ext.setSchroedingerPrincipalQuantumNumber(2)
+    ext.setSchroedingerAzimuthalQuantumNumber(0)
+
+    render(<HydrogenEnergyDiagram />)
+
+    const nodeX = Number(screen.getByTestId('hydrogen-node-marker').getAttribute('x1'))
+    expect(nodeX).toBeGreaterThan(45)
+    expect(nodeX).toBeLessThan(50)
   })
 })

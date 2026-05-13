@@ -21,7 +21,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_WHEELER_DEWITT_CONFIG } from '@/lib/geometry/extended/wheelerDeWitt'
 import type { SrmtClock } from '@/lib/physics/srmt'
 import { WheelerDeWittStrategy } from '@/rendering/webgpu/renderers/strategies/WheelerDeWittStrategy'
-import { useSrmtDiagnosticStore } from '@/stores/srmtDiagnosticStore'
+import { useSrmtDiagnosticStore } from '@/stores/diagnostics/srmtDiagnosticStore'
 import { mockWebGPU } from '@/tests/__mocks__/webgpu'
 
 // ---------------------------------------------------------------------------

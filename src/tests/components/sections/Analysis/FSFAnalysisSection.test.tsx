@@ -11,8 +11,8 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { FSFAnalysisContent } from '@/components/sections/Analysis/FSFAnalysisSection'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

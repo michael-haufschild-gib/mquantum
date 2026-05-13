@@ -9,14 +9,14 @@
  */
 
 import { logger } from '@/lib/logger'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import {
   useWavefunctionSliceStore,
   type WavefunctionSliceSourceMode,
-} from '@/stores/wavefunctionSliceStore'
+} from '@/stores/diagnostics/wavefunctionSliceStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 import type { WebGPURenderContext } from '../core/types'
-import { requestStateSave as genericStateSave } from './stateSave'
+import { interleaveStateInjection, requestStateSave as genericStateSave } from './stateSave'
 
 /** Mutable state shared between the save function and the TDSE pass. */
 export interface SaveLoadState {
@@ -195,15 +195,14 @@ export function injectLoadedWavefunction(
 ): boolean {
   if (!state.pendingInjection || !state.psiBuffer) return false
 
-  const { re, im } = state.pendingInjection
-  const elementCount = Math.min(re.length, im.length, totalSites)
-  // Interleave the loaded Re/Im halves into one [re,im,re,im,...] payload
-  // so a single writeBuffer matches the merged ψ buffer's vec2f layout.
-  const interleaved = new Float32Array(elementCount * 2)
-  for (let i = 0; i < elementCount; i++) {
-    interleaved[2 * i] = re[i]!
-    interleaved[2 * i + 1] = im[i]!
+  let interleaved: Float32Array<ArrayBuffer>
+  try {
+    interleaved = interleaveStateInjection('TDSE', state.pendingInjection, totalSites)
+  } catch (err) {
+    state.pendingInjection = null
+    throw err
   }
+  const elementCount = totalSites
   device.queue.writeBuffer(state.psiBuffer, 0, interleaved)
   state.pendingInjection = null
   logger.log(`[TDSE] Injected loaded wavefunction (${elementCount} sites)`)

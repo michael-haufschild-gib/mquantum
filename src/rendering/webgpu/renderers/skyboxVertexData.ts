@@ -10,6 +10,9 @@
 import type { SkyboxMode, SkyboxProceduralSettings } from '@/stores/defaults/visualDefaults'
 
 import type { SkyboxMode as ShaderSkyboxMode } from '../shaders/skybox/types'
+import { SKYBOX_UNIFORMS_LAYOUT } from './skyboxLayout'
+
+const SKYBOX_INDEX = SKYBOX_UNIFORMS_LAYOUT.index
 
 /**
  * Resolved KTX2 cubemap asset URLs (eagerly resolved by Vite).
@@ -250,19 +253,19 @@ export function packSkyboxCoreUniforms(
   hue: number,
   animDistortion: number
 ): void {
-  data[0] = modeToNumeric(shaderMode)
-  data[1] = t
-  data[2] = intensity
-  data[3] = hue
-  data[4] = settings?.saturation ?? 1.0
-  data[5] = settings?.scale ?? 1.0
-  data[6] = settings?.complexity ?? 0.5
-  data[7] = settings?.timeScale ?? 0.2
-  data[8] = settings?.evolution ?? 0.0
-  data[10] = animDistortion
-  data[12] = settings?.turbulence ?? 0.3
-  data[13] = settings?.dualToneContrast ?? 0.5
-  data[14] = settings?.sunIntensity ?? 0.0
+  data[SKYBOX_INDEX.mode] = modeToNumeric(shaderMode)
+  data[SKYBOX_INDEX.time] = t
+  data[SKYBOX_INDEX.intensity] = intensity
+  data[SKYBOX_INDEX.hue] = hue
+  data[SKYBOX_INDEX.saturation] = settings?.saturation ?? 1.0
+  data[SKYBOX_INDEX.scale] = settings?.scale ?? 1.0
+  data[SKYBOX_INDEX.complexity] = settings?.complexity ?? 0.5
+  data[SKYBOX_INDEX.timeScale] = settings?.timeScale ?? 0.2
+  data[SKYBOX_INDEX.evolution] = settings?.evolution ?? 0.0
+  data[SKYBOX_INDEX.distortion] = animDistortion
+  data[SKYBOX_INDEX.turbulence] = settings?.turbulence ?? 0.3
+  data[SKYBOX_INDEX.dualTone] = settings?.dualToneContrast ?? 0.5
+  data[SKYBOX_INDEX.sunIntensity] = settings?.sunIntensity ?? 0.0
 }
 
 /** Pack sun position and mode-specific skybox settings (indices 40-51). */
@@ -271,17 +274,18 @@ export function packSkyboxModeSettings(
   settings: SkyboxProceduralSettings | undefined
 ): void {
   const sunPos = settings?.sunPosition ?? [10, 10, 10]
-  data[40] = sunPos[0]
-  data[41] = sunPos[1]
-  data[42] = sunPos[2]
-  data[44] = settings?.aurora?.curtainHeight ?? 0.5
-  data[45] = settings?.aurora?.waveFrequency ?? 1.0
-  data[46] = settings?.horizonGradient?.gradientContrast ?? 0.5
-  data[47] = settings?.horizonGradient?.spotlightFocus ?? 0.5
-  data[48] = settings?.ocean?.causticIntensity ?? 0.5
-  data[49] = settings?.ocean?.depthGradient ?? 0.5
-  data[50] = settings?.ocean?.bubbleDensity ?? 0.3
-  data[51] = settings?.ocean?.surfaceShimmer ?? 0.4
+  const sunIdx = SKYBOX_INDEX.sunPosition
+  data[sunIdx] = sunPos[0]
+  data[sunIdx + 1] = sunPos[1]
+  data[sunIdx + 2] = sunPos[2]
+  data[SKYBOX_INDEX.auroraCurtainHeight] = settings?.aurora?.curtainHeight ?? 0.5
+  data[SKYBOX_INDEX.auroraWaveFrequency] = settings?.aurora?.waveFrequency ?? 1.0
+  data[SKYBOX_INDEX.horizonGradientContrast] = settings?.horizonGradient?.gradientContrast ?? 0.5
+  data[SKYBOX_INDEX.horizonSpotlightFocus] = settings?.horizonGradient?.spotlightFocus ?? 0.5
+  data[SKYBOX_INDEX.oceanCausticIntensity] = settings?.ocean?.causticIntensity ?? 0.5
+  data[SKYBOX_INDEX.oceanDepthGradient] = settings?.ocean?.depthGradient ?? 0.5
+  data[SKYBOX_INDEX.oceanBubbleDensity] = settings?.ocean?.bubbleDensity ?? 0.3
+  data[SKYBOX_INDEX.oceanSurfaceShimmer] = settings?.ocean?.surfaceShimmer ?? 0.4
 }
 
 /** Pack cosine palette coefficients into skybox uniform data (indices 16-39). */
@@ -290,14 +294,14 @@ export function packSkyboxPalette(
   coeffs: { a?: number[]; b?: number[]; c?: number[]; d?: number[] } | undefined
 ): void {
   // color1 (= palA), color2 (= palB)
-  writeVec3(data, 16, coeffs?.a, 0.5, 0.5, 0.5)
-  writeVec3(data, 20, coeffs?.b, 0.5, 0.5, 0.5)
+  writeVec3(data, SKYBOX_INDEX.color1, coeffs?.a, 0.5, 0.5, 0.5)
+  writeVec3(data, SKYBOX_INDEX.color2, coeffs?.b, 0.5, 0.5, 0.5)
 
   // palA-D (explicit palette coefficients)
-  writeVec3(data, 24, coeffs?.a, 0.5, 0.5, 0.5)
-  writeVec3(data, 28, coeffs?.b, 0.5, 0.5, 0.5)
-  writeVec3(data, 32, coeffs?.c, 1.0, 1.0, 1.0)
-  writeVec3(data, 36, coeffs?.d, 0.0, 0.33, 0.67)
+  writeVec3(data, SKYBOX_INDEX.palA, coeffs?.a, 0.5, 0.5, 0.5)
+  writeVec3(data, SKYBOX_INDEX.palB, coeffs?.b, 0.5, 0.5, 0.5)
+  writeVec3(data, SKYBOX_INDEX.palC, coeffs?.c, 1.0, 1.0, 1.0)
+  writeVec3(data, SKYBOX_INDEX.palD, coeffs?.d, 0.0, 0.33, 0.67)
 }
 
 const TWO_PI = Math.PI * 2
@@ -377,25 +381,41 @@ export function packSkyboxPrecomputedPalettes(
   const tempShift = Math.sin(effectiveTime * 0.02) * 0.5 + 0.5
 
   // Aurora — cosinePalette(0.8, ...)
-  writePrecomputedSample(data, 52, evalCosinePalette(0.8, pal))
+  writePrecomputedSample(data, SKYBOX_INDEX.auroraTopColor, evalCosinePalette(0.8, pal))
   // Crystalline — cosinePalette(0.9, ...)
-  writePrecomputedSample(data, 56, evalCosinePalette(0.9, pal))
+  writePrecomputedSample(data, SKYBOX_INDEX.crystallineShimmerColor, evalCosinePalette(0.9, pal))
   // Nebula — t = 0.1 (deep) and t = 0.85 (knot)
-  writePrecomputedSample(data, 60, evalCosinePalette(0.1, pal))
-  writePrecomputedSample(data, 64, evalCosinePalette(0.85, pal))
+  writePrecomputedSample(data, SKYBOX_INDEX.nebulaDeepColor, evalCosinePalette(0.1, pal))
+  writePrecomputedSample(data, SKYBOX_INDEX.nebulaKnotColor, evalCosinePalette(0.85, pal))
   // Ocean — t = 0.0, 0.5, 1.0 (deep, mid, surface)
-  writePrecomputedSample(data, 68, evalCosinePalette(0.0, pal))
-  writePrecomputedSample(data, 72, evalCosinePalette(0.5, pal))
-  writePrecomputedSample(data, 76, evalCosinePalette(1.0, pal))
+  writePrecomputedSample(data, SKYBOX_INDEX.oceanDeepPalette, evalCosinePalette(0.0, pal))
+  writePrecomputedSample(data, SKYBOX_INDEX.oceanMidPalette, evalCosinePalette(0.5, pal))
+  writePrecomputedSample(data, SKYBOX_INDEX.oceanSurfacePalette, evalCosinePalette(1.0, pal))
   // Horizon — floor(0.1+tp*0.1), horizon(0.4+tp*0.05), mid(0.6), top(0.85-tp*0.05), sweep(0.95)
-  writePrecomputedSample(data, 80, evalCosinePalette(0.1 + tempPulse * 0.1, pal))
-  writePrecomputedSample(data, 84, evalCosinePalette(0.4 + tempPulse * 0.05, pal))
-  writePrecomputedSample(data, 88, evalCosinePalette(0.6, pal))
-  writePrecomputedSample(data, 92, evalCosinePalette(0.85 - tempPulse * 0.05, pal))
-  writePrecomputedSample(data, 96, evalCosinePalette(0.95, pal))
+  writePrecomputedSample(
+    data,
+    SKYBOX_INDEX.horizonFloorColor,
+    evalCosinePalette(0.1 + tempPulse * 0.1, pal)
+  )
+  writePrecomputedSample(
+    data,
+    SKYBOX_INDEX.horizonHorizonColor,
+    evalCosinePalette(0.4 + tempPulse * 0.05, pal)
+  )
+  writePrecomputedSample(data, SKYBOX_INDEX.horizonMidColor, evalCosinePalette(0.6, pal))
+  writePrecomputedSample(
+    data,
+    SKYBOX_INDEX.horizonTopColor,
+    evalCosinePalette(0.85 - tempPulse * 0.05, pal)
+  )
+  writePrecomputedSample(data, SKYBOX_INDEX.horizonSweepColor, evalCosinePalette(0.95, pal))
   // Twilight — horizon(0.5 + tempShift * 0.3), sun(tempShift)
-  writePrecomputedSample(data, 100, evalCosinePalette(0.5 + tempShift * 0.3, pal))
-  writePrecomputedSample(data, 104, evalCosinePalette(tempShift, pal))
+  writePrecomputedSample(
+    data,
+    SKYBOX_INDEX.twilightHorizonColor,
+    evalCosinePalette(0.5 + tempShift * 0.3, pal)
+  )
+  writePrecomputedSample(data, SKYBOX_INDEX.twilightSunColor, evalCosinePalette(tempShift, pal))
 }
 
 /** Compute animation-driven visual effects for the skybox based on animation mode. */

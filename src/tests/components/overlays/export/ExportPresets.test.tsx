@@ -3,8 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ExportPresets } from '@/components/overlays/export/ExportPresets'
-import { useExportStore } from '@/stores/exportStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
+import { useExportStore } from '@/stores/runtime/exportStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
 
 vi.mock('@/components/ui/Icon', () => ({
   Icon: ({ name }: { name: string }) => <span data-testid={`icon-${name}`}>{name}</span>,

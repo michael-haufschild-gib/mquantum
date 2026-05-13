@@ -15,7 +15,7 @@ import {
   computeFsfCosmologyCoefs,
   computeFsfVacuumDispersion,
 } from '@/lib/physics/freeScalar/vacuumDispersion'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
 import {
   computeFsfDiagnostics,

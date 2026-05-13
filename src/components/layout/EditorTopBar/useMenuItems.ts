@@ -7,8 +7,8 @@
 import { useMemo } from 'react'
 
 import type { ToastType } from '@/contexts/ToastContextInstance'
-import type { SavedScene, SavedStyle } from '@/stores/presetManagerStore'
-import type { ThemeAccent, ThemeMode } from '@/stores/themeStore'
+import type { SavedScene, SavedStyle } from '@/stores/runtime/presetManagerStore'
+import type { ThemeAccent, ThemeMode } from '@/stores/ui/themeStore'
 
 import {
   buildAccentItems,

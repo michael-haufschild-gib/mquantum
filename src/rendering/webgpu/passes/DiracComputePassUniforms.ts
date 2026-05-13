@@ -3,12 +3,17 @@
  *
  * Pure data-writing functions extracted from DiracComputePass.
  * No GPU pipeline or bind group logic — only buffer writes.
+ *
+ * All struct offsets come from `DIRAC_UNIFORMS_LAYOUT.index`, which is
+ * derived from the WGSL field declarations. There are no hand-computed
+ * magic numbers in this file.
  */
 
 import type { DiracConfig } from '@/lib/geometry/extended/dirac'
 import { sigmaMaxFromPmlConfig } from '@/lib/physics/pml/profile'
 
 import { MAX_DIM, packFFTStageUniforms, writeSlicePositionsToF32 } from './computePassUtils'
+import { DIRAC_UNIFORMS_LAYOUT } from './diracUniformsLayout'
 
 /** Parameters for writing DiracUniforms to a GPU buffer. */
 export interface DiracUniformParams {
@@ -50,6 +55,14 @@ const VIEW_MAP: Record<string, number> = {
   axialCharge: 7,
 }
 
+/** Physics potential is disabled when the UI potential switch is off. */
+export function effectiveDiracPotentialType(config: DiracConfig): DiracConfig['potentialType'] {
+  return config.showPotential ? config.potentialType : 'none'
+}
+
+/** Float/u32 indices of every DiracUniforms field (byteOffset / 4). */
+const I = DIRAC_UNIFORMS_LAYOUT.index
+
 /**
  * Write all Dirac uniform fields into the pre-allocated u32/f32 views,
  * then upload to the GPU uniform buffer.
@@ -73,87 +86,87 @@ export function writeDiracUniforms(
   const { basisX, basisY, basisZ, boundingRadius } = params
   u32.fill(0)
 
-  // gridSize (offset 0, indices 0-11)
-  for (let d = 0; d < config.latticeDim; d++) u32[d] = config.gridSize[d]!
-  // strides (offset 48, indices 12-23)
-  for (let d = 0; d < config.latticeDim; d++) u32[12 + d] = strides[d]!
-  // spacing (offset 96, indices 24-35)
-  for (let d = 0; d < config.latticeDim; d++) f32[24 + d] = config.spacing[d]!
+  // Lattice parameter arrays
+  for (let d = 0; d < config.latticeDim; d++) u32[I.gridSize + d] = config.gridSize[d]!
+  for (let d = 0; d < config.latticeDim; d++) u32[I.strides + d] = strides[d]!
+  for (let d = 0; d < config.latticeDim; d++) f32[I.spacing + d] = config.spacing[d]!
 
-  // Lattice scalars (offset 144, indices 36-39)
-  u32[36] = totalSites
-  u32[37] = config.latticeDim
-  f32[38] = config.mass
-  f32[39] = config.speedOfLight
+  // Lattice scalars
+  u32[I.totalSites] = totalSites
+  u32[I.latticeDim] = config.latticeDim
+  f32[I.mass] = config.mass
+  f32[I.speedOfLight] = config.speedOfLight
 
-  // Physics scalars (offset 160, indices 40-43)
-  f32[40] = config.hbar
-  f32[41] = config.dt
-  u32[42] = currentSpinorSize
-  u32[43] = POT_MAP[config.potentialType] ?? 0
+  // Physics scalars
+  f32[I.hbar] = config.hbar
+  f32[I.dt] = config.dt
+  u32[I.spinorSize] = currentSpinorSize
+  u32[I.potentialType] = POT_MAP[effectiveDiracPotentialType(config)] ?? 0
 
-  // Potential parameters (offset 176, indices 44-47)
-  f32[44] = config.potentialStrength
-  f32[45] = config.potentialWidth
-  f32[46] = config.potentialCenter
-  f32[47] = config.harmonicOmega
+  // Potential parameters
+  f32[I.potentialStrength] = config.potentialStrength
+  f32[I.potentialWidth] = config.potentialWidth
+  f32[I.potentialCenter] = config.potentialCenter
+  f32[I.harmonicOmega] = config.harmonicOmega
 
-  // Potential + init (offset 192, indices 48-51)
-  f32[48] = config.coulombZ
-  u32[49] = INIT_MAP[config.initialCondition] ?? 0
-  f32[50] = config.packetWidth
-  f32[51] = config.positiveEnergyFraction
+  // Potential + init
+  f32[I.coulombZ] = config.coulombZ
+  u32[I.initCondition] = INIT_MAP[config.initialCondition] ?? 0
+  f32[I.packetWidth] = config.packetWidth
+  f32[I.positiveEnergyFraction] = config.positiveEnergyFraction
 
-  // packetCenter (offset 208, indices 52-63)
-  for (let d = 0; d < config.latticeDim; d++) f32[52 + d] = config.packetCenter[d] ?? 0
-  // packetMomentum (offset 256, indices 64-75)
-  for (let d = 0; d < config.latticeDim; d++) f32[64 + d] = config.packetMomentum[d] ?? 0
+  // Packet init arrays
+  for (let d = 0; d < config.latticeDim; d++) {
+    f32[I.packetCenter + d] = config.packetCenter[d] ?? 0
+  }
+  for (let d = 0; d < config.latticeDim; d++) {
+    f32[I.packetMomentum + d] = config.packetMomentum[d] ?? 0
+  }
 
-  // Display + simulation state (offset 304, indices 76-79)
-  u32[76] = VIEW_MAP[config.fieldView] ?? 0
-  u32[77] = config.autoScale ? 1 : 0
-  f32[78] = simTime
-  u32[79] = config.absorberEnabled ? 1 : 0
+  // Display + simulation state
+  u32[I.fieldView] = VIEW_MAP[config.fieldView] ?? 0
+  u32[I.autoScale] = config.autoScale ? 1 : 0
+  f32[I.simTime] = simTime
+  u32[I.absorberEnabled] = config.absorberEnabled ? 1 : 0
 
-  // PML absorber (offset 320, indices 80-81)
-  f32[80] = config.absorberWidth
-  // Auto-compute sigma_max from PML target reflection coefficient
-  f32[81] = sigmaMaxFromPmlConfig(config)
+  // PML absorber — auto-compute sigma_max from PML target reflection coefficient.
+  f32[I.absorberWidth] = config.absorberWidth
+  f32[I.absorberStrength] = sigmaMaxFromPmlConfig(config)
 
-  // slicePositions (offset 328, indices 82-93, WGSL array<f32, 12>).
-  writeSlicePositionsToF32(f32, 82, config.slicePositions)
+  // Slice positions for extra dimensions (WGSL array<f32, 12>).
+  writeSlicePositionsToF32(f32, I.slicePositions, config.slicePositions)
 
-  // Basis vectors (offset 376, indices 94-105, 106-117, 118-129)
+  // Basis vectors (each array<f32, 12>)
   const writeBasis = (offset: number, b?: Float32Array) => {
     if (b) {
       for (let d = 0; d < Math.min(b.length, MAX_DIM); d++) f32[offset + d] = b[d]!
     }
   }
-  writeBasis(94, basisX)
-  if (!basisX) f32[94] = 1.0
-  writeBasis(106, basisY)
-  if (!basisY) f32[107] = 1.0
-  writeBasis(118, basisZ)
-  if (!basisZ) f32[120] = 1.0
+  writeBasis(I.basisX, basisX)
+  if (!basisX) f32[I.basisX] = 1.0
+  writeBasis(I.basisY, basisY)
+  if (!basisY) f32[I.basisY + 1] = 1.0
+  writeBasis(I.basisZ, basisZ)
+  if (!basisZ) f32[I.basisZ + 2] = 1.0
 
-  // Bounding + density scale (offset 520, indices 130-133)
-  f32[130] = boundingRadius ?? 2.0
-  f32[131] = maxDensity
-  u32[132] = config.stepsPerFrame
-  u32[133] = config.showPotential ? 1 : 0
+  // Bounding + density scale
+  f32[I.boundingRadius] = boundingRadius ?? 2.0
+  f32[I.densityScale] = maxDensity
+  u32[I.stepsPerFrame] = config.stepsPerFrame
+  u32[I.showPotential] = config.showPotential ? 1 : 0
 
-  // Spin polarization angles (offset 536, indices 134-135)
-  f32[134] = config.spinDirection[0] ?? 0
-  f32[135] = config.spinDirection[1] ?? 0
+  // Spin polarization angles (Bloch sphere)
+  f32[I.spinTheta] = config.spinDirection[0] ?? 0
+  f32[I.spinPhi] = config.spinDirection[1] ?? 0
 
-  // kGridScale (offset 544, indices 136-147): 2π / (N * a) per dimension.
-  // Hoisted out of the kinetic kernel so each thread replaces a divide with
-  // a multiply during k-vector construction. Mirrors TDSE's kGridScale field.
+  // kGridScale: 2π / (N · a) per dimension. Hoisted out of the kinetic
+  // kernel so each thread replaces a divide with a multiply during k-vector
+  // construction. Mirrors TDSE's kGridScale field.
   const TWO_PI = Math.PI * 2
   for (let d = 0; d < config.latticeDim; d++) {
     const N = config.gridSize[d]!
     const a = config.spacing[d]!
-    f32[136 + d] = TWO_PI / (N * a)
+    f32[I.kGridScale + d] = TWO_PI / (N * a)
   }
 
   device.queue.writeBuffer(uniformBuffer, 0, uniformData)

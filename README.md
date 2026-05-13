@@ -100,7 +100,11 @@ src/
     ui/             # Reusable primitives (Button, Slider, etc.)
     layout/         # Layout frames and panels
     sections/       # Sidebar control sections
-  stores/           # Zustand state management
+  stores/           # Zustand state management (grouped by purpose)
+    scene/          # Scene state read by the renderer
+    ui/             # UI plumbing (panels, dialogs, theme)
+    diagnostics/    # Analysis / measurement / observation overlays
+    runtime/        # Operational state (presets, export, perf)
     slices/         # Store slices by domain
     utils/          # Preset serialization, merge helpers
     defaults/       # Default values

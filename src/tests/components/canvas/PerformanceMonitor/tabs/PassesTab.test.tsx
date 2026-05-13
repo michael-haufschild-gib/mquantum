@@ -9,7 +9,7 @@ import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { PassesTabContent } from '@/components/canvas/PerformanceMonitor/tabs/PassesTab'
-import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
+import { usePerformanceMetricsStore } from '@/stores/diagnostics/performanceMetricsStore'
 
 const initialState = usePerformanceMetricsStore.getState()
 

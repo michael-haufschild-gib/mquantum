@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { SchroedingerControls } from '@/components/sections/Geometry/SchroedingerControls'
 import { ObjectTypeExplorer } from '@/components/sections/ObjectTypes/ObjectTypeExplorer'
 import { ToastProvider } from '@/contexts/ToastContext'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 describe('ObjectTypeExplorer quantum mode entries', () => {
   beforeEach(() => {
@@ -62,5 +62,19 @@ describe('ObjectTypeExplorer quantum mode entries', () => {
     render(<SchroedingerControls />)
     expect(screen.queryByTestId('mode-selector')).not.toBeInTheDocument()
     expect(screen.queryByTestId('schroedinger-scale')).not.toBeInTheDocument()
+  })
+
+  it('reports volumetric rendering for compute modes with stale iso state', () => {
+    useExtendedObjectStore.setState((state) => ({
+      schroedinger: {
+        ...state.schroedinger,
+        quantumMode: 'tdseDynamics',
+        isoEnabled: true,
+      },
+    }))
+
+    render(<SchroedingerControls />)
+
+    expect(screen.getByText('Rendering: Volumetric (Beer-Lambert)')).toBeInTheDocument()
   })
 })

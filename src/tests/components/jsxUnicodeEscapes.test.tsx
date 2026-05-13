@@ -22,7 +22,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { OpenQuantumDiagnosticsSection } from '@/components/sections/Analysis/OpenQuantumDiagnosticsSection'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 describe('JSX backslash-u escapes', () => {
   it('does not process \\uXXXX in JSX text content (regression probe)', () => {

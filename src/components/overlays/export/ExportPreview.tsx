@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Icon } from '@/components/ui/Icon'
-import { useExportStore } from '@/stores/exportStore'
+import { useExportStore } from '@/stores/runtime/exportStore'
 
 /**
  * Get export width in pixels based on resolution setting

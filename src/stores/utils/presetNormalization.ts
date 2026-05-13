@@ -17,7 +17,7 @@ export {
   SKYBOX_TEXTURE_SET,
 } from './presetNormalizationShared'
 import { normalizeOpaqueHexColor } from '@/lib/colors/colorUtils'
-import type { LightSource, LightType } from '@/rendering/lights/types'
+import type { LightSource, LightType } from '@/lib/lighting/lightSource'
 import {
   clampConeAngle,
   clampDecay,
@@ -27,11 +27,11 @@ import {
   createNewLight,
   MAX_LIGHTS,
   normalizeRotationTupleSigned,
-} from '@/rendering/lights/types'
+} from '@/lib/lighting/lightSource'
 
-import { MAX_SPEED, MIN_SPEED } from '../animationStore'
 import type { SkyboxMode, SkyboxSelection, SkyboxTexture } from '../defaults/visualDefaults'
-import { usePBRStore } from '../pbrStore'
+import { MAX_SPEED, MIN_SPEED } from '../scene/animationStore'
+import { usePBRStore } from '../scene/pbrStore'
 import {
   clampToRange,
   isFiniteVec3,

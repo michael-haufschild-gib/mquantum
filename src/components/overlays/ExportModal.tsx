@@ -5,7 +5,7 @@ import { Icon } from '@/components/ui/Icon'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import { useIsDesktop } from '@/hooks/useMediaQuery'
 import { soundManager } from '@/lib/audio/SoundManager'
-import { ExportMode, useExportStore } from '@/stores/exportStore'
+import { ExportMode, useExportStore } from '@/stores/runtime/exportStore'
 
 import { Button } from '../ui/Button'
 import { ConfirmModal } from '../ui/ConfirmModal'

@@ -8,7 +8,7 @@ import { createPortal } from 'react-dom'
 import { useShallow } from 'zustand/react/shallow'
 
 import { useProgressiveRefinement } from '@/hooks/useProgressiveRefinement'
-import { usePerformanceStore } from '@/stores/performanceStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
 
 /** Props for the progressive rendering quality indicator overlay. */
 export interface RefinementIndicatorProps {

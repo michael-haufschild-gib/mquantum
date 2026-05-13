@@ -27,6 +27,11 @@ export interface SchrodingerRenderResources {
   indexCount: number
   clearValueTransparent: GPURenderPassColorAttachment['clearValue']
   clearValueInvalidPos: GPURenderPassColorAttachment['clearValue']
+  primaryColorAttachment: GPURenderPassColorAttachment
+  secondaryColorAttachment: GPURenderPassColorAttachment
+  singleColorAttachments: [GPURenderPassColorAttachment]
+  dualColorAttachments: [GPURenderPassColorAttachment, GPURenderPassColorAttachment]
+  renderPassDescriptor: GPURenderPassDescriptor
 }
 
 // ---------------------------------------------------------------------------
@@ -35,7 +40,8 @@ export interface SchrodingerRenderResources {
 
 function encode2DRenderPass(
   ctx: WebGPURenderContext,
-  resources: SchrodingerRenderResources
+  resources: SchrodingerRenderResources,
+  drawStatsOut: WebGPUPassDrawStats
 ): WebGPUPassDrawStats | null {
   const colorView = ctx.getWriteTarget('object-color')
   if (!colorView) {
@@ -43,17 +49,12 @@ function encode2DRenderPass(
     return null
   }
 
-  const passEncoder = ctx.beginRenderPass({
-    label: 'schroedinger-render-2d',
-    colorAttachments: [
-      {
-        view: colorView,
-        loadOp: 'clear' as const,
-        storeOp: 'store' as const,
-        clearValue: resources.clearValueTransparent,
-      },
-    ],
-  })
+  resources.primaryColorAttachment.view = colorView
+  resources.primaryColorAttachment.clearValue = resources.clearValueTransparent
+  resources.renderPassDescriptor.label = 'schroedinger-render-2d'
+  resources.renderPassDescriptor.colorAttachments = resources.singleColorAttachments
+
+  const passEncoder = ctx.beginRenderPass(resources.renderPassDescriptor)
 
   passEncoder.setPipeline(resources.renderPipeline)
   passEncoder.setBindGroup(0, resources.cameraBindGroup)
@@ -62,7 +63,12 @@ function encode2DRenderPass(
   passEncoder.draw(3)
   passEncoder.end()
 
-  return { calls: 1, triangles: 1, vertices: 3, lines: 0, points: 0 }
+  drawStatsOut.calls = 1
+  drawStatsOut.triangles = 1
+  drawStatsOut.vertices = 3
+  drawStatsOut.lines = 0
+  drawStatsOut.points = 0
+  return drawStatsOut
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +78,8 @@ function encode2DRenderPass(
 function encode3DRenderPass(
   ctx: WebGPURenderContext,
   config: SchrodingerRendererConfig,
-  resources: SchrodingerRenderResources
+  resources: SchrodingerRenderResources,
+  drawStatsOut: WebGPUPassDrawStats
 ): WebGPUPassDrawStats | null {
   const isTemporal = !!config.temporal
 
@@ -94,29 +101,19 @@ function encode3DRenderPass(
     return null
   }
 
-  // PERF: Use pre-allocated clearValue objects (passed via resources) to avoid per-frame allocation
-  const colorAttachments: GPURenderPassColorAttachment[] = [
-    {
-      view: colorView,
-      loadOp: 'clear' as const,
-      storeOp: 'store' as const,
-      clearValue: resources.clearValueTransparent,
-    },
-  ]
+  resources.primaryColorAttachment.view = colorView
+  resources.primaryColorAttachment.clearValue = resources.clearValueTransparent
 
   if (isTemporal && secondaryView) {
-    colorAttachments.push({
-      view: secondaryView,
-      loadOp: 'clear' as const,
-      storeOp: 'store' as const,
-      clearValue: resources.clearValueInvalidPos,
-    })
+    resources.secondaryColorAttachment.view = secondaryView
+    resources.secondaryColorAttachment.clearValue = resources.clearValueInvalidPos
   }
 
-  const passEncoder = ctx.beginRenderPass({
-    label: 'schroedinger-render',
-    colorAttachments,
-  })
+  resources.renderPassDescriptor.label = 'schroedinger-render'
+  resources.renderPassDescriptor.colorAttachments =
+    isTemporal && secondaryView ? resources.dualColorAttachments : resources.singleColorAttachments
+
+  const passEncoder = ctx.beginRenderPass(resources.renderPassDescriptor)
 
   passEncoder.setPipeline(resources.renderPipeline)
   passEncoder.setBindGroup(0, resources.cameraBindGroup)
@@ -127,13 +124,12 @@ function encode3DRenderPass(
   passEncoder.drawIndexed(resources.indexCount)
   passEncoder.end()
 
-  return {
-    calls: 1,
-    triangles: Math.floor(resources.indexCount / 3),
-    vertices: resources.indexCount,
-    lines: 0,
-    points: 0,
-  }
+  drawStatsOut.calls = 1
+  drawStatsOut.triangles = Math.floor(resources.indexCount / 3)
+  drawStatsOut.vertices = resources.indexCount
+  drawStatsOut.lines = 0
+  drawStatsOut.points = 0
+  return drawStatsOut
 }
 
 // ---------------------------------------------------------------------------
@@ -147,13 +143,17 @@ function encode3DRenderPass(
  * @param config - Renderer configuration (temporal, isosurface flags)
  * @param resources - GPU pipeline and bind group resources
  * @param is2D - Whether to use the 2D fullscreen triangle path
+ * @param drawStatsOut - Reusable output object for draw statistics
  * @returns Draw statistics, or null if required render targets are missing
  */
 export function encodeSchrodingerRenderPass(
   ctx: WebGPURenderContext,
   config: SchrodingerRendererConfig,
   resources: SchrodingerRenderResources,
-  is2D: boolean
+  is2D: boolean,
+  drawStatsOut: WebGPUPassDrawStats = { calls: 0, triangles: 0, vertices: 0, lines: 0, points: 0 }
 ): WebGPUPassDrawStats | null {
-  return is2D ? encode2DRenderPass(ctx, resources) : encode3DRenderPass(ctx, config, resources)
+  return is2D
+    ? encode2DRenderPass(ctx, resources, drawStatsOut)
+    : encode3DRenderPass(ctx, config, resources, drawStatsOut)
 }

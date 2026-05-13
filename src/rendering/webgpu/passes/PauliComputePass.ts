@@ -29,11 +29,12 @@
 
 import type { PauliConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 import type { WebGPURenderContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
+import { destroyGpuResources } from '../utils/gpuResourceHelpers'
 import {
   computeStridesPadded,
   createDensityTexture,
@@ -41,6 +42,7 @@ import {
   DIAG_DECIMATION,
   GRID_WG,
   LINEAR_WG,
+  MAX_DIM,
   pickSiteDispatch,
   sanitizeGridSizes,
 } from './computePassUtils'
@@ -58,7 +60,7 @@ import {
   type PauliUniformStepStagingState,
   prePackPauliFrameSnapshots,
 } from './PauliComputePassUniformStaging'
-import { requestStateSave as genericStateSave } from './stateSave'
+import { interleaveStateInjection, requestStateSave as genericStateSave } from './stateSave'
 
 /** Number of f32 values in diagnostic result buffer:
  *  totalNorm, normUp, normDown, sigmaX, sigmaY, sigmaZ, maxDensity, pad */
@@ -100,8 +102,15 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   // State
   private initialized = false
   private lastConfigHash = ''
-  /** Hash of V(x)-shaping parameters — dirty check for potentialPipeline dispatch. */
-  private lastPotentialHash = ''
+  /** Cached V(x)-shaping parameters — dirty check for potentialPipeline dispatch. */
+  private lastPotentialType: PauliConfig['potentialType'] | null = null
+  private lastPotentialHarmonicOmega = NaN
+  private lastPotentialWellDepth = NaN
+  private lastPotentialWellWidth = NaN
+  private lastPotentialMass = NaN
+  private lastPotentialLatticeDim = 0
+  private readonly lastPotentialGridSize = new Array<number>(MAX_DIM).fill(NaN)
+  private readonly lastPotentialSpacing = new Array<number>(MAX_DIM).fill(NaN)
   private simTime = 0
   private maxDensity = 1.0
   private stepAccumulator = 0
@@ -120,6 +129,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   private readonly uniformData = new ArrayBuffer(PAULI_UNIFORM_SIZE)
   private readonly uniformU32 = new Uint32Array(this.uniformData)
   private readonly uniformF32 = new Float32Array(this.uniformData)
+  private readonly strideScratch = new Array<number>(MAX_DIM).fill(0)
 
   private readonly densityGridSize: number
 
@@ -227,7 +237,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   }
 
   /**
-   * Hash V(x)-shaping parameters. A difference here triggers a single
+   * Check V(x)-shaping parameters. A difference here triggers a single
    * pauliPotential dispatch before the next Strang loop so the substep kernel
    * reads a fresh potential[idx] without recomputing V per voxel.
    *
@@ -235,17 +245,42 @@ export class PauliComputePass extends WebGPUBaseComputePass {
    * Grid topology and spacing are included because they define the physical
    * position (f32(coord) − N/2 + 0.5)·spacing used by every V formula.
    */
-  private computePauliPotentialHash(config: PauliConfig): string {
-    return [
-      config.potentialType,
-      config.harmonicOmega,
-      config.wellDepth,
-      config.wellWidth,
-      config.mass,
-      config.latticeDim,
-      config.gridSize.slice(0, config.latticeDim).join(','),
-      config.spacing.slice(0, config.latticeDim).join(','),
-    ].join('|')
+  private consumePauliPotentialDirty(config: PauliConfig): boolean {
+    let dirty =
+      this.lastPotentialType !== config.potentialType ||
+      this.lastPotentialHarmonicOmega !== config.harmonicOmega ||
+      this.lastPotentialWellDepth !== config.wellDepth ||
+      this.lastPotentialWellWidth !== config.wellWidth ||
+      this.lastPotentialMass !== config.mass ||
+      this.lastPotentialLatticeDim !== config.latticeDim
+
+    for (let d = 0; d < config.latticeDim; d++) {
+      if (
+        this.lastPotentialGridSize[d] !== config.gridSize[d] ||
+        this.lastPotentialSpacing[d] !== config.spacing[d]
+      ) {
+        dirty = true
+        break
+      }
+    }
+
+    if (!dirty) return false
+
+    this.lastPotentialType = config.potentialType
+    this.lastPotentialHarmonicOmega = config.harmonicOmega
+    this.lastPotentialWellDepth = config.wellDepth
+    this.lastPotentialWellWidth = config.wellWidth
+    this.lastPotentialMass = config.mass
+    this.lastPotentialLatticeDim = config.latticeDim
+    for (let d = 0; d < config.latticeDim; d++) {
+      this.lastPotentialGridSize[d] = config.gridSize[d]!
+      this.lastPotentialSpacing[d] = config.spacing[d]!
+    }
+    return true
+  }
+
+  private invalidatePauliPotential(): void {
+    this.lastPotentialType = null
   }
 
   // ============================================================================
@@ -286,7 +321,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     // Freshly-created potentialBuffer holds uninitialized memory — force the
     // next executePauli to fire the potential fill kernel before the Strang
     // loop reads from it (otherwise potentialHalf would see garbage).
-    this.lastPotentialHash = ''
+    this.invalidatePauliPotential()
   }
 
   /** Create the 3D density texture for spin-resolved rendering */
@@ -347,21 +382,18 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     // Injection only needs the spinor buffer; it can complete even while the
     // async pipeline build is still pending.
     if (this.pendingInjection) {
-      const { re, im } = this.pendingInjection
       const expected = 2 * this.buf.totalSites
-      if (re.length !== expected || im.length !== expected) {
-        // Drop the injection rather than partial-uploading: a truncated or
-        // version-mismatched state file would otherwise leave a hybrid spinor
-        // with stale data from the previous run beyond `min(re,im)`.
-        this.pendingInjection = null
-        throw new Error(
-          `[Pauli] Invalid save-state length: expected re=im=${expected} (2·totalSites), got re=${re.length}, im=${im.length}`
+      let interleaved: Float32Array<ArrayBuffer>
+      try {
+        interleaved = interleaveStateInjection(
+          'Pauli',
+          this.pendingInjection,
+          expected,
+          `${expected} (2·totalSites)`
         )
-      }
-      const interleaved = new Float32Array(expected * 2)
-      for (let i = 0; i < expected; i++) {
-        interleaved[2 * i] = re[i]!
-        interleaved[2 * i + 1] = im[i]!
+      } catch (err) {
+        this.pendingInjection = null
+        throw err
       }
       device.queue.writeBuffer(this.buf.spinorBuffer, 0, interleaved)
       this.pendingInjection = null
@@ -413,7 +445,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
         totalSites: this.buf.totalSites,
         simTime: this.simTime,
         maxDensity: this.maxDensity,
-        strides: computeStridesPadded(config.gridSize, config.latticeDim),
+        strides: computeStridesPadded(config.gridSize, config.latticeDim, this.strideScratch),
         basisX,
         basisY,
         basisZ,
@@ -559,9 +591,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     // Refresh scalar potential V(x) only when its shaping parameters change.
     // Uniforms are written above, so the fill kernel reads the current
     // potentialType / harmonicOmega / wellDepth / wellWidth / mass values.
-    const potHash = this.computePauliPotentialHash(config)
-    if (potHash !== this.lastPotentialHash) {
-      this.lastPotentialHash = potHash
+    if (this.consumePauliPotentialDirty(config)) {
       const p = ctx.beginComputePass({ label: 'pauli-potential-fill' })
       dispatchSite(p, this.pl.potentialPipeline, this.pl.potential3DPipeline, [this.bg.potentialBG])
       p.end()
@@ -882,21 +912,22 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       this.diagMappingInFlight = false
     }
     if (this.buf) {
-      this.buf.spinorBuffer.destroy()
-      this.buf.fftScratchA.destroy()
-      this.buf.uniformBuffer.destroy()
+      destroyGpuResources(
+        this.buf.spinorBuffer,
+        this.buf.fftScratchA,
+        this.buf.uniformBuffer,
+        this.buf.fftTwiddleBuffer,
+        this.buf.packUniformBuffer,
+        this.buf.packUniformBufferNoNorm,
+        this.buf.potentialBuffer,
+        this.buf.diagUniformBuffer,
+        this.buf.diagPartialBuffer,
+        this.buf.diagResultBuffer,
+        this.buf.diagStagingBuffer
+      )
       for (const b of this.buf.fftAxisUniformBuffers) b.destroy()
-      this.buf.fftTwiddleBuffer.destroy()
-      this.buf.packUniformBuffer.destroy()
-      this.buf.packUniformBufferNoNorm.destroy()
-      this.buf.potentialBuffer.destroy()
-      this.buf.diagUniformBuffer.destroy()
-      this.buf.diagPartialBuffer.destroy()
-      this.buf.diagResultBuffer.destroy()
-      this.buf.diagStagingBuffer.destroy()
     }
-    this.densityTexture?.destroy()
-    this.bg?.renormalizeUniformBuffer?.destroy()
+    destroyGpuResources(this.densityTexture, this.bg?.renormalizeUniformBuffer)
     disposePauliUniformStepStaging(this.uniformStepStaging)
     super.dispose()
   }

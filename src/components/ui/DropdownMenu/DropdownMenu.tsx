@@ -11,8 +11,8 @@ import React, {
 import { useShallow } from 'zustand/react/shallow'
 
 import { soundManager } from '@/lib/audio/SoundManager'
-import { supportsPopover } from '@/lib/dom/popoverSupport'
-import { useDropdownStore } from '@/stores/dropdownStore'
+import { supportsPopover } from '@/lib/popoverSupport'
+import { useDropdownStore } from '@/stores/ui/dropdownStore'
 
 import { MenuItems } from './MenuItems'
 import { SubmenuPortalContext } from './SubmenuPortalContext'

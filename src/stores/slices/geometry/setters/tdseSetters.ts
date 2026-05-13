@@ -9,6 +9,8 @@
 
 import {
   DEFAULT_TDSE_CONFIG,
+  isTdseInitialCondition,
+  isTdsePotentialType,
   type TdseConfig,
   type TdseDisorderDistribution,
   type TdseDriveWaveform,
@@ -18,9 +20,15 @@ import {
 } from '@/lib/geometry/extended/types'
 import { reduceGridToFit } from '@/lib/math/ndArray'
 import { clampKKState, computeEffectiveSpacing } from '@/lib/physics/compactification'
-import type { MetricConfig } from '@/lib/physics/tdse/metrics/types'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { type MetricConfig, normalizeMetricForLattice } from '@/lib/physics/tdse/metrics/types'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import {
+  canApplyPresetRequest,
+  createLatestPresetRequestGuard,
+  loadPresetModule,
+  type SchroedingerPresetApplyOptions,
+} from '@/stores/utils/dynamicPresetImport'
 
 import {
   clampDtWithCfl,
@@ -96,7 +104,7 @@ export interface TdseSetters extends TdseStochasticSetters {
   setTdseSlicePosition: (dimIndex: number, value: number) => void
   setTdseCompactDim: (dimIndex: number, compact: boolean) => void
   setTdseCompactRadius: (dimIndex: number, radius: number) => void
-  applyTdsePreset: (presetId: string) => void
+  applyTdsePreset: (presetId: string, options?: SchroedingerPresetApplyOptions) => Promise<void>
   resetTdseField: () => void
   // ER=EPR Double-trace Wormhole Coupling
   setTdseWormholeEnabled: (enabled: boolean) => void
@@ -211,6 +219,7 @@ const normalizeTdseVector = (
 export function createTdseSetters(ctx: SetterContext): TdseSetters {
   const { setWithVersion, isFinite, warnNonFinite, hasOnlyFinite } = ctx
   const D = 'tdse' as const
+  const beginPresetRequest = createLatestPresetRequestGuard()
 
   return {
     setTdseLatticeDim: (dim) => {
@@ -224,10 +233,11 @@ export function createTdseSetters(ctx: SetterContext): TdseSetters {
         const resized = resizeTdseArrays(prev, clamped)
         const potentialType =
           clamped < 2 && prev.potentialType === 'doubleSlit' ? 'barrier' : prev.potentialType
+        const metric = normalizeMetricForLattice(prev.metric, clamped)
         return {
           schroedinger: {
             ...state.schroedinger,
-            tdse: { ...prev, ...resized, potentialType, needsReset: true },
+            tdse: { ...prev, ...resized, potentialType, metric, needsReset: true },
           },
         }
       })
@@ -353,6 +363,7 @@ export function createTdseSetters(ctx: SetterContext): TdseSetters {
     },
     setTdseStepsPerFrame: nestedIntSetter(ctx, D, 'stepsPerFrame', 1, 16, 'floor'),
     setTdseInitialCondition: (condition) => {
+      if (!isTdseInitialCondition(condition)) return
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
@@ -425,6 +436,7 @@ export function createTdseSetters(ctx: SetterContext): TdseSetters {
       })
     },
     setTdsePotentialType: (potentialType) => {
+      if (!isTdsePotentialType(potentialType)) return
       setWithVersion((state) => {
         const prev = state.schroedinger.tdse
         // Switching to or from the Regge–Wheeler ringdown potential reshapes
@@ -513,6 +525,7 @@ export function createTdseSetters(ctx: SetterContext): TdseSetters {
       })
     },
     setTdseCompactDim: (dimIndex, compact) => {
+      if (typeof compact !== 'boolean') return
       setWithVersion((state) => {
         const td = state.schroedinger.tdse
         const compactDims = [...(td.compactDims ?? [])]
@@ -568,44 +581,54 @@ export function createTdseSetters(ctx: SetterContext): TdseSetters {
         }
       })
     },
-    applyTdsePreset: (presetId) => {
-      void import('@/lib/physics/tdse/presets').then(({ getTdsePreset }) => {
-        const preset = getTdsePreset(presetId)
-        if (!preset) return
-        setWithVersion((state) => {
-          const globalDim = useGeometryStore.getState().dimension
-          const { latticeDim: _presetDim, ...safeOverrides } = preset.overrides
-          const base = {
-            ...DEFAULT_TDSE_CONFIG,
-            ...safeOverrides,
-            slicePositions: state.schroedinger.tdse.slicePositions,
-            needsReset: true,
-          }
-          const resized = resizeTdseArrays(base, globalDim)
-          const potentialType =
-            globalDim < 2 && base.potentialType === 'doubleSlit'
-              ? ('barrier' as const)
-              : base.potentialType
-          const parentAbsorber =
-            preset.overrides.absorberEnabled !== undefined
-              ? {
-                  absorberEnabled: preset.overrides.absorberEnabled,
-                  absorberWidth: preset.overrides.absorberWidth ?? state.schroedinger.absorberWidth,
-                  pmlTargetReflection:
-                    preset.overrides.pmlTargetReflection ?? state.schroedinger.pmlTargetReflection,
-                }
-              : {}
-          return {
-            schroedinger: {
-              ...state.schroedinger,
-              ...preset.renderingOverrides,
-              ...parentAbsorber,
-              tdse: { ...base, ...resized, potentialType, needsReset: true },
-            },
-          }
-        })
-        useDiagnosticsStore.getState().resetTdse()
-      })
+    applyTdsePreset: (presetId, options) => {
+      const isLatestRequest = beginPresetRequest()
+      return loadPresetModule(
+        () => import('@/lib/physics/tdse/presets'),
+        'tdseSetters',
+        `TDSE presets for '${presetId}'`,
+        ({ getTdsePreset }) => {
+          if (!canApplyPresetRequest(isLatestRequest, ctx.get().schroedinger.quantumMode, options))
+            return
+          const preset = getTdsePreset(presetId)
+          if (!preset) return
+          setWithVersion((state) => {
+            const globalDim = useGeometryStore.getState().dimension
+            const { latticeDim: _presetDim, ...safeOverrides } = preset.overrides
+            const base = {
+              ...DEFAULT_TDSE_CONFIG,
+              ...safeOverrides,
+              slicePositions: state.schroedinger.tdse.slicePositions,
+              needsReset: true,
+            }
+            const resized = resizeTdseArrays(base, globalDim)
+            const potentialType =
+              globalDim < 2 && base.potentialType === 'doubleSlit'
+                ? ('barrier' as const)
+                : base.potentialType
+            const parentAbsorber =
+              preset.overrides.absorberEnabled !== undefined
+                ? {
+                    absorberEnabled: preset.overrides.absorberEnabled,
+                    absorberWidth:
+                      preset.overrides.absorberWidth ?? state.schroedinger.absorberWidth,
+                    pmlTargetReflection:
+                      preset.overrides.pmlTargetReflection ??
+                      state.schroedinger.pmlTargetReflection,
+                  }
+                : {}
+            return {
+              schroedinger: {
+                ...state.schroedinger,
+                ...preset.renderingOverrides,
+                ...parentAbsorber,
+                tdse: { ...base, ...resized, potentialType, needsReset: true },
+              },
+            }
+          })
+          useDiagnosticsStore.getState().resetTdse()
+        }
+      )
     },
     resetTdseField: () => {
       setWithVersion((state) => ({

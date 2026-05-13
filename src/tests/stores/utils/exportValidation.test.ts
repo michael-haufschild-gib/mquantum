@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { ExportSettings } from '@/stores/exportStore'
+import type { ExportSettings } from '@/stores/runtime/exportStore'
 import {
   clampMin,
   clampToRange,

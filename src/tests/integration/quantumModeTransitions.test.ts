@@ -12,9 +12,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
 import { isComputeQuantumType, QUANTUM_TYPE_REGISTRY } from '@/lib/geometry/registry'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 function getRegistrySchroedingerModes(): SchroedingerQuantumMode[] {
   const modes: SchroedingerQuantumMode[] = []
@@ -360,6 +360,49 @@ describe('quantum mode state machine transitions', () => {
       await new Promise((r) => setTimeout(r, 25))
       const afterRoundTrip = useExtendedObjectStore.getState().schroedinger.freeScalar
       expect(afterRoundTrip.modeK[0]).toBe(1)
+    })
+  })
+
+  describe('async preset stale-write guards', () => {
+    it('skips first-visit compute preset if user leaves the mode before import resolves', async () => {
+      await import('@/lib/physics/freeScalar/presets')
+
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('freeScalarField')
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('harmonicOscillator')
+      await new Promise((r) => setTimeout(r, 25))
+
+      const state = useExtendedObjectStore.getState().schroedinger
+      expect(state.quantumMode).toBe('harmonicOscillator')
+      expect(state.freeScalar.modeK[0]).toBe(1)
+    })
+
+    it('skips guarded manual preset apply if mode changes before import resolves', async () => {
+      await import('@/lib/physics/bec/presets')
+
+      useExtendedObjectStore.setState((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          quantumMode: 'becDynamics',
+          autoScaleMaxGain: 77,
+        },
+      }))
+
+      const apply = useExtendedObjectStore
+        .getState()
+        .applyBecPreset('groundState', { expectedQuantumMode: 'becDynamics' })
+
+      useExtendedObjectStore.setState((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          quantumMode: 'harmonicOscillator',
+        },
+      }))
+
+      await apply
+
+      const state = useExtendedObjectStore.getState().schroedinger
+      expect(state.quantumMode).toBe('harmonicOscillator')
+      expect(state.autoScaleMaxGain).toBe(77)
     })
   })
 

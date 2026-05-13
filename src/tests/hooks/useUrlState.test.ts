@@ -9,10 +9,10 @@ import { useUrlState } from '@/hooks/useUrlState'
 import { applySceneExample, findSceneByName } from '@/lib/sceneExamples'
 import type { ShareableState } from '@/lib/url/state-serializer'
 import { parseCurrentUrl } from '@/lib/url/state-serializer'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { usePresetManagerStore } from '@/stores/presetManagerStore'
-import { useSrmtSweepStore } from '@/stores/srmtSweepStore'
+import { useSrmtSweepStore } from '@/stores/diagnostics/srmtSweepStore'
+import { usePresetManagerStore } from '@/stores/runtime/presetManagerStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 vi.mock('@/lib/url/state-serializer', async () => {
   const actual = await vi.importActual<typeof import('@/lib/url/state-serializer')>(

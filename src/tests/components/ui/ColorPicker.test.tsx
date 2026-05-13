@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -27,11 +27,11 @@ describe('ColorPicker', () => {
     render(<ColorPicker value="#112233" onChange={vi.fn()} />)
 
     await waitFor(() => {
-      expect(screen.queryAllByTitle('History')).toHaveLength(0)
+      expect(screen.queryAllByRole('button', { name: /^Use recent color/i })).toHaveLength(0)
     })
   })
 
-  it('keeps only string entries from persisted history payloads', async () => {
+  it('keeps only valid color entries from persisted history payloads', async () => {
     localStorage.setItem(
       HISTORY_KEY,
       JSON.stringify(['#ff0000', 123, null, 'invalid', '#00ff00', '#abc'])
@@ -40,7 +40,7 @@ describe('ColorPicker', () => {
     render(<ColorPicker value="#112233" onChange={vi.fn()} />)
 
     await waitFor(() => {
-      expect(screen.queryAllByTitle('History')).toHaveLength(4)
+      expect(screen.queryAllByRole('button', { name: /^Use recent color/i })).toHaveLength(3)
     })
   })
 
@@ -92,6 +92,16 @@ describe('ColorPicker', () => {
       // Tooltip wraps the label text
       expect(screen.getByText('Color')).toBeInTheDocument()
     })
+
+    it('renders a named button for the trigger swatch', () => {
+      render(<ColorPicker value="#ff0000" onChange={vi.fn()} label="Background" />)
+      expect(screen.getByRole('button', { name: 'Background color picker' })).toBeInTheDocument()
+    })
+
+    it('disables the trigger swatch when disabled', () => {
+      render(<ColorPicker value="#ff0000" onChange={vi.fn()} label="Background" disabled />)
+      expect(screen.getByRole('button', { name: 'Background color picker' })).toBeDisabled()
+    })
   })
 
   describe('HEX input interaction', () => {
@@ -120,6 +130,20 @@ describe('ColorPicker', () => {
       // onChange should not be called with invalid input
       expect(onChange).not.toHaveBeenCalledWith(expect.stringMatching(/ZZZZZZ/i))
     })
+
+    it('preserves existing opacity when entering opaque hex', async () => {
+      const onChange = vi.fn()
+      render(<ColorPicker value="#33669980" onChange={onChange} />)
+
+      const hexInput = screen.getByLabelText('Hex color value')
+      const alphaInput = screen.getByLabelText('Opacity percentage')
+      await waitFor(() => expect(hexInput).toHaveValue('33669980'))
+      await waitFor(() => expect(alphaInput).toHaveValue(50))
+
+      fireEvent.change(hexInput, { target: { value: '446699' } })
+
+      expect(onChange).toHaveBeenLastCalledWith('#44669980')
+    })
   })
 
   describe('mode switching', () => {
@@ -138,15 +162,28 @@ describe('ColorPicker', () => {
       render(<ColorPicker value="#ff0000" onChange={vi.fn()} />)
       expect(screen.getByLabelText('Hex color value')).toBeInTheDocument()
     })
+
+    it('preserves existing opacity when editing RGB channels', async () => {
+      const user = userEvent.setup()
+      const onChange = vi.fn()
+      render(<ColorPicker value="#33669980" onChange={onChange} />)
+
+      await user.click(screen.getByRole('button', { name: 'RGB' }))
+      const redInput = screen.getByLabelText('Red channel')
+      await waitFor(() => expect(redInput).toHaveValue(51))
+
+      fireEvent.change(redInput, { target: { value: '68' } })
+
+      expect(onChange).toHaveBeenLastCalledWith('#44669980')
+    })
   })
 
   describe('palette swatches', () => {
     it('renders palette swatches', () => {
       render(<ColorPicker value="#ff0000" onChange={vi.fn()} />)
-      // Palette buttons have title attribute set to the hex color
-      const paletteButtons = screen
-        .getAllByRole('button')
-        .filter((btn) => btn.getAttribute('title')?.match(/^#[0-9a-fA-F]{6}$/))
+      const paletteButtons = screen.getAllByRole('button', {
+        name: /^Use palette color #[0-9a-fA-F]{6}$/i,
+      })
       expect(paletteButtons.length).toBeGreaterThan(0)
     })
 
@@ -155,9 +192,9 @@ describe('ColorPicker', () => {
       const onChange = vi.fn()
       render(<ColorPicker value="#ff0000" onChange={onChange} />)
 
-      const paletteButtons = screen
-        .getAllByRole('button')
-        .filter((btn) => btn.getAttribute('title')?.match(/^#[0-9a-fA-F]{6}$/))
+      const paletteButtons = screen.getAllByRole('button', {
+        name: /^Use palette color #[0-9a-fA-F]{6}$/i,
+      })
 
       await user.click(paletteButtons[0]!)
       expect(onChange).toHaveBeenCalledWith(expect.stringMatching(/^#[0-9a-fA-F]{6}$/))
@@ -165,9 +202,9 @@ describe('ColorPicker', () => {
   })
 
   describe('copy button', () => {
-    it('renders copy button', () => {
+    it('renders copy button with an accessible name', () => {
       render(<ColorPicker value="#ff0000" onChange={vi.fn()} />)
-      expect(screen.getByTitle('Copy to clipboard')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Copy to clipboard' })).toBeInTheDocument()
     })
   })
 })

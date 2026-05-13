@@ -12,7 +12,7 @@ const { openModalMock, showMsgBoxMock } = vi.hoisted(() => ({
   showMsgBoxMock: vi.fn(),
 }))
 
-vi.mock('@/stores/screenshotStore', () => ({
+vi.mock('@/stores/runtime/screenshotStore', () => ({
   useScreenshotStore: {
     getState: () => ({
       openModal: openModalMock,
@@ -20,7 +20,7 @@ vi.mock('@/stores/screenshotStore', () => ({
   },
 }))
 
-vi.mock('@/stores/msgBoxStore', () => ({
+vi.mock('@/stores/ui/msgBoxStore', () => ({
   useMsgBoxStore: {
     getState: () => ({
       showMsgBox: showMsgBoxMock,

@@ -12,8 +12,8 @@ import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ExportGeneralTab } from '@/components/overlays/export/ExportGeneralTab'
-import { useExportStore } from '@/stores/exportStore'
-import { useLayoutStore } from '@/stores/layoutStore'
+import { useExportStore } from '@/stores/runtime/exportStore'
+import { useLayoutStore } from '@/stores/ui/layoutStore'
 
 vi.mock('@/components/ui/Icon', () => ({
   Icon: ({ name }: { name: string }) => <span data-testid={`icon-${name}`}>{name}</span>,

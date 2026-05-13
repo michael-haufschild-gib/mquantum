@@ -5,8 +5,8 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 describe('schroedingerSlice — quantum number constraints', () => {
   beforeEach(() => {
@@ -224,6 +224,33 @@ describe('schroedingerSlice — clamped setters', () => {
 
     useExtendedObjectStore.getState().setSchroedingerTermCount(20)
     expect(useExtendedObjectStore.getState().schroedinger.termCount).toBe(8)
+  })
+
+  it('setSchroedingerConfig sanitizes harmonic oscillator scalar controls', () => {
+    const store = useExtendedObjectStore.getState()
+    store.setSchroedingerConfig({
+      seed: 42.9,
+      termCount: 99,
+      maxQuantumNumber: 99,
+      frequencySpread: -2,
+    })
+
+    expect(useExtendedObjectStore.getState().schroedinger.seed).toBe(42)
+    expect(useExtendedObjectStore.getState().schroedinger.termCount).toBe(8)
+    expect(useExtendedObjectStore.getState().schroedinger.maxQuantumNumber).toBe(6)
+    expect(useExtendedObjectStore.getState().schroedinger.frequencySpread).toBe(0)
+
+    store.setSchroedingerConfig({
+      seed: Number.NaN,
+      termCount: Number.POSITIVE_INFINITY,
+      maxQuantumNumber: Number.NEGATIVE_INFINITY,
+      frequencySpread: Number.NaN,
+    })
+
+    expect(useExtendedObjectStore.getState().schroedinger.seed).toBe(42)
+    expect(useExtendedObjectStore.getState().schroedinger.termCount).toBe(8)
+    expect(useExtendedObjectStore.getState().schroedinger.maxQuantumNumber).toBe(6)
+    expect(useExtendedObjectStore.getState().schroedinger.frequencySpread).toBe(0)
   })
 
   it('version increments on each state change', () => {

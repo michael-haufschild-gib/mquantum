@@ -87,10 +87,10 @@ vi.mock('@/components/ui/Icon', () => ({
 }))
 
 import { HawkingPageCurvePanel } from '@/components/overlays/HawkingPageCurvePanel'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { usePageCurveStore } from '@/stores/pageCurveStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { usePageCurveStore } from '@/stores/diagnostics/pageCurveStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 /**
  * Reset every store this panel observes, so tests start from a clean slate

@@ -23,11 +23,12 @@ import type { DiracConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
 import { spinorSize } from '@/lib/physics/dirac/cliffordAlgebraFallback'
 import { DiracAlgebraBridge } from '@/lib/physics/dirac/diracAlgebra'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
+import { destroyGpuResources } from '../utils/gpuResourceHelpers'
 import {
   computeConfigHash,
   computeStridesPadded,
@@ -36,6 +37,7 @@ import {
   DIAG_DECIMATION,
   GRID_WG,
   LINEAR_WG,
+  MAX_DIM,
   pickSiteDispatch,
   sanitizeGridSizes,
 } from './computePassUtils'
@@ -56,8 +58,13 @@ import {
   rebuildDiracBuffers,
 } from './DiracComputePassSetup'
 import { runBatchedStrangStep, runLegacyStrangStep } from './DiracComputePassStrang'
-import { buildDiracFFTStagingData, writeDiracUniforms } from './DiracComputePassUniforms'
-import { requestStateSave as genericStateSave } from './stateSave'
+import {
+  buildDiracFFTStagingData,
+  effectiveDiracPotentialType,
+  writeDiracUniforms,
+} from './DiracComputePassUniforms'
+import { DIRAC_UNIFORM_SIZE } from './diracUniformsLayout'
+import { interleaveStateInjection, requestStateSave as genericStateSave } from './stateSave'
 
 /**
  * Compute pass for Dirac equation split-operator dynamics.
@@ -137,7 +144,15 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   // State
   private initialized = false
   private lastConfigHash = ''
-  private lastPotentialHash = ''
+  private lastPotentialType: DiracConfig['potentialType'] | null = null
+  private lastPotentialStrength = NaN
+  private lastPotentialWidth = NaN
+  private lastPotentialCenter = NaN
+  private lastPotentialHarmonicOmega = NaN
+  private lastPotentialCoulombZ = NaN
+  private lastPotentialMass = NaN
+  private lastPotentialLatticeDim = 0
+  private readonly lastPotentialSpacing = new Array<number>(MAX_DIM).fill(NaN)
   private totalSites = 0
   private simTime = 0
   private maxDensity = 1.0
@@ -152,11 +167,37 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   // Dirac algebra bridge (generates gamma matrices off main thread)
   private readonly algebraBridge = new DiracAlgebraBridge()
 
-  // Pre-allocated uniform views
-  /** DiracUniforms struct: 592 bytes (includes kGridScale) */
-  private readonly uniformData = new ArrayBuffer(592)
+  // Pre-allocated uniform views — size derived from the WGSL struct layout.
+  private readonly uniformData = new ArrayBuffer(DIRAC_UNIFORM_SIZE)
   private readonly uniformU32 = new Uint32Array(this.uniformData)
   private readonly uniformF32 = new Float32Array(this.uniformData)
+  private readonly strideScratch = new Array<number>(MAX_DIM).fill(0)
+
+  private readonly dc = (
+    passEncoder: GPUComputePassEncoder,
+    pipeline: GPUComputePipeline,
+    bindGroups: GPUBindGroup[],
+    workgroupCountX: number,
+    workgroupCountY?: number,
+    workgroupCountZ?: number
+  ): void => {
+    this.dispatchCompute(
+      passEncoder,
+      pipeline,
+      bindGroups,
+      workgroupCountX,
+      workgroupCountY ?? 1,
+      workgroupCountZ ?? 1
+    )
+  }
+
+  private readonly dispatchFFTAxisDelegatedCallback = (
+    ctx: WebGPURenderContext,
+    axisDim: number,
+    slotOffset: number
+  ): number => this.dispatchFFTAxisDelegated(ctx, axisDim, slotOffset)
+
+  private readonly getDiagGenerationCallback = (): number => this.diagGeneration
 
   private readonly densityGridSize: number
 
@@ -444,10 +485,48 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   }
 
   /** Refresh potential buffer when physics parameters change. */
+  private consumePotentialDirty(config: DiracConfig): boolean {
+    const potentialType = effectiveDiracPotentialType(config)
+    let dirty =
+      this.lastPotentialType !== potentialType ||
+      this.lastPotentialStrength !== config.potentialStrength ||
+      this.lastPotentialWidth !== config.potentialWidth ||
+      this.lastPotentialCenter !== config.potentialCenter ||
+      this.lastPotentialHarmonicOmega !== config.harmonicOmega ||
+      this.lastPotentialCoulombZ !== config.coulombZ ||
+      this.lastPotentialMass !== config.mass ||
+      this.lastPotentialLatticeDim !== config.latticeDim
+
+    for (let d = 0; d < config.latticeDim; d++) {
+      if (this.lastPotentialSpacing[d] !== config.spacing[d]) {
+        dirty = true
+        break
+      }
+    }
+
+    if (!dirty) return false
+
+    this.lastPotentialType = potentialType
+    this.lastPotentialStrength = config.potentialStrength
+    this.lastPotentialWidth = config.potentialWidth
+    this.lastPotentialCenter = config.potentialCenter
+    this.lastPotentialHarmonicOmega = config.harmonicOmega
+    this.lastPotentialCoulombZ = config.coulombZ
+    this.lastPotentialMass = config.mass
+    this.lastPotentialLatticeDim = config.latticeDim
+    for (let d = 0; d < config.latticeDim; d++) {
+      this.lastPotentialSpacing[d] = config.spacing[d]!
+    }
+    return true
+  }
+
+  private invalidatePotential(): void {
+    this.lastPotentialType = null
+  }
+
   private refreshPotentialIfDirty(ctx: WebGPURenderContext, config: DiracConfig): void {
-    const potHash = `${config.potentialType}|${config.potentialStrength}|${config.potentialWidth}|${config.potentialCenter}|${config.harmonicOmega}|${config.coulombZ}|${config.mass}|${config.spacing.join(',')}`
-    if (potHash !== this.lastPotentialHash && this.pl && this.bg) {
-      this.lastPotentialHash = potHash
+    if (!this.pl || !this.bg) return
+    if (this.consumePotentialDirty(config)) {
       const d = pickSiteDispatch(config.latticeDim, this.totalSites, config.gridSize)
       const p = ctx.beginComputePass({ label: 'dirac-potential-update' })
       this.dispatchCompute(p, this.pl.potentialPipeline, [this.bg.potentialBG!], d.x, d.y, d.z)
@@ -456,8 +535,8 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   }
 
   /** Initialize spinor wavepacket and potential if needed. */
-  private maybeInitialize(ctx: WebGPURenderContext, config: DiracConfig): void {
-    if (this.initialized && !config.needsReset) return
+  private maybeInitialize(ctx: WebGPURenderContext, config: DiracConfig): boolean {
+    if (this.initialized && !config.needsReset) return false
     const { device } = ctx
 
     // Site-dispatch shape covers init + potential-fill. pickSiteDispatch picks
@@ -472,12 +551,13 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     // Injection only needs the spinor buffer; can complete before the
     // async pipeline build finishes.
     if (this.pendingInjection && this.spinorBuffer) {
-      const { re, im } = this.pendingInjection
-      const elementCount = Math.min(re.length, this.currentSpinorSize * this.totalSites)
-      const interleaved = new Float32Array(elementCount * 2)
-      for (let i = 0; i < elementCount; i++) {
-        interleaved[i * 2] = re[i]!
-        interleaved[i * 2 + 1] = im[i]!
+      const elementCount = this.currentSpinorSize * this.totalSites
+      let interleaved: Float32Array<ArrayBuffer>
+      try {
+        interleaved = interleaveStateInjection('Dirac', this.pendingInjection, elementCount)
+      } catch (err) {
+        this.pendingInjection = null
+        throw err
       }
       device.queue.writeBuffer(this.spinorBuffer, 0, interleaved)
       this.pendingInjection = null
@@ -486,7 +566,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       // Init kernel + potential fill both need the compiled pipelines and
       // their bind groups. Defer marking `initialized` until they exist —
       // otherwise we'd permanently skip init when the async compile lands.
-      if (!this.pl || !this.bg) return
+      if (!this.pl || !this.bg) return false
 
       const initPass = ctx.beginComputePass({ label: 'dirac-init-pass' })
       this.dispatchCompute(
@@ -500,6 +580,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       initPass.end()
     }
 
+    let potentialFilled = false
     // Always fill potential (needed for both init and load)
     if (this.pl && this.bg) {
       const potPass = ctx.beginComputePass({ label: 'dirac-potential-fill' })
@@ -512,6 +593,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
         siteDispatch.z
       )
       potPass.end()
+      potentialFilled = true
     }
 
     this.maxDensity = 1.0
@@ -522,6 +604,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     // Invalidate in-flight readbacks before resetting diagnostics store
     this.diagGeneration++
     useDiagnosticsStore.getState().resetDirac()
+    return potentialFilled
   }
 
   private updateUniforms(
@@ -545,7 +628,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
         currentSpinorSize: this.currentSpinorSize,
         simTime: this.simTime,
         maxDensity: this.maxDensity,
-        strides: computeStridesPadded(config.gridSize, config.latticeDim),
+        strides: computeStridesPadded(config.gridSize, config.latticeDim, this.strideScratch),
         basisX,
         basisY,
         basisZ,
@@ -561,7 +644,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     slotOffset: number
   ): number {
     if (!this.pl || !this.bg || !this.fftAxisUniformBuffer || !this.fftAxisStagingBuffer) {
-      return slotOffset
+      throw new Error('[Dirac FFT] resources not ready')
     }
     const params: FFTAxisSharedMemParams = {
       pl: this.pl,
@@ -569,7 +652,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       fftAxisUniformBuffer: this.fftAxisUniformBuffer,
       fftAxisStagingBuffer: this.fftAxisStagingBuffer,
       totalSites: this.totalSites,
-      dispatchCompute: (p, pl, bgs, x) => this.dispatchCompute(p, pl, bgs, x),
+      dispatchCompute: this.dc,
     }
     return dispatchFFTAxisSharedMem(ctx, axisDim, slotOffset, params)
   }
@@ -613,13 +696,13 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       this.buildPipelinesAsync(device, config.latticeDim, oldRenorm)
       this.initialized = false
       this.simTime = 0
-      this.lastPotentialHash = ''
+      this.invalidatePotential()
     }
 
     this.flushGammaUpload(device)
     this.updateUniforms(device, config, basisX, basisY, basisZ, boundingRadius)
-    this.maybeInitialize(ctx, config)
-    this.refreshPotentialIfDirty(ctx, config)
+    const initializedThisFrame = this.maybeInitialize(ctx, config)
+    if (!initializedThisFrame) this.refreshPotentialIfDirty(ctx, config)
 
     const { pl, bg } = this
     if (!pl || !bg) return
@@ -658,15 +741,20 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       // (power-of-2 in [2, SHARED_MEM_FFT_MAX_AXIS]) so the batched path does
       // not silently dispatch the shared-memory FFT on unsupported sizes.
       // Unsupported sizes fall through to the legacy path, which throws.
-      const axesOk = config.gridSize
-        .slice(0, config.latticeDim)
-        .every((d) => d >= 2 && d <= SHARED_MEM_FFT_MAX_AXIS && (d & (d - 1)) === 0)
+      let axesOk = true
+      for (let d = 0; d < config.latticeDim; d++) {
+        const axisDim = config.gridSize[d] ?? 0
+        if (axisDim < 2 || axisDim > SHARED_MEM_FFT_MAX_AXIS || (axisDim & (axisDim - 1)) !== 0) {
+          axesOk = false
+          break
+        }
+      }
       const batchedFFT =
         !batchDisabled && axesOk && (bg.fftSharedMemBGs?.length ?? 0) >= config.latticeDim * 2
       const ifftSlotOffset = config.latticeDim // forward = [0, D), inverse = [D, 2D)
 
-      const dispatchCompute = this.dispatchCompute.bind(this)
-      const dispatchFFTAxisDelegated = this.dispatchFFTAxisDelegated.bind(this)
+      const dispatchCompute = this.dc
+      const dispatchFFTAxisDelegated = this.dispatchFFTAxisDelegatedCallback
 
       for (let step = 0; step < stepsThisFrame; step++) {
         if (batchedFFT) {
@@ -760,8 +848,8 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       initialNorm: this.initialNorm,
       maxDensity: this.maxDensity,
       diagMappingInFlight: this.diagMappingInFlight,
-      getDiagGeneration: () => this.diagGeneration,
-      dispatchCompute: (p, pl, bgs, x) => this.dispatchCompute(p, pl, bgs, x),
+      getDiagGeneration: this.getDiagGenerationCallback,
+      dispatchCompute: this.dc,
     }
     dispatchDiagnostics(ctx, config, params, (result) => {
       this.maxDensity = result.maxDensity
@@ -783,22 +871,33 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       this.diagStagingBuffer.unmap()
       this.diagMappingInFlight = false
     }
-    // prettier-ignore
-    const gpuBuffers: (GPUBuffer | null | undefined)[] = [
-      this.spinorBuffer, this.potentialBuffer, this.gammaBuffer,
-      this.fftScratchA, this.fftScratchB, this.uniformBuffer, this.fftUniformBuffer,
-      this.fftStagingBuffer, this.fftAxisUniformBuffer, this.fftAxisStagingBuffer,
+    destroyGpuResources(
+      this.spinorBuffer,
+      this.potentialBuffer,
+      this.gammaBuffer,
+      this.fftScratchA,
+      this.fftScratchB,
+      this.uniformBuffer,
+      this.fftUniformBuffer,
+      this.fftStagingBuffer,
+      this.fftAxisUniformBuffer,
+      this.fftAxisStagingBuffer,
       this.fftTwiddleBuffer,
-      this.packUniformBuffer, this.packUniformBufferNoNorm,
-      this.diagUniformBuffer, this.diagPartialNormBuffer, this.diagPartialMaxBuffer,
-      this.diagPartialParticleBuffer, this.diagPartialAntiBuffer,
-      this.diagResultBuffer, this.diagStagingBuffer, this.bg?.renormalizeUniformBuffer,
-    ]
-    for (const buf of gpuBuffers) buf?.destroy()
+      this.packUniformBuffer,
+      this.packUniformBufferNoNorm,
+      this.diagUniformBuffer,
+      this.diagPartialNormBuffer,
+      this.diagPartialMaxBuffer,
+      this.diagPartialParticleBuffer,
+      this.diagPartialAntiBuffer,
+      this.diagResultBuffer,
+      this.diagStagingBuffer,
+      this.bg?.renormalizeUniformBuffer,
+      this.densityTexture
+    )
     if (this.fftAxisUniformBuffers) {
       for (const b of this.fftAxisUniformBuffers) b.destroy()
     }
-    this.densityTexture?.destroy()
 
     this.spinorBuffer = this.potentialBuffer = this.gammaBuffer = null
     this.fftScratchA = this.fftScratchB = this.uniformBuffer = this.fftUniformBuffer = null

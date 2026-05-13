@@ -4,8 +4,6 @@
  * Centralized constants used across visual store slices.
  */
 
-import type { TransformMode } from '@/rendering/lights/types'
-import { createDefaultLight } from '@/rendering/lights/types'
 import {
   type CosineCoefficients,
   DEFAULT_COLOR_ALGORITHM,
@@ -16,8 +14,10 @@ import {
   DEFAULT_MULTI_SOURCE_WEIGHTS,
   DEFAULT_PHASE_DIVERGING_SETTINGS,
   type DistributionSettings,
-} from '@/rendering/shaders/palette'
-import type { ShaderType, ToneMappingAlgorithm } from '@/rendering/shaders/types'
+} from '@/lib/colors/palette'
+import type { TransformMode } from '@/lib/lighting/lightSource'
+import { createDefaultLight } from '@/lib/lighting/lightSource'
+import type { ShaderType, ToneMappingAlgorithm } from '@/lib/rendering/shaderTypes'
 
 // ============================================================================
 // Basic Visual Defaults

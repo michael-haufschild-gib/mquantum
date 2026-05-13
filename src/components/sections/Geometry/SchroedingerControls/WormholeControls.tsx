@@ -20,7 +20,7 @@ import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import type { TdseConfig } from '@/lib/geometry/extended/tdse'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 const AXIS_OPTIONS = [
   { value: '0', label: 'Axis 0 (x)' },

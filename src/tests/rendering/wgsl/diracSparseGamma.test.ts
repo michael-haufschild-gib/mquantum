@@ -124,6 +124,13 @@ describe('Dirac sparse gamma tables', () => {
     expect(generateDiracSparseGammaBlock(12)).toContain('DIRAC_USE_SPARSE_GAMMA: bool = false')
   })
 
+  it('rejects non-integer dims with a disabled block rather than throwing', () => {
+    for (const dim of [2.5, Number.NaN]) {
+      expect(() => generateDiracSparseGammaBlock(dim)).not.toThrow()
+      expect(generateDiracSparseGammaBlock(dim)).toContain('DIRAC_USE_SPARSE_GAMMA: bool = false')
+    }
+  })
+
   it('can emit init-projector tables for every supported Dirac dimension', () => {
     for (let dim = 1; dim <= DIRAC_SPARSE_INIT_MAX_DIM; dim++) {
       const block = generateDiracSparseGammaBlock(dim, DIRAC_SPARSE_INIT_MAX_DIM)

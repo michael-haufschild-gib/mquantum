@@ -6,8 +6,8 @@
 
 import type React from 'react'
 
-import type { ExportMode, ExportSettings } from '@/stores/exportStore'
-import { useExportStore } from '@/stores/exportStore'
+import type { ExportMode, ExportSettings } from '@/stores/runtime/exportStore'
+import { useExportStore } from '@/stores/runtime/exportStore'
 
 import type { WebGPUCamera } from './core/WebGPUCamera'
 import type { WebGPUDevice } from './core/WebGPUDevice'
@@ -62,6 +62,7 @@ export interface ExportRuntimeState {
   settings: ExportSettings | null
   recorder: ExportRecorder | null
   rotationSnapshot: Map<string, number> | null
+  environmentCaptured: boolean
   originalCanvasWidth: number
   originalCanvasHeight: number
   originalCameraAspect: number
@@ -124,6 +125,7 @@ export function createInitialExportRuntimeState(): ExportRuntimeState {
     settings: null,
     recorder: null,
     rotationSnapshot: null,
+    environmentCaptured: false,
     originalCanvasWidth: 0,
     originalCanvasHeight: 0,
     originalCameraAspect: 1,

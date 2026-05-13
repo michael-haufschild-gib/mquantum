@@ -41,7 +41,7 @@ import {
   computeFsfCosmologySnapshot,
   computeFsfVacuumDispersion,
 } from '@/lib/physics/freeScalar/vacuumDispersion'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 import { MetricRow } from './AnalysisPrimitives'
 import { FSFCosmoTrajectoryChart } from './FSFCosmoTrajectoryChart'

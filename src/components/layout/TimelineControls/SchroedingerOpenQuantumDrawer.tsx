@@ -18,7 +18,10 @@ import { useShallow } from 'zustand/react/shallow'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { ToggleButton } from '@/components/ui/ToggleButton'
-import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import {
+  type ExtendedObjectState,
+  useExtendedObjectStore,
+} from '@/stores/scene/extendedObjectStore'
 
 import { AnimationDrawerContainer } from './AnimationDrawerContainer'
 import { DrawerSection } from './DrawerSection'

@@ -19,8 +19,13 @@ import {
 import { logger } from '@/lib/logger'
 import { reduceGridToFit } from '@/lib/math/ndArray'
 import { maxStableDt } from '@/lib/physics/dirac/scales'
-import { useAppearanceStore } from '@/stores/appearanceStore'
-import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
+import {
+  canApplyPresetRequest,
+  createLatestPresetRequestGuard,
+  loadPresetModule,
+  type SchroedingerPresetApplyOptions,
+} from '@/stores/utils/dynamicPresetImport'
 
 import {
   defaultDiracGridPerDim,
@@ -63,7 +68,7 @@ export interface DiracSetters {
   setDiracDiagnosticsEnabled: (enabled: boolean) => void
   setDiracDiagnosticsInterval: (interval: number) => void
   setDiracSlicePosition: (dimIndex: number, value: number) => void
-  applyDiracPreset: (presetId: string) => Promise<void>
+  applyDiracPreset: (presetId: string, options?: SchroedingerPresetApplyOptions) => Promise<void>
 }
 
 /**
@@ -127,6 +132,17 @@ function normalizeDiracFieldView(
   return latticeDim < 3 && fieldView === 'axialCharge' ? 'totalDensity' : fieldView
 }
 
+/** Half-extent of the primary Dirac potential axis. */
+function diracAxis0HalfExtent(gridSize: number[], spacing: number[]): number {
+  return (gridSize[0] ?? 32) * (spacing[0] ?? 0.15) * 0.5
+}
+
+/** Keep step/barrier/well centers inside the axis-0 lattice domain. */
+function clampDiracPotentialCenter(gridSize: number[], spacing: number[], center: number): number {
+  const halfExtent = diracAxis0HalfExtent(gridSize, spacing)
+  return Math.max(-halfExtent, Math.min(halfExtent, center))
+}
+
 /**
  * Resize Dirac arrays to match a new latticeDim, preserving existing values
  * where possible and filling new dimensions with defaults.
@@ -157,6 +173,7 @@ export const resizeDiracArrays = (prev: DiracConfig, newDim: number): Partial<Di
   )
   const newDt = clampDiracDt(spacing, prev.speedOfLight, prev.dt)
   const fieldView = normalizeDiracFieldView(newDim, prev.fieldView)
+  const potentialCenter = clampDiracPotentialCenter(gridSize, spacing, prev.potentialCenter)
   return {
     latticeDim: newDim,
     gridSize,
@@ -166,6 +183,7 @@ export const resizeDiracArrays = (prev: DiracConfig, newDim: number): Partial<Di
     slicePositions,
     dt: newDt,
     packetWidth: newPacketWidth,
+    potentialCenter,
     fieldView,
   }
 }
@@ -177,6 +195,7 @@ export const resizeDiracArrays = (prev: DiracConfig, newDim: number): Partial<Di
 export function createDiracSetters(ctx: SetterContext): DiracSetters {
   const { setWithVersion, isFinite, warnNonFinite, hasOnlyFinite } = ctx
   const D = 'dirac' as const
+  const beginPresetRequest = createLatestPresetRequestGuard()
 
   return {
     setDiracMass: nestedClampedSetter(ctx, D, 'mass', 0.01, 10),
@@ -232,7 +251,22 @@ export function createDiracSetters(ctx: SetterContext): DiracSetters {
     },
     setDiracPotentialStrength: nestedClampedSetter(ctx, D, 'potentialStrength', -100, 100),
     setDiracPotentialWidth: nestedClampedSetter(ctx, D, 'potentialWidth', 0.01, 10),
-    setDiracPotentialCenter: nestedClampedSetter(ctx, D, 'potentialCenter', -10, 10),
+    setDiracPotentialCenter: (center) => {
+      if (!isFinite(center)) {
+        warnNonFinite('dirac.potentialCenter', center)
+        return
+      }
+      setWithVersion((state) => {
+        const prev = state.schroedinger.dirac
+        const clamped = clampDiracPotentialCenter(prev.gridSize, prev.spacing, center)
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            dirac: { ...prev, potentialCenter: clamped },
+          },
+        }
+      })
+    },
     setDiracHarmonicOmega: nestedClampedSetter(ctx, D, 'harmonicOmega', 0.01, 10),
     setDiracCoulombZ: nestedIntSetter(ctx, D, 'coulombZ', 1, 137),
     setDiracInitialCondition: (condition) => {
@@ -340,6 +374,11 @@ export function createDiracSetters(ctx: SetterContext): DiracSetters {
         // resizeDiracArrays + applyDiracPreset.
         const minHalfExtent = Math.min(...snapped.map((g, i) => g * (newSpacing[i] ?? 0.15) * 0.5))
         const packetWidth = Math.min(minHalfExtent * 0.4, prevDirac.packetWidth)
+        const potentialCenter = clampDiracPotentialCenter(
+          snapped,
+          newSpacing,
+          prevDirac.potentialCenter
+        )
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -348,6 +387,7 @@ export function createDiracSetters(ctx: SetterContext): DiracSetters {
               gridSize: snapped,
               packetCenter,
               packetWidth,
+              potentialCenter,
               needsReset: true,
             },
           },
@@ -386,6 +426,11 @@ export function createDiracSetters(ctx: SetterContext): DiracSetters {
         // Decreasing min(spacing) shrinks the Dirac CFL ceiling, so re-clamp
         // dt to keep the lattice stable after the user tightens the grid.
         const dt = clampDiracDt(clamped, prevDirac.speedOfLight, prevDirac.dt)
+        const potentialCenter = clampDiracPotentialCenter(
+          prevDirac.gridSize,
+          clamped,
+          prevDirac.potentialCenter
+        )
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -396,6 +441,7 @@ export function createDiracSetters(ctx: SetterContext): DiracSetters {
               packetMomentum,
               packetWidth,
               dt,
+              potentialCenter,
               needsReset: true,
             },
           },
@@ -471,12 +517,15 @@ export function createDiracSetters(ctx: SetterContext): DiracSetters {
         }
       })
     },
-    applyDiracPreset: (presetId) => {
+    applyDiracPreset: (presetId, options) => {
+      const isLatestRequest = beginPresetRequest()
       return loadPresetModule(
         () => import('@/lib/physics/dirac/presets'),
         'diracSetters',
         `Dirac presets for '${presetId}'`,
         async ({ DIRAC_SCENARIO_PRESETS }) => {
+          if (!canApplyPresetRequest(isLatestRequest, ctx.get().schroedinger.quantumMode, options))
+            return
           const preset = DIRAC_SCENARIO_PRESETS.find((p) => p.id === presetId)
           if (!preset) return
           setWithVersion((state) => {
@@ -491,7 +540,12 @@ export function createDiracSetters(ctx: SetterContext): DiracSetters {
               dim,
               safeOverrides.fieldView ?? prev.fieldView
             )
-            const merged = { ...prev, ...safeOverrides, fieldView, needsReset: true }
+            const showPotential =
+              safeOverrides.showPotential ??
+              (safeOverrides.potentialType !== undefined
+                ? safeOverrides.potentialType !== 'none'
+                : prev.showPotential)
+            const merged = { ...prev, ...safeOverrides, fieldView, showPotential, needsReset: true }
 
             if (safeOverrides.spacing) {
               const srcSpacing = safeOverrides.spacing
@@ -521,6 +575,11 @@ export function createDiracSetters(ctx: SetterContext): DiracSetters {
 
             const minHalfExt = Math.min(...gs.map((g, i) => g * (sp[i] ?? 0.15) * 0.5))
             merged.packetWidth = Math.min(minHalfExt * 0.4, merged.packetWidth)
+            merged.potentialCenter = clampDiracPotentialCenter(
+              merged.gridSize,
+              merged.spacing,
+              merged.potentialCenter
+            )
 
             merged.dt = clampDiracDt(merged.spacing, merged.speedOfLight, merged.dt)
 
@@ -554,12 +613,13 @@ export function createDiracSetters(ctx: SetterContext): DiracSetters {
             const dim = ctx.get().schroedinger.dirac.latticeDim ?? 3
             const expectedView = normalizeDiracFieldView(dim, preset.overrides.fieldView)
             await loadPresetModule(
-              () => import('@/rendering/shaders/palette/types'),
+              () => import('@/lib/colors/palette/types'),
               'diracSetters',
               `Dirac fieldView color algorithm for '${presetId}'`,
               async ({ DIRAC_FIELD_VIEW_TO_COLOR_ALGO }) => {
                 // Guard: if a newer preset arrived while this chunk loaded,
                 // the fieldView in the store won't match — skip the stale write.
+                if (!isLatestRequest()) return
                 if (ctx.get().schroedinger.dirac.fieldView !== expectedView) return
                 const algo = DIRAC_FIELD_VIEW_TO_COLOR_ALGO[expectedView]
                 if (algo) {

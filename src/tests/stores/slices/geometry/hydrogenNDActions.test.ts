@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { HYDROGEN_ND_PRESETS } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 describe('Hydrogen ND Store Actions', () => {
   beforeEach(() => {

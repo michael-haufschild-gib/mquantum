@@ -7,7 +7,7 @@
  * structural cycle.
  *
  * The store re-exports these types so consumers continue to do
- * `import type { ExportSettings } from '@/stores/exportStore'`.
+ * `import type { ExportSettings } from '@/stores/runtime/exportStore'`.
  *
  * @module stores/utils/exportTypes
  */

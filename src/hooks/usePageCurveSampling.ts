@@ -22,8 +22,8 @@ import type { ObjectType } from '@/lib/geometry/types'
 import { horizonPlaneArea } from '@/lib/physics/bec/pageCurve'
 import { asymptoticSoundSpeed, hasHorizon, hawkingReadout } from '@/lib/physics/bec/sonicHorizon'
 import { buildWaterfallParams } from '@/lib/physics/bec/waterfallParams'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { usePageCurveStore } from '@/stores/pageCurveStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { usePageCurveStore } from '@/stores/diagnostics/pageCurveStore'
 
 /** Inputs driving the sampling loop — all read via zustand selectors in the caller. */
 export interface PageCurveSamplingInputs {

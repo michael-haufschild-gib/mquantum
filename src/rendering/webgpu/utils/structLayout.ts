@@ -30,7 +30,7 @@ type WGSLVecType =
 
 /** WGSL fixed-size array type descriptor. */
 interface WGSLArrayType {
-  readonly element: WGSLVecType
+  readonly element: WGSLVecType | WGSLScalarType
   readonly count: number
 }
 
@@ -93,7 +93,14 @@ function vecAlignAndSize(components: number): { align: number; size: number } {
 
 function typeAlignAndSize(type: WGSLFieldType): { align: number; size: number } {
   if (typeof type === 'object') {
-    const elem = vecAlignAndSize(vecComponents(type.element))
+    // Array element may be a scalar (`array<u32, N>`) or a vector
+    // (`array<vec4f, N>`). Scalars have align 4 / size 4; vectors follow
+    // the WGSL vec alignment rules.
+    const element = type.element
+    const elem =
+      element === 'i32' || element === 'u32' || element === 'f32'
+        ? { align: 4, size: 4 }
+        : vecAlignAndSize(vecComponents(element))
     const stride = roundUp(elem.align, elem.size)
     return { align: elem.align, size: type.count * stride }
   }
@@ -110,10 +117,13 @@ function typeAlignAndSize(type: WGSLFieldType): { align: number; size: number } 
 /**
  * Construct a WGSL array type descriptor for use in field definitions.
  *
- * @param element - Vector element type (e.g. `'vec4f'`, `'vec4<i32>'`)
+ * Supports both vector elements (`array<vec4f, N>`) and scalar elements
+ * (`array<u32, N>`, `array<f32, N>`, `array<i32, N>`).
+ *
+ * @param element - Element type (vector like `'vec4f'`, `'vec4<i32>'` or scalar like `'u32'`, `'f32'`, `'i32'`)
  * @param count - Number of array elements
  */
-function arr(element: WGSLVecType, count: number): WGSLArrayType {
+function arr(element: WGSLVecType | WGSLScalarType, count: number): WGSLArrayType {
   return { element, count }
 }
 

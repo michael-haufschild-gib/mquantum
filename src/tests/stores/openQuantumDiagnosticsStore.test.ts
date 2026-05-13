@@ -9,7 +9,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import type { OpenQuantumMetrics } from '@/lib/physics/openQuantum/types'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
 import { describeRingBufferBehavior } from './diagnostics/ringBufferTests'
 

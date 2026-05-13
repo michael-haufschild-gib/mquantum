@@ -7,8 +7,6 @@
  * @module rendering/webgpu/graph/RenderGraphContexts
  */
 
-import { logger } from '@/lib/logger'
-
 import type {
   WebGPUCapabilities,
   WebGPUFrameContext,
@@ -17,6 +15,7 @@ import type {
   WebGPUSetupContext,
 } from '../core/types'
 import { WebGPUResourcePool } from '../core/WebGPUResourcePool'
+import { resolveResourceAlias } from './resourceAliases'
 
 // =============================================================================
 // Render Context (per-frame execution)
@@ -97,20 +96,7 @@ export class RenderContextImpl implements WebGPURenderContext {
    * reading from C should actually read from A.
    */
   private resolveAlias(resourceId: string): string {
-    let current = resourceId
-    let depth = 0
-    const maxDepth = 16
-
-    while (this.resourceAliases.has(current)) {
-      if (depth >= maxDepth) {
-        logger.warn(`WebGPURenderGraph: Alias chain too long at '${current}' (possible cycle)`)
-        return current
-      }
-      depth++
-      current = this.resourceAliases.get(current)!
-    }
-
-    return current
+    return resolveResourceAlias(this.resourceAliases, resourceId)
   }
 
   getTexture(resourceId: string): GPUTexture | null {
@@ -134,7 +120,8 @@ export class RenderContextImpl implements WebGPURenderContext {
   }
 
   getSampler(resourceId: string): GPUSampler | null {
-    return this.pool.getSampler(resourceId)
+    const resolved = this.resolveAlias(resourceId)
+    return this.pool.getSampler(resolved)
   }
 
   getResource(resourceId: string): WebGPUResource | null {

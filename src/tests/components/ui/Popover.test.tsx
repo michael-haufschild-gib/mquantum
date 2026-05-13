@@ -108,8 +108,10 @@ describe('Popover', () => {
       render(<Popover trigger={<Button>Open</Button>} content={<div>Content</div>} />)
 
       const buttons = screen.getAllByRole('button', { name: 'Open' })
-      const trigger = buttons.find((el) => el.getAttribute('aria-haspopup') === 'dialog')!
+      expect(buttons).toHaveLength(1)
+      const trigger = buttons[0]!
       expect(trigger).toHaveAttribute('aria-expanded', 'false')
+      expect(trigger).toHaveAttribute('aria-haspopup', 'dialog')
     })
 
     it('should update aria-expanded when open', async () => {
@@ -118,9 +120,24 @@ describe('Popover', () => {
 
       await user.click(screen.getByText('Open'))
 
-      const buttons = screen.getAllByRole('button', { name: 'Open' })
-      const trigger = buttons.find((el) => el.getAttribute('aria-haspopup') === 'dialog')!
+      const trigger = screen.getByRole('button', { name: 'Open' })
       expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    })
+
+    it('should make non-native triggers keyboard operable', () => {
+      render(
+        <Popover
+          trigger={<div aria-label="Open color picker">Swatch</div>}
+          content={<div data-testid="content">Content</div>}
+        />
+      )
+
+      const trigger = screen.getByRole('button', { name: 'Open color picker' })
+      expect(trigger).toHaveAttribute('tabIndex', '0')
+
+      fireEvent.keyDown(trigger, { key: 'Enter' })
+
+      expect(screen.getByTestId('content')).toBeInTheDocument()
     })
   })
 
@@ -221,8 +238,7 @@ describe('Popover', () => {
       )
 
       // The trigger wrapper (aria-haspopup) should have the custom class
-      const buttons = screen.getAllByRole('button', { name: 'Open' })
-      const triggerWrapper = buttons.find((el) => el.getAttribute('aria-haspopup') === 'dialog')!
+      const triggerWrapper = screen.getByRole('button', { name: 'Open' })
       expect(triggerWrapper).toHaveClass('custom-class')
     })
   })

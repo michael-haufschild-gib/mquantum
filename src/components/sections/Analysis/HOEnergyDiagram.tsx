@@ -13,8 +13,8 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { generateQuantumPreset, getNamedPreset } from '@/lib/geometry/extended/schroedinger/presets'
 import { hermite } from '@/lib/math/hermitePolynomial'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 /* ── SVG layout constants ── */
 const WIDTH = 260

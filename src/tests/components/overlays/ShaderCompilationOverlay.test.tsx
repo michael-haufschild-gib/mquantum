@@ -8,7 +8,7 @@ import { act, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ShaderCompilationOverlay } from '@/components/overlays/ShaderCompilationOverlay'
-import { usePerformanceStore } from '@/stores/performanceStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
 
 describe('ShaderCompilationOverlay', () => {
   beforeEach(() => {
@@ -74,7 +74,9 @@ describe('ShaderCompilationOverlay', () => {
     act(() => {
       vi.advanceTimersByTime(100)
     })
-    usePerformanceStore.setState({ isShaderCompiling: false })
+    act(() => {
+      usePerformanceStore.setState({ isShaderCompiling: false })
+    })
     rerender(<ShaderCompilationOverlay />)
 
     // Should still be visible (minimum display time not elapsed)
@@ -100,13 +102,50 @@ describe('ShaderCompilationOverlay', () => {
     expect(screen.getByText('Phase 1...')).toBeInTheDocument()
 
     // Update message
-    usePerformanceStore.setState({ shaderCompilationMessage: 'Phase 2...' })
+    act(() => {
+      usePerformanceStore.setState({ shaderCompilationMessage: 'Phase 2...' })
+    })
     rerender(<ShaderCompilationOverlay />)
 
     act(() => {
       vi.advanceTimersByTime(1)
     })
     expect(screen.getByText('Phase 2...')).toBeInTheDocument()
+  })
+
+  it('does not restart the minimum display timer when the message changes', () => {
+    usePerformanceStore.setState({
+      isShaderCompiling: true,
+      shaderCompilationMessage: 'Phase 1...',
+    })
+    const { rerender } = render(<ShaderCompilationOverlay />)
+
+    act(() => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(screen.getByTestId('shader-compilation-overlay')).toBeInTheDocument()
+
+    act(() => {
+      vi.advanceTimersByTime(500)
+      usePerformanceStore.setState({ shaderCompilationMessage: 'Phase 2...' })
+    })
+    rerender(<ShaderCompilationOverlay />)
+
+    act(() => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(screen.getByText('Phase 2...')).toBeInTheDocument()
+
+    act(() => {
+      vi.advanceTimersByTime(150)
+      usePerformanceStore.setState({ isShaderCompiling: false })
+    })
+    rerender(<ShaderCompilationOverlay />)
+
+    act(() => {
+      vi.advanceTimersByTime(0)
+    })
+    expect(screen.queryByTestId('shader-compilation-overlay')).not.toBeInTheDocument()
   })
 
   it('has accessible role=status and aria-live', () => {

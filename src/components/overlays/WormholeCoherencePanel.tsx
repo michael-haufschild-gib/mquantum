@@ -23,10 +23,13 @@ import { Button } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
 import { useIsDesktop } from '@/hooks/useMediaQuery'
 import { usePanelCollision } from '@/hooks/usePanelCollision'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { useLayoutStore } from '@/stores/layoutStore'
-import { getWormholeSample, useWormholeCoherenceStore } from '@/stores/wormholeCoherenceStore'
+import {
+  getWormholeSample,
+  useWormholeCoherenceStore,
+} from '@/stores/diagnostics/wormholeCoherenceStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { useLayoutStore } from '@/stores/ui/layoutStore'
 
 const WIDTH = 360
 const HEIGHT = 180

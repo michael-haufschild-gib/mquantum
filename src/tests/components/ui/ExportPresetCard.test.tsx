@@ -52,6 +52,22 @@ describe('ExportPresetCard', () => {
     expect(screen.getByRole('button')).not.toHaveAccessibleName(/Instagram Instagram/)
   })
 
+  it('exposes active preset state to assistive tech', () => {
+    render(
+      <ExportPresetCard
+        id="instagram"
+        label="Instagram"
+        description="1080x1080 • 1:1 Square"
+        isActive={true}
+        onClick={vi.fn()}
+      />
+    )
+
+    expect(
+      screen.getByRole('button', { name: 'Instagram: 1080x1080 • 1:1 Square' })
+    ).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('renders preset icon as a current-color mask instead of a standalone image', () => {
     render(
       <ExportPresetCard

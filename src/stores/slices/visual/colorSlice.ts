@@ -1,15 +1,17 @@
 import type { StateCreator } from 'zustand'
 
+import { normalizeOpaqueHexColor } from '@/lib/colors/colorUtils'
+import {
+  COLOR_ALGORITHM_TO_INT,
+  type ColorAlgorithm,
+  type CosineCoefficients,
+  type DistributionSettings,
+  type DivergingPsiSettings,
+  type DomainColoringSettings,
+  type MultiSourceWeights,
+  type PhaseDivergingSettings,
+} from '@/lib/colors/palette'
 import { logger } from '@/lib/logger'
-import type {
-  ColorAlgorithm,
-  CosineCoefficients,
-  DistributionSettings,
-  DivergingPsiSettings,
-  DomainColoringSettings,
-  MultiSourceWeights,
-  PhaseDivergingSettings,
-} from '@/rendering/shaders/palette'
 import {
   DEFAULT_COLOR_ALGORITHM,
   DEFAULT_COSINE_COEFFICIENTS,
@@ -27,6 +29,22 @@ import {
 
 import type { AppearanceSlice, ColorSlice, ColorSliceState } from './types'
 
+function isColorAlgorithm(value: unknown): value is ColorAlgorithm {
+  return (
+    typeof value === 'string' && Object.prototype.hasOwnProperty.call(COLOR_ALGORITHM_TO_INT, value)
+  )
+}
+
+function mergeDivergingComponent(
+  current: DivergingPsiSettings['component'],
+  incoming: DivergingPsiSettings['component'] | undefined
+): DivergingPsiSettings['component'] {
+  if (incoming === undefined) return current
+  if (incoming === 'real' || incoming === 'imag') return incoming
+  logger.warn('[colorSlice] Ignoring invalid divergingPsi.component:', incoming)
+  return current
+}
+
 function isValidCosineIndex(index: number): boolean {
   return Number.isInteger(index) && index >= 0 && index < 3
 }
@@ -40,6 +58,14 @@ function mergeNumeric(
 ): number {
   if (incoming === undefined || !Number.isFinite(incoming)) return current
   return Math.max(min, Math.min(max, incoming))
+}
+
+function mergeOpaqueHexColor(current: string, incoming: string | undefined, field: string): string {
+  if (incoming === undefined) return current
+  const normalized = normalizeOpaqueHexColor(incoming)
+  if (normalized) return normalized
+  logger.warn(`[colorSlice] Ignoring invalid ${field}:`, incoming)
+  return current
 }
 
 export const COLOR_INITIAL_STATE: ColorSliceState = {
@@ -63,11 +89,31 @@ export const createColorSlice: StateCreator<AppearanceSlice, [], [], ColorSlice>
     ...COLOR_INITIAL_STATE,
 
     // Actions
-    setEdgeColor: (color: string) => set({ edgeColor: color }),
-    setFaceColor: (color: string) => set({ faceColor: color }),
+    setEdgeColor: (color: string) => {
+      const normalized = normalizeOpaqueHexColor(color)
+      if (!normalized) {
+        logger.warn('[colorSlice] Ignoring invalid edgeColor:', color)
+        return
+      }
+      set({ edgeColor: normalized })
+    },
+    setFaceColor: (color: string) => {
+      const normalized = normalizeOpaqueHexColor(color)
+      if (!normalized) {
+        logger.warn('[colorSlice] Ignoring invalid faceColor:', color)
+        return
+      }
+      set({ faceColor: normalized })
+    },
     setPerDimensionColorEnabled: (enabled: boolean) => set({ perDimensionColorEnabled: enabled }),
 
-    setColorAlgorithm: (algorithm: ColorAlgorithm) => set({ colorAlgorithm: algorithm }),
+    setColorAlgorithm: (algorithm: ColorAlgorithm) => {
+      if (!isColorAlgorithm(algorithm)) {
+        logger.warn('[colorSlice] Ignoring invalid colorAlgorithm:', algorithm)
+        return
+      }
+      set({ colorAlgorithm: algorithm })
+    },
 
     setCosineCoefficients: (coefficients: CosineCoefficients) =>
       set((state) => {
@@ -171,25 +217,49 @@ export const createColorSlice: StateCreator<AppearanceSlice, [], [], ColorSlice>
     setPhaseDivergingSettings: (settings: Partial<PhaseDivergingSettings>) =>
       set((state) => ({
         phaseDiverging: {
-          neutralColor: settings.neutralColor ?? state.phaseDiverging.neutralColor,
-          positiveColor: settings.positiveColor ?? state.phaseDiverging.positiveColor,
-          negativeColor: settings.negativeColor ?? state.phaseDiverging.negativeColor,
+          neutralColor: mergeOpaqueHexColor(
+            state.phaseDiverging.neutralColor,
+            settings.neutralColor,
+            'phaseDiverging.neutralColor'
+          ),
+          positiveColor: mergeOpaqueHexColor(
+            state.phaseDiverging.positiveColor,
+            settings.positiveColor,
+            'phaseDiverging.positiveColor'
+          ),
+          negativeColor: mergeOpaqueHexColor(
+            state.phaseDiverging.negativeColor,
+            settings.negativeColor,
+            'phaseDiverging.negativeColor'
+          ),
         },
       })),
 
     setDivergingPsiSettings: (settings: Partial<DivergingPsiSettings>) =>
       set((state) => ({
         divergingPsi: {
-          neutralColor: settings.neutralColor ?? state.divergingPsi.neutralColor,
-          positiveColor: settings.positiveColor ?? state.divergingPsi.positiveColor,
-          negativeColor: settings.negativeColor ?? state.divergingPsi.negativeColor,
+          neutralColor: mergeOpaqueHexColor(
+            state.divergingPsi.neutralColor,
+            settings.neutralColor,
+            'divergingPsi.neutralColor'
+          ),
+          positiveColor: mergeOpaqueHexColor(
+            state.divergingPsi.positiveColor,
+            settings.positiveColor,
+            'divergingPsi.positiveColor'
+          ),
+          negativeColor: mergeOpaqueHexColor(
+            state.divergingPsi.negativeColor,
+            settings.negativeColor,
+            'divergingPsi.negativeColor'
+          ),
           intensityFloor: mergeNumeric(
             state.divergingPsi.intensityFloor,
             settings.intensityFloor,
             0,
             1
           ),
-          component: settings.component ?? state.divergingPsi.component,
+          component: mergeDivergingComponent(state.divergingPsi.component, settings.component),
         },
       })),
   }) as unknown as AppearanceSlice

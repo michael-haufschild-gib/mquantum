@@ -137,6 +137,35 @@ describe('computePassOrder', () => {
     expect(result).toEqual(['self-ref'])
   })
 
+  it('orders read-write overlays after earlier producers of the same target', async () => {
+    const computePassOrder = await getComputePassOrder()
+    const skybox = createMockPass({
+      id: 'skybox',
+      priority: 50,
+      inputs: [],
+      outputs: [{ resourceId: 'scene-render', access: 'write', binding: 0 }],
+    })
+    const overlay = createMockPass({
+      id: 'measurement-point-cloud',
+      priority: 0,
+      inputs: [{ resourceId: 'scene-render', access: 'read', binding: 0 }],
+      outputs: [{ resourceId: 'scene-render', access: 'write', binding: 0 }],
+    })
+    const composite = createMockPass({
+      id: 'environment-composite',
+      priority: 0,
+      inputs: [{ resourceId: 'scene-render', access: 'read', binding: 0 }],
+      outputs: [{ resourceId: 'hdr-color', access: 'write', binding: 0 }],
+    })
+
+    const result = computePassOrder(passMap(skybox, overlay, composite))
+
+    expect(result.indexOf('skybox')).toBeLessThan(result.indexOf('measurement-point-cloud'))
+    expect(result.indexOf('measurement-point-cloud')).toBeLessThan(
+      result.indexOf('environment-composite')
+    )
+  })
+
   it('uses priority as tiebreaker for independent passes', async () => {
     const computePassOrder = await getComputePassOrder()
     const passes = Array.from({ length: 5 }, (_, i) =>
@@ -187,5 +216,34 @@ describe('computePassOrder', () => {
     // external-texture has no producer — should not crash
     const result = computePassOrder(passMap(pass))
     expect(result).toEqual(['consumer'])
+  })
+
+  it('orders in-place read/write overlays after all other producers of the same resource', async () => {
+    const computePassOrder = await getComputePassOrder()
+    const scene = createMockPass({
+      id: 'scene',
+      priority: 100,
+      inputs: [],
+      outputs: [{ resourceId: 'scene-render', access: 'write', binding: 0 }],
+    })
+    const overlay = createMockPass({
+      id: 'measurement-point-cloud',
+      priority: 0,
+      inputs: [{ resourceId: 'scene-render', access: 'read', binding: 0 }],
+      outputs: [{ resourceId: 'scene-render', access: 'write', binding: 0 }],
+    })
+    const composite = createMockPass({
+      id: 'environment-composite',
+      priority: 200,
+      inputs: [{ resourceId: 'scene-render', access: 'read', binding: 0 }],
+      outputs: [{ resourceId: 'hdr-color', access: 'write', binding: 0 }],
+    })
+
+    const result = computePassOrder(passMap(overlay, composite, scene))
+
+    expect(result.indexOf('scene')).toBeLessThan(result.indexOf('measurement-point-cloud'))
+    expect(result.indexOf('measurement-point-cloud')).toBeLessThan(
+      result.indexOf('environment-composite')
+    )
   })
 })

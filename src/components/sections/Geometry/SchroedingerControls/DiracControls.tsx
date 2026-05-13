@@ -107,20 +107,17 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
   const spinorComponents = Math.pow(2, Math.floor((latticeDim + 1) / 2))
   const memoryKB = Math.round((totalSites * spinorComponents * 2 * 4) / 1024)
 
-  // Half-extent for position sliders
-  const halfExtent = useMemo(() => {
-    let max = 1
-    for (let d = 0; d < latticeDim; d++) {
-      const extent = (dirac.gridSize[d] ?? 32) * (dirac.spacing[d] ?? 0.15) * 0.5
-      if (extent > max) max = extent
-    }
-    return max
-  }, [dirac.gridSize, dirac.spacing, latticeDim])
+  const axis0HalfExtent = useMemo(
+    () => (dirac.gridSize[0] ?? 32) * (dirac.spacing[0] ?? 0.15) * 0.5,
+    [dirac.gridSize, dirac.spacing]
+  )
 
   const potentialType = dirac.potentialType ?? 'none'
   const potentialEnabled = dirac.showPotential
 
   const showPotentialParams = potentialEnabled && potentialType !== 'none'
+  const showPotentialStrength =
+    potentialType === 'step' || potentialType === 'barrier' || potentialType === 'well'
   const showBarrierWidth = potentialType === 'barrier' || potentialType === 'well'
   const showHarmonicOmega = potentialType === 'harmonicTrap'
   const showCoulombZ = potentialType === 'coulomb'
@@ -181,15 +178,17 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
         />
         {showPotentialParams && (
           <>
-            <Slider
-              label="Potential Strength V₀"
-              tooltip="Height of the potential in units of mc². Above 2mc² the Klein paradox regime begins."
-              value={dirac.potentialStrength}
-              onChange={actions.setPotentialStrength}
-              min={0}
-              max={10}
-              step={0.1}
-            />
+            {showPotentialStrength && (
+              <Slider
+                label="Potential Strength V₀"
+                tooltip="Height of the potential in units of mc². Above 2mc² the Klein paradox regime begins."
+                value={dirac.potentialStrength}
+                onChange={actions.setPotentialStrength}
+                min={0}
+                max={10}
+                step={0.1}
+              />
+            )}
             {showBarrierWidth && (
               <Slider
                 label="Potential Width"
@@ -207,8 +206,8 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
                 tooltip="Position of the potential along the primary axis relative to the lattice center."
                 value={dirac.potentialCenter}
                 onChange={actions.setPotentialCenter}
-                min={-halfExtent}
-                max={halfExtent}
+                min={-axis0HalfExtent}
+                max={axis0HalfExtent}
                 step={0.1}
               />
             )}

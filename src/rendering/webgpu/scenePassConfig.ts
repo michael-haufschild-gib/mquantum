@@ -7,6 +7,12 @@
  * @module rendering/webgpu/scenePassConfig
  */
 
+import {
+  COLOR_ALGORITHM_TO_INT,
+  type ColorAlgorithm as PaletteColorAlgorithm,
+  type ColorAlgorithmAvailabilityOptions,
+  getAvailableColorAlgorithms,
+} from '@/lib/colors/palette/types'
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
 import type { FreeScalarInitialCondition } from '@/lib/geometry/extended/freeScalar'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
@@ -14,14 +20,9 @@ import {
   getQuantumTypeDefaultColorAlgorithm,
   getQuantumTypeEntry,
   isComputeQuantumType,
+  supportsSchroedingerSurfaceMode,
 } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
-import {
-  COLOR_ALGORITHM_TO_INT,
-  type ColorAlgorithm as PaletteColorAlgorithm,
-  type ColorAlgorithmAvailabilityOptions,
-  getAvailableColorAlgorithms,
-} from '@/rendering/shaders/palette/types'
 import type { SkyboxMode } from '@/stores/defaults/visualDefaults'
 
 import type { WebGPUFrameStats } from './core/types'
@@ -85,6 +86,11 @@ export interface PassConfig {
   openQuantumEnabled: boolean
   crossSectionEnabled: boolean
   probabilityCurrentEnabled: boolean
+  quantumBackreactionLensingEnabled: boolean
+  bilocalERBridgeEnabled: boolean
+  entropicTimeShearEnabled: boolean
+  spectralDimensionFlowEnabled: boolean
+  vacuumBubbleLensEnabled: boolean
   densityGridResolution: number
   skyboxEnabled: boolean
   skyboxMode: SkyboxMode
@@ -114,6 +120,11 @@ export interface SchrodingerPassConfig {
   openQuantumEnabled: boolean
   crossSectionEnabled: boolean
   probabilityCurrentEnabled: boolean
+  quantumBackreactionLensingEnabled: boolean
+  bilocalERBridgeEnabled: boolean
+  entropicTimeShearEnabled: boolean
+  spectralDimensionFlowEnabled: boolean
+  vacuumBubbleLensEnabled: boolean
   densityGridResolution: number
 }
 
@@ -124,7 +135,6 @@ export interface PPPassConfig {
   paperEnabled: boolean
   frameBlendingEnabled: boolean
   skyboxEnabled: boolean
-  skyboxMode: SkyboxMode
   temporalReprojectionEnabled: boolean
 }
 
@@ -143,8 +153,15 @@ export function executeFrameAndCollectMetrics({
   size,
   dpr,
 }: FrameMetricsArgs): WebGPUFrameStats {
+  const metricsMode = collector.beginFrame(graph)
+  if (metricsMode === 'none') {
+    const frameStats = graph.execute(deltaTime, metricsMode)
+    collector.recordFrame(0, frameStats, graph, size, dpr)
+    return frameStats
+  }
+
   const cpuStartMs = performance.now()
-  const frameStats = graph.execute(deltaTime)
+  const frameStats = graph.execute(deltaTime, metricsMode)
   const cpuTimeMs = performance.now() - cpuStartMs
   collector.recordFrame(cpuTimeMs, frameStats, graph, size, dpr)
   return frameStats
@@ -175,7 +192,7 @@ export function pauliFieldViewForColorAlgorithm(algo: string, currentFieldView?:
 /**
  * Map a Pauli field view to its matching color algorithm. Matches the
  * inverse PAULI_FIELD_VIEW_TO_COLOR_ALGO map exported from
- * `rendering/shaders/palette/types.ts`. Kept inline so this module has
+ * `lib/colors/palette/types.ts`. Kept inline so this module has
  * no cross-module dependency on that file's symbol layout.
  *
  * @internal
@@ -281,6 +298,14 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
     ? (getQuantumTypeEntry('pauliSpinor')?.dimensions.min ?? 3)
     : (getQuantumTypeEntry(config.quantumMode)?.dimensions.min ?? 2)
   const effectiveDimension = isCompute ? Math.max(config.dimension, modeMinDim) : config.dimension
+  const isosurface = supportsSchroedingerSurfaceMode({
+    objectType: config.objectType,
+    quantumMode: config.quantumMode,
+    dimension: effectiveDimension,
+    representation: config.representation,
+  })
+    ? config.isosurface
+    : false
   const colorAlgorithm = normalizeColorAlgorithmForQuantumMode(
     config.quantumMode,
     config.colorAlgorithm,
@@ -290,7 +315,7 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
     config.objectType,
     {
       dimension: effectiveDimension,
-      isosurface: config.isosurface,
+      isosurface,
       representation: config.representation,
     },
     config.freeScalarInitialCondition
@@ -309,7 +334,7 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
     quantumMode: config.quantumMode,
     termCount: isCompute ? 1 : config.termCount,
     colorAlgorithm,
-    isosurface: config.isosurface,
+    isosurface,
     representation: isCompute ? 'position' : config.representation,
     openQuantumEnabled: gate(config.openQuantumEnabled, isCompute),
     // Keep the default all-effects-off volumetric shader grid-only. Once any
@@ -340,6 +365,11 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
       config.probabilityCurrentEnabled || compileEffectBundle,
       disableAnalytical
     ),
+    quantumBackreactionLensingEnabled: config.quantumBackreactionLensingEnabled,
+    bilocalERBridgeEnabled: config.bilocalERBridgeEnabled,
+    entropicTimeShearEnabled: config.entropicTimeShearEnabled,
+    spectralDimensionFlowEnabled: config.spectralDimensionFlowEnabled,
+    vacuumBubbleLensEnabled: config.vacuumBubbleLensEnabled,
     densityGridResolution: config.densityGridResolution,
   }
 }
@@ -352,7 +382,6 @@ export function extractPPConfig(config: PassConfig): PPPassConfig {
     paperEnabled: config.paperEnabled,
     frameBlendingEnabled: config.frameBlendingEnabled,
     skyboxEnabled: config.skyboxEnabled,
-    skyboxMode: config.skyboxMode,
     temporalReprojectionEnabled: config.temporalReprojectionEnabled,
   }
 }

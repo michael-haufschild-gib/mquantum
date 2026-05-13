@@ -30,7 +30,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { PaperControls } from '@/components/sections/PostProcessing/PaperControls'
-import { usePostProcessingStore } from '@/stores/postProcessingStore'
+import { usePostProcessingStore } from '@/stores/scene/postProcessingStore'
 
 function getPaperState() {
   const s = usePostProcessingStore.getState()

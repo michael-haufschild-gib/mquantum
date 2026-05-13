@@ -12,7 +12,7 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Switch } from '@/components/ui/Switch'
-import { type LightingSlice, useLightingStore } from '@/stores/lightingStore'
+import { type LightingSlice, useLightingStore } from '@/stores/scene/lightingStore'
 
 import { LightEditor } from './LightEditor'
 import { LightList } from './LightList'

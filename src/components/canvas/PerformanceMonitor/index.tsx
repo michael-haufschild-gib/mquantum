@@ -2,7 +2,7 @@ import { AnimatePresence, domMax, LazyMotion, m, useMotionValue } from 'motion/r
 import { useEffect, useRef, useState } from 'react'
 
 import { usePanelCollision } from '@/hooks/usePanelCollision'
-import { useUIStore } from '@/stores/uiStore'
+import { useUIStore } from '@/stores/ui/uiStore'
 
 import { CollapsedView } from './CollapsedView'
 import { ExpandedContent } from './ExpandedContent'

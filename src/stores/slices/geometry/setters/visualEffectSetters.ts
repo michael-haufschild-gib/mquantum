@@ -16,6 +16,8 @@ import {
   type SchroedingerConfig,
   type SecondQuantizationMode,
 } from '@/lib/geometry/extended/types'
+import { supportsSchroedingerSurfaceMode } from '@/lib/geometry/registry'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 import type { SetterContext } from './sliceSetterUtils'
 
@@ -184,6 +186,10 @@ const axisToNormal = (axis: 'x' | 'y' | 'z'): [number, number, number] => {
   return [0, 0, 1]
 }
 
+const isRaymarchQuality = (quality: unknown): quality is RaymarchQuality =>
+  typeof quality === 'string' &&
+  Object.prototype.hasOwnProperty.call(RAYMARCH_QUALITY_TO_SAMPLES, quality)
+
 /**
  * Create visual effect setters for the Schroedinger configuration.
  *
@@ -220,6 +226,7 @@ export function createVisualEffectSetters(
     setSchroedingerScatteringAnisotropy: clampedSetter('scatteringAnisotropy', -0.9, 0.9),
     setSchroedingerRoughness: clampedSetter('roughness', 0.0, 1.0),
     setSchroedingerRaymarchQuality: (quality: RaymarchQuality) => {
+      if (!isRaymarchQuality(quality)) return
       const sampleCount = RAYMARCH_QUALITY_TO_SAMPLES[quality]
       setWithVersion((state) => ({
         schroedinger: { ...state.schroedinger, raymarchQuality: quality, sampleCount },
@@ -386,7 +393,22 @@ export function createVisualEffectSetters(
     setSchroedingerRadialProbabilityColor: valueSetter('radialProbabilityColor'),
 
     // Isosurface
-    setSchroedingerIsoEnabled: valueSetter('isoEnabled'),
+    setSchroedingerIsoEnabled: (enabled: boolean) => {
+      let nextEnabled = enabled
+      if (enabled) {
+        const { dimension, objectType } = useGeometryStore.getState()
+        const { quantumMode, representation } = ctx.get().schroedinger
+        nextEnabled = supportsSchroedingerSurfaceMode({
+          objectType,
+          quantumMode,
+          dimension,
+          representation,
+        })
+      }
+      setWithVersion((state) => ({
+        schroedinger: { ...state.schroedinger, isoEnabled: nextEnabled },
+      }))
+    },
     setSchroedingerIsoThreshold: clampedSetter('isoThreshold', -6, 0),
 
     // Cross-section

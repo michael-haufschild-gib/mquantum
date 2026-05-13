@@ -230,6 +230,29 @@ describe('packAntiDeSitterDensityGrid (BTZ path)', () => {
     }
     expect(diffCount).toBeGreaterThan(500)
   })
+
+  it('sanitizes non-finite BTZ config before grid packing', () => {
+    const packed = packAntiDeSitterDensityGrid(
+      btzConfig({
+        btzHorizonRadius: Number.NaN,
+        btzOmega: Number.POSITIVE_INFINITY,
+        btzAngularM: Number.NEGATIVE_INFINITY,
+        mL: Number.POSITIVE_INFINITY,
+      })
+    )
+
+    expect(packed.gridSize).toBe(DENSITY_GRID_SIZE)
+    expect(packed.peakDensity).toBeGreaterThan(0)
+    expect(Number.isFinite(packed.peakDensity)).toBe(true)
+    expect(Number.isFinite(packed.effectiveDelta)).toBe(true)
+
+    for (let i = 0; i < packed.density.length; i++) {
+      const value = halfToFloat(packed.density[i]!)
+      if (!Number.isFinite(value)) {
+        throw new Error(`density[${i}] encoded non-finite half-float ${value}`)
+      }
+    }
+  })
 })
 
 describe('packAntiDeSitterDensityGrid (d=3 S¹ angular regression)', () => {

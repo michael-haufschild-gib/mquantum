@@ -16,7 +16,7 @@ import {
   type SweepWorkerLike,
   WheelerDeWittSrmtSweepCoordinator,
 } from '@/rendering/webgpu/renderers/strategies/WheelerDeWittSrmtSweepCoordinator'
-import { useSrmtSweepStore } from '@/stores/srmtSweepStore'
+import { useSrmtSweepStore } from '@/stores/diagnostics/srmtSweepStore'
 
 interface RecordedPost {
   message: SrmtSweepRequest | { type: 'cancel'; epoch: number }

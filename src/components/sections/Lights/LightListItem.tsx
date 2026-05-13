@@ -18,7 +18,7 @@ import LightToggleOffIcon from '@/assets/icons/light-toggle-off.svg?react'
 import LightToggleOnIcon from '@/assets/icons/light-toggle-on.svg?react'
 import TrashIcon from '@/assets/icons/trash.svg?react'
 import { Button } from '@/components/ui/Button'
-import type { LightSource, LightType } from '@/rendering/lights/types'
+import type { LightSource, LightType } from '@/lib/lighting/lightSource'
 
 /** Special ID for the virtual ambient light entry */
 export const AMBIENT_LIGHT_ID = '__ambient__'
@@ -66,7 +66,9 @@ export const LightListItem: React.FC<LightListItemProps> = memo(function LightLi
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
+      if (e.currentTarget !== e.target) return
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
         onSelect()
       }
     },
@@ -106,6 +108,7 @@ export const LightListItem: React.FC<LightListItemProps> = memo(function LightLi
       tabIndex={0}
       onKeyDown={handleKeyDown}
       aria-pressed={isSelected}
+      aria-label={`Select ${light.name}`}
     >
       {/* Light type icon with color */}
       <span

@@ -13,8 +13,8 @@
 import fc from 'fast-check'
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 describe('quantum number interdependency clamping', () => {
   beforeEach(() => {
@@ -226,6 +226,28 @@ describe('quantum mode switching', () => {
     // Switch to TDSE — should disable cross-section
     store.setSchroedingerQuantumMode('tdseDynamics')
     expect(useExtendedObjectStore.getState().schroedinger.crossSectionEnabled).toBe(false)
+  })
+
+  it('blocks isosurface enablement in compute modes at the store boundary', () => {
+    const store = useExtendedObjectStore.getState()
+    store.setSchroedingerQuantumMode('tdseDynamics')
+
+    store.setSchroedingerIsoEnabled(true)
+
+    expect(useExtendedObjectStore.getState().schroedinger.isoEnabled).toBe(false)
+  })
+
+  it('clears isosurface when switching to Wigner representation', () => {
+    const store = useExtendedObjectStore.getState()
+
+    store.setSchroedingerIsoEnabled(true)
+    expect(useExtendedObjectStore.getState().schroedinger.isoEnabled).toBe(true)
+
+    store.setSchroedingerRepresentation('wigner')
+
+    const schroedinger = useExtendedObjectStore.getState().schroedinger
+    expect(schroedinger.representation).toBe('wigner')
+    expect(schroedinger.isoEnabled).toBe(false)
   })
 
   it('cannot set momentum representation in compute modes', () => {

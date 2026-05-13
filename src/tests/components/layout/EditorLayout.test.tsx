@@ -9,8 +9,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EditorLayout } from '@/components/layout/EditorLayout'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { BREAKPOINTS } from '@/hooks/useMediaQuery'
-import { useLayoutStore } from '@/stores/layoutStore'
-import { useThemeStore } from '@/stores/themeStore'
+import { useLayoutStore } from '@/stores/ui/layoutStore'
+import { useThemeStore } from '@/stores/ui/themeStore'
 
 function renderLayout() {
   return render(

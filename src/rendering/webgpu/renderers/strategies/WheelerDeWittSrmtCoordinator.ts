@@ -19,7 +19,7 @@ import type { WheelerDeWittConfig } from '@/lib/geometry/extended/wheelerDeWitt'
 import type { SrmtClock } from '@/lib/physics/srmt'
 import type { WdwSrmtOverlay } from '@/lib/physics/wheelerDeWitt/densityGrid'
 import type { WheelerDeWittSolverOutput } from '@/lib/physics/wheelerDeWitt/solver'
-import { useSrmtDiagnosticStore } from '@/stores/srmtDiagnosticStore'
+import { useSrmtDiagnosticStore } from '@/stores/diagnostics/srmtDiagnosticStore'
 
 import { computeWdwConfigHash } from './WheelerDeWittPhysicsCache'
 import {

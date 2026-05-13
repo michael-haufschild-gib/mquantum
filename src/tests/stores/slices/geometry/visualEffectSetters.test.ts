@@ -9,7 +9,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { RAYMARCH_QUALITY_TO_SAMPLES } from '@/lib/geometry/extended/types'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 const getSchroedinger = () => useExtendedObjectStore.getState().schroedinger
 
@@ -36,6 +36,17 @@ describe('visualEffectSetters — compound logic', () => {
       const ultraSamples = getSchroedinger().sampleCount
 
       expect(fastSamples).toBeLessThan(ultraSamples)
+    })
+
+    it('rejects invalid quality ids without corrupting sampleCount', () => {
+      useExtendedObjectStore.getState().setSchroedingerRaymarchQuality('quality')
+      const before = getSchroedinger()
+
+      useExtendedObjectStore.getState().setSchroedingerRaymarchQuality('cinematic' as never)
+
+      const after = getSchroedinger()
+      expect(after.raymarchQuality).toBe(before.raymarchQuality)
+      expect(after.sampleCount).toBe(before.sampleCount)
     })
   })
 

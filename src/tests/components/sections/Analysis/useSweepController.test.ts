@@ -9,9 +9,9 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useSweepController } from '@/components/sections/Analysis/useSweepController'
-import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { useCoordinateEntanglementStore } from '@/stores/diagnostics/coordinateEntanglementStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 const getExt = () => useExtendedObjectStore.getState()
 const getEnt = () => useCoordinateEntanglementStore.getState()

@@ -8,7 +8,7 @@ import React, { useCallback } from 'react'
 import { Section } from '@/components/sections/Section'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { ToggleGroup, type ToggleOption } from '@/components/ui/ToggleGroup'
-import { usePerformanceStore } from '@/stores/performanceStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
 
 import { DimensionSelector } from './DimensionSelector'
 import { ObjectSettingsSection } from './ObjectSettingsSection'

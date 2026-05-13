@@ -9,11 +9,11 @@ import { useShallow } from 'zustand/react/shallow'
 import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
 import { logger } from '@/lib/logger'
 import { getModifierSymbols, getPlatformKeyLabel } from '@/lib/platform'
-import { useCameraStore } from '@/stores/cameraStore'
-import { useExportStore } from '@/stores/exportStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { useLayoutStore } from '@/stores/layoutStore'
-import { useLightingStore } from '@/stores/lightingStore'
+import { useExportStore } from '@/stores/runtime/exportStore'
+import { useCameraStore } from '@/stores/scene/cameraStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { useLightingStore } from '@/stores/scene/lightingStore'
+import { useLayoutStore } from '@/stores/ui/layoutStore'
 
 /** Configuration for a single keyboard shortcut binding. */
 export interface ShortcutConfig {

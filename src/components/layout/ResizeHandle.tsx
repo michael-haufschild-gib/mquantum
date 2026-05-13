@@ -13,7 +13,7 @@
 import React, { useCallback, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-import { clampSidebarWidth, useLayoutStore } from '@/stores/layoutStore'
+import { clampSidebarWidth, useLayoutStore } from '@/stores/ui/layoutStore'
 
 /** Props for the draggable panel resize handle. */
 export interface ResizeHandleProps {

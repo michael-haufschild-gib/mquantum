@@ -1,8 +1,17 @@
 import { AnimatePresence, m } from 'motion/react'
-import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import React, {
+  cloneElement,
+  isValidElement,
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 
 import { soundManager } from '@/lib/audio/SoundManager'
-import { supportsPopover } from '@/lib/dom/popoverSupport'
+import { supportsPopover } from '@/lib/popoverSupport'
 
 /** Props for the Popover component */
 export interface PopoverProps {
@@ -25,6 +34,28 @@ export interface PopoverProps {
 }
 
 const VIEWPORT_MARGIN = 8
+const INTERACTIVE_TRIGGER_TAGS = new Set(['a', 'button', 'input', 'select', 'summary', 'textarea'])
+
+type TriggerElementProps = {
+  className?: string
+  onClick?: React.MouseEventHandler<HTMLElement>
+  onKeyDown?: React.KeyboardEventHandler<HTMLElement>
+  ref?: React.Ref<HTMLElement>
+  role?: string
+  tabIndex?: number
+  'aria-controls'?: string
+  'aria-expanded'?: boolean
+  'aria-haspopup'?: React.AriaAttributes['aria-haspopup']
+}
+
+function assignRef<T>(ref: React.Ref<T> | undefined, value: T | null): void {
+  if (!ref) return
+  if (typeof ref === 'function') {
+    ref(value)
+    return
+  }
+  ref.current = value
+}
 
 /** Computes the horizontal position based on alignment. */
 function computeHorizontalPosition(
@@ -110,7 +141,7 @@ export const Popover: React.FC<PopoverProps> = React.memo(
     offset = 4,
   }) => {
     const popoverRef = useRef<HTMLDivElement>(null)
-    const triggerRef = useRef<HTMLDivElement>(null)
+    const triggerRef = useRef<HTMLElement>(null)
     const popoverId = useId()
 
     const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
@@ -138,9 +169,81 @@ export const Popover: React.FC<PopoverProps> = React.memo(
       [isControlled, onOpenChange]
     )
 
-    const handleTriggerClick = useCallback(() => {
-      handleOpenChange(!isOpen)
-    }, [handleOpenChange, isOpen])
+    const handleTriggerClick = useCallback(
+      (event?: React.MouseEvent<HTMLElement>) => {
+        if (event?.defaultPrevented) return
+        handleOpenChange(!isOpen)
+      },
+      [handleOpenChange, isOpen]
+    )
+
+    const handleTriggerKeyDown = useCallback(
+      (event: React.KeyboardEvent<HTMLElement>) => {
+        if (event.defaultPrevented) return
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        handleOpenChange(!isOpen)
+      },
+      [handleOpenChange, isOpen]
+    )
+
+    const triggerElement = isValidElement<TriggerElementProps>(trigger) ? trigger : null
+    const triggerElementRef = triggerElement?.props.ref
+    const setTriggerRef = useCallback(
+      (element: HTMLElement | null) => {
+        triggerRef.current = element
+        assignRef(triggerElementRef, element)
+      },
+      [triggerElementRef]
+    )
+
+    const renderedTrigger = triggerElement ? (
+      (() => {
+        const triggerTag = typeof triggerElement.type === 'string' ? triggerElement.type : null
+        const shouldButtonize = triggerTag !== null && !INTERACTIVE_TRIGGER_TAGS.has(triggerTag)
+        const mergedClassName = [triggerElement.props.className, className]
+          .filter(Boolean)
+          .join(' ')
+
+        return cloneElement(triggerElement, {
+          ref: setTriggerRef,
+          className: mergedClassName,
+          onClick: (event: React.MouseEvent<HTMLElement>) => {
+            triggerElement.props.onClick?.(event)
+            handleTriggerClick(event)
+          },
+          onKeyDown: shouldButtonize
+            ? (event: React.KeyboardEvent<HTMLElement>) => {
+                triggerElement.props.onKeyDown?.(event)
+                handleTriggerKeyDown(event)
+              }
+            : triggerElement.props.onKeyDown,
+          role: shouldButtonize
+            ? (triggerElement.props.role ?? 'button')
+            : triggerElement.props.role,
+          tabIndex: shouldButtonize
+            ? (triggerElement.props.tabIndex ?? 0)
+            : triggerElement.props.tabIndex,
+          'aria-haspopup': 'dialog',
+          'aria-expanded': isOpen,
+          'aria-controls': isOpen ? popoverId : undefined,
+        })
+      })()
+    ) : (
+      <div
+        ref={setTriggerRef}
+        onClick={handleTriggerClick}
+        onKeyDown={handleTriggerKeyDown}
+        className={`inline-block cursor-pointer ${className}`}
+        role="button"
+        tabIndex={0}
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? popoverId : undefined}
+      >
+        {trigger}
+      </div>
+    )
 
     // Sync popover visibility with React state
     // Guarded: Popover API requires Safari 17+, Chrome 114+, Firefox 125+.
@@ -237,16 +340,7 @@ export const Popover: React.FC<PopoverProps> = React.memo(
 
     return (
       <>
-        <div
-          ref={triggerRef}
-          onClick={handleTriggerClick}
-          className={`inline-block cursor-pointer ${className}`}
-          role="button"
-          aria-haspopup="dialog"
-          aria-expanded={isOpen}
-        >
-          {trigger}
-        </div>
+        {renderedTrigger}
 
         <div
           ref={popoverRef}
@@ -262,6 +356,7 @@ export const Popover: React.FC<PopoverProps> = React.memo(
           <AnimatePresence>
             {isOpen && (
               <m.div
+                role="dialog"
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}

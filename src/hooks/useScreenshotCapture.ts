@@ -14,7 +14,10 @@
 
 import { useShallow } from 'zustand/react/shallow'
 
-import { type CaptureStatus, useScreenshotCaptureStore } from '@/stores/screenshotCaptureStore'
+import {
+  type CaptureStatus,
+  useScreenshotCaptureStore,
+} from '@/stores/runtime/screenshotCaptureStore'
 
 const CAPTURE_TIMEOUT_MS = 5000
 

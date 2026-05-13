@@ -7,7 +7,7 @@
 
 import type { PauliConfig } from '@/lib/geometry/extended/types'
 import { sigmaMaxFromPmlConfig } from '@/lib/physics/pml/profile'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
 import {
   FFT_UNIFORM_SIZE,
@@ -17,18 +17,21 @@ import {
   packFFTAxisUniforms,
 } from './computePassUtils'
 import { buildFFTTwiddleTable, FFT_TWIDDLE_BYTES } from './FFTTwiddle'
+import { PAULI_UNIFORMS_LAYOUT } from './pauliUniformsLayout'
 
-/** PauliUniforms struct size in bytes (640 = 160 indices × 4) */
-export const PAULI_UNIFORM_SIZE = 640
+/** Float32/Uint32 index map for PauliUniforms fields. */
+const I = PAULI_UNIFORMS_LAYOUT.index
+
+/** PauliUniforms struct size in bytes (640 = 160 indices × 4). Derived from the layout. */
+export const PAULI_UNIFORM_SIZE = PAULI_UNIFORMS_LAYOUT.totalSize
 
 /**
  * U32 index of `params.fieldView` inside the packed PauliUniforms struct.
- * Matches the absolute offset (`o = 76`) used by {@link packPauliUniforms}.
- * Exported so callers (and tests) can read the encoded enum without
- * hard-coding the numeric slot, which would silently drift if the layout
- * is reshuffled. Single source of truth — the packer reads from here too.
+ * Derived from {@link PAULI_UNIFORMS_LAYOUT} so the value cannot drift from
+ * the WGSL struct. Exported so callers (and tests) can read the encoded
+ * enum without hard-coding the numeric slot.
  */
-export const PAULI_FIELD_VIEW_U32_OFFSET = 76
+export const PAULI_FIELD_VIEW_U32_OFFSET = PAULI_UNIFORMS_LAYOUT.index.fieldView
 
 /**
  * Mapping from `PauliConfig.fieldView` strings to the u32 enum value the
@@ -333,22 +336,19 @@ export function packPauliUniforms(
 
   const gridSize = config.gridSize.slice(0, config.latticeDim)
 
-  let o = 0
-  // Grid parameters (u32)
-  u32[o++] = config.latticeDim
-  for (let d = 0; d < MAX_DIM; d++) u32[o++] = gridSize[d] ?? 1
-  for (let d = 0; d < MAX_DIM; d++) u32[o++] = strides[d] ?? 0
-  u32[o] = totalSites
+  // Lattice (offsets 0..103)
+  u32[I.latticeDim] = config.latticeDim
+  for (let d = 0; d < MAX_DIM; d++) u32[I.gridSize + d] = gridSize[d] ?? 1
+  for (let d = 0; d < MAX_DIM; d++) u32[I.strides + d] = strides[d] ?? 0
+  u32[I.totalSites] = totalSites
 
-  // Physics parameters (f32, offset 26*4 = 104)
-  o = 26
-  f32[o++] = config.dt
-  f32[o++] = config.hbar
-  f32[o++] = config.mass
-  f32[o] = simTime
+  // Physics (offsets 104..119)
+  f32[I.dt] = config.dt
+  f32[I.hbar] = config.hbar
+  f32[I.mass] = config.mass
+  f32[I.simTime] = simTime
 
-  // Magnetic field (offset 30*4 = 120)
-  o = 30
+  // Magnetic field (offsets 120..143)
   const fieldTypeMap: Record<string, number> = {
     uniform: 0,
     gradient: 1,
@@ -356,48 +356,45 @@ export function packPauliUniforms(
     quadrupole: 3,
   }
   const fieldTypeId = fieldTypeMap[config.fieldType] ?? 0
-  u32[o++] = fieldTypeId
-  f32[o++] = config.fieldStrength
-  f32[o++] = config.fieldDirection[0] // theta
-  f32[o++] = config.fieldDirection[1] // phi
-  f32[o++] = config.gradientStrength
-  f32[o] = config.rotatingFrequency
-  // Slots [36] (fieldVecBx) and [37] (fieldVecBy) follow. fieldVecBz lives at
-  // [66] inside what was previously _pad2. Host precomputes the uniform-field
-  // B vector so the shader fieldType=0 branch avoids 4 sin/cos per thread per
-  // Strang substep. For fieldType != 0 these stay at 0 (zeroed by the fill on
-  // line 320) — the shader does not read them on those paths.
+  u32[I.fieldType] = fieldTypeId
+  f32[I.fieldStrength] = config.fieldStrength
+  f32[I.fieldDirTheta] = config.fieldDirection[0]
+  f32[I.fieldDirPhi] = config.fieldDirection[1]
+  f32[I.gradientStrength] = config.gradientStrength
+  f32[I.rotatingFrequency] = config.rotatingFrequency
+  // Host-precomputed B vector for fieldType=0 (uniform). Saves 4 sin/cos per
+  // thread per Strang substep. For fieldType != 0 these stay at 0 (zeroed by
+  // the `u32.fill(0)` above) — the shader does not read them on those paths.
+  // fieldVecBz lives at u32 index 66, between packetMomentum and potentialType,
+  // to fit the existing 640-byte layout.
   if (fieldTypeId === 0) {
     const B0 = config.fieldStrength
     const theta = config.fieldDirection[0] ?? 0
     const phi = config.fieldDirection[1] ?? 0
     const sinTheta = Math.sin(theta)
     const cosTheta = Math.cos(theta)
-    f32[36] = B0 * sinTheta * Math.cos(phi)
-    f32[37] = B0 * sinTheta * Math.sin(phi)
-    f32[66] = B0 * cosTheta
+    f32[I.fieldVecBx] = B0 * sinTheta * Math.cos(phi)
+    f32[I.fieldVecBy] = B0 * sinTheta * Math.sin(phi)
+    f32[I.fieldVecBz] = B0 * cosTheta
   }
 
-  // Initial spin state (offset 38*4 = 152)
-  o = 38
-  f32[o++] = config.initialSpinDirection[0] // theta
-  f32[o] = config.initialSpinDirection[1] // phi
+  // Spin state (offsets 152..159)
+  f32[I.spinTheta] = config.initialSpinDirection[0]
+  f32[I.spinPhi] = config.initialSpinDirection[1]
 
-  // Initial condition (offset 40*4 = 160)
-  o = 40
+  // Initial condition + packet (offsets 160..267)
   const icMap: Record<string, number> = {
     gaussianSpinUp: 0,
     gaussianSpinDown: 1,
     gaussianSuperposition: 2,
     planeWaveSpinor: 3,
   }
-  u32[o++] = icMap[config.initialCondition] ?? 0
-  f32[o++] = config.packetWidth
-  for (let d = 0; d < MAX_DIM; d++) f32[o++] = config.packetCenter[d] ?? 0
-  for (let d = 0; d < MAX_DIM; d++) f32[o++] = config.packetMomentum[d] ?? 0
+  u32[I.initCondition] = icMap[config.initialCondition] ?? 0
+  f32[I.packetWidth] = config.packetWidth
+  for (let d = 0; d < MAX_DIM; d++) f32[I.packetCenter + d] = config.packetCenter[d] ?? 0
+  for (let d = 0; d < MAX_DIM; d++) f32[I.packetMomentum + d] = config.packetMomentum[d] ?? 0
 
-  // Potential (offset 67*4 = 268)
-  o = 67
+  // Potential (offsets 268..287)
   const potMap: Record<string, number> = {
     none: 0,
     harmonicTrap: 1,
@@ -405,81 +402,72 @@ export function packPauliUniforms(
     barrier: 2,
     doubleWell: 3,
   }
-  u32[o++] = potMap[config.potentialType] ?? 0
-  f32[o++] = config.harmonicOmega
-  f32[o++] = config.wellDepth
-  f32[o++] = config.wellWidth
-  u32[o] = config.showPotential ? 1 : 0
+  u32[I.potentialType] = potMap[config.potentialType] ?? 0
+  f32[I.harmonicOmega] = config.harmonicOmega
+  f32[I.wellDepth] = config.wellDepth
+  f32[I.wellWidth] = config.wellWidth
+  u32[I.showPotential] = config.showPotential ? 1 : 0
 
-  // PML absorber (offset 72*4 = 288)
-  o = 72
-  u32[o++] = config.absorberEnabled ? 1 : 0
-  f32[o++] = config.absorberWidth
+  // PML absorber (offsets 288..303)
+  u32[I.absorberEnabled] = config.absorberEnabled ? 1 : 0
+  f32[I.absorberWidth] = config.absorberWidth
   // Auto-compute σ_max from PML target reflection coefficient
-  f32[o] = sigmaMaxFromPmlConfig(config)
-  // o+1 would be pad slot; skipped since next section uses absolute offset
+  f32[I.absorberStrength] = sigmaMaxFromPmlConfig(config)
 
-  // Display (offset PAULI_FIELD_VIEW_U32_OFFSET * 4 = 304)
-  o = PAULI_FIELD_VIEW_U32_OFFSET
-  u32[o++] = PAULI_FIELD_VIEW_ENUM[config.fieldView] ?? 0
-  u32[o++] = config.autoScale ? 1 : 0
-  f32[o++] = config.spinUpColor[0]
-  f32[o++] = config.spinUpColor[1]
-  f32[o++] = config.spinUpColor[2]
-  f32[o++] = config.spinDownColor[0]
-  f32[o++] = config.spinDownColor[1]
-  f32[o] = config.spinDownColor[2]
+  // Display (offsets 304..335)
+  u32[I.fieldView] = PAULI_FIELD_VIEW_ENUM[config.fieldView] ?? 0
+  u32[I.autoScale] = config.autoScale ? 1 : 0
+  f32[I.spinUpR] = config.spinUpColor[0]
+  f32[I.spinUpG] = config.spinUpColor[1]
+  f32[I.spinUpB] = config.spinUpColor[2]
+  f32[I.spinDownR] = config.spinDownColor[0]
+  f32[I.spinDownG] = config.spinDownColor[1]
+  f32[I.spinDownB] = config.spinDownColor[2]
 
-  // Bounding / Basis (offset 84*4 = 336)
-  o = 84
-  f32[o++] = boundingRadius ?? 5.0
-  f32[o] = maxDensity
-  // 2 padding floats
+  // Bounding (offsets 336..343; _pad4/_pad5 at 344..351 left zero by fill)
+  f32[I.boundingRadius] = boundingRadius ?? 5.0
+  f32[I.densityScale] = maxDensity
 
-  // Basis vectors — N-D arrays for proper higher-dim rotation (offset 88*4 = 352)
-  o = 88
+  // Basis vectors — N-D arrays for proper higher-dim rotation (offsets 352..495)
   if (basisX) {
-    for (let d = 0; d < Math.min(basisX.length, MAX_DIM); d++) f32[o + d] = basisX[d]!
+    for (let d = 0; d < Math.min(basisX.length, MAX_DIM); d++) f32[I.basisX + d] = basisX[d]!
   } else {
-    f32[o] = 1.0
+    f32[I.basisX] = 1.0
   }
-  o += MAX_DIM // array<f32, 12>
   if (basisY) {
-    for (let d = 0; d < Math.min(basisY.length, MAX_DIM); d++) f32[o + d] = basisY[d]!
+    for (let d = 0; d < Math.min(basisY.length, MAX_DIM); d++) f32[I.basisY + d] = basisY[d]!
   } else {
-    f32[o + 1] = 1.0
+    f32[I.basisY + 1] = 1.0
   }
-  o += MAX_DIM
   if (basisZ) {
-    for (let d = 0; d < Math.min(basisZ.length, MAX_DIM); d++) f32[o + d] = basisZ[d]!
+    for (let d = 0; d < Math.min(basisZ.length, MAX_DIM); d++) f32[I.basisZ + d] = basisZ[d]!
   } else {
-    f32[o + 2] = 1.0
+    f32[I.basisZ + 2] = 1.0
   }
-  // Spacing (offset 124*4 = 496)
-  o = 124
-  for (let d = 0; d < MAX_DIM; d++) f32[o++] = config.spacing[d] ?? 0.1
 
-  // kGridScale (offset 148*4 = 592, indices 148-159): 2π / (N · a) per dim.
-  // Hoisted out of the kinetic kernel so each thread replaces a divide with
-  // a multiply during k-vector construction. Mirrors TDSE/Dirac kGridScale.
-  // Slots beyond latticeDim left at the zero-fill default (unused by shader).
+  // Spacing (offsets 496..543)
+  for (let d = 0; d < MAX_DIM; d++) f32[I.spacing + d] = config.spacing[d] ?? 0.1
+
+  // kGridScale (offsets 592..639): 2π / (N · a) per dim. Hoisted out of the
+  // kinetic kernel so each thread replaces a divide with a multiply during
+  // k-vector construction. Mirrors TDSE/Dirac kGridScale. Slots beyond
+  // latticeDim left at the zero-fill default (unused by shader).
   {
     const TWO_PI = Math.PI * 2
     for (let d = 0; d < config.latticeDim; d++) {
       const N = config.gridSize[d]!
       const a = config.spacing[d] ?? 0.1
-      f32[148 + d] = TWO_PI / (N * a)
+      f32[I.kGridScale + d] = TWO_PI / (N * a)
     }
   }
 
-  // Slice positions (offset 136*4 = 544, WGSL array<f32, 12>)
+  // Slice positions (offsets 544..591, WGSL array<f32, 12>)
   // WGSL reads slicePositions[d] where d is the full dimension index (d >= 3).
   // config.slicePositions is 0-indexed for extra dims: [0] = dim 3, [1] = dim 4, etc.
   // Write at WGSL index (i + 3) to match the shader's access pattern.
   // Clamped to MAX_SLICE_POSITIONS_WRITE_COUNT so an oversized store array
   // cannot overflow past the 12-slot region into the next uniform field.
-  o = 136
-  // Indices 0-2 (visible dims): always 0 — shader only reads d >= 3
+  // Indices 0-2 (visible dims): always 0 — shader only reads d >= 3.
   const pauliSliceN = Math.min(config.slicePositions.length, MAX_SLICE_POSITIONS_WRITE_COUNT)
   for (let i = 0; i < pauliSliceN; i++) {
     const d = i + 3 // physical dimension index
@@ -491,7 +479,7 @@ export function packPauliUniforms(
       const t2 = simTime * config.sliceSpeed * 1.3 * 2 * Math.PI + phase * 1.5
       pos += config.sliceAmplitude * (0.7 * Math.sin(t1) + 0.3 * Math.sin(t2))
     }
-    f32[o + d] = pos
+    f32[I.slicePositions + d] = pos
   }
 }
 

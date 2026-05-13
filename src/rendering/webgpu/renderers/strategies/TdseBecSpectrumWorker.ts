@@ -11,7 +11,7 @@ import type {
   IncompressibleSpectrumWorkerRequest,
   IncompressibleSpectrumWorkerResponse,
 } from '@/lib/physics/bec/incompressibleSpectrum.worker'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
 /** Mutable state shared with the strategy across maybeComputeSpectrum calls. */
 export interface BecSpectrumWorkerState {

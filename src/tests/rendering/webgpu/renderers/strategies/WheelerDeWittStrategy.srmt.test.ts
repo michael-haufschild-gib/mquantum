@@ -24,7 +24,7 @@ import {
   computeWdwSrmtRenderHash,
   WheelerDeWittStrategy,
 } from '@/rendering/webgpu/renderers/strategies/WheelerDeWittStrategy'
-import { useSrmtDiagnosticStore } from '@/stores/srmtDiagnosticStore'
+import { useSrmtDiagnosticStore } from '@/stores/diagnostics/srmtDiagnosticStore'
 import { mockWebGPU } from '@/tests/__mocks__/webgpu'
 
 // Mock the worker dispatcher so the strategy populates the store

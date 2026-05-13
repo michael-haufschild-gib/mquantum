@@ -72,6 +72,14 @@ export const BTZ_F_EPSILON = 1e-3
  */
 export const BTZ_AMPLITUDE_CEILING = 500
 
+function isFiniteNonNegative(value: number): boolean {
+  return Number.isFinite(value) && value >= 0
+}
+
+function isFinitePositive(value: number): boolean {
+  return Number.isFinite(value) && value > 0
+}
+
 /**
  * BTZ metric function f(r) = (r² − r_+²) / L² for the non-rotating static
  * black hole. Positive outside the horizon, zero at r = r_+, negative
@@ -83,6 +91,7 @@ export const BTZ_AMPLITUDE_CEILING = 500
  * @returns The metric component f(r).
  */
 export function btzMetricF(r: number, rplus: number, L: number): number {
+  if (!isFiniteNonNegative(r) || !isFiniteNonNegative(rplus) || !isFinitePositive(L)) return 0
   return (r * r - rplus * rplus) / (L * L)
 }
 
@@ -96,6 +105,7 @@ export function btzMetricF(r: number, rplus: number, L: number): number {
  * @returns Hawking temperature (physical units consistent with inputs).
  */
 export function btzTemperature(rplus: number, L: number): number {
+  if (!isFiniteNonNegative(rplus) || !isFinitePositive(L)) return 0
   return rplus / (2 * Math.PI * L * L)
 }
 
@@ -111,6 +121,7 @@ export function btzTemperature(rplus: number, L: number): number {
  * @returns Bekenstein-Hawking entropy S_BH.
  */
 export function btzEntropy(rplus: number, Gnewton: number): number {
+  if (!isFiniteNonNegative(rplus) || !isFinitePositive(Gnewton)) return 0
   return (Math.PI * rplus) / (2 * Gnewton)
 }
 
@@ -125,6 +136,7 @@ export function btzEntropy(rplus: number, Gnewton: number): number {
  * @returns ADM mass M.
  */
 export function btzMass(rplus: number, Gnewton: number, L: number): number {
+  if (!isFiniteNonNegative(rplus) || !isFinitePositive(Gnewton) || !isFinitePositive(L)) return 0
   return (rplus * rplus) / (8 * Gnewton * L * L)
 }
 
@@ -139,10 +151,13 @@ export function btzMass(rplus: number, Gnewton: number, L: number): number {
  * @returns Δ_+.
  */
 export function btzScalarDelta(mL: number): number {
+  if (!Number.isFinite(mL)) return 1
   const m2L2 = mL >= 0 ? mL * mL : -(mL * mL)
+  if (!Number.isFinite(m2L2)) return 1
   const disc = 1 + m2L2
   if (disc <= 0) return 1
-  return 1 + Math.sqrt(disc)
+  const delta = 1 + Math.sqrt(disc)
+  return Number.isFinite(delta) ? delta : 1
 }
 
 /**
@@ -181,7 +196,18 @@ export function btzThermalAmplitude(
   epsilonF: number = BTZ_F_EPSILON
 ): number {
   if (!Number.isFinite(r) || !Number.isFinite(phi)) return 0
-  if (r <= rplus || rplus <= 0 || L <= 0) return 0
+  if (
+    r <= rplus ||
+    !isFinitePositive(rplus) ||
+    !isFinitePositive(L) ||
+    !isFinitePositive(omega) ||
+    !isFinitePositive(delta) ||
+    !Number.isFinite(mAngular) ||
+    !isFinitePositive(beta) ||
+    !isFinitePositive(epsilonF)
+  ) {
+    return 0
+  }
 
   const f = btzMetricF(r, rplus, L)
   const fSafe = Math.max(f, epsilonF)

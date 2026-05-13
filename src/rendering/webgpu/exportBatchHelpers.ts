@@ -7,10 +7,10 @@
  * @module rendering/webgpu/exportBatchHelpers
  */
 
-import type { ExportSettings } from '@/stores/exportStore'
-import { useExportStore } from '@/stores/exportStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
-import { useRotationStore } from '@/stores/rotationStore'
+import type { ExportSettings } from '@/stores/runtime/exportStore'
+import { useExportStore } from '@/stores/runtime/exportStore'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
+import { useRotationStore } from '@/stores/scene/rotationStore'
 
 import {
   createExportRecorder,
@@ -146,6 +146,7 @@ export function captureExportEnvironment(
   size: { width: number; height: number }
 ): void {
   const perfStore = usePerformanceStore.getState()
+  runtime.environmentCaptured = true
   runtime.originalCanvasWidth = canvas.width
   runtime.originalCanvasHeight = canvas.height
   runtime.originalCameraAspect =

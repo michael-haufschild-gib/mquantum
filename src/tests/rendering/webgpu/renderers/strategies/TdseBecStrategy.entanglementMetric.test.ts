@@ -4,7 +4,7 @@ import { DEFAULT_TDSE_CONFIG } from '@/lib/geometry/extended/tdse'
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 import type { CoordinateEntanglementResult } from '@/lib/physics/coordinateEntanglement'
 import { TdseBecStrategy } from '@/rendering/webgpu/renderers/strategies/TdseBecStrategy'
-import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
+import { useCoordinateEntanglementStore } from '@/stores/diagnostics/coordinateEntanglementStore'
 
 class MockWorker {
   static instances: MockWorker[] = []

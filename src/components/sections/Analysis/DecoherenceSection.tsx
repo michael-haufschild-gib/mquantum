@@ -17,7 +17,7 @@ import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { useAnySweepRunning } from '@/hooks/useAnySweepRunning'
 import { MAX_STOCHASTIC_SITES } from '@/lib/physics/stochastic/localizationKernel'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 import { ControlGroup } from '../../ui/ControlGroup'
 

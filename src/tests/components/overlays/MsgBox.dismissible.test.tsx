@@ -14,8 +14,8 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { MsgBox } from '@/components/overlays/MsgBox'
-import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
-import { useMsgBoxStore } from '@/stores/msgBoxStore'
+import { useDismissedDialogsStore } from '@/stores/ui/dismissedDialogsStore'
+import { useMsgBoxStore } from '@/stores/ui/msgBoxStore'
 
 // localStorage and HTMLDialogElement mocks are provided globally by
 // installDOMMocks() in src/tests/setup.ts.
