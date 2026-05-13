@@ -9,20 +9,19 @@
  *   pnpm test:shaders:tint              # curated ~500
  *   pnpm test:shaders:tint -- --grep ... # override
  *
- * Bugs caught: Chrome-Tint-only rejections (stricter bind-group-layout checks,
- * storage-texture format nuances, `textureSample` placement rules, etc.) that
- * naga's validator does not enforce.
+ * Bugs caught: Chrome-Tint-only shader-module rejections (syntax/type-system
+ * differences, storage-texture format nuances, `textureSample` placement
+ * rules, etc.) that naga's validator does not enforce.
  */
 
 import { expect, test } from '@playwright/test'
-
-import { enumerateAll } from '@/tests/rendering/wgsl/enumerateAll'
 
 import {
   RENDERER_READY_TIMEOUT,
   waitForAppLoaded,
   waitForRendererReady,
 } from './helpers/app-helpers'
+import { selectTintRecords, TINT_SURFACE_ORDER, tintOptionsFromEnv } from './wgslTintSelection'
 
 test.describe('@wgsl-tint WGSL validation (Chrome/Tint)', () => {
   // Gate the entire suite behind an explicit env var so the default Playwright
@@ -41,22 +40,29 @@ test.describe('@wgsl-tint WGSL validation (Chrome/Tint)', () => {
     // running 50k+ shaders through a real browser is impractical.
     //
     // WGSL_TINT_MAX bounds the batch (default 500). WGSL_SUBSET / WGSL_MODE /
-    // WGSL_MAX all pass through to the enumerator so the curation can be
-    // narrowed further.
-    const parsedTintMax = Number(process.env.WGSL_TINT_MAX ?? 500)
-    const TINT_MAX =
-      Number.isFinite(parsedTintMax) && parsedTintMax > 0 ? Math.floor(parsedTintMax) : 500
-    const records: Array<{ label: string; wgsl: string; surface: string }> = []
-    for (const rec of enumerateAll({ maxUnique: TINT_MAX })) {
-      records.push({ label: rec.label, wgsl: rec.wgsl, surface: rec.surface })
-      if (records.length >= TINT_MAX) break
-    }
+    // WGSL_MAX all pass through to the selector so the curation can be
+    // narrowed further. Selection is surface-balanced; a small cap must still
+    // reach late enumerator surfaces such as skybox, wigner, and render passes.
+    const tintOptions = tintOptionsFromEnv()
+    const records = selectTintRecords(tintOptions).map((rec) => ({
+      label: rec.label,
+      wgsl: rec.wgsl,
+      surface: rec.surface,
+    }))
     // Fail loudly if curation/filtering yielded nothing — a green run with
     // zero validated shaders is meaningless and would mask coverage drops.
     expect(
       records.length,
       'No shaders collected — check WGSL_TINT_MAX, WGSL_SUBSET, WGSL_MODE filters'
     ).toBeGreaterThan(0)
+
+    const expectedSurfaces = [...new Set(tintOptions.subsets ?? TINT_SURFACE_ORDER)]
+    if (tintOptions.maxRecords >= expectedSurfaces.length) {
+      const coveredSurfaces = [...new Set(records.map((record) => record.surface))]
+      expect(coveredSurfaces, 'Tint curation missed requested shader surface(s)').toEqual(
+        expect.arrayContaining(expectedSurfaces)
+      )
+    }
 
     // Need the app to boot so the worker registers `navigator.gpu`, even
     // though we request our own adapter/device below. The renderer-ready
@@ -97,33 +103,37 @@ test.describe('@wgsl-tint WGSL validation (Chrome/Tint)', () => {
           const device = await adapter.requestDevice()
 
           const out: TintFailure[] = []
-          for (const { label, wgsl, surface } of list) {
-            // Capture uncaught errors from the validation scope. Most WGSL
-            // rejections surface via getCompilationInfo, but some land in
-            // device.onuncapturederror / pushErrorScope('validation').
-            device.pushErrorScope('validation')
-            const mod = device.createShaderModule({ code: wgsl, label })
-            const info = await mod.getCompilationInfo()
-            const scoped = await device.popErrorScope()
+          try {
+            for (const { label, wgsl, surface } of list) {
+              // Capture uncaught errors from the validation scope. Most WGSL
+              // rejections surface via getCompilationInfo, but some land in
+              // device.onuncapturederror / pushErrorScope('validation').
+              device.pushErrorScope('validation')
+              const mod = device.createShaderModule({ code: wgsl, label })
+              const info = await mod.getCompilationInfo()
+              const scoped = await device.popErrorScope()
 
-            const errors = info.messages
-              .filter((m) => m.type === 'error')
-              .map((m) => ({
-                line: m.lineNum,
-                col: m.linePos,
-                msg: m.message,
-                offset: m.offset,
-              }))
+              const errors = info.messages
+                .filter((m) => m.type === 'error')
+                .map((m) => ({
+                  line: m.lineNum,
+                  col: m.linePos,
+                  msg: m.message,
+                  offset: m.offset,
+                }))
 
-            if (scoped) {
-              // A validation error on the scope but no compilation-info message
-              // — record the scope message with line=0.
-              errors.push({ line: 0, col: 0, msg: `validation: ${scoped.message}`, offset: 0 })
+              if (scoped) {
+                // A validation error on the scope but no compilation-info message
+                // — record the scope message with line=0.
+                errors.push({ line: 0, col: 0, msg: `validation: ${scoped.message}`, offset: 0 })
+              }
+
+              if (errors.length > 0) out.push({ label, surface, errors })
             }
-
-            if (errors.length > 0) out.push({ label, surface, errors })
+            return out
+          } finally {
+            device.destroy()
           }
-          return out
         },
         chunk
       )
