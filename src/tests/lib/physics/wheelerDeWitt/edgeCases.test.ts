@@ -16,6 +16,11 @@ import { describe, expect, it } from 'vitest'
 
 import { hhLangerSeed } from '@/lib/physics/wheelerDeWitt/hhLangerSeed'
 import { solveWheelerDeWitt } from '@/lib/physics/wheelerDeWitt/solver'
+import {
+  resetCflWarningBudget,
+  WDW_CFL_WARN_BUDGET,
+} from '@/lib/physics/wheelerDeWitt/solverConstants'
+import type { WheelerDeWittSolverInput } from '@/lib/physics/wheelerDeWitt/solverTypes'
 
 function assertAllFinite(chi: Float32Array): void {
   for (let i = 0; i < chi.length; i++) {
@@ -26,6 +31,17 @@ function assertAllFinite(chi: Float32Array): void {
 }
 
 describe('WDW solver — extreme parameter corners', () => {
+  const VALID_INPUT: WheelerDeWittSolverInput = {
+    boundaryCondition: 'noBoundary',
+    inflatonMass: 0.3,
+    cosmologicalConstant: 0.0,
+    aMin: 0.1,
+    aMax: 1.5,
+    gridNa: 8,
+    gridNphi: 4,
+    phiExtent: 3.5,
+  }
+
   it('handles gridNa = 3 minimum without crash', () => {
     const out = solveWheelerDeWitt({
       boundaryCondition: 'noBoundary',
@@ -70,7 +86,7 @@ describe('WDW solver — extreme parameter corners', () => {
         gridNphi: 8,
         phiExtent: 3.5,
       })
-    ).toThrow(/gridNa must be >= 3/)
+    ).toThrow(/gridNa must be an integer >= 3/)
   })
 
   it('rejects gridNphi < 3 with a clear error', () => {
@@ -85,7 +101,7 @@ describe('WDW solver — extreme parameter corners', () => {
         gridNphi: 2,
         phiExtent: 3.5,
       })
-    ).toThrow(/gridNphi must be >= 3/)
+    ).toThrow(/gridNphi must be an integer >= 3/)
   })
 
   it('rejects aMax ≤ aMin', () => {
@@ -101,6 +117,58 @@ describe('WDW solver — extreme parameter corners', () => {
         phiExtent: 3.5,
       })
     ).toThrow(/aMax must exceed aMin/)
+  })
+
+  it.each([
+    ['unknown boundary condition', { boundaryCondition: 'bogus' }, /boundaryCondition must be one of/],
+    ['NaN mass', { inflatonMass: Number.NaN }, /inflatonMass must be finite/],
+    ['negative mass', { inflatonMass: -0.1 }, /inflatonMass must be >= 0/],
+    [
+      'non-finite cosmological constant',
+      { cosmologicalConstant: Number.POSITIVE_INFINITY },
+      /cosmologicalConstant must be finite/,
+    ],
+    ['zero aMin', { aMin: 0 }, /aMin must be > 0/],
+    ['non-finite aMax', { aMax: Number.NEGATIVE_INFINITY }, /aMax must be finite/],
+    ['fractional gridNa', { gridNa: 3.5 }, /gridNa must be an integer >= 3/],
+    ['fractional gridNphi', { gridNphi: 3.5 }, /gridNphi must be an integer >= 3/],
+    ['zero phiExtent', { phiExtent: 0 }, /phiExtent must be > 0/],
+    [
+      'non-positive inflatonMassAsymmetry',
+      { inflatonMassAsymmetry: 0 },
+      /inflatonMassAsymmetry must be > 0/,
+    ],
+  ])('rejects invalid public input: %s', (_name, override, message) => {
+    expect(() =>
+      solveWheelerDeWitt({
+        ...VALID_INPUT,
+        ...(override as Partial<WheelerDeWittSolverInput>),
+      })
+    ).toThrow(message)
+  })
+
+  it('rejects non-finite custom boundary buffers before propagation', () => {
+    const chi = new Float32Array(2 * VALID_INPUT.gridNphi * VALID_INPUT.gridNphi)
+    const chiDeriv = new Float32Array(chi.length)
+    chi[3] = Number.NaN
+
+    expect(() =>
+      solveWheelerDeWitt({
+        ...VALID_INPUT,
+        customBoundary: { chi, chiDeriv },
+      })
+    ).toThrow(/customBoundary\.chi\[3\] must be finite/)
+  })
+
+  it('clamps non-finite CFL warning reset budgets to zero', () => {
+    resetCflWarningBudget(Number.POSITIVE_INFINITY)
+    expect(WDW_CFL_WARN_BUDGET.remaining).toBe(0)
+
+    resetCflWarningBudget(Number.NaN)
+    expect(WDW_CFL_WARN_BUDGET.remaining).toBe(0)
+
+    resetCflWarningBudget()
+    expect(WDW_CFL_WARN_BUDGET.remaining).toBe(3)
   })
 
   it('remains finite at Λ = +1 (upper clamp edge, large dS Euclidean growth)', () => {

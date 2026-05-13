@@ -48,7 +48,7 @@ export const WDW_CFL_WARN_BUDGET: CflWarningBudget = { remaining: WDW_CFL_WARN_D
  * tests.
  */
 export function resetCflWarningBudget(budget: number = WDW_CFL_WARN_DEFAULT): void {
-  WDW_CFL_WARN_BUDGET.remaining = Math.max(0, Math.floor(budget))
+  WDW_CFL_WARN_BUDGET.remaining = Number.isFinite(budget) ? Math.max(0, Math.floor(budget)) : 0
 }
 
 /**

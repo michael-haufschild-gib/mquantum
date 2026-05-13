@@ -49,6 +49,8 @@ import { fileURLToPath } from 'node:url'
 
 import type { WdwBoundaryCondition } from '@/lib/geometry/extended/wheelerDeWitt'
 
+import { validateWheelerDeWittSolverInput } from './solverInputValidation'
+
 /** Inputs accepted by the Rust validator. Mirrors the TS solver inputs
  * minus `customBoundary` (the Rust path uses the dispatched BC generator
  * exclusively — analytic-fixture tests stay TS-only). */
@@ -196,6 +198,7 @@ async function loadValidatorModule(): Promise<ValidatorModule> {
 export async function solveWheelerDeWittWasmValidator(
   input: WdwValidatorInput
 ): Promise<WdwValidatorOutput> {
+  validateWheelerDeWittSolverInput(input)
   const mod = await loadValidatorModule()
   const chi = mod.solve_leapfrog_validator_wasm(
     bcToCode(input.boundaryCondition),
