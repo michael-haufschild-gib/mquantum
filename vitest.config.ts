@@ -200,17 +200,17 @@ export default defineConfig({
       // denominator changes (new files, exclusion list changes) — document why.
       // The companion `scripts/check-coverage-ratchet.js` rejects thresholds
       // that drift > 1% below actual, so missed ratchet-ups break CI.
-      // Last measured 2026-05-09: stmts 85.02%, branches 75.32%, funcs 81.12%, lines 86.09%
+      // Last measured 2026-05-13: stmts 85.80%, branches 76.93%, funcs 82.92%, lines 86.84%
       // Big jump from PR #72 — large test+refactor wave (curved-space sampling,
       // type-extraction splits, broad coverage uplift) plus CodeRabbit
       // follow-ups (extracted boundingRadiusQuantize.ts, set-equality and
-      // exact-match assertions). Thresholds raised to track actuals within 1%
-      // per the ratchet contract.
+      // exact-match assertions). PR #88 ratchet-up tracks the latest dev
+      // measurements (rounded down to nearest 0.5%) per the ratchet contract.
       thresholds: {
-        statements: 85,
-        branches: 75,
-        functions: 81,
-        lines: 85.5,
+        statements: 85.5,
+        branches: 76.5,
+        functions: 82.5,
+        lines: 86.5,
       },
     },
   },
