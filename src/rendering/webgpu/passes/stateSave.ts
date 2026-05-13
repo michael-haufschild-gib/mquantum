@@ -42,6 +42,12 @@ interface InterleavedBufferSource {
 /** GPU buffer source for state readback. */
 export type StateSaveBufferSource = SeparateBufferSource | InterleavedBufferSource
 
+/** Loaded split-component data pending upload back into GPU buffers. */
+export interface StateInjectionData {
+  re: Float32Array
+  im: Float32Array
+}
+
 // ─── Metadata ───────────────────────────────────────────────────────────────
 
 /**
@@ -240,6 +246,36 @@ function requestInterleavedSave(
 }
 
 // ─── Shared Helpers ─────────────────────────────────────────────────────────
+
+/** Assert loaded split-component arrays exactly match the expected component count. */
+export function assertStateInjectionLength(
+  label: string,
+  data: StateInjectionData,
+  expectedElements: number,
+  expectedDescription = String(expectedElements)
+): void {
+  if (data.re.length !== expectedElements || data.im.length !== expectedElements) {
+    throw new Error(
+      `[${label}] Invalid save-state length: expected re=im=${expectedDescription}, got re=${data.re.length}, im=${data.im.length}`
+    )
+  }
+}
+
+/** Convert split re/im arrays to the vec2f `[re0, im0, ...]` upload layout. */
+export function interleaveStateInjection(
+  label: string,
+  data: StateInjectionData,
+  expectedElements: number,
+  expectedDescription?: string
+): Float32Array<ArrayBuffer> {
+  assertStateInjectionLength(label, data, expectedElements, expectedDescription)
+  const interleaved = new Float32Array(expectedElements * 2) as Float32Array<ArrayBuffer>
+  for (let i = 0; i < expectedElements; i++) {
+    interleaved[i * 2] = data.re[i]!
+    interleaved[i * 2 + 1] = data.im[i]!
+  }
+  return interleaved
+}
 
 /** Serialize readback data and trigger browser download. */
 async function serializeAndDownload(

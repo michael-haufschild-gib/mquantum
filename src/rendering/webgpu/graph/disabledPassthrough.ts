@@ -12,6 +12,7 @@ import { logger } from '@/lib/logger'
 
 import type { WebGPURenderPass } from '../core/types'
 import type { WebGPUResourcePool } from '../core/WebGPUResourcePool'
+import { resolveResourceAlias } from './resourceAliases'
 
 /**
  * Seen mismatch signatures for passthrough warnings. A stable mismatch would
@@ -54,6 +55,7 @@ export function handleDisabledPassthrough(
 
   const inputId = inputs[0]!.resourceId
   const outputId = outputs[0]!.resourceId
+  const resolvedInputId = resolveResourceAlias(resourceAliases, inputId)
 
   if (writtenByEnabledPass.has(outputId)) {
     passTimings?.set(passId, 0)
@@ -65,11 +67,11 @@ export function handleDisabledPassthrough(
   const skipPassthrough = pass.config.skipPassthrough ?? false
 
   if (skipPassthrough) {
-    resourceAliases.set(outputId, inputId)
+    resourceAliases.set(outputId, resolvedInputId)
     if (shouldLog)
-      logger.log(`[WebGPU RenderGraph] Pass '${passId}' aliasing ${outputId} → ${inputId}`)
+      logger.log(`[WebGPU RenderGraph] Pass '${passId}' aliasing ${outputId} → ${resolvedInputId}`)
   } else {
-    const inputTexture = pool.getTexture(inputId)
+    const inputTexture = pool.getTexture(resolvedInputId)
     const outputTexture = pool.getTexture(outputId)
 
     if (inputTexture && outputTexture) {
@@ -95,16 +97,16 @@ export function handleDisabledPassthrough(
           // values. Log a warning so the renderer author can mark the pass with
           // skipPassthrough=true (intentional alias) or fix the format mismatch.
           const warnKey =
-            `${passId}:${inputId}→${outputId}:` +
+            `${passId}:${resolvedInputId}→${outputId}:` +
             `${inputTexture.format}:${inputTexture.width}×${inputTexture.height}→` +
             `${outputTexture.format}:${outputTexture.width}×${outputTexture.height}`
           if (!warnedPassthroughMismatch.has(warnKey)) {
             warnedPassthroughMismatch.add(warnKey)
             logger.warn(
-              `[WebGPU RenderGraph] Disabled pass '${passId}' falling back to alias because ${inputId} (${inputTexture.format} ${inputTexture.width}×${inputTexture.height}) does not match ${outputId} (${outputTexture.format} ${outputTexture.width}×${outputTexture.height}). Add skipPassthrough=true to the pass config if aliasing is intentional.`
+              `[WebGPU RenderGraph] Disabled pass '${passId}' falling back to alias because ${resolvedInputId} (${inputTexture.format} ${inputTexture.width}×${inputTexture.height}) does not match ${outputId} (${outputTexture.format} ${outputTexture.width}×${outputTexture.height}). Add skipPassthrough=true to the pass config if aliasing is intentional.`
             )
           }
-          resourceAliases.set(outputId, inputId)
+          resourceAliases.set(outputId, resolvedInputId)
         }
       }
     }

@@ -40,7 +40,9 @@ export interface SrmtSweepCancelToken {
 
 /** Clamp the SRMT rankCap to the [8, 256] range the worker tolerates. */
 export function clampRankCap(rankCap: number): number {
-  return Math.max(8, Math.min(256, Math.round(rankCap)))
+  const rounded = Math.round(rankCap)
+  if (Number.isNaN(rounded)) return 8
+  return Math.max(8, Math.min(256, rounded))
 }
 
 /**
@@ -51,7 +53,9 @@ export function clampRankCap(rankCap: number): number {
  * in `gridNa`).
  */
 export function clampGridNa(gridNa: number): number {
-  return Math.max(64, Math.min(1024, Math.round(gridNa)))
+  const rounded = Math.round(gridNa)
+  if (Number.isNaN(rounded)) return 64
+  return Math.max(64, Math.min(1024, rounded))
 }
 
 /**
@@ -76,7 +80,9 @@ export function clampGridNa(gridNa: number): number {
  * sweep so `gridNa` is raised from the actual CFL-derived linear bound.
  */
 export function clampGridNphi(gridNphi: number): number {
-  return Math.max(32, Math.min(64, Math.round(gridNphi)))
+  const rounded = Math.round(gridNphi)
+  if (Number.isNaN(rounded)) return 32
+  return Math.max(32, Math.min(64, rounded))
 }
 
 /**
@@ -97,11 +103,10 @@ export function clampGridNphi(gridNphi: number): number {
  * real-valued knob — no integer rounding.
  */
 export function clampPhiExtent(phiExtent: number): number {
-  // NaN falls through to the lower bound (safest default); ±Infinity
-  // map to their respective bounds via Math.max / Math.min, matching
-  // the behaviour of clampRankCap / clampGridNa / clampGridNphi on
-  // out-of-range numeric input.
-  if (Number.isNaN(phiExtent)) return 0.5
+  // NaN and non-numeric values fall through to the lower bound (safest
+  // default). +Infinity maps to the upper bound; -Infinity to lower.
+  if (phiExtent === Number.POSITIVE_INFINITY) return 10
+  if (!Number.isFinite(phiExtent)) return 0.5
   return Math.max(0.5, Math.min(10, phiExtent))
 }
 

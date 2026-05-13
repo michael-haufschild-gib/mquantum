@@ -63,6 +63,14 @@ describe('URL params -> store state integration', () => {
     expect(sch.scale).toBeCloseTo(1.5)
   })
 
+  it('rejects isosurface from URL when representation is Wigner', () => {
+    applyUrlStateToStores('d=4&t=schroedinger&repr=wigner&iso=1')
+
+    const sch = useExtendedObjectStore.getState().schroedinger
+    expect(sch.representation).toBe('wigner')
+    expect(sch.isoEnabled).toBe(false)
+  })
+
   it('applies representation param from URL', () => {
     applyUrlStateToStores('d=4&t=schroedinger&repr=momentum')
     expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('momentum')

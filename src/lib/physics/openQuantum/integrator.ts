@@ -35,6 +35,66 @@ const eigenvectors = new Float64Array(MAX_K * MAX_K * 2)
 /** Scratch for matrix reconstruction */
 const scratchMatrix = new Float64Array(MAX_K * MAX_K * 2)
 
+function assertValidK(caller: string, K: number): void {
+  if (!Number.isInteger(K) || K < 1) {
+    throw new Error(`${caller}: K must be a positive integer, got ${K}`)
+  }
+  if (K > MAX_K) {
+    throw new Error(`${caller}: K=${K} exceeds MAX_K=${MAX_K}`)
+  }
+}
+
+function assertDensityMatrixShape(caller: string, rho: DensityMatrix): void {
+  assertValidK(caller, rho.K)
+  const expected = rho.K * rho.K * 2
+  if (rho.elements.length < expected) {
+    throw new Error(`${caller}: rho.elements too small (expected >= ${expected})`)
+  }
+}
+
+function assertArrayLength(
+  caller: string,
+  name: string,
+  values: ArrayLike<number>,
+  K: number
+): void {
+  if (values.length < K) {
+    throw new Error(`${caller}: ${name} length must be >= K (${K}), got ${values.length}`)
+  }
+}
+
+function assertOutputLength(caller: string, name: string, values: Float64Array, min: number): void {
+  if (values.length < min) {
+    throw new Error(`${caller}: ${name} too small (expected >= ${min})`)
+  }
+}
+
+function assertFiniteNumber(caller: string, name: string, value: number): void {
+  if (!Number.isFinite(value)) {
+    throw new Error(`${caller}: ${name} must be finite, got ${value}`)
+  }
+}
+
+function assertChannels(caller: string, channels: readonly LindbladChannel[], K: number): void {
+  for (let i = 0; i < channels.length; i++) {
+    const ch = channels[i]!
+    if (
+      !Number.isInteger(ch.row) ||
+      !Number.isInteger(ch.col) ||
+      ch.row < 0 ||
+      ch.row >= K ||
+      ch.col < 0 ||
+      ch.col >= K
+    ) {
+      throw new Error(
+        `${caller}: channel ${i} index out of range for K=${K} (row=${ch.row}, col=${ch.col})`
+      )
+    }
+    assertFiniteNumber(caller, `channel ${i} amplitudeRe`, ch.amplitudeRe)
+    assertFiniteNumber(caller, `channel ${i} amplitudeIm`, ch.amplitudeIm)
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Density matrix factory
 // ---------------------------------------------------------------------------
@@ -46,6 +106,7 @@ const scratchMatrix = new Float64Array(MAX_K * MAX_K * 2)
  * @returns Fresh density matrix
  */
 export function createDensityMatrix(K: number): DensityMatrix {
+  assertValidK('createDensityMatrix', K)
   return { K, elements: new Float64Array(K * K * 2) }
 }
 
@@ -62,9 +123,14 @@ export function densityMatrixFromCoefficients(
   coeffsIm: ArrayLike<number>,
   K: number
 ): DensityMatrix {
+  assertValidK('densityMatrixFromCoefficients', K)
+  assertArrayLength('densityMatrixFromCoefficients', 'coeffsRe', coeffsRe, K)
+  assertArrayLength('densityMatrixFromCoefficients', 'coeffsIm', coeffsIm, K)
   const rho = createDensityMatrix(K)
   const el = rho.elements
   for (let k = 0; k < K; k++) {
+    assertFiniteNumber('densityMatrixFromCoefficients', `coeffsRe[${k}]`, coeffsRe[k]!)
+    assertFiniteNumber('densityMatrixFromCoefficients', `coeffsIm[${k}]`, coeffsIm[k]!)
     for (let l = 0; l < K; l++) {
       const idx = 2 * (k * K + l)
       // c_k · c_l* = (ck_re + i ck_im)(cl_re - i cl_im)
@@ -89,6 +155,9 @@ export function densityMatrixFromCoefficients(
  * @param dt - Timestep
  */
 function unitaryStep(rho: DensityMatrix, energies: Float64Array, dt: number): void {
+  assertDensityMatrixShape('unitaryStep', rho)
+  assertArrayLength('unitaryStep', 'energies', energies, rho.K)
+  assertFiniteNumber('unitaryStep', 'dt', dt)
   const K = rho.K
   const el = rho.elements
 
@@ -168,6 +237,7 @@ function dissipativeStep(
  * @param rho - Density matrix (mutated in place)
  */
 export function hermitianize(rho: DensityMatrix): void {
+  assertDensityMatrixShape('hermitianize', rho)
   const K = rho.K
   const el = rho.elements
   for (let k = 0; k < K; k++) {
@@ -192,6 +262,7 @@ export function hermitianize(rho: DensityMatrix): void {
  * @param rho - Density matrix (mutated in place)
  */
 export function traceNormalize(rho: DensityMatrix): void {
+  assertDensityMatrixShape('traceNormalize', rho)
   const K = rho.K
   const el = rho.elements
   let trace = 0
@@ -222,7 +293,10 @@ export function hermitianEigendecompose(
   outEigenvalues: Float64Array,
   outEigenvectors: Float64Array
 ): void {
+  assertDensityMatrixShape('hermitianEigendecompose', rho)
   const K = rho.K
+  assertOutputLength('hermitianEigendecompose', 'outEigenvalues', outEigenvalues, K)
+  assertOutputLength('hermitianEigendecompose', 'outEigenvectors', outEigenvectors, K * K * 2)
 
   // Copy rho into work matrix (scratchMatrix)
   const size = K * K * 2
@@ -398,6 +472,7 @@ export function hermitianEigendecompose(
  * @param rho - Density matrix (mutated in place)
  */
 export function eigenvalueFloor(rho: DensityMatrix): void {
+  assertDensityMatrixShape('eigenvalueFloor', rho)
   const K = rho.K
   const EPS = 1e-12
 
@@ -493,6 +568,11 @@ export function evolveStep(
   channels: readonly LindbladChannel[],
   dt: number
 ): void {
+  assertDensityMatrixShape('evolveStep', rho)
+  assertArrayLength('evolveStep', 'energies', energies, rho.K)
+  assertFiniteNumber('evolveStep', 'dt', dt)
+  assertChannels('evolveStep', channels, rho.K)
+
   // 1. Unitary step
   unitaryStep(rho, energies, dt)
 
@@ -525,6 +605,9 @@ export function evolveMultiStep(
   dt: number,
   substeps: number
 ): void {
+  if (!Number.isInteger(substeps) || substeps < 0) {
+    throw new Error(`evolveMultiStep: substeps must be a non-negative integer, got ${substeps}`)
+  }
   for (let s = 0; s < substeps; s++) {
     evolveStep(rho, energies, channels, dt)
   }

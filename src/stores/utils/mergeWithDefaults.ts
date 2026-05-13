@@ -20,13 +20,26 @@ import {
   FREE_SCALAR_MAX_TOTAL_SITES,
 } from '@/lib/geometry/extended/freeScalar'
 import { sanitizeQuantumWalkConfig } from '@/lib/geometry/extended/quantumWalk'
-import { getNamedPresetStoreControls } from '@/lib/geometry/extended/schroedinger/presets'
-import { normalizeTdseBlackHoleParams } from '@/lib/geometry/extended/tdse'
+import { sanitizeHarmonicOscillatorScalars } from '@/lib/geometry/extended/schroedinger/configSanitization'
 import {
+  isTdseDensityView,
+  isTdseDisorderDistribution,
+  isTdseDriveWaveform,
+  isTdseFieldView,
+  isTdseInitialCondition,
+  isTdsePotentialType,
+  normalizeTdseBlackHoleParams,
+} from '@/lib/geometry/extended/tdse'
+import {
+  createDefaultSchroedingerConfig,
   DEFAULT_PAULI_CONFIG,
   DEFAULT_SCHROEDINGER_CONFIG,
   type FreeScalarConfig,
+  RAYMARCH_QUALITY_TO_SAMPLES,
+  SCHROEDINGER_QUALITY_PRESETS,
 } from '@/lib/geometry/extended/types'
+import { isAnalyticQuantumType } from '@/lib/geometry/registry'
+import type { QuantumTypeKey } from '@/lib/geometry/registry/types'
 import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
 import { sanitizePowerOfTwoGridSizes } from '@/lib/math/ndArray'
@@ -37,9 +50,13 @@ import { OBJECT_TYPE_TO_CONFIG_KEY } from './presetSerialization'
 /**
  * Mapping from config key to its default config.
  */
-const CONFIG_KEY_TO_DEFAULT: Record<string, object> = {
-  schroedinger: DEFAULT_SCHROEDINGER_CONFIG,
-  pauliSpinor: DEFAULT_PAULI_CONFIG,
+const CONFIG_KEY_TO_DEFAULT: Record<string, () => object> = {
+  schroedinger: createDefaultSchroedingerConfig,
+  pauliSpinor: () => structuredClone(DEFAULT_PAULI_CONFIG),
+}
+
+function hasRecordKey<T extends object>(record: T, value: unknown): value is keyof T {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(record, value)
 }
 
 /**
@@ -98,8 +115,8 @@ function resolveMergeKey(
     return deepMerge(defaultVal as object, loadedVal)
   }
 
-  // Primitives: only accept when types match (prevents number replacing an expected object).
-  if (!defaultIsObject || typeof loadedVal === typeof defaultVal) return loadedVal
+  // Primitives: only accept when types match.
+  if (!defaultIsObject && typeof loadedVal === typeof defaultVal) return loadedVal
   return undefined
 }
 
@@ -202,6 +219,60 @@ function normalizeDiracEnums(normalized: Record<string, unknown>): Record<string
   return next === diracRecord ? normalized : { ...normalized, dirac: next }
 }
 
+interface EnumFieldRule {
+  field: string
+  isValid: (value: unknown) => boolean
+}
+
+const TDSE_ENUM_FIELD_RULES: readonly EnumFieldRule[] = [
+  { field: 'potentialType', isValid: isTdsePotentialType },
+  { field: 'initialCondition', isValid: isTdseInitialCondition },
+  { field: 'fieldView', isValid: isTdseFieldView },
+  { field: 'driveWaveform', isValid: isTdseDriveWaveform },
+  { field: 'disorderDistribution', isValid: isTdseDisorderDistribution },
+  { field: 'densityView', isValid: isTdseDensityView },
+] as const
+
+function normalizeEnumFields(
+  record: Record<string, unknown>,
+  defaults: Record<string, unknown>,
+  rules: readonly EnumFieldRule[]
+): Record<string, unknown> {
+  let next = record
+  for (const { field, isValid } of rules) {
+    if (isValid(record[field])) continue
+    next = next === record ? { ...record } : next
+    next[field] = defaults[field]
+  }
+  return next
+}
+
+function normalizeTdseEnums(normalized: Record<string, unknown>): Record<string, unknown> {
+  const tdse = normalized.tdse
+  if (!tdse || typeof tdse !== 'object' || Array.isArray(tdse)) return normalized
+
+  const tdseRecord = tdse as Record<string, unknown>
+  const defaults = DEFAULT_SCHROEDINGER_CONFIG.tdse as unknown as Record<string, unknown>
+  const next = normalizeEnumFields(tdseRecord, defaults, TDSE_ENUM_FIELD_RULES)
+
+  return next === tdseRecord ? normalized : { ...normalized, tdse: next }
+}
+
+function normalizeSchroedingerQualityEnums(
+  normalized: Record<string, unknown>
+): Record<string, unknown> {
+  let next = normalized
+  if (!hasRecordKey(SCHROEDINGER_QUALITY_PRESETS, normalized.qualityPreset)) {
+    next = next === normalized ? { ...normalized } : next
+    next.qualityPreset = DEFAULT_SCHROEDINGER_CONFIG.qualityPreset
+  }
+  if (!hasRecordKey(RAYMARCH_QUALITY_TO_SAMPLES, normalized.raymarchQuality)) {
+    next = next === normalized ? { ...normalized } : next
+    next.raymarchQuality = DEFAULT_SCHROEDINGER_CONFIG.raymarchQuality
+  }
+  return next
+}
+
 /**
  * Reconcile `latticeDim` with the authoritative `gridSize.length` in each
  * compute-mode sub-config. `reshapeSchroedingerDefaultsForLoadedLattice` only
@@ -239,29 +310,13 @@ function sanitizeComputeLatticeDims(normalized: Record<string, unknown>): Record
   return out
 }
 
-function hasOwnLoadedKey(loaded: unknown, key: string): boolean {
-  return (
-    loaded !== null &&
-    typeof loaded === 'object' &&
-    !Array.isArray(loaded) &&
-    Object.prototype.hasOwnProperty.call(loaded, key)
-  )
-}
-
-function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(
-  merged: T,
-  loaded: unknown
-): T {
+function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged: T): T {
   let normalized = merged as unknown as Record<string, unknown>
   if (normalized.quantumMode === 'hydrogenOrbital') {
     normalized = { ...normalized, quantumMode: 'hydrogenND' }
   }
-  if (hasOwnLoadedKey(loaded, 'presetName')) {
-    const presetControls = getNamedPresetStoreControls(normalized.presetName)
-    if (presetControls) {
-      normalized = { ...normalized, ...presetControls }
-    }
-  }
+  normalized = normalizeSchroedingerQualityEnums(normalized)
+  normalized = sanitizeHarmonicOscillatorScalars(normalized, DEFAULT_SCHROEDINGER_CONFIG)
   normalized = sanitizeComputeLatticeDims(normalized)
   normalized = normalizeDiracEnums(normalized)
 
@@ -279,6 +334,8 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(
   // path — so a pre-constraint scene with (bhSpin=2, bhMultipoleL=0) would slip
   // through. Clamp here so the invariant always holds in memory.
   normalized = normalizeTdseBhParams(normalized)
+  normalized = normalizeTdseEnums(normalized)
+  normalized = normalizeSchroedingerSurfaceMode(normalized)
 
   // Reconcile cosmology invariants for the freeScalar sub-config. A scene
   // saved at one grid (e.g. 32³ at d=3, large safe η₀) loaded onto a smaller
@@ -319,6 +376,19 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(
   }
 
   return normalized as T
+}
+
+function normalizeSchroedingerSurfaceMode(
+  normalized: Record<string, unknown>
+): Record<string, unknown> {
+  if (normalized.isoEnabled !== true) return normalized
+
+  const quantumMode =
+    typeof normalized.quantumMode === 'string' ? normalized.quantumMode : 'harmonicOscillator'
+  const surfaceSupported =
+    normalized.representation !== 'wigner' && isAnalyticQuantumType(quantumMode as QuantumTypeKey)
+
+  return surfaceSupported ? normalized : { ...normalized, isoEnabled: false }
 }
 
 /**
@@ -434,11 +504,12 @@ export function mergeExtendedObjectStateForType(
     return {}
   }
 
-  const defaultConfig = CONFIG_KEY_TO_DEFAULT[configKey]
-  if (!defaultConfig) {
+  const defaultConfigFactory = CONFIG_KEY_TO_DEFAULT[configKey]
+  if (!defaultConfigFactory) {
     logger.warn(`No default config found for key: ${configKey}`)
     return {}
   }
+  const defaultConfig = defaultConfigFactory()
 
   // Guard: loaded may be null/undefined/non-object from corrupted or stale presets
   if (loaded == null || typeof loaded !== 'object') {
@@ -461,10 +532,7 @@ export function mergeExtendedObjectStateForType(
   const mergedConfig = deepMerge(effectiveDefault, migratedLoadedConfig)
   const normalizedConfig =
     configKey === 'schroedinger'
-      ? normalizeSchroedingerConfig(
-          mergedConfig as unknown as typeof DEFAULT_SCHROEDINGER_CONFIG,
-          migratedLoadedConfig
-        )
+      ? normalizeSchroedingerConfig(mergedConfig as unknown as typeof DEFAULT_SCHROEDINGER_CONFIG)
       : mergedConfig
 
   return {

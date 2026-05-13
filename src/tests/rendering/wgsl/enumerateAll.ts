@@ -9,8 +9,8 @@
  *   Default `all`. Unknown values throw.
  * - `WGSL_MODE` restrict analytic walker to a single quantumMode
  *   (harmonicOscillator | hydrogenND | hydrogenNDCoupled). Unknown values throw.
- * - `WGSL_MAX` numeric cap on total unique shaders emitted. Non-finite or
- *   non-positive values throw.
+ * - `WGSL_MAX` positive integer cap on total unique shaders emitted. Malformed
+ *   or non-positive values throw.
  *
  * Dedup across enumerators is by sha256 — two enumerators producing the
  * same WGSL (rare but possible for minimal shaders) yield only one record.
@@ -98,13 +98,15 @@ export function optionsFromEnv(
     opts.onlyMode = env.WGSL_MODE as EnumerateAllOptions['onlyMode']
   }
   if (env.WGSL_MAX) {
-    const n = Number(env.WGSL_MAX)
-    if (!Number.isFinite(n) || n <= 0) {
-      throw new Error(
-        `[enumerateAll] WGSL_MAX must be a positive finite number, got: ${env.WGSL_MAX}`
-      )
+    const rawMax = env.WGSL_MAX.trim()
+    if (!/^\d+$/.test(rawMax)) {
+      throw new Error(`[enumerateAll] WGSL_MAX must be a positive integer, got: ${env.WGSL_MAX}`)
     }
-    opts.maxUnique = n
+    const maxUnique = Number.parseInt(rawMax, 10)
+    if (maxUnique <= 0) {
+      throw new Error(`[enumerateAll] WGSL_MAX must be a positive integer, got: ${env.WGSL_MAX}`)
+    }
+    opts.maxUnique = maxUnique
   }
   return opts
 }

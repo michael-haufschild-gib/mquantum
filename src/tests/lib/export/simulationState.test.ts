@@ -153,6 +153,76 @@ describe('simulationState serialization', () => {
     await expect(deserializeSimulationState(data)).rejects.toThrow('Unsupported .mqstate version')
   })
 
+  it('rejects malformed files before constructing wavefunction arrays', async () => {
+    await expect(deserializeSimulationState(new ArrayBuffer(8))).rejects.toThrow('header too short')
+
+    const data = new ArrayBuffer(64 + 2 + 4)
+    const u8 = new Uint8Array(data)
+    const view = new DataView(data)
+    u8[0] = 'M'.charCodeAt(0)
+    u8[1] = 'Q'.charCodeAt(0)
+    u8[2] = 'S'.charCodeAt(0)
+    u8[3] = 'T'.charCodeAt(0)
+    view.setUint32(4, 1, true)
+    u8[8] = getQuantumTypeStateSaveIdMap().tdseDynamics!
+    u8[9] = 1
+    u8[10] = 1
+    view.setUint32(12, 4, true)
+    view.setUint32(56, 4, true)
+    view.setUint32(60, 2, true)
+    new TextEncoder().encodeInto('{}', new Uint8Array(data, 64, 2))
+
+    await expect(deserializeSimulationState(data)).rejects.toThrow(
+      'expected wavefunction payload 32 bytes, got 4'
+    )
+  })
+
+  it('rejects invalid header shape metadata', async () => {
+    const data = new ArrayBuffer(128)
+    const u8 = new Uint8Array(data)
+    const view = new DataView(data)
+    u8[0] = 'M'.charCodeAt(0)
+    u8[1] = 'Q'.charCodeAt(0)
+    u8[2] = 'S'.charCodeAt(0)
+    u8[3] = 'T'.charCodeAt(0)
+    view.setUint32(4, 1, true)
+    u8[9] = 12
+    u8[10] = 1
+    view.setUint32(56, 1, true)
+
+    await expect(deserializeSimulationState(data)).rejects.toThrow(
+      'latticeDim must be 1..11, got 12'
+    )
+
+    u8[9] = 1
+    u8[10] = 0
+    await expect(deserializeSimulationState(data)).rejects.toThrow(
+      'componentCount must be >= 1, got 0'
+    )
+  })
+
+  it('rejects serialization when wavefunction arrays do not match the header shape', async () => {
+    const wf = {
+      re: new Float32Array(3),
+      im: new Float32Array(4),
+      totalSites: 4,
+      componentCount: 1,
+    }
+
+    await expect(serializeSimulationState({}, wf, 'tdseDynamics', [4])).rejects.toThrow(
+      'expected re=im=4'
+    )
+  })
+
+  it('rejects serialization beyond the format dimension limit', async () => {
+    const gridSize = Array.from({ length: 12 }, () => 1)
+    const wf = makeWavefunction(1, 1)
+
+    await expect(serializeSimulationState({}, wf, 'tdseDynamics', gridSize)).rejects.toThrow(
+      'gridSize length must be 1..11, got 12'
+    )
+  })
+
   it('preserves config with nested objects', async () => {
     const gridSize = [32]
     const totalSites = 32

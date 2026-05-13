@@ -118,6 +118,10 @@ import { phiLaplacianAt } from './phiLaplacian'
 import { buildPhiSpongeDamping, isConstantInPhiSlab } from './phiSponge'
 import { WDW_CFL_BUDGET, WDW_CFL_WARN_BUDGET } from './solverConstants'
 import {
+  validateWdwCustomBoundary,
+  validateWheelerDeWittSolverInput,
+} from './solverInputValidation'
+import {
   BandKind,
   type WheelerDeWittSolverInput,
   type WheelerDeWittSolverOutput,
@@ -157,6 +161,8 @@ export const WDW_SOLVER_VERSION = '3.0.0'
  * @returns Dense `χ` grid and auxiliary metadata.
  */
 export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWittSolverOutput {
+  validateWheelerDeWittSolverInput(input)
+
   const {
     boundaryCondition,
     inflatonMass,
@@ -172,10 +178,6 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
   // inside `wdwPotential` / `wdwU`, so the output stays bit-identical
   // to the pre-asymmetry code path.
   const inflatonMassAsymmetry = input.inflatonMassAsymmetry ?? 1
-
-  if (gridNa < 3) throw new Error('gridNa must be >= 3')
-  if (gridNphi < 3) throw new Error('gridNphi must be >= 3')
-  if (!(aMax > aMin)) throw new Error('aMax must exceed aMin')
 
   const Na = gridNa
   const Nphi = gridNphi
@@ -218,15 +220,6 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
   // the `symmetryPreservation` Phase 1 bound. See `isConstantInPhiSlab`.
   let spongeEnabled = !input.customBoundary && !input.disableSponge
 
-  // Stage-2 per-column WKB state (turning point, α, pending match).
-  const columnStates = initColumnWkbStates(
-    Nphi,
-    phiExtent,
-    inflatonMass,
-    cosmologicalConstant,
-    inflatonMassAsymmetry
-  )
-
   // Initial slab: either a caller-supplied override or the dispatched
   // BC generator. See {@link WheelerDeWittSolverInput#customBoundary}
   // for the override contract (primarily used by analytic-fixture tests
@@ -235,18 +228,7 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
   let initial: WdwBoundaryField
   if (input.customBoundary) {
     const custom = input.customBoundary
-    if (custom.chi.length !== expectedInitialLen) {
-      throw new Error(
-        `customBoundary.chi length ${custom.chi.length} does not match ` +
-          `expected 2·Nphi·Nphi = ${expectedInitialLen}`
-      )
-    }
-    if (custom.chiDeriv.length !== expectedInitialLen) {
-      throw new Error(
-        `customBoundary.chiDeriv length ${custom.chiDeriv.length} does not match ` +
-          `expected 2·Nphi·Nphi = ${expectedInitialLen}`
-      )
-    }
+    validateWdwCustomBoundary(custom, expectedInitialLen)
     initial = custom
   } else {
     initial = buildWdwBoundary(boundaryCondition, {
@@ -258,6 +240,15 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
       asymmetry: inflatonMassAsymmetry,
     })
   }
+
+  // Stage-2 per-column WKB state (turning point, α, pending match).
+  const columnStates = initColumnWkbStates(
+    Nphi,
+    phiExtent,
+    inflatonMass,
+    cosmologicalConstant,
+    inflatonMassAsymmetry
+  )
 
   // Copy χ(a_min, ·) into slab 0 unchanged — this is the physical
   // boundary condition, and Phase 3 removes the sponge damping of the

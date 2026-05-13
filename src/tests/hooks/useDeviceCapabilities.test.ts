@@ -8,7 +8,11 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useDeviceCapabilities } from '@/hooks/useDeviceCapabilities'
-import { MOBILE_DEFAULT_MAX_FPS, MOBILE_DEFAULT_RESOLUTION_SCALE } from '@/lib/deviceCapabilities'
+import {
+  DEFAULT_CAPABILITIES,
+  MOBILE_DEFAULT_MAX_FPS,
+  MOBILE_DEFAULT_RESOLUTION_SCALE,
+} from '@/lib/deviceCapabilities'
 import { usePerformanceStore } from '@/stores/runtime/performanceStore'
 import { useLightingStore } from '@/stores/scene/lightingStore'
 
@@ -30,9 +34,9 @@ describe('useDeviceCapabilities', () => {
     localStorage.removeItem('mdim_max_fps')
     // Reset stores to initial state
     usePerformanceStore.setState({
-      gpuTier: 3,
-      isMobileGPU: false,
-      gpuName: 'unknown',
+      gpuTier: DEFAULT_CAPABILITIES.gpuTier,
+      isMobileGPU: DEFAULT_CAPABILITIES.isMobileGPU,
+      gpuName: DEFAULT_CAPABILITIES.gpuName,
       deviceCapabilitiesDetected: false,
       renderResolutionScale: 1.0,
       maxFps: 60,
@@ -46,7 +50,7 @@ describe('useDeviceCapabilities', () => {
     vi.restoreAllMocks()
   })
 
-  it('should detect desktop GPU and not apply mobile defaults', async () => {
+  it('should detect high-tier desktop GPU and not apply constrained defaults', async () => {
     vi.mocked(detectDeviceCapabilities).mockResolvedValue({
       gpuTier: 3,
       isMobileGPU: false,
@@ -61,14 +65,14 @@ describe('useDeviceCapabilities', () => {
       expect(usePerformanceStore.getState().deviceCapabilitiesDetected).toBe(true)
     })
 
-    // Should NOT apply mobile defaults
+    // Should NOT apply constrained defaults
     expect(usePerformanceStore.getState().renderResolutionScale).toBe(1.0)
     expect(usePerformanceStore.getState().maxFps).toBe(60)
     expect(usePerformanceStore.getState().isMobileGPU).toBe(false)
     expect(usePerformanceStore.getState().gpuTier).toBe(3)
   })
 
-  it('should detect mobile GPU and apply mobile defaults', async () => {
+  it('should detect mobile GPU and apply constrained defaults', async () => {
     vi.mocked(detectDeviceCapabilities).mockResolvedValue({
       gpuTier: 2,
       isMobileGPU: true,
@@ -83,7 +87,7 @@ describe('useDeviceCapabilities', () => {
       expect(usePerformanceStore.getState().deviceCapabilitiesDetected).toBe(true)
     })
 
-    // Should apply mobile defaults
+    // Should apply constrained defaults
     expect(usePerformanceStore.getState().renderResolutionScale).toBe(
       MOBILE_DEFAULT_RESOLUTION_SCALE
     )
@@ -92,7 +96,7 @@ describe('useDeviceCapabilities', () => {
     expect(usePerformanceStore.getState().gpuTier).toBe(2)
   })
 
-  it('applies mobile defaults when persisted preference strings are malformed', async () => {
+  it('applies constrained defaults when persisted preference strings are malformed', async () => {
     localStorage.setItem('mdim_render_resolution_scale', '0.75junk')
     localStorage.setItem('mdim_max_fps', '45fps')
 
@@ -138,6 +142,51 @@ describe('useDeviceCapabilities', () => {
     expect(usePerformanceStore.getState().maxFps).toBe(48)
   })
 
+  it('applies constrained defaults on low-tier desktop GPUs', async () => {
+    vi.mocked(detectDeviceCapabilities).mockResolvedValue({
+      gpuTier: 1,
+      isMobileGPU: false,
+      gpuName: 'intel hd graphics',
+      detectionType: 'BENCHMARK',
+      estimatedFps: 18,
+    })
+
+    renderHook(() => useDeviceCapabilities())
+
+    await waitFor(() => {
+      expect(usePerformanceStore.getState().deviceCapabilitiesDetected).toBe(true)
+    })
+
+    expect(usePerformanceStore.getState().renderResolutionScale).toBe(
+      MOBILE_DEFAULT_RESOLUTION_SCALE
+    )
+    expect(usePerformanceStore.getState().maxFps).toBe(MOBILE_DEFAULT_MAX_FPS)
+    expect(usePerformanceStore.getState().isMobileGPU).toBe(false)
+    expect(usePerformanceStore.getState().gpuTier).toBe(1)
+  })
+
+  it('removes spotlights on low-tier desktop GPUs', async () => {
+    const spotId = useLightingStore.getState().addLight('spot')
+    expect(spotId).toBe(useLightingStore.getState().selectedLightId)
+
+    vi.mocked(detectDeviceCapabilities).mockResolvedValue({
+      gpuTier: 0,
+      isMobileGPU: false,
+      gpuName: 'blocklisted gpu',
+      detectionType: 'BLOCKLISTED',
+      estimatedFps: 10,
+    })
+
+    renderHook(() => useDeviceCapabilities())
+
+    await waitFor(() => {
+      expect(usePerformanceStore.getState().deviceCapabilitiesDetected).toBe(true)
+    })
+
+    expect(useLightingStore.getState().lights.map((light) => light.type)).toEqual(['point'])
+    expect(useLightingStore.getState().selectedLightId).toBeNull()
+  })
+
   it('removes spotlights on mobile GPUs while preserving the default point light', async () => {
     const spotId = useLightingStore.getState().addLight('spot')
     expect(spotId).toBe(useLightingStore.getState().selectedLightId)
@@ -161,9 +210,9 @@ describe('useDeviceCapabilities', () => {
     expect(useLightingStore.getState().selectedLightId).toBeNull()
   })
 
-  it('should handle detect-gpu failure gracefully (tier 3 fallback)', async () => {
+  it('should handle detect-gpu failure gracefully (tier 0 fallback)', async () => {
     vi.mocked(detectDeviceCapabilities).mockResolvedValue({
-      gpuTier: 3,
+      gpuTier: 0,
       isMobileGPU: false,
       gpuName: 'detection-failed',
       detectionType: 'error',
@@ -176,9 +225,10 @@ describe('useDeviceCapabilities', () => {
       expect(usePerformanceStore.getState().deviceCapabilitiesDetected).toBe(true)
     })
 
-    expect(usePerformanceStore.getState().gpuTier).toBe(3)
-    // Should NOT apply mobile defaults for fallback
-    expect(usePerformanceStore.getState().renderResolutionScale).toBe(1.0)
+    expect(usePerformanceStore.getState().gpuTier).toBe(0)
+    expect(usePerformanceStore.getState().renderResolutionScale).toBe(
+      MOBILE_DEFAULT_RESOLUTION_SCALE
+    )
   })
 
   it('should only run detection once', async () => {

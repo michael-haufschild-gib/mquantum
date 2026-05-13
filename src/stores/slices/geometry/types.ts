@@ -15,7 +15,7 @@ import {
 } from '@/lib/geometry/extended/types'
 import type { OpenQuantumVisualizationMode } from '@/lib/physics/openQuantum/types'
 import type { AntiDeSitterSetters } from '@/stores/slices/geometry/setters/antiDeSitterSetters'
-import type { BecSetters } from '@/stores/slices/geometry/setters/becSetters'
+import type { BecSetters } from '@/stores/slices/geometry/setters/becSetterDomain'
 import type { DiracSetters } from '@/stores/slices/geometry/setters/diracSetters'
 import type { FreeScalarSetters } from '@/stores/slices/geometry/setters/freeScalarSetters'
 import type { QuantumWalkSetters } from '@/stores/slices/geometry/setters/quantumWalkSetters'

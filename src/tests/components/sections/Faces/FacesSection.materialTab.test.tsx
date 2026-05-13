@@ -39,4 +39,20 @@ describe('FacesSection material tab availability', () => {
     expect(materialTab).not.toBeDisabled()
     expect(materialTab).not.toHaveAttribute('aria-disabled')
   })
+
+  it('disables Material tab for compute modes even if iso state is stale', () => {
+    useExtendedObjectStore.setState((state) => ({
+      schroedinger: {
+        ...state.schroedinger,
+        quantumMode: 'tdseDynamics',
+        isoEnabled: true,
+      },
+    }))
+
+    render(<FacesSection defaultOpen />)
+
+    const materialTab = screen.getByRole('tab', { name: 'Material' })
+    expect(materialTab).toBeDisabled()
+    expect(materialTab).toHaveAttribute('aria-disabled', 'true')
+  })
 })

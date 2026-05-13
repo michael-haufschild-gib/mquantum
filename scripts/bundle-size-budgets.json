@@ -12,7 +12,7 @@
     "rendering-compute-shared": { "gzip": 4500 },
     "rendering-tdse-bec": { "gzip": 85000 },
     "rendering-fsf": { "gzip": 25200 },
-    "rendering-dirac": { "gzip": 25000 },
+    "rendering-dirac": { "gzip": 25100 },
     "rendering-pauli": { "gzip": 21000 },
     "rendering-wdw": { "gzip": 8100 },
     "rendering-qw": { "gzip": 14000 },

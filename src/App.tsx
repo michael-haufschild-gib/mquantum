@@ -99,7 +99,7 @@ function AppContent() {
   // Dynamic Favicon
   useDynamicFavicon()
 
-  // Detect device capabilities (GPU tier) and apply mobile defaults
+  // Detect device capabilities (GPU tier) and apply constrained defaults
   useDeviceCapabilities()
 
   // Detect WebGPU support

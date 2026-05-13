@@ -8,7 +8,13 @@
  * @module stores/slices/geometry/setters/tdseUiSetters
  */
 
-import type { TdseDisorderDistribution, TdseFieldView } from '@/lib/geometry/extended/tdse'
+import {
+  isTdseDensityView,
+  isTdseDisorderDistribution,
+  isTdseFieldView,
+  type TdseDisorderDistribution,
+  type TdseFieldView,
+} from '@/lib/geometry/extended/tdse'
 import { logger } from '@/lib/logger'
 import {
   DEFAULT_METRIC_CONFIG,
@@ -31,9 +37,9 @@ import {
 } from '@/lib/physics/tdse/metrics/types'
 
 import {
+  clampUint32Seed,
   nestedClampedSetter,
   nestedIntSetter,
-  nestedValueSetter,
   type SetterContext,
 } from './sliceSetterUtils'
 
@@ -85,6 +91,7 @@ function clampOrFallback(
  * the per-kind defaults.
  */
 function normalizeMetricConfig(cfg: MetricConfig, prev: MetricConfig): MetricConfig {
+  if (!cfg || typeof cfg !== 'object' || !('kind' in cfg)) return prev
   const samePrev = prev.kind === cfg.kind ? prev : undefined
   switch (cfg.kind) {
     case 'flat':
@@ -188,6 +195,8 @@ function normalizeMetricConfig(cfg: MetricConfig, prev: MetricConfig): MetricCon
         ),
       }
     }
+    default:
+      return prev
   }
 }
 
@@ -226,6 +235,10 @@ function metricsEqual(a: MetricConfig, b: MetricConfig): boolean {
   }
 }
 
+function isBoolean(value: unknown): value is boolean {
+  return typeof value === 'boolean'
+}
+
 /**
  * Creates UI, diagnostic, absorber, and disorder setters for the TDSE slice.
  * @param ctx - Shared setter context with set/get and validation helpers
@@ -235,14 +248,19 @@ export function createTdseUiSetters(ctx: SetterContext) {
 
   return {
     setTdseDisorderSeed: (seed: number) => {
+      if (!ctx.isFinite(seed)) {
+        ctx.warnNonFinite('tdse.disorderSeed', seed)
+        return
+      }
       ctx.setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, disorderSeed: Math.floor(Math.max(0, seed)) },
+          tdse: { ...state.schroedinger.tdse, disorderSeed: clampUint32Seed(seed) },
         },
       }))
     },
     setTdseDisorderDistribution: (distribution: TdseDisorderDistribution) => {
+      if (!isTdseDisorderDistribution(distribution)) return
       ctx.setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
@@ -251,6 +269,7 @@ export function createTdseUiSetters(ctx: SetterContext) {
       }))
     },
     setTdseAbsorberEnabled: (enabled: boolean) => {
+      if (!isBoolean(enabled)) return
       ctx.setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
@@ -274,25 +293,79 @@ export function createTdseUiSetters(ctx: SetterContext) {
       }))
     },
     setTdsePmlTargetReflection: nestedClampedSetter(ctx, D, 'pmlTargetReflection', 1e-12, 0.999),
-    setTdseFieldView: nestedValueSetter(ctx, D, 'fieldView') as (view: TdseFieldView) => void,
-    setTdseAutoScale: nestedValueSetter(ctx, D, 'autoScale') as (autoScale: boolean) => void,
-    setTdseShowPotential: nestedValueSetter(ctx, D, 'showPotential') as (
-      showPotential: boolean
-    ) => void,
-    setTdseAutoLoop: nestedValueSetter(ctx, D, 'autoLoop') as (autoLoop: boolean) => void,
-    setTdseDiagnosticsEnabled: nestedValueSetter(ctx, D, 'diagnosticsEnabled') as (
-      enabled: boolean
-    ) => void,
+    setTdseFieldView: (view: TdseFieldView) => {
+      if (!isTdseFieldView(view)) return
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          [D]: { ...state.schroedinger[D], fieldView: view },
+        },
+      }))
+    },
+    setTdseAutoScale: (autoScale: boolean) => {
+      if (!isBoolean(autoScale)) return
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          [D]: { ...state.schroedinger[D], autoScale },
+        },
+      }))
+    },
+    setTdseShowPotential: (showPotential: boolean) => {
+      if (!isBoolean(showPotential)) return
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          [D]: { ...state.schroedinger[D], showPotential },
+        },
+      }))
+    },
+    setTdseAutoLoop: (autoLoop: boolean) => {
+      if (!isBoolean(autoLoop)) return
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          [D]: { ...state.schroedinger[D], autoLoop },
+        },
+      }))
+    },
+    setTdseDiagnosticsEnabled: (enabled: boolean) => {
+      if (!isBoolean(enabled)) return
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          [D]: { ...state.schroedinger[D], diagnosticsEnabled: enabled },
+        },
+      }))
+    },
     setTdseDiagnosticsInterval: nestedIntSetter(ctx, D, 'diagnosticsInterval', 1, 60, 'floor'),
-    setTdseObservablesEnabled: nestedValueSetter(ctx, D, 'observablesEnabled') as (
-      enabled: boolean
-    ) => void,
-    setTdseImaginaryTimeEnabled: nestedValueSetter(ctx, D, 'imaginaryTimeEnabled') as (
-      enabled: boolean
-    ) => void,
-    setTdseCustomPotentialExpression: nestedValueSetter(ctx, D, 'customPotentialExpression') as (
-      expression: string
-    ) => void,
+    setTdseObservablesEnabled: (enabled: boolean) => {
+      if (!isBoolean(enabled)) return
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          [D]: { ...state.schroedinger[D], observablesEnabled: enabled },
+        },
+      }))
+    },
+    setTdseImaginaryTimeEnabled: (enabled: boolean) => {
+      if (!isBoolean(enabled)) return
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          [D]: { ...state.schroedinger[D], imaginaryTimeEnabled: enabled },
+        },
+      }))
+    },
+    setTdseCustomPotentialExpression: (expression: string) => {
+      if (typeof expression !== 'string') return
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          [D]: { ...state.schroedinger[D], customPotentialExpression: expression },
+        },
+      }))
+    },
     /**
      * Toggle the ER=EPR double-trace wormhole coupling. A transition of the
      * flag resets ψ: enabling the coupling mid-evolution introduces a
@@ -303,6 +376,7 @@ export function createTdseUiSetters(ctx: SetterContext) {
      * trips don't kick the simulation.
      */
     setTdseWormholeEnabled: (enabled: boolean) => {
+      if (!isBoolean(enabled)) return
       ctx.setWithVersion((state) => {
         const prev = state.schroedinger.tdse
         const next = !!enabled
@@ -334,6 +408,7 @@ export function createTdseUiSetters(ctx: SetterContext) {
      * values are silently floored/clamped to the `{0,1,2}` range.
      */
     setTdseWormholeAxis: (axis: number) => {
+      if (!Number.isFinite(axis)) return
       const raw = Number(axis)
       const clamped = (Math.max(0, Math.min(2, Math.floor(raw))) | 0) as 0 | 1 | 2
       ctx.setWithVersion((state) => ({
@@ -351,6 +426,7 @@ export function createTdseUiSetters(ctx: SetterContext) {
      * any schroedingerVersion-keyed recompute flows.
      */
     setTdseWormholeHudEnabled: (enabled: boolean) => {
+      if (!isBoolean(enabled)) return
       ctx.set((state) => ({
         schroedinger: {
           ...state.schroedinger,
@@ -359,16 +435,28 @@ export function createTdseUiSetters(ctx: SetterContext) {
       }))
     },
     /** Toggle the Ricci-scalar curvature overlay. Pure render flag. */
-    setShowCurvatureOverlay: nestedValueSetter(ctx, D, 'showCurvatureOverlay') as (
-      enabled: boolean
-    ) => void,
+    setShowCurvatureOverlay: (enabled: boolean) => {
+      if (!isBoolean(enabled)) return
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          [D]: { ...state.schroedinger[D], showCurvatureOverlay: enabled },
+        },
+      }))
+    },
     /**
      * Select the density-volume view mode. `coordinate` = bare |ψ|²,
      * `proper` = |ψ|²·√|g|. Render-only.
      */
-    setDensityView: nestedValueSetter(ctx, D, 'densityView') as (
-      view: 'coordinate' | 'proper'
-    ) => void,
+    setDensityView: (view: 'coordinate' | 'proper') => {
+      if (!isTdseDensityView(view)) return
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          [D]: { ...state.schroedinger[D], densityView: view },
+        },
+      }))
+    },
     /**
      * Clamp the Wave 6 overlay opacity into `[0, 1]`. Render-only.
      */

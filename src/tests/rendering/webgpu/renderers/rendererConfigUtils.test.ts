@@ -126,9 +126,20 @@ describe('applyModeOverrides', () => {
       dimension: 2,
       quantumMode: 'tdseDynamics',
       temporal: true,
+      isosurface: true,
     } as never)
     expect(cfg.temporal).toBe(false)
+    expect(cfg.isosurface).toBe(false)
     expect(cfg.dimension).toBeGreaterThanOrEqual(3)
+  })
+
+  it('preserves analytic 2D isosurface requests for isolines', () => {
+    const cfg = applyModeOverrides({
+      dimension: 2,
+      quantumMode: 'harmonicOscillator',
+      isosurface: true,
+    } as never)
+    expect(cfg.isosurface).toBe(true)
   })
 
   it('does not mutate the caller-supplied config', () => {
@@ -159,7 +170,9 @@ describe('buildShaderConfig', () => {
       uncertaintyBoundaryEnabled: true,
       analyticalGradientEnabled: true,
       fastEigenInterpolationEnabled: true,
+      isosurface: true,
     } as never)
+    expect(cfg.isosurface).toBe(false)
     expect(cfg.nodal).toBe(false)
     expect(cfg.phaseMateriality).toBe(false)
     expect(cfg.interference).toBe(false)
@@ -249,6 +262,15 @@ describe('buildShaderConfig', () => {
     } as never)
     expect(cfg.useEigenfunctionCache).toBe(true)
     expect(cfg.useAnalyticalGradient).toBe(true)
+  })
+
+  it('keeps analytic 2D isosurface requests for isoline shaders', () => {
+    const cfg = buildShaderConfig({
+      dimension: 2,
+      quantumMode: 'harmonicOscillator',
+      isosurface: true,
+    } as never)
+    expect(cfg.isosurface).toBe(true)
   })
 
   it('flags isWigner true for analytic Wigner mode and false in compute modes', () => {

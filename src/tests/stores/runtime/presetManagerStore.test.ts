@@ -1308,6 +1308,42 @@ describe('presetManagerStore (invariants)', () => {
       expect(schroedinger.mysteryExtended).toBeUndefined()
     })
 
+    it('clears unsupported isosurface settings when loading Wigner scenes', () => {
+      const importedScene = {
+        id: 'wigner-iso-scene-id',
+        name: 'Wigner Iso Scene',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {},
+          postProcessing: {},
+          environment: { skyboxEnabled: false },
+          geometry: { dimension: 4, objectType: 'schroedinger' },
+          extended: {
+            schroedinger: {
+              representation: 'wigner',
+              isoEnabled: true,
+            },
+          },
+          transform: { uniformScale: 1 },
+          rotation: { rotations: {} },
+          animation: { speed: 1, isPlaying: true, animatingPlanes: ['XY'] },
+          camera: { position: [0, 0, 5], target: [0, 0, 0] },
+          ui: {},
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importScenes(JSON.stringify([importedScene]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedScenes
+      usePresetManagerStore.getState().loadScene(saved!.id)
+
+      const schroedinger = useExtendedObjectStore.getState().schroedinger
+      expect(schroedinger.representation).toBe('wigner')
+      expect(schroedinger.isoEnabled).toBe(false)
+    })
+
     it('persists momentum representation settings in saved scenes', () => {
       const extended = useExtendedObjectStore.getState()
       extended.setSchroedingerRepresentation('momentum')

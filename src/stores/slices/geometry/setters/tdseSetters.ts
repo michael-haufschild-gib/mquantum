@@ -9,6 +9,8 @@
 
 import {
   DEFAULT_TDSE_CONFIG,
+  isTdseInitialCondition,
+  isTdsePotentialType,
   type TdseConfig,
   type TdseDisorderDistribution,
   type TdseDriveWaveform,
@@ -21,7 +23,12 @@ import { clampKKState, computeEffectiveSpacing } from '@/lib/physics/compactific
 import { type MetricConfig, normalizeMetricForLattice } from '@/lib/physics/tdse/metrics/types'
 import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
-import { beginDynamicPresetApply, loadPresetModule } from '@/stores/utils/dynamicPresetImport'
+import {
+  canApplyPresetRequest,
+  createLatestPresetRequestGuard,
+  loadPresetModule,
+  type SchroedingerPresetApplyOptions,
+} from '@/stores/utils/dynamicPresetImport'
 
 import {
   clampDtWithCfl,
@@ -97,7 +104,7 @@ export interface TdseSetters extends TdseStochasticSetters {
   setTdseSlicePosition: (dimIndex: number, value: number) => void
   setTdseCompactDim: (dimIndex: number, compact: boolean) => void
   setTdseCompactRadius: (dimIndex: number, radius: number) => void
-  applyTdsePreset: (presetId: string) => Promise<void>
+  applyTdsePreset: (presetId: string, options?: SchroedingerPresetApplyOptions) => Promise<void>
   resetTdseField: () => void
   // ER=EPR Double-trace Wormhole Coupling
   setTdseWormholeEnabled: (enabled: boolean) => void
@@ -212,6 +219,7 @@ const normalizeTdseVector = (
 export function createTdseSetters(ctx: SetterContext): TdseSetters {
   const { setWithVersion, isFinite, warnNonFinite, hasOnlyFinite } = ctx
   const D = 'tdse' as const
+  const beginPresetRequest = createLatestPresetRequestGuard()
 
   return {
     setTdseLatticeDim: (dim) => {
@@ -355,6 +363,7 @@ export function createTdseSetters(ctx: SetterContext): TdseSetters {
     },
     setTdseStepsPerFrame: nestedIntSetter(ctx, D, 'stepsPerFrame', 1, 16, 'floor'),
     setTdseInitialCondition: (condition) => {
+      if (!isTdseInitialCondition(condition)) return
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
@@ -427,6 +436,7 @@ export function createTdseSetters(ctx: SetterContext): TdseSetters {
       })
     },
     setTdsePotentialType: (potentialType) => {
+      if (!isTdsePotentialType(potentialType)) return
       setWithVersion((state) => {
         const prev = state.schroedinger.tdse
         // Switching to or from the Regge–Wheeler ringdown potential reshapes
@@ -515,6 +525,7 @@ export function createTdseSetters(ctx: SetterContext): TdseSetters {
       })
     },
     setTdseCompactDim: (dimIndex, compact) => {
+      if (typeof compact !== 'boolean') return
       setWithVersion((state) => {
         const td = state.schroedinger.tdse
         const compactDims = [...(td.compactDims ?? [])]
@@ -570,14 +581,15 @@ export function createTdseSetters(ctx: SetterContext): TdseSetters {
         }
       })
     },
-    applyTdsePreset: (presetId) => {
-      const isCurrentPresetApply = beginDynamicPresetApply()
+    applyTdsePreset: (presetId, options) => {
+      const isLatestRequest = beginPresetRequest()
       return loadPresetModule(
         () => import('@/lib/physics/tdse/presets'),
         'tdseSetters',
         `TDSE presets for '${presetId}'`,
         ({ getTdsePreset }) => {
-          if (!isCurrentPresetApply()) return
+          if (!canApplyPresetRequest(isLatestRequest, ctx.get().schroedinger.quantumMode, options))
+            return
           const preset = getTdsePreset(presetId)
           if (!preset) return
           setWithVersion((state) => {

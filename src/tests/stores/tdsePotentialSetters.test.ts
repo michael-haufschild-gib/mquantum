@@ -57,21 +57,21 @@ describe('TDSE potential setters', () => {
 
   it('sets drive enabled boolean', () => {
     const s = useExtendedObjectStore.getState()
-    // @ts-expect-error intentional invalid input
-    s.setTdseDriveEnabled(true as unknown as number)
+    s.setTdseDriveEnabled(true)
     expect(getTdse().driveEnabled).toBe(true)
+    s.setTdseDriveEnabled(false)
+    expect(getTdse().driveEnabled).toBe(false)
+
     // @ts-expect-error intentional invalid input
-    s.setTdseDriveEnabled(false as unknown as number)
+    s.setTdseDriveEnabled('true')
     expect(getTdse().driveEnabled).toBe(false)
   })
 
   it('validates drive waveform values', () => {
     const s = useExtendedObjectStore.getState()
-    // @ts-expect-error intentional invalid input
-    s.setTdseDriveWaveform('sine' as unknown as number)
+    s.setTdseDriveWaveform('sine')
     expect(getTdse().driveWaveform).toBe('sine')
-    // @ts-expect-error intentional invalid input
-    s.setTdseDriveWaveform('pulse' as unknown as number)
+    s.setTdseDriveWaveform('pulse')
     expect(getTdse().driveWaveform).toBe('pulse')
     // Invalid waveform should not change state
     // @ts-expect-error intentional invalid input

@@ -37,6 +37,17 @@ describe('visualEffectSetters — compound logic', () => {
 
       expect(fastSamples).toBeLessThan(ultraSamples)
     })
+
+    it('rejects invalid quality ids without corrupting sampleCount', () => {
+      useExtendedObjectStore.getState().setSchroedingerRaymarchQuality('quality')
+      const before = getSchroedinger()
+
+      useExtendedObjectStore.getState().setSchroedingerRaymarchQuality('cinematic' as never)
+
+      const after = getSchroedinger()
+      expect(after.raymarchQuality).toBe(before.raymarchQuality)
+      expect(after.sampleCount).toBe(before.sampleCount)
+    })
   })
 
   describe('setSchroedingerPmlTargetReflection', () => {

@@ -19,9 +19,9 @@ import type { WebGPURenderPass } from '../core/types'
  */
 export function computePassOrder(passes: Map<string, WebGPURenderPass>): string[] {
   // Build output → producers lookup. Multiple passes may write the same
-  // resource when a later pass blends into an existing texture; readers must
-  // depend on every writer rather than whichever pass was registered last.
-  const outputToPasses = new Map<string, Set<string>>()
+  // target sequentially (for example overlays compositing into scene-render),
+  // so consumers must wait for every producer except themselves.
+  const outputToPasses = new Map<string, string[]>()
 
   for (const [id, pass] of passes) {
     if (!pass.config.outputs || !Array.isArray(pass.config.outputs)) {
@@ -29,12 +29,12 @@ export function computePassOrder(passes: Map<string, WebGPURenderPass>): string[
       continue
     }
     for (const output of pass.config.outputs) {
-      let producers = outputToPasses.get(output.resourceId)
-      if (!producers) {
-        producers = new Set()
-        outputToPasses.set(output.resourceId, producers)
+      const producers = outputToPasses.get(output.resourceId)
+      if (producers) {
+        producers.push(id)
+      } else {
+        outputToPasses.set(output.resourceId, [id])
       }
-      producers.add(id)
     }
   }
 

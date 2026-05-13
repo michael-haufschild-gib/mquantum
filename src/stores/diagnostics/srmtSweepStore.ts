@@ -139,22 +139,26 @@ export interface SrmtSweepState {
 }
 
 function totalPointsFor(config: SrmtSweepConfig): number {
+  const bounded = (min: number, max: number): number => {
+    const points = Number.isFinite(config.points) ? Math.floor(config.points) : min
+    return Math.max(min, Math.min(max, points))
+  }
   switch (config.kind) {
     case 'cut':
-      return Math.max(1, Math.min(64, Math.floor(config.points)))
+      return bounded(1, 64)
     case 'mass':
     case 'lambda':
     case 'phiRef':
-      return Math.max(1, Math.min(21, Math.floor(config.points)))
+      return bounded(1, 21)
     case 'rankCap':
-      return Math.max(1, Math.min(32, Math.floor(config.points)))
+      return bounded(1, 32)
     case 'phiExtent':
-      return Math.max(1, Math.min(13, Math.floor(config.points)))
+      return bounded(1, 13)
     case 'gridNa':
     case 'gridNphi':
-      return Math.max(1, Math.min(9, Math.floor(config.points)))
+      return bounded(1, 9)
     case 'gridNphiCoupled':
-      return Math.max(3, Math.min(7, Math.floor(config.points)))
+      return bounded(3, 7)
     case 'bc':
       return 3
   }

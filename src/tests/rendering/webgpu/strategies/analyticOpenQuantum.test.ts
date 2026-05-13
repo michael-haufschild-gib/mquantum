@@ -26,6 +26,8 @@ function makePreset(seed: number, coefficients: [number, number][]): CachedPrese
       presetName: 'regression',
       seed,
       termCount: coefficients.length,
+      maxQuantumNumber: coefficients.length,
+      frequencySpread: 0,
       dimension: 3,
     },
   }

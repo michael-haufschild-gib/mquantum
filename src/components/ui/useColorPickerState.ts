@@ -25,6 +25,7 @@ import {
   handleSvArrowKey,
   HISTORY_KEY,
   MAX_HISTORY,
+  normalizeColorHistoryEntry,
   sanitizeColorHistory,
 } from './colorPickerUtils'
 
@@ -86,15 +87,21 @@ export function useColorPickerState(args: UseColorPickerStateArgs): ColorPickerS
   const [initialColor, setInitialColor] = useState(value)
 
   const lastEmittedRef = useRef<string>('')
+  const sessionColorRef = useRef<string>('')
 
   const [hexInput, setHexInput] = useState(value)
   const [rgbInput, setRgbInput] = useState({ r: 0, g: 0, b: 0, a: 1 })
 
   const addToHistory = (color: string) => {
+    const safeColor = normalizeColorHistoryEntry(color)
+    if (!safeColor) {
+      return
+    }
+
     setHistory((prev) => {
       const safePrev = sanitizeColorHistory(prev)
-      const filtered = safePrev.filter((c) => c !== color)
-      const newHistory = [color, ...filtered].slice(0, MAX_HISTORY)
+      const filtered = safePrev.filter((c) => c !== safeColor)
+      const newHistory = [safeColor, ...filtered].slice(0, MAX_HISTORY)
       try {
         localStorage.setItem(HISTORY_KEY, JSON.stringify(newHistory))
       } catch (error) {
@@ -151,9 +158,11 @@ export function useColorPickerState(args: UseColorPickerStateArgs): ColorPickerS
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open)
     if (open) {
+      sessionColorRef.current = ''
       setInitialColor(value)
     } else {
-      addToHistory(value)
+      addToHistory(sessionColorRef.current || value)
+      sessionColorRef.current = ''
     }
   }
 
@@ -175,6 +184,7 @@ export function useColorPickerState(args: UseColorPickerStateArgs): ColorPickerS
       }
 
       lastEmittedRef.current = output
+      sessionColorRef.current = output
       onChange(output)
       return output
     },

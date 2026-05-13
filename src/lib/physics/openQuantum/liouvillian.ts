@@ -21,7 +21,47 @@
 
 import type { ComplexMatrix } from './complexMatrix'
 import { complexMatZero } from './complexMatrix'
+import { MAX_K } from './integrator'
 import type { LindbladChannel } from './types'
+
+function assertValidInputs(
+  energies: Float64Array,
+  channels: readonly LindbladChannel[],
+  K: number
+): void {
+  if (!Number.isInteger(K) || K < 1) {
+    throw new Error(`buildLiouvillian: K must be a positive integer, got ${K}`)
+  }
+  if (K > MAX_K) {
+    throw new Error(`buildLiouvillian: K=${K} exceeds MAX_K=${MAX_K}`)
+  }
+  if (energies.length < K) {
+    throw new Error(`buildLiouvillian: energies length must be >= K (${K}), got ${energies.length}`)
+  }
+  for (let k = 0; k < K; k++) {
+    if (!Number.isFinite(energies[k]!)) {
+      throw new Error(`buildLiouvillian: energies[${k}] must be finite, got ${energies[k]}`)
+    }
+  }
+  for (let i = 0; i < channels.length; i++) {
+    const ch = channels[i]!
+    if (
+      !Number.isInteger(ch.row) ||
+      !Number.isInteger(ch.col) ||
+      ch.row < 0 ||
+      ch.row >= K ||
+      ch.col < 0 ||
+      ch.col >= K
+    ) {
+      throw new Error(
+        `buildLiouvillian: channel ${i} index out of range for K=${K} (row=${ch.row}, col=${ch.col})`
+      )
+    }
+    if (!Number.isFinite(ch.amplitudeRe) || !Number.isFinite(ch.amplitudeIm)) {
+      throw new Error(`buildLiouvillian: channel ${i} amplitude must be finite`)
+    }
+  }
+}
 
 /**
  * Build the Liouvillian superoperator from energies and Lindblad channels.
@@ -42,6 +82,8 @@ export function buildLiouvillian(
   channels: readonly LindbladChannel[],
   K: number
 ): ComplexMatrix {
+  assertValidInputs(energies, channels, K)
+
   const N = K * K
   const L = complexMatZero(N)
 

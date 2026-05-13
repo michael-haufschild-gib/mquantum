@@ -11,7 +11,10 @@
 import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-import { associatedLaguerre } from '@/lib/math/laguerrePolynomial'
+import {
+  computeHydrogenRadialProbabilityDensity,
+  computeHydrogenRadialWavefunction,
+} from '@/lib/math/hydrogenRadialProbability'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
 
@@ -27,18 +30,6 @@ const PH = HEIGHT - PY - PB
 
 /** Blue secondary color for radial curve — uses theme token */
 const WAVE_COLOR = 'var(--dirac-particle)'
-
-/**
- * Radial probability density P(r) = r²|R_{nl}(r)|² (unnormalized).
- */
-function hydrogenRadialProb(n: number, l: number, r: number): number {
-  const rho = (2 * r) / n
-  const rhoL = Math.pow(rho, l)
-  const expFactor = Math.exp(-rho / 2)
-  const lagVal = associatedLaguerre(n - l - 1, 2 * l + 1, rho)
-  const R = rhoL * expFactor * lagVal
-  return r * r * R * R
-}
 
 /**
  * Combined energy level + radial probability chart for hydrogen orbitals.
@@ -81,7 +72,7 @@ export const HydrogenEnergyDiagram: React.FC = React.memo(() => {
     const samples: { r: number; p: number }[] = []
     for (let i = 0; i < nSamples; i++) {
       const r = (rMax * i) / (nSamples - 1)
-      const p = hydrogenRadialProb(n, l, r)
+      const p = computeHydrogenRadialProbabilityDensity(n, l, r, 1.0, dimension)
       if (p > maxP) maxP = p
       samples.push({ r, p })
     }
@@ -98,10 +89,8 @@ export const HydrogenEnergyDiagram: React.FC = React.memo(() => {
     for (let i = 2; i < samples.length; i++) {
       const r0 = samples[i - 1]!.r
       const r1 = samples[i]!.r
-      const rho0 = (2 * r0) / n
-      const rho1 = (2 * r1) / n
-      const R0 = associatedLaguerre(n - l - 1, 2 * l + 1, rho0)
-      const R1 = associatedLaguerre(n - l - 1, 2 * l + 1, rho1)
+      const R0 = computeHydrogenRadialWavefunction(n, l, r0, 1.0, dimension)
+      const R1 = computeHydrogenRadialWavefunction(n, l, r1, 1.0, dimension)
       if (R0 * R1 < 0 && r0 > 0) {
         nodes.push(r0 - (R0 * (r1 - r0)) / (R1 - R0))
       }

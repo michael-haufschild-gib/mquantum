@@ -33,7 +33,6 @@ import {
 import { getFirstPresetId } from '@/lib/physics/presetDefaults'
 import { usePerformanceStore } from '@/stores/runtime/performanceStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
-import { invalidateDynamicPresetApplies } from '@/stores/utils/dynamicPresetImport'
 
 import type { ExtendedObjectSlice } from '../types'
 import { reconcileCosmologyInvariants } from './freeScalarCosmologySetters'
@@ -79,7 +78,6 @@ export function resetModeSessionCaches(): void {
   modeSettingsCache.clear()
   visitedModes.clear()
   visitedModes.add('harmonicOscillator')
-  invalidateDynamicPresetApplies()
 }
 
 /** Per-mode rendering defaults. Modes not listed fall back to DEFAULT_SCHROEDINGER_CONFIG values. */
@@ -310,22 +308,22 @@ function applyFirstPreset(
       break
     }
     case 'tdseDynamics':
-      void store.applyTdsePreset(presetId)
+      void store.applyTdsePreset(presetId, { expectedQuantumMode: mode })
       break
     case 'becDynamics':
-      void store.applyBecPreset(presetId)
+      void store.applyBecPreset(presetId, { expectedQuantumMode: mode })
       break
     case 'diracEquation':
-      void store.applyDiracPreset(presetId)
+      void store.applyDiracPreset(presetId, { expectedQuantumMode: mode })
       break
     case 'freeScalarField':
-      store.applyFreeScalarPreset(presetId)
+      void store.applyFreeScalarPreset(presetId, { expectedQuantumMode: mode })
       break
     case 'quantumWalk':
-      void store.applyQuantumWalkPreset(presetId)
+      void store.applyQuantumWalkPreset(presetId, { expectedQuantumMode: mode })
       break
     case 'wheelerDeWitt':
-      void store.applyWheelerDeWittPreset(presetId)
+      void store.applyWheelerDeWittPreset(presetId, { expectedQuantumMode: mode })
       break
     case 'antiDeSitter':
       store.setAdsPreset(presetId as import('@/lib/geometry/extended/antiDeSitter').AdsPresetName)
@@ -351,7 +349,6 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
       const currentMode = get().schroedinger.quantumMode
       if (currentMode !== mode) {
         modeSettingsCache.set(currentMode, snapshotRenderingSettings(get().schroedinger))
-        invalidateDynamicPresetApplies()
       }
 
       enforceDimensionConstraints(mode)
@@ -412,7 +409,11 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
         if (value === 'momentum' && qm === 'hydrogenNDCoupled') return
       }
       setWithVersion((state) => ({
-        schroedinger: { ...state.schroedinger, representation: value },
+        schroedinger: {
+          ...state.schroedinger,
+          representation: value,
+          isoEnabled: value === 'wigner' ? false : state.schroedinger.isoEnabled,
+        },
       }))
     },
 

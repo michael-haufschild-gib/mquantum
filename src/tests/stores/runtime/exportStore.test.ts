@@ -4,7 +4,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { ExportResolution } from '@/stores/runtime/exportStore'
+import type { ExportMode, ExportResolution } from '@/stores/runtime/exportStore'
 import type { TextOverlaySettings } from '@/stores/runtime/exportStore'
 import {
   getCompressionFactor,
@@ -252,6 +252,7 @@ describe('exportStore (invariants)', () => {
         bitrateMode: 'constant',
         hardwareAcceleration: 'prefer-hardware',
         rotation: 90,
+        resetEvolution: true,
       })
       const before = useExportStore.getState().settings
 
@@ -261,6 +262,7 @@ describe('exportStore (invariants)', () => {
         bitrateMode: 'invalid' as unknown as 'constant',
         hardwareAcceleration: 'gpu-only' as unknown as 'no-preference',
         rotation: 45 as unknown as 0,
+        resetEvolution: 'yes' as unknown as boolean,
       })
 
       const after = useExportStore.getState().settings
@@ -269,6 +271,18 @@ describe('exportStore (invariants)', () => {
       expect(after.bitrateMode).toBe(before.bitrateMode)
       expect(after.hardwareAcceleration).toBe(before.hardwareAcceleration)
       expect(after.rotation).toBe(before.rotation)
+      expect(after.resetEvolution).toBe(before.resetEvolution)
+    })
+
+    it('rejects invalid export mode overrides and preserves the previous mode', () => {
+      useExportStore.getState().setExportModeOverride('stream')
+      const before = useExportStore.getState()
+
+      useExportStore.getState().setExportModeOverride('invalid-mode' as unknown as ExportMode)
+
+      const after = useExportStore.getState()
+      expect(after.exportModeOverride).toBe(before.exportModeOverride)
+      expect(after.exportMode).toBe(before.exportMode)
     })
   })
 

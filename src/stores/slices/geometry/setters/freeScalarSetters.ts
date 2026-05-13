@@ -15,7 +15,12 @@ import type {
 } from '@/lib/geometry/extended/types'
 import { nearestPow2 } from '@/lib/math/ndArray'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
-import { beginDynamicPresetApply, loadPresetModule } from '@/stores/utils/dynamicPresetImport'
+import {
+  canApplyPresetRequest,
+  createLatestPresetRequestGuard,
+  loadPresetModule,
+  type SchroedingerPresetApplyOptions,
+} from '@/stores/utils/dynamicPresetImport'
 
 import {
   createFreeScalarCosmologySetters,
@@ -81,7 +86,10 @@ export interface FreeScalarSetters extends FreeScalarCosmologySetters, FreeScala
   setFreeScalarKSpaceBroadeningSigma: (value: number) => void
   setFreeScalarKSpaceRadialBinCount: (value: number) => void
   // Presets
-  applyFreeScalarPreset: (presetId: string) => void
+  applyFreeScalarPreset: (
+    presetId: string,
+    options?: SchroedingerPresetApplyOptions
+  ) => Promise<void>
 }
 
 /**
@@ -117,6 +125,7 @@ export const resizeFreeScalarArrays = (
 export function createFreeScalarSetters(ctx: SetterContext): FreeScalarSetters {
   const { setWithVersion, set, isFinite, warnNonFinite, hasOnlyFinite } = ctx
   const D = 'freeScalar' as const
+  const beginPresetRequest = createLatestPresetRequestGuard()
 
   return {
     setFreeScalarLatticeDim: (dim) => {
@@ -565,14 +574,15 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarSetters {
     },
     ...createFreeScalarPreheatingSetters(ctx),
     ...createFreeScalarCosmologySetters(ctx),
-    applyFreeScalarPreset: (presetId) => {
-      const isCurrentPresetApply = beginDynamicPresetApply()
-      void loadPresetModule(
+    applyFreeScalarPreset: (presetId, options) => {
+      const isLatestRequest = beginPresetRequest()
+      return loadPresetModule(
         () => import('@/lib/physics/freeScalar/presets'),
         'freeScalarSetters',
-        `free-scalar presets for "${presetId}"`,
+        `free-scalar presets for '${presetId}'`,
         ({ FREE_SCALAR_PRESETS }) => {
-          if (!isCurrentPresetApply()) return
+          if (!canApplyPresetRequest(isLatestRequest, ctx.get().schroedinger.quantumMode, options))
+            return
           const preset = FREE_SCALAR_PRESETS.find((p) => p.id === presetId)
           if (!preset) return
           setWithVersion((state) => {

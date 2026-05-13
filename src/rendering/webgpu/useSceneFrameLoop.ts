@@ -256,6 +256,11 @@ export function useSceneFrameLoop(deps: SceneFrameLoopDeps): void {
   const animationFrameRef = useRef<number>(0)
   const lastTimeRef = useRef<number>(initialFrameTimeRef.current)
   const fpsThrottleAnchorRef = useRef<number>(initialFrameTimeRef.current)
+  const cleanupExportRef = useRef(cleanupExport)
+
+  useEffect(() => {
+    cleanupExportRef.current = cleanupExport
+  }, [cleanupExport])
 
   const renderFrame = useCallback(() => {
     if (tickExport()) {
@@ -298,8 +303,12 @@ export function useSceneFrameLoop(deps: SceneFrameLoopDeps): void {
         window.clearTimeout(interactionTimerRef.current)
         interactionTimerRef.current = null
       }
-
-      cleanupExport()
     }
-  }, [renderFrame, cleanupExport, interactionTimerRef])
+  }, [renderFrame, interactionTimerRef])
+
+  useEffect(() => {
+    return () => {
+      cleanupExportRef.current()
+    }
+  }, [])
 }

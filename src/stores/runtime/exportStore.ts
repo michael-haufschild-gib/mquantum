@@ -10,6 +10,7 @@ import {
   getRecommendedBitrate as getRecommendedBitrateImpl,
   isBitrateMode,
   isExportFormat,
+  isExportMode,
   isExportResolution,
   isFiniteNumber,
   isHardwareAcceleration,
@@ -326,6 +327,11 @@ const sanitizeSettingsPatch = (newSettings: Partial<ExportSettings>): void => {
   stripInvalidEnum(newSettings, 'hardwareAcceleration', isHardwareAcceleration)
   stripInvalidEnum(newSettings, 'rotation', isRotation)
 
+  if ('resetEvolution' in newSettings && typeof newSettings.resetEvolution !== 'boolean') {
+    logger.warn('[exportStore] Ignoring invalid resetEvolution update:', newSettings.resetEvolution)
+    delete newSettings.resetEvolution
+  }
+
   if (newSettings.textOverlay) {
     newSettings.textOverlay = sanitizeTextOverlayPatch(
       newSettings.textOverlay as Partial<TextOverlaySettings>
@@ -458,6 +464,10 @@ export const useExportStore = create<ExportStore>()(
         set({ settings: updatedSettings, lastAppliedPreset: null })
       },
       setExportModeOverride: (mode) => {
+        if (mode !== null && !isExportMode(mode)) {
+          logger.warn('[exportStore] Ignoring invalid export mode override:', mode)
+          return
+        }
         set({ exportModeOverride: mode, exportMode: mode ?? 'in-memory' })
       },
       setCompletionDetails: (details) => set({ completionDetails: details }),

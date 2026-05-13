@@ -146,6 +146,7 @@ export function captureExportEnvironment(
   size: { width: number; height: number }
 ): void {
   const perfStore = usePerformanceStore.getState()
+  runtime.environmentCaptured = true
   runtime.originalCanvasWidth = canvas.width
   runtime.originalCanvasHeight = canvas.height
   runtime.originalCameraAspect =

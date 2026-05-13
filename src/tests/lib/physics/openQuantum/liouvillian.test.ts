@@ -8,6 +8,7 @@
 
 import { describe, expect, it } from 'vitest'
 
+import { MAX_K } from '@/lib/physics/openQuantum/integrator'
 import { buildLiouvillian } from '@/lib/physics/openQuantum/liouvillian'
 import type { LindbladChannel } from '@/lib/physics/openQuantum/types'
 
@@ -21,6 +22,25 @@ function traceSuperop(L: { real: Float64Array; imag: Float64Array }, N: number):
 }
 
 describe('buildLiouvillian', () => {
+  it('rejects invalid inputs before constructing a malformed superoperator', () => {
+    expect(() => buildLiouvillian(new Float64Array([0]), [], 0)).toThrow(
+      'K must be a positive integer'
+    )
+    expect(() => buildLiouvillian(new Float64Array(MAX_K + 1), [], MAX_K + 1)).toThrow(
+      `K=${MAX_K + 1} exceeds MAX_K=${MAX_K}`
+    )
+    expect(() => buildLiouvillian(new Float64Array([0]), [], 2)).toThrow(
+      'energies length must be >= K (2), got 1'
+    )
+    expect(() =>
+      buildLiouvillian(
+        new Float64Array([0, 1]),
+        [{ row: 0, col: 2, amplitudeRe: 1, amplitudeIm: 0 }],
+        2
+      )
+    ).toThrow('channel 0 index out of range for K=2')
+  })
+
   describe('Hamiltonian part (no dissipation)', () => {
     it('produces purely imaginary diagonal for two-level system', () => {
       const energies = new Float64Array([0, 1.0])

@@ -55,10 +55,27 @@ describe('EditorLeftPanel surface mode selector', () => {
   })
 
   it('hides mode selector in Wigner representation', () => {
+    useExtendedObjectStore.getState().setSchroedingerIsoEnabled(true)
     useExtendedObjectStore.getState().setSchroedingerRepresentation('wigner')
 
     render(<EditorLeftPanel />)
 
+    expect(useExtendedObjectStore.getState().schroedinger.isoEnabled).toBe(false)
     expect(screen.queryByTestId('surface-mode-selector')).not.toBeInTheDocument()
+  })
+
+  it('hides mode selector for compute modes even if iso state is stale', () => {
+    useExtendedObjectStore.setState((state) => ({
+      schroedinger: {
+        ...state.schroedinger,
+        quantumMode: 'tdseDynamics',
+        isoEnabled: true,
+      },
+    }))
+
+    render(<EditorLeftPanel />)
+
+    expect(screen.queryByTestId('surface-mode-selector')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('schroedinger-iso-threshold')).not.toBeInTheDocument()
   })
 })

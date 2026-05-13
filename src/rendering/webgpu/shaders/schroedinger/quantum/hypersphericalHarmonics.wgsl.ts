@@ -305,15 +305,15 @@ fn evalHypersphericalHarmonic${D}D(
   // l_1 = azimuthalL (overall angular momentum)
   let l1 = uniforms.azimuthalL;
   let m = uniforms.magneticM;
-  let useReal = uniforms.useRealOrbitals != 0u;`)
+  let useReal = uniforms.useRealOrbitals != 0u;
+  if (l1 < 0 || abs(m) > l1) { return vec2f(0.0, 0.0); }`)
 
   // Extract chain quantum numbers
   for (let k = 2; k <= numTheta; k++) {
     lines.push(`  let l${k} = getAngularChainL(uniforms, ${k - 1});`)
   }
 
-  // The innermost angular momentum is |m|
-  // l_{D-2} must equal |m| for consistency
+  // The innermost angular momentum must remain >= |m| for consistency.
   lines.push('')
   lines.push('  // Accumulate product of Gegenbauer layers')
   lines.push('  var product: f32 = 1.0;')
@@ -334,6 +334,7 @@ fn evalHypersphericalHarmonic${D}D(
     lines.push(`  {`)
     lines.push(`    let lk = ${lkVar};`)
     lines.push(`    let lkp1 = ${lkp1Var};`)
+    lines.push(`    if (lk < 0 || lkp1 < 0 || lkp1 > lk) { return vec2f(0.0, 0.0); }`)
     lines.push(`    let nk = lk - lkp1; // Gegenbauer degree`)
     lines.push(`    let alphaF = f32(lkp1) + f32(${D} - ${k} - 2) * 0.5;`)
     lines.push(`    let ct = hs.cosTheta[${thetaIdx}];`)
@@ -362,6 +363,7 @@ fn evalHypersphericalHarmonic${D}D(
   lines.push(``)
   lines.push(`  // Innermost layer: standard Y_lm(θ_{D-2}, φ)`)
   lines.push(`  let innermostL = ${innermostLVar};`)
+  lines.push(`  if (innermostL < 0 || abs(m) > innermostL) { return vec2f(0.0, 0.0); }`)
   lines.push(`  let ct_inner = hs.cosTheta[${innermostThetaIdx}];`)
   lines.push(`  let st_inner = hs.sinTheta[${innermostThetaIdx}];`)
   lines.push(

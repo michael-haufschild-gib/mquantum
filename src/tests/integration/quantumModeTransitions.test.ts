@@ -363,6 +363,49 @@ describe('quantum mode state machine transitions', () => {
     })
   })
 
+  describe('async preset stale-write guards', () => {
+    it('skips first-visit compute preset if user leaves the mode before import resolves', async () => {
+      await import('@/lib/physics/freeScalar/presets')
+
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('freeScalarField')
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('harmonicOscillator')
+      await new Promise((r) => setTimeout(r, 25))
+
+      const state = useExtendedObjectStore.getState().schroedinger
+      expect(state.quantumMode).toBe('harmonicOscillator')
+      expect(state.freeScalar.modeK[0]).toBe(1)
+    })
+
+    it('skips guarded manual preset apply if mode changes before import resolves', async () => {
+      await import('@/lib/physics/bec/presets')
+
+      useExtendedObjectStore.setState((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          quantumMode: 'becDynamics',
+          autoScaleMaxGain: 77,
+        },
+      }))
+
+      const apply = useExtendedObjectStore
+        .getState()
+        .applyBecPreset('groundState', { expectedQuantumMode: 'becDynamics' })
+
+      useExtendedObjectStore.setState((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          quantumMode: 'harmonicOscillator',
+        },
+      }))
+
+      await apply
+
+      const state = useExtendedObjectStore.getState().schroedinger
+      expect(state.quantumMode).toBe('harmonicOscillator')
+      expect(state.autoScaleMaxGain).toBe(77)
+    })
+  })
+
   describe('rapid cycling stress test', () => {
     it('50 rapid mode switches do not corrupt state', () => {
       for (let i = 0; i < 50; i++) {

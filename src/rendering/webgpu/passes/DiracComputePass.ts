@@ -64,7 +64,7 @@ import {
   writeDiracUniforms,
 } from './DiracComputePassUniforms'
 import { DIRAC_UNIFORM_SIZE } from './diracUniformsLayout'
-import { requestStateSave as genericStateSave } from './stateSave'
+import { interleaveStateInjection, requestStateSave as genericStateSave } from './stateSave'
 
 /**
  * Compute pass for Dirac equation split-operator dynamics.
@@ -551,12 +551,13 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     // Injection only needs the spinor buffer; can complete before the
     // async pipeline build finishes.
     if (this.pendingInjection && this.spinorBuffer) {
-      const { re, im } = this.pendingInjection
-      const elementCount = Math.min(re.length, this.currentSpinorSize * this.totalSites)
-      const interleaved = new Float32Array(elementCount * 2)
-      for (let i = 0; i < elementCount; i++) {
-        interleaved[i * 2] = re[i]!
-        interleaved[i * 2 + 1] = im[i]!
+      const elementCount = this.currentSpinorSize * this.totalSites
+      let interleaved: Float32Array<ArrayBuffer>
+      try {
+        interleaved = interleaveStateInjection('Dirac', this.pendingInjection, elementCount)
+      } catch (err) {
+        this.pendingInjection = null
+        throw err
       }
       device.queue.writeBuffer(this.spinorBuffer, 0, interleaved)
       this.pendingInjection = null

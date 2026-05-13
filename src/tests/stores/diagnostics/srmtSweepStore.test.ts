@@ -57,6 +57,15 @@ describe('useSrmtSweepStore', () => {
     expect(s.wdwConfigSnapshot).toEqual(DEFAULT_WHEELER_DEWITT_CONFIG)
   })
 
+  it.each([
+    [{ ...cutConfig(), points: Number.NaN }, 1],
+    [{ ...cutConfig(), kind: 'rankCap' as const, points: Number.POSITIVE_INFINITY }, 1],
+    [{ ...cutConfig(), kind: 'gridNphiCoupled' as const, points: Number.NaN }, 3],
+  ])('startSweep normalizes non-finite totalPoints metadata', (config, expected) => {
+    useSrmtSweepStore.getState().startSweep(config, DEFAULT_WHEELER_DEWITT_CONFIG, [])
+    expect(useSrmtSweepStore.getState().totalPoints).toBe(expected)
+  })
+
   it('appendPoint accepts sequential indices and bumps version', () => {
     const { startSweep, appendPoint } = useSrmtSweepStore.getState()
     startSweep(cutConfig(), DEFAULT_WHEELER_DEWITT_CONFIG, [])

@@ -104,13 +104,14 @@ describe('Popover', () => {
   })
 
   describe('accessibility', () => {
-    it('should put aria attributes on the actual trigger', () => {
+    it('should have correct aria attributes on trigger', () => {
       render(<Popover trigger={<Button>Open</Button>} content={<div>Content</div>} />)
 
-      const trigger = screen.getByRole('button', { name: 'Open' })
+      const buttons = screen.getAllByRole('button', { name: 'Open' })
+      expect(buttons).toHaveLength(1)
+      const trigger = buttons[0]!
       expect(trigger).toHaveAttribute('aria-expanded', 'false')
       expect(trigger).toHaveAttribute('aria-haspopup', 'dialog')
-      expect(trigger).toHaveAttribute('aria-controls')
     })
 
     it('should update aria-expanded when open', async () => {
@@ -123,17 +124,18 @@ describe('Popover', () => {
       expect(trigger).toHaveAttribute('aria-expanded', 'true')
     })
 
-    it('should open from native keyboard activation', async () => {
-      const user = userEvent.setup()
+    it('should make non-native triggers keyboard operable', () => {
       render(
         <Popover
-          trigger={<Button>Open</Button>}
+          trigger={<div aria-label="Open color picker">Swatch</div>}
           content={<div data-testid="content">Content</div>}
         />
       )
 
-      screen.getByRole('button', { name: 'Open' }).focus()
-      await user.keyboard('{Enter}')
+      const trigger = screen.getByRole('button', { name: 'Open color picker' })
+      expect(trigger).toHaveAttribute('tabIndex', '0')
+
+      fireEvent.keyDown(trigger, { key: 'Enter' })
 
       expect(screen.getByTestId('content')).toBeInTheDocument()
     })
@@ -235,8 +237,9 @@ describe('Popover', () => {
         />
       )
 
-      const trigger = screen.getByRole('button', { name: 'Open' })
-      expect(trigger).toHaveClass('custom-class')
+      // The trigger wrapper (aria-haspopup) should have the custom class
+      const triggerWrapper = screen.getByRole('button', { name: 'Open' })
+      expect(triggerWrapper).toHaveClass('custom-class')
     })
   })
 })

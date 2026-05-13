@@ -10,6 +10,7 @@
 
 import { logger } from '@/lib/logger'
 
+import { sanitizePixelExtent, sanitizePixelSize } from '../utils/sceneMath'
 import type { ResourceSize, WebGPURenderResourceConfig, WebGPUResource } from './types'
 
 // =============================================================================
@@ -21,6 +22,52 @@ const DEFAULT_USAGE =
   GPUTextureUsage.RENDER_ATTACHMENT |
   GPUTextureUsage.COPY_SRC |
   GPUTextureUsage.COPY_DST
+
+function defaultUsageForType(type: WebGPURenderResourceConfig['type']): GPUTextureUsageFlags {
+  return type === 'storageTexture' ? DEFAULT_USAGE | GPUTextureUsage.STORAGE_BINDING : DEFAULT_USAGE
+}
+
+function resourceSizeEquals(a: ResourceSize, b: ResourceSize): boolean {
+  return (
+    a.mode === b.mode && a.width === b.width && a.height === b.height && a.fraction === b.fraction
+  )
+}
+
+function sanitizePositiveInteger(value: number | undefined, fallback = 1): number {
+  return Number.isFinite(value) && value! > 0 ? Math.max(1, Math.floor(value!)) : fallback
+}
+
+function sanitizeSampleCount(value: number | undefined): number {
+  return value === 4 ? 4 : 1
+}
+
+function sanitizeArrayLayerCount(config: WebGPURenderResourceConfig): number {
+  if (config.type === 'cubemap') return 6
+  return sanitizePositiveInteger(config.arrayLayerCount)
+}
+
+function allocationConfigEquals(
+  a: WebGPURenderResourceConfig,
+  b: WebGPURenderResourceConfig
+): boolean {
+  return (
+    a.type === b.type &&
+    (a.format ?? 'rgba16float') === (b.format ?? 'rgba16float') &&
+    (a.usage ?? defaultUsageForType(a.type)) === (b.usage ?? defaultUsageForType(b.type)) &&
+    sanitizeSampleCount(a.sampleCount) === sanitizeSampleCount(b.sampleCount) &&
+    sanitizePositiveInteger(a.mipLevelCount) === sanitizePositiveInteger(b.mipLevelCount) &&
+    sanitizeArrayLayerCount(a) === sanitizeArrayLayerCount(b) &&
+    resourceSizeEquals(a.size, b.size)
+  )
+}
+
+function estimateMipTexels(width: number, height: number, mipLevelCount: number): number {
+  let texels = 0
+  for (let level = 0; level < mipLevelCount; level++) {
+    texels += Math.max(1, width >> level) * Math.max(1, height >> level)
+  }
+  return texels
+}
 
 // =============================================================================
 // Resource Pool
@@ -76,12 +123,13 @@ export class WebGPUResourcePool {
    * @param height
    */
   setSize(width: number, height: number): void {
-    if (this.width === width && this.height === height) {
+    const safeSize = sanitizePixelSize(width, height)
+    if (this.width === safeSize.width && this.height === safeSize.height) {
       return
     }
 
-    this.width = width
-    this.height = height
+    this.width = safeSize.width
+    this.height = safeSize.height
 
     // Resize all non-fixed resources
     for (const [id, config] of this.configs) {
@@ -97,7 +145,14 @@ export class WebGPUResourcePool {
    * @param config
    */
   addResource(config: WebGPURenderResourceConfig): void {
+    const previous = this.configs.get(config.id)
+    const hasAllocatedResource =
+      this.resources.has(config.id) || this.pingPongResources.has(config.id)
     this.configs.set(config.id, config)
+
+    if (previous && hasAllocatedResource && !allocationConfigEquals(previous, config)) {
+      this.reallocateResource(config.id, config)
+    }
   }
 
   /**
@@ -126,6 +181,11 @@ export class WebGPUResourcePool {
    * @param id
    */
   getResource(id: string): WebGPUResource | null {
+    const pingPong = this.pingPongResources.get(id)
+    if (pingPong) {
+      return pingPong.read
+    }
+
     // Check if already allocated
     let resource = this.resources.get(id)
     if (resource) {
@@ -258,8 +318,10 @@ export class WebGPUResourcePool {
 
     const countResource = (r: WebGPUResource): number => {
       const bytesPerPixel = this.getBytesPerPixel(r.config.format ?? 'rgba16float')
-      const layers = r.config.arrayLayerCount ?? 1
-      return r.width * r.height * bytesPerPixel * layers
+      const layers = sanitizeArrayLayerCount(r.config)
+      const mipLevels = sanitizePositiveInteger(r.config.mipLevelCount)
+      const sampleCount = sanitizeSampleCount(r.config.sampleCount)
+      return estimateMipTexels(r.width, r.height, mipLevels) * bytesPerPixel * layers * sampleCount
     }
 
     for (const resource of this.resources.values()) {
@@ -327,7 +389,7 @@ export class WebGPUResourcePool {
 
     const { width, height } = this.resolveSize(config.size)
     const format = config.format ?? 'rgba16float'
-    const usage = config.usage ?? DEFAULT_USAGE
+    const usage = config.usage ?? defaultUsageForType(config.type)
 
     // Create main texture
     const texture = this.device.createTexture({
@@ -335,12 +397,12 @@ export class WebGPUResourcePool {
       size: {
         width,
         height,
-        depthOrArrayLayers: config.arrayLayerCount ?? 1,
+        depthOrArrayLayers: sanitizeArrayLayerCount(config),
       },
       format,
       usage,
-      sampleCount: config.sampleCount ?? 1,
-      mipLevelCount: config.mipLevelCount ?? 1,
+      sampleCount: sanitizeSampleCount(config.sampleCount),
+      mipLevelCount: sanitizePositiveInteger(config.mipLevelCount),
     })
 
     const view = texture.createView({
@@ -391,19 +453,19 @@ export class WebGPUResourcePool {
         return { width: this.width || 1, height: this.height || 1 }
 
       case 'fixed':
-        return {
-          width: size.width ?? 256,
-          height: size.height ?? 256,
-        }
+        return sanitizePixelSize(size.width ?? 256, size.height ?? 256)
 
       case 'fraction': {
-        const fraction = size.fraction ?? 1
+        const fraction =
+          size.fraction !== undefined && Number.isFinite(size.fraction) && size.fraction > 0
+            ? size.fraction
+            : 1
         // Fractional render targets must cover every source pixel block. For
         // half-res temporal buffers, floor(odd / 2) leaves the right/bottom
         // full-res edge with no corresponding quarter-res texel.
         return {
-          width: Math.max(1, Math.ceil((this.width || 1) * fraction)),
-          height: Math.max(1, Math.ceil((this.height || 1) * fraction)),
+          width: sanitizePixelExtent(Math.ceil((this.width || 1) * fraction)),
+          height: sanitizePixelExtent(Math.ceil((this.height || 1) * fraction)),
         }
       }
 

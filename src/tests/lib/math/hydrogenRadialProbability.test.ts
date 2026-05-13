@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { computeRadialProbabilityNorm } from '@/lib/math/hydrogenRadialProbability'
+import {
+  computeHydrogenRadialProbabilityDensity,
+  computeHydrogenRadialWavefunction,
+  computeRadialProbabilityNorm,
+} from '@/lib/math/hydrogenRadialProbability'
 
 /**
  * Known analytical peak values for hydrogen radial probability P(r) = 4πr²|R_nl(r)|².
@@ -248,6 +252,41 @@ describe('computeRadialProbabilityNorm', () => {
       const norm3D = computeRadialProbabilityNorm(1, 0, 1.0, 3)
       // These must NOT be equal — they use fundamentally different radial functions
       expect(Math.abs(norm2D - norm3D) / norm3D).toBeGreaterThan(0.1)
+    })
+  })
+
+  describe('shared radial wavefunction helpers', () => {
+    it('use the D-dimensional radial node location instead of the 3D Laguerre node', () => {
+      const d2Node = 0.75
+      const d3Node = 2.0
+
+      expect(Math.abs(computeHydrogenRadialWavefunction(2, 0, d2Node, 1.0, 2))).toBeLessThan(1e-10)
+      expect(Math.abs(computeHydrogenRadialWavefunction(2, 0, d3Node, 1.0, 3))).toBeLessThan(1e-10)
+
+      expect(Math.abs(computeHydrogenRadialWavefunction(2, 0, d2Node, 1.0, 3))).toBeGreaterThan(
+        0.01
+      )
+      expect(Math.abs(computeHydrogenRadialWavefunction(2, 0, d3Node, 1.0, 2))).toBeGreaterThan(
+        0.01
+      )
+    })
+
+    it('returns finite chart density for sanitized invalid inputs', () => {
+      const density = computeHydrogenRadialProbabilityDensity(
+        Number.NaN,
+        Number.POSITIVE_INFINITY,
+        Number.NEGATIVE_INFINITY,
+        Number.NaN,
+        Number.NaN
+      )
+
+      expect(Number.isFinite(density)).toBe(true)
+      expect(density).toBeGreaterThanOrEqual(0)
+    })
+
+    it('mirrors WGSL half-integer radial behavior at the origin', () => {
+      expect(computeHydrogenRadialWavefunction(1, 0, 0, 1.0, 4)).toBe(0)
+      expect(computeHydrogenRadialWavefunction(2, 1, 0, 1.0, 6)).toBe(0)
     })
   })
 })

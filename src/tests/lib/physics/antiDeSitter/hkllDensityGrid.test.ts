@@ -42,6 +42,15 @@ function readRChannel(density: Uint16Array, index: number): number {
   return halfToFloat(density[index * 4]!)
 }
 
+function expectFinitePackedDensity(packed: { density: Uint16Array }): void {
+  for (let i = 0; i < packed.density.length; i++) {
+    const value = halfToFloat(packed.density[i]!)
+    if (!Number.isFinite(value)) {
+      throw new Error(`density[${i}] encoded non-finite half-float ${value}`)
+    }
+  }
+}
+
 function voxelIdx(x: number, y: number, z: number): number {
   const N = DENSITY_GRID_SIZE
   return (z * N + y) * N + x
@@ -161,5 +170,49 @@ describe('packAntiDeSitterDensityGrid (HKLL path)', () => {
     const rAtYNode = readRChannel(packed.density, voxelIdx(worldToIdx(0), worldToIdx(peakX), zC))
     expect(peakR).toBeGreaterThan(0)
     expect(peakR).toBeGreaterThan(rAtYNode + 1e-4)
+  })
+
+  it('sanitizes malformed HKLL config before CPU packing', () => {
+    const packed = packAntiDeSitterDensityGrid(
+      hkllConfig({
+        d: Number.NaN,
+        n: Number.POSITIVE_INFINITY,
+        l: Number.POSITIVE_INFINITY,
+        m: Number.NEGATIVE_INFINITY,
+        mL: Number.POSITIVE_INFINITY,
+        branch: 'bad-branch' as never,
+        hkllBoundarySource: 'planeWave',
+        hkllSourceSigma: Number.NaN,
+        hkllPlaneWaveM: Number.POSITIVE_INFINITY,
+      })
+    )
+
+    expect(packed.gridSize).toBe(DENSITY_GRID_SIZE)
+    expect(Number.isFinite(packed.peakDensity)).toBe(true)
+    expect(Number.isFinite(packed.effectiveDelta)).toBe(true)
+    expectFinitePackedDensity(packed)
+  })
+})
+
+describe('packAntiDeSitterDensityGrid malformed config defense', () => {
+  it('sanitizes malformed bound-state config before CPU packing', () => {
+    const packed = packAntiDeSitterDensityGrid({
+      ...DEFAULT_ANTI_DE_SITTER_CONFIG,
+      d: Number.NaN,
+      n: Number.POSITIVE_INFINITY,
+      l: Number.NEGATIVE_INFINITY,
+      m: Number.POSITIVE_INFINITY,
+      mL: Number.NEGATIVE_INFINITY,
+      branch: 'bad-branch' as never,
+      boundaryOverlay: true,
+      btzEnabled: false,
+      hkllEnabled: false,
+    })
+
+    expect(packed.gridSize).toBe(DENSITY_GRID_SIZE)
+    expect(packed.peakDensity).toBeGreaterThan(0)
+    expect(Number.isFinite(packed.peakDensity)).toBe(true)
+    expect(Number.isFinite(packed.effectiveDelta)).toBe(true)
+    expectFinitePackedDensity(packed)
   })
 })

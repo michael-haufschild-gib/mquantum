@@ -112,6 +112,8 @@ describe('clampRankCap', () => {
     expect(clampRankCap(7.2)).toBe(8)
     expect(clampRankCap(50.6)).toBe(51)
     expect(clampRankCap(1000)).toBe(256)
+    expect(clampRankCap(Number.POSITIVE_INFINITY)).toBe(256)
+    expect(clampRankCap(Number.NaN)).toBe(8)
   })
 })
 
@@ -630,6 +632,8 @@ describe('clampGridNa', () => {
     expect(clampGridNa(63.4)).toBe(64)
     expect(clampGridNa(127.6)).toBe(128)
     expect(clampGridNa(2000)).toBe(1024)
+    expect(clampGridNa(Number.POSITIVE_INFINITY)).toBe(1024)
+    expect(clampGridNa(Number.NaN)).toBe(64)
   })
 })
 
@@ -646,6 +650,8 @@ describe('clampGridNphi', () => {
     expect(clampGridNphi(33)).toBe(33)
     expect(clampGridNphi(48.4)).toBe(48)
     expect(clampGridNphi(100)).toBe(64)
+    expect(clampGridNphi(Number.POSITIVE_INFINITY)).toBe(64)
+    expect(clampGridNphi(Number.NaN)).toBe(32)
   })
 })
 
@@ -664,6 +670,7 @@ describe('clampPhiExtent', () => {
     expect(clampPhiExtent(15)).toBe(10)
     expect(clampPhiExtent(Number.POSITIVE_INFINITY)).toBe(10)
     expect(clampPhiExtent(Number.NaN)).toBe(0.5)
+    expect(clampPhiExtent(Number.NEGATIVE_INFINITY)).toBe(0.5)
   })
 })
 

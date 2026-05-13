@@ -12,6 +12,7 @@ import {
   getQuantumTypeRuntime,
   isComputeQuantumType,
   isHydrogenFamilyQuantumType,
+  supportsSchroedingerSurfaceMode,
 } from '@/lib/geometry/registry'
 
 import type {
@@ -103,6 +104,17 @@ export function applyModeOverrides(config?: SchrodingerRendererConfig): Schrodin
     }
   }
 
+  if (
+    !supportsSchroedingerSurfaceMode({
+      objectType: result.isPauli ? 'pauliSpinor' : 'schroedinger',
+      quantumMode: result.quantumMode,
+      dimension: result.dimension ?? 3,
+      representation: result.representation,
+    })
+  ) {
+    result.isosurface = false
+  }
+
   return result
 }
 
@@ -149,7 +161,14 @@ export function buildShaderConfig(
 
   const enableCache = rendererConfig.eigenfunctionCacheEnabled ?? !pipelineIs2D
   const isHydrogen = modeKey ? isHydrogenFamilyQuantumType(modeKey) : false
-  const isosurface = rendererConfig.isosurface ?? false
+  const isosurface = supportsSchroedingerSurfaceMode({
+    objectType: isPauli ? 'pauliSpinor' : 'schroedinger',
+    quantumMode: rendererConfig.quantumMode,
+    dimension: dim,
+    representation: rendererConfig.representation,
+  })
+    ? (rendererConfig.isosurface ?? false)
+    : false
   const openQuantumEnabled = rendererConfig.openQuantumEnabled ?? false
 
   const { useDensityGrid, densityGridSize } = computeDensityGridConfig(
@@ -184,7 +203,7 @@ export function buildShaderConfig(
 
   return {
     dimension: rendererConfig.dimension!,
-    isosurface: rendererConfig.isosurface,
+    isosurface,
     quantumMode: shaderQuantumMode,
     termCount: computeMode ? 1 : rendererConfig.termCount,
     nodal,

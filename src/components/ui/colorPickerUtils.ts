@@ -1,4 +1,4 @@
-import { hsvToHex } from '@/lib/colors/colorUtils'
+import { hsvToHex, isValidHex } from '@/lib/colors/colorUtils'
 
 const MAX_HISTORY = 8
 const HISTORY_KEY = 'mquantum_color_history'
@@ -23,6 +23,54 @@ const HUE_STOPS = [0, 1 / 6, 2 / 6, 3 / 6, 4 / 6, 5 / 6, 1] as const
 
 /** CSS linear gradient covering the full hue wheel. */
 const HUE_GRADIENT = `linear-gradient(to right, ${HUE_STOPS.map((s) => `${hsvToHex(s, 1, 1)} ${Math.round(s * 100)}%`).join(', ')})`
+const RGB_COLOR_RE = /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i
+const RGBA_COLOR_RE = /^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*((?:\d+\.?\d*|\.\d+))\s*\)$/i
+
+/** Return true when a CSS RGB channel is an integer in [0, 255]. */
+function isRgbChannel(value: number): boolean {
+  return Number.isInteger(value) && value >= 0 && value <= 255
+}
+
+/** Format a sanitized CSS color function without embedding raw color literals. */
+function formatColorFunction(name: 'rgb' | 'rgba', values: Array<number | string>): string {
+  return `${name}(${values.join(', ')})`
+}
+
+/**
+ * Normalize one persisted history entry to a ColorPicker-supported color string.
+ * @param entry - Candidate persisted color
+ * @returns Normalized color, or null when unsupported/malformed
+ */
+function normalizeColorHistoryEntry(entry: string): string | null {
+  const color = entry.trim()
+  if (isValidHex(color)) {
+    return color.toLowerCase()
+  }
+
+  const rgbMatch = color.match(RGB_COLOR_RE)
+  if (rgbMatch) {
+    const r = parseInt(rgbMatch[1] ?? '', 10)
+    const g = parseInt(rgbMatch[2] ?? '', 10)
+    const b = parseInt(rgbMatch[3] ?? '', 10)
+    if (isRgbChannel(r) && isRgbChannel(g) && isRgbChannel(b)) {
+      return formatColorFunction('rgb', [r, g, b])
+    }
+    return null
+  }
+
+  const rgbaMatch = color.match(RGBA_COLOR_RE)
+  if (rgbaMatch) {
+    const r = parseInt(rgbaMatch[1] ?? '', 10)
+    const g = parseInt(rgbaMatch[2] ?? '', 10)
+    const b = parseInt(rgbaMatch[3] ?? '', 10)
+    const a = parseFloat(rgbaMatch[4] ?? '')
+    if (isRgbChannel(r) && isRgbChannel(g) && isRgbChannel(b) && a >= 0 && a <= 1) {
+      return formatColorFunction('rgba', [r, g, b, a])
+    }
+  }
+
+  return null
+}
 
 /**
  * Normalize persisted color history into a bounded string list.
@@ -33,9 +81,17 @@ function sanitizeColorHistory(raw: unknown): string[] {
   if (!Array.isArray(raw)) {
     return []
   }
-  return raw
-    .filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
-    .slice(0, MAX_HISTORY)
+  const seen = new Set<string>()
+  const sanitized: string[] = []
+  for (const entry of raw) {
+    if (typeof entry !== 'string') continue
+    const color = normalizeColorHistoryEntry(entry)
+    if (!color || seen.has(color)) continue
+    seen.add(color)
+    sanitized.push(color)
+    if (sanitized.length >= MAX_HISTORY) break
+  }
+  return sanitized
 }
 
 /**
@@ -83,5 +139,6 @@ export {
   HUE_GRADIENT,
   MAX_HISTORY,
   NOISE_BG,
+  normalizeColorHistoryEntry,
   sanitizeColorHistory,
 }

@@ -2,7 +2,7 @@
  * Regression tests for computed scenario selection in Schroedinger compute modes.
  */
 
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
@@ -105,7 +105,9 @@ describe('ScenarioSelector - compute mode presets', () => {
   })
 
   afterEach(() => {
-    resetStores()
+    act(() => {
+      resetStores()
+    })
   })
 
   it('shows a matching restored compute preset from current config', () => {

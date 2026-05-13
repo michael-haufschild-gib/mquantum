@@ -361,6 +361,12 @@ function buildPackParams(
   effectiveSampleCount: number,
   colorAlgorithm: number
 ) {
+  const isoEnabled = config.isosurface ?? inputs.schroedinger?.isoEnabled ?? false
+  const schroedinger =
+    inputs.schroedinger?.isoEnabled === isoEnabled
+      ? inputs.schroedinger
+      : { ...(inputs.schroedinger ?? {}), isoEnabled }
+
   return {
     quantumModeInt: inputs.quantumModeInt,
     quantumModeStr: inputs.quantumModeStr,
@@ -380,7 +386,7 @@ function buildPackParams(
     uncertaintyLogRhoThreshold: inputs.uncertaintyLogRhoThreshold,
     uncertaintyConfidenceMass: inputs.uncertaintyConfidenceMass,
     uncertaintyBoundaryWidth: inputs.uncertaintyBoundaryWidth,
-    schroedinger: inputs.schroedinger,
+    schroedinger,
     appearance: inputs.appearance,
     pbr: inputs.pbr,
     pauliSpinor: inputs.extended?.pauliSpinor,

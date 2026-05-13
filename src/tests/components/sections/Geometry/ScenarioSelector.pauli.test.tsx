@@ -2,7 +2,7 @@
  * Regression tests for Pauli scenario selection.
  */
 
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
@@ -29,7 +29,9 @@ describe('ScenarioSelector - Pauli presets', () => {
   })
 
   afterEach(() => {
-    resetStores()
+    act(() => {
+      resetStores()
+    })
   })
 
   it('shows the matching default Pauli preset without mutating the config on mount', () => {

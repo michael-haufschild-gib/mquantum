@@ -137,6 +137,24 @@ async function assertSolverParity(
 // `aMax < a_turn(0) = 1/√(K·V(0))` so Stage-2/3 never engage and the raw
 // CN-ADI outputs can be compared pointwise.
 const rustValidatorMatchesPhase2Js = true
+
+describe('Wheeler-DeWitt WASM validator wrapper', () => {
+  it('validates shared solver inputs before attempting to load the optional binary', async () => {
+    await expect(
+      solveWheelerDeWittWasmValidator({
+        boundaryCondition: 'noBoundary',
+        inflatonMass: 0.3,
+        cosmologicalConstant: 0,
+        aMin: 0.1,
+        aMax: 1.5,
+        gridNa: 3.5,
+        gridNphi: 8,
+        phiExtent: 2,
+      })
+    ).rejects.toThrow(/gridNa must be an integer >= 3/)
+  })
+})
+
 describe.skipIf(!validatorAvailable || !rustValidatorMatchesPhase2Js)(
   'Wheeler-DeWitt JS↔Rust pointwise comparison',
   () => {

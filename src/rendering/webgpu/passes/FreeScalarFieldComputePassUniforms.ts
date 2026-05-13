@@ -157,7 +157,7 @@ export function computeFsfConfigHash(config: FreeScalarConfig): string {
  * @param config - Free scalar field configuration
  */
 export function computeFsfInitHash(config: FreeScalarConfig): string {
-  const base = `${config.initialCondition}_m${config.mass}_k${config.modeK.join(',')}_c${config.packetCenter.join(',')}_w${config.packetWidth}_a${config.packetAmplitude}_s${config.vacuumSeed}`
+  const base = `${config.initialCondition}_m${config.mass}_sp${config.spacing.join(',')}_k${config.modeK.join(',')}_c${config.packetCenter.join(',')}_w${config.packetWidth}_a${config.packetAmplitude}_s${config.vacuumSeed}`
   const cosmo = config.cosmology
   const bk =
     cosmo.enabled && cosmo.preset === 'bianchiKasner' && cosmo.kasnerExponents
@@ -166,10 +166,13 @@ export function computeFsfInitHash(config: FreeScalarConfig): string {
   const cosmoHash = cosmo.enabled
     ? `_cosmo1_${cosmo.preset}_eta${cosmo.eta0}_h${cosmo.hubble}_st${cosmo.steepness}${bk}`
     : '_cosmo0'
+  const preheatingHash = config.preheating.enabled
+    ? `_preheat1_f${config.preheating.frequency}`
+    : '_preheat0'
   if (config.selfInteractionEnabled) {
-    return `${base}${cosmoHash}_si${config.selfInteractionLambda}_v${config.selfInteractionVev}`
+    return `${base}${cosmoHash}${preheatingHash}_si${config.selfInteractionLambda}_v${config.selfInteractionVev}`
   }
-  return `${base}${cosmoHash}`
+  return `${base}${cosmoHash}${preheatingHash}`
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -244,14 +247,14 @@ export interface FsfUniformParams {
 
 /**
  * Write the uniform buffer with current config values.
- * Layout matches the N-D FreeScalarUniforms struct (512 bytes).
+ * Layout matches the N-D FreeScalarUniforms struct.
  *
  * Writes into the provided pre-allocated typed array views, then uploads
  * the backing ArrayBuffer to the GPU uniform buffer.
  *
  * @param device - GPU device
  * @param uniformBuffer - GPU uniform buffer
- * @param uniformData - Pre-allocated ArrayBuffer (512 bytes)
+ * @param uniformData - Pre-allocated ArrayBuffer of exactly FSF_UNIFORM_SIZE bytes
  * @param params - Uniform parameters
  * @returns The computed maxFieldValue for this frame
  */
@@ -261,6 +264,12 @@ export function writeFsfUniforms(
   uniformData: ArrayBuffer,
   params: FsfUniformParams
 ): number {
+  if (uniformData.byteLength !== FSF_UNIFORM_SIZE) {
+    throw new RangeError(
+      `writeFsfUniforms expected ${FSF_UNIFORM_SIZE} bytes, got ${uniformData.byteLength}`
+    )
+  }
+
   const { config, totalSites, basisX, basisY, basisZ, boundingRadius, colorAlgorithm } = params
 
   // PERF: Reuse cached typed array views instead of creating 3 new views per frame.

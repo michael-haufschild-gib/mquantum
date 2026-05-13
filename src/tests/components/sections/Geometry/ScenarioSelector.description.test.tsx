@@ -5,7 +5,7 @@
  * a known preset, and is hidden when the config is custom (no preset match).
  */
 
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { ScenarioSelector } from '@/components/sections/Geometry/ScenarioSelector'
@@ -26,7 +26,9 @@ describe('ScenarioSelector - description info icon', () => {
   })
 
   afterEach(() => {
-    resetStores()
+    act(() => {
+      resetStores()
+    })
   })
 
   it('renders the info icon with the matching preset description when state matches', () => {

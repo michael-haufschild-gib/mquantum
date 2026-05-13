@@ -460,6 +460,28 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     expect(wgsl).not.toContain('fn hydrogenRadial(')
   })
 
+  it('uses the D-dimensional hydrogen radial function for radial probability overlay', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 5,
+      isosurface: false,
+      temporalAccumulation: false,
+      useDensityGrid: false,
+      quantumMode: 'hydrogenND',
+      nodal: false,
+      phaseMateriality: false,
+      interference: false,
+      uncertaintyBoundary: false,
+      probabilityCurrentEnabled: false,
+      crossSectionEnabled: false,
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(wgsl).toContain('const HYDROGEN_ND_DIMENSION: i32 = 5;')
+    expect(wgsl).toMatch(
+      /fn computeRadialProbabilityOverlay[\s\S]*HYDROGEN_ND_DIMENSION == 3[\s\S]*R = hydrogenRadialND\(/
+    )
+  })
+
   it('uses sphere intersection for non-free-scalar modes', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 3,

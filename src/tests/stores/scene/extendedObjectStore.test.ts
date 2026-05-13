@@ -34,6 +34,18 @@ describe('extendedObjectStore (invariants)', () => {
     expect(config.momentumHbar).toBe(10.0)
   })
 
+  it('rejects invalid quality preset ids without throwing', () => {
+    const store = useExtendedObjectStore.getState()
+    store.setSchroedingerQualityPreset('high')
+    const before = useExtendedObjectStore.getState().schroedinger
+
+    expect(() => store.setSchroedingerQualityPreset('cinematic' as never)).not.toThrow()
+
+    const after = useExtendedObjectStore.getState().schroedinger
+    expect(after.qualityPreset).toBe(before.qualityPreset)
+    expect(after.resolution).toBe(before.resolution)
+  })
+
   it('ignores non-finite discrete Wigner and probability-current step updates', () => {
     const store = useExtendedObjectStore.getState()
     store.setSchroedingerWignerDimensionIndex(3)

@@ -75,4 +75,16 @@ describe('computeAdsConfigHash', () => {
       computeAdsConfigHash({ ...baseConfig, m: 2 })
     )
   })
+
+  it('does not throw when malformed restored state carries non-finite floats', () => {
+    const hash = computeAdsConfigHash({
+      ...baseConfig,
+      mL: Number.NaN,
+      btzHorizonRadius: Number.POSITIVE_INFINITY,
+      btzOmega: Number.NEGATIVE_INFINITY,
+      hkllSourceSigma: Number.NaN,
+    })
+
+    expect(hash).toContain('invalid')
+  })
 })

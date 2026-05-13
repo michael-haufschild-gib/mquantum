@@ -84,6 +84,52 @@ describe('BEC setters', () => {
     expect(getBec().vortexCharge).toBe(3)
   })
 
+  it('rejects malformed discrete vortex controls', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setBecVortexCharge(2)
+    s.setBecVortexCharge(NaN)
+    expect(getBec().vortexCharge).toBe(2)
+
+    s.setBecVortexLatticeCount(5)
+    s.setBecVortexLatticeCount(Infinity)
+    expect(getBec().vortexLatticeCount).toBe(5)
+
+    s.setBecVortexPairCount(2)
+    s.setBecVortexPairCount(NaN)
+    expect(getBec().vortexPairCount).toBe(2)
+
+    const planeBefore = getBec().vortexPlane1
+    s.setBecVortexPlane1([NaN, 1])
+    expect(getBec().vortexPlane1).toEqual(planeBefore)
+  })
+
+  it('rejects malformed BEC enums and boolean controls', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setBecInitialCondition('blackHoleAnalog')
+    s.setBecInitialCondition('bogus' as unknown as Parameters<typeof s.setBecInitialCondition>[0])
+    expect(getBec().initialCondition).toBe('blackHoleAnalog')
+
+    s.setBecFieldView('phase')
+    s.setBecFieldView('bogus' as unknown as Parameters<typeof s.setBecFieldView>[0])
+    expect(getBec().fieldView).toBe('phase')
+
+    s.setBecDisorderDistribution('gaussian')
+    s.setBecDisorderDistribution(
+      'bogus' as unknown as Parameters<typeof s.setBecDisorderDistribution>[0]
+    )
+    expect(getBec().disorderDistribution).toBe('gaussian')
+
+    s.setBecAutoScale(false)
+    s.setBecAutoScale('yes' as unknown as Parameters<typeof s.setBecAutoScale>[0])
+    expect(getBec().autoScale).toBe(false)
+
+    s.setBecHawkingPairInjection(false)
+    s.setBecHawkingPairInjection(
+      'yes' as unknown as Parameters<typeof s.setBecHawkingPairInjection>[0]
+    )
+    expect(getBec().hawkingPairInjection).toBe(false)
+  })
+
   it('clamps solitonDepth to [0, 1]', () => {
     const s = useExtendedObjectStore.getState()
     s.setBecSolitonDepth(-0.5)
@@ -228,6 +274,8 @@ describe('BEC setters', () => {
       expect(getBec().disorderSeed).toBe(1234)
       s.setBecDisorderSeed(-50)
       expect(getBec().disorderSeed).toBe(0)
+      s.setBecDisorderSeed(2 ** 40)
+      expect(getBec().disorderSeed).toBe(0xffffffff)
     })
 
     it('accepts both uniform and gaussian distributions', () => {

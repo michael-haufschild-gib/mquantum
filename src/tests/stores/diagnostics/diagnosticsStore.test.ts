@@ -96,10 +96,31 @@ describe('diagnosticsStore', () => {
       const kValues = new Float32Array([0.1, 0.2, 0.3])
       useDiagnosticsStore.getState().setBecIncompressibleSpectrum(spectrum, kValues, 5.0, 2.0)
       const ch = useDiagnosticsStore.getState().bec
-      expect(ch.incompressibleSpectrum).toBe(spectrum)
-      expect(ch.spectrumKValues).toBe(kValues)
+      expect(Array.from(ch.incompressibleSpectrum)).toEqual([1, 2, 3])
+      expect(Array.from(ch.spectrumKValues)).toEqual([
+        expect.closeTo(0.1),
+        expect.closeTo(0.2),
+        expect.closeTo(0.3),
+      ])
       expect(ch.totalIncompressibleEnergy).toBe(5.0)
       expect(ch.totalCompressibleEnergy).toBe(2.0)
+    })
+
+    it('setBecIncompressibleSpectrum sanitizes non-finite spectrum payloads', () => {
+      useDiagnosticsStore
+        .getState()
+        .setBecIncompressibleSpectrum(
+          new Float32Array([1, Number.NaN, Number.POSITIVE_INFINITY, -2]),
+          new Float32Array([0.1, Number.NaN, 2, -1]),
+          Number.NaN,
+          Number.POSITIVE_INFINITY
+        )
+
+      const ch = useDiagnosticsStore.getState().bec
+      expect(Array.from(ch.incompressibleSpectrum)).toEqual([1, 0, 0, 0])
+      expect(Array.from(ch.spectrumKValues)).toEqual([expect.closeTo(0.1), 0, 2, 0])
+      expect(ch.totalIncompressibleEnergy).toBe(0)
+      expect(ch.totalCompressibleEnergy).toBe(0)
     })
 
     it('clearBecIncompressibleSpectrum drops stale spectrum without clearing BEC readbacks', () => {

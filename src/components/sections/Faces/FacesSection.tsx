@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/Button'
 import { ColorPicker } from '@/components/ui/ColorPicker'
 import { Slider } from '@/components/ui/Slider'
 import { Tabs } from '@/components/ui/Tabs'
+import { supportsSchroedingerSurfaceMode } from '@/lib/geometry/registry'
 import { DEFAULT_FACE_PBR } from '@/stores/defaults/visualDefaults'
 import { type AppearanceSlice, useAppearanceStore } from '@/stores/scene/appearanceStore'
 import {
@@ -63,9 +64,11 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
   // Isosurface mode controls (drives material tab availability and rendering mode)
   const schroedingerIsoSelector = useShallow((state: ExtendedObjectState) => ({
     isoEnabled: state.schroedinger?.isoEnabled ?? false,
+    quantumMode: state.schroedinger?.quantumMode ?? 'harmonicOscillator',
     representation: state.schroedinger?.representation ?? 'position',
   }))
-  const { isoEnabled, representation } = useExtendedObjectStore(schroedingerIsoSelector)
+  const { isoEnabled, quantumMode, representation } =
+    useExtendedObjectStore(schroedingerIsoSelector)
 
   // Appearance settings
   const appearanceSelector = useShallow((state: AppearanceSlice) => ({
@@ -126,8 +129,14 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
 
   // Material tab only enabled in isosurface mode and 3D+ (PBR has no effect on volumetric clouds, 2D, or Wigner).
   // Pauli spinor always uses volumetric rendering — no isosurface, no material tab.
+  const surfaceModeSupported = supportsSchroedingerSurfaceMode({
+    objectType,
+    quantumMode,
+    dimension,
+    representation,
+  })
   const materialTabEnabled =
-    objectType !== 'pauliSpinor' && isoEnabled && dimension > 2 && representation !== 'wigner'
+    surfaceModeSupported && isoEnabled && dimension > 2 && representation !== 'wigner'
 
   // Reset to colors tab if material tab becomes disabled while selected
   React.useEffect(() => {

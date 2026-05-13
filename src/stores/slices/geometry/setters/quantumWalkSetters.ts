@@ -9,13 +9,21 @@ import {
   resizeQuantumWalkArrays,
 } from '@/lib/geometry/extended/quantumWalk'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
-import { beginDynamicPresetApply, loadPresetModule } from '@/stores/utils/dynamicPresetImport'
+import {
+  canApplyPresetRequest,
+  createLatestPresetRequestGuard,
+  loadPresetModule,
+  type SchroedingerPresetApplyOptions,
+} from '@/stores/utils/dynamicPresetImport'
 
 import type { SetterContext } from './sliceSetterUtils'
 
 /** Actions exposed by the quantum-walk setter bundle. */
 export interface QuantumWalkSetters {
-  applyQuantumWalkPreset: (presetId: string) => Promise<void>
+  applyQuantumWalkPreset: (
+    presetId: string,
+    options?: SchroedingerPresetApplyOptions
+  ) => Promise<void>
   resetQuantumWalk: () => void
   setQwAutoScale: (autoScale: boolean) => void
   setQwAbsorberEnabled: (enabled: boolean) => void
@@ -27,16 +35,18 @@ export interface QuantumWalkSetters {
 /** Create all quantum-walk-related setters. */
 export function createQuantumWalkSetters(ctx: SetterContext): QuantumWalkSetters {
   const { setWithVersion, set } = ctx
+  const beginPresetRequest = createLatestPresetRequestGuard()
 
   return {
-    applyQuantumWalkPreset: (presetId) => {
-      const isCurrentPresetApply = beginDynamicPresetApply()
+    applyQuantumWalkPreset: (presetId, options) => {
+      const isLatestRequest = beginPresetRequest()
       return loadPresetModule(
         () => import('@/lib/physics/quantumWalk/presets'),
         'schroedingerSlice',
         `quantum-walk presets for '${presetId}'`,
         ({ QUANTUM_WALK_PRESETS }) => {
-          if (!isCurrentPresetApply()) return
+          if (!canApplyPresetRequest(isLatestRequest, ctx.get().schroedinger.quantumMode, options))
+            return
           const preset = QUANTUM_WALK_PRESETS.find((p) => p.id === presetId)
           if (!preset) return
           setWithVersion((state) => {

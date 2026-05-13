@@ -137,10 +137,23 @@ describe('extractSchrodingerConfig', () => {
 
   it('forces compute mode overrides for tdseDynamics', () => {
     const extracted = extractSchrodingerConfig(
-      makePassConfig({ quantumMode: 'tdseDynamics', nodalEnabled: true })
+      makePassConfig({ quantumMode: 'tdseDynamics', isosurface: true, nodalEnabled: true })
     )
+    expect(extracted.isosurface).toBe(false)
     expect(extracted.nodalEnabled).toBe(false)
     expect(extracted.termCount).toBe(1)
+  })
+
+  it('keeps analytic 2D isosurface requests as isolines', () => {
+    const extracted = extractSchrodingerConfig(
+      makePassConfig({
+        quantumMode: 'harmonicOscillator',
+        dimension: 2,
+        isosurface: true,
+      })
+    )
+
+    expect(extracted.isosurface).toBe(true)
   })
 
   it('forces compute mode overrides for becDynamics', () => {

@@ -226,6 +226,33 @@ describe('schroedingerSlice — clamped setters', () => {
     expect(useExtendedObjectStore.getState().schroedinger.termCount).toBe(8)
   })
 
+  it('setSchroedingerConfig sanitizes harmonic oscillator scalar controls', () => {
+    const store = useExtendedObjectStore.getState()
+    store.setSchroedingerConfig({
+      seed: 42.9,
+      termCount: 99,
+      maxQuantumNumber: 99,
+      frequencySpread: -2,
+    })
+
+    expect(useExtendedObjectStore.getState().schroedinger.seed).toBe(42)
+    expect(useExtendedObjectStore.getState().schroedinger.termCount).toBe(8)
+    expect(useExtendedObjectStore.getState().schroedinger.maxQuantumNumber).toBe(6)
+    expect(useExtendedObjectStore.getState().schroedinger.frequencySpread).toBe(0)
+
+    store.setSchroedingerConfig({
+      seed: Number.NaN,
+      termCount: Number.POSITIVE_INFINITY,
+      maxQuantumNumber: Number.NEGATIVE_INFINITY,
+      frequencySpread: Number.NaN,
+    })
+
+    expect(useExtendedObjectStore.getState().schroedinger.seed).toBe(42)
+    expect(useExtendedObjectStore.getState().schroedinger.termCount).toBe(8)
+    expect(useExtendedObjectStore.getState().schroedinger.maxQuantumNumber).toBe(6)
+    expect(useExtendedObjectStore.getState().schroedinger.frequencySpread).toBe(0)
+  })
+
   it('version increments on each state change', () => {
     const v1 = useExtendedObjectStore.getState().schroedingerVersion
     useExtendedObjectStore.getState().setSchroedingerScale(1.5)
