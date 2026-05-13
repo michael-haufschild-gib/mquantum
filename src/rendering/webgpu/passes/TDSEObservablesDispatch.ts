@@ -14,7 +14,7 @@ import {
   processObservablesReadback,
   sanitizeObservablesLatticeDim,
 } from './ObservablesComputeSetup'
-import type { TdsePipelineResult } from './TDSEComputePassSetup'
+import type { TdsePipelineResult } from './TDSEComputePassPipelineTypes'
 
 /** Mutable state for observables resources. */
 export interface ObservablesState {

@@ -13,7 +13,7 @@ import { computeScarCorrelation } from '@/lib/physics/tdse/scarMetric'
 
 import type { WebGPURenderContext } from '../core/types'
 import { LINEAR_WG } from './computePassUtils'
-import type { TdsePipelineResult } from './TDSEComputePassSetup'
+import type { TdsePipelineResult } from './TDSEComputePassPipelineTypes'
 
 /** Dispatch function interface for compute passes. */
 export type DispatchComputeFn = (
