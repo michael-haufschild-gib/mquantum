@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  DEFAULT_DIVERGING_PSI_SETTINGS,
+  DEFAULT_PHASE_DIVERGING_SETTINGS,
+} from '@/lib/colors/palette'
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
+import { APPEARANCE_INITIAL_STATE } from '@/stores/slices/appearanceSlice'
+import {
   normalizeAppearanceLoadData,
   normalizePostProcessingLoadData,
 } from '@/stores/utils/presetNormalizationVisual'
@@ -54,6 +60,45 @@ describe('normalizeAppearanceLoadData', () => {
 
     expect(result).not.toHaveProperty('edgeColor')
     expect(result).not.toHaveProperty('faceColor')
+  })
+
+  it('normalizes opaque hex colors and strips invalid color strings', () => {
+    useAppearanceStore.setState(APPEARANCE_INITIAL_STATE)
+
+    const result = normalizeAppearanceLoadData({
+      edgeColor: '#ABC',
+      faceColor: 'red',
+      phaseDiverging: {
+        neutralColor: '#DEF',
+        positiveColor: 'rgb(255, 0, 0)',
+        negativeColor: '#123456',
+      },
+      divergingPsi: {
+        neutralColor: '#12345678',
+        positiveColor: '#135',
+        negativeColor: '#ABCDEF',
+      },
+    }) as {
+      edgeColor?: string
+      faceColor?: string
+      phaseDiverging?: { neutralColor: string; positiveColor: string; negativeColor: string }
+      divergingPsi?: { neutralColor: string; positiveColor: string; negativeColor: string }
+    }
+
+    expect(result.edgeColor).toBe('#aabbcc')
+    expect(result).not.toHaveProperty('faceColor')
+    expect(result.phaseDiverging).toEqual({
+      neutralColor: '#ddeeff',
+      positiveColor: DEFAULT_PHASE_DIVERGING_SETTINGS.positiveColor,
+      negativeColor: '#123456',
+    })
+    expect(result.divergingPsi).toEqual({
+      neutralColor: DEFAULT_DIVERGING_PSI_SETTINGS.neutralColor,
+      positiveColor: '#113355',
+      negativeColor: '#abcdef',
+      intensityFloor: DEFAULT_DIVERGING_PSI_SETTINGS.intensityFloor,
+      component: DEFAULT_DIVERGING_PSI_SETTINGS.component,
+    })
   })
 
   it('strips non-boolean fields', () => {

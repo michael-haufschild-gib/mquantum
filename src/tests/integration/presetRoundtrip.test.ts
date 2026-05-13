@@ -118,11 +118,11 @@ describe('style preset save/load roundtrip', () => {
 
   it('saves and loads back-to-back without cross-contamination', () => {
     // Save style A
-    useAppearanceStore.getState().setEdgeColor('#FF0000')
+    useAppearanceStore.getState().setEdgeColor('#ff0000')
     usePresetManagerStore.getState().saveStyle('Style A')
 
     // Save style B with different values
-    useAppearanceStore.getState().setEdgeColor('#00FF00')
+    useAppearanceStore.getState().setEdgeColor('#00ff00')
     usePresetManagerStore.getState().saveStyle('Style B')
 
     const styles = usePresetManagerStore.getState().savedStyles
@@ -130,19 +130,19 @@ describe('style preset save/load roundtrip', () => {
 
     // Load style A
     usePresetManagerStore.getState().loadStyle(styles[0]!.id)
-    expect(useAppearanceStore.getState().edgeColor).toBe('#FF0000')
+    expect(useAppearanceStore.getState().edgeColor).toBe('#ff0000')
 
     // Load style B
     usePresetManagerStore.getState().loadStyle(styles[1]!.id)
-    expect(useAppearanceStore.getState().edgeColor).toBe('#00FF00')
+    expect(useAppearanceStore.getState().edgeColor).toBe('#00ff00')
 
     // Load A again to confirm no contamination
     usePresetManagerStore.getState().loadStyle(styles[0]!.id)
-    expect(useAppearanceStore.getState().edgeColor).toBe('#FF0000')
+    expect(useAppearanceStore.getState().edgeColor).toBe('#ff0000')
   })
 
   it('export/import roundtrip preserves style data', () => {
-    useAppearanceStore.getState().setEdgeColor('#ABCDEF')
+    useAppearanceStore.getState().setEdgeColor('#abcdef')
     useLightingStore.getState().setLightStrength(2.5)
 
     usePresetManagerStore.getState().saveStyle('Export Test')
@@ -163,7 +163,7 @@ describe('style preset save/load roundtrip', () => {
     useLightingStore.getState().reset()
 
     usePresetManagerStore.getState().loadStyle(imported!.id)
-    expect(useAppearanceStore.getState().edgeColor).toBe('#ABCDEF')
+    expect(useAppearanceStore.getState().edgeColor).toBe('#abcdef')
     expect(useLightingStore.getState().lightStrength).toBeCloseTo(2.5)
   })
 
@@ -176,13 +176,13 @@ describe('style preset save/load roundtrip', () => {
     expect(usePresetManagerStore.getState().savedStyles).toHaveLength(0)
 
     // Attempting to load deleted style should be a no-op
-    useAppearanceStore.getState().setEdgeColor('#BEFORE')
+    useAppearanceStore.getState().setEdgeColor('#beef00')
     usePresetManagerStore.getState().loadStyle(id)
-    expect(useAppearanceStore.getState().edgeColor).toBe('#BEFORE')
+    expect(useAppearanceStore.getState().edgeColor).toBe('#beef00')
   })
 
   it('rename changes name without affecting data', () => {
-    useAppearanceStore.getState().setEdgeColor('#RENAMED')
+    useAppearanceStore.getState().setEdgeColor('#fedcba')
     usePresetManagerStore.getState().saveStyle('Original Name')
     const [saved] = usePresetManagerStore.getState().savedStyles
 
@@ -193,6 +193,6 @@ describe('style preset save/load roundtrip', () => {
     // Data should be unchanged
     useAppearanceStore.getState().reset()
     usePresetManagerStore.getState().loadStyle(renamed!.id)
-    expect(useAppearanceStore.getState().edgeColor).toBe('#RENAMED')
+    expect(useAppearanceStore.getState().edgeColor).toBe('#fedcba')
   })
 })

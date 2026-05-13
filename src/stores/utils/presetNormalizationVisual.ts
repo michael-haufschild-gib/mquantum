@@ -7,6 +7,8 @@
  * @module stores/utils/presetNormalizationVisual
  */
 
+import { normalizeOpaqueHexColor } from '@/lib/colors/colorUtils'
+
 import { useAppearanceStore } from '../scene/appearanceStore'
 import {
   APPEARANCE_LOAD_KEYS,
@@ -37,10 +39,20 @@ function validateNumericField(
   }
 }
 
-/** Validate a boolean field: delete if not boolean. */
 /** Validate a string field: delete if not string. */
 function validateStringField(obj: Record<string, unknown>, key: string): void {
   if (key in obj && typeof obj[key] !== 'string') {
+    delete obj[key]
+  }
+}
+
+/** Normalize an opaque hex color field; delete if invalid. */
+function validateOpaqueHexField(obj: Record<string, unknown>, key: string): void {
+  if (!(key in obj)) return
+  const normalized = normalizeOpaqueHexColor(obj[key])
+  if (normalized) {
+    obj[key] = normalized
+  } else {
     delete obj[key]
   }
 }
@@ -76,11 +88,9 @@ function normalizeDivergingColors(
   defaults: { neutralColor: string; positiveColor: string; negativeColor: string }
 ): { neutralColor: string; positiveColor: string; negativeColor: string } {
   return {
-    neutralColor: typeof raw.neutralColor === 'string' ? raw.neutralColor : defaults.neutralColor,
-    positiveColor:
-      typeof raw.positiveColor === 'string' ? raw.positiveColor : defaults.positiveColor,
-    negativeColor:
-      typeof raw.negativeColor === 'string' ? raw.negativeColor : defaults.negativeColor,
+    neutralColor: normalizeOpaqueHexColor(raw.neutralColor) ?? defaults.neutralColor,
+    positiveColor: normalizeOpaqueHexColor(raw.positiveColor) ?? defaults.positiveColor,
+    negativeColor: normalizeOpaqueHexColor(raw.negativeColor) ?? defaults.negativeColor,
   }
 }
 
@@ -217,8 +227,8 @@ export function normalizeAppearanceLoadData(
   const fallback = useAppearanceStore.getState()
 
   // Simple scalar/string/boolean fields
-  validateStringField(appearance, 'edgeColor')
-  validateStringField(appearance, 'faceColor')
+  validateOpaqueHexField(appearance, 'edgeColor')
+  validateOpaqueHexField(appearance, 'faceColor')
   validateBooleanField(appearance, 'perDimensionColorEnabled')
   validateEnumField(appearance, 'colorAlgorithm', COLOR_ALGORITHM_SET as Set<string>)
 

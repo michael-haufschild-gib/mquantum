@@ -13,7 +13,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { logger } from '@/lib/logger'
-import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
+import {
+  createLatestPresetRequestGuard,
+  loadPresetModule,
+} from '@/stores/utils/dynamicPresetImport'
 
 describe('loadPresetModule', () => {
   let warnSpy: ReturnType<typeof vi.spyOn>
@@ -94,5 +97,16 @@ describe('loadPresetModule', () => {
     await result
     expect(events).toEqual(['handler:start', 'handler:end'])
     expect(warnSpy).not.toHaveBeenCalled()
+  })
+
+  it('invalidates earlier preset request guards when a newer request starts', () => {
+    const beginRequest = createLatestPresetRequestGuard()
+
+    const first = beginRequest()
+    expect(first()).toBe(true)
+
+    const second = beginRequest()
+    expect(first()).toBe(false)
+    expect(second()).toBe(true)
   })
 })

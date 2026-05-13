@@ -102,6 +102,92 @@ export type TdseDriveWaveform = 'sine' | 'pulse' | 'chirp'
  */
 export type TdseDisorderDistribution = DisorderDistribution
 
+export const TDSE_FIELD_VIEWS: readonly TdseFieldView[] = [
+  'density',
+  'phase',
+  'current',
+  'potential',
+  'superfluidVelocity',
+  'healingLength',
+  'machNumber',
+  'hawkingFlux',
+  'quantumPressure',
+  'vorticity',
+]
+
+export const TDSE_INITIAL_CONDITIONS: readonly TdseInitialCondition[] = [
+  'gaussianPacket',
+  'planeWave',
+  'superposition',
+  'thomasFermi',
+  'vortexImprint',
+  'vortexLattice',
+  'darkSoliton',
+  'ndVortexPair',
+  'blackHoleAnalog',
+]
+
+export const TDSE_POTENTIAL_TYPES: readonly TdsePotentialType[] = [
+  'free',
+  'barrier',
+  'step',
+  'finiteWell',
+  'harmonicTrap',
+  'driven',
+  'doubleSlit',
+  'periodicLattice',
+  'doubleWell',
+  'becTrap',
+  'radialDoubleWell',
+  'custom',
+  'andersonDisorder',
+  'coupledAnharmonic',
+  'blackHoleRingdown',
+]
+
+export const TDSE_DRIVE_WAVEFORMS: readonly TdseDriveWaveform[] = ['sine', 'pulse', 'chirp']
+
+export const TDSE_DISORDER_DISTRIBUTIONS: readonly TdseDisorderDistribution[] = [
+  'uniform',
+  'gaussian',
+]
+
+const TDSE_FIELD_VIEW_SET = new Set<string>(TDSE_FIELD_VIEWS)
+const TDSE_INITIAL_CONDITION_SET = new Set<string>(TDSE_INITIAL_CONDITIONS)
+const TDSE_POTENTIAL_TYPE_SET = new Set<string>(TDSE_POTENTIAL_TYPES)
+const TDSE_DRIVE_WAVEFORM_SET = new Set<string>(TDSE_DRIVE_WAVEFORMS)
+const TDSE_DISORDER_DISTRIBUTION_SET = new Set<string>(TDSE_DISORDER_DISTRIBUTIONS)
+
+/** Return true when a value is a supported TDSE field-view mode. */
+export function isTdseFieldView(value: unknown): value is TdseFieldView {
+  return typeof value === 'string' && TDSE_FIELD_VIEW_SET.has(value)
+}
+
+/** Return true when a value is a supported TDSE initial condition. */
+export function isTdseInitialCondition(value: unknown): value is TdseInitialCondition {
+  return typeof value === 'string' && TDSE_INITIAL_CONDITION_SET.has(value)
+}
+
+/** Return true when a value is a supported TDSE potential type. */
+export function isTdsePotentialType(value: unknown): value is TdsePotentialType {
+  return typeof value === 'string' && TDSE_POTENTIAL_TYPE_SET.has(value)
+}
+
+/** Return true when a value is a supported TDSE drive waveform. */
+export function isTdseDriveWaveform(value: unknown): value is TdseDriveWaveform {
+  return typeof value === 'string' && TDSE_DRIVE_WAVEFORM_SET.has(value)
+}
+
+/** Return true when a value is a supported TDSE disorder distribution. */
+export function isTdseDisorderDistribution(value: unknown): value is TdseDisorderDistribution {
+  return typeof value === 'string' && TDSE_DISORDER_DISTRIBUTION_SET.has(value)
+}
+
+/** Return true when a value is a supported TDSE density-volume view. */
+export function isTdseDensityView(value: unknown): value is 'coordinate' | 'proper' {
+  return value === 'coordinate' || value === 'proper'
+}
+
 // ============================================================================
 // TDSE Config
 // ============================================================================

@@ -12,6 +12,7 @@ import { logger } from '@/lib/logger'
 import type {
   CropSettings,
   ExportFormat,
+  ExportMode,
   ExportResolution,
   ExportSettings,
   TextOverlaySettings,
@@ -110,6 +111,9 @@ export const isVideoCodec = (value: unknown): value is VideoCodec =>
 
 export const isExportResolution = (value: unknown): value is ExportResolution =>
   value === '720p' || value === '1080p' || value === '4k' || value === 'custom'
+
+export const isExportMode = (value: unknown): value is ExportMode =>
+  value === 'auto' || value === 'in-memory' || value === 'stream' || value === 'segmented'
 
 export const isBitrateMode = (value: unknown): value is ExportSettings['bitrateMode'] =>
   value === 'constant' || value === 'variable'

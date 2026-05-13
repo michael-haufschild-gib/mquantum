@@ -13,7 +13,10 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_BEC_CONFIG } from '@/lib/geometry/extended/bec'
 import { DEFAULT_DIRAC_CONFIG } from '@/lib/geometry/extended/dirac'
 import { DEFAULT_FREE_SCALAR_CONFIG } from '@/lib/geometry/extended/freeScalar'
-import { DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/schroedinger'
+import {
+  createDefaultSchroedingerConfig,
+  DEFAULT_SCHROEDINGER_CONFIG,
+} from '@/lib/geometry/extended/schroedinger'
 import { DEFAULT_TDSE_CONFIG } from '@/lib/geometry/extended/tdse'
 
 describe('DEFAULT_TDSE_CONFIG structural invariants', () => {
@@ -291,5 +294,29 @@ describe('DEFAULT_SCHROEDINGER_CONFIG structural invariants', () => {
   it('BEC and Dirac sub-configs have needsReset=true (need first init)', () => {
     expect(cfg.bec.needsReset).toBe(true)
     expect(cfg.dirac.needsReset).toBe(true)
+  })
+
+  it('createDefaultSchroedingerConfig returns mutation-isolated nested config', () => {
+    const first = createDefaultSchroedingerConfig()
+    const second = createDefaultSchroedingerConfig()
+
+    expect(first).toEqual(DEFAULT_SCHROEDINGER_CONFIG)
+    expect(first.tdse).not.toBe(DEFAULT_SCHROEDINGER_CONFIG.tdse)
+    expect(first.tdse).not.toBe(second.tdse)
+    expect(first.tdse.gridSize).not.toBe(DEFAULT_SCHROEDINGER_CONFIG.tdse.gridSize)
+    expect(first.extraDimQuantumNumbers).not.toBe(
+      DEFAULT_SCHROEDINGER_CONFIG.extraDimQuantumNumbers
+    )
+    expect(first.cosineParams.a).not.toBe(DEFAULT_SCHROEDINGER_CONFIG.cosineParams.a)
+
+    first.tdse.gridSize[0] = 128
+    first.extraDimQuantumNumbers[0] = 7
+    first.cosineParams.a[0] = 1.5
+
+    expect(second.tdse.gridSize[0]).toBe(DEFAULT_SCHROEDINGER_CONFIG.tdse.gridSize[0])
+    expect(second.extraDimQuantumNumbers[0]).toBe(
+      DEFAULT_SCHROEDINGER_CONFIG.extraDimQuantumNumbers[0]
+    )
+    expect(second.cosineParams.a[0]).toBe(DEFAULT_SCHROEDINGER_CONFIG.cosineParams.a[0])
   })
 })

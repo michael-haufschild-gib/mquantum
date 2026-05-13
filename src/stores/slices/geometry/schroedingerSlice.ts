@@ -4,6 +4,7 @@ import {
   resizeQuantumWalkArrays,
   sanitizeQuantumWalkConfig,
 } from '@/lib/geometry/extended/quantumWalk'
+import { sanitizeHarmonicOscillatorScalars } from '@/lib/geometry/extended/schroedinger/configSanitization'
 import { normalizeHydrogenNDPresetName } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import { SCHROEDINGER_PALETTE_DEFINITIONS } from '@/lib/geometry/extended/schroedinger/palettes'
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
@@ -20,6 +21,7 @@ import {
   SchroedingerColorMode,
   type SchroedingerConfig,
   SchroedingerPresetName,
+  type SchroedingerQualityPreset,
   type TdseConfig,
 } from '@/lib/geometry/extended/types'
 import { isHydrogenFamilyQuantumType } from '@/lib/geometry/registry'
@@ -28,7 +30,8 @@ import { sanitizePowerOfTwoGridSizes } from '@/lib/math/ndArray'
 import { normalizeHydrogenCoupledAngularChain } from '@/lib/physics/hydrogenCoupled/presets'
 
 import { createAntiDeSitterSetters } from './setters/antiDeSitterSetters'
-import { createBecSetters, resizeBecArrays } from './setters/becSetters'
+import { resizeBecArrays } from './setters/becResize'
+import { createBecSetters } from './setters/becSetters'
 import { createDiracSetters, resizeDiracArrays } from './setters/diracSetters'
 import { reconcileCosmologyInvariants } from './setters/freeScalarCosmologySetters'
 import { createFreeScalarSetters, resizeFreeScalarArrays } from './setters/freeScalarSetters'
@@ -148,6 +151,13 @@ const MODE_RESIZE_MAP: Record<
     const update = resizeSimpleModeForDim(state.quantumWalk, dim, resizeQuantumWalkArrays, false)
     return update ? { quantumWalk: update } : {}
   },
+}
+
+function isSchroedingerQualityPreset(value: unknown): value is SchroedingerQualityPreset {
+  return (
+    typeof value === 'string' &&
+    Object.prototype.hasOwnProperty.call(SCHROEDINGER_QUALITY_PRESETS, value)
+  )
 }
 
 /** Compute resize updates for the active compute mode (only when latticeDim changed). */
@@ -277,6 +287,10 @@ export const createSchroedingerSlice: StateCreator<
 
     // === Quality Settings ===
     setSchroedingerQualityPreset: (preset) => {
+      if (!isSchroedingerQualityPreset(preset)) {
+        logger.warn('[schroedingerSlice] Ignoring invalid qualityPreset:', preset)
+        return
+      }
       const settings = SCHROEDINGER_QUALITY_PRESETS[preset]
       setWithVersion((state) => ({
         schroedinger: {
@@ -539,17 +553,24 @@ export const createSchroedingerSlice: StateCreator<
     // === Config Operations ===
     setSchroedingerConfig: (config) => {
       setWithVersion((state) => {
-        const hasHydrogenPreset = Object.prototype.hasOwnProperty.call(config, 'hydrogenNDPreset')
-        const schroedinger = { ...state.schroedinger, ...config }
+        const sanitizedConfig = sanitizeHarmonicOscillatorScalars(config, state.schroedinger)
+        const hasHydrogenPreset = Object.prototype.hasOwnProperty.call(
+          sanitizedConfig,
+          'hydrogenNDPreset'
+        )
+        const schroedinger = { ...state.schroedinger, ...sanitizedConfig }
         Object.assign(schroedinger, sanitizeHydrogenQuantumState(schroedinger, state.schroedinger))
         if (hasHydrogenPreset) {
           schroedinger.hydrogenNDPreset = normalizeHydrogenNDPresetName(
-            config.hydrogenNDPreset,
+            sanitizedConfig.hydrogenNDPreset,
             'custom'
           )
         }
-        if (config.freeScalar) {
-          let mergedFreeScalar = { ...state.schroedinger.freeScalar, ...config.freeScalar }
+        if (sanitizedConfig.freeScalar) {
+          let mergedFreeScalar = {
+            ...state.schroedinger.freeScalar,
+            ...sanitizedConfig.freeScalar,
+          }
           if (mergedFreeScalar.latticeDim !== state.schroedinger.freeScalar.latticeDim) {
             mergedFreeScalar = {
               ...mergedFreeScalar,
@@ -562,15 +583,18 @@ export const createSchroedingerSlice: StateCreator<
           const reconciled = reconcileCosmologyInvariants(sizedFreeScalar)
           schroedinger.freeScalar = { ...sizedFreeScalar, ...reconciled }
         }
-        if (config.tdse) {
-          const mergedTdse = { ...state.schroedinger.tdse, ...config.tdse }
+        if (sanitizedConfig.tdse) {
+          const mergedTdse = { ...state.schroedinger.tdse, ...sanitizedConfig.tdse }
           schroedinger.tdse = sanitizeTdseStochasticFields(mergedTdse, state.schroedinger.tdse)
         }
-        if (config.quantumWalk) {
-          const mergedQuantumWalk = { ...state.schroedinger.quantumWalk, ...config.quantumWalk }
+        if (sanitizedConfig.quantumWalk) {
+          const mergedQuantumWalk = {
+            ...state.schroedinger.quantumWalk,
+            ...sanitizedConfig.quantumWalk,
+          }
           schroedinger.quantumWalk = sanitizeQuantumWalkConfig(mergedQuantumWalk)
         }
-        if (schroedinger.quantumMode === 'hydrogenNDCoupled' || config.angularChain) {
+        if (schroedinger.quantumMode === 'hydrogenNDCoupled' || sanitizedConfig.angularChain) {
           schroedinger.angularChain = normalizeHydrogenCoupledAngularChain(
             schroedinger.angularChain,
             {
