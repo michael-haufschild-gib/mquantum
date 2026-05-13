@@ -25,6 +25,14 @@ import type {
   QuantumTypeStrategyKind,
 } from './types'
 
+/** Inputs for checking whether the surface-mode toggle can affect rendering. */
+export interface SchroedingerSurfaceModeSupportOptions {
+  objectType: ObjectType
+  quantumMode?: SchroedingerQuantumMode
+  dimension: number
+  representation?: 'position' | 'momentum' | 'wigner'
+}
+
 // ============================================================================
 // Curated Per-ObjectType Display Strings
 // ============================================================================
@@ -445,6 +453,23 @@ export function isComputeQuantumType(key: QuantumTypeKey): boolean {
  */
 export function isAnalyticQuantumType(key: QuantumTypeKey): boolean {
   return QUANTUM_TYPE_REGISTRY.get(key)?.category === 'analytic'
+}
+
+/**
+ * Returns whether the Schrödinger surface-mode toggle is meaningful.
+ *
+ * The same `isoEnabled` flag drives true 3D isosurfaces and 2D isolines, but
+ * only analytic Schrödinger modes have shader support for either path.
+ * Compute-backed density-grid modes and Pauli spinors must stay volumetric.
+ */
+export function supportsSchroedingerSurfaceMode(
+  options: SchroedingerSurfaceModeSupportOptions
+): boolean {
+  if (options.objectType !== 'schroedinger') return false
+  if (options.dimension < 2) return false
+  if (options.representation === 'wigner') return false
+
+  return isAnalyticQuantumType(options.quantumMode ?? 'harmonicOscillator')
 }
 
 /**

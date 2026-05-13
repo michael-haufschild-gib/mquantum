@@ -155,8 +155,12 @@ function isValidLightingNumber(value: number): boolean {
   return Number.isFinite(value)
 }
 
-function isValidRotationTuple(value: [number, number, number]): boolean {
-  return value.every((component) => Number.isFinite(component))
+function isValidVector3Tuple(value: unknown): value is [number, number, number] {
+  return (
+    Array.isArray(value) &&
+    value.length === 3 &&
+    value.every((component) => Number.isFinite(component))
+  )
 }
 
 // ============================================================================
@@ -196,7 +200,12 @@ function sanitizeLightUpdates(
     }
   }
 
-  if (sanitized.rotation !== undefined && !isValidRotationTuple(sanitized.rotation)) {
+  if (sanitized.position !== undefined && !isValidVector3Tuple(sanitized.position)) {
+    logger.warn('[lightingSlice] Ignoring invalid position update:', sanitized.position)
+    delete sanitized.position
+  }
+
+  if (sanitized.rotation !== undefined && !isValidVector3Tuple(sanitized.rotation)) {
     logger.warn('[lightingSlice] Ignoring non-finite rotation update:', sanitized.rotation)
     delete sanitized.rotation
   }
@@ -345,14 +354,20 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
   },
 
   updateLight: (id: string, updates: Partial<Omit<LightSource, 'id'>>) => {
-    set((state) => ({
-      version: state.version + 1,
-      lights: state.lights.map((light) => {
+    set((state) => {
+      const sanitized = sanitizeLightUpdates(updates)
+      if (Object.keys(sanitized).length === 0) return state
+
+      let updated = false
+      const lights = state.lights.map((light) => {
         if (light.id !== id) return light
-        const sanitized = sanitizeLightUpdates(updates)
+        updated = true
         return applyLightUpdates(light, sanitized)
-      }),
-    }))
+      })
+
+      if (!updated) return state
+      return { version: state.version + 1, lights }
+    })
   },
 
   duplicateLight: (id: string) => {

@@ -50,6 +50,28 @@ describe('useColorPickerState', () => {
       expect(result.current.history).toEqual(['#ff0000', '#00ff00'])
     })
 
+    it('drops invalid colors and duplicates from persisted history', () => {
+      localStorage.setItem(
+        HISTORY_KEY,
+        JSON.stringify(['#FF0000', 'not-a-color', '#ff0000', '#zzzzzz', '#00ff00', ''])
+      )
+      const { result } = renderHook(() =>
+        useColorPickerState({ value: '#ffffff', onChange: vi.fn(), disableAlpha: false })
+      )
+      expect(result.current.history).toEqual(['#ff0000', '#00ff00'])
+    })
+
+    it('keeps valid rgb and rgba history entries while rejecting malformed channels', () => {
+      localStorage.setItem(
+        HISTORY_KEY,
+        JSON.stringify(['rgb(12, 34, 56)', 'rgba(12, 34, 56, 0.5)', 'rgb(999, 0, 0)'])
+      )
+      const { result } = renderHook(() =>
+        useColorPickerState({ value: '#ffffff', onChange: vi.fn(), disableAlpha: false })
+      )
+      expect(result.current.history).toEqual(['rgb(12, 34, 56)', 'rgba(12, 34, 56, 0.5)'])
+    })
+
     it('returns empty history when localStorage contains non-array', () => {
       localStorage.setItem(HISTORY_KEY, '"not-array"')
       const { result } = renderHook(() =>
@@ -109,6 +131,21 @@ describe('useColorPickerState', () => {
       expect(stored[0]).toBe('#aabbcc')
     })
 
+    it('adds the latest emitted color to history when prop value has not caught up', () => {
+      const { result } = renderHook(() =>
+        useColorPickerState({ value: '#000000', onChange: vi.fn(), disableAlpha: false })
+      )
+      act(() => {
+        result.current.handleOpenChange(true)
+        result.current.handleHsvChange({ h: 0, s: 1, v: 1, a: 1 })
+        result.current.handleOpenChange(false)
+      })
+
+      expect(result.current.history[0]).toBe('#ff0000')
+      const stored = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]') as string[]
+      expect(stored[0]).toBe('#ff0000')
+    })
+
     it('deduplicates repeated colors in history', () => {
       localStorage.setItem(HISTORY_KEY, JSON.stringify(['#ff0000']))
       const { result } = renderHook(() =>
@@ -119,6 +156,18 @@ describe('useColorPickerState', () => {
       })
       // Should appear once, not twice
       expect(result.current.history.filter((c) => c === '#ff0000')).toHaveLength(1)
+    })
+
+    it('does not persist invalid current values into history', () => {
+      const { result } = renderHook(() =>
+        useColorPickerState({ value: 'not-a-color', onChange: vi.fn(), disableAlpha: false })
+      )
+      act(() => {
+        result.current.handleOpenChange(false)
+      })
+
+      expect(result.current.history).toEqual([])
+      expect(localStorage.getItem(HISTORY_KEY)).toBeNull()
     })
   })
 

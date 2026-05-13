@@ -113,6 +113,57 @@ describe('Enhanced Features Stores (invariants)', () => {
       expect(next.divergingPsi.component).toBe('imag')
     })
 
+    it('normalizes diverging palette colors and rejects invalid color strings', () => {
+      const store = useAppearanceStore.getState()
+      store.setEdgeColor('#ABC')
+      store.setFaceColor('  #12ABef  ')
+      store.setPhaseDivergingSettings({
+        neutralColor: '#FAFAFA',
+        positiveColor: '#F50',
+        negativeColor: '#0033ff',
+      })
+      store.setDivergingPsiSettings({
+        neutralColor: '#101010',
+        positiveColor: '#202020',
+        negativeColor: '#303030',
+        component: 'imag',
+      })
+
+      store.setEdgeColor('red')
+      store.setFaceColor('#abcdef80')
+      store.setPhaseDivergingSettings({
+        neutralColor: 'not-a-color',
+        positiveColor: '#abcd',
+      })
+      store.setDivergingPsiSettings({
+        positiveColor: 'rgb(255, 0, 0)',
+        negativeColor: '#12345678',
+        component: 'phase' as never,
+      })
+
+      const next = useAppearanceStore.getState()
+      expect(next.edgeColor).toBe('#aabbcc')
+      expect(next.faceColor).toBe('#12abef')
+      expect(next.phaseDiverging).toEqual({
+        neutralColor: '#fafafa',
+        positiveColor: '#ff5500',
+        negativeColor: '#0033ff',
+      })
+      expect(next.divergingPsi.neutralColor).toBe('#101010')
+      expect(next.divergingPsi.positiveColor).toBe('#202020')
+      expect(next.divergingPsi.negativeColor).toBe('#303030')
+      expect(next.divergingPsi.component).toBe('imag')
+    })
+
+    it('rejects invalid color algorithm identifiers at the store boundary', () => {
+      const store = useAppearanceStore.getState()
+
+      store.setColorAlgorithm('phaseDiverging')
+      store.setColorAlgorithm('shader-injection' as never)
+
+      expect(useAppearanceStore.getState().colorAlgorithm).toBe('phaseDiverging')
+    })
+
     it('preserves all color-algorithm settings when switching algorithms', () => {
       const store = useAppearanceStore.getState()
 

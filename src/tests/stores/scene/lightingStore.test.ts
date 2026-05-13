@@ -169,6 +169,38 @@ describe('lightingStore (invariants)', () => {
     expect(after.color).toBe('#00FF00')
   })
 
+  it('updateLight ignores malformed position updates and only bumps version for valid fields', () => {
+    const id = useLightingStore.getState().addLight('point')!
+
+    useLightingStore.getState().updateLight(id, {
+      position: [1, 2, 3],
+      color: '#ABCDEF',
+    })
+
+    const before = useLightingStore.getState()
+    const beforeLight = before.lights.find((l) => l.id === id)!
+
+    useLightingStore.getState().updateLight(id, {
+      position: [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY],
+    })
+
+    let after = useLightingStore.getState()
+    let light = after.lights.find((l) => l.id === id)!
+    expect(light.position).toEqual(beforeLight.position)
+    expect(after.version).toBe(before.version)
+
+    useLightingStore.getState().updateLight(id, {
+      position: [4, 5] as unknown as [number, number, number],
+      color: '#00FF00',
+    })
+
+    after = useLightingStore.getState()
+    light = after.lights.find((l) => l.id === id)!
+    expect(light.position).toEqual(beforeLight.position)
+    expect(light.color).toBe('#00FF00')
+    expect(after.version).toBe(before.version + 1)
+  })
+
   it('ignores non-finite updates for core numeric lighting controls', () => {
     const store = useLightingStore.getState()
     store.setLightHorizontalAngle(45)

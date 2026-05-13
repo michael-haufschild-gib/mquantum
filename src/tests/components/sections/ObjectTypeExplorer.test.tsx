@@ -63,4 +63,18 @@ describe('ObjectTypeExplorer quantum mode entries', () => {
     expect(screen.queryByTestId('mode-selector')).not.toBeInTheDocument()
     expect(screen.queryByTestId('schroedinger-scale')).not.toBeInTheDocument()
   })
+
+  it('reports volumetric rendering for compute modes with stale iso state', () => {
+    useExtendedObjectStore.setState((state) => ({
+      schroedinger: {
+        ...state.schroedinger,
+        quantumMode: 'tdseDynamics',
+        isoEnabled: true,
+      },
+    }))
+
+    render(<SchroedingerControls />)
+
+    expect(screen.getByText('Rendering: Volumetric (Beer-Lambert)')).toBeInTheDocument()
+  })
 })

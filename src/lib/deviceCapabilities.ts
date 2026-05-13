@@ -42,11 +42,27 @@ export interface DeviceCapabilities {
 
 /** Default capabilities (conservative until detection completes) */
 export const DEFAULT_CAPABILITIES: DeviceCapabilities = {
-  gpuTier: 3, // Assume best until proven otherwise
+  gpuTier: 0,
   isMobileGPU: false,
   gpuName: 'unknown',
   detectionType: 'pending',
   estimatedFps: undefined,
+}
+
+function normalizeGPUTier(tier: number): GPUTier {
+  if (Number.isInteger(tier) && tier >= 0 && tier <= 3) {
+    return tier as GPUTier
+  }
+  logger.warn('[DeviceCapabilities] Invalid GPU tier reported:', tier)
+  return DEFAULT_CAPABILITIES.gpuTier
+}
+
+function normalizeString(value: string | undefined, fallback: string): string {
+  return typeof value === 'string' && value.trim().length > 0 ? value : fallback
+}
+
+function normalizeEstimatedFps(fps: number | undefined): number | undefined {
+  return typeof fps === 'number' && Number.isFinite(fps) ? fps : undefined
 }
 
 // ============================================================================
@@ -92,22 +108,19 @@ export async function detectDeviceCapabilities(): Promise<DeviceCapabilities> {
     const tierResult = await detectGPUTier()
 
     return {
-      gpuTier: tierResult.tier as GPUTier,
-      isMobileGPU: tierResult.isMobile ?? false,
-      gpuName: tierResult.gpu ?? 'unknown',
-      detectionType: tierResult.type,
-      estimatedFps: tierResult.fps,
+      gpuTier: normalizeGPUTier(tierResult.tier),
+      isMobileGPU: tierResult.isMobile === true,
+      gpuName: normalizeString(tierResult.gpu, 'unknown'),
+      detectionType: normalizeString(tierResult.type, 'unknown'),
+      estimatedFps: normalizeEstimatedFps(tierResult.fps),
     }
   } catch (error) {
-    // Detection failed - assume desktop tier 3 for best experience
     logger.warn('[DeviceCapabilities] GPU detection failed:', error)
 
     return {
-      gpuTier: 3,
-      isMobileGPU: false,
+      ...DEFAULT_CAPABILITIES,
       gpuName: 'detection-failed',
       detectionType: 'error',
-      estimatedFps: undefined,
     }
   }
 }

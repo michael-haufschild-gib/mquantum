@@ -604,9 +604,14 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
   // General
   reset: () => {
     set({
+      gpuTier: DEFAULT_CAPABILITIES.gpuTier,
+      isMobileGPU: DEFAULT_CAPABILITIES.isMobileGPU,
+      gpuName: DEFAULT_CAPABILITIES.gpuName,
+      deviceCapabilitiesDetected: false,
       isInteracting: false,
       sceneTransitioning: false,
       isLoadingScene: false,
+      presetLoadVersion: 0,
       progressiveRefinementEnabled: true,
       refinementStage: 'final',
       refinementProgress: 100,

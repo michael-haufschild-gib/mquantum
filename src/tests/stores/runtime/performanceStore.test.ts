@@ -5,7 +5,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { DESKTOP_DEFAULT_RESOLUTION_SCALE } from '@/lib/deviceCapabilities'
+import { DEFAULT_CAPABILITIES, DESKTOP_DEFAULT_RESOLUTION_SCALE } from '@/lib/deviceCapabilities'
 import { DEFAULT_MAX_FPS, MAX_MAX_FPS, MIN_MAX_FPS } from '@/stores/defaults/visualDefaults'
 import {
   hasPersistedMaxFps,
@@ -38,6 +38,30 @@ describe('performanceStore', () => {
       expect(after.isInteracting).toBe(false)
       expect(after.sceneTransitioning).toBe(false)
       expect(after.isLoadingScene).toBe(false)
+    })
+  })
+
+  describe('device capabilities', () => {
+    it('reset restores capability defaults', () => {
+      const store = usePerformanceStore.getState()
+
+      store.setDeviceCapabilities({
+        gpuTier: 1,
+        isMobileGPU: true,
+        gpuName: 'mali mobile gpu',
+        detectionType: 'BENCHMARK',
+        estimatedFps: 20,
+      })
+
+      expect(usePerformanceStore.getState().deviceCapabilitiesDetected).toBe(true)
+
+      store.reset()
+
+      const state = usePerformanceStore.getState()
+      expect(state.gpuTier).toBe(DEFAULT_CAPABILITIES.gpuTier)
+      expect(state.isMobileGPU).toBe(DEFAULT_CAPABILITIES.isMobileGPU)
+      expect(state.gpuName).toBe(DEFAULT_CAPABILITIES.gpuName)
+      expect(state.deviceCapabilitiesDetected).toBe(false)
     })
   })
 

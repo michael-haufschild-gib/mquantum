@@ -10,6 +10,7 @@ import { Tab, Tabs } from '@/components/ui/Tabs'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import { useAnySweepRunning } from '@/hooks/useAnySweepRunning'
 import { useScrollingPanelAttr } from '@/hooks/useScrollingPanelAttr'
+import { supportsSchroedingerSurfaceMode } from '@/lib/geometry/registry'
 import { usePerformanceStore } from '@/stores/runtime/performanceStore'
 import {
   type ExtendedObjectState,
@@ -48,15 +49,22 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
   const isoSelector = useShallow((state: ExtendedObjectState) => ({
     isoEnabled: state.schroedinger?.isoEnabled ?? false,
     isoThreshold: state.schroedinger?.isoThreshold ?? -3,
+    quantumMode: state.schroedinger?.quantumMode ?? 'harmonicOscillator',
     representation: state.schroedinger?.representation ?? 'position',
     setIsoEnabled: state.setSchroedingerIsoEnabled,
     setIsoThreshold: state.setSchroedingerIsoThreshold,
   }))
-  const { isoEnabled, isoThreshold, representation, setIsoEnabled, setIsoThreshold } =
+  const { isoEnabled, isoThreshold, quantumMode, representation, setIsoEnabled, setIsoThreshold } =
     useExtendedObjectStore(isoSelector)
 
   const densityGridResolution = usePerformanceStore((s) => s.densityGridResolution)
   const setDensityGridResolution = usePerformanceStore((s) => s.setDensityGridResolution)
+  const surfaceModeSupported = supportsSchroedingerSurfaceMode({
+    objectType,
+    quantumMode,
+    dimension,
+    representation,
+  })
 
   const handleSurfaceModeChange = (mode: SurfaceMode) => {
     setIsoEnabled(mode === 'isosurface')
@@ -142,7 +150,7 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
           <div className="px-4 py-2">
             <DimensionSelector disabled={sweepRunning} />
           </div>
-          {dimension >= 2 && representation !== 'wigner' && objectType !== 'pauliSpinor' && (
+          {surfaceModeSupported && (
             <div className="px-4 pb-2">
               <div className="space-y-1">
                 <ToggleGroup

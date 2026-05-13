@@ -26,4 +26,20 @@ describe('AdvancedObjectControls probability current controls', () => {
       screen.queryByTestId('schroedinger-probability-current-color-mode')
     ).not.toBeInTheDocument()
   })
+
+  it('keeps volumetric controls visible for compute modes with stale iso state', () => {
+    useGeometryStore.getState().setObjectType('schroedinger')
+    useGeometryStore.getState().setDimension(3)
+    useExtendedObjectStore.setState((state) => ({
+      schroedinger: {
+        ...state.schroedinger,
+        quantumMode: 'tdseDynamics',
+        isoEnabled: true,
+      },
+    }))
+
+    render(<AdvancedObjectControls />)
+
+    expect(screen.getByTestId('control-group-subsurface-scattering')).toBeInTheDocument()
+  })
 })
