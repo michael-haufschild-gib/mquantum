@@ -790,7 +790,7 @@ const projectRulesPlugin = {
 
 export default [
   {
-    ignores: ['dist', 'coverage', 'node_modules', 'scripts/!(playwright)/**', 'playwright.config.ts', 'playwright.benchmark.config.ts', 'src/wasm/**/pkg/**', 'src/wasm/**/pkg-validator/**', '.claude/worktrees/**'],
+    ignores: ['dist', 'coverage', 'node_modules', 'logs/**', 'scripts/!(playwright)/**', 'playwright.config.ts', 'playwright.benchmark.config.ts', 'src/wasm/**/pkg/**', 'src/wasm/**/pkg-validator/**', '.claude/worktrees/**'],
   },
 
   // @eslint-react strict-typescript: registers all @eslint-react/* plugins + sets strict rule

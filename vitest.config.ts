@@ -1,6 +1,7 @@
 import react from '@vitejs/plugin-react'
 import os from 'os'
 import path from 'path'
+import svgr from 'vite-plugin-svgr'
 import { defineConfig } from 'vitest/config'
 
 // Cap workers at min(8, available CPUs). 8 is the empirical sweet spot on
@@ -9,7 +10,15 @@ import { defineConfig } from 'vitest/config'
 const MAX_WORKERS = Math.max(1, Math.min(8, os.availableParallelism?.() ?? os.cpus().length))
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    svgr({
+      svgrOptions: {
+        icon: true,
+        replaceAttrValues: { '#000': 'currentColor', '#000000': 'currentColor' },
+      },
+    }),
+  ],
   test: {
     globals: true,
     environment: 'happy-dom',
