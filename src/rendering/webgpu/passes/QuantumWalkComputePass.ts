@@ -30,7 +30,7 @@ import {
 import { packAbsorberUniforms, packWriteGridUniforms } from './QuantumWalkComputePassUniforms'
 import { QwDiagnostics } from './QuantumWalkDiagnostics'
 import { createQwPipelines } from './QuantumWalkPipelines'
-import { requestStateSave as genericStateSave } from './stateSave'
+import { interleaveStateInjection, requestStateSave as genericStateSave } from './stateSave'
 
 const COIN_WG = 64
 
@@ -389,13 +389,14 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
 
     // Inject loaded wavefunction (re-interleave separate re/im into coin state format)
     if (this.pendingInjection && this.coinStateA) {
-      const { re, im } = this.pendingInjection
       const coinStates = 2 * safeConfig.latticeDim
-      const totalElements = Math.min(re.length, this.totalSites * coinStates)
-      const interleaved = new Float32Array(totalElements * 2)
-      for (let i = 0; i < totalElements; i++) {
-        interleaved[i * 2] = re[i]!
-        interleaved[i * 2 + 1] = im[i]!
+      const totalElements = this.totalSites * coinStates
+      let interleaved: Float32Array<ArrayBuffer>
+      try {
+        interleaved = interleaveStateInjection('QuantumWalk', this.pendingInjection, totalElements)
+      } catch (err) {
+        this.pendingInjection = null
+        throw err
       }
       device.queue.writeBuffer(this.coinStateA, 0, interleaved)
       this.pendingInjection = null

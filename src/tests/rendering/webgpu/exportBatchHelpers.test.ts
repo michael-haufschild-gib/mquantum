@@ -62,6 +62,7 @@ function makeRuntime(loopOverrides: Partial<ExportLoopState> = {}): ExportRuntim
     settings: null,
     recorder: null,
     rotationSnapshot: null,
+    environmentCaptured: true,
     originalCanvasWidth: 1920,
     originalCanvasHeight: 1080,
     originalCameraAspect: 16 / 9,

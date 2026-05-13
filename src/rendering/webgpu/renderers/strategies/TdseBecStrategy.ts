@@ -9,6 +9,7 @@
 
 import type { TdseConfig } from '@/lib/geometry/extended/tdse'
 import { logger } from '@/lib/logger'
+import { healingLength, soundSpeed, thomasFermiRadius } from '@/lib/physics/bec/chemicalPotential'
 import { computeEffectiveSpacing } from '@/lib/physics/compactification'
 import { isCoordinateEntanglementMetricSupported } from '@/lib/physics/coordinateEntanglement'
 import type {
@@ -57,6 +58,25 @@ const SPECTRUM_INTERVAL = 4
 
 /** Interval (in frames) between entanglement readbacks. */
 const ENTANGLEMENT_DECIMATION = 10
+
+function computeBecEffectiveTrapOmega(
+  omega: number,
+  anisotropy: readonly number[],
+  latDim: number
+): number {
+  if (!Number.isFinite(omega) || omega <= 0 || !Number.isInteger(latDim) || latDim <= 0) {
+    return 0
+  }
+
+  let logSum = 0
+  for (let d = 0; d < latDim; d++) {
+    const effectiveOmega = omega * (anisotropy[d] ?? 1.0)
+    if (!Number.isFinite(effectiveOmega) || effectiveOmega <= 0) return 0
+    logSum += Math.log(effectiveOmega)
+  }
+
+  return Math.exp(logSum / latDim)
+}
 
 /** Strategy for TDSE and BEC dynamics modes using split-operator compute dispatch. */
 export class TdseBecStrategy implements QuantumModeStrategy {
@@ -325,20 +345,12 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     const aniso = bec?.trapAnisotropy ?? []
     const latDim = bec?.latticeDim ?? 3
 
-    // Geometric mean of effective trap frequencies for anisotropic R_TF
-    let omegaProd = 1.0
-    for (let d = 0; d < latDim; d++) {
-      omegaProd *= omega * (aniso[d] ?? 1.0)
-    }
-    const omegaEff = Math.pow(omegaProd, 1 / latDim)
-    const peakN = diag.maxDensity
-    const mu = g * peakN
-    const xiDenom = 2 * mass * g * peakN
-    const xi = xiDenom > 0 ? hbar / Math.sqrt(xiDenom) : Infinity
-    const csVal = (g * peakN) / mass
-    const cs = csVal > 0 ? Math.sqrt(csVal) : 0
-    const rtfDenom = mass * omegaEff * omegaEff
-    const rtf = rtfDenom > 0 && mu > 0 ? Math.sqrt((2 * mu) / rtfDenom) : 0
+    const omegaEff = computeBecEffectiveTrapOmega(omega, aniso, latDim)
+    const peakN = Number.isFinite(diag.maxDensity) && diag.maxDensity > 0 ? diag.maxDensity : 0
+    const mu = Number.isFinite(g) ? g * peakN : 0
+    const xi = healingLength(hbar, mass, g, peakN)
+    const cs = soundSpeed(g, peakN, mass)
+    const rtf = thomasFermiRadius(mu, mass, omegaEff)
 
     // Vortex count from plaquette-based phase singularity detection
     const [vortexPlaquettes, posCharge, negCharge] = tdsePass.getVortexCounts()

@@ -302,6 +302,7 @@ export class WebGPURenderGraph {
       try {
         stores[key] = getter()
       } catch (e) {
+        delete stores[key]
         logger.error(`Failed to capture store '${key}':`, e)
       }
     }
@@ -641,6 +642,8 @@ export class WebGPURenderGraph {
     this.passOrder = []
     this.resources.clear()
     this.beforeSubmitHooks.clear()
+    this.passStateTracking.clear()
+    this.resourceAliases.clear()
 
     this.pool.dispose()
     this.timestampCollector.dispose()

@@ -22,6 +22,7 @@ import { describe, expect, it } from 'vitest'
 import { hermiteBlock } from '@/rendering/webgpu/shaders/schroedinger/quantum/hermite.wgsl'
 import { ho1dBlock } from '@/rendering/webgpu/shaders/schroedinger/quantum/ho1d.wgsl'
 import { hydrogenRadialBlock } from '@/rendering/webgpu/shaders/schroedinger/quantum/hydrogenRadial.wgsl'
+import { hypersphericalHarmonic5d } from '@/rendering/webgpu/shaders/schroedinger/quantum/hypersphericalHarmonics.wgsl'
 import { laguerreBlock } from '@/rendering/webgpu/shaders/schroedinger/quantum/laguerre.wgsl'
 import { legendreBlock } from '@/rendering/webgpu/shaders/schroedinger/quantum/legendre.wgsl'
 import { sphericalHarmonicsBlock } from '@/rendering/webgpu/shaders/schroedinger/quantum/sphericalHarmonics.wgsl'
@@ -362,6 +363,10 @@ describe('LEGENDRE_INV_K in legendre.wgsl.ts', () => {
       expect(invKs[k]!).toBeCloseTo(1 / k, 9)
     })
   }
+
+  it('rejects unsupported l before the recurrence table cap can alias l=7', () => {
+    expect(legendreBlock).toContain('if (l < 0 || l > MAX_LEGENDRE_L || absM > l) { return 0.0; }')
+  })
 })
 
 describe('Legendre polynomial structural checks', () => {
@@ -372,10 +377,29 @@ describe('Legendre polynomial structural checks', () => {
   })
 })
 
+describe('coupled hyperspherical harmonic structural guards', () => {
+  it('rejects malformed angular chains before Gegenbauer negative-degree aliasing', () => {
+    expect(hypersphericalHarmonic5d).toContain(
+      'if (lk < 0 || lkp1 < 0 || lkp1 > lk) { return vec2f(0.0, 0.0); }'
+    )
+  })
+
+  it('rejects magnetic quantum numbers outside the innermost angular layer', () => {
+    expect(hypersphericalHarmonic5d).toContain(
+      'if (innermostL < 0 || abs(m) > innermostL) { return vec2f(0.0, 0.0); }'
+    )
+  })
+})
+
 describe('hydrogenRadial structural constants', () => {
   // The hydrogenRadial.wgsl.ts has structural constants beyond LN_FACTORIAL_LUT.
   // Verify the FACTORIAL_LUT referenced by hydrogenRadialNorm is the same
   // one defined in sphericalHarmonics.wgsl.ts (they share the same block).
+
+  it('Gegenbauer rejects negative degree instead of aliasing C_0^alpha', () => {
+    expect(hydrogenRadialBlock).toContain('if (n < 0) { return 0.0; }')
+    expect(hydrogenRadialBlock).toContain('if (n == 0) { return 1.0; }')
+  })
 
   it('LN_FACTORIAL_LUT covers max needed index: n+l+D-2 = 7+6+11-2 = 22', () => {
     const lnFact = extractWgslArray(hydrogenRadialBlock, 'LN_FACTORIAL_LUT')

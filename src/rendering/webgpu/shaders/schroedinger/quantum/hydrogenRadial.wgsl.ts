@@ -333,7 +333,8 @@ fn hydrogenRadialNDWithNorm(n: i32, l: i32, r: f32, a0: f32, dim: i32, norm: f32
  * Evaluate Gegenbauer polynomial C_n^alpha(x) using recurrence.
  */
 fn gegenbauer(n: i32, alpha: f32, x: f32) -> f32 {
-  if (n <= 0) { return 1.0; }
+  if (n < 0) { return 0.0; }
+  if (n == 0) { return 1.0; }
   if (n == 1) { return 2.0 * alpha * x; }
 
   var cNm2 = 1.0;

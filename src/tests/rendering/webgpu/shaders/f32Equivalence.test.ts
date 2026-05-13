@@ -95,6 +95,7 @@ function hermite_f64(n: number, u: number): number {
 }
 
 const INV_PI = 1 / Math.PI
+const MAX_LEGENDRE_L = 7
 const HO_NORM_F64 = [
   1.0, 0.7071067811865475, 0.3535533905932738, 0.14433756729740643, 0.05103103630798083,
   0.016137430609245714, 0.004658474953115118,
@@ -136,7 +137,7 @@ function laguerre_f64(k: number, alpha: number, x: number): number {
 /** Legendre P^|m|_l(x) — f64, mirrors WGSL legendre() with Condon-Shortley phase */
 function legendre_f64(l: number, m: number, x: number): number {
   const absM = Math.abs(m)
-  if (absM > l) return 0
+  if (l < 0 || l > MAX_LEGENDRE_L || absM > l) return 0
   const xc = Math.max(-1, Math.min(1, x))
   const somx2 = Math.sqrt((1 - xc) * (1 + xc))
   let pmm = 1.0
@@ -250,6 +251,7 @@ const LAGUERRE_INV_DEN_F32 = [
 const LEGENDRE_INV_K_F32 = [1.0, 1.0, 0.5, 0.3333333333, 0.25, 0.2, 0.1666666667, 0.1428571429].map(
   f
 )
+const MAX_LEGENDRE_L_F32 = MAX_LEGENDRE_L
 
 const LN_FACTORIAL_F32 = [
   0.0, 0.0, 0.6931472, 1.7917595, 3.1780539, 4.7874917, 6.5792512, 8.5251614, 10.604602, 12.801827,
@@ -322,9 +324,9 @@ function laguerre_f32(k: number, alpha: number, x: number): number {
 /** Legendre P^|m|_l(x) — f32 (matches WGSL legendre()) */
 function legendre_f32(l: number, m: number, x: number): number {
   const absM = Math.abs(m)
-  if (absM > l) return f(0)
+  if (l < 0 || l > MAX_LEGENDRE_L_F32 || absM > l) return f(0)
   const xc = f(Math.max(-1, Math.min(1, f(x))))
-  const somx2 = f(Math.sqrt(f(f(f(1) - xc) * f(f(1) + xc))))
+  const somx2 = f(Math.sqrt(f(f(1) - f(xc * xc))))
   let pmm = f(1)
   if (absM > 0) {
     let fact = f(1)
@@ -580,6 +582,11 @@ describe('f32 equivalence — Laguerre polynomials', () => {
 })
 
 describe('f32 equivalence — Legendre polynomials', () => {
+  it('returns zero beyond the WGSL recurrence table instead of aliasing the maximum supported degree', () => {
+    expect(legendre_f32(MAX_LEGENDRE_L_F32 + 1, 0, 0.35)).toBe(0)
+    expect(legendre_f64(MAX_LEGENDRE_L + 1, 0, 0.35)).toBe(0)
+  })
+
   // Hydrogen-relevant (l, m) pairs
   const lmPairs: [number, number][] = [
     [0, 0],

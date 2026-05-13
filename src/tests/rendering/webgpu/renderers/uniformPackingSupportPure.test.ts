@@ -655,6 +655,31 @@ describe('packAdsTimeEvolution', () => {
     expect(floatView[I.adsGrowthRate]).toBeGreaterThan(0)
   })
 
+  it('zeros both slots when malformed mL would overflow tachyon growth', () => {
+    const floatView = makeFloatView()
+    floatView[I.adsEnergy] = 99
+    floatView[I.adsGrowthRate] = 99
+    packAdsTimeEvolution(floatView, 'antiDeSitter', {
+      d: 3,
+      n: 0,
+      l: 0,
+      m: 0,
+      mL: -Number.MAX_VALUE,
+      branch: 'plus',
+      boundaryOverlay: false,
+      btzEnabled: false,
+      btzHorizonRadius: 1,
+      btzOmega: 1,
+      btzAngularM: 0,
+      hkllEnabled: false,
+      hkllBoundarySource: 'eigenstate',
+      hkllSourceSigma: 0.3,
+      hkllPlaneWaveM: 0,
+    } as never)
+    expect(floatView[I.adsEnergy]).toBe(0)
+    expect(floatView[I.adsGrowthRate]).toBe(0)
+  })
+
   it('replaces non-finite computed energy with 0 (defensive)', () => {
     // Force a NaN by passing an absurdly large ℓ to the eigenstate path,
     // which can produce non-finite `Δ + ℓ + 2n` if Δ is NaN. Use mL value

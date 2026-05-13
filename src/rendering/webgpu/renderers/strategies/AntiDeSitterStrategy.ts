@@ -33,6 +33,11 @@ import type {
   SchroedingerSnapshot,
 } from './types'
 
+/** Serialize finite floats at fixed precision; collapse malformed state to a stable sentinel. */
+function hashFloat(value: number, digits = 6): string {
+  return Number.isFinite(value) ? value.toFixed(digits) : 'invalid'
+}
+
 /**
  * Deterministic hash of the physics-relevant AdS config fields.
  * Exported for unit-testing hash stability.
@@ -43,16 +48,16 @@ export function computeAdsConfigHash(config: AntiDeSitterConfig): string {
     config.n,
     config.l,
     config.m,
-    config.mL.toFixed(6),
+    hashFloat(config.mL),
     config.branch,
     config.boundaryOverlay ? 1 : 0,
     config.btzEnabled ? 1 : 0,
-    config.btzHorizonRadius.toFixed(6),
-    config.btzOmega.toFixed(6),
+    hashFloat(config.btzHorizonRadius),
+    hashFloat(config.btzOmega),
     config.btzAngularM,
     config.hkllEnabled ? 1 : 0,
     config.hkllBoundarySource,
-    config.hkllSourceSigma.toFixed(6),
+    hashFloat(config.hkllSourceSigma),
     config.hkllPlaneWaveM,
   ].join('|')
 }

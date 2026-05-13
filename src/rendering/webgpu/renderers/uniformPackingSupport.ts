@@ -633,6 +633,11 @@ export function packAdsTimeEvolution(
     return
   }
   const growth = computeAdsGrowthRate(ads.d, ads.mL)
+  if (!Number.isFinite(growth)) {
+    floatView[I.adsEnergy] = 0
+    floatView[I.adsGrowthRate] = 0
+    return
+  }
   if (growth > 0) {
     floatView[I.adsEnergy] = 0
     floatView[I.adsGrowthRate] = growth

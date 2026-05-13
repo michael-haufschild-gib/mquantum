@@ -20,6 +20,7 @@ import {
   getQuantumTypeDefaultColorAlgorithm,
   getQuantumTypeEntry,
   isComputeQuantumType,
+  supportsSchroedingerSurfaceMode,
 } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
 import type { SkyboxMode } from '@/stores/defaults/visualDefaults'
@@ -281,6 +282,14 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
     ? (getQuantumTypeEntry('pauliSpinor')?.dimensions.min ?? 3)
     : (getQuantumTypeEntry(config.quantumMode)?.dimensions.min ?? 2)
   const effectiveDimension = isCompute ? Math.max(config.dimension, modeMinDim) : config.dimension
+  const isosurface = supportsSchroedingerSurfaceMode({
+    objectType: config.objectType,
+    quantumMode: config.quantumMode,
+    dimension: effectiveDimension,
+    representation: config.representation,
+  })
+    ? config.isosurface
+    : false
   const colorAlgorithm = normalizeColorAlgorithmForQuantumMode(
     config.quantumMode,
     config.colorAlgorithm,
@@ -290,7 +299,7 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
     config.objectType,
     {
       dimension: effectiveDimension,
-      isosurface: config.isosurface,
+      isosurface,
       representation: config.representation,
     },
     config.freeScalarInitialCondition
@@ -309,7 +318,7 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
     quantumMode: config.quantumMode,
     termCount: isCompute ? 1 : config.termCount,
     colorAlgorithm,
-    isosurface: config.isosurface,
+    isosurface,
     representation: isCompute ? 'position' : config.representation,
     openQuantumEnabled: gate(config.openQuantumEnabled, isCompute),
     // Keep the default all-effects-off volumetric shader grid-only. Once any

@@ -66,7 +66,8 @@ export class AnalyticOpenQuantumExecutor {
   private wasDisabled = true
 
   // HO caches
-  private hoCacheKey = ''
+  private hoStateKey = ''
+  private hoPropagatorKey = ''
   private hoChannels: LindbladChannel[] = []
   private hoEnergies: Float64Array | null = null
   private hoPropagator: ComplexMatrix | null = null
@@ -79,7 +80,9 @@ export class AnalyticOpenQuantumExecutor {
   private hydrogenPropagator: ComplexMatrix | null = null
   private hydrogenBasisPackedBuffer: ArrayBuffer | null = null
   private hydrogenBasisLabels: string[] = []
-  private hydrogenOQConfigHash = ''
+  private hydrogenBasisKey = ''
+  private hydrogenPropagatorKey = ''
+  private hydrogenInitialStateKey = ''
 
   execute(
     ctx: WebGPURenderContext,
@@ -167,41 +170,49 @@ export class AnalyticOpenQuantumExecutor {
     const userL = schCfg?.azimuthalQuantumNumber ?? 0
     const userM = schCfg?.magneticQuantumNumber ?? 0
 
-    const hash = `h:${maxN}:${dim}:${oqConfig.bathTemperature}:${oqConfig.couplingScale}:${oqConfig.dephasingRate}:${oqConfig.dephasingModel}:${dt}:${substeps}:${extraDimOmega.join(',')}:${userN}:${userL}:${userM}`
-    const configChanged = hash !== this.hydrogenOQConfigHash
+    const basisKey = `h-basis:${maxN}:${dim}:${extraDimOmega.join(',')}`
+    const basisChanged = basisKey !== this.hydrogenBasisKey
 
-    if (configChanged) {
+    if (basisChanged) {
       this.hydrogenBasis = buildHydrogenBasis(maxN, dim, extraDimOmega)
-      const K = this.hydrogenBasis.length
-      const energies = basisEnergies(this.hydrogenBasis)
+      this.hydrogenBasisPackedBuffer = packHydrogenBasisForGPU(this.hydrogenBasis, dim)
+      this.hydrogenBasisLabels = basisLabels(this.hydrogenBasis)
+      this.hydrogenBasisKey = basisKey
+      this.hydrogenInitialStateKey = ''
+      forceUpdate = true
+    }
+
+    const basis = this.hydrogenBasis!
+    const K = basis.length
+    const propagatorKey = `h-prop:${basisKey}:${oqConfig.bathTemperature}:${oqConfig.couplingScale}:${oqConfig.dephasingRate}:${oqConfig.dephasingModel}:${dt}:${substeps}`
+    if (basisChanged || propagatorKey !== this.hydrogenPropagatorKey) {
+      const energies = basisEnergies(basis)
       this.hydrogenRates = buildTransitionRates(
-        this.hydrogenBasis,
+        basis,
         oqConfig.bathTemperature ?? 300,
         oqConfig.couplingScale ?? 1.0,
         dim
       )
       this.hydrogenChannels = buildHydrogenChannels(
-        this.hydrogenBasis,
+        basis,
         this.hydrogenRates,
         oqConfig.dephasingRate ?? 0.5,
         (oqConfig.dephasingModel ?? 'uniform') !== 'none'
       )
       const liouvillian = buildLiouvillian(energies, this.hydrogenChannels, K)
       this.hydrogenPropagator = computePropagator(liouvillian, dt * substeps, K)
-
-      this.hydrogenBasisPackedBuffer = packHydrogenBasisForGPU(this.hydrogenBasis, dim)
-      this.hydrogenBasisLabels = basisLabels(this.hydrogenBasis)
-
-      this.hydrogenOQConfigHash = hash
-      this.initialized = false
+      this.hydrogenPropagatorKey = propagatorKey
       forceUpdate = true
     }
 
-    const basis = this.hydrogenBasis!
-    const K = basis.length
-
+    const initialStateKey = `h-state:${basisKey}:${userN}:${userL}:${userM}`
     let stateReinitialized = false
-    if (!this.state || this.state.K !== K || !this.initialized) {
+    if (
+      !this.state ||
+      this.state.K !== K ||
+      !this.initialized ||
+      initialStateKey !== this.hydrogenInitialStateKey
+    ) {
       const matchIdx = basis.findIndex((s) => s.n === userN && s.l === userL && s.m === userM)
       const initialIdx = matchIdx >= 0 ? matchIdx : 0
       const coeffsRe = new Float64Array(K)
@@ -210,6 +221,7 @@ export class AnalyticOpenQuantumExecutor {
       this.initialized = true
       this.frameCounter = 0
       this.lastVonNeumann = 0
+      this.hydrogenInitialStateKey = initialStateKey
       stateReinitialized = true
     }
 
@@ -232,8 +244,19 @@ export class AnalyticOpenQuantumExecutor {
   ): void {
     const K = cachedPreset.termCount
 
+    const presetKey = cachedPresetConfig
+      ? [
+          cachedPresetConfig.presetName,
+          cachedPresetConfig.seed,
+          cachedPresetConfig.termCount,
+          cachedPresetConfig.maxQuantumNumber,
+          cachedPresetConfig.frequencySpread,
+          cachedPresetConfig.dimension,
+        ].join(':')
+      : `k:${K}`
+
     let stateReinitialized = false
-    if (!this.state || this.state.K !== K || !this.initialized) {
+    if (!this.state || this.state.K !== K || !this.initialized || presetKey !== this.hoStateKey) {
       const coeffsRe = new Float64Array(K)
       const coeffsIm = new Float64Array(K)
       for (let k = 0; k < K; k++) {
@@ -245,15 +268,13 @@ export class AnalyticOpenQuantumExecutor {
       this.initialized = true
       this.frameCounter = 0
       this.lastVonNeumann = 0
+      this.hoStateKey = presetKey
       stateReinitialized = true
     }
 
-    const presetKey = cachedPresetConfig
-      ? `${cachedPresetConfig.presetName}:${cachedPresetConfig.seed}:${cachedPresetConfig.termCount}:${cachedPresetConfig.dimension}`
-      : `k:${K}`
     const dt = oqConfig.dt ?? 0.01
     const substeps = oqConfig.substeps ?? 4
-    const hoCacheKey = [
+    const hoPropagatorKey = [
       presetKey,
       oqConfig.dephasingRate ?? 0,
       oqConfig.relaxationRate ?? 0,
@@ -265,7 +286,11 @@ export class AnalyticOpenQuantumExecutor {
       substeps,
     ].join(':')
 
-    if (hoCacheKey !== this.hoCacheKey || !this.hoEnergies || this.hoEnergies.length !== K) {
+    if (
+      hoPropagatorKey !== this.hoPropagatorKey ||
+      !this.hoEnergies ||
+      this.hoEnergies.length !== K
+    ) {
       this.hoChannels = buildLindbladChannels(oqConfig, K)
       const energies = new Float64Array(K)
       for (let k = 0; k < K; k++) {
@@ -274,8 +299,7 @@ export class AnalyticOpenQuantumExecutor {
       this.hoEnergies = energies
       const liouvillian = buildLiouvillian(energies, this.hoChannels, K)
       this.hoPropagator = computePropagator(liouvillian, dt * substeps, K)
-      this.hoCacheKey = hoCacheKey
-      this.initialized = false
+      this.hoPropagatorKey = hoPropagatorKey
       forceUpdate = true
     }
 
@@ -420,7 +444,8 @@ export class AnalyticOpenQuantumExecutor {
     this.resetTokenSeen = -1
     this.updateTick = 0
     this.lastSchroedingerVersion = -1
-    this.hoCacheKey = ''
+    this.hoStateKey = ''
+    this.hoPropagatorKey = ''
     this.hoChannels = []
     this.hoEnergies = null
     this.hoPropagator = null
@@ -431,7 +456,9 @@ export class AnalyticOpenQuantumExecutor {
     this.hydrogenBasisPackedBuffer = null
     this.hydrogenBasisLabels = []
     this.hoPopulationLabels = null
-    this.hydrogenOQConfigHash = ''
+    this.hydrogenBasisKey = ''
+    this.hydrogenPropagatorKey = ''
+    this.hydrogenInitialStateKey = ''
     // Re-arm the disable→re-enable detector. Without this, an explicit
     // reset() called while the executor is in the "enabled" state would
     // cause the *next* execute() call to skip the disable→re-enable

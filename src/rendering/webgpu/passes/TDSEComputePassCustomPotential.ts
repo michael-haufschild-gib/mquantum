@@ -14,6 +14,8 @@ import { parseExpression } from '@/lib/physics/expressionParser'
 import { evaluatePotentialGrid } from '@/lib/physics/potentialGridEvaluator'
 import { computeTdseEffectiveSpacing } from '@/lib/physics/tdse/effectiveSpacing'
 
+import { computeTdseDisorderScaling } from './TDSEDisorderScaling'
+
 /**
  * Compute a hash string for potential dirty-tracking.
  * Returns a unique string when any parameter affecting V(x) changes.
@@ -155,11 +157,7 @@ export function uploadAndersonDisorderBuffer(
 
   // Effective hopping energy t = ℏ²/(2m·dx²). Scale disorder by t so that
   // config.disorderStrength is in tight-binding units (W/t).
-  const dx = config.spacing[0] ?? 0.1
-  const hbar = config.hbar ?? 1
-  const mass = config.mass ?? 1
-  const tEff = (hbar * hbar) / (2 * mass * dx * dx)
-  const effectiveStrength = config.disorderStrength * tEff
+  const { tEff, effectiveStrength, disorderStrength } = computeTdseDisorderScaling(config)
 
   const gridSize = config.gridSize.slice(0, config.latticeDim)
   const potential = generateDisorderPotential(
@@ -184,7 +182,7 @@ export function uploadAndersonDisorderBuffer(
     if (absV > maxAbsV) maxAbsV = absV
   }
   logger.log(
-    `[TDSE] Anderson disorder: W/t=${config.disorderStrength}, t=${tEff.toFixed(2)}, ` +
+    `[TDSE] Anderson disorder: W/t=${disorderStrength}, t=${tEff.toFixed(2)}, ` +
       `W_eff=${effectiveStrength.toFixed(1)}, seed=${config.disorderSeed}, ` +
       `dist=${config.disorderDistribution}, maxV=${maxAbsV.toFixed(3)}`
   )

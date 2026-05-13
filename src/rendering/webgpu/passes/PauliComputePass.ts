@@ -59,7 +59,7 @@ import {
   type PauliUniformStepStagingState,
   prePackPauliFrameSnapshots,
 } from './PauliComputePassUniformStaging'
-import { requestStateSave as genericStateSave } from './stateSave'
+import { interleaveStateInjection, requestStateSave as genericStateSave } from './stateSave'
 
 /** Number of f32 values in diagnostic result buffer:
  *  totalNorm, normUp, normDown, sigmaX, sigmaY, sigmaZ, maxDensity, pad */
@@ -348,21 +348,18 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     // Injection only needs the spinor buffer; it can complete even while the
     // async pipeline build is still pending.
     if (this.pendingInjection) {
-      const { re, im } = this.pendingInjection
       const expected = 2 * this.buf.totalSites
-      if (re.length !== expected || im.length !== expected) {
-        // Drop the injection rather than partial-uploading: a truncated or
-        // version-mismatched state file would otherwise leave a hybrid spinor
-        // with stale data from the previous run beyond `min(re,im)`.
-        this.pendingInjection = null
-        throw new Error(
-          `[Pauli] Invalid save-state length: expected re=im=${expected} (2·totalSites), got re=${re.length}, im=${im.length}`
+      let interleaved: Float32Array<ArrayBuffer>
+      try {
+        interleaved = interleaveStateInjection(
+          'Pauli',
+          this.pendingInjection,
+          expected,
+          `${expected} (2·totalSites)`
         )
-      }
-      const interleaved = new Float32Array(expected * 2)
-      for (let i = 0; i < expected; i++) {
-        interleaved[2 * i] = re[i]!
-        interleaved[2 * i + 1] = im[i]!
+      } catch (err) {
+        this.pendingInjection = null
+        throw err
       }
       device.queue.writeBuffer(this.buf.spinorBuffer, 0, interleaved)
       this.pendingInjection = null

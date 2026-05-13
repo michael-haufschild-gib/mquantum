@@ -99,8 +99,19 @@ describe('applyModeOverrides', () => {
       ...BASE_CONFIG,
       quantumMode: 'tdseDynamics',
       temporal: true,
+      isosurface: true,
     })
     expect(result.temporal).toBe(false)
+    expect(result.isosurface).toBe(false)
+  })
+
+  it('preserves analytic 2D isosurface requests for isolines', () => {
+    const result = applyModeOverrides({
+      ...BASE_CONFIG,
+      dimension: 2,
+      isosurface: true,
+    })
+    expect(result.isosurface).toBe(true)
   })
 
   it('forces dimension >= 3 for BEC and Dirac', () => {
@@ -176,7 +187,12 @@ describe('buildPipelineOutputs', () => {
 
 describe('buildShaderConfig', () => {
   it('disables analytic features for compute modes', () => {
-    const config = buildShaderConfig({ ...BASE_CONFIG, quantumMode: 'tdseDynamics' })
+    const config = buildShaderConfig({
+      ...BASE_CONFIG,
+      quantumMode: 'tdseDynamics',
+      isosurface: true,
+    })
+    expect(config.isosurface).toBe(false)
     expect(config.nodal).toBe(false)
     expect(config.phaseMateriality).toBe(false)
     expect(config.interference).toBe(false)
@@ -216,6 +232,11 @@ describe('buildShaderConfig', () => {
     const config = buildShaderConfig({ ...BASE_CONFIG, representation: 'wigner' })
     expect(config.isWigner).toBe(true)
     expect(config.useWignerCache).toBe(true)
+  })
+
+  it('keeps analytic 2D isosurface requests for isoline shaders', () => {
+    const config = buildShaderConfig({ ...BASE_CONFIG, dimension: 2, isosurface: true })
+    expect(config.isosurface).toBe(true)
   })
 })
 
