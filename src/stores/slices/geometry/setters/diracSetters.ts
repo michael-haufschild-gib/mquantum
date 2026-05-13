@@ -20,7 +20,12 @@ import { logger } from '@/lib/logger'
 import { reduceGridToFit } from '@/lib/math/ndArray'
 import { maxStableDt } from '@/lib/physics/dirac/scales'
 import { useAppearanceStore } from '@/stores/scene/appearanceStore'
-import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
+import {
+  canApplyPresetRequest,
+  createLatestPresetRequestGuard,
+  loadPresetModule,
+  type SchroedingerPresetApplyOptions,
+} from '@/stores/utils/dynamicPresetImport'
 
 import {
   defaultDiracGridPerDim,
@@ -63,7 +68,7 @@ export interface DiracSetters {
   setDiracDiagnosticsEnabled: (enabled: boolean) => void
   setDiracDiagnosticsInterval: (interval: number) => void
   setDiracSlicePosition: (dimIndex: number, value: number) => void
-  applyDiracPreset: (presetId: string) => Promise<void>
+  applyDiracPreset: (presetId: string, options?: SchroedingerPresetApplyOptions) => Promise<void>
 }
 
 /**
@@ -177,6 +182,7 @@ export const resizeDiracArrays = (prev: DiracConfig, newDim: number): Partial<Di
 export function createDiracSetters(ctx: SetterContext): DiracSetters {
   const { setWithVersion, isFinite, warnNonFinite, hasOnlyFinite } = ctx
   const D = 'dirac' as const
+  const beginPresetRequest = createLatestPresetRequestGuard()
 
   return {
     setDiracMass: nestedClampedSetter(ctx, D, 'mass', 0.01, 10),
@@ -471,12 +477,15 @@ export function createDiracSetters(ctx: SetterContext): DiracSetters {
         }
       })
     },
-    applyDiracPreset: (presetId) => {
+    applyDiracPreset: (presetId, options) => {
+      const isLatestRequest = beginPresetRequest()
       return loadPresetModule(
         () => import('@/lib/physics/dirac/presets'),
         'diracSetters',
         `Dirac presets for '${presetId}'`,
         async ({ DIRAC_SCENARIO_PRESETS }) => {
+          if (!canApplyPresetRequest(isLatestRequest, ctx.get().schroedinger.quantumMode, options))
+            return
           const preset = DIRAC_SCENARIO_PRESETS.find((p) => p.id === presetId)
           if (!preset) return
           setWithVersion((state) => {
@@ -560,6 +569,7 @@ export function createDiracSetters(ctx: SetterContext): DiracSetters {
               async ({ DIRAC_FIELD_VIEW_TO_COLOR_ALGO }) => {
                 // Guard: if a newer preset arrived while this chunk loaded,
                 // the fieldView in the store won't match — skip the stale write.
+                if (!isLatestRequest()) return
                 if (ctx.get().schroedinger.dirac.fieldView !== expectedView) return
                 const algo = DIRAC_FIELD_VIEW_TO_COLOR_ALGO[expectedView]
                 if (algo) {

@@ -57,6 +57,13 @@ describe('btzMetricF', () => {
     const fB = btzMetricF(r, rp, 2)
     expect(fB).toBeCloseTo(fA / 4, 12)
   })
+
+  it('returns finite zero for invalid physical domains', () => {
+    expect(btzMetricF(Number.NaN, 0.5, 1)).toBe(0)
+    expect(btzMetricF(1, Number.POSITIVE_INFINITY, 1)).toBe(0)
+    expect(btzMetricF(1, 0.5, 0)).toBe(0)
+    expect(btzMetricF(-1, 0.5, 1)).toBe(0)
+  })
 })
 
 describe('btzTemperature', () => {
@@ -84,6 +91,13 @@ describe('btzTemperature', () => {
     expect(btzTemperature(rp, 0.5)).toBeGreaterThan(btzTemperature(rp, 1))
     expect(btzTemperature(rp, 1)).toBeGreaterThan(btzTemperature(rp, 2))
   })
+
+  it('returns finite zero for invalid thermodynamic domains', () => {
+    expect(btzTemperature(Number.NaN, 1)).toBe(0)
+    expect(btzTemperature(1, Number.POSITIVE_INFINITY)).toBe(0)
+    expect(btzTemperature(-0.1, 1)).toBe(0)
+    expect(btzTemperature(1, 0)).toBe(0)
+  })
 })
 
 describe('btzEntropy', () => {
@@ -107,6 +121,13 @@ describe('btzEntropy', () => {
     expect(btzEntropy(1, 2)).toBeCloseTo(base / 2, 12)
     expect(btzEntropy(1, 0.5)).toBeCloseTo(base * 2, 12)
   })
+
+  it('returns finite zero for invalid entropy domains', () => {
+    expect(btzEntropy(Number.POSITIVE_INFINITY, 1)).toBe(0)
+    expect(btzEntropy(1, Number.NaN)).toBe(0)
+    expect(btzEntropy(-0.1, 1)).toBe(0)
+    expect(btzEntropy(1, 0)).toBe(0)
+  })
 })
 
 describe('btzMass', () => {
@@ -123,6 +144,14 @@ describe('btzMass', () => {
     const mA = btzMass(0.2, 1, 1)
     const mB = btzMass(0.4, 1, 1)
     expect(mB).toBeCloseTo(4 * mA, 12)
+  })
+
+  it('returns finite zero for invalid mass domains', () => {
+    expect(btzMass(Number.NaN, 1, 1)).toBe(0)
+    expect(btzMass(1, Number.POSITIVE_INFINITY, 1)).toBe(0)
+    expect(btzMass(1, 1, Number.NaN)).toBe(0)
+    expect(btzMass(-0.1, 1, 1)).toBe(0)
+    expect(btzMass(1, 0, 1)).toBe(0)
   })
 })
 
@@ -143,6 +172,12 @@ describe('btzScalarDelta', () => {
 
   it('returns 1 when below the BF bound rather than NaN', () => {
     expect(btzScalarDelta(-Math.sqrt(2))).toBe(1)
+  })
+
+  it('returns a finite BF fallback for non-finite or overflowing masses', () => {
+    expect(btzScalarDelta(Number.NaN)).toBe(1)
+    expect(btzScalarDelta(Number.POSITIVE_INFINITY)).toBe(1)
+    expect(btzScalarDelta(Number.MAX_VALUE)).toBe(1)
   })
 })
 
@@ -215,6 +250,15 @@ describe('btzThermalAmplitude', () => {
     expect(btzThermalAmplitude(1, Number.POSITIVE_INFINITY, rplus, L, omega, delta, 0, beta)).toBe(
       0
     )
+    expect(btzThermalAmplitude(1, 0, Number.NaN, L, omega, delta, 0, beta)).toBe(0)
+    expect(btzThermalAmplitude(1, 0, rplus, Number.POSITIVE_INFINITY, omega, delta, 0, beta)).toBe(
+      0
+    )
+    expect(btzThermalAmplitude(1, 0, rplus, L, Number.NaN, delta, 0, beta)).toBe(0)
+    expect(btzThermalAmplitude(1, 0, rplus, L, omega, Number.POSITIVE_INFINITY, 0, beta)).toBe(0)
+    expect(btzThermalAmplitude(1, 0, rplus, L, omega, delta, Number.NaN, beta)).toBe(0)
+    expect(btzThermalAmplitude(1, 0, rplus, L, omega, delta, 0, Number.NaN)).toBe(0)
+    expect(btzThermalAmplitude(1, 0, rplus, L, omega, delta, 0, beta, Number.NaN)).toBe(0)
   })
 })
 

@@ -89,6 +89,13 @@ describe('TDSE UI setters', () => {
       useExtendedObjectStore.getState().setTdseFieldView('vorticity')
       expect(getTdse().fieldView).toBe('vorticity')
     })
+
+    it('rejects invalid field views', () => {
+      useExtendedObjectStore.getState().setTdseFieldView('phase')
+      // @ts-expect-error intentional invalid input
+      useExtendedObjectStore.getState().setTdseFieldView('spin')
+      expect(getTdse().fieldView).toBe('phase')
+    })
   })
 
   describe('boolean toggle setters', () => {
@@ -122,6 +129,19 @@ describe('TDSE UI setters', () => {
     it('toggles imaginaryTimeEnabled', () => {
       useExtendedObjectStore.getState().setTdseImaginaryTimeEnabled(true)
       expect(getTdse().imaginaryTimeEnabled).toBe(true)
+    })
+
+    it('rejects malformed boolean toggles', () => {
+      useExtendedObjectStore.getState().setTdseAutoScale(true)
+      useExtendedObjectStore.getState().setTdseDiagnosticsEnabled(false)
+
+      // @ts-expect-error intentional invalid input
+      useExtendedObjectStore.getState().setTdseAutoScale('false')
+      // @ts-expect-error intentional invalid input
+      useExtendedObjectStore.getState().setTdseDiagnosticsEnabled(1)
+
+      expect(getTdse().autoScale).toBe(true)
+      expect(getTdse().diagnosticsEnabled).toBe(false)
     })
   })
 
@@ -158,12 +178,27 @@ describe('TDSE UI setters', () => {
       expect(getTdse().disorderSeed).toBe(42)
       useExtendedObjectStore.getState().setTdseDisorderSeed(-5)
       expect(getTdse().disorderSeed).toBe(0)
+      useExtendedObjectStore.getState().setTdseDisorderSeed(2 ** 40)
+      expect(getTdse().disorderSeed).toBe(0xffffffff)
+    })
+
+    it('rejects non-finite seeds', () => {
+      useExtendedObjectStore.getState().setTdseDisorderSeed(123)
+      useExtendedObjectStore.getState().setTdseDisorderSeed(NaN)
+      expect(getTdse().disorderSeed).toBe(123)
     })
   })
 
   describe('setTdseDisorderDistribution', () => {
     it('sets disorder distribution', () => {
       useExtendedObjectStore.getState().setTdseDisorderDistribution('gaussian')
+      expect(getTdse().disorderDistribution).toBe('gaussian')
+    })
+
+    it('rejects invalid disorder distributions', () => {
+      useExtendedObjectStore.getState().setTdseDisorderDistribution('gaussian')
+      // @ts-expect-error intentional invalid input
+      useExtendedObjectStore.getState().setTdseDisorderDistribution('lorentzian')
       expect(getTdse().disorderDistribution).toBe('gaussian')
     })
   })
@@ -178,6 +213,28 @@ describe('TDSE UI setters', () => {
       useExtendedObjectStore.getState().setTdseCustomPotentialExpression('x^2')
       useExtendedObjectStore.getState().setTdseCustomPotentialExpression('')
       expect(getTdse().customPotentialExpression).toBe('')
+    })
+
+    it('rejects non-string expressions', () => {
+      useExtendedObjectStore.getState().setTdseCustomPotentialExpression('x^2')
+      // @ts-expect-error intentional invalid input
+      useExtendedObjectStore.getState().setTdseCustomPotentialExpression(42)
+      expect(getTdse().customPotentialExpression).toBe('x^2')
+    })
+  })
+
+  describe('setTdseMetric', () => {
+    it('rejects unknown metric kinds without changing state', () => {
+      useExtendedObjectStore.getState().setTdseMetric({
+        kind: 'morrisThorne',
+        throatRadius: 0.7,
+      })
+      const before = getTdse().metric
+
+      // @ts-expect-error intentional invalid input
+      useExtendedObjectStore.getState().setTdseMetric({ kind: 'wormhole' })
+
+      expect(getTdse().metric).toEqual(before)
     })
   })
 })

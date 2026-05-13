@@ -120,7 +120,11 @@ describe('WDW solver — extreme parameter corners', () => {
   })
 
   it.each([
-    ['unknown boundary condition', { boundaryCondition: 'bogus' }, /boundaryCondition must be one of/],
+    [
+      'unknown boundary condition',
+      { boundaryCondition: 'bogus' },
+      /boundaryCondition must be one of/,
+    ],
     ['NaN mass', { inflatonMass: Number.NaN }, /inflatonMass must be finite/],
     ['negative mass', { inflatonMass: -0.1 }, /inflatonMass must be >= 0/],
     [
@@ -132,6 +136,8 @@ describe('WDW solver — extreme parameter corners', () => {
     ['non-finite aMax', { aMax: Number.NEGATIVE_INFINITY }, /aMax must be finite/],
     ['fractional gridNa', { gridNa: 3.5 }, /gridNa must be an integer >= 3/],
     ['fractional gridNphi', { gridNphi: 3.5 }, /gridNphi must be an integer >= 3/],
+    ['too-large gridNa', { gridNa: 1025 }, /gridNa must be an integer >= 3 and <= 1024/],
+    ['too-large gridNphi', { gridNphi: 129 }, /gridNphi must be an integer >= 3 and <= 128/],
     ['zero phiExtent', { phiExtent: 0 }, /phiExtent must be > 0/],
     [
       'non-positive inflatonMassAsymmetry',

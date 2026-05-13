@@ -50,4 +50,20 @@ describe('becHawkingSetters', () => {
       expect(getBec().hawkingLh).toBe(0.6)
     })
   })
+
+  describe('setBecHawkingSeed', () => {
+    it('clamps to the shader u32 seed domain without wrapping', () => {
+      useExtendedObjectStore.getState().setBecHawkingSeed(2 ** 40)
+      expect(getBec().hawkingSeed).toBe(0xffffffff)
+
+      useExtendedObjectStore.getState().setBecHawkingSeed(-5)
+      expect(getBec().hawkingSeed).toBe(0)
+    })
+
+    it('rejects non-finite seeds', () => {
+      useExtendedObjectStore.getState().setBecHawkingSeed(123)
+      useExtendedObjectStore.getState().setBecHawkingSeed(NaN)
+      expect(getBec().hawkingSeed).toBe(123)
+    })
+  })
 })

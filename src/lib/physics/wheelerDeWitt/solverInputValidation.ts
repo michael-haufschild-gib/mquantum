@@ -9,11 +9,18 @@ const WDW_BOUNDARY_CONDITIONS: readonly WdwBoundaryCondition[] = [
   'deWitt',
 ]
 
+/** Maximum `a`-axis samples accepted by the WdW solver before allocation. */
+export const WDW_SOLVER_MAX_GRID_NA = 1024
+/** Maximum samples per inflaton axis accepted by the WdW solver before allocation. */
+export const WDW_SOLVER_MAX_GRID_NPHI = 128
+
 /**
  * Runtime guard for the canonical Wheeler-DeWitt boundary-condition enum.
  */
 export function isWdwBoundaryCondition(value: unknown): value is WdwBoundaryCondition {
-  return typeof value === 'string' && WDW_BOUNDARY_CONDITIONS.includes(value as WdwBoundaryCondition)
+  return (
+    typeof value === 'string' && WDW_BOUNDARY_CONDITIONS.includes(value as WdwBoundaryCondition)
+  )
 }
 
 function assertFinite(name: string, value: number): void {
@@ -25,10 +32,10 @@ function assertPositiveFinite(name: string, value: number): void {
   if (!(value > 0)) throw new Error(`${name} must be > 0`)
 }
 
-function assertIntegerAtLeast(name: string, value: number, min: number): void {
+function assertIntegerInRange(name: string, value: number, min: number, max: number): void {
   assertFinite(name, value)
-  if (!Number.isInteger(value) || value < min) {
-    throw new Error(`${name} must be an integer >= ${min}`)
+  if (!Number.isInteger(value) || value < min || value > max) {
+    throw new Error(`${name} must be an integer >= ${min} and <= ${max}`)
   }
 }
 
@@ -52,8 +59,8 @@ export function validateWheelerDeWittSolverInput(input: WheelerDeWittSolverInput
   assertPositiveFinite('aMin', input.aMin)
   assertFinite('aMax', input.aMax)
   if (!(input.aMax > input.aMin)) throw new Error('aMax must exceed aMin')
-  assertIntegerAtLeast('gridNa', input.gridNa, 3)
-  assertIntegerAtLeast('gridNphi', input.gridNphi, 3)
+  assertIntegerInRange('gridNa', input.gridNa, 3, WDW_SOLVER_MAX_GRID_NA)
+  assertIntegerInRange('gridNphi', input.gridNphi, 3, WDW_SOLVER_MAX_GRID_NPHI)
   assertPositiveFinite('phiExtent', input.phiExtent)
 }
 

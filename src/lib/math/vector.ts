@@ -41,6 +41,12 @@ function getScratch(pool: Map<number, Float64Array>, size: number): Float64Array
   return buf
 }
 
+function vectorResult(length: number, out?: VectorND): VectorND {
+  const result = out ?? new Array(length)
+  result.length = length
+  return result
+}
+
 /**
  * Creates an n-dimensional vector initialized with a fill value
  * @param dimension - The dimensionality of the vector
@@ -70,7 +76,7 @@ export function addVectors(a: VectorND, b: VectorND, out?: VectorND): VectorND {
     throw new Error(`Vector dimensions must match: ${a.length} !== ${b.length}`)
   }
 
-  const result = out ?? new Array(a.length)
+  const result = vectorResult(a.length, out)
   for (let i = 0; i < a.length; i++) {
     result[i] = a[i]! + b[i]!
   }
@@ -109,7 +115,7 @@ export function subtractVectors(a: VectorND, b: VectorND, out?: VectorND): Vecto
   }
 
   // JS fallback
-  const result = out ?? new Array(a.length)
+  const result = vectorResult(a.length, out)
   for (let i = 0; i < a.length; i++) {
     result[i] = a[i]! - b[i]!
   }
@@ -125,7 +131,7 @@ export function subtractVectors(a: VectorND, b: VectorND, out?: VectorND): Vecto
  * @returns Vector scaled by the scalar
  */
 export function scaleVector(v: VectorND, scalar: number, out?: VectorND): VectorND {
-  const result = out ?? new Array(v.length)
+  const result = vectorResult(v.length, out)
   for (let i = 0; i < v.length; i++) {
     result[i] = v[i]! * scalar
   }
@@ -266,7 +272,7 @@ export function vectorsEqual(a: VectorND, b: VectorND, epsilon = EPSILON): boole
  * @returns Vector with the same values
  */
 export function copyVector(v: VectorND, out?: VectorND): VectorND {
-  const result = out ?? new Array(v.length)
+  const result = vectorResult(v.length, out)
   for (let i = 0; i < v.length; i++) {
     result[i] = v[i]!
   }
@@ -288,7 +294,7 @@ export function crossProduct3D(a: VectorND, b: VectorND, out?: VectorND): Vector
     throw new Error(`Cross product requires 3D vectors: got ${a.length}D and ${b.length}D`)
   }
 
-  const result = out ?? new Array(3)
+  const result = vectorResult(3, out)
   result[0] = a[1]! * b[2]! - a[2]! * b[1]!
   result[1] = a[2]! * b[0]! - a[0]! * b[2]!
   result[2] = a[0]! * b[1]! - a[1]! * b[0]!

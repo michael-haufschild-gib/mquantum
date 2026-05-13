@@ -308,22 +308,22 @@ function applyFirstPreset(
       break
     }
     case 'tdseDynamics':
-      store.applyTdsePreset(presetId)
+      void store.applyTdsePreset(presetId, { expectedQuantumMode: mode })
       break
     case 'becDynamics':
-      void store.applyBecPreset(presetId)
+      void store.applyBecPreset(presetId, { expectedQuantumMode: mode })
       break
     case 'diracEquation':
-      void store.applyDiracPreset(presetId)
+      void store.applyDiracPreset(presetId, { expectedQuantumMode: mode })
       break
     case 'freeScalarField':
-      store.applyFreeScalarPreset(presetId)
+      void store.applyFreeScalarPreset(presetId, { expectedQuantumMode: mode })
       break
     case 'quantumWalk':
-      void store.applyQuantumWalkPreset(presetId)
+      void store.applyQuantumWalkPreset(presetId, { expectedQuantumMode: mode })
       break
     case 'wheelerDeWitt':
-      void store.applyWheelerDeWittPreset(presetId)
+      void store.applyWheelerDeWittPreset(presetId, { expectedQuantumMode: mode })
       break
     case 'antiDeSitter':
       store.setAdsPreset(presetId as import('@/lib/geometry/extended/antiDeSitter').AdsPresetName)
@@ -409,7 +409,11 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
         if (value === 'momentum' && qm === 'hydrogenNDCoupled') return
       }
       setWithVersion((state) => ({
-        schroedinger: { ...state.schroedinger, representation: value },
+        schroedinger: {
+          ...state.schroedinger,
+          representation: value,
+          isoEnabled: value === 'wigner' ? false : state.schroedinger.isoEnabled,
+        },
       }))
     },
 

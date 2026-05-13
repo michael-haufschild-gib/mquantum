@@ -425,6 +425,18 @@ describe('Matrix Operations', () => {
       copy[0] = 999
       expect(original[0]).toBe(1)
     })
+
+    it('throws when out matrix length does not match source length', () => {
+      const original = mat([
+        [1, 2],
+        [3, 4],
+      ])
+      const out = new Float32Array(9)
+
+      expect(() => copyMatrix(original, out)).toThrow(
+        'Output matrix dimensions incompatible: expected length 4, received 9'
+      )
+    })
   })
 
   describe('multiplyMatrices (5x5)', () => {
@@ -507,6 +519,18 @@ describe('Matrix Operations', () => {
       ])
       const v = [3, 4]
       const out = [0, 0]
+      const result = multiplyMatrixVector(M, v, out)
+      expect(result).toBe(out)
+      expect(out).toEqual([3, 8])
+    })
+
+    it('truncates oversized out arrays to the matrix dimension', () => {
+      const M = mat([
+        [1, 0],
+        [0, 2],
+      ])
+      const v = [3, 4]
+      const out = [99, 99, 99, 99]
       const result = multiplyMatrixVector(M, v, out)
       expect(result).toBe(out)
       expect(out).toEqual([3, 8])

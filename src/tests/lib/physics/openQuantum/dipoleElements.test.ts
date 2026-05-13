@@ -97,6 +97,12 @@ describe('radialDipoleIntegral', () => {
     const reverse = radialDipoleIntegral(5, 4, 4, 3)
     expect(forward).toBeCloseTo(reverse, 6)
   })
+
+  it('returns zero for invalid quantum tuples instead of clamping to another transition', () => {
+    expect(radialDipoleIntegral(1, 1, 2, 1)).toBe(0)
+    expect(radialDipoleIntegral(2, -1, 3, 1)).toBe(0)
+    expect(radialDipoleIntegral(Number.NaN, 0, 2, 1)).toBe(0)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -334,6 +340,16 @@ describe('radialDipoleIntegral — ND', () => {
     expect(Number.isFinite(result)).toBe(true)
     expect(result).toBeGreaterThan(0)
   })
+
+  it('sanitizes malformed dimensions before evaluating the shared radial model', () => {
+    const d3 = radialDipoleIntegral(1, 0, 2, 1, 3)
+    const d2 = radialDipoleIntegral(1, 0, 2, 1, 2)
+    const d11 = radialDipoleIntegral(1, 0, 2, 1, 11)
+
+    expect(radialDipoleIntegral(1, 0, 2, 1, Number.NaN)).toBeCloseTo(d3, 12)
+    expect(radialDipoleIntegral(1, 0, 2, 1, 1)).toBeCloseTo(d2, 12)
+    expect(radialDipoleIntegral(1, 0, 2, 1, 99)).toBeCloseTo(d11, 12)
+  })
 })
 
 describe('dipoleMatrixElementSquared — ND', () => {
@@ -366,6 +382,18 @@ describe('dipoleMatrixElementSquared — ND', () => {
     // Without clearing cache, D=5 should return a different value
     const d5 = dipoleMatrixElementSquared(s1, s2, 5)
     expect(d3).not.toBeCloseTo(d5, 2)
+  })
+
+  it('uses sanitized dimension in dipole cache keys and radial evaluation', () => {
+    const s1 = makeState(0, 1, 0, 0)
+    const s2 = makeState(1, 2, 1, 0)
+
+    clearDipoleCache()
+    const d3 = dipoleMatrixElementSquared(s1, s2, 3)
+    clearDipoleCache()
+    const malformed = dipoleMatrixElementSquared(s1, s2, Number.NaN)
+
+    expect(malformed).toBeCloseTo(d3, 12)
   })
 
   it('selection rules still enforced at D≠3', () => {

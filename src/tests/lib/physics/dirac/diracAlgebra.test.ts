@@ -166,6 +166,14 @@ describe('DiracAlgebraBridge.getSpinorSize', () => {
     }
     bridge.dispose()
   })
+
+  it('rejects invalid dimensions synchronously', () => {
+    const bridge = new DiracAlgebraBridge()
+    for (const dim of [0, 12, 2.5, Number.NaN]) {
+      expect(() => bridge.getSpinorSize(dim)).toThrow(/spatialDim must be an integer in \[1, 11\]/)
+    }
+    bridge.dispose()
+  })
 })
 
 // ── Helper: build a mock Worker class that captures handlers ─────────────────

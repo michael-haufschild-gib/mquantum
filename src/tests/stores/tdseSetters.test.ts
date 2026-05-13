@@ -46,10 +46,11 @@ describe('TDSE dynamics setters', () => {
 
   it('sets potential type', () => {
     const s = useExtendedObjectStore.getState()
+    s.setTdsePotentialType('barrier')
+    expect(getTdse().potentialType).toBe('barrier')
+
     // @ts-expect-error intentional invalid input
     s.setTdsePotentialType('harmonic')
-    expect(getTdse().potentialType).toBe('harmonic')
-    s.setTdsePotentialType('barrier')
     expect(getTdse().potentialType).toBe('barrier')
   })
 
@@ -161,9 +162,23 @@ describe('TDSE dynamics setters', () => {
 
   it('sets initial condition type', () => {
     const s = useExtendedObjectStore.getState()
+    s.setTdseInitialCondition('planeWave')
+    expect(getTdse().initialCondition).toBe('planeWave')
+
     // @ts-expect-error intentional invalid input
     s.setTdseInitialCondition('gaussian')
-    expect(getTdse().initialCondition).toBe('gaussian')
+    expect(getTdse().initialCondition).toBe('planeWave')
+  })
+
+  it('rejects malformed compact dimension toggles', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setTdseLatticeDim(3)
+    s.setTdseCompactDim(0, true)
+    expect(getTdse().compactDims[0]).toBe(true)
+
+    // @ts-expect-error intentional invalid input
+    s.setTdseCompactDim(0, 'false')
+    expect(getTdse().compactDims[0]).toBe(true)
   })
 
   it('creates slice positions for dims > 3', () => {

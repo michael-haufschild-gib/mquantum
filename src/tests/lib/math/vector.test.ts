@@ -68,6 +68,13 @@ describe('Vector Operations', () => {
       expect(out).toEqual([5, 7, 9])
     })
 
+    it('truncates oversized out arrays to the result dimension', () => {
+      const out = [99, 99, 99, 99]
+      const result = addVectors([1, 2], [3, 4], out)
+      expect(result).toBe(out)
+      expect(out).toEqual([4, 6])
+    })
+
     it('throws error for mismatched dimensions', () => {
       const a = [1, 2, 3]
       const b = [1, 2]
@@ -97,6 +104,13 @@ describe('Vector Operations', () => {
       const result = subtractVectors(a, b, out)
       expect(result).toBe(out)
       expect(out).toEqual([9, 18, 27])
+    })
+
+    it('truncates oversized out arrays to the result dimension', () => {
+      const out = [99, 99, 99, 99]
+      const result = subtractVectors([10, 20], [1, 2], out)
+      expect(result).toBe(out)
+      expect(out).toEqual([9, 18])
     })
 
     it('throws error for mismatched dimensions', () => {
@@ -137,6 +151,13 @@ describe('Vector Operations', () => {
       const result = scaleVector(v, 3, out)
       expect(result).toBe(out)
       expect(out).toEqual([6, 12, 18])
+    })
+
+    it('truncates oversized out arrays to the result dimension', () => {
+      const out = [99, 99, 99, 99]
+      const result = scaleVector([2, 4], 3, out)
+      expect(result).toBe(out)
+      expect(out).toEqual([6, 12])
     })
   })
 
@@ -328,6 +349,14 @@ describe('Vector Operations', () => {
       expect(out[2]).toBeCloseTo(0.8, 10)
     })
 
+    it('truncates oversized out arrays to the result dimension', () => {
+      const out = [99, 99, 99, 99]
+      const result = normalize([3, 4], out)
+      expect(result).toBe(out)
+      expect(out).toHaveLength(2)
+      expect(magnitude(out)).toBeCloseTo(1, 10)
+    })
+
     it('normalizes 11D vector to unit length', () => {
       const v = Array.from({ length: 11 }, (_, i) => i + 1)
       const normalized = normalize(v)
@@ -390,6 +419,13 @@ describe('Vector Operations', () => {
       const result = copyVector(original, out)
       expect(result).toBe(out)
       expect(out).toEqual([7, 8, 9])
+    })
+
+    it('truncates oversized out arrays to the source dimension', () => {
+      const out = [99, 99, 99, 99]
+      const result = copyVector([7, 8], out)
+      expect(result).toBe(out)
+      expect(out).toEqual([7, 8])
     })
   })
 
@@ -464,6 +500,13 @@ describe('Vector Operations', () => {
       const out = [0, 0, 0]
       const result = crossProduct3D(a, b, out)
 
+      expect(result).toBe(out)
+      expect(out).toEqual([0, 0, 1])
+    })
+
+    it('truncates oversized out arrays to 3D', () => {
+      const out = [99, 99, 99, 99]
+      const result = crossProduct3D([1, 0, 0], [0, 1, 0], out)
       expect(result).toBe(out)
       expect(out).toEqual([0, 0, 1])
     })

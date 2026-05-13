@@ -28,6 +28,11 @@ describe('createDensityMatrix', () => {
     expect(rho.elements.length).toBe(4 * 4 * 2)
     expect(rho.elements.every((v) => v === 0)).toBe(true)
   })
+
+  it('rejects invalid basis sizes before scratch-buffer users can corrupt state', () => {
+    expect(() => createDensityMatrix(0)).toThrow('K must be a positive integer')
+    expect(() => createDensityMatrix(MAX_K + 1)).toThrow(`K=${MAX_K + 1} exceeds MAX_K=${MAX_K}`)
+  })
 })
 
 describe('densityMatrixFromCoefficients', () => {
@@ -49,9 +54,36 @@ describe('densityMatrixFromCoefficients', () => {
     expect(rho.elements[0]).toBeCloseTo(1.0) // rho_{00} re
     expect(rho.elements[2 * 3]).toBeCloseTo(0.0) // rho_{11} re
   })
+
+  it('rejects coefficient arrays shorter than K instead of generating NaNs', () => {
+    expect(() => densityMatrixFromCoefficients([1], [0, 0], 2)).toThrow(
+      'coeffsRe length must be >= K (2), got 1'
+    )
+    expect(() => densityMatrixFromCoefficients([1, 0], [0], 2)).toThrow(
+      'coeffsIm length must be >= K (2), got 1'
+    )
+  })
 })
 
 describe('evolveStep', () => {
+  it('rejects malformed inputs at the public boundary', () => {
+    const rho = densityMatrixFromCoefficients([1, 0], [0, 0], 2)
+    expect(() => evolveStep(rho, new Float64Array([0]), [], 0.01)).toThrow(
+      'energies length must be >= K (2), got 1'
+    )
+    expect(() =>
+      evolveStep(
+        rho,
+        new Float64Array([0, 1]),
+        [{ row: 0, col: 2, amplitudeRe: 1, amplitudeIm: 0 }],
+        0.01
+      )
+    ).toThrow('channel 0 index out of range for K=2')
+    expect(() => evolveStep(rho, new Float64Array([0, 1]), [], Number.NaN)).toThrow(
+      'dt must be finite'
+    )
+  })
+
   it('preserves trace after 100 steps with dephasing', () => {
     const rho = densityMatrixFromCoefficients([1 / Math.sqrt(2), 1 / Math.sqrt(2)], [0, 0], 2)
     const energies = new Float64Array([0.5, 1.5])

@@ -98,6 +98,14 @@ describe('BEC setters', () => {
       expect(bec().initialCondition).toBe('thomasFermi')
       expect(bec().fieldView).toBe('density')
     })
+
+    it('rejects invalid condition values', () => {
+      store().setBecInitialCondition('vortexImprint')
+      store().setBecInitialCondition(
+        'bogus' as unknown as Parameters<ReturnType<typeof store>['setBecInitialCondition']>[0]
+      )
+      expect(bec().initialCondition).toBe('vortexImprint')
+    })
   })
 
   describe('setBecFieldView', () => {
@@ -114,6 +122,14 @@ describe('BEC setters', () => {
       store().setBecFieldView('hawkingFlux')
       expect(bec().fieldView).toBe('hawkingFlux')
     })
+
+    it('rejects invalid field view values', () => {
+      store().setBecFieldView('phase')
+      store().setBecFieldView(
+        'bogus' as unknown as Parameters<ReturnType<typeof store>['setBecFieldView']>[0]
+      )
+      expect(bec().fieldView).toBe('phase')
+    })
   })
 
   describe('setBecVortexCharge', () => {
@@ -129,6 +145,12 @@ describe('BEC setters', () => {
       store().setBecVortexCharge(1)
       expect(bec().needsReset).toBe(true)
     })
+
+    it('rejects non-finite values', () => {
+      store().setBecVortexCharge(2)
+      store().setBecVortexCharge(NaN)
+      expect(bec().vortexCharge).toBe(2)
+    })
   })
 
   describe('setBecVortexLatticeCount', () => {
@@ -139,6 +161,12 @@ describe('BEC setters', () => {
       expect(bec().vortexLatticeCount).toBe(1)
       store().setBecVortexLatticeCount(99)
       expect(bec().vortexLatticeCount).toBe(16)
+    })
+
+    it('rejects non-finite values', () => {
+      store().setBecVortexLatticeCount(5)
+      store().setBecVortexLatticeCount(Infinity)
+      expect(bec().vortexLatticeCount).toBe(5)
     })
   })
 
@@ -341,9 +369,33 @@ describe('BEC setters', () => {
       expect(bec().slicePositions[0]).toBe(0.5)
     })
 
+    it('clamps slice positions to uniform writer bounds', () => {
+      useExtendedObjectStore.setState((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, latticeDim: 4, slicePositions: [0] },
+        },
+      }))
+      store().setBecSlicePosition(0, 2)
+      expect(bec().slicePositions[0]).toBe(1)
+      store().setBecSlicePosition(0, -2)
+      expect(bec().slicePositions[0]).toBe(-1)
+    })
+
     it('rejects non-finite values', () => {
       store().setBecSlicePosition(0, NaN)
       // Should not crash
+    })
+  })
+
+  describe('setBecCompactDim', () => {
+    it('rejects malformed boolean values', () => {
+      store().setBecCompactDim(0, true)
+      store().setBecCompactDim(
+        0,
+        'false' as unknown as Parameters<ReturnType<typeof store>['setBecCompactDim']>[1]
+      )
+      expect(bec().compactDims[0]).toBe(true)
     })
   })
 

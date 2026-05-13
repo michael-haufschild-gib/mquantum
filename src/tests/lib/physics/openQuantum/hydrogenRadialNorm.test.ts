@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest'
 
 // ---------------------------------------------------------------------------
 // Independent R_nl implementation for test verification
-// (mirrors the private hydrogenRadialWavefunction in dipoleElements.ts)
+// (cross-checks the shared production helper used by radial normalization and dipoles)
 // ---------------------------------------------------------------------------
 
 function factorial(n: number): number {

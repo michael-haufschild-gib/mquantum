@@ -10,7 +10,16 @@
  */
 
 import type { WdwBoundaryCondition, WdwSrmtClock } from '@/lib/geometry/extended/wheelerDeWitt'
-import { loadPresetModule } from '@/stores/utils/dynamicPresetImport'
+import {
+  WDW_SOLVER_MAX_GRID_NA,
+  WDW_SOLVER_MAX_GRID_NPHI,
+} from '@/lib/physics/wheelerDeWitt/solverInputValidation'
+import {
+  canApplyPresetRequest,
+  createLatestPresetRequestGuard,
+  loadPresetModule,
+  type SchroedingerPresetApplyOptions,
+} from '@/stores/utils/dynamicPresetImport'
 
 import {
   nestedClampedSetter,
@@ -57,7 +66,10 @@ export interface WheelerDeWittSetters {
   setWdwSrmtCutNormalized: (cut: number) => void
   setWdwSrmtRankCap: (cap: number) => void
   setWdwSrmtHeatmapIntensity: (intensity: number) => void
-  applyWheelerDeWittPreset: (presetId: string) => Promise<void>
+  applyWheelerDeWittPreset: (
+    presetId: string,
+    options?: SchroedingerPresetApplyOptions
+  ) => Promise<void>
   triggerWdwRecompute: () => void
 }
 
@@ -69,6 +81,7 @@ export interface WheelerDeWittSetters {
  * @returns Map of action name → setter
  */
 export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSetters {
+  const beginPresetRequest = createLatestPresetRequestGuard()
   // Render-only animation-effect setters: MUST NOT flip needsReset so the
   // solver does not re-run when the user toggles a visual overlay.
   const setPhaseRotationEnabled = nestedValueSetter(ctx, 'wheelerDeWitt', 'phaseRotationEnabled')
@@ -197,8 +210,8 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
         ctx.warnNonFinite('wheelerDeWitt.gridNphi', gridNphi)
         return
       }
-      const clampedNa = clamp(Math.round(gridNa), 16, 1024)
-      const clampedNphi = clamp(Math.round(gridNphi), 8, 128)
+      const clampedNa = clamp(Math.round(gridNa), 16, WDW_SOLVER_MAX_GRID_NA)
+      const clampedNphi = clamp(Math.round(gridNphi), 8, WDW_SOLVER_MAX_GRID_NPHI)
       ctx.setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
@@ -243,12 +256,15 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
     setWdwSrmtCutNormalized: setSrmtCutNormalized,
     setWdwSrmtRankCap: setSrmtRankCap,
     setWdwSrmtHeatmapIntensity: setSrmtHeatmapIntensity,
-    applyWheelerDeWittPreset: (presetId) => {
+    applyWheelerDeWittPreset: (presetId, options) => {
+      const isLatestRequest = beginPresetRequest()
       return loadPresetModule(
         () => import('@/lib/physics/wheelerDeWitt/presets'),
         'wheelerDeWittSetters',
         `Wheeler–DeWitt presets for '${presetId}'`,
         ({ getWdwPreset, WDW_PRESET_PHYSICS_FIELDS }) => {
+          if (!canApplyPresetRequest(isLatestRequest, ctx.get().schroedinger.quantumMode, options))
+            return
           const preset = getWdwPreset(presetId)
           if (!preset) return
           ctx.setWithVersion((state) => {

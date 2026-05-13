@@ -69,6 +69,52 @@ function recomputeLevelSpacing(entries: EigenstateEntry[]) {
   )
 }
 
+function finiteOr(value: number | undefined, fallback: number): number {
+  return Number.isFinite(value) ? (value as number) : fallback
+}
+
+function nonNegativeFiniteOr(value: number | undefined, fallback: number): number {
+  return Number.isFinite(value) && (value as number) >= 0 ? (value as number) : fallback
+}
+
+function healingLengthOr(value: number | undefined, fallback: number): number {
+  if (value === Infinity) return Infinity
+  return nonNegativeFiniteOr(value, fallback)
+}
+
+function countOr(value: number | undefined, fallback: number): number {
+  return Number.isFinite(value) && (value as number) >= 0 ? Math.floor(value as number) : fallback
+}
+
+function sanitizeNonNegativeFloat32Array(values: Float32Array): Float32Array {
+  const sanitized = new Float32Array(values.length)
+  for (let i = 0; i < values.length; i++) {
+    const value = values[i] ?? 0
+    sanitized[i] = Number.isFinite(value) && value >= 0 ? value : 0
+  }
+  return sanitized
+}
+
+function sanitizeBecUpdate(
+  snapshot: Partial<BecChannelData>,
+  current: BecChannelData
+): Partial<BecChannelData> {
+  return {
+    ...snapshot,
+    totalNorm: nonNegativeFiniteOr(snapshot.totalNorm, current.totalNorm),
+    maxDensity: nonNegativeFiniteOr(snapshot.maxDensity, current.maxDensity),
+    normDrift: finiteOr(snapshot.normDrift, current.normDrift),
+    chemicalPotential: finiteOr(snapshot.chemicalPotential, current.chemicalPotential),
+    healingLength: healingLengthOr(snapshot.healingLength, current.healingLength),
+    soundSpeed: nonNegativeFiniteOr(snapshot.soundSpeed, current.soundSpeed),
+    thomasFermiRadius: nonNegativeFiniteOr(snapshot.thomasFermiRadius, current.thomasFermiRadius),
+    vortexCount: countOr(snapshot.vortexCount, current.vortexCount),
+    vortexPlaquettes: countOr(snapshot.vortexPlaquettes, current.vortexPlaquettes),
+    vortexPositiveCharge: countOr(snapshot.vortexPositiveCharge, current.vortexPositiveCharge),
+    vortexNegativeCharge: countOr(snapshot.vortexNegativeCharge, current.vortexNegativeCharge),
+  }
+}
+
 // ─── Store Type ──────────────────────────────────────────────────────────────
 
 interface DiagnosticsState {
@@ -216,16 +262,17 @@ export const useDiagnosticsStore = create<DiagnosticsState>((set, get) => ({
     set((state) => {
       const ch = state.bec
       const head = ch.historyHead
-      const norm = snapshot.totalNorm ?? ch.totalNorm
-      const chemPot = snapshot.chemicalPotential ?? ch.chemicalPotential
-      const healingLen = snapshot.healingLength ?? ch.healingLength
+      const safeSnapshot = sanitizeBecUpdate(snapshot, ch)
+      const norm = safeSnapshot.totalNorm ?? ch.totalNorm
+      const chemPot = safeSnapshot.chemicalPotential ?? ch.chemicalPotential
+      const healingLen = safeSnapshot.healingLength ?? ch.healingLength
       ch.historyNorm[head] = norm
       ch.historyChemPot[head] = chemPot
       ch.historyHealingLen[head] = healingLen
       return {
         bec: {
           ...ch,
-          ...snapshot,
+          ...safeSnapshot,
           hasData: true,
           readbackGeneration: ch.readbackGeneration + 1,
           ...advanceRingBuffer(ch),
@@ -238,10 +285,10 @@ export const useDiagnosticsStore = create<DiagnosticsState>((set, get) => ({
     set((state) => ({
       bec: {
         ...state.bec,
-        incompressibleSpectrum: spectrum,
-        spectrumKValues: kValues,
-        totalIncompressibleEnergy: totalIncomp,
-        totalCompressibleEnergy: totalComp,
+        incompressibleSpectrum: sanitizeNonNegativeFloat32Array(spectrum),
+        spectrumKValues: sanitizeNonNegativeFloat32Array(kValues),
+        totalIncompressibleEnergy: nonNegativeFiniteOr(totalIncomp, 0),
+        totalCompressibleEnergy: nonNegativeFiniteOr(totalComp, 0),
       },
     }))
   },

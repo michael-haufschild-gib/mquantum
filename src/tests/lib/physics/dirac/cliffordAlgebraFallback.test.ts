@@ -98,9 +98,23 @@ describe('spinorSize', () => {
       expect(spinorSize(d)).toBe(expected[d - 1])
     }
   })
+
+  it('rejects dimensions outside the supported Dirac range', () => {
+    for (const dim of [0, 12, 2.5, Number.NaN]) {
+      expect(() => spinorSize(dim)).toThrow(/spatialDim must be an integer in \[1, 11\]/)
+    }
+  })
 })
 
 describe('generateDiracMatricesFallback', () => {
+  it('rejects invalid dimensions instead of emitting mismatched fallback matrices', () => {
+    for (const dim of [0, 12, 2.5, Number.NaN]) {
+      expect(() => generateDiracMatricesFallback(dim)).toThrow(
+        /spatialDim must be an integer in \[1, 11\]/
+      )
+    }
+  })
+
   it('packs spinor size as u32 bits in first element', () => {
     const { gammaData, spinorSize: s } = generateDiracMatricesFallback(3)
     const u32 = new Uint32Array(gammaData.buffer, 0, 1)

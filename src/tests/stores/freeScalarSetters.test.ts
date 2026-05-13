@@ -133,7 +133,7 @@ describe('free scalar field setters', () => {
       // Loading it while globalDim is in the supported range must leave
       // `cosmology.enabled=true` with the preset's hubble and eta0.
       const s = useExtendedObjectStore.getState()
-      s.applyFreeScalarPreset('deSitterVacuum')
+      await s.applyFreeScalarPreset('deSitterVacuum')
       // applyFreeScalarPreset does a dynamic import → wait for it to settle.
       await vi.waitFor(() => {
         expect(getFSF().cosmology.enabled).toBe(true)

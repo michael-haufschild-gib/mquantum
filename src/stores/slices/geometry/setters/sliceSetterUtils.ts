@@ -90,6 +90,14 @@ export const DIRAC_MAX_TOTAL_SITES = 262144 // 64^3
 /** Maximum total free scalar lattice sites (~8MB for phi+pi buffers) */
 export const MAX_TOTAL_SITES = FREE_SCALAR_MAX_TOTAL_SITES
 
+/** Maximum unsigned 32-bit seed representable in shader u32 uniforms. */
+export const UINT32_SEED_MAX = 0xffffffff
+
+/** Clamp a finite numeric seed into the shader/runtime u32 seed domain. */
+export function clampUint32Seed(seed: number): number {
+  return Math.min(UINT32_SEED_MAX, Math.floor(Math.max(0, seed)))
+}
+
 /**
  * Compute the largest power-of-2 grid size per dimension that keeps total
  * sites within a given budget. All lattice modes need power-of-2 per axis for FFT.
