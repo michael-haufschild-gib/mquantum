@@ -1322,8 +1322,8 @@ describe('WGSL Shader Compilation - Skybox', () => {
     })
 
     expect(wgsl).toContain('fn safeNormalizeOcean(')
-    expect(wgsl).not.toContain('normalize(userSurface - userDeep')
-    expect(wgsl).not.toContain('normalize(userMid +')
+    expect(wgsl).not.toMatch(/normalize\s*\(\s*userSurface\s*-\s*userDeep\b/)
+    expect(wgsl).not.toMatch(/normalize\s*\(\s*userMid\s*\+/)
   })
 })
 

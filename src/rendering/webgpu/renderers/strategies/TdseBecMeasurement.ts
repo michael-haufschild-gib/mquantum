@@ -106,6 +106,8 @@ export function handleMeasurement(
     .catch((err) => {
       logger.error('[Measurement] Collapse failed:', err)
       const s = useMeasurementStore.getState()
-      if (s.isCollapsing) s.completeMeasurement([], 0, null)
+      if (s.isCollapsing && s.collapseGeneration === collapseGeneration) {
+        s.completeMeasurement([], 0, null)
+      }
     })
 }

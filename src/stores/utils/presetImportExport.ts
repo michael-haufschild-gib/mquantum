@@ -51,7 +51,12 @@ function hasRequiredFields(item: unknown, requiredDataKeys: readonly string[]): 
     return false
   }
 
-  return requiredDataKeys.every((key) => Boolean(data[key]))
+  return requiredDataKeys.every(
+    (key) =>
+      Object.prototype.hasOwnProperty.call(data, key) &&
+      data[key] !== undefined &&
+      data[key] !== null
+  )
 }
 
 /**
