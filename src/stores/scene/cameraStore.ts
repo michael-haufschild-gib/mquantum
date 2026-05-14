@@ -127,5 +127,6 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
       camera.setPosition(...DEFAULT_POSITION)
       camera.setTarget(...DEFAULT_TARGET)
     }
+    set({ pendingState: null })
   },
 }))

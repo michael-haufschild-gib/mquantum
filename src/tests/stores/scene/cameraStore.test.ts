@@ -172,5 +172,22 @@ describe('cameraStore (invariants)', () => {
       // Should not throw
       useCameraStore.getState().reset()
     })
+
+    it('clears queued camera state when reset runs before camera registers', () => {
+      const queuedState = {
+        position: [10, 20, 30] as [number, number, number],
+        target: [1, 2, 3] as [number, number, number],
+      }
+      useCameraStore.getState().applyState(queuedState)
+      expect(useCameraStore.getState().pendingState).toEqual(queuedState)
+
+      useCameraStore.getState().reset()
+      expect(useCameraStore.getState().pendingState).toBeNull()
+
+      const camera = createMockCamera()
+      useCameraStore.getState().registerCamera(camera)
+      expect(camera.setPosition).not.toHaveBeenCalled()
+      expect(camera.setTarget).not.toHaveBeenCalled()
+    })
   })
 })
