@@ -73,6 +73,17 @@ export function handleMeasurement(
       const { executeFullMeasurement, executePartialMeasurement } =
         await import('@/lib/physics/measurementOrchestrator')
 
+      // Re-check after the awaited dynamic import: if a new collapse started
+      // (or the collapse was cancelled) during the await, drop this stale
+      // readback so inject/record can't overwrite the newer collapse.
+      const postImportMeasurement = useMeasurementStore.getState()
+      if (
+        !postImportMeasurement.isCollapsing ||
+        postImportMeasurement.collapseGeneration !== collapseGeneration
+      ) {
+        return
+      }
+
       const config = {
         latticeDim: gridSize.length,
         gridSize,
