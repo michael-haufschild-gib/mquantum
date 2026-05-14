@@ -35,6 +35,15 @@ describe('Hydrogen Quantum Number Utilities', () => {
       expect(validateQuantumNumbers(2, 1, -2)).toBe(false)
       expect(validateQuantumNumbers(3, 0, 1)).toBe(false)
     })
+
+    it('rejects non-finite and fractional quantum numbers', () => {
+      expect(validateQuantumNumbers(Number.NaN, 0, 0)).toBe(false)
+      expect(validateQuantumNumbers(2, Number.POSITIVE_INFINITY, 0)).toBe(false)
+      expect(validateQuantumNumbers(2, 1, Number.NaN)).toBe(false)
+      expect(validateQuantumNumbers(2.5, 1, 0)).toBe(false)
+      expect(validateQuantumNumbers(3, 1.5, 0)).toBe(false)
+      expect(validateQuantumNumbers(3, 1, 0.5)).toBe(false)
+    })
   })
 
   describe('orbitalShapeLetter', () => {
@@ -61,6 +70,12 @@ describe('Hydrogen Quantum Number Utilities', () => {
     it('clamps to zero for invalid n', () => {
       expect(maxAzimuthalForPrincipal(0)).toBe(0)
       expect(maxAzimuthalForPrincipal(-3)).toBe(0)
+      expect(maxAzimuthalForPrincipal(Number.NaN)).toBe(0)
+      expect(maxAzimuthalForPrincipal(Number.POSITIVE_INFINITY)).toBe(0)
+    })
+
+    it('floors fractional principal quantum numbers before deriving l max', () => {
+      expect(maxAzimuthalForPrincipal(3.9)).toBe(2)
     })
   })
 

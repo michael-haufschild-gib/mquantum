@@ -65,9 +65,22 @@ export function complexMatIdentity(N: number): ComplexMatrix {
 /** Minimum N for WASM complex matmul — below this, FFI overhead dominates. */
 const WASM_MATMUL_MIN_N = 64
 
+function outputAliasesInput(A: ComplexMatrix, B: ComplexMatrix, out: ComplexMatrix): boolean {
+  return (
+    out.real === A.real ||
+    out.real === A.imag ||
+    out.real === B.real ||
+    out.real === B.imag ||
+    out.imag === A.real ||
+    out.imag === A.imag ||
+    out.imag === B.real ||
+    out.imag === B.imag
+  )
+}
+
 /**
  * Complex matrix multiply: C = A × B for N×N matrices.
- * Output must not alias A or B.
+ * Supports output aliasing A or B via a temporary buffer.
  *
  * Uses i-k-j loop order for optimal row-major cache access. The inner j-loop
  * accesses B[k,:] and out[i,:] sequentially (~3KB working set for N=196),
@@ -86,6 +99,13 @@ export function complexMatMul(
   out: ComplexMatrix,
   N: number
 ): void {
+  if (outputAliasesInput(A, B, out)) {
+    const temp = complexMatZero(N)
+    complexMatMul(A, B, temp, N)
+    complexMatCopy(temp, out, N)
+    return
+  }
+
   // ── WASM fast path ──────────────────────────────────────────────────
   if (N >= WASM_MATMUL_MIN_N && isAnimationWasmReady()) {
     const packed = complexMatMulWasm(A.real, A.imag, B.real, B.imag, N)

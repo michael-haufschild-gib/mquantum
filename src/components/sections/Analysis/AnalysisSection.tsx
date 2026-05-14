@@ -186,6 +186,7 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
               <Switch
                 checked={carpetEnabled}
                 onCheckedChange={setCarpetEnabled}
+                ariaLabel="Toggle quantum carpet"
                 tooltip="Toggle the quantum carpet — a space-time density plot of the evolution history."
                 data-testid="carpet-toggle"
               />

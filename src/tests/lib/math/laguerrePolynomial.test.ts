@@ -105,6 +105,16 @@ describe('associatedLaguerre', () => {
     expect(associatedLaguerre(Infinity, 0, 1)).toBeNaN()
   })
 
+  it('returns NaN for malformed alpha and x before base cases hide invalid input', () => {
+    expect(associatedLaguerre(0, Infinity, 1)).toBeNaN()
+    expect(associatedLaguerre(0, -1, 1)).toBeNaN()
+    expect(associatedLaguerre(0, 0, NaN)).toBeNaN()
+  })
+
+  it('returns NaN for orders outside the bounded recurrence domain', () => {
+    expect(associatedLaguerre(513, 0, 1)).toBeNaN()
+  })
+
   it('floors non-integer p', () => {
     // L_2.7^0(x) should behave as L_2^0(x)
     expect(associatedLaguerre(2.7, 0, 0)).toBeCloseTo(associatedLaguerre(2, 0, 0))

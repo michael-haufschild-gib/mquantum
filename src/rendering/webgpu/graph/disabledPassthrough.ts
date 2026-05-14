@@ -22,6 +22,19 @@ import { resolveResourceAlias } from './resourceAliases'
  */
 const warnedPassthroughMismatch = new Set<string>()
 
+function aliasDisabledOutput(
+  resourceAliases: Map<string, string>,
+  outputId: string,
+  resolvedInputId: string
+): boolean {
+  if (outputId === resolvedInputId) {
+    resourceAliases.delete(outputId)
+    return false
+  }
+  resourceAliases.set(outputId, resolvedInputId)
+  return true
+}
+
 /**
  * Maintains the resource chain for a disabled pass by either aliasing or
  * copying its first input to its first output.
@@ -67,8 +80,8 @@ export function handleDisabledPassthrough(
   const skipPassthrough = pass.config.skipPassthrough ?? false
 
   if (skipPassthrough) {
-    resourceAliases.set(outputId, resolvedInputId)
-    if (shouldLog)
+    const didAlias = aliasDisabledOutput(resourceAliases, outputId, resolvedInputId)
+    if (shouldLog && didAlias)
       logger.log(`[WebGPU RenderGraph] Pass '${passId}' aliasing ${outputId} → ${resolvedInputId}`)
   } else {
     const inputTexture = pool.getTexture(resolvedInputId)
@@ -106,9 +119,11 @@ export function handleDisabledPassthrough(
               `[WebGPU RenderGraph] Disabled pass '${passId}' falling back to alias because ${resolvedInputId} (${inputTexture.format} ${inputTexture.width}×${inputTexture.height}) does not match ${outputId} (${outputTexture.format} ${outputTexture.width}×${outputTexture.height}). Add skipPassthrough=true to the pass config if aliasing is intentional.`
             )
           }
-          resourceAliases.set(outputId, resolvedInputId)
+          aliasDisabledOutput(resourceAliases, outputId, resolvedInputId)
         }
       }
+    } else {
+      aliasDisabledOutput(resourceAliases, outputId, resolvedInputId)
     }
   }
 

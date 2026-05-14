@@ -151,7 +151,7 @@ describe('WheelerDeWittSrmtSweepCoordinator.startSweep', () => {
   })
 
   it('cancels the prior sweep before starting a new one (epoch bumps)', () => {
-    const { worker, posts } = createFakeWorker()
+    const { worker, posts, terminated } = createFakeWorker()
     const coord = new WheelerDeWittSrmtSweepCoordinator(() => worker)
     coord.startSweep({
       config: mkCutConfig(),
@@ -175,6 +175,7 @@ describe('WheelerDeWittSrmtSweepCoordinator.startSweep', () => {
     if (posts[0]!.message.type === 'start') expect(posts[0]!.message.epoch).toBe(1)
     if (posts[1]!.message.type === 'cancel') expect(posts[1]!.message.epoch).toBe(1)
     if (posts[2]!.message.type === 'start') expect(posts[2]!.message.epoch).toBe(2)
+    expect(terminated.called).toBe(true)
   })
 })
 
@@ -251,7 +252,7 @@ describe('WheelerDeWittSrmtSweepCoordinator.update', () => {
   })
 
   it('aborts the sweep when the WdW config hash changes mid-run', () => {
-    const { worker, posts } = createFakeWorker()
+    const { worker, posts, terminated } = createFakeWorker()
     const coord = new WheelerDeWittSrmtSweepCoordinator(() => worker)
     coord.startSweep({
       config: mkCutConfig(),
@@ -269,6 +270,27 @@ describe('WheelerDeWittSrmtSweepCoordinator.update', () => {
     // A cancel message was posted to the worker.
     const cancelCount = posts.filter((p) => p.message.type === 'cancel').length
     expect(cancelCount).toBeGreaterThanOrEqual(1)
+    expect(terminated.called).toBe(true)
+  })
+
+  it('terminates the worker when the store was manually aborted by the UI', () => {
+    const { worker, posts, terminated, emit } = createFakeWorker()
+    const coord = new WheelerDeWittSrmtSweepCoordinator(() => worker)
+    const epoch = coord.startSweep({
+      config: mkCutConfig(),
+      wdwConfig: DEFAULT_WHEELER_DEWITT_CONFIG,
+      physics: { inflatonMass: 0.3, cosmologicalConstant: 0 },
+      landmarks: [],
+      solverOutput: mkSolverOutput(),
+    })
+
+    useSrmtSweepStore.getState().abortSweep()
+    coord.update(DEFAULT_WHEELER_DEWITT_CONFIG, false)
+
+    expect(terminated.called).toBe(true)
+    expect(posts.some((p) => p.message.type === 'cancel')).toBe(true)
+    emit({ type: 'done', epoch, landmarks: [], totalMs: 100 })
+    expect(useSrmtSweepStore.getState().status).toBe('idle')
   })
 
   it('does nothing when the store is idle', () => {
@@ -413,6 +435,105 @@ describe('materialiseSweepConfig — lambda defaults', () => {
     expect(config.sweepMin).toBe(-1)
     expect(config.sweepMax).toBe(0.1)
     expect(config.cutNormalized).toBe(0.7)
+  })
+
+  it('clamps broad URL ranges before re-solve sweeps reach the solver', () => {
+    const mass = materialiseSweepConfig(
+      {
+        kind: 'mass',
+        sweepMin: -1024,
+        sweepMax: 1024,
+        cutAnchor: -1,
+        phiRef: 99,
+      },
+      DEFAULT_WHEELER_DEWITT_CONFIG
+    )
+
+    expect(mass.sweepMin).toBe(0)
+    expect(mass.sweepMax).toBe(2)
+    expect(mass.cutNormalized).toBe(0.1)
+    expect(mass.phiRef).toBe(DEFAULT_WHEELER_DEWITT_CONFIG.phiExtent)
+
+    const highRank = materialiseSweepConfig(
+      { kind: 'mass' },
+      { ...DEFAULT_WHEELER_DEWITT_CONFIG, srmtRankCap: 999 }
+    )
+    expect(highRank.rankCap).toBe(256)
+
+    const lambda = materialiseSweepConfig(
+      { kind: 'lambda', sweepMin: 1024, sweepMax: -1024 },
+      DEFAULT_WHEELER_DEWITT_CONFIG
+    )
+
+    expect(lambda.sweepMin).toBe(-1)
+    expect(lambda.sweepMax).toBe(1)
+
+    const badNumbers = materialiseSweepConfig(
+      { kind: 'mass', sweepMin: Number.NaN, sweepMax: Number.NaN },
+      DEFAULT_WHEELER_DEWITT_CONFIG
+    )
+    expect(badNumbers.sweepMin).toBe(0.1)
+    expect(badNumbers.sweepMax).toBe(1.5)
+    expect(
+      materialiseSweepConfig({ kind: 'mass', points: 64 }, DEFAULT_WHEELER_DEWITT_CONFIG).points
+    ).toBe(21)
+  })
+
+  it('clamps cut and phiRef sweep bounds to their executable domains', () => {
+    const cut = materialiseSweepConfig(
+      { kind: 'cut', sweepMin: -10, sweepMax: 10 },
+      DEFAULT_WHEELER_DEWITT_CONFIG
+    )
+
+    expect(cut.sweepMin).toBe(0)
+    expect(cut.sweepMax).toBe(1)
+
+    const wdw = { ...DEFAULT_WHEELER_DEWITT_CONFIG, phiExtent: 0.75 }
+    const phiRef = materialiseSweepConfig(
+      { kind: 'phiRef', sweepMin: -10, sweepMax: 10, phiRef: 10 },
+      wdw
+    )
+
+    expect(phiRef.phiRef).toBe(0.75)
+    expect(phiRef.sweepMin).toBe(-0.75)
+    expect(phiRef.sweepMax).toBe(0.75)
+  })
+
+  it('clamps numerical sensitivity ranges using the same bounds as the drivers', () => {
+    expect(
+      materialiseSweepConfig(
+        { kind: 'rankCap', sweepMin: -10, sweepMax: 10_000 },
+        DEFAULT_WHEELER_DEWITT_CONFIG
+      )
+    ).toMatchObject({ sweepMin: 8, sweepMax: 256 })
+    expect(
+      materialiseSweepConfig({ kind: 'rankCap', points: 64 }, DEFAULT_WHEELER_DEWITT_CONFIG).points
+    ).toBe(32)
+
+    expect(
+      materialiseSweepConfig(
+        { kind: 'phiExtent', sweepMin: -10, sweepMax: 10_000 },
+        DEFAULT_WHEELER_DEWITT_CONFIG
+      )
+    ).toMatchObject({ sweepMin: 0.5, sweepMax: 10 })
+
+    expect(
+      materialiseSweepConfig(
+        { kind: 'gridNa', sweepMin: -10, sweepMax: 10_000 },
+        DEFAULT_WHEELER_DEWITT_CONFIG
+      )
+    ).toMatchObject({ sweepMin: 64, sweepMax: 1024 })
+
+    expect(
+      materialiseSweepConfig(
+        { kind: 'gridNphiCoupled', sweepMin: -10, sweepMax: 10_000 },
+        DEFAULT_WHEELER_DEWITT_CONFIG
+      )
+    ).toMatchObject({ sweepMin: 32, sweepMax: 64 })
+    expect(
+      materialiseSweepConfig({ kind: 'gridNphiCoupled', points: 64 }, DEFAULT_WHEELER_DEWITT_CONFIG)
+        .points
+    ).toBe(7)
   })
 })
 

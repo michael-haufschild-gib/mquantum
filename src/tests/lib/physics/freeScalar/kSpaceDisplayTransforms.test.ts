@@ -958,6 +958,21 @@ describe('buildKSpaceDisplayTextures', () => {
     expect(analysis.length).toBe(OUTPUT_GRID_SIZE ** 3 * 4)
   })
 
+  it('sanitizes invalid display enum values before choosing transform branches', () => {
+    const raw = makeTestRawData(4)
+    const expected = buildKSpaceDisplayTextures(raw, DEFAULT_KSPACE_VIZ)
+    const invalidConfig = {
+      ...DEFAULT_KSPACE_VIZ,
+      displayMode: 'not-a-display-mode',
+      exposureMode: 'not-an-exposure-mode',
+    } as unknown as KSpaceVizConfig
+
+    const actual = buildKSpaceDisplayTextures(raw, invalidConfig)
+
+    expect(actual.density).toEqual(expected.density)
+    expect(actual.analysis).toEqual(expected.analysis)
+  })
+
   it('nkOnly=true produces valid output (skips aux channels)', () => {
     const raw = makeTestRawData(8)
     const { density, analysis } = buildKSpaceDisplayTextures(raw, DEFAULT_KSPACE_VIZ, true)

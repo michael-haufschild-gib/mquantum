@@ -19,8 +19,16 @@ import {
   packSkyboxPrecomputedPalettes,
   writeVec3,
 } from '@/rendering/webgpu/renderers/skyboxVertexData'
+import { SHADER_SKYBOX_MODES } from '@/rendering/webgpu/shaders/skybox/types'
+import { SKYBOX_MODES } from '@/stores/defaults/visualDefaults'
 
 describe('mapSkyboxModeToShader', () => {
+  it('covers every store-level skybox mode with a known shader mode', () => {
+    for (const mode of SKYBOX_MODES) {
+      expect(SHADER_SKYBOX_MODES).toContain(mapSkyboxModeToShader(mode))
+    }
+  })
+
   it('maps each procedural_* prefix to its shader identifier', () => {
     expect(mapSkyboxModeToShader('procedural_aurora')).toBe('aurora')
     expect(mapSkyboxModeToShader('procedural_nebula')).toBe('nebula')
@@ -40,7 +48,12 @@ describe('mapSkyboxModeToShader', () => {
 })
 
 describe('modeToNumeric', () => {
-  it('encodes shader mode strings into the integer values the WGSL switch reads', () => {
+  it('encodes every shader skybox mode to a unique numeric slot', () => {
+    const encoded = SHADER_SKYBOX_MODES.map((mode) => modeToNumeric(mode))
+    expect(new Set(encoded).size).toBe(SHADER_SKYBOX_MODES.length)
+  })
+
+  it('encodes shader mode strings into the persisted numeric mode slots', () => {
     expect(modeToNumeric('classic')).toBe(0)
     expect(modeToNumeric('aurora')).toBe(1)
     expect(modeToNumeric('nebula')).toBe(2)
@@ -81,6 +94,14 @@ describe('writeVec3', () => {
     expect(buf[0]).toBe(1)
     expect(buf[1]).toBeCloseTo(0.6)
     expect(buf[2]).toBeCloseTo(0.7)
+  })
+
+  it('substitutes per-component defaults when individual entries are non-finite', () => {
+    const buf = new Float32Array(4)
+    writeVec3(buf, 0, [Number.NaN, 0.6, Number.POSITIVE_INFINITY], 0.3, 0.4, 0.5)
+    expect(buf[0]).toBeCloseTo(0.3)
+    expect(buf[1]).toBeCloseTo(0.6)
+    expect(buf[2]).toBeCloseTo(0.5)
   })
 })
 
@@ -201,6 +222,41 @@ describe('packSkyboxCoreUniforms', () => {
     expect(buf[SKYBOX_SLOT.dualToneContrast]).toBeCloseTo(0.8)
     expect(buf[SKYBOX_SLOT.sunIntensity]).toBeCloseTo(0.4)
   })
+
+  it('sanitizes corrupt runtime values before GPU upload', () => {
+    const buf = new Float32Array(16)
+    packSkyboxCoreUniforms(
+      buf,
+      'aurora',
+      {
+        saturation: Number.NaN,
+        scale: 99,
+        complexity: -1,
+        timeScale: Number.POSITIVE_INFINITY,
+        evolution: 99,
+        turbulence: -2,
+        dualToneContrast: 5,
+        sunIntensity: 9,
+      } as never,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      -9,
+      Number.NaN
+    )
+
+    expect(buf[SKYBOX_SLOT.time]).toBe(0)
+    expect(buf[SKYBOX_SLOT.intensity]).toBe(1)
+    expect(buf[SKYBOX_SLOT.hue]).toBe(-1)
+    expect(buf[SKYBOX_SLOT.saturation]).toBe(1)
+    expect(buf[SKYBOX_SLOT.scale]).toBe(3)
+    expect(buf[SKYBOX_SLOT.complexity]).toBe(0)
+    expect(buf[SKYBOX_SLOT.timeScale]).toBeCloseTo(0.2)
+    expect(buf[SKYBOX_SLOT.evolution]).toBe(10)
+    expect(buf[SKYBOX_SLOT.animDistortion]).toBe(0)
+    expect(buf[SKYBOX_SLOT.turbulence]).toBe(0)
+    expect(buf[SKYBOX_SLOT.dualToneContrast]).toBe(1)
+    expect(buf[SKYBOX_SLOT.sunIntensity]).toBe(2)
+  })
 })
 
 describe('packSkyboxModeSettings', () => {
@@ -242,6 +298,33 @@ describe('packSkyboxModeSettings', () => {
     expect(buf[SKYBOX_SLOT.oceanDepthGradient]).toBeCloseTo(0.7)
     expect(buf[SKYBOX_SLOT.oceanBubbleDensity]).toBeCloseTo(0.8)
     expect(buf[SKYBOX_SLOT.oceanSurfaceShimmer]).toBeCloseTo(0.05)
+  })
+
+  it('sanitizes corrupt nested mode settings before GPU upload', () => {
+    const buf = new Float32Array(64)
+    packSkyboxModeSettings(buf, {
+      sunPosition: [Number.NaN, 4, Number.POSITIVE_INFINITY],
+      aurora: { curtainHeight: 2, waveFrequency: 0 },
+      horizonGradient: { gradientContrast: -1, spotlightFocus: 2 },
+      ocean: {
+        causticIntensity: Number.NaN,
+        depthGradient: -1,
+        bubbleDensity: 4,
+        surfaceShimmer: Number.NEGATIVE_INFINITY,
+      },
+    } as never)
+
+    expect(buf[SKYBOX_SLOT.sunPositionX]).toBe(10)
+    expect(buf[SKYBOX_SLOT.sunPositionY]).toBe(4)
+    expect(buf[SKYBOX_SLOT.sunPositionZ]).toBe(10)
+    expect(buf[SKYBOX_SLOT.auroraCurtainHeight]).toBe(1)
+    expect(buf[SKYBOX_SLOT.auroraWaveFrequency]).toBeCloseTo(0.3)
+    expect(buf[SKYBOX_SLOT.horizonGradientContrast]).toBe(0)
+    expect(buf[SKYBOX_SLOT.horizonSpotlightFocus]).toBe(1)
+    expect(buf[SKYBOX_SLOT.oceanCausticIntensity]).toBeCloseTo(0.5)
+    expect(buf[SKYBOX_SLOT.oceanDepthGradient]).toBe(0)
+    expect(buf[SKYBOX_SLOT.oceanBubbleDensity]).toBe(1)
+    expect(buf[SKYBOX_SLOT.oceanSurfaceShimmer]).toBeCloseTo(0.4)
   })
 })
 
@@ -301,6 +384,29 @@ describe('packSkyboxPalette', () => {
     expect(buf[SKYBOX_SLOT.palD1]).toBeCloseTo(d[1]!)
     expect(buf[SKYBOX_SLOT.palD2]).toBeCloseTo(d[2]!)
   })
+
+  it('falls back per component for corrupt palette coefficients', () => {
+    const buf = new Float32Array(40)
+    packSkyboxPalette(buf, {
+      a: [Number.NaN, 0.2],
+      b: [Number.POSITIVE_INFINITY, 0.5, 0.6],
+      c: ['bad', 0.8, 0.9],
+      d: [0.11, undefined, Number.NEGATIVE_INFINITY],
+    })
+
+    expect(buf[SKYBOX_SLOT.color1A0]).toBeCloseTo(0.5)
+    expect(buf[SKYBOX_SLOT.color1A1]).toBeCloseTo(0.2)
+    expect(buf[SKYBOX_SLOT.color1A2]).toBeCloseTo(0.5)
+    expect(buf[SKYBOX_SLOT.color2B0]).toBeCloseTo(0.5)
+    expect(buf[SKYBOX_SLOT.color2B1]).toBeCloseTo(0.5)
+    expect(buf[SKYBOX_SLOT.color2B2]).toBeCloseTo(0.6)
+    expect(buf[SKYBOX_SLOT.palC0]).toBe(1)
+    expect(buf[SKYBOX_SLOT.palC1]).toBeCloseTo(0.8)
+    expect(buf[SKYBOX_SLOT.palC2]).toBeCloseTo(0.9)
+    expect(buf[SKYBOX_SLOT.palD0]).toBeCloseTo(0.11)
+    expect(buf[SKYBOX_SLOT.palD1]).toBeCloseTo(0.33)
+    expect(buf[SKYBOX_SLOT.palD2]).toBeCloseTo(0.67)
+  })
 })
 
 describe('packSkyboxPrecomputedPalettes', () => {
@@ -331,6 +437,19 @@ describe('packSkyboxPrecomputedPalettes', () => {
     const t = 0.1 + tempPulse * 0.1
     const expected = 0.5 + 0.5 * Math.cos(2 * Math.PI * (t + 0))
     expect(buf[SKYBOX_SLOT.precomputedHorizonFloor0]).toBeCloseTo(expected, 4)
+  })
+
+  it('keeps precomputed palette samples finite for corrupt coefficients and time', () => {
+    const buf = new Float32Array(108)
+    packSkyboxPrecomputedPalettes(
+      buf,
+      { a: [Number.NaN, 0.2, 0.3], b: [0.4, Number.POSITIVE_INFINITY, 0.6] },
+      Number.NaN
+    )
+
+    for (const value of buf) {
+      expect(Number.isFinite(value)).toBe(true)
+    }
   })
 })
 
@@ -398,6 +517,13 @@ describe('computeSkyboxAnimationEffects', () => {
     expect(r.rotY).toBe(0)
     expect(r.intensityMul).toBe(1.0)
   })
+
+  it('uses inert finite time when animation time is corrupt', () => {
+    const r = computeSkyboxAnimationEffects(true, 'classic', 'tumble', Number.NaN)
+    expect(r.rotX).toBe(0)
+    expect(r.rotY).toBe(0)
+    expect(r.rotZ).toBe(0)
+  })
 })
 
 describe('generateSkyboxCubeVertices', () => {
@@ -413,5 +539,12 @@ describe('generateSkyboxCubeVertices', () => {
   it('default size is 1', () => {
     const buf = generateSkyboxCubeVertices()
     for (const v of buf) expect(Math.abs(v)).toBe(1)
+  })
+
+  it('falls back to a unit cube for non-finite or non-positive size', () => {
+    for (const size of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const buf = generateSkyboxCubeVertices(size)
+      for (const v of buf) expect(Math.abs(v)).toBe(1)
+    }
   })
 })

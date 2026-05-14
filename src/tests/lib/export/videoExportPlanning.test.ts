@@ -53,6 +53,18 @@ describe('videoExportPlanning', () => {
       ).toEqual({ width: 1920, height: 1080 })
     })
 
+    it('clamps full-frame render dimensions to max texture limit', () => {
+      const result = computeRenderDimensions({
+        exportWidth: 8192,
+        exportHeight: 4608,
+        originalAspect: 16 / 9,
+        maxTextureDimension2D: 4096,
+        crop: { enabled: false, x: 0, y: 0, width: 1, height: 1 },
+      })
+
+      expect(result).toEqual({ width: 4096, height: 2304 })
+    })
+
     it('scales using crop region while preserving original aspect (landscape camera)', () => {
       // Pin exact dimensions so a future refactor that swaps max/min in
       // `scaleFactor` or flips the aspect branch is caught immediately.
@@ -103,6 +115,18 @@ describe('videoExportPlanning', () => {
         crop: { enabled: true, x: 0, y: 0, width: 0, height: 1 },
       })
       expect(result).toEqual({ width: 1920, height: 1080 })
+    })
+
+    it('falls back to bounded export dimensions when crop dimensions are non-finite', () => {
+      const result = computeRenderDimensions({
+        exportWidth: 3840,
+        exportHeight: 2160,
+        originalAspect: 16 / 9,
+        maxTextureDimension2D: 2048,
+        crop: { enabled: true, x: 0, y: 0, width: Number.NaN, height: 1 },
+      })
+
+      expect(result).toEqual({ width: 2048, height: 1152 })
     })
 
     it('clamps render dimensions to max texture limit', () => {

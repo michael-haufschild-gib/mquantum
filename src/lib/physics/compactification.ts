@@ -7,6 +7,44 @@
  * @module lib/physics/compactification
  */
 
+const DEFAULT_GRID_SIZE = 32
+const DEFAULT_SPACING = 0.1
+const DEFAULT_COMPACT_RADIUS = 0.15
+const MIN_COMPACT_RADIUS = 0.01
+const MIN_SPECTRUM_RADIUS = 1e-6
+const MAX_LATTICE_DIM = 32
+const MAX_KK_LEVELS = 1024
+
+function sanitizeLatticeDim(latticeDim: number): number {
+  if (!Number.isInteger(latticeDim) || latticeDim <= 0) return 0
+  return Math.min(latticeDim, MAX_LATTICE_DIM)
+}
+
+function positiveFiniteOr(value: number | undefined, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback
+}
+
+function sanitizeGridSize(value: number | undefined): number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0
+    ? value
+    : DEFAULT_GRID_SIZE
+}
+
+function sanitizeCompactRadius(value: number | undefined, fallback: number): number {
+  const radius = positiveFiniteOr(value, fallback)
+  return Math.max(MIN_COMPACT_RADIUS, radius)
+}
+
+function sanitizeProvidedCompactRadius(value: number | undefined): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return undefined
+  return Math.max(MIN_COMPACT_RADIUS, value)
+}
+
+function sanitizeSpectrumLevelCount(maxN: number): number {
+  if (!Number.isFinite(maxN) || maxN <= 0) return 0
+  return Math.min(Math.floor(maxN), MAX_KK_LEVELS)
+}
+
 /**
  * Compute effective spacing for each dimension, overriding compact dims
  * with spacing derived from the compactification radius R.
@@ -28,14 +66,20 @@ export function computeEffectiveSpacing(
   compactRadii: number[] | undefined,
   latticeDim: number
 ): number[] {
-  const result = new Array<number>(latticeDim)
-  for (let d = 0; d < latticeDim; d++) {
-    if (compactDims?.[d] && compactRadii?.[d] != null) {
-      const R = Math.max(0.01, compactRadii[d]!)
-      const N = gridSize[d] ?? 32
+  const safeDim = sanitizeLatticeDim(latticeDim)
+  const result = new Array<number>(safeDim)
+  for (let d = 0; d < safeDim; d++) {
+    const fallbackSpacing = positiveFiniteOr(spacing[d], DEFAULT_SPACING)
+    if (compactDims?.[d]) {
+      const R = sanitizeProvidedCompactRadius(compactRadii?.[d])
+      if (R === undefined) {
+        result[d] = fallbackSpacing
+        continue
+      }
+      const N = sanitizeGridSize(gridSize[d])
       result[d] = (2 * Math.PI * R) / N
     } else {
-      result[d] = spacing[d] ?? 0.1
+      result[d] = fallbackSpacing
     }
   }
   return result
@@ -55,7 +99,7 @@ export function buildCompactDimsMask(
 ): number {
   let mask = 0
   if (!compactDims) return mask
-  for (let d = 0; d < Math.min(latticeDim, 32); d++) {
+  for (let d = 0; d < sanitizeLatticeDim(latticeDim); d++) {
     if (compactDims[d]) mask |= 1 << d
   }
   return mask
@@ -81,15 +125,17 @@ export function computeMaxCompactRadius(
   latticeDim: number
 ): number {
   let maxExtendedExtent = 0
-  for (let d = 0; d < latticeDim; d++) {
+  const safeDim = sanitizeLatticeDim(latticeDim)
+  for (let d = 0; d < safeDim; d++) {
     if (!compactDims?.[d]) {
-      const extent = (gridSize[d] ?? 32) * (spacing[d] ?? 0.1)
+      const extent = sanitizeGridSize(gridSize[d]) * positiveFiniteOr(spacing[d], DEFAULT_SPACING)
       if (extent > maxExtendedExtent) maxExtendedExtent = extent
     }
   }
   // Fallback: if all dims are compact, use the grid's natural extent
   if (maxExtendedExtent <= 0) {
-    maxExtendedExtent = (gridSize[0] ?? 32) * (spacing[0] ?? 0.1)
+    maxExtendedExtent =
+      sanitizeGridSize(gridSize[0]) * positiveFiniteOr(spacing[0], DEFAULT_SPACING)
   }
   return maxExtendedExtent / (2 * Math.PI)
 }
@@ -121,19 +167,14 @@ export function clampKKState(
   mass: number,
   clampDtFn: (dt: number, spacing: number[], latticeDim: number, mass: number) => number
 ): { dt: number; compactRadii: number[] } {
-  const rMax = computeMaxCompactRadius(gridSize, spacing, compactDims, latticeDim)
-  const clampedRadii = Array.from({ length: latticeDim }, (_, d) => {
-    const r = compactRadii?.[d] ?? 0.15
-    return compactDims?.[d] ? Math.max(0.01, Math.min(rMax, r)) : r
+  const safeDim = sanitizeLatticeDim(latticeDim)
+  const rMax = computeMaxCompactRadius(gridSize, spacing, compactDims, safeDim)
+  const clampedRadii = Array.from({ length: safeDim }, (_, d) => {
+    const r = sanitizeCompactRadius(compactRadii?.[d], DEFAULT_COMPACT_RADIUS)
+    return compactDims?.[d] ? Math.max(MIN_COMPACT_RADIUS, Math.min(rMax, r)) : r
   })
-  const effSpacing = computeEffectiveSpacing(
-    gridSize,
-    spacing,
-    compactDims,
-    clampedRadii,
-    latticeDim
-  )
-  return { dt: clampDtFn(dt, effSpacing, latticeDim, mass), compactRadii: clampedRadii }
+  const effSpacing = computeEffectiveSpacing(gridSize, spacing, compactDims, clampedRadii, safeDim)
+  return { dt: clampDtFn(dt, effSpacing, safeDim, mass), compactRadii: clampedRadii }
 }
 
 /**
@@ -155,9 +196,12 @@ export function computeKKSpectrum(
   maxN: number
 ): { n: number; energy: number }[] {
   const levels: { n: number; energy: number }[] = []
-  const safeR = Math.max(1e-6, R)
-  for (let n = 0; n <= maxN; n++) {
-    const energy = (n * hbar) ** 2 / (2 * mass * safeR * safeR)
+  const safeR = Math.max(MIN_SPECTRUM_RADIUS, positiveFiniteOr(R, MIN_SPECTRUM_RADIUS))
+  const safeHbar = Number.isFinite(hbar) ? hbar : 1
+  const safeMass = positiveFiniteOr(mass, 1)
+  const safeMaxN = sanitizeSpectrumLevelCount(maxN)
+  for (let n = 0; n <= safeMaxN; n++) {
+    const energy = (n * safeHbar) ** 2 / (2 * safeMass * safeR * safeR)
     levels.push({ n, energy })
   }
   return levels

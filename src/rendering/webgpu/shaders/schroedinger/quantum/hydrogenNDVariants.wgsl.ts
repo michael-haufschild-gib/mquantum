@@ -328,26 +328,29 @@ ${hoCallsWithEarlyExit}
  * @returns WGSL function code
  */
 export function generateHydrogenNDCachedBlock(dimension: number): string {
-  const extraDimCount = dimension - 3
+  const dim = sanitizeShaderDimension(dimension, { min: 2, fallback: 3 })
+  if (dim <= 3) {
+    return getHydrogenNDGeneratedBlock(dim)
+  }
 
-  const coordExtraction = generateCoordExtraction(dimension)
-  const extraDimEarlyExit = generateExtraDimEarlyExit(dimension)
-  const radiusCalc = generateRadiusCalculation(dimension)
+  const extraDimCount = dim - 3
+
+  const coordExtraction = generateCoordExtraction(dim)
+  const extraDimEarlyExit = generateExtraDimEarlyExit(dim)
+  const radiusCalc = generateRadiusCalculation(dim)
   const extraDimProduct =
-    extraDimCount > 0
-      ? generateExtraDimProductCached(dimension)
-      : generateExtraDimProduct(dimension)
-  const extraDimEnergy = generateExtraDimEnergy(dimension)
+    extraDimCount > 0 ? generateExtraDimProductCached(dim) : generateExtraDimProduct(dim)
+  const extraDimEnergy = generateExtraDimEnergy(dim)
 
   return `
 // ============================================
-// Hydrogen ND - ${dimension}D (Cached Extra Dimensions)
+// Hydrogen ND - ${dim}D (Cached Extra Dimensions)
 // Extra dimensions: ${extraDimCount} (using eigenfunction cache)
-// N-D radial correction: λ = l + ${(dimension - 3) / 2}, n_eff = n + ${(dimension - 3) / 2}
+// N-D radial correction: λ = l + ${(dim - 3) / 2}, n_eff = n + ${(dim - 3) / 2}
 // Generated at JavaScript level for maximum optimization
 // ============================================
 
-fn evalHydrogenNDPsi${dimension}DCached(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
+fn evalHydrogenNDPsi${dim}DCached(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
   // Extract coordinates (unrolled)
 ${coordExtraction}
 ${extraDimEarlyExit}${radiusCalc}
@@ -365,7 +368,7 @@ ${extraDimEarlyExit}${radiusCalc}
 
   // Radial part: R_nl^(D)(r_3D) with D-dimensional effective potential
   // PERF: Uses precomputed normalization from uniform (eliminates per-sample log/exp/sqrt)
-  let R = hydrogenRadialNDWithNorm(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius, ${dimension}, uniforms.hydrogenRadialNorm);
+  let R = hydrogenRadialNDWithNorm(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius, ${dim}, uniforms.hydrogenRadialNorm);
 
   // Angular part: Y_lm as complex vec2f(re, im) from Cartesian direction
   let Y = evalHydrogenNDAngularCartesian(uniforms.azimuthalL, uniforms.magneticM, nx, ny, nz, uniforms.useRealOrbitals != 0u);
@@ -375,7 +378,7 @@ ${extraDimProduct}
   let psi0 = vec2f(scale * Y.x, scale * Y.y);
 ${extraDimEnergy}
   // Time evolution with D-dimensional energy: E = -0.5/n_eff²
-  return hydrogenNDTimeEvolutionND(psi0, uniforms.principalN, extraEnergy, t, ${dimension});
+  return hydrogenNDTimeEvolutionND(psi0, uniforms.principalN, extraEnergy, t, ${dim});
 }
 `
 }
@@ -480,3 +483,31 @@ export const hydrogenNDGen8dBlock = generateHydrogenNDBlock(8)
 export const hydrogenNDGen9dBlock = generateHydrogenNDBlock(9)
 export const hydrogenNDGen10dBlock = generateHydrogenNDBlock(10)
 export const hydrogenNDGen11dBlock = generateHydrogenNDBlock(11)
+
+/** Return the pre-generated hydrogen ND evaluator for a sanitized dimension. */
+export function getHydrogenNDGeneratedBlock(dimension: number): string {
+  const dim = sanitizeShaderDimension(dimension, { min: 2, fallback: 3 })
+  switch (dim) {
+    case 2:
+      return hydrogenNDGen2dBlock
+    case 3:
+      return hydrogenNDGen3dBlock
+    case 4:
+      return hydrogenNDGen4dBlock
+    case 5:
+      return hydrogenNDGen5dBlock
+    case 6:
+      return hydrogenNDGen6dBlock
+    case 7:
+      return hydrogenNDGen7dBlock
+    case 8:
+      return hydrogenNDGen8dBlock
+    case 9:
+      return hydrogenNDGen9dBlock
+    case 10:
+      return hydrogenNDGen10dBlock
+    case 11:
+    default:
+      return hydrogenNDGen11dBlock
+  }
+}

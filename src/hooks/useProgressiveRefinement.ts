@@ -126,18 +126,20 @@ export function useProgressiveRefinement(
     setRefinementStage('low')
     setRefinementProgress(0)
 
+    const totalDuration = REFINEMENT_STAGE_TIMING.final
+
     // Schedule stage transitions — stored in ref; cleanup runs on unmount/dep change
     const stages = REFINEMENT_STAGES.slice(1) // Skip 'low', already set
     stages.forEach((stageKey) => {
       const delay = REFINEMENT_STAGE_TIMING[stageKey]
       const timer = window.setTimeout(() => {
         setRefinementStage(stageKey)
+        setRefinementProgress(Math.min(100, (delay / totalDuration) * 100))
       }, delay)
       stageTimers.push(timer)
     })
 
     // Progress animation using RAF for proper frame sync
-    const totalDuration = REFINEMENT_STAGE_TIMING.final
     const updateProgress = () => {
       const elapsed = performance.now() - startTimeRef.current
       const newProgress = Math.min(100, (elapsed / totalDuration) * 100)

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { MAX_LIGHTS, MIN_LIGHTS } from '@/lib/lighting/lightSource'
+import { type LightType, MAX_LIGHTS, MIN_LIGHTS } from '@/lib/lighting/lightSource'
+import { DEFAULT_LIGHTS } from '@/stores/defaults/visualDefaults'
 import { useLightingStore } from '@/stores/scene/lightingStore'
 
 describe('lightingStore (invariants)', () => {
@@ -228,5 +229,77 @@ describe('lightingStore (invariants)', () => {
     expect(after.ambientIntensity).toBe(before.ambientIntensity)
     expect(after.lightStrength).toBe(before.lightStrength)
     expect(after.exposure).toBe(before.exposure)
+  })
+
+  it('initializes and resets with mutation-isolated light defaults', () => {
+    useLightingStore.getState().reset()
+
+    const firstState = useLightingStore.getState()
+    const firstLight = firstState.lights[0]!
+    const defaultLight = DEFAULT_LIGHTS[0]!
+    expect(firstState.lights).not.toBe(DEFAULT_LIGHTS)
+    expect(firstLight).not.toBe(defaultLight)
+    expect(firstLight.position).not.toBe(defaultLight.position)
+
+    firstLight.position[0] = 999
+    firstLight.rotation[1] = 999
+    expect(defaultLight.position[0]).not.toBe(999)
+    expect(defaultLight.rotation[1]).not.toBe(999)
+
+    useLightingStore.getState().reset()
+    const resetLight = useLightingStore.getState().lights[0]!
+    expect(resetLight.position).toEqual(defaultLight.position)
+    expect(resetLight.rotation).toEqual(defaultLight.rotation)
+    expect(resetLight.position).not.toBe(defaultLight.position)
+    expect(resetLight.rotation).not.toBe(defaultLight.rotation)
+  })
+
+  it('rejects malformed runtime booleans and enum updates', () => {
+    const store = useLightingStore.getState()
+    const id = store.addLight('spot')!
+    store.setLightEnabled(true)
+    store.setAmbientEnabled(true)
+    store.setShowLightIndicator(false)
+    store.setToneMappingEnabled(true)
+    store.setToneMappingAlgorithm('aces')
+    store.setTransformMode('translate')
+    store.setShowLightGizmos(false)
+    store.setIsDraggingLight(false)
+
+    const before = useLightingStore.getState()
+    const beforeLight = before.lights.find((light) => light.id === id)!
+
+    expect(store.addLight('area' as unknown as LightType)).toBeNull()
+    store.setLightEnabled('false' as unknown as boolean)
+    store.setAmbientEnabled(1 as unknown as boolean)
+    store.setShowLightIndicator('yes' as unknown as boolean)
+    store.setToneMappingEnabled('true' as unknown as boolean)
+    store.setToneMappingAlgorithm('filmic' as unknown as typeof before.toneMappingAlgorithm)
+    store.setTransformMode('scale' as unknown as typeof before.transformMode)
+    store.setShowLightGizmos('yes' as unknown as boolean)
+    store.setIsDraggingLight('yes' as unknown as boolean)
+    store.updateLight(id, {
+      enabled: 'yes' as unknown as boolean,
+      type: 'area' as unknown as LightType,
+      name: 42 as unknown as string,
+      color: 7 as unknown as string,
+      intensity: 1.7,
+    })
+
+    const after = useLightingStore.getState()
+    const afterLight = after.lights.find((light) => light.id === id)!
+    expect(after.lightEnabled).toBe(before.lightEnabled)
+    expect(after.ambientEnabled).toBe(before.ambientEnabled)
+    expect(after.showLightIndicator).toBe(before.showLightIndicator)
+    expect(after.toneMappingEnabled).toBe(before.toneMappingEnabled)
+    expect(after.toneMappingAlgorithm).toBe(before.toneMappingAlgorithm)
+    expect(after.transformMode).toBe(before.transformMode)
+    expect(after.showLightGizmos).toBe(before.showLightGizmos)
+    expect(after.isDraggingLight).toBe(before.isDraggingLight)
+    expect(afterLight.enabled).toBe(beforeLight.enabled)
+    expect(afterLight.type).toBe(beforeLight.type)
+    expect(afterLight.name).toBe(beforeLight.name)
+    expect(afterLight.color).toBe(beforeLight.color)
+    expect(afterLight.intensity).toBe(1.7)
   })
 })

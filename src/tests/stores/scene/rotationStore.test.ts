@@ -80,6 +80,24 @@ describe('rotationStore', () => {
       expect(rotations.has('XY')).toBe(false)
       expect(rotations.has('XZ')).toBe(false)
     })
+
+    it('repairs corrupted dimensions before setting a rotation', () => {
+      useRotationStore.setState({
+        dimension: Number.NaN,
+        rotations: new Map([
+          ['XY', 1],
+          ['INVALID', 2],
+        ]),
+      })
+
+      useRotationStore.getState().setRotation('XZ', Math.PI / 2)
+
+      const { dimension, rotations } = useRotationStore.getState()
+      expect(dimension).toBe(4)
+      expect(rotations.has('XY')).toBe(false)
+      expect(rotations.has('INVALID')).toBe(false)
+      expect(rotations.get('XZ')).toBeCloseTo(Math.PI / 2)
+    })
   })
 
   describe('updateRotations', () => {
@@ -142,6 +160,29 @@ describe('rotationStore', () => {
       expect(rotations.get('XZ')).toBeCloseTo(Math.PI / 2)
       expect(rotations.has('XY')).toBe(false)
       expect(rotations.has('YZ')).toBe(false)
+    })
+
+    it('repairs corrupted dimensions before applying batched rotations', () => {
+      useRotationStore.setState({
+        dimension: 100,
+        rotations: new Map([
+          ['XY', 1],
+          ['ZW', 2],
+        ]),
+      })
+
+      useRotationStore.getState().updateRotations(
+        new Map([
+          ['XY', 0.25],
+          ['XV', 0.5],
+        ])
+      )
+
+      const { dimension, rotations } = useRotationStore.getState()
+      expect(dimension).toBe(4)
+      expect(rotations.get('XY')).toBeCloseTo(0.25)
+      expect(rotations.has('ZW')).toBe(false)
+      expect(rotations.has('XV')).toBe(false)
     })
   })
 

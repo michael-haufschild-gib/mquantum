@@ -9,8 +9,13 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 
+import {
+  computeHydrogenRadialProbabilityDensity,
+  computeHydrogenRadialWavefunction,
+} from '@/lib/math/hydrogenRadialProbability'
+
 // ---------------------------------------------------------------------------
-// Mirrors of internal functions (same as existing test + production code)
+// Independent 3D reference helpers
 // ---------------------------------------------------------------------------
 
 function laguerre(k: number, alpha: number, x: number): number {
@@ -25,12 +30,6 @@ function laguerre(k: number, alpha: number, x: number): number {
     lNm1 = lN
   }
   return lN
-}
-
-function lnFactorial(k: number): number {
-  let sum = 0
-  for (let i = 2; i <= k; i++) sum += Math.log(i)
-  return sum
 }
 
 function factorial(n: number): number {
@@ -49,23 +48,6 @@ function hydrogenRadial3D(n: number, l: number, r: number, a0: number): number {
   for (let i = 0; i < l; i++) rhoL *= rho
   const L = laguerre(n - l - 1, 2 * l + 1, rho)
   return norm * rhoL * L * Math.exp(-rho / 2)
-}
-
-function hydrogenRadialND(n: number, l: number, r: number, a0: number, dim: number): number {
-  if (n < 1 || l < 0 || l >= n) return 0
-  const lambda = l + (dim - 3) / 2
-  const nr = n - l - 1
-  const nEff = nr + lambda + 1
-  const rho = (2 * r) / (nEff * a0)
-  const twoOverNa = 2 / (nEff * a0)
-  const front = twoOverNa * Math.sqrt(twoOverNa)
-  const denomFactArg = Math.round(nr + 2 * lambda + 1)
-  const lnNum = lnFactorial(nr)
-  const lnDen = Math.log(2 * nEff) + lnFactorial(denomFactArg)
-  const norm = front * Math.sqrt(Math.exp(lnNum - lnDen))
-  const rhoLambda = Math.pow(Math.max(rho, 1e-20), lambda)
-  const L = laguerre(nr, 2 * lambda + 1, rho)
-  return norm * rhoLambda * L * Math.exp(-rho / 2)
 }
 
 function integrate(f: (r: number) => number, rMax: number, steps: number = 2000): number {
@@ -96,6 +78,14 @@ const arbState = arbQuantumNumbers.chain(({ n, l }) => arbDim.map((dim) => ({ n,
 /** Arbitrary positive radial coordinate */
 const arbR = fc.double({ min: 0.01, max: 30, noNaN: true, noDefaultInfinity: true })
 
+/** Runtime scalar input, including malformed values that can arrive from stores/URLs */
+const arbRuntimeScalar = fc.oneof(
+  fc.double({ min: -1e6, max: 1e6, noNaN: true, noDefaultInfinity: true }),
+  fc.constant(Number.NaN),
+  fc.constant(Number.POSITIVE_INFINITY),
+  fc.constant(Number.NEGATIVE_INFINITY)
+)
+
 // ---------------------------------------------------------------------------
 // D=3 identity
 // ---------------------------------------------------------------------------
@@ -105,7 +95,7 @@ describe('hydrogenRadialND D=3 identity — property', () => {
     fc.assert(
       fc.property(arbQuantumNumbers, arbR, ({ n, l }, r) => {
         const ref = hydrogenRadial3D(n, l, r, 1.0)
-        const nd = hydrogenRadialND(n, l, r, 1.0, 3)
+        const nd = computeHydrogenRadialWavefunction(n, l, r, 1.0, 3)
         if (Math.abs(ref) < 1e-15) {
           expect(Math.abs(nd)).toBeLessThan(1e-10)
         } else {
@@ -130,7 +120,7 @@ describe('hydrogenRadialND normalization — property', () => {
         const rMax = nEff * nEff * a0 * 8
         const normIntegral = integrate(
           (r) => {
-            const R = hydrogenRadialND(n, l, r, a0, dim)
+            const R = computeHydrogenRadialWavefunction(n, l, r, a0, dim)
             return R * R * r * r
           },
           rMax,
@@ -157,8 +147,8 @@ describe('hydrogenRadialND asymptotic decay — property', () => {
         // Test at r well beyond classical turning point
         const nearR = rChar
         const farR = rChar * 6
-        const nearVal = Math.abs(hydrogenRadialND(n, l, nearR, a0, dim))
-        const farVal = Math.abs(hydrogenRadialND(n, l, farR, a0, dim))
+        const nearVal = Math.abs(computeHydrogenRadialWavefunction(n, l, nearR, a0, dim))
+        const farVal = Math.abs(computeHydrogenRadialWavefunction(n, l, farR, a0, dim))
         if (nearVal < 1e-20) return
         expect(farVal).toBeLessThan(nearVal * 0.01)
       }),
@@ -190,11 +180,11 @@ describe('hydrogenRadialND node count — property', () => {
         const steps = 2000
         const dr = rMax / steps
         let signChanges = 0
-        let prevVal = hydrogenRadialND(n, l, dr, a0, dim)
+        let prevVal = computeHydrogenRadialWavefunction(n, l, dr, a0, dim)
 
         for (let i = 2; i <= steps; i++) {
           const r = i * dr
-          const val = hydrogenRadialND(n, l, r, a0, dim)
+          const val = computeHydrogenRadialWavefunction(n, l, r, a0, dim)
           if (Math.abs(val) > 1e-15 && Math.abs(prevVal) > 1e-15) {
             if (Math.sign(val) !== Math.sign(prevVal)) signChanges++
           }
@@ -204,6 +194,32 @@ describe('hydrogenRadialND node count — property', () => {
         expect(signChanges).toBe(n - l - 1)
       }),
       { numRuns: 40 }
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Runtime input sanitation
+// ---------------------------------------------------------------------------
+
+describe('hydrogenRadialND runtime input sanitation — property', () => {
+  it('returns finite wavefunction and density for malformed runtime scalars', () => {
+    fc.assert(
+      fc.property(
+        arbRuntimeScalar,
+        arbRuntimeScalar,
+        arbRuntimeScalar,
+        arbRuntimeScalar,
+        arbRuntimeScalar,
+        (n, l, r, a0, dim) => {
+          const R = computeHydrogenRadialWavefunction(n, l, r, a0, dim)
+          const density = computeHydrogenRadialProbabilityDensity(n, l, r, a0, dim)
+          expect(Number.isFinite(R)).toBe(true)
+          expect(Number.isFinite(density)).toBe(true)
+          expect(density).toBeGreaterThanOrEqual(0)
+        }
+      ),
+      { numRuns: 200 }
     )
   })
 })

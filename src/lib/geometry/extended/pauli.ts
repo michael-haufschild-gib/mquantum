@@ -7,6 +7,8 @@
  * include gauge-covariant orbital magnetic coupling `(p - qA)^2`.
  */
 
+import { MAX_DIMENSION } from '@/constants/dimension'
+
 import type { PmlAbsorberConfig } from './crossMode'
 
 // ============================================================================
@@ -188,9 +190,9 @@ export const DEFAULT_PAULI_CONFIG: PauliConfig = {
   initialSpinDirection: [Math.PI / 2, 0],
 
   initialCondition: 'gaussianSuperposition',
-  packetCenter: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  packetCenter: Array.from({ length: MAX_DIMENSION }, () => 0),
   packetWidth: 0.8,
-  packetMomentum: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  packetMomentum: Array.from({ length: MAX_DIMENSION }, () => 0),
 
   potentialType: 'none',
   harmonicOmega: 1.0,
@@ -219,4 +221,14 @@ export const DEFAULT_PAULI_CONFIG: PauliConfig = {
   // by initializePauliForDimension to `max(0, latticeDim - 3)` — empty at the
   // default 3D config so there are no unused slots leaking into the uniform.
   slicePositions: [],
+}
+
+/**
+ * Create a fresh copy of the default Pauli spinor config.
+ *
+ * Deep-clones mutable arrays so store initialization and reset paths do not
+ * share references with {@link DEFAULT_PAULI_CONFIG}.
+ */
+export function createDefaultPauliConfig(): PauliConfig {
+  return structuredClone(DEFAULT_PAULI_CONFIG)
 }

@@ -369,11 +369,17 @@ export function multiplyMatrixVector(m: MatrixND, v: VectorND, out?: VectorND): 
   }
 
   const result: VectorND = out ?? new Array(dim)
-  result.length = dim
+  const target = out === v ? new Array<number>(dim) : result
+  target.length = dim
 
   // Try WASM path if available, then JS fallback
-  if (!isAnimationWasmReady() || !tryWasmMatrixVector(result, m, v, dim)) {
-    jsMatrixVector(result, m, v, dim)
+  if (!isAnimationWasmReady() || !tryWasmMatrixVector(target, m, v, dim)) {
+    jsMatrixVector(target, m, v, dim)
+  }
+
+  if (target !== result) {
+    result.length = dim
+    for (let i = 0; i < dim; i++) result[i] = target[i]!
   }
 
   return result

@@ -57,6 +57,9 @@ export function dotProductWasm(a: Float64Array, b: Float64Array): number | null 
   if (!ready || !module) {
     return null
   }
+  if (a.length !== b.length) {
+    return null
+  }
 
   try {
     return module.dot_product_wasm(a, b)
@@ -116,6 +119,9 @@ export function normalizeVectorWasm(v: Float64Array): Float64Array | null {
 export function subtractVectorsWasm(a: Float64Array, b: Float64Array): Float64Array | null {
   const { ready, module } = getWasmRuntime()
   if (!ready || !module) {
+    return null
+  }
+  if (a.length !== b.length) {
     return null
   }
 

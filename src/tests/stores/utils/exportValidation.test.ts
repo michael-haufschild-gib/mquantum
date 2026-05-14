@@ -318,6 +318,14 @@ describe('sanitizeCropPatch', () => {
     const result = sanitizeCropPatch(input)
     expect(result).toEqual(input)
   })
+
+  it('keeps full crop patches inside unit bounds', () => {
+    const result = sanitizeCropPatch({ x: 0.8, y: 0.75, width: 0.5, height: 0.4 })
+    expect(result.x).toBe(0.5)
+    expect(result.y).toBe(0.6)
+    expect(result.width).toBe(0.5)
+    expect(result.height).toBe(0.4)
+  })
 })
 
 describe('stripInvalidEnum', () => {

@@ -6,7 +6,7 @@
  * These are display-only transforms — they do not affect physics invariants.
  */
 
-import type { KSpaceVizConfig } from '@/lib/geometry/extended/types'
+import { type KSpaceVizConfig, sanitizeKSpaceVizConfig } from '@/lib/geometry/extended/freeScalar'
 import type { KSpaceRawData } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import {
   OUTPUT_GRID_SIZE,
@@ -711,15 +711,16 @@ export function buildKSpaceDisplayTextures(
   nkOnly: boolean = false,
   outputGridSize: number = OUTPUT_GRID_SIZE
 ): { density: Uint16Array; analysis: Uint16Array } {
+  const safeConfig = sanitizeKSpaceVizConfig(config)
   let grid: KSpaceDisplayGrid
-  if (config.displayMode === 'radial3d') {
-    grid = buildRadialDisplayGrid(raw, config, outputGridSize)
+  if (safeConfig.displayMode === 'radial3d') {
+    grid = buildRadialDisplayGrid(raw, safeConfig, outputGridSize)
   } else {
-    grid = projectToDisplayGrid(raw, config, outputGridSize)
+    grid = projectToDisplayGrid(raw, safeConfig, outputGridSize)
   }
 
-  applyExposureTransfer(grid, config)
-  applyBroadening(grid, config, raw.latticeDim, nkOnly, outputGridSize)
+  applyExposureTransfer(grid, safeConfig)
+  applyBroadening(grid, safeConfig, raw.latticeDim, nkOnly, outputGridSize)
 
   return packDisplayTextures(grid, nkOnly, outputGridSize)
 }

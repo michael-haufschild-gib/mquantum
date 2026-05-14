@@ -19,11 +19,21 @@ import { horizonBlock } from './modes/horizon.wgsl'
 import { nebulaBlock } from './modes/nebula.wgsl'
 import { oceanBlock } from './modes/ocean.wgsl'
 import { twilightBlock } from './modes/twilight.wgsl'
-import { SkyboxShaderConfig } from './types'
+import type { SkyboxMode, SkyboxShaderConfig } from './types'
 import { colorBlock } from './utils/color.wgsl'
 import { noiseBlock } from './utils/noise.wgsl'
 import { rotationBlock } from './utils/rotation.wgsl'
 import { composeSkyboxVertexShader } from './vertex.wgsl'
+
+const SKYBOX_MODE_BLOCKS: Record<SkyboxMode, string> = {
+  classic: classicBlock,
+  aurora: auroraBlock,
+  nebula: nebulaBlock,
+  crystalline: crystallineBlock,
+  horizon: horizonBlock,
+  ocean: oceanBlock,
+  twilight: twilightBlock,
+}
 
 /**
  * Compose Skybox fragment shader with specified mode and effects.
@@ -46,28 +56,7 @@ export function composeSkyboxFragmentShader(config: SkyboxShaderConfig): {
   if (useSun) features.push('Sun Glow')
   if (useVignette) features.push('Vignette')
 
-  // Select Mode Block
-  let modeBlock = classicBlock
-  switch (mode) {
-    case 'aurora':
-      modeBlock = auroraBlock
-      break
-    case 'nebula':
-      modeBlock = nebulaBlock
-      break
-    case 'crystalline':
-      modeBlock = crystallineBlock
-      break
-    case 'horizon':
-      modeBlock = horizonBlock
-      break
-    case 'ocean':
-      modeBlock = oceanBlock
-      break
-    case 'twilight':
-      modeBlock = twilightBlock
-      break
-  }
+  const modeBlock = SKYBOX_MODE_BLOCKS[mode] ?? classicBlock
 
   // Check if noise utils are needed
   // Aurora, Nebula, Crystalline, Horizon, Ocean, Twilight use noise/fbm/hash

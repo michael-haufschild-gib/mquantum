@@ -42,6 +42,10 @@ const STOCHASTIC_SIGMA_MIN = 0.5
 const STOCHASTIC_SIGMA_MAX = 5.0
 const STOCHASTIC_SEED_MAX = 999999
 const DEFAULT_SIGMA = 2.0
+const DEFAULT_STOCHASTIC_GRID_SIZE = 1
+const DEFAULT_STOCHASTIC_SPACING = 1
+const STOCHASTIC_LATTICE_DIM_MIN = 1
+const STOCHASTIC_LATTICE_DIM_MAX = 11
 
 /** Workgroup size for expectation reduction shaders (must match @workgroup_size in WGSL). */
 export const EXPECT_WG = 256
@@ -57,6 +61,24 @@ const STOCHASTIC_UNIFORM_SIZE = 1568
 
 /** Size of the expectation finalize uniform buffer (16 bytes). */
 const EXPECT_FINALIZE_UNIFORM_SIZE = 16
+
+function sanitizeStochasticLatticeDim(latticeDim: number): number {
+  if (!Number.isFinite(latticeDim)) return STOCHASTIC_LATTICE_DIM_MIN
+  return Math.floor(clamp(latticeDim, STOCHASTIC_LATTICE_DIM_MIN, STOCHASTIC_LATTICE_DIM_MAX))
+}
+
+function sanitizePositiveAxisArray(
+  values: readonly unknown[],
+  latticeDim: number,
+  fallback: number
+): number[] {
+  const result = new Array<number>(latticeDim)
+  for (let d = 0; d < latticeDim; d++) {
+    const value = Array.isArray(values) ? values[d] : undefined
+    result[d] = typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback
+  }
+  return result
+}
 
 function sanitizeStochasticRuntimeConfig(config: TdseConfig): TdseConfig | null {
   const gamma = config.stochasticGamma
@@ -74,6 +96,13 @@ function sanitizeStochasticRuntimeConfig(config: TdseConfig): TdseConfig | null 
   const seed = Number.isFinite(config.stochasticSeed)
     ? Math.floor(clamp(config.stochasticSeed, 0, STOCHASTIC_SEED_MAX))
     : 0
+  const latticeDim = sanitizeStochasticLatticeDim(config.latticeDim)
+  const gridSize = sanitizePositiveAxisArray(
+    config.gridSize,
+    latticeDim,
+    DEFAULT_STOCHASTIC_GRID_SIZE
+  )
+  const spacing = sanitizePositiveAxisArray(config.spacing, latticeDim, DEFAULT_STOCHASTIC_SPACING)
 
   return {
     ...config,
@@ -81,6 +110,9 @@ function sanitizeStochasticRuntimeConfig(config: TdseConfig): TdseConfig | null 
     stochasticSigma: sigma,
     stochasticNumSites: numSites,
     stochasticSeed: seed,
+    latticeDim,
+    gridSize,
+    spacing,
     dt,
   }
 }

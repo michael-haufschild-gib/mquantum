@@ -93,9 +93,13 @@ export function writeInvertMat4(out: Float32Array, m: Float32Array): boolean {
 
   const det = m0 * inv[0]! + m1 * inv[4]! + m2 * inv[8]! + m3 * inv[12]!
 
-  if (Math.abs(det) < 1e-10) return false
+  if (!Number.isFinite(det) || Math.abs(det) < 1e-10) return false
 
   const invDet = 1.0 / det
+  for (let i = 0; i < 16; i++) {
+    if (!Number.isFinite(inv[i]! * invDet)) return false
+  }
+
   for (let i = 0; i < 16; i++) {
     out[i] = inv[i]! * invDet
   }

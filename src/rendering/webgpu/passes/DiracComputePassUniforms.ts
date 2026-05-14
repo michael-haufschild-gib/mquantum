@@ -13,7 +13,7 @@ import type { DiracConfig } from '@/lib/geometry/extended/dirac'
 import { sigmaMaxFromPmlConfig } from '@/lib/physics/pml/profile'
 
 import { MAX_DIM, packFFTStageUniforms, writeSlicePositionsToF32 } from './computePassUtils'
-import { DIRAC_UNIFORMS_LAYOUT } from './diracUniformsLayout'
+import { DIRAC_UNIFORM_SIZE, DIRAC_UNIFORMS_LAYOUT } from './diracUniformsLayout'
 
 /** Parameters for writing DiracUniforms to a GPU buffer. */
 export interface DiracUniformParams {
@@ -82,6 +82,12 @@ export function writeDiracUniforms(
   f32: Float32Array,
   params: DiracUniformParams
 ): void {
+  if (uniformData.byteLength !== DIRAC_UNIFORM_SIZE) {
+    throw new RangeError(
+      `writeDiracUniforms expected ${DIRAC_UNIFORM_SIZE} bytes, got ${uniformData.byteLength}`
+    )
+  }
+
   const { config, totalSites, currentSpinorSize, simTime, maxDensity, strides } = params
   const { basisX, basisY, basisZ, boundingRadius } = params
   u32.fill(0)

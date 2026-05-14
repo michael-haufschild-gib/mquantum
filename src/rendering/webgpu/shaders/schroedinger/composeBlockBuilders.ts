@@ -44,16 +44,7 @@ import {
   generateHydrogenNDCachedBlock,
   generateHydrogenNDCachedDispatchBlock,
   generateHydrogenNDDispatchBlock,
-  hydrogenNDGen2dBlock,
-  hydrogenNDGen3dBlock,
-  hydrogenNDGen4dBlock,
-  hydrogenNDGen5dBlock,
-  hydrogenNDGen6dBlock,
-  hydrogenNDGen7dBlock,
-  hydrogenNDGen8dBlock,
-  hydrogenNDGen9dBlock,
-  hydrogenNDGen10dBlock,
-  hydrogenNDGen11dBlock,
+  getHydrogenNDGeneratedBlock,
 } from './quantum/hydrogenNDVariants.wgsl'
 import { hydrogenRadialBlock } from './quantum/hydrogenRadial.wgsl'
 import {
@@ -221,19 +212,9 @@ export function buildQuantumMathBlocks(opts: {
   }
   const hoNDBlock = hoNDBlockMap[opts.actualDim] || hoND3dBlock
 
-  const hydrogenNDBlockMap: Record<number, string> = {
-    2: hydrogenNDGen2dBlock,
-    3: hydrogenNDGen3dBlock,
-    4: hydrogenNDGen4dBlock,
-    5: hydrogenNDGen5dBlock,
-    6: hydrogenNDGen6dBlock,
-    7: hydrogenNDGen7dBlock,
-    8: hydrogenNDGen8dBlock,
-    9: hydrogenNDGen9dBlock,
-    10: hydrogenNDGen10dBlock,
-    11: hydrogenNDGen11dBlock,
-  }
-  const hydrogenNDBlock = hydrogenNDBlockMap[opts.hydrogenNDDimension] || ''
+  const hydrogenNDBlock = opts.includeHydrogenND
+    ? getHydrogenNDGeneratedBlock(opts.hydrogenNDDimension)
+    : ''
 
   // In 2D, coupled hydrogen reduces to uncoupled (no hyperspherical harmonics)
   const selectedPsiBlock =

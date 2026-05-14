@@ -20,6 +20,7 @@ const linearColorCache = new Map<string, Rgb>()
  * (IEC 61966-2-1).
  */
 export function srgbToLinearChannel(c: number): number {
+  if (!Number.isFinite(c)) return 0
   const clamped = clamp01(c)
   return clamped <= 0.04045 ? clamped / 12.92 : Math.pow((clamped + 0.055) / 1.055, 2.4)
 }
@@ -68,11 +69,11 @@ export function parseHexColorToLinearRgb(hex: string, fallback: Rgb = [1, 1, 1])
 
   const srgb = parseHexColorToSrgbRgb(hex)
   if (!srgb) return fallback
-  const linear: Rgb = [
+  const linear: Rgb = Object.freeze([
     srgbToLinearChannel(srgb[0]),
     srgbToLinearChannel(srgb[1]),
     srgbToLinearChannel(srgb[2]),
-  ]
+  ] as [number, number, number])
   const cacheKey = hex.trim().toLowerCase()
   if (linearColorCache.size >= LINEAR_COLOR_CACHE_MAX_ENTRIES) {
     linearColorCache.clear()

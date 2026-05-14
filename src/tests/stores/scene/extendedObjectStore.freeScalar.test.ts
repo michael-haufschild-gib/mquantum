@@ -102,6 +102,52 @@ describe('extendedObjectStore — free scalar field actions', () => {
     expect(after.slicePositions).toEqual(before.slicePositions)
   })
 
+  it('ignores invalid k-space enum updates from direct callers', () => {
+    const store = useExtendedObjectStore.getState()
+    store.setFreeScalarKSpaceDisplayMode('radial3d')
+    store.setFreeScalarKSpaceExposureMode('none')
+    const before = useExtendedObjectStore.getState().schroedinger.freeScalar.kSpaceViz
+
+    store.setFreeScalarKSpaceDisplayMode('bogus' as never)
+    store.setFreeScalarKSpaceExposureMode('not-log' as never)
+
+    const after = useExtendedObjectStore.getState().schroedinger.freeScalar.kSpaceViz
+    expect(after.displayMode).toBe(before.displayMode)
+    expect(after.exposureMode).toBe(before.exposureMode)
+  })
+
+  it('sanitizes k-space viz when merging free scalar config directly', () => {
+    const store = useExtendedObjectStore.getState()
+
+    store.setSchroedingerConfig({
+      freeScalar: {
+        kSpaceViz: {
+          displayMode: 'bogus',
+          exposureMode: 'not-log',
+          lowPercentile: 1000,
+          highPercentile: -1000,
+          gamma: Number.NaN,
+          broadeningEnabled: 'yes',
+          broadeningRadius: 999,
+          broadeningSigma: -5,
+          radialBinCount: 999,
+        },
+      },
+    } as never)
+
+    const viz = useExtendedObjectStore.getState().schroedinger.freeScalar.kSpaceViz
+    expect(viz.displayMode).toBe('raw3d')
+    expect(viz.exposureMode).toBe('log')
+    expect(viz.lowPercentile).toBeGreaterThanOrEqual(0)
+    expect(viz.highPercentile).toBeLessThanOrEqual(100)
+    expect(viz.highPercentile - viz.lowPercentile).toBeGreaterThanOrEqual(0.5)
+    expect(viz.gamma).toBe(1)
+    expect(viz.broadeningEnabled).toBe(true)
+    expect(viz.broadeningRadius).toBe(5)
+    expect(viz.broadeningSigma).toBe(0.5)
+    expect(viz.radialBinCount).toBe(128)
+  })
+
   it('setFreeScalarInitialCondition updates condition and triggers reset', () => {
     useExtendedObjectStore.getState().setFreeScalarInitialCondition('singleMode')
     const fs = useExtendedObjectStore.getState().schroedinger.freeScalar

@@ -67,6 +67,7 @@ export const PreheatingControls: React.FC<PreheatingControlsProps> = React.memo(
           <Switch
             checked={preheating.enabled}
             onCheckedChange={actions.setPreheatingEnabled}
+            ariaLabel="Toggle preheating"
             data-testid="preheating-toggle"
           />
         }

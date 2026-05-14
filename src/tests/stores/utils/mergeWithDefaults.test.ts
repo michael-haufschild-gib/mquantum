@@ -724,16 +724,21 @@ describe('mergeExtendedObjectStateForType — adversarial inputs', () => {
     expect((s.cosineParams as Record<string, unknown>).unknownNested).toBeUndefined()
   })
 
-  it('handles array with wrong element types', () => {
+  it('drops numeric arrays with wrong element types', () => {
     const loaded = {
       schroedinger: {
         parameterValues: ['not', 'numbers'] as unknown, // strings instead of numbers
+        visualizationAxes: ['0', '1', '2'] as unknown,
+        cosineParams: {
+          a: ['0.5', 0.5, 0.5] as unknown,
+        },
       },
     }
-    // Should not throw — arrays are replaced wholesale
     const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
-    const s = merged.schroedinger as Record<string, unknown>
-    expect(s.parameterValues).toEqual(['not', 'numbers'])
+    const s = merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
+    expect(s.parameterValues).toEqual(DEFAULT_SCHROEDINGER_CONFIG.parameterValues)
+    expect(s.visualizationAxes).toEqual(DEFAULT_SCHROEDINGER_CONFIG.visualizationAxes)
+    expect(s.cosineParams.a).toEqual(DEFAULT_SCHROEDINGER_CONFIG.cosineParams.a)
   })
 
   it('preserves default cosineParams when loaded value is null', () => {

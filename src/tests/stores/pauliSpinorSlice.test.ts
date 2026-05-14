@@ -4,6 +4,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 
+import { MAX_DIMENSION } from '@/constants/dimension'
 import { DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
@@ -17,6 +18,21 @@ describe('pauliSpinorSlice', () => {
     expect(state.pauliSpinor.dt).toBe(DEFAULT_PAULI_CONFIG.dt)
     expect(state.pauliSpinor.fieldType).toBe(DEFAULT_PAULI_CONFIG.fieldType)
     expect(state.pauliSpinor.fieldView).toBe(DEFAULT_PAULI_CONFIG.fieldView)
+  })
+
+  it('initializes and resets with mutation-isolated Pauli arrays', () => {
+    let state = useExtendedObjectStore.getState()
+    expect(state.pauliSpinor.gridSize).not.toBe(DEFAULT_PAULI_CONFIG.gridSize)
+    expect(state.pauliSpinor.spacing).not.toBe(DEFAULT_PAULI_CONFIG.spacing)
+    expect(state.pauliSpinor.spinUpColor).not.toBe(DEFAULT_PAULI_CONFIG.spinUpColor)
+
+    state.pauliSpinor.gridSize[0] = 128
+    expect(DEFAULT_PAULI_CONFIG.gridSize[0]).toBe(64)
+
+    useExtendedObjectStore.getState().reset()
+    state = useExtendedObjectStore.getState()
+    expect(state.pauliSpinor.gridSize).not.toBe(DEFAULT_PAULI_CONFIG.gridSize)
+    expect(state.pauliSpinor.gridSize[0]).toBe(DEFAULT_PAULI_CONFIG.gridSize[0])
   })
 
   // === Physics setters ===
@@ -149,7 +165,25 @@ describe('pauliSpinorSlice', () => {
     expect(state.latticeDim).toBe(5)
     expect(state.gridSize).toHaveLength(5)
     expect(state.spacing).toHaveLength(5)
+    expect(state.packetCenter).toHaveLength(MAX_DIMENSION)
+    expect(state.packetMomentum).toHaveLength(MAX_DIMENSION)
     expect(state.needsReset).toBe(true)
+  })
+
+  it('initializePauliForDimension normalizes malformed runtime dimensions', () => {
+    const { initializePauliForDimension } = useExtendedObjectStore.getState()
+
+    initializePauliForDimension(Number.NaN)
+    expect(useExtendedObjectStore.getState().pauliSpinor.latticeDim).toBe(
+      DEFAULT_PAULI_CONFIG.latticeDim
+    )
+
+    initializePauliForDimension(99.9)
+    const state = useExtendedObjectStore.getState().pauliSpinor
+    expect(state.latticeDim).toBe(MAX_DIMENSION)
+    expect(state.gridSize).toHaveLength(MAX_DIMENSION)
+    expect(state.packetCenter).toHaveLength(MAX_DIMENSION)
+    expect(state.packetMomentum).toHaveLength(MAX_DIMENSION)
   })
 
   it('initializePauliForDimension sizes slicePositions to max(0, dim - 3)', () => {

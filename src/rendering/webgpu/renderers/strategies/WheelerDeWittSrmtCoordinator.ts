@@ -33,6 +33,22 @@ import {
   type SrmtWorkerState,
 } from './WheelerDeWittSrmtWorker'
 
+const DEFAULT_SRMT_CLOCK: SrmtClock = 'a'
+const DEFAULT_SRMT_CUT_NORMALIZED = 0.5
+const DEFAULT_SRMT_RANK_CAP = 64
+const DEFAULT_SRMT_HEATMAP_INTENSITY = 0.6
+
+/** Return a supported SRMT clock, falling back to the canonical `a` clock. */
+export function normalizeSrmtClock(clock: unknown): SrmtClock {
+  return SRMT_CLOCKS.includes(clock as SrmtClock) ? (clock as SrmtClock) : DEFAULT_SRMT_CLOCK
+}
+
+/** Clamp the normalized cut slider into the safe interior-control range. */
+export function normalizeSrmtCutNormalized(cutNormalized: number): number {
+  const safe = Number.isFinite(cutNormalized) ? cutNormalized : DEFAULT_SRMT_CUT_NORMALIZED
+  return Math.max(0.1, Math.min(0.9, safe))
+}
+
 /**
  * Clamp the user-facing `srmtRankCap` to the integer range the worker
  * actually honours. Kept as a shared helper so the compute hash and the
@@ -42,7 +58,14 @@ import {
  * innocuous URL/store churn.
  */
 export function normalizeSrmtRankCap(rankCap: number): number {
-  return Math.max(8, Math.min(256, Math.round(rankCap)))
+  const safe = Number.isFinite(rankCap) ? rankCap : DEFAULT_SRMT_RANK_CAP
+  return Math.max(8, Math.min(256, Math.round(safe)))
+}
+
+/** Clamp the overlay alpha multiplier consumed by the density-grid packer. */
+export function normalizeSrmtHeatmapIntensity(intensity: number): number {
+  const safe = Number.isFinite(intensity) ? intensity : DEFAULT_SRMT_HEATMAP_INTENSITY
+  return Math.max(0, Math.min(1, safe))
 }
 
 /**
@@ -54,7 +77,7 @@ export function normalizeSrmtRankCap(rankCap: number): number {
  */
 export function resolveSrmtCutIndexForLen(srmtCutNormalized: number, clockLen: number): number {
   if (clockLen < 3) return 1
-  const raw = Math.round(srmtCutNormalized * (clockLen - 1))
+  const raw = Math.round(normalizeSrmtCutNormalized(srmtCutNormalized) * (clockLen - 1))
   return Math.max(1, Math.min(clockLen - 2, raw))
 }
 
@@ -88,7 +111,7 @@ export function computeWdwSrmtComputeHash(
   const cutToken = gridSize
     ? `${resolveSrmtCutIndexForLen(config.srmtCutNormalized, gridSize[0])},` +
       `${resolveSrmtCutIndexForLen(config.srmtCutNormalized, gridSize[1])}`
-    : config.srmtCutNormalized.toFixed(4)
+    : normalizeSrmtCutNormalized(config.srmtCutNormalized).toFixed(4)
   return [
     config.srmtEnabled ? 1 : 0,
     computeWdwConfigHash(config),
@@ -110,8 +133,8 @@ export function computeWdwSrmtRenderHash(
 ): string {
   return [
     computeWdwSrmtComputeHash(config, gridSize),
-    config.srmtClock,
-    config.srmtHeatmapIntensity.toFixed(4),
+    normalizeSrmtClock(config.srmtClock),
+    normalizeSrmtHeatmapIntensity(config.srmtHeatmapIntensity).toFixed(4),
   ].join('|')
 }
 
@@ -196,6 +219,7 @@ export class WheelerDeWittSrmtCoordinator {
     const gridSize = solverOutput?.gridSize
     const computeHash = computeWdwSrmtComputeHash(config, gridSize)
     const renderHash = computeWdwSrmtRenderHash(config, gridSize)
+    const selectedClock = normalizeSrmtClock(config.srmtClock)
     const justToggledOff = !enabled && this.lastEnabled
     const justToggledOn = enabled && !this.lastEnabled
     const computeChanged = computeHash !== this.lastComputeHash
@@ -204,7 +228,7 @@ export class WheelerDeWittSrmtCoordinator {
     // Transition 1+2: compute re-queue.
     const computeDirty = enabled && (justToggledOn || computeChanged || solverDirty)
     if (computeDirty && solverOutput) {
-      this.queueAllClocks(config, solverOutput)
+      this.queueAllClocks(config, solverOutput, selectedClock)
       this.lastComputeHash = computeHash
       this.lastRenderHash = renderHash
     } else if (justToggledOff) {
@@ -217,7 +241,7 @@ export class WheelerDeWittSrmtCoordinator {
       useSrmtDiagnosticStore.getState().clear()
     } else if (enabled && renderChanged) {
       // Transition 3: render-only delta.
-      this.syncStoreForSelectedClock(config.srmtClock)
+      this.syncStoreForSelectedClock(selectedClock)
       this.lastRenderHash = renderHash
     }
 
@@ -227,17 +251,16 @@ export class WheelerDeWittSrmtCoordinator {
     // clock has no cache yet (syncStoreForSelectedClock early-returns).
     const resultArrived = enabled && this.workerState.resultGeneration !== this.lastResultGeneration
     if (resultArrived) {
-      this.syncStoreForSelectedClock(config.srmtClock)
+      this.syncStoreForSelectedClock(selectedClock)
     }
 
     // Transition 5b: density repacks are expensive, so gate them on the
     // SELECTED clock's per-entry generation — not the batch-wide counter.
     // Replies for the other two clocks update the quality table but must
     // not force a full-grid repack.
-    const selectedClockGeneration =
-      this.workerState.resultsByClock[config.srmtClock]?.generation ?? 0
+    const selectedClockGeneration = this.workerState.resultsByClock[selectedClock]?.generation ?? 0
     const hasSelectedClockResult =
-      enabled && this.workerState.resultsByClock[config.srmtClock] !== null
+      enabled && this.workerState.resultsByClock[selectedClock] !== null
     // Only treat the generation delta as a meaningful repack trigger once
     // the newly selected clock actually has a cached result. Switching
     // from a completed clock to one that is still pending otherwise
@@ -250,7 +273,7 @@ export class WheelerDeWittSrmtCoordinator {
     // pending, and we prefer to keep the prior snapshot visible until
     // its reply lands.
     const renderDirtyGated = enabled && renderChanged && hasSelectedClockResult
-    const nextOverlay = enabled ? this.buildOverlay(config, solverOutput) : null
+    const nextOverlay = enabled ? this.buildOverlay(config, solverOutput, selectedClock) : null
     // Retain the last non-null overlay ONLY for render-only clock switches
     // where the newly selected clock is still pending — we prefer holding
     // the prior snapshot a few frames over a black gap. After a compute
@@ -264,7 +287,10 @@ export class WheelerDeWittSrmtCoordinator {
     // worker reply for the newly selected clock lands.
     const reusedOverlay =
       canReusePreviousOverlay && this.lastOverlay
-        ? { ...this.lastOverlay, intensity: config.srmtHeatmapIntensity }
+        ? {
+            ...this.lastOverlay,
+            intensity: normalizeSrmtHeatmapIntensity(config.srmtHeatmapIntensity),
+          }
         : null
     const overlayDirty =
       computeDirty ||
@@ -303,17 +329,18 @@ export class WheelerDeWittSrmtCoordinator {
    */
   private buildOverlay(
     config: WheelerDeWittConfig,
-    solverOutput: WheelerDeWittSolverOutput | null
+    solverOutput: WheelerDeWittSolverOutput | null,
+    selectedClock: SrmtClock
   ): WdwSrmtOverlay | null {
     if (!solverOutput) return null
-    const cache = this.workerState.resultsByClock[config.srmtClock]
+    const cache = this.workerState.resultsByClock[selectedClock]
     if (!cache) return null
     return {
       sliceK: cache.result.sliceK,
       slicePlane: cache.result.slicePlane,
-      intensity: config.srmtHeatmapIntensity,
+      intensity: normalizeSrmtHeatmapIntensity(config.srmtHeatmapIntensity),
       cutIndex: cache.cutIndex,
-      clockAxisLen: clockAxisLenFor(config.srmtClock, solverOutput.gridSize),
+      clockAxisLen: clockAxisLenFor(selectedClock, solverOutput.gridSize),
       Nphi: solverOutput.gridSize[1],
     }
   }
@@ -325,7 +352,8 @@ export class WheelerDeWittSrmtCoordinator {
    */
   private queueAllClocks(
     config: WheelerDeWittConfig,
-    solverOutput: WheelerDeWittSolverOutput
+    solverOutput: WheelerDeWittSolverOutput,
+    selectedClock: SrmtClock
   ): void {
     const rankCap = normalizeSrmtRankCap(config.srmtRankCap)
     const hash = computeWdwSrmtComputeHash(config, solverOutput.gridSize)
@@ -334,7 +362,7 @@ export class WheelerDeWittSrmtCoordinator {
       phi1: this.buildDispatchArgs(config, solverOutput, 'phi1', rankCap, hash),
       phi2: this.buildDispatchArgs(config, solverOutput, 'phi2', rankCap, hash),
     }
-    queueSrmtCompute(this.workerState, argsByClock, config.srmtClock)
+    queueSrmtCompute(this.workerState, argsByClock, selectedClock)
   }
 
   /** Build the per-clock dispatch arguments for the queue. */

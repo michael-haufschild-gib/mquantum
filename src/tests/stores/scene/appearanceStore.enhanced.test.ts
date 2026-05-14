@@ -11,13 +11,13 @@ import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 import { useLightingStore } from '@/stores/scene/lightingStore'
 import { usePostProcessingStore } from '@/stores/scene/postProcessingStore'
 import { APPEARANCE_INITIAL_STATE } from '@/stores/slices/appearanceSlice'
-import { LIGHTING_INITIAL_STATE } from '@/stores/slices/lightingSlice'
+import { createLightingInitialState } from '@/stores/slices/lightingSlice'
 import { POST_PROCESSING_INITIAL_STATE } from '@/stores/slices/postProcessingSlice'
 
 describe('Enhanced Features Stores (invariants)', () => {
   beforeEach(() => {
     useAppearanceStore.setState(APPEARANCE_INITIAL_STATE)
-    useLightingStore.setState(LIGHTING_INITIAL_STATE)
+    useLightingStore.setState(createLightingInitialState())
     usePostProcessingStore.setState(POST_PROCESSING_INITIAL_STATE)
   })
 
@@ -360,6 +360,48 @@ describe('Enhanced Features Stores (invariants)', () => {
       const next = useAppearanceStore.getState()
       expect(next.cosineCoefficients.a).toEqual([0.4, 1.25, 0.6])
       expect(next.cosineCoefficients.a).toHaveLength(3)
+    })
+
+    it('ignores malformed cosine coefficient payloads and keys', () => {
+      const store = useAppearanceStore.getState()
+
+      store.setCosineCoefficients({
+        a: [0.4, 0.5, 0.6],
+        b: [0.2, 0.3, 0.4],
+        c: [1, 1.1, 1.2],
+        d: [0, 0.1, 0.2],
+      })
+
+      expect(() =>
+        store.setCosineCoefficients({
+          a: [0.7, 0.8, 0.9],
+        } as never)
+      ).not.toThrow()
+      expect(() => store.setCosineCoefficient('bad-key' as never, 0, 1.5)).not.toThrow()
+
+      const next = useAppearanceStore.getState()
+      expect(next.cosineCoefficients).toEqual({
+        a: [0.7, 0.8, 0.9],
+        b: [0.2, 0.3, 0.4],
+        c: [1, 1.1, 1.2],
+        d: [0, 0.1, 0.2],
+      })
+    })
+
+    it('ignores malformed domain-coloring enum and boolean settings', () => {
+      const store = useAppearanceStore.getState()
+
+      store.setDomainColoringSettings({
+        modulusMode: 'logPsiAbs',
+        contoursEnabled: false,
+      })
+      store.setDomainColoringSettings({
+        modulusMode: 'sqrtPsi' as never,
+        contoursEnabled: 'true' as never,
+      })
+
+      expect(useAppearanceStore.getState().domainColoring.modulusMode).toBe('logPsiAbs')
+      expect(useAppearanceStore.getState().domainColoring.contoursEnabled).toBe(false)
     })
 
     it('clamps advanced SSS controls to shader-safe ranges', () => {

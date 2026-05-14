@@ -21,6 +21,7 @@ import { composeDensityGridComputeShader } from '@/rendering/webgpu/shaders/schr
 import { composeEigenfunctionCacheComputeShader } from '@/rendering/webgpu/shaders/schroedinger/compute/composeEigenCache'
 import { composeWignerCacheComputeShader } from '@/rendering/webgpu/shaders/schroedinger/compute/composeWignerCache'
 import { generateEmissionPreBlock } from '@/rendering/webgpu/shaders/schroedinger/volume/emission.wgsl'
+import { COLOR_ALGORITHM_INDICES } from '@/rendering/webgpu/shaders/schroedinger/volume/emissionConstants'
 import {
   composeSkyboxFragmentShader,
   composeSkyboxVertexShader,
@@ -552,10 +553,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 })
 
 describe('WGSL Color Algorithm Specialization', () => {
-  // 0=LCH, 1=MultiSource, 2=Radial, 3=Phase, 4=Mixed, 5=Blackbody,
-  // 6=PhaseCyclicUniform, 7=PhaseDiverging, 8=DomainColoringPsi,
-  // 9=Diverging, 10=RelativePhase, 11=Energy
-  const allAlgorithms = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const
+  const allAlgorithms = COLOR_ALGORITHM_INDICES
 
   for (const alg of allAlgorithms) {
     it(`produces valid WGSL for colorAlgorithm=${alg}`, () => {
@@ -908,7 +906,7 @@ describe('WGSL Emission Pre-Block Conditional Inclusion', () => {
   it('blackbody() is always included (WGSL requires symbol resolution in dead branches)', () => {
     // blackbody is referenced in main.wgsl.ts and main2D.wgsl.ts behind
     // FEATURE_PHASE_MATERIALITY guards, so it must always be defined
-    for (const alg of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const) {
+    for (const alg of COLOR_ALGORITHM_INDICES) {
       const block = generateEmissionPreBlock(alg, false)
       expect(block).toContain('fn blackbody(')
     }

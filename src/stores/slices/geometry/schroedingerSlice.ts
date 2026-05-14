@@ -1,5 +1,7 @@
 import { StateCreator } from 'zustand'
 
+import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
+import { sanitizeKSpaceVizConfig } from '@/lib/geometry/extended/freeScalar'
 import {
   resizeQuantumWalkArrays,
   sanitizeQuantumWalkConfig,
@@ -158,6 +160,12 @@ function isSchroedingerQualityPreset(value: unknown): value is SchroedingerQuali
     typeof value === 'string' &&
     Object.prototype.hasOwnProperty.call(SCHROEDINGER_QUALITY_PRESETS, value)
   )
+}
+
+/** Clamp finite public dimension input to the supported Schroedinger range. */
+function clampSchroedingerDimensionInput(dimension: number): number | null {
+  if (!Number.isFinite(dimension)) return null
+  return Math.max(MIN_DIMENSION, Math.min(MAX_DIMENSION, Math.floor(dimension)))
 }
 
 /** Compute resize updates for the active compute mode (only when latticeDim changed). */
@@ -581,7 +589,11 @@ export const createSchroedingerSlice: StateCreator<
             maxTotalSites: FREE_SCALAR_MAX_TOTAL_SITES,
           })
           const reconciled = reconcileCosmologyInvariants(sizedFreeScalar)
-          schroedinger.freeScalar = { ...sizedFreeScalar, ...reconciled }
+          schroedinger.freeScalar = {
+            ...sizedFreeScalar,
+            ...reconciled,
+            kSpaceViz: sanitizeKSpaceVizConfig(sizedFreeScalar.kSpaceViz),
+          }
         }
         if (sanitizedConfig.tdse) {
           const mergedTdse = { ...state.schroedinger.tdse, ...sanitizedConfig.tdse }
@@ -607,7 +619,12 @@ export const createSchroedingerSlice: StateCreator<
       })
     },
 
-    initializeSchroedingerForDimension: (dimension) => {
+    initializeSchroedingerForDimension: (dimensionInput) => {
+      const dimension = clampSchroedingerDimensionInput(dimensionInput)
+      if (dimension === null) {
+        logger.warn('[schroedingerSlice] Ignoring non-finite initialize dimension:', dimensionInput)
+        return
+      }
       const paramCount = Math.max(0, dimension - 3)
       const colorMode: SchroedingerColorMode = 'mixed'
       const extent = 2.0
@@ -640,7 +657,15 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
 
-    syncActiveComputeModeLatticeDim: (dimension) => {
+    syncActiveComputeModeLatticeDim: (dimensionInput) => {
+      const dimension = clampSchroedingerDimensionInput(dimensionInput)
+      if (dimension === null) {
+        logger.warn(
+          '[schroedingerSlice] Ignoring non-finite compute lattice dimension:',
+          dimensionInput
+        )
+        return
+      }
       // Lightweight counterpart to initializeSchroedingerForDimension that only
       // resizes the active compute mode's lattice arrays. Does NOT touch
       // parameterValues / center / densityGain — those are handled by the React

@@ -41,6 +41,20 @@ export interface AffineFitResult {
   beta: number
 }
 
+function invalidAffineFit(): AffineFitResult {
+  return { q: Number.NaN, alpha: Number.NaN, beta: Number.NaN }
+}
+
+const MIN_AFFINE_FIT_COUNT = 3
+const MIN_AFFINE_JACKKNIFE_COUNT = MIN_AFFINE_FIT_COUNT + 1
+
+function hasFiniteWindow(K: Float64Array, E: Float64Array, count: number): boolean {
+  for (let i = 0; i < count; i++) {
+    if (!Number.isFinite(K[i]) || !Number.isFinite(E[i])) return false
+  }
+  return true
+}
+
 /**
  * Least-squares affine fit of `K` onto `E` over the first `count`
  * indices. Returns the quality metric `q` **and** the fitted `α, β`
@@ -49,7 +63,8 @@ export interface AffineFitResult {
  * existing helper is a thin wrapper over this function.
  *
  * Degenerate inputs return `{ q: NaN, alpha: NaN, beta: NaN }` when
- * `count<2`, `count` exceeds buffer length, or `Σ(E − mean(E))² ≤ 0`
+ * `count<3`, `count` exceeds buffer length, any value is non-finite,
+ * or `Σ(E − mean(E))² ≤ 0`
  * (zero-variance `E`). When the fit succeeds but `Σ K² = 0` (zero-norm
  * `K`), `α` and `β` are finite (they parameterise the `K ≈ αE + β` fit
  * even at `K≡0`) and `q` falls back to `Σ residual² / Σ ΔK²` via `sKK`,
@@ -61,12 +76,9 @@ export interface AffineFitResult {
  * @returns `{ q, alpha, beta }` — see {@link AffineFitResult}.
  */
 export function fitAffineParams(K: Float64Array, E: Float64Array, count: number): AffineFitResult {
-  if (!Number.isSafeInteger(count) || count < 2) {
-    return { q: Number.NaN, alpha: Number.NaN, beta: Number.NaN }
-  }
-  if (count > K.length || count > E.length) {
-    return { q: Number.NaN, alpha: Number.NaN, beta: Number.NaN }
-  }
+  if (!Number.isSafeInteger(count) || count < MIN_AFFINE_FIT_COUNT) return invalidAffineFit()
+  if (count > K.length || count > E.length) return invalidAffineFit()
+  if (!hasFiniteWindow(K, E, count)) return invalidAffineFit()
 
   let sumE = 0
   let sumK = 0
@@ -88,9 +100,12 @@ export function fitAffineParams(K: Float64Array, E: Float64Array, count: number)
     sKK += dK * dK
   }
 
-  if (sEE <= 0) return { q: Number.NaN, alpha: Number.NaN, beta: Number.NaN }
+  if (!Number.isFinite(sEE) || !Number.isFinite(sEK) || !Number.isFinite(sKK) || sEE <= 0) {
+    return invalidAffineFit()
+  }
   const alpha = sEK / sEE
   const beta = meanK - alpha * meanE
+  if (!Number.isFinite(alpha) || !Number.isFinite(beta)) return invalidAffineFit()
 
   let num = 0
   let den = 0
@@ -103,9 +118,11 @@ export function fitAffineParams(K: Float64Array, E: Float64Array, count: number)
   }
 
   if (den <= 0) {
-    return { q: sKK > 0 ? num / sKK : Number.NaN, alpha, beta }
+    const q = sKK > 0 ? num / sKK : Number.NaN
+    return { q: Number.isFinite(q) ? q : Number.NaN, alpha, beta }
   }
-  return { q: num / den, alpha, beta }
+  const q = num / den
+  return { q: Number.isFinite(q) ? q : Number.NaN, alpha, beta }
 }
 
 /**
@@ -128,8 +145,8 @@ export function fitAffineParams(K: Float64Array, E: Float64Array, count: number)
  * @param K - Modular spectrum `K_n` (ascending).
  * @param E - HJ spectrum `E_n` (ascending).
  * @param count - Number of leading values to include in the fit.
- * @returns Fit quality, or `NaN` for degenerate inputs (fewer than 2
- *          points, zero-variance `E`, or zero-variance `K` with
+ * @returns Fit quality, or `NaN` for degenerate inputs (fewer than 3
+ *          points, non-finite values, zero-variance `E`, or zero-variance `K` with
  *          non-zero residual).
  */
 export function computeAffineFitQuality(K: Float64Array, E: Float64Array, count: number): number {
@@ -152,7 +169,8 @@ export function computeAffineFitQuality(K: Float64Array, E: Float64Array, count:
  * index is dropped, which is the "rank truncation sensitivity" the SRMT
  * sweep needs an error bar for.
  *
- * Returns `NaN` when `count < 3` (need ≥ 2 jackknife replicates), when
+ * Returns `NaN` when `count < 4` (each dropped subset still needs three
+ * points for a non-exact affine fit), when
  * any single replicate yields a non-finite `q_k`, or when the underlying
  * `count` falls outside the K/E buffers.
  *
@@ -162,8 +180,9 @@ export function computeAffineFitQuality(K: Float64Array, E: Float64Array, count:
  * @returns Jackknife standard deviation of `q`, or `NaN`.
  */
 export function jackknifeAffineFitStdev(K: Float64Array, E: Float64Array, count: number): number {
-  if (!Number.isSafeInteger(count) || count < 3) return Number.NaN
+  if (!Number.isSafeInteger(count) || count < MIN_AFFINE_JACKKNIFE_COUNT) return Number.NaN
   if (count > K.length || count > E.length) return Number.NaN
+  if (!hasFiniteWindow(K, E, count)) return Number.NaN
 
   const n = count
   const reduced = n - 1
@@ -216,6 +235,7 @@ export function jackknifeAffineFitStdev(K: Float64Array, E: Float64Array, count:
 export function computeRigidFitQuality(K: Float64Array, E: Float64Array, count: number): number {
   if (!Number.isSafeInteger(count) || count < 2) return Number.NaN
   if (count > K.length || count > E.length) return Number.NaN
+  if (!hasFiniteWindow(K, E, count)) return Number.NaN
 
   let sumK = 0
   let sumE = 0
@@ -224,6 +244,7 @@ export function computeRigidFitQuality(K: Float64Array, E: Float64Array, count: 
     sumE += E[i]!
   }
   const beta = (sumK - sumE) / count
+  if (!Number.isFinite(beta)) return Number.NaN
 
   let num = 0
   let den = 0
@@ -233,7 +254,8 @@ export function computeRigidFitQuality(K: Float64Array, E: Float64Array, count: 
     den += K[i]! * K[i]!
   }
   if (den <= 0) return Number.NaN
-  return num / den
+  const q = num / den
+  return Number.isFinite(q) ? q : Number.NaN
 }
 
 /**
@@ -250,6 +272,7 @@ export function computeRigidFitQuality(K: Float64Array, E: Float64Array, count: 
 export function jackknifeRigidFitStdev(K: Float64Array, E: Float64Array, count: number): number {
   if (!Number.isSafeInteger(count) || count < 3) return Number.NaN
   if (count > K.length || count > E.length) return Number.NaN
+  if (!hasFiniteWindow(K, E, count)) return Number.NaN
 
   const n = count
   const reduced = n - 1

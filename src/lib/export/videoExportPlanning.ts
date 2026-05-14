@@ -64,6 +64,32 @@ export function ensureEvenDimensions(width: number, height: number): Dimensions 
   return { width: safeWidth, height: safeHeight }
 }
 
+function resolveSafeTextureLimit(maxTextureDimension2D: number): number {
+  const finiteTextureLimit =
+    Number.isFinite(maxTextureDimension2D) && maxTextureDimension2D > 0
+      ? maxTextureDimension2D
+      : 8192
+  return Math.max(2, Math.min(finiteTextureLimit, 8192))
+}
+
+function clampDimensionsToTextureLimit(
+  width: number,
+  height: number,
+  maxTextureDimension2D: number
+): Dimensions {
+  const safeLimit = resolveSafeTextureLimit(maxTextureDimension2D)
+  let renderWidth = Number.isFinite(width) && width > 0 ? width : 2
+  let renderHeight = Number.isFinite(height) && height > 0 ? height : 2
+
+  if (renderWidth > safeLimit || renderHeight > safeLimit) {
+    const ratio = Math.min(safeLimit / renderWidth, safeLimit / renderHeight)
+    renderWidth = Math.floor(renderWidth * ratio)
+    renderHeight = Math.floor(renderHeight * ratio)
+  }
+
+  return ensureEvenDimensions(renderWidth, renderHeight)
+}
+
 /**
  * Compute internal render size for export.
  *
@@ -77,14 +103,17 @@ export function computeRenderDimensions({
   maxTextureDimension2D,
   crop,
 }: ComputeRenderDimensionsArgs): Dimensions {
+  const safeLimit = resolveSafeTextureLimit(maxTextureDimension2D)
   if (
     !crop.enabled ||
+    !Number.isFinite(crop.width) ||
+    !Number.isFinite(crop.height) ||
     crop.width <= 0 ||
     crop.height <= 0 ||
     !Number.isFinite(originalAspect) ||
     originalAspect <= 0
   ) {
-    return ensureEvenDimensions(exportWidth, exportHeight)
+    return clampDimensionsToTextureLimit(exportWidth, exportHeight, safeLimit)
   }
 
   const scaleX = exportWidth / crop.width
@@ -102,11 +131,6 @@ export function computeRenderDimensions({
     renderHeight = Math.round(renderWidth / originalAspect)
   }
 
-  const finiteTextureLimit =
-    Number.isFinite(maxTextureDimension2D) && maxTextureDimension2D > 0
-      ? maxTextureDimension2D
-      : 8192
-  const safeLimit = Math.max(2, Math.min(finiteTextureLimit, 8192))
   if (renderWidth > safeLimit || renderHeight > safeLimit) {
     const ratio = Math.min(safeLimit / renderWidth, safeLimit / renderHeight)
     renderWidth = Math.floor(renderWidth * ratio)

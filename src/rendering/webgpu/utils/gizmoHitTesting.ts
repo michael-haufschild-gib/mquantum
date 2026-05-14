@@ -87,6 +87,19 @@ export function computeMouseRay(
     cameraPosition: { x: number; y: number; z: number }
   }
 ): { origin: [number, number, number]; dir: [number, number, number] } | null {
+  if (
+    !Number.isFinite(clientX) ||
+    !Number.isFinite(clientY) ||
+    !Number.isFinite(rect.left) ||
+    !Number.isFinite(rect.top) ||
+    !Number.isFinite(rect.width) ||
+    !Number.isFinite(rect.height) ||
+    rect.width <= 0 ||
+    rect.height <= 0
+  ) {
+    return null
+  }
+
   const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1
   const ndcY = -(((clientY - rect.top) / rect.height) * 2 - 1)
 
@@ -96,14 +109,17 @@ export function computeMouseRay(
   // WebGPU clip z is [0, 1] (not [-1, 1] like OpenGL)
   const near = transformPoint(invVP, [ndcX, ndcY, 0])
   const far = transformPoint(invVP, [ndcX, ndcY, 1])
+  if (!near.every(Number.isFinite) || !far.every(Number.isFinite)) return null
 
   const dx = far[0] - near[0]
   const dy = far[1] - near[1]
   const dz = far[2] - near[2]
   const len = Math.sqrt(dx * dx + dy * dy + dz * dz)
-  if (len < 0.0001) return null
+  if (!Number.isFinite(len) || len < 0.0001) return null
 
   const cp = matrices.cameraPosition
+  if (!Number.isFinite(cp.x) || !Number.isFinite(cp.y) || !Number.isFinite(cp.z)) return null
+
   return {
     origin: [cp.x, cp.y, cp.z],
     dir: [dx / len, dy / len, dz / len],

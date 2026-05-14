@@ -11,6 +11,26 @@ use crate::animation::MIN_SAFE_DISTANCE;
 
 // ============================================================================
 
+const DEFAULT_PROJECTION_DISTANCE: f64 = 4.0;
+
+#[inline(always)]
+fn finite_or_zero(value: f64) -> f64 {
+    if value.is_finite() {
+        value
+    } else {
+        0.0
+    }
+}
+
+#[inline(always)]
+fn sanitize_projection_distance(value: f64) -> f64 {
+    if value.is_finite() && value > MIN_SAFE_DISTANCE {
+        value
+    } else {
+        DEFAULT_PROJECTION_DISTANCE
+    }
+}
+
 /// Projects n-dimensional vertices to 3D positions using perspective projection.
 ///
 /// This writes directly into a Float32Array for Three.js buffer updates.
@@ -31,6 +51,7 @@ pub fn project_vertices_to_positions(
         return vec![];
     }
 
+    let projection_distance = sanitize_projection_distance(projection_distance);
     let vertex_count = flat_vertices.len() / dimension;
     let mut positions = vec![0.0f32; vertex_count * 3];
 
@@ -71,9 +92,9 @@ pub fn project_vertices_to_positions(
 fn project_vertices_3d(positions: &mut [f32], verts: &[f64], count: usize, proj_dist: f64) {
     for i in 0..count {
         let offset = i * 3;
-        let x = verts[offset];
-        let y = verts[offset + 1];
-        let z = verts[offset + 2];
+        let x = finite_or_zero(verts[offset]);
+        let y = finite_or_zero(verts[offset + 1]);
+        let z = finite_or_zero(verts[offset + 2]);
         let scale = 1.0 / proj_dist;
         let out_idx = i * 3;
         positions[out_idx] = (x * scale) as f32;
@@ -87,10 +108,10 @@ fn project_vertices_3d(positions: &mut [f32], verts: &[f64], count: usize, proj_
 fn project_vertices_4d(positions: &mut [f32], verts: &[f64], count: usize, proj_dist: f64) {
     for i in 0..count {
         let offset = i * 4;
-        let x = verts[offset];
-        let y = verts[offset + 1];
-        let z = verts[offset + 2];
-        let w = verts[offset + 3];
+        let x = finite_or_zero(verts[offset]);
+        let y = finite_or_zero(verts[offset + 1]);
+        let z = finite_or_zero(verts[offset + 2]);
+        let w = finite_or_zero(verts[offset + 3]);
         // num_higher_dims = 1, normalization_factor = 1.0
         let effective_depth = w;
         let mut denom = proj_dist - effective_depth;
@@ -115,12 +136,12 @@ fn project_vertices_5d(positions: &mut [f32], verts: &[f64], count: usize, proj_
     const NORM_FACTOR: f64 = std::f64::consts::SQRT_2;
     for i in 0..count {
         let offset = i * 5;
-        let x = verts[offset];
-        let y = verts[offset + 1];
-        let z = verts[offset + 2];
-        let w = verts[offset + 3];
-        let v = verts[offset + 4];
-        let effective_depth = (w + v) / NORM_FACTOR;
+        let x = finite_or_zero(verts[offset]);
+        let y = finite_or_zero(verts[offset + 1]);
+        let z = finite_or_zero(verts[offset + 2]);
+        let w = finite_or_zero(verts[offset + 3]);
+        let v = finite_or_zero(verts[offset + 4]);
+        let effective_depth = finite_or_zero((w + v) / NORM_FACTOR);
         let mut denom = proj_dist - effective_depth;
         if denom.abs() < MIN_SAFE_DISTANCE {
             denom = if denom >= 0.0 {
@@ -150,15 +171,15 @@ fn project_vertices_nd(
 
     for i in 0..count {
         let offset = i * dim;
-        let x = verts[offset];
-        let y = verts[offset + 1];
-        let z = verts[offset + 2];
+        let x = finite_or_zero(verts[offset]);
+        let y = finite_or_zero(verts[offset + 1]);
+        let z = finite_or_zero(verts[offset + 2]);
 
         let mut effective_depth = 0.0;
         for d in 3..dim {
-            effective_depth += verts[offset + d];
+            effective_depth += finite_or_zero(verts[offset + d]);
         }
-        effective_depth /= normalization_factor;
+        effective_depth = finite_or_zero(effective_depth / normalization_factor);
 
         let mut denom = proj_dist - effective_depth;
         if denom.abs() < MIN_SAFE_DISTANCE {

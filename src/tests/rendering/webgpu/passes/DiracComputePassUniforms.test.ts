@@ -30,6 +30,26 @@ function writeConfig(config: DiracConfig): Uint32Array {
 }
 
 describe('DiracComputePassUniforms', () => {
+  it('rejects stale uniform buffers before writing live offsets', () => {
+    const uniformData = new ArrayBuffer(DIRAC_UNIFORM_SIZE - 4)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+
+    expect(() =>
+      writeDiracUniforms(fakeDevice(), {} as GPUBuffer, uniformData, u32, f32, {
+        config: DEFAULT_DIRAC_CONFIG,
+        totalSites: 64 * 64 * 64,
+        currentSpinorSize: 4,
+        simTime: 0,
+        maxDensity: 1,
+        strides: [64 * 64, 64, 1],
+        boundingRadius: 4.8,
+      })
+    ).toThrow(
+      `writeDiracUniforms expected ${DIRAC_UNIFORM_SIZE} bytes, got ${DIRAC_UNIFORM_SIZE - 4}`
+    )
+  })
+
   it('packs selected potential type when potential physics is enabled', () => {
     const u32 = writeConfig({
       ...DEFAULT_DIRAC_CONFIG,

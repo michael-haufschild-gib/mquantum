@@ -7,6 +7,7 @@ import {
   type CosineCoefficients,
   type DistributionSettings,
   type DivergingPsiSettings,
+  type DomainColoringModulusMode,
   type DomainColoringSettings,
   type MultiSourceWeights,
   type PhaseDivergingSettings,
@@ -49,15 +50,56 @@ function isValidCosineIndex(index: number): boolean {
   return Number.isInteger(index) && index >= 0 && index < 3
 }
 
+const COSINE_KEYS = ['a', 'b', 'c', 'd'] as const
+
+function isCosineKey(value: unknown): value is keyof CosineCoefficients {
+  return typeof value === 'string' && (COSINE_KEYS as readonly string[]).includes(value)
+}
+
+function isDomainColoringModulusMode(value: unknown): value is DomainColoringModulusMode {
+  return value === 'logPsiAbsSquared' || value === 'logPsiAbs'
+}
+
 /** Merge an optional numeric value with validation and clamping. */
-function mergeNumeric(
-  current: number,
-  incoming: number | undefined,
-  min: number,
-  max: number
-): number {
-  if (incoming === undefined || !Number.isFinite(incoming)) return current
+function mergeNumeric(current: number, incoming: unknown, min: number, max: number): number {
+  if (incoming === undefined || typeof incoming !== 'number' || !Number.isFinite(incoming)) {
+    return current
+  }
   return Math.max(min, Math.min(max, incoming))
+}
+
+function mergeCosineVector(
+  current: [number, number, number],
+  incoming: unknown,
+  key: keyof CosineCoefficients
+): [number, number, number] {
+  if (incoming === undefined) return current
+  if (!Array.isArray(incoming)) {
+    logger.warn(`[colorSlice] Ignoring invalid cosine coefficient vector ${key}:`, incoming)
+    return current
+  }
+  return [
+    mergeNumeric(current[0], incoming[0], 0, 2),
+    mergeNumeric(current[1], incoming[1], 0, 2),
+    mergeNumeric(current[2], incoming[2], 0, 2),
+  ]
+}
+
+function mergeDomainColoringModulusMode(
+  current: DomainColoringModulusMode,
+  incoming: unknown
+): DomainColoringModulusMode {
+  if (incoming === undefined) return current
+  if (isDomainColoringModulusMode(incoming)) return incoming
+  logger.warn('[colorSlice] Ignoring invalid domainColoring.modulusMode:', incoming)
+  return current
+}
+
+function mergeBoolean(current: boolean, incoming: unknown, field: string): boolean {
+  if (incoming === undefined) return current
+  if (typeof incoming === 'boolean') return incoming
+  logger.warn(`[colorSlice] Ignoring invalid ${field}:`, incoming)
+  return current
 }
 
 function mergeOpaqueHexColor(current: string, incoming: string | undefined, field: string): string {
@@ -117,29 +159,26 @@ export const createColorSlice: StateCreator<AppearanceSlice, [], [], ColorSlice>
 
     setCosineCoefficients: (coefficients: CosineCoefficients) =>
       set((state) => {
+        const source =
+          coefficients !== null && typeof coefficients === 'object'
+            ? (coefficients as Partial<Record<keyof CosineCoefficients, unknown>>)
+            : {}
         const next = { ...state.cosineCoefficients }
-        for (const key of ['a', 'b', 'c', 'd'] as const) {
-          const values = coefficients[key]
-          const prev = state.cosineCoefficients[key]
-          next[key] = [
-            mergeNumeric(prev[0], values[0], 0, 2),
-            mergeNumeric(prev[1], values[1], 0, 2),
-            mergeNumeric(prev[2], values[2], 0, 2),
-          ]
-          for (let i = 0; i < 3; i++) {
-            if (!Number.isFinite(values[i])) {
-              logger.warn(
-                `[colorSlice] Ignoring non-finite cosine coefficient ${key}[${i}]:`,
-                values[i]
-              )
-            }
-          }
+        if (source !== coefficients) {
+          logger.warn('[colorSlice] Ignoring invalid cosine coefficients payload:', coefficients)
+        }
+        for (const key of COSINE_KEYS) {
+          next[key] = mergeCosineVector(state.cosineCoefficients[key], source[key], key)
         }
         return { cosineCoefficients: next }
       }),
 
     setCosineCoefficient: (key: 'a' | 'b' | 'c' | 'd', index: number, value: number) =>
       set((state) => {
+        if (!isCosineKey(key)) {
+          logger.warn('[colorSlice] Ignoring invalid cosine coefficient key:', key)
+          return state
+        }
         if (!isValidCosineIndex(index)) {
           logger.warn('[colorSlice] Ignoring invalid cosine coefficient index:', index)
           return state
@@ -191,8 +230,15 @@ export const createColorSlice: StateCreator<AppearanceSlice, [], [], ColorSlice>
     setDomainColoringSettings: (settings: Partial<DomainColoringSettings>) =>
       set((state) => ({
         domainColoring: {
-          modulusMode: settings.modulusMode ?? state.domainColoring.modulusMode,
-          contoursEnabled: settings.contoursEnabled ?? state.domainColoring.contoursEnabled,
+          modulusMode: mergeDomainColoringModulusMode(
+            state.domainColoring.modulusMode,
+            settings.modulusMode
+          ),
+          contoursEnabled: mergeBoolean(
+            state.domainColoring.contoursEnabled,
+            settings.contoursEnabled,
+            'domainColoring.contoursEnabled'
+          ),
           contourDensity: mergeNumeric(
             state.domainColoring.contourDensity,
             settings.contourDensity,

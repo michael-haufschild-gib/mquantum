@@ -56,6 +56,8 @@ export interface GramSchmidtState {
   gsPartialImBuffer: GPUBuffer | null
   gsResultBuffer: GPUBuffer | null
   gsNumWorkgroups: number
+  /** totalSites used to size the currently allocated GS infrastructure buffers. */
+  gsBufferTotalSites: number
   /** Merged ψ buffer (array<vec2f>) — see TDSEComputePassResources. */
   psiBuffer: GPUBuffer | null
   totalSites: number
@@ -74,9 +76,21 @@ export interface GramSchmidtState {
  * Create GS uniform + partial + result buffers if not yet created.
  */
 export function ensureGSBuffers(device: GPUDevice, state: GramSchmidtState): void {
-  if (state.gsUniformBuffer) return
-  const wgCount = Math.max(1, Math.ceil(state.totalSites / 256))
+  const totalSites =
+    Number.isFinite(state.totalSites) && state.totalSites > 0 ? Math.floor(state.totalSites) : 0
+  if (state.gsUniformBuffer && state.gsBufferTotalSites === totalSites) return
+  if (
+    state.gsUniformBuffer ||
+    state.gsPartialReBuffer ||
+    state.gsPartialImBuffer ||
+    state.gsResultBuffer
+  ) {
+    destroyGSBuffers(state)
+  }
+
+  const wgCount = Math.max(1, Math.ceil(totalSites / 256))
   state.gsNumWorkgroups = wgCount
+  state.gsBufferTotalSites = totalSites
 
   state.gsUniformBuffer = device.createBuffer({
     label: 'gs-uniform',
@@ -118,6 +132,7 @@ export function storeCurrentEigenstate(
   tdseConfig?: TdseConfig
 ): number {
   if (!state.psiBuffer) return -1
+  if (!Number.isFinite(state.totalSites) || state.totalSites <= 0) return -1
   if (state.gsEigenstates.length >= MAX_STORED_EIGENSTATES) return -1
 
   // One vec2f buffer per stored eigenstate, sized 8 bytes/site to mirror the
@@ -291,6 +306,8 @@ export function destroyGSBuffers(state: GramSchmidtState): void {
   state.gsPartialReBuffer = null
   state.gsPartialImBuffer = null
   state.gsResultBuffer = null
+  state.gsNumWorkgroups = 0
+  state.gsBufferTotalSites = 0
 }
 
 /**

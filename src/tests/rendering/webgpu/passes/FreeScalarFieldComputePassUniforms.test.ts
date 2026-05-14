@@ -21,9 +21,11 @@ import { estimateVacuumMaxPhi, estimateVacuumMaxPi } from '@/lib/physics/freeSca
 import { computeStridesPadded } from '@/rendering/webgpu/passes/computePassUtils'
 import {
   computeFsfConfigHash,
+  computeFsfDiagnostics,
   computeFsfInitHash,
   computeFsfMaxPhiEstimate,
   estimateFsfMaxFieldValue,
+  FSF_IDENTITY_HAMILTONIAN_COEFS,
   FSF_UNIFORM_SIZE,
   writeFsfUniforms,
 } from '@/rendering/webgpu/passes/FreeScalarFieldComputePassUniforms'
@@ -581,6 +583,62 @@ describe('writeFsfUniforms', () => {
     })
 
     expect(new Uint32Array(uniformData)[123]).toBe(1)
+  })
+})
+
+describe('computeFsfDiagnostics', () => {
+  function expectZeroDiagnostics(
+    phi: Float32Array,
+    pi: Float32Array,
+    config = createConfig()
+  ): void {
+    expect(computeFsfDiagnostics(phi, pi, config, FSF_IDENTITY_HAMILTONIAN_COEFS)).toEqual({
+      totalEnergy: 0,
+      totalNorm: 0,
+      maxPhi: 0,
+      maxPi: 0,
+      energyDrift: 0,
+      meanPhi: 0,
+      variancePhi: 0,
+    })
+  }
+
+  it('returns a zero snapshot for invalid readback buffers', () => {
+    expectZeroDiagnostics(new Float32Array(), new Float32Array())
+    expectZeroDiagnostics(new Float32Array([1, 2]), new Float32Array([1]))
+    expectZeroDiagnostics(new Float32Array([1, Number.NaN]), new Float32Array([0, 0]))
+    expectZeroDiagnostics(new Float32Array([1, 2]), new Float32Array([0, Number.POSITIVE_INFINITY]))
+  })
+
+  it('returns a zero snapshot for invalid grid, spacing, or coefficient contracts', () => {
+    const phi = new Float32Array(8)
+    const pi = new Float32Array(8)
+    const cfg = createConfig({ latticeDim: 3, gridSize: [2, 2, 2], spacing: [1, 1, 1] })
+
+    expectZeroDiagnostics(
+      phi,
+      pi,
+      createConfig({ latticeDim: 3, gridSize: [2, 2, 3], spacing: [1, 1, 1] })
+    )
+    expectZeroDiagnostics(
+      phi,
+      pi,
+      createConfig({ latticeDim: 3, gridSize: [2, 2, 2], spacing: [1, 0, 1] })
+    )
+    expect(
+      computeFsfDiagnostics(phi, pi, cfg, {
+        ...FSF_IDENTITY_HAMILTONIAN_COEFS,
+        aKinetic: Number.NaN,
+      })
+    ).toEqual({
+      totalEnergy: 0,
+      totalNorm: 0,
+      maxPhi: 0,
+      maxPi: 0,
+      energyDrift: 0,
+      meanPhi: 0,
+      variancePhi: 0,
+    })
   })
 })
 

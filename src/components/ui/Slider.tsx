@@ -11,10 +11,37 @@ const DRAG_SENSITIVITY_PRECISE = 0.05
 /** Pixels of mouse movement to traverse full range */
 const DRAG_PIXELS_TO_FULL_RANGE = 200
 
+const STRICT_DECIMAL_PATTERN = /^[+-]?(?:\d+\.?\d*|\.\d+)$/
+
 function snapToValidStep(value: number, step: number): number {
   if (!Number.isFinite(step) || step <= 0) return value
   const snapped = Math.round(value / step) * step
   return Number.isFinite(snapped) ? snapped : value
+}
+
+function hasValidRange(min: number, max: number): boolean {
+  return Number.isFinite(min) && Number.isFinite(max) && max > min
+}
+
+function clampToRange(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max)
+}
+
+function sanitizeValue(value: number, min: number, max: number): number {
+  if (!hasValidRange(min, max)) return 0
+  if (!Number.isFinite(value)) return min
+  return clampToRange(value, min, max)
+}
+
+function parseStrictFiniteNumber(input: string): number | null {
+  const trimmed = input.trim()
+  if (!STRICT_DECIMAL_PATTERN.test(trimmed)) return null
+  const value = Number(trimmed)
+  return Number.isFinite(value) ? value : null
+}
+
+function formatSliderNumber(value: number, decimals: number): string {
+  return value.toFixed(decimals)
 }
 
 /** Props for the {@link Slider} range input component. */
@@ -55,8 +82,14 @@ export const Slider: React.FC<SliderProps> = React.memo(
     'data-testid': dataTestId,
   }) => {
     const id = useId()
-    const percentage =
-      max > min ? Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100)) : 0
+    const rangeIsValid = hasValidRange(min, max)
+    const safeMin = rangeIsValid ? min : 0
+    const safeMax = rangeIsValid ? max : 0
+    const safeValue = sanitizeValue(value, min, max)
+    const safeStep = Number.isFinite(step) && step > 0 ? step : undefined
+    const percentage = rangeIsValid
+      ? Math.min(100, Math.max(0, ((safeValue - safeMin) / (safeMax - safeMin)) * 100))
+      : 0
     const decimals = (() => {
       if (!Number.isFinite(step) || step <= 0) return 0
       const text = step.toString().toLowerCase()
@@ -67,7 +100,7 @@ export const Slider: React.FC<SliderProps> = React.memo(
       return Math.min(100, text.split('.')[1]?.length ?? 0)
     })()
 
-    const [inputValue, setInputValue] = useState(value.toString())
+    const [inputValue, setInputValue] = useState(formatSliderNumber(safeValue, decimals))
     // Removed isHovered state - use pure CSS group-hover instead (eliminates re-renders on hover)
     const [isDragging, setIsDragging] = useState(false)
     const [isLabelDragging, setIsLabelDragging] = useState(false)
@@ -83,12 +116,12 @@ export const Slider: React.FC<SliderProps> = React.memo(
     useEffect(() => {
       if (!isInputFocused) {
         const syncInputTimer = window.setTimeout(() => {
-          setInputValue(value.toFixed(decimals))
+          setInputValue(formatSliderNumber(safeValue, decimals))
         }, 0)
         return () => clearTimeout(syncInputTimer)
       }
       return undefined
-    }, [value, decimals, isInputFocused])
+    }, [safeValue, decimals, isInputFocused])
 
     // Cleanup event listeners on unmount
     useEffect(() => {
@@ -108,15 +141,15 @@ export const Slider: React.FC<SliderProps> = React.memo(
     // Label Drag Logic
     const handleLabelMouseDown = useCallback(
       (e: React.MouseEvent) => {
-        if (disabled) return
+        if (disabled || !rangeIsValid) return
         setIsLabelDragging(true)
         soundManager.playClick()
         e.preventDefault()
         document.body.style.cursor = 'ew-resize'
 
         const startX = e.clientX
-        const startValue = value
-        const range = max - min
+        const startValue = safeValue
+        const range = safeMax - safeMin
         const sensitivity = e.shiftKey ? DRAG_SENSITIVITY_PRECISE : DRAG_SENSITIVITY_NORMAL
 
         const handleMouseMove = (moveEvent: MouseEvent) => {
@@ -127,7 +160,8 @@ export const Slider: React.FC<SliderProps> = React.memo(
 
           newValue = snapToValidStep(newValue, step)
 
-          newValue = Math.min(Math.max(newValue, min), max)
+          newValue = clampToRange(newValue, safeMin, safeMax)
+          if (!Number.isFinite(newValue)) return
 
           // Use startTransition to prioritize UI responsiveness over store updates
           React.startTransition(() => {
@@ -152,7 +186,7 @@ export const Slider: React.FC<SliderProps> = React.memo(
         window.addEventListener('mousemove', handleMouseMove)
         window.addEventListener('mouseup', handleMouseUp)
       },
-      [disabled, value, min, max, step, onChange]
+      [disabled, rangeIsValid, safeValue, safeMin, safeMax, step, onChange]
     )
 
     const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -160,15 +194,12 @@ export const Slider: React.FC<SliderProps> = React.memo(
     }, [])
 
     const handleInputBlur = useCallback(() => {
-      let newValue = parseFloat(inputValue)
-      if (isNaN(newValue)) {
-        newValue = value
-      } else {
-        newValue = Math.min(Math.max(newValue, min), max)
-      }
+      const parsed = parseStrictFiniteNumber(inputValue)
+      const newValue =
+        rangeIsValid && parsed !== null ? clampToRange(parsed, safeMin, safeMax) : safeValue
       onChange(newValue)
-      setInputValue(newValue.toFixed(decimals))
-    }, [inputValue, value, min, max, onChange, decimals])
+      setInputValue(formatSliderNumber(newValue, decimals))
+    }, [inputValue, rangeIsValid, safeMin, safeMax, safeValue, onChange, decimals])
 
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -193,11 +224,13 @@ export const Slider: React.FC<SliderProps> = React.memo(
       (e: React.ChangeEvent<HTMLInputElement>) => {
         if (disabled) return
         const val = Number(e.target.value)
+        if (!rangeIsValid || !Number.isFinite(val)) return
+        const newValue = clampToRange(val, safeMin, safeMax)
         React.startTransition(() => {
-          onChange(val)
+          onChange(newValue)
         })
       },
-      [disabled, onChange]
+      [disabled, rangeIsValid, safeMin, safeMax, onChange]
     )
 
     const handleRangeMouseDown = useCallback(() => {
@@ -218,7 +251,9 @@ export const Slider: React.FC<SliderProps> = React.memo(
       setIsDragging(false)
     }, [])
 
-    const displayValue = formatValue ? formatValue(value) : value.toFixed(decimals)
+    const displayValue = formatValue
+      ? formatValue(safeValue)
+      : formatSliderNumber(safeValue, decimals)
 
     return (
       <div
@@ -301,10 +336,10 @@ export const Slider: React.FC<SliderProps> = React.memo(
           <input
             id={id}
             type="range"
-            min={min}
-            max={max}
-            step={step}
-            value={value}
+            min={safeMin}
+            max={safeMax}
+            step={safeStep}
+            value={safeValue}
             onChange={handleRangeChange}
             onMouseDown={handleRangeMouseDown}
             onMouseUp={handleRangeMouseUp}

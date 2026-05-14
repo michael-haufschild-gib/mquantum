@@ -127,10 +127,21 @@ describe('WDW solver — extreme parameter corners', () => {
     ],
     ['NaN mass', { inflatonMass: Number.NaN }, /inflatonMass must be finite/],
     ['negative mass', { inflatonMass: -0.1 }, /inflatonMass must be >= 0/],
+    ['too-large mass', { inflatonMass: 2.1 }, /inflatonMass must be <= 2/],
     [
       'non-finite cosmological constant',
       { cosmologicalConstant: Number.POSITIVE_INFINITY },
       /cosmologicalConstant must be finite/,
+    ],
+    [
+      'too-large cosmological constant',
+      { cosmologicalConstant: 1.1 },
+      /cosmologicalConstant must be <= 1/,
+    ],
+    [
+      'too-negative cosmological constant',
+      { cosmologicalConstant: -1.1 },
+      /cosmologicalConstant must be >= -1/,
     ],
     ['zero aMin', { aMin: 0 }, /aMin must be > 0/],
     ['non-finite aMax', { aMax: Number.NEGATIVE_INFINITY }, /aMax must be finite/],
@@ -140,9 +151,14 @@ describe('WDW solver — extreme parameter corners', () => {
     ['too-large gridNphi', { gridNphi: 129 }, /gridNphi must be an integer >= 3 and <= 128/],
     ['zero phiExtent', { phiExtent: 0 }, /phiExtent must be > 0/],
     [
-      'non-positive inflatonMassAsymmetry',
-      { inflatonMassAsymmetry: 0 },
-      /inflatonMassAsymmetry must be > 0/,
+      'too-small inflatonMassAsymmetry',
+      { inflatonMassAsymmetry: 0.05 },
+      /inflatonMassAsymmetry must be >= 0.1/,
+    ],
+    [
+      'too-large inflatonMassAsymmetry',
+      { inflatonMassAsymmetry: 10.1 },
+      /inflatonMassAsymmetry must be <= 10/,
     ],
   ])('rejects invalid public input: %s', (_name, override, message) => {
     expect(() =>

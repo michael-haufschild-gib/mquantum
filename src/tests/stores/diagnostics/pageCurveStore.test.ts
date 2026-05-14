@@ -50,6 +50,34 @@ describe('pageCurveStore', () => {
     expect(s.lastSTherm).toBe(0)
   })
 
+  it('ignores non-finite and non-monotonic sample times', () => {
+    const store = usePageCurveStore.getState()
+    store.pushSample({ t: 1, tH: 0.1, areaH: 1, cs0: 1, supersonicExtent: 2 })
+    const seeded = usePageCurveStore.getState()
+    expect(seeded.buffer.count).toBe(1)
+    const version = seeded.version
+
+    usePageCurveStore.getState().pushSample({
+      t: Number.NaN,
+      tH: 1,
+      areaH: 1,
+      cs0: 1,
+      supersonicExtent: 2,
+    })
+    usePageCurveStore.getState().pushSample({ t: 1, tH: 1, areaH: 1, cs0: 1, supersonicExtent: 2 })
+    usePageCurveStore.getState().pushSample({
+      t: 0.5,
+      tH: 1,
+      areaH: 1,
+      cs0: 1,
+      supersonicExtent: 2,
+    })
+
+    const after = usePageCurveStore.getState()
+    expect(after.buffer.count).toBe(1)
+    expect(after.version).toBe(version)
+  })
+
   it('setBufferSize reallocates and clears', () => {
     const store = usePageCurveStore.getState()
     store.pushSample({ t: 1, tH: 0.1, areaH: 1, cs0: 1, supersonicExtent: 2 })

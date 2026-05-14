@@ -15,6 +15,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_WHEELER_DEWITT_CONFIG } from '@/lib/geometry/extended/wheelerDeWitt'
 import type { SrmtClock, SrmtResult } from '@/lib/physics/srmt'
 import { computeSrmtDiagnostic } from '@/lib/physics/srmt/diagnostic'
+import {
+  normalizeSrmtClock,
+  normalizeSrmtCutNormalized,
+  normalizeSrmtHeatmapIntensity,
+  normalizeSrmtRankCap,
+  resolveSrmtCutIndexForLen,
+} from '@/rendering/webgpu/renderers/strategies/WheelerDeWittSrmtCoordinator'
 import type {
   SrmtClockCacheEntry,
   SrmtDispatchArgs,
@@ -184,6 +191,31 @@ describe('computeWdwSrmtComputeHash / computeWdwSrmtRenderHash', () => {
     expect(computeWdwSrmtComputeHash({ ...base, worldlineEnabled: true })).toBe(
       computeWdwSrmtComputeHash(base)
     )
+  })
+
+  it('normalizes invalid runtime SRMT values before hashing or indexing', () => {
+    const base = { ...DEFAULT_WHEELER_DEWITT_CONFIG }
+
+    expect(normalizeSrmtClock('bogus')).toBe('a')
+    expect(normalizeSrmtCutNormalized(Number.NaN)).toBe(0.5)
+    expect(resolveSrmtCutIndexForLen(Number.NaN, 32)).toBe(16)
+    expect(normalizeSrmtRankCap(Number.NaN)).toBe(64)
+    expect(normalizeSrmtHeatmapIntensity(Number.NaN)).toBe(0.6)
+
+    expect(
+      computeWdwSrmtComputeHash({
+        ...base,
+        srmtCutNormalized: Number.NaN,
+        srmtRankCap: Number.NaN,
+      })
+    ).toBe(computeWdwSrmtComputeHash(base))
+    expect(
+      computeWdwSrmtRenderHash({
+        ...base,
+        srmtClock: 'bogus' as SrmtClock,
+        srmtHeatmapIntensity: Number.NaN,
+      })
+    ).toBe(computeWdwSrmtRenderHash(base))
   })
 })
 

@@ -714,6 +714,64 @@ export const FSF_IDENTITY_HAMILTONIAN_COEFS: FsfHamiltonianCoefs = {
   massSquaredScale: 1,
 }
 
+function zeroFsfDiagnosticsSnapshot(): FsfDiagnosticsSnapshot {
+  return {
+    totalEnergy: 0,
+    totalNorm: 0,
+    maxPhi: 0,
+    maxPi: 0,
+    energyDrift: 0,
+    meanPhi: 0,
+    variancePhi: 0,
+  }
+}
+
+function validateFsfDiagnosticsInputs(
+  phi: Float32Array,
+  pi: Float32Array,
+  config: FreeScalarConfig,
+  coefs: FsfHamiltonianCoefs
+): boolean {
+  if (phi.length === 0 || phi.length !== pi.length) return false
+  if (
+    !Number.isInteger(config.latticeDim) ||
+    config.latticeDim < 1 ||
+    config.latticeDim > MAX_DIM
+  ) {
+    return false
+  }
+  if (!Number.isFinite(config.mass)) return false
+  if (
+    !Number.isFinite(coefs.aKinetic) ||
+    !Number.isFinite(coefs.aPotential) ||
+    !Number.isFinite(coefs.aFull) ||
+    !Number.isFinite(coefs.massSquaredScale) ||
+    !Number.isFinite(coefs.aPotentialRatio1 ?? 1) ||
+    !Number.isFinite(coefs.aPotentialRatio2 ?? 1)
+  ) {
+    return false
+  }
+
+  let expectedSites = 1
+  for (let d = 0; d < config.latticeDim; d++) {
+    const n = config.gridSize[d]
+    const spacing = config.spacing[d]
+    if (
+      typeof n !== 'number' ||
+      typeof spacing !== 'number' ||
+      !Number.isInteger(n) ||
+      n <= 0 ||
+      !Number.isFinite(spacing) ||
+      spacing <= 0
+    ) {
+      return false
+    }
+    expectedSites *= n
+    if (!Number.isSafeInteger(expectedSites) || expectedSites > phi.length) return false
+  }
+  return expectedSites === phi.length
+}
+
 /**
  * Compute field statistics from mapped readback data.
  *
@@ -754,6 +812,10 @@ export function computeFsfDiagnostics(
   config: FreeScalarConfig,
   coefs: FsfHamiltonianCoefs
 ): FsfDiagnosticsSnapshot {
+  if (!validateFsfDiagnosticsInputs(phi, pi, config, coefs)) {
+    return zeroFsfDiagnosticsSnapshot()
+  }
+
   const N = phi.length
 
   // Compute cell volume (product of spacings)
@@ -770,6 +832,9 @@ export function computeFsfDiagnostics(
   for (let i = 0; i < N; i++) {
     const p = phi[i]!
     const q = pi[i]!
+    if (!Number.isFinite(p) || !Number.isFinite(q)) {
+      return zeroFsfDiagnosticsSnapshot()
+    }
     sumPhi += p
     sumPhi2 += p * p
     sumPi2 += q * q
@@ -849,6 +914,16 @@ export function computeFsfDiagnostics(
   // mathematically non-negative. Clamp at zero so displayed and exported
   // diagnostics stay physically meaningful.
   const variancePhi = Math.max(0, sumPhi2 / N - meanPhi * meanPhi)
+  if (
+    !Number.isFinite(totalEnergy) ||
+    !Number.isFinite(totalNorm) ||
+    !Number.isFinite(maxPhi) ||
+    !Number.isFinite(maxPi) ||
+    !Number.isFinite(meanPhi) ||
+    !Number.isFinite(variancePhi)
+  ) {
+    return zeroFsfDiagnosticsSnapshot()
+  }
 
   return {
     totalEnergy,

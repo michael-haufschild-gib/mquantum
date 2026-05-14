@@ -10,6 +10,7 @@
 import React, { useCallback, useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+import { MAX_DIMENSION } from '@/constants/dimension'
 import { useRotationUpdates } from '@/hooks/useRotationUpdates'
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
 import { getNamedPresetStoreControls } from '@/lib/geometry/extended/schroedinger/presets'
@@ -258,10 +259,10 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
   })
 
   const schroedingerBasisCacheRef = useRef({
-    basisX: new Float32Array(11),
-    basisY: new Float32Array(11),
-    basisZ: new Float32Array(11),
-    origin: new Float32Array(11),
+    basisX: new Float32Array(MAX_DIMENSION),
+    basisY: new Float32Array(MAX_DIMENSION),
+    basisZ: new Float32Array(MAX_DIMENSION),
+    origin: new Float32Array(MAX_DIMENSION),
   })
 
   // ── Store wiring ──

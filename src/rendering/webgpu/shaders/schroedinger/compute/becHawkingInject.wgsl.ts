@@ -58,8 +58,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (idx >= params.totalSites) { return; }
   if (params.hawkingPairInjection == 0u) { return; }
 
-  // Recover N-D coords for boundary guard.
-  let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
+  // Recover N-D coords for boundary guard. Clamp dimension to fixed uniform arrays.
+  let activeDim = min(params.latticeDim, 12u);
+  let coords = linearToND(idx, params.strides, params.gridSize, activeDim);
 
   let zC = psi[idx];
   let re = zC.x;
@@ -74,7 +75,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // density is loop-invariant — hoist 1/density so the inner loop does a multiply, not a divide.
   let invDensity = 1.0 / max(density, 1e-20);
   var vsMagSq: f32 = 0.0;
-  for (var d: u32 = 0u; d < params.latticeDim; d++) {
+  for (var d: u32 = 0u; d < activeDim; d++) {
     if (params.gridSize[d] <= 1u) { continue; }
     let coord = coords[d];
     let Nd = params.gridSize[d];
@@ -82,7 +83,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let stride = params.strides[d];
     let fwdIdx = idx + stride;
     let bwdIdx = idx - stride;
-    let invDx = 0.5 / params.spacing[d];
+    let invDx = 0.5 / max(abs(params.spacing[d]), 1e-6);
     let zF = psi[fwdIdx];
     let zB = psi[bwdIdx];
     let dRe = (zF.x - zB.x) * invDx;

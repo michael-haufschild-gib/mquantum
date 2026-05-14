@@ -9,6 +9,7 @@ export interface SwitchProps {
   checked: boolean
   onCheckedChange: (checked: boolean) => void
   label?: string
+  ariaLabel?: string
   disabled?: boolean
   className?: string
   iconOn?: React.ReactNode
@@ -22,6 +23,7 @@ export const Switch: React.FC<SwitchProps> = React.memo(
     checked,
     onCheckedChange,
     label,
+    ariaLabel,
     disabled = false,
     className = '',
     iconOn,
@@ -66,7 +68,7 @@ export const Switch: React.FC<SwitchProps> = React.memo(
             disabled={disabled}
             role="switch"
             aria-checked={checked}
-            aria-label={label}
+            aria-label={ariaLabel ?? label}
           />
 
           {/* Track */}

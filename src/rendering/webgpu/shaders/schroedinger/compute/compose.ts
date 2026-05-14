@@ -45,16 +45,7 @@ import {
 import { hydrogenNDCommonBlock } from '../quantum/hydrogenNDCommon.wgsl'
 import {
   generateHydrogenNDDispatchBlock,
-  hydrogenNDGen2dBlock,
-  hydrogenNDGen3dBlock,
-  hydrogenNDGen4dBlock,
-  hydrogenNDGen5dBlock,
-  hydrogenNDGen6dBlock,
-  hydrogenNDGen7dBlock,
-  hydrogenNDGen8dBlock,
-  hydrogenNDGen9dBlock,
-  hydrogenNDGen10dBlock,
-  hydrogenNDGen11dBlock,
+  getHydrogenNDGeneratedBlock,
 } from '../quantum/hydrogenNDVariants.wgsl'
 import { hydrogenRadialBlock } from '../quantum/hydrogenRadial.wgsl'
 import {
@@ -256,19 +247,7 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
   }
   const hoNDBlock = hoNDBlockMap[actualDim] || hoND3dBlock
 
-  const hydrogenNDBlockMap: Record<number, string> = {
-    2: hydrogenNDGen2dBlock,
-    3: hydrogenNDGen3dBlock,
-    4: hydrogenNDGen4dBlock,
-    5: hydrogenNDGen5dBlock,
-    6: hydrogenNDGen6dBlock,
-    7: hydrogenNDGen7dBlock,
-    8: hydrogenNDGen8dBlock,
-    9: hydrogenNDGen9dBlock,
-    10: hydrogenNDGen10dBlock,
-    11: hydrogenNDGen11dBlock,
-  }
-  const hydrogenNDBlock = hydrogenNDBlockMap[hydrogenNDDimension] || ''
+  const hydrogenNDBlock = includeHydrogenND ? getHydrogenNDGeneratedBlock(hydrogenNDDimension) : ''
 
   // Select the psi block based on quantum mode.
   // Coupled mode uses the full hyperspherical harmonics evaluation.

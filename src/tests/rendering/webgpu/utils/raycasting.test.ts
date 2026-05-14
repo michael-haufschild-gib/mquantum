@@ -40,6 +40,13 @@ function simplePerspective(): Float32Array {
   return m
 }
 
+function expectFiniteMiss(result: ReturnType<typeof raycastCanvas>): void {
+  expect(result.hit).toBe(false)
+  for (const value of [...result.worldPosition, ...result.rayOrigin, ...result.rayDirection]) {
+    expect(Number.isFinite(value)).toBe(true)
+  }
+}
+
 describe('raycastCanvas — identity matrices (pure NDC mapping)', () => {
   it('hits the bounding cube when clicking the center with identity matrices', () => {
     const result = raycastCanvas(50, 50, 100, 100, identityMat4(), identityMat4(), 1.0)
@@ -130,5 +137,25 @@ describe('raycastCanvas — degenerate inputs', () => {
     const zeroView = new Float32Array(16)
     const result = raycastCanvas(50, 50, 100, 100, zeroView, simplePerspective(), 2.0)
     expect(result.hit).toBe(false)
+  })
+
+  it('returns a finite miss for invalid canvas dimensions or click coordinates', () => {
+    expectFiniteMiss(raycastCanvas(50, 50, 0, 100, identityMat4(), identityMat4(), 1.0))
+    expectFiniteMiss(raycastCanvas(Number.NaN, 50, 100, 100, identityMat4(), identityMat4(), 1.0))
+  })
+
+  it('returns a finite miss for invalid bounding radii', () => {
+    expectFiniteMiss(
+      raycastCanvas(50, 50, 100, 100, identityMat4(), identityMat4(), Number.POSITIVE_INFINITY)
+    )
+    expectFiniteMiss(raycastCanvas(50, 50, 100, 100, identityMat4(), identityMat4(), 0))
+    expectFiniteMiss(raycastCanvas(50, 50, 100, 100, identityMat4(), identityMat4(), -1))
+  })
+
+  it('returns a finite miss for non-finite matrices', () => {
+    const badProjection = identityMat4()
+    badProjection[0] = Number.NaN
+
+    expectFiniteMiss(raycastCanvas(50, 50, 100, 100, identityMat4(), badProjection, 1.0))
   })
 })

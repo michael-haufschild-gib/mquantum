@@ -5,6 +5,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 
+import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
 
@@ -178,6 +179,55 @@ describe('schroedingerSlice — mode switching', () => {
     useExtendedObjectStore.getState().setSchroedingerQuantumMode('harmonicOscillator')
     useExtendedObjectStore.getState().setSchroedingerRepresentation('momentum')
     expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('momentum')
+  })
+})
+
+describe('schroedingerSlice — dimension initialization contract', () => {
+  beforeEach(() => {
+    useExtendedObjectStore.getState().reset()
+    useGeometryStore.getState().reset()
+  })
+
+  it('clamps direct finite initialization dimensions to supported bounds', () => {
+    const store = useExtendedObjectStore.getState()
+
+    store.initializeSchroedingerForDimension(100)
+    expect(useExtendedObjectStore.getState().schroedinger.center).toHaveLength(MAX_DIMENSION)
+    expect(useExtendedObjectStore.getState().schroedinger.parameterValues).toHaveLength(
+      MAX_DIMENSION - 3
+    )
+
+    store.initializeSchroedingerForDimension(1)
+    expect(useExtendedObjectStore.getState().schroedinger.center).toHaveLength(MIN_DIMENSION)
+    expect(useExtendedObjectStore.getState().schroedinger.parameterValues).toHaveLength(0)
+  })
+
+  it('ignores non-finite direct initialization dimensions without throwing', () => {
+    const store = useExtendedObjectStore.getState()
+    store.initializeSchroedingerForDimension(4)
+    const before = useExtendedObjectStore.getState().schroedinger
+
+    expect(() => store.initializeSchroedingerForDimension(Number.NaN)).not.toThrow()
+    expect(() => store.initializeSchroedingerForDimension(Number.POSITIVE_INFINITY)).not.toThrow()
+
+    const after = useExtendedObjectStore.getState().schroedinger
+    expect(after.center).toEqual(before.center)
+    expect(after.parameterValues).toEqual(before.parameterValues)
+  })
+
+  it('ignores non-finite direct compute lattice sync dimensions without throwing', () => {
+    const store = useExtendedObjectStore.getState()
+    store.setSchroedingerQuantumMode('freeScalarField')
+    store.syncActiveComputeModeLatticeDim(4)
+    const before = useExtendedObjectStore.getState().schroedinger.freeScalar
+
+    expect(() => store.syncActiveComputeModeLatticeDim(Number.NaN)).not.toThrow()
+    expect(() => store.syncActiveComputeModeLatticeDim(Number.NEGATIVE_INFINITY)).not.toThrow()
+
+    const after = useExtendedObjectStore.getState().schroedinger.freeScalar
+    expect(after.latticeDim).toBe(before.latticeDim)
+    expect(after.gridSize).toEqual(before.gridSize)
+    expect(after.spacing).toEqual(before.spacing)
   })
 })
 

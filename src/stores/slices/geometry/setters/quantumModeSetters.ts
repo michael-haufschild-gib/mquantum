@@ -492,6 +492,7 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
     },
 
     setSchroedingerUseRealOrbitals: (useRealOrbitals: boolean) => {
+      if (typeof useRealOrbitals !== 'boolean') return
       setWithVersion((state) => ({
         schroedinger: { ...state.schroedinger, useRealOrbitals, hydrogenNDPreset: 'custom' },
       }))
@@ -590,12 +591,12 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
     },
 
     setSchroedingerExtraDimOmega: (dimIndex: number, omega: number) => {
-      const omegas = [...get().schroedinger.extraDimOmega]
-      if (dimIndex < 0 || dimIndex >= 8) return
+      if (!Number.isInteger(dimIndex) || dimIndex < 0 || dimIndex >= 8) return
       if (!isFinite(omega)) {
         warn('extraDimOmega', omega)
         return
       }
+      const omegas = [...get().schroedinger.extraDimOmega]
       omegas[dimIndex] = Math.max(0.1, Math.min(2.0, omega))
       setWithVersion((state) => ({
         schroedinger: { ...state.schroedinger, extraDimOmega: omegas },

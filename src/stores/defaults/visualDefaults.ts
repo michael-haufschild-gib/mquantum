@@ -151,7 +151,12 @@ export const DEFAULT_TONE_MAPPING_ALGORITHM: ToneMappingAlgorithm = 'aces'
 export const DEFAULT_EXPOSURE = 0.7
 
 // Multi-light system
-export const DEFAULT_LIGHTS = [createDefaultLight()]
+/** Create a fresh default light array with mutation-isolated nested tuples. */
+export function createDefaultLights(): ReturnType<typeof createDefaultLight>[] {
+  return [createDefaultLight()]
+}
+
+export const DEFAULT_LIGHTS = createDefaultLights()
 export const DEFAULT_SELECTED_LIGHT_ID: string | null = null
 export const DEFAULT_TRANSFORM_MODE: TransformMode = 'translate'
 export const DEFAULT_SHOW_LIGHT_GIZMOS = false
@@ -205,30 +210,29 @@ export const DEFAULT_FACE_PBR: PBRConfig = {
 // ============================================================================
 
 /** Available pre-baked skybox texture identifiers. */
-export type SkyboxTexture = 'space_blue' | 'space_lightblue' | 'space_red' | 'none'
+export const SKYBOX_TEXTURES = ['none', 'space_blue', 'space_lightblue', 'space_red'] as const
+/** Available pre-baked skybox texture identifier. */
+export type SkyboxTexture = (typeof SKYBOX_TEXTURES)[number]
+
+/** Procedural skybox modes exposed by the environment store. */
+export const PROCEDURAL_SKYBOX_MODES = [
+  'procedural_aurora',
+  'procedural_nebula',
+  'procedural_crystalline',
+  'procedural_horizon',
+  'procedural_ocean',
+  'procedural_twilight',
+] as const
 
 /** Skybox rendering mode (procedural vs texture-based). */
-export type SkyboxMode =
-  | 'classic'
-  | 'procedural_aurora'
-  | 'procedural_nebula'
-  | 'procedural_crystalline'
-  | 'procedural_horizon'
-  | 'procedural_ocean'
-  | 'procedural_twilight'
+export const SKYBOX_MODES = ['classic', ...PROCEDURAL_SKYBOX_MODES] as const
+/** Skybox rendering mode (procedural vs texture-based). */
+export type SkyboxMode = (typeof SKYBOX_MODES)[number]
 
 /** Unified skybox selection - combines disabled, classic textures, and procedural modes */
-export type SkyboxSelection =
-  | 'none'
-  | 'space_blue'
-  | 'space_lightblue'
-  | 'space_red'
-  | 'procedural_aurora'
-  | 'procedural_nebula'
-  | 'procedural_crystalline'
-  | 'procedural_horizon'
-  | 'procedural_ocean'
-  | 'procedural_twilight'
+export const SKYBOX_SELECTIONS = [...SKYBOX_TEXTURES, ...PROCEDURAL_SKYBOX_MODES] as const
+/** Unified skybox selection - combines disabled, classic textures, and procedural modes */
+export type SkyboxSelection = (typeof SKYBOX_SELECTIONS)[number]
 
 export const DEFAULT_SKYBOX_ENABLED = false
 export const DEFAULT_SKYBOX_TEXTURE: SkyboxTexture = 'none'
@@ -238,13 +242,16 @@ export const DEFAULT_SKYBOX_ROTATION = 0
 export const DEFAULT_SKYBOX_HIGH_QUALITY = false
 
 /** Animation style for procedural skybox effects. */
-export type SkyboxAnimationMode =
-  | 'none'
-  | 'cinematic' // Smooth Y orbit + subtle vertical bob (The "Standard")
-  | 'heatwave' // UV Distortion (The "Hot")
-  | 'tumble' // Chaotic tumbling (The "Disaster")
-  | 'ethereal' // Complex rot + Shimmer (The "Magic")
-  | 'nebula' // Color shifting (The "Cosmic")
+export const SKYBOX_ANIMATION_MODES = [
+  'none',
+  'cinematic',
+  'heatwave',
+  'tumble',
+  'ethereal',
+  'nebula',
+] as const
+/** Animation style for procedural skybox effects. */
+export type SkyboxAnimationMode = (typeof SKYBOX_ANIMATION_MODES)[number]
 
 export const DEFAULT_SKYBOX_ANIMATION_MODE: SkyboxAnimationMode = 'heatwave'
 export const DEFAULT_SKYBOX_ANIMATION_SPEED = 0.01

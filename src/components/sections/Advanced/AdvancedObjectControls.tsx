@@ -112,6 +112,7 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
               <Switch
                 checked={sssEnabled}
                 onCheckedChange={setSssEnabled}
+                ariaLabel="Toggle subsurface scattering"
                 tooltip="Simulate translucent subsurface light scattering within the volume."
                 data-testid="global-sss-toggle"
               />

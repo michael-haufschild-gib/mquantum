@@ -363,10 +363,10 @@ export class VideoRecorder {
     width: number,
     height: number
   ): void {
-    const normalizedX = Math.min(Math.max(crop.x, 0), 1)
-    const normalizedY = Math.min(Math.max(crop.y, 0), 1)
     const normalizedWidth = Math.min(Math.max(crop.width, 0), 1)
     const normalizedHeight = Math.min(Math.max(crop.height, 0), 1)
+    const normalizedX = Math.min(Math.max(crop.x, 0), Math.max(0, 1 - normalizedWidth))
+    const normalizedY = Math.min(Math.max(crop.y, 0), Math.max(0, 1 - normalizedHeight))
 
     const sx = normalizedX * this.canvas.width
     const sy = normalizedY * this.canvas.height

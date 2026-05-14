@@ -38,6 +38,13 @@ import type {
   SrmtSweepResponse,
   SrmtSweepSolverSnapshot,
 } from '@/lib/physics/srmt/srmtSweep.worker'
+import {
+  clampGridNa,
+  clampGridNphi,
+  clampPhiExtent,
+  clampRankCap,
+  normalisePointCount,
+} from '@/lib/physics/srmt/sweepDriverHelpers'
 import type {
   SrmtSweepConfig,
   SrmtSweepKind,
@@ -108,7 +115,16 @@ export class WheelerDeWittSrmtSweepCoordinator {
   update(wdwConfig: WheelerDeWittConfig, solverDirty: boolean): void {
     if (this.disposed) return
     const store = useSrmtSweepStore.getState()
-    if (store.status !== 'running') return
+    if (store.status !== 'running') {
+      if (this.sweepConfigHash) {
+        const cancelledEpoch = this.epoch
+        this.epoch += 1
+        this.sendCancelBestEffort(cancelledEpoch)
+        this.terminateWorker()
+        this.sweepConfigHash = null
+      }
+      return
+    }
     if (!this.sweepConfigHash) return
     const currentHash = computeWdwConfigHash(wdwConfig)
     if (currentHash !== this.sweepConfigHash || solverDirty) {
@@ -125,8 +141,14 @@ export class WheelerDeWittSrmtSweepCoordinator {
     if (this.disposed) {
       throw new Error('WheelerDeWittSrmtSweepCoordinator.startSweep called after dispose')
     }
-    // Cancel any prior in-flight sweep before bumping epoch.
-    this.sendCancelBestEffort()
+    // Cancel any prior in-flight sweep before bumping epoch. Worker
+    // sweep handlers are synchronous, so cancel messages alone cannot
+    // interrupt an active solve; terminate the worker to stop CPU work.
+    if (this.sweepConfigHash) {
+      this.sendCancelBestEffort()
+      this.terminateWorker()
+      this.sweepConfigHash = null
+    }
     this.epoch += 1
     const epoch = this.epoch
 
@@ -162,8 +184,8 @@ export class WheelerDeWittSrmtSweepCoordinator {
   }
 
   /**
-   * Abort the in-flight sweep (if any) without tearing down the worker.
-   * The store transitions from `running → idle`.
+   * Abort the in-flight sweep (if any). The store transitions from
+   * `running → idle`.
    */
   abortSweep(): void {
     if (this.disposed) return
@@ -175,6 +197,7 @@ export class WheelerDeWittSrmtSweepCoordinator {
     const cancelledEpoch = this.epoch
     this.epoch += 1
     this.sendCancelBestEffort(cancelledEpoch)
+    this.terminateWorker()
     this.sweepConfigHash = null
     useSrmtSweepStore.getState().abortSweep()
   }
@@ -187,12 +210,7 @@ export class WheelerDeWittSrmtSweepCoordinator {
     if (this.disposed) return
     this.disposed = true
     this.sendCancelBestEffort()
-    if (this.worker) {
-      this.worker.onmessage = null
-      this.worker.onerror = null
-      this.worker.terminate()
-      this.worker = null
-    }
+    this.terminateWorker()
     this.sweepConfigHash = null
     // Sweep is strategy-scoped; resetting the store on strategy dispose
     // prevents the UI from showing stale points after the user switches
@@ -315,6 +333,14 @@ export class WheelerDeWittSrmtSweepCoordinator {
     }
   }
 
+  private terminateWorker(): void {
+    if (!this.worker) return
+    this.worker.onmessage = null
+    this.worker.onerror = null
+    this.worker.terminate()
+    this.worker = null
+  }
+
   private cancelAndFail(message: string): void {
     // Same epoch-invalidation story as `abortSweep` — bump so stale
     // same-epoch worker messages cannot flip the store back to
@@ -322,6 +348,7 @@ export class WheelerDeWittSrmtSweepCoordinator {
     const cancelledEpoch = this.epoch
     this.epoch += 1
     this.sendCancelBestEffort(cancelledEpoch)
+    this.terminateWorker()
     this.sweepConfigHash = null
     useSrmtSweepStore.getState().failSweep(message)
   }
@@ -337,6 +364,43 @@ export class WheelerDeWittSrmtSweepCoordinator {
  */
 export const DEFAULT_SWEEP_LANCZOS_SEED = 0xdeadbeef
 
+function clampFinite(value: number, lo: number, hi: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback
+  return Math.max(lo, Math.min(hi, value))
+}
+
+function finiteOrDefault(value: number | undefined, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function orderedSweepRange(
+  rawMin: number | undefined,
+  rawMax: number | undefined,
+  defaultMin: number,
+  defaultMax: number,
+  clampValue: (value: number) => number
+): readonly [number, number] {
+  const lo = clampValue(finiteOrDefault(rawMin, defaultMin))
+  const hi = clampValue(finiteOrDefault(rawMax, defaultMax))
+  return lo <= hi ? [lo, hi] : [hi, lo]
+}
+
+function clampUnitInterval(value: number): number {
+  return clampFinite(value, 0, 1, 0)
+}
+
+function clampMass(value: number): number {
+  return clampFinite(value, 0, 2, 0)
+}
+
+function clampLambda(value: number): number {
+  return clampFinite(value, -1, 1, 0)
+}
+
+function clampPhiRef(value: number, phiExtent: number): number {
+  return clampFinite(value, -phiExtent, phiExtent, 0)
+}
+
 /**
  * Merge a pending sweep (possibly partial, as URL params may only
  * carry the kind) with sensible per-kind defaults drawn from the live
@@ -349,85 +413,139 @@ export function materialiseSweepConfig(
   wdwConfig: WheelerDeWittConfig
 ): SrmtSweepConfig {
   const clocks = ['a', 'phi1', 'phi2'] as const
-  const defaultPhiRef = (wdwConfig.phiExtent || 1) / 2
+  const phiExtent = clampPhiExtent(wdwConfig.phiExtent)
+  const defaultPhiRef = phiExtent / 2
   const common = {
     clocks,
-    rankCap: wdwConfig.srmtRankCap,
-    cutNormalized: pending.cutAnchor ?? wdwConfig.srmtCutNormalized,
-    phiRef: pending.phiRef ?? defaultPhiRef,
+    rankCap: clampRankCap(wdwConfig.srmtRankCap),
+    cutNormalized: clampFinite(pending.cutAnchor ?? wdwConfig.srmtCutNormalized, 0.1, 0.9, 0.5),
+    phiRef: clampPhiRef(pending.phiRef ?? defaultPhiRef, phiExtent),
     seed: pending.seed ?? DEFAULT_SWEEP_LANCZOS_SEED,
   }
   switch (pending.kind) {
-    case 'cut':
+    case 'cut': {
+      const [sweepMin, sweepMax] = orderedSweepRange(
+        pending.sweepMin,
+        pending.sweepMax,
+        0.1,
+        0.9,
+        clampUnitInterval
+      )
       return {
         ...common,
         kind: 'cut',
-        points: pending.points ?? 17,
-        sweepMin: pending.sweepMin ?? 0.1,
-        sweepMax: pending.sweepMax ?? 0.9,
+        points: normalisePointCount('cut', pending.points ?? 17),
+        sweepMin,
+        sweepMax,
       }
-    case 'mass':
+    }
+    case 'mass': {
+      const [sweepMin, sweepMax] = orderedSweepRange(
+        pending.sweepMin,
+        pending.sweepMax,
+        0.1,
+        1.5,
+        clampMass
+      )
       return {
         ...common,
         kind: 'mass',
-        points: pending.points ?? 9,
-        sweepMin: pending.sweepMin ?? 0.1,
-        sweepMax: pending.sweepMax ?? 1.5,
+        points: normalisePointCount('mass', pending.points ?? 9),
+        sweepMin,
+        sweepMax,
       }
-    case 'lambda':
+    }
+    case 'lambda': {
+      const [sweepMin, sweepMax] = orderedSweepRange(
+        pending.sweepMin,
+        pending.sweepMax,
+        -0.5,
+        0.5,
+        clampLambda
+      )
       return {
         ...common,
         kind: 'lambda',
-        points: pending.points ?? 9,
+        points: normalisePointCount('lambda', pending.points ?? 9),
         // Default spans the Λ < 0 (AdS) → Λ > 0 (dS) transition so the
         // sweep captures the regime change in one shot.
-        sweepMin: pending.sweepMin ?? -0.5,
-        sweepMax: pending.sweepMax ?? 0.5,
+        sweepMin,
+        sweepMax,
       }
+    }
     case 'bc':
       return {
         ...common,
         kind: 'bc',
-        points: 3,
+        points: normalisePointCount('bc', pending.points ?? 3),
         sweepMin: 0,
         sweepMax: 2,
       }
     case 'phiRef': {
-      const phiExt = wdwConfig.phiExtent
+      const [sweepMin, sweepMax] = orderedSweepRange(
+        pending.sweepMin,
+        pending.sweepMax,
+        0.05,
+        Math.max(0.05, phiExtent - 0.05),
+        (value) => clampPhiRef(value, phiExtent)
+      )
       return {
         ...common,
         kind: 'phiRef',
-        points: pending.points ?? 11,
+        points: normalisePointCount('phiRef', pending.points ?? 11),
         // `phiRef` sweep range spans roughly (0, phiExtent); the landmark
         // is symmetric in sign so 0 → phiExtent is enough.
-        sweepMin: pending.sweepMin ?? 0.05,
-        sweepMax: pending.sweepMax ?? Math.max(0.05, phiExt - 0.05),
+        sweepMin,
+        sweepMax,
       }
     }
-    case 'rankCap':
+    case 'rankCap': {
+      const [sweepMin, sweepMax] = orderedSweepRange(
+        pending.sweepMin,
+        pending.sweepMax,
+        8,
+        128,
+        clampRankCap
+      )
       return {
         ...common,
         kind: 'rankCap',
-        points: pending.points ?? 9,
+        points: normalisePointCount('rankCap', pending.points ?? 9),
         // rankCap sweep reports the span [8, 128] by default; driver
         // rounds + dedups, so 9 points across this range yields the
         // 8,16,24,…,128 cadence that fits on the plot.
-        sweepMin: pending.sweepMin ?? 8,
-        sweepMax: pending.sweepMax ?? 128,
+        sweepMin,
+        sweepMax,
       }
-    case 'phiExtent':
+    }
+    case 'phiExtent': {
+      const [sweepMin, sweepMax] = orderedSweepRange(
+        pending.sweepMin,
+        pending.sweepMax,
+        1.0,
+        3.0,
+        clampPhiExtent
+      )
       return {
         ...common,
         kind: 'phiExtent',
-        points: pending.points ?? 5,
+        points: normalisePointCount('phiExtent', pending.points ?? 5),
         // Default range sits either side of the DEFAULT_WHEELER_DEWITT_CONFIG
         // `phiExtent=2`. CFL tightens as phiExtent shrinks (smaller dφ),
         // so the lower bound is kept ≥ 1 to stay inside the stability
         // budget on default (aMin, gridNphi).
-        sweepMin: pending.sweepMin ?? 1.0,
-        sweepMax: pending.sweepMax ?? 3.0,
+        sweepMin,
+        sweepMax,
       }
-    case 'gridNa':
+    }
+    case 'gridNa': {
+      const [sweepMin, sweepMax] = orderedSweepRange(
+        pending.sweepMin,
+        pending.sweepMax,
+        64,
+        512,
+        clampGridNa
+      )
       return {
         ...common,
         kind: 'gridNa',
@@ -435,25 +553,41 @@ export function materialiseSweepConfig(
         // study (need ≥ 3 to compare residuals; 5 gives one extra interior
         // sample so the tail trend is visible). Driver rounds + dedups, so
         // 5 points across [64, 512] yields {64, 176, 288, 400, 512}.
-        points: pending.points ?? 5,
-        sweepMin: pending.sweepMin ?? 64,
-        sweepMax: pending.sweepMax ?? 512,
+        points: normalisePointCount('gridNa', pending.points ?? 5),
+        sweepMin,
+        sweepMax,
       }
-    case 'gridNphi':
+    }
+    case 'gridNphi': {
+      const [sweepMin, sweepMax] = orderedSweepRange(
+        pending.sweepMin,
+        pending.sweepMax,
+        32,
+        64,
+        clampGridNphi
+      )
       return {
         ...common,
         kind: 'gridNphi',
-        points: pending.points ?? 5,
+        points: normalisePointCount('gridNphi', pending.points ?? 5),
         // Default spans the driver-clamped asymptotic range [32, 64] —
         // see `clampGridNphi` docstring. Below 32 the Schmidt column
         // count Nφ² drops below Na=128 and q_a hits a pre-asymptotic
         // hump; above 64 the explicit-leapfrog CFL term exceeds the
         // solver's warn budget (solver.ts:447-456 rate-limits the dev
         // warn, so behaviour is preserved).
-        sweepMin: pending.sweepMin ?? 32,
-        sweepMax: pending.sweepMax ?? 64,
+        sweepMin,
+        sweepMax,
       }
-    case 'gridNphiCoupled':
+    }
+    case 'gridNphiCoupled': {
+      const [sweepMin, sweepMax] = orderedSweepRange(
+        pending.sweepMin,
+        pending.sweepMax,
+        32,
+        64,
+        clampGridNphi
+      )
       return {
         ...common,
         kind: 'gridNphiCoupled',
@@ -465,10 +599,11 @@ export function materialiseSweepConfig(
         // the cost of the uncoupled kind, so the default point count is
         // kept conservative (5 points across [32, 64] → {32, 40, 48,
         // 56, 64}).
-        points: pending.points ?? 5,
-        sweepMin: pending.sweepMin ?? 32,
-        sweepMax: pending.sweepMax ?? 64,
+        points: normalisePointCount('gridNphiCoupled', pending.points ?? 5),
+        sweepMin,
+        sweepMax,
       }
+    }
   }
 }
 

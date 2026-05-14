@@ -33,15 +33,24 @@ export const Input = ({
   tooltip,
   disabled,
   value,
+  defaultValue,
   onChange,
   type = 'text',
   ref,
+  'aria-describedby': ariaDescribedBy,
+  'aria-invalid': ariaInvalid,
   ...props
 }: InputProps & { ref?: React.Ref<HTMLInputElement> }) => {
   const inputId = useId()
+  const errorId = `${inputId}-error`
   const [isFocused, setIsFocused] = useState(false)
-  const [internalValue, setInternalValue] = useState('')
+  const [internalValue, setInternalValue] = useState(() =>
+    defaultValue === undefined || defaultValue === null ? '' : String(defaultValue)
+  )
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const errorMessageId = error && typeof error === 'string' ? errorId : undefined
+  const describedBy = [ariaDescribedBy, errorMessageId].filter(Boolean).join(' ') || undefined
+  const clearLabel = label ? `Clear ${label}` : 'Clear input'
 
   // Proper ref merging using callback ref pattern
   const setRefs = useCallback(
@@ -126,8 +135,11 @@ export const Input = ({
           ref={setRefs}
           type={type}
           value={value}
+          defaultValue={defaultValue}
           onChange={handleChange}
           disabled={disabled || loading}
+          aria-invalid={error ? true : ariaInvalid}
+          aria-describedby={describedBy}
           onFocus={(e) => {
             setIsFocused(true)
             soundManager.playHover()
@@ -166,6 +178,7 @@ export const Input = ({
                   exit={{ opacity: 0, scale: 0.8 }}
                   type="button"
                   onClick={handleClear}
+                  aria-label={clearLabel}
                   className="text-text-tertiary hover:text-text-primary rounded-full p-0.5 hover:bg-[var(--bg-active)] transition-colors"
                 >
                   <svg
@@ -194,6 +207,8 @@ export const Input = ({
       <AnimatePresence>
         {error && typeof error === 'string' && (
           <m.span
+            id={errorId}
+            role="alert"
             initial={{ opacity: 0, y: -5, height: 0 }}
             animate={{ opacity: 1, y: 0, height: 'auto' }}
             exit={{ opacity: 0, y: -5, height: 0 }}

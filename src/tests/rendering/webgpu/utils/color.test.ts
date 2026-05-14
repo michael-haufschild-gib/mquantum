@@ -28,6 +28,12 @@ describe('rendering/webgpu/utils/color', () => {
       expect(srgbToLinearChannel(-1)).toBe(0)
       expect(srgbToLinearChannel(2)).toBe(1)
     })
+
+    it('fails closed for non-finite input', () => {
+      expect(srgbToLinearChannel(Number.NaN)).toBe(0)
+      expect(srgbToLinearChannel(Number.POSITIVE_INFINITY)).toBe(0)
+      expect(srgbToLinearChannel(Number.NEGATIVE_INFINITY)).toBe(0)
+    })
   })
 
   describe('parseHexColorToSrgbRgb', () => {
@@ -115,6 +121,22 @@ describe('rendering/webgpu/utils/color', () => {
       const first = parseHexColorToLinearRgb('#FFAA00', [0, 0, 0])
       const second = parseHexColorToLinearRgb('  #ffaa00  ', [0, 0, 0])
       expect(second).toBe(first)
+    })
+
+    it('keeps cached colors immutable across callers', () => {
+      const first = parseHexColorToLinearRgb('#336699', [0, 0, 0])
+      const expected = [...first]
+
+      try {
+        const mutable = first as unknown as number[]
+        mutable[0] = Number.NaN
+      } catch {
+        // Frozen arrays throw in strict mode; either way the cache must stay intact.
+      }
+
+      const second = parseHexColorToLinearRgb('#336699', [0, 0, 0])
+      expect(Object.isFrozen(second)).toBe(true)
+      expect(second).toEqual(expected)
     })
 
     it('parses whitespace-wrapped hex input on a cold cache entry', () => {

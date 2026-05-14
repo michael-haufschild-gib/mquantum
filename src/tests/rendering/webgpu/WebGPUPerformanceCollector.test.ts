@@ -17,8 +17,8 @@ function resetMetricsStore(): void {
     maxFps: 0,
     frameTime: 0,
     cpuTime: 0,
-    gpu: { calls: 0, triangles: 0, points: 0, lines: 0 },
-    sceneGpu: { calls: 0, triangles: 0, points: 0, lines: 0 },
+    gpu: { calls: 0, triangles: 0, vertices: 0, points: 0, lines: 0 },
+    sceneGpu: { calls: 0, triangles: 0, vertices: 0, points: 0, lines: 0 },
     memory: { geometries: 0, textures: 0, programs: 0, heap: 0 },
     vram: { geometries: 0, textures: 0, total: 0 },
     viewport: { width: 0, height: 0, dpr: 1 },
@@ -160,14 +160,14 @@ describe('WebGPUStatsCollector', () => {
       triangles: 300,
       lines: 4,
       points: 2,
-      uniqueVertices: 900,
+      vertices: 900,
     })
     expect(metrics.sceneGpu).toMatchObject({
       calls: 7,
       triangles: 300,
       lines: 4,
       points: 2,
-      uniqueVertices: 900,
+      vertices: 900,
     })
     expect(metrics.buffers).toEqual({
       temporal: { width: 640, height: 360 },
@@ -397,6 +397,101 @@ describe('WebGPUStatsCollector', () => {
     expect(metrics.passTimings).toEqual([])
     expect(metrics.totalGpuTimeMs).toBe(0)
     expect(metrics.cpuBreakdown).toEqual({ setupMs: 0, passesMs: 0, submitMs: 0 })
+    nowSpy.mockRestore()
+  })
+
+  it('does not fold hidden time into FPS when monitor is shown again', () => {
+    useUIStore.setState({ showPerfMonitor: true, perfMonitorExpanded: false })
+
+    const collector = new WebGPUStatsCollector()
+    const graph = createGraphMock()
+    const nowSpy = vi.spyOn(performance, 'now')
+
+    nowSpy.mockReturnValue(1000)
+    collector.recordFrame(
+      4,
+      createFrameStats(),
+      graph as unknown as WebGPURenderGraph,
+      { width: 800, height: 600 },
+      1
+    )
+
+    useUIStore.setState({ showPerfMonitor: false, perfMonitorExpanded: false })
+    collector.recordFrame(
+      4,
+      createFrameStats(),
+      graph as unknown as WebGPURenderGraph,
+      { width: 800, height: 600 },
+      1
+    )
+
+    useUIStore.setState({ showPerfMonitor: true, perfMonitorExpanded: false })
+    nowSpy.mockReturnValue(10_000)
+    collector.recordFrame(
+      4,
+      createFrameStats(),
+      graph as unknown as WebGPURenderGraph,
+      { width: 800, height: 600 },
+      1
+    )
+
+    const metrics = usePerformanceMetricsStore.getState()
+    expect(metrics.frameTime).toBeCloseTo(16.67, 2)
+    expect(metrics.fps).toBe(60)
+    nowSpy.mockRestore()
+  })
+
+  it('does not dilute expanded draw stats with prior FPS-only frames', () => {
+    useUIStore.setState({ showPerfMonitor: true, perfMonitorExpanded: false })
+
+    const collector = new WebGPUStatsCollector()
+    const graph = createGraphMock()
+    const nowSpy = vi
+      .spyOn(performance, 'now')
+      .mockReturnValueOnce(100)
+      .mockReturnValueOnce(200)
+      .mockReturnValueOnce(600)
+
+    collector.recordFrame(
+      4,
+      createFrameStats(),
+      graph as unknown as WebGPURenderGraph,
+      { width: 800, height: 600 },
+      1
+    )
+    collector.recordFrame(
+      4,
+      createFrameStats(),
+      graph as unknown as WebGPURenderGraph,
+      { width: 800, height: 600 },
+      1
+    )
+
+    useUIStore.setState({ showPerfMonitor: true, perfMonitorExpanded: true })
+    collector.recordFrame(
+      4,
+      createFrameStats({
+        drawStats: {
+          calls: 10,
+          triangles: 30,
+          vertices: 90,
+          lines: 4,
+          points: 2,
+        },
+      }),
+      graph as unknown as WebGPURenderGraph,
+      { width: 800, height: 600 },
+      1
+    )
+
+    const metrics = usePerformanceMetricsStore.getState()
+    expect(metrics.gpu).toMatchObject({
+      calls: 10,
+      triangles: 30,
+      vertices: 90,
+      lines: 4,
+      points: 2,
+    })
     nowSpy.mockRestore()
   })
 })

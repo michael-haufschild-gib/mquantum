@@ -65,6 +65,20 @@ export const CURVED_STAGE_TIMES_OFFSET = TDSE_UNIFORM_OFFSET_STAGE_TIME_K1
 /** Byte size of one (K1, K2, K3, K4) quartet of f32 stage times. */
 export const CURVED_STAGE_TIMES_STRIDE = 16
 
+function sanitizeCurvedStageStepCount(steps: number): number {
+  if (!Number.isFinite(steps) || steps <= 0) return 0
+  return Math.min(Math.floor(steps), CURVED_MAX_STEPS_PER_FRAME)
+}
+
+function sanitizeCurvedStageStepIndex(stepIdx: number): number {
+  if (!Number.isFinite(stepIdx) || stepIdx <= 0) return 0
+  return Math.min(Math.floor(stepIdx), CURVED_MAX_STEPS_PER_FRAME - 1)
+}
+
+function finiteOrZero(value: number): number {
+  return Number.isFinite(value) ? value : 0
+}
+
 /** Factory signatures matching the base pass's protected helpers. */
 type CreateShaderModule = (device: GPUDevice, code: string, label: string) => GPUShaderModule
 type CreateComputePipeline = (
@@ -458,17 +472,19 @@ export function writeCurvedStageTimes(
   dt: number,
   steps: number
 ): void {
-  const clampedSteps = Math.max(0, Math.min(steps, CURVED_MAX_STEPS_PER_FRAME))
+  const clampedSteps = sanitizeCurvedStageStepCount(steps)
   if (clampedSteps === 0) return
   const data = scratch.stageTimeStagingData
-  const halfDt = 0.5 * dt
+  const safeSimTimeStart = finiteOrZero(simTimeStart)
+  const safeDt = finiteOrZero(dt)
+  const halfDt = 0.5 * safeDt
   for (let s = 0; s < clampedSteps; s++) {
-    const t = simTimeStart + s * dt
+    const t = safeSimTimeStart + s * safeDt
     const base = s * 4
     data[base] = t // K1 = t
     data[base + 1] = t + halfDt // K2 = t + dt/2
     data[base + 2] = t + halfDt // K3 = t + dt/2
-    data[base + 3] = t + dt // K4 = t + dt
+    data[base + 3] = t + safeDt // K4 = t + dt
   }
   // Upload only the populated prefix. WebGPU writeBuffer is queue-serialized,
   // so this completes before the command buffer that reads the staging data
@@ -499,7 +515,7 @@ export function copyCurvedStageTimesForStep(
   uniformBuffer: GPUBuffer,
   stepIdx: number
 ): void {
-  const safeIdx = Math.max(0, Math.min(stepIdx, CURVED_MAX_STEPS_PER_FRAME - 1))
+  const safeIdx = sanitizeCurvedStageStepIndex(stepIdx)
   encoder.copyBufferToBuffer(
     scratch.stageTimeStagingBuffer,
     safeIdx * CURVED_STAGE_TIMES_STRIDE,

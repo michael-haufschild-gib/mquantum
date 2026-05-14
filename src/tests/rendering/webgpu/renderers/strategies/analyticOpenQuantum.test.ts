@@ -62,10 +62,14 @@ function makeCtx(openQuantum: typeof DEFAULT_OPEN_QUANTUM_CONFIG): WebGPURenderC
   } as unknown as WebGPURenderContext
 }
 
-function makeShared(preset: ReturnType<typeof makePreset>, config: PresetConfig): ModeFrameContext {
+function makeShared(
+  preset: ReturnType<typeof makePreset>,
+  config: PresetConfig,
+  rendererConfig: Partial<ModeFrameContext['rendererConfig']> = {}
+): ModeFrameContext {
   return {
     device: {},
-    rendererConfig: { quantumMode: 'harmonicOscillator', dimension: 1 },
+    rendererConfig: { quantumMode: 'harmonicOscillator', dimension: 1, ...rendererConfig },
     cachedPreset: { preset, config },
   } as unknown as ModeFrameContext
 }
@@ -136,5 +140,40 @@ describe('AnalyticOpenQuantumExecutor', () => {
     )
 
     expect(offDiagonalMagnitude(uploads.at(-1)!)).toBeLessThan(0.01)
+  })
+
+  it('normalizes malformed hydrogen basis inputs before executor allocation', () => {
+    const executor = new AnalyticOpenQuantumExecutor()
+    const { gridPass, uploads } = makeGridPass()
+    const preset = makePreset([[1, 0]])
+    const config = makePresetConfig()
+    const malformedHydrogen = {
+      ...DEFAULT_OPEN_QUANTUM_CONFIG,
+      enabled: true,
+      hydrogenBasisMaxN: Infinity,
+    }
+    const ctx = {
+      frame: {
+        stores: {
+          extended: {
+            schroedinger: {
+              openQuantum: malformedHydrogen,
+              extraDimOmega: 'not-an-array',
+            },
+          },
+        },
+      },
+    } as unknown as WebGPURenderContext
+
+    expect(() =>
+      executor.execute(
+        ctx,
+        makeShared(preset, config, { quantumMode: 'hydrogenND', dimension: Infinity }),
+        gridPass,
+        1,
+        undefined
+      )
+    ).not.toThrow()
+    expect(uploads).toHaveLength(1)
   })
 })

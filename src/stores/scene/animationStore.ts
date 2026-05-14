@@ -96,6 +96,14 @@ function getAllPlaneNames(dimension: number): string[] {
   return getRotationPlanes(dimension).map((p) => p.name)
 }
 
+function getValidatedPlaneNames(dimension: number, action: string): string[] | null {
+  if (!isValidDimensionInput(dimension)) {
+    logger.warn(`[animationStore] Ignoring ${action} for invalid dimension: ${dimension}`)
+    return null
+  }
+  return getAllPlaneNames(dimension)
+}
+
 export const useAnimationStore = create<AnimationState>((set, get) => ({
   isPlaying: true,
   speed: DEFAULT_SPEED,
@@ -152,12 +160,14 @@ export const useAnimationStore = create<AnimationState>((set, get) => ({
   },
 
   animateAll: (dimension: number) => {
-    const planes = getAllPlaneNames(dimension)
+    const planes = getValidatedPlaneNames(dimension, 'animateAll')
+    if (!planes) return
     set({ animatingPlanes: new Set(planes), isPlaying: true })
   },
 
   randomizePlanes: (dimension: number) => {
-    const planeNames = getAllPlaneNames(dimension)
+    const planeNames = getValidatedPlaneNames(dimension, 'randomizePlanes')
+    if (!planeNames) return
 
     // Each plane has 50% chance of being selected
     const selected = planeNames.filter(() => Math.random() < 0.5)
@@ -175,7 +185,8 @@ export const useAnimationStore = create<AnimationState>((set, get) => ({
   },
 
   resetToFirstPlane: (dimension: number) => {
-    const planes = getAllPlaneNames(dimension)
+    const planes = getValidatedPlaneNames(dimension, 'resetToFirstPlane')
+    if (!planes) return
     if (planes.length > 0 && planes[0]) {
       set({ animatingPlanes: new Set([planes[0]]), isPlaying: true })
     }

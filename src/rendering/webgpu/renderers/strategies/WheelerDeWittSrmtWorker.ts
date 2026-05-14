@@ -47,6 +47,15 @@ import {
 
 /** The three SRMT clocks in canonical dispatch order. */
 export const SRMT_CLOCKS: readonly SrmtClock[] = ['a', 'phi1', 'phi2']
+const DEFAULT_SRMT_CLOCK: SrmtClock = 'a'
+
+function isSrmtClock(value: unknown): value is SrmtClock {
+  return typeof value === 'string' && (SRMT_CLOCKS as readonly string[]).includes(value)
+}
+
+function normalizeQueueSelectedClock(value: unknown): SrmtClock {
+  return isSrmtClock(value) ? value : DEFAULT_SRMT_CLOCK
+}
 
 /**
  * Entry in the worker-state result cache. `snapshot` is the UI-shaped view
@@ -455,12 +464,23 @@ export function queueSrmtCompute(
   state.resultsByClock = createEmptyResultsByClock()
   state.lastDispatchedHash = createEmptyLastDispatchedHash()
   state.queue = []
-  state.selectedClock = selectedClock
+  const normalizedSelectedClock = normalizeQueueSelectedClock(selectedClock)
+  state.selectedClock = normalizedSelectedClock
   // Order: selected clock first, then the remaining two in canonical order
   // (so tests get a deterministic tail).
-  const ordered: SrmtClock[] = [selectedClock, ...SRMT_CLOCKS.filter((c) => c !== selectedClock)]
+  const ordered: SrmtClock[] = [
+    normalizedSelectedClock,
+    ...SRMT_CLOCKS.filter((c) => c !== normalizedSelectedClock),
+  ]
   for (const clock of ordered) {
-    state.queue.push(argsByClock[clock])
+    const args = (argsByClock as Partial<Record<SrmtClock, SrmtDispatchArgs>>)[clock]
+    if (args) {
+      state.queue.push(args)
+    }
+  }
+  if (state.queue.length === 0) {
+    useSrmtDiagnosticStore.getState().setSrmtComputing(false)
+    return
   }
   useSrmtDiagnosticStore.getState().beginSrmtComputing()
   dispatchNextInQueue(state)

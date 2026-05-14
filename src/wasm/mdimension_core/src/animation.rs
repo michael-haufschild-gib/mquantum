@@ -1072,6 +1072,27 @@ mod tests {
     }
 
     #[test]
+    fn test_project_vertices_sanitizes_non_finite_inputs() {
+        let invalid_distance = project_vertices_to_positions(&[4.0, 0.0, 0.0], 3, f64::NAN);
+        assert_eq!(invalid_distance.len(), 3);
+        assert!((invalid_distance[0] - 1.0).abs() < 1e-5);
+        assert!(invalid_distance.iter().all(|v| v.is_finite()));
+
+        let zero_distance = project_vertices_to_positions(&[4.0, 0.0, 0.0], 3, 0.0);
+        assert_eq!(zero_distance.len(), 3);
+        assert!((zero_distance[0] - 1.0).abs() < 1e-5);
+        assert!(zero_distance.iter().all(|v| v.is_finite()));
+
+        let invalid_vertex =
+            project_vertices_to_positions(&[f64::NAN, f64::INFINITY, 6.0, f64::INFINITY], 4, 4.0);
+        assert_eq!(invalid_vertex.len(), 3);
+        assert_eq!(invalid_vertex[0], 0.0);
+        assert_eq!(invalid_vertex[1], 0.0);
+        assert!((invalid_vertex[2] - 1.5).abs() < 1e-5);
+        assert!(invalid_vertex.iter().all(|v| v.is_finite()));
+    }
+
+    #[test]
     fn test_project_vertices_multiple() {
         // Two 4D vertices
         let vertices = vec![

@@ -8,13 +8,15 @@
  */
 
 import { logger } from '@/lib/logger'
-import type {
-  SkyboxMode,
-  SkyboxProceduralSettings,
-  SkyboxTexture,
+import {
+  DEFAULT_SKYBOX_ANIMATION_SPEED,
+  DEFAULT_SKYBOX_ROTATION,
+  type SkyboxMode,
+  type SkyboxProceduralSettings,
+  type SkyboxTexture,
 } from '@/stores/defaults/visualDefaults'
 
-import type { AnimationSnapshot, CameraSnapshot } from '../core/storeAccess'
+import type { AnimationSnapshot, CameraMatrix, CameraSnapshot } from '../core/storeAccess'
 import { getStoreSnapshot } from '../core/storeAccess'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
@@ -52,6 +54,83 @@ import {
 } from './skyboxVertexData'
 
 const VERTEX_INDEX = SKYBOX_VERTEX_UNIFORMS_LAYOUT.index
+const TWO_PI = Math.PI * 2
+
+function finiteOrFallback(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function clampFinite(value: unknown, fallback: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, finiteOrFallback(value, fallback)))
+}
+
+function normalizeRotationRadians(value: unknown): number {
+  const finite = finiteOrFallback(value, DEFAULT_SKYBOX_ROTATION)
+  return ((finite % TWO_PI) + TWO_PI) % TWO_PI
+}
+
+function matrixElements(matrix: CameraMatrix | undefined): ArrayLike<number> | null {
+  const elements = matrix?.elements
+  if (!elements || elements.length < 16) return null
+
+  for (let index = 0; index < 16; index += 1) {
+    if (!Number.isFinite(elements[index])) return null
+  }
+
+  return elements
+}
+
+function writeIdentityMatrix(data: Float32Array, offset: number): void {
+  data[offset + 0] = 1
+  data[offset + 5] = 1
+  data[offset + 10] = 1
+  data[offset + 15] = 1
+}
+
+function writeFiniteProjectionMatrix(
+  data: Float32Array,
+  offset: number,
+  matrix: CameraMatrix | undefined
+): void {
+  const elements = matrixElements(matrix)
+  if (!elements) {
+    writeIdentityMatrix(data, offset)
+    return
+  }
+
+  for (let index = 0; index < 16; index += 1) {
+    data[offset + index] = elements[index]!
+  }
+}
+
+function writeFiniteViewMatrixWithoutTranslation(
+  data: Float32Array,
+  offset: number,
+  matrix: CameraMatrix | undefined
+): void {
+  const elements = matrixElements(matrix)
+  if (!elements) {
+    writeIdentityMatrix(data, offset)
+    return
+  }
+
+  data[offset + 0] = elements[0]!
+  data[offset + 1] = elements[1]!
+  data[offset + 2] = elements[2]!
+  data[offset + 3] = 0
+  data[offset + 4] = elements[4]!
+  data[offset + 5] = elements[5]!
+  data[offset + 6] = elements[6]!
+  data[offset + 7] = 0
+  data[offset + 8] = elements[8]!
+  data[offset + 9] = elements[9]!
+  data[offset + 10] = elements[10]!
+  data[offset + 11] = 0
+  data[offset + 12] = 0
+  data[offset + 13] = 0
+  data[offset + 14] = 0
+  data[offset + 15] = 1
+}
 
 /**
  * WebGPU renderer for procedural skybox backgrounds.
@@ -472,11 +551,17 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     const settings = env?.proceduralSettings
     const isPlaying = anim?.isPlaying ?? false
     const skyboxAnimationMode = env?.skyboxAnimationMode ?? 'none'
-    const skyboxAnimationSpeed = env?.skyboxAnimationSpeed ?? 1.0
+    const skyboxAnimationSpeed = clampFinite(
+      env?.skyboxAnimationSpeed,
+      DEFAULT_SKYBOX_ANIMATION_SPEED,
+      0,
+      5
+    )
 
     // --- Animation time accumulation (matches WebGL Skybox.tsx pattern) ---
-    const frameTime = ctx.frame?.time ?? 0
-    if (this.lastFrameTime < 0) {
+    const fallbackFrameTime = this.lastFrameTime >= 0 ? this.lastFrameTime : 0
+    const frameTime = finiteOrFallback(ctx.frame?.time, fallbackFrameTime)
+    if (!Number.isFinite(this.lastFrameTime) || this.lastFrameTime < 0) {
       this.lastFrameTime = frameTime
     }
     const delta = frameTime - this.lastFrameTime
@@ -488,9 +573,12 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       const speed =
         storeMode === 'classic' && skyboxAnimationMode !== 'none' ? skyboxAnimationSpeed : 1.0
       this.skyboxTime += delta * speed
+      if (!Number.isFinite(this.skyboxTime)) {
+        this.skyboxTime = 0
+      }
     }
 
-    const t = this.skyboxTime
+    const t = finiteOrFallback(this.skyboxTime, 0)
 
     // Compute animation mode effects (classic mode only, matches WebGL)
     const animFx = computeSkyboxAnimationEffects(isPlaying, storeMode, skyboxAnimationMode, t)
@@ -565,7 +653,7 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       skyboxRotation?: number
     }>(ctx, 'environment')
 
-    const baseRotation = env?.skyboxRotation ?? 0
+    const baseRotation = normalizeRotationRadians(env?.skyboxRotation)
 
     // Compose final rotation: base rotation + animation-driven rotation
     const rotX = this.animRotX
@@ -618,44 +706,8 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     data[modelIdx + 14] = 0
     data[modelIdx + 15] = 1
 
-    // modelViewMatrix (copy view matrix, ignoring translation for skybox)
-    if (camera?.viewMatrix?.elements && camera.viewMatrix.elements.length >= 16) {
-      const vm = camera.viewMatrix.elements
-      // Remove translation from view matrix for skybox
-      data[modelViewIdx + 0] = vm[0]!
-      data[modelViewIdx + 1] = vm[1]!
-      data[modelViewIdx + 2] = vm[2]!
-      data[modelViewIdx + 3] = 0
-      data[modelViewIdx + 4] = vm[4]!
-      data[modelViewIdx + 5] = vm[5]!
-      data[modelViewIdx + 6] = vm[6]!
-      data[modelViewIdx + 7] = 0
-      data[modelViewIdx + 8] = vm[8]!
-      data[modelViewIdx + 9] = vm[9]!
-      data[modelViewIdx + 10] = vm[10]!
-      data[modelViewIdx + 11] = 0
-      data[modelViewIdx + 12] = 0
-      data[modelViewIdx + 13] = 0
-      data[modelViewIdx + 14] = 0
-      data[modelViewIdx + 15] = 1
-    } else {
-      // Identity
-      data[modelViewIdx + 0] = 1
-      data[modelViewIdx + 5] = 1
-      data[modelViewIdx + 10] = 1
-      data[modelViewIdx + 15] = 1
-    }
-
-    // projectionMatrix
-    if (camera?.projectionMatrix?.elements) {
-      data.set(camera.projectionMatrix.elements, projIdx)
-    } else {
-      // Identity
-      data[projIdx + 0] = 1
-      data[projIdx + 5] = 1
-      data[projIdx + 10] = 1
-      data[projIdx + 15] = 1
-    }
+    writeFiniteViewMatrixWithoutTranslation(data, modelViewIdx, camera?.viewMatrix)
+    writeFiniteProjectionMatrix(data, projIdx, camera?.projectionMatrix)
 
     // rotationMatrix (mat3x3 stored as 3 columns with 16-byte alignment each)
     // Uses the same composed rotation as modelMatrix

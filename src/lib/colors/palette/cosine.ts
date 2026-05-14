@@ -11,6 +11,35 @@
  * @see https://iquilezles.org/articles/palettes/
  */
 
+function finiteOrFallback(value: number, fallback: number): number {
+  return Number.isFinite(value) ? value : fallback
+}
+
+function clamp01(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.min(1, value))
+}
+
+function coefficientAt(values: readonly number[], index: number, fallback: number): number {
+  return Array.isArray(values) ? finiteOrFallback(values[index] ?? Number.NaN, fallback) : fallback
+}
+
+function cosineChannel(
+  t: number,
+  a: readonly number[],
+  b: readonly number[],
+  c: readonly number[],
+  d: readonly number[],
+  index: number
+): number {
+  const base = coefficientAt(a, index, 0)
+  const amplitude = coefficientAt(b, index, 0)
+  const frequency = coefficientAt(c, index, 1)
+  const phase = coefficientAt(d, index, 0)
+  const angle = Math.PI * 2 * (frequency * finiteOrFallback(t, 0) + phase)
+  return clamp01(base + amplitude * Math.cos(angle))
+}
+
 /**
  * TypeScript utility function to calculate cosine palette color.
  * Used for color preview in UI.
@@ -28,16 +57,10 @@ export function calculateCosineColor(
   c: [number, number, number],
   d: [number, number, number]
 ): { r: number; g: number; b: number } {
-  // 2π — kept in sync with the WGSL `TAU` constant in
-  // shaders/shared/core/constants.wgsl.ts. Use the JS exact value rather
-  // than a 5-digit truncation so the UI preview matches the GPU swatch
-  // (the previous 6.28318 drifted by ~3e-6 / radian, visible at high
-  // brightness amplitudes).
-  const TAU = Math.PI * 2
   return {
-    r: Math.max(0, Math.min(1, a[0] + b[0] * Math.cos(TAU * (c[0] * t + d[0])))),
-    g: Math.max(0, Math.min(1, a[1] + b[1] * Math.cos(TAU * (c[1] * t + d[1])))),
-    b: Math.max(0, Math.min(1, a[2] + b[2] * Math.cos(TAU * (c[2] * t + d[2])))),
+    r: cosineChannel(t, a, b, c, d, 0),
+    g: cosineChannel(t, a, b, c, d, 1),
+    b: cosineChannel(t, a, b, c, d, 2),
   }
 }
 
@@ -55,9 +78,12 @@ export function applyDistributionTS(
   cycles: number,
   offset: number
 ): number {
-  const clamped = Math.max(0, Math.min(1, t))
-  const curved = Math.pow(clamped, power)
-  const cycled = (((curved * cycles + offset) % 1) + 1) % 1 // fract equivalent
+  const clamped = clamp01(t)
+  const safePower = Math.max(0.001, finiteOrFallback(power, 1))
+  const safeCycles = finiteOrFallback(cycles, 1)
+  const safeOffset = finiteOrFallback(offset, 0)
+  const curved = Math.pow(clamped, safePower)
+  const cycled = (((curved * safeCycles + safeOffset) % 1) + 1) % 1 // fract equivalent
   return cycled
 }
 

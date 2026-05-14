@@ -79,10 +79,10 @@ describe('fitAffineParams', () => {
     expect(beta).toBeNaN()
   })
 
-  it('returns NaNs throughout for count<2 and count>buffer', () => {
+  it('returns NaNs throughout for count<3 and count>buffer', () => {
     const E = new Float64Array([1, 2, 3])
     const K = new Float64Array([1, 2, 3])
-    for (const bad of [0, 1, 7]) {
+    for (const bad of [0, 1, 2, 7]) {
       const r = fitAffineParams(K, E, bad)
       expect(r.q).toBeNaN()
       expect(r.alpha).toBeNaN()
@@ -101,6 +101,29 @@ describe('fitAffineParams', () => {
     const viaDirect = fitAffineParams(K, E, n).q
     expect(Object.is(viaWrapper, viaDirect)).toBe(true)
   })
+
+  it('does not publish a perfect affine score for two-point spectra', () => {
+    const E = new Float64Array([1, 2])
+    const K = new Float64Array([100, -3])
+
+    const { q, alpha, beta } = fitAffineParams(K, E, 2)
+
+    expect(q).toBeNaN()
+    expect(alpha).toBeNaN()
+    expect(beta).toBeNaN()
+    expect(computeAffineFitQuality(K, E, 2)).toBeNaN()
+  })
+
+  it('rejects non-finite spectra before fit parameters are published', () => {
+    const E = new Float64Array([1, 2, Number.POSITIVE_INFINITY])
+    const K = new Float64Array([1, 2, 3])
+
+    const { q, alpha, beta } = fitAffineParams(K, E, 3)
+
+    expect(q).toBeNaN()
+    expect(alpha).toBeNaN()
+    expect(beta).toBeNaN()
+  })
 })
 
 describe('jackknifeAffineFitStdev', () => {
@@ -111,11 +134,12 @@ describe('jackknifeAffineFitStdev', () => {
     expect(sigma).toBeLessThan(1e-12)
   })
 
-  it('returns NaN when count<3 (jackknife undefined for n<3 replicates)', () => {
+  it('returns NaN when count<4 (dropped subsets need at least three points)', () => {
     const { K, E } = affinePair(1, 0, 5)
     expect(jackknifeAffineFitStdev(K, E, 0)).toBeNaN()
     expect(jackknifeAffineFitStdev(K, E, 1)).toBeNaN()
     expect(jackknifeAffineFitStdev(K, E, 2)).toBeNaN()
+    expect(jackknifeAffineFitStdev(K, E, 3)).toBeNaN()
   })
 
   it('returns NaN when count exceeds buffer length', () => {
@@ -211,6 +235,13 @@ describe('computeRigidFitQuality', () => {
     expect(computeRigidFitQuality(K, E, 0)).toBeNaN()
     expect(computeRigidFitQuality(K, E, 1)).toBeNaN()
     expect(computeRigidFitQuality(K, E, 10)).toBeNaN()
+  })
+
+  it('rejects non-finite rigid spectra', () => {
+    const K = new Float64Array([1, Number.NaN, 3])
+    const E = new Float64Array([1, 2, 3])
+
+    expect(computeRigidFitQuality(K, E, 3)).toBeNaN()
   })
 
   it('matches a manual β* = mean(K) − mean(E) derivation', () => {

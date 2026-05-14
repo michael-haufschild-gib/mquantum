@@ -12,6 +12,8 @@
  * @module lib/math/laguerrePolynomial
  */
 
+const MAX_ASSOCIATED_LAGUERRE_ORDER = 512
+
 /**
  * Evaluate the associated Laguerre polynomial L_p^α(x).
  *
@@ -24,6 +26,8 @@ export function associatedLaguerre(p: number, alpha: number, x: number): number 
   if (!Number.isFinite(p)) return NaN
   p = Math.floor(p)
   if (p < 0) return 0
+  if (p > MAX_ASSOCIATED_LAGUERRE_ORDER) return NaN
+  if (!Number.isFinite(alpha) || alpha < 0 || !Number.isFinite(x)) return NaN
   if (p === 0) return 1
   if (p === 1) return 1 + alpha - x
 
@@ -32,6 +36,7 @@ export function associatedLaguerre(p: number, alpha: number, x: number): number 
   let lCurr = lPrev1
   for (let j = 2; j <= p; j++) {
     lCurr = ((2 * j - 1 + alpha - x) * lPrev1 - (j - 1 + alpha) * lPrev2) / j
+    if (!Number.isFinite(lCurr)) return NaN
     lPrev2 = lPrev1
     lPrev1 = lCurr
   }

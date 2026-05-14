@@ -400,8 +400,16 @@ export function resolveQuantumTypeKey(
   objectType: ObjectType,
   quantumMode?: SchroedingerQuantumMode
 ): QuantumTypeKey | undefined {
-  if (objectType === 'pauliSpinor') return 'pauliSpinor'
-  if (objectType === 'schroedinger' && quantumMode) return quantumMode
+  if (objectType === 'pauliSpinor') {
+    return QUANTUM_TYPE_REGISTRY.has('pauliSpinor') ? 'pauliSpinor' : undefined
+  }
+  if (objectType === 'schroedinger' && quantumMode) {
+    const entry = QUANTUM_TYPE_REGISTRY.get(quantumMode)
+    return entry?.internal.objectType === 'schroedinger' &&
+      entry.internal.quantumMode === quantumMode
+      ? quantumMode
+      : undefined
+  }
   return undefined
 }
 

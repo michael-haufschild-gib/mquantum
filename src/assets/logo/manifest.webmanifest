@@ -1,6 +1,6 @@
 {
-  "name": "MDimension - N-Dimensional Quantum Physics Visualizer",
-  "short_name": "MDimension",
+  "name": "MQuantum - N-Dimensional Quantum Physics Visualizer",
+  "short_name": "MQuantum",
   "description": "Visualize quantum wavefunctions in 2 to 11 dimensions via WebGPU",
   "start_url": "/",
   "display": "standalone",

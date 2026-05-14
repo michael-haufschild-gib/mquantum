@@ -14,9 +14,9 @@ import { create } from 'zustand'
 export interface GPUStats {
   calls: number
   triangles: number
+  vertices: number
   points: number
   lines: number
-  uniqueVertices?: number // Actual vertex buffer count (for indexed geometry)
 }
 
 /** JavaScript heap memory usage snapshot. */
@@ -111,8 +111,8 @@ export const usePerformanceMetricsStore = create<PerformanceMetricsState>((set) 
   maxFps: 0,
   frameTime: 0,
   cpuTime: 0,
-  gpu: { calls: 0, triangles: 0, points: 0, lines: 0 },
-  sceneGpu: { calls: 0, triangles: 0, points: 0, lines: 0 },
+  gpu: { calls: 0, triangles: 0, vertices: 0, points: 0, lines: 0 },
+  sceneGpu: { calls: 0, triangles: 0, vertices: 0, points: 0, lines: 0 },
   memory: { geometries: 0, textures: 0, programs: 0, heap: 0 },
   vram: { geometries: 0, textures: 0, total: 0 },
   viewport: { width: 0, height: 0, dpr: 1 },

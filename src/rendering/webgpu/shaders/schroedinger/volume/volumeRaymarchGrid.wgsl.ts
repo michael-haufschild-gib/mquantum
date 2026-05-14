@@ -67,7 +67,8 @@ fn volumeRaymarchGrid(
   let primaryHitThreshold: f32 = 0.01;
 
   // Sample count scaled by per-pixel path length to keep step SIZE constant
-  let maxPathLen = 2.0 * uniforms.boundingRadius;
+  let safeBoundingRadius = max(abs(uniforms.boundingRadius), 1e-4);
+  let maxPathLen = 2.0 * safeBoundingRadius;
   let sampleCount = max(i32(f32(max(uniforms.sampleCount, 1)) * (tFar - tNear) / maxPathLen), 4);
   let stepLen = (tFar - tNear) / f32(sampleCount);
   var t = tNear;

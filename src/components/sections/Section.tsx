@@ -1,5 +1,5 @@
 import { AnimatePresence, m } from 'motion/react'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
 
 /** Props for the collapsible sidebar section container. */
 export interface SectionProps {
@@ -26,6 +26,14 @@ function readSectionOpenState(storageKey: string, defaultOpen: boolean): boolean
   }
 }
 
+function writeSectionOpenState(storageKey: string, isOpen: boolean): void {
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(isOpen))
+  } catch {
+    // Persistence is best-effort; blocked storage must not break the sidebar.
+  }
+}
+
 export const Section: React.FC<SectionProps> = React.memo(
   ({
     title,
@@ -38,6 +46,7 @@ export const Section: React.FC<SectionProps> = React.memo(
   }) => {
     // Persistence logic
     const storageKey = `section-state-${title.replace(/\s+/g, '-').toLowerCase()}`
+    const contentId = useId()
     const sectionRef = useRef<HTMLDivElement>(null)
     const scrollTimerRef = useRef<number | null>(null)
 
@@ -71,7 +80,7 @@ export const Section: React.FC<SectionProps> = React.memo(
 
     useEffect(() => {
       if (openState.storageKey !== storageKey) return
-      localStorage.setItem(storageKey, JSON.stringify(openState.isOpen))
+      writeSectionOpenState(storageKey, openState.isOpen)
     }, [openState.isOpen, openState.storageKey, storageKey])
 
     // Sync open state to parent after state has been reconciled with the
@@ -121,6 +130,7 @@ export const Section: React.FC<SectionProps> = React.memo(
             onClick={handleToggle}
             className="flex-1 flex items-center justify-between py-3 px-4 text-left outline-none focus-visible:ring-1 focus-visible:ring-accent/50 focus-visible:ring-inset z-10 bg-transparent"
             aria-expanded={isOpen}
+            aria-controls={contentId}
             data-testid={dataTestId ? `${dataTestId}-header` : undefined}
           >
             <div className="flex items-center gap-3">
@@ -192,7 +202,7 @@ export const Section: React.FC<SectionProps> = React.memo(
         <AnimatePresence initial={false}>
           {isOpen && (
             <m.div
-              id={`section-content-${title}`}
+              id={contentId}
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}

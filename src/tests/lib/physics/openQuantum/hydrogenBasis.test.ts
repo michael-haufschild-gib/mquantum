@@ -10,6 +10,9 @@ import {
   buildHydrogenBasis,
   extraDimEnergy,
   hydrogenEnergy,
+  normalizeHydrogenBasisDimension,
+  normalizeHydrogenBasisMaxN,
+  normalizeHydrogenExtraDimOmega,
 } from '@/lib/physics/openQuantum/hydrogenBasis'
 
 // ---------------------------------------------------------------------------
@@ -60,8 +63,32 @@ describe('extraDimEnergy', () => {
     expect(extraDimEnergy([0, 1], [2])).toBe(2.5)
   })
 
+  it('defaults non-finite or non-positive omega values to 1', () => {
+    expect(extraDimEnergy([0, 1, 0], [NaN, -2, Infinity])).toBe(2.5)
+  })
+
   it('returns 0 for empty arrays', () => {
     expect(extraDimEnergy([], [])).toBe(0)
+  })
+})
+
+describe('hydrogen basis normalization', () => {
+  it('clamps maxN to the fixed GPU basis domain', () => {
+    expect(normalizeHydrogenBasisMaxN(0)).toBe(1)
+    expect(normalizeHydrogenBasisMaxN(2.9)).toBe(2)
+    expect(normalizeHydrogenBasisMaxN(10)).toBe(3)
+    expect(normalizeHydrogenBasisMaxN(Infinity)).toBe(2)
+  })
+
+  it('clamps dimension to the shader-supported domain', () => {
+    expect(normalizeHydrogenBasisDimension(1)).toBe(2)
+    expect(normalizeHydrogenBasisDimension(7.9)).toBe(7)
+    expect(normalizeHydrogenBasisDimension(99)).toBe(11)
+    expect(normalizeHydrogenBasisDimension(NaN)).toBe(3)
+  })
+
+  it('normalizes extra-dimension frequencies to finite positive values', () => {
+    expect(normalizeHydrogenExtraDimOmega([2, NaN, -1, Infinity], 7)).toEqual([2, 1, 1, 1])
   })
 })
 
@@ -189,6 +216,18 @@ describe('buildHydrogenBasis', () => {
       // maxN=4 would produce 1+4+9+16 = 30 states without truncation
       const basis = buildHydrogenBasis(4, 3)
       expect(basis).toHaveLength(14)
+    })
+
+    it('normalizes malformed basis bounds before allocation or enumeration', () => {
+      const nonFinite = buildHydrogenBasis(Infinity, Infinity, [NaN, -1, Infinity])
+      expect(nonFinite).toHaveLength(5)
+      expect(nonFinite[0]!.extraDimN).toHaveLength(0)
+      expect(nonFinite.every((state) => Number.isFinite(state.energy))).toBe(true)
+
+      const tooLarge = buildHydrogenBasis(99, 99, [NaN, -1, Infinity])
+      expect(tooLarge).toHaveLength(14)
+      expect(tooLarge[0]!.extraDimN).toHaveLength(8)
+      expect(tooLarge.every((state) => Number.isFinite(state.energy))).toBe(true)
     })
   })
 

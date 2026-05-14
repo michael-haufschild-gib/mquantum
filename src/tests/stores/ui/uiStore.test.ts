@@ -32,6 +32,37 @@ describe('uiStore.bufferVisualization', () => {
     })
   })
 
+  describe('Runtime UI boundary guards', () => {
+    it('ignores non-boolean toggle payloads', () => {
+      const store = useUIStore.getState()
+
+      store.setShowAxisHelper(false)
+      store.setShowPerfMonitor(true)
+      store.setPerfMonitorExpanded(true)
+      store.setShowTemporalDepthBuffer(true)
+
+      store.setShowAxisHelper('false' as never)
+      store.setShowPerfMonitor('false' as never)
+      store.setPerfMonitorExpanded('false' as never)
+      store.setShowTemporalDepthBuffer('false' as never)
+
+      const next = useUIStore.getState()
+      expect(next.showAxisHelper).toBe(false)
+      expect(next.showPerfMonitor).toBe(true)
+      expect(next.perfMonitorExpanded).toBe(true)
+      expect(next.showTemporalDepthBuffer).toBe(true)
+    })
+
+    it('ignores invalid performance monitor tab identifiers', () => {
+      const store = useUIStore.getState()
+
+      store.setPerfMonitorTab('shader')
+      store.setPerfMonitorTab('gpu' as never)
+
+      expect(useUIStore.getState().perfMonitorTab).toBe('shader')
+    })
+  })
+
   describe('Animation Bias', () => {
     it('clamps animation bias to [0, 1]', () => {
       useUIStore.getState().setAnimationBias(-1)

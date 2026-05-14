@@ -295,6 +295,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
             <Switch
               checked={fs.selfInteractionEnabled}
               onCheckedChange={setSelfInteractionEnabled}
+              ariaLabel="Toggle self-interaction"
             />
           }
         >

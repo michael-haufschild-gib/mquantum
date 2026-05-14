@@ -66,6 +66,13 @@ export const MenuItems: React.FC<{
     return () => clearCloseTimeout()
   }, [clearCloseTimeout])
 
+  useEffect(() => {
+    clearCloseTimeout()
+    setActiveSubmenuIndex(null)
+    setSubmenuTriggerRect(null)
+    setSubmenuAutoFocusFirst(false)
+  }, [items, clearCloseTimeout])
+
   const getItemRef = useCallback(
     (index: number) => (el: HTMLButtonElement | null) => {
       itemRefs.current[index] = el

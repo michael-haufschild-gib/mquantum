@@ -100,6 +100,19 @@ describe('pushAutocorrelationSample', () => {
     // The oldest surviving entry lives at buf.head (index 76) with value 76.
     expect(buf.cRe[76]).toBe(76)
   })
+
+  it('drops non-finite samples instead of poisoning the capture buffer', () => {
+    const buf = createHellerBuffer(8)
+
+    pushAutocorrelationSample(buf, 1, 0, 0)
+    pushAutocorrelationSample(buf, Number.NaN, 0, 0.1)
+    pushAutocorrelationSample(buf, 1, Number.POSITIVE_INFINITY, 0.2)
+    pushAutocorrelationSample(buf, 1, 0, Number.NaN)
+
+    expect(buf.count).toBe(1)
+    expect(buf.head).toBe(1)
+    expect(buf.cRe[0]).toBe(1)
+  })
 })
 
 describe('resetHellerBuffer', () => {
@@ -333,6 +346,41 @@ describe('computeHellerSpectrum', () => {
     expect(Math.abs(top.omega - E)).toBeLessThan(2 * deltaOmega)
   })
 
+  it('treats a non-finite readback sample as a dropped slot', () => {
+    const n = 256
+    const dt = 0.1
+    const E = 2.0
+    const dropIdx = Math.floor(n / 2)
+    const buf = createHellerBuffer(n)
+    for (let i = 0; i < n; i++) {
+      const t = i * dt
+      if (i === dropIdx) {
+        pushAutocorrelationSample(buf, Number.NaN, Number.NaN, t)
+      } else {
+        pushAutocorrelationSample(buf, Math.cos(-E * t), Math.sin(-E * t), t)
+      }
+    }
+
+    const spectrum = computeHellerSpectrum(buf)
+
+    expect(spectrum.nUsed).toBe(n)
+    expect(spectrum.nInterpolated).toBe(1)
+    expect(spectrum.peaks.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('rejects sparse traces before allocating a huge reconstructed grid', () => {
+    const buf = createHellerBuffer(64)
+    for (let i = 0; i < 63; i++) {
+      pushAutocorrelationSample(buf, 1, 0, i * 0.1)
+    }
+    pushAutocorrelationSample(buf, 1, 0, 1_000_000)
+
+    const spectrum = computeHellerSpectrum(buf, 64)
+
+    expect(spectrum.nUsed).toBe(0)
+    expect(spectrum.omega).toHaveLength(0)
+  })
+
   it('rejects a non-integer-multiple anomaly (genuine cadence change)', () => {
     // A trace whose gaps are neither `dt` nor an integer multiple of
     // `dt` (e.g. a paused-then-nudged capture that landed at 1.5·dt)
@@ -407,6 +455,18 @@ describe('computeHellerSpectrum', () => {
     expect(spectrum.nUsed).toBe(n)
     expect(spectrum.nInterpolated).toBe(0)
     expect(spectrum.peaks.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('falls back to the default minimum sample gate for malformed minSamples', () => {
+    const buf = createHellerBuffer(64)
+    for (let i = 0; i < 32; i++) {
+      pushAutocorrelationSample(buf, 1, 0, i * 0.1)
+    }
+
+    const spectrum = computeHellerSpectrum(buf, Number.NaN)
+
+    expect(spectrum.nUsed).toBe(0)
+    expect(spectrum.omega).toHaveLength(0)
   })
 })
 

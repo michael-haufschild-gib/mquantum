@@ -171,6 +171,7 @@ export const CosmologyControls: React.FC<CosmologyControlsProps> = React.memo(
             checked={cosmology.enabled}
             onCheckedChange={actions.setCosmologyEnabled}
             disabled={selfInteractionEnabled || !inRange}
+            ariaLabel="Toggle cosmology"
             data-testid="cosmology-toggle"
           />
         }

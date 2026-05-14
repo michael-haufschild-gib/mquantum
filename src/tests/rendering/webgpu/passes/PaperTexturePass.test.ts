@@ -11,6 +11,7 @@ type PaperInternals = {
   seed: number
   intensity: number
   updateFromStores: (ctx: WebGPURenderContext) => void
+  writeUniformData: (ctx: WebGPURenderContext) => Float32Array
 }
 
 describe('PaperTexturePass input sanitization', () => {
@@ -67,6 +68,23 @@ describe('PaperTexturePass input sanitization', () => {
     expect(pass.foldCount).toBe(4)
     expect(pass.seed).toBe(123)
     expect(pass.intensity).toBe(0.8)
+  })
+
+  it('writes finite shader uniforms for invalid render context size and time', () => {
+    const pass = new PaperTexturePass({
+      colorInput: 'ldr-color',
+      outputResource: 'paper-output',
+    }) as unknown as PaperInternals
+
+    const data = pass.writeUniformData({
+      size: { width: Number.NaN, height: 0 },
+      frame: { time: Number.POSITIVE_INFINITY },
+    } as unknown as WebGPURenderContext)
+
+    expect(data[0]).toBe(1)
+    expect(data[1]).toBe(1)
+    expect(data[2]).toBe(0)
+    expect(Array.from(data.slice(0, 28)).every(Number.isFinite)).toBe(true)
   })
 })
 

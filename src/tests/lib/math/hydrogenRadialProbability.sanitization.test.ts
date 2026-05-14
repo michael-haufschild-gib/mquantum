@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { computeRadialProbabilityNorm } from '@/lib/math/hydrogenRadialProbability'
+import {
+  computeHydrogenRadialProbabilityDensity,
+  computeHydrogenRadialWavefunction,
+  computeRadialProbabilityNorm,
+} from '@/lib/math/hydrogenRadialProbability'
 
 describe('computeRadialProbabilityNorm input sanitization', () => {
   it('normalizes fractional quantum numbers to physical integer values', () => {
@@ -22,6 +26,24 @@ describe('computeRadialProbabilityNorm input sanitization', () => {
     const nanA0 = computeRadialProbabilityNorm(3, 1, Number.NaN)
 
     expect(nanA0).toBeCloseTo(safe, 10)
+  })
+
+  it('bounds extreme finite bohr radius before scanning radial probability', () => {
+    const bounded = computeRadialProbabilityNorm(3, 1, 1_000_000)
+    const extreme = computeRadialProbabilityNorm(3, 1, Number.MAX_VALUE)
+
+    expect(Number.isFinite(extreme)).toBe(true)
+    expect(extreme).toBeGreaterThan(0)
+    expect(extreme).toBeCloseTo(bounded, 10)
+  })
+
+  it('returns finite values for extreme finite chart radii', () => {
+    const wavefunction = computeHydrogenRadialWavefunction(2, 0, Number.MAX_VALUE, 1.0, 3)
+    const density = computeHydrogenRadialProbabilityDensity(2, 0, Number.MAX_VALUE, 1.0, 3)
+
+    expect(Number.isFinite(wavefunction)).toBe(true)
+    expect(Number.isFinite(density)).toBe(true)
+    expect(density).toBeGreaterThanOrEqual(0)
   })
 
   it('sanitizes dimension before using D-dimensional hydrogen math', () => {

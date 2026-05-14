@@ -21,7 +21,7 @@ import { usePostProcessingStore } from '../scene/postProcessingStore'
 import { useRotationStore } from '../scene/rotationStore'
 import { useTransformStore } from '../scene/transformStore'
 import { APPEARANCE_INITIAL_STATE } from '../slices/appearanceSlice'
-import { LIGHTING_INITIAL_STATE } from '../slices/lightingSlice'
+import { createLightingInitialState } from '../slices/lightingSlice'
 import { POST_PROCESSING_INITIAL_STATE } from '../slices/postProcessingSlice'
 import { SKYBOX_INITIAL_STATE } from '../slices/skyboxSlice'
 import { PBR_INITIAL_STATE } from '../slices/visual/pbrSlice'
@@ -138,7 +138,7 @@ function restoreStyleStores(data: SavedStyle['data']): void {
     ...normalizeAppearanceLoadData(sanitizeLoadedState(data.appearance)),
   })
   useLightingStore.setState({
-    ...LIGHTING_INITIAL_STATE,
+    ...createLightingInitialState(),
     ...normalizeLightingLoadData(sanitizeLoadedState(data.lighting)),
   })
   usePostProcessingStore.setState({

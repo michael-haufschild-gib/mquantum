@@ -34,6 +34,19 @@ describe('check-untracked-imports', () => {
     ).toBe(repoPath('src/assets/icons/new.svg'))
   })
 
+  it('resolves Vite root-absolute /src imports', () => {
+    const existing = new Set([repoPath('src/assets/icons/new.svg')])
+
+    expect(
+      tryResolve(
+        '/src/assets/icons/new.svg?url',
+        repoPath('src/components/IconButton.tsx'),
+        (path) => existing.has(path),
+        ROOT
+      )
+    ).toBe(repoPath('src/assets/icons/new.svg'))
+  })
+
   it('flags tracked source files that import untracked SVG assets', () => {
     const files = new Map([
       [
@@ -55,6 +68,32 @@ describe('check-untracked-imports', () => {
       {
         file: 'src/components/IconButton.tsx',
         specifier: '@/assets/icons/new.svg?react',
+        resolvedTo: 'src/assets/icons/new.svg',
+      },
+    ])
+  })
+
+  it('flags tracked source files that import untracked assets via /src absolute paths', () => {
+    const files = new Map([
+      [
+        repoPath('src/components/IconButton.tsx'),
+        "import iconUrl from '/src/assets/icons/new.svg?url'\nexport { iconUrl }\n",
+      ],
+    ])
+    const existing = new Set([...files.keys(), repoPath('src/assets/icons/new.svg')])
+
+    expect(
+      findUntrackedImportViolations({
+        root: ROOT,
+        trackedFiles: ['src/components/IconButton.tsx'],
+        untrackedFiles: ['src/assets/icons/new.svg'],
+        readFile: (path) => files.get(path),
+        exists: (path) => existing.has(path),
+      })
+    ).toEqual([
+      {
+        file: 'src/components/IconButton.tsx',
+        specifier: '/src/assets/icons/new.svg?url',
         resolvedTo: 'src/assets/icons/new.svg',
       },
     ])

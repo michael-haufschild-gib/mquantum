@@ -27,7 +27,8 @@ fn volumeRaymarchHQ(
   let primaryHitThreshold: f32 = 0.01; // Alpha threshold to consider a "hit"
 
   // Sample count scaled by per-pixel path length to keep step SIZE constant.
-  let maxPathLen = 2.0 * uniforms.boundingRadius;
+  let safeBoundingRadius = max(abs(uniforms.boundingRadius), 1e-4);
+  let maxPathLen = 2.0 * safeBoundingRadius;
   let sampleCount = max(i32(f32(max(uniforms.sampleCount, 1)) * (tFar - tNear) / maxPathLen), 4);
   let stepLen = (tFar - tNear) / f32(sampleCount);
   // Hoist 1/stepLen so compositeOverlay skips its per-call division.
@@ -39,7 +40,7 @@ fn volumeRaymarchHQ(
   let ambientLight = lighting.ambientColor * lighting.ambientIntensity;
 
   // PERF: Hoist loop-invariant bounding radius computation
-  let boundR2 = uniforms.boundingRadius * uniforms.boundingRadius;
+  let boundR2 = safeBoundingRadius * safeBoundingRadius;
   // sqrt(0.85)≈0.92: outer 8% shell is deep exponential tail for HO/hydrogen wavefunctions.
   let boundR2Skip = boundR2 * 0.85;
 
