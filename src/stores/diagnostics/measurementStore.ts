@@ -47,6 +47,8 @@ interface MeasurementState {
   measureAxis: number | null
   /** Whether a measurement readback/collapse is in progress */
   isCollapsing: boolean
+  /** Monotonic token used to ignore stale async collapse readbacks */
+  collapseGeneration: number
   /** Pending measurement request from canvas click */
   pendingMeasurement: PendingMeasurement | null
   /** Post-collapse cooldown counter (frames remaining) */
@@ -125,12 +127,24 @@ export const useMeasurementStore = create<MeasurementState>((set) => ({
   autoEvolveFrames: 30,
   measureAxis: null,
   isCollapsing: false,
+  collapseGeneration: 0,
   pendingMeasurement: null,
   cooldownFrames: 0,
   positionMean: [],
   positionStd: [],
 
-  setEnabled: (enabled) => set({ enabled }),
+  setEnabled: (enabled) =>
+    set((state) =>
+      enabled
+        ? { enabled }
+        : {
+            enabled,
+            isCollapsing: false,
+            pendingMeasurement: null,
+            cooldownFrames: 0,
+            collapseGeneration: state.collapseGeneration + 1,
+          }
+    ),
   setCollapseWidth: (width) => set({ collapseWidth: Math.max(0.05, Math.min(5, width)) }),
   setAutoEvolveFrames: (frames) =>
     set({ autoEvolveFrames: Math.max(1, Math.min(300, Math.floor(frames))) }),
@@ -138,7 +152,12 @@ export const useMeasurementStore = create<MeasurementState>((set) => ({
 
   requestMeasurement: (clickPosition) => set({ pendingMeasurement: { clickPosition } }),
 
-  startCollapse: () => set({ isCollapsing: true, pendingMeasurement: null }),
+  startCollapse: () =>
+    set((state) => ({
+      isCollapsing: true,
+      pendingMeasurement: null,
+      collapseGeneration: state.collapseGeneration + 1,
+    })),
 
   completeMeasurement: (position, density, measuredAxis) => {
     set((state) => {
@@ -184,7 +203,7 @@ export const useMeasurementStore = create<MeasurementState>((set) => ({
   },
 
   clearMeasurements: () =>
-    set({
+    set((state) => ({
       measurements: [],
       totalCount: 0,
       positionMean: [],
@@ -192,5 +211,6 @@ export const useMeasurementStore = create<MeasurementState>((set) => ({
       isCollapsing: false,
       cooldownFrames: 0,
       pendingMeasurement: null,
-    }),
+      collapseGeneration: state.collapseGeneration + 1,
+    })),
 }))

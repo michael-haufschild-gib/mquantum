@@ -25,6 +25,21 @@ vi.mock('@/lib/physics/measurementOrchestrator', () => ({
   executePartialMeasurement: vi.fn(),
 }))
 
+function createDeferred<T>(): {
+  promise: Promise<T>
+  resolve: (value: T) => void
+} {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((r) => {
+    resolve = r
+  })
+  return { promise, resolve }
+}
+
+async function flushMicrotasks(): Promise<void> {
+  for (let i = 0; i < 8; i++) await Promise.resolve()
+}
+
 describe('getCurrentEigenstateEnergy', () => {
   beforeEach(() => {
     // Reset to initial state before each test
@@ -118,5 +133,32 @@ describe('getCurrentEigenstateEnergy', () => {
       1.0
     )
     expect(useMeasurementStore.getState().measurements[0]?.position).toEqual([0.25, 0.5, 0.75])
+  })
+
+  it('ignores stale collapse readback after measurements are cleared', async () => {
+    const setLoadedWavefunction = vi.fn()
+    const readback = createDeferred<{ re: Float32Array; im: Float32Array; simTime: number }>()
+    const requestMeasurementReadback = vi.fn(() => readback.promise)
+    const tdsePass = {
+      requestMeasurementReadback,
+      setLoadedWavefunction,
+    }
+
+    useMeasurementStore.getState().requestMeasurement([0, 0, 0])
+    handleMeasurement({} as never, tdsePass as never, DEFAULT_TDSE_CONFIG)
+    expect(useMeasurementStore.getState().isCollapsing).toBe(true)
+
+    useMeasurementStore.getState().clearMeasurements()
+    readback.resolve({
+      re: new Float32Array([1]),
+      im: new Float32Array([0]),
+      simTime: 1,
+    })
+    await flushMicrotasks()
+
+    expect(executeFullMeasurement).not.toHaveBeenCalled()
+    expect(setLoadedWavefunction).not.toHaveBeenCalled()
+    expect(useMeasurementStore.getState().measurements).toHaveLength(0)
+    expect(useMeasurementStore.getState().isCollapsing).toBe(false)
   })
 })

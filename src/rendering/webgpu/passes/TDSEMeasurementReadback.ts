@@ -55,31 +55,44 @@ export function requestMeasurementReadback(
 
   encoder.copyBufferToBuffer(state.psiBuffer, 0, staging, 0, byteSize)
 
-  return device.queue
-    .onSubmittedWorkDone()
-    .then(async () => {
+  return new Promise((resolve) => {
+    // Render graph submits the encoder after pass execution returns. Defer
+    // mapping so the copy is submitted before the staging buffer enters
+    // pending-map state; mapAsync itself waits for prior use of this buffer.
+    queueMicrotask(() => {
       if (staging.mapState !== 'unmapped') {
         staging.destroy()
-        return null
+        resolve(null)
+        return
       }
-      await staging.mapAsync(GPUMapMode.READ)
 
-      // Deinterleave [Re, Im, Re, Im, ...] into separate Float32Arrays.
-      const interleaved = new Float32Array(staging.getMappedRange())
-      const re = new Float32Array(totalSites)
-      const im = new Float32Array(totalSites)
-      for (let i = 0; i < totalSites; i++) {
-        re[i] = interleaved[2 * i]!
-        im[i] = interleaved[2 * i + 1]!
-      }
-      staging.unmap()
-      staging.destroy()
+      void staging
+        .mapAsync(GPUMapMode.READ)
+        .then(() => {
+          // Deinterleave [Re, Im, Re, Im, ...] into separate Float32Arrays.
+          const interleaved = new Float32Array(staging.getMappedRange())
+          const re = new Float32Array(totalSites)
+          const im = new Float32Array(totalSites)
+          for (let i = 0; i < totalSites; i++) {
+            re[i] = interleaved[2 * i]!
+            im[i] = interleaved[2 * i + 1]!
+          }
+          staging.unmap()
+          staging.destroy()
 
-      return { re, im, simTime: capturedSimTime }
+          return { re, im, simTime: capturedSimTime }
+        })
+        .catch((err) => {
+          logger.error('[TDSE] Measurement readback failed:', err)
+          try {
+            if (staging.mapState === 'mapped') staging.unmap()
+          } catch {
+            /* already unmapped */
+          }
+          staging.destroy()
+          return null
+        })
+        .then(resolve)
     })
-    .catch((err) => {
-      logger.error('[TDSE] Measurement readback failed:', err)
-      staging.destroy()
-      return null
-    })
+  })
 }

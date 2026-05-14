@@ -50,14 +50,23 @@ export function handleMeasurement(
   const collapseWidth = mState.collapseWidth
 
   mState.startCollapse()
+  const collapseGeneration = useMeasurementStore.getState().collapseGeneration
 
   // Request async readback
   const readbackPromise = tdsePass.requestMeasurementReadback(ctx)
 
   void readbackPromise
     .then(async (data) => {
+      const currentMeasurement = useMeasurementStore.getState()
+      if (
+        !currentMeasurement.isCollapsing ||
+        currentMeasurement.collapseGeneration !== collapseGeneration
+      ) {
+        return
+      }
+
       if (!data) {
-        useMeasurementStore.getState().completeMeasurement([], 0, null)
+        currentMeasurement.completeMeasurement([], 0, null)
         return
       }
 
