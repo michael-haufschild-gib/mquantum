@@ -68,6 +68,7 @@ export class WebGPUDevice {
 
   private deviceLostCallbacks: Set<(reason: string) => void> = new Set()
   private initPromise: Promise<WebGPUInitResult> | null = null
+  private initGeneration = 0
 
   private constructor() {}
 
@@ -103,12 +104,25 @@ export class WebGPUDevice {
       return this.initPromise
     }
 
+    const generation = this.initGeneration + 1
+    this.initGeneration = generation
     this.canvas = canvas
     this.initPromise = this.doInitialize(canvas)
-      .then((result) => ({
-        success: true as const,
-        ...result,
-      }))
+      .then((result) => {
+        if (!this.isCurrentInitialization(canvas, generation)) {
+          this.destroyInitializationResult(result)
+          throw new WebGPUInitError(
+            'INTERNAL_ERROR',
+            'WebGPU initialization was superseded by a newer canvas'
+          )
+        }
+
+        this.publishInitialization(canvas, result, generation)
+        return {
+          success: true as const,
+          ...result,
+        }
+      })
       .catch((error) => {
         // `WebGPUInitError` carries an explicit failure code from the
         // throw site so the boundary doesn't have to string-match. Any
@@ -124,6 +138,52 @@ export class WebGPUDevice {
         }
       })
     return this.initPromise
+  }
+
+  private isCurrentInitialization(canvas: HTMLCanvasElement, generation: number): boolean {
+    return this.initGeneration === generation && this.canvas === canvas
+  }
+
+  private destroyInitializationResult(result: WebGPUInitData): void {
+    try {
+      result.context.unconfigure()
+    } catch (cleanupError) {
+      logger.warn('[WebGPU] Failed to unconfigure superseded context:', cleanupError)
+    }
+
+    try {
+      result.device.destroy()
+    } catch (cleanupError) {
+      logger.warn('[WebGPU] Failed to destroy superseded device:', cleanupError)
+    }
+  }
+
+  private publishInitialization(
+    canvas: HTMLCanvasElement,
+    result: WebGPUInitData,
+    generation: number
+  ): void {
+    this._adapter = result.adapter
+    this.device = result.device
+    this.context = result.context
+    this.format = result.format
+    this.capabilities = result.capabilities
+
+    // Handle device loss after refs are published so a pre-resolved lost
+    // promise cannot race with initialization and leave stale live refs.
+    void result.device.lost.then((info) => {
+      if (!this.isCurrentInitialization(canvas, generation) || this.device !== result.device) {
+        return
+      }
+      logger.error('WebGPU device lost:', info.message, 'reason:', info.reason)
+      this.handleDeviceLost(info.reason)
+    })
+
+    logger.log('[WebGPU] Initialized:', {
+      adapter: result.capabilities.adapterInfo,
+      format: result.format,
+      timestampQuery: result.capabilities.timestampQuery,
+    })
   }
 
   private async doInitialize(canvas: HTMLCanvasElement): Promise<WebGPUInitData> {
@@ -247,26 +307,6 @@ export class WebGPUDevice {
       adapterInfo: adapterInfoString,
     }
 
-    // Store references
-    this._adapter = adapter
-    this.device = device
-    this.context = context
-    this.format = format
-    this.capabilities = capabilities
-
-    // Handle device loss after refs are published so a pre-resolved lost
-    // promise cannot race with initialization and leave stale live refs.
-    void device.lost.then((info) => {
-      logger.error('WebGPU device lost:', info.message, 'reason:', info.reason)
-      this.handleDeviceLost(info.reason)
-    })
-
-    logger.log('[WebGPU] Initialized:', {
-      adapter: adapterInfoString,
-      format,
-      timestampQuery: requestsWebGPUFeature(deviceDescriptor, 'timestamp-query'),
-    })
-
     return { adapter, device, context, format, capabilities }
   }
 
@@ -377,6 +417,7 @@ export class WebGPUDevice {
    * Destroy the device and release resources.
    */
   destroy(): void {
+    this.initGeneration += 1
     this.context?.unconfigure()
     this.device?.destroy()
 
@@ -389,5 +430,16 @@ export class WebGPUDevice {
     this.deviceLostCallbacks.clear()
 
     WebGPUDevice.instance = null
+  }
+
+  /**
+   * Destroy only when the provided canvas still owns this singleton.
+   */
+  destroyForCanvas(canvas: HTMLCanvasElement): boolean {
+    if (this.canvas !== canvas) {
+      return false
+    }
+    this.destroy()
+    return true
   }
 }

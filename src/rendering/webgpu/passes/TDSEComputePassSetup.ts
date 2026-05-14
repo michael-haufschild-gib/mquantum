@@ -139,10 +139,10 @@ export function composeTdseUnpackShader(): string {
 /**
  * Pure WGSL for the Stockham FFT per-stage compute shader (TDSE variant).
  *
- * Uses the twiddle-table fork of the kernel — stages >= 2 look the complex
- * exponential up in a CPU-precomputed `storage` buffer instead of calling
- * `cos/sin` per thread. See `FFTTwiddle.ts` for table layout. Dirac and
- * Pauli compile the original `tdseStockhamFFTBlock` elsewhere.
+ * Uses the twiddle-table kernel — stages >= 2 look the complex exponential
+ * up in a CPU-precomputed `storage` buffer instead of calling `cos/sin` per
+ * thread. See `FFTTwiddle.ts` for table layout. Dirac and Pauli compose the
+ * same `tdseStockhamFFTTwiddleBlock` in their own setup files.
  */
 export function composeTdseFftStageShader(): string {
   return tdseFFTStageUniformsBlock + tdseStockhamFFTTwiddleBlock

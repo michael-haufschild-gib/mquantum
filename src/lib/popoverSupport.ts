@@ -11,3 +11,27 @@
  */
 export const supportsPopover =
   typeof HTMLElement !== 'undefined' && typeof HTMLElement.prototype.showPopover === 'function'
+
+function isIgnorablePopoverStateError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'InvalidStateError'
+}
+
+/** Show a popover without relying on `:popover-open` selector support. */
+export function showPopoverSafely(popover: HTMLElement): void {
+  if (!supportsPopover) return
+  try {
+    popover.showPopover()
+  } catch (error) {
+    if (!isIgnorablePopoverStateError(error)) throw error
+  }
+}
+
+/** Hide a popover without relying on `:popover-open` selector support. */
+export function hidePopoverSafely(popover: HTMLElement): void {
+  if (!supportsPopover) return
+  try {
+    popover.hidePopover()
+  } catch (error) {
+    if (!isIgnorablePopoverStateError(error)) throw error
+  }
+}

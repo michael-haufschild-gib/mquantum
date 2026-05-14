@@ -85,6 +85,15 @@ describe('preset import corruption resilience', () => {
   })
 
   describe('style import rejects entries with missing required fields', () => {
+    it('rejects null array entries without throwing', () => {
+      let result: boolean | undefined
+      expect(() => {
+        result = usePresetManagerStore.getState().importStyles(JSON.stringify([null]))
+      }).not.toThrow()
+      expect(result).toBe(false)
+      expect(usePresetManagerStore.getState().savedStyles).toHaveLength(0)
+    })
+
     it('rejects entry missing id', () => {
       const data = [makeValidStyle({ id: undefined })]
       // Remove id entirely since spread with undefined keeps the key
@@ -198,6 +207,15 @@ describe('preset import corruption resilience', () => {
     it('accepts empty array', () => {
       const result = usePresetManagerStore.getState().importScenes('[]')
       expect(result).toBe(true)
+    })
+
+    it('rejects primitive array entries without throwing', () => {
+      let result: boolean | undefined
+      expect(() => {
+        result = usePresetManagerStore.getState().importScenes(JSON.stringify([42]))
+      }).not.toThrow()
+      expect(result).toBe(false)
+      expect(usePresetManagerStore.getState().savedScenes).toHaveLength(0)
     })
   })
 

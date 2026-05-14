@@ -35,147 +35,15 @@ struct FFTAxisUniforms {
 `
 
 /**
- * Shared-memory Stockham FFT kernel.
- *
- * Bind group layout:
- *   @group(0) @binding(0) FFTAxisUniforms (uniform)
- *   @group(0) @binding(1) complexBuf (storage, read_write) — array<vec2f>
- *
- * The buffer holds interleaved [re,im] complex values (8 bytes per element).
- * The vec2f typed view drops one shift per address computation and replaces
- * two scalar loads/stores per complex element with a single 8-byte vec2f op.
- * The buffer base is WebGPU-aligned (256 bytes) and the element stride is 8.
- */
-export const tdseSharedMemFFTBlock = /* wgsl */ `
-@group(0) @binding(0) var<uniform> axisUni: FFTAxisUniforms;
-@group(0) @binding(1) var<storage, read_write> complexBuf: array<vec2f>;
-
-const SM_FFT_TWO_PI: f32 = 6.28318530717958647692;
-
-// Unified ping-pong shared memory: A at [0..128), B at [128..256).
-// 256 * 8 = 2048 bytes — well under the 16 KB workgroup storage cap.
-// Avoids per-stage A/B selection branches by indexing a single flat buffer.
-var<workgroup> smem: array<vec2f, 256>;
-
-fn cmul_sm(a: vec2f, b: vec2f) -> vec2f {
-  return vec2f(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
-}
-
-@compute @workgroup_size(64)
-fn main(
-  @builtin(local_invocation_id) lid: vec3u,
-  @builtin(workgroup_id) wgid: vec3u
-) {
-  let tid = lid.x;
-  let N = axisUni.axisDim;
-  let halfN = N >> 1u;
-  let log2N = axisUni.log2N;
-  let pencilId = wgid.x;
-
-  // axisStride is a product of power-of-2 grid dims → itself power of 2.
-  let axisStride = axisUni.axisStride;
-  let log2Stride = firstTrailingBit(axisStride);
-  let strideMask = axisStride - 1u;
-  let batchInner = pencilId & strideMask;
-  let batchOuter = pencilId >> log2Stride;
-  let outerStride = axisStride * N;
-  let baseOffset = batchOuter * outerStride + batchInner;
-
-  // ── Load pencil from global memory into smem[0..N) (A half). ──
-  // Loop: each thread handles ceil(N/64) elements. For N ≤ 64 only iteration
-  // i=tid runs; for N=128 each thread does 2 loads. Without this loop a
-  // workgroup_size(64) kernel silently drops elements 64..127 at N=128.
-  for (var i = tid; i < N; i = i + 64u) {
-    let gAddr = baseOffset + i * axisStride;
-    smem[i] = complexBuf[gAddr];
-  }
-  workgroupBarrier();
-
-  // ── Stage 0 (specialized). ──
-  // First butterfly has halfStage=1, so j = tid & 0 = 0 and the twiddle is
-  // W^0 = (1, 0). Skip the cos/sin and complex multiply entirely.
-  if (log2N > 0u && tid < halfN) {
-    let val0 = smem[tid];
-    let val1 = smem[tid + halfN];
-    // g = tid, fullStage = 2, j = 0 → outIdx0 = tid * 2.
-    let outIdx0 = tid << 1u;
-    smem[128u + outIdx0]       = val0 + val1;
-    smem[128u + outIdx0 + 1u]  = val0 - val1;
-  }
-  workgroupBarrier();
-
-  // ── Stage 1 (specialized: twiddles ∈ {(1,0), (0,−dir)}). ──
-  // halfStage=2, fullStage=4. Angles are multiples of π/2, so cos/sin simplify
-  // to ±1, 0 and the complex multiply reduces to a swap with a signed flip.
-  // Eliminates halfN cos + halfN sin per FFT dispatch.
-  let dir = axisUni.direction;
-  if (log2N > 1u && tid < halfN) {
-    // outIdx0 = ((tid & ~1u) << 1u) + j,  j = tid & 1u.
-    let j = tid & 1u;
-    let outIdx0 = ((tid & 0xFFFFFFFEu) << 1u) + j;
-    let val0 = smem[128u + tid];                     // srcBase = 128 after stage 0
-    let val1 = smem[128u + tid + halfN];
-    // j=0: tw·val1 = val1.  j=1: tw = (0, −dir) ⇒ tw·val1 = (dir·val1.y, −dir·val1.x).
-    let rotated = vec2f(dir * val1.y, -dir * val1.x);
-    let twVal1 = select(val1, rotated, j == 1u);
-    smem[outIdx0] = val0 + twVal1;                   // dstBase = 0 → write to A
-    smem[outIdx0 + 2u] = val0 - twVal1;              // halfStage = 2
-  }
-  workgroupBarrier();
-
-  // ── Butterfly stages 2..log2N-1. ──
-  // Stage s reads from half ((s & 1) == 0 → A[0..128), else B[128..256)) and
-  // writes to the other half. srcBase/dstBase pre-computed per stage avoid
-  // per-butterfly branches over smemA vs smemB.
-  let inv_fullStage_base = -dir * SM_FFT_TWO_PI;
-  for (var s = 2u; s < log2N; s = s + 1u) {
-    let halfStage = 1u << s;
-    let fullStage = halfStage << 1u;
-    let hsMask = halfStage - 1u;
-    let srcBase = (s & 1u) << 7u;         // 0 or 128
-    let dstBase = ((s + 1u) & 1u) << 7u;  // 128 or 0
-    // 1/fullStage is uniform across halfN butterfly threads — compute once.
-    let invFullStage = 1.0 / f32(fullStage);
-    let anglePerJ = inv_fullStage_base * invFullStage;
-
-    if (tid < halfN) {
-      // Stockham decomposition: g = tid >> s, j = tid & (halfStage-1).
-      let j = tid & hsMask;
-      // g * fullStage = ((tid >> s) << (s+1)) = (tid & ~hsMask) << 1.
-      let outIdx0 = ((tid & ~hsMask) << 1u) + j;
-
-      let val0 = smem[srcBase + tid];
-      let val1 = smem[srcBase + tid + halfN];
-
-      // Twiddle: W_N^{j*N/fullStage} = exp(-i·dir·2π·j/fullStage).
-      let angle = anglePerJ * f32(j);
-      let tw = vec2f(cos(angle), sin(angle));
-      let twVal1 = cmul_sm(tw, val1);
-
-      smem[dstBase + outIdx0] = val0 + twVal1;
-      smem[dstBase + outIdx0 + halfStage] = val0 - twVal1;
-    }
-
-    workgroupBarrier();
-  }
-
-  // ── Write result back to global memory. ──
-  // After log2N stages the result lives in half (log2N & 1).
-  let finalBase = (log2N & 1u) << 7u;
-  for (var i = tid; i < N; i = i + 64u) {
-    let gAddr = baseOffset + i * axisStride;
-    complexBuf[gAddr] = smem[finalBase + i];
-  }
-}
-`
-
-/**
  * Shared-memory Stockham FFT kernel with a CPU-precomputed twiddle table
  * replacing `cos/sin` at stages s >= 2.
  *
- * Diverges from `tdseSharedMemFFTBlock` only in the s >= 2 butterfly body —
- * the stage-0/1 specializations, smem ping-pong layout, workgroup-barrier
- * cadence, and load/store loops are identical.
+ * Stage 0 (W^0 = (1,0)) and stage 1 (W^{halfStage} ∈ {(1,0), (0,-dir)})
+ * stay specialized in-kernel — no table read, no trig. Stages ≥ 2 read the
+ * forward twiddle from `fftTwiddleTable` and conjugate via `dir * twFwd.y`
+ * for the inverse direction. Same smem ping-pong layout, workgroup-barrier
+ * cadence, and load/store loops a per-stage Stockham would use, but a single
+ * dispatch covers all log2(N) stages of one pencil.
  *
  * Bind group layout:
  *   @group(0) @binding(0) FFTAxisUniforms (uniform)
@@ -187,6 +55,11 @@ fn main(
  *
  * Used by TDSE, Dirac, and Pauli (all three modes share the same twiddle
  * buffer because their FFT axis lengths fit within N_MAX_FFT_TWIDDLE = 128).
+ *
+ * The buffer holds interleaved [re,im] complex values (8 bytes per element).
+ * The vec2f typed view drops one shift per address computation and replaces
+ * two scalar loads/stores per complex element with a single 8-byte vec2f op.
+ * The buffer base is WebGPU-aligned (256 bytes) and the element stride is 8.
  */
 export const tdseSharedMemFFTTwiddleBlock = /* wgsl */ `
 @group(0) @binding(0) var<uniform> axisUni: FFTAxisUniforms;

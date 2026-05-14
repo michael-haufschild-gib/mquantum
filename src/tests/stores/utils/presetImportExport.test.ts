@@ -105,6 +105,24 @@ describe('parseAndValidateImport', () => {
       if (!result.success) return
       expect(result.items).toHaveLength(3)
     })
+
+    it('accepts epoch-zero timestamps because imports regenerate timestamps', () => {
+      const original = makeValidStyle('Epoch Style')
+      original.timestamp = 0
+
+      const result = parseAndValidateImport(
+        JSON.stringify([original]),
+        new Set<string>(),
+        STYLE_IMPORT_KEYS,
+        identitySanitize,
+        'styles'
+      )
+
+      expect(result.success).toBe(true)
+      if (!result.success) return
+      expect(result.items[0]!.name).toBe('Epoch Style')
+      expect(result.items[0]!.timestamp).toBeGreaterThan(0)
+    })
   })
 
   describe('name deduplication', () => {
@@ -169,6 +187,29 @@ describe('parseAndValidateImport', () => {
       expect(result.success).toBe(false)
       if (result.success) return
       expect(result.error).toContain('expected an array')
+    })
+
+    it('rejects null, primitive, and array items without throwing', () => {
+      for (const item of [null, 42, 'bad', true, []]) {
+        expect(() =>
+          parseAndValidateImport(
+            JSON.stringify([item]),
+            new Set<string>(),
+            STYLE_IMPORT_KEYS,
+            identitySanitize,
+            'styles'
+          )
+        ).not.toThrow()
+
+        const result = parseAndValidateImport(
+          JSON.stringify([item]),
+          new Set<string>(),
+          STYLE_IMPORT_KEYS,
+          identitySanitize,
+          'styles'
+        )
+        expect(result.success).toBe(false)
+      }
     })
 
     it('rejects items missing required data keys', () => {

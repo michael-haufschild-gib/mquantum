@@ -9,20 +9,25 @@ type MockGraphInstance = {
   dispose: ReturnType<typeof vi.fn>
 }
 
-const { initializeMock, onDeviceLostMock, graphInstances } = vi.hoisted(() => {
-  const instances: MockGraphInstance[] = []
-  return {
-    initializeMock: vi.fn(),
-    onDeviceLostMock: vi.fn(),
-    graphInstances: instances,
-  }
-})
+const { initializeMock, onDeviceLostMock, destroyMock, graphInitializeMock, graphInstances } =
+  vi.hoisted(() => {
+    const instances: MockGraphInstance[] = []
+    return {
+      initializeMock: vi.fn(),
+      onDeviceLostMock: vi.fn(),
+      destroyMock: vi.fn(),
+      graphInitializeMock: vi.fn(),
+      graphInstances: instances,
+    }
+  })
 
 vi.mock('@/rendering/webgpu/core/WebGPUDevice', () => ({
   WebGPUDevice: {
     getInstance: () => ({
       initialize: initializeMock,
       onDeviceLost: onDeviceLostMock,
+      destroy: destroyMock,
+      destroyForCanvas: destroyMock,
     }),
   },
 }))
@@ -30,7 +35,7 @@ vi.mock('@/rendering/webgpu/core/WebGPUDevice', () => ({
 vi.mock('@/rendering/webgpu/graph/WebGPURenderGraph', () => ({
   WebGPURenderGraph: class MockWebGPURenderGraph {
     setSize = vi.fn()
-    initialize = vi.fn().mockResolvedValue(undefined)
+    initialize = graphInitializeMock
     dispose = vi.fn()
 
     constructor() {
@@ -52,6 +57,9 @@ describe('WebGPUCanvas', () => {
   beforeEach(() => {
     initializeMock.mockReset()
     onDeviceLostMock.mockReset()
+    destroyMock.mockReset()
+    graphInitializeMock.mockReset()
+    graphInitializeMock.mockResolvedValue(undefined)
     graphInstances.length = 0
 
     Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
@@ -134,5 +142,90 @@ describe('WebGPUCanvas', () => {
     const canvas = screen.getByTestId('webgpu-canvas') as HTMLCanvasElement
     expect(canvas.width).toBe(1)
     expect(canvas.height).toBe(1)
+  })
+
+  it('disposes graph, unregisters device-loss handler, and destroys device on unmount', async () => {
+    initializeMock.mockResolvedValue({ success: true })
+    const unsubscribe = vi.fn()
+    onDeviceLostMock.mockReturnValue(unsubscribe)
+
+    const { unmount } = render(<WebGPUCanvas dpr={1} />)
+
+    await waitFor(() => {
+      expect(graphInstances).toHaveLength(1)
+      expect(onDeviceLostMock).toHaveBeenCalledTimes(1)
+    })
+
+    unmount()
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
+    expect(graphInstances[0]!.dispose).toHaveBeenCalledTimes(1)
+    expect(destroyMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('destroys a device that finishes initializing after the component unmounts', async () => {
+    let resolveInitialize!: (result: { success: true }) => void
+    const initializePromise = new Promise<{ success: true }>((resolve) => {
+      resolveInitialize = resolve
+    })
+    initializeMock.mockReturnValue(initializePromise)
+
+    const { unmount } = render(<WebGPUCanvas dpr={1} />)
+
+    await waitFor(() => {
+      expect(initializeMock).toHaveBeenCalledTimes(1)
+    })
+
+    unmount()
+    expect(destroyMock).not.toHaveBeenCalled()
+
+    resolveInitialize({ success: true })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(destroyMock).toHaveBeenCalledTimes(1)
+    expect(graphInstances).toHaveLength(0)
+  })
+
+  it('disposes graph and destroys device when graph initialization fails', async () => {
+    initializeMock.mockResolvedValue({ success: true })
+    graphInitializeMock.mockRejectedValueOnce(new Error('graph init failed'))
+    const onError = vi.fn()
+
+    render(<WebGPUCanvas dpr={1} onError={onError} />)
+
+    await waitFor(() => {
+      expect(onError).toHaveBeenCalledTimes(1)
+    })
+
+    expect(onError.mock.calls[0]![0]).toBeInstanceOf(Error)
+    expect((onError.mock.calls[0]![0] as Error).message).toBe('graph init failed')
+    expect(graphInstances).toHaveLength(1)
+    expect(graphInstances[0]!.dispose).toHaveBeenCalledTimes(1)
+    expect(destroyMock).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('webgpu-container')).toHaveAttribute('data-renderer-state', 'error')
+  })
+
+  it('keeps the error boundary stable when the onError callback throws', async () => {
+    initializeMock.mockResolvedValue({
+      success: false,
+      code: 'NO_NAVIGATOR_GPU',
+      error: 'mock webgpu unavailable',
+    })
+    const onError = vi.fn(() => {
+      throw new Error('consumer error handler failed')
+    })
+
+    render(<WebGPUCanvas dpr={1} onError={onError} />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('webgpu-container')).toHaveAttribute('data-renderer-state', 'error')
+    })
+
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('webgpu-container')).toHaveAttribute(
+      'data-renderer-error',
+      'mock webgpu unavailable'
+    )
   })
 })

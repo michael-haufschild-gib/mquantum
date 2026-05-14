@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { CanvasContextMenu } from '@/components/layout/CanvasContextMenu'
+import { Z_INDEX } from '@/constants/zIndex'
 import { useDropdownStore } from '@/stores/ui/dropdownStore'
 
 // Mock the stores
@@ -115,6 +116,15 @@ describe('CanvasContextMenu (invariants)', () => {
       expect(screen.getByText('Toggle Right Panel')).toBeInTheDocument()
     })
 
+    it('exposes context menu semantics to assistive tech', async () => {
+      render(<CanvasContextMenu />)
+
+      rightClickCanvas()
+
+      expect(await screen.findByRole('menu', { name: 'Canvas context menu' })).toBeInTheDocument()
+      expect(screen.getByRole('menuitem', { name: 'Reset Camera' })).toBeInTheDocument()
+    })
+
     it('should position menu at click coordinates', async () => {
       render(<CanvasContextMenu />)
 
@@ -133,6 +143,16 @@ describe('CanvasContextMenu (invariants)', () => {
 
       const menu = await screen.findByTestId('canvas-context-menu')
       expect(menu).toHaveStyle({ top: '250px', left: '150px' })
+    })
+
+    it('renders on the central popover layer', async () => {
+      render(<CanvasContextMenu />)
+
+      rightClickCanvas()
+
+      expect(await screen.findByTestId('canvas-context-menu')).toHaveStyle({
+        zIndex: Z_INDEX.TOOLTIP,
+      })
     })
   })
 

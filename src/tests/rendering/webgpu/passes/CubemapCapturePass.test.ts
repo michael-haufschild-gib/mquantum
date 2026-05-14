@@ -71,4 +71,43 @@ describe('CubemapCapturePass', () => {
       )
     ).toBe(false)
   })
+
+  it('requests a new capture when skybox settings change without a mode change', () => {
+    const pass = new CubemapCapturePass()
+    const internals = pass as unknown as {
+      device: GPUDevice
+      proceduralPipeline: GPURenderPipeline
+      uniformBuffer: GPUBuffer
+      needsCapture: boolean
+      lastSkyboxMode: string
+      lastSkyboxVersion: number
+      requestCapture: ReturnType<typeof vi.fn>
+      execute: (ctx: unknown) => void
+    }
+
+    internals.device = {} as GPUDevice
+    internals.proceduralPipeline = {} as GPURenderPipeline
+    internals.uniformBuffer = {} as GPUBuffer
+    internals.needsCapture = false
+    internals.lastSkyboxMode = 'procedural_ocean'
+    internals.lastSkyboxVersion = 4
+    internals.requestCapture = vi.fn()
+
+    internals.execute({
+      frame: {
+        stores: {
+          environment: {
+            skyboxMode: 'procedural_ocean',
+            skyboxVersion: 5,
+            skyboxAnimationMode: 'none',
+            skyboxAnimationSpeed: 0,
+            proceduralSettings: { timeScale: 0 },
+          },
+          animation: { isPlaying: false },
+        },
+      },
+    })
+
+    expect(internals.requestCapture).toHaveBeenCalledTimes(1)
+  })
 })

@@ -50,19 +50,39 @@ export function handleMeasurement(
   const collapseWidth = mState.collapseWidth
 
   mState.startCollapse()
+  const collapseGeneration = useMeasurementStore.getState().collapseGeneration
 
   // Request async readback
   const readbackPromise = tdsePass.requestMeasurementReadback(ctx)
 
   void readbackPromise
     .then(async (data) => {
+      const currentMeasurement = useMeasurementStore.getState()
+      if (
+        !currentMeasurement.isCollapsing ||
+        currentMeasurement.collapseGeneration !== collapseGeneration
+      ) {
+        return
+      }
+
       if (!data) {
-        useMeasurementStore.getState().completeMeasurement([], 0, null)
+        currentMeasurement.completeMeasurement([], 0, null)
         return
       }
 
       const { executeFullMeasurement, executePartialMeasurement } =
         await import('@/lib/physics/measurementOrchestrator')
+
+      // Re-check after the awaited dynamic import: if a new collapse started
+      // (or the collapse was cancelled) during the await, drop this stale
+      // readback so inject/record can't overwrite the newer collapse.
+      const postImportMeasurement = useMeasurementStore.getState()
+      if (
+        !postImportMeasurement.isCollapsing ||
+        postImportMeasurement.collapseGeneration !== collapseGeneration
+      ) {
+        return
+      }
 
       const config = {
         latticeDim: gridSize.length,
@@ -97,6 +117,8 @@ export function handleMeasurement(
     .catch((err) => {
       logger.error('[Measurement] Collapse failed:', err)
       const s = useMeasurementStore.getState()
-      if (s.isCollapsing) s.completeMeasurement([], 0, null)
+      if (s.isCollapsing && s.collapseGeneration === collapseGeneration) {
+        s.completeMeasurement([], 0, null)
+      }
     })
 }

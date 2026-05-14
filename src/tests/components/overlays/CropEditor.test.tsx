@@ -11,6 +11,7 @@ import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { CropEditor } from '@/components/overlays/CropEditor'
+import { Z_INDEX } from '@/constants/zIndex'
 import { useExportStore } from '@/stores/runtime/exportStore'
 import { useLayoutStore } from '@/stores/ui/layoutStore'
 
@@ -146,6 +147,12 @@ describe('CropEditor', () => {
     expect(screen.getByText('Crop Selection')).toBeInTheDocument()
     expect(screen.getByText('Confirm Area')).toBeInTheDocument()
     expect(screen.getByText('Cancel')).toBeInTheDocument()
+  })
+
+  it('renders on the central modal stacking layer', () => {
+    useExportStore.setState({ isCropEditorOpen: true })
+    renderWithToast(<CropEditor />)
+    expect(screen.getByTestId('crop-editor-layer')).toHaveStyle({ zIndex: Z_INDEX.MODAL })
   })
 
   it('shows aspect ratio preset buttons', () => {

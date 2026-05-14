@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { Z_INDEX } from '@/constants/zIndex'
 import { useCameraStore } from '@/stores/scene/cameraStore'
 import { type LayoutStore, useLayoutStore } from '@/stores/ui/layoutStore'
 import { useThemeStore } from '@/stores/ui/themeStore'
@@ -331,7 +332,11 @@ export const CommandPalette: React.FC = React.memo(() => {
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[20vh] px-4">
+        <div
+          data-testid="command-palette-layer"
+          className="fixed inset-0 flex items-start justify-center pt-[20vh] px-4"
+          style={{ zIndex: Z_INDEX.MODAL }}
+        >
           <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

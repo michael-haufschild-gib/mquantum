@@ -11,7 +11,7 @@ import React, {
 } from 'react'
 
 import { soundManager } from '@/lib/audio/SoundManager'
-import { supportsPopover } from '@/lib/popoverSupport'
+import { hidePopoverSafely, showPopoverSafely, supportsPopover } from '@/lib/popoverSupport'
 
 /** Props for the Popover component */
 export interface PopoverProps {
@@ -142,6 +142,7 @@ export const Popover: React.FC<PopoverProps> = React.memo(
   }) => {
     const popoverRef = useRef<HTMLDivElement>(null)
     const triggerRef = useRef<HTMLElement>(null)
+    const nativePopoverOpenRef = useRef(false)
     const popoverId = useId()
 
     const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
@@ -252,10 +253,12 @@ export const Popover: React.FC<PopoverProps> = React.memo(
       const popover = popoverRef.current
       if (!popover) return
 
-      if (isOpen && !popover.matches(':popover-open')) {
-        popover.showPopover()
-      } else if (!isOpen && popover.matches(':popover-open')) {
-        popover.hidePopover()
+      if (isOpen) {
+        showPopoverSafely(popover)
+        nativePopoverOpenRef.current = true
+      } else if (nativePopoverOpenRef.current) {
+        hidePopoverSafely(popover)
+        nativePopoverOpenRef.current = false
       }
     }, [isOpen])
 

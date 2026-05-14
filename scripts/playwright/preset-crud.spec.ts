@@ -46,7 +46,7 @@ async function saveSceneViaUI(
 
   // Read back the id of the scene we just saved
   return page.evaluate(async (n: string) => {
-    const mod = await import('/src/stores/presetManagerStore.ts')
+    const mod = await import('/src/stores/runtime/presetManagerStore.ts')
     const scene = mod.usePresetManagerStore.getState().savedScenes.find((s) => s.name === n)
     return scene?.id ?? ''
   }, name)
@@ -70,7 +70,7 @@ async function saveStyleViaUI(
   await page.keyboard.press('Escape')
 
   return page.evaluate(async (n: string) => {
-    const mod = await import('/src/stores/presetManagerStore.ts')
+    const mod = await import('/src/stores/runtime/presetManagerStore.ts')
     const style = mod.usePresetManagerStore.getState().savedStyles.find((s) => s.name === n)
     return style?.id ?? ''
   }, name)
@@ -83,7 +83,7 @@ test.describe('scene preset CRUD', () => {
     await page.goto('/?t=schroedinger&d=5&qm=harmonicOscillator')
     await waitForAppLoaded(page)
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/presetManagerStore.ts')
+      const mod = await import('/src/stores/runtime/presetManagerStore.ts')
       const store = mod.usePresetManagerStore.getState()
       for (const scene of store.savedScenes) {
         store.deleteScene(scene.id)
@@ -249,7 +249,7 @@ test.describe('scene preset CRUD', () => {
 
     // Both scenes should exist in the store (duplicate names allowed)
     const savedScenes = await page.evaluate(async (name: string) => {
-      const mod = await import('/src/stores/presetManagerStore.ts')
+      const mod = await import('/src/stores/runtime/presetManagerStore.ts')
       return mod.usePresetManagerStore
         .getState()
         .savedScenes.filter((s) => s.name === name)
@@ -275,7 +275,7 @@ test.describe('style preset CRUD', () => {
     await page.goto('/')
     await waitForAppLoaded(page)
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/presetManagerStore.ts')
+      const mod = await import('/src/stores/runtime/presetManagerStore.ts')
       const store = mod.usePresetManagerStore.getState()
       for (const style of store.savedStyles) {
         store.deleteStyle(style.id)
@@ -296,7 +296,7 @@ test.describe('style preset CRUD', () => {
   test('load saved style changes visual state', async ({ page }) => {
     // Change colorAlgorithm to something distinctive
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/appearanceStore.ts')
+      const mod = await import('/src/stores/scene/appearanceStore.ts')
       mod.useAppearanceStore.setState({ colorAlgorithm: 'blackbody' })
     })
 
@@ -306,13 +306,13 @@ test.describe('style preset CRUD', () => {
 
     // Change to a different value
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/appearanceStore.ts')
+      const mod = await import('/src/stores/scene/appearanceStore.ts')
       mod.useAppearanceStore.setState({ colorAlgorithm: 'phase' })
     })
 
     // Verify it changed
     const middleAlgo = await page.evaluate(async () => {
-      const mod = await import('/src/stores/appearanceStore.ts')
+      const mod = await import('/src/stores/scene/appearanceStore.ts')
       return mod.useAppearanceStore.getState().colorAlgorithm
     })
     expect(middleAlgo).toBe('phase')
@@ -324,7 +324,7 @@ test.describe('style preset CRUD', () => {
     // colorAlgorithm should be restored to 'blackbody'
     await expect(async () => {
       const restored = await page.evaluate(async () => {
-        const mod = await import('/src/stores/appearanceStore.ts')
+        const mod = await import('/src/stores/scene/appearanceStore.ts')
         return mod.useAppearanceStore.getState().colorAlgorithm
       })
       expect(restored).toBe('blackbody')
@@ -363,7 +363,7 @@ test.describe('style preset CRUD', () => {
 
     // Delete via store
     await page.evaluate(async (name: string) => {
-      const mod = await import('/src/stores/presetManagerStore.ts')
+      const mod = await import('/src/stores/runtime/presetManagerStore.ts')
       const store = mod.usePresetManagerStore.getState()
       const style = store.savedStyles.find((s) => s.name === name)
       if (style) store.deleteStyle(style.id)
