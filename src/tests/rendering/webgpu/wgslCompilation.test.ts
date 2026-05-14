@@ -1314,6 +1314,17 @@ describe('WGSL Shader Compilation - Skybox', () => {
     expect(features).toContain('Sun Glow')
     expect(features).toContain('Vignette')
   })
+
+  it('guards ocean palette-derived normalization against zero vectors', () => {
+    const { wgsl } = composeSkyboxFragmentShader({
+      mode: 'ocean',
+      effects: { sun: false, vignette: false },
+    })
+
+    expect(wgsl).toContain('fn safeNormalizeOcean(')
+    expect(wgsl).not.toContain('normalize(userSurface - userDeep')
+    expect(wgsl).not.toContain('normalize(userMid +')
+  })
 })
 
 describe('WGSL Cross-Object Verification', () => {

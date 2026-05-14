@@ -173,6 +173,7 @@ export class CubemapCapturePass extends WebGPUBasePass {
   // External texture tracking
   private lastExternalTextureUuid: string | null = null
   private lastSkyboxMode: string | null = null
+  private lastSkyboxVersion: number | null = null
 
   constructor(config: CubemapCapturePassConfig = {}) {
     super({
@@ -531,16 +532,28 @@ export class CubemapCapturePass extends WebGPUBasePass {
     // Get environment state for smart capture throttling
     const env = getStoreSnapshot<{
       skyboxMode?: string
+      skyboxVersion?: number
       skyboxAnimationMode?: string
       skyboxAnimationSpeed?: number
       proceduralSettings?: { timeScale?: number }
     }>(ctx, 'environment')
 
     const currentSkyboxMode = env?.skyboxMode ?? null
+    const currentSkyboxVersion =
+      typeof env?.skyboxVersion === 'number' && Number.isFinite(env.skyboxVersion)
+        ? env.skyboxVersion
+        : null
 
     // Check for skybox mode changes
     if (currentSkyboxMode !== this.lastSkyboxMode) {
       this.lastSkyboxMode = currentSkyboxMode
+      this.requestCapture()
+    }
+
+    // Check for skybox setting changes that do not rebuild the pass, such as
+    // procedural palette, intensity, or ocean-specific controls.
+    if (currentSkyboxVersion !== this.lastSkyboxVersion) {
+      this.lastSkyboxVersion = currentSkyboxVersion
       this.requestCapture()
     }
 

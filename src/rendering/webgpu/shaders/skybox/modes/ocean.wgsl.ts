@@ -5,6 +5,14 @@ export const oceanBlock = `
 // --- Ocean Mode: Deep Ocean Underwater Atmosphere ---
 // Serene, calming, elegant - with caustic patterns, bubbles and surface shimmer
 
+fn safeNormalizeOcean(v: vec3<f32>, fallback: vec3<f32>) -> vec3<f32> {
+  let lenSq = dot(v, v);
+  if (lenSq > 1e-12) {
+    return v * inverseSqrt(lenSq);
+  }
+  return fallback;
+}
+
 fn getDeepOcean(dir: vec3<f32>, time: f32) -> vec3<f32> {
   // Base gradient from deep to surface - controlled by depth gradient
   var depth = 1.0 - (dir.y * 0.5 + 0.5);
@@ -69,12 +77,18 @@ fn getDeepOcean(dir: vec3<f32>, time: f32) -> vec3<f32> {
   let contrastBoost = 1.0 + (1.0 - paletteContrast) * 1.5;
 
   // Create enhanced colors for seaweed visibility
-  let colorDir = normalize(userSurface - userDeep + vec3<f32>(0.001));
+  let colorDir = safeNormalizeOcean(
+    userSurface - userDeep + vec3<f32>(0.001),
+    vec3<f32>(0.0, 0.0, 1.0)
+  );
   let seaweedHighlight = userMid + colorDir * 0.4 * contrastBoost;
   let seaweedShadow = userMid - colorDir * 0.3 * contrastBoost;
 
   // Add subtle complementary tint to highlights for extra pop
-  let complement = vec3<f32>(1.0) - normalize(userMid + vec3<f32>(0.1));
+  let complement = vec3<f32>(1.0) - safeNormalizeOcean(
+    userMid + vec3<f32>(0.1),
+    vec3<f32>(0.57735026)
+  );
   let seaweedHighlightFinal = seaweedHighlight + complement * 0.15 * contrastBoost;
 
   // Base water color with enhanced depth gradient
