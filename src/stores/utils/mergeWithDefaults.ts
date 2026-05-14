@@ -39,11 +39,26 @@ import {
   RAYMARCH_QUALITY_TO_SAMPLES,
   SCHROEDINGER_QUALITY_PRESETS,
 } from '@/lib/geometry/extended/types'
+import {
+  DEFAULT_WHEELER_DEWITT_CONFIG,
+  type WdwSrmtClock,
+} from '@/lib/geometry/extended/wheelerDeWitt'
 import { isAnalyticQuantumType } from '@/lib/geometry/registry'
 import type { QuantumTypeKey } from '@/lib/geometry/registry/types'
 import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
 import { sanitizePowerOfTwoGridSizes } from '@/lib/math/ndArray'
+import {
+  isWdwBoundaryCondition,
+  WDW_SOLVER_MAX_COSMOLOGICAL_CONSTANT,
+  WDW_SOLVER_MAX_GRID_NA,
+  WDW_SOLVER_MAX_GRID_NPHI,
+  WDW_SOLVER_MAX_INFLATON_MASS,
+  WDW_SOLVER_MAX_INFLATON_MASS_ASYMMETRY,
+  WDW_SOLVER_MIN_COSMOLOGICAL_CONSTANT,
+  WDW_SOLVER_MIN_INFLATON_MASS,
+  WDW_SOLVER_MIN_INFLATON_MASS_ASYMMETRY,
+} from '@/lib/physics/wheelerDeWitt/solverInputValidation'
 
 import { reconcileCosmologyInvariants } from '../slices/geometry/setters/freeScalarCosmologySetters'
 import { OBJECT_TYPE_TO_CONFIG_KEY } from './presetSerialization'
@@ -328,6 +343,7 @@ const TDSE_ENUM_FIELD_RULES: readonly EnumFieldRule[] = [
   { field: 'disorderDistribution', isValid: isTdseDisorderDistribution },
   { field: 'densityView', isValid: isTdseDensityView },
 ] as const
+const WDW_SRMT_CLOCK_SET = new Set<WdwSrmtClock>(['a', 'phi1', 'phi2'])
 
 function normalizeEnumFields(
   record: Record<string, unknown>,
@@ -352,6 +368,120 @@ function normalizeTdseEnums(normalized: Record<string, unknown>): Record<string,
   const next = normalizeEnumFields(tdseRecord, defaults, TDSE_ENUM_FIELD_RULES)
 
   return next === tdseRecord ? normalized : { ...normalized, tdse: next }
+}
+
+function isWdwSrmtClock(value: unknown): value is WdwSrmtClock {
+  return typeof value === 'string' && WDW_SRMT_CLOCK_SET.has(value as WdwSrmtClock)
+}
+
+function clampFiniteNumber(value: unknown, fallback: number, min: number, max: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
+  return Math.max(min, Math.min(max, value))
+}
+
+function clampFiniteInteger(value: unknown, fallback: number, min: number, max: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
+  return Math.max(min, Math.min(max, Math.round(value)))
+}
+
+function positiveFiniteOrFallback(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback
+}
+
+function normalizeWheelerDeWittConfig(
+  normalized: Record<string, unknown>
+): Record<string, unknown> {
+  const wdw = normalized.wheelerDeWitt
+  if (!wdw || typeof wdw !== 'object' || Array.isArray(wdw)) return normalized
+
+  const current = wdw as Record<string, unknown>
+  const defaults = DEFAULT_WHEELER_DEWITT_CONFIG
+  let aMin = positiveFiniteOrFallback(current.aMin, defaults.aMin)
+  let aMax =
+    typeof current.aMax === 'number' && Number.isFinite(current.aMax) && current.aMax > aMin
+      ? current.aMax
+      : defaults.aMax
+  if (!(aMax > aMin)) {
+    aMin = defaults.aMin
+    aMax = defaults.aMax
+  }
+
+  return {
+    ...normalized,
+    wheelerDeWitt: {
+      ...current,
+      boundaryCondition: isWdwBoundaryCondition(current.boundaryCondition)
+        ? current.boundaryCondition
+        : defaults.boundaryCondition,
+      inflatonMass: clampFiniteNumber(
+        current.inflatonMass,
+        defaults.inflatonMass,
+        WDW_SOLVER_MIN_INFLATON_MASS,
+        WDW_SOLVER_MAX_INFLATON_MASS
+      ),
+      inflatonMassAsymmetry: clampFiniteNumber(
+        current.inflatonMassAsymmetry,
+        defaults.inflatonMassAsymmetry,
+        WDW_SOLVER_MIN_INFLATON_MASS_ASYMMETRY,
+        WDW_SOLVER_MAX_INFLATON_MASS_ASYMMETRY
+      ),
+      cosmologicalConstant: clampFiniteNumber(
+        current.cosmologicalConstant,
+        defaults.cosmologicalConstant,
+        WDW_SOLVER_MIN_COSMOLOGICAL_CONSTANT,
+        WDW_SOLVER_MAX_COSMOLOGICAL_CONSTANT
+      ),
+      aMin,
+      aMax,
+      gridNa: clampFiniteInteger(current.gridNa, defaults.gridNa, 16, WDW_SOLVER_MAX_GRID_NA),
+      gridNphi: clampFiniteInteger(
+        current.gridNphi,
+        defaults.gridNphi,
+        8,
+        WDW_SOLVER_MAX_GRID_NPHI
+      ),
+      phiExtent: positiveFiniteOrFallback(current.phiExtent, defaults.phiExtent),
+      streamlineDensity: clampFiniteInteger(
+        current.streamlineDensity,
+        defaults.streamlineDensity,
+        2,
+        16
+      ),
+      phaseRotationSpeed: clampFiniteNumber(
+        current.phaseRotationSpeed,
+        defaults.phaseRotationSpeed,
+        0,
+        5
+      ),
+      worldlineSpeed: clampFiniteNumber(current.worldlineSpeed, defaults.worldlineSpeed, 0.1, 3),
+      worldlinePulseWidth: clampFiniteNumber(
+        current.worldlinePulseWidth,
+        defaults.worldlinePulseWidth,
+        0.02,
+        0.3
+      ),
+      renderDynamicRange: clampFiniteNumber(
+        current.renderDynamicRange,
+        defaults.renderDynamicRange,
+        1,
+        10_000
+      ),
+      srmtClock: isWdwSrmtClock(current.srmtClock) ? current.srmtClock : defaults.srmtClock,
+      srmtCutNormalized: clampFiniteNumber(
+        current.srmtCutNormalized,
+        defaults.srmtCutNormalized,
+        0.1,
+        0.9
+      ),
+      srmtRankCap: clampFiniteInteger(current.srmtRankCap, defaults.srmtRankCap, 8, 256),
+      srmtHeatmapIntensity: clampFiniteNumber(
+        current.srmtHeatmapIntensity,
+        defaults.srmtHeatmapIntensity,
+        0,
+        1
+      ),
+    },
+  }
 }
 
 function normalizeSchroedingerQualityEnums(
@@ -431,6 +561,7 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged
   // through. Clamp here so the invariant always holds in memory.
   normalized = normalizeTdseBhParams(normalized)
   normalized = normalizeTdseEnums(normalized)
+  normalized = normalizeWheelerDeWittConfig(normalized)
   normalized = normalizeSchroedingerSurfaceMode(normalized)
 
   // Reconcile cosmology invariants for the freeScalar sub-config. A scene

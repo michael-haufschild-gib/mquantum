@@ -30,15 +30,27 @@ const SCENE_REQUIRED_KEYS = [
   'ui',
 ] as const
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 /** Validate that a preset object has all required fields. */
-function hasRequiredFields(
-  item: Record<string, unknown>,
-  requiredDataKeys: readonly string[]
-): boolean {
-  if (!item.id || !isNonEmptyTrimmedString(item.name as string) || !item.timestamp || !item.data) {
+function hasRequiredFields(item: unknown, requiredDataKeys: readonly string[]): boolean {
+  if (!isRecord(item)) {
     return false
   }
-  const data = item.data as Record<string, unknown>
+
+  const data = item.data
+  if (
+    !item.id ||
+    !isNonEmptyTrimmedString(item.name) ||
+    item.timestamp === undefined ||
+    item.timestamp === null ||
+    !isRecord(data)
+  ) {
+    return false
+  }
+
   return requiredDataKeys.every((key) => Boolean(data[key]))
 }
 
@@ -96,9 +108,7 @@ export function parseAndValidateImport<T, TItem = Record<string, unknown>>(
     }
   }
 
-  const valid = imported.every((i) =>
-    hasRequiredFields(i as Record<string, unknown>, requiredDataKeys)
-  )
+  const valid = imported.every((i) => hasRequiredFields(i, requiredDataKeys))
   if (!valid) {
     return {
       success: false,

@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { DEFAULT_PAULI_CONFIG, DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
+import { DEFAULT_WHEELER_DEWITT_CONFIG } from '@/lib/geometry/extended/wheelerDeWitt'
 import { mergeExtendedObjectStateForType } from '@/stores/utils/mergeWithDefaults'
 
 describe('mergeExtendedObjectStateForType — schroedinger', () => {
@@ -144,6 +145,72 @@ describe('mergeExtendedObjectStateForType — schroedinger', () => {
       expect(
         (schroedinger as unknown as Record<string, unknown>).uncertaintyBoundaryStrength
       ).toBeCloseTo(0.72, 5)
+    })
+  })
+
+  describe('Wheeler-DeWitt load invariants', () => {
+    it('sanitizes loaded WdW solver and display controls that bypass setters', () => {
+      const loaded = {
+        schroedinger: {
+          quantumMode: 'wheelerDeWitt',
+          wheelerDeWitt: {
+            boundaryCondition: 'bogus',
+            inflatonMass: 99,
+            cosmologicalConstant: -99,
+            inflatonMassAsymmetry: 0,
+            gridNa: 1025,
+            gridNphi: 2.5,
+            streamlineDensity: 99,
+            phaseRotationSpeed: -99,
+            worldlineSpeed: 99,
+            worldlinePulseWidth: 0,
+            renderDynamicRange: 0,
+            srmtClock: 'bogus',
+            srmtCutNormalized: 99,
+            srmtRankCap: 2.2,
+            srmtHeatmapIntensity: -1,
+          },
+        },
+      }
+
+      const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+      const wdw = (merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG).wheelerDeWitt
+
+      expect(wdw.boundaryCondition).toBe(DEFAULT_WHEELER_DEWITT_CONFIG.boundaryCondition)
+      expect(wdw.inflatonMass).toBe(2)
+      expect(wdw.cosmologicalConstant).toBe(-1)
+      expect(wdw.inflatonMassAsymmetry).toBe(0.1)
+      expect(wdw.gridNa).toBe(1024)
+      expect(wdw.gridNphi).toBe(8)
+      expect(wdw.streamlineDensity).toBe(16)
+      expect(wdw.phaseRotationSpeed).toBe(0)
+      expect(wdw.worldlineSpeed).toBe(3)
+      expect(wdw.worldlinePulseWidth).toBe(0.02)
+      expect(wdw.renderDynamicRange).toBe(1)
+      expect(wdw.srmtClock).toBe(DEFAULT_WHEELER_DEWITT_CONFIG.srmtClock)
+      expect(wdw.srmtCutNormalized).toBe(0.9)
+      expect(wdw.srmtRankCap).toBe(8)
+      expect(wdw.srmtHeatmapIntensity).toBe(0)
+    })
+
+    it('falls back to safe WdW domain bounds when a loaded scene has an invalid range', () => {
+      const loaded = {
+        schroedinger: {
+          quantumMode: 'wheelerDeWitt',
+          wheelerDeWitt: {
+            aMin: 2,
+            aMax: 1,
+            phiExtent: 0,
+          },
+        },
+      }
+
+      const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+      const wdw = (merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG).wheelerDeWitt
+
+      expect(wdw.aMin).toBe(DEFAULT_WHEELER_DEWITT_CONFIG.aMin)
+      expect(wdw.aMax).toBe(DEFAULT_WHEELER_DEWITT_CONFIG.aMax)
+      expect(wdw.phiExtent).toBe(DEFAULT_WHEELER_DEWITT_CONFIG.phiExtent)
     })
   })
 
