@@ -113,6 +113,89 @@ describe('WebGPUDevice.initialize() error contract', () => {
     expect(a).toBe(b)
   })
 
+  it('does not let a superseded canvas initialization publish over the current canvas', async () => {
+    const fakeLimits = {
+      maxStorageBufferBindingSize: 134217728,
+      maxUniformBufferBindingSize: 65536,
+      maxComputeWorkgroupSizeX: 256,
+      maxComputeWorkgroupSizeY: 256,
+      maxComputeWorkgroupSizeZ: 64,
+      maxComputeInvocationsPerWorkgroup: 256,
+      maxComputeWorkgroupStorageSize: 16384,
+      maxBindGroups: 4,
+      maxTextureDimension2D: 8192,
+    }
+    const firstDestroy = vi.fn()
+    const secondDestroy = vi.fn()
+    const firstDevice = {
+      lost: new Promise(() => {}),
+      limits: fakeLimits,
+      features: new Set<GPUFeatureName>(),
+      queue: { writeBuffer: vi.fn() },
+      destroy: firstDestroy,
+    }
+    const secondDevice = {
+      lost: new Promise(() => {}),
+      limits: fakeLimits,
+      features: new Set<GPUFeatureName>(),
+      queue: { writeBuffer: vi.fn() },
+      destroy: secondDestroy,
+    }
+    let resolveFirstDevice!: (device: typeof firstDevice) => void
+    const firstDevicePromise = new Promise<typeof firstDevice>((resolve) => {
+      resolveFirstDevice = resolve
+    })
+    const firstAdapter = {
+      features: new Set<GPUFeatureName>(),
+      limits: fakeLimits,
+      info: { vendor: 'first', architecture: 'mock', device: 'gpu-a' },
+      isFallbackAdapter: false,
+      requestDevice: vi.fn(() => firstDevicePromise),
+    }
+    const secondAdapter = {
+      features: new Set<GPUFeatureName>(),
+      limits: fakeLimits,
+      info: { vendor: 'second', architecture: 'mock', device: 'gpu-b' },
+      isFallbackAdapter: false,
+      requestDevice: vi.fn(async () => secondDevice),
+    }
+    const adapters = [firstAdapter, secondAdapter]
+    installFakeGpu(() => adapters.shift() ?? null)
+
+    const firstContext = { configure: vi.fn(), unconfigure: vi.fn() }
+    const secondContext = { configure: vi.fn(), unconfigure: vi.fn() }
+    const firstCanvas = document.createElement('canvas')
+    const secondCanvas = document.createElement('canvas')
+    Object.defineProperty(firstCanvas, 'getContext', {
+      configurable: true,
+      value: vi.fn((contextId: string) => (contextId === 'webgpu' ? firstContext : null)),
+    })
+    Object.defineProperty(secondCanvas, 'getContext', {
+      configurable: true,
+      value: vi.fn((contextId: string) => (contextId === 'webgpu' ? secondContext : null)),
+    })
+
+    const device = WebGPUDevice.getInstance()
+    const firstInit = device.initialize(firstCanvas)
+    const secondInit = device.initialize(secondCanvas)
+    const secondResult = await secondInit
+
+    resolveFirstDevice(firstDevice)
+    const firstResult = await firstInit
+
+    expect(secondResult.success).toBe(true)
+    expect(firstResult.success).toBe(false)
+    if (firstResult.success || !secondResult.success) return
+    expect(firstResult.code).toBe('INTERNAL_ERROR')
+    expect(firstResult.error).toContain('superseded')
+    expect(device.getDevice()).toBe(secondDevice)
+    expect(device.getContext()).toBe(secondContext)
+    expect(firstContext.unconfigure).toHaveBeenCalledTimes(1)
+    expect(firstDestroy).toHaveBeenCalledTimes(1)
+    expect(secondContext.unconfigure).not.toHaveBeenCalled()
+    expect(secondDestroy).not.toHaveBeenCalled()
+  })
+
   it('reports a stable error string suitable for the data-renderer-error DOM attribute', async () => {
     uninstallWebGPUMock()
 

@@ -40,6 +40,47 @@ export interface WebGPUCanvasProps {
   children?: React.ReactNode
 }
 
+interface WebGPUErrorOverlayProps {
+  className?: string
+  style?: React.CSSProperties
+  error: Error
+  errorCode: WebGPUInitErrorCode | null
+}
+
+const WebGPUErrorOverlay = React.forwardRef<HTMLDivElement, WebGPUErrorOverlayProps>(
+  ({ className, style, error, errorCode }, ref) => (
+    <div
+      ref={ref}
+      className={className}
+      data-testid="webgpu-container"
+      data-renderer-state="error"
+      data-renderer-error={error.message}
+      // `data-renderer-error-code` carries the structured failure code
+      // so e2e tests and telemetry can branch without parsing message text.
+      {...(errorCode ? { 'data-renderer-error-code': errorCode } : {})}
+      style={{
+        ...style,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'var(--text-danger)',
+      }}
+    >
+      <div style={{ textAlign: 'center', padding: '20px' }}>
+        <p>WebGPU initialization failed</p>
+        <p style={{ fontSize: '0.875rem', opacity: 0.7 }}>{error.message}</p>
+        {errorCode ? (
+          <p style={{ fontSize: '0.75rem', opacity: 0.55, marginTop: '8px' }}>
+            code: <code>{errorCode}</code>
+          </p>
+        ) : null}
+      </div>
+    </div>
+  )
+)
+
+WebGPUErrorOverlay.displayName = 'WebGPUErrorOverlay'
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -102,15 +143,30 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
 
     let cancelled = false
     let unsubDeviceLost: (() => void) | null = null
+    let deviceManager: WebGPUDevice | null = null
+    let deviceInitialized = false
+    let deviceDestroyed = false
+    let pendingGraph: WebGPURenderGraph | null = null
+
+    const destroyInitializedDevice = () => {
+      if (!deviceInitialized || deviceDestroyed) return
+      deviceDestroyed = true
+      deviceManager?.destroyForCanvas(canvas)
+      deviceManager = null
+    }
 
     const initialize = async () => {
       try {
-        const deviceManager = WebGPUDevice.getInstance()
+        deviceManager = WebGPUDevice.getInstance()
 
         // Initialize device with canvas
         const result = await deviceManager.initialize(canvas)
+        if (result.success) {
+          deviceInitialized = true
+        }
 
         if (cancelled) {
+          destroyInitializedDevice()
           return
         }
 
@@ -124,6 +180,7 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
 
         // Create render graph
         const graph = new WebGPURenderGraph()
+        pendingGraph = graph
 
         // Set initial size
         const container = containerRef.current
@@ -146,10 +203,13 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
         // Guard against unmount during async initialization
         if (cancelled) {
           graph.dispose()
+          pendingGraph = null
+          destroyInitializedDevice()
           return
         }
 
         graphRef.current = graph
+        pendingGraph = null
 
         // Register device lost handler (store unsubscribe for cleanup)
         unsubDeviceLost = deviceManager.onDeviceLost((reason) => {
@@ -170,13 +230,24 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
 
         setContext(ctx)
         setIsInitialized(true)
-        onReadyRef.current?.(graph)
+        try {
+          onReadyRef.current?.(graph)
+        } catch (callbackError) {
+          logger.error('[WebGPUCanvas] onReady callback failed:', callbackError)
+        }
       } catch (error) {
+        pendingGraph?.dispose()
+        pendingGraph = null
+        destroyInitializedDevice()
         if (cancelled) return
         logger.error('[WebGPUCanvas] Initialization failed:', error)
         const err = error instanceof Error ? error : new Error(String(error))
         setInitError(err)
-        onErrorRef.current?.(err)
+        try {
+          onErrorRef.current?.(err)
+        } catch (callbackError) {
+          logger.error('[WebGPUCanvas] onError callback failed:', callbackError)
+        }
       }
     }
 
@@ -185,10 +256,13 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
     return () => {
       cancelled = true
       unsubDeviceLost?.()
+      pendingGraph?.dispose()
+      pendingGraph = null
       if (graphRef.current) {
         graphRef.current.dispose()
         graphRef.current = null
       }
+      destroyInitializedDevice()
     }
   }, [])
 
@@ -238,40 +312,13 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
   // Render error state
   if (initError) {
     return (
-      <div
+      <WebGPUErrorOverlay
         ref={containerRef}
         className={className}
-        data-testid="webgpu-container"
-        data-renderer-state="error"
-        data-renderer-error={initError.message}
-        // `data-renderer-error-code` carries the structured failure code
-        // (NO_NAVIGATOR_GPU / ADAPTER_REQUEST_FAILED / DEVICE_REQUEST_FAILED /
-        // CONTEXT_CONFIGURE_FAILED / INTERNAL_ERROR) so e2e tests and
-        // telemetry can branch on the failure mode without parsing the
-        // human-readable message.
-        {...(initErrorCode ? { 'data-renderer-error-code': initErrorCode } : {})}
-        style={{
-          ...style,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'var(--text-danger)',
-        }}
-      >
-        <div style={{ textAlign: 'center', padding: '20px' }}>
-          <p>WebGPU initialization failed</p>
-          <p style={{ fontSize: '0.875rem', opacity: 0.7 }}>{initError.message}</p>
-          {initErrorCode ? (
-            // Surface the structured failure code so a user copy-pasting
-            // into a support ticket carries the diagnostic identifier
-            // alongside the human-readable message. Same code that lands
-            // in `data-renderer-error-code` for e2e + telemetry.
-            <p style={{ fontSize: '0.75rem', opacity: 0.55, marginTop: '8px' }}>
-              code: <code>{initErrorCode}</code>
-            </p>
-          ) : null}
-        </div>
-      </div>
+        style={style}
+        error={initError}
+        errorCode={initErrorCode}
+      />
     )
   }
 
