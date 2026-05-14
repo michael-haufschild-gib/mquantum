@@ -23,9 +23,10 @@ import {
   normalizeRotationTupleSigned,
 } from '@/lib/lighting/lightSource'
 import { logger } from '@/lib/logger'
-import type { ToneMappingAlgorithm } from '@/lib/rendering/shaderTypes'
+import { TONE_MAPPING_OPTIONS, type ToneMappingAlgorithm } from '@/lib/rendering/shaderTypes'
 
 import {
+  createDefaultLights,
   DEFAULT_AMBIENT_COLOR,
   DEFAULT_AMBIENT_ENABLED,
   DEFAULT_AMBIENT_INTENSITY,
@@ -35,7 +36,6 @@ import {
   DEFAULT_LIGHT_HORIZONTAL_ANGLE,
   DEFAULT_LIGHT_STRENGTH,
   DEFAULT_LIGHT_VERTICAL_ANGLE,
-  DEFAULT_LIGHTS,
   DEFAULT_SELECTED_LIGHT_ID,
   DEFAULT_SHOW_LIGHT_GIZMOS,
   DEFAULT_SHOW_LIGHT_INDICATOR,
@@ -125,34 +125,61 @@ export type LightingSlice = LightingSliceState & LightingSliceActions
 // Initial State
 // ============================================================================
 
-export const LIGHTING_INITIAL_STATE: LightingSliceState = {
-  // Basic lighting
-  lightEnabled: DEFAULT_LIGHT_ENABLED,
-  lightColor: DEFAULT_LIGHT_COLOR,
-  lightHorizontalAngle: DEFAULT_LIGHT_HORIZONTAL_ANGLE,
-  lightVerticalAngle: DEFAULT_LIGHT_VERTICAL_ANGLE,
-  ambientEnabled: DEFAULT_AMBIENT_ENABLED,
-  ambientIntensity: DEFAULT_AMBIENT_INTENSITY,
-  ambientColor: DEFAULT_AMBIENT_COLOR,
-  showLightIndicator: DEFAULT_SHOW_LIGHT_INDICATOR,
+/** Create a fresh lighting state so reset/load paths never share light objects. */
+export function createLightingInitialState(): LightingSliceState {
+  return {
+    // Basic lighting
+    lightEnabled: DEFAULT_LIGHT_ENABLED,
+    lightColor: DEFAULT_LIGHT_COLOR,
+    lightHorizontalAngle: DEFAULT_LIGHT_HORIZONTAL_ANGLE,
+    lightVerticalAngle: DEFAULT_LIGHT_VERTICAL_ANGLE,
+    ambientEnabled: DEFAULT_AMBIENT_ENABLED,
+    ambientIntensity: DEFAULT_AMBIENT_INTENSITY,
+    ambientColor: DEFAULT_AMBIENT_COLOR,
+    showLightIndicator: DEFAULT_SHOW_LIGHT_INDICATOR,
 
-  // Enhanced lighting
-  lightStrength: DEFAULT_LIGHT_STRENGTH,
-  toneMappingEnabled: DEFAULT_TONE_MAPPING_ENABLED,
-  toneMappingAlgorithm: DEFAULT_TONE_MAPPING_ALGORITHM,
-  exposure: DEFAULT_EXPOSURE,
+    // Enhanced lighting
+    lightStrength: DEFAULT_LIGHT_STRENGTH,
+    toneMappingEnabled: DEFAULT_TONE_MAPPING_ENABLED,
+    toneMappingAlgorithm: DEFAULT_TONE_MAPPING_ALGORITHM,
+    exposure: DEFAULT_EXPOSURE,
 
-  // Multi-light system
-  lights: DEFAULT_LIGHTS,
-  version: 0,
-  selectedLightId: DEFAULT_SELECTED_LIGHT_ID,
-  transformMode: DEFAULT_TRANSFORM_MODE,
-  showLightGizmos: DEFAULT_SHOW_LIGHT_GIZMOS,
-  isDraggingLight: false,
+    // Multi-light system
+    lights: createDefaultLights(),
+    version: 0,
+    selectedLightId: DEFAULT_SELECTED_LIGHT_ID,
+    transformMode: DEFAULT_TRANSFORM_MODE,
+    showLightGizmos: DEFAULT_SHOW_LIGHT_GIZMOS,
+    isDraggingLight: false,
+  }
 }
+
+export const LIGHTING_INITIAL_STATE: LightingSliceState = createLightingInitialState()
+
+const LIGHT_TYPES = new Set<LightType>(['point', 'directional', 'spot'])
+const TRANSFORM_MODES = new Set<TransformMode>(['translate', 'rotate'])
+const TONE_MAPPING_ALGORITHMS = new Set<ToneMappingAlgorithm>(
+  TONE_MAPPING_OPTIONS.map((option) => option.value)
+)
 
 function isValidLightingNumber(value: number): boolean {
   return Number.isFinite(value)
+}
+
+function isBoolean(value: unknown): value is boolean {
+  return typeof value === 'boolean'
+}
+
+function isLightType(value: unknown): value is LightType {
+  return typeof value === 'string' && LIGHT_TYPES.has(value as LightType)
+}
+
+function isTransformMode(value: unknown): value is TransformMode {
+  return typeof value === 'string' && TRANSFORM_MODES.has(value as TransformMode)
+}
+
+function isToneMappingAlgorithm(value: unknown): value is ToneMappingAlgorithm {
+  return typeof value === 'string' && TONE_MAPPING_ALGORITHMS.has(value as ToneMappingAlgorithm)
 }
 
 function isValidVector3Tuple(value: unknown): value is [number, number, number] {
@@ -181,16 +208,32 @@ const NUMERIC_LIGHT_FIELDS: ReadonlyArray<{
   { key: 'decay', label: 'decay', clamp: clampDecay },
 ]
 
-/**
- * Strip invalid numeric/rotation values from light updates, logging warnings.
- * @param updates - Raw partial light updates
- * @returns Sanitized updates with invalid fields removed
- */
-function sanitizeLightUpdates(
-  updates: Partial<Omit<LightSource, 'id'>>
-): Partial<Omit<LightSource, 'id'>> {
-  const sanitized: Partial<Omit<LightSource, 'id'>> = { ...updates }
+function removeInvalidLightMetadata(
+  sanitized: Partial<Omit<LightSource, 'id'>>,
+  raw: Record<string, unknown>
+): void {
+  if (raw.type !== undefined && !isLightType(raw.type)) {
+    logger.warn('[lightingSlice] Ignoring invalid light type update:', raw.type)
+    delete sanitized.type
+  }
 
+  if (raw.enabled !== undefined && !isBoolean(raw.enabled)) {
+    logger.warn('[lightingSlice] Ignoring invalid light enabled update:', raw.enabled)
+    delete sanitized.enabled
+  }
+
+  if (raw.name !== undefined && typeof raw.name !== 'string') {
+    logger.warn('[lightingSlice] Ignoring invalid light name update:', raw.name)
+    delete sanitized.name
+  }
+
+  if (raw.color !== undefined && typeof raw.color !== 'string') {
+    logger.warn('[lightingSlice] Ignoring invalid light color update:', raw.color)
+    delete sanitized.color
+  }
+}
+
+function removeInvalidLightScalars(sanitized: Partial<Omit<LightSource, 'id'>>): void {
   for (const { key, label } of NUMERIC_LIGHT_FIELDS) {
     const value = sanitized[key]
     if (value === undefined) continue
@@ -199,7 +242,9 @@ function sanitizeLightUpdates(
       delete sanitized[key]
     }
   }
+}
 
+function removeInvalidLightVectors(sanitized: Partial<Omit<LightSource, 'id'>>): void {
   if (sanitized.position !== undefined && !isValidVector3Tuple(sanitized.position)) {
     logger.warn('[lightingSlice] Ignoring invalid position update:', sanitized.position)
     delete sanitized.position
@@ -209,6 +254,22 @@ function sanitizeLightUpdates(
     logger.warn('[lightingSlice] Ignoring non-finite rotation update:', sanitized.rotation)
     delete sanitized.rotation
   }
+}
+
+/**
+ * Strip invalid numeric/rotation values from light updates, logging warnings.
+ * @param updates - Raw partial light updates
+ * @returns Sanitized updates with invalid fields removed
+ */
+function sanitizeLightUpdates(
+  updates: Partial<Omit<LightSource, 'id'>>
+): Partial<Omit<LightSource, 'id'>> {
+  const sanitized: Partial<Omit<LightSource, 'id'>> = { ...updates }
+  const raw = sanitized as Record<string, unknown>
+
+  removeInvalidLightMetadata(sanitized, raw)
+  removeInvalidLightScalars(sanitized)
+  removeInvalidLightVectors(sanitized)
 
   return sanitized
 }
@@ -246,10 +307,14 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
   set,
   get
 ) => ({
-  ...LIGHTING_INITIAL_STATE,
+  ...createLightingInitialState(),
 
   // --- Basic Lighting Actions ---
   setLightEnabled: (enabled: boolean) => {
+    if (!isBoolean(enabled)) {
+      logger.warn('[lightingSlice] Ignoring invalid light enabled flag:', enabled)
+      return
+    }
     set({ lightEnabled: enabled })
   },
 
@@ -275,6 +340,10 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
   },
 
   setAmbientEnabled: (enabled: boolean) => {
+    if (!isBoolean(enabled)) {
+      logger.warn('[lightingSlice] Ignoring invalid ambient enabled flag:', enabled)
+      return
+    }
     set((state) => ({
       ambientEnabled: enabled,
       version: state.version + 1,
@@ -300,6 +369,10 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
   },
 
   setShowLightIndicator: (show: boolean) => {
+    if (!isBoolean(show)) {
+      logger.warn('[lightingSlice] Ignoring invalid light indicator flag:', show)
+      return
+    }
     set({ showLightIndicator: show })
   },
 
@@ -313,10 +386,18 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
   },
 
   setToneMappingEnabled: (enabled: boolean) => {
+    if (!isBoolean(enabled)) {
+      logger.warn('[lightingSlice] Ignoring invalid tone mapping enabled flag:', enabled)
+      return
+    }
     set({ toneMappingEnabled: enabled })
   },
 
   setToneMappingAlgorithm: (algorithm: ToneMappingAlgorithm) => {
+    if (!isToneMappingAlgorithm(algorithm)) {
+      logger.warn('[lightingSlice] Ignoring invalid tone mapping algorithm:', algorithm)
+      return
+    }
     set({ toneMappingAlgorithm: algorithm })
   },
 
@@ -330,6 +411,10 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
 
   // --- Multi-Light System Actions ---
   addLight: (type: LightType) => {
+    if (!isLightType(type)) {
+      logger.warn('[lightingSlice] Ignoring invalid light type:', type)
+      return null
+    }
     const state = get()
     if (state.lights.length >= MAX_LIGHTS) {
       return null
@@ -393,14 +478,26 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
   },
 
   setTransformMode: (mode: TransformMode) => {
+    if (!isTransformMode(mode)) {
+      logger.warn('[lightingSlice] Ignoring invalid transform mode:', mode)
+      return
+    }
     set({ transformMode: mode })
   },
 
   setShowLightGizmos: (show: boolean) => {
+    if (!isBoolean(show)) {
+      logger.warn('[lightingSlice] Ignoring invalid light gizmos flag:', show)
+      return
+    }
     set({ showLightGizmos: show })
   },
 
   setIsDraggingLight: (dragging: boolean) => {
+    if (!isBoolean(dragging)) {
+      logger.warn('[lightingSlice] Ignoring invalid dragging flag:', dragging)
+      return
+    }
     set({ isDraggingLight: dragging })
   },
 
@@ -409,6 +506,6 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
   },
 
   reset: () => {
-    set(LIGHTING_INITIAL_STATE)
+    set(createLightingInitialState())
   },
 })

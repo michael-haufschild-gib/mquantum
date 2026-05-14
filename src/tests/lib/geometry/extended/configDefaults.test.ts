@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_BEC_CONFIG } from '@/lib/geometry/extended/bec'
 import { DEFAULT_DIRAC_CONFIG } from '@/lib/geometry/extended/dirac'
 import { DEFAULT_FREE_SCALAR_CONFIG } from '@/lib/geometry/extended/freeScalar'
+import { createDefaultPauliConfig, DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/pauli'
 import {
   createDefaultSchroedingerConfig,
   DEFAULT_SCHROEDINGER_CONFIG,
@@ -146,6 +147,35 @@ describe('DEFAULT_DIRAC_CONFIG structural invariants', () => {
 
   it('needsReset is true by default (needs first initialization)', () => {
     expect(cfg.needsReset).toBe(true)
+  })
+})
+
+describe('DEFAULT_PAULI_CONFIG structural invariants', () => {
+  const cfg = DEFAULT_PAULI_CONFIG
+
+  it('grid and spacing lengths match latticeDim', () => {
+    expect(cfg.gridSize).toHaveLength(cfg.latticeDim)
+    expect(cfg.spacing).toHaveLength(cfg.latticeDim)
+  })
+
+  it('createDefaultPauliConfig returns mutation-isolated nested arrays', () => {
+    const first = createDefaultPauliConfig()
+    const second = createDefaultPauliConfig()
+
+    expect(first).toEqual(DEFAULT_PAULI_CONFIG)
+    expect(first.gridSize).not.toBe(DEFAULT_PAULI_CONFIG.gridSize)
+    expect(first.gridSize).not.toBe(second.gridSize)
+    expect(first.packetCenter).not.toBe(DEFAULT_PAULI_CONFIG.packetCenter)
+    expect(first.packetMomentum).not.toBe(DEFAULT_PAULI_CONFIG.packetMomentum)
+    expect(first.spinUpColor).not.toBe(DEFAULT_PAULI_CONFIG.spinUpColor)
+
+    first.gridSize[0] = 128
+    first.packetCenter[0] = 3
+    first.spinUpColor[0] = 0.25
+
+    expect(second.gridSize[0]).toBe(DEFAULT_PAULI_CONFIG.gridSize[0])
+    expect(second.packetCenter[0]).toBe(DEFAULT_PAULI_CONFIG.packetCenter[0])
+    expect(second.spinUpColor[0]).toBe(DEFAULT_PAULI_CONFIG.spinUpColor[0])
   })
 })
 

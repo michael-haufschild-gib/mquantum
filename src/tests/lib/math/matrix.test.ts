@@ -296,6 +296,18 @@ describe('Matrix Operations', () => {
       const v = [1, 2] // 2
       expect(() => multiplyMatrixVector(M, v)).toThrow()
     })
+
+    it('handles output aliasing with the input vector', () => {
+      const M = mat([
+        [1, 2],
+        [4, 5],
+      ])
+      const v = [7, 8]
+      const result = multiplyMatrixVector(M, v, v)
+
+      expect(result).toBe(v)
+      expect(v).toEqual([23, 68])
+    })
   })
 
   describe('transposeMatrix', () => {

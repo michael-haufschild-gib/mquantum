@@ -25,6 +25,9 @@ import { ADS_PRESET_MAP } from '@/lib/physics/antiDeSitter/presets'
 
 import type { SetterContext } from './sliceSetterUtils'
 
+const ADS_BRANCHES: readonly AdsQuantizationBranch[] = ['standard', 'alternate']
+const ADS_HKLL_SOURCES: readonly AdsHkllSource[] = ['eigenstate', 'localized', 'planeWave']
+
 /** Closed interval bounds for the AdS sliders. */
 export const ADS_LIMITS = {
   dMin: 3,
@@ -92,6 +95,18 @@ function clamp(v: number, lo: number, hi: number): number {
 
 function clampInt(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, Math.floor(v)))
+}
+
+function isAdsQuantizationBranch(value: unknown): value is AdsQuantizationBranch {
+  return ADS_BRANCHES.includes(value as AdsQuantizationBranch)
+}
+
+function isAdsHkllSource(value: unknown): value is AdsHkllSource {
+  return ADS_HKLL_SOURCES.includes(value as AdsHkllSource)
+}
+
+function isBoolean(value: unknown): value is boolean {
+  return typeof value === 'boolean'
 }
 
 /**
@@ -171,10 +186,12 @@ export function createAntiDeSitterSetters(ctx: SetterContext): AntiDeSitterSette
       applyWithReset(ctx, { mL: clamp(mL, mLMin, mLMax), preset: 'custom' })
     },
     setAdsQuantizationBranch: (branch) => {
+      if (!isAdsQuantizationBranch(branch)) return
       applyWithReset(ctx, { branch, preset: 'custom' })
     },
     setAdsBoundaryOverlay: (enabled) => {
-      applyWithReset(ctx, { boundaryOverlay: enabled, preset: 'custom' })
+      if (!isBoolean(enabled)) return
+      applyWithReset(ctx, { boundaryOverlay: enabled === true, preset: 'custom' })
     },
     setAdsPreset: (name) => {
       if (name === 'custom') {
@@ -215,11 +232,13 @@ export function createAntiDeSitterSetters(ctx: SetterContext): AntiDeSitterSette
       })
     },
     setAdsBtzEnabled: (enabled) => {
+      if (!isBoolean(enabled)) return
       // BTZ and HKLL are mutually exclusive in Stage 2B — turning on BTZ
       // forcibly clears the HKLL flag so the dispatch in
       // `packAntiDeSitterDensityGrid` has no ambiguity to resolve.
-      const partial: Partial<AntiDeSitterConfig> = { btzEnabled: !!enabled, preset: 'custom' }
-      if (enabled) partial.hkllEnabled = false
+      const nextEnabled = enabled === true
+      const partial: Partial<AntiDeSitterConfig> = { btzEnabled: nextEnabled, preset: 'custom' }
+      if (nextEnabled) partial.hkllEnabled = false
       applyWithReset(ctx, partial)
     },
     setAdsBtzHorizonRadius: (r) => {
@@ -249,12 +268,15 @@ export function createAntiDeSitterSetters(ctx: SetterContext): AntiDeSitterSette
       applyWithReset(ctx, { btzAngularM: clampedM, preset: 'custom' })
     },
     setAdsHkllEnabled: (enabled) => {
+      if (!isBoolean(enabled)) return
       // Mirror the BTZ mutex — turning on HKLL forcibly clears btzEnabled.
-      const partial: Partial<AntiDeSitterConfig> = { hkllEnabled: !!enabled, preset: 'custom' }
-      if (enabled) partial.btzEnabled = false
+      const nextEnabled = enabled === true
+      const partial: Partial<AntiDeSitterConfig> = { hkllEnabled: nextEnabled, preset: 'custom' }
+      if (nextEnabled) partial.btzEnabled = false
       applyWithReset(ctx, partial)
     },
     setAdsHkllBoundarySource: (source) => {
+      if (!isAdsHkllSource(source)) return
       applyWithReset(ctx, { hkllBoundarySource: source, preset: 'custom' })
     },
     setAdsHkllSourceSigma: (sigma) => {

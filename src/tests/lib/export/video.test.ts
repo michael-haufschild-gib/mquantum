@@ -342,6 +342,58 @@ describe('VideoRecorder', () => {
       expect(args?.[7]).toBe(100)
       expect(args?.[8]).toBeCloseTo(25, 12)
     })
+
+    it('keeps crop source rectangles inside the canvas when x/y plus size overflow', async () => {
+      canvas.width = 1000
+      canvas.height = 500
+      const recorderWithOverflowCrop = new VideoRecorder(canvas, {
+        ...defaultOptions,
+        width: 100,
+        height: 100,
+        crop: {
+          enabled: true,
+          x: 0.75,
+          y: 0.75,
+          width: 0.5,
+          height: 0.5,
+        },
+      })
+
+      await recorderWithOverflowCrop.initialize()
+
+      const drawImage = vi.fn()
+      ;(
+        recorderWithOverflowCrop as unknown as {
+          compositionCanvas: HTMLCanvasElement | null
+          compositionCtx: CanvasRenderingContext2D | null
+        }
+      ).compositionCanvas = document.createElement('canvas')
+      ;(
+        recorderWithOverflowCrop as unknown as {
+          compositionCanvas: HTMLCanvasElement | null
+          compositionCtx: CanvasRenderingContext2D | null
+        }
+      ).compositionCtx = {
+        globalCompositeOperation: 'source-over',
+        fillStyle: '#000000',
+        filter: 'none',
+        fillRect: vi.fn(),
+        drawImage,
+      } as unknown as CanvasRenderingContext2D
+
+      await recorderWithOverflowCrop.captureFrame(0, 1 / 60)
+
+      expect(drawImage).toHaveBeenCalledTimes(1)
+      const args = drawImage.mock.calls[0]
+      expect(args?.[1]).toBe(500)
+      expect(args?.[2]).toBe(250)
+      expect(args?.[3]).toBe(500)
+      expect(args?.[4]).toBe(250)
+      expect(args?.[5]).toBe(0)
+      expect(args?.[6]).toBe(25)
+      expect(args?.[7]).toBe(100)
+      expect(args?.[8]).toBe(50)
+    })
   })
 
   describe('finalize', () => {

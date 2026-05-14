@@ -104,6 +104,29 @@ describe('complexSvdSingularValues', () => {
     expect(acc).toBeCloseTo(fro2, 8)
   })
 
+  it('handles large finite amplitudes without overflowing the Gram matrix', () => {
+    const re = new Float64Array(9)
+    const im = new Float64Array(9)
+    re[0] = 3e200
+    re[4] = 2e200
+    re[8] = 1e200
+
+    const sv = complexSvdSingularValues({ rows: 3, cols: 3, re, im })
+
+    expect(sv[0]!).toBeCloseTo(3e200, 12)
+    expect(sv[1]!).toBeCloseTo(2e200, 12)
+    expect(sv[2]!).toBeCloseTo(1e200, 12)
+  })
+
+  it('rejects non-finite matrix entries before Gram construction', () => {
+    const re = new Float64Array([1, Number.POSITIVE_INFINITY, 0, 1])
+    const im = new Float64Array(4)
+
+    expect(() => complexSvdSingularValues({ rows: 2, cols: 2, re, im })).toThrow(
+      /non-finite matrix entry/
+    )
+  })
+
   it('returns zeros for a rank-deficient complex matrix', () => {
     // Build a rank-1 complex matrix u·vᴴ with u, v nonzero so Σσ_k² =
     // ||u||² · ||v||². Only the leading singular value is nonzero.

@@ -34,6 +34,12 @@ const DEFAULT_RANK_TRUNCATION = 1e-8
  */
 export const MODULAR_EPSILON = 1e-14
 
+function schmidtWeight(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  const weight = value * value
+  return Number.isFinite(weight) && weight > 0 ? weight : 0
+}
+
 /**
  * Compute the modular-Hamiltonian spectrum from Schmidt singular values.
  *
@@ -61,15 +67,18 @@ export function modularSpectrum(
     return { spectrum: new Float64Array(0), epsilon: 0, rankThreshold: 0 }
   }
 
-  // Dominant singular value.
-  const s0 = schmidt[0]!
-  const maxSq = s0 * s0
+  // Dominant finite singular-value weight. Schmidt values are mathematically
+  // non-negative, but upstream numeric failures should floor-pin the affected
+  // modes rather than poison the whole modular spectrum with NaN/Infinity.
+  let maxSq = 0
+  for (let i = 0; i < n; i++) {
+    maxSq = Math.max(maxSq, schmidtWeight(schmidt[i]!))
+  }
   const epsilon = maxSq > 0 ? MODULAR_EPSILON * maxSq : MODULAR_EPSILON
 
   const spectrum = new Float64Array(n)
   for (let i = 0; i < n; i++) {
-    const s = schmidt[i]!
-    const lam = s * s
+    const lam = schmidtWeight(schmidt[i]!)
     spectrum[i] = -Math.log(lam + epsilon)
   }
 
@@ -77,8 +86,7 @@ export function modularSpectrum(
   if (maxSq > 0) {
     const thresh = safeTruncationRatio * maxSq
     for (let i = 0; i < n; i++) {
-      const s = schmidt[i]!
-      if (s * s < thresh) {
+      if (schmidtWeight(schmidt[i]!) < thresh) {
         rankThreshold = i
         break
       }

@@ -155,9 +155,9 @@ async function main() {
 
   // Generate manifest.webmanifest
   const manifest = {
-    name: 'MDimension - N-Dimensional Object Visualizer',
-    short_name: 'MDimension',
-    description: 'Explore and visualize n-dimensional geometric objects in real-time 3D',
+    name: 'MQuantum - N-Dimensional Quantum Physics Visualizer',
+    short_name: 'MQuantum',
+    description: 'Visualize quantum wavefunctions in 2 to 11 dimensions via WebGPU',
     start_url: '/',
     display: 'standalone',
     background_color: '#0d0d0f',

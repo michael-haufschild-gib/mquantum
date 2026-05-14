@@ -13,6 +13,18 @@ const WDW_BOUNDARY_CONDITIONS: readonly WdwBoundaryCondition[] = [
 export const WDW_SOLVER_MAX_GRID_NA = 1024
 /** Maximum samples per inflaton axis accepted by the WdW solver before allocation. */
 export const WDW_SOLVER_MAX_GRID_NPHI = 128
+/** Minimum inflaton mass accepted by public WdW solver inputs. */
+export const WDW_SOLVER_MIN_INFLATON_MASS = 0
+/** Maximum inflaton mass accepted by public WdW solver inputs. */
+export const WDW_SOLVER_MAX_INFLATON_MASS = 2
+/** Minimum cosmological constant accepted by public WdW solver inputs. */
+export const WDW_SOLVER_MIN_COSMOLOGICAL_CONSTANT = -1
+/** Maximum cosmological constant accepted by public WdW solver inputs. */
+export const WDW_SOLVER_MAX_COSMOLOGICAL_CONSTANT = 1
+/** Minimum per-axis mass-asymmetry ratio accepted by public WdW solver inputs. */
+export const WDW_SOLVER_MIN_INFLATON_MASS_ASYMMETRY = 0.1
+/** Maximum per-axis mass-asymmetry ratio accepted by public WdW solver inputs. */
+export const WDW_SOLVER_MAX_INFLATON_MASS_ASYMMETRY = 10
 
 /**
  * Runtime guard for the canonical Wheeler-DeWitt boundary-condition enum.
@@ -30,6 +42,12 @@ function assertFinite(name: string, value: number): void {
 function assertPositiveFinite(name: string, value: number): void {
   assertFinite(name, value)
   if (!(value > 0)) throw new Error(`${name} must be > 0`)
+}
+
+function assertFiniteInRange(name: string, value: number, min: number, max: number): void {
+  assertFinite(name, value)
+  if (value < min) throw new Error(`${name} must be >= ${min}`)
+  if (value > max) throw new Error(`${name} must be <= ${max}`)
 }
 
 function assertIntegerInRange(name: string, value: number, min: number, max: number): void {
@@ -50,11 +68,25 @@ export function validateWheelerDeWittSolverInput(input: WheelerDeWittSolverInput
     throw new Error('boundaryCondition must be one of: noBoundary, tunneling, deWitt')
   }
 
-  assertFinite('inflatonMass', input.inflatonMass)
-  if (input.inflatonMass < 0) throw new Error('inflatonMass must be >= 0')
-  assertFinite('cosmologicalConstant', input.cosmologicalConstant)
+  assertFiniteInRange(
+    'inflatonMass',
+    input.inflatonMass,
+    WDW_SOLVER_MIN_INFLATON_MASS,
+    WDW_SOLVER_MAX_INFLATON_MASS
+  )
+  assertFiniteInRange(
+    'cosmologicalConstant',
+    input.cosmologicalConstant,
+    WDW_SOLVER_MIN_COSMOLOGICAL_CONSTANT,
+    WDW_SOLVER_MAX_COSMOLOGICAL_CONSTANT
+  )
   const inflatonMassAsymmetry = input.inflatonMassAsymmetry ?? 1
-  assertPositiveFinite('inflatonMassAsymmetry', inflatonMassAsymmetry)
+  assertFiniteInRange(
+    'inflatonMassAsymmetry',
+    inflatonMassAsymmetry,
+    WDW_SOLVER_MIN_INFLATON_MASS_ASYMMETRY,
+    WDW_SOLVER_MAX_INFLATON_MASS_ASYMMETRY
+  )
 
   assertPositiveFinite('aMin', input.aMin)
   assertFinite('aMax', input.aMax)

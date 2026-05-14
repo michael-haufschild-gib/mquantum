@@ -264,20 +264,43 @@ describe('Heller readback back-pressure scheduling', () => {
       onSubmittedWorkDone: () => Promise<undefined>
     }
     queue.onSubmittedWorkDone = vi.fn().mockResolvedValue(undefined)
+    const mappedPsi = new Float32Array(state.totalSites * 2)
+    for (let i = 0; i < state.totalSites; i++) {
+      mappedPsi[2 * i] = 1
+      mappedPsi[2 * i + 1] = 0
+    }
+    const createBufferMock = vi.mocked(device.createBuffer)
+    const originalCreateBuffer = createBufferMock.getMockImplementation()
+    createBufferMock.mockImplementation((desc) => {
+      const buffer =
+        originalCreateBuffer?.(desc) ??
+        Object.assign(createMockBuffer(String(desc.label ?? 'buffer')), {
+          size: desc.size,
+          usage: desc.usage,
+        })
+      vi.mocked(buffer.getMappedRange).mockReturnValue(mappedPsi.buffer.slice(0))
+      return buffer
+    })
 
-    // Simulate 40 Strang steps of dt=0.05. Spread them across frames
-    // with irregular `stepsThisFrame` (2, 3, 1, 2, 4, ...). From the
-    // scheduler's point of view, what matters is that tickHellerStep
-    // is called 40 times with monotonically-increasing simTime at
-    // exact dt spacing.
-    const dt = 0.05
-    for (let k = 1; k <= 40; k++) {
-      tickHellerStep(device, createMockCommandEncoder(), state, k * dt)
-      // Microtask drain so the first few mapAsync resolutions can push
-      // samples before the next tick fires.
-      await Promise.resolve()
-      await Promise.resolve()
-      await Promise.resolve()
+    try {
+      // Simulate 40 Strang steps of dt=0.05. Spread them across frames
+      // with irregular `stepsThisFrame` (2, 3, 1, 2, 4, ...). From the
+      // scheduler's point of view, what matters is that tickHellerStep
+      // is called 40 times with monotonically-increasing simTime at
+      // exact dt spacing.
+      const dt = 0.05
+      for (let k = 1; k <= 40; k++) {
+        tickHellerStep(device, createMockCommandEncoder(), state, k * dt)
+        // Microtask drain so the first few mapAsync resolutions can push
+        // samples before the next tick fires.
+        await Promise.resolve()
+        await Promise.resolve()
+        await Promise.resolve()
+      }
+    } finally {
+      if (originalCreateBuffer) {
+        createBufferMock.mockImplementation(originalCreateBuffer)
+      }
     }
 
     // Every 4 Strang steps → one sample. 40/4 = 10 targets. Allow for
@@ -289,7 +312,7 @@ describe('Heller readback back-pressure scheduling', () => {
     // Inter-sample times must be exact multiples of `sampleInterval *
     // dt` — not approximate, because the scheduler never records any
     // time that is not a step-boundary simTime.
-    const nominalGap = 4 * dt
+    const nominalGap = 4 * 0.05
     const start = count === state.buffer.capacity ? state.buffer.head : 0
     for (let i = 1; i < count; i++) {
       const prev = state.buffer.times[(start + i - 1) % state.buffer.capacity]!

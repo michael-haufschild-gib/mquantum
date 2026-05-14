@@ -103,6 +103,17 @@ export const clampToRange = (value: number, min: number, max: number): number =>
 
 export const clampMin = (value: number, min: number): number => Math.max(min, value)
 
+/** Clamp a crop rectangle so x + width and y + height remain within [0, 1]. */
+export function normalizeCropBounds(crop: CropSettings): CropSettings {
+  // Math.min/Math.max propagate NaN, so clampToRange alone cannot rescue
+  // non-finite inputs. Substitute safe defaults before clamping.
+  const width = Number.isFinite(crop.width) ? clampToRange(crop.width, 0, 1) : 1
+  const height = Number.isFinite(crop.height) ? clampToRange(crop.height, 0, 1) : 1
+  const x = Number.isFinite(crop.x) ? clampToRange(crop.x, 0, Math.max(0, 1 - width)) : 0
+  const y = Number.isFinite(crop.y) ? clampToRange(crop.y, 0, Math.max(0, 1 - height)) : 0
+  return { ...crop, x, y, width, height }
+}
+
 export const isExportFormat = (value: unknown): value is ExportFormat =>
   value === 'mp4' || value === 'webm'
 
@@ -242,6 +253,13 @@ export function sanitizeCropPatch(raw: Partial<CropSettings>): Partial<CropSetti
   if ('enabled' in patch && typeof patch.enabled !== 'boolean') {
     logger.warn('[exportStore] Ignoring invalid crop.enabled update:', patch.enabled)
     delete patch.enabled
+  }
+
+  if (patch.x !== undefined && patch.width !== undefined) {
+    patch.x = clampToRange(patch.x, 0, Math.max(0, 1 - patch.width))
+  }
+  if (patch.y !== undefined && patch.height !== undefined) {
+    patch.y = clampToRange(patch.y, 0, Math.max(0, 1 - patch.height))
   }
 
   return patch

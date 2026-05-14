@@ -354,6 +354,37 @@ describe('WebGPURenderGraph timestampWrites wiring', () => {
     expect(enabledSpy).toHaveBeenCalledTimes(1)
   })
 
+  it('sanitizes frame deltas before passes observe frame context', async () => {
+    const seenDeltas: number[] = []
+    const seenTimes: number[] = []
+    const pass: WebGPURenderPass = {
+      id: 'delta-pass',
+      config: createRenderPassConfig('delta-pass', [
+        { resourceId: 'out', access: 'write', binding: 0 },
+      ]),
+      initialize: vi.fn().mockResolvedValue(undefined),
+      execute: (ctx) => {
+        if (!ctx.frame) {
+          throw new Error('Expected frame context')
+        }
+        seenDeltas.push(ctx.frame.delta)
+        seenTimes.push(ctx.frame.time)
+      },
+      dispose: vi.fn(),
+    }
+
+    const { graph } = await createGraphHarness(pass)
+    const nanStats = graph.execute(Number.NaN, 'none')
+    const negativeStats = graph.execute(-1, 'none')
+    const longStats = graph.execute(2, 'none')
+
+    expect(seenDeltas).toEqual([0, 0, 0.1])
+    expect(seenTimes).toEqual([0, 0, 0.1])
+    expect(nanStats.totalTimeMs).toBe(0)
+    expect(negativeStats.totalTimeMs).toBe(0)
+    expect(longStats.totalTimeMs).toBe(100)
+  })
+
   it('injects timestampWrites into render pass descriptors and resolves query data', async () => {
     const pass: WebGPURenderPass = {
       id: 'render-pass',

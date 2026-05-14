@@ -85,6 +85,24 @@ describe('useProgressiveRefinement', () => {
     expect(usePerformanceStore.getState().qualityMultiplier).toBe(REFINEMENT_STAGE_QUALITY.final)
   })
 
+  it('keeps progress monotonic across stage timer boundaries', () => {
+    renderHook(() => useProgressiveRefinement())
+
+    act(() => {
+      vi.advanceTimersByTime(100)
+    })
+    expect(usePerformanceStore.getState().refinementStage).toBe('medium')
+    const progressAtMedium = usePerformanceStore.getState().refinementProgress
+
+    act(() => {
+      vi.advanceTimersByTime(16)
+    })
+
+    expect(usePerformanceStore.getState().refinementProgress).toBeGreaterThanOrEqual(
+      progressAtMedium
+    )
+  })
+
   it('clears pending transitions when export mode takes over quality control', () => {
     const { rerender } = renderHook(() => useProgressiveRefinement())
 

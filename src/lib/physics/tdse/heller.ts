@@ -69,6 +69,10 @@ const DEFAULT_TOP_N = 6
 /** Default noise-floor fraction of max power for peak detection. */
 const DEFAULT_NOISE_FLOOR = 0.01
 
+function resolveMinSamples(minSamples: number): number {
+  return Number.isInteger(minSamples) && minSamples > 0 ? minSamples : HELLER_DEFAULT_MIN_SAMPLES
+}
+
 /**
  * Fixed-size circular buffer of complex autocorrelation samples C(t) and
  * their associated observation times (stored as offsets from the first
@@ -124,6 +128,7 @@ export function pushAutocorrelationSample(
   cIm: number,
   simTime: number
 ): void {
+  if (!Number.isFinite(cRe) || !Number.isFinite(cIm) || !Number.isFinite(simTime)) return
   buf.cRe[buf.head] = cRe
   buf.cIm[buf.head] = cIm
   buf.times[buf.head] = simTime
@@ -249,7 +254,7 @@ export function computeHellerSpectrum(
     nInterpolated: 0,
   }
   const n = buf.count
-  if (n < minSamples) return empty
+  if (n < resolveMinSamples(minSamples)) return empty
 
   // Extract samples in chronological order. If the buffer has wrapped,
   // the oldest entry lives at `head`; otherwise it lives at 0.
@@ -288,12 +293,15 @@ export function computeHellerSpectrum(
   const uniformityTol = HELLER_UNIFORMITY_TOLERANCE * dtNominal
   const indices = new Int32Array(n)
   indices[0] = 0
+  const maxGridPoints = Math.ceil(n / (1 - HELLER_MAX_INTERPOLATION_FRACTION))
   for (let i = 1; i < n; i++) {
     const gap = times[i]! - times[i - 1]!
     const kGap = Math.round(gap / dtNominal)
-    if (kGap < 1) return empty
+    if (!Number.isSafeInteger(kGap) || kGap < 1) return empty
     if (Math.abs(gap - kGap * dtNominal) > uniformityTol) return empty
-    indices[i] = indices[i - 1]! + kGap
+    const nextIndex = indices[i - 1]! + kGap
+    if (nextIndex + 1 > maxGridPoints) return empty
+    indices[i] = nextIndex
   }
 
   const nGrid = indices[n - 1]! + 1

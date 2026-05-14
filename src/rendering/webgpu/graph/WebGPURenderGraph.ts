@@ -30,6 +30,13 @@ import { RenderContextImpl, SetupContextImpl } from './RenderGraphContexts'
 import { computePassOrder } from './topologicalSort'
 import { WebGPUTimestampCollector } from './WebGPUTimestampCollector'
 
+const MAX_FRAME_DELTA_SECONDS = 0.1
+
+function sanitizeFrameDeltaSeconds(delta: number): number {
+  if (!Number.isFinite(delta) || delta <= 0) return 0
+  return Math.min(delta, MAX_FRAME_DELTA_SECONDS)
+}
+
 /** Context passed to pre-submit hooks for late-stage command buffer injection. */
 export interface WebGPUBeforeSubmitHookContext {
   device: GPUDevice
@@ -361,10 +368,12 @@ export class WebGPURenderGraph {
     const collectDetailedStats = metricsMode === 'full'
     const cpuSetupStart = collectDetailedStats ? performance.now() : 0
 
-    this.elapsedTime += delta
+    const frameDelta = sanitizeFrameDeltaSeconds(delta)
+
+    this.elapsedTime += frameDelta
     this.frameNumber++
 
-    this.frameContext = this.captureFrameContext(delta)
+    this.frameContext = this.captureFrameContext(frameDelta)
 
     const device = this.deviceManager.getDevice()
     const canvasTexture = this.deviceManager.getCurrentTexture()
@@ -562,7 +571,7 @@ export class WebGPURenderGraph {
     const cpuSubmitMs = collectDetailedStats ? performance.now() - cpuSubmitStart : 0
 
     return {
-      totalTimeMs: delta * 1000,
+      totalTimeMs: frameDelta * 1000,
       passTiming: collectDetailedStats ? this.buildPassTimingResult(passEnabledMemo!) : [],
       commandBufferCount: 1,
       vramUsage: collectDetailedStats ? this.pool.getVRAMUsage() : 0,

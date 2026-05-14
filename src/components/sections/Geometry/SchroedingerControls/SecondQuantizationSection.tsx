@@ -158,6 +158,7 @@ export function SecondQuantizationSection({
         <Switch
           checked={sqLayerEnabled}
           onCheckedChange={actions.setEnabled}
+          ariaLabel="Toggle second quantization layer"
           data-testid="sq-layer-toggle"
         />
       }

@@ -59,6 +59,27 @@ describe('Tabs', () => {
       expect(tab2).toHaveAttribute('aria-selected', 'true')
       expect(tab3).toHaveAttribute('aria-selected', 'false')
     })
+
+    it('falls back to the first enabled tab when value is missing', () => {
+      render(<Tabs tabs={mockTabs} value="missing" onChange={() => {}} />)
+
+      expect(screen.getByRole('tab', { name: 'Tab 1' })).toHaveAttribute('aria-selected', 'true')
+      expect(screen.getByRole('tabpanel')).toHaveTextContent('Content 1')
+    })
+
+    it('falls back past a disabled active value', () => {
+      const tabsWithDisabled: Tab[] = [
+        { id: 'tab1', label: 'Tab 1', content: <div>Content 1</div>, disabled: true },
+        { id: 'tab2', label: 'Tab 2', content: <div>Content 2</div> },
+        { id: 'tab3', label: 'Tab 3', content: <div>Content 3</div> },
+      ]
+
+      render(<Tabs tabs={tabsWithDisabled} value="tab1" onChange={() => {}} />)
+
+      expect(screen.getByRole('tab', { name: 'Tab 1' })).toHaveAttribute('aria-selected', 'false')
+      expect(screen.getByRole('tab', { name: 'Tab 2' })).toHaveAttribute('aria-selected', 'true')
+      expect(screen.getByRole('tabpanel')).toHaveTextContent('Content 2')
+    })
   })
 
   describe('tab switching', () => {
@@ -82,6 +103,17 @@ describe('Tabs', () => {
       await user.click(screen.getByRole('tab', { name: 'Tab 1' }))
 
       expect(handleChange).not.toHaveBeenCalled()
+    })
+
+    it('repairs missing controlled value when fallback active tab is clicked', async () => {
+      const user = userEvent.setup()
+      const handleChange = vi.fn()
+
+      render(<Tabs tabs={mockTabs} value="missing" onChange={handleChange} />)
+
+      await user.click(screen.getByRole('tab', { name: 'Tab 1' }))
+
+      expect(handleChange).toHaveBeenCalledWith('tab1')
     })
 
     it('does not call onChange when a disabled tab is clicked', async () => {

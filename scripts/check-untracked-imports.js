@@ -67,6 +67,8 @@ function tryResolve(specifier, fromFile, exists = existsSync, root = ROOT) {
   let base
   if (cleanSpecifier.startsWith('@/')) {
     base = resolve(root, 'src', cleanSpecifier.slice(2))
+  } else if (cleanSpecifier.startsWith('/src/')) {
+    base = resolve(root, cleanSpecifier.slice(1))
   } else if (cleanSpecifier.startsWith('.')) {
     base = resolve(fromDir, cleanSpecifier)
   } else {

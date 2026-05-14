@@ -33,6 +33,7 @@ import {
 } from '@/rendering/webgpu/renderers/rendererConfigUtils'
 import type { SchrodingerRendererConfig } from '@/rendering/webgpu/renderers/schrodingerRendererTypes'
 import { composeSchroedingerShader } from '@/rendering/webgpu/shaders/schroedinger/compose'
+import { COLOR_ALGORITHM_INDICES } from '@/rendering/webgpu/shaders/schroedinger/volume/emissionConstants'
 
 /** Enumerator surface identifiers. Must stay in sync with `enumerateAll.SurfaceName`. */
 export type ShaderSurface =
@@ -68,12 +69,10 @@ const ANALYTIC_MODES: readonly AnalyticMode[] = [
 ] as const
 
 /**
- * Color algorithm indices declared in `COLOR_ALG_NAMES`. The renderer's
- * supported runtime range is 0..26 (validated by `resolveColorAlgorithmInt`)
- * — enumerating beyond that walks configs the app never accepts and
- * distorts dedup/failure counts.
+ * Color algorithm indices declared by shader emission. Keep this derived so
+ * validation covers newly added shader branches.
  */
-const COLOR_ALGORITHMS: readonly number[] = Array.from({ length: 27 }, (_, i) => i)
+const COLOR_ALGORITHMS: readonly number[] = COLOR_ALGORITHM_INDICES
 
 const REPRESENTATIONS: readonly SchrodingerRendererConfig['representation'][] = [
   'position',
@@ -117,8 +116,8 @@ interface EnumerateOptions {
  * Booleans walked: isosurface, temporal, nodalEnabled, phaseMaterialityEnabled,
  * interferenceEnabled, uncertaintyBoundaryEnabled, eigenfunctionCacheEnabled,
  * openQuantumEnabled, crossSectionEnabled, probabilityCurrentEnabled.
- * Enums walked: quantumMode (3), representation (3), colorAlgorithm (29),
- * dimension (per-mode min..max), termCount (HO only, 9 values).
+ * Enums walked: quantumMode (3), representation (3), all shader color
+ * algorithms, dimension (per-mode min..max), termCount (HO only, 9 values).
  */
 export function* enumerateSchroedingerAnalytic(
   opts: EnumerateOptions = {}

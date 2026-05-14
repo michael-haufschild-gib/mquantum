@@ -6,9 +6,9 @@ export const MAX_DIMENSION = 11
 
 /**
  * Human-readable axis labels for dimension indices.
- * With MAX_DIMENSION = 11, indices 0..10 are currently used.
+ * Length must match MAX_DIMENSION so parsers and UI do not expose unsupported axes.
  */
-export const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p', 'o'] as const
+export const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p'] as const
 
 /**
  * All power-of-2 grid size options for lattice compute modes.

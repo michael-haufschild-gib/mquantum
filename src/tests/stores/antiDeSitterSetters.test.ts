@@ -71,6 +71,21 @@ describe('anti-de Sitter setters', () => {
     expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.mL).toBe(3)
   })
 
+  it('enum and boolean setters ignore malformed runtime values', () => {
+    const store = useExtendedObjectStore.getState()
+    store.setAdsQuantizationBranch('alternate')
+    store.setAdsBoundaryOverlay(true)
+    useExtendedObjectStore.getState().clearComputeNeedsReset('antiDeSitter')
+
+    store.setAdsQuantizationBranch('bogus' as never)
+    store.setAdsBoundaryOverlay('false' as never)
+
+    const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+    expect(after.branch).toBe('alternate')
+    expect(after.boundaryOverlay).toBe(true)
+    expect(after.needsReset).toBe(false)
+  })
+
   it('non-finite inputs are ignored (no state mutation)', () => {
     const store = useExtendedObjectStore.getState()
     store.setAdsDimension(4)
@@ -207,6 +222,17 @@ describe('anti-de Sitter setters', () => {
       expect(after.needsReset).toBe(false)
     })
 
+    it('setAdsBtzEnabled ignores malformed runtime booleans', () => {
+      const store = useExtendedObjectStore.getState()
+      useExtendedObjectStore.getState().clearComputeNeedsReset('antiDeSitter')
+
+      store.setAdsBtzEnabled('true' as never)
+
+      const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(after.btzEnabled).toBe(false)
+      expect(after.needsReset).toBe(false)
+    })
+
     it('preset btzHotSmall applies BTZ config (enabled, r+=0.15, ω=1, m_A=0)', () => {
       const store = useExtendedObjectStore.getState()
       store.setAdsPreset('btzHotSmall')
@@ -315,6 +341,21 @@ describe('anti-de Sitter setters', () => {
       expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.hkllBoundarySource).toBe(
         'planeWave'
       )
+    })
+
+    it('HKLL enum and boolean setters ignore malformed runtime values', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsHkllEnabled(true)
+      store.setAdsHkllBoundarySource('localized')
+      useExtendedObjectStore.getState().clearComputeNeedsReset('antiDeSitter')
+
+      store.setAdsHkllEnabled('false' as never)
+      store.setAdsHkllBoundarySource('bogus' as never)
+
+      const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(after.hkllEnabled).toBe(true)
+      expect(after.hkllBoundarySource).toBe('localized')
+      expect(after.needsReset).toBe(false)
     })
 
     it('HKLL setters reject non-finite inputs', () => {

@@ -94,4 +94,52 @@ describe('handleDisabledPassthrough', () => {
 
     expect(resourceAliases.get('c')).toBe('source')
   })
+
+  it('does not create a self-alias when an explicit passthrough maps a resource to itself', () => {
+    const pool = new WebGPUResourcePool()
+    const resourceAliases = new Map<string, string>()
+
+    handleDisabledPassthrough(
+      pool,
+      resourceAliases,
+      makePass('disabled-self', 'scene-render', 'scene-render', true),
+      'disabled-self',
+      createMockCommandEncoder(),
+      new Map(),
+      new Set(),
+      false
+    )
+
+    expect(resourceAliases.has('scene-render')).toBe(false)
+  })
+
+  it('aliases when a copy cannot run because one side is not allocated', () => {
+    const pool = new WebGPUResourcePool()
+    pool.initialize(mockWebGPU.device)
+    pool.setSize(16, 16)
+    pool.addResource({
+      id: 'source',
+      type: 'renderTarget',
+      size: { mode: 'fixed', width: 16, height: 16 },
+      format: 'rgba8unorm',
+    })
+
+    expect(pool.getTexture('source')?.width).toBe(16)
+    const resourceAliases = new Map<string, string>()
+    const encoder = createMockCommandEncoder()
+
+    handleDisabledPassthrough(
+      pool,
+      resourceAliases,
+      makePass('disabled-missing-output', 'source', 'missing-output'),
+      'disabled-missing-output',
+      encoder,
+      new Map(),
+      new Set(),
+      false
+    )
+
+    expect(encoder.copyTextureToTexture).not.toHaveBeenCalled()
+    expect(resourceAliases.get('missing-output')).toBe('source')
+  })
 })

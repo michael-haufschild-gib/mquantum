@@ -266,4 +266,32 @@ describe('computeMouseRay', () => {
       expect(result.origin).toEqual([0, 0, 5])
     }
   })
+
+  it('returns null for invalid viewport dimensions, matrices, or camera position', () => {
+    expect(
+      computeMouseRay(400, 300, { ...mockRect, width: 0 } as DOMRect, {
+        projectionMatrix: identityMat4(),
+        viewMatrix: identityMat4(),
+        cameraPosition: { x: 0, y: 0, z: 5 },
+      })
+    ).toBe(null)
+
+    const badProjection = identityMat4()
+    badProjection[0] = Number.NaN
+    expect(
+      computeMouseRay(400, 300, mockRect, {
+        projectionMatrix: badProjection,
+        viewMatrix: identityMat4(),
+        cameraPosition: { x: 0, y: 0, z: 5 },
+      })
+    ).toBe(null)
+
+    expect(
+      computeMouseRay(400, 300, mockRect, {
+        projectionMatrix: identityMat4(),
+        viewMatrix: identityMat4(),
+        cameraPosition: { x: Number.NaN, y: 0, z: 5 },
+      })
+    ).toBe(null)
+  })
 })

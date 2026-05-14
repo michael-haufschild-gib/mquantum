@@ -224,6 +224,7 @@ export const ExportGeneralTab = () => {
             <Switch
               checked={settings.crop.enabled}
               onCheckedChange={(c) => updateSettings({ crop: { ...settings.crop, enabled: c } })}
+              ariaLabel="Crop frame"
               tooltip="Restrict the export to a custom rectangular region of the canvas."
             />
           </div>
@@ -268,6 +269,7 @@ export const ExportGeneralTab = () => {
           <Switch
             checked={settings.resetEvolution}
             onCheckedChange={(c) => updateSettings({ resetEvolution: c })}
+            ariaLabel="Reset evolution"
             tooltip="Reset the wavefunction and evolution to initial state before recording starts. Same as the timeline reset button."
           />
         </div>

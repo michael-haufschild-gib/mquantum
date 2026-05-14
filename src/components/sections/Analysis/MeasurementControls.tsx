@@ -139,6 +139,7 @@ export const MeasurementControls: React.FC = React.memo(() => {
           checked={enabled}
           onCheckedChange={handleToggle}
           disabled={sweepRunning}
+          ariaLabel="Toggle measurement"
           tooltip="Enable Born-rule measurement: click the volume to sample from |ψ|² and collapse the wavefunction."
           data-testid="measurement-toggle"
         />

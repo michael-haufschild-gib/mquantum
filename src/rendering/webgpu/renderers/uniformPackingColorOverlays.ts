@@ -9,6 +9,7 @@ import { SCHROEDINGER_LAYOUT } from './schroedingerLayout'
 import type { SchroedingerPackParams } from './uniformPackingTypes'
 
 const I = SCHROEDINGER_LAYOUT.index
+const RADIAL_PROBABILITY_COLOR_FALLBACK = parseHexColorToLinearRgb('#44aaff')
 
 interface HydrogenResult {
   validN: number
@@ -17,14 +18,25 @@ interface HydrogenResult {
 }
 
 /** Parse a hex color string to a linear-space RGB triplet. */
-export const parseColor = (hex: string): Rgb => parseHexColorToLinearRgb(hex)
+export const parseColor = (hex: unknown, fallback?: Rgb): Rgb =>
+  parseHexColorToLinearRgb(typeof hex === 'string' ? hex : '', fallback)
+
+function finiteClamped(value: unknown, fallback: number, min: number, max: number): number {
+  const finite = typeof value === 'number' && Number.isFinite(value) ? value : fallback
+  return Math.max(min, Math.min(max, finite))
+}
 
 /**
  * Pack a hex color into a 4-float RGBA slot in a uniform Float32Array.
  * Alpha is hardcoded to 0 — uniform color slots use alpha as padding.
  */
-export function packColorRgba(floatView: Float32Array, idx: number, hex: string): void {
-  const rgb = parseColor(hex)
+export function packColorRgba(
+  floatView: Float32Array,
+  idx: number,
+  hex: unknown,
+  fallback?: Rgb
+): void {
+  const rgb = parseColor(hex, fallback)
   floatView[idx] = rgb[0]
   floatView[idx + 1] = rgb[1]
   floatView[idx + 2] = rgb[2]
@@ -52,9 +64,14 @@ export function packRepresentationAndColorOverlays(
   floatView[I.momentumHbar] = schroedinger?.momentumHbar ?? 1.0
 
   const isMomentumRep = !isUniformComputeMode && schroedinger?.representation === 'momentum'
-  const radialProbEnabled = (schroedinger?.radialProbabilityEnabled ?? false) && !isMomentumRep
+  const radialProbEnabled = schroedinger?.radialProbabilityEnabled === true && !isMomentumRep
   intView[I.radialProbabilityEnabled] = radialProbEnabled ? 1 : 0
-  floatView[I.radialProbabilityOpacity] = schroedinger?.radialProbabilityOpacity ?? 0.6
+  floatView[I.radialProbabilityOpacity] = finiteClamped(
+    schroedinger?.radialProbabilityOpacity,
+    0.6,
+    0,
+    1
+  )
   floatView[I.radialProbabilityNorm] =
     radialProbEnabled && quantumModeStr !== 'harmonicOscillator'
       ? computeRadialProbabilityNorm(
@@ -67,7 +84,8 @@ export function packRepresentationAndColorOverlays(
   packColorRgba(
     floatView,
     I.radialProbabilityColor,
-    schroedinger?.radialProbabilityColor ?? '#44aaff'
+    schroedinger?.radialProbabilityColor ?? '#44aaff',
+    RADIAL_PROBABILITY_COLOR_FALLBACK
   )
 
   const domainColoring = appearance?.domainColoring

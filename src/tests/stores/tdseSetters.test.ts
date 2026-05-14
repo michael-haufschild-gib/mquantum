@@ -181,6 +181,32 @@ describe('TDSE dynamics setters', () => {
     expect(getTdse().compactDims[0]).toBe(true)
   })
 
+  it('ignores invalid TDSE dimension indices without dirtying compute state', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setTdseLatticeDim(5)
+    s.setTdseSlicePosition(0, 0.1)
+    s.setTdseCompactDim(0, true)
+    s.setTdseCompactRadius(0, 0.2)
+
+    const before = useExtendedObjectStore.getState()
+    const beforeTdse = before.schroedinger.tdse
+    const beforeVersion = before.schroedingerVersion
+
+    s.setTdseSlicePosition(Number.NaN, 0.2)
+    s.setTdseSlicePosition(1.5, 0.2)
+    s.setTdseCompactDim(99, true)
+    s.setTdseCompactDim(1.5, true)
+    s.setTdseCompactRadius(-1, 0.3)
+    s.setTdseCompactRadius(1.5, 0.3)
+
+    const after = useExtendedObjectStore.getState()
+    expect(after.schroedingerVersion).toBe(beforeVersion)
+    expect(after.schroedinger.tdse.slicePositions).toEqual(beforeTdse.slicePositions)
+    expect(after.schroedinger.tdse.compactDims).toEqual(beforeTdse.compactDims)
+    expect(after.schroedinger.tdse.compactRadii).toEqual(beforeTdse.compactRadii)
+    expect(after.schroedinger.tdse.needsReset).toBe(beforeTdse.needsReset)
+  })
+
   it('creates slice positions for dims > 3', () => {
     const s = useExtendedObjectStore.getState()
     s.setTdseLatticeDim(5)

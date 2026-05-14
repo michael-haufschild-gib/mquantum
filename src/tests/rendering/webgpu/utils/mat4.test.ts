@@ -112,6 +112,19 @@ describe('writeInvertMat4', () => {
       expect(out[i]).toBe(42)
     }
   })
+
+  it('returns false without writing when matrix values are non-finite', () => {
+    const matrix = identity()
+    matrix[0] = Number.NaN
+    const out = new Float32Array(16).fill(42)
+
+    const ok = writeInvertMat4(out, matrix)
+
+    expect(ok).toBe(false)
+    for (let i = 0; i < 16; i++) {
+      expect(out[i]).toBe(42)
+    }
+  })
 })
 
 describe('writeMultiplyMat4', () => {

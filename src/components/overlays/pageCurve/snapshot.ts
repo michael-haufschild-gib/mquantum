@@ -5,7 +5,11 @@
  * @module components/overlays/pageCurve/snapshot
  */
 
-import { getPageCurveSample, type PageCurveRingBuffer } from '@/lib/physics/bec/pageCurve'
+import {
+  getPageCurveSample,
+  type PageCurveRingBuffer,
+  type PageCurveSample,
+} from '@/lib/physics/bec/pageCurve'
 
 /** Layout width of the Page-curve SVG in CSS px. */
 export const PAGE_CURVE_WIDTH = 360
@@ -32,6 +36,17 @@ function buildPath(points: TracePoint[]): string {
     d += ` L ${points[i]!.x.toFixed(2)} ${points[i]!.y.toFixed(2)}`
   }
   return d
+}
+
+function isFinitePageCurveSample(sample: PageCurveSample | null): sample is PageCurveSample {
+  return (
+    sample !== null &&
+    Number.isFinite(sample.t) &&
+    Number.isFinite(sample.sTherm) &&
+    sample.sTherm >= 0 &&
+    Number.isFinite(sample.sPage) &&
+    sample.sPage >= 0
+  )
 }
 
 /** Plot-space snapshot derived from the ring buffer + latest S_BH. */
@@ -88,20 +103,22 @@ export function buildPageCurveSnapshot(
   let sMax = 0
   const thermPoints: TracePoint[] = []
   const pagePoints: TracePoint[] = []
+  let validCount = 0
   for (let i = 0; i < n; i++) {
     const s = getPageCurveSample(buffer, i)
-    if (!s) continue
+    if (!isFinitePageCurveSample(s)) continue
+    validCount++
     if (s.t < tMin) tMin = s.t
     if (s.t > tMax) tMax = s.t
-    if (s.sTherm > sMax) sMax = s.sTherm
+    sMax = Math.max(sMax, s.sTherm, s.sPage)
   }
-  if (!Number.isFinite(tMin) || !Number.isFinite(tMax) || tMax <= tMin) return out
+  if (validCount < 2 || !Number.isFinite(tMin) || !Number.isFinite(tMax) || tMax <= tMin) return out
   const sMaxShown = Math.max(sMax, out.sBH * 1.2, 1e-6)
   const plotW = PAGE_CURVE_WIDTH - PAD_L - PAD_R
   const plotH = PAGE_CURVE_HEIGHT - PAD_T - PAD_B
   for (let i = 0; i < n; i++) {
     const s = getPageCurveSample(buffer, i)
-    if (!s) continue
+    if (!isFinitePageCurveSample(s)) continue
     const x = PAD_L + ((s.t - tMin) / (tMax - tMin)) * plotW
     const yTh = PAD_T + plotH - (s.sTherm / sMaxShown) * plotH
     const yPg = PAD_T + plotH - (s.sPage / sMaxShown) * plotH

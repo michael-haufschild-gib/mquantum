@@ -4,11 +4,9 @@ import React, { useCallback } from 'react'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { soundManager } from '@/lib/audio/SoundManager'
 
-/** Props for the {@link Switch} toggle component. */
-export interface SwitchProps {
+interface SwitchPropsBase {
   checked: boolean
   onCheckedChange: (checked: boolean) => void
-  label?: string
   disabled?: boolean
   className?: string
   iconOn?: React.ReactNode
@@ -17,11 +15,24 @@ export interface SwitchProps {
   'data-testid'?: string
 }
 
+/**
+ * Accessible-name variants: at least one of `label` or `ariaLabel` is required
+ * so the type system guarantees the rendered checkbox always has an accessible
+ * name (the runtime falls back from `ariaLabel` to `label`).
+ */
+type SwitchAccessibleName =
+  | { label: string; ariaLabel?: string }
+  | { label?: string; ariaLabel: string }
+
+/** Props for the {@link Switch} toggle component. */
+export type SwitchProps = SwitchPropsBase & SwitchAccessibleName
+
 export const Switch: React.FC<SwitchProps> = React.memo(
   ({
     checked,
     onCheckedChange,
     label,
+    ariaLabel,
     disabled = false,
     className = '',
     iconOn,
@@ -30,6 +41,13 @@ export const Switch: React.FC<SwitchProps> = React.memo(
     'data-testid': dataTestId,
     ref,
   }: SwitchProps & { ref?: React.Ref<HTMLInputElement> }) => {
+    // The discriminated union enforces presence at the type level but cannot
+    // catch empty/whitespace strings at runtime (e.g. preset-driven UI passing
+    // a stripped label). Trim both sources and fall back to a generic name so
+    // the rendered checkbox always carries a non-empty accessible name for
+    // screen readers.
+    const resolvedAccessibleName = ariaLabel?.trim() || label?.trim() || 'Toggle switch'
+
     const handleMouseEnter = useCallback(() => {
       if (!disabled) {
         soundManager.playHover()
@@ -66,7 +84,7 @@ export const Switch: React.FC<SwitchProps> = React.memo(
             disabled={disabled}
             role="switch"
             aria-checked={checked}
-            aria-label={label}
+            aria-label={resolvedAccessibleName}
           />
 
           {/* Track */}

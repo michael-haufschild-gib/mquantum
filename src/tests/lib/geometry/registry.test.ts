@@ -289,6 +289,12 @@ describe('Quantum Type Registry (Flat Model)', () => {
     it('returns undefined for schroedinger without quantumMode', () => {
       expect(resolveQuantumTypeKey('schroedinger')).toBeUndefined()
     })
+
+    it('rejects malformed schroedinger quantum modes at runtime', () => {
+      expect(resolveQuantumTypeKey('schroedinger', 'pauliSpinor' as never)).toBeUndefined()
+      expect(resolveQuantumTypeKey('schroedinger', 'legacyMode' as never)).toBeUndefined()
+      expect(resolveQuantumTypeKey('schroedinger', '' as never)).toBeUndefined()
+    })
   })
 
   describe('getQuantumTypeName', () => {

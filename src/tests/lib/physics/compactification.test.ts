@@ -59,6 +59,11 @@ describe('computeEffectiveSpacing', () => {
     expect(result).toEqual([0.2, 0.3])
   })
 
+  it('falls back to spacing when compact radius is missing or malformed', () => {
+    expect(computeEffectiveSpacing([32], [0.2], [true], undefined, 1)).toEqual([0.2])
+    expect(computeEffectiveSpacing([32], [0.2], [true], [Number.NaN], 1)).toEqual([0.2])
+  })
+
   it('handles mixed compact and extended in higher dimensions', () => {
     const result = computeEffectiveSpacing(
       [32, 32, 32, 32, 32],
@@ -70,6 +75,21 @@ describe('computeEffectiveSpacing', () => {
     expect(result[0]).toBe(0.1)
     expect(result[3]).toBeCloseTo((2 * Math.PI * 0.2) / 32, 10)
     expect(result[4]).toBeCloseTo((2 * Math.PI * 0.5) / 32, 10)
+  })
+
+  it('sanitizes malformed lattice dimensions, grid sizes, radii, and spacing', () => {
+    expect(computeEffectiveSpacing([], [], undefined, undefined, Number.NaN)).toEqual([])
+
+    const result = computeEffectiveSpacing(
+      [Number.NaN, 0],
+      [Number.NaN, Number.POSITIVE_INFINITY],
+      [true, false],
+      [Number.NaN],
+      2
+    )
+
+    expect(result[0]).toBe(0.1)
+    expect(result[1]).toBe(0.1)
   })
 })
 
@@ -94,6 +114,10 @@ describe('buildCompactDimsMask', () => {
 
   it('handles all compact dimensions', () => {
     expect(buildCompactDimsMask([true, true, true], 3)).toBe(7)
+  })
+
+  it('returns 0 for malformed latticeDim', () => {
+    expect(buildCompactDimsMask([true, true, true], Number.POSITIVE_INFINITY)).toBe(0)
   })
 })
 
@@ -141,6 +165,23 @@ describe('computeKKSpectrum', () => {
     // Should not produce Infinity or NaN
     expect(Number.isFinite(levels[1]!.energy)).toBe(true)
     expect(levels[1]!.energy).toBeGreaterThan(0)
+  })
+
+  it('returns finite fallback levels for malformed physical parameters', () => {
+    const levels = computeKKSpectrum(
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+      2
+    )
+
+    expect(levels).toHaveLength(3)
+    expect(levels.every((level) => Number.isFinite(level.energy))).toBe(true)
+  })
+
+  it('bounds malformed mode counts instead of looping indefinitely', () => {
+    expect(computeKKSpectrum(1, 1, 1, Number.POSITIVE_INFINITY)).toHaveLength(1)
+    expect(computeKKSpectrum(1, 1, 1, 3.8)).toHaveLength(4)
   })
 
   // ── Physics cross-checks (independent of implementation formula) ──────────
@@ -321,6 +362,12 @@ describe('computeMaxCompactRadius', () => {
     // Max extent = max(32*0.1=3.2, 64*0.1=6.4) = 6.4
     expect(rMax).toBeCloseTo(6.4 / (2 * Math.PI), 10)
   })
+
+  it('uses finite default extent for malformed grid metadata', () => {
+    const rMax = computeMaxCompactRadius([Number.NaN], [Number.POSITIVE_INFINITY], [true], 1)
+
+    expect(rMax).toBeCloseTo((32 * 0.1) / (2 * Math.PI), 10)
+  })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -421,5 +468,27 @@ describe('clampKKState', () => {
     )
     expect(result.compactRadii[0]).toBe(100.0)
     expect(result.compactRadii[1]).toBe(200.0)
+  })
+
+  it('sanitizes non-finite radii before returning state or clamping dt', () => {
+    const capturedSpacing: number[][] = []
+    const captureDt = (dt: number, spacing: number[]) => {
+      capturedSpacing.push([...spacing])
+      return dt
+    }
+    const result = clampKKState(
+      0.01,
+      [Number.NaN, 32],
+      [Number.POSITIVE_INFINITY, 0.1],
+      [true, false],
+      [Number.NaN, Number.POSITIVE_INFINITY],
+      2,
+      1.0,
+      captureDt
+    )
+
+    expect(result.compactRadii).toEqual([0.15, 0.15])
+    expect(capturedSpacing[0]![0]).toBeCloseTo((2 * Math.PI * 0.15) / 32, 10)
+    expect(capturedSpacing[0]![1]).toBe(0.1)
   })
 })

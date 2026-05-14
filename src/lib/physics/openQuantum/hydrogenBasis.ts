@@ -13,6 +13,13 @@
 
 import { MAX_K } from './integrator'
 
+const DEFAULT_BASIS_MAX_N = 2
+const MIN_BASIS_MAX_N = 1
+const MAX_BASIS_MAX_N = 3
+const DEFAULT_BASIS_DIMENSION = 3
+const MIN_BASIS_DIMENSION = 2
+const MAX_BASIS_DIMENSION = 11
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -88,9 +95,39 @@ export function extraDimEnergy(
 ): number {
   let sum = 0
   for (let i = 0; i < extraDimN.length; i++) {
-    sum += (extraDimOmega[i] ?? 1) * (extraDimN[i]! + 0.5)
+    const omega = extraDimOmega[i]
+    const safeOmega = typeof omega === 'number' && Number.isFinite(omega) && omega > 0 ? omega : 1
+    sum += safeOmega * (extraDimN[i]! + 0.5)
   }
   return sum
+}
+
+function clampInteger(value: number, fallback: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return fallback
+  return Math.min(max, Math.max(min, Math.floor(value)))
+}
+
+/** Normalize OQ hydrogen basis maxN to the fixed MAX_K-compatible domain. */
+export function normalizeHydrogenBasisMaxN(maxN: number): number {
+  return clampInteger(maxN, DEFAULT_BASIS_MAX_N, MIN_BASIS_MAX_N, MAX_BASIS_MAX_N)
+}
+
+/** Normalize hydrogen basis dimension to the shader-supported domain. */
+export function normalizeHydrogenBasisDimension(dimension: number): number {
+  return clampInteger(dimension, DEFAULT_BASIS_DIMENSION, MIN_BASIS_DIMENSION, MAX_BASIS_DIMENSION)
+}
+
+/** Normalize extra-dimension oscillator frequencies to finite positive values. */
+export function normalizeHydrogenExtraDimOmega(
+  extraDimOmega: readonly number[],
+  dimension: number
+): number[] {
+  const dim = normalizeHydrogenBasisDimension(dimension)
+  const count = Math.max(0, dim - 3)
+  return Array.from({ length: count }, (_, i) => {
+    const omega = extraDimOmega[i]
+    return typeof omega === 'number' && Number.isFinite(omega) && omega > 0 ? omega : 1
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -119,6 +156,9 @@ export function buildHydrogenBasis(
   dimension: number,
   extraDimOmega: readonly number[] = []
 ): HydrogenBasisState[] {
+  const safeMaxN = normalizeHydrogenBasisMaxN(maxN)
+  const safeDimension = normalizeHydrogenBasisDimension(dimension)
+  const safeExtraDimOmega = normalizeHydrogenExtraDimOmega(extraDimOmega, safeDimension)
   const states: HydrogenBasisState[] = []
 
   // Extra-dimension quantum numbers are ground-state (all zeros) in the
@@ -127,14 +167,14 @@ export function buildHydrogenBasis(
   // The OQ dynamics therefore model decoherence/transitions within the 3D
   // hydrogen subspace only. Users with excited extra-dim states will see
   // the 3D (n,l,m) part of their orbital in the density matrix path.
-  const numExtra = Math.max(0, dimension - 3)
+  const numExtra = Math.max(0, safeDimension - 3)
   const extraN = new Array<number>(numExtra).fill(0)
 
-  for (let n = 1; n <= maxN; n++) {
+  for (let n = 1; n <= safeMaxN; n++) {
     for (let l = 0; l < n; l++) {
       for (let m = -l; m <= l; m++) {
-        const e3D = dimension !== 3 ? hydrogenEnergyND(n, l, dimension) : hydrogenEnergy(n)
-        const eExtra = numExtra > 0 ? extraDimEnergy(extraN, extraDimOmega) : 0
+        const e3D = safeDimension !== 3 ? hydrogenEnergyND(n, l, safeDimension) : hydrogenEnergy(n)
+        const eExtra = numExtra > 0 ? extraDimEnergy(extraN, safeExtraDimOmega) : 0
         states.push({
           index: 0, // assigned after sorting
           n,

@@ -107,14 +107,15 @@ export const DrawerSection: React.FC<DrawerSectionProps> = React.memo(
         {/* Controls area — disabled when enabled is false */}
         {children &&
           (enabled !== undefined ? (
-            <div
+            <fieldset
               role="group"
               aria-label={`${title} parameters`}
               aria-disabled={isDisabled}
-              className={`space-y-3 ${isDisabled ? 'opacity-50 pointer-events-none' : ''}`}
+              disabled={isDisabled}
+              className={`space-y-3 border-0 p-0 m-0 min-w-0 ${isDisabled ? 'opacity-50 pointer-events-none' : ''}`}
             >
               {children}
-            </div>
+            </fieldset>
           ) : (
             <div className="space-y-3">{children}</div>
           ))}

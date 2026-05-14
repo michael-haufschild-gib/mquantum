@@ -20,7 +20,8 @@ export function orbitalShapeLetter(l: number): string {
  * @returns Maximum azimuthal quantum number (n-1)
  */
 export function maxAzimuthalForPrincipal(n: number): number {
-  return Math.max(0, n - 1)
+  if (!Number.isFinite(n)) return 0
+  return Math.max(0, Math.floor(n) - 1)
 }
 
 /**
@@ -31,6 +32,7 @@ export function maxAzimuthalForPrincipal(n: number): number {
  * @returns True if quantum numbers are valid
  */
 export function validateQuantumNumbers(n: number, l: number, m: number): boolean {
+  if (!Number.isInteger(n) || !Number.isInteger(l) || !Number.isInteger(m)) return false
   if (n < 1) return false
   if (l < 0 || l >= n) return false
   if (Math.abs(m) > l) return false

@@ -2,15 +2,18 @@
  * Skybox types for WebGPU shaders.
  */
 
+/** Procedural skybox rendering modes that determine the atmosphere shader. */
+export const SHADER_SKYBOX_MODES = [
+  'classic',
+  'aurora',
+  'nebula',
+  'crystalline',
+  'horizon',
+  'ocean',
+  'twilight',
+] as const
 /** Procedural skybox rendering mode that determines the atmosphere shader. */
-export type SkyboxMode =
-  | 'classic'
-  | 'aurora'
-  | 'nebula'
-  | 'crystalline'
-  | 'horizon'
-  | 'ocean'
-  | 'twilight'
+export type SkyboxMode = (typeof SHADER_SKYBOX_MODES)[number]
 
 /** Toggleable visual effects layered on top of the skybox base mode. */
 export interface SkyboxEffects {

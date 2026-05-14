@@ -1,7 +1,7 @@
 /**
  * Skybox main entry point for WGSL
  */
-import { SkyboxEffects, SkyboxMode } from './types'
+import type { SkyboxEffects, SkyboxMode } from './types'
 
 /**
  * Generate the main fragment function for the skybox shader

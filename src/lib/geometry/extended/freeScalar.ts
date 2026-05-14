@@ -57,6 +57,19 @@ export type KSpaceDisplayMode = 'raw3d' | 'radial3d'
 /** Exposure transfer function for k-space occupation mapping. */
 export type KSpaceExposureMode = 'none' | 'linear' | 'log'
 
+export const KSPACE_DISPLAY_MODES: readonly KSpaceDisplayMode[] = ['raw3d', 'radial3d']
+export const KSPACE_EXPOSURE_MODES: readonly KSpaceExposureMode[] = ['none', 'linear', 'log']
+
+/** Return true when a value is a supported k-space display projection. */
+export function isKSpaceDisplayMode(value: unknown): value is KSpaceDisplayMode {
+  return typeof value === 'string' && KSPACE_DISPLAY_MODES.includes(value as KSpaceDisplayMode)
+}
+
+/** Return true when a value is a supported k-space exposure transfer mode. */
+export function isKSpaceExposureMode(value: unknown): value is KSpaceExposureMode {
+  return typeof value === 'string' && KSPACE_EXPOSURE_MODES.includes(value as KSpaceExposureMode)
+}
+
 /**
  * Display-only transforms applied to k-space occupation data before GPU upload.
  * These do not affect the underlying physics — only how n_k values are visualized.
@@ -110,6 +123,71 @@ export const PASSTHROUGH_KSPACE_VIZ: KSpaceVizConfig = {
   broadeningRadius: 1,
   broadeningSigma: 1.0,
   radialBinCount: 32,
+}
+
+function finiteOrDefault(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value))
+}
+
+/**
+ * Normalize k-space visualization config from stores, presets, and workers.
+ *
+ * UI controls already constrain normal interactions, but imported scenes and
+ * direct store writes can bypass those setters. The display transform pipeline
+ * must not silently reinterpret unknown modes as raw/linear.
+ */
+export function sanitizeKSpaceVizConfig(input: unknown): KSpaceVizConfig {
+  const source =
+    input && typeof input === 'object' ? (input as Partial<KSpaceVizConfig>) : DEFAULT_KSPACE_VIZ
+  const high = clampNumber(
+    finiteOrDefault(source.highPercentile, DEFAULT_KSPACE_VIZ.highPercentile),
+    1,
+    100
+  )
+  const low = clampNumber(
+    finiteOrDefault(source.lowPercentile, DEFAULT_KSPACE_VIZ.lowPercentile),
+    0,
+    Math.min(99, high - 0.5)
+  )
+
+  return {
+    displayMode: isKSpaceDisplayMode(source.displayMode)
+      ? source.displayMode
+      : DEFAULT_KSPACE_VIZ.displayMode,
+    fftShiftEnabled:
+      typeof source.fftShiftEnabled === 'boolean'
+        ? source.fftShiftEnabled
+        : DEFAULT_KSPACE_VIZ.fftShiftEnabled,
+    exposureMode: isKSpaceExposureMode(source.exposureMode)
+      ? source.exposureMode
+      : DEFAULT_KSPACE_VIZ.exposureMode,
+    lowPercentile: low,
+    highPercentile: Math.max(low + 0.5, high),
+    gamma: clampNumber(finiteOrDefault(source.gamma, DEFAULT_KSPACE_VIZ.gamma), 0.1, 3.0),
+    broadeningEnabled:
+      typeof source.broadeningEnabled === 'boolean'
+        ? source.broadeningEnabled
+        : DEFAULT_KSPACE_VIZ.broadeningEnabled,
+    broadeningRadius: clampNumber(
+      Math.round(finiteOrDefault(source.broadeningRadius, DEFAULT_KSPACE_VIZ.broadeningRadius)),
+      1,
+      5
+    ),
+    broadeningSigma: clampNumber(
+      finiteOrDefault(source.broadeningSigma, DEFAULT_KSPACE_VIZ.broadeningSigma),
+      0.5,
+      3.0
+    ),
+    radialBinCount: clampNumber(
+      Math.round(finiteOrDefault(source.radialBinCount, DEFAULT_KSPACE_VIZ.radialBinCount)),
+      16,
+      128
+    ),
+  }
 }
 
 // ============================================================================

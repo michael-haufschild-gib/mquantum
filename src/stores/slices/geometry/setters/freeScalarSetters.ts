@@ -7,7 +7,10 @@
  * @module stores/slices/geometry/setters/freeScalarSetters
  */
 
-import { DEFAULT_FREE_SCALAR_CONFIG } from '@/lib/geometry/extended/freeScalar'
+import {
+  DEFAULT_FREE_SCALAR_CONFIG,
+  sanitizeKSpaceVizConfig,
+} from '@/lib/geometry/extended/freeScalar'
 import type {
   FreeScalarConfig,
   FreeScalarFieldView,
@@ -28,6 +31,10 @@ import {
   reconcileCosmologyInvariants,
 } from './freeScalarCosmologySetters'
 import {
+  createFreeScalarKSpaceVizSetters,
+  type FreeScalarKSpaceVizSetters,
+} from './freeScalarKSpaceVizSetters'
+import {
   createFreeScalarPreheatingSetters,
   type FreeScalarPreheatingSetters,
 } from './freeScalarPreheatingSetters'
@@ -42,7 +49,8 @@ import {
 } from './sliceSetterUtils'
 
 /** Actions exposed by the free-scalar field setter bundle. */
-export interface FreeScalarSetters extends FreeScalarCosmologySetters, FreeScalarPreheatingSetters {
+export interface FreeScalarSetters
+  extends FreeScalarCosmologySetters, FreeScalarKSpaceVizSetters, FreeScalarPreheatingSetters {
   setFreeScalarLatticeDim: (dim: number) => void
   setFreeScalarGridSize: (size: number[]) => void
   setFreeScalarSpacing: (spacing: number[]) => void
@@ -70,21 +78,6 @@ export interface FreeScalarSetters extends FreeScalarCosmologySetters, FreeScala
   // Diagnostics
   setFreeScalarDiagnosticsEnabled: (enabled: boolean) => void
   setFreeScalarDiagnosticsInterval: (interval: number) => void
-  // k-Space Visualization Display Transforms
-  setFreeScalarKSpaceDisplayMode: (
-    mode: import('@/lib/geometry/extended/types').KSpaceDisplayMode
-  ) => void
-  setFreeScalarKSpaceFftShift: (enabled: boolean) => void
-  setFreeScalarKSpaceExposureMode: (
-    mode: import('@/lib/geometry/extended/types').KSpaceExposureMode
-  ) => void
-  setFreeScalarKSpaceLowPercentile: (value: number) => void
-  setFreeScalarKSpaceHighPercentile: (value: number) => void
-  setFreeScalarKSpaceGamma: (value: number) => void
-  setFreeScalarKSpaceBroadeningEnabled: (enabled: boolean) => void
-  setFreeScalarKSpaceBroadeningRadius: (value: number) => void
-  setFreeScalarKSpaceBroadeningSigma: (value: number) => void
-  setFreeScalarKSpaceRadialBinCount: (value: number) => void
   // Presets
   applyFreeScalarPreset: (
     presetId: string,
@@ -426,152 +419,7 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarSetters {
         },
       }))
     },
-    setFreeScalarKSpaceDisplayMode: (mode) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: {
-            ...state.schroedinger.freeScalar,
-            kSpaceViz: { ...state.schroedinger.freeScalar.kSpaceViz, displayMode: mode },
-          },
-        },
-      }))
-    },
-    setFreeScalarKSpaceFftShift: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: {
-            ...state.schroedinger.freeScalar,
-            kSpaceViz: { ...state.schroedinger.freeScalar.kSpaceViz, fftShiftEnabled: enabled },
-          },
-        },
-      }))
-    },
-    setFreeScalarKSpaceExposureMode: (mode) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: {
-            ...state.schroedinger.freeScalar,
-            kSpaceViz: { ...state.schroedinger.freeScalar.kSpaceViz, exposureMode: mode },
-          },
-        },
-      }))
-    },
-    setFreeScalarKSpaceLowPercentile: (value) => {
-      if (!isFinite(value)) {
-        warnNonFinite('freeScalar.kSpaceViz.lowPercentile', value)
-        return
-      }
-      setWithVersion((state) => {
-        const viz = state.schroedinger.freeScalar.kSpaceViz
-        const clamped = Math.max(0, Math.min(viz.highPercentile - 0.5, value))
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            freeScalar: {
-              ...state.schroedinger.freeScalar,
-              kSpaceViz: { ...viz, lowPercentile: clamped },
-            },
-          },
-        }
-      })
-    },
-    setFreeScalarKSpaceHighPercentile: (value) => {
-      if (!isFinite(value)) {
-        warnNonFinite('freeScalar.kSpaceViz.highPercentile', value)
-        return
-      }
-      setWithVersion((state) => {
-        const viz = state.schroedinger.freeScalar.kSpaceViz
-        const clamped = Math.max(viz.lowPercentile + 0.5, Math.min(100, value))
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            freeScalar: {
-              ...state.schroedinger.freeScalar,
-              kSpaceViz: { ...viz, highPercentile: clamped },
-            },
-          },
-        }
-      })
-    },
-    setFreeScalarKSpaceGamma: (value) => {
-      if (!isFinite(value)) {
-        warnNonFinite('freeScalar.kSpaceViz.gamma', value)
-        return
-      }
-      const clamped = Math.max(0.1, Math.min(3.0, value))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: {
-            ...state.schroedinger.freeScalar,
-            kSpaceViz: { ...state.schroedinger.freeScalar.kSpaceViz, gamma: clamped },
-          },
-        },
-      }))
-    },
-    setFreeScalarKSpaceBroadeningEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: {
-            ...state.schroedinger.freeScalar,
-            kSpaceViz: { ...state.schroedinger.freeScalar.kSpaceViz, broadeningEnabled: enabled },
-          },
-        },
-      }))
-    },
-    setFreeScalarKSpaceBroadeningRadius: (value) => {
-      if (!isFinite(value)) {
-        warnNonFinite('freeScalar.kSpaceViz.broadeningRadius', value)
-        return
-      }
-      const clamped = Math.max(1, Math.min(5, Math.round(value)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: {
-            ...state.schroedinger.freeScalar,
-            kSpaceViz: { ...state.schroedinger.freeScalar.kSpaceViz, broadeningRadius: clamped },
-          },
-        },
-      }))
-    },
-    setFreeScalarKSpaceBroadeningSigma: (value) => {
-      if (!isFinite(value)) {
-        warnNonFinite('freeScalar.kSpaceViz.broadeningSigma', value)
-        return
-      }
-      const clamped = Math.max(0.5, Math.min(3.0, value))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: {
-            ...state.schroedinger.freeScalar,
-            kSpaceViz: { ...state.schroedinger.freeScalar.kSpaceViz, broadeningSigma: clamped },
-          },
-        },
-      }))
-    },
-    setFreeScalarKSpaceRadialBinCount: (value) => {
-      if (!isFinite(value)) {
-        warnNonFinite('freeScalar.kSpaceViz.radialBinCount', value)
-        return
-      }
-      const clamped = Math.max(16, Math.min(128, Math.round(value)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: {
-            ...state.schroedinger.freeScalar,
-            kSpaceViz: { ...state.schroedinger.freeScalar.kSpaceViz, radialBinCount: clamped },
-          },
-        },
-      }))
-    },
+    ...createFreeScalarKSpaceVizSetters(ctx),
     ...createFreeScalarPreheatingSetters(ctx),
     ...createFreeScalarCosmologySetters(ctx),
     applyFreeScalarPreset: (presetId, options) => {
@@ -590,7 +438,7 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarSetters {
             const base: FreeScalarConfig = {
               ...DEFAULT_FREE_SCALAR_CONFIG,
               ...preset.overrides,
-              kSpaceViz: state.schroedinger.freeScalar.kSpaceViz,
+              kSpaceViz: sanitizeKSpaceVizConfig(state.schroedinger.freeScalar.kSpaceViz),
               slicePositions: state.schroedinger.freeScalar.slicePositions,
               needsReset: true,
             }

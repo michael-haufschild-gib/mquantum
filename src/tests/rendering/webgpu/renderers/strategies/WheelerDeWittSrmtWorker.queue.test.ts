@@ -150,6 +150,17 @@ describe('queueSrmtCompute — sequential per-clock cross-clock queue', () => {
     expect(tailClocks).toEqual(['a', 'phi2'])
   })
 
+  it('falls back to canonical clock order when selectedClock is malformed at runtime', () => {
+    queueSrmtCompute(state, makeArgsByClock(), 'not-a-clock' as SrmtClock)
+
+    const worker = FakeWorker.instances[0]!
+    expect(worker.messages).toHaveLength(1)
+    expect((worker.messages[0]!.message as { config: { clock: SrmtClock } }).config.clock).toBe('a')
+    expect(state.selectedClock).toBe('a')
+    expect(state.queue.map((q) => q.clock)).toEqual(['phi1', 'phi2'])
+    expect(useSrmtDiagnosticStore.getState().computing).toBe(true)
+  })
+
   it('clears stale quality progress when a fresh batch starts', () => {
     useSrmtDiagnosticStore.getState().setDiagnostic(
       {

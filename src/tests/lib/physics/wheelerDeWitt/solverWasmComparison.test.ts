@@ -75,8 +75,14 @@ function diffMetrics(ts: Float32Array, rs: Float32Array): DiffMetrics {
   let maxAbsTs = 0
   let worstOffset = -1
   for (let i = 0; i < ts.length; i++) {
-    const t = ts[i] ?? 0
-    const r = rs[i] ?? 0
+    const t = ts[i]!
+    const r = rs[i]!
+    if (!Number.isFinite(t)) {
+      throw new Error(`ts[${i}] must be finite`)
+    }
+    if (!Number.isFinite(r)) {
+      throw new Error(`rs[${i}] must be finite`)
+    }
     const d = Math.abs(t - r)
     if (d > maxAbsDiff) {
       maxAbsDiff = d
@@ -88,6 +94,26 @@ function diffMetrics(ts: Float32Array, rs: Float32Array): DiffMetrics {
   const normalisedRelDiff = maxAbsTs > 0 ? maxAbsDiff / maxAbsTs : maxAbsDiff
   return { maxAbsDiff, maxAbsTs, normalisedRelDiff, worstOffset }
 }
+
+describe('Wheeler-DeWitt WASM comparison metrics', () => {
+  it('computes scale-normalised pointwise differences', () => {
+    const m = diffMetrics(new Float32Array([1, -2]), new Float32Array([1.25, -1]))
+
+    expect(m.maxAbsDiff).toBe(1)
+    expect(m.maxAbsTs).toBe(2)
+    expect(m.normalisedRelDiff).toBe(0.5)
+    expect(m.worstOffset).toBe(1)
+  })
+
+  it('rejects non-finite solver output instead of treating it as matching', () => {
+    expect(() => diffMetrics(new Float32Array([1, Number.NaN]), new Float32Array([1, 0]))).toThrow(
+      /ts\[1\] must be finite/
+    )
+    expect(() =>
+      diffMetrics(new Float32Array([1, 0]), new Float32Array([1, Number.POSITIVE_INFINITY]))
+    ).toThrow(/rs\[1\] must be finite/)
+  })
+})
 
 /**
  * Reusable comparison body: run both solvers on the same input, assert

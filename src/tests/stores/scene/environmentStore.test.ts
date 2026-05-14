@@ -179,6 +179,29 @@ describe('environmentStore', () => {
         expect(state.skyboxMode).toBe('classic')
         expect(state.skyboxTexture).toBe('space_blue')
       })
+
+      it('ignores invalid runtime skybox enum updates', () => {
+        const { setSkyboxSelection, setSkyboxMode, setSkyboxTexture, setSkyboxAnimationMode } =
+          useEnvironmentStore.getState()
+
+        setSkyboxSelection('space_blue')
+        setSkyboxMode('procedural_aurora')
+        setSkyboxTexture('space_red')
+        setSkyboxAnimationMode('cinematic')
+        const before = useEnvironmentStore.getState()
+
+        setSkyboxSelection('procedural_missing' as never)
+        setSkyboxMode('procedural_missing' as never)
+        setSkyboxTexture('space_missing' as never)
+        setSkyboxAnimationMode('warp' as never)
+
+        const after = useEnvironmentStore.getState()
+        expect(after.skyboxSelection).toBe(before.skyboxSelection)
+        expect(after.skyboxEnabled).toBe(before.skyboxEnabled)
+        expect(after.skyboxMode).toBe(before.skyboxMode)
+        expect(after.skyboxTexture).toBe(before.skyboxTexture)
+        expect(after.skyboxAnimationMode).toBe(before.skyboxAnimationMode)
+      })
     })
 
     describe('procedural settings', () => {

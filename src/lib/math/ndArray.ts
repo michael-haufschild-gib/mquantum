@@ -107,17 +107,35 @@ export function sanitizePowerOfTwoGridSizes<T extends { gridSize: number[]; latt
     maxTotalSites: number
     maxGridSize?: number
     minGridSize?: number
+    maxDimensions?: number
   }
 ): T {
   const minGridSize = options.minGridSize ?? MIN_POWER_OF_TWO_GRID_SIZE
   const maxGridSize = options.maxGridSize ?? MAX_POWER_OF_TWO_GRID_SIZE
-  const activeGrid = config.gridSize
-    .slice(0, config.latticeDim)
-    .map((g) => nearestPow2(g, minGridSize, maxGridSize))
+  const maxDimensions = options.maxDimensions ?? Number.POSITIVE_INFINITY
+  const requestedDim = Number.isFinite(config.latticeDim)
+    ? Math.floor(config.latticeDim)
+    : MIN_POWER_OF_TWO_GRID_SIZE - 1
+  const latticeDim = Math.max(1, Math.min(maxDimensions, requestedDim))
+  const fallback = computeDefaultPow2GridPerDim(
+    latticeDim,
+    options.maxTotalSites,
+    maxGridSize,
+    minGridSize
+  )
+  const activeGrid = Array.from({ length: latticeDim }, (_, d) =>
+    nearestPow2(config.gridSize[d] ?? fallback, minGridSize, maxGridSize)
+  )
   const fittedActive = reduceGridToFit([...activeGrid], options.maxTotalSites, minGridSize)
-  const fixed = [...fittedActive, ...config.gridSize.slice(config.latticeDim)]
-  if (fixed.every((g, i) => g === config.gridSize[i])) return config
-  return { ...config, gridSize: fixed }
+  const fixed = [...fittedActive, ...config.gridSize.slice(latticeDim)]
+  if (
+    latticeDim === config.latticeDim &&
+    fixed.length === config.gridSize.length &&
+    fixed.every((g, i) => g === config.gridSize[i])
+  ) {
+    return config
+  }
+  return { ...config, latticeDim, gridSize: fixed }
 }
 
 /**

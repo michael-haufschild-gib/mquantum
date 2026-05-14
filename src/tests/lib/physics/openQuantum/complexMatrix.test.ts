@@ -116,6 +116,42 @@ describe('complexMatMul', () => {
     expect(AB.real[2]).toBeCloseTo(4, 10)
     expect(AB.real[3]).toBeCloseTo(3, 10)
   })
+
+  it('supports output aliasing the left or right operand', () => {
+    const N = 2
+    const A = mat(N, [
+      [1, 1],
+      [2, -1],
+      [0.5, 0],
+      [-3, 2],
+    ])
+    const B = mat(N, [
+      [0, 2],
+      [1, 0],
+      [4, -1],
+      [2, 3],
+    ])
+    const expected = complexMatZero(N)
+    complexMatMul(A, B, expected, N)
+
+    const leftAlias = mat(N, [
+      [1, 1],
+      [2, -1],
+      [0.5, 0],
+      [-3, 2],
+    ])
+    complexMatMul(leftAlias, B, leftAlias, N)
+    expectMatClose(leftAlias, expected, N)
+
+    const rightAlias = mat(N, [
+      [0, 2],
+      [1, 0],
+      [4, -1],
+      [2, 3],
+    ])
+    complexMatMul(A, rightAlias, rightAlias, N)
+    expectMatClose(rightAlias, expected, N)
+  })
 })
 
 describe('complexMatAdd', () => {

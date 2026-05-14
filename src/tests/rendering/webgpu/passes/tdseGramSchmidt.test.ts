@@ -46,6 +46,7 @@ function createGSState(overrides: Partial<GramSchmidtState> = {}): GramSchmidtSt
     gsPartialImBuffer: null,
     gsResultBuffer: null,
     gsNumWorkgroups: 0,
+    gsBufferTotalSites: 0,
     psiBuffer: null,
     totalSites: 0,
     pl: null,
@@ -77,6 +78,7 @@ describe('ensureGSBuffers', () => {
 
     // ceil(512 / 256) = 2
     expect(state.gsNumWorkgroups).toBe(2)
+    expect(state.gsBufferTotalSites).toBe(512)
   })
 
   it('does not recreate buffers on subsequent calls', () => {
@@ -88,6 +90,32 @@ describe('ensureGSBuffers', () => {
 
     expect(device.createBuffer).toHaveBeenCalledTimes(4)
   })
+
+  it('recreates buffers when totalSites changes', () => {
+    const device = createMockDevice()
+    const state = createGSState({ totalSites: 256 })
+
+    ensureGSBuffers(device, state)
+    const oldUniform = state.gsUniformBuffer
+    const oldPartialRe = state.gsPartialReBuffer
+    const oldPartialIm = state.gsPartialImBuffer
+    const oldResult = state.gsResultBuffer
+    state.gsEigenstates = [
+      { psi: createMockBuffer('old-eigen'), normSquared: 1, energy: NaN, ipr: NaN },
+    ]
+
+    state.totalSites = 513
+    ensureGSBuffers(device, state)
+
+    expect(oldUniform?.destroy).toHaveBeenCalled()
+    expect(oldPartialRe?.destroy).toHaveBeenCalled()
+    expect(oldPartialIm?.destroy).toHaveBeenCalled()
+    expect(oldResult?.destroy).toHaveBeenCalled()
+    expect(state.gsEigenstates).toHaveLength(0)
+    expect(state.gsNumWorkgroups).toBe(3)
+    expect(state.gsBufferTotalSites).toBe(513)
+    expect(device.createBuffer).toHaveBeenCalledTimes(8)
+  })
 })
 
 describe('storeCurrentEigenstate', () => {
@@ -98,6 +126,16 @@ describe('storeCurrentEigenstate', () => {
     const result = storeCurrentEigenstate(device, state)
 
     expect(result).toBe(-1)
+  })
+
+  it('returns -1 when totalSites is invalid', () => {
+    const device = createMockDevice()
+    const state = createGSState({ psiBuffer: createMockBuffer('psi'), totalSites: 0 })
+
+    const result = storeCurrentEigenstate(device, state)
+
+    expect(result).toBe(-1)
+    expect(device.createBuffer).not.toHaveBeenCalled()
   })
 
   it('copies psi buffers and increments eigenstate count', () => {
@@ -214,6 +252,8 @@ describe('destroyGSBuffers', () => {
     expect(state.gsPartialReBuffer).toBeNull()
     expect(state.gsPartialImBuffer).toBeNull()
     expect(state.gsResultBuffer).toBeNull()
+    expect(state.gsNumWorkgroups).toBe(0)
+    expect(state.gsBufferTotalSites).toBe(0)
   })
 })
 

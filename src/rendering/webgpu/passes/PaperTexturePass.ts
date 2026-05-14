@@ -220,6 +220,16 @@ function clampPaperSeed(value: number | undefined, fallback: number): number {
   return clampFinite(value, fallback, 0, 1000)
 }
 
+/** Clamp render-context resolution to positive finite shader dimensions. */
+function sanitizeResolutionExtent(value: number | undefined): number {
+  return clampFinite(value, 1, 1, Number.MAX_SAFE_INTEGER)
+}
+
+/** Replace invalid animation time with a deterministic shader-safe value. */
+function sanitizeTime(value: number | undefined): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
 /**
  * Converts quality level to numeric value.
  * @param quality - Quality level ('low', 'medium', 'high')
@@ -543,6 +553,40 @@ export class PaperTexturePass extends WebGPUBasePass {
     this.intensity = clampUnit(value, this.intensity)
   }
 
+  private writeUniformData(ctx: WebGPURenderContext): Float32Array {
+    const data = this.uniformData
+    data.fill(0)
+    data[0] = sanitizeResolutionExtent(ctx.size?.width)
+    data[1] = sanitizeResolutionExtent(ctx.size?.height)
+    data[2] = sanitizeTime(ctx.frame?.time)
+    data[3] = 1.0 // pixelRatio - WebGPU handles DPR internally
+    // colorFront (RGBA, alpha always 1.0)
+    data[4] = this.colorFront[0]
+    data[5] = this.colorFront[1]
+    data[6] = this.colorFront[2]
+    data[7] = 1.0
+    // colorBack (RGBA, alpha always 1.0)
+    data[8] = this.colorBack[0]
+    data[9] = this.colorBack[1]
+    data[10] = this.colorBack[2]
+    data[11] = 1.0
+    // Parameters
+    data[12] = this.contrast
+    data[13] = this.roughness
+    data[14] = this.fiber
+    data[15] = this.fiberSize
+    data[16] = this.crumples
+    data[17] = this.crumpleSize
+    data[18] = this.folds
+    data[19] = this.foldCount
+    data[20] = this.drops
+    data[21] = this.fade
+    data[22] = this.seed
+    data[23] = this.quality
+    data[24] = this.intensity
+    return data
+  }
+
   /**
    * Execute the paper texture pass.
    * @param ctx - WebGPU render context
@@ -580,39 +624,7 @@ export class PaperTexturePass extends WebGPUBasePass {
     // f32 drops, fade, seed, quality = 96
     // f32 intensity, pad0, pad1, pad2 = 112 -> aligned to 128
     // PERF: Reuse pre-allocated uniform buffer
-    const data = this.uniformData
-    data[0] = ctx.size.width
-    data[1] = ctx.size.height
-    data[2] = ctx.frame?.time ?? 0
-    data[3] = 1.0 // pixelRatio - WebGPU handles DPR internally
-    // colorFront (RGBA, alpha always 1.0)
-    data[4] = this.colorFront[0]
-    data[5] = this.colorFront[1]
-    data[6] = this.colorFront[2]
-    data[7] = 1.0
-    // colorBack (RGBA, alpha always 1.0)
-    data[8] = this.colorBack[0]
-    data[9] = this.colorBack[1]
-    data[10] = this.colorBack[2]
-    data[11] = 1.0
-    // Parameters
-    data[12] = this.contrast
-    data[13] = this.roughness
-    data[14] = this.fiber
-    data[15] = this.fiberSize
-    data[16] = this.crumples
-    data[17] = this.crumpleSize
-    data[18] = this.folds
-    data[19] = this.foldCount
-    data[20] = this.drops
-    data[21] = this.fade
-    data[22] = this.seed
-    data[23] = this.quality
-    data[24] = this.intensity
-    // Padding
-    data[25] = 0
-    data[26] = 0
-    data[27] = 0
+    const data = this.writeUniformData(ctx)
 
     this.writeUniformBuffer(this.device, this.uniformBuffer, data)
 

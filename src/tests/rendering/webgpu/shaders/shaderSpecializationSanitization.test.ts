@@ -4,6 +4,10 @@ import { composeSchroedingerShader } from '@/rendering/webgpu/shaders/schroeding
 import { composeDensityGridComputeShader } from '@/rendering/webgpu/shaders/schroedinger/compute/compose'
 import { composeWignerCacheComputeShader } from '@/rendering/webgpu/shaders/schroedinger/compute/composeWignerCache'
 import { composeWignerSpatialComputeShader } from '@/rendering/webgpu/shaders/schroedinger/compute/composeWignerSpatial'
+import {
+  generateHydrogenNDCachedBlock,
+  getHydrogenNDGeneratedBlock,
+} from '@/rendering/webgpu/shaders/schroedinger/quantum/hydrogenNDVariants.wgsl'
 
 const expectNoInvalidWgslLiterals = (wgsl: string): void => {
   expect(wgsl).not.toMatch(/=\s*(NaN|Infinity|undefined)\b/)
@@ -89,5 +93,36 @@ describe('shader specialization sanitization', () => {
     expect(wgsl).toContain('texture_storage_3d<r16float, write>')
     expect(wgsl).not.toContain('bad-format')
     expectNoInvalidWgslLiterals(wgsl)
+  })
+
+  it('sanitizes direct hydrogen ND generated-block selection', () => {
+    const fallbackWgsl = getHydrogenNDGeneratedBlock(Number.NaN)
+    expect(fallbackWgsl).toContain('fn evalHydrogenNDPsi3D(')
+    expectNoInvalidWgslLiterals(fallbackWgsl)
+
+    const twoDimWgsl = getHydrogenNDGeneratedBlock(2)
+    expect(twoDimWgsl).toContain('fn evalHydrogenNDPsi2D(')
+    expect(twoDimWgsl).not.toContain('x2*x2')
+    expectNoInvalidWgslLiterals(twoDimWgsl)
+
+    const clampedWgsl = getHydrogenNDGeneratedBlock(99)
+    expect(clampedWgsl).toContain('fn evalHydrogenNDPsi11D(')
+    expectNoInvalidWgslLiterals(clampedWgsl)
+  })
+
+  it('sanitizes cached hydrogen ND block generation and avoids invalid cached 2D WGSL', () => {
+    const fallbackWgsl = generateHydrogenNDCachedBlock(Number.POSITIVE_INFINITY)
+    expect(fallbackWgsl).toContain('fn evalHydrogenNDPsi3D(')
+    expect(fallbackWgsl).not.toContain('Cached')
+    expectNoInvalidWgslLiterals(fallbackWgsl)
+
+    const twoDimWgsl = generateHydrogenNDCachedBlock(2)
+    expect(twoDimWgsl).toContain('fn evalHydrogenNDPsi2D(')
+    expect(twoDimWgsl).not.toContain('x2*x2')
+    expectNoInvalidWgslLiterals(twoDimWgsl)
+
+    const cachedWgsl = generateHydrogenNDCachedBlock(11.9)
+    expect(cachedWgsl).toContain('fn evalHydrogenNDPsi11DCached(')
+    expectNoInvalidWgslLiterals(cachedWgsl)
   })
 })

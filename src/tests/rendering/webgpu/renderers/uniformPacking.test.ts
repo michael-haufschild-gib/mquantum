@@ -11,8 +11,10 @@ import { describe, expect, it } from 'vitest'
 import { SCHROEDINGER_LAYOUT } from '@/rendering/webgpu/renderers/schroedingerLayout'
 import {
   packSchroedingerUniforms,
+  sanitizeSchroedingerBoundingRadius,
   type SchroedingerPackParams,
 } from '@/rendering/webgpu/renderers/uniformPacking'
+import { parseHexColorToLinearRgb } from '@/rendering/webgpu/utils/color'
 
 const I = SCHROEDINGER_LAYOUT.index
 
@@ -64,6 +66,35 @@ describe('packSchroedingerUniforms — defaults', () => {
     expect(floatView[I.omega + 11]).toBe(0)
   })
 
+  it('sanitizes invalid bounding radius before packing radius and reciprocal uniforms', () => {
+    const { floatView, intView } = makeBuffer()
+    packSchroedingerUniforms(floatView, intView, { ...baseParams, boundingRadius: 0 })
+    expect(floatView[I.boundingRadius]).toBe(2)
+    expect(floatView[I.invBoundingRadius]).toBe(0.5)
+
+    expect(sanitizeSchroedingerBoundingRadius(Number.NaN)).toBe(2)
+    expect(sanitizeSchroedingerBoundingRadius(3.5)).toBe(3.5)
+  })
+
+  it('sanitizes volume lighting parameters before GPU upload', () => {
+    const { floatView, intView } = makeBuffer()
+    packSchroedingerUniforms(floatView, intView, {
+      ...baseParams,
+      canonicalDensityCompensation: Number.NaN,
+      schroedinger: {
+        densityGain: Number.POSITIVE_INFINITY,
+        densityContrast: -10,
+        powderScale: Number.NaN,
+        scatteringAnisotropy: 2,
+      } as never,
+    })
+
+    expect(floatView[I.densityGain]).toBe(2)
+    expect(floatView[I.densityContrast]).toBe(1)
+    expect(floatView[I.powderScale]).toBe(1)
+    expect(floatView[I.scatteringAnisotropy]).toBeCloseTo(0.9)
+  })
+
   it('clamps invalid hydrogen quantum numbers (n=0 → n=1, l>=n → l=n-1, m beyond ±l clamped)', () => {
     const { floatView, intView } = makeBuffer()
     packSchroedingerUniforms(floatView, intView, {
@@ -109,6 +140,40 @@ describe('packSchroedingerUniforms — defaults', () => {
     ]) {
       expect(Number.isFinite(floatView[idx]), `uniform index ${idx}`).toBe(true)
     }
+  })
+
+  it('sanitizes radial probability overlay controls before GPU upload', () => {
+    const { floatView, intView } = makeBuffer()
+    packSchroedingerUniforms(floatView, intView, {
+      ...baseParams,
+      quantumModeStr: 'hydrogenND',
+      rendererQuantumMode: 'hydrogenND',
+      schroedinger: {
+        radialProbabilityEnabled: 'true',
+        radialProbabilityOpacity: Number.NaN,
+        radialProbabilityColor: 'not-a-color',
+      } as never,
+    })
+
+    expect(intView[I.radialProbabilityEnabled]).toBe(0)
+    expect(floatView[I.radialProbabilityOpacity]).toBeCloseTo(0.6)
+    const fallback = parseHexColorToLinearRgb('#44aaff')
+    expect(floatView[I.radialProbabilityColor]).toBeCloseTo(fallback[0])
+    expect(floatView[I.radialProbabilityColor + 1]).toBeCloseTo(fallback[1])
+    expect(floatView[I.radialProbabilityColor + 2]).toBeCloseTo(fallback[2])
+
+    packSchroedingerUniforms(floatView, intView, {
+      ...baseParams,
+      quantumModeStr: 'hydrogenND',
+      rendererQuantumMode: 'hydrogenND',
+      schroedinger: {
+        radialProbabilityEnabled: true,
+        radialProbabilityOpacity: 9,
+      } as never,
+    })
+
+    expect(intView[I.radialProbabilityEnabled]).toBe(1)
+    expect(floatView[I.radialProbabilityOpacity]).toBe(1)
   })
 
   it('writes hydrogenBoost = 50·n²·3^l for the default configuration (n=2, l=1)', () => {

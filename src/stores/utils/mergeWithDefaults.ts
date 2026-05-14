@@ -18,7 +18,9 @@ import {
 import {
   DEFAULT_PREHEATING_CONFIG,
   FREE_SCALAR_MAX_TOTAL_SITES,
+  sanitizeKSpaceVizConfig,
 } from '@/lib/geometry/extended/freeScalar'
+import { createDefaultPauliConfig } from '@/lib/geometry/extended/pauli'
 import { sanitizeQuantumWalkConfig } from '@/lib/geometry/extended/quantumWalk'
 import { sanitizeHarmonicOscillatorScalars } from '@/lib/geometry/extended/schroedinger/configSanitization'
 import {
@@ -32,7 +34,6 @@ import {
 } from '@/lib/geometry/extended/tdse'
 import {
   createDefaultSchroedingerConfig,
-  DEFAULT_PAULI_CONFIG,
   DEFAULT_SCHROEDINGER_CONFIG,
   type FreeScalarConfig,
   RAYMARCH_QUALITY_TO_SAMPLES,
@@ -52,11 +53,103 @@ import { OBJECT_TYPE_TO_CONFIG_KEY } from './presetSerialization'
  */
 const CONFIG_KEY_TO_DEFAULT: Record<string, () => object> = {
   schroedinger: createDefaultSchroedingerConfig,
-  pauliSpinor: () => structuredClone(DEFAULT_PAULI_CONFIG),
+  pauliSpinor: createDefaultPauliConfig,
 }
 
 function hasRecordKey<T extends object>(record: T, value: unknown): value is keyof T {
   return typeof value === 'string' && Object.prototype.hasOwnProperty.call(record, value)
+}
+
+const NUMERIC_ARRAY_FIELDS = new Set([
+  'angularChain',
+  'center',
+  'compactRadii',
+  'crossSectionPlaneNormal',
+  'extraDimOmega',
+  'extraDimQuantumNumbers',
+  'fieldDirection',
+  'gridSize',
+  'initialPosition',
+  'initialSpinDirection',
+  'modeK',
+  'packetCenter',
+  'packetMomentum',
+  'parameterValues',
+  'particleColor',
+  'spacing',
+  'spinDirection',
+  'spinDownColor',
+  'spinUpColor',
+  'slicePositions',
+  'trapAnisotropy',
+  'visualizationAxes',
+  'vortexPlane1',
+  'vortexPlane2',
+  'a',
+  'b',
+  'c',
+  'd',
+])
+
+const BOOLEAN_ARRAY_FIELDS = new Set(['compactDims'])
+
+// `gridSize`, `spacing`, and `initialPosition` are intentionally excluded.
+// Their downstream sanitizer (`sanitizeQuantumWalkConfig` and the
+// `LATTICE_SIZED_ARRAY_FIELDS` reshape) fixes non-finite entries per index,
+// preserving the user's other valid values. Enforcing finite at the merge
+// gate would reject the whole array and erase those values along with the
+// bad one — see the "sanitizes loaded quantumWalk grids" test.
+const FINITE_NUMERIC_ARRAY_FIELDS = new Set([
+  'angularChain',
+  'center',
+  'crossSectionPlaneNormal',
+  'extraDimOmega',
+  'extraDimQuantumNumbers',
+  'fieldDirection',
+  'initialSpinDirection',
+  'parameterValues',
+  'particleColor',
+  'spinDirection',
+  'spinDownColor',
+  'spinUpColor',
+  'visualizationAxes',
+  'vortexPlane1',
+  'vortexPlane2',
+  'a',
+  'b',
+  'c',
+  'd',
+])
+
+function matchesNumericArrayElement(value: unknown, key: string): boolean {
+  if (typeof value !== 'number') return false
+  return !FINITE_NUMERIC_ARRAY_FIELDS.has(key) || Number.isFinite(value)
+}
+
+function arrayElementsMatchFieldContract(
+  loadedVal: unknown[],
+  defaultVal: unknown,
+  key: string
+): boolean {
+  if (NUMERIC_ARRAY_FIELDS.has(key)) {
+    return loadedVal.every((value) => matchesNumericArrayElement(value, key))
+  }
+  if (BOOLEAN_ARRAY_FIELDS.has(key)) {
+    return loadedVal.every((value) => typeof value === 'boolean')
+  }
+  if (!Array.isArray(defaultVal) || defaultVal.length === 0) return true
+
+  const exemplar = defaultVal.find((value) => value !== undefined)
+  if (typeof exemplar === 'number') {
+    return loadedVal.every((value) => matchesNumericArrayElement(value, key))
+  }
+  if (typeof exemplar === 'boolean') {
+    return loadedVal.every((value) => typeof value === 'boolean')
+  }
+  if (typeof exemplar === 'string') {
+    return loadedVal.every((value) => typeof value === 'string')
+  }
+  return true
 }
 
 /**
@@ -81,18 +174,21 @@ function shouldAcceptLoadedArray(
   loadedVal: unknown[],
   defaultVal: unknown,
   defaultIsObject: boolean,
-  defaultIsArray: boolean
+  defaultIsArray: boolean,
+  key: string
 ): boolean {
   // Loaded array where default is a plain object: type mismatch.
   if (defaultIsObject) return false
   // Fixed-size default array whose length doesn't match: reject.
   if (!defaultIsArray) return true
   const defaultArr = defaultVal as unknown[]
-  return defaultArr.length === 0 || loadedVal.length === defaultArr.length
+  if (defaultArr.length !== 0 && loadedVal.length !== defaultArr.length) return false
+  return arrayElementsMatchFieldContract(loadedVal, defaultVal, key)
 }
 
 /** Resolve a single key during deep-merge, returning the value to set or `undefined` to skip. */
 function resolveMergeKey(
+  key: string,
   loadedVal: unknown,
   defaultVal: unknown,
   defaultIsObject: boolean,
@@ -102,7 +198,7 @@ function resolveMergeKey(
   if (loadedVal === null && (defaultIsObject || defaultIsArray)) return undefined
 
   if (Array.isArray(loadedVal)) {
-    return shouldAcceptLoadedArray(loadedVal, defaultVal, defaultIsObject, defaultIsArray)
+    return shouldAcceptLoadedArray(loadedVal, defaultVal, defaultIsObject, defaultIsArray, key)
       ? loadedVal
       : undefined
   }
@@ -140,7 +236,7 @@ function deepMerge<T extends object>(defaults: T, loaded: unknown): T {
       defaultVal !== null && typeof defaultVal === 'object' && !Array.isArray(defaultVal)
     const defaultIsArray = Array.isArray(defaultVal)
 
-    const resolved = resolveMergeKey(loadedVal, defaultVal, defaultIsObject, defaultIsArray)
+    const resolved = resolveMergeKey(key, loadedVal, defaultVal, defaultIsObject, defaultIsArray)
     if (resolved !== undefined) {
       ;(result as Record<string, unknown>)[key] = resolved
     }
@@ -363,6 +459,13 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged
       freeScalar: sanitizePowerOfTwoGridSizes(normalized.freeScalar as FreeScalarConfig, {
         maxTotalSites: FREE_SCALAR_MAX_TOTAL_SITES,
       }),
+    }
+    normalized = {
+      ...normalized,
+      freeScalar: {
+        ...(normalized.freeScalar as object),
+        kSpaceViz: sanitizeKSpaceVizConfig((normalized.freeScalar as FreeScalarConfig).kSpaceViz),
+      },
     }
     const reconciled = reconcileCosmologyInvariants(
       (normalized.freeScalar as FreeScalarConfig) ?? (fs as FreeScalarConfig)

@@ -3,7 +3,7 @@
  * Port of vertex portion from compose.ts
  */
 import { generateVertexOutputStruct } from './core/varyings.wgsl'
-import { SkyboxEffects } from './types'
+import type { SkyboxEffects } from './types'
 
 /**
  * Vertex input struct

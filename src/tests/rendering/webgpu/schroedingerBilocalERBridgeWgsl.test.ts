@@ -128,4 +128,15 @@ describe('Schroedinger bilocal ER bridge WGSL composition', () => {
       'emission *= bridgeGain',
     ])
   })
+
+  it('simple grid raymarcher recomputes bridge log-density when density grid has no phase', () => {
+    const body = functionSlice(generateVolumeRaymarchGridSimpleBlock(), 'volumeRaymarchGrid')
+
+    expect(body).toContain('if (IS_DUAL_CHANNEL || !DENSITY_GRID_HAS_PHASE) {')
+    expectOrdered(body, [
+      'var remoteLogDensity = remoteGridSample.g',
+      'if (IS_DUAL_CHANNEL || !DENSITY_GRID_HAS_PHASE) {',
+      'remoteLogDensity = log(remoteRho)',
+    ])
+  })
 })

@@ -4,7 +4,7 @@
  * In WGSL, varyings are passed through struct outputs from vertex shader
  * and struct inputs to fragment shader.
  */
-import { SkyboxEffects } from '../types'
+import type { SkyboxEffects } from '../types'
 
 /**
  * Vertex output / Fragment input struct

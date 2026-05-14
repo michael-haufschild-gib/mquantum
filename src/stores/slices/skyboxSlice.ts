@@ -15,6 +15,11 @@ import {
   DEFAULT_SKYBOX_ROTATION,
   DEFAULT_SKYBOX_SELECTION,
   DEFAULT_SKYBOX_TEXTURE,
+  PROCEDURAL_SKYBOX_MODES,
+  SKYBOX_ANIMATION_MODES,
+  SKYBOX_MODES,
+  SKYBOX_SELECTIONS,
+  SKYBOX_TEXTURES,
   type SkyboxAnimationMode,
   type SkyboxMode,
   type SkyboxProceduralSettings,
@@ -97,15 +102,27 @@ export const SKYBOX_INITIAL_STATE: SkyboxSliceState = {
   backgroundColor: DEFAULT_BACKGROUND_COLOR,
 }
 
-/** All procedural mode prefixes */
-const PROCEDURAL_MODES = [
-  'procedural_aurora',
-  'procedural_nebula',
-  'procedural_crystalline',
-  'procedural_horizon',
-  'procedural_ocean',
-  'procedural_twilight',
-] as const
+const PROCEDURAL_MODE_SET = new Set<SkyboxMode>(PROCEDURAL_SKYBOX_MODES)
+const SKYBOX_SELECTION_SET = new Set<SkyboxSelection>(SKYBOX_SELECTIONS)
+const SKYBOX_MODE_SET = new Set<SkyboxMode>(SKYBOX_MODES)
+const SKYBOX_TEXTURE_SET = new Set<SkyboxTexture>(SKYBOX_TEXTURES)
+const SKYBOX_ANIMATION_MODE_SET = new Set<SkyboxAnimationMode>(SKYBOX_ANIMATION_MODES)
+
+function isSkyboxSelection(value: unknown): value is SkyboxSelection {
+  return typeof value === 'string' && SKYBOX_SELECTION_SET.has(value as SkyboxSelection)
+}
+
+function isSkyboxMode(value: unknown): value is SkyboxMode {
+  return typeof value === 'string' && SKYBOX_MODE_SET.has(value as SkyboxMode)
+}
+
+function isSkyboxTexture(value: unknown): value is SkyboxTexture {
+  return typeof value === 'string' && SKYBOX_TEXTURE_SET.has(value as SkyboxTexture)
+}
+
+function isSkyboxAnimationMode(value: unknown): value is SkyboxAnimationMode {
+  return typeof value === 'string' && SKYBOX_ANIMATION_MODE_SET.has(value as SkyboxAnimationMode)
+}
 
 function isFiniteSkyboxNumericInput(value: number): boolean {
   return Number.isFinite(value)
@@ -117,6 +134,10 @@ function isObjectRecord(value: unknown): value is Record<string, unknown> {
 
 function warnInvalidProceduralSetting(path: string, value: unknown): void {
   logger.warn(`[skyboxSlice] Ignoring invalid procedural setting "${path}":`, value)
+}
+
+function warnInvalidSkyboxSetting(path: string, value: unknown): void {
+  logger.warn(`[skyboxSlice] Ignoring invalid ${path}:`, value)
 }
 
 /** Validate a numeric value against a numeric schema entry. */
@@ -249,7 +270,7 @@ function deriveStateFromSelection(selection: SkyboxSelection): {
   }
 
   // Check if it's any procedural mode
-  if (PROCEDURAL_MODES.includes(selection as (typeof PROCEDURAL_MODES)[number])) {
+  if (PROCEDURAL_MODE_SET.has(selection as SkyboxMode)) {
     return {
       skyboxEnabled: true,
       skyboxMode: selection as SkyboxMode,
@@ -281,11 +302,16 @@ function deriveSelectionFromModeAndTexture(
 export const createSkyboxSlice: StateCreator<SkyboxSlice, [], [], SkyboxSlice> = (set) => ({
   ...SKYBOX_INITIAL_STATE,
 
-  setSkyboxSelection: (selection: SkyboxSelection) =>
+  setSkyboxSelection: (selection: SkyboxSelection) => {
+    if (!isSkyboxSelection(selection)) {
+      warnInvalidSkyboxSetting('skybox selection', selection)
+      return
+    }
     set({
       skyboxSelection: selection,
       ...deriveStateFromSelection(selection),
-    }),
+    })
+  },
   setSkyboxEnabled: (enabled: boolean) =>
     set((state) => {
       const nextSelection = enabled
@@ -303,7 +329,11 @@ export const createSkyboxSlice: StateCreator<SkyboxSlice, [], [], SkyboxSlice> =
         ...deriveStateFromSelection(nextSelection),
       }
     }),
-  setSkyboxMode: (mode: SkyboxMode) =>
+  setSkyboxMode: (mode: SkyboxMode) => {
+    if (!isSkyboxMode(mode)) {
+      warnInvalidSkyboxSetting('skybox mode', mode)
+      return
+    }
     set((state) => {
       const nextSelection: SkyboxSelection =
         mode === 'classic'
@@ -316,8 +346,13 @@ export const createSkyboxSlice: StateCreator<SkyboxSlice, [], [], SkyboxSlice> =
         skyboxSelection: nextSelection,
         ...deriveStateFromSelection(nextSelection),
       }
-    }),
+    })
+  },
   setSkyboxTexture: (texture: SkyboxTexture) => {
+    if (!isSkyboxTexture(texture)) {
+      warnInvalidSkyboxSetting('skybox texture', texture)
+      return
+    }
     const nextSelection: SkyboxSelection = texture === 'none' ? 'none' : texture
     set({
       skyboxSelection: nextSelection,
@@ -340,7 +375,13 @@ export const createSkyboxSlice: StateCreator<SkyboxSlice, [], [], SkyboxSlice> =
     const normalized = ((rotation % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
     set({ skyboxRotation: normalized })
   },
-  setSkyboxAnimationMode: (mode: SkyboxAnimationMode) => set({ skyboxAnimationMode: mode }),
+  setSkyboxAnimationMode: (mode: SkyboxAnimationMode) => {
+    if (!isSkyboxAnimationMode(mode)) {
+      warnInvalidSkyboxSetting('skybox animation mode', mode)
+      return
+    }
+    set({ skyboxAnimationMode: mode })
+  },
   setSkyboxAnimationSpeed: (speed: number) => {
     if (!isFiniteSkyboxNumericInput(speed)) {
       logger.warn('[skyboxSlice] Ignoring non-finite skybox animation speed:', speed)

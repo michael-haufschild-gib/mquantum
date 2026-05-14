@@ -66,6 +66,28 @@ describe('modularHamiltonian.modularSpectrum', () => {
     expect(epsilon).toBe(0)
     expect(rankThreshold).toBe(0)
   })
+
+  it('floor-pins non-finite Schmidt values instead of emitting NaN spectra', () => {
+    const { spectrum, epsilon, rankThreshold } = modularSpectrum(
+      new Float64Array([0.5, Number.NaN, Number.POSITIVE_INFINITY, 0])
+    )
+
+    expect(epsilon).toBeCloseTo(0.25 * MODULAR_EPSILON, 22)
+    for (const k of spectrum) expect(Number.isFinite(k)).toBe(true)
+    expect(spectrum[0]!).toBeCloseTo(-Math.log(0.25 + epsilon), 10)
+    expect(spectrum[1]!).toBeCloseTo(-Math.log(epsilon), 6)
+    expect(spectrum[2]!).toBeCloseTo(-Math.log(epsilon), 6)
+    expect(spectrum[3]!).toBeCloseTo(-Math.log(epsilon), 6)
+    expect(rankThreshold).toBe(1)
+  })
+
+  it('derives epsilon from the largest finite weight when the leading entry is invalid', () => {
+    const { spectrum, epsilon } = modularSpectrum(new Float64Array([Number.NaN, 0.5, 0]))
+
+    expect(epsilon).toBeCloseTo(0.25 * MODULAR_EPSILON, 22)
+    expect(spectrum[0]!).toBeCloseTo(-Math.log(epsilon), 6)
+    expect(spectrum[1]!).toBeCloseTo(-Math.log(0.25 + epsilon), 10)
+  })
 })
 
 describe('modularHamiltonian.MODULAR_EPSILON', () => {

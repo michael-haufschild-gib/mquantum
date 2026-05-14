@@ -25,6 +25,16 @@ import {
 /** Active tab in the performance monitor */
 export type PerfMonitorTab = 'perf' | 'sys' | 'shader' | 'buffers' | 'passes'
 
+const PERF_MONITOR_TABS: readonly PerfMonitorTab[] = ['perf', 'sys', 'shader', 'buffers', 'passes']
+
+function isBoolean(value: unknown): value is boolean {
+  return typeof value === 'boolean'
+}
+
+function isPerfMonitorTab(value: unknown): value is PerfMonitorTab {
+  return typeof value === 'string' && (PERF_MONITOR_TABS as readonly string[]).includes(value)
+}
+
 // ============================================================================
 // State Interface
 // ============================================================================
@@ -91,22 +101,42 @@ export const createUISlice: StateCreator<UISlice, [], [], UISlice> = (set) => ({
 
   // --- UI Helper Actions ---
   setShowAxisHelper: (show: boolean) => {
+    if (!isBoolean(show)) {
+      logger.warn('[uiSlice] Ignoring invalid showAxisHelper value:', show)
+      return
+    }
     set({ showAxisHelper: show })
   },
 
   setShowPerfMonitor: (show: boolean) => {
+    if (!isBoolean(show)) {
+      logger.warn('[uiSlice] Ignoring invalid showPerfMonitor value:', show)
+      return
+    }
     set({ showPerfMonitor: show })
   },
 
   setPerfMonitorExpanded: (expanded: boolean) => {
+    if (!isBoolean(expanded)) {
+      logger.warn('[uiSlice] Ignoring invalid perfMonitorExpanded value:', expanded)
+      return
+    }
     set({ perfMonitorExpanded: expanded })
   },
 
   setPerfMonitorTab: (tab: PerfMonitorTab) => {
+    if (!isPerfMonitorTab(tab)) {
+      logger.warn('[uiSlice] Ignoring invalid perfMonitorTab value:', tab)
+      return
+    }
     set({ perfMonitorTab: tab })
   },
 
   setShowTemporalDepthBuffer: (show: boolean) => {
+    if (!isBoolean(show)) {
+      logger.warn('[uiSlice] Ignoring invalid showTemporalDepthBuffer value:', show)
+      return
+    }
     set({ showTemporalDepthBuffer: show })
   },
 

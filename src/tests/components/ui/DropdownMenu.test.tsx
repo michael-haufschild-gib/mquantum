@@ -455,6 +455,43 @@ describe('DropdownMenu (invariants)', () => {
       expect(subItemClick).toHaveBeenCalledTimes(1)
       expect(useDropdownStore.getState().openDropdownId).toBeNull()
     })
+
+    it('closes an open submenu when the item list changes', async () => {
+      const initialItems: DropdownMenuItem[] = [
+        {
+          label: 'Has Submenu',
+          items: [{ label: 'Old Sub Item', onClick: vi.fn() }],
+        },
+      ]
+      const replacementItems: DropdownMenuItem[] = [
+        {
+          label: 'Has Submenu',
+          items: [{ label: 'New Sub Item', onClick: vi.fn() }],
+        },
+      ]
+
+      const user = userEvent.setup()
+      const { rerender } = render(
+        <DropdownMenu trigger={<Button>Open Menu</Button>} items={initialItems} id="test-menu" />
+      )
+
+      await user.click(screen.getByText('Open Menu'))
+      const submenuTrigger = screen.getByRole('menuitem', { name: /Has Submenu/ })
+      await vi.waitFor(() => expect(submenuTrigger).toHaveFocus())
+      await user.keyboard('{Enter}')
+      expect(await screen.findByText('Old Sub Item')).toBeInTheDocument()
+
+      rerender(
+        <DropdownMenu
+          trigger={<Button>Open Menu</Button>}
+          items={replacementItems}
+          id="test-menu"
+        />
+      )
+
+      await vi.waitFor(() => expect(screen.queryByText('Old Sub Item')).not.toBeInTheDocument())
+      expect(screen.queryByText('New Sub Item')).not.toBeInTheDocument()
+    })
   })
 
   describe('data attributes', () => {

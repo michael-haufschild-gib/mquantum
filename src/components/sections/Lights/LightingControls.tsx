@@ -50,6 +50,7 @@ export const LightingControls: React.FC<LightingControlsProps> = React.memo(
               <Switch
                 checked={showLightGizmos}
                 onCheckedChange={setShowLightGizmos}
+                ariaLabel="Show light gizmos"
                 tooltip="Show light position indicators in the 3D viewport."
               />
             </div>

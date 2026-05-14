@@ -20,6 +20,9 @@ import { BandKind, type ColumnWkbState, type ComplexPair } from './solverTypes'
  * given `a`, used to classify cells as transition-band vs deep-band.
  */
 export function wkbPhaseSinceTurning(a: number, aTurn: number, alpha: number): number {
+  if (!Number.isFinite(a) || !Number.isFinite(aTurn) || !Number.isFinite(alpha) || alpha <= 0) {
+    return 0
+  }
   const da = a - aTurn
   if (da <= 0) return 0
   return (2 / 3) * Math.sqrt(alpha) * Math.pow(da, 1.5)
@@ -38,7 +41,7 @@ export function applyTransitionAbsorber(
   U: number,
   da: number
 ): ComplexPair {
-  if (U > 0) {
+  if (Number.isFinite(U) && U > 0 && Number.isFinite(da) && da > 0) {
     const damp = Math.exp(-WDW_EUCLIDEAN_ABSORBER_ETA * Math.sqrt(U) * da)
     return { re: nextRe * damp, im: nextIm * damp }
   }
@@ -52,12 +55,25 @@ export function applyTransitionAbsorber(
  *   χ(a) = χ_match · (U_match / U(a))^{1/4} · exp(−(S(a) − S_match))
  */
 export function propagateWkbTail(state: ColumnWkbState, S: number, U: number): ComplexPair {
+  const fallback = { re: state.chiReAtMatch, im: state.chiImAtMatch }
+  if (
+    !Number.isFinite(S) ||
+    !Number.isFinite(U) ||
+    U <= 0 ||
+    !Number.isFinite(state.sEucAtMatch) ||
+    !Number.isFinite(state.uPrefactorAtMatch)
+  ) {
+    return fallback
+  }
   const uPrefactorAtA = Math.pow(Math.abs(U), 0.25)
-  if (uPrefactorAtA === 0) {
-    return { re: state.chiReAtMatch, im: state.chiImAtMatch }
+  if (!Number.isFinite(uPrefactorAtA) || uPrefactorAtA === 0) {
+    return fallback
   }
   const prefactorRatio = state.uPrefactorAtMatch / uPrefactorAtA
   const damp = Math.exp(-(S - state.sEucAtMatch))
+  if (!Number.isFinite(prefactorRatio) || !Number.isFinite(damp)) {
+    return fallback
+  }
   return {
     re: state.chiReAtMatch * prefactorRatio * damp,
     im: state.chiImAtMatch * prefactorRatio * damp,
@@ -103,6 +119,7 @@ export function initColumnWkbStates(
  * reads cleanly.
  */
 export function classifyCellBand(state: ColumnWkbState, a: number, U: number): BandKind {
+  if (!Number.isFinite(U)) return BandKind.Lorentzian
   if (U <= 0) return BandKind.Lorentzian
   if (state.aTurn === null || state.alpha === null) return BandKind.EuclideanTransition
   const phase = wkbPhaseSinceTurning(a, state.aTurn, state.alpha)
@@ -129,9 +146,13 @@ export function captureMatch(
   chiIm: number
 ): void {
   if (state.matched) return
+  if (!Number.isFinite(U) || U <= 0 || !Number.isFinite(chiRe) || !Number.isFinite(chiIm)) return
+  const sEucAtMatch = wdwEuclideanWkbAction(a, phi1, phi2, m, lambda, asymmetry)
+  const uPrefactorAtMatch = Math.pow(Math.abs(U), 0.25)
+  if (!Number.isFinite(sEucAtMatch) || !Number.isFinite(uPrefactorAtMatch)) return
   state.matched = true
-  state.sEucAtMatch = wdwEuclideanWkbAction(a, phi1, phi2, m, lambda, asymmetry)
-  state.uPrefactorAtMatch = Math.pow(Math.abs(U), 0.25)
+  state.sEucAtMatch = sEucAtMatch
+  state.uPrefactorAtMatch = uPrefactorAtMatch
   state.chiReAtMatch = chiRe
   state.chiImAtMatch = chiIm
 }

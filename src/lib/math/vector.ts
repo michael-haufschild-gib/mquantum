@@ -47,6 +47,12 @@ function vectorResult(length: number, out?: VectorND): VectorND {
   return result
 }
 
+function assertSameVectorLength(a: VectorND, b: VectorND): void {
+  if (a.length !== b.length) {
+    throw new Error(`Vector dimensions must match: ${a.length} !== ${b.length}`)
+  }
+}
+
 /**
  * Creates an n-dimensional vector initialized with a fill value
  * @param dimension - The dimensionality of the vector
@@ -68,13 +74,10 @@ export function createVector(dimension: number, fill = 0): VectorND {
  * @param b - Second vector
  * @param out
  * @returns New vector containing the sum
- * @throws {Error} If vectors have different dimensions (DEV only)
- * @note Validation is DEV-only for performance in production hot paths
+ * @throws {Error} If vectors have different dimensions
  */
 export function addVectors(a: VectorND, b: VectorND, out?: VectorND): VectorND {
-  if (import.meta.env.DEV && a.length !== b.length) {
-    throw new Error(`Vector dimensions must match: ${a.length} !== ${b.length}`)
-  }
+  assertSameVectorLength(a, b)
 
   const result = vectorResult(a.length, out)
   for (let i = 0; i < a.length; i++) {
@@ -93,13 +96,10 @@ export function addVectors(a: VectorND, b: VectorND, out?: VectorND): VectorND {
  * @param b - Second vector (subtracted from first)
  * @param out - Optional output vector to avoid allocation
  * @returns Vector containing the difference
- * @throws {Error} If vectors have different dimensions (DEV only)
- * @note Validation is DEV-only for performance in production hot paths
+ * @throws {Error} If vectors have different dimensions
  */
 export function subtractVectors(a: VectorND, b: VectorND, out?: VectorND): VectorND {
-  if (import.meta.env.DEV && a.length !== b.length) {
-    throw new Error(`Vector dimensions must match: ${a.length} !== ${b.length}`)
-  }
+  assertSameVectorLength(a, b)
 
   // Try WASM path if available (only when no out buffer, as WASM allocates)
   if (isAnimationWasmReady() && !out) {
@@ -147,13 +147,10 @@ export function scaleVector(v: VectorND, scalar: number, out?: VectorND): Vector
  * @param a - First vector
  * @param b - Second vector
  * @returns The scalar dot product
- * @throws {Error} If vectors have different dimensions (DEV only)
- * @note Validation is DEV-only for performance in production hot paths
+ * @throws {Error} If vectors have different dimensions
  */
 export function dotProduct(a: VectorND, b: VectorND): number {
-  if (import.meta.env.DEV && a.length !== b.length) {
-    throw new Error(`Vector dimensions must match: ${a.length} !== ${b.length}`)
-  }
+  assertSameVectorLength(a, b)
 
   // Try WASM path if available
   if (isAnimationWasmReady()) {
@@ -286,11 +283,11 @@ export function copyVector(v: VectorND, out?: VectorND): VectorND {
  * @param b - Second 3D vector
  * @param out - Optional output vector to avoid allocation
  * @returns The cross product vector (perpendicular to both inputs)
- * @throws {Error} If vectors don't have exactly 3 components (DEV only)
+ * @throws {Error} If vectors don't have exactly 3 components
  * @note Only defined for 3D vectors
  */
 export function crossProduct3D(a: VectorND, b: VectorND, out?: VectorND): VectorND {
-  if (import.meta.env.DEV && (a.length !== 3 || b.length !== 3)) {
+  if (a.length !== 3 || b.length !== 3) {
     throw new Error(`Cross product requires 3D vectors: got ${a.length}D and ${b.length}D`)
   }
 

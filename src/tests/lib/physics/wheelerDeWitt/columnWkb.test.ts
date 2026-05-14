@@ -19,6 +19,8 @@ describe('Wheeler-DeWitt column WKB helpers', () => {
   it('computes zero phase before the turning surface and the closed-form phase after it', () => {
     expect(wkbPhaseSinceTurning(1.9, 2, 8)).toBe(0)
     expect(wkbPhaseSinceTurning(2, 2, 8)).toBe(0)
+    expect(wkbPhaseSinceTurning(2.5, 2, -8)).toBe(0)
+    expect(wkbPhaseSinceTurning(2.5, 2, NaN)).toBe(0)
 
     const observed = wkbPhaseSinceTurning(2.5, 2, 8)
     const expected = (2 / 3) * Math.sqrt(8) * Math.pow(0.5, 1.5)
@@ -33,6 +35,8 @@ describe('Wheeler-DeWitt column WKB helpers', () => {
     expect(damped.im).toBeCloseTo(-4 * factor, 12)
     expect(applyTransitionAbsorber(3, -4, 0, 0.2)).toEqual({ re: 3, im: -4 })
     expect(applyTransitionAbsorber(3, -4, -1, 0.2)).toEqual({ re: 3, im: -4 })
+    expect(applyTransitionAbsorber(3, -4, NaN, 0.2)).toEqual({ re: 3, im: -4 })
+    expect(applyTransitionAbsorber(3, -4, 9, NaN)).toEqual({ re: 3, im: -4 })
   })
 
   it('propagates a matched WKB tail by prefactor ratio and Euclidean action damping', () => {
@@ -52,6 +56,8 @@ describe('Wheeler-DeWitt column WKB helpers', () => {
     expect(propagated.re).toBeCloseTo(0.5 * expectedScale, 12)
     expect(propagated.im).toBeCloseTo(-0.25 * expectedScale, 12)
     expect(propagateWkbTail(state, 99, 0)).toEqual({ re: 0.5, im: -0.25 })
+    expect(propagateWkbTail(state, NaN, 16)).toEqual({ re: 0.5, im: -0.25 })
+    expect(propagateWkbTail(state, 99, NaN)).toEqual({ re: 0.5, im: -0.25 })
   })
 
   it('initializes one WKB state per phi column with the analytic turning surface', () => {
@@ -77,7 +83,11 @@ describe('Wheeler-DeWitt column WKB helpers', () => {
     }
 
     expect(classifyCellBand(transitionState, 2, -0.01)).toBe(BandKind.Lorentzian)
+    expect(classifyCellBand(transitionState, 2, NaN)).toBe(BandKind.Lorentzian)
     expect(classifyCellBand({ ...transitionState, aTurn: null, alpha: null }, 2, 1)).toBe(
+      BandKind.EuclideanTransition
+    )
+    expect(classifyCellBand({ ...transitionState, alpha: NaN }, 3, 1)).toBe(
       BandKind.EuclideanTransition
     )
 
@@ -119,5 +129,23 @@ describe('Wheeler-DeWitt column WKB helpers', () => {
     expect(state.uPrefactorAtMatch).toBe(first.uPrefactorAtMatch)
     expect(state.chiReAtMatch).toBe(first.chiReAtMatch)
     expect(state.chiImAtMatch).toBe(first.chiImAtMatch)
+  })
+
+  it('does not capture a deep-band match from non-finite inputs', () => {
+    const state: ColumnWkbState = {
+      aTurn: 1,
+      alpha: 2,
+      matched: false,
+      sEucAtMatch: 0,
+      uPrefactorAtMatch: 0,
+      chiReAtMatch: 0,
+      chiImAtMatch: 0,
+    }
+
+    captureMatch(state, 1.8, 0.1, -0.2, 0.5, 0.3, 1.2, NaN, 2, 3)
+    expect(state.matched).toBe(false)
+
+    captureMatch(state, 1.8, 0.1, -0.2, 0.5, 0.3, 1.2, 9, NaN, 3)
+    expect(state.matched).toBe(false)
   })
 })

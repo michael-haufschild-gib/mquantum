@@ -174,6 +174,16 @@ export class WebGPUStatsCollector {
    */
   beginFrame(graph: WebGPURenderGraph): WebGPUFrameMetricsMode {
     this.updateMeasurementTier()
+    const previousTier = this.previousMeasurementTier
+    const tierChanged = this.measurementTier !== previousTier
+
+    if (tierChanged) {
+      this.resetAccumulatedWindow()
+      this.lastFrameTime = 0
+      if (previousTier === TIER_HIDDEN || this.measurementTier === TIER_HIDDEN) {
+        this.smoothedFps = null
+      }
+    }
 
     const timestampActive = this.measurementTier === TIER_FULL_STATS
     if (
@@ -185,10 +195,7 @@ export class WebGPUStatsCollector {
       this.timestampCollectionActive = timestampActive
     }
 
-    if (
-      this.measurementTier !== TIER_FULL_STATS &&
-      this.previousMeasurementTier === TIER_FULL_STATS
-    ) {
+    if (this.measurementTier !== TIER_FULL_STATS && previousTier === TIER_FULL_STATS) {
       this.clearPublishedFullStats()
     }
     this.previousMeasurementTier = this.measurementTier
@@ -322,9 +329,9 @@ export class WebGPUStatsCollector {
     const gpuStats: GPUStats = {
       calls: Math.round(this.accumulated.drawCalls / frameCount),
       triangles: Math.round(this.accumulated.triangles / frameCount),
+      vertices: Math.round(this.accumulated.vertices / frameCount),
       points: Math.round(this.accumulated.points / frameCount),
       lines: Math.round(this.accumulated.lines / frameCount),
-      uniqueVertices: Math.round(this.accumulated.vertices / frameCount),
     }
 
     // Update metrics
@@ -389,7 +396,10 @@ export class WebGPUStatsCollector {
       updateCpuBreakdown(this.latestCpuBreakdown)
     }
 
-    // Reset accumulators
+    this.resetAccumulatedWindow()
+  }
+
+  private resetAccumulatedWindow(): void {
     this.accumulated.frameCount = 0
     this.accumulated.totalCpuTimeMs = 0
     this.accumulated.totalFrameTimeMs = 0

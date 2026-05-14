@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { rotationToDirection } from '@/lib/lighting/lightSource'
+import { type LightSource, rotationToDirection } from '@/lib/lighting/lightSource'
 import { parseHexColorToLinearRgb } from '@/rendering/webgpu/utils/color'
 import { packLightingUniforms } from '@/rendering/webgpu/utils/lighting'
 
@@ -158,6 +158,65 @@ describe('rendering/webgpu/utils/lighting', () => {
       const view = new DataView(backingBuffer)
       expect(view.getInt32((prefixFloats + 132) * 4, true)).toBe(1)
       expect(view.getInt32(132 * 4, true)).toBe(0)
+    })
+
+    it('sanitizes malformed snapshots before uploading lighting uniforms', () => {
+      const data = new Float32Array(144)
+
+      packLightingUniforms(data, {
+        lights: [
+          {
+            id: 'malformed-light',
+            name: 'Malformed',
+            type: 'spot',
+            enabled: true,
+            position: [Number.NaN, 1e12, -1e12],
+            rotation: [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY],
+            color: 'not-a-color',
+            intensity: Number.POSITIVE_INFINITY,
+            coneAngle: Number.POSITIVE_INFINITY,
+            penumbra: -5,
+            range: -10,
+            decay: Number.NaN,
+          } as unknown as LightSource,
+          {
+            id: 'invalid-type',
+            name: 'Invalid Type',
+            type: 'area',
+            enabled: true,
+            position: [1, 2, 3],
+            rotation: [0, 0, 0],
+            color: '#ffffff',
+            intensity: 1,
+            coneAngle: 30,
+            penumbra: 0.5,
+            range: 0,
+            decay: 2,
+          } as unknown as LightSource,
+        ],
+        ambientColor: '#ffffff',
+        ambientIntensity: Number.NaN,
+        ambientEnabled: true,
+      })
+
+      expect(Array.from(data).every(Number.isFinite)).toBe(true)
+      expect(data[0]).toBe(0)
+      expect(data[1]).toBe(1_000_000)
+      expect(data[2]).toBe(-1_000_000)
+      expect(data[3]).toBe(3)
+      expect(data[4]).toBeCloseTo(0, 6)
+      expect(data[5]).toBeCloseTo(0, 6)
+      expect(data[6]).toBeCloseTo(-1, 6)
+      expect(data[7]).toBe(1)
+      expect(data[8]).toBe(1)
+      expect(data[9]).toBe(1)
+      expect(data[10]).toBe(1)
+      expect(data[11]).toBe(1)
+      expect(data[12]).toBe(2)
+      expect(data[15]).toBe(1)
+      expect(data[16 + 3]).toBe(0)
+      expect(data[16 + 15]).toBe(0)
+      expect(data[131]).toBeCloseTo(0.3, 6)
     })
   })
 })

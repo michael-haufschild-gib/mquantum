@@ -246,6 +246,38 @@ describe('runStrangEvolution curved stochastic branch', () => {
     expect(stochasticState.stagingSlotCount).toBe(0)
   })
 
+  it('sanitizes malformed lattice geometry before staging collapse centers', () => {
+    const writes: ArrayBuffer[] = []
+    const device = {
+      queue: {
+        writeBuffer: (_target: GPUBuffer, _offset: number, data: ArrayBuffer) => {
+          writes.push(data.slice(0))
+        },
+      },
+      createBuffer: (descriptor: GPUBufferDescriptor) => buffer(String(descriptor.label)),
+    } as unknown as GPUDevice
+    const stochasticState = makeStochasticState()
+    const config = {
+      stochasticEnabled: true,
+      stochasticGamma: 2,
+      stochasticSigma: 1,
+      stochasticNumSites: 2,
+      stochasticSeed: 1234,
+      dt: 0.02,
+      latticeDim: Number.POSITIVE_INFINITY,
+      gridSize: [16, Number.NaN],
+      spacing: [0.1, Number.POSITIVE_INFINITY],
+    } as unknown as TdseConfig
+
+    prepareStochasticStaging(device, config, stochasticState, 1, Number.NaN)
+
+    expect(writes).toHaveLength(1)
+    const staged = new Float32Array(writes[0]!)
+    for (const value of staged) {
+      expect(Number.isFinite(value)).toBe(true)
+    }
+  })
+
   it('dispatches CSL localization before curved stochastic renormalization', () => {
     const events: string[] = []
     const ctx = makeContext(events)

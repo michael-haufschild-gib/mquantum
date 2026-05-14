@@ -617,9 +617,17 @@ export function createDiracSetters(ctx: SetterContext): DiracSetters {
               'diracSetters',
               `Dirac fieldView color algorithm for '${presetId}'`,
               async ({ DIRAC_FIELD_VIEW_TO_COLOR_ALGO }) => {
-                // Guard: if a newer preset arrived while this chunk loaded,
-                // the fieldView in the store won't match — skip the stale write.
-                if (!isLatestRequest()) return
+                // Guard: if a newer preset or mode switch arrived while this chunk loaded,
+                // skip the stale appearance write.
+                if (
+                  !canApplyPresetRequest(
+                    isLatestRequest,
+                    ctx.get().schroedinger.quantumMode,
+                    options
+                  )
+                ) {
+                  return
+                }
                 if (ctx.get().schroedinger.dirac.fieldView !== expectedView) return
                 const algo = DIRAC_FIELD_VIEW_TO_COLOR_ALGO[expectedView]
                 if (algo) {

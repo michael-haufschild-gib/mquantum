@@ -161,6 +161,7 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
           <Switch
             checked={config.crossSectionEnabled ?? false}
             onCheckedChange={(checked) => setCrossSectionEnabled(checked)}
+            ariaLabel="Toggle slice plane"
             tooltip="Show a 2D cross-section slice through the 3D wavefunction volume."
             data-testid="schroedinger-cross-section-toggle"
           />
@@ -361,6 +362,7 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
             <Switch
               checked={config.radialProbabilityEnabled ?? false}
               onCheckedChange={(checked) => setRadialProbabilityEnabled(checked)}
+              ariaLabel="Toggle radial probability"
               tooltip="Show the radial probability distribution P(r) as a spherical shell overlay."
               data-testid="schroedinger-radial-probability-toggle"
             />

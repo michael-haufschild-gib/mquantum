@@ -12,6 +12,17 @@
  * @module lib/url/wdwSerializer
  */
 
+import {
+  WDW_SOLVER_MAX_COSMOLOGICAL_CONSTANT,
+  WDW_SOLVER_MAX_GRID_NA,
+  WDW_SOLVER_MAX_GRID_NPHI,
+  WDW_SOLVER_MAX_INFLATON_MASS,
+  WDW_SOLVER_MAX_INFLATON_MASS_ASYMMETRY,
+  WDW_SOLVER_MIN_COSMOLOGICAL_CONSTANT,
+  WDW_SOLVER_MIN_INFLATON_MASS,
+  WDW_SOLVER_MIN_INFLATON_MASS_ASYMMETRY,
+} from '@/lib/physics/wheelerDeWitt/solverInputValidation'
+
 import { parseFloatParamSci, parseIntParam } from './paramHelpers'
 
 export const VALID_WDW_BOUNDARY_CONDITIONS = ['noBoundary', 'tunneling', 'deWitt'] as const
@@ -118,17 +129,32 @@ export function serializeWdw(params: URLSearchParams, state: WdwUrlState): void 
 /** Parse Wheeler–DeWitt URL params into the shared state object. */
 export function deserializeWdw(params: URLSearchParams, state: WdwUrlState): void {
   state.wdwBoundaryCondition = parseEnumParam(params, 'wdw_bc', VALID_WDW_BOUNDARY_CONDITIONS)
-  state.wdwInflatonMass = parseFloatParamSci(params, 'wdw_m', 0, 2.0)
+  state.wdwInflatonMass = parseFloatParamSci(
+    params,
+    'wdw_m',
+    WDW_SOLVER_MIN_INFLATON_MASS,
+    WDW_SOLVER_MAX_INFLATON_MASS
+  )
   // [0.1, 10]: α < 0.1 makes the φ₂ axis nearly massless (numerical
   // instability); α > 10 makes it so stiff the grid can't resolve it.
-  state.wdwInflatonMassAsymmetry = parseFloatParamSci(params, 'wdw_ma', 0.1, 10)
-  state.wdwCosmologicalConstant = parseFloatParamSci(params, 'wdw_lambda', -1, 1)
+  state.wdwInflatonMassAsymmetry = parseFloatParamSci(
+    params,
+    'wdw_ma',
+    WDW_SOLVER_MIN_INFLATON_MASS_ASYMMETRY,
+    WDW_SOLVER_MAX_INFLATON_MASS_ASYMMETRY
+  )
+  state.wdwCosmologicalConstant = parseFloatParamSci(
+    params,
+    'wdw_lambda',
+    WDW_SOLVER_MIN_COSMOLOGICAL_CONSTANT,
+    WDW_SOLVER_MAX_COSMOLOGICAL_CONSTANT
+  )
   // Grid bounds match the solver's hard minima (≥ 3 per axis) and the
   // publication preset's max of (256, 48); we leave headroom above that
   // for power-user experiments while keeping the serializer cheap to
   // validate.
-  state.wdwGridNa = parseIntParam(params, 'wdw_gn_a', 16, 1024)
-  state.wdwGridNphi = parseIntParam(params, 'wdw_gn_p', 8, 128)
+  state.wdwGridNa = parseIntParam(params, 'wdw_gn_a', 16, WDW_SOLVER_MAX_GRID_NA)
+  state.wdwGridNphi = parseIntParam(params, 'wdw_gn_p', 8, WDW_SOLVER_MAX_GRID_NPHI)
   state.wdwStreamlinesEnabled = parseBoolParam(params, 'wdw_sl')
   state.wdwStreamlineDensity = parseIntParam(params, 'wdw_sld', 2, 16)
   state.wdwPhaseRotationEnabled = parseBoolParam(params, 'wdw_pr')

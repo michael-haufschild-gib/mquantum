@@ -12,6 +12,25 @@ const AXIS_COLORS: [number, number, number][] = [
   [0.2, 1, 0.2],
   [0.2, 0.2, 1],
 ]
+const DEFAULT_SHAFT_LENGTH = 3.0
+const DEFAULT_RING_RADIUS = 2.5
+const DEFAULT_RING_SEGMENTS = 48
+const MIN_RING_SEGMENTS = 3
+const MAX_RING_SEGMENTS = 256
+
+function sanitizeAlpha(alpha: number): number {
+  if (!Number.isFinite(alpha)) return 1
+  return Math.min(Math.max(alpha, 0), 1)
+}
+
+function sanitizePositive(value: number, fallback: number): number {
+  return Number.isFinite(value) && value > 0 ? value : fallback
+}
+
+function sanitizeSegments(segments: number): number {
+  if (!Number.isFinite(segments)) return DEFAULT_RING_SEGMENTS
+  return Math.min(Math.max(Math.trunc(segments), MIN_RING_SEGMENTS), MAX_RING_SEGMENTS)
+}
 
 function pushLine(
   out: number[],
@@ -40,6 +59,8 @@ function pushLine(
  */
 export function generateTranslateGizmo(alpha = 1.0, shaftLength = 3.0): Float32Array {
   const out: number[] = []
+  const safeAlpha = sanitizeAlpha(alpha)
+  const safeShaftLength = sanitizePositive(shaftLength, DEFAULT_SHAFT_LENGTH)
   const headLen = 0.4
   const headW = 0.12
 
@@ -70,15 +91,27 @@ export function generateTranslateGizmo(alpha = 1.0, shaftLength = 3.0): Float32A
     const [perpA, perpB] = perps[a]!
 
     // Shaft
-    pushLine(out, 0, 0, 0, ax * shaftLength, ay * shaftLength, az * shaftLength, r, g, b, alpha)
+    pushLine(
+      out,
+      0,
+      0,
+      0,
+      ax * safeShaftLength,
+      ay * safeShaftLength,
+      az * safeShaftLength,
+      r,
+      g,
+      b,
+      safeAlpha
+    )
 
     // Arrowhead
-    const tipX = ax * shaftLength
-    const tipY = ay * shaftLength
-    const tipZ = az * shaftLength
-    const baseX = ax * (shaftLength - headLen)
-    const baseY = ay * (shaftLength - headLen)
-    const baseZ = az * (shaftLength - headLen)
+    const tipX = ax * safeShaftLength
+    const tipY = ay * safeShaftLength
+    const tipZ = az * safeShaftLength
+    const baseX = ax * (safeShaftLength - headLen)
+    const baseY = ay * (safeShaftLength - headLen)
+    const baseZ = az * (safeShaftLength - headLen)
 
     pushLine(
       out,
@@ -91,7 +124,7 @@ export function generateTranslateGizmo(alpha = 1.0, shaftLength = 3.0): Float32A
       r,
       g,
       b,
-      alpha
+      safeAlpha
     )
     pushLine(
       out,
@@ -104,7 +137,7 @@ export function generateTranslateGizmo(alpha = 1.0, shaftLength = 3.0): Float32A
       r,
       g,
       b,
-      alpha
+      safeAlpha
     )
     pushLine(
       out,
@@ -117,7 +150,7 @@ export function generateTranslateGizmo(alpha = 1.0, shaftLength = 3.0): Float32A
       r,
       g,
       b,
-      alpha
+      safeAlpha
     )
     pushLine(
       out,
@@ -130,7 +163,7 @@ export function generateTranslateGizmo(alpha = 1.0, shaftLength = 3.0): Float32A
       r,
       g,
       b,
-      alpha
+      safeAlpha
     )
   }
 
@@ -147,61 +180,64 @@ export function generateTranslateGizmo(alpha = 1.0, shaftLength = 3.0): Float32A
  */
 export function generateRotateGizmo(alpha = 1.0, radius = 2.5, segments = 48): Float32Array {
   const out: number[] = []
+  const safeAlpha = sanitizeAlpha(alpha)
+  const safeRadius = sanitizePositive(radius, DEFAULT_RING_RADIUS)
+  const safeSegments = sanitizeSegments(segments)
 
   // X ring (YZ plane)
-  for (let i = 0; i < segments; i++) {
-    const a0 = (i / segments) * Math.PI * 2
-    const a1 = ((i + 1) / segments) * Math.PI * 2
+  for (let i = 0; i < safeSegments; i++) {
+    const a0 = (i / safeSegments) * Math.PI * 2
+    const a1 = ((i + 1) / safeSegments) * Math.PI * 2
     pushLine(
       out,
       0,
-      Math.cos(a0) * radius,
-      Math.sin(a0) * radius,
+      Math.cos(a0) * safeRadius,
+      Math.sin(a0) * safeRadius,
       0,
-      Math.cos(a1) * radius,
-      Math.sin(a1) * radius,
+      Math.cos(a1) * safeRadius,
+      Math.sin(a1) * safeRadius,
       AXIS_COLORS[0]![0],
       AXIS_COLORS[0]![1],
       AXIS_COLORS[0]![2],
-      alpha
+      safeAlpha
     )
   }
 
   // Y ring (XZ plane)
-  for (let i = 0; i < segments; i++) {
-    const a0 = (i / segments) * Math.PI * 2
-    const a1 = ((i + 1) / segments) * Math.PI * 2
+  for (let i = 0; i < safeSegments; i++) {
+    const a0 = (i / safeSegments) * Math.PI * 2
+    const a1 = ((i + 1) / safeSegments) * Math.PI * 2
     pushLine(
       out,
-      Math.cos(a0) * radius,
+      Math.cos(a0) * safeRadius,
       0,
-      Math.sin(a0) * radius,
-      Math.cos(a1) * radius,
+      Math.sin(a0) * safeRadius,
+      Math.cos(a1) * safeRadius,
       0,
-      Math.sin(a1) * radius,
+      Math.sin(a1) * safeRadius,
       AXIS_COLORS[1]![0],
       AXIS_COLORS[1]![1],
       AXIS_COLORS[1]![2],
-      alpha
+      safeAlpha
     )
   }
 
   // Z ring (XY plane)
-  for (let i = 0; i < segments; i++) {
-    const a0 = (i / segments) * Math.PI * 2
-    const a1 = ((i + 1) / segments) * Math.PI * 2
+  for (let i = 0; i < safeSegments; i++) {
+    const a0 = (i / safeSegments) * Math.PI * 2
+    const a1 = ((i + 1) / safeSegments) * Math.PI * 2
     pushLine(
       out,
-      Math.cos(a0) * radius,
-      Math.sin(a0) * radius,
+      Math.cos(a0) * safeRadius,
+      Math.sin(a0) * safeRadius,
       0,
-      Math.cos(a1) * radius,
-      Math.sin(a1) * radius,
+      Math.cos(a1) * safeRadius,
+      Math.sin(a1) * safeRadius,
       0,
       AXIS_COLORS[2]![0],
       AXIS_COLORS[2]![1],
       AXIS_COLORS[2]![2],
-      alpha
+      safeAlpha
     )
   }
 

@@ -7,7 +7,12 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
+import {
+  ALL_GRID_SIZE_OPTIONS,
+  AXIS_LABELS,
+  MAX_DIMENSION,
+  MIN_DIMENSION,
+} from '@/constants/dimension'
 
 describe('dimension constant invariants', () => {
   it('MIN_DIMENSION >= 2 (required for rotation planes to exist)', () => {
@@ -41,5 +46,20 @@ describe('dimension constant invariants', () => {
     const maxPlanes = (MAX_DIMENSION * (MAX_DIMENSION - 1)) / 2
     expect(maxPlanes).toBeLessThanOrEqual(100) // UI can handle up to ~55 planes for 11D
     expect(Number.isInteger(maxPlanes)).toBe(true)
+  })
+
+  it('axis labels exactly cover the supported dimension indices', () => {
+    expect(AXIS_LABELS).toHaveLength(MAX_DIMENSION)
+    expect(new Set(AXIS_LABELS).size).toBe(AXIS_LABELS.length)
+  })
+
+  it('grid size options are positive integer powers of two', () => {
+    for (const option of ALL_GRID_SIZE_OPTIONS) {
+      const parsed = Number(option.value)
+      expect(Number.isInteger(parsed)).toBe(true)
+      expect(parsed).toBeGreaterThan(0)
+      expect(Number.isInteger(Math.log2(parsed))).toBe(true)
+      expect(option.label).toBe(option.value)
+    }
   })
 })

@@ -126,22 +126,32 @@ export function useProgressiveRefinement(
     setRefinementStage('low')
     setRefinementProgress(0)
 
+    const totalDuration = REFINEMENT_STAGE_TIMING.final
+
     // Schedule stage transitions — stored in ref; cleanup runs on unmount/dep change
     const stages = REFINEMENT_STAGES.slice(1) // Skip 'low', already set
     stages.forEach((stageKey) => {
       const delay = REFINEMENT_STAGE_TIMING[stageKey]
       const timer = window.setTimeout(() => {
         setRefinementStage(stageKey)
+        // Stage-timer firing late can otherwise drag progress backward after
+        // the RAF loop has already advanced — clamp against current store
+        // progress so timers can only move it forward.
+        const targetProgress = Math.min(100, (delay / totalDuration) * 100)
+        const currentProgress = usePerformanceStore.getState().refinementProgress
+        setRefinementProgress(Math.max(currentProgress, targetProgress))
       }, delay)
       stageTimers.push(timer)
     })
 
-    // Progress animation using RAF for proper frame sync
-    const totalDuration = REFINEMENT_STAGE_TIMING.final
+    // Progress animation using RAF for proper frame sync. Each tick clamps
+    // against current store progress so a late-firing RAF cannot drag the
+    // value back below a discrete bump from `setRefinementStage`.
     const updateProgress = () => {
       const elapsed = performance.now() - startTimeRef.current
       const newProgress = Math.min(100, (elapsed / totalDuration) * 100)
-      setRefinementProgress(newProgress)
+      const currentProgress = usePerformanceStore.getState().refinementProgress
+      setRefinementProgress(Math.max(currentProgress, newProgress))
       if (newProgress < 100) {
         progressRafRef.current = requestAnimationFrame(updateProgress)
       } else {

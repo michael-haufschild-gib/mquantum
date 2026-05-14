@@ -2,14 +2,44 @@
  * Tests for platform detection utilities
  */
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { getModifierSymbols, getPlatformKeyLabel, isMac } from '@/lib/platform'
+import { detectIsMac, getModifierSymbols, getPlatformKeyLabel, isMac } from '@/lib/platform'
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 describe('platform detection', () => {
   // Note: In Node.js test environment, navigator is undefined so isMac = false
   it('should detect non-Mac platform in test environment', () => {
     expect(isMac).toBe(false)
+  })
+
+  it('detects Mac-like platforms from explicit navigator data', () => {
+    expect(detectIsMac({ userAgentData: { platform: 'macOS' }, platform: 'Win32' })).toBe(true)
+    expect(detectIsMac({ userAgentData: { platform: 'Windows' }, platform: 'MacIntel' })).toBe(
+      false
+    )
+  })
+
+  it('falls back safely when userAgentData is absent, null, or malformed', () => {
+    expect(detectIsMac()).toBe(false)
+    expect(detectIsMac({ userAgentData: null, platform: 'MacIntel' })).toBe(true)
+    expect(detectIsMac({ userAgentData: { platform: undefined }, platform: 'iPhone' })).toBe(true)
+    expect(detectIsMac({ userAgentData: null, platform: 'Linux x86_64' })).toBe(false)
+  })
+
+  it('uses Mac symbols when imported under a Mac navigator', async () => {
+    vi.resetModules()
+    vi.stubGlobal('navigator', { platform: 'MacIntel' })
+
+    const platform = await import('@/lib/platform')
+
+    expect(platform.isMac).toBe(true)
+    expect(platform.getModifierSymbols()).toEqual({ ctrl: '⌘', shift: '⇧', alt: '⌥' })
+    expect(platform.getPlatformKeyLabel('Delete')).toBe('⌦')
+    expect(platform.getPlatformKeyLabel('Backspace')).toBe('⌫')
   })
 })
 

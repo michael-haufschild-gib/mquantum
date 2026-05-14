@@ -85,6 +85,7 @@ function createState(overrides: Partial<GramSchmidtState> = {}): GramSchmidtStat
     gsPartialImBuffer: null,
     gsResultBuffer: null,
     gsNumWorkgroups: 0,
+    gsBufferTotalSites: 0,
     psiBuffer: null,
     totalSites: 0,
     pl: null,

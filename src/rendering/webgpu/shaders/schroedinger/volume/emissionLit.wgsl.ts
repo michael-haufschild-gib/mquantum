@@ -16,13 +16,25 @@ export const emissionPostBlock = /* wgsl */ `
 // Light helpers called by isosurface shaders (volumetric path inlines these
 // directly for fewer struct reads per light).
 
+fn safeNormalizeEmission(v: vec3f, fallback: vec3f) -> vec3f {
+  let lenSq = dot(v, v);
+  // NaN comparisons evaluate false, so the negated ordered > test routes
+  // near-zero and NaN lenSq to the fallback. The upper bound keeps +Inf out
+  // of inverseSqrt — the WGSL spec allows implementations to return an
+  // indeterminate value for inverseSqrt(+Inf) when finite-math assumptions
+  // are in play, so we cap lenSq at a generous finite ceiling and route the
+  // overflow case to the same fallback branch.
+  if (!(lenSq > 1.0e-12) || lenSq > 1.0e30) { return fallback; }
+  return v * inverseSqrt(lenSq);
+}
+
 fn getEmissionLightDir(lightIdx: i32, pos: vec3f) -> vec3f {
   let light = lighting.lights[lightIdx];
   let lightType = i32(light.position.w);
   if (lightType == LIGHT_TYPE_DIRECTIONAL) {
-    return normalize(-light.direction.xyz);
+    return safeNormalizeEmission(-light.direction.xyz, vec3f(0.0, 0.0, 1.0));
   } else {
-    return normalize(light.position.xyz - pos);
+    return safeNormalizeEmission(light.position.xyz - pos, vec3f(0.0, 0.0, 1.0));
   }
 }
 
@@ -135,7 +147,7 @@ fn computeEmissionLit(
     var l: vec3f;
     var lightDistance: f32 = 0.0;
     if (lightType == LIGHT_TYPE_DIRECTIONAL) {
-      l = normalize(-light.direction.xyz);
+      l = safeNormalizeEmission(-light.direction.xyz, -viewDir);
     } else {
       let delta = light.position.xyz - p;
       let lenSq = max(dot(delta, delta), 1.0e-12);
@@ -157,7 +169,8 @@ fn computeEmissionLit(
 
       if (lightType == LIGHT_TYPE_SPOT) {
         // lightToFrag is -l (l is already the surface->light unit vector).
-        let cosAngle = dot(-l, normalize(light.direction.xyz));
+        let spotDir = safeNormalizeEmission(light.direction.xyz, viewDir);
+        let cosAngle = dot(-l, spotDir);
         attenuation *= smoothstep(light.params.z, light.params.y, cosAngle);
       }
     }
@@ -180,7 +193,7 @@ fn computeEmissionLit(
 
     // Subsurface Scattering (SSS) — noise/transmission pre-computed above
     if (sssActive) {
-      let halfVec = normalize(l + n * sssJitteredDistortion);
+      let halfVec = safeNormalizeEmission(l + n * sssJitteredDistortion, n);
       let trans = pow(clamp(dot(viewDir, -halfVec), 0.0, 1.0), material.sssThickness * 4.0);
       col += material.sssColor * light.color.rgb * (trans * sssTransmission) * material.sssIntensity * attenuation;
     }

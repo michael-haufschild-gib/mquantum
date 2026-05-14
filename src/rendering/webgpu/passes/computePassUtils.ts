@@ -274,6 +274,19 @@ export function computeStridesPadded(
   latticeDim: number,
   target?: number[]
 ): number[] {
+  if (!Number.isInteger(latticeDim) || latticeDim < 0 || latticeDim > MAX_DIM) {
+    throw new Error(
+      `[compute] computeStridesPadded: latticeDim=${latticeDim} is unsupported; expected integer 0..${MAX_DIM}`
+    )
+  }
+  for (let d = 0; d < latticeDim; d++) {
+    const axis = gridSize[d]
+    if (typeof axis !== 'number' || !Number.isFinite(axis) || !Number.isInteger(axis) || axis < 1) {
+      throw new Error(
+        `[compute] computeStridesPadded: gridSize[${d}]=${axis} is invalid; expected integer >= 1`
+      )
+    }
+  }
   const strides = target ?? new Array(MAX_DIM)
   for (let d = 0; d < MAX_DIM; d++) strides[d] = 0
   if (latticeDim > 0) {
@@ -295,6 +308,7 @@ export function sanitizeGridSizes<T extends { gridSize: number[]; latticeDim: nu
 ): T {
   const sanitized = sanitizePowerOfTwoGridSizes(config, {
     maxTotalSites: MAX_LINEAR_DISPATCH_SITES,
+    maxDimensions: MAX_DIM,
   })
   if (sanitized === config) return config
   logger.warn(`[compute] Grid sizes sanitized: ${config.gridSize} -> ${sanitized.gridSize}`)

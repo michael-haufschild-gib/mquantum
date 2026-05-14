@@ -111,6 +111,16 @@ describe('animationStore', () => {
         expect(planes.size).toBe((dim * (dim - 1)) / 2)
       }
     })
+
+    it('ignores invalid dimensions without clearing current planes', () => {
+      useAnimationStore.getState().animateAll(4)
+      const before = new Set(useAnimationStore.getState().animatingPlanes)
+
+      expect(() => useAnimationStore.getState().animateAll(Number.NaN)).not.toThrow()
+      expect(() => useAnimationStore.getState().animateAll(1)).not.toThrow()
+
+      expect(useAnimationStore.getState().animatingPlanes).toEqual(before)
+    })
   })
 
   describe('stopAll', () => {
@@ -219,6 +229,17 @@ describe('animationStore', () => {
         expect(count).toBeLessThanOrEqual(maxPlanes)
       }
     })
+
+    it('ignores invalid dimensions without replacing the current selection', () => {
+      useAnimationStore.getState().randomizePlanes(4)
+      const before = new Set(useAnimationStore.getState().animatingPlanes)
+
+      expect(() =>
+        useAnimationStore.getState().randomizePlanes(Number.POSITIVE_INFINITY)
+      ).not.toThrow()
+
+      expect(useAnimationStore.getState().animatingPlanes).toEqual(before)
+    })
   })
 
   describe('setDimension', () => {
@@ -312,6 +333,17 @@ describe('animationStore', () => {
       useAnimationStore.getState().updateAccumulatedTime(Number.NaN)
       useAnimationStore.getState().updateAccumulatedTime(Number.POSITIVE_INFINITY)
       expect(useAnimationStore.getState().accumulatedTime).toBe(before)
+    })
+  })
+
+  describe('resetToFirstPlane', () => {
+    it('ignores invalid dimensions without replacing the current selection', () => {
+      useAnimationStore.getState().animateAll(4)
+      const before = new Set(useAnimationStore.getState().animatingPlanes)
+
+      expect(() => useAnimationStore.getState().resetToFirstPlane(Number.NaN)).not.toThrow()
+
+      expect(useAnimationStore.getState().animatingPlanes).toEqual(before)
     })
   })
 })

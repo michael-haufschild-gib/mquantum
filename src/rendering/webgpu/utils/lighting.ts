@@ -8,9 +8,20 @@
  */
 
 import type { LightSource } from '@/lib/lighting/lightSource'
-import { rotationToDirection } from '@/lib/lighting/lightSource'
+import {
+  clampConeAngle,
+  clampDecay,
+  clampIntensity,
+  clampPenumbra,
+  clampRange,
+  normalizeRotationTupleSigned,
+  rotationToDirection,
+} from '@/lib/lighting/lightSource'
 
 import { parseHexColorToLinearRgb } from './color'
+
+const MAX_PACKED_LIGHTS = 8
+const MAX_LIGHT_POSITION_COMPONENT = 1_000_000
 
 /**
  * Minimal subset of the lighting store used by WebGPU renderers.
@@ -22,6 +33,39 @@ export interface WebGPULightingState {
   ambientIntensity?: number
   ambientEnabled?: boolean
   version?: number
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function finiteNumber(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function finiteNumberInRange(value: unknown, min: number, max: number, fallback: number): number {
+  const finite = finiteNumber(value, fallback)
+  return Math.max(min, Math.min(max, finite))
+}
+
+function sanitizeVector3(
+  value: unknown,
+  fallback: [number, number, number],
+  maxAbs: number
+): [number, number, number] {
+  if (!Array.isArray(value) || value.length !== 3) return fallback
+  return [
+    finiteNumberInRange(value[0], -maxAbs, maxAbs, fallback[0]),
+    finiteNumberInRange(value[1], -maxAbs, maxAbs, fallback[1]),
+    finiteNumberInRange(value[2], -maxAbs, maxAbs, fallback[2]),
+  ]
+}
+
+function lightTypeToUniform(type: unknown): number {
+  if (type === 'point') return 1
+  if (type === 'directional') return 2
+  if (type === 'spot') return 3
+  return 0
 }
 
 /**
@@ -50,18 +94,20 @@ export function packLightingUniforms(data: Float32Array, lighting: WebGPULightin
 
   data.fill(0)
 
-  const lights = lighting.lights ?? []
-  const lightCount = Math.min(lights.length, 8)
+  const lights = Array.isArray(lighting.lights) ? lighting.lights : []
+  const lightCount = Math.min(lights.length, MAX_PACKED_LIGHTS)
 
   for (let i = 0; i < lightCount; i++) {
-    const light = lights[i]
+    const light = lights[i] as unknown
     if (!light) continue
+    const lightRecord = isObject(light) ? light : null
+    if (!lightRecord) continue
     const offset = i * 16
 
     // position: vec4f (xyz = position, w = type)
     // Must match WGSL constants: LIGHT_TYPE_POINT=1, LIGHT_TYPE_DIRECTIONAL=2, LIGHT_TYPE_SPOT=3
-    const lightType = light.type === 'directional' ? 2 : light.type === 'spot' ? 3 : 1
-    const pos = light.position ?? [0, 0, 0]
+    const lightType = lightTypeToUniform(lightRecord.type)
+    const pos = sanitizeVector3(lightRecord.position, [0, 0, 0], MAX_LIGHT_POSITION_COMPONENT)
     data[offset + 0] = pos[0]
     data[offset + 1] = pos[1]
     data[offset + 2] = pos[2]
@@ -72,7 +118,9 @@ export function packLightingUniforms(data: Float32Array, lighting: WebGPULightin
     // Pre-normalized on CPU so WGSL avoids per-pixel fastNormalize on the
     // directional/spot path. Zero-length input falls back to (0, 1, 0) to
     // mirror WGSL's fastNormalize semantics (LEN_SQ_THRESHOLD = EPS_POSITION²).
-    const rot = light.rotation ?? [0, 0, 0]
+    const rot = normalizeRotationTupleSigned(
+      sanitizeVector3(lightRecord.rotation, [0, 0, 0], Number.MAX_SAFE_INTEGER)
+    )
     const direction = rotationToDirection(rot)
     const dx = direction[0]
     const dy = direction[1]
@@ -88,25 +136,28 @@ export function packLightingUniforms(data: Float32Array, lighting: WebGPULightin
       data[offset + 5] = dy * invLen
       data[offset + 6] = dz * invLen
     }
-    data[offset + 7] = light.range ?? 0
+    data[offset + 7] = clampRange(finiteNumber(lightRecord.range, 0))
 
     // color: vec4f (rgb = linear color, a = intensity)
-    const lightColor = parseHexColorToLinearRgb(light.color, [1, 1, 1])
+    const lightColor = parseHexColorToLinearRgb(
+      typeof lightRecord.color === 'string' ? lightRecord.color : '#ffffff',
+      [1, 1, 1]
+    )
     data[offset + 8] = lightColor[0]
     data[offset + 9] = lightColor[1]
     data[offset + 10] = lightColor[2]
-    data[offset + 11] = light.intensity ?? 1
+    data[offset + 11] = clampIntensity(finiteNumber(lightRecord.intensity, 1))
 
     // params: vec4f (x = decay, y = spotCosInner, z = spotCosOuter, w = enabled)
     // Spot cone cosines are derived from coneAngle + penumbra (matches WebGL CPU packing).
-    const coneAngle = light.coneAngle ?? 30
-    const penumbra = light.penumbra ?? 0
+    const coneAngle = clampConeAngle(finiteNumber(lightRecord.coneAngle, 30))
+    const penumbra = clampPenumbra(finiteNumber(lightRecord.penumbra, 0))
     const outerAngleRad = (coneAngle * Math.PI) / 180
     const innerAngleRad = outerAngleRad * (1.0 - penumbra)
-    data[offset + 12] = light.decay ?? 2
+    data[offset + 12] = clampDecay(finiteNumber(lightRecord.decay, 2))
     data[offset + 13] = Math.cos(innerAngleRad)
     data[offset + 14] = Math.cos(outerAngleRad)
-    data[offset + 15] = light.enabled !== false ? 1.0 : 0.0
+    data[offset + 15] = lightType === 0 || lightRecord.enabled === false ? 0.0 : 1.0
   }
 
   // ambientColor: vec3f at offset 128
@@ -116,7 +167,9 @@ export function packLightingUniforms(data: Float32Array, lighting: WebGPULightin
   data[130] = ambientColor[2]
 
   // ambientIntensity: f32 at offset 131 (multiply by enabled flag like WebGL uAmbientEnabled)
-  data[131] = (lighting.ambientEnabled !== false ? 1 : 0) * (lighting.ambientIntensity ?? 0.3)
+  data[131] =
+    (lighting.ambientEnabled !== false ? 1 : 0) *
+    finiteNumberInRange(lighting.ambientIntensity, 0, 1, 0.3)
 
   // lightCount: i32 at offset 132 (use DataView for correct type)
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength)

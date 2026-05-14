@@ -162,6 +162,7 @@ function DecoherenceContent() {
                 <Switch
                   checked={tdse.branchingEnabled}
                   onCheckedChange={setBranchingEnabled}
+                  ariaLabel="Toggle branch visualization"
                   tooltip="Enable or disable branch visualization."
                   data-testid="decoherence-branching-toggle"
                 />

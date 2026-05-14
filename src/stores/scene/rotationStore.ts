@@ -14,6 +14,15 @@ import { getRotationPlanes } from '@/lib/math/rotation'
  * Avoids recreating Set on every setRotation/updateRotations call.
  */
 const validPlanesCache = new Map<number, Set<string>>()
+const DEFAULT_ROTATION_DIMENSION = 4
+
+function isValidRotationDimension(dimension: number): boolean {
+  return Number.isInteger(dimension) && dimension >= MIN_DIMENSION && dimension <= MAX_DIMENSION
+}
+
+function sanitizeRotationDimension(dimension: number): number {
+  return isValidRotationDimension(dimension) ? dimension : DEFAULT_ROTATION_DIMENSION
+}
 
 /**
  * Get cached Set of valid plane names for a dimension.
@@ -37,6 +46,7 @@ function getValidPlanesSet(dimension: number): Set<string> {
  * 10000 radians ≈ 1592 full rotations ≈ 11 hours at default speed.
  */
 const LAZY_NORMALIZE_THRESHOLD = 10000
+const ROTATION_CHANGE_EPSILON = 1e-10
 
 /**
  * Rotation store state and actions.
@@ -102,6 +112,52 @@ function isValidRotationAngle(angle: number): boolean {
   return Number.isFinite(angle)
 }
 
+function isApplicableRotationUpdate(
+  plane: string,
+  angle: number,
+  validPlanes: Set<string>
+): boolean {
+  return validPlanes.has(plane) && isValidRotationAngle(angle)
+}
+
+function rotationUpdatesChangeState(
+  updates: Map<string, number>,
+  currentRotations: Map<string, number>,
+  validPlanes: Set<string>,
+  repairingDimension: boolean
+): boolean {
+  if (repairingDimension) return true
+
+  for (const [plane, angle] of updates.entries()) {
+    if (!isApplicableRotationUpdate(plane, angle, validPlanes)) continue
+    const normalizedAngle = normalizeAngle(angle)
+    const currentAngle = currentRotations.get(plane)
+    if (
+      currentAngle === undefined ||
+      !Number.isFinite(currentAngle) ||
+      Math.abs(currentAngle - normalizedAngle) > ROTATION_CHANGE_EPSILON
+    ) {
+      return true
+    }
+  }
+
+  return false
+}
+
+function applyRotationUpdates(
+  baseRotations: Map<string, number>,
+  updates: Map<string, number>,
+  validPlanes: Set<string>
+): Map<string, number> {
+  const nextRotations = new Map(baseRotations)
+  for (const [plane, angle] of updates.entries()) {
+    if (isApplicableRotationUpdate(plane, angle, validPlanes)) {
+      nextRotations.set(plane, normalizeAngle(angle))
+    }
+  }
+  return nextRotations
+}
+
 export const useRotationStore = create<RotationState>((set) => ({
   rotations: new Map(),
   dimension: 4,
@@ -114,15 +170,20 @@ export const useRotationStore = create<RotationState>((set) => ({
     }
 
     set((state) => {
+      const dimension = sanitizeRotationDimension(state.dimension)
+      const repairingDimension = dimension !== state.dimension
       // Only set rotation if plane is valid for current dimension
       // Use cached Set to avoid recreation on every call
-      const validPlanes = getValidPlanesSet(state.dimension)
+      const validPlanes = getValidPlanesSet(dimension)
       if (!validPlanes.has(plane)) {
+        if (repairingDimension) {
+          return { dimension, rotations: new Map(), version: state.version + 1 }
+        }
         return state // Ignore invalid plane
       }
-      const newRotations = new Map(state.rotations)
+      const newRotations = repairingDimension ? new Map<string, number>() : new Map(state.rotations)
       newRotations.set(plane, normalizeAngle(angle))
-      return { rotations: newRotations, version: state.version + 1 }
+      return { dimension, rotations: newRotations, version: state.version + 1 }
     })
   },
 
@@ -131,38 +192,21 @@ export const useRotationStore = create<RotationState>((set) => ({
     if (updates.size === 0) return
 
     set((state) => {
+      const dimension = sanitizeRotationDimension(state.dimension)
+      const repairingDimension = dimension !== state.dimension
       // Filter updates to only include valid planes for current dimension
       // Use cached Set to avoid recreation on every call
-      const validPlanes = getValidPlanesSet(state.dimension)
-
-      // OPT-MAP-1: First pass - check if any values actually changed
-      // Avoids creating a new Map when all updates are no-ops (same values)
-      let hasChanges = false
-      for (const [plane, angle] of updates.entries()) {
-        if (validPlanes.has(plane) && isValidRotationAngle(angle)) {
-          const normalizedAngle = normalizeAngle(angle)
-          const currentAngle = state.rotations.get(plane)
-          // Check if value is different (with tolerance for floating point)
-          if (currentAngle === undefined || Math.abs(currentAngle - normalizedAngle) > 1e-10) {
-            hasChanges = true
-            break
-          }
-        }
-      }
+      const validPlanes = getValidPlanesSet(dimension)
 
       // Early exit if no actual changes - avoid Map allocation and version bump
-      if (!hasChanges) {
+      if (!rotationUpdatesChangeState(updates, state.rotations, validPlanes, repairingDimension)) {
         return state
       }
 
       // Second pass - create new Map only when we have actual changes
-      const newRotations = new Map(state.rotations)
-      for (const [plane, angle] of updates.entries()) {
-        if (validPlanes.has(plane) && isValidRotationAngle(angle)) {
-          newRotations.set(plane, normalizeAngle(angle))
-        }
-      }
-      return { rotations: newRotations, version: state.version + 1 }
+      const baseRotations = repairingDimension ? new Map<string, number>() : state.rotations
+      const newRotations = applyRotationUpdates(baseRotations, updates, validPlanes)
+      return { dimension, rotations: newRotations, version: state.version + 1 }
     })
   },
 
@@ -175,12 +219,8 @@ export const useRotationStore = create<RotationState>((set) => ({
   },
 
   setDimension: (dimension: number) => {
-    if (!Number.isFinite(dimension) || !Number.isInteger(dimension)) {
+    if (!isValidRotationDimension(dimension)) {
       logger.warn(`[rotationStore] Ignoring invalid dimension: ${dimension}`)
-      return
-    }
-
-    if (dimension < MIN_DIMENSION || dimension > MAX_DIMENSION) {
       return
     }
 

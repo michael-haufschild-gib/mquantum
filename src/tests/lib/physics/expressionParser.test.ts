@@ -321,6 +321,12 @@ describe('parseExpression', () => {
       expect(evalExpr(expr, coords)).toBe(66)
     })
 
+    it('rejects axis labels beyond the supported dimension contract', () => {
+      const result = parseExpression('o')
+      expect(result.success).toBe(false)
+      if (!result.success) expect(result.error).toContain('Unknown identifier')
+    })
+
     it('handles deeply nested function calls', () => {
       expect(evalExpr('sin(cos(sin(cos(0))))', [])).toBeCloseTo(Math.sin(Math.cos(Math.sin(1))))
     })

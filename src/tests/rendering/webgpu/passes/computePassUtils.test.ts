@@ -194,6 +194,16 @@ describe('computeStridesPadded', () => {
     expect(strides.every((s) => s === 0)).toBe(true)
   })
 
+  it('rejects lattice dimensions that cannot fit uniform stride arrays', () => {
+    expect(() => computeStridesPadded(new Array(MAX_DIM + 1).fill(2), MAX_DIM + 1)).toThrow(
+      /latticeDim/
+    )
+  })
+
+  it('rejects missing active grid axes before NaN strides reach uniforms', () => {
+    expect(() => computeStridesPadded([4, 8], 3)).toThrow(/gridSize\[2\]/)
+  })
+
   it('handles 1D grid correctly', () => {
     const strides = computeStridesPadded([64], 1)
     expect(strides[0]).toBe(1) // single dimension stride is 1
@@ -248,6 +258,25 @@ describe('sanitizeGridSizes', () => {
     const result = sanitizeGridSizes(config)
     const totalSites = result.gridSize.slice(0, 4).reduce((a, b) => a * b, 1)
     expect(totalSites).toBeLessThanOrEqual(MAX_LINEAR_DISPATCH_SITES)
+  })
+
+  it('pads missing active axes before buffer sizing reaches undefined grid slots', () => {
+    const config = { gridSize: [64, 64, 64], latticeDim: 5 }
+    const result = sanitizeGridSizes(config)
+
+    expect(result.gridSize).toHaveLength(5)
+    expect(result.gridSize.every((g) => Number.isInteger(g) && g >= 2)).toBe(true)
+    const totalSites = result.gridSize.slice(0, result.latticeDim).reduce((a, b) => a * b, 1)
+    expect(totalSites).toBeLessThanOrEqual(MAX_LINEAR_DISPATCH_SITES)
+  })
+
+  it('clamps invalid latticeDim values into the supported compute-pass range', () => {
+    const tooLarge = sanitizeGridSizes({ gridSize: new Array(MAX_DIM + 2).fill(2), latticeDim: 99 })
+    expect(tooLarge.latticeDim).toBe(MAX_DIM)
+
+    const invalid = sanitizeGridSizes({ gridSize: [64, 64], latticeDim: Number.NaN })
+    expect(invalid.latticeDim).toBe(1)
+    expect(invalid.gridSize[0]).toBe(64)
   })
 
   it('does not mutate the input config', () => {

@@ -115,4 +115,28 @@ describe('HydrogenNDCoupledControls', () => {
     // l₁ = 1 corresponds to 'p' orbital
     expect(screen.getByText(/l₁ = 1 \(p\)/)).toBeInTheDocument()
   })
+
+  it('renders finite fallback controls for malformed runtime config values', () => {
+    const malformedConfig = {
+      ...DEFAULT_SCHROEDINGER_CONFIG,
+      principalQuantumNumber: Number.NaN,
+      azimuthalQuantumNumber: Number.POSITIVE_INFINITY,
+      magneticQuantumNumber: Number.NaN,
+      angularChain: undefined as unknown as number[],
+      useRealOrbitals: 'yes' as unknown as boolean,
+      bohrRadiusScale: Number.POSITIVE_INFINITY,
+    }
+
+    render(
+      <HydrogenNDCoupledControls
+        config={malformedConfig}
+        dimension={4}
+        actions={makeMockActions()}
+      />
+    )
+
+    expect(screen.getByText(/l₁ = 0 \(s\)/)).toBeInTheDocument()
+    expect(screen.getByText(/m = 0/)).toBeInTheDocument()
+    expect(screen.getByText('l₂ (0–0)')).toBeInTheDocument()
+  })
 })

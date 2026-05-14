@@ -114,7 +114,7 @@ export const hex8ToHsv = (hex8: string): HSVA => {
       .join('')
   }
 
-  if (hex.length !== 8) return { h: 0, s: 0, v: 0, a: 1 }
+  if (!/^[0-9a-fA-F]{8}$/.test(hex)) return { h: 0, s: 0, v: 0, a: 1 }
 
   const r = parseInt(hex.substring(0, 2), 16)
   const g = parseInt(hex.substring(2, 4), 16)

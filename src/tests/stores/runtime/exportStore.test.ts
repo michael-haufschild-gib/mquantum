@@ -103,6 +103,21 @@ describe('exportStore (invariants)', () => {
       expect(useExportStore.getState().lastAppliedPreset).toBeNull()
     })
 
+    it('platform presets reset encoding after High Q WebM selection', () => {
+      useExportStore.getState().applyPreset('high-q')
+      expect(useExportStore.getState().settings.format).toBe('webm')
+      expect(useExportStore.getState().settings.codec).toBe('vp9')
+
+      useExportStore.getState().applyPreset('tiktok')
+      const settings = useExportStore.getState().settings
+
+      expect(settings.format).toBe('mp4')
+      expect(settings.codec).toBe('avc')
+      expect(settings.customWidth).toBe(1080)
+      expect(settings.customHeight).toBe(1920)
+      expect(useExportStore.getState().lastAppliedPreset).toBe('tiktok')
+    })
+
     it('reset() clears preset provenance', () => {
       useExportStore.getState().applyPreset('twitter-video')
       expect(useExportStore.getState().lastAppliedPreset).toBe('twitter-video')
@@ -712,6 +727,32 @@ describe('exportStore (invariants)', () => {
         expect(crop.y).toBe(0.2)
         expect(crop.width).toBe(0.5)
         expect(crop.height).toBe(0.6)
+      })
+
+      it('keeps manual crop patches within the source frame after deep merge', () => {
+        useExportStore.getState().updateSettings({
+          crop: {
+            enabled: true,
+            x: 0.1,
+            y: 0.1,
+            width: 0.5,
+            height: 0.4,
+          },
+        })
+
+        useExportStore.getState().updateSettings({
+          crop: {
+            ...useExportStore.getState().settings.crop,
+            x: 0.8,
+            y: 0.75,
+          },
+        })
+
+        const { crop } = useExportStore.getState().settings
+        expect(crop.x).toBe(0.5)
+        expect(crop.y).toBe(0.6)
+        expect(crop.x + crop.width).toBeLessThanOrEqual(1)
+        expect(crop.y + crop.height).toBeLessThanOrEqual(1)
       })
 
       it('should allow disabling crop', () => {

@@ -83,7 +83,7 @@ describe('mergeExtendedObjectStateForType — fuzz testing', () => {
     )
   })
 
-  it('cosineParams always has arrays of length 3 regardless of input', () => {
+  it('cosineParams always has finite numeric arrays of length 3 regardless of input', () => {
     fc.assert(
       fc.property(arbPartialConfig, (partialConfig) => {
         const result = mergeExtendedObjectStateForType(
@@ -100,6 +100,29 @@ describe('mergeExtendedObjectStateForType — fuzz testing', () => {
         expect(sch.cosineParams.b).toHaveLength(3)
         expect(sch.cosineParams.c).toHaveLength(3)
         expect(sch.cosineParams.d).toHaveLength(3)
+        expect(sch.cosineParams.a.every(Number.isFinite)).toBe(true)
+        expect(sch.cosineParams.b.every(Number.isFinite)).toBe(true)
+        expect(sch.cosineParams.c.every(Number.isFinite)).toBe(true)
+        expect(sch.cosineParams.d.every(Number.isFinite)).toBe(true)
+        expect(sch.cosineParams.a.every((value) => typeof value === 'number')).toBe(true)
+        expect(sch.cosineParams.b.every((value) => typeof value === 'number')).toBe(true)
+        expect(sch.cosineParams.c.every((value) => typeof value === 'number')).toBe(true)
+        expect(sch.cosineParams.d.every((value) => typeof value === 'number')).toBe(true)
+      }),
+      { numRuns: 500 }
+    )
+  })
+
+  it('variable-length numeric arrays never accept non-numeric elements', () => {
+    fc.assert(
+      fc.property(arbPartialConfig, (partialConfig) => {
+        const result = mergeExtendedObjectStateForType(
+          { schroedinger: partialConfig },
+          'schroedinger'
+        )
+        const sch = result.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
+        expect(sch.parameterValues.every((value) => typeof value === 'number')).toBe(true)
+        expect(sch.parameterValues.every(Number.isFinite)).toBe(true)
       }),
       { numRuns: 500 }
     )

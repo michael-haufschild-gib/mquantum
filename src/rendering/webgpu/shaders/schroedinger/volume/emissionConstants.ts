@@ -38,3 +38,10 @@ export const COLOR_ALG_NAMES: Record<number, string> = {
   27: 'Quantum Potential Q(x) (Bohmian)',
   28: 'Vortex Density (topological charge)',
 }
+
+/** Numeric shader color algorithm indices, sorted for validation walkers. */
+export const COLOR_ALGORITHM_INDICES = Object.freeze(
+  Object.keys(COLOR_ALG_NAMES)
+    .map((key) => Number.parseInt(key, 10))
+    .sort((a, b) => a - b)
+) as readonly number[]

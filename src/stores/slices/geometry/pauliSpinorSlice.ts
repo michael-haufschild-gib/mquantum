@@ -1,6 +1,11 @@
 import { StateCreator } from 'zustand'
 
-import { DEFAULT_PAULI_CONFIG, type PauliConfig } from '@/lib/geometry/extended/types'
+import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
+import {
+  createDefaultPauliConfig,
+  DEFAULT_PAULI_CONFIG,
+  type PauliConfig,
+} from '@/lib/geometry/extended/pauli'
 
 import { ExtendedObjectSlice, PauliSpinorSlice } from './types'
 
@@ -9,6 +14,11 @@ export const createPauliSpinorSlice: StateCreator<ExtendedObjectSlice, [], [], P
   get
 ) => {
   const isFinite = (value: number): boolean => Number.isFinite(value)
+
+  const clampPauliDimension = (dimension: number): number => {
+    if (!Number.isFinite(dimension)) return DEFAULT_PAULI_CONFIG.latticeDim
+    return Math.max(MIN_DIMENSION, Math.min(MAX_DIMENSION, Math.floor(dimension)))
+  }
 
   /** Wrapped setter that auto-increments pauliSpinorVersion on state changes. */
   const setWithVersion: typeof set = (updater) => {
@@ -35,7 +45,7 @@ export const createPauliSpinorSlice: StateCreator<ExtendedObjectSlice, [], [], P
   }
 
   return {
-    pauliSpinor: { ...DEFAULT_PAULI_CONFIG },
+    pauliSpinor: createDefaultPauliConfig(),
 
     // === Physics ===
     setPauliDt: (dt) => setPauliClamped('dt', dt, 0.0001, 0.1),
@@ -176,13 +186,13 @@ export const createPauliSpinorSlice: StateCreator<ExtendedObjectSlice, [], [], P
     },
     initializePauliForDimension: (dimension) => {
       setWithVersion((state) => {
-        const dim = Math.max(2, Math.min(11, dimension))
+        const dim = clampPauliDimension(dimension)
         const gridSize = Array.from({ length: dim }, () =>
           dim <= 3 ? 64 : dim <= 4 ? 32 : dim <= 7 ? 8 : 4
         )
         const spacing = Array.from({ length: dim }, () => 0.15)
-        const packetCenter = Array.from({ length: 11 }, () => 0)
-        const packetMomentum = Array.from({ length: 11 }, () => 0)
+        const packetCenter = Array.from({ length: MAX_DIMENSION }, () => 0)
+        const packetMomentum = Array.from({ length: MAX_DIMENSION }, () => 0)
         // Resize slicePositions to match the number of extra dims (dim - 3).
         // Preserve any existing values at the matching 0-indexed extra-dim slots.
         const prevSlice = state.pauliSpinor.slicePositions

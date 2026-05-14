@@ -7,12 +7,44 @@
  * @module rendering/webgpu/renderers/skyboxVertexData
  */
 
-import type { SkyboxMode, SkyboxProceduralSettings } from '@/stores/defaults/visualDefaults'
+import {
+  DEFAULT_SKYBOX_PROCEDURAL_SETTINGS,
+  type SkyboxMode,
+  type SkyboxProceduralSettings,
+} from '@/stores/defaults/visualDefaults'
 
 import type { SkyboxMode as ShaderSkyboxMode } from '../shaders/skybox/types'
 import { SKYBOX_UNIFORMS_LAYOUT } from './skyboxLayout'
 
 const SKYBOX_INDEX = SKYBOX_UNIFORMS_LAYOUT.index
+
+const STORE_MODE_TO_SHADER_MODE: Record<SkyboxMode, ShaderSkyboxMode> = {
+  classic: 'classic',
+  procedural_aurora: 'aurora',
+  procedural_nebula: 'nebula',
+  procedural_crystalline: 'crystalline',
+  procedural_horizon: 'horizon',
+  procedural_ocean: 'ocean',
+  procedural_twilight: 'twilight',
+}
+
+const SHADER_MODE_TO_NUMERIC: Record<ShaderSkyboxMode, number> = {
+  classic: 0,
+  aurora: 1,
+  nebula: 2,
+  crystalline: 4,
+  horizon: 5,
+  ocean: 6,
+  twilight: 7,
+}
+
+function finiteOrFallback(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function clampFinite(value: unknown, fallback: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, finiteOrFallback(value, fallback)))
+}
 
 /**
  * Resolved KTX2 cubemap asset URLs (eagerly resolved by Vite).
@@ -59,7 +91,8 @@ export async function loadSkyboxKTX2Texture(
  * @param size - Half-extent of the cube (default 1.0)
  * @returns Float32Array with 108 floats (36 vertices x 3 components)
  */
-export function generateSkyboxCubeVertices(size = 1.0): Float32Array {
+export function generateSkyboxCubeVertices(rawSize: number = 1.0): Float32Array {
+  const size = Number.isFinite(rawSize) && rawSize > 0 ? rawSize : 1.0
   return new Float32Array([
     // Front face
     -size,
@@ -185,23 +218,7 @@ export function generateSkyboxCubeVertices(size = 1.0): Float32Array {
  * @returns Shader-level mode identifier without prefix
  */
 export function mapSkyboxModeToShader(storeMode: SkyboxMode): ShaderSkyboxMode {
-  switch (storeMode) {
-    case 'procedural_aurora':
-      return 'aurora'
-    case 'procedural_nebula':
-      return 'nebula'
-    case 'procedural_crystalline':
-      return 'crystalline'
-    case 'procedural_horizon':
-      return 'horizon'
-    case 'procedural_ocean':
-      return 'ocean'
-    case 'procedural_twilight':
-      return 'twilight'
-    case 'classic':
-    default:
-      return 'classic'
-  }
+  return STORE_MODE_TO_SHADER_MODE[storeMode] ?? 'classic'
 }
 
 /**
@@ -209,38 +226,22 @@ export function mapSkyboxModeToShader(storeMode: SkyboxMode): ShaderSkyboxMode {
  * @param mode
  */
 export function modeToNumeric(mode: ShaderSkyboxMode): number {
-  switch (mode) {
-    case 'classic':
-      return 0
-    case 'aurora':
-      return 1
-    case 'nebula':
-      return 2
-    case 'crystalline':
-      return 4
-    case 'horizon':
-      return 5
-    case 'ocean':
-      return 6
-    case 'twilight':
-      return 7
-    default:
-      return 0
-  }
+  return SHADER_MODE_TO_NUMERIC[mode] ?? 0
 }
 
 /** Write 3 floats from an optional array with per-component defaults. */
 export function writeVec3(
   data: Float32Array,
   offset: number,
-  src: number[] | undefined,
+  src: readonly unknown[] | undefined,
   d0: number,
   d1: number,
   d2: number
 ): void {
-  data[offset] = src?.[0] ?? d0
-  data[offset + 1] = src?.[1] ?? d1
-  data[offset + 2] = src?.[2] ?? d2
+  const vector = Array.isArray(src) ? src : undefined
+  data[offset] = finiteOrFallback(vector?.[0], d0)
+  data[offset + 1] = finiteOrFallback(vector?.[1], d1)
+  data[offset + 2] = finiteOrFallback(vector?.[2], d2)
 }
 
 /** Pack core skybox uniforms (indices 0-15). */
@@ -254,18 +255,18 @@ export function packSkyboxCoreUniforms(
   animDistortion: number
 ): void {
   data[SKYBOX_INDEX.mode] = modeToNumeric(shaderMode)
-  data[SKYBOX_INDEX.time] = t
-  data[SKYBOX_INDEX.intensity] = intensity
-  data[SKYBOX_INDEX.hue] = hue
-  data[SKYBOX_INDEX.saturation] = settings?.saturation ?? 1.0
-  data[SKYBOX_INDEX.scale] = settings?.scale ?? 1.0
-  data[SKYBOX_INDEX.complexity] = settings?.complexity ?? 0.5
-  data[SKYBOX_INDEX.timeScale] = settings?.timeScale ?? 0.2
-  data[SKYBOX_INDEX.evolution] = settings?.evolution ?? 0.0
-  data[SKYBOX_INDEX.distortion] = animDistortion
-  data[SKYBOX_INDEX.turbulence] = settings?.turbulence ?? 0.3
-  data[SKYBOX_INDEX.dualTone] = settings?.dualToneContrast ?? 0.5
-  data[SKYBOX_INDEX.sunIntensity] = settings?.sunIntensity ?? 0.0
+  data[SKYBOX_INDEX.time] = finiteOrFallback(t, 0)
+  data[SKYBOX_INDEX.intensity] = clampFinite(intensity, 1.0, 0, 11)
+  data[SKYBOX_INDEX.hue] = clampFinite(hue, 0.0, -1, 1)
+  data[SKYBOX_INDEX.saturation] = clampFinite(settings?.saturation, 1.0, 0, 2)
+  data[SKYBOX_INDEX.scale] = clampFinite(settings?.scale, 1.0, 0.1, 3.0)
+  data[SKYBOX_INDEX.complexity] = clampFinite(settings?.complexity, 0.5, 0, 1)
+  data[SKYBOX_INDEX.timeScale] = clampFinite(settings?.timeScale, 0.2, 0, 2.0)
+  data[SKYBOX_INDEX.evolution] = clampFinite(settings?.evolution, 0.0, 0, 10)
+  data[SKYBOX_INDEX.distortion] = clampFinite(animDistortion, 0.0, 0, 2)
+  data[SKYBOX_INDEX.turbulence] = clampFinite(settings?.turbulence, 0.3, 0, 1)
+  data[SKYBOX_INDEX.dualTone] = clampFinite(settings?.dualToneContrast, 0.5, 0, 1)
+  data[SKYBOX_INDEX.sunIntensity] = clampFinite(settings?.sunIntensity, 0.0, 0, 2)
 }
 
 /** Pack sun position and mode-specific skybox settings (indices 40-51). */
@@ -273,25 +274,77 @@ export function packSkyboxModeSettings(
   data: Float32Array,
   settings: SkyboxProceduralSettings | undefined
 ): void {
-  const sunPos = settings?.sunPosition ?? [10, 10, 10]
+  const defaults = DEFAULT_SKYBOX_PROCEDURAL_SETTINGS
   const sunIdx = SKYBOX_INDEX.sunPosition
-  data[sunIdx] = sunPos[0]
-  data[sunIdx + 1] = sunPos[1]
-  data[sunIdx + 2] = sunPos[2]
-  data[SKYBOX_INDEX.auroraCurtainHeight] = settings?.aurora?.curtainHeight ?? 0.5
-  data[SKYBOX_INDEX.auroraWaveFrequency] = settings?.aurora?.waveFrequency ?? 1.0
-  data[SKYBOX_INDEX.horizonGradientContrast] = settings?.horizonGradient?.gradientContrast ?? 0.5
-  data[SKYBOX_INDEX.horizonSpotlightFocus] = settings?.horizonGradient?.spotlightFocus ?? 0.5
-  data[SKYBOX_INDEX.oceanCausticIntensity] = settings?.ocean?.causticIntensity ?? 0.5
-  data[SKYBOX_INDEX.oceanDepthGradient] = settings?.ocean?.depthGradient ?? 0.5
-  data[SKYBOX_INDEX.oceanBubbleDensity] = settings?.ocean?.bubbleDensity ?? 0.3
-  data[SKYBOX_INDEX.oceanSurfaceShimmer] = settings?.ocean?.surfaceShimmer ?? 0.4
+  writeVec3(
+    data,
+    sunIdx,
+    settings?.sunPosition as readonly unknown[] | undefined,
+    defaults.sunPosition[0],
+    defaults.sunPosition[1],
+    defaults.sunPosition[2]
+  )
+  data[SKYBOX_INDEX.auroraCurtainHeight] = clampFinite(
+    settings?.aurora?.curtainHeight,
+    defaults.aurora.curtainHeight,
+    0,
+    1
+  )
+  data[SKYBOX_INDEX.auroraWaveFrequency] = clampFinite(
+    settings?.aurora?.waveFrequency,
+    defaults.aurora.waveFrequency,
+    0.3,
+    3
+  )
+  data[SKYBOX_INDEX.horizonGradientContrast] = clampFinite(
+    settings?.horizonGradient?.gradientContrast,
+    defaults.horizonGradient.gradientContrast,
+    0,
+    1
+  )
+  data[SKYBOX_INDEX.horizonSpotlightFocus] = clampFinite(
+    settings?.horizonGradient?.spotlightFocus,
+    defaults.horizonGradient.spotlightFocus,
+    0,
+    1
+  )
+  data[SKYBOX_INDEX.oceanCausticIntensity] = clampFinite(
+    settings?.ocean?.causticIntensity,
+    defaults.ocean.causticIntensity,
+    0,
+    1
+  )
+  data[SKYBOX_INDEX.oceanDepthGradient] = clampFinite(
+    settings?.ocean?.depthGradient,
+    defaults.ocean.depthGradient,
+    0,
+    1
+  )
+  data[SKYBOX_INDEX.oceanBubbleDensity] = clampFinite(
+    settings?.ocean?.bubbleDensity,
+    defaults.ocean.bubbleDensity,
+    0,
+    1
+  )
+  data[SKYBOX_INDEX.oceanSurfaceShimmer] = clampFinite(
+    settings?.ocean?.surfaceShimmer,
+    defaults.ocean.surfaceShimmer,
+    0,
+    1
+  )
 }
 
 /** Pack cosine palette coefficients into skybox uniform data (indices 16-39). */
 export function packSkyboxPalette(
   data: Float32Array,
-  coeffs: { a?: number[]; b?: number[]; c?: number[]; d?: number[] } | undefined
+  coeffs:
+    | {
+        a?: readonly unknown[]
+        b?: readonly unknown[]
+        c?: readonly unknown[]
+        d?: readonly unknown[]
+      }
+    | undefined
 ): void {
   // color1 (= palA), color2 (= palB)
   writeVec3(data, SKYBOX_INDEX.color1, coeffs?.a, 0.5, 0.5, 0.5)
@@ -311,7 +364,14 @@ const TWO_PI = Math.PI * 2
  * shader sees, so CPU-precomputed samples match GPU-computed ones exactly.
  */
 function resolvePaletteCoefficients(
-  coeffs: { a?: number[]; b?: number[]; c?: number[]; d?: number[] } | undefined
+  coeffs:
+    | {
+        a?: readonly unknown[]
+        b?: readonly unknown[]
+        c?: readonly unknown[]
+        d?: readonly unknown[]
+      }
+    | undefined
 ): {
   a: [number, number, number]
   b: [number, number, number]
@@ -319,11 +379,18 @@ function resolvePaletteCoefficients(
   d: [number, number, number]
 } {
   const pick = (
-    src: number[] | undefined,
+    src: readonly unknown[] | undefined,
     d0: number,
     d1: number,
     d2: number
-  ): [number, number, number] => [src?.[0] ?? d0, src?.[1] ?? d1, src?.[2] ?? d2]
+  ): [number, number, number] => {
+    const vector = Array.isArray(src) ? src : undefined
+    return [
+      finiteOrFallback(vector?.[0], d0),
+      finiteOrFallback(vector?.[1], d1),
+      finiteOrFallback(vector?.[2], d2),
+    ]
+  }
   return {
     a: pick(coeffs?.a, 0.5, 0.5, 0.5),
     b: pick(coeffs?.b, 0.5, 0.5, 0.5),
@@ -371,14 +438,22 @@ function writePrecomputedSample(
  */
 export function packSkyboxPrecomputedPalettes(
   data: Float32Array,
-  coeffs: { a?: number[]; b?: number[]; c?: number[]; d?: number[] } | undefined,
+  coeffs:
+    | {
+        a?: readonly unknown[]
+        b?: readonly unknown[]
+        c?: readonly unknown[]
+        d?: readonly unknown[]
+      }
+    | undefined,
   effectiveTime: number
 ): void {
   const pal = resolvePaletteCoefficients(coeffs)
+  const safeTime = finiteOrFallback(effectiveTime, 0)
 
   // Time-dependent helpers (mirrors per-mode WGSL inline math exactly).
-  const tempPulse = Math.sin(effectiveTime * 0.12) * 0.08 + Math.sin(effectiveTime * 0.07) * 0.04
-  const tempShift = Math.sin(effectiveTime * 0.02) * 0.5 + 0.5
+  const tempPulse = Math.sin(safeTime * 0.12) * 0.08 + Math.sin(safeTime * 0.07) * 0.04
+  const tempShift = Math.sin(safeTime * 0.02) * 0.5 + 0.5
 
   // Aurora — cosinePalette(0.8, ...)
   writePrecomputedSample(data, SKYBOX_INDEX.auroraTopColor, evalCosinePalette(0.8, pal))
@@ -432,32 +507,33 @@ export function computeSkyboxAnimationEffects(
   intensityMul: number
   distortion: number
 } {
+  const safeTime = finiteOrFallback(t, 0)
   const result = { rotX: 0, rotY: 0, rotZ: 0, hue: 0, intensityMul: 1.0, distortion: 0 }
   if (!isPlaying || storeMode !== 'classic' || animationMode === 'none') return result
 
   switch (animationMode) {
     case 'cinematic':
-      result.rotY = t * 0.1
-      result.rotX = Math.sin(t * 0.5) * 0.005
-      result.rotZ = Math.cos(t * 0.3) * 0.003
+      result.rotY = safeTime * 0.1
+      result.rotX = Math.sin(safeTime * 0.5) * 0.005
+      result.rotZ = Math.cos(safeTime * 0.3) * 0.003
       break
     case 'heatwave':
-      result.distortion = 1.0 + Math.sin(t * 0.5) * 0.5
-      result.rotY = t * 0.02
+      result.distortion = 1.0 + Math.sin(safeTime * 0.5) * 0.5
+      result.rotY = safeTime * 0.02
       break
     case 'tumble':
-      result.rotX = t * 0.05
-      result.rotY = t * 0.07
-      result.rotZ = t * 0.03
+      result.rotX = safeTime * 0.05
+      result.rotY = safeTime * 0.07
+      result.rotZ = safeTime * 0.03
       break
     case 'ethereal':
-      result.rotY = t * 0.05
-      result.hue = Math.sin(t * 0.1) * 0.1
-      result.intensityMul = 1.0 + Math.sin(t * 10) * 0.02
+      result.rotY = safeTime * 0.05
+      result.hue = Math.sin(safeTime * 0.1) * 0.1
+      result.intensityMul = 1.0 + Math.sin(safeTime * 10) * 0.02
       break
     case 'nebula':
-      result.hue = (t * 0.05) % 1.0
-      result.rotY = t * 0.03
+      result.hue = (safeTime * 0.05) % 1.0
+      result.rotY = safeTime * 0.03
       result.intensityMul = 1.1
       break
   }

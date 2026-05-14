@@ -1,12 +1,16 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Section } from '@/components/sections/Section'
 
 describe('Section', () => {
   beforeEach(() => {
     localStorage.clear()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
   it('toggles open/closed on click', async () => {
@@ -71,6 +75,63 @@ describe('Section', () => {
     const button = screen.getByRole('button', { name: /settings/i })
     expect(button).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByTestId('section-content')).not.toBeInTheDocument()
+  })
+
+  it('keeps toggling when persisted storage writes fail', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked')
+    })
+
+    render(
+      <Section title="Settings" defaultOpen={false}>
+        <div data-testid="section-content">Content</div>
+      </Section>
+    )
+
+    const button = screen.getByRole('button', { name: /settings/i })
+    expect(button).toHaveAttribute('aria-expanded', 'false')
+
+    await user.click(button)
+
+    await waitFor(() => {
+      expect(button).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.getByTestId('section-content')).toBeInTheDocument()
+    })
+  })
+
+  it('uses unique content ids for duplicate section titles', () => {
+    render(
+      <>
+        <Section title="Settings" defaultOpen={true}>
+          <div>First</div>
+        </Section>
+        <Section title="Settings" defaultOpen={true}>
+          <div>Second</div>
+        </Section>
+      </>
+    )
+
+    const buttons = screen.getAllByRole('button', { name: /settings/i })
+    expect(buttons).toHaveLength(2)
+    const [firstButton, secondButton] = buttons
+    if (!firstButton || !secondButton) {
+      throw new Error('Expected two section buttons')
+    }
+    const firstControl = firstButton.getAttribute('aria-controls')
+    const secondControl = secondButton.getAttribute('aria-controls')
+
+    expect(firstControl).toEqual(expect.stringMatching(/^.+$/))
+    expect(secondControl).toEqual(expect.stringMatching(/^.+$/))
+    expect(firstControl).not.toBe(secondControl)
+    // ARIA references are id-based; resolving aria-controls is the only way to
+    // prove the relationship is real and not a pair of dangling strings.
+    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- verifying aria-controls id resolution
+    expect(document.getElementById(firstControl as string)).toBeInTheDocument()
+    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- verifying aria-controls id resolution
+    expect(document.getElementById(secondControl as string)).toBeInTheDocument()
+    expect(screen.getByText('First')).toBeInTheDocument()
+    expect(screen.getByText('Second')).toBeInTheDocument()
   })
 
   it('rehydrates persisted state when the section title changes', async () => {

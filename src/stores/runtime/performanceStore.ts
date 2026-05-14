@@ -632,5 +632,6 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
     })
     persistResolutionScale(DESKTOP_DEFAULT_RESOLUTION_SCALE)
     persistMaxFps(DEFAULT_MAX_FPS)
+    persistDensityGridResolution(DEFAULT_DENSITY_GRID_RESOLUTION)
   },
 }))

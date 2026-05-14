@@ -99,6 +99,8 @@ describe('hex8ToHsv', () => {
   it('returns black fallback for invalid hex8', () => {
     expect(hex8ToHsv('#gggggggg')).toEqual({ h: 0, s: 0, v: 0, a: 1 })
     expect(hex8ToHsv('#zzzz')).toEqual({ h: 0, s: 0, v: 0, a: 1 })
+    expect(hex8ToHsv('#ff0000fg')).toEqual({ h: 0, s: 0, v: 0, a: 1 })
+    expect(hex8ToHsv('#f00g')).toEqual({ h: 0, s: 0, v: 0, a: 1 })
   })
 })
 
@@ -376,6 +378,7 @@ describe('parseColorToHsv', () => {
     expect(parseColorToHsv('not-a-color')).toEqual({ h: 0, s: 0, v: 0, a: 1 })
     expect(parseColorToHsv('')).toEqual({ h: 0, s: 0, v: 0, a: 1 })
     expect(parseColorToHsv('#gggg')).toEqual({ h: 0, s: 0, v: 0, a: 1 })
+    expect(parseColorToHsv('#ff0000fg')).toEqual({ h: 0, s: 0, v: 0, a: 1 })
   })
 
   it('falls back for rgb/rgba with trailing junk', () => {

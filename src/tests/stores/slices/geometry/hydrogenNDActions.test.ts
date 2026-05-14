@@ -222,6 +222,33 @@ describe('Hydrogen ND Store Actions', () => {
     })
   })
 
+  describe('runtime input guards', () => {
+    it('ignores malformed real-orbital toggles', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerUseRealOrbitals(false)
+      const before = useExtendedObjectStore.getState().schroedinger
+      const beforeVersion = useExtendedObjectStore.getState().schroedingerVersion
+
+      store.setSchroedingerUseRealOrbitals('true' as unknown as boolean)
+
+      const after = useExtendedObjectStore.getState()
+      expect(after.schroedinger.useRealOrbitals).toBe(before.useRealOrbitals)
+      expect(after.schroedingerVersion).toBe(beforeVersion)
+    })
+
+    it('ignores non-integer extra-dimension omega indices without dirtying state', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerExtraDimOmega(1, 1.4)
+      const before = useExtendedObjectStore.getState()
+
+      store.setSchroedingerExtraDimOmega(1.5, 1.8)
+
+      const after = useExtendedObjectStore.getState()
+      expect(after.schroedinger.extraDimOmega).toEqual(before.schroedinger.extraDimOmega)
+      expect(after.schroedingerVersion).toBe(before.schroedingerVersion)
+    })
+  })
+
   describe('Edge Cases', () => {
     it('should preserve hydrogen ND state when switching modes', () => {
       const store = useExtendedObjectStore.getState()

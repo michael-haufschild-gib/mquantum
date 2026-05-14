@@ -10,40 +10,24 @@
 import { COLOR_ALGORITHM_OPTIONS, type ColorAlgorithm } from '@/lib/colors/palette'
 import { clampFiniteUnknown } from '@/lib/math/clamp'
 
-import type { SkyboxMode, SkyboxSelection, SkyboxTexture } from '../defaults/visualDefaults'
+import {
+  PROCEDURAL_SKYBOX_MODES,
+  SKYBOX_SELECTIONS,
+  SKYBOX_TEXTURES,
+  type SkyboxMode,
+  type SkyboxSelection,
+  type SkyboxTexture,
+} from '../defaults/visualDefaults'
 
 // ============================================================================
 // Validation Sets
 // ============================================================================
 
-export const SKYBOX_SELECTION_SET = new Set<SkyboxSelection>([
-  'none',
-  'space_blue',
-  'space_lightblue',
-  'space_red',
-  'procedural_aurora',
-  'procedural_nebula',
-  'procedural_crystalline',
-  'procedural_horizon',
-  'procedural_ocean',
-  'procedural_twilight',
-])
+export const SKYBOX_SELECTION_SET = new Set<SkyboxSelection>(SKYBOX_SELECTIONS)
 
-export const PROCEDURAL_SKYBOX_MODE_SET = new Set<SkyboxMode>([
-  'procedural_aurora',
-  'procedural_nebula',
-  'procedural_crystalline',
-  'procedural_horizon',
-  'procedural_ocean',
-  'procedural_twilight',
-])
+export const PROCEDURAL_SKYBOX_MODE_SET = new Set<SkyboxMode>(PROCEDURAL_SKYBOX_MODES)
 
-export const SKYBOX_TEXTURE_SET = new Set<SkyboxTexture>([
-  'none',
-  'space_blue',
-  'space_lightblue',
-  'space_red',
-])
+export const SKYBOX_TEXTURE_SET = new Set<SkyboxTexture>(SKYBOX_TEXTURES)
 
 export const COLOR_ALGORITHM_SET = new Set<ColorAlgorithm>(
   COLOR_ALGORITHM_OPTIONS.map((option) => option.value)

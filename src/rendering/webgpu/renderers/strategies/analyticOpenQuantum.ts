@@ -14,6 +14,9 @@ import {
   basisLabels,
   buildHydrogenBasis,
   type HydrogenBasisState,
+  normalizeHydrogenBasisDimension,
+  normalizeHydrogenBasisMaxN,
+  normalizeHydrogenExtraDimOmega,
 } from '@/lib/physics/openQuantum/hydrogenBasis'
 import { buildHydrogenChannels } from '@/lib/physics/openQuantum/hydrogenChannels'
 import { buildTransitionRates, type TransitionRate } from '@/lib/physics/openQuantum/hydrogenRates'
@@ -171,10 +174,14 @@ export class AnalyticOpenQuantumExecutor {
     forceUpdate: boolean,
     isPlaying: boolean
   ): void {
-    const dim = shared.rendererConfig.dimension ?? 3
-    const maxN = oqConfig.hydrogenBasisMaxN ?? 2
+    const dim = normalizeHydrogenBasisDimension(shared.rendererConfig.dimension ?? 3)
+    const maxN = normalizeHydrogenBasisMaxN(oqConfig.hydrogenBasisMaxN ?? 2)
     const schCfg = extended?.schroedinger
-    const extraDimOmega = (schCfg?.extraDimOmega as number[] | undefined) ?? []
+    const rawExtraDimOmega = schCfg?.extraDimOmega
+    const extraDimOmega = normalizeHydrogenExtraDimOmega(
+      Array.isArray(rawExtraDimOmega) ? rawExtraDimOmega : [],
+      dim
+    )
     const dt = oqConfig.dt ?? 0.01
     const substeps = oqConfig.substeps ?? 4
 

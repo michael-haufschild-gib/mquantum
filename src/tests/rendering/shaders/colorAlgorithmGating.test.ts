@@ -1,9 +1,20 @@
 /**
- * Tests for color algorithm gating — open quantum algorithms 16-18.
+ * Tests for color algorithm ID parity and mode-specific gating.
  */
 import { describe, expect, it } from 'vitest'
 
 import { COLOR_ALGORITHM_TO_INT, getAvailableColorAlgorithms } from '@/lib/colors/palette/types'
+import { COLOR_ALGORITHM_INDICES } from '@/rendering/webgpu/shaders/schroedinger/volume/emissionConstants'
+
+describe('color algorithm shader/runtime id parity', () => {
+  it('keeps palette IDs in lock-step with shader emission IDs', () => {
+    const paletteIndices = Object.values(COLOR_ALGORITHM_TO_INT).sort((a, b) => a - b)
+
+    expect(new Set(paletteIndices).size).toBe(paletteIndices.length)
+    expect(paletteIndices).toEqual(COLOR_ALGORITHM_INDICES)
+    expect(COLOR_ALGORITHM_INDICES).toEqual(COLOR_ALGORITHM_INDICES.map((_, index) => index))
+  })
+})
 
 describe('COLOR_ALGORITHM_TO_INT open quantum entries', () => {
   it('maps purityMap to 16', () => {

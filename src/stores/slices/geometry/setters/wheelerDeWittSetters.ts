@@ -11,8 +11,14 @@
 
 import type { WdwBoundaryCondition, WdwSrmtClock } from '@/lib/geometry/extended/wheelerDeWitt'
 import {
+  WDW_SOLVER_MAX_COSMOLOGICAL_CONSTANT,
   WDW_SOLVER_MAX_GRID_NA,
   WDW_SOLVER_MAX_GRID_NPHI,
+  WDW_SOLVER_MAX_INFLATON_MASS,
+  WDW_SOLVER_MAX_INFLATON_MASS_ASYMMETRY,
+  WDW_SOLVER_MIN_COSMOLOGICAL_CONSTANT,
+  WDW_SOLVER_MIN_INFLATON_MASS,
+  WDW_SOLVER_MIN_INFLATON_MASS_ASYMMETRY,
 } from '@/lib/physics/wheelerDeWitt/solverInputValidation'
 import {
   canApplyPresetRequest,
@@ -169,21 +175,30 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
         ctx.warnNonFinite('wheelerDeWitt.inflatonMass', m)
         return
       }
-      applyWithReset('inflatonMass', clamp(m, 0, 2))
+      applyWithReset(
+        'inflatonMass',
+        clamp(m, WDW_SOLVER_MIN_INFLATON_MASS, WDW_SOLVER_MAX_INFLATON_MASS)
+      )
     },
     setWdwCosmologicalConstant: (lambda) => {
       if (!ctx.isFinite(lambda)) {
         ctx.warnNonFinite('wheelerDeWitt.cosmologicalConstant', lambda)
         return
       }
-      applyWithReset('cosmologicalConstant', clamp(lambda, -1, 1))
+      applyWithReset(
+        'cosmologicalConstant',
+        clamp(lambda, WDW_SOLVER_MIN_COSMOLOGICAL_CONSTANT, WDW_SOLVER_MAX_COSMOLOGICAL_CONSTANT)
+      )
     },
     setWdwInflatonMassAsymmetry: (ratio) => {
       if (!ctx.isFinite(ratio)) {
         ctx.warnNonFinite('wheelerDeWitt.inflatonMassAsymmetry', ratio)
         return
       }
-      applyWithReset('inflatonMassAsymmetry', clamp(ratio, 0.1, 10))
+      applyWithReset(
+        'inflatonMassAsymmetry',
+        clamp(ratio, WDW_SOLVER_MIN_INFLATON_MASS_ASYMMETRY, WDW_SOLVER_MAX_INFLATON_MASS_ASYMMETRY)
+      )
     },
     setWdwGridSize: (preset) => {
       const { gridNa, gridNphi } = WDW_GRID_PRESETS[preset]

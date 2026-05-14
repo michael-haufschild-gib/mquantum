@@ -7,7 +7,10 @@ import React from 'react'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
-import { SkyboxAnimationMode, SkyboxProceduralSettings } from '@/stores/defaults/visualDefaults'
+import type {
+  SkyboxAnimationMode,
+  SkyboxProceduralSettings,
+} from '@/stores/defaults/visualDefaults'
 
 const ANIMATION_MODES: { value: SkyboxAnimationMode; label: string }[] = [
   { value: 'none', label: 'None' },

@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LightEditor } from '@/components/sections/Lights/LightEditor'
 import { AMBIENT_LIGHT_ID } from '@/components/sections/Lights/LightListItem'
 import { useLightingStore } from '@/stores/scene/lightingStore'
-import { LIGHTING_INITIAL_STATE } from '@/stores/slices/lightingSlice'
+import { createLightingInitialState } from '@/stores/slices/lightingSlice'
 
 vi.mock('@/components/ui/Icon', () => ({
   Icon: ({ name }: { name: string }) => <span data-testid={`icon-${name}`}>{name}</span>,
@@ -54,7 +54,7 @@ const SPOT_LIGHT = {
 
 describe('LightEditor', () => {
   beforeEach(() => {
-    useLightingStore.setState({ ...LIGHTING_INITIAL_STATE })
+    useLightingStore.setState(createLightingInitialState())
   })
 
   it('shows placeholder when no light is selected', () => {

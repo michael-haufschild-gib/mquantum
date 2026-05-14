@@ -111,8 +111,11 @@ function ensureHawkingBindGroup(
 /**
  * Dispatch the injection pipeline if enabled. No-ops when:
  *   - `hawkingPairInjection` is false,
- *   - `hawkingInjectRate` is non-positive,
+ *   - `hawkingInjectRate` is non-finite or non-positive,
+ *   - dispatch workgroup count is invalid,
  *   - pipeline or any buffer is null.
+ *
+ * @returns True when a compute dispatch was submitted.
  *
  * @param device - WebGPU device
  * @param ctx - Render context (for begin/end compute pass)
@@ -137,25 +140,32 @@ export function maybeDispatchHawkingInject(
     bindGroups: GPUBindGroup[],
     wgX: number
   ) => void
-): void {
-  if (!config.hawkingPairInjection) return
-  if ((config.hawkingInjectRate ?? 0) <= 0) return
-  if (!state.pipeline || !uniformBuffer || !psi) return
+): boolean {
+  if (!config.hawkingPairInjection) return false
+  // `NaN <= 0` and `Infinity <= 0` are both `false`, so a bare `<= 0` test
+  // lets non-finite injection rates slip past the gate. Reject them explicitly
+  // (matches the `Number.isInteger` discipline on `linearWG` below).
+  const injectRate = config.hawkingInjectRate ?? 0
+  if (!Number.isFinite(injectRate) || injectRate <= 0) return false
+  // dispatchWorkgroups takes GPUSize32 (u32). Reject NaN/Infinity and any
+  // non-integer count — fractional values trigger GPUValidationError at dispatch.
+  if (!Number.isInteger(linearWG) || linearWG <= 0 || linearWG > 0xffffffff) return false
+  if (!state.pipeline || !uniformBuffer || !psi) return false
 
   ensureHawkingBindGroup(device, state, uniformBuffer, psi)
-  if (!state.bg) return
+  if (!state.bg) return false
 
   const pass = ctx.beginComputePass({ label: 'bec-hawking-inject' })
   dispatchCompute(pass, state.pipeline, [state.bg], linearWG)
   pass.end()
+  return true
 }
 
 /**
- * One-call helper combining dispatch + step-counter advance. Keeping the
- * increment here (rather than in the caller) localises the "once per frame,
- * post-evolution" contract in a single function. The advanced counter lands
- * back on `state.stepIndex`; the caller's next uniform write reads it from
- * there.
+ * One-call helper combining dispatch + step-counter advance. The counter
+ * advances only after a submitted dispatch, so disabled/missing-resource frames
+ * do not consume deterministic noise steps. The advanced counter lands back on
+ * `state.stepIndex`; the caller's next uniform write reads it from there.
  *
  * @param device - WebGPU device
  * @param ctx - Render context
@@ -181,7 +191,7 @@ export function runHawkingFrame(
     wgX: number
   ) => void
 ): void {
-  maybeDispatchHawkingInject(
+  const dispatched = maybeDispatchHawkingInject(
     device,
     ctx,
     config,
@@ -193,7 +203,9 @@ export function runHawkingFrame(
   )
   // Advance noise counter after dispatch so next frame's uniform-write sees
   // the bumped value while the current dispatch consumed the in-flight one.
-  state.stepIndex = (state.stepIndex + 1) >>> 0
+  if (dispatched) {
+    state.stepIndex = (state.stepIndex + 1) >>> 0
+  }
 }
 
 /** Drop references. GPU buffers are owned by the main pass — do not destroy. */

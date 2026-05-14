@@ -7,23 +7,13 @@ import iconYoutube from '@/assets/exporter/youtube.svg'
 import iconFilm from '@/assets/icons/film.svg'
 import iconSparkles from '@/assets/icons/sparkles.svg'
 import { soundManager } from '@/lib/audio/SoundManager'
+import type { ExportPresetId } from '@/stores/utils/exportPresetDefinitions'
 
 import { Icon } from './Icon'
 import { TileButton } from './TileButton'
 
-/**
- * Supported export preset identifiers.
- */
-export type ExportPresetCardId =
-  | 'landscape-1080p'
-  | 'landscape-720p'
-  | 'instagram'
-  | 'tiktok'
-  | 'youtube-shorts'
-  | 'twitter-video'
-  | 'cinematic'
-  | 'square-60fps'
-  | 'high-q'
+/** Supported export preset identifiers accepted by the card. */
+export type ExportPresetCardId = ExportPresetId
 
 const PRESET_ICON_BY_ID: Record<ExportPresetCardId, string> = {
   'landscape-1080p': iconLandscape,

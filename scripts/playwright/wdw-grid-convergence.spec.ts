@@ -83,7 +83,7 @@ async function waitForSweepCompletion(page: Page, timeoutMs: number): Promise<vo
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     const state = await page.evaluate(async () => {
-      const mod = await import('/src/stores/srmtSweepStore.ts')
+      const mod = await import('/src/stores/diagnostics/srmtSweepStore.ts')
       const s = mod.useSrmtSweepStore.getState()
       return {
         status: s.status,
@@ -104,7 +104,7 @@ async function waitForSweepCompletion(page: Page, timeoutMs: number): Promise<vo
 /** Read per-point per-clock quality samples from the SRMT sweep store. */
 async function readSweepSamples(page: Page): Promise<ClockQualitySample[]> {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/srmtSweepStore.ts')
+    const mod = await import('/src/stores/diagnostics/srmtSweepStore.ts')
     const s = mod.useSrmtSweepStore.getState()
     return s.points.map((p) => ({
       sweepValue: p.sweepValue,
@@ -126,7 +126,7 @@ async function readSweepConfigSummary(
   page: Page
 ): Promise<{ kind: string; sweepMin: number; sweepMax: number; points: number } | null> {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/srmtSweepStore.ts')
+    const mod = await import('/src/stores/diagnostics/srmtSweepStore.ts')
     const cfg = mod.useSrmtSweepStore.getState().config
     if (cfg === null) return null
     return {

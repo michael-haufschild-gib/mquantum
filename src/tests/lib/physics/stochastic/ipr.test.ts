@@ -96,6 +96,26 @@ describe('inverseParticipationRatio', () => {
     const psiIm = new Float64Array(10)
     expect(inverseParticipationRatio(psiRe, psiIm)).toBe(0)
   })
+
+  it('returns 0 for invalid wavefunction buffers', () => {
+    expect(inverseParticipationRatio(new Float64Array(), new Float64Array())).toBe(0)
+    expect(inverseParticipationRatio(new Float64Array([1, 0]), new Float64Array([0]))).toBe(0)
+    expect(
+      inverseParticipationRatio(new Float64Array([1, Number.NaN]), new Float64Array([0, 0]))
+    ).toBe(0)
+    expect(
+      inverseParticipationRatio(
+        new Float64Array([1, 0]),
+        new Float64Array([0, Number.POSITIVE_INFINITY])
+      )
+    ).toBe(0)
+  })
+
+  it('is scale-invariant for huge finite amplitudes that would overflow naive sums', () => {
+    const psiRe = new Float64Array([1e200, 1e200, 0])
+    const psiIm = new Float64Array([0, 0, 0])
+    expect(inverseParticipationRatio(psiRe, psiIm)).toBeCloseTo(2, 12)
+  })
 })
 
 describe('normalizedIPR', () => {
@@ -116,6 +136,11 @@ describe('normalizedIPR', () => {
     const nipr = normalizedIPR(psiRe, psiIm)
     expect(Math.abs(nipr - 1 / N)).toBeLessThan(1e-8)
   })
+
+  it('returns 0 for empty or mismatched buffers', () => {
+    expect(normalizedIPR(new Float64Array(), new Float64Array())).toBe(0)
+    expect(normalizedIPR(new Float64Array([1]), new Float64Array())).toBe(0)
+  })
 })
 
 describe('iprFromDensity', () => {
@@ -131,5 +156,17 @@ describe('iprFromDensity', () => {
     const ipr2 = iprFromDensity(density)
 
     expect(Math.abs(ipr1 - ipr2)).toBeLessThan(1e-10)
+  })
+
+  it('rejects invalid densities instead of emitting NaN or nonphysical values', () => {
+    expect(iprFromDensity([])).toBe(0)
+    expect(iprFromDensity([0, 0, 0])).toBe(0)
+    expect(iprFromDensity([0.5, Number.NaN])).toBe(0)
+    expect(iprFromDensity([0.5, Number.POSITIVE_INFINITY])).toBe(0)
+    expect(iprFromDensity([0.5, -0.1])).toBe(0)
+  })
+
+  it('is scale-invariant for huge finite densities that would overflow naive sums', () => {
+    expect(iprFromDensity([1e200, 1e200, 0])).toBeCloseTo(2, 12)
   })
 })

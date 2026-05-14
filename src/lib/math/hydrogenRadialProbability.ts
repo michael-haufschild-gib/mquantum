@@ -19,6 +19,9 @@ interface HydrogenRadialParams {
   dimension: number
 }
 
+const MIN_BOHR_RADIUS = 0.001
+const MAX_BOHR_RADIUS = 1_000_000
+
 function sanitizeHydrogenRadialParams(
   n: number,
   l: number,
@@ -28,7 +31,9 @@ function sanitizeHydrogenRadialParams(
   const validN = Number.isFinite(n) ? Math.max(1, Math.min(20, Math.floor(n))) : 1
   const validLRaw = Number.isFinite(l) ? Math.floor(l) : 0
   const validL = Math.max(0, Math.min(validLRaw, validN - 1))
-  const validA0 = Number.isFinite(a0) ? Math.max(a0, 0.001) : 0.001
+  const validA0 = Number.isFinite(a0)
+    ? Math.max(MIN_BOHR_RADIUS, Math.min(MAX_BOHR_RADIUS, a0))
+    : MIN_BOHR_RADIUS
   const validDimension = Number.isFinite(dimension)
     ? Math.max(2, Math.min(11, Math.floor(dimension)))
     : 3
@@ -43,7 +48,9 @@ function sanitizeRadius(r: number): number {
 /** Hydrogen radial wavefunction R_nl(r) — mirrors WGSL hydrogenRadial() */
 function hydrogenRadial(n: number, l: number, r: number, a0: number): number {
   if (n < 1 || l < 0 || l >= n) return 0.0
-  const a0Safe = Number.isFinite(a0) ? Math.max(a0, 0.001) : 0.001
+  const a0Safe = Number.isFinite(a0)
+    ? Math.max(MIN_BOHR_RADIUS, Math.min(MAX_BOHR_RADIUS, a0))
+    : MIN_BOHR_RADIUS
   const nf = n
   const rho = (2.0 * r) / (nf * a0Safe)
 
@@ -70,7 +77,9 @@ function hydrogenRadial(n: number, l: number, r: number, a0: number): number {
 /** N-dimensional hydrogen radial wavefunction R_nl^(D)(r) — mirrors WGSL hydrogenRadialND() */
 function hydrogenRadialND(n: number, l: number, r: number, a0: number, dim: number): number {
   if (n < 1 || l < 0 || l >= n) return 0.0
-  const a0Safe = Number.isFinite(a0) ? Math.max(a0, 0.001) : 0.001
+  const a0Safe = Number.isFinite(a0)
+    ? Math.max(MIN_BOHR_RADIUS, Math.min(MAX_BOHR_RADIUS, a0))
+    : MIN_BOHR_RADIUS
 
   const lambda = l + (dim - 3) / 2
   const nr = n - l - 1
@@ -117,9 +126,11 @@ function computeRhoLambda(rho: number, lambda: number): number {
 }
 
 function evaluateHydrogenRadial(params: HydrogenRadialParams, r: number): number {
-  return params.dimension !== 3
-    ? hydrogenRadialND(params.n, params.l, r, params.a0, params.dimension)
-    : hydrogenRadial(params.n, params.l, r, params.a0)
+  const value =
+    params.dimension !== 3
+      ? hydrogenRadialND(params.n, params.l, r, params.a0, params.dimension)
+      : hydrogenRadial(params.n, params.l, r, params.a0)
+  return Number.isFinite(value) ? value : 0
 }
 
 /**
@@ -155,7 +166,9 @@ export function computeHydrogenRadialProbabilityDensity(
 ): number {
   const radius = sanitizeRadius(r)
   const R = computeHydrogenRadialWavefunction(n, l, radius, a0, dimension)
-  return radius * radius * R * R
+  const radialAmplitude = radius * R
+  const density = radialAmplitude * radialAmplitude
+  return Number.isFinite(density) ? density : 0
 }
 
 /**
@@ -188,8 +201,9 @@ export function computeRadialProbabilityNorm(
   for (let i = 1; i <= steps; i++) {
     const r = i * dr
     const R = evaluateHydrogenRadial(params, r)
-    const P = 4.0 * Math.PI * r * r * R * R
-    if (P > maxP) maxP = P
+    const radialAmplitude = r * R
+    const P = 4.0 * Math.PI * radialAmplitude * radialAmplitude
+    if (Number.isFinite(P) && P > maxP) maxP = P
   }
 
   return maxP > 1e-30 ? 1.0 / maxP : 1.0

@@ -61,6 +61,25 @@ describe('buildPageCurveSnapshot', () => {
     expect(snap.sMax).toBeGreaterThanOrEqual(12) // >= 1.2 * 10
   })
 
+  it('skips corrupt samples instead of emitting NaN SVG path coordinates', () => {
+    const buf = createPageCurveBuffer(8)
+    pushPageCurveSample(buf, { t: 0, sTherm: 0.1, sPage: 0.1, islandRadius: 0 })
+    pushPageCurveSample(buf, {
+      t: Number.NaN,
+      sTherm: Number.POSITIVE_INFINITY,
+      sPage: 0.2,
+      islandRadius: 0,
+    })
+    pushPageCurveSample(buf, { t: 1, sTherm: 0.3, sPage: 0.25, islandRadius: 0 })
+
+    const snap = buildPageCurveSnapshot(buf, 3, 0.5, 3, () => null)
+
+    expect(snap.hasData).toBe(true)
+    expect(snap.thermPath).not.toContain('NaN')
+    expect(snap.pagePath).not.toContain('NaN')
+    expect(snap.thermPath.split(' L ')).toHaveLength(2)
+  })
+
   it('passes bufferVersion through verbatim (memoization key contract)', () => {
     const buf = createPageCurveBuffer(4)
     const snap = buildPageCurveSnapshot(buf, 0, 0, 42, () => null)

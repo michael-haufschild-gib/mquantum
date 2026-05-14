@@ -183,16 +183,25 @@ export const Tabs: React.FC<TabsProps> = React.memo(
     const [canScrollLeft, setCanScrollLeft] = useState(false)
     const [canScrollRight, setCanScrollRight] = useState(false)
     const [isPending, startTransition] = useTransition()
-    const [mountedTabs, setMountedTabs] = useState<Set<string>>(new Set([value]))
+
+    const activeValue = useMemo(() => {
+      const requestedTab = tabs.find((tab) => tab.id === value)
+      if (requestedTab && !requestedTab.disabled) return requestedTab.id
+      return tabs.find((tab) => !tab.disabled)?.id
+    }, [tabs, value])
+
+    const [mountedTabs, setMountedTabs] = useState<Set<string>>(
+      () => new Set(activeValue ? [activeValue] : [])
+    )
 
     const mountedTabIds = useMemo(() => {
-      if (mountedTabs.has(value)) {
+      if (!activeValue || mountedTabs.has(activeValue)) {
         return mountedTabs
       }
       const next = new Set(mountedTabs)
-      next.add(value)
+      next.add(activeValue)
       return next
-    }, [mountedTabs, value])
+    }, [mountedTabs, activeValue])
 
     // Optimized Scroll Checking using ResizeObserver
     // Wait for layout to stabilize before showing scroll indicators
@@ -349,7 +358,7 @@ export const Tabs: React.FC<TabsProps> = React.memo(
             <div
               key={tab.id}
               id={`${instanceId}-panel-${tab.id}`}
-              className={`w-full h-full ${tab.id === value ? 'block animate-fade-in' : 'hidden'}`}
+              className={`w-full h-full ${tab.id === activeValue ? 'block animate-fade-in' : 'hidden'}`}
               role="tabpanel"
               aria-labelledby={`${instanceId}-tab-${tab.id}`}
               data-testid={testId ? `${testId}-panel-${tab.id}` : undefined}
@@ -358,7 +367,7 @@ export const Tabs: React.FC<TabsProps> = React.memo(
             </div>
           )
         }),
-      [tabs, mountedTabIds, value, testId, instanceId]
+      [tabs, mountedTabIds, activeValue, testId, instanceId]
     )
 
     return (
@@ -389,7 +398,7 @@ export const Tabs: React.FC<TabsProps> = React.memo(
                 role="tablist"
               >
                 {tabs.map((tab, index) => {
-                  const isActive = tab.id === value
+                  const isActive = tab.id === activeValue
                   return (
                     <TabButton
                       key={tab.id}

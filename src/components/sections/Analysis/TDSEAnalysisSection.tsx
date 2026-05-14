@@ -409,6 +409,7 @@ const ObservablesDisplay: React.FC<ObservablesDisplayProps> = React.memo(
           <Switch
             checked={enabled}
             onCheckedChange={onEnabledChange}
+            ariaLabel="Toggle observables"
             tooltip="Enable GPU readback of position, momentum, and energy expectation values."
             data-testid="observables-toggle"
           />

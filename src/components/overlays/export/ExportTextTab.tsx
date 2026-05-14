@@ -36,6 +36,7 @@ export const ExportTextTab = () => {
         <Switch
           checked={textOverlay.enabled}
           onCheckedChange={(c) => update({ enabled: c })}
+          ariaLabel="Enable text overlay"
           tooltip="Burn a text watermark or title into the exported video frames."
         />
       </div>

@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { DEFAULT_CAPABILITIES, DESKTOP_DEFAULT_RESOLUTION_SCALE } from '@/lib/deviceCapabilities'
 import { DEFAULT_MAX_FPS, MAX_MAX_FPS, MIN_MAX_FPS } from '@/stores/defaults/visualDefaults'
 import {
+  DEFAULT_DENSITY_GRID_RESOLUTION,
   hasPersistedMaxFps,
   hasPersistedResolutionScale,
   REFINEMENT_STAGE_QUALITY,
@@ -300,8 +301,10 @@ describe('performanceStore', () => {
       // Set non-default values (persisted to localStorage)
       store.setRenderResolutionScale(0.5)
       store.setMaxFps(90)
+      store.setDensityGridResolution(256)
       expect(localStorage.getItem('mdim_render_resolution_scale')).toBe('0.5')
       expect(localStorage.getItem('mdim_max_fps')).toBe('90')
+      expect(localStorage.getItem('mdim_density_grid_resolution')).toBe('256')
 
       // Reset should overwrite with defaults in localStorage
       store.reset()
@@ -309,7 +312,53 @@ describe('performanceStore', () => {
         String(DESKTOP_DEFAULT_RESOLUTION_SCALE)
       )
       expect(localStorage.getItem('mdim_max_fps')).toBe(String(DEFAULT_MAX_FPS))
+      expect(localStorage.getItem('mdim_density_grid_resolution')).toBe(
+        String(DEFAULT_DENSITY_GRID_RESOLUTION)
+      )
     })
+  })
+})
+
+describe('density grid resolution persistence', () => {
+  const DENSITY_GRID_RESOLUTION_KEY = 'mdim_density_grid_resolution'
+
+  beforeEach(() => {
+    usePerformanceStore.getState().reset()
+    localStorage.removeItem(DENSITY_GRID_RESOLUTION_KEY)
+  })
+
+  afterEach(() => {
+    localStorage.removeItem(DENSITY_GRID_RESOLUTION_KEY)
+  })
+
+  it('persists valid density grid resolution preferences', () => {
+    usePerformanceStore.getState().setDensityGridResolution(128)
+
+    expect(usePerformanceStore.getState().densityGridResolution).toBe(128)
+    expect(localStorage.getItem(DENSITY_GRID_RESOLUTION_KEY)).toBe('128')
+  })
+
+  it('rejects invalid density grid resolution values at runtime', () => {
+    usePerformanceStore.getState().setDensityGridResolution(128)
+
+    usePerformanceStore.getState().setDensityGridResolution(512 as never)
+    usePerformanceStore.getState().setDensityGridResolution(Number.NaN as never)
+
+    expect(usePerformanceStore.getState().densityGridResolution).toBe(128)
+    expect(localStorage.getItem(DENSITY_GRID_RESOLUTION_KEY)).toBe('128')
+  })
+
+  it('reset persists the default density grid resolution', () => {
+    usePerformanceStore.getState().setDensityGridResolution(256)
+
+    usePerformanceStore.getState().reset()
+
+    expect(usePerformanceStore.getState().densityGridResolution).toBe(
+      DEFAULT_DENSITY_GRID_RESOLUTION
+    )
+    expect(localStorage.getItem(DENSITY_GRID_RESOLUTION_KEY)).toBe(
+      String(DEFAULT_DENSITY_GRID_RESOLUTION)
+    )
   })
 })
 

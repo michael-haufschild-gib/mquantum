@@ -4,7 +4,7 @@
  * These are pure TypeScript functions that can be tested without WASM.
  */
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { getWasmRuntime } from '@/lib/wasm/animation/runtime'
 import {
@@ -20,7 +20,20 @@ import {
   subtractVectorsWasm,
 } from '@/lib/wasm/animation-wasm'
 
+function resetRuntimeSnapshot(): void {
+  const runtime = getWasmRuntime() as {
+    ready: boolean
+    module: ReturnType<typeof getWasmRuntime>['module']
+  }
+  runtime.ready = false
+  runtime.module = null
+}
+
 describe('animation-wasm helpers', () => {
+  afterEach(() => {
+    resetRuntimeSnapshot()
+  })
+
   describe('float64ToVector', () => {
     it('converts Float64Array to number array', () => {
       const input = new Float64Array([1.5, 2.5, 3.5])
@@ -110,6 +123,38 @@ describe('animation-wasm helpers', () => {
       const a = new Float64Array([1, 2])
       const b = new Float64Array([3, 4])
       expect(subtractVectorsWasm(a, b)).toBeNull()
+    })
+  })
+
+  describe('WASM vector wrappers validate dimensions before dispatch', () => {
+    it('rejects mismatched dot-product vectors', () => {
+      const dot = vi.fn(() => 0)
+      const runtime = getWasmRuntime() as {
+        ready: boolean
+        module: ReturnType<typeof getWasmRuntime>['module']
+      }
+      runtime.ready = true
+      runtime.module = { dot_product_wasm: dot } as unknown as ReturnType<
+        typeof getWasmRuntime
+      >['module']
+
+      expect(dotProductWasm(new Float64Array([1, 2, 3]), new Float64Array([4, 5]))).toBeNull()
+      expect(dot).not.toHaveBeenCalled()
+    })
+
+    it('rejects mismatched subtraction vectors', () => {
+      const subtract = vi.fn(() => new Float64Array([0]))
+      const runtime = getWasmRuntime() as {
+        ready: boolean
+        module: ReturnType<typeof getWasmRuntime>['module']
+      }
+      runtime.ready = true
+      runtime.module = { subtract_vectors_wasm: subtract } as unknown as ReturnType<
+        typeof getWasmRuntime
+      >['module']
+
+      expect(subtractVectorsWasm(new Float64Array([1, 2, 3]), new Float64Array([4, 5]))).toBeNull()
+      expect(subtract).not.toHaveBeenCalled()
     })
   })
 })

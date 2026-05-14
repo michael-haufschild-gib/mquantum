@@ -103,6 +103,7 @@ export const ShaderTabContent = React.memo(function ShaderTabContent() {
                     <Switch
                       checked={isEnabled}
                       onCheckedChange={() => toggleShaderModule(mod)}
+                      ariaLabel={`Toggle shader module ${mod}`}
                       className="scale-75 origin-right"
                     />
                   </div>

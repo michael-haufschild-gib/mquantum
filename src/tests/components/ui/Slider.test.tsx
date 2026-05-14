@@ -92,6 +92,20 @@ describe('Slider', () => {
       expect(onChange).toHaveBeenCalledWith(5)
     })
 
+    it('rejects numeric prefixes with trailing junk on blur', async () => {
+      const user = userEvent.setup()
+      const onChange = vi.fn()
+      render(<Slider label="Scale" value={5} min={0} max={10} onChange={onChange} />)
+
+      const input = screen.getByRole('textbox', { name: /scale value/i })
+      await user.clear(input)
+      await user.type(input, '7abc')
+      await user.tab()
+
+      expect(onChange).toHaveBeenCalledWith(5)
+      expect(input).toHaveValue('5')
+    })
+
     it('commits value on Enter keypress', async () => {
       const user = userEvent.setup()
       const onChange = vi.fn()
@@ -167,6 +181,24 @@ describe('Slider', () => {
       // The component should not throw even with bad props
       render(<Slider label="Bad" value={5} min={10} max={0} onChange={vi.fn()} />)
       expect(screen.getByRole('slider')).toBeInTheDocument()
+    })
+
+    it('normalizes non-finite external values before rendering controls', () => {
+      render(<Slider label="Bad" value={Number.NaN} min={0} max={10} onChange={vi.fn()} />)
+
+      expect(screen.getByRole('textbox', { name: /bad value/i })).toHaveValue('0')
+      expect(screen.getByRole('slider')).toHaveValue('0')
+    })
+
+    it('does not emit values from label drag when range props are invalid', () => {
+      const onChange = vi.fn()
+      render(<Slider label="Bad" value={5} min={10} max={0} onChange={onChange} />)
+
+      fireEvent.mouseDown(screen.getByText('Bad'), { clientX: 0 })
+      fireEvent.mouseMove(window, { clientX: 100 })
+      fireEvent.mouseUp(window)
+
+      expect(onChange).not.toHaveBeenCalled()
     })
 
     it('handles decimal step values for fractional input', async () => {
@@ -248,6 +280,21 @@ describe('Slider', () => {
       fireEvent.mouseUp(window)
 
       expect(onChange).toHaveBeenCalledWith(6)
+    })
+
+    it('preserves fractional value display when step is invalid', () => {
+      // Regression: `toFixed(0)` on a 0.4 slider value renders "0" and on blur
+      // commits 0 — silently overwriting user intent. The fallback path must
+      // use `step="any"` on the native range input and skip `toFixed()` so
+      // the text input keeps the raw value.
+      render(
+        <Slider label="Scale" value={0.4} min={0} max={10} step={Number.NaN} onChange={vi.fn()} />
+      )
+
+      const range = screen.getByRole('slider')
+      expect(range).toHaveAttribute('step', 'any')
+
+      expect(screen.getByLabelText('Scale value')).toHaveValue('0.4')
     })
   })
 })

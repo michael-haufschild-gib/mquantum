@@ -66,6 +66,14 @@ const DEFAULT_BRANCH_COLOR_A: TdseBranchColor = [0, 1, 1]
 const DEFAULT_BRANCH_COLOR_B: TdseBranchColor = [1, 0, 1]
 const MIN_DIM = 2
 const DEFAULT_DIM = 3
+const DEFAULT_BOUNDING_RADIUS = 2.0
+
+/** Keep radius/reciprocal uniforms finite even if frame state is corrupted. */
+export function sanitizeSchroedingerBoundingRadius(boundingRadius: number): number {
+  return Number.isFinite(boundingRadius) && boundingRadius > 0
+    ? boundingRadius
+    : DEFAULT_BOUNDING_RADIUS
+}
 
 function sanitizePackingDimension(dimension: number): number {
   if (!Number.isFinite(dimension)) return DEFAULT_DIM
@@ -340,20 +348,45 @@ function packVisualFields(
   p: SchroedingerPackParams
 ): void {
   const { schroedinger, appearance, pbr, canonicalDensityCompensation, cachedPeakDensity } = p
+  const densityGain = finiteClamped(
+    schroedinger?.densityGain,
+    DEFAULT_SCHROEDINGER_CONFIG.densityGain,
+    0.1,
+    5.0
+  )
+  const densityCompensation =
+    Number.isFinite(canonicalDensityCompensation) && canonicalDensityCompensation > 0
+      ? canonicalDensityCompensation
+      : 1.0
 
   intView[I.phaseAnimationEnabled] = schroedinger?.phaseAnimationEnabled ? 1 : 0
   floatView[I.timeScale] = schroedinger?.timeScale ?? 0.8
   floatView[I.fieldScale] = schroedinger?.fieldScale ?? 1.0
-  floatView[I.densityGain] = (schroedinger?.densityGain ?? 2.0) * canonicalDensityCompensation
-  floatView[I.powderScale] = schroedinger?.powderScale ?? 1.0
+  floatView[I.densityGain] = densityGain * densityCompensation
+  floatView[I.powderScale] = finiteClamped(
+    schroedinger?.powderScale,
+    DEFAULT_SCHROEDINGER_CONFIG.powderScale,
+    0.0,
+    2.0
+  )
   floatView[I.emissionIntensity] = appearance?.faceEmission ?? 0.0
   floatView[I.emissionThreshold] = appearance?.faceEmissionThreshold ?? 0.0
   // Emission color shift is meaningless in Wigner phase-space mode — force to zero
   const isWigner = schroedinger?.representation === 'wigner'
   floatView[I.emissionColorShift] = isWigner ? 0.0 : (appearance?.faceEmissionColorShift ?? 0.0)
   floatView[I.peakDensity] = cachedPeakDensity
-  floatView[I.densityContrast] = schroedinger?.densityContrast ?? 1.8
-  floatView[I.scatteringAnisotropy] = schroedinger?.scatteringAnisotropy ?? 0.0
+  floatView[I.densityContrast] = finiteClamped(
+    schroedinger?.densityContrast,
+    DEFAULT_SCHROEDINGER_CONFIG.densityContrast,
+    1.0,
+    4.0
+  )
+  floatView[I.scatteringAnisotropy] = finiteClamped(
+    schroedinger?.scatteringAnisotropy,
+    DEFAULT_SCHROEDINGER_CONFIG.scatteringAnisotropy,
+    -0.9,
+    0.9
+  )
   floatView[I.roughness] = pbr?.face?.roughness ?? 0.3
   packQuantumBackreaction(floatView, intView, schroedinger)
   packBilocalERBridge(floatView, intView, schroedinger)
@@ -420,8 +453,9 @@ function packPhaseAndInterference(
   isDensityMatrixMode: boolean,
   schroedinger: Partial<SchroedingerConfig> | undefined
 ): void {
-  floatView[I.boundingRadius] = boundingRadius
-  floatView[I.invBoundingRadius] = 1.0 / boundingRadius
+  const safeBoundingRadius = sanitizeSchroedingerBoundingRadius(boundingRadius)
+  floatView[I.boundingRadius] = safeBoundingRadius
+  floatView[I.invBoundingRadius] = 1.0 / safeBoundingRadius
   intView[I.phaseMaterialityEnabled] =
     !isDensityMatrixMode && schroedinger?.phaseMaterialityEnabled ? 1 : 0
   floatView[I.phaseMaterialityStrength] = schroedinger?.phaseMaterialityStrength ?? 1.0

@@ -20,9 +20,6 @@ export const StatsTabContent = React.memo(function StatsTabContent() {
     }))
   )
 
-  const sceneVertices = sceneGpu.triangles * 3 + sceneGpu.lines * 2 + sceneGpu.points
-  const totalVertices = gpu.triangles * 3 + gpu.lines * 2 + gpu.points
-
   return (
     <div className="grid grid-cols-1 gap-5 p-5">
       <div className="space-y-3">
@@ -30,7 +27,7 @@ export const StatsTabContent = React.memo(function StatsTabContent() {
         <div className="grid grid-cols-2 gap-2">
           <InfoCard label="Calls" value={sceneGpu.calls} />
           <InfoCard label="Triangles" value={formatMetric(sceneGpu.triangles)} />
-          <InfoCard label="Vertices" value={formatMetric(sceneVertices)} />
+          <InfoCard label="Vertices" value={formatMetric(sceneGpu.vertices)} />
           <InfoCard label="Points" value={formatMetric(sceneGpu.points)} />
         </div>
       </div>
@@ -39,7 +36,7 @@ export const StatsTabContent = React.memo(function StatsTabContent() {
         <div className="grid grid-cols-2 gap-2">
           <InfoCard label="Calls" value={gpu.calls} />
           <InfoCard label="Triangles" value={formatMetric(gpu.triangles)} />
-          <InfoCard label="Vertices" value={formatMetric(totalVertices)} />
+          <InfoCard label="Vertices" value={formatMetric(gpu.vertices)} />
           <InfoCard label="Points" value={formatMetric(gpu.points)} />
         </div>
       </div>

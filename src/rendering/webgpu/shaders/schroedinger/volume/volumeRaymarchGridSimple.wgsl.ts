@@ -104,7 +104,8 @@ fn volumeRaymarchGrid(
   var iterCount: i32 = 0;
   var primaryHitT: f32 = -1.0;
 
-  let maxPathLen = 2.0 * uniforms.boundingRadius;
+  let safeBoundingRadius = max(abs(uniforms.boundingRadius), 1e-4);
+  let maxPathLen = 2.0 * safeBoundingRadius;
   let sampleCount = max(i32(f32(max(uniforms.sampleCount, 1)) * (tFar - tNear) / maxPathLen), 4);
   let stepLen = (tFar - tNear) / f32(sampleCount);
   var t = tNear;
@@ -166,7 +167,7 @@ fn volumeRaymarchGrid(
       let remoteRho = select(remotePrimaryRho, remotePrimaryRho + remoteGridSample.g, IS_DUAL_CHANNEL);
       var localLogDensity = sCenter;
       var remoteLogDensity = remoteGridSample.g;
-      if (IS_DUAL_CHANNEL) {
+      if (IS_DUAL_CHANNEL || !DENSITY_GRID_HAS_PHASE) {
         if (rho > 1e-9) {
           localLogDensity = log(rho);
         } else {

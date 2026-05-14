@@ -85,6 +85,24 @@ describe('calculateCosineColor', () => {
     // With phase offset, colors should be different
     expect(colorNoOffset.r).not.toBeCloseTo(colorWithOffset.r)
   })
+
+  it('keeps malformed runtime coefficients from producing NaN colors', () => {
+    const color = calculateCosineColor(
+      Number.NaN,
+      [Number.NaN, Number.POSITIVE_INFINITY, 0.5],
+      [0.5, Number.NaN, Number.POSITIVE_INFINITY],
+      [1, Number.POSITIVE_INFINITY, Number.NaN],
+      [0, Number.NaN, Number.NEGATIVE_INFINITY]
+    )
+
+    expect(Object.values(color).every((channel) => Number.isFinite(channel))).toBe(true)
+    expect(color.r).toBeGreaterThanOrEqual(0)
+    expect(color.g).toBeGreaterThanOrEqual(0)
+    expect(color.b).toBeGreaterThanOrEqual(0)
+    expect(color.r).toBeLessThanOrEqual(1)
+    expect(color.g).toBeLessThanOrEqual(1)
+    expect(color.b).toBeLessThanOrEqual(1)
+  })
 })
 
 describe('applyDistributionTS', () => {
@@ -164,6 +182,19 @@ describe('applyDistributionTS', () => {
       // 0.25 * 2 = 0.5
       // 0.5 + 0.25 = 0.75
       expect(result).toBeCloseTo(0.75)
+    })
+
+    it('falls back to finite distribution controls for malformed runtime values', () => {
+      expect(
+        applyDistributionTS(
+          Number.NaN,
+          Number.NaN,
+          Number.POSITIVE_INFINITY,
+          Number.NEGATIVE_INFINITY
+        )
+      ).toBe(0)
+
+      expect(Number.isFinite(applyDistributionTS(0, -1, 1, 0))).toBe(true)
     })
   })
 })

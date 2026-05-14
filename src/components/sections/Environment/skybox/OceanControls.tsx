@@ -10,7 +10,7 @@
 import React from 'react'
 
 import { Slider } from '@/components/ui/Slider'
-import { SkyboxProceduralSettings } from '@/stores/defaults/visualDefaults'
+import type { SkyboxProceduralSettings } from '@/stores/defaults/visualDefaults'
 
 interface OceanControlsProps {
   proceduralSettings: SkyboxProceduralSettings

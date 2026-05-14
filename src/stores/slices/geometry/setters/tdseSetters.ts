@@ -212,6 +212,10 @@ const normalizeTdseVector = (
   })
 }
 
+function isValidIndex(index: number, upperBoundExclusive: number): boolean {
+  return Number.isInteger(index) && index >= 0 && index < upperBoundExclusive
+}
+
 /**
  * Creates all TDSE-related setter actions for the schroedingerSlice.
  * @param ctx - Shared setter context with set/get and validation helpers
@@ -508,14 +512,13 @@ export function createTdseSetters(ctx: SetterContext): TdseSetters {
         warnNonFinite('tdse.slicePositions', value)
         return
       }
+      if (!isValidIndex(dimIndex, ctx.get().schroedinger.tdse.slicePositions.length)) return
       setWithVersion((state) => {
         const td = state.schroedinger.tdse
         const slicePositions = [...td.slicePositions]
-        if (dimIndex >= 0 && dimIndex < slicePositions.length) {
-          const halfExtent =
-            (td.gridSize[dimIndex + 3] ?? 1) * (td.spacing[dimIndex + 3] ?? 0.1) * 0.5
-          slicePositions[dimIndex] = Math.max(-halfExtent, Math.min(halfExtent, value))
-        }
+        const halfExtent =
+          (td.gridSize[dimIndex + 3] ?? 1) * (td.spacing[dimIndex + 3] ?? 0.1) * 0.5
+        slicePositions[dimIndex] = Math.max(-halfExtent, Math.min(halfExtent, value))
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -526,13 +529,12 @@ export function createTdseSetters(ctx: SetterContext): TdseSetters {
     },
     setTdseCompactDim: (dimIndex, compact) => {
       if (typeof compact !== 'boolean') return
+      if (!isValidIndex(dimIndex, ctx.get().schroedinger.tdse.latticeDim)) return
       setWithVersion((state) => {
         const td = state.schroedinger.tdse
         const compactDims = [...(td.compactDims ?? [])]
-        if (dimIndex >= 0 && dimIndex < td.latticeDim) {
-          while (compactDims.length < td.latticeDim) compactDims.push(false)
-          compactDims[dimIndex] = compact
-        }
+        while (compactDims.length < td.latticeDim) compactDims.push(false)
+        compactDims[dimIndex] = compact
         const kk = clampKKState(
           td.dt,
           td.gridSize,
@@ -556,13 +558,12 @@ export function createTdseSetters(ctx: SetterContext): TdseSetters {
         warnNonFinite('tdse.compactRadii', radius)
         return
       }
+      if (!isValidIndex(dimIndex, ctx.get().schroedinger.tdse.latticeDim)) return
       setWithVersion((state) => {
         const td = state.schroedinger.tdse
         const rawRadii = [...(td.compactRadii ?? [])]
-        if (dimIndex >= 0 && dimIndex < td.latticeDim) {
-          while (rawRadii.length < td.latticeDim) rawRadii.push(0.15)
-          rawRadii[dimIndex] = radius
-        }
+        while (rawRadii.length < td.latticeDim) rawRadii.push(0.15)
+        rawRadii[dimIndex] = radius
         const kk = clampKKState(
           td.dt,
           td.gridSize,

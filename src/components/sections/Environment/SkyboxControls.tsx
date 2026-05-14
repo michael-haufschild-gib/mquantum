@@ -11,7 +11,7 @@ import React, { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { TileButton } from '@/components/ui/TileButton'
-import { SkyboxSelection } from '@/stores/defaults/visualDefaults'
+import type { SkyboxSelection } from '@/stores/defaults/visualDefaults'
 import { type EnvironmentStore, useEnvironmentStore } from '@/stores/scene/environmentStore'
 
 import { AuroraControls } from './skybox/AuroraControls'

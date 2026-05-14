@@ -159,6 +159,8 @@ export const usePageCurveStore = create<PageCurveState>((set, get) => {
 
     pushSample: (inputs) => {
       const state = get()
+      if (!Number.isFinite(inputs.t) || inputs.t < 0) return
+      if (Number.isFinite(integrator.lastT) && inputs.t <= integrator.lastT) return
       const rate = thermalEntropyDensityRate({
         tH: inputs.tH,
         areaH: inputs.areaH,

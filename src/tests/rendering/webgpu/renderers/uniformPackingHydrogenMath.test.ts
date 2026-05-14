@@ -173,6 +173,22 @@ describe('computeHydrogenRadialNormND — CPU/GPU parity (f32 emulation ≤ 3 UL
   })
 })
 
+describe('computeHydrogenRadialNormND — invalid input hardening', () => {
+  it('returns a finite zero norm for non-finite and non-positive scale inputs', () => {
+    expect(computeHydrogenRadialNormND(0, 0, Number.NaN, 1)).toBe(0)
+    expect(computeHydrogenRadialNormND(0, 0, 1, Number.POSITIVE_INFINITY)).toBe(0)
+    expect(computeHydrogenRadialNormND(0, 0, 0, 1)).toBe(0)
+    expect(computeHydrogenRadialNormND(0, 0, 1, 0)).toBe(0)
+  })
+
+  it('rejects impossible or out-of-LUT quantum indices before factorial work', () => {
+    expect(computeHydrogenRadialNormND(-1, 0, 1, 1)).toBe(0)
+    expect(computeHydrogenRadialNormND(0.5, 0, 1, 1)).toBe(0)
+    expect(computeHydrogenRadialNormND(1_000_000_000, 0, 1, 1)).toBe(0)
+    expect(computeHydrogenRadialNormND(0, 20, 1, 1)).toBe(0)
+  })
+})
+
 describe('computeHypersphericalLayerNorm — closed-form values', () => {
   it('matches Gegenbauer norm √(2/3) for C_1^{1} (D=4, k=0, lk=1, lkp1=0)', () => {
     // α = lkp1 + (D-k-2)/2 = 0 + 1 = 1 → C_1^{1}, whose orthogonality norm is √(2/3).
@@ -230,5 +246,21 @@ describe('computeHypersphericalLayerNorm — CPU/GPU parity (f32 emulation ≤ 3
     }
     expect(checked).toBeGreaterThan(100)
     expect(maxRelErr, `worst divergence at ${maxAt}`).toBeLessThan(REL_TOL)
+  })
+})
+
+describe('computeHypersphericalLayerNorm — invalid input hardening', () => {
+  const sentinel = Math.exp(-20)
+
+  it('returns the WGSL invalid sentinel for non-finite, non-integer, and out-of-range layers', () => {
+    expect(computeHypersphericalLayerNorm(Number.NaN, 0, 4, 0)).toBeCloseTo(sentinel, 12)
+    expect(computeHypersphericalLayerNorm(1.5, 0, 4, 0)).toBeCloseTo(sentinel, 12)
+    expect(computeHypersphericalLayerNorm(1, 0, 3, 0)).toBeCloseTo(sentinel, 12)
+    expect(computeHypersphericalLayerNorm(1, 0, 4, 1)).toBeCloseTo(sentinel, 12)
+  })
+
+  it('rejects out-of-LUT factorial and gamma arguments without emitting NaN', () => {
+    expect(computeHypersphericalLayerNorm(1_000_000_000, 0, 4, 0)).toBeCloseTo(sentinel, 12)
+    expect(computeHypersphericalLayerNorm(20, 20, 11, 0)).toBeCloseTo(sentinel, 12)
   })
 })

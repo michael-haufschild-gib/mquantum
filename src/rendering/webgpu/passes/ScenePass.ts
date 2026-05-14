@@ -61,6 +61,30 @@ export interface ScenePassConfig {
   onRenderStats?: (stats: SceneRenderStats) => void
 }
 
+const DEFAULT_CLEAR_COLOR = { r: 0, g: 0, b: 0, a: 1 } as const
+const TRANSPARENT_CLEAR_COLOR = { r: 0, g: 0, b: 0, a: 0 } as const
+
+/** Clamp a finite numeric channel into the WebGPU clear-value unit range. */
+function clampUnit(value: number, fallback: number): number {
+  const safe = Number.isFinite(value) ? value : fallback
+  return Math.max(0, Math.min(1, safe))
+}
+
+/** Normalize a clear color before it is passed into a WebGPU render-pass descriptor. */
+export function normalizeSceneClearColor(color: { r: number; g: number; b: number; a: number }): {
+  r: number
+  g: number
+  b: number
+  a: number
+} {
+  return {
+    r: clampUnit(color.r, DEFAULT_CLEAR_COLOR.r),
+    g: clampUnit(color.g, DEFAULT_CLEAR_COLOR.g),
+    b: clampUnit(color.b, DEFAULT_CLEAR_COLOR.b),
+    a: clampUnit(color.a, DEFAULT_CLEAR_COLOR.a),
+  }
+}
+
 /**
  * WGSL Copy Fragment Shader for passthrough mode.
  */
@@ -143,7 +167,7 @@ export class ScenePass extends WebGPUBasePass {
     })
 
     this.passConfig = config
-    this.clearColor = config.clearColor ?? { r: 0, g: 0, b: 0, a: 1 }
+    this.clearColor = normalizeSceneClearColor(config.clearColor ?? DEFAULT_CLEAR_COLOR)
     this.autoClear = config.autoClear ?? true
     this.renderBackground = config.renderBackground ?? true
     this.mode = config.mode ?? 'clear'
@@ -202,7 +226,7 @@ export class ScenePass extends WebGPUBasePass {
    * @param color.a
    */
   setClearColor(color: { r: number; g: number; b: number; a: number }): void {
-    this.clearColor = { ...color }
+    this.clearColor = normalizeSceneClearColor(color)
   }
 
   /**
@@ -211,11 +235,12 @@ export class ScenePass extends WebGPUBasePass {
    * @param alpha - Alpha value (0-1)
    */
   setClearColorHex(hex: number, alpha = 1): void {
+    const safeHex = Number.isFinite(hex) ? Math.max(0, Math.min(0xffffff, Math.round(hex))) : 0
     this.clearColor = {
-      r: ((hex >> 16) & 255) / 255,
-      g: ((hex >> 8) & 255) / 255,
-      b: (hex & 255) / 255,
-      a: alpha,
+      r: ((safeHex >> 16) & 255) / 255,
+      g: ((safeHex >> 8) & 255) / 255,
+      b: (safeHex & 255) / 255,
+      a: clampUnit(alpha, DEFAULT_CLEAR_COLOR.a),
     }
   }
 
@@ -254,6 +279,11 @@ export class ScenePass extends WebGPUBasePass {
    */
   getRenderBackground(): boolean {
     return this.renderBackground
+  }
+
+  /** Resolve the render-pass clear value from background and color settings. */
+  private getClearValue(): { r: number; g: number; b: number; a: number } {
+    return this.renderBackground ? this.clearColor : { ...TRANSPARENT_CLEAR_COLOR }
   }
 
   /**
@@ -295,7 +325,7 @@ export class ScenePass extends WebGPUBasePass {
           view: outputView,
           loadOp: this.autoClear ? ('clear' as const) : ('load' as const),
           storeOp: 'store' as const,
-          clearValue: this.clearColor,
+          clearValue: this.getClearValue(),
         },
       ],
     })
@@ -336,7 +366,7 @@ export class ScenePass extends WebGPUBasePass {
           view: outputView,
           loadOp: this.autoClear ? ('clear' as const) : ('load' as const),
           storeOp: 'store' as const,
-          clearValue: this.clearColor,
+          clearValue: this.getClearValue(),
         },
       ],
     })
