@@ -68,7 +68,7 @@ test.describe('A1: Quantum Carpet — shader + physics', () => {
 
     // Enable carpet via store
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/carpetStore.ts')
+      const mod = await import('/src/stores/diagnostics/carpetStore.ts')
       mod.useCarpetStore.getState().setEnabled(true)
     })
 
@@ -88,7 +88,7 @@ test.describe('A1: Quantum Carpet — shader + physics', () => {
     await waitForFirstFrame(page)
 
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/carpetStore.ts')
+      const mod = await import('/src/stores/diagnostics/carpetStore.ts')
       mod.useCarpetStore.getState().setEnabled(true)
     })
 
@@ -107,7 +107,7 @@ test.describe('A1: Quantum Carpet — shader + physics', () => {
     await waitForFirstFrame(page)
 
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/carpetStore.ts')
+      const mod = await import('/src/stores/diagnostics/carpetStore.ts')
       mod.useCarpetStore.getState().setEnabled(true)
     })
 
@@ -129,7 +129,7 @@ test.describe('A1: Quantum Carpet — shader + physics', () => {
 
     // Axis 0
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/carpetStore.ts')
+      const mod = await import('/src/stores/diagnostics/carpetStore.ts')
       const store = mod.useCarpetStore.getState()
       store.setEnabled(true)
       store.setSliceAxis(0)
@@ -147,7 +147,7 @@ test.describe('A1: Quantum Carpet — shader + physics', () => {
 
     // Clear and switch to axis 1
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/carpetStore.ts')
+      const mod = await import('/src/stores/diagnostics/carpetStore.ts')
       const store = mod.useCarpetStore.getState()
       store.clear()
       store.setSliceAxis(1)
@@ -186,7 +186,7 @@ test.describe('A3: Observables — GPU reduction + Heisenberg', () => {
 
     // Enable observables AFTER pipeline is ready
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setTdseObservablesEnabled(true)
       mod.useExtendedObjectStore.getState().setTdseDiagnosticsEnabled(true)
     })
@@ -197,7 +197,7 @@ test.describe('A3: Observables — GPU reduction + Heisenberg', () => {
     // Poll until observables store has data
     await page.waitForFunction(
       async () => {
-        const mod = await import('/src/stores/diagnosticsStore.ts')
+        const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
         return mod.useDiagnosticsStore.getState().observables.hasData
       },
       { timeout: 30_000 }
@@ -237,7 +237,7 @@ test.describe('A3: Observables — GPU reduction + Heisenberg', () => {
 
     // Free potential, no absorber, known initial momentum
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setTdsePotentialType('free')
       s.setTdseAbsorberEnabled(false)
@@ -252,10 +252,15 @@ test.describe('A3: Observables — GPU reduction + Heisenberg', () => {
     // The readbackGeneration drain+snapshot pattern ensures we never read
     // stale data from the previous Classic Tunneling configuration.
     await page.evaluate(async () => {
-      const obsMod = await import('/src/stores/diagnosticsStore.ts')
+      const obsMod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
       obsMod.useDiagnosticsStore.getState().resetObservables()
     })
-    await waitForFreshReadback(page, '/src/stores/diagnosticsStore.ts', 60_000, 'observables')
+    await waitForFreshReadback(
+      page,
+      '/src/stores/diagnostics/diagnosticsStore.ts',
+      60_000,
+      'observables'
+    )
 
     const obs = await readObservablesDiagnostics(page)
     expect(obs.hasData).toBe(true)
@@ -284,7 +289,7 @@ test.describe('B2: Data Export — content integrity', () => {
     await waitForFirstFrame(page)
     // Wait for enough simulation to populate diagnostics history for export.
     await waitForSimulationFrames(page, 120)
-    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'tdse')
+    await waitForDiagnostics(page, '/src/stores/diagnostics/diagnosticsStore.ts', undefined, 'tdse')
 
     // Open analysis section
     await page.getByTestId('toggle-right-panel').click()
@@ -330,7 +335,12 @@ test.describe('B2: Data Export — content integrity', () => {
     await waitForShaderCompilation(page)
     await waitForFirstFrame(page)
     await waitForSimulationFrames(page, 120)
-    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'dirac')
+    await waitForDiagnostics(
+      page,
+      '/src/stores/diagnostics/diagnosticsStore.ts',
+      undefined,
+      'dirac'
+    )
 
     await page.getByTestId('toggle-right-panel').click()
     const rightPanel = new RightPanel(page)
@@ -379,7 +389,7 @@ test.describe('B3: Imaginary Time — convergence + renormalization', () => {
     await waitForFirstFrame(page)
 
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setTdsePotentialType('harmonicTrap')
       s.setTdseHarmonicOmega(2.0)
@@ -389,7 +399,7 @@ test.describe('B3: Imaginary Time — convergence + renormalization', () => {
       s.resetTdseField()
     })
 
-    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'tdse')
+    await waitForDiagnostics(page, '/src/stores/diagnostics/diagnosticsStore.ts', undefined, 'tdse')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readTdseDiagnostics(page)
@@ -410,7 +420,7 @@ test.describe('B3: Imaginary Time — convergence + renormalization', () => {
 
       await page.evaluate(
         async ({ p }: { p: string }) => {
-          const mod = await import('/src/stores/extendedObjectStore.ts')
+          const mod = await import('/src/stores/scene/extendedObjectStore.ts')
           const s = mod.useExtendedObjectStore.getState() as Record<
             string,
             (...a: unknown[]) => void
@@ -435,7 +445,7 @@ test.describe('B3: Imaginary Time — convergence + renormalization', () => {
     await waitForFirstFrame(page)
 
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setTdsePotentialType('harmonicTrap')
       s.setTdseImaginaryTimeEnabled(true)
@@ -447,7 +457,7 @@ test.describe('B3: Imaginary Time — convergence + renormalization', () => {
 
     // Request eigenstate storage
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/simulationStateStore.ts')
+      const mod = await import('/src/stores/runtime/simulationStateStore.ts')
       mod.useSimulationStateStore.getState().requestStoreEigenstate()
     })
 
@@ -500,7 +510,7 @@ test.describe('C2: Quantum Walk — shaders + coin operators', () => {
 
     // Reset with Grover coin
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const store = mod.useExtendedObjectStore.getState()
       store.setSchroedingerConfig({
         quantumWalk: {
@@ -510,7 +520,7 @@ test.describe('C2: Quantum Walk — shaders + coin operators', () => {
         },
       })
       // Resume animation for the new walk
-      const anim = await import('/src/stores/animationStore.ts')
+      const anim = await import('/src/stores/scene/animationStore.ts')
       if (!anim.useAnimationStore.getState().isPlaying)
         anim.useAnimationStore.getState().togglePlayPause()
     })
@@ -550,7 +560,7 @@ test.describe('C2: Quantum Walk — shaders + coin operators', () => {
 
     // Reset
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const store = mod.useExtendedObjectStore.getState()
       store.setSchroedingerConfig({
         quantumWalk: { ...store.schroedinger.quantumWalk, steps: 0, needsReset: true },
@@ -592,7 +602,7 @@ test.describe('C3: Measurement — Born rule + wavefunction collapse', () => {
 
   test('measurement point cloud pass: shader compiles', async ({ page }) => {
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/measurementStore.ts')
+      const mod = await import('/src/stores/diagnostics/measurementStore.ts')
       const store = mod.useMeasurementStore.getState()
       store.setEnabled(true)
       store.addMeasurement([0, 0, 0], 0.5)
@@ -606,7 +616,7 @@ test.describe('C3: Measurement — Born rule + wavefunction collapse', () => {
 
   test('statistics compute correctly for known positions', async ({ page }) => {
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/measurementStore.ts')
+      const mod = await import('/src/stores/diagnostics/measurementStore.ts')
       const store = mod.useMeasurementStore.getState()
       store.setEnabled(true)
       store.addMeasurement([1, 0, 0], 0.5)
@@ -629,7 +639,7 @@ test.describe('C3: Measurement — Born rule + wavefunction collapse', () => {
 
   test('partial measurement: axis selection works', async ({ page }) => {
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/measurementStore.ts')
+      const mod = await import('/src/stores/diagnostics/measurementStore.ts')
       const store = mod.useMeasurementStore.getState()
       store.setEnabled(true)
       store.setMeasureAxis(0)
@@ -639,7 +649,7 @@ test.describe('C3: Measurement — Born rule + wavefunction collapse', () => {
     expect(state.measureAxis).toBe(0)
 
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/measurementStore.ts')
+      const mod = await import('/src/stores/diagnostics/measurementStore.ts')
       mod.useMeasurementStore.getState().setMeasureAxis(2)
     })
 
@@ -649,7 +659,7 @@ test.describe('C3: Measurement — Born rule + wavefunction collapse', () => {
 
   test('clear measurements resets everything', async ({ page }) => {
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/measurementStore.ts')
+      const mod = await import('/src/stores/diagnostics/measurementStore.ts')
       const store = mod.useMeasurementStore.getState()
       store.setEnabled(true)
       store.addMeasurement([1, 0, 0], 0.5)
@@ -660,7 +670,7 @@ test.describe('C3: Measurement — Born rule + wavefunction collapse', () => {
     expect(state.totalCount).toBe(2)
 
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/measurementStore.ts')
+      const mod = await import('/src/stores/diagnostics/measurementStore.ts')
       mod.useMeasurementStore.getState().clearMeasurements()
     })
 
@@ -688,14 +698,14 @@ test.describe('Combined: multiple roadmap features simultaneously', () => {
 
     // Enable ALL roadmap features simultaneously
     await page.evaluate(async () => {
-      const carpet = await import('/src/stores/carpetStore.ts')
+      const carpet = await import('/src/stores/diagnostics/carpetStore.ts')
       carpet.useCarpetStore.getState().setEnabled(true)
 
-      const ext = await import('/src/stores/extendedObjectStore.ts')
+      const ext = await import('/src/stores/scene/extendedObjectStore.ts')
       ext.useExtendedObjectStore.getState().setTdseObservablesEnabled(true)
       ext.useExtendedObjectStore.getState().setTdseDiagnosticsEnabled(true)
 
-      const meas = await import('/src/stores/measurementStore.ts')
+      const meas = await import('/src/stores/diagnostics/measurementStore.ts')
       meas.useMeasurementStore.getState().setEnabled(true)
     })
 
@@ -709,7 +719,7 @@ test.describe('Combined: multiple roadmap features simultaneously', () => {
     await waitForFirstFrame(page)
 
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setTdsePotentialType('harmonicTrap')
       s.setTdseAbsorberEnabled(false)
@@ -723,7 +733,7 @@ test.describe('Combined: multiple roadmap features simultaneously', () => {
 
     await page.waitForFunction(
       async () => {
-        const mod = await import('/src/stores/diagnosticsStore.ts')
+        const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
         return mod.useDiagnosticsStore.getState().observables.hasData
       },
       { timeout: 30_000 }
@@ -756,9 +766,9 @@ test.describe('Combined: multiple roadmap features simultaneously', () => {
     await waitForFirstFrame(page)
 
     await page.evaluate(async () => {
-      const ext = await import('/src/stores/extendedObjectStore.ts')
+      const ext = await import('/src/stores/scene/extendedObjectStore.ts')
       ext.useExtendedObjectStore.getState().setTdseObservablesEnabled(true)
-      const carpet = await import('/src/stores/carpetStore.ts')
+      const carpet = await import('/src/stores/diagnostics/carpetStore.ts')
       carpet.useCarpetStore.getState().setEnabled(true)
     })
 

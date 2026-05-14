@@ -66,7 +66,7 @@ async function openSkyboxSection(page: import('@playwright/test').Page): Promise
   }
 
   // Switch from the default "Color" sub-tab to the "Skybox" sub-tab
-  const skyboxTab = page.getByRole('tab', { name: 'Skybox' })
+  const skyboxTab = page.getByTestId('env-controls-tab-skybox')
   await skyboxTab.click()
 
   // Wait for the first skybox option to be visible (proves grid rendered)
@@ -161,7 +161,7 @@ test.describe('skybox: selection without errors', () => {
       // Verify store updated
       await expect(async () => {
         const selection = await page.evaluate(async () => {
-          const mod = await import('/src/stores/environmentStore.ts')
+          const mod = await import('/src/stores/scene/environmentStore.ts')
           return mod.useEnvironmentStore.getState().skyboxSelection
         })
         expect(selection).toBe(id)

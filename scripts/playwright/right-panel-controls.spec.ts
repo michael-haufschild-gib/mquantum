@@ -59,7 +59,7 @@ test.describe('right panel: post-processing controls', () => {
 
     // Get initial bloom state
     const initialBloom = await page.evaluate(async () => {
-      const mod = await import('/src/stores/postProcessingStore.ts')
+      const mod = await import('/src/stores/scene/postProcessingStore.ts')
       return mod.usePostProcessingStore.getState().bloomEnabled
     })
 
@@ -68,7 +68,7 @@ test.describe('right panel: post-processing controls', () => {
     // Verify store updated
     await expect(async () => {
       const afterBloom = await page.evaluate(async () => {
-        const mod = await import('/src/stores/postProcessingStore.ts')
+        const mod = await import('/src/stores/scene/postProcessingStore.ts')
         return mod.usePostProcessingStore.getState().bloomEnabled
       })
       expect(afterBloom).toBe(!initialBloom)
@@ -80,7 +80,7 @@ test.describe('right panel: post-processing controls', () => {
 
     // Ensure bloom is OFF
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/postProcessingStore.ts')
+      const mod = await import('/src/stores/scene/postProcessingStore.ts')
       mod.usePostProcessingStore.getState().setBloomEnabled(false)
     })
     await waitForShaderCompilation(page)
@@ -88,7 +88,7 @@ test.describe('right panel: post-processing controls', () => {
 
     // Turn bloom ON with extreme settings for guaranteed visual difference
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/postProcessingStore.ts')
+      const mod = await import('/src/stores/scene/postProcessingStore.ts')
       const store = mod.usePostProcessingStore.getState()
       store.setBloomEnabled(true)
       store.setBloomGain(5.0)
@@ -123,45 +123,42 @@ test.describe('right panel: environment section', () => {
     await rightPanel.waitForVisible()
     await rightPanel.switchTab('Scene')
 
+    const envHeader = page.getByTestId('section-environment-header')
+    const isExpanded = await envHeader.getAttribute('aria-expanded').catch(() => null)
+    if (isExpanded !== 'true') {
+      await envHeader.click()
+    }
+
+    await page.getByTestId('env-controls-tab-skybox').click()
+
     // Get initial skybox from store
     const initialSkybox = await page.evaluate(async () => {
-      const mod = await import('/src/stores/environmentStore.ts')
-      return mod.useEnvironmentStore.getState().skybox
+      const mod = await import('/src/stores/scene/environmentStore.ts')
+      return mod.useEnvironmentStore.getState().skyboxSelection
     })
 
     // Find a skybox option that's different from the current one
-    const targetOption = initialSkybox === 'none' ? 'cosmos' : 'none'
+    const targetOption = initialSkybox === 'space_blue' ? 'none' : 'space_blue'
     const skyboxBtn = page.getByTestId(`skybox-option-${targetOption}`)
-    const hasSkyboxBtn = await skyboxBtn.isVisible().catch(() => false)
-
-    if (!hasSkyboxBtn) {
-      // The environment section may need expanding
-      const envHeader = page.getByTestId('section-environment-header')
-      const hasHeader = await envHeader.isVisible().catch(() => false)
-      if (hasHeader) await envHeader.click()
-    }
 
     // The environment section MUST surface at least one skybox option.
     // Previously this branch silently skipped when no option was visible —
     // that masked a real product regression (controls disappeared) as a
     // green test. Now hard-fail so the regression surfaces.
-    const anyOption = page.locator('[data-testid^="skybox-option-"]').first()
     await expect(
-      anyOption,
-      'environment section must expose at least one skybox option'
+      skyboxBtn,
+      `environment section must expose skybox option "${targetOption}"`
     ).toBeVisible({ timeout: 5000 })
 
     // Click it and verify store updated
-    const optionTestId = await anyOption.getAttribute('data-testid')
-    const targetId = optionTestId?.replace('skybox-option-', '')
-    await anyOption.click()
+    await skyboxBtn.click()
 
     await expect(async () => {
       const newSkybox = await page.evaluate(async () => {
-        const mod = await import('/src/stores/environmentStore.ts')
-        return mod.useEnvironmentStore.getState().skybox
+        const mod = await import('/src/stores/scene/environmentStore.ts')
+        return mod.useEnvironmentStore.getState().skyboxSelection
       })
-      expect(newSkybox).toBe(targetId)
+      expect(newSkybox).toBe(targetOption)
     }).toPass({ timeout: 3000 })
   })
 })

@@ -40,7 +40,7 @@ import {
 /** Enable measurement mode and configure for fast pipeline tests. */
 async function enableMeasurementFast(page: import('@playwright/test').Page): Promise<void> {
   await page.evaluate(async () => {
-    const { useMeasurementStore } = await import('/src/stores/measurementStore.ts')
+    const { useMeasurementStore } = await import('/src/stores/diagnostics/measurementStore.ts')
     const store = useMeasurementStore.getState()
     store.setEnabled(true)
     store.setAutoEvolveFrames(1) // Minimize cooldown between measurements
@@ -57,12 +57,12 @@ async function triggerMeasurementAndWait(
   timeoutMs = 15_000
 ) {
   const countBefore = await page.evaluate(async () => {
-    const { useMeasurementStore } = await import('/src/stores/measurementStore.ts')
+    const { useMeasurementStore } = await import('/src/stores/diagnostics/measurementStore.ts')
     return useMeasurementStore.getState().totalCount
   })
 
   await page.evaluate(async (pos: [number, number, number]) => {
-    const { useMeasurementStore } = await import('/src/stores/measurementStore.ts')
+    const { useMeasurementStore } = await import('/src/stores/diagnostics/measurementStore.ts')
     useMeasurementStore.getState().requestMeasurement(pos)
   }, clickPosition)
 
@@ -79,7 +79,7 @@ async function triggerMeasurementAndWait(
 /** Read the last measurement record from the store. */
 async function getLastMeasurement(page: import('@playwright/test').Page) {
   return page.evaluate(async () => {
-    const { useMeasurementStore } = await import('/src/stores/measurementStore.ts')
+    const { useMeasurementStore } = await import('/src/stores/diagnostics/measurementStore.ts')
     const measurements = useMeasurementStore.getState().measurements
     const last = measurements[measurements.length - 1]
     if (!last) return null
@@ -127,7 +127,7 @@ test.describe('Measurement UI Controls', () => {
     await expect(slider).toBeVisible({ timeout: 3000 })
 
     await page.evaluate(async () => {
-      const { useMeasurementStore } = await import('/src/stores/measurementStore.ts')
+      const { useMeasurementStore } = await import('/src/stores/diagnostics/measurementStore.ts')
       useMeasurementStore.getState().setCollapseWidth(1.0)
     })
     const state = await readMeasurementState(page)
@@ -147,7 +147,7 @@ test.describe('Measurement UI Controls', () => {
     await page.getByTestId('measurement-toggle').click()
 
     await page.evaluate(async () => {
-      const { useMeasurementStore } = await import('/src/stores/measurementStore.ts')
+      const { useMeasurementStore } = await import('/src/stores/diagnostics/measurementStore.ts')
       const store = useMeasurementStore.getState()
       store.addMeasurement([0, 0, 0], 0.5)
       store.addMeasurement([1, 1, 1], 0.3)
@@ -168,7 +168,7 @@ test.describe('Measurement UI Controls', () => {
 
     // Inject measurements with known positions
     await page.evaluate(async () => {
-      const { useMeasurementStore } = await import('/src/stores/measurementStore.ts')
+      const { useMeasurementStore } = await import('/src/stores/diagnostics/measurementStore.ts')
       const store = useMeasurementStore.getState()
       store.addMeasurement([1, 0, 0], 0.5)
       store.addMeasurement([3, 0, 0], 0.5)
@@ -247,7 +247,7 @@ test.describe('Measurement GPU Pipeline', () => {
 
     // Set partial measurement on axis 0 (x-axis)
     await page.evaluate(async () => {
-      const { useMeasurementStore } = await import('/src/stores/measurementStore.ts')
+      const { useMeasurementStore } = await import('/src/stores/diagnostics/measurementStore.ts')
       useMeasurementStore.getState().setMeasureAxis(0)
     })
 
@@ -265,7 +265,7 @@ test.describe('Measurement GPU Pipeline', () => {
     await enableMeasurementFast(page)
 
     await page.evaluate(async () => {
-      const { useMeasurementStore } = await import('/src/stores/measurementStore.ts')
+      const { useMeasurementStore } = await import('/src/stores/diagnostics/measurementStore.ts')
       useMeasurementStore.getState().setMeasureAxis(2)
     })
 
@@ -296,7 +296,7 @@ test.describe('Measurement Physics Accuracy', () => {
 
   test('simulation remains stable after wavefunction collapse', async ({ page }) => {
     // Wait for diagnostics baseline
-    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'tdse')
+    await waitForDiagnostics(page, '/src/stores/diagnostics/diagnosticsStore.ts', undefined, 'tdse')
 
     const diagBefore = await readTdseDiagnostics(page)
     expect(diagBefore.hasData).toBe(true)
@@ -330,7 +330,7 @@ test.describe('Measurement Physics Accuracy', () => {
 
     // Use narrow collapse width for tight localization
     await page.evaluate(async () => {
-      const { useMeasurementStore } = await import('/src/stores/measurementStore.ts')
+      const { useMeasurementStore } = await import('/src/stores/diagnostics/measurementStore.ts')
       useMeasurementStore.getState().setCollapseWidth(0.15)
     })
 
@@ -376,7 +376,7 @@ test.describe('Measurement Physics Accuracy', () => {
 
     // Read grid config to determine domain bounds
     const bounds = await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const ext = mod.useExtendedObjectStore.getState() as Record<string, unknown>
       const schroedinger = ext.schroedinger as Record<string, unknown> | undefined
       const tdse = schroedinger?.tdse as Record<string, unknown> | undefined
@@ -442,7 +442,7 @@ test.describe('Measurement Canvas Click', () => {
   test('cooldown blocks canvas click measurement', async ({ page }) => {
     // Use longer cooldown so we can test the guard
     await page.evaluate(async () => {
-      const { useMeasurementStore } = await import('/src/stores/measurementStore.ts')
+      const { useMeasurementStore } = await import('/src/stores/diagnostics/measurementStore.ts')
       const store = useMeasurementStore.getState()
       store.setEnabled(true)
       store.setAutoEvolveFrames(60) // ~1 second cooldown at 60fps
@@ -494,7 +494,7 @@ test.describe('Measurement State Machine', () => {
 
     // Request measurement and try to catch the isCollapsing=true state
     await page.evaluate(async () => {
-      const { useMeasurementStore } = await import('/src/stores/measurementStore.ts')
+      const { useMeasurementStore } = await import('/src/stores/diagnostics/measurementStore.ts')
       useMeasurementStore.getState().requestMeasurement([0, 0, 0])
     })
 
@@ -514,7 +514,7 @@ test.describe('Measurement State Machine', () => {
 
     // Add some more via store for accumulated state
     await page.evaluate(async () => {
-      const { useMeasurementStore } = await import('/src/stores/measurementStore.ts')
+      const { useMeasurementStore } = await import('/src/stores/diagnostics/measurementStore.ts')
       const store = useMeasurementStore.getState()
       store.addMeasurement([1, 1, 1], 0.3)
       store.addMeasurement([2, 2, 2], 0.1)
@@ -525,7 +525,7 @@ test.describe('Measurement State Machine', () => {
 
     // Clear everything
     await page.evaluate(async () => {
-      const { useMeasurementStore } = await import('/src/stores/measurementStore.ts')
+      const { useMeasurementStore } = await import('/src/stores/diagnostics/measurementStore.ts')
       useMeasurementStore.getState().clearMeasurements()
     })
 
