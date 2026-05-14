@@ -7,6 +7,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { CommandPalette } from '@/components/layout/CommandPalette'
+import { Z_INDEX } from '@/constants/zIndex'
 import { useCameraStore } from '@/stores/scene/cameraStore'
 import { useLayoutStore } from '@/stores/ui/layoutStore'
 import { useThemeStore } from '@/stores/ui/themeStore'
@@ -34,6 +35,12 @@ describe('CommandPalette', () => {
     useLayoutStore.getState().setCommandPaletteOpen(true)
     render(<CommandPalette />)
     expect(screen.getByPlaceholderText(/type a command/i)).toBeInTheDocument()
+  })
+
+  it('renders on the central modal stacking layer', () => {
+    useLayoutStore.getState().setCommandPaletteOpen(true)
+    render(<CommandPalette />)
+    expect(screen.getByTestId('command-palette-layer')).toHaveStyle({ zIndex: Z_INDEX.MODAL })
   })
 
   it('opens from keyboard shortcut, filters commands, and closes on Escape', async () => {

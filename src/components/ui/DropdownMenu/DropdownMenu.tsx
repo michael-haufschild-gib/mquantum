@@ -10,11 +10,13 @@ import React, {
 } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+import { Z_INDEX } from '@/constants/zIndex'
 import { soundManager } from '@/lib/audio/SoundManager'
-import { supportsPopover } from '@/lib/popoverSupport'
+import { hidePopoverSafely, showPopoverSafely, supportsPopover } from '@/lib/popoverSupport'
 import { useDropdownStore } from '@/stores/ui/dropdownStore'
 
 import { MenuItems } from './MenuItems'
+import { MENU_ITEM_SELECTOR } from './menuItemSelector'
 import { SubmenuPortalContext } from './SubmenuPortalContext'
 import type { DropdownMenuProps } from './types'
 
@@ -52,6 +54,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
     )
 
     const triggerRef = useRef<HTMLDivElement>(null)
+    const nativePopoverOpenRef = useRef(false)
     const [coords, setCoords] = useState({ top: 0, left: 0 })
     const offset = 4
     const originalTriggerOnClick =
@@ -86,10 +89,12 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
       const popover = popoverRef.current
       if (!popover) return
 
-      if (isOpen && !popover.matches(':popover-open')) {
-        popover.showPopover()
-      } else if (!isOpen && popover.matches(':popover-open')) {
-        popover.hidePopover()
+      if (isOpen) {
+        showPopoverSafely(popover)
+        nativePopoverOpenRef.current = true
+      } else if (nativePopoverOpenRef.current) {
+        hidePopoverSafely(popover)
+        nativePopoverOpenRef.current = false
       }
     }, [isOpen])
 
@@ -215,9 +220,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
     useEffect(() => {
       if (!isOpen || !menuRef.current) return
       const timer = requestAnimationFrame(() => {
-        const firstItem = menuRef.current?.querySelector<HTMLElement>(
-          '[role="menuitem"]:not(:disabled)'
-        )
+        const firstItem = menuRef.current?.querySelector<HTMLElement>(MENU_ITEM_SELECTOR)
         firstItem?.focus()
       })
       return () => cancelAnimationFrame(timer)
@@ -229,9 +232,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
         const menu = menuRef.current
         if (!menu) return
 
-        const menuItems = Array.from(
-          menu.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled)')
-        )
+        const menuItems = Array.from(menu.querySelectorAll<HTMLElement>(MENU_ITEM_SELECTOR))
         const currentIndex = menuItems.indexOf(document.activeElement as HTMLElement)
 
         switch (e.key) {
@@ -289,11 +290,13 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
           id={dropdownId}
           data-dropdown-content="true"
           data-dropdown-id={dropdownId}
+          data-testid={`dropdown-content-${dropdownId}`}
           className="m-0 p-0 border-none bg-transparent"
           style={{
             position: 'fixed',
             top: coords.top,
             left: coords.left,
+            zIndex: Z_INDEX.TOOLTIP,
           }}
         >
           <SubmenuPortalContext.Provider value={popoverRef}>

@@ -3,9 +3,10 @@ import React, { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Button } from '@/components/ui/Button'
+import { Z_INDEX } from '@/constants/zIndex'
 import { soundManager } from '@/lib/audio/SoundManager'
 import { getModifierSymbols } from '@/lib/platform'
-import { supportsPopover } from '@/lib/popoverSupport'
+import { hidePopoverSafely, showPopoverSafely, supportsPopover } from '@/lib/popoverSupport'
 import { useCameraStore } from '@/stores/scene/cameraStore'
 import { useDropdownStore } from '@/stores/ui/dropdownStore'
 import { type LayoutStore, useLayoutStore } from '@/stores/ui/layoutStore'
@@ -47,11 +48,11 @@ export const CanvasContextMenuContent: React.FC<CanvasContextMenuContentProps> =
     useEffect(() => {
       if (!supportsPopover) return
       const popover = popoverRef.current
-      if (!popover || popover.matches(':popover-open')) return
+      if (!popover) return
 
-      popover.showPopover()
+      showPopoverSafely(popover)
       return () => {
-        if (popover.matches(':popover-open')) popover.hidePopover()
+        hidePopoverSafely(popover)
       }
     }, [])
 
@@ -110,11 +111,13 @@ export const CanvasContextMenuContent: React.FC<CanvasContextMenuContentProps> =
         {...(supportsPopover ? { popover: 'manual' } : {})}
         id={dropdownId}
         data-testid="canvas-context-menu"
-        className="fixed z-50 m-0 p-0 border-none bg-transparent"
-        style={{ top: position.y, left: position.x }}
+        className="fixed m-0 p-0 border-none bg-transparent"
+        style={{ top: position.y, left: position.x, zIndex: Z_INDEX.TOOLTIP }}
       >
         <AnimatePresence>
           <m.div
+            role="menu"
+            aria-label="Canvas context menu"
             initial={{ opacity: 0, scale: 0.9, x: -10, y: -10 }}
             animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
             exit={{ opacity: 0, scale: 0.9 }}
@@ -134,6 +137,8 @@ export const CanvasContextMenuContent: React.FC<CanvasContextMenuContentProps> =
               return (
                 <Button
                   key={index}
+                  role="menuitem"
+                  ariaLabel={item.label}
                   onClick={() => handleItemClick(item.action)}
                   onMouseEnter={handleItemHover}
                   className="w-full text-left px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex justify-between items-center transition-colors group rounded-none border-none bg-transparent"
@@ -142,7 +147,10 @@ export const CanvasContextMenuContent: React.FC<CanvasContextMenuContentProps> =
                 >
                   <span>{item.label}</span>
                   {item.shortcut && (
-                    <span className="text-xs font-mono text-text-tertiary group-hover:text-text-secondary">
+                    <span
+                      aria-hidden="true"
+                      className="text-xs font-mono text-text-tertiary group-hover:text-text-secondary"
+                    >
                       {item.shortcut}
                     </span>
                   )}

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Button } from '@/components/ui/Button'
 import { Tooltip } from '@/components/ui/Tooltip'
+import { Z_INDEX } from '@/constants/zIndex'
 
 describe('Tooltip', () => {
   beforeEach(() => {
@@ -127,5 +128,21 @@ describe('Tooltip', () => {
     })
 
     expect(screen.getByTestId('custom-content')).toBeInTheDocument()
+  })
+
+  it('uses the centralized tooltip z-index above nonblocking overlays', async () => {
+    render(
+      <Tooltip content="Layered tooltip" delay={0}>
+        <Button>Hover me</Button>
+      </Tooltip>
+    )
+
+    fireEvent.mouseEnter(screen.getByRole('button'))
+
+    await act(async () => {
+      vi.advanceTimersByTime(0)
+    })
+
+    expect(screen.getByRole('tooltip')).toHaveStyle({ zIndex: Z_INDEX.TOOLTIP })
   })
 })

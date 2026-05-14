@@ -2,7 +2,10 @@ import { m } from 'motion/react'
 import React, { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
+import { Z_INDEX } from '@/constants/zIndex'
+
 import { MenuItems } from './MenuItems'
+import { MENU_ITEM_SELECTOR } from './menuItemSelector'
 import { SubmenuPortalContext } from './SubmenuPortalContext'
 import type { DropdownMenuItem } from './types'
 
@@ -39,13 +42,13 @@ export const PortaledSubmenu: React.FC<{
     // otherwise fall back to document.body. This ensures submenus stay in the
     // same stacking context as the parent menu when using native popover API.
     const portalContainerRef = useContext(SubmenuPortalContext)
-    const [portalTarget, setPortalTarget] = useState<HTMLElement>(() => document.body)
+    const [portalTarget, setPortalTarget] = useState<HTMLElement>(
+      () => portalContainerRef?.current ?? document.body
+    )
 
     useLayoutEffect(() => {
-      const syncPortalTargetTimer = window.setTimeout(() => {
-        setPortalTarget(portalContainerRef?.current ?? document.body)
-      }, 0)
-      return () => clearTimeout(syncPortalTargetTimer)
+      const nextPortalTarget = portalContainerRef?.current ?? document.body
+      setPortalTarget((current) => (current === nextPortalTarget ? current : nextPortalTarget))
     }, [portalContainerRef])
 
     useLayoutEffect(() => {
@@ -86,7 +89,7 @@ export const PortaledSubmenu: React.FC<{
     useEffect(() => {
       if (!autoFocusFirst || !ready) return
       const focusTimer = requestAnimationFrame(() => {
-        menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not(:disabled)')?.focus()
+        menuRef.current?.querySelector<HTMLElement>(MENU_ITEM_SELECTOR)?.focus()
       })
       return () => cancelAnimationFrame(focusTimer)
     }, [autoFocusFirst, ready])
@@ -96,9 +99,7 @@ export const PortaledSubmenu: React.FC<{
         const menu = menuRef.current
         if (!menu) return
 
-        const menuItems = Array.from(
-          menu.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled)')
-        )
+        const menuItems = Array.from(menu.querySelectorAll<HTMLElement>(MENU_ITEM_SELECTOR))
         if (menuItems.length === 0) return
 
         const currentIndex = menuItems.indexOf(document.activeElement as HTMLElement)
@@ -156,7 +157,7 @@ export const PortaledSubmenu: React.FC<{
           position: 'fixed',
           top: coords.top,
           left: coords.left,
-          zIndex: 200 + depth * 10,
+          zIndex: Z_INDEX.TOOLTIP + depth * 10,
           maxHeight: '60vh',
           overflowY: 'auto',
           backdropFilter: 'blur(16px)',

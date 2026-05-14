@@ -28,12 +28,14 @@ export const MenuItemButton = React.memo(
     itemRef: (el: HTMLButtonElement | null) => void
   }) => {
     const isMobile = useIsMobile()
+    const role = item.checked !== undefined ? 'menuitemcheckbox' : 'menuitem'
 
     return (
       <button
         type="button"
         ref={itemRef}
-        role="menuitem"
+        role={role}
+        aria-checked={item.checked !== undefined ? item.checked : undefined}
         tabIndex={-1}
         onClick={onItemClick}
         onMouseEnter={onMouseEnter}
@@ -51,7 +53,10 @@ export const MenuItemButton = React.memo(
       >
         <span className="flex items-center gap-2">
           {item.checked !== undefined && (
-            <span className={`text-xs ${item.checked ? 'text-accent' : 'opacity-0'}`}>
+            <span
+              aria-hidden="true"
+              className={`text-xs ${item.checked ? 'text-accent' : 'opacity-0'}`}
+            >
               {'\u2022'}
             </span>
           )}

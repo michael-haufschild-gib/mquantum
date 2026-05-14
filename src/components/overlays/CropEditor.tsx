@@ -2,6 +2,7 @@ import { m } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+import { Z_INDEX } from '@/constants/zIndex'
 import { captureScreenshotAsync } from '@/hooks/useScreenshotCapture'
 import { useToast } from '@/hooks/useToast'
 import { logger } from '@/lib/logger'
@@ -111,7 +112,11 @@ export const CropEditor = () => {
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col pointer-events-auto overflow-hidden">
+    <div
+      data-testid="crop-editor-layer"
+      className="fixed inset-0 flex flex-col pointer-events-auto overflow-hidden"
+      style={{ zIndex: Z_INDEX.MODAL }}
+    >
       {/* Toolbar */}
       <m.div
         initial={{ y: -100 }}

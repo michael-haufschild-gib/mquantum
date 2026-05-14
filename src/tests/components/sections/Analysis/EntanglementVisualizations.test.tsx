@@ -18,6 +18,7 @@ import {
   PerDimensionBars,
   SpectrumBars,
 } from '@/components/sections/Analysis/EntanglementVisualizations'
+import { Z_INDEX } from '@/constants/zIndex'
 
 // ─── PerDimensionBars ────────────────────────────────────────────────────────
 
@@ -195,7 +196,9 @@ describe('AtlasHeatmap', () => {
     await user.hover(cells[0]!)
 
     // Tooltip should appear showing λ/N coordinates and entropy label
-    expect(screen.getByText(/S̄\/S_max =/)).toBeInTheDocument()
+    const entropyLine = screen.getByText(/S̄\/S_max =/)
+    expect(entropyLine).toBeInTheDocument()
+    expect(screen.getByTestId('atlas-tooltip')).toHaveStyle({ zIndex: Z_INDEX.TOOLTIP })
   })
 
   it('hides floating tooltip after mouse leave', async () => {

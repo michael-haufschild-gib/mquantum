@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Button } from '@/components/ui/Button'
 import { DropdownMenu, type DropdownMenuItem } from '@/components/ui/DropdownMenu'
+import { Z_INDEX } from '@/constants/zIndex'
 import { useDropdownStore } from '@/stores/ui/dropdownStore'
 
 // Mock the sound manager
@@ -45,6 +46,32 @@ describe('DropdownMenu (invariants)', () => {
 
       expect(screen.getByText('Item 1')).toBeInTheDocument()
       expect(screen.getByText('Item 2')).toBeInTheDocument()
+    })
+
+    it('does not crash when the :popover-open selector is unavailable', async () => {
+      const originalMatches = HTMLElement.prototype.matches
+      const matchesSpy = vi.spyOn(HTMLElement.prototype, 'matches').mockImplementation(function (
+        this: HTMLElement,
+        selector: string
+      ) {
+        if (selector === ':popover-open') {
+          throw new DOMException('Unknown pseudo-class', 'SyntaxError')
+        }
+        return originalMatches.call(this, selector)
+      })
+
+      try {
+        const user = userEvent.setup()
+        render(
+          <DropdownMenu trigger={<Button>Open Menu</Button>} items={mockItems} id="test-menu" />
+        )
+
+        await user.click(screen.getByText('Open Menu'))
+
+        expect(screen.getByText('Item 1')).toBeInTheDocument()
+      } finally {
+        matchesSpy.mockRestore()
+      }
     })
   })
 
@@ -305,6 +332,27 @@ describe('DropdownMenu (invariants)', () => {
       // so `onClose` must not fire.
       expect(useDropdownStore.getState().openDropdownId).toBe('test-menu')
     })
+
+    it('exposes checked menu items through ARIA and keeps them keyboard navigable', async () => {
+      const items: DropdownMenuItem[] = [
+        { label: 'Light', checked: false, onClick: vi.fn() },
+        { label: 'Dark', checked: true, onClick: vi.fn() },
+      ]
+
+      const user = userEvent.setup()
+      render(<DropdownMenu trigger={<Button>Open Menu</Button>} items={items} id="test-menu" />)
+
+      await user.click(screen.getByText('Open Menu'))
+
+      const light = screen.getByRole('menuitemcheckbox', { name: 'Light' })
+      const dark = screen.getByRole('menuitemcheckbox', { name: 'Dark' })
+      expect(light).toHaveAttribute('aria-checked', 'false')
+      expect(dark).toHaveAttribute('aria-checked', 'true')
+
+      await vi.waitFor(() => expect(light).toHaveFocus())
+      await user.keyboard('{ArrowDown}')
+      expect(dark).toHaveFocus()
+    })
   })
 
   describe('invariant: onClose fires only when transitioning from open to closed', () => {
@@ -516,6 +564,17 @@ describe('DropdownMenu (invariants)', () => {
       // When open, the dropdown menu should be visible with its items
       expect(screen.getByRole('menu')).toBeInTheDocument()
       expect(screen.getByRole('menuitem', { name: 'Item 1' })).toBeInTheDocument()
+    })
+
+    it('renders dropdown content on the central popover layer', async () => {
+      const user = userEvent.setup()
+      render(<DropdownMenu trigger={<Button>Open Menu</Button>} items={mockItems} id="test-menu" />)
+
+      await user.click(screen.getByText('Open Menu'))
+
+      expect(screen.getByTestId('dropdown-content-test-menu')).toHaveStyle({
+        zIndex: Z_INDEX.TOOLTIP,
+      })
     })
   })
 })

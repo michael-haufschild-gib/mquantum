@@ -13,6 +13,7 @@
 import React, { useState } from 'react'
 
 import { Tooltip } from '@/components/ui/Tooltip'
+import { Z_INDEX } from '@/constants/zIndex'
 
 /* ── SVG layout constants ── */
 const BAR_W = 260
@@ -459,10 +460,13 @@ export const AtlasHeatmap: React.FC<{
       {/* Floating cell tooltip */}
       {hovered && (
         <div
-          className="fixed z-[100] glass-panel-dark border border-border-default rounded-lg px-3 py-2 pointer-events-none max-w-[240px] shadow-lg"
+          role="tooltip"
+          data-testid="atlas-tooltip"
+          className="fixed glass-panel-dark border border-border-default rounded-lg px-3 py-2 pointer-events-none max-w-[240px] shadow-lg"
           style={{
             left: `${hovered.x}px`,
             top: `${hovered.y - 8}px`,
+            zIndex: Z_INDEX.TOOLTIP,
             transform: 'translate(-50%, -100%)',
             textShadow: '0 1px 2px var(--bg-overlay)',
           }}

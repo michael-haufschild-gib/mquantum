@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PortaledSubmenu } from '@/components/ui/DropdownMenu/PortaledSubmenu'
 import { SubmenuPortalContext } from '@/components/ui/DropdownMenu/SubmenuPortalContext'
 import type { DropdownMenuItem } from '@/components/ui/DropdownMenu/types'
+import { Z_INDEX } from '@/constants/zIndex'
 
 // Mock motion/react to avoid animation issues in tests
 vi.mock('motion/react', () => ({
@@ -111,7 +112,8 @@ describe('PortaledSubmenu', () => {
       </SubmenuPortalContext.Provider>
     )
 
-    // Items should be reachable in document body (portal goes to container)
+    const submenu = screen.getByTestId('portaled-submenu')
+    expect(container).toContainElement(submenu)
     expect(screen.getByText('Sub Item 1')).toBeInTheDocument()
     document.body.removeChild(container)
   })
@@ -204,7 +206,6 @@ describe('PortaledSubmenu', () => {
     )
 
     const menuEl = screen.getByTestId('portaled-submenu')
-    // zIndex = 200 + depth * 10 = 200 + 30 = 230
-    expect(menuEl).toHaveStyle({ zIndex: 230 })
+    expect(menuEl).toHaveStyle({ zIndex: Z_INDEX.TOOLTIP + 30 })
   })
 })

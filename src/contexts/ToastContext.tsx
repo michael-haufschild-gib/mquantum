@@ -1,6 +1,8 @@
 import { AnimatePresence, m } from 'motion/react'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { Z_INDEX } from '@/constants/zIndex'
+
 import { type Toast, ToastContext, type ToastType } from './ToastContextInstance'
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -34,7 +36,8 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <ToastContext.Provider value={contextValue}>
       {children}
       <div
-        className="fixed bottom-6 end-6 z-[100] flex flex-col gap-2 pointer-events-none items-end"
+        className="fixed bottom-6 end-6 flex flex-col gap-2 pointer-events-none items-end"
+        style={{ zIndex: Z_INDEX.TOOLTIP }}
         data-testid="toast-container"
       >
         <AnimatePresence mode="popLayout">
