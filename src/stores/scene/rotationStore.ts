@@ -134,6 +134,7 @@ function rotationUpdatesChangeState(
     const currentAngle = currentRotations.get(plane)
     if (
       currentAngle === undefined ||
+      !Number.isFinite(currentAngle) ||
       Math.abs(currentAngle - normalizedAngle) > ROTATION_CHANGE_EPSILON
     ) {
       return true

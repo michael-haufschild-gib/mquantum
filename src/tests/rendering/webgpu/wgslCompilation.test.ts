@@ -952,8 +952,8 @@ describe('WGSL Emission Pre-Block Conditional Inclusion', () => {
   })
 
   it('dead COLOR_ALG_* constants are removed', () => {
-    // Test all algorithm values — none should emit COLOR_ALG_ constants
-    for (const alg of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const) {
+    // Walk the shared algorithm registry so newer COLOR_ALG_* ids stay covered.
+    for (const alg of COLOR_ALGORITHM_INDICES) {
       const block = generateEmissionPreBlock(alg, false)
       expect(block).not.toContain('COLOR_ALG_')
     }

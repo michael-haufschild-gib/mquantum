@@ -24,7 +24,7 @@ fn finite_or_zero(value: f64) -> f64 {
 
 #[inline(always)]
 fn sanitize_projection_distance(value: f64) -> f64 {
-    if value.is_finite() && value > MIN_SAFE_DISTANCE {
+    if value.is_finite() && value >= MIN_SAFE_DISTANCE {
         value
     } else {
         DEFAULT_PROJECTION_DISTANCE

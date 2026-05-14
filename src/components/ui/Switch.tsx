@@ -4,12 +4,9 @@ import React, { useCallback } from 'react'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { soundManager } from '@/lib/audio/SoundManager'
 
-/** Props for the {@link Switch} toggle component. */
-export interface SwitchProps {
+interface SwitchPropsBase {
   checked: boolean
   onCheckedChange: (checked: boolean) => void
-  label?: string
-  ariaLabel?: string
   disabled?: boolean
   className?: string
   iconOn?: React.ReactNode
@@ -17,6 +14,18 @@ export interface SwitchProps {
   tooltip?: string
   'data-testid'?: string
 }
+
+/**
+ * Accessible-name variants: at least one of `label` or `ariaLabel` is required
+ * so the type system guarantees the rendered checkbox always has an accessible
+ * name (the runtime falls back from `ariaLabel` to `label`).
+ */
+type SwitchAccessibleName =
+  | { label: string; ariaLabel?: string }
+  | { label?: string; ariaLabel: string }
+
+/** Props for the {@link Switch} toggle component. */
+export type SwitchProps = SwitchPropsBase & SwitchAccessibleName
 
 export const Switch: React.FC<SwitchProps> = React.memo(
   ({

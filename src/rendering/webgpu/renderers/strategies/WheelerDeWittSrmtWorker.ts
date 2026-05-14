@@ -465,7 +465,6 @@ export function queueSrmtCompute(
   state.lastDispatchedHash = createEmptyLastDispatchedHash()
   state.queue = []
   const normalizedSelectedClock = normalizeQueueSelectedClock(selectedClock)
-  state.selectedClock = normalizedSelectedClock
   // Order: selected clock first, then the remaining two in canonical order
   // (so tests get a deterministic tail).
   const ordered: SrmtClock[] = [
@@ -479,9 +478,14 @@ export function queueSrmtCompute(
     }
   }
   if (state.queue.length === 0) {
+    state.selectedClock = null
     useSrmtDiagnosticStore.getState().setSrmtComputing(false)
     return
   }
+  // Anchor `selectedClock` to the actually enqueued head: when the preferred
+  // clock was filtered out, `handleResultReply`'s publish gate would otherwise
+  // never fire and `setDiagnostic` would skip the whole batch.
+  state.selectedClock = state.queue[0]!.clock
   useSrmtDiagnosticStore.getState().beginSrmtComputing()
   dispatchNextInQueue(state)
 }

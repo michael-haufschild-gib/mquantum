@@ -187,7 +187,9 @@ export const MOBILE_EXPORT_PRESETS = MOBILE_PRESET_IDS.map(definePreset)
 
 /** Returns true when the raw value is a known export preset id. */
 export function isExportPresetId(value: string | null): value is ExportPresetId {
-  return typeof value === 'string' && value in EXPORT_PRESET_CONFIGS
+  return (
+    typeof value === 'string' && Object.prototype.hasOwnProperty.call(EXPORT_PRESET_CONFIGS, value)
+  )
 }
 
 /** Look up the settings patch for a preset id, or undefined for unknown runtime input. */

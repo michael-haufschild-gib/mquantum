@@ -105,10 +105,12 @@ export const clampMin = (value: number, min: number): number => Math.max(min, va
 
 /** Clamp a crop rectangle so x + width and y + height remain within [0, 1]. */
 export function normalizeCropBounds(crop: CropSettings): CropSettings {
-  const width = clampToRange(crop.width, 0, 1)
-  const height = clampToRange(crop.height, 0, 1)
-  const x = clampToRange(crop.x, 0, Math.max(0, 1 - width))
-  const y = clampToRange(crop.y, 0, Math.max(0, 1 - height))
+  // Math.min/Math.max propagate NaN, so clampToRange alone cannot rescue
+  // non-finite inputs. Substitute safe defaults before clamping.
+  const width = Number.isFinite(crop.width) ? clampToRange(crop.width, 0, 1) : 1
+  const height = Number.isFinite(crop.height) ? clampToRange(crop.height, 0, 1) : 1
+  const x = Number.isFinite(crop.x) ? clampToRange(crop.x, 0, Math.max(0, 1 - width)) : 0
+  const y = Number.isFinite(crop.y) ? clampToRange(crop.y, 0, Math.max(0, 1 - height)) : 0
   return { ...crop, x, y, width, height }
 }
 

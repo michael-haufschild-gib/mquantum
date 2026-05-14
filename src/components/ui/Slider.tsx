@@ -11,7 +11,7 @@ const DRAG_SENSITIVITY_PRECISE = 0.05
 /** Pixels of mouse movement to traverse full range */
 const DRAG_PIXELS_TO_FULL_RANGE = 200
 
-const STRICT_DECIMAL_PATTERN = /^[+-]?(?:\d+\.?\d*|\.\d+)$/
+const STRICT_DECIMAL_PATTERN = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/
 
 function snapToValidStep(value: number, step: number): number {
   if (!Number.isFinite(step) || step <= 0) return value

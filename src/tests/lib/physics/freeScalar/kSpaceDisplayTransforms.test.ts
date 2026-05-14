@@ -960,9 +960,14 @@ describe('buildKSpaceDisplayTextures', () => {
 
   it('sanitizes invalid display enum values before choosing transform branches', () => {
     const raw = makeTestRawData(4)
-    const expected = buildKSpaceDisplayTextures(raw, DEFAULT_KSPACE_VIZ)
+    // The sanitizer routes invalid enums to DEFAULT_KSPACE_VIZ; the broadening
+    // pass is the dominant cost of the full pipeline (separable 3D Gaussian on
+    // a 64^3 grid) and is orthogonal to enum selection, so we disable it for
+    // both runs to keep the test under the CI worker budget.
+    const baseConfig: KSpaceVizConfig = { ...DEFAULT_KSPACE_VIZ, broadeningEnabled: false }
+    const expected = buildKSpaceDisplayTextures(raw, baseConfig)
     const invalidConfig = {
-      ...DEFAULT_KSPACE_VIZ,
+      ...baseConfig,
       displayMode: 'not-a-display-mode',
       exposureMode: 'not-an-exposure-mode',
     } as unknown as KSpaceVizConfig

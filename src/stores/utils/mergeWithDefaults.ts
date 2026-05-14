@@ -93,6 +93,12 @@ const NUMERIC_ARRAY_FIELDS = new Set([
 
 const BOOLEAN_ARRAY_FIELDS = new Set(['compactDims'])
 
+// `gridSize`, `spacing`, and `initialPosition` are intentionally excluded.
+// Their downstream sanitizer (`sanitizeQuantumWalkConfig` and the
+// `LATTICE_SIZED_ARRAY_FIELDS` reshape) fixes non-finite entries per index,
+// preserving the user's other valid values. Enforcing finite at the merge
+// gate would reject the whole array and erase those values along with the
+// bad one — see the "sanitizes loaded quantumWalk grids" test.
 const FINITE_NUMERIC_ARRAY_FIELDS = new Set([
   'angularChain',
   'center',

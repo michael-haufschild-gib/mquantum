@@ -18,7 +18,10 @@ export const emissionPostBlock = /* wgsl */ `
 
 fn safeNormalizeEmission(v: vec3f, fallback: vec3f) -> vec3f {
   let lenSq = dot(v, v);
-  if (lenSq < 1.0e-12) { return fallback; }
+  // NaN comparisons evaluate false, so the negated ordered > test routes both
+  // near-zero and non-finite lenSq to the fallback instead of letting NaN
+  // leak into inverseSqrt.
+  if (!(lenSq > 1.0e-12)) { return fallback; }
   return v * inverseSqrt(lenSq);
 }
 

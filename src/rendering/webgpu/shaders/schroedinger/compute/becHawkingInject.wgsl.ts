@@ -83,7 +83,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let stride = params.strides[d];
     let fwdIdx = idx + stride;
     let bwdIdx = idx - stride;
-    let invDx = 0.5 / max(abs(params.spacing[d]), 1e-6);
+    // Route both near-zero and non-finite spacing values to the floor: NaN
+    // comparisons evaluate false, so an ordered >= against the floor
+    // (via select) sanitizes both cases without relying on min/max NaN handling.
+    let dxAbs = abs(params.spacing[d]);
+    let safeDx = select(1e-6, dxAbs, dxAbs >= 1e-6);
+    let invDx = 0.5 / safeDx;
     let zF = psi[fwdIdx];
     let zB = psi[bwdIdx];
     let dRe = (zF.x - zB.x) * invDx;

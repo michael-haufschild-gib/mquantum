@@ -143,7 +143,9 @@ export function maybeDispatchHawkingInject(
 ): boolean {
   if (!config.hawkingPairInjection) return false
   if ((config.hawkingInjectRate ?? 0) <= 0) return false
-  if (!Number.isFinite(linearWG) || linearWG <= 0) return false
+  // dispatchWorkgroups takes GPUSize32 (u32). Reject NaN/Infinity and any
+  // non-integer count — fractional values trigger GPUValidationError at dispatch.
+  if (!Number.isInteger(linearWG) || linearWG <= 0 || linearWG > 0xffffffff) return false
   if (!state.pipeline || !uniformBuffer || !psi) return false
 
   ensureHawkingBindGroup(device, state, uniformBuffer, psi)

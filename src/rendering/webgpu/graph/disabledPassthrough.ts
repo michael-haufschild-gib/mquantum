@@ -31,6 +31,11 @@ function aliasDisabledOutput(
     resourceAliases.delete(outputId)
     return false
   }
+  // Treat unchanged mappings as a no-op so steady-state alias logs do not
+  // fire every frame and we skip a redundant map write.
+  if (resourceAliases.get(outputId) === resolvedInputId) {
+    return false
+  }
   resourceAliases.set(outputId, resolvedInputId)
   return true
 }

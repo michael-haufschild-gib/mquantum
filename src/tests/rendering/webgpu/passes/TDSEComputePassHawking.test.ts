@@ -48,7 +48,11 @@ describe('composeBecHawkingInjectShader', () => {
 
   it('guards spacing used by central differences', () => {
     const wgsl = composeBecHawkingInjectShader()
-    expect(wgsl).toContain('0.5 / max(abs(params.spacing[d]), 1e-6)')
+    // Routes NaN/Infinity to the 1e-6 floor via select() rather than relying
+    // on min/max NaN handling, which WGSL leaves indeterminate.
+    expect(wgsl).toContain('let dxAbs = abs(params.spacing[d]);')
+    expect(wgsl).toContain('let safeDx = select(1e-6, dxAbs, dxAbs >= 1e-6);')
+    expect(wgsl).toContain('let invDx = 0.5 / safeDx;')
   })
 })
 
@@ -56,30 +60,30 @@ describe('maybeDispatchHawkingInject', () => {
   it('does not dispatch when linear workgroup count is invalid', () => {
     const { ctx, device, dispatchCompute, psi, state, uniformBuffer } = createDispatchHarness()
 
-    expect(
-      maybeDispatchHawkingInject(
-        device,
-        ctx,
-        enabledConfig(),
-        state,
-        uniformBuffer,
-        psi,
-        Number.NaN,
-        dispatchCompute
-      )
-    ).toBe(false)
-    expect(
-      maybeDispatchHawkingInject(
-        device,
-        ctx,
-        enabledConfig(),
-        state,
-        uniformBuffer,
-        psi,
-        0,
-        dispatchCompute
-      )
-    ).toBe(false)
+    // GPUSize32 requires a positive integer; everything else must be rejected
+    // before reaching beginComputePass/dispatchCompute.
+    const invalidCounts = [
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+      0,
+      -1,
+      1.5,
+    ]
+    for (const count of invalidCounts) {
+      expect(
+        maybeDispatchHawkingInject(
+          device,
+          ctx,
+          enabledConfig(),
+          state,
+          uniformBuffer,
+          psi,
+          count,
+          dispatchCompute
+        )
+      ).toBe(false)
+    }
 
     expect(ctx.beginComputePass).not.toHaveBeenCalled()
     expect(dispatchCompute).not.toHaveBeenCalled()

@@ -124,6 +124,12 @@ describe('Section', () => {
     expect(firstControl).toEqual(expect.stringMatching(/^.+$/))
     expect(secondControl).toEqual(expect.stringMatching(/^.+$/))
     expect(firstControl).not.toBe(secondControl)
+    // ARIA references are id-based; resolving aria-controls is the only way to
+    // prove the relationship is real and not a pair of dangling strings.
+    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- verifying aria-controls id resolution
+    expect(document.getElementById(firstControl as string)).toBeInTheDocument()
+    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- verifying aria-controls id resolution
+    expect(document.getElementById(secondControl as string)).toBeInTheDocument()
     expect(screen.getByText('First')).toBeInTheDocument()
     expect(screen.getByText('Second')).toBeInTheDocument()
   })
