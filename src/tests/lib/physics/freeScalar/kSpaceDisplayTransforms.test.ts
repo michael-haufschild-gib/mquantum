@@ -960,19 +960,30 @@ describe('buildKSpaceDisplayTextures', () => {
 
   it('sanitizes invalid display enum values before choosing transform branches', () => {
     const raw = makeTestRawData(4)
-    // The sanitizer routes invalid enums to DEFAULT_KSPACE_VIZ; the broadening
-    // pass is the dominant cost of the full pipeline (separable 3D Gaussian on
-    // a 64^3 grid) and is orthogonal to enum selection, so we disable it for
-    // both runs to keep the test under the CI worker budget.
+    // The sanitizer routes invalid enums to DEFAULT_KSPACE_VIZ. Two cost knobs
+    // make this test CI-friendly:
+    //  - broadeningEnabled: false   — broadening (separable 3D Gaussian on a
+    //                                 96^3 grid) is the dominant pipeline cost
+    //                                 and is orthogonal to enum selection.
+    //  - outputGridSize: 16         — equality check is on packed Uint16
+    //                                 textures (G^3 * 4 elements). At the
+    //                                 default G=96 that is ~3.5M elements and
+    //                                 vitest's `toEqual` walks them through
+    //                                 chai's slow deep-eql path, which alone
+    //                                 has exceeded the 60s test budget under
+    //                                 4-worker contention. G=16 shrinks the
+    //                                 packed arrays to 16,384 elements while
+    //                                 keeping the branch coverage identical.
     const baseConfig: KSpaceVizConfig = { ...DEFAULT_KSPACE_VIZ, broadeningEnabled: false }
-    const expected = buildKSpaceDisplayTextures(raw, baseConfig)
+    const G = 16
+    const expected = buildKSpaceDisplayTextures(raw, baseConfig, false, G)
     const invalidConfig = {
       ...baseConfig,
       displayMode: 'not-a-display-mode',
       exposureMode: 'not-an-exposure-mode',
     } as unknown as KSpaceVizConfig
 
-    const actual = buildKSpaceDisplayTextures(raw, invalidConfig)
+    const actual = buildKSpaceDisplayTextures(raw, invalidConfig, false, G)
 
     expect(actual.density).toEqual(expected.density)
     expect(actual.analysis).toEqual(expected.analysis)

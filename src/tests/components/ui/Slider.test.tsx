@@ -281,5 +281,20 @@ describe('Slider', () => {
 
       expect(onChange).toHaveBeenCalledWith(6)
     })
+
+    it('preserves fractional value display when step is invalid', () => {
+      // Regression: `toFixed(0)` on a 0.4 slider value renders "0" and on blur
+      // commits 0 — silently overwriting user intent. The fallback path must
+      // use `step="any"` on the native range input and skip `toFixed()` so
+      // the text input keeps the raw value.
+      render(
+        <Slider label="Scale" value={0.4} min={0} max={10} step={Number.NaN} onChange={vi.fn()} />
+      )
+
+      const range = screen.getByRole('slider')
+      expect(range).toHaveAttribute('step', 'any')
+
+      expect(screen.getByLabelText('Scale value')).toHaveValue('0.4')
+    })
   })
 })

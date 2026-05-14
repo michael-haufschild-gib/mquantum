@@ -176,10 +176,14 @@ const MOBILE_PRESET_IDS: readonly ExportPresetId[] = [
   'high-q',
 ]
 
+// `definePreset` and `getExportPresetConfig` both return shallow clones of the
+// shared `EXPORT_PRESET_CONFIGS[id]` entry so a downstream mutation (e.g. a
+// caller patching `cropRatio` on the returned config) cannot leak back into
+// the module-level definitions and silently corrupt subsequent reads.
 const definePreset = (id: ExportPresetId): ExportPresetDefinition => ({
   id,
   ...PRESET_COPY[id],
-  config: EXPORT_PRESET_CONFIGS[id],
+  config: { ...EXPORT_PRESET_CONFIGS[id] },
 })
 
 export const DESKTOP_EXPORT_PRESETS = DESKTOP_PRESET_IDS.map(definePreset)
@@ -194,7 +198,7 @@ export function isExportPresetId(value: string | null): value is ExportPresetId 
 
 /** Look up the settings patch for a preset id, or undefined for unknown runtime input. */
 export function getExportPresetConfig(value: string): PresetConfig | undefined {
-  return isExportPresetId(value) ? EXPORT_PRESET_CONFIGS[value] : undefined
+  return isExportPresetId(value) ? { ...EXPORT_PRESET_CONFIGS[value] } : undefined
 }
 
 /**

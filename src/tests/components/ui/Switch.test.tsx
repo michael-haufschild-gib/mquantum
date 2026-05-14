@@ -99,6 +99,28 @@ describe('Switch', () => {
     expect(screen.getByRole('switch', { name: 'Enable export crop' })).toBeInTheDocument()
   })
 
+  it('falls back to a generic name when label/ariaLabel are empty or whitespace', () => {
+    // The discriminated union allows empty strings to satisfy the type-level
+    // "at least one of label/ariaLabel" contract, so the runtime must reject
+    // empty/whitespace and substitute a non-empty accessible name.
+    render(<Switch checked={false} onCheckedChange={vi.fn()} label="   " />)
+
+    expect(screen.getByRole('switch', { name: 'Toggle switch' })).toBeInTheDocument()
+  })
+
+  it('prefers ariaLabel when both are non-empty, after trimming', () => {
+    render(
+      <Switch
+        checked={false}
+        onCheckedChange={vi.fn()}
+        ariaLabel="  Aria wins  "
+        label="Label fallback"
+      />
+    )
+
+    expect(screen.getByRole('switch', { name: 'Aria wins' })).toBeInTheDocument()
+  })
+
   it('keeps every project Switch instance accessible by name', () => {
     const findings = listTsxFiles(SOURCE_ROOT).flatMap(findSwitchesMissingAccessibleName)
 

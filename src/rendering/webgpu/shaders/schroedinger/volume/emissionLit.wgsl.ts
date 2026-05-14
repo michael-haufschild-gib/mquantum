@@ -18,10 +18,13 @@ export const emissionPostBlock = /* wgsl */ `
 
 fn safeNormalizeEmission(v: vec3f, fallback: vec3f) -> vec3f {
   let lenSq = dot(v, v);
-  // NaN comparisons evaluate false, so the negated ordered > test routes both
-  // near-zero and non-finite lenSq to the fallback instead of letting NaN
-  // leak into inverseSqrt.
-  if (!(lenSq > 1.0e-12)) { return fallback; }
+  // NaN comparisons evaluate false, so the negated ordered > test routes
+  // near-zero and NaN lenSq to the fallback. The upper bound keeps +Inf out
+  // of inverseSqrt — the WGSL spec allows implementations to return an
+  // indeterminate value for inverseSqrt(+Inf) when finite-math assumptions
+  // are in play, so we cap lenSq at a generous finite ceiling and route the
+  // overflow case to the same fallback branch.
+  if (!(lenSq > 1.0e-12) || lenSq > 1.0e30) { return fallback; }
   return v * inverseSqrt(lenSq);
 }
 

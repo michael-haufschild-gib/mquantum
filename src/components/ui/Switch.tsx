@@ -41,6 +41,13 @@ export const Switch: React.FC<SwitchProps> = React.memo(
     'data-testid': dataTestId,
     ref,
   }: SwitchProps & { ref?: React.Ref<HTMLInputElement> }) => {
+    // The discriminated union enforces presence at the type level but cannot
+    // catch empty/whitespace strings at runtime (e.g. preset-driven UI passing
+    // a stripped label). Trim both sources and fall back to a generic name so
+    // the rendered checkbox always carries a non-empty accessible name for
+    // screen readers.
+    const resolvedAccessibleName = ariaLabel?.trim() || label?.trim() || 'Toggle switch'
+
     const handleMouseEnter = useCallback(() => {
       if (!disabled) {
         soundManager.playHover()
@@ -77,7 +84,7 @@ export const Switch: React.FC<SwitchProps> = React.memo(
             disabled={disabled}
             role="switch"
             aria-checked={checked}
-            aria-label={ariaLabel ?? label}
+            aria-label={resolvedAccessibleName}
           />
 
           {/* Track */}

@@ -60,8 +60,10 @@ describe('maybeDispatchHawkingInject', () => {
   it('does not dispatch when linear workgroup count is invalid', () => {
     const { ctx, device, dispatchCompute, psi, state, uniformBuffer } = createDispatchHarness()
 
-    // GPUSize32 requires a positive integer; everything else must be rejected
-    // before reaching beginComputePass/dispatchCompute.
+    // GPUSize32 requires a positive integer in the u32 range; everything else
+    // (NaN/Infinity, zero/negative, fractional, > 0xffffffff) must be rejected
+    // before reaching beginComputePass/dispatchCompute. `0x1_0000_0000` is the
+    // first value that overflows u32 and exercises the explicit upper bound.
     const invalidCounts = [
       Number.NaN,
       Number.POSITIVE_INFINITY,
@@ -69,6 +71,7 @@ describe('maybeDispatchHawkingInject', () => {
       0,
       -1,
       1.5,
+      0x1_0000_0000,
     ]
     for (const count of invalidCounts) {
       expect(
@@ -80,6 +83,32 @@ describe('maybeDispatchHawkingInject', () => {
           uniformBuffer,
           psi,
           count,
+          dispatchCompute
+        )
+      ).toBe(false)
+    }
+
+    expect(ctx.beginComputePass).not.toHaveBeenCalled()
+    expect(dispatchCompute).not.toHaveBeenCalled()
+  })
+
+  it('does not dispatch when hawkingInjectRate is non-finite or non-positive', () => {
+    const { ctx, device, dispatchCompute, psi, state, uniformBuffer } = createDispatchHarness()
+
+    // `NaN <= 0` and `Infinity <= 0` both evaluate to `false`, so a bare
+    // `<= 0` test would let non-finite rates pass the gate. The runtime must
+    // reject them via `Number.isFinite` before dispatching.
+    const invalidRates = [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, 0, -0.1]
+    for (const rate of invalidRates) {
+      expect(
+        maybeDispatchHawkingInject(
+          device,
+          ctx,
+          enabledConfig({ hawkingInjectRate: rate }),
+          state,
+          uniformBuffer,
+          psi,
+          7,
           dispatchCompute
         )
       ).toBe(false)

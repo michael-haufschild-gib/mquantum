@@ -40,8 +40,14 @@ function parseStrictFiniteNumber(input: string): number | null {
   return Number.isFinite(value) ? value : null
 }
 
-function formatSliderNumber(value: number, decimals: number): string {
-  return value.toFixed(decimals)
+/**
+ * Format a numeric value for the slider's text input. When `decimals` is
+ * `null` (the step is non-finite/invalid), the value is preserved with no
+ * granularity rounding — using `toFixed(0)` in that branch silently truncates
+ * fractional sliders to integers, so we fall back to `String(value)`.
+ */
+function formatSliderNumber(value: number, decimals: number | null): string {
+  return decimals === null ? String(value) : value.toFixed(decimals)
 }
 
 /** Props for the {@link Slider} range input component. */
@@ -86,12 +92,19 @@ export const Slider: React.FC<SliderProps> = React.memo(
     const safeMin = rangeIsValid ? min : 0
     const safeMax = rangeIsValid ? max : 0
     const safeValue = sanitizeValue(value, min, max)
-    const safeStep = Number.isFinite(step) && step > 0 ? step : undefined
+    // `safeStep`: when the caller passed a non-finite or non-positive step, the
+    // browser default (`step=1`) would force integer-only stepping on the
+    // `<input type="range">`. `step="any"` is the standard way to lift that
+    // restriction — see MDN docs for `<input type="range">` step attribute.
+    const safeStep: number | 'any' = Number.isFinite(step) && step > 0 ? step : 'any'
     const percentage = rangeIsValid
       ? Math.min(100, Math.max(0, ((safeValue - safeMin) / (safeMax - safeMin)) * 100))
       : 0
-    const decimals = (() => {
-      if (!Number.isFinite(step) || step <= 0) return 0
+    // `decimals === null` is the sentinel for "no granularity" so the text
+    // input preserves the raw value instead of collapsing fractional sliders
+    // to integers via `toFixed(0)`.
+    const decimals: number | null = (() => {
+      if (!Number.isFinite(step) || step <= 0) return null
       const text = step.toString().toLowerCase()
       if (text.includes('e-')) {
         const [mantissa, exponent] = text.split('e-')
