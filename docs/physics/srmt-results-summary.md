@@ -68,7 +68,7 @@ per §2.2).
 
 ### 2.2 Grid-convergence behaviour
 
-```
+```text
 Na    Nphi   rigid_a       rigid_φ1      φ/a margin
 48    12      28.27         3.602e+4     1274×
 64    16      92.98         5.434e+3       58×    (coarse-grid noise)
@@ -114,12 +114,12 @@ content beyond standard quantum cosmology.
 
 | Criterion                              | Verdict | Notes |
 |----------------------------------------|---------|-------|
-| 1. Rigid champion identity (= `a`)     | PASSES at 362/363 = 99.7% (1 point fails in coarse-grid noise zone) |
-| 2. Between-clock margin ≥ 30×           | PASSES at 326/363 = 89.8% in coarse grid; passes universally at 192×48+ |
-| 3. WKB-independence (WKB ≠ `a`)         | PASSES at 265/363 = 73.0% (33 failures all at m=0; documented edge case) |
-| 4. BC × m × Λ stability                | PASSES under rigid metric across all sampled BCs, masses, Λ |
-| 5. Grid-resolution stability           | PASSES — champion = `a` at every resolution 48×12 → 256×64 |
-| 6. Reproducibility manifest            | PASSES — 51-column CSV with full manifest; see `artifacts/` |
+| 1. Rigid champion identity (= `a`)     | PASSES  | 362/363 = 99.7% (1 point fails in coarse-grid noise zone) |
+| 2. Between-clock margin ≥ 30×          | PASSES  | 326/363 = 89.8% in coarse grid; passes universally at 192×48+ |
+| 3. WKB-independence (WKB ≠ `a`)        | PASSES  | 265/363 = 73.0% (33 failures all at m=0; documented edge case) |
+| 4. BC × m × Λ stability                | PASSES  | rigid metric across all sampled BCs, masses, Λ |
+| 5. Grid-resolution stability           | PASSES  | champion = `a` at every resolution 48×12 → 256×64 |
+| 6. Reproducibility manifest            | PASSES  | 51-column CSV with full manifest; see `artifacts/` |
 
 **Net verdict at 64×16:** 231/363 (63.6%) of grid points satisfy
 all three numerical criteria simultaneously. The failures are

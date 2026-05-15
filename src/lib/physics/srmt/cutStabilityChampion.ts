@@ -101,11 +101,15 @@ export function computeCutStability(
     const fullCount = Math.min(schmidt.length, rankCap * 2)
     if (fullCount < rankCap + 2) return Number.NaN
 
-    // Build numCuts overlapping rank windows of length rankCap.
+    // Build numCuts overlapping rank windows of length rankCap. With
+    // numCuts <= 1 we degenerate to a single window starting at rank
+    // 0; the cross-window distance loop below then returns NaN, which
+    // is the deterministic "insufficient data" signal callers expect.
+    const maxStart = Math.max(0, fullCount - rankCap)
     const windows: Float64Array[] = []
     for (let i = 0; i < numCuts; i++) {
-      const startFloat = (i * (fullCount - rankCap)) / (numCuts - 1)
-      const start = Math.floor(startFloat)
+      const startFloat = numCuts > 1 ? (i * maxStart) / (numCuts - 1) : 0
+      const start = Math.min(maxStart, Math.max(0, Math.floor(startFloat)))
       const trimmed = new Float64Array(rankCap)
       for (let j = 0; j < rankCap; j++) trimmed[j] = schmidt[start + j]!
       const { spectrum } = modularSpectrum(trimmed)

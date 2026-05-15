@@ -12,7 +12,7 @@ extended to (192, 48) and (256, 64).
 When the grid convergence scan is pushed past the v2 publication
 grid (128×32) to (192×48) and (256×64):
 
-```
+```text
 Na   Nphi   L2-champion   rigid-champion   q_rigid_a    q_rigid_φ1    φ/a margin
 48    12    a             a                 28.27        3.60e+4        1274×
 64    16    a             a                 92.98        5.43e+3          58×
@@ -94,7 +94,7 @@ for the next dedicated sweep run.
 
 ## Reproducibility
 
-```
+```bash
 pnpm exec vitest run src/tests/lib/physics/srmt/_liveInvestigation.test.ts -t "grid-convergence" --reporter=verbose
 ```
 

@@ -29,8 +29,8 @@ function formatNumber(value: number | undefined): string {
 }
 
 function formatRatio(value: number): string {
-  if (!Number.isFinite(value)) return '—'
   if (value === Number.POSITIVE_INFINITY) return '∞'
+  if (!Number.isFinite(value)) return '—'
   if (value >= 1000) return value.toExponential(1)
   if (value >= 100) return value.toFixed(0)
   if (value >= 10) return value.toFixed(1)
@@ -80,12 +80,12 @@ export const SrmtNullBaselineStrip: React.FC<SrmtNullBaselineStripProps> = ({ sn
       })
     : Number.NaN
   // Falsification: the real fit failed to beat at least one baseline.
-  // ratio < 1 means min(baseline) < realQ — i.e. a null beat the real
-  // fit, which is the SRMT-failure signal we explicitly want to flag.
-  // EITHER metric falsifying is sufficient — the strip flags red if
-  // either L2 or rigid show a baseline win.
+  // ratio <= 1 means min(baseline) <= realQ — i.e. a null met or beat
+  // the real fit, which is the SRMT-failure signal we explicitly want
+  // to flag. A tie (ratio === 1) is treated as falsification: the real
+  // fit does not strictly beat the best null.
   const falsified =
-    (Number.isFinite(ratio) && ratio < 1) || (Number.isFinite(ratioRigid) && ratioRigid < 1)
+    (Number.isFinite(ratio) && ratio <= 1) || (Number.isFinite(ratioRigid) && ratioRigid <= 1)
 
   const palette = falsified
     ? {

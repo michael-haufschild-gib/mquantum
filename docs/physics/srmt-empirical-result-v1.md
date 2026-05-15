@@ -107,7 +107,7 @@ tunneling.
 
 ## The headline result — rigid metric
 
-```
+```text
 BC          m     rigid_a     rigid_φ1    φ/a margin
 noBoundary  0.1     26.25      5486.45     209×
 noBoundary  0.3     92.98      5434.40      58×
@@ -184,7 +184,8 @@ against.
 ## Reproducibility
 
 Re-run with:
-```
+
+```bash
 pnpm exec vitest run src/tests/lib/physics/srmt/_liveInvestigation.test.ts --reporter=verbose
 ```
 

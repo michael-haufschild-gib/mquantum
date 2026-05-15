@@ -120,7 +120,12 @@ describe('V2 PUBLICATION SWEEP — full 21 × 21 × 3 grid against v2 criteria',
       }
     }
 
-    const total = verdicts.length
+    // Expected sweep cardinality = product of the input grid sizes.
+    // We compute this from the grid arrays (not from verdicts.length)
+    // so a future regression that silently drops a point on the inner
+    // loop fails the cardinality assertion at the bottom of this test.
+    const expectedTotal = BCS.length * MASSES.length * LAMBDAS.length
+    const total = expectedTotal
     const c1Failures = verdicts.filter((v) => !v.c1Pass)
     const c2Failures = verdicts.filter((v) => !v.c2Pass)
     const c3Failures = verdicts.filter((v) => !v.c3Pass)
@@ -197,6 +202,6 @@ describe('V2 PUBLICATION SWEEP — full 21 × 21 × 3 grid against v2 criteria',
 
     console.log('==================================================================\n')
 
-    expect(verdicts.length).toBe(total)
+    expect(verdicts.length).toBe(expectedTotal)
   }, 600_000)
 })

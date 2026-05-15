@@ -1,11 +1,25 @@
 # SRMT — Pre-Registered Falsification Criteria
 
+> **Archived historical pre-registration — superseded by v2.0.0.**
+> This file is preserved verbatim as the v1.0.0 pre-reg the v1
+> exploratory results in [`srmt-empirical-result-v1.md`](./srmt-empirical-result-v1.md)
+> were scored against. Active falsification work uses
+> [`srmt-falsification-v2.md`](./srmt-falsification-v2.md) and
+> requires `SRMT_DIAGNOSTIC_VERSION ≥ 1.2.0`.
+>
+> **Version timeline.** `SRMT_DIAGNOSTIC_VERSION` jumped from `1.0.0`
+> directly to `1.2.0` after the v1 sweep — the `1.1.0` coupling
+> referenced on the next line was a draft tag and was never released.
+> Treat the coupling below as the *intended* coupling at the time
+> this pre-reg was frozen; the actual diagnostic version that
+> implements the v1 scoring shipped as `1.2.0`.
+
 **Version**: 1.0.0
-**Diagnostic version coupled to**: `SRMT_DIAGNOSTIC_VERSION = 1.1.0`
-**Status**: PRE-REGISTERED. This document fixes the falsification bar
-*before* the publication sweep runs. Editing this document AFTER a
-publication sweep result is known invalidates the pre-registration and
-requires a versioned bump + restart of the sweep.
+**Diagnostic version coupled to**: `SRMT_DIAGNOSTIC_VERSION = 1.1.0` *(draft tag; shipped as `1.2.0` — see note above)*
+**Status**: ARCHIVED PRE-REGISTRATION. This document fixed the
+falsification bar *before* the v1 exploratory sweep ran. It is now
+superseded by v2.0.0; further edits are forbidden so the historical
+pre-reg coupling stays intact.
 
 ## Purpose
 

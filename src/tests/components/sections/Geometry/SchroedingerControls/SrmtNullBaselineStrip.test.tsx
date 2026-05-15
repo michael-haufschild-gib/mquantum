@@ -124,4 +124,27 @@ describe('SrmtNullBaselineStrip', () => {
     const strip = screen.getByTestId('wdw-srmt-null-baseline-strip')
     expect(strip).toHaveAttribute('data-falsified', 'true')
   })
+
+  it('falsifies on a tie (ratio === 1) — real fit must STRICTLY beat the best null', () => {
+    // Affine real = 0.04 matched exactly by the best affine baseline →
+    // ratio === 1. Rigid stays comfortably above 1 so the tie alone
+    // must trigger the falsification flag.
+    const snapshot = makeSnapshot({
+      nullBaselines: { shuffled: 0.04, reversed: 0.8, synthetic: 0.7 },
+    })
+    render(<SrmtNullBaselineStrip snapshot={snapshot} />)
+    const strip = screen.getByTestId('wdw-srmt-null-baseline-strip')
+    expect(strip).toHaveAttribute('data-falsified', 'true')
+    expect(strip).toHaveTextContent(/BASELINE WIN/i)
+  })
+
+  it('renders ∞ for the wins-by ratio when real affine quality is zero (perfect fit)', () => {
+    // Real = 0 → bestBaselineRatio returns +∞. The strip must show
+    // the ∞ glyph rather than swallowing it as a dash.
+    const snapshot = makeSnapshot({ affineMatchQuality: 0 })
+    render(<SrmtNullBaselineStrip snapshot={snapshot} />)
+    const strip = screen.getByTestId('wdw-srmt-null-baseline-strip')
+    expect(strip).toHaveTextContent(/∞×/)
+    expect(strip).toHaveAttribute('data-falsified', 'false')
+  })
 })

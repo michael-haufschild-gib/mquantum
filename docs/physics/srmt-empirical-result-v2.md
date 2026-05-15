@@ -60,7 +60,7 @@ within-clock null floor.
 
 ### 2. Λ axis: `a` is rigid champion across cosmological constant
 
-```
+```text
 Λ        champ(rigid)  rigid_a       rigid_φ1      φ/a margin
 -0.50    a                  41.39       2.099e+3      50.73×
 -0.20    a                  62.86       4.082e+3      64.94×
@@ -74,7 +74,7 @@ within-clock null floor.
 
 ### 3. Grid convergence: champion identity is stable, magnitude is not
 
-```
+```text
 Na   Nphi  champ(L2)   champ(rigid)   rigid_a       rigid_φ1      φ/a margin
 48   12    a           a                 28.27        3.602e+4    1.274e+3 ×
 64   16    a           a                 92.98        5.434e+3       58.45 ×
@@ -102,7 +102,7 @@ The WKB phase-rate diagnostic, computed entirely from `arg(χ)`
 without any modular / HJ / affine machinery, picks a **different
 clock** than rigid-q:
 
-```
+```text
 Case                            rate_a   rate_φ1  rate_φ2  WKB-champ   rigid-champ
 m=0.3 Λ=+0.1 noBoundary         0.150    0.398    0.398    null (φ tie)  a
 m=1.0 Λ=-0.2 deWitt             0.121    0.153    0.153    null (φ tie)  a
@@ -184,7 +184,8 @@ work:
 ## Reproducibility
 
 All v2 results are reproducible:
-```
+
+```bash
 pnpm exec vitest run src/tests/lib/physics/srmt/_liveInvestigation.test.ts --reporter=verbose
 ```
 

@@ -196,11 +196,21 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
       console.log(`  ${r.clock}: rigid_ratio=${fmt(r.rigidRatio)}× → ${verdict}`)
     }
 
+    // L2 margin = (runner-up.q − champion.q). The criterion requires
+    // champion === 'a' AND margin > 0.02 — a bare champion call from
+    // findChampionClock is necessary but not sufficient (the helper
+    // uses a strict-less-than tie-tolerance, so a margin of exactly
+    // 0.02 still names a champion). Recomputing the margin here keeps
+    // the printed verdict honest about that threshold.
+    const sortedQ = reports.map((r) => r.q).sort((x, y) => x - y)
+    const l2Margin = (sortedQ[1] ?? Number.NaN) - (sortedQ[0] ?? Number.NaN)
+    const criterion1Passes = champion === 'a' && l2Margin > 0.02
     console.log(
-      '\n--- Criterion 1 (a wins under L2 by > 0.02) ---\n  ' +
-        (champion === 'a'
-          ? 'a is champion — SRMT conjecture supported under L2'
-          : `champion is ${champion ?? 'undecided'} — SRMT NOT supported under L2`)
+      `\n--- Criterion 1 (a wins under L2 by > 0.02) ---\n  ` +
+        `L2 margin=${fmt(l2Margin)}  ` +
+        (criterion1Passes
+          ? 'a is champion AND margin > 0.02 — SRMT conjecture supported under L2'
+          : `champion is ${champion ?? 'undecided'}, margin=${fmt(l2Margin)} — SRMT NOT supported under L2`)
     )
 
     console.log(
@@ -546,6 +556,14 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
       'Case                            rate_a       rate_φ1      rate_φ2      WKB-champ   rigid-champ   AGREES'
     )
     let agreeCount = 0
+    const wkbResults: Array<{
+      label: string
+      rateA: number
+      ratePhi1: number
+      ratePhi2: number
+      wkbChamp: SrmtClock | null
+      rigidChamp: SrmtClock | null
+    }> = []
     for (const { label, wdw } of cases) {
       const out = solveWheelerDeWitt(wdw)
       const rates = computeWkbPhaseRates(out.chi, out.gridSize, out.aMin, out.aMax)
@@ -564,6 +582,15 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
 
       const agrees = wkbChamp === rigidChamp && wkbChamp !== null
       if (agrees) agreeCount++
+
+      wkbResults.push({
+        label,
+        rateA: rates.a,
+        ratePhi1: rates.phi1,
+        ratePhi2: rates.phi2,
+        wkbChamp,
+        rigidChamp,
+      })
 
       console.log(
         [
@@ -589,7 +616,17 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
     }
     console.log('==================================================================\n')
 
-    expect(cases.length).toBe(3)
+    // Content-level assertions: every input case produced a row with
+    // finite WKB phase rates, and the labels match the inputs in order
+    // (catches regressions where a case is silently skipped or paired
+    // with the wrong WdW solve).
+    expect(wkbResults.map((r) => r.label)).toEqual(cases.map((c) => c.label))
+    for (const r of wkbResults) {
+      expect(Number.isFinite(r.rateA)).toBe(true)
+      expect(Number.isFinite(r.ratePhi1)).toBe(true)
+      expect(Number.isFinite(r.ratePhi2)).toBe(true)
+    }
+    expect(agreeCount).toBeLessThanOrEqual(cases.length)
   }, 600_000)
 
   it('Page-Wootters cross-diagnostic: does the PW-natural clock agree with rigid-q?', () => {
@@ -642,6 +679,15 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
       '\n========== PAGE-WOOTTERS CROSS-DIAGNOSTIC — third independent champion ==========\n' +
         'Case                            PW_a       PW_φ1      PW_φ2      PW-champ    rigid-champ  WKB-champ'
     )
+    const pwResults: Array<{
+      label: string
+      pwA: number
+      pwPhi1: number
+      pwPhi2: number
+      pwChamp: SrmtClock | null
+      rigidChamp: SrmtClock | null
+      wkbChamp: SrmtClock | null
+    }> = []
     for (const { label, wdw } of cases) {
       const out = solveWheelerDeWitt(wdw)
       const pwRates = computePageWoottersRates(out.chi, out.gridSize)
@@ -659,6 +705,16 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
         phi2: rp2.qRigid,
       })
 
+      pwResults.push({
+        label,
+        pwA: pwRates.a,
+        pwPhi1: pwRates.phi1,
+        pwPhi2: pwRates.phi2,
+        pwChamp,
+        rigidChamp,
+        wkbChamp,
+      })
+
       console.log(
         [
           label.padEnd(32),
@@ -673,7 +729,15 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
     }
     console.log('==================================================================\n')
 
-    expect(cases.length).toBe(3)
+    // Content-level assertions: every input case produced a row with
+    // finite Page-Wootters rates and an attempted champion call across
+    // all three independent diagnostics.
+    expect(pwResults.map((r) => r.label)).toEqual(cases.map((c) => c.label))
+    for (const r of pwResults) {
+      expect(Number.isFinite(r.pwA)).toBe(true)
+      expect(Number.isFinite(r.pwPhi1)).toBe(true)
+      expect(Number.isFinite(r.pwPhi2)).toBe(true)
+    }
   }, 600_000)
 
   it('FOUR-DIAGNOSTIC CONSENSUS: rigid vs WKB vs PW vs cut-stability', () => {
@@ -726,6 +790,16 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
       '\n========== FOUR-DIAGNOSTIC CONSENSUS — four independent champion selectors ==========\n' +
         'Case                            rigid-q     WKB-rate    Page-Woott  cut-stab    consensus'
     )
+    const consensusRows: Array<{
+      label: string
+      qRigidA: number
+      qRigidPhi1: number
+      qRigidPhi2: number
+      rigidChamp: SrmtClock | null
+      wkbChamp: SrmtClock | null
+      pwChamp: SrmtClock | null
+      csChamp: SrmtClock | null
+    }> = []
     for (const { label, wdw } of cases) {
       const out = solveWheelerDeWitt(wdw)
       const Na = out.gridSize[0]
@@ -754,6 +828,17 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
       const consensus =
         tally.length > 0 && tally[0]![1] > 0 ? `${tally[0]![0]} (${tally[0]![1]}/4)` : 'no-vote'
 
+      consensusRows.push({
+        label,
+        qRigidA: ra.qRigid,
+        qRigidPhi1: rp1.qRigid,
+        qRigidPhi2: rp2.qRigid,
+        rigidChamp,
+        wkbChamp,
+        pwChamp,
+        csChamp,
+      })
+
       console.log(
         [
           label.padEnd(32),
@@ -770,6 +855,15 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
     console.log('  distinguishability (Page-Wootters), and clock-locality (cut-stability).')
     console.log('==================================================================\n')
 
-    expect(cases.length).toBe(3)
+    // Content-level assertions: every input case ran all three rigid
+    // q evaluations to finite values (the SRMT-primary metric), and
+    // the four-way row pairs each case label with its computed rigid
+    // q in order.
+    expect(consensusRows.map((r) => r.label)).toEqual(cases.map((c) => c.label))
+    for (const r of consensusRows) {
+      expect(Number.isFinite(r.qRigidA)).toBe(true)
+      expect(Number.isFinite(r.qRigidPhi1)).toBe(true)
+      expect(Number.isFinite(r.qRigidPhi2)).toBe(true)
+    }
   }, 600_000)
 })
