@@ -95,6 +95,51 @@ export interface SrmtResult {
    * rankCap)` points.
    */
   affineMatchQuality: number
+  /**
+   * Robustness companions to {@link affineMatchQuality}. All scored on the
+   * same `(K, E, count)` triple as the L2 quality so the cross-metric
+   * comparison is apples-to-apples. A claim that survives BOTH `l2` and
+   * `lInf` checks is stronger than one that wins under L2 alone.
+   *
+   * Optional for backward compatibility with stored snapshots that
+   * predate the multi-metric extension; consumers must tolerate
+   * `undefined` and treat it as "metric not available for this run".
+   */
+  qualityMetrics?: {
+    /** L∞-residual / L∞-signal. See {@link computeAffineFitLInf}. */
+    lInf: number
+    /** Strict (α = 1) residual. See `computeRigidFitQuality`. */
+    rigid: number
+  }
+  /**
+   * Null-hypothesis baseline q-values scored against the unconstrained
+   * affine fit. A genuine SRMT match must beat every baseline by
+   * orders of magnitude — see {@link computeNullBaselines}. Caveat:
+   * the reversed baseline is direction-symmetric under L2 (see the
+   * module docstring); pair with {@link nullBaselinesRigid} for
+   * direction-sensitive testing.
+   */
+  nullBaselines?: {
+    /** `q` with `K` shuffled (deterministic Fisher-Yates). */
+    shuffled: number
+    /** `q` with `K` reversed. */
+    reversed: number
+    /** `q` with `K` replaced by Gaussian noise matching mean+stdev. */
+    synthetic: number
+  }
+  /**
+   * Null-hypothesis baseline q-values scored against the STRICT
+   * (α = 1) rigid fit. Companion to {@link nullBaselines} but with
+   * the slope pinned, so the reversed baseline is direction-sensitive
+   * (`K_reversed` against `E` doesn't fit `K ≈ E + const`). The v1
+   * empirical investigation showed rigid is the metric where the SRMT
+   * signal lives — these baselines are the corresponding null tests.
+   */
+  nullBaselinesRigid?: {
+    shuffled: number
+    reversed: number
+    synthetic: number
+  }
   /** Orientation of the clock slice for render-time consumers. */
   slicePlane: SrmtSlicePlane
   /**

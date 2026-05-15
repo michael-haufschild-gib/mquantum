@@ -303,7 +303,13 @@ describe('sweepPointsToCsv', () => {
         'rEff_phi1,floorFrac_phi1,' +
         'q_phi2,q_phi2_sigma,q_phi2_rigid,q_phi2_rigid_sigma,alpha_phi2,beta_phi2,' +
         'rEff_phi2,floorFrac_phi2,' +
-        'computeMs,coupledGridNa'
+        'computeMs,coupledGridNa,' +
+        'q_a_linf,q_a_shuf,q_a_rev,q_a_syn,' +
+        'q_phi1_linf,q_phi1_shuf,q_phi1_rev,q_phi1_syn,' +
+        'q_phi2_linf,q_phi2_shuf,q_phi2_rev,q_phi2_syn,' +
+        'q_a_rshuf,q_a_rrev,q_a_rsyn,' +
+        'q_phi1_rshuf,q_phi1_rrev,q_phi1_rsyn,' +
+        'q_phi2_rshuf,q_phi2_rrev,q_phi2_rsyn'
     )
     // Main block: 1 kind + 1 landmark + 1 header + 2 data = 5 lines.
     // Tail block: blank + marker + sub-header (no data since the test
@@ -444,11 +450,11 @@ describe('sweepPointsToCsv', () => {
     const csv = sweepPointsToCsv([p0, p1], 'cut', [])
     const lines = csv.trim().split('\n')
 
-    // Main 30-col block intact.
+    // Main 51-col block (30 original + 12 affine-baseline + 9 rigid-baseline).
     const headerLine = lines.findIndex((l) => l.startsWith('index,'))
     expect(headerLine).toBeGreaterThanOrEqual(0)
-    expect(lines[headerLine + 1]!.split(',')).toHaveLength(30)
-    expect(lines[headerLine + 2]!.split(',')).toHaveLength(30)
+    expect(lines[headerLine + 1]!.split(',')).toHaveLength(51)
+    expect(lines[headerLine + 2]!.split(',')).toHaveLength(51)
 
     // Tail marker + sub-header present.
     const markerLine = lines.indexOf(SRMT_SWEEP_SPECTRA_TAIL_MARKER)

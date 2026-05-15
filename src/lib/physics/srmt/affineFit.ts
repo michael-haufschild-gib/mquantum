@@ -216,6 +216,42 @@ export function jackknifeAffineFitStdev(K: Float64Array, E: Float64Array, count:
 }
 
 /**
+ * Worst-case (L∞) affine residual `q_lInf = max_n |K_n − (α E_n + β)| / max_n |K_n|`.
+ *
+ * Uses the SAME least-squares `(α, β)` as {@link computeAffineFitQuality}, but
+ * reports the worst single-mode mismatch instead of the L2-aggregated
+ * residual. Purpose: metric-robustness check. A clock that "wins" the
+ * SRMT contest under L2 but fails under L∞ has likely won by averaging
+ * out a single badly-tracking mode — the L∞ score surfaces that hidden
+ * failure. Publication-grade SRMT claims must hold under both metrics.
+ *
+ * Normalized by `max_n |K_n|` (not `Σ K²`) so the metric is dimensionally
+ * an "L∞-residual / L∞-signal" ratio bounded in `[0, ∞)`, with 0 = perfect
+ * fit and 1 = worst residual equal to the largest spectral value.
+ *
+ * @param K - Modular spectrum `K_n` (ascending).
+ * @param E - HJ spectrum `E_n` (ascending).
+ * @param count - Number of leading values to include.
+ * @returns Worst-case fit quality, or `NaN` for degenerate inputs.
+ */
+export function computeAffineFitLInf(K: Float64Array, E: Float64Array, count: number): number {
+  const { alpha, beta } = fitAffineParams(K, E, count)
+  if (!Number.isFinite(alpha) || !Number.isFinite(beta)) return Number.NaN
+
+  let maxResid = 0
+  let maxK = 0
+  for (let i = 0; i < count; i++) {
+    const r = Math.abs(K[i]! - (alpha * E[i]! + beta))
+    if (r > maxResid) maxResid = r
+    const absK = Math.abs(K[i]!)
+    if (absK > maxK) maxK = absK
+  }
+  if (!(maxK > 0)) return Number.NaN
+  const q = maxResid / maxK
+  return Number.isFinite(q) ? q : Number.NaN
+}
+
+/**
  * Strict (α = 1) match quality `q_rigid = Σ (K_n − E_n − β*)² / Σ K_n²`
  * where `β* = mean(K) − mean(E)` is the unique minimiser over β.
  *

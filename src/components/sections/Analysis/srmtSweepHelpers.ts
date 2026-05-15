@@ -288,11 +288,19 @@ export function sweepPointsToCsv(
     // within 1.5 nats of the ε-floor. A claim rooted in points with
     // `rEff < 8` or `floorFrac ≥ 0.25` is probably a metric artifact
     // — the champion-clock UI gate reflects the same rule.
-    // Total column count: 30 — Playwright CSV parsers tolerate `>= 29`
-    // so the trailing `coupledGridNa` column can be appended without
-    // breaking existing readers. `coupledGridNa` is populated only for
-    // `gridNphiCoupled` (empty on every other kind). Never reorder
-    // existing columns.
+    // Total column count: 51 (30 original + 12 affine-baseline + 9 rigid-baseline).
+    // Playwright CSV parsers tolerate `>= 29` so trailing columns can be
+    // appended without breaking existing readers. `coupledGridNa` is
+    // populated only for `gridNphiCoupled` (empty on every other kind).
+    // Per-clock `q_*_linf`, `q_*_shuf`, `q_*_rev`, `q_*_syn` were
+    // appended to support Criterion 2 (metric robustness) and
+    // Criterion 3 (null-baseline floor) of the SRMT falsification
+    // pre-registration (`docs/physics/srmt-falsification.md`). The
+    // rigid-baseline trio `q_*_rshuf`, `q_*_rrev`, `q_*_rsyn` was added
+    // in diagnostic v1.2.0 — these score the same perturbed K against
+    // the rigid (α=1) fit, restoring direction sensitivity to the
+    // reversed baseline that the L2 affine fit dissolves into the
+    // slope parameter. Never reorder existing columns.
     [
       'index',
       'sweepValue',
@@ -324,6 +332,27 @@ export function sweepPointsToCsv(
       'floorFrac_phi2',
       'computeMs',
       'coupledGridNa',
+      'q_a_linf',
+      'q_a_shuf',
+      'q_a_rev',
+      'q_a_syn',
+      'q_phi1_linf',
+      'q_phi1_shuf',
+      'q_phi1_rev',
+      'q_phi1_syn',
+      'q_phi2_linf',
+      'q_phi2_shuf',
+      'q_phi2_rev',
+      'q_phi2_syn',
+      'q_a_rshuf',
+      'q_a_rrev',
+      'q_a_rsyn',
+      'q_phi1_rshuf',
+      'q_phi1_rrev',
+      'q_phi1_rsyn',
+      'q_phi2_rshuf',
+      'q_phi2_rrev',
+      'q_phi2_rsyn',
     ].join(','),
   ].join('\n')
   const rows = points.map((p) =>
@@ -358,6 +387,27 @@ export function sweepPointsToCsv(
       formatNumber(p.floorFractionByClock?.phi2),
       p.computeMs.toFixed(1),
       p.coupledGridNa !== undefined ? String(p.coupledGridNa) : '',
+      formatNumber(p.qLInf?.a),
+      formatNumber(p.nullBaselinesByClock?.a?.shuffled),
+      formatNumber(p.nullBaselinesByClock?.a?.reversed),
+      formatNumber(p.nullBaselinesByClock?.a?.synthetic),
+      formatNumber(p.qLInf?.phi1),
+      formatNumber(p.nullBaselinesByClock?.phi1?.shuffled),
+      formatNumber(p.nullBaselinesByClock?.phi1?.reversed),
+      formatNumber(p.nullBaselinesByClock?.phi1?.synthetic),
+      formatNumber(p.qLInf?.phi2),
+      formatNumber(p.nullBaselinesByClock?.phi2?.shuffled),
+      formatNumber(p.nullBaselinesByClock?.phi2?.reversed),
+      formatNumber(p.nullBaselinesByClock?.phi2?.synthetic),
+      formatNumber(p.nullBaselinesRigidByClock?.a?.shuffled),
+      formatNumber(p.nullBaselinesRigidByClock?.a?.reversed),
+      formatNumber(p.nullBaselinesRigidByClock?.a?.synthetic),
+      formatNumber(p.nullBaselinesRigidByClock?.phi1?.shuffled),
+      formatNumber(p.nullBaselinesRigidByClock?.phi1?.reversed),
+      formatNumber(p.nullBaselinesRigidByClock?.phi1?.synthetic),
+      formatNumber(p.nullBaselinesRigidByClock?.phi2?.shuffled),
+      formatNumber(p.nullBaselinesRigidByClock?.phi2?.reversed),
+      formatNumber(p.nullBaselinesRigidByClock?.phi2?.synthetic),
     ]
       .map(csvCell)
       .join(',')

@@ -18,9 +18,10 @@
 
 import type { WheelerDeWittSolverOutput } from '@/lib/physics/wheelerDeWitt/solver'
 
-import { computeAffineFitQuality } from './affineFit'
+import { computeAffineFitLInf, computeAffineFitQuality, computeRigidFitQuality } from './affineFit'
 import { hjSpectrumOnSliceTopK } from './hjOperator'
 import { modularSpectrum } from './modularHamiltonian'
+import { computeNullBaselines, computeNullBaselinesRigid } from './nullBaselines'
 import { computeVolumeElement, normalizedSchmidtValues } from './schmidt'
 import type { SrmtConfig, SrmtResult, SrmtSlicePlane } from './types'
 
@@ -318,6 +319,22 @@ export function computeSrmtDiagnostic(
   const compareCount = Math.min(kSpec.length, hjSpec.length, config.rankCap)
   const q = computeAffineFitQuality(kSpec, hjSpec, compareCount)
 
+  // Multi-metric robustness — same (K, E, count) triple, different cost
+  // functions. A clock "wins" only if it beats every baseline under L2,
+  // L∞, AND the rigid α=1 fit. See `docs/physics/srmt-falsification.md`.
+  const qLInf = computeAffineFitLInf(kSpec, hjSpec, compareCount)
+  const qRigid = computeRigidFitQuality(kSpec, hjSpec, compareCount)
+
+  // Null-hypothesis baselines: shuffled / reversed / synthetic K against
+  // the same E. A genuine SRMT match must beat each baseline by orders
+  // of magnitude — see `nullBaselines.ts`. The deterministic default seed
+  // makes the publication sweep reproducible without per-run plumbing.
+  // Rigid variant pairs with q_rigid (the v1 finding's primary metric)
+  // so the reversed baseline regains direction sensitivity that the
+  // L2 affine fit dissolves into the slope parameter `α`.
+  const baselines = computeNullBaselines(kSpec, hjSpec, compareCount)
+  const baselinesRigid = computeNullBaselinesRigid(kSpec, hjSpec, compareCount)
+
   // Cast outputs to Float32 per SrmtResult contract. `new Float32Array(f64)`
   // performs the element-wise cast in one call — same shape as the old manual
   // loops, no TypedArray polyfill risk in the supported browsers.
@@ -334,6 +351,17 @@ export function computeSrmtDiagnostic(
     kSpectrum: kF32,
     hjSpectrum: hjF32,
     affineMatchQuality: q,
+    qualityMetrics: { lInf: qLInf, rigid: qRigid },
+    nullBaselines: {
+      shuffled: baselines.shuffled,
+      reversed: baselines.reversed,
+      synthetic: baselines.synthetic,
+    },
+    nullBaselinesRigid: {
+      shuffled: baselinesRigid.shuffled,
+      reversed: baselinesRigid.reversed,
+      synthetic: baselinesRigid.synthetic,
+    },
     slicePlane: slicePlaneFor(config.clock),
     sliceK,
   }
