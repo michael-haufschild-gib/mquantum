@@ -46,10 +46,11 @@ export default defineConfig({
       '**/dist/**',
       '**/scripts/playwright/**', // Playwright tests run separately
       '**/.claude/worktrees/**', // Isolated agent worktrees
-      // One-shot research diagnostics: skipped by default so `pnpm test`
-      // stays regression-focused. Run explicitly via
-      // `pnpm exec vitest run src/tests/.../_oneshot<Name>.test.ts`.
-      '**/_oneshot*.test.ts',
+      // Underscore-prefixed research diagnostics (one-shot scans, live
+      // investigations, publication CSV dumps): skipped by default so
+      // `pnpm test` stays regression-focused. Run explicitly via
+      // `pnpm exec vitest run src/tests/.../_<name>.test.ts`.
+      '**/_*.test.ts',
     ],
     coverage: {
       provider: 'v8',
