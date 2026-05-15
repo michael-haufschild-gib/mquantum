@@ -72,6 +72,43 @@ export interface SrmtSnapshot {
   hjSpectrum: Float32Array
   /** Affine-match quality of the selected clock (duplicated in `clockAffineQuality`). */
   affineMatchQuality: number
+  /**
+   * Optional robustness metrics scored on the same `(K, E, count)` triple
+   * as {@link affineMatchQuality}. Surfaced in the SRMT panel so
+   * publication-grade claims can be cross-checked at a glance. Optional
+   * because legacy snapshots (e.g. those rebuilt from preset state)
+   * predate the multi-metric extension.
+   */
+  qualityMetrics?: {
+    /** L∞-residual / L∞-signal. */
+    lInf: number
+    /** Strict (α = 1) residual. */
+    rigid: number
+  }
+  /**
+   * Optional null-hypothesis baseline q-values. See
+   * {@link computeNullBaselines}. A genuine SRMT match must beat every
+   * baseline by orders of magnitude.
+   */
+  nullBaselines?: {
+    /** `q` with `K` shuffled (deterministic Fisher-Yates). */
+    shuffled: number
+    /** `q` with `K` reversed. */
+    reversed: number
+    /** `q` with `K` replaced by Gaussian noise matching mean+stdev. */
+    synthetic: number
+  }
+  /**
+   * Companion to {@link nullBaselines} scored under the rigid (α=1)
+   * fit so the reversed baseline is direction-sensitive. The v2
+   * empirical investigation found the rigid metric is where the
+   * SRMT signal lives — these are the corresponding null tests.
+   */
+  nullBaselinesRigid?: {
+    shuffled: number
+    reversed: number
+    synthetic: number
+  }
   /** Wall-clock compute duration in milliseconds (selected clock only). */
   computeTimeMs: number
 }

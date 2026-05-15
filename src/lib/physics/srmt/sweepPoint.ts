@@ -18,6 +18,7 @@
 import type { WheelerDeWittSolverOutput } from '@/lib/physics/wheelerDeWitt/solver'
 
 import {
+  computeAffineFitLInf,
   computeRigidFitQuality,
   fitAffineParams,
   jackknifeAffineFitStdev,
@@ -26,6 +27,7 @@ import {
 import type { SrmtPhysicsContext } from './diagnostic'
 import { hjSpectrumOnSliceTopK } from './hjOperator'
 import { floorFractionFromModular, modularSpectrum } from './modularHamiltonian'
+import { computeNullBaselines, computeNullBaselinesRigid } from './nullBaselines'
 import { computeVolumeElement, effectiveRankFromSchmidt, normalizedSchmidtValues } from './schmidt'
 import {
   clampRankCap,
@@ -67,6 +69,9 @@ export function computeSrmtPointFromSolver(
     qStdev: {},
     qRigid: {},
     qRigidStdev: {},
+    qLInf: {},
+    nullBaselinesByClock: {},
+    nullBaselinesRigidByClock: {},
     alphaByClock: {},
     betaByClock: {},
     rEffByClock: {},
@@ -176,6 +181,47 @@ export function writePerClockFit(
   if (Number.isFinite(qRigid)) {
     const sigma = jackknifeRigidFitStdev(K, E, compareCount)
     if (Number.isFinite(sigma)) point.qRigidStdev![clock] = sigma
+  }
+  // L∞ + null baselines round out the publication-grade falsification
+  // pack (`docs/physics/srmt-falsification.md`, Criteria 2 + 3). Same
+  // (K, E, count) triple as the affine fit so the comparison stays
+  // apples-to-apples. Baselines use the deterministic default seed so
+  // CSV reproducibility (byte-identical across runs) is preserved.
+  //
+  // The two records are lazily initialised here because legacy callers
+  // (notably the direct-unit-test fixtures in
+  // `sweepPoint.direct.test.ts`) construct points without these
+  // optional dicts. Defaulting on entry preserves their contract while
+  // still propagating the falsification data through every production
+  // sweep path.
+  if (!point.qLInf) point.qLInf = {}
+  if (!point.nullBaselinesByClock) point.nullBaselinesByClock = {}
+  if (!point.nullBaselinesRigidByClock) point.nullBaselinesRigidByClock = {}
+  const qLInf = computeAffineFitLInf(K, E, compareCount)
+  if (Number.isFinite(qLInf)) point.qLInf[clock] = qLInf
+  const baselines = computeNullBaselines(K, E, compareCount)
+  if (
+    Number.isFinite(baselines.shuffled) ||
+    Number.isFinite(baselines.reversed) ||
+    Number.isFinite(baselines.synthetic)
+  ) {
+    point.nullBaselinesByClock[clock] = {
+      shuffled: baselines.shuffled,
+      reversed: baselines.reversed,
+      synthetic: baselines.synthetic,
+    }
+  }
+  const baselinesRigid = computeNullBaselinesRigid(K, E, compareCount)
+  if (
+    Number.isFinite(baselinesRigid.shuffled) ||
+    Number.isFinite(baselinesRigid.reversed) ||
+    Number.isFinite(baselinesRigid.synthetic)
+  ) {
+    point.nullBaselinesRigidByClock[clock] = {
+      shuffled: baselinesRigid.shuffled,
+      reversed: baselinesRigid.reversed,
+      synthetic: baselinesRigid.synthetic,
+    }
   }
   point.rEffByClock![clock] = effectiveRankFromSchmidt(schmidtFull)
   const floorWindow = compareCount > 0 && compareCount <= K.length ? K.subarray(0, compareCount) : K

@@ -244,6 +244,35 @@ export interface SrmtSweepPoint {
    */
   qRigidStdev?: Partial<Record<SrmtClock, number>>
   /**
+   * Per-clock L∞ affine-fit residual `max|K − αE − β| / max|K|`. See
+   * {@link computeAffineFitLInf}. Surfaces a single bad mode that the
+   * L2-aggregated `quality[clock]` averages over — Criterion 2 of the
+   * SRMT falsification gate (`docs/physics/srmt-falsification.md`).
+   */
+  qLInf?: Partial<Record<SrmtClock, number>>
+  /**
+   * Per-clock null-hypothesis baseline q-values. See
+   * {@link computeNullBaselines}. Each clock's record carries the same
+   * three baselines (`shuffled`, `reversed`, `synthetic`) scored
+   * against THAT clock's `(K, E)` pair using the deterministic default
+   * seed. Criterion 3 of the falsification gate requires every clock's
+   * `quality[clock]` to beat `min(baselines)` at every published point.
+   */
+  nullBaselinesByClock?: Partial<
+    Record<SrmtClock, { shuffled: number; reversed: number; synthetic: number }>
+  >
+  /**
+   * Per-clock null-hypothesis baselines scored against the strict
+   * rigid (α=1) fit. Companion to {@link nullBaselinesByClock} but
+   * with `α` pinned so the reversed baseline is direction-sensitive
+   * — the v1 empirical investigation found the rigid metric is where
+   * the SRMT signal lives, so these are the corresponding rigorous
+   * null tests for the publication-grade claim.
+   */
+  nullBaselinesRigidByClock?: Partial<
+    Record<SrmtClock, { shuffled: number; reversed: number; synthetic: number }>
+  >
+  /**
    * Per-clock fitted slope `α` from the least-squares affine fit
    * `K ≈ α·E + β` that produces `quality[clock]`. Exposed so downstream
    * analysis can see the unit-conversion factor the scalar `q_affine`

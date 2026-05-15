@@ -235,6 +235,9 @@ function buildSnapshot(
     kSpectrum: result.kSpectrum,
     hjSpectrum: result.hjSpectrum,
     affineMatchQuality: result.affineMatchQuality,
+    ...(result.qualityMetrics ? { qualityMetrics: result.qualityMetrics } : {}),
+    ...(result.nullBaselines ? { nullBaselines: result.nullBaselines } : {}),
+    ...(result.nullBaselinesRigid ? { nullBaselinesRigid: result.nullBaselinesRigid } : {}),
     computeTimeMs,
   }
 }

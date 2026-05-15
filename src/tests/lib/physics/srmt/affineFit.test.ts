@@ -13,6 +13,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  computeAffineFitLInf,
   computeAffineFitQuality,
   computeRigidFitQuality,
   fitAffineParams,
@@ -287,5 +288,38 @@ describe('jackknifeRigidFitStdev', () => {
     const { K, E } = affinePair(1, 0, 5)
     expect(jackknifeRigidFitStdev(K, E, 0)).toBeNaN()
     expect(jackknifeRigidFitStdev(K, E, 2)).toBeNaN()
+  })
+})
+
+describe('computeAffineFitLInf', () => {
+  it('returns 0 for an exact affine match', () => {
+    const { K, E } = affinePair(1.7, 0.3, 12)
+    expect(computeAffineFitLInf(K, E, 12)).toBeLessThan(1e-14)
+  })
+
+  it('flags a single bad mode that L2 averages away', () => {
+    // 19 modes on the line y = E + 1, plus one outlier at index 9.
+    // L2 averages the outlier across the sum; L∞ surfaces it.
+    const { K, E } = affinePair(1, 1, 20)
+    K[9] = K[9]! + 5
+    const q2 = computeAffineFitQuality(K, E, 20)
+    const qInf = computeAffineFitLInf(K, E, 20)
+    expect(q2).toBeGreaterThan(0)
+    // L∞ residual is the maximum outlier scaled by max|K|; on this
+    // construction it should exceed the L2-aggregated score (which is
+    // diluted by the 19 good modes) by an order of magnitude.
+    expect(qInf).toBeGreaterThan(q2)
+  })
+
+  it('returns NaN for degenerate zero-variance E', () => {
+    const E = new Float64Array([3, 3, 3, 3])
+    const K = new Float64Array([0.1, 0.2, 0.3, 0.4])
+    expect(computeAffineFitLInf(K, E, 4)).toBeNaN()
+  })
+
+  it('returns NaN when max|K| = 0 (degenerate K)', () => {
+    const E = new Float64Array([1, 2, 3, 4])
+    const K = new Float64Array([0, 0, 0, 0])
+    expect(computeAffineFitLInf(K, E, 4)).toBeNaN()
   })
 })

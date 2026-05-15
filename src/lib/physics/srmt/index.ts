@@ -10,6 +10,7 @@
  */
 
 export {
+  computeAffineFitLInf,
   computeAffineFitQuality,
   computeRigidFitQuality,
   jackknifeAffineFitStdev,
@@ -26,6 +27,13 @@ export {
   hjSpectrumOnSliceTopK,
 } from './hjOperator'
 export { modularSpectrum } from './modularHamiltonian'
+export type { NullBaselineQuality } from './nullBaselines'
+export {
+  bestBaselineRatio,
+  computeNullBaselines,
+  computeNullBaselinesRigid,
+  DEFAULT_NULL_BASELINE_SEED,
+} from './nullBaselines'
 export type { ChiTensor } from './schmidt'
 export { reshapeForClock, schmidtValues } from './schmidt'
 /**
@@ -34,7 +42,11 @@ export { reshapeForClock, schmidtValues } from './schmidt'
  * when any stage's output semantics change. Paired with
  * `WDW_SOLVER_VERSION` in the sweep CSV reproducibility manifest.
  */
-export const SRMT_DIAGNOSTIC_VERSION = '1.0.0'
+export const SRMT_DIAGNOSTIC_VERSION = '1.2.0'
+export type { CutStabilityRecord } from './cutStabilityChampion'
+export { computeCutStability, findCutStabilityChampion } from './cutStabilityChampion'
+export type { PageWoottersRecord } from './pageWoottersChampion'
+export { computePageWoottersRates, findPageWoottersChampion } from './pageWoottersChampion'
 export type { ComplexMatrix } from './svd'
 export { complexSvdSingularValues } from './svd'
 export type {
@@ -45,4 +57,6 @@ export type {
 } from './sweepTypes'
 export { SRMT_BC_SWEEP_ORDER } from './sweepTypes'
 export type { SrmtClock, SrmtConfig, SrmtResult, SrmtSlicePlane } from './types'
+export type { WkbPhaseRateRecord } from './wkbChampion'
+export { computeWkbPhaseRates, findWkbChampion } from './wkbChampion'
 export { extractWkbPhase } from './wkbPhase'

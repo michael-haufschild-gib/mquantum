@@ -33,6 +33,7 @@ import {
 
 import { SrmtClockTable } from './SrmtClockTable'
 import { SrmtComputingStrip } from './SrmtComputingStrip'
+import { SrmtNullBaselineStrip } from './SrmtNullBaselineStrip'
 import { countCompletedClocks } from './srmtPanelHelpers'
 import { SrmtQualityChip } from './SrmtQualityChip'
 import { SrmtSpectrumChart, SrmtSpectrumLegend } from './SrmtSpectrumChart'
@@ -90,6 +91,7 @@ const PopulatedPanel: React.FC<{
         </div>
         <SrmtSpectrumChart snapshot={snapshot} />
         <SrmtSpectrumLegend />
+        <SrmtNullBaselineStrip snapshot={snapshot} />
         <SrmtClockTable quality={quality} selectedClock={highlightedClock} />
       </div>
     </div>
