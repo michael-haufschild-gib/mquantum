@@ -2,7 +2,7 @@
 
 **Date**: 2026-05-14
 **Pre-registration evaluated**: `srmt-falsification.md` v1.0.0
-**Diagnostic version**: `SRMT_DIAGNOSTIC_VERSION = 1.1.0`
+**Diagnostic version**: `SRMT_DIAGNOSTIC_VERSION = 1.1.0` *(draft tag; v1 scoring shipped as `1.2.0` — see `srmt-falsification.md` version timeline)*
 **Solver version**: `WDW_SOLVER_VERSION = 3.0.0`
 **Investigation source**: `src/tests/lib/physics/srmt/_liveInvestigation.test.ts`
 **Scope**: Reduced (exploratory) sweep. Not the full publication-grade

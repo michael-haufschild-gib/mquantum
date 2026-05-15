@@ -1,7 +1,8 @@
 /**
  * V2-COMPLIANT PUBLICATION SWEEP — exploratory at 64×16.
  *
- * Runs the full 21 × 21 × 3 BC × m × Λ grid that the v2
+ * Runs a reduced 11 × 11 × 3 BC × m × Λ grid (363 points) as a
+ * tractable subsample of the full 21 × 21 × 3 grid that the v2
  * pre-registration (`docs/physics/srmt-falsification-v2.md`)
  * stipulates, scores every point against v2 Criteria 1–5, and
  * dumps a verdict.
@@ -52,9 +53,10 @@ interface PointVerdict {
   c3Pass: boolean // WKB champion is NOT `a` (or null)
 }
 
-describe('V2 PUBLICATION SWEEP — full 21 × 21 × 3 grid against v2 criteria', () => {
+describe('V2 PUBLICATION SWEEP — reduced 11 × 11 × 3 grid against v2 criteria', () => {
   it('runs the v2-criteria sweep at 64×16 and prints the verdict', () => {
-    const MASSES = linspace(0, 2, 11) // 11 points for tractability (21 full grid would be ~1300 runs)
+    // 11 × 11 × 3 = 363 points: tractable subsample of the full 21 × 21 × 3 v2 grid (~1300 runs).
+    const MASSES = linspace(0, 2, 11)
     const LAMBDAS = linspace(-1, 1, 11)
     const verdicts: PointVerdict[] = []
     const rankCap = 24

@@ -58,15 +58,16 @@ function reportClock(
   output: ReturnType<typeof solveWheelerDeWitt>,
   clock: SrmtClock,
   cutIndex: number,
-  rankCap: number
+  rankCap: number,
+  wdw: WheelerDeWittSolverInput
 ): ClockReport {
   const result = computeSrmtDiagnostic(
     output,
     { clock, cutIndex, rankCap },
     {
-      inflatonMass: 0.3,
-      cosmologicalConstant: 0.1,
-      inflatonMassAsymmetry: 1,
+      inflatonMass: wdw.inflatonMass,
+      cosmologicalConstant: wdw.cosmologicalConstant,
+      inflatonMassAsymmetry: wdw.inflatonMassAsymmetry ?? 1,
     }
   )
   const baselines = result.nullBaselines ?? {
@@ -135,7 +136,7 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
     const reports: ClockReport[] = CLOCKS.map((c) => {
       const axisLen = c === 'a' ? Na : Nphi
       const cut = Math.floor(axisLen / 2)
-      return reportClock(out, c, cut, rankCap)
+      return reportClock(out, c, cut, rankCap, wdw)
     })
 
     console.log(
@@ -173,7 +174,7 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
     console.log('\n--- Criterion 3 (null-baseline floor) per clock — L2 affine ---')
     for (const r of reports) {
       const verdict =
-        r.bestBaselineRatio < 1
+        r.bestBaselineRatio <= 1
           ? 'FALSIFIED (a baseline beat the real fit)'
           : r.bestBaselineRatio < 10
             ? 'WEAK (margin < 10×)'
@@ -185,7 +186,7 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
     console.log('--- Criterion 3 (null-baseline floor) per clock — RIGID (α=1) ---')
     for (const r of reports) {
       const verdict =
-        r.rigidRatio < 1
+        r.rigidRatio <= 1
           ? 'FALSIFIED (rigid baseline beat the real rigid fit)'
           : r.rigidRatio < 10
             ? 'WEAK (margin < 10×)'
@@ -270,9 +271,9 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
         const Nphi = out.gridSize[1]
         const cutA = Math.floor(Na / 2)
         const cutPhi = Math.floor(Nphi / 2)
-        const ra = reportClock(out, 'a', cutA, 24)
-        const rp1 = reportClock(out, 'phi1', cutPhi, 24)
-        const rp2 = reportClock(out, 'phi2', cutPhi, 24)
+        const ra = reportClock(out, 'a', cutA, 24, wdw)
+        const rp1 = reportClock(out, 'phi1', cutPhi, 24, wdw)
+        const rp2 = reportClock(out, 'phi2', cutPhi, 24, wdw)
         rows.push({
           m,
           bc,
@@ -379,9 +380,9 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
       const out = solveWheelerDeWitt(wdw)
       const Na = out.gridSize[0]
       const Nphi = out.gridSize[1]
-      const ra = reportClock(out, 'a', Math.floor(Na / 2), 24)
-      const rp1 = reportClock(out, 'phi1', Math.floor(Nphi / 2), 24)
-      const rp2 = reportClock(out, 'phi2', Math.floor(Nphi / 2), 24)
+      const ra = reportClock(out, 'a', Math.floor(Na / 2), 24, wdw)
+      const rp1 = reportClock(out, 'phi1', Math.floor(Nphi / 2), 24, wdw)
+      const rp2 = reportClock(out, 'phi2', Math.floor(Nphi / 2), 24, wdw)
       rows.push({
         lambda,
         championRigid: findChampionClock({
@@ -454,9 +455,9 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
       }
       const out = solveWheelerDeWitt(wdw)
       const [NaOut, NphiOut] = out.gridSize
-      const ra = reportClock(out, 'a', Math.floor(NaOut / 2), 24)
-      const rp1 = reportClock(out, 'phi1', Math.floor(NphiOut / 2), 24)
-      const rp2 = reportClock(out, 'phi2', Math.floor(NphiOut / 2), 24)
+      const ra = reportClock(out, 'a', Math.floor(NaOut / 2), 24, wdw)
+      const rp1 = reportClock(out, 'phi1', Math.floor(NphiOut / 2), 24, wdw)
+      const rp2 = reportClock(out, 'phi2', Math.floor(NphiOut / 2), 24, wdw)
       rows.push({
         Na: NaCfg,
         Nphi: NphiCfg,
@@ -571,9 +572,9 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
 
       const Na = out.gridSize[0]
       const Nphi = out.gridSize[1]
-      const ra = reportClock(out, 'a', Math.floor(Na / 2), 24)
-      const rp1 = reportClock(out, 'phi1', Math.floor(Nphi / 2), 24)
-      const rp2 = reportClock(out, 'phi2', Math.floor(Nphi / 2), 24)
+      const ra = reportClock(out, 'a', Math.floor(Na / 2), 24, wdw)
+      const rp1 = reportClock(out, 'phi1', Math.floor(Nphi / 2), 24, wdw)
+      const rp2 = reportClock(out, 'phi2', Math.floor(Nphi / 2), 24, wdw)
       const rigidChamp = findChampionClock({
         a: ra.qRigid,
         phi1: rp1.qRigid,
@@ -696,9 +697,9 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
       const wkbChamp = findWkbChampion(wkbRates)
       const Na = out.gridSize[0]
       const Nphi = out.gridSize[1]
-      const ra = reportClock(out, 'a', Math.floor(Na / 2), 24)
-      const rp1 = reportClock(out, 'phi1', Math.floor(Nphi / 2), 24)
-      const rp2 = reportClock(out, 'phi2', Math.floor(Nphi / 2), 24)
+      const ra = reportClock(out, 'a', Math.floor(Na / 2), 24, wdw)
+      const rp1 = reportClock(out, 'phi1', Math.floor(Nphi / 2), 24, wdw)
+      const rp2 = reportClock(out, 'phi2', Math.floor(Nphi / 2), 24, wdw)
       const rigidChamp = findChampionClock({
         a: ra.qRigid,
         phi1: rp1.qRigid,
@@ -804,9 +805,9 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
       const out = solveWheelerDeWitt(wdw)
       const Na = out.gridSize[0]
       const Nphi = out.gridSize[1]
-      const ra = reportClock(out, 'a', Math.floor(Na / 2), 24)
-      const rp1 = reportClock(out, 'phi1', Math.floor(Nphi / 2), 24)
-      const rp2 = reportClock(out, 'phi2', Math.floor(Nphi / 2), 24)
+      const ra = reportClock(out, 'a', Math.floor(Na / 2), 24, wdw)
+      const rp1 = reportClock(out, 'phi1', Math.floor(Nphi / 2), 24, wdw)
+      const rp2 = reportClock(out, 'phi2', Math.floor(Nphi / 2), 24, wdw)
       const rigidChamp = findChampionClock({
         a: ra.qRigid,
         phi1: rp1.qRigid,
