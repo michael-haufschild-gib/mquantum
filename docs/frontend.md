@@ -42,7 +42,7 @@ Use these primitives. Never use raw HTML `<input>`, `<select>`, `<button>`.
 
 Each sidebar section lives in `src/components/sections/{Name}/`. The control panel (`ControlPanel.tsx`) aggregates them.
 
-Existing sections: Advanced, Environment, Export, Faces, Geometry, Lights, ObjectTypes, Performance, PostProcessing, RenderMode, Settings, Shortcuts, Test.
+Existing sections: Advanced, Environment, Export, Faces, Geometry, Lights, ObjectTypes, Performance, PostProcessing, RenderMode, Settings, Shortcuts, Test. The Analysis section (`AnalysisSection`) routes to mode-specific content components — including `BellExperimentContent` when `objectType === 'bellPair'`, which hosts the CHSH controls, S(N) sparkline, loophole-budget panel, and (η, v) atlas sweep.
 
 ## State Management Pattern
 
@@ -101,7 +101,7 @@ Stores are grouped by purpose. Import path: `@/stores/{group}/{name}Store`.
 | `screenshotCaptureStore` | runtime | Screenshot capture coordination |
 | `presetManagerStore` | runtime | Scene/style preset management |
 | `simulationStateStore` | runtime | Simulation state save/load |
-| `diagnosticsStore`, `performanceMetricsStore`, `measurementStore`, `coordinateEntanglementStore`, `wavefunctionSliceStore`, `srmtDiagnosticStore`, `srmtSweepStore`, `andersonSweepStore`, `monitoringSweepStore`, `hellerSpectrometerStore`, `quantumnessAtlasStore`, `wormholeCoherenceStore`, `pageCurveStore`, `carpetStore` | diagnostics | Analysis / measurement / observation overlays |
+| `diagnosticsStore`, `performanceMetricsStore`, `measurementStore`, `coordinateEntanglementStore`, `wavefunctionSliceStore`, `srmtDiagnosticStore`, `srmtSweepStore`, `andersonSweepStore`, `monitoringSweepStore`, `hellerSpectrometerStore`, `quantumnessAtlasStore`, `wormholeCoherenceStore`, `pageCurveStore`, `carpetStore`, `bellExperimentStore` | diagnostics | Analysis / measurement / observation overlays |
 
 ## Theme System
 
