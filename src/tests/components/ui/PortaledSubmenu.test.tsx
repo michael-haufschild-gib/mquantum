@@ -7,9 +7,9 @@ import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { Button } from '@/components/ui/Button'
 import { PortaledSubmenu } from '@/components/ui/DropdownMenu/PortaledSubmenu'
 import { SubmenuPortalContext } from '@/components/ui/DropdownMenu/SubmenuPortalContext'
-import type { DropdownMenuItem } from '@/components/ui/DropdownMenu/types'
 import { Z_INDEX } from '@/constants/zIndex'
 
 // Mock motion/react to avoid animation issues in tests
@@ -27,6 +27,18 @@ vi.mock('motion/react', () => ({
       ) => {
         const { initial: _i, animate: _a, exit: _e, transition: _t, ...rest } = props
         return <div ref={ref} {...rest} />
+      }
+    ),
+    button: React.forwardRef(
+      (
+        props: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+          whileHover?: unknown
+          whileTap?: unknown
+        },
+        ref: React.Ref<HTMLButtonElement>
+      ) => {
+        const { whileHover: _h, whileTap: _t, ...rest } = props
+        return <button ref={ref} {...rest} />
       }
     ),
   },
@@ -52,46 +64,62 @@ const makeTriggerRect = (overrides: Partial<DOMRect> = {}): DOMRect =>
     ...overrides,
   }) as DOMRect
 
-const ITEMS: DropdownMenuItem[] = [
-  { label: 'Sub Item 1', onClick: vi.fn() },
-  { label: 'Sub Item 2', onClick: vi.fn() },
-]
+const testMenuItems = (onClose?: () => void) => (
+  <>
+    <Button type="button" role="menuitem" onClick={onClose} variant="ghost" size="sm">
+      Sub Item 1
+    </Button>
+    <Button type="button" role="menuitem" variant="ghost" size="sm">
+      Sub Item 2
+    </Button>
+  </>
+)
+
+const renderSubmenu = ({
+  children = testMenuItems(),
+  triggerRect = makeTriggerRect(),
+  onClose = vi.fn(),
+  depth = 1,
+  onRequestClose,
+  onMouseEnter = vi.fn(),
+  onMouseLeave = vi.fn(),
+}: {
+  children?: React.ReactNode
+  triggerRect?: DOMRect
+  onClose?: () => void
+  depth?: number
+  onRequestClose?: () => void
+  onMouseEnter?: () => void
+  onMouseLeave?: () => void
+} = {}) => {
+  const submenuProps = {
+    triggerRect,
+    onClose,
+    depth,
+    onMouseEnter,
+    onMouseLeave,
+    ...(onRequestClose ? { onRequestClose } : {}),
+  }
+
+  return render(<PortaledSubmenu {...submenuProps}>{children}</PortaledSubmenu>)
+}
 
 describe('PortaledSubmenu', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('renders submenu items into a portal target', () => {
-    render(
-      <PortaledSubmenu
-        items={ITEMS}
-        triggerRect={makeTriggerRect()}
-        onClose={vi.fn()}
-        depth={1}
-        onMouseEnter={vi.fn()}
-        onMouseLeave={vi.fn()}
-      />
-    )
+  it('renders child submenu items into a portal target', () => {
+    renderSubmenu()
 
     expect(screen.getByText('Sub Item 1')).toBeInTheDocument()
     expect(screen.getByText('Sub Item 2')).toBeInTheDocument()
   })
 
   it('renders into document.body by default (no context)', () => {
-    render(
-      <PortaledSubmenu
-        items={ITEMS}
-        triggerRect={makeTriggerRect()}
-        onClose={vi.fn()}
-        depth={1}
-        onMouseEnter={vi.fn()}
-        onMouseLeave={vi.fn()}
-      />
-    )
+    renderSubmenu()
 
-    // Content should appear in document body
-    expect(screen.getByText('Sub Item 1')).toBeInTheDocument()
+    expect(document.body).toContainElement(screen.getByTestId('portaled-submenu'))
   })
 
   it('uses portal container from SubmenuPortalContext when provided', () => {
@@ -102,13 +130,14 @@ describe('PortaledSubmenu', () => {
     render(
       <SubmenuPortalContext.Provider value={containerRef}>
         <PortaledSubmenu
-          items={ITEMS}
           triggerRect={makeTriggerRect()}
           onClose={vi.fn()}
           depth={1}
           onMouseEnter={vi.fn()}
           onMouseLeave={vi.fn()}
-        />
+        >
+          {testMenuItems()}
+        </PortaledSubmenu>
       </SubmenuPortalContext.Provider>
     )
 
@@ -118,20 +147,11 @@ describe('PortaledSubmenu', () => {
     document.body.removeChild(container)
   })
 
-  it('calls onClose when a menu item is clicked', async () => {
+  it('preserves child click handlers', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
 
-    render(
-      <PortaledSubmenu
-        items={ITEMS}
-        triggerRect={makeTriggerRect()}
-        onClose={onClose}
-        depth={1}
-        onMouseEnter={vi.fn()}
-        onMouseLeave={vi.fn()}
-      />
-    )
+    renderSubmenu({ children: testMenuItems(onClose), onClose })
 
     await user.click(screen.getByText('Sub Item 1'))
     expect(onClose).toHaveBeenCalled()
@@ -142,16 +162,7 @@ describe('PortaledSubmenu', () => {
     const onMouseEnter = vi.fn()
     const onMouseLeave = vi.fn()
 
-    render(
-      <PortaledSubmenu
-        items={ITEMS}
-        triggerRect={makeTriggerRect()}
-        onClose={vi.fn()}
-        depth={1}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
-      />
-    )
+    renderSubmenu({ onMouseEnter, onMouseLeave })
 
     const menu = screen.getByTestId('portaled-submenu')
     await user.hover(menu)
@@ -162,48 +173,21 @@ describe('PortaledSubmenu', () => {
   })
 
   it('renders with correct data-dropdown-content attribute', () => {
-    render(
-      <PortaledSubmenu
-        items={ITEMS}
-        triggerRect={makeTriggerRect()}
-        onClose={vi.fn()}
-        depth={1}
-        onMouseEnter={vi.fn()}
-        onMouseLeave={vi.fn()}
-      />
-    )
+    renderSubmenu()
 
     const menuEl = screen.getByTestId('portaled-submenu')
     expect(menuEl).toHaveAttribute('data-dropdown-content', 'true')
   })
 
   it('applies fixed position styling', () => {
-    render(
-      <PortaledSubmenu
-        items={ITEMS}
-        triggerRect={makeTriggerRect()}
-        onClose={vi.fn()}
-        depth={1}
-        onMouseEnter={vi.fn()}
-        onMouseLeave={vi.fn()}
-      />
-    )
+    renderSubmenu()
 
     const menuEl = screen.getByTestId('portaled-submenu')
     expect(menuEl).toHaveStyle({ position: 'fixed' })
   })
 
   it('increments zIndex by depth', () => {
-    render(
-      <PortaledSubmenu
-        items={ITEMS}
-        triggerRect={makeTriggerRect()}
-        onClose={vi.fn()}
-        depth={3}
-        onMouseEnter={vi.fn()}
-        onMouseLeave={vi.fn()}
-      />
-    )
+    renderSubmenu({ depth: 3 })
 
     const menuEl = screen.getByTestId('portaled-submenu')
     expect(menuEl).toHaveStyle({ zIndex: Z_INDEX.TOOLTIP + 30 })

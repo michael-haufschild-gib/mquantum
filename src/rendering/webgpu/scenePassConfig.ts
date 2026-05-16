@@ -396,6 +396,20 @@ export function extractPPConfig(config: PassConfig): PPPassConfig {
   }
 }
 
+/**
+ * Build the React effect dependency key for pass setup from the exact config
+ * subsets that drive pass rebuild decisions.
+ */
+export function buildPassSetupKey(
+  schrodingerConfig: SchrodingerPassConfig,
+  ppConfig: PPPassConfig
+): string {
+  return JSON.stringify({
+    schrodingerConfig,
+    ppConfig,
+  })
+}
+
 /** @returns True if all keys of `b` match the corresponding values in `a`. */
 export function shallowEqual<T extends object>(a: T | null, b: T): boolean {
   if (!a) return false

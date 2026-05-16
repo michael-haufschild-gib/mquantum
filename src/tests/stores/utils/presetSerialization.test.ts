@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { DEFAULT_SKYBOX_PROCEDURAL_SETTINGS } from '@/stores/defaults/visualDefaults'
 import { normalizeEnvironmentLoadData } from '@/stores/utils/presetNormalization'
 import {
   sanitizeExtendedLoadedState,
@@ -70,6 +71,60 @@ describe('normalizeEnvironmentLoadData', () => {
         skyboxEnabled: false,
       })
     ).not.toHaveProperty('backgroundColor')
+  })
+
+  it('defaults legacy enabled skybox imports to a visible classic skybox', () => {
+    expect(
+      normalizeEnvironmentLoadData({
+        skyboxEnabled: true,
+      })
+    ).toMatchObject({
+      skyboxSelection: 'space_blue',
+      skyboxEnabled: true,
+      skyboxMode: 'classic',
+      skyboxTexture: 'space_blue',
+    })
+  })
+
+  it('normalizes skybox scalar fields during scene/style load', () => {
+    const normalized = normalizeEnvironmentLoadData({
+      skyboxSelection: 'space_blue',
+      skyboxIntensity: 99,
+      skyboxRotation: -Math.PI / 2,
+      skyboxAnimationSpeed: 'fast',
+      skyboxAnimationMode: 'warp',
+      skyboxHighQuality: 'false',
+    })
+
+    expect(normalized.skyboxIntensity).toBe(10)
+    expect(normalized.skyboxRotation).toBeCloseTo(1.5 * Math.PI)
+    expect(normalized).not.toHaveProperty('skyboxAnimationSpeed')
+    expect(normalized).not.toHaveProperty('skyboxAnimationMode')
+    expect(normalized).not.toHaveProperty('skyboxHighQuality')
+  })
+
+  it('merges partial procedural skybox imports with defaults', () => {
+    const normalized = normalizeEnvironmentLoadData({
+      skyboxSelection: 'procedural_aurora',
+      proceduralSettings: {
+        scale: 2,
+        timeScale: 'bad',
+        sunPosition: [1, 2],
+        aurora: {
+          curtainHeight: 0.75,
+          waveFrequency: 'bad',
+        },
+      },
+    })
+
+    expect(normalized.proceduralSettings).toEqual({
+      ...DEFAULT_SKYBOX_PROCEDURAL_SETTINGS,
+      scale: 2,
+      aurora: {
+        ...DEFAULT_SKYBOX_PROCEDURAL_SETTINGS.aurora,
+        curtainHeight: 0.75,
+      },
+    })
   })
 })
 

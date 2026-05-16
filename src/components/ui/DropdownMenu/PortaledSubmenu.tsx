@@ -4,10 +4,8 @@ import { createPortal } from 'react-dom'
 
 import { Z_INDEX } from '@/constants/zIndex'
 
-import { MenuItems } from './MenuItems'
 import { MENU_ITEM_SELECTOR } from './menuItemSelector'
 import { SubmenuPortalContext } from './SubmenuPortalContext'
-import type { DropdownMenuItem } from './types'
 
 /**
  * Portaled submenu that positions itself relative to a trigger rect.
@@ -15,7 +13,7 @@ import type { DropdownMenuItem } from './types'
  * that would close the parent menu when opening a submenu.
  */
 export const PortaledSubmenu: React.FC<{
-  items: DropdownMenuItem[]
+  children: React.ReactNode
   triggerRect: DOMRect
   onClose: () => void
   depth: number
@@ -25,7 +23,7 @@ export const PortaledSubmenu: React.FC<{
   onMouseLeave: () => void
 }> = React.memo(
   ({
-    items,
+    children,
     triggerRect,
     onClose,
     depth,
@@ -167,7 +165,7 @@ export const PortaledSubmenu: React.FC<{
         onMouseLeave={onMouseLeave}
         onKeyDown={handleKeyDown}
       >
-        <MenuItems items={items} onClose={onClose} depth={depth + 1} />
+        {children}
       </m.div>
     )
 

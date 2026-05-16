@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest'
 
 import { isComputeQuantumType } from '@/lib/geometry/registry/helpers'
 import {
+  buildPassSetupKey,
   computeCasSharpnessFromRenderScale,
   extractPPConfig,
   extractSchrodingerConfig,
@@ -735,6 +736,66 @@ describe('extractPPConfig', () => {
     expect(Object.keys(pp)).not.toContain('dimension')
     expect(Object.keys(pp)).not.toContain('quantumMode')
     expect(Object.keys(pp)).not.toContain('skyboxMode')
+  })
+})
+
+describe('buildPassSetupKey', () => {
+  it('captures every extracted rebuild config field', () => {
+    const schrodingerConfig = extractSchrodingerConfig(
+      makePassConfig({
+        dimension: 5,
+        termCount: 4,
+        nodalEnabled: true,
+        antiAliasingMethod: 'fxaa',
+        bloomEnabled: true,
+      })
+    )
+    const ppConfig = extractPPConfig(
+      makePassConfig({ antiAliasingMethod: 'fxaa', bloomEnabled: true })
+    )
+
+    const parsed = JSON.parse(buildPassSetupKey(schrodingerConfig, ppConfig)) as {
+      schrodingerConfig: Record<string, unknown>
+      ppConfig: Record<string, unknown>
+    }
+
+    expect(Object.keys(parsed.schrodingerConfig)).toEqual(Object.keys(schrodingerConfig))
+    expect(Object.keys(parsed.ppConfig)).toEqual(Object.keys(ppConfig))
+  })
+
+  it('changes when extracted rebuild fields change', () => {
+    const schrodingerConfig = extractSchrodingerConfig(makePassConfig())
+    const ppConfig = extractPPConfig(makePassConfig())
+    const baseKey = buildPassSetupKey(schrodingerConfig, ppConfig)
+
+    expect(
+      buildPassSetupKey(
+        {
+          ...schrodingerConfig,
+          densityGridResolution: schrodingerConfig.densityGridResolution + 1,
+        },
+        ppConfig
+      )
+    ).not.toBe(baseKey)
+    expect(
+      buildPassSetupKey(schrodingerConfig, { ...ppConfig, antiAliasingMethod: 'fxaa' })
+    ).not.toBe(baseKey)
+  })
+
+  it('ignores full config fields outside rebuild subsets', () => {
+    const keyFor = (config: PassConfig) =>
+      buildPassSetupKey(extractSchrodingerConfig(config), extractPPConfig(config))
+
+    const baseKey = keyFor(makePassConfig())
+    const runtimeOnlyKey = keyFor(
+      makePassConfig({
+        backgroundColor: '#ffffff',
+        renderResolutionScale: 0.5,
+        skyboxMode: 'procedural_aurora',
+      })
+    )
+
+    expect(runtimeOnlyKey).toBe(baseKey)
   })
 })
 

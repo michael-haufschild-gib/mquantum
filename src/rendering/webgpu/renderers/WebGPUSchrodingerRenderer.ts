@@ -20,7 +20,10 @@ import type {
   QuantumModeForShader,
   SchroedingerWGSLShaderConfig,
 } from '../shaders/schroedinger/compose'
-import { packLightingUniforms } from '../utils/lighting'
+import { LIGHTING_UNIFORMS_FLOAT_LENGTH, packLightingUniforms } from '../utils/lighting'
+import { BASIS_UNIFORMS_FLOAT_LENGTH } from './basisLayout'
+import { CAMERA_UNIFORMS_FLOAT_LENGTH } from './cameraLayout'
+import { MATERIAL_UNIFORMS_FLOAT_LENGTH } from './materialLayout'
 import {
   applyModeOverrides,
   buildPipelineOutputs,
@@ -137,10 +140,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private schroedingerUniformData = new ArrayBuffer(SCHROEDINGER_UNIFORM_SIZE)
   private schroedingerFloatView = new Float32Array(this.schroedingerUniformData)
   private schroedingerIntView = new Int32Array(this.schroedingerUniformData)
-  private cameraUniformData = new Float32Array(132)
-  private basisUniformData = new Float32Array(48)
-  private lightingUniformData = new Float32Array(144)
-  private materialUniformData = new Float32Array(40)
+  private cameraUniformData = new Float32Array(CAMERA_UNIFORMS_FLOAT_LENGTH)
+  private basisUniformData = new Float32Array(BASIS_UNIFORMS_FLOAT_LENGTH)
+  private lightingUniformData = new Float32Array(LIGHTING_UNIFORMS_FLOAT_LENGTH)
+  private materialUniformData = new Float32Array(MATERIAL_UNIFORMS_FLOAT_LENGTH)
   private materialDataView = new DataView(this.materialUniformData.buffer)
   private timeUpdateBuffer = new Float32Array(1)
   private readonly clearValueTransparent = { r: 0, g: 0, b: 0, a: 0 }

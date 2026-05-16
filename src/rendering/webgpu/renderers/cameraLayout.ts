@@ -65,3 +65,7 @@ export const CAMERA_UNIFORMS_LAYOUT = computeStructLayout(CAMERA_FIELDS)
 
 /** Total byte size of the CameraUniforms GPU buffer (derived from layout). */
 export const CAMERA_UNIFORMS_SIZE = CAMERA_UNIFORMS_LAYOUT.totalSize
+
+/** Float32 element count for CameraUniforms staging arrays. */
+export const CAMERA_UNIFORMS_FLOAT_LENGTH =
+  CAMERA_UNIFORMS_SIZE / Float32Array.BYTES_PER_ELEMENT
