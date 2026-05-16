@@ -28,6 +28,7 @@ import type {
   PeschelWorkerRequest,
   PeschelWorkerResponse,
 } from '@/lib/physics/entanglement/peschelWorker'
+import { buildCosmoEtaSweep } from '@/lib/physics/freeScalar/cosmoEtaSweep'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 // ─── Worker mock ─────────────────────────────────────────────────────────
@@ -437,5 +438,61 @@ describe('FSFEntanglementProbe — epoch discipline', () => {
     expect(msg.gridSize).toEqual([16, 16, 16])
     // First three spacing entries match; the rest are dropped by `.slice(0, 3)`.
     expect(msg.spacing).toEqual([0.1, 0.2, 0.3])
+  })
+})
+
+// ─── buildCosmoEtaSweep — sign preservation regression ───────────────────
+//
+// Regression: the sweep generator pinned the midpoint to eta0 but produced
+// every other sample with a hardcoded negative sign. For LQC and
+// Bianchi-Kasner presets that demand η > 0 (eta0 forced positive by
+// `resolvePresetSwitchSubstate`), the resulting 1-positive + 24-negative
+// sweep collapsed to a single surviving sample in the trajectory builder
+// (computeCosmologyAt throws on non-positive eta for those presets, the
+// throws are caught and skipped) and the chart's `etas.length < 2` guard
+// hid the trajectory entirely.
+
+describe('buildCosmoEtaSweep — sign preservation', () => {
+  it('returns 25 samples for a finite non-zero eta0', () => {
+    expect(buildCosmoEtaSweep(-10).length).toBe(25)
+    expect(buildCosmoEtaSweep(5).length).toBe(25)
+  })
+
+  it('pins the midpoint to eta0 bit-identically (negative)', () => {
+    const out = buildCosmoEtaSweep(-10)
+    expect(out[12]).toBe(-10)
+  })
+
+  it('pins the midpoint to eta0 bit-identically (positive)', () => {
+    const out = buildCosmoEtaSweep(7.5)
+    expect(out[12]).toBe(7.5)
+  })
+
+  it('produces all-negative samples for negative eta0 (FLRW/deSitter)', () => {
+    const out = buildCosmoEtaSweep(-10)
+    for (const v of out) expect(v).toBeLessThan(0)
+  })
+
+  it('produces all-positive samples for positive eta0 (LQC/Bianchi)', () => {
+    const out = buildCosmoEtaSweep(10)
+    for (const v of out) expect(v).toBeGreaterThan(0)
+  })
+
+  it('spans one decade on either side of eta0 in |eta|', () => {
+    const out = buildCosmoEtaSweep(-10)
+    // i=0 → |eta| = |eta0| / 10 = 1
+    expect(Math.abs(out[0]!)).toBeCloseTo(1, 5)
+    // i=24 → |eta| = |eta0| * 10 = 100
+    expect(Math.abs(out[24]!)).toBeCloseTo(100, 4)
+  })
+
+  it('returns an empty array for eta0 = 0', () => {
+    expect(buildCosmoEtaSweep(0)).toEqual([])
+  })
+
+  it('returns an empty array for non-finite eta0', () => {
+    expect(buildCosmoEtaSweep(Number.NaN)).toEqual([])
+    expect(buildCosmoEtaSweep(Number.POSITIVE_INFINITY)).toEqual([])
+    expect(buildCosmoEtaSweep(Number.NEGATIVE_INFINITY)).toEqual([])
   })
 })

@@ -135,11 +135,11 @@ describe('extractSchrodingerConfig', () => {
     expect(extracted.colorAlgorithm).toBe('kSpaceOccupation')
   })
 
-  it('forces compute mode overrides for tdseDynamics', () => {
+  it('forces compute mode overrides for tdseDynamics but preserves isosurface', () => {
     const extracted = extractSchrodingerConfig(
       makePassConfig({ quantumMode: 'tdseDynamics', isosurface: true, nodalEnabled: true })
     )
-    expect(extracted.isosurface).toBe(false)
+    expect(extracted.isosurface).toBe(true)
     expect(extracted.nodalEnabled).toBe(false)
     expect(extracted.termCount).toBe(1)
   })
@@ -513,6 +513,58 @@ describe('normalizeColorAlgorithmForQuantumMode', () => {
       'particleAntiparticleSplit'
     )
     expect(result).toBe('particleAntiparticle')
+  })
+
+  it('falls back to pauliSpinDensity for bellPair when stale algorithm is Bell-invalid', () => {
+    // Regression: ObjectTypeExplorer does not reset s.schroedinger.quantumMode
+    // when switching to Bell. A preset (or stale store state) that carried
+    // a free-scalar-field algorithm like 'energyFlux' would otherwise pass
+    // through the normalizer (because quantumMode='freeScalarField' makes it
+    // "available") and then render pure black because the analysis texture
+    // is stubbed for non-FSF pipelines. The bellPair branch in
+    // getAvailableColorAlgorithms now hides those algos, and this fallback
+    // pins the runtime to the Bell apparatus default.
+    expect(
+      normalizeColorAlgorithmForQuantumMode(
+        'freeScalarField',
+        'energyFlux',
+        false,
+        undefined,
+        undefined,
+        'bellPair'
+      )
+    ).toBe('pauliSpinDensity')
+    expect(
+      normalizeColorAlgorithmForQuantumMode(
+        'freeScalarField',
+        'hamiltonianDecomposition',
+        false,
+        undefined,
+        undefined,
+        'bellPair'
+      )
+    ).toBe('pauliSpinDensity')
+    expect(
+      normalizeColorAlgorithmForQuantumMode(
+        'freeScalarField',
+        'modeCharacter',
+        false,
+        undefined,
+        undefined,
+        'bellPair'
+      )
+    ).toBe('pauliSpinDensity')
+    // A Bell-valid algorithm passes through unchanged.
+    expect(
+      normalizeColorAlgorithmForQuantumMode(
+        'harmonicOscillator',
+        'blackbody',
+        false,
+        undefined,
+        undefined,
+        'bellPair'
+      )
+    ).toBe('blackbody')
   })
 
   it('drops stale kSpaceOccupation for freeScalarField + vacuumNoise', () => {

@@ -32,6 +32,11 @@ import { EBERHARD_THRESHOLD, maxChshGivenEta } from '@/lib/physics/bell/loophole
 import { useBellExperimentStore } from '@/stores/diagnostics/bellExperimentStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
+// Measurement axes, Werner visibility, detection efficiency, analysis
+// policy, and per-particle precession fields live in the Geometry-tab
+// `BellPairControls` component. This Analysis-tab panel keeps run controls,
+// readouts, sampler / LHV strategy, trial-loop pacing, and the atlas sweep.
+
 /** Convert a Float64Array ring buffer to Float32 for the Sparkline primitive. */
 function f64ToF32(src: Float64Array): Float32Array {
   const dst = new Float32Array(src.length)
@@ -48,15 +53,13 @@ function f64ToF32(src: Float64Array): Float32Array {
  */
 export const BellExperimentContent: React.FC = React.memo(() => {
   // ── Config bindings from the extended object store ──
+  // The Analysis panel only consumes the *experiment runtime* slice of the
+  // config: sampler mode, LHV strategy, trial-loop pacing, seed. State
+  // noise (v, η, analysisMode), measurement axes, and precession fields
+  // live in the Geometry-tab `BellPairControls` and reach this panel only
+  // via the readouts (loophole budget, headline).
   const {
     config,
-    setAliceAxis,
-    setAliceAxisPrime,
-    setBobAxis,
-    setBobAxisPrime,
-    setVisibility,
-    setDetectionEfficiency,
-    setAnalysisMode,
     setSamplerMode,
     setLhvStrategyId,
     setTargetTrials,
@@ -66,13 +69,6 @@ export const BellExperimentContent: React.FC = React.memo(() => {
   } = useExtendedObjectStore(
     useShallow((s) => ({
       config: s.bellPair,
-      setAliceAxis: s.setBellAliceAxis,
-      setAliceAxisPrime: s.setBellAliceAxisPrime,
-      setBobAxis: s.setBellBobAxis,
-      setBobAxisPrime: s.setBellBobAxisPrime,
-      setVisibility: s.setBellVisibility,
-      setDetectionEfficiency: s.setBellDetectionEfficiency,
-      setAnalysisMode: s.setBellAnalysisMode,
       setSamplerMode: s.setBellSamplerMode,
       setLhvStrategyId: s.setBellLhvStrategyId,
       setTargetTrials: s.setBellTargetTrials,
@@ -148,35 +144,6 @@ export const BellExperimentContent: React.FC = React.memo(() => {
   // ── Sparkline payloads ──
   const sparkQm = f64ToF32(historyQmS)
   const sparkLhv = f64ToF32(historyLhvS)
-
-  // ── Axis helpers ──
-  const renderAxisSliders = (
-    label: string,
-    axis: readonly [number, number],
-    onChange: (axis: [number, number]) => void
-  ) => (
-    <div className="space-y-1">
-      <p className="text-xs text-text-secondary">{label}</p>
-      <Slider
-        label="θ (polar)"
-        min={0}
-        max={Math.PI}
-        step={0.005}
-        value={axis[0]}
-        onChange={(v) => onChange([v, axis[1]])}
-        showValue
-      />
-      <Slider
-        label="φ (azimuth)"
-        min={0}
-        max={2 * Math.PI}
-        step={0.005}
-        value={axis[1]}
-        onChange={(v) => onChange([axis[0], v])}
-        showValue
-      />
-    </div>
-  )
 
   return (
     <div className="flex flex-col gap-2" data-testid="bell-experiment-content">
@@ -284,55 +251,12 @@ export const BellExperimentContent: React.FC = React.memo(() => {
         </p>
       </div>
 
-      {/* Measurement-axis sliders */}
-      <div className="space-y-2 border-t border-[var(--border-subtle)] pt-2">
-        <p className="text-xs font-semibold">Measurement axes (Bloch sphere)</p>
-        <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-          {renderAxisSliders('Alice a (unprimed)', config.aliceAxis, setAliceAxis)}
-          {renderAxisSliders('Alice a′ (primed)', config.aliceAxisPrime, setAliceAxisPrime)}
-          {renderAxisSliders('Bob b (unprimed)', config.bobAxis, setBobAxis)}
-          {renderAxisSliders('Bob b′ (primed)', config.bobAxisPrime, setBobAxisPrime)}
-        </div>
-      </div>
-
-      {/* State noise / loopholes */}
-      <div className="space-y-1 border-t border-[var(--border-subtle)] pt-2">
-        <p className="text-xs font-semibold">State noise &amp; detection loopholes</p>
-        <Slider
-          label="Werner visibility v"
-          tooltip="Mixes the singlet with the maximally mixed state. v ≤ 1/√2 makes CHSH violation impossible regardless of angles."
-          min={0}
-          max={1}
-          step={0.005}
-          value={config.visibility}
-          onChange={setVisibility}
-          showValue
-          data-testid="bell-slider-visibility"
-        />
-        <Slider
-          label="Detection efficiency η"
-          tooltip="Symmetric per-detector firing probability. Eberhard threshold ≈ 0.828; below that, without fair-sampling, no violation is possible."
-          min={0}
-          max={1}
-          step={0.005}
-          value={config.detectionEfficiency}
-          onChange={setDetectionEfficiency}
-          showValue
-          data-testid="bell-slider-eta"
-        />
-        <div>
-          <p className="text-xs text-text-secondary mb-0.5">Analysis policy</p>
-          <ToggleGroup
-            value={config.analysisMode}
-            onChange={(v) => setAnalysisMode(v as typeof config.analysisMode)}
-            data-testid="bell-toggle-analysis"
-            options={[
-              { value: 'fairSampling', label: 'Fair sampling' },
-              { value: 'assignNonDetection', label: 'Clauser-Horne' },
-            ]}
-          />
-        </div>
-      </div>
+      {/* Hint: measurement axes, Werner v, detection η, analysis policy, and
+          precession fields are configured in the Geometry tab (left panel). */}
+      <p className="text-[10px] text-text-secondary opacity-70 border-t border-[var(--border-subtle)] pt-2">
+        Configure measurement axes, Werner visibility, detection efficiency, analysis policy, and
+        precession fields in the Geometry tab.
+      </p>
 
       {/* Sampler controls */}
       <div className="space-y-1 border-t border-[var(--border-subtle)] pt-2">

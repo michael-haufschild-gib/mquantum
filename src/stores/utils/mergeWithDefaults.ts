@@ -44,8 +44,6 @@ import {
   DEFAULT_WHEELER_DEWITT_CONFIG,
   type WdwSrmtClock,
 } from '@/lib/geometry/extended/wheelerDeWitt'
-import { isAnalyticQuantumType } from '@/lib/geometry/registry'
-import type { QuantumTypeKey } from '@/lib/geometry/registry/types'
 import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
 import { sanitizePowerOfTwoGridSizes } from '@/lib/math/ndArray'
@@ -619,10 +617,7 @@ function normalizeSchroedingerSurfaceMode(
 ): Record<string, unknown> {
   if (normalized.isoEnabled !== true) return normalized
 
-  const quantumMode =
-    typeof normalized.quantumMode === 'string' ? normalized.quantumMode : 'harmonicOscillator'
-  const surfaceSupported =
-    normalized.representation !== 'wigner' && isAnalyticQuantumType(quantumMode as QuantumTypeKey)
+  const surfaceSupported = normalized.representation !== 'wigner'
 
   return surfaceSupported ? normalized : { ...normalized, isoEnabled: false }
 }

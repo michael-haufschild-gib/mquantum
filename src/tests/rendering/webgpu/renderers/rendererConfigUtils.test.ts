@@ -129,7 +129,7 @@ describe('applyModeOverrides', () => {
       isosurface: true,
     } as never)
     expect(cfg.temporal).toBe(false)
-    expect(cfg.isosurface).toBe(false)
+    expect(cfg.isosurface).toBe(true)
     expect(cfg.dimension).toBeGreaterThanOrEqual(3)
   })
 
@@ -157,10 +157,19 @@ describe('applyModeOverrides', () => {
     } as never)
     expect(cfg.dimension).toBe(5)
   })
+
+  it('preserves isosurface for Pauli spinor mode (density-grid isosurface path)', () => {
+    const cfg = applyModeOverrides({
+      dimension: 3,
+      isPauli: true,
+      isosurface: true,
+    } as never)
+    expect(cfg.isosurface).toBe(true)
+  })
 })
 
 describe('buildShaderConfig', () => {
-  it('disables analytic-only features when in compute mode', () => {
+  it('disables analytic-only features but preserves isosurface in compute mode', () => {
     const cfg = buildShaderConfig({
       dimension: 3,
       quantumMode: 'tdseDynamics',
@@ -172,7 +181,7 @@ describe('buildShaderConfig', () => {
       fastEigenInterpolationEnabled: true,
       isosurface: true,
     } as never)
-    expect(cfg.isosurface).toBe(false)
+    expect(cfg.isosurface).toBe(true)
     expect(cfg.nodal).toBe(false)
     expect(cfg.phaseMateriality).toBe(false)
     expect(cfg.interference).toBe(false)
@@ -187,6 +196,19 @@ describe('buildShaderConfig', () => {
     // level so the inline analytic path is unused.
     expect(cfg.quantumMode).toBe('harmonicOscillator')
     expect(cfg.termCount).toBe(1)
+    expect(cfg.fastGridEmission).toBe(true)
+  })
+
+  it('allows isosurface with useDensityGrid for Pauli spinor mode', () => {
+    const cfg = buildShaderConfig({
+      dimension: 3,
+      isPauli: true,
+      isosurface: true,
+    } as never)
+    expect(cfg.isosurface).toBe(true)
+    expect(cfg.useDensityGrid).toBe(true)
+    expect(cfg.isPauli).toBe(true)
+    expect(cfg.isFreeScalar).toBe(true)
     expect(cfg.fastGridEmission).toBe(true)
   })
 

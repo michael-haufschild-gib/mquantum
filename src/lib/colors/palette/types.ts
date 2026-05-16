@@ -335,6 +335,27 @@ export function getAvailableColorAlgorithms(
     return COLOR_ALGORITHM_OPTIONS.filter((opt) => pauliValidAlgos.has(opt.value))
   }
 
+  // Bell pair: the apparatus density grid encodes Alice arm intensity (R),
+  // CHSH glow (G), Bob arm intensity (B), and combined magnitude (A) — no
+  // wavefunction phase, no kinetic/gradient/potential energy density, no
+  // k-space occupation. Selecting the user is decoupled from `quantumMode`
+  // (which retains its previous Schroedinger value), so a leftover
+  // `freeScalarField` mode would otherwise expose `hamiltonianDecomposition`,
+  // `modeCharacter`, `energyFlux`, `kSpaceOccupation` — all of which call
+  // `sampleAnalysisFromGrid` and read a stubbed `vec4f(0)` for non-FSF
+  // pipelines, producing pure-black voxels. Mirror the Pauli precedent: hard
+  // allowlist of algorithms that render meaningfully on the apparatus grid.
+  if (objectType === 'bellPair') {
+    const bellValidAlgos = new Set<string>([
+      'pauliSpinDensity', // default — dual-channel (R=Alice, G=CHSH glow) hue mix
+      'blackbody',
+      'viridis',
+      'inferno',
+      'densityContours',
+    ])
+    return COLOR_ALGORITHM_OPTIONS.filter((opt) => bellValidAlgos.has(opt.value))
+  }
+
   // Educational analysis algorithms — only available for free scalar field
   const educationalAlgos = new Set<string>([
     'hamiltonianDecomposition',

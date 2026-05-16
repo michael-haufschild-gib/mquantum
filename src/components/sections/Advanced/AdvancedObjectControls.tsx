@@ -82,11 +82,13 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
     }))
   )
 
-  if (objectType !== 'schroedinger' && objectType !== 'pauliSpinor') {
+  if (objectType !== 'schroedinger' && objectType !== 'pauliSpinor' && objectType !== 'bellPair') {
     return null
   }
 
   const isPauli = objectType === 'pauliSpinor'
+  const isBellPair = objectType === 'bellPair'
+  const isSchroedinger = objectType === 'schroedinger'
   const effectiveIsoEnabled =
     isoEnabled &&
     supportsSchroedingerSurfaceMode({
@@ -95,8 +97,11 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
       dimension,
       representation,
     })
+  // Bell-pair is always volumetric (isosurface not supported). Pauli and
+  // Schrödinger hide volumetric controls when isosurface is active.
   const showVolumetric =
-    isPauli || (!effectiveIsoEnabled && dimension > 2 && representation !== 'wigner')
+    !effectiveIsoEnabled &&
+    (isPauli || isBellPair || (dimension > 2 && representation !== 'wigner'))
 
   return (
     <Section title="Advanced Rendering" defaultOpen={true} data-testid="advanced-object-controls">
@@ -211,8 +216,9 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
           />
         </ControlGroup>
 
-        {/* Volume Effects (Schrödinger volumetric only — Pauli has no powderScale/scatteringAnisotropy) */}
-        {showVolumetric && !isPauli && (
+        {/* Volume Effects (Schrödinger volumetric only — Pauli and Bell-pair
+            do not own powderScale/scatteringAnisotropy on their config slices) */}
+        {showVolumetric && isSchroedinger && (
           <ControlGroup
             title="Volume Effects"
             collapsible

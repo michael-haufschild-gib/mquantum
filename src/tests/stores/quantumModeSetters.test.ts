@@ -228,13 +228,13 @@ describe('quantum mode switching', () => {
     expect(useExtendedObjectStore.getState().schroedinger.crossSectionEnabled).toBe(false)
   })
 
-  it('blocks isosurface enablement in compute modes at the store boundary', () => {
+  it('allows isosurface enablement in compute modes', () => {
     const store = useExtendedObjectStore.getState()
     store.setSchroedingerQuantumMode('tdseDynamics')
 
     store.setSchroedingerIsoEnabled(true)
 
-    expect(useExtendedObjectStore.getState().schroedinger.isoEnabled).toBe(false)
+    expect(useExtendedObjectStore.getState().schroedinger.isoEnabled).toBe(true)
   })
 
   it('clears isosurface when switching to Wigner representation', () => {

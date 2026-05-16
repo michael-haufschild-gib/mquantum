@@ -135,7 +135,11 @@ export const ExposureSection: React.FC<ExposureSectionProps> = React.memo(
   ({ defaultOpen = true }) => {
     const objectType = useGeometryStore((s) => s.objectType)
 
-    if (objectType !== 'schroedinger' && objectType !== 'pauliSpinor') {
+    if (
+      objectType !== 'schroedinger' &&
+      objectType !== 'pauliSpinor' &&
+      objectType !== 'bellPair'
+    ) {
       return null
     }
 

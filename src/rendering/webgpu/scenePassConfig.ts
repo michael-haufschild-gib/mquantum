@@ -259,6 +259,15 @@ export function normalizeColorAlgorithmForQuantumMode(
     if (matched) return matched
     return 'pauliSpinDensity'
   }
+  if (objectType === 'bellPair') {
+    // Bell apparatus density grid (R=Alice, G=CHSH glow, B=Bob) has no
+    // wavefunction phase or field-theoretic energy density. Falling through
+    // to `getQuantumTypeDefaultColorAlgorithm(quantumMode)` would return the
+    // leftover Schroedinger mode's default (e.g. FSF's energyFlux) and
+    // re-introduce the black-render bug for any preset / URL state that
+    // carries a Bell-invalid color algorithm.
+    return 'pauliSpinDensity'
+  }
   return (getQuantumTypeDefaultColorAlgorithm(quantumMode) ??
     'radialDistance') as PaletteColorAlgorithm
 }

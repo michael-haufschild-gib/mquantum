@@ -46,13 +46,21 @@ export function useSceneCameraController(deps: SceneCameraControllerDeps): Scene
   // ── Camera instance ──
   const cameraRef = useRef<WebGPUCamera | null>(null)
   if (!cameraRef.current) {
+    // Guard against a transient degenerate canvas size during initial layout.
+    // The `||` shortcut fallback used previously did not catch `width / 0 =
+    // Infinity` (Infinity is truthy), which baked an aspect = Infinity into
+    // the projection matrix (`out[0] = f / aspect = 0`, collapsing the x
+    // component to zero) and persisted there until a *valid* resize fired
+    // — the aspect-update effect below is itself gated on `width > 0 &&
+    // height > 0`, so a width-only / height-zero seed had no auto-recovery.
+    const initialAspect = size.width > 0 && size.height > 0 ? size.width / size.height : 1
     cameraRef.current = new WebGPUCamera({
       position: [0, 3.125, 7.5],
       target: [0, 0, 0],
       fov: 60,
       near: 0.1,
       far: 10000,
-      aspect: size.width / size.height || 1,
+      aspect: initialAspect,
     })
   }
 

@@ -14,31 +14,30 @@ import { Icon } from '@/components/ui/Icon'
 import { Select } from '@/components/ui/Select'
 import { PAULI_FIELD_VIEW_TO_COLOR_ALGO } from '@/lib/colors/palette/types'
 import type { AdsPresetName, AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
-import { type BecConfig, DEFAULT_BEC_CONFIG } from '@/lib/geometry/extended/bec'
 import type { SchroedingerPresetName } from '@/lib/geometry/extended/common'
-import type { FreeScalarConfig } from '@/lib/geometry/extended/freeScalar'
 import type { PauliConfig } from '@/lib/geometry/extended/pauli'
 import type { HydrogenNDPresetName, SchroedingerConfig } from '@/lib/geometry/extended/schroedinger'
 import { getHydrogenNDPresetsWithKeysByDimension } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
-import type { TdseConfig } from '@/lib/geometry/extended/tdse'
-import { DEFAULT_TDSE_CONFIG } from '@/lib/geometry/extended/tdse'
 import { ADS_PRESETS } from '@/lib/physics/antiDeSitter/presets'
 import { BEC_SCENARIO_PRESETS } from '@/lib/physics/bec/presets'
+import { BELL_SCENARIO_PRESETS } from '@/lib/physics/bell/presets'
 import { DIRAC_SCENARIO_PRESETS } from '@/lib/physics/dirac/presets'
 import { FREE_SCALAR_PRESETS } from '@/lib/physics/freeScalar/presets'
 import { HYDROGEN_COUPLED_PRESETS } from '@/lib/physics/hydrogenCoupled/presets'
 import { PAULI_SCENARIO_PRESETS } from '@/lib/physics/pauli/presets'
-import type { ScenarioPreset } from '@/lib/physics/presetTypes'
 import { QUANTUM_WALK_PRESETS } from '@/lib/physics/quantumWalk/presets'
 import { TDSE_SCENARIO_PRESETS } from '@/lib/physics/tdse/presets'
 import { WDW_SCENARIO_PRESETS } from '@/lib/physics/wheelerDeWitt/presets'
 import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
-import { resizeBecArrays } from '@/stores/slices/geometry/setters/becResize'
-import { resizeTdseArrays } from '@/stores/slices/geometry/setters/tdseSetters'
 
+import {
+  findActiveScenarioPresetId,
+  findBellPresetId,
+  findPauliPresetId,
+} from './ScenarioSelector.matching'
 import { getScenarioPresetOptions as getTdsePresetOptions } from './SchroedingerControls/tdseControlsConstants'
 
 /** Apply a Pauli preset by ID, setting config and color algorithm. */
@@ -53,183 +52,6 @@ function applyPauliPresetById(
     ? PAULI_FIELD_VIEW_TO_COLOR_ALGO[preset.overrides.fieldView]
     : undefined
   if (algo) useAppearanceStore.getState().setColorAlgorithm(algo)
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function isNeutralPresetTailValue(value: unknown): boolean {
-  return typeof value === 'number' ? Object.is(value, 0) : value === undefined
-}
-
-function matchesLiveArrayTail(live: unknown[], preset: unknown[], start: number): boolean {
-  const repeatedPresetValue = preset[preset.length - 1]
-  return live
-    .slice(start)
-    .every(
-      (value) => presetValueEquals(value, repeatedPresetValue) || isNeutralPresetTailValue(value)
-    )
-}
-
-function presetValueEquals(a: unknown, b: unknown): boolean {
-  if (Array.isArray(a) && Array.isArray(b)) {
-    const commonLength = Math.min(a.length, b.length)
-    for (let i = 0; i < commonLength; i++) {
-      if (!presetValueEquals(a[i], b[i])) return false
-    }
-    if (a.length > b.length) return matchesLiveArrayTail(a, b, commonLength)
-    return b.slice(commonLength).every(isNeutralPresetTailValue)
-  }
-  if (isRecord(a) && isRecord(b)) {
-    const bKeys = Object.keys(b)
-    return bKeys.every((key) => presetValueEquals(a[key], b[key]))
-  }
-  return Object.is(a, b)
-}
-
-function findScenarioPresetId<TConfig extends object>(
-  config: TConfig,
-  presets: readonly ScenarioPreset<Partial<TConfig>>[]
-): string | null {
-  const configRecord = config as Record<string, unknown>
-  for (const preset of presets) {
-    const entries = Object.entries(preset.overrides as Record<string, unknown>)
-    const matches = entries.every(([key, value]) => presetValueEquals(configRecord[key], value))
-    if (matches) return preset.id
-  }
-  return null
-}
-
-function countPresetOverrideLeaves(value: unknown): number {
-  if (Array.isArray(value)) {
-    return value.reduce((total, item) => total + countPresetOverrideLeaves(item), 0)
-  }
-  if (isRecord(value)) {
-    return Object.values(value).reduce<number>(
-      (total, item) => total + countPresetOverrideLeaves(item),
-      0
-    )
-  }
-  return 1
-}
-
-function findMostSpecificScenarioPresetId<TConfig extends object>(
-  config: TConfig,
-  presets: readonly ScenarioPreset<Partial<TConfig>>[]
-): string | null {
-  const configRecord = config as Record<string, unknown>
-  let bestMatch: { id: string; specificity: number } | null = null
-
-  for (const preset of presets) {
-    const entries = Object.entries(preset.overrides as Record<string, unknown>)
-    const matches = entries.every(([key, value]) => presetValueEquals(configRecord[key], value))
-    if (!matches) continue
-
-    const specificity = countPresetOverrideLeaves(preset.overrides)
-    if (bestMatch === null || specificity > bestMatch.specificity) {
-      bestMatch = { id: preset.id, specificity }
-    }
-  }
-
-  return bestMatch?.id ?? null
-}
-
-function tdseConfigMatches(current: TdseConfig, expected: TdseConfig): boolean {
-  const ignored = new Set(['needsReset', 'slicePositions'])
-  return Object.keys(expected).every((key) => {
-    if (ignored.has(key)) return true
-    const currentValue = (current as unknown as Record<string, unknown>)[key]
-    const expectedValue = (expected as unknown as Record<string, unknown>)[key]
-    return presetValueEquals(currentValue, expectedValue)
-  })
-}
-
-function becConfigMatches(current: BecConfig, expected: BecConfig): boolean {
-  const ignored = new Set(['needsReset', 'slicePositions'])
-  return Object.keys(expected).every((key) => {
-    if (ignored.has(key)) return true
-    const currentValue = (current as unknown as Record<string, unknown>)[key]
-    const expectedValue = (expected as unknown as Record<string, unknown>)[key]
-    return presetValueEquals(currentValue, expectedValue)
-  })
-}
-
-function findTdsePresetId(config: TdseConfig, dimension: number): string | null {
-  for (const preset of TDSE_SCENARIO_PRESETS) {
-    const { latticeDim: _presetDim, ...safeOverrides } = preset.overrides
-    const base = {
-      ...DEFAULT_TDSE_CONFIG,
-      ...safeOverrides,
-      slicePositions: config.slicePositions,
-      needsReset: true,
-    }
-    const resized = resizeTdseArrays(base, dimension)
-    const potentialType =
-      dimension < 2 && base.potentialType === 'doubleSlit'
-        ? ('barrier' as const)
-        : base.potentialType
-    const expected = { ...base, ...resized, potentialType, needsReset: true }
-    if (tdseConfigMatches(config, expected)) return preset.id
-  }
-  return null
-}
-
-function findBecPresetId(config: BecConfig, dimension: number): string | null {
-  for (const preset of BEC_SCENARIO_PRESETS) {
-    if ((preset.minDim ?? 2) > dimension) continue
-
-    const {
-      latticeDim: _presetDim,
-      gridSize: _presetGrid,
-      spacing: _presetSpacing,
-      trapAnisotropy: _presetAniso,
-      slicePositions: _presetSlice,
-      ...safeOverrides
-    } = preset.overrides
-    const merged = {
-      ...DEFAULT_BEC_CONFIG,
-      ...safeOverrides,
-      slicePositions: config.slicePositions,
-      needsReset: true,
-    }
-    const resized = resizeBecArrays(merged, dimension)
-    const expected = { ...merged, ...resized, needsReset: true }
-    if (becConfigMatches(config, expected)) return preset.id
-  }
-  return null
-}
-
-function findPauliPresetId(config: PauliConfig): string | null {
-  return findScenarioPresetId(config, PAULI_SCENARIO_PRESETS)
-}
-
-function findActiveScenarioPresetId(
-  mode: SchroedingerConfig['quantumMode'],
-  schroedinger: SchroedingerConfig,
-  dimension: number
-): string | null {
-  switch (mode) {
-    case 'hydrogenNDCoupled':
-      return findScenarioPresetId(schroedinger, HYDROGEN_COUPLED_PRESETS)
-    case 'tdseDynamics':
-      return findTdsePresetId(schroedinger.tdse, dimension)
-    case 'becDynamics':
-      return findBecPresetId(schroedinger.bec, dimension)
-    case 'diracEquation':
-      return findScenarioPresetId(schroedinger.dirac, DIRAC_SCENARIO_PRESETS)
-    case 'freeScalarField':
-      return findMostSpecificScenarioPresetId(
-        schroedinger.freeScalar as FreeScalarConfig,
-        FREE_SCALAR_PRESETS
-      )
-    case 'quantumWalk':
-      return findScenarioPresetId(schroedinger.quantumWalk, QUANTUM_WALK_PRESETS)
-    case 'wheelerDeWitt':
-      return findScenarioPresetId(schroedinger.wheelerDeWitt, WDW_SCENARIO_PRESETS)
-    default:
-      return null
-  }
 }
 
 /* ── Harmonic Oscillator options ───────────────────────────── */
@@ -255,6 +77,10 @@ const DIRAC_PRESET_OPTIONS = DIRAC_SCENARIO_PRESETS.map((p) => ({ value: p.id, l
 /* ── Pauli options ─────────────────────────────────────────── */
 
 const PAULI_PRESET_OPTIONS = PAULI_SCENARIO_PRESETS.map((p) => ({ value: p.id, label: p.name }))
+
+/* ── Bell options ──────────────────────────────────────────── */
+
+const BELL_PRESET_OPTIONS = BELL_SCENARIO_PRESETS.map((p) => ({ value: p.id, label: p.name }))
 
 /* ── Free Scalar Field options ─────────────────────────────── */
 
@@ -341,6 +167,7 @@ const ID_PRESET_TABLES: Record<string, readonly { id: string; description: strin
   quantumWalk: QUANTUM_WALK_PRESETS,
   wheelerDeWitt: WDW_SCENARIO_PRESETS,
   pauliSpinor: PAULI_SCENARIO_PRESETS,
+  bellPair: BELL_SCENARIO_PRESETS,
 }
 
 function findActiveDescription(
@@ -376,17 +203,25 @@ export const ScenarioSelector: React.FC = React.memo(() => {
     useShallow((s) => ({ objectType: s.objectType, dimension: s.dimension }))
   )
 
-  const { schroedinger, quantumMode, presetName, hydrogenNDPreset, adsPreset, pauliSpinor } =
-    useExtendedObjectStore(
-      useShallow((s) => ({
-        schroedinger: s.schroedinger,
-        quantumMode: s.schroedinger.quantumMode,
-        presetName: s.schroedinger.presetName,
-        hydrogenNDPreset: s.schroedinger.hydrogenNDPreset,
-        adsPreset: (s.schroedinger.antiDeSitter as AntiDeSitterConfig | undefined)?.preset,
-        pauliSpinor: s.pauliSpinor,
-      }))
-    )
+  const {
+    schroedinger,
+    quantumMode,
+    presetName,
+    hydrogenNDPreset,
+    adsPreset,
+    pauliSpinor,
+    bellPair,
+  } = useExtendedObjectStore(
+    useShallow((s) => ({
+      schroedinger: s.schroedinger,
+      quantumMode: s.schroedinger.quantumMode,
+      presetName: s.schroedinger.presetName,
+      hydrogenNDPreset: s.schroedinger.hydrogenNDPreset,
+      adsPreset: (s.schroedinger.antiDeSitter as AntiDeSitterConfig | undefined)?.preset,
+      pauliSpinor: s.pauliSpinor,
+      bellPair: s.bellPair,
+    }))
+  )
 
   // Store actions (stable references — single batched selector)
   const {
@@ -401,6 +236,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
     applyWheelerDeWittPreset,
     setPauliConfig,
     setAdsPreset,
+    setBellPairConfig,
   } = useExtendedObjectStore(
     useShallow((s) => ({
       setPresetName: s.setSchroedingerPresetName,
@@ -414,12 +250,18 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       applyWheelerDeWittPreset: s.applyWheelerDeWittPreset,
       setPauliConfig: s.setPauliConfig,
       setAdsPreset: s.setAdsPreset,
+      setBellPairConfig: s.setBellPairConfig,
     }))
   )
 
-  // Determine active mode key
+  // Determine active mode key.
+  // For non-Schrödinger object types, the preset list is driven by the
+  // ObjectType itself — schroedinger.quantumMode is a sibling field that
+  // does not move when the user switches ObjectType, so falling through to
+  // it would show stale HO/TDSE presets on a Bell or Pauli object.
   const isPauli = objectType === 'pauliSpinor'
-  const mode = isPauli ? 'pauliSpinor' : quantumMode
+  const isBellPair = objectType === 'bellPair'
+  const mode: string = isBellPair ? 'bellPair' : isPauli ? 'pauliSpinor' : quantumMode
 
   // Build options
   const options = useMemo(() => {
@@ -444,6 +286,8 @@ export const ScenarioSelector: React.FC = React.memo(() => {
         return WDW_PRESET_OPTIONS
       case 'pauliSpinor':
         return PAULI_PRESET_OPTIONS
+      case 'bellPair':
+        return BELL_PRESET_OPTIONS
       case 'antiDeSitter':
         return ADS_PRESET_OPTIONS
       default:
@@ -462,6 +306,8 @@ export const ScenarioSelector: React.FC = React.memo(() => {
         return adsPreset === 'custom' || adsPreset === undefined ? '' : adsPreset
       case 'pauliSpinor':
         return findPauliPresetId(pauliSpinor) ?? ''
+      case 'bellPair':
+        return findBellPresetId(bellPair) ?? ''
       default:
         return (
           findActiveScenarioPresetId(
@@ -471,7 +317,16 @@ export const ScenarioSelector: React.FC = React.memo(() => {
           ) ?? ''
         )
     }
-  }, [mode, presetName, hydrogenNDPreset, adsPreset, pauliSpinor, schroedinger, dimension])
+  }, [
+    mode,
+    presetName,
+    hydrogenNDPreset,
+    adsPreset,
+    pauliSpinor,
+    bellPair,
+    schroedinger,
+    dimension,
+  ])
 
   const selectOptions = useMemo(() => {
     if (!options || activeValue !== '') return options
@@ -523,6 +378,11 @@ export const ScenarioSelector: React.FC = React.memo(() => {
         case 'pauliSpinor':
           applyPauliPresetById(value, setPauliConfig)
           break
+        case 'bellPair': {
+          const preset = BELL_SCENARIO_PRESETS.find((p) => p.id === value)
+          if (preset) setBellPairConfig({ ...preset.overrides, needsReset: true })
+          break
+        }
         case 'antiDeSitter':
           setAdsPreset(value as AdsPresetName)
           break
@@ -541,6 +401,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       applyWheelerDeWittPreset,
       setPauliConfig,
       setAdsPreset,
+      setBellPairConfig,
     ]
   )
 

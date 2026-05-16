@@ -22,6 +22,12 @@ function setupPreSweepTdse(): void {
   useExtendedObjectStore.setState((state) => ({
     schroedinger: {
       ...state.schroedinger,
+      // The runtime PML pipeline reads `schroedinger.absorberEnabled` (shared
+      // top-level) via applySharedPml — the nested `tdse.absorberEnabled` is
+      // shadowed and never consumed by the compute pass. Mirror both so the
+      // tests reflect a realistic UI-driven setter pattern (the existing
+      // setTdseAbsorberEnabled setter writes both fields atomically).
+      absorberEnabled: true,
       tdse: {
         ...state.schroedinger.tdse,
         potentialType: 'andersonDisorder',
@@ -35,6 +41,7 @@ function setupPreSweepTdse(): void {
 }
 
 const getTdse = () => useExtendedObjectStore.getState().schroedinger.tdse
+const getSharedAbsorber = () => useExtendedObjectStore.getState().schroedinger.absorberEnabled
 
 describe('AndersonSweepSection — snapshot and restore', () => {
   beforeEach(() => {
@@ -53,6 +60,10 @@ describe('AndersonSweepSection — snapshot and restore', () => {
     expect(getTdse().disorderStrength).toBe(1) // wMin from default UI sliders
     expect(getTdse().diagnosticsEnabled).toBe(true)
     expect(getTdse().absorberEnabled).toBe(false)
+    // Regression: applySharedPml reads schroedinger.absorberEnabled (top-level)
+    // — writing only the nested copy left the PML active during the sweep and
+    // biased IPR measurements toward smaller (more "localized") values.
+    expect(getSharedAbsorber()).toBe(false)
   })
 
   it('restores the user TDSE fields when the sweep is aborted', async () => {
@@ -67,6 +78,7 @@ describe('AndersonSweepSection — snapshot and restore', () => {
     expect(getTdse().disorderSeed).toBe(PRE_SWEEP_SEED)
     expect(getTdse().absorberEnabled).toBe(true)
     expect(getTdse().diagnosticsEnabled).toBe(false)
+    expect(getSharedAbsorber()).toBe(true)
   })
 
   it('restores the user TDSE fields when the sweep is reset via "New Sweep"', async () => {
@@ -86,6 +98,7 @@ describe('AndersonSweepSection — snapshot and restore', () => {
     expect(getTdse().disorderSeed).toBe(PRE_SWEEP_SEED)
     expect(getTdse().absorberEnabled).toBe(true)
     expect(getTdse().diagnosticsEnabled).toBe(false)
+    expect(getSharedAbsorber()).toBe(true)
   })
 
   it('restores the user TDSE fields as soon as the sweep completes', async () => {
@@ -99,6 +112,7 @@ describe('AndersonSweepSection — snapshot and restore', () => {
     expect(getTdse().disorderSeed).toBe(PRE_SWEEP_SEED)
     expect(getTdse().absorberEnabled).toBe(true)
     expect(getTdse().diagnosticsEnabled).toBe(false)
+    expect(getSharedAbsorber()).toBe(true)
   })
 
   it('does not restore stale TDSE fields if the user starts a second sweep', async () => {
@@ -109,10 +123,13 @@ describe('AndersonSweepSection — snapshot and restore', () => {
     await user.click(screen.getByTestId('sweep-abort'))
     expect(getTdse().disorderStrength).toBe(PRE_SWEEP_W)
 
-    // User changes their config between sweeps.
+    // User changes their config between sweeps. Mirror both the top-level and
+    // tdse-nested absorberEnabled the way setTdseAbsorberEnabled would so the
+    // sweep snapshot captures a self-consistent state.
     useExtendedObjectStore.setState((s) => ({
       schroedinger: {
         ...s.schroedinger,
+        absorberEnabled: false,
         tdse: { ...s.schroedinger.tdse, disorderStrength: 12, absorberEnabled: false },
       },
     }))
@@ -122,6 +139,7 @@ describe('AndersonSweepSection — snapshot and restore', () => {
     await user.click(screen.getByTestId('sweep-abort'))
     expect(getTdse().disorderStrength).toBe(12)
     expect(getTdse().absorberEnabled).toBe(false)
+    expect(getSharedAbsorber()).toBe(false)
   })
 
   it('keeps the original snapshot if a rapid second start event fires before rerender', async () => {
@@ -137,6 +155,7 @@ describe('AndersonSweepSection — snapshot and restore', () => {
     expect(getTdse().disorderSeed).toBe(PRE_SWEEP_SEED)
     expect(getTdse().absorberEnabled).toBe(true)
     expect(getTdse().diagnosticsEnabled).toBe(false)
+    expect(getSharedAbsorber()).toBe(true)
   })
 
   it('aborts and restores TDSE fields if the section unmounts mid-sweep', async () => {
@@ -151,5 +170,6 @@ describe('AndersonSweepSection — snapshot and restore', () => {
     expect(getTdse().disorderSeed).toBe(PRE_SWEEP_SEED)
     expect(getTdse().absorberEnabled).toBe(true)
     expect(getTdse().diagnosticsEnabled).toBe(false)
+    expect(getSharedAbsorber()).toBe(true)
   })
 })

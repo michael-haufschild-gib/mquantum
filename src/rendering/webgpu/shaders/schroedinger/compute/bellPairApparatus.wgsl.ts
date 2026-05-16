@@ -1,12 +1,24 @@
 /**
  * Bell-pair apparatus density-write shader.
  *
- * Writes a static "apparatus" pattern into the density grid: a central
- * Gaussian source sphere plus two analyzer regions offset along ±x.
- * The R channel encodes Alice-side intensity (spin-up convention) and the
- * B channel encodes Bob-side intensity. The G channel modulates the
- * apparatus by the live CHSH violation strength so the canvas pulses
- * brighter as the empirical |S| grows past the classical bound.
+ * Writes a config-aware "apparatus" pattern into the density grid:
+ *   - A central source Gaussian whose brightness scales with the Werner
+ *     visibility v (mixing dims the singlet).
+ *   - Two analyzer cores at (±armOffset, 0, 0) whose brightness scales
+ *     with detection efficiency η.
+ *   - Per analyzer, two oriented lobes — one along the unprimed Bloch
+ *     axis, one along the primed axis (slightly attenuated) — so the
+ *     canvas reflects the four CHSH measurement settings. Dragging the
+ *     θ/φ sliders rotates the lobes.
+ *   - The G (green) channel pulses with the live |S| as in the previous
+ *     version.
+ *
+ * Channel layout preserved from the previous shader so the default
+ * `pauliSpinDensity` color algorithm continues to work:
+ *   R = Alice-side intensity (source/2 + Alice analyzer + Alice lobes)
+ *   G = CHSH-glow (QM + LHV)
+ *   B = Bob-side intensity   (source/2 + Bob analyzer   + Bob lobes)
+ *   A = combined apparatus density
  *
  * Bindings (group 0):
  *   0: uniform `BellApparatusUniforms`
@@ -24,26 +36,32 @@
  */
 export const bellPairApparatusWgsl = /* wgsl */ `
 struct BellApparatusUniforms {
-  /** Density-grid resolution (uniform N for an N×N×N cube). */
-  gridSize: u32,
-  /** Live |S| from the QM accumulator; drives green-channel pulse. */
-  liveSAbs: f32,
-  /** Live |S| from the LHV accumulator; drives the dim secondary pulse. */
-  liveLhvAbs: f32,
-  /** Total trial count (used to ramp the apparatus from cold → warm). */
-  trialCount: f32,
-  /** Analyzer-arm offset along x in normalized [-1, 1] grid coords. */
-  armOffset: f32,
-  /** Source Gaussian sigma (in normalized grid coords). */
-  sourceSigma: f32,
-  /** Analyzer Gaussian sigma. */
-  analyzerSigma: f32,
-  /** Bounding-radius scale to map normalized coords to world units. */
-  worldScale: f32,
+  gridSize: u32,             // offset 0
+  liveSAbs: f32,             // 4
+  liveLhvAbs: f32,           // 8
+  trialCount: f32,           // 12
+  armOffset: f32,            // 16
+  sourceSigma: f32,          // 20
+  analyzerSigma: f32,        // 24
+  worldScale: f32,           // 28
+  visibility: f32,           // 32
+  detectionEfficiency: f32,  // 36
+  lobeOffset: f32,           // 40
+  primedLobeScale: f32,      // 44
+  aliceAxis: vec3<f32>,      // 48
+  aliceAxisPrime: vec3<f32>, // 64
+  bobAxis: vec3<f32>,        // 80
+  bobAxisPrime: vec3<f32>,   // 96
 }
 
 @group(0) @binding(0) var<uniform> bell: BellApparatusUniforms;
 @group(0) @binding(1) var densityGrid: texture_storage_3d<rgba16float, write>;
+
+fn gauss3(p: vec3f, center: vec3f, sigma: f32) -> f32 {
+  let d = p - center;
+  let inv2s2 = 1.0 / (2.0 * sigma * sigma);
+  return exp(-dot(d, d) * inv2s2);
+}
 
 @compute @workgroup_size(4, 4, 4)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
@@ -54,37 +72,49 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let nf = f32(N);
   let p = (vec3f(f32(gid.x), f32(gid.y), f32(gid.z)) + vec3f(0.5)) / nf * 2.0 - vec3f(1.0);
 
-  // Source Gaussian at origin: equal up/down (singlet visualization).
-  let r2_source = dot(p, p);
-  let inv2s2_source = 1.0 / (2.0 * bell.sourceSigma * bell.sourceSigma);
-  let source = exp(-r2_source * inv2s2_source);
+  let aliceCenter = vec3f(-bell.armOffset, 0.0, 0.0);
+  let bobCenter   = vec3f( bell.armOffset, 0.0, 0.0);
 
-  // Alice analyzer at (-arm, 0, 0) — biased to up (R) channel.
-  let pA = p - vec3f(-bell.armOffset, 0.0, 0.0);
-  let r2_A = dot(pA, pA);
-  let inv2s2_arm = 1.0 / (2.0 * bell.analyzerSigma * bell.analyzerSigma);
-  let alice = exp(-r2_A * inv2s2_arm);
+  // Source: Werner visibility scales the central singlet sphere.
+  let source = bell.visibility * gauss3(p, vec3f(0.0), bell.sourceSigma);
 
-  // Bob analyzer at (+arm, 0, 0) — biased to down (B) channel.
-  let pB = p - vec3f(bell.armOffset, 0.0, 0.0);
-  let r2_B = dot(pB, pB);
-  let bob = exp(-r2_B * inv2s2_arm);
+  // Detection efficiency scales the entire analyzer apparatus (cores +
+  // lobes). η² makes the dimming feel dramatic between perfect (η=1) and
+  // marginal (η≈0.83) regimes.
+  let etaScale = bell.detectionEfficiency * bell.detectionEfficiency;
+  let aliceCore = etaScale * gauss3(p, aliceCenter, bell.analyzerSigma);
+  let bobCore   = etaScale * gauss3(p, bobCenter,   bell.analyzerSigma);
+
+  // Oriented lobes. The lobe sits at analyzer_center + lobeOffset * axis_dir
+  // so the user's Bloch-sphere setting maps directly to spatial position.
+  // Smaller sigma than the analyzer core to keep the two axis lobes
+  // distinguishable at canonical-CHSH separation (≈ √2 · lobeOffset).
+  let lobeSigma = max(0.06, bell.analyzerSigma * 0.55);
+  let aliceA  = etaScale *
+                gauss3(p, aliceCenter + bell.lobeOffset * bell.aliceAxis,      lobeSigma);
+  let aliceAp = etaScale * bell.primedLobeScale *
+                gauss3(p, aliceCenter + bell.lobeOffset * bell.aliceAxisPrime, lobeSigma);
+  let bobB    = etaScale *
+                gauss3(p, bobCenter   + bell.lobeOffset * bell.bobAxis,        lobeSigma);
+  let bobBp   = etaScale * bell.primedLobeScale *
+                gauss3(p, bobCenter   + bell.lobeOffset * bell.bobAxisPrime,   lobeSigma);
 
   // Cold → warm ramp: opacity grows with trial count, saturating around 5k.
   let warmth = clamp(bell.trialCount / 5000.0, 0.0, 1.0);
+  let armBoost = 0.4 + 0.6 * warmth;
 
-  // Tsirelson glow: green channel intensity is the empirical CHSH overage
-  // past the classical bound, normalised to the Tsirelson distance (0.828).
+  // CHSH glow on the green channel: empirical |S| past the classical bound,
+  // normalised to the Tsirelson distance (0.828).
   let chsh_glow = clamp((bell.liveSAbs - 2.0) / 0.828, 0.0, 1.0);
-  let lhv_glow = clamp((bell.liveLhvAbs - 2.0) / 0.828, 0.0, 1.0);
+  let lhv_glow  = clamp((bell.liveLhvAbs - 2.0) / 0.828, 0.0, 1.0);
 
-  // R = Alice intensity (source + Alice arm), B = Bob intensity.
-  let r = (0.5 * source + alice) * (0.4 + 0.6 * warmth);
-  let b = (0.5 * source + bob) * (0.4 + 0.6 * warmth);
-  // G encodes the CHSH glow; the renderer's color algorithm picks it up.
-  let g = source * chsh_glow + (alice + bob) * 0.4 * lhv_glow;
-  // A = combined magnitude (used by some color algos as the absolute density).
-  let a = source + 0.5 * (alice + bob);
+  let aliceTotal = (0.5 * source + aliceCore + aliceA + aliceAp) * armBoost;
+  let bobTotal   = (0.5 * source + bobCore   + bobB   + bobBp)   * armBoost;
+
+  let r = aliceTotal;
+  let b = bobTotal;
+  let g = source * chsh_glow + (aliceCore + bobCore) * 0.4 * lhv_glow;
+  let a = source + 0.5 * (aliceTotal + bobTotal);
 
   textureStore(densityGrid, vec3i(i32(gid.x), i32(gid.y), i32(gid.z)), vec4f(r, g, b, a));
 }

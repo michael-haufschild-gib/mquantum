@@ -401,7 +401,6 @@ export async function setupRenderPasses(
 
 /** Pauli spinor uses the TDSE lattice engine with all analytic features disabled. */
 const PAULI_RENDERER_OVERRIDES = {
-  isosurface: false,
   quantumMode: 'tdseDynamics' as const,
   termCount: 1 as const,
   nodalEnabled: false,
@@ -514,6 +513,7 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
     case 'pauliSpinor':
       return new WebGPUSchrodingerRenderer({
         dimension,
+        isosurface,
         colorAlgorithm,
         densityGridResolution: config.densityGridResolution,
         ...PAULI_RENDERER_OVERRIDES,

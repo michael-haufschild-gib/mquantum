@@ -33,9 +33,102 @@ import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
 import { destroyGpuResources } from '../utils/gpuResourceHelpers'
 import { createDensityTexture, GRID_WG } from './computePassUtils'
 
-/** Number of f32 values in the uniform buffer (matches the WGSL struct). */
-const UNIFORM_F32_COUNT = 8
-const UNIFORM_BYTES = UNIFORM_F32_COUNT * 4
+/**
+ * Uniform byte layout for `BellApparatusUniforms` (must match the WGSL
+ * struct in `bellPairApparatus.wgsl.ts`).
+ *
+ *   0..3     u32 gridSize
+ *   4..47    11 × f32 scalars (liveSAbs, liveLhvAbs, trialCount,
+ *            armOffset, sourceSigma, analyzerSigma, worldScale,
+ *            visibility, detectionEfficiency, lobeOffset, primedLobeScale)
+ *   48..63   vec3<f32> aliceAxis      (12 used + 4 pad)
+ *   64..79   vec3<f32> aliceAxisPrime
+ *   80..95   vec3<f32> bobAxis
+ *   96..111  vec3<f32> bobAxisPrime
+ */
+export const BELL_APPARATUS_UNIFORM_BYTES = 112
+const UNIFORM_BYTES = BELL_APPARATUS_UNIFORM_BYTES
+const UNIFORM_F32_COUNT = UNIFORM_BYTES / 4
+
+/** Convert a Bloch axis (θ, φ) to a unit 3-vector. */
+function axisToVec3(axis: readonly [number, number]): [number, number, number] {
+  const sinT = Math.sin(axis[0])
+  return [sinT * Math.cos(axis[1]), sinT * Math.sin(axis[1]), Math.cos(axis[0])]
+}
+
+/** Tunables consumed by the apparatus shader (fixed for now; can be promoted to props). */
+const APPARATUS_GEOMETRY = Object.freeze({
+  armOffset: 0.6,
+  sourceSigma: 0.18,
+  analyzerSigma: 0.22,
+  lobeOffset: 0.3,
+  primedLobeScale: 0.55,
+})
+
+/**
+ * Pack a {@link BellPairConfig} plus live-stats into the binary layout
+ * expected by `BellApparatusUniforms`. Pure function — extracted so unit
+ * tests can verify the packing without a real GPU device.
+ *
+ * @param config - Bell-pair config (axes, visibility, η).
+ * @param densityGridSize - Voxel resolution per axis.
+ * @param boundingRadius - World-space bounding radius (drives worldScale).
+ * @param liveSAbs - QM |S| from the diagnostic store.
+ * @param liveLhvAbs - LHV |S| from the diagnostic store.
+ * @param totalTrials - Total trials drawn so far.
+ * @returns ArrayBuffer of length {@link BELL_APPARATUS_UNIFORM_BYTES}.
+ */
+export function packBellApparatusUniforms(
+  config: BellPairConfig,
+  densityGridSize: number,
+  boundingRadius: number,
+  liveSAbs: number,
+  liveLhvAbs: number,
+  totalTrials: number
+): ArrayBuffer {
+  const { armOffset, sourceSigma, analyzerSigma, lobeOffset, primedLobeScale } = APPARATUS_GEOMETRY
+
+  const visibility = Number.isFinite(config.visibility)
+    ? Math.max(0, Math.min(1, config.visibility))
+    : 1
+  const eta = Number.isFinite(config.detectionEfficiency)
+    ? Math.max(0, Math.min(1, config.detectionEfficiency))
+    : 1
+  const aliceAxis = axisToVec3(config.aliceAxis)
+  const aliceAxisPrime = axisToVec3(config.aliceAxisPrime)
+  const bobAxis = axisToVec3(config.bobAxis)
+  const bobAxisPrime = axisToVec3(config.bobAxisPrime)
+
+  const buf = new ArrayBuffer(UNIFORM_BYTES)
+  const u32 = new Uint32Array(buf)
+  const f32 = new Float32Array(buf)
+  u32[0] = densityGridSize >>> 0
+  f32[1] = Number.isFinite(liveSAbs) ? liveSAbs : 0
+  f32[2] = Number.isFinite(liveLhvAbs) ? liveLhvAbs : 0
+  f32[3] = totalTrials
+  f32[4] = armOffset
+  f32[5] = sourceSigma
+  f32[6] = analyzerSigma
+  f32[7] = Math.max(boundingRadius, 0.01)
+  f32[8] = visibility
+  f32[9] = eta
+  f32[10] = lobeOffset
+  f32[11] = primedLobeScale
+  // vec3<f32> slots start at f32 index 12, one per 4-slot block (12 used + 4 pad).
+  f32[12] = aliceAxis[0]
+  f32[13] = aliceAxis[1]
+  f32[14] = aliceAxis[2]
+  f32[16] = aliceAxisPrime[0]
+  f32[17] = aliceAxisPrime[1]
+  f32[18] = aliceAxisPrime[2]
+  f32[20] = bobAxis[0]
+  f32[21] = bobAxis[1]
+  f32[22] = bobAxis[2]
+  f32[24] = bobAxisPrime[0]
+  f32[25] = bobAxisPrime[1]
+  f32[26] = bobAxisPrime[2]
+  return buf
+}
 
 /**
  * Compute pass for the Bell-pair apparatus density write.
@@ -217,30 +310,16 @@ export class BellPairComputePass extends WebGPUBaseComputePass {
       return
     }
 
-    // armOffset: 0.6 of the normalized cube — analyzer arms sit comfortably
-    // inside the box without clipping at the boundary.
-    const armOffset = 0.6
-    const sourceSigma = 0.18
-    const analyzerSigma = 0.22
-    const u = this.uniformScratch
-    // f32 buffer maps to the uniform: each entry is one 4-byte f32 slot.
-    // u32 gridSize stored as Float32Array via bit-cast is wrong — we need a
-    // separate write. The struct interleaves u32 then f32s; use Uint32Array
-    // view to set the first slot, then Float32Array view for the rest.
-    const uniformBytes = new ArrayBuffer(UNIFORM_BYTES)
-    const uniformU32 = new Uint32Array(uniformBytes)
-    const uniformF32 = new Float32Array(uniformBytes)
-    uniformU32[0] = this.densityGridSize >>> 0
-    uniformF32[1] = Number.isFinite(liveSAbs) ? liveSAbs : 0
-    uniformF32[2] = Number.isFinite(liveLhvAbs) ? liveLhvAbs : 0
-    uniformF32[3] = totalTrials
-    uniformF32[4] = armOffset
-    uniformF32[5] = sourceSigma
-    uniformF32[6] = analyzerSigma
-    uniformF32[7] = Math.max(boundingRadius, 0.01)
+    const uniformBytes = packBellApparatusUniforms(
+      config,
+      this.densityGridSize,
+      boundingRadius,
+      liveSAbs,
+      liveLhvAbs,
+      totalTrials
+    )
     // Keep the scratch buffer in sync for state inspection / tests.
-    u.set(uniformF32)
-    void config // accepted for future per-config tweaks (e.g. visibility-driven dim)
+    this.uniformScratch.set(new Float32Array(uniformBytes))
 
     ctx.device.queue.writeBuffer(this.uniformBuffer, 0, uniformBytes)
 

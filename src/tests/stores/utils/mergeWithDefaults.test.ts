@@ -111,7 +111,7 @@ describe('mergeExtendedObjectStateForType — schroedinger', () => {
       expect(schroedinger.isoEnabled).toBe(false)
     })
 
-    it('clears loaded isosurface mode for compute-backed quantum modes', () => {
+    it('preserves loaded isosurface mode for compute-backed quantum modes', () => {
       const savedState = {
         schroedinger: {
           quantumMode: 'tdseDynamics',
@@ -123,7 +123,7 @@ describe('mergeExtendedObjectStateForType — schroedinger', () => {
       const schroedinger = merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
 
       expect(schroedinger.quantumMode).toBe('tdseDynamics')
-      expect(schroedinger.isoEnabled).toBe(false)
+      expect(schroedinger.isoEnabled).toBe(true)
     })
   })
 

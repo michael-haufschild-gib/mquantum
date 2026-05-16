@@ -261,7 +261,7 @@ describe('Quantum Type Registry (Flat Model)', () => {
       ).toBe(true)
     })
 
-    it('blocks compute modes, Wigner representation, and Pauli spinors', () => {
+    it('allows compute modes (density-grid isosurface shader path)', () => {
       expect(
         supportsSchroedingerSurfaceMode({
           objectType: 'schroedinger',
@@ -269,7 +269,41 @@ describe('Quantum Type Registry (Flat Model)', () => {
           dimension: 3,
           representation: 'position',
         })
-      ).toBe(false)
+      ).toBe(true)
+      expect(
+        supportsSchroedingerSurfaceMode({
+          objectType: 'schroedinger',
+          quantumMode: 'freeScalarField',
+          dimension: 3,
+          representation: 'position',
+        })
+      ).toBe(true)
+      expect(
+        supportsSchroedingerSurfaceMode({
+          objectType: 'schroedinger',
+          quantumMode: 'diracEquation',
+          dimension: 3,
+          representation: 'position',
+        })
+      ).toBe(true)
+    })
+
+    it('allows pauliSpinor object type (density-grid isosurface path)', () => {
+      expect(
+        supportsSchroedingerSurfaceMode({
+          objectType: 'pauliSpinor',
+          dimension: 3,
+        })
+      ).toBe(true)
+      expect(
+        supportsSchroedingerSurfaceMode({
+          objectType: 'pauliSpinor',
+          dimension: 2,
+        })
+      ).toBe(true)
+    })
+
+    it('blocks Wigner representation, bellPair, and dimension < 2', () => {
       expect(
         supportsSchroedingerSurfaceMode({
           objectType: 'schroedinger',
@@ -280,8 +314,14 @@ describe('Quantum Type Registry (Flat Model)', () => {
       ).toBe(false)
       expect(
         supportsSchroedingerSurfaceMode({
-          objectType: 'pauliSpinor',
+          objectType: 'bellPair',
           dimension: 3,
+        })
+      ).toBe(false)
+      expect(
+        supportsSchroedingerSurfaceMode({
+          objectType: 'pauliSpinor',
+          dimension: 1,
         })
       ).toBe(false)
     })
