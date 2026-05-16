@@ -287,7 +287,8 @@ function needsEffectBundleShader(
 /** @returns Normalized Schroedinger-specific config with compute-mode overrides applied. */
 export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {
   const isPauli = config.objectType === 'pauliSpinor'
-  const isCompute = isComputeQuantumType(config.quantumMode) || isPauli
+  const isBellPair = config.objectType === 'bellPair'
+  const isCompute = isComputeQuantumType(config.quantumMode) || isPauli || isBellPair
   const is2D = !isCompute && (config.dimension === 2 || config.representation === 'wigner')
   const disableAnalytical = isCompute || is2D
   const disableQuantumEffect = isCompute || config.openQuantumEnabled

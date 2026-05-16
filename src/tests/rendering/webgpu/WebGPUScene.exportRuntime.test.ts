@@ -187,7 +187,6 @@ describe('useExportRuntime cancellation', () => {
       )
 
       usePerformanceStore.setState({
-        progressiveRefinementEnabled: false,
         renderResolutionScale: 0.5,
       })
       useExportStore.setState({
@@ -208,7 +207,6 @@ describe('useExportRuntime cancellation', () => {
         await Promise.resolve()
       })
 
-      expect(usePerformanceStore.getState().progressiveRefinementEnabled).toBe(false)
       expect(usePerformanceStore.getState().renderResolutionScale).toBe(0.5)
 
       await act(async () => {
@@ -217,7 +215,6 @@ describe('useExportRuntime cancellation', () => {
       })
 
       expect(runtimeRef.current.environmentCaptured).toBe(false)
-      expect(usePerformanceStore.getState().progressiveRefinementEnabled).toBe(false)
       expect(usePerformanceStore.getState().renderResolutionScale).toBe(0.5)
     } finally {
       Object.defineProperty(window, 'showSaveFilePicker', {

@@ -147,7 +147,10 @@ export function serializeTdsePotential(
     setStringParam(params, 'cpx', state.customPotentialExpression)
   }
   if (state.potentialType === 'coupledAnharmonic') {
-    setFloatParam(params, 'anh_l', state.anharmonicLambda, true)
+    // omitZero=false: the store default is 1.0, so an explicit
+    // `anharmonicLambda = 0` (no quartic perturbation) must survive
+    // the URL round-trip instead of silently reverting to 1.0.
+    setFloatParam(params, 'anh_l', state.anharmonicLambda)
   }
   if (state.potentialType === 'andersonDisorder') {
     setFloatParam(params, 'dis_w', state.disorderStrength, true)
@@ -219,14 +222,20 @@ export function serializeTdseVisualization(
 export function serializeTdseFeatures(params: URLSearchParams, state: TdseSerializableState): void {
   if (state.openQuantumEnabled) {
     params.set('oq', '1')
-    setFloatParam(params, 'oq_dp', state.openQuantumDephasingRate, true)
+    // omitZero=false for dephasing: default 0.5, so an explicit 0
+    // (dephasing off while other channels are on) must round-trip.
+    // Relaxation / thermal default to 0.0 already, so omitZero=true
+    // keeps "all-default open quantum" links short.
+    setFloatParam(params, 'oq_dp', state.openQuantumDephasingRate)
     setFloatParam(params, 'oq_rx', state.openQuantumRelaxationRate, true)
     setFloatParam(params, 'oq_th', state.openQuantumThermalUpRate, true)
   }
 
   if (state.stochasticEnabled) {
     params.set('sloc', '1')
-    setFloatParam(params, 'sloc_g', state.stochasticGamma, true)
+    // omitZero=false for γ: default 0.5, so an explicit 0 (no
+    // monitoring) must round-trip rather than reverting to 0.5.
+    setFloatParam(params, 'sloc_g', state.stochasticGamma)
     setFloatParam(params, 'sloc_s', state.stochasticSigma, true)
     setIntParam(params, 'sloc_n', state.stochasticNumSites)
   }

@@ -459,6 +459,15 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
   /** Initialize field state and perform leapfrog kickstart. */
   private initializeField(ctx: WebGPURenderContext, config: FreeScalarConfig): void {
+    // Consume the injection here: clearing the class field *before* the call
+    // ensures that a length-mismatch (or any other) throw in initializeFsfField
+    // cannot trap the renderer in an infinite-throw loop — the next frame's
+    // willReinitialize branch would otherwise re-enter with the same bad
+    // injection and rethrow. The local handle below is the only reference the
+    // initializer needs; result.pendingInjection is always null on success.
+    const injection = this.pendingInjection
+    this.pendingInjection = null
+
     const result = initializeFsfField(ctx, config, {
       pl: this.pl,
       bg: this.bg,
@@ -467,7 +476,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       uniformBuffer: this.uniformBuffer,
       totalSites: this.totalSites,
       simEta: this.simEta,
-      pendingInjection: this.pendingInjection,
+      pendingInjection: injection,
       pendingStagingBuffers: this.pendingStagingBuffers,
       kSpace: this.kSpace,
       // Midpoint-coef kickstart needs these to stage the correct coefs

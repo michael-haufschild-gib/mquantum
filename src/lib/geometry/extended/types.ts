@@ -7,6 +7,7 @@
 
 export * from './antiDeSitter'
 export * from './bec'
+export * from './bellPair'
 export * from './common'
 export * from './crossMode'
 export * from './dirac'
@@ -20,6 +21,8 @@ export * from './wheelerDeWitt'
 // Combined Object Parameters
 // ============================================================================
 
+import type { BellPairConfig } from './bellPair'
+import { DEFAULT_BELL_PAIR_CONFIG } from './bellPair'
 import type { PauliConfig } from './pauli'
 import { DEFAULT_PAULI_CONFIG } from './pauli'
 import type { SchroedingerConfig } from './schroedinger'
@@ -34,6 +37,8 @@ export interface ExtendedObjectParams {
   schroedinger: SchroedingerConfig
   /** Configuration for Pauli spinor simulation */
   pauliSpinor: PauliConfig
+  /** Configuration for Bell-pair / CHSH experiment */
+  bellPair: BellPairConfig
 }
 
 /**
@@ -42,4 +47,5 @@ export interface ExtendedObjectParams {
 export const DEFAULT_EXTENDED_OBJECT_PARAMS: ExtendedObjectParams = {
   schroedinger: DEFAULT_SCHROEDINGER_CONFIG,
   pauliSpinor: DEFAULT_PAULI_CONFIG,
+  bellPair: DEFAULT_BELL_PAIR_CONFIG,
 }

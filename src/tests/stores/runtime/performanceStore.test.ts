@@ -11,7 +11,6 @@ import {
   DEFAULT_DENSITY_GRID_RESOLUTION,
   hasPersistedMaxFps,
   hasPersistedResolutionScale,
-  REFINEMENT_STAGE_QUALITY,
   usePerformanceStore,
 } from '@/stores/runtime/performanceStore'
 
@@ -21,22 +20,19 @@ describe('performanceStore', () => {
     usePerformanceStore.getState().reset()
   })
 
-  describe('interaction state', () => {
-    it('interaction flags toggle independently and reset clears them', () => {
+  describe('scene loading state', () => {
+    it('scene loading flags toggle independently and reset clears them', () => {
       const store = usePerformanceStore.getState()
 
-      store.setIsInteracting(true)
       store.setSceneTransitioning(true)
       store.setIsLoadingScene(true)
 
       const state = usePerformanceStore.getState()
-      expect(state.isInteracting).toBe(true)
       expect(state.sceneTransitioning).toBe(true)
       expect(state.isLoadingScene).toBe(true)
 
       store.reset()
       const after = usePerformanceStore.getState()
-      expect(after.isInteracting).toBe(false)
       expect(after.sceneTransitioning).toBe(false)
       expect(after.isLoadingScene).toBe(false)
     })
@@ -63,84 +59,6 @@ describe('performanceStore', () => {
       expect(state.isMobileGPU).toBe(DEFAULT_CAPABILITIES.isMobileGPU)
       expect(state.gpuName).toBe(DEFAULT_CAPABILITIES.gpuName)
       expect(state.deviceCapabilitiesDetected).toBe(false)
-    })
-  })
-
-  describe('progressive refinement', () => {
-    it('should set progressiveRefinementEnabled', () => {
-      const { setProgressiveRefinementEnabled } = usePerformanceStore.getState()
-
-      setProgressiveRefinementEnabled(false)
-      expect(usePerformanceStore.getState().progressiveRefinementEnabled).toBe(false)
-      // When disabled, should reset to final quality
-      expect(usePerformanceStore.getState().refinementStage).toBe('final')
-      expect(usePerformanceStore.getState().qualityMultiplier).toBe(1.0)
-    })
-
-    it('should set refinement stage with correct quality multiplier', () => {
-      const { setRefinementStage } = usePerformanceStore.getState()
-
-      setRefinementStage('low')
-      expect(usePerformanceStore.getState().refinementStage).toBe('low')
-      expect(usePerformanceStore.getState().qualityMultiplier).toBe(REFINEMENT_STAGE_QUALITY.low)
-
-      setRefinementStage('medium')
-      expect(usePerformanceStore.getState().refinementStage).toBe('medium')
-      expect(usePerformanceStore.getState().qualityMultiplier).toBe(REFINEMENT_STAGE_QUALITY.medium)
-
-      setRefinementStage('high')
-      expect(usePerformanceStore.getState().refinementStage).toBe('high')
-      expect(usePerformanceStore.getState().qualityMultiplier).toBe(REFINEMENT_STAGE_QUALITY.high)
-
-      setRefinementStage('final')
-      expect(usePerformanceStore.getState().refinementStage).toBe('final')
-      expect(usePerformanceStore.getState().qualityMultiplier).toBe(REFINEMENT_STAGE_QUALITY.final)
-    })
-
-    it('should clamp refinement progress to 0-100', () => {
-      const { setRefinementProgress } = usePerformanceStore.getState()
-
-      setRefinementProgress(-10)
-      expect(usePerformanceStore.getState().refinementProgress).toBe(0)
-
-      setRefinementProgress(150)
-      expect(usePerformanceStore.getState().refinementProgress).toBe(100)
-
-      setRefinementProgress(50)
-      expect(usePerformanceStore.getState().refinementProgress).toBe(50)
-    })
-
-    it('should ignore non-finite refinement progress updates', () => {
-      const { setRefinementProgress } = usePerformanceStore.getState()
-      setRefinementProgress(80)
-      expect(usePerformanceStore.getState().refinementProgress).toBe(80)
-
-      setRefinementProgress(Number.NaN)
-      setRefinementProgress(Number.POSITIVE_INFINITY)
-      setRefinementProgress(Number.NEGATIVE_INFINITY)
-
-      expect(usePerformanceStore.getState().refinementProgress).toBe(80)
-    })
-
-    it('should reset refinement when enabled', () => {
-      const { setRefinementStage, resetRefinement } = usePerformanceStore.getState()
-
-      setRefinementStage('final')
-      resetRefinement()
-
-      expect(usePerformanceStore.getState().refinementStage).toBe('low')
-      expect(usePerformanceStore.getState().qualityMultiplier).toBe(REFINEMENT_STAGE_QUALITY.low)
-    })
-
-    it('should not reset refinement when disabled', () => {
-      const { setProgressiveRefinementEnabled, resetRefinement } = usePerformanceStore.getState()
-
-      setProgressiveRefinementEnabled(false)
-      // Since disabled sets to final, the stage is already final
-      resetRefinement()
-
-      // Should stay at final when disabled
-      expect(usePerformanceStore.getState().refinementStage).toBe('final')
     })
   })
 
@@ -279,9 +197,7 @@ describe('performanceStore', () => {
       const store = usePerformanceStore.getState()
 
       // Modify various state
-      store.setIsInteracting(true)
       store.setSceneTransitioning(true)
-      store.setRefinementStage('low')
       store.setShaderCompiling('test', true)
 
       // Reset
@@ -289,9 +205,7 @@ describe('performanceStore', () => {
 
       // Verify all back to defaults
       const state = usePerformanceStore.getState()
-      expect(state.isInteracting).toBe(false)
       expect(state.sceneTransitioning).toBe(false)
-      expect(state.refinementStage).toBe('final')
       expect(state.isShaderCompiling).toBe(false)
     })
 

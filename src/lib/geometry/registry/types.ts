@@ -24,7 +24,7 @@ import type { ObjectType } from '../types'
  * that flat model. The two-level ObjectType + SchroedingerQuantumMode split
  * is an internal implementation detail bridged via {@link QuantumTypeInternal}.
  */
-export type QuantumTypeKey = SchroedingerQuantumMode | 'pauliSpinor'
+export type QuantumTypeKey = SchroedingerQuantumMode | 'pauliSpinor' | 'bellTest'
 
 // ============================================================================
 // Core Enums and Literal Types
@@ -58,6 +58,7 @@ export type QuantumTypeStrategyKind =
   | 'wheelerDeWitt'
   | 'antiDeSitter'
   | 'pauli'
+  | 'bellPair'
 
 /** Analytic shader family used by HO / hydrogen-specific gates. */
 export type QuantumTypeAnalyticFamily = 'harmonicOscillator' | 'hydrogen'
@@ -73,6 +74,7 @@ export type QuantumTypeEvolutionResetKind =
   | 'wheelerDeWitt'
   | 'antiDeSitter'
   | 'pauli'
+  | 'bellPair'
 
 /** Optional compile-time selector fields required by renderer shader config. */
 export type QuantumTypeCompileContextField = 'diracFieldView' | 'freeScalarInitialCondition'

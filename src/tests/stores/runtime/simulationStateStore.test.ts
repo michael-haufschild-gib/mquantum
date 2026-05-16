@@ -509,6 +509,54 @@ describe('simulationStateStore', () => {
     })
   })
 
+  describe('load-generation race guard', () => {
+    /**
+     * Regression: a slow file1 load whose `.then` resolves after the user
+     * calls `reset()` and starts a faster file2 must NOT overwrite the
+     * file2-derived pendingLoadData with file1's stale value. Token
+     * pattern (`_loadGeneration`) mirrors the TDSE measurement
+     * `collapseGeneration` guard added in commit 32e27873.
+     */
+    it('drops a stale load after reset bumps the load generation', async () => {
+      // Deferred deserialize: file1's load will hang until we resolve it.
+      let resolveFile1: ((value: unknown) => void) | undefined
+      const file1Pending = new Promise<unknown>((resolve) => {
+        resolveFile1 = resolve
+      })
+      deserializeMock.mockImplementationOnce(() => file1Pending)
+
+      const file1 = new File([new ArrayBuffer(128)], 'file1.mqstate')
+      useSimulationStateStore.getState().loadFromFile(file1)
+      expect(useSimulationStateStore.getState().status).toBe('loading')
+
+      // User resets while file1 is still pending. This bumps the load
+      // generation so file1's eventual .then must drop its write.
+      useSimulationStateStore.getState().reset()
+      expect(useSimulationStateStore.getState().status).toBe('idle')
+
+      // Resolve file1 with what would, pre-fix, have been published.
+      resolveFile1!({
+        quantumMode: 'tdseDynamics' as const,
+        latticeDim: 1,
+        componentCount: 1,
+        gridSize: [32],
+        totalSites: 32,
+        config: { quantumMode: 'tdseDynamics' },
+        psiRe: new Float32Array(32),
+        psiIm: new Float32Array(32),
+      })
+
+      // Give the .then callback a chance to run and (correctly) drop.
+      await new Promise((r) => setTimeout(r, 10))
+
+      // pendingLoadData must remain null — file1's stale write is dropped.
+      // setSchroedingerConfigSpy must NOT have been called (the post-await
+      // guard returns before we touch any sibling store).
+      expect(useSimulationStateStore.getState().pendingLoadData).toBeNull()
+      expect(setSchroedingerConfigSpy).not.toHaveBeenCalled()
+    })
+  })
+
   describe('reset', () => {
     it('resets all state to initial values', () => {
       useSimulationStateStore.setState({

@@ -15,6 +15,7 @@ import React, { useCallback, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { BECAnalysisContent } from '@/components/sections/Analysis/BECAnalysisSection'
+import { BellExperimentContent } from '@/components/sections/Analysis/BellExperimentSection'
 import { DiracAnalysisContent } from '@/components/sections/Analysis/DiracAnalysisSection'
 import { FSFAnalysisContent } from '@/components/sections/Analysis/FSFAnalysisSection'
 import { MeasurementControls } from '@/components/sections/Analysis/MeasurementControls'
@@ -143,6 +144,17 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
     const setCarpetEnabled = useCarpetStore((s) => s.setEnabled)
 
     const isPauli = objectType === 'pauliSpinor'
+    const isBellPair = objectType === 'bellPair'
+
+    // Bell-pair has its own analysis path (CHSH panel, no shared cross-section /
+    // export controls; exports are panel-internal).
+    if (isBellPair) {
+      return (
+        <Section title="Bell Test" defaultOpen={defaultOpen} data-testid="analysis-section">
+          <BellExperimentContent />
+        </Section>
+      )
+    }
 
     // Pauli spinor has its own analysis path
     if (isPauli) {

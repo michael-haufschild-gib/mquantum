@@ -194,7 +194,7 @@ describe('computeSchroedingerUpdate preset invariants', () => {
           geometry: { dimension: 3 },
           animation: { accumulatedTime: 0 },
           appearance: { colorAlgorithm: 'radialDistance', appearanceVersion: 1 },
-          performance: { qualityMultiplier: 1 },
+          performance: {},
           pbr: { pbrVersion: 0 },
           extended: {
             schroedingerVersion: 1,

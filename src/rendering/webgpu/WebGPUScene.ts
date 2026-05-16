@@ -167,16 +167,13 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
   const { graph, size, canvas, device } = useWebGPU()
 
   // ── Camera controller ──
-  const { cameraRef, dimensionRef, startInteraction, scheduleEndInteraction, interactionTimerRef } =
-    useSceneCameraController({ size, dimension })
+  const { cameraRef, dimensionRef } = useSceneCameraController({ size, dimension })
 
   // ── Gizmo interaction (produces pointer handlers with pointer capture) ──
   const { overlayRef, handlePointerDown, handlePointerUp, handlePointerMove, handlePointerCancel } =
     useGizmoInteraction({
       cameraRef,
       dimensionRef,
-      startInteraction,
-      scheduleEndInteraction,
     })
 
   // ── Wheel handler (passive: false for preventDefault) ──
@@ -189,15 +186,13 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       e.preventDefault()
       const zoomFactor = e.deltaY > 0 ? 1.1 : 0.9
       cameraRef.current.zoom(zoomFactor)
-      startInteraction()
-      scheduleEndInteraction()
     }
 
     overlay.addEventListener('wheel', handleWheel, { passive: false })
     return () => {
       overlay.removeEventListener('wheel', handleWheel)
     }
-  }, [cameraRef, overlayRef, startInteraction, scheduleEndInteraction])
+  }, [cameraRef, overlayRef])
 
   // ── Stats collector initialization ──
   const statsCollectorRef = useRef<WebGPUStatsCollector>(new WebGPUStatsCollector())
@@ -304,7 +299,6 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     executeSceneFrame,
     tickExport,
     cleanupExport,
-    interactionTimerRef,
   })
 
   // ── Pass setup ──
@@ -450,7 +444,6 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
         usePerformanceStore.getState().setShaderCompiling('pipeline', false)
         return
       }
-      perfStore.resetRefinement()
 
       // Track whether this setup touched the graph. If it did and gets aborted,
       // we must force a full rebuild so the next setup doesn't warm-swap on a

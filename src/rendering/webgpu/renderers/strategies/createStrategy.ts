@@ -30,6 +30,13 @@ export async function createModeStrategy(
     return new PauliStrategy()
   }
 
+  // Bell-pair owns its own ObjectType, so the renderer config carries an
+  // isBellPair flag rather than a quantum-mode discriminator.
+  if (config.isBellPair) {
+    const { BellPairStrategy } = await import('./BellPairStrategy')
+    return new BellPairStrategy()
+  }
+
   const strategyKind = config.quantumMode
     ? getQuantumTypeStrategyKind(config.quantumMode)
     : undefined

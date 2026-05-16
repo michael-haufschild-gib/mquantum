@@ -86,8 +86,7 @@ ${bayerJitterSection}
   let threshold = schroedinger.isoThreshold;
   let isoGain = max(schroedinger.densityGain, 0.01);
 
-  let fastMode = quality.qualityMultiplier < 0.75;
-  let maxSteps = select(128, 64, fastMode);
+  let maxSteps = 128;
   let stepLen = (tFar - tNear) / f32(maxSteps);
   var t = tNear;
   var hitT: f32 = -1.0;

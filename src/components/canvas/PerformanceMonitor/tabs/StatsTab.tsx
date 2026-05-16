@@ -46,7 +46,7 @@ export const StatsTabContent = React.memo(function StatsTabContent() {
           <InfoCard label="Textures" value={memory.textures} />
           <InfoCard label="Programs" value={memory.programs} />
           <InfoCard label="Geometries" value={memory.geometries} />
-          <InfoCard label="Heap" value={`${memory.heap} MB`} />
+          <InfoCard label="Heap" value={`${memory.heap.toFixed(1)} MB`} />
         </div>
       </div>
     </div>

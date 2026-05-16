@@ -438,6 +438,15 @@ fn add_gaussian_kernel(
         let center = center_grid[d].round() as i32;
         lo[d] = 0i32.max(center - radius);
         hi[d] = ((grid_sizes[d] as i32) - 1).min(center + radius);
+        // Empty intersection of kernel range and grid range — orbit
+        // point is outside the grid in this dimension. Without this
+        // guard the loop body would execute once on the initial
+        // coords=[lo, ...] (lo[d] beyond hi[d]) and either alias into
+        // an unrelated cell or panic when the alias exceeds
+        // weight.len(). Matches the TS guard in scarMetric.ts.
+        if lo[d] > hi[d] {
+            return;
+        }
         coords[d] = lo[d];
     }
 

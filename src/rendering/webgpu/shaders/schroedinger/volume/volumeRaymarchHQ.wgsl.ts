@@ -1,15 +1,17 @@
 /**
- * High-quality volume raymarching function.
+ * Volume raymarching function.
+ *
+ * Uses tetrahedral gradient sampling (4 samples) for O(h^2) accuracy.
  *
  * @module rendering/webgpu/shaders/schroedinger/volume/volumeRaymarchHQ.wgsl
  */
 
 export const volumeRaymarchHQBlock = /* wgsl */ `
 /**
- * High-quality volume integration with lighting.
+ * Volume integration with lighting.
  * Uses tetrahedral gradient sampling (4 samples) for O(h^2) accuracy.
  */
-fn volumeRaymarchHQ(
+fn volumeRaymarch(
   rayOrigin: vec3f,
   rayDir: vec3f,
   tNear: f32,

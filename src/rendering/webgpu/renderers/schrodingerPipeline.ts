@@ -47,7 +47,6 @@ export interface SchrodingerPipelineResources {
   cameraUniformBuffer: GPUBuffer
   lightingUniformBuffer: GPUBuffer
   materialUniformBuffer: GPUBuffer
-  qualityUniformBuffer: GPUBuffer
   schroedingerUniformBuffer: GPUBuffer
   basisUniformBuffer: GPUBuffer
   cameraBindGroup: GPUBindGroup
@@ -227,7 +226,6 @@ async function createSchrodingerPipelineImpl(
     entries: [
       { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } },
       { binding: 1, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } },
-      { binding: 2, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } },
     ],
   })
 
@@ -389,7 +387,6 @@ async function createSchrodingerPipelineImpl(
   const cameraUniformBuffer = deps.createUniformBuffer(device, 528, 'schroedinger-camera')
   const lightingUniformBuffer = deps.createUniformBuffer(device, 576, 'schroedinger-lighting')
   const materialUniformBuffer = deps.createUniformBuffer(device, 160, 'schroedinger-material')
-  const qualityUniformBuffer = deps.createUniformBuffer(device, 64, 'schroedinger-quality')
   const schroedingerUniformBuffer = deps.createUniformBuffer(
     device,
     SCHROEDINGER_UNIFORM_SIZE,
@@ -409,7 +406,6 @@ async function createSchrodingerPipelineImpl(
     entries: [
       { binding: 0, resource: { buffer: lightingUniformBuffer } },
       { binding: 1, resource: { buffer: materialUniformBuffer } },
-      { binding: 2, resource: { buffer: qualityUniformBuffer } },
     ],
   })
 
@@ -440,7 +436,6 @@ async function createSchrodingerPipelineImpl(
     cameraUniformBuffer,
     lightingUniformBuffer,
     materialUniformBuffer,
-    qualityUniformBuffer,
     schroedingerUniformBuffer,
     basisUniformBuffer,
     cameraBindGroup,

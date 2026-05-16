@@ -231,8 +231,6 @@ export interface SceneFrameLoopDeps {
   executeSceneFrame: (deltaTime: number) => void
   tickExport: () => boolean
   cleanupExport: () => void
-  /** Interaction timer ref — cleaned up when the loop unmounts. */
-  interactionTimerRef: RefObject<number | null>
 }
 
 /**
@@ -243,14 +241,7 @@ export interface SceneFrameLoopDeps {
  * when active, and applies FPS throttling.
  */
 export function useSceneFrameLoop(deps: SceneFrameLoopDeps): void {
-  const {
-    maxFps,
-    advanceSceneStateByDelta,
-    executeSceneFrame,
-    tickExport,
-    cleanupExport,
-    interactionTimerRef,
-  } = deps
+  const { maxFps, advanceSceneStateByDelta, executeSceneFrame, tickExport, cleanupExport } = deps
 
   const initialFrameTimeRef = useRef<number>(performance.now())
   const animationFrameRef = useRef<number>(0)
@@ -297,14 +288,8 @@ export function useSceneFrameLoop(deps: SceneFrameLoopDeps): void {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current)
       }
-
-      // Clear interaction debounce timer
-      if (interactionTimerRef.current !== null) {
-        window.clearTimeout(interactionTimerRef.current)
-        interactionTimerRef.current = null
-      }
     }
-  }, [renderFrame, interactionTimerRef])
+  }, [renderFrame])
 
   useEffect(() => {
     return () => {

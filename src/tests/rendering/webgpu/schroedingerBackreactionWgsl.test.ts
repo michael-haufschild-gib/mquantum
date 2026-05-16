@@ -41,7 +41,7 @@ describe('Schroedinger quantum backreaction lensing WGSL composition', () => {
       useDensityGrid: true,
     }).wgsl
 
-    expect(analytic).toContain('sampleDensityWithPhaseAndFlow(samplePos, animTime, uniforms)')
+    expect(analytic).toContain('sampleDensityWithPhase(samplePos, animTime, uniforms)')
     expect(analytic).toContain('computeEmissionLit(rho, sCenter, phase, samplePos')
     // PERF (OPT-PERF-2): grid path now loads its sample state through the
     // consolidated `loadGridSampleState` helper. The literal textureSample call
@@ -51,7 +51,7 @@ describe('Schroedinger quantum backreaction lensing WGSL composition', () => {
   })
 
   it('applies backreaction before HQ analytic density and emission sampling', () => {
-    const hqBody = functionSlice(volumeRaymarchBlock, 'volumeRaymarchHQ')
+    const hqBody = functionSlice(volumeRaymarchBlock, 'volumeRaymarch')
 
     // PERF refactor: gradient is now produced by ensureGradient (per-step
     // cache shared with entropy/spectral/born-null/emission). The post-warp

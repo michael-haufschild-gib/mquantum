@@ -11,7 +11,6 @@ import { Slider } from '@/components/ui/Slider'
 import { usePerformanceStore } from '@/stores/runtime/performanceStore'
 
 import { EigenfunctionCacheControls } from './EigenfunctionCacheControls'
-import { ProgressiveRefinementControls } from './ProgressiveRefinementControls'
 import { TemporalReprojectionControls } from './TemporalReprojectionControls'
 
 /** Props for the rendering performance controls section. */
@@ -66,11 +65,6 @@ export const PerformanceSection: React.FC<PerformanceSectionProps> = React.memo(
             tooltip="100% = native resolution. Lower values reduce GPU load for mobile/low-end devices."
             data-testid="render-resolution-slider"
           />
-        </div>
-
-        {/* Progressive Refinement - All objects */}
-        <div className="pb-3 mb-3 border-b border-panel-border">
-          <ProgressiveRefinementControls />
         </div>
 
         {/* Temporal Reprojection */}

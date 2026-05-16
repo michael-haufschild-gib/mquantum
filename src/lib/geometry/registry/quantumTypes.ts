@@ -569,5 +569,80 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         },
       },
     ],
+
+    // ─── Bell Pair / CHSH Experiment ───────────────────────────────────────────
+
+    [
+      'bellTest',
+      {
+        key: 'bellTest',
+        name: 'Bell Test',
+        description:
+          'Two-qubit Bell experiment with CHSH inequality: spin-entangled pair, four measurement angles, Tsirelson bound vs. classical bound (2 ↔ 2√2).',
+        category: 'compute',
+        runtime: {
+          dataPath: 'spinorGrid',
+          strategy: 'bellPair',
+          evolutionReset: 'bellPair',
+          stateSaveId: 11,
+          defaultColorAlgorithm: 'pauliSpinDensity',
+        },
+        dimensions: {
+          // Bell physics lives in the spin sector. We expose 3D because the
+          // existing rendering pipeline assumes ≥3 spatial axes for the
+          // canvas; higher dimensions add nothing and are gated off.
+          min: 3,
+          max: 3,
+          recommended: 3,
+          recommendedReason: 'CHSH is a spin-sector experiment; the canvas only needs 3D.',
+        },
+        rendering: SHARED_RENDERING,
+        animation: {
+          // The trial loop animates the CHSH plot in the analysis panel,
+          // not via the timeline drawer.
+          hasTypeSpecificAnimations: false,
+          systems: {},
+        },
+        urlSerialization: {
+          typeKey: 'bellTest',
+          serializableParams: [
+            'bell_at',
+            'bell_ap',
+            'bell_apt',
+            'bell_app',
+            'bell_bt',
+            'bell_bp',
+            'bell_bpt',
+            'bell_bpp',
+            'bell_v',
+            'bell_eta',
+            'bell_an',
+            'bell_bax',
+            'bell_bay',
+            'bell_baz',
+            'bell_bbx',
+            'bell_bby',
+            'bell_bbz',
+            'bell_m',
+            'bell_lhv',
+            'bell_n',
+            'bell_tpf',
+            'bell_seed',
+          ],
+        },
+        ui: {
+          // M5 ships the BellExperimentSection in components/sections/Analysis.
+          // Until then, the dynamic component loader falls back to a generic
+          // placeholder when this key is unknown.
+          controlsComponentKey: 'BellPairControls',
+          hasTimelineControls: false,
+          qualityPresets: QUALITY_PRESETS,
+        },
+        internal: {
+          objectType: 'bellPair',
+          configStoreKey: 'bellPair',
+        },
+      },
+    ],
   ]
 )

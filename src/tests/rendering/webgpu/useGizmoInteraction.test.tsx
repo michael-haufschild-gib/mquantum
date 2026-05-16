@@ -94,15 +94,11 @@ function makePointerEvent(target: HTMLElement, init: PointerEventInit): MockPoin
 interface SetupResult {
   handlers: ReturnType<typeof useGizmoInteraction>
   cameraRef: RefObject<CameraStub>
-  startInteraction: ReturnType<typeof vi.fn>
-  scheduleEndInteraction: ReturnType<typeof vi.fn>
   overlayEl: HTMLDivElement
 }
 
 function setup(dimension = 3): SetupResult {
   const camera = makeCameraStub()
-  const startInteraction = vi.fn()
-  const scheduleEndInteraction = vi.fn()
   const overlayEl = document.createElement('div')
   // Provide a non-degenerate bounding rect for ray computation paths.
   overlayEl.getBoundingClientRect = () =>
@@ -115,8 +111,6 @@ function setup(dimension = 3): SetupResult {
     const handlers = useGizmoInteraction({
       cameraRef: cameraRef as unknown as RefObject<WebGPUCamera | null>,
       dimensionRef,
-      startInteraction,
-      scheduleEndInteraction,
     })
     // Wire the overlayRef to a real element so helpers that read its rect work.
     ;(handlers.overlayRef as { current: HTMLDivElement | null }).current = overlayEl
@@ -126,8 +120,6 @@ function setup(dimension = 3): SetupResult {
   return {
     handlers: result.current.handlers,
     cameraRef: result.current.cameraRef as unknown as RefObject<CameraStub>,
-    startInteraction,
-    scheduleEndInteraction,
     overlayEl,
   }
 }
@@ -229,7 +221,7 @@ describe('useGizmoInteraction — camera drag (pointer events with capture)', ()
   })
 
   it('aborts an in-flight drag on window blur (Safari fallback)', () => {
-    const { handlers, cameraRef, overlayEl, scheduleEndInteraction } = baseSetup
+    const { handlers, cameraRef, overlayEl } = baseSetup
 
     handlers.handlePointerDown(
       makePointerEvent(overlayEl, { clientX: 100, clientY: 100 }) as unknown as React.PointerEvent
@@ -240,7 +232,6 @@ describe('useGizmoInteraction — camera drag (pointer events with capture)', ()
     expect(cameraRef.current!.orbit).toHaveBeenCalledTimes(1)
 
     window.dispatchEvent(new Event('blur'))
-    expect(scheduleEndInteraction).toHaveBeenCalled()
 
     handlers.handlePointerMove(
       makePointerEvent(overlayEl, { clientX: 900, clientY: 100 }) as unknown as React.PointerEvent
@@ -264,17 +255,16 @@ describe('useGizmoInteraction — camera drag (pointer events with capture)', ()
   })
 
   it('ignores pointerup when no pointerdown opened an interaction', () => {
-    const { handlers, overlayEl, scheduleEndInteraction } = baseSetup
+    const { handlers, overlayEl } = baseSetup
     const upEvent = makePointerEvent(overlayEl, { clientX: 0, clientY: 0, pointerId: 9 })
 
     handlers.handlePointerUp(upEvent as unknown as React.PointerEvent)
 
     expect(upEvent.currentTarget.releasePointerCapture).not.toHaveBeenCalled()
-    expect(scheduleEndInteraction).not.toHaveBeenCalled()
   })
 
   it('ignores non-primary pointerdown without starting a drag', () => {
-    const { handlers, cameraRef, overlayEl, startInteraction } = baseSetup
+    const { handlers, cameraRef, overlayEl } = baseSetup
     const downEvent = makePointerEvent(overlayEl, {
       clientX: 100,
       clientY: 100,
@@ -292,7 +282,6 @@ describe('useGizmoInteraction — camera drag (pointer events with capture)', ()
     )
 
     expect(downEvent.currentTarget.setPointerCapture).not.toHaveBeenCalled()
-    expect(startInteraction).not.toHaveBeenCalled()
     expect(cameraRef.current!.orbit).not.toHaveBeenCalled()
   })
 

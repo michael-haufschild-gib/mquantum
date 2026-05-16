@@ -72,7 +72,8 @@ function setBoolParam(params: URLSearchParams, key: string, value: boolean | und
 }
 
 function setIntParam(params: URLSearchParams, key: string, value: number | undefined): void {
-  if (value !== undefined) params.set(key, value.toString())
+  if (value === undefined || !Number.isInteger(value)) return
+  params.set(key, value.toString())
 }
 
 function setStringParam(params: URLSearchParams, key: string, value: string | undefined): void {
@@ -86,7 +87,9 @@ function setFloatParam(
   omitZero = false,
   precision = 2
 ): void {
-  if (value !== undefined && !(omitZero && value === 0)) params.set(key, value.toFixed(precision))
+  if (value === undefined || !Number.isFinite(value)) return
+  if (omitZero && value === 0) return
+  params.set(key, value.toFixed(precision))
 }
 
 /**

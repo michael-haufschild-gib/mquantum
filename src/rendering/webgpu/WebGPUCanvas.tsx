@@ -20,6 +20,37 @@ import { WebGPUSchrodingerRenderer } from './renderers/WebGPUSchrodingerRenderer
 import { resolveCanvasPixelSize } from './utils/sceneMath'
 import { type WebGPUCanvasContext, WebGPUContext } from './WebGPUContext'
 
+/**
+ * Per-canvas refcount of "alive" effect instances.
+ *
+ * React StrictMode runs effects twice (mount → cleanup → mount). Both mounts'
+ * async initialize() calls share the singleton's cached init promise; when the
+ * promise resolves, BOTH continuations run. The first continuation sees its own
+ * `cancelled` flag set and would naively destroy the singleton device — but the
+ * second continuation is about to use it. This refcount lets the first
+ * continuation observe that another effect on the same canvas is still alive,
+ * so the destroy is skipped and deferred to whichever effect leaves last.
+ */
+const aliveCanvasEffects = new WeakMap<HTMLCanvasElement, number>()
+const incrementAliveEffects = (canvas: HTMLCanvasElement): void => {
+  aliveCanvasEffects.set(canvas, (aliveCanvasEffects.get(canvas) ?? 0) + 1)
+}
+const decrementAliveEffects = (canvas: HTMLCanvasElement): void => {
+  const next = (aliveCanvasEffects.get(canvas) ?? 0) - 1
+  if (next <= 0) {
+    aliveCanvasEffects.delete(canvas)
+  } else {
+    aliveCanvasEffects.set(canvas, next)
+  }
+}
+// "Other" means: alive effects beyond the current one. The current effect's
+// own slot is included in the refcount until cleanup decrements it, so we
+// must compare against `> 1` rather than `> 0`. Otherwise the catch-block
+// destroy path (which runs while the current effect is still counted)
+// would always skip destruction and leak the device.
+const hasOtherAliveEffects = (canvas: HTMLCanvasElement): boolean =>
+  (aliveCanvasEffects.get(canvas) ?? 0) > 1
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -148,8 +179,22 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
     let deviceDestroyed = false
     let pendingGraph: WebGPURenderGraph | null = null
 
+    // Claim a slot for this effect instance. Decremented in the cleanup
+    // function below. The async-initialize destroy path consults this count
+    // before destroying the singleton — see `aliveCanvasEffects`.
+    incrementAliveEffects(canvas)
+
     const destroyInitializedDevice = () => {
       if (!deviceInitialized || deviceDestroyed) return
+      // StrictMode race: another effect instance for the same canvas may still
+      // be using the singleton device. Skip the destroy if any peer is alive;
+      // whoever leaves last will run this branch with `hasOtherAliveEffects`
+      // false and perform the destroy.
+      if (hasOtherAliveEffects(canvas)) {
+        deviceDestroyed = true
+        deviceManager = null
+        return
+      }
       deviceDestroyed = true
       deviceManager?.destroyForCanvas(canvas)
       deviceManager = null
@@ -262,6 +307,12 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
         graphRef.current.dispose()
         graphRef.current = null
       }
+      // Decrement BEFORE destroyInitializedDevice so the alive-effect count
+      // reflects "this effect has left" at the moment we decide whether to
+      // destroy. In a real unmount, count drops to 0 and the destroy proceeds.
+      // In a StrictMode remount, the next mount synchronously increments before
+      // any async destroy path observes the count.
+      decrementAliveEffects(canvas)
       destroyInitializedDevice()
     }
   }, [])

@@ -58,17 +58,6 @@ import {
   packSchroedingerUniforms,
 } from './uniformPacking'
 
-/**
- * Four-decimal integer key for `qualityMultiplier` dirty checks. Avoids
- * per-frame `toFixed()` allocations while preserving the previous tolerance.
- */
-const QUALITY_SIGNATURE_SCALE = 10000
-
-/** Convert `qualityMultiplier` to a stable four-decimal dirty-check key. */
-export function qualitySignatureKey(qualityMultiplier: number): number {
-  return Math.round(qualityMultiplier * QUALITY_SIGNATURE_SCALE)
-}
-
 /** Byte offset of the time field in the SchroedingerUniforms buffer. */
 export const TIME_FIELD_OFFSET = SCHROEDINGER_LAYOUT.byteOffset.time
 
@@ -299,7 +288,6 @@ function readDirtyInputs(
       appearanceVersion: appearance?.appearanceVersion ?? 0,
       pbrVersion: pbr?.pbrVersion ?? 0,
       pauliSpinorVersion: extended?.pauliSpinorVersion ?? 0,
-      qualitySignature: qualitySignatureKey(performance?.qualityMultiplier ?? 1.0),
     },
   }
 }
@@ -488,9 +476,7 @@ export function computeSchroedingerUpdate(
   }
 
   // Derived values for packing
-  const qualityMultiplier = inputs.performance?.qualityMultiplier ?? 1.0
-  const fastMode = qualityMultiplier < 0.75
-  const baseSampleCount = inputs.schroedinger?.sampleCount ?? (fastMode ? 32 : 64)
+  const baseSampleCount = inputs.schroedinger?.sampleCount ?? 64
   const radiusScale = state.boundingRadius / 2.0
   const effectiveSampleCount = Math.min(Math.max(8, Math.ceil(baseSampleCount * radiusScale)), 96)
 

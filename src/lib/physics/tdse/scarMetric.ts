@@ -259,6 +259,13 @@ function addGaussianKernel(
     const center = Math.round(centerGrid[d]!)
     lo[d] = Math.max(0, center - radius)
     hi[d] = Math.min(gridSize[d]! - 1, center + radius)
+    // Empty intersection of kernel range and grid range — orbit point is
+    // outside the grid in this dimension. Without this guard the loop
+    // body would still execute once on the initial coords=[lo, ...]
+    // (lo[d] beyond hi[d]) and write to an aliased linearIdx, polluting
+    // unrelated cells (or panicking in the Rust mirror when the alias
+    // exceeds totalSites).
+    if (lo[d]! > hi[d]!) return
     coords[d] = lo[d]!
   }
 

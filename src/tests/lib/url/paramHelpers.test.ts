@@ -93,4 +93,40 @@ describe('URL param helpers', () => {
 
     expect(params.toString()).toBe('flag=0&gain=3.142&zero_kept=0.00&count=12&label=a+b')
   })
+
+  it('setFloatParam drops NaN and ±Infinity so the round-trip stays symmetric with parseFloatParam', () => {
+    const params = new URLSearchParams()
+
+    setFloatParam(params, 'nan', Number.NaN)
+    setFloatParam(params, 'pos_inf', Number.POSITIVE_INFINITY)
+    setFloatParam(params, 'neg_inf', Number.NEGATIVE_INFINITY)
+    setFloatParam(params, 'kept', 1.5, false, 3)
+
+    expect(params.has('nan')).toBe(false)
+    expect(params.has('pos_inf')).toBe(false)
+    expect(params.has('neg_inf')).toBe(false)
+    expect(params.get('kept')).toBe('1.500')
+
+    // Confirm the parser would have rejected what the emitter dropped.
+    const malicious = new URLSearchParams('nan=NaN&pos_inf=Infinity&neg_inf=-Infinity')
+    expect(parseFloatParam(malicious, 'nan', -10, 10)).toBeUndefined()
+    expect(parseFloatParam(malicious, 'pos_inf', -10, 10)).toBeUndefined()
+    expect(parseFloatParam(malicious, 'neg_inf', -10, 10)).toBeUndefined()
+  })
+
+  it('setIntParam drops non-integer floats and NaN/Infinity', () => {
+    const params = new URLSearchParams()
+
+    setIntParam(params, 'pi', 3.14)
+    setIntParam(params, 'nan', Number.NaN)
+    setIntParam(params, 'inf', Number.POSITIVE_INFINITY)
+    setIntParam(params, 'neg_int', -7)
+    setIntParam(params, 'zero', 0)
+
+    expect(params.has('pi')).toBe(false)
+    expect(params.has('nan')).toBe(false)
+    expect(params.has('inf')).toBe(false)
+    expect(params.get('neg_int')).toBe('-7')
+    expect(params.get('zero')).toBe('0')
+  })
 })

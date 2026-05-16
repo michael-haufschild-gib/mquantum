@@ -70,7 +70,7 @@ function makeRuntime(loopOverrides: Partial<ExportLoopState> = {}): ExportRuntim
     exportHeight: 1080,
     renderWidth: 1920,
     renderHeight: 1080,
-    originalPerf: { progressiveRefinementEnabled: false, renderResolutionScale: 1 },
+    originalPerf: { renderResolutionScale: 1 },
     loop: makeLoop(loopOverrides),
   }
 }

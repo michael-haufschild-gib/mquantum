@@ -76,6 +76,10 @@ fn main(
 
     // Compute lattice coordinates. Strides are products of power-of-2 grid
     // dims → use firstTrailingBit for shift/mask instead of u32 divide/modulo.
+    // Voxel-centered: must stay in lockstep with tdseStochasticLoc's
+    // coords[] formula — the centering ⟨W⟩ that this pass computes is
+    // subtracted from W in the apply pass, and a frame mismatch would
+    // violate the martingale property the comments at the top promise.
     var coords: array<f32, 12>;
     var rem = idx;
     let ldim = tdseParams.latticeDim;
@@ -84,8 +88,7 @@ fn main(
       let logStride = firstTrailingBit(stride);
       let ci = rem >> logStride;
       rem = rem & (stride - 1u);
-      let halfExtent = f32(tdseParams.gridSize[d]) * tdseParams.spacing[d] * 0.5;
-      coords[d] = f32(ci) * tdseParams.spacing[d] - halfExtent;
+      coords[d] = (f32(ci) - f32(tdseParams.gridSize[d]) * 0.5 + 0.5) * tdseParams.spacing[d];
     }
 
     // W(x) = normFactor · Σ_k exp(-dist²/(2σ²)) · ξ_k

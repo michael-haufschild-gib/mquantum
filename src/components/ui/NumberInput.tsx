@@ -12,11 +12,11 @@ export interface NumberInputProps extends Omit<InputProps, 'onChange' | 'value'>
   precision?: number
 }
 
-/** Formats a number for display, trimming trailing zeros. */
+/** Formats a number for display, trimming trailing zeros after the decimal point. */
 function formatNumericValue(num: number, precision: number): string {
-  return Number(num)
-    .toFixed(precision)
-    .replace(/\.?0+$/, '')
+  const fixed = Number(num).toFixed(precision)
+  if (!fixed.includes('.')) return fixed
+  return fixed.replace(/0+$/, '').replace(/\.$/, '')
 }
 
 /** Handles revert logic when the user's input is empty or an invalid expression. */

@@ -43,6 +43,8 @@ export { reshapeForClock, schmidtValues } from './schmidt'
  * `WDW_SOLVER_VERSION` in the sweep CSV reproducibility manifest.
  */
 export const SRMT_DIAGNOSTIC_VERSION = '1.2.0'
+export type { BornOppenheimerRecord } from './bornOppenheimerChampion'
+export { computeBornOppenheimerRates, findBornOppenheimerChampion } from './bornOppenheimerChampion'
 export type { CutStabilityRecord } from './cutStabilityChampion'
 export { computeCutStability, findCutStabilityChampion } from './cutStabilityChampion'
 export type { PageWoottersRecord } from './pageWoottersChampion'

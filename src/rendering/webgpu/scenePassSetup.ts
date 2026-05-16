@@ -425,6 +425,37 @@ const PAULI_RENDERER_OVERRIDES = {
 }
 
 /**
+ * Bell-pair piggy-backs on the same shared renderer scaffold as Pauli: it
+ * needs no analytic / quantum-effect shader branches, just the volume
+ * raymarcher and the canvas bind-group plumbing. The strategy supplies the
+ * actual compute pass and trial-loop driver.
+ */
+const BELL_PAIR_RENDERER_OVERRIDES = {
+  isosurface: false,
+  quantumMode: 'tdseDynamics' as const,
+  termCount: 1 as const,
+  nodalEnabled: false,
+  phaseMaterialityEnabled: false,
+  interferenceEnabled: false,
+  uncertaintyBoundaryEnabled: false,
+  temporal: false,
+  eigenfunctionCacheEnabled: false,
+  analyticalGradientEnabled: false,
+  fastEigenInterpolationEnabled: false,
+  representation: 'position' as const,
+  openQuantumEnabled: false,
+  isPauli: false,
+  isBellPair: true,
+  crossSectionEnabled: false,
+  probabilityCurrentEnabled: false,
+  quantumBackreactionLensingEnabled: false,
+  bilocalERBridgeEnabled: false,
+  entropicTimeShearEnabled: false,
+  spectralDimensionFlowEnabled: false,
+  vacuumBubbleLensEnabled: false,
+}
+
+/**
  * Create the appropriate object renderer based on object type.
  *
  * @param objectType - The type of object to render
@@ -486,6 +517,14 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
         colorAlgorithm,
         densityGridResolution: config.densityGridResolution,
         ...PAULI_RENDERER_OVERRIDES,
+      })
+
+    case 'bellPair':
+      return new WebGPUSchrodingerRenderer({
+        dimension,
+        colorAlgorithm,
+        densityGridResolution: config.densityGridResolution,
+        ...BELL_PAIR_RENDERER_OVERRIDES,
       })
 
     default:

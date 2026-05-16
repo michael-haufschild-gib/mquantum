@@ -30,7 +30,8 @@ import { isFreeScalarAnalysisAlgorithm } from './schrodingerRendererTypes'
 export function isComputeQuantumMode(config: SchrodingerRendererConfig): boolean {
   return (
     (config.quantumMode != null && isComputeQuantumType(config.quantumMode)) ||
-    config.isPauli === true
+    config.isPauli === true ||
+    config.isBellPair === true
   )
 }
 
@@ -97,16 +98,25 @@ export function applyModeOverrides(config?: SchrodingerRendererConfig): Schrodin
     result.temporal = false
     // Clamp to the mode's minimum dimension from the quantum type registry.
     // All compute modes currently require 3D+ (no 2D grid rendering path).
-    const modeKey = result.isPauli ? 'pauliSpinor' : result.quantumMode
+    const modeKey = result.isPauli
+      ? 'pauliSpinor'
+      : result.isBellPair
+        ? 'bellTest'
+        : result.quantumMode
     const minDim = modeKey ? (getQuantumTypeEntry(modeKey)?.dimensions.min ?? 3) : 3
     if ((result.dimension ?? 3) < minDim) {
       result.dimension = minDim
     }
   }
 
+  const surfaceObjectType: 'schroedinger' | 'pauliSpinor' | 'bellPair' = result.isPauli
+    ? 'pauliSpinor'
+    : result.isBellPair
+      ? 'bellPair'
+      : 'schroedinger'
   if (
     !supportsSchroedingerSurfaceMode({
-      objectType: result.isPauli ? 'pauliSpinor' : 'schroedinger',
+      objectType: surfaceObjectType,
       quantumMode: result.quantumMode,
       dimension: result.dimension ?? 3,
       representation: result.representation,
@@ -151,7 +161,8 @@ export function buildShaderConfig(
 ): SchroedingerWGSLShaderConfig {
   const dim = rendererConfig.dimension ?? 3
   const isPauli = rendererConfig.isPauli === true
-  const modeKey = isPauli ? 'pauliSpinor' : rendererConfig.quantumMode
+  const isBellPair = rendererConfig.isBellPair === true
+  const modeKey = isPauli ? 'pauliSpinor' : isBellPair ? 'bellTest' : rendererConfig.quantumMode
   const runtime = modeKey ? getQuantumTypeRuntime(modeKey) : undefined
   const strategyKind = runtime?.strategy
   const isFreeScalarField = strategyKind === 'freeScalarField'
@@ -161,8 +172,13 @@ export function buildShaderConfig(
 
   const enableCache = rendererConfig.eigenfunctionCacheEnabled ?? !pipelineIs2D
   const isHydrogen = modeKey ? isHydrogenFamilyQuantumType(modeKey) : false
+  const surfaceObjectTypeShader: 'schroedinger' | 'pauliSpinor' | 'bellPair' = isPauli
+    ? 'pauliSpinor'
+    : isBellPair
+      ? 'bellPair'
+      : 'schroedinger'
   const isosurface = supportsSchroedingerSurfaceMode({
-    objectType: isPauli ? 'pauliSpinor' : 'schroedinger',
+    objectType: surfaceObjectTypeShader,
     quantumMode: rendererConfig.quantumMode,
     dimension: dim,
     representation: rendererConfig.representation,
@@ -357,6 +373,7 @@ export function computePipelineCacheKey(
     config.adsAmplitude ? 1 : 0,
     config.gridPhaseOffset ? 1 : 0,
     config.isPauli ? 1 : 0,
+    config.isBellPair ? 1 : 0,
     config.sampleSpaceRotation ? 1 : 0,
   ].join(':')
 }

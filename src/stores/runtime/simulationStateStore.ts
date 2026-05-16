@@ -118,6 +118,17 @@ function scheduleClearLoadingFlag(): void {
   }
 }
 
+/**
+ * Monotonically increasing load-token. Each `loadFromFile` captures the
+ * current value at call time; the awaited `.then` chain bumps and re-reads
+ * to drop stale chains that started before a {@link reset} or a newer
+ * `loadFromFile` invalidated them. Without this guard, a slow file1 load
+ * whose `.then` resolves after the user's reset and a faster file2 can
+ * overwrite the file2-derived `pendingLoadData` with file1's stale value.
+ * Same race-token pattern as the TDSE measurement `collapseGeneration`.
+ */
+let _loadGeneration = 0
+
 function normalizeLoadedFreeScalarSubConfig(
   subConfig: Record<string, unknown>
 ): Record<string, unknown> {
@@ -133,6 +144,54 @@ function normalizeLoadedFreeScalarSubConfig(
     { ...subConfig, gridSize: [...gridSize] as number[], latticeDim },
     { maxTotalSites: FREE_SCALAR_MAX_TOTAL_SITES }
   )
+}
+
+/**
+ * Build the `setSchroedingerConfig` payload for a non-Pauli compute-mode
+ * load, forcing `needsReset: true` into the correct sub-config so the
+ * compute pass actually re-seeds its field buffers. Extracted from
+ * `loadFromFile` so the `.then` body stays under the cognitive-complexity
+ * lint budget while keeping the original semantics.
+ */
+function buildSchroedingerPushedConfig(
+  restConfig: Record<string, unknown>,
+  quantumMode: SaveableQuantumMode
+): Record<string, unknown> {
+  const subKey = getQuantumTypeConfigSubKey(quantumMode)
+  const loadedSubConfig =
+    subKey && typeof restConfig[subKey] === 'object' && restConfig[subKey] !== null
+      ? { ...(restConfig[subKey] as Record<string, unknown>), needsReset: true }
+      : undefined
+  const subConfig =
+    quantumMode === 'freeScalarField' && loadedSubConfig
+      ? normalizeLoadedFreeScalarSubConfig(loadedSubConfig)
+      : loadedSubConfig
+  return {
+    ...restConfig,
+    quantumMode,
+    needsReset: true,
+    ...(subKey && subConfig ? { [subKey]: subConfig } : {}),
+  }
+}
+
+/**
+ * Apply a successful deserialized load to the sibling scene/extended-object
+ * stores. Pauli loads switch object type; every other compute mode pushes
+ * a Schroedinger config with the correct sub-config reset flag.
+ */
+function applyLoadedQuantumMode(
+  quantumMode: SaveableQuantumMode,
+  restConfig: Record<string, unknown>
+): void {
+  if (quantumMode === 'pauliSpinor') {
+    useGeometryStore.getState().setObjectType('pauliSpinor')
+    const pauliConfig = (restConfig.pauli ?? restConfig) as Partial<PauliConfig>
+    useExtendedObjectStore.getState().setPauliConfig({ ...pauliConfig, needsReset: true })
+    return
+  }
+  useExtendedObjectStore
+    .getState()
+    .setSchroedingerConfig(buildSchroedingerPushedConfig(restConfig, quantumMode))
 }
 
 /**
@@ -171,11 +230,19 @@ export const useSimulationStateStore = create<SimulationStateState>((set, get) =
     // and let the second write race the first into the store.
     if (get().status === 'loading') return
     set({ status: 'loading', error: null })
+    // Capture this load's token. A `reset()`, `clearLoadData()`, or
+    // `setLoadError()` between now and the `.then` will bump
+    // `_loadGeneration`, so the post-await re-checks drop the stale chain
+    // before it overwrites pendingLoadData. See the `_loadGeneration` doc.
+    const myGeneration = ++_loadGeneration
     file
       .arrayBuffer()
       .then(async (data) => {
+        if (myGeneration !== _loadGeneration) return
         const { deserializeSimulationState } = await import('@/lib/export/simulationState')
+        if (myGeneration !== _loadGeneration) return
         const result = await deserializeSimulationState(data)
+        if (myGeneration !== _loadGeneration) return
 
         // Build a fresh config for the store push WITHOUT mutating
         // `result.config` (which is also stashed on `pendingLoadData` and
@@ -193,41 +260,11 @@ export const useSimulationStateStore = create<SimulationStateState>((set, get) =
         const wasLoadingScene = usePerformanceStore.getState().isLoadingScene
         usePerformanceStore.getState().setIsLoadingScene(true)
         try {
-          if (result.quantumMode === 'pauliSpinor') {
-            // Pauli is a separate object type — switch objectType and apply pauli config.
-            useGeometryStore.getState().setObjectType('pauliSpinor')
-            const pauliConfig = (restConfig.pauli ?? restConfig) as Partial<PauliConfig>
-            useExtendedObjectStore.getState().setPauliConfig({
-              ...pauliConfig,
-              needsReset: true,
-            })
-          } else {
-            // Compute-mode sub-configs live on `schroedinger.<mode>`, and
-            // `setSchroedingerConfig` does a SHALLOW merge. Setting
-            // `needsReset: true` at the top level does NOT propagate into the
-            // sub-config the compute pass actually checks, so the field
-            // buffers keep whatever vacuum data the previous reinit sampled
-            // and the loaded wavefunction is silently dropped. Build a new
-            // config object with the reset flag forced into the correct
-            // sub-config for each compute mode.
-            const subKey = getQuantumTypeConfigSubKey(result.quantumMode)
-            const loadedSubConfig =
-              subKey && typeof restConfig[subKey] === 'object' && restConfig[subKey] !== null
-                ? { ...(restConfig[subKey] as Record<string, unknown>), needsReset: true }
-                : undefined
-            const subConfig =
-              result.quantumMode === 'freeScalarField' && loadedSubConfig
-                ? normalizeLoadedFreeScalarSubConfig(loadedSubConfig)
-                : loadedSubConfig
-            const pushed: Record<string, unknown> = {
-              ...restConfig,
-              quantumMode: result.quantumMode,
-              // Preserve the top-level flag too for analytic modes that read it.
-              needsReset: true,
-              ...(subKey && subConfig ? { [subKey]: subConfig } : {}),
-            }
-            useExtendedObjectStore.getState().setSchroedingerConfig(pushed)
-          }
+          // Sibling-store dispatch (object type swap or schroedinger config).
+          // Pauli is a separate object type; every other compute mode pushes
+          // a Schroedinger config with the correct sub-config reset flag —
+          // see `applyLoadedQuantumMode` for the mode-specific shaping.
+          applyLoadedQuantumMode(result.quantumMode, restConfig)
 
           set({
             pendingLoadData: {
@@ -248,6 +285,7 @@ export const useSimulationStateStore = create<SimulationStateState>((set, get) =
         }
       })
       .catch((err) => {
+        if (myGeneration !== _loadGeneration) return
         set({ status: 'error', error: String(err) })
       })
   },
@@ -256,15 +294,28 @@ export const useSimulationStateStore = create<SimulationStateState>((set, get) =
   setSaveComplete: () => set({ status: 'done', saveRequested: false, saveRequestedForMode: null }),
   setSaveError: (error) =>
     set({ status: 'error', error, saveRequested: false, saveRequestedForMode: null }),
-  clearLoadData: () => set({ pendingLoadData: null, status: 'done' }),
-  setLoadError: (error) => set({ status: 'error', error, pendingLoadData: null }),
+  clearLoadData: () => {
+    // Invalidate any in-flight load whose `.then` hasn't fired yet — once
+    // the consumer has drained the current pendingLoadData, a stale chain
+    // resolving later must not refill it. See `_loadGeneration` doc.
+    _loadGeneration += 1
+    set({ pendingLoadData: null, status: 'done' })
+  },
+  setLoadError: (error) => {
+    _loadGeneration += 1
+    set({ status: 'error', error, pendingLoadData: null })
+  },
 
   requestStoreEigenstate: () => set({ storeEigenstateRequested: true }),
   clearStoreEigenstateRequest: (newCount) =>
     set({ storeEigenstateRequested: false, storedEigenstateCount: newCount }),
   clearStoredEigenstates: () => set({ storedEigenstateCount: 0 }),
 
-  reset: () =>
+  reset: () => {
+    // Bump the load-generation so any in-flight loadFromFile chain drops
+    // its post-await write rather than resurrecting pendingLoadData after
+    // the user has explicitly reset.
+    _loadGeneration += 1
     set({
       status: 'idle',
       error: null,
@@ -273,5 +324,6 @@ export const useSimulationStateStore = create<SimulationStateState>((set, get) =
       pendingLoadData: null,
       storeEigenstateRequested: false,
       storedEigenstateCount: 0,
-    }),
+    })
+  },
 }))

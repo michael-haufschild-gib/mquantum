@@ -1,16 +1,14 @@
 /**
  * Camera controller hook for the WebGPU scene.
  *
- * Manages camera initialization, orbit/pan/zoom controls, wheel handling,
- * 2D mode resets, and progressive refinement interaction signaling.
+ * Manages camera initialization, aspect-ratio sync, and 2D mode resets.
  *
  * @module rendering/webgpu/useSceneCameraController
  */
 
 import type { RefObject } from 'react'
-import { useCallback, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 
-import { INTERACTION_RESTORE_DELAY, usePerformanceStore } from '@/stores/runtime/performanceStore'
 import { useCameraStore } from '@/stores/scene/cameraStore'
 
 import { WebGPUCamera } from './core/WebGPUCamera'
@@ -29,25 +27,18 @@ export interface SceneCameraController {
   cameraRef: RefObject<WebGPUCamera | null>
   /** Ref that tracks the current dimension (avoids stale closures). */
   dimensionRef: RefObject<number>
-  /** Signal the start of a user interaction (camera drag, zoom). */
-  startInteraction: () => void
-  /** Schedule the end of a user interaction after a debounce delay. */
-  scheduleEndInteraction: () => void
-  /** Ref to the interaction debounce timer (for cleanup). */
-  interactionTimerRef: RefObject<number | null>
 }
 
 /**
- * Hook that manages the WebGPU camera lifecycle and interaction signaling.
+ * Hook that manages the WebGPU camera lifecycle.
  *
  * Responsibilities:
  * - Creates and registers the WebGPUCamera with the camera store.
  * - Updates aspect ratio on canvas resize.
  * - Resets to top-down view when entering 2D mode.
- * - Manages progressive refinement interaction start/end signaling.
  *
  * Does NOT handle mouse/wheel events directly — those are composed
- * by the scene component using the returned refs and callbacks.
+ * by the scene component using the returned refs.
  */
 export function useSceneCameraController(deps: SceneCameraControllerDeps): SceneCameraController {
   const { size, dimension } = deps
@@ -94,32 +85,8 @@ export function useSceneCameraController(deps: SceneCameraControllerDeps): Scene
   const dimensionRef = useRef(dimension)
   dimensionRef.current = dimension
 
-  // ── Interaction state for progressive refinement ──
-  const interactionTimerRef = useRef<number | null>(null)
-
-  const startInteraction = useCallback(() => {
-    if (interactionTimerRef.current !== null) {
-      window.clearTimeout(interactionTimerRef.current)
-      interactionTimerRef.current = null
-    }
-    usePerformanceStore.getState().setIsInteracting(true)
-  }, [])
-
-  const scheduleEndInteraction = useCallback(() => {
-    if (interactionTimerRef.current !== null) {
-      window.clearTimeout(interactionTimerRef.current)
-    }
-    interactionTimerRef.current = window.setTimeout(() => {
-      interactionTimerRef.current = null
-      usePerformanceStore.getState().setIsInteracting(false)
-    }, INTERACTION_RESTORE_DELAY)
-  }, [])
-
   return {
     cameraRef,
     dimensionRef,
-    startInteraction,
-    scheduleEndInteraction,
-    interactionTimerRef,
   }
 }

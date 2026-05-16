@@ -74,6 +74,13 @@ const OBJECT_TYPE_DISPLAY: Readonly<
     recommended: 3,
     recommendedReason: '3D provides intuitive spin dynamics with magnetic field in physical space',
   },
+  bellPair: {
+    name: 'Bell Pair',
+    description:
+      'Two-qubit entangled spin state. Drives the CHSH / Bell experiment with live S(N) plot crossing the classical bound toward Tsirelson.',
+    recommended: 3,
+    recommendedReason: 'CHSH lives in the spin sector; the canvas only needs 3D for the apparatus.',
+  },
 }
 
 /** All ObjectType values that have at least one entry in QUANTUM_TYPE_REGISTRY. */
@@ -402,6 +409,9 @@ export function resolveQuantumTypeKey(
 ): QuantumTypeKey | undefined {
   if (objectType === 'pauliSpinor') {
     return QUANTUM_TYPE_REGISTRY.has('pauliSpinor') ? 'pauliSpinor' : undefined
+  }
+  if (objectType === 'bellPair') {
+    return QUANTUM_TYPE_REGISTRY.has('bellTest') ? 'bellTest' : undefined
   }
   if (objectType === 'schroedinger' && quantumMode) {
     const entry = QUANTUM_TYPE_REGISTRY.get(quantumMode)

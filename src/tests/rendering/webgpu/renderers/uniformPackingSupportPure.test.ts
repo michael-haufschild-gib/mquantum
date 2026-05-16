@@ -18,7 +18,6 @@ import {
   packBasisVectors,
   packCameraUniforms,
   packMaterialUniforms,
-  packQualityUniforms,
 } from '@/rendering/webgpu/renderers/uniformPackingSupport'
 import { MAX_DIM, MAX_TERMS } from '@/rendering/webgpu/shaders/schroedinger/uniforms.wgsl'
 
@@ -116,36 +115,6 @@ describe('applyHOMomentumTransform', () => {
     applyHOMomentumTransform(floatView, intView, 1, 1)
 
     expect(floatView[I.coeff]).toBe(-5)
-  })
-})
-
-// =========================================================================
-// packQualityUniforms
-// =========================================================================
-
-describe('packQualityUniforms', () => {
-  it('writes quality multiplier and derived sample count', () => {
-    const buf = new ArrayBuffer(48)
-    const data = new Float32Array(buf)
-    const dv = new DataView(buf)
-
-    packQualityUniforms(data, dv, 0.5)
-
-    expect(dv.getInt32(0, true)).toBe(64) // floor(128 * 0.5) = 64
-    expect(data[1]).toBeCloseTo(0.002, 6) // 0.001 / 0.5
-    expect(data[8]).toBeCloseTo(0.5)
-  })
-
-  it('handles a quality multiplier > 1 (high-quality preset)', () => {
-    const buf = new ArrayBuffer(48)
-    const data = new Float32Array(buf)
-    const dv = new DataView(buf)
-
-    packQualityUniforms(data, dv, 2.0)
-
-    expect(dv.getInt32(0, true)).toBe(256)
-    expect(data[1]).toBeCloseTo(0.0005, 6)
-    expect(data[8]).toBeCloseTo(2.0)
   })
 })
 

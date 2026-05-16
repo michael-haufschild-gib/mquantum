@@ -39,26 +39,8 @@ describe('Schroedinger entropic time-shear WGSL composition', () => {
     expect(wgsl).not.toContain('normalize(fallbackTransverse + vec3f(1e-5, 0.0, 0.0))')
   })
 
-  it('applies stable analytic order and resamples after entropy shear', () => {
-    const body = functionSlice(volumeRaymarchBlock, 'volumeRaymarch')
-
-    expectOrdered(body, [
-      'let bridge = applyBilocalERBridgeTopology(',
-      'sampleDensityWithPhaseAndFlow(samplePos, animTime, uniforms)',
-      'let beforeBackreaction = samplePos',
-      'let metric = applyQuantumBackreactionMetric(',
-      'length(samplePos - beforeBackreaction) > 1e-6',
-      'sampleDensityWithPhaseAndFlow(samplePos, animTime, uniforms)',
-      'let entropyShear = applyEntropicTimeShear(',
-      'samplePos = entropyShear.position',
-      'sampleDensityWithPhaseAndFlow(samplePos, animTime, uniforms)',
-      'computeEmissionLit(rho, sCenter, phase, samplePos',
-      'entropyEmissionGain',
-    ])
-  })
-
   it('applies stable HQ analytic order and resamples before gradient/emission', () => {
-    const body = functionSlice(volumeRaymarchBlock, 'volumeRaymarchHQ')
+    const body = functionSlice(volumeRaymarchBlock, 'volumeRaymarch')
 
     // PERF: HQ now uses ensureGradient at the emission point (per-step cache
     // shared with all spacetime effects) instead of sampleDensityWithAnalyticalGradient.

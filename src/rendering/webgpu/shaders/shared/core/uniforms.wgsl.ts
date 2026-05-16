@@ -158,27 +158,6 @@ struct PostProcessUniforms {
 }
 `
 
-const QUALITY_UNIFORMS_STRUCT = /* wgsl */ `
-struct QualityUniforms {
-  // SDF raymarching quality
-  sdfMaxIterations: i32,
-  sdfSurfaceDistance: f32,
-
-  // Reserved (formerly shadow + AO quality — removed, keeping layout)
-  _reservedShadowQuality: i32,
-  _reservedShadowSoftness: f32,
-  _reservedAoEnabled: i32,
-  _reservedAoSamples: i32,
-  _reservedAoRadius: f32,
-  _reservedAoIntensity: f32,
-
-  // Global quality multiplier (for fast mode)
-  qualityMultiplier: f32,
-
-  _reservedDebug: i32,
-}
-`
-
 const BIND_GROUP_LAYOUT_COMMENTS = /* wgsl */ `
 // Group 0: Camera and time-varying uniforms (updated every frame)
 // @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -199,7 +178,6 @@ const UNIFORM_BLOCKS: ShaderBlock[] = [
   { name: 'Material Uniform Buffer', content: MATERIAL_UNIFORMS_STRUCT },
   { name: 'N-Dimensional Transform Uniforms', content: ND_TRANSFORM_UNIFORMS_STRUCT },
   { name: 'Post-Processing Uniforms', content: POST_PROCESS_UNIFORMS_STRUCT },
-  { name: 'Quality Uniforms', content: QUALITY_UNIFORMS_STRUCT },
   { name: 'Bind Group Layouts', content: BIND_GROUP_LAYOUT_COMMENTS },
 ]
 

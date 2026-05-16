@@ -10,6 +10,7 @@
  * for the missing parameters.
  */
 
+import { createDefaultBellPairConfig } from '@/lib/geometry/extended/bellPair'
 import {
   isDiracFieldView,
   isDiracInitialCondition,
@@ -69,6 +70,7 @@ import { OBJECT_TYPE_TO_CONFIG_KEY } from './presetSerialization'
 const CONFIG_KEY_TO_DEFAULT: Record<string, () => object> = {
   schroedinger: createDefaultSchroedingerConfig,
   pauliSpinor: createDefaultPauliConfig,
+  bellPair: createDefaultBellPairConfig,
 }
 
 function hasRecordKey<T extends object>(record: T, value: unknown): value is keyof T {

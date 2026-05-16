@@ -159,17 +159,17 @@ fn RRTAndODTFit(v: vec3f) -> vec3f {
 
 // ACES Filmic
 fn ACESFilmicToneMapping(color: vec3f, exposure: f32) -> vec3f {
-  // ACES Input Matrix (transposed for WGSL column-major)
+  // ACES Input Matrix (sRGB → AP1, columns of the standard matrix)
   let ACESInputMat = mat3x3f(
-    vec3f(0.59719, 0.35458, 0.04823),
-    vec3f(0.07600, 0.90834, 0.01566),
-    vec3f(0.02840, 0.13383, 0.83777)
+    vec3f(0.59719, 0.07600, 0.02840),
+    vec3f(0.35458, 0.90834, 0.13383),
+    vec3f(0.04823, 0.01566, 0.83777)
   );
-  // ACES Output Matrix (transposed for WGSL column-major)
+  // ACES Output Matrix (AP1 → sRGB, columns of the standard matrix)
   let ACESOutputMat = mat3x3f(
-    vec3f( 1.60475, -0.53108, -0.07367),
-    vec3f(-0.10208,  1.10813, -0.00605),
-    vec3f(-0.00327, -0.07276,  1.07602)
+    vec3f( 1.60475, -0.10208, -0.00327),
+    vec3f(-0.53108,  1.10813, -0.07276),
+    vec3f(-0.07367, -0.00605,  1.07602)
   );
 
   var c = color * exposure / 0.6;
@@ -180,22 +180,22 @@ fn ACESFilmicToneMapping(color: vec3f, exposure: f32) -> vec3f {
 }
 
 // PERF: Precomputed AGX_INPUT_MATRIX = AgXInsetMatrix * LINEAR_SRGB_TO_LINEAR_REC2020
-// (transposed for WGSL column-major) — eliminates one matrix multiply per pixel
+// Columns of the standard matrix — eliminates one matrix multiply per pixel
 const AGX_INPUT_MATRIX = mat3x3f(
-  vec3f(0.587512206399144, 0.313681468644592, 0.0988063249562637),
-  vec3f(0.186722181710028, 0.707402721510485, 0.105775096779487),
-  vec3f(0.126348794494964, 0.137330842818871, 0.736320362686164)
+  vec3f(0.587512206399144, 0.186722181710028, 0.126348794494964),
+  vec3f(0.313681468644592, 0.707402721510485, 0.137330842818871),
+  vec3f(0.0988063249562637, 0.105775096779487, 0.736320362686164)
 );
 // Output matrices cannot be combined (pow(2.2) separates them)
 const AGX_OUTSET_MATRIX = mat3x3f(
-  vec3f( 1.1271005818144368, -0.11060664309660323, -0.016493938717834573),
-  vec3f(-0.1413297634984383,  1.157823702216272, -0.016493938717834257),
-  vec3f(-0.14132976349843826, -0.11060664309660294, 1.2519364065950405)
+  vec3f( 1.1271005818144368, -0.1413297634984383, -0.14132976349843826),
+  vec3f(-0.11060664309660323,  1.157823702216272, -0.11060664309660294),
+  vec3f(-0.016493938717834573, -0.016493938717834257, 1.2519364065950405)
 );
 const LINEAR_REC2020_TO_LINEAR_SRGB = mat3x3f(
-  vec3f( 1.6605, -0.5876, -0.0728),
-  vec3f(-0.1246,  1.1329, -0.0083),
-  vec3f(-0.0182, -0.1006,  1.1187)
+  vec3f( 1.6605, -0.1246, -0.0182),
+  vec3f(-0.5876,  1.1329, -0.1006),
+  vec3f(-0.0728, -0.0083,  1.1187)
 );
 
 // AgX contrast approximation

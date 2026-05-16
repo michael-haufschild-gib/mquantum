@@ -189,17 +189,16 @@ struct FragmentOutput {
  * Generate consolidated bind group declarations for standard uniforms.
  * Uses only 2 groups (0-1) to stay within 4-group limit.
  * Group 0: Camera
- * Group 1: Lighting + Material + Quality (combined)
+ * Group 1: Lighting + Material (combined)
  */
 export function generateConsolidatedBindGroups(): string {
   return /* wgsl */ `
 // Group 0: Camera and frame uniforms
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 
-// Group 1: Combined rendering uniforms (Lighting + Material + Quality)
+// Group 1: Combined rendering uniforms (Lighting + Material)
 @group(1) @binding(0) var<uniform> lighting: LightingUniforms;
 @group(1) @binding(1) var<uniform> material: MaterialUniforms;
-@group(1) @binding(2) var<uniform> quality: QualityUniforms;
 `
 }
 

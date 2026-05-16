@@ -8,7 +8,6 @@
 import { domMax, LazyMotion, MotionConfig } from 'motion/react'
 import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 
-import { RefinementIndicator } from '@/components/canvas/RefinementIndicator'
 import { EditorLayout } from '@/components/layout/EditorLayout'
 import { MsgBox } from '@/components/overlays/MsgBox'
 import { ShaderCompilationOverlay } from '@/components/overlays/ShaderCompilationOverlay'
@@ -134,9 +133,6 @@ function AppContent() {
   return (
     <EditorLayout>
       <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-        {/* Performance indicators */}
-        <RefinementIndicator position="bottom-right" />
-
         {/* Safari WebGPU Warning Modal */}
         <Modal
           isOpen={showSafariWarning}

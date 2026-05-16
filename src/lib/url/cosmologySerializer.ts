@@ -43,6 +43,9 @@ export interface CosmologySerializableState {
   cosmologyLqcRhoCritical?: number
   cosmologyLqcEquationOfState?: number
   cosmologyLqcInitialRhoRatio?: number
+  cosmologyKasnerP1?: number
+  cosmologyKasnerP2?: number
+  cosmologyKasnerP3?: number
 }
 
 /** Mutable target for `deserializeCosmology` — same fields but written. */
@@ -78,6 +81,10 @@ export function serializeCosmology(
     setFloatParam(params, 'cos_rhoc', state.cosmologyLqcRhoCritical, true, 4)
     setFloatParam(params, 'cos_w', state.cosmologyLqcEquationOfState, true, 4)
     setFloatParam(params, 'cos_rhostart', state.cosmologyLqcInitialRhoRatio, true, 4)
+  } else if (state.cosmologyPreset === 'bianchiKasner') {
+    setFloatParam(params, 'cos_p1', state.cosmologyKasnerP1, true, 4)
+    setFloatParam(params, 'cos_p2', state.cosmologyKasnerP2, true, 4)
+    setFloatParam(params, 'cos_p3', state.cosmologyKasnerP3, true, 4)
   }
   setFloatParam(params, 'cos_eta0', state.cosmologyEta0, true)
 }
@@ -99,6 +106,9 @@ function resolveCosmologyPresetParams(
       lqcRhoCritical?: number
       lqcEquationOfState?: number
       lqcInitialRhoRatio?: number
+      kasnerP1?: number
+      kasnerP2?: number
+      kasnerP3?: number
     }
   | undefined {
   if (preset === 'ekpyrotic') {
@@ -129,6 +139,13 @@ function resolveCosmologyPresetParams(
       lqcEquationOfState: wRaw ?? 1.0,
       lqcInitialRhoRatio: rhoStartRaw ?? 0.01,
     }
+  }
+  if (preset === 'bianchiKasner') {
+    const p1 = parseFloatParam(params, 'cos_p1', -2, 2)
+    const p2 = parseFloatParam(params, 'cos_p2', -2, 2)
+    const p3 = parseFloatParam(params, 'cos_p3', -2, 2)
+    if (p1 === undefined || p2 === undefined || p3 === undefined) return undefined
+    return { kasnerP1: p1, kasnerP2: p2, kasnerP3: p3 }
   }
   return {}
 }
@@ -181,5 +198,8 @@ export function deserializeCosmology(
   if (presetParams.lqcInitialRhoRatio !== undefined) {
     state.cosmologyLqcInitialRhoRatio = presetParams.lqcInitialRhoRatio
   }
+  if (presetParams.kasnerP1 !== undefined) state.cosmologyKasnerP1 = presetParams.kasnerP1
+  if (presetParams.kasnerP2 !== undefined) state.cosmologyKasnerP2 = presetParams.kasnerP2
+  if (presetParams.kasnerP3 !== undefined) state.cosmologyKasnerP3 = presetParams.kasnerP3
   state.cosmologyEta0 = eta0
 }

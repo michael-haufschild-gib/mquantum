@@ -143,9 +143,9 @@ describe('Schrodinger shader bind group validation', () => {
         expect(g0.length).toBe(1)
       })
 
-      it('group 1 has exactly 3 bindings (lighting, material, quality)', () => {
+      it('group 1 has exactly 2 bindings (lighting, material)', () => {
         const g1 = grouped.get(1) ?? []
-        expect(g1.length).toBe(3)
+        expect(g1.length).toBe(2)
       })
 
       it('group 2 has at least 2 bindings (schroedinger + basis)', () => {

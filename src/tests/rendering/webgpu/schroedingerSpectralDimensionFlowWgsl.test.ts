@@ -60,25 +60,8 @@ describe('Schroedinger spectral-dimension flow WGSL composition', () => {
     ])
   })
 
-  it('resamples analytic volume after spectral coordinate compression', () => {
-    const body = functionSlice(volumeRaymarchBlock, 'volumeRaymarch')
-
-    expectOrdered(body, [
-      'let entropyShear = applyEntropicTimeShear(',
-      'let spectralFlow = applySpectralDimensionFlow(',
-      'samplePos = spectralFlow.position',
-      'spectralEmissionGain = spectralFlow.emissionGain',
-      'spectralOpacityScale = spectralFlow.opacityScale',
-      'sampleDensityWithPhaseAndFlow(samplePos, animTime, uniforms)',
-      'computeEffectiveDensity(',
-      'rho * spectralOpacityScale',
-      'computeEmissionLit(rho, sCenter, phase, samplePos',
-      'spectralEmissionGain',
-    ])
-  })
-
   it('resamples HQ analytic volume before gradient and emission', () => {
-    const body = functionSlice(volumeRaymarchBlock, 'volumeRaymarchHQ')
+    const body = functionSlice(volumeRaymarchBlock, 'volumeRaymarch')
 
     // PERF: HQ now uses ensureGradient at the emission point (per-step cache
     // shared with all spacetime effects) instead of sampleDensityWithAnalyticalGradient.

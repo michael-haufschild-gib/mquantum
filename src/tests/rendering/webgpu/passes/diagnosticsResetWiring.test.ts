@@ -33,6 +33,48 @@ describe('DensityDistributionAnalyzer.reset() — diagnostics wiring', () => {
     useDiagnosticsStore.getState().resetDensity()
   })
 
+  it('clears stale slices when buildDistribution finds 0 active voxels', () => {
+    // Seed the store with prior-mode slices that would leak into the export
+    // gate if the count==0 path doesn't symmetrically clear them.
+    useDiagnosticsStore.getState().pushDensitySlices({
+      sliceX: new Float32Array([0.1, 0.2, 0.3, 0.4]),
+      sliceY: new Float32Array([0.5, 0.6, 0.7, 0.8]),
+      sliceZ: new Float32Array([0.9, 1.0, 1.1, 1.2]),
+      sliceGridSize: 4,
+      sliceWorldBound: 2.0,
+    })
+    expect(useDiagnosticsStore.getState().density.sliceX).toEqual(
+      new Float32Array([0.1, 0.2, 0.3, 0.4])
+    )
+    expect(useDiagnosticsStore.getState().density.sliceGridSize).toBe(4)
+
+    // Build distribution from an all-zero half-float buffer: every voxel is
+    // below RHO_EPSILON, so count==0 and the early-return branch fires.
+    const gridSize = 4
+    const bytesPerTexel = 2
+    const bytesPerRow = Math.ceil((gridSize * bytesPerTexel) / 256) * 256
+    const stride = 1
+    const totalHalfs = (bytesPerRow / 2) * gridSize * gridSize
+    const halfView = new Uint16Array(totalHalfs) // all zeros = decoded 0.0
+
+    new DensityDistributionAnalyzer().buildDistribution(
+      halfView,
+      gridSize,
+      bytesPerRow,
+      bytesPerTexel,
+      stride,
+      2.0
+    )
+
+    // The export gate must now read FALSE: sliceX is null AND sliceGridSize is 0.
+    const after = useDiagnosticsStore.getState().density
+    expect(after.sliceX).toBeNull()
+    expect(after.sliceY).toBeNull()
+    expect(after.sliceZ).toBeNull()
+    expect(after.sliceGridSize).toBe(0)
+    expect(after.sliceWorldBound).toBe(0)
+  })
+
   it('clears density slices that would otherwise leak across mode switches', () => {
     // Simulate the state captured by a previous analytic frame: a snapshot
     // and three center-plane slices for a 16³ grid with bound 2.0.
