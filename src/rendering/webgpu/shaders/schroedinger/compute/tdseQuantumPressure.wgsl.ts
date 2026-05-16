@@ -13,7 +13,6 @@ fn tdseQuantumPressureAtSite(
   invSpacings: ptr<function, array<f32, 12>>
 ) -> f32 {
   let rCenter = sqrt(max(density, 1e-30));
-  let hasPML = params.absorberEnabled != 0u;
   var laplacianR: f32 = 0.0;
   var maxInvDx2: f32 = 0.0;
 
@@ -30,8 +29,9 @@ fn tdseQuantumPressureAtSite(
     let atHi = coord == Nd - 1u;
     var fwdIdx = select(idx + stride, idx - stride * (Nd - 1u), atHi);
     var bwdIdx = select(idx - stride, idx + stride * (Nd - 1u), atLo);
-    if (hasPML && atLo) { bwdIdx = idx; }
-    if (hasPML && atHi) { fwdIdx = idx; }
+    let pmlAxis = tdsePmlAxisActive(d);
+    if (pmlAxis && atLo) { bwdIdx = idx; }
+    if (pmlAxis && atHi) { fwdIdx = idx; }
 
     let zF = psi[fwdIdx];
     let zB = psi[bwdIdx];

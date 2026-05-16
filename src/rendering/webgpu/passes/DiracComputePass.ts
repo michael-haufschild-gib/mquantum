@@ -19,7 +19,7 @@
  *   5. Half-step V (per-component phase rotation)
  */
 
-import type { DiracConfig } from '@/lib/geometry/extended/types'
+import { type DiracConfig, sanitizeDiracLatticeConfig } from '@/lib/geometry/extended/dirac'
 import { logger } from '@/lib/logger'
 import { spinorSize } from '@/lib/physics/dirac/cliffordAlgebraFallback'
 import { DiracAlgebraBridge } from '@/lib/physics/dirac/diracAlgebra'
@@ -39,7 +39,6 @@ import {
   LINEAR_WG,
   MAX_DIM,
   pickSiteDispatch,
-  sanitizeGridSizes,
 } from './computePassUtils'
 import type { DiagDispatchParams, FFTAxisSharedMemParams } from './DiracComputePassDispatchers'
 import {
@@ -269,7 +268,9 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       totalSites: this.totalSites,
       label: 'dirac',
       getMetadata: async () => {
-        const diracConfig = useExtendedObjectStore.getState().schroedinger.dirac
+        const diracConfig = sanitizeDiracLatticeConfig(
+          useExtendedObjectStore.getState().schroedinger.dirac
+        )
         return {
           quantumMode: 'diracEquation',
           config: { quantumMode: 'diracEquation', dirac: diracConfig } as Record<string, unknown>,
@@ -668,7 +669,12 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     basisZ?: Float32Array,
     boundingRadius?: number
   ): void {
-    const config = sanitizeGridSizes(rawConfig)
+    const config = sanitizeDiracLatticeConfig(rawConfig)
+    if (config !== rawConfig) {
+      logger.warn(
+        `[Dirac-COMPUTE] Lattice config sanitized: ${rawConfig.gridSize} -> ${config.gridSize}`
+      )
+    }
     const { device } = ctx
     const configHash = `${computeConfigHash(config.gridSize, config.latticeDim)}_s${spinorSize(config.latticeDim)}`
 

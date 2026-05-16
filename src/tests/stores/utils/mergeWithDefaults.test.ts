@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from 'vitest'
 
+import { DIRAC_MAX_TOTAL_SITES } from '@/lib/geometry/extended/dirac'
 import { DEFAULT_PAULI_CONFIG, DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
 import { DEFAULT_WHEELER_DEWITT_CONFIG } from '@/lib/geometry/extended/wheelerDeWitt'
 import { mergeExtendedObjectStateForType } from '@/stores/utils/mergeWithDefaults'
@@ -589,6 +590,46 @@ describe('mergeExtendedObjectStateForType — Dirac enum invariants', () => {
     expect(dirac.potentialType).toBe('coulomb')
     expect(dirac.initialCondition).toBe('planeWave')
     expect(dirac.fieldView).toBe('currentDensity')
+  })
+
+  it('reduces oversized loaded Dirac grids before GPU resources are built', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'diracEquation',
+        dirac: {
+          latticeDim: 11,
+          gridSize: Array(11).fill(4),
+        },
+      },
+    }
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const dirac = (merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG).dirac
+    const totalSites = dirac.gridSize
+      .slice(0, dirac.latticeDim)
+      .reduce((product, axis) => product * axis, 1)
+
+    expect(dirac.latticeDim).toBe(11)
+    expect(totalSites).toBeLessThanOrEqual(DIRAC_MAX_TOTAL_SITES)
+  })
+
+  it('raises undersized loaded Dirac grids to preserve storage-buffer offset alignment', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'diracEquation',
+        dirac: {
+          latticeDim: 2,
+          gridSize: [2, 2],
+        },
+      },
+    }
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const dirac = (merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG).dirac
+    const totalSites = dirac.gridSize
+      .slice(0, dirac.latticeDim)
+      .reduce((product, axis) => product * axis, 1)
+
+    expect(dirac.gridSize).toEqual([8, 8])
+    expect(totalSites).toBeGreaterThanOrEqual(64)
   })
 })
 

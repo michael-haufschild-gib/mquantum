@@ -12,9 +12,11 @@
 
 import { createDefaultBellPairConfig } from '@/lib/geometry/extended/bellPair'
 import {
+  type DiracConfig,
   isDiracFieldView,
   isDiracInitialCondition,
   isDiracPotentialType,
+  sanitizeDiracLatticeConfig,
 } from '@/lib/geometry/extended/dirac'
 import {
   DEFAULT_PREHEATING_CONFIG,
@@ -326,6 +328,9 @@ function normalizeDiracEnums(normalized: Record<string, unknown>): Record<string
     next = next === diracRecord ? { ...diracRecord } : next
     next.fieldView = defaults.fieldView
   }
+
+  const sanitized = sanitizeDiracLatticeConfig(next as unknown as DiracConfig)
+  if (sanitized !== (next as unknown)) next = sanitized as unknown as Record<string, unknown>
 
   return next === diracRecord ? normalized : { ...normalized, dirac: next }
 }
