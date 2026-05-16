@@ -48,7 +48,7 @@ const waitForBecReady = (page: Page, extraFrames = 120) => waitForModeReady(page
 /** Set BEC field view via store mutation. */
 async function setFieldView(page: Page, view: string): Promise<void> {
   await page.evaluate(async (v) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setBecFieldView(v)
@@ -58,7 +58,7 @@ async function setFieldView(page: Page, view: string): Promise<void> {
 /** Set BEC interaction strength via store mutation. */
 async function setInteractionStrength(page: Page, g: number): Promise<void> {
   await page.evaluate(async (val) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setBecInteractionStrength(val)
@@ -68,7 +68,7 @@ async function setInteractionStrength(page: Page, g: number): Promise<void> {
 /** Enable isosurface mode via store. */
 async function enableIsosurface(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerIsoEnabled(true)
   })
 }
@@ -76,7 +76,7 @@ async function enableIsosurface(page: Page): Promise<void> {
 /** Set BEC absorber enabled/disabled. */
 async function setAbsorber(page: Page, enabled: boolean): Promise<void> {
   await page.evaluate(async (val) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setBecAbsorberEnabled(val)
@@ -86,7 +86,7 @@ async function setAbsorber(page: Page, enabled: boolean): Promise<void> {
 /** Set BEC auto-scale enabled/disabled. */
 async function setAutoScale(page: Page, enabled: boolean): Promise<void> {
   await page.evaluate(async (val) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setBecAutoScale(val)
@@ -96,7 +96,7 @@ async function setAutoScale(page: Page, enabled: boolean): Promise<void> {
 /** Enable BEC diagnostics readback. */
 async function enableDiagnostics(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setBecDiagnosticsEnabled(true)

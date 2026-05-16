@@ -57,7 +57,7 @@ async function configureDirac(
       if (presetId) {
         const store =
           window.__EXTENDED_OBJECT_STORE__ ??
-          (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+          (await import('/src/stores/scene/extendedObjectStore.ts')).useExtendedObjectStore
         const s = store.getState() as Record<string, (...a: unknown[]) => unknown>
         await (s.applyDiracPreset as (id: string) => Promise<void>)(presetId)
       }

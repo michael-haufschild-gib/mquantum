@@ -47,8 +47,8 @@ test.describe('Page curve HUD', () => {
 
     // Turn on BEC diagnostics + the Page-curve HUD.
     await page.evaluate(async () => {
-      const extMod = await import('/src/stores/extendedObjectStore.ts')
-      const pcMod = await import('/src/stores/pageCurveStore.ts')
+      const extMod = await import('/src/stores/scene/extendedObjectStore.ts')
+      const pcMod = await import('/src/stores/diagnostics/pageCurveStore.ts')
       const ext = extMod.useExtendedObjectStore.getState() as Partial<{
         setBecDiagnosticsEnabled: (enabled: boolean) => void
       }>
@@ -65,7 +65,7 @@ test.describe('Page curve HUD', () => {
     await waitForSimulationFrames(page, 240)
     await page.waitForFunction(
       async () => {
-        const m = await import('/src/stores/diagnosticsStore.ts')
+        const m = await import('/src/stores/diagnostics/diagnosticsStore.ts')
         const gen =
           (m.useDiagnosticsStore.getState() as { bec?: { readbackGeneration?: number } })?.bec
             ?.readbackGeneration ?? 0
@@ -78,7 +78,7 @@ test.describe('Page curve HUD', () => {
 
     // Assert producer path: store actually accumulating non-trivial samples.
     const snapshot = await page.evaluate(async () => {
-      const mod = await import('/src/stores/pageCurveStore.ts')
+      const mod = await import('/src/stores/diagnostics/pageCurveStore.ts')
       const s = mod.usePageCurveStore.getState()
       return {
         version: s.version,
@@ -131,7 +131,7 @@ test.describe('Page curve HUD', () => {
     expect(before).toBe('off')
 
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/pageCurveStore.ts')
+      const mod = await import('/src/stores/diagnostics/pageCurveStore.ts')
       const pc = mod.usePageCurveStore.getState()
       pc.setIslandOverlayEnabled(true)
     })
@@ -147,8 +147,8 @@ test.describe('Page curve HUD', () => {
     // G_eff slider observable effect: S_BH = A_h / (4·G_eff), so setting
     // G_eff to 10× its current value must cut S_BH by 10× on the next push.
     const { gEffBefore, sBHBefore, becGenBefore } = await page.evaluate(async () => {
-      const pcMod = await import('/src/stores/pageCurveStore.ts')
-      const dxMod = await import('/src/stores/diagnosticsStore.ts')
+      const pcMod = await import('/src/stores/diagnostics/pageCurveStore.ts')
+      const dxMod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
       const s = pcMod.usePageCurveStore.getState()
       const d = dxMod.useDiagnosticsStore.getState() as {
         bec?: { readbackGeneration?: number }
@@ -160,7 +160,7 @@ test.describe('Page curve HUD', () => {
       }
     })
     await page.evaluate(async (newG: number) => {
-      const mod = await import('/src/stores/pageCurveStore.ts')
+      const mod = await import('/src/stores/diagnostics/pageCurveStore.ts')
       const pc = mod.usePageCurveStore.getState()
       pc.setGEff(newG)
     }, gEffBefore * 10)
@@ -168,7 +168,7 @@ test.describe('Page curve HUD', () => {
     // panel's sample-push effect has observed the new gEff.
     await page.waitForFunction(
       async (prevGen: number) => {
-        const m = await import('/src/stores/diagnosticsStore.ts')
+        const m = await import('/src/stores/diagnostics/diagnosticsStore.ts')
         const d = m.useDiagnosticsStore.getState() as {
           bec?: { readbackGeneration?: number }
         }
@@ -178,7 +178,7 @@ test.describe('Page curve HUD', () => {
       { timeout: 20_000 }
     )
     const sBHAfter = await page.evaluate(async () => {
-      const mod = await import('/src/stores/pageCurveStore.ts')
+      const mod = await import('/src/stores/diagnostics/pageCurveStore.ts')
       return mod.usePageCurveStore.getState().lastSBH
     })
     expect(sBHAfter).toBeGreaterThan(0)
@@ -198,8 +198,8 @@ test.describe('Page curve HUD', () => {
     // island radius grows > 0 quickly (otherwise waitForSimulationFrames
     // would need to run long enough to accumulate a crossing).
     await page.evaluate(async () => {
-      const extMod = await import('/src/stores/extendedObjectStore.ts')
-      const pcMod = await import('/src/stores/pageCurveStore.ts')
+      const extMod = await import('/src/stores/scene/extendedObjectStore.ts')
+      const pcMod = await import('/src/stores/diagnostics/pageCurveStore.ts')
       const ext = extMod.useExtendedObjectStore.getState() as Partial<{
         setBecDiagnosticsEnabled: (enabled: boolean) => void
       }>
@@ -219,8 +219,8 @@ test.describe('Page curve HUD', () => {
     // asserting on the strategy's downstream contract.
     await waitForSimulationFrames(page, 60)
     const storeSnapshot = await page.evaluate(async () => {
-      const pcMod = await import('/src/stores/pageCurveStore.ts')
-      const extMod = await import('/src/stores/extendedObjectStore.ts')
+      const pcMod = await import('/src/stores/diagnostics/pageCurveStore.ts')
+      const extMod = await import('/src/stores/scene/extendedObjectStore.ts')
       const bhMod = await import('/src/lib/physics/bec/sonicHorizon.ts')
       const bcMod =
         await import('/src/rendering/webgpu/renderers/strategies/TdseBecConfigBuilder.ts')
@@ -265,11 +265,11 @@ test.describe('Page curve HUD', () => {
     // the `applyIslandOverlay` call path, which returns the original config
     // unchanged when the flag is false — the shader sees zeroed radius).
     await page.evaluate(async () => {
-      const m = await import('/src/stores/pageCurveStore.ts')
+      const m = await import('/src/stores/diagnostics/pageCurveStore.ts')
       m.usePageCurveStore.getState().setIslandOverlayEnabled(false)
     })
     const afterOff = await page.evaluate(async () => {
-      const m = await import('/src/stores/pageCurveStore.ts')
+      const m = await import('/src/stores/diagnostics/pageCurveStore.ts')
       return m.usePageCurveStore.getState().islandOverlayEnabled
     })
     expect(afterOff).toBe(false)

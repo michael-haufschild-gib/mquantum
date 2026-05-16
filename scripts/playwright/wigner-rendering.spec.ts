@@ -28,7 +28,7 @@ test.describe('Wigner phase-space rendering', () => {
 
     // Switch to Wigner representation
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerRepresentation('wigner')
     })
 
@@ -45,7 +45,7 @@ test.describe('Wigner phase-space rendering', () => {
 
     // Switch to Wigner representation
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerRepresentation('wigner')
     })
 
@@ -64,7 +64,7 @@ test.describe('Wigner phase-space rendering', () => {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         await page.evaluate(async () => {
-          const mod = await import('/src/stores/extendedObjectStore.ts')
+          const mod = await import('/src/stores/scene/extendedObjectStore.ts')
           mod.useExtendedObjectStore.getState().setSchroedingerRepresentation('wigner')
         })
         break

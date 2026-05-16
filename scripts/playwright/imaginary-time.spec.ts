@@ -40,7 +40,7 @@ test.describe('imaginary-time propagation', () => {
 
     // Enable imaginary-time via store
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const store = mod.useExtendedObjectStore.getState()
       store.setTdsePotentialType('harmonicTrap')
       store.setTdseImaginaryTimeEnabled(true)
@@ -87,8 +87,8 @@ test.describe('imaginary-time propagation', () => {
 
     // Enable imaginary-time and store an eigenstate
     await page.evaluate(async () => {
-      const ext = await import('/src/stores/extendedObjectStore.ts')
-      const sim = await import('/src/stores/simulationStateStore.ts')
+      const ext = await import('/src/stores/scene/extendedObjectStore.ts')
+      const sim = await import('/src/stores/runtime/simulationStateStore.ts')
       ext.useExtendedObjectStore.getState().setTdseImaginaryTimeEnabled(true)
       sim.useSimulationStateStore.getState().requestStoreEigenstate()
     })
@@ -102,7 +102,7 @@ test.describe('imaginary-time propagation', () => {
 
     // Trigger grid rebuild by changing latticeDim
     await page.evaluate(async () => {
-      const ext = await import('/src/stores/extendedObjectStore.ts')
+      const ext = await import('/src/stores/scene/extendedObjectStore.ts')
       ext.useExtendedObjectStore.getState().setTdseLatticeDim(2)
     })
 
@@ -115,7 +115,7 @@ test.describe('imaginary-time propagation', () => {
 
     // Check that the stored eigenstate count was reset
     const count = await page.evaluate(async () => {
-      const sim = await import('/src/stores/simulationStateStore.ts')
+      const sim = await import('/src/stores/runtime/simulationStateStore.ts')
       return sim.useSimulationStateStore.getState().storedEigenstateCount
     })
     expect(count).toBe(0)

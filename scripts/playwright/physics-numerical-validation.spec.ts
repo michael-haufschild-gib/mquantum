@@ -66,7 +66,7 @@ test.describe('TDSE integrator unitarity', () => {
     // This is the purest test of integrator unitarity — no probability should
     // be created or destroyed. Any drift = integrator bug.
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setTdsePotentialType('free')
       s.setTdseAbsorberEnabled(false)
@@ -110,7 +110,7 @@ test.describe('TDSE integrator unitarity', () => {
     await waitForShaderCompilation(page)
 
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setTdsePotentialType('harmonicTrap')
       s.setTdseHarmonicOmega(2.0)
@@ -250,7 +250,7 @@ test.describe('HO dimensional density scaling', () => {
     // Use groundState preset: seed=13, termCount=1, maxN=1 → guarantees n=0 per dim.
     // seed=0 with default maxN=5 produces random excited states.
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerPresetName('groundState')
     })
     await resetAndWaitForDensityDiagnostics(page)
@@ -273,7 +273,7 @@ test.describe('HO dimensional density scaling', () => {
     await setupAndWaitForDensity(page, 'harmonicOscillator', 5)
     // Use groundState preset: guarantees n=0 per dimension.
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerPresetName('groundState')
     })
     await resetAndWaitForDensityDiagnostics(page)
@@ -295,7 +295,7 @@ test.describe('HO dimensional density scaling', () => {
 
     await setupAndWaitForDensity(page, 'harmonicOscillator', 3)
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerPresetName('groundState')
     })
     await resetAndWaitForDensityDiagnostics(page)
@@ -304,7 +304,7 @@ test.describe('HO dimensional density scaling', () => {
     await gotoMode(page, 'harmonicOscillator', 5)
     await waitForShaderCompilation(page)
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerPresetName('groundState')
     })
     await resetAndWaitForDensityDiagnostics(page)
@@ -345,7 +345,7 @@ test.describe('cross-mode density sanity', () => {
     // HO ground state
     await setupAndWaitForDensity(page, 'harmonicOscillator', 3)
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerPresetName('groundState')
     })
     await resetAndWaitForDensityDiagnostics(page)
@@ -416,7 +416,7 @@ test.describe('free scalar field energy conservation', () => {
     // Use gaussianPacket initial condition for clean, localized energy.
     // Enable diagnostics readback (FSF defaults to diagnosticsEnabled=false).
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setFreeScalarSelfInteractionEnabled(false)
       s.setFreeScalarAbsorberEnabled(false)
@@ -427,7 +427,7 @@ test.describe('free scalar field energy conservation', () => {
 
     // Verify settings took effect
     const fsfConfig = await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const fs = mod.useExtendedObjectStore.getState().schroedinger.freeScalar
       return {
         absorberEnabled: fs.absorberEnabled,
@@ -490,7 +490,7 @@ test.describe('TDSE observables physics', () => {
 
     // Configure: free potential, no absorber, observables enabled
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setTdsePotentialType('free')
       s.setTdseAbsorberEnabled(false)
@@ -505,7 +505,7 @@ test.describe('TDSE observables physics', () => {
     // Wait for observables diagnostic data
     await page.waitForFunction(
       async () => {
-        const mod = await import('/src/stores/diagnosticsStore.ts')
+        const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
         return mod.useDiagnosticsStore.getState().observables.hasData
       },
       { timeout: 30_000 }
@@ -537,7 +537,7 @@ test.describe('TDSE observables physics', () => {
     await waitForShaderCompilation(page)
 
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setTdsePotentialType('free')
       s.setTdseAbsorberEnabled(false)
@@ -553,7 +553,7 @@ test.describe('TDSE observables physics', () => {
     // Read initial position
     await page.waitForFunction(
       async () => {
-        const mod = await import('/src/stores/diagnosticsStore.ts')
+        const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
         return mod.useDiagnosticsStore.getState().observables.hasData
       },
       { timeout: 30_000 }
@@ -613,7 +613,7 @@ test.describe('quantum walk norm conservation', () => {
 
     // Disable absorber to isolate unitarity
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setQwAbsorberEnabled(false)
       s.resetQuantumWalk()
@@ -622,7 +622,7 @@ test.describe('quantum walk norm conservation', () => {
     // Wait for QW diagnostics to appear
     await page.waitForFunction(
       async () => {
-        const mod = await import('/src/stores/diagnosticsStore.ts')
+        const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
         return mod.useDiagnosticsStore.getState().qw.hasData
       },
       { timeout: 30_000 }
@@ -653,7 +653,7 @@ test.describe('quantum walk norm conservation', () => {
 
     // Enable absorber with aggressive settings
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setQwAbsorberEnabled(true)
       s.setQwAbsorberWidth(0.3)
@@ -662,7 +662,7 @@ test.describe('quantum walk norm conservation', () => {
 
     await page.waitForFunction(
       async () => {
-        const mod = await import('/src/stores/diagnosticsStore.ts')
+        const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
         return mod.useDiagnosticsStore.getState().qw.hasData
       },
       { timeout: 30_000 }
@@ -687,7 +687,7 @@ test.describe('quantum walk norm conservation', () => {
     await waitForShaderCompilation(page)
 
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setQwAbsorberEnabled(false)
       // Set coin type via direct state merge (no dedicated setter)
@@ -706,7 +706,7 @@ test.describe('quantum walk norm conservation', () => {
 
     await page.waitForFunction(
       async () => {
-        const mod = await import('/src/stores/diagnosticsStore.ts')
+        const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
         return mod.useDiagnosticsStore.getState().qw.hasData
       },
       { timeout: 30_000 }
@@ -723,7 +723,7 @@ test.describe('quantum walk norm conservation', () => {
     await waitForShaderCompilation(page)
 
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const store = mod.useExtendedObjectStore.getState()
       const s = store as Record<string, (...a: unknown[]) => void>
       s.setQwAbsorberEnabled(false)
@@ -741,7 +741,7 @@ test.describe('quantum walk norm conservation', () => {
 
     await page.waitForFunction(
       async () => {
-        const mod = await import('/src/stores/diagnosticsStore.ts')
+        const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
         return mod.useDiagnosticsStore.getState().qw.hasData
       },
       { timeout: 30_000 }
@@ -760,7 +760,7 @@ test.describe('quantum walk norm conservation', () => {
     await waitForShaderCompilation(page)
 
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setQwAbsorberEnabled(false)
       s.resetQuantumWalk()
@@ -769,7 +769,7 @@ test.describe('quantum walk norm conservation', () => {
     // Wait for initial diagnostics
     await page.waitForFunction(
       async () => {
-        const mod = await import('/src/stores/diagnosticsStore.ts')
+        const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
         return mod.useDiagnosticsStore.getState().qw.hasData
       },
       { timeout: 30_000 }
@@ -842,7 +842,7 @@ test.describe('BEC physics — strong validation', () => {
 
     // g = 200 (low)
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setBecInteractionStrength(200)
       s.setBecInitialCondition('thomasFermi')
@@ -854,7 +854,7 @@ test.describe('BEC physics — strong validation', () => {
 
     // g = 1000 (high)
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setBecInteractionStrength(1000)
       s.resetBecField()
@@ -880,7 +880,7 @@ test.describe('BEC physics — strong validation', () => {
     await waitForShaderCompilation(page)
 
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setBecInteractionStrength(-500)
       s.setBecInitialCondition('thomasFermi')
@@ -906,7 +906,7 @@ test.describe('BEC physics — strong validation', () => {
     await setupAndWaitForDensity(page, 'becDynamics', 3)
 
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setBecInteractionStrength(500)
       s.setBecInitialCondition('thomasFermi')
@@ -974,7 +974,7 @@ test.describe('FSF physics — strong validation', () => {
     await waitForShaderCompilation(page)
 
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setFreeScalarSelfInteractionEnabled(false)
       s.setFreeScalarInitialCondition('vacuum')
@@ -996,7 +996,7 @@ test.describe('FSF physics — strong validation', () => {
     await waitForShaderCompilation(page)
 
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setFreeScalarSelfInteractionEnabled(false)
       s.setFreeScalarInitialCondition('vacuum')
@@ -1019,7 +1019,7 @@ test.describe('FSF physics — strong validation', () => {
 
     // Free field (no self-interaction)
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setFreeScalarSelfInteractionEnabled(false)
       s.setFreeScalarInitialCondition('gaussianPacket')
@@ -1031,7 +1031,7 @@ test.describe('FSF physics — strong validation', () => {
 
     // Self-interaction enabled
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setFreeScalarSelfInteractionEnabled(true)
       s.setFreeScalarSelfInteractionLambda(2.0)

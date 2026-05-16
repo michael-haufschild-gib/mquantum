@@ -28,7 +28,7 @@ test.setTimeout(60_000)
 /** Open the perf monitor in expanded mode and switch to the Passes tab. */
 async function openPassesTab(page: import('@playwright/test').Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/uiStore.ts')
+    const mod = await import('/src/stores/ui/uiStore.ts')
     mod.useUIStore.setState({
       showPerfMonitor: true,
       perfMonitorExpanded: true,
@@ -138,9 +138,9 @@ test.describe('performance profiling', () => {
 
     // Switch to free scalar field mode (uses compute passes)
     await page.evaluate(async () => {
-      const geoMod = await import('/src/stores/geometryStore.ts')
+      const geoMod = await import('/src/stores/scene/geometryStore.ts')
       geoMod.useGeometryStore.getState().setDimension(3)
-      const extMod = await import('/src/stores/extendedObjectStore.ts')
+      const extMod = await import('/src/stores/scene/extendedObjectStore.ts')
       const ext = extMod.useExtendedObjectStore.getState() as Record<
         string,
         { setQuantumMode?: (m: string) => void }
@@ -168,7 +168,7 @@ test.describe('performance profiling', () => {
   test('no pass timing data when perf monitor is hidden', async ({ page }) => {
     // Keep perf monitor hidden (default state)
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/uiStore.ts')
+      const mod = await import('/src/stores/ui/uiStore.ts')
       mod.useUIStore.setState({ showPerfMonitor: false })
     })
 
@@ -193,7 +193,7 @@ test.describe('performance profiling', () => {
 
     // Check if the GPU supports timestamp queries
     const supportsTimestamp = await page.evaluate(async () => {
-      const perfMod = await import('/src/stores/performanceStore.ts')
+      const perfMod = await import('/src/stores/runtime/performanceStore.ts')
       const state = perfMod.usePerformanceStore.getState()
       // deviceCapabilitiesDetected is set after init; if not detected, can't tell
       return state.deviceCapabilitiesDetected

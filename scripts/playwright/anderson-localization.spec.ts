@@ -172,7 +172,7 @@ test.describe('Anderson Localization', () => {
 
     // Switch to potential field view
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       ;(
         mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
       ).setTdseFieldView('potential')
@@ -231,7 +231,7 @@ test.describe('Anderson Localization', () => {
 
     // Read energy spectrum from store
     const spectrum = await page.evaluate(async () => {
-      const mod = await import('/src/stores/diagnosticsStore.ts')
+      const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
       const s = mod.useDiagnosticsStore.getState().observables
       return Array.from(s.energySpectrum)
     })

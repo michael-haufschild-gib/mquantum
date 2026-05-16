@@ -25,7 +25,7 @@ import {
 
 test.setTimeout(300_000)
 
-const ENT_STORE = '/src/stores/coordinateEntanglementStore.ts'
+const ENT_STORE = '/src/stores/diagnostics/coordinateEntanglementStore.ts'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 

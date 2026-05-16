@@ -38,7 +38,7 @@ const assertPixels = assertNonBlankPixels
 /** Set angular chain values for coupled mode via store. */
 async function setAngularChain(page: Page, chain: number[]): Promise<void> {
   await page.evaluate(async (c: number[]) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     const store = mod.useExtendedObjectStore.getState()
     for (let i = 0; i < c.length; i++) {
       store.setSchroedingerAngularChainValue(i, c[i]!)
@@ -49,7 +49,7 @@ async function setAngularChain(page: Page, chain: number[]): Promise<void> {
 /** Set bohr radius scale via store. */
 async function setBohrRadiusScale(page: Page, scale: number): Promise<void> {
   await page.evaluate(async (s) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerBohrRadiusScale(s)
   }, scale)
 }
@@ -165,8 +165,8 @@ test.describe('C: Angular chain controls', () => {
 
     // At D=3, chain length = D-3 = 0, so no chain sliders
     const chainAt3D = await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
-      const gmod = await import('/src/stores/geometryStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
+      const gmod = await import('/src/stores/scene/geometryStore.ts')
       return {
         dim: gmod.useGeometryStore.getState().dimension,
         mode: mod.useExtendedObjectStore.getState().schroedinger.quantumMode,
@@ -213,7 +213,7 @@ test.describe('D: Mode switching', () => {
 
     // Switch to coupled hydrogen
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerQuantumMode('hydrogenNDCoupled')
     })
     await waitForShaderCompilation(page)
@@ -221,7 +221,7 @@ test.describe('D: Mode switching', () => {
 
     // Switch back to HO
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerQuantumMode('harmonicOscillator')
     })
     await waitForShaderCompilation(page)
@@ -236,7 +236,7 @@ test.describe('D: Mode switching', () => {
 
     // Switch to coupled
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerQuantumMode('hydrogenNDCoupled')
     })
     await waitForShaderCompilation(page)
@@ -250,7 +250,7 @@ test.describe('D: Mode switching', () => {
 
     // Increase to 5D
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/geometryStore.ts')
+      const mod = await import('/src/stores/scene/geometryStore.ts')
       mod.useGeometryStore.getState().setDimension(5)
     })
     await waitForShaderCompilation(page)

@@ -46,7 +46,7 @@ test.describe('HO density oracle', () => {
     // The "groundState" preset uses seed=13, termCount=1, maxN=1 — guarantees
     // n=0 per dimension. The default seed=0 with maxN=5 produces random excited states.
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerPresetName('groundState')
     })
     // Wait for density grid to recompute with ground state parameters

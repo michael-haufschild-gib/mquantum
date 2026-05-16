@@ -41,7 +41,7 @@ const waitForHydrogen2DReady = (page: Page) => waitForModeReady(page)
 /** Enable isosurface mode (isolines in 2D) via store. */
 async function enableIsosurface(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerIsoEnabled(true)
   })
 }
@@ -49,7 +49,7 @@ async function enableIsosurface(page: Page): Promise<void> {
 /** Toggle real vs complex orbitals via store. */
 async function setUseRealOrbitals(page: Page, useReal: boolean): Promise<void> {
   await page.evaluate(async (r) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerUseRealOrbitals(r)
   }, useReal)
 }
@@ -57,7 +57,7 @@ async function setUseRealOrbitals(page: Page, useReal: boolean): Promise<void> {
 /** Set density gain via store. */
 async function setDensityGain(page: Page, gain: number): Promise<void> {
   await page.evaluate(async (g) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerDensityGain(g)
   }, gain)
 }
@@ -65,7 +65,7 @@ async function setDensityGain(page: Page, gain: number): Promise<void> {
 /** Set bohr radius scale via store. */
 async function setBohrRadiusScale(page: Page, scale: number): Promise<void> {
   await page.evaluate(async (s) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerBohrRadiusScale(s)
   }, scale)
 }
@@ -73,7 +73,7 @@ async function setBohrRadiusScale(page: Page, scale: number): Promise<void> {
 /** Read the current representation from the store. */
 async function getRepresentation(page: Page): Promise<string> {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     return mod.useExtendedObjectStore.getState().schroedinger?.representation ?? 'position'
   })
 }
@@ -81,7 +81,7 @@ async function getRepresentation(page: Page): Promise<string> {
 /** Read the current azimuthal quantum number from the store. */
 async function getAzimuthalL(page: Page): Promise<number> {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     return mod.useExtendedObjectStore.getState().schroedinger?.azimuthalQuantumNumber ?? 0
   })
 }
@@ -283,7 +283,7 @@ test.describe('Hydrogen 2D: representation constraints', () => {
 
     // Attempt to set momentum representation via store
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerRepresentation('momentum')
     })
 
@@ -298,7 +298,7 @@ test.describe('Hydrogen 2D: representation constraints', () => {
 
     // Switch to dim=2
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/geometryStore.ts')
+      const mod = await import('/src/stores/scene/geometryStore.ts')
       mod.useGeometryStore.getState().setDimension(2)
     })
     await waitForShaderCompilation(page)
@@ -324,7 +324,7 @@ test.describe('Hydrogen 2D: dimension switching', () => {
 
     // Switch to 2D
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/geometryStore.ts')
+      const mod = await import('/src/stores/scene/geometryStore.ts')
       mod.useGeometryStore.getState().setDimension(2)
     })
     await waitForShaderCompilation(page)
@@ -338,7 +338,7 @@ test.describe('Hydrogen 2D: dimension switching', () => {
 
     // Switch to 3D
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/geometryStore.ts')
+      const mod = await import('/src/stores/scene/geometryStore.ts')
       mod.useGeometryStore.getState().setDimension(3)
     })
     await waitForShaderCompilation(page)
@@ -352,14 +352,14 @@ test.describe('Hydrogen 2D: dimension switching', () => {
     for (let i = 0; i < 4; i++) {
       const dim = i % 2 === 0 ? 3 : 2
       await page.evaluate(async (d: number) => {
-        const mod = await import('/src/stores/geometryStore.ts')
+        const mod = await import('/src/stores/scene/geometryStore.ts')
         mod.useGeometryStore.getState().setDimension(d)
       }, dim)
     }
 
     // Settle on 2D
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/geometryStore.ts')
+      const mod = await import('/src/stores/scene/geometryStore.ts')
       mod.useGeometryStore.getState().setDimension(2)
     })
     await waitForShaderCompilation(page)

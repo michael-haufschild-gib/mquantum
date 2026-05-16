@@ -77,7 +77,7 @@ test.describe('differential rendering', () => {
 
     // Set n=1, l=0 (1s orbital — spherical)
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const store = mod.useExtendedObjectStore.getState()
       store.setSchroedingerPrincipalQuantumNumber(1)
       store.setSchroedingerAzimuthalQuantumNumber(0)
@@ -87,7 +87,7 @@ test.describe('differential rendering', () => {
 
     // Set n=3, l=2 (3d orbital — clover shape)
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const store = mod.useExtendedObjectStore.getState()
       store.setSchroedingerPrincipalQuantumNumber(3)
       store.setSchroedingerAzimuthalQuantumNumber(2)
@@ -106,7 +106,7 @@ test.describe('differential rendering', () => {
 
     // Ensure animation is playing at max speed for visible change
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/animationStore.ts')
+      const mod = await import('/src/stores/scene/animationStore.ts')
       const store = mod.useAnimationStore.getState()
       if (!store.isPlaying) store.togglePlayPause()
       store.setSpeed(5.0) // fast animation
@@ -149,7 +149,7 @@ test.describe('differential rendering', () => {
 
     // Disable bloom completely
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/postProcessingStore.ts')
+      const mod = await import('/src/stores/scene/postProcessingStore.ts')
       mod.usePostProcessingStore.getState().setBloomEnabled(false)
     })
     await waitForShaderCompilation(page)
@@ -157,7 +157,7 @@ test.describe('differential rendering', () => {
 
     // Enable bloom with extreme gain + low threshold for maximum visual difference
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/postProcessingStore.ts')
+      const mod = await import('/src/stores/scene/postProcessingStore.ts')
       const store = mod.usePostProcessingStore.getState()
       store.setBloomEnabled(true)
       store.setBloomGain(5.0)
@@ -186,7 +186,7 @@ test.describe('differential rendering', () => {
 
     // Disable cross-section
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerCrossSectionEnabled(false)
     })
     await waitForShaderCompilation(page)
@@ -194,7 +194,7 @@ test.describe('differential rendering', () => {
 
     // Enable cross-section
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerCrossSectionEnabled(true)
     })
     await waitForShaderCompilation(page)
@@ -232,7 +232,7 @@ test.describe('differential rendering', () => {
 
     // Switch to momentum
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerRepresentation('momentum')
     })
     await waitForShaderCompilation(page)
@@ -254,7 +254,7 @@ test.describe('differential rendering', () => {
 
     // Switch to wigner
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerRepresentation('wigner')
     })
     await waitForShaderCompilation(page)
@@ -271,7 +271,7 @@ test.describe('differential rendering', () => {
 
     // Set blackbody colormap
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/appearanceStore.ts')
+      const mod = await import('/src/stores/scene/appearanceStore.ts')
       mod.useAppearanceStore.getState().setColorAlgorithm('blackbody')
     })
     await waitForShaderCompilation(page)
@@ -280,7 +280,7 @@ test.describe('differential rendering', () => {
 
     // Set phase colormap — fundamentally different color mapping
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/appearanceStore.ts')
+      const mod = await import('/src/stores/scene/appearanceStore.ts')
       mod.useAppearanceStore.getState().setColorAlgorithm('phase')
     })
     await waitForShaderCompilation(page)
@@ -298,7 +298,7 @@ test.describe('differential rendering', () => {
 
     // Set very low density gain
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerDensityGain(0.1)
     })
     await waitForUniformUpdate(page)
@@ -306,7 +306,7 @@ test.describe('differential rendering', () => {
 
     // Set very high density gain
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerDensityGain(10.0)
     })
     await waitForUniformUpdate(page)
@@ -323,22 +323,22 @@ test.describe('differential rendering', () => {
 
     // Set minimum scale and verify store accepted it
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerScale(0.1)
     })
     const scaleAfterMin = await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       return mod.useExtendedObjectStore.getState().schroedinger.scale
     })
     expect(scaleAfterMin).toBeCloseTo(0.1, 1)
 
     // Set maximum scale and verify store accepted it
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerScale(2.0)
     })
     const scaleAfterMax = await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       return mod.useExtendedObjectStore.getState().schroedinger.scale
     })
     expect(scaleAfterMax).toBeCloseTo(2.0, 1)

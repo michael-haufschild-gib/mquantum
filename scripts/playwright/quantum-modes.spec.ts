@@ -213,7 +213,7 @@ test.describe('quantum mode switching via UI', () => {
     // The doubleSlit preset sets potentialType to 'doubleSlit'.
     await expect(async () => {
       const potentialType = await page.evaluate(async () => {
-        const mod = await import('/src/stores/extendedObjectStore.ts')
+        const mod = await import('/src/stores/scene/extendedObjectStore.ts')
         return mod.useExtendedObjectStore.getState().schroedinger.tdse.potentialType
       })
       expect(potentialType).toBe('doubleSlit')

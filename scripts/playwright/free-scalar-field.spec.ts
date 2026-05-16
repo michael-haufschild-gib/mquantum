@@ -122,7 +122,7 @@ const waitForFsfReady = (page: Page, extraFrames = 120) => waitForModeReady(page
 /** Set FSF initial condition via store. Enables selfInteraction first if kinkProfile. */
 async function setInitialCondition(page: Page, initCond: string): Promise<void> {
   await page.evaluate(async (cond) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     const store = mod.useExtendedObjectStore.getState()
     if (cond === 'kinkProfile') {
       store.setFreeScalarSelfInteractionEnabled(true)
@@ -138,7 +138,7 @@ async function setColorAlgorithm(page: Page, algo: string): Promise<void> {
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       await page.evaluate(async (a) => {
-        const mod = await import('/src/stores/appearanceStore.ts')
+        const mod = await import('/src/stores/scene/appearanceStore.ts')
         mod.useAppearanceStore.setState({ colorAlgorithm: a })
       }, algo)
       return
@@ -157,7 +157,7 @@ async function setColorAlgorithm(page: Page, algo: string): Promise<void> {
 /** Set field view via store. Enables selfInteraction first if wallDensity. */
 async function setFieldView(page: Page, view: string): Promise<void> {
   await page.evaluate(async (v) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     const store = mod.useExtendedObjectStore.getState()
     if (v === 'wallDensity') {
       store.setFreeScalarSelfInteractionEnabled(true)
@@ -169,7 +169,7 @@ async function setFieldView(page: Page, view: string): Promise<void> {
 /** Enable isosurface mode via store. */
 async function enableIsosurface(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerIsoEnabled(true)
   })
 }
@@ -177,7 +177,7 @@ async function enableIsosurface(page: Page): Promise<void> {
 /** Enable FSF diagnostics readback. */
 async function enableDiagnostics(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setFreeScalarDiagnosticsEnabled(true)
   })
 }
@@ -319,7 +319,7 @@ test.describe('free scalar field: k-space occupation map', () => {
     const fc = await getFrameCount(page)
     await waitForFrameAdvance(page, fc + 30)
     const algo = await page.evaluate(async () => {
-      const mod = await import('/src/stores/appearanceStore.ts')
+      const mod = await import('/src/stores/scene/appearanceStore.ts')
       return mod.useAppearanceStore.getState().colorAlgorithm
     })
     expect(algo, 'kSpaceOccupation should auto-switch away for vacuumNoise').not.toBe(
@@ -354,7 +354,7 @@ test.describe('free scalar field: feature toggles', () => {
     await waitForShaderCompilation(page)
 
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setFreeScalarAbsorberEnabled(false)
     })
 
@@ -369,7 +369,7 @@ test.describe('free scalar field: feature toggles', () => {
     await waitForShaderCompilation(page)
 
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setFreeScalarAutoScale(false)
     })
 
@@ -443,7 +443,7 @@ test.describe('free scalar field: physics', () => {
 
     // Ensure self-interaction is off (free Hamiltonian → symplectic integrator)
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setFreeScalarSelfInteractionEnabled(false)
     })
 
@@ -498,7 +498,7 @@ test.describe('free scalar field: self-interaction scenario presets', () => {
   /** Apply an FSF scenario preset by id, waiting for the store to update. */
   async function applyFsfPreset(page: Page, presetId: string): Promise<void> {
     await page.evaluate(async (id) => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().applyFreeScalarPreset(id)
     }, presetId)
 
@@ -506,7 +506,7 @@ test.describe('free scalar field: self-interaction scenario presets', () => {
     // update is async. Wait until needsReset flips to true (preset applied).
     await page.waitForFunction(
       async () => {
-        const mod = await import('/src/stores/extendedObjectStore.ts')
+        const mod = await import('/src/stores/scene/extendedObjectStore.ts')
         return mod.useExtendedObjectStore.getState().schroedinger.freeScalar.needsReset === true
       },
       { timeout: 5_000 }

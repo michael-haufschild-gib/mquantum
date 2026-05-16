@@ -106,7 +106,7 @@ test.describe('Styles menu', () => {
   test('clicking an example style applies it without crash', async ({ appPage: page }) => {
     // Capture initial visual state for comparison using real store fields
     const initialStyle = await page.evaluate(async () => {
-      const mod = await import('/src/stores/appearanceStore.ts')
+      const mod = await import('/src/stores/scene/appearanceStore.ts')
       const s = mod.useAppearanceStore.getState()
       return JSON.stringify({
         colorAlgorithm: s.colorAlgorithm,
@@ -133,7 +133,7 @@ test.describe('Styles menu', () => {
     // Verify at least one visual store changed (style presets mutate appearance/theme/PBR stores)
     await expect(async () => {
       const newStyle = await page.evaluate(async () => {
-        const mod = await import('/src/stores/appearanceStore.ts')
+        const mod = await import('/src/stores/scene/appearanceStore.ts')
         const s = mod.useAppearanceStore.getState()
         return JSON.stringify({
           colorAlgorithm: s.colorAlgorithm,

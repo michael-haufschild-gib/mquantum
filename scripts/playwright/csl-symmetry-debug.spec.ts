@@ -22,7 +22,7 @@ test.setTimeout(120_000)
 /** Read TDSE diagnostics from the store. */
 async function readDiagnostics(page: import('@playwright/test').Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/diagnosticsStore.ts')
+    const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
     const s = mod.useDiagnosticsStore.getState().tdse
     return {
       totalNorm: s.totalNorm,
@@ -37,7 +37,7 @@ async function readDiagnostics(page: import('@playwright/test').Page) {
 /** Read TDSE stochastic config from the store. */
 async function readTdseConfig(page: import('@playwright/test').Page) {
   return page.evaluate(async () => {
-    const ext = await import('/src/stores/extendedObjectStore.ts')
+    const ext = await import('/src/stores/scene/extendedObjectStore.ts')
     const tdse = ext.useExtendedObjectStore.getState().schroedinger.tdse
     return {
       potentialType: tdse.potentialType,
@@ -205,7 +205,7 @@ test.describe('CSL Symmetry-Breaking Investigation', () => {
 
     // Check that density stays concentrated
     const lastMaxDensity = await page.evaluate(async () => {
-      const mod = await import('/src/stores/diagnosticsStore.ts')
+      const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
       return mod.useDiagnosticsStore.getState().tdse.maxDensity
     })
     console.log(`\nMax density at end: ${lastMaxDensity.toFixed(6)}`)

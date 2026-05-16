@@ -49,14 +49,14 @@ test.describe('open quantum drawer', () => {
 
     // Enable open quantum via store
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setOpenQuantumEnabled(true)
     })
 
     // Verify store updated — the field is at schroedinger.openQuantum.enabled
     await expect(async () => {
       const enabled = await page.evaluate(async () => {
-        const mod = await import('/src/stores/extendedObjectStore.ts')
+        const mod = await import('/src/stores/scene/extendedObjectStore.ts')
         return mod.useExtendedObjectStore.getState().schroedinger.openQuantum.enabled
       })
       expect(enabled).toBe(true)

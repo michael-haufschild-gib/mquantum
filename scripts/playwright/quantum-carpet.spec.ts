@@ -65,7 +65,7 @@ async function getCarpetFrames(page: import('@playwright/test').Page): Promise<n
 /** Enable carpet via store injection (bypasses UI navigation). */
 async function enableCarpetViaStore(page: import('@playwright/test').Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/carpetStore.ts')
+    const mod = await import('/src/stores/diagnostics/carpetStore.ts')
     mod.useCarpetStore.getState().setEnabled(true)
   })
   await expect(page.getByTestId('quantum-carpet-panel')).toBeVisible({ timeout: 5000 })
@@ -79,7 +79,7 @@ async function enableCarpetViaStore(page: import('@playwright/test').Page): Prom
  */
 async function getCarpetNonZeroCount(page: import('@playwright/test').Page): Promise<number> {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/carpetStore.ts')
+    const mod = await import('/src/stores/diagnostics/carpetStore.ts')
     const data = mod.useCarpetStore.getState().carpetData
     if (!data) return 0
     let count = 0
@@ -131,7 +131,7 @@ test.describe('quantum carpet: UI controls', () => {
 
     // Store should be disabled
     const enabled = await page.evaluate(async () => {
-      const mod = await import('/src/stores/carpetStore.ts')
+      const mod = await import('/src/stores/diagnostics/carpetStore.ts')
       return mod.useCarpetStore.getState().enabled
     })
     expect(enabled).toBe(false)
@@ -143,7 +143,7 @@ test.describe('quantum carpet: UI controls', () => {
 
     // Enter cinematic mode via store
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/layoutStore.ts')
+      const mod = await import('/src/stores/ui/layoutStore.ts')
       mod.useLayoutStore.getState().setCinematicMode(true)
     })
 
@@ -152,7 +152,7 @@ test.describe('quantum carpet: UI controls', () => {
 
     // Exit cinematic mode — panel should return
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/layoutStore.ts')
+      const mod = await import('/src/stores/ui/layoutStore.ts')
       mod.useLayoutStore.getState().setCinematicMode(false)
     })
     await expect(page.getByTestId('quantum-carpet-panel')).toBeVisible({ timeout: 5000 })

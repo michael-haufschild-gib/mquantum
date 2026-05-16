@@ -223,9 +223,10 @@ test.describe('performance benchmark', () => {
       await page.evaluate(async () => {
         const perfStore =
           window.__PERFORMANCE_STORE__ ??
-          (await import('/src/stores/performanceStore.ts')).usePerformanceStore
+          (await import('/src/stores/runtime/performanceStore.ts')).usePerformanceStore
         perfStore.getState().setMaxFps(0)
-        const uiStore = window.__UI_STORE__ ?? (await import('/src/stores/uiStore.ts')).useUIStore
+        const uiStore =
+          window.__UI_STORE__ ?? (await import('/src/stores/ui/uiStore.ts')).useUIStore
         uiStore.setState({ showPerfMonitor: true, perfMonitorExpanded: true })
       })
 

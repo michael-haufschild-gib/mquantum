@@ -68,7 +68,7 @@ async function setGridWithConfig(page: Page, mode: string, size: number): Promis
   if (mode === 'quantumWalk') {
     await page.evaluate(
       async ({ grid, d }: { grid: number[]; d: number }) => {
-        const mod = await import('/src/stores/extendedObjectStore.ts')
+        const mod = await import('/src/stores/scene/extendedObjectStore.ts')
         const state = mod.useExtendedObjectStore.getState()
         const qw = state.schroedinger.quantumWalk
         state.setSchroedingerConfig({
@@ -85,13 +85,13 @@ async function setGridWithConfig(page: Page, mode: string, size: number): Promis
     )
   } else if (mode === 'pauliSpinor') {
     await page.evaluate(async (grid: number[]) => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setPauliGridSize(grid)
     }, gridArray)
   } else if (mode === 'freeScalarField') {
     // Set gaussianPacket + gridSize in one update to avoid double-reset
     await page.evaluate(async (grid: number[]) => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const state = mod.useExtendedObjectStore.getState()
       const fs = state.schroedinger.freeScalar
       state.setSchroedingerConfig({
@@ -107,7 +107,7 @@ async function setGridWithConfig(page: Page, mode: string, size: number): Promis
     const setter = setterMap[mode]!
     await page.evaluate(
       async ({ fn, grid }: { fn: string; grid: number[] }) => {
-        const mod = await import('/src/stores/extendedObjectStore.ts')
+        const mod = await import('/src/stores/scene/extendedObjectStore.ts')
         ;(mod.useExtendedObjectStore.getState() as Record<string, (s: number[]) => void>)[fn](grid)
       },
       { fn: setter, grid: gridArray }

@@ -44,7 +44,7 @@ test.describe('quantum scarring features', () => {
 
     // Verify the potential type was applied
     const potType = await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       return mod.useExtendedObjectStore.getState().schroedinger.tdse.potentialType
     })
     expect(potType).toBe('coupledAnharmonic')
@@ -60,7 +60,7 @@ test.describe('quantum scarring features', () => {
 
     // Change the coupling strength
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setTdseAnharmonicLambda(10.0)
     })
 
@@ -70,7 +70,7 @@ test.describe('quantum scarring features', () => {
 
     // Verify the parameter was applied
     const lambda = await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       return mod.useExtendedObjectStore.getState().schroedinger.tdse.anharmonicLambda
     })
     expect(lambda).toBe(10.0)
@@ -86,7 +86,7 @@ test.describe('quantum scarring features', () => {
 
     // Enable disorder
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState()
       s.setTdseDisorderStrength(5.0)
       s.setTdseDisorderSeed(123)
@@ -98,7 +98,7 @@ test.describe('quantum scarring features', () => {
 
     // Verify disorder config applied
     const config = await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const tdse = mod.useExtendedObjectStore.getState().schroedinger.tdse
       return { disorderStrength: tdse.disorderStrength, disorderSeed: tdse.disorderSeed }
     })
@@ -116,7 +116,7 @@ test.describe('quantum scarring features', () => {
 
     // Enable disorder overlay on top of coupled anharmonic
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState()
       s.setTdseAnharmonicLambda(5.0)
       s.setTdseDisorderStrength(3.0)
@@ -141,7 +141,7 @@ test.describe('quantum scarring features', () => {
 
     // Verify ITP is enabled
     const itpEnabled = await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       return mod.useExtendedObjectStore.getState().schroedinger.tdse.imaginaryTimeEnabled
     })
     expect(itpEnabled).toBe(true)
@@ -160,7 +160,7 @@ test.describe('quantum scarring features', () => {
     // Test the eigenstate diagnostics store from the browser context
     // Level spacing requires ≥10 eigenstates with valid energies
     const result = await page.evaluate(async () => {
-      const mod = await import('/src/stores/diagnosticsStore.ts')
+      const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
       const store = mod.useDiagnosticsStore
 
       store.getState().clearEigenstate()
@@ -206,7 +206,7 @@ test.describe('quantum scarring features', () => {
 
     // Enable disorder with seed 42
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState()
       s.setTdseDisorderStrength(10.0)
       s.setTdseDisorderSeed(42)
@@ -215,14 +215,14 @@ test.describe('quantum scarring features', () => {
 
     // Change seed — should trigger potential refresh
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setTdseDisorderSeed(999)
     })
     await waitForFrameAdvance(page, 3)
 
     // Verify seed was applied (no crash)
     const seed = await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       return mod.useExtendedObjectStore.getState().schroedinger.tdse.disorderSeed
     })
     expect(seed).toBe(999)

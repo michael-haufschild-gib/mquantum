@@ -55,7 +55,7 @@ const waitForDiracReady = (page: Page, extraFrames = 150) => waitForModeReady(pa
 /** Set Dirac field view via store mutation. */
 async function setFieldView(page: Page, view: string): Promise<void> {
   await page.evaluate(async (v) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setDiracFieldView(v)
@@ -65,7 +65,7 @@ async function setFieldView(page: Page, view: string): Promise<void> {
 /** Set Dirac absorber enabled/disabled. */
 async function setAbsorber(page: Page, enabled: boolean): Promise<void> {
   await page.evaluate(async (val) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setDiracAbsorberEnabled(val)
@@ -75,7 +75,7 @@ async function setAbsorber(page: Page, enabled: boolean): Promise<void> {
 /** Set Dirac auto-scale enabled/disabled. */
 async function setAutoScale(page: Page, enabled: boolean): Promise<void> {
   await page.evaluate(async (val) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setDiracAutoScale(val)
@@ -85,7 +85,7 @@ async function setAutoScale(page: Page, enabled: boolean): Promise<void> {
 /** Set Dirac show-potential overlay. */
 async function setShowPotential(page: Page, enabled: boolean): Promise<void> {
   await page.evaluate(async (val) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setDiracShowPotential(val)
@@ -95,7 +95,7 @@ async function setShowPotential(page: Page, enabled: boolean): Promise<void> {
 /** Enable Dirac diagnostics readback. */
 async function enableDiagnostics(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setDiracDiagnosticsEnabled(true)
@@ -105,7 +105,7 @@ async function enableDiagnostics(page: Page): Promise<void> {
 /** Enable isosurface mode via store. */
 async function enableIsosurface(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerIsoEnabled(true)
   })
 }
@@ -220,7 +220,7 @@ test.describe('Dirac equation: control response', () => {
 
     // Switch to harmonic trap — triggers needsReset
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const store = mod.useExtendedObjectStore.getState() as Record<
         string,
         (...args: unknown[]) => void
@@ -253,7 +253,7 @@ test.describe('Dirac equation: control response', () => {
     // Heavy mass — mass setter does not trigger needsReset on its own,
     // so we also set needsReset to reinitialize with the new dispersion.
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const store = mod.useExtendedObjectStore.getState() as Record<
         string,
         (...args: unknown[]) => void
@@ -303,7 +303,7 @@ test.describe('Dirac equation: control response', () => {
 
     // Start with free particle + gaussianPacket (default initial condition)
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const store = mod.useExtendedObjectStore.getState() as Record<
         string,
         (...args: unknown[]) => void
@@ -319,7 +319,7 @@ test.describe('Dirac equation: control response', () => {
 
     // Switch to plane wave
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       ;(
         mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
       ).setDiracInitialCondition('planeWave')
@@ -406,7 +406,7 @@ test.describe('Dirac equation: physics validation', () => {
     await gotoMode(page, 'diracEquation', 3)
     await waitForShaderCompilation(page)
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       ;(
         mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
       ).setDiracPotentialType('none')

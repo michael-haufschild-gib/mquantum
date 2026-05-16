@@ -66,7 +66,7 @@ test.describe('representation mode shader paths', () => {
 
     await verifyShaderPath(page, 'momentum', async () => {
       await page.evaluate(async () => {
-        const mod = await import('/src/stores/extendedObjectStore.ts')
+        const mod = await import('/src/stores/scene/extendedObjectStore.ts')
         mod.useExtendedObjectStore.getState().setSchroedingerRepresentation('momentum')
       })
     })
@@ -79,7 +79,7 @@ test.describe('representation mode shader paths', () => {
 
     await verifyShaderPath(page, 'wigner', async () => {
       await page.evaluate(async () => {
-        const mod = await import('/src/stores/extendedObjectStore.ts')
+        const mod = await import('/src/stores/scene/extendedObjectStore.ts')
         mod.useExtendedObjectStore.getState().setSchroedingerRepresentation('wigner')
       })
     })
@@ -92,7 +92,7 @@ test.describe('representation mode shader paths', () => {
 
     await verifyShaderPath(page, 'hydrogen momentum', async () => {
       await page.evaluate(async () => {
-        const mod = await import('/src/stores/extendedObjectStore.ts')
+        const mod = await import('/src/stores/scene/extendedObjectStore.ts')
         mod.useExtendedObjectStore.getState().setSchroedingerRepresentation('momentum')
       })
     })
@@ -105,7 +105,7 @@ test.describe('representation mode shader paths', () => {
 
     await verifyShaderPath(page, 'hydrogen 5D wigner', async () => {
       await page.evaluate(async () => {
-        const mod = await import('/src/stores/extendedObjectStore.ts')
+        const mod = await import('/src/stores/scene/extendedObjectStore.ts')
         mod.useExtendedObjectStore.getState().setSchroedingerRepresentation('wigner')
       })
     })
@@ -126,7 +126,7 @@ test.describe('post-processing shader paths', () => {
   test('SMAA anti-aliasing: compiles and renders', async ({ page }) => {
     await verifyShaderPath(page, 'SMAA', async () => {
       await page.evaluate(async () => {
-        const mod = await import('/src/stores/postProcessingStore.ts')
+        const mod = await import('/src/stores/scene/postProcessingStore.ts')
         mod.usePostProcessingStore.getState().setAntiAliasingMethod('smaa')
       })
     })
@@ -135,7 +135,7 @@ test.describe('post-processing shader paths', () => {
   test('FXAA anti-aliasing: compiles and renders', async ({ page }) => {
     await verifyShaderPath(page, 'FXAA', async () => {
       await page.evaluate(async () => {
-        const mod = await import('/src/stores/postProcessingStore.ts')
+        const mod = await import('/src/stores/scene/postProcessingStore.ts')
         mod.usePostProcessingStore.getState().setAntiAliasingMethod('fxaa')
       })
     })
@@ -144,7 +144,7 @@ test.describe('post-processing shader paths', () => {
   test('cinematic effects: compiles and renders', async ({ page }) => {
     await verifyShaderPath(page, 'cinematic', async () => {
       await page.evaluate(async () => {
-        const mod = await import('/src/stores/postProcessingStore.ts')
+        const mod = await import('/src/stores/scene/postProcessingStore.ts')
         const store = mod.usePostProcessingStore.getState()
         store.setCinematicEnabled(true)
         store.setCinematicAberration(0.5)
@@ -157,7 +157,7 @@ test.describe('post-processing shader paths', () => {
   test('paper texture: compiles and renders', async ({ page }) => {
     await verifyShaderPath(page, 'paper texture', async () => {
       await page.evaluate(async () => {
-        const mod = await import('/src/stores/postProcessingStore.ts')
+        const mod = await import('/src/stores/scene/postProcessingStore.ts')
         mod.usePostProcessingStore.getState().setPaperEnabled(true)
       })
     })
@@ -166,7 +166,7 @@ test.describe('post-processing shader paths', () => {
   test('tone mapping enabled: compiles and renders', async ({ page }) => {
     await verifyShaderPath(page, 'tone mapping', async () => {
       await page.evaluate(async () => {
-        const mod = await import('/src/stores/lightingStore.ts')
+        const mod = await import('/src/stores/scene/lightingStore.ts')
         mod.useLightingStore.getState().setToneMappingEnabled(true)
       })
     })
@@ -175,7 +175,7 @@ test.describe('post-processing shader paths', () => {
   test('frame blending enabled: compiles and renders', async ({ page }) => {
     await verifyShaderPath(page, 'frame blending', async () => {
       await page.evaluate(async () => {
-        const mod = await import('/src/stores/postProcessingStore.ts')
+        const mod = await import('/src/stores/scene/postProcessingStore.ts')
         mod.usePostProcessingStore.getState().setFrameBlendingEnabled(true)
       })
     })
@@ -197,7 +197,7 @@ test.describe('rendering variant shader paths', () => {
 
     await verifyShaderPath(page, 'cross-section HO', async () => {
       await page.evaluate(async () => {
-        const mod = await import('/src/stores/extendedObjectStore.ts')
+        const mod = await import('/src/stores/scene/extendedObjectStore.ts')
         mod.useExtendedObjectStore.getState().setSchroedingerCrossSectionEnabled(true)
       })
     })
@@ -210,7 +210,7 @@ test.describe('rendering variant shader paths', () => {
 
     await verifyShaderPath(page, 'cross-section hydrogen', async () => {
       await page.evaluate(async () => {
-        const mod = await import('/src/stores/extendedObjectStore.ts')
+        const mod = await import('/src/stores/scene/extendedObjectStore.ts')
         mod.useExtendedObjectStore.getState().setSchroedingerCrossSectionEnabled(true)
       })
     })
@@ -223,7 +223,7 @@ test.describe('rendering variant shader paths', () => {
 
     await verifyShaderPath(page, 'open quantum', async () => {
       await page.evaluate(async () => {
-        const mod = await import('/src/stores/extendedObjectStore.ts')
+        const mod = await import('/src/stores/scene/extendedObjectStore.ts')
         mod.useExtendedObjectStore.getState().setOpenQuantumEnabled(true)
       })
     })
@@ -236,7 +236,7 @@ test.describe('rendering variant shader paths', () => {
 
     await verifyShaderPath(page, 'temporal reprojection', async () => {
       await page.evaluate(async () => {
-        const mod = await import('/src/stores/performanceStore.ts')
+        const mod = await import('/src/stores/runtime/performanceStore.ts')
         mod.usePerformanceStore.getState().setTemporalReprojectionEnabled(true)
       })
     })
@@ -257,10 +257,10 @@ test.describe('combined shader paths', () => {
     await waitForShaderCompilation(page)
 
     await page.evaluate(async () => {
-      const extMod = await import('/src/stores/extendedObjectStore.ts')
+      const extMod = await import('/src/stores/scene/extendedObjectStore.ts')
       extMod.useExtendedObjectStore.getState().setSchroedingerRepresentation('momentum')
 
-      const ppMod = await import('/src/stores/postProcessingStore.ts')
+      const ppMod = await import('/src/stores/scene/postProcessingStore.ts')
       const ppStore = ppMod.usePostProcessingStore.getState()
       ppStore.setBloomEnabled(true)
       ppStore.setAntiAliasingMethod('smaa')
@@ -276,12 +276,12 @@ test.describe('combined shader paths', () => {
     await waitForShaderCompilation(page)
 
     await page.evaluate(async () => {
-      const extMod = await import('/src/stores/extendedObjectStore.ts')
+      const extMod = await import('/src/stores/scene/extendedObjectStore.ts')
       const extStore = extMod.useExtendedObjectStore.getState()
       extStore.setSchroedingerRepresentation('wigner')
       extStore.setSchroedingerCrossSectionEnabled(true)
 
-      const ppMod = await import('/src/stores/postProcessingStore.ts')
+      const ppMod = await import('/src/stores/scene/postProcessingStore.ts')
       const ppStore = ppMod.usePostProcessingStore.getState()
       ppStore.setCinematicEnabled(true)
       ppStore.setCinematicAberration(0.3)
@@ -297,10 +297,10 @@ test.describe('combined shader paths', () => {
     await waitForShaderCompilation(page)
 
     await page.evaluate(async () => {
-      const extMod = await import('/src/stores/extendedObjectStore.ts')
+      const extMod = await import('/src/stores/scene/extendedObjectStore.ts')
       extMod.useExtendedObjectStore.getState().setOpenQuantumEnabled(true)
 
-      const ppMod = await import('/src/stores/postProcessingStore.ts')
+      const ppMod = await import('/src/stores/scene/postProcessingStore.ts')
       ppMod.usePostProcessingStore.getState().setPaperEnabled(true)
     })
     await waitForShaderCompilation(page)
@@ -314,10 +314,10 @@ test.describe('combined shader paths', () => {
     await waitForShaderCompilation(page)
 
     await page.evaluate(async () => {
-      const perfMod = await import('/src/stores/performanceStore.ts')
+      const perfMod = await import('/src/stores/runtime/performanceStore.ts')
       perfMod.usePerformanceStore.getState().setTemporalReprojectionEnabled(true)
 
-      const ppMod = await import('/src/stores/postProcessingStore.ts')
+      const ppMod = await import('/src/stores/scene/postProcessingStore.ts')
       ppMod.usePostProcessingStore.getState().setBloomEnabled(true)
     })
     await waitForShaderCompilation(page)
@@ -334,13 +334,13 @@ test.describe('combined shader paths', () => {
     // This exercises maximum bind group pressure, resource allocation,
     // and pass graph complexity — the highest-risk configuration.
     await page.evaluate(async () => {
-      const extMod = await import('/src/stores/extendedObjectStore.ts')
+      const extMod = await import('/src/stores/scene/extendedObjectStore.ts')
       const extStore = extMod.useExtendedObjectStore.getState()
       extStore.setSchroedingerRepresentation('momentum')
       extStore.setSchroedingerCrossSectionEnabled(true)
       extStore.setOpenQuantumEnabled(true)
 
-      const ppMod = await import('/src/stores/postProcessingStore.ts')
+      const ppMod = await import('/src/stores/scene/postProcessingStore.ts')
       const ppStore = ppMod.usePostProcessingStore.getState()
       ppStore.setBloomEnabled(true)
       ppStore.setAntiAliasingMethod('smaa')
@@ -351,10 +351,10 @@ test.describe('combined shader paths', () => {
       ppStore.setPaperEnabled(true)
       ppStore.setFrameBlendingEnabled(true)
 
-      const lightMod = await import('/src/stores/lightingStore.ts')
+      const lightMod = await import('/src/stores/scene/lightingStore.ts')
       lightMod.useLightingStore.getState().setToneMappingEnabled(true)
 
-      const perfMod = await import('/src/stores/performanceStore.ts')
+      const perfMod = await import('/src/stores/runtime/performanceStore.ts')
       perfMod.usePerformanceStore.getState().setTemporalReprojectionEnabled(true)
     })
     await waitForShaderCompilation(page)

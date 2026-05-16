@@ -60,7 +60,7 @@ async function applyTdsePreset(page: import('@playwright/test').Page, presetId: 
   await page.evaluate(async (id: string) => {
     const store =
       window.__EXTENDED_OBJECT_STORE__ ??
-      (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+      (await import('/src/stores/scene/extendedObjectStore.ts')).useExtendedObjectStore
     ;(store.getState() as Record<string, (...a: unknown[]) => void>).applyTdsePreset(id)
   }, presetId)
 }
@@ -70,7 +70,7 @@ async function applyDiracPreset(page: import('@playwright/test').Page, presetId:
   await page.evaluate(async (id: string) => {
     const store =
       window.__EXTENDED_OBJECT_STORE__ ??
-      (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+      (await import('/src/stores/scene/extendedObjectStore.ts')).useExtendedObjectStore
     await (store.getState() as Record<string, (...a: unknown[]) => unknown>).applyDiracPreset(id)
   }, presetId)
 }
@@ -88,7 +88,7 @@ async function configureFsf(
   await page.evaluate(async (cfg: Record<string, unknown>) => {
     const store =
       window.__EXTENDED_OBJECT_STORE__ ??
-      (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+      (await import('/src/stores/scene/extendedObjectStore.ts')).useExtendedObjectStore
     const s = store.getState() as Record<string, (...a: unknown[]) => void>
     if (cfg.initialCondition !== undefined) s.setFreeScalarInitialCondition(cfg.initialCondition)
     if (cfg.selfCouplingEnabled !== undefined)
@@ -307,7 +307,7 @@ test.describe('TDSE non-default features', () => {
     await page.evaluate(async () => {
       const store =
         window.__EXTENDED_OBJECT_STORE__ ??
-        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+        (await import('/src/stores/scene/extendedObjectStore.ts')).useExtendedObjectStore
       const s = store.getState() as Record<string, (...a: unknown[]) => void>
       s.setTdsePotentialType('andersonDisorder')
     })
@@ -322,7 +322,7 @@ test.describe('TDSE non-default features', () => {
     await page.evaluate(async () => {
       const store =
         window.__EXTENDED_OBJECT_STORE__ ??
-        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+        (await import('/src/stores/scene/extendedObjectStore.ts')).useExtendedObjectStore
       const s = store.getState() as Record<string, (...a: unknown[]) => void>
       s.setTdseAbsorberEnabled(true)
       s.setTdseDiagnosticsEnabled(true)
@@ -338,7 +338,7 @@ test.describe('TDSE non-default features', () => {
     await page.evaluate(async () => {
       const store =
         window.__EXTENDED_OBJECT_STORE__ ??
-        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+        (await import('/src/stores/scene/extendedObjectStore.ts')).useExtendedObjectStore
       const s = store.getState() as Record<string, (...a: unknown[]) => void>
       s.setTdseObservablesEnabled(true)
     })
@@ -353,7 +353,7 @@ test.describe('TDSE non-default features', () => {
     await page.evaluate(async () => {
       const store =
         window.__EXTENDED_OBJECT_STORE__ ??
-        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+        (await import('/src/stores/scene/extendedObjectStore.ts')).useExtendedObjectStore
       const s = store.getState() as Record<string, (...a: unknown[]) => void>
       s.setTdseStochasticEnabled(true)
       s.setTdseStochasticGamma(2.0)
@@ -371,7 +371,7 @@ test.describe('TDSE non-default features', () => {
     await page.evaluate(async () => {
       const store =
         window.__EXTENDED_OBJECT_STORE__ ??
-        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+        (await import('/src/stores/scene/extendedObjectStore.ts')).useExtendedObjectStore
       const s = store.getState() as Record<string, (...a: unknown[]) => void>
       s.setTdsePotentialType('harmonicTrap')
       s.setTdseImaginaryTimeEnabled(true)
@@ -387,7 +387,7 @@ test.describe('TDSE non-default features', () => {
     await page.evaluate(async () => {
       const store =
         window.__EXTENDED_OBJECT_STORE__ ??
-        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+        (await import('/src/stores/scene/extendedObjectStore.ts')).useExtendedObjectStore
       const s = store.getState() as Record<string, (...a: unknown[]) => void>
       s.setTdseAbsorberEnabled(true)
       s.setTdseDiagnosticsEnabled(true)
@@ -415,7 +415,7 @@ test.describe('FSF cosmology & preheating', () => {
     await page.evaluate(async () => {
       const store =
         window.__EXTENDED_OBJECT_STORE__ ??
-        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+        (await import('/src/stores/scene/extendedObjectStore.ts')).useExtendedObjectStore
       const s = store.getState() as Record<string, (...a: unknown[]) => void>
       s.setFreeScalarCosmologyEnabled(true)
       s.setFreeScalarCosmologyPreset('deSitter')
@@ -434,7 +434,7 @@ test.describe('FSF cosmology & preheating', () => {
     await page.evaluate(async () => {
       const store =
         window.__EXTENDED_OBJECT_STORE__ ??
-        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+        (await import('/src/stores/scene/extendedObjectStore.ts')).useExtendedObjectStore
       const s = store.getState() as Record<string, (...a: unknown[]) => void>
       s.setFreeScalarCosmologyEnabled(true)
       s.setFreeScalarCosmologyPreset('ekpyrotic')
@@ -453,7 +453,7 @@ test.describe('FSF cosmology & preheating', () => {
     await page.evaluate(async () => {
       const store =
         window.__EXTENDED_OBJECT_STORE__ ??
-        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+        (await import('/src/stores/scene/extendedObjectStore.ts')).useExtendedObjectStore
       const s = store.getState() as Record<string, (...a: unknown[]) => void>
       s.setFreeScalarCosmologyEnabled(true)
       s.setFreeScalarCosmologyPreset('kasner')
@@ -471,7 +471,7 @@ test.describe('FSF cosmology & preheating', () => {
     await page.evaluate(async () => {
       const store =
         window.__EXTENDED_OBJECT_STORE__ ??
-        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+        (await import('/src/stores/scene/extendedObjectStore.ts')).useExtendedObjectStore
       const s = store.getState() as Record<string, (...a: unknown[]) => void>
       s.setFreeScalarPreheatingEnabled(true)
       s.setFreeScalarPreheatingAmplitude(0.5)
@@ -489,7 +489,7 @@ test.describe('FSF cosmology & preheating', () => {
     await page.evaluate(async () => {
       const store =
         window.__EXTENDED_OBJECT_STORE__ ??
-        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+        (await import('/src/stores/scene/extendedObjectStore.ts')).useExtendedObjectStore
       const s = store.getState() as Record<string, (...a: unknown[]) => void>
       s.setFreeScalarCosmologyEnabled(true)
       s.setFreeScalarCosmologyPreset('deSitter')
@@ -516,7 +516,7 @@ test.describe('FSF cosmology & preheating', () => {
     await page.evaluate(async () => {
       const store =
         window.__EXTENDED_OBJECT_STORE__ ??
-        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+        (await import('/src/stores/scene/extendedObjectStore.ts')).useExtendedObjectStore
       const s = store.getState() as Record<string, (...a: unknown[]) => void>
       s.setFreeScalarAbsorberEnabled(true)
     })
@@ -540,7 +540,7 @@ test.describe('QW & Dirac non-default features', () => {
     await page.evaluate(async () => {
       const store =
         window.__EXTENDED_OBJECT_STORE__ ??
-        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+        (await import('/src/stores/scene/extendedObjectStore.ts')).useExtendedObjectStore
       const s = store.getState() as Record<string, (...a: unknown[]) => void>
       s.setQwAbsorberEnabled(true)
     })
@@ -555,7 +555,7 @@ test.describe('QW & Dirac non-default features', () => {
     await page.evaluate(async () => {
       const store =
         window.__EXTENDED_OBJECT_STORE__ ??
-        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+        (await import('/src/stores/scene/extendedObjectStore.ts')).useExtendedObjectStore
       const s = store.getState() as Record<string, (...a: unknown[]) => void>
       s.setDiracAbsorberEnabled(true)
       s.setDiracDiagnosticsEnabled(true)

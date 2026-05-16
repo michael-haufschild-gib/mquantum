@@ -50,7 +50,7 @@ test.describe('surface mode selector', () => {
     // Store should reflect isosurface mode
     await expect(async () => {
       const isoEnabled = await page.evaluate(async () => {
-        const mod = await import('/src/stores/extendedObjectStore.ts')
+        const mod = await import('/src/stores/scene/extendedObjectStore.ts')
         return mod.useExtendedObjectStore.getState().schroedinger.isoEnabled
       })
       expect(isoEnabled).toBe(true)
@@ -83,7 +83,7 @@ test.describe('surface mode selector', () => {
 
     // Ensure volumetric mode
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerIsoEnabled(false)
     })
     await waitForShaderCompilation(page)
@@ -91,7 +91,7 @@ test.describe('surface mode selector', () => {
 
     // Switch to isosurface
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerIsoEnabled(true)
     })
     await waitForShaderCompilation(page)
@@ -111,7 +111,7 @@ test.describe('material controls (Faces section)', () => {
     // Material tab only enabled in isosurface mode (PBR has no effect on volumetric)
     // Enable isosurface via store injection after app is loaded
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerIsoEnabled(true)
     })
     await topBar.openRightPanel()

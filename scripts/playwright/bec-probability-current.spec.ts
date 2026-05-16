@@ -30,7 +30,7 @@ test.setTimeout(180_000)
 /** Set BEC field view via store mutation. */
 async function setFieldView(page: Page, view: string): Promise<void> {
   await page.evaluate(async (v) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setBecFieldView(v)
@@ -46,7 +46,7 @@ async function setFieldView(page: Page, view: string): Promise<void> {
  */
 async function setAutoScale(page: Page, enabled: boolean): Promise<void> {
   await page.evaluate(async (e) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setBecAutoScale(e)
@@ -137,7 +137,7 @@ test.describe('BEC probability current: physics validation', () => {
     await waitForModeReady(page, 60)
     await applyBecPreset(page, 'darkSoliton')
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       ;(
         mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       ).setBecSolitonVelocity(0.7)

@@ -116,14 +116,14 @@ async function readDebugBuffer(page: Page): Promise<FsfCosmoDebugSample[]> {
  */
 async function applyDeSitterVacuumPreset(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().applyFreeScalarPreset('deSitterVacuum')
   })
 
   // Wait for the preset overrides to land in the store.
   await page.waitForFunction(
     async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const fs = mod.useExtendedObjectStore.getState().schroedinger.freeScalar
       return (
         fs.initialCondition === 'vacuumNoise' &&
@@ -140,7 +140,7 @@ async function applyDeSitterVacuumPreset(page: Page): Promise<void> {
 /** Read a few top-level config fields for the trace header. */
 async function readFsfConfigSnapshot(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     const fs = mod.useExtendedObjectStore.getState().schroedinger.freeScalar
     return {
       latticeDim: fs.latticeDim,

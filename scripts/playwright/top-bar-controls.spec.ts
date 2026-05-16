@@ -51,7 +51,7 @@ test.describe('representation toggle', () => {
     await repButton.click() // → Momentum
 
     const rep = await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       return mod.useExtendedObjectStore.getState().schroedinger.representation
     })
     expect(rep).toBe('momentum')
@@ -96,7 +96,7 @@ test.describe('performance monitor toggle', () => {
 
     // Get initial state
     const initialState = await page.evaluate(async () => {
-      const mod = await import('/src/stores/uiStore.ts')
+      const mod = await import('/src/stores/ui/uiStore.ts')
       return mod.useUIStore.getState().showPerfMonitor
     })
 
@@ -106,7 +106,7 @@ test.describe('performance monitor toggle', () => {
     // Store should have flipped
     await expect(async () => {
       const afterState = await page.evaluate(async () => {
-        const mod = await import('/src/stores/uiStore.ts')
+        const mod = await import('/src/stores/ui/uiStore.ts')
         return mod.useUIStore.getState().showPerfMonitor
       })
       expect(afterState).toBe(!initialState)
@@ -121,7 +121,7 @@ test.describe('performance monitor UI', () => {
   test('enabling perf monitor shows FPS display on canvas', async ({ appPage: page }) => {
     // Ensure perf monitor is visible
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/uiStore.ts')
+      const mod = await import('/src/stores/ui/uiStore.ts')
       mod.useUIStore.setState({ showPerfMonitor: true })
     })
 
@@ -136,14 +136,14 @@ test.describe('performance monitor UI', () => {
   test('disabling perf monitor hides FPS display', async ({ appPage: page }) => {
     // First enable, then disable
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/uiStore.ts')
+      const mod = await import('/src/stores/ui/uiStore.ts')
       mod.useUIStore.setState({ showPerfMonitor: true })
     })
     await expect(page.getByTestId('fps-value')).toBeVisible({ timeout: 5000 })
 
     // Disable
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/uiStore.ts')
+      const mod = await import('/src/stores/ui/uiStore.ts')
       mod.useUIStore.setState({ showPerfMonitor: false })
     })
     await expect(page.getByTestId('fps-value')).not.toBeVisible({ timeout: 5000 })

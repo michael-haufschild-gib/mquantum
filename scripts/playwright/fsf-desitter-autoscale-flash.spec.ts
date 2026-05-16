@@ -115,13 +115,13 @@ async function readDebugBuffer(page: Page): Promise<FsfCosmoDebugSample[]> {
 
 async function applyDeSitterAndForceAutoScale(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().applyFreeScalarPreset('deSitterVacuum')
   })
 
   await page.waitForFunction(
     async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const fs = mod.useExtendedObjectStore.getState().schroedinger.freeScalar
       return (
         fs.initialCondition === 'vacuumNoise' &&
@@ -137,7 +137,7 @@ async function applyDeSitterAndForceAutoScale(page: Page): Promise<void> {
   // showed `autoScale: false` despite the preset declaring true, so this
   // reproduces the user's exact setting.
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setFreeScalarAutoScale(true)
     // Also force a field reset so the new auto-scale baseline is recomputed
     // from eta0 and the vacuum is re-sampled cleanly.
@@ -146,7 +146,7 @@ async function applyDeSitterAndForceAutoScale(page: Page): Promise<void> {
 
   await page.waitForFunction(
     async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const fs = mod.useExtendedObjectStore.getState().schroedinger.freeScalar
       return fs.autoScale === true
     },
@@ -156,7 +156,7 @@ async function applyDeSitterAndForceAutoScale(page: Page): Promise<void> {
 
 async function readFsfConfigSnapshot(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     const s = mod.useExtendedObjectStore.getState()
     const fs = s.schroedinger.freeScalar
     return {
