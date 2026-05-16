@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { Input } from '@/components/ui/Input'
 
@@ -43,5 +43,13 @@ describe('Input', () => {
     await user.click(clearButton)
 
     expect(input).toHaveValue('')
+  })
+
+  it('forwards refs to the native input element', () => {
+    const ref = vi.fn<(node: HTMLInputElement | null) => void>()
+
+    render(<Input ref={ref} label="Mass" />)
+
+    expect(ref).toHaveBeenCalledWith(screen.getByLabelText('Mass'))
   })
 })

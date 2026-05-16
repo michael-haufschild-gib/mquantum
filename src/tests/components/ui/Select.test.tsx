@@ -31,4 +31,12 @@ describe('Select', () => {
     render(<Select options={mockOptions} value="option1" onChange={vi.fn()} disabled />)
     expect(screen.getByRole('combobox')).toBeDisabled()
   })
+
+  it('forwards refs to the native select element', () => {
+    const ref = vi.fn<(node: HTMLSelectElement | null) => void>()
+
+    render(<Select ref={ref} options={mockOptions} value="option1" onChange={vi.fn()} />)
+
+    expect(ref).toHaveBeenCalledWith(screen.getByRole('combobox'))
+  })
 })

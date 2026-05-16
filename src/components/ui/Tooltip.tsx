@@ -21,18 +21,25 @@ export const Tooltip: React.FC<TooltipProps> = React.memo(
     const triggerRef = useRef<HTMLDivElement>(null)
     const tooltipRef = useRef<HTMLDivElement>(null)
 
-    const showTooltip = useCallback(() => {
-      timeoutRef.current = setTimeout(() => {
-        setIsVisible(true)
-      }, delay)
-    }, [delay])
-
-    const hideTooltip = useCallback(() => {
+    const clearShowTimer = useCallback(() => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
       }
-      setIsVisible(false)
     }, [])
+
+    const showTooltip = useCallback(() => {
+      clearShowTimer()
+      timeoutRef.current = setTimeout(() => {
+        timeoutRef.current = null
+        setIsVisible(true)
+      }, delay)
+    }, [clearShowTimer, delay])
+
+    const hideTooltip = useCallback(() => {
+      clearShowTimer()
+      setIsVisible(false)
+    }, [clearShowTimer])
 
     useEffect(() => {
       if (isVisible && triggerRef.current && tooltipRef.current) {
@@ -71,11 +78,9 @@ export const Tooltip: React.FC<TooltipProps> = React.memo(
 
     useEffect(() => {
       return () => {
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current)
-        }
+        clearShowTimer()
       }
-    }, [])
+    }, [clearShowTimer])
 
     return (
       <div className={`relative inline-block ${className}`}>

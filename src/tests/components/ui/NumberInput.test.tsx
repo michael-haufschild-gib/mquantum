@@ -116,4 +116,12 @@ describe('NumberInput', () => {
 
     expect(onChange).not.toHaveBeenCalled()
   })
+
+  it('forwards refs to the native input element', () => {
+    const ref = vi.fn<(node: HTMLInputElement | null) => void>()
+
+    render(<NumberInput aria-label="Value" ref={ref} value={5} onChange={vi.fn()} />)
+
+    expect(ref).toHaveBeenCalledWith(screen.getByRole('textbox', { name: /value/i }))
+  })
 })

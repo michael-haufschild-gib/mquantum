@@ -10,6 +10,8 @@ export interface NumberInputProps extends Omit<InputProps, 'onChange' | 'value'>
   max?: number
   step?: number
   precision?: number
+  /** Ref forwarded to the native input element. */
+  ref?: React.Ref<HTMLInputElement>
 }
 
 /** Formats a number for display, trimming trailing zeros after the decimal point. */
@@ -240,7 +242,7 @@ export const NumberInput: React.FC<NumberInputProps> = React.memo(
     onKeyDown: externalOnKeyDown,
     ref: externalRef,
     ...props
-  }: NumberInputProps & { ref?: React.Ref<HTMLInputElement> }) => {
+  }: NumberInputProps) => {
     const [localValue, setLocalValue] = useState(value.toString())
     const [error, setError] = useState<string | null>(null)
     const inputRef = useRef<HTMLInputElement>(null)

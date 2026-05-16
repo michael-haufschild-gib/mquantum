@@ -71,6 +71,26 @@ describe('Tooltip', () => {
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
   })
 
+  it('clears stacked hover and focus timers when trigger exits before delay', () => {
+    render(
+      <Tooltip content="Tooltip text" delay={500}>
+        <Button>Hover me</Button>
+      </Tooltip>
+    )
+
+    const trigger = screen.getByRole('button')
+    fireEvent.mouseEnter(trigger)
+    fireEvent.focus(trigger)
+    fireEvent.mouseLeave(trigger)
+    fireEvent.blur(trigger)
+
+    act(() => {
+      vi.advanceTimersByTime(500)
+    })
+
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  })
+
   it('hides tooltip when mouse leaves after showing', async () => {
     render(
       <Tooltip content="Tooltip text" delay={100}>

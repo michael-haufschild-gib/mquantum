@@ -18,6 +18,8 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
   label?: string
   /** Tooltip text shown on hover over the label. */
   tooltip?: string
+  /** Ref forwarded to the native input element. */
+  ref?: React.Ref<HTMLInputElement>
 }
 
 export const Input = ({
@@ -40,7 +42,7 @@ export const Input = ({
   'aria-describedby': ariaDescribedBy,
   'aria-invalid': ariaInvalid,
   ...props
-}: InputProps & { ref?: React.Ref<HTMLInputElement> }) => {
+}: InputProps) => {
   const inputId = useId()
   const errorId = `${inputId}-error`
   const [isFocused, setIsFocused] = useState(false)

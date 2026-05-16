@@ -20,6 +20,8 @@ export interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'ref'> {
   glow?: boolean
   /** Tooltip text shown on hover over the button. */
   tooltip?: string
+  /** Ref forwarded to the native button element. */
+  ref?: React.Ref<HTMLButtonElement>
 }
 
 const baseStyles =
@@ -57,7 +59,7 @@ export const Button: React.FC<ButtonProps> = React.memo(
     tooltip,
     ref: externalRef,
     ...props
-  }: ButtonProps & { ref?: React.Ref<HTMLButtonElement> }) => {
+  }: ButtonProps) => {
     const internalRef = useRef<HTMLButtonElement>(null)
 
     const setRef = useCallback(
