@@ -35,6 +35,7 @@ import {
   MIN_TORUS_PERIOD,
   normalizeMetricForLattice,
 } from '@/lib/physics/tdse/metrics/types'
+import { normalizeMirrorAxisForLattice } from '@/lib/physics/tdse/wormholeCoupling'
 
 import {
   clampUint32Seed,
@@ -409,12 +410,16 @@ export function createTdseUiSetters(ctx: SetterContext) {
      */
     setTdseWormholeAxis: (axis: number) => {
       if (!Number.isFinite(axis)) return
-      const raw = Number(axis)
-      const clamped = (Math.max(0, Math.min(2, Math.floor(raw))) | 0) as 0 | 1 | 2
       ctx.setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, wormholeMirrorAxis: clamped },
+          tdse: {
+            ...state.schroedinger.tdse,
+            wormholeMirrorAxis: normalizeMirrorAxisForLattice(
+              axis,
+              state.schroedinger.tdse.latticeDim
+            ),
+          },
         },
       }))
     },

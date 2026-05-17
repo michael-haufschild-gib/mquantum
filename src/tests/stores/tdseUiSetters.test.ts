@@ -223,6 +223,31 @@ describe('TDSE UI setters', () => {
     })
   })
 
+  describe('setTdseWormholeAxis', () => {
+    it('clamps axis to the active lattice dimensions', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setTdseLatticeDim(2)
+      store.setTdseWormholeAxis(2)
+      expect(getTdse().wormholeMirrorAxis).toBe(1)
+
+      store.setTdseLatticeDim(1)
+      store.setTdseWormholeAxis(2)
+      expect(getTdse().wormholeMirrorAxis).toBe(0)
+    })
+
+    it('rejects non-finite axes without dirtying state', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setTdseLatticeDim(3)
+      store.setTdseWormholeAxis(1)
+      const beforeVersion = useExtendedObjectStore.getState().schroedingerVersion
+
+      store.setTdseWormholeAxis(Number.NaN)
+
+      expect(getTdse().wormholeMirrorAxis).toBe(1)
+      expect(useExtendedObjectStore.getState().schroedingerVersion).toBe(beforeVersion)
+    })
+  })
+
   describe('setTdseMetric', () => {
     it('rejects unknown metric kinds without changing state', () => {
       useExtendedObjectStore.getState().setTdseMetric({

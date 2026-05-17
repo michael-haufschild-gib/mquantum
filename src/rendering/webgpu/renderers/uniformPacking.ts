@@ -260,7 +260,12 @@ function packHydrogenAndExtraDims(
   floatView[I.hydrogenNDBoost] = hydrogenBoost * normCompensation
 
   // hydrogenRadialThreshold — uses D-dimensional n_eff = n + (D-3)/2
-  const hydrogenFieldScale = schroedinger?.fieldScale ?? 1.0
+  const hydrogenFieldScale = finiteClamped(
+    schroedinger?.fieldScale,
+    DEFAULT_SCHROEDINGER_CONFIG.fieldScale,
+    0.5,
+    2.0
+  )
   const nEff = validN + (dimension - 3) / 2
   floatView[I.hydrogenRadialThreshold] =
     25.0 * nEff * bohrRadius * (1.0 + 0.1 * validL) * hydrogenFieldScale
@@ -360,8 +365,18 @@ function packVisualFields(
       : 1.0
 
   intView[I.phaseAnimationEnabled] = schroedinger?.phaseAnimationEnabled ? 1 : 0
-  floatView[I.timeScale] = schroedinger?.timeScale ?? 0.8
-  floatView[I.fieldScale] = schroedinger?.fieldScale ?? 1.0
+  floatView[I.timeScale] = finiteClamped(
+    schroedinger?.timeScale,
+    DEFAULT_SCHROEDINGER_CONFIG.timeScale,
+    0.1,
+    2.0
+  )
+  floatView[I.fieldScale] = finiteClamped(
+    schroedinger?.fieldScale,
+    DEFAULT_SCHROEDINGER_CONFIG.fieldScale,
+    0.5,
+    2.0
+  )
   floatView[I.densityGain] = densityGain * densityCompensation
   floatView[I.powderScale] = finiteClamped(
     schroedinger?.powderScale,

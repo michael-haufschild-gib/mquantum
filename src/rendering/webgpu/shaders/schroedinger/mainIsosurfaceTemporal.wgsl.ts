@@ -185,10 +185,11 @@ ${bayerJitterSection}
     }
     if (sliceOnlyCrossSection && crossSection.alpha > 0.0) {
       // Cross-section only: output cross-section color with world position
-      let crossHitPos = ro + rd * ((tNear + tFar) * 0.5);
+      let crossHitT = clamp(crossSection.hitT, tNear, tFar);
+      let crossHitPos = ro + rd * crossHitT;
       let crossHitPosWorld = (camera.modelMatrix * vec4f(crossHitPos, 1.0)).xyz;
       output.color = vec4f(crossSection.color, crossSection.alpha);
-      output.worldPosition = vec4f(crossHitPosWorld, (tNear + tFar) * 0.5);
+      output.worldPosition = vec4f(crossHitPosWorld, crossHitT);
       return output;
     }
     discard;
@@ -404,6 +405,7 @@ ${bayerJitterSection}
     if (schroedinger.crossSectionCompositeMode == CROSS_SECTION_COMPOSITE_SLICE_ONLY) {
       finalColor = crossSection.color;
       finalAlpha = crossSection.alpha;
+      hitT = crossSection.hitT;
     } else {
       let crossSectionAlpha = clamp(crossSection.alpha, 0.0, 1.0);
       finalColor = mix(finalColor, crossSection.color, crossSectionAlpha);
@@ -414,7 +416,8 @@ ${bayerJitterSection}
   }
 
   // Compute world-space hit position for temporal reprojection
-  let hitPosWorld = (camera.modelMatrix * vec4f(p, 1.0)).xyz;
+  let hitPosModel = ro + rd * hitT;
+  let hitPosWorld = (camera.modelMatrix * vec4f(hitPosModel, 1.0)).xyz;
 
   output.color = vec4f(finalColor, finalAlpha);
   output.worldPosition = vec4f(hitPosWorld, hitT);

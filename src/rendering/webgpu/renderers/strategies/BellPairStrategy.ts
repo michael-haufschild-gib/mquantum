@@ -17,7 +17,7 @@
  * @module rendering/webgpu/renderers/strategies/BellPairStrategy
  */
 
-import type { BellPairConfig } from '@/lib/geometry/extended/bellPair'
+import { type BellPairConfig, sanitizeBellPairConfig } from '@/lib/geometry/extended/bellPair'
 import { useBellExperimentStore } from '@/stores/diagnostics/bellExperimentStore'
 
 import type { WebGPURenderContext } from '../../core/types'
@@ -53,14 +53,13 @@ export class BellPairStrategy extends SinglePassComputeStrategy<
   }
 
   /**
-   * Bell rendering has no PML absorber and no color-algorithm-driven
-   * fieldView swap, so the effective config is identity on the input.
+   * Validate raw Bell-pair config before GPU dispatch.
    *
-   * @param config - Raw Bell config.
-   * @returns The same config object.
+   * @param config - Raw Bell-pair config.
+   * @returns Sanitized Bell-pair config from sanitizeBellPairConfig.
    */
   protected override deriveEffectiveConfig(config: BellPairConfig): BellPairConfig {
-    return config
+    return sanitizeBellPairConfig(config)
   }
 
   /**

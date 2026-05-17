@@ -23,6 +23,7 @@ import {
   type BellPairField,
   type BellSamplerMode,
   createDefaultBellPairConfig,
+  sanitizeBellPairConfig,
 } from '@/lib/geometry/extended/bellPair'
 
 import { type BellPairSlice, type ExtendedObjectSlice } from './types'
@@ -151,7 +152,7 @@ export const createBellPairSlice: StateCreator<ExtendedObjectSlice, [], [], Bell
     },
     setBellPairConfig: (config) => {
       setWithVersion((state) => ({
-        bellPair: { ...state.bellPair, ...config },
+        bellPair: sanitizeBellPairConfig({ ...state.bellPair, ...config }),
       }))
     },
     getBellPairConfig: () => get().bellPair,

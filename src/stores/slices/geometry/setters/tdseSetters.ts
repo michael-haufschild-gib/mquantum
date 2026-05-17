@@ -21,6 +21,7 @@ import {
 import { reduceGridToFit } from '@/lib/math/ndArray'
 import { clampKKState, computeEffectiveSpacing } from '@/lib/physics/compactification'
 import { type MetricConfig, normalizeMetricForLattice } from '@/lib/physics/tdse/metrics/types'
+import { normalizeMirrorAxisForLattice } from '@/lib/physics/tdse/wormholeCoupling'
 import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
 import {
@@ -109,7 +110,7 @@ export interface TdseSetters extends TdseStochasticSetters {
   // ER=EPR Double-trace Wormhole Coupling
   setTdseWormholeEnabled: (enabled: boolean) => void
   setTdseWormholeG: (g: number) => void
-  setTdseWormholeAxis: (axis: 0 | 1 | 2) => void
+  setTdseWormholeAxis: (axis: number) => void
   setTdseWormholeHudEnabled: (enabled: boolean) => void
   // Curved-space kinetic operator (Laplace–Beltrami)
   setTdseMetric: (cfg: MetricConfig) => void
@@ -189,6 +190,7 @@ export const resizeTdseArrays = (prev: TdseConfig, newDim: number): Partial<Tdse
     slitWidth,
     slitSeparation,
     packetWidth,
+    wormholeMirrorAxis: normalizeMirrorAxisForLattice(prev.wormholeMirrorAxis, newDim),
   }
 }
 

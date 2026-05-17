@@ -361,4 +361,29 @@ describe('SRMT cut-sweep determinism', () => {
     expect(csvA).toContain('# generated: 2026-04-19T10:00:00.000Z')
     expect(csvA).toContain('# git: test-sha')
   })
+
+  it('pins the canonical uint32 Lanczos seed, not the raw pre-coercion seed', () => {
+    const wdwConfig = {
+      ...DEFAULT_WHEELER_DEWITT_CONFIG,
+      boundaryCondition: WDW_INPUT.boundaryCondition,
+      inflatonMass: WDW_INPUT.inflatonMass,
+      cosmologicalConstant: WDW_INPUT.cosmologicalConstant,
+      aMin: WDW_INPUT.aMin,
+      aMax: WDW_INPUT.aMax,
+      gridNa: WDW_INPUT.gridNa,
+      gridNphi: WDW_INPUT.gridNphi,
+      phiExtent: WDW_INPUT.phiExtent,
+    }
+    const manifest = buildSrmtSweepManifest({
+      wdwConfig,
+      srmtConfig: { ...SWEEP_CFG, seed: -1 },
+      gitSha: 'test-sha',
+      wdwSolverVersion: '1.0.0',
+      srmtDiagnosticVersion: '1.0.0',
+      generatedAt: '2026-04-19T10:00:00.000Z',
+    })
+
+    const srmtLine = manifest.find((l) => l.startsWith('# srmt: ')) ?? ''
+    expect(srmtLine).toContain('seed=4294967295')
+  })
 })

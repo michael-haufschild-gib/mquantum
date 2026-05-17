@@ -112,6 +112,12 @@ describe('Open Quantum setters', () => {
       store().setOpenQuantumVisualizationMode('purityMap')
       expect(oq().visualizationMode).toBe('purityMap')
     })
+
+    it('rejects invalid visualization modes from untyped callers', () => {
+      store().setOpenQuantumVisualizationMode('entropyMap')
+      store().setOpenQuantumVisualizationMode('phase' as never)
+      expect(oq().visualizationMode).toBe('density')
+    })
   })
 
   describe('setOpenQuantumBathTemperature', () => {
@@ -146,6 +152,12 @@ describe('Open Quantum setters', () => {
   describe('setOpenQuantumDephasingModel', () => {
     it('sets dephasing model', () => {
       store().setOpenQuantumDephasingModel('uniform')
+      expect(oq().dephasingModel).toBe('uniform')
+    })
+
+    it('rejects invalid dephasing models from untyped callers', () => {
+      store().setOpenQuantumDephasingModel('none')
+      store().setOpenQuantumDephasingModel('bogus' as never)
       expect(oq().dephasingModel).toBe('uniform')
     })
   })

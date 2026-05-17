@@ -28,6 +28,7 @@
 
 import type { WheelerDeWittConfig } from '@/lib/geometry/extended/wheelerDeWitt'
 
+import { normalizeLanczosSeed } from './lanczos'
 import type { SrmtSweepConfig } from './sweepTypes'
 
 /** Inputs to {@link buildSrmtSweepManifest}. */
@@ -114,7 +115,7 @@ function formatSrmtConfig(c: SrmtSweepConfig): string {
   // callers (and any archived CSVs reproduced from them) stay byte-exact;
   // seeded runs get the explicit provenance line they need.
   if (c.seed !== undefined) {
-    fields.push(`seed=${formatInteger(c.seed)}`)
+    fields.push(`seed=${formatSeed(c.seed)}`)
   }
   return fields.join(' ')
 }
@@ -145,6 +146,11 @@ function formatNumeric(v: number): string {
 function formatInteger(v: number): string {
   if (!Number.isFinite(v)) return 'NaN'
   return String(Math.trunc(v))
+}
+
+function formatSeed(v: number): string {
+  if (!Number.isFinite(v)) return 'NaN'
+  return String(normalizeLanczosSeed(v))
 }
 
 /**

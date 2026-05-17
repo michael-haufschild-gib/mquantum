@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from 'vitest'
 
+import { DEFAULT_BELL_PAIR_CONFIG } from '@/lib/geometry/extended/bellPair'
 import { DIRAC_MAX_TOTAL_SITES } from '@/lib/geometry/extended/dirac'
 import { DEFAULT_PAULI_CONFIG, DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
 import { DEFAULT_WHEELER_DEWITT_CONFIG } from '@/lib/geometry/extended/wheelerDeWitt'
@@ -93,6 +94,41 @@ describe('mergeExtendedObjectStateForType — schroedinger', () => {
       expect(schroedinger.termCount).toBe(8)
       expect(schroedinger.maxQuantumNumber).toBe(6)
       expect(schroedinger.frequencySpread).toBe(0)
+    })
+
+    it('sanitizes loaded open-quantum config that bypasses setters', () => {
+      const savedState = {
+        schroedinger: {
+          openQuantum: {
+            enabled: true,
+            dt: Infinity,
+            substeps: NaN,
+            dephasingRate: -1,
+            relaxationRate: 99,
+            thermalUpRate: Infinity,
+            bathTemperature: 0,
+            couplingScale: NaN,
+            hydrogenBasisMaxN: 99,
+            visualizationMode: 'phase',
+            dephasingModel: 'bogus',
+          },
+        },
+      }
+
+      const merged = mergeExtendedObjectStateForType(savedState, 'schroedinger')
+      const oq = (merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG).openQuantum
+
+      expect(oq.enabled).toBe(true)
+      expect(oq.dt).toBe(0.01)
+      expect(oq.substeps).toBe(4)
+      expect(oq.dephasingRate).toBe(0)
+      expect(oq.relaxationRate).toBe(5)
+      expect(oq.thermalUpRate).toBe(0)
+      expect(oq.bathTemperature).toBe(0.1)
+      expect(oq.couplingScale).toBe(1)
+      expect(oq.hydrogenBasisMaxN).toBe(3)
+      expect(oq.visualizationMode).toBe('density')
+      expect(oq.dephasingModel).toBe('uniform')
     })
   })
 
@@ -194,7 +230,7 @@ describe('mergeExtendedObjectStateForType — schroedinger', () => {
       expect(wdw.srmtHeatmapIntensity).toBe(0)
     })
 
-    it('falls back to safe WdW domain bounds when a loaded scene has an invalid range', () => {
+    it('clamps WdW domain bounds and falls back when a loaded scene has an invalid range', () => {
       const loaded = {
         schroedinger: {
           quantumMode: 'wheelerDeWitt',
@@ -211,7 +247,27 @@ describe('mergeExtendedObjectStateForType — schroedinger', () => {
 
       expect(wdw.aMin).toBe(DEFAULT_WHEELER_DEWITT_CONFIG.aMin)
       expect(wdw.aMax).toBe(DEFAULT_WHEELER_DEWITT_CONFIG.aMax)
-      expect(wdw.phiExtent).toBe(DEFAULT_WHEELER_DEWITT_CONFIG.phiExtent)
+      expect(wdw.phiExtent).toBe(0.5)
+    })
+
+    it('clamps loaded WdW domains to solver-safe finite bounds', () => {
+      const loaded = {
+        schroedinger: {
+          quantumMode: 'wheelerDeWitt',
+          wheelerDeWitt: {
+            aMin: 1e-9,
+            aMax: 1e12,
+            phiExtent: 1e12,
+          },
+        },
+      }
+
+      const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+      const wdw = (merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG).wheelerDeWitt
+
+      expect(wdw.aMin).toBe(0.05)
+      expect(wdw.aMax).toBe(10)
+      expect(wdw.phiExtent).toBe(10)
     })
   })
 
@@ -350,6 +406,71 @@ describe('mergeExtendedObjectStateForType — cosmology invariants', () => {
     expect(preheating.amplitude).toBe(DEFAULT_SCHROEDINGER_CONFIG.freeScalar.preheating.amplitude)
     expect(preheating.frequency).toBe(DEFAULT_SCHROEDINGER_CONFIG.freeScalar.preheating.frequency)
     expect(fs.needsReset).toBe(true)
+  })
+
+  it('sanitizes loaded freeScalar scalar controls before direct restore reaches uniforms', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'freeScalarField',
+        freeScalar: {
+          latticeDim: 4,
+          gridSize: [32, 32, 32, 16],
+          spacing: [0.001, Number.NaN, Number.POSITIVE_INFINITY, 0.2],
+          mass: Number.POSITIVE_INFINITY,
+          dt: Number.POSITIVE_INFINITY,
+          stepsPerFrame: -3.5,
+          packetWidth: -4,
+          packetAmplitude: Number.NaN,
+          vacuumSeed: Number.POSITIVE_INFINITY,
+          selfInteractionLambda: Number.POSITIVE_INFINITY,
+          selfInteractionVev: -1,
+          absorberWidth: Number.POSITIVE_INFINITY,
+          pmlTargetReflection: 0,
+          diagnosticsInterval: Number.POSITIVE_INFINITY,
+          slicePositions: [Number.NaN],
+        },
+      },
+    }
+
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const fs = (merged.schroedinger as { freeScalar: Record<string, unknown> }).freeScalar
+
+    expect(fs.spacing).toEqual([0.01, 0.1, 0.1, 0.2])
+    expect(fs.mass).toBe(DEFAULT_SCHROEDINGER_CONFIG.freeScalar.mass)
+    expect(Number.isFinite(fs.dt as number)).toBe(true)
+    expect(fs.stepsPerFrame).toBe(1)
+    expect(fs.packetWidth).toBe(0.01)
+    expect(fs.packetAmplitude).toBe(DEFAULT_SCHROEDINGER_CONFIG.freeScalar.packetAmplitude)
+    expect(fs.vacuumSeed).toBe(DEFAULT_SCHROEDINGER_CONFIG.freeScalar.vacuumSeed)
+    expect(fs.selfInteractionLambda).toBe(
+      DEFAULT_SCHROEDINGER_CONFIG.freeScalar.selfInteractionLambda
+    )
+    expect(fs.selfInteractionVev).toBe(0.1)
+    expect(fs.absorberWidth).toBe(DEFAULT_SCHROEDINGER_CONFIG.freeScalar.absorberWidth)
+    expect(fs.pmlTargetReflection).toBe(1e-12)
+    expect(fs.diagnosticsInterval).toBe(DEFAULT_SCHROEDINGER_CONFIG.freeScalar.diagnosticsInterval)
+    expect(fs.slicePositions).toEqual([0])
+  })
+
+  it('sanitizes loaded shared PML controls before they override compute modes', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'tdseDynamics',
+        absorberWidth: Number.POSITIVE_INFINITY,
+        pmlTargetReflection: 0,
+        tdse: {
+          absorberEnabled: true,
+          absorberWidth: 0.2,
+          pmlTargetReflection: 1e-6,
+        },
+      },
+    }
+
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const schro = merged.schroedinger as Record<string, unknown>
+
+    expect(schro.absorberWidth).toBe(DEFAULT_SCHROEDINGER_CONFIG.absorberWidth)
+    expect(schro.pmlTargetReflection).toBe(1e-12)
   })
 
   it('soft-disables cosmology when the loaded latticeDim is out of the supported range', () => {
@@ -774,6 +895,37 @@ describe('mergeExtendedObjectStateForType — pauliSpinor', () => {
     expect(pauli.spinDownColor).toEqual(DEFAULT_PAULI_CONFIG.spinDownColor)
   })
 
+  it('sanitizes loaded Pauli potential and lattice controls', () => {
+    const merged = mergeExtendedObjectStateForType(
+      {
+        pauliSpinor: {
+          latticeDim: 5,
+          gridSize: [30, 64, Number.POSITIVE_INFINITY, 1024, 4],
+          spacing: [0.2, Number.NaN, 0.05, Number.POSITIVE_INFINITY, 0.5],
+          potentialType: 'not-a-potential',
+          harmonicOmega: Number.POSITIVE_INFINITY,
+          wellDepth: -5,
+          wellWidth: Number.NaN,
+          mass: Number.POSITIVE_INFINITY,
+          pmlTargetReflection: 0,
+        },
+      },
+      'pauliSpinor'
+    )
+    const pauli = merged.pauliSpinor as typeof DEFAULT_PAULI_CONFIG
+
+    expect(pauli.latticeDim).toBe(5)
+    expect(pauli.gridSize).toHaveLength(5)
+    expect(pauli.gridSize.every((value) => Number.isInteger(value) && value > 0)).toBe(true)
+    expect(pauli.spacing).toEqual([0.2, DEFAULT_PAULI_CONFIG.spacing[1], 0.05, 0.15, 0.5])
+    expect(pauli.potentialType).toBe(DEFAULT_PAULI_CONFIG.potentialType)
+    expect(pauli.harmonicOmega).toBe(DEFAULT_PAULI_CONFIG.harmonicOmega)
+    expect(pauli.wellDepth).toBe(0)
+    expect(pauli.wellWidth).toBe(DEFAULT_PAULI_CONFIG.wellWidth)
+    expect(pauli.mass).toBe(DEFAULT_PAULI_CONFIG.mass)
+    expect(pauli.pmlTargetReflection).toBe(1e-12)
+  })
+
   it('does not touch schroedinger config when merging pauliSpinor', () => {
     const loaded = {
       pauliSpinor: { fieldStrength: 3.0 },
@@ -783,6 +935,38 @@ describe('mergeExtendedObjectStateForType — pauliSpinor', () => {
 
     // Only pauliSpinor key should be present
     expect(Object.keys(merged)).toEqual(['pauliSpinor'])
+  })
+})
+
+describe('mergeExtendedObjectStateForType — bellPair', () => {
+  it('sanitizes invalid Bell trial-loop and Bloch fields from loaded scenes', () => {
+    const merged = mergeExtendedObjectStateForType(
+      {
+        bellPair: {
+          visibility: Number.NaN,
+          detectionEfficiency: 2,
+          aliceAxis: [Number.NaN, Number.POSITIVE_INFINITY],
+          fieldA: [Number.POSITIVE_INFINITY, 0.25, -60],
+          analysisMode: 'bogus',
+          samplerMode: 'mystery',
+          targetTrials: -10,
+          trialsPerFrame: Number.POSITIVE_INFINITY,
+          seed: Number.NaN,
+        },
+      },
+      'bellPair'
+    )
+
+    const bellPair = merged.bellPair as typeof DEFAULT_BELL_PAIR_CONFIG
+    expect(bellPair.visibility).toBe(DEFAULT_BELL_PAIR_CONFIG.visibility)
+    expect(bellPair.detectionEfficiency).toBe(1)
+    expect(bellPair.aliceAxis).toEqual(DEFAULT_BELL_PAIR_CONFIG.aliceAxis)
+    expect(bellPair.fieldA).toEqual(DEFAULT_BELL_PAIR_CONFIG.fieldA)
+    expect(bellPair.analysisMode).toBe(DEFAULT_BELL_PAIR_CONFIG.analysisMode)
+    expect(bellPair.samplerMode).toBe(DEFAULT_BELL_PAIR_CONFIG.samplerMode)
+    expect(bellPair.targetTrials).toBe(4)
+    expect(bellPair.trialsPerFrame).toBe(DEFAULT_BELL_PAIR_CONFIG.trialsPerFrame)
+    expect(bellPair.seed).toBe(DEFAULT_BELL_PAIR_CONFIG.seed)
   })
 })
 
@@ -828,6 +1012,96 @@ describe('mergeExtendedObjectStateForType — adversarial inputs', () => {
     expect(s.sampleCount).toBe(DEFAULT_SCHROEDINGER_CONFIG.sampleCount)
     expect(s.scale).toBe(DEFAULT_SCHROEDINGER_CONFIG.scale)
     expect(s.densityGain).toBe(DEFAULT_SCHROEDINGER_CONFIG.densityGain)
+  })
+
+  it('normalizes non-finite and out-of-range top-level Schroedinger numeric controls', () => {
+    const merged = mergeExtendedObjectStateForType(
+      {
+        schroedinger: {
+          timeScale: Number.NaN,
+          fieldScale: Number.POSITIVE_INFINITY,
+          densityGain: 999,
+          densityContrast: -1,
+          powderScale: Number.NEGATIVE_INFINITY,
+          sampleCount: 7.2,
+          wignerDimensionIndex: Number.NaN,
+          wignerXRange: Number.POSITIVE_INFINITY,
+          wignerPRange: 0,
+          wignerQuadPoints: 200,
+          wignerCacheResolution: 2000,
+          spectralDimensionFlowStrength: Number.POSITIVE_INFINITY,
+          spectralDimensionFlowUvDimension: 9,
+          spectralDimensionFlowDiffusionScale: Number.NaN,
+        },
+      },
+      'schroedinger'
+    )
+    const s = merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
+
+    expect(s.timeScale).toBe(DEFAULT_SCHROEDINGER_CONFIG.timeScale)
+    expect(s.fieldScale).toBe(DEFAULT_SCHROEDINGER_CONFIG.fieldScale)
+    expect(s.densityGain).toBe(5)
+    expect(s.densityContrast).toBe(1)
+    expect(s.powderScale).toBe(DEFAULT_SCHROEDINGER_CONFIG.powderScale)
+    expect(s.sampleCount).toBe(16)
+    expect(s.wignerDimensionIndex).toBe(DEFAULT_SCHROEDINGER_CONFIG.wignerDimensionIndex)
+    expect(s.wignerXRange).toBe(DEFAULT_SCHROEDINGER_CONFIG.wignerXRange)
+    expect(s.wignerPRange).toBe(1)
+    expect(s.wignerQuadPoints).toBe(96)
+    expect(s.wignerCacheResolution).toBe(1024)
+    expect(s.spectralDimensionFlowStrength).toBe(
+      DEFAULT_SCHROEDINGER_CONFIG.spectralDimensionFlowStrength
+    )
+    expect(s.spectralDimensionFlowUvDimension).toBe(3.5)
+    expect(s.spectralDimensionFlowDiffusionScale).toBe(
+      DEFAULT_SCHROEDINGER_CONFIG.spectralDimensionFlowDiffusionScale
+    )
+  })
+
+  it('normalizes loaded anti-de Sitter controls before they reach HKLL UI and packers', () => {
+    const merged = mergeExtendedObjectStateForType(
+      {
+        schroedinger: {
+          antiDeSitter: {
+            d: 99,
+            n: -4,
+            l: 99,
+            m: 99,
+            mL: -99,
+            branch: 'bad-branch',
+            boundaryOverlay: 'yes',
+            preset: 'bad-preset',
+            btzEnabled: true,
+            btzHorizonRadius: 99,
+            btzOmega: -10,
+            btzAngularM: 99,
+            hkllEnabled: true,
+            hkllBoundarySource: 'bad-source',
+            hkllSourceSigma: 99,
+            hkllPlaneWaveM: 99,
+          },
+        },
+      },
+      'schroedinger'
+    )
+    const ads = (merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG).antiDeSitter
+
+    expect(ads.d).toBe(7)
+    expect(ads.n).toBe(0)
+    expect(ads.l).toBe(3)
+    expect(ads.m).toBe(3)
+    expect(ads.mL).toBe(-3)
+    expect(ads.branch).toBe(DEFAULT_SCHROEDINGER_CONFIG.antiDeSitter.branch)
+    expect(ads.boundaryOverlay).toBe(DEFAULT_SCHROEDINGER_CONFIG.antiDeSitter.boundaryOverlay)
+    expect(ads.preset).toBe(DEFAULT_SCHROEDINGER_CONFIG.antiDeSitter.preset)
+    expect(ads.btzEnabled).toBe(false)
+    expect(ads.btzHorizonRadius).toBe(2)
+    expect(ads.btzOmega).toBe(0.1)
+    expect(ads.btzAngularM).toBe(5)
+    expect(ads.hkllEnabled).toBe(true)
+    expect(ads.hkllBoundarySource).toBe(DEFAULT_SCHROEDINGER_CONFIG.antiDeSitter.hkllBoundarySource)
+    expect(ads.hkllSourceSigma).toBe(1.5)
+    expect(ads.hkllPlaneWaveM).toBe(8)
   })
 
   it('returns mutation-isolated default sub-configs for sparse schroedinger scenes', () => {

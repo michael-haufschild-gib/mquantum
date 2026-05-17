@@ -62,7 +62,9 @@ export const KB_ATOMIC = 3.1668115634556e-6
  * @returns Spontaneous emission rate in atomic time units
  */
 export function einsteinA(omega: number, dipoleSq: number): number {
-  if (omega <= 0 || dipoleSq <= 0) return 0
+  if (!Number.isFinite(omega) || !Number.isFinite(dipoleSq) || omega <= 0 || dipoleSq <= 0) {
+    return 0
+  }
   return (4 * ALPHA * ALPHA * ALPHA * omega * omega * omega * dipoleSq) / 3
 }
 
@@ -76,7 +78,9 @@ export function einsteinA(omega: number, dipoleSq: number): number {
  * @returns Mean photon number
  */
 export function thermalOccupation(omega: number, temperature: number): number {
-  if (temperature <= 0 || omega <= 0) return 0
+  if (!Number.isFinite(temperature) || !Number.isFinite(omega) || temperature <= 0 || omega <= 0) {
+    return 0
+  }
   const x = omega / (KB_ATOMIC * temperature)
   if (x > 500) return 0 // negligible thermal population
   return 1 / (Math.exp(x) - 1)
@@ -107,6 +111,10 @@ export function buildTransitionRates(
 ): TransitionRate[] {
   const rates: TransitionRate[] = []
   const K = basis.length
+  const safeTemperature = Number.isFinite(temperature) && temperature > 0 ? temperature : 0
+  const safeCouplingScale =
+    Number.isFinite(couplingScale) && couplingScale >= 0 ? couplingScale : 1.0
+  const safeDimension = Number.isInteger(dimension) && dimension > 0 ? Math.floor(dimension) : 3
 
   for (let i = 0; i < K; i++) {
     for (let j = i + 1; j < K; j++) {
@@ -120,16 +128,16 @@ export function buildTransitionRates(
       const omega = Math.abs(stateJ.energy - stateI.energy)
       if (omega < 1e-15) continue // degenerate — no transition
 
-      const dipoleSq = dipoleMatrixElementSquared(stateI, stateJ, dimension)
-      if (dipoleSq < 1e-30) continue
+      const dipoleSq = dipoleMatrixElementSquared(stateI, stateJ, safeDimension)
+      if (!Number.isFinite(dipoleSq) || dipoleSq < 1e-30) continue
 
       const A = einsteinA(omega, dipoleSq)
-      const nBar = thermalOccupation(omega, temperature)
+      const nBar = thermalOccupation(omega, safeTemperature)
 
       // Higher-energy state is stateJ (larger index in energy-sorted basis)
       // γ_down: j → i (emission), γ_up: i → j (absorption)
-      const gammaDown = couplingScale * A * (1 + nBar)
-      const gammaUp = couplingScale * A * nBar
+      const gammaDown = safeCouplingScale * A * (1 + nBar)
+      const gammaUp = safeCouplingScale * A * nBar
 
       rates.push({
         from: j, // higher energy

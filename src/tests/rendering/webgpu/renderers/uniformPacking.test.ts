@@ -413,6 +413,8 @@ describe('packSchroedingerUniforms — hydrogen modes', () => {
       ...baseParams,
       schroedinger: {
         representation: 'wigner',
+        timeScale: Number.NaN,
+        fieldScale: Number.POSITIVE_INFINITY,
         wignerAutoRange: false,
         wignerDimensionIndex: Number.NaN,
         wignerXRange: Number.NaN,
@@ -422,6 +424,8 @@ describe('packSchroedingerUniforms — hydrogen modes', () => {
     })
 
     expect(intView[I.wignerDimensionIndex]).toBe(0)
+    expect(floatView[I.timeScale]).toBeCloseTo(0.8)
+    expect(floatView[I.fieldScale]).toBe(1)
     expect(floatView[I.wignerXRange]).toBe(6)
     expect(floatView[I.wignerPRange]).toBe(6)
     expect(intView[I.wignerQuadPoints]).toBe(32)

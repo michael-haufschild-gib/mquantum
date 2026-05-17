@@ -15,10 +15,21 @@ describe('resolveCanvasPixelSize', () => {
       height: 12,
     })
   })
+
+  it('caps scaled CSS dimensions to the device texture limit', () => {
+    expect(resolveCanvasPixelSize(10_000, 8_000, 2, 4096)).toEqual({
+      width: 4096,
+      height: 4096,
+    })
+  })
 })
 
 describe('sanitizePixelSize', () => {
   it('sanitizes direct render-graph dimensions', () => {
     expect(sanitizePixelSize(640.9, Number.NEGATIVE_INFINITY)).toEqual({ width: 640, height: 1 })
+  })
+
+  it('caps direct render-graph dimensions to the provided maximum extent', () => {
+    expect(sanitizePixelSize(9000, 512, 8192)).toEqual({ width: 8192, height: 512 })
   })
 })

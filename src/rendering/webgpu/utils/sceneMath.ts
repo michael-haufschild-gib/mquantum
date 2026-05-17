@@ -10,18 +10,24 @@
 import { writeInvertMat4, writeMultiplyMat4 } from './mat4'
 
 /** Sanitizes one pixel extent for GPU texture/canvas use. */
-export function sanitizePixelExtent(value: number): number {
-  return Number.isFinite(value) && value > 0 ? Math.max(1, Math.floor(value)) : 1
+export function sanitizePixelExtent(value: number, maxExtent?: number): number {
+  const resolvedMax =
+    maxExtent !== undefined && Number.isFinite(maxExtent) && maxExtent > 0
+      ? Math.max(1, Math.floor(maxExtent))
+      : Number.MAX_SAFE_INTEGER
+  const safe = Number.isFinite(value) && value > 0 ? Math.max(1, Math.floor(value)) : 1
+  return Math.min(safe, resolvedMax)
 }
 
 /** Sanitizes a width/height pair for GPU texture/canvas use. */
 export function sanitizePixelSize(
   width: number,
-  height: number
+  height: number,
+  maxExtent?: number
 ): { width: number; height: number } {
   return {
-    width: sanitizePixelExtent(width),
-    height: sanitizePixelExtent(height),
+    width: sanitizePixelExtent(width, maxExtent),
+    height: sanitizePixelExtent(height, maxExtent),
   }
 }
 
@@ -29,9 +35,10 @@ export function sanitizePixelSize(
 export function resolveCanvasPixelSize(
   cssWidth: number,
   cssHeight: number,
-  devicePixelRatio: number
+  devicePixelRatio: number,
+  maxExtent?: number
 ): { width: number; height: number } {
-  return sanitizePixelSize(cssWidth * devicePixelRatio, cssHeight * devicePixelRatio)
+  return sanitizePixelSize(cssWidth * devicePixelRatio, cssHeight * devicePixelRatio, maxExtent)
 }
 
 /**

@@ -16,19 +16,36 @@ import {
 } from './cliffordAlgebraFallback'
 import type { DiracAlgebraRequest, DiracAlgebraResponse } from './diracAlgebraWorker'
 
+interface PendingDiracAlgebraRequest {
+  spatialDim: number
+  resolve: (r: { gammaData: Float32Array; spinorSize: number }) => void
+  reject: (e: Error) => void
+}
+
 /** Main-thread bridge to the Dirac algebra web worker for gamma matrix generation. */
 export class DiracAlgebraBridge {
   private worker: Worker | null = null
   private epoch = 0
-  private pending: Map<
-    number,
-    {
-      spatialDim: number
-      resolve: (r: { gammaData: Float32Array; spinorSize: number }) => void
-      reject: (e: Error) => void
-    }
-  > = new Map()
+  private pending = new Map<number, PendingDiracAlgebraRequest>()
   private workerFailed = false
+
+  private resolveWithFallback(p: PendingDiracAlgebraRequest): void {
+    try {
+      p.resolve(generateDiracMatricesFallback(p.spatialDim))
+    } catch (err) {
+      p.reject(err instanceof Error ? err : new Error(String(err)))
+    }
+  }
+
+  private failWorkerAndResolvePendingWithFallback(): void {
+    this.worker?.terminate()
+    this.worker = null
+    this.workerFailed = true
+
+    const pending = Array.from(this.pending.values())
+    this.pending.clear()
+    for (const p of pending) this.resolveWithFallback(p)
+  }
 
   private ensureWorker(): Worker | null {
     if (this.workerFailed) return null
@@ -42,13 +59,12 @@ export class DiracAlgebraBridge {
         const { epoch } = e.data
         const p = this.pending.get(epoch)
         if (!p) return
-        this.pending.delete(epoch)
         if (e.data.type === 'error') {
-          p.reject(new Error(`Dirac algebra worker compute failed: ${e.data.message}`))
+          this.failWorkerAndResolvePendingWithFallback()
           return
         }
         if (e.data.type !== 'result') {
-          p.reject(new Error('Dirac algebra worker returned an invalid message type'))
+          this.failWorkerAndResolvePendingWithFallback()
           return
         }
         const validationError = validateGammaPayload(
@@ -57,19 +73,14 @@ export class DiracAlgebraBridge {
           e.data.spinorSize
         )
         if (validationError) {
-          p.reject(validationError)
+          this.failWorkerAndResolvePendingWithFallback()
           return
         }
+        this.pending.delete(epoch)
         p.resolve({ gammaData: e.data.gammaData, spinorSize: e.data.spinorSize })
       }
-      this.worker.onerror = (e) => {
-        for (const [, p] of this.pending) {
-          p.reject(new Error(`Dirac algebra worker error: ${e.message}`))
-        }
-        this.pending.clear()
-        this.worker?.terminate()
-        this.worker = null
-        this.workerFailed = true
+      this.worker.onerror = () => {
+        this.failWorkerAndResolvePendingWithFallback()
       }
       return this.worker
     } catch {
@@ -90,6 +101,7 @@ export class DiracAlgebraBridge {
     gammaData: Float32Array
     spinorSize: number
   }> {
+    computeSpinorSize(spatialDim)
     const worker = this.ensureWorker()
 
     if (!worker) {
@@ -105,7 +117,11 @@ export class DiracAlgebraBridge {
         epoch,
         spatialDim,
       }
-      worker.postMessage(msg)
+      try {
+        worker.postMessage(msg)
+      } catch {
+        this.failWorkerAndResolvePendingWithFallback()
+      }
     })
   }
 

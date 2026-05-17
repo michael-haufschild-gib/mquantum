@@ -79,12 +79,12 @@ export function serializeCosmology(
     setFloatParam(params, 'cos_h', state.cosmologyHubble, true)
   } else if (state.cosmologyPreset === 'lqcBounce') {
     setFloatParam(params, 'cos_rhoc', state.cosmologyLqcRhoCritical, true, 4)
-    setFloatParam(params, 'cos_w', state.cosmologyLqcEquationOfState, true, 4)
+    setFloatParam(params, 'cos_w', state.cosmologyLqcEquationOfState, false, 4)
     setFloatParam(params, 'cos_rhostart', state.cosmologyLqcInitialRhoRatio, true, 4)
   } else if (state.cosmologyPreset === 'bianchiKasner') {
-    setFloatParam(params, 'cos_p1', state.cosmologyKasnerP1, true, 4)
-    setFloatParam(params, 'cos_p2', state.cosmologyKasnerP2, true, 4)
-    setFloatParam(params, 'cos_p3', state.cosmologyKasnerP3, true, 4)
+    setFloatParam(params, 'cos_p1', state.cosmologyKasnerP1, false, 4)
+    setFloatParam(params, 'cos_p2', state.cosmologyKasnerP2, false, 4)
+    setFloatParam(params, 'cos_p3', state.cosmologyKasnerP3, false, 4)
   }
   setFloatParam(params, 'cos_eta0', state.cosmologyEta0, true)
 }
@@ -95,22 +95,22 @@ export function serializeCosmology(
  * invalid. Extracted to keep `deserializeCosmologyParams` under the
  * cognitive-complexity budget.
  */
+interface ResolvedCosmologyPresetParams {
+  steepness?: number
+  hubble?: number
+  lqcRhoCritical?: number
+  lqcEquationOfState?: number
+  lqcInitialRhoRatio?: number
+  kasnerP1?: number
+  kasnerP2?: number
+  kasnerP3?: number
+}
+
 function resolveCosmologyPresetParams(
   params: URLSearchParams,
   preset: CosmologyPreset,
   spacetimeDim: number
-):
-  | {
-      steepness?: number
-      hubble?: number
-      lqcRhoCritical?: number
-      lqcEquationOfState?: number
-      lqcInitialRhoRatio?: number
-      kasnerP1?: number
-      kasnerP2?: number
-      kasnerP3?: number
-    }
-  | undefined {
+): ResolvedCosmologyPresetParams | undefined {
   if (preset === 'ekpyrotic') {
     const raw = parseFloatParam(params, 'cos_s', 0, 100)
     if (raw === undefined) return undefined
@@ -150,6 +150,23 @@ function resolveCosmologyPresetParams(
   return {}
 }
 
+function isValidResolvedCosmologyParams(
+  preset: CosmologyPreset,
+  spacetimeDim: number,
+  presetParams: ResolvedCosmologyPresetParams
+): boolean {
+  if (preset !== 'bianchiKasner') {
+    return isValidPreset({ preset, spacetimeDim, ...presetParams })
+  }
+  const { kasnerP1, kasnerP2, kasnerP3 } = presetParams
+  if (kasnerP1 === undefined || kasnerP2 === undefined || kasnerP3 === undefined) return false
+  return isValidPreset({
+    preset,
+    spacetimeDim,
+    kasnerExponents: { p1: kasnerP1, p2: kasnerP2, p3: kasnerP3 },
+  })
+}
+
 /**
  * Parse cosmological-background URL params into state, validating the
  * preset/steepness combination so invalid states never reach the store.
@@ -183,7 +200,7 @@ export function deserializeCosmology(
   const eta0 = parseFloatParam(params, 'cos_eta0', -10000, 10000)
   if (eta0 === undefined || eta0 === 0) return
 
-  if (!isValidPreset({ preset, spacetimeDim, ...presetParams })) return
+  if (!isValidResolvedCosmologyParams(preset, spacetimeDim, presetParams)) return
 
   state.cosmologyEnabled = true
   state.cosmologyPreset = preset

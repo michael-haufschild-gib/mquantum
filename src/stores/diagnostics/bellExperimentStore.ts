@@ -22,7 +22,7 @@
 
 import { create } from 'zustand'
 
-import type { BellPairConfig } from '@/lib/geometry/extended/bellPair'
+import { type BellPairConfig, sanitizeBellPairConfig } from '@/lib/geometry/extended/bellPair'
 import { CANONICAL_CHSH_PHI } from '@/lib/physics/bell/analytic'
 import { sampleJointOutcome } from '@/lib/physics/bell/bornSample'
 import { Z_95 } from '@/lib/physics/bell/chsh'
@@ -295,6 +295,11 @@ function precessionTime(config: BellPairConfig, totalTrials: number): number {
   return totalTrials / trialsPerFrame
 }
 
+function normalizeBatchCount(count: number): number {
+  if (!Number.isFinite(count) || count <= 0) return 0
+  return Math.floor(count)
+}
+
 function newHistoryF64(): Float64Array {
   const buf = new Float64Array(HISTORY_LENGTH)
   buf.fill(Number.NaN)
@@ -460,7 +465,12 @@ export const useBellExperimentStore = create<BellExperimentState>((set, get) => 
     },
 
     processTrialBatch: (config, count) => {
-      if (count <= 0) return
+      const trialCount = normalizeBatchCount(count)
+      if (trialCount <= 0) return
+      const safeConfig = sanitizeBellPairConfig(config)
+      if (Number.isFinite(config.trialsPerFrame) && config.trialsPerFrame > 0) {
+        safeConfig.trialsPerFrame = config.trialsPerFrame
+      }
 
       // Config-version gating: trials drawn at a previous (axes, v, η)
       // setting are not commensurable with trials drawn at the current
@@ -470,24 +480,24 @@ export const useBellExperimentStore = create<BellExperimentState>((set, get) => 
       // config-key changes, but ONLY when there are already trials to
       // discard (so an explicit `reset(seedOverride)` followed by a
       // first batch keeps the override seed in force).
-      const fieldA = fieldVec(config.fieldA)
-      const fieldB = fieldVec(config.fieldB)
-      const configKey = `${config.aliceAxis[0]}:${config.aliceAxis[1]}:${config.aliceAxisPrime[0]}:${config.aliceAxisPrime[1]}:${config.bobAxis[0]}:${config.bobAxis[1]}:${config.bobAxisPrime[0]}:${config.bobAxisPrime[1]}:${config.visibility}:${config.detectionEfficiency}:${config.analysisMode}:${fieldA[0]}:${fieldA[1]}:${fieldA[2]}:${fieldB[0]}:${fieldB[1]}:${fieldB[2]}:${config.samplerMode}:${config.lhvStrategyId}`
+      const fieldA = fieldVec(safeConfig.fieldA)
+      const fieldB = fieldVec(safeConfig.fieldB)
+      const configKey = `${safeConfig.aliceAxis[0]}:${safeConfig.aliceAxis[1]}:${safeConfig.aliceAxisPrime[0]}:${safeConfig.aliceAxisPrime[1]}:${safeConfig.bobAxis[0]}:${safeConfig.bobAxis[1]}:${safeConfig.bobAxisPrime[0]}:${safeConfig.bobAxisPrime[1]}:${safeConfig.visibility}:${safeConfig.detectionEfficiency}:${safeConfig.analysisMode}:${fieldA[0]}:${fieldA[1]}:${fieldA[2]}:${fieldB[0]}:${fieldB[1]}:${fieldB[2]}:${safeConfig.samplerMode}:${safeConfig.lhvStrategyId}`
       const priorState = get()
       if (priorState.totalTrials > 0 && _lastConfigKey !== '' && _lastConfigKey !== configKey) {
         const fresh = initialState()
         resetAccumulators()
         _rng = null
         _rngSeed = -1
-        getRng(config.seed >>> 0)
-        set({ ...fresh, seed: config.seed >>> 0 })
+        getRng(safeConfig.seed >>> 0)
+        set({ ...fresh, seed: safeConfig.seed >>> 0 })
       }
       _lastConfigKey = configKey
 
       const rng = getRng(get().seed)
       const state = get()
-      const setup = prepareBatchSampling(config, precessionTime(config, state.totalTrials))
-      const ring = drainTrialBatchInto(rng, setup, count, state.recentOutcomes, {
+      const setup = prepareBatchSampling(safeConfig, precessionTime(safeConfig, state.totalTrials))
+      const ring = drainTrialBatchInto(rng, setup, trialCount, state.recentOutcomes, {
         recentHead: state.recentHead,
         recentCount: state.recentCount,
       })
@@ -499,7 +509,7 @@ export const useBellExperimentStore = create<BellExperimentState>((set, get) => 
         state.qmHasViolated || (Number.isFinite(qmSnapshot.S) && Math.abs(qmSnapshot.S) > 2)
 
       // Push S(N) sample into the history ring.
-      const newTotal = state.totalTrials + count
+      const newTotal = state.totalTrials + trialCount
       const head = state.historyHead
       state.historyQmS[head] = Number.isFinite(qmSnapshot.S) ? Math.abs(qmSnapshot.S) : Number.NaN
       state.historyLhvS[head] = Number.isFinite(lhvSnapshot.S)

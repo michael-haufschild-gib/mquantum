@@ -106,6 +106,22 @@ describe('buildHydrogenChannels', () => {
     expect(diagonalChannels.length).toBe(0)
   })
 
+  it('skips non-finite transition and dephasing rates', () => {
+    const basis = buildHydrogenBasis(2, 3)
+    const channels = buildHydrogenChannels(
+      basis,
+      [
+        { from: 1, to: 0, gammaDown: Infinity, gammaUp: NaN, omega: 1, dipoleSq: 1 },
+        { from: 2, to: 0, gammaDown: 0.25, gammaUp: 0, omega: 1, dipoleSq: 1 },
+      ],
+      Infinity,
+      true
+    )
+
+    expect(channels).toHaveLength(1)
+    expect(channels[0]).toMatchObject({ row: 0, col: 2, amplitudeRe: 0.5, amplitudeIm: 0 })
+  })
+
   it('all channel amplitudes are real and non-negative', () => {
     // Bug caught: amplitudeIm set to non-zero, or amplitudeRe is negative
     // (should be sqrt of a non-negative rate).

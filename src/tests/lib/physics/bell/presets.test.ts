@@ -46,10 +46,11 @@ describe('BELL_SCENARIO_PRESETS', () => {
     expect(eta - EBERHARD_THRESHOLD).toBeLessThan(0.05)
   })
 
-  it('detectionLoopholeExploit selects an LHV sampler with a registered strategy id', () => {
+  it('detectionLoopholeExploit selects the fair-sampling LHV loophole path', () => {
     const preset = byId.get('detectionLoopholeExploit')!
     expect(preset.overrides.samplerMode).toBe('lhv')
-    expect(preset.overrides.analysisMode).toBe('assignNonDetection')
+    expect(preset.overrides.analysisMode).toBe('fairSampling')
+    expect(preset.overrides.detectionEfficiency).toBeLessThan(EBERHARD_THRESHOLD)
     const ids = LHV_STRATEGIES.map((s) => s.id)
     expect(ids).toContain(preset.overrides.lhvStrategyId)
   })

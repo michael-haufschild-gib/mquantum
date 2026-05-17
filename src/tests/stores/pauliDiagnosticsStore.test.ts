@@ -98,6 +98,46 @@ describe('pauliDiagnosticsStore', () => {
     expect(after).toEqual([1.5, -0.3, 2.1])
   })
 
+  it('ignores non-finite readbacks instead of poisoning current state and history', () => {
+    useDiagnosticsStore.getState().updatePauli({
+      totalNorm: 0.9,
+      normDrift: 0.1,
+      maxDensity: 2,
+      spinUpFraction: 0.6,
+      spinDownFraction: 0.4,
+      spinExpectationZ: 0.2,
+      coherenceMagnitude: 0.5,
+      meanPosition: [1, 2, 3],
+      larmorFrequency: 7,
+    })
+
+    useDiagnosticsStore.getState().updatePauli({
+      totalNorm: Number.NaN,
+      normDrift: Number.NaN,
+      maxDensity: Number.POSITIVE_INFINITY,
+      spinUpFraction: Number.NaN,
+      spinDownFraction: Number.NEGATIVE_INFINITY,
+      spinExpectationZ: Number.NaN,
+      coherenceMagnitude: Number.NaN,
+      meanPosition: [1, Number.NaN, 3],
+      larmorFrequency: Number.POSITIVE_INFINITY,
+    })
+
+    const state = useDiagnosticsStore.getState().pauli
+    expect(state.totalNorm).toBe(0.9)
+    expect(state.normDrift).toBe(0.1)
+    expect(state.maxDensity).toBe(2)
+    expect(state.spinUpFraction).toBe(0.6)
+    expect(state.spinDownFraction).toBe(0.4)
+    expect(state.spinExpectationZ).toBe(0.2)
+    expect(state.coherenceMagnitude).toBe(0.5)
+    expect(state.meanPosition).toEqual([1, 2, 3])
+    expect(state.larmorFrequency).toBe(7)
+    expect(state.historyNorm[1]).toBeCloseTo(0.9)
+    expect(state.historySpinUpFrac[1]).toBeCloseTo(0.6)
+    expect(state.historySpinExpZ[1]).toBeCloseTo(0.2)
+  })
+
   it('reset restores meanPosition and spin fields', () => {
     useDiagnosticsStore.getState().updatePauli({
       totalNorm: 0.9,

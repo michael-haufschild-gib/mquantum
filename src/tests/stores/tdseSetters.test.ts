@@ -44,6 +44,19 @@ describe('TDSE dynamics setters', () => {
     expect(getTdse().potentialType).toBe('barrier')
   })
 
+  it('clamps wormhole mirror axis when latticeDim shrinks', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setTdseLatticeDim(3)
+    s.setTdseWormholeAxis(2)
+    expect(getTdse().wormholeMirrorAxis).toBe(2)
+
+    s.setTdseLatticeDim(2)
+    expect(getTdse().wormholeMirrorAxis).toBe(1)
+
+    s.setTdseLatticeDim(1)
+    expect(getTdse().wormholeMirrorAxis).toBe(0)
+  })
+
   it('sets potential type', () => {
     const s = useExtendedObjectStore.getState()
     s.setTdsePotentialType('barrier')

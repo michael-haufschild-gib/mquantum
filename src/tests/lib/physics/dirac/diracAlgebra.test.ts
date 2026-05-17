@@ -268,7 +268,7 @@ describe('DiracAlgebraBridge.dispose', () => {
 // ── DiracAlgebraBridge — worker error path ────────────────────────────────────
 
 describe('DiracAlgebraBridge — worker error path', () => {
-  it('rejects pending promises when worker fires onerror', async () => {
+  it('resolves pending promises via JS fallback when worker fires onerror', async () => {
     const [handle, restore] = installMockWorker()
     const bridge = new DiracAlgebraBridge()
     const pendingPromise = bridge.generateMatrices(3)
@@ -276,22 +276,42 @@ describe('DiracAlgebraBridge — worker error path', () => {
     // Simulate a worker crash
     handle.triggerError('WASM failed to load')
 
-    await expect(pendingPromise).rejects.toThrow('Dirac algebra worker error: WASM failed to load')
+    const { gammaData, spinorSize: s } = await pendingPromise
+    const { gammaData: refData, spinorSize: refS } = generateDiracMatricesFallback(3)
+    expect(s).toBe(refS)
+    expect(gammaData.length).toBe(refData.length)
     restore()
     bridge.dispose()
   })
 
-  it('falls back to JS for subsequent calls after worker error', async () => {
+  it('falls back to JS for in-flight and subsequent calls after worker error', async () => {
     const [handle, restore] = installMockWorker()
     const bridge = new DiracAlgebraBridge()
-    const failingPromise = bridge.generateMatrices(3)
+    const fallbackPromise = bridge.generateMatrices(3)
     handle.triggerError('crash')
-    await expect(failingPromise).rejects.toThrow()
+    await expect(fallbackPromise).resolves.toMatchObject({ spinorSize: 4 })
 
     // After worker error, workerFailed=true — next call uses JS fallback
     const { spinorSize: s } = await bridge.generateMatrices(3)
     expect(s).toBe(4) // correct fallback result for 3D
     // postMessage was only called once (for the failed request)
+    expect(handle.postMessage).toHaveBeenCalledOnce()
+
+    restore()
+    bridge.dispose()
+  })
+
+  it('falls back to JS when postMessage throws instead of leaving a pending request', async () => {
+    const [handle, restore] = installMockWorker()
+    handle.postMessage.mockImplementation(() => {
+      throw new Error('worker port closed')
+    })
+    const bridge = new DiracAlgebraBridge()
+
+    await expect(bridge.generateMatrices(3)).resolves.toMatchObject({ spinorSize: 4 })
+    expect(handle.terminate).toHaveBeenCalledOnce()
+
+    await expect(bridge.generateMatrices(3)).resolves.toMatchObject({ spinorSize: 4 })
     expect(handle.postMessage).toHaveBeenCalledOnce()
 
     restore()
@@ -387,7 +407,7 @@ describe('DiracAlgebraBridge — worker success path (mock)', () => {
     bridge.dispose()
   })
 
-  it('rejects malformed worker result shape before GPU upload can see it', async () => {
+  it('falls back to JS for malformed worker result before GPU upload can see it', async () => {
     const [handle, restore] = installMockWorker()
     const bridge = new DiracAlgebraBridge()
     const p = bridge.generateMatrices(3)
@@ -399,7 +419,13 @@ describe('DiracAlgebraBridge — worker success path (mock)', () => {
       spinorSize: 8,
     })
 
-    await expect(p).rejects.toThrow(/invalid gamma matrix payload/i)
+    const result = await p
+    expect(result.spinorSize).toBe(4)
+    expect(result.gammaData.length).toBe(generateDiracMatricesFallback(3).gammaData.length)
+    expect(handle.terminate).toHaveBeenCalledOnce()
+
+    await expect(bridge.generateMatrices(3)).resolves.toMatchObject({ spinorSize: 4 })
+    expect(handle.postMessage).toHaveBeenCalledOnce()
 
     restore()
     bridge.dispose()

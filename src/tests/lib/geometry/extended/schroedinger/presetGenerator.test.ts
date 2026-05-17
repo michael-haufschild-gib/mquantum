@@ -12,7 +12,7 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 
-import { generateQuantumPreset } from '@/lib/geometry/extended/schroedinger/presets'
+import { generateQuantumPreset, getNamedPreset } from '@/lib/geometry/extended/schroedinger/presets'
 
 describe('generateQuantumPreset', () => {
   describe('coefficient normalization', () => {
@@ -286,6 +286,51 @@ describe('generateQuantumPreset', () => {
         ),
         { numRuns: 200 }
       )
+    })
+  })
+
+  describe('named preset semantic states', () => {
+    it('materializes advertised harmonic-oscillator basis states', () => {
+      const expectedStates = [
+        ['groundState', [[0, 0, 0]]],
+        ['firstExcited', [[0, 0, 1]]],
+        [
+          'groundExcitedBeat',
+          [
+            [0, 0, 0],
+            [0, 3, 0],
+          ],
+        ],
+        ['nodalStructure', [[6, 2, 2]]],
+      ] as const
+
+      for (const [name, expected] of expectedStates) {
+        const preset = getNamedPreset(name, 3)
+        if (!preset) throw new Error(`Named preset '${name}' was not found`)
+        expect(preset.quantumNumbers).toEqual(expected)
+        expect(preset.termCount).toBe(expected.length)
+      }
+    })
+
+    it('makes the isotropic preset exactly degenerate', () => {
+      const preset = getNamedPreset('isotropic', 3)
+      if (!preset) throw new Error('Named preset isotropic was not found')
+
+      expect(preset.quantumNumbers).toEqual([
+        [2, 0, 0],
+        [0, 2, 0],
+        [0, 0, 2],
+      ])
+      expect(preset.energies[0]!).toBeCloseTo(preset.energies[1]!, 8)
+      expect(preset.energies[1]!).toBeCloseTo(preset.energies[2]!, 8)
+    })
+
+    it('pads exact named states with valid ground modes in higher dimensions', () => {
+      const preset = getNamedPreset('nodalStructure', 6)
+      if (!preset) throw new Error('Named preset nodalStructure was not found')
+
+      expect(preset.quantumNumbers).toEqual([[6, 2, 2, 0, 0, 0]])
+      expect(preset.quantumNumbers[0]!.slice(3).every((n) => n === 0 && n % 2 === 0)).toBe(true)
     })
   })
 })

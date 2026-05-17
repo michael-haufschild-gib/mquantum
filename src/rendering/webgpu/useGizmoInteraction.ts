@@ -21,9 +21,10 @@ import { useLightingStore } from '@/stores/scene/lightingStore'
 import type { WebGPUCamera } from './core/WebGPUCamera'
 import {
   computeMouseRay,
+  computeRotateDragRotation,
+  computeTranslateDragPosition,
   type GizmoDragState,
   gizmoScale,
-  rayAxisClosest,
   rayPlaneIntersect,
   testGizmoHit,
   testGroundTargetHit,
@@ -460,16 +461,6 @@ interface LightingActions {
   updateLight: (id: string, update: Record<string, unknown>) => void
 }
 
-/** Axis index lookup for translate/rotate drag kinds. */
-const DRAG_AXIS_INDEX: Record<string, number> = {
-  'translate-x': 0,
-  'translate-y': 1,
-  'translate-z': 2,
-  'rotate-x': 0,
-  'rotate-y': 1,
-  'rotate-z': 2,
-}
-
 /**
  * Apply a single frame of gizmo drag to the lighting store.
  *
@@ -491,44 +482,15 @@ function applyTranslateDrag(
   ray: GizmoDragRay,
   lighting: LightingActions
 ): void {
-  const axisIdx = DRAG_AXIS_INDEX[drag.kind]!
-  const axisDir: [number, number, number] = [0, 0, 0]
-  axisDir[axisIdx] = 1
-
-  const [currentT] = rayAxisClosest(ray.origin, ray.dir, drag.startLightPos, axisDir)
-  const delta = currentT - drag.startAxisT
-
-  const newPos: [number, number, number] = [...drag.startLightPos]
-  newPos[axisIdx as 0 | 1 | 2] += delta
+  const newPos = computeTranslateDragPosition(drag, ray)
+  if (!newPos) return
   lighting.updateLight(drag.lightId, { position: newPos })
-}
-
-/** Compute the angle on a ring plane given the axis index and displacement from center. */
-function ringAngle(axisIdx: number, dx: number, dy: number, dz: number): number {
-  if (axisIdx === 0) return Math.atan2(dz, dy)
-  if (axisIdx === 1) return Math.atan2(dx, dz)
-  return Math.atan2(dy, dx)
 }
 
 /** Apply rotate ring drag. */
 function applyRotateDrag(drag: GizmoDragState, ray: GizmoDragRay, lighting: LightingActions): void {
-  const axisIdx = DRAG_AXIS_INDEX[drag.kind]!
-  const normal: [number, number, number] = [0, 0, 0]
-  normal[axisIdx] = 1
-
-  const hit = rayPlaneIntersect(ray.origin, ray.dir, normal, drag.startLightPos)
-  if (!hit) return
-
-  const dx = hit[0] - drag.startLightPos[0]
-  const dy = hit[1] - drag.startLightPos[1]
-  const dz = hit[2] - drag.startLightPos[2]
-
-  const currentAngle = ringAngle(axisIdx, dx, dy, dz)
-  const rawDelta = currentAngle - drag.startAngle
-  const deltaAngle = Math.atan2(Math.sin(rawDelta), Math.cos(rawDelta))
-
-  const newRot: [number, number, number] = [...drag.startLightRot]
-  newRot[axisIdx as 0 | 1 | 2] += deltaAngle
+  const newRot = computeRotateDragRotation(drag, ray)
+  if (!newRot) return
   lighting.updateLight(drag.lightId, { rotation: newRot })
 }
 

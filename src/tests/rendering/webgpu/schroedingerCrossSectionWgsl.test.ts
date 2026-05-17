@@ -32,6 +32,13 @@ describe('Schroedinger cross-section WGSL composition', () => {
       isosurface: true,
       useDensityGrid: false,
     })
+    const { wgsl: isoTemporalWgsl } = composeSchroedingerShader({
+      dimension: 4,
+      quantumMode: 'harmonicOscillator',
+      isosurface: true,
+      temporalAccumulation: true,
+      useDensityGrid: false,
+    })
     const { wgsl: temporalWgsl } = composeSchroedingerShader({
       dimension: 4,
       quantumMode: 'harmonicOscillator',
@@ -44,6 +51,9 @@ describe('Schroedinger cross-section WGSL composition', () => {
     expect(isoWgsl).toContain(
       'schroedinger.crossSectionCompositeMode == CROSS_SECTION_COMPOSITE_SLICE_ONLY'
     )
+    expect(isoTemporalWgsl).toContain('hitT = crossSection.hitT;')
+    expect(isoTemporalWgsl).toContain('let hitPosModel = ro + rd * hitT;')
+    expect(isoTemporalWgsl).toContain('output.worldPosition = vec4f(hitPosWorld, hitT);')
     expect(temporalWgsl).toContain('let crossSection = evaluateCrossSectionSample(')
     expect(temporalWgsl).toContain('output.color = vec4f(finalColor, finalAlpha);')
   })

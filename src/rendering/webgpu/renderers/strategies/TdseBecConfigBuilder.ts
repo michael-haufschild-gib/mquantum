@@ -81,8 +81,14 @@ function sanitizeInitialCondition(value: BecConfig['initialCondition']): BecInit
   return BEC_INITIAL_CONDITIONS.has(value) ? value : DEFAULT_BEC_CONFIG.initialCondition
 }
 
-function sanitizeFieldView(value: BecConfig['fieldView']): BecFieldView {
-  return BEC_FIELD_VIEWS.has(value) ? value : DEFAULT_BEC_CONFIG.fieldView
+function sanitizeFieldView(
+  value: BecConfig['fieldView'],
+  effectiveInitCondition: BecInitialCondition
+): BecFieldView {
+  if (!BEC_FIELD_VIEWS.has(value)) return DEFAULT_BEC_CONFIG.fieldView
+  return value === 'hawkingFlux' && effectiveInitCondition !== 'blackHoleAnalog'
+    ? DEFAULT_BEC_CONFIG.fieldView
+    : value
 }
 
 function sanitizeVortexPlane(
@@ -148,7 +154,7 @@ function prepareBecInitCondition(bec: BecConfig, g: number, latDim: number) {
     mom[1] = clampFinite(bec.solitonDepth, DEFAULT_BEC_CONFIG.solitonDepth, 0, 1)
     mom[2] = clampFinite(bec.solitonVelocity, DEFAULT_BEC_CONFIG.solitonVelocity, -1, 1)
   }
-  return { mappedInit, mom }
+  return { initCond, mappedInit, mom }
 }
 
 /**
@@ -201,7 +207,7 @@ export function buildBecConfig(
   let mu =
     g > 0 ? thomasFermiMuND(latDim, g, effectiveInitOmega) : Math.pow(1 / (2 * Math.PI), latDim / 4)
 
-  const { mappedInit, mom } = prepareBecInitCondition(
+  const { initCond, mappedInit, mom } = prepareBecInitCondition(
     { ...bec, initialCondition: sanitizeInitialCondition(bec.initialCondition) },
     g,
     latDim
@@ -297,7 +303,7 @@ export function buildBecConfig(
       absorberEnabled: booleanOr(schroedinger?.absorberEnabled, false),
       absorberWidth: clampFinite(schroedinger?.absorberWidth, 0.2, 0.05, 0.5),
       pmlTargetReflection: clampFinite(schroedinger?.pmlTargetReflection, 1e-6, 1e-12, 0.999),
-      fieldView: sanitizeFieldView(bec.fieldView),
+      fieldView: sanitizeFieldView(bec.fieldView, initCond),
       autoScale: booleanOr(bec.autoScale, true),
       autoScaleMaxGain: clampFinite(schroedinger?.autoScaleMaxGain, 20, 1, 100),
       showPotential: false,

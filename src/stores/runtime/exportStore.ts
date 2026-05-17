@@ -7,6 +7,18 @@ import {
   calculatePresetCropForRatio,
   getExportPresetConfig,
 } from '../utils/exportPresetDefinitions'
+import type {
+  BrowserType,
+  CompletionDetails,
+  CropSettings,
+  ExportFormat,
+  ExportMode,
+  ExportResolution,
+  ExportSettings,
+  ExportTier,
+  TextOverlaySettings,
+  VideoCodec,
+} from '../utils/exportTypes'
 import {
   clampMin,
   clampToRange,
@@ -25,24 +37,12 @@ import {
   sanitizeTextOverlayPatch,
   stripInvalidEnum,
 } from '../utils/exportValidation'
+import { createBestEffortJSONStorage } from '../utils/persistStorage'
 import { useScreenshotCaptureStore } from './screenshotCaptureStore'
 
 // Re-export for backward compatibility with tests and consumers
 export const getCompressionFactor = getCompressionFactorImpl
 export const getRecommendedBitrate = getRecommendedBitrateImpl
-
-import type {
-  BrowserType,
-  CompletionDetails,
-  CropSettings,
-  ExportFormat,
-  ExportMode,
-  ExportResolution,
-  ExportSettings,
-  ExportTier,
-  TextOverlaySettings,
-  VideoCodec,
-} from '../utils/exportTypes'
 
 export type {
   BrowserType,
@@ -99,6 +99,10 @@ interface ExportStore {
 
   // Helpers
   applyPreset: (presetName: string) => void
+}
+
+type ExportPersistedState = {
+  settings: ExportSettings
 }
 
 const DEFAULT_SETTINGS: ExportSettings = {
@@ -524,7 +528,8 @@ export const useExportStore = create<ExportStore>()(
     }),
     {
       name: 'mquantum-export-settings',
-      partialize: (state) => ({ settings: state.settings }), // Only persist settings
+      storage: createBestEffortJSONStorage<ExportPersistedState>('exportStore'),
+      partialize: (state): ExportPersistedState => ({ settings: state.settings }), // Only persist settings
       merge: (persistedState, currentState) => {
         const persisted = persistedState as { settings?: Partial<ExportSettings> }
         const hydratedSettings = sanitizeHydratedSettings(persisted?.settings)

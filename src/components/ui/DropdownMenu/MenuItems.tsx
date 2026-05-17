@@ -7,6 +7,18 @@ import { MenuItemButton } from './MenuItemButton'
 import { PortaledSubmenu } from './PortaledSubmenu'
 import type { DropdownMenuItem } from './types'
 
+function isSeparatorItem(item: DropdownMenuItem): boolean {
+  return (
+    item.label === '---' &&
+    item.onClick === undefined &&
+    item.items === undefined &&
+    item.disabled !== true &&
+    item.shortcut === undefined &&
+    item.checked === undefined &&
+    item['data-testid'] === undefined
+  )
+}
+
 /**
  * Renders a list of menu items with submenu support, hover timing,
  * and click/keyboard interaction.
@@ -84,7 +96,7 @@ export const MenuItems: React.FC<{
     <>
       {items.map((item, index) => {
         // Separator
-        if (item.label === '---') {
+        if (isSeparatorItem(item)) {
           return (
             <div
               key={index}

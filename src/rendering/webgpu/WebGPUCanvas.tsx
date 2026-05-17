@@ -114,14 +114,16 @@ function applyInitialCanvasSize(
   canvas: HTMLCanvasElement,
   graph: WebGPURenderGraph,
   container: HTMLElement | null,
-  dprOverride: number | undefined
+  dprOverride: number | undefined,
+  maxTextureDimension2D: number | undefined
 ): void {
   if (!container) return
   const pixelRatio = dprOverride ?? window.devicePixelRatio
   const { width, height } = resolveCanvasPixelSize(
     container.clientWidth,
     container.clientHeight,
-    pixelRatio
+    pixelRatio,
+    maxTextureDimension2D
   )
   canvas.width = width
   canvas.height = height
@@ -233,7 +235,13 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
         const graph = new WebGPURenderGraph()
         pendingGraph = graph
 
-        applyInitialCanvasSize(canvas, graph, containerRef.current, dprRef.current)
+        applyInitialCanvasSize(
+          canvas,
+          graph,
+          containerRef.current,
+          dprRef.current,
+          deviceManager.getCapabilities()?.maxTextureDimension2D
+        )
 
         await graph.initialize()
         if (abortIfCancelled()) {
@@ -307,10 +315,13 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
       if (!canvas || !graph) return
 
       const devicePixelRatio = dpr ?? window.devicePixelRatio
+      const maxTextureDimension2D =
+        WebGPUDevice.getInstance().getCapabilities()?.maxTextureDimension2D
       const { width, height } = resolveCanvasPixelSize(
         container.clientWidth,
         container.clientHeight,
-        devicePixelRatio
+        devicePixelRatio,
+        maxTextureDimension2D
       )
 
       if (canvas.width !== width || canvas.height !== height) {

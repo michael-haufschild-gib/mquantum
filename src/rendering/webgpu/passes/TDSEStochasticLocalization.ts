@@ -34,7 +34,7 @@ import {
 } from '../shaders/schroedinger/compute/tdseStochasticLoc.wgsl'
 import { tdseUniformsBlock } from '../shaders/schroedinger/compute/tdseUniforms.wgsl'
 import { createComputeBGL } from '../utils/computeBindGroupLayout'
-import type { SiteDispatch } from './computePassUtils'
+import { MAX_DISPATCH_PER_DIM, type SiteDispatch } from './computePassUtils'
 
 /** Maximum collapse centers per dispatch (mirrors physics constant). */
 const MAX_CENTERS_PER_DISPATCH = MAX_STOCHASTIC_SITES
@@ -117,6 +117,18 @@ function sanitizeStochasticRuntimeConfig(config: TdseConfig): TdseConfig | null 
   }
 }
 
+function isValidDispatchCount(value: number): boolean {
+  return Number.isInteger(value) && value > 0 && value <= MAX_DISPATCH_PER_DIM
+}
+
+function isValidSiteDispatch(siteDispatch: SiteDispatch): boolean {
+  return (
+    isValidDispatchCount(siteDispatch.x) &&
+    isValidDispatchCount(siteDispatch.y) &&
+    isValidDispatchCount(siteDispatch.z)
+  )
+}
+
 /** Pure WGSL composition for the stochastic-localization apply-kick compute shader (1-D variant). */
 export function composeTdseStochasticLocShader(): string {
   return tdseUniformsBlock + freeScalarNDIndexBlock + tdseStochasticLocBlock
@@ -161,7 +173,10 @@ export interface StochasticLocState {
   rng: (() => number) | null
   lastSeed: number
   stagingBuffer: GPUBuffer | null
+  /** Number of uniform slots valid for the current frame. */
   stagingSlotCount: number
+  /** Allocated slot capacity of stagingBuffer. */
+  stagingCapacity: number
 }
 
 /** Create initial stochastic localization state. */
@@ -186,6 +201,7 @@ export function createStochasticLocState(): StochasticLocState {
     lastSeed: -1,
     stagingBuffer: null,
     stagingSlotCount: 0,
+    stagingCapacity: 0,
   }
 }
 
@@ -319,6 +335,15 @@ export function rebuildExpectationBindGroups(
     !state.expectResultBuffer
   )
     return
+  if (!isValidDispatchCount(numWorkgroups)) {
+    state.expectPartialBuffer?.destroy()
+    state.expectPartialBuffer = null
+    state.expectFinalizeUniformBuffer?.destroy()
+    state.expectFinalizeUniformBuffer = null
+    state.expectReduceBG = null
+    state.expectFinalizeBG = null
+    return
+  }
 
   // Partial sums: 2 channels × numWorkgroups
   state.expectPartialBuffer?.destroy()
@@ -435,6 +460,7 @@ export function prepareStochasticStaging(
     !Number.isFinite(stepsThisFrame) ||
     stepsThisFrame <= 0
   ) {
+    state.stagingSlotCount = 0
     return
   }
 
@@ -447,7 +473,7 @@ export function prepareStochasticStaging(
   const cslSubsteps = computeCSLSubsteps(runtimeConfig.stochasticGamma, runtimeConfig.dt)
   const totalSlots = safeStepsThisFrame * cslSubsteps
 
-  if (!state.stagingBuffer || state.stagingSlotCount < totalSlots) {
+  if (!state.stagingBuffer || state.stagingCapacity < totalSlots) {
     state.stagingBuffer?.destroy()
     const slotCount = Math.max(totalSlots, 16)
     state.stagingBuffer = device.createBuffer({
@@ -455,8 +481,9 @@ export function prepareStochasticStaging(
       size: slotCount * STOCHASTIC_UNIFORM_SIZE,
       usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
     })
-    state.stagingSlotCount = slotCount
+    state.stagingCapacity = slotCount
   }
+  state.stagingSlotCount = totalSlots
 
   const safeBoundingRadius =
     Number.isFinite(boundingRadius) && boundingRadius > 0 ? boundingRadius : 2.0
@@ -513,12 +540,19 @@ export function maybeDispatchStochasticLoc(
     !state.pipeline ||
     !state.bg ||
     !state.uniformBuffer ||
-    !state.stagingBuffer
+    !state.stagingBuffer ||
+    !state.expectReducePipeline ||
+    !state.expectReduceBG ||
+    !state.expectFinalizePipeline ||
+    !state.expectFinalizeBG
   ) {
     return
   }
 
-  if (step >= state.stagingSlotCount) return
+  if (!Number.isInteger(step) || step < 0 || step >= state.stagingSlotCount) return
+  if (!Number.isInteger(totalSites) || totalSites <= 0 || !isValidSiteDispatch(siteDispatch)) return
+  const expectWG = Math.ceil(totalSites / EXPECT_WG)
+  if (!isValidDispatchCount(expectWG)) return
 
   // Copy this step's uniform data from staging to active buffer
   ctx.encoder.copyBufferToBuffer(
@@ -529,22 +563,15 @@ export function maybeDispatchStochasticLoc(
     STOCHASTIC_UNIFORM_SIZE
   )
 
-  // Compute ⟨W⟩ via 2-channel reduction
-  if (
-    state.expectReducePipeline &&
-    state.expectReduceBG &&
-    state.expectFinalizePipeline &&
-    state.expectFinalizeBG
-  ) {
-    const expectWG = Math.ceil(totalSites / EXPECT_WG)
-    const rPass = ctx.beginComputePass({ label: `tdse-stochastic-expect-reduce-${step}` })
-    dispatchCompute(rPass, state.expectReducePipeline, [state.expectReduceBG], expectWG)
-    rPass.end()
+  // Compute ⟨W⟩ via 2-channel reduction. Required for centered CSL; if these
+  // resources are unavailable the early guard above skips the whole kick.
+  const rPass = ctx.beginComputePass({ label: `tdse-stochastic-expect-reduce-${step}` })
+  dispatchCompute(rPass, state.expectReducePipeline, [state.expectReduceBG], expectWG)
+  rPass.end()
 
-    const fPass = ctx.beginComputePass({ label: `tdse-stochastic-expect-finalize-${step}` })
-    dispatchCompute(fPass, state.expectFinalizePipeline, [state.expectFinalizeBG], 1)
-    fPass.end()
-  }
+  const fPass = ctx.beginComputePass({ label: `tdse-stochastic-expect-finalize-${step}` })
+  dispatchCompute(fPass, state.expectFinalizePipeline, [state.expectFinalizeBG], 1)
+  fPass.end()
 
   // Apply the centered stochastic localization kick. 3-D dispatch fast-path
   // when latticeDim===3 (skips the per-thread shift/mask coord decomposition).
@@ -568,6 +595,7 @@ export function disposeStochasticLoc(state: StochasticLocState): void {
   state.stagingBuffer?.destroy()
   state.stagingBuffer = null
   state.stagingSlotCount = 0
+  state.stagingCapacity = 0
   state.expectPartialBuffer?.destroy()
   state.expectPartialBuffer = null
   state.expectResultBuffer?.destroy()

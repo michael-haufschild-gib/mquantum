@@ -253,6 +253,30 @@ describe('Hydration timing', () => {
     vi.mocked(useDismissedDialogsStore.persist.onFinishHydration).mockRestore()
   })
 
+  it('showConditionalMsgBox_beforeHydration_unregistersDeferredShowAfterHydration', () => {
+    let hydrationCallback: ((state: DismissedDialogsState) => void) | null = null
+    const unsubscribe = vi.fn()
+
+    vi.spyOn(useDismissedDialogsStore.persist, 'hasHydrated').mockReturnValue(false)
+    vi.spyOn(useDismissedDialogsStore.persist, 'onFinishHydration').mockImplementation((cb) => {
+      hydrationCallback = cb
+      return unsubscribe
+    })
+
+    showConditionalMsgBox('one-shot-dialog', 'Title', 'Message')
+
+    expect(unsubscribe).not.toHaveBeenCalled()
+
+    vi.spyOn(useDismissedDialogsStore.persist, 'hasHydrated').mockReturnValue(true)
+    hydrationCallback!(useDismissedDialogsStore.getState())
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
+    expect(useMsgBoxStore.getState().isOpen).toBe(true)
+
+    vi.mocked(useDismissedDialogsStore.persist.hasHydrated).mockRestore()
+    vi.mocked(useDismissedDialogsStore.persist.onFinishHydration).mockRestore()
+  })
+
   it('showConditionalMsgBox_beforeHydration_respectsDismissedStateAfterHydration', () => {
     let hydrationCallback: ((state: DismissedDialogsState) => void) | null = null
 

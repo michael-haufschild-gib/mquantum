@@ -155,8 +155,73 @@ function writePerspectiveMatrix(
   out[15] = 0
 }
 
+const DEFAULT_CAMERA_STATE: WebGPUCameraState = {
+  position: [0, 3.125, 7.5],
+  target: [0, 0, 0],
+  up: [0, 1, 0],
+  fov: 60,
+  near: 0.1,
+  far: 10000,
+  aspect: 1,
+}
+
 /** Minimum distance from camera to target, preventing NaN in orbit and degenerate matrices. */
 const MIN_CAMERA_DISTANCE = 0.01
+const MIN_FOV_DEGREES = 1
+const MAX_FOV_DEGREES = 179
+const MIN_ASPECT = 1e-6
+const MAX_ASPECT = 1e6
+const MIN_NEAR_PLANE = 1e-6
+const MAX_NEAR_PLANE = 1e6
+const MIN_CLIP_SPAN = 1e-6
+const MAX_FAR_PLANE = 1e9
+const MAX_CAMERA_COORD = 1e6
+
+function clampFiniteNumber(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value))
+}
+
+function sanitizeVec3(
+  value: readonly number[] | undefined,
+  fallback: readonly [number, number, number]
+): [number, number, number] {
+  if (
+    !value ||
+    value.length !== 3 ||
+    !Number.isFinite(value[0]) ||
+    !Number.isFinite(value[1]) ||
+    !Number.isFinite(value[2])
+  ) {
+    return [fallback[0], fallback[1], fallback[2]]
+  }
+  return [
+    clampFiniteNumber(value[0]!, -MAX_CAMERA_COORD, MAX_CAMERA_COORD),
+    clampFiniteNumber(value[1]!, -MAX_CAMERA_COORD, MAX_CAMERA_COORD),
+    clampFiniteNumber(value[2]!, -MAX_CAMERA_COORD, MAX_CAMERA_COORD),
+  ]
+}
+
+function sanitizeFov(value: number | undefined, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback
+  return clampFiniteNumber(value as number, MIN_FOV_DEGREES, MAX_FOV_DEGREES)
+}
+
+function sanitizeAspect(value: number | undefined, fallback: number): number {
+  if (!Number.isFinite(value) || (value as number) <= 0) return fallback
+  return clampFiniteNumber(value as number, MIN_ASPECT, MAX_ASPECT)
+}
+
+function sanitizeNearPlane(value: number | undefined, fallback: number): number {
+  if (!Number.isFinite(value) || (value as number) <= 0) return fallback
+  return clampFiniteNumber(value as number, MIN_NEAR_PLANE, MAX_NEAR_PLANE)
+}
+
+function sanitizeFarPlane(value: number | undefined, near: number, fallback: number): number {
+  if (!Number.isFinite(value) || (value as number) <= near + MIN_CLIP_SPAN) {
+    return fallback > near + MIN_CLIP_SPAN ? fallback : near + MIN_CLIP_SPAN
+  }
+  return clampFiniteNumber(value as number, near + MIN_CLIP_SPAN, MAX_FAR_PLANE)
+}
 
 // ============================================================================
 // Camera Class
@@ -173,15 +238,19 @@ export class WebGPUCamera {
   private dirty = true
 
   constructor(initialState?: Partial<WebGPUCameraState>) {
-    this.state = {
-      position: [0, 3.125, 7.5], // Match WebGL default camera position
-      target: [0, 0, 0],
-      up: [0, 1, 0],
-      fov: 60, // Match WebGL camera fov
-      near: 0.1,
-      far: 10000,
-      aspect: 1,
+    const merged = {
+      ...DEFAULT_CAMERA_STATE,
       ...initialState,
+    }
+    const near = sanitizeNearPlane(merged.near, DEFAULT_CAMERA_STATE.near)
+    this.state = {
+      position: sanitizeVec3(merged.position, DEFAULT_CAMERA_STATE.position),
+      target: sanitizeVec3(merged.target, DEFAULT_CAMERA_STATE.target),
+      up: sanitizeVec3(merged.up, DEFAULT_CAMERA_STATE.up),
+      fov: sanitizeFov(merged.fov, DEFAULT_CAMERA_STATE.fov),
+      near,
+      far: sanitizeFarPlane(merged.far, near, DEFAULT_CAMERA_STATE.far),
+      aspect: sanitizeAspect(merged.aspect, DEFAULT_CAMERA_STATE.aspect),
     }
 
     // Initialize matrices
@@ -207,7 +276,8 @@ export class WebGPUCamera {
    * @param z
    */
   setPosition(x: number, y: number, z: number): void {
-    this.state.position = [x, y, z]
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return
+    this.state.position = sanitizeVec3([x, y, z], this.state.position)
     this.dirty = true
   }
 
@@ -218,7 +288,8 @@ export class WebGPUCamera {
    * @param z
    */
   setTarget(x: number, y: number, z: number): void {
-    this.state.target = [x, y, z]
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return
+    this.state.target = sanitizeVec3([x, y, z], this.state.target)
     this.dirty = true
   }
 
@@ -227,7 +298,9 @@ export class WebGPUCamera {
    * @param fov
    */
   setFov(fov: number): void {
-    this.state.fov = fov
+    const next = sanitizeFov(fov, this.state.fov)
+    if (this.state.fov === next) return
+    this.state.fov = next
     this.dirty = true
   }
 
@@ -236,8 +309,9 @@ export class WebGPUCamera {
    * @param aspect
    */
   setAspect(aspect: number): void {
-    if (this.state.aspect === aspect) return
-    this.state.aspect = aspect
+    const next = sanitizeAspect(aspect, this.state.aspect)
+    if (this.state.aspect === next) return
+    this.state.aspect = next
     this.dirty = true
   }
 
@@ -247,8 +321,19 @@ export class WebGPUCamera {
    * @param far
    */
   setClippingPlanes(near: number, far: number): void {
-    this.state.near = near
-    this.state.far = far
+    if (
+      !Number.isFinite(near) ||
+      !Number.isFinite(far) ||
+      near <= 0 ||
+      far <= near + MIN_CLIP_SPAN
+    ) {
+      return
+    }
+    const nextNear = sanitizeNearPlane(near, this.state.near)
+    const nextFar = sanitizeFarPlane(far, nextNear, this.state.far)
+    if (this.state.near === nextNear && this.state.far === nextFar) return
+    this.state.near = nextNear
+    this.state.far = nextFar
     this.dirty = true
   }
 
@@ -405,7 +490,7 @@ export class WebGPUCamera {
     dy = distance * Math.sin(elevation)
     dz = distance * cosElev * Math.cos(azimuth)
 
-    this.state.position = [tx + dx, ty + dy, tz + dz]
+    this.state.position = sanitizeVec3([tx + dx, ty + dy, tz + dz], this.state.position)
     this.dirty = true
   }
 
@@ -448,7 +533,7 @@ export class WebGPUCamera {
       if (newDistance < MIN_CAMERA_DISTANCE) return
     }
 
-    this.state.position = [tx + dx, ty + dy, tz + dz]
+    this.state.position = sanitizeVec3([tx + dx, ty + dy, tz + dz], this.state.position)
     this.dirty = true
   }
 
@@ -478,16 +563,22 @@ export class WebGPUCamera {
     const [px, py, pz] = this.state.position
     const [tx, ty, tz] = this.state.target
 
-    this.state.position = [
-      px + rx * deltaX + ux * deltaY,
-      py + ry * deltaX + uy * deltaY,
-      pz + rz * deltaX + uz * deltaY,
-    ]
-    this.state.target = [
-      tx + rx * deltaX + ux * deltaY,
-      ty + ry * deltaX + uy * deltaY,
-      tz + rz * deltaX + uz * deltaY,
-    ]
+    this.state.position = sanitizeVec3(
+      [
+        px + rx * deltaX + ux * deltaY,
+        py + ry * deltaX + uy * deltaY,
+        pz + rz * deltaX + uz * deltaY,
+      ],
+      this.state.position
+    )
+    this.state.target = sanitizeVec3(
+      [
+        tx + rx * deltaX + ux * deltaY,
+        ty + ry * deltaX + uy * deltaY,
+        tz + rz * deltaX + uz * deltaY,
+      ],
+      this.state.target
+    )
     this.dirty = true
   }
 }

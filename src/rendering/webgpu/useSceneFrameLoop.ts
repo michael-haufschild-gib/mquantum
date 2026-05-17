@@ -51,6 +51,7 @@ export interface SceneFrameCallbackDeps {
     origin: Float32Array
   }>
   exportRuntimeRef: RefObject<ExportRuntimeState>
+  maxTextureDimension2D?: number
   onFrame?: (deltaTime: number) => void
 }
 
@@ -78,6 +79,7 @@ export function useSceneFrameCallbacks(deps: SceneFrameCallbackDeps): SceneFrame
     schroedingerRotation,
     schroedingerBasisCacheRef,
     exportRuntimeRef,
+    maxTextureDimension2D,
     onFrame,
   } = deps
 
@@ -176,7 +178,12 @@ export function useSceneFrameCallbacks(deps: SceneFrameCallbackDeps): SceneFrame
         if (cw > 0 && ch > 0) {
           const renderScale = usePerformanceStore.getState().renderResolutionScale
           const dpr = window.devicePixelRatio * renderScale
-          const { width: targetW, height: targetH } = resolveCanvasPixelSize(cw, ch, dpr)
+          const { width: targetW, height: targetH } = resolveCanvasPixelSize(
+            cw,
+            ch,
+            dpr,
+            maxTextureDimension2D
+          )
           if (canvas.width !== targetW || canvas.height !== targetH) {
             canvas.width = targetW
             canvas.height = targetH
@@ -214,7 +221,16 @@ export function useSceneFrameCallbacks(deps: SceneFrameCallbackDeps): SceneFrame
 
       onFrame?.(deltaTime)
     },
-    [canvas, exportRuntimeRef, graph, onFrame, size.height, size.width, statsCollector]
+    [
+      canvas,
+      exportRuntimeRef,
+      graph,
+      maxTextureDimension2D,
+      onFrame,
+      size.height,
+      size.width,
+      statsCollector,
+    ]
   )
 
   return { advanceSceneStateByDelta, executeSceneFrame }
@@ -255,6 +271,9 @@ export function useSceneFrameLoop(deps: SceneFrameLoopDeps): void {
 
   const renderFrame = useCallback(() => {
     if (tickExport()) {
+      const exportNow = performance.now()
+      lastTimeRef.current = exportNow
+      fpsThrottleAnchorRef.current = exportNow
       animationFrameRef.current = requestAnimationFrame(renderFrame)
       return
     }

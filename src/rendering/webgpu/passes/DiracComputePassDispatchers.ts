@@ -14,7 +14,13 @@ import {
 import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
 import type { WebGPURenderContext } from '../core/types'
-import { assertPow2Log2, FFT_UNIFORM_SIZE, LINEAR_WG } from './computePassUtils'
+import {
+  assertPow2Log2,
+  assertSharedMemoryFFTLog2,
+  FFT_UNIFORM_SIZE,
+  LINEAR_WG,
+  SHARED_MEM_FFT_MAX_AXIS,
+} from './computePassUtils'
 import type { DiracBindGroupResult, DiracPipelineResult } from './DiracComputePassResources'
 
 /** DiracDiagUniforms struct size (16 bytes: totalSites, numWorkgroups, spinorSize, pad) */
@@ -204,8 +210,7 @@ export interface FFTAxisSharedMemParams {
   readonly dispatchCompute: FFTAxisParams['dispatchCompute']
 }
 
-/** Maximum axis dimension for the shared-memory FFT kernel (smemA/smemB are array<vec2f, 128>). */
-export const SHARED_MEM_FFT_MAX_AXIS = 128
+export { SHARED_MEM_FFT_MAX_AXIS }
 
 /**
  * Dispatch shared-memory FFT for one axis: single dispatch completes all stages.
@@ -223,11 +228,7 @@ export function dispatchFFTAxisSharedMem(
   slotOffset: number,
   p: FFTAxisSharedMemParams
 ): number {
-  if (axisDim > SHARED_MEM_FFT_MAX_AXIS || axisDim < 2 || (axisDim & (axisDim - 1)) !== 0) {
-    throw new Error(
-      `[Dirac FFT] axisDim=${axisDim} out of range for shared-memory FFT (must be power of 2, max ${SHARED_MEM_FFT_MAX_AXIS})`
-    )
-  }
+  assertSharedMemoryFFTLog2(axisDim, 'Dirac FFT')
   ctx.encoder.copyBufferToBuffer(
     p.fftAxisStagingBuffer,
     slotOffset * FFT_UNIFORM_SIZE,

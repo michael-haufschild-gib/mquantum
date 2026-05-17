@@ -30,6 +30,7 @@ import {
   MIN_TORUS_PERIOD,
   normalizeMetricForLattice,
 } from '@/lib/physics/tdse/metrics/types'
+import { normalizeMirrorAxisForLattice } from '@/lib/physics/tdse/wormholeCoupling'
 
 import {
   MAX_DIM,
@@ -380,7 +381,7 @@ export function writeTdseUniforms(
   u32[I.wormholeCouplingEnabled] = config.wormholeCouplingEnabled ? 1 : 0
   f32[I.wormholeCouplingG] = wormholeG
   u32[I.wormholeMirrorAxis] =
-    Math.max(0, Math.min(2, Math.floor(config.wormholeMirrorAxis ?? 0))) >>> 0
+    normalizeMirrorAxisForLattice(config.wormholeMirrorAxis, config.latticeDim) >>> 0
   u32[I._padWormhole] = 0
 
   // Analog-Hawking island overlay.

@@ -9,6 +9,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+import { createBestEffortJSONStorage } from '../utils/persistStorage'
+
 /** Persistent state tracking permanently dismissed dialog boxes. */
 export interface DismissedDialogsState {
   /** Set of dialog IDs that have been dismissed */
@@ -28,6 +30,15 @@ export interface DismissedDialogsState {
 
   /** Get count of dismissed dialogs */
   getDismissedCount: () => number
+}
+
+type DismissedDialogsPersistedState = {
+  dismissedIds: string[]
+}
+
+function toDismissedIdArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((id): id is string => typeof id === 'string')
 }
 
 export const useDismissedDialogsStore = create<DismissedDialogsState>()(
@@ -55,14 +66,17 @@ export const useDismissedDialogsStore = create<DismissedDialogsState>()(
     }),
     {
       name: 'mquantum-dismissed-dialogs',
-      partialize: (state) => ({
+      storage: createBestEffortJSONStorage<DismissedDialogsPersistedState>('dismissedDialogsStore'),
+      partialize: (state): DismissedDialogsPersistedState => ({
         // Convert Set to Array for JSON serialization
         dismissedIds: [...state.dismissedIds],
       }),
       merge: (persisted, current) => ({
         ...current,
         // Convert Array back to Set on hydration
-        dismissedIds: new Set((persisted as { dismissedIds?: string[] })?.dismissedIds ?? []),
+        dismissedIds: new Set(
+          toDismissedIdArray((persisted as { dismissedIds?: unknown })?.dismissedIds)
+        ),
       }),
     }
   )

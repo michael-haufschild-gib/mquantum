@@ -131,6 +131,53 @@ describe('dispatchGramSchmidt', () => {
     expect(device.queue.writeBuffer).not.toHaveBeenCalled()
   })
 
+  it('does not dispatch when GS scalar dimensions are stale or invalid', () => {
+    const { device } = createDeviceWithWriteSnapshots()
+    const ctx = createRenderContext(device)
+    const dispatch = vi.fn<DispatchComputeFn>()
+    const baseState = {
+      gsEigenstates: [{ psi: createMockBuffer('eigen'), normSquared: 1, energy: NaN, ipr: NaN }],
+      gsUniformBuffer: createMockBuffer('gs-uniform'),
+      gsPartialReBuffer: createMockBuffer('gs-partial-re'),
+      gsPartialImBuffer: createMockBuffer('gs-partial-im'),
+      gsResultBuffer: createMockBuffer('gs-result'),
+      psiBuffer: createMockBuffer('psi'),
+      pl: createPipelines(),
+    }
+
+    dispatchGramSchmidt(
+      ctx,
+      createState({
+        ...baseState,
+        totalSites: 0,
+        gsNumWorkgroups: 1,
+      }),
+      dispatch
+    )
+    dispatchGramSchmidt(
+      ctx,
+      createState({
+        ...baseState,
+        totalSites: 513,
+        gsNumWorkgroups: 0,
+      }),
+      dispatch
+    )
+    dispatchGramSchmidt(
+      ctx,
+      createState({
+        ...baseState,
+        totalSites: 513,
+        gsNumWorkgroups: 1,
+      }),
+      dispatch
+    )
+
+    expect(dispatch).not.toHaveBeenCalled()
+    expect(ctx.beginComputePass).not.toHaveBeenCalled()
+    expect(device.queue.writeBuffer).not.toHaveBeenCalled()
+  })
+
   it('dispatches reduce, finalize, and subtract once per stored eigenstate', () => {
     const { device, writeSnapshots } = createDeviceWithWriteSnapshots()
     const ctx = createRenderContext(device)

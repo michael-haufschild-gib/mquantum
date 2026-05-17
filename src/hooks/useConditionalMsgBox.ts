@@ -149,7 +149,10 @@ export function showConditionalMsgBox(
   // incorrect "not dismissed" checks (race condition)
   if (!useDismissedDialogsStore.persist.hasHydrated()) {
     // Wait for hydration to complete, then check and show if needed
-    useDismissedDialogsStore.persist.onFinishHydration(() => {
+    let unsubscribe: (() => void) | undefined
+    unsubscribe = useDismissedDialogsStore.persist.onFinishHydration(() => {
+      unsubscribe?.()
+      unsubscribe = undefined
       doShowConditionalMsgBox(dialogId, title, message, type, actions)
     })
     // Return true optimistically - actual show depends on hydrated state

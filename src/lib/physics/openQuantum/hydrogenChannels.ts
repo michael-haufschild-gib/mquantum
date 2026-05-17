@@ -18,6 +18,10 @@ import type { HydrogenBasisState } from './hydrogenBasis'
 import type { TransitionRate } from './hydrogenRates'
 import type { LindbladChannel } from './types'
 
+function isPositiveFinite(value: number): boolean {
+  return Number.isFinite(value) && value > 0
+}
+
 /**
  * Build Lindblad channels for hydrogen open quantum dynamics.
  *
@@ -39,7 +43,7 @@ export function buildHydrogenChannels(
   // Emission and absorption channels from physics-derived rates
   for (const rate of rates) {
     // Downward (emission): L = √γ_down |to⟩⟨from|
-    if (rate.gammaDown > 0) {
+    if (isPositiveFinite(rate.gammaDown)) {
       channels.push({
         row: rate.to,
         col: rate.from,
@@ -49,7 +53,7 @@ export function buildHydrogenChannels(
     }
 
     // Upward (absorption): L = √γ_up |from⟩⟨to|
-    if (rate.gammaUp > 0) {
+    if (isPositiveFinite(rate.gammaUp)) {
       channels.push({
         row: rate.from,
         col: rate.to,
@@ -60,7 +64,7 @@ export function buildHydrogenChannels(
   }
 
   // Pure dephasing: L_k = √γ_φ |k⟩⟨k| for each k
-  if (dephasingEnabled && dephasingRate > 0) {
+  if (dephasingEnabled && isPositiveFinite(dephasingRate)) {
     const amp = Math.sqrt(dephasingRate)
     for (let k = 0; k < K; k++) {
       channels.push({

@@ -204,6 +204,9 @@ export function writeSlicePositionsToF32(
 /** FFTStageUniforms struct size (32 bytes) */
 export const FFT_UNIFORM_SIZE = 32
 
+/** Maximum axis dimension supported by shared-memory FFT kernels and twiddle table. */
+export const SHARED_MEM_FFT_MAX_AXIS = 128
+
 /** PackUniforms struct size (16 bytes) */
 export const PACK_UNIFORM_SIZE = 16
 
@@ -240,6 +243,25 @@ export function assertPow2Log2(axisDim: number): number {
     throw new Error(`[FFT] axisDim=${axisDim} must be a power of 2 >= 2`)
   }
   return Math.log2(axisDim)
+}
+
+/**
+ * Return log2(axisDim), asserting the shared-memory FFT kernel can represent
+ * the axis. The WGSL shared arrays and CPU twiddle table are sized for axes
+ * up to 128, so power-of-two validation alone is insufficient.
+ *
+ * @param axisDim - Axis length
+ * @param label - Error prefix identifying the caller
+ * @returns `log2(axisDim)` as an integer
+ */
+export function assertSharedMemoryFFTLog2(axisDim: number, label = 'FFT'): number {
+  const log2N = assertPow2Log2(axisDim)
+  if (axisDim > SHARED_MEM_FFT_MAX_AXIS) {
+    throw new Error(
+      `[${label}] axisDim=${axisDim} out of range for shared-memory FFT (must be power of 2, max ${SHARED_MEM_FFT_MAX_AXIS})`
+    )
+  }
+  return log2N
 }
 
 /**

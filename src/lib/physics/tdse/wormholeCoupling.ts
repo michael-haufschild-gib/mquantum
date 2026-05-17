@@ -185,3 +185,16 @@ export function computeWormholeCoherence(
 export function isValidMirrorAxis(v: unknown): v is MirrorAxis {
   return v === 0 || v === 1 || v === 2
 }
+
+/**
+ * Clamp a user/config mirror-axis value to an axis supported by the active
+ * lattice. The wormhole kernel only exposes x/y/z axes, and a lattice with
+ * fewer active dimensions must not upload an out-of-range axis because the
+ * shader treats that as a no-op.
+ */
+export function normalizeMirrorAxisForLattice(axis: unknown, latticeDim: number): MirrorAxis {
+  const dim = Number.isFinite(latticeDim) ? Math.floor(latticeDim) : 1
+  const maxAxis = Math.max(0, Math.min(2, dim - 1))
+  const raw = typeof axis === 'number' && Number.isFinite(axis) ? Math.floor(axis) : 0
+  return Math.max(0, Math.min(maxAxis, raw)) as MirrorAxis
+}

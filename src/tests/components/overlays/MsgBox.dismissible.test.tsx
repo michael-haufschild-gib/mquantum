@@ -152,6 +152,42 @@ describe('MsgBox dismissible (invariants)', () => {
       await user.click(checkbox)
       expect(checkbox).not.toBeChecked()
     })
+
+    it('checkbox_newDialogAfterAction_resetsToUnchecked', async () => {
+      const user = userEvent.setup()
+
+      useMsgBoxStore.setState({
+        isOpen: true,
+        title: 'First',
+        message: 'First message',
+        type: 'info',
+        actions: [
+          {
+            label: 'Next',
+            onClick: () => {
+              useMsgBoxStore.getState().closeMsgBox()
+              useMsgBoxStore.getState().showMsgBox('Second', 'Second message', 'info', [], {
+                dismissible: true,
+                dismissId: 'second-dialog',
+              })
+            },
+          },
+        ],
+        dismissible: true,
+        dismissId: 'first-dialog',
+      })
+
+      render(<MsgBox />)
+
+      const checkbox = screen.getByRole('switch')
+      await user.click(checkbox)
+      expect(checkbox).toBeChecked()
+
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+
+      expect(screen.getByText('Second message')).toBeInTheDocument()
+      expect(screen.getByRole('switch')).not.toBeChecked()
+    })
   })
 
   describe('invariant: dismiss persists only when checkbox checked before action', () => {

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { createDefaultBellPairConfig } from '@/lib/geometry/extended/bellPair'
 import { CLASSICAL_BOUND, TSIRELSON_BOUND } from '@/lib/physics/bell/chsh'
 import { LHV_STRATEGIES, lhvDeterministicBell } from '@/lib/physics/bell/lhv'
+import { BELL_SCENARIO_PRESETS } from '@/lib/physics/bell/presets'
 import { useBellExperimentStore } from '@/stores/diagnostics/bellExperimentStore'
 
 beforeEach(() => {
@@ -26,6 +27,18 @@ describe('bellExperimentStore — initial state', () => {
 })
 
 describe('processTrialBatch — QM converges to 2√2 at canonical CHSH angles', () => {
+  it('ignores non-finite batch counts without mutating statistics', () => {
+    const cfg = createDefaultBellPairConfig()
+
+    useBellExperimentStore.getState().processTrialBatch(cfg, Number.NaN)
+
+    const s = useBellExperimentStore.getState()
+    expect(s.totalTrials).toBe(0)
+    expect(s.historyCount).toBe(0)
+    expect(s.qm.S).toBeNaN()
+    expect(s.lhv.S).toBeNaN()
+  })
+
   it('|S| crosses 2 and approaches 2√2 with 100k trials', () => {
     const cfg = createDefaultBellPairConfig() // canonical CHSH defaults, v=1, η=1, qm sampler
     // Process in batches of 10k so the running ring buffer is exercised.
@@ -116,6 +129,22 @@ describe('processTrialBatch — detection efficiency loophole', () => {
     const s = useBellExperimentStore.getState()
     expect(Math.abs(s.qm.S)).toBeGreaterThan(CLASSICAL_BOUND)
     expect(s.qm.nonDetections).toBeGreaterThan(0)
+  })
+
+  it('detection-loophole preset makes the LHV trace violate only through fair-sampling', () => {
+    const preset = BELL_SCENARIO_PRESETS.find((entry) => entry.id === 'detectionLoopholeExploit')
+    if (!preset) throw new Error('Missing detectionLoopholeExploit preset')
+    const cfg = {
+      ...createDefaultBellPairConfig(),
+      ...preset.overrides,
+    }
+
+    useBellExperimentStore.getState().processTrialBatch(cfg, 80_000)
+    const s = useBellExperimentStore.getState()
+
+    expect(cfg.samplerMode).toBe('lhv')
+    expect(cfg.analysisMode).toBe('fairSampling')
+    expect(Math.abs(s.lhv.S)).toBeGreaterThan(CLASSICAL_BOUND)
   })
 })
 

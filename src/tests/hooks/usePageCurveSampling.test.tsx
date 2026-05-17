@@ -106,6 +106,28 @@ describe('usePageCurveSampling', () => {
     expect(usePageCurveStore.getState().lastSTherm).toBe(0)
   })
 
+  it('clears accumulated samples when the waterfall physics profile changes', () => {
+    const { rerender } = renderHook((inputs) => usePageCurveSampling(inputs), {
+      initialProps: waterfallInputs(),
+    })
+    expect(usePageCurveStore.getState().buffer.count).toBe(1)
+    setBecGeneration(1)
+    expect(usePageCurveStore.getState().buffer.count).toBe(2)
+
+    rerender(
+      waterfallInputs({
+        bec: {
+          ...DEFAULT_BEC_CONFIG,
+          initialCondition: 'blackHoleAnalog',
+          hawkingVmax: 4.0,
+        },
+      })
+    )
+
+    expect(usePageCurveStore.getState().buffer.count).toBe(0)
+    expect(usePageCurveStore.getState().lastSTherm).toBe(0)
+  })
+
   it('does not push samples when disabled', () => {
     const { result } = renderHook(() => usePageCurveSampling(waterfallInputs({ enabled: false })))
 

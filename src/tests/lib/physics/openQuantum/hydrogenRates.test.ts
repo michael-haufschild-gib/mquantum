@@ -86,6 +86,12 @@ describe('thermalOccupation', () => {
     // Bug caught: missing T ≤ 0 guard producing NaN
     expect(thermalOccupation(0.375, -100)).toBe(0)
   })
+
+  it('returns 0 for non-finite temperature or transition frequency', () => {
+    // Corrupt restored state must not produce NaN photon occupations.
+    expect(thermalOccupation(0.375, Infinity)).toBe(0)
+    expect(thermalOccupation(NaN, 300)).toBe(0)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -156,6 +162,18 @@ describe('buildTransitionRates', () => {
     for (let i = 0; i < rates1.length; i++) {
       expect(rates2[i]!.gammaDown).toBeCloseTo(2 * rates1[i]!.gammaDown, 10)
       expect(rates2[i]!.gammaUp).toBeCloseTo(2 * rates1[i]!.gammaUp, 10)
+    }
+  })
+
+  it('falls back to finite spontaneous rates for malformed temperature and coupling', () => {
+    // Bug caught: Infinity temperature produced Infinity thermal occupation,
+    // and NaN coupling propagated NaN rates into Lindblad amplitudes.
+    const rates = buildTransitionRates(basis, Infinity, NaN)
+    expect(rates.length).toBeGreaterThan(0)
+    for (const rate of rates) {
+      expect(Number.isFinite(rate.gammaDown)).toBe(true)
+      expect(rate.gammaDown).toBeGreaterThan(0)
+      expect(rate.gammaUp).toBe(0)
     }
   })
 

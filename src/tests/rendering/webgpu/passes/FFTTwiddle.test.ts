@@ -10,6 +10,7 @@
 
 import { describe, expect, it } from 'vitest'
 
+import { SHARED_MEM_FFT_MAX_AXIS } from '@/rendering/webgpu/passes/computePassUtils'
 import {
   buildFFTTwiddleTable,
   FFT_TWIDDLE_BYTES,
@@ -20,6 +21,7 @@ import {
 describe('FFTTwiddle constants', () => {
   it('N_MAX is 128 (power of two in TDSE grid range)', () => {
     expect(N_MAX_FFT_TWIDDLE).toBe(128)
+    expect(N_MAX_FFT_TWIDDLE).toBe(SHARED_MEM_FFT_MAX_AXIS)
     expect(N_MAX_FFT_TWIDDLE & (N_MAX_FFT_TWIDDLE - 1)).toBe(0)
   })
 

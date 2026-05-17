@@ -424,6 +424,8 @@ export class WebGPUStatsCollector {
    * Reset the collector state.
    */
   reset(): void {
+    this.timestampCollectionGraph?.setTimestampCollectionActive(false)
+    this.clearPublishedFullStats()
     this.measurementTier = TIER_HIDDEN
     this.previousMeasurementTier = TIER_HIDDEN
     this.lastPublishTime = 0
