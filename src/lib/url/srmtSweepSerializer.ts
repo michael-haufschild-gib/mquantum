@@ -18,23 +18,16 @@
  *
  * @module lib/url/srmtSweepSerializer
  */
-import type { SrmtSweepKind } from '@/lib/physics/srmt/sweepTypes'
+import {
+  isSrmtSweepKind,
+  SRMT_SWEEP_KINDS,
+  type SrmtSweepKind,
+} from '@/lib/physics/srmt/sweepTypes'
 
 import { deserializeSrmt, serializeSrmt, type SrmtUrlState } from './srmtSerializer'
 
 /** Valid sweep kinds as accepted / emitted in URLs. */
-export const VALID_SRMT_SWEEP_KINDS = [
-  'cut',
-  'mass',
-  'lambda',
-  'bc',
-  'phiRef',
-  'rankCap',
-  'phiExtent',
-  'gridNa',
-  'gridNphi',
-  'gridNphiCoupled',
-] as const satisfies readonly SrmtSweepKind[]
+export const VALID_SRMT_SWEEP_KINDS = SRMT_SWEEP_KINDS satisfies readonly SrmtSweepKind[]
 
 /** String union accepted by `sw=…` — one per entry of {@link VALID_SRMT_SWEEP_KINDS}. */
 export type UrlSrmtSweepKind = (typeof VALID_SRMT_SWEEP_KINDS)[number]
@@ -134,10 +127,7 @@ export function deserializeSrmtAndSweep(
 /** Parse the SRMT sweep sub-block into `state`. */
 export function deserializeSrmtSweep(params: URLSearchParams, state: SrmtSweepUrlState): void {
   const kindRaw = params.get('sw')
-  const kind =
-    kindRaw && (VALID_SRMT_SWEEP_KINDS as readonly string[]).includes(kindRaw)
-      ? (kindRaw as UrlSrmtSweepKind)
-      : undefined
+  const kind = kindRaw && isSrmtSweepKind(kindRaw) ? (kindRaw as UrlSrmtSweepKind) : undefined
   state.srmtSweepKind = kind
   // Orphaned `sw_*` params (no `sw=…` or invalid kind) must not mutate
   // hidden sweep state. A later manually-selected sweep would otherwise

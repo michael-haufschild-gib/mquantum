@@ -82,17 +82,27 @@ import type { SrmtClock } from './types'
  *   vs. uncoupled `gridNphi`). Emits `sweepValue = N_φ`; the per-point
  *   `gridNa` is derived, not reported as the swept axis.
  */
-export type SrmtSweepKind =
-  | 'cut'
-  | 'mass'
-  | 'lambda'
-  | 'bc'
-  | 'phiRef'
-  | 'rankCap'
-  | 'phiExtent'
-  | 'gridNa'
-  | 'gridNphi'
-  | 'gridNphiCoupled'
+/** Runtime list of supported SRMT sweep kind values. */
+export const SRMT_SWEEP_KINDS = [
+  'cut',
+  'mass',
+  'lambda',
+  'bc',
+  'phiRef',
+  'rankCap',
+  'phiExtent',
+  'gridNa',
+  'gridNphi',
+  'gridNphiCoupled',
+] as const
+
+/** Parameter axis varied by an SRMT sweep. */
+export type SrmtSweepKind = (typeof SRMT_SWEEP_KINDS)[number]
+
+/** Return whether a runtime value is a supported SRMT sweep kind. */
+export function isSrmtSweepKind(value: unknown): value is SrmtSweepKind {
+  return typeof value === 'string' && (SRMT_SWEEP_KINDS as readonly string[]).includes(value)
+}
 
 /** Ordered list of boundary conditions for the `'bc'` sweep kind. */
 export const SRMT_BC_SWEEP_ORDER: readonly WdwBoundaryCondition[] = [

@@ -207,6 +207,29 @@ describe('BEC setters', () => {
     expect(dtAfter).toBeLessThan(0.015)
   })
 
+  it('ignores invalid BEC compact indices without dirtying compute state', () => {
+    const s = useExtendedObjectStore.getState()
+    s.clearComputeNeedsReset('bec')
+    s.setBecCompactDim(0, true)
+    s.setBecCompactRadius(0, 0.2)
+    s.clearComputeNeedsReset('bec')
+
+    const before = useExtendedObjectStore.getState()
+    const beforeBec = before.schroedinger.bec
+    const beforeVersion = before.schroedingerVersion
+
+    s.setBecCompactDim(99, true)
+    s.setBecCompactDim(1.5, true)
+    s.setBecCompactRadius(-1, 0.3)
+    s.setBecCompactRadius(1.5, 0.3)
+
+    const after = useExtendedObjectStore.getState()
+    expect(after.schroedingerVersion).toBe(beforeVersion)
+    expect(after.schroedinger.bec.compactDims).toEqual(beforeBec.compactDims)
+    expect(after.schroedinger.bec.compactRadii).toEqual(beforeBec.compactRadii)
+    expect(after.schroedinger.bec.needsReset).toBe(false)
+  })
+
   describe('applyBecPreset — stale rendering field regression', () => {
     // Regression: BEC presets had heterogeneous renderingOverrides keys. Some
     // set autoScaleMaxGain explicitly, others omitted it. Switching from the

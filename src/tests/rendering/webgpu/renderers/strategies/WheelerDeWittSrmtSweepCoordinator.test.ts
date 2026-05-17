@@ -16,7 +16,7 @@ import {
   type SweepWorkerLike,
   WheelerDeWittSrmtSweepCoordinator,
 } from '@/rendering/webgpu/renderers/strategies/WheelerDeWittSrmtSweepCoordinator'
-import { useSrmtSweepStore } from '@/stores/diagnostics/srmtSweepStore'
+import { type PendingSrmtSweep, useSrmtSweepStore } from '@/stores/diagnostics/srmtSweepStore'
 
 interface RecordedPost {
   message: SrmtSweepRequest | { type: 'cancel'; epoch: number }
@@ -375,6 +375,21 @@ describe('WheelerDeWittSrmtSweepCoordinator.maybeDispatchPending', () => {
       kind: 'cut',
       points: 5,
     })
+    expect(useSrmtSweepStore.getState().status).toBe('idle')
+    expect(posts).toHaveLength(0)
+  })
+
+  it('drops malformed pending sweep kinds before coordinator dispatch', () => {
+    const { worker, posts } = createFakeWorker()
+    const coord = new WheelerDeWittSrmtSweepCoordinator(() => worker)
+    useSrmtSweepStore
+      .getState()
+      .setPendingSweep({ kind: 'bogus', points: 5 } as unknown as PendingSrmtSweep)
+
+    expect(useSrmtSweepStore.getState().pendingSweep).toBeNull()
+    expect(() =>
+      coord.maybeDispatchPending(DEFAULT_WHEELER_DEWITT_CONFIG, mkSolverOutput(), false)
+    ).not.toThrow()
     expect(useSrmtSweepStore.getState().status).toBe('idle')
     expect(posts).toHaveLength(0)
   })

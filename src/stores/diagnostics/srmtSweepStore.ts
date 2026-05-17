@@ -26,9 +26,11 @@ import type { WheelerDeWittConfig } from '@/lib/geometry/extended/wheelerDeWitt'
 import type { SrmtClock } from '@/lib/physics/srmt'
 import type {
   SrmtSweepConfig,
+  SrmtSweepKind,
   SrmtSweepLandmark,
   SrmtSweepPoint,
 } from '@/lib/physics/srmt/sweepTypes'
+import { isSrmtSweepKind } from '@/lib/physics/srmt/sweepTypes'
 
 import type { SweepStatus } from '../utils/sweepUtils'
 
@@ -45,17 +47,7 @@ export type SrmtSweepStatus = SweepStatus | 'error'
  * default sweep config at dispatch time.
  */
 export interface PendingSrmtSweep {
-  kind:
-    | 'cut'
-    | 'mass'
-    | 'lambda'
-    | 'bc'
-    | 'phiRef'
-    | 'rankCap'
-    | 'phiExtent'
-    | 'gridNa'
-    | 'gridNphi'
-    | 'gridNphiCoupled'
+  kind: SrmtSweepKind
   points?: number
   sweepMin?: number
   sweepMax?: number
@@ -200,6 +192,12 @@ function nowMs(): number {
     : Date.now()
 }
 
+function normalisePendingSweep(pending: PendingSrmtSweep | null): PendingSrmtSweep | null {
+  if (!pending) return null
+  if (!isSrmtSweepKind((pending as { kind?: unknown }).kind)) return null
+  return pending
+}
+
 /**
  * Summarise which clocks completed in a sweep point's quality record,
  * producing a stable key for presentation/telemetry. Exported for
@@ -307,7 +305,8 @@ export const useSrmtSweepStore = create<SrmtSweepState>((set) => ({
   },
 
   setPendingSweep: (pending) => {
-    set((s) => ({ pendingSweep: pending, version: s.version + 1 }))
+    const next = normalisePendingSweep(pending)
+    set((s) => ({ pendingSweep: next, version: s.version + 1 }))
   },
 
   consumePendingSweep: () => {

@@ -460,13 +460,18 @@ export function createBecSetters(ctx: SetterContext): BecSetters {
     },
     setBecCompactDim: (dimIndex, compact) => {
       if (typeof compact !== 'boolean') return
+      if (
+        !Number.isInteger(dimIndex) ||
+        dimIndex < 0 ||
+        dimIndex >= ctx.get().schroedinger.bec.latticeDim
+      ) {
+        return
+      }
       setWithVersion((state) => {
         const bec = state.schroedinger.bec
         const compactDims = [...(bec.compactDims ?? [])]
-        if (dimIndex >= 0 && dimIndex < bec.latticeDim) {
-          while (compactDims.length < bec.latticeDim) compactDims.push(false)
-          compactDims[dimIndex] = compact
-        }
+        while (compactDims.length < bec.latticeDim) compactDims.push(false)
+        compactDims[dimIndex] = compact
         const kk = clampKKState(
           bec.dt,
           bec.gridSize,
@@ -490,13 +495,18 @@ export function createBecSetters(ctx: SetterContext): BecSetters {
         warnNonFinite('bec.compactRadii', radius)
         return
       }
+      if (
+        !Number.isInteger(dimIndex) ||
+        dimIndex < 0 ||
+        dimIndex >= ctx.get().schroedinger.bec.latticeDim
+      ) {
+        return
+      }
       setWithVersion((state) => {
         const bec = state.schroedinger.bec
         const rawRadii = [...(bec.compactRadii ?? [])]
-        if (dimIndex >= 0 && dimIndex < bec.latticeDim) {
-          while (rawRadii.length < bec.latticeDim) rawRadii.push(0.15)
-          rawRadii[dimIndex] = radius
-        }
+        while (rawRadii.length < bec.latticeDim) rawRadii.push(0.15)
+        rawRadii[dimIndex] = radius
         const kk = clampKKState(
           bec.dt,
           bec.gridSize,
