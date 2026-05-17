@@ -185,7 +185,7 @@ ${bayerJitterSection}
     }
     if (sliceOnlyCrossSection && crossSection.alpha > 0.0) {
       // Cross-section only: output cross-section color with world position
-      let crossHitT = max(crossSection.hitT, 0.0);
+      let crossHitT = clamp(crossSection.hitT, tNear, tFar);
       let crossHitPos = ro + rd * crossHitT;
       let crossHitPosWorld = (camera.modelMatrix * vec4f(crossHitPos, 1.0)).xyz;
       output.color = vec4f(crossSection.color, crossSection.alpha);

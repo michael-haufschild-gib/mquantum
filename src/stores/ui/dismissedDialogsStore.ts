@@ -36,6 +36,11 @@ type DismissedDialogsPersistedState = {
   dismissedIds: string[]
 }
 
+function toDismissedIdArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((id): id is string => typeof id === 'string')
+}
+
 export const useDismissedDialogsStore = create<DismissedDialogsState>()(
   persist(
     (set, get) => ({
@@ -69,7 +74,9 @@ export const useDismissedDialogsStore = create<DismissedDialogsState>()(
       merge: (persisted, current) => ({
         ...current,
         // Convert Array back to Set on hydration
-        dismissedIds: new Set((persisted as { dismissedIds?: string[] })?.dismissedIds ?? []),
+        dismissedIds: new Set(
+          toDismissedIdArray((persisted as { dismissedIds?: unknown })?.dismissedIds)
+        ),
       }),
     }
   )

@@ -113,8 +113,8 @@ export function buildTransitionRates(
   const K = basis.length
   const safeTemperature = Number.isFinite(temperature) && temperature > 0 ? temperature : 0
   const safeCouplingScale =
-    Number.isFinite(couplingScale) && couplingScale > 0 ? couplingScale : 1.0
-  const safeDimension = Number.isFinite(dimension) ? dimension : 3
+    Number.isFinite(couplingScale) && couplingScale >= 0 ? couplingScale : 1.0
+  const safeDimension = Number.isInteger(dimension) && dimension > 0 ? Math.floor(dimension) : 3
 
   for (let i = 0; i < K; i++) {
     for (let j = i + 1; j < K; j++) {
@@ -129,7 +129,7 @@ export function buildTransitionRates(
       if (omega < 1e-15) continue // degenerate — no transition
 
       const dipoleSq = dipoleMatrixElementSquared(stateI, stateJ, safeDimension)
-      if (dipoleSq < 1e-30) continue
+      if (!Number.isFinite(dipoleSq) || dipoleSq < 1e-30) continue
 
       const A = einsteinA(omega, dipoleSq)
       const nBar = thermalOccupation(omega, safeTemperature)

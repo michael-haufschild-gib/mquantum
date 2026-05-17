@@ -257,9 +257,8 @@ export function sanitizeBellPairConfig(config: Partial<BellPairConfig>): BellPai
       Math.round(n)
     ),
     spacing: normalizeNumberArray(base.spacing, fallback.spacing, 1e-6, 100),
-    slicePositions: Array.isArray(base.slicePositions)
-      ? base.slicePositions.filter((entry): entry is number => Number.isFinite(entry))
-      : [...fallback.slicePositions],
+    // Bell-pair simulation is fixed to 3D, so it has no extra slice dimensions.
+    slicePositions: [...fallback.slicePositions],
     aliceAxis: normalizeBellAxis(base.aliceAxis, fallback.aliceAxis),
     aliceAxisPrime: normalizeBellAxis(base.aliceAxisPrime, fallback.aliceAxisPrime),
     bobAxis: normalizeBellAxis(base.bobAxis, fallback.bobAxis),

@@ -320,11 +320,7 @@ describe('geometryStore', () => {
 
       expect(useTransformStore.getState().dimension).toBe(DEFAULT_DIMENSION)
       expect(useRotationStore.getState().dimension).toBe(DEFAULT_DIMENSION)
-      expect(
-        [...useAnimationStore.getState().animatingPlanes].every((p) =>
-          ['XY', 'XZ', 'YZ'].includes(p)
-        )
-      ).toBe(true)
+      expect(useAnimationStore.getState().animatingPlanes).toEqual(new Set(['XY', 'XZ', 'YZ']))
       expect(useTransformStore.getState().getScaleMatrix()).toHaveLength(
         DEFAULT_DIMENSION * DEFAULT_DIMENSION
       )

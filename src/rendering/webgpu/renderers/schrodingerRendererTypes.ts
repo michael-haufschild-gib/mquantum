@@ -11,7 +11,6 @@ import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { getQuantumTypeShaderUniformIdMap } from '@/lib/geometry/registry'
 import type { HydrogenBasisState } from '@/lib/physics/openQuantum/hydrogenBasis'
-import { MAX_K } from '@/lib/physics/openQuantum/integrator'
 import type { AnimationState } from '@/stores/scene/animationStore'
 import type { AppearanceStoreState } from '@/stores/scene/appearanceStore'
 import type { GeometryState } from '@/stores/scene/geometryStore'
@@ -35,6 +34,8 @@ export {
   NODAL_RENDER_MODE_MAP,
 } from '../shaders/schroedinger/temporalJitter'
 export { SCHROEDINGER_UNIFORM_SIZE } from './schroedingerLayout'
+
+const PACKED_HYDROGEN_BASIS_CAPACITY = 14
 
 // ---------------------------------------------------------------------------
 // String → integer enum maps for GPU uniform packing
@@ -269,7 +270,7 @@ export function packHydrogenBasisForGPU(
   const u32View = new Uint32Array(buffer, 688, 4) // basisCount + 3 padding
 
   const maxDims = 11
-  const basisCount = Math.min(MAX_K, basis.length)
+  const basisCount = Math.min(PACKED_HYDROGEN_BASIS_CAPACITY, basis.length)
   const safeDimension =
     typeof dimension === 'number' && Number.isFinite(dimension)
       ? Math.min(maxDims, Math.max(2, Math.floor(dimension)))
@@ -282,9 +283,10 @@ export function packHydrogenBasisForGPU(
     i32View[flatBase + 0] = Number.isFinite(state.n) ? Math.floor(state.n) : 0
     i32View[flatBase + 1] = Number.isFinite(state.l) ? Math.floor(state.l) : 0
     i32View[flatBase + 2] = Number.isFinite(state.m) ? Math.floor(state.m) : 0
-    const extraCount = Math.min(Math.max(0, safeDimension - 3), state.extraDimN.length)
+    const extraDimN = Array.isArray(state.extraDimN) ? state.extraDimN : []
+    const extraCount = Math.min(Math.max(0, safeDimension - 3), extraDimN.length)
     for (let d = 0; d < extraCount; d++) {
-      const extraN = state.extraDimN[d]!
+      const extraN = extraDimN[d]!
       i32View[flatBase + 3 + d] = Number.isFinite(extraN) ? Math.floor(extraN) : 0
     }
 

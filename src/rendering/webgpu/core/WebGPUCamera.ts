@@ -175,6 +175,7 @@ const MIN_NEAR_PLANE = 1e-6
 const MAX_NEAR_PLANE = 1e6
 const MIN_CLIP_SPAN = 1e-6
 const MAX_FAR_PLANE = 1e9
+const MAX_CAMERA_COORD = 1e6
 
 function clampFiniteNumber(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
@@ -193,7 +194,11 @@ function sanitizeVec3(
   ) {
     return [fallback[0], fallback[1], fallback[2]]
   }
-  return [value[0]!, value[1]!, value[2]!]
+  return [
+    clampFiniteNumber(value[0]!, -MAX_CAMERA_COORD, MAX_CAMERA_COORD),
+    clampFiniteNumber(value[1]!, -MAX_CAMERA_COORD, MAX_CAMERA_COORD),
+    clampFiniteNumber(value[2]!, -MAX_CAMERA_COORD, MAX_CAMERA_COORD),
+  ]
 }
 
 function sanitizeFov(value: number | undefined, fallback: number): number {
@@ -272,7 +277,7 @@ export class WebGPUCamera {
    */
   setPosition(x: number, y: number, z: number): void {
     if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return
-    this.state.position = [x, y, z]
+    this.state.position = sanitizeVec3([x, y, z], this.state.position)
     this.dirty = true
   }
 
@@ -284,7 +289,7 @@ export class WebGPUCamera {
    */
   setTarget(x: number, y: number, z: number): void {
     if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return
-    this.state.target = [x, y, z]
+    this.state.target = sanitizeVec3([x, y, z], this.state.target)
     this.dirty = true
   }
 

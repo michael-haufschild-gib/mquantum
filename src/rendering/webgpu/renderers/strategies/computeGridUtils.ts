@@ -218,6 +218,7 @@ export function handleSimulationStateIO(
       simState.setSaveError(
         `Save canceled: requested mode "${forMode}" is no longer handled by the active renderer`
       )
+      simState.clearSaveRequest()
     } else {
       // Only clear the request once the save has actually been scheduled.
       // `requestStateSave` returns `false` when a previous save (or slice
