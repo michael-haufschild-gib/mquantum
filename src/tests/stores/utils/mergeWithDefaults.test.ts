@@ -300,6 +300,58 @@ describe('mergeExtendedObjectStateForType — cosmology invariants', () => {
     expect(fs.gridSize).toEqual([64, 64, 64])
   })
 
+  it('sanitizes loaded freeScalar init enums and vectors before direct restore reaches shaders', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'freeScalarField',
+        freeScalar: {
+          latticeDim: 3,
+          gridSize: [32, 32, 32],
+          initialCondition: 'bogus',
+          fieldView: 'bogus',
+          packetCenter: [1, Number.NaN, 2],
+          modeK: [2, Number.POSITIVE_INFINITY, 0],
+          needsReset: false,
+        },
+      },
+    }
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const fs = (merged.schroedinger as { freeScalar: Record<string, unknown> }).freeScalar
+
+    expect(fs.initialCondition).toBe(DEFAULT_SCHROEDINGER_CONFIG.freeScalar.initialCondition)
+    expect(fs.fieldView).toBe(DEFAULT_SCHROEDINGER_CONFIG.freeScalar.fieldView)
+    expect(fs.packetCenter).toEqual(DEFAULT_SCHROEDINGER_CONFIG.freeScalar.packetCenter)
+    expect(fs.modeK).toEqual(DEFAULT_SCHROEDINGER_CONFIG.freeScalar.modeK)
+    expect(fs.needsReset).toBe(true)
+  })
+
+  it('sanitizes loaded freeScalar preheating before direct restore reaches mass uniforms', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'freeScalarField',
+        freeScalar: {
+          latticeDim: 3,
+          gridSize: [32, 32, 32],
+          preheating: {
+            enabled: true,
+            amplitude: Number.NaN,
+            frequency: Number.POSITIVE_INFINITY,
+          },
+          needsReset: false,
+        },
+      },
+    }
+
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const fs = (merged.schroedinger as { freeScalar: Record<string, unknown> }).freeScalar
+    const preheating = fs.preheating as Record<string, unknown>
+
+    expect(preheating.enabled).toBe(true)
+    expect(preheating.amplitude).toBe(DEFAULT_SCHROEDINGER_CONFIG.freeScalar.preheating.amplitude)
+    expect(preheating.frequency).toBe(DEFAULT_SCHROEDINGER_CONFIG.freeScalar.preheating.frequency)
+    expect(fs.needsReset).toBe(true)
+  })
+
   it('soft-disables cosmology when the loaded latticeDim is out of the supported range', () => {
     // L7 audit: scenes saved with cosmology enabled at latticeDim ∈ [2,6]
     // and loaded onto an unsupported lattice (e.g. 1D after a manual edit)

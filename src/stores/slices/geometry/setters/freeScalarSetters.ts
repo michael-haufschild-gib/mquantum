@@ -9,6 +9,8 @@
 
 import {
   DEFAULT_FREE_SCALAR_CONFIG,
+  isFreeScalarFieldView,
+  isFreeScalarInitialCondition,
   sanitizeKSpaceVizConfig,
 } from '@/lib/geometry/extended/freeScalar'
 import type {
@@ -109,6 +111,21 @@ export const resizeFreeScalarArrays = (
     i < prev.slicePositions.length ? prev.slicePositions[i]! : 0
   )
   return { latticeDim: newDim, gridSize, spacing, packetCenter, modeK, slicePositions }
+}
+
+const normalizeFreeScalarVector = (
+  values: number[],
+  fallback: readonly number[],
+  latticeDim: number,
+  transform: (value: number) => number = (value) => value
+): number[] => {
+  const dim = Math.max(1, Math.min(11, Math.floor(Number.isFinite(latticeDim) ? latticeDim : 3)))
+  return Array.from({ length: dim }, (_, i) => {
+    const next = values[i]
+    if (Number.isFinite(next)) return transform(next!)
+    const prev = fallback[i]
+    return Number.isFinite(prev) ? transform(prev!) : 0
+  })
 }
 
 /**
@@ -230,6 +247,7 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarSetters {
     },
     setFreeScalarStepsPerFrame: nestedIntSetter(ctx, D, 'stepsPerFrame', 1, 16, 'floor'),
     setFreeScalarInitialCondition: (condition) => {
+      if (!isFreeScalarInitialCondition(condition)) return
       setWithVersion((state) => {
         const fs = state.schroedinger.freeScalar
         const maxPerDim = defaultGridPerDim(fs.latticeDim)
@@ -253,14 +271,33 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarSetters {
         }
       })
     },
-    setFreeScalarFieldView: nestedValueSetter(ctx, D, 'fieldView'),
-    setFreeScalarPacketCenter: (center) => {
+    setFreeScalarFieldView: (view) => {
+      if (!isFreeScalarFieldView(view)) return
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, packetCenter: center, needsReset: true },
+          freeScalar: { ...state.schroedinger.freeScalar, fieldView: view },
         },
       }))
+    },
+    setFreeScalarPacketCenter: (center) => {
+      if (!Array.isArray(center) || !hasOnlyFinite(center)) {
+        warnNonFinite('freeScalar.packetCenter', center)
+        return
+      }
+      setWithVersion((state) => {
+        const fs = state.schroedinger.freeScalar
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            freeScalar: {
+              ...fs,
+              packetCenter: normalizeFreeScalarVector(center, fs.packetCenter, fs.latticeDim),
+              needsReset: true,
+            },
+          },
+        }
+      })
     },
     setFreeScalarPacketWidth: (width) => {
       if (!isFinite(width)) {
@@ -293,12 +330,23 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarSetters {
       }))
     },
     setFreeScalarModeK: (k) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, modeK: k, needsReset: true },
-        },
-      }))
+      if (!Array.isArray(k) || !hasOnlyFinite(k)) {
+        warnNonFinite('freeScalar.modeK', k)
+        return
+      }
+      setWithVersion((state) => {
+        const fs = state.schroedinger.freeScalar
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            freeScalar: {
+              ...fs,
+              modeK: normalizeFreeScalarVector(k, fs.modeK, fs.latticeDim, Math.round),
+              needsReset: true,
+            },
+          },
+        }
+      })
     },
     setFreeScalarAutoScale: nestedValueSetter(ctx, D, 'autoScale'),
     setFreeScalarVacuumSeed: (seed) => {
