@@ -11,7 +11,7 @@ const ASSET_ROOT = resolve(SRC_ROOT, 'assets')
 const TEST_ROOT = resolve(SRC_ROOT, 'tests')
 const SVG_ASSET_IMPORT_RE = /['"][^'"]*assets\/(icons|exporter)\/([^'"]+\.svg)(\?react)?['"]/g
 const UNSAFE_SVG_RE =
-  /<!DOCTYPE|xmlns:xlink|<script|<foreignObject|\son\w+=|javascript:|(?:fill|stroke)=["']#000(?:000)?["']|(?:fill|stroke)\s*:\s*#000(?:000)?/i
+  /<!DOCTYPE|xmlns:xlink|<script|<foreignObject|\son\w+=|javascript:|(?:href|src)\s*=\s*["'](?:https?:|\/\/|data:)|url\(\s*["']?(?:https?:|\/\/|data:)|(?:fill|stroke)=["']#000(?:000)?["']|(?:fill|stroke)\s*:\s*#000(?:000)?/i
 const CURRENT_COLOR_PAINT_RE =
   /(?:fill|stroke)=["']currentColor["']|(?:fill|stroke)\s*:\s*currentColor/i
 
@@ -101,6 +101,19 @@ describe('SVG asset imports', () => {
     for (const { asset } of importedAssets) {
       const source = readFileSync(resolve(ASSET_ROOT, asset), 'utf8')
       expect(source, asset).not.toMatch(UNSAFE_SVG_RE)
+    }
+  })
+
+  it('treats modern href and CSS url external references as unsafe SVG content', () => {
+    const unsafeSamples = [
+      '<image href="https://example.com/pixel.png" />',
+      '<use href="//example.com/sprite.svg#icon" />',
+      '<rect style="fill: url(https://example.com/pattern.svg#p)" />',
+      '<image href="data:image/svg+xml;base64,PHN2Zy8+" />',
+    ]
+
+    for (const source of unsafeSamples) {
+      expect(source).toMatch(UNSAFE_SVG_RE)
     }
   })
 

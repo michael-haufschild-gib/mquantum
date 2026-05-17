@@ -218,7 +218,7 @@ test.describe('Pauli spinor physics invariants', () => {
     await applyPauliPreset(page, 'larmorPrecession')
     // Disable PML absorbers so norm loss = pure integrator error
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       ;(
         mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       ).setPauliConfig({ absorberEnabled: false, needsReset: true })

@@ -102,12 +102,10 @@ fn henyeyGreenstein(dotLH: f32, g: f32) -> f32 {
 // Apply distribution function for color algorithms
 fn applyDistributionS(t: f32, power: f32, cycles: f32, offset: f32) -> f32 {
   let clamped = clamp(t, 0.0, 1.0);
-  // Guard pow() - ensure base > 0 and power >= small value
+  // Match the CPU preview: clamp input, apply power, then wrap cycles with fract.
   let safePower = max(power, 0.001);
-  let safeBase = max(clamped, 0.0001);
-  let curved = pow(safeBase, safePower);
-  // Clamp before fract to avoid fract(1.0)=0 discontinuity at peak density
-  return fract(clamp(curved * cycles + offset, 0.0, 0.999));
+  let curved = pow(clamped, safePower);
+  return fract(curved * cycles + offset);
 }`)
   }
 

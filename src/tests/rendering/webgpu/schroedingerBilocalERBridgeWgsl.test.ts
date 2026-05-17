@@ -44,20 +44,6 @@ describe('Schroedinger bilocal ER bridge WGSL composition', () => {
       'let remoteDensityInfo = sampleDensityWithPhase(remoteEndpoint, animTime, uniforms)',
       'let bridge = applyBilocalERBridgeTopology(',
       'samplePos = bridge.position',
-      'let warpedDensityResult = sampleDensityWithPhaseAndFlow(samplePos, animTime, uniforms)',
-      'let emission = computeEmissionLit(rho, sCenter, phase, samplePos',
-      '* causticMultiplier * bridgeGain',
-    ])
-  })
-
-  it('applies topology before HQ analytic density and emission integration', () => {
-    const body = functionSlice(volumeRaymarchBlock, 'volumeRaymarchHQ')
-
-    expectOrdered(body, [
-      'let remoteEndpoint = vec3f(-pos.x, pos.y, pos.z)',
-      'let remoteDensityInfo = sampleDensityWithPhase(remoteEndpoint, animTime, uniforms)',
-      'let bridge = applyBilocalERBridgeTopology(',
-      'samplePos = bridge.position',
       'quickCheck = sampleDensityWithPhase(samplePos, animTime, uniforms)',
       'let emission = computeEmissionLit(rho, sCenter, phase, samplePos',
       '* causticMultiplier * bridgeGain',

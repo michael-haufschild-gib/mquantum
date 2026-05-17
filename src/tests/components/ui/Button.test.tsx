@@ -70,4 +70,12 @@ describe('Button', () => {
     render(<Button data-testid="my-btn">Test</Button>)
     expect(screen.getByTestId('my-btn')).toBeInTheDocument()
   })
+
+  it('forwards refs to the native button element', () => {
+    const ref = vi.fn<(node: HTMLButtonElement | null) => void>()
+
+    render(<Button ref={ref}>Focusable</Button>)
+
+    expect(ref).toHaveBeenCalledWith(screen.getByRole('button', { name: 'Focusable' }))
+  })
 })

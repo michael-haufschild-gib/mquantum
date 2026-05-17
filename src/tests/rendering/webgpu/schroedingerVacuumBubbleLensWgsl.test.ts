@@ -40,24 +40,8 @@ describe('Schroedinger vacuum bubble lens WGSL composition', () => {
     expect(wgsl).toContain('let emissionGain = 1.0 + wall * tunnelingGate * strength')
   })
 
-  it('resamples analytic volume after vacuum-bubble coordinate refraction', () => {
-    const body = functionSlice(volumeRaymarchBlock, 'volumeRaymarch')
-
-    expectOrdered(body, [
-      'let vacuumBubbleActive = isVacuumBubbleLensActive(uniforms)',
-      'let spectralFlow = applySpectralDimensionFlow(',
-      'let vacuumBubble = applyVacuumBubbleLens(',
-      'samplePos = vacuumBubble.position',
-      'vacuumBubbleEmissionGain = vacuumBubble.emissionGain',
-      'vacuumBubbleOpacityScale = vacuumBubble.opacityScale',
-      'sampleDensityWithPhaseAndFlow(samplePos, animTime, uniforms)',
-      'rho * spectralOpacityScale * vacuumBubbleOpacityScale',
-      'vacuumBubbleEmissionGain',
-    ])
-  })
-
   it('resamples HQ analytic volume before gradient and emission', () => {
-    const body = functionSlice(volumeRaymarchBlock, 'volumeRaymarchHQ')
+    const body = functionSlice(volumeRaymarchBlock, 'volumeRaymarch')
 
     // PERF: HQ now uses ensureGradient at the emission point (per-step cache
     // shared with all spacetime effects) instead of sampleDensityWithAnalyticalGradient.

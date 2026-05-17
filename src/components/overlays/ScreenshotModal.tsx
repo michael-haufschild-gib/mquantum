@@ -119,11 +119,8 @@ export const ScreenshotModal = () => {
       <div className="flex flex-col gap-4" data-testid="screenshot-modal-content">
         {/* Crop Editor Area */}
         <div className="relative bg-black rounded-lg overflow-hidden border border-border-default">
-          <div
-            ref={containerRef}
-            className="relative flex items-center justify-center p-4 sm:p-8 select-none"
-          >
-            <div className="relative inline-block shadow-2xl shadow-black">
+          <div className="relative flex items-center justify-center p-4 sm:p-8 select-none">
+            <div ref={containerRef} className="relative inline-block shadow-2xl shadow-black">
               <img
                 ref={imgRef}
                 src={imageSrc}

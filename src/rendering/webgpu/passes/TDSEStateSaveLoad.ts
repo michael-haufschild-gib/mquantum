@@ -153,7 +153,7 @@ export function requestSliceCapture(
         else if (axisIdx === 1) iy = i
         else iz = i
 
-        const flatIdx = ix + iy * nx + iz * nx * ny
+        const flatIdx = ix * ny * nz + iy * nz + iz
         if (flatIdx < totalSites) {
           // Interleaved layout: [re0, im0, re1, im1, ...].
           const r = interleaved[2 * flatIdx]!

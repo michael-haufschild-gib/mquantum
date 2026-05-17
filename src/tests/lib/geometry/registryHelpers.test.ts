@@ -133,6 +133,14 @@ describe('getAvailableTypesForDimension', () => {
         available: false,
         disabledReason: 'Requires 3D+',
       },
+      {
+        type: 'bellPair',
+        name: 'Bell Pair',
+        description:
+          'Two-qubit entangled spin state. Drives the CHSH / Bell experiment with live S(N) plot crossing the classical bound toward Tsirelson.',
+        available: false,
+        disabledReason: 'Requires 3D+',
+      },
     ])
   })
 
@@ -146,6 +154,7 @@ describe('getAvailableTypesForDimension', () => {
     ).toEqual([
       { type: 'schroedinger', available: true, disabledReason: undefined },
       { type: 'pauliSpinor', available: false, disabledReason: 'Max 6D' },
+      { type: 'bellPair', available: false, disabledReason: 'Max 3D' },
     ])
   })
 })

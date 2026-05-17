@@ -40,6 +40,19 @@ const MAX_SMAA_THRESHOLD = 0.5
 const MIN_SMAA_SEARCH_STEPS = 4
 const MAX_SMAA_SEARCH_STEPS = 32
 
+function resolveSMAATextureSize(
+  width: number,
+  height: number
+): { width: number; height: number } | null {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return null
+  }
+  return {
+    width: Math.max(1, Math.floor(width)),
+    height: Math.max(1, Math.floor(height)),
+  }
+}
+
 /**
  * SMAA (Subpixel Morphological Anti-Aliasing) pass.
  *
@@ -399,7 +412,14 @@ export class SMAAPass extends WebGPUBasePass {
       return
     }
 
-    const { width, height } = ctx.size
+    const resolvedSize = resolveSMAATextureSize(ctx.size.width, ctx.size.height)
+    if (!resolvedSize) return
+
+    const inputView = ctx.getTextureView(this.colorInputId)
+    const outputView = ctx.getWriteTarget(this.outputResourceId) ?? ctx.getCanvasTextureView()
+    if (!inputView || !outputView) return
+
+    const { width, height } = resolvedSize
     this.ensureTextures(this.device, width, height)
 
     if (
@@ -410,11 +430,6 @@ export class SMAAPass extends WebGPUBasePass {
     ) {
       return
     }
-
-    const inputView = ctx.getTextureView(this.colorInputId)
-    const outputView = ctx.getWriteTarget(this.outputResourceId) ?? ctx.getCanvasTextureView()
-
-    if (!inputView) return
 
     // === Pass 1: Edge Detection ===
     this.edgeUniformData[0] = width

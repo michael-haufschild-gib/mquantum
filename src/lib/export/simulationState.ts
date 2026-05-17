@@ -28,8 +28,8 @@ import {
   getQuantumTypeStateSaveIdMap,
 } from '@/lib/geometry/registry'
 
-/** Quantum modes that can be saved/loaded, including pauliSpinor (separate object type). */
-export type SaveableQuantumMode = SchroedingerQuantumMode | 'pauliSpinor'
+/** Quantum modes that can be saved/loaded, including pauliSpinor and bellTest (separate object types). */
+export type SaveableQuantumMode = SchroedingerQuantumMode | 'pauliSpinor' | 'bellTest'
 
 /** Wavefunction data read back from GPU, ready for serialization. */
 export interface WavefunctionReadbackResult {

@@ -204,7 +204,50 @@ describe('CosmologyControls', () => {
       />
     )
     await openGroup(user)
-    // bianchiKasner requires latticeDim>=3, so should not appear in the select options
+    // bianchiKasner requires latticeDim === 3 (spacetimeDim === 4) per
+    // isValidPreset; the dropdown filter pins this so users can't pick a
+    // preset that would auto-disable cosmology.
     expect(screen.queryByText(/Bianchi-I/)).not.toBeInTheDocument()
+  })
+
+  it('excludes bianchiKasner preset option for latticeDim > 3', async () => {
+    // Regression: a previous filter `latticeDim >= 3` exposed bianchiKasner
+    // at latticeDim 4..11, but `isValidPreset` in `lib/physics/cosmology/presets.ts`
+    // hard-requires spacetimeDim === 4 (latticeDim === 3) — selecting the
+    // option at any higher dim ran through `resolveEta0ForPresetSwitch` →
+    // `isValidPreset` returning false → cosmology silently auto-disabled.
+    // The filter must mirror the actual validity constraint so the user can
+    // never reach the silently-disabled state through the dropdown.
+    const user = userEvent.setup()
+    render(
+      <CosmologyControls
+        cosmology={{ ...DEFAULT_COSMOLOGY_CONFIG, enabled: true }}
+        latticeDim={4}
+        gridSize={[32, 32, 32, 32]}
+        spacing={[0.1, 0.1, 0.1, 0.1]}
+        selfInteractionEnabled={false}
+        actions={makeMockActions()}
+      />
+    )
+    await openGroup(user)
+    expect(screen.queryByText(/Bianchi-I/)).not.toBeInTheDocument()
+  })
+
+  it('includes bianchiKasner preset option for latticeDim === 3', async () => {
+    // The flip-side of the above: at the supported latticeDim the option
+    // must be present in the dropdown.
+    const user = userEvent.setup()
+    render(
+      <CosmologyControls
+        cosmology={{ ...DEFAULT_COSMOLOGY_CONFIG, enabled: true }}
+        latticeDim={3}
+        gridSize={DEFAULT_GRID_SIZE}
+        spacing={DEFAULT_SPACING}
+        selfInteractionEnabled={false}
+        actions={makeMockActions()}
+      />
+    )
+    await openGroup(user)
+    expect(screen.getByText(/Bianchi-I/)).toBeInTheDocument()
   })
 })

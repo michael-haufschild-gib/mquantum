@@ -20,6 +20,35 @@ import { WebGPUSchrodingerRenderer } from './renderers/WebGPUSchrodingerRenderer
 import { resolveCanvasPixelSize } from './utils/sceneMath'
 import { type WebGPUCanvasContext, WebGPUContext } from './WebGPUContext'
 
+/**
+ * Per-canvas refcount of "alive" effect instances.
+ *
+ * React StrictMode runs effects twice (mount → cleanup → mount). Both mounts'
+ * async initialize() calls share the singleton's cached init promise; when the
+ * promise resolves, BOTH continuations run. The first continuation sees its own
+ * `cancelled` flag set and would naively destroy the singleton device — but the
+ * second continuation is about to use it. This refcount lets the first
+ * continuation observe that another effect on the same canvas is still alive,
+ * so the destroy is skipped and deferred to whichever effect leaves last.
+ */
+const aliveCanvasEffects = new WeakMap<HTMLCanvasElement, number>()
+const incrementAliveEffects = (canvas: HTMLCanvasElement): void => {
+  aliveCanvasEffects.set(canvas, (aliveCanvasEffects.get(canvas) ?? 0) + 1)
+}
+const decrementAliveEffects = (canvas: HTMLCanvasElement): void => {
+  const next = (aliveCanvasEffects.get(canvas) ?? 0) - 1
+  if (next <= 0) {
+    aliveCanvasEffects.delete(canvas)
+  } else {
+    aliveCanvasEffects.set(canvas, next)
+  }
+}
+// After cleanup decrements, the count reflects only OTHER alive effects.
+// The cancelled-continuation and cleanup paths both run after decrement,
+// so `> 0` correctly detects a peer that would still use the device.
+const hasAnyAliveEffects = (canvas: HTMLCanvasElement): boolean =>
+  (aliveCanvasEffects.get(canvas) ?? 0) > 0
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -80,6 +109,24 @@ const WebGPUErrorOverlay = React.forwardRef<HTMLDivElement, WebGPUErrorOverlayPr
 )
 
 WebGPUErrorOverlay.displayName = 'WebGPUErrorOverlay'
+
+function applyInitialCanvasSize(
+  canvas: HTMLCanvasElement,
+  graph: WebGPURenderGraph,
+  container: HTMLElement | null,
+  dprOverride: number | undefined
+): void {
+  if (!container) return
+  const pixelRatio = dprOverride ?? window.devicePixelRatio
+  const { width, height } = resolveCanvasPixelSize(
+    container.clientWidth,
+    container.clientHeight,
+    pixelRatio
+  )
+  canvas.width = width
+  canvas.height = height
+  graph.setSize(width, height)
+}
 
 // ============================================================================
 // Component
@@ -148,105 +195,87 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
     let deviceDestroyed = false
     let pendingGraph: WebGPURenderGraph | null = null
 
-    const destroyInitializedDevice = () => {
-      if (!deviceInitialized || deviceDestroyed) return
+    incrementAliveEffects(canvas)
+
+    const forceDestroyDevice = () => {
       deviceDestroyed = true
       deviceManager?.destroyForCanvas(canvas)
       deviceManager = null
     }
 
+    const destroyInitializedDevice = () => {
+      if (!deviceInitialized || deviceDestroyed) return
+      if (hasAnyAliveEffects(canvas)) {
+        deviceDestroyed = true
+        deviceManager = null
+        return
+      }
+      forceDestroyDevice()
+    }
+
+    const abortIfCancelled = (): boolean => {
+      if (!cancelled) return false
+      destroyInitializedDevice()
+      return true
+    }
+
     const initialize = async () => {
       try {
         deviceManager = WebGPUDevice.getInstance()
-
-        // Initialize device with canvas
         const result = await deviceManager.initialize(canvas)
-        if (result.success) {
-          deviceInitialized = true
-        }
-
-        if (cancelled) {
-          destroyInitializedDevice()
-          return
-        }
-
+        if (result.success) deviceInitialized = true
+        if (abortIfCancelled()) return
         if (!result.success) {
-          // Surface the structured failure code to the test/telemetry
-          // boundary via state so the error overlay can emit it as a
-          // dedicated DOM attribute.
           setInitErrorCode(result.code)
           throw new Error(result.error || 'Failed to initialize WebGPU')
         }
 
-        // Create render graph
         const graph = new WebGPURenderGraph()
         pendingGraph = graph
 
-        // Set initial size
-        const container = containerRef.current
-        if (container) {
-          const devicePixelRatio = dprRef.current ?? window.devicePixelRatio
-          const { width, height } = resolveCanvasPixelSize(
-            container.clientWidth,
-            container.clientHeight,
-            devicePixelRatio
-          )
+        applyInitialCanvasSize(canvas, graph, containerRef.current, dprRef.current)
 
-          canvas.width = width
-          canvas.height = height
-          graph.setSize(width, height)
-        }
-
-        // Initialize graph
         await graph.initialize()
-
-        // Guard against unmount during async initialization
-        if (cancelled) {
+        if (abortIfCancelled()) {
           graph.dispose()
           pendingGraph = null
-          destroyInitializedDevice()
           return
         }
 
         graphRef.current = graph
         pendingGraph = null
 
-        // Register device lost handler (store unsubscribe for cleanup)
         unsubDeviceLost = deviceManager.onDeviceLost((reason) => {
           logger.error('[WebGPUCanvas] Device lost:', reason)
-          // Clear static GPU resources that hold references to the destroyed device
           WebGPUBasePass.clearStaticResources()
           WebGPUSchrodingerRenderer.clearPipelineCache()
           handleDeviceLostRef.current(reason)
         })
 
-        // Create context
-        const ctx: WebGPUCanvasContext = {
+        setContext({
           device: deviceManager,
           graph,
           canvas,
           size: { width: canvas.width, height: canvas.height },
-        }
-
-        setContext(ctx)
+        })
         setIsInitialized(true)
         try {
           onReadyRef.current?.(graph)
-        } catch (callbackError) {
-          logger.error('[WebGPUCanvas] onReady callback failed:', callbackError)
+        } catch (e) {
+          logger.error('[WebGPUCanvas] onReady callback failed:', e)
         }
       } catch (error) {
         pendingGraph?.dispose()
         pendingGraph = null
-        destroyInitializedDevice()
-        if (cancelled) return
+        if (abortIfCancelled()) return
+        if (deviceInitialized && !deviceDestroyed) forceDestroyDevice()
         logger.error('[WebGPUCanvas] Initialization failed:', error)
         const err = error instanceof Error ? error : new Error(String(error))
         setInitError(err)
         try {
           onErrorRef.current?.(err)
-        } catch (callbackError) {
-          logger.error('[WebGPUCanvas] onError callback failed:', callbackError)
+        } catch (e) {
+          logger.error('[WebGPUCanvas] onError callback failed:', e)
         }
       }
     }
@@ -258,10 +287,10 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
       unsubDeviceLost?.()
       pendingGraph?.dispose()
       pendingGraph = null
-      if (graphRef.current) {
-        graphRef.current.dispose()
-        graphRef.current = null
-      }
+      graphRef.current?.dispose()
+      graphRef.current = null
+      // Decrement before destroy so the count reflects "this effect has left".
+      decrementAliveEffects(canvas)
       destroyInitializedDevice()
     }
   }, [])

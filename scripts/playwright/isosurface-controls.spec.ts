@@ -37,7 +37,7 @@ test.describe('isosurface threshold controls', () => {
   test('threshold slider updates store via number input', async ({ page }) => {
     // Enable isosurface mode
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerIsoEnabled(true)
     })
 
@@ -57,7 +57,7 @@ test.describe('isosurface threshold controls', () => {
     // Verify store updated
     await expect(async () => {
       const threshold = await page.evaluate(async () => {
-        const mod = await import('/src/stores/extendedObjectStore.ts')
+        const mod = await import('/src/stores/scene/extendedObjectStore.ts')
         return mod.useExtendedObjectStore.getState().schroedinger.isoThreshold
       })
       expect(threshold).toBeCloseTo(-3, 0)
@@ -73,7 +73,7 @@ test.describe('isosurface threshold controls', () => {
 
     // Enable isosurface and set a low threshold (shows lots of density)
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const store = mod.useExtendedObjectStore.getState()
       store.setSchroedingerIsoEnabled(true)
       store.setSchroedingerIsoThreshold(-1)
@@ -84,7 +84,7 @@ test.describe('isosurface threshold controls', () => {
 
     // Set a high threshold (shows very little)
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerIsoThreshold(-5)
     })
     await waitForUniformUpdate(page)
@@ -101,14 +101,14 @@ test.describe('isosurface threshold controls', () => {
 
     // Enable isosurface
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerIsoEnabled(true)
     })
     await waitForShaderCompilation(page)
 
     // Test min threshold
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerIsoThreshold(-6)
     })
     await waitForUniformUpdate(page)
@@ -116,7 +116,7 @@ test.describe('isosurface threshold controls', () => {
 
     // Test max threshold
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerIsoThreshold(0)
     })
     await waitForUniformUpdate(page)

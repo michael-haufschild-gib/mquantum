@@ -930,6 +930,12 @@ describe('WGSL Emission Pre-Block Conditional Inclusion', () => {
     expect(block).not.toContain('PHASE_HUE_INFLUENCE')
   })
 
+  it('applyDistributionS wraps cycles instead of saturating before fract', () => {
+    const block = generateEmissionPreBlock(1, false)
+    expect(block).toContain('return fract(curved * cycles + offset);')
+    expect(block).not.toContain('fract(clamp(')
+  })
+
   it('algorithm 4 (Mixed) does NOT include applyDistributionS', () => {
     const block = generateEmissionPreBlock(4, false)
     expect(block).not.toContain('fn applyDistributionS(')

@@ -30,6 +30,10 @@ const TDSE_WG_PI:     f32 = 3.14159265358979323846;
 const TDSE_WG_TAU:    f32 = 6.28318530717958647692;
 const TDSE_WG_INV_TAU: f32 = 1.0 / TDSE_WG_TAU;
 
+fn tdsePmlAxisActive(axis: u32) -> bool {
+  return params.absorberEnabled != 0u && (params.compactDimsMask & (1u << axis)) == 0u;
+}
+
 // Convert precomputed fractional lattice coordinates to lo/hi/frac for trilinear
 // interpolation. Returns false if out of bounds. For visible dims
 // (< min(latticeDim,3)): lo/hi/frac. For slice dims (>= 3): nearest-neighbor
@@ -140,7 +144,6 @@ fn computeSuperfluidVelocityMagSq(
   let hbarOverM = params.hbar / max(params.mass, 1e-6);
   let densitySafe = max(density, 1e-20);
   let invDensity = 1.0 / densitySafe;  // per-thread scalar, used inside axis loop
-  let hasPML = params.absorberEnabled != 0u;
   var vsMagSq: f32 = 0.0;
   for (var d: u32 = 0u; d < params.latticeDim; d++) {
     if (params.gridSize[d] <= 1u) { continue; }
@@ -151,15 +154,16 @@ fn computeSuperfluidVelocityMagSq(
     let invDx = 0.5 * invSpacing;
     let atLo = coord == 0u;
     let atHi = coord == Nd - 1u;
+    let pmlAxis = tdsePmlAxisActive(d);
 
     var dRe: f32;
     var dIm: f32;
-    if (hasPML && atLo) {
+    if (pmlAxis && atLo) {
       let fIdx = idx + stride;
       let zF = psi[fIdx];
       dRe = (zF.x - re) * invSpacing;
       dIm = (zF.y - im) * invSpacing;
-    } else if (hasPML && atHi) {
+    } else if (pmlAxis && atHi) {
       let bIdx = idx - stride;
       let zB = psi[bIdx];
       dRe = (re - zB.x) * invSpacing;
@@ -339,7 +343,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // current magnitude via central differences (NN) with PML-aware boundaries
     var currentMagSq: f32 = 0.0;
     let hbarOverM = params.hbar / max(params.mass, 1e-6);
-    let hasPML = params.absorberEnabled != 0u;
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
       if (params.gridSize[d] <= 1u) {
         continue;
@@ -351,15 +354,16 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       let invDx = 0.5 * invSpacing;
       let atLo = coord == 0u;
       let atHi = coord == Nd - 1u;
+      let pmlAxis = tdsePmlAxisActive(d);
 
       var dRe: f32;
       var dIm: f32;
-      if (hasPML && atLo) {
+      if (pmlAxis && atLo) {
         let fIdx = idx + stride;
         let zF = psi[fIdx];
         dRe = (zF.x - re) * invSpacing;
         dIm = (zF.y - im) * invSpacing;
-      } else if (hasPML && atHi) {
+      } else if (pmlAxis && atHi) {
         let bIdx = idx - stride;
         let zB = psi[bIdx];
         dRe = (re - zB.x) * invSpacing;

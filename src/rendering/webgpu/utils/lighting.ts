@@ -20,8 +20,36 @@ import {
 
 import { parseHexColorToLinearRgb } from './color'
 
+const FLOAT32_BYTES = Float32Array.BYTES_PER_ELEMENT
+const FLOATS_PER_VEC3 = 3
+const FLOATS_PER_VEC4 = 4
+const LIGHT_DATA_VEC4_COUNT = 4
+const LIGHT_DATA_FLOAT_LENGTH = LIGHT_DATA_VEC4_COUNT * FLOATS_PER_VEC4
 const MAX_PACKED_LIGHTS = 8
 const MAX_LIGHT_POSITION_COMPONENT = 1_000_000
+
+const roundUpToFloatMultiple = (value: number, multiple: number): number =>
+  Math.ceil(value / multiple) * multiple
+
+const LIGHTING_AMBIENT_COLOR_FLOAT_OFFSET = MAX_PACKED_LIGHTS * LIGHT_DATA_FLOAT_LENGTH
+const LIGHTING_AMBIENT_INTENSITY_FLOAT_OFFSET =
+  LIGHTING_AMBIENT_COLOR_FLOAT_OFFSET + FLOATS_PER_VEC3
+
+/** Float32 index of `LightingUniforms.lightCount`. */
+export const LIGHTING_LIGHT_COUNT_FLOAT_OFFSET = LIGHTING_AMBIENT_INTENSITY_FLOAT_OFFSET + 1
+
+/** Byte offset of `LightingUniforms.lightCount`. */
+export const LIGHTING_LIGHT_COUNT_BYTE_OFFSET =
+  LIGHTING_LIGHT_COUNT_FLOAT_OFFSET * FLOAT32_BYTES
+
+/** Float32 element count for LightingUniforms staging arrays. */
+export const LIGHTING_UNIFORMS_FLOAT_LENGTH = roundUpToFloatMultiple(
+  LIGHTING_LIGHT_COUNT_FLOAT_OFFSET + 1,
+  LIGHT_DATA_FLOAT_LENGTH
+)
+
+/** Total byte size of the LightingUniforms GPU buffer. */
+export const LIGHTING_UNIFORMS_SIZE = LIGHTING_UNIFORMS_FLOAT_LENGTH * FLOAT32_BYTES
 
 /**
  * Minimal subset of the lighting store used by WebGPU renderers.
@@ -72,24 +100,25 @@ function lightTypeToUniform(type: unknown): number {
  * Fill a Float32Array with the packed LightingUniforms layout.
  *
  * WGSL layout (float indices):
- * - lights: 8 × LightData @ 0..127 (each LightData = 16 floats)
- * - ambientColor: vec3f @ 128..130
- * - ambientIntensity: f32 @ 131
- * - lightCount: i32 @ byte offset 132*4
- * - padding @ 133..143
+ * - lights: 8 × LightData @ 0..127
+ * - ambientColor: vec3f @ LIGHTING_AMBIENT_COLOR_FLOAT_OFFSET
+ * - ambientIntensity: f32 @ LIGHTING_AMBIENT_INTENSITY_FLOAT_OFFSET
+ * - lightCount: i32 @ LIGHTING_LIGHT_COUNT_BYTE_OFFSET
  *
- * LightData layout (16 floats):
+ * LightData layout (LIGHT_DATA_FLOAT_LENGTH floats):
  * - position: vec4f  (xyz=position, w=type)
  * - direction: vec4f (xyz=direction, w=range)
  * - color: vec4f     (rgb=linear color, a=intensity)
  * - params: vec4f    (x=decay, y=spotCosInner, z=spotCosOuter, w=enabled(0/1))
  *
- * @param data Output array (must be length >= 144)
+ * @param data Output array (must be length >= LIGHTING_UNIFORMS_FLOAT_LENGTH)
  * @param lighting Lighting state from stores
  */
 export function packLightingUniforms(data: Float32Array, lighting: WebGPULightingState): void {
-  if (data.length < 144) {
-    throw new Error(`packLightingUniforms: expected data length >= 144, got ${data.length}`)
+  if (data.length < LIGHTING_UNIFORMS_FLOAT_LENGTH) {
+    throw new Error(
+      `packLightingUniforms: expected data length >= ${LIGHTING_UNIFORMS_FLOAT_LENGTH}, got ${data.length}`
+    )
   }
 
   data.fill(0)
@@ -102,7 +131,7 @@ export function packLightingUniforms(data: Float32Array, lighting: WebGPULightin
     if (!light) continue
     const lightRecord = isObject(light) ? light : null
     if (!lightRecord) continue
-    const offset = i * 16
+    const offset = i * LIGHT_DATA_FLOAT_LENGTH
 
     // position: vec4f (xyz = position, w = type)
     // Must match WGSL constants: LIGHT_TYPE_POINT=1, LIGHT_TYPE_DIRECTIONAL=2, LIGHT_TYPE_SPOT=3
@@ -160,18 +189,18 @@ export function packLightingUniforms(data: Float32Array, lighting: WebGPULightin
     data[offset + 15] = lightType === 0 || lightRecord.enabled === false ? 0.0 : 1.0
   }
 
-  // ambientColor: vec3f at offset 128
+  // ambientColor: vec3f
   const ambientColor = parseHexColorToLinearRgb(lighting.ambientColor ?? '#ffffff', [1, 1, 1])
-  data[128] = ambientColor[0]
-  data[129] = ambientColor[1]
-  data[130] = ambientColor[2]
+  data[LIGHTING_AMBIENT_COLOR_FLOAT_OFFSET] = ambientColor[0]
+  data[LIGHTING_AMBIENT_COLOR_FLOAT_OFFSET + 1] = ambientColor[1]
+  data[LIGHTING_AMBIENT_COLOR_FLOAT_OFFSET + 2] = ambientColor[2]
 
-  // ambientIntensity: f32 at offset 131 (multiply by enabled flag like WebGL uAmbientEnabled)
-  data[131] =
+  // ambientIntensity: f32 (multiply by enabled flag like WebGL uAmbientEnabled)
+  data[LIGHTING_AMBIENT_INTENSITY_FLOAT_OFFSET] =
     (lighting.ambientEnabled !== false ? 1 : 0) *
     finiteNumberInRange(lighting.ambientIntensity, 0, 1, 0.3)
 
-  // lightCount: i32 at offset 132 (use DataView for correct type)
+  // lightCount: i32 (use DataView for correct type)
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength)
-  view.setInt32(132 * 4, lightCount, true)
+  view.setInt32(LIGHTING_LIGHT_COUNT_BYTE_OFFSET, lightCount, true)
 }

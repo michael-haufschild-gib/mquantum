@@ -118,6 +118,7 @@ const WAVE_EVOLUTION_RESET_HANDLERS: Record<
   wheelerDeWitt: (state) => state.triggerWdwRecompute(),
   antiDeSitter: (state) => state.triggerAdsRecompute(),
   pauli: (state) => state.resetPauliField(),
+  bellPair: (state) => state.resetBellPair(),
 }
 
 /**
@@ -186,7 +187,6 @@ export function useExportRuntime({
       runtime.renderWidth = 0
       runtime.renderHeight = 0
       runtime.originalPerf = {
-        progressiveRefinementEnabled: true,
         renderResolutionScale: 1,
       }
       runtime.loop = createInitialExportLoopState()
@@ -219,9 +219,7 @@ export function useExportRuntime({
     }
 
     const perfStore = usePerformanceStore.getState()
-    perfStore.setProgressiveRefinementEnabled(runtime.originalPerf.progressiveRefinementEnabled)
     perfStore.setRenderResolutionScale(runtime.originalPerf.renderResolutionScale)
-    perfStore.setRefinementStage('final')
 
     runtime.rotationSnapshot = null
   }, [canvas, cameraRef, exportRuntimeRef, graph, size.height, size.width])

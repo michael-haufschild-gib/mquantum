@@ -103,6 +103,44 @@ describe('free scalar field setters', () => {
     expect(getFSF().pmlTargetReflection).toBe(0.999)
   })
 
+  it('rejects malformed free-scalar enum setters without dirtying compute state', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setFreeScalarInitialCondition('singleMode')
+    s.setFreeScalarFieldView('pi')
+    s.clearComputeNeedsReset('freeScalar')
+
+    const before = useExtendedObjectStore.getState()
+    const beforeVersion = before.schroedingerVersion
+
+    s.setFreeScalarInitialCondition('bogus' as never)
+    s.setFreeScalarFieldView('bogus' as never)
+
+    const after = useExtendedObjectStore.getState()
+    expect(after.schroedingerVersion).toBe(beforeVersion)
+    expect(after.schroedinger.freeScalar.initialCondition).toBe('singleMode')
+    expect(after.schroedinger.freeScalar.fieldView).toBe('pi')
+    expect(after.schroedinger.freeScalar.needsReset).toBe(false)
+  })
+
+  it('rejects non-finite free-scalar init vectors before they reach WGSL uniforms', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setFreeScalarPacketCenter([1, 2, 3])
+    s.setFreeScalarModeK([1, 0, -1])
+    s.clearComputeNeedsReset('freeScalar')
+
+    const before = useExtendedObjectStore.getState()
+    const beforeVersion = before.schroedingerVersion
+
+    s.setFreeScalarPacketCenter([4, Number.NaN, 6])
+    s.setFreeScalarModeK([2, Number.POSITIVE_INFINITY, 0])
+
+    const after = useExtendedObjectStore.getState()
+    expect(after.schroedingerVersion).toBe(beforeVersion)
+    expect(after.schroedinger.freeScalar.packetCenter).toEqual([1, 2, 3])
+    expect(after.schroedinger.freeScalar.modeK).toEqual([1, 0, -1])
+    expect(after.schroedinger.freeScalar.needsReset).toBe(false)
+  })
+
   it('creates slice positions for dims > 3', () => {
     const s = useExtendedObjectStore.getState()
     s.setFreeScalarLatticeDim(5)
@@ -259,6 +297,22 @@ describe('free scalar field setters', () => {
       // Refused — cosmology stays off AND self-interaction is untouched.
       expect(getFSF().cosmology.enabled).toBe(false)
       expect(getFSF().selfInteractionEnabled).toBe(true)
+    })
+
+    it('rejects malformed cosmology preset strings without dirtying compute state', () => {
+      const s = useExtendedObjectStore.getState()
+      s.setFreeScalarCosmologyPreset('deSitter')
+      s.clearComputeNeedsReset('freeScalar')
+
+      const before = useExtendedObjectStore.getState()
+      const beforeVersion = before.schroedingerVersion
+
+      s.setFreeScalarCosmologyPreset('bogus' as never)
+
+      const after = useExtendedObjectStore.getState()
+      expect(after.schroedingerVersion).toBe(beforeVersion)
+      expect(after.schroedinger.freeScalar.cosmology.preset).toBe('deSitter')
+      expect(after.schroedinger.freeScalar.needsReset).toBe(false)
     })
 
     it('soft-disables cosmology when reconcile hits an invalid preset combo', () => {

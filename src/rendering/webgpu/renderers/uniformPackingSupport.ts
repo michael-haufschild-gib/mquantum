@@ -27,14 +27,12 @@ import { sanitizePixelExtent } from '../utils/sceneMath'
 import { zeroReservedFields } from '../utils/structLayout'
 import { CAMERA_UNIFORMS_LAYOUT } from './cameraLayout'
 import { MATERIAL_UNIFORMS_LAYOUT } from './materialLayout'
-import { QUALITY_UNIFORMS_LAYOUT } from './qualityLayout'
 import type { CameraSnapshot, TransformSnapshot } from './schrodingerRendererTypes'
 import { SCHROEDINGER_LAYOUT } from './schroedingerLayout'
 
 const I = SCHROEDINGER_LAYOUT.index
 const CL = CAMERA_UNIFORMS_LAYOUT.index
 const ML = MATERIAL_UNIFORMS_LAYOUT.index
-const QL = QUALITY_UNIFORMS_LAYOUT.index
 const DEFAULT_COMPENSATION_DIMENSION = 3
 const DEFAULT_COMPENSATION_BOUNDING_RADIUS = 2.0
 
@@ -374,38 +372,6 @@ export function packMaterialUniforms(
   data[sp + 0] = specularColor[0]
   data[sp + 1] = specularColor[1]
   data[sp + 2] = specularColor[2]
-}
-
-// =========================================================================
-// Quality uniform buffer
-// =========================================================================
-
-/**
- * Pack quality/performance parameters into the quality uniform buffer.
- *
- * @param data - Float32Array(12) for the quality uniform buffer
- * @param dataView - DataView of the same buffer (for int32 writes)
- * @param qualityMultiplier - Current quality multiplier (0.0-1.0+)
- */
-export function packQualityUniforms(
-  data: Float32Array,
-  dataView: DataView,
-  qualityMultiplier: number
-): void {
-  // Live fields. Reserved (`_`-prefixed) slots are zeroed below in one pass
-  // — keeps the buffer-layout-compat zeros declarative.
-  data[QL.sdfSurfaceDistance] = 0.001 / qualityMultiplier
-  data[QL.qualityMultiplier] = qualityMultiplier
-
-  dataView.setInt32(
-    QUALITY_UNIFORMS_LAYOUT.byteOffset.sdfMaxIterations,
-    Math.floor(128 * qualityMultiplier),
-    true
-  )
-
-  // Bulk-zero every reserved (`_`-prefixed) slot. Zero is safe for both
-  // f32 (+0.0) and i32 (0x00000000) — the bit pattern is identical.
-  zeroReservedFields(data, QUALITY_UNIFORMS_LAYOUT)
 }
 
 // =========================================================================

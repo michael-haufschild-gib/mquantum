@@ -85,7 +85,16 @@ export const CosmologyControls: React.FC<CosmologyControlsProps> = React.memo(
     const presetOptions = useMemo(
       () =>
         (['minkowski', 'deSitter', 'ekpyrotic', 'kasner', 'bianchiKasner', 'lqcBounce'] as const)
-          .filter((p) => (p === 'bianchiKasner' ? latticeDim >= 3 : true))
+          // bianchiKasner: this implementation carries exactly three Kasner
+          // exponents and two axis-ratio uniforms; `isValidPreset` in
+          // `presets.ts` enforces `spacetimeDim === 4`, i.e. `latticeDim === 3`.
+          // Selecting bianchiKasner at any other latticeDim would soft-disable
+          // cosmology via `resolveEta0ForPresetSwitch` → `isValidPreset` → false
+          // — silently, with no UI signal — which produces the
+          // "I picked a preset and cosmology turned off by itself" bug.
+          // Loosen this filter only when both `isValidPreset` and the shader
+          // contract gain genuine d-dimensional Bianchi-I support.
+          .filter((p) => (p === 'bianchiKasner' ? latticeDim === 3 : true))
           .map((p) => ({
             value: p,
             label: PRESET_LABELS[p],

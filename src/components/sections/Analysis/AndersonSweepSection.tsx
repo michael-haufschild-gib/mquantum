@@ -194,6 +194,10 @@ export const AndersonSweepSection: React.FC = React.memo(() => {
     useExtendedObjectStore.setState({
       schroedinger: {
         ...schroedinger,
+        // The runtime PML pipeline reads `schroedinger.absorberEnabled` via
+        // applySharedPml — the nested `tdse.absorberEnabled` is shadowed and
+        // never consumed. Restore both for consistency with setTdseAbsorberEnabled.
+        absorberEnabled: saved.absorberEnabled,
         tdse: {
           ...schroedinger.tdse,
           needsReset: true,
@@ -225,15 +229,28 @@ export const AndersonSweepSection: React.FC = React.memo(() => {
     const firstSeed = seedForStep(0)
     const { schroedinger } = useExtendedObjectStore.getState()
     // Capture pre-sweep values so handleAbort / handleReset can restore them.
+    // absorberEnabled is captured from the SHARED top-level field because
+    // applySharedPml (computeGridUtils) reads from that field, not the
+    // tdse-nested one. Capturing the nested copy left runtime absorber state
+    // tied to a value no compute pass ever read, so the sweep's IPR
+    // measurements ran with the absorber active and were biased toward
+    // smaller (more "localized") values.
     savedTdseRef.current = {
       disorderStrength: schroedinger.tdse.disorderStrength,
       disorderSeed: schroedinger.tdse.disorderSeed,
-      absorberEnabled: schroedinger.tdse.absorberEnabled,
+      absorberEnabled: schroedinger.absorberEnabled,
       diagnosticsEnabled: schroedinger.tdse.diagnosticsEnabled,
     }
     useExtendedObjectStore.setState({
       schroedinger: {
         ...schroedinger,
+        // Sweep measures IPR — absorbers would bias localization toward
+        // smaller values by removing wavefunction at boundaries before it
+        // can fully delocalize. Write the SHARED top-level field because the
+        // compute pipeline reads it via applySharedPml; mirror to the nested
+        // field for consistency with setTdseAbsorberEnabled. Restored on
+        // completion / abort / unmount / reset.
+        absorberEnabled: false,
         tdse: {
           ...schroedinger.tdse,
           needsReset: true,
@@ -241,9 +258,6 @@ export const AndersonSweepSection: React.FC = React.memo(() => {
           disorderSeed: firstSeed,
           diagnosticsEnabled: true,
           potentialType: 'andersonDisorder',
-          // Sweep measures IPR — absorbers would bias localization toward
-          // smaller values by removing wavefunction at boundaries before it
-          // can fully delocalize. We restore on completion.
           absorberEnabled: false,
         },
       },

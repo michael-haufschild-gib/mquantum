@@ -218,6 +218,17 @@ function applyCosmologyParams(
   if (urlState.cosmologyLqcInitialRhoRatio !== undefined) {
     ext.setFreeScalarCosmologyLqcInitialRhoRatio(urlState.cosmologyLqcInitialRhoRatio)
   }
+  if (
+    urlState.cosmologyKasnerP1 !== undefined &&
+    urlState.cosmologyKasnerP2 !== undefined &&
+    urlState.cosmologyKasnerP3 !== undefined
+  ) {
+    ext.setFreeScalarCosmologyBianchiExponents(
+      urlState.cosmologyKasnerP1,
+      urlState.cosmologyKasnerP2,
+      urlState.cosmologyKasnerP3
+    )
+  }
   if (urlState.cosmologyEta0 !== undefined) {
     ext.setFreeScalarCosmologyEta0(urlState.cosmologyEta0)
   }
@@ -284,6 +295,54 @@ function applyAdsParams(
   }
   applyAdsBoundStateFields(urlState, ext)
   applyAdsStageTwoFields(urlState, ext)
+}
+
+/**
+ * Apply Bell-pair / CHSH URL state params.
+ *
+ * Sets the four measurement axes, Werner visibility, detection efficiency,
+ * analysis policy, per-particle precession fields, sampler mode, LHV
+ * strategy id, target trial count, trials-per-frame, and optional seed.
+ * Each setter on the BellPair slice clamps its input and bumps
+ * `bellPairVersion` so the strategy picks up changes on the next frame.
+ *
+ * @param urlState - Parsed URL state.
+ * @param ext - Extended-object store snapshot (setters live on this slice).
+ */
+function applyBellParams(
+  urlState: ParsedShareableState,
+  ext: ReturnType<typeof useExtendedObjectStore.getState>
+): void {
+  if (urlState.bellAliceAxis !== undefined) {
+    ext.setBellAliceAxis([urlState.bellAliceAxis[0], urlState.bellAliceAxis[1]])
+  }
+  if (urlState.bellAliceAxisPrime !== undefined) {
+    ext.setBellAliceAxisPrime([urlState.bellAliceAxisPrime[0], urlState.bellAliceAxisPrime[1]])
+  }
+  if (urlState.bellBobAxis !== undefined) {
+    ext.setBellBobAxis([urlState.bellBobAxis[0], urlState.bellBobAxis[1]])
+  }
+  if (urlState.bellBobAxisPrime !== undefined) {
+    ext.setBellBobAxisPrime([urlState.bellBobAxisPrime[0], urlState.bellBobAxisPrime[1]])
+  }
+  if (urlState.bellVisibility !== undefined) ext.setBellVisibility(urlState.bellVisibility)
+  if (urlState.bellDetectionEfficiency !== undefined) {
+    ext.setBellDetectionEfficiency(urlState.bellDetectionEfficiency)
+  }
+  if (urlState.bellAnalysisMode !== undefined) ext.setBellAnalysisMode(urlState.bellAnalysisMode)
+  if (urlState.bellFieldA !== undefined) {
+    ext.setBellFieldA([urlState.bellFieldA[0], urlState.bellFieldA[1], urlState.bellFieldA[2]])
+  }
+  if (urlState.bellFieldB !== undefined) {
+    ext.setBellFieldB([urlState.bellFieldB[0], urlState.bellFieldB[1], urlState.bellFieldB[2]])
+  }
+  if (urlState.bellSamplerMode !== undefined) ext.setBellSamplerMode(urlState.bellSamplerMode)
+  if (urlState.bellLhvStrategyId !== undefined) ext.setBellLhvStrategyId(urlState.bellLhvStrategyId)
+  if (urlState.bellTargetTrials !== undefined) ext.setBellTargetTrials(urlState.bellTargetTrials)
+  if (urlState.bellTrialsPerFrame !== undefined) {
+    ext.setBellTrialsPerFrame(urlState.bellTrialsPerFrame)
+  }
+  if (urlState.bellSeed !== undefined) ext.setBellSeed(urlState.bellSeed)
 }
 
 /**
@@ -527,6 +586,7 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
     applyCosmologyParams(urlState, ext)
     applyWdwParams(urlState, ext)
     applyAdsParams(urlState, ext)
+    applyBellParams(urlState, ext)
     applySrmtSweepParams(urlState, ext.schroedinger.quantumMode)
   } catch (error) {
     logger.warn('[useUrlState] Failed to apply URL state:', error)

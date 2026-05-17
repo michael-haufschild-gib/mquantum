@@ -127,6 +127,12 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
       if (!isAvailable) {
         if (objectType === 'pauliSpinor') {
           setColorAlgorithm('pauliSpinDensity')
+        } else if (objectType === 'bellPair') {
+          // Bell allowlist is narrow (5 algos); 'radialDistance' is not in it,
+          // so falling through to the compute/analytic default would leave the
+          // Select with a value the dropdown can't render. Pin to the Bell
+          // registry default instead.
+          setColorAlgorithm('pauliSpinDensity')
         } else {
           setColorAlgorithm(isComputeMode ? 'blackbody' : 'radialDistance')
         }

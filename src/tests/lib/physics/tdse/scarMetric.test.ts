@@ -156,6 +156,43 @@ describe('computeScarCorrelation', () => {
     expect(Number.isFinite(result.meanCorrelation)).toBe(true)
     expect(Number.isFinite(result.orbitCorrelation)).toBe(true)
   })
+
+  it('orbit point outside the grid does not pollute weight via linearIdx aliasing', () => {
+    // Regression: addGaussianKernel previously processed the initial
+    // coords=[lo,...] iteration even when lo[d] > hi[d] for some dim
+    // (orbit beyond the grid). When some dims had valid ranges and
+    // others were out-of-grid, linearIdx aliased the out-of-grid index
+    // into a valid linear slot — silently writing Gaussian weight to
+    // unrelated cells. The kernel writes must collapse to zero (no
+    // contribution at all) for an orbit whose center is beyond the
+    // grid in any dimension.
+    const gridSize = [8, 8]
+    const spacing = [1.0, 1.0]
+    const totalSites = 64
+
+    // Orbit at physical (1, 8): with halfGrid=3.5 and radius=3 (for
+    // tubeWidth=1, spacing=1) centerGrid = (4.5, 11.5) → center=(5,12)
+    // → lo=(2, 9), hi=(7, 7). Box empty in dim 1.
+    //
+    // Pre-fix, the kernel aliased writes to cells with
+    // linearIdx = coords[0]*8 + 9 for coords[0] = 2..6 — that maps to
+    // cells (3,1), (4,1), (5,1), (6,1), (7,1) in 8×8 row-major.
+    // Put density at those exact cells so any aliased weight produces
+    // a spurious non-zero correlation.
+    const re = new Float32Array(totalSites)
+    for (let row = 3; row <= 7; row++) re[row * 8 + 1] = 1.0
+    const im = new Float32Array(totalSites)
+
+    const orbitOutside = makeTrajectory([makePoint([1, 8])])
+    const result = computeScarCorrelation(re, im, [orbitOutside], gridSize, spacing, 1.0)
+
+    // Post-fix the weight map is identically zero (no kernel writes),
+    // so the correlation collapses to 0 (denominator 0 → C = 0).
+    // Pre-fix this returned a non-zero correlation from the aliased
+    // weights landing on the density-occupied cells.
+    expect(result.maxCorrelation).toBe(0)
+    expect(result.orbitCorrelations[0]).toBe(0)
+  })
 })
 
 // ---------------------------------------------------------------------------

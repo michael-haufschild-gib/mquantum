@@ -407,6 +407,26 @@ describe('packSchroedingerUniforms — hydrogen modes', () => {
     expect(floatView[I.emissionColorShift]).toBe(0)
   })
 
+  it('sanitizes restored manual Wigner controls before GPU upload', () => {
+    const { floatView, intView } = makeBuffer()
+    packSchroedingerUniforms(floatView, intView, {
+      ...baseParams,
+      schroedinger: {
+        representation: 'wigner',
+        wignerAutoRange: false,
+        wignerDimensionIndex: Number.NaN,
+        wignerXRange: Number.NaN,
+        wignerPRange: Number.POSITIVE_INFINITY,
+        wignerQuadPoints: Number.NEGATIVE_INFINITY,
+      } as never,
+    })
+
+    expect(intView[I.wignerDimensionIndex]).toBe(0)
+    expect(floatView[I.wignerXRange]).toBe(6)
+    expect(floatView[I.wignerPRange]).toBe(6)
+    expect(intView[I.wignerQuadPoints]).toBe(32)
+  })
+
   it('uses appearance.faceEmissionColorShift in non-Wigner representations', () => {
     const { floatView, intView } = makeBuffer()
     packSchroedingerUniforms(floatView, intView, {

@@ -403,5 +403,22 @@ describe('useColorPickerState', () => {
       })
       expect(writeText).toHaveBeenCalledWith('#abcdef')
     })
+
+    it('writes the latest emitted color when the value prop has not caught up', async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined)
+      vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+
+      const { result } = renderHook(() =>
+        useColorPickerState({ value: '#000000', onChange: vi.fn(), disableAlpha: false })
+      )
+      act(() => {
+        result.current.handleHsvChange({ h: 0, s: 1, v: 1, a: 1 })
+      })
+      await act(async () => {
+        await result.current.handleCopy()
+      })
+
+      expect(writeText).toHaveBeenCalledWith('#ff0000')
+    })
   })
 })

@@ -44,7 +44,7 @@ async function waitForTdseReadbacks(
 /** Read the TDSE diagnostic snapshot currently in the unified store. */
 async function readTdseDiagnostics(page: import('@playwright/test').Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/diagnosticsStore.ts')
+    const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
     const s = mod.useDiagnosticsStore.getState().tdse
     return {
       simTime: s.simTime,
@@ -82,7 +82,7 @@ test.describe('TDSE Decoherent Branching Visualization', () => {
     expect(state, 'renderer must reach ready state (WebGPU required)').toBe('ready')
 
     const store = await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const tdse = mod.useExtendedObjectStore.getState().schroedinger.tdse
       return {
         branchingEnabled: tdse.branchingEnabled,
@@ -128,7 +128,7 @@ test.describe('TDSE Decoherent Branching Visualization', () => {
     // the simulation timeline continuous so differences are attributable
     // to the plane move).
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setTdseBranchPlanePosition(0.5)
     })
     await waitForFreshReadback(page, DIAGNOSTICS_MODULE, 30_000, 'tdse')

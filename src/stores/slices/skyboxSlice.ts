@@ -208,8 +208,9 @@ function sanitizeProceduralValue(
   return undefined
 }
 
-function sanitizeProceduralSettingsPatch(
-  settings: Partial<SkyboxProceduralSettings>
+/** Validate a procedural skybox settings patch against the default settings schema. */
+export function sanitizeSkyboxProceduralSettingsPatch(
+  settings: unknown
 ): Partial<SkyboxProceduralSettings> {
   const sanitized = sanitizeProceduralValue(
     settings,
@@ -242,7 +243,8 @@ function deepMergeRecord(
   return merged
 }
 
-function mergeProceduralSettings(
+/** Deep-merge a sanitized procedural skybox patch into existing/default settings. */
+export function mergeSkyboxProceduralSettings(
   base: SkyboxProceduralSettings,
   patch: Partial<SkyboxProceduralSettings>
 ): SkyboxProceduralSettings {
@@ -393,13 +395,16 @@ export const createSkyboxSlice: StateCreator<SkyboxSlice, [], [], SkyboxSlice> =
   setSkyboxLoading: (loading: boolean) => set({ skyboxLoading: loading }),
   setProceduralSettings: (settings: Partial<SkyboxProceduralSettings>) =>
     set((state) => {
-      const sanitizedSettings = sanitizeProceduralSettingsPatch(settings)
+      const sanitizedSettings = sanitizeSkyboxProceduralSettingsPatch(settings)
       if (Object.keys(sanitizedSettings).length === 0) {
         return {}
       }
 
       return {
-        proceduralSettings: mergeProceduralSettings(state.proceduralSettings, sanitizedSettings),
+        proceduralSettings: mergeSkyboxProceduralSettings(
+          state.proceduralSettings,
+          sanitizedSettings
+        ),
       }
     }),
   setClassicCubeTexture: (texture: unknown | null) => set({ classicCubeTexture: texture }),

@@ -48,6 +48,7 @@ const FIRST_PRESET_IDS = {
   wheelerDeWitt: 'noBoundaryBaseline',
   antiDeSitterDefault: 'adsFourGround',
   antiDeSitter3D: 'adsThreeGround',
+  bellTest: 'canonicalCHSH',
 } as const
 
 function resolveHydrogenCoupled(dimension: number): string | undefined {
@@ -84,6 +85,7 @@ const PRESET_RESOLVERS: Readonly<Record<QuantumTypeKey, FirstPresetResolver>> = 
   pauliSpinor: () => FIRST_PRESET_IDS.pauliSpinor,
   wheelerDeWitt: () => FIRST_PRESET_IDS.wheelerDeWitt,
   antiDeSitter: resolveAntiDeSitter,
+  bellTest: () => FIRST_PRESET_IDS.bellTest,
 }
 
 /**

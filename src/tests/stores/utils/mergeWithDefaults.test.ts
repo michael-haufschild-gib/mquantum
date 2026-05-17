@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from 'vitest'
 
+import { DIRAC_MAX_TOTAL_SITES } from '@/lib/geometry/extended/dirac'
 import { DEFAULT_PAULI_CONFIG, DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
 import { DEFAULT_WHEELER_DEWITT_CONFIG } from '@/lib/geometry/extended/wheelerDeWitt'
 import { mergeExtendedObjectStateForType } from '@/stores/utils/mergeWithDefaults'
@@ -111,7 +112,7 @@ describe('mergeExtendedObjectStateForType — schroedinger', () => {
       expect(schroedinger.isoEnabled).toBe(false)
     })
 
-    it('clears loaded isosurface mode for compute-backed quantum modes', () => {
+    it('preserves loaded isosurface mode for compute-backed quantum modes', () => {
       const savedState = {
         schroedinger: {
           quantumMode: 'tdseDynamics',
@@ -123,7 +124,7 @@ describe('mergeExtendedObjectStateForType — schroedinger', () => {
       const schroedinger = merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
 
       expect(schroedinger.quantumMode).toBe('tdseDynamics')
-      expect(schroedinger.isoEnabled).toBe(false)
+      expect(schroedinger.isoEnabled).toBe(true)
     })
   })
 
@@ -297,6 +298,58 @@ describe('mergeExtendedObjectStateForType — cosmology invariants', () => {
     const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
     const fs = (merged.schroedinger as { freeScalar: Record<string, unknown> }).freeScalar
     expect(fs.gridSize).toEqual([64, 64, 64])
+  })
+
+  it('sanitizes loaded freeScalar init enums and vectors before direct restore reaches shaders', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'freeScalarField',
+        freeScalar: {
+          latticeDim: 3,
+          gridSize: [32, 32, 32],
+          initialCondition: 'bogus',
+          fieldView: 'bogus',
+          packetCenter: [1, Number.NaN, 2],
+          modeK: [2, Number.POSITIVE_INFINITY, 0],
+          needsReset: false,
+        },
+      },
+    }
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const fs = (merged.schroedinger as { freeScalar: Record<string, unknown> }).freeScalar
+
+    expect(fs.initialCondition).toBe(DEFAULT_SCHROEDINGER_CONFIG.freeScalar.initialCondition)
+    expect(fs.fieldView).toBe(DEFAULT_SCHROEDINGER_CONFIG.freeScalar.fieldView)
+    expect(fs.packetCenter).toEqual(DEFAULT_SCHROEDINGER_CONFIG.freeScalar.packetCenter)
+    expect(fs.modeK).toEqual(DEFAULT_SCHROEDINGER_CONFIG.freeScalar.modeK)
+    expect(fs.needsReset).toBe(true)
+  })
+
+  it('sanitizes loaded freeScalar preheating before direct restore reaches mass uniforms', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'freeScalarField',
+        freeScalar: {
+          latticeDim: 3,
+          gridSize: [32, 32, 32],
+          preheating: {
+            enabled: true,
+            amplitude: Number.NaN,
+            frequency: Number.POSITIVE_INFINITY,
+          },
+          needsReset: false,
+        },
+      },
+    }
+
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const fs = (merged.schroedinger as { freeScalar: Record<string, unknown> }).freeScalar
+    const preheating = fs.preheating as Record<string, unknown>
+
+    expect(preheating.enabled).toBe(true)
+    expect(preheating.amplitude).toBe(DEFAULT_SCHROEDINGER_CONFIG.freeScalar.preheating.amplitude)
+    expect(preheating.frequency).toBe(DEFAULT_SCHROEDINGER_CONFIG.freeScalar.preheating.frequency)
+    expect(fs.needsReset).toBe(true)
   })
 
   it('soft-disables cosmology when the loaded latticeDim is out of the supported range', () => {
@@ -589,6 +642,46 @@ describe('mergeExtendedObjectStateForType — Dirac enum invariants', () => {
     expect(dirac.potentialType).toBe('coulomb')
     expect(dirac.initialCondition).toBe('planeWave')
     expect(dirac.fieldView).toBe('currentDensity')
+  })
+
+  it('reduces oversized loaded Dirac grids before GPU resources are built', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'diracEquation',
+        dirac: {
+          latticeDim: 11,
+          gridSize: Array(11).fill(4),
+        },
+      },
+    }
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const dirac = (merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG).dirac
+    const totalSites = dirac.gridSize
+      .slice(0, dirac.latticeDim)
+      .reduce((product, axis) => product * axis, 1)
+
+    expect(dirac.latticeDim).toBe(11)
+    expect(totalSites).toBeLessThanOrEqual(DIRAC_MAX_TOTAL_SITES)
+  })
+
+  it('raises undersized loaded Dirac grids to preserve storage-buffer offset alignment', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'diracEquation',
+        dirac: {
+          latticeDim: 2,
+          gridSize: [2, 2],
+        },
+      },
+    }
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const dirac = (merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG).dirac
+    const totalSites = dirac.gridSize
+      .slice(0, dirac.latticeDim)
+      .reduce((product, axis) => product * axis, 1)
+
+    expect(dirac.gridSize).toEqual([8, 8])
+    expect(totalSites).toBeGreaterThanOrEqual(64)
   })
 })
 

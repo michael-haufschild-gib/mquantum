@@ -43,14 +43,14 @@ async function waitForPipelineGenAdvance(
 
 async function setIsoEnabled(page: import('@playwright/test').Page, enabled: boolean) {
   await page.evaluate(async (iso: boolean) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerIsoEnabled(iso)
   }, enabled)
 }
 
 async function enableDecoherence(page: import('@playwright/test').Page, branching = true) {
   await page.evaluate(async (b: boolean) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     const ext = mod.useExtendedObjectStore.getState()
     ext.setTdseStochasticEnabled(true)
     ext.setTdseStochasticGamma(1.0)
@@ -67,7 +67,7 @@ async function pixels(page: import('@playwright/test').Page) {
 /** Read density grid center voxel via the diagnostics density channel. */
 async function readDensityCenter(page: import('@playwright/test').Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/diagnosticsStore.ts')
+    const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
     const d = mod.useDiagnosticsStore.getState().density
     return {
       hasData: d.hasData,

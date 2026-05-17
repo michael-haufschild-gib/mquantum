@@ -91,7 +91,17 @@ export function computeLevelSpacing(energies: number[], iprs?: number[]): LevelS
 
   // Unfolding: normalize by mean spacing
   const meanSpacing = rawSpacings.reduce((a, b) => a + b, 0) / rawSpacings.length
-  const spacings = meanSpacing > 0 ? rawSpacings.map((s) => s / meanSpacing) : rawSpacings
+  if (meanSpacing <= 0) {
+    return {
+      energies: sorted,
+      spacings: rawSpacings,
+      meanSpacing,
+      brodyBeta: 0,
+      classification: 'poisson',
+      meanIPR,
+    }
+  }
+  const spacings = rawSpacings.map((s) => s / meanSpacing)
 
   // Brody parameter fit via maximum likelihood
   const brodyBeta = fitBrodyParameter(spacings)

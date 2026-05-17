@@ -243,7 +243,7 @@ async function computeEigenstateDiagnosticsAsync(
       sumDensitySq += density * density
     }
     const normSq = sumDensity * sumDensity
-    const ipr = normSq > 0 ? sumDensitySq / normSq : 0
+    const ipr = sumDensitySq > 0 ? normSq / sumDensitySq : 0
 
     // Orbit correlation: compare eigenstate density against classical trajectories
     // at the same energy on the CLEAN (disorder-free) Hamiltonian.

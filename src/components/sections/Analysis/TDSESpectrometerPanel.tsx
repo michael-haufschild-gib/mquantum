@@ -105,6 +105,7 @@ export const TDSESpectrometerPanel: React.FC<TDSESpectrometerPanelProps> = React
       enabled,
       sampleInterval,
       sampleCount,
+      sampleVersion,
       resetVersion,
       hamiltonianTimeDependent,
       bufferRef,
@@ -116,6 +117,7 @@ export const TDSESpectrometerPanel: React.FC<TDSESpectrometerPanelProps> = React
         enabled: s.enabled,
         sampleInterval: s.sampleInterval,
         sampleCount: s.sampleCount,
+        sampleVersion: s.sampleVersion,
         resetVersion: s.resetVersion,
         hamiltonianTimeDependent: s.hamiltonianTimeDependent,
         bufferRef: s.bufferRef,
@@ -195,25 +197,26 @@ export const TDSESpectrometerPanel: React.FC<TDSESpectrometerPanelProps> = React
 
     /* ── Live-update effect ─────────────────────────────────── */
     // Recompute the spectrum every LIVE_UPDATE_SAMPLE_STRIDE new
-    // samples while enabled. Reads `liveUpdate` and
-    // `hamiltonianTimeDependent` inside the effect body so toggling
-    // them mid-capture does not require re-subscribing.
-    const lastComputedCountRef = useRef(0)
+    // samples while enabled. Depends on `sampleVersion` (not just
+    // `sampleCount`) so updates keep firing even after the ring buffer
+    // reaches capacity and `sampleCount` saturates.
+    const lastComputedVersionRef = useRef(0)
     useEffect(() => {
       if (!liveUpdate) return
       if (hamiltonianTimeDependent) return
       if (sampleCount < HELLER_DEFAULT_MIN_SAMPLES) return
-      if (sampleCount - lastComputedCountRef.current < LIVE_UPDATE_SAMPLE_STRIDE) return
-      lastComputedCountRef.current = sampleCount
+      if (sampleVersion - lastComputedVersionRef.current < LIVE_UPDATE_SAMPLE_STRIDE) return
+      lastComputedVersionRef.current = sampleVersion
       setComputeAttempted(true)
       setSpectrum(runHellerCompute())
-    }, [sampleCount, liveUpdate, hamiltonianTimeDependent])
+    }, [sampleVersion, liveUpdate, hamiltonianTimeDependent, sampleCount])
 
     // Reset the live-update stride anchor on any capture reset so the
     // first post-reset sample above the min-gate triggers a fresh
     // compute instead of waiting another LIVE_UPDATE_SAMPLE_STRIDE.
     useEffect(() => {
-      lastComputedCountRef.current = 0
+      lastComputedVersionRef.current = sampleVersion
+      // eslint-disable-next-line @eslint-react/exhaustive-deps
     }, [resetVersion])
 
     /* ── Debounced sample-interval slider ───────────────────── */
@@ -247,12 +250,12 @@ export const TDSESpectrometerPanel: React.FC<TDSESpectrometerPanelProps> = React
     const captureFull = sampleCount >= bufferCapacity
 
     // bufferRef is a stable mutable reference from the pass that mutates
-    // in place (React cannot observe this). Pass sampleCount through to
+    // in place (React cannot observe this). Pass sampleVersion through to
     // force re-derivation when the buffer advances — otherwise T captured /
-    // Δω / Nyquist rows would freeze at the first frame's values.
+    // Δω / Nyquist rows would freeze once the ring buffer is full.
     const timing = useMemo(
-      () => deriveCaptureTiming(bufferRef, sampleCount),
-      [bufferRef, sampleCount]
+      () => deriveCaptureTiming(bufferRef, sampleVersion),
+      [bufferRef, sampleVersion]
     )
 
     const potentialIncompatible = useMemo(

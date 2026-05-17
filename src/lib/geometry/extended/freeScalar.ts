@@ -44,6 +44,37 @@ export type FreeScalarInitialCondition =
   | 'gaussianPacket'
   | 'kinkProfile'
 
+/** Runtime list of valid free-scalar initial-condition enum values. */
+export const FREE_SCALAR_INITIAL_CONDITIONS = [
+  'vacuumNoise',
+  'singleMode',
+  'gaussianPacket',
+  'kinkProfile',
+] as const satisfies readonly FreeScalarInitialCondition[]
+
+/** Return whether a runtime value is a supported free-scalar initial condition. */
+export function isFreeScalarInitialCondition(value: unknown): value is FreeScalarInitialCondition {
+  return (
+    typeof value === 'string' &&
+    FREE_SCALAR_INITIAL_CONDITIONS.includes(value as FreeScalarInitialCondition)
+  )
+}
+
+/** Runtime list of valid free-scalar field-view enum values. */
+export const FREE_SCALAR_FIELD_VIEWS = [
+  'phi',
+  'pi',
+  'energyDensity',
+  'wallDensity',
+  'freezeOutStrain',
+  'equationOfState',
+] as const satisfies readonly FreeScalarFieldView[]
+
+/** Return whether a runtime value is a supported free-scalar field view. */
+export function isFreeScalarFieldView(value: unknown): value is FreeScalarFieldView {
+  return typeof value === 'string' && FREE_SCALAR_FIELD_VIEWS.includes(value as FreeScalarFieldView)
+}
+
 /** Maximum total free scalar lattice sites (~8MB for phi+pi buffers). */
 export const FREE_SCALAR_MAX_TOTAL_SITES = 1048576
 

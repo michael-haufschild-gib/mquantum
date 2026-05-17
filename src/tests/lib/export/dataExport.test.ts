@@ -399,7 +399,13 @@ describe('exportWavefunctionSliceCSV', () => {
     expect(exportWavefunctionSliceCSV('wavefunction', 'x')).toBe('')
   })
 
-  it('exports density grid slice with correct position mapping', () => {
+  it('exports density grid slice with voxel-centered position labels', () => {
+    // The DensityGrid compute shader writes voxel i at world position
+    // (-bound + (i + 0.5) * 2*bound/N) — see densityGrid.wgsl.ts. Exported
+    // positions must match that voxel-center convention so analytic
+    // comparisons (e.g. Gaussian sigma fits) aren't biased outward by a
+    // half-voxel. For N=5 and worldBound=2: voxel-centers are at
+    // -1.6, -0.8, 0.0, 0.8, 1.6.
     const sliceX = new Float32Array([0.1, 0.5, 0.9, 0.5, 0.1])
     useDiagnosticsStore.getState().pushDensitySlices({
       sliceX,
@@ -414,14 +420,16 @@ describe('exportWavefunctionSliceCSV', () => {
     expect(lines[0]).toBe('position_x,density')
     expect(lines).toHaveLength(6) // header + 5 data rows
 
-    // First position should be -worldBound = -2.0
     const firstRow = lines[1]!.split(',').map(Number)
-    expect(firstRow[0]).toBeCloseTo(-2.0)
+    expect(firstRow[0]).toBeCloseTo(-1.6)
     expect(firstRow[1]).toBeCloseTo(0.1)
 
-    // Last position should be +worldBound = 2.0
+    const middleRow = lines[3]!.split(',').map(Number)
+    expect(middleRow[0]).toBeCloseTo(0.0)
+    expect(middleRow[1]).toBeCloseTo(0.9)
+
     const lastRow = lines[5]!.split(',').map(Number)
-    expect(lastRow[0]).toBeCloseTo(2.0)
+    expect(lastRow[0]).toBeCloseTo(1.6)
     expect(lastRow[1]).toBeCloseTo(0.1)
   })
 

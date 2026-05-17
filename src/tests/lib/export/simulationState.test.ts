@@ -260,6 +260,7 @@ describe('simulationState serialization', () => {
       'wheelerDeWitt',
       'antiDeSitter',
       'pauliSpinor',
+      'bellTest',
     ] as const
     const stateSaveIds = getQuantumTypeStateSaveIdMap()
 

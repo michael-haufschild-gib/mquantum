@@ -27,7 +27,7 @@ fn forwardPhaseNeighbor(
   if (coord + 1u < Nd) {
     return siteIdx + stride;
   }
-  if (params.absorberEnabled != 0u) {
+  if (tdsePmlAxisActive(axis)) {
     return siteIdx;
   }
   return siteIdx - stride * (Nd - 1u);

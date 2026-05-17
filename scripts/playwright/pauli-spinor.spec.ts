@@ -51,8 +51,8 @@ const waitForPauliReady = (page: Page, extraFrames = 120) => waitForModeReady(pa
 /** Set Pauli field view via store mutation (syncs color algorithm). */
 async function setFieldView(page: Page, view: string): Promise<void> {
   await page.evaluate(async (v) => {
-    const storeMod = await import('/src/stores/extendedObjectStore.ts')
-    const appMod = await import('/src/stores/appearanceStore.ts')
+    const storeMod = await import('/src/stores/scene/extendedObjectStore.ts')
+    const appMod = await import('/src/stores/scene/appearanceStore.ts')
     ;(
       storeMod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setPauliFieldView(v)
@@ -72,7 +72,7 @@ async function setFieldView(page: Page, view: string): Promise<void> {
 /** Set color algorithm via appearance store. */
 async function setColorAlgorithm(page: Page, algo: string): Promise<void> {
   await page.evaluate(async (a) => {
-    const mod = await import('/src/stores/appearanceStore.ts')
+    const mod = await import('/src/stores/scene/appearanceStore.ts')
     mod.useAppearanceStore.setState({ colorAlgorithm: a })
   }, algo)
 }
@@ -80,7 +80,7 @@ async function setColorAlgorithm(page: Page, algo: string): Promise<void> {
 /** Enable isosurface mode via store. */
 async function enableIsosurface(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerIsoEnabled(true)
   })
 }
@@ -88,7 +88,7 @@ async function enableIsosurface(page: Page): Promise<void> {
 /** Set Pauli magnetic field type via store. */
 async function setFieldType(page: Page, fieldType: string): Promise<void> {
   await page.evaluate(async (ft) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setPauliConfig({ fieldType: ft, needsReset: true })
@@ -98,7 +98,7 @@ async function setFieldType(page: Page, fieldType: string): Promise<void> {
 /** Set Pauli autoScale enabled/disabled. */
 async function setAutoScale(page: Page, enabled: boolean): Promise<void> {
   await page.evaluate(async (val) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setPauliAutoScale(val)
@@ -277,7 +277,7 @@ test.describe('Pauli spinor: control response', () => {
 
     // Pure spin-up
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       ;(
         mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
       ).setPauliConfig({ initialCondition: 'gaussianSpinUp', needsReset: true })
@@ -290,7 +290,7 @@ test.describe('Pauli spinor: control response', () => {
 
     // Superposition
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       ;(
         mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
       ).setPauliConfig({ initialCondition: 'gaussianSuperposition', needsReset: true })

@@ -2,7 +2,7 @@
 
 ## Object Type Constraint
 
-Two object types: `ObjectType = 'schroedinger' | 'pauliSpinor'`. Both are quantum wavefunctions rendered through the same pipeline.
+Three object types: `ObjectType = 'schroedinger' | 'pauliSpinor' | 'bellPair'`. The first two are single-particle quantum wavefunctions; `bellPair` is the two-qubit entangled spin state used by the Bell / CHSH experiment. All three render through the same WebGPU pipeline.
 
 ## Supported Quantum Modes
 
@@ -25,6 +25,12 @@ Two object types: `ObjectType = 'schroedinger' | 'pauliSpinor'`. Both are quantu
 | BEC Dynamics      | `becDynamics`     | Bose-Einstein condensate via Gross-Pitaevskii equation            |
 | Dirac Equation    | `diracEquation`   | Relativistic Dirac equation on a lattice                          |
 | Quantum Walk      | `quantumWalk`     | Discrete-time quantum walk with coin operator                     |
+
+### Foundational Quantum Tests
+
+| Mode      | Key        | Object type | Hilbert space    | Key Parameters                                                                                                                                                                                                          |
+| --------- | ---------- | ----------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bell Test | `bellTest` | `bellPair`  | ℂ² ⊗ ℂ² (4 amps) | Four CHSH measurement axes (`aliceAxis`, `aliceAxisPrime`, `bobAxis`, `bobAxisPrime`); Werner visibility `v ∈ [0,1]` (threshold 1/√2 ≈ 0.7071); detection efficiency `η ∈ [0,1]` (Eberhard threshold 2/(1+√2) ≈ 0.8284); analysisMode `fairSampling \| assignNonDetection`; per-particle precession fields `fieldA`, `fieldB`; sampler `qm \| lhv` with three canonical LHV strategies. Trial loop runs in `useBellExperimentStore.processTrialBatch` driven from the renderer strategy; CHSH `S` and 95 % Wald CI are computed online with a side-by-side LHV baseline so the audience sees the classical bound `\|S\| ≤ 2` and the Tsirelson bound `\|S\| = 2√2` in the same plot. (η, v) atlas sweep panel scans the loophole plane and renders a heatmap of the violation region. |
 
 ## Wheeler–DeWitt SRMT Diagnostic (display-only overlay)
 

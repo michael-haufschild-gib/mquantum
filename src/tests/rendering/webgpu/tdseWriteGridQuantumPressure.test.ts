@@ -20,7 +20,7 @@ describe('tdseWriteGrid quantum pressure view', () => {
     expect(tdseQuantumPressureBlock).toContain('sqrt(max(density, 1e-30))')
     expect(tdseQuantumPressureBlock).toContain('var laplacianR: f32 = 0.0;')
     expect(tdseQuantumPressureBlock).toContain('(*invSpacings)[d]')
-    expect(tdseQuantumPressureBlock).toContain('params.absorberEnabled != 0u')
+    expect(tdseQuantumPressureBlock).toContain('let pmlAxis = tdsePmlAxisActive(d);')
     expect(tdseQuantumPressureBlock).toContain('sqrt(max(dot(zF, zF), 1e-30))')
     expect(tdseQuantumPressureBlock).toContain('laplacianR += (rF - 2.0 * rCenter + rB) * invDx2;')
     expect(tdseQuantumPressureBlock).toContain('params.hbar * params.hbar')

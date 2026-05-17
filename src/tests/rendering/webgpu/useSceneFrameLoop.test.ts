@@ -27,7 +27,6 @@ function createDeps(overrides: Partial<SceneFrameLoopDeps> = {}): SceneFrameLoop
     executeSceneFrame: vi.fn(),
     tickExport: vi.fn(() => false),
     cleanupExport: vi.fn(),
-    interactionTimerRef: { current: null },
     ...overrides,
   }
 }

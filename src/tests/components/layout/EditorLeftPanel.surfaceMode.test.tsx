@@ -64,7 +64,7 @@ describe('EditorLeftPanel surface mode selector', () => {
     expect(screen.queryByTestId('surface-mode-selector')).not.toBeInTheDocument()
   })
 
-  it('hides mode selector for compute modes even if iso state is stale', () => {
+  it('shows mode selector for compute modes with isosurface enabled', () => {
     useExtendedObjectStore.setState((state) => ({
       schroedinger: {
         ...state.schroedinger,
@@ -75,7 +75,7 @@ describe('EditorLeftPanel surface mode selector', () => {
 
     render(<EditorLeftPanel />)
 
-    expect(screen.queryByTestId('surface-mode-selector')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('schroedinger-iso-threshold')).not.toBeInTheDocument()
+    expect(screen.getByTestId('surface-mode-selector')).toBeInTheDocument()
+    expect(screen.getByTestId('schroedinger-iso-threshold')).toBeInTheDocument()
   })
 })

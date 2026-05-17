@@ -8,36 +8,9 @@ import {
   packBasisVectors,
   packCameraUniforms,
   packMaterialUniforms,
-  packQualityUniforms,
   packSchroedingerUniforms,
 } from '@/rendering/webgpu/renderers/uniformPacking'
 import { MAX_DIM, MAX_TERMS } from '@/rendering/webgpu/shaders/schroedinger/uniforms.wgsl'
-
-describe('packQualityUniforms', () => {
-  it('packs maxSamples from quality multiplier at int offset 0', () => {
-    const buffer = new ArrayBuffer(48)
-    const dataView = new DataView(buffer)
-    const floatView = new Float32Array(buffer)
-
-    packQualityUniforms(floatView, dataView, 1.0)
-
-    expect(dataView.getInt32(0, true)).toBe(128)
-    expect(floatView[1]).toBeCloseTo(0.001)
-    expect(floatView[8]).toBe(1.0)
-  })
-
-  it('scales maxSamples proportionally to quality multiplier', () => {
-    const buffer = new ArrayBuffer(48)
-    const dataView = new DataView(buffer)
-    const floatView = new Float32Array(buffer)
-
-    packQualityUniforms(floatView, dataView, 0.5)
-
-    expect(dataView.getInt32(0, true)).toBe(64)
-    expect(floatView[1]).toBeCloseTo(0.002)
-    expect(floatView[8]).toBe(0.5)
-  })
-})
 
 describe('packBasisVectors', () => {
   it('initializes with identity basis when no vectors provided', () => {
@@ -772,6 +745,26 @@ describe('packSchroedingerUniforms', () => {
     expect(floatView[index.quantumBackreactionLensingStrength]).toBe(3)
     expect(floatView[index.quantumBackreactionCausticGain]).toBe(2)
     expect(floatView[index.quantumBackreactionSoftening]).toBeCloseTo(0.05)
+  })
+
+  it('sanitizes non-finite quantum backreaction lensing controls before GPU upload', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      schroedinger: {
+        quantumBackreactionLensingEnabled: true,
+        quantumBackreactionLensingStrength: Number.NaN,
+        quantumBackreactionCausticGain: Number.POSITIVE_INFINITY,
+        quantumBackreactionSoftening: Number.NaN,
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    const index = SCHROEDINGER_LAYOUT.index
+    expect(intView[index.quantumBackreactionLensingEnabled]).toBe(1)
+    expect(Number.isFinite(floatView[index.quantumBackreactionLensingStrength])).toBe(true)
+    expect(Number.isFinite(floatView[index.quantumBackreactionCausticGain])).toBe(true)
+    expect(Number.isFinite(floatView[index.quantumBackreactionSoftening])).toBe(true)
   })
 
   it('zeroes bilocal ER bridge uniforms when disabled', () => {

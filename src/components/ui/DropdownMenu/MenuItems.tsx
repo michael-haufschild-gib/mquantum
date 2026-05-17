@@ -165,7 +165,6 @@ export const MenuItems: React.FC<{
             <AnimatePresence>
               {hasSubmenu && isSubmenuOpen && submenuTriggerRect && (
                 <PortaledSubmenu
-                  items={item.items!}
                   triggerRect={submenuTriggerRect}
                   onClose={onClose}
                   depth={depth}
@@ -173,7 +172,9 @@ export const MenuItems: React.FC<{
                   onRequestClose={() => closeSubmenuAndRefocus(index)}
                   onMouseEnter={clearCloseTimeout}
                   onMouseLeave={scheduleClose}
-                />
+                >
+                  <MenuItems items={item.items!} onClose={onClose} depth={depth + 1} />
+                </PortaledSubmenu>
               )}
             </AnimatePresence>
           </React.Fragment>

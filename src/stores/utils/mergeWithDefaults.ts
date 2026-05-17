@@ -10,16 +10,14 @@
  * for the missing parameters.
  */
 
+import { createDefaultBellPairConfig } from '@/lib/geometry/extended/bellPair'
 import {
+  type DiracConfig,
   isDiracFieldView,
   isDiracInitialCondition,
   isDiracPotentialType,
+  sanitizeDiracLatticeConfig,
 } from '@/lib/geometry/extended/dirac'
-import {
-  DEFAULT_PREHEATING_CONFIG,
-  FREE_SCALAR_MAX_TOTAL_SITES,
-  sanitizeKSpaceVizConfig,
-} from '@/lib/geometry/extended/freeScalar'
 import { createDefaultPauliConfig } from '@/lib/geometry/extended/pauli'
 import { sanitizeQuantumWalkConfig } from '@/lib/geometry/extended/quantumWalk'
 import { sanitizeHarmonicOscillatorScalars } from '@/lib/geometry/extended/schroedinger/configSanitization'
@@ -35,7 +33,6 @@ import {
 import {
   createDefaultSchroedingerConfig,
   DEFAULT_SCHROEDINGER_CONFIG,
-  type FreeScalarConfig,
   RAYMARCH_QUALITY_TO_SAMPLES,
   SCHROEDINGER_QUALITY_PRESETS,
 } from '@/lib/geometry/extended/types'
@@ -43,11 +40,8 @@ import {
   DEFAULT_WHEELER_DEWITT_CONFIG,
   type WdwSrmtClock,
 } from '@/lib/geometry/extended/wheelerDeWitt'
-import { isAnalyticQuantumType } from '@/lib/geometry/registry'
-import type { QuantumTypeKey } from '@/lib/geometry/registry/types'
 import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
-import { sanitizePowerOfTwoGridSizes } from '@/lib/math/ndArray'
 import {
   isWdwBoundaryCondition,
   WDW_SOLVER_MAX_COSMOLOGICAL_CONSTANT,
@@ -60,7 +54,7 @@ import {
   WDW_SOLVER_MIN_INFLATON_MASS_ASYMMETRY,
 } from '@/lib/physics/wheelerDeWitt/solverInputValidation'
 
-import { reconcileCosmologyInvariants } from '../slices/geometry/setters/freeScalarCosmologySetters'
+import { normalizeFreeScalarLoadedConfig } from './mergeWithDefaultsFreeScalar'
 import { OBJECT_TYPE_TO_CONFIG_KEY } from './presetSerialization'
 
 /**
@@ -69,6 +63,7 @@ import { OBJECT_TYPE_TO_CONFIG_KEY } from './presetSerialization'
 const CONFIG_KEY_TO_DEFAULT: Record<string, () => object> = {
   schroedinger: createDefaultSchroedingerConfig,
   pauliSpinor: createDefaultPauliConfig,
+  bellPair: createDefaultBellPairConfig,
 }
 
 function hasRecordKey<T extends object>(record: T, value: unknown): value is keyof T {
@@ -121,6 +116,8 @@ const FINITE_NUMERIC_ARRAY_FIELDS = new Set([
   'extraDimOmega',
   'extraDimQuantumNumbers',
   'fieldDirection',
+  'modeK',
+  'packetCenter',
   'initialSpinDirection',
   'parameterValues',
   'particleColor',
@@ -326,6 +323,9 @@ function normalizeDiracEnums(normalized: Record<string, unknown>): Record<string
     next = next === diracRecord ? { ...diracRecord } : next
     next.fieldView = defaults.fieldView
   }
+
+  const sanitized = sanitizeDiracLatticeConfig(next as unknown as DiracConfig)
+  if (sanitized !== (next as unknown)) next = sanitized as unknown as Record<string, unknown>
 
   return next === diracRecord ? normalized : { ...normalized, dirac: next }
 }
@@ -564,50 +564,7 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged
   normalized = normalizeWheelerDeWittConfig(normalized)
   normalized = normalizeSchroedingerSurfaceMode(normalized)
 
-  // Reconcile cosmology invariants for the freeScalar sub-config. A scene
-  // saved at one grid (e.g. 32³ at d=3, large safe η₀) loaded onto a smaller
-  // grid (e.g. 8⁶ at d=6, smaller safe η₀) will have an `eta0` that the
-  // user-facing setters would have clamped — but the loader path bypasses
-  // those setters via direct `setState`. Without this normalisation step,
-  // the next vacuumNoise reset would feed an out-of-range `eta0` into
-  // `sampleAdiabaticVacuum` and either throw or fall back silently.
-  //
-  // Also back-fill the `preheating` sub-config from its default whenever a
-  // scene saved before the parametric-resonance feature shipped is loaded.
-  // The GPU pass reads `config.preheating.enabled` every substep, so an
-  // undefined value would crash the leapfrog loop on the first frame.
-  const fs = normalized.freeScalar
-  if (fs && typeof fs === 'object') {
-    const fsRecord = fs as Record<string, unknown>
-    if (!fsRecord.preheating || typeof fsRecord.preheating !== 'object') {
-      normalized = {
-        ...normalized,
-        freeScalar: { ...fsRecord, preheating: { ...DEFAULT_PREHEATING_CONFIG } },
-      }
-    }
-    normalized = {
-      ...normalized,
-      freeScalar: sanitizePowerOfTwoGridSizes(normalized.freeScalar as FreeScalarConfig, {
-        maxTotalSites: FREE_SCALAR_MAX_TOTAL_SITES,
-      }),
-    }
-    normalized = {
-      ...normalized,
-      freeScalar: {
-        ...(normalized.freeScalar as object),
-        kSpaceViz: sanitizeKSpaceVizConfig((normalized.freeScalar as FreeScalarConfig).kSpaceViz),
-      },
-    }
-    const reconciled = reconcileCosmologyInvariants(
-      (normalized.freeScalar as FreeScalarConfig) ?? (fs as FreeScalarConfig)
-    )
-    if (Object.keys(reconciled).length > 0) {
-      normalized = {
-        ...normalized,
-        freeScalar: { ...(normalized.freeScalar as object), ...reconciled },
-      }
-    }
-  }
+  normalized = normalizeFreeScalarLoadedConfig(normalized)
 
   return normalized as T
 }
@@ -617,10 +574,7 @@ function normalizeSchroedingerSurfaceMode(
 ): Record<string, unknown> {
   if (normalized.isoEnabled !== true) return normalized
 
-  const quantumMode =
-    typeof normalized.quantumMode === 'string' ? normalized.quantumMode : 'harmonicOscillator'
-  const surfaceSupported =
-    normalized.representation !== 'wigner' && isAnalyticQuantumType(quantumMode as QuantumTypeKey)
+  const surfaceSupported = normalized.representation !== 'wigner'
 
   return surfaceSupported ? normalized : { ...normalized, isoEnabled: false }
 }

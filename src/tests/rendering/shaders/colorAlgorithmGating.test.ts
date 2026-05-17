@@ -358,3 +358,110 @@ describe('getAvailableColorAlgorithms — density-grid availability for analytic
     expect(withDefaults).toEqual(withExplicit)
   })
 })
+
+describe('getAvailableColorAlgorithms — bellPair allowlist', () => {
+  // ObjectTypeExplorer switches `objectType` to 'bellPair' WITHOUT resetting
+  // `s.schroedinger.quantumMode`. So whatever Schroedinger mode the user was
+  // last in remains in the store. Without a bellPair-specific branch in
+  // getAvailableColorAlgorithms, the function falls through to the per-mode
+  // branches (freeScalarField in particular) and exposes algorithms that read
+  // a stubbed analysis texture, producing pure-black voxels on the apparatus
+  // render. The branch must filter regardless of leftover quantumMode.
+
+  const educationalAnalysisAlgos = [
+    'hamiltonianDecomposition',
+    'modeCharacter',
+    'energyFlux',
+    'kSpaceOccupation',
+  ] as const
+
+  it('excludes free-scalar-field educational analysis algorithms when leftover quantumMode is freeScalarField', () => {
+    // Repro of the user-reported bug: previously in Free Scalar Field, then
+    // clicked Bell Test → educational algos would be exposed → black render.
+    const algos = getAvailableColorAlgorithms('freeScalarField', false, 'bellPair')
+    const values = algos.map((a) => a.value)
+    for (const algo of educationalAnalysisAlgos) {
+      expect(
+        values,
+        `${algo} must be hidden for bellPair regardless of leftover quantumMode`
+      ).not.toContain(algo)
+    }
+  })
+
+  it('excludes educational analysis algorithms for every leftover Schroedinger quantumMode', () => {
+    // The fix must not depend on which Schroedinger mode the user previously
+    // selected — the bellPair branch must hard-allowlist independently.
+    const schroedingerModes = [
+      'harmonicOscillator',
+      'hydrogenND',
+      'hydrogenNDCoupled',
+      'freeScalarField',
+      'tdseDynamics',
+      'becDynamics',
+      'diracEquation',
+      'quantumWalk',
+      'wheelerDeWitt',
+      'antiDeSitter',
+    ] as const
+    for (const mode of schroedingerModes) {
+      const values = getAvailableColorAlgorithms(mode, false, 'bellPair').map((a) => a.value)
+      for (const algo of educationalAnalysisAlgos) {
+        expect(
+          values,
+          `${algo} must be hidden for bellPair when leftover quantumMode='${mode}'`
+        ).not.toContain(algo)
+      }
+    }
+  })
+
+  it('exposes the Bell apparatus default plus density colormaps', () => {
+    const values = getAvailableColorAlgorithms('harmonicOscillator', false, 'bellPair').map(
+      (a) => a.value
+    )
+    // pauliSpinDensity is the Bell registry default — dual-channel apparatus rendering.
+    expect(values).toContain('pauliSpinDensity')
+    // Density colormaps reading the R channel (Alice intensity).
+    expect(values).toContain('blackbody')
+    expect(values).toContain('viridis')
+    expect(values).toContain('inferno')
+    expect(values).toContain('densityContours')
+  })
+
+  it('excludes Dirac-, open-quantum-, and density-grid-only algorithms', () => {
+    // The Bell apparatus has no antiparticle channel, no density matrix, and
+    // no continuous spatial wavefunction phase. Algorithms specific to those
+    // physics paths must be hidden.
+    const values = getAvailableColorAlgorithms('harmonicOscillator', true, 'bellPair').map(
+      (a) => a.value
+    )
+    expect(values).not.toContain('particleAntiparticle')
+    expect(values).not.toContain('purityMap')
+    expect(values).not.toContain('entropyMap')
+    expect(values).not.toContain('coherenceMap')
+    expect(values).not.toContain('quantumPotential')
+    expect(values).not.toContain('vortexDensity')
+    expect(values).not.toContain('pauliSpinExpectation')
+    expect(values).not.toContain('pauliCoherence')
+  })
+
+  it('returns a stable allowlist independent of openQuantumEnabled and availabilityOptions', () => {
+    // Bell is fixed at 3D, position representation, no isosurface — the
+    // availabilityOptions knobs do not apply. The allowlist must therefore
+    // be invariant under those parameters.
+    const baseline = getAvailableColorAlgorithms('harmonicOscillator', false, 'bellPair').map(
+      (a) => a.value
+    )
+    const withOq = getAvailableColorAlgorithms('harmonicOscillator', true, 'bellPair').map(
+      (a) => a.value
+    )
+    const withOpts = getAvailableColorAlgorithms(
+      'harmonicOscillator',
+      false,
+      'bellPair',
+      undefined,
+      { dimension: 3, isosurface: false, representation: 'position' }
+    ).map((a) => a.value)
+    expect(withOq).toEqual(baseline)
+    expect(withOpts).toEqual(baseline)
+  })
+})

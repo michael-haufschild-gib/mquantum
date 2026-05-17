@@ -10,6 +10,7 @@
 
 import type { StoreApi } from 'zustand'
 
+import { defaultDiracGridPerDim, DIRAC_MAX_TOTAL_SITES } from '@/lib/geometry/extended/dirac'
 import { FREE_SCALAR_MAX_TOTAL_SITES } from '@/lib/geometry/extended/freeScalar'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { computeDefaultPow2GridPerDim } from '@/lib/math/ndArray'
@@ -84,9 +85,6 @@ export const clampDtWithCfl = (
 /** Maximum total TDSE/BEC lattice sites — FFT needs power-of-2 per axis */
 export const TDSE_MAX_TOTAL_SITES = 262144 // 64^3
 
-/** Maximum total Dirac lattice sites — FFT needs power-of-2 per axis */
-export const DIRAC_MAX_TOTAL_SITES = 262144 // 64^3
-
 /** Maximum total free scalar lattice sites (~8MB for phi+pi buffers) */
 export const MAX_TOTAL_SITES = FREE_SCALAR_MAX_TOTAL_SITES
 
@@ -123,12 +121,7 @@ export const defaultTdseGridPerDim = (d: number): number =>
  */
 export const defaultGridPerDim = (d: number): number => computeDefaultGridPerDim(d, MAX_TOTAL_SITES)
 
-/**
- * Compute default per-dimension grid size for Dirac equation mode.
- * @param d - Number of spatial dimensions
- */
-export const defaultDiracGridPerDim = (d: number): number =>
-  computeDefaultGridPerDim(d, DIRAC_MAX_TOTAL_SITES)
+export { defaultDiracGridPerDim, DIRAC_MAX_TOTAL_SITES }
 
 // ---------------------------------------------------------------------------
 // Nested domain setter factories

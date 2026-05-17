@@ -99,8 +99,11 @@ export function setBoolParam(
 
 /**
  * Set a URL param to a fixed-precision float string only when the value
- * is defined. When `omitZero` is true a value of exactly `0` is treated
- * the same as undefined, so default-zero fields don't bloat the URL.
+ * is defined and finite. When `omitZero` is true a value of exactly `0`
+ * is treated the same as undefined, so default-zero fields don't bloat
+ * the URL. Non-finite values (NaN, ±Infinity) are silently dropped to
+ * stay symmetric with {@link parseFloatParam}, which rejects those
+ * tokens — otherwise an emit+parse round-trip would lose the field.
  */
 export function setFloatParam(
   params: URLSearchParams,
@@ -109,14 +112,19 @@ export function setFloatParam(
   omitZero = false,
   precision = 2
 ): void {
-  if (value !== undefined && !(omitZero && value === 0)) {
-    params.set(key, value.toFixed(precision))
-  }
+  if (value === undefined || !Number.isFinite(value)) return
+  if (omitZero && value === 0) return
+  params.set(key, value.toFixed(precision))
 }
 
-/** Set a URL param to a base-10 integer string only when the value is defined. */
+/**
+ * Set a URL param to a base-10 integer string only when the value is a
+ * defined safe integer. Non-integer floats and NaN/Infinity are dropped
+ * because {@link parseIntParam} would reject them on the way back in.
+ */
 export function setIntParam(params: URLSearchParams, key: string, value: number | undefined): void {
-  if (value !== undefined) params.set(key, value.toString())
+  if (value === undefined || !Number.isInteger(value)) return
+  params.set(key, value.toString())
 }
 
 /** Set a URL param to the given string only when the value is defined. */

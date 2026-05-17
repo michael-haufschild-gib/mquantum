@@ -163,6 +163,8 @@ export interface ExtendedStoreSnapshot {
   clearComputeNeedsReset?: (configKey: string) => void
   pauliSpinor?: import('@/lib/geometry/extended/types').PauliConfig
   pauliSpinorVersion?: number
+  bellPair?: import('@/lib/geometry/extended/types').BellPairConfig
+  bellPairVersion?: number
 }
 
 /** Object transform snapshot */
@@ -173,10 +175,7 @@ export interface TransformSnapshot {
 
 /** Performance/quality snapshot */
 export interface PerformanceSnapshot {
-  qualityMultiplier?: number
-  isInteracting?: boolean
   sceneTransitioning?: boolean
-  refinementStage?: string
 }
 
 /** Lighting snapshot type (inferred from packLightingUniforms) */
@@ -225,6 +224,8 @@ export interface SchrodingerRendererConfig {
   openQuantumEnabled?: boolean
   /** Whether this renderer is configured for Pauli Spinor mode. */
   isPauli?: boolean
+  /** Whether this renderer is configured for Bell-pair / CHSH mode. */
+  isBellPair?: boolean
   /** Compile-time gate for cross-section slice. */
   crossSectionEnabled?: boolean
   /** Compile-time gate for probability current j-field. */

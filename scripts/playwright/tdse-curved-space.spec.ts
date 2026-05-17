@@ -45,7 +45,7 @@ async function setTdseMetric(
   cfg: { kind: 'flat' | 'morrisThorne'; throatRadius?: number }
 ): Promise<void> {
   await page.evaluate(async (metric) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setTdseMetric(metric)
@@ -55,7 +55,7 @@ async function setTdseMetric(
 /** Read the TDSE metric field from the extended object store. */
 async function readTdseMetric(page: Page): Promise<{ kind: string; throatRadius?: number }> {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     const s = mod.useExtendedObjectStore.getState() as Record<string, unknown>
     const schroedinger = s.schroedinger as { tdse?: { metric?: unknown } } | undefined
     return (schroedinger?.tdse?.metric ?? { kind: 'flat' }) as {

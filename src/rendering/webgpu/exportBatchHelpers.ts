@@ -153,12 +153,9 @@ export function captureExportEnvironment(
     cameraRef.current?.getState().aspect ||
     (size.width > 0 && size.height > 0 ? size.width / size.height : 1)
   runtime.originalPerf = {
-    progressiveRefinementEnabled: perfStore.progressiveRefinementEnabled,
     renderResolutionScale: perfStore.renderResolutionScale,
   }
 
-  perfStore.setProgressiveRefinementEnabled(false)
-  perfStore.setRefinementStage('final')
   perfStore.setRenderResolutionScale(1)
 }
 

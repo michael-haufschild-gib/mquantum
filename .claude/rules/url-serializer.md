@@ -69,6 +69,24 @@ The URL state serializer (`src/lib/url/state-serializer.ts`) provides shareable 
 | `sw_max` | float -1024..1024 | Upper sweep bound (same per-kind ranges as `sw_min`). Ignored for `sw=bc`. |
 | `sw_phi` | float -10..10 | φ reference used when computing the turning-point landmark. |
 | `sw_c` | float 0.1..0.9 | Anchor `srmtCutNormalized` for mass/bc sweeps (the cut held fixed while physics varies). Ignored for `sw=cut`. |
+| `bell_at` | float 0..π | Bell — Alice's unprimed axis polar angle θ (radians, 4-decimal precision). |
+| `bell_ap` | float 0..2π | Bell — Alice's unprimed axis azimuthal angle φ. |
+| `bell_apt` | float 0..π | Bell — Alice's primed axis polar angle θ′. |
+| `bell_app` | float 0..2π | Bell — Alice's primed axis azimuthal angle φ′. |
+| `bell_bt` | float 0..π | Bell — Bob's unprimed axis polar angle θ. |
+| `bell_bp` | float 0..2π | Bell — Bob's unprimed axis azimuthal angle φ. |
+| `bell_bpt` | float 0..π | Bell — Bob's primed axis polar angle θ′. |
+| `bell_bpp` | float 0..2π | Bell — Bob's primed axis azimuthal angle φ′. |
+| `bell_v` | float 0..1 | Bell — Werner-state visibility v. v ≤ 1/√2 ≈ 0.7071 forbids CHSH violation. |
+| `bell_eta` | float 0..1 | Bell — symmetric detection efficiency η. Eberhard threshold η_E = 2/(1+√2) ≈ 0.8284. |
+| `bell_an` | enum `fairSampling\|assignNonDetection` | Bell — analysis policy for trials containing a non-detection. |
+| `bell_bax`, `bell_bay`, `bell_baz` | float -50..50 | Bell — Alice's effective precession field vector (γ·B_A, ℏ=1 units). |
+| `bell_bbx`, `bell_bby`, `bell_bbz` | float -50..50 | Bell — Bob's effective precession field vector. |
+| `bell_m` | enum `qm\|lhv` | Bell — sampler mode. `qm` = Born rule on the joint state; `lhv` = local hidden-variable model. |
+| `bell_lhv` | string (1–63 chars) | Bell — LHV strategy id (`deterministicBell`, `noisyClassical`, `detectionLoophole_<cutoff>`). |
+| `bell_n` | int 4..10_000_000 | Bell — target trial count for one Run. |
+| `bell_tpf` | int 1..5000 | Bell — trials drawn per UI frame when running. |
+| `bell_seed` | int 0..2^32-1 | Bell — PRNG seed for reproducibility. Emit only on explicit "share with seed". |
 
 ## Rules
 
@@ -80,5 +98,6 @@ The URL state serializer (`src/lib/url/state-serializer.ts`) provides shareable 
 - `ads_*` params are only emitted when `qm=antiDeSitter` (but are accepted on parse regardless)
 - `ads_hkll` and `ads_btz` are mutually exclusive at the store level — setting one clears the other. The URL parser accepts both; the store applies them in order, so the last-applied setter wins.
 - `sw*` params are only emitted when `qm=wheelerDeWitt`. On parse they populate a `pendingSweep` slot on the SRMT sweep store; the sweep section claims it via `consumePendingSweep` exactly once after the Wheeler–DeWitt solver has mounted and produced a solver output.
+- `bell_*` params are only emitted when `t=bellPair` (top-level ObjectType, not a `qm`). On parse they are accepted regardless of `t`, so the orchestrator can fold them into the parsed state for the URL state hook to apply via `setBell*` setters in M5. Float fields use 4-decimal precision (~6 m° angular resolution) to preserve CHSH-sweep fidelity.
 - New params follow the pattern: short key, validated/clamped in `deserializeState`, applied in `applyUrlStateParams`
 - Camera state and visual appearance (colors, PBR, post-processing) are NOT url-serialized — use scene presets for those

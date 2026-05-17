@@ -49,7 +49,7 @@ const waitForHydrogenReady = (page: Page) => waitForModeReady(page)
 /** Enable isosurface mode via store. */
 async function enableIsosurface(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerIsoEnabled(true)
   })
 }
@@ -57,7 +57,7 @@ async function enableIsosurface(page: Page): Promise<void> {
 /** Enable cross-section via store. */
 async function enableCrossSection(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerCrossSectionEnabled(true)
   })
 }
@@ -65,7 +65,7 @@ async function enableCrossSection(page: Page): Promise<void> {
 /** Set color algorithm via appearance store. */
 async function setColorAlgorithm(page: Page, algo: string): Promise<void> {
   await page.evaluate(async (a) => {
-    const mod = await import('/src/stores/appearanceStore.ts')
+    const mod = await import('/src/stores/scene/appearanceStore.ts')
     mod.useAppearanceStore.getState().setColorAlgorithm(a)
   }, algo)
 }
@@ -73,7 +73,7 @@ async function setColorAlgorithm(page: Page, algo: string): Promise<void> {
 /** Set density gain via store. */
 async function setDensityGain(page: Page, gain: number): Promise<void> {
   await page.evaluate(async (g) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerDensityGain(g)
   }, gain)
 }
@@ -81,7 +81,7 @@ async function setDensityGain(page: Page, gain: number): Promise<void> {
 /** Set bohr radius scale via store. */
 async function setBohrRadiusScale(page: Page, scale: number): Promise<void> {
   await page.evaluate(async (s) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerBohrRadiusScale(s)
   }, scale)
 }
@@ -89,7 +89,7 @@ async function setBohrRadiusScale(page: Page, scale: number): Promise<void> {
 /** Toggle real vs complex orbitals via store. */
 async function setUseRealOrbitals(page: Page, useReal: boolean): Promise<void> {
   await page.evaluate(async (r) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerUseRealOrbitals(r)
   }, useReal)
 }
@@ -97,7 +97,7 @@ async function setUseRealOrbitals(page: Page, useReal: boolean): Promise<void> {
 /** Set representation via store. */
 async function setRepresentation(page: Page, rep: string): Promise<void> {
   await page.evaluate(async (r) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerRepresentation(r)
   }, rep)
 }
@@ -105,7 +105,7 @@ async function setRepresentation(page: Page, rep: string): Promise<void> {
 /** Apply hydrogen ND preset via store. */
 async function applyHydrogenNDPreset(page: Page, preset: string): Promise<void> {
   await page.evaluate(async (p) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setSchroedingerHydrogenNDPreset(p)
@@ -116,7 +116,7 @@ async function applyHydrogenNDPreset(page: Page, preset: string): Promise<void> 
 async function setExtraDimQuantumNumber(page: Page, dimIndex: number, n: number): Promise<void> {
   await page.evaluate(
     async ({ idx, val }: { idx: number; val: number }) => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerExtraDimQuantumNumber(idx, val)
     },
     { idx: dimIndex, val: n }

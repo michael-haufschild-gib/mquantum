@@ -10,7 +10,7 @@ describe('tdseWriteGrid quantized circulation view', () => {
     expect(tdseVorticityBlock).toContain('fn wrappedPhaseDelta')
     expect(tdseVorticityBlock).toContain('return atan2(sin(raw), cos(raw));')
     expect(tdseVorticityBlock).toContain('fn forwardPhaseNeighbor')
-    expect(tdseVorticityBlock).toContain('params.absorberEnabled != 0u')
+    expect(tdseVorticityBlock).toContain('tdsePmlAxisActive(axis)')
     expect(tdseVorticityBlock).toContain('fn plaquetteWinding')
     expect(tdseVorticityBlock).toContain('return circulation * TDSE_WG_INV_TAU;')
   })

@@ -418,8 +418,18 @@ export class WebGPUDevice {
    */
   destroy(): void {
     this.initGeneration += 1
-    this.context?.unconfigure()
-    this.device?.destroy()
+
+    try {
+      this.context?.unconfigure()
+    } catch (cleanupError) {
+      logger.warn('[WebGPU] Failed to unconfigure context during destroy:', cleanupError)
+    }
+
+    try {
+      this.device?.destroy()
+    } catch (cleanupError) {
+      logger.warn('[WebGPU] Failed to destroy device during destroy:', cleanupError)
+    }
 
     this._adapter = null
     this.device = null

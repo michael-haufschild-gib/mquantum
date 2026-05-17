@@ -21,6 +21,7 @@ describe('QUANTUM_TYPE_REGISTRY', () => {
       'wheelerDeWitt',
       'antiDeSitter',
       'pauliSpinor',
+      'bellTest',
     ]
     expect(QUANTUM_TYPE_REGISTRY.size).toBe(expectedKeys.length)
     for (const key of expectedKeys) {
@@ -79,6 +80,7 @@ describe('QUANTUM_TYPE_REGISTRY', () => {
       wheelerDeWitt: 'wheelerDeWitt',
       antiDeSitter: 'antiDeSitter',
       pauliSpinor: 'pauli',
+      bellTest: 'bellPair',
     })
   })
 
@@ -107,6 +109,7 @@ describe('QUANTUM_TYPE_REGISTRY', () => {
       wheelerDeWitt: [],
       antiDeSitter: [],
       pauliSpinor: [],
+      bellTest: [],
     })
   })
 
@@ -142,7 +145,7 @@ describe('QUANTUM_TYPE_REGISTRY', () => {
   })
 
   it('every entry has valid internal.objectType', () => {
-    const validObjectTypes = new Set(['schroedinger', 'pauliSpinor'])
+    const validObjectTypes = new Set(['schroedinger', 'pauliSpinor', 'bellPair'])
     for (const [key, entry] of QUANTUM_TYPE_REGISTRY) {
       expect(
         validObjectTypes.has(entry.internal.objectType),
@@ -159,12 +162,18 @@ describe('QUANTUM_TYPE_REGISTRY', () => {
     }
   })
 
-  it('compute modes (except pauliSpinor) have objectType "schroedinger"', () => {
+  it('compute modes (except pauliSpinor and bellTest) have objectType "schroedinger"', () => {
     for (const [key, entry] of QUANTUM_TYPE_REGISTRY) {
-      if (entry.category === 'compute' && key !== 'pauliSpinor') {
+      if (entry.category === 'compute' && key !== 'pauliSpinor' && key !== 'bellTest') {
         expect(entry.internal.objectType, `${key}`).toBe('schroedinger')
       }
     }
+  })
+
+  it('bellTest has objectType "bellPair"', () => {
+    const bell = QUANTUM_TYPE_REGISTRY.get('bellTest')!
+    expect(bell.internal.objectType).toBe('bellPair')
+    expect(bell.category).toBe('compute')
   })
 
   it('pauliSpinor has objectType "pauliSpinor"', () => {

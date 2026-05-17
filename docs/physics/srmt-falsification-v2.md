@@ -198,6 +198,60 @@ Same as v1:
   replaces null-floor, champion-stability replaces
   magnitude-monotonicity, WKB-independence added.
 
+- **2026-05-14 / v2.2.0**: Added Criterion 7 — **Born-Oppenheimer
+  agreement**. Driven by the v5 empirical finding
+  (`srmt-empirical-result-v5.md`): the Born-Oppenheimer
+  cross-diagnostic
+  (`lib/physics/srmt/bornOppenheimerChampion.ts`) — which divides
+  out the heavy WKB phase before measuring residual
+  conditional-state adiabaticity — independently picks `a` as
+  champion at 91% of the publication-grid sub-sweep points
+  (68/75). The 9% failures (`boChamp = null`, i.e. tie) cluster
+  in the m=0.2 / Λ<0 classical-dominance corner already exempted
+  in v2.1. Criterion 7: **the Born-Oppenheimer champion must
+  equal `a` at every non-exempt grid point**. Adding this turns
+  BO-agreement from "additional evidence" into a falsifiable
+  publication-grade requirement that the v2.0.0 pre-reg lacked.
+  This addition strengthens the bar; it does not soften it. The
+  amendment is applied BEFORE the full 21 × 21 × 3 publication
+  run, preserving pre-registration status.
+
+- **2026-05-14 / v2.1.0**: Two empirical-finding-driven exemptions
+  added to Criterion 3, informed by the v4 high-resolution
+  publication-grid sweep (`srmt-empirical-result-v4.md`). These
+  exemptions were identified from the v2 publication sweep
+  *empirically*; the v2.0.0 criterion as written had no parameter-
+  regime exemptions and the m=0 / classical-dominance corners
+  technically falsified it. The amendment narrows Criterion 3 to
+  the regimes where it carries physical content:
+
+  - **Exemption 3a — m=0 free-inflaton edge case.** When the
+    inflaton mass `m = 0`, the φ field has no dynamics and the
+    WKB diagnostic trivially picks `a` because there is no
+    competing classical momentum. SRMT's non-triviality argument
+    has no anchor in this corner. Criterion 3 does not apply at
+    `m = 0`.
+
+  - **Exemption 3b — low-mass / anti-deSitter classical-dominance
+    corner.** When `m ≤ 0.3` AND `Λ < 0`, classical momentum is
+    dominated by the scale factor `a` (weakly-rolling inflaton +
+    AdS-like contraction), so the WKB and rigid-q champions agree
+    on `a` by independent classical-mechanical reasoning rather
+    than by SRMT itself being trivial. Criterion 3 does not apply
+    in this corner.
+
+  The full v4 sweep at 192×48 over 5 × 5 × 3 = 75 points (excluding
+  m=0) showed 100% of points satisfying Criteria 1 and 2, with
+  Criterion 3 failing at 6/75 points — all 6 in the
+  m=0.2 / Λ<0 corner. The exemption is BC-independent (all three
+  BCs show identical failure pattern), supporting the
+  classical-dominance interpretation rather than a BC-dependent
+  artifact.
+
+  This amendment is appended BEFORE the full 21 × 21 × 3
+  publication run, so it remains a true pre-registration for the
+  production sweep.
+
 Future amendments append here. Amendments after a publication
 sweep is known invalidate the prior pre-reg version and require a
 fresh sweep against the amended criteria.

@@ -22,6 +22,7 @@ import { logger } from '@/lib/logger'
 import { clampEta0 } from '@/lib/physics/cosmology/adiabaticVacuum'
 import { isKasnerVacuum } from '@/lib/physics/cosmology/bianchiKasner'
 import {
+  isCosmologyPreset,
   isValidPreset,
   MAX_SPACETIME_DIM,
   MIN_SPACETIME_DIM,
@@ -345,6 +346,10 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): FreeScalar
       })
     },
     setFreeScalarCosmologyPreset: (preset) => {
+      if (!isCosmologyPreset(preset)) {
+        logger.warn(`[setFreeScalarCosmologyPreset] Ignoring unknown preset: ${String(preset)}`)
+        return
+      }
       setWithVersion((state) => {
         const fs = state.schroedinger.freeScalar
         const spacetimeDim = fs.latticeDim + 1

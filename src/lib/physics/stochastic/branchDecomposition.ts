@@ -47,12 +47,25 @@ export function spatialBranchPartition(
       `gridSize/spacing must have at least ${latticeDim} entries (got ${gridSize.length}/${spacing.length})`
     )
   }
+  if (!Number.isFinite(planePosition)) {
+    throw new Error(`planePosition must be finite (got ${planePosition})`)
+  }
+  for (let d = 0; d < latticeDim; d++) {
+    const size = gridSize[d]
+    if (!Number.isInteger(size) || size! < 1) {
+      throw new Error(`gridSize[${d}] must be a positive integer (got ${size})`)
+    }
+    const dx = spacing[d]
+    if (typeof dx !== 'number' || !Number.isFinite(dx) || dx <= 0) {
+      throw new Error(`spacing[${d}] must be a finite positive number (got ${dx})`)
+    }
+  }
 
   const totalSites = gridSize.slice(0, latticeDim).reduce((a, b) => a * b, 1)
 
   if (psiRe.length < totalSites || psiIm.length < totalSites) {
     throw new Error(
-      `psiRe/psiIm length (${psiRe.length}) does not match totalSites (${totalSites})`
+      `psiRe/psiIm length (${psiRe.length}/${psiIm.length}) does not match totalSites (${totalSites})`
     )
   }
 
@@ -71,6 +84,9 @@ export function spatialBranchPartition(
     const x0 = coord0 * spacing[0]! - halfExtent0
 
     const density = psiRe[idx]! * psiRe[idx]! + psiIm[idx]! * psiIm[idx]!
+    if (!Number.isFinite(density)) {
+      throw new Error(`non-finite wavefunction density at index ${idx}`)
+    }
 
     if (x0 < threshold) {
       normA += density

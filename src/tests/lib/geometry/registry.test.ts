@@ -36,13 +36,16 @@ import { getControlsComponent, hasControlsComponent } from '@/lib/geometry/regis
 
 describe('Object Type Registry', () => {
   describe('Registry Structure', () => {
-    it('exposes exactly two ObjectTypes via the per-dimension helper', () => {
+    it('exposes the three ObjectTypes via the per-dimension helper', () => {
       // The helper enumerates every ObjectType backed by at least one
       // QUANTUM_TYPE_REGISTRY entry — there is no separate ObjectType registry.
+      // At 11D only schroedinger is supported (pauliSpinor max=6, bellPair max=3),
+      // but the type list itself enumerates all three with availability flags.
       const types = getAvailableTypesForDimension(11).map((t) => t.type)
-      expect(types).toHaveLength(2)
       expect(types).toContain('schroedinger')
       expect(types).toContain('pauliSpinor')
+      expect(types).toContain('bellPair')
+      expect(types).toHaveLength(3)
     })
 
     it('returns derived facts for schroedinger', () => {
@@ -110,11 +113,18 @@ describe('Object Type Registry', () => {
 
     it('getAvailableTypesForDimension returns filtered list', () => {
       const typesAt4D = getAvailableTypesForDimension(4)
-      expect(typesAt4D.length).toBe(2)
+      // schroedinger, pauliSpinor, bellPair — all three types are present.
+      // schroedinger and pauliSpinor are *available* at 4D; bellPair is not
+      // (its range is 3D only, since CHSH lives in the spin sector).
+      expect(typesAt4D.length).toBe(3)
       const types = typesAt4D.map((t) => t.type)
       expect(types).toContain('schroedinger')
       expect(types).toContain('pauliSpinor')
-      expect(typesAt4D.every((t) => t.available)).toBe(true)
+      expect(types).toContain('bellPair')
+      const availableTypes = typesAt4D.filter((t) => t.available).map((t) => t.type)
+      expect(availableTypes).toContain('schroedinger')
+      expect(availableTypes).toContain('pauliSpinor')
+      expect(availableTypes).not.toContain('bellPair')
     })
 
     it('getRecommendedDimension returns value for schroedinger', () => {
@@ -182,6 +192,7 @@ describe('Quantum Type Registry (Flat Model)', () => {
       expect(keys).toEqual([
         'antiDeSitter',
         'becDynamics',
+        'bellTest',
         'diracEquation',
         'freeScalarField',
         'harmonicOscillator',
@@ -196,8 +207,8 @@ describe('Quantum Type Registry (Flat Model)', () => {
 
     it('every entry has a valid internal bridge', () => {
       for (const [key, entry] of QUANTUM_TYPE_REGISTRY) {
-        expect(entry.internal.objectType).toMatch(/^(schroedinger|pauliSpinor)$/)
-        expect(entry.internal.configStoreKey).toMatch(/^(schroedinger|pauliSpinor)$/)
+        expect(entry.internal.objectType).toMatch(/^(schroedinger|pauliSpinor|bellPair)$/)
+        expect(entry.internal.configStoreKey).toMatch(/^(schroedinger|pauliSpinor|bellPair)$/)
         if (entry.internal.objectType === 'schroedinger') {
           expect(entry.internal.quantumMode).toBe(key)
         }
@@ -250,7 +261,7 @@ describe('Quantum Type Registry (Flat Model)', () => {
       ).toBe(true)
     })
 
-    it('blocks compute modes, Wigner representation, and Pauli spinors', () => {
+    it('allows compute modes (density-grid isosurface shader path)', () => {
       expect(
         supportsSchroedingerSurfaceMode({
           objectType: 'schroedinger',
@@ -258,7 +269,41 @@ describe('Quantum Type Registry (Flat Model)', () => {
           dimension: 3,
           representation: 'position',
         })
-      ).toBe(false)
+      ).toBe(true)
+      expect(
+        supportsSchroedingerSurfaceMode({
+          objectType: 'schroedinger',
+          quantumMode: 'freeScalarField',
+          dimension: 3,
+          representation: 'position',
+        })
+      ).toBe(true)
+      expect(
+        supportsSchroedingerSurfaceMode({
+          objectType: 'schroedinger',
+          quantumMode: 'diracEquation',
+          dimension: 3,
+          representation: 'position',
+        })
+      ).toBe(true)
+    })
+
+    it('allows pauliSpinor object type (density-grid isosurface path)', () => {
+      expect(
+        supportsSchroedingerSurfaceMode({
+          objectType: 'pauliSpinor',
+          dimension: 3,
+        })
+      ).toBe(true)
+      expect(
+        supportsSchroedingerSurfaceMode({
+          objectType: 'pauliSpinor',
+          dimension: 2,
+        })
+      ).toBe(true)
+    })
+
+    it('blocks Wigner representation, bellPair, and dimension < 2', () => {
       expect(
         supportsSchroedingerSurfaceMode({
           objectType: 'schroedinger',
@@ -269,8 +314,14 @@ describe('Quantum Type Registry (Flat Model)', () => {
       ).toBe(false)
       expect(
         supportsSchroedingerSurfaceMode({
-          objectType: 'pauliSpinor',
+          objectType: 'bellPair',
           dimension: 3,
+        })
+      ).toBe(false)
+      expect(
+        supportsSchroedingerSurfaceMode({
+          objectType: 'pauliSpinor',
+          dimension: 1,
         })
       ).toBe(false)
     })

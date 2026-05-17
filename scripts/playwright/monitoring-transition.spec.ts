@@ -40,7 +40,7 @@ test.describe('Continuous Monitoring Transition', () => {
     await waitForTdseDiagnosticsReady(page)
 
     const ipr = await page.evaluate(async () => {
-      const mod = await import('/src/stores/diagnosticsStore.ts')
+      const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
       return mod.useDiagnosticsStore.getState().tdse.ipr
     })
 
@@ -68,7 +68,7 @@ test.describe('Continuous Monitoring Transition', () => {
       await waitForTdseDiagnosticsReady(page)
 
       const ipr = await page.evaluate(async () => {
-        const mod = await import('/src/stores/diagnosticsStore.ts')
+        const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
         return mod.useDiagnosticsStore.getState().tdse.ipr
       })
       iprs.push(ipr)
@@ -96,7 +96,7 @@ test.describe('Continuous Monitoring Transition', () => {
     await waitForTdseDiagnosticsReady(page)
 
     const iprMonitored = await page.evaluate(async () => {
-      const mod = await import('/src/stores/diagnosticsStore.ts')
+      const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
       return mod.useDiagnosticsStore.getState().tdse.ipr
     })
 
@@ -114,7 +114,7 @@ test.describe('Continuous Monitoring Transition', () => {
     await waitForTdseDiagnosticsReady(page)
 
     const iprStandard = await page.evaluate(async () => {
-      const mod = await import('/src/stores/diagnosticsStore.ts')
+      const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
       return mod.useDiagnosticsStore.getState().tdse.ipr
     })
 
@@ -138,7 +138,7 @@ test.describe('Continuous Monitoring Transition', () => {
     await waitForTdseDiagnosticsReady(page)
 
     const { norm, normDrift } = await page.evaluate(async () => {
-      const mod = await import('/src/stores/diagnosticsStore.ts')
+      const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
       const s = mod.useDiagnosticsStore.getState().tdse
       return { norm: s.totalNorm, normDrift: s.normDrift }
     })

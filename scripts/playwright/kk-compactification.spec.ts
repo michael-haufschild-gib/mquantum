@@ -37,7 +37,7 @@ test.setTimeout(600_000)
 async function setTdseCompactDim(page: Page, dimIndex: number, compact: boolean): Promise<void> {
   await page.evaluate(
     async ({ d, c }) => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       ;(
         mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
       ).setTdseCompactDim(d, c)
@@ -50,7 +50,7 @@ async function setTdseCompactDim(page: Page, dimIndex: number, compact: boolean)
 async function setTdseCompactRadius(page: Page, dimIndex: number, radius: number): Promise<void> {
   await page.evaluate(
     async ({ d, r }) => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       ;(
         mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
       ).setTdseCompactRadius(d, r)
@@ -63,7 +63,7 @@ async function setTdseCompactRadius(page: Page, dimIndex: number, radius: number
 async function setBecCompactDim(page: Page, dimIndex: number, compact: boolean): Promise<void> {
   await page.evaluate(
     async ({ d, c }) => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       ;(
         mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
       ).setBecCompactDim(d, c)
@@ -76,7 +76,7 @@ async function setBecCompactDim(page: Page, dimIndex: number, compact: boolean):
 async function setBecCompactRadius(page: Page, dimIndex: number, radius: number): Promise<void> {
   await page.evaluate(
     async ({ d, r }) => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       ;(
         mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
       ).setBecCompactRadius(d, r)
@@ -88,7 +88,7 @@ async function setBecCompactRadius(page: Page, dimIndex: number, radius: number)
 /** Enable TDSE diagnostics readback. */
 async function enableTdseDiagnostics(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setTdseDiagnosticsEnabled(true)
@@ -98,7 +98,7 @@ async function enableTdseDiagnostics(page: Page): Promise<void> {
 /** Enable BEC diagnostics readback. */
 async function enableBecDiagnostics(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setBecDiagnosticsEnabled(true)
@@ -108,7 +108,7 @@ async function enableBecDiagnostics(page: Page): Promise<void> {
 /** Read TDSE compactDims from live store. */
 async function readTdseCompactDims(page: Page): Promise<boolean[]> {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     return [...(mod.useExtendedObjectStore.getState().schroedinger.tdse.compactDims ?? [])]
   })
 }
@@ -116,7 +116,7 @@ async function readTdseCompactDims(page: Page): Promise<boolean[]> {
 /** Read BEC compactDims from live store. */
 async function readBecCompactDims(page: Page): Promise<boolean[]> {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     return [...(mod.useExtendedObjectStore.getState().schroedinger.bec.compactDims ?? [])]
   })
 }
@@ -124,7 +124,7 @@ async function readBecCompactDims(page: Page): Promise<boolean[]> {
 /** Read TDSE compactRadii from live store. */
 async function readTdseCompactRadii(page: Page): Promise<number[]> {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     return [...(mod.useExtendedObjectStore.getState().schroedinger.tdse.compactRadii ?? [])]
   })
 }
@@ -252,7 +252,7 @@ test.describe('KK compactification: PML interaction', () => {
 
     // Enable absorber
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       ;(
         mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
       ).setTdseAbsorberEnabled(true)

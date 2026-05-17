@@ -41,7 +41,7 @@ async function enableDecoherence(
 ) {
   await page.evaluate(
     async ([g, o]) => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState()
       s.setTdseStochasticEnabled(true)
       s.setTdseStochasticGamma(g)
@@ -61,7 +61,7 @@ async function enableDecoherence(
 async function applyDecoherencePreset(page: import('@playwright/test').Page, presetId: string) {
   await page.evaluate(async (id: string) => {
     const presetMod = await import('/src/lib/physics/tdse/decoherencePresets.ts')
-    const storeMod = await import('/src/stores/extendedObjectStore.ts')
+    const storeMod = await import('/src/stores/scene/extendedObjectStore.ts')
     const preset = presetMod.DECOHERENCE_PRESETS.find((p: { id: string }) => p.id === id)
     if (!preset) throw new Error(`Preset '${id}' not found`)
     const s = storeMod.useExtendedObjectStore.getState()
@@ -86,7 +86,7 @@ async function applyDecoherencePreset(page: import('@playwright/test').Page, pre
 async function waitForDiagData(page: import('@playwright/test').Page) {
   await page.waitForFunction(
     async () => {
-      const mod = await import('/src/stores/diagnosticsStore.ts')
+      const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
       return mod.useDiagnosticsStore.getState().tdse.hasData
     },
     { timeout: 30_000 }
@@ -96,7 +96,7 @@ async function waitForDiagData(page: import('@playwright/test').Page) {
 /** Read branch-specific diagnostics. */
 async function readBranchDiag(page: import('@playwright/test').Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/diagnosticsStore.ts')
+    const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
     const s = mod.useDiagnosticsStore.getState().tdse
     return {
       hasData: s.hasData,
@@ -129,7 +129,7 @@ test.describe('decoherence — rendering', () => {
 
     // Verify config applied
     const cfg = await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const t = mod.useExtendedObjectStore.getState().schroedinger?.tdse
       return {
         enabled: t?.stochasticEnabled,
@@ -239,7 +239,7 @@ test.describe('decoherence — diagnostics', () => {
 
     // γ=0 means stochastic dispatch is skipped — should be identical to vanilla TDSE
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState()
       s.setTdseStochasticEnabled(true)
       s.setTdseStochasticGamma(0)
@@ -264,7 +264,7 @@ test.describe('decoherence — diagnostics', () => {
 
     // Baseline: no decoherence, free potential
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState()
       s.setTdsePotentialType('free')
       s.setTdseAbsorberEnabled(false)
@@ -276,7 +276,7 @@ test.describe('decoherence — diagnostics', () => {
 
     // Strong decoherence run
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState()
       s.setTdseStochasticEnabled(true)
       s.setTdseStochasticGamma(5.0)
@@ -287,7 +287,7 @@ test.describe('decoherence — diagnostics', () => {
     })
     // Reset diagnostics store for fresh data
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/diagnosticsStore.ts')
+      const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
       mod.useDiagnosticsStore.getState().resetTdse()
     })
     await waitForSimulationFrames(page, 180)
@@ -313,7 +313,7 @@ test.describe('decoherence — diagnostics', () => {
     await waitForDiagData(page)
 
     const diag = await page.evaluate(async () => {
-      const mod = await import('/src/stores/diagnosticsStore.ts')
+      const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
       const s = mod.useDiagnosticsStore.getState().tdse
       return { norm: s.totalNorm, maxDensity: s.maxDensity, simTime: s.simTime, ipr: s.ipr }
     })
@@ -347,9 +347,9 @@ test.describe('decoherence — monitoring sweep', () => {
 
     // Start a short sweep (3 steps) driven by a manual tick interval
     await page.evaluate(async () => {
-      const sweepMod = await import('/src/stores/monitoringSweepStore.ts')
-      const extMod = await import('/src/stores/extendedObjectStore.ts')
-      const diagMod = await import('/src/stores/diagnosticsStore.ts')
+      const sweepMod = await import('/src/stores/diagnostics/monitoringSweepStore.ts')
+      const extMod = await import('/src/stores/scene/extendedObjectStore.ts')
+      const diagMod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
 
       extMod.useExtendedObjectStore.getState().setTdseDiagnosticsEnabled(true)
 
@@ -377,7 +377,7 @@ test.describe('decoherence — monitoring sweep', () => {
     // Wait for completion
     await page.waitForFunction(
       async () => {
-        const mod = await import('/src/stores/monitoringSweepStore.ts')
+        const mod = await import('/src/stores/diagnostics/monitoringSweepStore.ts')
         return mod.useMonitoringSweepStore.getState().status === 'complete'
       },
       { timeout: 60_000 }
@@ -388,7 +388,7 @@ test.describe('decoherence — monitoring sweep', () => {
     })
 
     const results = await page.evaluate(async () => {
-      const mod = await import('/src/stores/monitoringSweepStore.ts')
+      const mod = await import('/src/stores/diagnostics/monitoringSweepStore.ts')
       const s = mod.useMonitoringSweepStore.getState()
       return {
         status: s.status,

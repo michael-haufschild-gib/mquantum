@@ -29,6 +29,7 @@ import type { CosmologyPreset } from '@/lib/physics/cosmology/presets'
 import type { MetricKind } from '@/lib/physics/tdse/metrics/types'
 
 import { type AdsUrlState, deserializeAds, serializeAds } from './adsSerializer'
+import { type BellUrlState, deserializeBell, serializeBell } from './bellSerializer'
 import {
   type CosmologySerializableState,
   deserializeCosmology,
@@ -95,6 +96,7 @@ const VALID_REPRESENTATIONS: SchroedingerRepresentation[] = ['position', 'moment
 export interface ShareableObjectState
   extends
     AdsUrlState,
+    BellUrlState,
     SrmtUrlState,
     SrmtSweepUrlState,
     TdseSerializableState,
@@ -256,6 +258,12 @@ export function serializeState(state: ShareableState): string {
     serializeAds(params, state)
   }
 
+  // Bell-pair / CHSH experiment. Bell uses its own ObjectType, so guard on
+  // that instead of quantumMode (which is undefined for the bellPair object).
+  if (state.objectType === 'bellPair') {
+    serializeBell(params, state)
+  }
+
   return params.toString()
 }
 
@@ -317,6 +325,12 @@ export function deserializeState(searchParams: string): ParsedShareableState {
 
   // Anti-de Sitter (Stage 1).
   deserializeAds(params, state)
+
+  // Bell-pair / CHSH experiment. Always attempted — the parser keeps
+  // every present field regardless of objectType so links with `t=bellPair`
+  // and links with `bell_*` keys both round-trip without ordering
+  // assumptions on the URL.
+  deserializeBell(params, state)
 
   // Strip undefined values so Object.keys(state).length reflects actual params
   for (const key of Object.keys(state) as Array<keyof typeof state>) {

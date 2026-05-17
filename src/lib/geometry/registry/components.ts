@@ -33,6 +33,10 @@ const componentLoaders: Record<string, () => Promise<{ default: ComponentType<un
     import('@/components/sections/Geometry/PauliSpinorControls').then((m) => ({
       default: m.PauliSpinorControls as ComponentType<unknown>,
     })),
+  BellPairControls: () =>
+    import('@/components/sections/Geometry/BellPairControls').then((m) => ({
+      default: m.BellPairControls as ComponentType<unknown>,
+    })),
 }
 
 /**

@@ -67,6 +67,19 @@ export const AbsorptionSection: React.FC<AbsorptionSectionProps> = React.memo(
   ({ defaultOpen = true }) => {
     const objectType = useGeometryStore((s) => s.objectType)
 
+    if (objectType === 'bellPair') {
+      // Bell-pair has no wave-propagation boundary, so a PML absorber is
+      // meaningless. Show the section as Unavailable so the panel layout is
+      // consistent with other object types.
+      return (
+        <UnavailableSection
+          title="Absorption"
+          reason="Bell-pair has no boundary absorber"
+          data-testid="absorption-section"
+        />
+      )
+    }
+
     if (objectType !== 'schroedinger' && objectType !== 'pauliSpinor') {
       return null
     }

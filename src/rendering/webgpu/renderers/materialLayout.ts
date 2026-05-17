@@ -54,9 +54,8 @@ const MATERIAL_FIELDS = [
   { name: '_padding2', type: 'f32' },
 
   // --- Specular (offset 128..159) ---
-  // specularIntensity (f32) is followed by specularColor (vec3f) — vec3f's
-  // 16-byte alignment pushes specularColor from byte 132 → 144 with a
-  // 12-byte implicit padding gap before it.
+  // specularIntensity (f32) is followed by specularColor (vec3f), so vec3f
+  // alignment leaves an implicit padding gap before specularColor.
   { name: 'specularIntensity', type: 'f32' },
   { name: 'specularColor', type: 'vec3f' },
 ] as const satisfies readonly StructFieldDef[]
@@ -66,3 +65,7 @@ export const MATERIAL_UNIFORMS_LAYOUT = computeStructLayout(MATERIAL_FIELDS)
 
 /** Total byte size of the MaterialUniforms GPU buffer (derived from layout). */
 export const MATERIAL_UNIFORMS_SIZE = MATERIAL_UNIFORMS_LAYOUT.totalSize
+
+/** Float32 element count for MaterialUniforms staging arrays. */
+export const MATERIAL_UNIFORMS_FLOAT_LENGTH =
+  MATERIAL_UNIFORMS_SIZE / Float32Array.BYTES_PER_ELEMENT

@@ -224,6 +224,13 @@ function installMockWorker(): [MockWorkerHandle, () => void] {
   return [handle, restore]
 }
 
+function fakeGammaPayload(spatialDim: number, fill = 0): Float32Array {
+  const s = spinorSize(spatialDim)
+  const data = new Float32Array(1 + (spatialDim + 1) * s * s * 2).fill(fill)
+  new Uint32Array(data.buffer, data.byteOffset, 1)[0] = s
+  return data
+}
+
 // ── DiracAlgebraBridge.dispose ────────────────────────────────────────────────
 
 describe('DiracAlgebraBridge.dispose', () => {
@@ -297,21 +304,24 @@ describe('DiracAlgebraBridge — worker error path', () => {
 describe('DiracAlgebraBridge — worker success path (mock)', () => {
   it('resolves with gammaData from worker message matching correct epoch', async () => {
     const [handle, restore] = installMockWorker()
-    const mockSpinorSize = 4
     const mockDim = 3
-    const matSize = mockSpinorSize * mockSpinorSize * 2
-    const totalLen = 1 + mockDim * matSize + matSize
-    const fakeGammaData = new Float32Array(totalLen).fill(0.5)
+    const mockSpinorSize = spinorSize(mockDim)
+    const fakeGammaData = fakeGammaPayload(mockDim, 0.5)
 
     const bridge = new DiracAlgebraBridge()
     const resultPromise = bridge.generateMatrices(mockDim)
 
     // Worker responds with epoch=1
-    handle.triggerMessage({ epoch: 1, gammaData: fakeGammaData, spinorSize: mockSpinorSize })
+    handle.triggerMessage({
+      type: 'result',
+      epoch: 1,
+      gammaData: fakeGammaData,
+      spinorSize: mockSpinorSize,
+    })
 
     const { gammaData, spinorSize: s } = await resultPromise
     expect(s).toBe(mockSpinorSize)
-    expect(gammaData.length).toBe(totalLen)
+    expect(gammaData.length).toBe(fakeGammaData.length)
     // Index 1 is the first real alpha-matrix float (not the u32 header)
     expect(gammaData[1]).toBeCloseTo(0.5, 6)
 
@@ -327,18 +337,18 @@ describe('DiracAlgebraBridge — worker success path (mock)', () => {
 
     const s1 = spinorSize(1) // 2
     const s2 = spinorSize(2) // 2
-    const gamma1 = new Float32Array(1 + 1 * s1 * s1 * 2 + s1 * s1 * 2).fill(1.0)
-    const gamma2 = new Float32Array(1 + 2 * s2 * s2 * 2 + s2 * s2 * 2).fill(2.0)
+    const gamma1 = fakeGammaPayload(1, 1.0)
+    const gamma2 = fakeGammaPayload(2, 2.0)
 
     // Deliver epoch 2 first (resolves promise2, promise1 still pending)
-    handle.triggerMessage({ epoch: 2, gammaData: gamma2, spinorSize: s2 })
+    handle.triggerMessage({ type: 'result', epoch: 2, gammaData: gamma2, spinorSize: s2 })
     const result2 = await promise2
     expect(result2.spinorSize).toBe(s2)
     // Index 1 is first real data float
     expect(result2.gammaData[1]).toBeCloseTo(2.0, 6)
 
     // Then deliver epoch 1
-    handle.triggerMessage({ epoch: 1, gammaData: gamma1, spinorSize: s1 })
+    handle.triggerMessage({ type: 'result', epoch: 1, gammaData: gamma1, spinorSize: s1 })
     const result1 = await promise1
     expect(result1.spinorSize).toBe(s1)
     expect(result1.gammaData[1]).toBeCloseTo(1.0, 6)
@@ -364,8 +374,32 @@ describe('DiracAlgebraBridge — worker success path (mock)', () => {
     expect(msg.spatialDim).toBe(5)
 
     // Clean up — resolve to avoid hanging promise
-    handle.triggerMessage({ epoch: 1, gammaData: new Float32Array(1), spinorSize: 8 })
+    const s = spinorSize(5)
+    handle.triggerMessage({
+      type: 'result',
+      epoch: 1,
+      gammaData: fakeGammaPayload(5),
+      spinorSize: s,
+    })
     await p
+
+    restore()
+    bridge.dispose()
+  })
+
+  it('rejects malformed worker result shape before GPU upload can see it', async () => {
+    const [handle, restore] = installMockWorker()
+    const bridge = new DiracAlgebraBridge()
+    const p = bridge.generateMatrices(3)
+
+    handle.triggerMessage({
+      type: 'result',
+      epoch: 1,
+      gammaData: new Float32Array(1),
+      spinorSize: 8,
+    })
+
+    await expect(p).rejects.toThrow(/invalid gamma matrix payload/i)
 
     restore()
     bridge.dispose()

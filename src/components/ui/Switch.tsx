@@ -25,7 +25,10 @@ type SwitchAccessibleName =
   | { label?: string; ariaLabel: string }
 
 /** Props for the {@link Switch} toggle component. */
-export type SwitchProps = SwitchPropsBase & SwitchAccessibleName
+export type SwitchProps = SwitchPropsBase &
+  SwitchAccessibleName & {
+    ref?: React.Ref<HTMLInputElement>
+  }
 
 export const Switch: React.FC<SwitchProps> = React.memo(
   ({
@@ -40,7 +43,7 @@ export const Switch: React.FC<SwitchProps> = React.memo(
     tooltip,
     'data-testid': dataTestId,
     ref,
-  }: SwitchProps & { ref?: React.Ref<HTMLInputElement> }) => {
+  }: SwitchProps) => {
     // The discriminated union enforces presence at the type level but cannot
     // catch empty/whitespace strings at runtime (e.g. preset-driven UI passing
     // a stripped label). Trim both sources and fall back to a generic name so

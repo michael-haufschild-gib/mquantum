@@ -62,6 +62,9 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
       if (entry.key === 'pauliSpinor') {
         // Pauli uses a different ObjectType
         setObjectType('pauliSpinor')
+      } else if (entry.key === 'bellTest') {
+        // Bell Pair has its own ObjectType — two-qubit spin Hilbert space
+        setObjectType('bellPair')
       } else {
         // All other modes use the schroedinger ObjectType
         if (useGeometryStore.getState().objectType !== 'schroedinger') {

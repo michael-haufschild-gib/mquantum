@@ -2,6 +2,7 @@
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { computeTdseEffectiveSpacing } from '@/lib/physics/tdse/effectiveSpacing'
+import { normalizeMetricForLattice } from '@/lib/physics/tdse/metrics/types'
 import { NUM_ENERGY_BINS } from '@/rendering/webgpu/shaders/schroedinger/compute/energySpectralDensity.wgsl'
 import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
@@ -40,8 +41,11 @@ export interface ObservablesState {
  * Returns true when the configured metric admits a flat-space Fourier path
  * for observables (flat or torus). Curved metrics fall back to real-space.
  */
-export function supportsFlatFourierObservables(config: Pick<TdseConfig, 'metric'>): boolean {
-  const metricKind = config.metric?.kind ?? 'flat'
+export function supportsFlatFourierObservables(
+  config: Pick<TdseConfig, 'metric' | 'latticeDim'>
+): boolean {
+  const latticeDim = Number.isFinite(config.latticeDim) ? config.latticeDim : 3
+  const metricKind = normalizeMetricForLattice(config.metric, latticeDim).kind
   return metricKind === 'flat' || metricKind === 'torus'
 }
 

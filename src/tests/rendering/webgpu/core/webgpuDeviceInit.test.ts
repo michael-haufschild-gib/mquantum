@@ -369,4 +369,58 @@ describe('WebGPUDevice.initialize() error contract', () => {
     expect(result.code).toBe('INTERNAL_ERROR')
     expect(result.error).toContain('synthesised internal failure')
   })
+
+  it('destroys device and clears refs when context unconfigure throws during destroy', async () => {
+    const fakeLimits = {
+      maxStorageBufferBindingSize: 134217728,
+      maxUniformBufferBindingSize: 65536,
+      maxComputeWorkgroupSizeX: 256,
+      maxComputeWorkgroupSizeY: 256,
+      maxComputeWorkgroupSizeZ: 64,
+      maxComputeInvocationsPerWorkgroup: 256,
+      maxComputeWorkgroupStorageSize: 16384,
+      maxBindGroups: 4,
+      maxTextureDimension2D: 8192,
+    }
+    const destroy = vi.fn()
+    const fakeDevice = {
+      lost: new Promise(() => {}),
+      limits: fakeLimits,
+      features: new Set<GPUFeatureName>(),
+      queue: { writeBuffer: vi.fn() },
+      destroy,
+    }
+    const fakeAdapter = {
+      features: new Set<GPUFeatureName>(),
+      limits: fakeLimits,
+      info: { vendor: 'fake', architecture: 'fake', device: 'fake' },
+      isFallbackAdapter: false,
+      requestDevice: vi.fn(async () => fakeDevice),
+    }
+    installFakeGpu(() => fakeAdapter)
+
+    const fakeContext = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(() => {
+        throw new Error('unconfigure failed during cleanup')
+      }),
+      getCurrentTexture: vi.fn(),
+    } as unknown as GPUCanvasContext
+    const canvas = document.createElement('canvas')
+    Object.defineProperty(canvas, 'getContext', {
+      configurable: true,
+      value: vi.fn((contextId: string) => (contextId === 'webgpu' ? fakeContext : null)),
+    })
+
+    const device = WebGPUDevice.getInstance()
+    const result = await device.initialize(canvas)
+
+    expect(result.success).toBe(true)
+    expect(() => device.destroy()).not.toThrow()
+    expect(fakeContext.unconfigure).toHaveBeenCalledTimes(1)
+    expect(destroy).toHaveBeenCalledTimes(1)
+    expect(device.isReady()).toBe(false)
+    expect(() => device.getDevice()).toThrow('WebGPU device not initialized')
+    expect(() => device.getContext()).toThrow('WebGPU context not initialized')
+  })
 })

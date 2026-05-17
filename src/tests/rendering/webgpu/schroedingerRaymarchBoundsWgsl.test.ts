@@ -12,7 +12,6 @@ describe('Schroedinger volume raymarch bounding-radius guards', () => {
   it('guards sample-count path length in every volume raymarch variant', () => {
     const bodies = [
       functionSlice(volumeRaymarchBlock, 'volumeRaymarch'),
-      functionSlice(volumeRaymarchBlock, 'volumeRaymarchHQ'),
       functionSlice(generateVolumeRaymarchGridBlock(false), 'volumeRaymarchGrid'),
       functionSlice(generateVolumeRaymarchGridSimpleBlock(), 'volumeRaymarchGrid'),
     ]
@@ -25,10 +24,8 @@ describe('Schroedinger volume raymarch bounding-radius guards', () => {
   })
 
   it('uses the guarded radius for analytic tail-skip bounds', () => {
-    const standard = functionSlice(volumeRaymarchBlock, 'volumeRaymarch')
-    const hq = functionSlice(volumeRaymarchBlock, 'volumeRaymarchHQ')
+    const body = functionSlice(volumeRaymarchBlock, 'volumeRaymarch')
 
-    expect(standard).toContain('let boundR2 = safeBoundingRadius * safeBoundingRadius;')
-    expect(hq).toContain('let boundR2 = safeBoundingRadius * safeBoundingRadius;')
+    expect(body).toContain('let boundR2 = safeBoundingRadius * safeBoundingRadius;')
   })
 })

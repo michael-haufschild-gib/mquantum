@@ -27,7 +27,7 @@ describe('AdvancedObjectControls probability current controls', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('keeps volumetric controls visible for compute modes with stale iso state', () => {
+  it('hides volumetric controls for compute modes in isosurface mode', () => {
     useGeometryStore.getState().setObjectType('schroedinger')
     useGeometryStore.getState().setDimension(3)
     useExtendedObjectStore.setState((state) => ({
@@ -40,6 +40,6 @@ describe('AdvancedObjectControls probability current controls', () => {
 
     render(<AdvancedObjectControls />)
 
-    expect(screen.getByTestId('control-group-subsurface-scattering')).toBeInTheDocument()
+    expect(screen.queryByTestId('control-group-subsurface-scattering')).not.toBeInTheDocument()
   })
 })

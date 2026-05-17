@@ -226,7 +226,8 @@ function restoreCameraState(data: Record<string, unknown>): void {
 
 /**
  * Enforce post-load invariants for compute quantum modes.
- * Compute modes require dimension >= 3, position representation, and volumetric rendering.
+ * Compute modes require dimension >= 3 and position representation.
+ * Isosurface mode is allowed (shader supports density-grid isosurface).
  */
 function enforceComputeModeInvariants(): void {
   const qm = useExtendedObjectStore.getState().schroedinger?.quantumMode
@@ -238,7 +239,6 @@ function enforceComputeModeInvariants(): void {
   const sch = useExtendedObjectStore.getState().schroedinger
   const patches: Record<string, unknown> = {}
   if (sch?.representation !== 'position') patches.representation = 'position'
-  if (sch?.isoEnabled) patches.isoEnabled = false
   if (sch?.crossSectionEnabled) patches.crossSectionEnabled = false
   if (Object.keys(patches).length > 0) {
     useExtendedObjectStore.setState({ schroedinger: { ...sch, ...patches } })

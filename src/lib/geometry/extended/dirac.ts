@@ -5,6 +5,8 @@
  * and default constants for the relativistic spinor solver.
  */
 
+import { computeDefaultPow2GridPerDim, reduceGridToFit } from '@/lib/math/ndArray'
+
 import type { PmlAbsorberConfig } from './crossMode'
 
 // ============================================================================
@@ -83,6 +85,24 @@ export const DIRAC_POTENTIAL_TYPES: readonly DiracPotentialType[] = [
   'coulomb',
 ]
 
+/** Maximum total Dirac lattice sites. Keeps spinor buffers within the mode budget. */
+export const DIRAC_MAX_TOTAL_SITES = 262144 // 64^3
+
+/**
+ * Minimum total sites needed for aligned per-component storage-buffer bindings.
+ * Dirac pack/unpack bind groups bind component slices at offset
+ * `component * totalSites * sizeof(vec2f)`. WebGPU requires storage buffer
+ * offsets to be 256-byte aligned, so totalSites must stay at or above 32.
+ * The store has historically used 64; keep that stricter invariant.
+ */
+export const DIRAC_MIN_ALIGNED_TOTAL_SITES = 64
+
+/** Highest Dirac lattice dimension supported by the Clifford algebra generator. */
+export const DIRAC_MAX_LATTICE_DIM = 11
+
+/** Highest per-axis FFT size exposed to Dirac controls. */
+export const DIRAC_MAX_GRID_SIZE = 128
+
 const DIRAC_INITIAL_CONDITION_SET = new Set<string>(DIRAC_INITIAL_CONDITIONS)
 const DIRAC_FIELD_VIEW_SET = new Set<string>(DIRAC_FIELD_VIEWS)
 const DIRAC_POTENTIAL_TYPE_SET = new Set<string>(DIRAC_POTENTIAL_TYPES)
@@ -101,6 +121,25 @@ export function isDiracFieldView(value: unknown): value is DiracFieldView {
 export function isDiracPotentialType(value: unknown): value is DiracPotentialType {
   return typeof value === 'string' && DIRAC_POTENTIAL_TYPE_SET.has(value)
 }
+
+/**
+ * Minimum per-dimension grid size for Dirac that satisfies WebGPU storage
+ * buffer offset alignment.
+ */
+export const minDiracGridPerDim = (dim: number): number => {
+  const safeDim = Number.isFinite(dim)
+    ? Math.max(1, Math.min(DIRAC_MAX_LATTICE_DIM, Math.floor(dim)))
+    : 1
+  const raw = Math.ceil(Math.pow(DIRAC_MIN_ALIGNED_TOTAL_SITES, 1 / safeDim))
+  return Math.max(2, 2 ** Math.ceil(Math.log2(raw)))
+}
+
+/** Compute default per-dimension grid size for Dirac equation mode. */
+export const defaultDiracGridPerDim = (dim: number): number =>
+  computeDefaultPow2GridPerDim(
+    Math.max(1, Math.min(DIRAC_MAX_LATTICE_DIM, Math.floor(dim))),
+    DIRAC_MAX_TOTAL_SITES
+  )
 
 // ============================================================================
 // Dirac Config
@@ -184,6 +223,36 @@ export interface DiracConfig extends PmlAbsorberConfig {
   needsReset: boolean
   /** Slice positions for dimensions > 3 */
   slicePositions: number[]
+}
+
+/**
+ * Sanitize lattice shape for Dirac before it reaches GPU resource creation.
+ * Store setters normally enforce this, but saved-scene loading and tests can
+ * bypass setters and otherwise create invalid bind-group offsets or oversized
+ * spinor buffers.
+ */
+export function sanitizeDiracLatticeConfig<T extends { latticeDim: number; gridSize: number[] }>(
+  config: T
+): T {
+  const requestedDim = Number.isFinite(config.latticeDim) ? Math.floor(config.latticeDim) : 3
+  const latticeDim = Math.max(1, Math.min(DIRAC_MAX_LATTICE_DIM, requestedDim))
+  const gridDefault = defaultDiracGridPerDim(latticeDim)
+  const minGrid = minDiracGridPerDim(latticeDim)
+
+  const activeGrid = Array.from({ length: latticeDim }, (_, i) => {
+    const raw = config.gridSize[i]
+    const finite = typeof raw === 'number' && Number.isFinite(raw) ? raw : gridDefault
+    const clamped = Math.max(minGrid, Math.min(DIRAC_MAX_GRID_SIZE, Math.round(finite)))
+    const log2 = Math.round(Math.log2(clamped))
+    return Math.max(minGrid, Math.min(gridDefault, 2 ** log2))
+  })
+  reduceGridToFit(activeGrid, DIRAC_MAX_TOTAL_SITES, minGrid)
+
+  const unchanged =
+    latticeDim === config.latticeDim &&
+    activeGrid.length === config.gridSize.length &&
+    activeGrid.every((g, i) => g === config.gridSize[i])
+  return unchanged ? config : { ...config, latticeDim, gridSize: activeGrid }
 }
 
 export const DEFAULT_DIRAC_CONFIG: DiracConfig = {

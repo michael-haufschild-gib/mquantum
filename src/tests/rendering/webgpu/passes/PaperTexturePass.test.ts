@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import type { WebGPURenderContext } from '@/rendering/webgpu/core/types'
 import { PAPER_TEXTURE_SHADER, PaperTexturePass } from '@/rendering/webgpu/passes/PaperTexturePass'
@@ -12,6 +12,13 @@ type PaperInternals = {
   intensity: number
   updateFromStores: (ctx: WebGPURenderContext) => void
   writeUniformData: (ctx: WebGPURenderContext) => Float32Array
+}
+
+type PaperDisposeInternals = {
+  uniformBuffer: { destroy: ReturnType<typeof vi.fn> } | null
+  noiseTexture: { destroy: ReturnType<typeof vi.fn> } | null
+  noiseTextureView: unknown
+  dispose: () => void
 }
 
 describe('PaperTexturePass input sanitization', () => {
@@ -85,6 +92,28 @@ describe('PaperTexturePass input sanitization', () => {
     expect(data[1]).toBe(1)
     expect(data[2]).toBe(0)
     expect(Array.from(data.slice(0, 28)).every(Number.isFinite)).toBe(true)
+  })
+
+  it('continues disposal when one GPU resource destroy throws', () => {
+    const pass = new PaperTexturePass({
+      colorInput: 'ldr-color',
+      outputResource: 'paper-output',
+    }) as unknown as PaperDisposeInternals
+    const uniformDestroy = vi.fn(() => {
+      throw new Error('uniform destroy failed')
+    })
+    const noiseDestroy = vi.fn()
+
+    pass.uniformBuffer = { destroy: uniformDestroy }
+    pass.noiseTexture = { destroy: noiseDestroy }
+    pass.noiseTextureView = {}
+
+    expect(() => pass.dispose()).not.toThrow()
+    expect(uniformDestroy).toHaveBeenCalledTimes(1)
+    expect(noiseDestroy).toHaveBeenCalledTimes(1)
+    expect(pass.uniformBuffer).toBeNull()
+    expect(pass.noiseTexture).toBeNull()
+    expect(pass.noiseTextureView).toBeNull()
   })
 })
 

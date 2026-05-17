@@ -18,6 +18,7 @@ import { dispatchDiagnostics } from '@/rendering/webgpu/passes/TDSEComputePassDi
 import {
   type ObservablesState,
   shouldDispatchObs,
+  supportsFlatFourierObservables,
   writeObservablesUniforms,
 } from '@/rendering/webgpu/passes/TDSEObservablesDispatch'
 
@@ -429,6 +430,8 @@ describe('dispatchDiagnostics observables path', () => {
 
 describe('shouldDispatchObs', () => {
   const baseConfig = {
+    latticeDim: 3,
+    metric: { kind: 'flat' },
     diagnosticsEnabled: false,
     diagnosticsInterval: 10,
   } as Parameters<typeof shouldDispatchObs>[2]
@@ -475,5 +478,37 @@ describe('shouldDispatchObs', () => {
   it('allows flat torus observables', () => {
     const config = { ...baseConfig, metric: { kind: 'torus' as const } }
     expect(shouldDispatchObs(true, 4, config)).toBe(true)
+  })
+})
+
+describe('supportsFlatFourierObservables', () => {
+  it('matches solver metric normalization for dimension-degenerate metrics', () => {
+    expect(
+      supportsFlatFourierObservables({
+        latticeDim: 2,
+        metric: { kind: 'sphere2D', sphereRadius: 1.5 },
+      })
+    ).toBe(true)
+    expect(
+      supportsFlatFourierObservables({
+        latticeDim: 1,
+        metric: { kind: 'morrisThorne', throatRadius: 0.5 },
+      })
+    ).toBe(true)
+  })
+
+  it('keeps supported curved metrics off the flat Fourier observables path', () => {
+    expect(
+      supportsFlatFourierObservables({
+        latticeDim: 3,
+        metric: { kind: 'sphere2D', sphereRadius: 1.5 },
+      })
+    ).toBe(false)
+    expect(
+      supportsFlatFourierObservables({
+        latticeDim: 2,
+        metric: { kind: 'morrisThorne', throatRadius: 0.5 },
+      })
+    ).toBe(false)
   })
 })

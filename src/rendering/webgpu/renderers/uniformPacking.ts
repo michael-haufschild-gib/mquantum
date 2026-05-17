@@ -635,5 +635,4 @@ export {
   packBasisVectors,
   packCameraUniforms,
   packMaterialUniforms,
-  packQualityUniforms,
 } from './uniformPackingSupport'

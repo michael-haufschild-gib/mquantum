@@ -91,11 +91,12 @@ test.describe('BEC performance baseline', () => {
       await page.evaluate(async () => {
         const perfStore =
           window.__PERFORMANCE_STORE__ ??
-          (await import('/src/stores/performanceStore.ts')).usePerformanceStore
+          (await import('/src/stores/runtime/performanceStore.ts')).usePerformanceStore
         perfStore.getState().setMaxFps(0)
-        const uiStore = window.__UI_STORE__ ?? (await import('/src/stores/uiStore.ts')).useUIStore
+        const uiStore =
+          window.__UI_STORE__ ?? (await import('/src/stores/ui/uiStore.ts')).useUIStore
         uiStore.setState({ showPerfMonitor: true, perfMonitorExpanded: true })
-        const anim = await import('/src/stores/animationStore.ts')
+        const anim = await import('/src/stores/scene/animationStore.ts')
         anim.useAnimationStore.getState().play()
       })
 
@@ -107,7 +108,7 @@ test.describe('BEC performance baseline', () => {
       // Let perf metrics update
       await page.waitForFunction(
         async () => {
-          const mod = await import('/src/stores/performanceMetricsStore.ts')
+          const mod = await import('/src/stores/diagnostics/performanceMetricsStore.ts')
           return mod.usePerformanceMetricsStore.getState().fps > 0
         },
         { timeout: 10_000 }
@@ -118,7 +119,7 @@ test.describe('BEC performance baseline', () => {
       await waitForFrameAdvance(page, measureStart + MEASURE_FRAMES)
       await page.waitForFunction(
         async () => {
-          const mod = await import('/src/stores/performanceMetricsStore.ts')
+          const mod = await import('/src/stores/diagnostics/performanceMetricsStore.ts')
           return mod.usePerformanceMetricsStore.getState().fps > 0
         },
         { timeout: 5_000 }

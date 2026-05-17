@@ -440,7 +440,16 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     if (!pending || !this.densityTexture || !this.analysisTexture) return
     const { density, analysis } = pending
     if (!density || !analysis) return
-    const gs = Math.round(Math.cbrt(density.length / 4))
+    const expectedLength = this.densityGridSize ** 3 * 4
+    if (density.length !== expectedLength || analysis.length !== expectedLength) {
+      logger.warn('[FreeScalarFieldComputePass] Dropping malformed k-space texture payload:', {
+        expectedLength,
+        densityLength: density.length,
+        analysisLength: analysis.length,
+      })
+      return
+    }
+    const gs = this.densityGridSize
     const layout = { bytesPerRow: gs * 8, rowsPerImage: gs }
     const size = { width: gs, height: gs, depthOrArrayLayers: gs }
     device.queue.writeTexture(
@@ -459,6 +468,15 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
   /** Initialize field state and perform leapfrog kickstart. */
   private initializeField(ctx: WebGPURenderContext, config: FreeScalarConfig): void {
+    // Consume the injection here: clearing the class field *before* the call
+    // ensures that a length-mismatch (or any other) throw in initializeFsfField
+    // cannot trap the renderer in an infinite-throw loop — the next frame's
+    // willReinitialize branch would otherwise re-enter with the same bad
+    // injection and rethrow. The local handle below is the only reference the
+    // initializer needs; result.pendingInjection is always null on success.
+    const injection = this.pendingInjection
+    this.pendingInjection = null
+
     const result = initializeFsfField(ctx, config, {
       pl: this.pl,
       bg: this.bg,
@@ -467,7 +485,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       uniformBuffer: this.uniformBuffer,
       totalSites: this.totalSites,
       simEta: this.simEta,
-      pendingInjection: this.pendingInjection,
+      pendingInjection: injection,
       pendingStagingBuffers: this.pendingStagingBuffers,
       kSpace: this.kSpace,
       // Midpoint-coef kickstart needs these to stage the correct coefs

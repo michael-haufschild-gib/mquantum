@@ -47,7 +47,7 @@ const waitForHoReady = (page: Page) => waitForModeReady(page)
 /** Set HO named preset via store. */
 async function setPresetName(page: Page, name: string): Promise<void> {
   await page.evaluate(async (n) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setSchroedingerPresetName(n)
@@ -57,7 +57,7 @@ async function setPresetName(page: Page, name: string): Promise<void> {
 /** Set HO seed via store. */
 async function setSeed(page: Page, seed: number): Promise<void> {
   await page.evaluate(async (s) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerSeed(s)
   }, seed)
 }
@@ -65,7 +65,7 @@ async function setSeed(page: Page, seed: number): Promise<void> {
 /** Set HO frequency spread via store. */
 async function setFrequencySpread(page: Page, spread: number): Promise<void> {
   await page.evaluate(async (s) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerFrequencySpread(s)
   }, spread)
 }
@@ -73,7 +73,7 @@ async function setFrequencySpread(page: Page, spread: number): Promise<void> {
 /** Set HO field scale via store. */
 async function setFieldScale(page: Page, scale: number): Promise<void> {
   await page.evaluate(async (s) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerFieldScale(s)
   }, scale)
 }
@@ -81,7 +81,7 @@ async function setFieldScale(page: Page, scale: number): Promise<void> {
 /** Set HO max quantum number via store. */
 async function setMaxQuantumNumber(page: Page, maxN: number): Promise<void> {
   await page.evaluate(async (n) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerMaxQuantumNumber(n)
   }, maxN)
 }
@@ -89,7 +89,7 @@ async function setMaxQuantumNumber(page: Page, maxN: number): Promise<void> {
 /** Set representation via store. */
 async function setRepresentation(page: Page, rep: string): Promise<void> {
   await page.evaluate(async (r) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerRepresentation(r)
   }, rep)
 }
@@ -97,7 +97,7 @@ async function setRepresentation(page: Page, rep: string): Promise<void> {
 /** Enable isosurface mode via store. */
 async function enableIsosurface(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerIsoEnabled(true)
   })
 }
@@ -105,7 +105,7 @@ async function enableIsosurface(page: Page): Promise<void> {
 /** Set color algorithm via appearance store. */
 async function setColorAlgorithm(page: Page, algo: string): Promise<void> {
   await page.evaluate(async (a) => {
-    const mod = await import('/src/stores/appearanceStore.ts')
+    const mod = await import('/src/stores/scene/appearanceStore.ts')
     mod.useAppearanceStore.getState().setColorAlgorithm(a)
   }, algo)
 }
@@ -217,7 +217,7 @@ test.describe('HO deep: control response', () => {
 
     // Set 4 terms so maxN actually affects which quantum numbers are sampled
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerTermCount(4)
     })
     await waitForShaderCompilation(page)
@@ -324,7 +324,7 @@ test.describe('HO deep: density diagnostics', () => {
 
     // 1 term — single eigenstate (smooth Gaussian)
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerTermCount(1)
     })
     await waitForShaderCompilation(page)
@@ -333,7 +333,7 @@ test.describe('HO deep: density diagnostics', () => {
 
     // 8 terms — superposition with interference nodes
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setSchroedingerTermCount(8)
     })
     await waitForShaderCompilation(page)

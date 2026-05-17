@@ -115,6 +115,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   // Lattice-coord decomposition. Strides are products of power-of-2 grid
   // dims → shift/mask beats u32 divide/modulo here.
+  // VOXEL-CENTERED: site i at (i - N/2 + 0.5)*s — same convention as
+  // tdseInit, tdsePotential, and the density-grid path. The earlier
+  // corner-aligned i*s - N*s/2 placed lattice site i at a position
+  // 0.5*s away from where the Hamiltonian places it, so a CSL Gaussian
+  // centered at "physical x = 0" landed on a different lattice site
+  // than V(x = 0); for sigma <~ spacing that's a real systematic offset.
   var coords: array<f32, 12>;
   var rem = idx;
   let ldim = tdseParams.latticeDim;
@@ -123,8 +129,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let logStride = firstTrailingBit(stride);
     let ci = rem >> logStride;
     rem = rem & (stride - 1u);
-    let halfExtent = f32(tdseParams.gridSize[d]) * tdseParams.spacing[d] * 0.5;
-    coords[d] = f32(ci) * tdseParams.spacing[d] - halfExtent;
+    coords[d] = (f32(ci) - f32(tdseParams.gridSize[d]) * 0.5 + 0.5) * tdseParams.spacing[d];
   }
 ${TDSE_STOCH_LOC_BODY}
 }
@@ -147,15 +152,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     gid.z * tdseParams.strides[2];
 
   // Direct worldspace coords from gid.xyz — skips the per-thread shift/mask
-  // decomposition the 1-D variant performs.
+  // decomposition the 1-D variant performs. Voxel-centered to match
+  // tdseInit/tdsePotential (see 1-D variant comment).
   let ldim = tdseParams.latticeDim;
   var coords: array<f32, 12>;
-  let halfExtent0 = f32(tdseParams.gridSize[0]) * tdseParams.spacing[0] * 0.5;
-  let halfExtent1 = f32(tdseParams.gridSize[1]) * tdseParams.spacing[1] * 0.5;
-  let halfExtent2 = f32(tdseParams.gridSize[2]) * tdseParams.spacing[2] * 0.5;
-  coords[0] = f32(gid.x) * tdseParams.spacing[0] - halfExtent0;
-  coords[1] = f32(gid.y) * tdseParams.spacing[1] - halfExtent1;
-  coords[2] = f32(gid.z) * tdseParams.spacing[2] - halfExtent2;
+  coords[0] = (f32(gid.x) - f32(tdseParams.gridSize[0]) * 0.5 + 0.5) * tdseParams.spacing[0];
+  coords[1] = (f32(gid.y) - f32(tdseParams.gridSize[1]) * 0.5 + 0.5) * tdseParams.spacing[1];
+  coords[2] = (f32(gid.z) - f32(tdseParams.gridSize[2]) * 0.5 + 0.5) * tdseParams.spacing[2];
 ${TDSE_STOCH_LOC_BODY}
 }
 `

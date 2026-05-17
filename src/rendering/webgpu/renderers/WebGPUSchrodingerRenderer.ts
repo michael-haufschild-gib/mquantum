@@ -20,7 +20,10 @@ import type {
   QuantumModeForShader,
   SchroedingerWGSLShaderConfig,
 } from '../shaders/schroedinger/compose'
-import { packLightingUniforms } from '../utils/lighting'
+import { LIGHTING_UNIFORMS_FLOAT_LENGTH, packLightingUniforms } from '../utils/lighting'
+import { BASIS_UNIFORMS_FLOAT_LENGTH } from './basisLayout'
+import { CAMERA_UNIFORMS_FLOAT_LENGTH } from './cameraLayout'
+import { MATERIAL_UNIFORMS_FLOAT_LENGTH } from './materialLayout'
 import {
   applyModeOverrides,
   buildPipelineOutputs,
@@ -33,7 +36,6 @@ import {
   computeSchroedingerUpdate,
   PRECOMPUTED_TERM_BYTE_OFFSET,
   PRECOMPUTED_TERM_BYTE_SIZE,
-  qualitySignatureKey,
   type SchrodingerFrameState,
   type SchroedingerUpdateResult,
   TIME_FIELD_OFFSET,
@@ -50,7 +52,6 @@ import {
   getStoreSnapshot,
   type LightingSnapshot,
   type PBRSliceState,
-  type PerformanceSnapshot,
   type SchrodingerRendererConfig,
   SCHROEDINGER_UNIFORM_SIZE,
 } from './schrodingerRendererTypes'
@@ -61,7 +62,7 @@ import {
 import { createVersionTracker, resetVersionTracker } from './stateDiffing'
 import { createInitialModeStrategy, createModeStrategy } from './strategies/createStrategy'
 import type { CachedPresetData, ModeFrameContext, QuantumModeStrategy } from './strategies/types'
-import { packMaterialUniforms, packQualityUniforms } from './uniformPacking'
+import { packMaterialUniforms } from './uniformPacking'
 export type { SchrodingerRendererConfig } from './schrodingerRendererTypes'
 
 type CarpetSliceComputePassInstance =
@@ -85,7 +86,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private cameraUniformBuffer: GPUBuffer | null = null
   private lightingUniformBuffer: GPUBuffer | null = null
   private materialUniformBuffer: GPUBuffer | null = null
-  private qualityUniformBuffer: GPUBuffer | null = null
   private schroedingerUniformBuffer: GPUBuffer | null = null
   private basisUniformBuffer: GPUBuffer | null = null
 
@@ -140,13 +140,11 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private schroedingerUniformData = new ArrayBuffer(SCHROEDINGER_UNIFORM_SIZE)
   private schroedingerFloatView = new Float32Array(this.schroedingerUniformData)
   private schroedingerIntView = new Int32Array(this.schroedingerUniformData)
-  private cameraUniformData = new Float32Array(132)
-  private basisUniformData = new Float32Array(48)
-  private lightingUniformData = new Float32Array(144)
-  private materialUniformData = new Float32Array(40)
+  private cameraUniformData = new Float32Array(CAMERA_UNIFORMS_FLOAT_LENGTH)
+  private basisUniformData = new Float32Array(BASIS_UNIFORMS_FLOAT_LENGTH)
+  private lightingUniformData = new Float32Array(LIGHTING_UNIFORMS_FLOAT_LENGTH)
+  private materialUniformData = new Float32Array(MATERIAL_UNIFORMS_FLOAT_LENGTH)
   private materialDataView = new DataView(this.materialUniformData.buffer)
-  private qualityUniformData = new Float32Array(12)
-  private qualityDataView = new DataView(this.qualityUniformData.buffer)
   private timeUpdateBuffer = new Float32Array(1)
   private readonly clearValueTransparent = { r: 0, g: 0, b: 0, a: 0 }
   private readonly clearValueInvalidPos = { r: 0, g: 0, b: 0, a: -1 }
@@ -259,7 +257,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.cameraUniformBuffer?.destroy()
     this.lightingUniformBuffer?.destroy()
     this.materialUniformBuffer?.destroy()
-    this.qualityUniformBuffer?.destroy()
     this.schroedingerUniformBuffer?.destroy()
     this.basisUniformBuffer?.destroy()
     this.vertexBuffer?.destroy()
@@ -302,7 +299,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.cameraUniformBuffer = resources.cameraUniformBuffer
     this.lightingUniformBuffer = resources.lightingUniformBuffer
     this.materialUniformBuffer = resources.materialUniformBuffer
-    this.qualityUniformBuffer = resources.qualityUniformBuffer
     this.schroedingerUniformBuffer = resources.schroedingerUniformBuffer
     this.basisUniformBuffer = resources.basisUniformBuffer
     this.cameraBindGroup = resources.cameraBindGroup
@@ -415,17 +411,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.writeUniformBuffer(this.device, this.materialUniformBuffer, this.materialUniformData)
   }
 
-  updateQualityUniforms(ctx: WebGPURenderContext): void {
-    if (!this.device || !this.qualityUniformBuffer) return
-    const performance = getStoreSnapshot<PerformanceSnapshot>(ctx, 'performance')
-    const qualityMultiplier = performance?.qualityMultiplier ?? 1.0
-    const qualitySignature = qualitySignatureKey(qualityMultiplier)
-    if (qualitySignature === this.frameState.versions.lastQualitySignature) return
-    this.frameState.versions.lastQualitySignature = qualitySignature
-    packQualityUniforms(this.qualityUniformData, this.qualityDataView, qualityMultiplier)
-    this.writeUniformBuffer(this.device, this.qualityUniformBuffer, this.qualityUniformData)
-  }
-
   // =========================================================================
   // Frame execution
   // =========================================================================
@@ -477,8 +462,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       this.frameState.versions.lastAppearanceVersion = appearanceVersion
       this.frameState.versions.lastPbrVersion = pbrVersion
     }
-
-    this.updateQualityUniforms(ctx)
 
     // ============================================
     // MODE-SPECIFIC COMPUTE PHASE
@@ -672,7 +655,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.cameraUniformBuffer?.destroy()
     this.lightingUniformBuffer?.destroy()
     this.materialUniformBuffer?.destroy()
-    this.qualityUniformBuffer?.destroy()
     this.schroedingerUniformBuffer?.destroy()
     this.basisUniformBuffer?.destroy()
 
@@ -681,7 +663,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.cameraUniformBuffer = null
     this.lightingUniformBuffer = null
     this.materialUniformBuffer = null
-    this.qualityUniformBuffer = null
     this.schroedingerUniformBuffer = null
     this.basisUniformBuffer = null
 

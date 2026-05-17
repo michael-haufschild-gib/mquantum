@@ -121,6 +121,14 @@ describe('Switch', () => {
     expect(screen.getByRole('switch', { name: 'Aria wins' })).toBeInTheDocument()
   })
 
+  it('forwards refs to the native switch input', () => {
+    const ref = vi.fn<(node: HTMLInputElement | null) => void>()
+
+    render(<Switch ref={ref} checked={false} onCheckedChange={vi.fn()} label="Focusable" />)
+
+    expect(ref).toHaveBeenCalledWith(screen.getByRole('switch', { name: 'Focusable' }))
+  })
+
   it('keeps every project Switch instance accessible by name', () => {
     const findings = listTsxFiles(SOURCE_ROOT).flatMap(findSwitchesMissingAccessibleName)
 

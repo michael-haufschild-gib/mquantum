@@ -61,6 +61,11 @@ export const COSMOLOGY_PRESETS: readonly CosmologyPreset[] = [
   'lqcBounce',
 ] as const
 
+/** Runtime guard for data loaded from URLs, persisted scenes, or devtools. */
+export function isCosmologyPreset(value: unknown): value is CosmologyPreset {
+  return typeof value === 'string' && (COSMOLOGY_PRESETS as readonly string[]).includes(value)
+}
+
 /** Minimum spacetime dimension supported (paper requires `n ≥ 3`). */
 export const MIN_SPACETIME_DIM = 3
 
@@ -167,6 +172,9 @@ export function qExponent(params: CosmologyPresetParams): number {
   // physically defined only for `n ∈ [3, 7]`, so a single guard at the
   // top of `qExponent` is the simplest contract.
   validateSpacetimeDim(spacetimeDim)
+  if (!isCosmologyPreset(preset)) {
+    throw new RangeError(`unknown cosmology preset: ${String(preset)}`)
+  }
 
   if (preset === 'minkowski') return 0
   if (preset === 'deSitter') return -1
@@ -317,6 +325,8 @@ export function validateSpacetimeDim(spacetimeDim: number): void {
  * @returns `true` if every downstream consumer would accept these params
  */
 export function isValidPreset(params: CosmologyPresetParams): boolean {
+  if (!isCosmologyPreset(params.preset)) return false
+
   if (params.preset === 'lqcBounce') {
     // LQC bounce requires n ≥ 3 (the Friedmann prefactor 1/(3(n − 2))
     // diverges at n = 2). The overall cosmology range `[3, 7]` applies

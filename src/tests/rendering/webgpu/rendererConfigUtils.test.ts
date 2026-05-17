@@ -94,7 +94,7 @@ describe('applyModeOverrides', () => {
     expect(result.analyticalGradientEnabled).toBe(false)
   })
 
-  it('disables temporal for compute modes', () => {
+  it('disables temporal but preserves isosurface for compute modes', () => {
     const result = applyModeOverrides({
       ...BASE_CONFIG,
       quantumMode: 'tdseDynamics',
@@ -102,7 +102,7 @@ describe('applyModeOverrides', () => {
       isosurface: true,
     })
     expect(result.temporal).toBe(false)
-    expect(result.isosurface).toBe(false)
+    expect(result.isosurface).toBe(true)
   })
 
   it('preserves analytic 2D isosurface requests for isolines', () => {
@@ -186,13 +186,13 @@ describe('buildPipelineOutputs', () => {
 })
 
 describe('buildShaderConfig', () => {
-  it('disables analytic features for compute modes', () => {
+  it('disables analytic features but preserves isosurface for compute modes', () => {
     const config = buildShaderConfig({
       ...BASE_CONFIG,
       quantumMode: 'tdseDynamics',
       isosurface: true,
     })
-    expect(config.isosurface).toBe(false)
+    expect(config.isosurface).toBe(true)
     expect(config.nodal).toBe(false)
     expect(config.phaseMateriality).toBe(false)
     expect(config.interference).toBe(false)

@@ -33,8 +33,6 @@ import {
 export interface GizmoInteractionDeps {
   cameraRef: React.RefObject<WebGPUCamera | null>
   dimensionRef: React.RefObject<number>
-  startInteraction: () => void
-  scheduleEndInteraction: () => void
 }
 
 /** Return value: pointer event handlers and overlay ref. */
@@ -56,7 +54,7 @@ export interface GizmoInteractionHandlers {
  * - pointerCancel: release capture, abort drag without commit
  */
 export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractionHandlers {
-  const { cameraRef, dimensionRef, startInteraction, scheduleEndInteraction } = deps
+  const { cameraRef, dimensionRef } = deps
 
   const isDraggingRef = useRef(false)
   const lastMouseRef = useRef({ x: 0, y: 0 })
@@ -94,8 +92,7 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
     }
     cursorOutsideDocumentRef.current = false
     activePointerIdRef.current = null
-    scheduleEndInteraction()
-  }, [scheduleEndInteraction])
+  }, [])
 
   // Window-blur safeguard: some browsers (notably Safari historically) do not
   // emit pointercancel reliably on focus loss, so we mirror the abort here.
@@ -152,14 +149,12 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
       if (dragState) {
         gizmoDragRef.current = dragState
         useLightingStore.getState().setIsDraggingLight(true)
-        startInteraction()
         return
       }
 
       isDraggingRef.current = true
-      startInteraction()
     },
-    [cameraRef, startInteraction]
+    [cameraRef]
   )
 
   // ── pointerUp: release capture, commit gizmo drag or handle click-to-select ──
@@ -187,7 +182,6 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
         gizmoDragRef.current = null
         useLightingStore.getState().setIsDraggingLight(false)
         activePointerIdRef.current = null
-        scheduleEndInteraction()
         return
       }
 
@@ -195,12 +189,11 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
 
       isDraggingRef.current = false
       activePointerIdRef.current = null
-      scheduleEndInteraction()
 
       if (!wasClick) return
       handleClickToSelect(cameraRef, overlayRef, e)
     },
-    [cameraRef, scheduleEndInteraction]
+    [cameraRef]
   )
 
   // ── pointerCancel: capture interrupted (focus loss, OS gesture). Abort drag. ──

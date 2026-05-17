@@ -44,7 +44,7 @@ async function setupTdseWithObservables(page: import('@playwright/test').Page) {
 
   // Enable observables after pipeline is ready — buffers exist now
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setTdseObservablesEnabled(true)
   })
 
@@ -75,7 +75,7 @@ async function setupTdseWithObservables(page: import('@playwright/test').Page) {
 async function waitForObservablesData(page: import('@playwright/test').Page) {
   await page.waitForFunction(
     async () => {
-      const mod = await import('/src/stores/diagnosticsStore.ts')
+      const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
       return mod.useDiagnosticsStore.getState().observables.hasData
     },
     { timeout: 30_000 }
@@ -97,7 +97,7 @@ test.describe('Observable Expectation Values', () => {
 
     // Debug: check if observablesEnabled reached the store
     const debugState = await page.evaluate(async () => {
-      const ext = await import('/src/stores/extendedObjectStore.ts')
+      const ext = await import('/src/stores/scene/extendedObjectStore.ts')
       const tdse = ext.useExtendedObjectStore.getState().schroedinger.tdse
       return {
         observablesEnabled: tdse?.observablesEnabled,
@@ -110,7 +110,7 @@ test.describe('Observable Expectation Values', () => {
 
     // Wait for data AND read it atomically to avoid race with store resets
     const obs = await page.evaluate(async () => {
-      const mod = await import('/src/stores/diagnosticsStore.ts')
+      const mod = await import('/src/stores/diagnostics/diagnosticsStore.ts')
       const store = mod.useDiagnosticsStore
 
       // Poll until hasData is true
@@ -197,7 +197,7 @@ test.describe('Observable Expectation Values', () => {
 
     // Enable observables via store (after pipeline is ready)
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setTdseObservablesEnabled(true)
     })
     await waitForObservablesData(page)

@@ -60,7 +60,7 @@ test.describe('hydrogen quantum number UI controls', () => {
     // Verify store updated
     await expect(async () => {
       const n = await page.evaluate(async () => {
-        const mod = await import('/src/stores/extendedObjectStore.ts')
+        const mod = await import('/src/stores/scene/extendedObjectStore.ts')
         return mod.useExtendedObjectStore.getState().schroedinger.principalQuantumNumber
       })
       expect(n).toBe(3)
@@ -92,7 +92,7 @@ test.describe('hydrogen quantum number UI controls', () => {
 
     await expect(async () => {
       const l = await page.evaluate(async () => {
-        const mod = await import('/src/stores/extendedObjectStore.ts')
+        const mod = await import('/src/stores/scene/extendedObjectStore.ts')
         return mod.useExtendedObjectStore.getState().schroedinger.azimuthalQuantumNumber
       })
       expect(l).toBe(1)
@@ -137,7 +137,7 @@ test.describe('hydrogen quantum number UI controls', () => {
 
     // Capture with default n=1
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState()
       s.setSchroedingerPrincipalQuantumNumber(1)
       s.setSchroedingerAzimuthalQuantumNumber(0)
@@ -201,12 +201,12 @@ test.describe('hydrogen dimension constraints', () => {
     await new TopBar(page).waitForVisible()
 
     const dim = await page.evaluate(async () => {
-      const mod = await import('/src/stores/geometryStore.ts')
+      const mod = await import('/src/stores/scene/geometryStore.ts')
       return mod.useGeometryStore.getState().dimension
     })
 
     const mode = await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, unknown>
       return (s.schroedinger as Record<string, unknown>)?.quantumMode
     })

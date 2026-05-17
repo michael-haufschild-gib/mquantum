@@ -71,9 +71,7 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
   // log-density threshold operates on the same scale as volumetric rendering.
   let isoGain = max(schroedinger.densityGain, 0.01);
 
-  // Use quality multiplier to determine step count
-  let fastMode = quality.qualityMultiplier < 0.75;
-  let maxSteps = select(128, 64, fastMode);
+  let maxSteps = 128;
   let stepLen = (tFar - tNear) / f32(maxSteps);
   var t = tNear;
   var hitT: f32 = -1.0;

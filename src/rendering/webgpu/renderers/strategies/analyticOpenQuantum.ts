@@ -450,15 +450,10 @@ export class AnalyticOpenQuantumExecutor {
   }
 
   private computeFrameStride(performance: PerformanceSnapshot | undefined, basisK: number): number {
-    const qualityMultiplier = performance?.qualityMultiplier ?? 1.0
-    const interacting = performance?.isInteracting ?? false
     const sceneTransitioning = performance?.sceneTransitioning ?? false
     const heavyBasis = basisK >= 10
 
     if (sceneTransitioning) return heavyBasis ? 5 : 4
-    if (interacting) return heavyBasis ? 4 : 3
-    if (qualityMultiplier < 0.5) return heavyBasis ? 4 : 3
-    if (qualityMultiplier < 0.75) return 3
     return heavyBasis ? 3 : 2
   }
 
@@ -467,12 +462,8 @@ export class AnalyticOpenQuantumExecutor {
     basisK: number
   ): number {
     if (basisK <= 8) return basisK
-    const qualityMultiplier = performance?.qualityMultiplier ?? 1.0
-    const interacting = performance?.isInteracting ?? false
     const sceneTransitioning = performance?.sceneTransitioning ?? false
     if (sceneTransitioning) return Math.min(basisK, 6)
-    if (interacting || qualityMultiplier < 0.5) return Math.min(basisK, 8)
-    if (qualityMultiplier < 0.75) return Math.min(basisK, 10)
     return basisK
   }
 

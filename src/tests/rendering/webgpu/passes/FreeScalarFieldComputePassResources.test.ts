@@ -61,8 +61,11 @@ describe('initializeFsfField save-state injection', () => {
     expect(() => initializeFsfField(renderState, config, initState)).toThrow(
       '[FSF] Invalid save-state length: expected re=im=4, got re=2, im=4'
     )
-    expect(initState.pendingInjection).toBeNull()
     expect(writeBuffer).not.toHaveBeenCalled()
+    // Note: clearing the pending injection on failure is the *caller's*
+    // responsibility (FreeScalarFieldComputePass.initializeField clears the
+    // class field before invoking us). See the class-level regression test
+    // below for the full infinite-throw-loop fix.
   })
 
   it('uploads exact-length save-state data to phi and pi buffers', () => {

@@ -550,7 +550,13 @@ export async function waitForSrmtQueueDrain(page: Page, timeoutMs = 60_000): Pro
 // type only proves the key is declared in `src/types/dev.d.ts`; it does
 // not catch a missing main.tsx assignment.
 const STORE_PATH_TO_WINDOW_KEY: Record<string, keyof Window> = {
+  // Legacy flat path — the historic key used by the bulk of existing specs.
   '/src/stores/diagnosticsStore.ts': '__DIAGNOSTICS_STORE__',
+  // Post-reorg grouped path. The Zustand store lives at
+  // `src/stores/diagnostics/diagnosticsStore.ts` after commit b14db620
+  // (May 2026 store reorganization). Newer specs reference the file at its
+  // real on-disk path; both forms map to the same DEV window bridge.
+  '/src/stores/diagnostics/diagnosticsStore.ts': '__DIAGNOSTICS_STORE__',
 }
 
 function storePathToWindowKey(storeModule: string): keyof Window {

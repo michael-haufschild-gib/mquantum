@@ -68,7 +68,7 @@ const waitForQwReady = (page: Page, extraFrames = 120) => waitForModeReady(page,
 async function setQwGridSize(page: Page, size: number, dim: number): Promise<void> {
   await page.evaluate(
     async ({ size, dim }: { size: number; dim: number }) => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const store = mod.useExtendedObjectStore.getState()
       const gridSize = Array.from({ length: dim }, () => size)
       const initialPosition = gridSize.map((s) => Math.floor(s / 2))
@@ -88,7 +88,7 @@ async function setQwGridSize(page: Page, size: number, dim: number): Promise<voi
 /** Set quantum walk auto-scale via store. */
 async function setQwAutoScale(page: Page, enabled: boolean): Promise<void> {
   await page.evaluate(async (val: boolean) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     const store = mod.useExtendedObjectStore.getState()
     store.setSchroedingerConfig({
       quantumWalk: { ...store.schroedinger.quantumWalk, autoScale: val },
@@ -99,7 +99,7 @@ async function setQwAutoScale(page: Page, enabled: boolean): Promise<void> {
 /** Set quantum walk absorber enabled via store. */
 async function setQwAbsorber(page: Page, enabled: boolean): Promise<void> {
   await page.evaluate(async (val: boolean) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setQwAbsorberEnabled(val)
   }, enabled)
 }
@@ -107,7 +107,7 @@ async function setQwAbsorber(page: Page, enabled: boolean): Promise<void> {
 /** Enable isosurface mode via store. */
 async function enableIsosurface(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerIsoEnabled(true)
   })
 }
@@ -115,7 +115,7 @@ async function enableIsosurface(page: Page): Promise<void> {
 /** Resume animation if paused. */
 async function resumeAnimation(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/animationStore.ts')
+    const mod = await import('/src/stores/scene/animationStore.ts')
     const store = mod.useAnimationStore.getState()
     if (!store.isPlaying) store.togglePlayPause()
   })
@@ -124,7 +124,7 @@ async function resumeAnimation(page: Page): Promise<void> {
 /** Reset the quantum walk and resume animation for fresh evolution. */
 async function resetAndResumeWalk(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     const store = mod.useExtendedObjectStore.getState()
     const qw = store.schroedinger.quantumWalk
     store.setSchroedingerConfig({
@@ -135,7 +135,7 @@ async function resetAndResumeWalk(page: Page): Promise<void> {
         needsReset: true,
       },
     })
-    const anim = await import('/src/stores/animationStore.ts')
+    const anim = await import('/src/stores/scene/animationStore.ts')
     if (!anim.useAnimationStore.getState().isPlaying)
       anim.useAnimationStore.getState().togglePlayPause()
   })
@@ -224,7 +224,7 @@ test.describe('Quantum Walk: control response', () => {
 
     // Blackbody — heat ramp coloring
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/appearanceStore.ts')
+      const mod = await import('/src/stores/scene/appearanceStore.ts')
       mod.useAppearanceStore.setState({ colorAlgorithm: 'blackbody' })
     })
     await waitForShaderCompilation(page)
@@ -239,7 +239,7 @@ test.describe('Quantum Walk: control response', () => {
 
     // Viridis — perceptually uniform scientific ramp (different hue palette)
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/appearanceStore.ts')
+      const mod = await import('/src/stores/scene/appearanceStore.ts')
       mod.useAppearanceStore.setState({ colorAlgorithm: 'viridis' })
     })
     await waitForShaderCompilation(page)

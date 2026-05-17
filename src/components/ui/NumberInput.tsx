@@ -10,13 +10,15 @@ export interface NumberInputProps extends Omit<InputProps, 'onChange' | 'value'>
   max?: number
   step?: number
   precision?: number
+  /** Ref forwarded to the native input element. */
+  ref?: React.Ref<HTMLInputElement>
 }
 
-/** Formats a number for display, trimming trailing zeros. */
+/** Formats a number for display, trimming trailing zeros after the decimal point. */
 function formatNumericValue(num: number, precision: number): string {
-  return Number(num)
-    .toFixed(precision)
-    .replace(/\.?0+$/, '')
+  const fixed = Number(num).toFixed(precision)
+  if (!fixed.includes('.')) return fixed
+  return fixed.replace(/0+$/, '').replace(/\.$/, '')
 }
 
 /** Handles revert logic when the user's input is empty or an invalid expression. */
@@ -240,7 +242,7 @@ export const NumberInput: React.FC<NumberInputProps> = React.memo(
     onKeyDown: externalOnKeyDown,
     ref: externalRef,
     ...props
-  }: NumberInputProps & { ref?: React.Ref<HTMLInputElement> }) => {
+  }: NumberInputProps) => {
     const [localValue, setLocalValue] = useState(value.toString())
     const [error, setError] = useState<string | null>(null)
     const inputRef = useRef<HTMLInputElement>(null)

@@ -19,28 +19,6 @@ import { DEFAULT_MAX_FPS, MAX_MAX_FPS, MIN_MAX_FPS } from '../defaults/visualDef
 // Constants
 // ============================================================================
 
-/** Delay before restoring full quality after interaction stops (ms) */
-export const INTERACTION_RESTORE_DELAY = 150
-
-/** Progressive refinement stages */
-export const REFINEMENT_STAGES = ['low', 'medium', 'high', 'final'] as const
-
-/** Time to reach each refinement stage after interaction stops (ms) */
-export const REFINEMENT_STAGE_TIMING: Record<RefinementStage, number> = {
-  low: 0,
-  medium: 100,
-  high: 300,
-  final: 500,
-}
-
-/** Quality multiplier for each refinement stage */
-export const REFINEMENT_STAGE_QUALITY: Record<RefinementStage, number> = {
-  low: 0.25,
-  medium: 0.5,
-  high: 0.75,
-  final: 1.0,
-}
-
 /** localStorage key for persisting render resolution scale */
 const RESOLUTION_SCALE_KEY = 'mdim_render_resolution_scale'
 
@@ -197,9 +175,6 @@ function persistDensityGridResolution(resolution: DensityGridResolution): void {
 // Types
 // ============================================================================
 
-/** Progressive refinement stage type */
-export type RefinementStage = (typeof REFINEMENT_STAGES)[number]
-
 /** Performance state interface */
 interface PerformanceState {
   // -------------------------------------------------------------------------
@@ -219,13 +194,10 @@ interface PerformanceState {
   deviceCapabilitiesDetected: boolean
 
   // -------------------------------------------------------------------------
-  // Interaction State
+  // Scene Loading State
   // -------------------------------------------------------------------------
 
-  /** Whether user is currently interacting (camera movement, dragging, etc.) */
-  isInteracting: boolean
-
-  /** Whether a scene/style preset is being loaded (pauses animation, low quality) */
+  /** Whether a scene/style preset is being loaded (pauses animation) */
   sceneTransitioning: boolean
 
   /** Whether a scene preset is currently being loaded (semantic flag for hooks to skip automatic behavior) */
@@ -233,22 +205,6 @@ interface PerformanceState {
 
   /** Counter incremented on each scene/style preset load. Used to trigger material recreation. */
   presetLoadVersion: number
-
-  // -------------------------------------------------------------------------
-  // Progressive Refinement (ALL objects)
-  // -------------------------------------------------------------------------
-
-  /** Whether progressive refinement is enabled */
-  progressiveRefinementEnabled: boolean
-
-  /** Current refinement stage */
-  refinementStage: RefinementStage
-
-  /** Current refinement progress (0-100) */
-  refinementProgress: number
-
-  /** Current quality multiplier based on refinement stage */
-  qualityMultiplier: number
 
   // -------------------------------------------------------------------------
   // Temporal Reprojection (Schroedinger raymarching)
@@ -310,17 +266,10 @@ interface PerformanceState {
   // Device Capabilities
   setDeviceCapabilities: (capabilities: DeviceCapabilities) => void
 
-  // Interaction State
-  setIsInteracting: (interacting: boolean) => void
+  // Scene Loading State
   setSceneTransitioning: (transitioning: boolean) => void
   setIsLoadingScene: (loading: boolean) => void
   incrementPresetLoadVersion: () => void
-
-  // Progressive Refinement
-  setProgressiveRefinementEnabled: (enabled: boolean) => void
-  setRefinementStage: (stage: RefinementStage) => void
-  setRefinementProgress: (progress: number) => void
-  resetRefinement: () => void
 
   // Temporal Reprojection
   setTemporalReprojectionEnabled: (enabled: boolean) => void
@@ -362,7 +311,7 @@ interface PerformanceState {
  * IMPORTANT: This store is excluded from URL serialization.
  * Performance settings are device-specific and should not be shared.
  */
-export const usePerformanceStore = create<PerformanceState>((set, get) => ({
+export const usePerformanceStore = create<PerformanceState>((set) => ({
   // -------------------------------------------------------------------------
   // Initial State
   // -------------------------------------------------------------------------
@@ -373,17 +322,10 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
   gpuName: DEFAULT_CAPABILITIES.gpuName,
   deviceCapabilitiesDetected: false,
 
-  // Interaction State
-  isInteracting: false,
+  // Scene Loading State
   sceneTransitioning: false,
   isLoadingScene: false,
   presetLoadVersion: 0,
-
-  // Progressive Refinement
-  progressiveRefinementEnabled: true,
-  refinementStage: 'final',
-  refinementProgress: 100,
-  qualityMultiplier: 1.0,
 
   // Temporal Reprojection
   temporalReprojectionEnabled: true,
@@ -426,11 +368,7 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
     })
   },
 
-  // Interaction State
-  setIsInteracting: (interacting: boolean) => {
-    set({ isInteracting: interacting })
-  },
-
+  // Scene Loading State
   setSceneTransitioning: (transitioning: boolean) => {
     set({ sceneTransitioning: transitioning })
   },
@@ -441,48 +379,6 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
 
   incrementPresetLoadVersion: () => {
     set((state) => ({ presetLoadVersion: state.presetLoadVersion + 1 }))
-  },
-
-  // Progressive Refinement
-  setProgressiveRefinementEnabled: (enabled: boolean) => {
-    set(
-      enabled
-        ? { progressiveRefinementEnabled: true }
-        : {
-            progressiveRefinementEnabled: false,
-            refinementStage: 'final' as RefinementStage,
-            refinementProgress: 100,
-            qualityMultiplier: 1.0,
-          }
-    )
-  },
-
-  setRefinementStage: (stage: RefinementStage) => {
-    const progress = REFINEMENT_STAGES.indexOf(stage) * 25 + 25
-    const quality = REFINEMENT_STAGE_QUALITY[stage]
-    set({
-      refinementStage: stage,
-      refinementProgress: Math.min(100, progress),
-      qualityMultiplier: quality,
-    })
-  },
-
-  setRefinementProgress: (progress: number) => {
-    if (!Number.isFinite(progress)) {
-      logger.warn('[performanceStore] Ignoring non-finite refinement progress:', progress)
-      return
-    }
-    set({ refinementProgress: Math.max(0, Math.min(100, progress)) })
-  },
-
-  resetRefinement: () => {
-    if (get().progressiveRefinementEnabled) {
-      set({
-        refinementStage: 'low',
-        refinementProgress: 0,
-        qualityMultiplier: REFINEMENT_STAGE_QUALITY.low,
-      })
-    }
   },
 
   // Temporal Reprojection
@@ -608,14 +504,9 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
       isMobileGPU: DEFAULT_CAPABILITIES.isMobileGPU,
       gpuName: DEFAULT_CAPABILITIES.gpuName,
       deviceCapabilitiesDetected: false,
-      isInteracting: false,
       sceneTransitioning: false,
       isLoadingScene: false,
       presetLoadVersion: 0,
-      progressiveRefinementEnabled: true,
-      refinementStage: 'final',
-      refinementProgress: 100,
-      qualityMultiplier: 1.0,
       temporalReprojectionEnabled: true,
       cameraTeleported: false,
       eigenfunctionCacheEnabled: true,

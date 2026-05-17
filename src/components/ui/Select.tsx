@@ -33,6 +33,8 @@ export interface SelectProps<T extends string = string> {
   endAdornment?: React.ReactNode
   /** Test ID for testing */
   'data-testid'?: string
+  /** Ref forwarded to the native select element. */
+  ref?: React.Ref<HTMLSelectElement>
 }
 
 /**
@@ -66,7 +68,7 @@ export const Select = React.memo(
     endAdornment,
     'data-testid': testId,
     ref,
-  }: SelectProps<T> & { ref?: React.Ref<HTMLSelectElement> }) => {
+  }: SelectProps<T>) => {
     // Generate a unique ID for the select element to associate with the label
     const selectId = React.useId()
 

@@ -279,7 +279,7 @@ test.describe('cross-feature interactions', () => {
     // Verify store updated
     await expect(async () => {
       const termCount = await page.evaluate(async () => {
-        const mod = await import('/src/stores/extendedObjectStore.ts')
+        const mod = await import('/src/stores/scene/extendedObjectStore.ts')
         return mod.useExtendedObjectStore.getState().schroedinger.termCount
       })
       expect(termCount).toBe(4)

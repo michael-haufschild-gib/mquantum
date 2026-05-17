@@ -42,6 +42,13 @@ export interface HellerSpectrometerState {
   sampleInterval: number
   /** Number of samples currently stored in the ring buffer. */
   sampleCount: number
+  /**
+   * Monotonically increasing counter bumped on every ring-buffer push.
+   * Unlike `sampleCount` (which saturates at capacity), this always
+   * changes — used by the live-update effect to detect new data even
+   * when the buffer is in rolling-window mode.
+   */
+  sampleVersion: number
   /** Bumped by `bumpResetVersion` whenever the ring buffer is cleared. */
   resetVersion: number
   /**
@@ -67,7 +74,7 @@ export interface HellerSpectrometerState {
   setEnabled: (v: boolean) => void
   /** Set the per-frame sample decimation interval. */
   setSampleInterval: (v: number) => void
-  /** Report the latest sample count from the pass. */
+  /** Report the latest sample count from the pass and bump sampleVersion. */
   setSampleCount: (v: number) => void
   /** Publish the ring buffer reference (called once by the pass). */
   setBufferRef: (buf: HellerRingBuffer | null) => void
@@ -100,6 +107,7 @@ export const useHellerSpectrometerStore = create<HellerSpectrometerState>((set) 
   enabled: false,
   sampleInterval: HELLER_DEFAULT_SAMPLE_INTERVAL,
   sampleCount: 0,
+  sampleVersion: 0,
   resetVersion: 0,
   pendingResetToken: 0,
   bufferRef: null,
@@ -144,7 +152,7 @@ export const useHellerSpectrometerStore = create<HellerSpectrometerState>((set) 
         sampleCount: 0,
       }
     }),
-  setSampleCount: (v) => set({ sampleCount: v }),
+  setSampleCount: (v) => set((s) => ({ sampleCount: v, sampleVersion: s.sampleVersion + 1 })),
   setBufferRef: (buf) => set({ bufferRef: buf }),
   setHamiltonianTimeDependent: (v) => set({ hamiltonianTimeDependent: v }),
   bumpResetVersion: () => set((s) => ({ resetVersion: s.resetVersion + 1, sampleCount: 0 })),

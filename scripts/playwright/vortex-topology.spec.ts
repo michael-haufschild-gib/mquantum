@@ -43,7 +43,7 @@ const assertPixels = assertNonBlankPixels
 /** Set BEC initial condition via store. */
 async function setBecInitialCondition(page: Page, condition: string): Promise<void> {
   await page.evaluate(async (c) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setBecInitialCondition(c)
@@ -53,7 +53,7 @@ async function setBecInitialCondition(page: Page, condition: string): Promise<vo
 /** Set BEC vortex plane 1 via store. */
 async function setBecVortexPlane1(page: Page, plane: [number, number]): Promise<void> {
   await page.evaluate(async (p) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setBecVortexPlane1(p)
@@ -63,7 +63,7 @@ async function setBecVortexPlane1(page: Page, plane: [number, number]): Promise<
 /** Set BEC vortex plane 2 via store. */
 async function setBecVortexPlane2(page: Page, plane: [number, number]): Promise<void> {
   await page.evaluate(async (p) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setBecVortexPlane2(p)
@@ -73,7 +73,7 @@ async function setBecVortexPlane2(page: Page, plane: [number, number]): Promise<
 /** Set BEC vortex separation via store. */
 async function setBecVortexSeparation(page: Page, sep: number): Promise<void> {
   await page.evaluate(async (s) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setBecVortexSeparation(s)
@@ -83,7 +83,7 @@ async function setBecVortexSeparation(page: Page, sep: number): Promise<void> {
 /** Set BEC vortex pair count via store. */
 async function setBecVortexPairCount(page: Page, count: number): Promise<void> {
   await page.evaluate(async (c) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setBecVortexPairCount(c)
@@ -93,7 +93,7 @@ async function setBecVortexPairCount(page: Page, count: number): Promise<void> {
 /** Set BEC field view via store mutation. */
 async function setFieldView(page: Page, view: string): Promise<void> {
   await page.evaluate(async (v) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setBecFieldView(v)
@@ -103,7 +103,7 @@ async function setFieldView(page: Page, view: string): Promise<void> {
 /** Enable BEC diagnostics readback. */
 async function enableDiagnostics(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setBecDiagnosticsEnabled(true)

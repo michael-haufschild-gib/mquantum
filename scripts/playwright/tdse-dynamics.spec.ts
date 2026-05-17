@@ -51,7 +51,7 @@ const waitForTdseReady = (page: Page, extraFrames = 120) => waitForModeReady(pag
 /** Set TDSE field view via store mutation. */
 async function setFieldView(page: Page, view: string): Promise<void> {
   await page.evaluate(async (v) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setTdseFieldView(v)
@@ -61,7 +61,7 @@ async function setFieldView(page: Page, view: string): Promise<void> {
 /** Enable isosurface mode via store. */
 async function enableIsosurface(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setSchroedingerIsoEnabled(true)
   })
 }
@@ -69,7 +69,7 @@ async function enableIsosurface(page: Page): Promise<void> {
 /** Enable TDSE diagnostics readback. */
 async function enableDiagnostics(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setTdseDiagnosticsEnabled(true)
@@ -79,7 +79,7 @@ async function enableDiagnostics(page: Page): Promise<void> {
 /** Set TDSE imaginary time propagation mode. */
 async function setImaginaryTime(page: Page, enabled: boolean): Promise<void> {
   await page.evaluate(async (val) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setTdseImaginaryTimeEnabled(val)
@@ -89,7 +89,7 @@ async function setImaginaryTime(page: Page, enabled: boolean): Promise<void> {
 /** Set TDSE absorber (PML) enabled/disabled. */
 async function setAbsorber(page: Page, enabled: boolean): Promise<void> {
   await page.evaluate(async (val) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setTdseAbsorberEnabled(val)
@@ -99,7 +99,7 @@ async function setAbsorber(page: Page, enabled: boolean): Promise<void> {
 /** Set TDSE auto-scale enabled/disabled. */
 async function setAutoScale(page: Page, enabled: boolean): Promise<void> {
   await page.evaluate(async (val) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setTdseAutoScale(val)
@@ -109,7 +109,7 @@ async function setAutoScale(page: Page, enabled: boolean): Promise<void> {
 /** Set TDSE packet width via store. */
 async function setPacketWidth(page: Page, width: number): Promise<void> {
   await page.evaluate(async (w) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setTdsePacketWidth(w)
@@ -119,7 +119,7 @@ async function setPacketWidth(page: Page, width: number): Promise<void> {
 /** Set TDSE show-potential overlay. */
 async function setShowPotential(page: Page, enabled: boolean): Promise<void> {
   await page.evaluate(async (val) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = await import('/src/stores/scene/extendedObjectStore.ts')
     ;(
       mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
     ).setTdseShowPotential(val)
@@ -281,7 +281,7 @@ test.describe('TDSE dynamics: control response', () => {
 
     // Switch to harmonic trap — triggers needsReset and reinitializes wavefunction
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const store = mod.useExtendedObjectStore.getState() as Record<
         string,
         (...args: unknown[]) => void
@@ -365,7 +365,7 @@ test.describe('TDSE dynamics: physics validation', () => {
 
     // Set up harmonic trap with diagnostics
     await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
       const store = mod.useExtendedObjectStore.getState() as Record<
         string,
         (...args: unknown[]) => void

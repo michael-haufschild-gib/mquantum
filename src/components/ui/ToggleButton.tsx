@@ -17,6 +17,8 @@ export interface ToggleButtonProps extends Omit<
   sound?: 'click' | 'swish'
   /** Tooltip text shown on hover over the button. */
   tooltip?: string
+  /** Ref forwarded to the native button element. */
+  ref?: React.Ref<HTMLButtonElement>
 }
 
 export const ToggleButton = React.memo(
@@ -30,7 +32,7 @@ export const ToggleButton = React.memo(
     tooltip,
     ref,
     ...props
-  }: ToggleButtonProps & { ref?: React.Ref<HTMLButtonElement> }) => {
+  }: ToggleButtonProps) => {
     const handleClick = useCallback(() => {
       if (sound === 'swish') {
         // Swish only on open, click on close

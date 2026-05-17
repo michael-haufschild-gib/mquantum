@@ -15,6 +15,8 @@
  * @module rendering/webgpu/renderers/strategies/SinglePassComputeStrategy
  */
 
+import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
+
 import type { WebGPURenderContext, WebGPUSetupContext } from '../../core/types'
 import type { SchroedingerWGSLShaderConfig } from '../../shaders/schroedinger/compose'
 import type { SchrodingerRendererConfig } from '../schrodingerRendererTypes'
@@ -192,12 +194,13 @@ export abstract class SinglePassComputeStrategy<
   }
 
   setup(ctx: WebGPUSetupContext, config: SchrodingerRendererConfig): ModeSetupResult {
+    const densityGridResolution = config.densityGridResolution ?? DENSITY_GRID_SIZE
     // Recreate the compute pass when the density grid resolution changes
     // in-place — otherwise the existing pass keeps its old texture/buffer
     // sizes and the new resolution silently has no effect.
-    if (!this.pass || this.pass.getDensityGridSize() !== config.densityGridResolution) {
+    if (!this.pass || this.pass.getDensityGridSize() !== densityGridResolution) {
       this.pass?.dispose()
-      this.pass = this.createPass(config.densityGridResolution ?? 0)
+      this.pass = this.createPass(densityGridResolution)
       this.pass.initializeDensityTexture(ctx.device)
     }
 

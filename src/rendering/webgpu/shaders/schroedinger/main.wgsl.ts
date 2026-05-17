@@ -11,7 +11,6 @@
  * - camera: CameraUniforms (Group 0, Binding 0)
  * - lighting: LightingUniforms (Group 1, Binding 0)
  * - material: MaterialUniforms (Group 1, Binding 1)
- * - quality: QualityUniforms (Group 1, Binding 2)
  * - schroedinger: SchroedingerUniforms (Group 2, Binding 0)
  * - basis: BasisVectors (Group 2, Binding 1)
  *
@@ -73,7 +72,7 @@ interface RaymarchCallOptions {
  * 1. gridOnly → grid call only, no inline fallback compiled
  * 2. useDensityGrid → grid preferred, with inline fallback for phase-dependent modes
  *    and a safety fallback if grid returns transparent (unless density matrix mode)
- * 3. no grid → direct inline fast/HQ toggle
+ * 3. no grid → direct inline raymarch
  */
 function generateRaymarchCall(opts: RaymarchCallOptions): string {
   const { useDensityGrid, gridOnly, useDensityMatrix = false } = opts
@@ -104,11 +103,7 @@ function generateRaymarchCall(opts: RaymarchCallOptions): string {
     probabilityCurrentVolumeMode;
 
   if (requiresDirectSampling) {
-    if (fastMode) {
-      volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
-    } else {
-      volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
-    }
+    volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
   } else {
     volumeResult = volumeRaymarchGrid(ro, rd, tNear, tFar, schroedinger);${
       useDensityMatrix
@@ -123,21 +118,13 @@ function generateRaymarchCall(opts: RaymarchCallOptions): string {
     // or when coordinate mapping produces out-of-range lookups.
     // Skip for free scalar: inline HO evaluation is wrong for lattice data.
     if (!IS_FREE_SCALAR && volumeResult.alpha < 0.01) {
-      if (fastMode) {
-        volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
-      } else {
-        volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
-      }
+      volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
     }`
     }
   }`
   }
 
-  return `if (fastMode) {
-    volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
-  } else {
-    volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
-  }`
+  return `volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);`
 }
 
 /**
@@ -200,11 +187,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
 
 
   // Volumetric raymarching using functions from integration block
-  // Fast mode selection based on quality multiplier
   var volumeResult: VolumeResult;
-
-  // Use quality multiplier < 1.0 as "fast mode" indicator
-  let fastMode = quality.qualityMultiplier < 0.75;
 
   ${raymarchCall}
 
@@ -386,11 +369,7 @@ ${bayerJitterSection}
   let tFar = tSphere.y;
 
   // Volumetric raymarching using functions from integration block
-  // Fast mode selection based on quality multiplier
   var volumeResult: VolumeResult;
-
-  // Use quality multiplier < 1.0 as "fast mode" indicator
-  let fastMode = quality.qualityMultiplier < 0.75;
 
   ${raymarchCall}
 

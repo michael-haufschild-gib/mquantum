@@ -29,9 +29,20 @@ import {
   normalizeRotationTupleSigned,
 } from '@/lib/lighting/lightSource'
 
-import type { SkyboxMode, SkyboxSelection, SkyboxTexture } from '../defaults/visualDefaults'
+import {
+  DEFAULT_SKYBOX_PROCEDURAL_SETTINGS,
+  SKYBOX_ANIMATION_MODES,
+  type SkyboxAnimationMode,
+  type SkyboxMode,
+  type SkyboxSelection,
+  type SkyboxTexture,
+} from '../defaults/visualDefaults'
 import { MAX_SPEED, MIN_SPEED } from '../scene/animationStore'
 import { usePBRStore } from '../scene/pbrStore'
+import {
+  mergeSkyboxProceduralSettings,
+  sanitizeSkyboxProceduralSettingsPatch,
+} from '../slices/skyboxSlice'
 import {
   clampToRange,
   isFiniteVec3,
@@ -81,6 +92,9 @@ export const ANIMATION_LOAD_KEYS = [
   'animatingPlanes',
 ] as const
 
+const SKYBOX_ANIMATION_MODE_SET = new Set<SkyboxAnimationMode>(SKYBOX_ANIMATION_MODES)
+const TWO_PI = Math.PI * 2
+
 /** Generate a unique name for an imported preset by appending "(imported N)" if needed. */
 export function makeUniqueImportedName(baseName: string, usedNames: Set<string>): string {
   if (!usedNames.has(baseName)) {
@@ -121,6 +135,12 @@ export function isSkyboxTexture(value: unknown): value is SkyboxTexture {
   return typeof value === 'string' && SKYBOX_TEXTURE_SET.has(value as SkyboxTexture)
 }
 
+function isSkyboxAnimationMode(value: unknown): value is SkyboxAnimationMode {
+  return (
+    typeof value === 'string' && SKYBOX_ANIMATION_MODE_SET.has(value as SkyboxAnimationMode)
+  )
+}
+
 /** Derive skybox enabled/mode/texture state from a unified skybox selection value. */
 export function deriveSkyboxStateFromSelection(selection: SkyboxSelection): {
   skyboxEnabled: boolean
@@ -150,6 +170,41 @@ export function deriveSkyboxStateFromSelection(selection: SkyboxSelection): {
   }
 }
 
+function normalizeSkyboxRotation(rotation: number): number {
+  return ((rotation % TWO_PI) + TWO_PI) % TWO_PI
+}
+
+function normalizeEnvironmentProceduralSettings(normalized: Record<string, unknown>): void {
+  if (!('proceduralSettings' in normalized)) return
+
+  const patch = sanitizeSkyboxProceduralSettingsPatch(normalized.proceduralSettings)
+  if (Object.keys(patch).length === 0) {
+    delete normalized.proceduralSettings
+    return
+  }
+
+  normalized.proceduralSettings = mergeSkyboxProceduralSettings(
+    DEFAULT_SKYBOX_PROCEDURAL_SETTINGS,
+    patch
+  )
+}
+
+function normalizeEnvironmentSkyboxScalars(normalized: Record<string, unknown>): void {
+  validateBooleanField(normalized, 'skyboxHighQuality')
+  clampNumericField(normalized, 'skyboxIntensity', 0, 10)
+  clampNumericField(normalized, 'skyboxRotation', 0, TWO_PI, normalizeSkyboxRotation)
+  clampNumericField(normalized, 'skyboxAnimationSpeed', 0, 5)
+
+  if (
+    'skyboxAnimationMode' in normalized &&
+    !isSkyboxAnimationMode(normalized.skyboxAnimationMode)
+  ) {
+    delete normalized.skyboxAnimationMode
+  }
+
+  normalizeEnvironmentProceduralSettings(normalized)
+}
+
 /**
  * Normalize imported environment payloads so unified skybox fields stay in sync.
  * Legacy presets may omit `skyboxSelection` or include removed fields like `classicSkyboxType`.
@@ -169,6 +224,8 @@ export function normalizeEnvironmentLoadData(
     selection = environment.skyboxMode
   } else if (isSkyboxTexture(environment.skyboxTexture) && environment.skyboxTexture !== 'none') {
     selection = environment.skyboxTexture
+  } else if (environment.skyboxEnabled === true) {
+    selection = 'space_blue'
   } else {
     selection = 'none'
   }
@@ -188,6 +245,7 @@ export function normalizeEnvironmentLoadData(
       delete normalized.backgroundColor
     }
   }
+  normalizeEnvironmentSkyboxScalars(normalized)
 
   return {
     ...normalized,

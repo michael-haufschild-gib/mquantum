@@ -7,6 +7,26 @@
 /** Workgroup size for 2D compute dispatches. Must match @workgroup_size(16, 16) in shaders. */
 export const WIGNER_WORKGROUP_SIZE = 16
 
+/** Minimum Wigner cache resolution accepted at runtime. */
+export const WIGNER_CACHE_MIN_RESOLUTION = 128
+/** Maximum Wigner cache resolution accepted at runtime. */
+export const WIGNER_CACHE_MAX_RESOLUTION = 1024
+/** Default Wigner cache resolution for invalid or omitted input. */
+export const WIGNER_CACHE_DEFAULT_RESOLUTION = 256
+
+/** Clamp and integerize runtime Wigner cache resolution input. */
+export function normalizeWignerCacheResolution(
+  resolution: number | undefined,
+  fallback = WIGNER_CACHE_DEFAULT_RESOLUTION
+): number {
+  const finiteFallback = Number.isFinite(fallback) ? fallback : WIGNER_CACHE_DEFAULT_RESOLUTION
+  const value = Number.isFinite(resolution) ? resolution : finiteFallback
+  return Math.max(
+    WIGNER_CACHE_MIN_RESOLUTION,
+    Math.min(WIGNER_CACHE_MAX_RESOLUTION, Math.round(value!))
+  )
+}
+
 /** Byte size of the Schrödinger uniform buffer (derived from layout). */
 export { SCHROEDINGER_UNIFORM_SIZE } from '../renderers/schroedingerLayout'
 

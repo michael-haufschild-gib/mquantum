@@ -42,39 +42,8 @@ describe('Schroedinger Born-null weave WGSL composition', () => {
     expect(wgsl).toContain('let opacityScale = clamp(1.0 - apertureWeight')
   })
 
-  it('resamples analytic volume after Born-null coordinate deformation', () => {
-    const body = functionSlice(volumeRaymarchBlock, 'volumeRaymarch')
-
-    // PERF: applyBornNullWeaveRaymarch was inlined here so the wrapper call
-    // disappears when the effect is inactive. The wrapper still exists for
-    // callers that have not yet been migrated. The behaviour contract that
-    // matters: vacuum-bubble deformation runs first, then born-null weave is
-    // gated on `bornNullWeaveActive`, computes a gradient (via the per-step
-    // cache), warps samplePos, resamples density via sampleDensityWithPhaseAndFlow,
-    // and the post-warp density+phase is what feeds compositeOverlay /
-    // computeEmissionLit.
-    expectOrdered(body, [
-      'let vacuumBubble = applyVacuumBubbleLens(',
-      'if (bornNullWeaveActive && rho >= EMPTY_SKIP_THRESHOLD)',
-      'let bornGradient = ensureGradient(samplePos, animTime, uniforms, &gradCache)',
-      // OPT-BORN-ANALYTICAL: Born is now dispatched through a hasAnalytical
-      // branch — analytical path reuses the closed-form psi gradients on the
-      // AnalyticalSample, fallback path keeps the original 3-evalPsi helper.
-      'var bornNullWeave: BornNullWeaveResult',
-      'bornNullWeave = applyBornNullWeaveAnalytical(',
-      'bornNullWeave = applyBornNullWeave(',
-      'samplePos = bornNullWeave.position',
-      'sampleDensityWithPhaseAndFlow(samplePos, animTime, uniforms)',
-      'rho = densityInfo.x',
-      'computeEffectiveDensity(',
-      'rho * spectralOpacityScale * vacuumBubbleOpacityScale * bornNullOpacityScale',
-      'computeEmissionLit(rho, sCenter, phase, samplePos',
-      'bornNullEmissionGain',
-    ])
-  })
-
   it('resamples HQ analytic volume before gradient and emission', () => {
-    const body = functionSlice(volumeRaymarchBlock, 'volumeRaymarchHQ')
+    const body = functionSlice(volumeRaymarchBlock, 'volumeRaymarch')
 
     // Same external-gate refactor for HQ. The post-warp density resample uses
     // sampleDensityWithPhase (rho/log/phase only — gradient is produced lazily

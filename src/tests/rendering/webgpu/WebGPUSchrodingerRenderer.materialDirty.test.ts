@@ -54,7 +54,7 @@ function createMockCtx(): { ctx: MockRenderContext; passEncoder: MockPassEncoder
         stores: {
           appearance: { appearanceVersion: 0 },
           pbr: { pbrVersion: 0 },
-          performance: { qualityMultiplier: 1 },
+          performance: {},
           extended: { schroedinger: {} },
           animation: { accumulatedTime: 0 },
           geometry: { dimension: 3 },
@@ -104,7 +104,6 @@ describe('WebGPUSchrodingerRenderer material dirty-checking', () => {
     renderer.updateBasisVectors = vi.fn()
     renderer.updateSchroedingerUniforms = vi.fn()
     renderer.updateLightingUniforms = vi.fn()
-    renderer.updateQualityUniforms = vi.fn()
     renderer.updateMaterialUniforms = vi.fn()
 
     return renderer

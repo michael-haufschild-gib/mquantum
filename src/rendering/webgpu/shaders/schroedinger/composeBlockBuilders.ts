@@ -481,10 +481,9 @@ export function buildVolumeBlocks(opts: {
       condition: !opts.is2D,
       content: opts.gridOnly
         ? [
-            '// Stubs: inline raymarch excluded in grid-only mode.',
+            '// Stub: inline raymarch excluded in grid-only mode.',
             '// The grid-based volumeRaymarchGrid handles all rendering.',
             'fn volumeRaymarch(ro: vec3f, rd: vec3f, tNear: f32, tFar: f32, uniforms: SchroedingerUniforms) -> VolumeResult { return VolumeResult(vec3f(0.0), 0.0, 0, 0.0); }',
-            'fn volumeRaymarchHQ(ro: vec3f, rd: vec3f, tNear: f32, tFar: f32, uniforms: SchroedingerUniforms) -> VolumeResult { return VolumeResult(vec3f(0.0), 0.0, 0, 0.0); }',
           ].join('\n')
         : volumeRaymarchBlock,
     },

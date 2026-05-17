@@ -11,6 +11,7 @@ import type { SavedScene, SavedStyle } from './presetTypes'
 export const OBJECT_TYPE_TO_CONFIG_KEY: Record<ObjectType, string> = {
   schroedinger: 'schroedinger',
   pauliSpinor: 'pauliSpinor',
+  bellPair: 'bellPair',
 }
 
 /**
@@ -57,6 +58,7 @@ export const TRANSIENT_FIELDS = new Set([
   'pbrVersion',
   'schroedingerVersion',
   'pauliSpinorVersion',
+  'bellPairVersion',
 
   // Exposure - runtime display preference, not part of scene/style presets
   'autoScaleMaxGain',

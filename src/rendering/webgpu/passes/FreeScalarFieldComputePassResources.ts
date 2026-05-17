@@ -294,14 +294,14 @@ export function initializeFsfField(
   // Track whether init consumed an injection so the kickstart can be skipped
   let injectedFromSave = false
 
-  // Check for pending loaded wavefunction data -- skip init and inject directly
+  // Check for pending loaded wavefunction data -- skip init and inject directly.
+  // The caller (FreeScalarFieldComputePass.initializeField) clears its own
+  // `pendingInjection` *before* invoking us so a length-mismatch throw here
+  // cannot trap the renderer in an infinite-throw loop — there is no need to
+  // null `ic.pendingInjection` on the failure path since `ic` is a local
+  // struct, not a back-reference to the class field.
   if (ic.pendingInjection && ic.phiBuffer && ic.piBuffer) {
-    try {
-      assertStateInjectionLength('FSF', ic.pendingInjection, ic.totalSites)
-    } catch (err) {
-      ic.pendingInjection = null
-      throw err
-    }
+    assertStateInjectionLength('FSF', ic.pendingInjection, ic.totalSites)
     const { re, im } = ic.pendingInjection
     device.queue.writeBuffer(ic.phiBuffer, 0, re as Float32Array<ArrayBuffer>)
     device.queue.writeBuffer(ic.piBuffer, 0, im as Float32Array<ArrayBuffer>)

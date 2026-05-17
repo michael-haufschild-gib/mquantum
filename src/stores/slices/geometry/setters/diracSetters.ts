@@ -15,6 +15,7 @@ import {
   isDiracFieldView,
   isDiracInitialCondition,
   isDiracPotentialType,
+  minDiracGridPerDim,
 } from '@/lib/geometry/extended/dirac'
 import { logger } from '@/lib/logger'
 import { reduceGridToFit } from '@/lib/math/ndArray'
@@ -72,14 +73,6 @@ export interface DiracSetters {
 }
 
 /**
- * WebGPU minStorageBufferOffsetAlignment is 256 bytes.
- * Dirac pack/unpack bind groups view spinor components at offset
- * `c * totalSites * 4`. To satisfy alignment: totalSites * 4 >= 256,
- * so totalSites >= 64. This gives the minimum per-dimension grid size.
- */
-const MIN_ALIGNED_TOTAL_SITES = 64
-
-/**
  * Minimum Dirac timestep. Any desired dt below this is raised — anything
  * smaller is unproductive for visualization (thousands of steps per frame
  * without visible evolution) and risks float underflow in the integrator.
@@ -110,14 +103,7 @@ function clampDiracDt(spacing: number[], speedOfLight: number, desiredDt: number
   return Math.max(MIN_DIRAC_DT, Math.min(dtMax * DIRAC_DT_CFL_SAFETY, desiredDt))
 }
 
-/**
- * Minimum per-dimension grid size for Dirac that satisfies WebGPU
- * buffer offset alignment (256 bytes). Returns a power of 2.
- */
-export const minDiracGridPerDim = (dim: number): number => {
-  const raw = Math.ceil(Math.pow(MIN_ALIGNED_TOTAL_SITES, 1 / dim))
-  return Math.max(2, 2 ** Math.ceil(Math.log2(raw)))
-}
+export { minDiracGridPerDim }
 
 /**
  * Normalize a Dirac fieldView for the given lattice dimension. axialCharge

@@ -259,6 +259,15 @@ export function normalizeColorAlgorithmForQuantumMode(
     if (matched) return matched
     return 'pauliSpinDensity'
   }
+  if (objectType === 'bellPair') {
+    // Bell apparatus density grid (R=Alice, G=CHSH glow, B=Bob) has no
+    // wavefunction phase or field-theoretic energy density. Falling through
+    // to `getQuantumTypeDefaultColorAlgorithm(quantumMode)` would return the
+    // leftover Schroedinger mode's default (e.g. FSF's energyFlux) and
+    // re-introduce the black-render bug for any preset / URL state that
+    // carries a Bell-invalid color algorithm.
+    return 'pauliSpinDensity'
+  }
   return (getQuantumTypeDefaultColorAlgorithm(quantumMode) ??
     'radialDistance') as PaletteColorAlgorithm
 }
@@ -287,7 +296,8 @@ function needsEffectBundleShader(
 /** @returns Normalized Schroedinger-specific config with compute-mode overrides applied. */
 export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {
   const isPauli = config.objectType === 'pauliSpinor'
-  const isCompute = isComputeQuantumType(config.quantumMode) || isPauli
+  const isBellPair = config.objectType === 'bellPair'
+  const isCompute = isComputeQuantumType(config.quantumMode) || isPauli || isBellPair
   const is2D = !isCompute && (config.dimension === 2 || config.representation === 'wigner')
   const disableAnalytical = isCompute || is2D
   const disableQuantumEffect = isCompute || config.openQuantumEnabled
@@ -384,6 +394,20 @@ export function extractPPConfig(config: PassConfig): PPPassConfig {
     skyboxEnabled: config.skyboxEnabled,
     temporalReprojectionEnabled: config.temporalReprojectionEnabled,
   }
+}
+
+/**
+ * Build the React effect dependency key for pass setup from the exact config
+ * subsets that drive pass rebuild decisions.
+ */
+export function buildPassSetupKey(
+  schrodingerConfig: SchrodingerPassConfig,
+  ppConfig: PPPassConfig
+): string {
+  return JSON.stringify({
+    schrodingerConfig,
+    ppConfig,
+  })
 }
 
 /** @returns True if all keys of `b` match the corresponding values in `a`. */

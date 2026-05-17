@@ -1,4 +1,9 @@
 import {
+  type BellAnalysisMode,
+  type BellPairAxis,
+  type BellPairConfig,
+  type BellPairField,
+  type BellSamplerMode,
   HydrogenNDPresetName,
   type PauliConfig,
   type PauliFieldType,
@@ -220,16 +225,65 @@ export interface PauliSpinorSliceActions {
 export type PauliSpinorSlice = PauliSpinorSliceState & PauliSpinorSliceActions
 
 // ============================================================================
+// Bell Pair Slice
+// ============================================================================
+
+/** State for the Bell-pair / CHSH experiment configuration. */
+export interface BellPairSliceState {
+  bellPair: BellPairConfig
+}
+
+/** Mutation actions for the Bell-pair configuration. */
+export interface BellPairSliceActions {
+  // Measurement axes
+  setBellAliceAxis: (axis: BellPairAxis) => void
+  setBellAliceAxisPrime: (axis: BellPairAxis) => void
+  setBellBobAxis: (axis: BellPairAxis) => void
+  setBellBobAxisPrime: (axis: BellPairAxis) => void
+
+  // State noise + loopholes
+  setBellVisibility: (v: number) => void
+  setBellDetectionEfficiency: (eta: number) => void
+  setBellAnalysisMode: (mode: BellAnalysisMode) => void
+
+  // Per-particle precession field
+  setBellFieldA: (b: BellPairField) => void
+  setBellFieldB: (b: BellPairField) => void
+
+  // Sampler selection
+  setBellSamplerMode: (mode: BellSamplerMode) => void
+  setBellLhvStrategyId: (id: string) => void
+
+  // Trial loop pacing
+  setBellTargetTrials: (n: number) => void
+  setBellTrialsPerFrame: (n: number) => void
+
+  // Reproducibility
+  setBellSeed: (seed: number) => void
+
+  // Lifecycle
+  resetBellPair: () => void
+  setBellPairConfig: (config: Partial<BellPairConfig>) => void
+  getBellPairConfig: () => BellPairConfig
+}
+
+/** Combined Bell-pair slice type (state + actions). */
+export type BellPairSlice = BellPairSliceState & BellPairSliceActions
+
+// ============================================================================
 // Combined Extended Object Slice
 // ============================================================================
 
-/** Combined extended-object slice: Schroedinger + Pauli with version tracking and reset. */
+/** Combined extended-object slice: Schroedinger + Pauli + BellPair with version tracking and reset. */
 export type ExtendedObjectSlice = SchroedingerSlice &
-  PauliSpinorSlice & {
+  PauliSpinorSlice &
+  BellPairSlice & {
     /** Version counter for schroedinger state changes (dirty-flag tracking) */
     schroedingerVersion: number
     /** Version counter for pauli spinor state changes (dirty-flag tracking) */
     pauliSpinorVersion: number
+    /** Version counter for bell-pair state changes (dirty-flag tracking) */
+    bellPairVersion: number
     /** Manually bump all version counters (used after direct setState calls) */
     bumpAllVersions: () => void
     reset: () => void

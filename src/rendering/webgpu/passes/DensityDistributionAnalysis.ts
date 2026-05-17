@@ -123,13 +123,26 @@ export class DensityDistributionAnalyzer {
       this.prefixMass = null
       this.totalMass = 0
       this.logRhoThreshold = DEFAULT_LOG_RHO_THRESHOLD
-      useDiagnosticsStore.getState().pushDensitySnapshot({
+      const store = useDiagnosticsStore.getState()
+      store.pushDensitySnapshot({
         maxDensity: 0,
         totalDensityMass: 0,
         activeVoxelCount: 0,
         centerDensity: 0,
         gridSize,
         worldBound,
+      })
+      // Also clear stale slices so the "Export Wavefunction Slices" button
+      // (gated on `density.sliceX !== null && density.sliceGridSize > 0`)
+      // doesn't expose data captured under the previous quantum state. The
+      // hot path below pushes fresh slices alongside the snapshot; the empty
+      // path must symmetrically clear them.
+      store.pushDensitySlices({
+        sliceX: null,
+        sliceY: null,
+        sliceZ: null,
+        sliceGridSize: 0,
+        sliceWorldBound: 0,
       })
       return
     }

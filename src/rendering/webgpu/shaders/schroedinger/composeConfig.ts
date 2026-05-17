@@ -101,6 +101,8 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   isQuantumWalk?: boolean
   /** Pauli spinor mode — alpha encodes density, not potential. */
   isPauli?: boolean
+  /** Bell-pair mode — density texture holds a static apparatus pattern modulated by live |S|. */
+  isBellPair?: boolean
   /**
    * AdS (anti-de Sitter) mode. Rides on the shared Schrödinger shader
    * composition path, so the top-level `quantumMode` is narrowed to
@@ -285,6 +287,7 @@ export function buildShaderDefinesAndFeatures(flags: {
   usePrecomputedNormals: boolean
   isQuantumWalk: boolean
   isPauli: boolean
+  isBellPair?: boolean
   isAds: boolean
   useWignerCache: boolean
   crossSectionEnabled: boolean

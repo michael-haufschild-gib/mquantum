@@ -387,6 +387,16 @@ describe('isValidPreset', () => {
     expect(isValidPreset({ preset: 'kasner', spacetimeDim: 4 })).toBe(true)
   })
 
+  it('rejects unknown runtime preset strings instead of treating them as ekpyrotic', () => {
+    expect(
+      isValidPreset({
+        preset: 'bogus' as never,
+        spacetimeDim: 4,
+        steepness: sCritical(4) * 2,
+      })
+    ).toBe(false)
+  })
+
   it('requires a finite positive hubble for de Sitter', () => {
     // Regression: previously isValidPreset only consulted qExponent, which
     // ignores the hubble requirement. The compute pass's scaleFactorAmplitude

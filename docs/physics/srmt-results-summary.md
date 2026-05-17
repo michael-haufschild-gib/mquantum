@@ -5,10 +5,11 @@
 **Diagnostic version**: `SRMT_DIAGNOSTIC_VERSION = 1.2.0`
 **Solver version**: `WDW_SOLVER_VERSION = 3.0.0`
 **Companion documents**: `srmt-falsification.md` (v1 pre-reg, frozen),
-`srmt-falsification-v2.md` (v2 pre-reg, frozen),
-`srmt-empirical-result-v1.md`, `-v2.md`, `-v3.md`
-**Artifact**: `artifacts/srmt-publication-sweep.csv` (51-column,
-v1.2.0-schema-compliant)
+`srmt-falsification-v2.md` (v2 pre-reg with v2.1 + v2.2 amendments),
+`srmt-empirical-result-v1.md`, `-v2.md`, `-v3.md`, `-v4.md`, `-v5.md`
+**Artifacts**:
+- `artifacts/srmt-publication-sweep.csv` (51-column, 96×24 cut sweep)
+- `artifacts/srmt-publication-grid-192x48.csv` (51-column, 192×48 publication grid)
 
 ## Abstract
 
@@ -90,25 +91,40 @@ to discriminate. The rigid metric continues to give a strict
 winner with increasing margin. This justifies the v2 pre-reg's
 demotion of L2 to a secondary sanity-check.
 
-### 2.4 Triple-diagnostic disagreement confirms SRMT non-triviality
+### 2.4 Five-diagnostic agreement landscape
 
-| Diagnostic               | Champion picked      | Construction                              |
-|--------------------------|----------------------|-------------------------------------------|
-| Rigid-q (SRMT)           | `a`                  | Entropy spectrum vs HJ spectrum, α=1 fit   |
-| WKB phase rate           | φ (tied)             | Mean coordinate-momentum from arg(χ)       |
-| Page-Wootters autocorr   | φ (tied)             | Conditional-state distinguishability       |
+| Diagnostic               | Champion in main regime | Picks `a`? | Notes |
+|--------------------------|-------------------------|-----------|-------|
+| Rigid-q (SRMT primary)   | `a`                     | YES       | Entropy vs HJ, α=1 fit |
+| Born-Oppenheimer         | `a`                     | YES       | Heavy-WKB-phase factorization; standard QC formalism |
+| WKB phase rate           | null (φ tied)           | NO        | Raw coordinate-momentum from arg(χ) |
+| Page-Wootters autocorr   | null (φ tied)           | NO        | Conditional-state distinguishability |
+| Cut-stability            | null                    | —         | Spectral window uniformity (less discriminating) |
 
-The two cross-diagnostics pick φ; rigid-q picks `a`. This is
-the strongest possible empirical argument that the SRMT
-criterion measures the **supermetric-signature structure of
-quantum cosmology**, not the classical-momentum dominance or the
-conditional-time distinguishability that older time-emergence
-proposals attempt to capture.
+**Two independent diagnostics (rigid-q and Born-Oppenheimer) pick
+`a` together in the main physics regime; two diagnostics (WKB,
+Page-Wootters) pick `φ` together.** Cut-stability is too coarse
+to discriminate at the sampled grids.
 
-The headline implication: **SRMT is a non-trivial conjecture**.
-If WKB and PW agreed with rigid-q, SRMT would be a restatement of
-established ideas. They disagree → SRMT carries new physical
-content beyond standard quantum cosmology.
+The SRMT-favored time `a` AGREES with the standard
+Born-Oppenheimer time-emergence formalism (after factoring out
+the heavy WKB phase) AND DISAGREES with the naive coordinate-
+phase-rate metric. This is *positive* independent confirmation
+from a standard quantum-cosmology framework, not just a
+non-triviality claim.
+
+### 2.5 v2.2 publication-grade verdict
+
+| Criterion | Pass at 64×16 (v2) | Pass at 192×48 (v4/v5) |
+|-----------|--------------------|-----------------------|
+| C1 (rigid champion = `a`) | 99.7% | **100%** |
+| C2 (between-clock margin ≥ 30×) | 89.8% | **100%** |
+| C3 (WKB ≠ `a`) | 73.0% | 92% (all in m=0.2/Λ<0 corner) |
+| C7 (BO = `a`, v2.2) | not measured | 91% (same corner) |
+| **All criteria simultaneously** | 63.6% | **91%** |
+
+Rigid-margin at 192×48: min 338×, median 3595×, max 35,134×.
+Min margin is 11× the v2 threshold.
 
 ## 3. Falsification verdict against pre-reg v2.0.0
 

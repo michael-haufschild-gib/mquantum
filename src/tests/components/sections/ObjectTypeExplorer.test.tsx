@@ -64,7 +64,7 @@ describe('ObjectTypeExplorer quantum mode entries', () => {
     expect(screen.queryByTestId('schroedinger-scale')).not.toBeInTheDocument()
   })
 
-  it('reports volumetric rendering for compute modes with stale iso state', () => {
+  it('reports isosurface rendering for compute modes with iso enabled', () => {
     useExtendedObjectStore.setState((state) => ({
       schroedinger: {
         ...state.schroedinger,
@@ -75,6 +75,6 @@ describe('ObjectTypeExplorer quantum mode entries', () => {
 
     render(<SchroedingerControls />)
 
-    expect(screen.getByText('Rendering: Volumetric (Beer-Lambert)')).toBeInTheDocument()
+    expect(screen.getByText('Rendering: Isosurface (Marching Cubes)')).toBeInTheDocument()
   })
 })

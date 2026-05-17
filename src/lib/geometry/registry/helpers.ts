@@ -74,6 +74,13 @@ const OBJECT_TYPE_DISPLAY: Readonly<
     recommended: 3,
     recommendedReason: '3D provides intuitive spin dynamics with magnetic field in physical space',
   },
+  bellPair: {
+    name: 'Bell Pair',
+    description:
+      'Two-qubit entangled spin state. Drives the CHSH / Bell experiment with live S(N) plot crossing the classical bound toward Tsirelson.',
+    recommended: 3,
+    recommendedReason: 'CHSH lives in the spin sector; the canvas only needs 3D for the apparatus.',
+  },
 }
 
 /** All ObjectType values that have at least one entry in QUANTUM_TYPE_REGISTRY. */
@@ -403,6 +410,9 @@ export function resolveQuantumTypeKey(
   if (objectType === 'pauliSpinor') {
     return QUANTUM_TYPE_REGISTRY.has('pauliSpinor') ? 'pauliSpinor' : undefined
   }
+  if (objectType === 'bellPair') {
+    return QUANTUM_TYPE_REGISTRY.has('bellTest') ? 'bellTest' : undefined
+  }
   if (objectType === 'schroedinger' && quantumMode) {
     const entry = QUANTUM_TYPE_REGISTRY.get(quantumMode)
     return entry?.internal.objectType === 'schroedinger' &&
@@ -466,18 +476,20 @@ export function isAnalyticQuantumType(key: QuantumTypeKey): boolean {
 /**
  * Returns whether the Schrödinger surface-mode toggle is meaningful.
  *
- * The same `isoEnabled` flag drives true 3D isosurfaces and 2D isolines, but
- * only analytic Schrödinger modes have shader support for either path.
- * Compute-backed density-grid modes and Pauli spinors must stay volumetric.
+ * Both analytic modes (inline wavefunction evaluation) and compute modes
+ * (density-grid sampling via `useDensityGrid=true`) support isosurface
+ * rendering. The isosurface shader has full density-grid code paths
+ * (see `isosurfaceSampling.ts`). Wigner representation is excluded
+ * (2D phase-space, no 3D surface).
  */
 export function supportsSchroedingerSurfaceMode(
   options: SchroedingerSurfaceModeSupportOptions
 ): boolean {
-  if (options.objectType !== 'schroedinger') return false
+  if (options.objectType !== 'schroedinger' && options.objectType !== 'pauliSpinor') return false
   if (options.dimension < 2) return false
   if (options.representation === 'wigner') return false
 
-  return isAnalyticQuantumType(options.quantumMode ?? 'harmonicOscillator')
+  return true
 }
 
 /**
