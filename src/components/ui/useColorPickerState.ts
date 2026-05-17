@@ -265,7 +265,7 @@ export function useColorPickerState(args: UseColorPickerStateArgs): ColorPickerS
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(value)
+      await navigator.clipboard.writeText(sessionColorRef.current || value)
     } catch (error) {
       logger.error('ColorPicker: Clipboard write failed', error)
     }

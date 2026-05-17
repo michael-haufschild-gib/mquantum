@@ -38,7 +38,8 @@ vi.mock('motion/react', () => ({
         ref: React.Ref<HTMLButtonElement>
       ) => {
         const { whileHover: _h, whileTap: _t, ...rest } = props
-        return <button ref={ref} {...rest} />
+        // eslint-disable-next-line project-rules/no-raw-html-controls -- motion/react test shim mirrors native m.button output.
+        return <button ref={ref} type="button" {...rest} />
       }
     ),
   },
