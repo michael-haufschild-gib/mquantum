@@ -109,18 +109,29 @@ export function packWignerAndPauliFields(
   hydrogen: HydrogenResult
 ): void {
   const { schroedinger, pauliSpinor, dimension } = p
-  const wignerDimIdx = schroedinger?.wignerDimensionIndex ?? 0
-  const clampedWignerDimIdx = Math.max(0, Math.min(wignerDimIdx, dimension - 1))
+  const rawWignerDimIdx = schroedinger?.wignerDimensionIndex
+  const wignerDimIdx =
+    typeof rawWignerDimIdx === 'number' && Number.isFinite(rawWignerDimIdx)
+      ? Math.floor(rawWignerDimIdx)
+      : 0
+  const maxWignerDimIdx =
+    Number.isFinite(dimension) && dimension > 0 ? Math.max(0, Math.floor(dimension) - 1) : 0
+  const clampedWignerDimIdx = Math.max(0, Math.min(wignerDimIdx, maxWignerDimIdx))
   intView[I.wignerDimensionIndex] = clampedWignerDimIdx
   intView[I.wignerCrossTermsEnabled] = schroedinger?.wignerCrossTermsEnabled ? 1 : 0
 
   if (schroedinger?.wignerAutoRange ?? true) {
     packWignerAutoRange(floatView, intView, p, clampedWignerDimIdx, hydrogen)
   } else {
-    floatView[I.wignerXRange] = schroedinger?.wignerXRange ?? 6.0
-    floatView[I.wignerPRange] = schroedinger?.wignerPRange ?? 6.0
+    floatView[I.wignerXRange] = finiteClamped(schroedinger?.wignerXRange, 6.0, 1.0, 30.0)
+    floatView[I.wignerPRange] = finiteClamped(schroedinger?.wignerPRange, 6.0, 1.0, 30.0)
   }
-  intView[I.wignerQuadPoints] = schroedinger?.wignerQuadPoints ?? 32
+  const rawQuadPoints = schroedinger?.wignerQuadPoints
+  const quadPoints =
+    typeof rawQuadPoints === 'number' && Number.isFinite(rawQuadPoints)
+      ? Math.round(rawQuadPoints)
+      : 32
+  intView[I.wignerQuadPoints] = Math.max(8, Math.min(96, quadPoints))
 
   const spinUp = pauliSpinor?.spinUpColor ?? DEFAULT_PAULI_CONFIG.spinUpColor
   const spinDown = pauliSpinor?.spinDownColor ?? DEFAULT_PAULI_CONFIG.spinDownColor

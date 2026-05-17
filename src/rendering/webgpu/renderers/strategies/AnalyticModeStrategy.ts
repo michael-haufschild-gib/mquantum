@@ -16,6 +16,7 @@ const I = SCHROEDINGER_LAYOUT.index
 import { DensityGridComputePass } from '../../passes/DensityGridComputePass'
 import { EigenfunctionCacheComputePass } from '../../passes/EigenfunctionCacheComputePass'
 import { WignerCacheComputePass } from '../../passes/WignerCacheComputePass'
+import { normalizeWignerCacheResolution } from '../../passes/wignerCacheTypes'
 import type { SchroedingerWGSLShaderConfig } from '../../shaders/schroedinger/compose'
 import type { SchrodingerRendererConfig } from '../schrodingerRendererTypes'
 import {
@@ -37,6 +38,14 @@ import type {
 /** Check if a quantum mode is a hydrogen family mode (decoupled or coupled). */
 function isHydrogenQuantumMode(mode: SchroedingerQuantumMode | undefined): boolean {
   return mode === 'hydrogenND' || mode === 'hydrogenNDCoupled'
+}
+
+function resolveFiniteAspect(width: number, height: number): number {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return 1
+  }
+  const aspect = width / height
+  return Number.isFinite(aspect) && aspect > 0 ? aspect : 1
 }
 
 /** Derived setup-time flags shared by every subsystem helper in `setup()`. */
@@ -505,9 +514,10 @@ export class AnalyticModeStrategy implements QuantumModeStrategy {
     shared: ModeFrameContext,
     resolution: number
   ): void {
-    if (resolution === this.lastWignerCacheResolution) return
-    const didResize = wignerPass.resize(ctx.device, resolution)
-    this.lastWignerCacheResolution = resolution
+    const normalizedResolution = normalizeWignerCacheResolution(resolution)
+    if (normalizedResolution === this.lastWignerCacheResolution) return
+    const didResize = wignerPass.resize(ctx.device, normalizedResolution)
+    this.lastWignerCacheResolution = normalizedResolution
     if (didResize) {
       const newCacheView = wignerPass.getCacheTextureView()
       const newCacheSampler = wignerPass.getCacheSampler()
@@ -580,7 +590,7 @@ export class AnalyticModeStrategy implements QuantumModeStrategy {
     const pRange = shared.schroedingerFloatView[I.wignerPRange]!
     const { xMin, xMax } = this.computeWignerGridRange(
       xRange,
-      ctx.size.width / ctx.size.height,
+      resolveFiniteAspect(ctx.size.width, ctx.size.height),
       isHydrogenRadial,
       schroedinger
     )

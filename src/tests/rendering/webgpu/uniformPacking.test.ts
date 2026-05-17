@@ -747,6 +747,26 @@ describe('packSchroedingerUniforms', () => {
     expect(floatView[index.quantumBackreactionSoftening]).toBeCloseTo(0.05)
   })
 
+  it('sanitizes non-finite quantum backreaction lensing controls before GPU upload', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      schroedinger: {
+        quantumBackreactionLensingEnabled: true,
+        quantumBackreactionLensingStrength: Number.NaN,
+        quantumBackreactionCausticGain: Number.POSITIVE_INFINITY,
+        quantumBackreactionSoftening: Number.NaN,
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    const index = SCHROEDINGER_LAYOUT.index
+    expect(intView[index.quantumBackreactionLensingEnabled]).toBe(1)
+    expect(Number.isFinite(floatView[index.quantumBackreactionLensingStrength])).toBe(true)
+    expect(Number.isFinite(floatView[index.quantumBackreactionCausticGain])).toBe(true)
+    expect(Number.isFinite(floatView[index.quantumBackreactionSoftening])).toBe(true)
+  })
+
   it('zeroes bilocal ER bridge uniforms when disabled', () => {
     const { floatView, intView } = createBuffer(BUFFER_SIZE)
     const params = makeBaseParams({

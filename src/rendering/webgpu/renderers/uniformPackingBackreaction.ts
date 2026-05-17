@@ -6,8 +6,10 @@ import { SCHROEDINGER_LAYOUT } from './schroedingerLayout'
 const I = SCHROEDINGER_LAYOUT.index
 const D = DEFAULT_SCHROEDINGER_CONFIG
 
-const clamp = (value: number, min: number, max: number): number =>
-  Math.max(min, Math.min(value, max))
+const clamp = (value: number, min: number, max: number): number => {
+  const finite = Number.isFinite(value) ? value : min
+  return Math.max(min, Math.min(finite, max))
+}
 
 /**
  * Pack quantum backreaction lensing uniforms (lensing strength, caustic gain,

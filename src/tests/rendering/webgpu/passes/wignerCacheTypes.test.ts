@@ -49,6 +49,7 @@ import {
   MAX_WIGNER_CROSS_LAYERS,
   MAX_WIGNER_CROSS_PAIRS,
   MAX_WIGNER_TERM_COUNT,
+  normalizeWignerCacheResolution,
   SCHROEDINGER_COEFF_FLOAT_INDEX,
   SCHROEDINGER_ENERGY_FLOAT_INDEX,
 } from '@/rendering/webgpu/passes/wignerCacheTypes'
@@ -172,6 +173,20 @@ describe('buildCrossPairMap', () => {
       expect(crossPairs.length).toBe((tc * (tc - 1)) / 2)
       expect(numCrossLayers).toBe(Math.ceil(crossPairs.length / 2))
     }
+  })
+})
+
+describe('normalizeWignerCacheResolution', () => {
+  it('rounds finite values and clamps to supported texture bounds', () => {
+    expect(normalizeWignerCacheResolution(256.7)).toBe(257)
+    expect(normalizeWignerCacheResolution(10)).toBe(128)
+    expect(normalizeWignerCacheResolution(2000)).toBe(1024)
+  })
+
+  it('falls back for non-finite restored values', () => {
+    expect(normalizeWignerCacheResolution(Number.NaN)).toBe(256)
+    expect(normalizeWignerCacheResolution(Number.POSITIVE_INFINITY, 512)).toBe(512)
+    expect(normalizeWignerCacheResolution(Number.NaN, Number.NaN)).toBe(256)
   })
 })
 

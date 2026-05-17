@@ -112,14 +112,22 @@ function makeCtx(): WebGPURenderContext {
   } as unknown as WebGPURenderContext
 }
 
+function installWignerPass(
+  strategy: AnalyticModeStrategy,
+  wignerPass: WignerPassMock,
+  lastResolution = 256
+): void {
+  const internals = strategy as unknown as StrategyInternals
+  internals.wignerCachePass = wignerPass
+  internals.wignerCacheInitialized = true
+  internals.lastWignerCacheResolution = lastResolution
+}
+
 describe('AnalyticModeStrategy Wigner cache', () => {
   it('uses animation.accumulatedTime, not raw frame.time, for Wigner cache phases', () => {
     const strategy = new AnalyticModeStrategy()
     const wignerPass = makeWignerPass()
-    const internals = strategy as unknown as StrategyInternals
-    internals.wignerCachePass = wignerPass
-    internals.wignerCacheInitialized = true
-    internals.lastWignerCacheResolution = 256
+    installWignerPass(strategy, wignerPass)
     ;(strategy as unknown as WignerCacheExecutor).executeWignerCache(makeCtx(), makeShared())
 
     expect(wignerPass.updateTimeOnly).toHaveBeenCalledWith(expect.anything(), 12.5)
@@ -130,5 +138,34 @@ describe('AnalyticModeStrategy Wigner cache', () => {
       0.25,
       true
     )
+  })
+
+  it('uses a finite fallback aspect before uploading Wigner grid ranges for degenerate canvas sizes', () => {
+    const strategy = new AnalyticModeStrategy()
+    const wignerPass = makeWignerPass()
+    installWignerPass(strategy, wignerPass)
+    const ctx = makeCtx()
+    ctx.size = { width: 800, height: 0 }
+    ;(strategy as unknown as WignerCacheExecutor).executeWignerCache(ctx, makeShared())
+
+    const [, xMin, xMax, pMin, pMax] = wignerPass.updateGridParams.mock.calls[0]!
+    expect([xMin, xMax, pMin, pMax].every(Number.isFinite)).toBe(true)
+    expect(xMin).toBe(-4)
+    expect(xMax).toBe(4)
+  })
+
+  it('normalizes non-finite restored Wigner cache resolution before resizing GPU textures', () => {
+    const strategy = new AnalyticModeStrategy()
+    const wignerPass = makeWignerPass()
+    installWignerPass(strategy, wignerPass, 512)
+    const ctx = makeCtx()
+    ;(
+      ctx.frame!.stores!.extended as {
+        schroedinger: { wignerCacheResolution: number }
+      }
+    ).schroedinger.wignerCacheResolution = Number.NaN
+    ;(strategy as unknown as WignerCacheExecutor).executeWignerCache(ctx, makeShared())
+
+    expect(wignerPass.resize).toHaveBeenCalledWith(expect.anything(), 256)
   })
 })

@@ -41,6 +41,7 @@ import {
   buildCrossPairMap,
   computeReconstructCoefficients,
   type CrossPairInfo,
+  normalizeWignerCacheResolution,
   TIME_FIELD_OFFSET,
   WIGNER_WORKGROUP_SIZE as WORKGROUP_SIZE,
   type WignerCacheComputeConfig,
@@ -119,7 +120,7 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
       workgroupSize: [WORKGROUP_SIZE, WORKGROUP_SIZE, 1],
     })
     this.passConfig = config
-    this.gridSize = Math.max(128, Math.min(1024, config.gridSize ?? 256))
+    this.gridSize = normalizeWignerCacheResolution(config.gridSize)
     this.workgroupCountX = Math.ceil(this.gridSize / WORKGROUP_SIZE)
     this.workgroupCountY = Math.ceil(this.gridSize / WORKGROUP_SIZE)
   }
@@ -394,7 +395,7 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
    * Returns true if resize actually happened, false if size unchanged.
    */
   resize(device: GPUDevice, newGridSize: number): boolean {
-    const clamped = Math.max(128, Math.min(1024, newGridSize))
+    const clamped = normalizeWignerCacheResolution(newGridSize, this.gridSize)
     if (clamped === this.gridSize || !this.shared) return false
 
     this.gridSize = clamped
