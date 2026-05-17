@@ -22,6 +22,7 @@ import { getStoreSnapshot } from '../core/storeAccess'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import { parseHexColorToLinearRgb, type Rgb } from '../utils/color'
+import { destroyGpuResources } from '../utils/gpuResourceHelpers'
 
 /**
  * Paper texture pass configuration.
@@ -666,10 +667,9 @@ export class PaperTexturePass extends WebGPUBasePass {
   dispose(): void {
     this.renderPipeline = null
     this.passBindGroupLayout = null
-    this.uniformBuffer?.destroy()
+    destroyGpuResources(this.uniformBuffer, this.noiseTexture)
     this.uniformBuffer = null
     this.sampler = null
-    this.noiseTexture?.destroy()
     this.noiseTexture = null
     this.noiseTextureView = null
     this.bgCache.invalidate()

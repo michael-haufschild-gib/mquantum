@@ -440,7 +440,16 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     if (!pending || !this.densityTexture || !this.analysisTexture) return
     const { density, analysis } = pending
     if (!density || !analysis) return
-    const gs = Math.round(Math.cbrt(density.length / 4))
+    const expectedLength = this.densityGridSize ** 3 * 4
+    if (density.length !== expectedLength || analysis.length !== expectedLength) {
+      logger.warn('[FreeScalarFieldComputePass] Dropping malformed k-space texture payload:', {
+        expectedLength,
+        densityLength: density.length,
+        analysisLength: analysis.length,
+      })
+      return
+    }
+    const gs = this.densityGridSize
     const layout = { bytesPerRow: gs * 8, rowsPerImage: gs }
     const size = { width: gs, height: gs, depthOrArrayLayers: gs }
     device.queue.writeTexture(

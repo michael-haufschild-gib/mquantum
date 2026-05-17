@@ -1,10 +1,39 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
+import type { WebGPURenderContext } from '@/rendering/webgpu/core/types'
 import { SMAAPass } from '@/rendering/webgpu/passes/SMAAPass'
 
 type TestableSMAAPass = {
   threshold: number
   maxSearchSteps: number
+  device: GPUDevice | null
+  edgeDetectionPipeline: GPURenderPipeline | null
+  blendWeightPipeline: GPURenderPipeline | null
+  neighborhoodBlendPipeline: GPURenderPipeline | null
+  edgeDetectionBindGroupLayout: GPUBindGroupLayout | null
+  blendWeightBindGroupLayout: GPUBindGroupLayout | null
+  neighborhoodBlendBindGroupLayout: GPUBindGroupLayout | null
+  edgeUniformBuffer: GPUBuffer | null
+  blendUniformBuffer: GPUBuffer | null
+  neighborhoodUniformBuffer: GPUBuffer | null
+  linearSampler: GPUSampler | null
+  pointSampler: GPUSampler | null
+}
+
+function installExecutableInternals(pass: SMAAPass, device: GPUDevice): void {
+  const internals = pass as unknown as TestableSMAAPass
+  internals.device = device
+  internals.edgeDetectionPipeline = {} as GPURenderPipeline
+  internals.blendWeightPipeline = {} as GPURenderPipeline
+  internals.neighborhoodBlendPipeline = {} as GPURenderPipeline
+  internals.edgeDetectionBindGroupLayout = {} as GPUBindGroupLayout
+  internals.blendWeightBindGroupLayout = {} as GPUBindGroupLayout
+  internals.neighborhoodBlendBindGroupLayout = {} as GPUBindGroupLayout
+  internals.edgeUniformBuffer = {} as GPUBuffer
+  internals.blendUniformBuffer = {} as GPUBuffer
+  internals.neighborhoodUniformBuffer = {} as GPUBuffer
+  internals.linearSampler = {} as GPUSampler
+  internals.pointSampler = {} as GPUSampler
 }
 
 describe('SMAAPass option sanitization', () => {
@@ -44,5 +73,29 @@ describe('SMAAPass option sanitization', () => {
     const pass = new SMAAPass({ maxSearchSteps: 12.9 }) as unknown as TestableSMAAPass
 
     expect(pass.maxSearchSteps).toBe(12)
+  })
+
+  it('skips GPU texture allocation for degenerate frame sizes', () => {
+    const createTexture = vi.fn()
+    const device = {
+      createTexture,
+      queue: { writeBuffer: vi.fn() },
+      createBindGroup: vi.fn(),
+    } as unknown as GPUDevice
+    const pass = new SMAAPass()
+    installExecutableInternals(pass, device)
+
+    const ctx = {
+      size: { width: 0, height: 720 },
+      getTextureView: vi.fn(() => ({}) as GPUTextureView),
+      getWriteTarget: vi.fn(() => ({}) as GPUTextureView),
+      getCanvasTextureView: vi.fn(() => ({}) as GPUTextureView),
+      beginRenderPass: vi.fn(),
+    } as unknown as WebGPURenderContext
+
+    pass.execute(ctx)
+
+    expect(createTexture).not.toHaveBeenCalled()
+    expect(ctx.beginRenderPass).not.toHaveBeenCalled()
   })
 })

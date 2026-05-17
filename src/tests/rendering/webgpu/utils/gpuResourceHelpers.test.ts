@@ -59,4 +59,22 @@ describe('destroyGpuResources', () => {
     )
     expect(order).toEqual(['a', 'b', 'c'])
   })
+
+  it('continues destroying later resources when one destroy throws', () => {
+    const order: string[] = []
+    const a = {
+      destroy: vi.fn(() => {
+        order.push('a')
+        throw new Error('destroy failed')
+      }),
+    }
+    const b = { destroy: vi.fn(() => order.push('b')) }
+
+    expect(() =>
+      destroyGpuResources(a as unknown as GPUBuffer, b as unknown as GPUTexture)
+    ).not.toThrow()
+    expect(order).toEqual(['a', 'b'])
+    expect(a.destroy).toHaveBeenCalledOnce()
+    expect(b.destroy).toHaveBeenCalledOnce()
+  })
 })

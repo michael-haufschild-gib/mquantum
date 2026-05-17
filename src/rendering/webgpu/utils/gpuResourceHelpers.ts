@@ -7,6 +7,8 @@
  * @module rendering/webgpu/utils/gpuResourceHelpers
  */
 
+import { logger } from '@/lib/logger'
+
 /**
  * Destroy multiple GPU resources, skipping null/undefined entries.
  * Variadic signature keeps call sites type-safe (each argument must be
@@ -16,5 +18,12 @@
 export function destroyGpuResources(
   ...resources: ReadonlyArray<GPUBuffer | GPUTexture | null | undefined>
 ): void {
-  for (const r of resources) r?.destroy()
+  for (const r of resources) {
+    if (!r) continue
+    try {
+      r.destroy()
+    } catch (error) {
+      logger.warn('[WebGPU] Failed to destroy GPU resource:', error)
+    }
+  }
 }
