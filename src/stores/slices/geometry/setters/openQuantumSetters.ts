@@ -7,7 +7,11 @@
  * @module stores/slices/geometry/setters/openQuantumSetters
  */
 
-import { DEFAULT_OPEN_QUANTUM_CONFIG } from '@/lib/physics/openQuantum/types'
+import {
+  DEFAULT_OPEN_QUANTUM_CONFIG,
+  isOpenQuantumDephasingModel,
+  isOpenQuantumVisualizationMode,
+} from '@/lib/physics/openQuantum/types'
 
 import type { SchroedingerSliceActions } from '../types'
 import {
@@ -64,7 +68,17 @@ export function createOpenQuantumSetters(ctx: SetterContext): OpenQuantumActions
         },
       }))
     },
-    setOpenQuantumVisualizationMode: nestedValueSetter(ctx, D, 'visualizationMode'),
+    setOpenQuantumVisualizationMode: (mode) => {
+      const visualizationMode = isOpenQuantumVisualizationMode(mode)
+        ? mode
+        : DEFAULT_OPEN_QUANTUM_CONFIG.visualizationMode
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          openQuantum: { ...state.schroedinger.openQuantum, visualizationMode },
+        },
+      }))
+    },
     requestOpenQuantumStateReset: () => {
       setWithVersion((state) => ({
         schroedinger: {
@@ -87,6 +101,16 @@ export function createOpenQuantumSetters(ctx: SetterContext): OpenQuantumActions
     setOpenQuantumBathTemperature: nestedClampedSetter(ctx, D, 'bathTemperature', 0.1, 100000),
     setOpenQuantumCouplingScale: nestedClampedSetter(ctx, D, 'couplingScale', 0.01, 100),
     setOpenQuantumHydrogenBasisMaxN: nestedIntSetter(ctx, D, 'hydrogenBasisMaxN', 1, 3, 'floor'),
-    setOpenQuantumDephasingModel: nestedValueSetter(ctx, D, 'dephasingModel'),
+    setOpenQuantumDephasingModel: (model) => {
+      const dephasingModel = isOpenQuantumDephasingModel(model)
+        ? model
+        : DEFAULT_OPEN_QUANTUM_CONFIG.dephasingModel
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          openQuantum: { ...state.schroedinger.openQuantum, dephasingModel },
+        },
+      }))
+    },
   }
 }

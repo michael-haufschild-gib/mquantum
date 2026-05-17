@@ -162,7 +162,17 @@ export function usePageCurveSampling(inputs: PageCurveSamplingInputs): HorizonCo
     usePageCurveStore.getState().clear()
     genRefRef.current = null
     lastPushedGenRef.current = null
-  }, [bec.initialCondition, quantumMode, objectType])
+  }, [
+    bec.initialCondition,
+    quantumMode,
+    objectType,
+    becParams,
+    bec.gridSize,
+    bec.spacing,
+    bec.dt,
+    bec.stepsPerFrame,
+    bec.diagnosticsInterval,
+  ])
 
   return horizonContext
 }

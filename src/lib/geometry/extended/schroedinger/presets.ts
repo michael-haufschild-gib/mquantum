@@ -41,6 +41,8 @@ export interface NamedPresetConfig {
   termCount: number
   maxN: number
   frequencySpread: number
+  /** Optional exact HO basis states for curated presets. Missing higher dims are padded with n=0. */
+  quantumNumbers?: readonly (readonly number[])[]
 }
 
 /** Store controls derived from a named Schroedinger preset. */
@@ -114,6 +116,16 @@ function generateTermQuantumNumbers(termRng: () => number, dim: number, nMax: nu
   return n
 }
 
+function sanitizeNamedQuantumNumbers(row: readonly number[], dim: number, nMax: number): number[] {
+  const evenMax = nMax & ~1
+  const n: number[] = []
+  for (let j = 0; j < dim; j++) {
+    const bounded = clampFiniteInteger(row[j], 0, 0, nMax)
+    n.push(j >= 3 ? Math.min(bounded & ~1, evenMax) : bounded)
+  }
+  return n
+}
+
 /**
  * Compute energy and coefficient for a superposition term.
  *
@@ -156,12 +168,14 @@ export function generateQuantumPreset(
   dimension: number,
   termCount: number = 3,
   maxN: number = 5,
-  frequencySpread: number = 0.02
+  frequencySpread: number = 0.02,
+  quantumNumberRows?: readonly (readonly number[])[]
 ): QuantumPreset {
   // Clamp parameters to valid ranges
   const safeSeed = Number.isFinite(seed) ? Math.trunc(seed) : 0
+  const configuredTermCount = quantumNumberRows?.length ?? termCount
   const dim = clampFiniteInteger(dimension, DEFAULT_DIMENSION, 3, MAX_DIM, 'floor')
-  const terms = clampFiniteInteger(termCount, DEFAULT_TERM_COUNT, 1, MAX_TERMS, 'floor')
+  const terms = clampFiniteInteger(configuredTermCount, DEFAULT_TERM_COUNT, 1, MAX_TERMS, 'floor')
   const nMax = clampFiniteInteger(maxN, DEFAULT_MAX_N, 1, MAX_QUANTUM_NUMBER, 'floor')
   const spread = clampFinite(frequencySpread, DEFAULT_FREQUENCY_SPREAD, 0, 0.5)
 
@@ -180,7 +194,10 @@ export function generateQuantumPreset(
 
   for (let k = 0; k < terms; k++) {
     const termRng = mulberry32((safeSeed + (k + 1) * TERM_RNG_PRIME) | 0)
-    const n = generateTermQuantumNumbers(termRng, dim, nMax)
+    const configuredRow = quantumNumberRows?.[k]
+    const n = configuredRow
+      ? sanitizeNamedQuantumNumbers(configuredRow, dim, nMax)
+      : generateTermQuantumNumbers(termRng, dim, nMax)
     quantumNumbers.push(n)
 
     const { energy, coeff } = computeTermEnergyAndCoeff(n, omega, termRng)
@@ -219,6 +236,7 @@ export const SCHROEDINGER_NAMED_PRESETS: Record<string, NamedPresetConfig> = {
     termCount: 1,
     maxN: 1,
     frequencySpread: 0.01,
+    quantumNumbers: [[0, 0, 0]],
   },
   firstExcited: {
     name: 'First Excited State',
@@ -228,6 +246,7 @@ export const SCHROEDINGER_NAMED_PRESETS: Record<string, NamedPresetConfig> = {
     termCount: 1,
     maxN: 1,
     frequencySpread: 0.01,
+    quantumNumbers: [[0, 0, 1]],
   },
   quantumBeat: {
     name: 'Quantum Beat',
@@ -237,6 +256,10 @@ export const SCHROEDINGER_NAMED_PRESETS: Record<string, NamedPresetConfig> = {
     termCount: 2,
     maxN: 2,
     frequencySpread: 0.005,
+    quantumNumbers: [
+      [0, 0, 0],
+      [1, 0, 0],
+    ],
   },
   groundExcitedBeat: {
     name: 'Ground vs Excited Beat',
@@ -246,6 +269,10 @@ export const SCHROEDINGER_NAMED_PRESETS: Record<string, NamedPresetConfig> = {
     termCount: 2,
     maxN: 3,
     frequencySpread: 0.005,
+    quantumNumbers: [
+      [0, 0, 0],
+      [0, 3, 0],
+    ],
   },
   highEnergy: {
     name: 'Excited Interference',
@@ -273,6 +300,11 @@ export const SCHROEDINGER_NAMED_PRESETS: Record<string, NamedPresetConfig> = {
     termCount: 3,
     maxN: 6,
     frequencySpread: 0.01,
+    quantumNumbers: [
+      [0, 0, 3],
+      [1, 0, 2],
+      [2, 2, 0],
+    ],
   },
   isotropic: {
     name: 'Isotropic Oscillator',
@@ -282,6 +314,11 @@ export const SCHROEDINGER_NAMED_PRESETS: Record<string, NamedPresetConfig> = {
     termCount: 3,
     maxN: 3,
     frequencySpread: 0.0,
+    quantumNumbers: [
+      [2, 0, 0],
+      [0, 2, 0],
+      [0, 0, 2],
+    ],
   },
   nodalStructure: {
     name: 'Nodal Structure',
@@ -291,6 +328,7 @@ export const SCHROEDINGER_NAMED_PRESETS: Record<string, NamedPresetConfig> = {
     termCount: 1,
     maxN: 6,
     frequencySpread: 0.01,
+    quantumNumbers: [[6, 2, 2]],
   },
   richSuperposition: {
     name: 'Rich Superposition',
@@ -301,6 +339,10 @@ export const SCHROEDINGER_NAMED_PRESETS: Record<string, NamedPresetConfig> = {
     maxN: 6,
     frequencySpread: 0.02,
   },
+}
+
+function getNamedPresetTermCount(config: NamedPresetConfig): number {
+  return config.quantumNumbers?.length ?? config.termCount
 }
 
 /** Resolve a named Schroedinger preset config from persisted or UI state. */
@@ -314,7 +356,7 @@ export function getNamedPresetStoreControls(name: unknown): NamedPresetStoreCont
   if (!config) return null
   return {
     seed: config.seed,
-    termCount: config.termCount,
+    termCount: getNamedPresetTermCount(config),
     maxQuantumNumber: config.maxN,
     frequencySpread: config.frequencySpread,
   }
@@ -333,9 +375,10 @@ export function getNamedPreset(name: string, dimension: number): QuantumPreset |
   return generateQuantumPreset(
     config.seed,
     dimension,
-    config.termCount,
+    getNamedPresetTermCount(config),
     config.maxN,
-    config.frequencySpread
+    config.frequencySpread,
+    config.quantumNumbers
   )
 }
 

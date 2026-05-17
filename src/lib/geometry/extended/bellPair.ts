@@ -179,6 +179,105 @@ export function createDefaultBellPairConfig(): BellPairConfig {
   return structuredClone(DEFAULT_BELL_PAIR_CONFIG)
 }
 
+const TWO_PI = 2 * Math.PI
+
+function finiteNumber(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
+  const finite = finiteNumber(value, fallback)
+  return Math.max(min, Math.min(max, finite))
+}
+
+function clampInteger(value: unknown, min: number, max: number, fallback: number): number {
+  return Math.max(min, Math.min(max, Math.round(finiteNumber(value, fallback))))
+}
+
+function normalizeBellAxis(value: unknown, fallback: BellPairAxis): BellPairAxis {
+  if (!Array.isArray(value) || value.length !== 2) return [...fallback]
+  const theta = clampNumber(value[0], 0, Math.PI, fallback[0])
+  const phiRaw = finiteNumber(value[1], fallback[1])
+  const phi = ((phiRaw % TWO_PI) + TWO_PI) % TWO_PI
+  return [theta, phi]
+}
+
+function normalizeBellField(value: unknown, fallback: BellPairField): BellPairField {
+  if (!Array.isArray(value) || value.length !== 3) return [...fallback]
+  if (!value.every((entry) => typeof entry === 'number' && Number.isFinite(entry))) {
+    return [...fallback]
+  }
+  return [
+    Math.max(-50, Math.min(50, value[0])),
+    Math.max(-50, Math.min(50, value[1])),
+    Math.max(-50, Math.min(50, value[2])),
+  ]
+}
+
+function normalizeNumberArray(
+  value: unknown,
+  fallback: number[],
+  min: number,
+  max: number
+): number[] {
+  if (!Array.isArray(value) || value.length !== fallback.length) return [...fallback]
+  if (!value.every((entry) => typeof entry === 'number' && Number.isFinite(entry))) {
+    return [...fallback]
+  }
+  return value.map((entry) => Math.max(min, Math.min(max, entry)))
+}
+
+/**
+ * Sanitize Bell-pair config after bulk scene/preset loads or direct store writes.
+ *
+ * UI setters validate individual fields, but scene loading merges raw JSON
+ * directly into the extended store. This keeps the trial loop finite and
+ * prevents NaN Bloch axes from reaching Bell sampling or apparatus uniforms.
+ */
+export function sanitizeBellPairConfig(config: Partial<BellPairConfig>): BellPairConfig {
+  const fallback = DEFAULT_BELL_PAIR_CONFIG
+  const base = { ...fallback, ...config }
+  const analysisMode: BellAnalysisMode =
+    base.analysisMode === 'fairSampling' || base.analysisMode === 'assignNonDetection'
+      ? base.analysisMode
+      : fallback.analysisMode
+  const samplerMode: BellSamplerMode =
+    base.samplerMode === 'qm' || base.samplerMode === 'lhv'
+      ? base.samplerMode
+      : fallback.samplerMode
+  const lhvStrategyId =
+    typeof base.lhvStrategyId === 'string' && base.lhvStrategyId.length > 0
+      ? base.lhvStrategyId.slice(0, 63)
+      : fallback.lhvStrategyId
+
+  return {
+    ...base,
+    latticeDim: clampInteger(base.latticeDim, 3, 3, fallback.latticeDim),
+    gridSize: normalizeNumberArray(base.gridSize, fallback.gridSize, 1, 4096).map((n) =>
+      Math.round(n)
+    ),
+    spacing: normalizeNumberArray(base.spacing, fallback.spacing, 1e-6, 100),
+    slicePositions: Array.isArray(base.slicePositions)
+      ? base.slicePositions.filter((entry): entry is number => Number.isFinite(entry))
+      : [...fallback.slicePositions],
+    aliceAxis: normalizeBellAxis(base.aliceAxis, fallback.aliceAxis),
+    aliceAxisPrime: normalizeBellAxis(base.aliceAxisPrime, fallback.aliceAxisPrime),
+    bobAxis: normalizeBellAxis(base.bobAxis, fallback.bobAxis),
+    bobAxisPrime: normalizeBellAxis(base.bobAxisPrime, fallback.bobAxisPrime),
+    visibility: clampNumber(base.visibility, 0, 1, fallback.visibility),
+    detectionEfficiency: clampNumber(base.detectionEfficiency, 0, 1, fallback.detectionEfficiency),
+    analysisMode,
+    fieldA: normalizeBellField(base.fieldA, fallback.fieldA),
+    fieldB: normalizeBellField(base.fieldB, fallback.fieldB),
+    samplerMode,
+    lhvStrategyId,
+    targetTrials: clampInteger(base.targetTrials, 4, 10_000_000, fallback.targetTrials),
+    trialsPerFrame: clampInteger(base.trialsPerFrame, 1, 5000, fallback.trialsPerFrame),
+    seed: Math.round(finiteNumber(base.seed, fallback.seed)) >>> 0,
+    needsReset: typeof base.needsReset === 'boolean' ? base.needsReset : fallback.needsReset,
+  }
+}
+
 /**
  * Stable URL-serializer keys for the Bell-pair config. Used by the URL
  * state serializer (`src/lib/url/state-serializer.ts`) and documented in

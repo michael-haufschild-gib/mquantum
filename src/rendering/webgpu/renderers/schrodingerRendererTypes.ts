@@ -11,6 +11,7 @@ import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { getQuantumTypeShaderUniformIdMap } from '@/lib/geometry/registry'
 import type { HydrogenBasisState } from '@/lib/physics/openQuantum/hydrogenBasis'
+import { MAX_K } from '@/lib/physics/openQuantum/integrator'
 import type { AnimationState } from '@/stores/scene/animationStore'
 import type { AppearanceStoreState } from '@/stores/scene/appearanceStore'
 import type { GeometryState } from '@/stores/scene/geometryStore'
@@ -259,7 +260,7 @@ export interface SchrodingerRendererConfig {
  * - basisCount: u32 + 3×u32 padding (16 bytes)
  */
 export function packHydrogenBasisForGPU(
-  basis: HydrogenBasisState[],
+  basis: readonly HydrogenBasisState[],
   dimension: number
 ): ArrayBuffer {
   const buffer = new ArrayBuffer(704)
@@ -268,22 +269,29 @@ export function packHydrogenBasisForGPU(
   const u32View = new Uint32Array(buffer, 688, 4) // basisCount + 3 padding
 
   const maxDims = 11
-  for (let k = 0; k < basis.length; k++) {
+  const basisCount = Math.min(MAX_K, basis.length)
+  const safeDimension =
+    typeof dimension === 'number' && Number.isFinite(dimension)
+      ? Math.min(maxDims, Math.max(2, Math.floor(dimension)))
+      : 3
+
+  for (let k = 0; k < basisCount; k++) {
     const state = basis[k]!
     // dim 0=n, 1=l, 2=m, 3+=extraDimN[i]
     const flatBase = k * maxDims
-    i32View[flatBase + 0] = state.n
-    i32View[flatBase + 1] = state.l
-    i32View[flatBase + 2] = state.m
-    const extraCount = Math.min(dimension - 3, state.extraDimN.length)
+    i32View[flatBase + 0] = Number.isFinite(state.n) ? Math.floor(state.n) : 0
+    i32View[flatBase + 1] = Number.isFinite(state.l) ? Math.floor(state.l) : 0
+    i32View[flatBase + 2] = Number.isFinite(state.m) ? Math.floor(state.m) : 0
+    const extraCount = Math.min(Math.max(0, safeDimension - 3), state.extraDimN.length)
     for (let d = 0; d < extraCount; d++) {
-      i32View[flatBase + 3 + d] = state.extraDimN[d]!
+      const extraN = state.extraDimN[d]!
+      i32View[flatBase + 3 + d] = Number.isFinite(extraN) ? Math.floor(extraN) : 0
     }
 
     // Energy
-    f32View[k] = state.energy
+    f32View[k] = Number.isFinite(state.energy) ? state.energy : 0
   }
 
-  u32View[0] = basis.length
+  u32View[0] = basisCount
   return buffer
 }

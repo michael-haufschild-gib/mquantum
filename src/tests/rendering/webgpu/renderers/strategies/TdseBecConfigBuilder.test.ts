@@ -174,9 +174,33 @@ describe('buildBecConfig — schroedinger overrides', () => {
     expect(config.fieldView).toBe('vorticity')
   })
 
-  it('passes hawkingFlux field view through to the TDSE compute config', () => {
-    const { config } = buildBecConfig(minimalBec({ fieldView: 'hawkingFlux' }), undefined)
+  it('passes hawkingFlux field view through for blackHoleAnalog BEC', () => {
+    const { config } = buildBecConfig(
+      minimalBec({ initialCondition: 'blackHoleAnalog', fieldView: 'hawkingFlux' }),
+      undefined
+    )
     expect(config.fieldView).toBe('hawkingFlux')
+  })
+
+  it('falls back from hawkingFlux for non-blackHoleAnalog BEC ingress', () => {
+    const { config } = buildBecConfig(
+      minimalBec({ initialCondition: 'thomasFermi', fieldView: 'hawkingFlux' }),
+      undefined
+    )
+    expect(config.fieldView).toBe(DEFAULT_BEC_CONFIG.fieldView)
+  })
+
+  it('falls back from hawkingFlux when attractive g demotes blackHoleAnalog init', () => {
+    const { config } = buildBecConfig(
+      minimalBec({
+        initialCondition: 'blackHoleAnalog',
+        fieldView: 'hawkingFlux',
+        interactionStrength: -100,
+      }),
+      undefined
+    )
+    expect(config.initialCondition).toBe('gaussianPacket')
+    expect(config.fieldView).toBe(DEFAULT_BEC_CONFIG.fieldView)
   })
 })
 

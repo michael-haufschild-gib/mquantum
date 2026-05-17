@@ -97,7 +97,7 @@ export const BELL_SCENARIO_PRESETS: readonly ScenarioPreset<Partial<BellPairConf
       id: 'detectionLoopholeExploit',
       name: 'Detection loophole (LHV fakes violation)',
       description:
-        'Low η + assignNonDetection policy lets a local hidden-variable strategy reproduce |S| > 2. Selects the LHV sampler.',
+        'Low η + fair-sampling postselection lets a local hidden-variable strategy reproduce |S| > 2. Selects the LHV sampler.',
       overrides: {
         aliceAxis: [Math.PI / 2, CANONICAL_CHSH_PHI.a],
         aliceAxisPrime: [Math.PI / 2, CANONICAL_CHSH_PHI.aPrime],
@@ -105,7 +105,7 @@ export const BELL_SCENARIO_PRESETS: readonly ScenarioPreset<Partial<BellPairConf
         bobAxisPrime: [Math.PI / 2, CANONICAL_CHSH_PHI.bPrime],
         visibility: 1,
         detectionEfficiency: 0.6,
-        analysisMode: 'assignNonDetection',
+        analysisMode: 'fairSampling',
         samplerMode: 'lhv',
         lhvStrategyId: 'detectionLoophole_0.500',
       },

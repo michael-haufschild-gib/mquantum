@@ -50,6 +50,14 @@ const CURVED_SCHW_MIN_RADIUS: f32 = 0.01;
 const CURVED_ADS_MIN_Z: f32 = 0.05;
 const CURVED_SPHERE_POLE_EPS: f32 = 0.2;
 const CURVED_MT_MIN_RADIUS: f32 = 1e-4;
+// exp(80) stays below f32::MAX. Clamp deSitter exponents so long high-H
+// sessions saturate to a finite geometry instead of poisoning kinetic /
+// diagnostic buffers with inf.
+const CURVED_EXP_LIMIT: f32 = 80.0;
+
+fn curvedExpClamped(exponent: f32) -> f32 {
+  return exp(clamp(exponent, -CURVED_EXP_LIMIT, CURVED_EXP_LIMIT));
+}
 
 // World coordinate of cell index i along an axis with N cells and spacing dx.
 fn curvedWorldCoord(i: f32, N: f32, dx: f32) -> f32 {
@@ -155,16 +163,11 @@ fn evalMetric(kind: u32, coords: array<f32, 12>, dim: u32, time: f32) -> CurvedM
   // de Sitter spatial slice: g_ij = a² δ_ij, a(t) = exp(H·t).
   if (kind == 3u) {
     let H = max(params.hubbleRate, 0.0);
-    let a = exp(H * time);
-    let invA2 = 1.0 / max(a * a, 1e-12);
+    let invA2 = curvedExpClamped(-2.0 * H * time);
     for (var d: u32 = 0u; d < dim; d++) {
       out.gInvDiag[d] = invA2;
     }
-    var sqrtDet: f32 = 1.0;
-    for (var d: u32 = 0u; d < dim; d++) {
-      sqrtDet = sqrtDet * a;
-    }
-    out.sqrtDet = sqrtDet;
+    out.sqrtDet = curvedExpClamped(H * time * f32(dim));
     return out;
   }
 

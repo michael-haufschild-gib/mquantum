@@ -67,6 +67,7 @@ describe('extendedObjectStore — free scalar field actions', () => {
     store.setFreeScalarKSpaceBroadeningSigma(1.2)
     store.setFreeScalarKSpaceRadialBinCount(64)
     store.setFreeScalarSlicePosition(0, 0.5)
+    store.setFreeScalarDiagnosticsInterval(30)
 
     const before = useExtendedObjectStore.getState().schroedinger.freeScalar
 
@@ -84,6 +85,7 @@ describe('extendedObjectStore — free scalar field actions', () => {
     store.setFreeScalarKSpaceBroadeningSigma(Number.NaN)
     store.setFreeScalarKSpaceRadialBinCount(Number.NEGATIVE_INFINITY)
     store.setFreeScalarSlicePosition(0, Number.NaN)
+    store.setFreeScalarDiagnosticsInterval(Number.POSITIVE_INFINITY)
 
     const after = useExtendedObjectStore.getState().schroedinger.freeScalar
     expect(after.spacing).toEqual(before.spacing)
@@ -100,6 +102,7 @@ describe('extendedObjectStore — free scalar field actions', () => {
     expect(after.kSpaceViz.broadeningSigma).toBe(before.kSpaceViz.broadeningSigma)
     expect(after.kSpaceViz.radialBinCount).toBe(before.kSpaceViz.radialBinCount)
     expect(after.slicePositions).toEqual(before.slicePositions)
+    expect(after.diagnosticsInterval).toBe(before.diagnosticsInterval)
   })
 
   it('ignores invalid k-space enum updates from direct callers', () => {

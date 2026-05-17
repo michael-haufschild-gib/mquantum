@@ -199,6 +199,19 @@ describe('ColorPicker', () => {
       await user.click(paletteButtons[0]!)
       expect(onChange).toHaveBeenCalledWith(expect.stringMatching(/^#[0-9a-fA-F]{6}$/))
     })
+
+    it('preserves existing opacity when selecting an opaque palette swatch', async () => {
+      const user = userEvent.setup()
+      const onChange = vi.fn()
+      render(<ColorPicker value="#33669980" onChange={onChange} />)
+
+      const paletteButtons = screen.getAllByRole('button', {
+        name: /^Use palette color #[0-9a-fA-F]{6}$/i,
+      })
+
+      await user.click(paletteButtons[0]!)
+      expect(onChange).toHaveBeenLastCalledWith(expect.stringMatching(/^#[0-9a-fA-F]{6}80$/))
+    })
   })
 
   describe('copy button', () => {

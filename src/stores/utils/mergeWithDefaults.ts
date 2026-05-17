@@ -10,7 +10,10 @@
  * for the missing parameters.
  */
 
-import { createDefaultBellPairConfig } from '@/lib/geometry/extended/bellPair'
+import {
+  createDefaultBellPairConfig,
+  sanitizeBellPairConfig,
+} from '@/lib/geometry/extended/bellPair'
 import {
   type DiracConfig,
   isDiracFieldView,
@@ -18,7 +21,7 @@ import {
   isDiracPotentialType,
   sanitizeDiracLatticeConfig,
 } from '@/lib/geometry/extended/dirac'
-import { createDefaultPauliConfig } from '@/lib/geometry/extended/pauli'
+import { createDefaultPauliConfig, type PauliConfig } from '@/lib/geometry/extended/pauli'
 import { sanitizeQuantumWalkConfig } from '@/lib/geometry/extended/quantumWalk'
 import { sanitizeHarmonicOscillatorScalars } from '@/lib/geometry/extended/schroedinger/configSanitization'
 import {
@@ -42,19 +45,29 @@ import {
 } from '@/lib/geometry/extended/wheelerDeWitt'
 import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
+import { sanitizeOpenQuantumConfig } from '@/lib/physics/openQuantum/types'
 import {
   isWdwBoundaryCondition,
+  WDW_SOLVER_MAX_A_MAX,
+  WDW_SOLVER_MAX_A_MIN,
   WDW_SOLVER_MAX_COSMOLOGICAL_CONSTANT,
   WDW_SOLVER_MAX_GRID_NA,
   WDW_SOLVER_MAX_GRID_NPHI,
   WDW_SOLVER_MAX_INFLATON_MASS,
   WDW_SOLVER_MAX_INFLATON_MASS_ASYMMETRY,
+  WDW_SOLVER_MAX_PHI_EXTENT,
+  WDW_SOLVER_MIN_A_MIN,
+  WDW_SOLVER_MIN_A_SPAN,
   WDW_SOLVER_MIN_COSMOLOGICAL_CONSTANT,
   WDW_SOLVER_MIN_INFLATON_MASS,
   WDW_SOLVER_MIN_INFLATON_MASS_ASYMMETRY,
+  WDW_SOLVER_MIN_PHI_EXTENT,
 } from '@/lib/physics/wheelerDeWitt/solverInputValidation'
 
+import { normalizeAntiDeSitterLoadedConfig } from './mergeWithDefaultsAntiDeSitter'
 import { normalizeFreeScalarLoadedConfig } from './mergeWithDefaultsFreeScalar'
+import { normalizePauliLoadedConfig } from './mergeWithDefaultsPauli'
+import { normalizeSchroedingerNumericScalars } from './mergeWithDefaultsSchroedingerScalars'
 import { OBJECT_TYPE_TO_CONFIG_KEY } from './presetSerialization'
 
 /**
@@ -384,10 +397,6 @@ function clampFiniteInteger(value: unknown, fallback: number, min: number, max: 
   return Math.max(min, Math.min(max, Math.round(value)))
 }
 
-function positiveFiniteOrFallback(value: unknown, fallback: number): number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback
-}
-
 function normalizeWheelerDeWittConfig(
   normalized: Record<string, unknown>
 ): Record<string, unknown> {
@@ -396,11 +405,18 @@ function normalizeWheelerDeWittConfig(
 
   const current = wdw as Record<string, unknown>
   const defaults = DEFAULT_WHEELER_DEWITT_CONFIG
-  let aMin = positiveFiniteOrFallback(current.aMin, defaults.aMin)
-  let aMax =
-    typeof current.aMax === 'number' && Number.isFinite(current.aMax) && current.aMax > aMin
-      ? current.aMax
-      : defaults.aMax
+  let aMin = clampFiniteNumber(
+    current.aMin,
+    defaults.aMin,
+    WDW_SOLVER_MIN_A_MIN,
+    WDW_SOLVER_MAX_A_MIN
+  )
+  let aMax = clampFiniteNumber(
+    current.aMax,
+    defaults.aMax,
+    WDW_SOLVER_MIN_A_MIN + WDW_SOLVER_MIN_A_SPAN,
+    WDW_SOLVER_MAX_A_MAX
+  )
   if (!(aMax > aMin)) {
     aMin = defaults.aMin
     aMax = defaults.aMax
@@ -440,7 +456,12 @@ function normalizeWheelerDeWittConfig(
         8,
         WDW_SOLVER_MAX_GRID_NPHI
       ),
-      phiExtent: positiveFiniteOrFallback(current.phiExtent, defaults.phiExtent),
+      phiExtent: clampFiniteNumber(
+        current.phiExtent,
+        defaults.phiExtent,
+        WDW_SOLVER_MIN_PHI_EXTENT,
+        WDW_SOLVER_MAX_PHI_EXTENT
+      ),
       streamlineDensity: clampFiniteInteger(
         current.streamlineDensity,
         defaults.streamlineDensity,
@@ -543,6 +564,7 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged
   }
   normalized = normalizeSchroedingerQualityEnums(normalized)
   normalized = sanitizeHarmonicOscillatorScalars(normalized, DEFAULT_SCHROEDINGER_CONFIG)
+  normalized = normalizeSchroedingerNumericScalars(normalized)
   normalized = sanitizeComputeLatticeDims(normalized)
   normalized = normalizeDiracEnums(normalized)
 
@@ -561,7 +583,12 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged
   // through. Clamp here so the invariant always holds in memory.
   normalized = normalizeTdseBhParams(normalized)
   normalized = normalizeTdseEnums(normalized)
+  normalized = normalizeAntiDeSitterLoadedConfig(normalized)
   normalized = normalizeWheelerDeWittConfig(normalized)
+  normalized = {
+    ...normalized,
+    openQuantum: sanitizeOpenQuantumConfig(normalized.openQuantum),
+  }
   normalized = normalizeSchroedingerSurfaceMode(normalized)
 
   normalized = normalizeFreeScalarLoadedConfig(normalized)
@@ -721,7 +748,11 @@ export function mergeExtendedObjectStateForType(
   const normalizedConfig =
     configKey === 'schroedinger'
       ? normalizeSchroedingerConfig(mergedConfig as unknown as typeof DEFAULT_SCHROEDINGER_CONFIG)
-      : mergedConfig
+      : configKey === 'pauliSpinor'
+        ? normalizePauliLoadedConfig(mergedConfig as unknown as PauliConfig, migratedLoadedConfig)
+        : configKey === 'bellPair'
+          ? sanitizeBellPairConfig(mergedConfig)
+          : mergedConfig
 
   return {
     [configKey]: normalizedConfig,

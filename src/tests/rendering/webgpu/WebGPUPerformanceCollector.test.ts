@@ -494,4 +494,70 @@ describe('WebGPUStatsCollector', () => {
     })
     nowSpy.mockRestore()
   })
+
+  it('disables graph timestamp collection when reset after expanded monitoring', () => {
+    useUIStore.setState({ showPerfMonitor: true, perfMonitorExpanded: true })
+
+    const collector = new WebGPUStatsCollector()
+    const graph = createGraphMock()
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(1000)
+
+    collector.recordFrame(
+      4,
+      createFrameStats(),
+      graph as unknown as WebGPURenderGraph,
+      { width: 800, height: 600 },
+      1
+    )
+
+    expect(graph.setTimestampCollectionActive).toHaveBeenLastCalledWith(true)
+
+    collector.reset()
+
+    expect(graph.setTimestampCollectionActive).toHaveBeenLastCalledWith(false)
+    nowSpy.mockRestore()
+  })
+
+  it('clears published full-stat snapshots on reset', () => {
+    useUIStore.setState({ showPerfMonitor: true, perfMonitorExpanded: true })
+
+    const collector = new WebGPUStatsCollector()
+    const graph = createGraphMock()
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(1000)
+
+    collector.recordFrame(
+      4,
+      createFrameStats({
+        passTiming: [
+          {
+            passId: 'scene',
+            gpuTimeMs: 3,
+            computeGpuTimeMs: 0,
+            renderGpuTimeMs: 3,
+            cpuTimeMs: 1,
+            skipped: false,
+          },
+        ],
+        cpuBreakdown: { setupMs: 1, passesMs: 2, submitMs: 3 },
+      }),
+      graph as unknown as WebGPURenderGraph,
+      { width: 800, height: 600 },
+      1
+    )
+
+    expect(usePerformanceMetricsStore.getState().passTimings).toHaveLength(1)
+    expect(usePerformanceMetricsStore.getState().cpuBreakdown).toEqual({
+      setupMs: 1,
+      passesMs: 2,
+      submitMs: 3,
+    })
+
+    collector.reset()
+
+    const metrics = usePerformanceMetricsStore.getState()
+    expect(metrics.passTimings).toEqual([])
+    expect(metrics.totalGpuTimeMs).toBe(0)
+    expect(metrics.cpuBreakdown).toEqual({ setupMs: 0, passesMs: 0, submitMs: 0 })
+    nowSpy.mockRestore()
+  })
 })

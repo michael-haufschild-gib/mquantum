@@ -310,6 +310,25 @@ describe('geometryStore', () => {
       expect(s.dimension).toBe(DEFAULT_DIMENSION)
       expect(s.objectType).toBe(DEFAULT_OBJECT_TYPE)
     })
+
+    it('propagates default dimension back to dependent transform and rotation stores', () => {
+      useGeometryStore.getState().setDimension(9)
+      useAnimationStore.getState().animateAll(9)
+      expect(useTransformStore.getState().dimension).toBe(9)
+
+      useGeometryStore.getState().reset()
+
+      expect(useTransformStore.getState().dimension).toBe(DEFAULT_DIMENSION)
+      expect(useRotationStore.getState().dimension).toBe(DEFAULT_DIMENSION)
+      expect(
+        [...useAnimationStore.getState().animatingPlanes].every((p) =>
+          ['XY', 'XZ', 'YZ'].includes(p)
+        )
+      ).toBe(true)
+      expect(useTransformStore.getState().getScaleMatrix()).toHaveLength(
+        DEFAULT_DIMENSION * DEFAULT_DIMENSION
+      )
+    })
   })
 
   describe('rapid state transitions', () => {

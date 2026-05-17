@@ -12,6 +12,56 @@
 /** Available density-matrix-aware color algorithms */
 export type OpenQuantumVisualizationMode = 'density' | 'purityMap' | 'entropyMap' | 'coherenceMap'
 
+const OPEN_QUANTUM_VISUALIZATION_MODES: readonly OpenQuantumVisualizationMode[] = [
+  'density',
+  'purityMap',
+  'entropyMap',
+  'coherenceMap',
+]
+
+const OPEN_QUANTUM_DEPHASING_MODELS = ['none', 'uniform'] as const
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+/** Return true when a runtime value is a supported open-quantum visualization mode. */
+export function isOpenQuantumVisualizationMode(
+  value: unknown
+): value is OpenQuantumVisualizationMode {
+  return (
+    typeof value === 'string' &&
+    OPEN_QUANTUM_VISUALIZATION_MODES.includes(value as OpenQuantumVisualizationMode)
+  )
+}
+
+/** Return true when a runtime value is a supported open-quantum dephasing model. */
+export function isOpenQuantumDephasingModel(value: unknown): value is 'none' | 'uniform' {
+  return (
+    typeof value === 'string' &&
+    OPEN_QUANTUM_DEPHASING_MODELS.includes(value as (typeof OPEN_QUANTUM_DEPHASING_MODELS)[number])
+  )
+}
+
+function finiteNumberInRange(value: unknown, fallback: number, min: number, max: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
+  return Math.min(max, Math.max(min, value))
+}
+
+function finiteIntegerInRange(value: unknown, fallback: number, min: number, max: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
+  return Math.min(max, Math.max(min, Math.floor(value)))
+}
+
+function finiteNonNegativeInteger(value: unknown, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
+  return Math.max(0, Math.floor(value))
+}
+
+function booleanOrFallback(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback
+}
+
 // ---------------------------------------------------------------------------
 // Density matrix
 // ---------------------------------------------------------------------------
@@ -91,6 +141,44 @@ export const DEFAULT_OPEN_QUANTUM_CONFIG: OpenQuantumConfig = {
   couplingScale: 1.0,
   dephasingModel: 'uniform',
   hydrogenBasisMaxN: 2,
+}
+
+/** Sanitize loaded or programmatic open-quantum config before physics use. */
+export function sanitizeOpenQuantumConfig(input: unknown): OpenQuantumConfig {
+  const raw = isRecord(input) ? input : {}
+  const defaults = DEFAULT_OPEN_QUANTUM_CONFIG
+
+  return {
+    enabled: booleanOrFallback(raw.enabled, defaults.enabled),
+    dt: finiteNumberInRange(raw.dt, defaults.dt, 0.001, 0.1),
+    substeps: finiteIntegerInRange(raw.substeps, defaults.substeps, 1, 10),
+    dephasingRate: finiteNumberInRange(raw.dephasingRate, defaults.dephasingRate, 0, 5),
+    relaxationRate: finiteNumberInRange(raw.relaxationRate, defaults.relaxationRate, 0, 5),
+    thermalUpRate: finiteNumberInRange(raw.thermalUpRate, defaults.thermalUpRate, 0, 5),
+    dephasingEnabled: booleanOrFallback(raw.dephasingEnabled, defaults.dephasingEnabled),
+    relaxationEnabled: booleanOrFallback(raw.relaxationEnabled, defaults.relaxationEnabled),
+    thermalEnabled: booleanOrFallback(raw.thermalEnabled, defaults.thermalEnabled),
+    resetToken: finiteNonNegativeInteger(raw.resetToken, defaults.resetToken),
+    visualizationMode: isOpenQuantumVisualizationMode(raw.visualizationMode)
+      ? raw.visualizationMode
+      : defaults.visualizationMode,
+    bathTemperature: finiteNumberInRange(
+      raw.bathTemperature,
+      defaults.bathTemperature,
+      0.1,
+      100000
+    ),
+    couplingScale: finiteNumberInRange(raw.couplingScale, defaults.couplingScale, 0.01, 100),
+    dephasingModel: isOpenQuantumDephasingModel(raw.dephasingModel)
+      ? raw.dephasingModel
+      : defaults.dephasingModel,
+    hydrogenBasisMaxN: finiteIntegerInRange(
+      raw.hydrogenBasisMaxN,
+      defaults.hydrogenBasisMaxN,
+      1,
+      3
+    ),
+  }
 }
 
 // ---------------------------------------------------------------------------

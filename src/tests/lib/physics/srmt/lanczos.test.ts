@@ -21,7 +21,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { jacobiEigendecompose } from '@/lib/math/jacobiEigenvalues'
-import { lanczosTopK, lanczosTopKOp } from '@/lib/physics/srmt/lanczos'
+import { lanczosTopK, lanczosTopKOp, normalizeLanczosSeed } from '@/lib/physics/srmt/lanczos'
 
 /** Deterministic LCG used for random test matrices. */
 function lcgRng(seed: number): () => number {
@@ -160,6 +160,15 @@ describe('lanczosTopK — tight cluster stability', () => {
 })
 
 describe('lanczosTopK — edge cases', () => {
+  it('canonicalizes seeds to uint32 and rejects non-finite seeds', () => {
+    expect(normalizeLanczosSeed(-1)).toBe(0xffff_ffff)
+    expect(normalizeLanczosSeed(0x1_0000_0005)).toBe(5)
+
+    const n = 4
+    const A = randomSymmetric(n, 42)
+    expect(() => lanczosTopK(A, n, 2, { seed: Number.NaN })).toThrow(/seed must be finite/)
+  })
+
   it('returns empty array for k = 0', () => {
     const n = 8
     const A = randomSymmetric(n, 1)

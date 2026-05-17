@@ -29,6 +29,7 @@ import { DIALOG_IDS } from '../ui/dismissedDialogsStore'
 import { useMsgBoxStore } from '../ui/msgBoxStore'
 import { useUIStore } from '../ui/uiStore'
 import { mergeExtendedObjectStateForType } from '../utils/mergeWithDefaults'
+import { createBestEffortJSONStorage } from '../utils/persistStorage'
 import {
   parseAndValidateImport,
   SCENE_IMPORT_KEYS,
@@ -291,6 +292,8 @@ export interface PresetManagerState {
   importScenes: (jsonData: string) => boolean
   exportScenes: () => string
 }
+
+type PresetManagerPersistedState = Pick<PresetManagerState, 'savedStyles' | 'savedScenes'>
 
 export const usePresetManagerStore = create<PresetManagerState>()(
   persist(
@@ -570,6 +573,11 @@ export const usePresetManagerStore = create<PresetManagerState>()(
     }),
     {
       name: 'mquantum-preset-manager',
+      storage: createBestEffortJSONStorage<PresetManagerPersistedState>('presetManagerStore'),
+      partialize: (state): PresetManagerPersistedState => ({
+        savedStyles: state.savedStyles,
+        savedScenes: state.savedScenes,
+      }),
     }
   )
 )

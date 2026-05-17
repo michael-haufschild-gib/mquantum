@@ -10,10 +10,77 @@ import { type FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { sanitizePowerOfTwoGridSizes } from '@/lib/math/ndArray'
 
 import { reconcileCosmologyInvariants } from '../slices/geometry/setters/freeScalarCosmologySetters'
+import { clampDtWithCfl } from '../slices/geometry/setters/sliceSetterUtils'
 
 function clampFiniteNumber(value: unknown, fallback: number, min: number, max: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
   return Math.max(min, Math.min(max, value))
+}
+
+function clampFiniteInteger(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number,
+  round: 'floor' | 'round' = 'round'
+): number {
+  const candidate = typeof value === 'number' && Number.isFinite(value) ? value : fallback
+  const rounded = round === 'floor' ? Math.floor(candidate) : Math.round(candidate)
+  return Math.max(min, Math.min(max, rounded))
+}
+
+function finiteArrayValue(
+  value: unknown,
+  index: number,
+  fallback: readonly number[],
+  fill: number
+): number {
+  const raw = Array.isArray(value) ? value[index] : undefined
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw
+  const fallbackValue = fallback[index] ?? fallback[fallback.length - 1] ?? fill
+  return Number.isFinite(fallbackValue) ? fallbackValue : fill
+}
+
+function normalizeNumberArray(
+  value: unknown,
+  fallback: readonly number[],
+  length: number,
+  fill: number,
+  transform: (value: number) => number = (value) => value
+): number[] {
+  return Array.from({ length }, (_, index) =>
+    transform(finiteArrayValue(value, index, fallback, fill))
+  )
+}
+
+function normalizeClampedNumberArray(
+  value: unknown,
+  fallback: readonly number[],
+  length: number,
+  fill: number,
+  min: number,
+  max: number
+): number[] {
+  return normalizeNumberArray(value, fallback, length, fill, (entry) =>
+    Math.max(min, Math.min(max, entry))
+  )
+}
+
+function normalizeFreeScalarSlicePositions(
+  value: unknown,
+  gridSize: readonly number[],
+  spacing: readonly number[],
+  latticeDim: number
+): number[] {
+  const targetLength = Math.max(0, latticeDim - 3)
+  return Array.from({ length: targetLength }, (_, index) => {
+    const raw = Array.isArray(value) ? value[index] : undefined
+    const finite = typeof raw === 'number' && Number.isFinite(raw) ? raw : 0
+    const axis = index + 3
+    const halfExtent = (gridSize[axis] ?? 1) * (spacing[axis] ?? 0.1) * 0.5
+    const limit = Number.isFinite(halfExtent) && halfExtent > 0 ? halfExtent : 0
+    return Math.max(-limit, Math.min(limit, finite))
+  })
 }
 
 function normalizeFreeScalarPreheatingConfig(value: unknown): {
@@ -52,6 +119,93 @@ function sanitizeFreeScalarEnums(config: FreeScalarConfig): Partial<FreeScalarCo
   return patch
 }
 
+function normalizeFreeScalarScalarControls(
+  freeScalar: Record<string, unknown>
+): Record<string, unknown> {
+  const defaults = DEFAULT_FREE_SCALAR_CONFIG
+  const latticeDim = clampFiniteInteger(freeScalar.latticeDim, defaults.latticeDim, 1, 11, 'floor')
+  const gridSize = Array.isArray(freeScalar.gridSize)
+    ? (freeScalar.gridSize as number[])
+    : defaults.gridSize
+  const spacing = normalizeClampedNumberArray(
+    freeScalar.spacing,
+    defaults.spacing,
+    latticeDim,
+    0.1,
+    0.01,
+    1.0
+  )
+  const mass = clampFiniteNumber(freeScalar.mass, defaults.mass, 0.0, 10.0)
+  const requestedDt =
+    typeof freeScalar.dt === 'number' && Number.isFinite(freeScalar.dt)
+      ? freeScalar.dt
+      : defaults.dt
+
+  return {
+    ...freeScalar,
+    latticeDim,
+    spacing,
+    mass,
+    dt: clampDtWithCfl(requestedDt, spacing, latticeDim, mass),
+    stepsPerFrame: clampFiniteInteger(
+      freeScalar.stepsPerFrame,
+      defaults.stepsPerFrame,
+      1,
+      16,
+      'floor'
+    ),
+    packetCenter: normalizeNumberArray(
+      freeScalar.packetCenter,
+      defaults.packetCenter,
+      latticeDim,
+      0
+    ),
+    packetWidth: clampFiniteNumber(freeScalar.packetWidth, defaults.packetWidth, 0.01, 5.0),
+    packetAmplitude: clampFiniteNumber(
+      freeScalar.packetAmplitude,
+      defaults.packetAmplitude,
+      0.01,
+      10.0
+    ),
+    modeK: normalizeNumberArray(freeScalar.modeK, defaults.modeK, latticeDim, 0, Math.round),
+    vacuumSeed:
+      typeof freeScalar.vacuumSeed === 'number' && Number.isFinite(freeScalar.vacuumSeed)
+        ? Math.round(freeScalar.vacuumSeed)
+        : defaults.vacuumSeed,
+    selfInteractionLambda: clampFiniteNumber(
+      freeScalar.selfInteractionLambda,
+      defaults.selfInteractionLambda,
+      0.01,
+      10.0
+    ),
+    selfInteractionVev: clampFiniteNumber(
+      freeScalar.selfInteractionVev,
+      defaults.selfInteractionVev,
+      0.1,
+      5.0
+    ),
+    absorberWidth: clampFiniteNumber(freeScalar.absorberWidth, defaults.absorberWidth, 0.05, 0.5),
+    pmlTargetReflection: clampFiniteNumber(
+      freeScalar.pmlTargetReflection,
+      defaults.pmlTargetReflection,
+      1e-12,
+      0.999
+    ),
+    diagnosticsInterval: clampFiniteInteger(
+      freeScalar.diagnosticsInterval,
+      defaults.diagnosticsInterval,
+      1,
+      120
+    ),
+    slicePositions: normalizeFreeScalarSlicePositions(
+      freeScalar.slicePositions,
+      gridSize,
+      spacing,
+      latticeDim
+    ),
+  }
+}
+
 /**
  * Normalize restored free-scalar config fields that bypass public setters.
  *
@@ -78,7 +232,9 @@ export function normalizeFreeScalarLoadedConfig(
 
   freeScalar = sanitizePowerOfTwoGridSizes(freeScalar as unknown as FreeScalarConfig, {
     maxTotalSites: FREE_SCALAR_MAX_TOTAL_SITES,
+    maxDimensions: 11,
   }) as unknown as Record<string, unknown>
+  freeScalar = normalizeFreeScalarScalarControls(freeScalar)
 
   freeScalar = {
     ...freeScalar,

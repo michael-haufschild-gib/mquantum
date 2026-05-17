@@ -103,6 +103,7 @@ export class AntiDeSitterStrategy implements QuantumModeStrategy {
         this.densityTexture.destroy()
         this.densityTexture = null
         this.densityTextureView = null
+        this.lastCpuConfigHash = null
       }
     }
 

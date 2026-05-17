@@ -82,6 +82,9 @@ describe('evolveStep', () => {
     expect(() => evolveStep(rho, new Float64Array([0, 1]), [], Number.NaN)).toThrow(
       'dt must be finite'
     )
+    expect(() => evolveStep(rho, new Float64Array([0, Number.NaN]), [], 0.01)).toThrow(
+      'evolveStep: energies[1] must be finite'
+    )
   })
 
   it('preserves trace after 100 steps with dephasing', () => {

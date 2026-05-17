@@ -29,10 +29,11 @@ import {
   createPackedBuffer,
   packForGPU,
 } from '@/lib/physics/openQuantum/statePacking'
-import type {
-  DensityMatrix,
-  LindbladChannel,
-  OpenQuantumConfig,
+import {
+  type DensityMatrix,
+  type LindbladChannel,
+  type OpenQuantumConfig,
+  sanitizeOpenQuantumConfig,
 } from '@/lib/physics/openQuantum/types'
 import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
@@ -98,8 +99,8 @@ export class AnalyticOpenQuantumExecutor {
     performance: PerformanceSnapshot | undefined
   ): void {
     const extended = getStoreSnapshot<ExtendedStoreSnapshot>(ctx, 'extended')
-    const oqConfig = extended?.schroedinger?.openQuantum
-    if (!oqConfig?.enabled) {
+    const oqConfig = sanitizeOpenQuantumConfig(extended?.schroedinger?.openQuantum)
+    if (!oqConfig.enabled) {
       // Mark for full reset on next enable so the diagnostics sparkline does
       // not splice the old curve onto a fresh evolution. Skipping this would
       // leave HISTORY_LENGTH (~120) stale samples visible for several seconds

@@ -9,17 +9,24 @@ type MockGraphInstance = {
   dispose: ReturnType<typeof vi.fn>
 }
 
-const { initializeMock, onDeviceLostMock, destroyMock, graphInitializeMock, graphInstances } =
-  vi.hoisted(() => {
-    const instances: MockGraphInstance[] = []
-    return {
-      initializeMock: vi.fn(),
-      onDeviceLostMock: vi.fn(),
-      destroyMock: vi.fn(),
-      graphInitializeMock: vi.fn(),
-      graphInstances: instances,
-    }
-  })
+const {
+  initializeMock,
+  onDeviceLostMock,
+  destroyMock,
+  getCapabilitiesMock,
+  graphInitializeMock,
+  graphInstances,
+} = vi.hoisted(() => {
+  const instances: MockGraphInstance[] = []
+  return {
+    initializeMock: vi.fn(),
+    onDeviceLostMock: vi.fn(),
+    destroyMock: vi.fn(),
+    getCapabilitiesMock: vi.fn(),
+    graphInitializeMock: vi.fn(),
+    graphInstances: instances,
+  }
+})
 
 vi.mock('@/rendering/webgpu/core/WebGPUDevice', () => ({
   WebGPUDevice: {
@@ -28,6 +35,7 @@ vi.mock('@/rendering/webgpu/core/WebGPUDevice', () => ({
       onDeviceLost: onDeviceLostMock,
       destroy: destroyMock,
       destroyForCanvas: destroyMock,
+      getCapabilities: getCapabilitiesMock,
     }),
   },
 }))
@@ -58,6 +66,8 @@ describe('WebGPUCanvas', () => {
     initializeMock.mockReset()
     onDeviceLostMock.mockReset()
     destroyMock.mockReset()
+    getCapabilitiesMock.mockReset()
+    getCapabilitiesMock.mockReturnValue({ maxTextureDimension2D: 4096 })
     graphInitializeMock.mockReset()
     graphInitializeMock.mockResolvedValue(undefined)
     graphInstances.length = 0
@@ -118,6 +128,24 @@ describe('WebGPUCanvas', () => {
       expect(graphInstances[0]!.setSize).toHaveBeenCalledWith(100, 50)
       expect(initializeMock).toHaveBeenCalledTimes(1)
     })
+  })
+
+  it('caps DPR-scaled backing size to the device texture limit', async () => {
+    getCapabilitiesMock.mockReturnValue({ maxTextureDimension2D: 256 })
+    initializeMock.mockResolvedValue({ success: true })
+    const onError = vi.fn()
+
+    render(<WebGPUCanvas dpr={4} onError={onError} />)
+
+    await waitFor(() => {
+      expect(initializeMock).toHaveBeenCalledTimes(1)
+      expect(graphInstances).toHaveLength(1)
+      expect(graphInstances[0]!.setSize).toHaveBeenCalledWith(256, 256)
+    })
+
+    const canvas = screen.getByTestId('webgpu-canvas') as HTMLCanvasElement
+    expect(canvas.width).toBe(256)
+    expect(canvas.height).toBe(256)
   })
 
   it('clamps zero-sized containers and non-finite DPR to a 1x1 backing canvas', async () => {

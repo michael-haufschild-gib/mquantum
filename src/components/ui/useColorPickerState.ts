@@ -58,8 +58,18 @@ export interface ColorPickerState {
   handleHsvChange: (newHsv: HSVA) => void
   handleSvKeyDown: (e: React.KeyboardEvent) => void
   updateSV: (clientX: number, clientY: number) => void
+  handleColorSelection: (color: string) => void
   handleEyedropper: () => Promise<void>
   handleCopy: () => Promise<void>
+}
+
+function hasExplicitAlpha(color: string): boolean {
+  const normalized = color.trim()
+  if (normalized.startsWith('#')) {
+    const hexLength = normalized.slice(1).length
+    return hexLength === 4 || hexLength === 8
+  }
+  return /^rgba\(/i.test(normalized)
 }
 
 /**
@@ -250,12 +260,20 @@ export function useColorPickerState(args: UseColorPickerStateArgs): ColorPickerS
     [hsv, handleHsvChange]
   )
 
+  const handleColorSelection = useCallback(
+    (color: string) => {
+      const parsed = parseColorToHsv(color)
+      handleHsvChange(hasExplicitAlpha(color) ? parsed : { ...parsed, a: hsv.a })
+    },
+    [handleHsvChange, hsv.a]
+  )
+
   const handleEyedropper = async () => {
     if (!window.EyeDropper) return
     try {
       const dropper = new window.EyeDropper()
       const result = await dropper.open()
-      handleHsvChange(parseColorToHsv(result.sRGBHex))
+      handleColorSelection(result.sRGBHex)
     } catch (error) {
       if (!(error instanceof DOMException && error.name === 'AbortError')) {
         logger.error('ColorPicker: EyeDropper error', error)
@@ -294,6 +312,7 @@ export function useColorPickerState(args: UseColorPickerStateArgs): ColorPickerS
     handleHsvChange,
     handleSvKeyDown,
     updateSV,
+    handleColorSelection,
     handleEyedropper,
     handleCopy,
   }

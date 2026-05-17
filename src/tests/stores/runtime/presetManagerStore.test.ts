@@ -430,7 +430,7 @@ describe('presetManagerStore (invariants)', () => {
       expect(pbr.face.specularColor).toBe('#123456')
     })
 
-    it('preserves missing PBR face fields when imported payload is partial', () => {
+    it('defaults missing PBR face fields when imported payload is partial', () => {
       usePBRStore.getState().setFacePBR({
         roughness: 0.55,
         metallic: 0.77,
@@ -465,9 +465,9 @@ describe('presetManagerStore (invariants)', () => {
 
       const pbr = usePBRStore.getState()
       expect(pbr.face.roughness).toBe(0.8)
-      expect(pbr.face.metallic).toBe(0.77)
-      expect(pbr.face.specularIntensity).toBe(1.4)
-      expect(pbr.face.specularColor).toBe('#abcdef')
+      expect(pbr.face.metallic).toBe(DEFAULT_FACE_PBR.metallic)
+      expect(pbr.face.specularIntensity).toBe(DEFAULT_FACE_PBR.specularIntensity)
+      expect(pbr.face.specularColor).toBe(DEFAULT_FACE_PBR.specularColor)
     })
 
     it('drops unknown imported style PBR fields on load', () => {
@@ -622,9 +622,11 @@ describe('presetManagerStore (invariants)', () => {
       expect(appearance.domainColoring.contourWidth).toBe(0.25)
       expect(appearance.domainColoring.contourStrength).toBe(1)
 
-      // neutralColor: loaded value 42 (not string) → normalizer uses current
-      // store state as fallback for individual invalid fields in nested objects
-      expect(appearance.phaseDiverging.neutralColor).toBe('#111111')
+      // neutralColor: loaded value 42 (not string) -> normalizer uses immutable
+      // defaults for individual invalid fields in nested objects.
+      expect(appearance.phaseDiverging.neutralColor).toBe(
+        APPEARANCE_INITIAL_STATE.phaseDiverging.neutralColor
+      )
       expect(appearance.phaseDiverging.positiveColor).toBe('#00ff00')
       expect(appearance.phaseDiverging.negativeColor).toBe('#0000ff')
 
@@ -632,9 +634,11 @@ describe('presetManagerStore (invariants)', () => {
       expect(appearance.divergingPsi.positiveColor).toBe('#202020')
       expect(appearance.divergingPsi.negativeColor).toBe('#303030')
       expect(appearance.divergingPsi.intensityFloor).toBe(1)
-      // component: loaded value 'phase' not in valid set → normalizer uses
-      // current store state as fallback ('imag' was set before import)
-      expect(appearance.divergingPsi.component).toBe('imag')
+      // component: loaded value 'phase' not in valid set -> immutable default,
+      // not the current pre-load store state ('imag').
+      expect(appearance.divergingPsi.component).toBe(
+        APPEARANCE_INITIAL_STATE.divergingPsi.component
+      )
 
       expect(appearance.shaderSettings.wireframe.lineThickness).toBe(5)
       expect(appearance.shaderSettings.surface.specularIntensity).toBe(0)

@@ -3,7 +3,12 @@
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 
 import type { WebGPURenderContext } from '../core/types'
-import { assertPow2Log2, FFT_UNIFORM_SIZE, LINEAR_WG } from './computePassUtils'
+import {
+  assertPow2Log2,
+  assertSharedMemoryFFTLog2,
+  FFT_UNIFORM_SIZE,
+  LINEAR_WG,
+} from './computePassUtils'
 import type { TdseBindGroupResult, TdsePipelineResult } from './TDSEComputePassSetup'
 import type { DiagReadbackState } from './TDSEDiagnosticsReadback'
 import { scheduleNormReadback } from './TDSEDiagnosticsReadback'
@@ -122,7 +127,7 @@ export function dispatchFFTAxisSharedMem(
   slotOffset: number,
   p: FFTAxisSharedMemParams
 ): number {
-  assertPow2Log2(axisDim)
+  assertSharedMemoryFFTLog2(axisDim, 'TDSE FFT')
   // Copy per-axis uniforms from staging to the active uniform buffer
   ctx.encoder.copyBufferToBuffer(
     p.fftAxisStagingBuffer,

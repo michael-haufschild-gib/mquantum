@@ -7,10 +7,14 @@
  * insensitive hash would silently render stale BTZ/HKLL densities after a
  * config change, which the eye cannot easily diagnose.
  */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import type { AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
-import { computeAdsConfigHash } from '@/rendering/webgpu/renderers/strategies/AntiDeSitterStrategy'
+import {
+  AntiDeSitterStrategy,
+  computeAdsConfigHash,
+} from '@/rendering/webgpu/renderers/strategies/AntiDeSitterStrategy'
+import { createMockTexture, installWebGPUMock, mockWebGPU } from '@/tests/__mocks__/webgpu'
 
 const baseConfig: AntiDeSitterConfig = {
   d: 3,
@@ -86,5 +90,58 @@ describe('computeAdsConfigHash', () => {
     })
 
     expect(hash).toContain('invalid')
+  })
+})
+
+describe('AntiDeSitterStrategy texture lifecycle', () => {
+  it('invalidates CPU-packed hash when density texture is recreated', async () => {
+    installWebGPUMock()
+    vi.spyOn(mockWebGPU.device, 'createTexture').mockImplementation(
+      (descriptor: GPUTextureDescriptor) => {
+        const texture = createMockTexture() as GPUTexture & {
+          width: number
+          height: number
+          depthOrArrayLayers: number
+        }
+        const size = descriptor.size
+        const sizeRecord = size as {
+          width?: number
+          height?: number
+          depthOrArrayLayers?: number
+        }
+        if (typeof sizeRecord.width === 'number') {
+          texture.width = sizeRecord.width
+          texture.height = sizeRecord.height ?? 1
+          texture.depthOrArrayLayers = sizeRecord.depthOrArrayLayers ?? 1
+        } else {
+          const [width = 1, height = 1, depthOrArrayLayers = 1] = Array.from(
+            size as Iterable<number>
+          )
+          texture.width = width
+          texture.height = height
+          texture.depthOrArrayLayers = depthOrArrayLayers
+        }
+        return texture
+      }
+    )
+
+    const strategy = new AntiDeSitterStrategy()
+    const firstSetup = strategy.setup(
+      { device: mockWebGPU.device } as never,
+      { densityGridResolution: 32 } as never
+    )
+    await Promise.all(firstSetup.initPromises)
+    ;(strategy as unknown as { lastCpuConfigHash: string | null }).lastCpuConfigHash =
+      'cached-cpu-pack'
+
+    const secondSetup = strategy.setup(
+      { device: mockWebGPU.device } as never,
+      { densityGridResolution: 48 } as never
+    )
+    await Promise.all(secondSetup.initPromises)
+
+    expect((strategy as unknown as { lastCpuConfigHash: string | null }).lastCpuConfigHash).toBe(
+      null
+    )
   })
 })

@@ -151,7 +151,9 @@ const SOURCE_CHUNKS: [string, string][] = [
   ['/lib/physics/tdse/heller', 'rendering-tdse-bec'],
   ['/lib/physics/tdse/classicalOrbit', 'rendering-tdse-bec'],
   ['/lib/physics/tdse/scarMetric', 'rendering-tdse-bec'],
-  ['/lib/physics/tdse/wormholeCoupling', 'rendering-tdse-bec'],
+  // Pure TDSE helpers used by eager stores/UI must stay below the lazy
+  // renderer chunks; otherwise stores and rendering-tdse-bec form a cycle.
+  ['/lib/physics/tdse/wormholeCoupling', 'physics'],
   ['/lib/physics/tdse/disorderNoise', 'rendering-tdse-bec'],
   ['/lib/physics/tdse/potentialProfile', 'rendering-tdse-bec'],
   ['/lib/physics/coordinateEntanglement', 'rendering-tdse-bec'],

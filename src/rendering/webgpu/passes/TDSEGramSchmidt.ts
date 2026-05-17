@@ -336,6 +336,13 @@ export function dispatchGramSchmidt(
   dispatch: DispatchComputeFn,
   postGSRenorm?: PostGSRenormResources
 ): void {
+  const totalSites =
+    Number.isFinite(state.totalSites) && state.totalSites > 0 ? Math.floor(state.totalSites) : 0
+  const gsNumWorkgroups =
+    Number.isFinite(state.gsNumWorkgroups) && state.gsNumWorkgroups > 0
+      ? Math.floor(state.gsNumWorkgroups)
+      : 0
+  const requiredGsWorkgroups = totalSites > 0 ? Math.ceil(totalSites / 256) : 0
   if (
     state.gsEigenstates.length === 0 ||
     !state.pl ||
@@ -343,15 +350,17 @@ export function dispatchGramSchmidt(
     !state.gsUniformBuffer ||
     !state.gsPartialReBuffer ||
     !state.gsPartialImBuffer ||
-    !state.gsResultBuffer
+    !state.gsResultBuffer ||
+    totalSites <= 0 ||
+    gsNumWorkgroups < requiredGsWorkgroups
   )
     return
 
   const { device } = ctx
-  const linearWG = Math.ceil(state.totalSites / LINEAR_WG)
+  const linearWG = Math.ceil(totalSites / LINEAR_WG)
 
   // Pre-allocate uniform scratch buffers
-  const reduceUnifBuf = new Uint32Array([state.totalSites, state.gsNumWorkgroups, 0, 0])
+  const reduceUnifBuf = new Uint32Array([totalSites, gsNumWorkgroups, 0, 0])
   const subtractUnifBuf = new ArrayBuffer(16)
   const subtractU32 = new Uint32Array(subtractUnifBuf)
   const subtractF32 = new Float32Array(subtractUnifBuf)
@@ -371,7 +380,7 @@ export function dispatchGramSchmidt(
       ],
     })
     const rPass = ctx.beginComputePass({ label: 'gs-reduce' })
-    dispatch(rPass, state.pl.gsReducePipeline, [reduceBG], state.gsNumWorkgroups)
+    dispatch(rPass, state.pl.gsReducePipeline, [reduceBG], gsNumWorkgroups)
     rPass.end()
 
     const finalizeBG = device.createBindGroup({
@@ -389,7 +398,7 @@ export function dispatchGramSchmidt(
     fPass.end()
 
     // Overwrite uniforms for subtract: { totalElements, normSquared, 0, 0 }
-    subtractU32[0] = state.totalSites
+    subtractU32[0] = totalSites
     subtractF32[1] = eigenstate.normSquared
     subtractU32[2] = 0
     subtractU32[3] = 0
@@ -411,7 +420,11 @@ export function dispatchGramSchmidt(
   }
 
   // Re-normalize after GS projection subtraction to restore target norm
-  if (postGSRenorm) {
+  if (
+    postGSRenorm &&
+    Number.isFinite(postGSRenorm.diagNumWorkgroups) &&
+    postGSRenorm.diagNumWorkgroups > 0
+  ) {
     const r = postGSRenorm
     const rReduce = ctx.beginComputePass({ label: 'post-gs-reduce' })
     dispatch(rReduce, r.diagReducePipeline, [r.diagReduceBG], r.diagNumWorkgroups)

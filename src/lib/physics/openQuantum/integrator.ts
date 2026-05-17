@@ -63,6 +63,17 @@ function assertArrayLength(
   }
 }
 
+function assertFiniteArrayPrefix(
+  caller: string,
+  name: string,
+  values: ArrayLike<number>,
+  K: number
+): void {
+  for (let k = 0; k < K; k++) {
+    assertFiniteNumber(caller, `${name}[${k}]`, values[k]!)
+  }
+}
+
 function assertOutputLength(caller: string, name: string, values: Float64Array, min: number): void {
   if (values.length < min) {
     throw new Error(`${caller}: ${name} too small (expected >= ${min})`)
@@ -157,6 +168,7 @@ export function densityMatrixFromCoefficients(
 function unitaryStep(rho: DensityMatrix, energies: Float64Array, dt: number): void {
   assertDensityMatrixShape('unitaryStep', rho)
   assertArrayLength('unitaryStep', 'energies', energies, rho.K)
+  assertFiniteArrayPrefix('unitaryStep', 'energies', energies, rho.K)
   assertFiniteNumber('unitaryStep', 'dt', dt)
   const K = rho.K
   const el = rho.elements
@@ -570,6 +582,7 @@ export function evolveStep(
 ): void {
   assertDensityMatrixShape('evolveStep', rho)
   assertArrayLength('evolveStep', 'energies', energies, rho.K)
+  assertFiniteArrayPrefix('evolveStep', 'energies', energies, rho.K)
   assertFiniteNumber('evolveStep', 'dt', dt)
   assertChannels('evolveStep', channels, rho.K)
 

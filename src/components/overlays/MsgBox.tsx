@@ -27,16 +27,15 @@ export const MsgBox: React.FC = () => {
   // Local state for the "don't show again" checkbox
   const [dontShowAgain, setDontShowAgain] = useState(false)
 
-  // Reset checkbox state when dialog opens/closes
+  // Reset checkbox for each visible dialog instance. Resetting only after
+  // close is insufficient because an action can close one dialog and open the
+  // next before a delayed close reset runs.
   useEffect(() => {
-    if (!isOpen) {
-      const resetTimer = window.setTimeout(() => {
-        setDontShowAgain(false)
-      }, 0)
-      return () => clearTimeout(resetTimer)
+    if (isOpen) {
+      setDontShowAgain(false)
     }
     return undefined
-  }, [isOpen])
+  }, [dismissId, isOpen])
 
   /**
    * Handles action button click.

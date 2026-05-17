@@ -7,7 +7,7 @@
  * @module rendering/webgpu/useScenePassSetup
  */
 
-import { type RefObject,useEffect, useRef } from 'react'
+import { type RefObject, useEffect, useRef } from 'react'
 
 import { logger } from '@/lib/logger'
 import { usePerformanceStore } from '@/stores/runtime/performanceStore'
@@ -47,6 +47,8 @@ export interface ScenePassSetupDeps {
   cameraRef: RefObject<WebGPUCamera | null>
   /** Full pass config derived from scene stores. */
   fullConfig: PassConfig
+  /** Device texture limit used to cap screen-sized render targets. */
+  maxTextureDimension2D?: number
 }
 
 /**
@@ -55,7 +57,13 @@ export interface ScenePassSetupDeps {
  * @param deps - Graph, canvas, camera ref, and full pass config.
  * @returns Nothing; setup runs through React effects.
  */
-export function useScenePassSetup({ graph, canvas, cameraRef, fullConfig }: ScenePassSetupDeps) {
+export function useScenePassSetup({
+  graph,
+  canvas,
+  cameraRef,
+  fullConfig,
+  maxTextureDimension2D,
+}: ScenePassSetupDeps) {
   const setupGenerationRef = useRef(0)
   const setupTaskRef = useRef<Promise<void>>(Promise.resolve())
   const lastSchrodingerConfigRef = useRef<SchrodingerPassConfig | null>(null)
@@ -209,7 +217,8 @@ export function useScenePassSetup({ graph, canvas, cameraRef, fullConfig }: Scen
         const { width: w, height: h } = resolveCanvasPixelSize(
           canvas.clientWidth,
           canvas.clientHeight,
-          effectiveDpr
+          effectiveDpr,
+          maxTextureDimension2D
         )
         canvas.width = w
         canvas.height = h
@@ -231,5 +240,5 @@ export function useScenePassSetup({ graph, canvas, cameraRef, fullConfig }: Scen
     return () => {
       cancelled = true
     }
-  }, [graph, canvas, setupConfigKey, cameraRef])
+  }, [graph, canvas, setupConfigKey, cameraRef, maxTextureDimension2D])
 }

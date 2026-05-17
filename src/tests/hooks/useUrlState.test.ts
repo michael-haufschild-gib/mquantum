@@ -242,6 +242,41 @@ describe('useUrlState', () => {
     hasHydratedSpy.mockRestore()
   })
 
+  it('loads deferred scene once and unregisters hydration listener', async () => {
+    let hydrationCallback: (() => void) | null = null
+    const unsubscribe = vi.fn()
+    const hasHydratedSpy = vi
+      .spyOn(usePresetManagerStore.persist, 'hasHydrated')
+      .mockReturnValue(false)
+    const onFinishHydrationSpy = vi
+      .spyOn(usePresetManagerStore.persist, 'onFinishHydration')
+      .mockImplementation((cb) => {
+        hydrationCallback = () => cb(usePresetManagerStore.getState())
+        return unsubscribe
+      })
+
+    mockedParseCurrentUrl.mockReturnValue({ scene: 'schroedinger bloom' })
+    mockedFindSceneByName.mockReturnValue({ id: 'schroedinger-bloom', source: 'example' })
+    mockedApplySceneExample.mockResolvedValue(true)
+
+    renderHook(() => useUrlState())
+
+    expect(mockedFindSceneByName).not.toHaveBeenCalled()
+    expect(unsubscribe).not.toHaveBeenCalled()
+
+    hasHydratedSpy.mockReturnValue(true)
+    hydrationCallback!()
+
+    await waitFor(() => {
+      expect(mockedFindSceneByName).toHaveBeenCalledWith('schroedinger bloom')
+      expect(mockedApplySceneExample).toHaveBeenCalledWith('schroedinger-bloom')
+    })
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
+
+    hasHydratedSpy.mockRestore()
+    onFinishHydrationSpy.mockRestore()
+  })
+
   it('queues SRMT sweep params only when qm=wheelerDeWitt', async () => {
     mockedParseCurrentUrl.mockReturnValue({
       objectType: 'schroedinger',

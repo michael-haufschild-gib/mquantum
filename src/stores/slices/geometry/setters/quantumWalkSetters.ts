@@ -66,6 +66,9 @@ export function createQuantumWalkSetters(ctx: SetterContext): QuantumWalkSetters
                     absorberEnabled: preset.overrides.absorberEnabled,
                     absorberWidth:
                       preset.overrides.absorberWidth ?? appliedQuantumWalk.absorberWidth,
+                    pmlTargetReflection:
+                      preset.overrides.pmlTargetReflection ??
+                      appliedQuantumWalk.pmlTargetReflection,
                   }
                 : {}
             return {

@@ -28,6 +28,14 @@ const TDSE_CURV_SCHW_MIN_RADIUS: f32 = 0.01;
 const TDSE_CURV_ADS_MIN_Z: f32 = 0.05;
 const TDSE_CURV_SPHERE_POLE_EPS: f32 = 0.2;
 const TDSE_CURV_MT_MIN_RADIUS: f32 = 1e-4;
+// exp(80) is below f32::MAX while still far above any display/norm scale this
+// path can use meaningfully. Prevents deSitter proper-volume diagnostics from
+// overflowing to inf during long high-H runs.
+const TDSE_CURV_EXP_LIMIT: f32 = 80.0;
+
+fn tdseCurvatureExpClamped(exponent: f32) -> f32 {
+  return exp(clamp(exponent, -TDSE_CURV_EXP_LIMIT, TDSE_CURV_EXP_LIMIT));
+}
 
 /**
  * Ricci-scalar R(x, t) for the active metric kind. Returns 0 on flat /
@@ -121,10 +129,7 @@ fn tdseCurvatureSqrtDet(coords: array<f32, 12>, dim: u32, time: f32) -> f32 {
   // de Sitter: √|g| = a(t)^dim, a(t) = exp(H·t).
   if (kind == 3u) {
     let H = max(params.hubbleRate, 0.0);
-    let a = exp(H * time);
-    var sd: f32 = 1.0;
-    for (var d: u32 = 0u; d < dim; d++) { sd = sd * a; }
-    return sd;
+    return tdseCurvatureExpClamped(H * time * f32(dim));
   }
 
   // AdS Poincaré half-space: √|g| = (L/z)^dim.

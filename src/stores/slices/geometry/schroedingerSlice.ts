@@ -9,7 +9,7 @@ import {
 import { sanitizeHarmonicOscillatorScalars } from '@/lib/geometry/extended/schroedinger/configSanitization'
 import { normalizeHydrogenNDPresetName } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import { SCHROEDINGER_PALETTE_DEFINITIONS } from '@/lib/geometry/extended/schroedinger/palettes'
-import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
+import { getNamedPresetStoreControls } from '@/lib/geometry/extended/schroedinger/presets'
 import { sanitizeTdseStochasticFields } from '@/lib/geometry/extended/tdse'
 import {
   type BecConfig,
@@ -440,13 +440,13 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerPresetName: (name: SchroedingerPresetName) => {
       let updates: Partial<SchroedingerConfig> = {}
       if (name !== 'custom') {
-        const preset = SCHROEDINGER_NAMED_PRESETS[name]
-        if (preset) {
+        const presetControls = getNamedPresetStoreControls(name)
+        if (presetControls) {
           updates = {
-            seed: preset.seed,
-            termCount: preset.termCount,
-            maxQuantumNumber: preset.maxN,
-            frequencySpread: preset.frequencySpread,
+            seed: presetControls.seed,
+            termCount: presetControls.termCount,
+            maxQuantumNumber: presetControls.maxQuantumNumber,
+            frequencySpread: presetControls.frequencySpread,
           }
         }
       }

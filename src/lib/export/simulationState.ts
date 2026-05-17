@@ -43,10 +43,8 @@ export interface WavefunctionReadbackResult {
   componentCount: number
 }
 
-const MAGIC = 'MQST'
-const VERSION = 1
 const HEADER_SIZE = 64
-const MAX_GRID_DIMENSIONS = 11
+const UINT32_MAX = 0xffffffff
 
 const STATE_SAVE_ID_BY_MODE = getQuantumTypeStateSaveIdMap() as Partial<
   Record<SaveableQuantumMode, number>
@@ -81,6 +79,10 @@ export async function serializeSimulationState(
   gridSize: number[]
 ): Promise<Blob> {
   validateSerializableState(wavefunction, gridSize)
+  const modeIndex = STATE_SAVE_ID_BY_MODE[quantumMode]
+  if (modeIndex === undefined) {
+    throw new Error(`Cannot serialize .mqstate: unknown quantum mode "${quantumMode}"`)
+  }
 
   const configJSON = JSON.stringify(config)
   const configBytes = new TextEncoder().encode(configJSON)
@@ -111,16 +113,16 @@ export async function serializeSimulationState(
   const hU8 = new Uint8Array(header)
 
   // Magic
-  hU8[0] = MAGIC.charCodeAt(0)
-  hU8[1] = MAGIC.charCodeAt(1)
-  hU8[2] = MAGIC.charCodeAt(2)
-  hU8[3] = MAGIC.charCodeAt(3)
+  hU8[0] = 77
+  hU8[1] = 81
+  hU8[2] = 83
+  hU8[3] = 84
 
   // Version
-  hView.setUint32(4, VERSION, true)
+  hView.setUint32(4, 1, true)
 
   // Mode metadata
-  hU8[8] = STATE_SAVE_ID_BY_MODE[quantumMode] ?? 0
+  hU8[8] = modeIndex
   hU8[9] = gridSize.length
   hU8[10] = wavefunction.componentCount
   hU8[11] = isCompressed ? 1 : 0
@@ -171,7 +173,10 @@ export async function deserializeSimulationState(data: ArrayBuffer): Promise<{
   const psiRe = wavData.slice(0, totalElements)
   const psiIm = wavData.slice(totalElements, totalElements * 2)
 
-  const quantumMode = MODE_BY_STATE_SAVE_ID[modeIndex] ?? 'tdseDynamics'
+  const quantumMode = MODE_BY_STATE_SAVE_ID[modeIndex]
+  if (!quantumMode) {
+    throw new Error(`Invalid .mqstate file: unknown quantum mode id ${modeIndex}`)
+  }
 
   // Backward compat: files saved before pauliSpinor was a separate mode
   // stored quantumMode='tdseDynamics' with a 'pauli' key in config.
@@ -199,33 +204,32 @@ function parseStateHeader(data: ArrayBuffer): StateHeader {
 
   const view = new DataView(data)
   const u8 = new Uint8Array(data)
-  const magic = String.fromCharCode(u8[0]!, u8[1]!, u8[2]!, u8[3]!)
-  if (magic !== MAGIC) throw new Error(`Invalid .mqstate file: bad magic "${magic}"`)
+  if (u8[0] !== 77 || u8[1] !== 81 || u8[2] !== 83 || u8[3] !== 84) {
+    throw new Error('Invalid .mqstate file: bad magic')
+  }
 
   const version = view.getUint32(4, true)
-  if (version !== VERSION) throw new Error(`Unsupported .mqstate version: ${version}`)
+  if (version !== 1) throw new Error(`Unsupported .mqstate version: ${version}`)
 
   const latticeDim = u8[9]!
   const componentCount = u8[10]!
-  assertHeaderShape(
-    data,
-    latticeDim,
-    componentCount,
-    view.getUint32(56, true),
-    view.getUint32(60, true)
-  )
+  const compressedFlag = u8[11]!
+  const totalSites = view.getUint32(56, true)
+  const configLength = view.getUint32(60, true)
+  assertHeaderShape(data, latticeDim, componentCount, totalSites, configLength, compressedFlag)
 
   const gridSize: number[] = []
   for (let d = 0; d < latticeDim; d++) gridSize.push(view.getUint32(12 + d * 4, true))
+  assertGridShape(gridSize, totalSites, 'Invalid .mqstate file')
 
   return {
     modeIndex: u8[8]!,
     latticeDim,
     componentCount,
-    compressed: u8[11]! === 1,
+    compressed: compressedFlag === 1,
     gridSize,
-    totalSites: view.getUint32(56, true),
-    configLength: view.getUint32(60, true),
+    totalSites,
+    configLength,
   }
 }
 
@@ -234,28 +238,30 @@ function assertHeaderShape(
   latticeDim: number,
   componentCount: number,
   totalSites: number,
-  configLength: number
+  configLength: number,
+  compressedFlag: number
 ): void {
-  if (latticeDim < 1 || latticeDim > MAX_GRID_DIMENSIONS) {
+  if (latticeDim < 1 || latticeDim > 11) {
     throw new Error(`Invalid .mqstate file: latticeDim must be 1..11, got ${latticeDim}`)
   }
   if (componentCount < 1) {
     throw new Error(`Invalid .mqstate file: componentCount must be >= 1, got ${componentCount}`)
   }
+  if (compressedFlag > 1) {
+    throw new Error(`Invalid .mqstate file: compressed flag ${compressedFlag}`)
+  }
   if (totalSites < 1) {
     throw new Error(`Invalid .mqstate file: totalSites must be >= 1, got ${totalSites}`)
   }
   if (HEADER_SIZE + configLength > data.byteLength) {
-    throw new Error(
-      `Invalid .mqstate file: config length ${configLength} exceeds file size ${data.byteLength}`
-    )
+    throw new Error(`Invalid .mqstate file: config length ${configLength} exceeds file size`)
   }
 }
 
 function parseStateConfig(data: ArrayBuffer, configLength: number): Record<string, unknown> {
-  const configBytes = new Uint8Array(data, HEADER_SIZE, configLength)
-  const configJSON = new TextDecoder().decode(configBytes)
-  const configRaw: unknown = JSON.parse(configJSON)
+  const configRaw: unknown = JSON.parse(
+    new TextDecoder().decode(new Uint8Array(data, HEADER_SIZE, configLength))
+  )
   return typeof configRaw === 'object' && configRaw !== null
     ? (configRaw as Record<string, unknown>)
     : {}
@@ -270,12 +276,12 @@ async function readWavefunctionPayload(
   let wavBytes: Uint8Array<ArrayBuffer> = new Uint8Array(data, wavStart)
   if (header.compressed) {
     if (typeof DecompressionStream === 'undefined') {
-      throw new Error('Compressed .mqstate files require DecompressionStream support')
+      throw new Error('Compressed .mqstate requires DecompressionStream')
     }
     wavBytes = await decompressGzip(wavBytes)
   }
 
-  const expectedWavBytes = totalElements * 2 * Float32Array.BYTES_PER_ELEMENT
+  const expectedWavBytes = totalElements * 8
   if (wavBytes.byteLength !== expectedWavBytes) {
     throw new Error(
       `Invalid .mqstate file: expected wavefunction payload ${expectedWavBytes} bytes, got ${wavBytes.byteLength}`
@@ -298,26 +304,49 @@ function validateSerializableState(
   wavefunction: WavefunctionReadbackResult,
   gridSize: number[]
 ): void {
-  if (gridSize.length < 1 || gridSize.length > MAX_GRID_DIMENSIONS) {
+  if (gridSize.length < 1 || gridSize.length > 11) {
     throw new Error(
       `Cannot serialize .mqstate: gridSize length must be 1..11, got ${gridSize.length}`
     )
   }
   if (
-    !Number.isSafeInteger(wavefunction.totalSites) ||
+    !Number.isInteger(wavefunction.totalSites) ||
     wavefunction.totalSites < 1 ||
-    !Number.isSafeInteger(wavefunction.componentCount) ||
-    wavefunction.componentCount < 1
+    wavefunction.totalSites > UINT32_MAX ||
+    !Number.isInteger(wavefunction.componentCount) ||
+    wavefunction.componentCount < 1 ||
+    wavefunction.componentCount > 255
   ) {
     throw new Error(
-      `Cannot serialize .mqstate: invalid shape totalSites=${wavefunction.totalSites}, componentCount=${wavefunction.componentCount}`
+      `Cannot serialize .mqstate: invalid shape ${wavefunction.totalSites}/${wavefunction.componentCount}`
     )
   }
+  assertGridShape(gridSize, wavefunction.totalSites, 'Cannot serialize .mqstate')
 
   const expected = wavefunction.totalSites * wavefunction.componentCount
   if (wavefunction.re.length !== expected || wavefunction.im.length !== expected) {
     throw new Error(
-      `Cannot serialize .mqstate: expected re=im=${expected} (totalSites=${wavefunction.totalSites} × componentCount=${wavefunction.componentCount}), got re=${wavefunction.re.length}, im=${wavefunction.im.length}`
+      `Cannot serialize .mqstate: expected re=im=${expected}, got re=${wavefunction.re.length}, im=${wavefunction.im.length}`
+    )
+  }
+}
+
+function assertGridShape(gridSize: number[], totalSites: number, context: string): void {
+  let product = 1
+  for (let d = 0; d < gridSize.length; d++) {
+    const size = gridSize[d]!
+    if (!Number.isInteger(size) || size < 1 || size > UINT32_MAX) {
+      throw new Error(`${context}: gridSize[${d}] invalid ${size}`)
+    }
+    if (product > UINT32_MAX / size) {
+      product = UINT32_MAX + 1
+      break
+    }
+    product *= size
+  }
+  if (product !== totalSites) {
+    throw new Error(
+      `${context}: gridSize product ${product} does not match totalSites ${totalSites}`
     )
   }
 }

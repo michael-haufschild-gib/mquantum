@@ -434,6 +434,30 @@ describe('writeTdseUniforms', () => {
     expect(f32[I.wormholeSinTau]).toBeCloseTo(Math.sin(tauG), 6)
   })
 
+  it('normalizes wormhole mirror axis to the active lattice before GPU upload', () => {
+    const uniformData = new ArrayBuffer(UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({
+        config: createTdseConfig({
+          latticeDim: 2,
+          gridSize: [64, 64],
+          wormholeMirrorAxis: 2,
+        } as Partial<TdseConfig>),
+      })
+    )
+
+    expect(u32[I.wormholeMirrorAxis]).toBe(1)
+  })
+
   it('clamps hawkingDeltaN into [0, 0.6]', () => {
     const uniformData = new ArrayBuffer(UNIFORM_SIZE)
     const u32 = new Uint32Array(uniformData)

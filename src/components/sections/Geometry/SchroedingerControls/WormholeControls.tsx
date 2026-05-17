@@ -20,6 +20,7 @@ import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import type { TdseConfig } from '@/lib/geometry/extended/tdse'
+import { normalizeMirrorAxisForLattice } from '@/lib/physics/tdse/wormholeCoupling'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 const AXIS_OPTIONS = [
@@ -50,7 +51,18 @@ export function WormholeControls({ td }: { td: TdseConfig }): React.ReactElement
     }))
   )
 
-  const axisValue = useMemo(() => String(td.wormholeMirrorAxis ?? 0), [td.wormholeMirrorAxis])
+  const axisValue = useMemo(
+    () => String(normalizeMirrorAxisForLattice(td.wormholeMirrorAxis, td.latticeDim)),
+    [td.latticeDim, td.wormholeMirrorAxis]
+  )
+  const axisOptions = useMemo(
+    () =>
+      AXIS_OPTIONS.slice(
+        0,
+        Math.max(1, Math.min(3, Number.isFinite(td.latticeDim) ? Math.floor(td.latticeDim) : 1))
+      ),
+    [td.latticeDim]
+  )
 
   return (
     <ControlGroup
@@ -80,7 +92,7 @@ export function WormholeControls({ td }: { td: TdseConfig }): React.ReactElement
       <Select
         label="Mirror axis"
         tooltip="Spatial axis across which the reflection operator P_M acts. The grid size along this axis must be even (power-of-two in practice)."
-        options={AXIS_OPTIONS}
+        options={axisOptions}
         value={axisValue}
         onChange={(v) => setTdseWormholeAxis((Number(v) as 0 | 1 | 2) ?? 0)}
         data-testid="tdse-wormhole-axis"

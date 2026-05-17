@@ -12,6 +12,28 @@ function length3(v: [number, number, number]): number {
   return Math.sqrt(v[0] ** 2 + v[1] ** 2 + v[2] ** 2)
 }
 
+/** Helper: assert every matrix/uniform scalar emitted by the camera is finite. */
+function expectFiniteMatrices(cam: WebGPUCamera): void {
+  const matrices = cam.getMatrices()
+  for (const name of [
+    'viewMatrix',
+    'projectionMatrix',
+    'viewProjectionMatrix',
+    'inverseViewMatrix',
+    'inverseProjectionMatrix',
+  ] as const) {
+    matrices[name].forEach((value, index) => {
+      expect(Number.isFinite(value), `${name}[${index}]`).toBe(true)
+    })
+  }
+  expect(Number.isFinite(matrices.cameraPosition.x)).toBe(true)
+  expect(Number.isFinite(matrices.cameraPosition.y)).toBe(true)
+  expect(Number.isFinite(matrices.cameraPosition.z)).toBe(true)
+  expect(Number.isFinite(matrices.cameraNear)).toBe(true)
+  expect(Number.isFinite(matrices.cameraFar)).toBe(true)
+  expect(Number.isFinite(matrices.fov)).toBe(true)
+}
+
 describe('WebGPUCamera', () => {
   describe('construction and state', () => {
     it('uses correct defaults', () => {
@@ -32,6 +54,26 @@ describe('WebGPUCamera', () => {
       expect(state.near).toBe(0.5)
       expect(state.position).toEqual([0, 3.125, 7.5]) // default preserved
     })
+
+    it('sanitizes malformed initial state before computing matrices', () => {
+      const cam = new WebGPUCamera({
+        position: [Number.NaN, 0, 0] as unknown as [number, number, number],
+        target: [0, Number.POSITIVE_INFINITY, 0] as unknown as [number, number, number],
+        fov: Number.NEGATIVE_INFINITY,
+        aspect: 0,
+        near: -1,
+        far: Number.NaN,
+      })
+
+      const state = cam.getState()
+      expect(state.position).toEqual([0, 3.125, 7.5])
+      expect(state.target).toEqual([0, 0, 0])
+      expect(state.fov).toBe(60)
+      expect(state.aspect).toBe(1)
+      expect(state.near).toBe(0.1)
+      expect(state.far).toBe(10000)
+      expectFiniteMatrices(cam)
+    })
   })
 
   describe('setters mark camera dirty', () => {
@@ -51,6 +93,43 @@ describe('WebGPUCamera', () => {
       const cam = new WebGPUCamera()
       cam.setFov(90)
       expect(cam.getState().fov).toBe(90)
+    })
+
+    it('ignores non-finite position and target updates', () => {
+      const cam = new WebGPUCamera({ position: [1, 2, 3], target: [4, 5, 6] })
+
+      cam.setPosition(Number.NaN, 7, 8)
+      cam.setTarget(9, Number.POSITIVE_INFINITY, 10)
+
+      expect(cam.getState().position).toEqual([1, 2, 3])
+      expect(cam.getState().target).toEqual([4, 5, 6])
+      expectFiniteMatrices(cam)
+    })
+
+    it('keeps projection state finite for invalid fov, aspect, and clipping inputs', () => {
+      const cam = new WebGPUCamera()
+
+      cam.setFov(0)
+      expect(cam.getState().fov).toBe(1)
+      cam.setFov(180)
+      expect(cam.getState().fov).toBe(179)
+      cam.setFov(Number.NaN)
+      expect(cam.getState().fov).toBe(179)
+
+      cam.setAspect(2)
+      expect(cam.getState().aspect).toBe(2)
+      cam.setAspect(0)
+      cam.setAspect(Number.POSITIVE_INFINITY)
+      expect(cam.getState().aspect).toBe(2)
+
+      cam.setClippingPlanes(0.5, 500)
+      expect(cam.getState().near).toBe(0.5)
+      expect(cam.getState().far).toBe(500)
+      cam.setClippingPlanes(Number.NaN, 600)
+      cam.setClippingPlanes(1, 0.5)
+      expect(cam.getState().near).toBe(0.5)
+      expect(cam.getState().far).toBe(500)
+      expectFiniteMatrices(cam)
     })
 
     it('setAspect skips update when value unchanged', () => {

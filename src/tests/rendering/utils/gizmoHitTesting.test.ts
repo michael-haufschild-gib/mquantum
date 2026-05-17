@@ -9,6 +9,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   computeMouseRay,
+  computeRotateDragRotation,
+  computeTranslateDragPosition,
   gizmoScale,
   rayAxisClosest,
   rayPlaneIntersect,
@@ -227,6 +229,77 @@ describe('testGizmoHit', () => {
       const hit = testGizmoHit(ray, lightPos, scale, 'rotate')
       expect(hit).toBe(null)
     })
+  })
+})
+
+describe('computeTranslateDragPosition', () => {
+  it('returns null instead of snapping when drag ray is parallel to grabbed axis', () => {
+    const result = computeTranslateDragPosition(
+      {
+        kind: 'translate-x',
+        startLightPos: [0, 0, 0],
+        startAxisT: 0.5,
+      },
+      {
+        origin: [0, 1, 0],
+        dir: [1, 0, 0],
+      }
+    )
+
+    expect(result).toBe(null)
+  })
+
+  it('computes translated position from finite closest-axis delta', () => {
+    const result = computeTranslateDragPosition(
+      {
+        kind: 'translate-x',
+        startLightPos: [0, 0, 0],
+        startAxisT: 0.5,
+      },
+      {
+        origin: [0.75, 1, 0],
+        dir: [0, -1, 0],
+      }
+    )
+
+    expect(result).toEqual([0.25, 0, 0])
+  })
+})
+
+describe('computeRotateDragRotation', () => {
+  it('returns null when the ray hits the ring plane at the undefined center angle', () => {
+    const result = computeRotateDragRotation(
+      {
+        kind: 'rotate-y',
+        startLightPos: [0, 0, 0],
+        startLightRot: [0, 0, 0],
+        startAngle: Math.PI / 2,
+      },
+      {
+        origin: [0, 5, 0],
+        dir: [0, -1, 0],
+      }
+    )
+
+    expect(result).toBe(null)
+  })
+
+  it('computes wrapped ring-angle delta for finite rotate drags', () => {
+    const result = computeRotateDragRotation(
+      {
+        kind: 'rotate-y',
+        startLightPos: [0, 0, 0],
+        startLightRot: [0, 0, 0],
+        startAngle: 0,
+      },
+      {
+        origin: [1, 5, 0],
+        dir: [0, -1, 0],
+      }
+    )
+
+    expect(result).not.toBe(null)
+    expect(result![1]).toBeCloseTo(Math.PI / 2, 6)
   })
 })
 

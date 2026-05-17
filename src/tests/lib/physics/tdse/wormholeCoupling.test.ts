@@ -4,6 +4,7 @@ import {
   applyWormholeCoupling,
   computeWormholeCoherence,
   isValidMirrorAxis,
+  normalizeMirrorAxisForLattice,
 } from '@/lib/physics/tdse/wormholeCoupling'
 
 /**
@@ -262,5 +263,15 @@ describe('isValidMirrorAxis', () => {
     expect(isValidMirrorAxis(-1)).toBe(false)
     expect(isValidMirrorAxis('0')).toBe(false)
     expect(isValidMirrorAxis(undefined)).toBe(false)
+  })
+})
+
+describe('normalizeMirrorAxisForLattice', () => {
+  it('clamps the mirror axis to the active lattice dimensions', () => {
+    expect(normalizeMirrorAxisForLattice(2, 3)).toBe(2)
+    expect(normalizeMirrorAxisForLattice(2, 2)).toBe(1)
+    expect(normalizeMirrorAxisForLattice(2, 1)).toBe(0)
+    expect(normalizeMirrorAxisForLattice(-1, 3)).toBe(0)
+    expect(normalizeMirrorAxisForLattice(Number.NaN, 3)).toBe(0)
   })
 })

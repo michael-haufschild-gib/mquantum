@@ -74,6 +74,6 @@ describe('ScenarioSelector - Bell presets', () => {
     const cfg = useExtendedObjectStore.getState().bellPair
     expect(cfg.samplerMode).toBe('lhv')
     expect(cfg.lhvStrategyId).toBe('detectionLoophole_0.500')
-    expect(cfg.analysisMode).toBe('assignNonDetection')
+    expect(cfg.analysisMode).toBe('fairSampling')
   })
 })

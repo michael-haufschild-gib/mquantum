@@ -174,8 +174,8 @@ fn create_rotation_matrix_into(
     out[plane_index2 * dimension + plane_index1] = sin;
 }
 
-/// Axis names for plane parsing
-const AXIS_NAMES: [char; 6] = ['X', 'Y', 'Z', 'W', 'V', 'U'];
+/// Axis names for plane parsing. Mirrors `src/constants/dimension.ts`.
+const AXIS_NAMES: [char; 11] = ['X', 'Y', 'Z', 'W', 'V', 'U', 'T', 'S', 'R', 'Q', 'P'];
 
 /// Parses an axis name to its index
 /// Returns None for invalid names
@@ -191,7 +191,7 @@ fn parse_axis_name_to_index(name: &str) -> Option<usize> {
     // Handle A6, A7, A8... format for dimensions > 6
     if name.starts_with('A') {
         if let Ok(num) = name[1..].parse::<usize>() {
-            if num >= AXIS_NAMES.len() {
+            if num >= 6 {
                 return Some(num);
             }
         }
@@ -233,6 +233,11 @@ fn parse_axis_byte(b: u8) -> Option<usize> {
         b'W' => Some(3),
         b'V' => Some(4),
         b'U' => Some(5),
+        b'T' => Some(6),
+        b'S' => Some(7),
+        b'R' => Some(8),
+        b'Q' => Some(9),
+        b'P' => Some(10),
         _ => None,
     }
 }
@@ -1093,6 +1098,17 @@ mod tests {
     }
 
     #[test]
+    fn test_project_vertices_sanitizes_f32_overflow_outputs() {
+        let result =
+            project_vertices_to_positions(&[f64::MAX, -f64::MAX, 1.0], 3, MIN_SAFE_DISTANCE);
+        assert_eq!(result.len(), 3);
+        assert!(result.iter().all(|v| v.is_finite()));
+        assert_eq!(result[0], 0.0);
+        assert_eq!(result[1], 0.0);
+        assert!((result[2] - 100.0).abs() < 1.0);
+    }
+
+    #[test]
     fn test_project_vertices_multiple() {
         // Two 4D vertices
         let vertices = vec![
@@ -1190,13 +1206,17 @@ mod tests {
 
     #[test]
     fn test_parse_plane_name_extended_dimensions() {
-        // A6, A7, etc. for dims > 6
+        // Current UI labels for dims > 6 mirror constants/dimension.ts.
+        assert_eq!(parse_plane_name("XT"), Some((0, 6)));
+        assert_eq!(parse_plane_name("YS"), Some((1, 7)));
+        assert_eq!(parse_plane_name("ZR"), Some((2, 8)));
+        assert_eq!(parse_plane_name("UT"), Some((5, 6)));
+        assert_eq!(parse_plane_name("TS"), Some((6, 7)));
+        assert_eq!(parse_plane_name("RP"), Some((8, 10)));
+
+        // Keep the older A-index notation accepted for external callers.
         assert_eq!(parse_plane_name("XA6"), Some((0, 6)));
-        assert_eq!(parse_plane_name("YA7"), Some((1, 7)));
-        assert_eq!(parse_plane_name("ZA8"), Some((2, 8)));
-        assert_eq!(parse_plane_name("UA6"), Some((5, 6)));
         assert_eq!(parse_plane_name("A6A7"), Some((6, 7)));
-        assert_eq!(parse_plane_name("A8A10"), Some((8, 10)));
     }
 
     #[test]

@@ -176,4 +176,33 @@ describe('AnalyticOpenQuantumExecutor', () => {
     ).not.toThrow()
     expect(uploads).toHaveLength(1)
   })
+
+  it('sanitizes malformed open-quantum runtime config before propagator creation', () => {
+    const executor = new AnalyticOpenQuantumExecutor()
+    const { gridPass, uploads } = makeGridPass()
+    const preset = makePreset([
+      [1, 0],
+      [0, 0],
+    ])
+    const config = makePresetConfig()
+    const malformedConfig = {
+      ...DEFAULT_OPEN_QUANTUM_CONFIG,
+      enabled: true,
+      dt: Infinity,
+      substeps: NaN,
+      dephasingRate: NaN,
+      relaxationRate: Infinity,
+      thermalUpRate: -1,
+      dephasingEnabled: true,
+      relaxationEnabled: true,
+      thermalEnabled: true,
+      visualizationMode: 'phase',
+      dephasingModel: 'bogus',
+    } as unknown as typeof DEFAULT_OPEN_QUANTUM_CONFIG
+
+    expect(() =>
+      executor.execute(makeCtx(malformedConfig), makeShared(preset, config), gridPass, 1, undefined)
+    ).not.toThrow()
+    expect(uploads).toHaveLength(1)
+  })
 })

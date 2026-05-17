@@ -360,8 +360,18 @@ function packVisualFields(
       : 1.0
 
   intView[I.phaseAnimationEnabled] = schroedinger?.phaseAnimationEnabled ? 1 : 0
-  floatView[I.timeScale] = schroedinger?.timeScale ?? 0.8
-  floatView[I.fieldScale] = schroedinger?.fieldScale ?? 1.0
+  floatView[I.timeScale] = finiteClamped(
+    schroedinger?.timeScale,
+    DEFAULT_SCHROEDINGER_CONFIG.timeScale,
+    0.1,
+    2.0
+  )
+  floatView[I.fieldScale] = finiteClamped(
+    schroedinger?.fieldScale,
+    DEFAULT_SCHROEDINGER_CONFIG.fieldScale,
+    0.5,
+    2.0
+  )
   floatView[I.densityGain] = densityGain * densityCompensation
   floatView[I.powderScale] = finiteClamped(
     schroedinger?.powderScale,

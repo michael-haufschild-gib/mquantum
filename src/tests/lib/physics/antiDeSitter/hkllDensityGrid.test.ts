@@ -20,7 +20,10 @@ import {
   type AntiDeSitterConfig,
   DEFAULT_ANTI_DE_SITTER_CONFIG,
 } from '@/lib/geometry/extended/antiDeSitter'
-import { packAntiDeSitterDensityGrid } from '@/lib/physics/antiDeSitter/densityGrid'
+import {
+  createAdsPackerScratch,
+  packAntiDeSitterDensityGrid,
+} from '@/lib/physics/antiDeSitter/densityGrid'
 
 // Decode the half-float R channel (byte offset 0 in each rgba16float texel).
 function halfToFloat(h: number): number {
@@ -190,6 +193,21 @@ describe('packAntiDeSitterDensityGrid (HKLL path)', () => {
     expect(packed.gridSize).toBe(DENSITY_GRID_SIZE)
     expect(Number.isFinite(packed.peakDensity)).toBe(true)
     expect(Number.isFinite(packed.effectiveDelta)).toBe(true)
+    expectFinitePackedDensity(packed)
+  })
+
+  it('does not reuse incompatible HKLL scratch buffers', () => {
+    const scratch = {
+      ...createAdsPackerScratch(DENSITY_GRID_SIZE),
+      hkllIm: new Float32Array(1),
+    }
+
+    const packed = packAntiDeSitterDensityGrid(
+      hkllConfig({ hkllBoundarySource: 'localized' }),
+      scratch
+    )
+
+    expect(packed.peakDensity).toBeGreaterThan(0)
     expectFinitePackedDensity(packed)
   })
 })

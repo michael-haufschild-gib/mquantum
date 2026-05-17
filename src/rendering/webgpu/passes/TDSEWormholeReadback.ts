@@ -21,7 +21,10 @@
  */
 
 import { logger } from '@/lib/logger'
-import { computeWormholeCoherence } from '@/lib/physics/tdse/wormholeCoupling'
+import {
+  computeWormholeCoherence,
+  normalizeMirrorAxisForLattice,
+} from '@/lib/physics/tdse/wormholeCoupling'
 import { useWormholeCoherenceStore } from '@/stores/diagnostics/wormholeCoherenceStore'
 
 /** Mutable per-pass readback state for the wormhole HUD. */
@@ -98,7 +101,7 @@ export function requestWormholeReadback(
   simTime: number
 ): void {
   if (!enabled) return
-  if (!psiBuffer || totalSites === 0) return
+  if (!psiBuffer || !Number.isInteger(totalSites) || totalSites <= 0) return
   if (state.mappingInFlight) return
   ensureStagingBuffer(device, state, totalSites)
   if (!state.staging) return
@@ -112,6 +115,8 @@ export function requestWormholeReadback(
   // lattice rebuild between now and the mapAsync resolving.
   const staging = state.staging
   const capturedGridSize = gridSize.slice()
+  const capturedAxis = normalizeMirrorAxisForLattice(axis, capturedGridSize.length)
+  const capturedG = Number.isFinite(g) ? Math.max(0, g) : 0
 
   device.queue
     .onSubmittedWorkDone()
@@ -136,7 +141,7 @@ export function requestWormholeReadback(
       let coherence: number
       try {
         const view = interleaved.subarray(0, 2 * totalSites)
-        coherence = computeWormholeCoherence(view, capturedGridSize, axis)
+        coherence = computeWormholeCoherence(view, capturedGridSize, capturedAxis)
       } catch (err) {
         logger.warn('[TDSE] Wormhole coherence CPU reduction failed:', err)
         staging.unmap()
@@ -144,7 +149,7 @@ export function requestWormholeReadback(
         return
       }
       staging.unmap()
-      useWormholeCoherenceStore.getState().pushSample(simTime, coherence, axis, g)
+      useWormholeCoherenceStore.getState().pushSample(simTime, coherence, capturedAxis, capturedG)
       state.mappingInFlight = false
     })
     .catch((err) => {

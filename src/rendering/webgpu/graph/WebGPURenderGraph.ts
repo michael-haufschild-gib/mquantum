@@ -163,7 +163,11 @@ export class WebGPURenderGraph {
   }
 
   setSize(width: number, height: number): void {
-    const safeSize = sanitizePixelSize(width, height)
+    const safeSize = sanitizePixelSize(
+      width,
+      height,
+      this.deviceManager.getCapabilities()?.maxTextureDimension2D
+    )
     if (this.width === safeSize.width && this.height === safeSize.height) return
     this.width = safeSize.width
     this.height = safeSize.height

@@ -226,6 +226,8 @@ export const FSFEntanglementProbe: React.FC = React.memo(() => {
     }
     worker.onerror = (err) => {
       logger.error('[FSFEntanglementProbe] worker error', err)
+      epochRef.current += 1
+      setResult(null)
       setPending(false)
     }
     workerRef.current = worker

@@ -415,6 +415,19 @@ describe('DropdownMenu (invariants)', () => {
       expect(screen.getByRole('separator')).toBeInTheDocument()
     })
 
+    it('renders an actionable item named like the separator sentinel as a menu item', async () => {
+      const handleClick = vi.fn()
+      const items: DropdownMenuItem[] = [{ label: '---', onClick: handleClick }]
+
+      const user = userEvent.setup()
+      render(<DropdownMenu trigger={<Button>Open Menu</Button>} items={items} id="test-menu" />)
+
+      await user.click(screen.getByText('Open Menu'))
+      await user.click(screen.getByRole('menuitem', { name: '---' }))
+
+      expect(handleClick).toHaveBeenCalledTimes(1)
+    })
+
     it('should render header items as non-interactive', async () => {
       const items: DropdownMenuItem[] = [
         { label: 'Header' }, // No onClick, items, or disabled - this is a header

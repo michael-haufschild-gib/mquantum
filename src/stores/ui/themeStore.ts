@@ -3,6 +3,8 @@ import { persist } from 'zustand/middleware'
 
 import { logger } from '@/lib/logger'
 
+import { createBestEffortJSONStorage } from '../utils/persistStorage'
+
 /** Application color scheme mode. */
 export type ThemeMode = 'light' | 'dark' | 'system'
 /** Available accent color options. */
@@ -55,6 +57,8 @@ export interface ThemeState {
   setPreset: (presetId: string) => void
 }
 
+type ThemePersistedState = Pick<ThemeState, 'mode' | 'accent'>
+
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set) => ({
@@ -81,6 +85,11 @@ export const useThemeStore = create<ThemeState>()(
     }),
     {
       name: 'mquantum-theme-storage',
+      storage: createBestEffortJSONStorage<ThemePersistedState>('themeStore'),
+      partialize: (state): ThemePersistedState => ({
+        mode: state.mode,
+        accent: state.accent,
+      }),
     }
   )
 )

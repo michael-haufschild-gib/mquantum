@@ -11,7 +11,9 @@ import type {
 import {
   computeCSLSubsteps,
   createStochasticLocState,
+  maybeDispatchStochasticLoc,
   prepareStochasticStaging,
+  rebuildExpectationBindGroups,
   type StochasticLocState,
 } from '@/rendering/webgpu/passes/TDSEStochasticLocalization'
 
@@ -244,6 +246,159 @@ describe('runStrangEvolution curved stochastic branch', () => {
 
     expect(events).toEqual([])
     expect(stochasticState.stagingSlotCount).toBe(0)
+  })
+
+  it('does not dispatch stale capacity slots beyond prepared stochastic uniforms', () => {
+    const events: string[] = []
+    const ctx = makeContext(events)
+    const stochasticState = makeStochasticState()
+    const config = {
+      stochasticEnabled: true,
+      stochasticGamma: 0.2,
+      stochasticSigma: 1,
+      stochasticNumSites: 2,
+      stochasticSeed: 1234,
+      dt: 0.02,
+      latticeDim: 1,
+      gridSize: [16],
+      spacing: [0.1],
+    } as unknown as TdseConfig
+
+    prepareStochasticStaging(ctx.device, config, stochasticState, 1, 2)
+
+    expect(stochasticState.stagingCapacity).toBeGreaterThan(stochasticState.stagingSlotCount)
+    expect(stochasticState.stagingSlotCount).toBe(1)
+    events.length = 0
+
+    maybeDispatchStochasticLoc(
+      ctx.device,
+      ctx,
+      config,
+      stochasticState,
+      { x: 1, y: 1, z: 1, use3D: false },
+      16,
+      1,
+      (pass, nextPipeline, _bindGroups, x, y = 1, z = 1) => {
+        events.push(`dispatch:${labelOf(pass)}:${labelOf(nextPipeline)}:${x}:${y}:${z}`)
+      }
+    )
+
+    expect(events).toEqual([])
+  })
+
+  it('does not apply CSL when expectation centering resources are unavailable', () => {
+    const events: string[] = []
+    const ctx = makeContext(events)
+    const stochasticState = makeStochasticState()
+    const config = {
+      stochasticEnabled: true,
+      stochasticGamma: 0.2,
+      stochasticSigma: 1,
+      stochasticNumSites: 2,
+      stochasticSeed: 1234,
+      dt: 0.02,
+      latticeDim: 1,
+      gridSize: [16],
+      spacing: [0.1],
+    } as unknown as TdseConfig
+
+    prepareStochasticStaging(ctx.device, config, stochasticState, 1, 2)
+    stochasticState.expectReduceBG = null
+    events.length = 0
+
+    maybeDispatchStochasticLoc(
+      ctx.device,
+      ctx,
+      config,
+      stochasticState,
+      { x: 1, y: 1, z: 1, use3D: false },
+      16,
+      0,
+      (pass, nextPipeline, _bindGroups, x, y = 1, z = 1) => {
+        events.push(`dispatch:${labelOf(pass)}:${labelOf(nextPipeline)}:${x}:${y}:${z}`)
+      }
+    )
+
+    expect(events).toEqual([])
+  })
+
+  it('rejects invalid stochastic dispatch dimensions before copying uniforms', () => {
+    const events: string[] = []
+    const ctx = makeContext(events)
+    const stochasticState = makeStochasticState()
+    const config = {
+      stochasticEnabled: true,
+      stochasticGamma: 0.2,
+      stochasticSigma: 1,
+      stochasticNumSites: 2,
+      stochasticSeed: 1234,
+      dt: 0.02,
+      latticeDim: 1,
+      gridSize: [16],
+      spacing: [0.1],
+    } as unknown as TdseConfig
+
+    prepareStochasticStaging(ctx.device, config, stochasticState, 1, 2)
+    events.length = 0
+
+    for (const [siteDispatch, totalSites] of [
+      [{ x: 0, y: 1, z: 1, use3D: false }, 16],
+      [{ x: 1, y: Number.NaN, z: 1, use3D: false }, 16],
+      [{ x: 1, y: 1, z: 1, use3D: false }, 0],
+      [{ x: 1, y: 1, z: 1, use3D: false }, Number.POSITIVE_INFINITY],
+    ] as const) {
+      maybeDispatchStochasticLoc(
+        ctx.device,
+        ctx,
+        config,
+        stochasticState,
+        siteDispatch,
+        totalSites,
+        0,
+        (pass, nextPipeline, _bindGroups, x, y = 1, z = 1) => {
+          events.push(`dispatch:${labelOf(pass)}:${labelOf(nextPipeline)}:${x}:${y}:${z}`)
+        }
+      )
+    }
+
+    expect(events).toEqual([])
+  })
+
+  it('clears expectation bind groups when rebuild receives invalid workgroup counts', () => {
+    const events: string[] = []
+    const stochasticState = makeStochasticState()
+    stochasticState.expectReduceBGL = {
+      label: 'expect-reduce-bgl',
+    } as unknown as GPUBindGroupLayout
+    stochasticState.expectFinalizeBGL = {
+      label: 'expect-finalize-bgl',
+    } as unknown as GPUBindGroupLayout
+    stochasticState.expectResultBuffer = buffer('expect-result')
+    stochasticState.expectPartialBuffer = buffer('old-partial')
+    stochasticState.expectFinalizeUniformBuffer = buffer('old-finalize-uniform')
+    stochasticState.expectReduceBG = bindGroup('old-reduce-bg')
+    stochasticState.expectFinalizeBG = bindGroup('old-finalize-bg')
+    const device = {
+      queue: {
+        writeBuffer: () => events.push('writeBuffer'),
+      },
+      createBuffer: (descriptor: GPUBufferDescriptor) => {
+        events.push(`createBuffer:${String(descriptor.label)}:${descriptor.size}`)
+        return buffer(String(descriptor.label))
+      },
+      createBindGroup: (descriptor: GPUBindGroupDescriptor) => {
+        events.push(`createBindGroup:${String(descriptor.label)}`)
+        return bindGroup(String(descriptor.label))
+      },
+    } as unknown as GPUDevice
+
+    rebuildExpectationBindGroups(device, stochasticState, buffer('uniform'), buffer('psi'), 0)
+
+    expect(events).toEqual([])
+    expect(stochasticState.expectPartialBuffer).toBeNull()
+    expect(stochasticState.expectFinalizeUniformBuffer).toBeNull()
+    expect(stochasticState.expectReduceBG).toBeNull()
+    expect(stochasticState.expectFinalizeBG).toBeNull()
   })
 
   it('sanitizes malformed lattice geometry before staging collapse centers', () => {

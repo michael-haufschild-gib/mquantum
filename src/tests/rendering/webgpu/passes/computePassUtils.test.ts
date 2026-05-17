@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  assertSharedMemoryFFTLog2,
   computeConfigHash,
   computeStrides,
   computeStridesPadded,
@@ -16,6 +17,7 @@ import {
   PACK_UNIFORM_SIZE,
   reduceGridToFit,
   sanitizeGridSizes,
+  SHARED_MEM_FFT_MAX_AXIS,
 } from '@/rendering/webgpu/passes/computePassUtils'
 
 // ============================================================================
@@ -61,6 +63,16 @@ describe('nearestPow2', () => {
       expect(result).toBeGreaterThanOrEqual(2)
       expect(result).toBeLessThanOrEqual(128)
     }
+  })
+})
+
+describe('assertSharedMemoryFFTLog2', () => {
+  it('accepts the largest axis supported by the WGSL shared-memory FFT', () => {
+    expect(assertSharedMemoryFFTLog2(SHARED_MEM_FFT_MAX_AXIS)).toBe(7)
+  })
+
+  it('rejects power-of-two axes larger than the shared-memory FFT arrays', () => {
+    expect(() => assertSharedMemoryFFTLog2(256, 'TDSE FFT')).toThrow(/TDSE FFT.*max 128/)
   })
 })
 

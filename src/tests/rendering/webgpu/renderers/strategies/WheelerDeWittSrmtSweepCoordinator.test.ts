@@ -12,6 +12,7 @@ import type { SrmtSweepRequest, SrmtSweepResponse } from '@/lib/physics/srmt/srm
 import type { SrmtSweepConfig, SrmtSweepPoint } from '@/lib/physics/srmt/sweepTypes'
 import type { WheelerDeWittSolverOutput } from '@/lib/physics/wheelerDeWitt/solver'
 import {
+  DEFAULT_SWEEP_LANCZOS_SEED,
   materialiseSweepConfig,
   type SweepWorkerLike,
   WheelerDeWittSrmtSweepCoordinator,
@@ -549,6 +550,15 @@ describe('materialiseSweepConfig — lambda defaults', () => {
       materialiseSweepConfig({ kind: 'gridNphiCoupled', points: 64 }, DEFAULT_WHEELER_DEWITT_CONFIG)
         .points
     ).toBe(7)
+  })
+
+  it('canonicalises pending Lanczos seed to the uint32 value used by the solver', () => {
+    expect(
+      materialiseSweepConfig({ kind: 'cut', seed: -1 }, DEFAULT_WHEELER_DEWITT_CONFIG).seed
+    ).toBe(0xffff_ffff)
+    expect(
+      materialiseSweepConfig({ kind: 'cut', seed: Number.NaN }, DEFAULT_WHEELER_DEWITT_CONFIG).seed
+    ).toBe(DEFAULT_SWEEP_LANCZOS_SEED)
   })
 })
 

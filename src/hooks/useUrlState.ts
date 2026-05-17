@@ -647,7 +647,10 @@ export function useUrlState(): void {
       if (usePresetManagerStore.persist.hasHydrated()) {
         void loadSceneByName(sceneName)
       } else {
-        usePresetManagerStore.persist.onFinishHydration(() => {
+        let unsubscribe: (() => void) | undefined
+        unsubscribe = usePresetManagerStore.persist.onFinishHydration(() => {
+          unsubscribe?.()
+          unsubscribe = undefined
           void loadSceneByName(sceneName)
         })
       }

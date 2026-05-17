@@ -283,6 +283,76 @@ export function testGizmoHit(
     : testRotateHit(ray, lightPos, scale)
 }
 
+/** Axis index lookup for translate drag kinds. */
+const TRANSLATE_AXIS_INDEX: Partial<Record<GizmoDragKind, 0 | 1 | 2>> = {
+  'translate-x': 0,
+  'translate-y': 1,
+  'translate-z': 2,
+}
+
+/** Axis index lookup for rotate drag kinds. */
+const ROTATE_AXIS_INDEX: Partial<Record<GizmoDragKind, 0 | 1 | 2>> = {
+  'rotate-x': 0,
+  'rotate-y': 1,
+  'rotate-z': 2,
+}
+
+/**
+ * Compute the next light position for an active translate drag.
+ */
+export function computeTranslateDragPosition(
+  drag: Pick<GizmoDragState, 'kind' | 'startLightPos' | 'startAxisT'>,
+  ray: { origin: [number, number, number]; dir: [number, number, number] }
+): [number, number, number] | null {
+  const axisIdx = TRANSLATE_AXIS_INDEX[drag.kind]
+  if (axisIdx === undefined) return null
+
+  const axisDir: [number, number, number] = [0, 0, 0]
+  axisDir[axisIdx] = 1
+
+  const [currentT, dist] = rayAxisClosest(ray.origin, ray.dir, drag.startLightPos, axisDir)
+  if (!Number.isFinite(currentT) || !Number.isFinite(dist)) return null
+
+  const delta = currentT - drag.startAxisT
+  if (!Number.isFinite(delta)) return null
+
+  const newPos: [number, number, number] = [...drag.startLightPos]
+  newPos[axisIdx] += delta
+  return newPos
+}
+
+/**
+ * Compute the next light rotation for an active rotate drag.
+ */
+export function computeRotateDragRotation(
+  drag: Pick<GizmoDragState, 'kind' | 'startLightPos' | 'startLightRot' | 'startAngle'>,
+  ray: { origin: [number, number, number]; dir: [number, number, number] }
+): [number, number, number] | null {
+  const axisIdx = ROTATE_AXIS_INDEX[drag.kind]
+  if (axisIdx === undefined) return null
+
+  const normal: [number, number, number] = [0, 0, 0]
+  normal[axisIdx] = 1
+
+  const hit = rayPlaneIntersect(ray.origin, ray.dir, normal, drag.startLightPos)
+  if (!hit) return null
+
+  const dx = hit[0] - drag.startLightPos[0]
+  const dy = hit[1] - drag.startLightPos[1]
+  const dz = hit[2] - drag.startLightPos[2]
+  const radialSq = dx * dx + dy * dy + dz * dz
+  if (!Number.isFinite(radialSq) || radialSq < 1e-10) return null
+
+  const currentAngle = computeRingAngle(axisIdx, dx, dy, dz)
+  const rawDelta = currentAngle - drag.startAngle
+  const deltaAngle = Math.atan2(Math.sin(rawDelta), Math.cos(rawDelta))
+  if (!Number.isFinite(deltaAngle)) return null
+
+  const newRot: [number, number, number] = [...drag.startLightRot]
+  newRot[axisIdx] += deltaAngle
+  return newRot
+}
+
 /** Light data needed for ground target hit testing. */
 interface GroundTargetLight {
   id: string

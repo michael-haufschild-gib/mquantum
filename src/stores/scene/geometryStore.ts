@@ -331,6 +331,7 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
     // Cancel any pending transition rAF to prevent stale callbacks
     // firing after reset (e.g. between tests).
     cancelPendingTransition()
+    propagateDimensionToStores(DEFAULT_DIMENSION)
     set({
       dimension: DEFAULT_DIMENSION,
       objectType: DEFAULT_OBJECT_TYPE,

@@ -167,6 +167,7 @@ const schroedingerSelector = (state: ReturnType<typeof useExtendedObjectStore.ge
  */
 export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension, onFrame }) => {
   const { graph, size, canvas, device } = useWebGPU()
+  const maxTextureDimension2D = device.getCapabilities()?.maxTextureDimension2D
 
   // ── Camera controller ──
   const { cameraRef, dimensionRef } = useSceneCameraController({ size, dimension })
@@ -279,6 +280,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     schroedingerRotation,
     schroedingerBasisCacheRef,
     exportRuntimeRef,
+    maxTextureDimension2D,
     onFrame,
   })
 
@@ -356,7 +358,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     skyboxMode: environment.skyboxMode as SkyboxMode,
     backgroundColor: environment.backgroundColor,
   }
-  useScenePassSetup({ graph, canvas, cameraRef, fullConfig })
+  useScenePassSetup({ graph, canvas, cameraRef, fullConfig, maxTextureDimension2D })
 
   // ── Runtime scene clear-color update ──
   useEffect(() => {

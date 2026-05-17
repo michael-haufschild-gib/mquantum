@@ -31,6 +31,16 @@ fn sanitize_projection_distance(value: f64) -> f64 {
     }
 }
 
+#[inline(always)]
+fn project_component(value: f64, scale: f64) -> f32 {
+    let projected = value * scale;
+    if projected.is_finite() && projected.abs() <= f32::MAX as f64 {
+        projected as f32
+    } else {
+        0.0
+    }
+}
+
 /// Projects n-dimensional vertices to 3D positions using perspective projection.
 ///
 /// This writes directly into a Float32Array for Three.js buffer updates.
@@ -97,9 +107,9 @@ fn project_vertices_3d(positions: &mut [f32], verts: &[f64], count: usize, proj_
         let z = finite_or_zero(verts[offset + 2]);
         let scale = 1.0 / proj_dist;
         let out_idx = i * 3;
-        positions[out_idx] = (x * scale) as f32;
-        positions[out_idx + 1] = (y * scale) as f32;
-        positions[out_idx + 2] = (z * scale) as f32;
+        positions[out_idx] = project_component(x, scale);
+        positions[out_idx + 1] = project_component(y, scale);
+        positions[out_idx + 2] = project_component(z, scale);
     }
 }
 
@@ -124,9 +134,9 @@ fn project_vertices_4d(positions: &mut [f32], verts: &[f64], count: usize, proj_
         }
         let scale = 1.0 / denom;
         let out_idx = i * 3;
-        positions[out_idx] = (x * scale) as f32;
-        positions[out_idx + 1] = (y * scale) as f32;
-        positions[out_idx + 2] = (z * scale) as f32;
+        positions[out_idx] = project_component(x, scale);
+        positions[out_idx + 1] = project_component(y, scale);
+        positions[out_idx + 2] = project_component(z, scale);
     }
 }
 
@@ -152,9 +162,9 @@ fn project_vertices_5d(positions: &mut [f32], verts: &[f64], count: usize, proj_
         }
         let scale = 1.0 / denom;
         let out_idx = i * 3;
-        positions[out_idx] = (x * scale) as f32;
-        positions[out_idx + 1] = (y * scale) as f32;
-        positions[out_idx + 2] = (z * scale) as f32;
+        positions[out_idx] = project_component(x, scale);
+        positions[out_idx + 1] = project_component(y, scale);
+        positions[out_idx + 2] = project_component(z, scale);
     }
 }
 
@@ -191,8 +201,8 @@ fn project_vertices_nd(
         }
         let scale = 1.0 / denom;
         let out_idx = i * 3;
-        positions[out_idx] = (x * scale) as f32;
-        positions[out_idx + 1] = (y * scale) as f32;
-        positions[out_idx + 2] = (z * scale) as f32;
+        positions[out_idx] = project_component(x, scale);
+        positions[out_idx + 1] = project_component(y, scale);
+        positions[out_idx + 2] = project_component(z, scale);
     }
 }

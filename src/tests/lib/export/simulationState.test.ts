@@ -385,7 +385,7 @@ describe('simulationState serialization', () => {
     }
   })
 
-  it('defaults unknown mode index to tdseDynamics', async () => {
+  it('rejects unknown mode indices instead of loading them as TDSE', async () => {
     // Manually construct a header with an unknown mode index (255)
     const gridSize = [4]
     const totalSites = 4
@@ -398,9 +398,37 @@ describe('simulationState serialization', () => {
     const u8 = new Uint8Array(data)
     u8[8] = 255
 
-    const result = await deserializeSimulationState(data)
-    // Unknown mode index falls back to 'tdseDynamics'
-    expect(result.quantumMode).toBe('tdseDynamics')
+    await expect(deserializeSimulationState(data)).rejects.toThrow('unknown quantum mode id 255')
+  })
+
+  it('rejects serialization when the mode has no .mqstate id', async () => {
+    const wf = makeWavefunction(4, 1)
+
+    await expect(serializeSimulationState({}, wf, 'missingMode' as never, [4])).rejects.toThrow(
+      'unknown quantum mode "missingMode"'
+    )
+  })
+
+  it('rejects serialization when grid metadata does not match totalSites', async () => {
+    const wf = makeWavefunction(4, 1)
+
+    await expect(serializeSimulationState({}, wf, 'tdseDynamics', [2, 3])).rejects.toThrow(
+      'gridSize product 6 does not match totalSites 4'
+    )
+  })
+
+  it('rejects deserialization when header grid metadata does not match totalSites', async () => {
+    const gridSize = [4]
+    const wf = makeWavefunction(4, 1)
+    const blob = await serializeSimulationState({}, wf, 'tdseDynamics', gridSize)
+    const data = await blobToArrayBuffer(blob)
+    const view = new DataView(data)
+
+    view.setUint32(12, 3, true)
+
+    await expect(deserializeSimulationState(data)).rejects.toThrow(
+      'gridSize product 3 does not match totalSites 4'
+    )
   })
 
   it('handles high-dimensional grid sizes (up to 11D)', async () => {

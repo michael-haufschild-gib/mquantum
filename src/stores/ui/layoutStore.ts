@@ -17,6 +17,8 @@ import { persist } from 'zustand/middleware'
 
 import { logger } from '@/lib/logger'
 
+import { createBestEffortJSONStorage } from '../utils/persistStorage'
+
 // ============================================================================
 // Constants
 // ============================================================================
@@ -116,6 +118,8 @@ export interface LayoutActions {
  * Combined layout store type.
  */
 export type LayoutStore = LayoutState & LayoutActions
+
+type LayoutPersistedState = Pick<LayoutState, 'sidebarWidth' | 'isCollapsed' | 'showLeftPanel'>
 
 // ============================================================================
 // Helper Functions
@@ -250,8 +254,9 @@ export const useLayoutStore = create<LayoutStore>()(
     }),
     {
       name: 'mquantum-layout',
+      storage: createBestEffortJSONStorage<LayoutPersistedState>('layoutStore'),
       // Only persist these fields
-      partialize: (state) => ({
+      partialize: (state): LayoutPersistedState => ({
         sidebarWidth: state.sidebarWidth,
         isCollapsed: state.isCollapsed,
         showLeftPanel: state.showLeftPanel,

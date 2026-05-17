@@ -25,6 +25,18 @@ export const WDW_SOLVER_MAX_COSMOLOGICAL_CONSTANT = 1
 export const WDW_SOLVER_MIN_INFLATON_MASS_ASYMMETRY = 0.1
 /** Maximum per-axis mass-asymmetry ratio accepted by public WdW solver inputs. */
 export const WDW_SOLVER_MAX_INFLATON_MASS_ASYMMETRY = 10
+/** Minimum scale factor accepted by public WdW solver inputs. */
+export const WDW_SOLVER_MIN_A_MIN = 0.05
+/** Minimum separation between aMin and aMax accepted by public WdW solver inputs. */
+export const WDW_SOLVER_MIN_A_SPAN = 1e-6
+/** Maximum scale-factor endpoint accepted by public WdW solver inputs. */
+export const WDW_SOLVER_MAX_A_MAX = 10
+/** Maximum lower scale-factor endpoint accepted by public WdW solver inputs. */
+export const WDW_SOLVER_MAX_A_MIN = WDW_SOLVER_MAX_A_MAX - WDW_SOLVER_MIN_A_SPAN
+/** Minimum φ half-extent accepted by public WdW solver inputs. */
+export const WDW_SOLVER_MIN_PHI_EXTENT = 0.5
+/** Maximum φ half-extent accepted by public WdW solver inputs. */
+export const WDW_SOLVER_MAX_PHI_EXTENT = 10
 
 /**
  * Runtime guard for the canonical Wheeler-DeWitt boundary-condition enum.
@@ -37,11 +49,6 @@ export function isWdwBoundaryCondition(value: unknown): value is WdwBoundaryCond
 
 function assertFinite(name: string, value: number): void {
   if (!Number.isFinite(value)) throw new Error(`${name} must be finite`)
-}
-
-function assertPositiveFinite(name: string, value: number): void {
-  assertFinite(name, value)
-  if (!(value > 0)) throw new Error(`${name} must be > 0`)
 }
 
 function assertFiniteInRange(name: string, value: number, min: number, max: number): void {
@@ -88,12 +95,25 @@ export function validateWheelerDeWittSolverInput(input: WheelerDeWittSolverInput
     WDW_SOLVER_MAX_INFLATON_MASS_ASYMMETRY
   )
 
-  assertPositiveFinite('aMin', input.aMin)
-  assertFinite('aMax', input.aMax)
+  assertFiniteInRange('aMin', input.aMin, WDW_SOLVER_MIN_A_MIN, WDW_SOLVER_MAX_A_MIN)
+  assertFiniteInRange(
+    'aMax',
+    input.aMax,
+    WDW_SOLVER_MIN_A_MIN + WDW_SOLVER_MIN_A_SPAN,
+    WDW_SOLVER_MAX_A_MAX
+  )
   if (!(input.aMax > input.aMin)) throw new Error('aMax must exceed aMin')
+  if (input.aMax - input.aMin < WDW_SOLVER_MIN_A_SPAN) {
+    throw new Error(`aMax must exceed aMin by at least ${WDW_SOLVER_MIN_A_SPAN}`)
+  }
   assertIntegerInRange('gridNa', input.gridNa, 3, WDW_SOLVER_MAX_GRID_NA)
   assertIntegerInRange('gridNphi', input.gridNphi, 3, WDW_SOLVER_MAX_GRID_NPHI)
-  assertPositiveFinite('phiExtent', input.phiExtent)
+  assertFiniteInRange(
+    'phiExtent',
+    input.phiExtent,
+    WDW_SOLVER_MIN_PHI_EXTENT,
+    WDW_SOLVER_MAX_PHI_EXTENT
+  )
 }
 
 function assertFiniteBuffer(name: string, values: Float32Array): void {

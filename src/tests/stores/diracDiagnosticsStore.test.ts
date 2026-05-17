@@ -78,6 +78,46 @@ describe('diracDiagnosticsStore', () => {
     expect(s2.historyAntiparticleFrac[1]).toBeCloseTo(0.2)
   })
 
+  it('ignores non-finite readbacks instead of poisoning current state and history', () => {
+    useDiagnosticsStore.getState().updateDirac({
+      totalNorm: 0.95,
+      normDrift: 0.05,
+      maxDensity: 3,
+      particleFraction: 0.6,
+      antiparticleFraction: 0.4,
+      meanPosition: [1, 2, 3],
+      comptonWavelength: 1.5,
+      zitterbewegungFreq: 2.5,
+      kleinThreshold: 3.5,
+    })
+
+    useDiagnosticsStore.getState().updateDirac({
+      totalNorm: Number.NaN,
+      normDrift: Number.NaN,
+      maxDensity: Number.POSITIVE_INFINITY,
+      particleFraction: Number.NaN,
+      antiparticleFraction: Number.NEGATIVE_INFINITY,
+      meanPosition: [1, 2, Number.NaN],
+      comptonWavelength: Number.NaN,
+      zitterbewegungFreq: Number.POSITIVE_INFINITY,
+      kleinThreshold: Number.NaN,
+    })
+
+    const state = useDiagnosticsStore.getState().dirac
+    expect(state.totalNorm).toBe(0.95)
+    expect(state.normDrift).toBe(0.05)
+    expect(state.maxDensity).toBe(3)
+    expect(state.particleFraction).toBe(0.6)
+    expect(state.antiparticleFraction).toBe(0.4)
+    expect(state.meanPosition).toEqual([1, 2, 3])
+    expect(state.comptonWavelength).toBe(1.5)
+    expect(state.zitterbewegungFreq).toBe(2.5)
+    expect(state.kleinThreshold).toBe(3.5)
+    expect(state.historyNorm[1]).toBeCloseTo(0.95)
+    expect(state.historyParticleFrac[1]).toBeCloseTo(0.6)
+    expect(state.historyAntiparticleFrac[1]).toBeCloseTo(0.4)
+  })
+
   it('reset restores meanPosition and physical constants', () => {
     useDiagnosticsStore.getState().updateDirac({
       totalNorm: 0.9,

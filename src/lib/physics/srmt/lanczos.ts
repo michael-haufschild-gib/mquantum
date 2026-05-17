@@ -64,6 +64,19 @@ const DEFAULT_SEED = 0x5eed_1ab1
 const DEFAULT_HEADROOM = 32
 
 /**
+ * Canonicalize a user-supplied Lanczos PRNG seed to the exact uint32
+ * state consumed by the internal LCG. Provenance emitters should use
+ * this helper too, otherwise a wrapped seed like `-1` can compute with
+ * `4294967295` while the manifest records `-1`.
+ */
+export function normalizeLanczosSeed(seed: number): number {
+  if (!Number.isFinite(seed)) {
+    throw new RangeError(`Lanczos seed must be finite, got ${seed}`)
+  }
+  return seed >>> 0
+}
+
+/**
  * Deterministic linear-congruential PRNG matching the convention used
  * elsewhere in this codebase's test fixtures. Produces a stream of doubles
  * in `[0, 1)`.
@@ -304,7 +317,7 @@ export function lanczosTopKOp(
   const defaultMaxIters = Math.min(n, headroom)
   const maxIters = Math.max(kClipped, Math.min(n, opts?.maxIterations ?? defaultMaxIters))
   const tol = opts?.tolerance ?? LANCZOS_BETA_TOL
-  const seed = opts?.seed ?? DEFAULT_SEED
+  const seed = opts?.seed === undefined ? DEFAULT_SEED : normalizeLanczosSeed(opts.seed)
 
   const betaFloor = tol * Math.max(1, infNormEstimate)
 

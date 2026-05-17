@@ -116,6 +116,17 @@ describe('Quantum walk store setters', () => {
     expect(qw.needsReset).toBe(true)
   })
 
+  it('propagates preset PML target to shared absorber overrides', async () => {
+    const s = useExtendedObjectStore.getState()
+    s.setSchroedingerQuantumMode('quantumWalk')
+
+    await s.applyQuantumWalkPreset('absorbingBoundary', { expectedQuantumMode: 'quantumWalk' })
+
+    const schro = useExtendedObjectStore.getState().schroedinger
+    expect(schro.quantumWalk.pmlTargetReflection).toBe(1e-4)
+    expect(schro.pmlTargetReflection).toBe(1e-4)
+  })
+
   it('total sites stay within limits for high dimensions', () => {
     const s = useExtendedObjectStore.getState()
     s.setSchroedingerQuantumMode('quantumWalk')

@@ -38,11 +38,11 @@ import {
   type SkyboxTexture,
 } from '../defaults/visualDefaults'
 import { MAX_SPEED, MIN_SPEED } from '../scene/animationStore'
-import { usePBRStore } from '../scene/pbrStore'
 import {
   mergeSkyboxProceduralSettings,
   sanitizeSkyboxProceduralSettingsPatch,
 } from '../slices/skyboxSlice'
+import { PBR_INITIAL_STATE } from '../slices/visual/pbrSlice'
 import {
   clampToRange,
   isFiniteVec3,
@@ -136,9 +136,7 @@ export function isSkyboxTexture(value: unknown): value is SkyboxTexture {
 }
 
 function isSkyboxAnimationMode(value: unknown): value is SkyboxAnimationMode {
-  return (
-    typeof value === 'string' && SKYBOX_ANIMATION_MODE_SET.has(value as SkyboxAnimationMode)
-  )
+  return typeof value === 'string' && SKYBOX_ANIMATION_MODE_SET.has(value as SkyboxAnimationMode)
 }
 
 /** Derive skybox enabled/mode/texture state from a unified skybox selection value. */
@@ -432,7 +430,7 @@ function buildNormalizedFace(
 /** Normalize imported PBR material data: clamp roughness, metallic, reflectance, etc. */
 export function normalizePbrLoadData(rawPbr: Record<string, unknown>): Record<string, unknown> {
   const pbr = { ...rawPbr }
-  const fallbackFace = usePBRStore.getState().face as unknown as Record<string, unknown>
+  const fallbackFace = PBR_INITIAL_STATE.face as unknown as Record<string, unknown>
 
   const faceSource =
     pbr.face && typeof pbr.face === 'object' && !Array.isArray(pbr.face)

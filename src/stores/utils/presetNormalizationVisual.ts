@@ -9,7 +9,7 @@
 
 import { normalizeOpaqueHexColor } from '@/lib/colors/colorUtils'
 
-import { useAppearanceStore } from '../scene/appearanceStore'
+import { APPEARANCE_INITIAL_STATE } from '../slices/appearanceSlice'
 import {
   APPEARANCE_LOAD_KEYS,
   clampFiniteOrFallback,
@@ -97,7 +97,7 @@ function normalizeDivergingColors(
 /** Normalize phaseDiverging and divergingPsi fields. */
 function normalizeAppearanceDivergingFields(
   appearance: Record<string, unknown>,
-  fallback: ReturnType<typeof useAppearanceStore.getState>
+  fallback: typeof APPEARANCE_INITIAL_STATE
 ): void {
   normalizeObjectField(appearance, 'phaseDiverging', (pd) =>
     normalizeDivergingColors(pd, fallback.phaseDiverging)
@@ -138,7 +138,7 @@ function normalizeObjectField<T>(
 /** Normalize the nested object fields of appearance data (cosine, distribution, etc.). */
 function normalizeAppearanceObjects(
   appearance: Record<string, unknown>,
-  fallback: ReturnType<typeof useAppearanceStore.getState>
+  fallback: typeof APPEARANCE_INITIAL_STATE
 ): void {
   normalizeObjectField(appearance, 'cosineCoefficients', (coefficients) => ({
     a: normalizeCosineVector(coefficients.a, fallback.cosineCoefficients.a),
@@ -224,7 +224,7 @@ export function normalizeAppearanceLoadData(
   rawAppearance: Record<string, unknown>
 ): Record<string, unknown> {
   const appearance = { ...rawAppearance }
-  const fallback = useAppearanceStore.getState()
+  const fallback = APPEARANCE_INITIAL_STATE
 
   // Simple scalar/string/boolean fields
   validateOpaqueHexField(appearance, 'edgeColor')

@@ -17,7 +17,7 @@
  * @module rendering/webgpu/renderers/strategies/BellPairStrategy
  */
 
-import type { BellPairConfig } from '@/lib/geometry/extended/bellPair'
+import { type BellPairConfig, sanitizeBellPairConfig } from '@/lib/geometry/extended/bellPair'
 import { useBellExperimentStore } from '@/stores/diagnostics/bellExperimentStore'
 
 import type { WebGPURenderContext } from '../../core/types'
@@ -60,7 +60,7 @@ export class BellPairStrategy extends SinglePassComputeStrategy<
    * @returns The same config object.
    */
   protected override deriveEffectiveConfig(config: BellPairConfig): BellPairConfig {
-    return config
+    return sanitizeBellPairConfig(config)
   }
 
   /**

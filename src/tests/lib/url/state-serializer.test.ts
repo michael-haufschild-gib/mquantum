@@ -733,6 +733,50 @@ describe('state-serializer', () => {
       expect(round.cosmologyEnabled).toBe(true)
       expect(round.cosmologySteepness).toBeCloseTo(3.4645, 4)
     })
+
+    it('round-trips LQC dust equation of state w=0 instead of restoring stiff-fluid default', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'freeScalarField',
+        cosmologyEnabled: true,
+        cosmologyPreset: 'lqcBounce',
+        cosmologyLqcRhoCritical: 2.5,
+        cosmologyLqcEquationOfState: 0,
+        cosmologyLqcInitialRhoRatio: 0.25,
+        cosmologyEta0: 5,
+      }
+      const serialized = serializeState(state)
+      expect(serialized).toContain('cos_w=0.0000')
+      const round = deserializeState(serialized)
+      expect(round.cosmologyEnabled).toBe(true)
+      expect(round.cosmologyPreset).toBe('lqcBounce')
+      expect(round.cosmologyLqcEquationOfState).toBe(0)
+    })
+
+    it('round-trips valid Bianchi-Kasner exponent triples containing zero', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'freeScalarField',
+        cosmologyEnabled: true,
+        cosmologyPreset: 'bianchiKasner',
+        cosmologyKasnerP1: 0,
+        cosmologyKasnerP2: 0,
+        cosmologyKasnerP3: 0,
+        cosmologyEta0: 2,
+      }
+      const serialized = serializeState(state)
+      expect(serialized).toContain('cos_p1=0.0000')
+      expect(serialized).toContain('cos_p2=0.0000')
+      expect(serialized).toContain('cos_p3=0.0000')
+      const round = deserializeState(serialized)
+      expect(round.cosmologyEnabled).toBe(true)
+      expect(round.cosmologyPreset).toBe('bianchiKasner')
+      expect(round.cosmologyKasnerP1).toBe(0)
+      expect(round.cosmologyKasnerP2).toBe(0)
+      expect(round.cosmologyKasnerP3).toBe(0)
+    })
   })
 
   describe('Wheeler–DeWitt minisuperspace params', () => {

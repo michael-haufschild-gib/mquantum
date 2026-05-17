@@ -52,6 +52,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
       handleHsvChange,
       handleSvKeyDown,
       updateSV,
+      handleColorSelection,
       handleEyedropper,
       handleCopy,
     } = useColorPickerState({ value, onChange, alpha, onChangeAlpha, disableAlpha })
@@ -330,7 +331,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                     <button
                       key={i}
                       type="button"
-                      onClick={() => handleHsvChange(parseColorToHsv(c))}
+                      onClick={() => handleColorSelection(c)}
                       className="w-6 h-6 rounded-md border border-border-subtle hover:scale-110 hover:border-border-strong transition-transform shadow-sm"
                       style={{ backgroundColor: c }}
                       aria-label={`Use palette color ${c}`}
@@ -346,7 +347,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                       <button
                         key={i}
                         type="button"
-                        onClick={() => handleHsvChange(parseColorToHsv(c))}
+                        onClick={() => handleColorSelection(c)}
                         className="w-5 h-5 rounded-full border border-border-default hover:scale-110 hover:border-border-strong transition-transform shadow-sm relative overflow-hidden"
                         aria-label={`Use recent color ${c}`}
                         title="History"

@@ -388,6 +388,35 @@ describe('useColorPickerState', () => {
         expect(color).toMatch(/^#[0-9a-fA-F]{6}$/)
       }
     })
+
+    it('preserves current alpha when selecting an opaque color', () => {
+      const onChange = vi.fn()
+      const { result } = renderHook(() =>
+        useColorPickerState({ value: '#33669980', onChange, disableAlpha: false })
+      )
+      act(() => {
+        result.current.handleHsvChange({ h: 0.58, s: 0.5, v: 0.6, a: 0.5 })
+      })
+
+      act(() => {
+        result.current.handleColorSelection('#ff0000')
+      })
+
+      expect(onChange).toHaveBeenLastCalledWith('#ff000080')
+    })
+
+    it('uses explicit alpha when selected color provides one', () => {
+      const onChange = vi.fn()
+      const { result } = renderHook(() =>
+        useColorPickerState({ value: '#33669980', onChange, disableAlpha: false })
+      )
+
+      act(() => {
+        result.current.handleColorSelection('#00ff0040')
+      })
+
+      expect(onChange).toHaveBeenLastCalledWith('#00ff0040')
+    })
   })
 
   describe('handleCopy', () => {

@@ -610,7 +610,8 @@ export function packHkllReconstructedDensityGrid(
   const coarseTotal = C ** 3
   let reField: Float32Array
   let imField: Float32Array
-  const useCoarseScratch = !!scratch && scratch.hkllRe.length >= coarseTotal
+  const useCoarseScratch =
+    !!scratch && scratch.hkllRe.length >= coarseTotal && scratch.hkllIm.length >= coarseTotal
   if (useCoarseScratch) {
     reField = scratch!.hkllRe
     imField = scratch!.hkllIm

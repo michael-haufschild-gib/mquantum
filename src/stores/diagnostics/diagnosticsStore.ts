@@ -77,6 +77,15 @@ function nonNegativeFiniteOr(value: number | undefined, fallback: number): numbe
   return Number.isFinite(value) && (value as number) >= 0 ? (value as number) : fallback
 }
 
+function finiteClampOr(
+  value: number | undefined,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  return Number.isFinite(value) ? Math.min(max, Math.max(min, value as number)) : fallback
+}
+
 function healingLengthOr(value: number | undefined, fallback: number): number {
   if (value === Infinity) return Infinity
   return nonNegativeFiniteOr(value, fallback)
@@ -93,6 +102,12 @@ function sanitizeNonNegativeFloat32Array(values: Float32Array): Float32Array {
     sanitized[i] = Number.isFinite(value) && value >= 0 ? value : 0
   }
   return sanitized
+}
+
+function finiteVectorOr(values: number[] | undefined, fallback: number[]): number[] {
+  if (!Array.isArray(values) || values.length < 3) return fallback
+  const next = [values[0], values[1], values[2]]
+  return next.every((value) => Number.isFinite(value)) ? (next as number[]) : fallback
 }
 
 function sanitizeBecUpdate(
@@ -112,6 +127,53 @@ function sanitizeBecUpdate(
     vortexPlaquettes: countOr(snapshot.vortexPlaquettes, current.vortexPlaquettes),
     vortexPositiveCharge: countOr(snapshot.vortexPositiveCharge, current.vortexPositiveCharge),
     vortexNegativeCharge: countOr(snapshot.vortexNegativeCharge, current.vortexNegativeCharge),
+  }
+}
+
+function sanitizeDiracUpdate(
+  snapshot: Partial<DiracChannelData>,
+  current: DiracChannelData
+): Partial<DiracChannelData> {
+  return {
+    ...snapshot,
+    totalNorm: nonNegativeFiniteOr(snapshot.totalNorm, current.totalNorm),
+    normDrift: finiteOr(snapshot.normDrift, current.normDrift),
+    maxDensity: nonNegativeFiniteOr(snapshot.maxDensity, current.maxDensity),
+    particleFraction: finiteClampOr(snapshot.particleFraction, current.particleFraction, 0, 1),
+    antiparticleFraction: finiteClampOr(
+      snapshot.antiparticleFraction,
+      current.antiparticleFraction,
+      0,
+      1
+    ),
+    meanPosition: finiteVectorOr(snapshot.meanPosition, current.meanPosition),
+    comptonWavelength: nonNegativeFiniteOr(snapshot.comptonWavelength, current.comptonWavelength),
+    zitterbewegungFreq: nonNegativeFiniteOr(
+      snapshot.zitterbewegungFreq,
+      current.zitterbewegungFreq
+    ),
+    kleinThreshold: nonNegativeFiniteOr(snapshot.kleinThreshold, current.kleinThreshold),
+  }
+}
+
+function sanitizePauliUpdate(
+  snapshot: Partial<PauliChannelData>,
+  current: PauliChannelData
+): Partial<PauliChannelData> {
+  return {
+    ...snapshot,
+    totalNorm: nonNegativeFiniteOr(snapshot.totalNorm, current.totalNorm),
+    normDrift: finiteOr(snapshot.normDrift, current.normDrift),
+    maxDensity: nonNegativeFiniteOr(snapshot.maxDensity, current.maxDensity),
+    spinUpFraction: finiteClampOr(snapshot.spinUpFraction, current.spinUpFraction, 0, 1),
+    spinDownFraction: finiteClampOr(snapshot.spinDownFraction, current.spinDownFraction, 0, 1),
+    spinExpectationZ: finiteClampOr(snapshot.spinExpectationZ, current.spinExpectationZ, -1, 1),
+    coherenceMagnitude: nonNegativeFiniteOr(
+      snapshot.coherenceMagnitude,
+      current.coherenceMagnitude
+    ),
+    meanPosition: finiteVectorOr(snapshot.meanPosition, current.meanPosition),
+    larmorFrequency: finiteOr(snapshot.larmorFrequency, current.larmorFrequency),
   }
 }
 
@@ -334,13 +396,15 @@ export const useDiagnosticsStore = create<DiagnosticsState>((set, get) => ({
     set((state) => {
       const ch = state.dirac
       const head = ch.historyHead
-      ch.historyNorm[head] = snapshot.totalNorm ?? ch.totalNorm
-      ch.historyParticleFrac[head] = snapshot.particleFraction ?? ch.particleFraction
-      ch.historyAntiparticleFrac[head] = snapshot.antiparticleFraction ?? ch.antiparticleFraction
+      const safeSnapshot = sanitizeDiracUpdate(snapshot, ch)
+      ch.historyNorm[head] = safeSnapshot.totalNorm ?? ch.totalNorm
+      ch.historyParticleFrac[head] = safeSnapshot.particleFraction ?? ch.particleFraction
+      ch.historyAntiparticleFrac[head] =
+        safeSnapshot.antiparticleFraction ?? ch.antiparticleFraction
       return {
         dirac: {
           ...ch,
-          ...snapshot,
+          ...safeSnapshot,
           hasData: true,
           readbackGeneration: ch.readbackGeneration + 1,
           ...advanceRingBuffer(ch),
@@ -423,13 +487,14 @@ export const useDiagnosticsStore = create<DiagnosticsState>((set, get) => ({
     set((state) => {
       const ch = state.pauli
       const head = ch.historyHead
-      ch.historyNorm[head] = snapshot.totalNorm ?? ch.totalNorm
-      ch.historySpinUpFrac[head] = snapshot.spinUpFraction ?? ch.spinUpFraction
-      ch.historySpinExpZ[head] = snapshot.spinExpectationZ ?? ch.spinExpectationZ
+      const safeSnapshot = sanitizePauliUpdate(snapshot, ch)
+      ch.historyNorm[head] = safeSnapshot.totalNorm ?? ch.totalNorm
+      ch.historySpinUpFrac[head] = safeSnapshot.spinUpFraction ?? ch.spinUpFraction
+      ch.historySpinExpZ[head] = safeSnapshot.spinExpectationZ ?? ch.spinExpectationZ
       return {
         pauli: {
           ...ch,
-          ...snapshot,
+          ...safeSnapshot,
           hasData: true,
           readbackGeneration: ch.readbackGeneration + 1,
           ...advanceRingBuffer(ch),

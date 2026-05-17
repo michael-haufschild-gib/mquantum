@@ -9,6 +9,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+import { createBestEffortJSONStorage } from '../utils/persistStorage'
+
 /** Persistent state tracking permanently dismissed dialog boxes. */
 export interface DismissedDialogsState {
   /** Set of dialog IDs that have been dismissed */
@@ -28,6 +30,10 @@ export interface DismissedDialogsState {
 
   /** Get count of dismissed dialogs */
   getDismissedCount: () => number
+}
+
+type DismissedDialogsPersistedState = {
+  dismissedIds: string[]
 }
 
 export const useDismissedDialogsStore = create<DismissedDialogsState>()(
@@ -55,7 +61,8 @@ export const useDismissedDialogsStore = create<DismissedDialogsState>()(
     }),
     {
       name: 'mquantum-dismissed-dialogs',
-      partialize: (state) => ({
+      storage: createBestEffortJSONStorage<DismissedDialogsPersistedState>('dismissedDialogsStore'),
+      partialize: (state): DismissedDialogsPersistedState => ({
         // Convert Set to Array for JSON serialization
         dismissedIds: [...state.dismissedIds],
       }),

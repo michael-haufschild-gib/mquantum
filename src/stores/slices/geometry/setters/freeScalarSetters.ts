@@ -459,6 +459,10 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarSetters {
       }))
     },
     setFreeScalarDiagnosticsInterval: (interval) => {
+      if (!isFinite(interval)) {
+        warnNonFinite('freeScalar.diagnosticsInterval', interval)
+        return
+      }
       const clamped = Math.max(1, Math.min(120, Math.round(interval)))
       set((state) => ({
         schroedinger: {

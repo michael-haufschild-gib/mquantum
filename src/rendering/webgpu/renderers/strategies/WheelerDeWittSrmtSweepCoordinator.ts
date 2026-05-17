@@ -33,6 +33,7 @@
 import type { WheelerDeWittConfig } from '@/lib/geometry/extended/wheelerDeWitt'
 import { logger } from '@/lib/logger'
 import type { SrmtPhysicsContext } from '@/lib/physics/srmt'
+import { normalizeLanczosSeed } from '@/lib/physics/srmt/lanczos'
 import type {
   SrmtSweepRequest,
   SrmtSweepResponse,
@@ -401,6 +402,11 @@ function clampPhiRef(value: number, phiExtent: number): number {
   return clampFinite(value, -phiExtent, phiExtent, 0)
 }
 
+function resolveSweepLanczosSeed(seed: number | undefined): number {
+  if (seed === undefined || !Number.isFinite(seed)) return DEFAULT_SWEEP_LANCZOS_SEED
+  return normalizeLanczosSeed(seed)
+}
+
 /**
  * Merge a pending sweep (possibly partial, as URL params may only
  * carry the kind) with sensible per-kind defaults drawn from the live
@@ -420,7 +426,7 @@ export function materialiseSweepConfig(
     rankCap: clampRankCap(wdwConfig.srmtRankCap),
     cutNormalized: clampFinite(pending.cutAnchor ?? wdwConfig.srmtCutNormalized, 0.1, 0.9, 0.5),
     phiRef: clampPhiRef(pending.phiRef ?? defaultPhiRef, phiExtent),
-    seed: pending.seed ?? DEFAULT_SWEEP_LANCZOS_SEED,
+    seed: resolveSweepLanczosSeed(pending.seed),
   }
   switch (pending.kind) {
     case 'cut': {

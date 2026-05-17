@@ -214,7 +214,11 @@ export function handleSimulationStateIO(
     // strategy handles — prevents a deferred save from being consumed
     // by the wrong strategy after a mode switch.
     const forMode = simState.saveRequestedForMode
-    if (!forMode || acceptedModes.includes(forMode)) {
+    if (forMode && !acceptedModes.includes(forMode)) {
+      simState.setSaveError(
+        `Save canceled: requested mode "${forMode}" is no longer handled by the active renderer`
+      )
+    } else {
       // Only clear the request once the save has actually been scheduled.
       // `requestStateSave` returns `false` when a previous save (or slice
       // readback that shares the in-flight flag) is still mapping; in that
