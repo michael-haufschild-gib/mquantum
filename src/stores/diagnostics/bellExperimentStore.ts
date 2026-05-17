@@ -29,6 +29,7 @@ import { Z_95 } from '@/lib/physics/bell/chsh'
 import { LHV_STRATEGIES, lhvDeterministicBell } from '@/lib/physics/bell/lhv'
 import { applyDetectionEfficiency, postSelectOutcome } from '@/lib/physics/bell/loopholes'
 import { PCG32 } from '@/lib/physics/bell/pcg32'
+import { precessDensityMatrix } from '@/lib/physics/bell/precession'
 import { blochAngleToVec3, jointOutcomeProbabilities } from '@/lib/physics/bell/projectors'
 import { bellState, pureDensityMatrix, wernerDensityMatrix } from '@/lib/physics/bell/state'
 import type { ComplexMat4, JointOutcome, Vec3 } from '@/lib/physics/bell/types'
@@ -274,6 +275,26 @@ function axisVec(axis: readonly [number, number]): Vec3 {
   return blochAngleToVec3(axis as readonly [number, number])
 }
 
+function fieldVec(field: unknown): Vec3 {
+  if (!Array.isArray(field)) return [0, 0, 0]
+  return [
+    typeof field[0] === 'number' && Number.isFinite(field[0]) ? field[0] : 0,
+    typeof field[1] === 'number' && Number.isFinite(field[1]) ? field[1] : 0,
+    typeof field[2] === 'number' && Number.isFinite(field[2]) ? field[2] : 0,
+  ]
+}
+
+function hasFieldMagnitude(field: Vec3): boolean {
+  return field[0] !== 0 || field[1] !== 0 || field[2] !== 0
+}
+
+function precessionTime(config: BellPairConfig, totalTrials: number): number {
+  if (!Number.isFinite(totalTrials) || totalTrials <= 0) return 0
+  const trialsPerFrame = config.trialsPerFrame
+  if (!Number.isFinite(trialsPerFrame) || trialsPerFrame <= 0) return 0
+  return totalTrials / trialsPerFrame
+}
+
 function newHistoryF64(): Float64Array {
   const buf = new Float64Array(HISTORY_LENGTH)
   buf.fill(Number.NaN)
@@ -449,7 +470,9 @@ export const useBellExperimentStore = create<BellExperimentState>((set, get) => 
       // config-key changes, but ONLY when there are already trials to
       // discard (so an explicit `reset(seedOverride)` followed by a
       // first batch keeps the override seed in force).
-      const configKey = `${config.aliceAxis[0]}:${config.aliceAxis[1]}:${config.aliceAxisPrime[0]}:${config.aliceAxisPrime[1]}:${config.bobAxis[0]}:${config.bobAxis[1]}:${config.bobAxisPrime[0]}:${config.bobAxisPrime[1]}:${config.visibility}:${config.detectionEfficiency}:${config.analysisMode}:${config.samplerMode}:${config.lhvStrategyId}`
+      const fieldA = fieldVec(config.fieldA)
+      const fieldB = fieldVec(config.fieldB)
+      const configKey = `${config.aliceAxis[0]}:${config.aliceAxis[1]}:${config.aliceAxisPrime[0]}:${config.aliceAxisPrime[1]}:${config.bobAxis[0]}:${config.bobAxis[1]}:${config.bobAxisPrime[0]}:${config.bobAxisPrime[1]}:${config.visibility}:${config.detectionEfficiency}:${config.analysisMode}:${fieldA[0]}:${fieldA[1]}:${fieldA[2]}:${fieldB[0]}:${fieldB[1]}:${fieldB[2]}:${config.samplerMode}:${config.lhvStrategyId}`
       const priorState = get()
       if (priorState.totalTrials > 0 && _lastConfigKey !== '' && _lastConfigKey !== configKey) {
         const fresh = initialState()
@@ -462,8 +485,8 @@ export const useBellExperimentStore = create<BellExperimentState>((set, get) => 
       _lastConfigKey = configKey
 
       const rng = getRng(get().seed)
-      const setup = prepareBatchSampling(config)
       const state = get()
+      const setup = prepareBatchSampling(config, precessionTime(config, state.totalTrials))
       const ring = drainTrialBatchInto(rng, setup, count, state.recentOutcomes, {
         recentHead: state.recentHead,
         recentCount: state.recentCount,
@@ -527,11 +550,17 @@ function _lhvById(id: string) {
 }
 
 /** Build the per-batch sampling fixtures from the current config. */
-function prepareBatchSampling(config: BellPairConfig): BatchSetup {
-  const rho: ComplexMat4 =
+function prepareBatchSampling(config: BellPairConfig, t: number): BatchSetup {
+  const baseRho: ComplexMat4 =
     config.visibility >= 1
       ? pureDensityMatrix(bellState('psiMinus'))
       : wernerDensityMatrix(config.visibility)
+  const fieldA = fieldVec(config.fieldA)
+  const fieldB = fieldVec(config.fieldB)
+  const rho =
+    t > 0 && (hasFieldMagnitude(fieldA) || hasFieldMagnitude(fieldB))
+      ? precessDensityMatrix(baseRho, fieldA, fieldB, t)
+      : baseRho
   const aliceAxes: readonly [Vec3, Vec3] = [
     axisVec(config.aliceAxis),
     axisVec(config.aliceAxisPrime),

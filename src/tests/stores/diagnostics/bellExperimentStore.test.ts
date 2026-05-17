@@ -71,6 +71,27 @@ describe('processTrialBatch — Werner threshold', () => {
   })
 })
 
+describe('processTrialBatch — precession fields', () => {
+  it('evolves QM correlations between rendered batches when one particle precesses', () => {
+    const cfg = {
+      ...createDefaultBellPairConfig(),
+      fieldA: [0, 0, Math.PI / 4] as [number, number, number],
+      fieldB: [0, 0, 0] as [number, number, number],
+      trialsPerFrame: 40_000,
+    }
+
+    useBellExperimentStore.getState().reset(7)
+    useBellExperimentStore.getState().processTrialBatch(cfg, cfg.trialsPerFrame)
+    useBellExperimentStore.getState().processTrialBatch(cfg, cfg.trialsPerFrame)
+
+    const s = useBellExperimentStore.getState()
+    expect(s.totalTrials).toBe(80_000)
+    // At t = 1 frame, Alice's Bloch axes have rotated by π/2, so the second
+    // batch cancels the canonical CHSH contribution instead of leaving |S|≈2√2.
+    expect(Math.abs(s.qm.S)).toBeLessThan(CLASSICAL_BOUND)
+  })
+})
+
 describe('processTrialBatch — detection efficiency loophole', () => {
   it('η < 1 + assignNonDetection drops |S| below the classical bound for QM', () => {
     const cfg = {
