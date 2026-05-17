@@ -160,14 +160,18 @@ pub fn compute_level_spacing(energies: &[f64]) -> Vec<f64> {
 
     // Unfolding: normalize by mean spacing
     let mean_spacing: f64 = raw_spacings.iter().sum::<f64>() / num_spacings as f64;
-    let mut spacings = if mean_spacing > 0.0 {
-        raw_spacings
-            .iter()
-            .map(|&s| s / mean_spacing)
-            .collect::<Vec<f64>>()
-    } else {
-        raw_spacings.clone()
-    };
+    if mean_spacing <= 0.0 {
+        let mut result = Vec::with_capacity(num_spacings + 3);
+        result.extend_from_slice(&raw_spacings);
+        result.push(0.0); // brody_beta
+        result.push(mean_spacing);
+        result.push(0.0); // poisson
+        return result;
+    }
+    let mut spacings = raw_spacings
+        .iter()
+        .map(|&s| s / mean_spacing)
+        .collect::<Vec<f64>>();
 
     // Brody parameter fit (modifies spacings in-place via sort)
     let brody_beta = fit_brody_parameter(&mut spacings);
@@ -188,12 +192,8 @@ pub fn compute_level_spacing(energies: &[f64]) -> Vec<f64> {
     let mut result = Vec::with_capacity(num_spacings + 3);
 
     // Return unfolded spacings (re-compute from raw to preserve original order)
-    if mean_spacing > 0.0 {
-        for s in &raw_spacings {
-            result.push(s / mean_spacing);
-        }
-    } else {
-        result.extend_from_slice(&raw_spacings);
+    for s in &raw_spacings {
+        result.push(s / mean_spacing);
     }
 
     result.push(brody_beta);
@@ -674,6 +674,21 @@ mod tests {
         let result = compute_level_spacing(&[1.0, 3.0]);
         assert_eq!(result.len(), 4); // 1 spacing + 3 metadata
         assert!((result[0] - 1.0).abs() < 1e-10); // single unfolded spacing = 1.0
+    }
+
+    #[test]
+    fn test_level_spacing_degenerate_spectrum_is_poisson() {
+        let energies = vec![1.5; 20];
+        let result = compute_level_spacing(&energies);
+        let num_spacings = energies.len() - 1;
+
+        assert_eq!(result.len(), num_spacings + 3);
+        for spacing in &result[..num_spacings] {
+            assert_eq!(*spacing, 0.0);
+        }
+        assert_eq!(result[num_spacings], 0.0);
+        assert_eq!(result[num_spacings + 1], 0.0);
+        assert_eq!(result[num_spacings + 2], 0.0);
     }
 
     #[test]

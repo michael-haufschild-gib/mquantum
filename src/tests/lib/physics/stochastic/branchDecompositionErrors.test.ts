@@ -43,11 +43,54 @@ describe('spatialBranchPartition — input validation', () => {
     )
   })
 
+  it('throws when active grid sizes are not positive integers', () => {
+    const psi = new Float64Array(8)
+    expect(() => spatialBranchPartition(psi, psi, [0], [1], 1)).toThrow(
+      /gridSize\[0\] must be a positive integer/
+    )
+    expect(() => spatialBranchPartition(psi, psi, [-8], [1], 1)).toThrow(
+      /gridSize\[0\] must be a positive integer/
+    )
+    expect(() => spatialBranchPartition(psi, psi, [2.5], [1], 1)).toThrow(
+      /gridSize\[0\] must be a positive integer/
+    )
+  })
+
+  it('throws when active spacings are not finite positive numbers', () => {
+    const psi = new Float64Array(8)
+    expect(() => spatialBranchPartition(psi, psi, [8], [0], 1)).toThrow(
+      /spacing\[0\] must be a finite positive number/
+    )
+    expect(() => spatialBranchPartition(psi, psi, [8], [-1], 1)).toThrow(
+      /spacing\[0\] must be a finite positive number/
+    )
+    expect(() => spatialBranchPartition(psi, psi, [8], [Number.NaN], 1)).toThrow(
+      /spacing\[0\] must be a finite positive number/
+    )
+  })
+
+  it('throws when planePosition is non-finite', () => {
+    const psi = new Float64Array(8)
+    expect(() => spatialBranchPartition(psi, psi, [8], [1], 1, Number.NaN)).toThrow(
+      /planePosition must be finite/
+    )
+  })
+
   it('throws when psi buffer length is shorter than totalSites', () => {
     // gridSize=[16], latticeDim=1 → totalSites=16, but psi=8.
     const psi = new Float64Array(8)
     expect(() => spatialBranchPartition(psi, psi, [16], [1], 1)).toThrow(
       /does not match totalSites/
+    )
+  })
+
+  it('throws when wavefunction density is non-finite', () => {
+    const psiRe = new Float64Array(8)
+    const psiIm = new Float64Array(8)
+    psiRe[3] = Number.NaN
+
+    expect(() => spatialBranchPartition(psiRe, psiIm, [8], [1], 1)).toThrow(
+      /non-finite wavefunction density/
     )
   })
 

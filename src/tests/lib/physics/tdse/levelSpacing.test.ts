@@ -64,6 +64,14 @@ describe('computeLevelSpacing', () => {
     expect(result.meanSpacing).toBe(1)
   })
 
+  it('classifies fully degenerate spectra as poisson', () => {
+    const result = computeLevelSpacing(Array.from({ length: 20 }, () => 1.5))
+    expect(result.spacings).toEqual(Array.from({ length: 19 }, () => 0))
+    expect(result.meanSpacing).toBe(0)
+    expect(result.brodyBeta).toBe(0)
+    expect(result.classification).toBe('poisson')
+  })
+
   it('returns finite empty metadata when fewer than two finite energies remain', () => {
     const result = computeLevelSpacing([Number.NaN, Number.POSITIVE_INFINITY], [0.1, Number.NaN])
     expect(result.energies).toEqual([])

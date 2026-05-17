@@ -23,6 +23,7 @@ export class DiracAlgebraBridge {
   private pending: Map<
     number,
     {
+      spatialDim: number
       resolve: (r: { gammaData: Float32Array; spinorSize: number }) => void
       reject: (e: Error) => void
     }
@@ -44,6 +45,19 @@ export class DiracAlgebraBridge {
         this.pending.delete(epoch)
         if (e.data.type === 'error') {
           p.reject(new Error(`Dirac algebra worker compute failed: ${e.data.message}`))
+          return
+        }
+        if (e.data.type !== 'result') {
+          p.reject(new Error('Dirac algebra worker returned an invalid message type'))
+          return
+        }
+        const validationError = validateGammaPayload(
+          p.spatialDim,
+          e.data.gammaData,
+          e.data.spinorSize
+        )
+        if (validationError) {
+          p.reject(validationError)
           return
         }
         p.resolve({ gammaData: e.data.gammaData, spinorSize: e.data.spinorSize })
@@ -85,7 +99,7 @@ export class DiracAlgebraBridge {
 
     const epoch = ++this.epoch
     return new Promise((resolve, reject) => {
-      this.pending.set(epoch, { resolve, reject })
+      this.pending.set(epoch, { spatialDim, resolve, reject })
       const msg: DiracAlgebraRequest = {
         type: 'generateMatrices',
         epoch,
@@ -116,4 +130,42 @@ export class DiracAlgebraBridge {
     }
     this.pending.clear()
   }
+}
+
+function validateGammaPayload(
+  spatialDim: number,
+  gammaData: unknown,
+  spinorSize: unknown
+): Error | null {
+  let expectedSpinorSize: number
+  try {
+    expectedSpinorSize = computeSpinorSize(spatialDim)
+  } catch (err) {
+    return err instanceof Error ? err : new Error(String(err))
+  }
+
+  if (!(gammaData instanceof Float32Array)) {
+    return new Error('Dirac algebra worker returned invalid gamma matrix payload: gammaData')
+  }
+  if (spinorSize !== expectedSpinorSize) {
+    return new Error(
+      `Dirac algebra worker returned invalid gamma matrix payload: spinorSize ${String(spinorSize)} !== ${expectedSpinorSize}`
+    )
+  }
+
+  const expectedLength = 1 + (spatialDim + 1) * expectedSpinorSize * expectedSpinorSize * 2
+  if (gammaData.length !== expectedLength) {
+    return new Error(
+      `Dirac algebra worker returned invalid gamma matrix payload: length ${gammaData.length} !== ${expectedLength}`
+    )
+  }
+
+  const header = new Uint32Array(gammaData.buffer, gammaData.byteOffset, 1)[0]
+  if (header !== expectedSpinorSize) {
+    return new Error(
+      `Dirac algebra worker returned invalid gamma matrix payload: header ${String(header)} !== ${expectedSpinorSize}`
+    )
+  }
+
+  return null
 }
