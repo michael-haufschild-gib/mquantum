@@ -34,6 +34,13 @@ function expectFiniteMatrices(cam: WebGPUCamera): void {
   expect(Number.isFinite(matrices.fov)).toBe(true)
 }
 
+function expectComponentsWithinCameraClamp(value: readonly number[]): void {
+  for (const component of value) {
+    expect(Number.isFinite(component)).toBe(true)
+    expect(Math.abs(component)).toBeLessThanOrEqual(1_000_000)
+  }
+}
+
 describe('WebGPUCamera', () => {
   describe('construction and state', () => {
     it('uses correct defaults', () => {
@@ -334,6 +341,15 @@ describe('WebGPUCamera', () => {
         expect(Number.isFinite(c)).toBe(true)
       }
     })
+
+    it('clamps orbit outputs from extreme finite offsets', () => {
+      const cam = new WebGPUCamera({ position: [0, 0, 0], target: [1_000_000, 0, 0] })
+
+      cam.orbit(Math.PI, 0)
+
+      expectComponentsWithinCameraClamp(cam.getState().position)
+      expectFiniteMatrices(cam)
+    })
   })
 
   describe('zoom', () => {
@@ -387,6 +403,15 @@ describe('WebGPUCamera', () => {
       expect(after[1] / lenAfter).toBeCloseTo(before[1] / lenBefore, 5)
       expect(after[2] / lenAfter).toBeCloseTo(before[2] / lenBefore, 5)
     })
+
+    it('clamps zoom outputs from extreme finite offsets', () => {
+      const cam = new WebGPUCamera({ position: [0, 0, 0], target: [1_000_000, 0, 0] })
+
+      cam.zoom(10)
+
+      expectComponentsWithinCameraClamp(cam.getState().position)
+      expectFiniteMatrices(cam)
+    })
   })
 
   describe('pan', () => {
@@ -424,6 +449,17 @@ describe('WebGPUCamera', () => {
       const after = cam.getState()
       expect(after.position).toEqual(before.position)
       expect(after.target).toEqual(before.target)
+    })
+
+    it('clamps pan outputs from extreme finite deltas', () => {
+      const cam = new WebGPUCamera({ position: [0, 0, 5], target: [0, 0, 0] })
+
+      cam.pan(1_000_000_000, -1_000_000_000)
+
+      const state = cam.getState()
+      expectComponentsWithinCameraClamp(state.position)
+      expectComponentsWithinCameraClamp(state.target)
+      expectFiniteMatrices(cam)
     })
   })
 

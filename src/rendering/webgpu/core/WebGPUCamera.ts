@@ -490,7 +490,7 @@ export class WebGPUCamera {
     dy = distance * Math.sin(elevation)
     dz = distance * cosElev * Math.cos(azimuth)
 
-    this.state.position = [tx + dx, ty + dy, tz + dz]
+    this.state.position = sanitizeVec3([tx + dx, ty + dy, tz + dz], this.state.position)
     this.dirty = true
   }
 
@@ -533,7 +533,7 @@ export class WebGPUCamera {
       if (newDistance < MIN_CAMERA_DISTANCE) return
     }
 
-    this.state.position = [tx + dx, ty + dy, tz + dz]
+    this.state.position = sanitizeVec3([tx + dx, ty + dy, tz + dz], this.state.position)
     this.dirty = true
   }
 
@@ -563,16 +563,22 @@ export class WebGPUCamera {
     const [px, py, pz] = this.state.position
     const [tx, ty, tz] = this.state.target
 
-    this.state.position = [
-      px + rx * deltaX + ux * deltaY,
-      py + ry * deltaX + uy * deltaY,
-      pz + rz * deltaX + uz * deltaY,
-    ]
-    this.state.target = [
-      tx + rx * deltaX + ux * deltaY,
-      ty + ry * deltaX + uy * deltaY,
-      tz + rz * deltaX + uz * deltaY,
-    ]
+    this.state.position = sanitizeVec3(
+      [
+        px + rx * deltaX + ux * deltaY,
+        py + ry * deltaX + uy * deltaY,
+        pz + rz * deltaX + uz * deltaY,
+      ],
+      this.state.position
+    )
+    this.state.target = sanitizeVec3(
+      [
+        tx + rx * deltaX + ux * deltaY,
+        ty + ry * deltaX + uy * deltaY,
+        tz + rz * deltaX + uz * deltaY,
+      ],
+      this.state.target
+    )
     this.dirty = true
   }
 }
