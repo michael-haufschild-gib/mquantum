@@ -45,6 +45,18 @@ describe('Schroedinger spectral-dimension flow WGSL composition', () => {
     // the ramp must close to exactly 0, not just damped.
     expect(wgsl).toContain('let shiftRamp = smoothstep(0.02, 0.08, dimensionDrop)')
     expect(wgsl).toContain('projectedCoordinate * compressionFactor * shiftRamp')
+    // PERF: entropic-shear and backreaction warps must also damp to exactly
+    // zero in low-effect regions for the same resample-skip contract. Without
+    // these ramps, entropyGain / potentialPhi are non-zero across the whole
+    // visible density window and every step retriggers density resamples.
+    expect(wgsl).toContain(
+      'let shearRamp = smoothstep(coherenceScale * 0.003, coherenceScale * 0.012, abs(shearMagnitudeRaw))'
+    )
+    expect(wgsl).toContain('let shearMagnitude = shearMagnitudeRaw * shearRamp')
+    expect(wgsl).toContain(
+      'let bendRamp = smoothstep(softening * 0.01, softening * 0.04, bendMagnitudeRaw)'
+    )
+    expect(wgsl).toContain('let bendMagnitude = bendMagnitudeRaw * bendRamp')
   })
 
   it('keeps coupled hydrogen in the analytic D_IR branch', () => {
