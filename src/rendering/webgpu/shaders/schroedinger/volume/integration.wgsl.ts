@@ -356,7 +356,16 @@ fn applySpectralDimensionFlow(
   let compressionFactor = clamp(dimensionDrop * (0.35 + 0.15 * strength), 0.0, 0.42);
   let maxShift = diffusionScale * 0.32 + 0.08;
   let projectedCoordinate = dot(worldPosition, gradN);
-  let compressionShift = clamp(projectedCoordinate * compressionFactor, -maxShift, maxShift);
+  // PERF: damp the position warp to exactly zero in low-effect regions so the
+  // raymarcher's downstream length(pos - beforeSpectralFlow) > 1e-6 check
+  // skips the per-step density resample. Peer warp effects (backreaction,
+  // vacuum bubble, bilocal bridge) all return worldPosition unchanged below
+  // their locality gates; spectral flow's gates are by-design loose ("running
+  // spectral dimension applies everywhere"), so without this ramp it triggers
+  // a full resample on every visible step, dominating frame time. The
+  // smoothstep [0.02, 0.08] avoids a banding seam at the gate boundary.
+  let shiftRamp = smoothstep(0.02, 0.08, dimensionDrop);
+  let compressionShift = clamp(projectedCoordinate * compressionFactor * shiftRamp, -maxShift, maxShift);
   let compressedPosition = worldPosition - gradN * compressionShift;
 
   let emissionGain = 1.0 + dimensionDrop * strength * (0.45 + 0.35 * uvGate);
@@ -430,11 +439,18 @@ fn applyEntropicTimeShear(
   let entropyGain = mix(reversibleGain, max(irreversibleGain, 0.0), irreversibility);
 
   let coherenceScale = clamp(uniforms.entropicTimeShearFilamentScale, 0.1, 4.0);
-  let shearMagnitude = clamp(
+  let shearMagnitudeRaw = clamp(
     uniforms.entropicTimeShearStrength * entropyGain * coherenceScale * 0.08,
     -coherenceScale * 0.25,
     coherenceScale * 0.25
   );
+  // PERF: damp the warp to exactly zero in low-effect regions so the
+  // raymarcher's downstream length(pos - before...) > 1e-6 check skips the
+  // density resample. entropyGain is non-zero everywhere the density and
+  // gradient windows overlap, so without this ramp every visible step
+  // triggers a resample. Threshold scales with the coherence scale.
+  let shearRamp = smoothstep(coherenceScale * 0.003, coherenceScale * 0.012, abs(shearMagnitudeRaw));
+  let shearMagnitude = shearMagnitudeRaw * shearRamp;
   return EntropicTimeShearResult(worldPosition + shearDir * shearMagnitude, entropyGain);
 }
 
@@ -469,7 +485,15 @@ fn applyQuantumBackreactionMetric(
   }
 
   let bendDir = transverseGradient / gradLen;
-  let bendMagnitude = clamp(potentialPhi * softening * 0.08, 0.0, softening * 1.5);
+  let bendMagnitudeRaw = clamp(potentialPhi * softening * 0.08, 0.0, softening * 1.5);
+  // PERF: damp the warp to exactly zero in low-stress regions so the
+  // raymarcher's downstream length(pos - before...) > 1e-6 gate skips the
+  // expensive density resample. potentialPhi is non-zero across the entire
+  // smoothstep(-14, -2) density window — without this ramp every visible
+  // step triggers a resample. Ramp width is referenced to softening so the
+  // gate scales with the user's chosen lensing locality.
+  let bendRamp = smoothstep(softening * 0.01, softening * 0.04, bendMagnitudeRaw);
+  let bendMagnitude = bendMagnitudeRaw * bendRamp;
   let warpedPosition = worldPosition + bendDir * bendMagnitude;
   let caustic =
     1.0 + uniforms.quantumBackreactionCausticGain *

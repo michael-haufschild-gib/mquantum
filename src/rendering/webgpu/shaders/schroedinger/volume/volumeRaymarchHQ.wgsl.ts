@@ -154,6 +154,27 @@ fn volumeRaymarch(
     var bornNullOpacityScale: f32 = 1.0;
     if (volumeWarpEffectsActive) {
     if (bilocalBridgeActive && quickRho >= EMPTY_SKIP_THRESHOLD) {
+      // PERF: defer the remote wavefunction evaluation (the most expensive
+      // line in this branch) behind cheap local-side gates. bridgeWeight ∝
+      // amplitudeWeight * logWindow * throatSoftening * phaseGate; if the
+      // local-side factors already pin the product near zero, the remote
+      // sample cannot rescue the bridge — skip it. logWindow uses the SAME
+      // local smoothstep both sides, and amplitudeWeight has a √(localRho)
+      // factor, so a small local logRho or rho already implies bridgeWeight ≈ 0.
+      let localLogWindow = smoothstep(-18.0, -2.0, quickS);
+      let localAmpFactor = sqrt(max(quickRho, 0.0)) / max(uniforms.peakDensity, 1e-6);
+      // throatSoftening is bounded ≤ 1; only depends on transverse distance
+      // from the throat midplane. We don't precompute it — but if the local
+      // log/amp product is small the bridge weight cannot exceed that, so
+      // bound the cheap gate from above.
+      let localGateUpperBound = localLogWindow * localAmpFactor;
+      if (localGateUpperBound < 1e-4) {
+        // Bridge contribution is below visibility — skip remote sample and
+        // the resample chain. Matches the apertureWeight ≤ 1e-5 short-circuit
+        // pattern in applyBornNullWeave.
+        samplePos = pos;
+        bridgeGain = 1.0;
+      } else {
       let remoteEndpoint = vec3f(-pos.x, pos.y, pos.z);
       let remoteDensityInfo = sampleDensityWithPhase(remoteEndpoint, animTime, uniforms);
       let bridge = applyBilocalERBridgeTopology(
@@ -185,6 +206,7 @@ fn volumeRaymarch(
         }
         quickRho = quickCheck.x;
         quickS = quickCheck.y;
+      }
       }
     }
 
@@ -386,7 +408,13 @@ fn volumeRaymarch(
       // Lazy: emission lighting only needs this gradient if alpha survives.
       gradient = vec3f(0.0);
 
-      if (nodalBandActive) {
+      // PERF: short-circuit computePhysicalNodalField — it does 4 evalPsi
+      // calls at tetrahedron corners. In deep tail (rho < EMPTY_SKIP_THRESHOLD)
+      // psi is exponentially small at the sample AND at all 4 corners
+      // (continuity), so the envelope weight (smoothstep on |ψ|) is exactly
+      // zero and the downstream > 1e-4 filter would reject the result anyway.
+      // Skipping here saves the 4 wavefunction evaluations per tail step.
+      if (nodalBandActive && quickRho >= EMPTY_SKIP_THRESHOLD) {
         let nodalSample = computePhysicalNodalField(samplePos, animTime, uniforms);
         let nodalBandIntensityHQ = nodalSample.intensity * nodalSample.envelopeWeight;
         if (nodalBandIntensityHQ > 1e-4) {
