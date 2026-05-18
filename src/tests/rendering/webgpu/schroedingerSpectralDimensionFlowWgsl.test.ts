@@ -37,6 +37,14 @@ describe('Schroedinger spectral-dimension flow WGSL composition', () => {
     expect(wgsl).toContain('let spectralDimension = mix(dIR, dUV, uvGate)')
     expect(wgsl).toContain('let compressedPosition = worldPosition - gradN * compressionShift')
     expect(wgsl).toContain('let opacityScale = clamp(1.0 - dimensionDrop')
+    // PERF: per-step shift ramp must damp compressionShift to exactly zero
+    // below dimensionDrop=0.02 so the raymarcher's downstream resample is
+    // skipped in low-effect regions. Regression of this gate re-introduces
+    // the unconditional per-step density resample that made the feature
+    // unusable. The downstream raymarchers gate on `length(...) > 1e-6` —
+    // the ramp must close to exactly 0, not just damped.
+    expect(wgsl).toContain('let shiftRamp = smoothstep(0.02, 0.08, dimensionDrop)')
+    expect(wgsl).toContain('projectedCoordinate * compressionFactor * shiftRamp')
   })
 
   it('keeps coupled hydrogen in the analytic D_IR branch', () => {

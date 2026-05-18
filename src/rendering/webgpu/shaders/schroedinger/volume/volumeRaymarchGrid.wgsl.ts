@@ -436,12 +436,16 @@ fn volumeRaymarchGrid(
       transmittance *= (1.0 - overlayOpacity);
     }
 
-    // Nodal surface overlay (uses inline evaluation, not grid)
+    // Nodal surface overlay (uses inline evaluation, not grid).
+    // PERF: skip the entire block in tail regions — both nodal evaluators
+    // produce zero envelope weight when sqrt(rho) is below the eps band, and
+    // the non-grid computePhysicalNodalField path does 4 evalPsi calls.
     if (
       FEATURE_NODAL &&
       uniforms.nodalEnabled != 0u &&
       uniforms.nodalStrength > 0.0 &&
-      activeNodalRenderMode(uniforms) == NODAL_RENDER_MODE_BAND
+      activeNodalRenderMode(uniforms) == NODAL_RENDER_MODE_BAND &&
+      rho >= EMPTY_SKIP_THRESHOLD
     ) {
       var nodal: NodalSample;
       if (canUseGridPsiAbsNodal(uniforms)) {
