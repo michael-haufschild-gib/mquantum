@@ -42,6 +42,10 @@ function makePassConfig(overrides: Partial<PassConfig> = {}): PassConfig {
     openQuantumEnabled: false,
     crossSectionEnabled: false,
     probabilityCurrentEnabled: false,
+    radialProbabilityEnabled: false,
+    bornNullWeaveEnabled: false,
+    phaseShimmerEnabled: false,
+    phaseAnimationEnabled: false,
     quantumBackreactionLensingEnabled: false,
     bilocalERBridgeEnabled: false,
     entropicTimeShearEnabled: false,
@@ -267,6 +271,9 @@ describe('extractSchrodingerConfig', () => {
           fastEigenInterpolationEnabled: true,
           crossSectionEnabled: true,
           probabilityCurrentEnabled: true,
+          bornNullWeaveEnabled: true,
+          phaseShimmerEnabled: true,
+          phaseAnimationEnabled: true,
           openQuantumEnabled: true,
         })
       )
@@ -277,6 +284,10 @@ describe('extractSchrodingerConfig', () => {
       ).toBe(false)
       expect(extracted.crossSectionEnabled, `${mode}: crossSectionEnabled`).toBe(false)
       expect(extracted.probabilityCurrentEnabled, `${mode}: probabilityCurrentEnabled`).toBe(false)
+      expect(extracted.radialProbabilityEnabled, `${mode}: radialProbabilityEnabled`).toBe(false)
+      expect(extracted.bornNullWeaveEnabled, `${mode}: bornNullWeaveEnabled`).toBe(false)
+      expect(extracted.phaseShimmerEnabled, `${mode}: phaseShimmerEnabled`).toBe(false)
+      expect(extracted.phaseAnimationEnabled, `${mode}: phaseAnimationEnabled`).toBe(false)
       expect(extracted.openQuantumEnabled, `${mode}: openQuantumEnabled`).toBe(false)
     }
   })
@@ -300,6 +311,7 @@ describe('extractSchrodingerConfig', () => {
     expect(extracted.temporalReprojectionEnabled).toBe(false)
     expect(extracted.crossSectionEnabled).toBe(false)
     expect(extracted.probabilityCurrentEnabled).toBe(false)
+    expect(extracted.radialProbabilityEnabled).toBe(false)
     // dimension itself stays at 2 (not clamped for analytic modes)
     expect(extracted.dimension).toBe(2)
   })
@@ -324,6 +336,7 @@ describe('extractSchrodingerConfig', () => {
     expect(extracted.temporalReprojectionEnabled).toBe(false)
     expect(extracted.crossSectionEnabled).toBe(false)
     expect(extracted.probabilityCurrentEnabled).toBe(false)
+    expect(extracted.radialProbabilityEnabled).toBe(false)
     // Wigner still preserves its representation
     expect(extracted.representation).toBe('wigner')
   })
@@ -370,6 +383,7 @@ describe('extractSchrodingerConfig', () => {
     expect(extracted.uncertaintyBoundaryEnabled).toBe(false)
     expect(extracted.crossSectionEnabled).toBe(false)
     expect(extracted.probabilityCurrentEnabled).toBe(false)
+    expect(extracted.radialProbabilityEnabled).toBe(false)
   })
 
   it('does not compile runtime-off effect flags just because a phase color algorithm is active', () => {
@@ -394,6 +408,92 @@ describe('extractSchrodingerConfig', () => {
     expect(extracted.uncertaintyBoundaryEnabled).toBe(false)
     expect(extracted.crossSectionEnabled).toBe(false)
     expect(extracted.probabilityCurrentEnabled).toBe(false)
+    expect(extracted.radialProbabilityEnabled).toBe(false)
+  })
+
+  it('preserves radial probability only for hydrogen analytic modes', () => {
+    const hydrogen = extractSchrodingerConfig(
+      makePassConfig({
+        quantumMode: 'hydrogenND',
+        radialProbabilityEnabled: true,
+      })
+    )
+    const coupled = extractSchrodingerConfig(
+      makePassConfig({
+        quantumMode: 'hydrogenNDCoupled',
+        radialProbabilityEnabled: true,
+      })
+    )
+    const ho = extractSchrodingerConfig(
+      makePassConfig({
+        quantumMode: 'harmonicOscillator',
+        radialProbabilityEnabled: true,
+      })
+    )
+
+    expect(hydrogen.radialProbabilityEnabled).toBe(true)
+    expect(coupled.radialProbabilityEnabled).toBe(true)
+    expect(ho.radialProbabilityEnabled).toBe(false)
+  })
+
+  it('preserves born-null weave for analytic modes and drops it for compute modes', () => {
+    const ho = extractSchrodingerConfig(
+      makePassConfig({ quantumMode: 'harmonicOscillator', bornNullWeaveEnabled: true })
+    )
+    const hydrogen = extractSchrodingerConfig(
+      makePassConfig({ quantumMode: 'hydrogenND', bornNullWeaveEnabled: true })
+    )
+    const tdse = extractSchrodingerConfig(
+      makePassConfig({ quantumMode: 'tdseDynamics', bornNullWeaveEnabled: true })
+    )
+    const wigner = extractSchrodingerConfig(
+      makePassConfig({
+        quantumMode: 'harmonicOscillator',
+        representation: 'wigner',
+        bornNullWeaveEnabled: true,
+      })
+    )
+
+    expect(ho.bornNullWeaveEnabled).toBe(true)
+    expect(hydrogen.bornNullWeaveEnabled).toBe(true)
+    expect(tdse.bornNullWeaveEnabled).toBe(false)
+    expect(wigner.bornNullWeaveEnabled).toBe(false)
+  })
+
+  it('preserves phase shimmer for analytic modes and drops it for compute / 2D / Wigner', () => {
+    const ho = extractSchrodingerConfig(
+      makePassConfig({ quantumMode: 'harmonicOscillator', phaseShimmerEnabled: true })
+    )
+    const hydrogen = extractSchrodingerConfig(
+      makePassConfig({ quantumMode: 'hydrogenND', phaseShimmerEnabled: true })
+    )
+    const tdse = extractSchrodingerConfig(
+      makePassConfig({ quantumMode: 'tdseDynamics', phaseShimmerEnabled: true })
+    )
+    const flat = extractSchrodingerConfig(
+      makePassConfig({ quantumMode: 'harmonicOscillator', dimension: 2, phaseShimmerEnabled: true })
+    )
+
+    expect(ho.phaseShimmerEnabled).toBe(true)
+    expect(hydrogen.phaseShimmerEnabled).toBe(true)
+    expect(tdse.phaseShimmerEnabled).toBe(false)
+    expect(flat.phaseShimmerEnabled).toBe(false)
+  })
+
+  it('preserves phase animation only for hydrogen analytic modes', () => {
+    const hydrogen = extractSchrodingerConfig(
+      makePassConfig({ quantumMode: 'hydrogenND', phaseAnimationEnabled: true })
+    )
+    const coupled = extractSchrodingerConfig(
+      makePassConfig({ quantumMode: 'hydrogenNDCoupled', phaseAnimationEnabled: true })
+    )
+    const ho = extractSchrodingerConfig(
+      makePassConfig({ quantumMode: 'harmonicOscillator', phaseAnimationEnabled: true })
+    )
+
+    expect(hydrogen.phaseAnimationEnabled).toBe(true)
+    expect(coupled.phaseAnimationEnabled).toBe(true)
+    expect(ho.phaseAnimationEnabled).toBe(false)
   })
 
   it('compiles the full runtime-gated effect bundle once any eligible effect is active', () => {

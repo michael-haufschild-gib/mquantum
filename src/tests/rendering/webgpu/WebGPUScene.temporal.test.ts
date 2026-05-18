@@ -34,6 +34,10 @@ interface ScenePassConfig {
   openQuantumEnabled: boolean
   crossSectionEnabled: boolean
   probabilityCurrentEnabled: boolean
+  radialProbabilityEnabled: boolean
+  bornNullWeaveEnabled: boolean
+  phaseShimmerEnabled: boolean
+  phaseAnimationEnabled: boolean
   quantumBackreactionLensingEnabled: boolean
   bilocalERBridgeEnabled: boolean
   entropicTimeShearEnabled: boolean
@@ -92,6 +96,10 @@ function createPassConfig(overrides: Partial<ScenePassConfig> = {}): ScenePassCo
     openQuantumEnabled: false,
     crossSectionEnabled: false,
     probabilityCurrentEnabled: false,
+    radialProbabilityEnabled: false,
+    bornNullWeaveEnabled: false,
+    phaseShimmerEnabled: false,
+    phaseAnimationEnabled: false,
     quantumBackreactionLensingEnabled: false,
     bilocalERBridgeEnabled: false,
     entropicTimeShearEnabled: false,

@@ -348,6 +348,120 @@ describe('buildShaderConfig', () => {
     expect(ho.sampleSpaceRotation).toBe(false)
   })
 
+  it('threads radial probability only for hydrogen analytic modes', () => {
+    const hydrogen = buildShaderConfig({
+      dimension: 3,
+      quantumMode: 'hydrogenND',
+      radialProbabilityEnabled: true,
+    } as never)
+    const coupled = buildShaderConfig({
+      dimension: 4,
+      quantumMode: 'hydrogenNDCoupled',
+      radialProbabilityEnabled: true,
+    } as never)
+    const ho = buildShaderConfig({
+      dimension: 3,
+      quantumMode: 'harmonicOscillator',
+      radialProbabilityEnabled: true,
+    } as never)
+    const tdse = buildShaderConfig({
+      dimension: 3,
+      quantumMode: 'tdseDynamics',
+      radialProbabilityEnabled: true,
+    } as never)
+
+    expect(hydrogen.radialProbabilityEnabled).toBe(true)
+    expect(coupled.radialProbabilityEnabled).toBe(true)
+    expect(ho.radialProbabilityEnabled).toBe(false)
+    expect(tdse.radialProbabilityEnabled).toBe(false)
+  })
+
+  it('threads born-null weave into shader config for analytic modes but never compute modes', () => {
+    const hydrogen = buildShaderConfig({
+      dimension: 3,
+      quantumMode: 'hydrogenND',
+      bornNullWeaveEnabled: true,
+    } as never)
+    const ho = buildShaderConfig({
+      dimension: 3,
+      quantumMode: 'harmonicOscillator',
+      bornNullWeaveEnabled: true,
+    } as never)
+    const tdse = buildShaderConfig({
+      dimension: 3,
+      quantumMode: 'tdseDynamics',
+      bornNullWeaveEnabled: true,
+    } as never)
+    const pauli = buildShaderConfig({
+      dimension: 3,
+      quantumMode: 'harmonicOscillator',
+      isPauli: true,
+      bornNullWeaveEnabled: true,
+    } as never)
+
+    expect(hydrogen.bornNullWeaveEnabled).toBe(true)
+    expect(ho.bornNullWeaveEnabled).toBe(true)
+    expect(tdse.bornNullWeaveEnabled).toBe(false)
+    expect(pauli.bornNullWeaveEnabled).toBe(false)
+  })
+
+  it('threads phase shimmer into shader config for analytic modes but never compute modes', () => {
+    const ho = buildShaderConfig({
+      dimension: 3,
+      quantumMode: 'harmonicOscillator',
+      phaseShimmerEnabled: true,
+    } as never)
+    const hydrogen = buildShaderConfig({
+      dimension: 3,
+      quantumMode: 'hydrogenND',
+      phaseShimmerEnabled: true,
+    } as never)
+    const tdse = buildShaderConfig({
+      dimension: 3,
+      quantumMode: 'tdseDynamics',
+      phaseShimmerEnabled: true,
+    } as never)
+    const pauli = buildShaderConfig({
+      dimension: 3,
+      quantumMode: 'harmonicOscillator',
+      isPauli: true,
+      phaseShimmerEnabled: true,
+    } as never)
+
+    expect(ho.phaseShimmerEnabled).toBe(true)
+    expect(hydrogen.phaseShimmerEnabled).toBe(true)
+    expect(tdse.phaseShimmerEnabled).toBe(false)
+    expect(pauli.phaseShimmerEnabled).toBe(false)
+  })
+
+  it('threads phase animation only for hydrogen analytic modes', () => {
+    const hydrogen = buildShaderConfig({
+      dimension: 3,
+      quantumMode: 'hydrogenND',
+      phaseAnimationEnabled: true,
+    } as never)
+    const coupled = buildShaderConfig({
+      dimension: 4,
+      quantumMode: 'hydrogenNDCoupled',
+      phaseAnimationEnabled: true,
+    } as never)
+    const ho = buildShaderConfig({
+      dimension: 3,
+      quantumMode: 'harmonicOscillator',
+      phaseAnimationEnabled: true,
+    } as never)
+    const tdse = buildShaderConfig({
+      dimension: 3,
+      quantumMode: 'tdseDynamics',
+      phaseAnimationEnabled: true,
+    } as never)
+
+    expect(hydrogen.phaseAnimationEnabled).toBe(true)
+    expect(coupled.phaseAnimationEnabled).toBe(true)
+    expect(ho.phaseAnimationEnabled).toBe(false)
+    expect(tdse.phaseAnimationEnabled).toBe(false)
+  })
+
   it('threads nodal specialization fields into shader config for analytic nodal mode', () => {
     const cfg = buildShaderConfig({
       dimension: 3,
@@ -500,6 +614,10 @@ describe('computePipelineCacheKey', () => {
       useDensityMatrix: false,
       crossSectionEnabled: true,
       probabilityCurrentEnabled: true,
+      radialProbabilityEnabled: false,
+      bornNullWeaveEnabled: false,
+      phaseShimmerEnabled: false,
+      phaseAnimationEnabled: false,
       sampleSpaceRotation: false,
     } as never
   }
@@ -554,6 +672,46 @@ describe('computePipelineCacheKey', () => {
       },
       { dimension: 3 } as never
     )
+
+    expect(k1).not.toBe(k2)
+  })
+
+  it('changes when radial probability overlay compile dependency changes', () => {
+    const cfg = makeShaderConfig()
+    const k1 = computePipelineCacheKey(cfg, { dimension: 3 } as never)
+    const k2 = computePipelineCacheKey({ ...cfg, radialProbabilityEnabled: true }, {
+      dimension: 3,
+    } as never)
+
+    expect(k1).not.toBe(k2)
+  })
+
+  it('changes when born-null weave compile dependency changes', () => {
+    const cfg = makeShaderConfig()
+    const k1 = computePipelineCacheKey(cfg, { dimension: 3 } as never)
+    const k2 = computePipelineCacheKey({ ...cfg, bornNullWeaveEnabled: true }, {
+      dimension: 3,
+    } as never)
+
+    expect(k1).not.toBe(k2)
+  })
+
+  it('changes when phase shimmer compile dependency changes', () => {
+    const cfg = makeShaderConfig()
+    const k1 = computePipelineCacheKey(cfg, { dimension: 3 } as never)
+    const k2 = computePipelineCacheKey({ ...cfg, phaseShimmerEnabled: true }, {
+      dimension: 3,
+    } as never)
+
+    expect(k1).not.toBe(k2)
+  })
+
+  it('changes when phase animation compile dependency changes', () => {
+    const cfg = makeShaderConfig()
+    const k1 = computePipelineCacheKey(cfg, { dimension: 3 } as never)
+    const k2 = computePipelineCacheKey({ ...cfg, phaseAnimationEnabled: true }, {
+      dimension: 3,
+    } as never)
 
     expect(k1).not.toBe(k2)
   })

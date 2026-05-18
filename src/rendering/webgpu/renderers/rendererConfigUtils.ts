@@ -257,6 +257,12 @@ export function buildShaderConfig(
     useDensityMatrix: rendererConfig.openQuantumEnabled ?? false,
     crossSectionEnabled: rendererConfig.crossSectionEnabled ?? true,
     probabilityCurrentEnabled: rendererConfig.probabilityCurrentEnabled ?? true,
+    radialProbabilityEnabled:
+      !computeMode && isHydrogen && rendererConfig.radialProbabilityEnabled === true,
+    bornNullWeaveEnabled: !computeMode && rendererConfig.bornNullWeaveEnabled === true,
+    phaseShimmerEnabled: !computeMode && rendererConfig.phaseShimmerEnabled === true,
+    phaseAnimationEnabled:
+      !computeMode && isHydrogen && rendererConfig.phaseAnimationEnabled === true,
     // Compute-grid modes already precompute density/phase into textures. Their
     // default object signal is the simulated field, not scene light response, so
     // use ambient emission and avoid per-hit gradient fetches plus light loops.
@@ -361,6 +367,10 @@ export function computePipelineCacheKey(
     config.useDensityMatrix ? 1 : 0,
     config.crossSectionEnabled ? 1 : 0,
     config.probabilityCurrentEnabled ? 1 : 0,
+    config.radialProbabilityEnabled ? 1 : 0,
+    config.bornNullWeaveEnabled ? 1 : 0,
+    config.phaseShimmerEnabled ? 1 : 0,
+    config.phaseAnimationEnabled ? 1 : 0,
     config.fastGridEmission ? 1 : 0,
     config.quantumBackreactionLensing ? 1 : 0,
     config.bilocalERBridge ? 1 : 0,
