@@ -232,6 +232,14 @@ export interface SchrodingerRendererConfig {
   crossSectionEnabled?: boolean
   /** Compile-time gate for probability current j-field. */
   probabilityCurrentEnabled?: boolean
+  /** Compile-time dependency for hydrogen radial-probability overlay. */
+  radialProbabilityEnabled?: boolean
+  /** Compile-time dependency for Born-Null Weave overlay (inline-raymarch only). */
+  bornNullWeaveEnabled?: boolean
+  /** Compile-time dependency for phase-shimmer noise (per-frame rho modulation). */
+  phaseShimmerEnabled?: boolean
+  /** Compile-time dependency for hydrogen phase animation (per-frame phase update). */
+  phaseAnimationEnabled?: boolean
   /** Compile-time gate for probability-stress optical metric branches. */
   quantumBackreactionLensingEnabled?: boolean
   /** Compile-time gate for bilocal ER bridge branches. */

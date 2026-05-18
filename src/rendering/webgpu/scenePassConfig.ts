@@ -86,6 +86,10 @@ export interface PassConfig {
   openQuantumEnabled: boolean
   crossSectionEnabled: boolean
   probabilityCurrentEnabled: boolean
+  radialProbabilityEnabled: boolean
+  bornNullWeaveEnabled: boolean
+  phaseShimmerEnabled: boolean
+  phaseAnimationEnabled: boolean
   quantumBackreactionLensingEnabled: boolean
   bilocalERBridgeEnabled: boolean
   entropicTimeShearEnabled: boolean
@@ -120,6 +124,10 @@ export interface SchrodingerPassConfig {
   openQuantumEnabled: boolean
   crossSectionEnabled: boolean
   probabilityCurrentEnabled: boolean
+  radialProbabilityEnabled: boolean
+  bornNullWeaveEnabled: boolean
+  phaseShimmerEnabled: boolean
+  phaseAnimationEnabled: boolean
   quantumBackreactionLensingEnabled: boolean
   bilocalERBridgeEnabled: boolean
   entropicTimeShearEnabled: boolean
@@ -283,13 +291,24 @@ function needsEffectBundleShader(
   disableQuantumEffect: boolean,
   isCompute: boolean
 ): boolean {
+  const radialProbabilityEnabled =
+    (config.quantumMode === 'hydrogenND' || config.quantumMode === 'hydrogenNDCoupled') &&
+    config.radialProbabilityEnabled
+  const phaseAnimationEnabled =
+    (config.quantumMode === 'hydrogenND' || config.quantumMode === 'hydrogenNDCoupled') &&
+    config.phaseAnimationEnabled
+
   return (
     gate(config.nodalEnabled, disableQuantumEffect) ||
     gate(config.phaseMaterialityEnabled, disableQuantumEffect) ||
     gate(config.interferenceEnabled, disableQuantumEffect) ||
     gate(config.uncertaintyBoundaryEnabled, isCompute) ||
     gate(config.crossSectionEnabled, disableAnalytical) ||
-    gate(config.probabilityCurrentEnabled, disableAnalytical)
+    gate(config.probabilityCurrentEnabled, disableAnalytical) ||
+    gate(radialProbabilityEnabled, disableAnalytical) ||
+    gate(config.bornNullWeaveEnabled, disableAnalytical) ||
+    gate(config.phaseShimmerEnabled, disableAnalytical) ||
+    gate(phaseAnimationEnabled, disableAnalytical)
   )
 }
 
@@ -373,6 +392,18 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
     crossSectionEnabled: gate(config.crossSectionEnabled || compileEffectBundle, disableAnalytical),
     probabilityCurrentEnabled: gate(
       config.probabilityCurrentEnabled || compileEffectBundle,
+      disableAnalytical
+    ),
+    radialProbabilityEnabled: gate(
+      (config.quantumMode === 'hydrogenND' || config.quantumMode === 'hydrogenNDCoupled') &&
+        config.radialProbabilityEnabled,
+      disableAnalytical
+    ),
+    bornNullWeaveEnabled: gate(config.bornNullWeaveEnabled, disableAnalytical),
+    phaseShimmerEnabled: gate(config.phaseShimmerEnabled, disableAnalytical),
+    phaseAnimationEnabled: gate(
+      (config.quantumMode === 'hydrogenND' || config.quantumMode === 'hydrogenNDCoupled') &&
+        config.phaseAnimationEnabled,
       disableAnalytical
     ),
     quantumBackreactionLensingEnabled: config.quantumBackreactionLensingEnabled,

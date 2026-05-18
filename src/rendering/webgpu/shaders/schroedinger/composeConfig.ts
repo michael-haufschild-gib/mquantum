@@ -120,6 +120,22 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   crossSectionEnabled?: boolean
   /** Compile-time gate for probability current j-field (default: true). */
   probabilityCurrentEnabled?: boolean
+  /** Compile-time dependency for hydrogen radial-probability overlay. */
+  radialProbabilityEnabled?: boolean
+  /** Compile-time dependency for Born-Null Weave (inline HQ raymarch only). */
+  bornNullWeaveEnabled?: boolean
+  /**
+   * Compile-time dependency for phase-shimmer noise. Modulates rho by
+   * time-varying gradient noise; in gridOnly the density grid bakes the
+   * pattern frozen, so the toggle must force the inline raymarch path.
+   */
+  phaseShimmerEnabled?: boolean
+  /**
+   * Compile-time dependency for hydrogen phase animation. Multiplies the
+   * wavefunction phase by exp(-i E t); in gridOnly the grid bakes the
+   * phase frozen, so the toggle must force the inline raymarch path.
+   */
+  phaseAnimationEnabled?: boolean
   /** Use ambient-only emission in grid-only compute raymarchers. */
   fastGridEmission?: boolean
   /** Compile-time gate for probability-stress optical metric branches. */
@@ -534,6 +550,10 @@ export function canUseGridOnly(config: SchroedingerWGSLShaderConfig, is2D: boole
     interference = true,
     nodal = true,
     probabilityCurrentEnabled = true,
+    radialProbabilityEnabled = false,
+    bornNullWeaveEnabled = false,
+    phaseShimmerEnabled = false,
+    phaseAnimationEnabled = false,
     useDensityMatrix = false,
     crossSectionEnabled = true,
   } = config
@@ -550,6 +570,10 @@ export function canUseGridOnly(config: SchroedingerWGSLShaderConfig, is2D: boole
     !phaseMateriality &&
     !interference &&
     !probabilityCurrentEnabled &&
+    !radialProbabilityEnabled &&
+    !bornNullWeaveEnabled &&
+    !phaseShimmerEnabled &&
+    !phaseAnimationEnabled &&
     !nodal &&
     !useDensityMatrix &&
     !crossSectionEnabled

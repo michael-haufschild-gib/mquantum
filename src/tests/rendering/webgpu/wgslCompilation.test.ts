@@ -483,6 +483,111 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     )
   })
 
+  it('keeps radial probability from being optimized out in hydrogen density-grid path', () => {
+    const { wgsl, features } = composeSchroedingerShader({
+      dimension: 5,
+      isosurface: false,
+      temporalAccumulation: false,
+      useDensityGrid: true,
+      densityGridSize: 64,
+      quantumMode: 'hydrogenND',
+      nodal: false,
+      phaseMateriality: false,
+      interference: false,
+      uncertaintyBoundary: false,
+      probabilityCurrentEnabled: false,
+      radialProbabilityEnabled: true,
+      crossSectionEnabled: false,
+      colorAlgorithm: 11, // radialDistance — non-phase
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(features).not.toContain('Grid-Only (inline raymarch excluded)')
+    expect(wgsl).not.toContain('Quantum Math Stubs (grid-only)')
+    expect(wgsl).toContain('fn hydrogenRadialND(')
+    expect(wgsl).toContain('R = hydrogenRadialND(')
+  })
+
+  it('keeps born-null weave from being optimized out in density-grid path', () => {
+    const { wgsl, features } = composeSchroedingerShader({
+      dimension: 3,
+      isosurface: false,
+      temporalAccumulation: false,
+      useDensityGrid: true,
+      densityGridSize: 64,
+      quantumMode: 'harmonicOscillator',
+      nodal: false,
+      phaseMateriality: false,
+      interference: false,
+      uncertaintyBoundary: false,
+      probabilityCurrentEnabled: false,
+      radialProbabilityEnabled: false,
+      bornNullWeaveEnabled: true,
+      crossSectionEnabled: false,
+      colorAlgorithm: 11, // radialDistance — non-phase
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(features).not.toContain('Grid-Only (inline raymarch excluded)')
+    expect(wgsl).not.toContain('Quantum Math Stubs (grid-only)')
+    expect(wgsl).toContain('fn isBornNullWeaveActive(')
+    expect(wgsl).toContain('fn applyBornNullWeaveRaymarchHQ(')
+  })
+
+  it('keeps phase shimmer from being optimized out in density-grid path', () => {
+    const { wgsl, features } = composeSchroedingerShader({
+      dimension: 3,
+      isosurface: false,
+      temporalAccumulation: false,
+      useDensityGrid: true,
+      densityGridSize: 64,
+      quantumMode: 'harmonicOscillator',
+      nodal: false,
+      phaseMateriality: false,
+      interference: false,
+      uncertaintyBoundary: false,
+      probabilityCurrentEnabled: false,
+      radialProbabilityEnabled: false,
+      bornNullWeaveEnabled: false,
+      phaseShimmerEnabled: true,
+      crossSectionEnabled: false,
+      colorAlgorithm: 11,
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(features).not.toContain('Grid-Only (inline raymarch excluded)')
+    expect(wgsl).not.toContain('Quantum Math Stubs (grid-only)')
+    expect(wgsl).toContain('fn sampleDensityWithPhaseComponents(')
+    expect(wgsl).toContain('uniforms.phaseShimmerEnabled')
+  })
+
+  it('keeps hydrogen phase animation from being optimized out in density-grid path', () => {
+    const { wgsl, features } = composeSchroedingerShader({
+      dimension: 5,
+      isosurface: false,
+      temporalAccumulation: false,
+      useDensityGrid: true,
+      densityGridSize: 64,
+      quantumMode: 'hydrogenND',
+      nodal: false,
+      phaseMateriality: false,
+      interference: false,
+      uncertaintyBoundary: false,
+      probabilityCurrentEnabled: false,
+      radialProbabilityEnabled: false,
+      bornNullWeaveEnabled: false,
+      phaseAnimationEnabled: true,
+      crossSectionEnabled: false,
+      colorAlgorithm: 11,
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(features).not.toContain('Grid-Only (inline raymarch excluded)')
+    expect(wgsl).not.toContain('Quantum Math Stubs (grid-only)')
+    expect(wgsl).toContain('fn evalPsiWithSpatialPhase(')
+    expect(wgsl).toContain('uniforms.phaseAnimationEnabled')
+  })
+
   it('uses sphere intersection for non-free-scalar modes', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 3,

@@ -125,6 +125,14 @@ const schroedingerCompileSelector = (state: ReturnType<typeof useExtendedObjectS
     uncertaintyBoundaryEnabled: s?.uncertaintyBoundaryEnabled ?? false,
     crossSectionEnabled: s?.crossSectionEnabled ?? false,
     probabilityCurrentEnabled: s?.probabilityCurrentEnabled ?? false,
+    radialProbabilityEnabled:
+      (quantumMode === 'hydrogenND' || quantumMode === 'hydrogenNDCoupled') &&
+      (s?.radialProbabilityEnabled ?? false),
+    bornNullWeaveEnabled: s?.bornNullWeaveEnabled ?? false,
+    phaseShimmerEnabled: s?.phaseShimmerEnabled ?? false,
+    phaseAnimationEnabled:
+      (quantumMode === 'hydrogenND' || quantumMode === 'hydrogenNDCoupled') &&
+      (s?.phaseAnimationEnabled ?? false),
     quantumBackreactionLensingEnabled: s?.quantumBackreactionLensingEnabled ?? false,
     bilocalERBridgeEnabled: s?.bilocalERBridgeEnabled ?? false,
     entropicTimeShearEnabled: s?.entropicTimeShearEnabled ?? false,
@@ -348,6 +356,10 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     openQuantumEnabled: schroedingerCompile.openQuantumEnabled,
     crossSectionEnabled: schroedingerCompile.crossSectionEnabled,
     probabilityCurrentEnabled: schroedingerCompile.probabilityCurrentEnabled,
+    radialProbabilityEnabled: schroedingerCompile.radialProbabilityEnabled,
+    bornNullWeaveEnabled: schroedingerCompile.bornNullWeaveEnabled,
+    phaseShimmerEnabled: schroedingerCompile.phaseShimmerEnabled,
+    phaseAnimationEnabled: schroedingerCompile.phaseAnimationEnabled,
     quantumBackreactionLensingEnabled: schroedingerCompile.quantumBackreactionLensingEnabled,
     bilocalERBridgeEnabled: schroedingerCompile.bilocalERBridgeEnabled,
     entropicTimeShearEnabled: schroedingerCompile.entropicTimeShearEnabled,
