@@ -279,7 +279,7 @@ const QuantumnessAtlasContent: React.FC<{ defaultOpen: boolean }> = React.memo(
             )}
             {isRunning && (
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between text-[10px] text-text-tertiary mb-0.5">
+                <div className="flex items-center justify-between text-3xs text-text-tertiary mb-0.5">
                   <span>
                     N={config.dimensions[progress.dimIdx]} λ=
                     {lambdaForStep(config, progress.lambdaIdx).toFixed(2)} γ=
@@ -298,7 +298,7 @@ const QuantumnessAtlasContent: React.FC<{ defaultOpen: boolean }> = React.memo(
               </div>
             )}
             {isComplete && (
-              <span className="text-[10px] text-text-secondary">
+              <span className="text-3xs text-text-secondary">
                 {results.length} points collected
               </span>
             )}
@@ -318,7 +318,7 @@ const QuantumnessAtlasContent: React.FC<{ defaultOpen: boolean }> = React.memo(
                 </div>
               </Tooltip>
 
-              <div className="flex items-center gap-3 text-[9px]">
+              <div className="flex items-center gap-3 text-4xs">
                 <Tooltip content="Normalized coordinate entanglement S̄/log(M). Measures quantum correlations across spatial dimensions. 0 = separable, 1 = maximally entangled.">
                   <span style={{ color: DIAG_COLORS.entanglement }}>● S̄/logM</span>
                 </Tooltip>
@@ -343,6 +343,7 @@ const QuantumnessAtlasContent: React.FC<{ defaultOpen: boolean }> = React.memo(
                           value: String(l),
                           label: l < 1 ? l.toFixed(2) : l.toFixed(1),
                         }))}
+                        tooltip="Coupling λ used for the erosion-curve slice"
                       />
                     )}
                     {availableDims.length > 1 && (
@@ -351,6 +352,7 @@ const QuantumnessAtlasContent: React.FC<{ defaultOpen: boolean }> = React.memo(
                         value={String(activeDim)}
                         onChange={(v) => setSelectedDim(Number(v))}
                         options={availableDims.map((d) => ({ value: String(d), label: `${d}D` }))}
+                        tooltip="Dimension N used for the erosion-curve slice"
                       />
                     )}
                   </div>
@@ -373,6 +375,7 @@ const QuantumnessAtlasContent: React.FC<{ defaultOpen: boolean }> = React.memo(
                         value: String(g),
                         label: g === 0 ? '0' : g < 1 ? g.toFixed(2) : g.toFixed(1),
                       }))}
+                      tooltip="Monitoring rate γ shown in the heatmap view"
                     />
                   )}
                   {activeGamma !== null && <TripleHeatmap results={results} gamma={activeGamma} />}
@@ -392,6 +395,7 @@ const QuantumnessAtlasContent: React.FC<{ defaultOpen: boolean }> = React.memo(
                           value: String(l),
                           label: l < 1 ? l.toFixed(2) : l.toFixed(1),
                         }))}
+                        tooltip="Coupling λ used for the dimension-comparison view"
                       />
                     )}
                     {availableGammas.length > 1 && (
@@ -403,6 +407,7 @@ const QuantumnessAtlasContent: React.FC<{ defaultOpen: boolean }> = React.memo(
                           value: String(g),
                           label: g === 0 ? '0' : g < 1 ? g.toFixed(2) : g.toFixed(1),
                         }))}
+                        tooltip="Monitoring rate γ used for the dimension-comparison view"
                       />
                     )}
                   </div>

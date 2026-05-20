@@ -314,21 +314,37 @@ const SrmtSweepContent: React.FC = React.memo(() => {
 
         <div className="flex gap-2 items-center">
           {running ? (
-            <Button onClick={abortSweep} data-testid="srmt-sweep-abort">
+            <Button
+              onClick={abortSweep}
+              tooltip="Abort the in-progress SRMT sweep"
+              data-testid="srmt-sweep-abort"
+            >
               Abort
             </Button>
           ) : (
-            <Button onClick={handleStart} data-testid="srmt-sweep-start">
+            <Button
+              onClick={handleStart}
+              tooltip="Start a fresh SRMT parameter sweep"
+              data-testid="srmt-sweep-start"
+            >
               Start
             </Button>
           )}
           {(complete || showError) && (
-            <Button onClick={reset} data-testid="srmt-sweep-reset">
+            <Button
+              onClick={reset}
+              tooltip="Clear results and reset the SRMT sweep state"
+              data-testid="srmt-sweep-reset"
+            >
               Reset
             </Button>
           )}
           {complete && points.length > 0 && (
-            <Button onClick={handleExportCsv} data-testid="srmt-sweep-export-csv">
+            <Button
+              onClick={handleExportCsv}
+              tooltip="Download the SRMT sweep results as CSV"
+              data-testid="srmt-sweep-export-csv"
+            >
               Export CSV
             </Button>
           )}
@@ -336,7 +352,7 @@ const SrmtSweepContent: React.FC = React.memo(() => {
 
         {progressLabel && (
           <div
-            className="text-[11px] font-mono"
+            className="text-2xs font-mono"
             style={{ color: 'var(--text-tertiary)' }}
             data-testid="srmt-sweep-progress"
           >
@@ -346,7 +362,7 @@ const SrmtSweepContent: React.FC = React.memo(() => {
 
         {showError && errorMessage && (
           <div
-            className="text-[11px] font-mono"
+            className="text-2xs font-mono"
             style={{ color: 'var(--danger)' }}
             data-testid="srmt-sweep-error"
           >

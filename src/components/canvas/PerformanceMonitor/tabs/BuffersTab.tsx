@@ -57,6 +57,7 @@ export const BuffersTabContent = React.memo(function BuffersTabContent() {
           size="icon"
           onClick={refreshBufferStats}
           ariaLabel="Refresh buffer stats"
+          tooltip="Re-sample render target sizes from the renderer"
         >
           <Icons.RefreshCw className="w-3 h-3" />
         </Button>
@@ -87,6 +88,7 @@ export const BuffersTabContent = React.memo(function BuffersTabContent() {
             label="Temporal"
             active={showTemporalDepthBuffer}
             onClick={() => setShowTemporalDepthBuffer(!showTemporalDepthBuffer)}
+            tooltip="Overlay the half-resolution temporal depth buffer"
             disabled={!temporalPreviewAvailable}
           />
         </div>

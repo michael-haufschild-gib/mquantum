@@ -47,8 +47,14 @@ vi.mock('motion/react', () => {
   ))
   MotionButton.displayName = 'MotionButton'
 
+  // Render whatever children AnimatePresence wraps as a plain fragment;
+  // happy-dom never animates so the exit/initial transitions don't matter.
+  const AnimatePresence = ({ children }: { children?: React.ReactNode }) => <>{children}</>
+  AnimatePresence.displayName = 'AnimatePresence'
+
   return {
     m: { div: MotionDiv, button: MotionButton },
+    AnimatePresence,
     useMotionValue: (initial: number) => {
       let val = initial
       return {

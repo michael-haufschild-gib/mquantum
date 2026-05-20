@@ -124,14 +124,14 @@ const TabButton = React.memo(
         onMouseEnter={handleMouseEnter}
         onKeyDown={handleKeyDownWrapper}
         className={`
-        relative px-4 py-2 text-xs uppercase tracking-widest font-bold whitespace-nowrap select-none transition-colors duration-200
+        relative px-2.5 py-2 text-xs font-semibold whitespace-nowrap select-none transition-colors duration-200
         outline-none border-none focus-visible:ring-1 focus-visible:ring-accent/50 focus-visible:rounded-sm
         ${fullWidth ? 'flex-1' : ''}
         ${
           isDisabled
             ? 'text-text-tertiary opacity-60 cursor-not-allowed'
             : isActive
-              ? 'text-accent text-glow-subtle cursor-pointer'
+              ? 'text-accent cursor-pointer'
               : 'text-text-secondary hover:text-text-primary cursor-pointer'
         }
         ${variant === 'pills' && isActive ? 'bg-[var(--bg-active)] rounded shadow-sm' : ''}
@@ -151,7 +151,7 @@ const TabButton = React.memo(
           <div className="absolute inset-0 bg-gradient-to-t from-accent/5 to-transparent pointer-events-none" />
         )}
         {tab.tooltip ? (
-          <Tooltip content={tab.tooltip} position="bottom">
+          <Tooltip content={tab.tooltip} position="top">
             <span className="relative z-10">{tab.label}</span>
           </Tooltip>
         ) : (

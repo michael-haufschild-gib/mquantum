@@ -114,7 +114,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = React.memo(
           {/* Header */}
           <div className="flex-none h-14 flex items-center justify-between px-4 border-b border-border/10 bg-glass/20">
             {!isCollapsed && (
-              <h2 className="text-xs font-bold tracking-[0.2em] text-accent text-glow select-none">
+              <h2 className="text-xs font-bold tracking-brand text-accent text-glow select-none">
                 {title}
               </h2>
             )}
@@ -126,6 +126,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = React.memo(
               className={isCollapsed ? 'w-full h-full rounded-full' : ''}
               ariaLabel={isCollapsed ? 'Expand control panel' : 'Collapse control panel'}
               aria-expanded={!isCollapsed}
+              tooltip={
+                isCollapsed
+                  ? 'Expand the sidebar control panel'
+                  : 'Collapse the sidebar control panel'
+              }
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"

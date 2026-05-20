@@ -27,7 +27,7 @@ const COLLAPSIBLE_HEADER_CLASS =
   'cursor-pointer hover:text-[var(--text-primary)] transition-colors focus:outline-none focus:ring-1 focus:ring-accent/50 focus:ring-inset'
 const CARD_HEADER_CLASS = 'px-3 bg-[var(--bg-active)] border-b border-[var(--border-subtle)]'
 
-const TITLE_TEXT_CLASS = 'text-xs font-semibold uppercase tracking-wider text-text-secondary'
+const TITLE_TEXT_CLASS = 'text-2xs font-semibold uppercase tracking-wider text-text-tertiary'
 
 function TitleLabel({ title, tooltip }: { title: string; tooltip?: string }) {
   const label = <span className={TITLE_TEXT_CLASS}>{title}</span>

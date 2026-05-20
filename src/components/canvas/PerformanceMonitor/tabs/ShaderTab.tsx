@@ -51,8 +51,9 @@ export const ShaderTabContent = React.memo(function ShaderTabContent() {
             variant={selectedShaderKey === key ? 'primary' : 'ghost'}
             size="sm"
             onClick={() => setSelectedShaderKey(key)}
+            tooltip={`Inspect the ${formatShaderName(key, objectType)} shader`}
             className={`
-              rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap
+              rounded-full text-2xs font-semibold uppercase tracking-wider whitespace-nowrap
               ${selectedShaderKey === key ? 'bg-accent/20 text-accent border-accent/30' : ''}
             `}
           >
@@ -104,6 +105,7 @@ export const ShaderTabContent = React.memo(function ShaderTabContent() {
                       checked={isEnabled}
                       onCheckedChange={() => toggleShaderModule(mod)}
                       ariaLabel={`Toggle shader module ${mod}`}
+                      tooltip={`Enable or disable the ${mod} shader module`}
                       className="scale-75 origin-right"
                     />
                   </div>

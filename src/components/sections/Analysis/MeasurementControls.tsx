@@ -212,6 +212,7 @@ export const MeasurementControls: React.FC = React.memo(() => {
             variant="ghost"
             size="sm"
             onClick={clearMeasurements}
+            tooltip="Discard the accumulated measurement statistics"
             data-testid="measurement-clear"
           >
             Clear Measurements

@@ -338,6 +338,7 @@ export function MetricControls({ td }: { td: TdseConfig }): React.ReactElement {
             ]}
             value={td.densityView ?? 'coordinate'}
             onChange={setDensityView}
+            tooltip="Coordinate-density vs proper-density (√|g|) display mode"
             data-testid="tdse-metric-density-view"
           />
         </>

@@ -125,7 +125,7 @@ export const SparklineRow: React.FC<{
   sparklineClassName?: string
 }> = ({ label, data, head, count, min, max, sparklineClassName = 'w-full' }) => (
   <div>
-    <span className="text-xs text-text-tertiary uppercase tracking-wider">{label}</span>
+    <span className="text-2xs text-text-tertiary uppercase tracking-wider">{label}</span>
     <Sparkline
       data={data}
       head={head}

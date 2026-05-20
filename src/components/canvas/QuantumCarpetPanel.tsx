@@ -212,6 +212,7 @@ const CarpetPanelInner: React.FC = React.memo(() => {
               options={axisOptions}
               value={String(sliceAxis)}
               onChange={handleAxisChange}
+              tooltip="Wavefunction axis sampled into the carpet"
               className="!w-16 !text-xs"
               data-testid="carpet-axis-select"
             />
@@ -219,6 +220,7 @@ const CarpetPanelInner: React.FC = React.memo(() => {
               options={COLORMAP_OPTIONS}
               value={colormap}
               onChange={handleColormapChange}
+              tooltip="Colormap used for the carpet heatmap"
               className="!w-20 !text-xs"
               data-testid="carpet-colormap-select"
             />
@@ -226,6 +228,7 @@ const CarpetPanelInner: React.FC = React.memo(() => {
               pressed={logScale}
               onToggle={setLogScale}
               ariaLabel="Toggle log scale"
+              tooltip="Use logarithmic intensity for the heatmap"
               className="!text-xs !px-1.5 !py-0.5"
               data-testid="carpet-log-toggle"
             >
@@ -237,7 +240,7 @@ const CarpetPanelInner: React.FC = React.memo(() => {
               onClick={togglePaused}
               ariaLabel={paused ? 'Resume' : 'Pause'}
               className="!p-1 !min-w-0"
-              title={paused ? 'Resume accumulation' : 'Pause accumulation'}
+              tooltip={paused ? 'Resume carpet accumulation' : 'Pause carpet accumulation'}
               data-testid="carpet-play-pause"
             >
               <Icon name={paused ? 'play' : 'pause'} size={10} />
@@ -248,7 +251,7 @@ const CarpetPanelInner: React.FC = React.memo(() => {
               onClick={clear}
               ariaLabel="Clear carpet"
               className="!p-1 !min-w-0"
-              title="Clear carpet"
+              tooltip="Clear the accumulated carpet history"
               data-testid="carpet-clear"
             >
               <Icon name="reset" size={10} />
@@ -259,7 +262,7 @@ const CarpetPanelInner: React.FC = React.memo(() => {
               onClick={handleClose}
               ariaLabel="Close carpet panel"
               className="!p-1 !min-w-0"
-              title="Close"
+              tooltip="Close the quantum carpet panel"
               data-testid="carpet-close"
             >
               <Icon name="cross" size={10} />

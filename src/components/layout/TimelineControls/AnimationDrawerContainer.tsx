@@ -72,6 +72,7 @@ export const AnimationDrawerContainer: React.FC<AnimationDrawerContainerProps> =
             size="icon"
             onClick={onClose}
             ariaLabel="Close drawer"
+            tooltip="Close this timeline drawer"
             className="w-6 h-6 p-0 rounded-full glass-panel flex items-center justify-center text-text-tertiary hover:text-text-primary"
           >
             <Icon name="chevron-down" size={12} />

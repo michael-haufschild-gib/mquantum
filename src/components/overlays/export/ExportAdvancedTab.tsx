@@ -66,7 +66,7 @@ export const ExportAdvancedTab = () => {
 
       {/* Codec */}
       <div className="space-y-3">
-        <label className="text-xs font-bold text-text-secondary uppercase tracking-widest ps-1">
+        <label className="text-2xs font-semibold text-text-secondary uppercase tracking-wider ps-1">
           Video Codec
         </label>
         <ToggleGroup
@@ -88,7 +88,7 @@ export const ExportAdvancedTab = () => {
 
       {/* Hardware Accel */}
       <div className="space-y-3">
-        <label className="text-xs font-bold text-text-secondary uppercase tracking-widest ps-1">
+        <label className="text-2xs font-semibold text-text-secondary uppercase tracking-wider ps-1">
           Encoding Hardware
         </label>
         <ToggleGroup
@@ -106,7 +106,7 @@ export const ExportAdvancedTab = () => {
 
       {/* Bitrate Mode */}
       <div className="space-y-3">
-        <label className="text-xs font-bold text-text-secondary uppercase tracking-widest ps-1">
+        <label className="text-2xs font-semibold text-text-secondary uppercase tracking-wider ps-1">
           Bitrate Mode
         </label>
         <ToggleGroup

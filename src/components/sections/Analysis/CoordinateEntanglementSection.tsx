@@ -156,7 +156,12 @@ const CoordinateEntanglementContent: React.FC<{ defaultOpen: boolean }> = React.
               disabled={sweepStatus === 'running'}
             />
             {enabled && (sweepStatus === 'idle' || sweepStatus === 'complete') && (
-              <Button variant="primary" size="sm" onClick={handleStartSweep}>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleStartSweep}
+                tooltip="Run a fresh λ×N entanglement-atlas sweep"
+              >
                 Start λ×N Sweep
               </Button>
             )}
@@ -165,7 +170,12 @@ const CoordinateEntanglementContent: React.FC<{ defaultOpen: boolean }> = React.
                 <span className="text-xs text-text-secondary">
                   {(sweepProgress * 100).toFixed(0)}%
                 </span>
-                <Button variant="secondary" size="sm" onClick={handleAbortSweep}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleAbortSweep}
+                  tooltip="Abort the in-progress λ×N entanglement sweep"
+                >
                   Abort
                 </Button>
               </div>

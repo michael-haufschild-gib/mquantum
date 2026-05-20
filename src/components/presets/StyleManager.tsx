@@ -125,6 +125,7 @@ export const StyleManager: React.FC<StyleManagerProps> = React.memo(({ onClose }
           onClick={openImportPicker}
           className="flex-1"
           ariaLabel="Import styles from JSON file"
+          tooltip="Import saved styles from a JSON file"
         >
           Import JSON
         </Button>
@@ -134,13 +135,14 @@ export const StyleManager: React.FC<StyleManagerProps> = React.memo(({ onClose }
           onClick={handleExport}
           className="flex-1"
           ariaLabel="Export all styles to JSON file"
+          tooltip="Export every saved style as a JSON file"
         >
           Export JSON
         </Button>
       </div>
 
       <div className="space-y-2">
-        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+        <h3 className="text-2xs font-semibold text-text-secondary uppercase tracking-wider">
           Saved Styles
         </h3>
 
@@ -177,6 +179,7 @@ export const StyleManager: React.FC<StyleManagerProps> = React.memo(({ onClose }
                       }
                     }}
                     aria-label={`Apply style "${style.name}"`}
+                    title={`Apply the saved style "${style.name}"`}
                   >
                     <div className="flex flex-col items-start min-w-0">
                       <InlineEdit
@@ -189,6 +192,7 @@ export const StyleManager: React.FC<StyleManagerProps> = React.memo(({ onClose }
                         textClassName="font-medium text-sm text-text-primary"
                         editButtonAriaLabel={`Rename style "${style.name}"`}
                         placeholder="Style name..."
+                        tooltip={`Edit the saved style name "${style.name}"`}
                         hideEditButton
                         isEditing={isEditingThis}
                         onEditingChange={(editing) => {
@@ -211,6 +215,7 @@ export const StyleManager: React.FC<StyleManagerProps> = React.memo(({ onClose }
                       }}
                       className={`p-1.5 text-text-secondary hover:text-accent hover:bg-accent/10 ${isEditingThis ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
                       ariaLabel={`Rename style "${style.name}"`}
+                      tooltip={`Rename the saved style "${style.name}"`}
                     >
                       <svg
                         width="14"
@@ -237,6 +242,7 @@ export const StyleManager: React.FC<StyleManagerProps> = React.memo(({ onClose }
                       }}
                       className={`p-1.5 text-text-secondary hover:text-danger hover:bg-danger-bg ${isEditingThis ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
                       ariaLabel={`Delete style "${style.name}"`}
+                      tooltip={`Delete the saved style "${style.name}"`}
                     >
                       <svg
                         width="14"

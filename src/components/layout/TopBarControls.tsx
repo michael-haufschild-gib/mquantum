@@ -30,7 +30,8 @@ interface IconButtonProps {
   icon: React.FC<{ className?: string }>
   active: boolean
   onClick: () => void
-  label: string
+  /** Tooltip text; also used as aria-label and test-id seed. Required for accessibility. */
+  tooltip: string
   small?: boolean
   className?: string
   disabled?: boolean
@@ -42,7 +43,7 @@ const IconButton: React.FC<IconButtonProps> = React.memo(
     icon: IconComponent,
     active,
     onClick,
-    label,
+    tooltip,
     small = false,
     className = '',
     disabled = false,
@@ -51,10 +52,10 @@ const IconButton: React.FC<IconButtonProps> = React.memo(
       onClick={onClick}
       disabled={disabled}
       onMouseEnter={() => soundManager.playHover()}
-      aria-label={label}
+      aria-label={tooltip}
       aria-pressed={active}
-      title={label}
-      data-testid={`control-${label.toLowerCase().replace(/\s+/g, '-')}`}
+      tooltip={tooltip}
+      data-testid={`control-${tooltip.toLowerCase().replace(/\s+/g, '-')}`}
       className={`
       rounded-md text-sm font-medium transition-colors duration-300 border cursor-pointer
       ${small ? 'py-1 px-2' : 'px-3 py-1.5'}
@@ -120,7 +121,7 @@ const CompactControls: React.FC<SharedControlsProps> = React.memo(
         active={representation === 'wigner'}
         onClick={toggleRepresentation}
         disabled={isComputeMode}
-        label={
+        tooltip={
           isComputeMode
             ? 'Position only (compute mode)'
             : `Representation: ${getRepresentationLabel(representation)}`
@@ -131,28 +132,28 @@ const CompactControls: React.FC<SharedControlsProps> = React.memo(
         icon={PerfIcon}
         active={showPerfMonitor}
         onClick={togglePerfMonitor}
-        label="Performance Monitor"
+        tooltip="Performance Monitor"
         small
       />
       <IconButton
         icon={isSoundEnabled ? SoundOnIcon : SoundOffIcon}
         active={isSoundEnabled}
         onClick={toggleSound}
-        label={isSoundEnabled ? 'Mute Sound' : 'Enable Sound'}
+        tooltip={isSoundEnabled ? 'Mute Sound' : 'Enable Sound'}
         small
       />
       <IconButton
         icon={CinematicIcon}
         active={isCinematicMode}
         onClick={toggleCinematic}
-        label="Cinematic Mode"
+        tooltip="Cinematic Mode"
         small
       />
       <IconButton
         icon={FullscreenIcon}
         active={isFullscreen}
         onClick={toggleFullscreen}
-        label="Fullscreen"
+        tooltip="Fullscreen"
         small
       />
     </div>
@@ -205,13 +206,13 @@ const DesktopControls: React.FC<SharedControlsProps> = React.memo(
         icon={PerfIcon}
         active={showPerfMonitor}
         onClick={togglePerfMonitor}
-        label="Performance Monitor"
+        tooltip="Performance Monitor"
       />
       <IconButton
         icon={FullscreenIcon}
         active={isFullscreen}
         onClick={toggleFullscreen}
-        label="Fullscreen"
+        tooltip="Fullscreen"
       />
 
       <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
@@ -220,13 +221,13 @@ const DesktopControls: React.FC<SharedControlsProps> = React.memo(
         icon={isSoundEnabled ? SoundOnIcon : SoundOffIcon}
         active={isSoundEnabled}
         onClick={toggleSound}
-        label={isSoundEnabled ? 'Mute Sound' : 'Enable Sound'}
+        tooltip={isSoundEnabled ? 'Mute Sound' : 'Enable Sound'}
       />
       <IconButton
         icon={CinematicIcon}
         active={isCinematicMode}
         onClick={toggleCinematic}
-        label="Cinematic Mode"
+        tooltip="Cinematic Mode"
       />
     </>
   )

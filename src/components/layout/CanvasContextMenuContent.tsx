@@ -141,6 +141,7 @@ export const CanvasContextMenuContent: React.FC<CanvasContextMenuContentProps> =
                   ariaLabel={item.label}
                   onClick={() => handleItemClick(item.action)}
                   onMouseEnter={handleItemHover}
+                  tooltip={`Run command: ${item.label}`}
                   className="w-full text-left px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex justify-between items-center transition-colors group rounded-none border-none bg-transparent"
                   size="sm"
                   variant="ghost"

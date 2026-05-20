@@ -56,6 +56,7 @@ export const GeometrySection: React.FC<GeometrySectionProps> = React.memo(
               onChange={handleGridResolutionChange}
               fullWidth
               ariaLabel="Density grid resolution"
+              tooltip="Density-grid resolution sampled per axis (higher = sharper, slower)"
               data-testid="density-grid-resolution"
             />
           </ControlGroup>

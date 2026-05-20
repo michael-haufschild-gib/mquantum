@@ -101,7 +101,7 @@ export const SrmtNullBaselineStrip: React.FC<SrmtNullBaselineStripProps> = ({ sn
 
   return (
     <div
-      className="rounded-md border px-2 py-1 text-[10px] font-mono tabular-nums"
+      className="rounded-md border px-2 py-1 text-3xs font-mono tabular-nums"
       style={{ color: palette.color, borderColor: palette.border, background: palette.bg }}
       data-testid="wdw-srmt-null-baseline-strip"
       data-falsified={falsified ? 'true' : 'false'}
@@ -155,7 +155,7 @@ export const SrmtNullBaselineStrip: React.FC<SrmtNullBaselineStripProps> = ({ sn
               rigid-ratio <span data-testid="wdw-srmt-rigid-ratio">{formatRatio(ratioRigid)}×</span>
             </span>
           </Tooltip>
-          <span className="text-[10px] grid grid-cols-3 gap-x-2" style={{ opacity: 0.75 }}>
+          <span className="text-3xs grid grid-cols-3 gap-x-2" style={{ opacity: 0.75 }}>
             <span data-testid="wdw-srmt-rigid-baseline-shuffled">
               rshuf {formatNumber(baselinesRigid.shuffled)}
             </span>

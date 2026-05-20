@@ -380,6 +380,7 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
                 size="sm"
                 variant="secondary"
                 onClick={() => actions.setDisorderSeed(Math.floor(Math.random() * 999999))}
+                tooltip="Draw a fresh random seed for the disordered potential"
                 data-testid="tdse-randomize-seed"
               >
                 Randomize Seed

@@ -241,6 +241,7 @@ export const MonitoringSweepSection: React.FC = React.memo(() => {
                 min={0.001}
                 max={10}
                 step={0.01}
+                tooltip="Lower bound of the monitoring-rate sweep range γ"
               />
               <NumberInput
                 label="γ max"
@@ -249,6 +250,7 @@ export const MonitoringSweepSection: React.FC = React.memo(() => {
                 min={0.01}
                 max={10}
                 step={0.1}
+                tooltip="Upper bound of the monitoring-rate sweep range γ"
               />
             </div>
             <div className="flex gap-2">
@@ -259,6 +261,7 @@ export const MonitoringSweepSection: React.FC = React.memo(() => {
                 min={5}
                 max={50}
                 step={1}
+                tooltip="Number of γ sample points across the sweep range"
               />
               <NumberInput
                 label="Time/step"
@@ -267,23 +270,39 @@ export const MonitoringSweepSection: React.FC = React.memo(() => {
                 min={0.1}
                 max={10}
                 step={0.1}
+                tooltip="Simulation time accumulated at each γ point"
               />
             </div>
           </div>
         )}
 
         {!isRunning && !isComplete && (
-          <Button size="sm" onClick={handleStartSweep} disabled={otherSweepRunning}>
+          <Button
+            size="sm"
+            onClick={handleStartSweep}
+            disabled={otherSweepRunning}
+            tooltip="Begin the CSL monitoring-rate sweep"
+          >
             Start Sweep
           </Button>
         )}
         {isRunning && (
-          <Button size="sm" variant="primary" onClick={handleAbort}>
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={handleAbort}
+            tooltip="Abort the in-progress monitoring-rate sweep"
+          >
             Abort
           </Button>
         )}
         {isComplete && (
-          <Button size="sm" variant="primary" onClick={handleClear}>
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={handleClear}
+            tooltip="Clear sweep results and start over"
+          >
             Clear
           </Button>
         )}

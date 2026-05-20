@@ -156,7 +156,12 @@ function AppContent() {
               <span className="text-text-primary font-medium">Firefox</span> instead.
             </p>
             <div className="flex justify-end pt-2">
-              <Button variant="primary" onClick={handleSafariAcknowledge} size="sm">
+              <Button
+                variant="primary"
+                onClick={handleSafariAcknowledge}
+                size="sm"
+                tooltip="Dismiss this Safari-compatibility notice and continue."
+              >
                 Understood
               </Button>
             </div>

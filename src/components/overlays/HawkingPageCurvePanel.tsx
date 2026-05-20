@@ -130,7 +130,7 @@ const PageCurvePanelInner: React.FC = React.memo(() => {
             onClick={handleClose}
             ariaLabel="Close Hawking Page Curve panel"
             className="!p-1 !min-w-0"
-            title="Close"
+            tooltip="Close the Hawking Page Curve panel"
             data-testid="hawking-page-curve-close"
           >
             <Icon name="cross" size={10} />

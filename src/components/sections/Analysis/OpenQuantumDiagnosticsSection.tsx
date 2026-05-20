@@ -126,7 +126,7 @@ export const OpenQuantumDiagnosticsSection: React.FC = React.memo(() => {
       {/* Per-state populations (hydrogen mode) */}
       {populationData.basisCount > 0 && (
         <div className="mt-3 space-y-1 px-1">
-          <span className="text-xs text-text-tertiary uppercase tracking-wider">
+          <span className="text-2xs text-text-tertiary uppercase tracking-wider">
             State Populations
           </span>
           {populationData.basisLabels.map((label, i) => (
@@ -142,6 +142,11 @@ export const OpenQuantumDiagnosticsSection: React.FC = React.memo(() => {
           size="sm"
           onClick={toggleFormulas}
           ariaLabel={showFormulas ? 'Hide formulas' : 'Show formulas'}
+          tooltip={
+            showFormulas
+              ? 'Hide the entropy formula reference'
+              : 'Show entropy formulas used in this panel'
+          }
           className="text-xs text-accent-cyan hover:text-accent-cyan/80 px-0 py-0"
         >
           {showFormulas ? 'Hide Formulas' : 'Formulas'}

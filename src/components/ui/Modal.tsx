@@ -103,12 +103,18 @@ export const Modal: React.FC<ModalProps> = React.memo(
         <div className="bg-panel border border-panel-border rounded-lg shadow-2xl overflow-hidden pointer-events-auto">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-panel-border bg-panel-header/50">
-            <h2
-              id={titleId}
-              className="text-sm font-bold text-text-primary tracking-wide uppercase"
-            >
-              {title}
-            </h2>
+            <div className="flex items-center gap-2 min-w-0">
+              <span
+                className="inline-block w-1 h-3.5 rounded-sm bg-accent/80 shadow-[0_0_6px_var(--color-accent-glow)] shrink-0"
+                aria-hidden
+              />
+              <h2
+                id={titleId}
+                className="text-sm font-semibold tracking-tight text-text-primary truncate"
+              >
+                {title}
+              </h2>
+            </div>
             <Button
               variant="ghost"
               size="icon"

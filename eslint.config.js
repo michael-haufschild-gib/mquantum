@@ -16,10 +16,60 @@ import globals from 'globals'
 const ASSET_EXT_RE = /\.(webp|png|jpe?g|svg|gif|avif)['"]?\s*$/i
 const HEX_COLOR_RE = /#([0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{4}|[0-9a-f]{3})(?![0-9a-f])/i
 const FUNC_COLOR_RE = /\b(?:rgba?|hsla?|oklch|color-mix)\s*\(/i
+// Tailwind arbitrary-value matcher for typography/spacing utilities. Matches
+// e.g. `text-[10px]`, `tracking-[0.14em]`, `leading-[1.2]`, `font-[700]`,
+// `gap-[1px]`, `space-x-[3px]`. Inner `var(--token)` references are
+// explicitly allowed at the call site below — those are token-driven, not
+// magic. The rule scope is deliberately narrow: it does NOT touch color or
+// shadow arbitraries (`bg-[var()]`, `shadow-[...]`, `border-[var()]`) which
+// have their own conventions and `no-hardcoded-colors`.
+const TW_ARBITRARY_TYPOGRAPHY_RE =
+  /\b(text|tracking|leading|font|gap|space-[xy])-\[([^\]]+)\]/g
 const EMOJI_RE =
   /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{231A}\u{231B}\u{23E9}-\u{23F3}\u{23F8}-\u{23FA}\u{25AA}\u{25AB}\u{25B6}\u{25C0}\u{25FB}-\u{25FE}\u{2934}\u{2935}\u{2B05}-\u{2B07}\u{2B1B}\u{2B1C}\u{2B50}\u{2B55}\u{3030}\u{303D}\u{3297}\u{3299}\u{200D}\u{FE0F}]/u
 
 const RAW_HTML_CONTROLS = new Set(['input', 'select', 'button', 'textarea'])
+
+// Interactive UI primitives that must always carry a `tooltip` prop at every
+// call site. Each of these accepts `tooltip?: string` (see src/components/ui/*),
+// renders a <Tooltip> wrapper around the control, and is the canonical way to
+// build an interactive surface in this codebase. The rule that enforces this
+// (`project-rules/require-interactive-tooltip`) does not run inside
+// src/components/ui/, so the primitives themselves are free to compose without
+// passing a tooltip to their own sub-elements.
+//
+// `FileInput` is intentionally excluded: it renders a hidden <input> driven
+// only programmatically (via ref.click() from a Button), so a tooltip on it
+// can never be surfaced to the user. The triggering Button carries the tooltip.
+const INTERACTIVE_PRIMITIVES = new Set([
+  'Button',
+  'Switch',
+  'Slider',
+  'ToggleButton',
+  'Select',
+  'Input',
+  'NumberInput',
+  'Knob',
+  'ToggleGroup',
+  'MultiToggleGroup',
+  'ColorPicker',
+  'TileButton',
+  'InlineEdit',
+])
+
+// Click-equivalent event handlers. A JSX element carrying any of these is
+// interactive from a user's perspective and therefore must be discoverable
+// via a tooltip (or wrapped in <Tooltip>).
+const CLICK_HANDLER_PROPS = new Set([
+  'onClick',
+  'onMouseDown',
+  'onMouseUp',
+  'onDoubleClick',
+  'onPointerDown',
+  'onPointerUp',
+])
+
+const MIN_TOOLTIP_LENGTH = 8
 
 // DOM traversal methods and properties that bypass testing-library's
 // user-centric query model, coupling tests to implementation details.
@@ -170,6 +220,85 @@ const projectRulesPlugin = {
             }
           },
           JSXText(node) {
+            check(node.value, node)
+          },
+        }
+      },
+    },
+
+    // ---- no-arbitrary-tw-tokens ----
+    // Bans Tailwind arbitrary-value utilities for typography and spacing
+    // (`text-[10px]`, `tracking-[0.14em]`, `leading-[1.2]`, `font-[700]`,
+    // `gap-[1px]`, `space-x-[3px]`). The semantic alternative is to extend
+    // `@theme` in `src/index.css` with named tokens (`--text-2xs`,
+    // `--tracking-brand`, …) and use the resulting utility (`text-2xs`,
+    // `tracking-brand`). Bracketed values whose inner content references a
+    // CSS variable (`text-[var(--text-primary)]`) are permitted — those are
+    // token-driven, not magic.
+    //
+    // Color and shadow arbitrary values are intentionally NOT covered here;
+    // `no-hardcoded-colors` already governs that domain.
+    //
+    // Scope: src/**/*.{ts,tsx}; tests, mocks, WGSL helpers, generated WASM
+    // bundles, config files all skip.
+    'no-arbitrary-tw-tokens': {
+      meta: {
+        type: 'problem',
+        docs: {
+          description:
+            'Disallow magic typography/spacing values in Tailwind arbitrary brackets — extend @theme and use a semantic utility',
+        },
+        messages: {
+          noArbitraryToken:
+            'Magic typography/spacing value `{{ match }}` — add a token to @theme in src/index.css and use the named utility instead (or `var(--token)` inside the brackets).',
+        },
+        schema: [],
+      },
+      create(context) {
+        const fp = normalizePath(context.filename)
+        if (!fp.endsWith('.ts') && !fp.endsWith('.tsx')) return {}
+        if (
+          fp.endsWith('.wgsl.ts') ||
+          fp.includes('.test.') ||
+          fp.includes('.spec.') ||
+          fp.includes('__mocks__') ||
+          fp.includes('eslint.config') ||
+          fp.includes('vite.config') ||
+          fp.includes('vitest.config') ||
+          fp.includes('tailwind.config')
+        ) {
+          return {}
+        }
+
+        function check(value, node) {
+          if (typeof value !== 'string') return
+          // Bracketed values containing var(--token) are token-driven —
+          // exclude them before the typography matcher even runs.
+          TW_ARBITRARY_TYPOGRAPHY_RE.lastIndex = 0
+          let match
+          while ((match = TW_ARBITRARY_TYPOGRAPHY_RE.exec(value)) !== null) {
+            const inner = match[2]
+            if (inner.includes('var(')) continue
+            context.report({
+              node,
+              messageId: 'noArbitraryToken',
+              data: { match: match[0] },
+            })
+          }
+        }
+
+        return {
+          Literal(node) {
+            check(node.value, node)
+          },
+          TemplateLiteral(node) {
+            for (const quasi of node.quasis) {
+              check(quasi.value.raw, node)
+            }
+          },
+          JSXText(node) {
+            // JSXText (e.g. children) does not normally carry class strings,
+            // but tagged-template `clsx` consumers occasionally inline them.
             check(node.value, node)
           },
         }
@@ -781,6 +910,195 @@ const projectRulesPlugin = {
         }
       },
     },
+
+    // ---- require-interactive-tooltip ----
+    // Every interactive primitive (Button, Switch, Slider, ToggleButton,
+    // Select, Input, NumberInput, Knob, ToggleGroup, MultiToggleGroup,
+    // ColorPicker, TileButton, FileInput, InlineEdit) and every JSX element
+    // with a click-equivalent handler (onClick, onMouseDown, onMouseUp,
+    // onDoubleClick, onPointerDown, onPointerUp) must carry one of:
+    //   - a `tooltip` prop (string literal of >= 8 chars, or an expression),
+    //   - a `title` attribute (string literal of >= 8 chars, or an expression),
+    //   - a direct ancestor <Tooltip> element with a `content` prop of
+    //     >= 8 chars (string literal or expression).
+    //
+    // The rule does not run inside src/components/ui/ — primitives define
+    // themselves there and compose the <Tooltip> wrapper internally — and is
+    // skipped on test and spec files.
+    'require-interactive-tooltip': {
+      meta: {
+        type: 'problem',
+        docs: {
+          description:
+            'Interactive elements must have a discoverable tooltip of at least 8 characters',
+        },
+        messages: {
+          missingPrimitive:
+            '<{{ name }}> must pass a `tooltip` prop (at least 8 characters) or be wrapped in <Tooltip content="..."> with at least 8 characters.',
+          missingOnClick:
+            'JSX element <{{ name }}> with a click handler must pass a `tooltip` or `title` (at least 8 characters), or be wrapped in <Tooltip content="..."> with at least 8 characters.',
+          tooShort:
+            '`{{ prop }}` on <{{ name }}> must be at least 8 characters (got {{ length }}).',
+          tooltipContentTooShort:
+            '<Tooltip content="..."> wrapping <{{ name }}> must be at least 8 characters (got {{ length }}).',
+        },
+        schema: [],
+      },
+      create(context) {
+        if (isUnderUiDir(context.filename)) return {}
+        const fp = normalizePath(context.filename)
+        if (fp.includes('.test.') || fp.includes('.spec.')) return {}
+
+        function getAttr(openingNode, attrName) {
+          for (const attr of openingNode.attributes) {
+            if (
+              attr.type === 'JSXAttribute' &&
+              attr.name &&
+              attr.name.type === 'JSXIdentifier' &&
+              attr.name.name === attrName
+            ) {
+              return attr
+            }
+          }
+          return null
+        }
+
+        function getClickHandlerName(openingNode) {
+          for (const attr of openingNode.attributes) {
+            if (
+              attr.type === 'JSXAttribute' &&
+              attr.name &&
+              attr.name.type === 'JSXIdentifier' &&
+              CLICK_HANDLER_PROPS.has(attr.name.name)
+            ) {
+              return attr.name.name
+            }
+          }
+          return null
+        }
+
+        // Returns the static string length of an attribute value, or:
+        //   - `Infinity` if the value is a dynamic expression (we trust the
+        //     author to supply >= 8 chars at runtime; static analysis cannot
+        //     prove or disprove this),
+        //   - `null` if the attribute is absent or its value is unsupported
+        //     (boolean shorthand, spread, etc.).
+        function attrStringLength(attr) {
+          if (!attr) return null
+          const v = attr.value
+          if (!v) return null
+          if (v.type === 'Literal' && typeof v.value === 'string') {
+            return v.value.length
+          }
+          if (v.type === 'JSXExpressionContainer') {
+            const expr = v.expression
+            if (expr.type === 'Literal' && typeof expr.value === 'string') {
+              return expr.value.length
+            }
+            if (
+              expr.type === 'TemplateLiteral' &&
+              expr.expressions.length === 0 &&
+              expr.quasis.length === 1
+            ) {
+              return expr.quasis[0].value.cooked.length
+            }
+            // Any other expression: dynamic. Trust the author.
+            return Infinity
+          }
+          return null
+        }
+
+        // Walks up the JSX ancestor chain to find an enclosing <Tooltip>.
+        // Returns the opening element node, or null. We treat only direct
+        // JSXElement parents as "wrapping" — interleaved fragments are fine,
+        // but a child several JSX levels deep does not inherit a tooltip.
+        function findEnclosingTooltip(jsxOpening) {
+          // jsxOpening.parent → JSXElement, then JSXElement.parent up the tree
+          let current = jsxOpening.parent
+          // Skip the element this opening belongs to.
+          if (current && current.type === 'JSXElement') {
+            current = current.parent
+          }
+          while (current) {
+            if (current.type === 'JSXElement') {
+              const open = current.openingElement
+              const openName =
+                open && open.name && open.name.type === 'JSXIdentifier' ? open.name.name : null
+              if (openName === 'Tooltip') return open
+              current = current.parent
+              continue
+            }
+            if (current.type === 'JSXFragment') {
+              current = current.parent
+              continue
+            }
+            // Bail at the first non-JSX boundary (function body, conditional
+            // expression, list literal, etc.) — a tooltip on the other side
+            // of a render boundary is not a wrapper.
+            return null
+          }
+          return null
+        }
+
+        return {
+          JSXOpeningElement(node) {
+            const name = node.name.type === 'JSXIdentifier' ? node.name.name : null
+            if (!name) return
+
+            const isPrimitive = INTERACTIVE_PRIMITIVES.has(name)
+            const clickHandler = isPrimitive ? null : getClickHandlerName(node)
+            if (!isPrimitive && !clickHandler) return
+
+            const tooltipAttr = getAttr(node, 'tooltip')
+            const titleAttr = getAttr(node, 'title')
+
+            // Primitives accept `tooltip`; non-primitive onClick targets may
+            // use either `tooltip` (forwarded to a child primitive) or the
+            // native `title` attribute. The rule accepts whichever is set.
+            const directAttr = tooltipAttr ?? titleAttr
+            const directPropName = tooltipAttr ? 'tooltip' : 'title'
+
+            if (directAttr) {
+              const len = attrStringLength(directAttr)
+              if (len !== null && len !== Infinity && len < MIN_TOOLTIP_LENGTH) {
+                context.report({
+                  node: directAttr,
+                  messageId: 'tooShort',
+                  data: { name, prop: directPropName, length: String(len) },
+                })
+              }
+              return
+            }
+
+            // No direct attribute — fall back to a wrapping <Tooltip content="...">.
+            const wrapper = findEnclosingTooltip(node)
+            if (wrapper) {
+              const contentAttr = getAttr(wrapper, 'content')
+              const len = attrStringLength(contentAttr)
+              if (len === Infinity || (len !== null && len >= MIN_TOOLTIP_LENGTH)) {
+                return
+              }
+              if (len !== null) {
+                context.report({
+                  node: contentAttr ?? wrapper,
+                  messageId: 'tooltipContentTooShort',
+                  data: { name, length: String(len) },
+                })
+                return
+              }
+              // Wrapper exists but has no usable content — fall through to the
+              // missing-tooltip report on the inner element.
+            }
+
+            context.report({
+              node,
+              messageId: isPrimitive ? 'missingPrimitive' : 'missingOnClick',
+              data: { name },
+            })
+          },
+        }
+      },
+    },
   },
 }
 
@@ -964,12 +1282,14 @@ export default [
       // Custom project rules
       'project-rules/no-direct-asset-imports': 'error',
       'project-rules/no-hardcoded-colors': 'error',
+      'project-rules/no-arbitrary-tw-tokens': 'error',
       'project-rules/no-emoji': 'error',
       'project-rules/no-raw-html-controls': 'error',
       'project-rules/no-shallow-matchers': 'error',
       'project-rules/no-dom-node-access': 'error',
       'project-rules/no-behavioral-string-test': 'error',
       'project-rules/require-gpu-labels': 'error',
+      'project-rules/require-interactive-tooltip': 'error',
     },
   },
 

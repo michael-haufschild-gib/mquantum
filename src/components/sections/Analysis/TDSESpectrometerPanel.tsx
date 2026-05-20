@@ -414,7 +414,7 @@ export const TDSESpectrometerPanel: React.FC<TDSESpectrometerPanelProps> = React
           {/* Peak list — ω and E = ℏω */}
           {spectrum && spectrum.peaks.length > 0 && (
             <div className="mt-1" data-testid="heller-peak-list">
-              <p className="text-xs text-text-secondary mb-0.5 uppercase tracking-wider">
+              <p className="text-2xs text-text-secondary mb-0.5 uppercase tracking-wider">
                 Top peaks
               </p>
               <div className="text-xs font-mono">
@@ -444,7 +444,7 @@ export const TDSESpectrometerPanel: React.FC<TDSESpectrometerPanelProps> = React
           )}
 
           {/* Advanced disclosure for sample interval — hidden by default */}
-          <details className="mt-2 text-xs" data-testid="heller-advanced-disclosure">
+          <details className="mt-2 text-2xs" data-testid="heller-advanced-disclosure">
             <summary className="cursor-pointer text-text-tertiary uppercase tracking-wider select-none">
               Advanced
             </summary>

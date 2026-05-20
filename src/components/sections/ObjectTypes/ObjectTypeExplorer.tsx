@@ -149,11 +149,11 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
       initial="hidden"
       animate="show"
     >
-      <div className="text-xs font-bold uppercase tracking-widest text-text-tertiary px-1">
+      <div className="text-2xs font-semibold uppercase tracking-wider text-text-tertiary px-1">
         Analytic
       </div>
       {analyticTypes.map(renderCard)}
-      <div className="text-xs font-bold uppercase tracking-widest text-text-tertiary px-1 mt-2">
+      <div className="text-2xs font-semibold uppercase tracking-wider text-text-tertiary px-1 mt-2">
         Compute (GPU)
       </div>
       {computeTypes.map(renderCard)}

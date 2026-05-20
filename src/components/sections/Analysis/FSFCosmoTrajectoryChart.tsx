@@ -129,7 +129,7 @@ export const FSFCosmoTrajectoryChart: React.FC<FSFCosmoTrajectoryChartProps> = R
     if (!chart) return null
     return (
       <div className="mt-2" data-testid="fsf-cosmo-trajectory">
-        <p className="text-[10px] text-text-tertiary uppercase tracking-wider">
+        <p className="text-3xs text-text-tertiary uppercase tracking-wider">
           Cosmological trajectory S(L_A, η)
         </p>
         <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">

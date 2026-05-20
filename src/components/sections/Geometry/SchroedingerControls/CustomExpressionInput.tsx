@@ -88,6 +88,7 @@ export const CustomExpressionInput: React.FC<CustomExpressionInputProps> = React
                 setLocalExpr(p.expr)
                 onChange(p.expr)
               }}
+              tooltip={`Insert the ${p.label} potential expression`}
               className="px-2 py-0.5 text-xs"
             >
               {p.label}

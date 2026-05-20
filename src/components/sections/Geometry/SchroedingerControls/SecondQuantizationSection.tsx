@@ -159,6 +159,7 @@ export function SecondQuantizationSection({
           checked={sqLayerEnabled}
           onCheckedChange={actions.setEnabled}
           ariaLabel="Toggle second quantization layer"
+          tooltip="Show or hide the second-quantization (Fock/Coherent/Squeezed) layer"
           data-testid="sq-layer-toggle"
         />
       }
@@ -274,6 +275,7 @@ export function SecondQuantizationSection({
                   actions.setSelectedModeIndex(0)
                   actions.setFockQuantumNumber(0)
                 }}
+                tooltip="Set the vacuum Fock state |0⟩ on mode 0"
                 data-testid="sq-preset-vacuum"
               >
                 Vacuum |0⟩
@@ -286,6 +288,7 @@ export function SecondQuantizationSection({
                   actions.setCoherentAlphaRe(1.0)
                   actions.setCoherentAlphaIm(0.0)
                 }}
+                tooltip="Set a unit coherent state |α=1⟩"
                 data-testid="sq-preset-coherent"
               >
                 Coherent |α=1⟩
@@ -298,6 +301,7 @@ export function SecondQuantizationSection({
                   actions.setSqueezeR(1.5)
                   actions.setSqueezeTheta(0)
                 }}
+                tooltip="Set a squeezed state with r=1.5, θ=0"
                 data-testid="sq-preset-squeezed"
               >
                 Squeezed (r=1.5)

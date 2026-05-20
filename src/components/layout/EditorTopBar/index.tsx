@@ -316,6 +316,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
               ariaLabel="Toggle Explorer"
               aria-expanded={showLeftPanel}
               data-testid="toggle-left-panel"
+              tooltip="Show or hide the left explorer panel"
               className={`p-1.5 ${
                 showLeftPanel
                   ? 'bg-accent/10 text-accent'
@@ -338,16 +339,17 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
             </Button>
 
             {/* Desktop Menus (Hidden on Mobile) */}
-            <div className="hidden sm:flex items-center gap-2 text-xs text-text-secondary">
+            <div className="hidden sm:flex items-center gap-1 text-sm text-text-secondary">
               <DropdownMenu
                 trigger={
                   <Button
                     variant="ghost"
                     size="sm"
                     data-testid="menu-file"
-                    className="px-2 py-1 font-medium tracking-wide"
+                    tooltip="Open the File menu (export, share, reset)"
+                    className="px-2.5 py-1 font-medium"
                   >
-                    FILE
+                    File
                   </Button>
                 }
                 items={fileItems}
@@ -358,9 +360,10 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
                     variant="ghost"
                     size="sm"
                     data-testid="menu-view"
-                    className="px-2 py-1 font-medium tracking-wide"
+                    tooltip="Open the View menu (panels, overlays, theme)"
+                    className="px-2.5 py-1 font-medium"
                   >
-                    VIEW
+                    View
                   </Button>
                 }
                 items={viewItems}
@@ -371,9 +374,10 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
                     variant="ghost"
                     size="sm"
                     data-testid="menu-scenes"
-                    className="px-2 py-1 font-medium tracking-wide"
+                    tooltip="Open the Scenes menu (load or save scene presets)"
+                    className="px-2.5 py-1 font-medium"
                   >
-                    SCENES
+                    Scenes
                   </Button>
                 }
                 items={sceneSubmenuItems}
@@ -384,9 +388,10 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
                     variant="ghost"
                     size="sm"
                     data-testid="menu-styles"
-                    className="px-2 py-1 font-medium tracking-wide"
+                    tooltip="Open the Styles menu (load or save style presets)"
+                    className="px-2.5 py-1 font-medium"
                   >
-                    STYLES
+                    Styles
                   </Button>
                 }
                 items={styleSubmenuItems}
@@ -397,7 +402,13 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
             <div className="flex sm:hidden">
               <DropdownMenu
                 trigger={
-                  <Button variant="ghost" size="icon" ariaLabel="Menu" className="p-1.5">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    ariaLabel="Menu"
+                    tooltip="Open the unified mobile menu"
+                    className="p-1.5"
+                  >
                     <svg
                       width="20"
                       height="20"
@@ -439,6 +450,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
               ariaLabel="Toggle Inspector"
               aria-expanded={showRightPanel}
               data-testid="toggle-right-panel"
+              tooltip="Show or hide the right inspector panel"
               className={`p-1.5 ${
                 showRightPanel
                   ? 'bg-accent/10 text-accent'

@@ -62,6 +62,7 @@ export const RotationAnimationDrawer: React.FC<RotationAnimationDrawerProps> = R
                 variant="ghost"
                 size="sm"
                 onClick={() => animateAll(dimension)}
+                tooltip="Animate every available rotation plane"
                 className="text-xs uppercase font-bold text-accent hover:text-accent-glow px-2 py-1"
               >
                 Select All
@@ -70,6 +71,7 @@ export const RotationAnimationDrawer: React.FC<RotationAnimationDrawerProps> = R
                 variant="ghost"
                 size="sm"
                 onClick={clearAllPlanes}
+                tooltip="Stop animating all rotation planes"
                 className="text-xs uppercase font-bold px-2 py-1"
               >
                 Deselect All
@@ -79,6 +81,7 @@ export const RotationAnimationDrawer: React.FC<RotationAnimationDrawerProps> = R
                 size="icon"
                 onClick={() => randomizePlanes(dimension)}
                 ariaLabel="Randomize rotation planes"
+                tooltip="Randomize which rotation planes animate"
                 className="w-7 h-7 p-0 rounded-lg flex items-center justify-center text-text-secondary hover:text-accent"
               >
                 <Icon name="dice" size={14} />
@@ -97,7 +100,7 @@ export const RotationAnimationDrawer: React.FC<RotationAnimationDrawerProps> = R
                   onToggle={() => togglePlane(plane.name)}
                   ariaLabel={`Toggle ${plane.name} rotation`}
                   tooltip={`Toggle ${plane.name} rotation`}
-                  className="flex-1 min-w-[60px] px-3 py-2 text-xs font-mono text-center uppercase tracking-wider"
+                  className="flex-1 min-w-[60px] px-3 py-2 text-2xs font-mono text-center uppercase tracking-wider"
                 >
                   {plane.name}
                 </ToggleButton>

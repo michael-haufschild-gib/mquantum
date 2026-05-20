@@ -184,7 +184,7 @@ function Chip({
   }[tone]
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${palette}`}
+      className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-3xs font-medium ${palette}`}
       title={tooltip}
     >
       {label}
@@ -270,6 +270,7 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
         options={PRESET_OPTIONS}
         value={preset}
         onChange={setPreset}
+        tooltip="Quick AdS preset (AdS₃, AdS₄/CFT₃, BTZ, KW window, etc.)"
         data-testid="ads-preset-select"
       />
 
@@ -366,6 +367,7 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
               label="Boundary overlay |O|²"
               checked={boundaryOverlay}
               onCheckedChange={setBoundary}
+              tooltip="Overlay the boundary primary operator |O|² on the bulk"
               data-testid="ads-boundary-overlay-switch"
             />
           )}
@@ -378,6 +380,7 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
             label="HKLL reconstruction"
             checked={hkllEnabled}
             onCheckedChange={setHkllEnabled}
+            tooltip="Enable HKLL boundary-to-bulk smearing reconstruction"
             data-testid="ads-hkll-toggle"
           />
           {hkllEnabled && <AntiDeSitterHkllControls ads={ads} />}

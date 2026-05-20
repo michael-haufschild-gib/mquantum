@@ -230,6 +230,7 @@ export const CropBox = ({ containerRef, crop, onCropChange, minSize = 0.05 }: Cr
           className={`absolute w-10 h-10 sm:w-8 sm:h-8 z-20 group touch-none ${h.pos}`}
           style={{ cursor: h.cursor }}
           onPointerDown={(e) => startResize(e, h.id)}
+          title="Drag to resize the crop selection"
           data-testid={`crop-handle-${h.id}`}
         >
           <div

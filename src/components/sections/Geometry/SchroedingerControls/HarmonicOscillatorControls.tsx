@@ -44,6 +44,7 @@ export const HarmonicOscillatorControls: React.FC<HarmonicOscillatorControlsProp
               variant="ghost"
               size="sm"
               onClick={() => randomizeSeed()}
+              tooltip="Draw a new random seed for HO superposition states"
               data-testid="schroedinger-randomize-seed"
             >
               Randomize

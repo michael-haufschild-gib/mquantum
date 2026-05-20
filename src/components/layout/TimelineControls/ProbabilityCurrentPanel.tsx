@@ -90,6 +90,7 @@ export const ProbabilityCurrentPanel: React.FC<ProbabilityCurrentPanelProps> = R
         options={STYLE_OPTIONS}
         value={config.probabilityCurrentStyle ?? 'magnitude'}
         onChange={setProbabilityCurrentStyle}
+        tooltip="Visualization style for the probability current"
         data-testid="schroedinger-probability-current-style"
       />
       <div className="grid grid-cols-2 gap-2">
@@ -98,6 +99,7 @@ export const ProbabilityCurrentPanel: React.FC<ProbabilityCurrentPanelProps> = R
           options={PLACEMENT_OPTIONS}
           value={config.probabilityCurrentPlacement ?? 'isosurface'}
           onChange={setProbabilityCurrentPlacement}
+          tooltip="Where current samples are placed (isosurface or volume)"
           data-testid="schroedinger-probability-current-placement"
         />
         <Select
@@ -105,6 +107,7 @@ export const ProbabilityCurrentPanel: React.FC<ProbabilityCurrentPanelProps> = R
           options={COLOR_MODE_OPTIONS}
           value={config.probabilityCurrentColorMode ?? 'magnitude'}
           onChange={setProbabilityCurrentColorMode}
+          tooltip="How current values are mapped to color"
           data-testid="schroedinger-probability-current-color-mode"
         />
       </div>
@@ -116,6 +119,7 @@ export const ProbabilityCurrentPanel: React.FC<ProbabilityCurrentPanelProps> = R
         value={config.probabilityCurrentScale ?? 1.0}
         onChange={setProbabilityCurrentScale}
         showValue
+        tooltip="Overall visual amplitude of the current field"
         data-testid="schroedinger-probability-current-scale"
       />
       <Slider
@@ -126,6 +130,7 @@ export const ProbabilityCurrentPanel: React.FC<ProbabilityCurrentPanelProps> = R
         value={config.probabilityCurrentSpeed ?? 1.0}
         onChange={setProbabilityCurrentSpeed}
         showValue
+        tooltip="Animation speed of flow advection (visual only)"
         data-testid="schroedinger-probability-current-speed"
       />
       <Slider
@@ -136,6 +141,7 @@ export const ProbabilityCurrentPanel: React.FC<ProbabilityCurrentPanelProps> = R
         value={config.probabilityCurrentDensityThreshold ?? 0.01}
         onChange={setProbabilityCurrentDensityThreshold}
         showValue
+        tooltip="Hide current samples below this |ψ|² density"
         data-testid="schroedinger-probability-current-density-threshold"
       />
       <Slider
@@ -146,6 +152,7 @@ export const ProbabilityCurrentPanel: React.FC<ProbabilityCurrentPanelProps> = R
         value={config.probabilityCurrentMagnitudeThreshold ?? 0.0}
         onChange={setProbabilityCurrentMagnitudeThreshold}
         showValue
+        tooltip="Hide current samples below this |j| magnitude"
         data-testid="schroedinger-probability-current-magnitude-threshold"
       />
       <p className="text-xs text-text-tertiary">
@@ -164,6 +171,7 @@ export const ProbabilityCurrentPanel: React.FC<ProbabilityCurrentPanelProps> = R
           value={config.probabilityCurrentOpacity ?? 0.7}
           onChange={setProbabilityCurrentOpacity}
           showValue
+          tooltip="Transparency of the current-arrow glyphs"
           data-testid="schroedinger-probability-current-opacity"
         />
       )}
@@ -178,6 +186,7 @@ export const ProbabilityCurrentPanel: React.FC<ProbabilityCurrentPanelProps> = R
             value={config.probabilityCurrentLineDensity ?? 8.0}
             onChange={setProbabilityCurrentLineDensity}
             showValue
+            tooltip="Streamline count per unit area"
             data-testid="schroedinger-probability-current-line-density"
           />
           <Slider
@@ -188,6 +197,7 @@ export const ProbabilityCurrentPanel: React.FC<ProbabilityCurrentPanelProps> = R
             value={config.probabilityCurrentStepSize ?? 0.04}
             onChange={setProbabilityCurrentStepSize}
             showValue
+            tooltip="Per-step distance for streamline integration"
             data-testid="schroedinger-probability-current-step-size"
           />
           <Slider
@@ -198,6 +208,7 @@ export const ProbabilityCurrentPanel: React.FC<ProbabilityCurrentPanelProps> = R
             value={config.probabilityCurrentSteps ?? 20}
             onChange={setProbabilityCurrentSteps}
             showValue
+            tooltip="Number of integration steps per streamline"
             data-testid="schroedinger-probability-current-steps"
           />
         </>

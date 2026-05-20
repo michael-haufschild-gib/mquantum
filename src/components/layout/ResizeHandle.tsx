@@ -121,6 +121,7 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = React.memo(({ className
       role="separator"
       aria-orientation="vertical"
       aria-label="Resize sidebar"
+      title="Drag to resize the sidebar"
     >
       {/* Visual handle line */}
       <div

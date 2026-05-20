@@ -23,7 +23,7 @@ export const OceanControls: React.FC<OceanControlsProps> = ({
 }) => {
   return (
     <div className="space-y-4 border-s-2 border-cyan-500/30 ps-4">
-      <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider block mb-2">
+      <span className="text-2xs font-semibold text-cyan-400 uppercase tracking-wider block mb-2">
         Ocean Depth
       </span>
 

@@ -29,7 +29,7 @@ export const ExportTextTab = () => {
       >
         <div className="flex flex-col">
           <span className="font-bold text-sm text-text-primary">Enable Overlay</span>
-          <span className="text-xs text-text-tertiary uppercase tracking-wide">
+          <span className="text-2xs text-text-tertiary uppercase tracking-wider">
             Add watermarks or titles
           </span>
         </div>
@@ -44,20 +44,21 @@ export const ExportTextTab = () => {
       {textOverlay.enabled && (
         <div className="space-y-6">
           <div className="space-y-2">
-            <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
+            <label className="text-2xs text-text-tertiary uppercase font-medium tracking-wider">
               Text Content
             </label>
             <Input
               value={textOverlay.text}
               onChange={(e) => update({ text: e.target.value })}
               placeholder="Enter text..."
+              tooltip="Text burned into each exported frame"
               className="text-lg font-bold"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
+              <label className="text-2xs text-text-tertiary uppercase font-medium tracking-wider">
                 Font Size
               </label>
               <NumberInput
@@ -69,7 +70,7 @@ export const ExportTextTab = () => {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
+              <label className="text-2xs text-text-tertiary uppercase font-medium tracking-wider">
                 Weight
               </label>
               <Select
@@ -88,7 +89,7 @@ export const ExportTextTab = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
+            <label className="text-2xs text-text-tertiary uppercase font-medium tracking-wider">
               Opacity
             </label>
             <Slider
@@ -105,7 +106,7 @@ export const ExportTextTab = () => {
           <div className="space-y-4 pt-4 border-t border-border-subtle">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
+                <label className="text-2xs text-text-tertiary uppercase font-medium tracking-wider">
                   Text Color
                 </label>
                 <ColorPicker
@@ -115,7 +116,7 @@ export const ExportTextTab = () => {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
+                <label className="text-2xs text-text-tertiary uppercase font-medium tracking-wider">
                   Shadow Color
                 </label>
                 <ColorPicker
@@ -128,12 +129,12 @@ export const ExportTextTab = () => {
           </div>
 
           <div className="space-y-4 pt-4 border-t border-border-subtle">
-            <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
+            <label className="text-2xs text-text-tertiary uppercase font-medium tracking-wider">
               Placement
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs text-text-tertiary uppercase tracking-wide">
+                <label className="text-2xs text-text-tertiary uppercase tracking-wider">
                   Vertical
                 </label>
                 <ToggleGroup
@@ -150,7 +151,7 @@ export const ExportTextTab = () => {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs text-text-tertiary uppercase tracking-wide">
+                <label className="text-2xs text-text-tertiary uppercase tracking-wider">
                   Horizontal
                 </label>
                 <ToggleGroup
