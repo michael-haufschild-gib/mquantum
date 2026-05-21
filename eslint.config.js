@@ -21,8 +21,10 @@ const FUNC_COLOR_RE = /\b(?:rgba?|hsla?|oklch|color-mix)\s*\(/i
 // `gap-[1px]`, `space-x-[3px]`. Inner `var(--token)` references are
 // explicitly allowed at the call site below — those are token-driven, not
 // magic. The rule scope is deliberately narrow: it does NOT touch color or
-// shadow arbitraries (`bg-[var()]`, `shadow-[...]`, `border-[var()]`) which
-// have their own conventions and `no-hardcoded-colors`.
+// shadow arbitrary classes, which have their own conventions and
+// `no-hardcoded-colors`. Keep this comment free of class-like examples:
+// Tailwind scans source comments and will emit malformed utilities for
+// illustrative empty `var()` examples.
 const TW_ARBITRARY_TYPOGRAPHY_RE =
   /\b(text|tracking|leading|font|gap|space-[xy])-\[([^\]]+)\]/g
 const EMOJI_RE =

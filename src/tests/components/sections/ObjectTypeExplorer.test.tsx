@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { act, fireEvent, render, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { SchroedingerControls } from '@/components/sections/Geometry/SchroedingerControls'
 import { ObjectTypeExplorer } from '@/components/sections/ObjectTypes/ObjectTypeExplorer'
@@ -29,6 +29,66 @@ describe('ObjectTypeExplorer quantum mode entries', () => {
 
     fireEvent.click(screen.getByTestId('object-type-hydrogenND'))
     expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('hydrogenND')
+  })
+
+  it('shows validation evidence on mode cards', () => {
+    render(
+      <ToastProvider>
+        <ObjectTypeExplorer />
+      </ToastProvider>
+    )
+
+    expect(screen.getByTestId('object-type-harmonicOscillator-validation')).toHaveTextContent(
+      /A\+P\s*Strong/
+    )
+    expect(screen.getByTestId('object-type-hydrogenND-validation')).toHaveTextContent(
+      /R\+A\+P\s*Strong/
+    )
+    expect(screen.getByTestId('object-type-pauliSpinor-validation')).toHaveTextContent(
+      /F\s*Fixture/
+    )
+  })
+
+  it('shows representative validation source paths in badge tooltip', async () => {
+    vi.useFakeTimers()
+    try {
+      render(
+        <ToastProvider>
+          <ObjectTypeExplorer />
+        </ToastProvider>
+      )
+
+      fireEvent.mouseEnter(screen.getByTestId('object-type-harmonicOscillator-validation'))
+      await act(async () => {
+        vi.advanceTimersByTime(150)
+      })
+
+      const tooltip = screen.getByRole('tooltip')
+      expect(tooltip).toHaveTextContent('lib/math/hermitePolynomials.property.test.ts')
+      expect(tooltip).toHaveTextContent('docs/physics/validation-status.md')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('previews dimension, representation, and evidence impacts before switching mode', () => {
+    useGeometryStore.getState().setDimension(2)
+    useExtendedObjectStore.getState().setSchroedingerRepresentation('momentum')
+
+    render(
+      <ToastProvider>
+        <ObjectTypeExplorer />
+      </ToastProvider>
+    )
+
+    const tdseHints = screen.getByTestId('object-type-tdseDynamics-suitability')
+    expect(tdseHints).toHaveTextContent('Will switch to 3D')
+    expect(tdseHints).toHaveTextContent('Will use Position')
+    expect(tdseHints).toHaveTextContent('Known limits')
+
+    fireEvent.click(screen.getByTestId('object-type-tdseDynamics'))
+    expect(useGeometryStore.getState().dimension).toBe(3)
+    expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('position')
   })
 
   it('switches objectType to pauliSpinor when clicking the Pauli card', () => {

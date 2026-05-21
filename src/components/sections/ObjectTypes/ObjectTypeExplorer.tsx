@@ -2,6 +2,7 @@ import { m } from 'motion/react'
 import React, { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+import { Tooltip } from '@/components/ui/Tooltip'
 import { useObjectTypeInitialization } from '@/hooks/useObjectTypeInitialization'
 import { useToast } from '@/hooks/useToast'
 import { soundManager } from '@/lib/audio/SoundManager'
@@ -20,6 +21,131 @@ import {
 } from '@/stores/scene/extendedObjectStore'
 import { type GeometryState, useGeometryStore } from '@/stores/scene/geometryStore'
 
+const VALIDATION_CONFIDENCE_LABELS = {
+  strong: 'Strong',
+  partial: 'Partial',
+  fixture: 'Fixture',
+} as const
+
+const VALIDATION_CONFIDENCE_CLASSES = {
+  strong: 'border-success-border bg-success-bg text-success',
+  partial: 'border-warning-border bg-warning-bg text-warning',
+  fixture: 'border-panel-border bg-[var(--bg-hover)] text-text-tertiary',
+} as const
+
+const VALIDATION_LEVEL_LABELS = {
+  A: 'Analytical oracle',
+  R: 'Reference dataset',
+  P: 'Property invariant',
+  C: 'Convergence',
+  F: 'Regression fixture',
+} as const
+
+const SWITCH_HINT_CLASSES = {
+  dimension: 'border-warning-border bg-warning-bg text-warning',
+  representation: 'border-accent/40 bg-accent/10 text-accent',
+  evidence: 'border-panel-border bg-[var(--bg-hover)] text-text-tertiary',
+} as const
+
+interface SwitchHint {
+  key: string
+  label: string
+  tone: keyof typeof SWITCH_HINT_CLASSES
+}
+
+function formatValidationLevels(entry: AvailableQuantumTypeInfo): string {
+  return entry.validation.levels.join('+')
+}
+
+function getDimensionSwitchHint(
+  entry: AvailableQuantumTypeInfo,
+  currentDimension: number,
+  registryEntry: ReturnType<typeof getQuantumTypeEntry>
+): SwitchHint | null {
+  if (entry.available || !registryEntry) return null
+
+  const { min, max, recommended } = registryEntry.dimensions
+  if (currentDimension < min) {
+    return { key: 'dimension', label: `Will switch to ${min}D`, tone: 'dimension' }
+  }
+  if (currentDimension > max) {
+    return {
+      key: 'dimension',
+      label: `Will switch to ${recommended ?? max}D`,
+      tone: 'dimension',
+    }
+  }
+  return entry.disabledReason
+    ? { key: 'dimension', label: entry.disabledReason, tone: 'dimension' }
+    : null
+}
+
+function getRepresentationSwitchHint(
+  entry: AvailableQuantumTypeInfo,
+  currentRepresentation: string
+): SwitchHint | null {
+  if (entry.category !== 'compute' || currentRepresentation === 'position') return null
+  return { key: 'representation', label: 'Will use Position', tone: 'representation' }
+}
+
+function getEvidenceHint(entry: AvailableQuantumTypeInfo): SwitchHint | null {
+  if (entry.validation.confidence === 'partial') {
+    return { key: 'evidence', label: 'Known limits', tone: 'evidence' }
+  }
+  if (entry.validation.confidence === 'fixture') {
+    return { key: 'evidence', label: 'Fixture evidence only', tone: 'evidence' }
+  }
+  return null
+}
+
+function getSwitchHints(
+  entry: AvailableQuantumTypeInfo,
+  currentDimension: number,
+  currentRepresentation: string,
+  registryEntry: ReturnType<typeof getQuantumTypeEntry>
+): SwitchHint[] {
+  return [
+    getDimensionSwitchHint(entry, currentDimension, registryEntry),
+    getRepresentationSwitchHint(entry, currentRepresentation),
+    getEvidenceHint(entry),
+  ].filter((hint): hint is SwitchHint => hint !== null)
+}
+
+function renderValidationTooltip(entry: AvailableQuantumTypeInfo): React.ReactNode {
+  const { validation } = entry
+
+  return (
+    <div className="max-w-72 space-y-2">
+      <div className="font-semibold text-text-primary">{entry.name} validation</div>
+      <div className="text-text-secondary">{validation.summary}</div>
+      {validation.limitation && <div className="text-warning">{validation.limitation}</div>}
+      <div className="flex flex-wrap gap-1">
+        {validation.levels.map((level) => (
+          <span
+            key={level}
+            className="rounded border border-panel-border bg-[var(--bg-hover)] px-1.5 py-0.5 font-mono text-2xs text-text-secondary"
+          >
+            {level}: {VALIDATION_LEVEL_LABELS[level]}
+          </span>
+        ))}
+      </div>
+      <div className="space-y-1 border-t border-border-subtle pt-2">
+        <div className="text-2xs font-semibold uppercase tracking-wider text-text-tertiary">
+          Evidence
+        </div>
+        <div className="space-y-0.5">
+          {validation.testRefs.slice(0, 3).map((ref) => (
+            <div key={ref} className="break-all font-mono text-2xs text-text-secondary">
+              {ref}
+            </div>
+          ))}
+        </div>
+        <div className="break-all font-mono text-2xs text-text-tertiary">{validation.source}</div>
+      </div>
+    </div>
+  )
+}
+
 export const ObjectTypeExplorer: React.FC = React.memo(() => {
   const { objectType, dimension, setObjectType } = useGeometryStore(
     useShallow((state: GeometryState) => ({
@@ -29,9 +155,10 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
     }))
   )
 
-  const { quantumMode, setQuantumMode } = useExtendedObjectStore(
+  const { quantumMode, representation, setQuantumMode } = useExtendedObjectStore(
     useShallow((state: ExtendedObjectState) => ({
       quantumMode: state.schroedinger.quantumMode,
+      representation: state.schroedinger.representation,
       setQuantumMode: state.setSchroedingerQuantumMode,
     }))
   )
@@ -100,6 +227,11 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
 
   const renderCard = (entry: AvailableQuantumTypeInfo) => {
     const isSelected = selectedKey === entry.key
+    const registryEntry = getQuantumTypeEntry(entry.key)
+    const validationClass = VALIDATION_CONFIDENCE_CLASSES[entry.validation.confidence]
+    const validationLabel = VALIDATION_CONFIDENCE_LABELS[entry.validation.confidence]
+    const validationLevels = formatValidationLevels(entry)
+    const switchHints = getSwitchHints(entry, dimension, representation, registryEntry)
 
     return (
       <m.button
@@ -116,6 +248,9 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
           }
           cursor-pointer
         `}
+        aria-label={[entry.name, entry.disabledReason, ...switchHints.map((hint) => hint.label)]
+          .filter(Boolean)
+          .join('. ')}
         whileHover={{ scale: 1.01, x: 2 }}
         whileTap={{ scale: 0.98 }}
         data-testid={`object-type-${entry.key}`}
@@ -125,7 +260,7 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
           <span className="font-medium text-sm">{entry.name}</span>
           <div className="flex items-center gap-2">
             <span className="text-xs text-text-tertiary font-mono">
-              {getQuantumTypeEntry(entry.key)?.dimensions.min ?? 1}D+
+              {registryEntry?.dimensions.min ?? 1}D+
             </span>
             {isSelected && (
               <div className="relative w-2 h-2">
@@ -138,6 +273,33 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
         <span className="text-xs text-text-secondary/80 line-clamp-2 leading-relaxed">
           {entry.description}
         </span>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <Tooltip content={renderValidationTooltip(entry)} position="right" delay={150}>
+            <div
+              className={`inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-2xs font-semibold uppercase tracking-wider ${validationClass}`}
+              aria-label={`${entry.name} validation ${validationLevels}: ${entry.validation.summary}`}
+              data-testid={`object-type-${entry.key}-validation`}
+            >
+              <span className="font-mono">{validationLevels}</span>
+              <span>{validationLabel}</span>
+            </div>
+          </Tooltip>
+        </div>
+        {switchHints.length > 0 && (
+          <div
+            className="mt-2 flex flex-wrap items-center gap-1.5"
+            data-testid={`object-type-${entry.key}-suitability`}
+          >
+            {switchHints.map((hint) => (
+              <span
+                key={hint.key}
+                className={`rounded border px-2 py-0.5 text-2xs font-medium ${SWITCH_HINT_CLASSES[hint.tone]}`}
+              >
+                {hint.label}
+              </span>
+            ))}
+          </div>
+        )}
       </m.button>
     )
   }

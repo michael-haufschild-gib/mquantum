@@ -23,6 +23,7 @@ import type {
   QuantumTypeKey,
   QuantumTypeRuntimeMetadata,
   QuantumTypeStrategyKind,
+  QuantumTypeValidation,
 } from './types'
 
 /** Inputs for checking whether the surface-mode toggle can affect rendering. */
@@ -445,12 +446,18 @@ export function getAvailableQuantumTypes(dimension: number): AvailableQuantumTyp
       name: entry.name,
       description: entry.description,
       category: entry.category,
+      validation: entry.validation,
       available,
       disabledReason,
     })
   }
 
   return result
+}
+
+/** Return validation evidence for a quantum type. */
+export function getQuantumTypeValidation(key: QuantumTypeKey): QuantumTypeValidation | undefined {
+  return QUANTUM_TYPE_REGISTRY.get(key)?.validation
 }
 
 /**

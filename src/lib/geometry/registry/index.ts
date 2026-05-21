@@ -22,6 +22,9 @@ export type {
   QuantumTypeCompileContextField,
   QuantumTypeEvolutionResetKind,
   QuantumTypeKey,
+  QuantumTypeValidation,
+  QuantumValidationConfidence,
+  QuantumValidationLevel,
 } from './types'
 
 // Registries
@@ -41,6 +44,7 @@ export {
   getQuantumTypeShaderUniformIdMap,
   getQuantumTypeStateSaveIdMap,
   getQuantumTypeStrategyKind,
+  getQuantumTypeValidation,
   isAnalyticQuantumType,
   isComputeQuantumType,
   isHydrogenFamilyQuantumType,

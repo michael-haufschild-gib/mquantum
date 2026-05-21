@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   getQuantumTypeCompileContextFields,
   getQuantumTypeEvolutionResetKind,
+  getQuantumTypeValidation,
   QUANTUM_TYPE_REGISTRY,
   supportsOpenQuantumForQuantumType,
 } from '@/lib/geometry/registry'
@@ -142,6 +143,29 @@ describe('QUANTUM_TYPE_REGISTRY', () => {
     for (const [key, entry] of QUANTUM_TYPE_REGISTRY) {
       expect(validCategories.has(entry.category), `${key}: category "${entry.category}"`).toBe(true)
     }
+  })
+
+  it('every entry declares user-visible validation evidence', () => {
+    const validLevels = new Set(['A', 'R', 'P', 'C', 'F'])
+    const validConfidence = new Set(['strong', 'partial', 'fixture'])
+
+    for (const [key, entry] of QUANTUM_TYPE_REGISTRY) {
+      const { validation } = entry
+      expect(validation.levels.length, `${key}: levels`).toBeGreaterThan(0)
+      expect(
+        validation.levels.every((level) => validLevels.has(level)),
+        `${key}: valid levels`
+      ).toBe(true)
+      expect(validConfidence.has(validation.confidence), `${key}: confidence`).toBe(true)
+      expect(validation.summary.length, `${key}: summary`).toBeGreaterThan(20)
+      expect(validation.testRefs.length, `${key}: testRefs`).toBeGreaterThan(0)
+      expect(validation.source, `${key}: source`).toBe('docs/physics/validation-status.md')
+    }
+  })
+
+  it('exposes validation metadata through the public helper', () => {
+    expect(getQuantumTypeValidation('hydrogenND')?.levels).toEqual(['R', 'A', 'P'])
+    expect(getQuantumTypeValidation('pauliSpinor')?.confidence).toBe('fixture')
   })
 
   it('every entry has valid internal.objectType', () => {
