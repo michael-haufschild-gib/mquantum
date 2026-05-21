@@ -16,7 +16,6 @@ import {
   SHARED_RENDERING,
   SLICE_ANIMATION,
 } from './quantumTypeShared'
-import { QUANTUM_TYPE_VALIDATION } from './quantumValidation'
 import type { QuantumTypeEntry, QuantumTypeKey, QuantumTypeRegistry } from './types'
 
 /** The flat Quantum Type Registry — single source of truth for all type metadata. */
@@ -41,7 +40,6 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           analyticFamily: 'harmonicOscillator',
           supportsOpenQuantum: true,
         },
-        validation: QUANTUM_TYPE_VALIDATION.harmonicOscillator,
         dimensions: {
           min: 2,
           max: 11,
@@ -87,7 +85,6 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           analyticFamily: 'hydrogen',
           supportsOpenQuantum: true,
         },
-        validation: QUANTUM_TYPE_VALIDATION.hydrogenND,
         dimensions: {
           min: 2,
           max: 11,
@@ -133,7 +130,6 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           analyticFamily: 'hydrogen',
           supportsOpenQuantum: true,
         },
-        validation: QUANTUM_TYPE_VALIDATION.hydrogenNDCoupled,
         dimensions: {
           min: 2,
           max: 11,
@@ -182,7 +178,6 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           compileContextFields: ['freeScalarInitialCondition'],
           hasPrecomputedNormals: true,
         },
-        validation: QUANTUM_TYPE_VALIDATION.freeScalarField,
         dimensions: {
           min: 3,
           max: 6,
@@ -228,7 +223,6 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           uniformComputeGrid: true,
           defaultColorAlgorithm: DEFAULT_COMPUTE_COLOR_ALGORITHM,
         },
-        validation: QUANTUM_TYPE_VALIDATION.tdseDynamics,
         dimensions: {
           min: 3,
           max: 6,
@@ -274,7 +268,6 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           uniformComputeGrid: true,
           defaultColorAlgorithm: DEFAULT_COMPUTE_COLOR_ALGORITHM,
         },
-        validation: QUANTUM_TYPE_VALIDATION.becDynamics,
         dimensions: {
           min: 3,
           max: 6,
@@ -322,7 +315,6 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           defaultColorAlgorithm: DEFAULT_COMPUTE_COLOR_ALGORITHM,
           compileContextFields: ['diracFieldView'],
         },
-        validation: QUANTUM_TYPE_VALIDATION.diracEquation,
         dimensions: {
           min: 3,
           max: 6,
@@ -369,7 +361,6 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           uniformComputeGrid: true,
           defaultColorAlgorithm: 'phaseCyclicUniform',
         },
-        validation: QUANTUM_TYPE_VALIDATION.quantumWalk,
         dimensions: {
           min: 3,
           max: 7,
@@ -415,7 +406,6 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           stateSaveId: 9,
           defaultColorAlgorithm: DEFAULT_COMPUTE_COLOR_ALGORITHM,
         },
-        validation: QUANTUM_TYPE_VALIDATION.wheelerDeWitt,
         dimensions: {
           min: 3,
           max: 3,
@@ -461,7 +451,6 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           defaultColorAlgorithm: DEFAULT_COMPUTE_COLOR_ALGORITHM,
           sampleSpaceRotation: true,
         },
-        validation: QUANTUM_TYPE_VALIDATION.antiDeSitter,
         dimensions: {
           min: 3,
           max: 7,
@@ -508,7 +497,6 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           stateSaveId: 7,
           defaultColorAlgorithm: 'pauliSpinDensity',
         },
-        validation: QUANTUM_TYPE_VALIDATION.pauliSpinor,
         dimensions: {
           min: 3,
           max: 6,
@@ -559,7 +547,6 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           stateSaveId: 11,
           defaultColorAlgorithm: 'pauliSpinDensity',
         },
-        validation: QUANTUM_TYPE_VALIDATION.bellTest,
         dimensions: {
           // Bell physics lives in the spin sector. We expose 3D because the
           // existing rendering pipeline assumes ≥3 spatial axes for the

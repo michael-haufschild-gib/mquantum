@@ -38,33 +38,6 @@ export type QuantumTypeKey = SchroedingerQuantumMode | 'pauliSpinor' | 'bellTest
 export type QuantumTypeCategory = 'analytic' | 'compute'
 
 /**
- * Validation evidence codes shown to users. They mirror
- * `docs/physics/validation-status.md`:
- * A=analytical oracle, R=reference dataset, P=property/invariant,
- * C=convergence, F=fixture/regression.
- */
-export type QuantumValidationLevel = 'A' | 'R' | 'P' | 'C' | 'F'
-
-/** At-a-glance confidence tier for the selected quantum type. */
-export type QuantumValidationConfidence = 'strong' | 'partial' | 'fixture'
-
-/** Compact validation summary for in-product trust affordances. */
-export interface QuantumTypeValidation {
-  /** Validation evidence levels in display order. */
-  levels: readonly QuantumValidationLevel[]
-  /** Human-readable trust tier derived from the evidence and limitations. */
-  confidence: QuantumValidationConfidence
-  /** One-sentence explanation of what is covered. */
-  summary: string
-  /** Known limitation or missing oracle for the mode. */
-  limitation?: string
-  /** Representative tests or docs backing the summary. */
-  testRefs: readonly string[]
-  /** Documentation source for detailed interpretation. */
-  source: string
-}
-
-/**
  * Runtime data path used by rendering and store orchestration.
  * This is narrower than category: several compute modes still differ in
  * texture/channel semantics and strategy ownership.
@@ -374,8 +347,6 @@ export interface QuantumTypeEntry {
   internal: QuantumTypeInternal
   /** Runtime metadata shared by renderer, persistence, and stores */
   runtime: QuantumTypeRuntimeMetadata
-  /** Physics validation evidence shown in mode-selection UI. */
-  validation: QuantumTypeValidation
 }
 
 /**
@@ -392,7 +363,6 @@ export interface AvailableQuantumTypeInfo {
   name: string
   description: string
   category: QuantumTypeCategory
-  validation: QuantumTypeValidation
   available: boolean
   disabledReason?: string
 }
