@@ -136,6 +136,7 @@ export const Vector3Input: React.FC<Vector3InputProps> = memo(function Vector3In
               className="w-full ps-6 pe-2 py-1.5 text-xs font-mono bg-panel-border/50 border border-panel-border rounded text-text-primary focus:outline-none focus:border-accent"
               containerClassName=""
               aria-label={`${label} ${axis}`}
+              tooltip={`${label}: ${axis}-axis component`}
             />
           </div>
         ))}

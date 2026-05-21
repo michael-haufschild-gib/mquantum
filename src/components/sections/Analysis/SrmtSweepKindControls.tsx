@@ -82,6 +82,7 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
             }
             showValue
             disabled={running}
+            tooltip="Lower bound of the SRMT cut-position sweep range"
             data-testid="srmt-sweep-cutmin-slider"
           />
           <Slider
@@ -99,6 +100,7 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
             }
             showValue
             disabled={running}
+            tooltip="Upper bound of the SRMT cut-position sweep range"
             data-testid="srmt-sweep-cutmax-slider"
           />
         </>
@@ -120,6 +122,7 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
             }
             showValue
             disabled={running}
+            tooltip="Lower bound of the inflaton-mass sweep range"
             data-testid="srmt-sweep-massmin-slider"
           />
           <Slider
@@ -137,6 +140,7 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
             }
             showValue
             disabled={running}
+            tooltip="Upper bound of the inflaton-mass sweep range"
             data-testid="srmt-sweep-massmax-slider"
           />
         </>
@@ -176,6 +180,7 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
             }
             showValue
             disabled={running}
+            tooltip="Cosmological constant upper bound. Positive is de Sitter; negative is AdS"
             data-testid="srmt-sweep-lambdamax-slider"
           />
         </>
@@ -215,6 +220,7 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
             }
             showValue
             disabled={running}
+            tooltip="Upper bound for the φref sensitivity-sweep range"
             data-testid="srmt-sweep-phirefmax-slider"
           />
         </>
@@ -254,6 +260,7 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
             }
             showValue
             disabled={running}
+            tooltip="Upper rankCap; sweep stops at this Schmidt-rank cap"
             data-testid="srmt-sweep-rankmax-slider"
           />
         </>
@@ -293,6 +300,7 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
             }
             showValue
             disabled={running}
+            tooltip="Upper bound of the φ-extent sweep range"
             data-testid="srmt-sweep-phiextmax-slider"
           />
         </>
@@ -332,6 +340,7 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
             }
             showValue
             disabled={running}
+            tooltip="Upper bound of the gridNa convergence sweep"
             data-testid="srmt-sweep-gridnamax-slider"
           />
         </>
@@ -371,6 +380,7 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
             }
             showValue
             disabled={running}
+            tooltip="Upper bound of the gridNphi sweep; coupled kind co-scales gridNa per point"
             data-testid="srmt-sweep-gridnphimax-slider"
           />
         </>

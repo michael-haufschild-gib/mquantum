@@ -181,6 +181,7 @@ export const CosmologyControls: React.FC<CosmologyControlsProps> = React.memo(
             onCheckedChange={actions.setCosmologyEnabled}
             disabled={selfInteractionEnabled || !inRange}
             ariaLabel="Toggle cosmology"
+            tooltip="Enable Mukhanov-Sasaki cosmology mode for the field"
             data-testid="cosmology-toggle"
           />
         }

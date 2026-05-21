@@ -1,6 +1,7 @@
 import React, { Suspense, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+import { PanelHeader } from '@/components/layout/PanelHeader'
 import { DimensionSelector } from '@/components/sections/Geometry/DimensionSelector'
 import { ScenarioSelector } from '@/components/sections/Geometry/ScenarioSelector'
 import { ObjectTypeExplorer } from '@/components/sections/ObjectTypes/ObjectTypeExplorer'
@@ -80,10 +81,9 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
   const tabs: Tab[] = [
     {
       id: 'type',
-      tooltip: 'Browse and select quantum object types and modes.',
       label: (
-        <div className="flex items-center gap-2">
-          <Icon name="sparkles" size={14} />
+        <div className="flex items-center gap-1">
+          <Icon name="sparkles" size={12} />
           <span>Type</span>
         </div>
       ),
@@ -95,10 +95,9 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
     },
     {
       id: 'geometry',
-      tooltip: 'Configure quantum numbers, dimensions, and mode-specific parameters.',
       label: (
-        <div className="flex items-center gap-2">
-          <Icon name="layers" size={14} />
+        <div className="flex items-center gap-1">
+          <Icon name="layers" size={12} />
           <span>Geometry</span>
         </div>
       ),
@@ -108,8 +107,8 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
           className={`min-h-full transition-opacity border-0 p-0 m-0 min-w-0${sweepRunning ? ' opacity-50' : ''}`}
         >
           <div className="px-4 pt-3 pb-1">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-medium text-[var(--text-tertiary)] uppercase tracking-wider shrink-0">
+            <div className="flex items-center gap-1.5">
+              <span className="text-3xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider shrink-0">
                 Grid
               </span>
               <ToggleGroup
@@ -133,12 +132,7 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
 
   return (
     <div className="h-full flex flex-col w-full shrink-0 overflow-hidden">
-      {/* Header */}
-      <div className="p-4 border-b border-[var(--border-subtle)] bg-[var(--bg-panel)] backdrop-blur-sm z-10 shrink-0 flex items-center gap-2">
-        <h2 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest">
-          Explorer
-        </h2>
-      </div>
+      <PanelHeader title="Explorer" subtitle="browse & pick" variant="muted" />
 
       {/* Content Container */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden w-full">

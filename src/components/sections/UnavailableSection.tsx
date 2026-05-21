@@ -28,25 +28,23 @@ export const UnavailableSection: React.FC<UnavailableSectionProps> = React.memo(
   ({ title, reason, className = '', 'data-testid': dataTestId }) => {
     return (
       <div
-        className={`group relative overflow-hidden border-b border-[var(--border-subtle)] last:border-b-0 opacity-50 ${className}`}
+        className={`group flex items-center justify-between gap-3 px-4 py-1.5 border-b border-[var(--border-subtle)] last:border-b-0 bg-transparent ${className}`}
         data-testid={dataTestId}
+        aria-disabled="true"
       >
-        <div className="flex items-center justify-between bg-[var(--bg-hover)] border-b border-[var(--border-subtle)] py-3 px-4">
-          <div className="flex items-center gap-3">
-            {/* LED Indicator — dimmed */}
-            <div className="relative flex items-center justify-center w-2 h-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-[var(--text-tertiary)]" />
-            </div>
-
-            <h3 className="text-xs font-bold tracking-widest uppercase text-[var(--text-tertiary)]">
-              {title}
-            </h3>
-          </div>
-
-          <span className="text-xs text-[var(--text-tertiary)] italic max-w-[200px] text-right leading-tight">
-            {reason}
-          </span>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span
+            className="inline-block w-1 h-1 rounded-full bg-[var(--text-tertiary)] opacity-50 shrink-0"
+            aria-hidden
+          />
+          <h3 className="text-2xs font-medium uppercase tracking-wider text-[var(--text-tertiary)] truncate">
+            {title}
+          </h3>
         </div>
+
+        <span className="text-2xs text-[var(--text-tertiary)] italic text-right leading-tight max-w-[60%] truncate">
+          {reason}
+        </span>
       </div>
     )
   }

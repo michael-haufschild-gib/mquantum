@@ -296,6 +296,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
               checked={fs.selfInteractionEnabled}
               onCheckedChange={setSelfInteractionEnabled}
               ariaLabel="Toggle self-interaction"
+              tooltip="Enable the quartic V(φ) = λ(φ²−v²)² self-interaction"
             />
           }
         >
@@ -358,6 +359,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
                   variant="ghost"
                   size="sm"
                   onClick={handleRandomizeSeed}
+                  tooltip="Draw a new vacuum-fluctuation random seed"
                   data-testid="randomize-seed-button"
                 >
                   Randomize

@@ -124,6 +124,7 @@ export const SceneManager: React.FC<SceneManagerProps> = React.memo(({ onClose }
           onClick={openImportPicker}
           className="flex-1"
           ariaLabel="Import scenes from JSON file"
+          tooltip="Import saved scenes from a JSON file"
         >
           Import JSON
         </Button>
@@ -133,13 +134,14 @@ export const SceneManager: React.FC<SceneManagerProps> = React.memo(({ onClose }
           onClick={handleExport}
           className="flex-1"
           ariaLabel="Export all scenes to JSON file"
+          tooltip="Export every saved scene as a JSON file"
         >
           Export JSON
         </Button>
       </div>
 
       <div className="space-y-2">
-        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+        <h3 className="text-2xs font-semibold text-text-secondary uppercase tracking-wider">
           Saved Scenes
         </h3>
 
@@ -176,6 +178,7 @@ export const SceneManager: React.FC<SceneManagerProps> = React.memo(({ onClose }
                       }
                     }}
                     aria-label={`Load scene "${scene.name}"`}
+                    title={`Load scene "${scene.name}"`}
                   >
                     <div className="flex flex-col items-start min-w-0">
                       <InlineEdit
@@ -188,6 +191,7 @@ export const SceneManager: React.FC<SceneManagerProps> = React.memo(({ onClose }
                         textClassName="font-medium text-sm text-text-primary"
                         editButtonAriaLabel={`Rename scene "${scene.name}"`}
                         placeholder="Scene name..."
+                        tooltip={`Edit the saved scene name "${scene.name}"`}
                         hideEditButton
                         isEditing={isEditingThis}
                         onEditingChange={(editing) => {
@@ -210,6 +214,7 @@ export const SceneManager: React.FC<SceneManagerProps> = React.memo(({ onClose }
                       }}
                       className={`p-1.5 text-text-secondary hover:text-accent hover:bg-accent/10 ${isEditingThis ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
                       ariaLabel={`Rename scene "${scene.name}"`}
+                      tooltip={`Rename the saved scene "${scene.name}"`}
                     >
                       <svg
                         width="14"
@@ -236,6 +241,7 @@ export const SceneManager: React.FC<SceneManagerProps> = React.memo(({ onClose }
                       }}
                       className={`p-1.5 text-text-secondary hover:text-danger hover:bg-danger-bg ${isEditingThis ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
                       ariaLabel={`Delete scene "${scene.name}"`}
+                      tooltip={`Delete the saved scene "${scene.name}"`}
                       data-testid={`delete-scene-${scene.id}`}
                     >
                       <svg

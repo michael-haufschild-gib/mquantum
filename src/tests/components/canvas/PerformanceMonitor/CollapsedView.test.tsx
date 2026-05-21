@@ -20,7 +20,7 @@ describe('CollapsedView', () => {
     render(<CollapsedView />)
 
     expect(screen.getByText('60')).toBeInTheDocument()
-    expect(screen.getByText('FPS')).toBeInTheDocument()
+    expect(screen.getByText('fps')).toBeInTheDocument()
   })
 
   it('renders initial frame time', () => {

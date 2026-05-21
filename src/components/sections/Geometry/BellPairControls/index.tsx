@@ -57,6 +57,7 @@ const AxisSliders: React.FC<{
       value={axis[0]}
       onChange={(v) => onChange([v, axis[1]])}
       showValue
+      tooltip={`Polar angle θ for ${label}`}
     />
     <Slider
       label="φ (azimuth)"
@@ -66,6 +67,7 @@ const AxisSliders: React.FC<{
       value={axis[1]}
       onChange={(v) => onChange([axis[0], v])}
       showValue
+      tooltip={`Azimuthal angle φ for ${label}`}
     />
   </div>
 )
@@ -94,6 +96,7 @@ const FieldSliders: React.FC<{
           onChange(next)
         }}
         showValue
+        tooltip={`${label} component B${axisName}`}
       />
     ))}
   </div>
@@ -195,6 +198,7 @@ export const BellPairControls: React.FC = React.memo(() => {
           <ToggleGroup
             value={config.analysisMode}
             onChange={(v) => setAnalysisMode(v as BellAnalysisMode)}
+            tooltip="How non-detection trials are folded into the CHSH estimate"
             data-testid="bell-geom-analysis"
             options={ANALYSIS_MODE_OPTIONS}
           />

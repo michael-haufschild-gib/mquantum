@@ -61,6 +61,7 @@ export const CosineGradientEditor: React.FC<CosineGradientEditorProps> = React.m
           variant="secondary"
           size="sm"
           onClick={handleToggleExpand}
+          tooltip="Show or hide the advanced cosine-gradient editor"
           className="flex items-center justify-between w-full"
         >
           <span>Advanced Editor</span>
@@ -78,7 +79,12 @@ export const CosineGradientEditor: React.FC<CosineGradientEditorProps> = React.m
         {isExpanded && (
           <div className="mt-4 space-y-6">
             {/* Reset Button */}
-            <Button variant="ghost" size="sm" onClick={handleReset}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleReset}
+              tooltip="Restore the default cosine-gradient coefficients"
+            >
               Reset to Default
             </Button>
 
@@ -103,6 +109,7 @@ export const CosineGradientEditor: React.FC<CosineGradientEditorProps> = React.m
                         value={cosineCoefficients[key][index] ?? 0}
                         onChange={(value) => setCosineCoefficient(key, index, value)}
                         showValue={false}
+                        tooltip={`Cosine gradient coefficient ${key.toUpperCase()} for ${channel}`}
                         className="w-full"
                       />
                       <div className="text-xs text-text-muted text-center">

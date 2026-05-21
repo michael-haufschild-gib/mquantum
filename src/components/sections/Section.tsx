@@ -128,7 +128,7 @@ export const Section: React.FC<SectionProps> = React.memo(
           <m.button
             type="button"
             onClick={handleToggle}
-            className="flex-1 flex items-center justify-between py-3 px-4 text-left outline-none focus-visible:ring-1 focus-visible:ring-accent/50 focus-visible:ring-inset z-10 bg-transparent"
+            className="flex-1 flex items-center justify-between py-2.5 px-4 text-left outline-none focus-visible:ring-1 focus-visible:ring-accent/50 focus-visible:ring-inset z-10 bg-transparent"
             aria-expanded={isOpen}
             aria-controls={contentId}
             data-testid={dataTestId ? `${dataTestId}-header` : undefined}
@@ -143,7 +143,7 @@ export const Section: React.FC<SectionProps> = React.memo(
               </div>
 
               <h3
-                className={`text-xs font-bold tracking-widest uppercase transition-colors duration-200 ${isOpen ? 'text-[var(--text-primary)] text-glow-subtle' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'}`}
+                className={`text-2xs font-semibold tracking-wider uppercase transition-colors duration-200 ${isOpen ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'}`}
               >
                 {title}
               </h3>

@@ -38,7 +38,8 @@ const CollapsibleSection: React.FC<{
         variant="ghost"
         size="sm"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between w-full text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider pb-1"
+        tooltip={`Expand or collapse the ${title} subsection`}
+        className="flex items-center justify-between w-full text-2xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider pb-1"
       >
         <span>{title}</span>
         <svg

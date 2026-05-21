@@ -344,7 +344,7 @@ export const NumberInput: React.FC<NumberInputProps> = React.memo(
         onKeyDown={handleKeyDown}
         error={error || props.error}
         rightIcon={
-          <div className="flex flex-col gap-[1px]">
+          <div className="flex flex-col gap-px">
             <button
               type="button"
               className="h-2 w-3 hover:bg-[var(--bg-active)] rounded-sm flex items-center justify-center"

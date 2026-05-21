@@ -65,7 +65,7 @@ export const SrmtQualityChip: React.FC<SrmtQualityChipProps> = ({
   const text = tier === 'pending' ? 'pending' : value.toFixed(3)
   const chip = (
     <span
-      className="inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-mono tabular-nums"
+      className="inline-flex items-center rounded-md border px-2 py-0.5 text-2xs font-mono tabular-nums"
       style={{
         backgroundColor: style.bg,
         color: style.color,

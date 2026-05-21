@@ -57,8 +57,14 @@ vi.mock('motion/react', () => {
     </button>
   ))
   MotionButton.displayName = 'MotionButton'
+  // Pass-through wrapper; happy-dom doesn't animate, so the transition lifecycle
+  // doesn't matter — Tooltip just needs the component to render its children.
+  const AnimatePresence = ({ children }: { children?: React.ReactNode }) => <>{children}</>
+  AnimatePresence.displayName = 'AnimatePresence'
+
   return {
     m: { div: MotionDiv, button: MotionButton },
+    AnimatePresence,
     useMotionValue: (initial: number) => {
       let val = initial
       return {

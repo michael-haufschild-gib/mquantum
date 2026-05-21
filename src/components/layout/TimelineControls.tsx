@@ -380,7 +380,7 @@ export const TimelineControls: FC = () => {
               sound="swish"
               ariaLabel="Toggle animations drawer"
               tooltip={effectsTooltip}
-              className="text-xs font-bold uppercase tracking-wider px-3 py-2.5 rounded-full"
+              className="text-xs font-semibold px-3 py-2 rounded-full"
             >
               Effects
               <span
@@ -398,7 +398,7 @@ export const TimelineControls: FC = () => {
               sound="swish"
               ariaLabel={`Toggle open quantum drawer, ${activeOpenQuantumCount} active`}
               tooltip="Open quantum system controls: decoherence, relaxation, and thermal coupling."
-              className="text-xs font-bold uppercase tracking-wider px-3 py-2.5 rounded-full"
+              className="text-xs font-semibold px-3 py-2 rounded-full"
             >
               Open Quantum
               <span
@@ -415,7 +415,7 @@ export const TimelineControls: FC = () => {
             sound="swish"
             ariaLabel="Toggle rotation drawer"
             tooltip="Select which N-dimensional rotation planes to animate."
-            className="text-xs font-bold uppercase tracking-wider px-3 py-2.5 rounded-full"
+            className="text-xs font-semibold px-3 py-2 rounded-full"
           >
             Rotate
             <span

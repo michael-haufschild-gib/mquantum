@@ -37,7 +37,7 @@ export const SrmtComputingStrip: React.FC<SrmtComputingStripProps> = ({ complete
       role="status"
       aria-live="polite"
       data-testid="wdw-srmt-computing-indicator"
-      className="rounded-md border px-2 py-1 text-[11px] flex items-center gap-2"
+      className="rounded-md border px-2 py-1 text-2xs flex items-center gap-2"
       style={{
         color: 'var(--text-secondary)',
         borderColor: 'var(--border-subtle)',

@@ -38,7 +38,7 @@ function updateSparklinePath(
   ref: React.RefObject<SVGPathElement | null>
 ): void {
   if (!ref.current || state.history.fps === prevState.history.fps) return
-  const points = computeSparklinePoints(state.history.fps, 64, 20, 0, 70)
+  const points = computeSparklinePoints(state.history.fps, 48, 16, 0, 70)
   if (points) ref.current.setAttribute('d', `M ${points}`)
 }
 
@@ -56,7 +56,7 @@ function updateColorLevel(
     indicatorRef.current.className = `relative inline-flex rounded-full h-2.5 w-2.5 ${color.bg}`
   }
   if (fpsContainerRef.current) {
-    fpsContainerRef.current.className = `text-lg font-bold font-mono leading-none ${color.text}`
+    fpsContainerRef.current.className = `text-base font-semibold font-mono leading-none tabular-nums ${color.text}`
   }
   if (sparklineRef.current) {
     sparklineRef.current.setAttribute('stroke', color.stroke)
@@ -118,42 +118,42 @@ export const CollapsedView = React.memo(function CollapsedView() {
 
   // Compute initial sparkline path
   const initialPath = useMemo(() => {
-    const pts = computeSparklinePoints(initialState.history.fps, 64, 20, 0, 70)
+    const pts = computeSparklinePoints(initialState.history.fps, 48, 16, 0, 70)
     return pts ? `M ${pts}` : ''
   }, [initialState.history.fps])
 
   return (
-    <div className="flex items-center gap-4 px-4 py-2 h-12">
-      <div className="flex items-center gap-3">
-        <div className="relative flex h-2.5 w-2.5">
+    <div className="flex items-center gap-2.5 px-3 py-1.5 h-9">
+      <div className="flex items-baseline gap-1.5">
+        <span className="relative flex h-1.5 w-1.5 self-center">
           <span
             ref={indicatorRef}
-            className={`relative inline-flex rounded-full h-2.5 w-2.5 ${initialColor.bg}`}
+            className={`relative inline-flex rounded-full h-1.5 w-1.5 ${initialColor.bg}`}
           />
-        </div>
-        <div className="flex flex-col">
-          <span
-            ref={fpsContainerRef}
-            data-testid="fps-value"
-            className={`text-lg font-bold font-mono leading-none ${initialColor.text}`}
-          >
-            <span ref={fpsRef}>{initialState.fps}</span>
-          </span>
-          <span className="text-xs uppercase tracking-wider text-text-tertiary font-bold">FPS</span>
-        </div>
+        </span>
+        <span
+          ref={fpsContainerRef}
+          data-testid="fps-value"
+          className={`text-base font-semibold font-mono leading-none tabular-nums ${initialColor.text}`}
+        >
+          <span ref={fpsRef}>{initialState.fps}</span>
+        </span>
+        <span className="text-3xs uppercase tracking-wider text-text-tertiary font-medium">
+          fps
+        </span>
       </div>
 
-      <div className="w-px h-6 bg-[var(--bg-active)]" />
+      <div className="w-px h-4 bg-[var(--border-subtle)]" />
 
-      <div className="w-16 h-6 flex items-center">
-        <svg width={64} height={20} className="overflow-visible">
+      <div className="w-12 h-4 flex items-center">
+        <svg width={48} height={16} className="overflow-visible">
           <path
             ref={sparklineRef}
             data-testid="sparkline-path"
             d={initialPath}
             fill="none"
             stroke={initialColor.stroke}
-            strokeWidth={1.5}
+            strokeWidth={1.25}
             strokeLinecap="round"
             strokeLinejoin="round"
             vectorEffect="non-scaling-stroke"
@@ -161,11 +161,11 @@ export const CollapsedView = React.memo(function CollapsedView() {
         </svg>
       </div>
 
-      <div className="flex flex-col items-end min-w-[32px]">
-        <span className="text-xs font-mono text-text-secondary">
+      <div className="flex items-baseline gap-1 min-w-[32px] justify-end">
+        <span className="text-2xs font-mono text-text-secondary tabular-nums">
           <span ref={frameTimeRef}>{initialState.frameTime.toFixed(1)}</span>
         </span>
-        <span className="text-[8px] text-text-tertiary">ms</span>
+        <span className="text-4xs text-text-tertiary">ms</span>
       </div>
     </div>
   )

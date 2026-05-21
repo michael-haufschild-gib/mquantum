@@ -68,6 +68,7 @@ export const PreheatingControls: React.FC<PreheatingControlsProps> = React.memo(
             checked={preheating.enabled}
             onCheckedChange={actions.setPreheatingEnabled}
             ariaLabel="Toggle preheating"
+            tooltip="Enable parametric-resonance preheating drive on the field mass"
             data-testid="preheating-toggle"
           />
         }

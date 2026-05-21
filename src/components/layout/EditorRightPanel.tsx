@@ -1,6 +1,7 @@
 import React, { Suspense, useRef, useState } from 'react'
 
 // Import existing sidebar sections
+import { PanelHeader } from '@/components/layout/PanelHeader'
 import { AbsorptionSection } from '@/components/sections/Absorption/AbsorptionSection'
 import { AdvancedObjectControls } from '@/components/sections/Advanced/AdvancedObjectControls'
 import { ExposureSection } from '@/components/sections/Exposure/ExposureSection'
@@ -44,10 +45,9 @@ export const EditorRightPanel: React.FC = React.memo(() => {
   const tabs: Tab[] = [
     {
       id: 'object',
-      tooltip: 'Appearance, exposure, absorption, and rendering for the active quantum object.',
       label: (
-        <div className="flex items-center gap-2">
-          <Icon name="sphere" size={14} />
+        <div className="flex items-center gap-1">
+          <Icon name="sphere" size={12} />
           <span>Object</span>
         </div>
       ),
@@ -55,10 +55,9 @@ export const EditorRightPanel: React.FC = React.memo(() => {
     },
     {
       id: 'analysis',
-      tooltip: 'Cross-section analysis, decoherence, entanglement, and quantum effects.',
       label: (
-        <div className="flex items-center gap-2">
-          <Icon name="chart" size={14} />
+        <div className="flex items-center gap-1">
+          <Icon name="chart" size={12} />
           <span>Analysis</span>
         </div>
       ),
@@ -70,10 +69,9 @@ export const EditorRightPanel: React.FC = React.memo(() => {
     },
     {
       id: 'scene',
-      tooltip: 'Environment, lighting, and post-processing effects.',
       label: (
-        <div className="flex items-center gap-2">
-          <Icon name="home" size={14} />
+        <div className="flex items-center gap-1">
+          <Icon name="home" size={12} />
           <span>Scene</span>
         </div>
       ),
@@ -85,10 +83,9 @@ export const EditorRightPanel: React.FC = React.memo(() => {
     },
     {
       id: 'system',
-      tooltip: 'Application settings and performance tuning.',
       label: (
-        <div className="flex items-center gap-2">
-          <Icon name="cog" size={14} />
+        <div className="flex items-center gap-1">
+          <Icon name="cog" size={12} />
           <span>System</span>
         </div>
       ),
@@ -102,12 +99,7 @@ export const EditorRightPanel: React.FC = React.memo(() => {
 
   return (
     <div className="h-full flex flex-col w-full shrink-0 overflow-hidden">
-      {/* Header Section */}
-      <div className="p-4 border-b border-[var(--border-subtle)] bg-[var(--bg-panel)] backdrop-blur-sm z-10 shrink-0 flex items-center gap-2">
-        <h2 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest">
-          Inspector
-        </h2>
-      </div>
+      <PanelHeader title="Inspector" subtitle="configure" variant="accent" />
 
       {/* Tabs & Content */}
       <div className="flex-1 overflow-hidden flex flex-col min-h-0">

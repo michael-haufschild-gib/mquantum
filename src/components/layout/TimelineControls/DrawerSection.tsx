@@ -81,7 +81,7 @@ export const DrawerSection: React.FC<DrawerSectionProps> = React.memo(
       <div className={`space-y-4 ${className ?? ''}`} data-testid={testId}>
         {/* Header with optional toggle and actions */}
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+          <h3 className="text-2xs font-bold text-text-secondary uppercase tracking-wider">
             {title}
           </h3>
           <div className="flex items-center gap-2">

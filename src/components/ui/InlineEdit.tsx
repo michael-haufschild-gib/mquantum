@@ -34,6 +34,8 @@ export interface InlineEditProps {
   isEditing?: boolean
   /** Callback when editing state changes (for controlled mode or external awareness) */
   onEditingChange?: (isEditing: boolean) => void
+  /** Hover tooltip describing what the inline-edit controls. */
+  tooltip?: string
 }
 
 /**
@@ -56,6 +58,7 @@ export const InlineEdit: React.FC<InlineEditProps> = memo(
     hideEditButton = false,
     isEditing: controlledIsEditing,
     onEditingChange,
+    tooltip,
   }) => {
     const [internalIsEditing, setInternalIsEditing] = useState(false)
     // Support both controlled and uncontrolled modes
@@ -239,6 +242,7 @@ export const InlineEdit: React.FC<InlineEditProps> = memo(
       <div
         className={`inline-flex items-center gap-1 min-w-0 ${className}`}
         onClick={handleContainerClick}
+        title={tooltip}
       >
         <AnimatePresence mode="wait" initial={false}>
           {isEditing ? (

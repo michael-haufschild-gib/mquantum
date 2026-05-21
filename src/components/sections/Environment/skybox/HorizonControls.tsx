@@ -17,7 +17,7 @@ export const HorizonControls: React.FC<HorizonControlsProps> = ({
 }) => {
   return (
     <div className="space-y-4 border-s-2 border-panel-border ps-4">
-      <span className="text-xs font-bold text-text-secondary uppercase tracking-wider block mb-2">
+      <span className="text-2xs font-bold text-text-secondary uppercase tracking-wider block mb-2">
         Horizon
       </span>
 

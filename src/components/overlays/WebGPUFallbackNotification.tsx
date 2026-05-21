@@ -120,6 +120,7 @@ export const WebGPUFallbackNotification: React.FC = () => {
         variant="ghost"
         size="sm"
         onClick={dismissNotification}
+        tooltip="Dismiss the WebGPU-unavailable notification"
         style={{ padding: '4px 8px', minWidth: 'auto' }}
       >
         Dismiss

@@ -29,7 +29,7 @@ export interface PostProcessingSectionHeaderProps {
 export const PostProcessingSectionHeader: React.FC<PostProcessingSectionHeaderProps> = ({
   title,
 }) => (
-  <div className="text-xs font-semibold text-text-secondary uppercase tracking-wider pt-2 pb-1 border-t border-panel-border mt-2 first:mt-0 first:border-t-0 first:pt-0">
+  <div className="text-2xs font-semibold text-text-secondary uppercase tracking-wider pt-2 pb-1 border-t border-panel-border mt-2 first:mt-0 first:border-t-0 first:pt-0">
     {title}
   </div>
 )

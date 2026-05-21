@@ -136,7 +136,7 @@ export const ExportPreview = () => {
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-[var(--bg-hover)] text-[var(--text-tertiary)] flex-col gap-2">
             <Icon name="image" className="w-8 h-8 opacity-20" />
-            <span className="text-xs uppercase tracking-widest">Preview Unavailable</span>
+            <span className="text-2xs uppercase tracking-wider">Preview Unavailable</span>
           </div>
         )}
       </div>

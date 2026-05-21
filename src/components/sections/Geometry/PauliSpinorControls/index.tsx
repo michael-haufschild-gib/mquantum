@@ -112,7 +112,7 @@ export const PauliSpinorControls: React.FC = React.memo(() => {
       {/* Wavepacket Position & Momentum */}
       <Section title="Wavepacket" defaultOpen={false}>
         <div className="space-y-3">
-          <p className="text-xs text-text-tertiary uppercase tracking-widest font-bold">Center</p>
+          <p className="text-2xs text-text-tertiary uppercase tracking-wider font-bold">Center</p>
           {Array.from({ length: latticeDim }, (_, d) => (
             <Slider
               key={`center-${d}`}
@@ -126,7 +126,7 @@ export const PauliSpinorControls: React.FC = React.memo(() => {
               showValue
             />
           ))}
-          <p className="text-xs text-text-tertiary uppercase tracking-widest font-bold mt-2">
+          <p className="text-2xs text-text-tertiary uppercase tracking-wider font-bold mt-2">
             Momentum
           </p>
           {Array.from({ length: latticeDim }, (_, d) => (

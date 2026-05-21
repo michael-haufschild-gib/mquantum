@@ -298,7 +298,7 @@ export const Knob: React.FC<KnobProps> = React.memo(
         </m.div>
 
         {label && (
-          <span className="text-xs font-medium text-text-secondary select-none tracking-wider uppercase opacity-80">
+          <span className="text-2xs font-medium text-text-secondary select-none tracking-wider uppercase opacity-80">
             {tooltip ? (
               <Tooltip content={tooltip} position="top">
                 <span>{label}</span>

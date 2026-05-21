@@ -1,22 +1,64 @@
+import { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+import { Button } from '@/components/ui/Button'
 import { ColorPicker } from '@/components/ui/ColorPicker'
+import { Icon } from '@/components/ui/Icon'
 import { Input } from '@/components/ui/Input'
 import { NumberInput } from '@/components/ui/NumberInput'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
+import { buildSceneStamp } from '@/lib/export/sceneStamp'
+import {
+  getQuantumTypeName,
+  getQuantumTypeValidation,
+  resolveQuantumTypeKey,
+} from '@/lib/geometry/registry'
 import { useExportStore } from '@/stores/runtime/exportStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 export const ExportTextTab = () => {
   const { settings, updateSettings } = useExportStore(
     useShallow((s) => ({ settings: s.settings, updateSettings: s.updateSettings }))
   )
+  const { objectType, dimension } = useGeometryStore(
+    useShallow((s) => ({ objectType: s.objectType, dimension: s.dimension }))
+  )
+  const { quantumMode, representation } = useExtendedObjectStore(
+    useShallow((s) => ({
+      quantumMode: s.schroedinger.quantumMode,
+      representation: s.schroedinger.representation,
+    }))
+  )
   const { textOverlay } = settings
 
   const update = (partial: Partial<typeof textOverlay>) =>
     updateSettings({ textOverlay: { ...textOverlay, ...partial } })
+
+  const sceneStamp = useMemo(() => {
+    const key = resolveQuantumTypeKey(objectType, quantumMode)
+    return buildSceneStamp({
+      modeName: key ? getQuantumTypeName(key) : objectType,
+      dimension,
+      representation: objectType === 'schroedinger' ? representation : undefined,
+      validation: key ? getQuantumTypeValidation(key) : undefined,
+    })
+  }, [dimension, objectType, quantumMode, representation])
+
+  const insertSceneStamp = () =>
+    update({
+      enabled: true,
+      text: sceneStamp,
+      fontSize: 18,
+      fontWeight: 600,
+      opacity: 0.9,
+      verticalPlacement: 'bottom',
+      horizontalPlacement: 'left',
+      padding: 24,
+    })
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
@@ -29,7 +71,7 @@ export const ExportTextTab = () => {
       >
         <div className="flex flex-col">
           <span className="font-bold text-sm text-text-primary">Enable Overlay</span>
-          <span className="text-xs text-text-tertiary uppercase tracking-wide">
+          <span className="text-2xs text-text-tertiary uppercase tracking-wider">
             Add watermarks or titles
           </span>
         </div>
@@ -41,23 +83,44 @@ export const ExportTextTab = () => {
         />
       </div>
 
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-border-subtle bg-[var(--bg-hover)]/50 p-3">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+            Scene Stamp
+          </div>
+          <div className="mt-1 truncate font-mono text-2xs text-text-tertiary">{sceneStamp}</div>
+        </div>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={insertSceneStamp}
+          tooltip="Use current mode, dimension, representation, and validation evidence as overlay text."
+          data-testid="insert-scene-stamp"
+          className="shrink-0"
+        >
+          <Icon name="copy" className="h-3.5 w-3.5" />
+          Insert
+        </Button>
+      </div>
+
       {textOverlay.enabled && (
         <div className="space-y-6">
           <div className="space-y-2">
-            <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
+            <label className="text-2xs text-text-tertiary uppercase font-medium tracking-wider">
               Text Content
             </label>
             <Input
               value={textOverlay.text}
               onChange={(e) => update({ text: e.target.value })}
               placeholder="Enter text..."
+              tooltip="Text burned into each exported frame"
               className="text-lg font-bold"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
+              <label className="text-2xs text-text-tertiary uppercase font-medium tracking-wider">
                 Font Size
               </label>
               <NumberInput
@@ -69,7 +132,7 @@ export const ExportTextTab = () => {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
+              <label className="text-2xs text-text-tertiary uppercase font-medium tracking-wider">
                 Weight
               </label>
               <Select
@@ -88,7 +151,7 @@ export const ExportTextTab = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
+            <label className="text-2xs text-text-tertiary uppercase font-medium tracking-wider">
               Opacity
             </label>
             <Slider
@@ -105,7 +168,7 @@ export const ExportTextTab = () => {
           <div className="space-y-4 pt-4 border-t border-border-subtle">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
+                <label className="text-2xs text-text-tertiary uppercase font-medium tracking-wider">
                   Text Color
                 </label>
                 <ColorPicker
@@ -115,7 +178,7 @@ export const ExportTextTab = () => {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
+                <label className="text-2xs text-text-tertiary uppercase font-medium tracking-wider">
                   Shadow Color
                 </label>
                 <ColorPicker
@@ -128,12 +191,12 @@ export const ExportTextTab = () => {
           </div>
 
           <div className="space-y-4 pt-4 border-t border-border-subtle">
-            <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
+            <label className="text-2xs text-text-tertiary uppercase font-medium tracking-wider">
               Placement
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs text-text-tertiary uppercase tracking-wide">
+                <label className="text-2xs text-text-tertiary uppercase tracking-wider">
                   Vertical
                 </label>
                 <ToggleGroup
@@ -150,7 +213,7 @@ export const ExportTextTab = () => {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs text-text-tertiary uppercase tracking-wide">
+                <label className="text-2xs text-text-tertiary uppercase tracking-wider">
                   Horizontal
                 </label>
                 <ToggleGroup

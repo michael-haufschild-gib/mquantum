@@ -367,7 +367,7 @@ const KGDispersionDiagram: React.FC<{
         </svg>
       </div>
       {cosmologyEnabled && (
-        <p className="text-[10px] text-text-tertiary italic mt-0.5 px-1">
+        <p className="text-3xs text-text-tertiary italic mt-0.5 px-1">
           n_k measured vs adiabatic vacuum at η₀
         </p>
       )}

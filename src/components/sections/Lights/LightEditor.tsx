@@ -182,9 +182,16 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
           value={selectedLight.name}
           onChange={handleNameChange}
           aria-label="Light name"
+          tooltip="Edit the display name for this light"
           containerClassName="flex-1"
         />
-        <Button variant="ghost" size="icon" onClick={handleDuplicate} ariaLabel="Duplicate light">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleDuplicate}
+          ariaLabel="Duplicate light"
+          tooltip="Duplicate this light into a new entry"
+        >
           <svg
             className="w-4 h-4"
             viewBox="0 0 24 24"

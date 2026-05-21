@@ -338,7 +338,7 @@ const HawkingHudRow: React.FC<HawkingHudRowProps> = React.memo(({ bec }) => {
 
   return (
     <div
-      className="mt-1 pt-1 border-t border-[var(--border-subtle)] text-[10px]"
+      className="mt-1 pt-1 border-t border-[var(--border-subtle)] text-3xs"
       data-testid="bec-hawking-hud"
     >
       <div className="flex gap-3">

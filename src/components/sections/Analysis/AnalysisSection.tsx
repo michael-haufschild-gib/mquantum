@@ -234,6 +234,7 @@ const SaveLoadButtons: React.FC = React.memo(() => {
           size="sm"
           onClick={() => useSimulationStateStore.getState().requestSave()}
           disabled={status === 'saving'}
+          tooltip="Save the current simulation state to a .mqstate file"
           data-testid="save-state"
         >
           {status === 'saving' ? 'Saving...' : 'Save State'}
@@ -243,6 +244,7 @@ const SaveLoadButtons: React.FC = React.memo(() => {
           size="sm"
           onClick={() => fileInputRef.current?.click()}
           disabled={status === 'loading'}
+          tooltip="Load a previously saved .mqstate simulation file"
           data-testid="load-state"
         >
           {status === 'loading' ? 'Loading...' : 'Load State'}
@@ -315,6 +317,7 @@ const DataExportButtons: React.FC<{
               const csv = exporter.fn()
               if (csv) downloadFile(csv, exportFilename(exporter.prefix, 'csv'))
             }}
+            tooltip="Download per-frame diagnostics as a CSV file"
             data-testid="export-diagnostics-csv"
           >
             Export Diagnostics (CSV)
@@ -330,6 +333,7 @@ const DataExportButtons: React.FC<{
               const csv = exportOpenQuantumDiagnosticsCSV()
               if (csv) downloadFile(csv, exportFilename('mdim-openquantum', 'csv'))
             }}
+            tooltip="Download Lindblad open-quantum metrics as CSV"
             data-testid="export-openquantum-csv"
           >
             Export Open Quantum (CSV)
@@ -346,6 +350,7 @@ const DataExportButtons: React.FC<{
                 const csv = exportObservablesDiagnosticsCSV()
                 if (csv) downloadFile(csv, exportFilename('mdim-observables', 'csv'))
               }}
+              tooltip="Download observable expectation-value history as CSV"
               data-testid="export-observables-csv"
             >
               Export Observables (CSV)
@@ -362,6 +367,7 @@ const DataExportButtons: React.FC<{
                 const csv = exportEntanglementCSV()
                 if (csv) downloadFile(csv, exportFilename('mdim-entanglement', 'csv'))
               }}
+              tooltip="Download coordinate-entanglement entropy history as CSV"
               data-testid="export-entanglement-csv"
             >
               Export Entanglement (CSV)
@@ -374,6 +380,7 @@ const DataExportButtons: React.FC<{
                   const csv = exportAtlasSweepCSV()
                   if (csv) downloadFile(csv, exportFilename('mdim-atlas-sweep', 'csv'))
                 }}
+                tooltip="Download the λ×N entanglement sweep grid as CSV"
                 data-testid="export-atlas-sweep-csv"
               >
                 Export λ×N Sweep (CSV)
@@ -391,6 +398,7 @@ const DataExportButtons: React.FC<{
               const csv = exportWavefunctionSliceCSV('density', 'x')
               if (csv) downloadFile(csv, exportFilename('mdim-slice-x', 'csv'))
             }}
+            tooltip="Download a |ψ|² slice along the x axis as CSV"
             data-testid="export-slice-csv"
           >
             Export |&psi;|&sup2; Slice (CSV)
@@ -405,6 +413,7 @@ const DataExportButtons: React.FC<{
             onClick={() => {
               useWavefunctionSliceStore.getState().requestCapture('x', quantumMode)
             }}
+            tooltip="Capture a wavefunction slice on the next frame"
             data-testid="capture-slice"
           >
             Capture |&psi;|&sup2; Slice
@@ -418,6 +427,7 @@ const DataExportButtons: React.FC<{
               const csv = exportWavefunctionSliceCSV('wavefunction', 'x')
               if (csv) downloadFile(csv, exportFilename('mdim-slice', 'csv'))
             }}
+            tooltip="Download the captured wavefunction slice as CSV"
             data-testid="export-wf-slice-csv"
           >
             Export |&psi;|&sup2; Slice (CSV)
@@ -432,6 +442,7 @@ const DataExportButtons: React.FC<{
             const json = exportDiagnosticsJSON(quantumMode)
             downloadFile(json, exportFilename('mdim-diagnostics', 'json'), 'application/json')
           }}
+          tooltip="Download every diagnostic for this mode as JSON"
           data-testid="export-diagnostics-json"
         >
           Export All (JSON)

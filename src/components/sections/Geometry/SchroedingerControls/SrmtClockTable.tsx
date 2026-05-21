@@ -60,7 +60,7 @@ const ClockRow: React.FC<ClockRowProps> = ({ clock, quality, isSelected, isChamp
             <span
               aria-label="champion"
               data-testid={`wdw-srmt-clock-row-${clock}-champion-glyph`}
-              className="text-[10px] tracking-wide uppercase"
+              className="text-3xs tracking-wide uppercase"
               style={{ color: 'var(--color-success, currentColor)' }}
             >
               [WIN]

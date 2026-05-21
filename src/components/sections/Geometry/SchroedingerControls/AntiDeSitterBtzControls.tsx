@@ -69,6 +69,7 @@ export const AntiDeSitterBtzControls: React.FC<{ ads: AntiDeSitterConfig }> = Re
           label="BTZ thermal state (AdS₃ BH)"
           checked={btzEnabled}
           onCheckedChange={setEnabled}
+          tooltip="Enable BTZ Hartle-Hawking thermal mode (AdS₃ black hole)"
           data-testid="ads-btz-toggle"
         />
         {btzEnabled && (

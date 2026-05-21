@@ -180,6 +180,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
                 options={BASIS_MAX_N_OPTIONS}
                 value={String(hydrogenBasisMaxN)}
                 onChange={onBasisMaxNChange}
+                tooltip="Largest principal quantum number n in the basis"
               />
             </DrawerSection>
 
@@ -192,6 +193,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
                 value={bathTemperature}
                 onChange={setBathTemperature}
                 showValue
+                tooltip="Bath temperature in kelvin (Lindblad equilibrium)"
               />
               <Slider
                 label="Coupling"
@@ -201,6 +203,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
                 value={couplingScale}
                 onChange={setCouplingScale}
                 showValue
+                tooltip="System-bath coupling strength (Lindblad rate prefactor)"
               />
             </DrawerSection>
 
@@ -214,6 +217,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
                 options={DEPHASING_MODEL_OPTIONS}
                 value={dephasingModel}
                 onChange={onDephasingModelChange}
+                tooltip="Pure-dephasing model applied to the hydrogen basis"
               />
               {dephasingModel !== 'none' && (
                 <Slider
@@ -224,6 +228,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
                   value={dephasingRate}
                   onChange={setDephasingRate}
                   showValue
+                  tooltip="Pure-dephasing rate \u03B3\u03C6 (off-diagonal decay)"
                 />
               )}
             </DrawerSection>
@@ -242,6 +247,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
                   onToggle={onDephasingToggle}
                   className="text-xs px-2 py-1 h-auto"
                   ariaLabel="Toggle dephasing channel"
+                  tooltip="Enable or disable the pure-dephasing Lindblad channel"
                 >
                   {dephasingEnabled ? 'ON' : 'OFF'}
                 </ToggleButton>
@@ -255,6 +261,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
                   value={dephasingRate}
                   onChange={setDephasingRate}
                   showValue
+                  tooltip="Pure-dephasing rate \u03B3\u03C6 (off-diagonal decay)"
                 />
               )}
             </div>
@@ -267,6 +274,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
                   onToggle={onRelaxationToggle}
                   className="text-xs px-2 py-1 h-auto"
                   ariaLabel="Toggle relaxation channel"
+                  tooltip="Enable or disable the relaxation Lindblad channel"
                 >
                   {relaxationEnabled ? 'ON' : 'OFF'}
                 </ToggleButton>
@@ -280,6 +288,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
                   value={relaxationRate}
                   onChange={setRelaxationRate}
                   showValue
+                  tooltip="Population decay rate \u03B3\u2193 (downward transitions)"
                 />
               )}
             </div>
@@ -292,6 +301,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
                   onToggle={onThermalToggle}
                   className="text-xs px-2 py-1 h-auto"
                   ariaLabel="Toggle thermal excitation channel"
+                  tooltip="Enable or disable the thermal-excitation channel"
                 >
                   {thermalEnabled ? 'ON' : 'OFF'}
                 </ToggleButton>
@@ -305,6 +315,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
                   value={thermalUpRate}
                   onChange={setThermalUpRate}
                   showValue
+                  tooltip="Thermal excitation rate \u03B3\u2191 (upward transitions)"
                 />
               )}
             </div>
@@ -320,6 +331,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
             value={dt}
             onChange={setDt}
             showValue
+            tooltip="Lindblad integration time step (smaller = more accurate)"
           />
           <Slider
             label="Substeps"
@@ -329,6 +341,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
             value={substeps}
             onChange={setSubsteps}
             showValue
+            tooltip="Sub-steps per visual frame for the Lindblad integrator"
           />
         </DrawerSection>
       </AnimationDrawerContainer>

@@ -130,7 +130,7 @@ export const CropEditor = () => {
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-text-primary text-sm">Crop Selection</span>
-              <span className="text-xs text-text-tertiary uppercase tracking-widest">
+              <span className="text-2xs text-text-tertiary uppercase tracking-widerst">
                 Cinematic Mode
               </span>
             </div>
@@ -139,19 +139,44 @@ export const CropEditor = () => {
           <div className="h-8 w-px bg-[var(--bg-active)]" />
 
           <div className="flex gap-2">
-            <Button size="sm" variant="secondary" onClick={() => setRatio(16 / 9)}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setRatio(16 / 9)}
+              tooltip="Lock crop to 16:9 widescreen ratio"
+            >
               16:9
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => setRatio(9 / 16)}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setRatio(9 / 16)}
+              tooltip="Lock crop to 9:16 portrait ratio"
+            >
               9:16
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => setRatio(1)}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setRatio(1)}
+              tooltip="Lock crop to a 1:1 square ratio"
+            >
               1:1
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => setRatio(4 / 5)}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setRatio(4 / 5)}
+              tooltip="Lock crop to 4:5 social media ratio"
+            >
               4:5
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => setRatio(2.35)}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setRatio(2.35)}
+              tooltip="Lock crop to 2.35:1 cinemascope ratio"
+            >
               2.35:1
             </Button>
           </div>
@@ -160,13 +185,20 @@ export const CropEditor = () => {
         <div className="flex gap-3">
           <Button
             onClick={handleCancel}
+            tooltip="Discard the crop and exit cinematic mode"
             className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
             variant="ghost"
             size="sm"
           >
             Cancel
           </Button>
-          <Button variant="primary" onClick={handleConfirm} glow className="px-6">
+          <Button
+            variant="primary"
+            onClick={handleConfirm}
+            glow
+            tooltip="Apply the selected crop region"
+            className="px-6"
+          >
             <Icon name="check" className="me-2" />
             Confirm Area
           </Button>

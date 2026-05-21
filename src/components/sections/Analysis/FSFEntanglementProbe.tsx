@@ -421,6 +421,7 @@ export const FSFEntanglementProbe: React.FC = React.memo(() => {
           label="Enabled"
           checked={enabled}
           onCheckedChange={setEnabled}
+          tooltip="Enable Peschel entanglement probe for free scalar field"
           data-testid="entanglement-probe-toggle"
         />
 
@@ -456,6 +457,7 @@ export const FSFEntanglementProbe: React.FC = React.memo(() => {
               value={la}
               onChange={setLaSelection}
               showValue
+              tooltip="Length L_A of the entanglement subsystem along axis 0"
               data-testid="entanglement-probe-la-slider"
             />
 
@@ -567,7 +569,7 @@ export const FSFEntanglementProbe: React.FC = React.memo(() => {
                 data-testid="entanglement-probe-modular"
                 data-modular-stale={result.subsystemLength === la ? 'false' : 'true'}
               >
-                <p className="text-[10px] text-text-tertiary uppercase tracking-wider pt-1">
+                <p className="text-3xs text-text-tertiary uppercase tracking-wider pt-1">
                   Modular spectrum at L_A = {result.subsystemLength}
                 </p>
                 <div className="space-y-0.5">

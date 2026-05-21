@@ -157,6 +157,7 @@ export const ScreenshotModal = () => {
               variant="secondary"
               onClick={handleCopy}
               size="lg"
+              tooltip="Copy the cropped screenshot to clipboard"
               className="flex-1 sm:flex-initial"
               data-testid="screenshot-copy-button"
             >
@@ -169,6 +170,7 @@ export const ScreenshotModal = () => {
               loading={isSaving}
               size="lg"
               glow
+              tooltip="Download the cropped screenshot as a PNG"
               className="flex-1 sm:flex-initial"
               data-testid="screenshot-save-button"
             >

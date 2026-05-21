@@ -36,6 +36,8 @@ export interface ExportPresetCardProps {
   description: string
   isActive: boolean
   onClick: () => void
+  /** Tooltip surfaced on hover; defaults to `${label}: ${description}`. */
+  tooltip?: string
 }
 
 /**
@@ -47,9 +49,11 @@ export const ExportPresetCard = ({
   description,
   isActive,
   onClick,
+  tooltip,
 }: ExportPresetCardProps) => {
   const iconSrc = PRESET_ICON_BY_ID[id]
   const iconMask = `url(${iconSrc}) center / contain no-repeat`
+  const resolvedTooltip = tooltip ?? `${label}: ${description}`
 
   return (
     <TileButton
@@ -57,6 +61,7 @@ export const ExportPresetCard = ({
       pressed={isActive}
       onClick={onClick}
       onMouseEnter={() => soundManager.playHover()}
+      title={resolvedTooltip}
       className={`
             relative flex items-center gap-2 text-left p-2 sm:p-3 lg:p-4 rounded-lg lg:rounded-xl border transition-colors duration-200 group
             ${

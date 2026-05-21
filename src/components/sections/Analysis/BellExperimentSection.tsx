@@ -153,17 +153,25 @@ export const BellExperimentContent: React.FC = React.memo(() => {
           variant={isRunning ? 'secondary' : 'primary'}
           size="sm"
           onClick={handleRun}
+          tooltip={isRunning ? 'Pause the CHSH trial loop' : 'Run the CHSH trial loop'}
           data-testid="bell-run-toggle"
         >
           {isRunning ? 'Pause' : 'Run'}
         </Button>
-        <Button variant="secondary" size="sm" onClick={handleReset} data-testid="bell-reset">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={handleReset}
+          tooltip="Reset CHSH trial counters and history"
+          data-testid="bell-reset"
+        >
           Reset
         </Button>
         <Button
           variant="secondary"
           size="sm"
           onClick={handleRandomizeSeed}
+          tooltip="Draw a fresh PRNG seed for trial sampling"
           data-testid="bell-randomize-seed"
         >
           Randomize seed
@@ -253,7 +261,7 @@ export const BellExperimentContent: React.FC = React.memo(() => {
 
       {/* Hint: measurement axes, Werner v, detection η, analysis policy, and
           precession fields are configured in the Geometry tab (left panel). */}
-      <p className="text-[10px] text-text-secondary opacity-70 border-t border-[var(--border-subtle)] pt-2">
+      <p className="text-3xs text-text-secondary opacity-70 border-t border-[var(--border-subtle)] pt-2">
         Configure measurement axes, Werner visibility, detection efficiency, analysis policy, and
         precession fields in the Geometry tab.
       </p>
@@ -264,6 +272,7 @@ export const BellExperimentContent: React.FC = React.memo(() => {
         <ToggleGroup
           value={config.samplerMode}
           onChange={(v) => setSamplerMode(v as typeof config.samplerMode)}
+          tooltip="Sampler: quantum (Born) or local hidden-variable baseline"
           data-testid="bell-toggle-sampler"
           options={[
             { value: 'qm', label: 'Quantum' },
@@ -275,6 +284,7 @@ export const BellExperimentContent: React.FC = React.memo(() => {
           value={config.lhvStrategyId}
           onChange={(v) => setLhvStrategyId(v)}
           options={LHV_STRATEGIES.map((s) => ({ value: s.id, label: s.name }))}
+          tooltip="Local hidden-variable strategy used as the LHV baseline"
           data-testid="bell-lhv-strategy"
         />
       </div>
@@ -290,6 +300,7 @@ export const BellExperimentContent: React.FC = React.memo(() => {
           value={config.targetTrials}
           onChange={setTargetTrials}
           showValue
+          tooltip="Stop the trial loop after this many CHSH trials"
           data-testid="bell-slider-target-trials"
         />
         <Slider
@@ -321,7 +332,7 @@ export const BellExperimentContent: React.FC = React.memo(() => {
       )}
 
       {/* Watermark — connects panel to physics core */}
-      <p className="text-[10px] text-text-secondary opacity-60 mt-1">
+      <p className="text-3xs text-text-secondary opacity-60 mt-1">
         Classical bound = {CLASSICAL_BOUND}. Tsirelson = 2√2 ≈ {TSIRELSON_BOUND.toFixed(3)}.
       </p>
     </div>

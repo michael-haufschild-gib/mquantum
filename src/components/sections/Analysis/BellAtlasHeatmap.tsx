@@ -143,11 +143,11 @@ export const BellAtlasHeatmap: React.FC<BellAtlasHeatmapProps> = React.memo((pro
         }}
         aria-label="Bell experiment (η, v) atlas heatmap"
       />
-      <div className="flex justify-between w-full text-[10px] text-text-secondary px-0.5">
+      <div className="flex justify-between w-full text-3xs text-text-secondary px-0.5">
         <span>v = lo</span>
         <span>v = hi</span>
       </div>
-      <p className="text-[10px] text-text-secondary">
+      <p className="text-3xs text-text-secondary">
         Rows: η (top = hi). Columns: v (right = hi). Outlined cells = CHSH violation.
       </p>
     </div>

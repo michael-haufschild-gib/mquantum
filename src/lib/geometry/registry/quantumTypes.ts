@@ -8,55 +8,16 @@
  * via the `internal` field on each entry.
  */
 
+import {
+  BELL_SERIALIZABLE_PARAMS,
+  DEFAULT_ANALYTIC_COLOR_ALGORITHM,
+  DEFAULT_COMPUTE_COLOR_ALGORITHM,
+  QUALITY_PRESETS,
+  SHARED_RENDERING,
+  SLICE_ANIMATION,
+} from './quantumTypeShared'
+import { QUANTUM_TYPE_VALIDATION } from './quantumValidation'
 import type { QuantumTypeEntry, QuantumTypeKey, QuantumTypeRegistry } from './types'
-
-/**
- * Shared rendering capabilities for all types (all use the same WebGPU
- * raymarching pipeline — the differences are in compute passes, not rendering).
- */
-const SHARED_RENDERING = {
-  supportsFaces: true,
-  supportsEdges: true,
-  supportsPoints: false,
-  renderMethod: 'raymarch' as const,
-  faceDetection: 'none' as const,
-  requiresRaymarching: true,
-  supportsEmission: true,
-}
-
-/**
- * Shared slice animation definition (4D+ only), used by most types.
- */
-const SLICE_ANIMATION = {
-  name: 'Slice Animation',
-  description: 'Animate through higher-dimensional slices (4D+ only)',
-  enabledByDefault: false,
-  minDimension: 4,
-  enabledKey: 'sliceAnimationEnabled',
-  params: {
-    sliceSpeed: {
-      min: 0.01,
-      max: 0.1,
-      default: 0.02,
-      step: 0.01,
-      label: 'Speed',
-      description: 'Speed of slice movement',
-    },
-    sliceAmplitude: {
-      min: 0.1,
-      max: 1.0,
-      default: 0.3,
-      step: 0.05,
-      label: 'Amplitude',
-      description: 'How far the slice moves in each extra dimension',
-    },
-  },
-}
-
-const QUALITY_PRESETS = ['draft', 'standard', 'high', 'ultra']
-
-const DEFAULT_ANALYTIC_COLOR_ALGORITHM = 'radialDistance'
-const DEFAULT_COMPUTE_COLOR_ALGORITHM = 'phaseDensity'
 
 /** The flat Quantum Type Registry — single source of truth for all type metadata. */
 export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey, QuantumTypeEntry>(
@@ -80,6 +41,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           analyticFamily: 'harmonicOscillator',
           supportsOpenQuantum: true,
         },
+        validation: QUANTUM_TYPE_VALIDATION.harmonicOscillator,
         dimensions: {
           min: 2,
           max: 11,
@@ -125,6 +87,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           analyticFamily: 'hydrogen',
           supportsOpenQuantum: true,
         },
+        validation: QUANTUM_TYPE_VALIDATION.hydrogenND,
         dimensions: {
           min: 2,
           max: 11,
@@ -170,6 +133,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           analyticFamily: 'hydrogen',
           supportsOpenQuantum: true,
         },
+        validation: QUANTUM_TYPE_VALIDATION.hydrogenNDCoupled,
         dimensions: {
           min: 2,
           max: 11,
@@ -218,6 +182,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           compileContextFields: ['freeScalarInitialCondition'],
           hasPrecomputedNormals: true,
         },
+        validation: QUANTUM_TYPE_VALIDATION.freeScalarField,
         dimensions: {
           min: 3,
           max: 6,
@@ -263,6 +228,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           uniformComputeGrid: true,
           defaultColorAlgorithm: DEFAULT_COMPUTE_COLOR_ALGORITHM,
         },
+        validation: QUANTUM_TYPE_VALIDATION.tdseDynamics,
         dimensions: {
           min: 3,
           max: 6,
@@ -308,6 +274,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           uniformComputeGrid: true,
           defaultColorAlgorithm: DEFAULT_COMPUTE_COLOR_ALGORITHM,
         },
+        validation: QUANTUM_TYPE_VALIDATION.becDynamics,
         dimensions: {
           min: 3,
           max: 6,
@@ -355,6 +322,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           defaultColorAlgorithm: DEFAULT_COMPUTE_COLOR_ALGORITHM,
           compileContextFields: ['diracFieldView'],
         },
+        validation: QUANTUM_TYPE_VALIDATION.diracEquation,
         dimensions: {
           min: 3,
           max: 6,
@@ -401,6 +369,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           uniformComputeGrid: true,
           defaultColorAlgorithm: 'phaseCyclicUniform',
         },
+        validation: QUANTUM_TYPE_VALIDATION.quantumWalk,
         dimensions: {
           min: 3,
           max: 7,
@@ -446,6 +415,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           stateSaveId: 9,
           defaultColorAlgorithm: DEFAULT_COMPUTE_COLOR_ALGORITHM,
         },
+        validation: QUANTUM_TYPE_VALIDATION.wheelerDeWitt,
         dimensions: {
           min: 3,
           max: 3,
@@ -491,6 +461,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           defaultColorAlgorithm: DEFAULT_COMPUTE_COLOR_ALGORITHM,
           sampleSpaceRotation: true,
         },
+        validation: QUANTUM_TYPE_VALIDATION.antiDeSitter,
         dimensions: {
           min: 3,
           max: 7,
@@ -537,6 +508,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           stateSaveId: 7,
           defaultColorAlgorithm: 'pauliSpinDensity',
         },
+        validation: QUANTUM_TYPE_VALIDATION.pauliSpinor,
         dimensions: {
           min: 3,
           max: 6,
@@ -587,6 +559,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
           stateSaveId: 11,
           defaultColorAlgorithm: 'pauliSpinDensity',
         },
+        validation: QUANTUM_TYPE_VALIDATION.bellTest,
         dimensions: {
           // Bell physics lives in the spin sector. We expose 3D because the
           // existing rendering pipeline assumes ≥3 spatial axes for the
@@ -605,30 +578,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         },
         urlSerialization: {
           typeKey: 'bellTest',
-          serializableParams: [
-            'bell_at',
-            'bell_ap',
-            'bell_apt',
-            'bell_app',
-            'bell_bt',
-            'bell_bp',
-            'bell_bpt',
-            'bell_bpp',
-            'bell_v',
-            'bell_eta',
-            'bell_an',
-            'bell_bax',
-            'bell_bay',
-            'bell_baz',
-            'bell_bbx',
-            'bell_bby',
-            'bell_bbz',
-            'bell_m',
-            'bell_lhv',
-            'bell_n',
-            'bell_tpf',
-            'bell_seed',
-          ],
+          serializableParams: BELL_SERIALIZABLE_PARAMS,
         },
         ui: {
           // M5 ships the BellExperimentSection in components/sections/Analysis.

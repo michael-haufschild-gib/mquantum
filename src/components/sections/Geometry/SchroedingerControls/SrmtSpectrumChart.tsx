@@ -155,7 +155,7 @@ export const SrmtSpectrumChart: React.FC<SrmtSpectrumChartProps> = ({ snapshot }
  * arrange it independently of the chart box (e.g. below the chart on
  * narrow panels). */
 export const SrmtSpectrumLegend: React.FC = () => (
-  <div className="flex items-center gap-3 text-[11px]">
+  <div className="flex items-center gap-3 text-2xs">
     <span className="inline-flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
       <svg width={14} height={6} aria-hidden="true">
         <line x1={0} y1={3} x2={14} y2={3} stroke={K_SERIES_COLOR} strokeWidth={1.5} />

@@ -388,7 +388,13 @@ export const AndersonSweepSection: React.FC = React.memo(() => {
             showValue
             data-testid="sweep-time-per-step"
           />
-          <Button size="sm" variant="primary" onClick={handleStart} data-testid="sweep-start">
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={handleStart}
+            tooltip="Begin the disorder-strength sweep"
+            data-testid="sweep-start"
+          >
             Start Sweep
           </Button>
         </>
@@ -400,7 +406,13 @@ export const AndersonSweepSection: React.FC = React.memo(() => {
             <span className="text-xs text-text-secondary font-mono">
               Step {currentStep + 1}/{config.steps} — W={wForStep(config, currentStep).toFixed(1)}
             </span>
-            <Button size="sm" variant="secondary" onClick={handleAbort} data-testid="sweep-abort">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleAbort}
+              tooltip="Abort the in-progress disorder sweep"
+              data-testid="sweep-abort"
+            >
               Abort
             </Button>
           </div>
@@ -419,7 +431,13 @@ export const AndersonSweepSection: React.FC = React.memo(() => {
           <span className="text-xs text-text-secondary font-mono">
             Sweep complete — {results.length} realizations
           </span>
-          <Button size="sm" variant="secondary" onClick={handleReset} data-testid="sweep-reset">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={handleReset}
+            tooltip="Clear results and start a new disorder sweep"
+            data-testid="sweep-reset"
+          >
             New Sweep
           </Button>
         </div>

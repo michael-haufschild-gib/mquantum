@@ -299,17 +299,18 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
           {/* Center Area (Transparent, lets clicks pass to canvas) */}
           <div className="flex-1 flex flex-col min-w-0 relative z-0">
             <div className="flex-1 relative w-full min-h-0 pointer-events-none">
-              {/* Loader */}
+              {/* Loader — quiet ring + label. The expanded ornamental
+                  composition lived here previously (triple-orbit + blur
+                  pulse); a single ring reads as "system thinking" without
+                  competing with the WebGPU canvas behind it. */}
               {!children && (
-                <div className="w-full h-full flex flex-col items-center justify-center text-text-tertiary">
-                  <div className="relative w-32 h-32 mb-8">
-                    <div className="absolute inset-0 border border-accent/20 rounded-full animate-[spin_8s_linear_infinite]"></div>
-                    <div className="absolute inset-2 border-t border-accent rounded-full animate-[spin_3s_linear_infinite]"></div>
-                    <div className="absolute inset-12 border border-accent/50 rounded-full animate-pulse"></div>
-                    <div className="absolute inset-[40%] bg-accent/20 blur-xl rounded-full animate-pulse"></div>
+                <div className="w-full h-full flex flex-col items-center justify-center text-text-tertiary gap-5">
+                  <div className="relative w-14 h-14">
+                    <div className="absolute inset-0 border border-[var(--border-subtle)] rounded-full" />
+                    <div className="absolute inset-0 border border-transparent border-t-accent rounded-full animate-spin-slow" />
                   </div>
-                  <p className="text-xs font-mono tracking-[0.5em] text-accent/80 animate-pulse uppercase">
-                    Initializing Core
+                  <p className="text-2xs font-mono tracking-widest text-accent/70 uppercase">
+                    Initializing
                   </p>
                 </div>
               )}

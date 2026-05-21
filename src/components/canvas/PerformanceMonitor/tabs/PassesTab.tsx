@@ -152,7 +152,7 @@ export const PassesTabContent = React.memo(function PassesTabContent() {
         <SectionHeader icon={<Icons.Layers />} label="Per-Pass Timing" />
         <div className="border border-border-subtle rounded-lg overflow-hidden">
           {/* Header */}
-          <div className="grid grid-cols-[1fr_60px_60px_48px] gap-1 px-3 py-1.5 bg-[var(--bg-hover)] border-b border-border-subtle text-xs text-text-tertiary uppercase tracking-wider font-bold">
+          <div className="grid grid-cols-[1fr_60px_60px_48px] gap-1 px-3 py-1.5 bg-[var(--bg-hover)] border-b border-border-subtle text-2xs text-text-tertiary uppercase tracking-wider font-semibold">
             <span>Pass</span>
             <span className="text-right">GPU</span>
             <span className="text-right">CPU</span>

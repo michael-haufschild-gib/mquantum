@@ -111,7 +111,7 @@ export const MenuItems: React.FC<{
           return (
             <div
               key={index}
-              className="px-3 py-1.5 text-xs font-bold text-accent uppercase tracking-wider opacity-70"
+              className="px-3 py-1.5 text-2xs font-semibold text-accent uppercase tracking-wider opacity-70"
             >
               {item.label}
             </div>

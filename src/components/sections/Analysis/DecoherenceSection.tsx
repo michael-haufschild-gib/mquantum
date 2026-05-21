@@ -106,6 +106,7 @@ function DecoherenceContent() {
             checked={tdse.stochasticEnabled}
             onCheckedChange={setStochasticEnabled}
             disabled={sweepRunning}
+            tooltip="Turn stochastic CSL-style decoherence on or off"
           />
         </div>
 
@@ -124,6 +125,7 @@ function DecoherenceContent() {
                 min={0}
                 max={10}
                 step={0.1}
+                tooltip="CSL monitoring rate γ (collapse strength per unit time)"
               />
               <Slider
                 label="Localization width (σ)"
@@ -132,6 +134,7 @@ function DecoherenceContent() {
                 min={0.5}
                 max={5.0}
                 step={0.1}
+                tooltip="Gaussian localization width σ for each collapse event"
               />
               <Slider
                 label="Collapse sites/step"
@@ -140,6 +143,7 @@ function DecoherenceContent() {
                 min={1}
                 max={MAX_STOCHASTIC_SITES}
                 step={1}
+                tooltip="Number of CSL collapse sites sampled per integration step"
               />
               <Slider
                 label="Seed"
@@ -177,17 +181,20 @@ function DecoherenceContent() {
                     min={-1.0}
                     max={1.0}
                     step={0.01}
+                    tooltip="Position of the branch partition along axis 0"
                   />
                   <div className="flex space-x-4">
                     <ColorPicker
                       label="Branch A"
                       value={rgbToHex(tdse.branchColorA)}
                       onChange={(hex) => setBranchColorA(hexToRgb(hex))}
+                      tooltip="Tint colour for branch A in the branch visualization"
                     />
                     <ColorPicker
                       label="Branch B"
                       value={rgbToHex(tdse.branchColorB)}
                       onChange={(hex) => setBranchColorB(hexToRgb(hex))}
+                      tooltip="Tint colour for branch B in the branch visualization"
                     />
                   </div>
                 </>

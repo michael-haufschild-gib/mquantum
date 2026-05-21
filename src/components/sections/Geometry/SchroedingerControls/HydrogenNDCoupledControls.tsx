@@ -114,6 +114,7 @@ export const HydrogenNDCoupledControls: React.FC<HydrogenNDCoupledControlsProps>
             min={1}
             max={7}
             step={1}
+            tooltip="Principal quantum number n (energy shell)"
           />
 
           {/* Angular momentum l₁ */}
@@ -122,6 +123,7 @@ export const HydrogenNDCoupledControls: React.FC<HydrogenNDCoupledControlsProps>
             value={String(azimuthalQuantumNumber)}
             onChange={(v) => setAzimuthalQuantumNumber(Number(v))}
             options={orbitalOptions}
+            tooltip="Orbital angular momentum quantum number ℓ₁ (s/p/d/f shell)"
           />
 
           {/* Magnetic quantum number m */}
@@ -130,6 +132,7 @@ export const HydrogenNDCoupledControls: React.FC<HydrogenNDCoupledControlsProps>
             value={String(magneticQuantumNumber)}
             onChange={(v) => setMagneticQuantumNumber(Number(v))}
             options={mOptions}
+            tooltip="Magnetic quantum number m along the z axis"
           />
         </ControlGroup>
 
@@ -154,6 +157,7 @@ export const HydrogenNDCoupledControls: React.FC<HydrogenNDCoupledControlsProps>
                   max={displayMaxL}
                   step={1}
                   disabled={displayMaxL <= minChainL}
+                  tooltip={`Hyperspherical angular momentum \u2113${subscript} (must satisfy \u2113${subscript} \u2264 \u2113${String.fromCodePoint(0x2080 + i + 1)})`}
                 />
               )
             })}
@@ -165,6 +169,7 @@ export const HydrogenNDCoupledControls: React.FC<HydrogenNDCoupledControlsProps>
             label="Real orbitals"
             checked={config.useRealOrbitals === true}
             onCheckedChange={setUseRealOrbitals}
+            tooltip="Render real (sin/cos) orbital combinations instead of complex Y_ℓm"
           />
           <Slider
             label="Bohr radius"
@@ -173,6 +178,7 @@ export const HydrogenNDCoupledControls: React.FC<HydrogenNDCoupledControlsProps>
             min={0.5}
             max={3.0}
             step={0.1}
+            tooltip="Visual scaling of the Bohr radius a₀ (display only)"
           />
         </ControlGroup>
       </div>

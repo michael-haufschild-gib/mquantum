@@ -109,6 +109,7 @@ export const LightListItem: React.FC<LightListItemProps> = memo(function LightLi
       onKeyDown={handleKeyDown}
       aria-pressed={isSelected}
       aria-label={`Select ${light.name}`}
+      title={`Select the light "${light.name}"`}
     >
       {/* Light type icon with color */}
       <span
@@ -134,6 +135,7 @@ export const LightListItem: React.FC<LightListItemProps> = memo(function LightLi
         onClick={handleToggleClick}
         className={light.enabled ? 'text-accent' : 'text-[var(--text-tertiary)]'}
         ariaLabel={light.enabled ? 'Disable light' : 'Enable light'}
+        tooltip={light.enabled ? `Disable "${light.name}"` : `Enable "${light.name}"`}
       >
         {light.enabled ? (
           <LightToggleOnIcon className="w-4 h-4" />
@@ -153,6 +155,11 @@ export const LightListItem: React.FC<LightListItemProps> = memo(function LightLi
             : 'text-[var(--text-tertiary)] hover:text-[var(--text-danger)]'
         }
         ariaLabel={isDeleteDisabled ? 'Cannot remove ambient light' : 'Remove light'}
+        tooltip={
+          isDeleteDisabled
+            ? 'The ambient light cannot be removed'
+            : `Remove the light "${light.name}"`
+        }
         disabled={isDeleteDisabled}
       >
         <TrashIcon className="w-4 h-4" />

@@ -58,6 +58,7 @@ export const ExportPresets = () => {
           description={p.description}
           isActive={p.id === activePresetId}
           onClick={() => handleSelect(p.id)}
+          tooltip={`Apply the ${p.label} export preset`}
         />
       ))}
     </div>

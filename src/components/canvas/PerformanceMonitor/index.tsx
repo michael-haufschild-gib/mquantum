@@ -31,8 +31,8 @@ export function PerformanceMonitor() {
 
   // -- Dimensions & Positioning --
   const containerRef = useRef<HTMLDivElement>(null)
-  const [width, setWidth] = useState(180)
-  const [height, setHeight] = useState(48)
+  const [width, setWidth] = useState(140)
+  const [height, setHeight] = useState(36)
 
   // Motion values for drag
   const x = useMotionValue(0)
@@ -57,8 +57,8 @@ export function PerformanceMonitor() {
     return () => observer.disconnect()
   }, [expanded])
 
-  const effectiveWidth = expanded ? width : 180
-  const effectiveHeight = expanded ? height : 48
+  const effectiveWidth = expanded ? width : 140
+  const effectiveHeight = expanded ? height : 36
 
   // Panel collision - keeps monitor from being covered by sidebars/toolbars
   usePanelCollision(x, y, effectiveWidth, effectiveHeight, isDragging)

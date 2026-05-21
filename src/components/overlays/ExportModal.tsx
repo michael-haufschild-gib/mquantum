@@ -12,6 +12,7 @@ import { ConfirmModal } from '../ui/ConfirmModal'
 import { Modal } from '../ui/Modal'
 import { Tabs } from '../ui/Tabs'
 import { ExportAdvancedTab } from './export/ExportAdvancedTab'
+import { ExportCompletedView } from './export/ExportCompletedView'
 import { ExportGeneralTab } from './export/ExportGeneralTab'
 import { ExportPresets } from './export/ExportPresets'
 import { ExportPreview } from './export/ExportPreview'
@@ -87,6 +88,7 @@ function RenderingView({
         onClick={onCancel}
         variant="danger"
         size="sm"
+        tooltip="Cancel the in-progress export"
         className="opacity-50 hover:opacity-100"
       >
         Cancel Operation
@@ -108,73 +110,6 @@ function EncodingView() {
       <div>
         <h3 className="text-xl font-bold text-white">Finalizing Video</h3>
         <p className="text-text-secondary">Encoding media stream...</p>
-      </div>
-    </div>
-  )
-}
-
-/** Completion view dispatching to in-memory, stream, or segmented result. */
-function CompletedView({
-  completionDetails,
-  previewUrl,
-  onDownload,
-  onReset,
-}: {
-  completionDetails: { type: string; segmentCount?: number } | null
-  previewUrl: string | null
-  onDownload: () => void
-  onReset: () => void
-}) {
-  const detailType = completionDetails?.type ?? 'in-memory'
-
-  if (detailType === 'stream') {
-    return (
-      <div className="flex flex-col items-center justify-center gap-6 py-4">
-        <div className="w-20 h-20 bg-success border border-success-border rounded-full flex items-center justify-center">
-          <Icon name="check" className="text-success w-10 h-10" />
-        </div>
-        <div className="text-center space-y-2">
-          <h3 className="text-2xl font-bold text-white">Export Successful</h3>
-          <p className="text-text-secondary">Video saved directly to your device.</p>
-        </div>
-        <Button onClick={onReset} variant="secondary" size="lg" className="w-full">
-          Start New Export
-        </Button>
-      </div>
-    )
-  }
-
-  if (detailType === 'segmented') {
-    return (
-      <div className="flex flex-col gap-6 text-center">
-        <div className="flex flex-col items-center gap-4">
-          <Icon name="layers" className="text-warning w-12 h-12" />
-          <h3 className="text-xl font-bold text-warning">Segmented Export Complete</h3>
-          <p className="text-sm text-text-secondary">
-            {completionDetails?.segmentCount ?? 0} segments downloaded.
-          </p>
-        </div>
-        <Button onClick={onReset} variant="secondary" size="lg" className="w-full">
-          Back to Editor
-        </Button>
-      </div>
-    )
-  }
-
-  // in-memory (default)
-  if (!previewUrl) return null
-  return (
-    <div className="space-y-6">
-      <div className="rounded-xl overflow-hidden border border-border-default bg-black aspect-video relative group shadow-2xl">
-        <video src={previewUrl} controls autoPlay loop className="w-full h-full object-contain" />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <Button onClick={onDownload} variant="primary" size="lg" glow className="py-6 text-lg">
-          <Icon name="download" className="w-5 h-5 me-2" /> Download
-        </Button>
-        <Button onClick={onReset} variant="secondary" size="lg" className="py-6">
-          New Export
-        </Button>
       </div>
     </div>
   )
@@ -379,7 +314,7 @@ export const ExportModal = () => {
             {status === 'encoding' && <EncodingView />}
             {status === 'completed' && (
               <div className="animate-in fade-in zoom-in-95 duration-300">
-                <CompletedView
+                <ExportCompletedView
                   completionDetails={completionDetails}
                   previewUrl={previewUrl}
                   onDownload={handleDownload}
@@ -402,7 +337,7 @@ export const ExportModal = () => {
 
               {/* Processing Mode & Stats */}
               <div className="space-y-4">
-                <span className="text-xs font-bold text-text-secondary uppercase tracking-wider">
+                <span className="text-2xs font-semibold text-text-secondary uppercase tracking-wider">
                   Processing Mode
                 </span>
 
@@ -461,7 +396,7 @@ export const ExportModal = () => {
               {/* Mobile Header: Processing Mode & Stats (hidden on desktop) */}
               <div className="lg:hidden p-4 pb-0 space-y-3 border-b border-border-subtle">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-text-secondary uppercase tracking-wider">
+                  <span className="text-2xs font-semibold text-text-secondary uppercase tracking-wider">
                     Processing Mode
                   </span>
                   <span className="text-xs text-text-tertiary">
@@ -501,6 +436,7 @@ export const ExportModal = () => {
                   onClick={handleExport}
                   variant="primary"
                   size="lg"
+                  tooltip="Start rendering the export with the selected settings"
                   className="w-full py-4 glow-accent-md hover:glow-accent-lg transition-shadow"
                   glow
                 >

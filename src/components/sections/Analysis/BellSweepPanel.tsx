@@ -155,6 +155,7 @@ export const BellSweepPanel: React.FC = React.memo(() => {
                 variant="secondary"
                 size="sm"
                 onClick={handleAbort}
+                tooltip="Abort the in-progress (η, v) atlas sweep"
                 data-testid="bell-atlas-abort"
               >
                 Abort
@@ -165,6 +166,7 @@ export const BellSweepPanel: React.FC = React.memo(() => {
               variant="primary"
               size="sm"
               onClick={handleStart}
+              tooltip="Run a fresh (η, v) atlas sweep across the loophole plane"
               data-testid="bell-atlas-start"
             >
               {sweepStatus === 'complete' ? 'Re-run sweep' : 'Run sweep'}
@@ -182,6 +184,7 @@ export const BellSweepPanel: React.FC = React.memo(() => {
           value={sweepConfig.etaSteps}
           onChange={(v) => setSweepConfig({ etaSteps: Math.max(2, Math.round(v)) })}
           showValue
+          tooltip="Grid resolution along the detection-efficiency axis η"
         />
         <Slider
           label="v steps"
@@ -191,6 +194,7 @@ export const BellSweepPanel: React.FC = React.memo(() => {
           value={sweepConfig.visibilitySteps}
           onChange={(v) => setSweepConfig({ visibilitySteps: Math.max(2, Math.round(v)) })}
           showValue
+          tooltip="Grid resolution along the Werner visibility axis v"
         />
         <Slider
           label="Trials / cell"
@@ -200,6 +204,7 @@ export const BellSweepPanel: React.FC = React.memo(() => {
           value={sweepConfig.trialsPerCell}
           onChange={(v) => setSweepConfig({ trialsPerCell: Math.max(100, Math.round(v)) })}
           showValue
+          tooltip="Trial sample size at each (η, v) atlas grid cell"
         />
       </div>
 

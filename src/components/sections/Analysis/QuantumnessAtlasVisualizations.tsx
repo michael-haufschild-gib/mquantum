@@ -267,7 +267,7 @@ export const DiagnosticScatter: React.FC<{ results: AtlasPoint[] }> = React.memo
     <div>
       <div className="flex items-center gap-2 mb-0.5">
         {dims.map((d) => (
-          <span key={d} className="text-[9px]" style={{ color: dimColor(d, dims) }}>
+          <span key={d} className="text-4xs" style={{ color: dimColor(d, dims) }}>
             ● {d}D
           </span>
         ))}
@@ -367,7 +367,7 @@ const DiagHeatmap: React.FC<{
 
   return (
     <div className="flex-1 min-w-0">
-      <p className="text-[9px] text-center mb-0.5" style={{ color }}>
+      <p className="text-4xs text-center mb-0.5" style={{ color }}>
         {label}
       </p>
       <svg width="100%" viewBox={`0 0 ${HM_SIZE} ${HM_SIZE}`} className="block">

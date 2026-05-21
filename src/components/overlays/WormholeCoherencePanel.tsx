@@ -188,7 +188,7 @@ const WormholeCoherencePanelInner: React.FC = React.memo(() => {
             onClick={handleClose}
             ariaLabel="Close wormhole coherence panel"
             className="!p-1 !min-w-0"
-            title="Close"
+            tooltip="Close the wormhole coherence panel"
             data-testid="wormhole-coherence-close"
           >
             <Icon name="cross" size={10} />

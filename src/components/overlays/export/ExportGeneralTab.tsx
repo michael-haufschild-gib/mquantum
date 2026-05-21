@@ -72,7 +72,7 @@ export const ExportGeneralTab = () => {
       {/* Format & Resolution Group */}
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider flex items-center gap-2">
+          <h3 className="text-2xs font-semibold text-text-primary uppercase tracking-wider flex items-center gap-2">
             <Icon name="cog" className="w-4 h-4 text-accent" />
             Output Format
           </h3>
@@ -80,7 +80,7 @@ export const ExportGeneralTab = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
-            <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
+            <label className="text-2xs text-text-tertiary uppercase font-medium tracking-wider">
               Container
             </label>
             <ToggleGroup
@@ -98,7 +98,7 @@ export const ExportGeneralTab = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
+            <label className="text-2xs text-text-tertiary uppercase font-medium tracking-wider">
               Resolution
             </label>
             <ToggleGroup
@@ -124,7 +124,9 @@ export const ExportGeneralTab = () => {
               className="flex gap-4 pt-2 overflow-hidden"
             >
               <div className="space-y-1.5 flex-1">
-                <label className="text-xs text-text-tertiary uppercase tracking-wide">Width</label>
+                <label className="text-2xs text-text-tertiary uppercase tracking-wider">
+                  Width
+                </label>
                 <NumberInput
                   value={settings.customWidth}
                   onChange={(val) => updateSettings({ customWidth: clampDimension(val) })}
@@ -135,7 +137,9 @@ export const ExportGeneralTab = () => {
                 />
               </div>
               <div className="space-y-1.5 flex-1">
-                <label className="text-xs text-text-tertiary uppercase tracking-wide">Height</label>
+                <label className="text-2xs text-text-tertiary uppercase tracking-wider">
+                  Height
+                </label>
                 <NumberInput
                   value={settings.customHeight}
                   onChange={(val) => updateSettings({ customHeight: clampDimension(val) })}
@@ -154,14 +158,14 @@ export const ExportGeneralTab = () => {
 
       {/* Timing & Quality */}
       <div className="space-y-4">
-        <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider flex items-center gap-2">
+        <h3 className="text-2xs font-semibold text-text-primary uppercase tracking-wider flex items-center gap-2">
           <Icon name="info" className="w-4 h-4 text-accent" />
           Timing & Smoothness
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
-            <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
+            <label className="text-2xs text-text-tertiary uppercase font-medium tracking-wider">
               Framerate
             </label>
             <ToggleGroup
@@ -204,6 +208,7 @@ export const ExportGeneralTab = () => {
         onClick={() =>
           updateSettings({ crop: { ...settings.crop, enabled: !settings.crop.enabled } })
         }
+        title="Toggle whether the export is cropped to a custom region"
       >
         <div className="flex items-center gap-4">
           <div
@@ -213,14 +218,14 @@ export const ExportGeneralTab = () => {
           </div>
           <div>
             <div className="text-sm font-bold text-text-primary">Crop Frame</div>
-            <div className="text-xs text-text-secondary uppercase tracking-wider">
+            <div className="text-2xs text-text-secondary uppercase tracking-wider">
               {settings.crop.enabled ? 'Custom area active' : 'Exporting full frame'}
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <div onClick={(e) => e.stopPropagation()}>
+          <div onClick={(e) => e.stopPropagation()} title="Stop the row click from also firing">
             <Switch
               checked={settings.crop.enabled}
               onCheckedChange={(c) => updateSettings({ crop: { ...settings.crop, enabled: c } })}
@@ -236,6 +241,7 @@ export const ExportGeneralTab = () => {
               e.stopPropagation()
               handleOpenCrop()
             }}
+            tooltip="Open the editor to set the crop region"
           >
             Edit Area
           </Button>
@@ -248,6 +254,7 @@ export const ExportGeneralTab = () => {
                     ${settings.resetEvolution ? 'bg-accent/5 border-accent/50' : 'glass-panel hover:bg-[var(--bg-hover)]'}
                 `}
         onClick={() => updateSettings({ resetEvolution: !settings.resetEvolution })}
+        title="Toggle whether the wavefunction resets before recording"
       >
         <div className="flex items-center gap-4">
           <div
@@ -257,7 +264,7 @@ export const ExportGeneralTab = () => {
           </div>
           <div>
             <div className="text-sm font-bold text-text-primary">Reset Evolution</div>
-            <div className="text-xs text-text-secondary uppercase tracking-wider">
+            <div className="text-2xs text-text-secondary uppercase tracking-wider">
               {settings.resetEvolution
                 ? 'Wavefunction resets before recording'
                 : 'Recording from current state'}
@@ -265,7 +272,7 @@ export const ExportGeneralTab = () => {
           </div>
         </div>
 
-        <div onClick={(e) => e.stopPropagation()}>
+        <div onClick={(e) => e.stopPropagation()} title="Stop the row click from also firing">
           <Switch
             checked={settings.resetEvolution}
             onCheckedChange={(c) => updateSettings({ resetEvolution: c })}

@@ -158,7 +158,7 @@ const SrmtDiagnosticContent: React.FC = React.memo(() => {
             data-testid="wdw-srmt-cut-slider"
           />
           <div
-            className="text-[11px] font-mono"
+            className="text-2xs font-mono"
             style={{
               color: srmtEnabled ? 'var(--text-tertiary)' : 'var(--text-disabled)',
             }}

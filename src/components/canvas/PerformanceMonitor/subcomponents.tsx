@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { computeSparklinePoints, formatBytes } from './utils'
 
 export const SectionHeader = ({ icon, label }: { icon: React.ReactNode; label: string }) => (
-  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-text-tertiary">
+  <div className="flex items-center gap-2 text-2xs font-semibold uppercase tracking-wider text-text-tertiary">
     <span className="opacity-70">{icon}</span>
     <span>{label}</span>
   </div>
@@ -21,7 +21,7 @@ export const InfoCard = ({
   highlight?: boolean
 }) => (
   <div className="bg-[var(--bg-hover)] rounded-md p-2 border border-[var(--border-subtle)]">
-    <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-0.5">
+    <div className="text-2xs text-[var(--text-tertiary)] uppercase tracking-wider mb-0.5">
       {label}
     </div>
     <div
@@ -89,11 +89,14 @@ export const DebugToggle = ({
   label,
   active,
   onClick,
+  tooltip,
   disabled = false,
 }: {
   label: string
   active: boolean
   onClick: () => void
+  /** Required; surfaced as the button's hover tooltip. */
+  tooltip: string
   disabled?: boolean
 }) => (
   <Button
@@ -101,7 +104,8 @@ export const DebugToggle = ({
     size="sm"
     onClick={disabled ? undefined : onClick}
     disabled={disabled}
-    className={`text-xs font-bold uppercase tracking-wider ${active ? 'bg-accent/20 text-accent border-accent/50 glow-accent-sm' : ''}`}
+    tooltip={tooltip}
+    className={`text-2xs font-semibold uppercase tracking-wider ${active ? 'bg-accent/20 text-accent border-accent/50 glow-accent-sm' : ''}`}
   >
     {label}
   </Button>

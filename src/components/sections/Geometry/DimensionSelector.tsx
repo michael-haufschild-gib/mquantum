@@ -163,6 +163,7 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = React.memo(
               className="absolute start-0 top-0 bottom-0 z-20 flex items-center"
               onPointerDown={handlePreventDefault}
               onMouseDown={handlePreventDefault}
+              title="Stops the dimension list from scrolling on edge press"
             >
               <Button
                 variant="ghost"
@@ -170,6 +171,7 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = React.memo(
                 onClick={scrollLeft}
                 className="h-full rounded-l-lg rounded-r-none border-none bg-gradient-to-r from-panel-bg via-panel-bg/90 to-transparent hover:bg-gradient-to-r px-1 w-auto"
                 ariaLabel="Scroll left"
+                tooltip="Scroll the dimension list left"
               >
                 <Icon name="chevron-left" />
               </Button>
@@ -195,6 +197,7 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = React.memo(
               className="absolute end-0 top-0 bottom-0 z-20 flex items-center"
               onPointerDown={handlePreventDefault}
               onMouseDown={handlePreventDefault}
+              title="Stops the dimension list from scrolling on edge press"
             >
               <Button
                 variant="ghost"
@@ -202,6 +205,7 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = React.memo(
                 onClick={scrollRight}
                 className="h-full rounded-r-lg rounded-l-none border-none bg-gradient-to-l from-panel-bg via-panel-bg/90 to-transparent hover:bg-gradient-to-l px-1 w-auto"
                 ariaLabel="Scroll right"
+                tooltip="Scroll the dimension list right"
               >
                 <Icon name="chevron-right" />
               </Button>

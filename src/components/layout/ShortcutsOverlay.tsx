@@ -71,6 +71,7 @@ export const ShortcutsOverlay: React.FC = React.memo(() => {
                 size="icon"
                 onClick={handleClose}
                 ariaLabel="Close"
+                tooltip="Close the keyboard shortcuts overlay"
                 data-testid="shortcuts-close"
                 className="p-1.5"
               >

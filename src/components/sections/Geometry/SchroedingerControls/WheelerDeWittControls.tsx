@@ -134,6 +134,7 @@ export const WheelerDeWittControls: React.FC = React.memo(() => {
         label="WKB streamlines"
         checked={wdw.streamlinesEnabled}
         onCheckedChange={setWdwStreamlinesEnabled}
+        tooltip="Overlay WKB-classical streamlines on the Wheeler-DeWitt PDE"
         data-testid="wdw-streamlines-switch"
       />
       {wdw.streamlinesEnabled && (

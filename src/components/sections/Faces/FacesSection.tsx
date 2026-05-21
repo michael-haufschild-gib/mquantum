@@ -417,6 +417,7 @@ const MaterialTabContent: React.FC<MaterialTabContentProps> = React.memo(
                   size="sm"
                   onClick={handleResetSpecularColor}
                   ariaLabel="Reset to default"
+                  tooltip="Restore the default specular tint color"
                 >
                   Reset
                 </Button>

@@ -78,7 +78,7 @@ export const SkyboxSharedClassicControls: React.FC<SkyboxSharedClassicControlsPr
 
       {/* Color Adjustments */}
       <div className="space-y-4 border-s-2 border-text-secondary/20 ps-4 mt-4">
-        <span className="text-xs font-bold text-text-secondary uppercase tracking-wider block mb-2">
+        <span className="text-2xs font-bold text-text-secondary uppercase tracking-wider block mb-2">
           Color
         </span>
         <Slider

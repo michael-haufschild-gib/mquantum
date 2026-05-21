@@ -116,6 +116,7 @@ export const MsgBox: React.FC = () => {
               checked={dontShowAgain}
               onCheckedChange={setDontShowAgain}
               label="Don't show again"
+              tooltip="Suppress this dialog for the rest of the session"
               className="text-sm"
               data-testid="msgbox-dismiss-switch"
             />
@@ -131,6 +132,7 @@ export const MsgBox: React.FC = () => {
                 onClick={() => handleAction(action)}
                 variant={action.variant || 'secondary'}
                 size="md"
+                tooltip={`Run action: ${action.label}`}
               >
                 {action.label}
               </Button>

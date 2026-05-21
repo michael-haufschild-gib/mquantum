@@ -87,6 +87,7 @@ export const MiscControls: React.FC<MiscControlsProps> = React.memo(({ className
           options={ANTI_ALIASING_OPTIONS}
           value={antiAliasingMethod}
           onChange={setAntiAliasingMethod}
+          tooltip="Anti-aliasing technique applied to the final image"
           data-testid="anti-aliasing-select"
         />
       </ControlGroup>

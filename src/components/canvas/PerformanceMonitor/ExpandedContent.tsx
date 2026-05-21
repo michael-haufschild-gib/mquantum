@@ -43,7 +43,7 @@ const FPSHeader = React.memo(function FPSHeader() {
               FPS
             </span>
           </div>
-          <div className="text-xs text-text-tertiary uppercase tracking-wider mt-1 font-medium">
+          <div className="text-2xs text-text-tertiary uppercase tracking-wider mt-1 font-medium">
             Min {minFpsLabel} • Max {maxFpsLabel}
           </div>
         </div>
@@ -52,7 +52,7 @@ const FPSHeader = React.memo(function FPSHeader() {
             {frameTime.toFixed(1)}
             <span className="text-xs text-text-tertiary ml-1">ms</span>
           </div>
-          <div className="text-xs text-text-tertiary uppercase tracking-wider mt-1 font-medium">
+          <div className="text-2xs text-text-tertiary uppercase tracking-wider mt-1 font-medium">
             Frame Time
           </div>
         </div>
@@ -108,11 +108,12 @@ export const ExpandedContent = React.memo(function ExpandedContent({
         onClick={() => {
           if (!didDrag) onCollapse()
         }}
+        title="Collapse the performance monitor"
         className="flex items-center justify-between px-5 py-4 border-b border-border-subtle bg-[var(--bg-hover)] cursor-pointer hover:bg-[var(--bg-active)] transition-colors"
       >
         <div className="flex items-center gap-3">
           <Icons.Activity className="w-4 h-4 text-text-tertiary" />
-          <span className="text-xs font-bold uppercase tracking-widest text-text-secondary">
+          <span className="text-2xs font-semibold uppercase tracking-wider text-text-secondary">
             System Monitor
           </span>
         </div>

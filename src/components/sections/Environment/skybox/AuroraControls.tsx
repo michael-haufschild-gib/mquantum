@@ -17,7 +17,7 @@ export const AuroraControls: React.FC<AuroraControlsProps> = ({
 }) => {
   return (
     <div className="space-y-4 border-s-2 border-success-border ps-4">
-      <span className="text-xs font-bold text-success uppercase tracking-wider block mb-2">
+      <span className="text-2xs font-semibold text-success uppercase tracking-wider block mb-2">
         Aurora
       </span>
 
