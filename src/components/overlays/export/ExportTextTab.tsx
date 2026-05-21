@@ -11,11 +11,7 @@ import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import { buildSceneStamp } from '@/lib/export/sceneStamp'
-import {
-  getQuantumTypeName,
-  getQuantumTypeValidation,
-  resolveQuantumTypeKey,
-} from '@/lib/geometry/registry'
+import { getQuantumTypeName, resolveQuantumTypeKey } from '@/lib/geometry/registry'
 import { useExportStore } from '@/stores/runtime/exportStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
@@ -44,7 +40,6 @@ export const ExportTextTab = () => {
       modeName: key ? getQuantumTypeName(key) : objectType,
       dimension,
       representation: objectType === 'schroedinger' ? representation : undefined,
-      validation: key ? getQuantumTypeValidation(key) : undefined,
     })
   }, [dimension, objectType, quantumMode, representation])
 
@@ -94,7 +89,7 @@ export const ExportTextTab = () => {
           size="sm"
           variant="secondary"
           onClick={insertSceneStamp}
-          tooltip="Use current mode, dimension, representation, and validation evidence as overlay text."
+          tooltip="Use current mode, dimension, and representation as overlay text."
           data-testid="insert-scene-stamp"
           className="shrink-0"
         >

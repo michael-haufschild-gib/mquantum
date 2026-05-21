@@ -43,9 +43,7 @@ describe('ExportTextTab scene stamp', () => {
 
     const overlay = useExportStore.getState().settings.textOverlay
     expect(overlay.enabled).toBe(true)
-    expect(overlay.text).toBe(
-      'mquantum | Hydrogen Orbitals | 4D | Momentum | R+A+P strong evidence'
-    )
+    expect(overlay.text).toBe('mquantum | Hydrogen Orbitals | 4D | Momentum')
     expect(overlay.horizontalPlacement).toBe('left')
     expect(screen.getByPlaceholderText('Enter text...')).toHaveValue(overlay.text)
   })
