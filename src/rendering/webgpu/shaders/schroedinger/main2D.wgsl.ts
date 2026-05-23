@@ -22,8 +22,12 @@ function generate2DCommonBody(): string {
   // Map UV [0,1] to centered coordinates [-1,1]
   let centeredUV = input.uv * 2.0 - 1.0;
 
-  // Scale by bounding radius and aspect ratio
-  let aspect = camera.resolution.x / camera.resolution.y;
+  // Scale by bounding radius and aspect ratio. Degenerate resize/export
+  // frames can briefly publish a zero resolution; keep coordinates finite.
+  var aspect = 1.0;
+  if (camera.resolution.x > 0.0 && camera.resolution.y > 0.0) {
+    aspect = camera.resolution.x / camera.resolution.y;
+  }
   let physX = centeredUV.x * schroedinger.boundingRadius * aspect;
   let physY = centeredUV.y * schroedinger.boundingRadius;
 

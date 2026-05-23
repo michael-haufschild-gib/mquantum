@@ -122,7 +122,7 @@ export const CanvasContextMenuContent: React.FC<CanvasContextMenuContentProps> =
             animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-            className="min-w-[180px] glass-panel rounded-lg shadow-xl overflow-hidden py-1"
+            className="min-w-[180px] surface-panel rounded-lg shadow-xl overflow-hidden py-1"
           >
             {items.map((item, index) => {
               if (item.type === 'separator') {

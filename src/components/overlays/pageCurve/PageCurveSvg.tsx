@@ -96,7 +96,7 @@ export const PageCurveSvg = React.memo(function PageCurveSvg({
         y={PAD_T}
         width={PAGE_CURVE_WIDTH - PAD_L - PAD_R}
         height={PAGE_CURVE_HEIGHT - PAD_T - PAD_B}
-        fill="var(--color-glass)"
+        fill="var(--color-control)"
         stroke="var(--color-panel-border)"
         strokeWidth={1}
       />

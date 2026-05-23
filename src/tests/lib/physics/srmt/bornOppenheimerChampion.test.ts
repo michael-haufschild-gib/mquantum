@@ -69,6 +69,15 @@ describe('Born-Oppenheimer cross-diagnostic', () => {
     expect(findBornOppenheimerChampion({ a: 0.5, phi1: 0.02, phi2: 0.7 })).toBe('phi1')
   })
 
+  it('does not score Born-Oppenheimer drift across zero-probability clock slices', () => {
+    const shape: [number, number, number] = [6, 6, 6]
+    const chi = buildChi(shape, (i0) => (i0 === 0 ? [1, 0] : [0, 0]))
+    const rates = computeBornOppenheimerRates(chi, shape)
+
+    expect(rates.a).toBeNaN()
+    expect(findBornOppenheimerChampion(rates)).toBeNull()
+  })
+
   it('findBornOppenheimerChampion returns null on a tie within tolerance', () => {
     expect(findBornOppenheimerChampion({ a: 0.5, phi1: 0.5 * 1.001, phi2: 0.7 })).toBeNull()
   })

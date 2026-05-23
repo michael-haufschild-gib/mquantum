@@ -186,6 +186,27 @@ describe('evaluatePotential1D', () => {
     expect(evaluatePotential1D(0, cfg)).toBeCloseTo(0, 10)
   })
 
+  it('blackHoleRingdown normalizes legacy BH params to the GPU Hamiltonian', () => {
+    const corrupted = createConfig({
+      potentialType: 'blackHoleRingdown',
+      bhMass: Number.NaN,
+      bhMultipoleL: 0,
+      bhSpin: 2,
+    } as Partial<TdseConfig>)
+    const normalized = createConfig({
+      potentialType: 'blackHoleRingdown',
+      bhMass: DEFAULT_TDSE_CONFIG.bhMass,
+      bhMultipoleL: 2,
+      bhSpin: 2,
+    })
+
+    const x = 2.5
+    const v = evaluatePotential1D(x, corrupted)
+    expect(Number.isFinite(v)).toBe(true)
+    expect(v).toBeGreaterThan(0)
+    expect(v).toBeCloseTo(evaluatePotential1D(x, normalized), 12)
+  })
+
   it('unknown potential type returns 0', () => {
     const cfg = createConfig({ potentialType: 'unknown' as never })
     expect(evaluatePotential1D(5, cfg)).toBe(0)
@@ -431,6 +452,26 @@ describe('getPotentialPlotScale', () => {
     // Scale should be at least the max value at the edge
     expect(scale).toBeGreaterThan(1)
     expect(scale).toBeGreaterThan(50) // conservative lower bound
+  })
+
+  it('normalizes black-hole params before computing plot scale', () => {
+    const corrupted = createConfig({
+      potentialType: 'blackHoleRingdown',
+      bhMass: Number.NaN,
+      bhMultipoleL: 0,
+      bhSpin: 2,
+    } as Partial<TdseConfig>)
+    const normalized = createConfig({
+      potentialType: 'blackHoleRingdown',
+      bhMass: DEFAULT_TDSE_CONFIG.bhMass,
+      bhMultipoleL: 2,
+      bhSpin: 2,
+    })
+
+    const scale = getPotentialPlotScale(corrupted)
+    expect(Number.isFinite(scale)).toBe(true)
+    expect(scale).toBeGreaterThan(0)
+    expect(scale).toBeCloseTo(getPotentialPlotScale(normalized), 12)
   })
 
   it('returns 1 for custom expression that fails to parse', () => {

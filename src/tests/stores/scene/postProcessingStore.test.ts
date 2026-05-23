@@ -24,6 +24,15 @@ describe('postProcessingStore', () => {
       expect(usePostProcessingStore.getState().bloomEnabled).toBe(false)
     })
 
+    it('ignores invalid bloom enabled updates from direct callers', () => {
+      const { setBloomEnabled } = usePostProcessingStore.getState()
+      setBloomEnabled(false)
+
+      setBloomEnabled('true' as never)
+
+      expect(usePostProcessingStore.getState().bloomEnabled).toBe(false)
+    })
+
     it('should clamp bloom gain to [0, 3]', () => {
       const { setBloomGain } = usePostProcessingStore.getState()
       setBloomGain(2.75)
@@ -118,6 +127,15 @@ describe('postProcessingStore', () => {
       expect(usePostProcessingStore.getState().cinematicEnabled).toBe(true)
     })
 
+    it('ignores invalid cinematic enabled updates from direct callers', () => {
+      const { setCinematicEnabled } = usePostProcessingStore.getState()
+      setCinematicEnabled(false)
+
+      setCinematicEnabled('true' as never)
+
+      expect(usePostProcessingStore.getState().cinematicEnabled).toBe(false)
+    })
+
     it('should set cinematic aberration with clamping', () => {
       const { setCinematicAberration } = usePostProcessingStore.getState()
 
@@ -168,6 +186,18 @@ describe('postProcessingStore', () => {
   })
 
   describe('paper texture', () => {
+    it('ignores invalid paper enabled and quality updates from direct callers', () => {
+      const { setPaperEnabled, setPaperQuality } = usePostProcessingStore.getState()
+      setPaperEnabled(false)
+      setPaperQuality('high')
+
+      setPaperEnabled('true' as never)
+      setPaperQuality('ultra' as never)
+
+      expect(usePostProcessingStore.getState().paperEnabled).toBe(false)
+      expect(usePostProcessingStore.getState().paperQuality).toBe('high')
+    })
+
     it('ignores non-finite paper numeric updates', () => {
       const {
         setPaperContrast,
@@ -235,6 +265,19 @@ describe('postProcessingStore', () => {
 
       setFrameBlendingEnabled(false)
       expect(usePostProcessingStore.getState().frameBlendingEnabled).toBe(false)
+    })
+
+    it('ignores invalid frame blending boolean updates from direct callers', () => {
+      const { setFrameBlendingEnabled, setHorizonMemoryEnabled } = usePostProcessingStore.getState()
+      setFrameBlendingEnabled(false)
+      setHorizonMemoryEnabled(false)
+
+      setFrameBlendingEnabled('true' as never)
+      setHorizonMemoryEnabled('true' as never)
+
+      const state = usePostProcessingStore.getState()
+      expect(state.frameBlendingEnabled).toBe(false)
+      expect(state.horizonMemoryEnabled).toBe(false)
     })
 
     it('should set frame blending factor with clamping', () => {

@@ -113,6 +113,8 @@ function makeResources(events: string[], stochasticState: StochasticLocState): E
     renormalizePipeline: pipeline('renormalize'),
     absorberPipeline: pipeline('absorber'),
     absorberPipeline3D: pipeline('absorber-3d'),
+    potentialPipeline: pipeline('potential'),
+    potentialPipeline3D: pipeline('potential-3d'),
     fusedPotentialPackPipeline: pipeline('fused-potential-pack'),
     fftSharedMemPipeline: pipeline('fft-shared-mem'),
     kineticPipeline: pipeline('kinetic'),
@@ -476,6 +478,153 @@ describe('runStrangEvolution curved stochastic branch', () => {
     expect(locStep0Index).toBeGreaterThan(expectReduceIndex)
     expect(locStep3Index).toBeGreaterThan(locStep0Index)
     expect(renormIndex).toBeGreaterThan(locStep3Index)
+  })
+
+  it('refreshes driven potentials with ordered per-step uniform snapshots', () => {
+    const events: string[] = []
+    const ctx = makeContext(events)
+    const stochasticState = makeStochasticState()
+    const resources = makeResources(events, stochasticState)
+    resources.prepareUniformSnapshots = (_device, simTimeStart, steps) => {
+      events.push(`prepare-uniforms:${simTimeStart}:${steps}`)
+    }
+    resources.applyUniformSnapshot = (_encoder, stepIdx) => {
+      events.push(`copy-uniform:${stepIdx}`)
+    }
+    resources.refreshDrivenPotential = (frameCtx) => {
+      const pass = frameCtx.beginComputePass({ label: 'tdse-potential-update-step' })
+      pass.end()
+    }
+    const config = {
+      metric: { kind: 'flat' },
+      potentialType: 'driven',
+      driveEnabled: true,
+      absorberEnabled: false,
+      imaginaryTimeEnabled: false,
+      stochasticEnabled: false,
+      stochasticGamma: 0,
+      dt: 0.02,
+      stepsPerFrame: 3,
+      latticeDim: 2,
+      gridSize: [4, 4],
+      spacing: [0.1, 0.1],
+      wormholeCouplingEnabled: false,
+    } as unknown as TdseConfig
+    const state = { simTime: 1, stepAccumulator: 0 }
+
+    runStrangEvolution(ctx, config, 1, state, resources)
+
+    expect(state.simTime).toBeCloseTo(1.06)
+    expect(events).toContain('prepare-uniforms:1:3')
+    expect(events.filter((event) => event.startsWith('copy-uniform:'))).toEqual([
+      'copy-uniform:0',
+      'copy-uniform:1',
+      'copy-uniform:2',
+      'copy-uniform:3',
+    ])
+    expect(events.filter((event) => event === 'begin:tdse-potential-update-step')).toHaveLength(4)
+
+    const firstCopy = events.indexOf('copy-uniform:0')
+    const firstPotential = events.indexOf('begin:tdse-potential-update-step')
+    const firstStrang = events.indexOf('begin:tdse-strang-0')
+    expect(firstPotential).toBeGreaterThan(firstCopy)
+    expect(firstStrang).toBeGreaterThan(firstPotential)
+  })
+
+  it('patches final deSitter metric time after ordered curved RK4 steps', () => {
+    const events: string[] = []
+    const ctx = makeContext(events)
+    const stochasticState = makeStochasticState()
+    const resources = makeResources(events, stochasticState)
+    resources.prepareCurvedStageTimes = (_device, simTimeStart, steps) => {
+      events.push(`prepare-stage-times:${simTimeStart}:${steps}`)
+    }
+    resources.applyCurvedStageTimesForStep = (_encoder, stepIdx) => {
+      events.push(`copy-stage-times:${stepIdx}`)
+    }
+    resources.applyCurvedFinalMetricTime = (_encoder, lastStepIdx) => {
+      events.push(`copy-final-metric-time:${lastStepIdx}`)
+    }
+    resources.prepareUniformSnapshots = (_device, simTimeStart, steps) => {
+      events.push(`prepare-uniforms:${simTimeStart}:${steps}`)
+    }
+    resources.applyUniformSnapshot = (_encoder, stepIdx) => {
+      events.push(`copy-uniform:${stepIdx}`)
+    }
+    resources.refreshDrivenPotential = (frameCtx) => {
+      const pass = frameCtx.beginComputePass({ label: 'tdse-potential-update-step' })
+      pass.end()
+    }
+    const config = {
+      metric: { kind: 'deSitter', hubbleRate: 0.3 },
+      potentialType: 'driven',
+      driveEnabled: true,
+      absorberEnabled: false,
+      imaginaryTimeEnabled: false,
+      stochasticEnabled: false,
+      stochasticGamma: 0,
+      dt: 0.02,
+      stepsPerFrame: 2,
+      latticeDim: 2,
+      gridSize: [4, 4],
+      spacing: [0.1, 0.1],
+      wormholeCouplingEnabled: false,
+    } as unknown as TdseConfig
+    const state = { simTime: 1, stepAccumulator: 0 }
+
+    runStrangEvolution(ctx, config, 1, state, resources)
+
+    expect(state.simTime).toBeCloseTo(1.04)
+    expect(events).toContain('prepare-stage-times:1:2')
+    expect(events.filter((event) => event.startsWith('copy-stage-times:'))).toEqual([
+      'copy-stage-times:0',
+      'copy-stage-times:1',
+    ])
+    expect(events).toContain('copy-final-metric-time:1')
+    const lastRk4Index = events.lastIndexOf('curved-rk4')
+    const finalUniformIndex = events.lastIndexOf('copy-uniform:2')
+    expect(events).toContain('prepare-uniforms:1:2')
+    expect(finalUniformIndex).toBeGreaterThan(lastRk4Index)
+    expect(events.indexOf('copy-final-metric-time:1')).toBeGreaterThan(lastRk4Index)
+    expect(events.indexOf('copy-final-metric-time:1')).toBeGreaterThan(finalUniformIndex)
+  })
+
+  it('does not patch final deSitter metric time when fractional steps floor to zero', () => {
+    const events: string[] = []
+    const ctx = makeContext(events)
+    const stochasticState = makeStochasticState()
+    const resources = makeResources(events, stochasticState)
+    resources.prepareCurvedStageTimes = (_device, simTimeStart, steps) => {
+      events.push(`prepare-stage-times:${simTimeStart}:${steps}`)
+    }
+    resources.applyCurvedStageTimesForStep = (_encoder, stepIdx) => {
+      events.push(`copy-stage-times:${stepIdx}`)
+    }
+    resources.applyCurvedFinalMetricTime = (_encoder, lastStepIdx) => {
+      events.push(`copy-final-metric-time:${lastStepIdx}`)
+    }
+    const config = {
+      metric: { kind: 'deSitter', hubbleRate: 0.3 },
+      absorberEnabled: false,
+      imaginaryTimeEnabled: false,
+      stochasticEnabled: false,
+      stochasticGamma: 0,
+      dt: 0.02,
+      stepsPerFrame: 1,
+      latticeDim: 2,
+      gridSize: [4, 4],
+      spacing: [0.1, 0.1],
+      wormholeCouplingEnabled: false,
+    } as unknown as TdseConfig
+    const state = { simTime: 1, stepAccumulator: 0 }
+
+    runStrangEvolution(ctx, config, 0.25, state, resources)
+
+    expect(state.simTime).toBe(1)
+    expect(state.stepAccumulator).toBeCloseTo(0.25)
+    expect(events).not.toContain('curved-rk4')
+    expect(events.some((event) => event.startsWith('prepare-stage-times:'))).toBe(false)
+    expect(events.some((event) => event.startsWith('copy-final-metric-time:'))).toBe(false)
   })
 
   it('routes a dimension-degenerate metric through the flat Strang path', () => {

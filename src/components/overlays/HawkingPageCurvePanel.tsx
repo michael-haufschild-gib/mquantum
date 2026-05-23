@@ -112,7 +112,7 @@ const PageCurvePanelInner: React.FC = React.memo(() => {
         className="flex flex-col overflow-hidden rounded-2xl shadow-[var(--shadow-hard)]"
         style={{ width: PANEL_W }}
       >
-        <div className="flex items-center gap-2 px-3 py-1.5 glass-panel">
+        <div className="flex items-center gap-2 px-3 py-1.5 surface-panel">
           <span className="text-xs font-medium text-primary/80 whitespace-nowrap">
             Hawking Page Curve
           </span>

@@ -8,10 +8,12 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 describe('TDSE dynamics setters', () => {
   beforeEach(() => {
     useExtendedObjectStore.getState().reset()
+    useGeometryStore.getState().reset()
   })
 
   const getTdse = () => useExtendedObjectStore.getState().schroedinger.tdse
@@ -241,5 +243,16 @@ describe('TDSE dynamics setters', () => {
 
     expect(getTdse().potentialType).toBe('barrier')
     expect(getTdse().needsReset).toBe(true)
+  })
+
+  it('does not apply fixed-dimensional TDSE presets above their valid dimension', async () => {
+    const s = useExtendedObjectStore.getState()
+    useGeometryStore.getState().setDimension(5)
+
+    await s.applyTdsePreset('andersonTransition4D')
+
+    expect(getTdse().potentialType).toBe('barrier')
+    expect(getTdse().latticeDim).toBe(3)
+    expect(getTdse().disorderStrength).not.toBe(15)
   })
 })

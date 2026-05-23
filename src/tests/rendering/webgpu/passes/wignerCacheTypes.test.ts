@@ -174,6 +174,10 @@ describe('buildCrossPairMap', () => {
       expect(numCrossLayers).toBe(Math.ceil(crossPairs.length / 2))
     }
   })
+
+  it('rejects term counts beyond the WGSL cross-term capacity before mapping pairs', () => {
+    expect(() => buildCrossPairMap(MAX_WIGNER_TERM_COUNT + 1)).toThrow(/MAX_WIGNER_TERM_COUNT/)
+  })
 })
 
 describe('normalizeWignerCacheResolution', () => {

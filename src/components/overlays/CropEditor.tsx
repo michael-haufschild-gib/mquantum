@@ -121,7 +121,7 @@ export const CropEditor = () => {
       <m.div
         initial={{ y: -100 }}
         animate={{ y: 0 }}
-        className="bg-[var(--bg-active)] backdrop-blur-xl p-4 flex justify-between items-center border-b border-border-default z-10"
+        className="bg-panel p-4 flex justify-between items-center border-b border-border-default z-10"
       >
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3">
@@ -214,7 +214,7 @@ export const CropEditor = () => {
       </div>
 
       {/* Dimensions Label */}
-      <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-[var(--bg-overlay)] backdrop-blur-md text-text-primary text-xs px-3 py-1.5 rounded-full font-mono pointer-events-none whitespace-nowrap border border-border-default flex items-center gap-2 z-10">
+      <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-panel text-text-primary text-xs px-3 py-1.5 rounded-full font-mono pointer-events-none whitespace-nowrap border border-border-default flex items-center gap-2 z-10">
         <Icon name="image" className="w-3 h-3 text-accent" />
         <span>
           {Math.round(crop.width * 100)}% × {Math.round(crop.height * 100)}%
@@ -227,7 +227,7 @@ export const CropEditor = () => {
         animate={{ y: 0 }}
         className="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-none z-10"
       >
-        <div className="bg-[var(--bg-overlay)] backdrop-blur-md px-4 py-2 rounded-full border border-border-default text-text-tertiary text-xs">
+        <div className="bg-panel px-4 py-2 rounded-full border border-border-default text-text-tertiary text-xs">
           Drag corners to resize • Drag center to move
         </div>
       </m.div>

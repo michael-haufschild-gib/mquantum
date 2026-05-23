@@ -161,6 +161,11 @@ describe('bestBaselineRatio', () => {
     expect(r).toBe(Number.POSITIVE_INFINITY)
   })
 
+  it('does not report infinite evidence when a zero-q null baseline ties a perfect real fit', () => {
+    const r = bestBaselineRatio(0, { shuffled: 0.5, reversed: 0, synthetic: 0.8 })
+    expect(r).toBe(1)
+  })
+
   it('returns NaN when real q is non-finite', () => {
     expect(
       bestBaselineRatio(Number.NaN, { shuffled: 0.5, reversed: 0.3, synthetic: 0.8 })

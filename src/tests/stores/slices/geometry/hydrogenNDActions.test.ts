@@ -220,6 +220,39 @@ describe('Hydrogen ND Store Actions', () => {
       store.setSchroedingerExtraDimFrequencySpread(1.0)
       expect(useExtendedObjectStore.getState().schroedinger.extraDimFrequencySpread).toBe(0.5)
     })
+
+    it('marks the hydrogen preset custom when extra-dimension frequencies change', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerHydrogenNDPreset('2pz_4d')
+
+      store.setSchroedingerExtraDimOmega(0, 1.4)
+
+      const config = useExtendedObjectStore.getState().schroedinger
+      expect(config.hydrogenNDPreset).toBe('custom')
+      expect(config.presetName).not.toBe('custom')
+    })
+
+    it('marks the hydrogen preset custom when all extra-dimension frequencies change', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerHydrogenNDPreset('2pz_4d')
+
+      store.setSchroedingerExtraDimOmegaAll([1.2, 1.1, 1, 1, 1, 1, 1, 1])
+
+      const config = useExtendedObjectStore.getState().schroedinger
+      expect(config.hydrogenNDPreset).toBe('custom')
+      expect(config.presetName).not.toBe('custom')
+    })
+
+    it('marks the hydrogen preset custom when frequency spread changes', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerHydrogenNDPreset('2pz_4d')
+
+      store.setSchroedingerExtraDimFrequencySpread(0.25)
+
+      const config = useExtendedObjectStore.getState().schroedinger
+      expect(config.hydrogenNDPreset).toBe('custom')
+      expect(config.presetName).not.toBe('custom')
+    })
   })
 
   describe('runtime input guards', () => {

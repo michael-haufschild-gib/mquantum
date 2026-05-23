@@ -14,7 +14,9 @@
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 
 import {
+  sanitizeShaderBoolean,
   sanitizeShaderDimension,
+  sanitizeShaderInteger,
   sanitizeShaderTermCount,
   type ShaderTermCount,
   type WGSLShaderConfig,
@@ -29,9 +31,30 @@ import {
 import { generateMainBlock2D, generateMainBlock2DIsolines } from './main2D.wgsl'
 import { generateMainBlockWigner2D } from './mainWigner2D.wgsl'
 import { NODAL_DEFINITION_MAP, NODAL_FAMILY_MAP, NODAL_RENDER_MODE_MAP } from './temporalJitter'
+import { COLOR_ALGORITHM_INDICES } from './volume/emissionConstants'
 
 /** Quantum physics mode for Schrödinger visualization */
 export type QuantumModeForShader = 'harmonicOscillator' | 'hydrogenND' | 'hydrogenNDCoupled'
+
+const DEFAULT_COLOR_ALGORITHM = 4
+const DEFAULT_DENSITY_GRID_SIZE = 64
+const COLOR_ALGORITHM_SET = new Set<number>(COLOR_ALGORITHM_INDICES)
+
+/** Restrict shader quantum mode selection to supported analytical modes. */
+export function sanitizeQuantumModeForShader(mode: unknown): QuantumModeForShader {
+  return mode === 'hydrogenND' || mode === 'hydrogenNDCoupled' ? mode : 'harmonicOscillator'
+}
+
+/** Restrict color algorithm specialization to known finite shader branches. */
+export function sanitizeShaderColorAlgorithm(value: unknown): number {
+  const algorithm = sanitizeShaderInteger(value, DEFAULT_COLOR_ALGORITHM)
+  return COLOR_ALGORITHM_SET.has(algorithm) ? algorithm : DEFAULT_COLOR_ALGORITHM
+}
+
+/** Restrict density-grid size constants to finite positive integer literals. */
+export function sanitizeShaderDensityGridSize(value: unknown): number {
+  return sanitizeShaderInteger(value, DEFAULT_DENSITY_GRID_SIZE, { min: 1, max: 4096 })
+}
 
 /**
  * Schrödinger shader configuration options.
@@ -210,19 +233,19 @@ export interface DerivedShaderFlags {
  * @param config - Shader configuration
  */
 export function derivedShaderFlags(config: SchroedingerWGSLShaderConfig): DerivedShaderFlags {
-  const {
-    dimension,
-    quantumMode = 'harmonicOscillator',
-    colorAlgorithm = 4,
-    useEigenfunctionCache = false,
-    useAnalyticalGradient: useAnalyticalGradientFlag = true,
-    useRobustEigenInterpolation: useRobustEigenInterpolationFlag = true,
-    isWigner = false,
-    isFreeScalar = false,
-    isFreeScalarField = false,
-    useDensityGrid = false,
-    termCount,
-  } = config
+  const { dimension, termCount } = config
+  const quantumMode = sanitizeQuantumModeForShader(config.quantumMode)
+  const colorAlgorithm = sanitizeShaderColorAlgorithm(config.colorAlgorithm)
+  const useEigenfunctionCache = sanitizeShaderBoolean(config.useEigenfunctionCache, false)
+  const useAnalyticalGradientFlag = sanitizeShaderBoolean(config.useAnalyticalGradient, true)
+  const useRobustEigenInterpolationFlag = sanitizeShaderBoolean(
+    config.useRobustEigenInterpolation,
+    true
+  )
+  const isWigner = sanitizeShaderBoolean(config.isWigner, false)
+  const isFreeScalar = sanitizeShaderBoolean(config.isFreeScalar, false)
+  const isFreeScalarField = sanitizeShaderBoolean(config.isFreeScalarField, false)
+  const useDensityGrid = sanitizeShaderBoolean(config.useDensityGrid, false)
   const actualDim = sanitizeShaderDimension(dimension, {
     min: isWigner ? 3 : 2,
     fallback: 3,
@@ -245,7 +268,7 @@ export function derivedShaderFlags(config: SchroedingerWGSLShaderConfig): Derive
   // Pre-computed normal grid: available for analytical modes (always) and any
   // compute mode that explicitly sets hasPrecomputedNormals (FSF has it).
   const usePrecomputedNormals =
-    useDensityGrid && (!isFreeScalar || config.hasPrecomputedNormals === true)
+    useDensityGrid && (!isFreeScalar || sanitizeShaderBoolean(config.hasPrecomputedNormals, false))
   return {
     is2D,
     isHydrogenFamily,
@@ -324,16 +347,51 @@ export function buildShaderDefinesAndFeatures(flags: {
 }): { defines: string[]; features: string[] } {
   const defines: string[] = []
   const features: string[] = []
-  const featureQuantumBackreaction = flags.quantumBackreactionLensing ?? true
-  const featureBilocalBridge = flags.bilocalERBridge ?? true
-  const featureEntropicShear = flags.entropicTimeShear ?? true
-  const featureSpectralFlow = flags.spectralDimensionFlow ?? true
-  const featureVacuumBubble = flags.vacuumBubbleLens ?? true
-  const featureNegativeAlphaPotentialOverlay = flags.negativeAlphaPotentialOverlay ?? true
-  const featureWdwOverlay = flags.wdwOverlay ?? true
-  const featureTdseBranchColor = flags.tdseBranchColor ?? true
-  const featureAdsAmplitude = flags.adsAmplitude ?? true
-  const featureGridPhaseOffset = flags.gridPhaseOffset ?? true
+  const is2D = sanitizeShaderBoolean(flags.is2D, false)
+  const isWigner = sanitizeShaderBoolean(flags.isWigner, false)
+  const enableTemporal = sanitizeShaderBoolean(flags.enableTemporal, false)
+  const useCache = sanitizeShaderBoolean(flags.useCache, false)
+  const useAnalyticalGradient = sanitizeShaderBoolean(flags.useAnalyticalGradient, false)
+  const useRobustEigenInterpolation = sanitizeShaderBoolean(
+    flags.useRobustEigenInterpolation,
+    false
+  )
+  const isosurface = sanitizeShaderBoolean(flags.isosurface, false)
+  const nodal = sanitizeShaderBoolean(flags.nodal, true)
+  const nodalSpecializationEnabled = sanitizeShaderBoolean(flags.nodalSpecializationEnabled, false)
+  const phaseMateriality = sanitizeShaderBoolean(flags.phaseMateriality, true)
+  const interference = sanitizeShaderBoolean(flags.interference, true)
+  const uncertaintyBoundary = sanitizeShaderBoolean(flags.uncertaintyBoundary, true)
+  const isDualChannel = sanitizeShaderBoolean(flags.isDualChannel, false)
+  const useDensityGrid = sanitizeShaderBoolean(flags.useDensityGrid, false)
+  const densityGridHasPhase = sanitizeShaderBoolean(flags.densityGridHasPhase, false)
+  const densityGridSize = sanitizeShaderDensityGridSize(flags.densityGridSize)
+  const colorAlgorithm = sanitizeShaderColorAlgorithm(flags.colorAlgorithm)
+  const isFreeScalar = sanitizeShaderBoolean(flags.isFreeScalar, false)
+  const isFreeScalarField = sanitizeShaderBoolean(flags.isFreeScalarField, false)
+  const usePrecomputedNormals = sanitizeShaderBoolean(flags.usePrecomputedNormals, false)
+  const isQuantumWalk = sanitizeShaderBoolean(flags.isQuantumWalk, false)
+  const isPauli = sanitizeShaderBoolean(flags.isPauli, false)
+  const isAds = sanitizeShaderBoolean(flags.isAds, false)
+  const useWignerCache = sanitizeShaderBoolean(flags.useWignerCache, false)
+  const crossSectionEnabled = sanitizeShaderBoolean(flags.crossSectionEnabled, true)
+  const probabilityCurrentEnabled = sanitizeShaderBoolean(flags.probabilityCurrentEnabled, true)
+  const fastGridEmission = sanitizeShaderBoolean(flags.fastGridEmission, false)
+  const featureQuantumBackreaction = sanitizeShaderBoolean(flags.quantumBackreactionLensing, true)
+  const featureBilocalBridge = sanitizeShaderBoolean(flags.bilocalERBridge, true)
+  const featureEntropicShear = sanitizeShaderBoolean(flags.entropicTimeShear, true)
+  const featureSpectralFlow = sanitizeShaderBoolean(flags.spectralDimensionFlow, true)
+  const featureVacuumBubble = sanitizeShaderBoolean(flags.vacuumBubbleLens, true)
+  const featureNegativeAlphaPotentialOverlay = sanitizeShaderBoolean(
+    flags.negativeAlphaPotentialOverlay,
+    true
+  )
+  const featureWdwOverlay = sanitizeShaderBoolean(flags.wdwOverlay, true)
+  const featureTdseBranchColor = sanitizeShaderBoolean(flags.tdseBranchColor, true)
+  const featureAdsAmplitude = sanitizeShaderBoolean(flags.adsAmplitude, true)
+  const featureGridPhaseOffset = sanitizeShaderBoolean(flags.gridPhaseOffset, true)
+  const sampleSpaceRotation = sanitizeShaderBoolean(flags.sampleSpaceRotation, false)
+  const strip = flags.profilingStrip
 
   // Only ACTUAL_DIM (clamped) is emitted — the previously-emitted
   // un-clamped `const DIMENSION` was never read by any WGSL shader.
@@ -341,11 +399,11 @@ export function buildShaderDefinesAndFeatures(flags: {
   // shaders actually use. See compose.ts / composeWignerCache.ts for
   // the same note in the sibling composers.
   defines.push(`const ACTUAL_DIM: i32 = ${flags.actualDim};`)
-  defines.push(`const IS_2D: bool = ${flags.is2D};`)
-  defines.push(`const IS_WIGNER: bool = ${flags.isWigner};`)
+  defines.push(`const IS_2D: bool = ${is2D};`)
+  defines.push(`const IS_WIGNER: bool = ${isWigner};`)
   features.push(`${flags.actualDim}D Quantum`)
 
-  if (flags.enableTemporal) {
+  if (enableTemporal) {
     defines.push('const TEMPORAL_ENABLED: bool = true;')
     features.push('Temporal Accumulation')
   } else {
@@ -368,18 +426,18 @@ export function buildShaderDefinesAndFeatures(flags: {
     defines.push('const HO_UNROLLED: bool = false;')
   }
 
-  if (flags.useCache) {
+  if (useCache) {
     defines.push('const USE_EIGENFUNCTION_CACHE: bool = true;')
     features.push('Eigenfunction Cache')
   } else {
     defines.push('const USE_EIGENFUNCTION_CACHE: bool = false;')
   }
-  defines.push(`const USE_ANALYTICAL_GRADIENT: bool = ${flags.useAnalyticalGradient};`)
-  defines.push(`const USE_ROBUST_EIGEN_INTERPOLATION: bool = ${flags.useRobustEigenInterpolation};`)
+  defines.push(`const USE_ANALYTICAL_GRADIENT: bool = ${useAnalyticalGradient};`)
+  defines.push(`const USE_ROBUST_EIGEN_INTERPOLATION: bool = ${useRobustEigenInterpolation};`)
   defines.push(`const FEATURE_RADIAL_PROBABILITY: bool = ${flags.includeHydrogen};`)
-  defines.push(`const FEATURE_CROSS_SECTION: bool = ${flags.crossSectionEnabled};`)
-  defines.push(`const FEATURE_PROBABILITY_CURRENT: bool = ${flags.probabilityCurrentEnabled};`)
-  defines.push(`const FAST_GRID_EMISSION: bool = ${flags.fastGridEmission ?? false};`)
+  defines.push(`const FEATURE_CROSS_SECTION: bool = ${crossSectionEnabled};`)
+  defines.push(`const FEATURE_PROBABILITY_CURRENT: bool = ${probabilityCurrentEnabled};`)
+  defines.push(`const FAST_GRID_EMISSION: bool = ${fastGridEmission};`)
   defines.push(`const FEATURE_QUANTUM_BACKREACTION_LENSING: bool = ${featureQuantumBackreaction};`)
   defines.push(`const FEATURE_BILOCAL_ER_BRIDGE: bool = ${featureBilocalBridge};`)
   defines.push(`const FEATURE_ENTROPIC_TIME_SHEAR: bool = ${featureEntropicShear};`)
@@ -404,22 +462,20 @@ export function buildShaderDefinesAndFeatures(flags: {
     features.push('Harmonic Oscillator')
   }
 
-  if (flags.isWigner) {
+  if (isWigner) {
     features.push('Wigner Phase-Space Mode')
-  } else if (flags.is2D) {
-    features.push(flags.isosurface ? '2D Isolines Mode' : '2D Heatmap Mode')
-  } else if (flags.isosurface) {
+  } else if (is2D) {
+    features.push(isosurface ? '2D Isolines Mode' : '2D Heatmap Mode')
+  } else if (isosurface) {
     features.push('Isosurface Mode')
   } else {
     features.push('Volumetric Mode')
   }
 
-  if (!flags.is2D) features.push('Beer-Lambert')
+  if (!is2D) features.push('Beer-Lambert')
 
-  defines.push(`const FEATURE_NODAL: bool = ${flags.nodal};`)
-  defines.push(
-    `const NODAL_SPECIALIZATION_ENABLED: bool = ${flags.nodalSpecializationEnabled ?? false};`
-  )
+  defines.push(`const FEATURE_NODAL: bool = ${nodal};`)
+  defines.push(`const NODAL_SPECIALIZATION_ENABLED: bool = ${nodalSpecializationEnabled};`)
   defines.push(
     `const NODAL_SPECIALIZED_DEFINITION: i32 = ${
       NODAL_DEFINITION_MAP[flags.nodalDefinition ?? 'psiAbs'] ?? NODAL_DEFINITION_MAP.psiAbs
@@ -435,17 +491,17 @@ export function buildShaderDefinesAndFeatures(flags: {
       NODAL_FAMILY_MAP[flags.nodalFamilyFilter ?? 'all'] ?? NODAL_FAMILY_MAP.all
     };`
   )
-  defines.push(`const FEATURE_PHASE_MATERIALITY: bool = ${flags.phaseMateriality};`)
-  defines.push(`const FEATURE_INTERFERENCE: bool = ${flags.interference};`)
-  defines.push(`const FEATURE_UNCERTAINTY_BOUNDARY: bool = ${flags.uncertaintyBoundary};`)
-  defines.push(`const COLOR_ALGORITHM: i32 = ${flags.colorAlgorithm};`)
-  defines.push(`const IS_DUAL_CHANNEL: bool = ${flags.isDualChannel};`)
-  defines.push(`const USE_DENSITY_GRID: bool = ${flags.useDensityGrid};`)
-  defines.push(`const DENSITY_GRID_HAS_PHASE: bool = ${flags.densityGridHasPhase};`)
-  defines.push(`const DENSITY_GRID_SIZE: f32 = ${flags.densityGridSize}.0;`)
-  defines.push(`const IS_FREE_SCALAR: bool = ${flags.isFreeScalar};`)
-  defines.push(`const IS_QUANTUM_WALK: bool = ${flags.isQuantumWalk};`)
-  defines.push(`const IS_PAULI: bool = ${flags.isPauli};`)
+  defines.push(`const FEATURE_PHASE_MATERIALITY: bool = ${phaseMateriality};`)
+  defines.push(`const FEATURE_INTERFERENCE: bool = ${interference};`)
+  defines.push(`const FEATURE_UNCERTAINTY_BOUNDARY: bool = ${uncertaintyBoundary};`)
+  defines.push(`const COLOR_ALGORITHM: i32 = ${colorAlgorithm};`)
+  defines.push(`const IS_DUAL_CHANNEL: bool = ${isDualChannel};`)
+  defines.push(`const USE_DENSITY_GRID: bool = ${useDensityGrid};`)
+  defines.push(`const DENSITY_GRID_HAS_PHASE: bool = ${densityGridHasPhase};`)
+  defines.push(`const DENSITY_GRID_SIZE: f32 = ${densityGridSize}.0;`)
+  defines.push(`const IS_FREE_SCALAR: bool = ${isFreeScalar};`)
+  defines.push(`const IS_QUANTUM_WALK: bool = ${isQuantumWalk};`)
+  defines.push(`const IS_PAULI: bool = ${isPauli};`)
   // Binary-sign phase: ONLY the free-scalar-field mode (not all compute
   // modes), Wigner, and AdS write phase = {0, π} based on sign(field).
   // Phase-based color algorithms that extract the sign via `sin(phase)`
@@ -454,32 +510,41 @@ export function buildShaderDefinesAndFeatures(flags: {
   // fall back to `cos(phase)` extraction for binary-phase modes, which
   // correctly recovers the sign as ±1. WdW writes continuous
   // `atan2(im, re)` phase and must NOT be classified binary.
-  const hasBinarySignPhase = flags.isFreeScalarField || flags.isWigner || flags.isAds
-  defines.push(`const IS_ADS: bool = ${flags.isAds};`)
+  const hasBinarySignPhase = isFreeScalarField || isWigner || isAds
+  defines.push(`const IS_ADS: bool = ${isAds};`)
   defines.push(`const HAS_BINARY_SIGN_PHASE: bool = ${hasBinarySignPhase};`)
   // Pre-computed gradient normals: enabled for density-grid analytic modes (HO/hydrogen)
   // and any compute mode that explicitly provides a normal grid (e.g. FSF).
-  defines.push(`const USE_PRECOMPUTED_NORMALS: bool = ${flags.usePrecomputedNormals};`)
+  defines.push(`const USE_PRECOMPUTED_NORMALS: bool = ${usePrecomputedNormals};`)
 
   // Profiling strip flags — default false, dead-code-eliminated when not profiling
-  const strip = flags.profilingStrip
-  defines.push(`const PROFILING_STRIP_GRADIENT: bool = ${strip?.gradient ?? false};`)
-  defines.push(`const PROFILING_STRIP_LIGHTING: bool = ${strip?.lighting ?? false};`)
-  defines.push(`const PROFILING_STRIP_EMPTY_SKIP: bool = ${strip?.emptySkip ?? false};`)
-  defines.push(`const PROFILING_STRIP_ADAPTIVE_STEP: bool = ${strip?.adaptiveStep ?? false};`)
-  defines.push(`const PROFILING_STRIP_COMPOSITING: bool = ${strip?.compositing ?? false};`)
-  if (strip?.halfSamples) {
+  defines.push(
+    `const PROFILING_STRIP_GRADIENT: bool = ${sanitizeShaderBoolean(strip?.gradient, false)};`
+  )
+  defines.push(
+    `const PROFILING_STRIP_LIGHTING: bool = ${sanitizeShaderBoolean(strip?.lighting, false)};`
+  )
+  defines.push(
+    `const PROFILING_STRIP_EMPTY_SKIP: bool = ${sanitizeShaderBoolean(strip?.emptySkip, false)};`
+  )
+  defines.push(
+    `const PROFILING_STRIP_ADAPTIVE_STEP: bool = ${sanitizeShaderBoolean(strip?.adaptiveStep, false)};`
+  )
+  defines.push(
+    `const PROFILING_STRIP_COMPOSITING: bool = ${sanitizeShaderBoolean(strip?.compositing, false)};`
+  )
+  if (sanitizeShaderBoolean(strip?.halfSamples, false)) {
     defines.push('const PROFILING_HALF_SAMPLES: bool = true;')
   } else {
     defines.push('const PROFILING_HALF_SAMPLES: bool = false;')
   }
 
-  defines.push(`const SAMPLE_SPACE_ROTATION: bool = ${flags.sampleSpaceRotation ?? false};`)
+  defines.push(`const SAMPLE_SPACE_ROTATION: bool = ${sampleSpaceRotation};`)
 
-  if (flags.useDensityGrid) features.push('Density Grid Raymarching')
-  if (flags.isWigner && flags.useWignerCache) features.push('Wigner Cache')
-  if (flags.sampleSpaceRotation) features.push('Sample-Space Rotation')
-  if (flags.fastGridEmission) features.push('Fast Grid Emission')
+  if (useDensityGrid) features.push('Density Grid Raymarching')
+  if (isWigner && useWignerCache) features.push('Wigner Cache')
+  if (sampleSpaceRotation) features.push('Sample-Space Rotation')
+  if (fastGridEmission) features.push('Fast Grid Emission')
   if (featureQuantumBackreaction) features.push('Quantum Backreaction Lens')
   if (featureBilocalBridge) features.push('Bilocal ER Bridge')
   if (featureEntropicShear) features.push('Entropic Time Shear')
@@ -542,21 +607,19 @@ export function selectMainBlock(
  * @param is2D - 2D mode flag
  */
 export function canUseGridOnly(config: SchroedingerWGSLShaderConfig, is2D: boolean): boolean {
-  const {
-    isosurface = false,
-    useDensityGrid = false,
-    colorAlgorithm = 4,
-    phaseMateriality = true,
-    interference = true,
-    nodal = true,
-    probabilityCurrentEnabled = true,
-    radialProbabilityEnabled = false,
-    bornNullWeaveEnabled = false,
-    phaseShimmerEnabled = false,
-    phaseAnimationEnabled = false,
-    useDensityMatrix = false,
-    crossSectionEnabled = true,
-  } = config
+  const isosurface = sanitizeShaderBoolean(config.isosurface, false)
+  const useDensityGrid = sanitizeShaderBoolean(config.useDensityGrid, false)
+  const colorAlgorithm = sanitizeShaderColorAlgorithm(config.colorAlgorithm)
+  const phaseMateriality = sanitizeShaderBoolean(config.phaseMateriality, true)
+  const interference = sanitizeShaderBoolean(config.interference, true)
+  const nodal = sanitizeShaderBoolean(config.nodal, true)
+  const probabilityCurrentEnabled = sanitizeShaderBoolean(config.probabilityCurrentEnabled, true)
+  const radialProbabilityEnabled = sanitizeShaderBoolean(config.radialProbabilityEnabled, false)
+  const bornNullWeaveEnabled = sanitizeShaderBoolean(config.bornNullWeaveEnabled, false)
+  const phaseShimmerEnabled = sanitizeShaderBoolean(config.phaseShimmerEnabled, false)
+  const phaseAnimationEnabled = sanitizeShaderBoolean(config.phaseAnimationEnabled, false)
+  const useDensityMatrix = sanitizeShaderBoolean(config.useDensityMatrix, false)
+  const crossSectionEnabled = sanitizeShaderBoolean(config.crossSectionEnabled, true)
 
   const isPhaseColorAlg = PHASE_COLOR_ALGS.includes(
     colorAlgorithm as (typeof PHASE_COLOR_ALGS)[number]

@@ -7,7 +7,9 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { DEFAULT_BEC_CONFIG } from '@/lib/geometry/extended/bec'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { resizeBecArrays } from '@/stores/slices/geometry/setters/becResize'
 
 describe('BEC setters', () => {
   beforeEach(() => {
@@ -179,6 +181,37 @@ describe('BEC setters', () => {
     expect(dtAfter).toBeLessThanOrEqual(0.05)
     // Verify dtAfter is a finite positive number (not NaN/Infinity)
     expect(Number.isFinite(dtAfter)).toBe(true)
+  })
+
+  it('resizes spacing from a mass-aware Thomas-Fermi radius', () => {
+    const base = {
+      ...DEFAULT_BEC_CONFIG,
+      interactionStrength: 500,
+      trapOmega: 1.0,
+      trapAnisotropy: [1, 1, 1],
+    }
+    const lightSpacing = resizeBecArrays({ ...base, mass: 1.0 }, 2).spacing![0]!
+    const heavySpacing = resizeBecArrays({ ...base, mass: 4.0 }, 2).spacing![0]!
+
+    // In 2D, μ ∝ m^(1/2), so R_TF ∝ sqrt(μ/m) = m^(-1/4).
+    expect(heavySpacing / lightSpacing).toBeCloseTo(Math.pow(4, -1 / 4), 6)
+  })
+
+  it('resizes spacing from anisotropic Thomas-Fermi normalization', () => {
+    const base = {
+      ...DEFAULT_BEC_CONFIG,
+      interactionStrength: 500,
+      trapOmega: 1.0,
+      trapAnisotropy: [1, 1, 1],
+      mass: 1.0,
+    }
+    const isotropicSpacing = resizeBecArrays(base, 2).spacing![0]!
+    const anisotropicSpacing = resizeBecArrays({ ...base, trapAnisotropy: [2, 1, 1] }, 2)
+      .spacing![0]!
+
+    // In 2D, μ ∝ (ωxωy)^(1/2); along x with ωx doubled,
+    // R_x ∝ sqrt(μ / ωx²) = 2^(-3/4).
+    expect(anisotropicSpacing / isotropicSpacing).toBeCloseTo(Math.pow(2, -3 / 4), 6)
   })
 
   it('setBecDt CFL bound respects effective spacing under compactification', () => {

@@ -22,7 +22,10 @@ import { HYDROGEN_COUPLED_PRESETS } from '@/lib/physics/hydrogenCoupled/presets'
 import { PAULI_SCENARIO_PRESETS } from '@/lib/physics/pauli/presets'
 import type { ScenarioPreset } from '@/lib/physics/presetTypes'
 import { QUANTUM_WALK_PRESETS } from '@/lib/physics/quantumWalk/presets'
-import { TDSE_SCENARIO_PRESETS } from '@/lib/physics/tdse/presets'
+import {
+  isTdsePresetCompatibleWithDimension,
+  TDSE_SCENARIO_PRESETS,
+} from '@/lib/physics/tdse/presets'
 import { WDW_SCENARIO_PRESETS } from '@/lib/physics/wheelerDeWitt/presets'
 import { resizeBecArrays } from '@/stores/slices/geometry/setters/becResize'
 import { resizeTdseArrays } from '@/stores/slices/geometry/setters/tdseSetters'
@@ -133,6 +136,8 @@ function becConfigMatches(current: BecConfig, expected: BecConfig): boolean {
 /** Find the TDSE preset id whose dimension-resized expected config matches the live config. */
 export function findTdsePresetId(config: TdseConfig, dimension: number): string | null {
   for (const preset of TDSE_SCENARIO_PRESETS) {
+    if (!isTdsePresetCompatibleWithDimension(preset, dimension)) continue
+
     const { latticeDim: _presetDim, ...safeOverrides } = preset.overrides
     const base = {
       ...DEFAULT_TDSE_CONFIG,

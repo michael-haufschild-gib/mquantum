@@ -38,7 +38,7 @@ export interface SelectProps<T extends string = string> {
 }
 
 /**
- * Styled dropdown select component with glass morphism design.
+ * Styled dropdown select component with solid panel styling.
  *
  * Provides a native select element with custom styling, hover effects,
  * and optional label. Supports generic string types for type-safe values.
@@ -108,7 +108,7 @@ export const Select = React.memo(
               onMouseEnter={handleMouseEnter}
               disabled={disabled}
               data-testid={testId}
-              className="glass-input w-full ps-3 pe-8 py-1.5 text-xs text-[var(--text-primary)] rounded-lg appearance-none cursor-pointer focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--bg-hover)] transition-colors"
+              className="surface-input w-full ps-3 pe-8 py-1.5 text-xs text-[var(--text-primary)] rounded-lg appearance-none cursor-pointer focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--bg-hover)] transition-colors"
             >
               {options.map((option) => (
                 <option

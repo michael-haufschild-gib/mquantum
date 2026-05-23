@@ -82,6 +82,9 @@ export class BellPairStrategy extends SinglePassComputeStrategy<
     args: SinglePassFrameArgs
   ): void {
     const store = useBellExperimentStore.getState()
+    if (config.needsReset) {
+      store.reset(config.seed)
+    }
     // Trial loop runs when both the global animation is playing AND the
     // Bell panel's Run button is active (isRunning).
     const trials =

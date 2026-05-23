@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest'
 
 import { composeWignerReconstructComputeShader } from '@/rendering/webgpu/shaders/schroedinger/compute/composeWignerReconstruct'
 import { composeWignerSpatialComputeShader } from '@/rendering/webgpu/shaders/schroedinger/compute/composeWignerSpatial'
+import { generateMainBlockWigner2D } from '@/rendering/webgpu/shaders/schroedinger/mainWigner2D.wgsl'
 
 describe('composeWignerSpatialComputeShader', () => {
   it('HO mode: includes Hermite, Laguerre, Wigner HO modules', () => {
@@ -72,6 +73,19 @@ describe('composeWignerSpatialComputeShader', () => {
     expect(wgsl).not.toContain('const DIMENSION: i32')
     expect(modules.length).toBeGreaterThan(5)
   })
+
+  it('clamps omega consistently in diagonal Wigner phase-space radius', () => {
+    const { wgsl } = composeWignerSpatialComputeShader({
+      dimension: 3,
+      quantumMode: 'harmonicOscillator',
+    })
+
+    const diagonalFn = wgsl.match(/fn wignerDiagonal[\s\S]*?return sign \/ PI/)?.[0] ?? ''
+    expect(diagonalFn).toContain('let omegaSafe = max(omega, 1e-20);')
+    expect(diagonalFn).toContain('let invOmega = 1.0 / omegaSafe;')
+    expect(diagonalFn).toContain('let u2 = omegaSafe * x * x + p * p * invOmega;')
+    expect(diagonalFn).not.toContain('let u2 = omega * x * x + p * p * invOmega;')
+  })
 })
 
 describe('composeWignerReconstructComputeShader', () => {
@@ -91,5 +105,16 @@ describe('composeWignerReconstructComputeShader', () => {
     expect(modules).not.toContain('Hermite Polynomials')
     expect(modules).not.toContain('Laguerre Polynomials')
     expect(modules).not.toContain('Spherical Harmonics')
+  })
+})
+
+describe('generateMainBlockWigner2D', () => {
+  it('declares the same finite aspect fallback as Wigner cache grid upload', () => {
+    const wgsl = generateMainBlockWigner2D(true)
+
+    expect(wgsl).toContain('var aspect = 1.0;')
+    expect(wgsl).toContain('if (camera.resolution.x > 0.0 && camera.resolution.y > 0.0)')
+    expect(wgsl).toContain('aspect = camera.resolution.x / camera.resolution.y;')
+    expect(wgsl).not.toContain('let aspect = camera.resolution.x / camera.resolution.y;')
   })
 })

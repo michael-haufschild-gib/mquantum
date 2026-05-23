@@ -19,20 +19,22 @@
  *   `ψ(rest; c) = e^{-iS(c)} · χ(c, rest) / ||·||`
  *
  * should be slowly c-varying for a good BO time. We measure that
- * variation as the mean step-to-step *infidelity*
- * `1 - |⟨ψ(c_t)|ψ(c_{t+1})⟩|²` averaged across the clock axis.
+ * variation as the support-weighted mean step-to-step *infidelity*
+ * `1 - |⟨ψ(c_t)|ψ(c_{t+1})⟩|²`, with adjacent-pair weight
+ * `sqrt(P(c_t)P(c_{t+1}))`. Zero-probability clock slices do not define
+ * conditional states and do not vote.
  *
  * Smaller infidelity = more adiabatic = better BO clock.
  *
  * ## Difference from Page-Wootters
  *
- * Page-Wootters measures the conditional-state autocorrelation
- * directly. Born-Oppenheimer DIVIDES OUT the heavy WKB phase
- * first; what remains is the *residual* (non-adiabatic) variation
- * after the dominant phase winding has been factored out. Two
- * states that differ only by the heavy phase will appear
- * orthogonal under Page-Wootters but adiabatic under
- * Born-Oppenheimer. This makes BO a distinct cross-diagnostic.
+ * Page-Wootters treats a useful clock as one whose supported
+ * conditional states become distinguishable, so smaller autocorrelation
+ * is better. Born-Oppenheimer asks the opposite adiabatic question:
+ * after the heavy WKB phase gauge is fixed, does the residual light
+ * state vary slowly with the proposed clock? Smaller residual
+ * infidelity is better. This makes BO a distinct cross-diagnostic even
+ * though both operate on conditional states.
  *
  * ## Independence from other diagnostics
  *
@@ -61,6 +63,11 @@ function axisLenAt(shape: [number, number, number], axis: 0 | 1 | 2): number {
   return shape[axis]
 }
 
+interface ConditionalSlice {
+  values: Float64Array
+  norm: number
+}
+
 /**
  * Extract a normalised residual conditional state at clock-axis
  * index `t` along axis `axis`, dividing out the heavy WKB phase
@@ -73,7 +80,7 @@ function residualConditionalSlice(
   shape: [number, number, number],
   axis: 0 | 1 | 2,
   t: number
-): Float64Array {
+): ConditionalSlice {
   const [N0, N1, N2] = shape
   const strides = shapeStrides(shape)
   const axisStride = strides[axis]!
@@ -161,7 +168,7 @@ function residualConditionalSlice(
     const inv = 1 / Math.sqrt(norm)
     for (let i = 0; i < 2 * sliceSize; i++) out[i] = out[i]! * inv
   }
-  return out
+  return { values: out, norm }
 }
 
 function overlapSquared(a: Float64Array, b: Float64Array): number {
@@ -184,9 +191,10 @@ function overlapSquared(a: Float64Array, b: Float64Array): number {
  *
  * @param chi - Interleaved complex amplitudes, length `2·Na·Nphi²`.
  * @param shape - `[Na, Nphi, Nphi]`.
- * @returns Per-clock mean step-to-step infidelity of the residual
- *          conditional state after dividing out the heavy WKB phase.
- *          Smaller = more BO-adiabatic = better BO clock.
+ * @returns Per-clock support-weighted step-to-step infidelity of the
+ *          residual conditional state after dividing out the heavy WKB
+ *          phase. Returns `NaN` for axes with no adjacent supported
+ *          clock slices. Smaller = more BO-adiabatic = better BO clock.
  */
 export function computeBornOppenheimerRates(
   chi: Float32Array,
@@ -196,19 +204,20 @@ export function computeBornOppenheimerRates(
     const axisLen = axisLenAt(shape, axis)
     if (axisLen < 2) return Number.NaN
     let sum = 0
-    let count = 0
+    let weightSum = 0
     let prev = residualConditionalSlice(chi, shape, axis, 0)
     for (let t = 1; t < axisLen; t++) {
       const next = residualConditionalSlice(chi, shape, axis, t)
-      const o = overlapSquared(prev, next)
+      const pairWeight = Math.sqrt(prev.norm * next.norm)
+      const o = overlapSquared(prev.values, next.values)
       const infid = 1 - Math.min(1, o)
-      if (Number.isFinite(infid)) {
-        sum += infid
-        count++
+      if (Number.isFinite(infid) && Number.isFinite(pairWeight) && pairWeight > 0) {
+        sum += pairWeight * infid
+        weightSum += pairWeight
       }
       prev = next
     }
-    return count > 0 ? sum / count : Number.NaN
+    return weightSum > 0 ? sum / weightSum : Number.NaN
   }
   return {
     a: meanInfidelity(0),

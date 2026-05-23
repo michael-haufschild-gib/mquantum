@@ -19,6 +19,7 @@ import {
   type SchroedingerConfig,
 } from '@/lib/geometry/extended/types'
 import { normalizeHydrogenCoupledAngularChain } from '@/lib/physics/hydrogenCoupled/presets'
+import { normalizeHydrogenExtraDimOmega } from '@/lib/physics/openQuantum/hydrogenBasis'
 
 import { MAX_DIM, MAX_EXTRA_DIM, MAX_TERMS } from '../shaders/schroedinger/uniforms.wgsl'
 import { zeroReservedFields } from '../utils/structLayout'
@@ -244,18 +245,13 @@ function packHydrogenAndExtraDims(
   // hydrogenNDBoost: compensate for HO normalization in extra dimensions
   const numExtraDims = Math.max(0, dimension - 3)
   let normCompensation = 1.0
-  const extraDimOmega = schroedinger?.extraDimOmega as number[] | undefined
-  const extraDimFrequencySpread = finiteClamped(
-    schroedinger?.extraDimFrequencySpread,
-    DEFAULT_SCHROEDINGER_CONFIG.extraDimFrequencySpread,
-    0,
-    0.5
+  const packedExtraDimOmega = normalizeHydrogenExtraDimOmega(
+    Array.isArray(schroedinger?.extraDimOmega) ? schroedinger.extraDimOmega : [],
+    MAX_EXTRA_DIM + 3,
+    schroedinger?.extraDimFrequencySpread
   )
   for (let i = 0; i < numExtraDims; i++) {
-    const baseOmega = finiteOrDefault(extraDimOmega?.[i], 1.0)
-    const spread = 1.0 + (i - 3.5) * extraDimFrequencySpread
-    const effectiveOmega = Math.max(baseOmega * spread, 0.01)
-    normCompensation *= Math.sqrt(Math.PI / effectiveOmega)
+    normCompensation *= Math.sqrt(Math.PI / packedExtraDimOmega[i]!)
   }
   floatView[I.hydrogenNDBoost] = hydrogenBoost * normCompensation
 
@@ -298,9 +294,7 @@ function packHydrogenAndExtraDims(
 
   // extraDimOmega: 2 vec4f = 8 floats
   for (let i = 0; i < MAX_EXTRA_DIM; i++) {
-    const baseOmega = finiteOrDefault(extraDimOmega?.[i], 1.0)
-    const spread = 1.0 + (i - 3.5) * extraDimFrequencySpread
-    floatView[I.extraDimOmega + i] = Math.max(baseOmega * spread, 0.01)
+    floatView[I.extraDimOmega + i] = packedExtraDimOmega[i]!
   }
 
   // Precompute normalization constants for coupled hydrogen ND

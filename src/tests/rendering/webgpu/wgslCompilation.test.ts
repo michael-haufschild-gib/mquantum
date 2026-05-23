@@ -210,6 +210,60 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     expect(wgsl).not.toContain('fn hoND3D(')
   })
 
+  it('uses a finite aspect fallback in true 2D fragment coordinate mapping', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 2,
+      temporal: false,
+      quantumMode: 'harmonicOscillator',
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(wgsl).toContain('var aspect = 1.0;')
+    expect(wgsl).toContain('if (camera.resolution.x > 0.0 && camera.resolution.y > 0.0) {')
+    expect(wgsl).not.toContain('let aspect = camera.resolution.x / camera.resolution.y;')
+  })
+
+  it('scales 2D contour anti-aliasing by camera zoom', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 2,
+      temporal: false,
+      quantumMode: 'harmonicOscillator',
+      isosurface: true,
+      nodal: true,
+    })
+
+    verifyWgsl(wgsl, true)
+    const expectedPixelSize =
+      '2.0 * uniforms.boundingRadius * modelPixelScale / max(camera.resolution.y, 1.0)'
+    expect(wgsl).toContain(
+      'let modelPixelScale = max(length((camera.modelMatrix * vec4f(1.0, 0.0, 0.0, 0.0)).xyz), 1e-6);'
+    )
+    const pixelSizeMatches = wgsl.match(
+      new RegExp(expectedPixelSize.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')
+    )
+    expect(pixelSizeMatches?.length ?? 0).toBeGreaterThanOrEqual(2)
+  })
+
+  it('uses post-modulated density for 2D isoline neighbor gradients', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 2,
+      temporal: false,
+      quantumMode: 'harmonicOscillator',
+      isosurface: true,
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(wgsl).toContain(
+      'let rho_r = sampleDensityWithPhase(pos + vec3f(eps, 0.0, 0.0), animTime, uniforms).x;'
+    )
+    expect(wgsl).toContain(
+      'let rho_u = sampleDensityWithPhase(pos + vec3f(0.0, eps, 0.0), animTime, uniforms).x;'
+    )
+    expect(wgsl).not.toContain(
+      'let rho_r = sampleDensity(pos + vec3f(eps, 0.0, 0.0), animTime, uniforms);'
+    )
+  })
+
   it('specializes hydrogen-ND family by excluding HO ND modules', () => {
     const { wgsl, modules } = composeSchroedingerShader({
       dimension: 7,
@@ -362,6 +416,23 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     expect(wgsl).toContain('let worldOffset = cameraRight * (jitterOffset.x * pixelSizeX) -')
     expect(wgsl).toContain('cameraUp * (jitterOffset.y * pixelSizeY);')
     expect(wgsl).not.toContain('* pixelSize * 2.0')
+  })
+
+  it('keeps temporal jitter finite on degenerate resize frames', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 4,
+      temporalAccumulation: true,
+      quantumMode: 'harmonicOscillator',
+    })
+
+    expect(wgsl).toContain(
+      'let nonNanResolution = select(vec2f(1.0), camera.resolution, camera.resolution == camera.resolution);'
+    )
+    expect(wgsl).toContain('let safeResolution = max(nonNanResolution, vec2f(1.0));')
+    expect(wgsl).toContain('/ safeResolution.y;')
+    expect(wgsl).toContain('safeResolution.x;')
+    expect(wgsl).not.toContain('/ camera.resolution.y;')
+    expect(wgsl).not.toContain('camera.resolution.x;')
   })
 
   it('uses box intersection for free scalar field bounding volume', () => {

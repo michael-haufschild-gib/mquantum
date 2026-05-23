@@ -6,6 +6,7 @@
  * @param decimals
  */
 export function formatMetric(value: number, unit = '', decimals = 1): string {
+  if (!Number.isFinite(value) || value < 0) return '—'
   if (value === 0) return `0${unit}`
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(decimals)}M${unit}`
   if (value >= 1_000) return `${(value / 1_000).toFixed(decimals)}k${unit}`
@@ -115,8 +116,9 @@ export function computeSparklinePoints(
   maxY: number
 ): string {
   if (data.length < 2) return ''
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width < 0 || height < 0) return ''
   const range = maxY - minY
-  if (range <= 0) {
+  if (!Number.isFinite(range) || range <= 0) {
     // Flat line at vertical center when all values are equal
     const midY = height * 0.5
     return data.map((_, i) => `${(i * width) / (data.length - 1)},${midY}`).join(' ')
@@ -125,7 +127,8 @@ export function computeSparklinePoints(
   const points: string[] = new Array(data.length)
   for (let i = 0; i < data.length; i++) {
     const x = i * stepX
-    const normalizedY = Math.max(0, Math.min(1, (data[i]! - minY) / range))
+    const value = Number.isFinite(data[i]!) ? data[i]! : minY
+    const normalizedY = Math.max(0, Math.min(1, (value - minY) / range))
     const y = height - normalizedY * height
     points[i] = `${x},${y}`
   }

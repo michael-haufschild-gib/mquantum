@@ -89,7 +89,12 @@ import type {
   TdsePipelineResult,
 } from './TDSEComputePassSetup'
 import { buildTdsePipelines, rebuildTdseBindGroups } from './TDSEComputePassSetup'
-import { writeTdseUniforms } from './TDSEComputePassUniforms'
+import {
+  createTdseUniformStepStagingState,
+  disposeTdseUniformStepStaging,
+  prePackTdseFrameSnapshots,
+  writeTdseUniforms,
+} from './TDSEComputePassUniforms'
 import {
   createWormholeBindGroup,
   createWormholePipeline,
@@ -97,6 +102,7 @@ import {
 } from './TDSEComputePassWormhole'
 import {
   buildCurvedPipelines,
+  copyCurvedFinalMetricTimeForStep,
   copyCurvedStageTimesForStep,
   createCurvedIntegratorState,
   createCurvedScratchBuffers,
@@ -282,6 +288,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   fwdAxisCount = 0
   stepAccumulator = 0
   omegaStagingBuffer: GPUBuffer | null = null
+  private readonly uniformStepStaging = createTdseUniformStepStagingState()
   /** Max |V| from the last custom potential upload, for display normalization */
   customPotentialScale = 1.0
 
@@ -698,6 +705,17 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     copyCurvedStageTimesForStep(encoder, scratch, this.uniformBuffer, stepIdx)
   }
 
+  /**
+   * Patch final metric-time fields after a time-dependent curved RK4 frame
+   * so post-step density and diagnostics shaders see the just-integrated
+   * time instead of the frame-start or next-step staging value.
+   */
+  applyCurvedFinalMetricTime(encoder: GPUCommandEncoder, lastStepIdx: number): void {
+    const scratch = this._curvedState.scratch
+    if (!scratch || !this.uniformBuffer) return
+    copyCurvedFinalMetricTimeForStep(encoder, scratch, this.uniformBuffer, lastStepIdx)
+  }
+
   /** Initialize wavefunction and potential if not yet initialized, reset requested, or auto-loop. */
   maybeInitialize(ctx: WebGPURenderContext, config: TdseConfig): void {
     const { device, encoder } = ctx
@@ -1029,6 +1047,70 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         ? (encoder: GPUCommandEncoder, stepIdx: number) =>
             this.applyCurvedStageTimesForStep(encoder, stepIdx)
         : undefined
+      const applyCurvedFinalMetricTime = curvedActive
+        ? (encoder: GPUCommandEncoder, lastStepIdx: number) =>
+            this.applyCurvedFinalMetricTime(encoder, lastStepIdx)
+        : undefined
+      const prepareUniformSnapshots = (d: GPUDevice, simTimeStart: number, steps: number) => {
+        prePackTdseFrameSnapshots({
+          state: this.uniformStepStaging,
+          device: d,
+          config,
+          totalSites: this.totalSites,
+          simTime: simTimeStart,
+          stepsThisFrame: steps,
+          maxDensity: this._diagState.maxDensity,
+          initialMaxDensity: this._diagState.initialMaxDensity,
+          autoScaleMaxGain: config.autoScaleMaxGain ?? 20,
+          strides: computeStridesPadded(config.gridSize, config.latticeDim, this.strideScratch),
+          needsInit: false,
+          basisX,
+          basisY,
+          basisZ,
+          boundingRadius,
+          customPotentialScale: this.customPotentialScale,
+          hawkingStepIndex: this._hawkingState.stepIndex,
+          uniformData: this.uniformData,
+          uniformU32: this.uniformU32,
+          uniformF32: this.uniformF32,
+        })
+      }
+      const applyUniformSnapshot = (encoder: GPUCommandEncoder, stepIdx: number) => {
+        if (!this.uniformStepStaging.buffer || !this.uniformBuffer) return
+        encoder.copyBufferToBuffer(
+          this.uniformStepStaging.buffer,
+          stepIdx * UNIFORM_SIZE,
+          this.uniformBuffer,
+          0,
+          UNIFORM_SIZE
+        )
+      }
+      const refreshDrivenPotential = (frameCtx: WebGPURenderContext) => {
+        if (!this.pl || !this.bg) return
+        const potentialPass = frameCtx.beginComputePass({ label: 'tdse-potential-update-step' })
+        const potentialPipeline = siteDispatch.use3D
+          ? this.pl.potentialPipeline3D
+          : this.pl.potentialPipeline
+        this.dc(
+          potentialPass,
+          potentialPipeline,
+          [this.bg.potentialBG],
+          siteDispatch.x,
+          siteDispatch.y,
+          siteDispatch.z
+        )
+        potentialPass.end()
+        maybeDispatchDisorder(
+          device,
+          frameCtx,
+          config,
+          this._disorderState,
+          this.potentialBuffer,
+          this.totalSites,
+          linearWG,
+          this.dc
+        )
+      }
       runStrangEvolution(ctx, config, speed, evoState, {
         pl,
         bg,
@@ -1048,6 +1130,10 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         dispatchCurvedRK4,
         prepareCurvedStageTimes,
         applyCurvedStageTimesForStep,
+        applyCurvedFinalMetricTime,
+        prepareUniformSnapshots,
+        applyUniformSnapshot,
+        refreshDrivenPotential,
       })
       this.simTime = evoState.simTime
       this.stepAccumulator = evoState.stepAccumulator
@@ -1126,6 +1212,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       this._obsState
     )
     disposeHawkingInject(this._hawkingState)
+    disposeTdseUniformStepStaging(this.uniformStepStaging)
     // ER=EPR wormhole — pipeline + bind group are GC'd via field nulling;
     // readback staging has its own destroy path.
     this.wormholePipeline = null

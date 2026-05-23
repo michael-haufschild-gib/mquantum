@@ -1,7 +1,7 @@
 /**
  * Bose-Einstein condensate physics computations in the Thomas-Fermi approximation.
  *
- * All formulas use natural units (ℏ = m = 1) unless explicit parameters are provided.
+ * All formulas use natural units (ℏ = 1) unless explicit parameters are provided.
  *
  * @module
  */
@@ -20,10 +20,11 @@ function isSupportedTfDimension(D: number): boolean {
 /**
  * Thomas-Fermi chemical potential for a 3D isotropic harmonic trap.
  *
- * μ = 0.5 × (15g̃ / 4π)^(2/5) × ω^(6/5)
+ * μ = 0.5 × (15g̃ / 4π)^(2/5) × m^(3/5) × ω^(6/5)
  *
  * @param g - Dimensionless interaction strength g̃ = g·N
  * @param omega - Trap angular frequency ω
+ * @param mass - Particle mass m
  * @returns Chemical potential μ in trap units (ℏω)
  *
  * @example
@@ -31,27 +32,30 @@ function isSupportedTfDimension(D: number): boolean {
  * thomasFermiMu3D(500, 1.0) // ≈ 6.4463
  * ```
  */
-export function thomasFermiMu3D(g: number, omega: number): number {
-  if (!isPositiveFinite(g) || !isPositiveFinite(omega)) return 0
-  return 0.5 * Math.pow((15 * g) / (4 * Math.PI), 2 / 5) * Math.pow(omega, 6 / 5)
+export function thomasFermiMu3D(g: number, omega: number, mass = 1): number {
+  if (!isPositiveFinite(g) || !isPositiveFinite(omega) || !isPositiveFinite(mass)) return 0
+  return (
+    0.5 * Math.pow((15 * g) / (4 * Math.PI), 2 / 5) * Math.pow(mass, 3 / 5) * Math.pow(omega, 6 / 5)
+  )
 }
 
 /**
  * Thomas-Fermi chemical potential for a D-dimensional isotropic harmonic trap.
  *
  * Derived from normalization of the TF density profile n(r) = (μ - V(r))/g̃
- * in a D-dimensional harmonic trap V(r) = ½ω²r².
+ * in a D-dimensional harmonic trap V(r) = ½mω²r².
  *
- * General formula (natural units ℏ = m = 1):
- *   μ_D = [D(D+2) · ω^D · g̃ · Γ(D/2) / (2^(D/2+2) · π^(D/2))]^(2/(D+2))
+ * General formula (natural units ℏ = 1):
+ *   μ_D = [D(D+2) · m^(D/2) · ω^D · g̃ · Γ(D/2) / (2^(D/2+2) · π^(D/2))]^(2/(D+2))
  *
  * Special cases:
- *   D=2: μ = ω · √(g̃ / π)
- *   D=3: μ = 0.5 × (15g̃ / 4π)^(2/5) × ω^(6/5)  (matches thomasFermiMu3D)
+ *   D=2: μ = √m · ω · √(g̃ / π)
+ *   D=3: μ = 0.5 × (15g̃ / 4π)^(2/5) × m^(3/5) × ω^(6/5)
  *
  * @param D - Spatial dimensionality (2-11)
  * @param g - Dimensionless interaction strength g̃ = g·N
  * @param omega - Trap angular frequency ω
+ * @param mass - Particle mass m
  * @returns Chemical potential μ in trap units (ℏω)
  *
  * @example
@@ -60,11 +64,17 @@ export function thomasFermiMu3D(g: number, omega: number): number {
  * thomasFermiMuND(2, 500, 1.0) // ≈ 12.6157
  * ```
  */
-export function thomasFermiMuND(D: number, g: number, omega: number): number {
-  if (!isSupportedTfDimension(D) || !isPositiveFinite(g) || !isPositiveFinite(omega)) return 0
-  // μ_D = [D(D+2) · ω^D · g̃ · Γ(D/2) / (2^(D/2+2) · π^(D/2))]^(2/(D+2))
+export function thomasFermiMuND(D: number, g: number, omega: number, mass = 1): number {
+  if (
+    !isSupportedTfDimension(D) ||
+    !isPositiveFinite(g) ||
+    !isPositiveFinite(omega) ||
+    !isPositiveFinite(mass)
+  )
+    return 0
+  // μ_D = [D(D+2) · m^(D/2) · ω^D · g̃ · Γ(D/2) / (2^(D/2+2) · π^(D/2))]^(2/(D+2))
   const halfD = D / 2
-  const numerator = D * (D + 2) * Math.pow(omega, D) * g * gammaHalf(D)
+  const numerator = D * (D + 2) * Math.pow(mass, halfD) * Math.pow(omega, D) * g * gammaHalf(D)
   const denominator = Math.pow(2, halfD + 2) * Math.pow(Math.PI, halfD)
   return Math.pow(numerator / denominator, 2 / (D + 2))
 }

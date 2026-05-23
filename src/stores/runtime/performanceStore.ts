@@ -49,6 +49,10 @@ function reportStorageFailure(op: 'read' | 'write', key: string, err: unknown): 
   )
 }
 
+function isBoolean(value: unknown): value is boolean {
+  return typeof value === 'boolean'
+}
+
 /** Valid density grid resolution options. */
 export type DensityGridResolution = 64 | 96 | 128 | 256
 
@@ -383,6 +387,7 @@ export const usePerformanceStore = create<PerformanceState>((set) => ({
 
   // Temporal Reprojection
   setTemporalReprojectionEnabled: (enabled: boolean) => {
+    if (!isBoolean(enabled)) return
     set({ temporalReprojectionEnabled: enabled })
   },
 
@@ -392,14 +397,17 @@ export const usePerformanceStore = create<PerformanceState>((set) => ({
 
   // Eigenfunction Cache
   setEigenfunctionCacheEnabled: (enabled: boolean) => {
+    if (!isBoolean(enabled)) return
     set({ eigenfunctionCacheEnabled: enabled })
   },
 
   setAnalyticalGradientEnabled: (enabled: boolean) => {
+    if (!isBoolean(enabled)) return
     set({ analyticalGradientEnabled: enabled })
   },
 
   setFastEigenInterpolationEnabled: (enabled: boolean) => {
+    if (!isBoolean(enabled)) return
     set({ fastEigenInterpolationEnabled: enabled })
   },
 

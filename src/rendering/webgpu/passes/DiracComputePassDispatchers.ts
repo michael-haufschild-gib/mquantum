@@ -22,6 +22,7 @@ import {
   SHARED_MEM_FFT_MAX_AXIS,
 } from './computePassUtils'
 import type { DiracBindGroupResult, DiracPipelineResult } from './DiracComputePassResources'
+import { isFinitePositiveNorm } from './normalizationGuards'
 
 /** DiracDiagUniforms struct size (16 bytes: totalSites, numWorkgroups, spinorSize, pad) */
 export const DIAG_UNIFORM_SIZE = 16
@@ -143,6 +144,7 @@ export function dispatchDiagnostics(
           const particleNorm = data[2]!
           const antiNorm = data[3]!
           staging.unmap()
+          const totalNormIsSafe = isFinitePositiveNorm(totalNorm)
 
           // Asymmetric maxDensity smoothing
           if (maxDens > 0) {
@@ -153,7 +155,7 @@ export function dispatchDiagnostics(
             }
           }
 
-          if (currentInitialNorm < 0) {
+          if (currentInitialNorm < 0 && totalNormIsSafe) {
             currentInitialNorm = totalNorm
             if (renormBuf) {
               device.queue.writeBuffer(renormBuf, 4, new Float32Array([totalNorm]))
@@ -162,10 +164,15 @@ export function dispatchDiagnostics(
 
           // Update diagnostics store
           if (config.diagnosticsEnabled) {
-            const norm0 = currentInitialNorm > 0 ? currentInitialNorm : totalNorm
-            const normDrift = norm0 > 0 ? (totalNorm - norm0) / norm0 : 0
-            const pFrac = totalNorm > 0 ? particleNorm / totalNorm : 0
-            const aFrac = totalNorm > 0 ? antiNorm / totalNorm : 0
+            const norm0 = isFinitePositiveNorm(currentInitialNorm)
+              ? currentInitialNorm
+              : totalNormIsSafe
+                ? totalNorm
+                : 0
+            const normDrift =
+              norm0 > 0 && Number.isFinite(totalNorm) ? (totalNorm - norm0) / norm0 : 0
+            const pFrac = totalNormIsSafe ? particleNorm / totalNorm : 0
+            const aFrac = totalNormIsSafe ? antiNorm / totalNorm : 0
 
             useDiagnosticsStore.getState().updateDirac({
               totalNorm,

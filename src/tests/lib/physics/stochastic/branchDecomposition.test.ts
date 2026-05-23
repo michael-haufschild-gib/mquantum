@@ -104,6 +104,29 @@ describe('spatialBranchPartition', () => {
     expect(populationA).toBeLessThan(0.01)
     expect(populationB).toBeGreaterThan(0.99)
   })
+
+  it('classifies branch plane using voxel-centered lattice coordinates', () => {
+    const n = 64
+    const spacing = 0.1
+    const psiRe = new Float64Array(n)
+    const psiIm = new Float64Array(n)
+    psiRe[31] = 1
+    psiRe[32] = 1
+
+    const halfExtent = n * spacing * 0.5
+    const planePosition = 0.025 / halfExtent
+    const { populationA, populationB } = spatialBranchPartition(
+      psiRe,
+      psiIm,
+      [n],
+      [spacing],
+      1,
+      planePosition
+    )
+
+    expect(populationA).toBeCloseTo(0.5, 12)
+    expect(populationB).toBeCloseTo(0.5, 12)
+  })
 })
 
 describe('branchEntropy', () => {
@@ -148,6 +171,12 @@ describe('fitExponentialDecay', () => {
 
   it('returns null for fewer than 3 points', () => {
     expect(fitExponentialDecay([0, 1], [1, 0.5])).toBeNull()
+  })
+
+  it('returns null for non-finite fit samples', () => {
+    expect(fitExponentialDecay([0, 1, Number.POSITIVE_INFINITY], [1, 0.5, 0.25])).toBeNull()
+    expect(fitExponentialDecay([0, 1, 2], [1, Number.POSITIVE_INFINITY, 0.25])).toBeNull()
+    expect(fitExponentialDecay([0, 1, 2], [1, Number.NaN, 0.25])).toBeNull()
   })
 
   it('handles noisy data with reasonable R²', () => {

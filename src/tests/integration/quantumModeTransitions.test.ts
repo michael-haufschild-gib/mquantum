@@ -102,6 +102,21 @@ describe('quantum mode state machine transitions', () => {
       useExtendedObjectStore.getState().setSchroedingerQuantumMode('harmonicOscillator')
       expect(useGeometryStore.getState().dimension).toBe(5)
     })
+
+    it('active compute modes clamp dimension changes to their registry maximum', () => {
+      for (const mode of COMPUTE_MODES) {
+        const entry = QUANTUM_TYPE_REGISTRY.get(mode)
+        if (!entry) throw new Error(`${mode} must have registry dimensions`)
+
+        useGeometryStore.getState().setDimension(3)
+        useExtendedObjectStore.getState().setSchroedingerQuantumMode(mode)
+        useGeometryStore.getState().setDimension(11)
+
+        expect(useGeometryStore.getState().dimension, `${mode} max dimension`).toBe(
+          entry!.dimensions.max
+        )
+      }
+    })
   })
 
   describe('representation enforcement', () => {

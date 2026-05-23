@@ -5,9 +5,11 @@
  * matching the WGSL shader logic. Used for unit testing and as ground
  * truth for GPU shader verification.
  *
- * The operator applies multiplicative Gaussian-weighted noise kicks:
- *   ψ[i] *= (1 + Σ_k √(γ·dt)·G(x_i, c_k, σ)·(ξ_k - ⟨L_k⟩))
- * where ξ_k ~ N(0,1) and ⟨L_k⟩ is the expectation of the localization operator.
+ * The operator applies the same centered combined-field exponential kick as
+ * the GPU path:
+ *   W(x) = (πσ²)^(-d/4) Σ_k G(x, c_k, σ) ξ_k
+ *   ψ(x) *= exp(√(γdt)(W(x)-⟨W⟩) - 0.5γdt(W(x)-⟨W⟩)²)
+ * where ⟨W⟩ is density-weighted over the current wavefunction.
  *
  * @module lib/physics/stochastic/localizationOperator
  */
@@ -15,6 +17,58 @@
 import { computeStrides } from '@/lib/math/ndArray'
 
 import type { CollapseCenter } from './localizationKernel'
+
+const STOCHASTIC_CUTOFF_SIGMA = 6
+
+function computeNoiseField(
+  coords: readonly number[],
+  centers: readonly CollapseCenter[],
+  latticeDim: number,
+  invTwoSigmaSq: number,
+  maxDistSq: number,
+  normFactor: number
+): number {
+  let rawSum = 0
+  for (const center of centers) {
+    let distSq = 0
+    for (let d = 0; d < latticeDim; d++) {
+      const diff = coords[d]! - (center.position[d] ?? 0)
+      distSq += diff * diff
+      if (distSq > maxDistSq) break
+    }
+    if (distSq < maxDistSq) {
+      rawSum += Math.exp(-distSq * invTwoSigmaSq) * center.noise
+    }
+  }
+  return normFactor * rawSum
+}
+
+function applyCenteredNoiseFields(
+  psiRe: Float64Array,
+  psiIm: Float64Array,
+  noiseFields: Float64Array,
+  gamma: number,
+  dt: number
+): void {
+  let norm = 0
+  let weightedNoise = 0
+  for (let i = 0; i < noiseFields.length; i++) {
+    const density = psiRe[i]! * psiRe[i]! + psiIm[i]! * psiIm[i]!
+    norm += density
+    weightedNoise += density * noiseFields[i]!
+  }
+
+  const meanNoise = norm > 0 && Number.isFinite(weightedNoise) ? weightedNoise / norm : 0
+  const sqrtGammaDt = Math.sqrt(gamma * dt)
+  const halfGammaDt = 0.5 * gamma * dt
+
+  for (let i = 0; i < noiseFields.length; i++) {
+    const centered = noiseFields[i]! - meanNoise
+    const scale = Math.exp(sqrtGammaDt * centered - halfGammaDt * centered * centered)
+    psiRe[i]! *= scale
+    psiIm[i]! *= scale
+  }
+}
 
 /**
  * Apply one localization step to a 1D wavefunction (CPU reference).
@@ -38,27 +92,21 @@ export function applyLocalizationStep1D(
   sigma: number,
   dt: number
 ): void {
-  if (gamma === 0) return
+  if (!Number.isFinite(gamma) || gamma <= 0 || !Number.isFinite(dt) || dt <= 0) return
+  if (!Number.isFinite(sigma) || sigma <= 0) return
 
   const invTwoSigmaSq = 1 / (2 * sigma * sigma)
-  const sqrtGammaDt = Math.sqrt(gamma * dt)
+  const maxDistSq = STOCHASTIC_CUTOFF_SIGMA * STOCHASTIC_CUTOFF_SIGMA * sigma * sigma
+  const normFactor = (Math.PI * sigma * sigma) ** -0.25
   const halfExtent = gridSize * spacing * 0.5
+  const noiseFields = new Float64Array(gridSize)
 
   for (let i = 0; i < gridSize; i++) {
-    const x = i * spacing - halfExtent
-    let totalFactor = 0
-
-    for (const center of centers) {
-      const diff = x - center.position[0]!
-      const distSq = diff * diff
-      const weight = Math.exp(-distSq * invTwoSigmaSq)
-      totalFactor += sqrtGammaDt * weight * (center.noise - (center.expectation ?? 0))
-    }
-
-    const scale = 1 + totalFactor
-    psiRe[i]! *= scale
-    psiIm[i]! *= scale
+    const x = (i + 0.5) * spacing - halfExtent
+    noiseFields[i] = computeNoiseField([x], centers, 1, invTwoSigmaSq, maxDistSq, normFactor)
   }
+
+  applyCenteredNoiseFields(psiRe, psiIm, noiseFields, gamma, dt)
 }
 
 /**
@@ -85,15 +133,18 @@ export function applyLocalizationStepND(
   sigma: number,
   dt: number
 ): void {
-  if (gamma === 0) return
+  if (!Number.isFinite(gamma) || gamma <= 0 || !Number.isFinite(dt) || dt <= 0) return
+  if (!Number.isFinite(sigma) || sigma <= 0) return
 
   const activeGrid = gridSize.slice(0, latticeDim)
   const totalSites = activeGrid.reduce((a, b) => a * b, 1)
   const strides = computeStrides(activeGrid)
 
   const invTwoSigmaSq = 1 / (2 * sigma * sigma)
-  const sqrtGammaDt = Math.sqrt(gamma * dt)
+  const maxDistSq = STOCHASTIC_CUTOFF_SIGMA * STOCHASTIC_CUTOFF_SIGMA * sigma * sigma
+  const normFactor = (Math.PI * sigma * sigma) ** (-latticeDim * 0.25)
   const halfExtents = gridSize.map((g, d) => g * spacing[d]! * 0.5)
+  const noiseFields = new Float64Array(totalSites)
 
   for (let idx = 0; idx < totalSites; idx++) {
     // Convert flat index to coordinates
@@ -102,25 +153,20 @@ export function applyLocalizationStepND(
     for (let d = 0; d < latticeDim; d++) {
       const ci = Math.floor(rem / strides[d]!)
       rem = rem % strides[d]!
-      coords.push(ci * spacing[d]! - halfExtents[d]!)
+      coords.push((ci + 0.5) * spacing[d]! - halfExtents[d]!)
     }
 
-    let totalFactor = 0
-    for (const center of centers) {
-      let distSq = 0
-      for (let d = 0; d < latticeDim; d++) {
-        // Centers only have visible-dim (≤3) coordinates; higher dims default to origin
-        const diff = coords[d]! - (center.position[d] ?? 0)
-        distSq += diff * diff
-      }
-      const weight = Math.exp(-distSq * invTwoSigmaSq)
-      totalFactor += sqrtGammaDt * weight * (center.noise - (center.expectation ?? 0))
-    }
-
-    const scale = 1 + totalFactor
-    psiRe[idx]! *= scale
-    psiIm[idx]! *= scale
+    noiseFields[idx] = computeNoiseField(
+      coords,
+      centers,
+      latticeDim,
+      invTwoSigmaSq,
+      maxDistSq,
+      normFactor
+    )
   }
+
+  applyCenteredNoiseFields(psiRe, psiIm, noiseFields, gamma, dt)
 }
 
 /**

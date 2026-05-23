@@ -364,8 +364,7 @@ export const Popover: React.FC<PopoverProps> = React.memo(
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.1, ease: 'easeOut' }}
-                className="glass-panel rounded-lg shadow-2xl border border-border-default"
-                style={{ backdropFilter: 'blur(24px)' }}
+                className="surface-panel rounded-lg shadow-2xl border border-border-default"
               >
                 {content}
               </m.div>

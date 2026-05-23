@@ -64,12 +64,12 @@ export const ControlPanel: React.FC<ControlPanelProps> = React.memo(
 
     const containerStyles = useMemo(() => {
       if (isSideBySideCollapsed) {
-        return 'pointer-events-auto glass-panel rounded-full flex flex-col overflow-hidden transition-all duration-300' // Collapsed: circular button
+        return 'pointer-events-auto surface-panel rounded-full flex flex-col overflow-hidden transition-all duration-300' // Collapsed: circular button
       }
       if (isSideBySide) {
-        return 'glass-panel rounded-2xl flex flex-col overflow-hidden h-full transition-all duration-300' // Expanded side-by-side
+        return 'surface-panel rounded-2xl flex flex-col overflow-hidden h-full transition-all duration-300' // Expanded side-by-side
       }
-      return 'pointer-events-auto glass-panel rounded-2xl flex flex-col overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]' // Overlay mode
+      return 'pointer-events-auto surface-panel rounded-2xl flex flex-col overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]' // Overlay mode
     }, [isSideBySide, isSideBySideCollapsed])
 
     // Width handling
@@ -105,14 +105,14 @@ export const ControlPanel: React.FC<ControlPanelProps> = React.memo(
         {/* Resize handle - only in side-by-side mode when expanded */}
         {isSideBySide && !isCollapsed && <ResizeHandle />}
 
-        {/* Floating Glass Card Container */}
+        {/* Floating panel container */}
         <div
           className={`${containerStyles} ${containerWidth}`}
           style={widthStyle}
           data-testid="control-panel-container"
         >
           {/* Header */}
-          <div className="flex-none h-14 flex items-center justify-between px-4 border-b border-border/10 bg-glass/20">
+          <div className="flex-none h-14 flex items-center justify-between px-4 border-b border-border/10 bg-surface">
             {!isCollapsed && (
               <h2 className="text-xs font-bold tracking-brand text-accent text-glow select-none">
                 {title}

@@ -169,7 +169,7 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
           ${
             isSelected
               ? 'bg-accent/10 border-accent text-accent shadow-[0_0_15px_color-mix(in_oklch,var(--color-accent)_10%,transparent)]'
-              : 'bg-[var(--bg-panel)]/30 border-panel-border hover:border-text-secondary/50 text-text-secondary hover:text-text-primary hover:bg-[var(--bg-panel)]/50'
+              : 'bg-panel border-panel-border hover:border-text-secondary/50 text-text-secondary hover:text-text-primary hover:bg-surface'
           }
           cursor-pointer
         `}

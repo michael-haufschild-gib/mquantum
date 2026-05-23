@@ -13,14 +13,16 @@
  * A *good* clock is one whose conditional states at different times
  * are nearly orthogonal — different `t` should correspond to genuinely
  * different "rest of universe" configurations. We quantify this by
- * the average step-to-step autocorrelation across the clock axis:
+ * the support-weighted step-to-step autocorrelation across the clock axis:
  *
- *   `C(x) = (1 / (N_x − 1)) · Σ_{i=0}^{N_x − 2} |⟨ψ_{rest}(t_i) | ψ_{rest}(t_{i+1})⟩|²`
+ *   `C(x) = Σ w_i |⟨ψ_rest(t_i)|ψ_rest(t_{i+1})⟩|² / Σ w_i`
  *
  * with each conditional state L²-normalised first so the sum is
- * bounded in `[0, 1]`. A clock with `C ≈ 1` is a poor clock — its
- * conditional states barely change. A clock with `C ≪ 1` is a good
- * clock — adjacent conditional states are nearly orthogonal.
+ * bounded in `[0, 1]`, and `w_i = sqrt(P(t_i)P(t_{i+1}))`. Adjacent
+ * pairs with zero clock probability do not define conditional states
+ * and therefore do not vote. A clock with `C ≈ 1` is a poor clock —
+ * its conditional states barely change. A clock with `C ≪ 1` is a good
+ * clock — adjacent supported conditional states are nearly orthogonal.
  *
  * The Page–Wootters champion is the clock with the **smallest** C
  * (most distinguishing).
@@ -40,8 +42,8 @@
 import type { SrmtClock } from './types'
 
 /**
- * Mean step-to-step autocorrelation of the conditional `|ψ_rest⟩`
- * states along each clock axis. Smaller = better clock.
+ * Support-weighted step-to-step autocorrelation of the conditional
+ * `|ψ_rest⟩` states along each clock axis. Smaller = better clock.
  */
 export interface PageWoottersRecord {
   a: number
@@ -62,10 +64,15 @@ function strideForAxis(
   }
 }
 
+interface ConditionalSlice {
+  values: Float64Array
+  norm: number
+}
+
 /**
  * Extract a normalised conditional state at clock-axis index `t`
- * along axis `axis`. The conditional state is the slice of `|χ|²`
- * at the clock value, then L²-normalised on the remaining 2D plane.
+ * along axis `axis`. The conditional state is the complex χ slice at
+ * the clock value, then L²-normalised on the remaining 2D plane.
  *
  * Returns interleaved (re, im) values for the slice, length
  * `2 · sliceSize`.
@@ -75,7 +82,7 @@ function conditionalSliceComplex(
   shape: [number, number, number],
   axis: 0 | 1 | 2,
   t: number
-): Float64Array {
+): ConditionalSlice {
   const [N0, N1, N2] = shape
   const { sliceSize, axisStride } = strideForAxis(shape, axis)
   const out = new Float64Array(2 * sliceSize)
@@ -132,7 +139,7 @@ function conditionalSliceComplex(
     const inv = 1 / Math.sqrt(norm)
     for (let i = 0; i < 2 * sliceSize; i++) out[i] = out[i]! * inv
   }
-  return out
+  return { values: out, norm }
 }
 
 /**
@@ -160,7 +167,9 @@ function overlapSquared(a: Float64Array, b: Float64Array): number {
  *
  * @param chi - Interleaved complex `χ` amplitudes, length `2·Na·Nphi²`.
  * @param shape - `[Na, Nphi, Nphi]`.
- * @returns Per-clock mean adjacent-conditional-state overlap.
+ * @returns Per-clock support-weighted adjacent-conditional-state overlap.
+ *          Returns `NaN` for an axis with no adjacent supported clock
+ *          slices.
  */
 export function computePageWoottersRates(
   chi: Float32Array,
@@ -170,18 +179,19 @@ export function computePageWoottersRates(
     const { axisLen } = strideForAxis(shape, axis)
     if (axisLen < 2) return Number.NaN
     let sum = 0
-    let count = 0
+    let weightSum = 0
     let prev = conditionalSliceComplex(chi, shape, axis, 0)
     for (let t = 1; t < axisLen; t++) {
       const next = conditionalSliceComplex(chi, shape, axis, t)
-      const o = overlapSquared(prev, next)
-      if (Number.isFinite(o)) {
-        sum += o
-        count++
+      const pairWeight = Math.sqrt(prev.norm * next.norm)
+      const o = overlapSquared(prev.values, next.values)
+      if (Number.isFinite(o) && Number.isFinite(pairWeight) && pairWeight > 0) {
+        sum += pairWeight * o
+        weightSum += pairWeight
       }
       prev = next
     }
-    return count > 0 ? sum / count : Number.NaN
+    return weightSum > 0 ? sum / weightSum : Number.NaN
   }
 
   return {

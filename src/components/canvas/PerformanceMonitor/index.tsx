@@ -91,9 +91,9 @@ export function PerformanceMonitor() {
           <div
             className="
               relative overflow-hidden rounded-full
-              glass-panel hover:brightness-110 cursor-pointer
+              surface-panel hover:border-accent/50 cursor-pointer
               shadow-[var(--shadow-hard)]
-              transition-[filter] duration-300
+              transition-colors duration-300
             "
           >
             <CollapsedView />
@@ -112,7 +112,7 @@ export function PerformanceMonitor() {
               className="
                 flex flex-col w-[360px]
                 relative overflow-hidden rounded-2xl
-                glass-panel
+                surface-panel
                 shadow-[var(--shadow-hard)]
               "
             >

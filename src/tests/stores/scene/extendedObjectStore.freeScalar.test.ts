@@ -119,6 +119,20 @@ describe('extendedObjectStore — free scalar field actions', () => {
     expect(after.exposureMode).toBe(before.exposureMode)
   })
 
+  it('ignores invalid k-space boolean updates from direct callers', () => {
+    const store = useExtendedObjectStore.getState()
+    store.setFreeScalarKSpaceFftShift(false)
+    store.setFreeScalarKSpaceBroadeningEnabled(false)
+    const before = useExtendedObjectStore.getState().schroedinger.freeScalar.kSpaceViz
+
+    store.setFreeScalarKSpaceFftShift('yes' as never)
+    store.setFreeScalarKSpaceBroadeningEnabled('true' as never)
+
+    const after = useExtendedObjectStore.getState().schroedinger.freeScalar.kSpaceViz
+    expect(after.fftShiftEnabled).toBe(before.fftShiftEnabled)
+    expect(after.broadeningEnabled).toBe(before.broadeningEnabled)
+  })
+
   it('sanitizes k-space viz when merging free scalar config directly', () => {
     const store = useExtendedObjectStore.getState()
 

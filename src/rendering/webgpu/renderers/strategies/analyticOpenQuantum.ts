@@ -181,7 +181,8 @@ export class AnalyticOpenQuantumExecutor {
     const rawExtraDimOmega = schCfg?.extraDimOmega
     const extraDimOmega = normalizeHydrogenExtraDimOmega(
       Array.isArray(rawExtraDimOmega) ? rawExtraDimOmega : [],
-      dim
+      dim,
+      schCfg?.extraDimFrequencySpread
     )
     const dt = oqConfig.dt ?? 0.01
     const substeps = oqConfig.substeps ?? 4
@@ -245,6 +246,8 @@ export class AnalyticOpenQuantumExecutor {
       stateReinitialized = true
     }
 
+    if (isPlaying) evolvePropagatorStep(this.hydrogenPropagator!, this.state)
+
     if (
       !this.shouldPublishOpenQuantumFrame(
         performance,
@@ -256,7 +259,6 @@ export class AnalyticOpenQuantumExecutor {
       return
     }
 
-    if (isPlaying) evolvePropagatorStep(this.hydrogenPropagator!, this.state)
     this.publishMetricsAndPack(K, gridPass, shared, schroedingerVersion, performance)
     gridPass.updateHydrogenBasisUniforms(shared.device, this.hydrogenBasisPackedBuffer!)
   }
@@ -344,6 +346,8 @@ export class AnalyticOpenQuantumExecutor {
       stateReinitialized = true
     }
 
+    if (isPlaying) evolvePropagatorStep(this.hoPropagator!, this.state)
+
     if (
       !this.shouldPublishOpenQuantumFrame(
         performance,
@@ -354,8 +358,6 @@ export class AnalyticOpenQuantumExecutor {
     ) {
       return
     }
-
-    if (isPlaying) evolvePropagatorStep(this.hoPropagator!, this.state)
 
     this.publishMetricsAndPack(K, gridPass, shared, schroedingerVersion, performance)
   }

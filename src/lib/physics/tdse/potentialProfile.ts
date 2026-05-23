@@ -7,6 +7,7 @@
  * @module lib/physics/tdse/potentialProfile
  */
 
+import { normalizeTdseBlackHoleParams } from '@/lib/geometry/extended/tdse'
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { parseExpression } from '@/lib/physics/expressionParser'
 import { computeReggeWheelerPotential } from '@/lib/physics/tdse/reggeWheeler'
@@ -75,10 +76,13 @@ export function evaluatePotential1D(x: number, config: TdseConfig): number {
       // is indistinguishable from a pure harmonic trap.
       return 0.5 * config.mass * config.harmonicOmega * config.harmonicOmega * x * x
 
-    case 'blackHoleRingdown':
-      // x is interpreted as the tortoise coordinate r*. The Regge–Wheeler
-      // helper inverts r*(r) and evaluates V_ℓ^s(r*) on a Schwarzschild bg.
-      return computeReggeWheelerPotential(x, config.bhMass, config.bhMultipoleL, config.bhSpin)
+    case 'blackHoleRingdown': // Match GPU uniform packing: legacy/direct configs can carry finite but // helper inverts r*(r) and evaluates V_ℓ^s(r*) on a Schwarzschild bg. // x is interpreted as the tortoise coordinate r*. The Regge–Wheeler
+    // non-physical pairs such as (s=2, ell=0), which the compute pass
+    // normalizes before evolution.
+    {
+      const bh = normalizeTdseBlackHoleParams(config)
+      return computeReggeWheelerPotential(x, bh.bhMass, bh.bhMultipoleL, bh.bhSpin)
+    }
 
     case 'custom': {
       const result = parseExpression(config.customPotentialExpression ?? '0')
@@ -257,10 +261,7 @@ export function getPotentialPlotScale(config: TdseConfig): number {
       // poison the plot scale and propagate into the energy-diagram HUD.
       // Validate first and fall back to 1.0 (dimensionful units of M)
       // when the input is unusable.
-      const M =
-        Number.isFinite(config.bhMass) && config.bhMass > 0 ? Math.max(config.bhMass, 1e-4) : 1.0
-      const ell = config.bhMultipoleL
-      const s = config.bhSpin
+      const { bhMass: M, bhMultipoleL: ell, bhSpin: s } = normalizeTdseBlackHoleParams(config)
       const MSq = M * M
       const orbital = (ell * (ell + 1)) / (27 * MSq)
       const spinCorrection = (2 * (1 - s * s)) / (81 * MSq)

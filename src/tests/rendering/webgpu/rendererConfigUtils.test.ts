@@ -146,6 +146,22 @@ describe('applyModeOverrides', () => {
     expect(fsResult.dimension).toBe(3)
   })
 
+  it('clamps compute mode dimensions to registry maxima', () => {
+    const wdwResult = applyModeOverrides({
+      ...BASE_CONFIG,
+      quantumMode: 'wheelerDeWitt',
+      dimension: 11,
+    })
+    expect(wdwResult.dimension).toBe(3)
+
+    const adsResult = applyModeOverrides({
+      ...BASE_CONFIG,
+      quantumMode: 'antiDeSitter',
+      dimension: 11,
+    })
+    expect(adsResult.dimension).toBe(7)
+  })
+
   it('preserves config for standard 3D analytic mode', () => {
     const result = applyModeOverrides({
       ...BASE_CONFIG,

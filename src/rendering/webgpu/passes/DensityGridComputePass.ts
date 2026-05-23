@@ -44,8 +44,14 @@ const DEFAULT_WORLD_BOUND = 2.0
 
 // Workgroup size (must match shader @workgroup_size)
 const WORKGROUP_SIZE = 8
+const MAX_DENSITY_GRID_SIZE = 4096
 
 export type { DensityGridComputeConfig }
+
+function sanitizeDensityGridSize(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_GRID_SIZE
+  return Math.max(1, Math.min(MAX_DENSITY_GRID_SIZE, Math.floor(value)))
+}
 
 /**
  * Compute pass that pre-computes a 3D density texture from quantum wavefunctions.
@@ -138,8 +144,14 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
       isCompute: true,
       workgroupSize: [WORKGROUP_SIZE, WORKGROUP_SIZE, WORKGROUP_SIZE],
     })
-    this.passConfig = config
-    this.gridSize = config.gridSize ?? DEFAULT_GRID_SIZE
+    this.passConfig = {
+      ...config,
+      gridSize: sanitizeDensityGridSize(config.gridSize),
+      forceRgba: config.forceRgba === true,
+      useDensityMatrix: config.useDensityMatrix === true,
+      useHydrogenBasis: config.useHydrogenBasis === true,
+    }
+    this.gridSize = this.passConfig.gridSize ?? DEFAULT_GRID_SIZE
     this.workgroupCount = Math.ceil(this.gridSize / WORKGROUP_SIZE)
   }
 

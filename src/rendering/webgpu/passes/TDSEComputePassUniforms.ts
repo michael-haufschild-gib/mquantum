@@ -77,6 +77,7 @@ const INIT_MAP: Record<string, number> = {
   superposition: 2,
   thomasFermi: 3,
   vortexImprint: 4,
+  vortexLattice: 4,
   darkSoliton: 5,
   ndVortexPair: 6,
   blackHoleAnalog: 7,
@@ -138,19 +139,49 @@ function finiteOrZero(v: number | undefined): number {
   return v === undefined || !Number.isFinite(v) ? 0 : v
 }
 
+/** Mutable holder for per-step TDSEUniforms staging. */
+export interface TdseUniformStepStagingState {
+  buffer: GPUBuffer | null
+  size: number
+}
+
+/** Create an empty per-step uniform staging state. */
+export function createTdseUniformStepStagingState(): TdseUniformStepStagingState {
+  return { buffer: null, size: 0 }
+}
+
+/** Destroy per-step uniform staging resources. */
+export function disposeTdseUniformStepStaging(state: TdseUniformStepStagingState): void {
+  state.buffer?.destroy()
+  state.buffer = null
+  state.size = 0
+}
+
+function ensureTdseUniformStepStaging(
+  state: TdseUniformStepStagingState,
+  device: GPUDevice,
+  byteSize: number
+): GPUBuffer {
+  if (state.buffer && state.size >= byteSize) return state.buffer
+  state.buffer?.destroy()
+  state.buffer = device.createBuffer({
+    label: 'tdse-step-uniform-staging',
+    size: byteSize,
+    usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+  })
+  state.size = byteSize
+  return state.buffer
+}
+
 /**
- * Write TDSE uniform data into a pre-allocated ArrayBuffer, then upload to the GPU.
+ * Pack TDSE uniform data into a pre-allocated ArrayBuffer.
  *
- * @param device - WebGPU device
- * @param uniformBuffer - Target GPU uniform buffer
- * @param uniformData - Pre-allocated ArrayBuffer (UNIFORM_SIZE bytes)
+ * @param uniformData - Pre-allocated ArrayBuffer (TDSE_UNIFORMS_LAYOUT.totalSize bytes)
  * @param uniformU32 - Uint32Array view of uniformData
  * @param uniformF32 - Float32Array view of uniformData
  * @param params - Current config and derived values
  */
-export function writeTdseUniforms(
-  device: GPUDevice,
-  uniformBuffer: GPUBuffer,
+export function packTdseUniformData(
   uniformData: ArrayBuffer,
   uniformU32: Uint32Array,
   uniformF32: Float32Array,
@@ -520,8 +551,77 @@ export function writeTdseUniforms(
     f32[I.invSpacing + d] = invDx
     f32[I.invSpacing2 + d] = invDx * invDx
   }
+}
 
+/**
+ * Write TDSE uniform data into a pre-allocated ArrayBuffer, then upload to the GPU.
+ *
+ * @param device - WebGPU device
+ * @param uniformBuffer - Target GPU uniform buffer
+ * @param uniformData - Pre-allocated ArrayBuffer (TDSE_UNIFORMS_LAYOUT.totalSize bytes)
+ * @param uniformU32 - Uint32Array view of uniformData
+ * @param uniformF32 - Float32Array view of uniformData
+ * @param params - Current config and derived values
+ */
+export function writeTdseUniforms(
+  device: GPUDevice,
+  uniformBuffer: GPUBuffer,
+  uniformData: ArrayBuffer,
+  uniformU32: Uint32Array,
+  uniformF32: Float32Array,
+  params: TdseUniformParams
+): void {
+  packTdseUniformData(uniformData, uniformU32, uniformF32, params)
   device.queue.writeBuffer(uniformBuffer, 0, uniformData)
+}
+
+/** Inputs for pre-packing a frame of ordered TDSEUniforms snapshots. */
+export interface PrePackTdseFrameSnapshotsParams extends Omit<TdseUniformParams, 'simTime'> {
+  state: TdseUniformStepStagingState
+  device: GPUDevice
+  simTime: number
+  stepsThisFrame: number
+  uniformData: ArrayBuffer
+  uniformU32: Uint32Array
+  uniformF32: Float32Array
+}
+
+/**
+ * Pre-pack `stepsThisFrame + 1` full TDSEUniforms snapshots into a staging
+ * buffer. Command-encoder copies can then patch the live TDSE uniform buffer
+ * in-order before each physics step; queue.writeBuffer cannot provide that
+ * ordering because all queued writes land before the command buffer executes.
+ */
+export function prePackTdseFrameSnapshots(
+  params: PrePackTdseFrameSnapshotsParams
+): GPUBuffer | null {
+  const steps = Number.isFinite(params.stepsThisFrame) ? Math.floor(params.stepsThisFrame) : 0
+  if (steps <= 0) return null
+  const slotSize = TDSE_UNIFORMS_LAYOUT.totalSize
+  const staging = ensureTdseUniformStepStaging(params.state, params.device, (steps + 1) * slotSize)
+  const base: Omit<TdseUniformParams, 'simTime'> = {
+    config: params.config,
+    totalSites: params.totalSites,
+    maxDensity: params.maxDensity,
+    initialMaxDensity: params.initialMaxDensity,
+    autoScaleMaxGain: params.autoScaleMaxGain,
+    strides: params.strides,
+    needsInit: false,
+    basisX: params.basisX,
+    basisY: params.basisY,
+    basisZ: params.basisZ,
+    boundingRadius: params.boundingRadius,
+    customPotentialScale: params.customPotentialScale,
+    hawkingStepIndex: params.hawkingStepIndex,
+  }
+  for (let step = 0; step <= steps; step++) {
+    packTdseUniformData(params.uniformData, params.uniformU32, params.uniformF32, {
+      ...base,
+      simTime: params.simTime + step * base.config.dt,
+    })
+    params.device.queue.writeBuffer(staging, step * slotSize, params.uniformData)
+  }
+  return staging
 }
 
 /**

@@ -115,6 +115,22 @@ describe('CropBox', () => {
     expect(box).toHaveStyle({ left: '10%', top: '20%', width: '60%', height: '50%' })
   })
 
+  it('sanitizes invalid crop props before writing inline styles', () => {
+    const onCropChange = vi.fn()
+    render(
+      <CropBox
+        containerRef={containerRef}
+        crop={{ x: Number.NaN, y: Infinity, width: -1, height: 0 }}
+        onCropChange={onCropChange}
+      />
+    )
+
+    const box = screen.getByTestId('crop-box')
+    expect(box).toHaveStyle({ left: '0%', top: '0%', width: '100%', height: '100%' })
+    expect(box).not.toHaveAttribute('style', expect.stringContaining('NaN'))
+    expect(box).not.toHaveAttribute('style', expect.stringContaining('Infinity'))
+  })
+
   it('renders all 4 corner resize handles', () => {
     const onCropChange = vi.fn()
     render(<CropBox containerRef={containerRef} crop={defaultCrop} onCropChange={onCropChange} />)
@@ -208,6 +224,28 @@ describe('CropBox', () => {
 
     // No additional calls after pointerup
     expect(onCropChange.mock.calls.length).toBe(callsAfterMove)
+  })
+
+  it('ignores resize movement while container height is zero', async () => {
+    containerDiv.remove()
+    const zeroHeight = makeContainerRef(800, 0)
+    containerRef = zeroHeight.ref
+    containerDiv = zeroHeight.div
+    const onCropChange = vi.fn()
+    render(<CropBox containerRef={containerRef} crop={defaultCrop} onCropChange={onCropChange} />)
+
+    const handle = screen.getByTestId('crop-handle-se')
+    act(() => {
+      handle.dispatchEvent(
+        new PointerEvent('pointerdown', { bubbles: true, clientX: 600, clientY: 400 })
+      )
+    })
+
+    act(() => {
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 650, clientY: 400 }))
+    })
+
+    expect(onCropChange).not.toHaveBeenCalled()
   })
 
   it('north handle resize moves top edge upward', async () => {

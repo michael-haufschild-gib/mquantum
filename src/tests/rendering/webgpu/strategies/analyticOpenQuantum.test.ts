@@ -208,4 +208,41 @@ describe('AnalyticOpenQuantumExecutor — HO state/cache ordering', () => {
     expect(resumed.populations[1]).toBeLessThan(0.1)
     expect(resumed.historyCount).toBe(2)
   })
+
+  it('continues physical evolution on frames where publishing is throttled', () => {
+    const excitedPreset = makePreset(1, [
+      [0, 0],
+      [1, 0],
+    ])
+    const relaxing = {
+      relaxationEnabled: true,
+      relaxationRate: 1,
+      dt: 0.1,
+      substeps: 1,
+    }
+
+    function runFiveFrames(performance?: Parameters<AnalyticOpenQuantumExecutor['execute']>[4]) {
+      useDiagnosticsStore.getState().resetOpenQuantum()
+      const executor = new AnalyticOpenQuantumExecutor()
+      const gridPass = makeGridPass()
+      for (let frame = 0; frame < 5; frame++) {
+        executor.execute(
+          makeContext(relaxing, true),
+          makeShared(excitedPreset),
+          gridPass,
+          1,
+          performance
+        )
+      }
+      return useDiagnosticsStore.getState().openQuantum.populations[0]!
+    }
+
+    const normalCadenceGround = runFiveFrames()
+    const throttledGround = runFiveFrames({ sceneTransitioning: true } as Parameters<
+      AnalyticOpenQuantumExecutor['execute']
+    >[4])
+
+    expect(throttledGround).toBeCloseTo(normalCadenceGround, 6)
+    expect(throttledGround).toBeGreaterThan(0.35)
+  })
 })

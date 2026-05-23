@@ -141,6 +141,16 @@ fn main(
 
 /** Pass 2: Finalize 2-channel partial sums into ⟨W⟩. */
 export const tdseStochasticExpectFinalizeBlock = /* wgsl */ `
+const STOCHASTIC_EXPECT_MAX_SAFE: f32 = 1.0e30;
+
+fn isSafeStochasticScalar(value: f32) -> bool {
+  return abs(value) < STOCHASTIC_EXPECT_MAX_SAFE;
+}
+
+fn isSafeStochasticNorm(value: f32) -> bool {
+  return value > 0.0 && value < STOCHASTIC_EXPECT_MAX_SAFE;
+}
+
 struct ExpectFinalizeUniforms {
   numWorkgroups: u32,
   _pad0: u32,
@@ -186,8 +196,11 @@ fn main(@builtin(local_invocation_id) lid: vec3u) {
   // Compute ⟨W⟩ = Σ(|ψ|²·W) / Σ|ψ|²
   if (local == 0u) {
     let normSq = result[1];
-    if (normSq > 0.0) {
-      result[0] = result[0] / normSq;
+    let weightedMeanNumerator = result[0];
+    if (isSafeStochasticNorm(normSq) && isSafeStochasticScalar(weightedMeanNumerator)) {
+      result[0] = weightedMeanNumerator / normSq;
+    } else {
+      result[0] = 0.0;
     }
   }
 }

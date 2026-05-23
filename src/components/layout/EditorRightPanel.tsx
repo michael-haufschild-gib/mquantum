@@ -8,7 +8,6 @@ import { ExposureSection } from '@/components/sections/Exposure/ExposureSection'
 import { FacesSection } from '@/components/sections/Faces/FacesSection'
 import { Icon } from '@/components/ui/Icon'
 import { Tab, Tabs } from '@/components/ui/Tabs'
-import { useScrollingPanelAttr } from '@/hooks/useScrollingPanelAttr'
 
 /** Object tab content — appearance, exposure, absorption, and advanced rendering. */
 const ObjectTabContent: React.FC = React.memo(() => {
@@ -40,7 +39,6 @@ export const EditorRightPanel: React.FC = React.memo(() => {
   // Default to 'object' tab as per user feedback (primary creative focus)
   const [activeTab, setActiveTab] = useState('object')
   const scrollContentRef = useRef<HTMLDivElement>(null)
-  useScrollingPanelAttr(scrollContentRef)
 
   const tabs: Tab[] = [
     {

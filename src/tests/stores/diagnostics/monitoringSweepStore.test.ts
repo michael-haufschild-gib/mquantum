@@ -153,6 +153,25 @@ describe('useMonitoringSweepStore', () => {
       expect(state.results[0]!.normDrift).toBeCloseTo(0.0015)
     })
 
+    it('does not fold non-finite or negative IPR diagnostics into averages', () => {
+      useMonitoringSweepStore.getState().startSweep(config)
+      useMonitoringSweepStore.getState().tick(1.0, 0.5, 0.01)
+
+      expect(useMonitoringSweepStore.getState().tick(1.2, Number.NaN, 0.01)).toBeNull()
+      expect(
+        useMonitoringSweepStore.getState().tick(1.2, Number.POSITIVE_INFINITY, 0.01)
+      ).toBeNull()
+      expect(useMonitoringSweepStore.getState().tick(1.2, -0.1, 0.01)).toBeNull()
+      expect(useMonitoringSweepStore.getState().tick(1.2, 0.4, Number.NaN)).toBeNull()
+
+      const advance = useMonitoringSweepStore.getState().tick(2.0, 0.3, 0.03)
+      expect(advance).toBeCloseTo(gammaForStep(config, 1))
+      const state = useMonitoringSweepStore.getState()
+      expect(state.results).toHaveLength(1)
+      expect(state.results[0]!.ipr).toBeCloseTo(0.4)
+      expect(state.results[0]!.normDrift).toBeCloseTo(0.02)
+    })
+
     it('completes sweep at last step', () => {
       useMonitoringSweepStore.getState().startSweep(config)
 

@@ -60,6 +60,10 @@ export interface DensityGridResources {
   computeBindGroup: GPUBindGroup
 }
 
+function isStrictTrue(value: unknown): boolean {
+  return value === true
+}
+
 /**
  * Probe whether the device supports a given storage texture format.
  *
@@ -111,8 +115,8 @@ export async function selectGridTextureFormat(
   device: GPUDevice,
   config: DensityGridComputeConfig
 ): Promise<'r16float' | 'rgba16float'> {
-  if (config.useDensityMatrix) return 'rgba16float'
-  if (config.forceRgba) return 'rgba16float'
+  if (isStrictTrue(config.useDensityMatrix)) return 'rgba16float'
+  if (isStrictTrue(config.forceRgba)) return 'rgba16float'
   const r16floatSupported = await supportsStorageTextureFormat(device, 'r16float')
   return r16floatSupported ? 'r16float' : 'rgba16float'
 }
@@ -207,12 +211,15 @@ export function createDensityGridResources(
   const gridParamsBuffer = createUniformBuffer(device, GRID_PARAMS_SIZE, 'density-grid-params')
 
   // Open quantum buffer (density matrix mode): 98 vec4f (rho) + 2 vec4f (metrics) = 1600 bytes
-  const openQuantumBuffer = config.useDensityMatrix
+  const useDensityMatrix = isStrictTrue(config.useDensityMatrix)
+  const useHydrogenBasis = isStrictTrue(config.useHydrogenBasis)
+
+  const openQuantumBuffer = useDensityMatrix
     ? createUniformBuffer(device, 1600, 'density-open-quantum')
     : null
 
   // Hydrogen basis buffer: 39 vec4i + 4 vec4f + 1 vec4u = 704 bytes
-  const hydrogenBasisBuffer = config.useHydrogenBasis
+  const hydrogenBasisBuffer = useHydrogenBasis
     ? createUniformBuffer(device, 704, 'density-hydrogen-basis')
     : null
 
@@ -243,14 +250,14 @@ export function createDensityGridResources(
       },
     },
   ]
-  if (config.useDensityMatrix) {
+  if (useDensityMatrix) {
     layoutEntries.push({
       binding: 4,
       visibility: GPUShaderStage.COMPUTE,
       buffer: { type: 'uniform' as const },
     })
   }
-  if (config.useHydrogenBasis) {
+  if (useHydrogenBasis) {
     layoutEntries.push({
       binding: 5,
       visibility: GPUShaderStage.COMPUTE,
@@ -269,10 +276,10 @@ export function createDensityGridResources(
     { binding: 2, resource: { buffer: gridParamsBuffer } },
     { binding: 3, resource: densityTextureView },
   ]
-  if (config.useDensityMatrix && openQuantumBuffer) {
+  if (useDensityMatrix && openQuantumBuffer) {
     bindGroupEntries.push({ binding: 4, resource: { buffer: openQuantumBuffer } })
   }
-  if (config.useHydrogenBasis && hydrogenBasisBuffer) {
+  if (useHydrogenBasis && hydrogenBasisBuffer) {
     bindGroupEntries.push({ binding: 5, resource: { buffer: hydrogenBasisBuffer } })
   }
   const computeBindGroup = device.createBindGroup({

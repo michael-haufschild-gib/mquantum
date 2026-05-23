@@ -59,10 +59,10 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               data-testid="toast-message"
               data-toast-type={toast.type}
               className={`
-                pointer-events-auto relative overflow-hidden rounded-xl border backdrop-blur-xl shadow-2xl w-[320px]
+                pointer-events-auto relative overflow-hidden rounded-xl border shadow-2xl w-[320px]
                 ${toast.type === 'success' ? 'bg-success-bg border-success-border' : ''}
                 ${toast.type === 'error' ? 'bg-danger-bg border-danger-border' : ''}
-                ${toast.type === 'info' ? 'bg-panel/90 border-border-subtle' : ''}
+                ${toast.type === 'info' ? 'bg-panel border-border-subtle' : ''}
               `}
             >
               <div className="p-4 flex items-start gap-3">

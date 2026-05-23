@@ -134,7 +134,7 @@ export const Section: React.FC<SectionProps> = React.memo(
             data-testid={dataTestId ? `${dataTestId}-header` : undefined}
           >
             <div className="flex items-center gap-3">
-              {/* LED Indicator - static glow, no animation = 0 style recalcs */}
+              {/* LED indicator: static accent, no blur/filter work. */}
               <div className="relative flex items-center justify-center w-2 h-2">
                 {isOpen && <div className="absolute inset-0 rounded-full bg-accent led-glow" />}
                 <div
@@ -207,7 +207,7 @@ export const Section: React.FC<SectionProps> = React.memo(
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 400, damping: 30, mass: 0.8 }}
-              className="overflow-hidden bg-[var(--bg-panel)]/30"
+              className="overflow-hidden bg-panel"
             >
               <div className="px-4 pb-4 pt-2 space-y-5">{children}</div>
             </m.div>

@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  copyCurvedFinalMetricTimeForStep,
   copyCurvedStageTimesForStep,
+  CURVED_FINAL_STAGE_TIME_OFFSET,
   CURVED_MAX_STEPS_PER_FRAME,
+  CURVED_SIM_TIME_OFFSET,
   CURVED_STAGE_TIMES_OFFSET,
   CURVED_STAGE_TIMES_STRIDE,
   type CurvedIntegratorScratch,
@@ -79,5 +82,37 @@ describe('TDSECurvedIntegrator stage-time guards', () => {
     expect(encoder.copyBufferToBuffer.mock.calls[1]?.[1]).toBe(
       (CURVED_MAX_STEPS_PER_FRAME - 1) * CURVED_STAGE_TIMES_STRIDE
     )
+  })
+
+  it('copies the final RK4 stage time into post-step metric-time uniforms', () => {
+    const scratch = makeScratch()
+    const encoder = {
+      copyBufferToBuffer: vi.fn(),
+    } as unknown as GPUCommandEncoder & {
+      copyBufferToBuffer: ReturnType<typeof vi.fn>
+    }
+    const uniformBuffer = {} as GPUBuffer
+
+    copyCurvedFinalMetricTimeForStep(encoder, scratch, uniformBuffer, 9999)
+
+    const finalSourceOffset =
+      (CURVED_MAX_STEPS_PER_FRAME - 1) * CURVED_STAGE_TIMES_STRIDE +
+      3 * Float32Array.BYTES_PER_ELEMENT
+    expect(encoder.copyBufferToBuffer.mock.calls).toEqual([
+      [
+        scratch.stageTimeStagingBuffer,
+        finalSourceOffset,
+        uniformBuffer,
+        CURVED_SIM_TIME_OFFSET,
+        Float32Array.BYTES_PER_ELEMENT,
+      ],
+      [
+        scratch.stageTimeStagingBuffer,
+        finalSourceOffset,
+        uniformBuffer,
+        CURVED_FINAL_STAGE_TIME_OFFSET,
+        Float32Array.BYTES_PER_ELEMENT,
+      ],
+    ])
   })
 })

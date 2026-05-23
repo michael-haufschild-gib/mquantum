@@ -567,7 +567,7 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
     }> = []
     for (const { label, wdw } of cases) {
       const out = solveWheelerDeWitt(wdw)
-      const rates = computeWkbPhaseRates(out.chi, out.gridSize, out.aMin, out.aMax)
+      const rates = computeWkbPhaseRates(out.chi, out.gridSize, out.aMin, out.aMax, out.phiExtent)
       const wkbChamp = findWkbChampion(rates)
 
       const Na = out.gridSize[0]
@@ -693,7 +693,13 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
       const out = solveWheelerDeWitt(wdw)
       const pwRates = computePageWoottersRates(out.chi, out.gridSize)
       const pwChamp = findPageWoottersChampion(pwRates)
-      const wkbRates = computeWkbPhaseRates(out.chi, out.gridSize, out.aMin, out.aMax)
+      const wkbRates = computeWkbPhaseRates(
+        out.chi,
+        out.gridSize,
+        out.aMin,
+        out.aMax,
+        out.phiExtent
+      )
       const wkbChamp = findWkbChampion(wkbRates)
       const Na = out.gridSize[0]
       const Nphi = out.gridSize[1]
@@ -814,7 +820,7 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
         phi2: rp2.qRigid,
       })
       const wkbChamp = findWkbChampion(
-        computeWkbPhaseRates(out.chi, out.gridSize, out.aMin, out.aMax)
+        computeWkbPhaseRates(out.chi, out.gridSize, out.aMin, out.aMax, out.phiExtent)
       )
       const pwChamp = findPageWoottersChampion(computePageWoottersRates(out.chi, out.gridSize))
       const csChamp = findCutStabilityChampion(

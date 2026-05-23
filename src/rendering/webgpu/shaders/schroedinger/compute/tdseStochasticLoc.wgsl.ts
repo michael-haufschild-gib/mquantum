@@ -26,6 +26,8 @@
 
 /** Shared bindings + helpers used by both variants. */
 const TDSE_STOCH_LOC_PRELUDE = /* wgsl */ `
+const STOCHASTIC_LOC_MAX_SAFE: f32 = 1.0e30;
+
 struct StochasticParams {
   gamma: f32,
   sigma: f32,
@@ -55,6 +57,13 @@ fn getCenterCoord(k: u32, d: u32) -> f32 {
 // Helper: read noise value from center k (stored at index 11 within the triplet)
 fn getCenterNoise(k: u32) -> f32 {
   return sParams.centers[k * 3u + 2u][3];
+}
+
+fn safeStochasticMean(value: f32) -> f32 {
+  if (abs(value) < STOCHASTIC_LOC_MAX_SAFE) {
+    return value;
+  }
+  return 0.0;
 }
 `
 
@@ -93,7 +102,8 @@ const TDSE_STOCH_LOC_BODY = /* wgsl */ `
   let noiseField = normFactor * rawSum;
 
   // Centered noise field: removes the density-weighted mean ⟨W⟩.
-  let wCentered = noiseField - expectResult[0];
+  let meanW = safeStochasticMean(expectResult[0]);
+  let wCentered = noiseField - meanW;
 
   // Exponential Milstein discretization with centering:
   //   ψ *= exp(√(γ·dt)·(W − ⟨W⟩) − (γ/2)·(W − ⟨W⟩)²·dt)

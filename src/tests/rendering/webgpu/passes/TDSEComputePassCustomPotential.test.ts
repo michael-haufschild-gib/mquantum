@@ -289,9 +289,9 @@ describe('computePotentialHash — Anderson disorder', () => {
     expect(computePotentialHash(a, FROZEN)).not.toBe(computePotentialHash(b, FROZEN))
   })
 
-  it('`hbar` change is ignored for non-Anderson types (no V(x) dependence)', () => {
-    const a = cfg({ potentialType: 'harmonicTrap', hbar: 1 })
-    const b = cfg({ potentialType: 'harmonicTrap', hbar: 2 })
+  it('`hbar` change is ignored for non-Anderson types when disorder overlay is off', () => {
+    const a = cfg({ potentialType: 'harmonicTrap', disorderStrength: 0, hbar: 1 })
+    const b = cfg({ potentialType: 'harmonicTrap', disorderStrength: 0, hbar: 2 })
     expect(computePotentialHash(a, FROZEN)).toBe(computePotentialHash(b, FROZEN))
   })
 
@@ -299,5 +299,25 @@ describe('computePotentialHash — Anderson disorder', () => {
     const a = cfg({ potentialType: 'andersonDisorder', disorderSeed: 1 })
     const b = cfg({ potentialType: 'andersonDisorder', disorderSeed: 2 })
     expect(computePotentialHash(a, FROZEN)).not.toBe(computePotentialHash(b, FROZEN))
+  })
+
+  it('`hbar` change → hash differs for non-Anderson disorder overlays', () => {
+    const a = cfg({ potentialType: 'barrier', disorderStrength: 3, hbar: 1 })
+    const b = cfg({ potentialType: 'barrier', disorderStrength: 3, hbar: 2 })
+    expect(computePotentialHash(a, FROZEN)).not.toBe(computePotentialHash(b, FROZEN))
+  })
+
+  it('disorder distribution change → hash differs for non-Anderson disorder overlays', () => {
+    const uniform = cfg({
+      potentialType: 'barrier',
+      disorderStrength: 3,
+      disorderDistribution: 'uniform',
+    })
+    const gaussian = cfg({
+      potentialType: 'barrier',
+      disorderStrength: 3,
+      disorderDistribution: 'gaussian',
+    })
+    expect(computePotentialHash(uniform, FROZEN)).not.toBe(computePotentialHash(gaussian, FROZEN))
   })
 })

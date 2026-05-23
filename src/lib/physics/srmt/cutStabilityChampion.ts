@@ -52,6 +52,23 @@ export interface CutStabilityRecord {
   phi2: number
 }
 
+function rankWindowStarts(fullCount: number, rankCap: number, numCuts: number): number[] {
+  const maxStart = Math.max(0, fullCount - rankCap)
+  const requested = Math.max(0, Math.floor(numCuts))
+  const count = Math.min(requested, maxStart + 1)
+  if (count < 2) return []
+
+  const starts: number[] = []
+  for (let i = 0; i < count; i++) {
+    const raw = (i * maxStart) / (count - 1)
+    const start = Math.min(maxStart, Math.max(0, Math.round(raw)))
+    if (starts.length === 0 || start > starts[starts.length - 1]!) {
+      starts.push(start)
+    }
+  }
+  return starts
+}
+
 /**
  * Compute the modular-spectrum cut-instability per clock.
  *
@@ -74,11 +91,11 @@ export function computeCutStability(
   rankCap = 24,
   numCuts = 5
 ): CutStabilityRecord {
-  const [Na, Nphi] = gridSize
+  const [Na, Nphi1, Nphi2] = gridSize
   const dVol = computeVolumeElement({ gridSize, aMin, aMax, phiExtent })
 
   const stabilityAlong = (clock: SrmtClock): number => {
-    const axisLen = clock === 'a' ? Na : Nphi
+    const axisLen = clock === 'a' ? Na : clock === 'phi1' ? Nphi1 : Nphi2
     if (axisLen < 4) return Number.NaN
     // Schmidt decomposition is independent of cut location (the
     // bipartition is determined by the clock axis, not cut index),
@@ -101,15 +118,14 @@ export function computeCutStability(
     const fullCount = Math.min(schmidt.length, rankCap * 2)
     if (fullCount < rankCap + 2) return Number.NaN
 
-    // Build numCuts overlapping rank windows of length rankCap. With
-    // numCuts <= 1 we degenerate to a single window starting at rank
-    // 0; the cross-window distance loop below then returns NaN, which
-    // is the deterministic "insufficient data" signal callers expect.
-    const maxStart = Math.max(0, fullCount - rankCap)
+    // Build unique overlapping rank windows of length rankCap. When
+    // the spectrum barely clears rankCap there may be fewer legal
+    // starts than requested cuts; duplicating adjacent windows would add
+    // zero distances and make low-rank spectra look falsely stable.
+    const starts = rankWindowStarts(fullCount, rankCap, numCuts)
+    if (starts.length < 2) return Number.NaN
     const windows: Float64Array[] = []
-    for (let i = 0; i < numCuts; i++) {
-      const startFloat = numCuts > 1 ? (i * maxStart) / (numCuts - 1) : 0
-      const start = Math.min(maxStart, Math.max(0, Math.floor(startFloat)))
+    for (const start of starts) {
       const trimmed = new Float64Array(rankCap)
       for (let j = 0; j < rankCap; j++) trimmed[j] = schmidt[start + j]!
       const { spectrum } = modularSpectrum(trimmed)

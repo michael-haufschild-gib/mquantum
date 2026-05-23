@@ -11,6 +11,7 @@ import { logger } from '@/lib/logger'
 import { useScreenshotStore } from '@/stores/runtime/screenshotStore'
 
 import { CropBox, CropValues } from './CropBox'
+import { resolveCropPixels } from './screenshotCrop'
 
 export const ScreenshotModal = () => {
   const { isOpen, imageSrc, closeModal } = useScreenshotStore(
@@ -46,14 +47,25 @@ export const ScreenshotModal = () => {
           return
         }
 
-        const pixelX = Math.round(crop.x * img.naturalWidth)
-        const pixelY = Math.round(crop.y * img.naturalHeight)
-        const pixelWidth = Math.round(crop.width * img.naturalWidth)
-        const pixelHeight = Math.round(crop.height * img.naturalHeight)
+        const cropPixels = resolveCropPixels(crop, img.naturalWidth, img.naturalHeight)
+        if (!cropPixels) {
+          resolve(null)
+          return
+        }
 
-        canvas.width = pixelWidth
-        canvas.height = pixelHeight
-        ctx.drawImage(img, pixelX, pixelY, pixelWidth, pixelHeight, 0, 0, pixelWidth, pixelHeight)
+        canvas.width = cropPixels.width
+        canvas.height = cropPixels.height
+        ctx.drawImage(
+          img,
+          cropPixels.x,
+          cropPixels.y,
+          cropPixels.width,
+          cropPixels.height,
+          0,
+          0,
+          cropPixels.width,
+          cropPixels.height
+        )
 
         canvas.toBlob((blob) => resolve(blob), 'image/png')
       }

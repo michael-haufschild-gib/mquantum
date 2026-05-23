@@ -28,12 +28,12 @@ const baseStyles =
   'relative overflow-hidden font-medium rounded-lg focus:outline-none focus:ring-1 focus:ring-accent/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors gap-2'
 
 const variantStyles = {
-  primary: 'glass-button-primary text-white',
-  secondary: 'glass-button text-text-primary',
+  primary: 'surface-button-primary text-white',
+  secondary: 'surface-button text-text-primary',
   ghost:
     'bg-transparent text-text-secondary hover:text-text-primary hover:bg-[var(--bg-hover)] border border-transparent hover:border-[var(--bg-hover)]',
   danger:
-    'bg-[var(--bg-danger)] text-[var(--text-danger)] border border-[var(--border-danger)] hover:bg-[var(--bg-danger)] hover:brightness-110 shadow-[0_0_15px_var(--bg-danger)]',
+    'bg-[var(--bg-danger)] text-[var(--text-danger)] border border-[var(--border-danger)] hover:bg-danger-solid hover:text-text-inverse shadow-[0_0_15px_var(--bg-danger)]',
 } as const
 
 const sizeStyles = {
@@ -124,7 +124,7 @@ export const Button: React.FC<ButtonProps> = React.memo(
     )
 
     const whileHoverAnimation = useMemo(
-      () => (!disabled && !loading ? { scale: 1.02, filter: 'brightness(1.1)' } : undefined),
+      () => (!disabled && !loading ? { scale: 1.02 } : undefined),
       [disabled, loading]
     )
 
@@ -149,7 +149,7 @@ export const Button: React.FC<ButtonProps> = React.memo(
       >
         {/* Loading State Overlay */}
         {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-inherit backdrop-blur-[1px] z-20">
+          <div className="absolute inset-0 flex items-center justify-center bg-inherit z-20">
             <LoadingSpinner size={size === 'sm' ? 12 : 16} />
           </div>
         )}

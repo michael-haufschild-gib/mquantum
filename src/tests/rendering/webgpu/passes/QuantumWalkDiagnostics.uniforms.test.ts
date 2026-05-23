@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { WebGPURenderContext } from '@/rendering/webgpu/core/types'
 import { QwDiagnostics } from '@/rendering/webgpu/passes/QuantumWalkDiagnostics'
+import { qwDiagReduceBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/qwDiagnostics.wgsl'
 
 type QwDiagnosticsHarness = {
   reducePipeline: GPUComputePipeline
@@ -12,6 +13,8 @@ type QwDiagnosticsHarness = {
   partialPosSqSumBuffer: GPUBuffer
   resultBuffer: GPUBuffer
   stagingBuffer: GPUBuffer
+  epoch: number
+  reset(): void
   dispatch(
     ctx: WebGPURenderContext,
     coinStateA: GPUBuffer,
@@ -32,6 +35,21 @@ function createPassEncoder(): GPUComputePassEncoder {
 }
 
 describe('QwDiagnostics uniform upload reuse', () => {
+  it('matches shift-kernel non-power-of-two stride semantics for position moments', () => {
+    expect(qwDiagReduceBlock).toContain('let safeStride0 = max(diagParams.stride0, 1u)')
+    expect(qwDiagReduceBlock).toContain('site / safeStride0')
+    expect(qwDiagReduceBlock).not.toContain('let coord0 = f32(site >> logS0);')
+  })
+
+  it('invalidates in-flight readbacks when diagnostics reset for a fresh walk', () => {
+    const diag = new QwDiagnostics() as unknown as QwDiagnosticsHarness
+    const epochBeforeReset = diag.epoch
+
+    diag.reset()
+
+    expect(diag.epoch).toBe(epochBeforeReset + 1)
+  })
+
   it('reuses and clears the diagnostic uniform upload array', () => {
     const diag = new QwDiagnostics() as unknown as QwDiagnosticsHarness
     const pipeline = {

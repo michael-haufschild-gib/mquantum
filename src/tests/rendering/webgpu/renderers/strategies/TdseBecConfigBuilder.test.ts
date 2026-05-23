@@ -262,6 +262,20 @@ describe('buildBecConfig — lattice passthrough', () => {
     expect(config.harmonicOmega).toBe(0)
     expect(config.harmonicOmegaInit).toBeUndefined()
   })
+
+  it('seeds mass-aware Thomas-Fermi μ for the shader trap potential', () => {
+    const { config: unitMass } = buildBecConfig(
+      minimalBec({ mass: 1.0, initialCondition: 'thomasFermi' }),
+      undefined
+    )
+    const { config: heavyMass } = buildBecConfig(
+      minimalBec({ mass: 4.0, initialCondition: 'thomasFermi' }),
+      undefined
+    )
+
+    expect(heavyMass.mass).toBe(4.0)
+    expect(heavyMass.packetAmplitude / unitMass.packetAmplitude).toBeCloseTo(Math.pow(4, 3 / 5), 6)
+  })
 })
 
 describe('buildBecConfig — malformed BEC ingress', () => {

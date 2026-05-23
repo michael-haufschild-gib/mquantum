@@ -40,7 +40,7 @@ const STRIPE_CLASS: Record<NonNullable<PanelHeaderProps['variant']>, string> = {
 export const PanelHeader: React.FC<PanelHeaderProps> = React.memo(
   ({ title, subtitle, variant = 'accent', rightSlot }) => {
     return (
-      <div className="px-4 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-panel)] backdrop-blur-sm z-10 shrink-0 flex items-center gap-2">
+      <div className="px-4 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-panel)] z-10 shrink-0 flex items-center gap-2">
         <span
           className={`inline-block w-1 h-3.5 rounded-sm shrink-0 ${STRIPE_CLASS[variant]}`}
           aria-hidden

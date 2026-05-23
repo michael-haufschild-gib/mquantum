@@ -132,16 +132,23 @@ describe('computeLevelSpacing', () => {
 })
 
 describe('classifyLocalization', () => {
-  it('classifies extended states (low IPR × N)', () => {
-    expect(classifyLocalization(1 / 1000, 1000)).toBe('extended')
+  it('classifies extended states (participation-count IPR near N)', () => {
+    expect(classifyLocalization(900, 1000)).toBe('extended')
   })
 
-  it('classifies localized states (high IPR × N)', () => {
-    expect(classifyLocalization(0.5, 100)).toBe('localized')
+  it('classifies localized states (participation-count IPR near 1)', () => {
+    expect(classifyLocalization(2, 1000)).toBe('localized')
   })
 
-  it('classifies critical states (intermediate IPR × N)', () => {
-    expect(classifyLocalization(5 / 1000, 1000)).toBe('critical')
+  it('classifies critical states (intermediate participation-count fraction)', () => {
+    expect(classifyLocalization(200, 1000)).toBe('critical')
+  })
+
+  it('uses thresholds reciprocal to the legacy Σp² convention', () => {
+    expect(classifyLocalization(1000 / 3, 1000)).toBe('critical')
+    expect(classifyLocalization(1000 / 3 + 1e-9, 1000)).toBe('extended')
+    expect(classifyLocalization(100, 1000)).toBe('critical')
+    expect(classifyLocalization(100 - 1e-9, 1000)).toBe('localized')
   })
 
   it('handles NaN IPR as critical', () => {

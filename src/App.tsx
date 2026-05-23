@@ -241,7 +241,7 @@ function AppContent() {
                 <span className="text-text-primary font-medium">WebGPU</span> for real-time quantum
                 wavefunction rendering. Your browser does not support WebGPU.
               </p>
-              <div className="glass-panel border border-border-default rounded-lg p-4 text-left space-y-2">
+              <div className="surface-panel border border-border-default rounded-lg p-4 text-left space-y-2">
                 <p className="text-xs font-semibold text-text-primary">Supported browsers:</p>
                 <ul className="text-xs text-text-tertiary space-y-1">
                   <li>Chrome 113+ (desktop &amp; Android)</li>

@@ -103,10 +103,10 @@ export function applyModeOverrides(config?: SchrodingerRendererConfig): Schrodin
       : result.isBellPair
         ? 'bellTest'
         : result.quantumMode
-    const minDim = modeKey ? (getQuantumTypeEntry(modeKey)?.dimensions.min ?? 3) : 3
-    if ((result.dimension ?? 3) < minDim) {
-      result.dimension = minDim
-    }
+    const dimensions = modeKey ? getQuantumTypeEntry(modeKey)?.dimensions : undefined
+    const minDim = dimensions?.min ?? 3
+    const maxDim = dimensions?.max ?? result.dimension ?? minDim
+    result.dimension = Math.max(minDim, Math.min(maxDim, result.dimension ?? 3))
   }
 
   const surfaceObjectType: 'schroedinger' | 'pauliSpinor' | 'bellPair' = result.isPauli

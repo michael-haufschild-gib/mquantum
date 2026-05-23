@@ -372,6 +372,7 @@ ${bayerJitterSection}
           0.9
         );
         col = mix(col, nodalColor * nodalLight, nodalMix);
+        hitT = nodalHit.t;
       }
     }
   }

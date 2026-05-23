@@ -9,6 +9,22 @@
  * - Copy: zero-gain fast path passthrough
  */
 
+const bloomRadianceSanitizer = /* wgsl */ `
+const BLOOM_MAX_RADIANCE: f32 = 65504.0;
+
+fn sanitizeBloomRadiance(color: vec3f) -> vec3f {
+  let nonNan = select(vec3f(0.0), color, color == color);
+  return clamp(nonNan, vec3f(0.0), vec3f(BLOOM_MAX_RADIANCE));
+}
+`
+
+const bloomAlphaSanitizer = /* wgsl */ `
+fn sanitizeBloomAlpha(alpha: f32) -> f32 {
+  let nonNan = select(0.0, alpha, alpha == alpha);
+  return clamp(nonNan, 0.0, 1.0);
+}
+`
+
 /**
  * Prefilter shader: luminance-based threshold with Karis average.
  *
@@ -35,12 +51,15 @@ struct VertexOutput {
   @location(0) uv: vec2f,
 }
 
+${bloomRadianceSanitizer}
+${bloomAlphaSanitizer}
+
 fn luminance(c: vec3f) -> f32 {
   return dot(c, vec3f(0.2126, 0.7152, 0.0722));
 }
 
 fn softThreshold(color: vec3f, threshold: f32, knee: f32) -> vec3f {
-  let radiance = max(color, vec3f(0.0));
+  let radiance = sanitizeBloomRadiance(color);
   let luma = luminance(radiance);
   let safeKnee = max(knee, 0.0001);
   // PERF: cache luma - threshold (used for both the soft window and the
@@ -56,7 +75,7 @@ fn softThreshold(color: vec3f, threshold: f32, knee: f32) -> vec3f {
 fn extractBloomSample(colorSample: vec4f, threshold: f32, knee: f32) -> vec3f {
   // object-color is premultiplied-alpha. Threshold in straight color space
   // and then re-apply alpha so transparent edge pixels don't leak bloom rings.
-  let alpha = clamp(colorSample.a, 0.0, 1.0);
+  let alpha = sanitizeBloomAlpha(colorSample.a);
   if (alpha <= 0.0001) {
     return vec3f(0.0);
   }
@@ -64,7 +83,7 @@ fn extractBloomSample(colorSample: vec4f, threshold: f32, knee: f32) -> vec3f {
   // vec3/f32 becomes 3 divisions; reciprocal + scalar-mul is 1 div + 3 muls.
   // Division is 10-40× slower than multiply on GPU ALUs.
   let invAlpha = 1.0 / alpha;
-  let straightColor = colorSample.rgb * invAlpha;
+  let straightColor = sanitizeBloomRadiance(colorSample.rgb * invAlpha);
   let thresholded = softThreshold(straightColor, threshold, knee);
   return thresholded * alpha;
 }
@@ -112,6 +131,8 @@ struct VertexOutput {
   @location(0) uv: vec2f,
 }
 
+${bloomRadianceSanitizer}
+
 @fragment
 fn main(input: VertexOutput) -> @location(0) vec4f {
   let dims = vec2f(textureDimensions(tInput));
@@ -130,19 +151,19 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   //   corner blocks = 0.03125 each (×4 per block × 4 blocks = 0.5)
   //   Total = 1.0
 
-  let a = textureSample(tInput, linearSampler, uv + texelSize * vec2f(-2.0, -2.0)).rgb;
-  let b = textureSample(tInput, linearSampler, uv + texelSize * vec2f( 0.0, -2.0)).rgb;
-  let c = textureSample(tInput, linearSampler, uv + texelSize * vec2f( 2.0, -2.0)).rgb;
-  let d = textureSample(tInput, linearSampler, uv + texelSize * vec2f(-1.0, -1.0)).rgb;
-  let e = textureSample(tInput, linearSampler, uv + texelSize * vec2f( 1.0, -1.0)).rgb;
-  let f = textureSample(tInput, linearSampler, uv + texelSize * vec2f(-2.0,  0.0)).rgb;
-  let g = textureSample(tInput, linearSampler, uv).rgb;
-  let h = textureSample(tInput, linearSampler, uv + texelSize * vec2f( 2.0,  0.0)).rgb;
-  let i = textureSample(tInput, linearSampler, uv + texelSize * vec2f(-1.0,  1.0)).rgb;
-  let j = textureSample(tInput, linearSampler, uv + texelSize * vec2f( 1.0,  1.0)).rgb;
-  let k = textureSample(tInput, linearSampler, uv + texelSize * vec2f(-2.0,  2.0)).rgb;
-  let l = textureSample(tInput, linearSampler, uv + texelSize * vec2f( 0.0,  2.0)).rgb;
-  let m = textureSample(tInput, linearSampler, uv + texelSize * vec2f( 2.0,  2.0)).rgb;
+  let a = sanitizeBloomRadiance(textureSample(tInput, linearSampler, uv + texelSize * vec2f(-2.0, -2.0)).rgb);
+  let b = sanitizeBloomRadiance(textureSample(tInput, linearSampler, uv + texelSize * vec2f( 0.0, -2.0)).rgb);
+  let c = sanitizeBloomRadiance(textureSample(tInput, linearSampler, uv + texelSize * vec2f( 2.0, -2.0)).rgb);
+  let d = sanitizeBloomRadiance(textureSample(tInput, linearSampler, uv + texelSize * vec2f(-1.0, -1.0)).rgb);
+  let e = sanitizeBloomRadiance(textureSample(tInput, linearSampler, uv + texelSize * vec2f( 1.0, -1.0)).rgb);
+  let f = sanitizeBloomRadiance(textureSample(tInput, linearSampler, uv + texelSize * vec2f(-2.0,  0.0)).rgb);
+  let g = sanitizeBloomRadiance(textureSample(tInput, linearSampler, uv).rgb);
+  let h = sanitizeBloomRadiance(textureSample(tInput, linearSampler, uv + texelSize * vec2f( 2.0,  0.0)).rgb);
+  let i = sanitizeBloomRadiance(textureSample(tInput, linearSampler, uv + texelSize * vec2f(-1.0,  1.0)).rgb);
+  let j = sanitizeBloomRadiance(textureSample(tInput, linearSampler, uv + texelSize * vec2f( 1.0,  1.0)).rgb);
+  let k = sanitizeBloomRadiance(textureSample(tInput, linearSampler, uv + texelSize * vec2f(-2.0,  2.0)).rgb);
+  let l = sanitizeBloomRadiance(textureSample(tInput, linearSampler, uv + texelSize * vec2f( 0.0,  2.0)).rgb);
+  let m = sanitizeBloomRadiance(textureSample(tInput, linearSampler, uv + texelSize * vec2f( 2.0,  2.0)).rgb);
 
   // Regrouped by final weight (mathematically identical to the 5-block form):
   //   corner taps (a,c,k,m) each appear in 1 block  → weight 0.03125
@@ -184,6 +205,8 @@ struct VertexOutput {
   @location(0) uv: vec2f,
 }
 
+${bloomRadianceSanitizer}
+
 @fragment
 fn main(input: VertexOutput) -> @location(0) vec4f {
   let dims = vec2f(textureDimensions(tLowerMip));
@@ -192,15 +215,15 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
 
   // 9-tap tent filter: corners 1/16, edges 2/16, center 4/16
   // Regrouped so weight multiplies happen after summation (saves 2 vec3 muls per pixel).
-  let tl = textureSample(tLowerMip, linearSampler, uv + vec2f(-texelSize.x, -texelSize.y)).rgb;
-  let top = textureSample(tLowerMip, linearSampler, uv + vec2f( 0.0,           -texelSize.y)).rgb;
-  let tr = textureSample(tLowerMip, linearSampler, uv + vec2f( texelSize.x,   -texelSize.y)).rgb;
-  let left = textureSample(tLowerMip, linearSampler, uv + vec2f(-texelSize.x,    0.0)).rgb;
-  let center = textureSample(tLowerMip, linearSampler, uv).rgb;
-  let right = textureSample(tLowerMip, linearSampler, uv + vec2f( texelSize.x,    0.0)).rgb;
-  let bl = textureSample(tLowerMip, linearSampler, uv + vec2f(-texelSize.x,    texelSize.y)).rgb;
-  let bot = textureSample(tLowerMip, linearSampler, uv + vec2f( 0.0,            texelSize.y)).rgb;
-  let br = textureSample(tLowerMip, linearSampler, uv + vec2f( texelSize.x,    texelSize.y)).rgb;
+  let tl = sanitizeBloomRadiance(textureSample(tLowerMip, linearSampler, uv + vec2f(-texelSize.x, -texelSize.y)).rgb);
+  let top = sanitizeBloomRadiance(textureSample(tLowerMip, linearSampler, uv + vec2f( 0.0,           -texelSize.y)).rgb);
+  let tr = sanitizeBloomRadiance(textureSample(tLowerMip, linearSampler, uv + vec2f( texelSize.x,   -texelSize.y)).rgb);
+  let left = sanitizeBloomRadiance(textureSample(tLowerMip, linearSampler, uv + vec2f(-texelSize.x,    0.0)).rgb);
+  let center = sanitizeBloomRadiance(textureSample(tLowerMip, linearSampler, uv).rgb);
+  let right = sanitizeBloomRadiance(textureSample(tLowerMip, linearSampler, uv + vec2f( texelSize.x,    0.0)).rgb);
+  let bl = sanitizeBloomRadiance(textureSample(tLowerMip, linearSampler, uv + vec2f(-texelSize.x,    texelSize.y)).rgb);
+  let bot = sanitizeBloomRadiance(textureSample(tLowerMip, linearSampler, uv + vec2f( 0.0,            texelSize.y)).rgb);
+  let br = sanitizeBloomRadiance(textureSample(tLowerMip, linearSampler, uv + vec2f( texelSize.x,    texelSize.y)).rgb);
   let corners = tl + tr + bl + br;
   let edges = top + left + right + bot;
   var bloom = (corners + edges * 2.0 + center * 4.0) * (1.0 / 16.0);
@@ -235,10 +258,12 @@ struct VertexOutput {
   @location(0) uv: vec2f,
 }
 
+${bloomRadianceSanitizer}
+
 @fragment
 fn main(input: VertexOutput) -> @location(0) vec4f {
   let sceneColor = textureSample(tScene, linearSampler, input.uv).rgb;
-  let bloomColor = textureSample(tBloom, linearSampler, input.uv).rgb;
+  let bloomColor = sanitizeBloomRadiance(textureSample(tBloom, linearSampler, input.uv).rgb);
   return vec4f(sceneColor + uniforms.bloomGain * bloomColor, 1.0);
 }
 `

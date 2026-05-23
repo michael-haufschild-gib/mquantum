@@ -5,7 +5,7 @@
  * letting users know the app is working rather than frozen.
  *
  * Design:
- * - Semi-transparent backdrop with blur (doesn't fully block view)
+ * - Lightweight backdrop that doesn't fully block view
  * - Glass-panel card with spinner and message
  * - Smooth entrance/exit animations
  * - Centered on screen for visibility
@@ -126,7 +126,7 @@ export const ShaderCompilationOverlay: React.FC = () => {
         >
           {/* Subtle backdrop - doesn't fully block the view */}
           <m.div
-            className="absolute inset-0 bg-[var(--bg-active)] backdrop-blur-[2px]"
+            className="absolute inset-0 bg-[var(--bg-active)]"
             aria-hidden="true"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -138,7 +138,7 @@ export const ShaderCompilationOverlay: React.FC = () => {
 
           {/* Content card - centered */}
           <m.div
-            className="relative z-10 px-6 py-4 rounded-xl glass-panel flex items-center gap-4 shadow-lg"
+            className="relative z-10 px-6 py-4 rounded-xl surface-panel flex items-center gap-4 shadow-lg"
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}

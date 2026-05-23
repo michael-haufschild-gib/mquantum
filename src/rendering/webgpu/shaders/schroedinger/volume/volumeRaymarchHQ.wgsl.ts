@@ -91,8 +91,10 @@ fn volumeRaymarch(
     gradCache.valid = false;
 
     // PERFORMANCE: Gaussian envelope early-skip for deep tail region.
-    // Disabled for free scalar (cubic lattice, no radial Gaussian decay).
-    if (!IS_FREE_SCALAR) {
+    // Disabled for free scalar (cubic lattice, no radial Gaussian decay) and
+    // radial-probability shells, whose normalized P(r) overlay can remain
+    // intentionally visible in low-density outer lobes.
+    if (!IS_FREE_SCALAR && !radialProbEnabled) {
       let r2 = dot(pos, pos);
       if (r2 > boundR2Skip) {
         // 8× step in tail shell: at r>0.92R, HO/hydrogen ρ is exponentially small.

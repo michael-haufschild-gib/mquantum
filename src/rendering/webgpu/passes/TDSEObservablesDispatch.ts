@@ -3,7 +3,10 @@
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { computeTdseEffectiveSpacing } from '@/lib/physics/tdse/effectiveSpacing'
 import { normalizeMetricForLattice } from '@/lib/physics/tdse/metrics/types'
-import { NUM_ENERGY_BINS } from '@/rendering/webgpu/shaders/schroedinger/compute/energySpectralDensity.wgsl'
+import {
+  ENERGY_SPECTRUM_FIXED_SCALE,
+  NUM_ENERGY_BINS,
+} from '@/rendering/webgpu/shaders/schroedinger/compute/energySpectralDensity.wgsl'
 import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
 import { DIAG_DECIMATION } from './computePassUtils'
@@ -211,10 +214,17 @@ export function writeObservablesUniforms(
   const esF32 = new Float32Array(esBuf)
   esU32[0] = totalSites
   esU32[1] = NUM_ENERGY_BINS
-  // Auto-compute energy range from lattice: E_max = ℏ²/(2m) * (π/a_min)² * D
-  const aMin = Math.min(...Array.from({ length: latticeDim }, (_, d) => spacingAt(d)))
-  const kMax = Math.PI / aMin
-  const eMaxAuto = (hbar * hbar * kMax * kMax * latticeDim) / (2 * mass)
+  // Auto-compute energy range from the actual discrete per-axis FFT vector:
+  // E_max = ℏ²/(2m) * Σ_d (floor(N_d/2) * 2π/(N_d a_d))². Using
+  // D*(π/a_min)² over-bins anisotropic lattices, and using continuum π/a
+  // diverges from the shader for odd/non-power-of-two recovery paths.
+  let kMaxSq = 0
+  for (let d = 0; d < latticeDim; d++) {
+    const n = gridAt(d)
+    const kMaxD = ((2 * Math.PI) / (n * spacingAt(d))) * Math.floor(n / 2)
+    kMaxSq += kMaxD * kMaxD
+  }
+  const eMaxAuto = (hbar * hbar * kMaxSq) / (2 * mass)
   esF32[2] = 0 // eMin
   esF32[3] = eMaxAuto // eMax
   esF32[4] = hbar
@@ -306,7 +316,7 @@ export function dispatchObservablesReadback(
           const esRaw = new Uint32Array(esStaging.getMappedRange())
           const spectrum = new Float32Array(NUM_ENERGY_BINS)
           for (let i = 0; i < NUM_ENERGY_BINS; i++) {
-            spectrum[i] = (esRaw[i] ?? 0) / 1048576.0
+            spectrum[i] = (esRaw[i] ?? 0) / ENERGY_SPECTRUM_FIXED_SCALE
           }
           esStaging.unmap()
 

@@ -24,6 +24,11 @@ export interface TdseRenderingOverrides {
 
 /** A named TDSE scenario preset with config overrides applied on selection. */
 export interface TdseScenarioPreset extends ScenarioPreset<TdsePresetOverride> {
+  /**
+   * Highest global scene dimension this preset can be applied to without
+   * changing the physics described by its name/description.
+   */
+  maxDim?: number
   /** Parent-level rendering overrides applied alongside TdseConfig overrides. */
   renderingOverrides?: TdseRenderingOverrides
 }

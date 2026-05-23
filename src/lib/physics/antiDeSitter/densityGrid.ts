@@ -659,16 +659,25 @@ export function packHkllReconstructedDensityGrid(
   // rho² field, so density and phase stay self-consistent across nodal
   // surfaces (both go to zero together, no sparkly/random phase angle).
   for (let z = 0; z < N; z++) {
+    const wz = ((z + 0.5) / N) * 2 - 1
     const fz = ((z + 0.5) / N) * C - 0.5
     const iz0 = Math.max(0, Math.min(C - 1, Math.floor(fz)))
     const iz1 = Math.max(0, Math.min(C - 1, iz0 + 1))
     const tz = Math.max(0, Math.min(1, fz - iz0))
     for (let y = 0; y < N; y++) {
+      const wy = ((y + 0.5) / N) * 2 - 1
       const fy = ((y + 0.5) / N) * C - 0.5
       const iy0 = Math.max(0, Math.min(C - 1, Math.floor(fy)))
       const iy1 = Math.max(0, Math.min(C - 1, iy0 + 1))
       const ty = Math.max(0, Math.min(1, fy - iy0))
       for (let x = 0; x < N; x++) {
+        const wx = ((x + 0.5) / N) * 2 - 1
+        const outIdx = (z * N + y) * N + x
+        if (wx * wx + wy * wy + wz * wz >= 1) {
+          packRGBA16F(density, outIdx, 0, Math.log(1e-10), 0, 0)
+          continue
+        }
+
         const fx = ((x + 0.5) / N) * C - 0.5
         const ix0 = Math.max(0, Math.min(C - 1, Math.floor(fx)))
         const ix1 = Math.max(0, Math.min(C - 1, ix0 + 1))
@@ -677,7 +686,6 @@ export function packHkllReconstructedDensityGrid(
         const re = trilinear(reField, C, ix0, iy0, iz0, ix1, iy1, iz1, tx, ty, tz)
         const im = trilinear(imField, C, ix0, iy0, iz0, ix1, iy1, iz1, tx, ty, tz)
         const rho2 = re * re + im * im
-        const outIdx = (z * N + y) * N + x
 
         const r = clamp01(rho2 * peakNorm)
         const logRho = Math.log(rho2 + 1e-10)

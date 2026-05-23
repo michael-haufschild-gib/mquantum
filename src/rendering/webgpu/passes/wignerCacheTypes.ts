@@ -93,6 +93,14 @@ export function buildCrossPairMap(termCount: number): {
   crossPairs: CrossPairInfo[]
   numCrossLayers: number
 } {
+  if (!Number.isSafeInteger(termCount) || termCount < 1 || termCount > MAX_WIGNER_TERM_COUNT) {
+    throw new Error(
+      `buildCrossPairMap: termCount=${termCount} exceeds MAX_WIGNER_TERM_COUNT=` +
+        `${MAX_WIGNER_TERM_COUNT}. Update the Wigner WGSL cross-term uniform layouts before ` +
+        `supporting larger superpositions.`
+    )
+  }
+
   const crossPairs: CrossPairInfo[] = []
   let pairIdx = 0
 

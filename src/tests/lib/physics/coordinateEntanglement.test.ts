@@ -16,6 +16,7 @@ import {
   computeReducedDensityMatrix,
   hermitianEigenvalues,
   isCoordinateEntanglementMetricSupported,
+  MAX_RDM_SIZE,
   vonNeumannEntropy,
 } from '@/lib/physics/coordinateEntanglement'
 
@@ -324,6 +325,41 @@ describe('hermitianEigenvalues', () => {
 // ─── Full Pipeline Tests ────────────────────────────────────────────────────
 
 describe('computeCoordinateEntanglement', () => {
+  it('zero-norm input is not reported as a separable low-entanglement state', () => {
+    const result = computeCoordinateEntanglement(
+      new Float32Array(16),
+      new Float32Array(16),
+      [4, 4],
+      {
+        computePairwiseMI: false,
+        computeBipartitions: false,
+        computeWignerNegativity: false,
+      }
+    )
+
+    expect(result.entropies).toEqual([null, null])
+    expect(Number.isNaN(result.averageEntropy)).toBe(true)
+    expect(Number.isNaN(result.normalizedEntropy)).toBe(true)
+    expect(result.spectrum).toEqual([])
+  })
+
+  it('returns a non-finite aggregate when every dimension exceeds the RDM cap', () => {
+    const M = MAX_RDM_SIZE + 1
+    const re = new Float32Array(M * M)
+    const im = new Float32Array(M * M)
+    re[0] = 1
+
+    const result = computeCoordinateEntanglement(re, im, [M, M], {
+      computePairwiseMI: false,
+      computeBipartitions: false,
+      computeWignerNegativity: false,
+    })
+
+    expect(result.entropies).toEqual([null, null])
+    expect(Number.isNaN(result.averageEntropy)).toBe(true)
+    expect(Number.isNaN(result.normalizedEntropy)).toBe(true)
+  })
+
   it('product state produces S≈0 for all dimensions', () => {
     const M = 8
     const g1 = gaussianFactor(M, M / 2, 1.5)
@@ -390,6 +426,32 @@ describe('computeCoordinateEntanglement', () => {
     // Sum to 1
     const sum = result.spectrum.reduce((a, b) => a + b, 0)
     expect(sum).toBeCloseTo(1.0, 6)
+  })
+
+  it('computes Wigner negativity for non-power-of-two grid dimensions', () => {
+    const gridSize = [3, 5]
+    const totalSites = gridSize[0]! * gridSize[1]!
+    const re = new Float32Array(totalSites)
+    const im = new Float32Array(totalSites)
+    for (let i = 0; i < totalSites; i++) {
+      re[i] = Math.sin(i * 1.7 + 0.2)
+      im[i] = Math.cos(i * 2.3 + 0.4)
+    }
+    normalize(re, im)
+
+    const result = computeCoordinateEntanglement(re, im, gridSize, {
+      computePairwiseMI: false,
+      computeBipartitions: false,
+      computeWignerNegativity: true,
+    })
+
+    expect(result.wignerNegativities).toHaveLength(2)
+    for (const neg of result.wignerNegativities) {
+      if (neg === null) throw new Error('Expected finite Wigner negativity')
+      expect(Number.isFinite(neg)).toBe(true)
+      expect(neg).toBeGreaterThanOrEqual(0)
+    }
+    expect(Number.isFinite(result.averageWignerNegativity)).toBe(true)
   })
 
   it('bipartition entropy computed for 3D with small grid', () => {

@@ -31,11 +31,20 @@ const DIAG_UNIFORM_SIZE = 32
 export function estimateInitialDensity(config: TdseConfig): number {
   const initStr = config.initialCondition as string
   const isBecInit =
-    initStr === 'thomasFermi' || initStr === 'vortexImprint' || initStr === 'darkSoliton'
+    initStr === 'thomasFermi' ||
+    initStr === 'vortexImprint' ||
+    initStr === 'vortexLattice' ||
+    initStr === 'darkSoliton' ||
+    initStr === 'ndVortexPair'
   if (isBecInit) {
     const mu = config.packetAmplitude
     const g = Math.abs(config.interactionStrength ?? 1)
     return g > 1e-10 ? mu / g : mu * mu
+  }
+  if (initStr === 'blackHoleAnalog') {
+    const mu = config.packetAmplitude
+    const g = config.interactionStrength ?? 1
+    return g > 1e-10 ? mu / g : 0
   }
   if (config.initialCondition === 'superposition') {
     return config.packetAmplitude * config.packetAmplitude * 0.5

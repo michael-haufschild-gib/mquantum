@@ -58,8 +58,12 @@ fn tdseDiagWorldCoords(idx: u32) -> array<f32, 12> {
   return world;
 }
 
-fn tdseDiagVolumeWeight(idx: u32) -> f32 {
-  if (params.metricKind == 0u || params.metricKind == 6u) { return 1.0; }
+fn tdseDiagCellMeasure(idx: u32) -> f32 {
+  var dV: f32 = 1.0;
+  for (var d: u32 = 0u; d < params.latticeDim; d = d + 1u) {
+    dV *= params.spacing[d];
+  }
+  if (params.metricKind == 0u || params.metricKind == 6u) { return dV; }
   let coords = tdseDiagWorldCoords(idx);
   let metricTime = select(params.simTime, params.stageTimeK4, params.metricKind == 3u);
   // tdseCurvatureSqrtDet is finite-positive by construction: every metric
@@ -71,7 +75,7 @@ fn tdseDiagVolumeWeight(idx: u32) -> f32 {
   // floor against rare driver fast-math negative-zero artifacts; WGSL does
   // not guarantee NaN propagation through max, and isFinite is unavailable
   // for f32, so NaN/Inf prevention is enforced upstream.
-  return max(tdseCurvatureSqrtDet(coords, params.latticeDim, metricTime), 0.0);
+  return max(tdseCurvatureSqrtDet(coords, params.latticeDim, metricTime), 0.0) * dV;
 }
 
 @compute @workgroup_size(256)
@@ -86,15 +90,15 @@ fn main(
   // Load: each thread computes |psi|^2 for one site
   var val: f32 = 0.0;
   var density: f32 = 0.0;
-  var volumeWeight: f32 = 1.0;
+  var cellMeasure: f32 = 1.0;
   var isLeft: bool = true;
   if (idx < diagParams.totalSites) {
     let z = psi[idx];
     let re = z.x;
     let im = z.y;
     density = re * re + im * im;
-    volumeWeight = tdseDiagVolumeWeight(idx);
-    val = density * volumeWeight;
+    cellMeasure = tdseDiagCellMeasure(idx);
+    val = density * cellMeasure;
 
     // Axis-0 coordinate from linear index. stride0 and gridSize0 are always
     // powers of 2 in this codebase, so replace the integer divide + mod with
@@ -109,7 +113,10 @@ fn main(
 
   let leftVal = select(0.0, val, isLeft);
   let rightVal = val - leftVal; // exactly one branch contributes — saves a select
-  shared_add[local] = vec4f(val, leftVal, rightVal, density * density * volumeWeight);
+  // IPR uses per-cell probability mass p_i = |psi_i|^2 dV_i:
+  // PR = (sum p_i)^2 / sum p_i^2. That preserves the documented 1..N
+  // participation-count scale even when flat/curved cell measures differ.
+  shared_add[local] = vec4f(val, leftVal, rightVal, val * val);
   shared_max[local] = density;
   workgroupBarrier();
 

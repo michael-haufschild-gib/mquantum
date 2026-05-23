@@ -6,8 +6,8 @@ import { SCHROEDINGER_LAYOUT } from './schroedingerLayout'
 const I = SCHROEDINGER_LAYOUT.index
 const D = DEFAULT_SCHROEDINGER_CONFIG
 
-const clamp = (value: number, min: number, max: number): number => {
-  const finite = Number.isFinite(value) ? value : min
+const finiteClamped = (value: number, fallback: number, min: number, max: number): number => {
+  const finite = Number.isFinite(value) ? value : fallback
   return Math.max(min, Math.min(finite, max))
 }
 
@@ -26,21 +26,28 @@ export function packQuantumBackreaction(
   const enabled = schroedinger?.quantumBackreactionLensingEnabled ?? false
   intView[I.quantumBackreactionLensingEnabled] = enabled ? 1 : 0
   floatView[I.quantumBackreactionLensingStrength] = enabled
-    ? clamp(
+    ? finiteClamped(
         schroedinger?.quantumBackreactionLensingStrength ?? D.quantumBackreactionLensingStrength,
+        D.quantumBackreactionLensingStrength,
         0.0,
         3.0
       )
     : 0.0
   floatView[I.quantumBackreactionCausticGain] = enabled
-    ? clamp(
+    ? finiteClamped(
         schroedinger?.quantumBackreactionCausticGain ?? D.quantumBackreactionCausticGain,
+        D.quantumBackreactionCausticGain,
         0.0,
         2.0
       )
     : 0.0
   floatView[I.quantumBackreactionSoftening] = enabled
-    ? clamp(schroedinger?.quantumBackreactionSoftening ?? D.quantumBackreactionSoftening, 0.05, 2.0)
+    ? finiteClamped(
+        schroedinger?.quantumBackreactionSoftening ?? D.quantumBackreactionSoftening,
+        D.quantumBackreactionSoftening,
+        0.05,
+        2.0
+      )
     : 0.0
 }
 
@@ -59,13 +66,28 @@ export function packBilocalERBridge(
   const enabled = schroedinger?.bilocalERBridgeEnabled ?? false
   intView[I.bilocalERBridgeEnabled] = enabled ? 1 : 0
   floatView[I.bilocalERBridgeStrength] = enabled
-    ? clamp(schroedinger?.bilocalERBridgeStrength ?? D.bilocalERBridgeStrength, 0.0, 2.0)
+    ? finiteClamped(
+        schroedinger?.bilocalERBridgeStrength ?? D.bilocalERBridgeStrength,
+        D.bilocalERBridgeStrength,
+        0.0,
+        2.0
+      )
     : 0.0
   floatView[I.bilocalERBridgeThroatRadius] = enabled
-    ? clamp(schroedinger?.bilocalERBridgeThroatRadius ?? D.bilocalERBridgeThroatRadius, 0.05, 2.0)
+    ? finiteClamped(
+        schroedinger?.bilocalERBridgeThroatRadius ?? D.bilocalERBridgeThroatRadius,
+        D.bilocalERBridgeThroatRadius,
+        0.05,
+        2.0
+      )
     : 0.0
   floatView[I.bilocalERBridgePhaseLock] = enabled
-    ? clamp(schroedinger?.bilocalERBridgePhaseLock ?? D.bilocalERBridgePhaseLock, 0.0, 1.0)
+    ? finiteClamped(
+        schroedinger?.bilocalERBridgePhaseLock ?? D.bilocalERBridgePhaseLock,
+        D.bilocalERBridgePhaseLock,
+        0.0,
+        1.0
+      )
     : 0.0
 }
 
@@ -84,18 +106,25 @@ export function packEntropicTimeShear(
   const enabled = schroedinger?.entropicTimeShearEnabled ?? false
   intView[I.entropicTimeShearEnabled] = enabled ? 1 : 0
   floatView[I.entropicTimeShearStrength] = enabled
-    ? clamp(schroedinger?.entropicTimeShearStrength ?? D.entropicTimeShearStrength, 0.0, 2.0)
+    ? finiteClamped(
+        schroedinger?.entropicTimeShearStrength ?? D.entropicTimeShearStrength,
+        D.entropicTimeShearStrength,
+        0.0,
+        2.0
+      )
     : 0.0
   floatView[I.entropicTimeShearFilamentScale] = enabled
-    ? clamp(
+    ? finiteClamped(
         schroedinger?.entropicTimeShearFilamentScale ?? D.entropicTimeShearFilamentScale,
+        D.entropicTimeShearFilamentScale,
         0.1,
         4.0
       )
     : 0.0
   floatView[I.entropicTimeShearIrreversibility] = enabled
-    ? clamp(
+    ? finiteClamped(
         schroedinger?.entropicTimeShearIrreversibility ?? D.entropicTimeShearIrreversibility,
+        D.entropicTimeShearIrreversibility,
         0.0,
         1.0
       )
@@ -116,22 +145,25 @@ export function packSpectralDimensionFlow(
   const enabled = schroedinger?.spectralDimensionFlowEnabled ?? false
   intView[I.spectralDimensionFlowEnabled] = enabled ? 1 : 0
   floatView[I.spectralDimensionFlowStrength] = enabled
-    ? clamp(
+    ? finiteClamped(
         schroedinger?.spectralDimensionFlowStrength ?? D.spectralDimensionFlowStrength,
+        D.spectralDimensionFlowStrength,
         0.0,
         2.0
       )
     : 0.0
   floatView[I.spectralDimensionFlowUvDimension] = enabled
-    ? clamp(
+    ? finiteClamped(
         schroedinger?.spectralDimensionFlowUvDimension ?? D.spectralDimensionFlowUvDimension,
+        D.spectralDimensionFlowUvDimension,
         1.2,
         3.5
       )
     : 0.0
   floatView[I.spectralDimensionFlowDiffusionScale] = enabled
-    ? clamp(
+    ? finiteClamped(
         schroedinger?.spectralDimensionFlowDiffusionScale ?? D.spectralDimensionFlowDiffusionScale,
+        D.spectralDimensionFlowDiffusionScale,
         0.05,
         3.0
       )
@@ -152,19 +184,44 @@ export function packVacuumBubbleLens(
   const enabled = schroedinger?.vacuumBubbleLensEnabled ?? false
   intView[I.vacuumBubbleLensEnabled] = enabled ? 1 : 0
   floatView[I.vacuumBubbleLensStrength] = enabled
-    ? clamp(schroedinger?.vacuumBubbleLensStrength ?? D.vacuumBubbleLensStrength, 0.0, 2.0)
+    ? finiteClamped(
+        schroedinger?.vacuumBubbleLensStrength ?? D.vacuumBubbleLensStrength,
+        D.vacuumBubbleLensStrength,
+        0.0,
+        2.0
+      )
     : 0.0
   floatView[I.vacuumBubbleWallRadius] = enabled
-    ? clamp(schroedinger?.vacuumBubbleWallRadius ?? D.vacuumBubbleWallRadius, 0.05, 1.5)
+    ? finiteClamped(
+        schroedinger?.vacuumBubbleWallRadius ?? D.vacuumBubbleWallRadius,
+        D.vacuumBubbleWallRadius,
+        0.05,
+        1.5
+      )
     : 0.0
   floatView[I.vacuumBubbleWallThickness] = enabled
-    ? clamp(schroedinger?.vacuumBubbleWallThickness ?? D.vacuumBubbleWallThickness, 0.02, 0.5)
+    ? finiteClamped(
+        schroedinger?.vacuumBubbleWallThickness ?? D.vacuumBubbleWallThickness,
+        D.vacuumBubbleWallThickness,
+        0.02,
+        0.5
+      )
     : 0.0
   floatView[I.vacuumBubbleTension] = enabled
-    ? clamp(schroedinger?.vacuumBubbleTension ?? D.vacuumBubbleTension, 0.0, 3.0)
+    ? finiteClamped(
+        schroedinger?.vacuumBubbleTension ?? D.vacuumBubbleTension,
+        D.vacuumBubbleTension,
+        0.0,
+        3.0
+      )
     : 0.0
   floatView[I.vacuumBubbleBias] = enabled
-    ? clamp(schroedinger?.vacuumBubbleBias ?? D.vacuumBubbleBias, 0.0, 3.0)
+    ? finiteClamped(
+        schroedinger?.vacuumBubbleBias ?? D.vacuumBubbleBias,
+        D.vacuumBubbleBias,
+        0.0,
+        3.0
+      )
     : 0.0
 }
 
@@ -184,12 +241,27 @@ export function packBornNullWeave(
   const enabled = !isUniformComputeMode && (schroedinger?.bornNullWeaveEnabled ?? false)
   intView[I.bornNullWeaveEnabled] = enabled ? 1 : 0
   floatView[I.bornNullWeaveStrength] = enabled
-    ? clamp(schroedinger?.bornNullWeaveStrength ?? D.bornNullWeaveStrength, 0.0, 2.0)
+    ? finiteClamped(
+        schroedinger?.bornNullWeaveStrength ?? D.bornNullWeaveStrength,
+        D.bornNullWeaveStrength,
+        0.0,
+        2.0
+      )
     : 0.0
   floatView[I.bornNullWeaveNodeWidth] = enabled
-    ? clamp(schroedinger?.bornNullWeaveNodeWidth ?? D.bornNullWeaveNodeWidth, 0.0001, 0.2)
+    ? finiteClamped(
+        schroedinger?.bornNullWeaveNodeWidth ?? D.bornNullWeaveNodeWidth,
+        D.bornNullWeaveNodeWidth,
+        0.0001,
+        0.2
+      )
     : 0.0
   floatView[I.bornNullWeaveCirculation] = enabled
-    ? clamp(schroedinger?.bornNullWeaveCirculation ?? D.bornNullWeaveCirculation, 0.0, 8.0)
+    ? finiteClamped(
+        schroedinger?.bornNullWeaveCirculation ?? D.bornNullWeaveCirculation,
+        D.bornNullWeaveCirculation,
+        0.0,
+        8.0
+      )
     : 0.0
 }

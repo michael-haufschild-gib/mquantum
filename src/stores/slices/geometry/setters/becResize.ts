@@ -6,6 +6,7 @@
 
 import { type BecConfig } from '@/lib/geometry/extended/types'
 import { thomasFermiMuND, thomasFermiRadius } from '@/lib/physics/bec/chemicalPotential'
+import { resolveBecMass } from '@/lib/physics/bec/waterfallParams'
 import { clampKKState } from '@/lib/physics/compactification'
 
 import { clampDtWithCfl, defaultTdseGridPerDim } from './sliceSetterUtils'
@@ -23,8 +24,13 @@ export const resizeBecArrays = (prev: BecConfig, newDim: number): Partial<BecCon
 
   const g = prev.interactionStrength ?? 500
   const omega = prev.trapOmega ?? 1.0
-  const mass = prev.mass ?? 1.0
-  const mu = g > 0 ? thomasFermiMuND(newDim, g, omega) : 0
+  const mass = resolveBecMass(prev)
+  let anisotropyProduct = 1.0
+  for (let d = 0; d < newDim; d++) {
+    anisotropyProduct *= trapAnisotropy[d] ?? 1.0
+  }
+  const geometricOmega = omega * Math.pow(anisotropyProduct, 1 / newDim)
+  const mu = g > 0 ? thomasFermiMuND(newDim, g, geometricOmega, mass) : 0
   const COVERAGE = 1.3
   const spacing = Array.from({ length: newDim }, (_, i) => {
     const effectiveOmega = omega * (trapAnisotropy[i] ?? 1.0)

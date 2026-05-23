@@ -282,6 +282,7 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
     name: 'Anderson: Localized (3D)',
     description:
       'Strong disorder W/t=25 — well above Wc/t≈16.5. Wavepacket remains exponentially localized.',
+    maxDim: 3,
     overrides: {
       latticeDim: 3,
       gridSize: [64, 64, 64],
@@ -310,6 +311,7 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
     name: 'Anderson: Extended (3D)',
     description:
       'Weak disorder W/t=5 — below Wc/t≈16.5. Wavepacket spreads diffusively across the lattice.',
+    maxDim: 3,
     overrides: {
       latticeDim: 3,
       gridSize: [64, 64, 64],
@@ -338,6 +340,7 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
     name: 'Anderson: 4D Transport',
     description:
       'Disorder W/t=15 on a 4D cube. Because the Anderson transition in 4D sits around Wc/t ≈ 34, W/t=15 lies well inside the extended (diffusive) phase; this preset probes weak-disorder transport in one dimension above 3D rather than sitting on the mobility edge.',
+    maxDim: 4,
     // Post-`resizeTdseArrays` form: the 262k-site budget yields
     // `defaultTdseGridPerDim(4) = 16` per axis (16⁴ = 65k sites). A
     // pre-resize [32]⁴ literal would be silently collapsed here with
@@ -375,6 +378,7 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
     name: 'Anderson: 5D Transport',
     description:
       'Disorder W/t=15 on a 5D cube. Higher-dimensional Anderson critical points are much larger than 3D (Wc/t increases roughly linearly with d), so this preset sits in the extended phase. Lets the user see how transport compares against the 3D and 4D presets in a regime where exact diagonalization is infeasible.',
+    maxDim: 5,
     // Post-`resizeTdseArrays` form: 262k-site budget yields
     // `defaultTdseGridPerDim(5) = 8` per axis (8⁵ = 32k sites). A pre-
     // resize [16]⁵ literal would be silently collapsed with spacing
@@ -408,6 +412,7 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
     name: 'Black Hole Ringdown (s=2, ℓ=2, M=1)',
     description:
       'Regge–Wheeler barrier for gravitational perturbations of Schwarzschild. A Gaussian wavepacket incoming from the left scatters off the ringdown potential and rings at the QNM frequency.',
+    maxDim: 3,
     // Preset geometry is written in post-`resizeTdseArrays` form so the
     // literal values in this file match what the simulation actually runs.
     // `applyTdsePreset` reshapes any preset whose gridSize/spacing don't line
@@ -519,6 +524,7 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
     name: 'Wavepacket on a Wormhole Metric',
     description:
       'Gaussian wave packet propagating along the proper-distance axis of a Morris–Thorne throat. The kinetic operator is the Laplace–Beltrami operator on the curved spatial slice — not a potential. Shows partial reflection off the geometric bottleneck, curvature-induced dispersion, and transmitted amplitude that continues toward the far asymptotic region. No teleportation, no traversal between disconnected regions — just a single ψ on a single curved 3-slice.',
+    maxDim: 3,
     // Grid is written in post-`resizeTdseArrays` form (same convention as
     // blackHoleRingdown). The 262k-site TDSE budget caps a 3D lattice at
     // 64³; a [128,64,64] preset would otherwise be silently collapsed to
@@ -625,6 +631,18 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
     renderingOverrides: { densityGain: 0.8, densityContrast: 1.4, autoScaleMaxGain: 12 },
   },
 ]
+
+/** Whether a TDSE preset can run in `dimension` without changing its stated physics. */
+export function isTdsePresetCompatibleWithDimension(
+  preset: Pick<TdseScenarioPreset, 'overrides' | 'maxDim'>,
+  dimension: number
+): boolean {
+  const dim = Number.isFinite(dimension) ? Math.floor(dimension) : 0
+  const minDim = preset.overrides.latticeDim
+  if (minDim !== undefined && dim < minDim) return false
+  if (preset.maxDim !== undefined && dim > preset.maxDim) return false
+  return dim >= 1
+}
 
 /** Lookup a preset by its id, merging default rendering overrides. */
 export function getTdsePreset(id: string): TdseScenarioPreset | undefined {

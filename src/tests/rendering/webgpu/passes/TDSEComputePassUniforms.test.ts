@@ -112,6 +112,31 @@ describe('writeTdseUniforms', () => {
     expect(u32[I.potentialType]).toBe(11) // custom → 11
   })
 
+  it('maps vortexLattice to the vortexImprint shader branch', () => {
+    const uniformData = new ArrayBuffer(UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({
+        config: createTdseConfig({
+          initialCondition: 'vortexLattice',
+          packetMomentum: [1, 0, 0, 6, 1],
+        }),
+      })
+    )
+
+    expect(u32[I.initCondition]).toBe(4)
+    expect(f32[I.packetMomentum + 3]).toBe(6)
+    expect(f32[I.packetMomentum + 4]).toBe(1)
+  })
+
   it('writes customPotentialScale at customPotentialScale slot (offset 704)', () => {
     const uniformData = new ArrayBuffer(UNIFORM_SIZE)
     const u32 = new Uint32Array(uniformData)

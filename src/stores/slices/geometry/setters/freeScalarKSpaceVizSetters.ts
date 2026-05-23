@@ -29,6 +29,10 @@ export interface FreeScalarKSpaceVizSetters {
   setFreeScalarKSpaceRadialBinCount: (value: number) => void
 }
 
+function isBoolean(value: unknown): value is boolean {
+  return typeof value === 'boolean'
+}
+
 /**
  * Creates the k-space visualization setter actions for the schroedingerSlice.
  * @param ctx - Shared setter context with setWithVersion + finite-input helpers
@@ -50,6 +54,7 @@ export function createFreeScalarKSpaceVizSetters(ctx: SetterContext): FreeScalar
       }))
     },
     setFreeScalarKSpaceFftShift: (enabled) => {
+      if (!isBoolean(enabled)) return
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
@@ -127,6 +132,7 @@ export function createFreeScalarKSpaceVizSetters(ctx: SetterContext): FreeScalar
       }))
     },
     setFreeScalarKSpaceBroadeningEnabled: (enabled) => {
+      if (!isBoolean(enabled)) return
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,

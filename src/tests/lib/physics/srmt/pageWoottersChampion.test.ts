@@ -85,6 +85,22 @@ describe('Page–Wootters cross-diagnostic', () => {
     expect(findPageWoottersChampion(rates)).toBeNull()
   })
 
+  it('does not treat zero-probability clock slices as orthogonal evolution', () => {
+    const shape: [number, number, number] = [6, 6, 6]
+    const chi = new Float32Array(2 * 6 * 6 * 6)
+    for (let i1 = 0; i1 < 6; i1++) {
+      for (let i2 = 0; i2 < 6; i2++) {
+        const idx = 2 * (0 * 6 * 6 + i1 * 6 + i2)
+        chi[idx] = 1
+      }
+    }
+
+    const rates = computePageWoottersRates(chi, shape)
+
+    expect(rates.a).toBeNaN()
+    expect(findPageWoottersChampion(rates)).toBeNull()
+  })
+
   it('autocorrelation lies in [0, 1] for a normalised conditional state', () => {
     const shape: [number, number, number] = [8, 8, 8]
     const chi = syntheticVaryingAlongAxis(shape, 1)

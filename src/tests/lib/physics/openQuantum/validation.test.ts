@@ -66,6 +66,20 @@ describe('validateDensityMatrix', () => {
     expect(result.traceDrift).toBeLessThan(1e-12)
   })
 
+  it('accepts a fully coherent 3-state pure state as positive semidefinite', () => {
+    // Gershgorin row bounds are negative for this valid rank-1 density
+    // matrix: diag=1/3 and each row has two off-diagonals of magnitude 1/3.
+    const K = 3
+    const c = 1 / Math.sqrt(K)
+    const rho = densityMatrixFromCoefficients([c, c, c], [0, 0, 0], K)
+
+    const result = validateDensityMatrix(rho)
+
+    expect(result.valid).toBe(true)
+    expect(result.violations).toEqual([])
+    expect(result.minEigenvalue).toBeGreaterThanOrEqual(-1e-10)
+  })
+
   it('accepts a maximally mixed state ρ = I/K', () => {
     const K = 4
     const rho = maximallyMixedState(K)
@@ -116,11 +130,11 @@ describe('validateDensityMatrix', () => {
     expect(hasTraceViolation).toBe(true)
   })
 
-  it('detects a negative eigenvalue bound (non-positive-semidefinite)', () => {
+  it('detects a negative eigenvalue (non-positive-semidefinite)', () => {
     const K = 2
     const rho = createDensityMatrix(K)
     const el = rho.elements
-    // Construct a matrix with negative Gershgorin eigenvalue bound:
+    // Construct a matrix with a negative eigenvalue:
     // ρ = [[0.1, 0.9], [0.9, 0.9]]
     // Gershgorin disc for row 0: center 0.1, radius 0.9 → min = -0.8
     el[2 * (0 * K + 0)] = 0.1

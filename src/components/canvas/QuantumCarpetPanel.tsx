@@ -7,7 +7,7 @@
  * CPU-side colormap application.
  *
  * Features:
- * - Draggable glass panel with opaque dark interior
+ * - Draggable solid panel with opaque dark interior
  * - Header controls: axis, colormap, log scale, clear, close
  * - Color bar gradient strip
  * - Axis labels (CSS)
@@ -203,7 +203,7 @@ const CarpetPanelInner: React.FC = React.memo(() => {
         style={{ width: PANEL_W }}
       >
         {/* ── Header ── */}
-        <div className="flex items-center gap-2 px-3 py-1.5 glass-panel">
+        <div className="flex items-center gap-2 px-3 py-1.5 surface-panel">
           <span className="text-xs font-medium text-primary/80 whitespace-nowrap">
             Quantum Carpet
           </span>

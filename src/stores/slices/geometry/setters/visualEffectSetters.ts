@@ -22,6 +22,9 @@ import { useGeometryStore } from '@/stores/scene/geometryStore'
 import type { SetterContext } from './sliceSetterUtils'
 
 type SchrodingerKey = keyof typeof DEFAULT_SCHROEDINGER_CONFIG
+type BooleanSchrodingerKey = {
+  [K in SchrodingerKey]: (typeof DEFAULT_SCHROEDINGER_CONFIG)[K] extends boolean ? K : never
+}[SchrodingerKey]
 
 /** Actions exposed by the visual-effect setter bundle. */
 export interface VisualEffectSetters {
@@ -210,6 +213,12 @@ export function createVisualEffectSetters(
   ) => (value: number) => void
 ) {
   const { setWithVersion, isFinite, warnNonFinite } = ctx
+  const booleanSetter =
+    <K extends BooleanSchrodingerKey>(key: K) =>
+    (value: boolean) => {
+      if (typeof value !== 'boolean') return
+      valueSetter(key)(value as (typeof DEFAULT_SCHROEDINGER_CONFIG)[K])
+    }
 
   return {
     // Volume rendering
@@ -278,7 +287,7 @@ export function createVisualEffectSetters(
     setSchroedingerInterferenceAmp: clampedSetter('interferenceAmp', 0.0, 1.0),
     setSchroedingerInterferenceFreq: clampedSetter('interferenceFreq', 1.0, 50.0),
     setSchroedingerInterferenceSpeed: clampedSetter('interferenceSpeed', 0.0, 10.0),
-    setSchroedingerQuantumBackreactionLensingEnabled: valueSetter(
+    setSchroedingerQuantumBackreactionLensingEnabled: booleanSetter(
       'quantumBackreactionLensingEnabled'
     ),
     setSchroedingerQuantumBackreactionLensingStrength: clampedSetter(
@@ -296,7 +305,7 @@ export function createVisualEffectSetters(
       0.05,
       2.0
     ),
-    setSchroedingerBilocalERBridgeEnabled: valueSetter('bilocalERBridgeEnabled'),
+    setSchroedingerBilocalERBridgeEnabled: booleanSetter('bilocalERBridgeEnabled'),
     setSchroedingerBilocalERBridgeStrength: clampedSetter('bilocalERBridgeStrength', 0.0, 2.0),
     setSchroedingerBilocalERBridgeThroatRadius: clampedSetter(
       'bilocalERBridgeThroatRadius',
@@ -304,7 +313,7 @@ export function createVisualEffectSetters(
       2.0
     ),
     setSchroedingerBilocalERBridgePhaseLock: clampedSetter('bilocalERBridgePhaseLock', 0.0, 1.0),
-    setSchroedingerEntropicTimeShearEnabled: valueSetter('entropicTimeShearEnabled'),
+    setSchroedingerEntropicTimeShearEnabled: booleanSetter('entropicTimeShearEnabled'),
     setSchroedingerEntropicTimeShearStrength: clampedSetter('entropicTimeShearStrength', 0.0, 2.0),
     setSchroedingerEntropicTimeShearFilamentScale: clampedSetter(
       'entropicTimeShearFilamentScale',
@@ -316,7 +325,7 @@ export function createVisualEffectSetters(
       0.0,
       1.0
     ),
-    setSchroedingerSpectralDimensionFlowEnabled: valueSetter('spectralDimensionFlowEnabled'),
+    setSchroedingerSpectralDimensionFlowEnabled: booleanSetter('spectralDimensionFlowEnabled'),
     setSchroedingerSpectralDimensionFlowStrength: clampedSetter(
       'spectralDimensionFlowStrength',
       0.0,
@@ -332,13 +341,13 @@ export function createVisualEffectSetters(
       0.05,
       3.0
     ),
-    setSchroedingerVacuumBubbleLensEnabled: valueSetter('vacuumBubbleLensEnabled'),
+    setSchroedingerVacuumBubbleLensEnabled: booleanSetter('vacuumBubbleLensEnabled'),
     setSchroedingerVacuumBubbleLensStrength: clampedSetter('vacuumBubbleLensStrength', 0.0, 2.0),
     setSchroedingerVacuumBubbleWallRadius: clampedSetter('vacuumBubbleWallRadius', 0.05, 1.5),
     setSchroedingerVacuumBubbleWallThickness: clampedSetter('vacuumBubbleWallThickness', 0.02, 0.5),
     setSchroedingerVacuumBubbleTension: clampedSetter('vacuumBubbleTension', 0.0, 3.0),
     setSchroedingerVacuumBubbleBias: clampedSetter('vacuumBubbleBias', 0.0, 3.0),
-    setSchroedingerBornNullWeaveEnabled: valueSetter('bornNullWeaveEnabled'),
+    setSchroedingerBornNullWeaveEnabled: booleanSetter('bornNullWeaveEnabled'),
     setSchroedingerBornNullWeaveStrength: clampedSetter('bornNullWeaveStrength', 0.0, 2.0),
     setSchroedingerBornNullWeaveNodeWidth: clampedSetter('bornNullWeaveNodeWidth', 0.0001, 0.2),
     setSchroedingerBornNullWeaveCirculation: clampedSetter('bornNullWeaveCirculation', 0.0, 8.0),

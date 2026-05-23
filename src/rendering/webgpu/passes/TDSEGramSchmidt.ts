@@ -44,7 +44,7 @@ export interface EigenstateBuffers {
   normSquared: number
   /** Eigenstate energy ⟨H⟩ at storage time (NaN if observables were disabled) */
   energy: number
-  /** Inverse participation ratio Σ|ψ|⁴ / (Σ|ψ|²)² — higher = more localized */
+  /** Participation-count IPR `(Σ|ψ|²)² / Σ|ψ|⁴` — higher = more extended */
   ipr: number
 }
 
@@ -118,7 +118,7 @@ export function ensureGSBuffers(device: GPUDevice, state: GramSchmidtState): voi
  * Copy the current wavefunction into eigenstate storage.
  *
  * Also initiates an async GPU readback to compute the inverse participation
- * ratio (IPR = Σ|ψ|⁴ / (Σ|ψ|²)²) and updates the eigenstate entry when done.
+ * ratio (IPR = `(Σ|ψ|²)² / Σ|ψ|⁴`) and updates the eigenstate entry when done.
  *
  * @param energy - Eigenstate energy ⟨H⟩ from the observables store (NaN if unavailable)
  * @param tdseConfig - TDSE configuration for classical orbit scar analysis (optional)
@@ -199,7 +199,7 @@ interface EigenstateDiagnostics {
  * Asynchronously compute eigenstate diagnostics: IPR and scar correlation.
  *
  * Reads the eigenstate wavefunction back from GPU, computes:
- * - IPR = Σ|ψ|⁴ / (Σ|ψ|²)² — localization measure
+ * - IPR = `(Σ|ψ|²)² / Σ|ψ|⁴` — participation-count localization measure
  * - Scar strength — max orbit correlation / mean (if config available and energy finite)
  */
 async function computeEigenstateDiagnosticsAsync(

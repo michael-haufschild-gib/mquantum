@@ -195,9 +195,10 @@ export interface DiracConfig extends PmlAbsorberConfig {
   packetWidth: number
   /** Initial momentum vector k₀ — length equals latticeDim */
   packetMomentum: number[]
-  /** Initial spin direction (for spin-polarized packets).
-   *  For S=2: single angle θ. For S=4: (θ, φ) on Bloch sphere.
-   *  For S>4: first two entries used as (θ, φ), rest default to 0. */
+  /** Initial spin direction for spin-polarized packets.
+   *  S=2 has one basis vector per energy sector, so spin angles do not define
+   *  an in-sector doublet; positiveEnergyFraction controls particle/antiparticle
+   *  mixing. For S>=4: first two entries are (θ, φ) on a Bloch sphere. */
   spinDirection: number[]
   /** Positive-energy projection strength (0-1).
    *  1.0 = pure positive energy (no Zitterbewegung).

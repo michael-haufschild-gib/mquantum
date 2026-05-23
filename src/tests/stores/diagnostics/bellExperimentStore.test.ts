@@ -39,6 +39,34 @@ describe('processTrialBatch — QM converges to 2√2 at canonical CHSH angles',
     expect(s.lhv.S).toBeNaN()
   })
 
+  it('uses the Bell config seed for the first config-driven batch', () => {
+    const cfg = { ...createDefaultBellPairConfig(), seed: 42 }
+
+    useBellExperimentStore.getState().reset()
+    useBellExperimentStore.getState().processTrialBatch(cfg, 5000)
+    const fromConfigSeed = useBellExperimentStore.getState()
+    const sFromConfigSeed = fromConfigSeed.qm.S
+
+    useBellExperimentStore.getState().reset(42)
+    useBellExperimentStore.getState().processTrialBatch(createDefaultBellPairConfig(), 5000)
+    const fromExplicitReset = useBellExperimentStore.getState()
+
+    expect(fromConfigSeed.seed).toBe(42)
+    expect(sFromConfigSeed).toBe(fromExplicitReset.qm.S)
+  })
+
+  it('changing the Bell config seed starts a fresh stochastic run', () => {
+    const cfg = { ...createDefaultBellPairConfig(), seed: 5 }
+
+    useBellExperimentStore.getState().processTrialBatch(cfg, 1000)
+    useBellExperimentStore.getState().processTrialBatch({ ...cfg, seed: 6 }, 1000)
+
+    const s = useBellExperimentStore.getState()
+    expect(s.seed).toBe(6)
+    expect(s.totalTrials).toBe(1000)
+    expect(s.historyCount).toBe(1)
+  })
+
   it('|S| crosses 2 and approaches 2√2 with 100k trials', () => {
     const cfg = createDefaultBellPairConfig() // canonical CHSH defaults, v=1, η=1, qm sampler
     // Process in batches of 10k so the running ring buffer is exercised.
@@ -102,6 +130,42 @@ describe('processTrialBatch — precession fields', () => {
     // At t = 1 frame, Alice's Bloch axes have rotated by π/2, so the second
     // batch cancels the canonical CHSH contribution instead of leaving |S|≈2√2.
     expect(Math.abs(s.qm.S)).toBeLessThan(CLASSICAL_BOUND)
+  })
+
+  it('reports the live precessing CHSH value instead of smearing previous times', () => {
+    const cfg = {
+      ...createDefaultBellPairConfig(),
+      fieldA: [0, 0, Math.PI / 4] as [number, number, number],
+      fieldB: [0, 0, 0] as [number, number, number],
+      trialsPerFrame: 40_000,
+    }
+
+    useBellExperimentStore.getState().reset(7)
+    useBellExperimentStore.getState().processTrialBatch(cfg, cfg.trialsPerFrame)
+    useBellExperimentStore.getState().processTrialBatch(cfg, cfg.trialsPerFrame)
+    useBellExperimentStore.getState().processTrialBatch(cfg, cfg.trialsPerFrame)
+
+    const s = useBellExperimentStore.getState()
+    expect(s.totalTrials).toBe(120_000)
+    // At t = 2 frames, Alice has rotated by π. The instantaneous CHSH
+    // magnitude is again Tsirelson-scale; a cumulative average over
+    // t = 0, 1, 2 would incorrectly cancel toward zero.
+    expect(Math.abs(s.qm.S)).toBeGreaterThan(TSIRELSON_BOUND - 0.15)
+  })
+
+  it('changing trialsPerFrame resets precessing ensembles because it changes physics time', () => {
+    const cfg = {
+      ...createDefaultBellPairConfig(),
+      fieldA: [0, 0, Math.PI / 4] as [number, number, number],
+      trialsPerFrame: 1000,
+    }
+
+    useBellExperimentStore.getState().processTrialBatch(cfg, 1000)
+    useBellExperimentStore.getState().processTrialBatch({ ...cfg, trialsPerFrame: 2000 }, 1000)
+
+    const s = useBellExperimentStore.getState()
+    expect(s.totalTrials).toBe(1000)
+    expect(s.historyCount).toBe(1)
   })
 })
 

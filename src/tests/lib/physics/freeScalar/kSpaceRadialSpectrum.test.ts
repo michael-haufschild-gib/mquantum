@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { DEFAULT_KSPACE_VIZ, PASSTHROUGH_KSPACE_VIZ } from '@/lib/geometry/extended/types'
+import type { KSpaceRawData } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import { computeRawKSpaceData, OUTPUT_GRID_SIZE } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import {
   buildRadialDisplayGrid,
@@ -50,6 +51,35 @@ function makePlaneWaveRawData(N: number) {
   }
 
   return computeRawKSpaceData(phi, pi, gridSize, spacing, 1.0, 3)
+}
+
+function makeOneDimensionalKSpaceRawData(N: number): KSpaceRawData {
+  const nk = new Float64Array(N)
+  const kMag = new Float64Array(N)
+  const omega = new Float64Array(N)
+  let kMagMax = 0
+
+  for (let k = 0; k < N; k++) {
+    const value = Math.abs(2 * Math.sin((Math.PI * k) / N))
+    nk[k] = 1
+    kMag[k] = value
+    omega[k] = value
+    if (value > kMagMax) kMagMax = value
+  }
+
+  return {
+    nk,
+    kMag,
+    omega,
+    nkMax: 1,
+    kMagMax,
+    omegaMax: kMagMax,
+    totalSites: N,
+    gridSize: [N],
+    strides: [1],
+    latticeDim: 1,
+    spacing: [1],
+  }
 }
 
 // ============================================================================
@@ -274,5 +304,27 @@ describe('buildRadialDisplayGrid', () => {
     }
 
     expect(checked).toBeGreaterThan(0)
+  })
+
+  it('resamples oversized radial grids across the full raw k range', () => {
+    const raw = makeOneDimensionalKSpaceRawData(16)
+    const G = 8
+    const center = Math.floor(G / 2)
+    const grid = buildRadialDisplayGrid(
+      raw,
+      {
+        ...PASSTHROUGH_KSPACE_VIZ,
+        displayMode: 'radial3d',
+        fftShiftEnabled: false,
+        radialBinCount: 128,
+      },
+      G
+    )
+
+    const edgeIdx = (center * G + center) * G
+    const middleIdx = (center * G + center) * G + center
+
+    expect(grid.kNorm[edgeIdx]).toBeLessThan(0.3)
+    expect(grid.kNorm[middleIdx]).toBeGreaterThan(0.8)
   })
 })

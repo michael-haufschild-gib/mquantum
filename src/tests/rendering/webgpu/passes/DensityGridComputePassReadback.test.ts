@@ -17,7 +17,10 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { DensityDistributionAnalyzer } from '@/rendering/webgpu/passes/DensityDistributionAnalysis'
 import type { DensityReadbackState } from '@/rendering/webgpu/passes/DensityGridComputePassResources'
-import { startPendingReadback } from '@/rendering/webgpu/passes/DensityGridComputePassResources'
+import {
+  selectGridTextureFormat,
+  startPendingReadback,
+} from '@/rendering/webgpu/passes/DensityGridComputePassResources'
 
 function createMockState(): DensityReadbackState {
   const fakeBuffer = {
@@ -106,5 +109,26 @@ describe('startPendingReadback applyState propagation', () => {
 
     expect(state.densityReadbackBuffer!.mapAsync).not.toHaveBeenCalled()
     expect(applyState).not.toHaveBeenCalled()
+  })
+})
+
+describe('density grid resource config sanitization', () => {
+  it('treats non-boolean density-grid resource flags as disabled', async () => {
+    const destroy = vi.fn()
+    const device = {
+      pushErrorScope: vi.fn(),
+      createTexture: vi.fn(() => ({ destroy })),
+      popErrorScope: vi.fn(() => Promise.resolve(null)),
+    } as unknown as GPUDevice
+
+    const format = await selectGridTextureFormat(device, {
+      dimension: 3,
+      useDensityMatrix: 'false' as never,
+      forceRgba: 'false' as never,
+    })
+
+    expect(format).toBe('r16float')
+    expect(device.createTexture).toHaveBeenCalled()
+    expect(destroy).toHaveBeenCalled()
   })
 })

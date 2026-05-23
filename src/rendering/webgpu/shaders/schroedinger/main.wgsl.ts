@@ -419,6 +419,7 @@ ${bayerJitterSection}
       );
       finalColor = mix(finalColor, overlayColor, overlayAlpha);
       finalAlpha = max(finalAlpha, overlayAlpha);
+      hitT = nodalHit.t;
     }
   }
 

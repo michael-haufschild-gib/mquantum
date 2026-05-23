@@ -77,9 +77,11 @@ export function generateBayerJitterSection(bayerJitter: boolean): string {
 
   let jitterOffset = camera.bayerOffset - vec2f(0.5);
   let dist = length(input.vPosition - camera.cameraPosition);
-  let pixelSizeY = 2.0 * dist * tan(camera.fov * 0.5) / camera.resolution.y;
+  let nonNanResolution = select(vec2f(1.0), camera.resolution, camera.resolution == camera.resolution);
+  let safeResolution = max(nonNanResolution, vec2f(1.0));
+  let pixelSizeY = 2.0 * dist * tan(camera.fov * 0.5) / safeResolution.y;
   let pixelSizeX = 2.0 * dist * tan(camera.fov * 0.5) * camera.aspectRatio /
-                   camera.resolution.x;
+                   safeResolution.x;
   let cameraRight = normalize(camera.inverseViewMatrix[0].xyz);
   let cameraUp = normalize(camera.inverseViewMatrix[1].xyz);
   let worldOffset = cameraRight * (jitterOffset.x * pixelSizeX) -

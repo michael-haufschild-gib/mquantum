@@ -304,7 +304,7 @@ export const TimelineControls: FC = () => {
       </AnimatePresence>
 
       {/* Main Timeline Bar */}
-      <div className="h-14 flex items-center px-4 gap-4 shrink-0 overflow-x-auto overflow-y-hidden scrollbar-none relative glass-panel rounded-t-xl sm:rounded-xl">
+      <div className="min-h-14 flex flex-wrap items-center px-2 py-2 gap-2 shrink-0 overflow-visible relative surface-panel rounded-t-xl sm:h-14 sm:flex-nowrap sm:px-4 sm:py-0 sm:gap-4 sm:overflow-x-auto sm:overflow-y-hidden sm:scrollbar-none sm:rounded-xl">
         {/* Playback Controls */}
         <div className="flex items-center gap-2 shrink-0">
           <div className="relative">
@@ -355,7 +355,7 @@ export const TimelineControls: FC = () => {
         </div>
 
         {/* Speed Slider */}
-        <div className="w-28 sm:w-44 pt-2.5 ps-3 border-s border-border-subtle shrink-0">
+        <div className="w-[clamp(8rem,45vw,11rem)] pt-2.5 ps-2 border-s border-border-subtle shrink-0 sm:w-44 sm:ps-3">
           <Slider
             label="SPEED"
             tooltip="Animation speed multiplier + controls how fast the wavefunction evolves in time."
@@ -369,10 +369,10 @@ export const TimelineControls: FC = () => {
           />
         </div>
 
-        <div className="flex-1 min-w-3" />
+        <div className="hidden sm:block flex-1 min-w-3" />
 
         {/* Drawer Toggles */}
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
           {hasTimelineControls(objectType) && hasEffectsDrawerContent && (
             <ToggleButton
               pressed={showAnimDrawer}

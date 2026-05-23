@@ -73,14 +73,14 @@ export const AnimationDrawerContainer: React.FC<AnimationDrawerContainerProps> =
             onClick={onClose}
             ariaLabel="Close drawer"
             tooltip="Close this timeline drawer"
-            className="w-6 h-6 p-0 rounded-full glass-panel flex items-center justify-center text-text-tertiary hover:text-text-primary"
+            className="w-6 h-6 p-0 rounded-full surface-panel flex items-center justify-center text-text-tertiary hover:text-text-primary"
           >
             <Icon name="chevron-down" size={12} />
           </Button>
         </div>
       )}
       <div
-        className={`glass-panel rounded-xl max-h-[400px] overflow-y-auto ${fullWidth ? '' : 'min-w-80 max-w-[calc(100vw-2rem)]'}`}
+        className={`surface-panel rounded-xl max-h-[400px] overflow-y-auto ${fullWidth ? '' : 'min-w-80 max-w-[calc(100vw-2rem)]'}`}
       >
         <div className="p-4 grid grid-cols-1 gap-6 md:[&:has(>:nth-child(3))]:grid-cols-2">
           {children}

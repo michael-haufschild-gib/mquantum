@@ -90,6 +90,19 @@ describe('hydrogen basis normalization', () => {
   it('normalizes extra-dimension frequencies to finite positive values', () => {
     expect(normalizeHydrogenExtraDimOmega([2, NaN, -1, Infinity], 7)).toEqual([2, 1, 1, 1])
   })
+
+  it('applies the hydrogen ND frequency spread used by shader uniforms', () => {
+    const normalizeWithSpread = normalizeHydrogenExtraDimOmega as (
+      extraDimOmega: readonly number[],
+      dimension: number,
+      extraDimFrequencySpread?: number
+    ) => number[]
+
+    const spreadOmega = normalizeWithSpread([2, 2], 5, 0.1)
+    expect(spreadOmega[0]).toBeCloseTo(1.3, 12)
+    expect(spreadOmega[1]).toBeCloseTo(1.5, 12)
+    expect(normalizeWithSpread([1, 1], 5, 0.5)).toEqual([0.01, 0.01])
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -255,6 +268,20 @@ describe('buildHydrogenBasis', () => {
       // Extra dims: 2*(0+0.5) + 3*(0+0.5) = 1 + 1.5 = 2.5
       // Total: -0.125 + 2.5 = 2.375
       expect(basis[0]!.energy).toBeCloseTo(2.375, 10)
+    })
+
+    it('5D zero-point energy uses spread-adjusted extra-dimension frequencies', () => {
+      const buildWithSpread = buildHydrogenBasis as (
+        maxN: number,
+        dimension: number,
+        extraDimOmega?: readonly number[],
+        extraDimFrequencySpread?: number
+      ) => ReturnType<typeof buildHydrogenBasis>
+      const basis = buildWithSpread(1, 5, [2, 2], 0.1)
+
+      // D=5: E_3D = -0.125. Shader-effective omegas are 2*(1-0.35)=1.3
+      // and 2*(1-0.25)=1.5, so zero-point contribution is 0.65+0.75.
+      expect(basis[0]!.energy).toBeCloseTo(1.275, 10)
     })
 
     it('7D states have extraDimN of length 4', () => {

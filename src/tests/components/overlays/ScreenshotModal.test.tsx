@@ -10,6 +10,7 @@ import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { resolveCropPixels } from '@/components/overlays/screenshotCrop'
 import { ScreenshotModal } from '@/components/overlays/ScreenshotModal'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { useScreenshotStore } from '@/stores/runtime/screenshotStore'
@@ -21,6 +22,28 @@ function renderWithProviders(ui: React.ReactElement) {
 // Minimal 1x1 PNG as data URL (valid base64)
 const TINY_PNG =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+
+describe('resolveCropPixels', () => {
+  it('clamps subpixel crops to at least one source pixel', () => {
+    expect(resolveCropPixels({ x: 0.99, y: 0.99, width: 0.001, height: 0.001 }, 1, 1)).toEqual({
+      x: 0,
+      y: 0,
+      width: 1,
+      height: 1,
+    })
+  })
+
+  it('recovers invalid crop fractions to the full image', () => {
+    expect(
+      resolveCropPixels({ x: Number.NaN, y: Infinity, width: -1, height: Number.NaN }, 320, 180)
+    ).toEqual({ x: 0, y: 0, width: 320, height: 180 })
+  })
+
+  it('returns null for invalid image dimensions', () => {
+    expect(resolveCropPixels({ x: 0, y: 0, width: 1, height: 1 }, 0, 100)).toBeNull()
+    expect(resolveCropPixels({ x: 0, y: 0, width: 1, height: 1 }, 100, Infinity)).toBeNull()
+  })
+})
 
 describe('ScreenshotModal', () => {
   // Mock Image so `generateOutput`'s `new Image()` stays in-flight

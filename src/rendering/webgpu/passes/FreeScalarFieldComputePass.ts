@@ -47,7 +47,10 @@ import {
   computeFsfInitHash,
   computeFsfMaxPhiEstimate,
   estimateFsfMaxFieldValue,
+  FSF_COSMO_COEFS_BYTE_OFFSET,
+  FSF_COSMO_COEFS_BYTE_SIZE,
   FSF_COSMO_COEFS_F32_COUNT,
+  FSF_DT_BYTE_OFFSET,
   FSF_UNIFORM_SIZE,
   writeFsfUniforms,
 } from './FreeScalarFieldComputePassUniforms'
@@ -63,8 +66,6 @@ import {
   projectSimEta,
   resolveFsfSubstepCoefs,
   snapshotFsfHamiltonianCoefs,
-  writeFsfCosmologyCoefsSlot,
-  writeFsfDtSlot,
 } from './fsfCosmologyStepping'
 import { composeFsfSaveMetadata } from './fsfStateIO'
 import { requestStateSave as genericStateSave } from './stateSave'
@@ -410,6 +411,57 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     })
   }
 
+  private stageUniformSlotCopy(
+    device: GPUDevice,
+    encoder: GPUCommandEncoder,
+    label: string,
+    values: readonly number[],
+    dstOffset: number,
+    byteSize: number
+  ): void {
+    if (!this.uniformBuffer) return
+    const staging = device.createBuffer({
+      label,
+      size: byteSize,
+      usage: GPUBufferUsage.COPY_SRC,
+      mappedAtCreation: true,
+    })
+    new Float32Array(staging.getMappedRange()).set(values)
+    staging.unmap()
+    encoder.copyBufferToBuffer(staging, 0, this.uniformBuffer, dstOffset, byteSize)
+    this.pendingStagingBuffers.push(staging)
+  }
+
+  private stageDtSlotCopy(
+    device: GPUDevice,
+    encoder: GPUCommandEncoder,
+    dt: number,
+    label: string
+  ): void {
+    this.stageUniformSlotCopy(device, encoder, label, [dt], FSF_DT_BYTE_OFFSET, 4)
+  }
+
+  private stageCosmologyCoefsSlotCopy(
+    device: GPUDevice,
+    encoder: GPUCommandEncoder,
+    label: string,
+    aKinetic: number,
+    aPotential: number,
+    aFull: number,
+    massSquaredScale: number,
+    aPotentialRatio1: number,
+    aPotentialRatio2: number
+  ): void {
+    this.stageUniformSlotCopy(
+      device,
+      encoder,
+      label,
+      [aKinetic, aPotential, aFull, massSquaredScale, aPotentialRatio1, aPotentialRatio2],
+      FSF_COSMO_COEFS_BYTE_OFFSET,
+      FSF_COSMO_COEFS_BYTE_SIZE
+    )
+  }
+
   /** Check if config changed and rebuild buffers/pipelines/bind groups as needed. */
   private maybeRebuild(device: GPUDevice, config: FreeScalarConfig): void {
     const configHash = computeFsfConfigHash(config)
@@ -685,7 +737,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         )
         if (nSub > maxNSubThisFrame) maxNSubThisFrame = nSub
         if (nSub !== 1 && this.uniformBuffer) {
-          writeFsfDtSlot(device, this.uniformBuffer, this.cosmoCoefsScratch, dtFull / nSub)
+          this.stageDtSlotCopy(device, encoder, dtFull / nSub, `free-scalar-dt-substep-${step}`)
         }
 
         for (let sub = 0; sub < nSub; sub++) {
@@ -716,10 +768,10 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
               (eta: number) => computeFsfCosmologyCoefs(config, eta)
             )
             this.preheatingTime = r.preheatingTime
-            writeFsfCosmologyCoefsSlot(
+            this.stageCosmologyCoefsSlotCopy(
               device,
-              this.uniformBuffer,
-              this.cosmoCoefsScratch,
+              encoder,
+              `free-scalar-cosmo-coefs-${step}-${sub}`,
               r.coefs.aKinetic,
               r.coefs.aPotential,
               r.coefs.aFull,
@@ -769,7 +821,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         // pre-flight CFL check (and any non-cosmology downstream reader)
         // sees the user-configured integrator step.
         if (nSub !== 1 && this.uniformBuffer) {
-          writeFsfDtSlot(device, this.uniformBuffer, this.cosmoCoefsScratch, dtFull)
+          this.stageDtSlotCopy(device, encoder, dtFull, `free-scalar-dt-full-${step}`)
         }
       }
 

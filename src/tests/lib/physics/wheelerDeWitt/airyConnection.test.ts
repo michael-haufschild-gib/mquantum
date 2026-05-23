@@ -18,7 +18,12 @@
 import { describe, expect, it } from 'vitest'
 
 import { airyAll } from '@/lib/physics/wheelerDeWitt/airy'
-import { extractColumnAiry, langerEvaluate } from '@/lib/physics/wheelerDeWitt/airyConnection'
+import {
+  applyAiryBoundaryBranchPolicy,
+  emptyColumnAiry,
+  extractColumnAiry,
+  langerEvaluate,
+} from '@/lib/physics/wheelerDeWitt/airyConnection'
 import {
   WDW_C_U,
   wdwLangerVariable,
@@ -160,6 +165,26 @@ describe('airyConnection — round-trip extraction (DeWitt: leaves c₁,c₂ unt
     const finalSq = info.c1Re ** 2 + info.c1Im ** 2 + info.c2Re ** 2 + info.c2Im ** 2
     expect(Math.abs(finalSq - rawSq) / rawSq).toBeLessThan(1e-6)
   })
+
+  it('HH/DeWitt branch policy preserves a finite pure-Bi raw column', () => {
+    const out = applyAiryBoundaryBranchPolicy('noBoundary', 0, 0, 0.6, -0.8)
+    const finalSq = out.c1Re ** 2 + out.c1Im ** 2 + out.c2Re ** 2 + out.c2Im ** 2
+
+    expect(out.c2Re).toBe(0)
+    expect(out.c2Im).toBe(0)
+    expect(finalSq).toBeCloseTo(1, 12)
+    expect(Math.hypot(out.c1Re, out.c1Im)).toBeGreaterThan(0)
+  })
+
+  it('Vilenkin branch policy preserves a finite pure-Bi raw column', () => {
+    const out = applyAiryBoundaryBranchPolicy('tunneling', 0, 0, 0.6, -0.8)
+    const finalSq = out.c1Re ** 2 + out.c1Im ** 2 + out.c2Re ** 2 + out.c2Im ** 2
+
+    expect(out.c2Re).toBeCloseTo(-out.c1Im, 12)
+    expect(out.c2Im).toBeCloseTo(out.c1Re, 12)
+    expect(finalSq).toBeCloseTo(1, 12)
+    expect(Math.hypot(out.c1Re, out.c1Im)).toBeGreaterThan(0)
+  })
 })
 
 describe('airyConnection — failure modes', () => {
@@ -184,6 +209,35 @@ describe('airyConnection — failure modes', () => {
 })
 
 describe('airyConnection — langerEvaluate consistency', () => {
+  it('keeps a pure decaying Airy branch finite after Bi overflows', () => {
+    const mass = 0
+    const lambda = 0.01
+    const phi1 = 0
+    const phi2 = 0
+    const a = 10
+    const aTurn = wdwTurningA(phi1, phi2, mass, lambda)!
+    const zeta = wdwLangerVariable(a, phi1, phi2, mass, lambda)
+    const airy = airyAll(zeta)
+    const info = {
+      ...emptyColumnAiry(aTurn),
+      hasOverwrite: true,
+      kappa: 2 * WDW_C_U * aTurn,
+      c1Re: 1,
+      c1Im: 0,
+      c2Re: 0,
+      c2Im: 0,
+    }
+
+    expect(zeta).toBeGreaterThan(100)
+    expect(Number.isFinite(airy.bi)).toBe(false)
+
+    const out = langerEvaluate(info, a, phi1, phi2, mass, lambda)
+
+    expect(Number.isFinite(out.re)).toBe(true)
+    expect(out.re).toBeGreaterThanOrEqual(0)
+    expect(out.im).toBe(0)
+  })
+
   it('matches the analytic input exactly at every Lorentzian sample', () => {
     const c1Re = 0.6
     const c1Im = 0

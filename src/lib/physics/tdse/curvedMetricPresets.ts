@@ -32,6 +32,7 @@ export const CURVED_METRIC_TDSE_PRESETS: TdseScenarioPreset[] = [
     name: 'Wormhole: Entangled-Looking Pair',
     description:
       'Two Gaussians launched outward from the joined throat of a double Morris–Thorne geometry. Each packet evolves on the same curved-space TDSE and reflects off the geometric bottleneck of the opposite throat. NOT a physical entangled-particle experiment; the "pair" label is structural — two classically-separable packets on a shared metric background, not a Bell-pair state.',
+    maxDim: 3,
     overrides: {
       latticeDim: 3,
       gridSize: [64, 64, 64],
@@ -64,6 +65,7 @@ export const CURVED_METRIC_TDSE_PRESETS: TdseScenarioPreset[] = [
     name: 'Schwarzschild: Tangential Wavepacket',
     description:
       'Gaussian wavepacket on a Schwarzschild spatial slice in isotropic coordinates, launched tangentially to hint at orbital motion. Shows curvature-induced dispersion and lensing-like path bending around the conformal-factor singularity at r=M/2. NOT a classical geodesic orbit — the packet is a quantum wavefunction on a fixed 3-slice; there is no temporal metric component, no proper-time evolution along worldlines, and no backreaction on the geometry.',
+    maxDim: 3,
     overrides: {
       latticeDim: 3,
       gridSize: [64, 64, 64],
@@ -91,6 +93,7 @@ export const CURVED_METRIC_TDSE_PRESETS: TdseScenarioPreset[] = [
     name: 'Schwarzschild: Phase-Wavelength Variation',
     description:
       'Wavefunction phase on a Schwarzschild exterior spatial slice. The visible phase-wavelength is the carrier de Broglie wavelength, which varies with depth in the gravitational well via the conformal factor ψ⁴. NOT a proper-time-evolved clock — the metric here is purely spatial. The phase rolling difference across the field reflects the conformal factor of the spatial 3-slice, not a real gravitational time-dilation measurement; a true redshift demo requires a (3+1) metric.',
+    maxDim: 3,
     overrides: {
       latticeDim: 3,
       gridSize: [64, 64, 64],
@@ -119,6 +122,7 @@ export const CURVED_METRIC_TDSE_PRESETS: TdseScenarioPreset[] = [
     name: 'de Sitter: Cosmological Stretching',
     description:
       'Wavepacket in a spatially flat de Sitter (expanding) universe with scale factor a(t)=exp(H·t). The lattice is comoving; physical wavelengths grow as a(t) so the packet "spreads" in coordinate space as the universe expands. NOT a full QFT-in-curved-spacetime calculation — this is a non-relativistic wavefunction on a time-dependent spatial metric, which captures the cosmological-redshift kinematics without particle creation or vacuum-state effects.',
+    maxDim: 3,
     overrides: {
       latticeDim: 3,
       gridSize: [64, 64, 64],
@@ -148,6 +152,7 @@ export const CURVED_METRIC_TDSE_PRESETS: TdseScenarioPreset[] = [
     name: '2-Sphere: Wavepacket on Compact Geometry',
     description:
       'Wavepacket on a 2-sphere of radius R, visualized through chart axis 1 = θ (polar) and axis 2 = φ (azimuthal). The φ seam wraps periodically and skips PML damping; θ remains a bounded chart coordinate with a pole clamp ε=0.2 to keep the metric non-singular. NOT a full closed-sphere coordinate solver: the extra axis is flat embedding space, not a physical third spherical coordinate.',
+    maxDim: 3,
     overrides: {
       latticeDim: 3,
       gridSize: [64, 64, 64],
@@ -178,6 +183,7 @@ export const CURVED_METRIC_TDSE_PRESETS: TdseScenarioPreset[] = [
     name: 'Torus: Quantized Plane Wave',
     description:
       'Plane wave on a flat 3-torus with periods L = π. Momentum on a compact space is quantized — only integer multiples of 2π/L are normalizable, so the chosen k = 2 (i.e. n = 1) is exactly resonant with the period and produces a clean stationary mode. NOT a real compactified universe; the period π is a pedagogical choice that makes the resonance arithmetic visible at unit lattice spacing.',
+    maxDim: 3,
     overrides: {
       latticeDim: 3,
       gridSize: [64, 64, 64],
@@ -207,6 +213,7 @@ export const CURVED_METRIC_TDSE_PRESETS: TdseScenarioPreset[] = [
     name: 'AdS: Wavepacket Reflecting off Conformal Boundary',
     description:
       'Wavepacket launched toward the AdS conformal boundary on the Poincaré half-space chart (axis 0 = z, boundary at z→0). The conformal factor (L/z)² steepens without bound as z→0, producing reflective-like behavior off the effective boundary at finite proper time — a hallmark of AdS being a "box" despite its infinite volume. The implementation folds the z axis via |z| (the metric uses max(|z|, 0.05) as a soft boundary floor), so the chart covers both sides of z=0 symmetrically rather than being a true half-space. NOT a holographic-duality demo — this is purely the Schrödinger equation on a fixed AdS spatial slice in Poincaré coordinates; no boundary CFT, no bulk-to-boundary propagator.',
+    maxDim: 3,
     overrides: {
       latticeDim: 3,
       gridSize: [64, 64, 64],

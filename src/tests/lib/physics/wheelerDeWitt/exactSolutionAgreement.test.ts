@@ -214,6 +214,15 @@ const SHARED_FOR_BULK: Pick<WheelerDeWittSolverInput, 'phiExtent' | 'gridNa' | '
 }
 
 describe('Wheeler–DeWitt solver vs closed-form column references', () => {
+  it('positive-V exact Ai branch remains finite after the unused Bi branch overflows', () => {
+    const sample = columnSolutionPositiveV({ a: 10, phi1: 0, phi2: 0, m: 0, lambda: 0.01 }, 1, 0)
+
+    expect(Number.isFinite(sample.chi.re)).toBe(true)
+    expect(Number.isFinite(sample.chi.im)).toBe(true)
+    expect(Number.isFinite(sample.dChi.re)).toBe(true)
+    expect(Number.isFinite(sample.dChi.im)).toBe(true)
+  })
+
   it('V>0 (m=0, Λ=0.5): HH-branch (c₁=1, c₂=0) — RK4 on Lorentzian, Langer on Stage-3 Euclidean', () => {
     resetCflWarningBudget()
     const m = 0

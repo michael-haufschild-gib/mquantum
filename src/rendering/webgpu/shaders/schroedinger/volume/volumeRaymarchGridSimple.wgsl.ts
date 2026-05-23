@@ -310,15 +310,25 @@ fn volumeRaymarchGrid(
     let hasWdwOverlay = FEATURE_WDW_OVERLAY && DENSITY_GRID_HAS_PHASE && gridSample.a > 0.01;
 
     if (!PROFILING_STRIP_EMPTY_SKIP && rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay && !hasWdwOverlay) {
-      let skipDistance = min(stepLen * 10.0, max(remaining, 0.0));
+      let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(remaining, 0.0));
       if (skipDistance > stepLen) {
         let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms);
+        let probeFar = sampleDensityFromGrid(pos + rayDir * skipDistance, uniforms);
         let midHasPot =
           FEATURE_NEGATIVE_ALPHA_POTENTIAL_OVERLAY && DENSITY_GRID_HAS_PHASE && probeMid.a < -0.01;
+        let farHasPot =
+          FEATURE_NEGATIVE_ALPHA_POTENTIAL_OVERLAY && DENSITY_GRID_HAS_PHASE && probeFar.a < -0.01;
         let midHasWdwOverlay =
           FEATURE_WDW_OVERLAY && DENSITY_GRID_HAS_PHASE && probeMid.a > 0.01;
+        let farHasWdwOverlay =
+          FEATURE_WDW_OVERLAY && DENSITY_GRID_HAS_PHASE && probeFar.a > 0.01;
         let midTotal = gridSkipDensity(probeMid);
-        if (midTotal < EMPTY_SKIP_THRESHOLD && !midHasPot && !midHasWdwOverlay) {
+        let farTotal = gridSkipDensity(probeFar);
+        if (
+          midTotal < EMPTY_SKIP_THRESHOLD && farTotal < EMPTY_SKIP_THRESHOLD
+          && !midHasPot && !farHasPot
+          && !midHasWdwOverlay && !farHasWdwOverlay
+        ) {
           t += skipDistance;
           continue;
         }
@@ -326,7 +336,7 @@ fn volumeRaymarchGrid(
     }
 
     var adaptiveStep: f32;
-    if (!PROFILING_STRIP_ADAPTIVE_STEP) {
+    if (!PROFILING_STRIP_ADAPTIVE_STEP && !hasPotOverlay) {
       let logRhoForStep = gridAdaptiveLogDensity(rho, sCenter);
       adaptiveStep = computeAdaptiveStep(logRhoForStep, stepLen, remaining);
     } else {

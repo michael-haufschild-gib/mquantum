@@ -303,7 +303,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
       <>
         <div
           ref={topBarRef}
-          className="glass-panel h-12 flex items-center px-4 z-40 shrink-0 select-none relative mb-2 rounded-xl mx-2 mt-2"
+          className="surface-panel h-12 flex items-center px-4 z-40 shrink-0 select-none relative mb-2 rounded-xl mx-2 mt-2"
           data-testid="top-bar"
         >
           {/* Left: Branding & Menu */}

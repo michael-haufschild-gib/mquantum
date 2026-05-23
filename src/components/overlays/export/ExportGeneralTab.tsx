@@ -203,7 +203,7 @@ export const ExportGeneralTab = () => {
       <div
         className={`
                     flex items-center justify-between p-4 rounded-xl border transition-colors cursor-pointer
-                    ${settings.crop.enabled ? 'bg-accent/5 border-accent/50' : 'glass-panel hover:bg-[var(--bg-hover)]'}
+                    ${settings.crop.enabled ? 'bg-accent/5 border-accent/50' : 'surface-panel hover:bg-[var(--bg-hover)]'}
                 `}
         onClick={() =>
           updateSettings({ crop: { ...settings.crop, enabled: !settings.crop.enabled } })
@@ -251,7 +251,7 @@ export const ExportGeneralTab = () => {
       <div
         className={`
                     flex items-center justify-between p-4 rounded-xl border transition-colors cursor-pointer
-                    ${settings.resetEvolution ? 'bg-accent/5 border-accent/50' : 'glass-panel hover:bg-[var(--bg-hover)]'}
+                    ${settings.resetEvolution ? 'bg-accent/5 border-accent/50' : 'surface-panel hover:bg-[var(--bg-hover)]'}
                 `}
         onClick={() => updateSettings({ resetEvolution: !settings.resetEvolution })}
         title="Toggle whether the wavefunction resets before recording"

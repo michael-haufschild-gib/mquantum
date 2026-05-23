@@ -150,7 +150,7 @@ export const PortaledSubmenu: React.FC<{
         animate={{ opacity: ready ? 1 : 0, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
         transition={{ duration: 0.12 }}
-        className="glass-panel min-w-[180px] max-w-[280px] rounded-lg py-1 shadow-xl border border-border-default"
+        className="surface-panel min-w-[180px] max-w-[280px] rounded-lg py-1 shadow-xl border border-border-default"
         style={{
           position: 'fixed',
           top: coords.top,
@@ -158,7 +158,6 @@ export const PortaledSubmenu: React.FC<{
           zIndex: Z_INDEX.TOOLTIP + depth * 10,
           maxHeight: '60vh',
           overflowY: 'auto',
-          backdropFilter: 'blur(16px)',
           visibility: ready ? 'visible' : 'hidden',
         }}
         onMouseEnter={onMouseEnter}

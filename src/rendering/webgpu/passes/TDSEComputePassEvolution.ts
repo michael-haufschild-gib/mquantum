@@ -137,6 +137,22 @@ export interface EvolutionResources {
    */
   prepareCurvedStageTimes?: (device: GPUDevice, simTimeStart: number, steps: number) => void
   applyCurvedStageTimesForStep?: (encoder: GPUCommandEncoder, stepIdx: number) => void
+  /**
+   * Patch post-evolution metric-time fields after the last time-dependent
+   * curved RK4 step. Required because per-step copies update only
+   * `stageTimeK{1..4}` during integration, while write-grid reads `simTime`.
+   */
+  applyCurvedFinalMetricTime?: (encoder: GPUCommandEncoder, lastStepIdx: number) => void
+  /**
+   * Optional ordered full-TDSEUniforms snapshots for time-dependent scalar
+   * potentials. The live uniform buffer must be patched via encoder copies;
+   * repeated queue.writeBuffer calls would all resolve before the frame's
+   * command buffer and every dispatch would see the last snapshot.
+   */
+  prepareUniformSnapshots?: (device: GPUDevice, simTimeStart: number, steps: number) => void
+  applyUniformSnapshot?: (encoder: GPUCommandEncoder, stepIdx: number) => void
+  /** Refresh V(x,t) after the caller has patched the TDSE uniform snapshot. */
+  refreshDrivenPotential?: (ctx: WebGPURenderContext) => void
 }
 
 /**
@@ -165,6 +181,12 @@ export function runStrangEvolution(
   const metricKind = normalizeMetricForLattice(config.metric, config.latticeDim).kind
   const absorberEnabled = config.absorberEnabled === true && metricKind !== 'torus'
   const stochasticActive = config.stochasticEnabled && config.stochasticGamma > 0
+  const drivenPotentialActive = config.potentialType === 'driven' && config.driveEnabled === true
+  const timeDependentPotentialUniforms =
+    drivenPotentialActive &&
+    res.prepareUniformSnapshots !== undefined &&
+    res.applyUniformSnapshot !== undefined &&
+    res.refreshDrivenPotential !== undefined
   const curvedBranch = metricKind !== 'flat' && metricKind !== 'torus'
   if (curvedBranch && res.dispatchCurvedRK4) {
     const { pl: curvedPl, bg: curvedBg, dc: curvedDc } = res
@@ -189,6 +211,9 @@ export function runStrangEvolution(
     if (curvedTimeDep && curvedSteps > 0 && res.prepareCurvedStageTimes) {
       res.prepareCurvedStageTimes(ctx.device, state.simTime, curvedSteps)
     }
+    if (timeDependentPotentialUniforms && curvedSteps > 0 && res.prepareUniformSnapshots) {
+      res.prepareUniformSnapshots(ctx.device, state.simTime, curvedSteps)
+    }
     if (stochasticActive && res.stochasticState && curvedSteps > 0) {
       prepareStochasticStaging(
         ctx.device,
@@ -199,6 +224,10 @@ export function runStrangEvolution(
       )
     }
     for (let step = 0; step < curvedSteps; step++) {
+      if (timeDependentPotentialUniforms && res.applyUniformSnapshot) {
+        res.applyUniformSnapshot(ctx.encoder, step)
+        res.refreshDrivenPotential?.(ctx)
+      }
       if (curvedTimeDep && res.applyCurvedStageTimesForStep) {
         res.applyCurvedStageTimesForStep(ctx.encoder, step)
       }
@@ -268,6 +297,13 @@ export function runStrangEvolution(
         tickHellerStep(ctx.device, ctx.encoder, res.hellerState, state.simTime)
       }
     }
+    if (timeDependentPotentialUniforms && res.applyUniformSnapshot) {
+      res.applyUniformSnapshot(ctx.encoder, curvedSteps)
+      res.refreshDrivenPotential?.(ctx)
+    }
+    if (curvedTimeDep && curvedSteps > 0 && res.applyCurvedFinalMetricTime) {
+      res.applyCurvedFinalMetricTime(ctx.encoder, curvedSteps - 1)
+    }
     return
   }
 
@@ -294,6 +330,9 @@ export function runStrangEvolution(
       res.boundingRadius
     )
   }
+  if (timeDependentPotentialUniforms && stepsThisFrame > 0 && res.prepareUniformSnapshots) {
+    res.prepareUniformSnapshots(ctx.device, state.simTime, stepsThisFrame)
+  }
 
   // PERF: batch every dispatch of the Strang step into a single compute pass.
   // Previously each substep opened ~10 separate passes (fused_Vhalf_pack, 3 fwd
@@ -319,6 +358,10 @@ export function runStrangEvolution(
     res.wormholePipeline !== null &&
     res.wormholeBG !== null
   for (let step = 0; step < stepsThisFrame; step++) {
+    if (timeDependentPotentialUniforms && res.applyUniformSnapshot) {
+      res.applyUniformSnapshot(ctx.encoder, step)
+      res.refreshDrivenPotential?.(ctx)
+    }
     if (fftAxesInPassAvailable) {
       const strangPass = ctx.beginComputePass({ label: `tdse-strang-${step}` })
       if (wormholeActive && res.wormholePipeline && res.wormholeBG) {
@@ -538,6 +581,10 @@ export function runStrangEvolution(
     if (res.hellerState) {
       tickHellerStep(ctx.device, ctx.encoder, res.hellerState, state.simTime)
     }
+  }
+  if (timeDependentPotentialUniforms && stepsThisFrame > 0 && res.applyUniformSnapshot) {
+    res.applyUniformSnapshot(ctx.encoder, stepsThisFrame)
+    res.refreshDrivenPotential?.(ctx)
   }
 }
 

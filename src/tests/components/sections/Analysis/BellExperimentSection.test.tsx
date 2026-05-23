@@ -73,6 +73,17 @@ describe('BellExperimentSection — smoke', () => {
     expect(screen.getByTestId('bell-violated')).toBeInTheDocument()
   })
 
+  it('labels the sparkline as S(t) when precession fields are active', () => {
+    useExtendedObjectStore.getState().setBellFieldA([0, 0, 0.5])
+    const cfg = useExtendedObjectStore.getState().bellPair
+    useBellExperimentStore.getState().processTrialBatch(cfg, cfg.trialsPerFrame)
+    useBellExperimentStore.getState().processTrialBatch(cfg, cfg.trialsPerFrame)
+
+    render(<BellExperimentSection />)
+
+    expect(screen.getByText(/\|S\|\(t\)/)).toBeInTheDocument()
+  })
+
   it('LHV strategy dropdown updates the config', async () => {
     const user = userEvent.setup()
     render(<BellExperimentSection />)

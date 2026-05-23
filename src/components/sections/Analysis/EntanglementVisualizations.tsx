@@ -462,7 +462,7 @@ export const AtlasHeatmap: React.FC<{
         <div
           role="tooltip"
           data-testid="atlas-tooltip"
-          className="fixed glass-panel-dark border border-border-default rounded-lg px-3 py-2 pointer-events-none max-w-[240px] shadow-lg"
+          className="fixed surface-panel-strong border border-border-default rounded-lg px-3 py-2 pointer-events-none max-w-[240px] shadow-lg"
           style={{
             left: `${hovered.x}px`,
             top: `${hovered.y - 8}px`,

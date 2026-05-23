@@ -20,6 +20,7 @@ import { oklabBlock } from '../shared/color/oklab.wgsl'
 import {
   assembleShaderBlocks,
   generateConsolidatedBindGroups,
+  sanitizeShaderBoolean,
   singleOutputBlock,
 } from '../shared/compose-helpers'
 import { constantsBlock } from '../shared/core/constants.wgsl'
@@ -38,6 +39,9 @@ import {
   canUseGridOnly,
   derivedShaderFlags,
   removeDefaultNodalSpecializationOverrides,
+  sanitizeQuantumModeForShader,
+  sanitizeShaderColorAlgorithm,
+  sanitizeShaderDensityGridSize,
   type SchroedingerWGSLShaderConfig,
   selectMainBlock,
 } from './composeConfig'
@@ -61,32 +65,29 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   modules: string[]
   features: string[]
 } {
-  const {
-    dimension,
-    isosurface = false,
-    temporalAccumulation: enableTemporal = false,
-    useDensityGrid = false,
-    densityGridHasPhase = false,
-    densityGridSize = 64,
-    quantumMode = 'harmonicOscillator',
-    nodal = true,
-    phaseMateriality = true,
-    interference = true,
-    uncertaintyBoundary = true,
-    colorAlgorithm = 4,
-    isWigner = false,
-    useWignerCache = false,
-    isFreeScalar = false,
-    isFreeScalarField = false,
-    isQuantumWalk = false,
-    isPauli = false,
-    isAds = false,
-    freeScalarAnalysis = false,
-    useDensityMatrix = false,
-    crossSectionEnabled = true,
-    probabilityCurrentEnabled = true,
-    overrides = [],
-  } = config
+  const { dimension, overrides = [] } = config
+  const isosurface = sanitizeShaderBoolean(config.isosurface, false)
+  const enableTemporal = sanitizeShaderBoolean(config.temporalAccumulation, false)
+  const useDensityGrid = sanitizeShaderBoolean(config.useDensityGrid, false)
+  const densityGridHasPhase = sanitizeShaderBoolean(config.densityGridHasPhase, false)
+  const densityGridSize = sanitizeShaderDensityGridSize(config.densityGridSize)
+  const quantumMode = sanitizeQuantumModeForShader(config.quantumMode)
+  const nodal = sanitizeShaderBoolean(config.nodal, true)
+  const phaseMateriality = sanitizeShaderBoolean(config.phaseMateriality, true)
+  const interference = sanitizeShaderBoolean(config.interference, true)
+  const uncertaintyBoundary = sanitizeShaderBoolean(config.uncertaintyBoundary, true)
+  const colorAlgorithm = sanitizeShaderColorAlgorithm(config.colorAlgorithm)
+  const isWigner = sanitizeShaderBoolean(config.isWigner, false)
+  const useWignerCache = sanitizeShaderBoolean(config.useWignerCache, false)
+  const isFreeScalar = sanitizeShaderBoolean(config.isFreeScalar, false)
+  const isFreeScalarField = sanitizeShaderBoolean(config.isFreeScalarField, false)
+  const isQuantumWalk = sanitizeShaderBoolean(config.isQuantumWalk, false)
+  const isPauli = sanitizeShaderBoolean(config.isPauli, false)
+  const isAds = sanitizeShaderBoolean(config.isAds, false)
+  const freeScalarAnalysis = sanitizeShaderBoolean(config.freeScalarAnalysis, false)
+  const useDensityMatrix = sanitizeShaderBoolean(config.useDensityMatrix, false)
+  const crossSectionEnabled = sanitizeShaderBoolean(config.crossSectionEnabled, true)
+  const probabilityCurrentEnabled = sanitizeShaderBoolean(config.probabilityCurrentEnabled, true)
 
   // Derived shader flags (extracted to reduce function complexity)
   const derived = derivedShaderFlags(config)

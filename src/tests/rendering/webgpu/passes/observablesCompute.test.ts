@@ -21,6 +21,7 @@ import {
   supportsFlatFourierObservables,
   writeObservablesUniforms,
 } from '@/rendering/webgpu/passes/TDSEObservablesDispatch'
+import { energySpectralDensityBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/energySpectralDensity.wgsl'
 
 const hadGPUBufferUsage = 'GPUBufferUsage' in globalThis
 
@@ -341,6 +342,44 @@ describe('writeObservablesUniforms', () => {
     expect(esF32[4]).toBe(1)
     expect(esF32[5]).toBe(1)
     expect(Number.isFinite(esF32[3])).toBe(true)
+  })
+
+  it('writes exact discrete anisotropic kinetic-energy range from grid and spacing', () => {
+    const { device, writeBuffer } = createMockDevice()
+    const resources = createObservablesBuffers(device, 15, 2)
+    const state = makeObservablesState(resources, 15)
+    const config = {
+      latticeDim: 2,
+      gridSize: [3, 5],
+      spacing: [0.1, 0.2],
+      compactDims: [],
+      compactRadii: [],
+      metric: { kind: 'flat' },
+      hbar: 2,
+      mass: 4,
+    } as unknown as Parameters<typeof writeObservablesUniforms>[1]
+
+    writeObservablesUniforms(device, config, state, [5, 1])
+
+    const energyWrite = writeBuffer.mock.calls.find(
+      ([buffer]) => (buffer as { label?: string }).label === 'energy-spectrum-uniform'
+    )!
+    const esF32 = new Float32Array(energyWrite[2] as ArrayBuffer)
+    const kMax0 = ((2 * Math.PI) / (3 * 0.1)) * Math.floor(3 / 2)
+    const kMax1 = ((2 * Math.PI) / (5 * 0.2)) * Math.floor(5 / 2)
+    const expected =
+      ((config.hbar * config.hbar) / (2 * config.mass)) * (kMax0 * kMax0 + kMax1 * kMax1)
+
+    expect(esF32[3]).toBeCloseTo(expected, 4)
+  })
+})
+
+describe('energySpectralDensity shader contracts', () => {
+  it('normalizes unscaled FFT density before fixed-point accumulation', () => {
+    expect(energySpectralDensityBlock).toContain(
+      'let density = (re * re + im * im) / max(f32(esParams.totalSites), 1.0);'
+    )
+    expect(energySpectralDensityBlock).not.toContain('let density = re * re + im * im;')
   })
 })
 

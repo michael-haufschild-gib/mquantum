@@ -32,7 +32,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
       return (
         <div className="flex h-screen w-full items-center justify-center bg-[var(--bg-app)] p-4 text-[var(--text-primary)]">
-          <div className="w-full max-w-md rounded-lg border border-danger-border bg-danger-bg p-6 backdrop-blur-md">
+          <div className="w-full max-w-md rounded-lg border border-danger-border bg-danger-bg p-6">
             <h2 className="mb-4 text-xl font-bold text-danger">Something went wrong</h2>
             <p className="mb-4 text-sm text-[var(--text-secondary)]">
               An error occurred while rendering the application.
@@ -48,7 +48,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 button always renders regardless of what failed. */}
             <button
               type="button"
-              className="rounded bg-danger-solid px-4 py-2 text-sm font-semibold text-text-inverse hover:brightness-110 transition-colors"
+              className="rounded bg-danger-solid px-4 py-2 text-sm font-semibold text-text-inverse hover:bg-danger transition-colors"
               onClick={() => window.location.reload()}
             >
               Reload Page

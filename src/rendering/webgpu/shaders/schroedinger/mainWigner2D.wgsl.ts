@@ -106,7 +106,10 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   // Hydrogen radial: offset by rCenter = n²a₀ so the orbital peak is at screen center.
   // HO / extra dim: centered at origin (symmetric wavefunction).
   // p is always symmetric: [-wignerPRange, +wignerPRange]
-  let aspect = camera.resolution.x / camera.resolution.y;
+  var aspect = 1.0;
+  if (camera.resolution.x > 0.0 && camera.resolution.y > 0.0) {
+    aspect = camera.resolution.x / camera.resolution.y;
+  }
   let centeredUV = input.uv * 2.0 - 1.0;
   var x = centeredUV.x * schroedinger.wignerXRange * aspect;
   var p = centeredUV.y * schroedinger.wignerPRange;

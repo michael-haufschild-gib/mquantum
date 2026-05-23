@@ -29,7 +29,11 @@ const FPSHeader = React.memo(function FPSHeader() {
     }))
   )
 
-  const fpsColor = getHealthColor(fps, 55, 30)
+  const hasValidFps = Number.isFinite(fps) && fps >= 0
+  const safeFps = hasValidFps ? fps : 0
+  const fpsColor = getHealthColor(safeFps, 55, 30)
+  const fpsLabel = hasValidFps ? Math.round(fps).toString() : '--'
+  const frameTimeLabel = Number.isFinite(frameTime) && frameTime >= 0 ? frameTime.toFixed(1) : '--'
   const minFpsLabel = formatFpsBound(minFps)
   const maxFpsLabel = formatFpsBound(maxFps)
 
@@ -38,7 +42,7 @@ const FPSHeader = React.memo(function FPSHeader() {
       <div className="flex justify-between items-end mb-2">
         <div>
           <div className={`text-4xl font-bold font-mono tracking-tighter ${fpsColor.text}`}>
-            {fps}
+            {fpsLabel}
             <span className="text-sm text-text-tertiary ml-2 font-sans tracking-normal font-medium">
               FPS
             </span>
@@ -49,7 +53,7 @@ const FPSHeader = React.memo(function FPSHeader() {
         </div>
         <div className="text-right">
           <div className="text-lg font-mono text-text-secondary">
-            {frameTime.toFixed(1)}
+            {frameTimeLabel}
             <span className="text-xs text-text-tertiary ml-1">ms</span>
           </div>
           <div className="text-2xs text-text-tertiary uppercase tracking-wider mt-1 font-medium">
