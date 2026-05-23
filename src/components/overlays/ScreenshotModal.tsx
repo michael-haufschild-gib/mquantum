@@ -115,9 +115,13 @@ export const ScreenshotModal = () => {
 
   const getCropDimensions = () => {
     if (!imgRef.current || !imageLoaded) return null
-    const w = Math.round(crop.width * imgRef.current.naturalWidth)
-    const h = Math.round(crop.height * imgRef.current.naturalHeight)
-    return `${w} × ${h}`
+    const cropPixels = resolveCropPixels(
+      crop,
+      imgRef.current.naturalWidth,
+      imgRef.current.naturalHeight
+    )
+    if (!cropPixels) return null
+    return `${cropPixels.width} × ${cropPixels.height}`
   }
 
   return (

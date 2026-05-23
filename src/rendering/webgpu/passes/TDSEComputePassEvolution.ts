@@ -297,7 +297,7 @@ export function runStrangEvolution(
         tickHellerStep(ctx.device, ctx.encoder, res.hellerState, state.simTime)
       }
     }
-    if (timeDependentPotentialUniforms && res.applyUniformSnapshot) {
+    if (timeDependentPotentialUniforms && curvedSteps > 0 && res.applyUniformSnapshot) {
       res.applyUniformSnapshot(ctx.encoder, curvedSteps)
       res.refreshDrivenPotential?.(ctx)
     }

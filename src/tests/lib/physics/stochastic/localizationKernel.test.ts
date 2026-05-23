@@ -123,6 +123,11 @@ describe('generateCollapseCenters', () => {
     }
   })
 
+  it('emits no centers when no active lattice dimensions are available', () => {
+    expect(generateCollapseCenters(3, [], [], 0, 42, 0)).toEqual([])
+    expect(generateCollapseCenters(3, [64], [], 1, 42, 0)).toEqual([])
+  })
+
   it('Gaussian noise values have correct statistics (N=10000, seed=42)', () => {
     const gridSize = [64]
     const spacing = [0.1]

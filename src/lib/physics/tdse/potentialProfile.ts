@@ -76,10 +76,12 @@ export function evaluatePotential1D(x: number, config: TdseConfig): number {
       // is indistinguishable from a pure harmonic trap.
       return 0.5 * config.mass * config.harmonicOmega * config.harmonicOmega * x * x
 
-    case 'blackHoleRingdown': // Match GPU uniform packing: legacy/direct configs can carry finite but // helper inverts r*(r) and evaluates V_ℓ^s(r*) on a Schwarzschild bg. // x is interpreted as the tortoise coordinate r*. The Regge–Wheeler
-    // non-physical pairs such as (s=2, ell=0), which the compute pass
-    // normalizes before evolution.
-    {
+    case 'blackHoleRingdown': {
+      // Match GPU uniform packing: legacy/direct configs can carry finite but
+      // non-physical pairs such as (s=2, ell=0), which the compute pass
+      // normalizes before evolution. x is interpreted as the tortoise
+      // coordinate r*. The helper inverts r*(r) and evaluates V_ℓ^s(r*) on a
+      // Schwarzschild background.
       const bh = normalizeTdseBlackHoleParams(config)
       return computeReggeWheelerPotential(x, bh.bhMass, bh.bhMultipoleL, bh.bhSpin)
     }

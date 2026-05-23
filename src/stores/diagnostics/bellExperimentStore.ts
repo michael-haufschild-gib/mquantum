@@ -419,6 +419,41 @@ function initialState(): Pick<
   }
 }
 
+type BellTrialState = Pick<
+  BellExperimentState,
+  | 'totalTrials'
+  | 'seed'
+  | 'qm'
+  | 'qmHasViolated'
+  | 'lhv'
+  | 'historyQmS'
+  | 'historyLhvS'
+  | 'historyTrialCount'
+  | 'historyHead'
+  | 'historyCount'
+  | 'recentOutcomes'
+  | 'recentHead'
+  | 'recentCount'
+>
+
+function initialTrialState(seed: number): BellTrialState {
+  return {
+    totalTrials: 0,
+    seed,
+    qm: emptySampler(),
+    qmHasViolated: false,
+    lhv: emptySampler(),
+    historyQmS: newHistoryF64(),
+    historyLhvS: newHistoryF64(),
+    historyTrialCount: new Uint32Array(HISTORY_LENGTH),
+    historyHead: 0,
+    historyCount: 0,
+    recentOutcomes: new Int8Array(RECENT_OUTCOMES * 4),
+    recentHead: 0,
+    recentCount: 0,
+  }
+}
+
 type BellExperimentSet = (state: Partial<BellExperimentState>) => void
 
 function syncConfigGatedRunState(
@@ -426,20 +461,20 @@ function syncConfigGatedRunState(
   configKey: string,
   configSeed: number,
   set: BellExperimentSet
-): BellExperimentState {
+): BellExperimentState | BellTrialState {
   const configChanged = _lastConfigKey !== '' && _lastConfigKey !== configKey
   const configSeedChanged = _lastConfigSeed !== null && _lastConfigSeed !== configSeed
   const seedChanged = state.seed !== configSeed
 
   if (state.totalTrials > 0 && (configChanged || configSeedChanged)) {
-    const fresh = initialState()
+    const fresh = initialTrialState(configSeed)
     resetAccumulators()
     _rng = null
     _rngSeed = -1
     _seedOverrideArmed = false
     getRng(configSeed)
-    set({ ...fresh, seed: configSeed })
-    return { ...state, ...fresh, seed: configSeed }
+    set(fresh)
+    return fresh
   }
 
   if (state.totalTrials === 0 && seedChanged && !_seedOverrideArmed) {

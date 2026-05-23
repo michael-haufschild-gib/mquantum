@@ -876,7 +876,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
                 }
               }
               const normDrift =
-                isFinitePositiveNorm(this.initialNorm) && Number.isFinite(totalNorm)
+                isFinitePositiveNorm(this.initialNorm) && totalNormIsSafe
                   ? (totalNorm - this.initialNorm) / this.initialNorm
                   : 0
 

@@ -13,11 +13,14 @@
  * @module
  */
 
+import { assembleShaderBlocks } from '../../shared/compose-helpers'
 import { renormalizeFiniteGuardBlock } from './renormalize.wgsl'
 
-export const diracRenormalizeBlock =
-  renormalizeFiniteGuardBlock +
-  /* wgsl */ `
+export const diracRenormalizeBlock = assembleShaderBlocks([
+  { name: 'renormalize-finite-guard', content: renormalizeFiniteGuardBlock },
+  {
+    name: 'dirac-renormalize',
+    content: /* wgsl */ `
 struct RenormUniforms {
   totalElements: u32,  // S * totalSites
   targetNorm: f32,     // initial ||ψ||² to restore to
@@ -46,7 +49,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
 
   // Scale: ψ *= √(target/current) so that ||ψ||² → targetNorm
-  let scale = sqrt(targetNorm / currentNorm);
+  let ratio = targetNorm / currentNorm;
+  if (!isSafeRenormNorm(ratio)) {
+    return;
+  }
+  let scale = sqrt(ratio);
   spinor[idx] = spinor[idx] * scale;
 }
-`
+`,
+  },
+]).wgsl

@@ -192,22 +192,26 @@ function sanitizePassTimings(timings: PassTimingEntry[]): PassTimingEntry[] {
   }))
 }
 
+function sumGpuTime(timings: PassTimingEntry[]): number {
+  return timings.reduce((sum, timing) => sum + timing.gpuTimeMs, 0)
+}
+
+// eslint-disable-next-line sonarjs/cognitive-complexity -- explicit field whitelist keeps updateMetrics sanitization auditable.
 function sanitizeMetricsPatch(
   metrics: Partial<PerformanceMetricsState>,
   state: PerformanceMetricsState
 ): Partial<PerformanceMetricsState> {
-  const patch: Partial<PerformanceMetricsState> = { ...metrics }
-  if (metrics.fps !== undefined) patch.fps = finiteNonNegative(metrics.fps, state.fps)
-  if (metrics.minFps !== undefined) {
+  const patch: Partial<PerformanceMetricsState> = {}
+  if (metrics.fps != null) patch.fps = finiteNonNegative(metrics.fps, state.fps)
+  if (metrics.minFps != null) {
     patch.minFps =
       metrics.minFps === Infinity ? Infinity : finiteNonNegative(metrics.minFps, state.minFps)
   }
-  if (metrics.maxFps !== undefined) patch.maxFps = finiteNonNegative(metrics.maxFps, state.maxFps)
-  if (metrics.frameTime !== undefined) {
+  if (metrics.maxFps != null) patch.maxFps = finiteNonNegative(metrics.maxFps, state.maxFps)
+  if (metrics.frameTime != null) {
     patch.frameTime = finiteNonNegative(metrics.frameTime, state.frameTime)
   }
-  if (metrics.cpuTime !== undefined)
-    patch.cpuTime = finiteNonNegative(metrics.cpuTime, state.cpuTime)
+  if (metrics.cpuTime != null) patch.cpuTime = finiteNonNegative(metrics.cpuTime, state.cpuTime)
   if (metrics.gpu) patch.gpu = sanitizeGpuStats(metrics.gpu, state.gpu)
   if (metrics.sceneGpu) patch.sceneGpu = sanitizeGpuStats(metrics.sceneGpu, state.sceneGpu)
   if (metrics.memory) patch.memory = sanitizeMemoryStats(metrics.memory, state.memory)
@@ -220,6 +224,15 @@ function sanitizeMetricsPatch(
     }
   }
   if (metrics.history) patch.history = sanitizeHistoryData(metrics.history, state.history)
+  if (metrics.buffers) patch.buffers = sanitizeBufferStats(metrics.buffers, state.buffers)
+  if (metrics.cpuBreakdown) patch.cpuBreakdown = sanitizeCpuBreakdown(metrics.cpuBreakdown)
+  if (metrics.passTimings) patch.passTimings = sanitizePassTimings(metrics.passTimings)
+  if (metrics.totalGpuTimeMs) {
+    patch.totalGpuTimeMs = finiteNonNegative(
+      metrics.totalGpuTimeMs,
+      sumGpuTime(patch.passTimings ?? state.passTimings)
+    )
+  }
   return patch
 }
 
@@ -248,8 +261,7 @@ export const usePerformanceMetricsStore = create<PerformanceMetricsState>((set) 
   totalGpuTimeMs: 0,
   cpuBreakdown: { setupMs: 0, passesMs: 0, submitMs: 0 },
 
-  updateMetrics: (metrics) =>
-    set((state) => ({ ...state, ...sanitizeMetricsPatch(metrics, state) })),
+  updateMetrics: (metrics) => set((state) => sanitizeMetricsPatch(metrics, state)),
   setGpuName: (name) => set({ gpuName: name.trim() || 'Unknown GPU' }),
   updateBufferStats: (buffers) =>
     set((state) => ({ buffers: sanitizeBufferStats(buffers, state.buffers) })),
@@ -257,10 +269,9 @@ export const usePerformanceMetricsStore = create<PerformanceMetricsState>((set) 
     set((state) => ({ sceneGpu: sanitizeGpuStats(stats, state.sceneGpu) })),
   updatePassTimings: (timings, totalGpuMs) => {
     const passTimings = sanitizePassTimings(timings)
-    const fallbackTotalGpuMs = passTimings.reduce((sum, timing) => sum + timing.gpuTimeMs, 0)
     set({
       passTimings,
-      totalGpuTimeMs: finiteNonNegative(totalGpuMs, fallbackTotalGpuMs),
+      totalGpuTimeMs: finiteNonNegative(totalGpuMs, sumGpuTime(passTimings)),
     })
   },
   updateCpuBreakdown: (breakdown) => set({ cpuBreakdown: sanitizeCpuBreakdown(breakdown) }),

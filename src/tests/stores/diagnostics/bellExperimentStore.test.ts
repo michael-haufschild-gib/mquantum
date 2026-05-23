@@ -67,6 +67,23 @@ describe('processTrialBatch — QM converges to 2√2 at canonical CHSH angles',
     expect(s.historyCount).toBe(1)
   })
 
+  it('config-key resets preserve run controls and selected LHV strategy', () => {
+    const cfg = { ...createDefaultBellPairConfig(), seed: 5, lhvStrategyId: 'noisyClassical' }
+
+    useBellExperimentStore.getState().setLhvStrategyId('noisyClassical')
+    useBellExperimentStore.getState().setIsRunning(true)
+    useBellExperimentStore.getState().processTrialBatch(cfg, 1000)
+    useBellExperimentStore
+      .getState()
+      .processTrialBatch({ ...cfg, visibility: cfg.visibility * 0.9 }, 1000)
+
+    const s = useBellExperimentStore.getState()
+    expect(s.isRunning).toBe(true)
+    expect(s.lhvStrategyId).toBe('noisyClassical')
+    expect(s.totalTrials).toBe(1000)
+    expect(s.historyCount).toBe(1)
+  })
+
   it('|S| crosses 2 and approaches 2√2 with 100k trials', () => {
     const cfg = createDefaultBellPairConfig() // canonical CHSH defaults, v=1, η=1, qm sampler
     // Process in batches of 10k so the running ring buffer is exercised.

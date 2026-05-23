@@ -6,7 +6,7 @@
  *
  * Design:
  * - Lightweight backdrop that doesn't fully block view
- * - Glass-panel card with spinner and message
+ * - Surface-panel card with spinner and message
  * - Smooth entrance/exit animations
  * - Centered on screen for visibility
  * - Minimum display time to avoid jarring flashes

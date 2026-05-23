@@ -16,6 +16,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import type { DensityDistributionAnalyzer } from '@/rendering/webgpu/passes/DensityDistributionAnalysis'
+import { sanitizeDensityGridSize } from '@/rendering/webgpu/passes/DensityGridComputePass'
 import type { DensityReadbackState } from '@/rendering/webgpu/passes/DensityGridComputePassResources'
 import {
   selectGridTextureFormat,
@@ -113,6 +114,12 @@ describe('startPendingReadback applyState propagation', () => {
 })
 
 describe('density grid resource config sanitization', () => {
+  it('clamps density grid size to the active device texture limit', () => {
+    expect(sanitizeDensityGridSize(4096, 512)).toBe(512)
+    expect(sanitizeDensityGridSize(1024, 2048)).toBe(1024)
+    expect(sanitizeDensityGridSize(Number.NaN, 512)).toBe(64)
+  })
+
   it('treats non-boolean density-grid resource flags as disabled', async () => {
     const destroy = vi.fn()
     const device = {

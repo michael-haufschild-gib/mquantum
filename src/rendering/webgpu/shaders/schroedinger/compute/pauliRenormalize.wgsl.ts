@@ -12,11 +12,14 @@
  * @module
  */
 
+import { assembleShaderBlocks } from '../../shared/compose-helpers'
 import { renormalizeFiniteGuardBlock } from './renormalize.wgsl'
 
-export const pauliRenormalizeBlock =
-  renormalizeFiniteGuardBlock +
-  /* wgsl */ `
+export const pauliRenormalizeBlock = assembleShaderBlocks([
+  { name: 'renormalize-finite-guard', content: renormalizeFiniteGuardBlock },
+  {
+    name: 'pauli-renormalize',
+    content: /* wgsl */ `
 struct PauliRenormUniforms {
   totalElements: u32,  // components * totalSites (number of vec2f slots)
   targetNorm: f32,     // initial ||ψ||² to restore to
@@ -44,7 +47,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
 
-  let scale = sqrt(targetNorm / currentNorm);
+  let ratio = targetNorm / currentNorm;
+  if (!isSafeRenormNorm(ratio)) {
+    return;
+  }
+  let scale = sqrt(ratio);
   spinor[idx] = spinor[idx] * scale;
 }
-`
+`,
+  },
+]).wgsl

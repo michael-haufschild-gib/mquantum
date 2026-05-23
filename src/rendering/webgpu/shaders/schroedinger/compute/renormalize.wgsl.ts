@@ -15,6 +15,8 @@
  * @module
  */
 
+import { assembleShaderBlocks } from '../../shared/compose-helpers'
+
 export const renormalizeFiniteGuardBlock = /* wgsl */ `
 const RENORM_MAX_SAFE_NORM: f32 = 1.0e30;
 
@@ -35,9 +37,11 @@ fn isSafeRenormNorm(value: f32) -> bool {
  * them as a single flat array). Keep this block in sync with
  * `renormalizeBlock`'s math — the only difference is the binding layout.
  */
-export const tdseRenormalizeVec2Block =
-  renormalizeFiniteGuardBlock +
-  /* wgsl */ `
+export const tdseRenormalizeVec2Block = assembleShaderBlocks([
+  { name: 'renormalize-finite-guard', content: renormalizeFiniteGuardBlock },
+  {
+    name: 'tdse-renormalize-vec2',
+    content: /* wgsl */ `
 struct RenormUniforms {
   totalElements: u32,  // = totalSites (one vec2f per site)
   targetNorm: f32,
@@ -60,14 +64,22 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (!isSafeRenormNorm(currentNorm) || !isSafeRenormNorm(targetNorm)) {
     return;
   }
-  let scale = sqrt(targetNorm / currentNorm);
+  let ratio = targetNorm / currentNorm;
+  if (!isSafeRenormNorm(ratio)) {
+    return;
+  }
+  let scale = sqrt(ratio);
   psi[idx] = psi[idx] * scale;
 }
-`
+`,
+  },
+]).wgsl
 
-export const renormalizeBlock =
-  renormalizeFiniteGuardBlock +
-  /* wgsl */ `
+export const renormalizeBlock = assembleShaderBlocks([
+  { name: 'renormalize-finite-guard', content: renormalizeFiniteGuardBlock },
+  {
+    name: 'renormalize-split',
+    content: /* wgsl */ `
 struct RenormUniforms {
   totalElements: u32,  // components * totalSites
   targetNorm: f32,     // initial ||ψ||² to restore to
@@ -96,9 +108,15 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
 
   // Scale: ψ *= √(target/current) so that ||ψ||² → targetNorm
-  let scale = sqrt(targetNorm / currentNorm);
+  let ratio = targetNorm / currentNorm;
+  if (!isSafeRenormNorm(ratio)) {
+    return;
+  }
+  let scale = sqrt(ratio);
 
   psiRe[idx] = psiRe[idx] * scale;
   psiIm[idx] = psiIm[idx] * scale;
 }
-`
+`,
+  },
+]).wgsl

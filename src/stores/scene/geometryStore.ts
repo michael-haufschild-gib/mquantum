@@ -189,7 +189,8 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
     // Enforce active quantum-mode dimension bounds, not just ObjectType bounds.
     // Compute kernels have tighter maxima than the generic Schrodinger object
     // type; exceeding them desynchronizes global dimension from lattice state.
-    const quantumMode = useExtendedObjectStore.getState().schroedinger?.quantumMode
+    const quantumMode =
+      currentType === 'schroedinger' && useExtendedObjectStore.getState().schroedinger?.quantumMode
     const quantumEntry = quantumMode ? getQuantumTypeEntry(quantumMode) : undefined
     if (quantumEntry) {
       clampedDimension = Math.max(

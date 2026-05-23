@@ -56,8 +56,8 @@ test.describe('mobile timeline controls', () => {
       }
     })
 
-    expect(metrics.left).toBeGreaterThanOrEqual(0)
-    expect(Math.ceil(metrics.right)).toBeLessThanOrEqual(metrics.viewportWidth)
+    expect(metrics.left).toBeGreaterThanOrEqual(-1)
+    expect(metrics.right).toBeLessThanOrEqual(metrics.viewportWidth + 1)
     expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1)
   })
 

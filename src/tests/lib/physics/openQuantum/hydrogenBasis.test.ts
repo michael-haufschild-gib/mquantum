@@ -99,9 +99,9 @@ describe('hydrogen basis normalization', () => {
     ) => number[]
 
     const spreadOmega = normalizeWithSpread([2, 2], 5, 0.1)
-    expect(spreadOmega[0]).toBeCloseTo(1.3, 12)
-    expect(spreadOmega[1]).toBeCloseTo(1.5, 12)
-    expect(normalizeWithSpread([1, 1], 5, 0.5)).toEqual([0.01, 0.01])
+    expect(spreadOmega[0]).toBeCloseTo(1.9, 12)
+    expect(spreadOmega[1]).toBeCloseTo(2.1, 12)
+    expect(normalizeWithSpread([1, 1], 5, 0.5)).toEqual([0.75, 1.25])
   })
 })
 
@@ -277,11 +277,11 @@ describe('buildHydrogenBasis', () => {
         extraDimOmega?: readonly number[],
         extraDimFrequencySpread?: number
       ) => ReturnType<typeof buildHydrogenBasis>
-      const basis = buildWithSpread(1, 5, [2, 2], 0.1)
+      const basis = buildWithSpread(1, 5, [2, 3], 0.1)
 
-      // D=5: E_3D = -0.125. Shader-effective omegas are 2*(1-0.35)=1.3
-      // and 2*(1-0.25)=1.5, so zero-point contribution is 0.65+0.75.
-      expect(basis[0]!.energy).toBeCloseTo(1.275, 10)
+      // D=5: E_3D = -0.125. Centered shader-effective omegas are
+      // 2*(1-0.05)=1.9 and 3*(1+0.05)=3.15.
+      expect(basis[0]!.energy).toBeCloseTo(2.4, 10)
     })
 
     it('7D states have extraDimN of length 4', () => {

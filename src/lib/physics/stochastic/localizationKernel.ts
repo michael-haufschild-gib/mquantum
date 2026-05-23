@@ -70,7 +70,7 @@ export function generateCollapseCenters(
       ? Math.min(Math.floor(latticeDim), gridSize.length, spacing.length, 11)
       : 0
   const centerCount =
-    Number.isFinite(numSites) && numSites > 0
+    activeDims > 0 && Number.isFinite(numSites) && numSites > 0
       ? Math.min(MAX_STOCHASTIC_SITES, Math.floor(numSites))
       : 0
 

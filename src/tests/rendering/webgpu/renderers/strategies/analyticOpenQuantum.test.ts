@@ -216,14 +216,14 @@ describe('AnalyticOpenQuantumExecutor', () => {
       hydrogenBasis: { energy: number }[]
     }
 
-    executor.execute(makeHydrogenCtx(openQuantum, [2, 2], 0), shared, gridPass, 1, undefined)
+    executor.execute(makeHydrogenCtx(openQuantum, [2, 3], 0), shared, gridPass, 1, undefined)
     const baseKey = state.hydrogenBasisKey
     const baseEnergy = state.hydrogenBasis[0]!.energy
 
-    executor.execute(makeHydrogenCtx(openQuantum, [2, 2], 0.1), shared, gridPass, 2, undefined)
+    executor.execute(makeHydrogenCtx(openQuantum, [2, 3], 0.1), shared, gridPass, 2, undefined)
 
     expect(state.hydrogenBasisKey).not.toBe(baseKey)
-    expect(state.hydrogenBasis[0]!.energy).toBeCloseTo(1.275, 10)
+    expect(state.hydrogenBasis[0]!.energy).toBeCloseTo(2.4, 10)
     expect(state.hydrogenBasis[0]!.energy).not.toBeCloseTo(baseEnergy, 10)
   })
 

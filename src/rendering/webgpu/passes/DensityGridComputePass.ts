@@ -48,9 +48,17 @@ const MAX_DENSITY_GRID_SIZE = 4096
 
 export type { DensityGridComputeConfig }
 
-function sanitizeDensityGridSize(value: unknown): number {
+/** Clamp density-grid texture size to finite CPU and GPU limits. */
+export function sanitizeDensityGridSize(
+  value: unknown,
+  maxGridSize: number = MAX_DENSITY_GRID_SIZE
+): number {
+  const safeMaxGridSize =
+    typeof maxGridSize === 'number' && Number.isFinite(maxGridSize) && maxGridSize > 0
+      ? Math.min(MAX_DENSITY_GRID_SIZE, Math.floor(maxGridSize))
+      : MAX_DENSITY_GRID_SIZE
   if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_GRID_SIZE
-  return Math.max(1, Math.min(MAX_DENSITY_GRID_SIZE, Math.floor(value)))
+  return Math.max(1, Math.min(safeMaxGridSize, Math.floor(value)))
 }
 
 /**
@@ -160,6 +168,9 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device } = ctx
+    this.gridSize = sanitizeDensityGridSize(this.gridSize, device.limits.maxTextureDimension3D)
+    this.passConfig = { ...this.passConfig, gridSize: this.gridSize }
+    this.workgroupCount = Math.ceil(this.gridSize / WORKGROUP_SIZE)
     this.densityTextureFormat = await selectGridTextureFormat(device, this.passConfig)
 
     // Compose compute shader

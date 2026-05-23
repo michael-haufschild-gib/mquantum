@@ -606,7 +606,7 @@ export function prePackTdseFrameSnapshots(
     initialMaxDensity: params.initialMaxDensity,
     autoScaleMaxGain: params.autoScaleMaxGain,
     strides: params.strides,
-    needsInit: false,
+    needsInit: params.needsInit,
     basisX: params.basisX,
     basisY: params.basisY,
     basisZ: params.basisZ,
@@ -617,6 +617,7 @@ export function prePackTdseFrameSnapshots(
   for (let step = 0; step <= steps; step++) {
     packTdseUniformData(params.uniformData, params.uniformU32, params.uniformF32, {
       ...base,
+      needsInit: step === 0 ? params.needsInit : false,
       simTime: params.simTime + step * base.config.dt,
     })
     params.device.queue.writeBuffer(staging, step * slotSize, params.uniformData)

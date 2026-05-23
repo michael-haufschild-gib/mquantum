@@ -17,6 +17,8 @@ import { FFT_UNIFORM_SIZE } from '@/rendering/webgpu/passes/computePassUtils'
 import { TDSE_UNIFORM_SIZE } from '@/rendering/webgpu/passes/TDSEComputePassResources'
 import {
   buildTdseFFTStagingData,
+  createTdseUniformStepStagingState,
+  prePackTdseFrameSnapshots,
   type TdseUniformParams,
   writeTdseUniforms,
 } from '@/rendering/webgpu/passes/TDSEComputePassUniforms'
@@ -620,5 +622,46 @@ describe('buildTdseFFTStagingData', () => {
 
     const first = new DataView(data, 0, FFT_UNIFORM_SIZE)
     expect(first.getFloat32(24, true)).toBeCloseTo(1 / 32, 6) // 1/axisDim
+  })
+})
+
+describe('prePackTdseFrameSnapshots', () => {
+  it('preserves needsInit for step 0 and clears it for later snapshots', () => {
+    const uniformData = new ArrayBuffer(TDSE_UNIFORMS_LAYOUT.totalSize)
+    const uniformU32 = new Uint32Array(uniformData)
+    const uniformF32 = new Float32Array(uniformData)
+    const snapshots: Float32Array[] = []
+    const device = {
+      queue: {
+        writeBuffer: vi.fn((_buffer: GPUBuffer, _offset: number, data: ArrayBuffer) => {
+          snapshots.push(new Float32Array(data.slice(0)))
+        }),
+      },
+    } as unknown as GPUDevice
+    const state = createTdseUniformStepStagingState()
+    state.buffer = {} as GPUBuffer
+    state.size = TDSE_UNIFORMS_LAYOUT.totalSize * 3
+
+    const staging = prePackTdseFrameSnapshots({
+      ...uniformParams({
+        config: createTdseConfig({
+          harmonicOmega: 2,
+          harmonicOmegaInit: 5,
+        }),
+        needsInit: true,
+      }),
+      state,
+      device,
+      stepsThisFrame: 2,
+      uniformData,
+      uniformU32,
+      uniformF32,
+    })
+
+    expect(staging).toBe(state.buffer)
+    expect(snapshots).toHaveLength(3)
+    expect(snapshots[0]![I.harmonicOmega]).toBeCloseTo(5)
+    expect(snapshots[1]![I.harmonicOmega]).toBeCloseTo(2)
+    expect(snapshots[2]![I.harmonicOmega]).toBeCloseTo(2)
   })
 })

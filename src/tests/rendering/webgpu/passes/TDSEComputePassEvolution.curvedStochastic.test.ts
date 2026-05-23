@@ -627,6 +627,46 @@ describe('runStrangEvolution curved stochastic branch', () => {
     expect(events.some((event) => event.startsWith('copy-final-metric-time:'))).toBe(false)
   })
 
+  it('does not apply final driven-uniform snapshots when curved steps floor to zero', () => {
+    const events: string[] = []
+    const ctx = makeContext(events)
+    const stochasticState = makeStochasticState()
+    const resources = makeResources(events, stochasticState)
+    resources.prepareUniformSnapshots = (_device, simTimeStart, steps) => {
+      events.push(`prepare-uniforms:${simTimeStart}:${steps}`)
+    }
+    resources.applyUniformSnapshot = (_encoder, stepIdx) => {
+      events.push(`copy-uniform:${stepIdx}`)
+    }
+    resources.refreshDrivenPotential = (frameCtx) => {
+      const pass = frameCtx.beginComputePass({ label: 'tdse-potential-update-step' })
+      pass.end()
+    }
+    const config = {
+      metric: { kind: 'deSitter', hubbleRate: 0.3 },
+      potentialType: 'driven',
+      driveEnabled: true,
+      absorberEnabled: false,
+      imaginaryTimeEnabled: false,
+      stochasticEnabled: false,
+      stochasticGamma: 0,
+      dt: 0.02,
+      stepsPerFrame: 1,
+      latticeDim: 2,
+      gridSize: [4, 4],
+      spacing: [0.1, 0.1],
+      wormholeCouplingEnabled: false,
+    } as unknown as TdseConfig
+    const state = { simTime: 1, stepAccumulator: 0 }
+
+    runStrangEvolution(ctx, config, 0.25, state, resources)
+
+    expect(state.simTime).toBe(1)
+    expect(events.some((event) => event.startsWith('prepare-uniforms:'))).toBe(false)
+    expect(events.some((event) => event.startsWith('copy-uniform:'))).toBe(false)
+    expect(events).not.toContain('begin:tdse-potential-update-step')
+  })
+
   it('routes a dimension-degenerate metric through the flat Strang path', () => {
     const events: string[] = []
     const ctx = makeContext(events)

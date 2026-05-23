@@ -57,4 +57,16 @@ describe('estimateInitialDensity', () => {
       )
     ).toBeCloseTo(0.02)
   })
+
+  it('uses attractive black-hole interaction magnitude for background density', () => {
+    expect(
+      estimateInitialDensity(
+        tdseConfig({
+          initialCondition: 'blackHoleAnalog',
+          packetAmplitude: 5,
+          interactionStrength: -250,
+        })
+      )
+    ).toBeCloseTo(0.02)
+  })
 })

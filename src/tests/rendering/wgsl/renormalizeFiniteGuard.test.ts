@@ -22,7 +22,10 @@ describe('renormalize shader finite norm guards', () => {
     expect(shader).toContain('RENORM_MAX_SAFE_NORM')
     expect(shader).toContain('!isSafeRenormNorm(currentNorm)')
     expect(shader).toContain('!isSafeRenormNorm(targetNorm)')
+    expect(shader).toContain('let ratio = targetNorm / currentNorm')
+    expect(shader).toContain('!isSafeRenormNorm(ratio)')
     expect(shader).not.toContain('currentNorm != currentNorm')
+    expect(shader).not.toContain('sqrt(targetNorm / currentNorm)')
   })
 
   it('CPU readback guard matches the shader finite-positive norm contract', () => {

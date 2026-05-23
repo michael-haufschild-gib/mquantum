@@ -43,7 +43,7 @@ export function estimateInitialDensity(config: TdseConfig): number {
   }
   if (initStr === 'blackHoleAnalog') {
     const mu = config.packetAmplitude
-    const g = config.interactionStrength ?? 1
+    const g = Math.abs(config.interactionStrength ?? 1)
     return g > 1e-10 ? mu / g : 0
   }
   if (config.initialCondition === 'superposition') {

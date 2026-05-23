@@ -105,4 +105,56 @@ describe('performanceMetricsStore', () => {
       screen: { width: 0, height: 720 },
     })
   })
+
+  it('sanitizes extended metrics passed through updateMetrics', () => {
+    usePerformanceMetricsStore.getState().updateMetrics({
+      buffers: {
+        temporal: { width: Number.NaN, height: 128.8 },
+        screen: { width: -1, height: 720.2 },
+      },
+      cpuBreakdown: {
+        setupMs: Number.NaN,
+        passesMs: Infinity,
+        submitMs: -1,
+      },
+      passTimings: [
+        {
+          passId: 'bad',
+          gpuTimeMs: Number.NaN,
+          computeGpuTimeMs: Infinity,
+          renderGpuTimeMs: -1,
+          cpuTimeMs: Number.NaN,
+          skipped: 'yes' as never,
+        },
+        {
+          passId: 'good',
+          gpuTimeMs: 3,
+          computeGpuTimeMs: 1,
+          renderGpuTimeMs: 2,
+          cpuTimeMs: 0.5,
+          skipped: false,
+        },
+      ],
+      totalGpuTimeMs: Infinity,
+    })
+
+    usePerformanceMetricsStore.getState().setGpuName('   ')
+
+    const state = usePerformanceMetricsStore.getState()
+    expect(state.gpuName).toBe('Unknown GPU')
+    expect(state.buffers).toEqual({
+      temporal: { width: 0, height: 129 },
+      screen: { width: 0, height: 720 },
+    })
+    expect(state.cpuBreakdown).toEqual({ setupMs: 0, passesMs: 0, submitMs: 0 })
+    expect(state.passTimings[0]).toEqual({
+      passId: 'bad',
+      gpuTimeMs: 0,
+      computeGpuTimeMs: 0,
+      renderGpuTimeMs: 0,
+      cpuTimeMs: 0,
+      skipped: false,
+    })
+    expect(state.totalGpuTimeMs).toBe(3)
+  })
 })

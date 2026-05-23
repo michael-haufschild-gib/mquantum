@@ -136,10 +136,11 @@ export function normalizeHydrogenExtraDimOmega(
   const dim = normalizeHydrogenBasisDimension(dimension)
   const count = Math.max(0, dim - 3)
   const spread = normalizeHydrogenExtraDimFrequencySpread(extraDimFrequencySpread)
+  const center = (count - 1) * 0.5
   return Array.from({ length: count }, (_, i) => {
     const omega = extraDimOmega[i]
     const baseOmega = typeof omega === 'number' && Number.isFinite(omega) && omega > 0 ? omega : 1
-    const spreadFactor = 1.0 + (i - 3.5) * spread
+    const spreadFactor = 1.0 + (i - center) * spread
     return Math.max(baseOmega * spreadFactor, MIN_EXTRA_DIM_OMEGA)
   })
 }
