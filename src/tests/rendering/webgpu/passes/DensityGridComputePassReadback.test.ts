@@ -118,6 +118,8 @@ describe('density grid resource config sanitization', () => {
     expect(sanitizeDensityGridSize(4096, 512)).toBe(512)
     expect(sanitizeDensityGridSize(1024, 2048)).toBe(1024)
     expect(sanitizeDensityGridSize(Number.NaN, 512)).toBe(64)
+    expect(sanitizeDensityGridSize(Number.NaN, 32)).toBe(32)
+    expect(sanitizeDensityGridSize(undefined, 0.5)).toBe(1)
   })
 
   it('treats non-boolean density-grid resource flags as disabled', async () => {

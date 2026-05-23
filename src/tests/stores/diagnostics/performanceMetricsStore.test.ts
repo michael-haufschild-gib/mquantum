@@ -87,6 +87,13 @@ describe('performanceMetricsStore', () => {
     ])
   })
 
+  it('accepts explicit zero total GPU time updates', () => {
+    usePerformanceMetricsStore.getState().updateMetrics({ totalGpuTimeMs: 4 })
+    usePerformanceMetricsStore.getState().updateMetrics({ totalGpuTimeMs: 0 })
+
+    expect(usePerformanceMetricsStore.getState().totalGpuTimeMs).toBe(0)
+  })
+
   it('sanitizes CPU breakdowns and buffer dimensions', () => {
     usePerformanceMetricsStore.getState().updateCpuBreakdown({
       setupMs: Number.NaN,

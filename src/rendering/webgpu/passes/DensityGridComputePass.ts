@@ -57,7 +57,9 @@ export function sanitizeDensityGridSize(
     typeof maxGridSize === 'number' && Number.isFinite(maxGridSize) && maxGridSize > 0
       ? Math.min(MAX_DENSITY_GRID_SIZE, Math.floor(maxGridSize))
       : MAX_DENSITY_GRID_SIZE
-  if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_GRID_SIZE
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return Math.max(1, Math.min(safeMaxGridSize, DEFAULT_GRID_SIZE))
+  }
   return Math.max(1, Math.min(safeMaxGridSize, Math.floor(value)))
 }
 

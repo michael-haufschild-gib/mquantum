@@ -227,7 +227,7 @@ function sanitizeMetricsPatch(
   if (metrics.buffers) patch.buffers = sanitizeBufferStats(metrics.buffers, state.buffers)
   if (metrics.cpuBreakdown) patch.cpuBreakdown = sanitizeCpuBreakdown(metrics.cpuBreakdown)
   if (metrics.passTimings) patch.passTimings = sanitizePassTimings(metrics.passTimings)
-  if (metrics.totalGpuTimeMs) {
+  if (metrics.totalGpuTimeMs != null) {
     patch.totalGpuTimeMs = finiteNonNegative(
       metrics.totalGpuTimeMs,
       sumGpuTime(patch.passTimings ?? state.passTimings)
