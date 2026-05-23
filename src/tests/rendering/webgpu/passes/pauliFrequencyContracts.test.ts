@@ -41,7 +41,10 @@ describe('Pauli spin frequency contracts', () => {
     expect(pauliPotentialHalf).toContain('params.rotatingFrequency * params.simTime')
     // Snapshot pre-packing lives in the dedicated staging helper module;
     // per-substep GPU copies stay in PauliComputePass alongside the Strang loop.
-    expect(pauliUniformStaging).toContain('params.simTime + step * params.config.dt')
+    expect(pauliUniformStaging).toContain('params.simTime + (step + 0.5) * params.config.dt')
+    expect(pauliUniformStaging).toContain(
+      'params.simTime + params.stepsThisFrame * params.config.dt'
+    )
     expect(pauliUniformStaging).toContain("label: 'pauli-step-uniform-staging'")
     expect(pauliComputePass).toContain('ctx.encoder.copyBufferToBuffer(')
     expect(pauliComputePass).toContain('step * PAULI_UNIFORM_SIZE')

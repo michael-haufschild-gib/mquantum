@@ -17,7 +17,11 @@
 import type { MetricConfig } from '@/lib/physics/tdse/metrics/types'
 import { wignerNegativityFromRDM } from '@/lib/physics/wigner/wignerFromRDM'
 
-import { MAX_BIPARTITION_RDM, MAX_PAIRWISE_RDM, MAX_RDM_SIZE } from './coordinateEntanglement/constants'
+import {
+  MAX_BIPARTITION_RDM,
+  MAX_PAIRWISE_RDM,
+  MAX_RDM_SIZE,
+} from './coordinateEntanglement/constants'
 import {
   computeJointReducedDensityMatrix,
   computeReducedDensityMatrix,
@@ -46,6 +50,26 @@ export type {
  */
 export function isCoordinateEntanglementMetricSupported(metric: MetricConfig | undefined): boolean {
   return metric === undefined || metric.kind === 'flat' || metric.kind === 'torus'
+}
+
+function emptyCoordinateEntanglementResult(
+  N: number,
+  options: EntanglementOptions
+): CoordinateEntanglementResult {
+  return {
+    entropies: new Array<number | null>(N).fill(null),
+    averageEntropy: Number.NaN,
+    maxEntropies: new Array<number | null>(N).fill(null),
+    normalizedEntropy: Number.NaN,
+    bipartitionEntropies:
+      options.computeBipartitions && N >= 2
+        ? new Array<number | null>(Math.floor(N / 2)).fill(null)
+        : [],
+    mutualInfo: null,
+    spectrum: [],
+    wignerNegativities: new Array<number | null>(N).fill(null),
+    averageWignerNegativity: options.computeWignerNegativity ? Number.NaN : 0,
+  }
 }
 
 // ─── Full Coordinate Entanglement Pipeline ──────────────────────────────────
@@ -85,6 +109,10 @@ export function computeCoordinateEntanglement(
   }
   // Guard against near-zero norm (numerical noise from GPU readback) —
   // amplifying 1e-20 by invNorm ≈ 1e10 would produce nonsensical RDMs.
+  // A zero vector is not a quantum state; do not report it as S=0 separable physics.
+  if (!Number.isFinite(norm2) || norm2 <= 1e-12) {
+    return emptyCoordinateEntanglementResult(N, options)
+  }
   if (norm2 > 1e-12 && Math.abs(norm2 - 1) > 1e-6) {
     const invNorm = 1 / Math.sqrt(norm2)
     const normRe = new Float32Array(psiRe.length)
@@ -141,9 +169,9 @@ export function computeCoordinateEntanglement(
     }
   }
 
-  const averageEntropy = computedCount > 0 ? computedSum / computedCount : 0
+  const averageEntropy = computedCount > 0 ? computedSum / computedCount : Number.NaN
   const maxAvg = computedCount > 0 ? computedMaxSum / computedCount : 0
-  const normalizedEntropy = maxAvg > 0 ? averageEntropy / maxAvg : 0
+  const normalizedEntropy = computedCount > 0 && maxAvg > 0 ? averageEntropy / maxAvg : Number.NaN
 
   // ── Bipartition entropies S_{k|N-k} for k=1,...,⌊N/2⌋ ────────────────
   const bipartitionEntropies: (number | null)[] = []
@@ -196,7 +224,11 @@ export function computeCoordinateEntanglement(
     }
   }
 
-  const averageWignerNegativity = wignerCount > 0 ? wignerSum / wignerCount : 0
+  const averageWignerNegativity = options.computeWignerNegativity
+    ? wignerCount > 0
+      ? wignerSum / wignerCount
+      : Number.NaN
+    : 0
 
   return {
     entropies,

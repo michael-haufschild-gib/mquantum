@@ -7,6 +7,8 @@ import {
 } from '@/lib/physics/tdse/diagnostics'
 import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
+import { isFinitePositiveNorm } from './normalizationGuards'
+
 /** Number of f32 values in diagnostic result buffer: [norm, maxDensity, normLeft, normRight, sumPsi4] */
 const DIAG_RESULT_COUNT = 5
 
@@ -79,6 +81,7 @@ export function scheduleNormReadback(
         const normRight = data[3]!
         const sumPsi4 = data[4]!
         staging.unmap()
+        const totalNormIsSafe = isFinitePositiveNorm(totalNorm)
 
         // Inverse Participation Ratio: IPR = (Σ|ψ|²)² / Σ|ψ|⁴ = 1 / Σp²
         // IPR → N for extended (delocalized) states, IPR → 1 for fully localized
@@ -92,11 +95,15 @@ export function scheduleNormReadback(
 
         // Auto-loop: capture initial norm, check decay/divergence/stagnation
         if (s.initialNorm < 0) {
-          s.initialNorm = totalNorm
-          s.initialMaxDensity = maxDens
-          s.prevNorm = totalNorm
-          s.stagnationCount = 0
-          if (renormBuf) device.queue.writeBuffer(renormBuf, 4, new Float32Array([totalNorm]))
+          if (totalNormIsSafe) {
+            s.initialNorm = totalNorm
+            s.initialMaxDensity = maxDens
+            s.prevNorm = totalNorm
+            s.stagnationCount = 0
+            if (renormBuf) device.queue.writeBuffer(renormBuf, 4, new Float32Array([totalNorm]))
+          } else {
+            s.pendingAutoReset = true
+          }
         } else if (s.initialNorm > 0) {
           if (!isFinite(totalNorm)) s.pendingAutoReset = true
           else if (s.currentAutoLoop) {

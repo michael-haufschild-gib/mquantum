@@ -104,7 +104,7 @@ export const ToggleGroup = React.memo(
     const group = (
       <LayoutGroup id={layoutId}>
         <div
-          className={`flex p-1 gap-1 glass-input rounded-lg border border-[var(--border-subtle)] ${fullWidth ? 'w-full' : ''} ${className}`}
+          className={`flex p-1 gap-1 surface-input rounded-lg border border-[var(--border-subtle)] ${fullWidth ? 'w-full' : ''} ${className}`}
           role="radiogroup"
           aria-label={ariaLabel}
           data-testid={testId}

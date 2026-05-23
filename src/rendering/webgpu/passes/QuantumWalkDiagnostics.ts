@@ -103,6 +103,7 @@ export class QwDiagnostics {
 
   /** Reset accumulator and store state. */
   reset(): void {
+    this.epoch++
     this.stepAccumulator = 0
     useDiagnosticsStore.getState().resetQw()
   }

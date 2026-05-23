@@ -65,6 +65,9 @@ pub fn compute_incompressible_spectrum(
     if total_sites == 0 || psi_re.len() != total_sites || psi_im.len() != total_sites {
         return Vec::new();
     }
+    if psi_re.iter().any(|v| !v.is_finite()) || psi_im.iter().any(|v| !v.is_finite()) {
+        return Vec::new();
+    }
 
     let hbar_over_m = hbar / mass.max(1e-10);
 
@@ -386,6 +389,23 @@ mod tests {
         let grid = [n, n];
         let sp = [1.0e308f64, 1.0e308f64];
 
+        assert!(compute_incompressible_spectrum(&psi_re, &psi_im, &grid, &sp, 1.0, 1.0).is_empty());
+    }
+
+    #[test]
+    fn rejects_non_finite_wavefunction_samples() {
+        let n: usize = 8;
+        let total = n * n;
+        let grid = [n, n];
+        let sp = [0.5f64; 2];
+        let mut psi_re = vec![1.0f32; total];
+        let mut psi_im = vec![0.0f32; total];
+
+        psi_re[7] = f32::NAN;
+        assert!(compute_incompressible_spectrum(&psi_re, &psi_im, &grid, &sp, 1.0, 1.0).is_empty());
+
+        psi_re[7] = 1.0;
+        psi_im[11] = f32::INFINITY;
         assert!(compute_incompressible_spectrum(&psi_re, &psi_im, &grid, &sp, 1.0, 1.0).is_empty());
     }
 

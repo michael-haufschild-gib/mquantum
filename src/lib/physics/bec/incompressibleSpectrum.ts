@@ -34,6 +34,61 @@ export interface IncompressibleSpectrumResult {
   totalCompressible: number
 }
 
+interface SpectrumInputShape {
+  dim: number
+  totalSites: number
+}
+
+function validateSpectrumInputShape(
+  psiRe: Float32Array,
+  psiIm: Float32Array,
+  gridSize: number[],
+  spacing: number[]
+): SpectrumInputShape | null {
+  const dim = gridSize.length
+  if (dim === 0 || spacing.length !== dim) return null
+
+  let totalSites = 1
+  for (let d = 0; d < dim; d++) {
+    const n = gridSize[d]!
+    const dx = spacing[d]!
+    if (!Number.isFinite(n) || !Number.isInteger(n) || n < 2 || (n & (n - 1)) !== 0) {
+      return null
+    }
+    if (!Number.isFinite(dx) || dx <= 0) return null
+    totalSites *= n
+  }
+
+  if (!Number.isSafeInteger(totalSites) || totalSites <= 0) return null
+  if (psiRe.length !== totalSites || psiIm.length !== totalSites) return null
+
+  for (let i = 0; i < totalSites; i++) {
+    if (!Number.isFinite(psiRe[i]!) || !Number.isFinite(psiIm[i]!)) return null
+  }
+
+  return { dim, totalSites }
+}
+
+function isValidWasmSpectrumPayload(packed: Float64Array): boolean {
+  if (packed.length !== 2 * NUM_SPECTRUM_BINS + 2) return false
+
+  for (let b = 0; b < NUM_SPECTRUM_BINS; b++) {
+    const spectrum = packed[b]!
+    const kValue = packed[NUM_SPECTRUM_BINS + b]!
+    if (!Number.isFinite(spectrum) || spectrum < 0) return false
+    if (!Number.isFinite(kValue) || kValue <= 0) return false
+  }
+
+  const totalIncompressible = packed[2 * NUM_SPECTRUM_BINS]!
+  const totalCompressible = packed[2 * NUM_SPECTRUM_BINS + 1]!
+  return (
+    Number.isFinite(totalIncompressible) &&
+    totalIncompressible >= 0 &&
+    Number.isFinite(totalCompressible) &&
+    totalCompressible >= 0
+  )
+}
+
 // ─── FFT ──────────────────────────────────────────────────────────────────────
 // Delegates to the shared FFT module (which uses WASM when available).
 // The shared module uses interleaved complex format [re0, im0, re1, im1, ...],
@@ -120,7 +175,6 @@ export function computeIncompressibleSpectrum(
   mass: number,
   numBins = NUM_SPECTRUM_BINS
 ): IncompressibleSpectrumResult {
-  const dim = gridSize.length
   const binCount = Number.isInteger(numBins) && numBins > 0 ? numBins : 0
   const zeroResult = (): IncompressibleSpectrumResult => ({
     spectrum: new Float32Array(binCount),
@@ -138,6 +192,10 @@ export function computeIncompressibleSpectrum(
   ) {
     return zeroResult()
   }
+
+  const shape = validateSpectrumInputShape(psiRe, psiIm, gridSize, spacing)
+  if (!shape) return zeroResult()
+  const { dim, totalSites } = shape
 
   // PERF: WASM fast-path. Rust `compute_incompressible_spectrum_wasm`
   // (src/wasm/mdimension_core/src/bec_spectrum.rs) covers the full residual
@@ -160,7 +218,7 @@ export function computeIncompressibleSpectrum(
       hbar,
       mass
     )
-    if (packed && packed.length === 2 * NUM_SPECTRUM_BINS + 2) {
+    if (packed && isValidWasmSpectrumPayload(packed)) {
       const spectrumF32 = new Float32Array(NUM_SPECTRUM_BINS)
       const kValues = new Float32Array(NUM_SPECTRUM_BINS)
       for (let b = 0; b < NUM_SPECTRUM_BINS; b++) {
@@ -173,37 +231,9 @@ export function computeIncompressibleSpectrum(
         totalIncompressible: packed[2 * NUM_SPECTRUM_BINS]!,
         totalCompressible: packed[2 * NUM_SPECTRUM_BINS + 1]!,
       }
-    } else if (packed) {
-      // WASM returned a result with unexpected length (likely input validation
-      // rejection producing an empty vec). Do NOT fall through to the TS path
-      // which lacks the same validation — return a zeroed result instead.
-      return {
-        spectrum: new Float32Array(NUM_SPECTRUM_BINS),
-        kValues: new Float32Array(NUM_SPECTRUM_BINS),
-        totalIncompressible: 0,
-        totalCompressible: 0,
-      }
     }
-    // packed is null/undefined → WASM not initialized, fall through to TS path
+    // packed is null/undefined/malformed → fall through to validated TS path.
   }
-
-  // TS fallback validation (mirrors the WASM input rejection above).
-  // Without these guards, invalid grid/spacing would produce NaN/Infinity
-  // energies and spectrum values via the Parseval scaling at the end.
-  if (dim === 0 || spacing.length !== dim) return zeroResult()
-  for (let d = 0; d < dim; d++) {
-    const n = gridSize[d]!
-    const dx = spacing[d]!
-    if (!Number.isFinite(n) || !Number.isInteger(n) || n < 2 || (n & (n - 1)) !== 0) {
-      return zeroResult()
-    }
-    if (!Number.isFinite(dx) || dx <= 0) return zeroResult()
-  }
-
-  let totalSites = 1
-  for (let d = 0; d < dim; d++) totalSites *= gridSize[d]!
-  if (!Number.isFinite(totalSites) || totalSites <= 0) return zeroResult()
-  if (psiRe.length !== totalSites || psiIm.length !== totalSites) return zeroResult()
 
   const hbarOverM = hbar / Math.max(mass, 1e-10)
 

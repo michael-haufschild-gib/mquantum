@@ -210,6 +210,34 @@ describe('packAntiDeSitterDensityGrid (HKLL path)', () => {
     expect(packed.peakDensity).toBeGreaterThan(0)
     expectFinitePackedDensity(packed)
   })
+
+  it('writes zero R channel outside the compactified AdS unit ball', () => {
+    const gridSize = 32
+    const packed = packAntiDeSitterDensityGrid(
+      hkllConfig({ hkllBoundarySource: 'planeWave', hkllPlaneWaveM: 3 }),
+      undefined,
+      gridSize
+    )
+
+    let outsideVoxelCount = 0
+    for (let z = 0; z < gridSize; z++) {
+      const wz = ((z + 0.5) / gridSize) * 2 - 1
+      for (let y = 0; y < gridSize; y++) {
+        const wy = ((y + 0.5) / gridSize) * 2 - 1
+        for (let x = 0; x < gridSize; x++) {
+          const wx = ((x + 0.5) / gridSize) * 2 - 1
+          if (wx * wx + wy * wy + wz * wz < 1) continue
+          outsideVoxelCount++
+          const index = (z * gridSize + y) * gridSize + x
+          const r = readRChannel(packed.density, index)
+          if (r !== 0) {
+            throw new Error(`outside AdS ball leak at (${x}, ${y}, ${z}): R=${r}`)
+          }
+        }
+      }
+    }
+    expect(outsideVoxelCount).toBeGreaterThan(0)
+  })
 })
 
 describe('packAntiDeSitterDensityGrid malformed config defense', () => {

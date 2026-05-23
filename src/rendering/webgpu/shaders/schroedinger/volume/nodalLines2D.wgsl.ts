@@ -30,8 +30,11 @@ export const nodalLines2DBlock = /* wgsl */ `
 // nodal-line pass from 3 to 2 wavefunction evaluations per pixel — evalPsi
 // dominates 2D fragment cost (Hermite/Laguerre/spherical-harmonic chains).
 fn evaluateNodalLines2D(pos: vec3f, psi_c: vec2f, animTime: f32, uniforms: SchroedingerUniforms) -> vec4f {
-  // Pixel-space step for finite differences
-  let pixelSize = 2.0 * uniforms.boundingRadius / max(camera.resolution.y, 1.0);
+  // Pixel-space step in post-pan/zoom world coordinates. main2D maps UV
+  // through camera.modelMatrix before calling this helper, so contour AA must
+  // track the same model scale or line width drifts while zooming.
+  let modelPixelScale = max(length((camera.modelMatrix * vec4f(1.0, 0.0, 0.0, 0.0)).xyz), 1e-6);
+  let pixelSize = 2.0 * uniforms.boundingRadius * modelPixelScale / max(camera.resolution.y, 1.0);
   let eps = max(pixelSize * 1.5, 0.002);
 
   // Evaluate wavefunction at right and up neighbours; centre value is supplied

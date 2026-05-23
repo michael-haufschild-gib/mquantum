@@ -543,6 +543,10 @@ export const createSchroedingerSlice: StateCreator<
         set((state) => ({
           pauliSpinor: { ...state.pauliSpinor, needsReset: false },
         }))
+      } else if (configKey === 'bellPair') {
+        set((state) => ({
+          bellPair: { ...state.bellPair, needsReset: false },
+        }))
       } else {
         clearSchrodingerModeNeedsReset(set, configKey as ResettableConfigKey)
       }
@@ -552,6 +556,11 @@ export const createSchroedingerSlice: StateCreator<
         setWithVersion((state) => ({
           pauliSpinorVersion: state.pauliSpinorVersion + 1,
           pauliSpinor: { ...state.pauliSpinor, needsReset: true },
+        }))
+      } else if (configKey === 'bellPair') {
+        setWithVersion((state) => ({
+          bellPairVersion: state.bellPairVersion + 1,
+          bellPair: { ...state.bellPair, needsReset: true },
         }))
       } else {
         markSchrodingerModeNeedsReset(setWithVersion, configKey as ResettableConfigKey)

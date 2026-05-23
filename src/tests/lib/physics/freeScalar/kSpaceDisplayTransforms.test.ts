@@ -76,6 +76,19 @@ function makeZeroRawData(N: number): KSpaceRawData {
   return computeRawKSpaceData(phi, pi, gridSize, spacing, 1.0, 3)
 }
 
+function halfToFloat(h: number): number {
+  const sign = (h & 0x8000) !== 0 ? -1 : 1
+  const exponent = (h & 0x7c00) >> 10
+  const fraction = h & 0x03ff
+  if (exponent === 0) {
+    return fraction === 0 ? 0 : sign * 2 ** -14 * (fraction / 1024)
+  }
+  if (exponent === 0x1f) {
+    return fraction === 0 ? sign * Infinity : Number.NaN
+  }
+  return sign * 2 ** (exponent - 15) * (1 + fraction / 1024)
+}
+
 // ============================================================================
 // computeRawKSpaceData
 // ============================================================================
@@ -927,6 +940,26 @@ describe('packDisplayTextures', () => {
     // These are packed as float16, so check that voxel 0 has larger R than voxel 1
     expect(density[0]).not.toBe(0) // voxel 0 R channel
     expect(density[4]).not.toBe(0) // voxel 1 R channel
+  })
+
+  it('density G channel stores log of normalized occupation, including empty voxels', () => {
+    const G = 2
+    const nk = new Float64Array(G ** 3)
+    nk[0] = 10.0
+    nk[1] = 5.0
+
+    const grid = {
+      nk,
+      kNorm: new Float64Array(G ** 3),
+      omegaNorm: new Float64Array(G ** 3),
+      nkOmega: new Float64Array(G ** 3),
+      nkMax: 10.0,
+    }
+
+    const { density } = packDisplayTextures(grid, false, G)
+    expect(halfToFloat(density[1]!)).toBeCloseTo(Math.log(1 + 1e-10), 4)
+    expect(halfToFloat(density[5]!)).toBeCloseTo(Math.log(0.5 + 1e-10), 3)
+    expect(halfToFloat(density[9]!)).toBeCloseTo(Math.log(1e-10), 1)
   })
 })
 

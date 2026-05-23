@@ -263,7 +263,7 @@ export const InlineEdit: React.FC<InlineEditProps> = memo(
                   onKeyDown={handleKeyDown}
                   placeholder={placeholder}
                   className={`
-                  w-full min-w-0 bg-glass border rounded px-2 py-1 text-sm transition-colors duration-200
+                  w-full min-w-0 bg-control border rounded px-2 py-1 text-sm transition-colors duration-200
                   ${
                     error
                       ? 'border-danger-border focus:border-danger focus:ring-1 focus:ring-danger-border'

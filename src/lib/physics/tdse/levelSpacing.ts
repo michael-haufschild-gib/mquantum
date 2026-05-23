@@ -234,7 +234,8 @@ function gamma(z: number): number {
 /**
  * Classify eigenstate localization from IPR values.
  *
- * @param ipr - Inverse participation ratio
+ * @param ipr - Participation-count IPR `(Σp)² / Σp²`; `1` is delta-localized,
+ *              `totalSites` is uniformly extended.
  * @param totalSites - Total number of lattice sites N
  * @returns Classification string
  */
@@ -243,11 +244,14 @@ export function classifyLocalization(
   totalSites: number
 ): 'extended' | 'critical' | 'localized' {
   if (!Number.isFinite(ipr) || totalSites <= 0) return 'critical'
-  // Extended: IPR ~ 1/N (uniform). Localized: IPR ~ O(1).
-  // Threshold: IPR > 10/N suggests localization; IPR < 3/N suggests extended.
-  const normalized = ipr * totalSites
-  if (normalized < 3) return 'extended'
-  if (normalized > 10) return 'localized'
+  // Current TDSE/stochastic convention is participation-count IPR:
+  // extended states have IPR ~ N, localized states have IPR ~ O(1).
+  // These thresholds mirror the old PR convention:
+  //   IPR_old < 3/N  <=>  IPR_count > N/3  (extended)
+  //   IPR_old > 10/N <=>  IPR_count < N/10 (localized)
+  const normalized = ipr / totalSites
+  if (normalized > 1 / 3) return 'extended'
+  if (normalized < 1 / 10) return 'localized'
   return 'critical'
 }
 

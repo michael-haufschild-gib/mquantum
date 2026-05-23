@@ -300,10 +300,10 @@ export function computeNullBaselinesRigid(
  * mean a baseline matched or beat the real fit — a falsification
  * signal.
  *
- * Returns `NaN` when either input is non-finite or non-positive (`realQ
- * ≤ 0` means perfect fit, which trivially beats any null; we report
- * `Infinity` in that specific case so the UI can render a ∞ chip
- * rather than swallowing the win as a NaN).
+ * Returns `NaN` when either input is non-finite or negative. For a perfect
+ * real fit (`realQ = 0`), returns `Infinity` only when every finite null is
+ * strictly worse; if a null also reaches zero residual, returns `1` to mark
+ * the tie instead of overstating the evidence.
  *
  * @param real - The real diagnostic q-value (`affineMatchQuality`).
  * @param baselines - Output of {@link computeNullBaselines}.
@@ -311,7 +311,6 @@ export function computeNullBaselinesRigid(
  */
 export function bestBaselineRatio(real: number, baselines: NullBaselineQuality): number {
   if (!Number.isFinite(real)) return Number.NaN
-  if (real === 0) return Number.POSITIVE_INFINITY
   if (real < 0) return Number.NaN
 
   let minBaseline = Number.POSITIVE_INFINITY
@@ -323,6 +322,7 @@ export function bestBaselineRatio(real: number, baselines: NullBaselineQuality):
     }
   }
   if (!anyFinite) return Number.NaN
+  if (real === 0) return minBaseline === 0 ? 1 : Number.POSITIVE_INFINITY
   const ratio = minBaseline / real
   return Number.isFinite(ratio) ? ratio : Number.NaN
 }

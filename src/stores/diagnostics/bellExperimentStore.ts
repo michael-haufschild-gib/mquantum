@@ -212,6 +212,8 @@ interface BellExperimentState {
 
 let _rng: PCG32 | null = null
 let _rngSeed = -1
+let _seedOverrideArmed = false
+let _lastConfigSeed: number | null = null
 
 /**
  * Last seen BellPairConfig signature (axes / v / η / mode). When the
@@ -286,6 +288,10 @@ function fieldVec(field: unknown): Vec3 {
 
 function hasFieldMagnitude(field: Vec3): boolean {
   return field[0] !== 0 || field[1] !== 0 || field[2] !== 0
+}
+
+function hasPrecessionFields(fieldA: Vec3, fieldB: Vec3): boolean {
+  return hasFieldMagnitude(fieldA) || hasFieldMagnitude(fieldB)
 }
 
 function precessionTime(config: BellPairConfig, totalTrials: number): number {
@@ -413,6 +419,75 @@ function initialState(): Pick<
   }
 }
 
+type BellTrialState = Pick<
+  BellExperimentState,
+  | 'totalTrials'
+  | 'seed'
+  | 'qm'
+  | 'qmHasViolated'
+  | 'lhv'
+  | 'historyQmS'
+  | 'historyLhvS'
+  | 'historyTrialCount'
+  | 'historyHead'
+  | 'historyCount'
+  | 'recentOutcomes'
+  | 'recentHead'
+  | 'recentCount'
+>
+
+function initialTrialState(seed: number): BellTrialState {
+  return {
+    totalTrials: 0,
+    seed,
+    qm: emptySampler(),
+    qmHasViolated: false,
+    lhv: emptySampler(),
+    historyQmS: newHistoryF64(),
+    historyLhvS: newHistoryF64(),
+    historyTrialCount: new Uint32Array(HISTORY_LENGTH),
+    historyHead: 0,
+    historyCount: 0,
+    recentOutcomes: new Int8Array(RECENT_OUTCOMES * 4),
+    recentHead: 0,
+    recentCount: 0,
+  }
+}
+
+type BellExperimentSet = (state: Partial<BellExperimentState>) => void
+
+function syncConfigGatedRunState(
+  state: BellExperimentState,
+  configKey: string,
+  configSeed: number,
+  set: BellExperimentSet
+): BellExperimentState | BellTrialState {
+  const configChanged = _lastConfigKey !== '' && _lastConfigKey !== configKey
+  const configSeedChanged = _lastConfigSeed !== null && _lastConfigSeed !== configSeed
+  const seedChanged = state.seed !== configSeed
+
+  if (state.totalTrials > 0 && (configChanged || configSeedChanged)) {
+    const fresh = initialTrialState(configSeed)
+    resetAccumulators()
+    _rng = null
+    _rngSeed = -1
+    _seedOverrideArmed = false
+    getRng(configSeed)
+    set(fresh)
+    return fresh
+  }
+
+  if (state.totalTrials === 0 && seedChanged && !_seedOverrideArmed) {
+    _rng = null
+    _rngSeed = -1
+    getRng(configSeed)
+    set({ seed: configSeed })
+    return { ...state, seed: configSeed }
+  }
+
+  return state
+}
+
 // ─── Store ──────────────────────────────────────────────────────────────────
 
 /**
@@ -441,6 +516,8 @@ export const useBellExperimentStore = create<BellExperimentState>((set, get) => 
       resetAccumulators()
       _rng = null
       _rngSeed = -1
+      _seedOverrideArmed = seedOverride !== undefined
+      _lastConfigSeed = null
       _lastConfigKey = '' // force config-keyed reset on next batch
       getRng(nextSeed) // prime the PCG-32
       const fresh = initialState()
@@ -458,6 +535,8 @@ export const useBellExperimentStore = create<BellExperimentState>((set, get) => 
       resetAccumulators()
       _rng = null
       _rngSeed = -1
+      _seedOverrideArmed = true
+      _lastConfigSeed = null
       _lastConfigKey = ''
       getRng(currentSeed)
       const fresh = initialState()
@@ -482,20 +561,23 @@ export const useBellExperimentStore = create<BellExperimentState>((set, get) => 
       // first batch keeps the override seed in force).
       const fieldA = fieldVec(safeConfig.fieldA)
       const fieldB = fieldVec(safeConfig.fieldB)
-      const configKey = `${safeConfig.aliceAxis[0]}:${safeConfig.aliceAxis[1]}:${safeConfig.aliceAxisPrime[0]}:${safeConfig.aliceAxisPrime[1]}:${safeConfig.bobAxis[0]}:${safeConfig.bobAxis[1]}:${safeConfig.bobAxisPrime[0]}:${safeConfig.bobAxisPrime[1]}:${safeConfig.visibility}:${safeConfig.detectionEfficiency}:${safeConfig.analysisMode}:${fieldA[0]}:${fieldA[1]}:${fieldA[2]}:${fieldB[0]}:${fieldB[1]}:${fieldB[2]}:${safeConfig.samplerMode}:${safeConfig.lhvStrategyId}`
-      const priorState = get()
-      if (priorState.totalTrials > 0 && _lastConfigKey !== '' && _lastConfigKey !== configKey) {
-        const fresh = initialState()
-        resetAccumulators()
-        _rng = null
-        _rngSeed = -1
-        getRng(safeConfig.seed >>> 0)
-        set({ ...fresh, seed: safeConfig.seed >>> 0 })
-      }
+      const isPrecessing = hasPrecessionFields(fieldA, fieldB)
+      const precessionScale = isPrecessing ? safeConfig.trialsPerFrame : 0
+      const configKey = `${safeConfig.aliceAxis[0]}:${safeConfig.aliceAxis[1]}:${safeConfig.aliceAxisPrime[0]}:${safeConfig.aliceAxisPrime[1]}:${safeConfig.bobAxis[0]}:${safeConfig.bobAxis[1]}:${safeConfig.bobAxisPrime[0]}:${safeConfig.bobAxisPrime[1]}:${safeConfig.visibility}:${safeConfig.detectionEfficiency}:${safeConfig.analysisMode}:${fieldA[0]}:${fieldA[1]}:${fieldA[2]}:${fieldB[0]}:${fieldB[1]}:${fieldB[2]}:${precessionScale}:${safeConfig.samplerMode}:${safeConfig.lhvStrategyId}`
+      const configSeed = safeConfig.seed >>> 0
+      const state = syncConfigGatedRunState(get(), configKey, configSeed, set)
+      _seedOverrideArmed = false
       _lastConfigKey = configKey
+      _lastConfigSeed = configSeed
 
-      const rng = getRng(get().seed)
-      const state = get()
+      const rng = getRng(state.seed)
+      // Precession makes rho(t) non-stationary. Keep S(t) and its CI tied
+      // to the current rendered batch; otherwise the accumulator smears
+      // incompatible time slices and the advertised dynamic CHSH signal
+      // collapses into a long-run time average.
+      if (state.totalTrials > 0 && isPrecessing) {
+        resetAccumulators()
+      }
       const setup = prepareBatchSampling(safeConfig, precessionTime(safeConfig, state.totalTrials))
       const ring = drainTrialBatchInto(rng, setup, trialCount, state.recentOutcomes, {
         recentHead: state.recentHead,
@@ -568,7 +650,7 @@ function prepareBatchSampling(config: BellPairConfig, t: number): BatchSetup {
   const fieldA = fieldVec(config.fieldA)
   const fieldB = fieldVec(config.fieldB)
   const rho =
-    t > 0 && (hasFieldMagnitude(fieldA) || hasFieldMagnitude(fieldB))
+    t > 0 && hasPrecessionFields(fieldA, fieldB)
       ? precessDensityMatrix(baseRho, fieldA, fieldB, t)
       : baseRho
   const aliceAxes: readonly [Vec3, Vec3] = [

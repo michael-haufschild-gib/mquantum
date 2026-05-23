@@ -85,6 +85,16 @@ export const QW_MAX_LATTICE_DIM = 11
 /** CPU references and saved states support 1D walks even though the global UI starts at 2D. */
 export const QW_MIN_LATTICE_DIM = 1
 
+const QW_COIN_TYPES = new Set<QuantumWalkCoinType>(['grover', 'hadamard', 'dft'])
+const QW_COIN_INITIALS = new Set<QuantumWalkCoinInitial>(['real', 'symmetric'])
+const QW_FIELD_VIEWS = new Set<QuantumWalkFieldView>([
+  'probability',
+  'phase',
+  'coinState',
+  'coinEntropy',
+  'causalCurvature',
+])
+
 /**
  * Compute the default per-dimension grid size for quantum walk, capped
  * so that gridSize^dim stays within the GPU dispatch limit.
@@ -117,6 +127,34 @@ function activeGridChanged(
     if (prev[d] !== next[d]) return true
   }
   return false
+}
+
+function clampFiniteNumber(value: unknown, fallback: number, min: number, max: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
+  return Math.max(min, Math.min(max, value))
+}
+
+function clampFiniteInteger(value: unknown, fallback: number, min: number, max: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
+  return Math.max(min, Math.min(max, Math.round(value)))
+}
+
+function sanitizeCoinType(value: unknown): QuantumWalkCoinType {
+  return typeof value === 'string' && QW_COIN_TYPES.has(value as QuantumWalkCoinType)
+    ? (value as QuantumWalkCoinType)
+    : DEFAULT_QUANTUM_WALK_CONFIG.coinType
+}
+
+function sanitizeCoinInitial(value: unknown): QuantumWalkCoinInitial {
+  return typeof value === 'string' && QW_COIN_INITIALS.has(value as QuantumWalkCoinInitial)
+    ? (value as QuantumWalkCoinInitial)
+    : DEFAULT_QUANTUM_WALK_CONFIG.coinInitial
+}
+
+function sanitizeFieldView(value: unknown): QuantumWalkFieldView {
+  return typeof value === 'string' && QW_FIELD_VIEWS.has(value as QuantumWalkFieldView)
+    ? (value as QuantumWalkFieldView)
+    : DEFAULT_QUANTUM_WALK_CONFIG.fieldView
 }
 
 /**
@@ -163,16 +201,73 @@ export function sanitizeQuantumWalkConfig<T extends QuantumWalkConfig>(config: T
     slicePositions,
     Math.max(0, latticeDim - 3)
   )
-  const changed = dimAdjusted || gridAdjusted || spacingAdjusted || initialAdjusted || sliceAdjusted
-  if (!changed) return config
+  const structuralAdjusted =
+    dimAdjusted || gridAdjusted || spacingAdjusted || initialAdjusted || sliceAdjusted
+
+  const coinType = sanitizeCoinType(config.coinType)
+  const coinInitial = sanitizeCoinInitial(config.coinInitial)
+  const fieldView = sanitizeFieldView(config.fieldView)
+  const coinBias = clampFiniteNumber(
+    config.coinBias,
+    DEFAULT_QUANTUM_WALK_CONFIG.coinBias,
+    0.01,
+    0.99
+  )
+  const stepsPerFrame = clampFiniteInteger(
+    config.stepsPerFrame,
+    DEFAULT_QUANTUM_WALK_CONFIG.stepsPerFrame,
+    1,
+    16
+  )
+  const autoScale =
+    typeof config.autoScale === 'boolean' ? config.autoScale : DEFAULT_QUANTUM_WALK_CONFIG.autoScale
+  const absorberEnabled =
+    typeof config.absorberEnabled === 'boolean'
+      ? config.absorberEnabled
+      : DEFAULT_QUANTUM_WALK_CONFIG.absorberEnabled
+  const absorberWidth = clampFiniteNumber(
+    config.absorberWidth,
+    DEFAULT_QUANTUM_WALK_CONFIG.absorberWidth,
+    0.05,
+    0.5
+  )
+  const pmlTargetReflection = clampFiniteNumber(
+    config.pmlTargetReflection,
+    DEFAULT_QUANTUM_WALK_CONFIG.pmlTargetReflection,
+    1e-12,
+    0.999
+  )
+  const needsReset = config.needsReset === true || structuralAdjusted
+  const scalarAdjusted =
+    coinType !== config.coinType ||
+    coinInitial !== config.coinInitial ||
+    fieldView !== config.fieldView ||
+    coinBias !== config.coinBias ||
+    stepsPerFrame !== config.stepsPerFrame ||
+    autoScale !== config.autoScale ||
+    absorberEnabled !== config.absorberEnabled ||
+    absorberWidth !== config.absorberWidth ||
+    pmlTargetReflection !== config.pmlTargetReflection ||
+    needsReset !== config.needsReset
+
+  if (!structuralAdjusted && !scalarAdjusted) return config
   return {
     ...sized,
+    coinType,
+    coinInitial,
+    fieldView,
+    coinBias,
+    stepsPerFrame,
+    autoScale,
+    absorberEnabled,
+    absorberWidth,
+    pmlTargetReflection,
     latticeDim,
     gridSize,
     spacing,
     initialPosition,
     slicePositions,
-    needsReset: true,
+    needsReset,
   }
 }
 

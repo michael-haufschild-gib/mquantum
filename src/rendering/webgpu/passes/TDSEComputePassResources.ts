@@ -177,6 +177,13 @@ export const TDSE_UNIFORM_SIZE = TDSE_UNIFORMS_LAYOUT.totalSize
 const UNIFORM_SIZE = TDSE_UNIFORM_SIZE
 
 /**
+ * Byte offset of `TDSEUniforms.simTime`. Curved time-dependent metrics patch
+ * this after ordered RK4 substeps so post-evolution visualization shaders
+ * read the same metric time as the final RK4/renormalization step.
+ */
+export const TDSE_UNIFORM_OFFSET_SIM_TIME = TDSE_UNIFORMS_LAYOUT.byteOffset.simTime
+
+/**
  * Byte offset of `TDSEUniforms.stageTimeK1` — start of the 16-byte
  * (K1, K2, K3, K4) RK4 stage-time quartet consumed by the curved-space
  * integrator for time-dependent metrics (deSitter).
@@ -187,6 +194,14 @@ const UNIFORM_SIZE = TDSE_UNIFORM_SIZE
  * into the wrong slots otherwise.
  */
 export const TDSE_UNIFORM_OFFSET_STAGE_TIME_K1 = TDSE_UNIFORMS_LAYOUT.byteOffset.stageTimeK1
+
+/**
+ * Byte offset of `TDSEUniforms.stageTimeK4`. Post-evolution deSitter
+ * diagnostics intentionally use this field as the metric volume time, so the
+ * curved path patches it back to the just-integrated final time after any
+ * full-uniform final snapshot.
+ */
+export const TDSE_UNIFORM_OFFSET_STAGE_TIME_K4 = TDSE_UNIFORMS_LAYOUT.byteOffset.stageTimeK4
 /** Diagnostics workgroup size (must match @workgroup_size in diagnostic shaders) */
 const DIAG_WG = 256
 /** DiagReduceUniforms struct size (32 bytes) */

@@ -73,12 +73,22 @@ fn sampleCrossSectionScalar(
   uniforms: SchroedingerUniforms
 ) -> CrossSectionScalarSample {
   let xND = mapPosToND(pos, uniforms);
-  let psi = evalPsi(xND, animTime, uniforms);
-
-  var rho = rhoFromPsi(psi);
+  let psiResult = evalPsiWithSpatialPhase(xND, animTime, uniforms);
+  let psi = psiResult.xy;
+  let psiMag2 = rhoFromPsi(psi);
+  var rawAmplitudeRho = psiMag2;
   if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
-    rho *= uniforms.hydrogenNDBoost;
+    rawAmplitudeRho *= uniforms.hydrogenNDBoost;
   }
+  let densityInfo = applyDensityPostModulation(
+    pos,
+    psi,
+    psiMag2,
+    psiResult.z,
+    psiResult.w,
+    uniforms
+  );
+  var rho = densityInfo.x;
 
   var scalar = rho;
   if (uniforms.crossSectionScalar == CROSS_SECTION_SCALAR_REAL) {
@@ -92,7 +102,7 @@ fn sampleCrossSectionScalar(
     if (uniforms.crossSectionScalar == CROSS_SECTION_SCALAR_DENSITY) {
       value01 = clamp((sFromRho(rho) + 8.0) / 8.0, 0.0, 1.0);
     } else {
-      let amplitude = sqrt(max(rho, DENSITY_EPS));
+      let amplitude = sqrt(max(rawAmplitudeRho, DENSITY_EPS));
       let signedUnit = scalar / max(amplitude, 1e-4);
       value01 = clamp(0.5 + 0.5 * signedUnit, 0.0, 1.0);
     }

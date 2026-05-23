@@ -102,7 +102,13 @@ describe('V2 PUBLICATION SWEEP — reduced 11 × 11 × 3 grid against v2 criteri
             phi2: rigidPhi2,
           })
           const margin = Math.min(rigidPhi1, rigidPhi2) / Math.max(rigidA, 1e-30)
-          const wkbRates = computeWkbPhaseRates(out.chi, out.gridSize, out.aMin, out.aMax)
+          const wkbRates = computeWkbPhaseRates(
+            out.chi,
+            out.gridSize,
+            out.aMin,
+            out.aMax,
+            out.phiExtent
+          )
           const wkbChamp = findWkbChampion(wkbRates)
 
           verdicts.push({

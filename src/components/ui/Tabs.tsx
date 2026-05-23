@@ -2,7 +2,7 @@
  * Tabs Component
  *
  * A reusable tab component for organizing content into switchable panels.
- * Follows the project's premium aesthetic with subtle motion and glass effects.
+ * Follows the project's compact panel aesthetic with subtle motion.
  *
  * Optimized to avoid forced reflows and support "keep-alive" with "mount-on-demand" for tab content.
  */
@@ -51,8 +51,7 @@ export interface TabsProps {
   tabListClassName?: string
   /** Optional class name for the content panel */
   contentClassName?: string
-  /** Optional ref forwarded to the scrollable content panel. Lets callers
-   *  attach scroll listeners (e.g. the panel-glass scrolling-attr hook). */
+  /** Optional ref forwarded to the scrollable content panel. */
   contentRef?: React.Ref<HTMLDivElement>
   /** Visual variant of the tabs */
   variant?: 'default' | 'minimal' | 'pills'
@@ -435,9 +434,8 @@ export const Tabs: React.FC<TabsProps> = React.memo(
         </div>
 
         {/* Content Panel - Keep Alive with Mount on Demand.
-         *  `contain: layout style paint` isolates the scroll repaint from the
-         *  surrounding glass-panel layer so the canvas behind the panel does
-         *  not get re-blurred whenever a tab's content layout shifts.
+         *  `contain: layout style paint` isolates scroll repaint from the
+         *  surrounding panel and WebGPU canvas.
          *  `overscroll-behavior: contain` blocks scroll chaining at the panel
          *  edges — the page (and the canvas underneath) cannot scroll when
          *  this list bottoms out. */}

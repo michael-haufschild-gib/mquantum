@@ -10,11 +10,11 @@ import { create } from 'zustand'
 import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
 import {
   getDimensionConstraints,
+  getQuantumTypeEntry,
   getRecommendedDimension,
   getUnavailabilityReason,
   isAvailableForDimension,
   isValidObjectType as isValidObjectTypeRegistry,
-  QUANTUM_MODES_3D_ONLY,
 } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
@@ -186,10 +186,17 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
       return
     }
 
-    // Enforce minimum dim=3 for quantum modes that lack a 2D rendering path
-    const quantumMode = useExtendedObjectStore.getState().schroedinger?.quantumMode
-    if (quantumMode && QUANTUM_MODES_3D_ONLY.has(quantumMode) && clampedDimension < 3) {
-      clampedDimension = 3
+    // Enforce active quantum-mode dimension bounds, not just ObjectType bounds.
+    // Compute kernels have tighter maxima than the generic Schrodinger object
+    // type; exceeding them desynchronizes global dimension from lattice state.
+    const quantumMode =
+      currentType === 'schroedinger' && useExtendedObjectStore.getState().schroedinger?.quantumMode
+    const quantumEntry = quantumMode ? getQuantumTypeEntry(quantumMode) : undefined
+    if (quantumEntry) {
+      clampedDimension = Math.max(
+        quantumEntry.dimensions.min,
+        Math.min(quantumEntry.dimensions.max, clampedDimension)
+      )
     }
 
     // Skip if same dimension (no change needed)

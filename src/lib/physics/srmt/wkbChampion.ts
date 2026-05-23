@@ -36,24 +36,28 @@ import type { SrmtClock } from './types'
 import { extractWkbPhase } from './wkbPhase'
 
 /**
- * Mean of `|∂S/∂x|` over the grid, for each clock candidate.
+ * Density-weighted mean of `|∂S/∂x|` over the grid, for each clock candidate.
  *
  * For each clock `x ∈ {a, φ₁, φ₂}` we extract the WKB phase `S(a, φ)`
- * unwrapped along axis `x`, then average the absolute finite-difference
- * gradient in the `x` direction over all interior cells. The
- * normalisation is per-cell so grids of different shape can be
- * compared directly.
+ * unwrapped along axis `x`, then average the absolute physical
+ * finite-difference gradient in the `x` direction over all interior
+ * edges weighted by the geometric midpoint density
+ * `sqrt(|χ_i|² · |χ_j|²)` and normalized by the same significant edge
+ * support. Axis spacing is applied explicitly (`da` for `a`,
+ * `dφ = 2·phiExtent/(Nφ−1)` for each inflaton axis) so the score is a
+ * Hamilton-Jacobi momentum scale, not a grid-resolution artifact or an
+ * envelope-width artifact.
  *
  * The clock with the largest score is the "WKB-natural" clock —
  * the variable along which the semiclassical action accumulates
- * most rapidly per grid-cell, hence the variable with the
+ * most rapidly per physical coordinate, hence the variable with the
  * largest conjugate momentum.
  *
  * Edge cases:
  *  - When `arg(χ)` is dominated by numerical noise (very small `|χ|`)
- *    the unwrap may be unstable; the smoothing in `extractWkbPhase`
- *    helps but does not eliminate this. Treat results from regions of
- *    very low density with caution.
+ *    the unwrap may be unstable; midpoint-density weighting suppresses
+ *    empty tails, while smoothing in `extractWkbPhase` damps residual
+ *    high-frequency noise.
  *  - The score is sign-invariant (`|∂S/∂x|`) — counter-circulating
  *    classical trajectories do not cancel.
  */
@@ -65,8 +69,11 @@ export interface WkbPhaseRateRecord {
 
 function meanAbsGradientAlongAxis(
   S: Float64Array,
+  density: Float64Array,
+  totalDensity: number,
   shape: [number, number, number],
-  axis: 0 | 1 | 2
+  axis: 0 | 1 | 2,
+  spacing: number
 ): number {
   const [N0, N1, N2] = shape
   // Stride-major: row-major with order (a, φ₁, φ₂).
@@ -74,9 +81,18 @@ function meanAbsGradientAlongAxis(
   const axisStride = strides[axis]!
   const axisLen = [N0, N1, N2][axis]!
   if (axisLen < 2) return 0
+  if (!(spacing > 0) || !Number.isFinite(spacing)) return 0
+  if (!(totalDensity > 0) || !Number.isFinite(totalDensity)) return 0
 
-  let count = 0
+  let maxDensity = 0
+  for (const rho of density) {
+    if (Number.isFinite(rho) && rho > maxDensity) maxDensity = rho
+  }
+  if (!(maxDensity > 0)) return 0
+  const minEndpointDensity = maxDensity * 1e-6
+
   let sum = 0
+  let weightSum = 0
   for (let i0 = 0; i0 < N0; i0++) {
     for (let i1 = 0; i1 < N1; i1++) {
       for (let i2 = 0; i2 < N2; i2++) {
@@ -84,15 +100,45 @@ function meanAbsGradientAlongAxis(
         if (coord >= axisLen - 1) continue
         const idx = i0 * strides[0]! + i1 * strides[1]! + i2 * strides[2]!
         const next = idx + axisStride
-        const grad = S[next]! - S[idx]!
-        if (Number.isFinite(grad)) {
-          sum += Math.abs(grad)
-          count++
+        const leftDensity = density[idx]!
+        const rightDensity = density[next]!
+        if (leftDensity <= minEndpointDensity || rightDensity <= minEndpointDensity) continue
+        const grad = (S[next]! - S[idx]!) / spacing
+        const weight = Math.sqrt(leftDensity * rightDensity)
+        if (Number.isFinite(grad) && Number.isFinite(weight) && weight > 0) {
+          sum += weight * Math.abs(grad)
+          weightSum += weight
         }
       }
     }
   }
-  return count > 0 ? sum / count : 0
+  return weightSum > 0 ? sum / weightSum : 0
+}
+
+function computeDensityWeights(chi: Float32Array, shape: [number, number, number]): Float64Array {
+  const [Na, Nphi1, Nphi2] = shape
+  const out = new Float64Array(Na * Nphi1 * Nphi2)
+  for (let ia = 0; ia < Na; ia++) {
+    for (let i1 = 0; i1 < Nphi1; i1++) {
+      for (let i2 = 0; i2 < Nphi2; i2++) {
+        const site = ia * Nphi1 * Nphi2 + i1 * Nphi2 + i2
+        const src = 2 * site
+        const re = chi[src]!
+        const im = chi[src + 1]!
+        const rho = re * re + im * im
+        out[site] = Number.isFinite(rho) && rho > 0 ? rho : 0
+      }
+    }
+  }
+  return out
+}
+
+function sumDensityWeights(density: Float64Array): number {
+  let total = 0
+  for (const rho of density) {
+    if (Number.isFinite(rho) && rho > 0) total += rho
+  }
+  return total
 }
 
 /**
@@ -103,6 +149,7 @@ function meanAbsGradientAlongAxis(
  * @param aMin - Lower bound of the `a` axis (passed through to
  *               {@link extractWkbPhase}; used only for boundary checks).
  * @param aMax - Upper bound of the `a` axis.
+ * @param phiExtent - Half-range of each φ axis, `φ ∈ [-phiExtent, +phiExtent]`.
  * @param sigmaCells - Gaussian smoothing width for the unwrap step.
  *               Defaults to `1.0`. Set to `0` to disable smoothing.
  * @returns Per-clock mean phase rate. Larger = the clock is more
@@ -113,15 +160,28 @@ export function computeWkbPhaseRates(
   shape: [number, number, number],
   aMin: number,
   aMax: number,
+  phiExtent: number,
   sigmaCells = 1.0
 ): WkbPhaseRateRecord {
+  const [Na, Nphi1, Nphi2] = shape
+  if (!Number.isFinite(aMin) || !Number.isFinite(aMax) || !(aMax > aMin)) {
+    throw new Error('computeWkbPhaseRates: aMax must exceed finite aMin')
+  }
+  if (!(phiExtent > 0) || !Number.isFinite(phiExtent)) {
+    throw new Error('computeWkbPhaseRates: phiExtent must be positive and finite')
+  }
+  const da = Na > 1 ? (aMax - aMin) / (Na - 1) : 1
+  const dphi1 = Nphi1 > 1 ? (2 * phiExtent) / (Nphi1 - 1) : 1
+  const dphi2 = Nphi2 > 1 ? (2 * phiExtent) / (Nphi2 - 1) : 1
+  const density = computeDensityWeights(chi, shape)
+  const totalDensity = sumDensityWeights(density)
   const S_a = extractWkbPhase(chi, shape, aMin, aMax, 'a', sigmaCells)
   const S_phi1 = extractWkbPhase(chi, shape, aMin, aMax, 'phi1', sigmaCells)
   const S_phi2 = extractWkbPhase(chi, shape, aMin, aMax, 'phi2', sigmaCells)
   return {
-    a: meanAbsGradientAlongAxis(S_a, shape, 0),
-    phi1: meanAbsGradientAlongAxis(S_phi1, shape, 1),
-    phi2: meanAbsGradientAlongAxis(S_phi2, shape, 2),
+    a: meanAbsGradientAlongAxis(S_a, density, totalDensity, shape, 0, da),
+    phi1: meanAbsGradientAlongAxis(S_phi1, density, totalDensity, shape, 1, dphi1),
+    phi2: meanAbsGradientAlongAxis(S_phi2, density, totalDensity, shape, 2, dphi2),
   }
 }
 

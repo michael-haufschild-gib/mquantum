@@ -88,20 +88,25 @@ const diracInitBody = /* wgsl */ `
   let pAmp = sqrt(pef);
   let aAmp = sqrt(1.0 - pef);
   let halfS = S / 2u;
+  let hasSpinDoublet = halfS > 1u;
+  let primarySpinAmp = select(1.0, cosHalf, hasSpinDoublet);
+  let secondarySpinAmp = select(0.0, sinHalf, hasSpinDoublet);
 
   // CSE — these subexpressions repeat across branches and components:
   //   * Bloch-rotation product (cosP + i sinP)·(phiCos + i phiSin)
-  //     yields the spin-down phase used by every component-1 / component-3
-  //     write (4 sites in mode 0/1, 1 site in mode 3).
-  //   * pAmp/aAmp × cosHalf/sinHalf × envelope is the real-amplitude
+  //     yields the spin-down phase used when each energy sector has a spin
+  //     doublet (S >= 4). For S=2, component 1 is the antiparticle sector,
+  //     not spin-down, so the single in-sector basis vector receives unit
+  //     polarization amplitude independent of Bloch angle.
+  //   * pAmp/aAmp × primary/secondary spin amplitudes × envelope is the real-amplitude
   //     factor before the cosP/sinP / spin-down-phase multiply. Caching
   //     these 4 products replaces 8 mul-chain per site with 4.
   let bdownCos = cosP * phiCos - sinP * phiSin;  // Re((cosP+i sinP)(phiCos+i phiSin))
   let bdownSin = sinP * phiCos + cosP * phiSin;  // Im(...)
-  let pCosE = pAmp * cosHalf * envelope;
-  let pSinE = pAmp * sinHalf * envelope;
-  let aCosE = aAmp * cosHalf * envelope;
-  let aSinE = aAmp * sinHalf * envelope;
+  let pCosE = pAmp * primarySpinAmp * envelope;
+  let pSinE = pAmp * secondarySpinAmp * envelope;
+  let aCosE = aAmp * primarySpinAmp * envelope;
+  let aSinE = aAmp * secondarySpinAmp * envelope;
 
   if ((params.initCondition == 0u || params.initCondition == 1u || params.initCondition == 3u)
       && DIRAC_USE_SPARSE_GAMMA) {
@@ -129,15 +134,15 @@ const diracInitBody = /* wgsl */ `
       hNegIm[sc0] = 0.0;
     }
 
-    posBaseRe[0] = cosHalf;
-    if (S > 1u) {
-      posBaseRe[1] = sinHalf * phiCos;
-      posBaseIm[1] = sinHalf * phiSin;
+    posBaseRe[0] = primarySpinAmp;
+    if (hasSpinDoublet) {
+      posBaseRe[1] = secondarySpinAmp * phiCos;
+      posBaseIm[1] = secondarySpinAmp * phiSin;
     }
-    negBaseRe[halfS] = cosHalf;
-    if (S > halfS + 1u) {
-      negBaseRe[halfS + 1u] = sinHalf * phiCos;
-      negBaseIm[halfS + 1u] = sinHalf * phiSin;
+    negBaseRe[halfS] = primarySpinAmp;
+    if (hasSpinDoublet) {
+      negBaseRe[halfS + 1u] = secondarySpinAmp * phiCos;
+      negBaseIm[halfS + 1u] = secondarySpinAmp * phiSin;
     }
 
     for (var md: u32 = 0u; md < params.latticeDim; md = md + 1u) {
@@ -188,13 +193,13 @@ const diracInitBody = /* wgsl */ `
     // gaussianPacket / planeWave: spin-polarized packet with energy projection
     // Upper (particle) spinor
     spinor[idx] = vec2f(pCosE * cosP, pCosE * sinP);
-    if (S > 1u) {
+    if (hasSpinDoublet) {
       spinor[1u * T + idx] = vec2f(pSinE * bdownCos, pSinE * bdownSin);
     }
     // Lower (antiparticle) spinor
     if (aAmp > 1e-10 && halfS > 0u) {
       spinor[halfS * T + idx] = vec2f(aCosE * cosP, aCosE * sinP);
-      if (S > halfS + 1u) {
+      if (hasSpinDoublet) {
         spinor[(halfS + 1u) * T + idx] = vec2f(aSinE * bdownCos, aSinE * bdownSin);
       }
     }
@@ -219,14 +224,14 @@ const diracInitBody = /* wgsl */ `
     let combinedCos = env1 * cosP + env2 * cosP2;
     let combinedSin = env1 * sinP + env2 * sinP2;
 
-    // Standing-wave envelope is independent of cosHalf/sinHalf, so the
-    // base amplitude pAmp·cosHalf / pAmp·sinHalf is reused unscaled.
-    let pCos = pAmp * cosHalf;
-    let pSin = pAmp * sinHalf;
+    // Standing-wave envelope is independent of the in-sector spin amplitudes,
+    // so the base amplitude pAmp·primary/secondarySpinAmp is reused unscaled.
+    let pCos = pAmp * primarySpinAmp;
+    let pSin = pAmp * secondarySpinAmp;
     // Component 0: spin-up from both packets
     spinor[idx] = vec2f(pCos * combinedCos, pCos * combinedSin);
     // Component 1: spin-down
-    if (S > 1u) {
+    if (hasSpinDoublet) {
       spinor[1u * T + idx] = vec2f(
         pSin * (combinedCos * phiCos - combinedSin * phiSin),
         pSin * (combinedSin * phiCos + combinedCos * phiSin)
@@ -238,13 +243,13 @@ const diracInitBody = /* wgsl */ `
     // (pef=0.5 gives maximum Zitterbewegung, equal upper/lower).
     // Reuses the bdownCos / bdownSin / p*E / a*E CSE blocks computed above.
     spinor[idx] = vec2f(pCosE * cosP, pCosE * sinP);
-    if (S > 1u) {
+    if (hasSpinDoublet) {
       spinor[1u * T + idx] = vec2f(pSinE * bdownCos, pSinE * bdownSin);
     }
     // Lower spinor
     if (halfS > 0u) {
       spinor[halfS * T + idx] = vec2f(aCosE * cosP, aCosE * sinP);
-      if (S > halfS + 1u) {
+      if (hasSpinDoublet) {
         spinor[(halfS + 1u) * T + idx] = vec2f(aSinE * bdownCos, aSinE * bdownSin);
       }
     }

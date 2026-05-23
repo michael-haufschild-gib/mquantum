@@ -52,7 +52,7 @@ export const ShortcutsOverlay: React.FC = React.memo(() => {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--bg-overlay)] backdrop-blur-sm p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--bg-overlay)] p-4"
           onClick={handleOverlayClick}
           data-testid="shortcuts-overlay"
         >
@@ -61,10 +61,10 @@ export const ShortcutsOverlay: React.FC = React.memo(() => {
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.9, y: 20 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="glass-panel rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto custom-scrollbar flex flex-col"
+            className="surface-panel rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto custom-scrollbar flex flex-col"
             onClick={handlePropagationStop}
           >
-            <div className="flex items-center justify-between p-6 border-b border-[var(--border-subtle)] sticky top-0 bg-[var(--bg-panel)] backdrop-blur z-10">
+            <div className="flex items-center justify-between p-6 border-b border-[var(--border-subtle)] sticky top-0 bg-[var(--bg-panel)] z-10">
               <h2 className="text-xl font-bold text-accent tracking-tight">Keyboard Shortcuts</h2>
               <Button
                 variant="ghost"

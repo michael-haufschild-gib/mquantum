@@ -55,7 +55,7 @@ export interface SrmtNullBaselineStripProps {
  *    (α=1 pinned). Reversed regains direction sensitivity.
  *
  * Falsification (`data-falsified="true"`) fires when EITHER ratio
- * drops below 1 — i.e. ANY baseline beats the corresponding real fit.
+ * is at or below 1 — i.e. ANY baseline ties or beats the corresponding real fit.
  */
 export const SrmtNullBaselineStrip: React.FC<SrmtNullBaselineStripProps> = ({ snapshot }) => {
   const metrics = snapshot.qualityMetrics

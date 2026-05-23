@@ -152,7 +152,7 @@ export const Input = ({
             props.onBlur?.(e)
           }}
           className={`
-            w-full bg-glass border rounded-lg px-3 py-2 text-xs transition-colors duration-200
+            w-full bg-control border rounded-lg px-3 py-2 text-xs transition-colors duration-200
             ${leftIcon ? 'ps-9' : ''}
             ${rightIcon || clearable || loading ? 'pe-9' : ''}
             ${

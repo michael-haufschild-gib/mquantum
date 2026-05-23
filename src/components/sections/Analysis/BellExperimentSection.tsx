@@ -3,7 +3,7 @@
  *
  * The CHSH/Bell-test panel: trial-loop controls, Bloch-sphere angle
  * inputs, Werner v and detection-efficiency η sliders, sampler &
- * analysis-mode toggles, LHV strategy dropdown, the live S(N)
+ * analysis-mode toggles, LHV strategy dropdown, the live S(N)/S(t)
  * sparkline crossing the classical bound toward Tsirelson, the four
  * per-bin correlation readouts, and the loophole-budget summary.
  *
@@ -42,6 +42,10 @@ function f64ToF32(src: Float64Array): Float32Array {
   const dst = new Float32Array(src.length)
   for (let i = 0; i < src.length; i++) dst[i] = src[i] ?? Number.NaN
   return dst
+}
+
+function hasNonZeroField(field: readonly number[] | undefined): boolean {
+  return Array.isArray(field) && field.some((v) => Number.isFinite(v) && v !== 0)
 }
 
 /**
@@ -144,6 +148,8 @@ export const BellExperimentContent: React.FC = React.memo(() => {
   // ── Sparkline payloads ──
   const sparkQm = f64ToF32(historyQmS)
   const sparkLhv = f64ToF32(historyLhvS)
+  const precessionActive = hasNonZeroField(config.fieldA) || hasNonZeroField(config.fieldB)
+  const sparklineLabel = precessionActive ? '|S|(t)' : '|S|(N)'
 
   return (
     <div className="flex flex-col gap-2" data-testid="bell-experiment-content">
@@ -197,11 +203,11 @@ export const BellExperimentContent: React.FC = React.memo(() => {
         )}
       </div>
 
-      {/* S(N) sparkline — QM in primary color, LHV behind. */}
+      {/* CHSH sparkline — QM in primary color, LHV behind. */}
       {historyCount > 1 && (
         <div className="space-y-0.5">
           <p className="text-xs text-text-secondary">
-            |S|(N) — classical bound = 2.000, Tsirelson = {TSIRELSON_BOUND.toFixed(3)}
+            {sparklineLabel} — classical bound = 2.000, Tsirelson = {TSIRELSON_BOUND.toFixed(3)}
           </p>
           <Sparkline
             data={sparkQm}

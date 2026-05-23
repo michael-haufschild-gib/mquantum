@@ -93,10 +93,16 @@ export function prePackPauliFrameSnapshots(params: PrePackPauliSnapshotsParams):
     params.state.strides
   )
   for (let step = 0; step <= params.stepsThisFrame; step++) {
+    // Time-dependent Zeeman kicks use the midpoint snapshot for both
+    // half-steps; the extra final snapshot restores render/slice time.
+    const snapshotTime =
+      step === params.stepsThisFrame
+        ? params.simTime + params.stepsThisFrame * params.config.dt
+        : params.simTime + (step + 0.5) * params.config.dt
     packPauliUniforms(params.uniformU32, params.uniformF32, {
       config: params.config,
       totalSites: params.totalSites,
-      simTime: params.simTime + step * params.config.dt,
+      simTime: snapshotTime,
       maxDensity: params.maxDensity,
       strides,
       basisX: params.basisX,

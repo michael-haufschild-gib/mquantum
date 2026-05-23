@@ -48,11 +48,20 @@ function isFinitePostProcessingInput(value: number): boolean {
   return Number.isFinite(value)
 }
 
+function isBoolean(value: unknown): value is boolean {
+  return typeof value === 'boolean'
+}
+
 const ANTI_ALIASING_METHODS = new Set<AntiAliasingMethod>(['none', 'fxaa', 'smaa'])
+const PAPER_QUALITIES = new Set<PaperQuality>(['low', 'medium', 'high'])
 
 /** Runtime guard for anti-aliasing methods crossing untyped boundaries. */
 function isAntiAliasingMethod(value: unknown): value is AntiAliasingMethod {
   return typeof value === 'string' && ANTI_ALIASING_METHODS.has(value as AntiAliasingMethod)
+}
+
+function isPaperQuality(value: unknown): value is PaperQuality {
+  return typeof value === 'string' && PAPER_QUALITIES.has(value as PaperQuality)
 }
 
 // ============================================================================
@@ -250,6 +259,7 @@ export const createPostProcessingSlice: StateCreator<
 
   // --- Bloom Actions ---
   setBloomEnabled: (enabled: boolean) => {
+    if (!isBoolean(enabled)) return
     set({ bloomEnabled: enabled })
   },
 
@@ -296,6 +306,7 @@ export const createPostProcessingSlice: StateCreator<
 
   // --- Cinematic Actions ---
   setCinematicEnabled: (enabled: boolean) => {
+    if (!isBoolean(enabled)) return
     set({ cinematicEnabled: enabled })
   },
 
@@ -325,6 +336,7 @@ export const createPostProcessingSlice: StateCreator<
 
   // --- Paper Texture Actions ---
   setPaperEnabled: (enabled: boolean) => {
+    if (!isBoolean(enabled)) return
     set({ paperEnabled: enabled })
   },
 
@@ -425,6 +437,10 @@ export const createPostProcessingSlice: StateCreator<
   },
 
   setPaperQuality: (quality: PaperQuality) => {
+    if (!isPaperQuality(quality)) {
+      logger.warn('[postProcessingSlice] Ignoring invalid paper quality:', quality)
+      return
+    }
     set({ paperQuality: quality })
   },
 
@@ -438,6 +454,7 @@ export const createPostProcessingSlice: StateCreator<
 
   // --- Frame Blending Actions ---
   setFrameBlendingEnabled: (enabled: boolean) => {
+    if (!isBoolean(enabled)) return
     set({ frameBlendingEnabled: enabled })
   },
 
@@ -450,6 +467,7 @@ export const createPostProcessingSlice: StateCreator<
   },
 
   setHorizonMemoryEnabled: (enabled: boolean) => {
+    if (!isBoolean(enabled)) return
     set({ horizonMemoryEnabled: enabled })
   },
 

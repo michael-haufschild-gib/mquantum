@@ -189,9 +189,8 @@ struct TDSEUniforms {
   // RK4 per-stage simTime offsets (K1=t, K2=K3=t+dt/2, K4=t+dt).
   // Time-dependent metrics (deSitter) read the relevant stage via
   // stageIndex (group-1 uniform bound to the kinetic pipeline).
-  // NOTE: Written once per FRAME at start-of-frame simTime — for
-  // stepsPerFrame > 1 the stage times are stale for later steps;
-  // acceptable for v2a scope.
+  // The host patches this 16-byte quartet before each deSitter RK4 step so
+  // multi-step frames preserve the intended stage times.
   stageTimeK1: f32,             // offset 896
   stageTimeK2: f32,             // offset 900
   stageTimeK3: f32,             // offset 904

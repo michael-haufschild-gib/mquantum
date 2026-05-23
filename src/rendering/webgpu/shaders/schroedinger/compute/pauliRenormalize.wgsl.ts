@@ -12,7 +12,14 @@
  * @module
  */
 
-export const pauliRenormalizeBlock = /* wgsl */ `
+import { assembleShaderBlocks } from '../../shared/compose-helpers'
+import { renormalizeFiniteGuardBlock } from './renormalize.wgsl'
+
+export const pauliRenormalizeBlock = assembleShaderBlocks([
+  { name: 'renormalize-finite-guard', content: renormalizeFiniteGuardBlock },
+  {
+    name: 'pauli-renormalize',
+    content: /* wgsl */ `
 struct PauliRenormUniforms {
   totalElements: u32,  // components * totalSites (number of vec2f slots)
   targetNorm: f32,     // initial ||ψ||² to restore to
@@ -34,19 +41,19 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let currentNorm = diagResult[0];
   let targetNorm = renormUni.targetNorm;
 
-  // Guard: skip if either norm is non-positive or NaN. NaN propagation in the
-  // sqrt(targetNorm/currentNorm) scale would corrupt every spinor entry in a
-  // single dispatch, so reject NaN on both sides.
-  if (
-    currentNorm <= 0.0 ||
-    currentNorm != currentNorm ||
-    targetNorm <= 0.0 ||
-    targetNorm != targetNorm
-  ) {
+  // Guard: skip if either norm is invalid or overflowed. A bad reduction must
+  // not turn the renormalization scale into zero/Inf and corrupt every spinor.
+  if (!isSafeRenormNorm(currentNorm) || !isSafeRenormNorm(targetNorm)) {
     return;
   }
 
-  let scale = sqrt(targetNorm / currentNorm);
+  let ratio = targetNorm / currentNorm;
+  if (!isSafeRenormNorm(ratio)) {
+    return;
+  }
+  let scale = sqrt(ratio);
   spinor[idx] = spinor[idx] * scale;
 }
-`
+`,
+  },
+]).wgsl

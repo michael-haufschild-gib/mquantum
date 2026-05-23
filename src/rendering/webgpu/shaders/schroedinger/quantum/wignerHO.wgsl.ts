@@ -44,9 +44,12 @@ fn wignerFactorial(n: i32) -> f32 {
  * where u^2 = omega*x^2 + p^2/omega
  */
 fn wignerDiagonal(n: i32, x: f32, p: f32, omega: f32) -> f32 {
-  // Cache 1/ω once — per-voxel divide → multiply.
-  let invOmega = 1.0 / max(omega, 1e-20);
-  let u2 = omega * x * x + p * p * invOmega;
+  // Clamp omega once and reuse for both phase-space axes. Using raw omega for
+  // ωx² while clamping only p²/ω makes corrupted non-positive frequencies
+  // non-Gaussian and can overflow exp(-u²).
+  let omegaSafe = max(omega, 1e-20);
+  let invOmega = 1.0 / omegaSafe;
+  let u2 = omegaSafe * x * x + p * p * invOmega;
   let sign = select(1.0, -1.0, (n & 1) != 0); // (-1)^n
   return sign / PI * laguerre(n, 0.0, 2.0 * u2) * exp(-u2);
 }

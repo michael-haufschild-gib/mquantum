@@ -9,6 +9,7 @@
 
 import type { HydrogenBasisState } from './hydrogenBasis'
 import { KB_ATOMIC, type TransitionRate } from './hydrogenRates'
+import { hermitianEigendecompose, MAX_K } from './integrator'
 import { isAllowedE1 } from './selectionRules'
 import type { LindbladChannel } from './types'
 import type { DensityMatrix } from './types'
@@ -29,6 +30,51 @@ export interface ValidationResult {
   minEigenvalue: number
   /** Specific violations found */
   violations: string[]
+}
+
+const validationEigenvalues = new Float64Array(MAX_K)
+const validationEigenvectors = new Float64Array(MAX_K * MAX_K * 2)
+const validationHermitianProjection: DensityMatrix = {
+  K: MAX_K,
+  elements: new Float64Array(MAX_K * MAX_K * 2),
+}
+
+function minHermitianEigenvalue(rho: DensityMatrix): number {
+  const K = rho.K
+  if (!Number.isInteger(K) || K < 1 || K > MAX_K) return Number.NEGATIVE_INFINITY
+
+  const source = rho.elements
+  const mutableProjection = validationHermitianProjection as { K: number; elements: Float64Array }
+  const projected = mutableProjection.elements
+  mutableProjection.K = K
+
+  for (let k = 0; k < K; k++) {
+    const diagIdx = 2 * (k * K + k)
+    projected[diagIdx] = source[diagIdx]!
+    projected[diagIdx + 1] = 0
+    for (let l = k + 1; l < K; l++) {
+      const idxKL = 2 * (k * K + l)
+      const idxLK = 2 * (l * K + k)
+      const avgRe = 0.5 * (source[idxKL]! + source[idxLK]!)
+      const avgIm = 0.5 * (source[idxKL + 1]! - source[idxLK + 1]!)
+      projected[idxKL] = avgRe
+      projected[idxKL + 1] = avgIm
+      projected[idxLK] = avgRe
+      projected[idxLK + 1] = -avgIm
+    }
+  }
+
+  hermitianEigendecompose(
+    validationHermitianProjection,
+    validationEigenvalues,
+    validationEigenvectors
+  )
+
+  let minEigenvalue = Infinity
+  for (let k = 0; k < K; k++) {
+    minEigenvalue = Math.min(minEigenvalue, validationEigenvalues[k]!)
+  }
+  return minEigenvalue
 }
 
 // ---------------------------------------------------------------------------
@@ -83,22 +129,13 @@ export function validateDensityMatrix(
     violations.push(`Trace drift: ${traceDrift.toExponential(2)}`)
   }
 
-  // Check positive semi-definiteness via Gershgorin circles
-  // (approximate — gives a lower bound on eigenvalues)
-  let minEigenvalue = Infinity
-  for (let k = 0; k < K; k++) {
-    const diag = el[2 * (k * K + k)]!
-    let offDiagSum = 0
-    for (let l = 0; l < K; l++) {
-      if (l === k) continue
-      const idx = 2 * (k * K + l)
-      offDiagSum += Math.sqrt(el[idx]! * el[idx]! + el[idx + 1]! * el[idx + 1]!)
-    }
-    const gershgorinMin = diag - offDiagSum
-    if (gershgorinMin < minEigenvalue) minEigenvalue = gershgorinMin
-  }
+  // Check positive semi-definiteness with the exact Hermitian spectrum.
+  // Gershgorin lower bounds are too conservative here: a valid coherent
+  // rank-1 pure state over K>=3 has diag=1/K and off-diagonal row sum
+  // (K-1)/K, so a bound-only check falsely reports a negative eigenvalue.
+  const minEigenvalue = minHermitianEigenvalue(rho)
   if (minEigenvalue < -tolerance) {
-    violations.push(`Negative eigenvalue bound: ${minEigenvalue.toExponential(2)} (Gershgorin)`)
+    violations.push(`Negative eigenvalue: ${minEigenvalue.toExponential(2)}`)
   }
 
   return {

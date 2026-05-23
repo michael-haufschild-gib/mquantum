@@ -165,4 +165,67 @@ describe('Tooltip', () => {
 
     expect(screen.getByRole('tooltip')).toHaveStyle({ zIndex: Z_INDEX.TOOLTIP })
   })
+
+  it('repositions while visible when the trigger moves during scroll', async () => {
+    let triggerTop = 100
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+    rectSpy.mockImplementation(function (this: HTMLElement) {
+      if (this.getAttribute('role') === 'tooltip') {
+        return {
+          x: 0,
+          y: 0,
+          left: 0,
+          top: 0,
+          right: 80,
+          bottom: 20,
+          width: 80,
+          height: 20,
+          toJSON: () => ({}),
+        }
+      }
+      if (this.textContent?.includes('Hover me')) {
+        return {
+          x: 40,
+          y: triggerTop,
+          left: 40,
+          top: triggerTop,
+          right: 90,
+          bottom: triggerTop + 20,
+          width: 50,
+          height: 20,
+          toJSON: () => ({}),
+        }
+      }
+      return {
+        x: 0,
+        y: 0,
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+        width: 0,
+        height: 0,
+        toJSON: () => ({}),
+      }
+    })
+
+    render(
+      <Tooltip content="Moving tooltip" delay={0}>
+        <Button>Hover me</Button>
+      </Tooltip>
+    )
+
+    fireEvent.mouseEnter(screen.getByRole('button'))
+
+    await act(async () => {
+      vi.advanceTimersByTime(0)
+    })
+
+    expect(screen.getByRole('tooltip')).toHaveStyle({ top: '72px' })
+
+    triggerTop = 160
+    fireEvent.scroll(window)
+
+    expect(screen.getByRole('tooltip')).toHaveStyle({ top: '132px' })
+  })
 })

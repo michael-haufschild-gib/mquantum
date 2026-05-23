@@ -15,6 +15,18 @@
  * @module
  */
 
+import { assembleShaderBlocks } from '../../shared/compose-helpers'
+
+export const renormalizeFiniteGuardBlock = /* wgsl */ `
+const RENORM_MAX_SAFE_NORM: f32 = 1.0e30;
+
+fn isSafeRenormNorm(value: f32) -> bool {
+  // Comparisons reject NaN and +/-Inf; the ceiling prevents an overflowed
+  // diagnostic reduction from turning the renormalization scale into zero.
+  return value > 0.0 && value < RENORM_MAX_SAFE_NORM;
+}
+`
+
 /**
  * TDSE-variant renormalization using a single vec2f ψ buffer (merged
  * Re+Im, 8-byte stride). See {@link renormalizeBlock} for the canonical
@@ -25,7 +37,11 @@
  * them as a single flat array). Keep this block in sync with
  * `renormalizeBlock`'s math — the only difference is the binding layout.
  */
-export const tdseRenormalizeVec2Block = /* wgsl */ `
+export const tdseRenormalizeVec2Block = assembleShaderBlocks([
+  { name: 'renormalize-finite-guard', content: renormalizeFiniteGuardBlock },
+  {
+    name: 'tdse-renormalize-vec2',
+    content: /* wgsl */ `
 struct RenormUniforms {
   totalElements: u32,  // = totalSites (one vec2f per site)
   targetNorm: f32,
@@ -45,15 +61,25 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
   let currentNorm = diagResult[0];
   let targetNorm = renormUni.targetNorm;
-  if (currentNorm <= 0.0 || currentNorm != currentNorm || targetNorm <= 0.0) {
+  if (!isSafeRenormNorm(currentNorm) || !isSafeRenormNorm(targetNorm)) {
     return;
   }
-  let scale = sqrt(targetNorm / currentNorm);
+  let ratio = targetNorm / currentNorm;
+  if (!isSafeRenormNorm(ratio)) {
+    return;
+  }
+  let scale = sqrt(ratio);
   psi[idx] = psi[idx] * scale;
 }
-`
+`,
+  },
+]).wgsl
 
-export const renormalizeBlock = /* wgsl */ `
+export const renormalizeBlock = assembleShaderBlocks([
+  { name: 'renormalize-finite-guard', content: renormalizeFiniteGuardBlock },
+  {
+    name: 'renormalize-split',
+    content: /* wgsl */ `
 struct RenormUniforms {
   totalElements: u32,  // components * totalSites
   targetNorm: f32,     // initial ||ψ||² to restore to
@@ -76,15 +102,21 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let currentNorm = diagResult[0];
   let targetNorm = renormUni.targetNorm;
 
-  // Guard: skip if norms are invalid
-  if (currentNorm <= 0.0 || currentNorm != currentNorm || targetNorm <= 0.0) {
+  // Guard: skip if norms are invalid or overflowed.
+  if (!isSafeRenormNorm(currentNorm) || !isSafeRenormNorm(targetNorm)) {
     return;
   }
 
   // Scale: ψ *= √(target/current) so that ||ψ||² → targetNorm
-  let scale = sqrt(targetNorm / currentNorm);
+  let ratio = targetNorm / currentNorm;
+  if (!isSafeRenormNorm(ratio)) {
+    return;
+  }
+  let scale = sqrt(ratio);
 
   psiRe[idx] = psiRe[idx] * scale;
   psiIm[idx] = psiIm[idx] * scale;
 }
-`
+`,
+  },
+]).wgsl

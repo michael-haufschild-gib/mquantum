@@ -68,7 +68,7 @@ function readPalette(el: HTMLElement): ThemePalette {
   }
   return {
     // Use the panel surface as the heatmap background so empty cells blend in.
-    bg: read('--bg-surface-2', '--bg-glass'),
+    bg: read('--bg-surface-2', '--bg-control'),
     warm: read('--chart-cost-warm', '--chart-pass-3'),
     pass: read('--chart-pass-1', '--chart-pass-1'),
     outline: read('--text-primary', '--text-primary'),

@@ -1,6 +1,6 @@
 import { m, useMotionValue } from 'motion/react'
 import type { PointerEvent as ReactPointerEvent, RefObject } from 'react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 /** Crop region coordinates as top/right/bottom/left fractions (0-1). */
 export interface CropValues {
@@ -21,6 +21,25 @@ interface CropBoxProps {
   minSize?: number
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value))
+}
+
+function normalizeMinSize(minSize: number): number {
+  return Number.isFinite(minSize) && minSize > 0 ? clamp(minSize, 0, 1) : 0.05
+}
+
+function normalizeCrop(crop: CropValues, minSize: number): CropValues {
+  const safeMinSize = normalizeMinSize(minSize)
+  const width =
+    Number.isFinite(crop.width) && crop.width > 0 ? clamp(crop.width, safeMinSize, 1) : 1
+  const height =
+    Number.isFinite(crop.height) && crop.height > 0 ? clamp(crop.height, safeMinSize, 1) : 1
+  const x = Number.isFinite(crop.x) ? clamp(crop.x, 0, 1 - width) : 0
+  const y = Number.isFinite(crop.y) ? clamp(crop.y, 0, 1 - height) : 0
+  return { x, y, width, height }
+}
+
 /**
  * Reusable crop box component with drag handles.
  * Used by both ScreenshotModal (inline) and CropEditor (full-screen).
@@ -33,6 +52,8 @@ interface CropBoxProps {
 export const CropBox = ({ containerRef, crop, onCropChange, minSize = 0.05 }: CropBoxProps) => {
   const [bounds, setBounds] = useState({ width: 0, height: 0 })
   const [isResizing, setIsResizing] = useState(false)
+  const safeMinSize = normalizeMinSize(minSize)
+  const safeCrop = useMemo(() => normalizeCrop(crop, minSize), [crop, minSize])
 
   const dragX = useMotionValue(0)
   const dragY = useMotionValue(0)
@@ -59,7 +80,7 @@ export const CropBox = ({ containerRef, crop, onCropChange, minSize = 0.05 }: Cr
 
   // Drag handler
   const onDragEnd = useCallback(() => {
-    if (isResizing || bounds.width === 0) return
+    if (isResizing || bounds.width <= 0 || bounds.height <= 0) return
 
     const dxPx = dragX.get()
     const dyPx = dragY.get()
@@ -67,14 +88,14 @@ export const CropBox = ({ containerRef, crop, onCropChange, minSize = 0.05 }: Cr
     const dx = dxPx / bounds.width
     const dy = dyPx / bounds.height
 
-    const nx = Math.max(0, Math.min(1 - crop.width, crop.x + dx))
-    const ny = Math.max(0, Math.min(1 - crop.height, crop.y + dy))
+    const nx = Math.max(0, Math.min(1 - safeCrop.width, safeCrop.x + dx))
+    const ny = Math.max(0, Math.min(1 - safeCrop.height, safeCrop.y + dy))
 
-    onCropChange({ ...crop, x: nx, y: ny })
+    onCropChange({ ...safeCrop, x: nx, y: ny })
 
     dragX.set(0)
     dragY.set(0)
-  }, [bounds.width, bounds.height, isResizing, dragX, dragY, crop, onCropChange])
+  }, [bounds.width, bounds.height, isResizing, dragX, dragY, safeCrop, onCropChange])
 
   // Resize start
   const startResize = useCallback(
@@ -88,13 +109,13 @@ export const CropBox = ({ containerRef, crop, onCropChange, minSize = 0.05 }: Cr
       startPos.current = {
         x: e.clientX,
         y: e.clientY,
-        cropX: crop.x,
-        cropY: crop.y,
-        cropW: crop.width,
-        cropH: crop.height,
+        cropX: safeCrop.x,
+        cropY: safeCrop.y,
+        cropW: safeCrop.width,
+        cropH: safeCrop.height,
       }
     },
-    [crop]
+    [safeCrop]
   )
 
   // Handle resize move
@@ -102,7 +123,7 @@ export const CropBox = ({ containerRef, crop, onCropChange, minSize = 0.05 }: Cr
     if (!isResizing) return
 
     const onResizeMove = (e: PointerEvent) => {
-      if (!activeHandle.current || bounds.width === 0) return
+      if (!activeHandle.current || bounds.width <= 0 || bounds.height <= 0) return
 
       const dxPx = e.clientX - startPos.current.x
       const dyPx = e.clientY - startPos.current.y
@@ -114,7 +135,7 @@ export const CropBox = ({ containerRef, crop, onCropChange, minSize = 0.05 }: Cr
       let { cropX: px, cropY: py, cropW: pw, cropH: ph } = s
 
       if (activeHandle.current.includes('w')) {
-        const maxDx = pw - minSize
+        const maxDx = pw - safeMinSize
         const validDx = Math.min(dx, maxDx)
         const finalDx = Math.max(-px, validDx)
         px += finalDx
@@ -123,11 +144,11 @@ export const CropBox = ({ containerRef, crop, onCropChange, minSize = 0.05 }: Cr
 
       if (activeHandle.current.includes('e')) {
         const maxW = 1 - px
-        pw = Math.max(minSize, Math.min(maxW, pw + dx))
+        pw = Math.max(safeMinSize, Math.min(maxW, pw + dx))
       }
 
       if (activeHandle.current.includes('n')) {
-        const maxDy = ph - minSize
+        const maxDy = ph - safeMinSize
         const validDy = Math.min(dy, maxDy)
         const finalDy = Math.max(-py, validDy)
         py += finalDy
@@ -136,7 +157,7 @@ export const CropBox = ({ containerRef, crop, onCropChange, minSize = 0.05 }: Cr
 
       if (activeHandle.current.includes('s')) {
         const maxH = 1 - py
-        ph = Math.max(minSize, Math.min(maxH, ph + dy))
+        ph = Math.max(safeMinSize, Math.min(maxH, ph + dy))
       }
 
       onCropChange({ x: px, y: py, width: pw, height: ph })
@@ -154,7 +175,7 @@ export const CropBox = ({ containerRef, crop, onCropChange, minSize = 0.05 }: Cr
       window.removeEventListener('pointermove', onResizeMove)
       window.removeEventListener('pointerup', onResizeEnd)
     }
-  }, [isResizing, bounds.width, bounds.height, minSize, onCropChange])
+  }, [isResizing, bounds.width, bounds.height, safeMinSize, onCropChange])
 
   // Corner bracket handles (video editor style)
   const handles = [
@@ -188,10 +209,10 @@ export const CropBox = ({ containerRef, crop, onCropChange, minSize = 0.05 }: Cr
     <m.div
       className="absolute border border-accent/50 shadow-[0_0_0_1px_var(--border-subtle),0_0_40px_var(--bg-overlay)] bg-transparent box-content cursor-move"
       style={{
-        left: `${crop.x * 100}%`,
-        top: `${crop.y * 100}%`,
-        width: `${crop.width * 100}%`,
-        height: `${crop.height * 100}%`,
+        left: `${safeCrop.x * 100}%`,
+        top: `${safeCrop.y * 100}%`,
+        width: `${safeCrop.width * 100}%`,
+        height: `${safeCrop.height * 100}%`,
         boxShadow: '0 0 0 9999px var(--bg-overlay)',
         x: dragX,
         y: dragY,
@@ -202,10 +223,10 @@ export const CropBox = ({ containerRef, crop, onCropChange, minSize = 0.05 }: Cr
       // Use explicit numeric constraints based on current crop dimensions
       // (containerRef constraints become stale after resize operations)
       dragConstraints={{
-        left: -crop.x * bounds.width,
-        right: (1 - crop.x - crop.width) * bounds.width,
-        top: -crop.y * bounds.height,
-        bottom: (1 - crop.y - crop.height) * bounds.height,
+        left: -safeCrop.x * bounds.width,
+        right: (1 - safeCrop.x - safeCrop.width) * bounds.width,
+        top: -safeCrop.y * bounds.height,
+        bottom: (1 - safeCrop.y - safeCrop.height) * bounds.height,
       }}
       onDragEnd={onDragEnd}
       data-testid="crop-box"

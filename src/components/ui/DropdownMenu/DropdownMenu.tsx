@@ -309,11 +309,10 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
                   animate="open"
                   exit="closed"
                   variants={menuVariants}
-                  className="glass-panel min-w-[180px] rounded-lg py-1 shadow-xl border border-border-default"
+                  className="surface-panel min-w-[180px] rounded-lg py-1 shadow-xl border border-border-default"
                   style={{
                     maxHeight: maxHeight || '80vh',
                     overflowY: 'auto',
-                    backdropFilter: 'blur(16px)',
                   }}
                   onClick={handleContentClick}
                   onKeyDown={handleMenuKeyDown}

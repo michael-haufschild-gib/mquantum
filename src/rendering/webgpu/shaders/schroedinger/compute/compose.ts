@@ -11,6 +11,7 @@
 import {
   assembleShaderBlocks,
   sanitizeDensityGridStorageFormat,
+  sanitizeShaderBoolean,
   sanitizeShaderDimension,
   sanitizeShaderTermCount,
 } from '../../shared/compose-helpers'
@@ -112,17 +113,24 @@ interface ComputeShaderFlags {
   useUnrolledHO: boolean
   termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | undefined
   storageFormat: 'r16float' | 'rgba16float'
+  quantumMode: ComputeQuantumMode
+  useDensityMatrix: boolean
+}
+
+/** Restrict compute shader mode selection to supported analytical modes. */
+function sanitizeComputeQuantumMode(mode: unknown): ComputeQuantumMode {
+  return mode === 'hydrogenND' || mode === 'hydrogenNDCoupled' ? mode : 'harmonicOscillator'
 }
 
 /** Generate WGSL compile-time defines and feature tags for the compute shader. */
 function generateComputeDefines(config: DensityGridComputeConfig): ComputeShaderFlags {
   const {
     dimension,
-    quantumMode = 'harmonicOscillator',
     termCount: rawTermCount,
     storageFormat: rawStorageFormat = 'r16float',
-    useDensityMatrix = false,
   } = config
+  const quantumMode = sanitizeComputeQuantumMode(config.quantumMode)
+  const useDensityMatrix = sanitizeShaderBoolean(config.useDensityMatrix, false)
 
   const defines: string[] = []
   const features: string[] = []
@@ -198,6 +206,8 @@ function generateComputeDefines(config: DensityGridComputeConfig): ComputeShader
     useUnrolledHO,
     termCount,
     storageFormat,
+    quantumMode,
+    useDensityMatrix,
   }
 }
 
@@ -215,8 +225,6 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
   modules: string[]
   features: string[]
 } {
-  const { quantumMode = 'harmonicOscillator', useDensityMatrix = false } = config
-
   const {
     defines,
     features,
@@ -230,6 +238,8 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
     useUnrolledHO,
     termCount,
     storageFormat,
+    quantumMode,
+    useDensityMatrix,
   } = generateComputeDefines(config)
 
   // Get dimension-specific blocks

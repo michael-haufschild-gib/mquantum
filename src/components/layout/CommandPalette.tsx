@@ -342,7 +342,7 @@ export const CommandPalette: React.FC = React.memo(() => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setIsOpen(false)}
-            className="absolute inset-0 bg-[var(--bg-overlay)] backdrop-blur-sm"
+            className="absolute inset-0 bg-[var(--bg-overlay)]"
           />
 
           <m.div
@@ -350,7 +350,7 @@ export const CommandPalette: React.FC = React.memo(() => {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -20 }}
             transition={{ type: 'spring', duration: 0.3 }}
-            className="w-full max-w-lg relative z-10 overflow-hidden rounded-xl border border-[var(--border-subtle)] shadow-2xl glass-panel-dark"
+            className="w-full max-w-lg relative z-10 overflow-hidden rounded-xl border border-[var(--border-subtle)] shadow-2xl surface-panel-strong"
           >
             <div className="relative border-b border-[var(--border-subtle)]">
               <div className="absolute start-4 top-3.5 text-[var(--text-tertiary)]">

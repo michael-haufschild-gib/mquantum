@@ -11,7 +11,7 @@
  *    initial condition → also a standing-wave dominantly → mean flux
  *    ratio `≈ 0`.
  *  - **Vilenkin (`tunneling`)**: outgoing Lorentzian wave (Stage-3
- *    enforces `c₂ = −i·c₁`) → `β = 0`, `|α| > 0` per column → mean flux
+ *    enforces `c₂ = +i·c₁`) → `β = 0`, `|α| > 0` per column → mean flux
  *    ratio `≈ +1` (pure outgoing, "tunneling" selection of the
  *    expanding-universe branch).
  *
@@ -213,7 +213,7 @@ describe('bogoliubov — sign convention check', () => {
   it('Vilenkin "outgoing" is the +α branch (β suppressed)', () => {
     // Compare per-column α and β explicitly: Vilenkin should have
     // |α|² > |β|² for the majority of columns. If the sign convention
-    // were flipped (c₂ = +i·c₁ instead of −i·c₁) we would see the
+    // were flipped (c₂ = −i·c₁ instead of +i·c₁) we would see the
     // opposite pattern, with most columns having |β|² > |α|².
     const out = solveWheelerDeWitt({ ...BC_INPUT, boundaryCondition: 'tunneling' })
     const summary = extractBogoliubov(out)

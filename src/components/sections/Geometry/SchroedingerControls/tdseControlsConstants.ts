@@ -6,7 +6,10 @@
  * @module components/sections/Geometry/SchroedingerControls/tdseControlsConstants
  */
 
-import { TDSE_SCENARIO_PRESETS } from '@/lib/physics/tdse/presets'
+import {
+  isTdsePresetCompatibleWithDimension,
+  TDSE_SCENARIO_PRESETS,
+} from '@/lib/physics/tdse/presets'
 
 /** Initial wavefunction shape options. */
 export const INITIAL_CONDITION_OPTIONS = [
@@ -65,11 +68,7 @@ export const FIELD_VIEW_OPTIONS = [
  * @returns Filtered preset options for the dropdown
  */
 export function getScenarioPresetOptions(dim: number): { value: string; label: string }[] {
-  return TDSE_SCENARIO_PRESETS.filter((p) => {
-    const presetDim = p.overrides.latticeDim
-    // No latticeDim in overrides → compatible with any dimension
-    if (presetDim === undefined) return true
-    // Preset designed for this dimension or lower (TDSE can scale arrays up)
-    return presetDim <= dim
-  }).map((p) => ({ value: p.id, label: p.name }))
+  return TDSE_SCENARIO_PRESETS.filter((p) => isTdsePresetCompatibleWithDimension(p, dim)).map(
+    (p) => ({ value: p.id, label: p.name })
+  )
 }

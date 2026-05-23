@@ -62,6 +62,29 @@ function makeCtx(openQuantum: typeof DEFAULT_OPEN_QUANTUM_CONFIG): WebGPURenderC
   } as unknown as WebGPURenderContext
 }
 
+function makeHydrogenCtx(
+  openQuantum: typeof DEFAULT_OPEN_QUANTUM_CONFIG,
+  extraDimOmega: readonly number[],
+  extraDimFrequencySpread: number
+): WebGPURenderContext {
+  return {
+    frame: {
+      stores: {
+        extended: {
+          schroedinger: {
+            openQuantum,
+            extraDimOmega,
+            extraDimFrequencySpread,
+            principalQuantumNumber: 1,
+            azimuthalQuantumNumber: 0,
+            magneticQuantumNumber: 0,
+          },
+        },
+      },
+    },
+  } as unknown as WebGPURenderContext
+}
+
 function makeShared(
   preset: ReturnType<typeof makePreset>,
   config: PresetConfig,
@@ -175,6 +198,33 @@ describe('AnalyticOpenQuantumExecutor', () => {
       )
     ).not.toThrow()
     expect(uploads).toHaveLength(1)
+  })
+
+  it('rebuilds hydrogen open-quantum basis from spread-adjusted shader frequencies', () => {
+    const executor = new AnalyticOpenQuantumExecutor()
+    const { gridPass } = makeGridPass()
+    const preset = makePreset([[1, 0]])
+    const config = makePresetConfig()
+    const openQuantum = {
+      ...DEFAULT_OPEN_QUANTUM_CONFIG,
+      enabled: true,
+      hydrogenBasisMaxN: 1,
+    }
+    const shared = makeShared(preset, config, { quantumMode: 'hydrogenND', dimension: 5 })
+    const state = executor as unknown as {
+      hydrogenBasisKey: string
+      hydrogenBasis: { energy: number }[]
+    }
+
+    executor.execute(makeHydrogenCtx(openQuantum, [2, 3], 0), shared, gridPass, 1, undefined)
+    const baseKey = state.hydrogenBasisKey
+    const baseEnergy = state.hydrogenBasis[0]!.energy
+
+    executor.execute(makeHydrogenCtx(openQuantum, [2, 3], 0.1), shared, gridPass, 2, undefined)
+
+    expect(state.hydrogenBasisKey).not.toBe(baseKey)
+    expect(state.hydrogenBasis[0]!.energy).toBeCloseTo(2.4, 10)
+    expect(state.hydrogenBasis[0]!.energy).not.toBeCloseTo(baseEnergy, 10)
   })
 
   it('sanitizes malformed open-quantum runtime config before propagator creation', () => {

@@ -44,8 +44,24 @@ const DEFAULT_WORLD_BOUND = 2.0
 
 // Workgroup size (must match shader @workgroup_size)
 const WORKGROUP_SIZE = 8
+const MAX_DENSITY_GRID_SIZE = 4096
 
 export type { DensityGridComputeConfig }
+
+/** Clamp density-grid texture size to finite CPU and GPU limits. */
+export function sanitizeDensityGridSize(
+  value: unknown,
+  maxGridSize: number = MAX_DENSITY_GRID_SIZE
+): number {
+  const safeMaxGridSize =
+    typeof maxGridSize === 'number' && Number.isFinite(maxGridSize) && maxGridSize > 0
+      ? Math.min(MAX_DENSITY_GRID_SIZE, Math.floor(maxGridSize))
+      : MAX_DENSITY_GRID_SIZE
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return Math.max(1, Math.min(safeMaxGridSize, DEFAULT_GRID_SIZE))
+  }
+  return Math.max(1, Math.min(safeMaxGridSize, Math.floor(value)))
+}
 
 /**
  * Compute pass that pre-computes a 3D density texture from quantum wavefunctions.
@@ -138,8 +154,14 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
       isCompute: true,
       workgroupSize: [WORKGROUP_SIZE, WORKGROUP_SIZE, WORKGROUP_SIZE],
     })
-    this.passConfig = config
-    this.gridSize = config.gridSize ?? DEFAULT_GRID_SIZE
+    this.passConfig = {
+      ...config,
+      gridSize: sanitizeDensityGridSize(config.gridSize),
+      forceRgba: config.forceRgba === true,
+      useDensityMatrix: config.useDensityMatrix === true,
+      useHydrogenBasis: config.useHydrogenBasis === true,
+    }
+    this.gridSize = this.passConfig.gridSize ?? DEFAULT_GRID_SIZE
     this.workgroupCount = Math.ceil(this.gridSize / WORKGROUP_SIZE)
   }
 
@@ -148,6 +170,9 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device } = ctx
+    this.gridSize = sanitizeDensityGridSize(this.gridSize, device.limits.maxTextureDimension3D)
+    this.passConfig = { ...this.passConfig, gridSize: this.gridSize }
+    this.workgroupCount = Math.ceil(this.gridSize / WORKGROUP_SIZE)
     this.densityTextureFormat = await selectGridTextureFormat(device, this.passConfig)
 
     // Compose compute shader

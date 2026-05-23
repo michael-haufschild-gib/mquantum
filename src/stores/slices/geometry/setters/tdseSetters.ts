@@ -590,13 +590,14 @@ export function createTdseSetters(ctx: SetterContext): TdseSetters {
         () => import('@/lib/physics/tdse/presets'),
         'tdseSetters',
         `TDSE presets for '${presetId}'`,
-        ({ getTdsePreset }) => {
+        ({ getTdsePreset, isTdsePresetCompatibleWithDimension }) => {
           if (!canApplyPresetRequest(isLatestRequest, ctx.get().schroedinger.quantumMode, options))
             return
           const preset = getTdsePreset(presetId)
           if (!preset) return
+          const globalDim = useGeometryStore.getState().dimension
+          if (!isTdsePresetCompatibleWithDimension(preset, globalDim)) return
           setWithVersion((state) => {
-            const globalDim = useGeometryStore.getState().dimension
             const { latticeDim: _presetDim, ...safeOverrides } = preset.overrides
             const base = {
               ...DEFAULT_TDSE_CONFIG,

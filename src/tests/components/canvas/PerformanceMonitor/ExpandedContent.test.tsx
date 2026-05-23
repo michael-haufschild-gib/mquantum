@@ -39,6 +39,26 @@ describe('ExpandedContent', () => {
     expect(screen.getByText('33.3')).toBeInTheDocument()
   })
 
+  it('uses placeholders for non-finite FPS header values', () => {
+    usePerformanceMetricsStore.setState({
+      fps: Number.NaN,
+      frameTime: Infinity,
+      minFps: Number.NaN,
+      maxFps: Infinity,
+      history: {
+        fps: [60, Number.NaN, 30, Infinity],
+        cpu: [],
+        mem: [],
+      },
+    })
+
+    const { container } = render(<ExpandedContent onCollapse={vi.fn()} didDrag={false} />)
+
+    expect(screen.getByText(/Min -- .* Max --/)).toBeInTheDocument()
+    expect(screen.getByText('--', { selector: 'div.text-lg' })).toBeInTheDocument()
+    expect(container).not.toHaveTextContent(/NaN|Infinity/)
+  })
+
   it('calls onCollapse when header is clicked and not dragging', async () => {
     const user = userEvent.setup()
     const onCollapse = vi.fn()

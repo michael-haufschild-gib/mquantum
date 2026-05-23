@@ -5,11 +5,11 @@
  * Runs after the forward FFT in the observables pipeline, reading from
  * the interleaved complex k-space buffer.
  *
- * Uses atomicAdd with fixed-point scaling (2^20) to accumulate floating-point
+ * Uses atomicAdd with fixed-point scaling to accumulate normalized spectral
  * density values into atomic<u32> bins without requiring shared memory.
  *
  * Output: 32-bin energy histogram ρ(E) stored as atomic<u32>.
- * On readback, divide each bin by the fixed-point scale (1048576.0) to get floats.
+ * On readback, divide each bin by ENERGY_SPECTRUM_FIXED_SCALE to get floats.
  *
  * @workgroup_size(64)
  * @module
@@ -17,6 +17,7 @@
 
 /** Number of energy histogram bins. */
 export const NUM_ENERGY_BINS = 32
+export const ENERGY_SPECTRUM_FIXED_SCALE = 16_777_216
 
 export const energySpectralDensityUniformsBlock = /* wgsl */ `
 struct EnergySpectrumUniforms {
@@ -108,14 +109,17 @@ fn main(
       let fBin = (ek - esParams.eMin) * invRange;
       let bin = min(u32(floor(fBin)), esParams.numBins - 1u);
 
-      // Read |φ(k)|² from interleaved complex buffer
+      // Read |φ(k)|² from interleaved complex buffer. The forward FFT is
+      // intentionally unnormalized, so Parseval gives Σ|φ(k)|² = N·Σ|ψ(x)|².
+      // Divide by N before fixed-point accumulation; otherwise plane-wave
+      // states on production grids saturate u32 bins and flatten the spectrum.
       let c = idx << 1u;
       let re = complexBuf[c];
       let im = complexBuf[c + 1u];
-      let density = re * re + im * im;
+      let density = (re * re + im * im) / max(f32(esParams.totalSites), 1.0);
 
       // Fixed-point encode and atomically accumulate into workgroup-local bin
-      let scaled = u32(clamp(density * 1048576.0, 0.0, 4294967040.0));
+      let scaled = u32(clamp(density * ${ENERGY_SPECTRUM_FIXED_SCALE}.0, 0.0, 4294967040.0));
       if (scaled > 0u) {
         atomicAdd(&shared_bins[bin], scaled);
       }

@@ -120,8 +120,33 @@ describe('BloomPass (progressive downsample/upsample)', () => {
   })
 
   it('prefilter shader clamps negative radiance before thresholding', () => {
-    expect(bloomPrefilterShader).toContain('let radiance = max(color, vec3f(0.0))')
+    expect(bloomPrefilterShader).toContain('let radiance = sanitizeBloomRadiance(color)')
     expect(bloomPrefilterShader).toContain('return radiance * factor')
+  })
+
+  it('prefilter shader blocks NaN and Inf radiance from poisoning the bloom mip chain', () => {
+    expect(bloomPrefilterShader).toContain('const BLOOM_MAX_RADIANCE: f32 = 65504.0')
+    expect(bloomPrefilterShader).toContain('fn sanitizeBloomRadiance(color: vec3f) -> vec3f')
+    expect(bloomPrefilterShader).toContain('select(vec3f(0.0), color, color == color)')
+    expect(bloomPrefilterShader).toContain('clamp(nonNan, vec3f(0.0), vec3f(BLOOM_MAX_RADIANCE))')
+    expect(bloomPrefilterShader).toContain('let alpha = sanitizeBloomAlpha(colorSample.a)')
+    expect(bloomPrefilterShader).toContain(
+      'let straightColor = sanitizeBloomRadiance(colorSample.rgb * invAlpha)'
+    )
+  })
+
+  it('downsample and upsample shaders sanitize bloom-chain samples before filtering', () => {
+    expect(bloomDownsampleShader).toContain('fn sanitizeBloomRadiance(color: vec3f) -> vec3f')
+    expect(bloomDownsampleShader).toContain(
+      'let a = sanitizeBloomRadiance(textureSample(tInput, linearSampler, uv + texelSize * vec2f(-2.0, -2.0)).rgb)'
+    )
+    expect(bloomUpsampleShader).toContain('fn sanitizeBloomRadiance(color: vec3f) -> vec3f')
+    expect(bloomUpsampleShader).toContain(
+      'let center = sanitizeBloomRadiance(textureSample(tLowerMip, linearSampler, uv).rgb)'
+    )
+    expect(bloomCompositeShader).toContain(
+      'let bloomColor = sanitizeBloomRadiance(textureSample(tBloom, linearSampler, input.uv).rgb)'
+    )
   })
 
   it('downsample shader uses 13-tap filter with no uniforms', () => {

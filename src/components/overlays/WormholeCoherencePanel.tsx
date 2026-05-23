@@ -171,7 +171,7 @@ const WormholeCoherencePanelInner: React.FC = React.memo(() => {
         className="flex flex-col overflow-hidden rounded-2xl shadow-[var(--shadow-hard)]"
         style={{ width: PANEL_W }}
       >
-        <div className="flex items-center gap-2 px-3 py-1.5 glass-panel">
+        <div className="flex items-center gap-2 px-3 py-1.5 surface-panel">
           <span className="text-xs font-medium text-primary/80 whitespace-nowrap">
             Wormhole I(L:R)
           </span>
@@ -208,7 +208,7 @@ const WormholeCoherencePanelInner: React.FC = React.memo(() => {
               y={PAD_T}
               width={WIDTH - PAD_L - PAD_R}
               height={HEIGHT - PAD_T - PAD_B}
-              fill="var(--color-glass)"
+              fill="var(--color-control)"
               stroke="var(--color-panel-border)"
               strokeWidth={1}
             />

@@ -22,7 +22,7 @@
  *     `(A_c, A_s)` of `cos φ_L` and `sin φ_L`.
  *  3. Mapping `(A_c, A_s) → (c₁, c₂)` via the Airy connection formula.
  *  4. Applying a per-BC branch policy (HH/DeWitt: `c₂ = 0`; Vilenkin:
- *     `c₂ = −i · c₁`).
+ *     `c₂ = +i · c₁`).
  *  5. Overwriting every Euclidean cell in the column with the Langer
  *     uniform formula
  *
@@ -95,7 +95,7 @@
 
 import type { WdwBoundaryCondition } from '@/lib/geometry/extended/wheelerDeWitt'
 
-import { airyAll } from './airy'
+import { airyAll, combineAiryBasis } from './airy'
 import { WDW_C_U, wdwLangerVariable, wdwLorentzianWkbAction, wdwTurningA, wdwU } from './constants'
 
 /**
@@ -321,7 +321,13 @@ export function extractColumnAiry(ctx: ColumnContext, bc: WdwBoundaryCondition):
   const c2RawRe = sqrtHalfPi * (acRe - asRe)
   const c2RawIm = sqrtHalfPi * (acIm - asIm)
 
-  const { c1Re, c1Im, c2Re, c2Im } = applyBcWeighting(bc, c1RawRe, c1RawIm, c2RawRe, c2RawIm)
+  const { c1Re, c1Im, c2Re, c2Im } = applyAiryBoundaryBranchPolicy(
+    bc,
+    c1RawRe,
+    c1RawIm,
+    c2RawRe,
+    c2RawIm
+  )
   const kappa = 2 * WDW_C_U * aTurn
 
   return {
@@ -354,30 +360,52 @@ export function extractColumnAiry(ctx: ColumnContext, bc: WdwBoundaryCondition):
  *
  * so the Lorentzian-side wave magnitude is unchanged. This keeps the
  * downstream `maxDensity` consistent with the leapfrog's physical
- * scale.
+ * scale. If the selected phase carrier `c₁` is numerically absent while
+ * `c₂` is finite, the raw `c₂` phase supplies the projected branch phase
+ * instead of erasing the column.
  */
-function applyBcWeighting(
+const AIRY_BRANCH_PHASE_FLOOR = 1e-30
+
+function zeroAiryBranchCoefficients(): { c1Re: number; c1Im: number; c2Re: number; c2Im: number } {
+  return { c1Re: 0, c1Im: 0, c2Re: 0, c2Im: 0 }
+}
+
+function selectAiryBranchPhase(
+  c1Re: number,
+  c1Im: number,
+  c2Re: number,
+  c2Im: number
+): { re: number; im: number } | null {
+  const mag1 = Math.hypot(c1Re, c1Im)
+  const mag2 = Math.hypot(c2Re, c2Im)
+  if (mag1 >= AIRY_BRANCH_PHASE_FLOOR) return { re: c1Re / mag1, im: c1Im / mag1 }
+  if (mag2 >= AIRY_BRANCH_PHASE_FLOOR) return { re: c2Re / mag2, im: c2Im / mag2 }
+  if (mag1 > 0) return { re: c1Re / mag1, im: c1Im / mag1 }
+  if (mag2 > 0) return { re: c2Re / mag2, im: c2Im / mag2 }
+  return null
+}
+
+/** Apply the selected WDW Airy boundary branch while preserving finite phase and magnitude. */
+export function applyAiryBoundaryBranchPolicy(
   bc: WdwBoundaryCondition,
   c1Re: number,
   c1Im: number,
   c2Re: number,
   c2Im: number
 ): { c1Re: number; c1Im: number; c2Re: number; c2Im: number } {
-  const totalSq = c1Re * c1Re + c1Im * c1Im + c2Re * c2Re + c2Im * c2Im
+  const totalMag = Math.hypot(c1Re, c1Im, c2Re, c2Im)
+  if (!(totalMag > 0) || !Number.isFinite(totalMag)) return zeroAiryBranchCoefficients()
+
+  const phase = selectAiryBranchPhase(c1Re, c1Im, c2Re, c2Im)
+  if (!phase) return zeroAiryBranchCoefficients()
 
   switch (bc) {
     case 'noBoundary':
     case 'deWitt': {
       // Pure decaying-Euclidean: discard Bi.
-      const mag1 = Math.sqrt(c1Re * c1Re + c1Im * c1Im)
-      if (mag1 < 1e-30) {
-        // Degenerate — keep both at zero.
-        return { c1Re: 0, c1Im: 0, c2Re: 0, c2Im: 0 }
-      }
-      const scale = Math.sqrt(totalSq) / mag1
       return {
-        c1Re: c1Re * scale,
-        c1Im: c1Im * scale,
+        c1Re: phase.re * totalMag,
+        c1Im: phase.im * totalMag,
         c2Re: 0,
         c2Im: 0,
       }
@@ -386,14 +414,10 @@ function applyBcWeighting(
       // Outgoing wave: c₂ = +i·c₁. With c₂ = i·c₁ the amplitudes satisfy
       //   |c₁_new|² + |c₂_new|² = 2·|c₁_new|²,
       // so to preserve totalSq we need |c₁_new|² = totalSq/2 →
-      //   c₁_new = c₁_raw · √(totalSq / (2·|c₁_raw|²)).
-      const mag1Sq = c1Re * c1Re + c1Im * c1Im
-      if (mag1Sq < 1e-30) {
-        return { c1Re: 0, c1Im: 0, c2Re: 0, c2Im: 0 }
-      }
-      const scale = Math.sqrt(totalSq / (2 * mag1Sq))
-      const newC1Re = c1Re * scale
-      const newC1Im = c1Im * scale
+      //   c₁_new = phase(raw carrier) · √(totalSq/2).
+      const newC1Mag = totalMag / Math.SQRT2
+      const newC1Re = phase.re * newC1Mag
+      const newC1Im = phase.im * newC1Mag
       // c₂ = +i · c₁  ⇒  (Re, Im) of c₂ = (−Im, Re) of c₁ (since
       //   i·(a + ib) = −b + i·a).
       return {
@@ -446,7 +470,7 @@ export function langerEvaluate(
     prefactor = Math.pow(zeta / U, 0.25)
   }
   const { ai, bi } = airyAll(zeta)
-  const re = prefactor * (info.c1Re * ai + info.c2Re * bi)
-  const im = prefactor * (info.c1Im * ai + info.c2Im * bi)
+  const re = prefactor * combineAiryBasis(info.c1Re, info.c2Re, ai, bi)
+  const im = prefactor * combineAiryBasis(info.c1Im, info.c2Im, ai, bi)
   return { re, im }
 }

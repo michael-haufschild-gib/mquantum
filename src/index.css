@@ -17,7 +17,7 @@
   --color-panel-header: var(--panel-header);
   --color-surface: var(--bg-surface);
   --color-elevated: var(--bg-elevated);
-  --color-glass: var(--bg-glass);
+  --color-control: var(--bg-control);
   --color-overlay: var(--bg-overlay);
 
   /* Text */
@@ -251,7 +251,7 @@
   input[type='email'],
   textarea,
   select {
-    @apply glass-input rounded-md px-3 py-2 text-sm w-full;
+    @apply surface-input rounded-md px-3 py-2 text-sm w-full;
   }
 
   /* Global Interactive Cursor Rules */
@@ -277,17 +277,11 @@
 }
 
 /* 
-   PREMIUM GLASSMORPHISM SYSTEM 
+   PANEL SURFACE SYSTEM
 */
 
-@utility glass-panel {
+@utility surface-panel {
   background-color: var(--bg-panel);
-
-  /* Reduced from blur(24px) saturate(180%) — those values forced a full
-     re-blur of the underlying WebGPU canvas every frame and dropped fps
-     during scroll. blur(10px) saturate(150%) keeps the glass aesthetic
-     while substantially cutting the per-frame compositor cost. */
-  backdrop-filter: blur(10px) saturate(150%);
   border: 1px solid var(--border-subtle);
   box-shadow:
     var(--shadow-soft),
@@ -300,21 +294,13 @@
     box-shadow 0.3s ease;
 }
 
-/* While the user is actively scrolling inside a glass panel, drop the
-   backdrop-filter entirely. The scroll handler toggles data-scrolling
-   on the panel; the rAF-debounced clear restores blur on idle. */
-.glass-panel[data-scrolling='true'] {
-  backdrop-filter: none;
-}
-
-@utility glass-panel-dark {
-  background-color: var(--bg-panel); /* Unified */
-  backdrop-filter: blur(12px);
+@utility surface-panel-strong {
+  background-color: var(--bg-panel);
   border: 1px solid var(--border-subtle);
-  box-shadow: inset 0 0 20px oklch(0% 0 0deg / 10%); /* Softer shadow */
+  box-shadow: inset 0 0 20px oklch(0% 0 0deg / 10%);
 }
 
-@utility glass-separator {
+@utility surface-separator {
   height: 1px;
   background: linear-gradient(
     90deg,
@@ -326,8 +312,8 @@
   border: none;
 }
 
-@utility glass-input {
-  background-color: var(--color-glass);
+@utility surface-input {
+  background-color: var(--color-control);
   border: 1px solid var(--border-subtle);
   box-shadow: inset 0 1px 2px oklch(0% 0 0deg / 5%);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -335,13 +321,13 @@
 
   &:hover {
     border-color: var(--border-default);
-    background-color: color-mix(in oklch, var(--color-glass), var(--text-primary) 5%);
+    background-color: color-mix(in oklch, var(--color-control), var(--text-primary) 5%);
   }
 
   &:focus {
     outline: none;
     border-color: var(--theme-accent);
-    background-color: color-mix(in oklch, var(--color-glass), var(--theme-accent) 5%);
+    background-color: color-mix(in oklch, var(--color-control), var(--theme-accent) 5%);
     box-shadow:
       inset 0 1px 2px oklch(0% 0 0deg / 5%),
       0 0 0 1px var(--theme-accent),
@@ -353,7 +339,7 @@
   }
 }
 
-@utility glass-button {
+@utility surface-button {
   position: relative;
   background: linear-gradient(to bottom, var(--border-subtle), transparent);
   border: 1px solid var(--border-default);
@@ -361,7 +347,6 @@
     0 1px 2px oklch(0% 0 0deg / 5%),
     inset 0 1px 0 0 oklch(100% 0 0deg / 10%),
     inset 0 0 0 1px oklch(100% 0 0deg / 2%);
-  backdrop-filter: blur(8px);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   color: var(--text-secondary);
@@ -403,7 +388,7 @@
   }
 }
 
-@utility glass-button-primary {
+@utility surface-button-primary {
   background: linear-gradient(
     135deg,
     color-mix(in oklch, var(--theme-accent) 25%, transparent),
@@ -464,10 +449,9 @@
   }
 }
 
-/* LED Glow - Static, no animation, zero style recalcs */
+/* LED Accent - static fill, no blur/filter work. */
 @utility led-glow {
-  filter: blur(4px);
-  opacity: 0.7;
+  opacity: 0.35;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -540,7 +524,6 @@
 
 @utility overlay-backdrop {
   background-color: var(--bg-overlay);
-  backdrop-filter: blur(4px);
 }
 
 /* ═══════════════════════════════════════════════════════════════════

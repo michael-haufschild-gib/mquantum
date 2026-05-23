@@ -71,6 +71,15 @@ describe('performanceStore', () => {
       expect(usePerformanceStore.getState().temporalReprojectionEnabled).toBe(false)
       expect(usePerformanceStore.getState().cameraTeleported).toBe(true)
     })
+
+    it('ignores invalid temporal reprojection boolean updates from direct callers', () => {
+      const store = usePerformanceStore.getState()
+      store.setTemporalReprojectionEnabled(false)
+
+      store.setTemporalReprojectionEnabled('false' as never)
+
+      expect(usePerformanceStore.getState().temporalReprojectionEnabled).toBe(false)
+    })
   })
 
   describe('eigenfunction cache fidelity controls', () => {
@@ -90,6 +99,22 @@ describe('performanceStore', () => {
       setAnalyticalGradientEnabled(false)
       setFastEigenInterpolationEnabled(false)
       setEigenfunctionCacheEnabled(false)
+
+      const state = usePerformanceStore.getState()
+      expect(state.eigenfunctionCacheEnabled).toBe(false)
+      expect(state.analyticalGradientEnabled).toBe(false)
+      expect(state.fastEigenInterpolationEnabled).toBe(false)
+    })
+
+    it('ignores invalid eigenfunction cache boolean updates from direct callers', () => {
+      const store = usePerformanceStore.getState()
+      store.setEigenfunctionCacheEnabled(false)
+      store.setAnalyticalGradientEnabled(false)
+      store.setFastEigenInterpolationEnabled(false)
+
+      store.setEigenfunctionCacheEnabled('true' as never)
+      store.setAnalyticalGradientEnabled('true' as never)
+      store.setFastEigenInterpolationEnabled('true' as never)
 
       const state = usePerformanceStore.getState()
       expect(state.eigenfunctionCacheEnabled).toBe(false)

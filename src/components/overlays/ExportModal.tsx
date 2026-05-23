@@ -431,7 +431,7 @@ export const ExportModal = () => {
               </div>
 
               {/* Footer Actions */}
-              <div className="p-4 lg:p-6 border-t border-border-subtle bg-panel-bg/95 backdrop-blur z-10">
+              <div className="p-4 lg:p-6 border-t border-border-subtle bg-panel-bg z-10">
                 <Button
                   onClick={handleExport}
                   variant="primary"

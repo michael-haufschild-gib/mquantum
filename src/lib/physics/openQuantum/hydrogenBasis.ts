@@ -19,6 +19,8 @@ const MAX_BASIS_MAX_N = 3
 const DEFAULT_BASIS_DIMENSION = 3
 const MIN_BASIS_DIMENSION = 2
 const MAX_BASIS_DIMENSION = 11
+const MIN_EXTRA_DIM_OMEGA = 0.01
+const MAX_EXTRA_DIM_FREQUENCY_SPREAD = 0.5
 
 // ---------------------------------------------------------------------------
 // Types
@@ -117,16 +119,29 @@ export function normalizeHydrogenBasisDimension(dimension: number): number {
   return clampInteger(dimension, DEFAULT_BASIS_DIMENSION, MIN_BASIS_DIMENSION, MAX_BASIS_DIMENSION)
 }
 
-/** Normalize extra-dimension oscillator frequencies to finite positive values. */
+function normalizeHydrogenExtraDimFrequencySpread(
+  extraDimFrequencySpread: number | undefined
+): number {
+  return typeof extraDimFrequencySpread === 'number' && Number.isFinite(extraDimFrequencySpread)
+    ? Math.max(0, Math.min(MAX_EXTRA_DIM_FREQUENCY_SPREAD, extraDimFrequencySpread))
+    : 0
+}
+
+/** Normalize extra-dimension oscillator frequencies to shader-effective values. */
 export function normalizeHydrogenExtraDimOmega(
   extraDimOmega: readonly number[],
-  dimension: number
+  dimension: number,
+  extraDimFrequencySpread?: number
 ): number[] {
   const dim = normalizeHydrogenBasisDimension(dimension)
   const count = Math.max(0, dim - 3)
+  const spread = normalizeHydrogenExtraDimFrequencySpread(extraDimFrequencySpread)
+  const center = (count - 1) * 0.5
   return Array.from({ length: count }, (_, i) => {
     const omega = extraDimOmega[i]
-    return typeof omega === 'number' && Number.isFinite(omega) && omega > 0 ? omega : 1
+    const baseOmega = typeof omega === 'number' && Number.isFinite(omega) && omega > 0 ? omega : 1
+    const spreadFactor = 1.0 + (i - center) * spread
+    return Math.max(baseOmega * spreadFactor, MIN_EXTRA_DIM_OMEGA)
   })
 }
 
@@ -154,11 +169,16 @@ export function normalizeHydrogenExtraDimOmega(
 export function buildHydrogenBasis(
   maxN: number,
   dimension: number,
-  extraDimOmega: readonly number[] = []
+  extraDimOmega: readonly number[] = [],
+  extraDimFrequencySpread?: number
 ): HydrogenBasisState[] {
   const safeMaxN = normalizeHydrogenBasisMaxN(maxN)
   const safeDimension = normalizeHydrogenBasisDimension(dimension)
-  const safeExtraDimOmega = normalizeHydrogenExtraDimOmega(extraDimOmega, safeDimension)
+  const safeExtraDimOmega = normalizeHydrogenExtraDimOmega(
+    extraDimOmega,
+    safeDimension,
+    extraDimFrequencySpread
+  )
   const states: HydrogenBasisState[] = []
 
   // Extra-dimension quantum numbers are ground-state (all zeros) in the

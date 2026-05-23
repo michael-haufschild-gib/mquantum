@@ -180,6 +180,7 @@ export function buildBecConfig(
   const omega = clampFinite(bec.trapOmega, DEFAULT_BEC_CONFIG.trapOmega, 0.01, 10)
   const initOmega = clampFinite(bec.initTrapOmega, omega, 0.01, 10)
   const anisotropy = clampFiniteArray(bec.trapAnisotropy, latDim, 1, 0.1, 10)
+  const mass = resolveBecMass(bec)
   const hbar = clampFinite(bec.hbar, DEFAULT_TDSE_CONFIG.hbar, 0.1, 10)
   const dt = clampFinite(bec.dt, DEFAULT_BEC_CONFIG.dt, 0.0001, 0.05)
   const stepsPerFrame = clampFiniteInteger(
@@ -205,7 +206,9 @@ export function buildBecConfig(
     effectiveInitOmega = initOmega * Math.pow(anisotropyProduct, 1 / latDim)
   }
   let mu =
-    g > 0 ? thomasFermiMuND(latDim, g, effectiveInitOmega) : Math.pow(1 / (2 * Math.PI), latDim / 4)
+    g > 0
+      ? thomasFermiMuND(latDim, g, effectiveInitOmega, mass)
+      : Math.pow(1 / (2 * Math.PI), latDim / 4)
 
   const { initCond, mappedInit, mom } = prepareBecInitCondition(
     { ...bec, initialCondition: sanitizeInitialCondition(bec.initialCondition) },
@@ -239,7 +242,7 @@ export function buildBecConfig(
       latticeDim: latDim,
       gridSize,
       spacing,
-      mass: resolveBecMass(bec),
+      mass,
       hbar,
       dt,
       stepsPerFrame,

@@ -10,7 +10,6 @@ import { Slider } from '@/components/ui/Slider'
 import { Tab, Tabs } from '@/components/ui/Tabs'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import { useAnySweepRunning } from '@/hooks/useAnySweepRunning'
-import { useScrollingPanelAttr } from '@/hooks/useScrollingPanelAttr'
 import { supportsSchroedingerSurfaceMode } from '@/lib/geometry/registry'
 import { usePerformanceStore } from '@/stores/runtime/performanceStore'
 import {
@@ -43,7 +42,6 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
   const [activeTab, setActiveTab] = useState('type')
   const sweepRunning = useAnySweepRunning()
   const scrollContentRef = useRef<HTMLDivElement>(null)
-  useScrollingPanelAttr(scrollContentRef)
   const { dimension, objectType } = useGeometryStore(
     useShallow((state) => ({ dimension: state.dimension, objectType: state.objectType }))
   )

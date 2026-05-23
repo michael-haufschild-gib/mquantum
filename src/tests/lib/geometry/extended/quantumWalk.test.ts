@@ -170,4 +170,31 @@ describe('sanitizeQuantumWalkConfig', () => {
     expect(cfg.gridSize.every((g) => Math.log2(g) % 1 === 0)).toBe(true)
     expect(cfg.needsReset).toBe(true)
   })
+
+  it('sanitizes non-finite scalar fields before they reach shader uniforms', () => {
+    const cfg = sanitizeQuantumWalkConfig({
+      ...DEFAULT_QUANTUM_WALK_CONFIG,
+      coinType: 'bogus' as never,
+      coinInitial: 'complex' as never,
+      fieldView: 'bad-field' as never,
+      coinBias: Number.POSITIVE_INFINITY,
+      stepsPerFrame: Number.NaN,
+      autoScale: 'yes' as never,
+      absorberEnabled: 'true' as never,
+      absorberWidth: Number.NaN,
+      pmlTargetReflection: Number.POSITIVE_INFINITY,
+      needsReset: 'false' as never,
+    })
+
+    expect(cfg.coinType).toBe(DEFAULT_QUANTUM_WALK_CONFIG.coinType)
+    expect(cfg.coinInitial).toBe(DEFAULT_QUANTUM_WALK_CONFIG.coinInitial)
+    expect(cfg.fieldView).toBe(DEFAULT_QUANTUM_WALK_CONFIG.fieldView)
+    expect(cfg.coinBias).toBe(DEFAULT_QUANTUM_WALK_CONFIG.coinBias)
+    expect(cfg.stepsPerFrame).toBe(DEFAULT_QUANTUM_WALK_CONFIG.stepsPerFrame)
+    expect(cfg.autoScale).toBe(DEFAULT_QUANTUM_WALK_CONFIG.autoScale)
+    expect(cfg.absorberEnabled).toBe(DEFAULT_QUANTUM_WALK_CONFIG.absorberEnabled)
+    expect(cfg.absorberWidth).toBe(DEFAULT_QUANTUM_WALK_CONFIG.absorberWidth)
+    expect(cfg.pmlTargetReflection).toBe(DEFAULT_QUANTUM_WALK_CONFIG.pmlTargetReflection)
+    expect(cfg.needsReset).toBe(false)
+  })
 })

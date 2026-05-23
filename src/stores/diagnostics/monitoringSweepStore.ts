@@ -99,4 +99,6 @@ export const useMonitoringSweepStore = createSweepStore<
     ipr: mean(samples.iprAccumulator),
     normDrift: mean(samples.normDriftAccumulator),
   }),
+  validateTickInputs: (simTime, ipr, normDrift) =>
+    Number.isFinite(simTime) && Number.isFinite(ipr) && ipr >= 0 && Number.isFinite(normDrift),
 })

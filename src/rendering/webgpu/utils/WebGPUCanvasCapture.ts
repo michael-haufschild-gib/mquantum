@@ -45,6 +45,7 @@ export class WebGPUCanvasCapture {
   private readbackHeight = 0
   private readbackFormat: CanvasCaptureTextureFormat | null = null
   private inFlight = false
+  private inFlightRequestId: number | null = null
   private disposed = false
 
   constructor(device: GPUDevice) {
@@ -155,9 +156,17 @@ export class WebGPUCanvasCapture {
   }
 
   queueCapture(params: QueueCanvasCaptureParams): void {
-    if (this.disposed || this.inFlight) return
-
     const { encoder, texture, width, height, format, requestId, onSuccess, onError } = params
+    if (this.disposed) {
+      onError('Screenshot capture canceled.', requestId)
+      return
+    }
+    if (this.inFlight) {
+      if (this.inFlightRequestId !== requestId) {
+        onError('Screenshot capture already in progress.', requestId)
+      }
+      return
+    }
 
     if (width <= 0 || height <= 0) {
       onError('Cannot capture screenshot: invalid canvas size.', requestId)
@@ -187,6 +196,7 @@ export class WebGPUCanvasCapture {
     }
 
     this.inFlight = true
+    this.inFlightRequestId = requestId
     const readbackBuffer = this.readbackBuffer
     const readbackBytesPerRow = this.readbackBytesPerRow
     const readbackBufferSize = this.readbackBufferSize
@@ -220,6 +230,7 @@ export class WebGPUCanvasCapture {
       })
       .finally(() => {
         this.inFlight = false
+        this.inFlightRequestId = null
       })
   }
 
@@ -228,5 +239,6 @@ export class WebGPUCanvasCapture {
     this.readbackBuffer?.destroy()
     this.readbackBuffer = null
     this.inFlight = false
+    this.inFlightRequestId = null
   }
 }

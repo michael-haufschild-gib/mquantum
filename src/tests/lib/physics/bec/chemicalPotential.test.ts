@@ -52,6 +52,13 @@ describe('thomasFermiMu3D', () => {
     // μ ∝ g^(2/5), so mu2/mu1 = 2^(2/5) ≈ 1.320
     expect(mu2 / mu1).toBeCloseTo(Math.pow(2, 2 / 5), 6)
   })
+
+  it('scales with m^(3/5) when the trap potential carries particle mass', () => {
+    const mu1 = thomasFermiMu3D(100, 1.0, 1.0)
+    const mu2 = thomasFermiMu3D(100, 1.0, 4.0)
+    // V = 1/2 mω²r² gives μ ∝ m^(3/5) in 3D at fixed g and ω.
+    expect(mu2 / mu1).toBeCloseTo(Math.pow(4, 3 / 5), 6)
+  })
 })
 
 describe('thomasFermiMuND', () => {
@@ -134,6 +141,29 @@ describe('thomasFermiMuND', () => {
       const expectedRatio = Math.pow(2, (2 * D) / (D + 2))
       expect(mu2 / mu1).toBeCloseTo(expectedRatio, 6)
     }
+  })
+
+  it('μ scales as m^(D/(D+2)) for each dimension D=2..6', () => {
+    // The TF trap potential is V = 1/2 mω²r², so mass enters with the
+    // same dimensional exponent as one power of ω².
+    const g = 500
+    const omega = 1.0
+    const mass1 = 1.0
+    const mass2 = 4.0
+
+    for (let D = 2; D <= 6; D++) {
+      const mu1 = thomasFermiMuND(D, g, omega, mass1)
+      const mu2 = thomasFermiMuND(D, g, omega, mass2)
+      const expectedRatio = Math.pow(mass2 / mass1, D / (D + 2))
+      expect(mu2 / mu1).toBeCloseTo(expectedRatio, 6)
+    }
+  })
+
+  it('returns 0 for non-positive or non-finite mass', () => {
+    expect(thomasFermiMu3D(100, 1.0, 0)).toBe(0)
+    expect(thomasFermiMu3D(100, 1.0, Number.NaN)).toBe(0)
+    expect(thomasFermiMuND(3, 100, 1.0, -1)).toBe(0)
+    expect(thomasFermiMuND(3, 100, 1.0, Number.POSITIVE_INFINITY)).toBe(0)
   })
 
   it('Thomas-Fermi radius R_TF is consistent with μ for 3D', () => {

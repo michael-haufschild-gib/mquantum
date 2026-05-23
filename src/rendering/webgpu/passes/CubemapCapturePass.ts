@@ -128,6 +128,9 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
  * Must stay in sync with createCubemapResource().
  */
 const CUBEMAP_CAPTURE_FORMAT: GPUTextureFormat = 'rgba16float'
+const CUBEMAP_FACE_COUNT = 6
+const CUBEMAP_UNIFORM_SLOT_BYTES = 256
+const CUBEMAP_UNIFORM_MIN_BYTES = 160
 
 // =============================================================================
 // CubemapCapturePass
@@ -151,8 +154,8 @@ export class CubemapCapturePass extends WebGPUBasePass {
 
   private bgCache = new BindGroupCache()
 
-  // Pre-allocated uniform data array (2 mat4x4 + 1 vec4 = 36 floats)
-  private readonly uniformData = new Float32Array(36)
+  // Pre-allocated uniform data array (2 mat4x4 + f32 + WGSL struct padding).
+  private readonly uniformData = new Float32Array(CUBEMAP_UNIFORM_MIN_BYTES / 4)
 
   // Cubemap resources (temporal history - 2 frames)
   private cubemapHistory: CubemapResource[] = []
@@ -203,7 +206,11 @@ export class CubemapCapturePass extends WebGPUBasePass {
         {
           binding: 0,
           visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-          buffer: { type: 'uniform' as const },
+          buffer: {
+            type: 'uniform' as const,
+            hasDynamicOffset: true,
+            minBindingSize: CUBEMAP_UNIFORM_MIN_BYTES,
+          },
         },
       ],
     })
@@ -224,9 +231,14 @@ export class CubemapCapturePass extends WebGPUBasePass {
       'cubemap-capture-procedural'
     )
 
-    // Create uniform buffer (2 mat4x4 + vec4)
-    // 64 bytes per matrix * 2 + 16 bytes vec4 = 144 bytes, align to 256
-    this.uniformBuffer = this.createUniformBuffer(device, 256, 'cubemap-capture-uniforms')
+    // Create one aligned slot per cube face. Queue writes happen before command
+    // execution, so each draw must bind a distinct range rather than overwrite
+    // one range six times in the same frame.
+    this.uniformBuffer = this.createUniformBuffer(
+      device,
+      CUBEMAP_FACE_COUNT * CUBEMAP_UNIFORM_SLOT_BYTES,
+      'cubemap-capture-uniforms'
+    )
 
     // Initialize cubemap temporal history (2 frames)
     this.initializeCubemapHistory(device)
@@ -319,7 +331,7 @@ export class CubemapCapturePass extends WebGPUBasePass {
 
     // Create individual face views for rendering
     const faceViews: GPUTextureView[] = []
-    for (let face = 0; face < 6; face++) {
+    for (let face = 0; face < CUBEMAP_FACE_COUNT; face++) {
       faceViews.push(
         texture.createView({
           label: `cubemap-capture-face-${face}`,
@@ -637,10 +649,11 @@ export class CubemapCapturePass extends WebGPUBasePass {
     const time = ctx.frame?.time ?? 0
 
     // Render to each cube face
-    for (let face = 0; face < 6; face++) {
+    for (let face = 0; face < CUBEMAP_FACE_COUNT; face++) {
       const viewMatrix = this.computeFaceViewMatrix(face)
       const faceView = writeCubemap.faceViews[face]
       if (!faceView) continue
+      const uniformOffset = face * CUBEMAP_UNIFORM_SLOT_BYTES
 
       // Update uniform buffer using pre-allocated array
       const uniformData = this.uniformData
@@ -649,13 +662,18 @@ export class CubemapCapturePass extends WebGPUBasePass {
       uniformData[32] = time // time
       // uniformData[33-35] = padding
 
-      this.writeUniformBuffer(this.device, this.uniformBuffer, uniformData)
+      this.writeUniformBuffer(this.device, this.uniformBuffer, uniformData, uniformOffset)
 
-      const bindGroup = this.bgCache.get([], () =>
+      const bindGroup = this.bgCache.get([this.uniformBuffer], () =>
         this.device!.createBindGroup({
           label: 'cubemap-capture-bg',
           layout: this.proceduralBindGroupLayout!,
-          entries: [{ binding: 0, resource: { buffer: this.uniformBuffer! } }],
+          entries: [
+            {
+              binding: 0,
+              resource: { buffer: this.uniformBuffer!, size: CUBEMAP_UNIFORM_SLOT_BYTES },
+            },
+          ],
         })
       )
 
@@ -674,7 +692,7 @@ export class CubemapCapturePass extends WebGPUBasePass {
 
       // Render using procedural pipeline (until texture-based capture is implemented)
       passEncoder.setPipeline(this.proceduralPipeline)
-      passEncoder.setBindGroup(0, bindGroup)
+      passEncoder.setBindGroup(0, bindGroup, [uniformOffset])
       passEncoder.setVertexBuffer(0, this.getFullscreenVertexBuffer(this.device))
       passEncoder.draw(3, 1, 0, 0)
 

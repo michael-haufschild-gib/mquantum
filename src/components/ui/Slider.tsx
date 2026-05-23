@@ -337,7 +337,7 @@ export const Slider: React.FC<SliderProps> = React.memo(
         {/* Slider Track Area */}
         <div className="relative h-5 flex items-center touch-none">
           {/* Track Background */}
-          <div className="absolute w-full h-[3px] bg-[var(--bg-hover)] rounded-full overflow-hidden transition-colors duration-300 group-hover/slider:bg-[var(--bg-active)] backdrop-blur-sm shadow-inner">
+          <div className="absolute w-full h-[3px] bg-[var(--bg-hover)] rounded-full overflow-hidden transition-colors duration-300 group-hover/slider:bg-[var(--bg-active)] shadow-inner">
             {/* Active Fill Track - Gradient */}
             <div
               className="h-full bg-gradient-to-r from-accent/50 to-accent shadow-[0_0_10px_var(--color-accent-glow)] opacity-80 group-hover/slider:opacity-100 transition-opacity duration-100 ease-out"
@@ -391,7 +391,7 @@ export const Slider: React.FC<SliderProps> = React.memo(
                 initial={{ opacity: 0, y: 10, scale: 0.8 }}
                 animate={{ opacity: 1, y: -20, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.8 }}
-                className="absolute top-0 -translate-x-1/2 px-2 py-1 glass-panel-dark border border-border-default rounded text-xs font-mono text-accent pointer-events-none shadow-xl z-30 whitespace-nowrap"
+                className="absolute top-0 -translate-x-1/2 px-2 py-1 surface-panel-strong border border-border-default rounded text-xs font-mono text-accent pointer-events-none shadow-xl z-30 whitespace-nowrap"
                 style={{ left: `${percentage}%` }}
               >
                 {displayValue}

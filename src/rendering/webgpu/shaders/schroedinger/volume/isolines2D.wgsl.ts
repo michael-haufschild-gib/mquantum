@@ -28,8 +28,11 @@ fn evaluateIsolines2D(pos: vec3f, rho: f32, s: f32, uniforms: SchroedingerUnifor
     return vec4f(0.0);
   }
 
-  // Pixel-space step for finite differences
-  let pixelSize = 2.0 * uniforms.boundingRadius / max(camera.resolution.y, 1.0);
+  // Pixel-space step in post-pan/zoom world coordinates. main2D maps UV
+  // through camera.modelMatrix before calling this helper, so contour AA must
+  // track the same model scale or line width drifts while zooming.
+  let modelPixelScale = max(length((camera.modelMatrix * vec4f(1.0, 0.0, 0.0, 0.0)).xyz), 1e-6);
+  let pixelSize = 2.0 * uniforms.boundingRadius * modelPixelScale / max(camera.resolution.y, 1.0);
   let invPixelSize = 1.0 / pixelSize;
   let eps = max(pixelSize * 1.5, 0.002);
   let invEps = 1.0 / eps;  // 1 reciprocal, 2 multiplies below
@@ -39,9 +42,11 @@ fn evaluateIsolines2D(pos: vec3f, rho: f32, s: f32, uniforms: SchroedingerUnifor
   // share locals across functions without an arg change).
   let animTime = uniforms.time * uniforms.timeScale;
 
-  // Sample density at neighbors for gradient
-  let rho_r = sampleDensity(pos + vec3f(eps, 0.0, 0.0), animTime, uniforms);
-  let rho_u = sampleDensity(pos + vec3f(0.0, eps, 0.0), animTime, uniforms);
+  // Sample the same post-modulated density field used by main2D's center
+  // value (hydrogen boost, uncertainty boundary, interference, shimmer).
+  // Raw sampleDensity() would mix two scalar fields and bend contour AA.
+  let rho_r = sampleDensityWithPhase(pos + vec3f(eps, 0.0, 0.0), animTime, uniforms).x;
+  let rho_u = sampleDensityWithPhase(pos + vec3f(0.0, eps, 0.0), animTime, uniforms).x;
 
   let s_r = sFromRho(rho_r);
   let s_u = sFromRho(rho_u);

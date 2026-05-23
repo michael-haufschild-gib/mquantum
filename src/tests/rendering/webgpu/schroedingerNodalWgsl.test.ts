@@ -108,6 +108,39 @@ describe('Schroedinger nodal WGSL composition', () => {
     expect(wgsl).not.toContain('let nodalSurfaceModeActive =')
   })
 
+  it('uses nodal surface hit distance for temporal volumetric reprojection', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 4,
+      quantumMode: 'harmonicOscillator',
+      isosurface: false,
+      temporalAccumulation: true,
+      nodal: true,
+      nodalRenderMode: 'surface',
+    })
+
+    expect(wgsl).toContain('var hitT = volumeResult.primaryHitT;')
+    expect(wgsl).toContain('let nodalHit = findNodalSurfaceHit(')
+    expect(wgsl).toContain('hitT = nodalHit.t;')
+    expect(wgsl).toContain('output.worldPosition = vec4f(hitPosWorld, hitT);')
+  })
+
+  it('uses nodal surface hit distance for temporal isosurface reprojection', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 5,
+      quantumMode: 'hydrogenND',
+      isosurface: true,
+      temporalAccumulation: true,
+      nodal: true,
+      nodalRenderMode: 'surface',
+    })
+
+    expect(wgsl).toContain('let nodalRenderMode = activeNodalRenderMode(schroedinger);')
+    expect(wgsl).toContain('} else if (nodalRenderMode == NODAL_RENDER_MODE_SURFACE) {')
+    expect(wgsl).toContain('let nodalHit = findNodalSurfaceHit(')
+    expect(wgsl).toContain('hitT = nodalHit.t;')
+    expect(wgsl).toContain('output.worldPosition = vec4f(hitPosWorld, hitT);')
+  })
+
   it('keeps nodal helper symbols available when nodal feature is disabled', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 3,

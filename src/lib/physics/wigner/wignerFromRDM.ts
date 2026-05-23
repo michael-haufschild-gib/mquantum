@@ -82,12 +82,56 @@ function fillAntiDiagonalSlice(
   }
 }
 
+function isPowerOfTwo(value: number): boolean {
+  return Number.isInteger(value) && value > 0 && (value & (value - 1)) === 0
+}
+
+/**
+ * Apply the inverse phase transform used by the open-boundary Wigner formula.
+ * Radix-2 sizes use the shared FFT; all other valid grid sizes use the same
+ * finite DFT directly so physics diagnostics do not inherit an FFT-only grid
+ * restriction.
+ */
+function inverseWignerPhaseTransform(
+  slice: Float64Array,
+  scratch: Float64Array | null,
+  M: number
+): void {
+  if (isPowerOfTwo(M)) {
+    ifft(slice, M)
+    return
+  }
+
+  if (!scratch) {
+    throw new Error('wignerFromRDM: missing DFT scratch buffer')
+  }
+
+  const invM = 1 / M
+  const angleScale = (2 * Math.PI) / M
+  for (let n = 0; n < M; n++) {
+    let sumRe = 0
+    let sumIm = 0
+    for (let k = 0; k < M; k++) {
+      const re = slice[k * 2]!
+      const im = slice[k * 2 + 1]!
+      const angle = angleScale * n * k
+      const c = Math.cos(angle)
+      const s = Math.sin(angle)
+      sumRe += re * c - im * s
+      sumIm += re * s + im * c
+    }
+    scratch[n * 2] = sumRe * invM
+    scratch[n * 2 + 1] = sumIm * invM
+  }
+  slice.set(scratch.subarray(0, M * 2))
+}
+
 /**
  * Computes the discrete Wigner function and negativity from a reduced density matrix.
  *
  * @param rhoRe - Real part of the M×M RDM, row-major: ρ[i,j] = rhoRe[i*M + j]
  * @param rhoIm - Imaginary part of the M×M RDM, row-major
- * @param M - Dimension of the RDM (must be a power of 2)
+ * @param M - Dimension of the RDM
  * @returns Wigner function grid and total negativity
  */
 export function wignerFromRDM(rhoRe: Float64Array, rhoIm: Float64Array, M: number): WignerResult {
@@ -105,12 +149,13 @@ export function wignerFromRDM(rhoRe: Float64Array, rhoIm: Float64Array, M: numbe
 
   // Interleaved complex buffer for one anti-diagonal slice, reused per row
   const slice = new Float64Array(M * 2)
+  const dftScratch = isPowerOfTwo(M) ? null : new Float64Array(M * 2)
 
   for (let m = 0; m < M; m++) {
     fillAntiDiagonalSlice(slice, rhoRe, rhoIm, M, m)
 
-    // IFFT: (1/M) Σ_k slice[k] · exp(2πi·n·k/M) → W[m, n]
-    ifft(slice, M)
+    // Inverse phase transform: (1/M) Σ_k slice[k] · exp(2πi·n·k/M) → W[m, n]
+    inverseWignerPhaseTransform(slice, dftScratch, M)
 
     // Store real part (imaginary part vanishes for Hermitian ρ) and accumulate negativity
     for (let n = 0; n < M; n++) {
@@ -133,7 +178,7 @@ export function wignerFromRDM(rhoRe: Float64Array, rhoIm: Float64Array, M: numbe
  *
  * @param rhoRe - Real part of the M×M RDM, row-major
  * @param rhoIm - Imaginary part of the M×M RDM, row-major
- * @param M - Dimension of the RDM (must be a power of 2)
+ * @param M - Dimension of the RDM
  * @returns Total Wigner negativity
  */
 export function wignerNegativityFromRDM(
@@ -143,10 +188,11 @@ export function wignerNegativityFromRDM(
 ): number {
   let negSum = 0
   const slice = new Float64Array(M * 2)
+  const dftScratch = isPowerOfTwo(M) ? null : new Float64Array(M * 2)
 
   for (let m = 0; m < M; m++) {
     fillAntiDiagonalSlice(slice, rhoRe, rhoIm, M, m)
-    ifft(slice, M)
+    inverseWignerPhaseTransform(slice, dftScratch, M)
 
     for (let n = 0; n < M; n++) {
       const val = slice[n * 2]!

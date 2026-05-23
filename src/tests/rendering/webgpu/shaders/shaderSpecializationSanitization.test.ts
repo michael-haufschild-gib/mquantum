@@ -95,6 +95,51 @@ describe('shader specialization sanitization', () => {
     expectNoInvalidWgslLiterals(wgsl)
   })
 
+  it('sanitizes density-grid density-matrix mode to strict booleans', () => {
+    const { wgsl, features } = composeDensityGridComputeShader({
+      dimension: 3,
+      quantumMode: 'harmonicOscillator',
+      useDensityMatrix: 'false' as never,
+    })
+
+    expect(wgsl).toContain('const USE_DENSITY_MATRIX: bool = false;')
+    expect(wgsl).not.toContain('OpenQuantumUniforms')
+    expect(wgsl).not.toContain('@binding(4)')
+    expect(features).not.toContain('Density Matrix (Open Quantum)')
+    expectNoInvalidWgslLiterals(wgsl)
+  })
+
+  it('sanitizes fragment shader feature booleans and finite numeric defines', () => {
+    const { wgsl, features } = composeSchroedingerShader({
+      dimension: 3,
+      temporalAccumulation: 'false' as never,
+      useDensityGrid: 'false' as never,
+      densityGridHasPhase: 'false' as never,
+      densityGridSize: Number.NaN,
+      colorAlgorithm: Number.NaN,
+      isWigner: 'false' as never,
+      isFreeScalar: 'false' as never,
+      crossSectionEnabled: 'off' as never,
+      probabilityCurrentEnabled: 'on' as never,
+      fastGridEmission: 'false' as never,
+      sampleSpaceRotation: 'false' as never,
+    })
+
+    expect(wgsl).toContain('const TEMPORAL_ENABLED: bool = false;')
+    expect(wgsl).toContain('const USE_DENSITY_GRID: bool = false;')
+    expect(wgsl).toContain('const DENSITY_GRID_HAS_PHASE: bool = false;')
+    expect(wgsl).toContain('const DENSITY_GRID_SIZE: f32 = 64.0;')
+    expect(wgsl).toContain('const COLOR_ALGORITHM: i32 = 4;')
+    expect(wgsl).toContain('const IS_WIGNER: bool = false;')
+    expect(wgsl).toContain('const IS_FREE_SCALAR: bool = false;')
+    expect(wgsl).toContain('const FEATURE_CROSS_SECTION: bool = true;')
+    expect(wgsl).toContain('const FEATURE_PROBABILITY_CURRENT: bool = true;')
+    expect(wgsl).toContain('const FAST_GRID_EMISSION: bool = false;')
+    expect(wgsl).toContain('const SAMPLE_SPACE_ROTATION: bool = false;')
+    expect(features).toContain('Color: Mixed')
+    expectNoInvalidWgslLiterals(wgsl)
+  })
+
   it('sanitizes direct hydrogen ND generated-block selection', () => {
     const fallbackWgsl = getHydrogenNDGeneratedBlock(Number.NaN)
     expect(fallbackWgsl).toContain('fn evalHydrogenNDPsi3D(')

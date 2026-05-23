@@ -40,7 +40,7 @@
  * @module lib/physics/wheelerDeWitt/exactColumnSolution
  */
 
-import { airyAll } from './airy'
+import { airyAll, combineAiryBasis } from './airy'
 import {
   besselJQuarter,
   besselJQuarterPrime,
@@ -145,7 +145,7 @@ function langerChiReal(
   const U = wdwU(a, phi1, phi2, m, lambda, asymmetry)
   const pref = langerPrefactor(zeta, U)
   const { ai, bi } = airyAll(zeta)
-  return pref * (c1 * ai + c2 * bi)
+  return pref * combineAiryBasis(c1, c2, ai, bi)
 }
 
 /**
@@ -180,7 +180,7 @@ export function columnSolutionPositiveV(input: ColumnArgs, c1: number, c2: numbe
   const U = wdwU(a, phi1, phi2, m, lambda, asymmetry)
   const pref = langerPrefactor(zeta, U)
   const { ai, bi, aiPrime, biPrime } = airyAll(zeta)
-  const chiReal = pref * (c1 * ai + c2 * bi)
+  const chiReal = pref * combineAiryBasis(c1, c2, ai, bi)
 
   // Derivative via chain rule:
   //   χ' = (1/4)·(ζ/U)^{1/4}·(ζ'/ζ − U'/U)·W(ζ) + (ζ/U)^{1/4}·W'(ζ)·ζ'(a)
@@ -200,8 +200,8 @@ export function columnSolutionPositiveV(input: ColumnArgs, c1: number, c2: numbe
   } else {
     const zetaPrime = dZetaDaAnalytic(a, phi1, phi2, m, lambda, asymmetry)
     const Uprime = dUdaAnalytic(a, V)
-    const Wmix = c1 * ai + c2 * bi
-    const WmixPrime = c1 * aiPrime + c2 * biPrime
+    const Wmix = combineAiryBasis(c1, c2, ai, bi)
+    const WmixPrime = combineAiryBasis(c1, c2, aiPrime, biPrime)
     const prefRate = 0.25 * (zetaPrime / zeta - Uprime / U)
     dChiReal = pref * prefRate * Wmix + pref * WmixPrime * zetaPrime
   }

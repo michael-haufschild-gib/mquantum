@@ -45,6 +45,37 @@ describe('ResizeHandle', () => {
     expect(document.body).toHaveClass('resize-dragging')
   })
 
+  it('starts dragging even if pointer capture cannot be acquired', () => {
+    render(<ResizeHandle />)
+    const handle = screen.getByRole('separator') as HTMLDivElement
+    handle.setPointerCapture = vi.fn(() => {
+      throw new Error('pointer already inactive')
+    })
+
+    expect(() => fireEvent.pointerDown(handle, { clientX: 320, pointerId: 1 })).not.toThrow()
+    expect(document.body).toHaveClass('resize-dragging')
+  })
+
+  it('uses window pointer events when pointer capture is unavailable', () => {
+    const setSidebarWidth = vi.fn()
+    useLayoutStore.setState({ sidebarWidth: 320, setSidebarWidth } as unknown as Parameters<
+      typeof useLayoutStore.setState
+    >[0])
+
+    render(<ResizeHandle />)
+    const handle = screen.getByRole('separator') as HTMLDivElement
+    handle.setPointerCapture = vi.fn(() => {
+      throw new Error('pointer already inactive')
+    })
+    fireEvent.pointerDown(handle, { clientX: 320, pointerId: 1 })
+
+    fireEvent.pointerMove(window, { clientX: 300, pointerId: 1 })
+    expect(setSidebarWidth).toHaveBeenCalled()
+
+    fireEvent.pointerUp(window, { clientX: 300, pointerId: 1 })
+    expect(document.body).not.toHaveClass('resize-dragging')
+  })
+
   it('removes resize-dragging class from body on pointerup', () => {
     render(<ResizeHandle />)
     const handle = screen.getByRole('separator')
@@ -58,6 +89,37 @@ describe('ResizeHandle', () => {
     const handle = screen.getByRole('separator')
     fireEvent.pointerDown(handle, { clientX: 320, pointerId: 1 })
     fireEvent.pointerCancel(handle, { pointerId: 1 })
+    expect(document.body).not.toHaveClass('resize-dragging')
+  })
+
+  it('removes resize-dragging class if unmounted during an active drag', () => {
+    const { unmount } = render(<ResizeHandle />)
+    const handle = screen.getByRole('separator')
+    fireEvent.pointerDown(handle, { clientX: 320, pointerId: 1 })
+
+    unmount()
+
+    expect(document.body).not.toHaveClass('resize-dragging')
+  })
+
+  it('ignores pointerup from a secondary pointer while dragging', () => {
+    render(<ResizeHandle />)
+    const handle = screen.getByRole('separator')
+    fireEvent.pointerDown(handle, { clientX: 320, pointerId: 1 })
+    fireEvent.pointerUp(handle, { clientX: 320, pointerId: 2 })
+    expect(document.body).toHaveClass('resize-dragging')
+
+    fireEvent.pointerUp(handle, { clientX: 320, pointerId: 1 })
+    expect(document.body).not.toHaveClass('resize-dragging')
+  })
+
+  it('ends the drag on window blur', () => {
+    render(<ResizeHandle />)
+    const handle = screen.getByRole('separator')
+    fireEvent.pointerDown(handle, { clientX: 320, pointerId: 1 })
+
+    fireEvent.blur(window)
+
     expect(document.body).not.toHaveClass('resize-dragging')
   })
 

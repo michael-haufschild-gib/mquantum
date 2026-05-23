@@ -227,7 +227,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
                   toggleCinematicMode()
                   soundManager.playClick()
                 }}
-                className="p-3 rounded-full glass-panel text-text-secondary hover:text-white hover:border-accent/50 transition-colors group shadow-2xl shadow-accent/20"
+                className="p-3 rounded-full surface-panel text-text-secondary hover:text-white hover:border-accent/50 transition-colors group shadow-2xl shadow-accent/20"
                 title="Exit Cinematic Mode (C)"
                 data-testid="exit-cinematic"
                 whileHover={{ scale: 1.1, rotate: 90 }}
@@ -259,7 +259,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={handleOverlayClick}
-                className="absolute inset-0 bg-[var(--bg-overlay)] backdrop-blur-sm z-20 pointer-events-auto"
+                className="absolute inset-0 bg-[var(--bg-overlay)] z-20 pointer-events-auto"
               />
             )}
           </AnimatePresence>
@@ -274,7 +274,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
                 variants={panelVariants}
                 data-testid="left-panel"
                 className={`
-                            glass-panel rounded-xl
+                            surface-panel rounded-xl
                             h-full overflow-hidden w-80 pointer-events-auto flex flex-col
                             ${!isDesktop ? 'absolute start-2 top-0 bottom-2 z-30 shadow-2xl' : 'relative z-20'}
                         `}
@@ -334,7 +334,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
                 variants={panelVariants}
                 data-testid="right-panel"
                 className={`
-                            glass-panel rounded-xl
+                            surface-panel rounded-xl
                             h-full overflow-hidden w-80 pointer-events-auto flex flex-col
                             ${!isDesktop ? 'absolute end-2 top-0 bottom-2 z-30 shadow-2xl' : 'relative z-20'}
                         `}

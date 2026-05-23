@@ -85,6 +85,29 @@ export function computeRadialShells(raw: KSpaceRawData, binCount: number): Radia
 // Radial Display Grid
 // ============================================================================
 
+function mapOutputCoordToRawKIndex(
+  outputCoord: number,
+  rawSize: number,
+  outputSize: number,
+  shift: boolean
+): number | null {
+  if (rawSize <= 1) {
+    return outputCoord === Math.floor(outputSize / 2) ? 0 : null
+  }
+
+  let displayIndex: number
+  if (rawSize <= outputSize) {
+    const offset = Math.floor((outputSize - rawSize) / 2)
+    displayIndex = outputCoord - offset
+    if (displayIndex < 0 || displayIndex >= rawSize) return null
+  } else {
+    displayIndex = Math.floor(((outputCoord + 0.5) * rawSize) / outputSize)
+    displayIndex = Math.max(0, Math.min(rawSize - 1, displayIndex))
+  }
+
+  return shift ? (displayIndex + Math.floor(rawSize / 2)) % rawSize : displayIndex
+}
+
 /**
  * Build a 64^3 display grid from radial shell data.
  *
@@ -129,19 +152,10 @@ export function buildRadialDisplayGrid(
 
         for (let d = 0; d < 3; d++) {
           const N = gridDims[d]!
-          if (N <= 1) {
-            const center = Math.floor(G / 2)
-            if (Math.abs(outCoords[d]! - center) > 0) valid = false
-            continue
-          }
-          const offset = Math.floor((G - N) / 2)
-          let kIdx = outCoords[d]! - offset
-          if (kIdx < 0 || kIdx >= N) {
+          const kIdx = mapOutputCoordToRawKIndex(outCoords[d]!, N, G, shift)
+          if (kIdx === null) {
             valid = false
             break
-          }
-          if (shift) {
-            kIdx = (kIdx + Math.floor(N / 2)) % N
           }
           // Compute |k| component from lattice momentum
           const a = raw.spacing[d] ?? 1.0

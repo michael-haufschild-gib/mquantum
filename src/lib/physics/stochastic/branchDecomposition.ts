@@ -81,7 +81,7 @@ export function spatialBranchPartition(
   for (let idx = 0; idx < totalSites; idx++) {
     // Extract axis-0 coordinate from flat index
     const coord0 = Math.floor(idx / strides[0]!) % gridSize[0]!
-    const x0 = coord0 * spacing[0]! - halfExtent0
+    const x0 = (coord0 + 0.5) * spacing[0]! - halfExtent0
 
     const density = psiRe[idx]! * psiRe[idx]! + psiIm[idx]! * psiIm[idx]!
     if (!Number.isFinite(density)) {
@@ -151,7 +151,10 @@ export function fitExponentialDecay(
   // Filter to positive values only (log requires > 0)
   const valid: { t: number; v: number }[] = []
   for (let i = 0; i < times.length; i++) {
-    if (values[i]! > 1e-15) {
+    const t = times[i]
+    const v = values[i]
+    if (!Number.isFinite(t) || !Number.isFinite(v)) return null
+    if (v! > 1e-15) {
       valid.push({ t: times[i]!, v: values[i]! })
     }
   }

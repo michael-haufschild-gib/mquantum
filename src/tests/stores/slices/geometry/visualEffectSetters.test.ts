@@ -135,6 +135,24 @@ describe('visualEffectSetters — compound logic', () => {
     })
   })
 
+  it('rejects non-boolean spacetime feature toggle inputs', () => {
+    const store = useExtendedObjectStore.getState()
+
+    store.setSchroedingerQuantumBackreactionLensingEnabled('true' as never)
+    store.setSchroedingerBilocalERBridgeEnabled(1 as never)
+    store.setSchroedingerEntropicTimeShearEnabled('yes' as never)
+    store.setSchroedingerSpectralDimensionFlowEnabled({} as never)
+    store.setSchroedingerVacuumBubbleLensEnabled('enabled' as never)
+    store.setSchroedingerBornNullWeaveEnabled(null as never)
+
+    expect(getSchroedinger().quantumBackreactionLensingEnabled).toBe(false)
+    expect(getSchroedinger().bilocalERBridgeEnabled).toBe(false)
+    expect(getSchroedinger().entropicTimeShearEnabled).toBe(false)
+    expect(getSchroedinger().spectralDimensionFlowEnabled).toBe(false)
+    expect(getSchroedinger().vacuumBubbleLensEnabled).toBe(false)
+    expect(getSchroedinger().bornNullWeaveEnabled).toBe(false)
+  })
+
   describe('bilocal ER bridge controls', () => {
     it('defaults to disabled with editable control defaults', () => {
       const config = getSchroedinger()

@@ -6,6 +6,8 @@ import {
   type SchroedingerWGSLShaderConfig,
 } from '@/rendering/webgpu/shaders/schroedinger/composeConfig'
 
+import { functionSlice } from './wgslTestHelpers'
+
 describe('Schroedinger cross-section WGSL composition', () => {
   it('includes cross-section uniforms and compositing helpers in volumetric mode', () => {
     const { wgsl } = composeSchroedingerShader({
@@ -119,6 +121,26 @@ describe('Schroedinger cross-section WGSL composition', () => {
     expect(wgsl).not.toContain('Quantum Math Stubs (grid-only)')
     expect(wgsl).toContain('fn evalPsi(')
     expect(wgsl).toContain('fn mapPosToND(')
+  })
+
+  it('samples cross-section density through shared post-modulation physics', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 4,
+      quantumMode: 'harmonicOscillator',
+      isosurface: false,
+      useDensityGrid: false,
+      interference: true,
+      phaseShimmerEnabled: true,
+      crossSectionEnabled: true,
+    })
+
+    const body = functionSlice(wgsl, 'sampleCrossSectionScalar')
+    expect(body).toContain('let psiResult = evalPsiWithSpatialPhase(xND, animTime, uniforms);')
+    expect(body).toContain('let densityInfo = applyDensityPostModulation(')
+    expect(body).toContain('var rho = densityInfo.x;')
+    expect(body).toContain('var rawAmplitudeRho = psiMag2;')
+    expect(body).toContain('let amplitude = sqrt(max(rawAmplitudeRho, DENSITY_EPS));')
+    expect(body).not.toContain('let amplitude = sqrt(max(rho, DENSITY_EPS));')
   })
 
   it('includes real hydrogen math when radial probability is active with density grid', () => {

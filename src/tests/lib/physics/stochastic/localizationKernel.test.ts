@@ -107,6 +107,27 @@ describe('generateCollapseCenters', () => {
     expect(anyDifferent).toBe(true)
   })
 
+  it('generates coordinates for every active lattice dimension', () => {
+    const gridSize = [4, 8, 16, 32]
+    const spacing = [1, 0.5, 0.25, 0.125]
+    const centers = generateCollapseCenters(3, gridSize, spacing, 4, 42, 0)
+
+    expect(centers).toHaveLength(3)
+    for (const center of centers) {
+      expect(center.position).toHaveLength(4)
+      for (let d = 0; d < 4; d++) {
+        const halfExtent = gridSize[d]! * spacing[d]! * 0.5
+        expect(center.position[d]).toBeGreaterThanOrEqual(-halfExtent)
+        expect(center.position[d]).toBeLessThan(halfExtent)
+      }
+    }
+  })
+
+  it('emits no centers when no active lattice dimensions are available', () => {
+    expect(generateCollapseCenters(3, [], [], 0, 42, 0)).toEqual([])
+    expect(generateCollapseCenters(3, [64], [], 1, 42, 0)).toEqual([])
+  })
+
   it('Gaussian noise values have correct statistics (N=10000, seed=42)', () => {
     const gridSize = [64]
     const spacing = [0.1]

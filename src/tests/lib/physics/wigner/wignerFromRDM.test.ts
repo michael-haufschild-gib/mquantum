@@ -167,6 +167,29 @@ describe('wignerFromRDM', () => {
     }
   })
 
+  it('preserves trace and position marginals for non-power-of-two RDM grids', () => {
+    // The Wigner transform itself is a finite DFT over the anti-diagonal; a
+    // radix-2 FFT is only an implementation shortcut, not a physics constraint
+    // on valid coordinate-grid sizes.
+    const M = 6
+    const psi = fockWavefunction(M, 1, 1.2)
+    const { re, im } = pureStateRDM(psi, M)
+
+    const { wigner, negativity } = wignerFromRDM(re, im, M)
+    const scalarNegativity = wignerNegativityFromRDM(re, im, M)
+
+    let sum = 0
+    for (let i = 0; i < wigner.length; i++) sum += wigner[i]!
+    expect(sum).toBeCloseTo(1, 8)
+    expect(scalarNegativity).toBeCloseTo(negativity, 12)
+
+    for (let m = 0; m < M; m++) {
+      let marginal = 0
+      for (let n = 0; n < M; n++) marginal += wigner[m * M + n]!
+      expect(marginal).toBeCloseTo(re[m * M + m]!, 8)
+    }
+  })
+
   it('maximally mixed state (ρ = I/M) has zero negativity', () => {
     // For ρ = I/M (diagonal), the anti-diagonal at position m only has k=0
     // contributing: ρ[m,m] = 1/M. The IFFT of a single-entry sequence gives

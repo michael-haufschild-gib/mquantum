@@ -599,7 +599,7 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
       const omegas = [...get().schroedinger.extraDimOmega]
       omegas[dimIndex] = Math.max(0.1, Math.min(2.0, omega))
       setWithVersion((state) => ({
-        schroedinger: { ...state.schroedinger, extraDimOmega: omegas },
+        schroedinger: { ...state.schroedinger, extraDimOmega: omegas, hydrogenNDPreset: 'custom' },
       }))
     },
 
@@ -611,7 +611,7 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
       const clamped = omegas.slice(0, 8).map((o) => Math.max(0.1, Math.min(2.0, o)))
       while (clamped.length < 8) clamped.push(1.0)
       setWithVersion((state) => ({
-        schroedinger: { ...state.schroedinger, extraDimOmega: clamped, presetName: 'custom' },
+        schroedinger: { ...state.schroedinger, extraDimOmega: clamped, hydrogenNDPreset: 'custom' },
       }))
     },
 
@@ -625,7 +625,7 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
         schroedinger: {
           ...state.schroedinger,
           extraDimFrequencySpread: clamped,
-          presetName: 'custom',
+          hydrogenNDPreset: 'custom',
         },
       }))
     },

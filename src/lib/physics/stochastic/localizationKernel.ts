@@ -20,11 +20,11 @@ export const MAX_STOCHASTIC_SITES = 32
 
 /** A collapse center with world-space position and noise value. */
 export interface CollapseCenter {
-  /** World-space position (length = latticeDim, max 3 for visible dims) */
+  /** World-space position across active lattice dimensions. */
   position: number[]
   /** Gaussian noise value dW ~ N(0, 1) */
   noise: number
-  /** GPU-computed expectation ⟨L_k⟩ for this center (default 0 when not available). */
+  /** Legacy per-center expectation metadata; current CSL path centers the combined W field. */
   expectation?: number
 }
 
@@ -65,16 +65,21 @@ export function generateCollapseCenters(
 ): CollapseCenter[] {
   const rng = createStochasticRng(seed, stepIndex)
   const centers: CollapseCenter[] = []
-  const visibleDims = Math.min(latticeDim, 3)
+  const activeDims =
+    Number.isFinite(latticeDim) && latticeDim > 0
+      ? Math.min(Math.floor(latticeDim), gridSize.length, spacing.length, 11)
+      : 0
+  const centerCount =
+    activeDims > 0 && Number.isFinite(numSites) && numSites > 0
+      ? Math.min(MAX_STOCHASTIC_SITES, Math.floor(numSites))
+      : 0
 
-  for (let k = 0; k < numSites; k++) {
+  for (let k = 0; k < centerCount; k++) {
     const position: number[] = []
-    for (let d = 0; d < visibleDims; d++) {
+    for (let d = 0; d < activeDims; d++) {
       const halfExtent = gridSize[d]! * spacing[d]! * 0.5
       position.push(rng() * 2 * halfExtent - halfExtent)
     }
-    // Pad to 3D if needed
-    while (position.length < 3) position.push(0)
 
     const [noise] = gaussianPair(rng)
     centers.push({ position, noise })

@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest'
 import { generateCollapseCenters } from '@/lib/physics/stochastic/localizationKernel'
 import {
   applyLocalizationStep1D,
+  applyLocalizationStepND,
   computeNorm,
   computeParticipationRatio,
   renormalize,
@@ -78,6 +79,83 @@ describe('applyLocalizationStep — single site 1D', () => {
     const densCenter = psiRe[32]! ** 2 + psiIm[32]! ** 2
     const densEdge = psiRe[0]! ** 2 + psiIm[0]! ** 2
     expect(densCenter).toBeGreaterThan(densEdge)
+  })
+
+  it('uses voxel-centered coordinates like the WGSL localization shader', () => {
+    const n = 64
+    const spacing = 0.1
+    const { psiRe, psiIm } = uniformPsi(n)
+    const centers = [{ position: [0], noise: 1.0 }]
+
+    applyLocalizationStep1D(psiRe, psiIm, n, spacing, centers, 1.0, 0.2, 0.01)
+
+    expect(psiRe[31]).toBeCloseTo(psiRe[32]!, 12)
+  })
+
+  it('matches the centered exponential CSL kick used by the WGSL shader', () => {
+    const n = 8
+    const spacing = 0.25
+    const gamma = 1.7
+    const sigma = 0.45
+    const dt = 0.02
+    const psiRe = new Float64Array(n)
+    const psiIm = new Float64Array(n)
+
+    for (let i = 0; i < n; i++) {
+      psiRe[i] = 1 + i * 0.1
+      psiIm[i] = i % 2 === 0 ? 0.2 : -0.1
+    }
+    renormalize(psiRe, psiIm)
+    const origRe = Float64Array.from(psiRe)
+    const origIm = Float64Array.from(psiIm)
+    const centers = [
+      { position: [-0.2], noise: 0.9, expectation: 99 },
+      { position: [0.55], noise: -0.35, expectation: -99 },
+    ]
+
+    const halfExtent = n * spacing * 0.5
+    const invTwoSigmaSq = 1 / (2 * sigma * sigma)
+    const normFactor = (Math.PI * sigma * sigma) ** -0.25
+    const fields = new Float64Array(n)
+    let meanNumerator = 0
+    let norm = 0
+    for (let i = 0; i < n; i++) {
+      const x = (i + 0.5) * spacing - halfExtent
+      for (const center of centers) {
+        fields[i]! +=
+          normFactor * Math.exp(-((x - center.position[0]!) ** 2) * invTwoSigmaSq) * center.noise
+      }
+      const density = origRe[i]! * origRe[i]! + origIm[i]! * origIm[i]!
+      meanNumerator += density * fields[i]!
+      norm += density
+    }
+    const mean = meanNumerator / norm
+
+    applyLocalizationStep1D(psiRe, psiIm, n, spacing, centers, gamma, sigma, dt)
+
+    for (let i = 0; i < n; i++) {
+      const centered = fields[i]! - mean
+      const scale = Math.exp(
+        Math.sqrt(gamma * dt) * centered - 0.5 * gamma * dt * centered * centered
+      )
+      expect(psiRe[i]).toBeCloseTo(origRe[i]! * scale, 12)
+      expect(psiIm[i]).toBeCloseTo(origIm[i]! * scale, 12)
+    }
+  })
+
+  it('uses voxel-centered coordinates in the N-D path', () => {
+    const gridSize = [4, 4]
+    const spacing = [1, 1]
+    const totalSites = 16
+    const { psiRe, psiIm } = uniformPsi(totalSites)
+    const centers = [{ position: [0, 0], noise: 1.0 }]
+
+    applyLocalizationStepND(psiRe, psiIm, gridSize, spacing, 2, centers, 1.0, 0.5, 0.01)
+
+    const idx = (x: number, y: number) => x * gridSize[1]! + y
+    expect(psiRe[idx(1, 1)]).toBeCloseTo(psiRe[idx(1, 2)]!, 12)
+    expect(psiRe[idx(1, 1)]).toBeCloseTo(psiRe[idx(2, 1)]!, 12)
+    expect(psiRe[idx(1, 1)]).toBeCloseTo(psiRe[idx(2, 2)]!, 12)
   })
 
   it('localization preserves phase structure', () => {

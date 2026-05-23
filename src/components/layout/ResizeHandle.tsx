@@ -10,7 +10,7 @@
  * - Subtle visual feedback during active drag
  */
 
-import React, { useCallback, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { clampSidebarWidth, useLayoutStore } from '@/stores/ui/layoutStore'
@@ -35,6 +35,7 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = React.memo(({ className
   const handleRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
   const rafIdRef = useRef<number | null>(null)
+  const activePointerIdRef = useRef<number | null>(null)
   const startXRef = useRef(0)
   const startWidthRef = useRef(0)
 
@@ -45,13 +46,107 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = React.memo(({ className
     }))
   )
 
+  const clearDragSideEffects = useCallback((pointerId?: number) => {
+    const activePointerId = pointerId ?? activePointerIdRef.current
+    if (activePointerId !== null) {
+      try {
+        handleRef.current?.releasePointerCapture(activePointerId)
+      } catch {
+        // Pointer capture may already be gone during unmount or browser cancel.
+      }
+    }
+
+    document.body.classList.remove('resize-dragging')
+    activePointerIdRef.current = null
+
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current)
+      rafIdRef.current = null
+    }
+  }, [])
+
+  useEffect(() => clearDragSideEffects, [clearDragSideEffects])
+
+  const updateSidebarFromPointer = useCallback(
+    (clientX: number, pointerId: number) => {
+      if (activePointerIdRef.current !== pointerId) return
+
+      // Cancel any pending RAF to avoid buildup
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current)
+      }
+
+      // Throttle updates via requestAnimationFrame
+      rafIdRef.current = requestAnimationFrame(() => {
+        // Calculate delta (negative because handle is on LEFT of sidebar)
+        const deltaX = startXRef.current - clientX
+        const newWidth = startWidthRef.current + deltaX
+        const viewportWidth = window.innerWidth
+
+        // Clamp and update
+        const clampedWidth = clampSidebarWidth(newWidth, viewportWidth)
+        setSidebarWidth(clampedWidth, viewportWidth)
+      })
+    },
+    [setSidebarWidth]
+  )
+
+  const finishDrag = useCallback(
+    (pointerId: number) => {
+      if (activePointerIdRef.current !== pointerId) return
+
+      setIsDragging(false)
+      clearDragSideEffects(pointerId)
+    },
+    [clearDragSideEffects]
+  )
+
+  useEffect(() => {
+    if (!isDragging) return undefined
+
+    const handleWindowBlur = () => {
+      setIsDragging(false)
+      clearDragSideEffects()
+    }
+
+    window.addEventListener('blur', handleWindowBlur)
+    return () => window.removeEventListener('blur', handleWindowBlur)
+  }, [clearDragSideEffects, isDragging])
+
+  useEffect(() => {
+    if (!isDragging) return undefined
+
+    const handleWindowPointerMove = (event: PointerEvent) => {
+      updateSidebarFromPointer(event.clientX, event.pointerId)
+    }
+    const handleWindowPointerEnd = (event: PointerEvent) => {
+      finishDrag(event.pointerId)
+    }
+
+    window.addEventListener('pointermove', handleWindowPointerMove)
+    window.addEventListener('pointerup', handleWindowPointerEnd)
+    window.addEventListener('pointercancel', handleWindowPointerEnd)
+    return () => {
+      window.removeEventListener('pointermove', handleWindowPointerMove)
+      window.removeEventListener('pointerup', handleWindowPointerEnd)
+      window.removeEventListener('pointercancel', handleWindowPointerEnd)
+    }
+  }, [finishDrag, isDragging, updateSidebarFromPointer])
+
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       e.preventDefault()
       e.stopPropagation()
 
+      if (activePointerIdRef.current !== null) return
+      activePointerIdRef.current = e.pointerId
+
       // Capture pointer to receive events even outside element
-      handleRef.current?.setPointerCapture(e.pointerId)
+      try {
+        handleRef.current?.setPointerCapture(e.pointerId)
+      } catch {
+        // Browser may reject capture if the pointer was cancelled mid-dispatch.
+      }
 
       setIsDragging(true)
       startXRef.current = e.clientX
@@ -65,45 +160,18 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = React.memo(({ className
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
-      if (!isDragging) return
-
-      // Cancel any pending RAF to avoid buildup
-      if (rafIdRef.current !== null) {
-        cancelAnimationFrame(rafIdRef.current)
-      }
-
-      // Throttle updates via requestAnimationFrame
-      rafIdRef.current = requestAnimationFrame(() => {
-        // Calculate delta (negative because handle is on LEFT of sidebar)
-        const deltaX = startXRef.current - e.clientX
-        const newWidth = startWidthRef.current + deltaX
-        const viewportWidth = window.innerWidth
-
-        // Clamp and update
-        const clampedWidth = clampSidebarWidth(newWidth, viewportWidth)
-        setSidebarWidth(clampedWidth, viewportWidth)
-      })
+      if (!isDragging || activePointerIdRef.current !== e.pointerId) return
+      updateSidebarFromPointer(e.clientX, e.pointerId)
     },
-    [isDragging, setSidebarWidth]
+    [isDragging, updateSidebarFromPointer]
   )
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
-      if (!isDragging) return
-
-      // Release pointer capture
-      handleRef.current?.releasePointerCapture(e.pointerId)
-
-      setIsDragging(false)
-      document.body.classList.remove('resize-dragging')
-
-      // Clean up any pending RAF
-      if (rafIdRef.current !== null) {
-        cancelAnimationFrame(rafIdRef.current)
-        rafIdRef.current = null
-      }
+      if (!isDragging || activePointerIdRef.current !== e.pointerId) return
+      finishDrag(e.pointerId)
     },
-    [isDragging]
+    [finishDrag, isDragging]
   )
 
   return (

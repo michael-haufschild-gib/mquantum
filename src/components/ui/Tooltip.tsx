@@ -42,7 +42,11 @@ export const Tooltip: React.FC<TooltipProps> = React.memo(
     }, [clearShowTimer])
 
     useEffect(() => {
-      if (isVisible && triggerRef.current && tooltipRef.current) {
+      if (!isVisible) return
+
+      const updatePosition = () => {
+        if (!triggerRef.current || !tooltipRef.current) return
+
         const triggerRect = triggerRef.current.getBoundingClientRect()
         const tooltipRect = tooltipRef.current.getBoundingClientRect()
 
@@ -68,11 +72,18 @@ export const Tooltip: React.FC<TooltipProps> = React.memo(
             break
         }
 
-        // Boundary Check (Simple)
         x = Math.max(8, Math.min(window.innerWidth - tooltipRect.width - 8, x))
         y = Math.max(8, Math.min(window.innerHeight - tooltipRect.height - 8, y))
 
         setCoords({ x, y })
+      }
+
+      updatePosition()
+      window.addEventListener('resize', updatePosition)
+      window.addEventListener('scroll', updatePosition, true)
+      return () => {
+        window.removeEventListener('resize', updatePosition)
+        window.removeEventListener('scroll', updatePosition, true)
       }
     }, [isVisible, position])
 
@@ -103,7 +114,7 @@ export const Tooltip: React.FC<TooltipProps> = React.memo(
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                  className="fixed px-3 py-1.5 text-xs font-medium text-text-primary glass-panel-dark border border-border-default rounded-lg shadow-lg pointer-events-none max-w-xs break-words tracking-wide"
+                  className="fixed px-3 py-1.5 text-xs font-medium text-text-primary surface-panel-strong border border-border-default rounded-lg shadow-lg pointer-events-none max-w-xs break-words tracking-wide"
                   style={{
                     left: `${coords.x}px`,
                     top: `${coords.y}px`,

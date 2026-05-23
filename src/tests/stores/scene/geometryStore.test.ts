@@ -124,6 +124,16 @@ describe('geometryStore', () => {
       expect(useGeometryStore.getState().objectType).toBe('pauliSpinor')
     })
 
+    it('does not apply stale Schroedinger quantum-mode bounds to pauliSpinor', () => {
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('wheelerDeWitt')
+      useGeometryStore.getState().setObjectType('pauliSpinor')
+
+      useGeometryStore.getState().setDimension(5)
+
+      expect(useGeometryStore.getState().dimension).toBe(5)
+      expect(useGeometryStore.getState().objectType).toBe('pauliSpinor')
+    })
+
     // Regression: commit 3338b95e added synchronous latticeDim sync for TDSE/FSF
     // in propagateDimensionToStores to close a render-tick gap where the renderer
     // could sample a stale bounding radius. That fix was incomplete — BEC, Dirac,

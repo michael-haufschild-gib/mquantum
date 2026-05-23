@@ -9,6 +9,7 @@
 import { type KSpaceVizConfig, sanitizeKSpaceVizConfig } from '@/lib/geometry/extended/freeScalar'
 import type { KSpaceRawData } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import {
+  float32ToFloat16,
   OUTPUT_GRID_SIZE,
   packR16F,
   packRG16F,
@@ -649,7 +650,7 @@ function blurAxis(
  * When nkOnly is true (k-space occupation mode), packs zeros for analysis .g/.b/.a
  * channels, saving ~75% of float16 conversion calls for the analysis texture.
  *
- * Density texture: R=nk/nkMax, G=log(nk+eps), B=0, A=0
+ * Density texture: R=nk/nkMax, G=log(nk/nkMax+eps), B=0, A=0
  * Analysis texture: R=nk/nkMax, G=kNorm, B=omegaNorm, A=nkOmega (or zeros if nkOnly)
  *
  * @param grid - Display grid with final values
@@ -667,6 +668,10 @@ export function packDisplayTextures(
   const analysis = new Uint16Array(outputTotal * 4)
 
   const nkNorm = Math.max(grid.nkMax, 1e-10)
+  const emptyLogHalf = float32ToFloat16(Math.log(1e-10))
+  for (let i = 0; i < outputTotal; i++) {
+    density[i * 4 + 1] = emptyLogHalf
+  }
 
   if (nkOnly) {
     // Fast path: 3 float16 conversions per occupied voxel (density RG + analysis R)
@@ -674,7 +679,7 @@ export function packDisplayTextures(
       const n = grid.nk[i]!
       if (n <= 0) continue
       const nNorm = n / nkNorm
-      packRG16F(density, i, nNorm, Math.log(n + 1e-10))
+      packRG16F(density, i, nNorm, Math.log(nNorm + 1e-10))
       packR16F(analysis, i, nNorm)
     }
   } else {
@@ -683,7 +688,7 @@ export function packDisplayTextures(
       const n = grid.nk[i]!
       if (n <= 0) continue
       const nNorm = n / nkNorm
-      packRG16F(density, i, nNorm, Math.log(n + 1e-10))
+      packRG16F(density, i, nNorm, Math.log(nNorm + 1e-10))
       packRGBA16F(analysis, i, nNorm, grid.kNorm[i]!, grid.omegaNorm[i]!, grid.nkOmega[i]!)
     }
   }

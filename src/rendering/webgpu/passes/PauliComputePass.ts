@@ -46,6 +46,7 @@ import {
   pickSiteDispatch,
   sanitizeGridSizes,
 } from './computePassUtils'
+import { isFinitePositiveNorm } from './normalizationGuards'
 import type { PauliBufferResult } from './PauliComputePassBuffers'
 import {
   PAULI_UNIFORM_SIZE,
@@ -842,6 +843,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
               const sigmaY = data[4]!
               const sigmaZ = data[5]!
               const rawMaxDensity = Math.max(0.001, data[6]!)
+              const totalNormIsSafe = isFinitePositiveNorm(totalNorm)
               // Asymmetric maxDensity smoothing (matches TDSE/Dirac pattern):
               // snap up instantly (new features visible immediately),
               // EMA down with α=0.4 (fading features blend smoothly).
@@ -853,7 +855,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
                 }
               }
 
-              const safeTotalNorm = totalNorm > 0 ? totalNorm : 1
+              const safeTotalNorm = totalNormIsSafe ? totalNorm : 1
               const spinUpFraction = normUp / safeTotalNorm
               const spinDownFraction = normDown / safeTotalNorm
               const spinExpectationZ = sigmaZ / safeTotalNorm
@@ -866,7 +868,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
                   : 1.0
               const larmorFrequency = (2 * this.cachedFieldStrength) / safeHbar
 
-              if (this.initialNorm === 0 && totalNorm > 0) {
+              if (this.initialNorm === 0 && totalNormIsSafe) {
                 this.initialNorm = totalNorm
                 if (this.bg?.renormalizeUniformBuffer) {
                   const buf = new Float32Array([totalNorm])
@@ -874,7 +876,9 @@ export class PauliComputePass extends WebGPUBaseComputePass {
                 }
               }
               const normDrift =
-                this.initialNorm > 0 ? (totalNorm - this.initialNorm) / this.initialNorm : 0
+                isFinitePositiveNorm(this.initialNorm) && totalNormIsSafe
+                  ? (totalNorm - this.initialNorm) / this.initialNorm
+                  : 0
 
               useDiagnosticsStore.getState().updatePauli({
                 totalNorm,

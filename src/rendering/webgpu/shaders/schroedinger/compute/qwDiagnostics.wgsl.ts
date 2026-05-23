@@ -77,9 +77,19 @@ fn main(
       prob += dot(z, z);
     }
 
-    // Site position along dim 0 via shift (stride0 is power-of-2).
-    let logS0 = firstTrailingBit(diagParams.stride0);
-    let coord0 = f32(site >> logS0);
+    // Site position along dim 0. Standard UI grids are power-of-two, but
+    // imported/programmatic configs can be non-power-of-two; the shift kernel
+    // handles those with modulo fallback, so diagnostics must not decode
+    // coord0 with a blind bit shift.
+    let safeStride0 = max(diagParams.stride0, 1u);
+    let isStridePow2 = (safeStride0 & (safeStride0 - 1u)) == 0u;
+    var coord0Index: u32;
+    if (isStridePow2) {
+      coord0Index = site >> firstTrailingBit(safeStride0);
+    } else {
+      coord0Index = site / safeStride0;
+    }
+    let coord0 = f32(coord0Index);
     let x = coord0 - f32(diagParams.gridSize0) * 0.5 + 0.5;
     xProb = x * prob;
     x2Prob = x * x * prob;

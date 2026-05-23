@@ -41,7 +41,11 @@ import {
 import { tdseUniformsBlock } from '../shaders/schroedinger/compute/tdseUniforms.wgsl'
 import { createComputeBGL } from '../utils/computeBindGroupLayout'
 import type { SiteDispatch } from './computePassUtils'
-import { TDSE_UNIFORM_OFFSET_STAGE_TIME_K1 } from './TDSEComputePassResources'
+import {
+  TDSE_UNIFORM_OFFSET_SIM_TIME,
+  TDSE_UNIFORM_OFFSET_STAGE_TIME_K1,
+  TDSE_UNIFORM_OFFSET_STAGE_TIME_K4,
+} from './TDSEComputePassResources'
 
 /** Workgroup size — must match `@workgroup_size` in all curved kernels. */
 const CURVED_WG = 64
@@ -61,6 +65,14 @@ export const CURVED_MAX_STEPS_PER_FRAME = 64
  * {@link TDSE_UNIFORM_OFFSET_STAGE_TIME_K1}.
  */
 export const CURVED_STAGE_TIMES_OFFSET = TDSE_UNIFORM_OFFSET_STAGE_TIME_K1
+
+/**
+ * Byte offsets in `TDSEUniforms` patched after a time-dependent curved RK4
+ * frame. Both fields must agree at the post-step boundary: write-grid uses
+ * `simTime`; deSitter diagnostics use `stageTimeK4`.
+ */
+export const CURVED_SIM_TIME_OFFSET = TDSE_UNIFORM_OFFSET_SIM_TIME
+export const CURVED_FINAL_STAGE_TIME_OFFSET = TDSE_UNIFORM_OFFSET_STAGE_TIME_K4
 
 /** Byte size of one (K1, K2, K3, K4) quartet of f32 stage times. */
 export const CURVED_STAGE_TIMES_STRIDE = 16
@@ -522,6 +534,36 @@ export function copyCurvedStageTimesForStep(
     uniformBuffer,
     CURVED_STAGE_TIMES_OFFSET,
     CURVED_STAGE_TIMES_STRIDE
+  )
+}
+
+/**
+ * Patch post-evolution time fields to the final time of the last executed
+ * RK4 step. This keeps volume-weighted visualization (`simTime`) and
+ * deSitter diagnostics (`stageTimeK4`) synchronized until the next frame's
+ * full uniform upload.
+ */
+export function copyCurvedFinalMetricTimeForStep(
+  encoder: GPUCommandEncoder,
+  scratch: CurvedIntegratorScratch,
+  uniformBuffer: GPUBuffer,
+  stepIdx: number
+): void {
+  const safeIdx = sanitizeCurvedStageStepIndex(stepIdx)
+  const finalTimeOffset = safeIdx * CURVED_STAGE_TIMES_STRIDE + 3 * Float32Array.BYTES_PER_ELEMENT
+  encoder.copyBufferToBuffer(
+    scratch.stageTimeStagingBuffer,
+    finalTimeOffset,
+    uniformBuffer,
+    CURVED_SIM_TIME_OFFSET,
+    Float32Array.BYTES_PER_ELEMENT
+  )
+  encoder.copyBufferToBuffer(
+    scratch.stageTimeStagingBuffer,
+    finalTimeOffset,
+    uniformBuffer,
+    CURVED_FINAL_STAGE_TIME_OFFSET,
+    Float32Array.BYTES_PER_ELEMENT
   )
 }
 

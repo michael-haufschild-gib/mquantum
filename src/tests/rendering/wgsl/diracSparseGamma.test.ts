@@ -142,10 +142,24 @@ describe('Dirac sparse gamma tables', () => {
   it('Dirac init shader declares energy projector plumbing instead of upper/lower basis split', () => {
     for (const shader of [composeDiracInitShader(5), composeDiracInitShader3D(3)]) {
       expect(shader).toContain('initProjectorNorm')
-      expect(shader).toContain('posBaseRe[0] = cosHalf')
-      expect(shader).toContain('negBaseRe[halfS] = cosHalf')
+      expect(shader).toContain('posBaseRe[0] = primarySpinAmp')
+      expect(shader).toContain('negBaseRe[halfS] = primarySpinAmp')
       expect(shader).toContain('projectedRe')
       expect(shader).toContain('DIRAC_USE_SPARSE_GAMMA: bool = true')
     }
+  })
+
+  it('Dirac init keeps spin polarization inside available energy sectors', () => {
+    const shader = composeDiracInitShader(1)
+
+    expect(shader).toContain('let hasSpinDoublet = halfS > 1u')
+    expect(shader).toContain('let primarySpinAmp = select(1.0, cosHalf, hasSpinDoublet)')
+    expect(shader).toContain('let secondarySpinAmp = select(0.0, sinHalf, hasSpinDoublet)')
+    expect(shader).toContain('posBaseRe[0] = primarySpinAmp')
+    expect(shader).toContain('negBaseRe[halfS] = primarySpinAmp')
+    expect(shader).toContain('if (hasSpinDoublet) {')
+    expect(shader).not.toContain('posBaseRe[0] = cosHalf')
+    expect(shader).not.toContain('if (S > 1u) {\n      posBaseRe[1]')
+    expect(shader).not.toContain('if (S > 1u) {\n      spinor[1u * T + idx]')
   })
 })

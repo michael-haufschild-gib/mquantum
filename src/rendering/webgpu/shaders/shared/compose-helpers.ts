@@ -50,6 +50,56 @@ interface ShaderDimensionOptions {
   fallback?: number
 }
 
+/** Bounds for compile-time numeric shader constants. */
+interface ShaderNumberOptions {
+  min?: number
+  max?: number
+}
+
+/**
+ * Convert runtime boolean-like input into a strict WGSL boolean.
+ * @param value - Runtime boolean candidate.
+ * @param fallback - Value used for non-boolean inputs.
+ * @returns Strict boolean.
+ */
+export function sanitizeShaderBoolean(value: unknown, fallback = false): boolean {
+  return typeof value === 'boolean' ? value : fallback
+}
+
+/**
+ * Convert runtime numeric input into a finite WGSL constant value.
+ * @param value - Runtime numeric candidate.
+ * @param fallback - Value used for non-finite or non-number inputs.
+ * @param options - Optional numeric bounds.
+ * @returns Finite clamped number.
+ */
+export function sanitizeShaderNumber(
+  value: unknown,
+  fallback: number,
+  options: ShaderNumberOptions = {}
+): number {
+  const fallbackValue = Number.isFinite(fallback) ? fallback : 0
+  const finiteValue = typeof value === 'number' && Number.isFinite(value) ? value : fallbackValue
+  const min = options.min ?? Number.NEGATIVE_INFINITY
+  const max = options.max ?? Number.POSITIVE_INFINITY
+  return Math.max(min, Math.min(max, finiteValue))
+}
+
+/**
+ * Convert runtime numeric input into a finite integer WGSL constant value.
+ * @param value - Runtime numeric candidate.
+ * @param fallback - Value used for non-finite or non-number inputs.
+ * @param options - Optional integer bounds.
+ * @returns Finite clamped integer.
+ */
+export function sanitizeShaderInteger(
+  value: unknown,
+  fallback: number,
+  options: ShaderNumberOptions = {}
+): number {
+  return Math.floor(sanitizeShaderNumber(value, fallback, options))
+}
+
 /**
  * Convert runtime dimension input into a finite integer WGSL specialization value.
  * @param dimension - Runtime dimension candidate.

@@ -79,16 +79,17 @@ export function computePotentialHash(config: TdseConfig, simTime: number): strin
   const custom =
     config.potentialType === 'custom' ? `|custom|${config.customPotentialExpression}` : ''
 
-  // Anderson hash includes `hbar` because `t_eff = ℏ²/(2m·dx²)` scales the
-  // disorder strength (see uploadAndersonDisorderBuffer). `mass`, `spacing`,
-  // `disorderStrength`, `disorderSeed` are already in `base` — only the
-  // disorder distribution and hbar need appending here.
-  const anderson =
-    config.potentialType === 'andersonDisorder'
-      ? `|anderson|${config.disorderDistribution}|${config.hbar}`
-      : ''
+  // Disorder hash includes `hbar` because `t_eff = ℏ²/(2m·dx²)` scales the
+  // disorder strength in both dedicated Anderson mode and non-Anderson
+  // overlay mode. `mass`, `spacing`, `disorderStrength`, `disorderSeed` are
+  // already in `base`; distribution and hbar are appended when a disorder
+  // field can actually contribute to V(x).
+  const disorderActive =
+    config.potentialType === 'andersonDisorder' ||
+    (Number.isFinite(config.disorderStrength) && config.disorderStrength > 0)
+  const disorder = disorderActive ? `|disorder|${config.disorderDistribution}|${config.hbar}` : ''
 
-  return `${base}${driven}${custom}${anderson}`
+  return `${base}${driven}${custom}${disorder}`
 }
 
 /**

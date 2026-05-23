@@ -7,16 +7,21 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { ScenarioSelector } from '@/components/sections/Geometry/ScenarioSelector'
-import type { TdseConfig } from '@/lib/geometry/extended/types'
+import { findTdsePresetId } from '@/components/sections/Geometry/ScenarioSelector.matching'
+import { DEFAULT_TDSE_CONFIG, type TdseConfig } from '@/lib/geometry/extended/types'
 import { BEC_SCENARIO_PRESETS } from '@/lib/physics/bec/presets'
 import { DIRAC_SCENARIO_PRESETS } from '@/lib/physics/dirac/presets'
 import { FREE_SCALAR_PRESETS } from '@/lib/physics/freeScalar/presets'
 import { QUANTUM_WALK_PRESETS } from '@/lib/physics/quantumWalk/presets'
-import { TDSE_SCENARIO_PRESETS } from '@/lib/physics/tdse/presets'
+import {
+  isTdsePresetCompatibleWithDimension,
+  TDSE_SCENARIO_PRESETS,
+} from '@/lib/physics/tdse/presets'
 import { WDW_SCENARIO_PRESETS } from '@/lib/physics/wheelerDeWitt/presets'
 import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { resizeTdseArrays } from '@/stores/slices/geometry/setters/tdseSetters'
 
 function resetStores(): void {
   useAppearanceStore.setState(useAppearanceStore.getInitialState())
@@ -60,6 +65,12 @@ function enterScenarioMode(mode: ScenarioMode, dimension: number): void {
   }))
 }
 
+function getTdsePresetName(id: string): string {
+  const preset = TDSE_SCENARIO_PRESETS.find((candidate) => candidate.id === id)
+  if (!preset) throw new Error(`TDSE preset ${id} missing`)
+  return preset.name
+}
+
 const SCENARIO_MATRIX: {
   mode: ScenarioMode
   dimension: number
@@ -68,7 +79,9 @@ const SCENARIO_MATRIX: {
   {
     mode: 'tdseDynamics',
     dimension: 5,
-    presetIds: TDSE_SCENARIO_PRESETS.map((preset) => preset.id),
+    presetIds: TDSE_SCENARIO_PRESETS.filter((preset) =>
+      isTdsePresetCompatibleWithDimension(preset, 5)
+    ).map((preset) => preset.id),
   },
   {
     mode: 'becDynamics',
@@ -216,5 +229,42 @@ describe('ScenarioSelector - compute mode presets', () => {
     render(<ScenarioSelector />)
 
     expect(screen.queryByRole('option', { name: 'Bianchi-I Kasner Cigar (vacuum)' })).toBeNull()
+  })
+
+  it('hides fixed-dimensional TDSE physics presets above their valid dimension', () => {
+    enterScenarioMode('tdseDynamics', 5)
+
+    render(<ScenarioSelector />)
+
+    expect(
+      screen.queryByRole('option', { name: getTdsePresetName('andersonTransition4D') })
+    ).toBeNull()
+    expect(
+      screen.queryByRole('option', { name: getTdsePresetName('wormholeWavepacket') })
+    ).toBeNull()
+    expect(
+      screen.getByRole('option', { name: getTdsePresetName('andersonTransition5D') })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('option', { name: getTdsePresetName('classicTunneling') })
+    ).toBeInTheDocument()
+  })
+
+  it('does not restore a fixed-dimensional TDSE preset label above its valid dimension', () => {
+    const preset = TDSE_SCENARIO_PRESETS.find(
+      (candidate) => candidate.id === 'andersonTransition4D'
+    )
+    if (!preset) throw new Error('andersonTransition4D preset missing')
+    const { latticeDim: _presetDim, ...safeOverrides } = preset.overrides
+    const base = {
+      ...DEFAULT_TDSE_CONFIG,
+      ...safeOverrides,
+      slicePositions: [0, 0],
+      needsReset: true,
+    }
+    const resized = resizeTdseArrays(base, 5)
+    const liveConfig = { ...base, ...resized, needsReset: true }
+
+    expect(findTdsePresetId(liveConfig, 5)).toBeNull()
   })
 })

@@ -55,6 +55,12 @@ describe('formatMetric', () => {
     expect(formatMetric(2000, ' tris')).toBe('2.0k tris')
     expect(formatMetric(2_000_000, ' tris')).toBe('2.0M tris')
   })
+
+  it('returns a placeholder for non-finite or negative metric values', () => {
+    expect(formatMetric(Number.NaN)).toBe('—')
+    expect(formatMetric(Infinity)).toBe('—')
+    expect(formatMetric(-1)).toBe('—')
+  })
 })
 
 describe('formatBytes', () => {
@@ -203,6 +209,13 @@ describe('computeSparklinePoints', () => {
     const out = computeSparklinePoints([-50, 200], 100, 50, 0, 100)
     // -50 below min → bottom (y=50); 200 above max → top (y=0).
     expect(out).toBe('0,50 100,0')
+  })
+
+  it('keeps non-finite samples out of SVG coordinates', () => {
+    const out = computeSparklinePoints([0, Number.NaN, 100, Infinity], 100, 50, 0, 100)
+    expect(out).toBe('0,50 33.333333333333336,50 66.66666666666667,0 100,50')
+    expect(out).not.toContain('NaN')
+    expect(out).not.toContain('Infinity')
   })
 
   it('produces a valid SVG points string format (only digits, commas, dots, minus, spaces)', () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/schroedinger'
 import { SCHROEDINGER_LAYOUT } from '@/rendering/webgpu/renderers/schroedingerLayout'
 import type { SchroedingerPackParams } from '@/rendering/webgpu/renderers/uniformPacking'
 import {
@@ -765,6 +766,87 @@ describe('packSchroedingerUniforms', () => {
     expect(Number.isFinite(floatView[index.quantumBackreactionLensingStrength])).toBe(true)
     expect(Number.isFinite(floatView[index.quantumBackreactionCausticGain])).toBe(true)
     expect(Number.isFinite(floatView[index.quantumBackreactionSoftening])).toBe(true)
+  })
+
+  it('uses default spacetime feature controls for non-finite enabled inputs', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      schroedinger: {
+        quantumBackreactionLensingEnabled: true,
+        quantumBackreactionLensingStrength: Number.NaN,
+        quantumBackreactionCausticGain: Infinity,
+        quantumBackreactionSoftening: Number.NaN,
+        bilocalERBridgeEnabled: true,
+        bilocalERBridgeStrength: Number.NaN,
+        bilocalERBridgeThroatRadius: Infinity,
+        bilocalERBridgePhaseLock: Number.NaN,
+        entropicTimeShearEnabled: true,
+        entropicTimeShearStrength: Number.NaN,
+        entropicTimeShearFilamentScale: Infinity,
+        entropicTimeShearIrreversibility: Number.NaN,
+        spectralDimensionFlowEnabled: true,
+        spectralDimensionFlowStrength: Number.NaN,
+        spectralDimensionFlowUvDimension: Infinity,
+        spectralDimensionFlowDiffusionScale: Number.NaN,
+        vacuumBubbleLensEnabled: true,
+        vacuumBubbleLensStrength: Number.NaN,
+        vacuumBubbleWallRadius: Infinity,
+        vacuumBubbleWallThickness: Number.NaN,
+        vacuumBubbleTension: Infinity,
+        vacuumBubbleBias: Number.NaN,
+        bornNullWeaveEnabled: true,
+        bornNullWeaveStrength: Number.NaN,
+        bornNullWeaveNodeWidth: Infinity,
+        bornNullWeaveCirculation: Number.NaN,
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    const index = SCHROEDINGER_LAYOUT.index
+    const defaults = DEFAULT_SCHROEDINGER_CONFIG
+    expect(floatView[index.quantumBackreactionLensingStrength]).toBeCloseTo(
+      defaults.quantumBackreactionLensingStrength
+    )
+    expect(floatView[index.quantumBackreactionCausticGain]).toBeCloseTo(
+      defaults.quantumBackreactionCausticGain
+    )
+    expect(floatView[index.quantumBackreactionSoftening]).toBeCloseTo(
+      defaults.quantumBackreactionSoftening
+    )
+    expect(floatView[index.bilocalERBridgeStrength]).toBeCloseTo(defaults.bilocalERBridgeStrength)
+    expect(floatView[index.bilocalERBridgeThroatRadius]).toBeCloseTo(
+      defaults.bilocalERBridgeThroatRadius
+    )
+    expect(floatView[index.bilocalERBridgePhaseLock]).toBeCloseTo(defaults.bilocalERBridgePhaseLock)
+    expect(floatView[index.entropicTimeShearStrength]).toBeCloseTo(
+      defaults.entropicTimeShearStrength
+    )
+    expect(floatView[index.entropicTimeShearFilamentScale]).toBeCloseTo(
+      defaults.entropicTimeShearFilamentScale
+    )
+    expect(floatView[index.entropicTimeShearIrreversibility]).toBeCloseTo(
+      defaults.entropicTimeShearIrreversibility
+    )
+    expect(floatView[index.spectralDimensionFlowStrength]).toBeCloseTo(
+      defaults.spectralDimensionFlowStrength
+    )
+    expect(floatView[index.spectralDimensionFlowUvDimension]).toBeCloseTo(
+      defaults.spectralDimensionFlowUvDimension
+    )
+    expect(floatView[index.spectralDimensionFlowDiffusionScale]).toBeCloseTo(
+      defaults.spectralDimensionFlowDiffusionScale
+    )
+    expect(floatView[index.vacuumBubbleLensStrength]).toBeCloseTo(defaults.vacuumBubbleLensStrength)
+    expect(floatView[index.vacuumBubbleWallRadius]).toBeCloseTo(defaults.vacuumBubbleWallRadius)
+    expect(floatView[index.vacuumBubbleWallThickness]).toBeCloseTo(
+      defaults.vacuumBubbleWallThickness
+    )
+    expect(floatView[index.vacuumBubbleTension]).toBeCloseTo(defaults.vacuumBubbleTension)
+    expect(floatView[index.vacuumBubbleBias]).toBeCloseTo(defaults.vacuumBubbleBias)
+    expect(floatView[index.bornNullWeaveStrength]).toBeCloseTo(defaults.bornNullWeaveStrength)
+    expect(floatView[index.bornNullWeaveNodeWidth]).toBeCloseTo(defaults.bornNullWeaveNodeWidth)
+    expect(floatView[index.bornNullWeaveCirculation]).toBeCloseTo(defaults.bornNullWeaveCirculation)
   })
 
   it('zeroes bilocal ER bridge uniforms when disabled', () => {

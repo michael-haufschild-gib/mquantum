@@ -277,6 +277,18 @@ export function airyAll(z: number): {
 }
 
 /**
+ * Combine `c1·Ai + c2·Bi`-style Airy basis values while preserving the
+ * algebraic identity `0·overflow = 0`. JavaScript would otherwise produce
+ * `NaN` for `0 * Infinity`, which corrupts pure-branch WKB/Langer solutions
+ * when the unused Airy branch overflows in the deep asymptotic region.
+ */
+export function combineAiryBasis(c1: number, c2: number, basis1: number, basis2: number): number {
+  const term1 = c1 === 0 ? 0 : c1 * basis1
+  const term2 = c2 === 0 ? 0 : c2 * basis2
+  return term1 + term2
+}
+
+/**
  * Airy function of the first kind, `Ai(z)`. Solution of `y'' = z·y`
  * decaying for `z → +∞`, oscillating for `z → −∞`.
  *

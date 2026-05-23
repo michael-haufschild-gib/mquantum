@@ -176,4 +176,37 @@ describe('PassesTabContent', () => {
     expect(screen.getByText(/Passes/)).toBeInTheDocument()
     expect(screen.getByText(/Submit/)).toBeInTheDocument()
   })
+
+  it('does not render invalid GPU timing percentages or widths', () => {
+    usePerformanceMetricsStore.setState({
+      passTimings: [
+        {
+          passId: 'badTimestamp',
+          gpuTimeMs: Number.NaN,
+          computeGpuTimeMs: Number.NaN,
+          renderGpuTimeMs: Number.NaN,
+          cpuTimeMs: Infinity,
+          skipped: false,
+        },
+        {
+          passId: 'validPass',
+          gpuTimeMs: 2,
+          computeGpuTimeMs: 0,
+          renderGpuTimeMs: 2,
+          cpuTimeMs: 0.5,
+          skipped: false,
+        },
+      ],
+      totalGpuTimeMs: Infinity,
+      cpuBreakdown: { setupMs: Number.NaN, passesMs: Infinity, submitMs: -1 },
+    })
+
+    const { container } = render(<PassesTabContent />)
+
+    expect(screen.getByText('Bad Timestamp')).toBeInTheDocument()
+    expect(screen.getByText('Valid Pass')).toBeInTheDocument()
+    expect(container).not.toHaveTextContent(/NaN|Infinity/)
+    expect(container).not.toContainHTML('NaN%')
+    expect(container).not.toContainHTML('Infinity%')
+  })
 })

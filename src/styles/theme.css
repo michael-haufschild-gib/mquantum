@@ -19,10 +19,10 @@
        BACKGROUNDS
        ═══════════════════════════════════════════════════════════════════ */
     --bg-app: var(--token-slate-1000);
-    --bg-panel: oklch(from var(--token-slate-950) l c h / 75%);
+    --bg-panel: var(--token-slate-950);
     --bg-surface: var(--token-slate-900);
     --bg-elevated: var(--token-slate-800);
-    --bg-glass: oklch(from var(--token-slate-900) l c h / 60%);
+    --bg-control: var(--token-slate-900);
     --bg-hover: oklch(100% 0 0deg / 8%);
     --bg-active: oklch(100% 0 0deg / 12%);
     --bg-overlay: oklch(0% 0 0deg / 60%);
@@ -149,8 +149,8 @@
     --dirac-particle: oklch(70% 0.15 220deg);
     --dirac-antiparticle: oklch(70% 0.15 0deg);
 
-    /* Glass alias — consumed by pageCurve, Knob, WormholeCoherencePanel. */
-    --color-glass: var(--bg-glass);
+    /* Legacy surface alias — consumed by pageCurve, Knob, WormholeCoherencePanel. */
+    --color-control: var(--bg-control);
   }
 
   /* ═══════════════════════════════════════════════════════════════════
@@ -159,10 +159,10 @@
   [data-mode='light'] {
     /* Backgrounds */
     --bg-app: var(--token-slate-50);
-    --bg-panel: oklch(from var(--token-slate-0) l c h / 85%);
+    --bg-panel: var(--token-slate-0);
     --bg-surface: var(--token-slate-100);
     --bg-elevated: var(--token-slate-0);
-    --bg-glass: oklch(from var(--token-slate-100) l c h / 70%);
+    --bg-control: var(--token-slate-100);
     --bg-hover: oklch(0% 0 0deg / 5%);
     --bg-active: oklch(0% 0 0deg / 10%);
     --bg-overlay: oklch(0% 0 0deg / 40%);

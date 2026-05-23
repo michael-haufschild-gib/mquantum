@@ -139,12 +139,24 @@ describe('SrmtNullBaselineStrip', () => {
   })
 
   it('renders ∞ for the wins-by ratio when real affine quality is zero (perfect fit)', () => {
-    // Real = 0 → bestBaselineRatio returns +∞. The strip must show
-    // the ∞ glyph rather than swallowing it as a dash.
+    // Real = 0 and every null > 0 → bestBaselineRatio returns +∞. The strip
+    // must show the ∞ glyph rather than swallowing it as a dash.
     const snapshot = makeSnapshot({ affineMatchQuality: 0 })
     render(<SrmtNullBaselineStrip snapshot={snapshot} />)
     const strip = screen.getByTestId('wdw-srmt-null-baseline-strip')
     expect(strip).toHaveTextContent(/∞×/)
     expect(strip).toHaveAttribute('data-falsified', 'false')
+  })
+
+  it('falsifies a perfect real fit when a null baseline also has zero residual', () => {
+    const snapshot = makeSnapshot({
+      affineMatchQuality: 0,
+      nullBaselines: { shuffled: 0.5, reversed: 0, synthetic: 0.7 },
+    })
+    render(<SrmtNullBaselineStrip snapshot={snapshot} />)
+    const strip = screen.getByTestId('wdw-srmt-null-baseline-strip')
+    expect(strip).toHaveAttribute('data-falsified', 'true')
+    expect(strip).toHaveTextContent(/BASELINE WIN/i)
+    expect(strip).toHaveTextContent(/1\.00×/)
   })
 })

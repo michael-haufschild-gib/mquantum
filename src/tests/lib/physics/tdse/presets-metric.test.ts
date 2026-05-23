@@ -93,6 +93,10 @@ describe('TDSE curved-space v2 presets', () => {
       expect(o.packetMomentum?.length).toBe(dim)
     })
 
+    it('is capped at the 3D slice it describes', () => {
+      expect(preset.maxDim).toBe(3)
+    })
+
     it('has strictly positive physics-scale metric parameters', () => {
       // Every populated metric parameter must be > 0. A zero throat
       // radius or sphere radius produces a singular metric that the

@@ -290,6 +290,23 @@ describe('computeIncompressibleSpectrum', () => {
     })
   })
 
+  it('rejects non-finite wavefunction samples before diagnostics can become NaN', () => {
+    withSpectrumWasmDisabled(() => {
+      const psiRe = new Float32Array(8 * 8)
+      const psiIm = new Float32Array(8 * 8)
+      psiRe.fill(1.0)
+      psiRe[9] = Number.NaN
+      psiIm[12] = Number.POSITIVE_INFINITY
+
+      const result = computeIncompressibleSpectrum(psiRe, psiIm, [8, 8], [0.5, 0.5], 1, 1)
+
+      expect(result.totalIncompressible).toBe(0)
+      expect(result.totalCompressible).toBe(0)
+      expect(result.spectrum.every((value) => value === 0)).toBe(true)
+      expect(result.kValues.every((value) => value === 0)).toBe(true)
+    })
+  })
+
   it('spectrum values are non-negative', () => {
     // Random wavefunction
     const N = 8

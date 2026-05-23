@@ -158,6 +158,20 @@ describe('applyModeOverrides', () => {
     expect(cfg.dimension).toBe(5)
   })
 
+  it('clamps compute mode dimensions to registry maxima', () => {
+    const wdw = applyModeOverrides({
+      dimension: 11,
+      quantumMode: 'wheelerDeWitt',
+    } as never)
+    expect(wdw.dimension).toBe(3)
+
+    const ads = applyModeOverrides({
+      dimension: 11,
+      quantumMode: 'antiDeSitter',
+    } as never)
+    expect(ads.dimension).toBe(7)
+  })
+
   it('preserves isosurface for Pauli spinor mode (density-grid isosurface path)', () => {
     const cfg = applyModeOverrides({
       dimension: 3,

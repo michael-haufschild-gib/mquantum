@@ -225,7 +225,7 @@ describe('Wheeler–DeWitt solver', () => {
   )
 
   it('Vilenkin maxDensity reflects the physical exp(+S_E) tunneling tail', () => {
-    // Vilenkin gets c₂ = −i·c₁ — the outgoing-wave Lorentzian → growing
+    // Vilenkin gets c₂ = +i·c₁ — the outgoing-wave Lorentzian → growing
     // Bi-branch Euclidean continuation. |χ_Euc|² grows as exp(+2·S_E)
     // (the famous "Vilenkin tunneling enhancement"), reaching ~1e20 at
     // cube corners with default config. This is physically correct; the
@@ -278,7 +278,7 @@ describe('Wheeler–DeWitt solver', () => {
   )
 
   it('Stage-3 Airy connection: Vilenkin Euclidean tail grows physically', () => {
-    // Vilenkin: c₂ = −i·c₁. The Euclidean continuation contains Bi(ζ)
+    // Vilenkin: c₂ = +i·c₁. The Euclidean continuation contains Bi(ζ)
     // which grows as exp(+S_E)/ζ^{1/4} → |χ_Euc|² ~ exp(+2·S_E). At cube
     // corners with default config S_E_max ≈ 30, so peak |χ|² is around
     // exp(60)·|c₁|². The exact value depends on the Vilenkin BC scale at

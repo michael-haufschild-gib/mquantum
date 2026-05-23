@@ -48,7 +48,8 @@ const WIGNER_FACTORIAL = [1, 1, 2, 6, 24, 120, 720, 5040]
 
 /** Diagonal Wigner function W_n(x,p) — mirrors wignerHO.wgsl.ts */
 function wignerDiagonal(n: number, x: number, p: number, omega: number): number {
-  const u2 = omega * x * x + (p * p) / omega
+  const omegaSafe = Math.max(omega, 1e-20)
+  const u2 = omegaSafe * x * x + (p * p) / omegaSafe
   const sign = n % 2 === 0 ? 1 : -1
   return (sign / Math.PI) * laguerre(n, 0, 2 * u2) * Math.exp(-u2)
 }

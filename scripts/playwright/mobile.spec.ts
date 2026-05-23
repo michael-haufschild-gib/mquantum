@@ -37,6 +37,30 @@ test.describe('mobile timeline controls', () => {
     expect(box.y + box.height).toBeGreaterThan(MOBILE.height - 100)
   })
 
+  test('bottom timeline controls do not overflow horizontally', async ({ page }) => {
+    await page.setViewportSize(MOBILE)
+    await page.goto('/')
+    await waitForAppLoaded(page)
+
+    const timeline = page.getByTestId('mobile-timeline-controls')
+    await expect(timeline).toBeVisible({ timeout: 5000 })
+
+    const metrics = await timeline.evaluate((element) => {
+      const rect = element.getBoundingClientRect()
+      return {
+        clientWidth: element.clientWidth,
+        left: rect.left,
+        right: rect.right,
+        scrollWidth: element.scrollWidth,
+        viewportWidth: window.innerWidth,
+      }
+    })
+
+    expect(metrics.left).toBeGreaterThanOrEqual(-1)
+    expect(metrics.right).toBeLessThanOrEqual(metrics.viewportWidth + 1)
+    expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1)
+  })
+
   test('hidden on desktop — desktop uses editor-bottom-panel', async ({ page }) => {
     await page.setViewportSize(DESKTOP)
     await page.goto('/')

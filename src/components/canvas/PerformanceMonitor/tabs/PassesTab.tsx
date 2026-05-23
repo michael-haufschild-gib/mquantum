@@ -28,6 +28,7 @@ const PASS_COLORS = [
 
 /** Classify a pass's GPU cost for color-coding the table rows. */
 function getCostColor(gpuTimeMs: number): string {
+  if (!Number.isFinite(gpuTimeMs) || gpuTimeMs < 0) return 'text-[var(--text-secondary)]'
   if (gpuTimeMs >= 4) return 'text-[var(--chart-cost-hot)]'
   if (gpuTimeMs >= 1) return 'text-[var(--chart-cost-warm)]'
   return 'text-[var(--text-secondary)]'
@@ -35,7 +36,12 @@ function getCostColor(gpuTimeMs: number): string {
 
 /** Format ms with 2 decimal places. */
 function fmtMs(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return '—'
   return ms < 0.005 ? '<0.01' : ms.toFixed(2)
+}
+
+function positiveMs(ms: number): number {
+  return Number.isFinite(ms) && ms > 0 ? ms : 0
 }
 
 /** Human-readable pass name from camelCase or kebab-case passId. */
@@ -68,7 +74,17 @@ export const PassesTabContent = React.memo(function PassesTabContent() {
   )
 
   const activePasses = passTimings.filter((p) => !p.skipped)
-  const hasGpuTimings = activePasses.some((p) => p.gpuTimeMs > 0)
+  const fallbackTotalGpuTimeMs = activePasses.reduce((sum, p) => sum + positiveMs(p.gpuTimeMs), 0)
+  const gpuBudgetMs =
+    Number.isFinite(totalGpuTimeMs) && totalGpuTimeMs > 0 ? totalGpuTimeMs : fallbackTotalGpuTimeMs
+  const hasGpuTimings = gpuBudgetMs > 0
+  const cpuPhases = [
+    { label: 'Setup', ms: cpuBreakdown.setupMs, color: 'var(--chart-cpu-setup)' },
+    { label: 'Passes', ms: cpuBreakdown.passesMs, color: 'var(--chart-cpu-passes)' },
+    { label: 'Submit', ms: cpuBreakdown.submitMs, color: 'var(--chart-cpu-submit)' },
+  ]
+  const cpuTotalMs = cpuPhases.reduce((sum, phase) => sum + positiveMs(phase.ms), 0)
+  const hasCpuBreakdown = positiveMs(cpuBreakdown.passesMs) > 0 && cpuTotalMs > 0
 
   if (passTimings.length === 0) {
     return (
@@ -81,12 +97,13 @@ export const PassesTabContent = React.memo(function PassesTabContent() {
   return (
     <div className="space-y-4 p-5 overflow-y-auto">
       {/* GPU Budget Bar */}
-      {hasGpuTimings && totalGpuTimeMs > 0 && (
+      {hasGpuTimings && (
         <div className="space-y-2">
-          <SectionHeader icon={<Icons.Zap />} label={`GPU Budget — ${fmtMs(totalGpuTimeMs)} ms`} />
+          <SectionHeader icon={<Icons.Zap />} label={`GPU Budget — ${fmtMs(gpuBudgetMs)} ms`} />
           <div className="h-5 w-full rounded-md overflow-hidden flex bg-[var(--bg-hover)]">
             {activePasses.map((p, i) => {
-              const pct = totalGpuTimeMs > 0 ? (p.gpuTimeMs / totalGpuTimeMs) * 100 : 0
+              const gpuTimeMs = positiveMs(p.gpuTimeMs)
+              const pct = gpuBudgetMs > 0 ? (gpuTimeMs / gpuBudgetMs) * 100 : 0
               if (pct < 0.5) return null
               return (
                 <div
@@ -106,20 +123,13 @@ export const PassesTabContent = React.memo(function PassesTabContent() {
       )}
 
       {/* CPU Breakdown Bar */}
-      {cpuBreakdown.passesMs > 0 && (
+      {hasCpuBreakdown && (
         <div className="space-y-2">
-          <SectionHeader
-            icon={<Icons.Clock />}
-            label={`CPU Breakdown — ${fmtMs(cpuBreakdown.setupMs + cpuBreakdown.passesMs + cpuBreakdown.submitMs)} ms`}
-          />
+          <SectionHeader icon={<Icons.Clock />} label={`CPU Breakdown — ${fmtMs(cpuTotalMs)} ms`} />
           <div className="h-3 w-full rounded-md overflow-hidden flex bg-[var(--bg-hover)]">
-            {[
-              { label: 'Setup', ms: cpuBreakdown.setupMs, color: 'var(--chart-cpu-setup)' },
-              { label: 'Passes', ms: cpuBreakdown.passesMs, color: 'var(--chart-cpu-passes)' },
-              { label: 'Submit', ms: cpuBreakdown.submitMs, color: 'var(--chart-cpu-submit)' },
-            ].map((phase) => {
-              const total = cpuBreakdown.setupMs + cpuBreakdown.passesMs + cpuBreakdown.submitMs
-              const pct = total > 0 ? (phase.ms / total) * 100 : 0
+            {cpuPhases.map((phase) => {
+              const safeMs = positiveMs(phase.ms)
+              const pct = cpuTotalMs > 0 ? (safeMs / cpuTotalMs) * 100 : 0
               if (pct < 0.5) return null
               return (
                 <div
@@ -160,7 +170,9 @@ export const PassesTabContent = React.memo(function PassesTabContent() {
           </div>
           {/* Rows */}
           {activePasses.map((p, i) => {
-            const pct = totalGpuTimeMs > 0 ? (p.gpuTimeMs / totalGpuTimeMs) * 100 : 0
+            const validGpuTime = Number.isFinite(p.gpuTimeMs) && p.gpuTimeMs >= 0
+            const gpuTimeMs = positiveMs(p.gpuTimeMs)
+            const pct = gpuBudgetMs > 0 ? (gpuTimeMs / gpuBudgetMs) * 100 : 0
             return (
               <div
                 key={p.passId}
@@ -176,13 +188,13 @@ export const PassesTabContent = React.memo(function PassesTabContent() {
                   </span>
                 </div>
                 <span className={`text-xs font-mono text-right ${getCostColor(p.gpuTimeMs)}`}>
-                  {hasGpuTimings ? fmtMs(p.gpuTimeMs) : '—'}
+                  {hasGpuTimings && validGpuTime ? fmtMs(p.gpuTimeMs) : '—'}
                 </span>
                 <span className="text-xs font-mono text-right text-text-tertiary">
                   {fmtMs(p.cpuTimeMs)}
                 </span>
                 <span className="text-xs font-mono text-right text-text-tertiary">
-                  {hasGpuTimings && totalGpuTimeMs > 0 ? `${pct.toFixed(0)}%` : '—'}
+                  {hasGpuTimings && validGpuTime ? `${pct.toFixed(0)}%` : '—'}
                 </span>
               </div>
             )
