@@ -95,6 +95,10 @@ export const ControlGroup: React.FC<ControlGroupProps> = React.memo(
       e.stopPropagation()
     }
 
+    const handleRightElementKeyEvent = (e: React.KeyboardEvent) => {
+      e.stopPropagation()
+    }
+
     const isCard = variant === 'card'
     const showTitleSection = collapsible || title.trim() !== ''
     const containerClass = isCard ? CARD_CONTAINER_CLASS : DEFAULT_CONTAINER_CLASS
@@ -132,7 +136,15 @@ export const ControlGroup: React.FC<ControlGroupProps> = React.memo(
               <TitleLabel title={title} tooltip={tooltip} />
             </div>
 
-            {rightElement && <div onClick={handleRightElementClick}>{rightElement}</div>}
+            {rightElement && (
+              <div
+                onClick={handleRightElementClick}
+                onKeyDown={handleRightElementKeyEvent}
+                onKeyUp={handleRightElementKeyEvent}
+              >
+                {rightElement}
+              </div>
+            )}
           </div>
         )}
 
