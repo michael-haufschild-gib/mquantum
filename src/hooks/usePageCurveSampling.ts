@@ -44,6 +44,55 @@ export interface HorizonContext {
   cs0: number
 }
 
+function useWaterfallParams(bec: BecConfig) {
+  return useMemo(
+    () =>
+      buildWaterfallParams({
+        hawkingVmax: bec.hawkingVmax,
+        hawkingLh: bec.hawkingLh,
+        hawkingDeltaN: bec.hawkingDeltaN,
+        interactionStrength: bec.interactionStrength,
+        mass: bec.mass,
+        gridSize: bec.gridSize,
+        spacing: bec.spacing,
+      }),
+    [
+      bec.hawkingVmax,
+      bec.hawkingLh,
+      bec.hawkingDeltaN,
+      bec.interactionStrength,
+      bec.mass,
+      bec.gridSize,
+      bec.spacing,
+    ]
+  )
+}
+
+function resolveHorizonContext(
+  inputs: PageCurveSamplingInputs,
+  becParams: ReturnType<typeof buildWaterfallParams>
+): HorizonContext {
+  const isBec =
+    inputs.enabled &&
+    inputs.objectType === 'schroedinger' &&
+    inputs.quantumMode === 'becDynamics' &&
+    inputs.bec.initialCondition === 'blackHoleAnalog'
+  if (!isBec) return { isBec, horizonPresent: false, cs0: 0 }
+  const horizonPresent = hasHorizon(becParams)
+  const cs0 = asymptoticSoundSpeed(becParams)
+  return { isBec, horizonPresent, cs0 }
+}
+
+/**
+ * Compute the synchronous horizon context without mutating the Page-curve
+ * sample buffer. Visible HUD panels use this; `PageCurveSamplingGate` owns
+ * the producer side so overlay sampling does not depend on panel visibility.
+ */
+export function usePageCurveHorizonContext(inputs: PageCurveSamplingInputs): HorizonContext {
+  const becParams = useWaterfallParams(inputs.bec)
+  return useMemo(() => resolveHorizonContext(inputs, becParams), [inputs, becParams])
+}
+
 /**
  * Wire the Page-curve store to the BEC readback generation. Returns a
  * synchronous `HorizonContext` the caller can use for empty-state UX.
@@ -70,39 +119,11 @@ export function usePageCurveSampling(inputs: PageCurveSamplingInputs): HorizonCo
   // breakpoint flip) does not wipe an in-flight page curve.
   const didInitResetRef = useRef(false)
 
-  const becParams = useMemo(
-    () =>
-      buildWaterfallParams({
-        hawkingVmax: bec.hawkingVmax,
-        hawkingLh: bec.hawkingLh,
-        hawkingDeltaN: bec.hawkingDeltaN,
-        interactionStrength: bec.interactionStrength,
-        mass: bec.mass,
-        gridSize: bec.gridSize,
-        spacing: bec.spacing,
-      }),
-    [
-      bec.hawkingVmax,
-      bec.hawkingLh,
-      bec.hawkingDeltaN,
-      bec.interactionStrength,
-      bec.mass,
-      bec.gridSize,
-      bec.spacing,
-    ]
+  const becParams = useWaterfallParams(bec)
+  const horizonContext = useMemo(
+    () => resolveHorizonContext(inputs, becParams),
+    [inputs, becParams]
   )
-
-  const horizonContext = useMemo<HorizonContext>(() => {
-    const isBec =
-      enabled &&
-      objectType === 'schroedinger' &&
-      quantumMode === 'becDynamics' &&
-      bec.initialCondition === 'blackHoleAnalog'
-    if (!isBec) return { isBec, horizonPresent: false, cs0: 0 }
-    const horizonPresent = hasHorizon(becParams)
-    const cs0 = asymptoticSoundSpeed(becParams)
-    return { isBec, horizonPresent, cs0 }
-  }, [enabled, objectType, quantumMode, bec.initialCondition, becParams])
 
   // Push effect — fires whenever BEC diagnostics advance.
   useEffect(() => {

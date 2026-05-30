@@ -25,9 +25,6 @@ function setLiveDiracDiagnostics(
       totalNorm: 0.9998,
       normDrift: 0.002,
       maxDensity: 0.0345,
-      comptonWavelength: 0.628,
-      zitterbewegungFreq: 3.14,
-      kleinThreshold: 2.0,
       ...overrides,
     },
   }))
@@ -183,10 +180,27 @@ describe('DiracAnalysisContent — diagnostics readout', () => {
     render(<DiracAnalysisContent />)
     expect(screen.getByText(/Upper=75\.0%/)).toBeInTheDocument()
     expect(screen.getByText(/Lower=25\.0%/)).toBeInTheDocument()
-    expect(screen.getByText(/λ_C=0\.628/)).toBeInTheDocument()
-    expect(screen.getByText(/ω_Z=3\.14/)).toBeInTheDocument()
+    expect(screen.getByText(/λ_C=1\.000/)).toBeInTheDocument()
+    expect(screen.getByText(/ω_Z=2\.00/)).toBeInTheDocument()
     expect(screen.getByText(/V_K=2\.00/)).toBeInTheDocument()
     expect(screen.getByText(/n_max=0\.0345/)).toBeInTheDocument()
+  })
+
+  it('derives characteristic scales from current config instead of stale diagnostics', () => {
+    setLiveDiracDiagnostics({
+      comptonWavelength: 99,
+      zitterbewegungFreq: 99,
+      kleinThreshold: 99,
+    })
+    useExtendedObjectStore.getState().setDiracMass(2)
+    useExtendedObjectStore.getState().setDiracSpeedOfLight(1)
+    useExtendedObjectStore.getState().setDiracHbar(1)
+
+    render(<DiracAnalysisContent />)
+
+    expect(screen.getByText(/λ_C=0\.500/)).toBeInTheDocument()
+    expect(screen.getByText(/ω_Z=4\.00/)).toBeInTheDocument()
+    expect(screen.getByText(/V_K=4\.00/)).toBeInTheDocument()
   })
 
   it('shows norm drift in danger style when |drift| > 1%', () => {

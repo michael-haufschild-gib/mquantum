@@ -682,6 +682,78 @@ describe('hermitianEigendecompose', () => {
     // Trace preservation (sanity)
     expect(sorted[0]! + sorted[1]!).toBeCloseTo(4, 12)
   })
+
+  it('converges and reconstructs a dense K=MAX_K Hermitian matrix (regression: classical-Jacobi 50-cap)', () => {
+    // Before the switch to cyclic Jacobi, hermitianEigendecompose performed ONE
+    // max-element rotation per loop iteration, capped at 50 iterations. A dense
+    // K-dimensional matrix needs O(K²) such single-element rotations to converge
+    // (measured worst case ~365 for K=14), so the cap silently returned a
+    // NON-converged diagonal for K ≥ 6 — and eigenvalueFloor then operated on
+    // garbage eigenpairs. This builds a dense K=MAX_K Hermitian matrix and
+    // demands the eigenpairs (a) sum to the trace and (b) reconstruct the input
+    // to machine precision. On the old 50-cap the reconstruction error was O(0.1).
+    const K = MAX_K // 14
+    // Deterministic LCG fill (no Math.random — reproducible per testing rules).
+    let seed = 0x1234_5678 >>> 0
+    const rnd = (): number => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
+      return seed / 0x1_0000_0000
+    }
+    const el = new Float64Array(K * K * 2)
+    let trace = 0
+    for (let i = 0; i < K; i++) {
+      for (let j = i; j < K; j++) {
+        const idxUp = 2 * (i * K + j)
+        const idxLo = 2 * (j * K + i)
+        if (i === j) {
+          const d = 0.5 + rnd() // positive diagonal
+          el[idxUp] = d
+          trace += d
+        } else {
+          const re = 2 * rnd() - 1
+          const im = 2 * rnd() - 1
+          el[idxUp] = re
+          el[idxUp + 1] = im
+          el[idxLo] = re // Hermitian: lower triangle = conjugate of upper
+          el[idxLo + 1] = -im
+        }
+      }
+    }
+    const rho: DensityMatrix = { K, elements: el }
+
+    const evals = new Float64Array(MAX_K)
+    const evecs = new Float64Array(MAX_K * MAX_K * 2)
+    hermitianEigendecompose(rho, evals, evecs)
+
+    // Eigenvalues sum to the trace (invariant under the similarity transform).
+    let evalSum = 0
+    for (let k = 0; k < K; k++) evalSum += evals[k]!
+    expect(evalSum).toBeCloseTo(trace, 10)
+
+    // Reconstruct V·Λ·V† and compare to the input to machine precision.
+    let maxError = 0
+    for (let i = 0; i < K; i++) {
+      for (let j = 0; j < K; j++) {
+        let sumRe = 0
+        let sumIm = 0
+        for (let k = 0; k < K; k++) {
+          const lambda = evals[k]!
+          const viIdx = 2 * (i * K + k)
+          const viRe = evecs[viIdx]!
+          const viIm = evecs[viIdx + 1]!
+          const vjIdx = 2 * (j * K + k)
+          const vjRe = evecs[vjIdx]!
+          const vjIm = -evecs[vjIdx + 1]! // conjugate
+          sumRe += lambda * (viRe * vjRe - viIm * vjIm)
+          sumIm += lambda * (viRe * vjIm + viIm * vjRe)
+        }
+        const idx = 2 * (i * K + j)
+        maxError = Math.max(maxError, Math.abs(sumRe - el[idx]!))
+        maxError = Math.max(maxError, Math.abs(sumIm - el[idx + 1]!))
+      }
+    }
+    expect(maxError).toBeLessThan(1e-10)
+  })
 })
 
 // ---------------------------------------------------------------------------

@@ -58,6 +58,8 @@ interface PreSweepSnapshot {
   potentialType: TdsePotentialType
   anharmonicLambda: number
   dimension: number
+  diagnosticsEnabled: boolean
+  diagnosticsInterval: number
   stochasticEnabled: boolean
   stochasticGamma: number
   entanglementEnabled: boolean
@@ -118,6 +120,8 @@ export function useAtlasSweepController(): {
     ext.setTdsePotentialType(snap.potentialType)
     ext.setTdseAnharmonicLambda(snap.anharmonicLambda)
 
+    ext.setTdseDiagnosticsEnabled(snap.diagnosticsEnabled)
+    ext.setTdseDiagnosticsInterval(snap.diagnosticsInterval)
     ext.setTdseStochasticGamma(snap.stochasticGamma)
     ext.setTdseStochasticEnabled(snap.stochasticEnabled)
 
@@ -154,6 +158,8 @@ export function useAtlasSweepController(): {
       potentialType: tdse.potentialType,
       anharmonicLambda: tdse.anharmonicLambda,
       dimension: useGeometryStore.getState().dimension,
+      diagnosticsEnabled: tdse.diagnosticsEnabled,
+      diagnosticsInterval: tdse.diagnosticsInterval,
       stochasticEnabled: tdse.stochasticEnabled,
       stochasticGamma: tdse.stochasticGamma,
       entanglementEnabled: entStore.enabled,
@@ -164,6 +170,11 @@ export function useAtlasSweepController(): {
 
     // Start sweep first — if validation throws, no state is mutated
     atlasStore.startSweep()
+
+    // Atlas records IPR from the TDSE diagnostics channel. Force diagnostics on
+    // during the sweep so IPR is measured even if the user had analysis closed.
+    ext.setTdseDiagnosticsEnabled(true)
+    ext.setTdseDiagnosticsInterval(1)
 
     // Enable entanglement + Wigner for the sweep, disable expensive MI/bipartitions
     entStore.setEnabled(true)

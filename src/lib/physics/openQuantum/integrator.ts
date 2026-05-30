@@ -322,154 +322,150 @@ export function hermitianEigendecompose(
     outEigenvectors[2 * (k * K + k)] = 1 // Real part of diagonal = 1
   }
 
-  // Jacobi rotations on the Hermitian matrix
-  // For small K this converges quickly
+  // Cyclic Jacobi: every sweep rotates ALL off-diagonal pairs (p, q), p < q.
+  //
+  // The previous revision rotated only the single largest off-diagonal element
+  // per loop iteration (classical Jacobi) but capped the loop at 50 iterations.
+  // Classical Jacobi needs O(K²) single-element rotations to converge — measured
+  // worst case ~59 for K=6, ~111 for K=8, ~365 for K=14 (MAX_K) — so a 50-iteration
+  // cap silently returned a NON-converged diagonal for K ≥ 6. That broke
+  // `eigenvalueFloor`: the stale "eigenvalues" either hid a genuinely negative
+  // eigenvalue (leaving ρ non-physical) or drove a reconstruction from wrong
+  // eigenpairs. Cyclic Jacobi converges in well under 50 *sweeps* for every
+  // K ≤ MAX_K, so the cap is now correct (matching this routine's "3-5 sweeps"
+  // docstring). The per-pair rotation math below is unchanged.
   const maxSweeps = 50
   const tolerance = 1e-14
 
   for (let sweep = 0; sweep < maxSweeps; sweep++) {
-    // Find max off-diagonal |element|
-    let maxOffDiag = 0
-    let pi = 0
-    let pj = 1
+    // Converged once a full sweep finds every off-diagonal already below
+    // tolerance (i.e. it performs no rotation). This per-element criterion is
+    // consistent with the per-pair skip below, so the loop breaks the sweep
+    // after convergence instead of spinning on no-op sweeps.
+    let rotated = false
 
-    for (let i = 0; i < K; i++) {
-      for (let j = i + 1; j < K; j++) {
-        const idx = 2 * (i * K + j)
-        const mag = Math.sqrt(
-          scratchMatrix[idx]! * scratchMatrix[idx]! +
-            scratchMatrix[idx + 1]! * scratchMatrix[idx + 1]!
-        )
-        if (mag > maxOffDiag) {
-          maxOffDiag = mag
-          pi = i
-          pj = j
+    for (let pi = 0; pi < K; pi++) {
+      for (let pj = pi + 1; pj < K; pj++) {
+        // Recompute the rotation from the current matrix state for this pair.
+        const aijIdx = 2 * (pi * K + pj)
+        const aijRe = scratchMatrix[aijIdx]!
+        const aijIm = scratchMatrix[aijIdx + 1]!
+        const aijMag = Math.sqrt(aijRe * aijRe + aijIm * aijIm)
+        // Skip pairs already at the noise floor — rotating them is a no-op and
+        // a phase from a ~0 element is undefined.
+        if (aijMag < tolerance) continue
+        rotated = true
+
+        const aii = scratchMatrix[2 * (pi * K + pi)]! // Real diagonal
+        const ajj = scratchMatrix[2 * (pj * K + pj)]! // Real diagonal
+
+        // Phase factor to make a_ij real: e^{iφ} where φ = -arg(a_ij)
+        const phaseRe = aijRe / aijMag
+        const phaseIm = -aijIm / aijMag
+
+        // 2×2 real symmetric problem with diagonal (aii, ajj) and off-diag aijMag.
+        //
+        // Jacobi rotation sign derivation
+        // ───────────────────────────────
+        // The code's rotation convention is `G = [[c, -s*e^{+iφ}], [s*e^{-iφ}, c]]`
+        // (applied right-hand on columns, then `G†` left-hand on rows — see below).
+        // For this G, the (i, j) element of `G† H G` is
+        //   |h_ij|*(c² − s²) + c·s·(h_jj − h_ii) = 0,
+        // which solves to `tan(2θ) = 2|h_ij| / (h_ii − h_jj)`. Using the standard
+        // Jacobi substitution `t = tan(θ)` and `τ = 1/tan(2θ) / 2`, we get
+        // `τ = (h_ii − h_jj) / (2|h_ij|)` — NOT `(h_jj − h_ii) / (2|h_ij|)`.
+        const tau = (aii - ajj) / (2 * aijMag)
+        const t =
+          tau >= 0 ? 1 / (tau + Math.sqrt(1 + tau * tau)) : -1 / (-tau + Math.sqrt(1 + tau * tau))
+        const c = 1 / Math.sqrt(1 + t * t)
+        const s = t * c
+
+        // Apply Givens rotation: G = [[c, -s·e^{-iφ}], [s·e^{iφ}, c]]
+        // Rotate columns of the work matrix and eigenvectors
+        for (let k = 0; k < K; k++) {
+          // Work matrix: row k, cols pi and pj
+          const idxKI = 2 * (k * K + pi)
+          const idxKJ = 2 * (k * K + pj)
+          const akiRe = scratchMatrix[idxKI]!
+          const akiIm = scratchMatrix[idxKI + 1]!
+          const akjRe = scratchMatrix[idxKJ]!
+          const akjIm = scratchMatrix[idxKJ + 1]!
+
+          // s·e^{iφ} · a_{kj}
+          const sPhRe = s * phaseRe
+          const sPhIm = s * phaseIm
+          const sPhAkjRe = sPhRe * akjRe - sPhIm * akjIm
+          const sPhAkjIm = sPhRe * akjIm + sPhIm * akjRe
+
+          // s·e^{-iφ} · a_{ki}
+          const sPhCRe = s * phaseRe
+          const sPhCIm = -s * phaseIm
+          const sPhCAkiRe = sPhCRe * akiRe - sPhCIm * akiIm
+          const sPhCAkiIm = sPhCRe * akiIm + sPhCIm * akiRe
+
+          scratchMatrix[idxKI] = c * akiRe + sPhAkjRe
+          scratchMatrix[idxKI + 1] = c * akiIm + sPhAkjIm
+          scratchMatrix[idxKJ] = c * akjRe - sPhCAkiRe
+          scratchMatrix[idxKJ + 1] = c * akjIm - sPhCAkiIm
+        }
+
+        // Now rotate rows (for Hermitian: apply G† from right on columns transposed)
+        for (let l = 0; l < K; l++) {
+          const idxIL = 2 * (pi * K + l)
+          const idxJL = 2 * (pj * K + l)
+          const ailRe = scratchMatrix[idxIL]!
+          const ailIm = scratchMatrix[idxIL + 1]!
+          const ajlRe = scratchMatrix[idxJL]!
+          const ajlIm = scratchMatrix[idxJL + 1]!
+
+          // s·e^{-iφ}
+          const sPhCRe2 = s * phaseRe
+          const sPhCIm2 = -s * phaseIm
+
+          // s·e^{iφ}
+          const sPh2Re = s * phaseRe
+          const sPh2Im = s * phaseIm
+
+          const sPhCAjlRe = sPhCRe2 * ajlRe - sPhCIm2 * ajlIm
+          const sPhCAjlIm = sPhCRe2 * ajlIm + sPhCIm2 * ajlRe
+
+          const sPh2AilRe = sPh2Re * ailRe - sPh2Im * ailIm
+          const sPh2AilIm = sPh2Re * ailIm + sPh2Im * ailRe
+
+          scratchMatrix[idxIL] = c * ailRe + sPhCAjlRe
+          scratchMatrix[idxIL + 1] = c * ailIm + sPhCAjlIm
+          scratchMatrix[idxJL] = c * ajlRe - sPh2AilRe
+          scratchMatrix[idxJL + 1] = c * ajlIm - sPh2AilIm
+        }
+
+        // Accumulate eigenvector rotation
+        for (let k = 0; k < K; k++) {
+          const idxKI = 2 * (k * K + pi)
+          const idxKJ = 2 * (k * K + pj)
+          const vkiRe = outEigenvectors[idxKI]!
+          const vkiIm = outEigenvectors[idxKI + 1]!
+          const vkjRe = outEigenvectors[idxKJ]!
+          const vkjIm = outEigenvectors[idxKJ + 1]!
+
+          const sPhRe2 = s * phaseRe
+          const sPhIm2 = s * phaseIm
+          const sPhVkjRe = sPhRe2 * vkjRe - sPhIm2 * vkjIm
+          const sPhVkjIm = sPhRe2 * vkjIm + sPhIm2 * vkjRe
+
+          const sPhCRe3 = s * phaseRe
+          const sPhCIm3 = -s * phaseIm
+          const sPhCVkiRe = sPhCRe3 * vkiRe - sPhCIm3 * vkiIm
+          const sPhCVkiIm = sPhCRe3 * vkiIm + sPhCIm3 * vkiRe
+
+          outEigenvectors[idxKI] = c * vkiRe + sPhVkjRe
+          outEigenvectors[idxKI + 1] = c * vkiIm + sPhVkjIm
+          outEigenvectors[idxKJ] = c * vkjRe - sPhCVkiRe
+          outEigenvectors[idxKJ + 1] = c * vkjIm - sPhCVkiIm
         }
       }
     }
 
-    if (maxOffDiag < tolerance) break
-
-    // Compute 2×2 rotation to zero out (pi, pj) element
-    const aii = scratchMatrix[2 * (pi * K + pi)]! // Real diagonal
-    const ajj = scratchMatrix[2 * (pj * K + pj)]! // Real diagonal
-    const aijIdx = 2 * (pi * K + pj)
-    const aijRe = scratchMatrix[aijIdx]!
-    const aijIm = scratchMatrix[aijIdx + 1]!
-    const aijMag = Math.sqrt(aijRe * aijRe + aijIm * aijIm)
-
-    // Phase factor to make a_ij real: e^{iφ} where φ = -arg(a_ij)
-    const phaseRe = aijMag > 1e-30 ? aijRe / aijMag : 1
-    const phaseIm = aijMag > 1e-30 ? -aijIm / aijMag : 0
-
-    // Now solve 2×2 real symmetric problem with diagonal (aii, ajj) and off-diag aijMag.
-    //
-    // Jacobi rotation sign derivation
-    // ───────────────────────────────
-    // The code's rotation convention is `G = [[c, -s*e^{+iφ}], [s*e^{-iφ}, c]]`
-    // (applied right-hand on columns, then `G†` left-hand on rows — see below).
-    // For this G, the (i, j) element of `G† H G` is
-    //   |h_ij|*(c² − s²) + c·s·(h_jj − h_ii) = 0,
-    // which solves to `tan(2θ) = 2|h_ij| / (h_ii − h_jj)`. Using the standard
-    // Jacobi substitution `t = tan(θ)` and `τ = 1/tan(2θ) / 2`, we get
-    // `τ = (h_ii − h_jj) / (2|h_ij|)` — NOT `(h_jj − h_ii) / (2|h_ij|)`.
-    //
-    // An earlier revision of this file had the sign flipped. Numerical
-    // evidence: on real `[[1, 2], [2, 3]]` (expected eigenvalues 2 ± √5) the
-    // flipped-sign sweep wobbled around the eigenvalues for all 50 maxSweeps
-    // without converging (off-diagonal bouncing between 0.04 and 2.24). On the
-    // complex `[[0.6, 0.2+0.1i], [0.2−0.1i, 0.4]]` from the test suite the
-    // reconstruction error plateaued at ~2% — which the test had quietly
-    // relaxed to `toBeLessThan(0.02)`. With the correct sign both cases
-    // converge in a single Jacobi sweep to machine precision.
-    const tau = (aii - ajj) / (2 * aijMag)
-    const t =
-      tau >= 0 ? 1 / (tau + Math.sqrt(1 + tau * tau)) : -1 / (-tau + Math.sqrt(1 + tau * tau))
-    const c = 1 / Math.sqrt(1 + t * t)
-    const s = t * c
-
-    // Apply Givens rotation: G = [[c, -s·e^{-iφ}], [s·e^{iφ}, c]]
-    // Rotate columns of the work matrix and eigenvectors
-    for (let k = 0; k < K; k++) {
-      // Work matrix: row k, cols pi and pj
-      const idxKI = 2 * (k * K + pi)
-      const idxKJ = 2 * (k * K + pj)
-      const akiRe = scratchMatrix[idxKI]!
-      const akiIm = scratchMatrix[idxKI + 1]!
-      const akjRe = scratchMatrix[idxKJ]!
-      const akjIm = scratchMatrix[idxKJ + 1]!
-
-      // s·e^{iφ} · a_{kj}
-      const sPhRe = s * phaseRe
-      const sPhIm = s * phaseIm
-      const sPhAkjRe = sPhRe * akjRe - sPhIm * akjIm
-      const sPhAkjIm = sPhRe * akjIm + sPhIm * akjRe
-
-      // s·e^{-iφ} · a_{ki}
-      const sPhCRe = s * phaseRe
-      const sPhCIm = -s * phaseIm
-      const sPhCAkiRe = sPhCRe * akiRe - sPhCIm * akiIm
-      const sPhCAkiIm = sPhCRe * akiIm + sPhCIm * akiRe
-
-      scratchMatrix[idxKI] = c * akiRe + sPhAkjRe
-      scratchMatrix[idxKI + 1] = c * akiIm + sPhAkjIm
-      scratchMatrix[idxKJ] = c * akjRe - sPhCAkiRe
-      scratchMatrix[idxKJ + 1] = c * akjIm - sPhCAkiIm
-    }
-
-    // Now rotate rows (for Hermitian: apply G† from right on columns transposed)
-    for (let l = 0; l < K; l++) {
-      const idxIL = 2 * (pi * K + l)
-      const idxJL = 2 * (pj * K + l)
-      const ailRe = scratchMatrix[idxIL]!
-      const ailIm = scratchMatrix[idxIL + 1]!
-      const ajlRe = scratchMatrix[idxJL]!
-      const ajlIm = scratchMatrix[idxJL + 1]!
-
-      // s·e^{-iφ}
-      const sPhCRe2 = s * phaseRe
-      const sPhCIm2 = -s * phaseIm
-
-      // s·e^{iφ}
-      const sPh2Re = s * phaseRe
-      const sPh2Im = s * phaseIm
-
-      const sPhCAjlRe = sPhCRe2 * ajlRe - sPhCIm2 * ajlIm
-      const sPhCAjlIm = sPhCRe2 * ajlIm + sPhCIm2 * ajlRe
-
-      const sPh2AilRe = sPh2Re * ailRe - sPh2Im * ailIm
-      const sPh2AilIm = sPh2Re * ailIm + sPh2Im * ailRe
-
-      scratchMatrix[idxIL] = c * ailRe + sPhCAjlRe
-      scratchMatrix[idxIL + 1] = c * ailIm + sPhCAjlIm
-      scratchMatrix[idxJL] = c * ajlRe - sPh2AilRe
-      scratchMatrix[idxJL + 1] = c * ajlIm - sPh2AilIm
-    }
-
-    // Accumulate eigenvector rotation
-    for (let k = 0; k < K; k++) {
-      const idxKI = 2 * (k * K + pi)
-      const idxKJ = 2 * (k * K + pj)
-      const vkiRe = outEigenvectors[idxKI]!
-      const vkiIm = outEigenvectors[idxKI + 1]!
-      const vkjRe = outEigenvectors[idxKJ]!
-      const vkjIm = outEigenvectors[idxKJ + 1]!
-
-      const sPhRe2 = s * phaseRe
-      const sPhIm2 = s * phaseIm
-      const sPhVkjRe = sPhRe2 * vkjRe - sPhIm2 * vkjIm
-      const sPhVkjIm = sPhRe2 * vkjIm + sPhIm2 * vkjRe
-
-      const sPhCRe3 = s * phaseRe
-      const sPhCIm3 = -s * phaseIm
-      const sPhCVkiRe = sPhCRe3 * vkiRe - sPhCIm3 * vkiIm
-      const sPhCVkiIm = sPhCRe3 * vkiIm + sPhCIm3 * vkiRe
-
-      outEigenvectors[idxKI] = c * vkiRe + sPhVkjRe
-      outEigenvectors[idxKI + 1] = c * vkiIm + sPhVkjIm
-      outEigenvectors[idxKJ] = c * vkjRe - sPhCVkiRe
-      outEigenvectors[idxKJ + 1] = c * vkjIm - sPhCVkiIm
-    }
+    if (!rotated) break
   }
 
   // Extract eigenvalues from diagonal of work matrix

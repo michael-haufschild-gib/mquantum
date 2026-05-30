@@ -4,10 +4,11 @@
  * Draggable HUD shell for the analog-Hawking Page-curve plot. Responsibilities:
  *   - Visibility gating (HUD toggle × cinematic mode × desktop viewport)
  *   - Drag + sidebar-collision state (matches `QuantumCarpetPanel`)
- *   - Composition of {@link usePageCurveSampling} and {@link PageCurveSvg}
+ *   - Composition of horizon context and {@link PageCurveSvg}
  *
- * Sampling logic lives in `hooks/usePageCurveSampling.ts`. SVG drawing lives
- * in `components/overlays/pageCurve/PageCurveSvg.tsx`. Keeping this file
+ * Sampling is owned by `PageCurveSamplingGate` so the island overlay can keep
+ * updating while the visible HUD is closed. SVG drawing lives in
+ * `components/overlays/pageCurve/PageCurveSvg.tsx`. Keeping this file
  * focused on layout + drag leaves every piece testable in isolation.
  *
  * @module components/overlays/HawkingPageCurvePanel
@@ -26,7 +27,7 @@ import {
 import { Button } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
 import { useIsDesktop } from '@/hooks/useMediaQuery'
-import { usePageCurveSampling } from '@/hooks/usePageCurveSampling'
+import { usePageCurveHorizonContext } from '@/hooks/usePageCurveSampling'
 import { usePanelCollision } from '@/hooks/usePanelCollision'
 import { usePageCurveStore } from '@/stores/diagnostics/pageCurveStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
@@ -41,8 +42,7 @@ const PANEL_H = PAGE_CURVE_HEIGHT + 64
 /**
  * Heavy inner panel — only mounted when the HUD toggle is on, not in cinematic
  * mode, and on a desktop viewport. Owns drag state + sidebar-collision spring
- * offsets; delegates sampling to {@link usePageCurveSampling} and drawing to
- * {@link PageCurveSvg}.
+ * offsets; delegates drawing to {@link PageCurveSvg}.
  */
 const PageCurvePanelInner: React.FC = React.memo(() => {
   const enabled = usePageCurveStore((s) => s.pageCurveHudEnabled)
@@ -80,8 +80,9 @@ const PageCurvePanelInner: React.FC = React.memo(() => {
 
   const handleClose = useCallback(() => setPageCurveHudEnabled(false), [setPageCurveHudEnabled])
 
-  // Drive samples + expose synchronous horizon context for the empty-state UI.
-  const horizonContext = usePageCurveSampling({
+  // Sampling is driven by PageCurveSamplingGate; the visible panel only needs
+  // synchronous horizon context for the empty-state UI.
+  const horizonContext = usePageCurveHorizonContext({
     enabled,
     objectType,
     quantumMode: config.quantumMode,

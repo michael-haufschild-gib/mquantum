@@ -70,6 +70,20 @@ describe('coherentFockCoefficients', () => {
     // c_1 should be proportional to i (imaginary alpha)
     expect(coeffs[1]!.im).not.toBeCloseTo(0, 2)
   })
+
+  it('stays finite for very large |alpha| (NaN-guard regression)', () => {
+    // For |alpha| >= ~87 the prefactor exp(-|alpha|²/2) underflows to 0 while
+    // alpha^n overflows to Infinity, so the unguarded product is 0·Infinity =
+    // NaN (and finite·Infinity = Infinity for n below the factorial-overflow
+    // point). The true coefficient there is negligibly small, so every entry
+    // must be a finite number. |alpha| is UI-clamped to <= ~7 but a malformed
+    // preset import can bypass the setter clamp — the utility must not emit NaN.
+    const coeffs = coherentFockCoefficients(100, 0, 200)
+    for (let n = 0; n < coeffs.length; n++) {
+      expect(Number.isFinite(coeffs[n]!.re)).toBe(true)
+      expect(Number.isFinite(coeffs[n]!.im)).toBe(true)
+    }
+  })
 })
 
 // ============================================================================
