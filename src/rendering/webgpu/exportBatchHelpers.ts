@@ -237,7 +237,8 @@ export async function finalizePreviewAndStartRecording(
   loop: ExportLoopState,
   runtime: ExportRuntimeState,
   settings: ExportSettings,
-  canvas: HTMLCanvasElement
+  canvas: HTMLCanvasElement,
+  mode: RuntimeExportMode
 ): Promise<void> {
   if (runtime.recorder) {
     const previewBlob = await runtime.recorder.finalize()
@@ -259,7 +260,23 @@ export async function finalizePreviewAndStartRecording(
     useRotationStore.getState().updateRotations(runtime.rotationSnapshot)
   }
 
-  await startStreamRecording(loop, runtime, settings, canvas)
+  if (mode === 'stream') {
+    await startStreamRecording(loop, runtime, settings, canvas)
+    return
+  }
+
+  const firstRecorderDuration =
+    mode === 'segmented' ? loop.segmentDurationFrames / settings.fps : settings.duration
+  const recorder = await createExportRecorder(
+    canvas,
+    settings,
+    runtime.exportWidth,
+    runtime.exportHeight,
+    firstRecorderDuration
+  )
+  await recorder.initialize()
+  runtime.recorder = recorder
+  useExportStore.getState().setStatus('rendering')
 }
 
 /**
@@ -375,7 +392,7 @@ export async function processWarmupPhase(ctx: BatchContext): Promise<'yield' | '
  * @returns 'yield' to return to event loop, 'abort' if finishing, 'done' when preview complete
  */
 export async function processPreviewPhase(ctx: BatchContext): Promise<'yield' | 'abort' | 'done'> {
-  const { runtime, settings, canvas } = ctx
+  const { runtime, settings, mode, canvas } = ctx
   const loop = runtime.loop
 
   while (loop.phase === 'preview') {
@@ -384,7 +401,7 @@ export async function processPreviewPhase(ctx: BatchContext): Promise<'yield' | 
       return 'abort'
     }
     if (loop.frameId >= loop.totalFrames) {
-      await finalizePreviewAndStartRecording(loop, runtime, settings, canvas)
+      await finalizePreviewAndStartRecording(loop, runtime, settings, canvas, mode)
       continue
     }
 

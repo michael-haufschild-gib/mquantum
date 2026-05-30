@@ -69,14 +69,17 @@ function useWaterfallParams(bec: BecConfig) {
 }
 
 function resolveHorizonContext(
-  inputs: PageCurveSamplingInputs,
+  enabled: boolean,
+  objectType: ObjectType,
+  quantumMode: string,
+  initialCondition: BecConfig['initialCondition'],
   becParams: ReturnType<typeof buildWaterfallParams>
 ): HorizonContext {
   const isBec =
-    inputs.enabled &&
-    inputs.objectType === 'schroedinger' &&
-    inputs.quantumMode === 'becDynamics' &&
-    inputs.bec.initialCondition === 'blackHoleAnalog'
+    enabled &&
+    objectType === 'schroedinger' &&
+    quantumMode === 'becDynamics' &&
+    initialCondition === 'blackHoleAnalog'
   if (!isBec) return { isBec, horizonPresent: false, cs0: 0 }
   const horizonPresent = hasHorizon(becParams)
   const cs0 = asymptoticSoundSpeed(becParams)
@@ -89,8 +92,13 @@ function resolveHorizonContext(
  * the producer side so overlay sampling does not depend on panel visibility.
  */
 export function usePageCurveHorizonContext(inputs: PageCurveSamplingInputs): HorizonContext {
-  const becParams = useWaterfallParams(inputs.bec)
-  return useMemo(() => resolveHorizonContext(inputs, becParams), [inputs, becParams])
+  const { enabled, objectType, quantumMode, bec } = inputs
+  const initialCondition = bec.initialCondition
+  const becParams = useWaterfallParams(bec)
+  return useMemo(
+    () => resolveHorizonContext(enabled, objectType, quantumMode, initialCondition, becParams),
+    [enabled, objectType, quantumMode, initialCondition, becParams]
+  )
 }
 
 /**
@@ -108,6 +116,7 @@ export function usePageCurveHorizonContext(inputs: PageCurveSamplingInputs): Hor
  */
 export function usePageCurveSampling(inputs: PageCurveSamplingInputs): HorizonContext {
   const { enabled, objectType, quantumMode, dimension, bec } = inputs
+  const initialCondition = bec.initialCondition
   const becGen = useDiagnosticsStore((s) => s.bec.readbackGeneration)
 
   // Time-anchor refs: sentinel `null` ⇒ "set on next push".
@@ -121,8 +130,8 @@ export function usePageCurveSampling(inputs: PageCurveSamplingInputs): HorizonCo
 
   const becParams = useWaterfallParams(bec)
   const horizonContext = useMemo(
-    () => resolveHorizonContext(inputs, becParams),
-    [inputs, becParams]
+    () => resolveHorizonContext(enabled, objectType, quantumMode, initialCondition, becParams),
+    [enabled, objectType, quantumMode, initialCondition, becParams]
   )
 
   // Push effect — fires whenever BEC diagnostics advance.

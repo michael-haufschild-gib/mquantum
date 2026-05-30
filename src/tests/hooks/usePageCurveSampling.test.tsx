@@ -1,7 +1,11 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { type PageCurveSamplingInputs, usePageCurveSampling } from '@/hooks/usePageCurveSampling'
+import {
+  type PageCurveSamplingInputs,
+  usePageCurveHorizonContext,
+  usePageCurveSampling,
+} from '@/hooks/usePageCurveSampling'
 import { DEFAULT_BEC_CONFIG } from '@/lib/geometry/extended/bec'
 import { getPageCurveSample } from '@/lib/physics/bec/pageCurve'
 import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
@@ -41,6 +45,28 @@ function setBecGeneration(readbackGeneration: number): void {
 describe('usePageCurveSampling', () => {
   beforeEach(resetStores)
   afterEach(resetStores)
+
+  it('keeps standalone horizon context stable when primitive inputs do not change', () => {
+    const { result, rerender } = renderHook((inputs) => usePageCurveHorizonContext(inputs), {
+      initialProps: waterfallInputs(),
+    })
+    const firstContext = result.current
+
+    rerender(waterfallInputs())
+
+    expect(result.current).toBe(firstContext)
+  })
+
+  it('keeps sampling horizon context stable when primitive inputs do not change', () => {
+    const { result, rerender } = renderHook((inputs) => usePageCurveSampling(inputs), {
+      initialProps: waterfallInputs(),
+    })
+    const firstContext = result.current
+
+    rerender(waterfallInputs())
+
+    expect(result.current).toBe(firstContext)
+  })
 
   it('reports horizon context synchronously for canonical waterfall parameters', () => {
     const { result } = renderHook(() => usePageCurveSampling(waterfallInputs()))
