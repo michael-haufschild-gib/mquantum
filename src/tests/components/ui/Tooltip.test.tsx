@@ -3,7 +3,35 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Button } from '@/components/ui/Button'
 import { Tooltip } from '@/components/ui/Tooltip'
+import { computeTooltipCoords } from '@/components/ui/tooltipPositioning'
 import { Z_INDEX } from '@/constants/zIndex'
+
+describe('computeTooltipCoords', () => {
+  it('flips below topbar controls instead of clamping over the trigger', () => {
+    const coords = computeTooltipCoords(
+      new DOMRect(10, 8, 160, 32),
+      new DOMRect(0, 0, 180, 28),
+      'top',
+      null,
+      { width: 500, height: 300 }
+    )
+
+    expect(coords.y).toBe(48)
+  })
+
+  it('uses pointer position while keeping tooltips outside the trigger', () => {
+    const coords = computeTooltipCoords(
+      new DOMRect(12, 12, 220, 120),
+      new DOMRect(0, 0, 104, 28),
+      'top',
+      { x: 130, y: 70 },
+      { width: 320, height: 320 }
+    )
+
+    expect(coords.x).toBe(144)
+    expect(coords.y).toBe(140)
+  })
+})
 
 describe('Tooltip', () => {
   beforeEach(() => {
@@ -108,6 +136,44 @@ describe('Tooltip', () => {
     expect(screen.getByRole('tooltip')).toBeInTheDocument()
 
     fireEvent.mouseLeave(trigger)
+
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  })
+
+  it('hides tooltip when the trigger is clicked', async () => {
+    render(
+      <Tooltip content="Tooltip text" delay={0}>
+        <Button>Click me</Button>
+      </Tooltip>
+    )
+
+    const trigger = screen.getByRole('button')
+    fireEvent.mouseEnter(trigger)
+
+    await act(async () => {
+      vi.advanceTimersByTime(0)
+    })
+
+    expect(screen.getByRole('tooltip')).toBeInTheDocument()
+
+    fireEvent.click(trigger)
+
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  })
+
+  it('clears delayed hover when the browser window blurs before the delay completes', () => {
+    render(
+      <Tooltip content="Tooltip text" delay={500}>
+        <Button>Hover me</Button>
+      </Tooltip>
+    )
+
+    fireEvent.mouseEnter(screen.getByRole('button'))
+    fireEvent(window, new Event('blur'))
+
+    act(() => {
+      vi.advanceTimersByTime(500)
+    })
 
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
   })
