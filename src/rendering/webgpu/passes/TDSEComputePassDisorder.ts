@@ -79,6 +79,12 @@ export function maybeDispatchDisorder(
     wgX: number
   ) => void
 ): void {
+  // The Regge-Wheeler ringdown mode is a named Schwarzschild scattering
+  // Hamiltonian. Adding generic Anderson disorder silently changes the QNM
+  // barrier into a different physical problem while the UI/analysis still
+  // labels it as pure black-hole ringdown.
+  if (config.potentialType === 'blackHoleRingdown') return
+
   const { effectiveStrength } = computeTdseDisorderScaling(config)
 
   maybeDispatchDisorderGeneric(

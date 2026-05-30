@@ -15,6 +15,11 @@ import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Slider } from '@/components/ui/Slider'
+import {
+  comptonWavelength,
+  kleinThreshold,
+  zitterbewegungFrequency,
+} from '@/lib/physics/dirac/scales'
 import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
@@ -258,29 +263,27 @@ DiracDispersionDiagram.displayName = 'DiracDispersionDiagram'
 /* ────────────────────────────────────────────────────────────── */
 
 const DiracDiagnosticsInline: React.FC = React.memo(() => {
-  const {
-    hasData,
-    totalNorm,
-    normDrift,
-    maxDensity,
-    particleFraction,
-    antiparticleFraction,
-    comptonWavelength,
-    zitterbewegungFreq,
-    kleinThreshold,
-  } = useDiagnosticsStore(
+  const { hasData, totalNorm, normDrift, maxDensity, particleFraction, antiparticleFraction } =
+    useDiagnosticsStore(
+      useShallow((s) => ({
+        hasData: s.dirac.hasData,
+        totalNorm: s.dirac.totalNorm,
+        normDrift: s.dirac.normDrift,
+        maxDensity: s.dirac.maxDensity,
+        particleFraction: s.dirac.particleFraction,
+        antiparticleFraction: s.dirac.antiparticleFraction,
+      }))
+    )
+  const { mass, speedOfLight, hbar } = useExtendedObjectStore(
     useShallow((s) => ({
-      hasData: s.dirac.hasData,
-      totalNorm: s.dirac.totalNorm,
-      normDrift: s.dirac.normDrift,
-      maxDensity: s.dirac.maxDensity,
-      particleFraction: s.dirac.particleFraction,
-      antiparticleFraction: s.dirac.antiparticleFraction,
-      comptonWavelength: s.dirac.comptonWavelength,
-      zitterbewegungFreq: s.dirac.zitterbewegungFreq,
-      kleinThreshold: s.dirac.kleinThreshold,
+      mass: s.schroedinger.dirac.mass,
+      speedOfLight: s.schroedinger.dirac.speedOfLight,
+      hbar: s.schroedinger.dirac.hbar,
     }))
   )
+  const liveComptonWavelength = comptonWavelength(hbar, mass, speedOfLight)
+  const liveZitterbewegungFreq = zitterbewegungFrequency(mass, speedOfLight, hbar)
+  const liveKleinThreshold = kleinThreshold(mass, speedOfLight)
 
   return (
     <DiagnosticsCard testId="dirac-analysis-inline" hasData={hasData}>
@@ -298,11 +301,11 @@ const DiracDiagnosticsInline: React.FC = React.memo(() => {
       {/* Characteristic scales */}
       <div className="mt-1 pt-1 border-t border-[var(--border-subtle)]">
         <div className="flex gap-3">
-          <span>λ_C={comptonWavelength.toFixed(3)}</span>
-          <span>ω_Z={zitterbewegungFreq.toFixed(2)}</span>
+          <span>λ_C={liveComptonWavelength.toFixed(3)}</span>
+          <span>ω_Z={liveZitterbewegungFreq.toFixed(2)}</span>
         </div>
         <div className="flex gap-3">
-          <span>V_K={kleinThreshold.toFixed(2)}</span>
+          <span>V_K={liveKleinThreshold.toFixed(2)}</span>
         </div>
       </div>
     </DiagnosticsCard>

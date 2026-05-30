@@ -46,6 +46,7 @@ describe('TDSE measurement-collapse injection', () => {
       targetNorm: 1,
     }
     internals._diagState.maxDensity = 9
+    internals._diagState.properMaxDensity = 11
     internals._diagState.initialNorm = 7
     internals._diagState.prevNorm = 7
     const startGen = internals._diagState.diagGeneration
@@ -62,6 +63,7 @@ describe('TDSE measurement-collapse injection', () => {
     expect(internals._diagState.initialNorm).toBe(1)
     expect(internals._diagState.prevNorm).toBe(1)
     expect(internals._diagState.maxDensity).toBe(1)
+    expect(internals._diagState.properMaxDensity).toBe(1)
     expect(internals._diagState.diagGeneration).toBe(startGen + 1)
     expect(writeBuffer).toHaveBeenCalledWith(psiBuffer, 0, expect.any(Float32Array))
     expect(writeBuffer).toHaveBeenCalledWith(renormBuffer, 4, expect.any(Float32Array))

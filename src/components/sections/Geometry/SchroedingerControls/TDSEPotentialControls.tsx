@@ -417,8 +417,8 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
 
           {showBlackHoleControls && <BlackHoleRingdownControls td={td} actions={actions} />}
 
-          {/* Disorder overlay (available for any potential except andersonDisorder which has its own) */}
-          {!showDisorderControls && (
+          {/* Disorder overlay (available for compatible non-Anderson potentials). */}
+          {!showDisorderControls && !showBlackHoleControls && (
             <>
               <Slider
                 label="Disorder (W)"

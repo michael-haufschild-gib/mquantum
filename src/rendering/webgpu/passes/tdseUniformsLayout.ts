@@ -190,7 +190,7 @@ const TDSE_UNIFORMS_FIELDS = [
   { name: 'showCurvatureOverlay', type: 'u32' },
   { name: 'densityViewMode', type: 'u32' },
   { name: 'curvatureOverlayOpacity', type: 'f32' },
-  { name: '_padV2d', type: 'u32' },
+  { name: 'densityDisplayMax', type: 'f32' },
 
   // --- Host-precomputed reciprocal spacing (offset 928) ---
   { name: 'invSpacing', type: arr('f32', 12) },

@@ -44,33 +44,8 @@ export interface HorizonContext {
   cs0: number
 }
 
-/**
- * Wire the Page-curve store to the BEC readback generation. Returns a
- * synchronous `HorizonContext` the caller can use for empty-state UX.
- *
- * The hook has two effects:
- *   - push effect: drives `usePageCurveStore.pushSample` whenever the BEC
- *     diagnostic generation advances (deduped by `lastPushedGenRef`).
- *   - reset effect: clears the store when the user switches BEC mode or
- *     initial condition (but not on simple HUD remount).
- *
- * @param inputs - Store snapshots (pre-selected by the caller).
- * @returns Synchronously evaluated horizon context for the empty-state UI.
- */
-export function usePageCurveSampling(inputs: PageCurveSamplingInputs): HorizonContext {
-  const { enabled, objectType, quantumMode, dimension, bec } = inputs
-  const becGen = useDiagnosticsStore((s) => s.bec.readbackGeneration)
-
-  // Time-anchor refs: sentinel `null` ⇒ "set on next push".
-  const genRefRef = useRef<number | null>(null)
-  // Dedupe guard — without it, any dependency change re-runs the effect and
-  // replays a sample for the same becGen, producing duplicate timestamps.
-  const lastPushedGenRef = useRef<number | null>(null)
-  // Guards the reset effect so a simple remount (HUD toggle, cinematic mode,
-  // breakpoint flip) does not wipe an in-flight page curve.
-  const didInitResetRef = useRef(false)
-
-  const becParams = useMemo(
+function useWaterfallParams(bec: BecConfig) {
+  return useMemo(
     () =>
       buildWaterfallParams({
         hawkingVmax: bec.hawkingVmax,
@@ -91,18 +66,73 @@ export function usePageCurveSampling(inputs: PageCurveSamplingInputs): HorizonCo
       bec.spacing,
     ]
   )
+}
 
-  const horizonContext = useMemo<HorizonContext>(() => {
-    const isBec =
-      enabled &&
-      objectType === 'schroedinger' &&
-      quantumMode === 'becDynamics' &&
-      bec.initialCondition === 'blackHoleAnalog'
-    if (!isBec) return { isBec, horizonPresent: false, cs0: 0 }
-    const horizonPresent = hasHorizon(becParams)
-    const cs0 = asymptoticSoundSpeed(becParams)
-    return { isBec, horizonPresent, cs0 }
-  }, [enabled, objectType, quantumMode, bec.initialCondition, becParams])
+function resolveHorizonContext(
+  enabled: boolean,
+  objectType: ObjectType,
+  quantumMode: string,
+  initialCondition: BecConfig['initialCondition'],
+  becParams: ReturnType<typeof buildWaterfallParams>
+): HorizonContext {
+  const isBec =
+    enabled &&
+    objectType === 'schroedinger' &&
+    quantumMode === 'becDynamics' &&
+    initialCondition === 'blackHoleAnalog'
+  if (!isBec) return { isBec, horizonPresent: false, cs0: 0 }
+  const horizonPresent = hasHorizon(becParams)
+  const cs0 = asymptoticSoundSpeed(becParams)
+  return { isBec, horizonPresent, cs0 }
+}
+
+/**
+ * Compute the synchronous horizon context without mutating the Page-curve
+ * sample buffer. Visible HUD panels use this; `PageCurveSamplingGate` owns
+ * the producer side so overlay sampling does not depend on panel visibility.
+ */
+export function usePageCurveHorizonContext(inputs: PageCurveSamplingInputs): HorizonContext {
+  const { enabled, objectType, quantumMode, bec } = inputs
+  const initialCondition = bec.initialCondition
+  const becParams = useWaterfallParams(bec)
+  return useMemo(
+    () => resolveHorizonContext(enabled, objectType, quantumMode, initialCondition, becParams),
+    [enabled, objectType, quantumMode, initialCondition, becParams]
+  )
+}
+
+/**
+ * Wire the Page-curve store to the BEC readback generation. Returns a
+ * synchronous `HorizonContext` the caller can use for empty-state UX.
+ *
+ * The hook has two effects:
+ *   - push effect: drives `usePageCurveStore.pushSample` whenever the BEC
+ *     diagnostic generation advances (deduped by `lastPushedGenRef`).
+ *   - reset effect: clears the store when the user switches BEC mode or
+ *     initial condition (but not on simple HUD remount).
+ *
+ * @param inputs - Store snapshots (pre-selected by the caller).
+ * @returns Synchronously evaluated horizon context for the empty-state UI.
+ */
+export function usePageCurveSampling(inputs: PageCurveSamplingInputs): HorizonContext {
+  const { enabled, objectType, quantumMode, dimension, bec } = inputs
+  const initialCondition = bec.initialCondition
+  const becGen = useDiagnosticsStore((s) => s.bec.readbackGeneration)
+
+  // Time-anchor refs: sentinel `null` ⇒ "set on next push".
+  const genRefRef = useRef<number | null>(null)
+  // Dedupe guard — without it, any dependency change re-runs the effect and
+  // replays a sample for the same becGen, producing duplicate timestamps.
+  const lastPushedGenRef = useRef<number | null>(null)
+  // Guards the reset effect so a simple remount (HUD toggle, cinematic mode,
+  // breakpoint flip) does not wipe an in-flight page curve.
+  const didInitResetRef = useRef(false)
+
+  const becParams = useWaterfallParams(bec)
+  const horizonContext = useMemo(
+    () => resolveHorizonContext(enabled, objectType, quantumMode, initialCondition, becParams),
+    [enabled, objectType, quantumMode, initialCondition, becParams]
+  )
 
   // Push effect — fires whenever BEC diagnostics advance.
   useEffect(() => {

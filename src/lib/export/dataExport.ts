@@ -8,10 +8,16 @@
  */
 
 import { AXIS_LABELS } from '@/constants/dimension'
+import {
+  comptonWavelength,
+  kleinThreshold,
+  zitterbewegungFrequency,
+} from '@/lib/physics/dirac/scales'
 import { useCoordinateEntanglementStore } from '@/stores/diagnostics/coordinateEntanglementStore'
 import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 import type { AtlasPoint } from '@/stores/diagnostics/quantumnessAtlasStore'
 import { useWavefunctionSliceStore } from '@/stores/diagnostics/wavefunctionSliceStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 // ─── Ring buffer utility ──────────────────────────────────────────────────
 
@@ -390,6 +396,7 @@ function buildFsfPayload(): Record<string, unknown> | null {
 function buildDiracPayload(): Record<string, unknown> | null {
   const s = useDiagnosticsStore.getState().dirac
   if (s.historyCount === 0) return null
+  const { mass, speedOfLight, hbar } = useExtendedObjectStore.getState().schroedinger.dirac
   return {
     current: {
       totalNorm: s.totalNorm,
@@ -397,9 +404,9 @@ function buildDiracPayload(): Record<string, unknown> | null {
       maxDensity: s.maxDensity,
       particleFraction: s.particleFraction,
       antiparticleFraction: s.antiparticleFraction,
-      comptonWavelength: s.comptonWavelength,
-      zitterbewegungFreq: s.zitterbewegungFreq,
-      kleinThreshold: s.kleinThreshold,
+      comptonWavelength: comptonWavelength(hbar, mass, speedOfLight),
+      zitterbewegungFreq: zitterbewegungFrequency(mass, speedOfLight, hbar),
+      kleinThreshold: kleinThreshold(mass, speedOfLight),
       meanPosition: s.meanPosition,
     },
     timeSeries: {

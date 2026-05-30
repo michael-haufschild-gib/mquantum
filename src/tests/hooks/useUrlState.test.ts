@@ -150,6 +150,49 @@ describe('useUrlState', () => {
     })
   })
 
+  it('applies extended Open Quantum URL fields through the hook path', async () => {
+    const parsedState: Partial<ShareableState> = {
+      objectType: 'schroedinger',
+      dimension: 4,
+      quantumMode: 'harmonicOscillator',
+      openQuantumEnabled: true,
+      openQuantumDephasingRate: 0.5,
+      openQuantumRelaxationRate: 1.2,
+      openQuantumThermalUpRate: 0.4,
+      openQuantumDephasingEnabled: false,
+      openQuantumRelaxationEnabled: true,
+      openQuantumThermalEnabled: true,
+      openQuantumDt: 0.025,
+      openQuantumSubsteps: 7,
+      openQuantumBathTemperature: 420,
+      openQuantumCouplingScale: 2.25,
+      openQuantumHydrogenBasisMaxN: 3,
+      openQuantumDephasingModel: 'none',
+      openQuantumVisualizationMode: 'entropyMap',
+    }
+    mockedParseCurrentUrl.mockReturnValue(parsedState)
+
+    renderHook(() => useUrlState())
+
+    await waitFor(() => {
+      const oq = useExtendedObjectStore.getState().schroedinger.openQuantum
+      expect(oq.enabled).toBe(true)
+      expect(oq.dephasingRate).toBeCloseTo(0.5)
+      expect(oq.relaxationRate).toBeCloseTo(1.2)
+      expect(oq.thermalUpRate).toBeCloseTo(0.4)
+      expect(oq.dephasingEnabled).toBe(false)
+      expect(oq.relaxationEnabled).toBe(true)
+      expect(oq.thermalEnabled).toBe(true)
+      expect(oq.dt).toBeCloseTo(0.025)
+      expect(oq.substeps).toBe(7)
+      expect(oq.bathTemperature).toBeCloseTo(420)
+      expect(oq.couplingScale).toBeCloseTo(2.25)
+      expect(oq.hydrogenBasisMaxN).toBe(3)
+      expect(oq.dephasingModel).toBe('none')
+      expect(oq.visualizationMode).toBe('entropyMap')
+    })
+  })
+
   it('brc+brc_p URL params route into tdse branching state', async () => {
     // Regression guard for the branching URL pipeline: `brc` and `brc_p`
     // must land on `schroedinger.tdse.branchingEnabled` /
@@ -222,6 +265,65 @@ describe('useUrlState', () => {
       expect(wdw.srmtCutNormalized).toBeCloseTo(0.6, 2)
       expect(wdw.srmtRankCap).toBe(96)
       expect(wdw.srmtHeatmapIntensity).toBeCloseTo(0.75, 2)
+    })
+  })
+
+  it('applies Dirac URL fields through the hook path', async () => {
+    const parsedState: Partial<ShareableState> = {
+      objectType: 'schroedinger',
+      dimension: 4,
+      quantumMode: 'diracEquation',
+      diracInitialCondition: 'zitterbewegung',
+      diracFieldView: 'axialCharge',
+      diracPotentialType: 'barrier',
+      diracPotentialStrength: 3.5,
+      diracPotentialWidth: 0.7,
+      diracPotentialCenter: 0.5,
+      diracMass: 1.7,
+      diracSpeedOfLight: 2.5,
+      diracHbar: 0.8,
+      diracDt: 0.006,
+      diracStepsPerFrame: 5,
+      diracGridSize: [16, 16, 16, 16],
+      diracSpacing: [0.12, 0.13, 0.14, 0.15],
+      diracPacketCenter: [0.1, -0.2, 0.3, 0.4],
+      diracPacketMomentum: [1.5, -2, 0.75, 0.5],
+      diracPacketWidth: 0.35,
+      diracPositiveEnergyFraction: 0.45,
+      diracAutoScale: true,
+      diracShowPotential: true,
+      diracDiagnosticsEnabled: false,
+      diracDiagnosticsInterval: 11,
+      diracSlicePositions: [0.25],
+    }
+    mockedParseCurrentUrl.mockReturnValue(parsedState)
+
+    renderHook(() => useUrlState())
+
+    await waitFor(() => {
+      const dirac = useExtendedObjectStore.getState().schroedinger.dirac
+      expect(dirac.initialCondition).toBe('zitterbewegung')
+      expect(dirac.fieldView).toBe('axialCharge')
+      expect(dirac.potentialType).toBe('barrier')
+      expect(dirac.potentialStrength).toBeCloseTo(3.5)
+      expect(dirac.potentialWidth).toBeCloseTo(0.7)
+      expect(dirac.potentialCenter).toBeCloseTo(0.5)
+      expect(dirac.mass).toBeCloseTo(1.7)
+      expect(dirac.speedOfLight).toBeCloseTo(2.5)
+      expect(dirac.hbar).toBeCloseTo(0.8)
+      expect(dirac.dt).toBeCloseTo(0.006)
+      expect(dirac.stepsPerFrame).toBe(5)
+      expect(dirac.gridSize).toEqual([16, 16, 16, 16])
+      expect(dirac.spacing).toEqual([0.12, 0.13, 0.14, 0.15])
+      expect(dirac.packetCenter).toEqual([0.1, -0.2, 0.3, 0.4])
+      expect(dirac.packetMomentum).toEqual([1.5, -2, 0.75, 0.5])
+      expect(dirac.packetWidth).toBeCloseTo(0.35)
+      expect(dirac.positiveEnergyFraction).toBeCloseTo(0.45)
+      expect(dirac.autoScale).toBe(true)
+      expect(dirac.showPotential).toBe(true)
+      expect(dirac.diagnosticsEnabled).toBe(false)
+      expect(dirac.diagnosticsInterval).toBe(11)
+      expect(dirac.slicePositions).toEqual([0.25])
     })
   })
 

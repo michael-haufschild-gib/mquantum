@@ -9,17 +9,42 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { downloadFileMock } = vi.hoisted(() => ({
-  downloadFileMock: vi.fn(),
-}))
+const { downloadFileMock, videoRecorderCtorMock, videoRecorderInstances } = vi.hoisted(() => {
+  const instances: unknown[] = []
+  const ctor = vi.fn(function MockVideoRecorder(
+    this: Record<string, unknown>,
+    canvas: HTMLCanvasElement,
+    options: unknown
+  ) {
+    this.canvas = canvas
+    this.options = options
+    this.initialize = vi.fn().mockResolvedValue(undefined)
+    this.captureFrame = vi.fn().mockResolvedValue(undefined)
+    this.finalize = vi.fn().mockResolvedValue(new Blob(['video'], { type: 'video/webm' }))
+    this.cancel = vi.fn().mockResolvedValue(undefined)
+    this.dispose = vi.fn()
+    instances.push(this)
+  })
+
+  return {
+    downloadFileMock: vi.fn(),
+    videoRecorderCtorMock: ctor,
+    videoRecorderInstances: instances,
+  }
+})
 
 vi.mock('@/lib/export/dataExport', () => ({
   downloadFile: downloadFileMock,
 }))
 
+vi.mock('@/lib/export/video', () => ({
+  VideoRecorder: videoRecorderCtorMock,
+}))
+
 import {
   applyCompletionByMode,
   type BatchContext,
+  processPreviewPhase,
   processRecordingPhase,
   processWarmupPhase,
   teardownRecorder,
@@ -27,6 +52,11 @@ import {
 } from '@/rendering/webgpu/exportBatchHelpers'
 import type { ExportLoopState, ExportRuntimeState } from '@/rendering/webgpu/sceneExportRuntime'
 import { useExportStore } from '@/stores/runtime/exportStore'
+
+beforeEach(() => {
+  videoRecorderCtorMock.mockClear()
+  videoRecorderInstances.length = 0
+})
 
 // ============================================================================
 // Helpers
@@ -286,6 +316,108 @@ describe('processWarmupPhase', () => {
     await processWarmupPhase(ctx)
     expect(ctx.runtime.loop.warmupFrame).toBe(2)
   })
+
+  it('starts stream recording directly after warmup without preview-mutating the scene', async () => {
+    useExportStore.setState(useExportStore.getInitialState())
+
+    const streamHandle = {} as FileSystemFileHandle
+    const runtime = makeRuntime({
+      phase: 'warmup',
+      warmupFrame: 3,
+      totalFrames: 999,
+      mainStreamHandle: streamHandle,
+    })
+    const settings = makeSettings()
+    const ctx: BatchContext = {
+      runtime,
+      settings,
+      mode: 'stream',
+      canvas: document.createElement('canvas'),
+      advanceSceneStateByDelta: vi.fn(),
+      executeSceneFrame: vi.fn(),
+      shouldYield: vi.fn().mockReturnValue(false),
+      finishExport: vi.fn().mockResolvedValue(undefined),
+    }
+
+    const result = await processWarmupPhase(ctx)
+
+    expect(result).toBe('done')
+    expect(ctx.advanceSceneStateByDelta).not.toHaveBeenCalled()
+    expect(ctx.executeSceneFrame).not.toHaveBeenCalled()
+    expect(ctx.runtime.loop.phase).toBe('recording')
+    expect(ctx.runtime.loop.frameId).toBe(0)
+    expect(ctx.runtime.loop.totalFrames).toBe(Math.ceil(settings.duration * settings.fps))
+    expect(useExportStore.getState().status).toBe('rendering')
+    expect(useExportStore.getState().previewUrl).toBeNull()
+
+    expect(videoRecorderCtorMock).toHaveBeenCalledOnce()
+    const recorder = videoRecorderInstances[0] as {
+      options: { streamHandle?: FileSystemFileHandle; duration?: number }
+      initialize: ReturnType<typeof vi.fn>
+    }
+    expect(recorder.options.streamHandle).toBe(streamHandle)
+    expect(recorder.options.duration).toBe(settings.duration)
+    expect(recorder.initialize).toHaveBeenCalledOnce()
+  })
+})
+
+// ============================================================================
+// processPreviewPhase
+// ============================================================================
+
+describe('processPreviewPhase', () => {
+  beforeEach(() => {
+    useExportStore.setState(useExportStore.getInitialState())
+  })
+
+  it.each(['in-memory', 'segmented'] as const)(
+    'starts a non-stream recorder after preview for %s mode',
+    async (mode) => {
+      const previewRecorder = {
+        initialize: vi.fn().mockResolvedValue(undefined),
+        captureFrame: vi.fn().mockResolvedValue(undefined),
+        finalize: vi.fn().mockResolvedValue(null),
+        cancel: vi.fn().mockResolvedValue(undefined),
+        dispose: vi.fn(),
+      }
+      const runtime = makeRuntime({
+        phase: 'preview',
+        frameId: 2,
+        totalFrames: 2,
+        segmentDurationFrames: 15,
+      })
+      runtime.recorder = previewRecorder
+      const settings = makeSettings()
+      const ctx: BatchContext = {
+        runtime,
+        settings,
+        mode,
+        canvas: document.createElement('canvas'),
+        advanceSceneStateByDelta: vi.fn(),
+        executeSceneFrame: vi.fn(),
+        shouldYield: vi.fn().mockReturnValue(false),
+        finishExport: vi.fn().mockResolvedValue(undefined),
+      }
+
+      await expect(processPreviewPhase(ctx)).resolves.toBe('done')
+
+      expect(previewRecorder.finalize).toHaveBeenCalledOnce()
+      expect(previewRecorder.dispose).toHaveBeenCalledOnce()
+      expect(runtime.loop.phase).toBe('recording')
+      expect(runtime.loop.frameId).toBe(0)
+      expect(runtime.recorder).toBe(videoRecorderInstances[0])
+      expect(useExportStore.getState().status).toBe('rendering')
+
+      expect(videoRecorderCtorMock).toHaveBeenCalledOnce()
+      const recorder = videoRecorderInstances[0] as {
+        options: { streamHandle?: FileSystemFileHandle; duration?: number }
+        initialize: ReturnType<typeof vi.fn>
+      }
+      expect(recorder.options.streamHandle).toBeUndefined()
+      expect(recorder.options.duration).toBe(mode === 'segmented' ? 0.5 : settings.duration)
+      expect(recorder.initialize).toHaveBeenCalledOnce()
+    }
+  )
 })
 
 // ============================================================================

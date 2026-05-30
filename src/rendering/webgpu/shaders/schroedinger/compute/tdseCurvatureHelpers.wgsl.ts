@@ -92,11 +92,9 @@ fn tdseCurvatureRicci(coords: array<f32, 12>, dim: u32, time: f32) -> f32 {
  * 'params.densityViewMode == 1u'. For flat / torus the answer is 1.0 so
  * proper mode on flat metrics is a no-op.
  *
- * WARNING: on strongly curved regions (near MT throats, small AdS z, near
- * sphere poles) √|g| can be large; the downstream display path applies
- * 'clamp(displayScalar * perpFalloff, 0, 1)' so saturation is handled, but
- * auto-scale ⟶ proper-volume interaction may wash out the packet. This is
- * a known interaction hazard, not a bug.
+ * On strongly curved regions (near MT throats, small AdS z, near sphere
+ * poles) √|g| can be large; the display path normalizes proper-density mode
+ * against the GPU-reduced max(|ψ|²√|g|) before the final clamp.
  */
 fn tdseCurvatureSqrtDet(coords: array<f32, 12>, dim: u32, time: f32) -> f32 {
   let kind = params.metricKind;

@@ -92,7 +92,10 @@ vi.mock('@/components/ui/Icon', () => ({
   Icon: ({ name }: { name: string }) => <span data-testid={`icon-${name}`}>{name}</span>,
 }))
 
+import { PageCurveSamplingGate } from '@/components/canvas/HudPanelGates'
 import { HawkingPageCurvePanel } from '@/components/overlays/HawkingPageCurvePanel'
+import { DEFAULT_TDSE_CONFIG, type TdseConfig } from '@/lib/geometry/extended/tdse'
+import { applyIslandOverlay } from '@/rendering/webgpu/renderers/strategies/tdseIslandOverlay'
 import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 import { usePageCurveStore } from '@/stores/diagnostics/pageCurveStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
@@ -129,13 +132,22 @@ function configureBecWaterfall(overrides: Partial<{ hawkingVmax: number }> = {})
   })
 }
 
-/** Bump the BEC readback generation, which the panel watches to push samples. */
+/** Bump the BEC readback generation, which the sampler watches to push samples. */
 function advanceBecGen(targetGen: number): void {
   act(() => {
     useDiagnosticsStore.setState((s) => ({
       bec: { ...s.bec, readbackGeneration: targetGen },
     }))
   })
+}
+
+function renderPanelWithSampler(): void {
+  render(
+    <>
+      <PageCurveSamplingGate />
+      <HawkingPageCurvePanel />
+    </>
+  )
 }
 
 describe('HawkingPageCurvePanel', () => {
@@ -164,7 +176,7 @@ describe('HawkingPageCurvePanel', () => {
       useExtendedObjectStore.getState().setBecHawkingVmax(2.0)
     })
 
-    render(<HawkingPageCurvePanel />)
+    renderPanelWithSampler()
     advanceBecGen(1)
     advanceBecGen(2)
 
@@ -179,7 +191,7 @@ describe('HawkingPageCurvePanel', () => {
     // grid). 50 readback ticks should accumulate S_therm well above 1e-4.
     configureBecWaterfall({ hawkingVmax: 3.5 })
 
-    render(<HawkingPageCurvePanel />)
+    renderPanelWithSampler()
     for (let g = 1; g <= 50; g++) advanceBecGen(g)
 
     const store = usePageCurveStore.getState()
@@ -198,7 +210,7 @@ describe('HawkingPageCurvePanel', () => {
       usePageCurveStore.getState().setGEff(10)
     })
 
-    render(<HawkingPageCurvePanel />)
+    renderPanelWithSampler()
     for (let g = 1; g <= 250; g++) advanceBecGen(g)
 
     const tPage = usePageCurveStore.getState().getPageTime()
@@ -210,7 +222,7 @@ describe('HawkingPageCurvePanel', () => {
 
   it('G_eff slider scales S_BH by exactly 1/x on the next pushed sample', () => {
     configureBecWaterfall({ hawkingVmax: 3.5 })
-    render(<HawkingPageCurvePanel />)
+    renderPanelWithSampler()
 
     // Establish a baseline sample with G_eff = 1.
     advanceBecGen(1)
@@ -232,7 +244,7 @@ describe('HawkingPageCurvePanel', () => {
 
   it('Stefan–Boltzmann slider raises the entropy rate proportionally', () => {
     configureBecWaterfall({ hawkingVmax: 3.5 })
-    render(<HawkingPageCurvePanel />)
+    renderPanelWithSampler()
 
     // Lock sb to a known value BEFORE any sample is pushed, so baseRate is
     // measured under the known sb and the ratio is unambiguous.
@@ -261,7 +273,7 @@ describe('HawkingPageCurvePanel', () => {
 
   it('flips data-island-overlay on the SVG root when the toggle changes', () => {
     configureBecWaterfall({ hawkingVmax: 3.5 })
-    render(<HawkingPageCurvePanel />)
+    renderPanelWithSampler()
     const svg = screen.getByTestId('hawking-page-curve-svg')
     expect(svg).toHaveAttribute('data-island-overlay', 'off')
 
@@ -272,5 +284,29 @@ describe('HawkingPageCurvePanel', () => {
       'data-island-overlay',
       'on'
     )
+  })
+
+  it('keeps island-overlay shader inputs live when the HUD panel is off', () => {
+    configureBecWaterfall({ hawkingVmax: 3.5 })
+    act(() => {
+      const pc = usePageCurveStore.getState()
+      pc.setPageCurveHudEnabled(false)
+      pc.setIslandOverlayEnabled(true)
+      pc.setGEff(10)
+    })
+
+    render(<PageCurveSamplingGate />)
+    for (let g = 1; g <= 250; g++) advanceBecGen(g)
+
+    const store = usePageCurveStore.getState()
+    expect(store.buffer.count).toBeGreaterThan(0)
+    expect(store.lastIslandRadius).toBeGreaterThan(0)
+
+    const input: TdseConfig = { ...DEFAULT_TDSE_CONFIG, needsReset: false }
+    const bec = useExtendedObjectStore.getState().schroedinger.bec
+    const result = applyIslandOverlay(input, bec)
+    expect(result).not.toBe(input)
+    expect(result.islandOverlayEnabled).toBe(true)
+    expect(result.islandRadiusWs).toBeGreaterThan(0)
   })
 })

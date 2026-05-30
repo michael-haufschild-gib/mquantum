@@ -57,6 +57,8 @@ function setupKnownTdseState() {
         ...state.schroedinger.tdse,
         potentialType: 'harmonicTrap',
         anharmonicLambda: 7,
+        diagnosticsEnabled: false,
+        diagnosticsInterval: 12,
         stochasticEnabled: false,
         stochasticGamma: 2.5,
       },
@@ -180,6 +182,22 @@ describe('useAtlasSweepController', () => {
     await user.click(screen.getByRole('button', { name: 'Abort' }))
 
     expect(useExtendedObjectStore.getState().schroedinger.tdse.stochasticGamma).toBe(2.5)
+  })
+
+  it('enables TDSE diagnostics for IPR sampling and restores the prior setting on abort', async () => {
+    setupKnownTdseState() // diagnosticsEnabled = false, diagnosticsInterval = 12
+    configureMinimalSweep()
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<TestHarness />)
+
+    await user.click(screen.getByRole('button', { name: 'Start' }))
+    expect(useExtendedObjectStore.getState().schroedinger.tdse.diagnosticsEnabled).toBe(true)
+    expect(useExtendedObjectStore.getState().schroedinger.tdse.diagnosticsInterval).toBe(1)
+
+    await user.click(screen.getByRole('button', { name: 'Abort' }))
+    expect(useExtendedObjectStore.getState().schroedinger.tdse.diagnosticsEnabled).toBe(false)
+    expect(useExtendedObjectStore.getState().schroedinger.tdse.diagnosticsInterval).toBe(12)
   })
 
   it('enables entanglement and Wigner negativity on sweep start', async () => {

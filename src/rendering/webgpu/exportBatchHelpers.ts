@@ -179,40 +179,25 @@ export async function transitionFromWarmup(
     return
   }
 
-  runtime.rotationSnapshot = new Map(useRotationStore.getState().rotations)
-  const previewDuration = Math.min(3, settings.duration)
-  loop.phase = 'preview'
-  loop.frameId = 0
-  loop.totalFrames = Math.max(1, Math.ceil(previewDuration * settings.fps))
-
-  const previewRecorder = await createExportRecorder(
-    canvas,
-    settings,
-    runtime.exportWidth,
-    runtime.exportHeight,
-    previewDuration
-  )
-  await previewRecorder.initialize()
-  runtime.recorder = previewRecorder
-  useExportStore.getState().setStatus('previewing')
+  await startStreamRecording(loop, runtime, settings, canvas)
 }
 
 /**
- * Finalize the preview phase and transition to recording.
+ * Start the real stream-to-disk recording phase.
+ *
+ * This must not be preceded by an animated preview pass. The preview pass runs
+ * through the production render graph, so it mutates GPU-backed evolution state
+ * for TDSE/BEC/Dirac/etc. and would shift the exported physics by the preview
+ * duration before the disk recording starts.
  */
-export async function finalizePreviewAndStartRecording(
+async function startStreamRecording(
   loop: ExportLoopState,
   runtime: ExportRuntimeState,
   settings: ExportSettings,
   canvas: HTMLCanvasElement
 ): Promise<void> {
-  if (runtime.recorder) {
-    const previewBlob = await runtime.recorder.finalize()
-    if (previewBlob) {
-      useExportStore.getState().setPreviewUrl(URL.createObjectURL(previewBlob))
-    }
-    runtime.recorder.dispose()
-    runtime.recorder = null
+  if (!loop.mainStreamHandle) {
+    throw new Error('Missing stream file handle for stream export')
   }
 
   loop.phase = 'recording'
@@ -221,10 +206,6 @@ export async function finalizePreviewAndStartRecording(
   loop.startTime = performance.now()
   loop.exportStartTime = Date.now()
   loop.lastEtaUpdate = 0
-
-  if (runtime.rotationSnapshot) {
-    useRotationStore.getState().updateRotations(runtime.rotationSnapshot)
-  }
 
   const { VideoRecorder } = await import('@/lib/export/video')
   const mainRecorder = new VideoRecorder(canvas, {
@@ -246,6 +227,55 @@ export async function finalizePreviewAndStartRecording(
   })
   await mainRecorder.initialize()
   runtime.recorder = mainRecorder
+  useExportStore.getState().setStatus('rendering')
+}
+
+/**
+ * Finalize the preview phase and transition to recording.
+ */
+export async function finalizePreviewAndStartRecording(
+  loop: ExportLoopState,
+  runtime: ExportRuntimeState,
+  settings: ExportSettings,
+  canvas: HTMLCanvasElement,
+  mode: RuntimeExportMode
+): Promise<void> {
+  if (runtime.recorder) {
+    const previewBlob = await runtime.recorder.finalize()
+    if (previewBlob) {
+      useExportStore.getState().setPreviewUrl(URL.createObjectURL(previewBlob))
+    }
+    runtime.recorder.dispose()
+    runtime.recorder = null
+  }
+
+  loop.phase = 'recording'
+  loop.frameId = 0
+  loop.totalFrames = Math.max(1, Math.ceil(settings.duration * settings.fps))
+  loop.startTime = performance.now()
+  loop.exportStartTime = Date.now()
+  loop.lastEtaUpdate = 0
+
+  if (runtime.rotationSnapshot) {
+    useRotationStore.getState().updateRotations(runtime.rotationSnapshot)
+  }
+
+  if (mode === 'stream') {
+    await startStreamRecording(loop, runtime, settings, canvas)
+    return
+  }
+
+  const firstRecorderDuration =
+    mode === 'segmented' ? loop.segmentDurationFrames / settings.fps : settings.duration
+  const recorder = await createExportRecorder(
+    canvas,
+    settings,
+    runtime.exportWidth,
+    runtime.exportHeight,
+    firstRecorderDuration
+  )
+  await recorder.initialize()
+  runtime.recorder = recorder
   useExportStore.getState().setStatus('rendering')
 }
 
@@ -362,7 +392,7 @@ export async function processWarmupPhase(ctx: BatchContext): Promise<'yield' | '
  * @returns 'yield' to return to event loop, 'abort' if finishing, 'done' when preview complete
  */
 export async function processPreviewPhase(ctx: BatchContext): Promise<'yield' | 'abort' | 'done'> {
-  const { runtime, settings, canvas } = ctx
+  const { runtime, settings, mode, canvas } = ctx
   const loop = runtime.loop
 
   while (loop.phase === 'preview') {
@@ -371,7 +401,7 @@ export async function processPreviewPhase(ctx: BatchContext): Promise<'yield' | 
       return 'abort'
     }
     if (loop.frameId >= loop.totalFrames) {
-      await finalizePreviewAndStartRecording(loop, runtime, settings, canvas)
+      await finalizePreviewAndStartRecording(loop, runtime, settings, canvas, mode)
       continue
     }
 

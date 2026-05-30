@@ -6,7 +6,7 @@
  * reflection/transmission coefficient estimation. Curved metrics integrate
  * norms and IPR with the proper spatial measure sqrt(|g|) dV.
  *
- * Output: [totalNorm, maxDensity, normLeft, normRight, sumPsi4]
+ * Output: [totalNorm, maxDensity, normLeft, normRight, sumPsi4, properMaxDensity]
  *
  * Pass 1 (`tdseDiagNormReduceBlock`):
  *   Each workgroup reduces a chunk of psi data into partial sums for
@@ -45,9 +45,11 @@ struct DiagReduceUniforms {
 
 // Pack the four additive fields (norm, left, right, ipr) into a single vec4
 // so the tree reduction touches shared memory 2× per step instead of 5×.
-// Max uses a different op (max) and stays separate.
+// Max uses a different op (max) and stays separate. .x is raw coordinate
+// density for physics consumers (vortex thresholds, exposure); .y is proper
+// density |ψ|²√|g| for the proper-volume display normalizer.
 var<workgroup> shared_add: array<vec4f, 256>;
-var<workgroup> shared_max: array<f32, 256>;
+var<workgroup> shared_max: array<vec2f, 256>;
 
 fn tdseDiagWorldCoords(idx: u32) -> array<f32, 12> {
   let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
@@ -91,6 +93,7 @@ fn main(
   var val: f32 = 0.0;
   var density: f32 = 0.0;
   var cellMeasure: f32 = 1.0;
+  var sqrtDet: f32 = 1.0;
   var isLeft: bool = true;
   if (idx < diagParams.totalSites) {
     let z = psi[idx];
@@ -98,6 +101,11 @@ fn main(
     let im = z.y;
     density = re * re + im * im;
     cellMeasure = tdseDiagCellMeasure(idx);
+    var flatCellMeasure: f32 = 1.0;
+    for (var d: u32 = 0u; d < params.latticeDim; d = d + 1u) {
+      flatCellMeasure *= max(params.spacing[d], 1e-12);
+    }
+    sqrtDet = cellMeasure / flatCellMeasure;
     val = density * cellMeasure;
 
     // Axis-0 coordinate from linear index. stride0 and gridSize0 are always
@@ -117,7 +125,7 @@ fn main(
   // PR = (sum p_i)^2 / sum p_i^2. That preserves the documented 1..N
   // participation-count scale even when flat/curved cell measures differ.
   shared_add[local] = vec4f(val, leftVal, rightVal, val * val);
-  shared_max[local] = density;
+  shared_max[local] = vec2f(density, density * sqrtDet);
   workgroupBarrier();
 
   // Tree reduction within workgroup
@@ -133,7 +141,8 @@ fn main(
   if (local == 0u) {
     let sum = shared_add[0];
     partialSums[wid.x] = sum.x;
-    partialMax[wid.x] = shared_max[0];
+    partialMax[wid.x * 2u] = shared_max[0].x;
+    partialMax[wid.x * 2u + 1u] = shared_max[0].y;
     partialLeft[wid.x] = sum.y;
     partialRight[wid.x] = sum.z;
     partialIpr[wid.x] = sum.w;
@@ -163,7 +172,7 @@ struct DiagReduceUniforms {
 @group(0) @binding(6) var<storage, read> partialIpr: array<f32>;
 
 var<workgroup> shared_add: array<vec4f, 256>;
-var<workgroup> shared_max: array<f32, 256>;
+var<workgroup> shared_max: array<vec2f, 256>;
 
 @compute @workgroup_size(256)
 fn main(
@@ -174,12 +183,12 @@ fn main(
   // Load partial sums — each thread accumulates multiple entries when
   // numWorkgroups > 256 (e.g. 64³ grid → 1024 partials).
   var acc: vec4f = vec4f(0.0, 0.0, 0.0, 0.0);
-  var max_val: f32 = 0.0;
+  var max_val: vec2f = vec2f(0.0, 0.0);
   let ngroups = diagParams.numWorkgroups;
   var i = local;
   while (i < ngroups) {
     acc = acc + vec4f(partialSums[i], partialLeft[i], partialRight[i], partialIpr[i]);
-    max_val = max(max_val, partialMax[i]);
+    max_val = max(max_val, vec2f(partialMax[i * 2u], partialMax[i * 2u + 1u]));
     i += 256u;
   }
   shared_add[local] = acc;
@@ -195,14 +204,16 @@ fn main(
     workgroupBarrier();
   }
 
-  // Write final result: [0]=totalNorm, [1]=maxDensity, [2]=normLeft, [3]=normRight, [4]=sumPsi4
+  // Write final result: [0]=totalNorm, [1]=raw maxDensity,
+  // [2]=normLeft, [3]=normRight, [4]=sumPsi4, [5]=proper maxDensity.
   if (local == 0u) {
     let sum = shared_add[0];
     result[0] = sum.x;
-    result[1] = shared_max[0];
+    result[1] = shared_max[0].x;
     result[2] = sum.y;
     result[3] = sum.z;
     result[4] = sum.w;
+    result[5] = shared_max[0].y;
   }
 }
 `

@@ -31,6 +31,7 @@ import {
 import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 import type { AtlasPoint } from '@/stores/diagnostics/quantumnessAtlasStore'
 import { useWavefunctionSliceStore } from '@/stores/diagnostics/wavefunctionSliceStore'
+import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 beforeEach(() => {
   useDiagnosticsStore.getState().resetTdse()
@@ -42,6 +43,7 @@ beforeEach(() => {
   useDiagnosticsStore.getState().resetPauli()
   useDiagnosticsStore.getState().resetDensity()
   useWavefunctionSliceStore.getState().reset()
+  useExtendedObjectStore.getState().reset()
 })
 
 describe('readRingBuffer', () => {
@@ -544,13 +546,20 @@ describe('exportDiagnosticsJSON', () => {
       totalNorm: 0.99,
       particleFraction: 0.7,
       antiparticleFraction: 0.3,
+      comptonWavelength: 99,
+      zitterbewegungFreq: 99,
+      kleinThreshold: 99,
     })
+    useExtendedObjectStore.getState().setDiracMass(2)
     const json = exportDiagnosticsJSON('diracEquation')
     const parsed = JSON.parse(json) as Record<string, unknown>
     expect(parsed).toHaveProperty('dirac')
     const dirac = parsed.dirac as Record<string, unknown>
     const current = dirac.current as Record<string, number>
     expect(current.particleFraction).toBeCloseTo(0.7)
+    expect(current.comptonWavelength).toBeCloseTo(0.5)
+    expect(current.zitterbewegungFreq).toBeCloseTo(4)
+    expect(current.kleinThreshold).toBeCloseTo(4)
   })
 
   it('includes Pauli data for pauliSpinor mode', () => {

@@ -19,6 +19,21 @@ import { usePresetManagerStore } from '@/stores/runtime/presetManagerStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
 
+type ExtendedObjectState = ReturnType<typeof useExtendedObjectStore.getState>
+
+/** Apply an optional parsed URL value to a store setter. */
+function applyIfDefined<T>(value: T | undefined, apply: (value: T) => void): void {
+  if (value !== undefined) apply(value)
+}
+
+/** Apply optional vector values to index-addressed store setters. */
+function applyIndexedNumberParams(
+  values: number[] | undefined,
+  apply: (index: number, value: number) => void
+): void {
+  values?.forEach((value, index) => apply(index, value))
+}
+
 /**
  * Apply TDSE-specific URL state params.
  *
@@ -45,6 +60,9 @@ function applyTdseParams(
     ext.setTdseCustomPotentialExpression(urlState.customPotentialExpression)
   if (urlState.anharmonicLambda !== undefined)
     ext.setTdseAnharmonicLambda(urlState.anharmonicLambda)
+  if (urlState.bhMass !== undefined) ext.setTdseBhMass(urlState.bhMass)
+  if (urlState.bhSpin !== undefined) ext.setTdseBhSpin(urlState.bhSpin)
+  if (urlState.bhMultipoleL !== undefined) ext.setTdseBhMultipoleL(urlState.bhMultipoleL)
   if (urlState.disorderStrength !== undefined)
     ext.setTdseDisorderStrength(urlState.disorderStrength)
   if (urlState.disorderSeed !== undefined) ext.setTdseDisorderSeed(urlState.disorderSeed)
@@ -133,6 +151,25 @@ function applyOpenQuantumParams(
     ext.setOpenQuantumRelaxationRate(urlState.openQuantumRelaxationRate)
   if (urlState.openQuantumThermalUpRate !== undefined)
     ext.setOpenQuantumThermalUpRate(urlState.openQuantumThermalUpRate)
+  if (urlState.openQuantumDephasingEnabled !== undefined)
+    ext.setOpenQuantumChannelEnabled('dephasing', urlState.openQuantumDephasingEnabled)
+  if (urlState.openQuantumRelaxationEnabled !== undefined)
+    ext.setOpenQuantumChannelEnabled('relaxation', urlState.openQuantumRelaxationEnabled)
+  if (urlState.openQuantumThermalEnabled !== undefined)
+    ext.setOpenQuantumChannelEnabled('thermal', urlState.openQuantumThermalEnabled)
+  if (urlState.openQuantumDt !== undefined) ext.setOpenQuantumDt(urlState.openQuantumDt)
+  if (urlState.openQuantumSubsteps !== undefined)
+    ext.setOpenQuantumSubsteps(urlState.openQuantumSubsteps)
+  if (urlState.openQuantumBathTemperature !== undefined)
+    ext.setOpenQuantumBathTemperature(urlState.openQuantumBathTemperature)
+  if (urlState.openQuantumCouplingScale !== undefined)
+    ext.setOpenQuantumCouplingScale(urlState.openQuantumCouplingScale)
+  if (urlState.openQuantumHydrogenBasisMaxN !== undefined)
+    ext.setOpenQuantumHydrogenBasisMaxN(urlState.openQuantumHydrogenBasisMaxN)
+  if (urlState.openQuantumDephasingModel !== undefined)
+    ext.setOpenQuantumDephasingModel(urlState.openQuantumDephasingModel)
+  if (urlState.openQuantumVisualizationMode !== undefined)
+    ext.setOpenQuantumVisualizationMode(urlState.openQuantumVisualizationMode)
 }
 
 /** Apply stochastic decoherence URL state params. */
@@ -295,6 +332,44 @@ function applyAdsParams(
   }
   applyAdsBoundStateFields(urlState, ext)
   applyAdsStageTwoFields(urlState, ext)
+}
+
+/** Apply Dirac-equation URL state params. */
+function applyDiracParams(urlState: ParsedShareableState, ext: ExtendedObjectState): void {
+  applyIfDefined(urlState.diracGridSize, (value) => ext.setDiracGridSize(value))
+  applyIfDefined(urlState.diracSpacing, (value) => ext.setDiracSpacing(value))
+  applyIfDefined(urlState.diracMass, (value) => ext.setDiracMass(value))
+  applyIfDefined(urlState.diracSpeedOfLight, (value) => ext.setDiracSpeedOfLight(value))
+  applyIfDefined(urlState.diracHbar, (value) => ext.setDiracHbar(value))
+  applyIfDefined(urlState.diracDt, (value) => ext.setDiracDt(value))
+  applyIfDefined(urlState.diracStepsPerFrame, (value) => ext.setDiracStepsPerFrame(value))
+  applyIfDefined(urlState.diracInitialCondition, (value) => ext.setDiracInitialCondition(value))
+  applyIfDefined(urlState.diracPotentialType, (value) => ext.setDiracPotentialType(value))
+  applyIfDefined(urlState.diracPotentialStrength, (value) => ext.setDiracPotentialStrength(value))
+  applyIfDefined(urlState.diracPotentialWidth, (value) => ext.setDiracPotentialWidth(value))
+  applyIfDefined(urlState.diracHarmonicOmega, (value) => ext.setDiracHarmonicOmega(value))
+  applyIfDefined(urlState.diracCoulombZ, (value) => ext.setDiracCoulombZ(value))
+  applyIfDefined(urlState.diracPotentialCenter, (value) => ext.setDiracPotentialCenter(value))
+  applyIfDefined(urlState.diracPacketWidth, (value) => ext.setDiracPacketWidth(value))
+  applyIfDefined(urlState.diracPositiveEnergyFraction, (value) =>
+    ext.setDiracPositiveEnergyFraction(value)
+  )
+  applyIndexedNumberParams(urlState.diracPacketCenter, (index, value) =>
+    ext.setDiracPacketCenter(index, value)
+  )
+  applyIndexedNumberParams(urlState.diracPacketMomentum, (index, value) =>
+    ext.setDiracPacketMomentum(index, value)
+  )
+  applyIfDefined(urlState.diracFieldView, (value) => ext.setDiracFieldView(value))
+  applyIfDefined(urlState.diracAutoScale, (value) => ext.setDiracAutoScale(value))
+  applyIfDefined(urlState.diracShowPotential, (value) => ext.setDiracShowPotential(value))
+  applyIfDefined(urlState.diracDiagnosticsEnabled, (value) => ext.setDiracDiagnosticsEnabled(value))
+  applyIfDefined(urlState.diracDiagnosticsInterval, (value) =>
+    ext.setDiracDiagnosticsInterval(value)
+  )
+  applyIndexedNumberParams(urlState.diracSlicePositions, (index, value) =>
+    ext.setDiracSlicePosition(index, value)
+  )
 }
 
 /**
@@ -524,6 +599,51 @@ function scheduleClearLoadingFlag(): void {
   }
 }
 
+/** Apply Schroedinger rendering and Wigner URL state params. */
+function applySchroedingerRenderingParams(
+  urlState: ParsedShareableState,
+  ext: ExtendedObjectState
+): void {
+  applyIfDefined(urlState.representation, (value) => ext.setSchroedingerRepresentation(value))
+  applyIfDefined(urlState.isoEnabled, (value) => ext.setSchroedingerIsoEnabled(value))
+  applyIfDefined(urlState.isoThreshold, (value) => ext.setSchroedingerIsoThreshold(value))
+  applyIfDefined(urlState.crossSectionEnabled, (value) =>
+    ext.setSchroedingerCrossSectionEnabled(value)
+  )
+  applyIfDefined(urlState.densityGain, (value) => ext.setSchroedingerDensityGain(value))
+  applyIfDefined(urlState.scale, (value) => ext.setSchroedingerScale(value))
+  applyIfDefined(urlState.wignerDimensionIndex, (value) =>
+    ext.setSchroedingerWignerDimensionIndex(value)
+  )
+  applyIfDefined(urlState.wignerAutoRange, (value) => ext.setSchroedingerWignerAutoRange(value))
+  applyIfDefined(urlState.wignerXRange, (value) => ext.setSchroedingerWignerXRange(value))
+  applyIfDefined(urlState.wignerPRange, (value) => ext.setSchroedingerWignerPRange(value))
+  applyIfDefined(urlState.wignerCrossTermsEnabled, (value) =>
+    ext.setSchroedingerWignerCrossTermsEnabled(value)
+  )
+  applyIfDefined(urlState.wignerQuadPoints, (value) => ext.setSchroedingerWignerQuadPoints(value))
+  applyIfDefined(urlState.wignerCacheResolution, (value) =>
+    ext.setSchroedingerWignerCacheResolution(value)
+  )
+}
+
+/** Apply Schroedinger quantum-number URL state params. */
+function applySchroedingerQuantumNumberParams(
+  urlState: ParsedShareableState,
+  ext: ExtendedObjectState
+): void {
+  applyIfDefined(urlState.termCount, (value) => ext.setSchroedingerTermCount(value))
+  applyIfDefined(urlState.seed, (value) => ext.setSchroedingerSeed(value))
+  applyIfDefined(urlState.hydrogenN, (value) => ext.setSchroedingerPrincipalQuantumNumber(value))
+  applyIfDefined(urlState.hydrogenL, (value) => ext.setSchroedingerAzimuthalQuantumNumber(value))
+  applyIfDefined(urlState.hydrogenM, (value) => ext.setSchroedingerMagneticQuantumNumber(value))
+}
+
+/** Apply shared dynamic-compute absorber URL state params. */
+function applySharedAbsorberParams(urlState: ParsedShareableState, ext: ExtendedObjectState): void {
+  applyIfDefined(urlState.absorberEnabled, (value) => ext.setSchroedingerAbsorberEnabled(value))
+}
+
 /**
  * Apply individual URL state parameters to stores.
  *
@@ -546,32 +666,16 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
     const ext = useExtendedObjectStore.getState()
 
     // ── Rendering ────────────────────────────────────────────────────────────
-    if (urlState.representation !== undefined)
-      ext.setSchroedingerRepresentation(urlState.representation)
-    if (urlState.isoEnabled !== undefined) ext.setSchroedingerIsoEnabled(urlState.isoEnabled)
-    if (urlState.isoThreshold !== undefined) ext.setSchroedingerIsoThreshold(urlState.isoThreshold)
-    if (urlState.crossSectionEnabled !== undefined)
-      ext.setSchroedingerCrossSectionEnabled(urlState.crossSectionEnabled)
-    if (urlState.densityGain !== undefined) ext.setSchroedingerDensityGain(urlState.densityGain)
-    if (urlState.scale !== undefined) ext.setSchroedingerScale(urlState.scale)
+    applySchroedingerRenderingParams(urlState, ext)
 
     // ── Quantum numbers ──────────────────────────────────────────────────────
-    if (urlState.termCount !== undefined) ext.setSchroedingerTermCount(urlState.termCount)
-    if (urlState.seed !== undefined) ext.setSchroedingerSeed(urlState.seed)
-    if (urlState.hydrogenN !== undefined)
-      ext.setSchroedingerPrincipalQuantumNumber(urlState.hydrogenN)
-    if (urlState.hydrogenL !== undefined)
-      ext.setSchroedingerAzimuthalQuantumNumber(urlState.hydrogenL)
-    if (urlState.hydrogenM !== undefined)
-      ext.setSchroedingerMagneticQuantumNumber(urlState.hydrogenM)
+    applySchroedingerQuantumNumberParams(urlState, ext)
 
     // ── Shared PML absorbing boundary ────────────────────────────────────────
     // PML is universal across all dynamic compute modes — see
     // computeGridUtils.applySharedPml. Must write to the top-level shared
     // field, not the per-mode TDSE one (which gets shadowed).
-    if (urlState.absorberEnabled !== undefined) {
-      ext.setSchroedingerAbsorberEnabled(urlState.absorberEnabled)
-    }
+    applySharedAbsorberParams(urlState, ext)
 
     // ── TDSE config ──────────────────────────────────────────────────────────
     applyTdseParams(urlState, ext)
@@ -584,6 +688,7 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
     applyWormholeParams(urlState, ext)
     applyEntanglementParams(urlState)
     applyCosmologyParams(urlState, ext)
+    applyDiracParams(urlState, ext)
     applyWdwParams(urlState, ext)
     applyAdsParams(urlState, ext)
     applyBellParams(urlState, ext)

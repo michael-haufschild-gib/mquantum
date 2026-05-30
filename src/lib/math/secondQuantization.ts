@@ -123,9 +123,19 @@ export function coherentFockCoefficients(
 
   for (let n = 0; n < maxN; n++) {
     const norm = prefactor / Math.sqrt(factorial(n))
+    // For very large |alpha| the two transcendentals diverge: prefactor
+    // underflows to 0 while alpha^n overflows to ±Infinity, so `norm *
+    // powerRe` evaluates to 0·Infinity = NaN (or finite·Infinity = Infinity
+    // for n below the factorial-overflow point). The exact coefficient in
+    // that regime is negligibly small (≪ 1e-300), so clamping the
+    // non-finite product to 0 is the correct limit and keeps the utility
+    // NaN-safe for any finite input — `|alpha|` is UI-clamped well below this
+    // regime, but a malformed preset import can bypass the setter clamp.
+    const re = norm * powerRe
+    const im = norm * powerIm
     result.push({
-      re: norm * powerRe,
-      im: norm * powerIm,
+      re: Number.isFinite(re) ? re : 0,
+      im: Number.isFinite(im) ? im : 0,
     })
     // Multiply by alpha: (a+bi)(c+di) = (ac-bd) + (ad+bc)i
     const nextRe = powerRe * alphaRe - powerIm * alphaIm

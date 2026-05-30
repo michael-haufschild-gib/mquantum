@@ -74,4 +74,5 @@ screenshots/
 scripts/playwright/videos/
 scripts/playwright/screenshots/
 scripts/playwright-output/
+.playwright-cli/
 .vercel

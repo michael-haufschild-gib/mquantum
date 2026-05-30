@@ -49,8 +49,12 @@ export interface TdseUniformParams {
   totalSites: number
   simTime: number
   maxDensity: number
+  /** Peak of |psi|^2 sqrt(|g|) from diagnostics, for proper-density display */
+  properMaxDensity: number
   /** Initial peak density from first diagnostics readback, for gain cap */
   initialMaxDensity: number
+  /** Initial peak proper density from first diagnostics readback, for gain cap */
+  initialProperMaxDensity: number
   /** Maximum autoScale amplification factor (from store) */
   autoScaleMaxGain: number
   strides: number[]
@@ -280,8 +284,24 @@ export function packTdseUniformData(
   f32[I.simTime] = simTime
   // AutoScale gain cap: never amplify beyond autoScaleMaxGain × initial peak density.
   // Without this, a 0.001-density residual gets amplified 1000× and looks like a full wavepacket.
-  const densityFloor = initialMaxDensity / Math.max(autoScaleMaxGain, 1)
-  f32[I.maxDensity] = config.autoScale ? Math.max(maxDensity, densityFloor) : 1.0
+  //
+  // Keep the raw coordinate-density scale separate from the proper-density
+  // display scale. Raw maxDensity is consumed by current/healing/vortex paths
+  // and must not change when the user toggles a render-only density view.
+  const gainCap = Math.max(autoScaleMaxGain, 1)
+  const densityFloor = initialMaxDensity / gainCap
+  const rawDensityScale = config.autoScale ? Math.max(maxDensity, densityFloor) : 1.0
+  const properPeak =
+    Number.isFinite(params.properMaxDensity) && params.properMaxDensity > 0
+      ? params.properMaxDensity
+      : maxDensity
+  const initialProperPeak =
+    Number.isFinite(params.initialProperMaxDensity) && params.initialProperMaxDensity > 0
+      ? params.initialProperMaxDensity
+      : initialMaxDensity
+  const properDensityFloor = initialProperPeak / gainCap
+  const properDensityScale = config.autoScale ? Math.max(properPeak, properDensityFloor) : 1.0
+  f32[I.maxDensity] = rawDensityScale
 
   // slicePositions (array<f32, 12>).
   writeSlicePositionsToF32(f32, I.slicePositions, config.slicePositions)
@@ -527,7 +547,6 @@ export function packTdseUniformData(
   // Curved-space TDSE v2 Wave 6 visualization block. All render-only — do
   // not touch the kinetic path. Opacity is clamped to [0, 1] so a bogus
   // store value can't amplify the overlay beyond the intended blend range.
-  // _padV2d stays 0 from fill.
   u32[I.showCurvatureOverlay] = config.showCurvatureOverlay ? 1 : 0
   u32[I.densityViewMode] = config.densityView === 'proper' ? 1 : 0
   const rawOpacity = config.curvatureOverlayOpacity ?? 0.4
@@ -535,6 +554,7 @@ export function packTdseUniformData(
     1,
     Math.max(0, Number.isFinite(rawOpacity) ? rawOpacity : 0.4)
   )
+  f32[I.densityDisplayMax] = config.densityView === 'proper' ? properDensityScale : rawDensityScale
 
   // Host-precomputed reciprocal spacing (array<f32, 12> ×2).
   // Eliminates one divide + max + mul per cell per RK4 stage in the curved
@@ -603,7 +623,9 @@ export function prePackTdseFrameSnapshots(
     config: params.config,
     totalSites: params.totalSites,
     maxDensity: params.maxDensity,
+    properMaxDensity: params.properMaxDensity,
     initialMaxDensity: params.initialMaxDensity,
+    initialProperMaxDensity: params.initialProperMaxDensity,
     autoScaleMaxGain: params.autoScaleMaxGain,
     strides: params.strides,
     needsInit: params.needsInit,
