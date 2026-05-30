@@ -5,6 +5,11 @@ import {
   tdseCurvedKineticBlock,
   tdseCurvedKineticBlock3D,
 } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseCurvedKinetic.wgsl'
+import {
+  tdseDiagNormFinalizeBlock,
+  tdseDiagNormReduceBlock,
+} from '@/rendering/webgpu/shaders/schroedinger/compute/tdseDiagnostics.wgsl'
+import { tdseWriteGridBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseWriteGrid.wgsl'
 
 describe('TDSE curvature WGSL finite guards', () => {
   it('caps deSitter proper-volume exponent before exp in curvature helpers', () => {
@@ -24,5 +29,13 @@ describe('TDSE curvature WGSL finite guards', () => {
       expect(wgsl).toContain('out.sqrtDet = curvedExpClamped(H * time * f32(dim));')
       expect(wgsl).not.toContain('let a = exp(H * time);')
     }
+  })
+
+  it('uses a separate proper-density peak for proper-volume display normalization', () => {
+    expect(tdseDiagNormReduceBlock).toContain('vec2f(density, density * sqrtDet)')
+    expect(tdseDiagNormReduceBlock).toContain('partialMax[wid.x * 2u]')
+    expect(tdseDiagNormFinalizeBlock).toContain('result[5] = shared_max[0].y;')
+    expect(tdseWriteGridBlock).toContain('params.densityDisplayMax')
+    expect(tdseWriteGridBlock).toContain('displayScalar = normDensityDisplay;')
   })
 })

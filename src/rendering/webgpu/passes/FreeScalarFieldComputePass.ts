@@ -830,6 +830,30 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       this.lastDebugNSub = maxNSubThisFrame
     }
 
+    // Display/analysis readouts happen after the leapfrog step and must use
+    // endpoint Hamiltonian coefficients. During time-dependent runs the live
+    // uniform buffer currently contains the last substep midpoint coefs, which
+    // are correct for integration but wrong for post-step energy textures.
+    const readoutCoefs = snapshotFsfHamiltonianCoefs(
+      config,
+      this.simEta,
+      this.preheatingTime,
+      this.preheatingReferenceEta
+    )
+    if ((config.cosmology.enabled || config.preheating.enabled) && this.uniformBuffer) {
+      this.stageCosmologyCoefsSlotCopy(
+        device,
+        encoder,
+        'free-scalar-cosmo-coefs-readout',
+        readoutCoefs.aKinetic,
+        readoutCoefs.aPotential,
+        readoutCoefs.aFull,
+        readoutCoefs.massSquaredScale,
+        readoutCoefs.aPotentialRatio1 ?? 1,
+        readoutCoefs.aPotentialRatio2 ?? 1
+      )
+    }
+
     // Write to 3D density grid texture
     if (this.pl && this.bg) {
       const gridWorkgroups = Math.ceil(this.densityGridSize / GRID_WORKGROUP_SIZE)
@@ -896,15 +920,6 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         this.densityGridSize,
         shouldUpdateKSpaceTextures
       )
-      // Snapshot cosmology + preheating coefs at the readback instant so
-      // the diagnostics Hamiltonian matches the time-dependent terms the
-      // pi-update just used.
-      const coefs = snapshotFsfHamiltonianCoefs(
-        config,
-        this.simEta,
-        this.preheatingTime,
-        this.preheatingReferenceEta
-      )
       this.kSpace.maybeStartDiagnosticsReadback(
         device,
         encoder,
@@ -912,7 +927,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         this.piBuffer,
         this.totalSites,
         config,
-        coefs
+        readoutCoefs
       )
 
       // Debug trace capture — guarded by the global `enabled` flag so it's
@@ -923,7 +938,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         if (isPlaying) this.debugFrameIndex += 1
         captureFsfCosmoDebugSample(
           config,
-          coefs,
+          readoutCoefs,
           this.simEta,
           this.lastDebugNSub,
           this.debugFrameIndex

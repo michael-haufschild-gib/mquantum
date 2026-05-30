@@ -20,7 +20,7 @@
  *   - RK4 per-stage simTime offsets (K1..K4)
  * Curved-space TDSE v2 Wave 6 visualization block at offsets 912-927:
  *   - showCurvatureOverlay (u32), densityViewMode (u32 enum 0=coordinate,1=proper),
- *     curvatureOverlayOpacity (f32), _padV2d (u32).
+ *     curvatureOverlayOpacity (f32), densityDisplayMax (f32).
  * Host-precomputed reciprocal spacing for the curved-space kinetic kernel:
  *   - invSpacing  (array<f32, 12>) at offsets 928-975  = 1 / max(spacing[d], 1e-12)
  *   - invSpacing2 (array<f32, 12>) at offsets 976-1023 = invSpacing[d] * invSpacing[d]
@@ -202,7 +202,7 @@ struct TDSEUniforms {
   showCurvatureOverlay: u32,    // offset 912 — 0=off, 1=on
   densityViewMode: u32,         // offset 916 — 0=coordinate, 1=proper (×√|g|)
   curvatureOverlayOpacity: f32, // offset 920 — clamped to [0, 1] by host
-  _padV2d: u32,                 // offset 924 — pad to 16-byte row
+  densityDisplayMax: f32,       // offset 924 — density field-view scale (raw or proper)
 
   // Host-precomputed reciprocal spacing per axis (96 bytes, 928-1023).
   // invSpacing[d]  = 1 / max(spacing[d], 1e-12)

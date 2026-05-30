@@ -219,6 +219,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     diagMappingInFlight: false,
     diagGeneration: 0,
     maxDensity: 1.0,
+    properMaxDensity: 1.0,
     initialNorm: 1.0,
     currentAutoLoop: false,
     pendingAutoReset: false,
@@ -227,6 +228,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     prevNorm: 0,
     stagnationCount: 0,
     initialMaxDensity: 1.0,
+    initialProperMaxDensity: 1.0,
   }
 
   // Gram-Schmidt state (shared mutable object for extracted module)
@@ -744,6 +746,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         }
       }
       this._diagState.maxDensity = 1.0
+      this._diagState.properMaxDensity = 1.0
       this._diagState.diagGeneration++
       return
     }
@@ -819,8 +822,10 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     }
 
     this._diagState.maxDensity = estimateInitialDensity(config)
+    this._diagState.properMaxDensity = this._diagState.maxDensity
     this._diagState.initialNorm = -1.0
     this._diagState.initialMaxDensity = 1.0
+    this._diagState.initialProperMaxDensity = 1.0
     this._diagState.prevNorm = 0
     this._diagState.stagnationCount = 0
     this.simTime = 0
@@ -931,7 +936,9 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
           totalSites: this.totalSites,
           simTime: this.simTime,
           maxDensity: this._diagState.maxDensity,
+          properMaxDensity: this._diagState.properMaxDensity,
           initialMaxDensity: this._diagState.initialMaxDensity,
+          initialProperMaxDensity: this._diagState.initialProperMaxDensity,
           autoScaleMaxGain: config.autoScaleMaxGain ?? 20,
           strides: computeStridesPadded(config.gridSize, config.latticeDim, this.strideScratch),
           needsInit: !this.initialized || config.needsReset || this._diagState.pendingAutoReset,
@@ -1060,7 +1067,9 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
           simTime: simTimeStart,
           stepsThisFrame: steps,
           maxDensity: this._diagState.maxDensity,
+          properMaxDensity: this._diagState.properMaxDensity,
           initialMaxDensity: this._diagState.initialMaxDensity,
+          initialProperMaxDensity: this._diagState.initialProperMaxDensity,
           autoScaleMaxGain: config.autoScaleMaxGain ?? 20,
           strides: computeStridesPadded(config.gridSize, config.latticeDim, this.strideScratch),
           needsInit: false,

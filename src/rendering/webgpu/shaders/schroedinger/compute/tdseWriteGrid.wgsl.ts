@@ -332,11 +332,17 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let potentialVal = potential[idx];
 
   let normDensityRaw = select(density / params.maxDensity, 0.0, params.maxDensity <= 0.0);
+  let densityDisplayScale = max(params.densityDisplayMax, 1e-20);
+  let normDensityDisplay = select(
+    density / densityDisplayScale,
+    0.0,
+    params.densityDisplayMax <= 0.0
+  );
   let densityGate = smoothstep(0.0, 0.02, normDensityRaw);
 
   var displayScalar: f32 = 0.0;
   if (params.fieldView == 0u) {
-    displayScalar = normDensityRaw;
+    displayScalar = normDensityDisplay;
   } else if (params.fieldView == 1u) {
     displayScalar = phase * TDSE_WG_INV_TAU * densityGate;
   } else if (params.fieldView == 2u) {
@@ -521,11 +527,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // views carry no volume-form meaning so √|g| would be visually confusing.
   // On flat / torus metrics √|g| = 1 so this branch is a no-op.
   //
-  // WARNING: auto-scale tracks the COORDINATE-volume maximum density, so in
-  // proper mode the packet may appear dim or bright depending on where the
-  // √|g| peak is relative to the packet support. The downstream 'clamp' to
-  // [0, 1] prevents visual overflow, but users exploring with auto-scale
-  // should be aware of the interaction.
+  // Auto-scale uses densityDisplayMax, which is raw max |ψ|² for coordinate
+  // view and max(|ψ|²√|g|) for proper view. Raw params.maxDensity remains
+  // the coordinate-density scale for current/healing/vortex consumers.
   if (params.densityViewMode == 1u && params.fieldView == 0u) {
     let properSqrtDet = tdseCurvatureSqrtDet(ndWorldPos, params.latticeDim, params.simTime);
     displayScalar = displayScalar * properSqrtDet;

@@ -18,6 +18,7 @@ type FakeBuffer = GPUBuffer & {
 }
 
 interface CopyEvent {
+  label?: string
   dstOffset: number
   size: number
   values: number[]
@@ -72,6 +73,7 @@ function makeContext(
     copyBufferToBuffer: vi.fn(
       (src: FakeBuffer, _srcOffset: number, _dst: GPUBuffer, dstOffset: number, size: number) => {
         copies.push({
+          label: src.label,
           dstOffset,
           size,
           values: Array.from(new Float32Array(src.backing.slice(0, size))),
@@ -144,6 +146,17 @@ describe('FreeScalarFieldComputePass ordered uniform staging', () => {
     expect(dtCopies.length).toBeGreaterThanOrEqual(2)
     expect(coefCopies.length).toBeGreaterThan(1)
     expect(new Set(coefCopies.map((copy) => copy.values[3]?.toFixed(6))).size).toBeGreaterThan(1)
+
+    const expectedFinalMassScale =
+      1 + config.preheating.amplitude * Math.sin(config.preheating.frequency * config.dt)
+    const readoutCopy = coefCopies.find((copy) => copy.label === 'free-scalar-cosmo-coefs-readout')
+    expect(readoutCopy?.values[3]).toBeCloseTo(expectedFinalMassScale, 6)
+
+    const internal = pass as unknown as {
+      kSpace: { maybeStartDiagnosticsReadback: ReturnType<typeof vi.fn> }
+    }
+    const diagnosticsCoefs = internal.kSpace.maybeStartDiagnosticsReadback.mock.calls.at(-1)?.[6]
+    expect(diagnosticsCoefs?.massSquaredScale).toBeCloseTo(expectedFinalMassScale, 6)
 
     const partialQueueWrites = writeBuffer.mock.calls.filter(
       (call) => call[1] === FSF_DT_BYTE_OFFSET || call[1] === FSF_COSMO_COEFS_BYTE_OFFSET

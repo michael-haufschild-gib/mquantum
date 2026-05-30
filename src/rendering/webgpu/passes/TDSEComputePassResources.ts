@@ -160,7 +160,7 @@ export interface TdseBindGroupInputs {
  *   - showCurvatureOverlay:    u32 @ 912 (Wave 6: diagnostic Ricci overlay flag)
  *   - densityViewMode:         u32 @ 916 (Wave 6: 0=coordinate, 1=proper ×√|g|)
  *   - curvatureOverlayOpacity: f32 @ 920 (Wave 6: clamped [0, 1])
- *   - _padV2d:                 u32 @ 924 (pad to 16-byte row)
+ *   - densityDisplayMax:       f32 @ 924 (density-view normalization scale)
  *   - invSpacing:              array<f32,12> @ 928 (host-precomputed 1/max(dx,1e-12))
  *   - invSpacing2:             array<f32,12> @ 976 (invSpacing^2; saves a mul per cell)
  *
@@ -206,8 +206,8 @@ export const TDSE_UNIFORM_OFFSET_STAGE_TIME_K4 = TDSE_UNIFORMS_LAYOUT.byteOffset
 const DIAG_WG = 256
 /** DiagReduceUniforms struct size (32 bytes) */
 const DIAG_UNIFORM_SIZE = 32
-/** Number of f32 values in diagnostic result buffer: [norm, maxDensity, normLeft, normRight, sumPsi4] */
-const DIAG_RESULT_COUNT = 5
+/** Number of f32 values in diagnostic result buffer: [norm, maxDensity, normLeft, normRight, sumPsi4, properMaxDensity] */
+const DIAG_RESULT_COUNT = 6
 
 /** Old buffers to destroy before rebuilding. Any field may be null. */
 export interface TdseDestroyableBuffers {
@@ -471,7 +471,8 @@ export function rebuildTdseBuffers(
   })
   const diagPartialMaxBuffer = device.createBuffer({
     label: 'tdse-diag-partial-max',
-    size: diagNumWorkgroups * 4,
+    // Two f32 lanes per workgroup: raw maxDensity and proper-density max.
+    size: diagNumWorkgroups * 8,
     usage: GPUBufferUsage.STORAGE,
   })
   const diagPartialLeftBuffer = device.createBuffer({

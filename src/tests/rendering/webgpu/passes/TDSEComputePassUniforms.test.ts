@@ -38,7 +38,9 @@ function uniformParams(overrides: Partial<TdseUniformParams> = {}): TdseUniformP
     totalSites: 262144,
     simTime: 0,
     maxDensity: 1,
+    properMaxDensity: 1,
     initialMaxDensity: 1,
+    initialProperMaxDensity: 1,
     autoScaleMaxGain: 20,
     strides: [4096, 64, 1],
     needsInit: false,
@@ -73,6 +75,51 @@ describe('writeTdseUniforms', () => {
     expect(u32[I.totalSites]).toBe(262144) // 64^3
     expect(f32[I.dt]).toBeCloseTo(0.005)
     expect(f32[I.hbar]).toBeCloseTo(1.0)
+  })
+
+  it('keeps raw maxDensity separate from the proper-density display scale', () => {
+    const uniformData = new ArrayBuffer(UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({
+        config: createTdseConfig({ autoScale: true, densityView: 'proper' }),
+        maxDensity: 0.2,
+        properMaxDensity: 3.0,
+        initialMaxDensity: 1.0,
+        initialProperMaxDensity: 4.0,
+        autoScaleMaxGain: 10,
+      })
+    )
+
+    expect(f32[I.maxDensity]).toBeCloseTo(0.2)
+    expect(f32[I.densityDisplayMax]).toBeCloseTo(3.0)
+
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({
+        config: createTdseConfig({ autoScale: true, densityView: 'coordinate' }),
+        maxDensity: 0.2,
+        properMaxDensity: 3.0,
+        initialMaxDensity: 1.0,
+        initialProperMaxDensity: 4.0,
+        autoScaleMaxGain: 10,
+      })
+    )
+
+    expect(f32[I.maxDensity]).toBeCloseTo(0.2)
+    expect(f32[I.densityDisplayMax]).toBeCloseTo(0.2)
   })
 
   it('maps potentialType to correct shader enum', () => {

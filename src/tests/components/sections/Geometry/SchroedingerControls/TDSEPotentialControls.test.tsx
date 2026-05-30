@@ -163,6 +163,19 @@ describe('TDSEPotentialControls', () => {
     expect(screen.getByTestId('tdse-disorder-seed')).toBeInTheDocument()
   })
 
+  it('hides generic disorder overlay controls for black-hole ringdown', () => {
+    render(
+      <TDSEPotentialControls
+        td={{ ...DEFAULT_TDSE_CONFIG, potentialType: 'blackHoleRingdown', disorderStrength: 5 }}
+        activeDims={3}
+        actions={makeMockActions()}
+      />
+    )
+    expect(screen.getByTestId('tdse-bh-mass')).toBeInTheDocument()
+    expect(screen.queryByTestId('tdse-disorder-strength')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('tdse-disorder-seed')).not.toBeInTheDocument()
+  })
+
   it('shows custom expression input for custom potential', () => {
     render(
       <TDSEPotentialControls

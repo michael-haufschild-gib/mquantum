@@ -9,8 +9,8 @@ import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
 import { isFinitePositiveNorm } from './normalizationGuards'
 
-/** Number of f32 values in diagnostic result buffer: [norm, maxDensity, normLeft, normRight, sumPsi4] */
-const DIAG_RESULT_COUNT = 5
+/** Number of f32 values in diagnostic result buffer: [norm, maxDensity, normLeft, normRight, sumPsi4, properMaxDensity] */
+const DIAG_RESULT_COUNT = 6
 
 /** Mutable state shared with the TDSE pass for diagnostics readback. */
 export interface DiagReadbackState {
@@ -19,6 +19,7 @@ export interface DiagReadbackState {
   diagMappingInFlight: boolean
   diagGeneration: number
   maxDensity: number
+  properMaxDensity: number
   initialNorm: number
   currentAutoLoop: boolean
   pendingAutoReset: boolean
@@ -30,6 +31,8 @@ export interface DiagReadbackState {
   stagnationCount: number
   /** Peak maxDensity from the first diagnostics readback, used to cap autoScale gain */
   initialMaxDensity: number
+  /** Initial peak proper density from first diagnostics readback, for proper-view gain cap */
+  initialProperMaxDensity: number
 }
 
 /**
@@ -80,6 +83,7 @@ export function scheduleNormReadback(
         const normLeft = data[2]!
         const normRight = data[3]!
         const sumPsi4 = data[4]!
+        const properMaxDens = data[5]!
         staging.unmap()
         const totalNormIsSafe = isFinitePositiveNorm(totalNorm)
 
@@ -92,12 +96,20 @@ export function scheduleNormReadback(
           if (s.maxDensity <= 0 || maxDens >= s.maxDensity) s.maxDensity = maxDens
           else s.maxDensity += 0.4 * (maxDens - s.maxDensity)
         }
+        if (properMaxDens > 0) {
+          if (s.properMaxDensity <= 0 || properMaxDens >= s.properMaxDensity) {
+            s.properMaxDensity = properMaxDens
+          } else {
+            s.properMaxDensity += 0.4 * (properMaxDens - s.properMaxDensity)
+          }
+        }
 
         // Auto-loop: capture initial norm, check decay/divergence/stagnation
         if (s.initialNorm < 0) {
           if (totalNormIsSafe) {
             s.initialNorm = totalNorm
             s.initialMaxDensity = maxDens
+            s.initialProperMaxDensity = properMaxDens
             s.prevNorm = totalNorm
             s.stagnationCount = 0
             if (renormBuf) device.queue.writeBuffer(renormBuf, 4, new Float32Array([totalNorm]))

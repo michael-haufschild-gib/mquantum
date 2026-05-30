@@ -179,22 +179,55 @@ export async function transitionFromWarmup(
     return
   }
 
-  runtime.rotationSnapshot = new Map(useRotationStore.getState().rotations)
-  const previewDuration = Math.min(3, settings.duration)
-  loop.phase = 'preview'
-  loop.frameId = 0
-  loop.totalFrames = Math.max(1, Math.ceil(previewDuration * settings.fps))
+  await startStreamRecording(loop, runtime, settings, canvas)
+}
 
-  const previewRecorder = await createExportRecorder(
-    canvas,
-    settings,
-    runtime.exportWidth,
-    runtime.exportHeight,
-    previewDuration
-  )
-  await previewRecorder.initialize()
-  runtime.recorder = previewRecorder
-  useExportStore.getState().setStatus('previewing')
+/**
+ * Start the real stream-to-disk recording phase.
+ *
+ * This must not be preceded by an animated preview pass. The preview pass runs
+ * through the production render graph, so it mutates GPU-backed evolution state
+ * for TDSE/BEC/Dirac/etc. and would shift the exported physics by the preview
+ * duration before the disk recording starts.
+ */
+async function startStreamRecording(
+  loop: ExportLoopState,
+  runtime: ExportRuntimeState,
+  settings: ExportSettings,
+  canvas: HTMLCanvasElement
+): Promise<void> {
+  if (!loop.mainStreamHandle) {
+    throw new Error('Missing stream file handle for stream export')
+  }
+
+  loop.phase = 'recording'
+  loop.frameId = 0
+  loop.totalFrames = Math.max(1, Math.ceil(settings.duration * settings.fps))
+  loop.startTime = performance.now()
+  loop.exportStartTime = Date.now()
+  loop.lastEtaUpdate = 0
+
+  const { VideoRecorder } = await import('@/lib/export/video')
+  const mainRecorder = new VideoRecorder(canvas, {
+    width: runtime.exportWidth,
+    height: runtime.exportHeight,
+    fps: settings.fps,
+    duration: settings.duration,
+    totalDuration: settings.duration,
+    bitrate: settings.bitrate,
+    format: settings.format,
+    codec: settings.codec,
+    streamHandle: loop.mainStreamHandle,
+    onProgress: (progress) => useExportStore.getState().setProgress(progress),
+    hardwareAcceleration: settings.hardwareAcceleration,
+    bitrateMode: settings.bitrateMode,
+    textOverlay: settings.textOverlay,
+    crop: settings.crop,
+    rotation: settings.rotation,
+  })
+  await mainRecorder.initialize()
+  runtime.recorder = mainRecorder
+  useExportStore.getState().setStatus('rendering')
 }
 
 /**
@@ -226,27 +259,7 @@ export async function finalizePreviewAndStartRecording(
     useRotationStore.getState().updateRotations(runtime.rotationSnapshot)
   }
 
-  const { VideoRecorder } = await import('@/lib/export/video')
-  const mainRecorder = new VideoRecorder(canvas, {
-    width: runtime.exportWidth,
-    height: runtime.exportHeight,
-    fps: settings.fps,
-    duration: settings.duration,
-    totalDuration: settings.duration,
-    bitrate: settings.bitrate,
-    format: settings.format,
-    codec: settings.codec,
-    streamHandle: loop.mainStreamHandle,
-    onProgress: (progress) => useExportStore.getState().setProgress(progress),
-    hardwareAcceleration: settings.hardwareAcceleration,
-    bitrateMode: settings.bitrateMode,
-    textOverlay: settings.textOverlay,
-    crop: settings.crop,
-    rotation: settings.rotation,
-  })
-  await mainRecorder.initialize()
-  runtime.recorder = mainRecorder
-  useExportStore.getState().setStatus('rendering')
+  await startStreamRecording(loop, runtime, settings, canvas)
 }
 
 /**
