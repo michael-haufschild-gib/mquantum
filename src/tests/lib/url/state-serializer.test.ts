@@ -180,11 +180,31 @@ describe('state-serializer', () => {
         openQuantumDephasingRate: 1.5,
         openQuantumRelaxationRate: 0.3,
         openQuantumThermalUpRate: 0.0,
+        openQuantumDephasingEnabled: false,
+        openQuantumRelaxationEnabled: true,
+        openQuantumThermalEnabled: true,
+        openQuantumDt: 0.025,
+        openQuantumSubsteps: 7,
+        openQuantumBathTemperature: 420,
+        openQuantumCouplingScale: 2.25,
+        openQuantumHydrogenBasisMaxN: 3,
+        openQuantumDephasingModel: 'none',
+        openQuantumVisualizationMode: 'entropyMap',
       }
       const result = serializeState(state)
       expect(result).toContain('oq=1')
       expect(result).toContain('oq_dp=1.50')
       expect(result).toContain('oq_rx=0.30')
+      expect(result).toContain('oq_de=0')
+      expect(result).toContain('oq_re=1')
+      expect(result).toContain('oq_te=1')
+      expect(result).toContain('oq_dt=0.0250')
+      expect(result).toContain('oq_sub=7')
+      expect(result).toContain('oq_tmp=420.00')
+      expect(result).toContain('oq_cpl=2.2500')
+      expect(result).toContain('oq_nmax=3')
+      expect(result).toContain('oq_dm=none')
+      expect(result).toContain('oq_viz=entropyMap')
       // thermalUpRate=0 should be omitted
       expect(result).not.toContain('oq_th')
     })
@@ -207,6 +227,24 @@ describe('state-serializer', () => {
       expect(result.openQuantumDephasingRate).toBeCloseTo(1.5)
       expect(result.openQuantumRelaxationRate).toBeCloseTo(0.3)
       expect(result.openQuantumThermalUpRate).toBeCloseTo(0.1)
+    })
+
+    it('deserializes extended oq params that change Lindblad dynamics and analysis cadence', () => {
+      const result = deserializeState(
+        'd=3&t=schroedinger&oq=1&oq_de=0&oq_re=1&oq_te=1&oq_dt=0.025&oq_sub=7&oq_tmp=420&oq_cpl=2.25&oq_nmax=3&oq_dm=none&oq_viz=entropyMap'
+      )
+
+      expect(result.openQuantumEnabled).toBe(true)
+      expect(result.openQuantumDephasingEnabled).toBe(false)
+      expect(result.openQuantumRelaxationEnabled).toBe(true)
+      expect(result.openQuantumThermalEnabled).toBe(true)
+      expect(result.openQuantumDt).toBeCloseTo(0.025)
+      expect(result.openQuantumSubsteps).toBe(7)
+      expect(result.openQuantumBathTemperature).toBeCloseTo(420)
+      expect(result.openQuantumCouplingScale).toBeCloseTo(2.25)
+      expect(result.openQuantumHydrogenBasisMaxN).toBe(3)
+      expect(result.openQuantumDephasingModel).toBe('none')
+      expect(result.openQuantumVisualizationMode).toBe('entropyMap')
     })
 
     it('clamps oq rates to [0, 5]', () => {
@@ -235,6 +273,16 @@ describe('state-serializer', () => {
         openQuantumDephasingRate: 2.5,
         openQuantumRelaxationRate: 1.0,
         openQuantumThermalUpRate: 0.5,
+        openQuantumDephasingEnabled: false,
+        openQuantumRelaxationEnabled: true,
+        openQuantumThermalEnabled: true,
+        openQuantumDt: 0.025,
+        openQuantumSubsteps: 7,
+        openQuantumBathTemperature: 420,
+        openQuantumCouplingScale: 2.25,
+        openQuantumHydrogenBasisMaxN: 3,
+        openQuantumDephasingModel: 'none',
+        openQuantumVisualizationMode: 'entropyMap',
       }
       const serialized = serializeState(original)
       const deserialized = deserializeState(serialized)
@@ -243,6 +291,110 @@ describe('state-serializer', () => {
       expect(deserialized.openQuantumDephasingRate).toBeCloseTo(2.5)
       expect(deserialized.openQuantumRelaxationRate).toBeCloseTo(1.0)
       expect(deserialized.openQuantumThermalUpRate).toBeCloseTo(0.5)
+      expect(deserialized.openQuantumDephasingEnabled).toBe(false)
+      expect(deserialized.openQuantumRelaxationEnabled).toBe(true)
+      expect(deserialized.openQuantumThermalEnabled).toBe(true)
+      expect(deserialized.openQuantumDt).toBeCloseTo(0.025)
+      expect(deserialized.openQuantumSubsteps).toBe(7)
+      expect(deserialized.openQuantumBathTemperature).toBeCloseTo(420)
+      expect(deserialized.openQuantumCouplingScale).toBeCloseTo(2.25)
+      expect(deserialized.openQuantumHydrogenBasisMaxN).toBe(3)
+      expect(deserialized.openQuantumDephasingModel).toBe('none')
+      expect(deserialized.openQuantumVisualizationMode).toBe('entropyMap')
+    })
+  })
+
+  describe('Dirac params', () => {
+    it('round-trips configured Dirac physics, display, diagnostics, and lattice params', () => {
+      const state: ShareableState = {
+        dimension: 4,
+        objectType: 'schroedinger',
+        quantumMode: 'diracEquation',
+        diracInitialCondition: 'zitterbewegung',
+        diracFieldView: 'axialCharge',
+        diracPotentialType: 'barrier',
+        diracPotentialStrength: 3.5,
+        diracPotentialWidth: 0.7,
+        diracPotentialCenter: 0.5,
+        diracHarmonicOmega: 0.9,
+        diracCoulombZ: 4,
+        diracMass: 1.7,
+        diracSpeedOfLight: 2.5,
+        diracHbar: 0.8,
+        diracDt: 0.006,
+        diracStepsPerFrame: 5,
+        diracGridSize: [16, 16, 16, 16],
+        diracSpacing: [0.12, 0.13, 0.14, 0.15],
+        diracPacketCenter: [0.1, -0.2, 0.3, 0.4],
+        diracPacketMomentum: [1.5, -2, 0.75, 0.5],
+        diracPacketWidth: 0.35,
+        diracPositiveEnergyFraction: 0.45,
+        diracAutoScale: true,
+        diracShowPotential: true,
+        diracDiagnosticsEnabled: false,
+        diracDiagnosticsInterval: 11,
+        diracSlicePositions: [0.25],
+      }
+
+      const serialized = serializeState(state)
+      const params = new URLSearchParams(serialized)
+      expect(params.get('dir_ic')).toBe('zitterbewegung')
+      expect(params.get('dir_fv')).toBe('axialCharge')
+      expect(params.get('dir_g')).toBe('16,16,16,16')
+      expect(params.get('dir_dx')).toBe('0.1200,0.1300,0.1400,0.1500')
+      expect(params.get('dir_diag')).toBe('0')
+
+      const round = deserializeState(serialized)
+      expect(round.diracInitialCondition).toBe('zitterbewegung')
+      expect(round.diracFieldView).toBe('axialCharge')
+      expect(round.diracPotentialType).toBe('barrier')
+      expect(round.diracPotentialStrength).toBeCloseTo(3.5)
+      expect(round.diracPotentialWidth).toBeCloseTo(0.7)
+      expect(round.diracPotentialCenter).toBeCloseTo(0.5)
+      expect(round.diracHarmonicOmega).toBeCloseTo(0.9)
+      expect(round.diracCoulombZ).toBe(4)
+      expect(round.diracMass).toBeCloseTo(1.7)
+      expect(round.diracSpeedOfLight).toBeCloseTo(2.5)
+      expect(round.diracHbar).toBeCloseTo(0.8)
+      expect(round.diracDt).toBeCloseTo(0.006)
+      expect(round.diracStepsPerFrame).toBe(5)
+      expect(round.diracGridSize).toEqual([16, 16, 16, 16])
+      expect(round.diracSpacing).toEqual([0.12, 0.13, 0.14, 0.15])
+      expect(round.diracPacketCenter).toEqual([0.1, -0.2, 0.3, 0.4])
+      expect(round.diracPacketMomentum).toEqual([1.5, -2, 0.75, 0.5])
+      expect(round.diracPacketWidth).toBeCloseTo(0.35)
+      expect(round.diracPositiveEnergyFraction).toBeCloseTo(0.45)
+      expect(round.diracAutoScale).toBe(true)
+      expect(round.diracShowPotential).toBe(true)
+      expect(round.diracDiagnosticsEnabled).toBe(false)
+      expect(round.diracDiagnosticsInterval).toBe(11)
+      expect(round.diracSlicePositions).toEqual([0.25])
+    })
+
+    it('omits Dirac params outside diracEquation mode', () => {
+      const serialized = serializeState({
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'tdseDynamics',
+        diracMass: 3,
+        diracFieldView: 'currentDensity',
+      })
+
+      expect(serialized).not.toContain('dir_m')
+      expect(serialized).not.toContain('dir_fv')
+    })
+
+    it('clamps Dirac scalar and vector params during deserialize', () => {
+      const round = deserializeState(
+        'qm=diracEquation&dir_m=99&dir_c=-1&dir_spf=99&dir_g=1,999&dir_dx=0,9&dir_pe=9'
+      )
+
+      expect(round.diracMass).toBe(10)
+      expect(round.diracSpeedOfLight).toBe(0.01)
+      expect(round.diracStepsPerFrame).toBe(16)
+      expect(round.diracGridSize).toEqual([2, 128])
+      expect(round.diracSpacing).toEqual([0.01, 1])
+      expect(round.diracPositiveEnergyFraction).toBe(1)
     })
   })
 
@@ -253,6 +405,40 @@ describe('state-serializer', () => {
         const d = deserializeState(s)
         expect(d.representation, `roundtrip failed for repr=${repr}`).toBe(repr)
       }
+    })
+
+    it('roundtrips configured Wigner controls when Wigner representation is active', () => {
+      const state: ShareableState = {
+        dimension: 6,
+        objectType: 'schroedinger',
+        representation: 'wigner',
+        quantumMode: 'hydrogenNDCoupled',
+        wignerDimensionIndex: 4,
+        wignerAutoRange: false,
+        wignerXRange: 3.5,
+        wignerPRange: 8.25,
+        wignerCrossTermsEnabled: false,
+        wignerQuadPoints: 64,
+        wignerCacheResolution: 512,
+      }
+
+      const serialized = serializeState(state)
+      const d = deserializeState(serialized)
+
+      expect(serialized).toContain('wig_d=4')
+      expect(serialized).toContain('wig_ar=0')
+      expect(serialized).toContain('wig_x=3.50')
+      expect(serialized).toContain('wig_p=8.25')
+      expect(serialized).toContain('wig_ct=0')
+      expect(serialized).toContain('wig_qp=64')
+      expect(serialized).toContain('wig_res=512')
+      expect(d.wignerDimensionIndex).toBe(4)
+      expect(d.wignerAutoRange).toBe(false)
+      expect(d.wignerXRange).toBeCloseTo(3.5)
+      expect(d.wignerPRange).toBeCloseTo(8.25)
+      expect(d.wignerCrossTermsEnabled).toBe(false)
+      expect(d.wignerQuadPoints).toBe(64)
+      expect(d.wignerCacheResolution).toBe(512)
     })
 
     it('roundtrips boolean flags', () => {
@@ -324,6 +510,24 @@ describe('state-serializer', () => {
       expect(d.isoThreshold).toBeCloseTo(-0.5)
     })
 
+    it('clamps Wigner URL controls to renderer-safe ranges', () => {
+      const low = deserializeState('repr=wigner&wig_d=-1&wig_x=.5&wig_p=0&wig_qp=2&wig_res=32')
+      const high = deserializeState(
+        'repr=wigner&wig_d=99&wig_x=99&wig_p=99&wig_qp=200&wig_res=4096'
+      )
+
+      expect(low.wignerDimensionIndex).toBe(0)
+      expect(low.wignerXRange).toBe(1)
+      expect(low.wignerPRange).toBe(1)
+      expect(low.wignerQuadPoints).toBe(8)
+      expect(low.wignerCacheResolution).toBe(128)
+      expect(high.wignerDimensionIndex).toBe(10)
+      expect(high.wignerXRange).toBe(30)
+      expect(high.wignerPRange).toBe(30)
+      expect(high.wignerQuadPoints).toBe(96)
+      expect(high.wignerCacheResolution).toBe(1024)
+    })
+
     it('ignores invalid enum values', () => {
       const d = deserializeState('repr=invalid&pot=unknown')
       expect(d.representation).toBeUndefined()
@@ -374,6 +578,29 @@ describe('state-serializer', () => {
       const d = deserializeState(serializeState(state))
       expect(d.potentialType).toBe('coupledAnharmonic')
       expect(d.anharmonicLambda).toBeCloseTo(5.5, 1)
+    })
+
+    it('roundtrips blackHoleRingdown with Regge-Wheeler parameters', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'tdseDynamics',
+        potentialType: 'blackHoleRingdown',
+        bhMass: 1.25,
+        bhMultipoleL: 3,
+        bhSpin: 2,
+      }
+      const serialized = serializeState(state)
+      expect(serialized).toContain('pot=blackHoleRingdown')
+      expect(serialized).toContain('bh_m=1.250')
+      expect(serialized).toContain('bh_l=3')
+      expect(serialized).toContain('bh_s=2')
+
+      const d = deserializeState(serialized)
+      expect(d.potentialType).toBe('blackHoleRingdown')
+      expect(d.bhMass).toBeCloseTo(1.25, 3)
+      expect(d.bhMultipoleL).toBe(3)
+      expect(d.bhSpin).toBe(2)
     })
 
     it('omits anharmonicLambda for non-coupledAnharmonic potentials', () => {

@@ -35,6 +35,7 @@ import {
   deserializeCosmology,
   serializeCosmology,
 } from './cosmologySerializer'
+import { deserializeDirac, type DiracUrlState, serializeDirac } from './diracSerializer'
 import {
   parseBoolParam,
   parseEnumParam,
@@ -97,6 +98,7 @@ export interface ShareableObjectState
   extends
     AdsUrlState,
     BellUrlState,
+    DiracUrlState,
     SrmtUrlState,
     SrmtSweepUrlState,
     TdseSerializableState,
@@ -118,6 +120,20 @@ export interface ShareableObjectState
   densityGain?: number
   /** Object scale (0.1 to 2.0) */
   scale?: number
+  /** Wigner selected phase-space dimension index */
+  wignerDimensionIndex?: number
+  /** Wigner auto-range enabled */
+  wignerAutoRange?: boolean
+  /** Wigner position half-range */
+  wignerXRange?: number
+  /** Wigner momentum half-range */
+  wignerPRange?: number
+  /** Wigner cross terms enabled */
+  wignerCrossTermsEnabled?: boolean
+  /** Wigner hydrogen quadrature points */
+  wignerQuadPoints?: number
+  /** Wigner cache texture resolution */
+  wignerCacheResolution?: number
 
   // ── Quantum numbers (HO / hydrogen) ──────────────────────────────────────
   /** HO superposition term count (1-8) */
@@ -226,6 +242,15 @@ export function serializeState(state: ShareableState): string {
   setBoolParam(params, 'cs', state.crossSectionEnabled)
   setFloatParam(params, 'dg', state.densityGain)
   setFloatParam(params, 'scale', state.scale)
+  if (state.representation === 'wigner') {
+    setIntParam(params, 'wig_d', state.wignerDimensionIndex)
+    setBoolParam(params, 'wig_ar', state.wignerAutoRange)
+    setFloatParam(params, 'wig_x', state.wignerXRange)
+    setFloatParam(params, 'wig_p', state.wignerPRange)
+    setBoolParam(params, 'wig_ct', state.wignerCrossTermsEnabled)
+    setIntParam(params, 'wig_qp', state.wignerQuadPoints)
+    setIntParam(params, 'wig_res', state.wignerCacheResolution)
+  }
 
   // Quantum numbers
   setIntParam(params, 'tc', state.termCount)
@@ -244,6 +269,9 @@ export function serializeState(state: ShareableState): string {
 
   // Cosmological background — only emit the sub-params when enabled
   serializeCosmology(params, state)
+
+  // Dirac equation mode — physics, potential, display, diagnostics, lattice.
+  serializeDirac(params, state.quantumMode, state)
 
   // Wheeler–DeWitt minisuperspace (physics + render-only + SRMT diagnostic)
   if (state.quantumMode === 'wheelerDeWitt') {
@@ -302,6 +330,13 @@ export function deserializeState(searchParams: string): ParsedShareableState {
   state.crossSectionEnabled = parseBoolParam(params, 'cs')
   state.densityGain = parseFloatParam(params, 'dg', 0.01, 50)
   state.scale = parseFloatParam(params, 'scale', 0.1, 2.0)
+  state.wignerDimensionIndex = parseIntParam(params, 'wig_d', 0, 10)
+  state.wignerAutoRange = parseBoolParam(params, 'wig_ar')
+  state.wignerXRange = parseFloatParam(params, 'wig_x', 1, 30)
+  state.wignerPRange = parseFloatParam(params, 'wig_p', 1, 30)
+  state.wignerCrossTermsEnabled = parseBoolParam(params, 'wig_ct')
+  state.wignerQuadPoints = parseIntParam(params, 'wig_qp', 8, 96)
+  state.wignerCacheResolution = parseIntParam(params, 'wig_res', 128, 1024)
 
   // Quantum numbers
   state.termCount = parseIntParam(params, 'tc', 1, 8)
@@ -320,6 +355,7 @@ export function deserializeState(searchParams: string): ParsedShareableState {
   // available for the s_c(n) check).
   deserializeCosmology(params, state)
 
+  deserializeDirac(params, state)
   deserializeWdw(params, state)
   deserializeSrmtAndSweep(params, state)
 

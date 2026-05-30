@@ -9,7 +9,8 @@
  * @module lib/url/tdseSerializer
  */
 
-import type { TdsePotentialType } from '@/lib/geometry/extended/tdse'
+import { normalizeTdseBlackHoleParams, type TdsePotentialType } from '@/lib/geometry/extended/tdse'
+import type { OpenQuantumVisualizationMode } from '@/lib/physics/openQuantum/types'
 import {
   MAX_ADS_RADIUS,
   MAX_DOUBLE_THROAT_SEPARATION,
@@ -54,6 +55,16 @@ type UrlMetricKind = (typeof VALID_METRIC_KINDS)[number]
 const VALID_DENSITY_VIEWS = ['coordinate', 'proper'] as const
 type UrlDensityView = (typeof VALID_DENSITY_VIEWS)[number]
 
+const VALID_OPEN_QUANTUM_DEPHASING_MODELS = ['none', 'uniform'] as const
+type UrlOpenQuantumDephasingModel = (typeof VALID_OPEN_QUANTUM_DEPHASING_MODELS)[number]
+
+const VALID_OPEN_QUANTUM_VISUALIZATION_MODES = [
+  'density',
+  'purityMap',
+  'entropyMap',
+  'coherenceMap',
+] as const satisfies readonly OpenQuantumVisualizationMode[]
+
 export const VALID_POTENTIAL_TYPES: TdsePotentialType[] = [
   'free',
   'barrier',
@@ -69,6 +80,7 @@ export const VALID_POTENTIAL_TYPES: TdsePotentialType[] = [
   'custom',
   'andersonDisorder',
   'coupledAnharmonic',
+  'blackHoleRingdown',
 ]
 
 /**
@@ -84,6 +96,9 @@ export interface TdseSerializableState {
   imaginaryTimeEnabled?: boolean
   customPotentialExpression?: string
   anharmonicLambda?: number
+  bhMass?: number
+  bhMultipoleL?: number
+  bhSpin?: 0 | 1 | 2
   disorderStrength?: number
   disorderSeed?: number
   disorderDistribution?: string
@@ -105,6 +120,16 @@ export interface TdseSerializableState {
   openQuantumDephasingRate?: number
   openQuantumRelaxationRate?: number
   openQuantumThermalUpRate?: number
+  openQuantumDephasingEnabled?: boolean
+  openQuantumRelaxationEnabled?: boolean
+  openQuantumThermalEnabled?: boolean
+  openQuantumDt?: number
+  openQuantumSubsteps?: number
+  openQuantumBathTemperature?: number
+  openQuantumCouplingScale?: number
+  openQuantumHydrogenBasisMaxN?: number
+  openQuantumDephasingModel?: UrlOpenQuantumDephasingModel
+  openQuantumVisualizationMode?: OpenQuantumVisualizationMode
   stochasticEnabled?: boolean
   stochasticGamma?: number
   stochasticSigma?: number
@@ -151,6 +176,11 @@ export function serializeTdsePotential(
     // `anharmonicLambda = 0` (no quartic perturbation) must survive
     // the URL round-trip instead of silently reverting to 1.0.
     setFloatParam(params, 'anh_l', state.anharmonicLambda)
+  }
+  if (state.potentialType === 'blackHoleRingdown') {
+    setFloatParam(params, 'bh_m', state.bhMass, false, 3)
+    setIntParam(params, 'bh_l', state.bhMultipoleL)
+    setIntParam(params, 'bh_s', state.bhSpin)
   }
   if (state.potentialType === 'andersonDisorder') {
     setFloatParam(params, 'dis_w', state.disorderStrength, true)
@@ -229,6 +259,16 @@ export function serializeTdseFeatures(params: URLSearchParams, state: TdseSerial
     setFloatParam(params, 'oq_dp', state.openQuantumDephasingRate)
     setFloatParam(params, 'oq_rx', state.openQuantumRelaxationRate, true)
     setFloatParam(params, 'oq_th', state.openQuantumThermalUpRate, true)
+    setBoolParam(params, 'oq_de', state.openQuantumDephasingEnabled)
+    setBoolParam(params, 'oq_re', state.openQuantumRelaxationEnabled)
+    setBoolParam(params, 'oq_te', state.openQuantumThermalEnabled)
+    setFloatParam(params, 'oq_dt', state.openQuantumDt, false, 4)
+    setIntParam(params, 'oq_sub', state.openQuantumSubsteps)
+    setFloatParam(params, 'oq_tmp', state.openQuantumBathTemperature, false, 2)
+    setFloatParam(params, 'oq_cpl', state.openQuantumCouplingScale, false, 4)
+    setIntParam(params, 'oq_nmax', state.openQuantumHydrogenBasisMaxN)
+    setStringParam(params, 'oq_dm', state.openQuantumDephasingModel)
+    setStringParam(params, 'oq_viz', state.openQuantumVisualizationMode)
   }
 
   if (state.stochasticEnabled) {
@@ -281,6 +321,16 @@ export function deserializeTdsePotential(
   }
   if (state.potentialType === 'coupledAnharmonic') {
     state.anharmonicLambda = parseFloatParam(params, 'anh_l', 0, 100)
+  }
+  if (state.potentialType === 'blackHoleRingdown') {
+    const bh = normalizeTdseBlackHoleParams({
+      bhMass: parseFloatParam(params, 'bh_m', 0.1, 5),
+      bhMultipoleL: parseIntParam(params, 'bh_l', 0, 6),
+      bhSpin: parseIntParam(params, 'bh_s', 0, 2),
+    })
+    state.bhMass = bh.bhMass
+    state.bhMultipoleL = bh.bhMultipoleL
+    state.bhSpin = bh.bhSpin
   }
   if (state.potentialType === 'andersonDisorder') {
     state.disorderStrength = parseFloatParam(params, 'dis_w', 0, 100)
@@ -395,6 +445,24 @@ export function deserializeTdseFeatures(
     state.openQuantumDephasingRate = parseFloatParam(params, 'oq_dp', 0, 5)
     state.openQuantumRelaxationRate = parseFloatParam(params, 'oq_rx', 0, 5)
     state.openQuantumThermalUpRate = parseFloatParam(params, 'oq_th', 0, 5)
+    state.openQuantumDephasingEnabled = parseBoolParam(params, 'oq_de')
+    state.openQuantumRelaxationEnabled = parseBoolParam(params, 'oq_re')
+    state.openQuantumThermalEnabled = parseBoolParam(params, 'oq_te')
+    state.openQuantumDt = parseFloatParam(params, 'oq_dt', 0.001, 0.1)
+    state.openQuantumSubsteps = parseIntParam(params, 'oq_sub', 1, 10)
+    state.openQuantumBathTemperature = parseFloatParam(params, 'oq_tmp', 0.1, 100000)
+    state.openQuantumCouplingScale = parseFloatParam(params, 'oq_cpl', 0.01, 100)
+    state.openQuantumHydrogenBasisMaxN = parseIntParam(params, 'oq_nmax', 1, 3)
+    state.openQuantumDephasingModel = parseEnumParam<UrlOpenQuantumDephasingModel>(
+      params,
+      'oq_dm',
+      VALID_OPEN_QUANTUM_DEPHASING_MODELS
+    )
+    state.openQuantumVisualizationMode = parseEnumParam<OpenQuantumVisualizationMode>(
+      params,
+      'oq_viz',
+      VALID_OPEN_QUANTUM_VISUALIZATION_MODES
+    )
   }
 
   const sloc = parseBoolParam(params, 'sloc')

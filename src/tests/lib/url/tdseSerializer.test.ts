@@ -71,6 +71,42 @@ describe('TDSE URL serializer', () => {
     expect(ignored.disorderDistribution).toBeUndefined()
   })
 
+  it('round-trips black-hole Regge-Wheeler extras only under blackHoleRingdown', () => {
+    const params = new URLSearchParams()
+    serializeTdsePotential(params, {
+      potentialType: 'blackHoleRingdown',
+      bhMass: 1.25,
+      bhMultipoleL: 3,
+      bhSpin: 2,
+      disorderStrength: 9,
+    })
+
+    expect(params.toString()).toBe('pot=blackHoleRingdown&bh_m=1.250&bh_l=3&bh_s=2')
+
+    const accepted: TdseDeserializableTarget = {}
+    deserializeTdsePotential(new URLSearchParams(params), accepted)
+    expect(accepted.potentialType).toBe('blackHoleRingdown')
+    expect(accepted.bhMass).toBeCloseTo(1.25, 3)
+    expect(accepted.bhMultipoleL).toBe(3)
+    expect(accepted.bhSpin).toBe(2)
+    expect(accepted.disorderStrength).toBeUndefined()
+
+    const normalized: TdseDeserializableTarget = {}
+    deserializeTdsePotential(
+      new URLSearchParams('pot=blackHoleRingdown&bh_m=999&bh_l=0&bh_s=2'),
+      normalized
+    )
+    expect(normalized.bhMass).toBe(5)
+    expect(normalized.bhSpin).toBe(2)
+    expect(normalized.bhMultipoleL).toBe(2)
+
+    const ignored: TdseDeserializableTarget = {}
+    deserializeTdsePotential(new URLSearchParams('pot=free&bh_m=1.25&bh_l=3&bh_s=2'), ignored)
+    expect(ignored.bhMass).toBeUndefined()
+    expect(ignored.bhMultipoleL).toBeUndefined()
+    expect(ignored.bhSpin).toBeUndefined()
+  })
+
   it('serializes flat metric without stale metric sub-params', () => {
     const params = new URLSearchParams()
 
@@ -156,5 +192,51 @@ describe('TDSE URL serializer', () => {
     expect(parsed.branchPlanePosition).toBe(-1)
     expect(parsed.wormholeCouplingEnabled).toBe(true)
     expect(parsed.wormholeMirrorAxis).toBe(2)
+  })
+
+  it('serializes and deserializes extended open-quantum params when enabled', () => {
+    const params = new URLSearchParams()
+    serializeTdseFeatures(params, {
+      openQuantumEnabled: true,
+      openQuantumDephasingRate: 0.5,
+      openQuantumRelaxationRate: 1.2,
+      openQuantumThermalUpRate: 0.4,
+      openQuantumDephasingEnabled: false,
+      openQuantumRelaxationEnabled: true,
+      openQuantumThermalEnabled: true,
+      openQuantumDt: 0.025,
+      openQuantumSubsteps: 7,
+      openQuantumBathTemperature: 420,
+      openQuantumCouplingScale: 2.25,
+      openQuantumHydrogenBasisMaxN: 3,
+      openQuantumDephasingModel: 'none',
+      openQuantumVisualizationMode: 'entropyMap',
+    })
+
+    expect(params.get('oq')).toBe('1')
+    expect(params.get('oq_de')).toBe('0')
+    expect(params.get('oq_re')).toBe('1')
+    expect(params.get('oq_te')).toBe('1')
+    expect(params.get('oq_dt')).toBe('0.0250')
+    expect(params.get('oq_sub')).toBe('7')
+    expect(params.get('oq_tmp')).toBe('420.00')
+    expect(params.get('oq_cpl')).toBe('2.2500')
+    expect(params.get('oq_nmax')).toBe('3')
+    expect(params.get('oq_dm')).toBe('none')
+    expect(params.get('oq_viz')).toBe('entropyMap')
+
+    const parsed: TdseDeserializableTarget = {}
+    deserializeTdseFeatures(params, parsed)
+    expect(parsed.openQuantumEnabled).toBe(true)
+    expect(parsed.openQuantumDephasingEnabled).toBe(false)
+    expect(parsed.openQuantumRelaxationEnabled).toBe(true)
+    expect(parsed.openQuantumThermalEnabled).toBe(true)
+    expect(parsed.openQuantumDt).toBeCloseTo(0.025)
+    expect(parsed.openQuantumSubsteps).toBe(7)
+    expect(parsed.openQuantumBathTemperature).toBeCloseTo(420)
+    expect(parsed.openQuantumCouplingScale).toBeCloseTo(2.25)
+    expect(parsed.openQuantumHydrogenBasisMaxN).toBe(3)
+    expect(parsed.openQuantumDephasingModel).toBe('none')
+    expect(parsed.openQuantumVisualizationMode).toBe('entropyMap')
   })
 })

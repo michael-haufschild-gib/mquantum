@@ -76,6 +76,35 @@ describe('URL params -> store state integration', () => {
     expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('momentum')
   })
 
+  it('applies configured Wigner URL controls through production setters', () => {
+    const serialized = serializeState({
+      dimension: 6,
+      objectType: 'schroedinger',
+      quantumMode: 'hydrogenNDCoupled',
+      representation: 'wigner',
+      wignerDimensionIndex: 4,
+      wignerAutoRange: false,
+      wignerXRange: 3.5,
+      wignerPRange: 8.25,
+      wignerCrossTermsEnabled: false,
+      wignerQuadPoints: 64,
+      wignerCacheResolution: 512,
+    })
+
+    applyUrlStateToStores(serialized)
+
+    const sch = useExtendedObjectStore.getState().schroedinger
+    expect(sch.quantumMode).toBe('hydrogenNDCoupled')
+    expect(sch.representation).toBe('wigner')
+    expect(sch.wignerDimensionIndex).toBe(4)
+    expect(sch.wignerAutoRange).toBe(false)
+    expect(sch.wignerXRange).toBeCloseTo(3.5)
+    expect(sch.wignerPRange).toBeCloseTo(8.25)
+    expect(sch.wignerCrossTermsEnabled).toBe(false)
+    expect(sch.wignerQuadPoints).toBe(64)
+    expect(sch.wignerCacheResolution).toBe(512)
+  })
+
   it('applies cross-section param from URL', () => {
     applyUrlStateToStores('d=4&t=schroedinger&cs=1')
     expect(useExtendedObjectStore.getState().schroedinger.crossSectionEnabled).toBe(true)
@@ -87,6 +116,17 @@ describe('URL params -> store state integration', () => {
     expect(tdse.potentialType).toBe('harmonicTrap')
   })
 
+  it('applies black-hole Regge-Wheeler URL params through TDSE setters', () => {
+    applyUrlStateToStores(
+      'd=3&t=schroedinger&qm=tdseDynamics&pot=blackHoleRingdown&bh_m=1.25&bh_l=3&bh_s=2'
+    )
+    const tdse = useExtendedObjectStore.getState().schroedinger.tdse
+    expect(tdse.potentialType).toBe('blackHoleRingdown')
+    expect(tdse.bhMass).toBeCloseTo(1.25, 3)
+    expect(tdse.bhMultipoleL).toBe(3)
+    expect(tdse.bhSpin).toBe(2)
+  })
+
   it('applies TDSE absorber and diagnostics from URL', () => {
     applyUrlStateToStores('d=3&t=schroedinger&qm=tdseDynamics&abs=1&diag=1&obs=1')
     const tdse = useExtendedObjectStore.getState().schroedinger.tdse
@@ -96,11 +136,80 @@ describe('URL params -> store state integration', () => {
   })
 
   it('applies open quantum params from URL', () => {
-    applyUrlStateToStores('d=4&t=schroedinger&qm=harmonicOscillator&oq=1&oq_dp=0.50&oq_rx=1.20')
+    applyUrlStateToStores(
+      'd=4&t=schroedinger&qm=harmonicOscillator&oq=1&oq_dp=0.50&oq_rx=1.20&oq_de=0&oq_re=1&oq_te=1&oq_dt=0.025&oq_sub=7&oq_tmp=420&oq_cpl=2.25&oq_nmax=3&oq_dm=none&oq_viz=entropyMap'
+    )
     const oq = useExtendedObjectStore.getState().schroedinger.openQuantum
     expect(oq.enabled).toBe(true)
     expect(oq.dephasingRate).toBeCloseTo(0.5)
     expect(oq.relaxationRate).toBeCloseTo(1.2)
+    expect(oq.dephasingEnabled).toBe(false)
+    expect(oq.relaxationEnabled).toBe(true)
+    expect(oq.thermalEnabled).toBe(true)
+    expect(oq.dt).toBeCloseTo(0.025)
+    expect(oq.substeps).toBe(7)
+    expect(oq.bathTemperature).toBeCloseTo(420)
+    expect(oq.couplingScale).toBeCloseTo(2.25)
+    expect(oq.hydrogenBasisMaxN).toBe(3)
+    expect(oq.dephasingModel).toBe('none')
+    expect(oq.visualizationMode).toBe('entropyMap')
+  })
+
+  it('applies configured Dirac URL params through production setters', () => {
+    const serialized = serializeState({
+      dimension: 4,
+      objectType: 'schroedinger',
+      quantumMode: 'diracEquation',
+      diracInitialCondition: 'zitterbewegung',
+      diracFieldView: 'axialCharge',
+      diracPotentialType: 'barrier',
+      diracPotentialStrength: 3.5,
+      diracPotentialWidth: 0.7,
+      diracPotentialCenter: 0.5,
+      diracMass: 1.7,
+      diracSpeedOfLight: 2.5,
+      diracHbar: 0.8,
+      diracDt: 0.006,
+      diracStepsPerFrame: 5,
+      diracGridSize: [16, 16, 16, 16],
+      diracSpacing: [0.12, 0.13, 0.14, 0.15],
+      diracPacketCenter: [0.1, -0.2, 0.3, 0.4],
+      diracPacketMomentum: [1.5, -2, 0.75, 0.5],
+      diracPacketWidth: 0.35,
+      diracPositiveEnergyFraction: 0.45,
+      diracAutoScale: true,
+      diracShowPotential: true,
+      diracDiagnosticsEnabled: false,
+      diracDiagnosticsInterval: 11,
+      diracSlicePositions: [0.25],
+    })
+
+    applyUrlStateToStores(serialized)
+
+    const dirac = useExtendedObjectStore.getState().schroedinger.dirac
+    expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('diracEquation')
+    expect(dirac.initialCondition).toBe('zitterbewegung')
+    expect(dirac.fieldView).toBe('axialCharge')
+    expect(dirac.potentialType).toBe('barrier')
+    expect(dirac.potentialStrength).toBeCloseTo(3.5)
+    expect(dirac.potentialWidth).toBeCloseTo(0.7)
+    expect(dirac.potentialCenter).toBeCloseTo(0.5)
+    expect(dirac.mass).toBeCloseTo(1.7)
+    expect(dirac.speedOfLight).toBeCloseTo(2.5)
+    expect(dirac.hbar).toBeCloseTo(0.8)
+    expect(dirac.dt).toBeCloseTo(0.006)
+    expect(dirac.stepsPerFrame).toBe(5)
+    expect(dirac.gridSize).toEqual([16, 16, 16, 16])
+    expect(dirac.spacing).toEqual([0.12, 0.13, 0.14, 0.15])
+    expect(dirac.packetCenter).toEqual([0.1, -0.2, 0.3, 0.4])
+    expect(dirac.packetMomentum).toEqual([1.5, -2, 0.75, 0.5])
+    expect(dirac.packetWidth).toBeCloseTo(0.35)
+    expect(dirac.positiveEnergyFraction).toBeCloseTo(0.45)
+    expect(dirac.autoScale).toBe(true)
+    expect(dirac.showPotential).toBe(true)
+    expect(dirac.diagnosticsEnabled).toBe(false)
+    expect(dirac.diagnosticsInterval).toBe(11)
+    expect(dirac.slicePositions).toEqual([0.25])
   })
 
   it('ignores unknown URL params without affecting known ones', () => {
