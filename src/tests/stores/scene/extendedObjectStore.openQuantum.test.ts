@@ -6,6 +6,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest'
 
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 function oq() {
@@ -19,6 +20,7 @@ function store() {
 describe('Open Quantum setters', () => {
   beforeEach(() => {
     useExtendedObjectStore.getState().reset()
+    useAppearanceStore.getState().setColorAlgorithm('mixed')
   })
 
   describe('setOpenQuantumEnabled', () => {
@@ -113,10 +115,20 @@ describe('Open Quantum setters', () => {
       expect(oq().visualizationMode).toBe('purityMap')
     })
 
+    it('syncs visualization mode to the renderer color algorithm', () => {
+      store().setOpenQuantumVisualizationMode('entropyMap')
+      expect(oq().visualizationMode).toBe('entropyMap')
+      expect(useAppearanceStore.getState().colorAlgorithm).toBe('entropyMap')
+
+      store().setOpenQuantumVisualizationMode('density')
+      expect(useAppearanceStore.getState().colorAlgorithm).toBe('blackbody')
+    })
+
     it('rejects invalid visualization modes from untyped callers', () => {
       store().setOpenQuantumVisualizationMode('entropyMap')
       store().setOpenQuantumVisualizationMode('phase' as never)
       expect(oq().visualizationMode).toBe('density')
+      expect(useAppearanceStore.getState().colorAlgorithm).toBe('blackbody')
     })
   })
 
@@ -176,6 +188,16 @@ describe('Open Quantum setters', () => {
       store().resetOpenQuantumToDefault()
       // Should be back to default
       expect(oq().dephasingRate).not.toBe(99)
+    })
+
+    it('resets the renderer color algorithm to default density coloring', () => {
+      store().setOpenQuantumVisualizationMode('entropyMap')
+      expect(useAppearanceStore.getState().colorAlgorithm).toBe('entropyMap')
+
+      store().resetOpenQuantumToDefault()
+
+      expect(oq().visualizationMode).toBe('density')
+      expect(useAppearanceStore.getState().colorAlgorithm).toBe('blackbody')
     })
   })
 })

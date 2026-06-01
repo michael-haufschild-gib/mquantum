@@ -11,6 +11,7 @@ import type { ShareableState } from '@/lib/url/state-serializer'
 import { parseCurrentUrl } from '@/lib/url/state-serializer'
 import { useSrmtSweepStore } from '@/stores/diagnostics/srmtSweepStore'
 import { usePresetManagerStore } from '@/stores/runtime/presetManagerStore'
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
 
@@ -41,6 +42,7 @@ describe('useUrlState', () => {
     mockedApplySceneExample.mockReset()
     useGeometryStore.getState().reset()
     useExtendedObjectStore.getState().reset()
+    useAppearanceStore.getState().setColorAlgorithm('mixed')
     useSrmtSweepStore.getState().setPendingSweep(null)
     useSrmtSweepStore.getState().reset()
   })
@@ -190,6 +192,7 @@ describe('useUrlState', () => {
       expect(oq.hydrogenBasisMaxN).toBe(3)
       expect(oq.dephasingModel).toBe('none')
       expect(oq.visualizationMode).toBe('entropyMap')
+      expect(useAppearanceStore.getState().colorAlgorithm).toBe('entropyMap')
     })
   })
 
