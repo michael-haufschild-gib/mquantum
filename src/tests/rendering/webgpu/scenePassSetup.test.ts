@@ -111,13 +111,9 @@ describe('extractSchrodingerConfig', () => {
     expect(extracted.openQuantumEnabled).toBe(false) // forced off
   })
 
-  it('end-to-end: extractSchrodingerConfig drops kSpaceOccupation under freeScalar+vacuumNoise', () => {
-    // Integration regression for PR #38 round 3: the fullConfig → normalize
-    // path must respect freeScalarInitialCondition. Before the fix, loading a
-    // preset with `quantumMode: freeScalarField`, `freeScalar.initialCondition:
-    // vacuumNoise`, `colorAlgorithm: kSpaceOccupation` would flow through
-    // extractSchrodingerConfig unchanged (the normalizer hardcoded
-    // freeScalarInitialCondition=undefined) and render as a blank map.
+  it('end-to-end: extractSchrodingerConfig drops kSpaceOccupation under static freeScalar+vacuumNoise', () => {
+    // Static exact vacuum has zero-subtracted n_k = 0 for every mode, so a
+    // preset with kSpaceOccupation should fall back instead of rendering blank.
     const extracted = extractSchrodingerConfig(
       makePassConfig({
         quantumMode: 'freeScalarField',
@@ -127,6 +123,18 @@ describe('extractSchrodingerConfig', () => {
     )
     expect(extracted.colorAlgorithm).not.toBe('kSpaceOccupation')
     expect(extracted.colorAlgorithm).toBe('phaseDensity')
+  })
+
+  it('end-to-end: extractSchrodingerConfig keeps kSpaceOccupation under dynamic freeScalar+vacuumNoise', () => {
+    const extracted = extractSchrodingerConfig(
+      makePassConfig({
+        quantumMode: 'freeScalarField',
+        colorAlgorithm: 'kSpaceOccupation',
+        freeScalarInitialCondition: 'vacuumNoise',
+        freeScalarVacuumCanEvolveKSpaceOccupation: true,
+      })
+    )
+    expect(extracted.colorAlgorithm).toBe('kSpaceOccupation')
   })
 
   it('end-to-end: extractSchrodingerConfig keeps kSpaceOccupation under freeScalar+gaussianPacket', () => {
@@ -668,15 +676,10 @@ describe('normalizeColorAlgorithmForQuantumMode', () => {
     ).toBe('blackbody')
   })
 
-  it('drops stale kSpaceOccupation for freeScalarField + vacuumNoise', () => {
-    // Regression: exact vacuum has n_k = 0 for all modes, so `kSpaceOccupation`
-    // produces an intentionally blank map. `getAvailableColorAlgorithms` hides
-    // it for this combination, but the normalizer path previously hardcoded
-    // `freeScalarInitialCondition: undefined` when calling it — letting a
-    // preset-carried `kSpaceOccupation` survive normalization and render as
-    // a blank panel at runtime. The fix threads the initial condition through
-    // so the availability check runs on the real (initialCondition, algo)
-    // pair and the stale algorithm falls back to `phaseDensity`.
+  it('drops stale kSpaceOccupation for static freeScalarField + vacuumNoise', () => {
+    // Static exact vacuum has n_k = 0 for all modes, so `kSpaceOccupation`
+    // produces an intentionally blank map. Dynamic cosmology/preheating opt
+    // back in through availabilityOptions.
     const result = normalizeColorAlgorithmForQuantumMode(
       'freeScalarField',
       'kSpaceOccupation',
@@ -688,6 +691,20 @@ describe('normalizeColorAlgorithmForQuantumMode', () => {
       'vacuumNoise'
     )
     expect(result).toBe('phaseDensity')
+  })
+
+  it('preserves kSpaceOccupation for dynamic freeScalarField + vacuumNoise', () => {
+    const result = normalizeColorAlgorithmForQuantumMode(
+      'freeScalarField',
+      'kSpaceOccupation',
+      false,
+      undefined,
+      undefined,
+      'schroedinger',
+      { freeScalarVacuumCanEvolveKSpaceOccupation: true },
+      'vacuumNoise'
+    )
+    expect(result).toBe('kSpaceOccupation')
   })
 
   it('preserves kSpaceOccupation for freeScalarField + gaussianPacket', () => {

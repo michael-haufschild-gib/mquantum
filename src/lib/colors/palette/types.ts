@@ -294,6 +294,11 @@ export interface ColorAlgorithmAvailabilityOptions {
   /** Isosurface rendering toggle. Isosurface analytic modes skip the grid. */
   isosurface?: boolean
   /**
+   * True when a vacuumNoise free-scalar run has dynamic terms (cosmology or
+   * preheating) that can evolve the adiabatic k-space occupation away from zero.
+   */
+  freeScalarVacuumCanEvolveKSpaceOccupation?: boolean
+  /**
    * Current representation. 'wigner' uses a 2D phase-space path with no grid.
    * Narrowed from `string` so typos (e.g. `'Wigner'`) cannot silently bypass
    * the `analyticHasDensityGrid` check.
@@ -462,9 +467,13 @@ export function getAvailableColorAlgorithms(
       'energyFlux',
       'kSpaceOccupation',
     ])
-    // Exact vacuum has n_k = 0 for all modes (zero-point subtracted), so the
-    // k-space occupation map is correctly but unhelpfully blank.
-    if (freeScalarInitialCondition === 'vacuumNoise') {
+    // Static exact vacuum has n_k = 0 for all modes (zero-point subtracted), so
+    // the k-space occupation map is correctly but unhelpfully blank. Dynamic
+    // cosmology / preheating starts from that vacuum but can create occupation.
+    if (
+      freeScalarInitialCondition === 'vacuumNoise' &&
+      !availabilityOptions?.freeScalarVacuumCanEvolveKSpaceOccupation
+    ) {
       computeValidAlgos.delete('kSpaceOccupation')
     }
     return COLOR_ALGORITHM_OPTIONS.filter((opt) => computeValidAlgos.has(opt.value))

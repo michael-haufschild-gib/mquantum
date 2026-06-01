@@ -58,7 +58,7 @@ describe('getAvailableColorAlgorithms — open quantum gating', () => {
     expect(values).not.toContain('coherenceMap')
   })
 
-  it('excludes kSpaceOccupation for freeScalarField + vacuumNoise', () => {
+  it('excludes kSpaceOccupation for static freeScalarField + vacuumNoise', () => {
     const algos = getAvailableColorAlgorithms(
       'freeScalarField',
       false,
@@ -72,6 +72,19 @@ describe('getAvailableColorAlgorithms — open quantum gating', () => {
     expect(values).toContain('hamiltonianDecomposition')
     expect(values).toContain('modeCharacter')
     expect(values).toContain('energyFlux')
+  })
+
+  it('includes kSpaceOccupation for dynamic freeScalarField + vacuumNoise', () => {
+    const algos = getAvailableColorAlgorithms(
+      'freeScalarField',
+      false,
+      'schroedinger',
+      'vacuumNoise',
+      { freeScalarVacuumCanEvolveKSpaceOccupation: true }
+    )
+    const values = algos.map((a) => a.value)
+
+    expect(values).toContain('kSpaceOccupation')
   })
 
   it('includes kSpaceOccupation for freeScalarField + gaussianPacket', () => {

@@ -82,6 +82,8 @@ export interface PassConfig {
    * undefined for legacy tests that don't exercise the vacuumNoise path.
    */
   freeScalarInitialCondition?: FreeScalarInitialCondition
+  /** True when vacuumNoise can develop nonzero k-space occupation dynamically. */
+  freeScalarVacuumCanEvolveKSpaceOccupation?: boolean
   representation: 'position' | 'momentum' | 'wigner'
   openQuantumEnabled: boolean
   crossSectionEnabled: boolean
@@ -122,6 +124,7 @@ export interface SchrodingerPassConfig {
   fastEigenInterpolationEnabled: boolean
   temporalReprojectionEnabled: boolean
   openQuantumEnabled: boolean
+  freeScalarVacuumCanEvolveKSpaceOccupation: boolean
   crossSectionEnabled: boolean
   probabilityCurrentEnabled: boolean
   radialProbabilityEnabled: boolean
@@ -346,6 +349,7 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
       dimension: effectiveDimension,
       isosurface,
       representation: config.representation,
+      freeScalarVacuumCanEvolveKSpaceOccupation: config.freeScalarVacuumCanEvolveKSpaceOccupation,
     },
     config.freeScalarInitialCondition
   )
@@ -366,6 +370,9 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
     isosurface,
     representation: isCompute ? 'position' : config.representation,
     openQuantumEnabled: gate(config.openQuantumEnabled, isCompute),
+    freeScalarVacuumCanEvolveKSpaceOccupation:
+      config.quantumMode === 'freeScalarField' &&
+      config.freeScalarVacuumCanEvolveKSpaceOccupation === true,
     // Keep the default all-effects-off volumetric shader grid-only. Once any
     // quantum effect is active, compile sibling runtime-gated blocks too so
     // effect-to-effect toggles avoid repeated swaps within the full shader.
@@ -527,6 +534,7 @@ export function resolveColorAlgorithmInt(config: PassConfig): number | undefined
       dimension: config.dimension,
       isosurface: config.isosurface,
       representation: config.representation,
+      freeScalarVacuumCanEvolveKSpaceOccupation: config.freeScalarVacuumCanEvolveKSpaceOccupation,
     },
     config.freeScalarInitialCondition
   )

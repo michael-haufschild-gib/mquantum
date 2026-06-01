@@ -176,6 +176,32 @@ describe('projectToDisplayGrid — FFT shift', () => {
     expect(Math.abs(sumNoShift - sumShift)).toBeLessThan(1e-10)
   })
 
+  it('centers the DC mode for odd-size shifted grids', () => {
+    const N = 5
+    const raw: KSpaceRawData = {
+      nk: new Float64Array([7, 0, 0, 0, 0]),
+      kMag: new Float64Array(N),
+      omega: new Float64Array(N).fill(1),
+      nkMax: 7,
+      kMagMax: 1,
+      omegaMax: 1,
+      totalSites: N,
+      gridSize: [N],
+      strides: [1],
+      latticeDim: 1,
+      spacing: [1],
+    }
+
+    const grid = projectToDisplayGrid(raw, { ...PASSTHROUGH_KSPACE_VIZ, fftShiftEnabled: true })
+    const G = OUTPUT_GRID_SIZE
+    const offset = Math.floor((G - N) / 2)
+    const dcX = offset + Math.floor(N / 2)
+    const center = Math.floor(G / 2)
+    const idx = (center * G + center) * G + dcX
+
+    expect(grid.nk[idx]).toBe(7)
+  })
+
   it('for latticeDim > 3, uses occupancy-weighted hidden-mode aggregation for metadata and nkOmega', () => {
     const gridSize = [2, 2, 2, 4]
     const strides = [16, 8, 4, 1]

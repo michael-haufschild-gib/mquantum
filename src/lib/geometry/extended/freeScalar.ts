@@ -418,6 +418,18 @@ export const DEFAULT_PREHEATING_CONFIG: PreheatingConfig = {
   frequency: 2.0,
 }
 
+/**
+ * Report whether an exact-vacuum free-scalar run has dynamic terms that can
+ * produce nonzero zero-point-subtracted k-space occupation.
+ */
+export function freeScalarVacuumCanEvolveKSpaceOccupation(
+  config: Pick<FreeScalarConfig, 'cosmology' | 'preheating'>
+): boolean {
+  const dynamicCosmology = config.cosmology.enabled && config.cosmology.preset !== 'minkowski'
+  const dynamicPreheating = config.preheating.enabled && config.preheating.amplitude > 0
+  return dynamicCosmology || dynamicPreheating
+}
+
 // ============================================================================
 // Free Scalar Config
 // ============================================================================

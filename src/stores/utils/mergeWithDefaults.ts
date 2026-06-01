@@ -68,6 +68,7 @@ import { normalizeAntiDeSitterLoadedConfig } from './mergeWithDefaultsAntiDeSitt
 import { normalizeFreeScalarLoadedConfig } from './mergeWithDefaultsFreeScalar'
 import { normalizePauliLoadedConfig } from './mergeWithDefaultsPauli'
 import { normalizeSchroedingerNumericScalars } from './mergeWithDefaultsSchroedingerScalars'
+import { normalizeBecLoadedConfig } from './normalizeBecLoadedConfig'
 import { OBJECT_TYPE_TO_CONFIG_KEY } from './presetSerialization'
 
 /**
@@ -583,6 +584,7 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged
   // through. Clamp here so the invariant always holds in memory.
   normalized = normalizeTdseBhParams(normalized)
   normalized = normalizeTdseEnums(normalized)
+  normalized = normalizeBecLoadedConfig(normalized)
   normalized = normalizeAntiDeSitterLoadedConfig(normalized)
   normalized = normalizeWheelerDeWittConfig(normalized)
   normalized = {

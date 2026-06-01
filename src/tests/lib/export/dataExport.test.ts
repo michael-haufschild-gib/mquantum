@@ -89,7 +89,7 @@ describe('exportTdseDiagnosticsCSV', () => {
       normRight: 0.5,
       R: 0.3,
       T: 0.6,
-      ipr: 0,
+      ipr: 42,
     })
     useDiagnosticsStore.getState().pushTdseSnapshot({
       simTime: 0.2,
@@ -100,12 +100,12 @@ describe('exportTdseDiagnosticsCSV', () => {
       normRight: 0.55,
       R: 0.35,
       T: 0.55,
-      ipr: 0,
+      ipr: 24,
     })
 
     const csv = exportTdseDiagnosticsCSV()
     const lines = csv.split('\n')
-    expect(lines[0]).toBe('simTime,frame,norm,R,T')
+    expect(lines[0]).toBe('simTime,frame,norm,R,T,ipr')
     expect(lines).toHaveLength(3) // header + 2 data rows
 
     const row1 = lines[1]!.split(',').map(Number)
@@ -113,6 +113,7 @@ describe('exportTdseDiagnosticsCSV', () => {
     expect(row1[2]).toBeCloseTo(0.99, 2) // norm
     expect(row1[3]).toBeCloseTo(0.3, 2) // R
     expect(row1[4]).toBeCloseTo(0.6, 2) // T
+    expect(row1[5]).toBeCloseTo(42, 2) // IPR
   })
 
   it('3-row export preserves chronological order (oldest first)', () => {
@@ -126,7 +127,7 @@ describe('exportTdseDiagnosticsCSV', () => {
         normRight: 0.5,
         R: 0.1,
         T: 0.9,
-        ipr: 0,
+        ipr: 10,
       },
       {
         simTime: 0.2,
@@ -137,7 +138,7 @@ describe('exportTdseDiagnosticsCSV', () => {
         normRight: 0.6,
         R: 0.25,
         T: 0.74,
-        ipr: 0,
+        ipr: 20,
       },
       {
         simTime: 0.3,
@@ -148,7 +149,7 @@ describe('exportTdseDiagnosticsCSV', () => {
         normRight: 0.7,
         R: 0.4,
         T: 0.58,
-        ipr: 0,
+        ipr: 30,
       },
     ]
     for (const s of snapshots) useDiagnosticsStore.getState().pushTdseSnapshot(s)
@@ -175,6 +176,7 @@ describe('exportTdseDiagnosticsCSV', () => {
     const row2 = lines[2]!.split(',').map(Number)
     expect(row2[2]).toBeCloseTo(0.99, 2) // norm
     expect(row2[4]).toBeCloseTo(0.74, 2) // T
+    expect(row2[5]).toBeCloseTo(20, 2) // IPR
   })
 })
 
@@ -484,7 +486,7 @@ describe('exportDiagnosticsJSON', () => {
       normRight: 0.5,
       R: 0.3,
       T: 0.6,
-      ipr: 0,
+      ipr: 42,
     })
 
     const json = exportDiagnosticsJSON('tdseDynamics')
@@ -496,15 +498,20 @@ describe('exportDiagnosticsJSON', () => {
     const current = tdse.current as Record<string, number>
     expect(current.totalNorm).toBeCloseTo(0.99)
     expect(current.R).toBeCloseTo(0.3)
+    expect(current.ipr).toBeCloseTo(42)
 
     const ts = tdse.timeSeries as Record<string, number[]>
+    expect(ts.simTime).toHaveLength(1)
     expect(ts.norm).toHaveLength(1)
     expect(ts.R).toHaveLength(1)
+    expect(ts.ipr).toHaveLength(1)
 
     // Verify time-series VALUES, not just lengths
+    expect(ts.simTime![0]).toBeCloseTo(0.1, 2)
     expect(ts.norm![0]).toBeCloseTo(0.99, 2)
     expect(ts.R![0]).toBeCloseTo(0.3, 2)
     expect(ts.T![0]).toBeCloseTo(0.6, 2)
+    expect(ts.ipr![0]).toBeCloseTo(42, 2)
   })
 
   it('TDSE JSON time-series preserves chronological order across snapshots', () => {
@@ -517,7 +524,7 @@ describe('exportDiagnosticsJSON', () => {
       normRight: 0.5,
       R: 0.1,
       T: 0.9,
-      ipr: 0,
+      ipr: 11,
     })
     useDiagnosticsStore.getState().pushTdseSnapshot({
       simTime: 0.2,
@@ -528,7 +535,7 @@ describe('exportDiagnosticsJSON', () => {
       normRight: 0.6,
       R: 0.3,
       T: 0.68,
-      ipr: 0,
+      ipr: 22,
     })
 
     const json = exportDiagnosticsJSON('tdseDynamics')
@@ -539,6 +546,10 @@ describe('exportDiagnosticsJSON', () => {
     expect(ts.R![1]).toBeCloseTo(0.3, 2) // newest
     expect(ts.norm![0]).toBeCloseTo(1.0, 2)
     expect(ts.norm![1]).toBeCloseTo(0.98, 2)
+    expect(ts.simTime![0]).toBeCloseTo(0.1, 2)
+    expect(ts.simTime![1]).toBeCloseTo(0.2, 2)
+    expect(ts.ipr![0]).toBeCloseTo(11, 2)
+    expect(ts.ipr![1]).toBeCloseTo(22, 2)
   })
 
   it('includes Dirac data for diracEquation mode', () => {

@@ -84,7 +84,7 @@ export function buildWaterfallParams(input: WaterfallParamInputs): WaterfallPara
     n0: computeWaterfallBackgroundDensity({ interactionStrength: g }),
     deltaN: input.hawkingDeltaN ?? 0,
     g,
-    mass: input.mass ?? 1.0,
+    mass: resolveBecMass(input),
     lBox: (input.gridSize[0] ?? 64) * (input.spacing[0] ?? 0.15),
   }
 }

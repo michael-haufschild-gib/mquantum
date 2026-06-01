@@ -114,6 +114,16 @@ describe('computeIslandOverlayFields', () => {
     expect(fields.islandCenterX0).toBeGreaterThan(0)
   })
 
+  it('uses the canonical BEC mass fallback for imported invalid mass values', () => {
+    const fields = computeIslandOverlayFields(mkBec({ mass: 0 }), ACTIVE_SNAPSHOT)
+    if (fields === null) {
+      throw new Error('expected non-null fields after mass fallback')
+    }
+
+    expect(fields.islandOverlayEnabled).toBe(true)
+    expect(fields.islandCenterX0).toBeGreaterThan(0)
+  })
+
   it('propagates islandBoost verbatim (no clamping at this layer)', () => {
     // Clamping lives in usePageCurveStore.setIslandBoost; this layer trusts
     // its input so a future double-clamp cannot silently override user values.
