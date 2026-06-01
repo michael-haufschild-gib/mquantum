@@ -597,7 +597,12 @@ export interface DiagFrameState {
   diagFrameCounter: number
 }
 
-/** Return the clamped diagnostics cadence in rendered frames. */
+/**
+ * Compute the TDSE diagnostics cadence in rendered frames.
+ *
+ * @param config TDSE configuration; disabled or invalid intervals fall back to DIAG_DECIMATION.
+ * @returns Floor-normalized interval clamped to at least one rendered frame.
+ */
 export function tdseDiagnosticsInterval(config: TdseConfig): number {
   const interval = config.diagnosticsEnabled
     ? config.diagnosticsInterval || DIAG_DECIMATION
@@ -605,15 +610,27 @@ export function tdseDiagnosticsInterval(config: TdseConfig): number {
   return Math.max(1, Math.floor(Number.isFinite(interval) ? interval : DIAG_DECIMATION))
 }
 
-/** Return true when the current frame should run TDSE diagnostics readback. */
+/**
+ * Decide whether current rendered frame should run TDSE diagnostics readback.
+ *
+ * @param config TDSE configuration used to derive cadence.
+ * @param diagFrameCounter Zero-based counter checked before caller increments it.
+ * @returns True once counter + 1 reaches configured diagnostics interval.
+ */
 export function shouldRunTdseDiagnosticsThisFrame(
   config: TdseConfig,
   diagFrameCounter: number
 ): boolean {
-  return Math.max(0, Math.floor(diagFrameCounter)) + 1 >= tdseDiagnosticsInterval(config)
+  return diagFrameCounter + 1 >= tdseDiagnosticsInterval(config)
 }
 
-/** Return true when wormhole HUD readback should piggyback on diagnostics cadence. */
+/**
+ * Decide whether wormhole HUD coherence readback should share TDSE diagnostics cadence.
+ *
+ * @param config TDSE configuration, including wormhole HUD opt-in.
+ * @param diagFrameCounter Zero-based counter checked before caller increments it.
+ * @returns True when HUD readback is enabled and diagnostics are due this frame.
+ */
 export function shouldRequestWormholeCoherenceReadback(
   config: TdseConfig,
   diagFrameCounter: number

@@ -67,104 +67,10 @@ function defaultUiStateFor(
   phiExtent: number,
   srmtCutNormalized: number
 ): SweepUiState {
-  const defaults = srmtSweepDefaultRange(kind, phiExtent)
-  const commonPhiRef = phiExtent / 2
-  if (kind === 'cut') {
-    return {
-      kind,
-      ...defaults,
-      phiRef: commonPhiRef,
-      cutAnchor: srmtCutNormalized,
-    }
-  }
-  if (kind === 'mass') {
-    return {
-      kind,
-      ...defaults,
-      phiRef: commonPhiRef,
-      cutAnchor: srmtCutNormalized,
-    }
-  }
-  if (kind === 'lambda') {
-    // Default range straddles the AdS (Λ<0) / dS (Λ>0) boundary so the
-    // sweep reveals the turning-surface regime change in one pass.
-    return {
-      kind,
-      ...defaults,
-      phiRef: commonPhiRef,
-      cutAnchor: srmtCutNormalized,
-    }
-  }
-  if (kind === 'phiRef') {
-    // phiRef does not enter the q-compute — the plot will be flat by
-    // construction and the physics read is per-point landmark motion.
-    // Range spans (0, phiExtent).
-    return {
-      kind,
-      ...defaults,
-      phiRef: commonPhiRef,
-      cutAnchor: srmtCutNormalized,
-    }
-  }
-  if (kind === 'rankCap') {
-    // Integer rankCap ∈ [8, 256] per driver. The 9-point cadence below
-    // yields 8, 23, 38, …, 128 once the driver rounds + dedups.
-    return {
-      kind,
-      ...defaults,
-      phiRef: commonPhiRef,
-      cutAnchor: srmtCutNormalized,
-    }
-  }
-  if (kind === 'phiExtent') {
-    return {
-      kind,
-      ...defaults,
-      phiRef: commonPhiRef,
-      cutAnchor: srmtCutNormalized,
-    }
-  }
-  if (kind === 'gridNa') {
-    // Cauchy / grid-convergence sweep on the a-axis. Driver clamps
-    // `points` to [3, 9]; Nₐ to [64, 1024]. Defaults span a >2× range
-    // so the leapfrog's 2nd-order convergence is observable in one
-    // sweep without blowing the per-point solve budget at the upper
-    // end.
-    return {
-      kind,
-      ...defaults,
-      phiRef: commonPhiRef,
-      cutAnchor: srmtCutNormalized,
-    }
-  }
-  if (kind === 'gridNphi') {
-    // Cauchy / grid-convergence sweep on the φ-axes. Driver clamps
-    // `points` to [3, 9]; Nφ to [32, 64]. Upper bound is conservative:
-    // the explicit-leapfrog CFL term grows as `N_φ²` at fixed `gridNa`,
-    // so callers hunting a true Cauchy tail should switch to
-    // `gridNphiCoupled` once the solver warns.
-    return {
-      kind,
-      ...defaults,
-      phiRef: commonPhiRef,
-      cutAnchor: srmtCutNormalized,
-    }
-  }
-  if (kind === 'gridNphiCoupled') {
-    // Joint (Nφ, Nₐ) grid-convergence sweep. Driver clamps `points` to
-    // [3, 7]; Nφ to [32, 64]. Per-point `gridNa` is co-scaled via the
-    // coupling formula so the CFL term stays bounded.
-    return {
-      kind,
-      ...defaults,
-      phiRef: commonPhiRef,
-      cutAnchor: srmtCutNormalized,
-    }
-  }
   return {
     kind,
-    ...defaults,
-    phiRef: commonPhiRef,
+    ...srmtSweepDefaultRange(kind, phiExtent),
+    phiRef: phiExtent / 2,
     cutAnchor: srmtCutNormalized,
   }
 }
