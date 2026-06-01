@@ -56,17 +56,18 @@ export interface CaptureTiming {
   /** Spectral resolution Δω = 2π/T, or NaN if empty. */
   deltaOmega: number
   /**
-   * Nyquist angular frequency π/dt where dt is the *actual* mean sample
-   * period measured from the ring buffer's `times` array. NaN if empty.
+   * Nyquist angular frequency π/dt where dt is the nominal cadence used
+   * by the spectrum builder. NaN if empty.
    */
   omegaNyquist: number
 }
 
 /**
  * Derive T captured, Δω resolution, and ω_max (Nyquist) from a ring
- * buffer. Reads the stored `times[]` directly so the numbers reflect
- * the real measured sample spacing, not a notional
- * `sampleInterval * frame_dt` product.
+ * buffer. Reads the stored `times[]` directly and mirrors the
+ * `computeHellerSpectrum` cadence convention: integer-multiple gaps are
+ * treated as dropped readback slots, so Nyquist uses the smallest
+ * positive gap rather than the first/last mean spacing.
  *
  * @param buf - Ring buffer, or null if the pass has not wired one yet
  * @param _sampleCount - Snapshot of `buf.count` at call time. Not read
@@ -84,20 +85,32 @@ export function deriveCaptureTiming(
   if (!buf || buf.count < 2) {
     return { tCaptured: NaN, deltaOmega: NaN, omegaNyquist: NaN }
   }
-  // Extract first and last stored times in chronological order.
-  // Mirrors the extraction logic in `computeHellerSpectrum`.
   const start = buf.count === buf.capacity ? buf.head : 0
-  const firstIdx = start % buf.capacity
-  const lastIdx = (start + buf.count - 1) % buf.capacity
-  const tFirst = buf.times[firstIdx]!
-  const tLast = buf.times[lastIdx]!
-  const tCaptured = tLast - tFirst
-  if (!(tCaptured > 0) || !Number.isFinite(tCaptured)) {
+  const tFirst = buf.times[start % buf.capacity]!
+  let previousTime = tFirst
+  let nominalDt = Infinity
+
+  if (!Number.isFinite(tFirst)) {
     return { tCaptured: NaN, deltaOmega: NaN, omegaNyquist: NaN }
   }
-  const dt = tCaptured / (buf.count - 1)
+
+  for (let i = 1; i < buf.count; i++) {
+    const time = buf.times[(start + i) % buf.capacity]!
+    const gap = time - previousTime
+    if (!(gap > 0) || !Number.isFinite(gap) || !Number.isFinite(time)) {
+      return { tCaptured: NaN, deltaOmega: NaN, omegaNyquist: NaN }
+    }
+    nominalDt = Math.min(nominalDt, gap)
+    previousTime = time
+  }
+
+  const tLast = previousTime
+  const tCaptured = tLast - tFirst
+  if (!(tCaptured > 0) || !Number.isFinite(tCaptured) || !Number.isFinite(nominalDt)) {
+    return { tCaptured: NaN, deltaOmega: NaN, omegaNyquist: NaN }
+  }
   const deltaOmega = (2 * Math.PI) / tCaptured
-  const omegaNyquist = Math.PI / dt
+  const omegaNyquist = Math.PI / nominalDt
   return { tCaptured, deltaOmega, omegaNyquist }
 }
 

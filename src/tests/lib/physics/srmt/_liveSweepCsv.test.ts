@@ -112,9 +112,10 @@ describe('LIVE SWEEP — falsification CSV end-to-end', () => {
     expect(qAShufIdx).toBeGreaterThan(-1)
     expect(firstRow[qALinfIdx]).not.toBe('')
     expect(firstRow[qAShufIdx]).not.toBe('')
-    // Every data row should have 51 columns (30 original + 12 affine + 9 rigid).
+    // Every data row should have 57 columns
+    // (30 original + 12 affine + 9 rigid + 6 per-point landmark columns).
     for (const row of dataRows) {
-      expect(row.split(',')).toHaveLength(51)
+      expect(row.split(',')).toHaveLength(57)
     }
   }, 60_000)
 })

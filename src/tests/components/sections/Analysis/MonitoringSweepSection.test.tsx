@@ -7,7 +7,7 @@
  * config stayed on whatever the last sweep step left behind.
  */
 
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -70,13 +70,39 @@ describe('MonitoringSweepSection — snapshot and restore', () => {
     expect(getTdse().stochasticGamma).toBe(PRE_SWEEP_GAMMA)
   })
 
-  it('restores the user TDSE state when the sweep is cleared after completion', async () => {
+  it('keeps the original TDSE snapshot when Start is invoked twice before rerender', () => {
+    render(<MonitoringSweepSection />)
+    const start = screen.getByRole('button', { name: /^Start Sweep$/i })
+
+    fireEvent.click(start)
+    fireEvent.click(start)
+    fireEvent.click(screen.getByRole('button', { name: /^Abort$/i }))
+
+    expect(useMonitoringSweepStore.getState().status).toBe('idle')
+    expect(getTdse().diagnosticsEnabled).toBe(false)
+    expect(getTdse().stochasticGamma).toBe(PRE_SWEEP_GAMMA)
+  })
+
+  it('restores the user TDSE state when the sweep completes', async () => {
     const user = userEvent.setup()
     render(<MonitoringSweepSection />)
     await user.click(screen.getByRole('button', { name: /^Start Sweep$/i }))
-    // Shortcut to the complete state to test the Clear button independently
-    // of the diagnostic-polling tick loop.
-    useMonitoringSweepStore.setState({ status: 'complete' })
+
+    act(() => {
+      useMonitoringSweepStore.setState({ status: 'complete' })
+    })
+
+    expect(getTdse().diagnosticsEnabled).toBe(false)
+    expect(getTdse().stochasticGamma).toBe(PRE_SWEEP_GAMMA)
+  })
+
+  it('clears completed sweep results after completion restore', async () => {
+    const user = userEvent.setup()
+    render(<MonitoringSweepSection />)
+    await user.click(screen.getByRole('button', { name: /^Start Sweep$/i }))
+    act(() => {
+      useMonitoringSweepStore.setState({ status: 'complete' })
+    })
     await user.click(await screen.findByRole('button', { name: /^Clear$/i }))
 
     expect(useMonitoringSweepStore.getState().status).toBe('idle')

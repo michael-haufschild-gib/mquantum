@@ -32,6 +32,7 @@ import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import { getGitSha } from '@/lib/buildInfo'
 import { downloadFile, exportFilename } from '@/lib/export/dataExport'
 import { SRMT_DIAGNOSTIC_VERSION } from '@/lib/physics/srmt'
+import { srmtSweepDefaultRange } from '@/lib/physics/srmt/sweepDefaults'
 import { buildSrmtSweepManifest } from '@/lib/physics/srmt/sweepManifest'
 import type { SrmtSweepKind } from '@/lib/physics/srmt/sweepTypes'
 import { WDW_SOLVER_VERSION } from '@/lib/physics/wheelerDeWitt/solver'
@@ -66,13 +67,12 @@ function defaultUiStateFor(
   phiExtent: number,
   srmtCutNormalized: number
 ): SweepUiState {
+  const defaults = srmtSweepDefaultRange(kind, phiExtent)
   const commonPhiRef = phiExtent / 2
   if (kind === 'cut') {
     return {
       kind,
-      points: 17,
-      sweepMin: 0.1,
-      sweepMax: 0.9,
+      ...defaults,
       phiRef: commonPhiRef,
       cutAnchor: srmtCutNormalized,
     }
@@ -80,9 +80,7 @@ function defaultUiStateFor(
   if (kind === 'mass') {
     return {
       kind,
-      points: 9,
-      sweepMin: 0.1,
-      sweepMax: 1.5,
+      ...defaults,
       phiRef: commonPhiRef,
       cutAnchor: srmtCutNormalized,
     }
@@ -92,9 +90,7 @@ function defaultUiStateFor(
     // sweep reveals the turning-surface regime change in one pass.
     return {
       kind,
-      points: 9,
-      sweepMin: -0.5,
-      sweepMax: 0.5,
+      ...defaults,
       phiRef: commonPhiRef,
       cutAnchor: srmtCutNormalized,
     }
@@ -105,9 +101,7 @@ function defaultUiStateFor(
     // Range spans (0, phiExtent).
     return {
       kind,
-      points: 11,
-      sweepMin: 0.05,
-      sweepMax: Math.max(0.05, phiExtent - 0.05),
+      ...defaults,
       phiRef: commonPhiRef,
       cutAnchor: srmtCutNormalized,
     }
@@ -117,9 +111,7 @@ function defaultUiStateFor(
     // yields 8, 23, 38, …, 128 once the driver rounds + dedups.
     return {
       kind,
-      points: 9,
-      sweepMin: 8,
-      sweepMax: 128,
+      ...defaults,
       phiRef: commonPhiRef,
       cutAnchor: srmtCutNormalized,
     }
@@ -127,9 +119,7 @@ function defaultUiStateFor(
   if (kind === 'phiExtent') {
     return {
       kind,
-      points: 5,
-      sweepMin: 1.0,
-      sweepMax: 3.0,
+      ...defaults,
       phiRef: commonPhiRef,
       cutAnchor: srmtCutNormalized,
     }
@@ -142,9 +132,7 @@ function defaultUiStateFor(
     // end.
     return {
       kind,
-      points: 3,
-      sweepMin: 128,
-      sweepMax: 384,
+      ...defaults,
       phiRef: commonPhiRef,
       cutAnchor: srmtCutNormalized,
     }
@@ -157,9 +145,7 @@ function defaultUiStateFor(
     // `gridNphiCoupled` once the solver warns.
     return {
       kind,
-      points: 3,
-      sweepMin: 32,
-      sweepMax: 64,
+      ...defaults,
       phiRef: commonPhiRef,
       cutAnchor: srmtCutNormalized,
     }
@@ -170,18 +156,14 @@ function defaultUiStateFor(
     // coupling formula so the CFL term stays bounded.
     return {
       kind,
-      points: 5,
-      sweepMin: 32,
-      sweepMax: 64,
+      ...defaults,
       phiRef: commonPhiRef,
       cutAnchor: srmtCutNormalized,
     }
   }
   return {
     kind,
-    points: 3,
-    sweepMin: 0,
-    sweepMax: 2,
+    ...defaults,
     phiRef: commonPhiRef,
     cutAnchor: srmtCutNormalized,
   }
