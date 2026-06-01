@@ -226,6 +226,26 @@ describe('buildShaderConfig', () => {
     expect(cfg.fastGridEmission).toBe(true)
   })
 
+  it('forces density-grid isosurface for open quantum mixed states', () => {
+    const cfg = buildShaderConfig({
+      dimension: 3,
+      quantumMode: 'harmonicOscillator',
+      isosurface: true,
+      openQuantumEnabled: true,
+      colorAlgorithm: 16,
+    } as never)
+    const { wgsl } = composeSchroedingerShader(cfg)
+
+    expect(cfg.isosurface).toBe(true)
+    expect(cfg.useDensityGrid).toBe(true)
+    expect(cfg.useDensityMatrix).toBe(true)
+    expect(cfg.densityGridHasPhase).toBe(true)
+    expect(wgsl).toContain('Main Fragment Shader - Isosurface Mode')
+    expect(wgsl).toContain('const DENSITY_GRID_HAS_PHASE: bool = true;')
+    expect(wgsl).toContain('sampleDensityFromGrid')
+    expect(wgsl).not.toContain('sampleQuantumState(pos, schroedinger)')
+  })
+
   it('enables fast grid emission for every compute-grid shader and leaves analytic modes lit', () => {
     const ho = buildShaderConfig({ dimension: 3, quantumMode: 'harmonicOscillator' } as never)
     const hydrogen = buildShaderConfig({ dimension: 3, quantumMode: 'hydrogenND' } as never)

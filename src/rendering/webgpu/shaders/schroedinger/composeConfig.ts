@@ -597,7 +597,7 @@ export function selectMainBlock(
   }
   return enableTemporal
     ? generateMainBlockTemporal({ bayerJitter: true, useDensityGrid, useDensityMatrix, gridOnly })
-    : generateMainBlockVolumetric({ useDensityGrid, gridOnly })
+    : generateMainBlockVolumetric({ useDensityGrid, useDensityMatrix, gridOnly })
 }
 
 /**

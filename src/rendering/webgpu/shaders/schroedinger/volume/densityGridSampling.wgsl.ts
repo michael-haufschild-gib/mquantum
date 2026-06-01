@@ -251,6 +251,13 @@ fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f 
     // was redundant — dropping it saves a per-sample max in the raymarch
     // loop (called every march step, every pixel, every frame).
     return gradRho / (rhoCenter.r + rhoCenter.g + 1e-8);
+  } else if (IS_PAULI && DENSITY_GRID_HAS_PHASE) {
+    let gradX = sxp.a - sxn.a;
+    let gradY = syp.a - syn.a;
+    let gradZ = szp.a - szn.a;
+    let gradRho = vec3f(gradX, gradY, gradZ) * inv2eps;
+    let rhoCenter = textureSampleLevel(densityGridTexture, densityGridSampler, baseUVW, 0.0);
+    return gradRho / (rhoCenter.a + 1e-8);
   } else if (DENSITY_GRID_HAS_PHASE) {
     let gradX = sxp.g - sxn.g;
     let gradY = syp.g - syn.g;

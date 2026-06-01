@@ -24,7 +24,6 @@ struct VertexUniforms {
   modelMatrix: mat4x4<f32>,
   modelViewMatrix: mat4x4<f32>,
   projectionMatrix: mat4x4<f32>,
-  rotationMatrix: mat3x3<f32>,
 }
 
 @group(0) @binding(1) var<uniform> vertexUniforms: VertexUniforms;
@@ -40,7 +39,7 @@ export function composeSkyboxVertexShader(effects: SkyboxEffects): string {
     '// Force to background: reverse-Z far plane = 0',
     'output.position.z = 0.0;',
     '',
-    'output.worldDirection = vertexUniforms.rotationMatrix * normalize(worldPos);',
+    'output.worldDirection = normalize(worldPos);',
   ]
 
   if (effects.vignette) {

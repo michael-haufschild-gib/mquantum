@@ -12,6 +12,7 @@ import {
   generateColorSample,
   generateDensitySample,
   generateGradientCompute,
+  generateIsosurfaceSpacetimeHelpers,
   generateSeedSample,
 } from './isosurfaceSampling'
 import { generateBayerJitterSection, getRayDirSource } from './temporalJitter'
@@ -46,6 +47,7 @@ export function generateMainBlockIsosurfaceTemporal(
   const binarySearchSample = generateBinarySearchSample(useDensityGrid)
   const gradientCompute = generateGradientCompute(useDensityGrid)
   const colorSample = generateColorSample(useDensityGrid)
+  const spacetimeHelpers = generateIsosurfaceSpacetimeHelpers()
 
   return /* wgsl */ `
 // ============================================
@@ -56,6 +58,8 @@ export function generateMainBlockIsosurfaceTemporal(
 
 // Light helpers: getEmissionLightDir, getEmissionLightAttenuation
 // from emissionLit.wgsl.ts (included via emissionPostBlock)
+
+${spacetimeHelpers}
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> TemporalFragmentOutput {
@@ -196,7 +200,9 @@ ${bayerJitterSection}
   }
 
   // Compute surface point and normal
-  let p = ro + rd * hitT;
+  let pRay = ro + rd * hitT;
+  let surfaceSample = sampleIsosurfaceWithSpacetimeWarp(pRay, rd, animTime, isoGain, schroedinger);
+  let p = surfaceSample.samplePos;
   var rawGrad: vec3f;
   ${gradientCompute}
   // PERF: rsqrt form — single hardware op replaces sqrt + divide for the
@@ -220,11 +226,12 @@ ${bayerJitterSection}
   ${colorSample}
 
   // For dual-channel modes: s = secondary density from grid (not log-density).
-  let sSurface = select(sFromRho(rhoSurface), dualSecondary, IS_DUAL_CHANNEL);
-  var surfaceColor = computeBaseColor(rhoSurface, sSurface, phase, p, schroedinger);
+  // Pauli non-dual modes may use A for hit density and R for selected-observable color.
+  let sSurface = select(sFromRho(colorRhoSurface), dualSecondary, IS_DUAL_CHANNEL);
+  var surfaceColor = computeBaseColor(colorRhoSurface, sSurface, phase, p, schroedinger);
 
   // Branch coloring: tint isosurface by branch plane position
-  if (schroedinger.quantumMode == 3 && schroedinger.branchSeparation > 0.5 && schroedinger.branchTransitionWidth > 0.0) {
+  if (schroedinger.quantumMode == 3 && schroedinger.branchSeparation > 0.0 && schroedinger.branchTransitionWidth > 0.0) {
     let branchFrac = smoothstep(
       schroedinger.branchPlaneThreshold - schroedinger.branchTransitionWidth,
       schroedinger.branchPlaneThreshold + schroedinger.branchTransitionWidth,
@@ -336,6 +343,7 @@ ${bayerJitterSection}
 
   // HDR Emission Glow (shared helper)
   col = applyHDREmissionGlow(col, surfaceColor, sSurface, schroedinger);
+  col *= surfaceEmissionGain;
 
   // Nodal overlay
   if (

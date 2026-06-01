@@ -7,12 +7,10 @@
  * offsets using WGSL alignment rules, eliminating hand-computed magic numbers
  * from the packing code in `WebGPUSkyboxRenderer.ts` and `skyboxVertexData.ts`.
  *
- * The `mat4x4<f32>` and `mat3x3<f32>` matrix types are modelled as
- * `array<vec4f, N>` because WGSL gives them identical alignment, stride, and
- * size: a `mat4x4<f32>` is four 16-byte vec4 columns, and a `mat3x3<f32>` is
- * three vec3 columns each padded to 16-byte stride. The TypeScript layout
- * engine has no native mat type; the equivalent vec4 array reproduces the
- * exact byte layout.
+ * The `mat4x4<f32>` matrix type is modelled as `array<vec4f, 4>` because WGSL
+ * gives it identical alignment, stride, and size. The TypeScript layout engine
+ * has no native mat type; the equivalent vec4 array reproduces the exact byte
+ * layout.
  *
  * Validated at test time by parsing both WGSL struct template literals and
  * comparing field names, types, and computed offsets.
@@ -127,7 +125,6 @@ const SKYBOX_VERTEX_UNIFORMS_FIELDS = [
   { name: 'modelMatrix', type: arr('vec4f', 4) },
   { name: 'modelViewMatrix', type: arr('vec4f', 4) },
   { name: 'projectionMatrix', type: arr('vec4f', 4) },
-  { name: 'rotationMatrix', type: arr('vec4f', 3) },
 ] as const satisfies readonly StructFieldDef[]
 
 /** Computed struct layout for SkyboxUniforms. */

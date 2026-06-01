@@ -597,6 +597,33 @@ export interface DiagFrameState {
   diagFrameCounter: number
 }
 
+/** Return the clamped diagnostics cadence in rendered frames. */
+export function tdseDiagnosticsInterval(config: TdseConfig): number {
+  const interval = config.diagnosticsEnabled
+    ? config.diagnosticsInterval || DIAG_DECIMATION
+    : DIAG_DECIMATION
+  return Math.max(1, Math.floor(Number.isFinite(interval) ? interval : DIAG_DECIMATION))
+}
+
+/** Return true when the current frame should run TDSE diagnostics readback. */
+export function shouldRunTdseDiagnosticsThisFrame(
+  config: TdseConfig,
+  diagFrameCounter: number
+): boolean {
+  return Math.max(0, Math.floor(diagFrameCounter)) + 1 >= tdseDiagnosticsInterval(config)
+}
+
+/** Return true when wormhole HUD readback should piggyback on diagnostics cadence. */
+export function shouldRequestWormholeCoherenceReadback(
+  config: TdseConfig,
+  diagFrameCounter: number
+): boolean {
+  return (
+    config.wormholeCoherenceHudEnabled === true &&
+    shouldRunTdseDiagnosticsThisFrame(config, diagFrameCounter)
+  )
+}
+
 /** Resources needed by the post-step dispatches. */
 export interface PostStepResources {
   pl: TdsePipelineResult
@@ -640,11 +667,12 @@ export function runPostStepDispatches(
   // display normalization. Without this, a spreading wavepacket fades to
   // invisible because maxDensity stays at the initial peak value.
   res.diagState.currentAutoLoop = config.autoLoop
+  const shouldRunDiagnostics = shouldRunTdseDiagnosticsThisFrame(
+    config,
+    frameState.diagFrameCounter
+  )
   frameState.diagFrameCounter++
-  const interval = config.diagnosticsEnabled
-    ? config.diagnosticsInterval || DIAG_DECIMATION
-    : DIAG_DECIMATION
-  if (frameState.diagFrameCounter >= interval) {
+  if (shouldRunDiagnostics) {
     frameState.diagFrameCounter = 0
     const { diagResultBuffer, diagStagingBuffer } = res.diagState
     if (diagResultBuffer && diagStagingBuffer && res.diagUniformBuffer) {

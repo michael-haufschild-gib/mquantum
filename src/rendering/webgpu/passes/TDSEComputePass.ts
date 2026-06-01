@@ -66,6 +66,7 @@ import {
   type EvolutionFrameState,
   runPostStepDispatches,
   runStrangEvolution,
+  shouldRequestWormholeCoherenceReadback,
 } from './TDSEComputePassEvolution'
 import {
   buildHawkingInjectPipeline,
@@ -1161,9 +1162,9 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     }
 
     // ER=EPR wormhole coherence HUD readback — piggybacks on the same
-    // per-frame cadence as diagnostics. Allocates staging buffers lazily
-    // on first enabled call; no-op when the HUD toggle is off.
-    if (config.wormholeCoherenceHudEnabled === true) {
+    // decimated cadence as TDSE diagnostics. This keeps the visual HUD from
+    // turning into a full-ψ GPU readback every rendered frame.
+    if (shouldRequestWormholeCoherenceReadback(config, this._diagFrameState.diagFrameCounter)) {
       requestWormholeReadback(
         device,
         ctx.encoder,

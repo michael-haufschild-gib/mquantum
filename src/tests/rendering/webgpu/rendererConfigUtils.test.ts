@@ -299,6 +299,20 @@ describe('buildShaderConfig', () => {
     const config = buildShaderConfig({ ...BASE_CONFIG, dimension: 2, isosurface: true })
     expect(config.isosurface).toBe(true)
   })
+
+  it('forces density-grid isosurface for open quantum mixed states', () => {
+    const config = buildShaderConfig({
+      ...BASE_CONFIG,
+      dimension: 3,
+      isosurface: true,
+      openQuantumEnabled: true,
+      colorAlgorithm: 16,
+    })
+    expect(config.isosurface).toBe(true)
+    expect(config.useDensityGrid).toBe(true)
+    expect(config.useDensityMatrix).toBe(true)
+    expect(config.densityGridHasPhase).toBe(true)
+  })
 })
 
 describe('computePipelineCacheKey', () => {

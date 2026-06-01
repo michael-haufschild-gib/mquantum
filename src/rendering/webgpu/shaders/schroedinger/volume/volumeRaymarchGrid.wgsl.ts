@@ -102,7 +102,7 @@ fn volumeRaymarchGrid(
   // PERF: hoist mode-only uniforms out of the per-sample loop.
   let branchColorActive =
     FEATURE_TDSE_BRANCH_COLOR
-    && uniforms.branchSeparation > 0.5
+    && uniforms.branchSeparation > 0.0
     && uniforms.branchTransitionWidth > 0.0;
   let backreactionActive = isQuantumBackreactionActive(uniforms)
     && FEATURE_QUANTUM_BACKREACTION_LENSING;
@@ -535,7 +535,7 @@ fn volumeRaymarchGrid(
         // Branch coloring: when alpha encodes branch fraction (2.0 + frac),
         // tint emission toward branch A or branch B color.
         // Guard: only TDSE dynamics (mode 3) produces branch-encoded alpha.
-        // branchSeparation > 0.5 means stochastic decoherence is active (γ > 0).
+        // branchSeparation > 0 means stochastic decoherence is active (γ > 0).
         // Without this guard, enabling "show branches" at γ=0 would recolor
         // the volume without any actual decoherence happening. branchColorActive
         // hoisted above the loop (uniforms-only).

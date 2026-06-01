@@ -659,6 +659,33 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     expect(wgsl).toContain('uniforms.phaseAnimationEnabled')
   })
 
+  it('does not fall back to pure-state inline raymarching in density-matrix mode', () => {
+    const { wgsl, features } = composeSchroedingerShader({
+      dimension: 3,
+      isosurface: false,
+      temporalAccumulation: false,
+      useDensityGrid: true,
+      useDensityMatrix: true,
+      densityGridSize: 64,
+      quantumMode: 'harmonicOscillator',
+      nodal: false,
+      phaseMateriality: false,
+      interference: false,
+      uncertaintyBoundary: false,
+      probabilityCurrentEnabled: false,
+      radialProbabilityEnabled: false,
+      bornNullWeaveEnabled: false,
+      phaseAnimationEnabled: false,
+      crossSectionEnabled: false,
+      colorAlgorithm: 16,
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(features).not.toContain('Grid-Only (inline raymarch excluded)')
+    expect(wgsl).toContain('No inline fallback in density matrix mode')
+    expect(wgsl).not.toContain('if (!IS_FREE_SCALAR && volumeResult.alpha < 0.01)')
+  })
+
   it('uses sphere intersection for non-free-scalar modes', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 3,

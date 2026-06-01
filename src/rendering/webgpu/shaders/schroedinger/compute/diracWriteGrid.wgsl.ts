@@ -84,6 +84,19 @@ fn upperLowerDensityAt(siteIdx: u32, S: u32, T: u32) -> vec2f {
   return vec2f(upper, lower);
 }
 
+fn getDiracPotentialScale() -> f32 {
+  if (params.potentialType == 1u || params.potentialType == 2u || params.potentialType == 3u) {
+    return max(abs(params.potentialStrength), 1.0);
+  } else if (params.potentialType == 4u) {
+    let r = params.boundingRadius * 0.5;
+    return max(0.5 * params.mass * params.harmonicOmega * params.harmonicOmega * r * r, 1.0);
+  } else if (params.potentialType == 5u) {
+    // diracPotential.wgsl soft-clamps r to 0.05, so |V|max = Z / 0.05.
+    return max(abs(params.coulombZ) / 0.05, 1.0);
+  }
+  return 1.0;
+}
+
 // Convert precomputed fractional lattice coordinates into interpolation corners.
 fn worldToLatticeInterp(
   coordFs: ptr<function, array<f32, 12>>,
@@ -569,8 +582,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   if (params.showPotential == 1u && params.fieldView != 3u) {
     let V = potential[nnSiteIdx];
-    let potScale = max(abs(params.potentialStrength), 1.0);
-    let normPot = abs(V) / potScale;
+    let normPot = abs(V) / getDiracPotentialScale();
     let fadeout = 1.0 - smoothstep(1.5, 3.0, normPot);
     var overlayGain: f32 = 1.0;
     if (params.potentialType == 4u || params.potentialType == 5u) {

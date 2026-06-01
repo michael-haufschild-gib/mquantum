@@ -12,6 +12,7 @@ import {
   generateColorSample,
   generateDensitySample,
   generateGradientCompute,
+  generateIsosurfaceSpacetimeHelpers,
   generateSeedSample,
 } from './isosurfaceSampling'
 
@@ -32,6 +33,7 @@ export function generateMainBlockIsosurface(config: IsosurfaceMainBlockConfig = 
   const binarySearchSample = generateBinarySearchSample(useDensityGrid)
   const gradientCompute = generateGradientCompute(useDensityGrid)
   const colorSample = generateColorSample(useDensityGrid)
+  const spacetimeHelpers = generateIsosurfaceSpacetimeHelpers()
 
   return /* wgsl */ `
 // ============================================
@@ -39,6 +41,8 @@ export function generateMainBlockIsosurface(config: IsosurfaceMainBlockConfig = 
 // ============================================
 // Light helpers: getEmissionLightDir, getEmissionLightAttenuation
 // from emissionLit.wgsl.ts (included via emissionPostBlock)
+
+${spacetimeHelpers}
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> FragmentOutput {
@@ -186,9 +190,11 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
   }
 
   // Compute surface point and normal (preserve gradient magnitude for uncertainty).
+  let pRay = ro + rd * hitT;
+  let surfaceSample = sampleIsosurfaceWithSpacetimeWarp(pRay, rd, animTime, isoGain, schroedinger);
+  let p = surfaceSample.samplePos;
   // Fuse normalization + length via inverseSqrt: one rsqrt replaces
   // sqrt + 3 vec3-by-scalar divs with rsqrt + 4 muls.
-  let p = ro + rd * hitT;
   var rawGrad: vec3f;
   ${gradientCompute}
   let gMagSq = dot(rawGrad, rawGrad);
@@ -207,14 +213,16 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
 
   // Surface coloring via full color algorithm system
   // For dual-channel modes (Dirac particle/antiparticle, Pauli spin-up/down):
-  //   rhoSurface = R (primary), dualSecondary = G (secondary) from the grid.
+  //   colorRhoSurface = R (primary), dualSecondary = G (secondary) from the grid.
   //   computeBaseColor expects (rho=primary, s=secondary) — NOT log-density.
+  // For Pauli non-dual modes, rhoSurface may come from A (total density)
+  // while colorRhoSurface remains R (selected observable).
   // For standard modes: s = log(rho) as usual.
-  let sSurface = select(sFromRho(rhoSurface), dualSecondary, IS_DUAL_CHANNEL);
-  var surfaceColor = computeBaseColor(rhoSurface, sSurface, phase, p, schroedinger);
+  let sSurface = select(sFromRho(colorRhoSurface), dualSecondary, IS_DUAL_CHANNEL);
+  var surfaceColor = computeBaseColor(colorRhoSurface, sSurface, phase, p, schroedinger);
 
   // Branch coloring: tint isosurface by branch plane position
-  if (schroedinger.quantumMode == 3 && schroedinger.branchSeparation > 0.5 && schroedinger.branchTransitionWidth > 0.0) {
+  if (schroedinger.quantumMode == 3 && schroedinger.branchSeparation > 0.0 && schroedinger.branchTransitionWidth > 0.0) {
     let branchFrac = smoothstep(
       schroedinger.branchPlaneThreshold - schroedinger.branchTransitionWidth,
       schroedinger.branchPlaneThreshold + schroedinger.branchTransitionWidth,
@@ -336,6 +344,7 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
 
   // HDR Emission Glow (shared helper)
   col = applyHDREmissionGlow(col, surfaceColor, sSurface, schroedinger);
+  col *= surfaceEmissionGain;
 
   // Iso-mode nodal consistency: band overlay + local ray-hit surface overlay.
   if (
