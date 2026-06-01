@@ -552,6 +552,18 @@ describe('materialiseSweepConfig — lambda defaults', () => {
     ).toBe(7)
   })
 
+  it('uses the same bare-URL grid defaults as the sweep panel', () => {
+    expect(materialiseSweepConfig({ kind: 'gridNa' }, DEFAULT_WHEELER_DEWITT_CONFIG)).toMatchObject(
+      { points: 3, sweepMin: 128, sweepMax: 384 }
+    )
+    expect(
+      materialiseSweepConfig({ kind: 'gridNphi' }, DEFAULT_WHEELER_DEWITT_CONFIG)
+    ).toMatchObject({ points: 3, sweepMin: 32, sweepMax: 64 })
+    expect(
+      materialiseSweepConfig({ kind: 'gridNphiCoupled' }, DEFAULT_WHEELER_DEWITT_CONFIG)
+    ).toMatchObject({ points: 5, sweepMin: 32, sweepMax: 64 })
+  })
+
   it('canonicalises pending Lanczos seed to the uint32 value used by the solver', () => {
     expect(
       materialiseSweepConfig({ kind: 'cut', seed: -1 }, DEFAULT_WHEELER_DEWITT_CONFIG).seed

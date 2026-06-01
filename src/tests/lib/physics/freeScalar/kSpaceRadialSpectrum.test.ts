@@ -82,6 +82,35 @@ function makeOneDimensionalKSpaceRawData(N: number): KSpaceRawData {
   }
 }
 
+function makeOneDimensionalDcRawData(N: number): KSpaceRawData {
+  const nk = new Float64Array(N)
+  const kMag = new Float64Array(N)
+  const omega = new Float64Array(N)
+  let kMagMax = 0
+
+  nk[0] = 9
+  for (let k = 0; k < N; k++) {
+    const value = Math.abs(2 * Math.sin((Math.PI * k) / N))
+    kMag[k] = value
+    omega[k] = value
+    if (value > kMagMax) kMagMax = value
+  }
+
+  return {
+    nk,
+    kMag,
+    omega,
+    nkMax: 9,
+    kMagMax,
+    omegaMax: kMagMax,
+    totalSites: N,
+    gridSize: [N],
+    strides: [1],
+    latticeDim: 1,
+    spacing: [1],
+  }
+}
+
 // ============================================================================
 // computeRadialShells
 // ============================================================================
@@ -326,5 +355,24 @@ describe('buildRadialDisplayGrid', () => {
 
     expect(grid.kNorm[edgeIdx]).toBeLessThan(0.3)
     expect(grid.kNorm[middleIdx]).toBeGreaterThan(0.8)
+  })
+
+  it('keeps DC occupation visible at the shifted center for oversized grids', () => {
+    const G = 64
+    const raw = makeOneDimensionalDcRawData(128)
+    const grid = buildRadialDisplayGrid(
+      raw,
+      {
+        ...PASSTHROUGH_KSPACE_VIZ,
+        displayMode: 'radial3d',
+        fftShiftEnabled: true,
+        radialBinCount: 128,
+      },
+      G
+    )
+    const center = Math.floor(G / 2)
+    const centerIdx = (center * G + center) * G + center
+
+    expect(grid.nk[centerIdx]).toBe(9)
   })
 })

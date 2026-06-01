@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Button } from '@/components/ui/Button'
-import { Switch } from '@/components/ui/Switch'
 import { usePerformanceStore } from '@/stores/runtime/performanceStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
 
@@ -15,11 +14,9 @@ import { formatBytes, formatShaderName } from '../utils'
 // ============================================================================
 export const ShaderTabContent = React.memo(function ShaderTabContent() {
   const objectType = useGeometryStore((s) => s.objectType)
-  const { shaderDebugInfos, shaderOverrides, toggleShaderModule } = usePerformanceStore(
+  const { shaderDebugInfos } = usePerformanceStore(
     useShallow((s) => ({
       shaderDebugInfos: s.shaderDebugInfos,
-      shaderOverrides: s.shaderOverrides,
-      toggleShaderModule: s.toggleShaderModule,
     }))
   )
 
@@ -89,28 +86,14 @@ export const ShaderTabContent = React.memo(function ShaderTabContent() {
           <div className="space-y-3">
             <SectionHeader icon={<Icons.Database />} label="Modules" />
             <div className="border border-border-subtle rounded-lg overflow-hidden">
-              {activeShaderInfo.activeModules.map((mod) => {
-                const isEnabled = !shaderOverrides.includes(mod)
-                return (
-                  <div
-                    key={mod}
-                    className="flex items-center justify-between p-2 hover:bg-[var(--bg-hover)] border-b border-border-subtle last:border-0 transition-colors"
-                  >
-                    <span
-                      className={`text-xs font-mono ${isEnabled ? 'text-text-secondary' : 'text-text-tertiary line-through'}`}
-                    >
-                      {mod}
-                    </span>
-                    <Switch
-                      checked={isEnabled}
-                      onCheckedChange={() => toggleShaderModule(mod)}
-                      ariaLabel={`Toggle shader module ${mod}`}
-                      tooltip={`Enable or disable the ${mod} shader module`}
-                      className="scale-75 origin-right"
-                    />
-                  </div>
-                )
-              })}
+              {activeShaderInfo.activeModules.map((mod) => (
+                <div
+                  key={mod}
+                  className="flex items-center justify-between p-2 hover:bg-[var(--bg-hover)] border-b border-border-subtle last:border-0 transition-colors"
+                >
+                  <span className="text-xs font-mono text-text-secondary">{mod}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>

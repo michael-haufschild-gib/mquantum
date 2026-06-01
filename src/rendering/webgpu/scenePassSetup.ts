@@ -9,6 +9,7 @@
 
 import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
+import { usePerformanceStore } from '@/stores/runtime/performanceStore'
 
 import type { WebGPURenderPass, WebGPUSetupContext } from './core/types'
 import { WebGPURenderGraph } from './graph/WebGPURenderGraph'
@@ -20,6 +21,12 @@ import { constructPPPasses, registerPasses } from './scenePassConstruction'
 // ============================================================================
 // Pass Setup & Cleanup
 // ============================================================================
+
+function publishShaderDebugInfo(renderer: WebGPUSchrodingerRenderer | null): void {
+  usePerformanceStore
+    .getState()
+    .setShaderDebugInfo('object', renderer?.getShaderDebugInfo() ?? null)
+}
 
 /** Safely add a pass -- logs and continues on failure instead of aborting the pipeline. */
 async function safeAddPass(
@@ -122,7 +129,15 @@ export async function setupSchrodingerPasses(
 
   const objectRenderer = createObjectRenderer(config.objectType, config)
   if (objectRenderer) {
-    await safeAddPass(graph, objectRenderer, `object-renderer(${config.objectType})`, shouldAbort)
+    const added = await safeAddPass(
+      graph,
+      objectRenderer,
+      `object-renderer(${config.objectType})`,
+      shouldAbort
+    )
+    publishShaderDebugInfo(added ? objectRenderer : null)
+  } else {
+    publishShaderDebugInfo(null)
   }
 
   if (useTemporalCloudAccumulation) {
@@ -217,6 +232,9 @@ export async function warmSwapSchrodingerPasses(
 
   if (newRenderer) {
     graph.addInitializedPass(newRenderer)
+    publishShaderDebugInfo(newRenderer)
+  } else {
+    publishShaderDebugInfo(null)
   }
   if (newTemporalPass) {
     graph.addInitializedPass(newTemporalPass)

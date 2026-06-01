@@ -39,6 +39,7 @@ import type {
   SrmtSweepResponse,
   SrmtSweepSolverSnapshot,
 } from '@/lib/physics/srmt/srmtSweep.worker'
+import { srmtSweepDefaultRange } from '@/lib/physics/srmt/sweepDefaults'
 import {
   clampGridNa,
   clampGridNphi,
@@ -421,6 +422,7 @@ export function materialiseSweepConfig(
   const clocks = ['a', 'phi1', 'phi2'] as const
   const phiExtent = clampPhiExtent(wdwConfig.phiExtent)
   const defaultPhiRef = phiExtent / 2
+  const defaults = srmtSweepDefaultRange(pending.kind, phiExtent)
   const common = {
     clocks,
     rankCap: clampRankCap(wdwConfig.srmtRankCap),
@@ -433,14 +435,14 @@ export function materialiseSweepConfig(
       const [sweepMin, sweepMax] = orderedSweepRange(
         pending.sweepMin,
         pending.sweepMax,
-        0.1,
-        0.9,
+        defaults.sweepMin,
+        defaults.sweepMax,
         clampUnitInterval
       )
       return {
         ...common,
         kind: 'cut',
-        points: normalisePointCount('cut', pending.points ?? 17),
+        points: normalisePointCount('cut', pending.points ?? defaults.points),
         sweepMin,
         sweepMax,
       }
@@ -449,14 +451,14 @@ export function materialiseSweepConfig(
       const [sweepMin, sweepMax] = orderedSweepRange(
         pending.sweepMin,
         pending.sweepMax,
-        0.1,
-        1.5,
+        defaults.sweepMin,
+        defaults.sweepMax,
         clampMass
       )
       return {
         ...common,
         kind: 'mass',
-        points: normalisePointCount('mass', pending.points ?? 9),
+        points: normalisePointCount('mass', pending.points ?? defaults.points),
         sweepMin,
         sweepMax,
       }
@@ -465,14 +467,14 @@ export function materialiseSweepConfig(
       const [sweepMin, sweepMax] = orderedSweepRange(
         pending.sweepMin,
         pending.sweepMax,
-        -0.5,
-        0.5,
+        defaults.sweepMin,
+        defaults.sweepMax,
         clampLambda
       )
       return {
         ...common,
         kind: 'lambda',
-        points: normalisePointCount('lambda', pending.points ?? 9),
+        points: normalisePointCount('lambda', pending.points ?? defaults.points),
         // Default spans the Λ < 0 (AdS) → Λ > 0 (dS) transition so the
         // sweep captures the regime change in one shot.
         sweepMin,
@@ -483,22 +485,22 @@ export function materialiseSweepConfig(
       return {
         ...common,
         kind: 'bc',
-        points: normalisePointCount('bc', pending.points ?? 3),
-        sweepMin: 0,
-        sweepMax: 2,
+        points: normalisePointCount('bc', pending.points ?? defaults.points),
+        sweepMin: defaults.sweepMin,
+        sweepMax: defaults.sweepMax,
       }
     case 'phiRef': {
       const [sweepMin, sweepMax] = orderedSweepRange(
         pending.sweepMin,
         pending.sweepMax,
-        0.05,
-        Math.max(0.05, phiExtent - 0.05),
+        defaults.sweepMin,
+        defaults.sweepMax,
         (value) => clampPhiRef(value, phiExtent)
       )
       return {
         ...common,
         kind: 'phiRef',
-        points: normalisePointCount('phiRef', pending.points ?? 11),
+        points: normalisePointCount('phiRef', pending.points ?? defaults.points),
         // `phiRef` sweep range spans roughly (0, phiExtent); the landmark
         // is symmetric in sign so 0 → phiExtent is enough.
         sweepMin,
@@ -509,14 +511,14 @@ export function materialiseSweepConfig(
       const [sweepMin, sweepMax] = orderedSweepRange(
         pending.sweepMin,
         pending.sweepMax,
-        8,
-        128,
+        defaults.sweepMin,
+        defaults.sweepMax,
         clampRankCap
       )
       return {
         ...common,
         kind: 'rankCap',
-        points: normalisePointCount('rankCap', pending.points ?? 9),
+        points: normalisePointCount('rankCap', pending.points ?? defaults.points),
         // rankCap sweep reports the span [8, 128] by default; driver
         // rounds + dedups, so 9 points across this range yields the
         // 8,16,24,…,128 cadence that fits on the plot.
@@ -528,14 +530,14 @@ export function materialiseSweepConfig(
       const [sweepMin, sweepMax] = orderedSweepRange(
         pending.sweepMin,
         pending.sweepMax,
-        1.0,
-        3.0,
+        defaults.sweepMin,
+        defaults.sweepMax,
         clampPhiExtent
       )
       return {
         ...common,
         kind: 'phiExtent',
-        points: normalisePointCount('phiExtent', pending.points ?? 5),
+        points: normalisePointCount('phiExtent', pending.points ?? defaults.points),
         // Default range sits either side of the DEFAULT_WHEELER_DEWITT_CONFIG
         // `phiExtent=2`. CFL tightens as phiExtent shrinks (smaller dφ),
         // so the lower bound is kept ≥ 1 to stay inside the stability
@@ -548,18 +550,16 @@ export function materialiseSweepConfig(
       const [sweepMin, sweepMax] = orderedSweepRange(
         pending.sweepMin,
         pending.sweepMax,
-        64,
-        512,
+        defaults.sweepMin,
+        defaults.sweepMax,
         clampGridNa
       )
       return {
         ...common,
         kind: 'gridNa',
-        // Five grids by default — the smallest practical Cauchy-convergence
-        // study (need ≥ 3 to compare residuals; 5 gives one extra interior
-        // sample so the tail trend is visible). Driver rounds + dedups, so
-        // 5 points across [64, 512] yields {64, 176, 288, 400, 512}.
-        points: normalisePointCount('gridNa', pending.points ?? 5),
+        // Shared with the UI default so a bare `sw=gridNa` URL does not
+        // launch a wider grid study than the panel's Start button.
+        points: normalisePointCount('gridNa', pending.points ?? defaults.points),
         sweepMin,
         sweepMax,
       }
@@ -568,14 +568,14 @@ export function materialiseSweepConfig(
       const [sweepMin, sweepMax] = orderedSweepRange(
         pending.sweepMin,
         pending.sweepMax,
-        32,
-        64,
+        defaults.sweepMin,
+        defaults.sweepMax,
         clampGridNphi
       )
       return {
         ...common,
         kind: 'gridNphi',
-        points: normalisePointCount('gridNphi', pending.points ?? 5),
+        points: normalisePointCount('gridNphi', pending.points ?? defaults.points),
         // Default spans the driver-clamped asymptotic range [32, 64] —
         // see `clampGridNphi` docstring. Below 32 the Schmidt column
         // count Nφ² drops below Na=128 and q_a hits a pre-asymptotic
@@ -590,8 +590,8 @@ export function materialiseSweepConfig(
       const [sweepMin, sweepMax] = orderedSweepRange(
         pending.sweepMin,
         pending.sweepMax,
-        32,
-        64,
+        defaults.sweepMin,
+        defaults.sweepMax,
         clampGridNphi
       )
       return {
@@ -605,7 +605,7 @@ export function materialiseSweepConfig(
         // the cost of the uncoupled kind, so the default point count is
         // kept conservative (5 points across [32, 64] → {32, 40, 48,
         // 56, 64}).
-        points: normalisePointCount('gridNphiCoupled', pending.points ?? 5),
+        points: normalisePointCount('gridNphiCoupled', pending.points ?? defaults.points),
         sweepMin,
         sweepMax,
       }

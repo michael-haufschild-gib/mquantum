@@ -6,6 +6,7 @@ import {
   SKYBOX_VERTEX_UNIFORMS_OFFSET,
 } from '@/rendering/webgpu/renderers/skyboxLayout'
 import { WebGPUSkyboxRenderer } from '@/rendering/webgpu/renderers/WebGPUSkyboxRenderer'
+import { composeSkyboxVertexShader } from '@/rendering/webgpu/shaders/skybox/vertex.wgsl'
 
 type TestableSkyboxRenderer = {
   device: GPUDevice | null
@@ -130,5 +131,16 @@ describe('WebGPUSkyboxRenderer vertex uniform safety', () => {
     expect(capturedData[VERTEX_SLOT.projectionMatrix + 5]).toBe(1)
     expect(capturedData[VERTEX_SLOT.projectionMatrix + 10]).toBe(1)
     expect(capturedData[VERTEX_SLOT.projectionMatrix + 15]).toBe(1)
+  })
+})
+
+describe('WebGPUSkyboxRenderer vertex shader rotation semantics', () => {
+  it('samples the skybox direction after one model-space rotation', () => {
+    const shader = composeSkyboxVertexShader({ sun: false, vignette: false })
+
+    expect(shader).toContain('let worldPos = (vertexUniforms.modelMatrix * posLocal).xyz;')
+    expect(shader).toContain('output.worldDirection = normalize(worldPos);')
+    expect(shader).not.toContain('rotationMatrix * normalize(worldPos)')
+    expect(shader).not.toContain('rotationMatrix:')
   })
 })

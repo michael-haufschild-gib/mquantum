@@ -84,7 +84,13 @@ export const MonitoringSweepSection: React.FC = React.memo(() => {
     }
   }, [status])
 
+  useEffect(() => {
+    if (status === 'complete') restorePreSweepState()
+  }, [restorePreSweepState, status])
+
   const handleStartSweep = useCallback(() => {
+    if (useMonitoringSweepStore.getState().status !== 'idle') return
+
     // Validate inputs are finite before mutating state
     if (![gammaMin, gammaMax, steps, timePerStep].every(Number.isFinite)) return
     if (steps < 1) return

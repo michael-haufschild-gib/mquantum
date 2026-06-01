@@ -106,6 +106,23 @@ describe('deriveCaptureTiming', () => {
     expect(out.tCaptured).toBeCloseTo(11 - 5, 12)
   })
 
+  it('keeps Nyquist tied to nominal cadence when readback drops a slot', () => {
+    // Chronological samples at t=0,1,2,4,5 imply one missing t=3
+    // readback. The FFT builder interpolates that dropped slot onto
+    // dt=1, so the displayed Nyquist must be π, not π / mean(5/4).
+    const times = new Float64Array([0, 1, 2, 4, 5])
+    const buf = {
+      times,
+      capacity: 5,
+      count: 5,
+      head: 0,
+    } as unknown as Parameters<typeof deriveCaptureTiming>[0]
+    const out = deriveCaptureTiming(buf, 5)
+    expect(out.tCaptured).toBeCloseTo(5, 12)
+    expect(out.deltaOmega).toBeCloseTo((2 * Math.PI) / 5, 12)
+    expect(out.omegaNyquist).toBeCloseTo(Math.PI, 12)
+  })
+
   it('returns NaNs when measured T is non-positive (clock went backward)', () => {
     const times = new Float64Array([5, 5]) // dt=0 ⇒ T=0 ⇒ NaN
     const buf = { times, capacity: 2, count: 2, head: 0 } as unknown as Parameters<

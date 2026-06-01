@@ -86,4 +86,17 @@ describe('buildWaterfallParams', () => {
     expect(params.g).toBe(500)
     expect(params.mass).toBe(1.0)
   })
+
+  it('uses the shared mass resolver for corrupted/imported mass values', () => {
+    const fallback = DEFAULT_TDSE_CONFIG.mass
+
+    for (const mass of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const params = buildWaterfallParams({
+        mass,
+        gridSize: [64],
+        spacing: [0.15],
+      })
+      expect(params.mass).toBe(fallback)
+    }
+  })
 })

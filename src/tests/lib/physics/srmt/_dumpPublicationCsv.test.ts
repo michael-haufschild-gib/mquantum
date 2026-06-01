@@ -3,8 +3,8 @@
  * for the user to hand to a thesis advisor / reviewer.
  *
  * The CSV is a real, end-to-end product of the v2 falsification
- * infrastructure: 51 columns including all 12 affine-baseline and 9
- * rigid-baseline columns introduced at diagnostic v1.2.0.
+ * infrastructure: 57 columns including all 12 affine-baseline, 9
+ * rigid-baseline, and 6 per-point landmark columns.
  *
  * @module tests/lib/physics/srmt/_dumpPublicationCsv
  */
@@ -28,7 +28,7 @@ import {
 } from '@/lib/physics/wheelerDeWitt/solver'
 
 describe('publication CSV artifact', () => {
-  it('writes a v2-compliant 51-column CSV to artifacts/', () => {
+  it('writes a v2-compliant 57-column CSV to artifacts/', () => {
     const wdw: WheelerDeWittSolverInput = {
       boundaryCondition: 'noBoundary',
       inflatonMass: 0.3,

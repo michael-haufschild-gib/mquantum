@@ -94,10 +94,32 @@ describe('PassesTabContent', () => {
         },
       ],
       totalGpuTimeMs: 0,
+      gpuTimingSupported: false,
       cpuBreakdown: { setupMs: 0, passesMs: 0, submitMs: 0 },
     })
     render(<PassesTabContent />)
     expect(screen.getByText(/GPU timing unavailable/)).toBeInTheDocument()
+  })
+
+  it('shows timestamp readback state when GPU timing is supported but not ready', () => {
+    usePerformanceMetricsStore.setState({
+      passTimings: [
+        {
+          passId: 'bloom',
+          gpuTimeMs: 0,
+          computeGpuTimeMs: 0,
+          renderGpuTimeMs: 0,
+          cpuTimeMs: 0.5,
+          skipped: false,
+        },
+      ],
+      totalGpuTimeMs: 0,
+      gpuTimingSupported: true,
+      cpuBreakdown: { setupMs: 0, passesMs: 0, submitMs: 0 },
+    })
+    render(<PassesTabContent />)
+    expect(screen.getByText(/waiting for timestamp readback/)).toBeInTheDocument()
+    expect(screen.queryByText(/timestamp-query not supported/)).not.toBeInTheDocument()
   })
 
   it('shows skipped pass count when passes are skipped', () => {

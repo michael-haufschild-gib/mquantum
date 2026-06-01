@@ -135,6 +135,8 @@ export interface VolumetricMainBlockConfig {
   useDensityGrid?: boolean
   /** When true, the grid-only path is guaranteed — no inline wavefunction fallback needed. */
   gridOnly?: boolean
+  /** Suppress inline pure-state fallback when the density grid encodes a mixed state. */
+  useDensityMatrix?: boolean
 }
 
 /**
@@ -143,14 +145,14 @@ export interface VolumetricMainBlockConfig {
  * @param config
  */
 export function generateMainBlockVolumetric(config: VolumetricMainBlockConfig = {}): string {
-  const { useDensityGrid = false, gridOnly = false } = config
+  const { useDensityGrid = false, gridOnly = false, useDensityMatrix = false } = config
 
   // When gridOnly=true, the density grid handles ALL rendering — no inline
   // wavefunction fallback is compiled. This dramatically reduces the fragment
   // shader size (removes ~1000 lines of quantum math, inline density sampling,
   // tetrahedral gradient, and both volumeRaymarch/HQ functions), which avoids
   // a GPU occupancy cliff on Apple Silicon's Metal compiler (Safari WebGPU).
-  const raymarchCall = generateRaymarchCall({ useDensityGrid, gridOnly })
+  const raymarchCall = generateRaymarchCall({ useDensityGrid, gridOnly, useDensityMatrix })
 
   return /* wgsl */ `
 // ============================================

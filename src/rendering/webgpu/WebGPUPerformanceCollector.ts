@@ -363,6 +363,8 @@ export class WebGPUStatsCollector {
         cpu: [...this.accumulated.cpuHistory],
         mem: [...this.accumulated.memHistory],
       },
+      gpuTimingSupported:
+        typeof graph.isGPUTimingAvailable === 'function' ? graph.isGPUTimingAvailable() : false,
     })
 
     // Update scene GPU stats (same as gpu for WebGPU - no post-processing separation yet)

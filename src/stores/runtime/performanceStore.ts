@@ -248,7 +248,6 @@ interface PerformanceState {
 
   // Shader Debugging
   shaderDebugInfos: Record<string, ShaderDebugInfo>
-  shaderOverrides: string[]
 
   // -------------------------------------------------------------------------
   // Shader Compilation State
@@ -295,8 +294,6 @@ interface PerformanceState {
 
   // Shader Debugging
   setShaderDebugInfo: (key: string, info: ShaderDebugInfo | null) => void
-  toggleShaderModule: (moduleName: string) => void
-  resetShaderOverrides: () => void
 
   // Shader Compilation
   setShaderCompiling: (shaderName: string, compiling: boolean) => void
@@ -351,7 +348,6 @@ export const usePerformanceStore = create<PerformanceState>((set) => ({
 
   // Shader Debugging
   shaderDebugInfos: {},
-  shaderOverrides: [],
 
   // Shader Compilation State
   compilingShaders: new Set<string>(),
@@ -461,22 +457,6 @@ export const usePerformanceStore = create<PerformanceState>((set) => ({
     })
   },
 
-  toggleShaderModule: (moduleName: string) => {
-    set((state) => {
-      const overrides = new Set(state.shaderOverrides)
-      if (overrides.has(moduleName)) {
-        overrides.delete(moduleName)
-      } else {
-        overrides.add(moduleName)
-      }
-      return { shaderOverrides: Array.from(overrides) }
-    })
-  },
-
-  resetShaderOverrides: () => {
-    set({ shaderOverrides: [] })
-  },
-
   // Shader Compilation
   setShaderCompiling: (shaderName: string, compiling: boolean) => {
     set((state) => {
@@ -524,7 +504,6 @@ export const usePerformanceStore = create<PerformanceState>((set) => ({
       densityGridResolution: DEFAULT_DENSITY_GRID_RESOLUTION,
       maxFps: DEFAULT_MAX_FPS,
       shaderDebugInfos: {},
-      shaderOverrides: [],
       compilingShaders: new Set<string>(),
       isShaderCompiling: false,
       shaderCompilationMessage: '',

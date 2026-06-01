@@ -142,7 +142,7 @@ function computeDensityGridConfig(
   termCount: number | undefined,
   configuredResolution?: number
 ): { useDensityGrid: boolean; densityGridSize: number } {
-  const useDensityGrid = computeMode || (!isosurface && !pipelineIs2D)
+  const useDensityGrid = computeMode || (!pipelineIs2D && (openQuantumEnabled || !isosurface))
   const baseDensityGridSize = configuredResolution ?? 96
   const estimatedK = openQuantumEnabled ? (isHydrogen ? 10 : (termCount ?? 4)) : 0
   const densityGridSize = openQuantumEnabled
@@ -237,7 +237,7 @@ export function buildShaderConfig(
     useRobustEigenInterpolation,
     useDensityGrid,
     densityGridSize,
-    densityGridHasPhase: computeMode ? true : undefined,
+    densityGridHasPhase: computeMode || (useDensityGrid && openQuantumEnabled) ? true : undefined,
     isWigner: computeMode ? false : isWigner,
     useWignerCache: computeMode ? false : isWigner,
     // `isFreeScalar` is the legacy compute-mode-grid flag (box bounds,

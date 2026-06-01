@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { shouldRequestWormholeCoherenceReadback } from '@/rendering/webgpu/passes/TDSEComputePassEvolution'
 import {
   createWormholeReadbackState,
   requestWormholeReadback,
@@ -85,5 +86,28 @@ describe('requestWormholeReadback', () => {
     expect(store.lastAxis).toBe(0)
     expect(store.lastG).toBe(0)
     expect(store.lastT).toBe(1.25)
+  })
+})
+
+describe('shouldRequestWormholeCoherenceReadback', () => {
+  it('gates the HUD readback on the TDSE diagnostics cadence', () => {
+    const config = {
+      diagnosticsEnabled: true,
+      diagnosticsInterval: 10,
+      wormholeCoherenceHudEnabled: true,
+    } as Parameters<typeof shouldRequestWormholeCoherenceReadback>[0]
+
+    expect(shouldRequestWormholeCoherenceReadback(config, 8)).toBe(false)
+    expect(shouldRequestWormholeCoherenceReadback(config, 9)).toBe(true)
+  })
+
+  it('does not request readback when the HUD toggle is off', () => {
+    const config = {
+      diagnosticsEnabled: true,
+      diagnosticsInterval: 1,
+      wormholeCoherenceHudEnabled: false,
+    } as Parameters<typeof shouldRequestWormholeCoherenceReadback>[0]
+
+    expect(shouldRequestWormholeCoherenceReadback(config, 0)).toBe(false)
   })
 })

@@ -686,8 +686,6 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     const modelIdx = VERTEX_INDEX.modelMatrix
     const modelViewIdx = VERTEX_INDEX.modelViewMatrix
     const projIdx = VERTEX_INDEX.projectionMatrix
-    const rotIdx = VERTEX_INDEX.rotationMatrix
-
     // modelMatrix (4x4 rotation matrix, column-major)
     data[modelIdx + 0] = m00
     data[modelIdx + 1] = m10
@@ -708,23 +706,6 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
 
     writeFiniteViewMatrixWithoutTranslation(data, modelViewIdx, camera?.viewMatrix)
     writeFiniteProjectionMatrix(data, projIdx, camera?.projectionMatrix)
-
-    // rotationMatrix (mat3x3 stored as 3 columns with 16-byte alignment each)
-    // Uses the same composed rotation as modelMatrix
-    data[rotIdx + 0] = m00
-    data[rotIdx + 1] = m10
-    data[rotIdx + 2] = m20
-    data[rotIdx + 3] = 0 // padding
-
-    data[rotIdx + 4] = m01
-    data[rotIdx + 5] = m11
-    data[rotIdx + 6] = m21
-    data[rotIdx + 7] = 0 // padding
-
-    data[rotIdx + 8] = m02
-    data[rotIdx + 9] = m12
-    data[rotIdx + 10] = m22
-    data[rotIdx + 11] = 0 // padding
 
     // VertexUniforms live at SKYBOX_VERTEX_UNIFORMS_OFFSET inside the shared buffer.
     this.writeUniformBuffer(this.device, this.uniformBuffer, data, SKYBOX_VERTEX_UNIFORMS_OFFSET)

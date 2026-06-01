@@ -35,6 +35,7 @@ function resetMetricsStore(): void {
     passTimings: [],
     totalGpuTimeMs: 0,
     cpuBreakdown: { setupMs: 0, passesMs: 0, submitMs: 0 },
+    gpuTimingSupported: false,
   })
 }
 
@@ -66,6 +67,7 @@ function createGraphMock() {
         ])
     ),
     setTimestampCollectionActive: vi.fn(),
+    isGPUTimingAvailable: vi.fn(() => true),
   }
 }
 
@@ -179,6 +181,7 @@ describe('WebGPUStatsCollector', () => {
     // 1 GB of textures as "1.0 KB" on the System tab.
     expect(metrics.vram.total).toBe(10 * 1024 * 1024)
     expect(metrics.vram.geometries).toBe(10 * 1024 * 1024)
+    expect(metrics.gpuTimingSupported).toBe(true)
 
     nowSpy.mockRestore()
   })

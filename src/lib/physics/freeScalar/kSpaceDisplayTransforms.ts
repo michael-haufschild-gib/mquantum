@@ -17,6 +17,8 @@ import {
 } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import { buildRadialDisplayGrid } from '@/lib/physics/freeScalar/kSpaceRadialSpectrum'
 
+import { fftShiftDisplayIndexToRawIndex, mapRawKIndexToOutputCoord } from './kSpaceGridMapping'
+
 // ============================================================================
 // Display Grid Intermediate Format
 // ============================================================================
@@ -121,12 +123,10 @@ function projectDirect3D(
   // Pre-compute offsets and centers (invariant across voxels)
   const offsets = [0, 0, 0]
   const centers = [0, 0, 0]
-  const halfN = [0, 0, 0]
   for (let d = 0; d < 3; d++) {
     const N = gridDims[d]!
     offsets[d] = Math.floor((G - N) / 2)
     centers[d] = Math.floor(G / 2)
-    halfN[d] = Math.floor(N / 2)
   }
 
   // Pre-allocated coordinate array (reused across all voxels)
@@ -152,7 +152,7 @@ function projectDirect3D(
           if (kIdx < 0 || kIdx >= N0) {
             valid = false
           } else {
-            if (shift) kIdx = (kIdx + halfN[0]!) % N0
+            if (shift) kIdx = fftShiftDisplayIndexToRawIndex(kIdx, N0)
             kCoords[0] = kIdx
           }
         }
@@ -168,7 +168,7 @@ function projectDirect3D(
             if (kIdx < 0 || kIdx >= N1) {
               valid = false
             } else {
-              if (shift) kIdx = (kIdx + halfN[1]!) % N1
+              if (shift) kIdx = fftShiftDisplayIndexToRawIndex(kIdx, N1)
               kCoords[1] = kIdx
             }
           }
@@ -185,7 +185,7 @@ function projectDirect3D(
             if (kIdx < 0 || kIdx >= N2) {
               valid = false
             } else {
-              if (shift) kIdx = (kIdx + halfN[2]!) % N2
+              if (shift) kIdx = fftShiftDisplayIndexToRawIndex(kIdx, N2)
               kCoords[2] = kIdx
             }
           }
@@ -206,13 +206,6 @@ function projectDirect3D(
       }
     }
   }
-}
-
-function mapRawKIndexToOutputCoord(rawIndex: number, N: number, G: number, shift: boolean): number {
-  if (N <= 1) return Math.floor(G / 2)
-  const displayIndex = shift ? (rawIndex + Math.floor(N / 2)) % N : rawIndex
-  if (N <= G) return Math.floor((G - N) / 2) + displayIndex
-  return Math.min(G - 1, Math.max(0, Math.floor(((displayIndex + 0.5) * G) / N)))
 }
 
 function projectDirect3DResampled(

@@ -160,13 +160,12 @@ describe('Skybox VertexUniforms WGSL validation', () => {
   const wgslFields = parseStructFields(vertexUniformsBlock, 'VertexUniforms')
   const tsLayout = SKYBOX_VERTEX_UNIFORMS_LAYOUT
 
-  it('parses the four matrix fields from the WGSL struct', () => {
-    expect(wgslFields.length).toBe(4)
+  it('parses the matrix fields from the WGSL struct', () => {
+    expect(wgslFields.length).toBe(3)
     expect(wgslFields.map((f) => f.name)).toEqual([
       'modelMatrix',
       'modelViewMatrix',
       'projectionMatrix',
-      'rotationMatrix',
     ])
   })
 
@@ -205,11 +204,9 @@ describe('Skybox VertexUniforms WGSL validation', () => {
     //   modelMatrix      at index 0  (floats 0..15)
     //   modelViewMatrix  at index 16 (floats 16..31)
     //   projectionMatrix at index 32 (floats 32..47)
-    //   rotationMatrix   at index 48 (floats 48..59)
     expect(tsLayout.index.modelMatrix).toBe(0)
     expect(tsLayout.index.modelViewMatrix).toBe(16)
     expect(tsLayout.index.projectionMatrix).toBe(32)
-    expect(tsLayout.index.rotationMatrix).toBe(48)
   })
 
   it('total size fits within the bind-group entry size', () => {

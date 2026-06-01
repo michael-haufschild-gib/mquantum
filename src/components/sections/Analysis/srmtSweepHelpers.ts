@@ -121,6 +121,7 @@ export function splitSrmtSweepCsv(csv: string): { main: string; tail: string | n
 }
 
 const SRMT_CLOCKS_IN_TAIL_ORDER: readonly SrmtClock[] = ['a', 'phi1', 'phi2']
+const SRMT_CLOCKS_IN_ROW_ORDER: readonly SrmtClock[] = ['a', 'phi1', 'phi2']
 
 /** Indices where the winning clock changes across consecutive sweep points. */
 export interface ChampionFlip {
@@ -288,7 +289,12 @@ export function sweepPointsToCsv(
     // within 1.5 nats of the ε-floor. A claim rooted in points with
     // `rEff < 8` or `floorFrac ≥ 0.25` is probably a metric artifact
     // — the champion-clock UI gate reflects the same rule.
-    // Total column count: 51 (30 original + 12 affine-baseline + 9 rigid-baseline).
+    // Per-point landmark columns carry the phiRef-sweep analysis signal:
+    // q is intentionally flat there, while the turning-point landmarks move
+    // or disappear per point. For non-phiRef sweeps these cells stay blank.
+    //
+    // Total column count: 57 (30 original + 12 affine-baseline +
+    // 9 rigid-baseline + 6 per-point landmark columns).
     // Playwright CSV parsers tolerate `>= 29` so trailing columns can be
     // appended without breaking existing readers. `coupledGridNa` is
     // populated only for `gridNphiCoupled` (empty on every other kind).
@@ -353,6 +359,12 @@ export function sweepPointsToCsv(
       'q_phi2_rshuf',
       'q_phi2_rrev',
       'q_phi2_rsyn',
+      'lm_a_norm',
+      'lm_a_abs',
+      'lm_phi1_norm',
+      'lm_phi1_abs',
+      'lm_phi2_norm',
+      'lm_phi2_abs',
     ].join(','),
   ].join('\n')
   const rows = points.map((p) =>
@@ -408,6 +420,7 @@ export function sweepPointsToCsv(
       formatNumber(p.nullBaselinesRigidByClock?.phi2?.shuffled),
       formatNumber(p.nullBaselinesRigidByClock?.phi2?.reversed),
       formatNumber(p.nullBaselinesRigidByClock?.phi2?.synthetic),
+      ...formatPerPointLandmarkCells(p),
     ]
       .map(csvCell)
       .join(',')
@@ -442,6 +455,21 @@ function formatSpectrumCell(values: Float32Array): string {
     parts[i] = Number.isFinite(v) ? v.toPrecision(7) : String(v)
   }
   return parts.join('|')
+}
+
+function formatPerPointLandmarkCells(point: SrmtSweepPoint): string[] {
+  const byClock = new Map<SrmtClock, SrmtSweepLandmark>()
+  for (const landmark of point.perPointLandmarks ?? []) {
+    byClock.set(landmark.clock, landmark)
+  }
+
+  const cells: string[] = []
+  for (const clock of SRMT_CLOCKS_IN_ROW_ORDER) {
+    const landmark = byClock.get(clock)
+    cells.push(formatNumber(landmark?.sweepValueAtLandmark ?? undefined))
+    cells.push(formatNumber(landmark?.absoluteCoordinate ?? undefined))
+  }
+  return cells
 }
 
 /**

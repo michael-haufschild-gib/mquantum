@@ -13,6 +13,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { MAX_DIMENSION } from '@/constants/dimension'
 import { useRotationUpdates } from '@/hooks/useRotationUpdates'
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
+import { freeScalarVacuumCanEvolveKSpaceOccupation } from '@/lib/geometry/extended/freeScalar'
 import { getNamedPresetStoreControls } from '@/lib/geometry/extended/schroedinger/presets'
 import {
   getQuantumTypeCompileContextFields,
@@ -112,6 +113,7 @@ const schroedingerCompileSelector = (state: ReturnType<typeof useExtendedObjectS
   const representation = (s?.representation ?? 'position') as 'position' | 'momentum' | 'wigner'
   const compileContextFields = getQuantumTypeCompileContextFields(quantumMode)
   const presetControls = getNamedPresetStoreControls(s?.presetName)
+  const freeScalar = s?.freeScalar
 
   return {
     quantumMode,
@@ -153,8 +155,12 @@ const schroedingerCompileSelector = (state: ReturnType<typeof useExtendedObjectS
     // n_k = 0 everywhere → blank map). Without this, preset or stale state
     // carrying kSpaceOccupation would leak past normalization and render.
     freeScalarInitialCondition: compileContextFields.includes('freeScalarInitialCondition')
-      ? s?.freeScalar?.initialCondition
+      ? freeScalar?.initialCondition
       : undefined,
+    freeScalarVacuumCanEvolveKSpaceOccupation:
+      compileContextFields.includes('freeScalarInitialCondition') && freeScalar
+        ? freeScalarVacuumCanEvolveKSpaceOccupation(freeScalar)
+        : undefined,
   }
 }
 
@@ -352,6 +358,8 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
         ? pauliFieldViewForColorAlgorithm(appearance.colorAlgorithm)
         : schroedingerCompile.pauliFieldView,
     freeScalarInitialCondition: schroedingerCompile.freeScalarInitialCondition,
+    freeScalarVacuumCanEvolveKSpaceOccupation:
+      schroedingerCompile.freeScalarVacuumCanEvolveKSpaceOccupation,
     representation: schroedingerCompile.representation,
     openQuantumEnabled: schroedingerCompile.openQuantumEnabled,
     crossSectionEnabled: schroedingerCompile.crossSectionEnabled,

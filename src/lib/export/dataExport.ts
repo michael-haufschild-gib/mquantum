@@ -90,7 +90,7 @@ function ringBufferTimeSeriesToCSV(
  * `simTime` lead column before the frame index — the only exporter that
  * breaks the `frame`-first convention.
  *
- * @returns CSV string with columns: simTime, frame, norm, R, T
+ * @returns CSV string with columns: simTime, frame, norm, R, T, ipr
  */
 export function exportTdseDiagnosticsCSV(): string {
   const state = useDiagnosticsStore.getState().tdse
@@ -102,10 +102,11 @@ export function exportTdseDiagnosticsCSV(): string {
   const norm = readRingBuffer(state.historyNorm, head, count)
   const R = readRingBuffer(state.historyR, head, count)
   const T = readRingBuffer(state.historyT, head, count)
+  const ipr = readRingBuffer(state.historyIpr, head, count)
 
-  const lines = ['simTime,frame,norm,R,T']
+  const lines = ['simTime,frame,norm,R,T,ipr']
   for (let i = 0; i < count; i++) {
-    lines.push(`${simTime[i]},${i},${norm[i]},${R[i]},${T[i]}`)
+    lines.push(`${simTime[i]},${i},${norm[i]},${R[i]},${T[i]},${ipr[i]}`)
   }
   return lines.join('\n')
 }
@@ -343,12 +344,15 @@ function buildTdsePayload(): Record<string, unknown> | null {
       maxDensity: s.maxDensity,
       R: s.R,
       T: s.T,
+      ipr: s.ipr,
       simTime: s.simTime,
     },
     timeSeries: {
+      simTime: readRingBuffer(s.historySimTime, s.historyHead, s.historyCount),
       norm: readRingBuffer(s.historyNorm, s.historyHead, s.historyCount),
       R: readRingBuffer(s.historyR, s.historyHead, s.historyCount),
       T: readRingBuffer(s.historyT, s.historyHead, s.historyCount),
+      ipr: readRingBuffer(s.historyIpr, s.historyHead, s.historyCount),
     },
   }
 }

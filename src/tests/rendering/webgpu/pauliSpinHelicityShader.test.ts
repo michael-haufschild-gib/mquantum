@@ -8,6 +8,9 @@ import {
   PAULI_UNIFORM_SIZE,
 } from '@/rendering/webgpu/passes/PauliComputePassBuffers'
 import { pauliWriteGridBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/pauliWriteGrid.wgsl'
+import { generateMainBlockIsosurface } from '@/rendering/webgpu/shaders/schroedinger/mainIsosurface.wgsl'
+import { generateMainBlockIsosurfaceTemporal } from '@/rendering/webgpu/shaders/schroedinger/mainIsosurfaceTemporal.wgsl'
+import { densityGridSamplingBlock } from '@/rendering/webgpu/shaders/schroedinger/volume/densityGridSampling.wgsl'
 import {
   generateVolumeRaymarchGridBlock,
   generateVolumeRaymarchGridSimpleBlock,
@@ -102,5 +105,46 @@ describe('Pauli spin helicity render view', () => {
       expect(block).toContain('let midTotal = gridSkipDensity(probeMid);')
       expect(block).toContain('let logRhoForStep = gridAdaptiveLogDensity(rho, sCenter);')
     }
+  })
+
+  it('colors Pauli non-dual simple raymarching with the selected observable channel', () => {
+    const block = generateVolumeRaymarchGridSimpleBlock()
+
+    expect(block).toContain('let emissionRho = colorRho;')
+    expect(block).toContain('let emissionS = colorS;')
+  })
+
+  it('uses alpha-channel density for Pauli non-dual isosurface hits', () => {
+    for (const block of [
+      generateMainBlockIsosurface({ useDensityGrid: true }),
+      generateMainBlockIsosurfaceTemporal({ useDensityGrid: true }),
+    ]) {
+      expect(block).toContain('fn sampleIsosurfaceHitState(')
+      expect(block).toContain('let gridSample = sampleDensityFromGrid(pos, uniforms);')
+      expect(block).toContain('IS_PAULI && !IS_DUAL_CHANNEL && DENSITY_GRID_HAS_PHASE')
+      expect(block).toContain(
+        'rawRho = select(primaryRho, gridSample.r + gridSample.g, IS_DUAL_CHANNEL);'
+      )
+      expect(block).toContain('rho = isoDensityState.hitRho;')
+      expect(block).toContain('var prevS = sFromRho(isoSeedState.hitRho);')
+      expect(block).toContain('let midS = sFromRho(isoMidState.hitRho);')
+      expect(block).toContain(
+        'let primarySurfaceRho = select(gridColor.r, gridColor.a, IS_PAULI && !IS_DUAL_CHANNEL && DENSITY_GRID_HAS_PHASE);'
+      )
+      expect(block).toContain('rhoSurface = primarySurfaceRho * isoGain;')
+      expect(block).toContain('colorRhoSurface = gridColor.r * isoGain;')
+      expect(block).toContain(
+        'var surfaceColor = computeBaseColor(colorRhoSurface, sSurface, phase, p, schroedinger);'
+      )
+      expect(block).not.toContain(
+        'var surfaceColor = computeBaseColor(rhoSurface, sSurface, phase, p, schroedinger);'
+      )
+    }
+  })
+
+  it('uses alpha-channel density for Pauli non-dual grid normals', () => {
+    expect(densityGridSamplingBlock).toContain('} else if (IS_PAULI && DENSITY_GRID_HAS_PHASE) {')
+    expect(densityGridSamplingBlock).toContain('let gradX = sxp.a - sxn.a;')
+    expect(densityGridSamplingBlock).toContain('return gradRho / (rhoCenter.a + 1e-8);')
   })
 })

@@ -130,6 +130,22 @@ describe('mergeExtendedObjectStateForType — schroedinger', () => {
       expect(oq.visualizationMode).toBe('density')
       expect(oq.dephasingModel).toBe('uniform')
     })
+
+    it('sanitizes loaded BEC mass before direct restore reaches analysis outputs', () => {
+      const savedState = {
+        schroedinger: {
+          quantumMode: 'becDynamics',
+          bec: {
+            mass: 0,
+          },
+        },
+      }
+
+      const merged = mergeExtendedObjectStateForType(savedState, 'schroedinger')
+      const bec = (merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG).bec
+
+      expect(bec.mass).toBe(DEFAULT_SCHROEDINGER_CONFIG.bec.mass)
+    })
   })
 
   describe('surface-mode invariants', () => {

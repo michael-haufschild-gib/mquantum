@@ -311,7 +311,7 @@ function readFrameInputs(
 
   // Branch separation: continuous 0..1 metric derived from stochastic γ.
   // Uses 1 - exp(-γ) as a monotonic proxy: γ=0 → 0, γ→∞ → 1.
-  // The raymarcher uses > 0.5 as the threshold for branch coloring.
+  // The raymarcher uses > 0 as the threshold for branch coloring.
   const tdseConf = schroedinger?.tdse
   const gammaRaw = tdseConf?.stochasticGamma ?? 0
   const stochasticGamma = Number.isFinite(gammaRaw) ? Math.max(0, gammaRaw) : 0

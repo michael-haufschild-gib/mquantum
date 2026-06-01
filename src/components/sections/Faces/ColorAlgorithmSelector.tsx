@@ -10,6 +10,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { Select } from '@/components/ui/Select'
 import { type ColorAlgorithm, getAvailableColorAlgorithms } from '@/lib/colors/palette'
 import type { DiracFieldView } from '@/lib/geometry/extended/dirac'
+import { freeScalarVacuumCanEvolveKSpaceOccupation } from '@/lib/geometry/extended/freeScalar'
 import type { PauliFieldView } from '@/lib/geometry/extended/pauli'
 import { supportsSchroedingerSurfaceMode } from '@/lib/geometry/registry'
 import { pauliFieldViewForColorAlgorithm } from '@/rendering/webgpu/scenePassConfig'
@@ -40,6 +41,7 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
       representation,
       openQuantumEnabled,
       freeScalarInitialCondition,
+      freeScalarVacuumCanEvolveKSpaceOccupation: fsfVacuumCanEvolveKSpaceOccupation,
       branchingEnabled,
       isosurfaceEnabled,
     } = useExtendedObjectStore(
@@ -48,6 +50,9 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
         representation: s.schroedinger.representation,
         openQuantumEnabled: s.schroedinger.openQuantum?.enabled ?? false,
         freeScalarInitialCondition: s.schroedinger.freeScalar.initialCondition,
+        freeScalarVacuumCanEvolveKSpaceOccupation: freeScalarVacuumCanEvolveKSpaceOccupation(
+          s.schroedinger.freeScalar
+        ),
         branchingEnabled:
           s.schroedinger.tdse?.stochasticEnabled && s.schroedinger.tdse?.branchingEnabled,
         isosurfaceEnabled: s.schroedinger.isoEnabled ?? false,
@@ -79,6 +84,7 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
             dimension,
             isosurface: effectiveIsosurfaceEnabled,
             representation,
+            freeScalarVacuumCanEvolveKSpaceOccupation: fsfVacuumCanEvolveKSpaceOccupation,
           }
         ),
       [
@@ -86,6 +92,7 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
         effectiveOpenQuantumEnabled,
         objectType,
         freeScalarInitialCondition,
+        fsfVacuumCanEvolveKSpaceOccupation,
         dimension,
         effectiveIsosurfaceEnabled,
         representation,

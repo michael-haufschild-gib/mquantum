@@ -16,10 +16,7 @@
  *   - matrix shorthand: `mat4x4f`, `mat4x4<f32>` → `arr('vec4f', 4)`;
  *     `mat3x3f`, `mat3x3<f32>` → `arr('vec4f', 3)`. WGSL §13.4.1 makes
  *     `mat3x3<f32>` column-aligned to 16 bytes with column stride 16 — i.e.
- *     identical alignment, stride, and total size to `array<vec4f, 3>`. The
- *     TypeScript skybox layout (`SKYBOX_VERTEX_UNIFORMS_LAYOUT`) models the
- *     `rotationMatrix: mat3x3<f32>` field as `arr('vec4f', 3)`, so the
- *     parser must produce the same shape for `typesEqual` to succeed.
+ *     identical alignment, stride, and total size to `array<vec4f, 3>`.
  *
  * Any other WGSL type causes `parseWGSLType` to throw — keeping unknown
  * additions visible at test time so the layout drift the test was built to

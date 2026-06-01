@@ -8,6 +8,7 @@
 
 import type { KSpaceVizConfig } from '@/lib/geometry/extended/types'
 import type { KSpaceDisplayGrid } from '@/lib/physics/freeScalar/kSpaceDisplayTransforms'
+import { mapOutputCoordToRawKIndex } from '@/lib/physics/freeScalar/kSpaceGridMapping'
 import type { KSpaceRawData } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import { OUTPUT_GRID_SIZE } from '@/lib/physics/freeScalar/kSpaceOccupation'
 
@@ -84,29 +85,6 @@ export function computeRadialShells(raw: KSpaceRawData, binCount: number): Radia
 // ============================================================================
 // Radial Display Grid
 // ============================================================================
-
-function mapOutputCoordToRawKIndex(
-  outputCoord: number,
-  rawSize: number,
-  outputSize: number,
-  shift: boolean
-): number | null {
-  if (rawSize <= 1) {
-    return outputCoord === Math.floor(outputSize / 2) ? 0 : null
-  }
-
-  let displayIndex: number
-  if (rawSize <= outputSize) {
-    const offset = Math.floor((outputSize - rawSize) / 2)
-    displayIndex = outputCoord - offset
-    if (displayIndex < 0 || displayIndex >= rawSize) return null
-  } else {
-    displayIndex = Math.floor(((outputCoord + 0.5) * rawSize) / outputSize)
-    displayIndex = Math.max(0, Math.min(rawSize - 1, displayIndex))
-  }
-
-  return shift ? (displayIndex + Math.floor(rawSize / 2)) % rawSize : displayIndex
-}
 
 /**
  * Build a 64^3 display grid from radial shell data.

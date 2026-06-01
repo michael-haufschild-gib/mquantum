@@ -11,6 +11,7 @@ import type { BecConfig } from '@/lib/geometry/extended/bec'
 import type { TdseConfig } from '@/lib/geometry/extended/tdse'
 import { logger } from '@/lib/logger'
 import { healingLength, soundSpeed, thomasFermiRadius } from '@/lib/physics/bec/chemicalPotential'
+import { resolveBecMass } from '@/lib/physics/bec/waterfallParams'
 import { computeEffectiveSpacing } from '@/lib/physics/compactification'
 import { isCoordinateEntanglementMetricSupported } from '@/lib/physics/coordinateEntanglement'
 import type {
@@ -393,7 +394,7 @@ export class TdseBecStrategy implements QuantumModeStrategy {
 
     const bec = extended?.schroedinger?.bec
     const g = bec?.interactionStrength ?? 500
-    const mass = bec?.mass ?? 1.0
+    const mass = resolveBecMass({ mass: bec?.mass })
     const hbar = bec?.hbar ?? 1.0
     const omega = bec?.trapOmega ?? 1.0
     const aniso = bec?.trapAnisotropy ?? []

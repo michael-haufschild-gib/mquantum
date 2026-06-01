@@ -76,6 +76,25 @@ describe('usePageCurveSampling', () => {
     expect(result.current.cs0).toBeGreaterThan(0)
   })
 
+  it('uses the canonical BEC mass fallback for imported invalid mass values', () => {
+    const { result } = renderHook(() =>
+      usePageCurveSampling(
+        waterfallInputs({
+          bec: {
+            ...DEFAULT_BEC_CONFIG,
+            initialCondition: 'blackHoleAnalog',
+            hawkingVmax: 3.5,
+            mass: 0,
+          },
+        })
+      )
+    )
+
+    expect(result.current.isBec).toBe(true)
+    expect(result.current.horizonPresent).toBe(true)
+    expect(usePageCurveStore.getState().lastRate).toBeGreaterThan(0)
+  })
+
   it('dedupes pushes when unrelated dependencies rerender at the same readback generation', () => {
     const { rerender } = renderHook((inputs) => usePageCurveSampling(inputs), {
       initialProps: waterfallInputs(),

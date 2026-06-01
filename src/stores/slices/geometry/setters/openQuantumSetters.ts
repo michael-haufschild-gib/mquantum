@@ -7,11 +7,14 @@
  * @module stores/slices/geometry/setters/openQuantumSetters
  */
 
+import type { ColorAlgorithm } from '@/lib/colors/palette/types'
 import {
   DEFAULT_OPEN_QUANTUM_CONFIG,
   isOpenQuantumDephasingModel,
   isOpenQuantumVisualizationMode,
+  type OpenQuantumVisualizationMode,
 } from '@/lib/physics/openQuantum/types'
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 
 import type { SchroedingerSliceActions } from '../types'
 import {
@@ -38,6 +41,16 @@ type OpenQuantumActions = Pick<
   | 'setOpenQuantumHydrogenBasisMaxN'
   | 'setOpenQuantumDephasingModel'
 >
+
+const OPEN_QUANTUM_VISUALIZATION_COLOR_ALGORITHM: Record<
+  OpenQuantumVisualizationMode,
+  ColorAlgorithm
+> = {
+  density: 'blackbody',
+  purityMap: 'purityMap',
+  entropyMap: 'entropyMap',
+  coherenceMap: 'coherenceMap',
+}
 
 /**
  * Creates all Open Quantum System setter actions for the schroedingerSlice.
@@ -72,6 +85,9 @@ export function createOpenQuantumSetters(ctx: SetterContext): OpenQuantumActions
       const visualizationMode = isOpenQuantumVisualizationMode(mode)
         ? mode
         : DEFAULT_OPEN_QUANTUM_CONFIG.visualizationMode
+      useAppearanceStore
+        .getState()
+        .setColorAlgorithm(OPEN_QUANTUM_VISUALIZATION_COLOR_ALGORITHM[visualizationMode])
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
@@ -91,6 +107,11 @@ export function createOpenQuantumSetters(ctx: SetterContext): OpenQuantumActions
       }))
     },
     resetOpenQuantumToDefault: () => {
+      useAppearanceStore
+        .getState()
+        .setColorAlgorithm(
+          OPEN_QUANTUM_VISUALIZATION_COLOR_ALGORITHM[DEFAULT_OPEN_QUANTUM_CONFIG.visualizationMode]
+        )
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,

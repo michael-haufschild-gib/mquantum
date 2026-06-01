@@ -9,6 +9,7 @@
  */
 
 import { logger } from '@/lib/logger'
+import type { ShaderDebugInfo } from '@/types/shaderDebug'
 
 import { DensityGridComputePass } from '../passes/DensityGridComputePass'
 import { EigenfunctionCacheComputePass } from '../passes/EigenfunctionCacheComputePass'
@@ -34,11 +35,13 @@ import type { ModeSetupResult } from './strategies/types'
 // ---------------------------------------------------------------------------
 
 const pipelineCache = new Map<string, GPURenderPipeline>()
+const pipelineDebugInfoCache = new Map<string, ShaderDebugInfo>()
 const MAX_CACHE_SIZE = 16
 
 /** Clear the render pipeline cache (e.g. on device loss). */
 export function clearSchrodingerPipelineCache(): void {
   pipelineCache.clear()
+  pipelineDebugInfoCache.clear()
 }
 
 // ---------------------------------------------------------------------------
@@ -60,6 +63,7 @@ export interface SchrodingerPipelineResources {
   vertexBuffer: GPUBuffer | null
   indexBuffer: GPUBuffer | null
   indexCount: number
+  shaderDebugInfo: ShaderDebugInfo
 }
 
 /** Base-class helper methods needed during pipeline creation. */
@@ -184,6 +188,7 @@ export async function createSchrodingerPipeline(
   } catch (err) {
     logger.error('[SchrodingerRenderer] Pipeline creation failed, clearing all caches:', err)
     pipelineCache.clear()
+    pipelineDebugInfoCache.clear()
     DensityGridComputePass.clearPipelineCache()
     EigenfunctionCacheComputePass.clearPipelineCache()
     throw err
@@ -245,6 +250,25 @@ async function createSchrodingerPipelineImpl(
 
   let renderPipelinePromise: Promise<GPURenderPipeline> | null = null
   let renderPipeline: GPURenderPipeline | null = null
+  let shaderDebugInfo = pipelineDebugInfoCache.get(cacheKey)
+  let fragmentShader = ''
+  let vertexShader = ''
+
+  if (!cachedPipeline || !shaderDebugInfo) {
+    const fragmentComposition = composeSchroedingerShader(shaderConfig)
+    fragmentShader = fragmentComposition.wgsl
+    vertexShader = pipelineIs2D
+      ? composeSchroedingerVertexShader2D()
+      : composeSchroedingerVertexShader()
+    shaderDebugInfo = {
+      name: 'object',
+      vertexShaderLength: vertexShader.length,
+      fragmentShaderLength: fragmentShader.length,
+      activeModules: fragmentComposition.modules,
+      features: fragmentComposition.features,
+    }
+    pipelineDebugInfoCache.set(cacheKey, shaderDebugInfo)
+  }
 
   if (cachedPipeline) {
     renderPipeline = cachedPipeline
@@ -252,11 +276,6 @@ async function createSchrodingerPipelineImpl(
     pipelineCache.delete(cacheKey)
     pipelineCache.set(cacheKey, cachedPipeline)
   } else {
-    const { wgsl: fragmentShader } = composeSchroedingerShader(shaderConfig)
-    const vertexShader = pipelineIs2D
-      ? composeSchroedingerVertexShader2D()
-      : composeSchroedingerVertexShader()
-
     const vertexModule = deps.createShaderModule(device, vertexShader, 'schroedinger-vertex')
     const fragmentModule = deps.createShaderModule(device, fragmentShader, 'schroedinger-fragment')
 
@@ -366,6 +385,7 @@ async function createSchrodingerPipelineImpl(
         if (pipelineCache.size >= MAX_CACHE_SIZE) {
           const oldest = pipelineCache.keys().next().value!
           pipelineCache.delete(oldest)
+          pipelineDebugInfoCache.delete(oldest)
         }
         pipelineCache.set(cacheKey, pipeline)
       })
@@ -465,5 +485,6 @@ async function createSchrodingerPipelineImpl(
     vertexBuffer,
     indexBuffer,
     indexCount,
+    shaderDebugInfo,
   }
 }

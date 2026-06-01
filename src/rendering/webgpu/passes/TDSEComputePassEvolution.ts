@@ -597,6 +597,50 @@ export interface DiagFrameState {
   diagFrameCounter: number
 }
 
+/**
+ * Compute the TDSE diagnostics cadence in rendered frames.
+ *
+ * @param config TDSE configuration; disabled or invalid intervals fall back to DIAG_DECIMATION.
+ * @returns Floor-normalized interval clamped to at least one rendered frame.
+ */
+export function tdseDiagnosticsInterval(config: TdseConfig): number {
+  const interval = config.diagnosticsEnabled
+    ? config.diagnosticsInterval || DIAG_DECIMATION
+    : DIAG_DECIMATION
+  return Math.max(1, Math.floor(Number.isFinite(interval) ? interval : DIAG_DECIMATION))
+}
+
+/**
+ * Decide whether current rendered frame should run TDSE diagnostics readback.
+ *
+ * @param config TDSE configuration used to derive cadence.
+ * @param diagFrameCounter Zero-based counter checked before caller increments it.
+ * @returns True once counter + 1 reaches configured diagnostics interval.
+ */
+export function shouldRunTdseDiagnosticsThisFrame(
+  config: TdseConfig,
+  diagFrameCounter: number
+): boolean {
+  return diagFrameCounter + 1 >= tdseDiagnosticsInterval(config)
+}
+
+/**
+ * Decide whether wormhole HUD coherence readback should share TDSE diagnostics cadence.
+ *
+ * @param config TDSE configuration, including wormhole HUD opt-in.
+ * @param diagFrameCounter Zero-based counter checked before caller increments it.
+ * @returns True when HUD readback is enabled and diagnostics are due this frame.
+ */
+export function shouldRequestWormholeCoherenceReadback(
+  config: TdseConfig,
+  diagFrameCounter: number
+): boolean {
+  return (
+    config.wormholeCoherenceHudEnabled === true &&
+    shouldRunTdseDiagnosticsThisFrame(config, diagFrameCounter)
+  )
+}
+
 /** Resources needed by the post-step dispatches. */
 export interface PostStepResources {
   pl: TdsePipelineResult
@@ -640,11 +684,12 @@ export function runPostStepDispatches(
   // display normalization. Without this, a spreading wavepacket fades to
   // invisible because maxDensity stays at the initial peak value.
   res.diagState.currentAutoLoop = config.autoLoop
+  const shouldRunDiagnostics = shouldRunTdseDiagnosticsThisFrame(
+    config,
+    frameState.diagFrameCounter
+  )
   frameState.diagFrameCounter++
-  const interval = config.diagnosticsEnabled
-    ? config.diagnosticsInterval || DIAG_DECIMATION
-    : DIAG_DECIMATION
-  if (frameState.diagFrameCounter >= interval) {
+  if (shouldRunDiagnostics) {
     frameState.diagFrameCounter = 0
     const { diagResultBuffer, diagStagingBuffer } = res.diagState
     if (diagResultBuffer && diagStagingBuffer && res.diagUniformBuffer) {

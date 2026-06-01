@@ -52,7 +52,11 @@ fn gridSkipDensity(gridSample: vec4f) -> f32 {
 }
 
 fn gridAdaptiveLogDensity(rho: f32, sCenter: f32) -> f32 {
-  if (IS_DUAL_CHANNEL || (IS_PAULI && !IS_DUAL_CHANNEL && DENSITY_GRID_HAS_PHASE)) {
+  if (
+    IS_DUAL_CHANNEL
+    || (IS_PAULI && !IS_DUAL_CHANNEL && DENSITY_GRID_HAS_PHASE)
+    || !DENSITY_GRID_HAS_PHASE
+  ) {
     if (rho > 1e-9) { return log(rho); }
     return -20.0;
   }
@@ -81,14 +85,28 @@ fn loadGridSampleStateSimple(
 ) -> GridSampleStateSimple {
   let gridSample = sampleDensityFromGrid(pos, uniforms);
   var rho = gridOpacityDensity(gridSample) * adsAmplitudeSq;
-  let sCenter = gridSample.g;
-  let phase = gridSample.b - phaseOffset;
   var colorRho: f32 = gridSample.r * adsAmplitudeSq;
   var colorS: f32 = 0.0;
+  var sCenter: f32;
   if (IS_DUAL_CHANNEL) {
     colorRho = gridSample.r;
     colorS = gridSample.g;
+    sCenter = gridSample.g;
     rho = rho + gridSample.g;
+  } else if (DENSITY_GRID_HAS_PHASE) {
+    sCenter = gridSample.g;
+    colorS = sCenter;
+  } else {
+    if (rho > 1e-9) {
+      sCenter = log(rho);
+    } else {
+      sCenter = -20.0;
+    }
+    colorS = sCenter;
+  }
+  var phase: f32 = 0.0;
+  if (DENSITY_GRID_HAS_PHASE) {
+    phase = gridSample.b - phaseOffset;
   }
   return GridSampleStateSimple(rho, sCenter, colorRho, colorS, phase, gridSample);
 }
@@ -125,7 +143,7 @@ fn volumeRaymarchGrid(
 
   let branchColorActive =
     FEATURE_TDSE_BRANCH_COLOR
-    && uniforms.branchSeparation > 0.5
+    && uniforms.branchSeparation > 0.0
     && uniforms.branchTransitionWidth > 0.0;
   let backreactionActive = isQuantumBackreactionActive(uniforms)
     && FEATURE_QUANTUM_BACKREACTION_LENSING;
@@ -371,8 +389,8 @@ fn volumeRaymarchGrid(
       if (primaryHitT < 0.0 && alpha > primaryHitThreshold) { primaryHitT = t; }
 
       if (!PROFILING_STRIP_COMPOSITING) {
-        let emissionRho = select(rho, colorRho, IS_DUAL_CHANNEL);
-        let emissionS = select(sCenter, colorS, IS_DUAL_CHANNEL);
+        let emissionRho = colorRho;
+        let emissionS = colorS;
         var emission: vec3f;
         if (PROFILING_STRIP_LIGHTING) {
           emission = computeBaseColor(emissionRho, emissionS, phase, pos, uniforms);

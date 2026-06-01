@@ -13,6 +13,7 @@
  */
 
 import { logger } from '@/lib/logger'
+import type { ShaderDebugInfo } from '@/types/shaderDebug'
 
 import type { WebGPURenderContext, WebGPURenderPass, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
@@ -106,6 +107,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   // Configuration
   private rendererConfig: SchrodingerRendererConfig
   private shaderConfig: SchroedingerWGSLShaderConfig
+  private shaderDebugInfo: ShaderDebugInfo | null = null
 
   // Geometry
   private indexCount = 0
@@ -308,10 +310,15 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.vertexBuffer = resources.vertexBuffer
     this.indexBuffer = resources.indexBuffer
     this.indexCount = resources.indexCount
+    this.shaderDebugInfo = resources.shaderDebugInfo
 
     // Dispose previous carpet pass — lazy-initialized on first enable
     this.carpetSlicePass?.dispose()
     this.carpetSlicePass = null
+  }
+
+  getShaderDebugInfo(): ShaderDebugInfo | null {
+    return this.shaderDebugInfo
   }
 
   // =========================================================================
