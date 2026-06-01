@@ -195,26 +195,6 @@ describe('performanceStore', () => {
 
       expect(usePerformanceStore.getState().shaderDebugInfos['testKey']).toBeUndefined()
     })
-
-    it('should toggle shader module overrides', () => {
-      const { toggleShaderModule } = usePerformanceStore.getState()
-
-      toggleShaderModule('lighting')
-      expect(usePerformanceStore.getState().shaderOverrides).toContain('lighting')
-
-      toggleShaderModule('lighting')
-      expect(usePerformanceStore.getState().shaderOverrides).not.toContain('lighting')
-    })
-
-    it('should reset shader overrides', () => {
-      const { toggleShaderModule, resetShaderOverrides } = usePerformanceStore.getState()
-
-      toggleShaderModule('lighting')
-      toggleShaderModule('emission')
-      resetShaderOverrides()
-
-      expect(usePerformanceStore.getState().shaderOverrides).toHaveLength(0)
-    })
   })
 
   describe('reset', () => {

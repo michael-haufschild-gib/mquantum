@@ -143,6 +143,7 @@ describe('performanceMetricsStore', () => {
         },
       ],
       totalGpuTimeMs: Infinity,
+      gpuTimingSupported: 'yes' as never,
     })
 
     usePerformanceMetricsStore.getState().setGpuName('   ')
@@ -163,5 +164,14 @@ describe('performanceMetricsStore', () => {
       skipped: false,
     })
     expect(state.totalGpuTimeMs).toBe(3)
+    expect(state.gpuTimingSupported).toBe(false)
+  })
+
+  it('accepts explicit GPU timing support state', () => {
+    usePerformanceMetricsStore.getState().updateMetrics({ gpuTimingSupported: true })
+    expect(usePerformanceMetricsStore.getState().gpuTimingSupported).toBe(true)
+
+    usePerformanceMetricsStore.getState().updateMetrics({ gpuTimingSupported: false })
+    expect(usePerformanceMetricsStore.getState().gpuTimingSupported).toBe(false)
   })
 })

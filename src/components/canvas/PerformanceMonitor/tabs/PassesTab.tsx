@@ -65,13 +65,15 @@ function formatPassId(passId: string): string {
  * Shows a stacked bar for GPU budget and a table with per-pass breakdown.
  */
 export const PassesTabContent = React.memo(function PassesTabContent() {
-  const { passTimings, totalGpuTimeMs, cpuBreakdown } = usePerformanceMetricsStore(
-    useShallow((s) => ({
-      passTimings: s.passTimings,
-      totalGpuTimeMs: s.totalGpuTimeMs,
-      cpuBreakdown: s.cpuBreakdown,
-    }))
-  )
+  const { passTimings, totalGpuTimeMs, cpuBreakdown, gpuTimingSupported } =
+    usePerformanceMetricsStore(
+      useShallow((s) => ({
+        passTimings: s.passTimings,
+        totalGpuTimeMs: s.totalGpuTimeMs,
+        cpuBreakdown: s.cpuBreakdown,
+        gpuTimingSupported: s.gpuTimingSupported,
+      }))
+    )
 
   const activePasses = passTimings.filter((p) => !p.skipped)
   const fallbackTotalGpuTimeMs = activePasses.reduce((sum, p) => sum + positiveMs(p.gpuTimeMs), 0)
@@ -153,7 +155,11 @@ export const PassesTabContent = React.memo(function PassesTabContent() {
       {!hasGpuTimings && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-warning border border-warning-border text-xs text-warning">
           <Icons.AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-          <span>GPU timing unavailable — timestamp-query not supported</span>
+          <span>
+            {gpuTimingSupported
+              ? 'GPU timing collecting — waiting for timestamp readback'
+              : 'GPU timing unavailable — timestamp-query not supported'}
+          </span>
         </div>
       )}
 

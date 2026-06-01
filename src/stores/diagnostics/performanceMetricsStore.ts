@@ -87,6 +87,7 @@ export interface PerformanceMetricsState {
   buffers: BufferStats
   history: GraphData
   gpuName: string
+  gpuTimingSupported: boolean
   passTimings: PassTimingEntry[]
   totalGpuTimeMs: number
   cpuBreakdown: CpuBreakdown
@@ -225,6 +226,9 @@ function sanitizeMetricsPatch(
   }
   if (metrics.history) patch.history = sanitizeHistoryData(metrics.history, state.history)
   if (metrics.buffers) patch.buffers = sanitizeBufferStats(metrics.buffers, state.buffers)
+  if (metrics.gpuTimingSupported != null) {
+    patch.gpuTimingSupported = metrics.gpuTimingSupported === true
+  }
   if (metrics.cpuBreakdown) patch.cpuBreakdown = sanitizeCpuBreakdown(metrics.cpuBreakdown)
   if (metrics.passTimings) patch.passTimings = sanitizePassTimings(metrics.passTimings)
   if (metrics.totalGpuTimeMs != null) {
@@ -257,6 +261,7 @@ export const usePerformanceMetricsStore = create<PerformanceMetricsState>((set) 
     mem: new Array(GRAPH_POINTS).fill(0),
   },
   gpuName: 'Unknown GPU',
+  gpuTimingSupported: false,
   passTimings: [],
   totalGpuTimeMs: 0,
   cpuBreakdown: { setupMs: 0, passesMs: 0, submitMs: 0 },

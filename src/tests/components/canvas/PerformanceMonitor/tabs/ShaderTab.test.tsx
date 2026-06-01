@@ -3,7 +3,7 @@
  *
  * Verifies: empty state when no shaders, shader keys render as selector buttons,
  * active shader info shows vertex/fragment sizes and features,
- * module toggle switch updates shaderOverrides in store.
+ * module list is diagnostic-only.
  */
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -31,7 +31,7 @@ describe('ShaderTabContent', () => {
   })
 
   it('shows empty state when no shader debug infos', () => {
-    usePerformanceStore.setState({ shaderDebugInfos: {}, shaderOverrides: [] })
+    usePerformanceStore.setState({ shaderDebugInfos: {} })
     render(<ShaderTabContent />)
     expect(screen.getByText('No shader data available')).toBeInTheDocument()
   })
@@ -42,7 +42,6 @@ describe('ShaderTabContent', () => {
         object: mockShaderInfo,
         skybox: { ...mockShaderInfo, name: 'skybox', features: [] },
       },
-      shaderOverrides: [],
     })
     render(<ShaderTabContent />)
     // formatShaderName transforms 'object' -> 'Object' etc.
@@ -52,7 +51,6 @@ describe('ShaderTabContent', () => {
   it('shows vertex shader size', () => {
     usePerformanceStore.setState({
       shaderDebugInfos: { object: mockShaderInfo },
-      shaderOverrides: [],
     })
     render(<ShaderTabContent />)
     // 4096 bytes = "4.0 KB"
@@ -62,7 +60,6 @@ describe('ShaderTabContent', () => {
   it('shows fragment shader size', () => {
     usePerformanceStore.setState({
       shaderDebugInfos: { object: mockShaderInfo },
-      shaderOverrides: [],
     })
     render(<ShaderTabContent />)
     expect(screen.getByText('8.0 KB')).toBeInTheDocument()
@@ -71,7 +68,6 @@ describe('ShaderTabContent', () => {
   it('shows feature badges for active shader', () => {
     usePerformanceStore.setState({
       shaderDebugInfos: { object: mockShaderInfo },
-      shaderOverrides: [],
     })
     render(<ShaderTabContent />)
     expect(screen.getByText('bloom')).toBeInTheDocument()
@@ -81,25 +77,19 @@ describe('ShaderTabContent', () => {
   it('renders active module names', () => {
     usePerformanceStore.setState({
       shaderDebugInfos: { object: mockShaderInfo },
-      shaderOverrides: [],
     })
     render(<ShaderTabContent />)
     expect(screen.getByText('lighting')).toBeInTheDocument()
     expect(screen.getByText('pbr')).toBeInTheDocument()
   })
 
-  it('toggling a module switch adds it to shaderOverrides', async () => {
-    const user = userEvent.setup()
+  it('does not expose dead shader module toggles', () => {
     usePerformanceStore.setState({
       shaderDebugInfos: { object: mockShaderInfo },
-      shaderOverrides: [],
     })
     render(<ShaderTabContent />)
 
-    // Find the switch for 'lighting' module and toggle it
-    const switches = screen.getAllByRole('switch')
-    await user.click(switches[0]!)
-    expect(usePerformanceStore.getState().shaderOverrides).toContain('lighting')
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
   })
 
   it('clicking a shader key button selects that shader', async () => {
@@ -109,7 +99,6 @@ describe('ShaderTabContent', () => {
         object: { ...mockShaderInfo, name: 'object', features: ['bloom'] },
         skybox: { ...mockShaderInfo, name: 'skybox', features: ['cubemap'] },
       },
-      shaderOverrides: [],
     })
     render(<ShaderTabContent />)
 
