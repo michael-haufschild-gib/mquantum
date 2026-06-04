@@ -4,6 +4,10 @@ import { isTdsePresetCompatibleWithDimension, TDSE_SCENARIO_PRESETS } from '@/li
 
 const TIME_TRAVEL_PRESET_IDS = ['postselectedCtcNovikovLoop', 'postselectedCtcParadoxGate'] as const
 const CTC_RESIDUAL_PRESET_IDS = ['ctcResidualNovikovMap', 'ctcResidualParadoxMap'] as const
+const CTC_LOOP_GAIN_PRESET_IDS = [
+  'ctcLoopGainConstructiveHorizon',
+  'ctcLoopGainShearedProtection',
+] as const
 
 describe('TDSE time-travel scenario presets', () => {
   it('exposes P-CTC scenarios that enable the nonlinear postselection operator', () => {
@@ -65,5 +69,40 @@ describe('TDSE time-travel scenario presets', () => {
     const novikovGeometry = { ...novikov.overrides, ctcLoopPhase: undefined }
     const paradoxGeometry = { ...paradox.overrides, ctcLoopPhase: undefined }
     expect(paradoxGeometry).toEqual(novikovGeometry)
+  })
+
+  it('exposes fixed-3D CTC loop-gain maps with high feedback and distinct holonomy shear', () => {
+    const constructive = TDSE_SCENARIO_PRESETS.find((p) => p.id === CTC_LOOP_GAIN_PRESET_IDS[0])
+    const sheared = TDSE_SCENARIO_PRESETS.find((p) => p.id === CTC_LOOP_GAIN_PRESET_IDS[1])
+    if (!constructive || !sheared) throw new Error('CTC loop-gain presets missing')
+
+    for (const preset of [constructive, sheared]) {
+      expect(preset.maxDim).toBe(3)
+      expect(preset.overrides.latticeDim).toBe(3)
+      expect(preset.overrides.gridSize).toEqual([64, 64, 64])
+      expect(preset.overrides.fieldView).toBe('ctcLoopGain')
+      expect(preset.overrides.initialCondition).toBe('superposition')
+      expect(preset.overrides.ctcPostselectionStrength).toBeGreaterThan(0.9)
+      expect(preset.overrides.wormholeMirrorAxis).toBe(0)
+      expect(isTdsePresetCompatibleWithDimension(preset, 3)).toBe(true)
+      expect(isTdsePresetCompatibleWithDimension(preset, 4)).toBe(false)
+    }
+
+    expect(constructive.overrides.ctcLoopPhase).toBe(0)
+    expect(constructive.overrides.packetMomentum).toEqual([0, 0, 0])
+    expect(sheared.overrides.ctcLoopPhase).toBeCloseTo(Math.PI / 2, 12)
+    expect(sheared.overrides.packetMomentum?.[1]).toBeGreaterThan(0)
+
+    const constructiveGeometry = {
+      ...constructive.overrides,
+      ctcLoopPhase: undefined,
+      packetMomentum: undefined,
+    }
+    const shearedGeometry = {
+      ...sheared.overrides,
+      ctcLoopPhase: undefined,
+      packetMomentum: undefined,
+    }
+    expect(shearedGeometry).toEqual(constructiveGeometry)
   })
 })

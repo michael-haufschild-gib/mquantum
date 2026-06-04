@@ -855,7 +855,7 @@ describe('mergeExtendedObjectStateForType — TDSE enum invariants', () => {
         tdse: {
           potentialType: 'andersonDisorder',
           initialCondition: 'planeWave',
-          fieldView: 'quantumPressure',
+          fieldView: 'ctcLoopGain',
           driveWaveform: 'chirp',
           disorderDistribution: 'gaussian',
           densityView: 'proper',
@@ -867,7 +867,7 @@ describe('mergeExtendedObjectStateForType — TDSE enum invariants', () => {
 
     expect(tdse.potentialType).toBe('andersonDisorder')
     expect(tdse.initialCondition).toBe('planeWave')
-    expect(tdse.fieldView).toBe('quantumPressure')
+    expect(tdse.fieldView).toBe('ctcLoopGain')
     expect(tdse.driveWaveform).toBe('chirp')
     expect(tdse.disorderDistribution).toBe('gaussian')
     expect(tdse.densityView).toBe('proper')

@@ -259,6 +259,8 @@ describe('ScenarioSelector - compute mode presets', () => {
       'postselectedCtcParadoxGate',
       'ctcResidualNovikovMap',
       'ctcResidualParadoxMap',
+      'ctcLoopGainConstructiveHorizon',
+      'ctcLoopGainShearedProtection',
     ]
 
     for (const presetId of timeTravelPresetIds) {

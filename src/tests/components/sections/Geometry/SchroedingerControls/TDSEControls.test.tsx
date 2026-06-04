@@ -107,6 +107,7 @@ describe('TDSEControls', () => {
     expect(screen.getByText('Quantum Pressure Q')).toBeInTheDocument()
     expect(screen.getByText('Circulation Ω')).toBeInTheDocument()
     expect(screen.getByText('CTC Loop Residue R')).toBeInTheDocument()
+    expect(screen.getByText('CTC Loop Gain G')).toBeInTheDocument()
     expect(screen.getByTestId('tdse-show-potential')).toBeInTheDocument()
     expect(screen.getByTestId('tdse-imaginary-time')).toBeInTheDocument()
   })

@@ -183,53 +183,51 @@ fn computeSuperfluidVelocityMagSq(
   return vsMagSq;
 }
 
-// Postselected CTC loop residue. Invalid mirror axes, single-cell axes, and odd
-// mirror axes return zero before any mirror read.
-fn computeCtcResidualScalar(
-  idx: u32,
-  re: f32,
-  im: f32,
-  density: f32,
-  nnCoords: ptr<function, array<u32, 12>>,
-  densityGate: f32
-) -> f32 {
+struct CtcMirrorSample { valid: bool, z: vec2f, density: f32 }
+
+fn zeroCtcMirrorSample() -> CtcMirrorSample { return CtcMirrorSample(false, vec2f(0.0), 0.0); }
+
+fn sampleCtcMirror(idx: u32, nnCoords: ptr<function, array<u32, 12>>) -> CtcMirrorSample {
   let axis = params.wormholeMirrorAxis;
-  if (axis >= 12u || axis >= params.latticeDim) {
-    return 0.0;
-  }
-
+  if (axis >= 12u || axis >= params.latticeDim) { return zeroCtcMirrorSample(); }
   let axisSize = params.gridSize[axis];
-  if (axisSize < 2u || (axisSize % 2u) != 0u) {
-    return 0.0;
-  }
-
+  if (axisSize < 2u || (axisSize % 2u) != 0u) { return zeroCtcMirrorSample(); }
   let coord = (*nnCoords)[axis];
-  if (coord >= axisSize) {
-    return 0.0;
-  }
-
+  if (coord >= axisSize) { return zeroCtcMirrorSample(); }
   let mirrorCoord = axisSize - 1u - coord;
   let mirrorDelta = i32(mirrorCoord) - i32(coord);
   let mirrorIdxI = i32(idx) + mirrorDelta * i32(params.strides[axis]);
-  if (mirrorIdxI < 0) {
-    return 0.0;
-  }
-
+  if (mirrorIdxI < 0) { return zeroCtcMirrorSample(); }
   let mirrorIdx = u32(mirrorIdxI);
-  if (mirrorIdx >= params.totalSites) {
-    return 0.0;
-  }
+  if (mirrorIdx >= params.totalSites) { return zeroCtcMirrorSample(); }
+  let z = psi[mirrorIdx];
+  return CtcMirrorSample(true, z, z.x * z.x + z.y * z.y);
+}
 
-  let zMirror = psi[mirrorIdx];
-  let mirrorDensity = zMirror.x * zMirror.x + zMirror.y * zMirror.y;
-  let cosPhi = cos(params.ctcLoopPhase);
-  let sinPhi = sin(params.ctcLoopPhase);
-  let echoRe = cosPhi * zMirror.x + sinPhi * zMirror.y;
-  let echoIm = cosPhi * zMirror.y - sinPhi * zMirror.x;
-  let dRe = re - echoRe;
-  let dIm = im - echoIm;
-  let residueRaw = (dRe * dRe + dIm * dIm) / (density + mirrorDensity + 1e-20);
+fn ctcEcho(z: vec2f) -> vec2f { let c = cos(params.ctcLoopPhase); let s = sin(params.ctcLoopPhase); return vec2f(c * z.x + s * z.y, c * z.y - s * z.x); }
+
+fn computeCtcResidualScalar(idx: u32, re: f32, im: f32, density: f32, nnCoords: ptr<function, array<u32, 12>>, densityGate: f32) -> f32 {
+  let mirror = sampleCtcMirror(idx, nnCoords);
+  if (!mirror.valid) { return 0.0; }
+  let echo = ctcEcho(mirror.z);
+  let dRe = re - echo.x; let dIm = im - echo.y;
+  let residueRaw = (dRe * dRe + dIm * dIm) / (density + mirror.density + 1e-20);
   return clamp(residueRaw, 0.0, 1.0) * densityGate;
+}
+
+fn computeCtcLoopGainScalar(idx: u32, re: f32, im: f32, density: f32, nnCoords: ptr<function, array<u32, 12>>, densityGate: f32) -> f32 {
+  let mirror = sampleCtcMirror(idx, nnCoords);
+  if (!mirror.valid) { return 0.0; }
+  let eps = 1e-20;
+  if (density <= eps || mirror.density <= eps) { return 0.0; }
+  let a = clamp(params.ctcPostselectionStrength, 0.0, 0.995);
+  if (a <= 0.0) { return 0.0; }
+  let echo = ctcEcho(mirror.z);
+  let theta = atan2(im, re); let thetaEcho = atan2(echo.y, echo.x);
+  let phaseMismatch = theta - thetaEcho; let delta = atan2(sin(phaseMismatch), cos(phaseMismatch));
+  let gain = 1.0 / (1.0 + a * a - 2.0 * a * cos(delta) + eps); let resonantGain = 1.0 / ((1.0 - a) * (1.0 - a) + eps);
+  let display = log(1.0 + gain) / log(1.0 + resonantGain);
+  return clamp(display, 0.0, 1.0) * densityGate;
 }
 
 @compute @workgroup_size(4, 4, 4)
@@ -548,6 +546,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     displayScalar = clamp(1.0 - exp(-circulationAbs), 0.0, 1.0) * densityGate;
   } else if (params.fieldView == 10u) {
     displayScalar = computeCtcResidualScalar(idx, re, im, density, &nnCoords, densityGate);
+  } else if (params.fieldView == 11u) {
+    displayScalar = computeCtcLoopGainScalar(idx, re, im, density, &nnCoords, densityGate);
   } else if (params.fieldView == 3u) {
     // potential (NN)
     let potentialScale = getPotentialScale();

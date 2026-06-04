@@ -23,6 +23,7 @@ import type { DisorderDistribution, PmlAbsorberConfig } from './crossMode'
  * - quantumPressure: Madelung quantum pressure Q = -(hbar²/2m)∇²√ρ/√ρ
  * - vorticity: Quantized plaquette phase circulation two-form
  * - ctcResidual: Postselected CTC loop-residue mismatch
+ * - ctcLoopGain: Chronology-horizon resonator gain from mirror-pair phase closure
  */
 export type TdseFieldView =
   | 'density'
@@ -36,6 +37,7 @@ export type TdseFieldView =
   | 'quantumPressure'
   | 'vorticity'
   | 'ctcResidual'
+  | 'ctcLoopGain'
 
 /**
  * Initial condition type for the TDSE wavepacket
@@ -116,6 +118,7 @@ export const TDSE_FIELD_VIEWS: readonly TdseFieldView[] = [
   'quantumPressure',
   'vorticity',
   'ctcResidual',
+  'ctcLoopGain',
 ]
 
 export const TDSE_INITIAL_CONDITIONS: readonly TdseInitialCondition[] = [

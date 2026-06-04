@@ -294,8 +294,55 @@ export interface CtcLoopResidualSample {
   mirrorIndex: number | null
 }
 
+/** Parameters for sampling the CTC loop-gain reference field at one site. */
+export interface CtcLoopGainSampleParams {
+  /** Interleaved (re, im) wavefunction of length `2·Π gridSize[d]`. */
+  psi: Float32Array
+  /** Per-axis lattice sizes. Length is the active lattice dimension. */
+  gridSize: readonly number[]
+  /** Mirror axis index. Invalid axes produce a zero display sample. */
+  axis: number
+  /** Linear site index of v in row-major TDSE storage. */
+  siteIndex: number
+  /** Loop holonomy phi in radians. */
+  phase: number
+  /** Loop-feedback survival, clamped to `[0, 0.995]`. */
+  ctcPostselectionStrength: number
+  /** Density scale used by the shader density gate. Defaults to 1. */
+  maxDensity?: number
+  /** Denominator epsilon. Defaults to the shader value. */
+  epsilon?: number
+}
+
+/** CPU reference output for one CTC loop-gain sample. */
+export interface CtcLoopGainSample {
+  /** Wrapped phase mismatch in `[-π, π]`. */
+  delta: number
+  /** Geometric-series gain before logarithmic display remapping. */
+  gain: number
+  /** Gain at exact chronology-horizon resonance for the same feedback. */
+  resonantGain: number
+  /** Renderer scalar after logarithmic remapping and density gate. */
+  displayScalar: number
+  density: number
+  mirrorDensity: number
+  mirrorIndex: number | null
+}
+
 function zeroCtcResidualSample(): CtcLoopResidualSample {
   return { rawResidue: 0, displayScalar: 0, density: 0, mirrorDensity: 0, mirrorIndex: null }
+}
+
+function zeroCtcLoopGainSample(): CtcLoopGainSample {
+  return {
+    delta: 0,
+    gain: 0,
+    resonantGain: 0,
+    displayScalar: 0,
+    density: 0,
+    mirrorDensity: 0,
+    mirrorIndex: null,
+  }
 }
 
 function smoothstep01(edge0: number, edge1: number, value: number): number {
@@ -374,6 +421,91 @@ export function computeCtcLoopResidualSample(
   const displayScalar = Math.max(0, Math.min(1, rawResidue)) * densityGate
 
   return { rawResidue, displayScalar, density, mirrorDensity, mirrorIndex }
+}
+
+/**
+ * CPU reference for the TDSE `ctcLoopGain` field view at one lattice site.
+ *
+ * Matches `computeCtcLoopGainScalar` in `tdseWriteGrid.wgsl.ts`: invalid mirror
+ * axes, single-cell mirror axes, odd mirror axes, zero feedback, empty local
+ * samples, and empty mirror echoes return zero; valid samples display the
+ * logarithmically normalized chronology-horizon loop gain.
+ */
+export function computeCtcLoopGainSample(params: CtcLoopGainSampleParams): CtcLoopGainSample {
+  const { psi, gridSize, axis, siteIndex } = params
+  if (!Number.isInteger(axis) || axis < 0 || axis >= gridSize.length || axis >= 12) {
+    return zeroCtcLoopGainSample()
+  }
+  if (!Number.isInteger(siteIndex) || siteIndex < 0) {
+    return zeroCtcLoopGainSample()
+  }
+  for (let d = 0; d < gridSize.length; d++) {
+    const n = gridSize[d]!
+    if (!Number.isInteger(n) || n < 1) return zeroCtcLoopGainSample()
+  }
+
+  const axisSize = gridSize[axis]!
+  if (axisSize < 2 || axisSize % 2 !== 0) {
+    return zeroCtcLoopGainSample()
+  }
+
+  const strides = computeStrides(gridSize)
+  const totalSites = gridSize.reduce((acc, n) => acc * n, 1)
+  if (siteIndex >= totalSites) {
+    return zeroCtcLoopGainSample()
+  }
+  if (psi.length !== 2 * totalSites) {
+    throw new Error(`[wormholeCoupling] psi length ${psi.length} != 2·totalSites ${2 * totalSites}`)
+  }
+
+  const strideA = strides[axis]!
+  const coord = Math.floor(siteIndex / strideA) % axisSize
+  const mirrorCoord = axisSize - 1 - coord
+  const mirrorIndex = siteIndex + (mirrorCoord - coord) * strideA
+  if (mirrorIndex < 0 || mirrorIndex >= totalSites) {
+    return zeroCtcLoopGainSample()
+  }
+
+  const re = psi[2 * siteIndex]!
+  const im = psi[2 * siteIndex + 1]!
+  const mirrorRe = psi[2 * mirrorIndex]!
+  const mirrorIm = psi[2 * mirrorIndex + 1]!
+  const density = re * re + im * im
+  const mirrorDensity = mirrorRe * mirrorRe + mirrorIm * mirrorIm
+  const epsilon = params.epsilon
+  const eps = typeof epsilon === 'number' && Number.isFinite(epsilon) && epsilon > 0 ? epsilon : 1e-20
+  if (density <= eps || mirrorDensity <= eps) {
+    return { ...zeroCtcLoopGainSample(), density, mirrorDensity, mirrorIndex }
+  }
+
+  const strength = params.ctcPostselectionStrength
+  const a = Number.isFinite(strength) ? Math.max(0, Math.min(0.995, strength)) : 0
+  if (a <= 0) {
+    return { ...zeroCtcLoopGainSample(), density, mirrorDensity, mirrorIndex }
+  }
+
+  const phi = Number.isFinite(params.phase) ? params.phase : 0
+  const cosPhi = Math.cos(phi)
+  const sinPhi = Math.sin(phi)
+  const echoRe = cosPhi * mirrorRe + sinPhi * mirrorIm
+  const echoIm = cosPhi * mirrorIm - sinPhi * mirrorRe
+  const theta = Math.atan2(im, re)
+  const thetaEcho = Math.atan2(echoIm, echoRe)
+  const phaseMismatch = theta - thetaEcho
+  const delta = Math.atan2(Math.sin(phaseMismatch), Math.cos(phaseMismatch))
+  const gain = 1 / (1 + a * a - 2 * a * Math.cos(delta) + eps)
+  const resonantGain = 1 / ((1 - a) * (1 - a) + eps)
+  const rawDisplay = Math.log1p(gain) / Math.log1p(resonantGain)
+  const maxDensityInput = params.maxDensity
+  const maxDensity =
+    typeof maxDensityInput === 'number' && Number.isFinite(maxDensityInput)
+      ? Math.max(maxDensityInput, 0)
+      : 1
+  const normDensity = maxDensity > 0 ? density / maxDensity : 0
+  const densityGate = smoothstep01(0, 0.02, normDensity)
+  const displayScalar = Math.max(0, Math.min(1, rawDisplay)) * densityGate
+
+  return { delta, gain, resonantGain, displayScalar, density, mirrorDensity, mirrorIndex }
 }
 
 /** Type guard for the mirror-axis enum used by the store and URL layer. */

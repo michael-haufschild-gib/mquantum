@@ -23,9 +23,12 @@ describe('tdseWriteGrid CTC residual field view', () => {
   })
 
   it('guards mirror reads before sampling psi', () => {
-    const fnStart = tdseWriteGridBlock.indexOf('fn computeCtcResidualScalar')
-    const fnEnd = tdseWriteGridBlock.indexOf('@compute', fnStart)
+    const fnStart = tdseWriteGridBlock.indexOf('fn sampleCtcMirror')
+    const fnEnd = tdseWriteGridBlock.indexOf('fn ctcEcho', fnStart)
     const fnBody = tdseWriteGridBlock.slice(fnStart, fnEnd)
+    const residualStart = tdseWriteGridBlock.indexOf('fn computeCtcResidualScalar')
+    const residualEnd = tdseWriteGridBlock.indexOf('fn computeCtcLoopGainScalar', residualStart)
+    const residualBody = tdseWriteGridBlock.slice(residualStart, residualEnd)
 
     expect(fnStart).toBeGreaterThan(0)
     expect(fnBody).toContain('if (axis >= 12u || axis >= params.latticeDim)')
@@ -34,10 +37,11 @@ describe('tdseWriteGrid CTC residual field view', () => {
     expect(fnBody).toContain('if (mirrorIdxI < 0)')
     expect(fnBody).toContain('if (mirrorIdx >= params.totalSites)')
     expect(fnBody.indexOf('if (mirrorIdx >= params.totalSites)')).toBeLessThan(
-      fnBody.indexOf('let zMirror = psi[mirrorIdx];')
+      fnBody.indexOf('let z = psi[mirrorIdx];')
     )
-    expect(fnBody).toContain('let residueRaw =')
-    expect(fnBody).toContain('return clamp(residueRaw, 0.0, 1.0) * densityGate;')
+    expect(residualBody).toContain('let mirror = sampleCtcMirror(idx, nnCoords);')
+    expect(residualBody).toContain('let residueRaw =')
+    expect(residualBody).toContain('return clamp(residueRaw, 0.0, 1.0) * densityGate;')
   })
 
   it('composes the residual branch into TDSE write-grid shaders', () => {
