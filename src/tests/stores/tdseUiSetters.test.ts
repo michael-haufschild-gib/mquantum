@@ -90,6 +90,11 @@ describe('TDSE UI setters', () => {
       expect(getTdse().fieldView).toBe('vorticity')
     })
 
+    it('sets field view to CTC residual', () => {
+      useExtendedObjectStore.getState().setTdseFieldView('ctcResidual')
+      expect(getTdse().fieldView).toBe('ctcResidual')
+    })
+
     it('rejects invalid field views', () => {
       useExtendedObjectStore.getState().setTdseFieldView('phase')
       // @ts-expect-error intentional invalid input

@@ -183,6 +183,55 @@ fn computeSuperfluidVelocityMagSq(
   return vsMagSq;
 }
 
+// Postselected CTC loop residue. Invalid mirror axes, single-cell axes, and odd
+// mirror axes return zero before any mirror read.
+fn computeCtcResidualScalar(
+  idx: u32,
+  re: f32,
+  im: f32,
+  density: f32,
+  nnCoords: ptr<function, array<u32, 12>>,
+  densityGate: f32
+) -> f32 {
+  let axis = params.wormholeMirrorAxis;
+  if (axis >= 12u || axis >= params.latticeDim) {
+    return 0.0;
+  }
+
+  let axisSize = params.gridSize[axis];
+  if (axisSize < 2u || (axisSize % 2u) != 0u) {
+    return 0.0;
+  }
+
+  let coord = (*nnCoords)[axis];
+  if (coord >= axisSize) {
+    return 0.0;
+  }
+
+  let mirrorCoord = axisSize - 1u - coord;
+  let mirrorDelta = i32(mirrorCoord) - i32(coord);
+  let mirrorIdxI = i32(idx) + mirrorDelta * i32(params.strides[axis]);
+  if (mirrorIdxI < 0) {
+    return 0.0;
+  }
+
+  let mirrorIdx = u32(mirrorIdxI);
+  if (mirrorIdx >= params.totalSites) {
+    return 0.0;
+  }
+
+  let zMirror = psi[mirrorIdx];
+  let mirrorDensity = zMirror.x * zMirror.x + zMirror.y * zMirror.y;
+  let cosPhi = cos(params.ctcLoopPhase);
+  let sinPhi = sin(params.ctcLoopPhase);
+  let echoRe = cosPhi * zMirror.x + sinPhi * zMirror.y;
+  let echoIm = cosPhi * zMirror.y - sinPhi * zMirror.x;
+  let dRe = re - echoRe;
+  let dIm = im - echoIm;
+  let residueRaw = (dRe * dRe + dIm * dIm) / (density + mirrorDensity + 1e-20);
+  return clamp(residueRaw, 0.0, 1.0) * densityGate;
+}
+
 @compute @workgroup_size(4, 4, 4)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let texDims = textureDimensions(outputTex);
@@ -497,6 +546,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       }
     }
     displayScalar = clamp(1.0 - exp(-circulationAbs), 0.0, 1.0) * densityGate;
+  } else if (params.fieldView == 10u) {
+    displayScalar = computeCtcResidualScalar(idx, re, im, density, &nnCoords, densityGate);
   } else if (params.fieldView == 3u) {
     // potential (NN)
     let potentialScale = getPotentialScale();

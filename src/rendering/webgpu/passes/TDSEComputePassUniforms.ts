@@ -118,6 +118,7 @@ const VIEW_MAP: Record<string, number> = {
   hawkingFlux: 7,
   quantumPressure: 8,
   vorticity: 9,
+  ctcResidual: 10,
 }
 
 /** Enum maps for TDSE drive waveform types. */

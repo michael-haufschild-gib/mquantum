@@ -57,6 +57,7 @@ export const FIELD_VIEW_OPTIONS = [
   { value: 'potential', label: 'Potential V(x)' },
   { value: 'quantumPressure', label: 'Quantum Pressure Q' },
   { value: 'vorticity', label: 'Circulation Ω' },
+  { value: 'ctcResidual', label: 'CTC Loop Residue R' },
 ]
 
 /**

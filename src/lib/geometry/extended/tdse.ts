@@ -22,6 +22,7 @@ import type { DisorderDistribution, PmlAbsorberConfig } from './crossMode'
  * - potential: External potential V(x)
  * - quantumPressure: Madelung quantum pressure Q = -(hbar²/2m)∇²√ρ/√ρ
  * - vorticity: Quantized plaquette phase circulation two-form
+ * - ctcResidual: Postselected CTC loop-residue mismatch
  */
 export type TdseFieldView =
   | 'density'
@@ -34,6 +35,7 @@ export type TdseFieldView =
   | 'hawkingFlux'
   | 'quantumPressure'
   | 'vorticity'
+  | 'ctcResidual'
 
 /**
  * Initial condition type for the TDSE wavepacket
@@ -113,6 +115,7 @@ export const TDSE_FIELD_VIEWS: readonly TdseFieldView[] = [
   'hawkingFlux',
   'quantumPressure',
   'vorticity',
+  'ctcResidual',
 ]
 
 export const TDSE_INITIAL_CONDITIONS: readonly TdseInitialCondition[] = [

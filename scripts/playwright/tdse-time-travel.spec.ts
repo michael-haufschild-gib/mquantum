@@ -7,7 +7,7 @@
 
 import type { Page } from '@playwright/test'
 
-import { test } from './fixtures'
+import { expect, test } from './fixtures'
 import {
   applyTdsePreset,
   assertNonBlankPixels,
@@ -15,7 +15,7 @@ import {
   expectSnapshotsDiffer,
   getFrameCount,
   gotoMode,
-  requireWebGPU,
+  hasWebGPU,
   waitForFrameAdvance,
   waitForRendererReady,
   waitForShaderCompilation,
@@ -37,6 +37,24 @@ const TIME_TRAVEL_PRESETS = [
     expectedFieldView: 'phase',
   },
 ] as const
+
+const CTC_RESIDUAL_PRESETS = [
+  {
+    id: 'ctcResidualNovikovMap',
+    label: 'CTC residual Novikov map',
+    expectedPhase: 0,
+  },
+  {
+    id: 'ctcResidualParadoxMap',
+    label: 'CTC residual paradox map',
+    expectedPhase: Math.PI,
+  },
+] as const
+
+async function requireWebGPUWithoutSkipping(page: Page): Promise<void> {
+  const available = await hasWebGPU(page)
+  expect(available, 'tdse-time-travel.spec.ts requires WebGPU and must not skip').toBe(true)
+}
 
 async function waitForAppliedTimeTravelPreset(
   page: Page,
@@ -62,10 +80,37 @@ async function waitForAppliedTimeTravelPreset(
   )
 }
 
+async function waitForAppliedCtcResidualPreset(
+  page: Page,
+  preset: (typeof CTC_RESIDUAL_PRESETS)[number]
+): Promise<void> {
+  await page.waitForFunction(
+    ({ id, expectedPhase }) => {
+      const extStore = window.__EXTENDED_OBJECT_STORE__
+      if (!extStore) return false
+      const tdse = extStore.getState().schroedinger.tdse
+      return (
+        tdse.ctcPostselectionEnabled === true &&
+        tdse.ctcPostselectionStrength > 0 &&
+        tdse.ctcPostselectionStrength < 0.02 &&
+        Math.abs(tdse.ctcLoopPhase - expectedPhase) < 1e-4 &&
+        tdse.fieldView === 'ctcResidual' &&
+        tdse.initialCondition === 'superposition' &&
+        tdse.wormholeMirrorAxis === 0 &&
+        tdse.gridSize[0] === 64 &&
+        tdse.gridSize[0] % 2 === 0 &&
+        id.length > 0
+      )
+    },
+    preset,
+    { timeout: 10_000 }
+  )
+}
+
 test.describe('TDSE P-CTC time-travel scenario presets', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await requireWebGPU(page, test.info())
+    await requireWebGPUWithoutSkipping(page)
   })
 
   for (const preset of TIME_TRAVEL_PRESETS) {
@@ -102,5 +147,48 @@ test.describe('TDSE P-CTC time-travel scenario presets', () => {
     const paradox = await capturePixelSnapshot(page)
 
     expectSnapshotsDiffer(novikov, paradox, 'P-CTC Novikov vs paradox-gate presets', 0.5)
+  })
+})
+
+test.describe('TDSE CTC loop-residue field view presets', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+    await requireWebGPUWithoutSkipping(page)
+  })
+
+  for (const preset of CTC_RESIDUAL_PRESETS) {
+    test(`${preset.label}: applies preset and renders non-blank residual pixels`, async ({ page }) => {
+      await gotoMode(page, 'tdseDynamics', 3)
+      await waitForRendererReady(page)
+      await waitForShaderCompilation(page)
+
+      await applyTdsePreset(page, preset.id)
+      await waitForAppliedCtcResidualPreset(page, preset)
+      await waitForShaderCompilation(page)
+      const frame = await getFrameCount(page)
+      await waitForFrameAdvance(page, frame + 45)
+
+      await assertNonBlankPixels(page, preset.label, 3)
+    })
+  }
+
+  test('Novikov and paradox residual maps render visually distinct residues', async ({ page }) => {
+    await gotoMode(page, 'tdseDynamics', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+
+    await applyTdsePreset(page, 'ctcResidualNovikovMap')
+    await waitForAppliedCtcResidualPreset(page, CTC_RESIDUAL_PRESETS[0])
+    await waitForShaderCompilation(page)
+    await waitForFrameAdvance(page, (await getFrameCount(page)) + 45)
+    const novikov = await capturePixelSnapshot(page)
+
+    await applyTdsePreset(page, 'ctcResidualParadoxMap')
+    await waitForAppliedCtcResidualPreset(page, CTC_RESIDUAL_PRESETS[1])
+    await waitForShaderCompilation(page)
+    await waitForFrameAdvance(page, (await getFrameCount(page)) + 45)
+    const paradox = await capturePixelSnapshot(page)
+
+    expectSnapshotsDiffer(novikov, paradox, 'CTC residual Novikov vs paradox maps', 0.4)
   })
 })

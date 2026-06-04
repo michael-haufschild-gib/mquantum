@@ -265,6 +265,117 @@ export function computeWormholeCoherence(
   return (numRe * numRe) / denom
 }
 
+/** Parameters for sampling the CTC loop-residue reference field at one site. */
+export interface CtcLoopResidualSampleParams {
+  /** Interleaved (re, im) wavefunction of length `2·Π gridSize[d]`. */
+  psi: Float32Array
+  /** Per-axis lattice sizes. Length is the active lattice dimension. */
+  gridSize: readonly number[]
+  /** Mirror axis index. Invalid axes produce a zero display sample. */
+  axis: number
+  /** Linear site index of v in row-major TDSE storage. */
+  siteIndex: number
+  /** Loop holonomy phi in radians. */
+  phase: number
+  /** Density scale used by the shader density gate. Defaults to 1. */
+  maxDensity?: number
+  /** Denominator epsilon. Defaults to the shader value. */
+  epsilon?: number
+}
+
+/** CPU reference output for one CTC loop-residue sample. */
+export interface CtcLoopResidualSample {
+  /** Raw PRD residue before display remapping. */
+  rawResidue: number
+  /** Renderer scalar: `clamp(rawResidue, 0, 1) * densityGate`. */
+  displayScalar: number
+  density: number
+  mirrorDensity: number
+  mirrorIndex: number | null
+}
+
+function zeroCtcResidualSample(): CtcLoopResidualSample {
+  return { rawResidue: 0, displayScalar: 0, density: 0, mirrorDensity: 0, mirrorIndex: null }
+}
+
+function smoothstep01(edge0: number, edge1: number, value: number): number {
+  const t = Math.max(0, Math.min(1, (value - edge0) / (edge1 - edge0)))
+  return t * t * (3 - 2 * t)
+}
+
+/**
+ * CPU reference for the TDSE `ctcResidual` field view at one lattice site.
+ *
+ * Matches `computeCtcResidualScalar` in `tdseWriteGrid.wgsl.ts`: invalid mirror
+ * axes, single-cell mirror axes, and odd mirror axes return zero; valid samples
+ * evaluate the postselected-loop residue against the nearest mirror site and
+ * apply the same local density gate.
+ */
+export function computeCtcLoopResidualSample(
+  params: CtcLoopResidualSampleParams
+): CtcLoopResidualSample {
+  const { psi, gridSize, axis, siteIndex } = params
+  if (!Number.isInteger(axis) || axis < 0 || axis >= gridSize.length || axis >= 12) {
+    return zeroCtcResidualSample()
+  }
+  if (!Number.isInteger(siteIndex) || siteIndex < 0) {
+    return zeroCtcResidualSample()
+  }
+  for (let d = 0; d < gridSize.length; d++) {
+    const n = gridSize[d]!
+    if (!Number.isInteger(n) || n < 1) return zeroCtcResidualSample()
+  }
+
+  const axisSize = gridSize[axis]!
+  if (axisSize < 2 || axisSize % 2 !== 0) {
+    return zeroCtcResidualSample()
+  }
+
+  const strides = computeStrides(gridSize)
+  const totalSites = gridSize.reduce((acc, n) => acc * n, 1)
+  if (siteIndex >= totalSites) {
+    return zeroCtcResidualSample()
+  }
+  if (psi.length !== 2 * totalSites) {
+    throw new Error(`[wormholeCoupling] psi length ${psi.length} != 2·totalSites ${2 * totalSites}`)
+  }
+
+  const strideA = strides[axis]!
+  const coord = Math.floor(siteIndex / strideA) % axisSize
+  const mirrorCoord = axisSize - 1 - coord
+  const mirrorIndex = siteIndex + (mirrorCoord - coord) * strideA
+  if (mirrorIndex < 0 || mirrorIndex >= totalSites) {
+    return zeroCtcResidualSample()
+  }
+
+  const re = psi[2 * siteIndex]!
+  const im = psi[2 * siteIndex + 1]!
+  const mirrorRe = psi[2 * mirrorIndex]!
+  const mirrorIm = psi[2 * mirrorIndex + 1]!
+  const density = re * re + im * im
+  const mirrorDensity = mirrorRe * mirrorRe + mirrorIm * mirrorIm
+  const phi = Number.isFinite(params.phase) ? params.phase : 0
+  const cosPhi = Math.cos(phi)
+  const sinPhi = Math.sin(phi)
+  const echoRe = cosPhi * mirrorRe + sinPhi * mirrorIm
+  const echoIm = cosPhi * mirrorIm - sinPhi * mirrorRe
+  const dRe = re - echoRe
+  const dIm = im - echoIm
+  const epsilon = params.epsilon
+  const eps = typeof epsilon === 'number' && Number.isFinite(epsilon) && epsilon > 0 ? epsilon : 1e-20
+  const rawResidue = (dRe * dRe + dIm * dIm) / (density + mirrorDensity + eps)
+  const maxDensityInput = params.maxDensity
+  const maxDensity =
+    typeof maxDensityInput === 'number' && Number.isFinite(maxDensityInput)
+      ? Math.max(maxDensityInput, 0)
+      : 1
+  const normDensity = maxDensity > 0 ? density / maxDensity : 0
+  const densityGate = smoothstep01(0, 0.02, normDensity)
+  const displayScalar = Math.max(0, Math.min(1, rawResidue)) * densityGate
+
+  return { rawResidue, displayScalar, density, mirrorDensity, mirrorIndex }
+}
+
 /** Type guard for the mirror-axis enum used by the store and URL layer. */
 export function isValidMirrorAxis(v: unknown): v is MirrorAxis {
   return v === 0 || v === 1 || v === 2

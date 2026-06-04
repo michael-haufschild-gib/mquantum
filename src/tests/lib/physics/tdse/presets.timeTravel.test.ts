@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { isTdsePresetCompatibleWithDimension, TDSE_SCENARIO_PRESETS } from '@/lib/physics/tdse/presets'
 
 const TIME_TRAVEL_PRESET_IDS = ['postselectedCtcNovikovLoop', 'postselectedCtcParadoxGate'] as const
+const CTC_RESIDUAL_PRESET_IDS = ['ctcResidualNovikovMap', 'ctcResidualParadoxMap'] as const
 
 describe('TDSE time-travel scenario presets', () => {
   it('exposes P-CTC scenarios that enable the nonlinear postselection operator', () => {
@@ -38,5 +39,31 @@ describe('TDSE time-travel scenario presets', () => {
       expect(isTdsePresetCompatibleWithDimension(preset, 3)).toBe(true)
       expect(isTdsePresetCompatibleWithDimension(preset, 5)).toBe(false)
     }
+  })
+
+  it('exposes fixed-3D CTC residual maps that differ only by loop holonomy', () => {
+    const novikov = TDSE_SCENARIO_PRESETS.find((p) => p.id === CTC_RESIDUAL_PRESET_IDS[0])
+    const paradox = TDSE_SCENARIO_PRESETS.find((p) => p.id === CTC_RESIDUAL_PRESET_IDS[1])
+    if (!novikov || !paradox) throw new Error('CTC residual presets missing')
+
+    for (const preset of [novikov, paradox]) {
+      expect(preset.maxDim).toBe(3)
+      expect(preset.overrides.latticeDim).toBe(3)
+      expect(preset.overrides.gridSize).toEqual([64, 64, 64])
+      expect(preset.overrides.fieldView).toBe('ctcResidual')
+      expect(preset.overrides.initialCondition).toBe('superposition')
+      expect(preset.overrides.ctcPostselectionEnabled).toBe(true)
+      expect(preset.overrides.ctcPostselectionStrength).toBeGreaterThan(0)
+      expect(preset.overrides.ctcPostselectionStrength).toBeLessThan(0.02)
+      expect(isTdsePresetCompatibleWithDimension(preset, 3)).toBe(true)
+      expect(isTdsePresetCompatibleWithDimension(preset, 4)).toBe(false)
+    }
+
+    expect(novikov.overrides.ctcLoopPhase).toBe(0)
+    expect(paradox.overrides.ctcLoopPhase).toBeCloseTo(Math.PI, 12)
+
+    const novikovGeometry = { ...novikov.overrides, ctcLoopPhase: undefined }
+    const paradoxGeometry = { ...paradox.overrides, ctcLoopPhase: undefined }
+    expect(paradoxGeometry).toEqual(novikovGeometry)
   })
 })

@@ -130,3 +130,83 @@ Verification:
 - `pnpm test:shaders:fast` passed.
 - `node scripts/check-wgsl-backticks.js` passed.
 - `PLAYWRIGHT_DEV_SERVER_PORT=3000 pnpm exec playwright test scripts/playwright/tdse-time-travel.spec.ts --workers=1` passed: 3 passed, 0 failed, 0 skipped; WebGPU available.
+
+## Round PRD - CTC Loop-Residue Field
+
+### Hypothesis
+
+Time-travel visualization should show not only the histories that survive, but the histories being rejected. A postselected CTC is a boundary-value rule: future-returned amplitude constrains earlier amplitude. The renderer can expose that rule as a scalar residue field,
+
+`R(v) = |psi(v) - exp(-i phi) psi(M(v))|^2 / (|psi(v)|^2 + |psi(M(v))|^2 + eps)`,
+
+where `M(v)` is the mirror mouth and `phi` is loop holonomy. `R=0` means the local wavefunction already agrees with its time-loop echo; high `R` means the current history cannot close the loop without postselection.
+
+Science anchors:
+- Lloyd et al. define CTCs as trajectories that can interact with a former self, and their P-CTC model combines teleportation with postselection to enforce consistency: https://arxiv.org/abs/1005.2219
+- Vaidman's TSVF describes quantum systems using both forward-evolving and backward-evolving states from earlier/later measurements: https://arxiv.org/abs/0706.1347
+- Stanford Encyclopedia of Philosophy surveys retrocausal quantum models where future boundary conditions help constrain earlier dynamics: https://plato.stanford.edu/entries/qm-retrocausality/
+
+### Feature
+
+Add TDSE field view `ctcResidual`.
+
+In the TDSE write-grid shader, when `fieldView == ctcResidual`, compute nearest-neighbor mirror-pair mismatch using existing `wormholeMirrorAxis` and `ctcLoopPhase`. The field view must read the evolved `psi` buffer and write a scalar into the density texture. This is a render-time scalar diagnostic of the CTC physics, not a color palette.
+
+Display mapping:
+- `0` = loop-consistent.
+- `1` = one-sided amplitude with empty mirror echo or stronger paradox after clipping.
+- raw `R` can exceed `1` for equal-but-opposite echoes, but the renderer clips display brightness to `1`.
+- Gate by local density so empty space stays empty.
+
+### Scenario Presets
+
+Add at least two fixed-3D TDSE presets:
+
+1. `ctcResidualNovikovMap`
+   - Uses the existing P-CTC setup with `ctcLoopPhase = 0`.
+   - Low postselection strength so residue remains visible long enough to watch it decay.
+   - Opens in `fieldView: 'ctcResidual'`.
+
+2. `ctcResidualParadoxMap`
+   - Same geometry but `ctcLoopPhase = pi`.
+   - Opens in `fieldView: 'ctcResidual'`.
+   - Must render differently from Novikov map because the accepted echo is phase-flipped.
+
+### User Sees
+
+Instead of two blobs with no explanation, users see a "disagreement heat" field:
+- bright residue means "this part would not survive the time-loop rule";
+- dim residue means "this part is already a self-consistent time-travel echo";
+- over frames, low-strength postselection should visibly reduce residue near the mirror mouths.
+
+### Correctness
+
+- `TdseFieldView`, UI field-view options, uniform enum packing, WGSL uniform comments, and write-grid shader agree on the new enum value.
+- The WGSL mirror-index calculation is safe for invalid axes, single-cell axes, and odd sizes; it no-ops to zero rather than reading out of bounds.
+- CPU reference math matches the WGSL formula.
+- Presets are exposed through the scenario selector and hidden above their fixed supported dimension.
+- The renderer changes the density texture output, not just UI text.
+
+### Acceptance Bar
+
+- Numerical/unit tests prove:
+  - residual is 0 for `psi(v) = exp(-i phi) psi(M(v))`;
+  - residual is high for phase-inconsistent or one-sided pairs;
+  - residual is phase-holonomy dependent;
+  - uniform packing maps `ctcResidual` to the shader enum.
+- Scenario tests prove the two presets exist, are fixed 3D, use `fieldView: 'ctcResidual'`, and differ by loop phase.
+- Playwright e2e tests apply both presets in the real app, require WebGPU, assert 0 skipped tests, assert non-blank pixels, and assert the two presets are visually distinct.
+- Run targeted Vitest, `pnpm exec tsc -b`, targeted ESLint, `pnpm test:shaders:fast`, `node scripts/check-wgsl-backticks.js`, and Playwright e2e on the existing dev server at port 3000.
+
+### Outcome
+
+Added TDSE `ctcResidual` field view: the renderer now draws density-gated loop-residue heat from evolved `psi` mirror pairs, exposing which amplitude fails the CTC self-consistency boundary.
+
+Verification:
+- `pnpm exec vitest run src/tests/lib/physics/tdse/ctcResidual.test.ts src/tests/lib/physics/tdse/presets.timeTravel.test.ts src/tests/rendering/webgpu/tdseWriteGridCtcResidual.test.ts src/tests/rendering/webgpu/passes/TDSEComputePassUniforms.test.ts src/tests/stores/tdseUiSetters.test.ts src/tests/components/sections/Geometry/SchroedingerControls/TDSEControls.test.tsx src/tests/components/sections/Geometry/ScenarioSelector.compute.test.tsx` passed: 7 files, 113 tests.
+- `pnpm exec eslint ...` on touched files passed.
+- `pnpm exec tsc -b` passed.
+- `pnpm test:shaders:fast` passed.
+- `node scripts/check-wgsl-backticks.js` passed.
+- `PLAYWRIGHT_DEV_SERVER_PORT=3000 pnpm exec playwright test scripts/playwright/tdse-time-travel.spec.ts --workers=1` passed: 6 passed, 0 skipped; GPU enforcement 100% execution.
+- Independent reviewer returned PASS after formula correction.
