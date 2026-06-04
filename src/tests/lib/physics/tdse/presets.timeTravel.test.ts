@@ -8,6 +8,10 @@ const CTC_LOOP_GAIN_PRESET_IDS = [
   'ctcLoopGainConstructiveHorizon',
   'ctcLoopGainShearedProtection',
 ] as const
+const CTC_DEUTSCH_ENTROPY_PRESET_IDS = [
+  'ctcDeutschEntropyParadoxMixer',
+  'ctcDeutschEntropyShearedMixer',
+] as const
 
 describe('TDSE time-travel scenario presets', () => {
   it('exposes P-CTC scenarios that enable the nonlinear postselection operator', () => {
@@ -104,5 +108,41 @@ describe('TDSE time-travel scenario presets', () => {
       packetMomentum: undefined,
     }
     expect(shearedGeometry).toEqual(constructiveGeometry)
+  })
+
+  it('exposes fixed-3D Deutsch entropy maps with high feedback and distinct holonomy shear', () => {
+    const paradox = TDSE_SCENARIO_PRESETS.find((p) => p.id === CTC_DEUTSCH_ENTROPY_PRESET_IDS[0])
+    const sheared = TDSE_SCENARIO_PRESETS.find((p) => p.id === CTC_DEUTSCH_ENTROPY_PRESET_IDS[1])
+    if (!paradox || !sheared) throw new Error('CTC Deutsch entropy presets missing')
+
+    for (const preset of [paradox, sheared]) {
+      expect(preset.maxDim).toBe(3)
+      expect(preset.overrides.latticeDim).toBe(3)
+      expect(preset.overrides.gridSize).toEqual([64, 64, 64])
+      expect(preset.overrides.fieldView).toBe('ctcDeutschEntropy')
+      expect(preset.overrides.initialCondition).toBe('superposition')
+      expect(preset.overrides.ctcPostselectionEnabled).toBe(false)
+      expect(preset.overrides.ctcPostselectionStrength).toBeGreaterThan(0.9)
+      expect(preset.overrides.wormholeMirrorAxis).toBe(0)
+      expect(isTdsePresetCompatibleWithDimension(preset, 3)).toBe(true)
+      expect(isTdsePresetCompatibleWithDimension(preset, 4)).toBe(false)
+    }
+
+    expect(paradox.overrides.ctcLoopPhase).toBeCloseTo(Math.PI, 12)
+    expect(paradox.overrides.packetMomentum).toEqual([0, 0, 0])
+    expect(sheared.overrides.ctcLoopPhase).toBeCloseTo(Math.PI / 2, 12)
+    expect(sheared.overrides.packetMomentum?.[1]).toBeGreaterThan(0)
+
+    const paradoxGeometry = {
+      ...paradox.overrides,
+      ctcLoopPhase: undefined,
+      packetMomentum: undefined,
+    }
+    const shearedGeometry = {
+      ...sheared.overrides,
+      ctcLoopPhase: undefined,
+      packetMomentum: undefined,
+    }
+    expect(shearedGeometry).toEqual(paradoxGeometry)
   })
 })

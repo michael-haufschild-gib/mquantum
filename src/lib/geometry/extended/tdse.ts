@@ -24,6 +24,7 @@ import type { DisorderDistribution, PmlAbsorberConfig } from './crossMode'
  * - vorticity: Quantized plaquette phase circulation two-form
  * - ctcResidual: Postselected CTC loop-residue mismatch
  * - ctcLoopGain: Chronology-horizon resonator gain from mirror-pair phase closure
+ * - ctcDeutschEntropy: Deutsch fixed-point paradox entropy from mirror-pair phase contradiction
  */
 export type TdseFieldView =
   | 'density'
@@ -38,6 +39,7 @@ export type TdseFieldView =
   | 'vorticity'
   | 'ctcResidual'
   | 'ctcLoopGain'
+  | 'ctcDeutschEntropy'
 
 /**
  * Initial condition type for the TDSE wavepacket
@@ -119,6 +121,7 @@ export const TDSE_FIELD_VIEWS: readonly TdseFieldView[] = [
   'vorticity',
   'ctcResidual',
   'ctcLoopGain',
+  'ctcDeutschEntropy',
 ]
 
 export const TDSE_INITIAL_CONDITIONS: readonly TdseInitialCondition[] = [

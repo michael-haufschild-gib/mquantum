@@ -120,6 +120,7 @@ const VIEW_MAP: Record<string, number> = {
   vorticity: 9,
   ctcResidual: 10,
   ctcLoopGain: 11,
+  ctcDeutschEntropy: 12,
 }
 
 /** Enum maps for TDSE drive waveform types. */

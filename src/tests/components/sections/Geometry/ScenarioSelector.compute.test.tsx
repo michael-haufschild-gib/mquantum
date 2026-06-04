@@ -261,6 +261,8 @@ describe('ScenarioSelector - compute mode presets', () => {
       'ctcResidualParadoxMap',
       'ctcLoopGainConstructiveHorizon',
       'ctcLoopGainShearedProtection',
+      'ctcDeutschEntropyParadoxMixer',
+      'ctcDeutschEntropyShearedMixer',
     ]
 
     for (const presetId of timeTravelPresetIds) {

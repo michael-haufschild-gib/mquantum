@@ -287,6 +287,19 @@ This is not "two blobs." Bright regions mean the wave would circle the time loop
 
 ### Outcome
 
+Added TDSE `ctcDeutschEntropy` field view: the renderer now draws a Deutsch fixed-point entropy proxy, highlighting mirror-pair regions where a clean pure history would need mixed-state self-consistency.
+
+Verification:
+- `pnpm exec vitest run src/tests/lib/physics/tdse/ctcDeutschEntropy.test.ts src/tests/lib/physics/tdse/ctcLoopGain.test.ts src/tests/lib/physics/tdse/ctcResidual.test.ts src/tests/lib/physics/tdse/presets.timeTravel.test.ts src/tests/rendering/webgpu/tdseWriteGridCtcDeutschEntropy.test.ts src/tests/rendering/webgpu/tdseWriteGridCtcLoopGain.test.ts src/tests/rendering/webgpu/tdseWriteGridCtcResidual.test.ts src/tests/rendering/webgpu/passes/TDSEComputePassUniforms.test.ts src/tests/stores/tdseUiSetters.test.ts src/tests/components/sections/Geometry/ScenarioSelector.compute.test.tsx` passed: 10 files, 124 tests.
+- `pnpm exec eslint ...` on touched files passed.
+- `pnpm exec tsc -b` passed.
+- `pnpm test:shaders:fast` passed.
+- `node scripts/check-wgsl-backticks.js` passed.
+- `PLAYWRIGHT_DEV_SERVER_PORT=3000 pnpm exec playwright test scripts/playwright/tdse-time-travel.spec.ts --workers=1` passed: 12 passed, 0 skipped; GPU enforcement 100% execution.
+- Independent reviewer returned PASS.
+
+### Outcome
+
 Added TDSE `ctcLoopGain` field view: the renderer now draws chronology-horizon gain from mirror-pair phase closure, showing where repeated CTC loop trips reinforce or suppress amplitude.
 
 Verification:
@@ -297,3 +310,78 @@ Verification:
 - `node scripts/check-wgsl-backticks.js` passed.
 - `PLAYWRIGHT_DEV_SERVER_PORT=3000 pnpm exec playwright test scripts/playwright/tdse-time-travel.spec.ts --workers=1` passed: 9 passed, 0 skipped; GPU enforcement 100% execution.
 - Independent reviewer returned PASS after zero-feedback PRD clarification.
+
+## Round PRD - Deutsch Fixed-Point Entropy
+
+### Hypothesis
+
+P-CTC views show postselection and loop gain. Deutsch CTCs ask a different question: if a clean state cannot satisfy the time loop, nature may need a mixed fixed point instead of a pure history. The renderer should expose where the loop would have to randomize a pure mirror-pair history into a Deutsch-style consistency mixture.
+
+Define a local paradox entropy proxy,
+
+`E_D(v) = f * balance(v) * sin^2(delta(v) / 2)`,
+
+where `f = clamp(ctcPostselectionStrength, 0, 1)` is loop feedback used as display strength, `balance = 4 rho(v) rho(M(v)) / (rho(v) + rho(M(v)) + eps)^2`, and `delta = arg(psi(v)) - arg(exp(-i phi) psi(M(v)))`. Equal mirror amplitudes with opposite phase need maximal mixing; one-sided or phase-consistent histories need none.
+
+Science anchors:
+- Deutsch introduced quantum CTC consistency through fixed points near closed timelike lines: https://doi.org/10.1103/PhysRevD.44.3197
+- Experimental Deutsch-CTC simulations show nonlinear behavior from a qubit interacting with an older version of itself and study decoherence effects: https://www.nature.com/articles/ncomms5145
+- Aaronson and Watrous phrase CTCs as regions where nature must produce fixed points of an evolution operator: https://arxiv.org/abs/0808.2669
+- CTC thermodynamics work contrasts Deutsch CTCs and postselected CTCs and studies entropy-law consequences: https://arxiv.org/abs/1711.08334
+
+### Feature
+
+Add TDSE field view `ctcDeutschEntropy`.
+
+In the TDSE write-grid shader, when `fieldView == ctcDeutschEntropy`, compute nearest-neighbor mirror-pair paradox entropy from evolved `psi`, `wormholeMirrorAxis`, `ctcLoopPhase`, and `ctcPostselectionStrength`. Write a scalar into the density texture:
+
+1. `echo = exp(-i phi) psi(M(v))`.
+2. If local or echo density is near zero, display `0`.
+3. `delta = atan2(sin(theta - thetaEcho), cos(theta - thetaEcho))`.
+4. `balance = 4 * density * mirrorDensity / (density + mirrorDensity + eps)^2`.
+5. `phaseParadox = 0.5 * (1 - cos(delta))`.
+6. `feedback = clamp(ctcPostselectionStrength, 0, 1)`.
+7. `display = clamp(feedback * balance * phaseParadox, 0, 1) * densityGate`.
+
+This is a render-time entropy proxy for Deutsch fixed-point mixing, not a palette-only change.
+
+### Scenario Presets
+
+Add at least two fixed-3D TDSE presets:
+
+1. `ctcDeutschEntropyParadoxMixer`
+   - Fixed 3D, `fieldView: 'ctcDeutschEntropy'`.
+   - Uses balanced mirror geometry, high feedback, `ctcLoopPhase = Math.PI`.
+   - Should render bright entropy where equal mirror histories contradict.
+
+2. `ctcDeutschEntropyShearedMixer`
+   - Same fixed 3D geometry and high feedback.
+   - Uses `ctcLoopPhase = Math.PI / 2` plus transverse momentum shear.
+   - Opens in `fieldView: 'ctcDeutschEntropy'`.
+   - Must render nonblank but visually distinct bands from the full paradox mixer.
+
+### User Sees
+
+Bright regions mean "the time loop cannot keep a single clean story here; it has to smear the story into a mixed fixed point." Dark regions mean the past-returning wave already agrees, or one side of the loop is absent. This makes Deutsch time travel visible as loss of purity, not a traveling object.
+
+### Correctness
+
+- `TdseFieldView`, UI field-view options, uniform enum packing, WGSL uniform comments, and write-grid shader agree on enum `12`.
+- WGSL mirror-index calculation is safe for invalid axes, single-cell axes, odd sizes, local-zero density, and mirror-zero density; those cases display zero without out-of-bounds reads.
+- CPU reference math matches the WGSL formula.
+- Presets are exposed through the scenario selector and hidden above their fixed supported dimension.
+- Existing `ctcResidual` and `ctcLoopGain` behavior is preserved.
+- The renderer changes density texture output, not just UI text.
+
+### Acceptance Bar
+
+- Numerical/unit tests prove:
+  - entropy is near `1` for equal-amplitude opposite-phase mirror pairs at high feedback;
+  - entropy is `0` for phase-consistent, one-sided, and zero-feedback pairs;
+  - entropy is lower but nonzero for `Math.PI / 2` shear;
+  - invalid/single/odd mirror axes no-op safely;
+  - uniform packing maps `ctcDeutschEntropy` to shader enum `12`.
+- Scenario tests prove the two presets exist, are fixed 3D, use `fieldView: 'ctcDeutschEntropy'`, use high feedback, and differ by loop phase/shear.
+- Scenario selector tests prove the new presets are visible at 3D and hidden above their fixed supported dimension.
+- Playwright e2e tests apply both presets in the real app on port 3000, require WebGPU, assert 0 skipped tests, assert nonblank pixels for both, and assert the two presets are visually distinct.
+- Run targeted Vitest, `pnpm exec tsc -b`, targeted ESLint, `pnpm test:shaders:fast`, `node scripts/check-wgsl-backticks.js`, independent review, and Playwright e2e on the existing dev server at port 3000.

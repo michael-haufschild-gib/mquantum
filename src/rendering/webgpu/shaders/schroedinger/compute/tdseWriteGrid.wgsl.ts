@@ -230,6 +230,7 @@ fn computeCtcLoopGainScalar(idx: u32, re: f32, im: f32, density: f32, nnCoords: 
   return clamp(display, 0.0, 1.0) * densityGate;
 }
 
+fn computeCtcDeutschEntropyScalar(idx: u32, re: f32, im: f32, density: f32, nnCoords: ptr<function, array<u32, 12>>, densityGate: f32) -> f32 { let mirror = sampleCtcMirror(idx, nnCoords); if (!mirror.valid) { return 0.0; } let eps = 1e-20; if (density <= eps || mirror.density <= eps) { return 0.0; } let echo = ctcEcho(mirror.z); let theta = atan2(im, re); let thetaEcho = atan2(echo.y, echo.x); let phaseMismatch = theta - thetaEcho; let delta = atan2(sin(phaseMismatch), cos(phaseMismatch)); let denom = density + mirror.density + eps; let balance = 4.0 * density * mirror.density / (denom * denom); let phaseParadox = 0.5 * (1.0 - cos(delta)); let feedback = clamp(params.ctcPostselectionStrength, 0.0, 1.0); let display = clamp(feedback * balance * phaseParadox, 0.0, 1.0); return display * densityGate; }
 @compute @workgroup_size(4, 4, 4)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let texDims = textureDimensions(outputTex);
@@ -544,11 +545,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       }
     }
     displayScalar = clamp(1.0 - exp(-circulationAbs), 0.0, 1.0) * densityGate;
-  } else if (params.fieldView == 10u) {
-    displayScalar = computeCtcResidualScalar(idx, re, im, density, &nnCoords, densityGate);
-  } else if (params.fieldView == 11u) {
+  } else if (params.fieldView == 10u) { displayScalar = computeCtcResidualScalar(idx, re, im, density, &nnCoords, densityGate); } else if (params.fieldView == 11u) {
     displayScalar = computeCtcLoopGainScalar(idx, re, im, density, &nnCoords, densityGate);
-  } else if (params.fieldView == 3u) {
+  } else if (params.fieldView == 12u) { displayScalar = computeCtcDeutschEntropyScalar(idx, re, im, density, &nnCoords, densityGate); } else if (params.fieldView == 3u) {
     // potential (NN)
     let potentialScale = getPotentialScale();
     let normPot = clamp(potentialVal / potentialScale, -1.0, 1.0);

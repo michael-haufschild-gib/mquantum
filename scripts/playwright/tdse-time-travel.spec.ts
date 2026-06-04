@@ -66,6 +66,21 @@ const CTC_LOOP_GAIN_PRESETS = [
   },
 ] as const
 
+const CTC_DEUTSCH_ENTROPY_PRESETS = [
+  {
+    id: 'ctcDeutschEntropyParadoxMixer',
+    label: 'CTC Deutsch entropy paradox mixer',
+    expectedPhase: Math.PI,
+    expectedShear: false,
+  },
+  {
+    id: 'ctcDeutschEntropyShearedMixer',
+    label: 'CTC Deutsch entropy sheared mixer',
+    expectedPhase: Math.PI / 2,
+    expectedShear: true,
+  },
+] as const
+
 async function requireWebGPUWithoutSkipping(page: Page): Promise<void> {
   const available = await hasWebGPU(page)
   expect(available, 'tdse-time-travel.spec.ts requires WebGPU and must not skip').toBe(true)
@@ -150,6 +165,35 @@ async function waitForAppliedCtcLoopGainPreset(
   )
 }
 
+async function waitForAppliedCtcDeutschEntropyPreset(
+  page: Page,
+  preset: (typeof CTC_DEUTSCH_ENTROPY_PRESETS)[number]
+): Promise<void> {
+  await page.waitForFunction(
+    ({ id, expectedPhase, expectedShear }) => {
+      const extStore = window.__EXTENDED_OBJECT_STORE__
+      if (!extStore) return false
+      const tdse = extStore.getState().schroedinger.tdse
+      const shear = Math.abs(tdse.packetMomentum[1] ?? 0)
+      return (
+        tdse.ctcPostselectionEnabled === false &&
+        tdse.ctcPostselectionStrength > 0.9 &&
+        Math.abs(tdse.ctcLoopPhase - expectedPhase) < 1e-4 &&
+        tdse.fieldView === 'ctcDeutschEntropy' &&
+        tdse.initialCondition === 'superposition' &&
+        tdse.wormholeMirrorAxis === 0 &&
+        tdse.latticeDim === 3 &&
+        tdse.gridSize[0] === 64 &&
+        tdse.gridSize[0] % 2 === 0 &&
+        (expectedShear ? shear > 1 : shear < 1e-4) &&
+        id.length > 0
+      )
+    },
+    preset,
+    { timeout: 10_000 }
+  )
+}
+
 test.describe('TDSE P-CTC time-travel scenario presets', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
@@ -190,6 +234,51 @@ test.describe('TDSE P-CTC time-travel scenario presets', () => {
     const paradox = await capturePixelSnapshot(page)
 
     expectSnapshotsDiffer(novikov, paradox, 'P-CTC Novikov vs paradox-gate presets', 0.5)
+  })
+})
+
+test.describe('TDSE CTC Deutsch entropy field view presets', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+    await requireWebGPUWithoutSkipping(page)
+  })
+
+  for (const preset of CTC_DEUTSCH_ENTROPY_PRESETS) {
+    test(`${preset.label}: applies preset and renders non-blank entropy pixels`, async ({
+      page,
+    }) => {
+      await gotoMode(page, 'tdseDynamics', 3)
+      await waitForRendererReady(page)
+      await waitForShaderCompilation(page)
+
+      await applyTdsePreset(page, preset.id)
+      await waitForAppliedCtcDeutschEntropyPreset(page, preset)
+      await waitForShaderCompilation(page)
+      const frame = await getFrameCount(page)
+      await waitForFrameAdvance(page, frame + 45)
+
+      await assertNonBlankPixels(page, preset.label, 2)
+    })
+  }
+
+  test('paradox and sheared mixers render visually distinct entropy maps', async ({ page }) => {
+    await gotoMode(page, 'tdseDynamics', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+
+    await applyTdsePreset(page, 'ctcDeutschEntropyParadoxMixer')
+    await waitForAppliedCtcDeutschEntropyPreset(page, CTC_DEUTSCH_ENTROPY_PRESETS[0])
+    await waitForShaderCompilation(page)
+    await waitForFrameAdvance(page, (await getFrameCount(page)) + 45)
+    const paradox = await capturePixelSnapshot(page)
+
+    await applyTdsePreset(page, 'ctcDeutschEntropyShearedMixer')
+    await waitForAppliedCtcDeutschEntropyPreset(page, CTC_DEUTSCH_ENTROPY_PRESETS[1])
+    await waitForShaderCompilation(page)
+    await waitForFrameAdvance(page, (await getFrameCount(page)) + 45)
+    const sheared = await capturePixelSnapshot(page)
+
+    expectSnapshotsDiffer(paradox, sheared, 'CTC Deutsch entropy paradox vs sheared maps', 0.35)
   })
 })
 

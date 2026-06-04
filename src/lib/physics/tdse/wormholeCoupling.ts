@@ -314,6 +314,26 @@ export interface CtcLoopGainSampleParams {
   epsilon?: number
 }
 
+/** Parameters for sampling the Deutsch fixed-point entropy reference field at one site. */
+export interface CtcDeutschEntropySampleParams {
+  /** Interleaved (re, im) wavefunction of length `2 * product(gridSize[d])`. */
+  psi: Float32Array
+  /** Per-axis lattice sizes. Length is the active lattice dimension. */
+  gridSize: readonly number[]
+  /** Mirror axis index. Invalid axes produce a zero display sample. */
+  axis: number
+  /** Linear site index of v in row-major TDSE storage. */
+  siteIndex: number
+  /** Loop holonomy phi in radians. */
+  phase: number
+  /** Deutsch feedback weight, clamped to `[0, 1]`. */
+  ctcPostselectionStrength: number
+  /** Density scale used by the shader density gate. Defaults to 1. */
+  maxDensity?: number
+  /** Denominator epsilon. Defaults to the shader value. */
+  epsilon?: number
+}
+
 /** CPU reference output for one CTC loop-gain sample. */
 export interface CtcLoopGainSample {
   /** Wrapped phase mismatch in `[-π, π]`. */
@@ -329,6 +349,21 @@ export interface CtcLoopGainSample {
   mirrorIndex: number | null
 }
 
+/** CPU reference output for one Deutsch fixed-point entropy sample. */
+export interface CtcDeutschEntropySample {
+  /** Wrapped phase mismatch in `[-pi, pi]`. */
+  delta: number
+  /** Mirror-pair amplitude balance in `[0, 1]`. */
+  balance: number
+  /** Phase contradiction term in `[0, 1]`. */
+  phaseParadox: number
+  /** Renderer scalar after feedback, balance, phase paradox, and density gate. */
+  displayScalar: number
+  density: number
+  mirrorDensity: number
+  mirrorIndex: number | null
+}
+
 function zeroCtcResidualSample(): CtcLoopResidualSample {
   return { rawResidue: 0, displayScalar: 0, density: 0, mirrorDensity: 0, mirrorIndex: null }
 }
@@ -338,6 +373,18 @@ function zeroCtcLoopGainSample(): CtcLoopGainSample {
     delta: 0,
     gain: 0,
     resonantGain: 0,
+    displayScalar: 0,
+    density: 0,
+    mirrorDensity: 0,
+    mirrorIndex: null,
+  }
+}
+
+function zeroCtcDeutschEntropySample(): CtcDeutschEntropySample {
+  return {
+    delta: 0,
+    balance: 0,
+    phaseParadox: 0,
     displayScalar: 0,
     density: 0,
     mirrorDensity: 0,
@@ -506,6 +553,90 @@ export function computeCtcLoopGainSample(params: CtcLoopGainSampleParams): CtcLo
   const displayScalar = Math.max(0, Math.min(1, rawDisplay)) * densityGate
 
   return { delta, gain, resonantGain, displayScalar, density, mirrorDensity, mirrorIndex }
+}
+
+/**
+ * CPU reference for the TDSE `ctcDeutschEntropy` field view at one lattice site.
+ *
+ * Matches `computeCtcDeutschEntropyScalar` in `tdseWriteGrid.wgsl.ts`: invalid
+ * mirror axes, single-cell mirror axes, odd mirror axes, empty local samples,
+ * and empty mirror echoes return zero; valid samples display the balanced
+ * mirror-pair phase contradiction weighted by Deutsch feedback.
+ */
+export function computeCtcDeutschEntropySample(
+  params: CtcDeutschEntropySampleParams
+): CtcDeutschEntropySample {
+  const { psi, gridSize, axis, siteIndex } = params
+  if (!Number.isInteger(axis) || axis < 0 || axis >= gridSize.length || axis >= 12) {
+    return zeroCtcDeutschEntropySample()
+  }
+  if (!Number.isInteger(siteIndex) || siteIndex < 0) {
+    return zeroCtcDeutschEntropySample()
+  }
+  for (let d = 0; d < gridSize.length; d++) {
+    const n = gridSize[d]!
+    if (!Number.isInteger(n) || n < 1) return zeroCtcDeutschEntropySample()
+  }
+
+  const axisSize = gridSize[axis]!
+  if (axisSize < 2 || axisSize % 2 !== 0) {
+    return zeroCtcDeutschEntropySample()
+  }
+
+  const strides = computeStrides(gridSize)
+  const totalSites = gridSize.reduce((acc, n) => acc * n, 1)
+  if (siteIndex >= totalSites) {
+    return zeroCtcDeutschEntropySample()
+  }
+  if (psi.length !== 2 * totalSites) {
+    throw new Error(`[wormholeCoupling] psi length ${psi.length} != 2·totalSites ${2 * totalSites}`)
+  }
+
+  const strideA = strides[axis]!
+  const coord = Math.floor(siteIndex / strideA) % axisSize
+  const mirrorCoord = axisSize - 1 - coord
+  const mirrorIndex = siteIndex + (mirrorCoord - coord) * strideA
+  if (mirrorIndex < 0 || mirrorIndex >= totalSites) {
+    return zeroCtcDeutschEntropySample()
+  }
+
+  const re = psi[2 * siteIndex]!
+  const im = psi[2 * siteIndex + 1]!
+  const mirrorRe = psi[2 * mirrorIndex]!
+  const mirrorIm = psi[2 * mirrorIndex + 1]!
+  const density = re * re + im * im
+  const mirrorDensity = mirrorRe * mirrorRe + mirrorIm * mirrorIm
+  const epsilon = params.epsilon
+  const eps = typeof epsilon === 'number' && Number.isFinite(epsilon) && epsilon > 0 ? epsilon : 1e-20
+  if (density <= eps || mirrorDensity <= eps) {
+    return { ...zeroCtcDeutschEntropySample(), density, mirrorDensity, mirrorIndex }
+  }
+
+  const phi = Number.isFinite(params.phase) ? params.phase : 0
+  const cosPhi = Math.cos(phi)
+  const sinPhi = Math.sin(phi)
+  const echoRe = cosPhi * mirrorRe + sinPhi * mirrorIm
+  const echoIm = cosPhi * mirrorIm - sinPhi * mirrorRe
+  const theta = Math.atan2(im, re)
+  const thetaEcho = Math.atan2(echoIm, echoRe)
+  const phaseMismatch = theta - thetaEcho
+  const delta = Math.atan2(Math.sin(phaseMismatch), Math.cos(phaseMismatch))
+  const denom = density + mirrorDensity + eps
+  const balance = (4 * density * mirrorDensity) / (denom * denom)
+  const phaseParadox = 0.5 * (1 - Math.cos(delta))
+  const strength = params.ctcPostselectionStrength
+  const feedback = Number.isFinite(strength) ? Math.max(0, Math.min(1, strength)) : 0
+  const maxDensityInput = params.maxDensity
+  const maxDensity =
+    typeof maxDensityInput === 'number' && Number.isFinite(maxDensityInput)
+      ? Math.max(maxDensityInput, 0)
+      : 1
+  const normDensity = maxDensity > 0 ? density / maxDensity : 0
+  const densityGate = smoothstep01(0, 0.02, normDensity)
+  const rawDisplay = feedback * balance * phaseParadox
+  const displayScalar = Math.max(0, Math.min(1, rawDisplay)) * densityGate
+
+  return { delta, balance, phaseParadox, displayScalar, density, mirrorDensity, mirrorIndex }
 }
 
 /** Type guard for the mirror-axis enum used by the store and URL layer. */
