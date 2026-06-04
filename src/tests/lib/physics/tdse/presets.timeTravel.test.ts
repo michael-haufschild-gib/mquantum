@@ -12,6 +12,10 @@ const CTC_DEUTSCH_ENTROPY_PRESET_IDS = [
   'ctcDeutschEntropyParadoxMixer',
   'ctcDeutschEntropyShearedMixer',
 ] as const
+const CTC_CAUSAL_SHADOW_PRESET_IDS = [
+  'ctcCausalShadowHeadOn',
+  'ctcCausalShadowPhaseSlip',
+] as const
 
 describe('TDSE time-travel scenario presets', () => {
   it('exposes P-CTC scenarios that enable the nonlinear postselection operator', () => {
@@ -144,5 +148,42 @@ describe('TDSE time-travel scenario presets', () => {
       packetMomentum: undefined,
     }
     expect(shearedGeometry).toEqual(paradoxGeometry)
+  })
+
+  it('exposes fixed-3D causal-shadow maps with high feedback and distinct phase shear', () => {
+    const headOn = TDSE_SCENARIO_PRESETS.find((p) => p.id === CTC_CAUSAL_SHADOW_PRESET_IDS[0])
+    const phaseSlip = TDSE_SCENARIO_PRESETS.find((p) => p.id === CTC_CAUSAL_SHADOW_PRESET_IDS[1])
+    if (!headOn || !phaseSlip) throw new Error('CTC causal-shadow presets missing')
+
+    for (const preset of [headOn, phaseSlip]) {
+      expect(preset.maxDim).toBe(3)
+      expect(preset.overrides.latticeDim).toBe(3)
+      expect(preset.overrides.gridSize).toEqual([64, 64, 64])
+      expect(preset.overrides.fieldView).toBe('ctcCausalShadow')
+      expect(preset.overrides.initialCondition).toBe('gaussianPacket')
+      expect(preset.overrides.potentialType).toBe('free')
+      expect(preset.overrides.ctcPostselectionStrength).toBeGreaterThan(0.9)
+      expect(preset.overrides.wormholeMirrorAxis).toBe(0)
+      expect(preset.overrides.packetMomentum?.[0]).toBeGreaterThan(6)
+      expect(isTdsePresetCompatibleWithDimension(preset, 3)).toBe(true)
+      expect(isTdsePresetCompatibleWithDimension(preset, 4)).toBe(false)
+    }
+
+    expect(headOn.overrides.ctcLoopPhase).toBe(0)
+    expect(headOn.overrides.packetMomentum?.[1]).toBeCloseTo(0, 12)
+    expect(phaseSlip.overrides.ctcLoopPhase).toBeCloseTo(Math.PI / 2, 12)
+    expect(phaseSlip.overrides.packetMomentum?.[1]).toBeGreaterThan(1)
+
+    const headOnGeometry = {
+      ...headOn.overrides,
+      ctcLoopPhase: undefined,
+      packetMomentum: undefined,
+    }
+    const phaseSlipGeometry = {
+      ...phaseSlip.overrides,
+      ctcLoopPhase: undefined,
+      packetMomentum: undefined,
+    }
+    expect(phaseSlipGeometry).toEqual(headOnGeometry)
   })
 })

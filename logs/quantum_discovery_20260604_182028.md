@@ -287,6 +287,19 @@ This is not "two blobs." Bright regions mean the wave would circle the time loop
 
 ### Outcome
 
+Added TDSE `ctcCausalShadow` field view: the renderer now draws coherent future-echo current cancellation, showing where a returned mirror flow opposes the local probability current.
+
+Verification:
+- `pnpm exec vitest run src/tests/lib/physics/tdse/ctcCausalShadow.test.ts src/tests/lib/physics/tdse/ctcDeutschEntropy.test.ts src/tests/lib/physics/tdse/ctcLoopGain.test.ts src/tests/lib/physics/tdse/ctcResidual.test.ts src/tests/lib/physics/tdse/presets.timeTravel.test.ts src/tests/rendering/webgpu/tdseWriteGridCtcCausalShadow.test.ts src/tests/rendering/webgpu/tdseWriteGridCtcDeutschEntropy.test.ts src/tests/rendering/webgpu/tdseWriteGridCtcLoopGain.test.ts src/tests/rendering/webgpu/tdseWriteGridCtcResidual.test.ts src/tests/rendering/webgpu/passes/TDSEComputePassUniforms.test.ts src/tests/stores/tdseUiSetters.test.ts src/tests/components/sections/Geometry/ScenarioSelector.compute.test.tsx` passed: 12 files, 140 tests.
+- `pnpm exec eslint ...` on touched files passed.
+- `pnpm exec tsc -b` passed.
+- `pnpm test:shaders:fast` passed.
+- `node scripts/check-wgsl-backticks.js` passed.
+- `PLAYWRIGHT_DEV_SERVER_PORT=3000 pnpm exec playwright test scripts/playwright/tdse-time-travel.spec.ts --workers=1` passed: 15 passed, 0 skipped; GPU enforcement 100% execution.
+- Independent reviewer returned PASS.
+
+### Outcome
+
 Added TDSE `ctcDeutschEntropy` field view: the renderer now draws a Deutsch fixed-point entropy proxy, highlighting mirror-pair regions where a clean pure history would need mixed-state self-consistency.
 
 Verification:
@@ -297,6 +310,83 @@ Verification:
 - `node scripts/check-wgsl-backticks.js` passed.
 - `PLAYWRIGHT_DEV_SERVER_PORT=3000 pnpm exec playwright test scripts/playwright/tdse-time-travel.spec.ts --workers=1` passed: 12 passed, 0 skipped; GPU enforcement 100% execution.
 - Independent reviewer returned PASS.
+
+## Round PRD - Advanced-Echo Causal Shadow
+
+### Hypothesis
+
+The prior CTC views show rejected histories, loop resonances, and Deutsch mixing. They still render scalar contradiction, not causal flow. A more human time-travel question is: "where does the future-returning wave cancel what was about to happen?" The renderer can expose this as a causal shadow in probability current: a dark/bright map of regions where an advanced echo erases local forward flux.
+
+Define local current `j(v) = Im(psi*(v) grad psi(v))`. Mirror sample the returning echo current `j(M(v))`, reflect its mirror-axis component into the local frame, and compute
+
+`C(v) = f * balanceJ * opposing(j(v), R j(M(v))) * phaseCoherence(delta)`,
+
+where `f = clamp(ctcPostselectionStrength, 0, 1)`, `balanceJ = 2 min(|j|, |jEcho|) / (|j| + |jEcho| + eps)`, `opposing = clamp(-dot(j, jEcho) / (|j| |jEcho| + eps), 0, 1)`, and `phaseCoherence(delta) = 0.5 * (1 + cos(delta))` with `delta = arg(psi(v)) - arg(exp(-i phi) psi(M(v)))`. High `C` means the returned echo carries equal and opposite causal flow.
+
+Science anchors:
+- Wheeler-Feynman absorber theory uses advanced and retarded waves plus future absorber boundary conditions to explain observed radiation arrows: https://arxiv.org/abs/1611.05331
+- The two-state vector formalism describes systems with both forward-evolving and backward-evolving states from initial/final boundary conditions: https://arxiv.org/abs/0706.1347
+- Deutsch CTCs formalize a quantum system interacting with an older version of itself through fixed-point consistency: https://doi.org/10.1103/PhysRevD.44.3197
+- D-CTC quantum-field work frames Deutsch consistency as a condition for branches with backward time steps: https://arxiv.org/abs/1609.01496
+
+### Feature
+
+Add TDSE field view `ctcCausalShadow`.
+
+In the TDSE write-grid shader, when `fieldView == ctcCausalShadow`, compute finite-difference probability current at the local site and its mirror site using the evolved `psi` buffer. Reflect the mirror-axis component of the mirror current into the local frame. Write a scalar into the density texture:
+
+1. `echo = exp(-i phi) psi(M(v))` for phase comparison.
+2. If local density, echo density, local current magnitude, mirror current magnitude, or feedback is near zero, display `0`.
+3. `delta = atan2(sin(theta - thetaEcho), cos(theta - thetaEcho))`.
+4. `phaseCoherence = 0.5 * (1 + cos(delta))`.
+5. `jEchoLocal = reflectAxis(j(M(v)), wormholeMirrorAxis)`.
+6. `opposing = clamp(-dot(j(v), jEchoLocal) / (|j(v)| |jEchoLocal| + eps), 0, 1)`.
+7. `balanceJ = 2 * min(|j(v)|, |jEchoLocal|) / (|j(v)| + |jEchoLocal| + eps)`.
+8. `display = clamp(feedback * balanceJ * opposing * phaseCoherence, 0, 1) * densityGate`.
+
+This is a render-time causal-flow diagnostic, not a palette-only change.
+
+### Scenario Presets
+
+Add at least two fixed-3D TDSE presets:
+
+1. `ctcCausalShadowHeadOn`
+   - Fixed 3D, `fieldView: 'ctcCausalShadow'`.
+   - Balanced mirror geometry, high feedback, `ctcLoopPhase = 0`.
+   - Strong axis-0 packet momentum so mirror-reflected echo current opposes local current.
+   - Should render bright causal shadow where future-returning flux erases outgoing flux.
+
+2. `ctcCausalShadowPhaseSlip`
+   - Same fixed 3D geometry and high feedback.
+   - Uses `ctcLoopPhase = Math.PI / 2` plus transverse momentum shear.
+   - Opens in `fieldView: 'ctcCausalShadow'`.
+   - Must render nonblank but visually distinct weaker/sheared shadow bands.
+
+### User Sees
+
+Bright regions mean "the future echo pushes back against the current causal flow here." Dark regions mean there is no returning flow, the flows move together, or the loop phase prevents a coherent advanced echo. This is time travel as canceled action, not as an object moving backward.
+
+### Correctness
+
+- `TdseFieldView`, UI field-view options, uniform enum packing, WGSL uniform comments, and write-grid shader agree on enum `13`.
+- WGSL mirror-index calculation is safe for invalid axes, single-cell axes, odd sizes, local-zero density, mirror-zero density, zero local current, and zero mirror current; those cases display zero without out-of-bounds reads.
+- CPU reference vector math matches the WGSL scalar formula.
+- Presets are exposed through the scenario selector and hidden above their fixed supported dimension.
+- Existing `ctcResidual`, `ctcLoopGain`, and `ctcDeutschEntropy` behavior is preserved.
+- The renderer changes density texture output, not just UI text.
+
+### Acceptance Bar
+
+- Numerical/unit tests prove:
+  - shadow is near `1` for equal-magnitude opposite reflected currents with phase coherence and high feedback;
+  - shadow is `0` for aligned currents, one-sided/zero-current pairs, phase-incoherent pairs, and zero feedback;
+  - `Math.PI / 2` phase slip gives lower but nonzero shadow;
+  - invalid/single/odd mirror axes no-op safely if a sampled CPU reference is added;
+  - uniform packing maps `ctcCausalShadow` to shader enum `13`.
+- Scenario tests prove the two presets exist, are fixed 3D, use `fieldView: 'ctcCausalShadow'`, use high feedback, and differ by loop phase/shear.
+- Scenario selector tests prove the new presets are visible at 3D and hidden above their fixed supported dimension.
+- Playwright e2e tests apply both presets in the real app on port 3000, require WebGPU, assert 0 skipped tests, assert nonblank pixels for both, and assert the two presets are visually distinct.
+- Run targeted Vitest, `pnpm exec tsc -b`, targeted ESLint, `pnpm test:shaders:fast`, `node scripts/check-wgsl-backticks.js`, independent review, and Playwright e2e on the existing dev server at port 3000.
 
 ### Outcome
 

@@ -81,6 +81,21 @@ const CTC_DEUTSCH_ENTROPY_PRESETS = [
   },
 ] as const
 
+const CTC_CAUSAL_SHADOW_PRESETS = [
+  {
+    id: 'ctcCausalShadowHeadOn',
+    label: 'CTC causal-shadow head-on echo',
+    expectedPhase: 0,
+    expectedShear: false,
+  },
+  {
+    id: 'ctcCausalShadowPhaseSlip',
+    label: 'CTC causal-shadow phase slip',
+    expectedPhase: Math.PI / 2,
+    expectedShear: true,
+  },
+] as const
+
 async function requireWebGPUWithoutSkipping(page: Page): Promise<void> {
   const available = await hasWebGPU(page)
   expect(available, 'tdse-time-travel.spec.ts requires WebGPU and must not skip').toBe(true)
@@ -194,6 +209,37 @@ async function waitForAppliedCtcDeutschEntropyPreset(
   )
 }
 
+async function waitForAppliedCtcCausalShadowPreset(
+  page: Page,
+  preset: (typeof CTC_CAUSAL_SHADOW_PRESETS)[number]
+): Promise<void> {
+  await page.waitForFunction(
+    ({ id, expectedPhase, expectedShear }) => {
+      const extStore = window.__EXTENDED_OBJECT_STORE__
+      if (!extStore) return false
+      const tdse = extStore.getState().schroedinger.tdse
+      const shear = Math.abs(tdse.packetMomentum[1] ?? 0)
+      return (
+        tdse.ctcPostselectionEnabled === false &&
+        tdse.ctcPostselectionStrength > 0.9 &&
+        Math.abs(tdse.ctcLoopPhase - expectedPhase) < 1e-4 &&
+        tdse.fieldView === 'ctcCausalShadow' &&
+        tdse.initialCondition === 'gaussianPacket' &&
+        tdse.potentialType === 'free' &&
+        tdse.wormholeMirrorAxis === 0 &&
+        tdse.latticeDim === 3 &&
+        tdse.gridSize[0] === 64 &&
+        tdse.gridSize[0] % 2 === 0 &&
+        Math.abs(tdse.packetMomentum[0] ?? 0) > 6 &&
+        (expectedShear ? shear > 1 : shear < 1e-4) &&
+        id.length > 0
+      )
+    },
+    preset,
+    { timeout: 10_000 }
+  )
+}
+
 test.describe('TDSE P-CTC time-travel scenario presets', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
@@ -234,6 +280,53 @@ test.describe('TDSE P-CTC time-travel scenario presets', () => {
     const paradox = await capturePixelSnapshot(page)
 
     expectSnapshotsDiffer(novikov, paradox, 'P-CTC Novikov vs paradox-gate presets', 0.5)
+  })
+})
+
+test.describe('TDSE CTC causal-shadow field view presets', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+    await requireWebGPUWithoutSkipping(page)
+  })
+
+  for (const preset of CTC_CAUSAL_SHADOW_PRESETS) {
+    test(`${preset.label}: applies preset and renders non-blank shadow pixels`, async ({
+      page,
+    }) => {
+      await gotoMode(page, 'tdseDynamics', 3)
+      await waitForRendererReady(page)
+      await waitForShaderCompilation(page)
+
+      await applyTdsePreset(page, preset.id)
+      await waitForAppliedCtcCausalShadowPreset(page, preset)
+      await waitForShaderCompilation(page)
+      const frame = await getFrameCount(page)
+      await waitForFrameAdvance(page, frame + 45)
+
+      await assertNonBlankPixels(page, preset.label, 2)
+    })
+  }
+
+  test('head-on and phase-slip presets render visually distinct causal shadows', async ({
+    page,
+  }) => {
+    await gotoMode(page, 'tdseDynamics', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+
+    await applyTdsePreset(page, 'ctcCausalShadowHeadOn')
+    await waitForAppliedCtcCausalShadowPreset(page, CTC_CAUSAL_SHADOW_PRESETS[0])
+    await waitForShaderCompilation(page)
+    await waitForFrameAdvance(page, (await getFrameCount(page)) + 45)
+    const headOn = await capturePixelSnapshot(page)
+
+    await applyTdsePreset(page, 'ctcCausalShadowPhaseSlip')
+    await waitForAppliedCtcCausalShadowPreset(page, CTC_CAUSAL_SHADOW_PRESETS[1])
+    await waitForShaderCompilation(page)
+    await waitForFrameAdvance(page, (await getFrameCount(page)) + 45)
+    const phaseSlip = await capturePixelSnapshot(page)
+
+    expectSnapshotsDiffer(headOn, phaseSlip, 'CTC causal-shadow head-on vs phase-slip maps', 0.3)
   })
 })
 

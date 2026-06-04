@@ -105,6 +105,11 @@ describe('TDSE UI setters', () => {
       expect(getTdse().fieldView).toBe('ctcDeutschEntropy')
     })
 
+    it('sets field view to CTC causal shadow', () => {
+      useExtendedObjectStore.getState().setTdseFieldView('ctcCausalShadow')
+      expect(getTdse().fieldView).toBe('ctcCausalShadow')
+    })
+
     it('rejects invalid field views', () => {
       useExtendedObjectStore.getState().setTdseFieldView('phase')
       // @ts-expect-error intentional invalid input

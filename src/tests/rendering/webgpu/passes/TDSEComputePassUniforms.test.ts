@@ -458,6 +458,24 @@ describe('writeTdseUniforms', () => {
     expect(u32[I.fieldView]).toBe(12)
   })
 
+  it('maps ctcCausalShadow fieldView to shader enum 13', () => {
+    const uniformData = new ArrayBuffer(UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({ config: createTdseConfig({ fieldView: 'ctcCausalShadow' }) })
+    )
+
+    expect(u32[I.fieldView]).toBe(13)
+  })
+
   it('packs blackHoleRingdown BH params at bhMass/bhMultipoleL/bhSpin (offsets 748/752/756)', () => {
     const uniformData = new ArrayBuffer(UNIFORM_SIZE)
     const u32 = new Uint32Array(uniformData)

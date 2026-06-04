@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- single exported WGSL block is validated by shader tests. */
 /**
  * TDSE — Write to 3D Density Grid Compute Shader
  *
@@ -183,9 +184,9 @@ fn computeSuperfluidVelocityMagSq(
   return vsMagSq;
 }
 
-struct CtcMirrorSample { valid: bool, z: vec2f, density: f32 }
+struct CtcMirrorSample { valid: bool, idx: u32, z: vec2f, density: f32 }
 
-fn zeroCtcMirrorSample() -> CtcMirrorSample { return CtcMirrorSample(false, vec2f(0.0), 0.0); }
+fn zeroCtcMirrorSample() -> CtcMirrorSample { return CtcMirrorSample(false, 0u, vec2f(0.0), 0.0); }
 
 fn sampleCtcMirror(idx: u32, nnCoords: ptr<function, array<u32, 12>>) -> CtcMirrorSample {
   let axis = params.wormholeMirrorAxis;
@@ -201,10 +202,49 @@ fn sampleCtcMirror(idx: u32, nnCoords: ptr<function, array<u32, 12>>) -> CtcMirr
   let mirrorIdx = u32(mirrorIdxI);
   if (mirrorIdx >= params.totalSites) { return zeroCtcMirrorSample(); }
   let z = psi[mirrorIdx];
-  return CtcMirrorSample(true, z, z.x * z.x + z.y * z.y);
+  return CtcMirrorSample(true, mirrorIdx, z, z.x * z.x + z.y * z.y);
 }
 
 fn ctcEcho(z: vec2f) -> vec2f { let c = cos(params.ctcLoopPhase); let s = sin(params.ctcLoopPhase); return vec2f(c * z.x + s * z.y, c * z.y - s * z.x); }
+
+fn computeProbabilityCurrentAtSite(idx: u32, z0: vec2f, coords: ptr<function, array<u32, 12>>, invSpacings: ptr<function, array<f32, 12>>) -> array<f32, 12> {
+  var current: array<f32, 12>;
+  let hbarOverM = params.hbar / max(params.mass, 1e-6);
+  for (var d: u32 = 0u; d < params.latticeDim; d++) {
+    current[d] = 0.0;
+    if (params.gridSize[d] <= 1u) { continue; }
+    let stride = params.strides[d];
+    let coord = (*coords)[d];
+    let Nd = params.gridSize[d];
+    let invSpacing = (*invSpacings)[d];
+    let invDx = 0.5 * invSpacing;
+    let atLo = coord == 0u;
+    let atHi = coord == Nd - 1u;
+    let pmlAxis = tdsePmlAxisActive(d);
+    var dRe: f32;
+    var dIm: f32;
+    if (pmlAxis && atLo) {
+      let fIdx = idx + stride;
+      let zF = psi[fIdx];
+      dRe = (zF.x - z0.x) * invSpacing;
+      dIm = (zF.y - z0.y) * invSpacing;
+    } else if (pmlAxis && atHi) {
+      let bIdx = idx - stride;
+      let zB = psi[bIdx];
+      dRe = (z0.x - zB.x) * invSpacing;
+      dIm = (z0.y - zB.y) * invSpacing;
+    } else {
+      let fwdIdx = select(idx + stride, idx - stride * (Nd - 1u), atHi);
+      let bwdIdx = select(idx - stride, idx + stride * (Nd - 1u), atLo);
+      let zF = psi[fwdIdx];
+      let zB = psi[bwdIdx];
+      dRe = (zF.x - zB.x) * invDx;
+      dIm = (zF.y - zB.y) * invDx;
+    }
+    current[d] = hbarOverM * (z0.x * dIm - z0.y * dRe);
+  }
+  return current;
+}
 
 fn computeCtcResidualScalar(idx: u32, re: f32, im: f32, density: f32, nnCoords: ptr<function, array<u32, 12>>, densityGate: f32) -> f32 {
   let mirror = sampleCtcMirror(idx, nnCoords);
@@ -231,6 +271,43 @@ fn computeCtcLoopGainScalar(idx: u32, re: f32, im: f32, density: f32, nnCoords: 
 }
 
 fn computeCtcDeutschEntropyScalar(idx: u32, re: f32, im: f32, density: f32, nnCoords: ptr<function, array<u32, 12>>, densityGate: f32) -> f32 { let mirror = sampleCtcMirror(idx, nnCoords); if (!mirror.valid) { return 0.0; } let eps = 1e-20; if (density <= eps || mirror.density <= eps) { return 0.0; } let echo = ctcEcho(mirror.z); let theta = atan2(im, re); let thetaEcho = atan2(echo.y, echo.x); let phaseMismatch = theta - thetaEcho; let delta = atan2(sin(phaseMismatch), cos(phaseMismatch)); let denom = density + mirror.density + eps; let balance = 4.0 * density * mirror.density / (denom * denom); let phaseParadox = 0.5 * (1.0 - cos(delta)); let feedback = clamp(params.ctcPostselectionStrength, 0.0, 1.0); let display = clamp(feedback * balance * phaseParadox, 0.0, 1.0); return display * densityGate; }
+
+fn computeCtcCausalShadowScalar(idx: u32, re: f32, im: f32, density: f32, nnCoords: ptr<function, array<u32, 12>>, invSpacings: ptr<function, array<f32, 12>>, densityGate: f32) -> f32 {
+  let mirror = sampleCtcMirror(idx, nnCoords);
+  if (!mirror.valid) { return 0.0; }
+  let eps = 1e-20;
+  let feedback = clamp(params.ctcPostselectionStrength, 0.0, 1.0);
+  if (density <= eps || mirror.density <= eps || feedback <= eps) { return 0.0; }
+  let axis = params.wormholeMirrorAxis;
+  var mirrorCoords: array<u32, 12>;
+  for (var d: u32 = 0u; d < params.latticeDim; d++) { mirrorCoords[d] = (*nnCoords)[d]; }
+  mirrorCoords[axis] = params.gridSize[axis] - 1u - (*nnCoords)[axis];
+  let localJ = computeProbabilityCurrentAtSite(idx, vec2f(re, im), nnCoords, invSpacings);
+  let mirrorJ = computeProbabilityCurrentAtSite(mirror.idx, mirror.z, &mirrorCoords, invSpacings);
+  var localMagSq: f32 = 0.0;
+  var mirrorMagSq: f32 = 0.0;
+  var dotJ: f32 = 0.0;
+  for (var d2: u32 = 0u; d2 < params.latticeDim; d2++) {
+    let jl = localJ[d2];
+    let jmLocal = mirrorJ[d2] * select(1.0, -1.0, d2 == axis);
+    localMagSq += jl * jl;
+    mirrorMagSq += jmLocal * jmLocal;
+    dotJ += jl * jmLocal;
+  }
+  let localMag = sqrt(localMagSq);
+  let mirrorMag = sqrt(mirrorMagSq);
+  if (localMag <= eps || mirrorMag <= eps) { return 0.0; }
+  let echo = ctcEcho(mirror.z);
+  let theta = atan2(im, re);
+  let thetaEcho = atan2(echo.y, echo.x);
+  let phaseMismatch = theta - thetaEcho;
+  let delta = atan2(sin(phaseMismatch), cos(phaseMismatch));
+  let phaseCoherence = 0.5 * (1.0 + cos(delta));
+  let opposing = clamp(-dotJ / (localMag * mirrorMag + eps), 0.0, 1.0);
+  let balanceJ = 2.0 * min(localMag, mirrorMag) / (localMag + mirrorMag + eps);
+  let display = clamp(feedback * balanceJ * opposing * phaseCoherence, 0.0, 1.0);
+  return display * densityGate;
+}
 @compute @workgroup_size(4, 4, 4)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let texDims = textureDimensions(outputTex);
@@ -547,7 +624,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     displayScalar = clamp(1.0 - exp(-circulationAbs), 0.0, 1.0) * densityGate;
   } else if (params.fieldView == 10u) { displayScalar = computeCtcResidualScalar(idx, re, im, density, &nnCoords, densityGate); } else if (params.fieldView == 11u) {
     displayScalar = computeCtcLoopGainScalar(idx, re, im, density, &nnCoords, densityGate);
-  } else if (params.fieldView == 12u) { displayScalar = computeCtcDeutschEntropyScalar(idx, re, im, density, &nnCoords, densityGate); } else if (params.fieldView == 3u) {
+  } else if (params.fieldView == 12u) { displayScalar = computeCtcDeutschEntropyScalar(idx, re, im, density, &nnCoords, densityGate); } else if (params.fieldView == 13u) {
+    displayScalar = computeCtcCausalShadowScalar(idx, re, im, density, &nnCoords, &invSpacings, densityGate);
+  } else if (params.fieldView == 3u) {
     // potential (NN)
     let potentialScale = getPotentialScale();
     let normPot = clamp(potentialVal / potentialScale, -1.0, 1.0);

@@ -334,6 +334,58 @@ export interface CtcDeutschEntropySampleParams {
   epsilon?: number
 }
 
+/** Parameters for the causal-shadow scalar from already-computed current vectors. */
+export interface CtcCausalShadowCurrentParams {
+  /** Local wavefunction sample `(re, im)`. */
+  localPsi: readonly [number, number]
+  /** Mirror wavefunction sample `(re, im)` before loop phase rotation. */
+  mirrorPsi: readonly [number, number]
+  /** Probability current at the local site. */
+  localCurrent: readonly number[]
+  /** Probability current at the mirror site, still in mirror-frame coordinates. */
+  mirrorCurrent: readonly number[]
+  /** Mirror axis index. Invalid axes produce a zero display sample. */
+  axis: number
+  /** Loop holonomy phi in radians. */
+  phase: number
+  /** Feedback weight, clamped to `[0, 1]`. */
+  ctcPostselectionStrength: number
+  /** Local density gate already computed by the renderer. Defaults to 1. */
+  densityGate?: number
+  /** Denominator epsilon. Defaults to the shader value. */
+  epsilon?: number
+}
+
+/** Parameters for sampling the causal-shadow reference field at one lattice site. */
+export interface CtcCausalShadowSampleParams {
+  /** Interleaved (re, im) wavefunction of length `2 * product(gridSize[d])`. */
+  psi: Float32Array
+  /** Per-axis lattice sizes. Length is the active lattice dimension. */
+  gridSize: readonly number[]
+  /** Per-axis spacing. Missing or invalid entries default to 1. */
+  spacing?: readonly number[]
+  /** Mirror axis index. Invalid axes produce a zero display sample. */
+  axis: number
+  /** Linear site index of v in row-major TDSE storage. */
+  siteIndex: number
+  /** Loop holonomy phi in radians. */
+  phase: number
+  /** Feedback weight, clamped to `[0, 1]`. */
+  ctcPostselectionStrength: number
+  /** Density scale used by the shader density gate. Defaults to 1. */
+  maxDensity?: number
+  /** hbar used by the finite-difference current. Defaults to 1. */
+  hbar?: number
+  /** mass used by the finite-difference current. Defaults to 1. */
+  mass?: number
+  /** Whether non-compact boundaries use one-sided PML differences. */
+  absorberEnabled?: boolean
+  /** Bit mask for compact axes; compact axes use periodic differences. */
+  compactDimsMask?: number
+  /** Denominator epsilon. Defaults to the shader value. */
+  epsilon?: number
+}
+
 /** CPU reference output for one CTC loop-gain sample. */
 export interface CtcLoopGainSample {
   /** Wrapped phase mismatch in `[-π, π]`. */
@@ -364,6 +416,25 @@ export interface CtcDeutschEntropySample {
   mirrorIndex: number | null
 }
 
+/** CPU reference output for one CTC causal-shadow sample. */
+export interface CtcCausalShadowSample {
+  /** Wrapped local-vs-echo phase mismatch in `[-pi, pi]`. */
+  delta: number
+  /** Phase-consistency weight in `[0, 1]`. */
+  phaseCoherence: number
+  /** Reflected-current opposition weight in `[0, 1]`. */
+  opposing: number
+  /** Current-magnitude balance in `[0, 1]`. */
+  balanceJ: number
+  /** Renderer scalar after feedback, current balance, opposition, phase coherence, and density gate. */
+  displayScalar: number
+  density: number
+  mirrorDensity: number
+  localCurrentMag: number
+  mirrorCurrentMag: number
+  mirrorIndex: number | null
+}
+
 function zeroCtcResidualSample(): CtcLoopResidualSample {
   return { rawResidue: 0, displayScalar: 0, density: 0, mirrorDensity: 0, mirrorIndex: null }
 }
@@ -388,6 +459,21 @@ function zeroCtcDeutschEntropySample(): CtcDeutschEntropySample {
     displayScalar: 0,
     density: 0,
     mirrorDensity: 0,
+    mirrorIndex: null,
+  }
+}
+
+function zeroCtcCausalShadowSample(): CtcCausalShadowSample {
+  return {
+    delta: 0,
+    phaseCoherence: 0,
+    opposing: 0,
+    balanceJ: 0,
+    displayScalar: 0,
+    density: 0,
+    mirrorDensity: 0,
+    localCurrentMag: 0,
+    mirrorCurrentMag: 0,
     mirrorIndex: null,
   }
 }
@@ -637,6 +723,284 @@ export function computeCtcDeutschEntropySample(
   const displayScalar = Math.max(0, Math.min(1, rawDisplay)) * densityGate
 
   return { delta, balance, phaseParadox, displayScalar, density, mirrorDensity, mirrorIndex }
+}
+
+function finitePositive(value: number | undefined, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback
+}
+
+function currentMagnitude(current: readonly number[]): number {
+  let magSq = 0
+  for (const v of current) {
+    const safe = Number.isFinite(v) ? v : 0
+    magSq += safe * safe
+  }
+  return Math.sqrt(magSq)
+}
+
+/**
+ * CPU reference for the TDSE `ctcCausalShadow` scalar from precomputed
+ * current vectors.
+ *
+ * Mirrors the shader formula exactly: phase coherence comes from
+ * `exp(-i phi) psi(M(v))`; the mirror current is reflected across the chosen
+ * axis before testing opposition against the local current.
+ */
+export function computeCtcCausalShadowFromCurrents(
+  params: CtcCausalShadowCurrentParams
+): CtcCausalShadowSample {
+  const { localPsi, mirrorPsi, localCurrent, mirrorCurrent, axis } = params
+  const dims = Math.max(localCurrent.length, mirrorCurrent.length)
+  if (!Number.isInteger(axis) || axis < 0 || axis >= dims || axis >= 12) {
+    return zeroCtcCausalShadowSample()
+  }
+
+  const re = Number.isFinite(localPsi[0]) ? localPsi[0] : 0
+  const im = Number.isFinite(localPsi[1]) ? localPsi[1] : 0
+  const mirrorRe = Number.isFinite(mirrorPsi[0]) ? mirrorPsi[0] : 0
+  const mirrorIm = Number.isFinite(mirrorPsi[1]) ? mirrorPsi[1] : 0
+  const density = re * re + im * im
+  const mirrorDensity = mirrorRe * mirrorRe + mirrorIm * mirrorIm
+  const eps = finitePositive(params.epsilon, 1e-20)
+
+  const localCurrentMag = currentMagnitude(localCurrent)
+  const mirrorCurrentMag = currentMagnitude(mirrorCurrent)
+  const strength = params.ctcPostselectionStrength
+  const feedback = Number.isFinite(strength) ? Math.max(0, Math.min(1, strength)) : 0
+  if (
+    density <= eps ||
+    mirrorDensity <= eps ||
+    localCurrentMag <= eps ||
+    mirrorCurrentMag <= eps ||
+    feedback <= eps
+  ) {
+    return {
+      ...zeroCtcCausalShadowSample(),
+      density,
+      mirrorDensity,
+      localCurrentMag,
+      mirrorCurrentMag,
+    }
+  }
+
+  const phi = Number.isFinite(params.phase) ? params.phase : 0
+  const cosPhi = Math.cos(phi)
+  const sinPhi = Math.sin(phi)
+  const echoRe = cosPhi * mirrorRe + sinPhi * mirrorIm
+  const echoIm = cosPhi * mirrorIm - sinPhi * mirrorRe
+  const theta = Math.atan2(im, re)
+  const thetaEcho = Math.atan2(echoIm, echoRe)
+  const phaseMismatch = theta - thetaEcho
+  const delta = Math.atan2(Math.sin(phaseMismatch), Math.cos(phaseMismatch))
+  const phaseCoherence = 0.5 * (1 + Math.cos(delta))
+
+  let dotJ = 0
+  for (let d = 0; d < dims; d++) {
+    const local = Number.isFinite(localCurrent[d]) ? localCurrent[d]! : 0
+    const mirror = Number.isFinite(mirrorCurrent[d]) ? mirrorCurrent[d]! : 0
+    const echoLocal = d === axis ? -mirror : mirror
+    dotJ += local * echoLocal
+  }
+  const opposing = Math.max(0, Math.min(1, -dotJ / (localCurrentMag * mirrorCurrentMag + eps)))
+  const balanceJ =
+    (2 * Math.min(localCurrentMag, mirrorCurrentMag)) /
+    (localCurrentMag + mirrorCurrentMag + eps)
+  const densityGate =
+    typeof params.densityGate === 'number' && Number.isFinite(params.densityGate)
+      ? Math.max(0, Math.min(1, params.densityGate))
+      : 1
+  const rawDisplay = feedback * balanceJ * opposing * phaseCoherence
+  const displayScalar = Math.max(0, Math.min(1, rawDisplay)) * densityGate
+
+  return {
+    delta,
+    phaseCoherence,
+    opposing,
+    balanceJ,
+    displayScalar,
+    density,
+    mirrorDensity,
+    localCurrentMag,
+    mirrorCurrentMag,
+    mirrorIndex: null,
+  }
+}
+
+function linearToCoords(siteIndex: number, gridSize: readonly number[], strides: readonly number[]): number[] {
+  const coords = new Array<number>(gridSize.length)
+  for (let d = 0; d < gridSize.length; d++) {
+    coords[d] = Math.floor(siteIndex / strides[d]!) % gridSize[d]!
+  }
+  return coords
+}
+
+function computeProbabilityCurrentAtSite(
+  psi: Float32Array,
+  gridSize: readonly number[],
+  strides: readonly number[],
+  spacing: readonly number[] | undefined,
+  siteIndex: number,
+  coords: readonly number[],
+  hbar: number,
+  mass: number,
+  absorberEnabled: boolean,
+  compactDimsMask: number
+): number[] {
+  const current = new Array<number>(gridSize.length).fill(0)
+  const re = psi[2 * siteIndex]!
+  const im = psi[2 * siteIndex + 1]!
+  const hbarOverM = hbar / Math.max(mass, 1e-6)
+
+  for (let d = 0; d < gridSize.length; d++) {
+    const nd = gridSize[d]!
+    if (nd <= 1) continue
+    const stride = strides[d]!
+    const coord = coords[d]!
+    const dx = finitePositive(spacing?.[d], 1)
+    const invSpacing = 1 / dx
+    const invDx = 0.5 * invSpacing
+    const atLo = coord === 0
+    const atHi = coord === nd - 1
+    const pmlAxis = absorberEnabled && (compactDimsMask & (1 << d)) === 0
+
+    let dRe: number
+    let dIm: number
+    if (pmlAxis && atLo) {
+      const fIdx = siteIndex + stride
+      const zRe = psi[2 * fIdx]!
+      const zIm = psi[2 * fIdx + 1]!
+      dRe = (zRe - re) * invSpacing
+      dIm = (zIm - im) * invSpacing
+    } else if (pmlAxis && atHi) {
+      const bIdx = siteIndex - stride
+      const zRe = psi[2 * bIdx]!
+      const zIm = psi[2 * bIdx + 1]!
+      dRe = (re - zRe) * invSpacing
+      dIm = (im - zIm) * invSpacing
+    } else {
+      const fwdIdx = atHi ? siteIndex - stride * (nd - 1) : siteIndex + stride
+      const bwdIdx = atLo ? siteIndex + stride * (nd - 1) : siteIndex - stride
+      const fRe = psi[2 * fwdIdx]!
+      const fIm = psi[2 * fwdIdx + 1]!
+      const bRe = psi[2 * bwdIdx]!
+      const bIm = psi[2 * bwdIdx + 1]!
+      dRe = (fRe - bRe) * invDx
+      dIm = (fIm - bIm) * invDx
+    }
+    current[d] = hbarOverM * (re * dIm - im * dRe)
+  }
+
+  return current
+}
+
+/**
+ * CPU reference for the TDSE `ctcCausalShadow` field view at one lattice site.
+ *
+ * Invalid mirror axes, single-cell mirror axes, odd mirror axes, empty local or
+ * mirror density, zero local or mirror current, and zero feedback all return a
+ * zero display sample without reading outside the wavefunction buffer.
+ */
+export function computeCtcCausalShadowSample(
+  params: CtcCausalShadowSampleParams
+): CtcCausalShadowSample {
+  const { psi, gridSize, axis, siteIndex } = params
+  if (!Number.isInteger(axis) || axis < 0 || axis >= gridSize.length || axis >= 12) {
+    return zeroCtcCausalShadowSample()
+  }
+  if (!Number.isInteger(siteIndex) || siteIndex < 0) {
+    return zeroCtcCausalShadowSample()
+  }
+  for (let d = 0; d < gridSize.length; d++) {
+    const n = gridSize[d]!
+    if (!Number.isInteger(n) || n < 1) return zeroCtcCausalShadowSample()
+  }
+
+  const axisSize = gridSize[axis]!
+  if (axisSize < 2 || axisSize % 2 !== 0) {
+    return zeroCtcCausalShadowSample()
+  }
+
+  const strides = computeStrides(gridSize)
+  const totalSites = gridSize.reduce((acc, n) => acc * n, 1)
+  if (siteIndex >= totalSites) {
+    return zeroCtcCausalShadowSample()
+  }
+  if (psi.length !== 2 * totalSites) {
+    throw new Error(`[wormholeCoupling] psi length ${psi.length} != 2·totalSites ${2 * totalSites}`)
+  }
+
+  const strideA = strides[axis]!
+  const coord = Math.floor(siteIndex / strideA) % axisSize
+  const mirrorCoord = axisSize - 1 - coord
+  const mirrorIndex = siteIndex + (mirrorCoord - coord) * strideA
+  if (mirrorIndex < 0 || mirrorIndex >= totalSites) {
+    return zeroCtcCausalShadowSample()
+  }
+
+  const re = psi[2 * siteIndex]!
+  const im = psi[2 * siteIndex + 1]!
+  const mirrorRe = psi[2 * mirrorIndex]!
+  const mirrorIm = psi[2 * mirrorIndex + 1]!
+  const density = re * re + im * im
+  const mirrorDensity = mirrorRe * mirrorRe + mirrorIm * mirrorIm
+  const eps = finitePositive(params.epsilon, 1e-20)
+  if (density <= eps || mirrorDensity <= eps) {
+    return { ...zeroCtcCausalShadowSample(), density, mirrorDensity, mirrorIndex }
+  }
+
+  const coords = linearToCoords(siteIndex, gridSize, strides)
+  const mirrorCoords = coords.slice()
+  mirrorCoords[axis] = mirrorCoord
+  const hbar = finitePositive(params.hbar, 1)
+  const mass = finitePositive(params.mass, 1)
+  const compactDimsMask =
+    typeof params.compactDimsMask === 'number' && Number.isFinite(params.compactDimsMask)
+      ? Math.trunc(params.compactDimsMask)
+      : 0
+  const localCurrent = computeProbabilityCurrentAtSite(
+    psi,
+    gridSize,
+    strides,
+    params.spacing,
+    siteIndex,
+    coords,
+    hbar,
+    mass,
+    params.absorberEnabled === true,
+    compactDimsMask
+  )
+  const mirrorCurrent = computeProbabilityCurrentAtSite(
+    psi,
+    gridSize,
+    strides,
+    params.spacing,
+    mirrorIndex,
+    mirrorCoords,
+    hbar,
+    mass,
+    params.absorberEnabled === true,
+    compactDimsMask
+  )
+  const maxDensityInput = params.maxDensity
+  const maxDensity =
+    typeof maxDensityInput === 'number' && Number.isFinite(maxDensityInput)
+      ? Math.max(maxDensityInput, 0)
+      : 1
+  const normDensity = maxDensity > 0 ? density / maxDensity : 0
+  const densityGate = smoothstep01(0, 0.02, normDensity)
+  const result = computeCtcCausalShadowFromCurrents({
+    localPsi: [re, im],
+    mirrorPsi: [mirrorRe, mirrorIm],
+    localCurrent,
+    mirrorCurrent,
+    axis,
+    phase: params.phase,
+    ctcPostselectionStrength: params.ctcPostselectionStrength,
+    densityGate,
+    epsilon: eps,
+  })
+
+  return { ...result, density, mirrorDensity, mirrorIndex }
 }
 
 /** Type guard for the mirror-axis enum used by the store and URL layer. */
