@@ -229,6 +229,17 @@ describe('ScenarioSelector - compute mode presets', () => {
     render(<ScenarioSelector />)
 
     expect(screen.queryByRole('option', { name: 'Bianchi-I Kasner Cigar (vacuum)' })).toBeNull()
+    expect(screen.queryByRole('option', { name: 'Retrocausal Caustic Flower' })).toBeNull()
+    expect(screen.queryByRole('option', { name: 'Retrocausal Caustic Web' })).toBeNull()
+  })
+
+  it('exposes retrocausal caustic free scalar presets at their fixed 3D dimension', () => {
+    enterScenarioMode('freeScalarField', 3)
+
+    render(<ScenarioSelector />)
+
+    expect(screen.getByRole('option', { name: 'Retrocausal Caustic Flower' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Retrocausal Caustic Web' })).toBeInTheDocument()
   })
 
   it('hides fixed-dimensional TDSE physics presets above their valid dimension', () => {

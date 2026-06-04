@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { WebGPUSchrodingerRenderer } from '@/rendering/webgpu/renderers/WebGPUSchrodingerRenderer'
+import { freeScalarInitBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/freeScalarInit.wgsl'
 
 describe('renderer temporal + free scalar interaction', () => {
   it('disables temporal outputs when quantumMode is freeScalarField even if temporal flag is true', () => {
@@ -24,5 +25,11 @@ describe('renderer temporal + free scalar interaction', () => {
     const outputIds = renderer.config.outputs.map((o) => o.resourceId)
     expect(outputIds).toContain('quarter-color')
     expect(outputIds).toContain('quarter-position')
+  })
+
+  it('contains retrocausal caustic shader enum 4 branch and pi assignment', () => {
+    expect(freeScalarInitBlock).toContain('params.initCondition == 4u')
+    expect(freeScalarInitBlock).toContain('computeRetrocausalCaustic(worldPos)')
+    expect(freeScalarInitBlock).toContain('piVal = caustic.y')
   })
 })

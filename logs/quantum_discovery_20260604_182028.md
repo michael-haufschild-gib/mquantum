@@ -475,3 +475,104 @@ Bright regions mean "the time loop cannot keep a single clean story here; it has
 - Scenario selector tests prove the new presets are visible at 3D and hidden above their fixed supported dimension.
 - Playwright e2e tests apply both presets in the real app on port 3000, require WebGPU, assert 0 skipped tests, assert nonblank pixels for both, and assert the two presets are visually distinct.
 - Run targeted Vitest, `pnpm exec tsc -b`, targeted ESLint, `pnpm test:shaders:fast`, `node scripts/check-wgsl-backticks.js`, independent review, and Playwright e2e on the existing dev server at port 3000.
+## Round PRD - Free Scalar Retrocausal Caustic Fractal
+
+### Hypothesis
+
+Time travel should not be shown as "a blob goes backward." In a field theory, the more interesting question is what the present looks like when both future and past boundary conditions are allowed to write into the same field. A closed time loop can be approximated as an infinite image sum: every trip through the loop returns as another advanced/retarded echo. If those echoes are folded through a compact mouth map, their constructive regions should form self-similar caustics, not two smooth packets.
+
+This round must avoid TDSE. Implement it in the free scalar Klein-Gordon path as a new renderer-visible initial condition, then let the existing FSF leapfrog evolve the pattern.
+
+Science anchors:
+- Politzer's CTC path-integral paper notes that closed-timelike-curve formulations can break ordinary unitarity, causality, and superposition: https://arxiv.org/abs/gr-qc/9310027
+- Carlini, Frolov, Mensky, Novikov, and Soleng connect time-machine self-consistency to an action principle in wormhole spacetimes: https://arxiv.org/abs/gr-qc/9506087
+- Quantum/quantum-gravity path work treats quantum paths as fractal at coarse-grained scales, with canonical paths having Hausdorff dimension 2: https://arxiv.org/abs/2206.00609
+- Experimental Deutsch-CTC simulations frame a system as interacting with an older version of itself, producing nonlinear quantum behavior: https://www.nature.com/articles/ncomms5145
+
+### Feature
+
+Add a free-scalar initial condition named `retrocausalCaustic`.
+
+For each lattice site, compute a bounded recursive image sum:
+
+1. Normalize position `p = (x - packetCenter) / sigma`, where `sigma = max(packetWidth, eps)`.
+2. Iterate a compact mouth map six times:
+   - `r2 = max(dot(p, p), eps)`
+   - `p_d = abs(p_d) / r2 - c_d(i)`, with deterministic offsets derived from `modeK` and iteration index.
+3. For each iteration, add a decayed advanced/retarded echo pair:
+   - `tau_i = sqrt(r2)`
+   - `phase_i = sum_d k_d p_d + loop_i`
+   - `echo_i = decay_i * cos(phase_i) * cos(tau_i)`
+   - `kick_i = decay_i * sin(phase_i) * sin(tau_i)`
+4. Set `phi = amplitude * boundedSum(echo_i)`.
+5. Set `pi = amplitude * omegaScale * boundedSum(kick_i)` so the caustic visibly evolves instead of staying static.
+
+The formula is not a palette. It changes the initial field buffers that the WebGPU renderer evolves.
+
+Add a CPU reference module for the same formula, and make the WGSL branch mirror it closely enough that tests can verify invariants and enum packing.
+
+### Scenario Presets
+
+Add at least two fixed-3D free-scalar presets:
+
+1. `retrocausalCausticFlower`
+   - Fixed 3D.
+   - `initialCondition: 'retrocausalCaustic'`.
+   - Larger width, moderate mass, `fieldView: 'phi'`.
+   - Should render nested flower/shell caustics with visible motion.
+
+2. `retrocausalCausticWeb`
+   - Fixed 3D.
+   - `initialCondition: 'retrocausalCaustic'`.
+   - Different `modeK`, narrower width, low/zero mass, `fieldView: 'energyDensity'`.
+   - Should render a sharper web or branching lattice, nonblank and visually distinct from Flower.
+
+### User Sees
+
+Bright threads are places where many possible "loop returns" focus into the same present point. The shape looks fractal because every return is folded and re-injected again, like a hall of mirrors for a scalar field. Over time, the Klein-Gordon solver turns that preloaded time-loop image into moving shells and branches.
+
+### Correctness
+
+- `FreeScalarInitialCondition`, runtime validation, UI options, uniform enum packing, and `freeScalarInit.wgsl.ts` agree on the new enum.
+- The formula is finite and bounded for near-zero width, near-origin sites, high mode numbers, and 3D/4D lattice dimensions.
+- CPU reference tests prove symmetry/antisymmetry behavior, finite bounds, deterministic mode dependence, and nonzero `pi` kick for evolving presets.
+- Scenario selector exposes both presets at 3D and hides them above their fixed supported dimension.
+- Playwright applies both presets through the real app on the already-running server at port 3000, requires WebGPU, asserts zero skipped tests, verifies nonblank pixels, and proves the two presets are visually distinct.
+
+### Acceptance Bar
+
+- Numerical/unit tests:
+  - CPU reference returns finite `phi` and `pi` for origin, off-axis, narrow width, and 4D positions.
+  - Output is bounded by the configured amplitude envelope.
+  - Changing `modeK` changes the caustic sample and branch statistics.
+  - The default Flower/Web preset math has nonzero `phi` and nonzero `pi` at representative sites.
+  - Uniform packing maps `retrocausalCaustic` to shader enum `4`.
+- Scenario tests:
+  - Both presets exist, are fixed 3D, use `initialCondition: 'retrocausalCaustic'`, differ in `modeK`/width/view, and carry rendering overrides.
+  - Scenario selector shows both at 3D and hides both at 5D.
+- E2E:
+  - `PLAYWRIGHT_DEV_SERVER_PORT=3000 pnpm exec playwright test scripts/playwright/free-scalar-retrocausal-caustic.spec.ts --workers=1`
+  - Both presets apply through `applyFreeScalarPreset` or the selector-equivalent app path.
+  - WebGPU is required; skipped GPU tests do not count.
+  - Canvas pixels are nonblank for each preset.
+  - Pixel summaries for Flower and Web differ by a meaningful threshold.
+- Quality gates:
+  - Targeted Vitest for new CPU math, store/selector coverage, uniform packing.
+  - Targeted ESLint on touched files.
+  - `pnpm exec tsc -b`.
+  - `pnpm test:shaders:fast`.
+  - `node scripts/check-wgsl-backticks.js`.
+  - Independent read-only review returns PASS.
+
+### Outcome
+
+Added Free Scalar Field `retrocausalCaustic` initial condition: the renderer now draws a bounded recursive advanced/retarded image sum in the Klein-Gordon field buffers, with Flower and Web scenario presets that evolve into nested caustic shells/branches instead of another TDSE blob.
+
+Verification:
+- `pnpm exec vitest run src/tests/lib/physics/freeScalar/retrocausalCaustic.test.ts src/tests/rendering/webgpu/passes/FreeScalarFieldComputePassUniforms.test.ts src/tests/rendering/webgpu/shaders/freeScalar.test.ts src/tests/components/sections/Geometry/SchroedingerControls/FreeScalarFieldControls.test.tsx src/tests/components/sections/Geometry/ScenarioSelector.compute.test.tsx src/tests/lib/physics/presetCatalogues.test.ts` passed: 6 files, 175 tests.
+- `pnpm exec eslint ...` on touched FSF/source/test files passed.
+- `pnpm exec tsc -b` passed.
+- `pnpm test:shaders:fast` passed.
+- `node scripts/check-wgsl-backticks.js` passed.
+- `PLAYWRIGHT_DEV_SERVER_PORT=3000 pnpm exec playwright test scripts/playwright/free-scalar-retrocausal-caustic.spec.ts --workers=1` passed: 1 passed, 0 skipped; GPU enforcement 100% execution.
+- Independent reviewer returned PASS.

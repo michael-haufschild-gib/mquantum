@@ -107,6 +107,24 @@ describe('FreeScalarFieldControls', () => {
     expect(screen.queryByTestId('vacuum-seed-input')).not.toBeInTheDocument()
   })
 
+  it('shows retrocausal caustic option with width, center, and mode controls', () => {
+    render(
+      <FreeScalarFieldControls
+        config={makeFsConfig({ initialCondition: 'retrocausalCaustic', latticeDim: 3 })}
+        dimension={3}
+        actions={createMockActions()}
+      />
+    )
+
+    const select = screen.getByTestId('init-condition-select') as HTMLSelectElement
+    const options = Array.from(select.options).map((o) => o.value)
+    expect(options).toContain('retrocausalCaustic')
+    expect(screen.getByTestId('amplitude-slider')).toBeInTheDocument()
+    expect(screen.getByText('Packet Width (σ)')).toBeInTheDocument()
+    expect(screen.getByText(/Center x/)).toBeInTheDocument()
+    expect(screen.getByText(/k_x/)).toBeInTheDocument()
+  })
+
   it('shows mode k sliders for singleMode condition', () => {
     render(
       <FreeScalarFieldControls

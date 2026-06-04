@@ -4,6 +4,7 @@
  * Initializes phi and pi storage buffers from selected initial conditions:
  * - singleMode (1u): plane wave A*cos(k.x) with conjugate momentum
  * - gaussianPacket (2u): Traveling Gaussian wavepacket with carrier wave and conjugate momentum
+ * - retrocausalCaustic (4u): bounded recursive advanced/retarded image caustic
  *
  * Supports N-dimensional lattices (1-11D) via per-dimension arrays and stride tables.
  * vacuumNoise is handled CPU-side via exact vacuum spectrum sampling
@@ -118,6 +119,97 @@ export const freeScalarInitBlock = /* wgsl */ `
 @group(0) @binding(1) var<storage, read_write> phi: array<f32>;
 @group(0) @binding(2) var<storage, read_write> pi: array<f32>;
 
+const RETROCAUSAL_EPS: f32 = 1e-6;
+const RETROCAUSAL_IMAGE_CLAMP: f32 = 8.0;
+const RETROCAUSAL_PHASE_GAIN: f32 = 1.7;
+const RETROCAUSAL_OMEGA_MAX: f32 = 96.0;
+
+fn retrocausalClamp(v: f32, lo: f32, hi: f32) -> f32 {
+  return min(hi, max(lo, v));
+}
+
+fn retrocausalMode(d: u32) -> f32 {
+  return f32(params.modeK[d]);
+}
+
+fn retrocausalOffset(d: u32, iter: u32, dim: u32) -> f32 {
+  let k0 = abs(retrocausalMode(d));
+  let k1 = abs(retrocausalMode((d + 1u) % dim));
+  let k2 = abs(retrocausalMode((d + 2u) % dim));
+  return 0.54
+    + 0.22 * cos(0.731 * f32(iter + 1u) * f32(d + 1u) + 0.173 * (k0 + 1.0))
+    + 0.13 * sin(0.419 * f32(iter + 1u) * (k1 + k2 + 2.0));
+}
+
+fn retrocausalLoopPhase(iter: u32, dim: u32) -> f32 {
+  var signedMode: f32 = 0.0;
+  var absMode: f32 = 0.0;
+  for (var d: u32 = 0u; d < dim; d++) {
+    let k = retrocausalMode(d);
+    signedMode += k * f32(d + 1u);
+    absMode += abs(k);
+  }
+  let modeSign = select(sign(signedMode), 1.0, abs(signedMode) < RETROCAUSAL_EPS);
+  return modeSign * (0.31 + 0.029 * absMode) * f32(iter + 1u);
+}
+
+fn retrocausalBoundedSum(sum: f32, norm: f32) -> f32 {
+  return tanh(RETROCAUSAL_PHASE_GAIN * (sum / max(norm, RETROCAUSAL_EPS)));
+}
+
+fn retrocausalOmegaScale() -> f32 {
+  var omegaSq = max(params.mass * params.mass, 0.0);
+  for (var d: u32 = 0u; d < params.latticeDim; d++) {
+    if (params.gridSize[d] <= 1u) { continue; }
+    let spacing = max(abs(params.spacing[d]), RETROCAUSAL_EPS);
+    let sk = 2.0 * sin(3.14159265358979323846 * retrocausalMode(d) / f32(params.gridSize[d])) / spacing;
+    omegaSq += sk * sk;
+  }
+  return min(sqrt(max(omegaSq, 0.0)), RETROCAUSAL_OMEGA_MAX);
+}
+
+fn computeRetrocausalCaustic(worldPos: array<f32, 12>) -> vec2f {
+  let dim = max(params.latticeDim, 1u);
+  let sigma = max(abs(params.packetWidth), RETROCAUSAL_EPS);
+  var p: array<f32, 12>;
+  for (var d: u32 = 0u; d < dim; d++) {
+    p[d] = (worldPos[d] - params.packetCenter[d]) / sigma;
+  }
+
+  var echoSum: f32 = 0.0;
+  var kickSum: f32 = 0.0;
+  var norm: f32 = 0.0;
+
+  for (var iter: u32 = 0u; iter < 6u; iter++) {
+    var r2: f32 = 0.0;
+    for (var d: u32 = 0u; d < dim; d++) {
+      r2 += p[d] * p[d];
+    }
+    r2 = max(r2, RETROCAUSAL_EPS);
+
+    for (var d: u32 = 0u; d < dim; d++) {
+      p[d] = retrocausalClamp(abs(p[d]) / r2 - retrocausalOffset(d, iter, dim), -RETROCAUSAL_IMAGE_CLAMP, RETROCAUSAL_IMAGE_CLAMP);
+    }
+
+    var imageR2: f32 = 0.0;
+    var phase: f32 = retrocausalLoopPhase(iter, dim);
+    for (var d: u32 = 0u; d < dim; d++) {
+      imageR2 += p[d] * p[d];
+      phase += retrocausalMode(d) * p[d];
+    }
+
+    let tau = sqrt(max(imageR2, RETROCAUSAL_EPS));
+    let decay = pow(0.72, f32(iter)) / (1.0 + 0.035 * imageR2);
+    echoSum += decay * cos(phase) * cos(tau);
+    kickSum += decay * sin(phase) * sin(tau);
+    norm += decay;
+  }
+
+  let echo = retrocausalBoundedSum(echoSum, norm);
+  let kick = retrocausalBoundedSum(kickSum, norm);
+  return vec2f(params.packetAmplitude * echo, params.packetAmplitude * retrocausalOmegaScale() * kick);
+}
+
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let idx = gid.x;
@@ -214,6 +306,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let w = select(params.packetWidth, 0.3, params.packetWidth <= 0.0);
     phiVal = v * tanh(dx / w);
     piVal = 0.0;
+  } else if (params.initCondition == 4u) {
+    let caustic = computeRetrocausalCaustic(worldPos);
+    phiVal = caustic.x;
+    piVal = caustic.y;
   }
   // initCondition == 0u (vacuumNoise): no-op, data written by CPU
 

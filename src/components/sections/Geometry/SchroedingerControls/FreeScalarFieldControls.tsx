@@ -73,6 +73,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
         { value: 'vacuumNoise', label: 'Exact Vacuum' },
         { value: 'singleMode', label: 'Single Mode' },
         { value: 'gaussianPacket', label: 'Gaussian Packet' },
+        { value: 'retrocausalCaustic', label: 'Retrocausal Caustic' },
       ]
       if (fs.selfInteractionEnabled) {
         opts.push({ value: 'kinkProfile', label: 'Kink (tanh)' })
@@ -400,11 +401,12 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
             </div>
           )}
 
-          {fs.initialCondition === 'gaussianPacket' && (
+          {(fs.initialCondition === 'gaussianPacket' ||
+            fs.initialCondition === 'retrocausalCaustic') && (
             <div className="space-y-2">
               <Slider
                 label="Packet Width (σ)"
-                tooltip="Gaussian envelope width in lattice units. Narrower packets have broader momentum spread (Heisenberg uncertainty)."
+                tooltip="Initial image-map width in lattice units. Narrower widths sharpen recursive caustics and increase local phase curvature."
                 min={0.05}
                 max={2.0}
                 step={0.05}

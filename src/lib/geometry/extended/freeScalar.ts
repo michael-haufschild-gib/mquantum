@@ -37,12 +37,14 @@ export type FreeScalarFieldView =
  * - singleMode: Single plane-wave mode A*cos(k.x)
  * - gaussianPacket: Gaussian wave packet A*exp(-|x-x0|^2/(2*sigma^2))*cos(k.x)
  * - kinkProfile: Domain wall kink phi = v*tanh((x-x0)/w) for self-interaction potential
+ * - retrocausalCaustic: Bounded recursive advanced/retarded image caustic
  */
 export type FreeScalarInitialCondition =
   | 'vacuumNoise'
   | 'singleMode'
   | 'gaussianPacket'
   | 'kinkProfile'
+  | 'retrocausalCaustic'
 
 /** Runtime list of valid free-scalar initial-condition enum values. */
 export const FREE_SCALAR_INITIAL_CONDITIONS = [
@@ -50,6 +52,7 @@ export const FREE_SCALAR_INITIAL_CONDITIONS = [
   'singleMode',
   'gaussianPacket',
   'kinkProfile',
+  'retrocausalCaustic',
 ] as const satisfies readonly FreeScalarInitialCondition[]
 
 /** Return whether a runtime value is a supported free-scalar initial condition. */
