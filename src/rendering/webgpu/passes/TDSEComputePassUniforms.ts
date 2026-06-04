@@ -435,6 +435,12 @@ export function packTdseUniformData(
     normalizeMirrorAxisForLattice(config.wormholeMirrorAxis, config.latticeDim) >>> 0
   u32[I._padWormhole] = 0
 
+  // Postselected CTC fixed-point filter.
+  u32[I.ctcPostselectionEnabled] = config.ctcPostselectionEnabled ? 1 : 0
+  f32[I.ctcPostselectionStrength] = clampFinite(config.ctcPostselectionStrength, 0, 0, 1)
+  f32[I.ctcLoopPhase] = clampFinite(config.ctcLoopPhase, 0, -Math.PI, Math.PI)
+  u32[I._padCtcPostselection] = 0
+
   // Analog-Hawking island overlay.
   // When the overlay is off (or radius is zero) the shader no-ops regardless
   // of the other fields — we still zero them so the GPU sees stable data.

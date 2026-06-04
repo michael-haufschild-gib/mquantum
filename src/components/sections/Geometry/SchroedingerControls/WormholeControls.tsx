@@ -7,6 +7,9 @@
  *   - Switch  : Enable coupling (flips `wormholeCouplingEnabled`).
  *   - Slider  : Coupling strength `g ∈ [0, 5]`.
  *   - Select  : Mirror axis (0 | 1 | 2).
+ *   - Switch  : Enable P-CTC postselection.
+ *   - Slider  : Paradox-sector damping strength.
+ *   - Slider  : Loop phase holonomy.
  *   - Switch  : Show coherence HUD panel (purely visual toggle).
  *
  * @module components/sections/Geometry/SchroedingerControls/WormholeControls
@@ -41,12 +44,18 @@ export function WormholeControls({ td }: { td: TdseConfig }): React.ReactElement
     setTdseWormholeEnabled,
     setTdseWormholeG,
     setTdseWormholeAxis,
+    setTdseCtcPostselectionEnabled,
+    setTdseCtcPostselectionStrength,
+    setTdseCtcLoopPhase,
     setTdseWormholeHudEnabled,
   } = useExtendedObjectStore(
     useShallow((s) => ({
       setTdseWormholeEnabled: s.setTdseWormholeEnabled,
       setTdseWormholeG: s.setTdseWormholeG,
       setTdseWormholeAxis: s.setTdseWormholeAxis,
+      setTdseCtcPostselectionEnabled: s.setTdseCtcPostselectionEnabled,
+      setTdseCtcPostselectionStrength: s.setTdseCtcPostselectionStrength,
+      setTdseCtcLoopPhase: s.setTdseCtcLoopPhase,
       setTdseWormholeHudEnabled: s.setTdseWormholeHudEnabled,
     }))
   )
@@ -96,6 +105,35 @@ export function WormholeControls({ td }: { td: TdseConfig }): React.ReactElement
         value={axisValue}
         onChange={(v) => setTdseWormholeAxis((Number(v) as 0 | 1 | 2) ?? 0)}
         data-testid="tdse-wormhole-axis"
+      />
+      <Switch
+        label="P-CTC postselection"
+        tooltip="Apply a nonlinear fixed-point filter to each mirror pair. The phase-twisted consistent sector survives while paradox amplitude is damped, then the pair is renormalized."
+        checked={td.ctcPostselectionEnabled ?? false}
+        onCheckedChange={setTdseCtcPostselectionEnabled}
+        data-testid="tdse-ctc-postselection-enabled"
+      />
+      <Slider
+        label="Postselection strength"
+        tooltip="Damps the paradox sector before pair renormalization. Zero is identity; one projects fully onto the phase-consistent fixed-point sector."
+        min={0}
+        max={1}
+        step={0.01}
+        value={td.ctcPostselectionStrength ?? 0}
+        onChange={setTdseCtcPostselectionStrength}
+        showValue
+        data-testid="tdse-ctc-postselection-strength"
+      />
+      <Slider
+        label="Loop phase"
+        tooltip="Phase holonomy φ used in the consistency condition ψ(v) = exp(-iφ)ψ(M(v))."
+        min={-Math.PI}
+        max={Math.PI}
+        step={0.01}
+        value={td.ctcLoopPhase ?? 0}
+        onChange={setTdseCtcLoopPhase}
+        showValue
+        data-testid="tdse-ctc-loop-phase"
       />
       <Switch
         label="Show coherence HUD"

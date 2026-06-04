@@ -64,8 +64,8 @@ describe('TDSEUniforms WGSL validation', () => {
     expect(wgslLayout.totalSize).toBe(tsLayout.totalSize)
   })
 
-  it('totalSize equals 1024 bytes (WGSL-documented struct size)', () => {
-    expect(tsLayout.totalSize).toBe(1024)
+  it('totalSize equals 1040 bytes (WGSL-documented struct size)', () => {
+    expect(tsLayout.totalSize).toBe(1040)
   })
 
   it('TDSE_UNIFORM_SIZE is derived from layout.totalSize', () => {
@@ -77,7 +77,7 @@ describe('TDSEUniforms WGSL validation', () => {
     // The literal value must remain stable so callers (e.g. TDSECurvedIntegrator)
     // that copy the K1..K4 quartet via copyBufferToBuffer keep targeting the
     // correct 16-byte block.
-    expect(TDSE_UNIFORM_OFFSET_STAGE_TIME_K1).toBe(896)
+    expect(TDSE_UNIFORM_OFFSET_STAGE_TIME_K1).toBe(912)
   })
 
   // Spot-check offsets used historically as raw indices in packing code.
@@ -105,14 +105,17 @@ describe('TDSEUniforms WGSL validation', () => {
     ['hawkingVmax', 760],
     ['wormholeCosTau', 792],
     ['wormholeCouplingEnabled', 800],
-    ['islandOverlayEnabled', 816],
-    ['metricKind', 832],
-    ['schwarzschildMass', 848],
-    ['torusPeriod', 880],
-    ['stageTimeK1', 896],
-    ['showCurvatureOverlay', 912],
-    ['invSpacing', 928],
-    ['invSpacing2', 976],
+    ['ctcPostselectionEnabled', 816],
+    ['ctcPostselectionStrength', 820],
+    ['ctcLoopPhase', 824],
+    ['islandOverlayEnabled', 832],
+    ['metricKind', 848],
+    ['schwarzschildMass', 864],
+    ['torusPeriod', 896],
+    ['stageTimeK1', 912],
+    ['showCurvatureOverlay', 928],
+    ['invSpacing', 944],
+    ['invSpacing2', 992],
   ])('offset of %s matches magic number %d', (name, expectedOffset) => {
     expect(tsLayout.byteOffset[name as keyof typeof tsLayout.byteOffset]).toBe(expectedOffset)
   })

@@ -248,6 +248,64 @@ describe('TDSE UI setters', () => {
     })
   })
 
+  describe('P-CTC postselection setters', () => {
+    it('clamps postselection strength and loop phase', () => {
+      const store = useExtendedObjectStore.getState()
+
+      store.setTdseCtcPostselectionStrength(2)
+      store.setTdseCtcLoopPhase(10)
+
+      expect(getTdse().ctcPostselectionStrength).toBe(1)
+      expect(getTdse().ctcLoopPhase).toBe(Math.PI)
+
+      store.setTdseCtcPostselectionStrength(-1)
+      store.setTdseCtcLoopPhase(-10)
+
+      expect(getTdse().ctcPostselectionStrength).toBe(0)
+      expect(getTdse().ctcLoopPhase).toBe(-Math.PI)
+    })
+
+    it('rejects non-finite postselection numeric values without dirtying state', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setTdseCtcPostselectionStrength(0.5)
+      store.setTdseCtcLoopPhase(1.25)
+      const beforeVersion = useExtendedObjectStore.getState().schroedingerVersion
+
+      store.setTdseCtcPostselectionStrength(Number.NaN)
+      store.setTdseCtcLoopPhase(Number.POSITIVE_INFINITY)
+
+      expect(getTdse().ctcPostselectionStrength).toBe(0.5)
+      expect(getTdse().ctcLoopPhase).toBe(1.25)
+      expect(useExtendedObjectStore.getState().schroedingerVersion).toBe(beforeVersion)
+    })
+
+    it('marks needsReset only when the postselection flag transitions', () => {
+      const store = useExtendedObjectStore.getState()
+
+      store.setTdseCtcPostselectionEnabled(false)
+      expect(getTdse().needsReset).toBe(false)
+
+      store.setTdseCtcPostselectionEnabled(true)
+      expect(getTdse().ctcPostselectionEnabled).toBe(true)
+      expect(getTdse().needsReset).toBe(true)
+
+      store.resetTdseField()
+      useExtendedObjectStore.setState((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, needsReset: false },
+        },
+      }))
+
+      store.setTdseCtcPostselectionEnabled(true)
+      expect(getTdse().needsReset).toBe(false)
+
+      store.setTdseCtcPostselectionEnabled(false)
+      expect(getTdse().ctcPostselectionEnabled).toBe(false)
+      expect(getTdse().needsReset).toBe(true)
+    })
+  })
+
   describe('setTdseMetric', () => {
     it('rejects unknown metric kinds without changing state', () => {
       useExtendedObjectStore.getState().setTdseMetric({

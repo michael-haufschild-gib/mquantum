@@ -154,19 +154,25 @@ const TDSE_UNIFORMS_FIELDS = [
   { name: 'wormholeMirrorAxis', type: 'u32' },
   { name: '_padWormhole', type: 'u32' },
 
-  // --- Analog-Hawking quantum-extremal island overlay (offset 816) ---
+  // --- Postselected CTC fixed-point filter (offset 816) ---
+  { name: 'ctcPostselectionEnabled', type: 'u32' },
+  { name: 'ctcPostselectionStrength', type: 'f32' },
+  { name: 'ctcLoopPhase', type: 'f32' },
+  { name: '_padCtcPostselection', type: 'u32' },
+
+  // --- Analog-Hawking quantum-extremal island overlay (offset 832) ---
   { name: 'islandOverlayEnabled', type: 'u32' },
   { name: 'islandCenterX0', type: 'f32' },
   { name: 'islandRadiusWs', type: 'f32' },
   { name: 'islandBoost', type: 'f32' },
 
-  // --- Curved-space TDSE v1 metric (offset 832) ---
+  // --- Curved-space TDSE v1 metric (offset 848) ---
   { name: 'metricKind', type: 'u32' },
   { name: 'throatRadius', type: 'f32' },
   { name: '_padMetric0', type: 'u32' },
   { name: '_padMetric1', type: 'u32' },
 
-  // --- Curved-space TDSE v2 metric block (offset 848) ---
+  // --- Curved-space TDSE v2 metric block (offset 864) ---
   { name: 'schwarzschildMass', type: 'f32' },
   { name: 'hubbleRate', type: 'f32' },
   { name: 'adsRadius', type: 'f32' },
@@ -176,23 +182,23 @@ const TDSE_UNIFORMS_FIELDS = [
   { name: '_padV2a', type: 'f32' },
   { name: '_padV2b', type: 'f32' },
 
-  // --- Torus periods (offset 880) ---
+  // --- Torus periods (offset 896) ---
   { name: 'torusPeriod', type: arr('f32', 3) },
   { name: '_padV2c', type: 'f32' },
 
-  // --- RK4 per-stage simTime offsets (offset 896) ---
+  // --- RK4 per-stage simTime offsets (offset 912) ---
   { name: 'stageTimeK1', type: 'f32' },
   { name: 'stageTimeK2', type: 'f32' },
   { name: 'stageTimeK3', type: 'f32' },
   { name: 'stageTimeK4', type: 'f32' },
 
-  // --- Curved-space TDSE v2 Wave 6 visualization (offset 912) ---
+  // --- Curved-space TDSE v2 Wave 6 visualization (offset 928) ---
   { name: 'showCurvatureOverlay', type: 'u32' },
   { name: 'densityViewMode', type: 'u32' },
   { name: 'curvatureOverlayOpacity', type: 'f32' },
   { name: 'densityDisplayMax', type: 'f32' },
 
-  // --- Host-precomputed reciprocal spacing (offset 928) ---
+  // --- Host-precomputed reciprocal spacing (offset 944) ---
   { name: 'invSpacing', type: arr('f32', 12) },
   { name: 'invSpacing2', type: arr('f32', 12) },
 ] as const satisfies readonly StructFieldDef[]
@@ -201,10 +207,10 @@ const TDSE_UNIFORMS_FIELDS = [
 export const TDSE_UNIFORMS_LAYOUT = computeStructLayout(TDSE_UNIFORMS_FIELDS)
 
 // Module-load sanity check: any future WGSL field insertion that breaks
-// the documented 1024-byte total surfaces here at first import rather than
+// the documented 1040-byte total surfaces here at first import rather than
 // silently corrupting GPU uploads. The dedicated test in
 // `tdseUniformsLayout.test.ts` provides the authoritative WGSL parity check.
-const TDSE_WGSL_DOCUMENTED_TOTAL = 1024
+const TDSE_WGSL_DOCUMENTED_TOTAL = 1040
 if (TDSE_UNIFORMS_LAYOUT.totalSize !== TDSE_WGSL_DOCUMENTED_TOTAL) {
   throw new Error(
     `TDSE_UNIFORMS_LAYOUT.totalSize=${TDSE_UNIFORMS_LAYOUT.totalSize} ` +

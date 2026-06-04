@@ -532,6 +532,59 @@ describe('writeTdseUniforms', () => {
     expect(u32[I.wormholeMirrorAxis]).toBe(1)
   })
 
+  it('writes clamped P-CTC postselection slots before GPU upload', () => {
+    const uniformData = new ArrayBuffer(UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({
+        config: createTdseConfig({
+          ctcPostselectionEnabled: true,
+          ctcPostselectionStrength: 2,
+          ctcLoopPhase: 2 * Math.PI,
+        }),
+      })
+    )
+
+    expect(u32[I.ctcPostselectionEnabled]).toBe(1)
+    expect(f32[I.ctcPostselectionStrength]).toBe(1)
+    expect(f32[I.ctcLoopPhase]).toBeCloseTo(Math.PI, 6)
+    expect(u32[I._padCtcPostselection]).toBe(0)
+  })
+
+  it('falls back CTC numeric slots to identity when config is non-finite', () => {
+    const uniformData = new ArrayBuffer(UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({
+        config: createTdseConfig({
+          ctcPostselectionEnabled: true,
+          ctcPostselectionStrength: Number.NaN,
+          ctcLoopPhase: Number.POSITIVE_INFINITY,
+        }),
+      })
+    )
+
+    expect(u32[I.ctcPostselectionEnabled]).toBe(1)
+    expect(f32[I.ctcPostselectionStrength]).toBe(0)
+    expect(f32[I.ctcLoopPhase]).toBe(0)
+  })
+
   it('clamps hawkingDeltaN into [0, 0.6]', () => {
     const uniformData = new ArrayBuffer(UNIFORM_SIZE)
     const u32 = new Uint32Array(uniformData)

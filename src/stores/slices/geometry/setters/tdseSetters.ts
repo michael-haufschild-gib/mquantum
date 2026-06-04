@@ -111,6 +111,9 @@ export interface TdseSetters extends TdseStochasticSetters {
   setTdseWormholeEnabled: (enabled: boolean) => void
   setTdseWormholeG: (g: number) => void
   setTdseWormholeAxis: (axis: number) => void
+  setTdseCtcPostselectionEnabled: (enabled: boolean) => void
+  setTdseCtcPostselectionStrength: (strength: number) => void
+  setTdseCtcLoopPhase: (phase: number) => void
   setTdseWormholeHudEnabled: (enabled: boolean) => void
   // Curved-space kinetic operator (Laplace–Beltrami)
   setTdseMetric: (cfg: MetricConfig) => void
