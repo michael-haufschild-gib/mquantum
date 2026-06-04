@@ -99,3 +99,34 @@ Commit note: normal pre-commit hook was blocked by pre-existing unrelated dirty 
 Follow-up threads:
 - Add URL serializer keys for CTC fields so share links preserve postselection settings.
 - Add a CPU reference for the phase-twisted projector, then replace source-contract shader tests with numerical parity tests.
+
+## Round Hardening - P-CTC Scenario Presets and Render Proof
+
+### Requirement Change
+
+Future WebGPU discovery additions must ship as scenario presets, with numerical math validation and Playwright e2e proof that every new preset renders non-blank pixels. The local `quantum-discovery-webgpu` skill now enforces this hard gate for PRDs and reviewer PASS decisions.
+
+### Outcome
+
+Added two fixed-3D TDSE P-CTC presets:
+- `postselectedCtcNovikovLoop`: zero-holonomy postselection. The accepted sector satisfies `psi(v) = psi(M(v))`, producing a symmetric two-mouth causal-loop density.
+- `postselectedCtcParadoxGate`: pi-holonomy postselection. The accepted sector satisfies the same mirror relation with a minus-sign phase flip, so density remains paired while phase view exposes the paradox gate.
+
+Added `applyCtcPostselection` CPU reference for the shader math:
+- phase-twisted consistent/paradox split,
+- paradox damping by `1 - strength`,
+- pair renormalization preserving local pair norm.
+
+Added hard-gate tests:
+- numerical Vitest coverage for P-CTC fixed point, partial paradox damping, zero-strength identity, and norm stability with wormhole coupling.
+- TDSE preset registry tests proving both presets exist, are physically distinct, and are 3D-only.
+- Scenario selector tests proving both presets are exposed at 3D and hidden above fixed supported dimension.
+- Playwright e2e applying each preset in the real app, checking clean WebGPU/shader output, non-blank canvas pixels, and visual distinction between Novikov and paradox-gate presets.
+
+Verification:
+- `pnpm exec vitest run src/tests/lib/physics/tdse/wormholeCoupling.test.ts src/tests/lib/physics/tdse/presets.timeTravel.test.ts src/tests/components/sections/Geometry/ScenarioSelector.compute.test.tsx` passed: 3 files, 38 tests.
+- `pnpm exec tsc -b` passed.
+- `pnpm exec eslint src/lib/physics/tdse/wormholeCoupling.ts src/lib/physics/tdse/presets.ts src/tests/lib/physics/tdse/wormholeCoupling.test.ts src/tests/lib/physics/tdse/presets.timeTravel.test.ts src/tests/components/sections/Geometry/ScenarioSelector.compute.test.tsx scripts/playwright/tdse-time-travel.spec.ts --max-warnings 0 --no-warn-ignored` passed.
+- `pnpm test:shaders:fast` passed.
+- `node scripts/check-wgsl-backticks.js` passed.
+- `PLAYWRIGHT_DEV_SERVER_PORT=3000 pnpm exec playwright test scripts/playwright/tdse-time-travel.spec.ts --workers=1` passed: 3 passed, 0 failed, 0 skipped; WebGPU available.

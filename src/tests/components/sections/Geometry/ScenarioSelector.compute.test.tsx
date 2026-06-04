@@ -250,6 +250,28 @@ describe('ScenarioSelector - compute mode presets', () => {
     ).toBeInTheDocument()
   })
 
+  it('exposes fixed-dimensional P-CTC time-travel scenarios at 3D only', () => {
+    enterScenarioMode('tdseDynamics', 3)
+    const { rerender } = render(<ScenarioSelector />)
+
+    expect(
+      screen.getByRole('option', { name: getTdsePresetName('postselectedCtcNovikovLoop') })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('option', { name: getTdsePresetName('postselectedCtcParadoxGate') })
+    ).toBeInTheDocument()
+
+    enterScenarioMode('tdseDynamics', 5)
+    rerender(<ScenarioSelector />)
+
+    expect(
+      screen.queryByRole('option', { name: getTdsePresetName('postselectedCtcNovikovLoop') })
+    ).toBeNull()
+    expect(
+      screen.queryByRole('option', { name: getTdsePresetName('postselectedCtcParadoxGate') })
+    ).toBeNull()
+  })
+
   it('does not restore a fixed-dimensional TDSE preset label above its valid dimension', () => {
     const preset = TDSE_SCENARIO_PRESETS.find(
       (candidate) => candidate.id === 'andersonTransition4D'

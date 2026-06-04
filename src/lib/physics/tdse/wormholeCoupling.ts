@@ -138,6 +138,90 @@ export function applyWormholeCoupling(
 }
 
 /**
+ * Apply the postselected-CTC mirror-pair filter in place.
+ *
+ * For each mirror pair `(v, M(v))`, decomposes the phase-twisted pair into
+ * loop-consistent and paradox sectors:
+ *
+ *   c = 0.5 * (ψ(v) + exp(-iφ)ψ(M(v)))
+ *   p = 0.5 * (ψ(v) - exp(-iφ)ψ(M(v)))
+ *
+ * then damps `p` by `(1-strength)` and renormalizes the pair to its incoming
+ * norm. `strength=1` produces the Novikov fixed point
+ * `ψ(v) = exp(-iφ)ψ(M(v))`; `strength=0` is the identity.
+ *
+ * @param psi - Interleaved `Float32Array` of length `2 · Π gridSize[d]`.
+ * @param gridSize - Per-axis lattice sizes.
+ * @param axis - Mirror axis index (`0 | 1 | 2`).
+ * @param strength - Paradox-sector damping strength, clamped to `[0, 1]`.
+ * @param phase - Loop holonomy φ in radians.
+ */
+export function applyCtcPostselection(
+  psi: Float32Array,
+  gridSize: readonly number[],
+  axis: MirrorAxis,
+  strength: number,
+  phase: number
+): void {
+  const ctcStrength = Number.isFinite(strength) ? Math.max(0, Math.min(1, strength)) : 0
+  if (ctcStrength === 0) return
+  const phi = Number.isFinite(phase) ? phase : 0
+  const { strideA, Na, blockSize, totalSites } = decompose(gridSize, axis)
+  if (psi.length !== 2 * totalSites) {
+    throw new Error(`[wormholeCoupling] psi length ${psi.length} != 2·totalSites ${2 * totalSites}`)
+  }
+
+  const cosPhi = Math.cos(phi)
+  const sinPhi = Math.sin(phi)
+  const damp = 1 - ctcStrength
+  const halfTotal = totalSites / 2
+  for (let tid = 0; tid < halfTotal; tid++) {
+    const outer = Math.floor(tid / blockSize)
+    const withinBlock = tid - outer * blockSize
+    const coordA = Math.floor(withinBlock / strideA)
+    const innerOffset = withinBlock - coordA * strideA
+    const idx = outer * (strideA * Na) + coordA * strideA + innerOffset
+    const mirrorIdx = idx + (Na - 1 - 2 * coordA) * strideA
+
+    const reV = psi[2 * idx]!
+    const imV = psi[2 * idx + 1]!
+    const reVP = psi[2 * mirrorIdx]!
+    const imVP = psi[2 * mirrorIdx + 1]!
+    const pairNormBefore = reV * reV + imV * imV + reVP * reVP + imVP * imVP
+    if (pairNormBefore <= 0) continue
+
+    // exp(-iφ) * ψ(M(v))
+    const twRe = cosPhi * reVP + sinPhi * imVP
+    const twIm = cosPhi * imVP - sinPhi * reVP
+
+    const consistentRe = 0.5 * (reV + twRe)
+    const consistentIm = 0.5 * (imV + twIm)
+    const paradoxRe = 0.5 * (reV - twRe)
+    const paradoxIm = 0.5 * (imV - twIm)
+
+    const filteredVRe = consistentRe + damp * paradoxRe
+    const filteredVIm = consistentIm + damp * paradoxIm
+    const filteredTwRe = consistentRe - damp * paradoxRe
+    const filteredTwIm = consistentIm - damp * paradoxIm
+
+    // exp(+iφ) * filteredTwistedMirror
+    const filteredVPRe = cosPhi * filteredTwRe - sinPhi * filteredTwIm
+    const filteredVPIm = cosPhi * filteredTwIm + sinPhi * filteredTwRe
+    const pairNormAfter =
+      filteredVRe * filteredVRe +
+      filteredVIm * filteredVIm +
+      filteredVPRe * filteredVPRe +
+      filteredVPIm * filteredVPIm
+    const renorm = Math.sqrt(pairNormBefore / Math.max(pairNormAfter, 1e-30))
+
+    psi[2 * idx] = filteredVRe * renorm
+    psi[2 * idx + 1] = filteredVIm * renorm
+    psi[2 * mirrorIdx] = filteredVPRe * renorm
+    psi[2 * mirrorIdx + 1] = filteredVPIm * renorm
+  }
+}
+
+/**
  * Compute the normalized L:R mirror coherence
  * `I(L:R) = |Σ_v ψ*(v)·ψ(M(v))|² / ‖ψ‖⁴`.
  *
