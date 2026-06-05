@@ -37,6 +37,7 @@ import { SCHROEDINGER_LAYOUT } from '../schroedingerLayout'
 import {
   packBilocalERBridge,
   packBornNullWeave,
+  packCausalDiamondModularOrbital,
   packEntropicTimeShear,
   packQuantumBackreaction,
   packSpectralDimensionFlow,
@@ -408,6 +409,7 @@ function packVisualFields(
     schroedinger,
     p.isUniformComputeMode || isDensityGridOnlyMode(p.quantumModeStr)
   )
+  packCausalDiamondModularOrbital(floatView, schroedinger, p.quantumModeStr === 'hydrogenND')
 }
 
 /** Pack nodal fields, color algorithm, and cosine palette. */

@@ -165,11 +165,11 @@ struct SchroedingerUniforms {
   // Sample count (LOD)
   sampleCount: i32,              // Sample count for loop control
 
-  // Precomputed constants
-  _reserved924: u32,
+  // Precomputed constants + hydrogenND causal diamond
+  cdR: f32,
   hydrogenRadialNorm: f32,         // Precomputed R_nl^(D) normalization (eliminates per-sample log/exp/sqrt)
-  _reserved932: f32,
-  _reserved936: f32,
+  cdK: f32,
+  cdGain: f32,
 
   // Color algorithm system (matches WebGL uniform system)
   colorAlgorithm: i32,           // Color algorithm selector (0-23)
@@ -183,11 +183,11 @@ struct SchroedingerUniforms {
   cosineC: vec4f,                // Cosine palette C coefficient
   cosineD: vec4f,                // Cosine palette D coefficient
 
-  // Reserved padding (formerly fog + erosionHQ, removed)
-  _reserved1024: u32,
-  _reserved1028: f32,
-  _reserved1032: f32,
-  _reserved1036: u32,
+  // HydrogenND causal diamond, reusing former fog + erosionHQ slots
+  cdCenter: f32,
+  cdWidth: f32,
+  cdHolonomy: f32,
+  cdMix: f32,
 
   // Dynamic bounding radius (replaces fixed BOUND_R constant)
   boundingRadius: f32,           // Bounding sphere radius (physics-based, ≥ 2.0)
@@ -379,6 +379,10 @@ struct SchroedingerUniforms {
   bornNullWeaveStrength: f32,
   bornNullWeaveNodeWidth: f32,
   bornNullWeaveCirculation: f32,
+
+  // HydrogenND causal-diamond modular orbital warp. Disabled host packing
+  // writes all fields as zero; hydrogenND psi helpers then return identity
+  // coordinates and unit visibility gain.
 }
 
 // ============================================

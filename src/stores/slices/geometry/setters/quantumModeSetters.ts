@@ -523,6 +523,8 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
         return
       }
       const presetData = getHydrogenNDPreset(presetName)
+      const causalDiamond = presetData.causalDiamond
+      const rendering = presetData.rendering
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
@@ -534,6 +536,36 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
           bohrRadiusScale: presetData.bohrRadiusScale,
           extraDimQuantumNumbers: [...presetData.extraDimN],
           extraDimOmega: [...presetData.extraDimOmega],
+          causalDiamondEnabled: causalDiamond?.enabled ?? false,
+          causalDiamondHorizonRadius:
+            causalDiamond?.horizonRadius ?? DEFAULT_SCHROEDINGER_CONFIG.causalDiamondHorizonRadius,
+          causalDiamondCompressionK:
+            causalDiamond?.compressionK ?? DEFAULT_SCHROEDINGER_CONFIG.causalDiamondCompressionK,
+          causalDiamondShellGain:
+            causalDiamond?.shellGain ?? DEFAULT_SCHROEDINGER_CONFIG.causalDiamondShellGain,
+          causalDiamondShellCenter:
+            causalDiamond?.shellCenter ?? DEFAULT_SCHROEDINGER_CONFIG.causalDiamondShellCenter,
+          causalDiamondShellWidth:
+            causalDiamond?.shellWidth ?? DEFAULT_SCHROEDINGER_CONFIG.causalDiamondShellWidth,
+          causalDiamondHolonomyStrength:
+            causalDiamond?.holonomyStrength ??
+            DEFAULT_SCHROEDINGER_CONFIG.causalDiamondHolonomyStrength,
+          causalDiamondHolonomyMix:
+            causalDiamond?.holonomyMix ?? DEFAULT_SCHROEDINGER_CONFIG.causalDiamondHolonomyMix,
+          ...(rendering
+            ? {
+                fieldScale: rendering.fieldScale,
+                densityGain: rendering.densityGain,
+                densityContrast: rendering.densityContrast,
+                powderScale: rendering.powderScale,
+                phaseAnimationEnabled: rendering.phaseAnimationEnabled,
+                phaseShimmerEnabled: rendering.phaseShimmerEnabled,
+                phaseShimmerStrength: rendering.phaseShimmerStrength,
+                phaseShimmerSpeed: rendering.phaseShimmerSpeed,
+                raymarchQuality: rendering.raymarchQuality,
+                sampleCount: rendering.sampleCount,
+              }
+            : {}),
         },
       }))
     },

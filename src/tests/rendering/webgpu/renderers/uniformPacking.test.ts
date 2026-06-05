@@ -388,6 +388,48 @@ describe('packSchroedingerUniforms — hydrogen modes', () => {
     expect(intView[I.extraDimN + 1]).toBe(4)
   })
 
+  it('packs causal-diamond controls only for active hydrogenND mode', () => {
+    const causalDiamondSchroedinger = {
+      causalDiamondEnabled: true,
+      causalDiamondHorizonRadius: 99,
+      causalDiamondCompressionK: 2.5,
+      causalDiamondShellGain: 9,
+      causalDiamondShellCenter: 0.77,
+      causalDiamondShellWidth: 0.02,
+      causalDiamondHolonomyStrength: 3.25,
+      causalDiamondHolonomyMix: 0.5,
+    } as never
+
+    const active = makeBuffer()
+    packSchroedingerUniforms(active.floatView, active.intView, {
+      ...baseParams,
+      quantumModeInt: 1,
+      quantumModeStr: 'hydrogenND',
+      rendererQuantumMode: 'hydrogenND',
+      schroedinger: causalDiamondSchroedinger,
+    })
+
+    expect(active.floatView[I.cdR]).toBe(20)
+    expect(active.floatView[I.cdK]).toBe(2.5)
+    expect(active.floatView[I.cdGain]).toBe(8)
+    expect(active.floatView[I.cdCenter]).toBeCloseTo(0.77)
+    expect(active.floatView[I.cdWidth]).toBeCloseTo(0.02)
+    expect(active.floatView[I.cdHolonomy]).toBeCloseTo(3.25)
+    expect(active.floatView[I.cdMix]).toBeCloseTo(0.5)
+
+    const inactive = makeBuffer()
+    packSchroedingerUniforms(inactive.floatView, inactive.intView, {
+      ...baseParams,
+      quantumModeInt: 2,
+      quantumModeStr: 'hydrogenNDCoupled',
+      rendererQuantumMode: 'hydrogenNDCoupled',
+      schroedinger: causalDiamondSchroedinger,
+    })
+
+    expect(inactive.floatView[I.cdR]).toBe(0)
+    expect(inactive.floatView[I.cdHolonomy]).toBe(0)
+  })
+
   it('honors useRealOrbitals flag', () => {
     const { floatView, intView } = makeBuffer()
     packSchroedingerUniforms(floatView, intView, {

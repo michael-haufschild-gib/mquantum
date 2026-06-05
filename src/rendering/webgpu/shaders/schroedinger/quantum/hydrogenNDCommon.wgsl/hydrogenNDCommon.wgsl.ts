@@ -153,6 +153,84 @@ fn evalHydrogenNDAngularCartesian(l: i32, m: i32, nx: f32, ny: f32, nz: f32, use
   }
 }
 
+fn isHydrogenNDCausalDiamondActive(uniforms: SchroedingerUniforms) -> bool {
+  return uniforms.cdR > 0.0
+    && (
+      uniforms.cdK > 0.0
+      || uniforms.cdGain > 0.0
+      || uniforms.cdHolonomy > 0.0
+    );
+}
+
+fn hydrogenNDCausalDiamondRadius(xND: array<f32, 11>) -> f32 {
+  var sumR2 = 0.0;
+  for (var i = 0; i < ACTUAL_DIM; i++) {
+    let xi = xND[i];
+    sumR2 += xi * xi;
+  }
+  return sqrt(max(sumR2, 0.0));
+}
+
+fn hydrogenNDCausalDiamondCompactU(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> f32 {
+  let horizonR = max(uniforms.cdR, 1e-4);
+  return clamp(hydrogenNDCausalDiamondRadius(xND) / horizonR, 0.0, 0.999);
+}
+
+fn hydrogenNDCausalDiamondModularClock(u: f32) -> f32 {
+  let uc = clamp(u, 0.0, 0.999);
+  return 0.5 * log((1.0 + uc) / max(1.0 - uc, 1e-6));
+}
+
+fn hydrogenNDCausalDiamondHorizonGain(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> f32 {
+  if (!isHydrogenNDCausalDiamondActive(uniforms)) {
+    return 1.0;
+  }
+
+  let u = hydrogenNDCausalDiamondCompactU(xND, uniforms);
+  let sech2Tau = max(1.0 - u * u, 0.0);
+  let shellCenter = clamp(uniforms.cdCenter, 0.05, 0.98);
+  let shellWidth = max(uniforms.cdWidth, 0.01);
+  let shellCoord = (u - shellCenter) / shellWidth;
+  let shell = exp(-(shellCoord * shellCoord));
+  let coreGain = 0.18 * sech2Tau;
+  let modularShellGain = sech2Tau * max(uniforms.cdGain, 0.0) * shell;
+  return clamp(coreGain + modularShellGain, 0.0, 8.0);
+}
+
+fn hydrogenNDCausalDiamondWarp(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> array<f32, 11> {
+  if (!isHydrogenNDCausalDiamondActive(uniforms)) {
+    return xND;
+  }
+
+  let u = hydrogenNDCausalDiamondCompactU(xND, uniforms);
+  let tau = hydrogenNDCausalDiamondModularClock(u);
+  let compressionK = clamp(uniforms.cdK, 0.0, 4.0);
+  let compression = exp(-compressionK * tau);
+  var warped = xND;
+
+  for (var i = 0; i < ACTUAL_DIM; i++) {
+    warped[i] = warped[i] * compression;
+  }
+
+  if (ACTUAL_DIM >= 4) {
+    let holonomyStrength = clamp(uniforms.cdHolonomy, 0.0, 8.0);
+    let holonomyMix = clamp(uniforms.cdMix, 0.0, 1.0);
+    let angle = tau * holonomyStrength * holonomyMix;
+    let c = cos(angle);
+    let s = sin(angle);
+    let x0 = warped[0];
+    let x1 = warped[1];
+    let x2 = warped[2];
+    let x3 = warped[3];
+    warped[0] = c * x0 - s * x3;
+    warped[3] = s * x0 + c * x3;
+    warped[1] = c * x1 + s * x2;
+    warped[2] = -s * x1 + c * x2;
+  }
+
+  return warped;
+}
+
 /**
  * Apply time evolution to hydrogen ND wavefunction (complex input).
  *

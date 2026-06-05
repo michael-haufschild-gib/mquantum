@@ -76,11 +76,11 @@ const SCHROEDINGER_FIELDS = [
   { name: 'isoThreshold', type: 'f32' },
   { name: 'sampleCount', type: 'i32' },
 
-  // --- Precomputed constants (offset 924) ---
-  { name: '_reserved924', type: 'u32' },
+  // --- Precomputed constants + hydrogenND causal diamond (offset 924) ---
+  { name: 'cdR', type: 'f32' },
   { name: 'hydrogenRadialNorm', type: 'f32' },
-  { name: '_reserved932', type: 'f32' },
-  { name: '_reserved936', type: 'f32' },
+  { name: 'cdK', type: 'f32' },
+  { name: 'cdGain', type: 'f32' },
 
   // --- Color algorithm system (offset 940) ---
   { name: 'colorAlgorithm', type: 'i32' },
@@ -92,11 +92,11 @@ const SCHROEDINGER_FIELDS = [
   { name: 'cosineC', type: 'vec4f' },
   { name: 'cosineD', type: 'vec4f' },
 
-  // --- Reserved: formerly fog + erosionHQ (offset 1024) ---
-  { name: '_reserved1024', type: 'u32' },
-  { name: '_reserved1028', type: 'f32' },
-  { name: '_reserved1032', type: 'f32' },
-  { name: '_reserved1036', type: 'u32' },
+  // --- HydrogenND causal diamond, reusing former fog + erosionHQ slots (offset 1024) ---
+  { name: 'cdCenter', type: 'f32' },
+  { name: 'cdWidth', type: 'f32' },
+  { name: 'cdHolonomy', type: 'f32' },
+  { name: 'cdMix', type: 'f32' },
 
   // --- Bounding radius + phase materiality (offset 1040) ---
   { name: 'boundingRadius', type: 'f32' },

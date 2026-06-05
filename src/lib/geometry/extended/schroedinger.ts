@@ -138,6 +138,8 @@ export type HydrogenNDPresetName =
   | '2pz_6d'
   | '3dz2_6d'
   | '4fz3_6d'
+  | 'causalDiamondHydrogenShell'
+  | 'causalDiamondHydrogenHolonomy4D'
   | 'custom'
 
 // ============================================================================
@@ -354,6 +356,22 @@ export interface SchroedingerQuantumEffectsConfig {
   bornNullWeaveNodeWidth: number
   /** Current-over-density circulation sensitivity (0.0-8.0) */
   bornNullWeaveCirculation: number
+  /** Enable observer causal-diamond modular-flow warp for hydrogenND orbitals */
+  causalDiamondEnabled: boolean
+  /** Finite observer horizon radius R in hydrogenND chart units (0.5-20.0) */
+  causalDiamondHorizonRadius: number
+  /** Modular conformal compression k in a(tau)=exp(-k tau) (0.0-4.0) */
+  causalDiamondCompressionK: number
+  /** Horizon-shell visibility gain around compactified radius u (0.0-8.0) */
+  causalDiamondShellGain: number
+  /** Horizon shell center in compactified radius u (0.05-0.98) */
+  causalDiamondShellCenter: number
+  /** Horizon shell Gaussian width in compactified radius u (0.01-0.35) */
+  causalDiamondShellWidth: number
+  /** 4D+ modular holonomy angle multiplier applied as tau-scaled rotations (0.0-8.0) */
+  causalDiamondHolonomyStrength: number
+  /** Blend from pure radial compression to transverse holonomy braiding (0.0-1.0) */
+  causalDiamondHolonomyMix: number
 }
 
 /** Second-quantization educational layer configuration. */
@@ -768,6 +786,14 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   bornNullWeaveStrength: 0.9,
   bornNullWeaveNodeWidth: 0.025,
   bornNullWeaveCirculation: 2.0,
+  causalDiamondEnabled: false,
+  causalDiamondHorizonRadius: 3.6,
+  causalDiamondCompressionK: 0.85,
+  causalDiamondShellGain: 2.4,
+  causalDiamondShellCenter: 0.82,
+  causalDiamondShellWidth: 0.075,
+  causalDiamondHolonomyStrength: 0.0,
+  causalDiamondHolonomyMix: 0.0,
 
   // Physical Probability Current (j-field)
   probabilityCurrentEnabled: false,

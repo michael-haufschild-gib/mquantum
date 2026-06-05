@@ -223,11 +223,23 @@ fn evalHydrogenNDMomentumPsi(xND: array<f32, 11>, t: f32, uniforms: Schroedinger
   return cmul(psiSpatial, cexp_i(-energy * t));
 }
 
+fn evalHydrogenNDPositionPsi(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
+  let warpedXND = hydrogenNDCausalDiamondWarp(xND, uniforms);
+  let horizonGain = hydrogenNDCausalDiamondHorizonGain(xND, uniforms);
+  return hydrogenNDOptimized(warpedXND, t, uniforms) * sqrt(max(horizonGain, 0.0));
+}
+
+fn evalHydrogenNDPositionSpatial(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> vec2f {
+  let warpedXND = hydrogenNDCausalDiamondWarp(xND, uniforms);
+  let horizonGain = hydrogenNDCausalDiamondHorizonGain(xND, uniforms);
+  return hydrogenNDOptimized(warpedXND, 0.0, uniforms) * sqrt(max(horizonGain, 0.0));
+}
+
 fn evalPsi(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
   if (uniforms.representationMode == REPRESENTATION_MOMENTUM) {
     return evalHydrogenNDMomentumPsi(xND, t, uniforms);
   }
-  return hydrogenNDOptimized(xND, t, uniforms);
+  return evalHydrogenNDPositionPsi(xND, t, uniforms);
 }
 
 fn evalPsiWithPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec3f {
@@ -242,7 +254,7 @@ fn evalSpatialPhase(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> f32 
     return atan2(psi.y, psi.x);
   }
 
-  let psi = hydrogenNDOptimized(xND, 0.0, uniforms);
+  let psi = evalHydrogenNDPositionSpatial(xND, uniforms);
   return atan2(psi.y, psi.x);
 }
 
@@ -251,7 +263,7 @@ fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUn
   if (uniforms.representationMode == REPRESENTATION_MOMENTUM) {
     psiSpatial = evalHydrogenNDMomentumSpatial(xND, uniforms);
   } else {
-    psiSpatial = hydrogenNDOptimized(xND, 0.0, uniforms);
+    psiSpatial = evalHydrogenNDPositionSpatial(xND, uniforms);
   }
   let spatialPhase = atan2(psiSpatial.y, psiSpatial.x);
 

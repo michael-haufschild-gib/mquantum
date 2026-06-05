@@ -4,6 +4,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 
+import { DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/schroedinger'
 import { HYDROGEN_ND_PRESETS } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
@@ -23,6 +24,24 @@ describe('Hydrogen ND Store Actions', () => {
         extraDimQuantumNumbers: [0, 0, 0, 0, 0, 0, 0, 0],
         extraDimOmega: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
         extraDimFrequencySpread: 0,
+        fieldScale: DEFAULT_SCHROEDINGER_CONFIG.fieldScale,
+        densityGain: DEFAULT_SCHROEDINGER_CONFIG.densityGain,
+        densityContrast: DEFAULT_SCHROEDINGER_CONFIG.densityContrast,
+        powderScale: DEFAULT_SCHROEDINGER_CONFIG.powderScale,
+        phaseAnimationEnabled: DEFAULT_SCHROEDINGER_CONFIG.phaseAnimationEnabled,
+        phaseShimmerEnabled: DEFAULT_SCHROEDINGER_CONFIG.phaseShimmerEnabled,
+        phaseShimmerStrength: DEFAULT_SCHROEDINGER_CONFIG.phaseShimmerStrength,
+        phaseShimmerSpeed: DEFAULT_SCHROEDINGER_CONFIG.phaseShimmerSpeed,
+        raymarchQuality: DEFAULT_SCHROEDINGER_CONFIG.raymarchQuality,
+        sampleCount: DEFAULT_SCHROEDINGER_CONFIG.sampleCount,
+        causalDiamondEnabled: false,
+        causalDiamondHorizonRadius: DEFAULT_SCHROEDINGER_CONFIG.causalDiamondHorizonRadius,
+        causalDiamondCompressionK: DEFAULT_SCHROEDINGER_CONFIG.causalDiamondCompressionK,
+        causalDiamondShellGain: DEFAULT_SCHROEDINGER_CONFIG.causalDiamondShellGain,
+        causalDiamondShellCenter: DEFAULT_SCHROEDINGER_CONFIG.causalDiamondShellCenter,
+        causalDiamondShellWidth: DEFAULT_SCHROEDINGER_CONFIG.causalDiamondShellWidth,
+        causalDiamondHolonomyStrength: DEFAULT_SCHROEDINGER_CONFIG.causalDiamondHolonomyStrength,
+        causalDiamondHolonomyMix: DEFAULT_SCHROEDINGER_CONFIG.causalDiamondHolonomyMix,
       },
     })
   })
@@ -92,6 +111,48 @@ describe('Hydrogen ND Store Actions', () => {
       store.setSchroedingerHydrogenNDPreset('3dz2_4d')
       expect(useExtendedObjectStore.getState().schroedinger.principalQuantumNumber).toBe(3)
       expect(useExtendedObjectStore.getState().schroedinger.azimuthalQuantumNumber).toBe(2)
+    })
+
+    it('applies causal-diamond shell controls from the 3D scenario preset', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerHydrogenNDPreset('causalDiamondHydrogenShell')
+
+      const config = useExtendedObjectStore.getState().schroedinger
+      const preset = HYDROGEN_ND_PRESETS.causalDiamondHydrogenShell
+
+      expect(config.hydrogenNDPreset).toBe('causalDiamondHydrogenShell')
+      expect(config.principalQuantumNumber).toBe(preset.n)
+      expect(config.azimuthalQuantumNumber).toBe(preset.l)
+      expect(config.causalDiamondEnabled).toBe(true)
+      expect(config.causalDiamondHorizonRadius).toBe(preset.causalDiamond?.horizonRadius)
+      expect(config.causalDiamondShellGain).toBeGreaterThan(4)
+      expect(config.causalDiamondHolonomyStrength).toBe(0)
+      expect(config.densityGain).toBe(preset.rendering?.densityGain)
+      expect(config.raymarchQuality).toBe('quality')
+      expect(config.sampleCount).toBe(64)
+    })
+
+    it('applies 4D holonomy controls and clears them when returning to ordinary preset', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerHydrogenNDPreset('causalDiamondHydrogenHolonomy4D')
+
+      const holonomyConfig = useExtendedObjectStore.getState().schroedinger
+      expect(holonomyConfig.causalDiamondEnabled).toBe(true)
+      expect(holonomyConfig.extraDimQuantumNumbers[0]).toBe(0)
+      expect(holonomyConfig.extraDimOmega[0]).toBeCloseTo(0.7)
+      expect(holonomyConfig.causalDiamondHolonomyStrength).toBeGreaterThan(4)
+      expect(holonomyConfig.causalDiamondHolonomyMix).toBe(1)
+      expect(holonomyConfig.phaseShimmerEnabled).toBe(true)
+      expect(holonomyConfig.densityGain).toBeGreaterThan(4)
+
+      store.setSchroedingerHydrogenNDPreset('2pz_4d')
+
+      const ordinaryConfig = useExtendedObjectStore.getState().schroedinger
+      expect(ordinaryConfig.hydrogenNDPreset).toBe('2pz_4d')
+      expect(ordinaryConfig.causalDiamondEnabled).toBe(false)
+      expect(ordinaryConfig.causalDiamondHolonomyStrength).toBe(
+        DEFAULT_SCHROEDINGER_CONFIG.causalDiamondHolonomyStrength
+      )
     })
 
     it('falls back to a valid preset id when runtime input is unknown', () => {
