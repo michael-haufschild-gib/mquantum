@@ -117,6 +117,36 @@ export const FREE_SCALAR_PRESETS: FreeScalarScenarioPreset[] = [
     renderingOverrides: { densityGain: 1.15, densityContrast: 2.1 },
   },
   {
+    id: 'rankDiffusionReheating',
+    name: 'Rank-Diffusion Reheating',
+    description: 'Preheating spreads the sheared rank seed into hot modes.',
+    overrides: {
+      latticeDim: 3,
+      gridSize: [64, 64, 64],
+      spacing: [0.12, 0.12, 0.12],
+      initialCondition: 'chronogenicShear',
+      packetCenter: [0, 0, 0],
+      packetWidth: 0.62,
+      packetAmplitude: 0.85,
+      modeK: [5, 0, 0],
+      mass: 0.65,
+      dt: 0.004,
+      stepsPerFrame: 8,
+      selfInteractionEnabled: false,
+      absorberEnabled: false,
+      fieldView: 'energyDensity',
+      autoScale: true,
+      diagnosticsEnabled: true,
+      diagnosticsInterval: 10,
+      preheating: {
+        enabled: true,
+        amplitude: 0.45,
+        frequency: 5.8,
+      },
+    },
+    renderingOverrides: { densityGain: 1.0, densityContrast: 2.4 },
+  },
+  {
     id: 'singleMode',
     name: 'Single Plane Wave',
     description: 'Single k-mode excitation — standing wave on the periodic lattice',
@@ -423,8 +453,7 @@ export const FREE_SCALAR_PRESETS: FreeScalarScenarioPreset[] = [
   {
     id: 'preheatingFirstTongue',
     name: 'Preheating: First Tongue (k=[1,0,0])',
-    description:
-      'Post-inflation parametric resonance seeded on a single lattice plane-wave mode. The drive m²(η) = m²·(1 + 0.3·sin(Ωη)) puts the k=[1,0,0] mode on the Mathieu first tongue (Ω = 2·ω_k ≈ 4.40 for the default 32³ lattice at a=0.1, m=1). Stripes along x amplify exponentially at μ ≈ A·m²/(4ω) ≈ 0.034, doubling every ~20 η — purely resonant, no dispersion, no corner-symmetry artifacts. Note: Ω is calibrated to the default grid shape.',
+    description: 'Parametric resonance seeded on one post-inflation k mode.',
     overrides: {
       initialCondition: 'singleMode',
       modeK: [1, 0, 0],

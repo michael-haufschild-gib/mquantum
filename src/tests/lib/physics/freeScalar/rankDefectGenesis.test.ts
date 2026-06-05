@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { FREE_SCALAR_PRESETS } from '@/lib/physics/freeScalar/presets'
 import {
   computeChronogenicShearMoments,
   computeRankDefectGenesisMoments,
@@ -87,5 +88,35 @@ describe('rank-defect genesis initial condition', () => {
     const lowWinding = sampleChronogenicShear([24, 16, 16], { ...SHEAR, modeK: [1, 0, 0] })
     const highWinding = sampleChronogenicShear([24, 16, 16], { ...SHEAR, modeK: [3, 0, 0] })
     expect(Math.abs(highWinding.pi - lowWinding.pi)).toBeGreaterThan(0.25)
+  })
+
+  it('configures rank-diffusion reheating as a null sheared seed plus mass drive', () => {
+    const preset = FREE_SCALAR_PRESETS.find(
+      (candidate) => candidate.id === 'rankDiffusionReheating'
+    )
+    if (!preset) throw new Error('rankDiffusionReheating preset missing')
+
+    const overrides = preset.overrides
+    expect(overrides.initialCondition).toBe('chronogenicShear')
+    expect(overrides.preheating?.enabled).toBe(true)
+    expect(overrides.preheating?.amplitude).toBe(0.45)
+    expect(overrides.preheating?.frequency).toBe(5.8)
+    expect(overrides.modeK).toEqual([5, 0, 0])
+    expect(overrides.mass).toBe(0.65)
+    expect(overrides.stepsPerFrame).toBe(8)
+
+    const moments = computeChronogenicShearMoments({
+      latticeDim: overrides.latticeDim ?? 3,
+      gridSize: overrides.gridSize ?? [64, 64, 64],
+      spacing: overrides.spacing ?? [0.12, 0.12, 0.12],
+      packetCenter: overrides.packetCenter ?? [0, 0, 0],
+      packetWidth: overrides.packetWidth ?? 1,
+      packetAmplitude: overrides.packetAmplitude ?? 1,
+      mass: overrides.mass ?? 0,
+      modeK: overrides.modeK ?? [1, 0, 0],
+    })
+    expect(Math.abs(moments.sumPhi)).toBeLessThan(1e-8)
+    expect(Math.abs(moments.sumPi)).toBeLessThan(1e-8)
+    expect(moments.energy).toBeGreaterThan(50)
   })
 })
