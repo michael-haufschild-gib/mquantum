@@ -245,6 +245,7 @@ export interface SceneFrameLoopDeps {
   maxFps: number
   advanceSceneStateByDelta: (deltaTime: number) => void
   executeSceneFrame: (deltaTime: number) => void
+  isFrameBackpressureActive?: () => boolean
   tickExport: () => boolean
   cleanupExport: () => void
 }
@@ -257,7 +258,14 @@ export interface SceneFrameLoopDeps {
  * when active, and applies FPS throttling.
  */
 export function useSceneFrameLoop(deps: SceneFrameLoopDeps): void {
-  const { maxFps, advanceSceneStateByDelta, executeSceneFrame, tickExport, cleanupExport } = deps
+  const {
+    maxFps,
+    advanceSceneStateByDelta,
+    executeSceneFrame,
+    isFrameBackpressureActive,
+    tickExport,
+    cleanupExport,
+  } = deps
 
   const initialFrameTimeRef = useRef<number>(performance.now())
   const animationFrameRef = useRef<number>(0)
@@ -291,6 +299,13 @@ export function useSceneFrameLoop(deps: SceneFrameLoopDeps): void {
       return
     }
 
+    if (isFrameBackpressureActive?.()) {
+      lastTimeRef.current = now
+      fpsThrottleAnchorRef.current = now
+      animationFrameRef.current = requestAnimationFrame(renderFrame)
+      return
+    }
+
     const deltaTime = (now - lastTimeRef.current) / 1000
     lastTimeRef.current = now
 
@@ -298,7 +313,7 @@ export function useSceneFrameLoop(deps: SceneFrameLoopDeps): void {
     executeSceneFrame(deltaTime)
 
     animationFrameRef.current = requestAnimationFrame(renderFrame)
-  }, [advanceSceneStateByDelta, executeSceneFrame, maxFps, tickExport])
+  }, [advanceSceneStateByDelta, executeSceneFrame, isFrameBackpressureActive, maxFps, tickExport])
 
   useEffect(() => {
     animationFrameRef.current = requestAnimationFrame(renderFrame)
