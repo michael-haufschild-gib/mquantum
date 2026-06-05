@@ -27,6 +27,38 @@ export interface ComplexMatrix {
   imag: Float64Array
 }
 
+const SINGULAR_PIVOT_TOL = 1e-30
+
+function matrixEntryCount(N: number, caller: string, allowZero = false): number {
+  const min = allowZero ? 0 : 1
+  if (!Number.isSafeInteger(N) || N < min) {
+    throw new RangeError(`${caller}: matrix dimension must be a safe integer >= ${min}`)
+  }
+
+  const size = N * N
+  if (!Number.isSafeInteger(size)) {
+    throw new RangeError(`${caller}: matrix dimension ${N} overflows safe element count`)
+  }
+  return size
+}
+
+function validateMatrixBuffer(m: ComplexMatrix, size: number, name: string, caller: string): void {
+  if (!(m?.real instanceof Float64Array) || !(m?.imag instanceof Float64Array)) {
+    throw new TypeError(`${caller}: ${name} must contain Float64Array real and imag buffers`)
+  }
+  if (m.real.length < size || m.imag.length < size) {
+    throw new RangeError(`${caller}: ${name} buffers are shorter than N*N=${size}`)
+  }
+}
+
+function assertFiniteMatrix(m: ComplexMatrix, size: number, name: string, caller: string): void {
+  for (let i = 0; i < size; i++) {
+    if (!Number.isFinite(m.real[i]!) || !Number.isFinite(m.imag[i]!)) {
+      throw new RangeError(`${caller}: ${name} contains a non-finite entry at index ${i}`)
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
@@ -38,9 +70,10 @@ export interface ComplexMatrix {
  * @returns Zero complex matrix
  */
 export function complexMatZero(N: number): ComplexMatrix {
+  const size = matrixEntryCount(N, 'complexMatZero', true)
   return {
-    real: new Float64Array(N * N),
-    imag: new Float64Array(N * N),
+    real: new Float64Array(size),
+    imag: new Float64Array(size),
   }
 }
 
@@ -51,6 +84,7 @@ export function complexMatZero(N: number): ComplexMatrix {
  * @returns Identity complex matrix
  */
 export function complexMatIdentity(N: number): ComplexMatrix {
+  matrixEntryCount(N, 'complexMatIdentity', true)
   const m = complexMatZero(N)
   for (let i = 0; i < N; i++) {
     m.real[i * N + i] = 1
@@ -99,6 +133,11 @@ export function complexMatMul(
   out: ComplexMatrix,
   N: number
 ): void {
+  const size = matrixEntryCount(N, 'complexMatMul', true)
+  validateMatrixBuffer(A, size, 'A', 'complexMatMul')
+  validateMatrixBuffer(B, size, 'B', 'complexMatMul')
+  validateMatrixBuffer(out, size, 'out', 'complexMatMul')
+
   if (outputAliasesInput(A, B, out)) {
     const temp = complexMatZero(N)
     complexMatMul(A, B, temp, N)
@@ -109,8 +148,7 @@ export function complexMatMul(
   // ── WASM fast path ──────────────────────────────────────────────────
   if (N >= WASM_MATMUL_MIN_N && isAnimationWasmReady()) {
     const packed = complexMatMulWasm(A.real, A.imag, B.real, B.imag, N)
-    if (packed && packed.length === 2 * N * N) {
-      const size = N * N
+    if (packed && packed.length === 2 * size) {
       out.real.set(packed.subarray(0, size))
       out.imag.set(packed.subarray(size))
       return
@@ -125,8 +163,8 @@ export function complexMatMul(
   const Or = out.real,
     Oi = out.imag
 
-  Or.fill(0)
-  Oi.fill(0)
+  Or.fill(0, 0, size)
+  Oi.fill(0, 0, size)
 
   for (let i = 0; i < N; i++) {
     const iN = i * N
@@ -159,7 +197,11 @@ export function complexMatAdd(
   out: ComplexMatrix,
   N: number
 ): void {
-  const size = N * N
+  const size = matrixEntryCount(N, 'complexMatAdd', true)
+  validateMatrixBuffer(A, size, 'A', 'complexMatAdd')
+  validateMatrixBuffer(B, size, 'B', 'complexMatAdd')
+  validateMatrixBuffer(out, size, 'out', 'complexMatAdd')
+
   for (let i = 0; i < size; i++) {
     out.real[i] = A.real[i]! + B.real[i]!
     out.imag[i] = A.imag[i]! + B.imag[i]!
@@ -182,7 +224,13 @@ export function complexMatScale(
   out: ComplexMatrix,
   N: number
 ): void {
-  const size = N * N
+  const size = matrixEntryCount(N, 'complexMatScale', true)
+  validateMatrixBuffer(A, size, 'A', 'complexMatScale')
+  validateMatrixBuffer(out, size, 'out', 'complexMatScale')
+  if (!Number.isFinite(scalarRe) || !Number.isFinite(scalarIm)) {
+    throw new RangeError('complexMatScale: scalar must be finite')
+  }
+
   for (let i = 0; i < size; i++) {
     const re = A.real[i]!
     const im = A.imag[i]!
@@ -199,7 +247,10 @@ export function complexMatScale(
  * @param N - Matrix dimension
  */
 export function complexMatCopy(src: ComplexMatrix, dst: ComplexMatrix, N: number): void {
-  const size = N * N
+  const size = matrixEntryCount(N, 'complexMatCopy', true)
+  validateMatrixBuffer(src, size, 'src', 'complexMatCopy')
+  validateMatrixBuffer(dst, size, 'dst', 'complexMatCopy')
+
   dst.real.set(src.real.subarray(0, size))
   dst.imag.set(src.imag.subarray(0, size))
 }
@@ -212,12 +263,15 @@ export function complexMatCopy(src: ComplexMatrix, dst: ComplexMatrix, N: number
  * @returns 1-norm
  */
 export function complexMatNorm1(A: ComplexMatrix, N: number): number {
+  const size = matrixEntryCount(N, 'complexMatNorm1', true)
+  validateMatrixBuffer(A, size, 'A', 'complexMatNorm1')
+
   let maxCol = 0
   for (let j = 0; j < N; j++) {
     let colSum = 0
     for (let i = 0; i < N; i++) {
       const idx = i * N + j
-      colSum += Math.sqrt(A.real[idx]! * A.real[idx]! + A.imag[idx]! * A.imag[idx]!)
+      colSum += Math.hypot(A.real[idx]!, A.imag[idx]!)
     }
     if (colSum > maxCol) maxCol = colSum
   }
@@ -251,7 +305,12 @@ const solveScratch = {
 export function solveLinearSystem(Q: ComplexMatrix, P: ComplexMatrix, N: number): ComplexMatrix {
   // Augmented matrix: [A | B] where A = Q, B = P
   // Work on copies (use pre-allocated buffers for N ≤ MAX_PADE_N)
-  const size = N * N
+  const size = matrixEntryCount(N, 'solveLinearSystem')
+  validateMatrixBuffer(Q, size, 'Q', 'solveLinearSystem')
+  validateMatrixBuffer(P, size, 'P', 'solveLinearSystem')
+  assertFiniteMatrix(Q, size, 'Q', 'solveLinearSystem')
+  assertFiniteMatrix(P, size, 'P', 'solveLinearSystem')
+
   let Ar: Float64Array
   let Ai: Float64Array
   let Br: Float64Array
@@ -311,7 +370,9 @@ export function solveLinearSystem(Q: ComplexMatrix, P: ComplexMatrix, N: number)
     const pivRe = Ar[col * N + col]!
     const pivIm = Ai[col * N + col]!
     const pivMag2 = pivRe * pivRe + pivIm * pivIm
-    if (pivMag2 < 1e-30) continue
+    if (pivMag2 < SINGULAR_PIVOT_TOL) {
+      throw new Error(`solveLinearSystem: singular matrix at pivot ${col}`)
+    }
 
     // Eliminate rows below
     for (let row = col + 1; row < N; row++) {
@@ -358,7 +419,9 @@ export function solveLinearSystem(Q: ComplexMatrix, P: ComplexMatrix, N: number)
       const pivRe = Ar[row * N + row]!
       const pivIm = Ai[row * N + row]!
       const pivMag2 = pivRe * pivRe + pivIm * pivIm
-      if (pivMag2 < 1e-30) continue
+      if (pivMag2 < SINGULAR_PIVOT_TOL) {
+        throw new Error(`solveLinearSystem: singular matrix at pivot ${row}`)
+      }
 
       result.real[row * N + j] = (sumRe * pivRe + sumIm * pivIm) / pivMag2
       result.imag[row * N + j] = (sumIm * pivRe - sumRe * pivIm) / pivMag2
@@ -444,11 +507,14 @@ function zeroScratch(m: ComplexMatrix, N: number): void {
  * @returns exp(A)
  */
 export function matrixExponentialPade(A: ComplexMatrix, N: number): ComplexMatrix {
+  const size = matrixEntryCount(N, 'matrixExponentialPade')
+  validateMatrixBuffer(A, size, 'A', 'matrixExponentialPade')
+  assertFiniteMatrix(A, size, 'A', 'matrixExponentialPade')
+
   // ── WASM fast path ──────────────────────────────────────────────────
   if (isAnimationWasmReady()) {
     const packed = matrixExponentialPadeWasm(A.real, A.imag, N)
-    if (packed && packed.length === 2 * N * N) {
-      const size = N * N
+    if (packed && packed.length === 2 * size) {
       return {
         real: packed.slice(0, size),
         imag: packed.slice(size),
@@ -458,6 +524,9 @@ export function matrixExponentialPade(A: ComplexMatrix, N: number): ComplexMatri
 
   // ── JS fallback ─────────────────────────────────────────────────────
   const norm = complexMatNorm1(A, N)
+  if (!Number.isFinite(norm)) {
+    throw new RangeError('matrixExponentialPade: matrix 1-norm exceeds finite range')
+  }
 
   // Handle zero matrix
   if (norm < 1e-30) return complexMatIdentity(N)
@@ -467,7 +536,6 @@ export function matrixExponentialPade(A: ComplexMatrix, N: number): ComplexMatri
   const s = Math.max(0, Math.ceil(Math.log2(norm / theta13)))
 
   const useScratch = N <= MAX_PADE_N
-  const size = N * N
 
   // Allocate or reuse scratch matrices
   const As = useScratch ? (zeroScratch(padeScratch.As, N), padeScratch.As) : complexMatZero(N)

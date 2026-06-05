@@ -5,6 +5,7 @@ import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { fft } from '@/lib/math/fft'
 import {
   computeOmegaK,
+  computeOmegaKFromMassSq,
   estimateVacuumEnergyVisualScale,
   estimateVacuumMaxPhi,
   estimateVacuumMaxPi,
@@ -43,6 +44,13 @@ describe('computeOmegaK', () => {
     const omegaX = computeOmegaK([1, 0, 0], [8, 8, 8], [0.1, 0.1, 0.1], 1.0, 1)
     // In 1D, only the x-component matters
     expect(omega1d).toBeCloseTo(omegaX, 10)
+  })
+
+  it('rejects invalid direct-call geometry and mass terms', () => {
+    expect(() => computeOmegaK([0], [8], [1], 1.0, Number.POSITIVE_INFINITY)).toThrow(/latticeDim/)
+    expect(() => computeOmegaK([0], [8], [1], Number.NaN, 1)).toThrow(/mass/)
+    expect(() => computeOmegaK([0, 0], [8, 8], [1], 1.0, 2)).toThrow(/spacing/)
+    expect(() => computeOmegaKFromMassSq([0], [8], [1], Number.NaN, 1)).toThrow(/massSq/)
   })
 })
 
@@ -143,6 +151,25 @@ describe('sampleVacuumSpectrum', () => {
     expect(() => sampleVacuumSpectrum(config, 42, 'kgFloor')).toThrow('power-of-2')
   })
 
+  it('throws on over-budget active grids before spectrum allocation', () => {
+    const config = makeConfig({
+      latticeDim: 2,
+      gridSize: [2 ** 20, 2, 1],
+      spacing: [1, 1, 1],
+    })
+    expect(() => sampleVacuumSpectrum(config, 42, 'kgFloor')).toThrow(/site budget/)
+    expect(() => estimateVacuumMaxPhi(config, 'kgFloor')).toThrow(/site budget/)
+  })
+
+  it('rejects huge powers of two without bitwise coercion', () => {
+    const config = makeConfig({
+      latticeDim: 1,
+      gridSize: [2 ** 32, 1, 1],
+      spacing: [1, 1, 1],
+    })
+    expect(() => sampleVacuumSpectrum(config, 42, 'kgFloor')).toThrow(/site budget|power-of-2/)
+  })
+
   it('throws when spacing does not cover all active dimensions', () => {
     const config = makeConfig({
       latticeDim: 3,
@@ -150,6 +177,15 @@ describe('sampleVacuumSpectrum', () => {
       spacing: [0.1, 0.1] as number[],
     })
     expect(() => sampleVacuumSpectrum(config, 42, 'kgFloor')).toThrow('spacing')
+  })
+
+  it('throws when latticeDim exceeds documented vacuum sampler support', () => {
+    const config = makeConfig({
+      latticeDim: 12,
+      gridSize: new Array(12).fill(2),
+      spacing: new Array(12).fill(1),
+    })
+    expect(() => sampleVacuumSpectrum(config, 42, 'kgFloor')).toThrow('latticeDim')
   })
 
   it('throws on non-positive or non-finite anisotropic axis stiffness', () => {

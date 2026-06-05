@@ -175,6 +175,7 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
         {!isComputeMode && (
           <DrawerSection title="Time Evolution" testId="animation-panel-timeEvolution">
             <Slider
+              data-testid="components-layout-timeline-controls-schroedinger-animation-drawer-slider-177-13"
               label="Time Scale"
               min={0.1}
               max={2.0}
@@ -211,6 +212,7 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
             testId="animation-panel-interference"
           >
             <Slider
+              data-testid="components-layout-timeline-controls-schroedinger-animation-drawer-slider-213-13"
               label="Amplitude"
               min={0}
               max={1}
@@ -221,6 +223,7 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
               showValue
             />
             <Slider
+              data-testid="components-layout-timeline-controls-schroedinger-animation-drawer-slider-223-13"
               label="Frequency"
               min={1}
               max={50}
@@ -231,6 +234,7 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
               showValue
             />
             <Slider
+              data-testid="components-layout-timeline-controls-schroedinger-animation-drawer-slider-233-13"
               label="Speed"
               min={0}
               max={10}
@@ -254,6 +258,7 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
             testId="animation-panel-phaseShimmer"
           >
             <Slider
+              data-testid="components-layout-timeline-controls-schroedinger-animation-drawer-slider-256-13"
               label="Strength"
               min={0}
               max={1}
@@ -264,6 +269,7 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
               showValue
             />
             <Slider
+              data-testid="components-layout-timeline-controls-schroedinger-animation-drawer-slider-266-13"
               label="Speed"
               min={0.1}
               max={5}

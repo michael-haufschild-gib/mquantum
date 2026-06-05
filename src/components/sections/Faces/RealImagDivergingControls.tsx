@@ -67,6 +67,7 @@ export const RealImagDivergingControls: React.FC = React.memo(() => {
       />
 
       <ColorPicker
+        data-testid="components-sections-faces-real-imag-diverging-controls-color-picker-69-7"
         label="Zero (Neutral)"
         tooltip="Color shown where the selected component is near zero."
         value={divergingPsi.neutralColor}
@@ -75,6 +76,7 @@ export const RealImagDivergingControls: React.FC = React.memo(() => {
       />
 
       <ColorPicker
+        data-testid="components-sections-faces-real-imag-diverging-controls-color-picker-77-7"
         label="Positive Wing"
         tooltip="Color for positive values of the selected wavefunction component."
         value={divergingPsi.positiveColor}
@@ -83,6 +85,7 @@ export const RealImagDivergingControls: React.FC = React.memo(() => {
       />
 
       <ColorPicker
+        data-testid="components-sections-faces-real-imag-diverging-controls-color-picker-85-7"
         label="Negative Wing"
         tooltip="Color for negative values of the selected wavefunction component."
         value={divergingPsi.negativeColor}
@@ -91,6 +94,7 @@ export const RealImagDivergingControls: React.FC = React.memo(() => {
       />
 
       <Slider
+        data-testid="components-sections-faces-real-imag-diverging-controls-slider-93-7"
         label="Intensity Floor"
         min={0}
         max={1}

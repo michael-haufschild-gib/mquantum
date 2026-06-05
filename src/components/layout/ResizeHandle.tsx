@@ -176,6 +176,7 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = React.memo(({ className
 
   return (
     <div
+      data-testid="components-layout-resize-handle-div-178-5"
       ref={handleRef}
       className={`
         absolute left-0 top-0 bottom-0 w-2 -translate-x-1/2

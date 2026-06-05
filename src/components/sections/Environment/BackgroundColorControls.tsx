@@ -19,6 +19,7 @@ export const BackgroundColorControls: React.FC = React.memo(() => {
   return (
     <div className="space-y-4">
       <ColorPicker
+        data-testid="components-sections-environment-background-color-controls-color-picker-21-7"
         label="Background Color"
         tooltip="Scene background color visible behind the quantum object and skybox."
         value={backgroundColor}

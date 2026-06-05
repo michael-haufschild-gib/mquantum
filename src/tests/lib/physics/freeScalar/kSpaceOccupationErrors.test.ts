@@ -12,7 +12,10 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { computeRawKSpaceData } from '@/lib/physics/freeScalar/kSpaceOccupation'
+import {
+  computeRawKSpaceData,
+  computeRawKSpaceDataFromComplex,
+} from '@/lib/physics/freeScalar/kSpaceOccupation'
 
 const PHI = new Float32Array(8)
 const PI = new Float32Array(8)
@@ -90,6 +93,20 @@ describe('computeRawKSpaceData — input validation', () => {
     expect(() => computeRawKSpaceData(PHI, PI, [4.5], [1], 1, 1)).toThrow(
       /gridSize\[0\] must be a positive integer/
     )
+    expect(() => computeRawKSpaceData(PHI, PI, [2 ** 32], [1], 1, 1)).toThrow(
+      /gridSize\[0\].*k-space FFT budget/
+    )
+  })
+
+  it('throws when active grid product cannot safely index k-space arrays', () => {
+    expect(() => computeRawKSpaceData(PHI, PI, [2 ** 16, 2 ** 16], [1, 1], 1, 2)).toThrow(
+      /totalSites exceeds k-space FFT budget/
+    )
+
+    const complex = new Float64Array(16)
+    expect(() =>
+      computeRawKSpaceDataFromComplex(complex, complex, [2 ** 16, 2 ** 16], [1, 1], 1, 2)
+    ).toThrow(/totalSites exceeds k-space FFT budget/)
   })
 
   it('throws when an active spacing entry is non-finite or non-positive', () => {

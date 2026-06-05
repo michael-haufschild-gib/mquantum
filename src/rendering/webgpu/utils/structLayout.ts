@@ -76,6 +76,18 @@ function roundUp(alignment: number, value: number): number {
   return Math.ceil(value / alignment) * alignment
 }
 
+function assertValidArrayCount(count: number): void {
+  if (!Number.isSafeInteger(count) || count <= 0) {
+    throw new Error(`WGSL array count must be a positive safe integer, got ${count}`)
+  }
+}
+
+function assertValidFieldName(name: string): void {
+  if (name.length === 0) {
+    throw new Error('WGSL struct field name must not be empty')
+  }
+}
+
 function vecComponents(type: WGSLVecType): number {
   if (type.startsWith('vec2')) return 2
   if (type.startsWith('vec3')) return 3
@@ -93,6 +105,7 @@ function vecAlignAndSize(components: number): { align: number; size: number } {
 
 function typeAlignAndSize(type: WGSLFieldType): { align: number; size: number } {
   if (typeof type === 'object') {
+    assertValidArrayCount(type.count)
     // Array element may be a scalar (`array<u32, N>`) or a vector
     // (`array<vec4f, N>`). Scalars have align 4 / size 4; vectors follow
     // the WGSL vec alignment rules.
@@ -124,6 +137,7 @@ function typeAlignAndSize(type: WGSLFieldType): { align: number; size: number } 
  * @param count - Number of array elements
  */
 function arr(element: WGSLVecType | WGSLScalarType, count: number): WGSLArrayType {
+  assertValidArrayCount(count)
   return { element, count }
 }
 
@@ -149,8 +163,15 @@ function computeStructLayout<const T extends readonly StructFieldDef[]>(
   const index = {} as Record<string, number>
   let offset = 0
   let maxAlign = 0
+  const seenNames = new Set<string>()
 
   for (const field of fields) {
+    assertValidFieldName(field.name)
+    if (seenNames.has(field.name)) {
+      throw new Error(`Duplicate WGSL struct field name: ${field.name}`)
+    }
+    seenNames.add(field.name)
+
     const { align, size } = typeAlignAndSize(field.type)
     offset = roundUp(align, offset)
     maxAlign = Math.max(maxAlign, align)
@@ -190,6 +211,12 @@ function computeStructLayout<const T extends readonly StructFieldDef[]>(
  * @param layout - Computed struct layout identifying reserved fields
  */
 function zeroReservedFields(floatView: Float32Array, layout: StructLayout): void {
+  if (floatView.byteLength < layout.totalSize) {
+    throw new Error(
+      `Reserved-field zeroing requires ${layout.totalSize} bytes, got ${floatView.byteLength}`
+    )
+  }
+
   for (const field of layout.fields) {
     if (!field.reserved) continue
     const start = field.offset / 4

@@ -140,6 +140,7 @@ export const CropEditor = () => {
 
           <div className="flex gap-2">
             <Button
+              data-testid="components-overlays-crop-editor-button-142-13"
               size="sm"
               variant="secondary"
               onClick={() => setRatio(16 / 9)}
@@ -148,6 +149,7 @@ export const CropEditor = () => {
               16:9
             </Button>
             <Button
+              data-testid="components-overlays-crop-editor-button-150-13"
               size="sm"
               variant="secondary"
               onClick={() => setRatio(9 / 16)}
@@ -156,6 +158,7 @@ export const CropEditor = () => {
               9:16
             </Button>
             <Button
+              data-testid="components-overlays-crop-editor-button-158-13"
               size="sm"
               variant="secondary"
               onClick={() => setRatio(1)}
@@ -164,6 +167,7 @@ export const CropEditor = () => {
               1:1
             </Button>
             <Button
+              data-testid="components-overlays-crop-editor-button-166-13"
               size="sm"
               variant="secondary"
               onClick={() => setRatio(4 / 5)}
@@ -172,6 +176,7 @@ export const CropEditor = () => {
               4:5
             </Button>
             <Button
+              data-testid="components-overlays-crop-editor-button-174-13"
               size="sm"
               variant="secondary"
               onClick={() => setRatio(2.35)}
@@ -184,6 +189,7 @@ export const CropEditor = () => {
 
         <div className="flex gap-3">
           <Button
+            data-testid="components-overlays-crop-editor-button-186-11"
             onClick={handleCancel}
             tooltip="Discard the crop and exit cinematic mode"
             className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
@@ -193,6 +199,7 @@ export const CropEditor = () => {
             Cancel
           </Button>
           <Button
+            data-testid="components-overlays-crop-editor-button-195-11"
             variant="primary"
             onClick={handleConfirm}
             glow

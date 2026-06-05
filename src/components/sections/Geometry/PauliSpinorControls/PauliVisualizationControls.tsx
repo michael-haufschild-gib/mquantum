@@ -37,6 +37,7 @@ export const PauliVisualizationControls: React.FC<PauliVisualizationControlsProp
     return (
       <div className="space-y-3">
         <ToggleGroup
+          data-testid="components-sections-geometry-pauli-spinor-controls-pauli-visualization-controls-toggle-group-39-9"
           options={[...FIELD_VIEW_OPTIONS]}
           value={fieldView}
           onChange={(v) => onFieldViewChange(v as PauliFieldView)}

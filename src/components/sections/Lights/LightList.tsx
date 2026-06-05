@@ -134,6 +134,7 @@ export const LightList: React.FC<LightListProps> = memo(function LightList({ cla
 
       {/* Add light select - native select has no z-index issues */}
       <Select<LightType | ''>
+        data-testid="components-sections-lights-light-list-select-136-7"
         options={LIGHT_TYPE_OPTIONS}
         value=""
         onChange={handleAddLight}

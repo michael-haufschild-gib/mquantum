@@ -58,6 +58,7 @@ export const CosineGradientEditor: React.FC<CosineGradientEditorProps> = React.m
       <div className={className}>
         {/* Toggle Button */}
         <Button
+          data-testid="components-sections-faces-cosine-gradient-editor-button-60-9"
           variant="secondary"
           size="sm"
           onClick={handleToggleExpand}
@@ -80,6 +81,7 @@ export const CosineGradientEditor: React.FC<CosineGradientEditorProps> = React.m
           <div className="mt-4 space-y-6">
             {/* Reset Button */}
             <Button
+              data-testid="components-sections-faces-cosine-gradient-editor-button-82-13"
               variant="ghost"
               size="sm"
               onClick={handleReset}
@@ -102,6 +104,7 @@ export const CosineGradientEditor: React.FC<CosineGradientEditorProps> = React.m
                   {CHANNEL_LABELS.map((channel, index) => (
                     <div key={channel} className="space-y-1">
                       <Slider
+                        data-testid="components-sections-faces-cosine-gradient-editor-slider-104-23"
                         label={channel}
                         min={0}
                         max={2}

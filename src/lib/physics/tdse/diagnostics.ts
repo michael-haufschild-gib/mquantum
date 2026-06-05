@@ -39,9 +39,11 @@ export interface TdseDiagnosticsSnapshot {
 export function normDriftFromHistory(history: TdseDiagnosticsSnapshot[]): number {
   if (history.length < 2) return 0
   const norm0 = history[0]!.totalNorm
-  if (norm0 === 0) return 0
+  if (!Number.isFinite(norm0) || norm0 <= 0) return 0
   const normN = history[history.length - 1]!.totalNorm
-  return (normN - norm0) / norm0
+  if (!Number.isFinite(normN)) return 0
+  const drift = (normN - norm0) / norm0
+  return Number.isFinite(drift) ? drift : 0
 }
 
 /**
@@ -60,11 +62,18 @@ export function computeReflectionTransmission(
   normRight: number,
   initialNorm?: number
 ): { R: number; T: number } {
-  const denom = initialNorm != null && initialNorm > 0 ? initialNorm : normLeft + normRight
-  if (denom === 0) return { R: 0, T: 0 }
+  const left = Number.isFinite(normLeft) && normLeft > 0 ? normLeft : 0
+  const right = Number.isFinite(normRight) && normRight > 0 ? normRight : 0
+  const denom =
+    initialNorm != null && Number.isFinite(initialNorm) && initialNorm > 0
+      ? initialNorm
+      : left + right
+  if (denom <= 0) return { R: 0, T: 0 }
+  const R = left / denom
+  const T = right / denom
   return {
-    R: normLeft / denom,
-    T: normRight / denom,
+    R: Number.isFinite(R) ? R : 0,
+    T: Number.isFinite(T) ? T : 0,
   }
 }
 

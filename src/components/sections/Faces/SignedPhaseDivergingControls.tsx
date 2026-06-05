@@ -36,6 +36,7 @@ export const SignedPhaseDivergingControls: React.FC = React.memo(() => {
   return (
     <div className="space-y-4">
       <ColorPicker
+        data-testid="components-sections-faces-signed-phase-diverging-controls-color-picker-38-7"
         label="Zero (Neutral)"
         tooltip="Color shown where the wavefunction phase crosses zero."
         value={phaseDiverging.neutralColor}
@@ -44,6 +45,7 @@ export const SignedPhaseDivergingControls: React.FC = React.memo(() => {
       />
 
       <ColorPicker
+        data-testid="components-sections-faces-signed-phase-diverging-controls-color-picker-46-7"
         label="Positive Wing"
         tooltip="Color for positive phase values of the wavefunction."
         value={phaseDiverging.positiveColor}
@@ -52,6 +54,7 @@ export const SignedPhaseDivergingControls: React.FC = React.memo(() => {
       />
 
       <ColorPicker
+        data-testid="components-sections-faces-signed-phase-diverging-controls-color-picker-54-7"
         label="Negative Wing"
         tooltip="Color for negative phase values of the wavefunction."
         value={phaseDiverging.negativeColor}

@@ -95,6 +95,7 @@ export const LightListItem: React.FC<LightListItemProps> = memo(function LightLi
 
   return (
     <div
+      data-testid="components-sections-lights-light-list-item-div-97-5"
       className={`
         flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors
         ${
@@ -130,6 +131,7 @@ export const LightListItem: React.FC<LightListItemProps> = memo(function LightLi
 
       {/* Enable/disable toggle */}
       <Button
+        data-testid="components-sections-lights-light-list-item-button-132-7"
         variant="ghost"
         size="icon"
         onClick={handleToggleClick}
@@ -146,6 +148,7 @@ export const LightListItem: React.FC<LightListItemProps> = memo(function LightLi
 
       {/* Delete button */}
       <Button
+        data-testid="components-sections-lights-light-list-item-button-148-7"
         variant="ghost"
         size="icon"
         onClick={handleRemoveClick}

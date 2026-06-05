@@ -25,11 +25,12 @@
  */
 
 import { execFileSync } from 'node:child_process'
-import { readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, extname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
+const SRC_ROOT = join(ROOT, 'src')
 const BASELINE_PATH = join(ROOT, 'scripts', 'unused-exports-baseline.json')
 
 /**
@@ -56,8 +57,11 @@ const TS_PRUNE_IGNORE = '^src/wasm/mdimension_core/pkg(?:-validator)?(?:/|$)'
  * report.
  */
 const RE_EXPORT_LINE_RE = /^\s*export\s+(?:type\s+)?(?:\*|\{[^}]*\})\s+from\s+['"][^'"]+['"]/
+const IMPORT_SPECIFIER_RE =
+  /(?:import|export)\s+(?:[^'";]*?\s+from\s*)?['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)/g
 
 const sourceCache = new Map()
+let importedModulePaths = null
 
 function readSourceLines(absPath) {
   const cached = sourceCache.get(absPath)
@@ -70,6 +74,66 @@ function readSourceLines(absPath) {
   }
   sourceCache.set(absPath, lines)
   return lines
+}
+
+function toRepoPath(absPath) {
+  return relative(ROOT, absPath).replaceAll('\\', '/')
+}
+
+function listSourceFiles(dir, out = []) {
+  let entries
+  try {
+    entries = readdirSync(dir, { withFileTypes: true })
+  } catch {
+    return out
+  }
+  for (const entry of entries) {
+    if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name === 'coverage') continue
+    const absPath = join(dir, entry.name)
+    if (entry.isDirectory()) {
+      listSourceFiles(absPath, out)
+      continue
+    }
+    const ext = extname(entry.name)
+    if ((ext === '.ts' || ext === '.tsx') && !entry.name.endsWith('.d.ts')) out.push(absPath)
+  }
+  return out
+}
+
+function resolveImportSpecifier(importerAbsPath, specifier) {
+  if (specifier.startsWith('@/')) return resolve(SRC_ROOT, specifier.slice(2))
+  if (specifier.startsWith('.')) return resolve(dirname(importerAbsPath), specifier)
+  return null
+}
+
+function getImportedModulePaths() {
+  if (importedModulePaths !== null) return importedModulePaths
+  importedModulePaths = new Set()
+  for (const absPath of listSourceFiles(SRC_ROOT)) {
+    const text = readFileSync(absPath, 'utf8')
+    for (const match of text.matchAll(IMPORT_SPECIFIER_RE)) {
+      const specifier = match[1] ?? match[2]
+      if (!specifier) continue
+      const resolved = resolveImportSpecifier(absPath, specifier)
+      if (resolved) importedModulePaths.add(toRepoPath(resolved))
+    }
+  }
+  return importedModulePaths
+}
+
+/**
+ * ts-prune does not resolve directory imports to `index.ts(x)`, so after
+ * moving modules from `Foo.tsx` to `Foo/index.tsx`, it reports every export
+ * in that imported module as unused. If some source file imports `Foo` as a
+ * module path, suppress the entry; the failure is resolver noise, not a dead
+ * export signal.
+ */
+function isImportedIndexModule(file) {
+  if (!/\/index\.tsx?$/.test(file)) return false
+  const imports = getImportedModulePaths()
+  const modulePath = file.replace(/\/index\.tsx?$/, '')
+  const indexPath = file.replace(/\.tsx?$/, '')
+  return imports.has(modulePath) || imports.has(indexPath)
 }
 
 /**
@@ -150,6 +214,7 @@ function parseUnused(output) {
       if (!match) return true
       const [, file, lineStr, name] = match
       if (TS_PRUNE_KEYWORD_FALSE_POSITIVES.has(name.trim())) return false
+      if (isImportedIndexModule(file)) return false
       return !isReExportSite(file, Number(lineStr))
     })
 }

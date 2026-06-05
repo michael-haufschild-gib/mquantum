@@ -93,6 +93,28 @@ describe('wavefunctionSliceStore', () => {
     expect(s.sliceSourceMode).toBe('tdseDynamics')
   })
 
+  it('sanitizes non-finite slice payloads without copying valid payloads', () => {
+    const valid = new Float32Array([0, 1, 2])
+    useWavefunctionSliceStore.getState().fulfillCapture({
+      sliceData: valid,
+      axis: 'x',
+      gridSize: 3,
+      worldBound: 2,
+    })
+    expect(useWavefunctionSliceStore.getState().sliceData).toBe(valid)
+
+    useWavefunctionSliceStore.getState().fulfillCapture({
+      sliceData: new Float32Array([1, Number.NaN, Number.POSITIVE_INFINITY, -1]),
+      axis: 'z',
+      gridSize: Number.NaN,
+      worldBound: Number.POSITIVE_INFINITY,
+    })
+    const s = useWavefunctionSliceStore.getState()
+    expect(Array.from(s.sliceData ?? [])).toEqual([1, 0, 0, 0])
+    expect(s.sliceGridSize).toBe(4)
+    expect(s.sliceWorldBound).toBe(1)
+  })
+
   it('reset clears all state', () => {
     useWavefunctionSliceStore.getState().fulfillCapture({
       sliceData: new Float32Array([1, 2, 3]),

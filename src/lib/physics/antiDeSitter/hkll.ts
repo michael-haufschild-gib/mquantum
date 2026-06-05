@@ -78,6 +78,7 @@ const DEFAULT_NTAU = 24
 const DEFAULT_N_PHI_S1 = 32
 const DEFAULT_N_THETA_S2 = 8
 const DEFAULT_N_PHI_S2 = 16
+const MAX_HKLL_SAMPLES = 1_000_000
 
 /** Complex scalar used throughout the reconstruction. */
 export interface ComplexValue {
@@ -123,6 +124,52 @@ export interface BoundaryProfileSpec {
   planeWaveM: number
 }
 
+interface ResolvedHkllParams {
+  params: HkllParams
+  nThetaSamples: number
+  sampleCount: number
+}
+
+function resolveHkllParams(params: HkllParams): ResolvedHkllParams {
+  const { d, delta, nTau, nPhi, nTheta } = params
+  if (!Number.isSafeInteger(d) || d < 3) {
+    throw new Error(`HKLL params.d must be an integer >= 3, got ${d}`)
+  }
+  if (!Number.isFinite(delta) || delta <= 0) {
+    throw new Error(`HKLL params.delta must be finite and positive, got ${delta}`)
+  }
+  if (!Number.isSafeInteger(nTau) || nTau <= 0) {
+    throw new Error(`HKLL params.nTau must be a positive safe integer, got ${nTau}`)
+  }
+  if (!Number.isSafeInteger(nPhi) || nPhi <= 0) {
+    throw new Error(`HKLL params.nPhi must be a positive safe integer, got ${nPhi}`)
+  }
+  if (!Number.isSafeInteger(nTheta) || nTheta < 0 || (d >= 4 && nTheta <= 0)) {
+    throw new Error(`HKLL params.nTheta is invalid for d=${d}: ${nTheta}`)
+  }
+
+  const nThetaSamples = d <= 3 ? 1 : nTheta
+  if (nTau > Math.floor(Number.MAX_SAFE_INTEGER / nThetaSamples)) {
+    throw new Error('HKLL sample count exceeds safe integer range')
+  }
+  const tauTheta = nTau * nThetaSamples
+  if (tauTheta > Math.floor(Number.MAX_SAFE_INTEGER / nPhi)) {
+    throw new Error('HKLL sample count exceeds safe integer range')
+  }
+  const sampleCount = tauTheta * nPhi
+  if (sampleCount > MAX_HKLL_SAMPLES) {
+    throw new Error(`HKLL sample count ${sampleCount} exceeds max ${MAX_HKLL_SAMPLES}`)
+  }
+  return { params: { d, delta, nTau, nPhi, nTheta }, nThetaSamples, sampleCount }
+}
+
+function finiteComplexOrZero(value: ComplexValue): ComplexValue {
+  return {
+    re: Number.isFinite(value.re) ? value.re : 0,
+    im: Number.isFinite(value.im) ? value.im : 0,
+  }
+}
+
 /** Default parameter set derived from the task spec. */
 export function defaultHkllParams(d: number, delta: number): HkllParams {
   if (d <= 3) {
@@ -164,12 +211,22 @@ export function hkllKernel(
   Delta: number,
   d: number
 ): number {
+  if (
+    !Number.isFinite(tau) ||
+    !Number.isFinite(cosOmegaDot) ||
+    !Number.isFinite(rho) ||
+    !Number.isFinite(Delta) ||
+    !Number.isFinite(d)
+  ) {
+    return 0
+  }
   if (rho <= 0 || rho >= Math.PI / 2) return 0
   // σ = −cos(Δt)·sec(ρ) + cos(Ω·Ω')·tan(ρ). Kernel is supported where σ < 0.
   const cosTau = Math.cos(tau)
   const secRho = 1 / Math.cos(rho)
   const tanRho = Math.tan(rho)
-  const sigma = -cosTau * secRho + cosOmegaDot * tanRho
+  const cosDot = Math.max(-1, Math.min(1, cosOmegaDot))
+  const sigma = -cosTau * secRho + cosDot * tanRho
   if (sigma >= 0) return 0
   const neg = -sigma
   // Guard against lightcone divergence; Δ − d is typically negative so
@@ -247,7 +304,7 @@ export function createBoundaryProfile(
     return sampleBoundaryFromBulkEigenstate(spec.n, spec.l, spec.m, spec.delta, spec.d)
   }
   if (spec.mode === 'localized') {
-    const sigma = Math.max(0.01, spec.sourceSigma)
+    const sigma = Number.isFinite(spec.sourceSigma) ? Math.max(0.01, spec.sourceSigma) : 0.3
     const twoSigma2 = 2 * sigma * sigma
     // Spot at θ₀ = π/2, φ₀ = 0. Great-circle distance γ on S² is given by
     // cos(γ) = sin(θ') cos(φ'). For d = 3 the θ' argument is ignored by
@@ -262,7 +319,7 @@ export function createBoundaryProfile(
     }
   }
   // planeWave.
-  const mb = Math.max(0, Math.round(spec.planeWaveM))
+  const mb = Number.isFinite(spec.planeWaveM) ? Math.max(0, Math.round(spec.planeWaveM)) : 0
   return (_t: number, _theta: number, phi: number): ComplexValue => {
     return { re: Math.cos(mb * phi), im: 0 }
   }
@@ -289,13 +346,14 @@ export function reconstructBulk(
   t: number,
   params: HkllParams
 ): ComplexValue {
+  const resolved = resolveHkllParams(params)
   if (rho <= RHO_EPSILON || rho >= Math.PI / 2 - RHO_EPSILON) {
     return { re: 0, im: 0 }
   }
   const tauMax = Math.min(Math.PI / 2 - rho - RHO_EPSILON, Math.PI / 2 - RHO_EPSILON)
   if (tauMax <= 0) return { re: 0, im: 0 }
 
-  const { d, delta, nTau, nPhi, nTheta } = params
+  const { d, delta, nTau, nPhi, nTheta } = resolved.params
   const dTau = (2 * tauMax) / nTau
   const dPhi = (2 * Math.PI) / nPhi
 
@@ -316,7 +374,7 @@ export function reconstructBulk(
         const cosOmegaDot = Math.cos(dphi)
         const K = hkllKernel(tau, cosOmegaDot, rho, delta, d)
         if (K === 0) continue
-        const src = boundaryProfile(t + tau, thetaP, phiP)
+        const src = finiteComplexOrZero(boundaryProfile(t + tau, thetaP, phiP))
         const w = K * dTau * dPhi
         re += w * src.re
         im += w * src.im
@@ -338,7 +396,7 @@ export function reconstructBulk(
         const cosOmegaDot = cosThetaB * cosThetaP + sinThetaB * sinThetaP * Math.cos(phi - phiP)
         const K = hkllKernel(tau, cosOmegaDot, rho, delta, d)
         if (K === 0) continue
-        const src = boundaryProfile(t + tau, thetaP, phiP)
+        const src = finiteComplexOrZero(boundaryProfile(t + tau, thetaP, phiP))
         const w = K * sinThetaP * dTau * dTheta * dPhi
         re += w * src.re
         im += w * src.im
@@ -350,8 +408,7 @@ export function reconstructBulk(
 
 /** Total number of boundary sample points (N_τ · N_Ω). Exposed for UI. */
 export function hkllSampleCount(params: HkllParams): number {
-  const nOmega = params.d <= 3 ? params.nPhi : params.nTheta * params.nPhi
-  return params.nTau * nOmega
+  return resolveHkllParams(params).sampleCount
 }
 
 /**
@@ -381,24 +438,25 @@ export function fillBoundarySampleGrid(
   profile: (t: number, theta: number, phi: number) => ComplexValue,
   params: HkllParams
 ): BoundarySampleGrid {
-  const nTheta = Math.max(1, params.nTheta)
+  const resolved = resolveHkllParams(params)
+  const { params: safeParams, nThetaSamples, sampleCount } = resolved
   const grid: BoundarySampleGrid = {
-    re: new Float32Array(params.nTau * nTheta * params.nPhi),
-    im: new Float32Array(params.nTau * nTheta * params.nPhi),
-    params,
+    re: new Float32Array(sampleCount),
+    im: new Float32Array(sampleCount),
+    params: safeParams,
     tauMax: Math.PI / 2 - RHO_EPSILON,
   }
-  const dTau = (2 * grid.tauMax) / params.nTau
-  const dPhi = (2 * Math.PI) / params.nPhi
-  const dTheta = params.d <= 3 ? 0 : (Math.PI - 2 * RHO_EPSILON) / params.nTheta
-  for (let iτ = 0; iτ < params.nTau; iτ++) {
+  const dTau = (2 * grid.tauMax) / safeParams.nTau
+  const dPhi = (2 * Math.PI) / safeParams.nPhi
+  const dTheta = safeParams.d <= 3 ? 0 : (Math.PI - 2 * RHO_EPSILON) / safeParams.nTheta
+  for (let iτ = 0; iτ < safeParams.nTau; iτ++) {
     const tau = -grid.tauMax + (iτ + 0.5) * dTau
-    for (let iθ = 0; iθ < nTheta; iθ++) {
-      const thetaP = params.d <= 3 ? Math.PI / 2 : RHO_EPSILON + (iθ + 0.5) * dTheta
-      for (let iφ = 0; iφ < params.nPhi; iφ++) {
+    for (let iθ = 0; iθ < nThetaSamples; iθ++) {
+      const thetaP = safeParams.d <= 3 ? Math.PI / 2 : RHO_EPSILON + (iθ + 0.5) * dTheta
+      for (let iφ = 0; iφ < safeParams.nPhi; iφ++) {
         const phiP = (iφ + 0.5) * dPhi
-        const src = profile(tau, thetaP, phiP)
-        const k = (iτ * nTheta + iθ) * params.nPhi + iφ
+        const src = finiteComplexOrZero(profile(tau, thetaP, phiP))
+        const k = (iτ * nThetaSamples + iθ) * safeParams.nPhi + iφ
         grid.re[k] = src.re
         grid.im[k] = src.im
       }
@@ -421,14 +479,25 @@ export function reconstructBulkFromSampleGrid(
   outIm: Float32Array,
   outIdx: number
 ): void {
+  const resolved = resolveHkllParams(grid.params)
+  if (grid.re.length < resolved.sampleCount || grid.im.length < resolved.sampleCount) {
+    throw new Error('HKLL sample grid buffers are smaller than params sample count')
+  }
+  if (
+    !Number.isSafeInteger(outIdx) ||
+    outIdx < 0 ||
+    outIdx >= outRe.length ||
+    outIdx >= outIm.length
+  ) {
+    throw new Error(`HKLL output index ${outIdx} is outside output buffers`)
+  }
   outRe[outIdx] = 0
   outIm[outIdx] = 0
   if (rho <= RHO_EPSILON || rho >= Math.PI / 2 - RHO_EPSILON) return
   const tauMaxLocal = Math.min(Math.PI / 2 - rho - RHO_EPSILON, grid.tauMax)
   if (tauMaxLocal <= 0) return
 
-  const { params } = grid
-  const nTheta = Math.max(1, params.nTheta)
+  const { params, nThetaSamples: nTheta } = resolved
   const dTauGrid = (2 * grid.tauMax) / params.nTau
   const dPhi = (2 * Math.PI) / params.nPhi
   const dTheta = params.d <= 3 ? 1 : (Math.PI - 2 * RHO_EPSILON) / params.nTheta
@@ -465,8 +534,11 @@ export function reconstructBulkFromSampleGrid(
         const measure = params.d <= 3 ? dTauGrid * dPhi : sinThetaP * dTauGrid * dTheta * dPhi
         const weight = K * measure
         const k = (iτ * nTheta + iθ) * params.nPhi + iφ
-        re += weight * grid.re[k]!
-        im += weight * grid.im[k]!
+        const srcRe = grid.re[k]!
+        const srcIm = grid.im[k]!
+        if (!Number.isFinite(srcRe) || !Number.isFinite(srcIm)) continue
+        re += weight * srcRe
+        im += weight * srcIm
       }
     }
   }

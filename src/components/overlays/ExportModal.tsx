@@ -85,6 +85,7 @@ function RenderingView({
       </div>
 
       <Button
+        data-testid="components-overlays-export-modal-button-87-7"
         onClick={onCancel}
         variant="danger"
         size="sm"
@@ -342,6 +343,7 @@ export const ExportModal = () => {
                 </span>
 
                 <ToggleGroup
+                  data-testid="components-overlays-export-modal-toggle-group-344-17"
                   options={[
                     { value: 'in-memory', label: 'Memory' },
                     { value: 'stream', label: 'Stream', disabled: !isStreamAvailable },
@@ -405,6 +407,7 @@ export const ExportModal = () => {
                   </span>
                 </div>
                 <ToggleGroup
+                  data-testid="components-overlays-export-modal-toggle-group-407-17"
                   options={[
                     { value: 'in-memory', label: 'Memory' },
                     { value: 'stream', label: 'Stream', disabled: !isStreamAvailable },
@@ -433,6 +436,7 @@ export const ExportModal = () => {
               {/* Footer Actions */}
               <div className="p-4 lg:p-6 border-t border-border-subtle bg-panel-bg z-10">
                 <Button
+                  data-testid="components-overlays-export-modal-button-435-17"
                   onClick={handleExport}
                   variant="primary"
                   size="lg"

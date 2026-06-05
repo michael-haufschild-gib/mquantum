@@ -50,6 +50,7 @@ const AxisSliders: React.FC<{
   <div className="space-y-1" data-testid={testId}>
     <p className="text-xs text-text-secondary">{label}</p>
     <Slider
+      data-testid="components-sections-geometry-bell-pair-controls-slider-52-5"
       label="θ (polar)"
       min={0}
       max={Math.PI}
@@ -60,6 +61,7 @@ const AxisSliders: React.FC<{
       tooltip={`Polar angle θ for ${label}`}
     />
     <Slider
+      data-testid="components-sections-geometry-bell-pair-controls-slider-62-5"
       label="φ (azimuth)"
       min={0}
       max={TWO_PI}
@@ -84,6 +86,7 @@ const FieldSliders: React.FC<{
     <p className="text-xs text-text-secondary">{label}</p>
     {(['x', 'y', 'z'] as const).map((axisName, i) => (
       <Slider
+        data-testid="components-sections-geometry-bell-pair-controls-slider-86-7"
         key={axisName}
         label={`B${axisName}`}
         min={-FIELD_LIMIT}

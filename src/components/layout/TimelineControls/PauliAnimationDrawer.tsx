@@ -68,6 +68,7 @@ export const PauliAnimationDrawer: React.FC<PauliAnimationDrawerProps> = React.m
         {/* Simulation Speed */}
         <DrawerSection title="Simulation" testId="animation-panel-simulationSpeed">
           <Slider
+            data-testid="components-layout-timeline-controls-pauli-animation-drawer-slider-70-11"
             label="Time Step (dt)"
             min={0.0001}
             max={0.05}
@@ -78,6 +79,7 @@ export const PauliAnimationDrawer: React.FC<PauliAnimationDrawerProps> = React.m
             showValue
           />
           <Slider
+            data-testid="components-layout-timeline-controls-pauli-animation-drawer-slider-80-11"
             label="Steps / Frame"
             min={1}
             max={16}

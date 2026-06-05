@@ -5,6 +5,10 @@
  * Parameters allow user-adjustable ℏ, c, m for pedagogical purposes.
  */
 
+function finiteOrInfinity(value: number): number {
+  return Number.isFinite(value) ? value : Infinity
+}
+
 /**
  * Compton wavelength: λ_C = ℏ/(mc)
  *
@@ -14,8 +18,9 @@
  * @returns Compton wavelength
  */
 export function comptonWavelength(hbar: number, mass: number, c: number): number {
-  if (mass * c === 0) return Infinity
-  return hbar / (mass * c)
+  const denom = mass * c
+  if (!Number.isFinite(hbar) || !Number.isFinite(denom) || denom === 0) return Infinity
+  return finiteOrInfinity(hbar / denom)
 }
 
 /**
@@ -27,8 +32,9 @@ export function comptonWavelength(hbar: number, mass: number, c: number): number
  * @returns ZBW angular frequency
  */
 export function zitterbewegungFrequency(mass: number, c: number, hbar: number): number {
-  if (hbar === 0) return Infinity
-  return (2 * mass * c * c) / hbar
+  const numerator = 2 * mass * c * c
+  if (!Number.isFinite(hbar) || hbar === 0 || !Number.isFinite(numerator)) return Infinity
+  return finiteOrInfinity(numerator / hbar)
 }
 
 /**
@@ -39,7 +45,7 @@ export function zitterbewegungFrequency(mass: number, c: number, hbar: number): 
  * @returns Minimum potential for Klein paradox
  */
 export function kleinThreshold(mass: number, c: number): number {
-  return 2 * mass * c * c
+  return finiteOrInfinity(2 * mass * c * c)
 }
 
 /**
@@ -51,7 +57,10 @@ export function kleinThreshold(mass: number, c: number): number {
  * @returns Relativistic energy
  */
 export function relativisticEnergy(p: number, mass: number, c: number): number {
-  return Math.sqrt((p * c) ** 2 + (mass * c * c) ** 2)
+  const pc = p * c
+  const mc2 = mass * c * c
+  if (!Number.isFinite(pc) || !Number.isFinite(mc2)) return Infinity
+  return Math.hypot(pc, mc2)
 }
 
 /**
@@ -66,7 +75,14 @@ export function relativisticEnergy(p: number, mass: number, c: number): number {
  */
 export function maxStableDt(spacing: number[], c: number): number {
   const n = spacing.length
-  if (n === 0 || c === 0) return Infinity
-  const minSpacing = Math.min(...spacing)
-  return minSpacing / (c * Math.sqrt(n))
+  if (n === 0 || !Number.isFinite(c) || c === 0) return Infinity
+
+  let minSpacing = Infinity
+  for (let i = 0; i < n; i++) {
+    const dx = spacing[i]!
+    if (!Number.isFinite(dx) || dx <= 0) return 0
+    if (dx < minSpacing) minSpacing = dx
+  }
+
+  return finiteOrInfinity(minSpacing / (Math.abs(c) * Math.sqrt(n)))
 }

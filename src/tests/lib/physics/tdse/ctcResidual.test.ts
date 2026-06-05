@@ -86,5 +86,15 @@ describe('computeCtcLoopResidualSample', () => {
       maxDensity: 1,
     })
     expect(invalidAxis).toMatchObject({ rawResidue: 0, displayScalar: 0, mirrorIndex: null })
+
+    const unsafeGrid = computeCtcLoopResidualSample({
+      psi: new Float32Array([1, 0, 0, 0]),
+      gridSize: [2 ** 32],
+      axis: 0,
+      siteIndex: 0,
+      phase: 0,
+      maxDensity: 1,
+    })
+    expect(unsafeGrid).toMatchObject({ rawResidue: 0, displayScalar: 0, mirrorIndex: null })
   })
 })

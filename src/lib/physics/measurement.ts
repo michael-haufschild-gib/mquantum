@@ -50,6 +50,77 @@ export interface DensitySamplingOptions {
 /** Options for metric-aware Gaussian measurement collapse. */
 export type CollapseOptions = DensitySamplingOptions
 
+const MAX_MEASUREMENT_SITES = 2 ** 20
+
+function resolveMeasurementGeometry(
+  caller: string,
+  gridSize: readonly number[],
+  spacing: readonly number[]
+): { latticeDim: number; totalSites: number } {
+  const latticeDim = gridSize.length
+  if (latticeDim === 0) {
+    throw new Error(`${caller}: gridSize must contain at least one dimension`)
+  }
+  if (spacing.length < latticeDim) {
+    throw new Error(`${caller}: spacing length ${spacing.length} < latticeDim ${latticeDim}`)
+  }
+
+  let totalSites = 1
+  for (let d = 0; d < latticeDim; d++) {
+    const size = gridSize[d]!
+    const step = spacing[d]!
+    if (!Number.isSafeInteger(size) || size <= 0) {
+      throw new Error(`${caller}: gridSize[${d}] must be a positive safe integer, got ${size}`)
+    }
+    if (!Number.isFinite(step) || step <= 0) {
+      throw new Error(`${caller}: spacing[${d}] must be a positive finite number, got ${step}`)
+    }
+    if (totalSites > Math.floor(MAX_MEASUREMENT_SITES / size)) {
+      throw new Error(`${caller}: grid product exceeds ${MAX_MEASUREMENT_SITES} sites`)
+    }
+    totalSites *= size
+  }
+  return { latticeDim, totalSites }
+}
+
+function assertWavefunctionShape(
+  caller: string,
+  psiRe: Float32Array,
+  psiIm: Float32Array,
+  expectedSites: number
+): void {
+  if (psiRe.length !== expectedSites) {
+    throw new Error(`${caller}: psiRe length ${psiRe.length} !== grid product ${expectedSites}`)
+  }
+  if (psiIm.length !== expectedSites) {
+    throw new Error(`${caller}: psiIm length ${psiIm.length} !== grid product ${expectedSites}`)
+  }
+}
+
+function assertFiniteAmplitude(caller: string, re: number, im: number, index: number): void {
+  if (!Number.isFinite(re) || !Number.isFinite(im)) {
+    throw new Error(`${caller}: non-finite wavefunction amplitude at index ${index}`)
+  }
+}
+
+function assertFiniteVector(caller: string, values: readonly number[], length: number): void {
+  if (values.length < length) {
+    throw new Error(`${caller}: vector length ${values.length} < latticeDim ${length}`)
+  }
+  for (let d = 0; d < length; d++) {
+    if (!Number.isFinite(values[d]!)) {
+      throw new Error(`${caller}: vector[${d}] must be finite, got ${values[d]}`)
+    }
+  }
+}
+
+function resolveCollapseSigmaSquared(caller: string, sigma: number): number {
+  if (!Number.isFinite(sigma) || sigma < 0) {
+    throw new Error(`${caller}: sigma must be a finite non-negative number, got ${sigma}`)
+  }
+  return Math.max(sigma * sigma, 1e-8)
+}
+
 function linearIndexToPosition(
   linearIndex: number,
   gridSize: readonly number[],
@@ -142,8 +213,12 @@ export function normalizeWavefunctionInSamplingMeasure(
   spacing: number[],
   options?: DensitySamplingOptions
 ): void {
-  const latticeDim = gridSize.length
-  const totalSites = psiRe.length
+  const { latticeDim, totalSites } = resolveMeasurementGeometry(
+    'normalizeWavefunctionInSamplingMeasure',
+    gridSize,
+    spacing
+  )
+  assertWavefunctionShape('normalizeWavefunctionInSamplingMeasure', psiRe, psiIm, totalSites)
   const positionScratch = new Array<number>(latticeDim)
   const metricScratch: MetricSample = {
     gInverseDiag: new Array<number>(latticeDim),
@@ -153,6 +228,7 @@ export function normalizeWavefunctionInSamplingMeasure(
   for (let i = 0; i < totalSites; i++) {
     const re = psiRe[i]!
     const im = psiIm[i]!
+    assertFiniteAmplitude('normalizeWavefunctionInSamplingMeasure', re, im, i)
     const volumeWeight = metricVolumeWeight(
       i,
       gridSize,
@@ -194,8 +270,12 @@ export function sampleFromDensity(
   spacing: number[],
   options?: DensitySamplingOptions
 ): MeasurementResult {
-  const latticeDim = gridSize.length
-  const totalSites = psiRe.length
+  const { latticeDim, totalSites } = resolveMeasurementGeometry(
+    'sampleFromDensity',
+    gridSize,
+    spacing
+  )
+  assertWavefunctionShape('sampleFromDensity', psiRe, psiIm, totalSites)
   const positionScratch = new Array<number>(latticeDim)
   const metricScratch: MetricSample = {
     gInverseDiag: new Array<number>(latticeDim),
@@ -208,6 +288,7 @@ export function sampleFromDensity(
   for (let i = 0; i < totalSites; i++) {
     const re = psiRe[i]!
     const im = psiIm[i]!
+    assertFiniteAmplitude('sampleFromDensity', re, im, i)
     const density = re * re + im * im
     const volumeWeight = metricVolumeWeight(
       i,
@@ -274,8 +355,15 @@ export function sampleFromMarginalDensity(
   axis: number,
   options?: DensitySamplingOptions
 ): PartialMeasurementResult {
-  const latticeDim = gridSize.length
-  const totalSites = psiRe.length
+  const { latticeDim, totalSites } = resolveMeasurementGeometry(
+    'sampleFromMarginalDensity',
+    gridSize,
+    spacing
+  )
+  assertWavefunctionShape('sampleFromMarginalDensity', psiRe, psiIm, totalSites)
+  if (!Number.isInteger(axis) || axis < 0 || axis >= latticeDim) {
+    throw new Error(`sampleFromMarginalDensity: axis must be in [0, ${latticeDim}), got ${axis}`)
+  }
   const axisSize = gridSize[axis]!
   const positionScratch = new Array<number>(latticeDim)
   const metricScratch: MetricSample = {
@@ -290,6 +378,7 @@ export function sampleFromMarginalDensity(
   for (let i = 0; i < totalSites; i++) {
     const re = psiRe[i]!
     const im = psiIm[i]!
+    assertFiniteAmplitude('sampleFromMarginalDensity', re, im, i)
     const density = re * re + im * im
     const volumeWeight = metricVolumeWeight(
       i,
@@ -365,7 +454,23 @@ export function computeFullCollapse(
   compactDims?: boolean[],
   options?: CollapseOptions
 ): [Float32Array, Float32Array] {
-  const latticeDim = gridSize.length
+  const { latticeDim, totalSites: expectedSites } = resolveMeasurementGeometry(
+    'computeFullCollapse',
+    gridSize,
+    spacing
+  )
+  if (!Number.isSafeInteger(totalSites) || totalSites <= 0) {
+    throw new Error(
+      `computeFullCollapse: totalSites must be a positive safe integer, got ${totalSites}`
+    )
+  }
+  if (totalSites !== expectedSites) {
+    throw new Error(
+      `computeFullCollapse: totalSites ${totalSites} !== grid product ${expectedSites}`
+    )
+  }
+  assertFiniteVector('computeFullCollapse: center', center, latticeDim)
+  const sigma2 = resolveCollapseSigmaSquared('computeFullCollapse', sigma)
   const metricAxisWeights = metricAxisWeightsAt(center, latticeDim, options)
 
   if (isAnimationWasmReady() && !metricAxisWeights) {
@@ -385,7 +490,6 @@ export function computeFullCollapse(
 
   const psiRe = new Float32Array(totalSites)
   const psiIm = new Float32Array(totalSites)
-  const sigma2 = Math.max(sigma * sigma, 1e-8)
 
   for (let i = 0; i < totalSites; i++) {
     let dist2 = 0
@@ -438,8 +542,16 @@ export function computePartialCollapse(
   axisCompact?: boolean,
   options?: CollapseOptions
 ): [Float32Array, Float32Array] {
-  const latticeDim = gridSize.length
-  const totalSites = psiRe.length
+  const { latticeDim, totalSites } = resolveMeasurementGeometry(
+    'computePartialCollapse',
+    gridSize,
+    spacing
+  )
+  assertWavefunctionShape('computePartialCollapse', psiRe, psiIm, totalSites)
+  const sigma2 = resolveCollapseSigmaSquared('computePartialCollapse', sigma)
+  if (!Number.isFinite(axisPosition)) {
+    throw new Error(`computePartialCollapse: axisPosition must be finite, got ${axisPosition}`)
+  }
   const curvedMetric = usesCurvedMetric(options)
 
   if (!Number.isInteger(axis) || axis < 0 || axis >= latticeDim) {
@@ -461,7 +573,6 @@ export function computePartialCollapse(
   }
   const axisSize = gridSize[axis]!
   const axisSpacing = spacing[axis]!
-  const sigma2 = Math.max(sigma * sigma, 1e-8)
   const axisL = axisSize * axisSpacing
 
   // Pre-compute 1D Gaussian envelope for the measured axis
@@ -484,6 +595,7 @@ export function computePartialCollapse(
   }
 
   for (let i = 0; i < totalSites; i++) {
+    assertFiniteAmplitude('computePartialCollapse', psiRe[i]!, psiIm[i]!, i)
     const axisCoord = extractAxisCoord(i, gridSize, axis, latticeDim)
     let g = envelope?.[axisCoord]
     if (g === undefined) {

@@ -86,6 +86,13 @@ export interface KSpaceBasisCoefs {
 /** Identity basis coefficients — the Minkowski short-circuit. */
 const MINKOWSKI_BASIS_COEFS: KSpaceBasisCoefs = { aKinetic: 1, aPotential: 1 }
 
+const MAX_K_SPACE_TOTAL_SITES = 2 ** 20
+
+interface KSpaceShape {
+  activeDims: number[]
+  totalSites: number
+}
+
 /**
  * Validate the `dispersion` and `basisCoefs` inputs common to every
  * public entry point in this module. `dispersion` must be either the
@@ -142,6 +149,43 @@ function validateVacuumInputs(
   }
 }
 
+function validateKSpaceShape(
+  gridSize: readonly number[],
+  spacing: readonly number[],
+  latticeDim: number
+): KSpaceShape {
+  if (!Number.isSafeInteger(latticeDim) || latticeDim < 1 || latticeDim > gridSize.length) {
+    throw new Error(`latticeDim must be an integer in [1, ${gridSize.length}], got ${latticeDim}`)
+  }
+  if (spacing.length < latticeDim) {
+    throw new Error(`spacing must provide at least ${latticeDim} entries, got ${spacing.length}`)
+  }
+
+  const activeDims = new Array<number>(latticeDim)
+  let totalSites = 1
+  for (let d = 0; d < latticeDim; d++) {
+    const n = gridSize[d]
+    if (typeof n !== 'number' || !Number.isSafeInteger(n) || n < 1 || n > MAX_K_SPACE_TOTAL_SITES) {
+      throw new Error(
+        `gridSize[${d}] must be a positive integer within k-space FFT budget, got ${n}`
+      )
+    }
+    const a = spacing[d]!
+    if (!Number.isFinite(a) || a <= 0) {
+      throw new Error(`spacing[${d}] must be a finite positive number, got ${a}`)
+    }
+    totalSites *= n
+    if (!Number.isSafeInteger(totalSites) || totalSites > MAX_K_SPACE_TOTAL_SITES) {
+      throw new Error(
+        `active grid totalSites exceeds k-space FFT budget ${MAX_K_SPACE_TOTAL_SITES}, got ${totalSites}`
+      )
+    }
+    activeDims[d] = n
+  }
+
+  return { activeDims, totalSites }
+}
+
 /**
  * Compute raw k-space occupation data from real-space phi and pi fields.
  * This is the physics stage — FFT + n_k computation with no display transforms.
@@ -184,28 +228,8 @@ export function computeRawKSpaceData(
   dispersion: VacuumDispersion = 'kgFloor',
   basisCoefs: KSpaceBasisCoefs = MINKOWSKI_BASIS_COEFS
 ): KSpaceRawData {
-  if (!Number.isInteger(latticeDim) || latticeDim < 1 || latticeDim > gridSize.length) {
-    throw new Error(`latticeDim must be an integer in [1, ${gridSize.length}], got ${latticeDim}`)
-  }
+  const { activeDims, totalSites } = validateKSpaceShape(gridSize, spacing, latticeDim)
   validateVacuumInputs(dispersion, basisCoefs, latticeDim)
-
-  const activeDims = gridSize.slice(0, latticeDim)
-  const totalSites = activeDims.reduce((a, b) => a * b, 1)
-
-  if (spacing.length < latticeDim) {
-    throw new Error(`spacing must provide at least ${latticeDim} entries, got ${spacing.length}`)
-  }
-
-  for (let d = 0; d < latticeDim; d++) {
-    const n = activeDims[d]!
-    if (!Number.isInteger(n) || n < 1) {
-      throw new Error(`gridSize[${d}] must be a positive integer, got ${n}`)
-    }
-    const a = spacing[d]!
-    if (!Number.isFinite(a) || a <= 0) {
-      throw new Error(`spacing[${d}] must be a finite positive number, got ${a}`)
-    }
-  }
 
   if (!Number.isFinite(mass)) {
     throw new Error(`mass must be finite, got ${mass}`)
@@ -274,28 +298,8 @@ export function computeRawKSpaceDataFromComplex(
   dispersion: VacuumDispersion = 'kgFloor',
   basisCoefs: KSpaceBasisCoefs = MINKOWSKI_BASIS_COEFS
 ): KSpaceRawData {
-  if (!Number.isInteger(latticeDim) || latticeDim < 1 || latticeDim > gridSize.length) {
-    throw new Error(`latticeDim must be an integer in [1, ${gridSize.length}], got ${latticeDim}`)
-  }
+  const { activeDims, totalSites } = validateKSpaceShape(gridSize, spacing, latticeDim)
   validateVacuumInputs(dispersion, basisCoefs, latticeDim)
-
-  const activeDims = gridSize.slice(0, latticeDim)
-  const totalSites = activeDims.reduce((a, b) => a * b, 1)
-
-  if (spacing.length < latticeDim) {
-    throw new Error(`spacing must provide at least ${latticeDim} entries, got ${spacing.length}`)
-  }
-
-  for (let d = 0; d < latticeDim; d++) {
-    const n = activeDims[d]!
-    if (!Number.isInteger(n) || n < 1) {
-      throw new Error(`gridSize[${d}] must be a positive integer, got ${n}`)
-    }
-    const a = spacing[d]!
-    if (!Number.isFinite(a) || a <= 0) {
-      throw new Error(`spacing[${d}] must be a finite positive number, got ${a}`)
-    }
-  }
 
   if (!Number.isFinite(mass)) {
     throw new Error(`mass must be finite, got ${mass}`)

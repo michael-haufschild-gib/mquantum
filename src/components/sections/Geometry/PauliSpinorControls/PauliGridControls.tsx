@@ -94,6 +94,7 @@ export const PauliGridControls: React.FC<PauliGridControlsProps> = React.memo(
         {/* Spacing per dimension */}
         {Array.from({ length: latticeDim }, (_, d) => (
           <Slider
+            data-testid="components-sections-geometry-pauli-spinor-controls-pauli-grid-controls-slider-96-11"
             key={`spacing-${d}`}
             label={`Spacing Δ${AXIS_LABELS[d] ?? d}`}
             tooltip="Distance between adjacent lattice points. Smaller spacing resolves finer wavefunction features but reduces the total domain size."
@@ -111,6 +112,7 @@ export const PauliGridControls: React.FC<PauliGridControlsProps> = React.memo(
 
         {/* Time stepping */}
         <Slider
+          data-testid="components-sections-geometry-pauli-spinor-controls-pauli-grid-controls-slider-113-9"
           label="Time Step dt"
           tooltip="Integration time step. Smaller values improve accuracy but slow evolution. Too large may cause numerical instability."
           value={dt}
@@ -121,6 +123,7 @@ export const PauliGridControls: React.FC<PauliGridControlsProps> = React.memo(
         />
 
         <Slider
+          data-testid="components-sections-geometry-pauli-spinor-controls-pauli-grid-controls-slider-123-9"
           label="Steps / Frame"
           tooltip="Number of integration steps computed per animation frame. Higher values evolve the simulation faster."
           value={stepsPerFrame}
@@ -132,6 +135,7 @@ export const PauliGridControls: React.FC<PauliGridControlsProps> = React.memo(
 
         {/* Physical constants */}
         <Slider
+          data-testid="components-sections-geometry-pauli-spinor-controls-pauli-grid-controls-slider-134-9"
           label="ℏ (Planck)"
           tooltip="Reduced Planck constant. Controls the quantum-to-classical ratio — smaller ℏ approaches classical behavior."
           value={hbar}
@@ -142,6 +146,7 @@ export const PauliGridControls: React.FC<PauliGridControlsProps> = React.memo(
         />
 
         <Slider
+          data-testid="components-sections-geometry-pauli-spinor-controls-pauli-grid-controls-slider-144-9"
           label="Mass m"
           tooltip="Particle mass in natural units. Affects wavepacket dispersion; Zeeman splitting is controlled by the effective field strength."
           value={mass}

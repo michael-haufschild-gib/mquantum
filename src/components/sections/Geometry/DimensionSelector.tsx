@@ -160,12 +160,14 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = React.memo(
         <div className="relative group">
           {canScrollLeft && (
             <div
+              data-testid="components-sections-geometry-dimension-selector-div-162-13"
               className="absolute start-0 top-0 bottom-0 z-20 flex items-center"
               onPointerDown={handlePreventDefault}
               onMouseDown={handlePreventDefault}
               title="Stops the dimension list from scrolling on edge press"
             >
               <Button
+                data-testid="components-sections-geometry-dimension-selector-button-168-15"
                 variant="ghost"
                 size="icon"
                 onClick={scrollLeft}
@@ -194,12 +196,14 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = React.memo(
 
           {canScrollRight && (
             <div
+              data-testid="components-sections-geometry-dimension-selector-div-196-13"
               className="absolute end-0 top-0 bottom-0 z-20 flex items-center"
               onPointerDown={handlePreventDefault}
               onMouseDown={handlePreventDefault}
               title="Stops the dimension list from scrolling on edge press"
             >
               <Button
+                data-testid="components-sections-geometry-dimension-selector-button-202-15"
                 variant="ghost"
                 size="icon"
                 onClick={scrollRight}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { DEFAULT_KSPACE_VIZ, PASSTHROUGH_KSPACE_VIZ } from '@/lib/geometry/extended/types'
+import { MAX_KSPACE_DISPLAY_GRID_SIZE } from '@/lib/physics/freeScalar/kSpaceDisplayGrid'
 import type { KSpaceRawData } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import { computeRawKSpaceData, OUTPUT_GRID_SIZE } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import {
@@ -228,6 +229,17 @@ describe('buildRadialDisplayGrid', () => {
     expect(grid.nk.length).toBe(OUTPUT_GRID_SIZE ** 3)
     expect(grid.kNorm.length).toBe(OUTPUT_GRID_SIZE ** 3)
     expect(grid.omegaNorm.length).toBe(OUTPUT_GRID_SIZE ** 3)
+  })
+
+  it('falls back to the shared output size for unsafe cubic grid requests', () => {
+    const raw = makePlaneWaveRawData(4)
+    const config = { ...DEFAULT_KSPACE_VIZ, displayMode: 'radial3d' as const }
+    const grid = buildRadialDisplayGrid(raw, config, MAX_KSPACE_DISPLAY_GRID_SIZE + 1)
+
+    expect(grid.nk.length).toBe(OUTPUT_GRID_SIZE ** 3)
+    expect(grid.kNorm.length).toBe(OUTPUT_GRID_SIZE ** 3)
+    expect(grid.omegaNorm.length).toBe(OUTPUT_GRID_SIZE ** 3)
+    expect(grid.nkOmega.length).toBe(OUTPUT_GRID_SIZE ** 3)
   })
 
   it('isotropic input produces radially symmetric shell means', () => {

@@ -55,6 +55,7 @@ export const MagneticFieldControls: React.FC<MagneticFieldControlsProps> = React
     return (
       <div className="space-y-3">
         <Select
+          data-testid="components-sections-geometry-pauli-spinor-controls-magnetic-field-controls-select-57-9"
           label="Field Type"
           tooltip="Spatial profile of the effective Zeeman field. Magnetic orbital motion is not included in this spin-only Pauli mode."
           options={FIELD_TYPE_OPTIONS}
@@ -63,6 +64,7 @@ export const MagneticFieldControls: React.FC<MagneticFieldControlsProps> = React
         />
 
         <Slider
+          data-testid="components-sections-geometry-pauli-spinor-controls-magnetic-field-controls-slider-65-9"
           label="Field Strength B₀"
           tooltip="Magnitude of the effective Zeeman coupling. Higher values increase the Larmor precession frequency ω_L = 2B₀/ℏ in this convention."
           value={fieldStrength}
@@ -73,6 +75,7 @@ export const MagneticFieldControls: React.FC<MagneticFieldControlsProps> = React
         />
 
         <Slider
+          data-testid="components-sections-geometry-pauli-spinor-controls-magnetic-field-controls-slider-75-9"
           label="Field θ (polar)"
           tooltip="Polar angle of the magnetic field direction. 0 = along +z (standard quantization axis)."
           value={fieldDirection[0]}
@@ -83,6 +86,7 @@ export const MagneticFieldControls: React.FC<MagneticFieldControlsProps> = React
         />
 
         <Slider
+          data-testid="components-sections-geometry-pauli-spinor-controls-magnetic-field-controls-slider-85-9"
           label="Field φ (azimuthal)"
           tooltip="Azimuthal angle of the magnetic field direction in the x-y plane."
           value={fieldDirection[1]}
@@ -94,6 +98,7 @@ export const MagneticFieldControls: React.FC<MagneticFieldControlsProps> = React
 
         {(fieldType === 'gradient' || fieldType === 'quadrupole') && (
           <Slider
+            data-testid="components-sections-geometry-pauli-spinor-controls-magnetic-field-controls-slider-96-11"
             label={fieldType === 'quadrupole' ? 'Quadrupole Strength g' : "Gradient Strength b'"}
             tooltip={
               fieldType === 'quadrupole'
@@ -110,6 +115,7 @@ export const MagneticFieldControls: React.FC<MagneticFieldControlsProps> = React
 
         {fieldType === 'rotating' && (
           <Slider
+            data-testid="components-sections-geometry-pauli-spinor-controls-magnetic-field-controls-slider-112-11"
             label="Rotation Frequency ω"
             tooltip="Angular frequency of the rotating magnetic field component. Resonance occurs when ω matches the Larmor frequency."
             value={rotatingFrequency}

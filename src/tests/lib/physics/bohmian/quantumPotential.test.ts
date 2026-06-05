@@ -278,6 +278,28 @@ describe('computeQuantumPotentialCpu — input validation', () => {
     expect(() => computeQuantumPotentialCpu(rho, 3, 0)).toThrow(/positive/)
     expect(() => computeQuantumPotentialCpu(rho, 3, -1)).toThrow(/positive/)
   })
+
+  it('rejects grid cubes that exceed the supported typed-array contract', () => {
+    expect(() => computeQuantumPotentialCpu(new Float32Array(1), 102, 1)).toThrow(
+      /gridSize³ exceeds/
+    )
+    expect(() => computeQuantumPotentialCpu(new Float32Array(1), 2000, 1)).toThrow(
+      /gridSize³ exceeds/
+    )
+  })
+
+  it('rejects non-finite density samples before stencil math', () => {
+    const rho = new Float32Array(27).fill(0.1)
+    rho[13] = Number.NaN
+    expect(() => computeQuantumPotentialCpu(rho, 3, 1)).toThrow(/densityGrid\[13\]/)
+    rho[13] = Number.POSITIVE_INFINITY
+    expect(() => computeQuantumPotentialCpu(rho, 3, 1)).toThrow(/densityGrid\[13\]/)
+  })
+
+  it('rejects overflowing world-space step size', () => {
+    const rho = new Float32Array(27).fill(0.1)
+    expect(() => computeQuantumPotentialCpu(rho, 3, Number.MAX_VALUE)).toThrow(/grid step/)
+  })
 })
 
 describe('computeQuantumPotential1DCpu — 1D HO first excited state', () => {

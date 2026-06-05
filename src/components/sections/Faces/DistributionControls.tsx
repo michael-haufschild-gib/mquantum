@@ -50,6 +50,7 @@ export const DistributionControls: React.FC<DistributionControlsProps> = React.m
         <div className="text-sm font-medium text-text-secondary mb-2">Distribution</div>
 
         <Slider
+          data-testid="components-sections-faces-distribution-controls-slider-52-9"
           label="Power"
           min={0.25}
           max={4}
@@ -61,6 +62,7 @@ export const DistributionControls: React.FC<DistributionControlsProps> = React.m
         />
 
         <Slider
+          data-testid="components-sections-faces-distribution-controls-slider-63-9"
           label="Cycles"
           min={0.5}
           max={5}
@@ -72,6 +74,7 @@ export const DistributionControls: React.FC<DistributionControlsProps> = React.m
         />
 
         <Slider
+          data-testid="components-sections-faces-distribution-controls-slider-74-9"
           label="Offset"
           min={0}
           max={1}

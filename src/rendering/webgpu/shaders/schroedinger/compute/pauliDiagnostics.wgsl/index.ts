@@ -1,0 +1,1 @@
+export * from './pauliDiagnostics.wgsl'

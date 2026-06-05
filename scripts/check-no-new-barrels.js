@@ -93,12 +93,21 @@ function isPureBarrel(absPath) {
   return !inExportBlock
 }
 
+// Shader source folders use `foo.wgsl/index.ts` wrappers to preserve the
+// `foo.wgsl` import identity after one-file-folder migration. Those are
+// narrow source adapters, not the general-purpose API barrels this ratchet
+// is meant to reject.
+function isShaderWrapperIndex(repoPath) {
+  return /\.wgsl\/index\.ts$/.test(repoPath)
+}
+
 const args = process.argv.slice(2)
 const updateMode = args.includes('--update')
 
 const barrels = []
 for (const path of walk(SRC)) {
-  if (isPureBarrel(path)) barrels.push(relative(ROOT, path).split(sep).join('/'))
+  const repoPath = relative(ROOT, path).split(sep).join('/')
+  if (isPureBarrel(path) && !isShaderWrapperIndex(repoPath)) barrels.push(repoPath)
 }
 barrels.sort()
 

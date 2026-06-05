@@ -1,0 +1,630 @@
+/**
+ * Strategy for TDSE dynamics and BEC dynamics quantum modes.
+ *
+ * BEC is implemented as TDSE with a config adapter that maps BEC-specific
+ * parameters (Thomas-Fermi, vortex, soliton) to the shared TDSE compute pass.
+ *
+ * @module rendering/webgpu/renderers/strategies/TdseBecStrategy
+ */
+
+import type { BecConfig } from '@/lib/geometry/extended/bec'
+import type { TdseConfig } from '@/lib/geometry/extended/tdse'
+import { logger } from '@/lib/logger'
+import { healingLength, soundSpeed, thomasFermiRadius } from '@/lib/physics/bec/chemicalPotential'
+import { resolveBecMass } from '@/lib/physics/bec/waterfallParams'
+import { computeEffectiveSpacing } from '@/lib/physics/compactification'
+import { isCoordinateEntanglementMetricSupported } from '@/lib/physics/coordinateEntanglement'
+import type {
+  EntanglementWorkerRequest,
+  EntanglementWorkerResponse,
+} from '@/lib/physics/coordinateEntanglement.worker'
+import { computeTdseEffectiveSpacing } from '@/lib/physics/tdse/effectiveSpacing'
+import { useCoordinateEntanglementStore } from '@/stores/diagnostics/coordinateEntanglementStore'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { useWavefunctionSliceStore } from '@/stores/diagnostics/wavefunctionSliceStore'
+import { useSimulationStateStore } from '@/stores/runtime/simulationStateStore'
+
+import type { WebGPURenderContext, WebGPUSetupContext } from '../../../core/types'
+import { TDSEComputePass } from '../../../passes/TDSEComputePass'
+import type { SchroedingerWGSLShaderConfig } from '../../../shaders/schroedinger/compose'
+import type { SchrodingerRendererConfig } from '../../schrodingerRendererTypes'
+import {
+  type AnimationState,
+  type AppearanceStoreState,
+  type ExtendedStoreSnapshot,
+  getStoreSnapshot,
+} from '../../schrodingerRendererTypes'
+import {
+  applySharedPml,
+  computeLatticeBoundingRadius,
+  createDensityTextureBindings,
+  handleSimulationStateIO,
+} from '../computeGridUtils'
+import { buildBecConfig } from '../TdseBecConfigBuilder'
+import { getCurrentEigenstateEnergy, handleMeasurement } from '../TdseBecMeasurement'
+import {
+  createBecSpectrumWorkerState,
+  dispatchBecSpectrumComputation,
+  invalidateBecSpectrumWorkerState,
+} from '../TdseBecSpectrumWorker'
+import { applyIslandOverlay } from '../tdseIslandOverlay'
+import type {
+  ModeFrameContext,
+  ModeSetupResult,
+  QuantumModeStrategy,
+  SchroedingerSnapshot,
+} from '../types'
+
+/** Interval (in diagnostic cycles) between spectrum computations. */
+const SPECTRUM_INTERVAL = 4
+
+/** Interval (in frames) between entanglement readbacks. */
+const ENTANGLEMENT_DECIMATION = 10
+
+function computeBecEffectiveTrapOmega(
+  omega: number,
+  anisotropy: readonly number[],
+  latDim: number
+): number {
+  if (!Number.isFinite(omega) || omega <= 0 || !Number.isInteger(latDim) || latDim <= 0) {
+    return 0
+  }
+
+  let logSum = 0
+  for (let d = 0; d < latDim; d++) {
+    const effectiveOmega = omega * (anisotropy[d] ?? 1.0)
+    if (!Number.isFinite(effectiveOmega) || effectiveOmega <= 0) return 0
+    logSum += Math.log(effectiveOmega)
+  }
+
+  return Math.exp(logSum / latDim)
+}
+
+/** Strategy for TDSE and BEC dynamics modes using split-operator compute dispatch. */
+export class TdseBecStrategy implements QuantumModeStrategy {
+  readonly isComputeMode = true
+
+  private tdsePass: TDSEComputePass | null = null
+  /**
+   * True once this strategy's compute pass has been moved to a successor via
+   * `adoptComputeState`. The warm-swap flow (see `scenePassSetup.warmSwap...`)
+   * leaves the predecessor renderer in the graph for a few frames while the
+   * new pipeline finishes compiling asynchronously. During that window the
+   * predecessor's `executeFrame` would otherwise hit `tdsePass=null`, warn, and
+   * skip silently. This flag tells it to skip without warning and tells
+   * `dispose` that the GPU resources have already been handed off.
+   */
+  private transferredOut = false
+  /** Counter for throttling spectrum computation (every SPECTRUM_INTERVAL diag cycles). */
+  private spectrumCounter = 0
+  /** Frame counter for entanglement readback decimation. */
+  private entanglementFrameCounter = 0
+  /** Guard to prevent overlapping entanglement readbacks. */
+  private entanglementInFlight = false
+  /** Web Worker for entanglement computation (lazy-initialized). */
+  private entanglementWorker: Worker | null = null
+  /** Epoch counter for entanglement worker results ordering. */
+  private entanglementEpoch = 0
+  /** BEC incompressible spectrum worker state (worker, epoch, in-flight, disposed). */
+  private readonly spectrumWorkerState = createBecSpectrumWorkerState()
+  /** Set on dispose to prevent late async callbacks from resurrecting resources. */
+  private disposed = false
+  private becConfigCache: {
+    bec: BecConfig
+    version: number | undefined
+    needsReset: boolean | undefined
+    absorberEnabled: boolean | undefined
+    absorberWidth: number | undefined
+    pmlTargetReflection: number | undefined
+    autoScaleMaxGain: number | undefined
+    result: { config: TdseConfig }
+  } | null = null
+
+  configureShader(_shader: SchroedingerWGSLShaderConfig, _config: SchrodingerRendererConfig): void {
+    // Compute mode overrides applied by renderer constructor
+  }
+
+  setup(ctx: WebGPUSetupContext, config: SchrodingerRendererConfig): ModeSetupResult {
+    // Dormancy guard: if this strategy was previously the source of a
+    // warm-swap transfer (adoptComputeState set `transferredOut = true` and
+    // nulled out `tdsePass`), we must not silently allocate a brand-new
+    // compute pass here. The successor owns the adopted state; resurrecting
+    // this instance would run a parallel integrator with a duplicate density
+    // texture and every downstream consumer would race over which view is
+    // live. Re-assert the dormant flag so `executeFrame` keeps its silent
+    // skip, clear the warning latches so a future re-use starts fresh, and
+    // return an empty bindings set — there is no texture view to hand to
+    // the render graph because we relinquished it.
+    if (this.transferredOut && !this.tdsePass) {
+      this.warnedTdsePassNull = false
+      this.warnedDensityNull = false
+      logger.log('[TdseBecStrategy] setup skipped: strategy is transferred-out (dormant)')
+      const emptyBindings = createDensityTextureBindings(ctx.device, null)
+      return { initPromises: [], ...emptyBindings }
+    }
+
+    // Normal fresh-setup or resume-after-adoption path.
+    this.transferredOut = false
+    this.warnedTdsePassNull = false
+    this.warnedDensityNull = false
+    if (!this.tdsePass) {
+      this.tdsePass = new TDSEComputePass(config.densityGridResolution)
+      this.tdsePass.initializeDensityTexture(ctx.device)
+    }
+    logger.log(
+      `[TdseBecStrategy] setup densityView=${this.tdsePass.getDensityTextureView()?.label ?? 'null'}`
+    )
+
+    const bindings = createDensityTextureBindings(
+      ctx.device,
+      this.tdsePass.getDensityTextureView() ?? null
+    )
+    return { initPromises: [], ...bindings }
+  }
+
+  computeBoundingRadius(
+    schroedinger: SchroedingerSnapshot,
+    _dimension: number,
+    config: SchrodingerRendererConfig
+  ): number | null {
+    const latticeConfig =
+      config.quantumMode === 'becDynamics' ? schroedinger.bec : schroedinger.tdse
+    if (!latticeConfig) return null
+    const latDim = latticeConfig.latticeDim ?? 3
+    const effSpacing =
+      'metric' in latticeConfig
+        ? computeTdseEffectiveSpacing({
+            gridSize: latticeConfig.gridSize ?? [32],
+            spacing: latticeConfig.spacing ?? [0.1],
+            compactDims: latticeConfig.compactDims as boolean[] | undefined,
+            compactRadii: latticeConfig.compactRadii as number[] | undefined,
+            latticeDim: latDim,
+            metric: latticeConfig.metric as TdseConfig['metric'],
+          })
+        : computeEffectiveSpacing(
+            latticeConfig.gridSize ?? [32],
+            latticeConfig.spacing ?? [0.1],
+            latticeConfig.compactDims as boolean[] | undefined,
+            latticeConfig.compactRadii as number[] | undefined,
+            latDim
+          )
+    return computeLatticeBoundingRadius(latDim, latticeConfig.gridSize ?? [32], effSpacing)
+  }
+
+  private warnedTdsePassNull = false
+  private warnedDensityNull = false
+
+  private buildBecConfigForFrame(
+    bec: BecConfig,
+    schroedinger: ExtendedStoreSnapshot['schroedinger'],
+    version: number | undefined
+  ): { config: TdseConfig } {
+    const needsReset = bec.needsReset
+    const absorberEnabled = schroedinger?.absorberEnabled
+    const absorberWidth = schroedinger?.absorberWidth
+    const pmlTargetReflection = schroedinger?.pmlTargetReflection
+    const autoScaleMaxGain = schroedinger?.autoScaleMaxGain
+    const cached = this.becConfigCache
+
+    if (
+      cached &&
+      cached.bec === bec &&
+      cached.version === version &&
+      cached.needsReset === needsReset &&
+      cached.absorberEnabled === absorberEnabled &&
+      cached.absorberWidth === absorberWidth &&
+      cached.pmlTargetReflection === pmlTargetReflection &&
+      cached.autoScaleMaxGain === autoScaleMaxGain
+    ) {
+      return cached.result
+    }
+
+    const result = buildBecConfig(bec, schroedinger)
+    this.becConfigCache = {
+      bec,
+      version,
+      needsReset,
+      absorberEnabled,
+      absorberWidth,
+      pmlTargetReflection,
+      autoScaleMaxGain,
+      result,
+    }
+    return result
+  }
+
+  executeFrame(ctx: WebGPURenderContext, shared: ModeFrameContext): void {
+    const tdsePass = this.tdsePass
+    if (!tdsePass) {
+      // Silent skip during the warm-swap window: adoptComputeState has moved
+      // our compute pass to a successor strategy that's compiling its pipeline
+      // asynchronously. The graph still calls us because this renderer hasn't
+      // been swapped out yet — our objectBindGroup still references the (now
+      // adopted) density texture, so the render-pass draw in the outer
+      // renderer uses valid data. Returning here just skips the redundant
+      // compute dispatch.
+      if (this.transferredOut) return
+      if (!this.warnedTdsePassNull) {
+        logger.warn(`[TdseBecStrategy] executeFrame: tdsePass is NULL`)
+        this.warnedTdsePassNull = true
+      }
+      return
+    }
+
+    const extended = getStoreSnapshot<ExtendedStoreSnapshot>(ctx, 'extended')
+    const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
+    const quantumMode = extended?.schroedinger?.quantumMode
+    const isBecMode = quantumMode === 'becDynamics'
+    const isPlaying = animation?.isPlaying ?? false
+    const speed = animation?.speed ?? 1.0
+
+    // Build TDSE config — either direct from store or mapped from BEC
+    let tdseConfig = extended?.schroedinger?.tdse
+    let clearReset: (() => void) | undefined = () => extended?.clearComputeNeedsReset?.('tdse')
+
+    if (isBecMode && extended?.schroedinger?.bec) {
+      const result = this.buildBecConfigForFrame(
+        extended.schroedinger.bec as BecConfig,
+        extended.schroedinger,
+        extended.schroedingerVersion
+      )
+      tdseConfig = result.config
+      clearReset = () => extended?.clearComputeNeedsReset?.('bec')
+    }
+
+    if (!tdseConfig) return
+
+    const schroedinger = extended?.schroedinger
+
+    // For TDSE mode, overlay the top-level autoScaleMaxGain (set by the Exposure slider)
+    // onto the nested TdseConfig. BEC mode already maps this in buildBecConfig.
+    if (!isBecMode && schroedinger?.autoScaleMaxGain !== undefined) {
+      tdseConfig = { ...tdseConfig, autoScaleMaxGain: schroedinger.autoScaleMaxGain }
+    }
+
+    // quantumPotential computes Q = -½·∇²R/R treating the density grid's R
+    // channel as √ρ_total. The TDSE/BEC write-grid shader only puts true
+    // density in R when fieldView='density'; other views (phase, current,
+    // superfluidVelocity, healing, potential) write the view's scalar instead,
+    // so Q would be computed on the wrong field and produce a physically
+    // meaningless (and visually empty) scene. Presets like BEC vortexDipole
+    // default to fieldView='phase', so without this override a user picking
+    // quantumPotential on the vortex-antivortex scenario would see nothing.
+    // Override fieldView at frame time — mirrors the DiracStrategy guardrail
+    // for the same algorithm.
+    const appearance = getStoreSnapshot<AppearanceStoreState>(ctx, 'appearance')
+    if (appearance?.colorAlgorithm === 'quantumPotential' && tdseConfig.fieldView !== 'density') {
+      tdseConfig = { ...tdseConfig, fieldView: 'density' }
+    }
+
+    // Analog-Hawking island overlay: when the user has toggled the overlay
+    // on AND the BEC is in blackHoleAnalog mode with a horizon AND the
+    // page-curve store has accumulated an island radius > 0, forward the
+    // island centroid (x₀ in world units) and radius into the TDSE uniforms
+    // so the write-grid shader can paint the island voxels. When any of
+    // those preconditions fails we pass through with the defaults and the
+    // shader no-ops. Mirrors the hawkingVmax/hawkingSeed plumbing pattern.
+    if (isBecMode && extended?.schroedinger?.bec) {
+      tdseConfig = applyIslandOverlay(tdseConfig, extended.schroedinger.bec)
+    }
+
+    const tdseWithSharedPml = applySharedPml(tdseConfig, schroedinger)
+
+    if (!tdsePass.getDensityTextureView()) {
+      if (!this.warnedDensityNull) {
+        logger.warn(`[TdseBecStrategy] executeFrame: densityTextureView is NULL`)
+        this.warnedDensityNull = true
+      }
+    }
+
+    tdsePass.executeTDSE(
+      ctx,
+      tdseWithSharedPml,
+      isPlaying,
+      speed,
+      schroedinger?.basisX as Float32Array | undefined,
+      schroedinger?.basisY as Float32Array | undefined,
+      schroedinger?.basisZ as Float32Array | undefined,
+      shared.boundingRadius
+    )
+
+    // Clear needsReset after processing
+    if (tdseConfig.needsReset) {
+      clearReset?.()
+    }
+
+    // BEC diagnostics
+    if (isBecMode) {
+      this.updateBecDiagnostics(tdsePass, extended)
+      this.maybeComputeSpectrum(ctx, tdsePass, tdseConfig)
+    }
+
+    // Coordinate entanglement diagnostics (TDSE mode only)
+    if (!isBecMode && isPlaying) {
+      this.maybeComputeEntanglement(ctx, tdsePass, tdseConfig)
+    }
+
+    // Simulation state save/load
+    handleSimulationStateIO(ctx, tdsePass, ['tdseDynamics', 'becDynamics'])
+
+    // Wavefunction slice capture. Only clear the request flag once the
+    // capture has actually been scheduled — `requestSliceCapture` returns
+    // `false` when a previous save/slice readback is still in flight, in
+    // which case the request must persist so the next frame can retry
+    // instead of dropping the user's click.
+    const sliceStore = useWavefunctionSliceStore.getState()
+    if (sliceStore.captureRequested) {
+      const scheduled = tdsePass.requestSliceCapture(
+        ctx,
+        sliceStore.requestedAxis,
+        tdseConfig.gridSize ?? [64],
+        shared.boundingRadius,
+        sliceStore.requestedSourceMode ?? quantumMode ?? null
+      )
+      if (scheduled) sliceStore.clearRequest()
+    }
+
+    // Eigenstate storage for Gram-Schmidt + scar analysis
+    const simState = useSimulationStateStore.getState()
+    if (simState.storeEigenstateRequested) {
+      const energy = getCurrentEigenstateEnergy()
+      const newCount = tdsePass.storeCurrentEigenstate(ctx.device, energy, tdseConfig)
+      simState.clearStoreEigenstateRequest(
+        newCount >= 0 ? newCount : tdsePass.getStoredEigenstateCount()
+      )
+      if (newCount >= 0) {
+        useDiagnosticsStore.getState().pushEigenstate(energy, NaN)
+      }
+    }
+
+    // C3: Born rule measurement
+    handleMeasurement(ctx, tdsePass, tdseConfig)
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // BEC DIAGNOSTICS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  private updateBecDiagnostics(
+    tdsePass: TDSEComputePass,
+    extended: ExtendedStoreSnapshot | undefined
+  ): void {
+    const diag = tdsePass.getDiagnostics()
+    if (!diag) return
+
+    const bec = extended?.schroedinger?.bec
+    const g = bec?.interactionStrength ?? 500
+    const mass = resolveBecMass({ mass: bec?.mass })
+    const hbar = bec?.hbar ?? 1.0
+    const omega = bec?.trapOmega ?? 1.0
+    const aniso = bec?.trapAnisotropy ?? []
+    const latDim = bec?.latticeDim ?? 3
+
+    const omegaEff = computeBecEffectiveTrapOmega(omega, aniso, latDim)
+    const peakN = Number.isFinite(diag.maxDensity) && diag.maxDensity > 0 ? diag.maxDensity : 0
+    const mu = Number.isFinite(g) ? g * peakN : 0
+    const xi = healingLength(hbar, mass, g, peakN)
+    const cs = soundSpeed(g, peakN, mass)
+    const rtf = thomasFermiRadius(mu, mass, omegaEff)
+
+    // Vortex count from plaquette-based phase singularity detection
+    const [vortexPlaquettes, posCharge, negCharge] = tdsePass.getVortexCounts()
+    const estimatedVortexCount = Math.max(posCharge, negCharge)
+
+    useDiagnosticsStore.getState().updateBec({
+      totalNorm: diag.totalNorm,
+      maxDensity: peakN,
+      normDrift: diag.normDrift,
+      chemicalPotential: mu,
+      healingLength: xi,
+      soundSpeed: cs,
+      thomasFermiRadius: rtf,
+      vortexCount: estimatedVortexCount,
+      vortexPlaquettes,
+      vortexPositiveCharge: posCharge,
+      vortexNegativeCharge: negCharge,
+    })
+  }
+
+  /**
+   * Trigger async incompressible E(k) spectrum computation at throttled intervals.
+   * Reads back psi from GPU, then ships the data to a Web Worker for the
+   * velocity-field + Helmholtz decomposition (previously run on the main thread,
+   * where the 3× Float64 FFT + shell binning at 64³ could consume 5–30 ms and
+   * jitter rendering for BEC turbulence presets).
+   */
+  private maybeComputeSpectrum(
+    ctx: WebGPURenderContext,
+    tdsePass: TDSEComputePass,
+    config: TdseConfig | undefined
+  ): void {
+    const g = config?.interactionStrength ?? 0
+    if (config?.needsReset) {
+      invalidateBecSpectrumWorkerState(this.spectrumWorkerState)
+      this.spectrumCounter = 0
+      return
+    }
+    if (!config || g <= 0) {
+      if (this.spectrumWorkerState.inFlight) {
+        invalidateBecSpectrumWorkerState(this.spectrumWorkerState)
+      }
+      this.spectrumCounter = 0
+      useDiagnosticsStore.getState().clearBecIncompressibleSpectrum()
+      return
+    }
+    if (this.spectrumWorkerState.inFlight) return
+
+    this.spectrumCounter++
+    if (this.spectrumCounter < SPECTRUM_INTERVAL) return
+    this.spectrumCounter = 0
+    this.spectrumWorkerState.inFlight = true
+
+    const gridSize = config.gridSize.slice(0, config.latticeDim)
+    const spacingArr = computeEffectiveSpacing(
+      config.gridSize,
+      config.spacing,
+      config.compactDims,
+      config.compactRadii,
+      config.latticeDim
+    )
+    const hbar = config.hbar
+    const mass = config.mass
+    const epoch = ++this.spectrumWorkerState.epoch
+    let readbackPromise: ReturnType<TDSEComputePass['requestMeasurementReadback']>
+    try {
+      readbackPromise = tdsePass.requestMeasurementReadback(ctx)
+    } catch (err) {
+      this.spectrumWorkerState.inFlight = false
+      logger.warn('[BEC] Failed to request spectrum readback:', err)
+      return
+    }
+
+    void readbackPromise.then(
+      (result) => {
+        if (this.disposed || this.transferredOut) {
+          this.spectrumWorkerState.inFlight = false
+          return
+        }
+        if (!result) {
+          this.spectrumWorkerState.inFlight = false
+          return
+        }
+        dispatchBecSpectrumComputation(
+          this.spectrumWorkerState,
+          result,
+          gridSize,
+          spacingArr,
+          hbar,
+          mass,
+          epoch
+        )
+      },
+      () => {
+        this.spectrumWorkerState.inFlight = false
+      }
+    )
+  }
+
+  /**
+   * Trigger async coordinate entanglement computation at decimated intervals.
+   * Reads back psi from GPU, ships to a Web Worker for CPU-side
+   * reduced density matrix + eigendecomposition.
+   */
+  private maybeComputeEntanglement(
+    ctx: WebGPURenderContext,
+    tdsePass: TDSEComputePass,
+    config: TdseConfig
+  ): void {
+    const entStore = useCoordinateEntanglementStore.getState()
+    if (!entStore.enabled || this.entanglementInFlight) return
+    if (!isCoordinateEntanglementMetricSupported(config.metric)) return
+
+    this.entanglementFrameCounter++
+    if (this.entanglementFrameCounter < ENTANGLEMENT_DECIMATION) return
+    this.entanglementFrameCounter = 0
+    this.entanglementInFlight = true
+
+    const gridSize = config.gridSize.slice(0, config.latticeDim)
+    const epoch = ++this.entanglementEpoch
+
+    void tdsePass.requestMeasurementReadback(ctx).then(
+      (result) => {
+        // Guard against late callbacks after dispose() or warm-swap handoff.
+        // Clearing `entanglementInFlight` here is safe because both lifecycle
+        // exits guarantee no further dispatches will run through this instance.
+        if (this.disposed || this.transferredOut) {
+          this.entanglementInFlight = false
+          return
+        }
+
+        if (!result) {
+          this.entanglementInFlight = false
+          return
+        }
+
+        const currentEntStore = useCoordinateEntanglementStore.getState()
+        if (!currentEntStore.enabled) {
+          this.entanglementInFlight = false
+          return
+        }
+
+        try {
+          // Lazy-initialize the worker
+          if (!this.entanglementWorker) {
+            this.entanglementWorker = new Worker(
+              new URL('../../../../../lib/physics/coordinateEntanglement.worker', import.meta.url),
+              { type: 'module' }
+            )
+            this.entanglementWorker.onmessage = (e: MessageEvent<EntanglementWorkerResponse>) => {
+              this.entanglementInFlight = false
+              // Discard stale messages from previous epochs or after lifecycle exit.
+              if (this.disposed || this.transferredOut || e.data.epoch !== this.entanglementEpoch)
+                return
+              if (e.data.type === 'error') {
+                logger.warn('[Entanglement] Worker compute failed:', e.data.message)
+                return
+              }
+              if (e.data.type !== 'result') return
+              const latestEntStore = useCoordinateEntanglementStore.getState()
+              if (!latestEntStore.enabled) return
+              latestEntStore.pushResult(e.data.result)
+            }
+            this.entanglementWorker.onerror = () => {
+              this.entanglementInFlight = false
+              logger.warn('[Entanglement] Worker error event (uncaught throw)')
+            }
+          }
+
+          const request: EntanglementWorkerRequest = {
+            type: 'compute',
+            epoch,
+            psiRe: result.re,
+            psiIm: result.im,
+            gridSize,
+            options: {
+              computePairwiseMI: currentEntStore.computePairwiseMI,
+              computeBipartitions: currentEntStore.computeBipartitions,
+              computeWignerNegativity: currentEntStore.computeWignerNegativity,
+            },
+          }
+
+          // Transfer psi arrays to worker (zero-copy)
+          this.entanglementWorker.postMessage(request, [result.re.buffer, result.im.buffer])
+        } catch (err) {
+          this.entanglementInFlight = false
+          logger.warn('[Entanglement] Failed to dispatch to worker:', err)
+        }
+      },
+      () => {
+        this.entanglementInFlight = false
+      }
+    )
+  }
+
+  adoptComputeState(source: QuantumModeStrategy, nextConfig?: SchrodingerRendererConfig): boolean {
+    if (!(source instanceof TdseBecStrategy) || !source.tdsePass) return false
+    const nextN = nextConfig?.densityGridResolution
+    if (nextN && source.tdsePass.densityGridSize !== nextN) return false
+    this.tdsePass?.dispose()
+    this.tdsePass = source.tdsePass
+    source.tdsePass = null
+    source.transferredOut = true
+    this.transferredOut = false
+    return true
+  }
+
+  getDensityTextureView(): GPUTextureView | null {
+    return this.tdsePass?.getDensityTextureView() ?? null
+  }
+
+  dispose(): void {
+    this.disposed = true
+    this.tdsePass?.dispose()
+    this.tdsePass = null
+    this.entanglementWorker?.terminate()
+    this.entanglementWorker = null
+    this.spectrumWorkerState.disposed = true
+    this.spectrumWorkerState.worker?.terminate()
+    this.spectrumWorkerState.worker = null
+  }
+}

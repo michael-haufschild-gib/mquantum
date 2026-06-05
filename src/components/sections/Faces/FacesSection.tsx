@@ -258,6 +258,7 @@ const ColorsTabContent: React.FC<ColorsTabContentProps> = React.memo(
         {/* Base color picker (HSL-based algorithms) */}
         {USES_BASE_COLOR.has(colorAlgorithm) && (
           <ColorPicker
+            data-testid="components-sections-faces-faces-section-color-picker-260-11"
             label="Base Color"
             tooltip="Starting hue for HSL-based color algorithms. The wavefunction amplitude shifts around this color."
             value={faceColor}
@@ -279,6 +280,7 @@ const ColorsTabContent: React.FC<ColorsTabContentProps> = React.memo(
           <>
             <LchPresetSelector />
             <Slider
+              data-testid="components-sections-faces-faces-section-slider-281-13"
               label="Lightness"
               min={0.1}
               max={1}
@@ -289,6 +291,7 @@ const ColorsTabContent: React.FC<ColorsTabContentProps> = React.memo(
               tooltip="Perceptual lightness (L) in the LCH color space"
             />
             <Slider
+              data-testid="components-sections-faces-faces-section-slider-291-13"
               label="Chroma"
               min={0}
               max={0.4}
@@ -392,6 +395,7 @@ const MaterialTabContent: React.FC<MaterialTabContentProps> = React.memo(
 
             {/* Specular Intensity */}
             <Slider
+              data-testid="components-sections-faces-faces-section-slider-394-13"
               label="Specular Intensity"
               min={0}
               max={2}
@@ -405,6 +409,7 @@ const MaterialTabContent: React.FC<MaterialTabContentProps> = React.memo(
             {/* Specular Color */}
             <div className="flex items-center justify-between">
               <ColorPicker
+                data-testid="components-sections-faces-faces-section-color-picker-407-15"
                 label="Specular Color"
                 tooltip="Tint of specular highlights. White is physically neutral; colored tints simulate metallic reflections."
                 value={specularColor}
@@ -413,6 +418,7 @@ const MaterialTabContent: React.FC<MaterialTabContentProps> = React.memo(
               />
               {specularColor !== DEFAULT_FACE_PBR.specularColor && (
                 <Button
+                  data-testid="components-sections-faces-faces-section-button-415-17"
                   variant="ghost"
                   size="sm"
                   onClick={handleResetSpecularColor}
@@ -482,6 +488,7 @@ const MultiSourceWeightsEditor: React.FC = React.memo(() => {
       <div className="text-sm font-medium text-text-secondary">Source Weights</div>
 
       <Slider
+        data-testid="components-sections-faces-faces-section-slider-484-7"
         label="Depth"
         min={0}
         max={1}
@@ -493,6 +500,7 @@ const MultiSourceWeightsEditor: React.FC = React.memo(() => {
       />
 
       <Slider
+        data-testid="components-sections-faces-faces-section-slider-495-7"
         label="Orbit Trap"
         min={0}
         max={1}
@@ -504,6 +512,7 @@ const MultiSourceWeightsEditor: React.FC = React.memo(() => {
       />
 
       <Slider
+        data-testid="components-sections-faces-faces-section-slider-506-7"
         label="Normal"
         min={0}
         max={1}

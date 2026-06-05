@@ -229,15 +229,21 @@ describe('ScenarioSelector - compute mode presets', () => {
     render(<ScenarioSelector />)
 
     expect(screen.queryByRole('option', { name: 'Bianchi-I Kasner Cigar (vacuum)' })).toBeNull()
+    expect(screen.queryByRole('option', { name: 'Chronogenic Shear' })).toBeNull()
+    expect(screen.queryByRole('option', { name: 'Rank-Defect Genesis' })).toBeNull()
+    expect(screen.queryByRole('option', { name: 'Rank-Diffusion Reheating' })).toBeNull()
     expect(screen.queryByRole('option', { name: 'Retrocausal Caustic Flower' })).toBeNull()
     expect(screen.queryByRole('option', { name: 'Retrocausal Caustic Web' })).toBeNull()
   })
 
-  it('exposes retrocausal caustic free scalar presets at their fixed 3D dimension', () => {
+  it('exposes fixed 3D free scalar presets at their required dimension', () => {
     enterScenarioMode('freeScalarField', 3)
 
     render(<ScenarioSelector />)
 
+    expect(screen.getByRole('option', { name: 'Chronogenic Shear' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Rank-Defect Genesis' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Rank-Diffusion Reheating' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Retrocausal Caustic Flower' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Retrocausal Caustic Web' })).toBeInTheDocument()
   })

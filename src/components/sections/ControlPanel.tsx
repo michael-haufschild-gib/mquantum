@@ -120,6 +120,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = React.memo(
             )}
 
             <Button
+              data-testid="components-sections-control-panel-button-122-13"
               variant="ghost"
               size="icon"
               onClick={toggleCollapsed}

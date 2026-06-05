@@ -10,9 +10,14 @@
  * @module lib/physics/tdse/disorderNoise
  */
 
-import type { TdseDisorderDistribution } from '@/lib/geometry/extended/types'
+import {
+  isTdseDisorderDistribution,
+  type TdseDisorderDistribution,
+} from '@/lib/geometry/extended/types'
 import { gaussianPair, mulberry32 } from '@/lib/math/rng'
 import { generateDisorderNoiseWasm, generateDisorderPotentialWasm } from '@/lib/wasm'
+
+export const MAX_DISORDER_NOISE_SITES = 2 ** 20
 
 /**
  * Generate a Float32Array of unit-scale disorder noise.
@@ -36,6 +41,23 @@ export function generateDisorderNoise(
   seed: number,
   distribution: TdseDisorderDistribution = 'uniform'
 ): Float32Array {
+  if (!Number.isSafeInteger(totalSites) || totalSites <= 0) {
+    throw new RangeError(
+      `generateDisorderNoise: totalSites must be a positive safe integer, got ${totalSites}`
+    )
+  }
+  if (totalSites > MAX_DISORDER_NOISE_SITES) {
+    throw new RangeError(
+      `generateDisorderNoise: totalSites ${totalSites} exceeds max supported sites ${MAX_DISORDER_NOISE_SITES}`
+    )
+  }
+  if (!Number.isFinite(seed)) {
+    throw new RangeError(`generateDisorderNoise: seed must be finite, got ${seed}`)
+  }
+  if (!isTdseDisorderDistribution(distribution)) {
+    throw new RangeError(`generateDisorderNoise: unsupported distribution ${String(distribution)}`)
+  }
+
   if (distribution === 'gaussian') {
     // Route via generateDisorderPotentialWasm with strength=1 so the WASM
     // gaussianPair path emits N(0, 1) samples byte-identical to the TS

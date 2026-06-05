@@ -62,6 +62,10 @@ export const DEFAULT_ORBIT_CONFIG: OrbitConfig = {
   seed: 314159,
 }
 
+const MAX_ORBIT_DIM = 11
+const MAX_ORBIT_STEPS = 200_000
+const MAX_ORBIT_COUNT = 64
+
 // ─── Potential & Gradient ───────────────────────────────────────────────────
 
 /**
@@ -172,15 +176,64 @@ export function computeGradient(
   h = 1e-5
 ): void {
   const dim = x.length
-  const inv2h = 1.0 / (2.0 * h)
+  const step = Number.isFinite(h) && h > 0 ? h : 1e-5
+  const inv2h = 1.0 / (2.0 * step)
   for (let d = 0; d < dim; d++) {
     const orig = x[d]!
-    x[d] = orig + h
+    x[d] = orig + step
     const vPlus = evaluatePotential(x, config)
-    x[d] = orig - h
+    x[d] = orig - step
     const vMinus = evaluatePotential(x, config)
     x[d] = orig
     grad[d] = (vPlus - vMinus) * inv2h
+  }
+}
+
+function boundedInteger(value: number, fallback: number, min: number, max: number): number {
+  const raw = Number.isFinite(value) ? Math.floor(value) : fallback
+  return Math.max(min, Math.min(max, raw))
+}
+
+function sanitizeOrbitConfig(orbitCfg: OrbitConfig): OrbitConfig {
+  const steps = boundedInteger(orbitCfg.steps, DEFAULT_ORBIT_CONFIG.steps, 0, MAX_ORBIT_STEPS)
+  const sampleInterval = boundedInteger(
+    orbitCfg.sampleInterval,
+    DEFAULT_ORBIT_CONFIG.sampleInterval,
+    1,
+    Math.max(1, MAX_ORBIT_STEPS)
+  )
+  return {
+    steps,
+    dt: Number.isFinite(orbitCfg.dt) && orbitCfg.dt > 0 ? orbitCfg.dt : DEFAULT_ORBIT_CONFIG.dt,
+    sampleInterval,
+    numOrbits: boundedInteger(
+      orbitCfg.numOrbits,
+      DEFAULT_ORBIT_CONFIG.numOrbits,
+      0,
+      MAX_ORBIT_COUNT
+    ),
+    tubeWidth:
+      Number.isFinite(orbitCfg.tubeWidth) && orbitCfg.tubeWidth > 0
+        ? orbitCfg.tubeWidth
+        : DEFAULT_ORBIT_CONFIG.tubeWidth,
+    seed: Number.isFinite(orbitCfg.seed) ? Math.floor(orbitCfg.seed) : DEFAULT_ORBIT_CONFIG.seed,
+  }
+}
+
+function isFiniteVector(v: Float64Array, length: number): boolean {
+  if (v.length !== length) return false
+  for (let i = 0; i < length; i++) {
+    if (!Number.isFinite(v[i]!)) return false
+  }
+  return true
+}
+
+function emptyTrajectory(dim: number): ClassicalTrajectory {
+  return {
+    points: [],
+    energy: 0,
+    energyDrift: 0,
+    dim: Number.isSafeInteger(dim) && dim > 0 ? dim : 0,
   }
 }
 
@@ -207,9 +260,20 @@ export function integrateOrbit(
   orbitCfg: OrbitConfig
 ): ClassicalTrajectory {
   const dim = x0.length
-  const dt = orbitCfg.dt
+  if (
+    dim <= 0 ||
+    dim > MAX_ORBIT_DIM ||
+    !isFiniteVector(x0, dim) ||
+    !isFiniteVector(p0, dim) ||
+    !Number.isFinite(config.mass) ||
+    config.mass <= 0
+  ) {
+    return emptyTrajectory(dim)
+  }
+  const safeOrbitCfg = sanitizeOrbitConfig(orbitCfg)
+  const dt = safeOrbitCfg.dt
   const halfDt = dt / 2
-  const invMass = 1.0 / Math.max(config.mass, 1e-10)
+  const invMass = 1.0 / config.mass
 
   // Working arrays
   const x = new Float64Array(x0)
@@ -230,7 +294,7 @@ export function integrateOrbit(
     p: new Float64Array(p),
   })
 
-  for (let step = 1; step <= orbitCfg.steps; step++) {
+  for (let step = 1; step <= safeOrbitCfg.steps; step++) {
     // Half-step momentum
     computeGradient(x, config, grad)
     for (let d = 0; d < dim; d++) p[d] = p[d]! - halfDt * grad[d]!
@@ -243,7 +307,7 @@ export function integrateOrbit(
     for (let d = 0; d < dim; d++) p[d] = p[d]! - halfDt * grad[d]!
 
     // Sample point
-    if (step % orbitCfg.sampleInterval === 0) {
+    if (step % safeOrbitCfg.sampleInterval === 0) {
       points.push({
         x: new Float64Array(x),
         p: new Float64Array(p),
@@ -284,10 +348,21 @@ export function generateOrbitsAtEnergy(
   orbitCfg: OrbitConfig = DEFAULT_ORBIT_CONFIG
 ): ClassicalTrajectory[] {
   const dim = config.latticeDim
+  if (
+    !Number.isSafeInteger(dim) ||
+    dim <= 0 ||
+    dim > MAX_ORBIT_DIM ||
+    !Number.isFinite(targetEnergy) ||
+    !Number.isFinite(config.mass) ||
+    config.mass <= 0
+  ) {
+    return []
+  }
+  const safeOrbitCfg = sanitizeOrbitConfig(orbitCfg)
   const orbits: ClassicalTrajectory[] = []
-  const rng = mulberry32(orbitCfg.seed)
+  const rng = mulberry32(safeOrbitCfg.seed)
 
-  for (let orbitIdx = 0; orbitIdx < orbitCfg.numOrbits; orbitIdx++) {
+  for (let orbitIdx = 0; orbitIdx < safeOrbitCfg.numOrbits; orbitIdx++) {
     // Generate random position in classically allowed region
     const x0 = new Float64Array(dim)
     const p0 = new Float64Array(dim)
@@ -311,7 +386,10 @@ export function generateOrbitsAtEnergy(
 
       // Random radius: sample uniformly in [0, r_max] where r_max is the classical turning point
       // For harmonic-like potentials, r_max ~ sqrt(2E / (mω²))
-      const omega = Math.max(config.harmonicOmega, 0.1)
+      const omega =
+        Number.isFinite(config.harmonicOmega) && config.harmonicOmega > 0
+          ? config.harmonicOmega
+          : 0.1
       const rMax = Math.sqrt(
         Math.max((2 * Math.abs(targetEnergy)) / (config.mass * omega * omega), 0.1)
       )
@@ -353,7 +431,8 @@ export function generateOrbitsAtEnergy(
       if (dim > 0) p0[0] = Math.sqrt(2 * config.mass * Math.abs(targetEnergy))
     }
 
-    orbits.push(integrateOrbit(x0, p0, config, orbitCfg))
+    const orbit = integrateOrbit(x0, p0, config, safeOrbitCfg)
+    if (orbit.points.length > 0) orbits.push(orbit)
   }
 
   return orbits

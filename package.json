@@ -13,6 +13,7 @@
     "build": "pnpm wasm:build && node scripts/check-untracked-imports.js && node scripts/check-wgsl-backticks.js && node scripts/check-detect-gpu-benchmarks.js && tsc -b && vite build && pnpm build:check",
     "build:web": "node scripts/check-untracked-imports.js && node scripts/check-wgsl-backticks.js && node scripts/check-detect-gpu-benchmarks.js && tsc -b && vite build && pnpm build:check",
     "build:check": "node scripts/check-chunk-cycles.js",
+    "lint:folders": "node scripts/check-folder-file-count.js",
     "bundle:check": "node scripts/check-bundle-size.js",
     "gpu-benchmarks:check": "node scripts/check-detect-gpu-benchmarks.js",
     "gpu-benchmarks:sync": "node scripts/sync-detect-gpu-benchmarks.js",
@@ -26,7 +27,7 @@
     "test:shaders": "WGSL_VALIDATE=1 vitest run src/tests/rendering/wgsl/wgslValidation.test.ts",
     "test:shaders:fast": "WGSL_VALIDATE=1 WGSL_MAX=2000 vitest run src/tests/rendering/wgsl/wgslValidation.test.ts",
     "test:shaders:tint": "WGSL_TINT=1 playwright test scripts/playwright/wgsl-tint-validation.spec.ts",
-    "lint": "eslint . --max-warnings 0 --no-warn-ignored",
+    "lint": "pnpm lint:folders && eslint . --max-warnings 0 --no-warn-ignored",
     "lint:css": "stylelint \"src/**/*.css\" --max-warnings 0",
     "lint:rust": "cargo clippy --manifest-path src/wasm/mdimension_core/Cargo.toml",
     "format": "prettier --write \"src/**/*.{ts,tsx,json,css}\"",
@@ -104,6 +105,7 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": [
+      "node scripts/check-folder-file-count.js",
       "eslint --fix --max-warnings 0 --no-warn-ignored",
       "prettier --write"
     ],

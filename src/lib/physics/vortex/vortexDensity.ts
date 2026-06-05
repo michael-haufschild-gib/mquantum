@@ -31,6 +31,15 @@
 
 /** 2*pi — base period of the phase wrap. */
 export const TAU = 2 * Math.PI
+export const MAX_VORTEX_PLAQUETTES = 2 ** 20
+
+function validateGridDimension(value: number, name: string): void {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new RangeError(
+      `computeVortexDensityCpu2D: ${name} must be a non-negative safe integer, got ${value}`
+    )
+  }
+}
 
 /**
  * Wrap a raw phase difference into the principal branch (-pi, pi] using the
@@ -82,16 +91,27 @@ export function computeVortexDensityCpu2D(
   width: number,
   height: number
 ): Float32Array {
+  validateGridDimension(width, 'width')
+  validateGridDimension(height, 'height')
   if (width < 2 || height < 2) {
     return new Float32Array(0)
   }
-  if (phaseField.length !== width * height) {
-    throw new Error(
-      `computeVortexDensityCpu2D: phaseField length ${phaseField.length} !== ${width * height}`
-    )
+  if (width > Math.floor(Number.MAX_SAFE_INTEGER / height)) {
+    throw new RangeError('computeVortexDensityCpu2D: width * height exceeds safe integer range')
   }
+  const expectedLength = width * height
   const plaqW = width - 1
   const plaqH = height - 1
+  if (plaqW > Math.floor(MAX_VORTEX_PLAQUETTES / plaqH)) {
+    throw new RangeError(
+      `computeVortexDensityCpu2D: plaquette count exceeds ${MAX_VORTEX_PLAQUETTES}`
+    )
+  }
+  if (phaseField.length !== expectedLength) {
+    throw new Error(
+      `computeVortexDensityCpu2D: phaseField length ${phaseField.length} !== ${expectedLength}`
+    )
+  }
   const out = new Float32Array(plaqW * plaqH)
   for (let j = 0; j < plaqH; j++) {
     for (let i = 0; i < plaqW; i++) {

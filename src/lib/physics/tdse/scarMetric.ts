@@ -36,6 +36,7 @@ import type { ClassicalTrajectory } from './classicalOrbit'
  * Below this, JS execution is fast enough that WASM boundary overhead dominates.
  */
 const WASM_SCAR_MIN_SITES = 1000
+const MAX_SCAR_TOTAL_SITES = 2 ** 20
 
 /** Result of scar correlation analysis for one eigenstate. */
 export interface ScarResult {
@@ -95,6 +96,9 @@ export function computeScarCorrelation(
     const size = gridSize[d]!
     const dx = spacing[d]!
     if (!Number.isInteger(size) || size <= 0 || !Number.isFinite(dx) || dx <= 0) {
+      return emptyScarResult(orbits)
+    }
+    if (totalSites > Math.floor(MAX_SCAR_TOTAL_SITES / size)) {
       return emptyScarResult(orbits)
     }
     totalSites *= size

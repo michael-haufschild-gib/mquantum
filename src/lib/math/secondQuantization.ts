@@ -88,6 +88,15 @@ function normalizeFockQuantumNumber(n: number): number {
   return Math.max(0, Math.floor(n))
 }
 
+function normalizeFockCoefficientLength(maxN: number): number {
+  if (!Number.isFinite(maxN)) return 0
+  return Math.max(0, Math.min(FOCK_MAX_SAFE_LENGTH, Math.floor(maxN)))
+}
+
+function finiteOrZero(value: number): number {
+  return Number.isFinite(value) ? value : 0
+}
+
 // ============================================================================
 // Fock decomposition
 // ============================================================================
@@ -113,7 +122,10 @@ export function coherentFockCoefficients(
   alphaIm: number,
   maxN: number
 ): Complex[] {
-  const alphaSq = alphaRe * alphaRe + alphaIm * alphaIm
+  const count = normalizeFockCoefficientLength(maxN)
+  const alphaReSafe = finiteOrZero(alphaRe)
+  const alphaImSafe = finiteOrZero(alphaIm)
+  const alphaSq = alphaReSafe * alphaReSafe + alphaImSafe * alphaImSafe
   const prefactor = Math.exp(-alphaSq / 2)
 
   const result: Complex[] = []
@@ -121,7 +133,7 @@ export function coherentFockCoefficients(
   let powerRe = 1
   let powerIm = 0
 
-  for (let n = 0; n < maxN; n++) {
+  for (let n = 0; n < count; n++) {
     const norm = prefactor / Math.sqrt(factorial(n))
     // For very large |alpha| the two transcendentals diverge: prefactor
     // underflows to 0 while alpha^n overflows to ±Infinity, so `norm *
@@ -138,8 +150,8 @@ export function coherentFockCoefficients(
       im: Number.isFinite(im) ? im : 0,
     })
     // Multiply by alpha: (a+bi)(c+di) = (ac-bd) + (ad+bc)i
-    const nextRe = powerRe * alphaRe - powerIm * alphaIm
-    const nextIm = powerRe * alphaIm + powerIm * alphaRe
+    const nextRe = powerRe * alphaReSafe - powerIm * alphaImSafe
+    const nextIm = powerRe * alphaImSafe + powerIm * alphaReSafe
     powerRe = nextRe
     powerIm = nextIm
   }
@@ -166,37 +178,45 @@ export function coherentFockCoefficients(
  * ```
  */
 export function squeezedFockCoefficients(r: number, theta: number, maxN: number): Complex[] {
-  const result: Complex[] = new Array(maxN).fill(null).map(() => ({ re: 0, im: 0 }))
+  const count = normalizeFockCoefficientLength(maxN)
+  const result: Complex[] = new Array(count).fill(null).map(() => ({ re: 0, im: 0 }))
+  const squeezeR = Number.isFinite(r) && r > 0 ? r : 0
+  const squeezeTheta = finiteOrZero(theta)
 
-  if (r < 1e-12) {
+  if (squeezeR < 1e-12) {
     // No squeezing → vacuum state
-    if (maxN > 0) {
+    if (count > 0) {
       result[0] = { re: 1, im: 0 }
     }
     return result
   }
 
-  const tanhR = Math.tanh(r)
-  const coshR = Math.cosh(r)
+  const tanhR = Math.tanh(squeezeR)
+  const coshR = Math.cosh(squeezeR)
   const sqrtCoshR = Math.sqrt(coshR)
 
   // -e^{i*theta} * tanh(r)
-  const muRe = -Math.cos(theta) * tanhR
-  const muIm = -Math.sin(theta) * tanhR
+  const muRe = -Math.cos(squeezeTheta) * tanhR
+  const muIm = -Math.sin(squeezeTheta) * tanhR
 
   // mu^k computed iteratively
   let muPowRe = 1
   let muPowIm = 0
 
-  for (let k = 0; 2 * k < maxN; k++) {
+  for (let k = 0; 2 * k < count; k++) {
     const n = 2 * k
     // sqrt((2k)!) / (2^k * k!)
     const combinatorialFactor = Math.sqrt(factorial(n)) / (Math.pow(2, k) * factorial(k))
-    const coeff = combinatorialFactor / sqrtCoshR
+    const coeff =
+      Number.isFinite(combinatorialFactor) && Number.isFinite(sqrtCoshR) && sqrtCoshR > 0
+        ? combinatorialFactor / sqrtCoshR
+        : 0
+    const re = coeff * muPowRe
+    const im = coeff * muPowIm
 
     result[n] = {
-      re: coeff * muPowRe,
-      im: coeff * muPowIm,
+      re: Number.isFinite(re) ? re : 0,
+      im: Number.isFinite(im) ? im : 0,
     }
 
     // Multiply mu^k by mu for next iteration

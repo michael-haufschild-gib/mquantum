@@ -109,6 +109,7 @@ export const ExpandedContent = React.memo(function ExpandedContent({
     <>
       {/* Header */}
       <div
+        data-testid="components-canvas-performance-monitor-expanded-content-div-111-7"
         onClick={() => {
           if (!didDrag) onCollapse()
         }}

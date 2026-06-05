@@ -14,6 +14,8 @@ import {
   createHellerBuffer,
   extractSpectrumPeaks,
   hannWindow,
+  HELLER_MAX_CAPACITY,
+  HELLER_MAX_FFT_POINTS,
   HELLER_MAX_INTERPOLATION_FRACTION,
   type HellerRingBuffer,
   pushAutocorrelationSample,
@@ -57,6 +59,10 @@ describe('hannWindow', () => {
     expect(w[7]!).toBeGreaterThan(0.98)
     expect(w[7]!).toBeLessThan(1.0)
   })
+
+  it('rejects over-budget window lengths before allocation', () => {
+    expect(() => hannWindow(HELLER_MAX_FFT_POINTS + 1)).toThrow(/max supported length/)
+  })
 })
 
 describe('createHellerBuffer', () => {
@@ -80,6 +86,7 @@ describe('createHellerBuffer', () => {
     expect(() => createHellerBuffer(0)).toThrow()
     expect(() => createHellerBuffer(-1)).toThrow()
     expect(() => createHellerBuffer(3.5)).toThrow()
+    expect(() => createHellerBuffer(HELLER_MAX_CAPACITY + 1)).toThrow(/max supported capacity/)
   })
 })
 

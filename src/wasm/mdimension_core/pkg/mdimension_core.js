@@ -405,7 +405,7 @@ export function compute_incompressible_spectrum_wasm(psi_re, psi_im, grid_size, 
  * * `psi_re` - Real part of wavefunction (Float32Array)
  * * `psi_im` - Imaginary part of wavefunction (Float32Array)
  * * `grid_size` - Grid dimensions
- * * `kept_dims` - Indices of dimensions to keep (sorted ascending)
+ * * `kept_dims` - Strictly increasing indices of dimensions to keep
  *
  * # Returns
  * Packed `Float64Array`: `[re_flat(M*M), im_flat(M*M)]` where `M = Π kept dims`.

@@ -20,9 +20,11 @@ import {
   createBoundaryProfile,
   defaultHkllParams,
   eigenstateBoundaryAmplitude,
+  fillBoundarySampleGrid,
   hkllKernel,
   hkllSampleCount,
   reconstructBulk,
+  reconstructBulkFromSampleGrid,
   sampleBoundaryFromBulkEigenstate,
 } from '@/lib/physics/antiDeSitter/hkll'
 import {
@@ -52,6 +54,13 @@ describe('hkllKernel', () => {
   it('vanishes at the bulk origin and the boundary', () => {
     expect(hkllKernel(0, 0, 0, 3, 4)).toBe(0)
     expect(hkllKernel(0, 0, Math.PI / 2, 3, 4)).toBe(0)
+  })
+
+  it('returns zero for non-finite kernel inputs', () => {
+    expect(hkllKernel(Number.NaN, 0, Math.PI / 4, 3, 4)).toBe(0)
+    expect(hkllKernel(0, Number.POSITIVE_INFINITY, Math.PI / 4, 3, 4)).toBe(0)
+    expect(hkllKernel(0, 0, Number.NaN, 3, 4)).toBe(0)
+    expect(hkllKernel(0, 0, Math.PI / 4, Number.NaN, 4)).toBe(0)
   })
 
   it('is finite near the lightcone via the ε guard', () => {
@@ -132,6 +141,34 @@ describe('createBoundaryProfile', () => {
     expect(profile(0, Math.PI / 2, Math.PI / 6).re).toBeCloseTo(Math.cos((3 * Math.PI) / 6), 10)
     expect(profile(0, Math.PI / 2, Math.PI / 3).re).toBeCloseTo(Math.cos(Math.PI), 10)
   })
+
+  it('sanitizes malformed localized and plane-wave controls', () => {
+    const localized = createBoundaryProfile({
+      mode: 'localized',
+      d: 4,
+      delta: 3,
+      n: 0,
+      l: 0,
+      m: 0,
+      branch: 'standard',
+      sourceSigma: Number.NaN,
+      planeWaveM: 2,
+    })
+    expect(localized(0, Math.PI / 2, 0).re).toBeCloseTo(1, 10)
+
+    const plane = createBoundaryProfile({
+      mode: 'planeWave',
+      d: 4,
+      delta: 3,
+      n: 0,
+      l: 0,
+      m: 0,
+      branch: 'standard',
+      sourceSigma: 0.3,
+      planeWaveM: Number.POSITIVE_INFINITY,
+    })
+    expect(plane(0, Math.PI / 2, Math.PI / 3).re).toBe(1)
+  })
 })
 
 describe('hkllSampleCount', () => {
@@ -142,6 +179,49 @@ describe('hkllSampleCount', () => {
     expect(hkllSampleCount(s1)).toBe(s1.nTau * s1.nPhi)
     // d=4+: N_τ × N_θ × N_φ.
     expect(hkllSampleCount(s2)).toBe(s2.nTau * s2.nTheta * s2.nPhi)
+  })
+
+  it('rejects invalid or oversized parameter grids before allocation', () => {
+    expect(() => hkllSampleCount({ d: 4, delta: 3, nTau: 8, nPhi: 16, nTheta: 0 })).toThrow(
+      /nTheta/
+    )
+    expect(() => hkllSampleCount({ d: 4, delta: 3, nTau: 1001, nPhi: 1001, nTheta: 1 })).toThrow(
+      /sample count/
+    )
+    expect(() =>
+      hkllSampleCount({ d: 4, delta: Number.NaN, nTau: 8, nPhi: 16, nTheta: 8 })
+    ).toThrow(/delta/)
+  })
+})
+
+describe('HKLL boundary sample grid contracts', () => {
+  it('clamps non-finite boundary samples to zero before reconstruction', () => {
+    const params = { d: 3, delta: 2, nTau: 2, nPhi: 4, nTheta: 0 }
+    const grid = fillBoundarySampleGrid(
+      () => ({ re: Number.NaN, im: Number.POSITIVE_INFINITY }),
+      params
+    )
+    expect(Array.from(grid.re).every((v) => v === 0)).toBe(true)
+    expect(Array.from(grid.im).every((v) => v === 0)).toBe(true)
+
+    const outRe = new Float32Array(1)
+    const outIm = new Float32Array(1)
+    reconstructBulkFromSampleGrid(grid, Math.PI / 4, Math.PI / 2, 0, outRe, outIm, 0)
+    expect(outRe[0]).toBe(0)
+    expect(outIm[0]).toBe(0)
+  })
+
+  it('rejects malformed sample grids and output slots', () => {
+    const params = defaultHkllParams(3, 2)
+    const grid = fillBoundarySampleGrid(() => ({ re: 1, im: 0 }), params)
+    const outRe = new Float32Array(1)
+    const outIm = new Float32Array(1)
+    expect(() =>
+      reconstructBulkFromSampleGrid({ ...grid, re: new Float32Array(1) }, 1, 1, 0, outRe, outIm, 0)
+    ).toThrow(/sample grid buffers/)
+    expect(() => reconstructBulkFromSampleGrid(grid, 1, 1, 0, outRe, outIm, 1)).toThrow(
+      /output index/
+    )
   })
 })
 

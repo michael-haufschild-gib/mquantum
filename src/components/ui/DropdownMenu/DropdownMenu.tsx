@@ -305,6 +305,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
                 <m.div
                   ref={menuRef}
                   role="menu"
+                  data-testid={`dropdown-menu-${dropdownId}`}
                   initial="closed"
                   animate="open"
                   exit="closed"

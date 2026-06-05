@@ -51,6 +51,7 @@ export const DimensionalSweepsSection: React.FC<DimensionalSweepsSectionProps> =
       testId="animation-panel-sliceAnimation"
     >
       <Slider
+        data-testid="components-layout-timeline-controls-dimensional-sweeps-section-slider-53-7"
         label="Amplitude"
         min={0.1}
         max={1.0}
@@ -61,6 +62,7 @@ export const DimensionalSweepsSection: React.FC<DimensionalSweepsSectionProps> =
         showValue
       />
       <Slider
+        data-testid="components-layout-timeline-controls-dimensional-sweeps-section-slider-63-7"
         label="Speed"
         min={0.01}
         max={0.1}

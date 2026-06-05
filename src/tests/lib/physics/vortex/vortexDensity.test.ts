@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   computeVortexDensityCpu2D,
+  MAX_VORTEX_PLAQUETTES,
   TAU,
   totalVortexCharge,
   wrapPhase,
@@ -144,6 +145,20 @@ describe('computeVortexDensityCpu2D — isolated defects', () => {
 })
 
 describe('computeVortexDensityCpu2D — input validation', () => {
+  it('rejects invalid dimensions before indexing the phase field', () => {
+    const invalidDimensions: Array<[number, number]> = [
+      [-1, 4],
+      [4, -1],
+      [1.5, 4],
+      [4, Number.NaN],
+    ]
+    for (const [width, height] of invalidDimensions) {
+      expect(() => computeVortexDensityCpu2D(new Float32Array(0), width, height)).toThrow(
+        /non-negative safe integer/
+      )
+    }
+  })
+
   it('returns an empty array when either dimension is below 2 plaquettes', () => {
     // No interior plaquettes possible — output length must be 0 so downstream
     // code reduces on a well-defined empty array instead of reading past its
@@ -161,6 +176,12 @@ describe('computeVortexDensityCpu2D — input validation', () => {
       /phaseField length 7 !== 16/
     )
     expect(() => computeVortexDensityCpu2D(new Float32Array(100), 4, 4)).toThrow()
+  })
+
+  it('rejects over-budget plaquette fields before output allocation', () => {
+    expect(() =>
+      computeVortexDensityCpu2D(new Float32Array(0), MAX_VORTEX_PLAQUETTES + 2, 2)
+    ).toThrow(/plaquette count exceeds/)
   })
 
   it('totalVortexCharge on an empty array returns exactly 0', () => {

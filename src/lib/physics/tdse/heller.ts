@@ -54,6 +54,10 @@ export const HELLER_UNIFORMITY_TOLERANCE = 0.01
  * nominal samples.
  */
 export const HELLER_MAX_INTERPOLATION_FRACTION = 0.2
+export const HELLER_MAX_FFT_POINTS = 2 ** 20
+export const HELLER_MAX_CAPACITY = Math.floor(
+  HELLER_MAX_FFT_POINTS * (1 - HELLER_MAX_INTERPOLATION_FRACTION)
+)
 
 /**
  * Minimum sample count required before `computeHellerSpectrum` will
@@ -102,6 +106,11 @@ export interface HellerRingBuffer {
 export function createHellerBuffer(capacity: number = HELLER_DEFAULT_CAPACITY): HellerRingBuffer {
   if (!Number.isInteger(capacity) || capacity <= 0) {
     throw new Error(`HellerRingBuffer capacity must be a positive integer, got ${capacity}`)
+  }
+  if (capacity > HELLER_MAX_CAPACITY) {
+    throw new Error(
+      `HellerRingBuffer capacity ${capacity} exceeds max supported capacity ${HELLER_MAX_CAPACITY}`
+    )
   }
   return {
     capacity,
@@ -163,6 +172,9 @@ export function resetHellerBuffer(buf: HellerRingBuffer): void {
 export function hannWindow(n: number): Float64Array {
   if (!Number.isInteger(n) || n < 0) {
     throw new Error(`hannWindow length must be a non-negative integer, got ${n}`)
+  }
+  if (n > HELLER_MAX_FFT_POINTS) {
+    throw new Error(`hannWindow length ${n} exceeds max supported length ${HELLER_MAX_FFT_POINTS}`)
   }
   const w = new Float64Array(n)
   if (n === 0) return w
@@ -305,6 +317,7 @@ export function computeHellerSpectrum(
   }
 
   const nGrid = indices[n - 1]! + 1
+  if (nGrid > HELLER_MAX_FFT_POINTS) return empty
   // nGrid >= n by construction. Cap the interpolation budget so a
   // pathologically sparse trace (user paused mid-capture etc.) cannot
   // produce a near-zero spectrum that looks like a valid result.

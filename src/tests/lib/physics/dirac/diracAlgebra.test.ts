@@ -430,4 +430,28 @@ describe('DiracAlgebraBridge — worker success path (mock)', () => {
     restore()
     bridge.dispose()
   })
+
+  it('falls back to JS when worker returns non-finite gamma matrix entries', async () => {
+    const [handle, restore] = installMockWorker()
+    const bridge = new DiracAlgebraBridge()
+    const p = bridge.generateMatrices(3)
+    const gammaData = fakeGammaPayload(3, 0)
+    gammaData[2] = Number.NaN
+
+    handle.triggerMessage({
+      type: 'result',
+      epoch: 1,
+      gammaData,
+      spinorSize: spinorSize(3),
+    })
+
+    const result = await p
+    expect(result.spinorSize).toBe(4)
+    expect(result.gammaData[2]).not.toBeNaN()
+    expect(result.gammaData.length).toBe(generateDiracMatricesFallback(3).gammaData.length)
+    expect(handle.terminate).toHaveBeenCalledOnce()
+
+    restore()
+    bridge.dispose()
+  })
 })

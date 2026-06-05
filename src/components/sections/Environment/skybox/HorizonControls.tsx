@@ -22,6 +22,7 @@ export const HorizonControls: React.FC<HorizonControlsProps> = ({
       </span>
 
       <Slider
+        data-testid="components-sections-environment-skybox-horizon-controls-slider-24-7"
         label="Gradient Contrast"
         tooltip="Sharpness of the horizon gradient transition. Higher values create a more dramatic dark-to-light boundary."
         value={proceduralSettings.horizonGradient?.gradientContrast ?? 0.5}
@@ -36,6 +37,7 @@ export const HorizonControls: React.FC<HorizonControlsProps> = ({
       />
 
       <Slider
+        data-testid="components-sections-environment-skybox-horizon-controls-slider-38-7"
         label="Spotlight Focus"
         tooltip="Concentration of the directional spotlight. Higher values create a tighter, more focused hot spot."
         value={proceduralSettings.horizonGradient?.spotlightFocus ?? 0.5}

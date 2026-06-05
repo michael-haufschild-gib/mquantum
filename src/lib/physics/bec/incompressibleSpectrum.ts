@@ -22,6 +22,8 @@
 /** Number of bins in the incompressible kinetic energy spectrum. */
 export const NUM_SPECTRUM_BINS = 32
 
+const MAX_BEC_TOTAL_SITES = 2 ** 20
+
 /** Result of the incompressible spectrum computation. */
 export interface IncompressibleSpectrumResult {
   /** Energy per bin E_incomp(k_n) */
@@ -39,27 +41,40 @@ interface SpectrumInputShape {
   totalSites: number
 }
 
+function validatePowerOfTwoGridShape(gridSize: readonly number[]): SpectrumInputShape | null {
+  const dim = gridSize.length
+  if (dim === 0) return null
+
+  let totalSites = 1
+  for (let d = 0; d < dim; d++) {
+    const n = gridSize[d]!
+    const log2N = Math.log2(n)
+    if (!Number.isSafeInteger(n) || n < 2 || n > MAX_BEC_TOTAL_SITES || !Number.isInteger(log2N)) {
+      return null
+    }
+    totalSites *= n
+    if (!Number.isSafeInteger(totalSites) || totalSites > MAX_BEC_TOTAL_SITES) return null
+  }
+
+  return { dim, totalSites }
+}
+
 function validateSpectrumInputShape(
   psiRe: Float32Array,
   psiIm: Float32Array,
   gridSize: number[],
   spacing: number[]
 ): SpectrumInputShape | null {
-  const dim = gridSize.length
+  const shape = validatePowerOfTwoGridShape(gridSize)
+  if (!shape) return null
+  const { dim, totalSites } = shape
   if (dim === 0 || spacing.length !== dim) return null
 
-  let totalSites = 1
   for (let d = 0; d < dim; d++) {
-    const n = gridSize[d]!
     const dx = spacing[d]!
-    if (!Number.isFinite(n) || !Number.isInteger(n) || n < 2 || (n & (n - 1)) !== 0) {
-      return null
-    }
     if (!Number.isFinite(dx) || dx <= 0) return null
-    totalSites *= n
   }
 
-  if (!Number.isSafeInteger(totalSites) || totalSites <= 0) return null
   if (psiRe.length !== totalSites || psiIm.length !== totalSites) return null
 
   for (let i = 0; i < totalSites; i++) {
@@ -120,8 +135,16 @@ export function fftND(
   gridSize: number[],
   inverse: boolean
 ): void {
-  let totalSites = 1
-  for (let d = 0; d < gridSize.length; d++) totalSites *= gridSize[d]!
+  const shape = validatePowerOfTwoGridShape(gridSize)
+  if (!shape) {
+    throw new Error('fftND gridSize must contain safe power-of-two dimensions within site budget')
+  }
+  const { totalSites } = shape
+  if (re.length < totalSites || im.length < totalSites) {
+    throw new Error(
+      `fftND arrays too small: need ${totalSites}, got re=${re.length}, im=${im.length}`
+    )
+  }
 
   // Interleave into a single buffer
   const interleaved = new Float64Array(totalSites * 2)

@@ -72,6 +72,16 @@ describe('computeLevelSpacing', () => {
     expect(result.classification).toBe('poisson')
   })
 
+  it('falls back to finite poisson metadata when finite energies produce overflowed spacings', () => {
+    const result = computeLevelSpacing([-Number.MAX_VALUE, 0, Number.MAX_VALUE])
+
+    expect(result.energies).toEqual([-Number.MAX_VALUE, 0, Number.MAX_VALUE])
+    expect(result.spacings).toEqual([Number.MAX_VALUE, Number.MAX_VALUE])
+    expect(result.meanSpacing).toBe(0)
+    expect(result.brodyBeta).toBe(0)
+    expect(result.classification).toBe('poisson')
+  })
+
   it('returns finite empty metadata when fewer than two finite energies remain', () => {
     const result = computeLevelSpacing([Number.NaN, Number.POSITIVE_INFINITY], [0.1, Number.NaN])
     expect(result.energies).toEqual([])
@@ -88,6 +98,11 @@ describe('computeLevelSpacing', () => {
       [0.1, 99, 0.2, 88, 0.3]
     )
     expect(result.meanIPR).toBeCloseTo(0.2, 10)
+  })
+
+  it('ignores non-positive IPR values instead of averaging impossible participation counts', () => {
+    const result = computeLevelSpacing([1, 2, 3, 4], [0, -5, 2, Number.NaN])
+    expect(result.meanIPR).toBe(2)
   })
 
   it('returns NaN meanIPR when no IPRs provided', () => {
@@ -153,6 +168,13 @@ describe('classifyLocalization', () => {
 
   it('handles NaN IPR as critical', () => {
     expect(classifyLocalization(NaN, 1000)).toBe('critical')
+  })
+
+  it('handles non-positive IPR and invalid site counts as critical', () => {
+    expect(classifyLocalization(0, 1000)).toBe('critical')
+    expect(classifyLocalization(-1, 1000)).toBe('critical')
+    expect(classifyLocalization(10, 1000.5)).toBe('critical')
+    expect(classifyLocalization(10, Number.POSITIVE_INFINITY)).toBe('critical')
   })
 
   it('handles zero totalSites as critical', () => {

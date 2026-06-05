@@ -29,6 +29,21 @@ const WASM_1D_MIN_N = 32
  */
 const WASM_ND_MIN_SITES = 256
 
+/**
+ * CPU FFT axis cap. This is intentionally much lower than the signed-shift
+ * boundary: a single `n = 2 ** 30` call would try to cache ~16 GiB of twiddle
+ * factors before doing any useful work.
+ */
+const MAX_FFT_AXIS_SIZE = 2 ** 20
+
+/** Maximum product of N-D FFT grid sites accepted by the CPU fallback. */
+const MAX_FFT_TOTAL_SITES = 2 ** 20
+
+function isSafePowerOfTwo(n: number): boolean {
+  if (!Number.isSafeInteger(n) || n < 1 || n > MAX_FFT_AXIS_SIZE) return false
+  return Number.isInteger(Math.log2(n))
+}
+
 // ============================================================================
 // WASM FFT Helpers
 // ============================================================================
@@ -120,7 +135,13 @@ function tryWasmIfftNd(data: Float64Array, gridSize: readonly number[]): boolean
  * @throws If n is not a power of 2
  */
 function assertPowerOf2(n: number): void {
-  if (!Number.isInteger(n) || n < 1 || (n & (n - 1)) !== 0) {
+  if (!Number.isSafeInteger(n) || n < 1) {
+    throw new Error(`FFT requires positive power-of-2 length, got ${n}`)
+  }
+  if (n > MAX_FFT_AXIS_SIZE) {
+    throw new Error(`FFT length too large: ${n} exceeds ${MAX_FFT_AXIS_SIZE}`)
+  }
+  if (!isSafePowerOfTwo(n)) {
     throw new Error(`FFT requires power-of-2 length, got ${n}`)
   }
 }
@@ -134,6 +155,9 @@ function assertPowerOf2(n: number): void {
  */
 function assertComplexDataLength(data: FFTArray, n: number): void {
   const expected = 2 * n
+  if (!Number.isSafeInteger(expected)) {
+    throw new Error(`FFT data length overflows safe integer range for ${n} samples`)
+  }
   if (data.length < expected) {
     throw new Error(`FFT data length too small: expected at least ${expected}, got ${data.length}`)
   }
@@ -145,16 +169,30 @@ function assertComplexDataLength(data: FFTArray, n: number): void {
  * @param gridSize - Grid dimensions
  * @throws If any dimension is not a positive power-of-2 integer
  */
-function assertValidGridSize(gridSize: readonly number[]): void {
+function assertValidGridSize(gridSize: readonly number[]): number {
+  let totalSites = 1
   for (let d = 0; d < gridSize.length; d++) {
     const n = gridSize[d]!
-    if (!Number.isInteger(n) || n < 1) {
+    if (!Number.isSafeInteger(n) || n < 1) {
       throw new Error(`FFT dimension must be positive integer, got ${n} at axis ${d}`)
     }
-    if ((n & (n - 1)) !== 0) {
+    if (n > MAX_FFT_AXIS_SIZE) {
+      throw new Error(`FFT dimension too large: got ${n} at axis ${d}, max ${MAX_FFT_AXIS_SIZE}`)
+    }
+    if (!isSafePowerOfTwo(n)) {
       throw new Error(`FFT dimension must be power-of-2, got ${n} at axis ${d}`)
     }
+    if (totalSites > Math.floor(Number.MAX_SAFE_INTEGER / n)) {
+      throw new Error(`FFT grid total sites overflow at axis ${d}`)
+    }
+    totalSites *= n
+    if (totalSites > MAX_FFT_TOTAL_SITES) {
+      throw new Error(
+        `FFT grid total sites too large: ${totalSites} exceeds ${MAX_FFT_TOTAL_SITES}`
+      )
+    }
   }
+  return totalSites
 }
 
 /**
@@ -416,9 +454,7 @@ function ndTransform(
   const dim = gridSize.length
   if (dim === 0) return
 
-  assertValidGridSize(gridSize)
-
-  const totalSites = gridSize.reduce((a, b) => a * b, 1)
+  const totalSites = assertValidGridSize(gridSize)
   assertComplexDataLength(data, totalSites)
   if (totalSites <= 1) return
 
@@ -469,15 +505,14 @@ export function ifftNd(data: FFTArray, gridSize: readonly number[]): void {
   // `assertComplexDataLength` (called inside `ndTransform`) would have
   // thrown loudly. Hoisting them here keeps both paths fail-fast and
   // matches what every production caller already expects.
+  let totalSites = 1
   if (gridSize.length > 0) {
-    assertValidGridSize(gridSize)
-    const totalSitesValidate = gridSize.reduce((a, b) => a * b, 1)
-    assertComplexDataLength(data, totalSitesValidate)
+    totalSites = assertValidGridSize(gridSize)
+    assertComplexDataLength(data, totalSites)
   }
 
   // Try N-D WASM path for Float64Array with sufficient total sites
   if (data instanceof Float64Array && isAnimationWasmReady()) {
-    const totalSites = gridSize.reduce((a, b) => a * b, 1)
     if (totalSites >= WASM_ND_MIN_SITES && tryWasmIfftNd(data, gridSize)) return
   }
 
@@ -498,15 +533,14 @@ export function fftNd(data: FFTArray, gridSize: readonly number[]): void {
   // returns an empty Float32Array, and `tryWasmFftNd` reports success
   // even though the buffer was never transformed. Throwing here keeps
   // the WASM-ready branch and the JS fallback path equally fail-fast.
+  let totalSites = 1
   if (gridSize.length > 0) {
-    assertValidGridSize(gridSize)
-    const totalSitesValidate = gridSize.reduce((a, b) => a * b, 1)
-    assertComplexDataLength(data, totalSitesValidate)
+    totalSites = assertValidGridSize(gridSize)
+    assertComplexDataLength(data, totalSites)
   }
 
   // Try N-D WASM path for Float64Array with sufficient total sites
   if (data instanceof Float64Array && isAnimationWasmReady()) {
-    const totalSites = gridSize.reduce((a, b) => a * b, 1)
     if (totalSites >= WASM_ND_MIN_SITES && tryWasmFftNd(data, gridSize)) return
   }
 

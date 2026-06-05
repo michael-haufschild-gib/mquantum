@@ -84,6 +84,7 @@ export const ExportGeneralTab = () => {
               Container
             </label>
             <ToggleGroup
+              data-testid="components-overlays-export-export-general-tab-toggle-group-86-13"
               options={[
                 { value: 'mp4', label: 'MP4' },
                 { value: 'webm', label: 'WebM', disabled: !supportedCodecs.vp9 },
@@ -102,6 +103,7 @@ export const ExportGeneralTab = () => {
               Resolution
             </label>
             <ToggleGroup
+              data-testid="components-overlays-export-export-general-tab-toggle-group-104-13"
               options={[
                 { value: '720p', label: '720P' },
                 { value: '1080p', label: '1080P' },
@@ -128,6 +130,7 @@ export const ExportGeneralTab = () => {
                   Width
                 </label>
                 <NumberInput
+                  data-testid="components-overlays-export-export-general-tab-number-input-130-17"
                   value={settings.customWidth}
                   onChange={(val) => updateSettings({ customWidth: clampDimension(val) })}
                   min={128}
@@ -141,6 +144,7 @@ export const ExportGeneralTab = () => {
                   Height
                 </label>
                 <NumberInput
+                  data-testid="components-overlays-export-export-general-tab-number-input-143-17"
                   value={settings.customHeight}
                   onChange={(val) => updateSettings({ customHeight: clampDimension(val) })}
                   min={128}
@@ -169,6 +173,7 @@ export const ExportGeneralTab = () => {
               Framerate
             </label>
             <ToggleGroup
+              data-testid="components-overlays-export-export-general-tab-toggle-group-171-13"
               options={[
                 { value: '24', label: '24' },
                 { value: '30', label: '30' },
@@ -182,6 +187,7 @@ export const ExportGeneralTab = () => {
 
           <div className="space-y-1">
             <Slider
+              data-testid="components-overlays-export-export-general-tab-slider-184-13"
               label="Duration"
               tooltip="Total length of the exported video in seconds."
               value={settings.duration}
@@ -201,6 +207,7 @@ export const ExportGeneralTab = () => {
 
       {/* Crop Control - Visual Card Style */}
       <div
+        data-testid="components-overlays-export-export-general-tab-div-203-7"
         className={`
                     flex items-center justify-between p-4 rounded-xl border transition-colors cursor-pointer
                     ${settings.crop.enabled ? 'bg-accent/5 border-accent/50' : 'surface-panel hover:bg-[var(--bg-hover)]'}
@@ -225,8 +232,13 @@ export const ExportGeneralTab = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <div onClick={(e) => e.stopPropagation()} title="Stop the row click from also firing">
+          <div
+            data-testid="components-overlays-export-export-general-tab-div-228-11"
+            onClick={(e) => e.stopPropagation()}
+            title="Stop the row click from also firing"
+          >
             <Switch
+              data-testid="components-overlays-export-export-general-tab-switch-229-13"
               checked={settings.crop.enabled}
               onCheckedChange={(c) => updateSettings({ crop: { ...settings.crop, enabled: c } })}
               ariaLabel="Crop frame"
@@ -234,6 +246,7 @@ export const ExportGeneralTab = () => {
             />
           </div>
           <Button
+            data-testid="components-overlays-export-export-general-tab-button-236-11"
             size="sm"
             variant="secondary"
             disabled={!settings.crop.enabled}
@@ -249,6 +262,7 @@ export const ExportGeneralTab = () => {
       </div>
       {/* Reset Evolution Toggle */}
       <div
+        data-testid="components-overlays-export-export-general-tab-div-251-7"
         className={`
                     flex items-center justify-between p-4 rounded-xl border transition-colors cursor-pointer
                     ${settings.resetEvolution ? 'bg-accent/5 border-accent/50' : 'surface-panel hover:bg-[var(--bg-hover)]'}
@@ -272,8 +286,13 @@ export const ExportGeneralTab = () => {
           </div>
         </div>
 
-        <div onClick={(e) => e.stopPropagation()} title="Stop the row click from also firing">
+        <div
+          data-testid="components-overlays-export-export-general-tab-div-275-9"
+          onClick={(e) => e.stopPropagation()}
+          title="Stop the row click from also firing"
+        >
           <Switch
+            data-testid="components-overlays-export-export-general-tab-switch-276-11"
             checked={settings.resetEvolution}
             onCheckedChange={(c) => updateSettings({ resetEvolution: c })}
             ariaLabel="Reset evolution"

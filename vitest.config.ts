@@ -66,57 +66,57 @@ export default defineConfig({
         // createBindGroup, dispatchWorkgroups). No testable logic in Vitest/happy-dom.
         // These are verified by Playwright e2e tests (rendering.spec.ts,
         // shader-compilation-matrix.spec.ts, physics-validation.spec.ts).
-        'src/rendering/webgpu/passes/TDSEComputePass.ts',
-        'src/rendering/webgpu/passes/TDSEComputePassDispatchers.ts',
+        'src/rendering/webgpu/passes/TDSEComputePass/index.ts',
+        'src/rendering/webgpu/passes/TDSEComputePassDispatchers/index.ts',
         'src/rendering/webgpu/passes/TDSEComputePassDispose.ts',
-        'src/rendering/webgpu/passes/DensityGridGradientSetup.ts',
-        'src/rendering/webgpu/passes/DiracComputePass.ts',
-        'src/rendering/webgpu/passes/DiracComputePassDispatchers.ts',
-        'src/rendering/webgpu/passes/DiracComputePassSetup.ts',
-        'src/rendering/webgpu/passes/DiracComputePassUniforms.ts',
-        'src/rendering/webgpu/passes/PauliComputePass.ts',
-        'src/rendering/webgpu/passes/PauliComputePassBuffers.ts',
-        'src/rendering/webgpu/passes/FreeScalarFieldComputePass.ts',
-        'src/rendering/webgpu/passes/WignerCacheComputePass.ts',
-        'src/rendering/webgpu/passes/WignerCacheComputePassSetup.ts',
-        'src/rendering/webgpu/passes/PaperTexturePass.ts',
-        'src/rendering/webgpu/passes/SMAAPass.ts',
-        'src/rendering/webgpu/passes/FrameBlendingPass.ts',
-        'src/rendering/webgpu/passes/FXAAPass.ts',
+        'src/rendering/webgpu/passes/DensityGridGradientSetup/index.ts',
+        'src/rendering/webgpu/passes/DiracComputePass/index.ts',
+        'src/rendering/webgpu/passes/DiracComputePassDispatchers/index.ts',
+        'src/rendering/webgpu/passes/DiracComputePassSetup/index.ts',
+        'src/rendering/webgpu/passes/DiracComputePassUniforms/index.ts',
+        'src/rendering/webgpu/passes/PauliComputePass/index.ts',
+        'src/rendering/webgpu/passes/PauliComputePassBuffers/index.ts',
+        'src/rendering/webgpu/passes/FreeScalarFieldComputePass/index.ts',
+        'src/rendering/webgpu/passes/WignerCacheComputePass/index.ts',
+        'src/rendering/webgpu/passes/WignerCacheComputePassSetup/index.ts',
+        'src/rendering/webgpu/passes/PaperTexturePass/index.ts',
+        'src/rendering/webgpu/passes/SMAAPass/index.ts',
+        'src/rendering/webgpu/passes/FrameBlendingPass/index.ts',
+        'src/rendering/webgpu/passes/FXAAPass/index.ts',
         // gizmoGround.ts — removed: pure geometry math, no GPU calls, testable
-        'src/rendering/webgpu/renderers/WebGPUSkyboxRenderer.ts',
+        'src/rendering/webgpu/renderers/WebGPUSkyboxRenderer/index.ts',
         // skyboxVertexData.ts — removed: mostly pure functions, testable
-        'src/rendering/webgpu/renderers/strategies/TdseBecStrategy.ts',
+        'src/rendering/webgpu/renderers/strategies/TdseBecStrategy/index.ts',
         // useRotationUpdates.ts — removed: React hook with zero GPU calls, testable
         'src/rendering/webgpu/passes/TDSEComputePassBindGroups.ts',
-        'src/rendering/webgpu/passes/PauliComputePassSetup.ts',
-        'src/rendering/webgpu/passes/FreeScalarFieldComputePassSetup.ts',
+        'src/rendering/webgpu/passes/PauliComputePassSetup/index.ts',
+        'src/rendering/webgpu/passes/FreeScalarFieldComputePassSetup/index.ts',
         'src/rendering/webgpu/passes/DiracComputePassBuffers.ts',
-        'src/rendering/webgpu/passes/TDSEComputePassSetup.ts',
+        'src/rendering/webgpu/passes/TDSEComputePassSetup/index.ts',
         'src/rendering/webgpu/passes/TDSEComputePassBuffers.ts',
-        'src/rendering/webgpu/passes/WebGPUTemporalCloudPass.ts',
-        'src/rendering/webgpu/passes/WebGPUTemporalCloudPassSetup.ts',
+        'src/rendering/webgpu/passes/WebGPUTemporalCloudPass/index.ts',
+        'src/rendering/webgpu/passes/WebGPUTemporalCloudPassSetup/index.ts',
         // GPU-only compute pass split files (same criterion as the entries
         // above): 100% WebGPU dispatch/bind-group/buffer-write calls, no
         // testable logic in Vitest/happy-dom. Verified by Playwright e2e
         // tests (rendering.spec.ts, physics-validation.spec.ts).
-        'src/rendering/webgpu/passes/TDSEComputePassEvolution.ts',
+        'src/rendering/webgpu/passes/TDSEComputePassEvolution/index.ts',
         'src/rendering/webgpu/passes/TDSEComputePassExecute.ts',
-        'src/rendering/webgpu/passes/TDSEStateSaveLoad.ts',
-        'src/rendering/webgpu/passes/TDSEStochasticLocalization.ts',
-        'src/rendering/webgpu/passes/TDSEObservablesDispatch.ts',
-        'src/rendering/webgpu/passes/TDSECurvedIntegrator.ts',
-        'src/rendering/webgpu/passes/TDSEVortexDetect.ts',
-        'src/rendering/webgpu/passes/DiracComputePassStrang.ts',
-        'src/rendering/webgpu/passes/QuantumWalkComputePass.ts',
-        'src/rendering/webgpu/passes/QuantumWalkDiagnostics.ts',
-        'src/rendering/webgpu/passes/DensityGridComputePass.ts',
-        'src/rendering/webgpu/passes/EigenfunctionCacheComputePass.ts',
-        'src/rendering/webgpu/passes/AdsDensityComputePass.ts',
-        'src/rendering/webgpu/passes/CarpetSliceComputePass.ts',
-        'src/rendering/webgpu/passes/LightGizmoPass.ts',
-        'src/rendering/webgpu/passes/CubemapCapturePass.ts',
-        'src/rendering/webgpu/passes/stateSave.ts',
+        'src/rendering/webgpu/passes/TDSEStateSaveLoad/index.ts',
+        'src/rendering/webgpu/passes/TDSEStochasticLocalization/index.ts',
+        'src/rendering/webgpu/passes/TDSEObservablesDispatch/index.ts',
+        'src/rendering/webgpu/passes/TDSECurvedIntegrator/index.ts',
+        'src/rendering/webgpu/passes/TDSEVortexDetect/index.ts',
+        'src/rendering/webgpu/passes/DiracComputePassStrang/index.ts',
+        'src/rendering/webgpu/passes/QuantumWalkComputePass/index.ts',
+        'src/rendering/webgpu/passes/QuantumWalkDiagnostics/index.ts',
+        'src/rendering/webgpu/passes/DensityGridComputePass/index.ts',
+        'src/rendering/webgpu/passes/EigenfunctionCacheComputePass/index.ts',
+        'src/rendering/webgpu/passes/AdsDensityComputePass/index.ts',
+        'src/rendering/webgpu/passes/CarpetSliceComputePass/index.ts',
+        'src/rendering/webgpu/passes/LightGizmoPass/index.ts',
+        'src/rendering/webgpu/passes/CubemapCapturePass/index.ts',
+        'src/rendering/webgpu/passes/stateSave/index.ts',
         // GPU orchestration: heavy WebGPU coupling, render graph + RAF loop
         // tied to canvas DOM element. Not viable in Vitest/happy-dom.
         'src/rendering/webgpu/WebGPUScene.ts',
@@ -130,36 +130,36 @@ export default defineConfig({
         // GPU strategies: each strategy's executeFrame() is a sequence of
         // GPU pipeline dispatches. Pure helpers (computeAdsConfigHash,
         // computeBasisVersion) are tested separately where exported.
-        'src/rendering/webgpu/renderers/strategies/AnalyticModeStrategy.ts',
-        'src/rendering/webgpu/renderers/strategies/analyticOpenQuantum.ts',
-        'src/rendering/webgpu/renderers/strategies/AntiDeSitterStrategy.ts',
-        'src/rendering/webgpu/renderers/strategies/FreeScalarFieldStrategy.ts',
-        'src/rendering/webgpu/renderers/strategies/DiracStrategy.ts',
-        'src/rendering/webgpu/renderers/strategies/PauliStrategy.ts',
-        'src/rendering/webgpu/renderers/strategies/QuantumWalkStrategy.ts',
+        'src/rendering/webgpu/renderers/strategies/AnalyticModeStrategy/index.ts',
+        'src/rendering/webgpu/renderers/strategies/analyticOpenQuantum/index.ts',
+        'src/rendering/webgpu/renderers/strategies/AntiDeSitterStrategy/index.ts',
+        'src/rendering/webgpu/renderers/strategies/FreeScalarFieldStrategy/index.ts',
+        'src/rendering/webgpu/renderers/strategies/DiracStrategy/index.ts',
+        'src/rendering/webgpu/renderers/strategies/PauliStrategy/index.ts',
+        'src/rendering/webgpu/renderers/strategies/QuantumWalkStrategy/index.ts',
         // Renderer + frame update: GPU buffer writes orchestrated against
         // store snapshots. Replaced in coverage by the underlying pure
         // helpers (uniformPacking, uniformPackingSupport, skyboxVertexData).
-        'src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts',
-        'src/rendering/webgpu/renderers/schrodingerFrameUpdate.ts',
+        'src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer/index.ts',
+        'src/rendering/webgpu/renderers/schrodingerFrameUpdate/index.ts',
         // Additional GPU-only pass modules following the existing exclusion
         // criterion (100% WebGPU API calls; verified by Playwright).
         'src/rendering/webgpu/passes/TDSEComputePassInit.ts',
-        'src/rendering/webgpu/passes/TDSEComputePassUniforms.ts',
-        'src/rendering/webgpu/passes/TDSEDiagnosticsReadback.ts',
-        'src/rendering/webgpu/passes/fsfCosmologyStepping.ts',
-        'src/rendering/webgpu/passes/FreeScalarFieldKSpace.ts',
+        'src/rendering/webgpu/passes/TDSEComputePassUniforms/index.ts',
+        'src/rendering/webgpu/passes/TDSEDiagnosticsReadback/index.ts',
+        'src/rendering/webgpu/passes/fsfCosmologyStepping/index.ts',
+        'src/rendering/webgpu/passes/FreeScalarFieldKSpace/index.ts',
         'src/rendering/webgpu/passes/FreeScalarFieldComputePassInit.ts',
-        'src/rendering/webgpu/passes/FreeScalarFieldComputePassUniforms.ts',
-        'src/rendering/webgpu/passes/DensityDistributionAnalysis.ts',
+        'src/rendering/webgpu/passes/FreeScalarFieldComputePassUniforms/index.ts',
+        'src/rendering/webgpu/passes/DensityDistributionAnalysis/index.ts',
         // computePassUtils.ts itself stays included — pure dispatch / FFT-pack
         // helpers are testable. Only the GPU texture creators (split into
         // computePassTextures.ts) need exclusion.
-        'src/rendering/webgpu/passes/computePassTextures.ts',
+        'src/rendering/webgpu/passes/computePassTextures/index.ts',
         'src/rendering/webgpu/core/WebGPUBasePass.ts',
         'src/rendering/webgpu/core/WebGPUResourcePool.ts',
         'src/rendering/webgpu/graph/WebGPURenderGraph.ts',
-        'src/rendering/webgpu/renderers/schrodingerPipeline.ts',
+        'src/rendering/webgpu/renderers/schrodingerPipeline/index.ts',
         // Application entry: bootstraps DOM, mounts React tree, no testable
         // logic in Vitest. Verified by Playwright app-loads.spec.ts.
         'src/App.tsx',
@@ -188,26 +188,26 @@ export default defineConfig({
         // Sweep coordinator wraps a Web Worker and reads from a Zustand
         // store. The pure sweep math lives in lib/physics/srmt and is
         // tested there; this file is the worker glue.
-        'src/rendering/webgpu/renderers/strategies/WheelerDeWittSrmtSweepCoordinator.ts',
+        'src/rendering/webgpu/renderers/strategies/WheelerDeWittSrmtSweepCoordinator/index.ts',
         // High-coverage React components and the URL-state hook: covered
         // by Playwright url-state.spec.ts and panels.spec.ts. Branches
         // here are mostly conditional rendering of optional sliders which
         // happy-dom would render trivially without exercising the
         // underlying physics.
-        'src/components/sections/Geometry/SchroedingerControls/AntiDeSitterControls.tsx',
+        'src/components/sections/Geometry/SchroedingerControls/AntiDeSitterControls/index.tsx',
       ],
       // Coverage ratchet: thresholds track current actuals (rounded down to
       // nearest 0.5%). Raise when coverage improves. Lower only when the
       // denominator changes (new files, exclusion list changes) — document why.
       // The companion `scripts/check-coverage-ratchet.js` rejects thresholds
       // that drift > 1% below actual, so missed ratchet-ups break CI.
-      // Last measured 2026-06-05 (PR #99): stmts 86.88%, branches 78.12%,
-      // funcs 85.22%, lines 88.07%. Ratchet bumps statements, functions, and
-      // lines to stay within the 1% ratchet window after CTC visualization
-      // tests raised measured coverage.
+      // Last measured 2026-06-05 (PR #100): stmts 87.23%, branches 78.71%,
+      // funcs 85.49%, lines 88.45%. Ratchet bumps branches to stay within
+      // the 1% ratchet window after index-layout coverage exclusions were
+      // restored.
       thresholds: {
         statements: 86.5,
-        branches: 77.5,
+        branches: 78.5,
         functions: 85,
         lines: 88,
       },

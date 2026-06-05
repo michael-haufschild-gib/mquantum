@@ -428,7 +428,7 @@ pub fn compute_rdm_wasm(
 /// * `psi_re` - Real part of wavefunction (Float32Array)
 /// * `psi_im` - Imaginary part of wavefunction (Float32Array)
 /// * `grid_size` - Grid dimensions
-/// * `kept_dims` - Indices of dimensions to keep (sorted ascending)
+/// * `kept_dims` - Strictly increasing indices of dimensions to keep
 ///
 /// # Returns
 /// Packed `Float64Array`: `[re_flat(M*M), im_flat(M*M)]` where `M = Π kept dims`.

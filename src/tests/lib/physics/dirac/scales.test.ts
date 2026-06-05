@@ -24,6 +24,11 @@ describe('comptonWavelength', () => {
     expect(comptonWavelength(1, 0, 1)).toBe(Infinity)
     expect(comptonWavelength(1, 1, 0)).toBe(Infinity)
   })
+
+  it('returns Infinity instead of NaN for corrupted inputs', () => {
+    expect(comptonWavelength(Number.NaN, 1, 1)).toBe(Infinity)
+    expect(comptonWavelength(1, Number.NaN, 1)).toBe(Infinity)
+  })
 })
 
 describe('zitterbewegungFrequency', () => {
@@ -43,6 +48,11 @@ describe('zitterbewegungFrequency', () => {
   it('returns Infinity when ℏ = 0', () => {
     expect(zitterbewegungFrequency(1, 1, 0)).toBe(Infinity)
   })
+
+  it('returns Infinity instead of NaN for corrupted inputs', () => {
+    expect(zitterbewegungFrequency(Number.NaN, 1, 1)).toBe(Infinity)
+    expect(zitterbewegungFrequency(1, 1, Number.NaN)).toBe(Infinity)
+  })
 })
 
 describe('kleinThreshold', () => {
@@ -53,6 +63,10 @@ describe('kleinThreshold', () => {
   it('scales with mass and c²', () => {
     expect(kleinThreshold(0.5, 2)).toBeCloseTo(4, 10) // 2 * 0.5 * 4 = 4
     expect(kleinThreshold(3, 1)).toBeCloseTo(6, 10)
+  })
+
+  it('returns Infinity instead of NaN for corrupted inputs', () => {
+    expect(kleinThreshold(Number.NaN, 1)).toBe(Infinity)
   })
 })
 
@@ -73,6 +87,18 @@ describe('relativisticEnergy', () => {
       c = 2
     const E = relativisticEnergy(p, m, c)
     expect(E * E).toBeCloseTo((p * c) ** 2 + (m * c * c) ** 2, 8)
+  })
+
+  it('does not overflow merely from squaring a large finite momentum term', () => {
+    const p = Number.MAX_VALUE / 4
+    const E = relativisticEnergy(p, 0, 1)
+
+    expect(E).toBeCloseTo(p, 12)
+    expect(Number.isFinite(E)).toBe(true)
+  })
+
+  it('returns Infinity instead of NaN for corrupted inputs', () => {
+    expect(relativisticEnergy(Number.NaN, 1, 1)).toBe(Infinity)
   })
 })
 
@@ -97,6 +123,11 @@ describe('maxStableDt', () => {
   it('returns Infinity for empty spacing or c=0', () => {
     expect(maxStableDt([], 1)).toBe(Infinity)
     expect(maxStableDt([0.1], 0)).toBe(Infinity)
+  })
+
+  it('returns a safe zero timestep for invalid spacing entries', () => {
+    expect(maxStableDt([0.1, Number.NaN], 1)).toBe(0)
+    expect(maxStableDt([0.1, -0.2], 1)).toBe(0)
   })
 })
 

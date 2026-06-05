@@ -100,6 +100,7 @@ export const DebugToggle = ({
   disabled?: boolean
 }) => (
   <Button
+    data-testid="components-canvas-performance-monitor-subcomponents-button-102-3"
     variant={active ? 'primary' : 'ghost'}
     size="sm"
     onClick={disabled ? undefined : onClick}

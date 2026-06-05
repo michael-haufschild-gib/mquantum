@@ -70,6 +70,7 @@ export {
 
 /** Symplectic eigenvalues are clipped to the physical floor `1/2`. */
 const SYMPLECTIC_FLOOR = 0.5
+const MAX_PESCHEL_SUBSYSTEM_ENTRIES = 1_048_576
 /**
  * Tolerance below `1/2` we accept before throwing. Wider than pure double
  * precision to absorb the compounded `matrix → sqrtm → matmul → eigen`
@@ -78,6 +79,17 @@ const SYMPLECTIC_FLOOR = 0.5
  * Gaussian state).
  */
 const SYMPLECTIC_FLOOR_TOLERANCE = 1e-4
+
+function assertSafePeschelMatrixSize(n: number, caller: string, fieldName = 'n'): void {
+  if (!Number.isSafeInteger(n) || n < 0) {
+    throw new Error(`${caller}: ${fieldName} must be a non-negative safe integer, got ${n}`)
+  }
+  if (n > Math.floor(Math.sqrt(MAX_PESCHEL_SUBSYSTEM_ENTRIES))) {
+    throw new Error(
+      `${caller}: matrix size exceeds ${MAX_PESCHEL_SUBSYSTEM_ENTRIES} entries, got ${fieldName}=${n}`
+    )
+  }
+}
 
 /**
  * Extract a contiguous `length × length` principal submatrix starting at
@@ -99,6 +111,8 @@ export function extractSubsystem(
   start: number,
   length: number
 ): Float64Array {
+  assertSafePeschelMatrixSize(fullSize, 'extractSubsystem', 'fullSize')
+  assertSafePeschelMatrixSize(length, 'extractSubsystem', 'length')
   if (!Number.isInteger(fullSize) || fullSize < 0) {
     throw new Error(`extractSubsystem: fullSize must be a non-negative integer, got ${fullSize}`)
   }
@@ -154,10 +168,12 @@ export function extractSubsystem(
  *                  or corrupted correlators).
  */
 export function symplecticEigenvalues(X: Float64Array, P: Float64Array, n: number): Float64Array {
-  if (!Number.isInteger(n) || n < 0) {
-    throw new Error(`symplecticEigenvalues: n must be a non-negative integer, got ${n}`)
-  }
+  assertSafePeschelMatrixSize(n, 'symplecticEigenvalues', 'n')
   if (n === 0) return new Float64Array(0)
+  const expectedLength = n * n
+  if (X.length < expectedLength || P.length < expectedLength) {
+    throw new Error(`symplecticEigenvalues: X/P length must be at least n² = ${expectedLength}`)
+  }
 
   // Step 1 + 2: sqrtm(X) via Jacobi eigendecomp
   const { values: xVals, vectors: xVecs } = jacobiEigendecompose(X, n)

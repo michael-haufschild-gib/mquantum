@@ -1,8 +1,21 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { generateDisorderNoise } from '@/lib/physics/tdse/disorderNoise'
+import { generateDisorderNoise, MAX_DISORDER_NOISE_SITES } from '@/lib/physics/tdse/disorderNoise'
 
 describe('generateDisorderNoise', () => {
+  it('rejects invalid inputs before noise generation', () => {
+    for (const totalSites of [0, -1, 1.5, Number.NaN]) {
+      expect(() => generateDisorderNoise(totalSites, 42)).toThrow(/positive safe integer/)
+    }
+    expect(() => generateDisorderNoise(MAX_DISORDER_NOISE_SITES + 1, 42)).toThrow(
+      /max supported sites/
+    )
+    expect(() => generateDisorderNoise(16, Number.NaN)).toThrow(/seed/)
+    expect(() => generateDisorderNoise(16, 42, 'lorentzian' as never)).toThrow(
+      /unsupported distribution/
+    )
+  })
+
   it('generates correct number of samples', () => {
     const noise = generateDisorderNoise(1000, 42)
     expect(noise).toHaveLength(1000)

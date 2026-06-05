@@ -58,6 +58,7 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
               Structure
             </span>
             <Slider
+              data-testid="components-sections-environment-skybox-skybox-shared-procedural-controls-slider-60-13"
               label="Scale"
               tooltip="Overall size of the procedural pattern. Smaller values create finer detail; larger values produce broader features."
               value={proceduralSettings.scale}
@@ -68,6 +69,7 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
             />
             {!hideComplexity && (
               <Slider
+                data-testid="components-sections-environment-skybox-skybox-shared-procedural-controls-slider-70-15"
                 label="Complexity"
                 tooltip="Number of noise octaves blended together. Higher values add finer detail layers."
                 value={proceduralSettings.complexity}
@@ -78,6 +80,7 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
               />
             )}
             <Slider
+              data-testid="components-sections-environment-skybox-skybox-shared-procedural-controls-slider-80-13"
               label="Evolution (Seed)"
               tooltip="Morphs the noise pattern into a different configuration. Animate this for continuously evolving backgrounds."
               value={proceduralSettings.evolution}
@@ -94,6 +97,7 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
               Appearance
             </span>
             <Slider
+              data-testid="components-sections-environment-skybox-skybox-shared-procedural-controls-slider-96-13"
               label="Brightness"
               tooltip="Overall brightness multiplier for the skybox. Zero produces a black background."
               value={skyboxIntensity}
@@ -104,6 +108,7 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
             />
 
             <Slider
+              data-testid="components-sections-environment-skybox-skybox-shared-procedural-controls-slider-106-13"
               label="Time Flow"
               tooltip="Speed of the skybox animation. Zero freezes motion; higher values accelerate the pattern evolution."
               value={proceduralSettings.timeScale}
@@ -121,6 +126,7 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
             </span>
 
             <Slider
+              data-testid="components-sections-environment-skybox-skybox-shared-procedural-controls-slider-123-13"
               label="Turbulence"
               tooltip="Amount of chaotic distortion applied to the pattern. Creates swirling, organic motion."
               value={proceduralSettings.turbulence}
@@ -131,6 +137,7 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
             />
 
             <Slider
+              data-testid="components-sections-environment-skybox-skybox-shared-procedural-controls-slider-133-13"
               label="Sun Intensity"
               tooltip="Brightness of the simulated sun/star point light in the skybox."
               value={proceduralSettings.sunIntensity}

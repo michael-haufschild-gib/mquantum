@@ -25,6 +25,36 @@ const DISTRIBUTION_CODE: Record<TdseDisorderDistribution, number> = {
   gaussian: 1,
 }
 
+const MAX_DISORDER_SITES = 2 ** 20
+
+function resolveTotalSites(gridSize: number[], latticeDim: number): number {
+  if (!Number.isInteger(latticeDim) || latticeDim <= 0) {
+    throw new Error(
+      `generateDisorderPotential: latticeDim must be a positive integer, got ${latticeDim}`
+    )
+  }
+  if (gridSize.length < latticeDim) {
+    throw new Error(
+      `generateDisorderPotential: gridSize length ${gridSize.length} is smaller than latticeDim ${latticeDim}`
+    )
+  }
+
+  let totalSites = 1
+  for (let d = 0; d < latticeDim; d++) {
+    const size = gridSize[d]!
+    if (!Number.isSafeInteger(size) || size <= 0) {
+      throw new Error(
+        `generateDisorderPotential: gridSize[${d}] must be a positive safe integer, got ${size}`
+      )
+    }
+    if (totalSites > Math.floor(MAX_DISORDER_SITES / size)) {
+      throw new Error(`generateDisorderPotential: grid product exceeds ${MAX_DISORDER_SITES} sites`)
+    }
+    totalSites *= size
+  }
+  return totalSites
+}
+
 /**
  * Generate a random disorder potential on an N-D lattice.
  *
@@ -42,16 +72,26 @@ export function generateDisorderPotential(
   seed: number,
   distribution: TdseDisorderDistribution
 ): Float32Array<ArrayBuffer> {
-  let totalSites = 1
-  for (let d = 0; d < latticeDim; d++) {
-    totalSites *= gridSize[d]!
+  if (!Number.isFinite(disorderStrength) || disorderStrength < 0) {
+    throw new Error(
+      `generateDisorderPotential: disorderStrength must be a finite non-negative number, got ${disorderStrength}`
+    )
   }
+  if (!Number.isFinite(seed)) {
+    throw new Error(`generateDisorderPotential: seed must be finite, got ${seed}`)
+  }
+  const distributionCode = DISTRIBUTION_CODE[distribution]
+  if (distributionCode === undefined) {
+    throw new Error(`generateDisorderPotential: unsupported distribution ${String(distribution)}`)
+  }
+
+  const totalSites = resolveTotalSites(gridSize, latticeDim)
 
   const wasmResult = generateDisorderPotentialWasm(
     totalSites,
     disorderStrength,
     seed,
-    DISTRIBUTION_CODE[distribution]
+    distributionCode
   )
   if (wasmResult) return wasmResult
 

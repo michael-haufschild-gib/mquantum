@@ -28,6 +28,35 @@ import { M_FLOOR } from '@/lib/physics/freeScalar/vacuumSpectrum'
  * of the free-scalar pipeline still uses `M_FLOOR`.
  */
 export const ENTROPY_IR_FLOOR = 1e-6
+const MAX_PESCHEL_MATRIX_ENTRIES = 2 ** 20
+const MAX_PESCHEL_TRANSVERSE_MODES = 2 ** 20
+
+function assertPositiveSafeInteger(value: number, label: string): void {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new Error(`${label} must be a positive safe integer, got ${value}`)
+  }
+}
+
+function resolvePeschelMatrixSize(axisSize: number, caller: string): number {
+  assertPositiveSafeInteger(axisSize, `${caller}: gridSize[0]`)
+  if (axisSize > Math.floor(Math.sqrt(MAX_PESCHEL_MATRIX_ENTRIES))) {
+    throw new Error(`${caller}: axis-0 matrix size exceeds ${MAX_PESCHEL_MATRIX_ENTRIES} entries`)
+  }
+  return axisSize * axisSize
+}
+
+function multiplyModeCount(acc: number, value: number, caller: string): number {
+  if (acc > Math.floor(MAX_PESCHEL_TRANSVERSE_MODES / value)) {
+    throw new Error(`${caller}: transverse mode count exceeds ${MAX_PESCHEL_TRANSVERSE_MODES}`)
+  }
+  return acc * value
+}
+
+function assertFiniteDispersion(value: number, label: string): void {
+  if (!Number.isFinite(value)) {
+    throw new Error(`${label} produced a non-finite lattice dispersion`)
+  }
+}
 
 /**
  * Configuration for a 1D free-scalar lattice.
@@ -158,11 +187,7 @@ export function buildLatticeSliceCorrelators(
   for (let d = 0; d < latticeDim; d++) {
     const N = gridSize[d]!
     const a = spacing[d]!
-    if (!Number.isInteger(N) || N < 1) {
-      throw new Error(
-        `buildLatticeSliceCorrelators: gridSize[${d}] must be a positive integer, got ${N}`
-      )
-    }
+    assertPositiveSafeInteger(N, `buildLatticeSliceCorrelators: gridSize[${d}]`)
     if (!Number.isFinite(a) || a <= 0) {
       throw new Error(
         `buildLatticeSliceCorrelators: spacing[${d}] must be a positive finite number, got ${a}`
@@ -171,6 +196,7 @@ export function buildLatticeSliceCorrelators(
   }
 
   const N0 = gridSize[0]!
+  const matrixSize = resolvePeschelMatrixSize(N0, 'buildLatticeSliceCorrelators')
   const a0 = spacing[0]!
 
   // Transverse geometry: dimensions d = 1 .. latticeDim-1. For a genuine
@@ -184,7 +210,9 @@ export function buildLatticeSliceCorrelators(
   }
   const transRank = transDimsArr.length
   let nTrans = 1
-  for (let d = 0; d < transRank; d++) nTrans *= transDimsArr[d]!
+  for (let d = 0; d < transRank; d++) {
+    nTrans = multiplyModeCount(nTrans, transDimsArr[d]!, 'buildLatticeSliceCorrelators')
+  }
   // Guard against degenerate N_d = 1 which would place every transverse
   // mode at k_lat = 0 and make the IR regularization unavoidable.
   if (nTrans < 1) {
@@ -204,7 +232,10 @@ export function buildLatticeSliceCorrelators(
         const ad = transSpacingsArr[d]!
         const sinD = Math.sin((Math.PI * idx[d]!) / Nd)
         const kd = (2 * sinD) / ad
-        acc += kd * kd
+        const kdSq = kd * kd
+        assertFiniteDispersion(kdSq, `buildLatticeSliceCorrelators: transverse k[${d}]`)
+        acc += kdSq
+        assertFiniteDispersion(acc, 'buildLatticeSliceCorrelators: transverse k sum')
       }
       transKLatSq[t] = acc
       // Advance the multi-dimensional index (base-N counter).
@@ -238,11 +269,15 @@ export function buildLatticeSliceCorrelators(
   for (let k0 = 0; k0 < N0; k0++) {
     const sin0 = Math.sin((Math.PI * k0) / N0)
     const k0Lat = (2 * sin0) / a0
-    const baseSq = k0Lat * k0Lat + massTermSq
+    const k0LatSq = k0Lat * k0Lat
+    assertFiniteDispersion(k0LatSq, 'buildLatticeSliceCorrelators: axis-0 k')
+    const baseSq = k0LatSq + massTermSq
+    assertFiniteDispersion(baseSq, 'buildLatticeSliceCorrelators: omega base')
     let xAcc = 0
     let pAcc = 0
     for (let t = 0; t < nTrans; t++) {
       let omegaSq = baseSq + transKLatSq[t]!
+      assertFiniteDispersion(omegaSq, 'buildLatticeSliceCorrelators: omega')
       if (omegaSq < ENTROPY_IR_FLOOR * ENTROPY_IR_FLOOR) {
         omegaSq = ENTROPY_IR_FLOOR * ENTROPY_IR_FLOOR
       }
@@ -274,8 +309,8 @@ export function buildLatticeSliceCorrelators(
     pProfile[r] = pAcc * invN0
   }
 
-  const X = new Float64Array(N0 * N0)
-  const P = new Float64Array(N0 * N0)
+  const X = new Float64Array(matrixSize)
+  const P = new Float64Array(matrixSize)
   for (let i = 0; i < N0; i++) {
     for (let j = 0; j < N0; j++) {
       // Periodic distance so both (i-j) and (j-i) alias to the same profile
@@ -309,11 +344,7 @@ export function buildLatticeSliceCorrelators(
  */
 export function buildLatticeCorrelators1D(config: LatticeCorrelatorConfig): LatticeCorrelators {
   const { gridSize, spacing, massSq } = config
-  if (!Number.isInteger(gridSize) || gridSize < 1) {
-    throw new Error(
-      `buildLatticeCorrelators1D: gridSize must be a positive integer, got ${gridSize}`
-    )
-  }
+  assertPositiveSafeInteger(gridSize, 'buildLatticeCorrelators1D: gridSize')
   if (!Number.isFinite(spacing) || spacing <= 0) {
     throw new Error(
       `buildLatticeCorrelators1D: spacing must be a positive finite number, got ${spacing}`

@@ -69,6 +69,7 @@ export const CinematicControls: React.FC<CinematicControlsProps> = React.memo(
         </div>
 
         <Slider
+          data-testid="components-sections-post-processing-cinematic-controls-slider-71-9"
           label="Aberration"
           tooltip="Chromatic aberration — separates RGB color channels at screen edges for a cinematic lens effect."
           min={0}
@@ -80,6 +81,7 @@ export const CinematicControls: React.FC<CinematicControlsProps> = React.memo(
         />
 
         <Slider
+          data-testid="components-sections-post-processing-cinematic-controls-slider-82-9"
           label="Vignette"
           tooltip="Darkens the edges and corners of the frame, focusing attention on the center."
           min={0}
@@ -91,6 +93,7 @@ export const CinematicControls: React.FC<CinematicControlsProps> = React.memo(
         />
 
         <Slider
+          data-testid="components-sections-post-processing-cinematic-controls-slider-93-9"
           label="Grain"
           tooltip="Film grain noise overlay. Adds texture and a photographic quality to the render."
           min={0}
@@ -107,6 +110,7 @@ export const CinematicControls: React.FC<CinematicControlsProps> = React.memo(
         </div>
 
         <Select
+          data-testid="components-sections-post-processing-cinematic-controls-select-109-9"
           label="Algorithm"
           tooltip="Tone mapping maps HDR values to display range. ACES is cinematic, Reinhard is softer, Uncharted 2 preserves highlights."
           value={toneMappingAlgorithm}
@@ -115,6 +119,7 @@ export const CinematicControls: React.FC<CinematicControlsProps> = React.memo(
         />
 
         <Slider
+          data-testid="components-sections-post-processing-cinematic-controls-slider-117-9"
           label="Exposure"
           tooltip="Overall brightness of the rendered image. Higher values brighten the scene; lower values create a darker, moodier look."
           min={0.1}

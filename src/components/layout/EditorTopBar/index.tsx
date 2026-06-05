@@ -403,6 +403,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
               <DropdownMenu
                 trigger={
                   <Button
+                    data-testid="components-layout-editor-top-bar-button-405-19"
                     variant="ghost"
                     size="icon"
                     ariaLabel="Menu"

@@ -127,6 +127,37 @@ describe('spatialBranchPartition', () => {
     expect(populationA).toBeCloseTo(0.5, 12)
     expect(populationB).toBeCloseTo(0.5, 12)
   })
+
+  it('keeps populations finite when huge finite amplitudes overflow total norm', () => {
+    const huge = Number.MAX_VALUE / 4
+    const psiRe = new Float64Array([huge, huge])
+    const psiIm = new Float64Array(2)
+
+    const result = spatialBranchPartition(psiRe, psiIm, [2], [1], 1, 0)
+
+    expect(result.populationA).toBeCloseTo(0.5, 12)
+    expect(result.populationB).toBeCloseTo(0.5, 12)
+    expect(result.totalNorm).toBe(Infinity)
+  })
+
+  it('rejects unsafe grid products before computing strides', () => {
+    const psiRe = new Float64Array(4)
+    const psiIm = new Float64Array(4)
+
+    expect(() => spatialBranchPartition(psiRe, psiIm, [2 ** 32, 2 ** 22], [1, 1], 2, 0)).toThrow(
+      /site budget/
+    )
+    expect(() => spatialBranchPartition(psiRe, psiIm, [2 ** 20, 2], [1, 1], 2, 0)).toThrow(
+      /site budget/
+    )
+  })
+
+  it('rejects non-finite wavefunction density', () => {
+    const psiRe = new Float64Array([1, Number.NaN])
+    const psiIm = new Float64Array(2)
+
+    expect(() => spatialBranchPartition(psiRe, psiIm, [2], [1], 1, 0)).toThrow(/non-finite/)
+  })
 })
 
 describe('branchEntropy', () => {
@@ -177,6 +208,15 @@ describe('fitExponentialDecay', () => {
     expect(fitExponentialDecay([0, 1, Number.POSITIVE_INFINITY], [1, 0.5, 0.25])).toBeNull()
     expect(fitExponentialDecay([0, 1, 2], [1, Number.POSITIVE_INFINITY, 0.25])).toBeNull()
     expect(fitExponentialDecay([0, 1, 2], [1, Number.NaN, 0.25])).toBeNull()
+  })
+
+  it('returns null when regression accumulation overflows finite output', () => {
+    expect(
+      fitExponentialDecay(
+        [Number.MAX_VALUE, Number.MAX_VALUE / 2, Number.MAX_VALUE / 4],
+        [1, 0.5, 0.25]
+      )
+    ).toBeNull()
   })
 
   it('handles noisy data with reasonable R²', () => {

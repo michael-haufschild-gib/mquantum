@@ -971,6 +971,21 @@ describe('curvedKineticRef — input validation', () => {
     ).toThrow(/spacing length 2 < latticeDim 3/)
   })
 
+  it('applyCurvedKineticRef rejects over-budget grids before output allocation', () => {
+    expect(() =>
+      applyCurvedKineticRef({
+        psiRe: new Float32Array(4),
+        psiIm: new Float32Array(4),
+        gridSize: [2 ** 20, 2],
+        spacing: [1, 1],
+        mass: 1,
+        hbar: 1,
+        latticeDim: 2,
+        metric,
+      })
+    ).toThrow(/site budget/)
+  })
+
   it('computeProperNorm rejects gridSize shorter than latticeDim', () => {
     expect(() => computeProperNorm(psi, psi, [4, 4], [1, 1, 1], 3, metric)).toThrow(
       /gridSize length 2 < latticeDim 3/

@@ -59,7 +59,7 @@ export function computeLevelSpacing(energies: number[], iprs?: number[]): LevelS
     const energy = energies[i]!
     if (!Number.isFinite(energy)) continue
     finiteEnergies.push(energy)
-    if (finiteEnergyIpRs && Number.isFinite(iprs![i])) finiteEnergyIpRs.push(iprs![i]!)
+    if (finiteEnergyIpRs && isValidParticipationCount(iprs![i])) finiteEnergyIpRs.push(iprs![i]!)
   }
   const meanIPR = computeMeanFinite(finiteEnergyIpRs)
 
@@ -85,17 +85,24 @@ export function computeLevelSpacing(energies: number[], iprs?: number[]): LevelS
 
   // Nearest-neighbor spacings
   const rawSpacings: number[] = []
+  let hasInvalidSpacing = false
   for (let i = 1; i < sorted.length; i++) {
-    rawSpacings.push(sorted[i]! - sorted[i - 1]!)
+    const spacing = sorted[i]! - sorted[i - 1]!
+    if (!Number.isFinite(spacing) || spacing < 0) {
+      rawSpacings.push(0)
+      hasInvalidSpacing = true
+    } else {
+      rawSpacings.push(spacing)
+    }
   }
 
   // Unfolding: normalize by mean spacing
   const meanSpacing = rawSpacings.reduce((a, b) => a + b, 0) / rawSpacings.length
-  if (meanSpacing <= 0) {
+  if (hasInvalidSpacing || !Number.isFinite(meanSpacing) || meanSpacing <= 0) {
     return {
       energies: sorted,
       spacings: rawSpacings,
-      meanSpacing,
+      meanSpacing: Number.isFinite(meanSpacing) ? meanSpacing : 0,
       brodyBeta: 0,
       classification: 'poisson',
       meanIPR,
@@ -123,8 +130,12 @@ export function computeLevelSpacing(energies: number[], iprs?: number[]): LevelS
 }
 
 function computeMeanFinite(values: number[] | undefined): number {
-  const finite = values?.filter(Number.isFinite) ?? []
+  const finite = values?.filter(isValidParticipationCount) ?? []
   return finite.length > 0 ? finite.reduce((a, b) => a + b, 0) / finite.length : NaN
+}
+
+function isValidParticipationCount(value: number | undefined): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
 }
 
 /**
@@ -243,7 +254,9 @@ export function classifyLocalization(
   ipr: number,
   totalSites: number
 ): 'extended' | 'critical' | 'localized' {
-  if (!Number.isFinite(ipr) || totalSites <= 0) return 'critical'
+  if (!isValidParticipationCount(ipr) || !Number.isSafeInteger(totalSites) || totalSites <= 0) {
+    return 'critical'
+  }
   // Current TDSE/stochastic convention is participation-count IPR:
   // extended states have IPR ~ N, localized states have IPR ~ O(1).
   // These thresholds mirror the old PR convention:

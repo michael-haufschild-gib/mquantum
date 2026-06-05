@@ -158,6 +158,18 @@ describe('peschelEntropy — 1D free scalar', () => {
     expect(lengths).toEqual([])
     expect(entropies).toEqual([])
   })
+
+  it('rejects subsystem extraction sizes that exceed the matrix allocation cap', () => {
+    expect(() => extractSubsystem(new Float64Array(0), 1025, 0, 1)).toThrow('exceeds')
+    expect(() => extractSubsystem(new Float64Array(4), 2, 0, 1025)).toThrow('exceeds')
+  })
+
+  it('rejects malformed symplectic matrix dimensions before eigensolve allocation', () => {
+    expect(() => symplecticEigenvalues(new Float64Array(0), new Float64Array(0), 1025)).toThrow(
+      'exceeds'
+    )
+    expect(() => symplecticEigenvalues(new Float64Array(3), new Float64Array(4), 2)).toThrow('n²')
+  })
 })
 
 describe('peschelEntropy — entanglement spectrum and modular temperature', () => {

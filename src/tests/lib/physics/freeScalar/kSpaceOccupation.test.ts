@@ -5,6 +5,7 @@ import { fftNd } from '@/lib/math/fft'
 import { sampleAdiabaticVacuum } from '@/lib/physics/cosmology/adiabaticVacuum'
 import {
   computeRawKSpaceData,
+  computeRawKSpaceDataFromComplex,
   computeTotalParticleNumber,
   float32ToFloat16,
   type KSpaceRawData,
@@ -139,6 +140,22 @@ describe('computeRawKSpaceData', () => {
     expect(raw.gridSize).toEqual([4, 4])
     expect(raw.nk).toHaveLength(activeTotalSites)
     expect(raw.omega).toHaveLength(activeTotalSites)
+  })
+
+  it('rejects over-budget active grids before FFT buffer allocation', () => {
+    const phi = new Float32Array(16)
+    const pi = new Float32Array(16)
+
+    expect(() => computeRawKSpaceData(phi, pi, [2 ** 20, 2], [1, 1], 1, 2)).toThrow(/FFT budget/)
+  })
+
+  it('rejects over-budget complex active grids before shared FFT dispatch', () => {
+    const phi = new Float64Array(32)
+    const pi = new Float64Array(32)
+
+    expect(() => computeRawKSpaceDataFromComplex(phi, pi, [2 ** 20, 2], [1, 1], 1, 2)).toThrow(
+      /FFT budget/
+    )
   })
 
   // ─── Adiabatic-vacuum dispatch (Round 2) ──────────────────────────────────

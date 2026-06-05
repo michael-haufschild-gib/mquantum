@@ -13,6 +13,10 @@ vi.setConfig({ testTimeout: 60_000 })
 import type { KSpaceVizConfig } from '@/lib/geometry/extended/types'
 import { DEFAULT_KSPACE_VIZ, PASSTHROUGH_KSPACE_VIZ } from '@/lib/geometry/extended/types'
 import {
+  MAX_KSPACE_DISPLAY_GRID_SIZE,
+  sanitizeKSpaceDisplayGridSize,
+} from '@/lib/physics/freeScalar/kSpaceDisplayGrid'
+import {
   applyBroadening,
   applyExposureTransfer,
   buildKSpaceDisplayTextures,
@@ -987,6 +991,19 @@ describe('packDisplayTextures', () => {
     expect(halfToFloat(density[5]!)).toBeCloseTo(Math.log(0.5 + 1e-10), 3)
     expect(halfToFloat(density[9]!)).toBeCloseTo(Math.log(1e-10), 1)
   })
+
+  it('rejects grid arrays that are too small for the requested output size', () => {
+    const G = 2
+    const grid = {
+      nk: new Float64Array(G ** 3 - 1),
+      kNorm: new Float64Array(G ** 3),
+      omegaNorm: new Float64Array(G ** 3),
+      nkOmega: new Float64Array(G ** 3),
+      nkMax: 1,
+    }
+
+    expect(() => packDisplayTextures(grid, false, G)).toThrow(/packDisplayTextures/)
+  })
 })
 
 // ============================================================================
@@ -994,6 +1011,21 @@ describe('packDisplayTextures', () => {
 // ============================================================================
 
 describe('buildKSpaceDisplayTextures', () => {
+  it('falls back to the shared output size for unsafe cubic grid requests', () => {
+    const raw = makeTestRawData(4)
+    const config: KSpaceVizConfig = { ...PASSTHROUGH_KSPACE_VIZ, broadeningEnabled: false }
+    const { density, analysis } = buildKSpaceDisplayTextures(
+      raw,
+      config,
+      false,
+      MAX_KSPACE_DISPLAY_GRID_SIZE + 1
+    )
+
+    expect(sanitizeKSpaceDisplayGridSize(MAX_KSPACE_DISPLAY_GRID_SIZE + 1)).toBe(OUTPUT_GRID_SIZE)
+    expect(density.length).toBe(OUTPUT_GRID_SIZE ** 3 * 4)
+    expect(analysis.length).toBe(OUTPUT_GRID_SIZE ** 3 * 4)
+  })
+
   it('produces non-zero output for plane wave with default config', () => {
     const raw = makeTestRawData(8)
     const { density } = buildKSpaceDisplayTextures(raw, DEFAULT_KSPACE_VIZ)

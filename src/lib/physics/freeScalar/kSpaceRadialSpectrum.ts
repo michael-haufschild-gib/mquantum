@@ -7,6 +7,10 @@
  */
 
 import type { KSpaceVizConfig } from '@/lib/geometry/extended/types'
+import {
+  getKSpaceDisplayVoxelCount,
+  sanitizeKSpaceDisplayGridSize,
+} from '@/lib/physics/freeScalar/kSpaceDisplayGrid'
 import type { KSpaceDisplayGrid } from '@/lib/physics/freeScalar/kSpaceDisplayTransforms'
 import { mapOutputCoordToRawKIndex } from '@/lib/physics/freeScalar/kSpaceGridMapping'
 import type { KSpaceRawData } from '@/lib/physics/freeScalar/kSpaceOccupation'
@@ -102,8 +106,8 @@ export function buildRadialDisplayGrid(
   config: KSpaceVizConfig,
   outputGridSize: number = OUTPUT_GRID_SIZE
 ): KSpaceDisplayGrid {
-  const G = Math.max(1, Math.min(512, Math.round(outputGridSize)))
-  const outputTotal = G ** 3
+  const G = sanitizeKSpaceDisplayGridSize(outputGridSize)
+  const outputTotal = getKSpaceDisplayVoxelCount(G)
   const nk = new Float64Array(outputTotal)
   const kNorm = new Float64Array(outputTotal)
   const omegaNorm = new Float64Array(outputTotal)

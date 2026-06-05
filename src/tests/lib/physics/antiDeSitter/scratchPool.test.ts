@@ -32,6 +32,31 @@ function cfg(overrides: Partial<AntiDeSitterConfig>): AntiDeSitterConfig {
 }
 
 describe('AdS packer scratch pool', () => {
+  it('allocates scratch for a validated custom grid size', () => {
+    const scratch = createAdsPackerScratch(8)
+    expect(scratch.density.length).toBe(8 ** 3 * 4)
+    expect(scratch.bulk.length).toBe(8 ** 3)
+  })
+
+  it('rejects invalid density grid sizes before allocation', () => {
+    expect(() => createAdsPackerScratch(0)).toThrow(/positive safe integer/)
+    expect(() => createAdsPackerScratch(1.5)).toThrow(/positive safe integer/)
+    expect(() => createAdsPackerScratch(257)).toThrow(/max supported size 256/)
+    expect(() => createAdsPackerScratch(2000)).toThrow(/exceeds max supported size/)
+  })
+
+  it('rejects invalid pack target grid sizes before path-specific work', () => {
+    expect(() => packAntiDeSitterDensityGrid(cfg({}), undefined, Number.NaN)).toThrow(
+      /positive safe integer/
+    )
+    expect(() =>
+      packAntiDeSitterDensityGrid(cfg({ d: 3, btzEnabled: true }), undefined, 257)
+    ).toThrow(/max supported size 256/)
+    expect(() =>
+      packAntiDeSitterDensityGrid(cfg({ hkllEnabled: true }), undefined, Infinity)
+    ).toThrow(/positive safe integer/)
+  })
+
   it('pooled pack matches unpooled pack for bound-state config', () => {
     const config = cfg({ d: 4, n: 0, l: 1, m: 0, boundaryOverlay: true })
     const scratch = createAdsPackerScratch()

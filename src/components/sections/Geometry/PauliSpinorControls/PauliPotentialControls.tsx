@@ -59,6 +59,7 @@ export const PauliPotentialControls: React.FC<PauliPotentialControlsProps> = Rea
     return (
       <div className="space-y-3">
         <Select
+          data-testid="components-sections-geometry-pauli-spinor-controls-pauli-potential-controls-select-61-9"
           label="Potential Type"
           tooltip="External scalar potential acting on the spinor. Harmonic trap confines the wavepacket; barrier and double-well create scattering/tunneling scenarios."
           options={POTENTIAL_TYPE_OPTIONS}
@@ -68,6 +69,7 @@ export const PauliPotentialControls: React.FC<PauliPotentialControlsProps> = Rea
 
         {showHarmonicParams && (
           <Slider
+            data-testid="components-sections-geometry-pauli-spinor-controls-pauli-potential-controls-slider-70-11"
             label="Trap Frequency ω"
             tooltip="Angular frequency of the harmonic confining potential V(x) = ½mω²x². Higher ω gives tighter confinement."
             value={harmonicOmega}
@@ -81,6 +83,7 @@ export const PauliPotentialControls: React.FC<PauliPotentialControlsProps> = Rea
         {showWellParams && (
           <>
             <Slider
+              data-testid="components-sections-geometry-pauli-spinor-controls-pauli-potential-controls-slider-83-13"
               label="Well Depth V₀"
               tooltip="Height (barrier) or depth (well) of the potential in energy units. Controls tunneling probability and bound state count."
               value={wellDepth}
@@ -91,6 +94,7 @@ export const PauliPotentialControls: React.FC<PauliPotentialControlsProps> = Rea
             />
 
             <Slider
+              data-testid="components-sections-geometry-pauli-spinor-controls-pauli-potential-controls-slider-93-13"
               label="Well Width"
               tooltip="Spatial extent of the barrier or well region. Wider barriers reduce tunneling; wider wells support more bound states."
               value={wellWidth}
@@ -104,6 +108,7 @@ export const PauliPotentialControls: React.FC<PauliPotentialControlsProps> = Rea
 
         {potentialType !== 'none' && (
           <Switch
+            data-testid="components-sections-geometry-pauli-spinor-controls-pauli-potential-controls-switch-106-11"
             label="Show Potential Overlay"
             tooltip="Overlay the scalar potential V(x) on the spinor density visualization."
             checked={showPotential}

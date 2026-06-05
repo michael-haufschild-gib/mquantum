@@ -154,17 +154,28 @@ pub fn compute_level_spacing(energies: &[f64]) -> Vec<f64> {
     // Nearest-neighbor spacings
     let num_spacings = n - 1;
     let mut raw_spacings = Vec::with_capacity(num_spacings);
+    let mut has_invalid_spacing = false;
     for i in 1..n {
-        raw_spacings.push(sorted[i] - sorted[i - 1]);
+        let spacing = sorted[i] - sorted[i - 1];
+        if spacing.is_finite() && spacing >= 0.0 {
+            raw_spacings.push(spacing);
+        } else {
+            raw_spacings.push(0.0);
+            has_invalid_spacing = true;
+        }
     }
 
     // Unfolding: normalize by mean spacing
     let mean_spacing: f64 = raw_spacings.iter().sum::<f64>() / num_spacings as f64;
-    if mean_spacing <= 0.0 {
+    if has_invalid_spacing || !mean_spacing.is_finite() || mean_spacing <= 0.0 {
         let mut result = Vec::with_capacity(num_spacings + 3);
         result.extend_from_slice(&raw_spacings);
         result.push(0.0); // brody_beta
-        result.push(mean_spacing);
+        result.push(if mean_spacing.is_finite() {
+            mean_spacing
+        } else {
+            0.0
+        });
         result.push(0.0); // poisson
         return result;
     }
@@ -704,6 +715,16 @@ mod tests {
     fn test_level_spacing_non_finite_only_returns_finite_empty_metadata() {
         let result = compute_level_spacing(&[f64::NAN, f64::INFINITY]);
         assert_eq!(result, vec![0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_level_spacing_overflowed_finite_spacings_return_finite_poisson_metadata() {
+        let result = compute_level_spacing(&[-f64::MAX, 0.0, f64::MAX]);
+        assert_eq!(result.len(), 5);
+        assert!(result.iter().all(|v| v.is_finite()));
+        assert_eq!(result[2], 0.0); // brody_beta
+        assert_eq!(result[3], 0.0); // mean_spacing fallback after overflowed sum
+        assert_eq!(result[4], 0.0); // poisson
     }
 
     // ── Scar correlation tests ──
