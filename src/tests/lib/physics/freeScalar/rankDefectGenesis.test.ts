@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  computeChronogenicShearMoments,
   computeRankDefectGenesisMoments,
   type RankDefectGenesisParams,
+  sampleChronogenicShear,
   sampleRankDefectGenesis,
 } from '@/lib/physics/freeScalar/rankDefectGenesis'
 
@@ -14,6 +16,14 @@ const BASE: RankDefectGenesisParams = {
   packetWidth: 0.9,
   packetAmplitude: 1.15,
   mass: 0.4,
+}
+
+const SHEAR: RankDefectGenesisParams = {
+  ...BASE,
+  packetWidth: 0.88,
+  packetAmplitude: 1.1,
+  mass: 0.35,
+  modeK: [2, 0, 0],
 }
 
 describe('rank-defect genesis initial condition', () => {
@@ -46,5 +56,36 @@ describe('rank-defect genesis initial condition', () => {
     expect(Math.abs(phiAxis.pi)).toBeLessThan(1e-10)
     expect(Math.abs(piAxis.pi)).toBeGreaterThan(0.3)
     expect(Math.abs(piAxis.phi)).toBeLessThan(1e-10)
+  })
+
+  it('keeps chronogenic shear globally null while preserving nonzero energy', () => {
+    const moments = computeChronogenicShearMoments(SHEAR)
+    expect(Math.abs(moments.sumPhi)).toBeLessThan(1e-10)
+    expect(Math.abs(moments.sumPi)).toBeLessThan(1e-10)
+    expect(moments.energy).toBeGreaterThan(100)
+  })
+
+  it('keeps chronogenic shear null on the even 64³ preset lattice', () => {
+    const moments = computeChronogenicShearMoments({
+      ...SHEAR,
+      gridSize: [64, 64, 64],
+    })
+    expect(moments.samples).toBe(64 * 64 * 64)
+    expect(Math.abs(moments.sumPhi)).toBeLessThan(1e-8)
+    expect(Math.abs(moments.sumPi)).toBeLessThan(1e-8)
+  })
+
+  it('shears local clock orientation so a phi-axis sample also carries pi', () => {
+    const unsheared = sampleRankDefectGenesis([24, 16, 16], SHEAR)
+    const sheared = sampleChronogenicShear([24, 16, 16], SHEAR)
+    expect(Math.abs(unsheared.pi)).toBeLessThan(1e-10)
+    expect(Math.abs(sheared.pi)).toBeGreaterThan(0.5)
+    expect(Math.abs(sheared.phi)).toBeLessThan(Math.abs(unsheared.phi))
+  })
+
+  it('uses modeK[0] as integer shear winding', () => {
+    const lowWinding = sampleChronogenicShear([24, 16, 16], { ...SHEAR, modeK: [1, 0, 0] })
+    const highWinding = sampleChronogenicShear([24, 16, 16], { ...SHEAR, modeK: [3, 0, 0] })
+    expect(Math.abs(highWinding.pi - lowWinding.pi)).toBeGreaterThan(0.25)
   })
 })

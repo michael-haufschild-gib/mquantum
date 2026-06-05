@@ -4,7 +4,9 @@
  * The GPU shader writes a globally null field pair: φ is odd along axis 0,
  * π is odd along axis 1, both under the same Gaussian envelope. The first
  * nonzero observable is the covariance orientation between field space and
- * lattice axes, which acts as the toy model's emergent clock direction.
+ * lattice axes, which acts as the toy model's emergent clock direction. The
+ * chronogenic-shear variant rotates that local orientation with radius while
+ * keeping the global φ/π sums null.
  */
 
 /** Parameters shared by the CPU oracle and preset-level invariant tests. */
@@ -23,6 +25,8 @@ export interface RankDefectGenesisParams {
   packetAmplitude: number
   /** Scalar mass m used in the π frequency scale. */
   mass: number
+  /** Optional integer mode vector; modeK[0] is chronogenic shear winding. */
+  modeK?: readonly number[]
 }
 
 /** Field values at one lattice sample. */
@@ -62,7 +66,8 @@ function coordFor(index: number, gridSize: number, spacing: number, center: numb
 
 function sampleAtCoords(
   indices: readonly number[],
-  params: RankDefectGenesisParams
+  params: RankDefectGenesisParams,
+  flavor: 'rankDefectGenesis' | 'chronogenicShear' = 'rankDefectGenesis'
 ): RankDefectGenesisSample {
   const dim = Math.max(1, Math.min(params.latticeDim, indices.length))
   const sigma = Math.max(Math.abs(params.packetWidth), 1e-6)
@@ -82,9 +87,20 @@ function sampleAtCoords(
 
   const envelope = Math.exp(-0.5 * r2)
   const omega = Math.sqrt(Math.max(params.mass * params.mass + 2 / (sigma * sigma), 0))
+  let phiAxis = x0
+  let piAxis = x1
+  if (flavor === 'chronogenicShear') {
+    const winding = Math.max(Math.abs(params.modeK?.[0] ?? 1), 1)
+    const theta = 0.45 * winding * r2
+    const c = Math.cos(theta)
+    const s = Math.sin(theta)
+    phiAxis = c * x0 - s * x1
+    piAxis = s * x0 + c * x1
+  }
+
   return {
-    phi: params.packetAmplitude * x0 * envelope,
-    pi: params.packetAmplitude * omega * x1 * envelope,
+    phi: params.packetAmplitude * phiAxis * envelope,
+    pi: params.packetAmplitude * omega * piAxis * envelope,
   }
 }
 
@@ -99,10 +115,36 @@ export function sampleRankDefectGenesis(
 }
 
 /**
+ * Sample the chronogenic-shear seed at one integer lattice coordinate.
+ */
+export function sampleChronogenicShear(
+  indices: readonly number[],
+  params: RankDefectGenesisParams
+): RankDefectGenesisSample {
+  return sampleAtCoords(indices, params, 'chronogenicShear')
+}
+
+/**
  * Compute low-order moments over the full lattice.
  */
 export function computeRankDefectGenesisMoments(
   params: RankDefectGenesisParams
+): RankDefectGenesisMoments {
+  return computeRankCompletionMoments(params, 'rankDefectGenesis')
+}
+
+/**
+ * Compute low-order moments over the full lattice for the sheared seed.
+ */
+export function computeChronogenicShearMoments(
+  params: RankDefectGenesisParams
+): RankDefectGenesisMoments {
+  return computeRankCompletionMoments(params, 'chronogenicShear')
+}
+
+function computeRankCompletionMoments(
+  params: RankDefectGenesisParams,
+  flavor: 'rankDefectGenesis' | 'chronogenicShear'
 ): RankDefectGenesisMoments {
   const dim = Math.max(1, params.latticeDim)
   const coords = Array.from({ length: dim }, () => 0)
@@ -127,7 +169,7 @@ export function computeRankDefectGenesisMoments(
       rest = Math.floor(rest / n)
     }
 
-    const sample = sampleAtCoords(coords, params)
+    const sample = sampleAtCoords(coords, params, flavor)
     const x0 = coordFor(
       coords[0] ?? 0,
       extents[0] ?? 1,

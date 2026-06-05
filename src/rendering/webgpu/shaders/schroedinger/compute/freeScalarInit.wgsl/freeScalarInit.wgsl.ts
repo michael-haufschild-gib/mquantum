@@ -6,6 +6,7 @@
  * - gaussianPacket (2u): Traveling Gaussian wavepacket with carrier wave and conjugate momentum
  * - retrocausalCaustic (4u): bounded recursive advanced/retarded image caustic
  * - rankDefectGenesis (5u): zero-mean orthogonal rank-completion seed
+ * - chronogenicShear (6u): sheared rank-completion seed
  *
  * Supports N-dimensional lattices (1-11D) via per-dimension arrays and stride tables.
  * vacuumNoise is handled CPU-side via exact vacuum spectrum sampling
@@ -226,13 +227,38 @@ fn computeRankDefectGenesis(worldPos: array<f32, 12>) -> vec2f {
     if (d == 1u) { x1 = u; }
   }
 
-  // A zero-rank domain has no observable. The first completion is
-  // globally null (odd axes integrate away) but locally rank-bearing:
-  // phi occupies axis 0, pi occupies the orthogonal axis 1.
+  // Globally null, locally rank-bearing: phi on axis 0, pi on axis 1.
   let envelope = exp(-0.5 * r2);
   let omega = sqrt(max(params.mass * params.mass + 2.0 / (sigma * sigma), 0.0));
   let phiSeed = params.packetAmplitude * x0 * envelope;
   let piSeed = params.packetAmplitude * omega * x1 * envelope;
+  return vec2f(phiSeed, piSeed);
+}
+
+fn computeChronogenicShear(worldPos: array<f32, 12>) -> vec2f {
+  let dim = max(params.latticeDim, 1u);
+  let sigma = max(abs(params.packetWidth), 1e-6);
+  var r2: f32 = 0.0;
+  var x0: f32 = 0.0;
+  var x1: f32 = 0.0;
+
+  for (var d: u32 = 0u; d < dim; d++) {
+    let centered = worldPos[d] + 0.5 * params.spacing[d] - params.packetCenter[d];
+    let u = centered / sigma;
+    r2 += u * u;
+    if (d == 0u) { x0 = u; }
+    if (d == 1u) { x1 = u; }
+  }
+
+  // Radial phase-space shear; modeK[0] is integer winding.
+  let shearWinding = max(abs(f32(params.modeK[0])), 1.0);
+  let theta = 0.45 * shearWinding * r2;
+  let c = cos(theta);
+  let s = sin(theta);
+  let envelope = exp(-0.5 * r2);
+  let omega = sqrt(max(params.mass * params.mass + 2.0 / (sigma * sigma), 0.0));
+  let phiSeed = params.packetAmplitude * (c * x0 - s * x1) * envelope;
+  let piSeed = params.packetAmplitude * omega * (s * x0 + c * x1) * envelope;
   return vec2f(phiSeed, piSeed);
 }
 
@@ -340,6 +366,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let completion = computeRankDefectGenesis(worldPos);
     phiVal = completion.x;
     piVal = completion.y;
+  } else if (params.initCondition == 6u) {
+    let shear = computeChronogenicShear(worldPos);
+    phiVal = shear.x;
+    piVal = shear.y;
   }
   // initCondition == 0u (vacuumNoise): no-op, data written by CPU
 

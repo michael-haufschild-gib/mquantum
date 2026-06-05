@@ -69,8 +69,7 @@ export const FREE_SCALAR_PRESETS: FreeScalarScenarioPreset[] = [
   {
     id: 'rankDefectGenesis',
     name: 'Rank-Defect Genesis',
-    description:
-      'Nothing-to-existence toy model: zero net φ and zero net π, but an orthogonal covariance defect gives the first clock direction and inflaton-like scalar amplitude.',
+    description: 'Zero-net covariance seed.',
     overrides: {
       latticeDim: 3,
       gridSize: [64, 64, 64],
@@ -91,6 +90,31 @@ export const FREE_SCALAR_PRESETS: FreeScalarScenarioPreset[] = [
       diagnosticsInterval: 10,
     },
     renderingOverrides: { densityGain: 1.2, densityContrast: 1.9 },
+  },
+  {
+    id: 'chronogenicShear',
+    name: 'Chronogenic Shear',
+    description: 'Sheared zero-net rank seed.',
+    overrides: {
+      latticeDim: 3,
+      gridSize: [64, 64, 64],
+      spacing: [0.12, 0.12, 0.12],
+      initialCondition: 'chronogenicShear',
+      packetCenter: [0, 0, 0],
+      packetWidth: 0.88,
+      packetAmplitude: 1.1,
+      modeK: [2, 0, 0],
+      mass: 0.35,
+      dt: 0.005,
+      stepsPerFrame: 6,
+      selfInteractionEnabled: false,
+      absorberEnabled: false,
+      fieldView: 'energyDensity',
+      autoScale: true,
+      diagnosticsEnabled: true,
+      diagnosticsInterval: 10,
+    },
+    renderingOverrides: { densityGain: 1.15, densityContrast: 2.1 },
   },
   {
     id: 'singleMode',

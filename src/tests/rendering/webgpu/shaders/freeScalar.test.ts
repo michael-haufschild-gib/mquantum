@@ -38,4 +38,10 @@ describe('renderer temporal + free scalar interaction', () => {
     expect(freeScalarInitBlock).toContain('computeRankDefectGenesis(worldPos)')
     expect(freeScalarInitBlock).toContain('piVal = completion.y')
   })
+
+  it('contains chronogenic shear shader enum 6 branch and sheared pi assignment', () => {
+    expect(freeScalarInitBlock).toContain('params.initCondition == 6u')
+    expect(freeScalarInitBlock).toContain('computeChronogenicShear(worldPos)')
+    expect(freeScalarInitBlock).toContain('piVal = shear.y')
+  })
 })

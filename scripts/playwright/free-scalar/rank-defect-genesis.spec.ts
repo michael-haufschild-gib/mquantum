@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 
-import { expect, test } from './fixtures'
+import { expect, test } from '../fixtures'
 import {
   assertNonBlankPixels,
   capturePixelSnapshot,
@@ -9,7 +9,7 @@ import {
   hasWebGPU,
   waitForModeReady,
   waitForShaderCompilation,
-} from './helpers/app-helpers'
+} from '../helpers/app-helpers'
 
 test.setTimeout(180_000)
 
@@ -31,6 +31,16 @@ async function applyPresetThroughSelector(page: Page, presetId: string): Promise
           fs.gridSize[2] === 64
         )
       }
+      if (id === 'chronogenicShear') {
+        return (
+          fs.initialCondition === 'chronogenicShear' &&
+          fs.fieldView === 'energyDensity' &&
+          fs.modeK[0] === 2 &&
+          fs.gridSize[0] === 64 &&
+          fs.gridSize[1] === 64 &&
+          fs.gridSize[2] === 64
+        )
+      }
       if (id === 'vacuumFluctuations') {
         return fs.initialCondition === 'vacuumNoise' && fs.fieldView === 'energyDensity'
       }
@@ -47,7 +57,7 @@ async function requireWebGPUWithoutSkipping(page: Page): Promise<void> {
   expect(available, 'rank-defect genesis e2e requires WebGPU and must not skip').toBe(true)
 }
 
-test.describe('free scalar rank-defect genesis preset', () => {
+test.describe('free scalar rank-completion genesis presets', () => {
   test('applies through the real scenario selector, renders, and differs from vacuum', async ({
     page,
   }) => {
@@ -64,5 +74,21 @@ test.describe('free scalar rank-defect genesis preset', () => {
     const vacuum = await capturePixelSnapshot(page)
 
     expectSnapshotsDiffer(rankDefect, vacuum, 'rank-defect genesis vs vacuum fluctuations', 0.5)
+  })
+
+  test('applies chronogenic shear and renders a different clock orientation', async ({ page }) => {
+    await requireWebGPUWithoutSkipping(page)
+    await gotoMode(page, 'freeScalarField', 3)
+    await waitForModeReady(page, 90)
+
+    await applyPresetThroughSelector(page, 'chronogenicShear')
+    await assertNonBlankPixels(page, 'chronogenic shear preset', 25)
+    const sheared = await capturePixelSnapshot(page)
+
+    await applyPresetThroughSelector(page, 'rankDefectGenesis')
+    await assertNonBlankPixels(page, 'rank-defect genesis preset', 25)
+    const unsheared = await capturePixelSnapshot(page)
+
+    expectSnapshotsDiffer(sheared, unsheared, 'chronogenic shear vs rank-defect genesis', 0.5)
   })
 })
