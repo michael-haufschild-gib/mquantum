@@ -17,7 +17,7 @@ describe('tdseWriteGrid CTC causal-shadow field view', () => {
     const branchEnd = nextElseIf === -1 ? tdseWriteGridBlock.length : nextElseIf
     const branch = tdseWriteGridBlock.slice(branchStart, branchEnd)
 
-    expect(branchStart).toBeGreaterThan(0)
+    expect(branchStart).toBeGreaterThanOrEqual(0)
     expect(branchEnd).toBeGreaterThan(branchStart)
     expect(branch).toContain(
       'displayScalar = computeCtcCausalShadowScalar(idx, re, im, density, &nnCoords, &invSpacings, densityGate);'
@@ -29,10 +29,12 @@ describe('tdseWriteGrid CTC causal-shadow field view', () => {
     const shadowEnd = tdseWriteGridBlock.indexOf('@compute', shadowStart)
     const shadowBody = tdseWriteGridBlock.slice(shadowStart, shadowEnd)
 
-    expect(shadowStart).toBeGreaterThan(0)
+    expect(shadowStart).toBeGreaterThanOrEqual(0)
     expect(shadowBody).toContain('let mirror = sampleCtcMirror(idx, nnCoords);')
     expect(shadowBody).toContain('if (!mirror.valid) { return 0.0; }')
-    expect(shadowBody).toContain('mirrorCoords[axis] = params.gridSize[axis] - 1u - (*nnCoords)[axis];')
+    expect(shadowBody).toContain(
+      'mirrorCoords[axis] = params.gridSize[axis] - 1u - (*nnCoords)[axis];'
+    )
     expect(shadowBody).toContain(
       'let localJ = computeProbabilityCurrentAtSite(idx, vec2f(re, im), nnCoords, invSpacings);'
     )
@@ -50,7 +52,9 @@ describe('tdseWriteGrid CTC causal-shadow field view', () => {
     expect(shadowBody).toContain('if (localMag <= eps || mirrorMag <= eps) { return 0.0; }')
     expect(shadowBody).toContain('let phaseCoherence = 0.5 * (1.0 + cos(delta));')
     expect(shadowBody).toContain('let jmLocal = mirrorJ[d2] * select(1.0, -1.0, d2 == axis);')
-    expect(shadowBody).toContain('let opposing = clamp(-dotJ / (localMag * mirrorMag + eps), 0.0, 1.0);')
+    expect(shadowBody).toContain(
+      'let opposing = clamp(-dotJ / (localMag * mirrorMag + eps), 0.0, 1.0);'
+    )
     expect(shadowBody).toContain(
       'let balanceJ = 2.0 * min(localMag, mirrorMag) / (localMag + mirrorMag + eps);'
     )
@@ -65,11 +69,13 @@ describe('tdseWriteGrid CTC causal-shadow field view', () => {
     const helperEnd = tdseWriteGridBlock.indexOf('fn computeCtcResidualScalar', helperStart)
     const helperBody = tdseWriteGridBlock.slice(helperStart, helperEnd)
 
-    expect(helperStart).toBeGreaterThan(0)
+    expect(helperStart).toBeGreaterThanOrEqual(0)
     expect(helperBody).toContain('let pmlAxis = tdsePmlAxisActive(d);')
     expect(helperBody).toContain('if (pmlAxis && atLo)')
     expect(helperBody).toContain('} else if (pmlAxis && atHi)')
-    expect(helperBody).toContain('let fwdIdx = select(idx + stride, idx - stride * (Nd - 1u), atHi);')
+    expect(helperBody).toContain(
+      'let fwdIdx = select(idx + stride, idx - stride * (Nd - 1u), atHi);'
+    )
     expect(helperBody).toContain('current[d] = hbarOverM * (z0.x * dIm - z0.y * dRe);')
   })
 

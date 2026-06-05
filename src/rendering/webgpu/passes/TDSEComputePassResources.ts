@@ -168,7 +168,7 @@ export interface TdseBindGroupInputs {
  *   - invSpacing:              array<f32,12> @ 944 (host-precomputed 1/max(dx,1e-12))
  *   - invSpacing2:             array<f32,12> @ 992 (invSpacing^2; saves a mul per cell)
  *
- * Total = 832 + 16 + 16 + 16 + 64 + 16 + 48 + 48 = 1040. The constants below are now
+ * Total = 816 + 16 + 16 + 16 + 64 + 16 + 48 + 48 = 1040. The constants below are now
  * derived from `TDSE_UNIFORMS_LAYOUT` (which mirrors the WGSL struct
  * field-by-field), so adding a field to the layout automatically updates
  * both `TDSE_UNIFORM_SIZE` and `TDSE_UNIFORM_OFFSET_STAGE_TIME_K1`.

@@ -5,6 +5,7 @@
  * within lint max-lines while preserving a single exported contract.
  */
 
+import { assembleShaderBlocks } from '../../shared/compose-helpers'
 import { wdwOverlayBlock } from './wdwOverlay.wgsl'
 
 /** Generate the simplified grid-only volume raymarching WGSL block. */
@@ -17,14 +18,10 @@ export function generateVolumeRaymarchGridSimpleBlock(usePrecomputedNormals = fa
   return computeGradientFromGrid(pos, uniforms);
 }`
 
-  return /* wgsl */ `
+  const raymarchBlock = /* wgsl */ `
 // ============================================
 // Grid-Based Volume Raymarching (Simplified — compute modes only)
 // ============================================
-
-${gradientFetchFn}
-
-${wdwOverlayBlock}
 
 // PERF: per-step grid-gradient cache. See volumeRaymarchGrid for rationale.
 fn ensureGridGradient(
@@ -449,4 +446,19 @@ fn volumeRaymarchGrid(
   return VolumeResult(accColor, finalAlpha, iterCount, primaryHitT);
 }
 `
+
+  return assembleShaderBlocks([
+    {
+      name: 'volumeRaymarchGridSimple.gradientFetch',
+      content: gradientFetchFn,
+    },
+    {
+      name: 'wdwOverlay',
+      content: wdwOverlayBlock,
+    },
+    {
+      name: 'volumeRaymarchGridSimple',
+      content: raymarchBlock,
+    },
+  ]).wgsl
 }

@@ -42,9 +42,10 @@ async function applyPresetThroughSelector(
 
   const expected = PRESETS[presetId]
   await page.waitForFunction(
-    async ({ fieldView, modeK, packetWidth }) => {
-      const mod = await import('/src/stores/scene/extendedObjectStore.ts')
-      const fs = mod.useExtendedObjectStore.getState().schroedinger.freeScalar
+    ({ fieldView, modeK, packetWidth }) => {
+      const extStore = window.__EXTENDED_OBJECT_STORE__
+      if (!extStore) return false
+      const fs = extStore.getState().schroedinger.freeScalar
       return (
         fs.initialCondition === 'retrocausalCaustic' &&
         fs.fieldView === fieldView &&

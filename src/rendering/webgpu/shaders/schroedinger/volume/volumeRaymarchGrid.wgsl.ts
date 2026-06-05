@@ -21,6 +21,7 @@
  *
  * @module rendering/webgpu/shaders/schroedinger/volume/volumeRaymarchGrid.wgsl
  */
+import { assembleShaderBlocks } from '../../shared/compose-helpers'
 import { volumeRaymarchGridHelpersBlock } from './volumeRaymarchGridHelpers.wgsl'
 import { wdwOverlayBlock } from './wdwOverlay.wgsl'
 
@@ -45,17 +46,10 @@ export function generateVolumeRaymarchGridBlock(usePrecomputedNormals: boolean):
   return computeGradientFromGrid(pos, uniforms);
 }`
 
-  return /* wgsl */ `
+  const raymarchBlock = /* wgsl */ `
 // ============================================
 // Grid-Based Volume Raymarching
 // ============================================
-
-// Gradient fetch: generated to avoid referencing undeclared normal-grid bindings.
-${gradientFetchFn}
-
-${wdwOverlayBlock}
-
-${volumeRaymarchGridHelpersBlock}
 
 fn volumeRaymarchGrid(
   rayOrigin: vec3f,
@@ -577,4 +571,23 @@ fn volumeRaymarchGrid(
   return VolumeResult(accColor, finalAlpha, iterCount, primaryHitT);
 }
 `
+
+  return assembleShaderBlocks([
+    {
+      name: 'volumeRaymarchGrid.gradientFetch',
+      content: gradientFetchFn,
+    },
+    {
+      name: 'wdwOverlay',
+      content: wdwOverlayBlock,
+    },
+    {
+      name: 'volumeRaymarchGrid.helpers',
+      content: volumeRaymarchGridHelpersBlock,
+    },
+    {
+      name: 'volumeRaymarchGrid',
+      content: raymarchBlock,
+    },
+  ]).wgsl
 }

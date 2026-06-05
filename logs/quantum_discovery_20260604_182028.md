@@ -106,7 +106,7 @@ Follow-up threads:
 
 Future WebGPU discovery additions must ship as scenario presets, with numerical math validation and Playwright e2e proof that every new preset renders non-blank pixels. The local `quantum-discovery-webgpu` skill now enforces this hard gate for PRDs and reviewer PASS decisions.
 
-### Outcome
+### Preset Render Proof Outcome
 
 Added two fixed-3D TDSE P-CTC presets:
 - `postselectedCtcNovikovLoop`: zero-holonomy postselection. The accepted sector satisfies `psi(v) = psi(M(v))`, producing a symmetric two-mouth causal-loop density.
@@ -198,7 +198,7 @@ Instead of two blobs with no explanation, users see a "disagreement heat" field:
 - Playwright e2e tests apply both presets in the real app, require WebGPU, assert 0 skipped tests, assert non-blank pixels, and assert the two presets are visually distinct.
 - Run targeted Vitest, `pnpm exec tsc -b`, targeted ESLint, `pnpm test:shaders:fast`, `node scripts/check-wgsl-backticks.js`, and Playwright e2e on the existing dev server at port 3000.
 
-### Outcome
+### Residual Outcome
 
 Added TDSE `ctcResidual` field view: the renderer now draws density-gated loop-residue heat from evolved `psi` mirror pairs, exposing which amplitude fails the CTC self-consistency boundary.
 
@@ -285,7 +285,7 @@ This is not "two blobs." Bright regions mean the wave would circle the time loop
 - Playwright e2e tests apply both presets in the real app on port 3000, require WebGPU, assert 0 skipped tests, assert nonblank pixels for both, and assert the two presets are visually distinct.
 - Run targeted Vitest, `pnpm exec tsc -b`, targeted ESLint, `pnpm test:shaders:fast`, `node scripts/check-wgsl-backticks.js`, independent review, and Playwright e2e on the existing dev server at port 3000.
 
-### Outcome
+### Causal Shadow Outcome
 
 Added TDSE `ctcCausalShadow` field view: the renderer now draws coherent future-echo current cancellation, showing where a returned mirror flow opposes the local probability current.
 
@@ -298,7 +298,7 @@ Verification:
 - `PLAYWRIGHT_DEV_SERVER_PORT=3000 pnpm exec playwright test scripts/playwright/tdse-time-travel.spec.ts --workers=1` passed: 15 passed, 0 skipped; GPU enforcement 100% execution.
 - Independent reviewer returned PASS.
 
-### Outcome
+### Deutsch Entropy Outcome
 
 Added TDSE `ctcDeutschEntropy` field view: the renderer now draws a Deutsch fixed-point entropy proxy, highlighting mirror-pair regions where a clean pure history would need mixed-state self-consistency.
 
@@ -388,7 +388,7 @@ Bright regions mean "the future echo pushes back against the current causal flow
 - Playwright e2e tests apply both presets in the real app on port 3000, require WebGPU, assert 0 skipped tests, assert nonblank pixels for both, and assert the two presets are visually distinct.
 - Run targeted Vitest, `pnpm exec tsc -b`, targeted ESLint, `pnpm test:shaders:fast`, `node scripts/check-wgsl-backticks.js`, independent review, and Playwright e2e on the existing dev server at port 3000.
 
-### Outcome
+### Loop Gain Outcome
 
 Added TDSE `ctcLoopGain` field view: the renderer now draws chronology-horizon gain from mirror-pair phase closure, showing where repeated CTC loop trips reinforce or suppress amplitude.
 
@@ -475,6 +475,7 @@ Bright regions mean "the time loop cannot keep a single clean story here; it has
 - Scenario selector tests prove the new presets are visible at 3D and hidden above their fixed supported dimension.
 - Playwright e2e tests apply both presets in the real app on port 3000, require WebGPU, assert 0 skipped tests, assert nonblank pixels for both, and assert the two presets are visually distinct.
 - Run targeted Vitest, `pnpm exec tsc -b`, targeted ESLint, `pnpm test:shaders:fast`, `node scripts/check-wgsl-backticks.js`, independent review, and Playwright e2e on the existing dev server at port 3000.
+
 ## Round PRD - Free Scalar Retrocausal Caustic Fractal
 
 ### Hypothesis
@@ -564,7 +565,7 @@ Bright threads are places where many possible "loop returns" focus into the same
   - `node scripts/check-wgsl-backticks.js`.
   - Independent read-only review returns PASS.
 
-### Outcome
+### Retrocausal Caustic Outcome
 
 Added Free Scalar Field `retrocausalCaustic` initial condition: the renderer now draws a bounded recursive advanced/retarded image sum in the Klein-Gordon field buffers, with Flower and Web scenario presets that evolve into nested caustic shells/branches instead of another TDSE blob.
 
