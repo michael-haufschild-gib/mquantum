@@ -26,6 +26,7 @@ import type { DisorderDistribution, PmlAbsorberConfig } from './crossMode'
  * - ctcLoopGain: Chronology-horizon resonator gain from mirror-pair phase closure
  * - ctcDeutschEntropy: Deutsch fixed-point paradox entropy from mirror-pair phase contradiction
  * - ctcCausalShadow: Current-opposed coherent CTC echo shadow
+ * - bornEclipse: Current exiting into its local Born-density shadow
  */
 export type TdseFieldView =
   | 'density'
@@ -42,6 +43,7 @@ export type TdseFieldView =
   | 'ctcLoopGain'
   | 'ctcDeutschEntropy'
   | 'ctcCausalShadow'
+  | 'bornEclipse'
 
 /**
  * Initial condition type for the TDSE wavepacket
@@ -125,6 +127,7 @@ export const TDSE_FIELD_VIEWS: readonly TdseFieldView[] = [
   'ctcLoopGain',
   'ctcDeutschEntropy',
   'ctcCausalShadow',
+  'bornEclipse',
 ]
 
 export const TDSE_INITIAL_CONDITIONS: readonly TdseInitialCondition[] = [

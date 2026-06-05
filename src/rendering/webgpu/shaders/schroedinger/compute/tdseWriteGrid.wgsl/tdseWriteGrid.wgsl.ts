@@ -246,6 +246,98 @@ fn computeProbabilityCurrentAtSite(idx: u32, z0: vec2f, coords: ptr<function, ar
   return current;
 }
 
+struct BornEclipseFlow {
+  currentMagSq: f32,
+  gradientMagSq: f32,
+  dotCurrentGradient: f32,
+  gradX: f32,
+  gradY: f32,
+}
+
+fn computeBornEclipseFlowAtSite(idx: u32, z0: vec2f, coords: ptr<function, array<u32, 12>>, invSpacings: ptr<function, array<f32, 12>>) -> BornEclipseFlow {
+  let hbarOverM = params.hbar / max(params.mass, 1e-6);
+  var currentMagSq: f32 = 0.0;
+  var gradientMagSq: f32 = 0.0;
+  var dotCurrentGradient: f32 = 0.0;
+  var gradX: f32 = 0.0;
+  var gradY: f32 = 0.0;
+
+  for (var d: u32 = 0u; d < params.latticeDim; d++) {
+    if (params.gridSize[d] <= 1u) { continue; }
+    let stride = params.strides[d];
+    let coord = (*coords)[d];
+    let Nd = params.gridSize[d];
+    let invSpacing = (*invSpacings)[d];
+    let invDx = 0.5 * invSpacing;
+    let atLo = coord == 0u;
+    let atHi = coord == Nd - 1u;
+    let pmlAxis = tdsePmlAxisActive(d);
+    var dRe: f32;
+    var dIm: f32;
+    if (pmlAxis && atLo) {
+      let fIdx = idx + stride;
+      let zF = psi[fIdx];
+      dRe = (zF.x - z0.x) * invSpacing;
+      dIm = (zF.y - z0.y) * invSpacing;
+    } else if (pmlAxis && atHi) {
+      let bIdx = idx - stride;
+      let zB = psi[bIdx];
+      dRe = (z0.x - zB.x) * invSpacing;
+      dIm = (z0.y - zB.y) * invSpacing;
+    } else {
+      let fwdIdx = select(idx + stride, idx - stride * (Nd - 1u), atHi);
+      let bwdIdx = select(idx - stride, idx + stride * (Nd - 1u), atLo);
+      let zF = psi[fwdIdx];
+      let zB = psi[bwdIdx];
+      dRe = (zF.x - zB.x) * invDx;
+      dIm = (zF.y - zB.y) * invDx;
+    }
+
+    let jd = hbarOverM * (z0.x * dIm - z0.y * dRe);
+    let gradRho = 2.0 * (z0.x * dRe + z0.y * dIm);
+    currentMagSq += jd * jd;
+    gradientMagSq += gradRho * gradRho;
+    dotCurrentGradient += jd * gradRho;
+    if (d == 0u) {
+      gradX = gradRho;
+    } else if (d == 1u) {
+      gradY = gradRho;
+    }
+  }
+
+  return BornEclipseFlow(currentMagSq, gradientMagSq, dotCurrentGradient, gradX, gradY);
+}
+
+fn computeBornEclipseScalar(idx: u32, z0: vec2f, density: f32, phase: f32, coords: ptr<function, array<u32, 12>>, invSpacings: ptr<function, array<f32, 12>>, densityGate: f32) -> f32 {
+  let eps = 1e-20;
+  if (density <= eps) { return 0.0; }
+
+  let flow = computeBornEclipseFlowAtSite(idx, z0, coords, invSpacings);
+  if (flow.currentMagSq <= eps || flow.gradientMagSq <= eps) { return 0.0; }
+
+  let currentMag = sqrt(flow.currentMagSq);
+  let gradientMag = sqrt(flow.gradientMagSq);
+  let opposition = clamp(
+    -flow.dotCurrentGradient / (currentMag * gradientMag + eps),
+    0.0,
+    1.0
+  );
+  if (opposition <= 0.0) { return 0.0; }
+
+  let densityScale = max(params.maxDensity, eps);
+  var spacingSum: f32 = 0.0;
+  for (var d: u32 = 0u; d < params.latticeDim; d++) {
+    spacingSum += params.spacing[d];
+  }
+  let averageSpacing = spacingSum / max(f32(params.latticeDim), 1.0);
+  let flowGate = 1.0 - exp(-currentMag / densityScale);
+  let gradientGate = 1.0 - exp(-8.0 * averageSpacing * gradientMag / densityScale);
+  let orientation = atan2(flow.gradY, flow.gradX);
+  let phaseBand = 0.55 + 0.45 * cos(phase + 2.0 * orientation - 0.7 * params.simTime);
+  let eclipse = opposition * flowGate * gradientGate * (0.65 + 0.35 * phaseBand);
+  return clamp(eclipse, 0.0, 1.0) * densityGate;
+}
+
 fn computeCtcResidualScalar(idx: u32, re: f32, im: f32, density: f32, nnCoords: ptr<function, array<u32, 12>>, densityGate: f32) -> f32 {
   let mirror = sampleCtcMirror(idx, nnCoords);
   if (!mirror.valid) { return 0.0; }
@@ -626,6 +718,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     displayScalar = computeCtcLoopGainScalar(idx, re, im, density, &nnCoords, densityGate);
   } else if (params.fieldView == 12u) { displayScalar = computeCtcDeutschEntropyScalar(idx, re, im, density, &nnCoords, densityGate); } else if (params.fieldView == 13u) {
     displayScalar = computeCtcCausalShadowScalar(idx, re, im, density, &nnCoords, &invSpacings, densityGate);
+  } else if (params.fieldView == 14u) {
+    displayScalar = computeBornEclipseScalar(idx, vec2f(re, im), density, phase, &nnCoords, &invSpacings, densityGate);
   } else if (params.fieldView == 3u) {
     // potential (NN)
     let potentialScale = getPotentialScale();

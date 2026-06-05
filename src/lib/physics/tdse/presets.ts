@@ -975,6 +975,40 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
   // ─────────────────────────────────────────────────────────────────────────
 
   {
+    id: 'bornEclipseCollider',
+    name: 'Born Eclipse Collider',
+    description:
+      'Two counter-propagating packets in free space, rendered in the Born Eclipse view. Bright sheets mark probability current exiting into its own density shadow, with phase-locked eclipse bands at the collision front.',
+    overrides: {
+      latticeDim: 3,
+      gridSize: [64, 64, 64],
+      spacing: [0.1, 0.1, 0.1],
+      dt: 0.0025,
+      stepsPerFrame: 6,
+      initialCondition: 'superposition',
+      packetCenter: [-1.35, 0, 0],
+      packetWidth: 0.52,
+      packetAmplitude: 1.0,
+      packetMomentum: [5.8, 1.15, 0],
+      potentialType: 'free',
+      absorberEnabled: true,
+      absorberWidth: 0.2,
+      pmlTargetReflection: 1e-6,
+      diagnosticsEnabled: true,
+      diagnosticsInterval: 5,
+      fieldView: 'bornEclipse',
+      autoScale: true,
+      autoLoop: true,
+      showPotential: false,
+    },
+    renderingOverrides: {
+      densityGain: 4.2,
+      densityContrast: 2.9,
+      autoScaleMaxGain: 75,
+      colorAlgorithm: 'inferno',
+    },
+  },
+  {
     id: 'quantumPressureDoubleSlit',
     name: 'Madelung Q — Double Slit',
     description:

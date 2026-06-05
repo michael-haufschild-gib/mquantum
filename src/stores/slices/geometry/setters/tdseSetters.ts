@@ -23,6 +23,7 @@ import { clampKKState, computeEffectiveSpacing } from '@/lib/physics/compactific
 import { type MetricConfig, normalizeMetricForLattice } from '@/lib/physics/tdse/metrics/types'
 import { normalizeMirrorAxisForLattice } from '@/lib/physics/tdse/wormholeCoupling'
 import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
 import {
   canApplyPresetRequest,
@@ -600,6 +601,7 @@ export function createTdseSetters(ctx: SetterContext): TdseSetters {
           if (!preset) return
           const globalDim = useGeometryStore.getState().dimension
           if (!isTdsePresetCompatibleWithDimension(preset, globalDim)) return
+          const { colorAlgorithm, ...parentRenderingOverrides } = preset.renderingOverrides ?? {}
           setWithVersion((state) => {
             const { latticeDim: _presetDim, ...safeOverrides } = preset.overrides
             const base = {
@@ -627,13 +629,18 @@ export function createTdseSetters(ctx: SetterContext): TdseSetters {
             return {
               schroedinger: {
                 ...state.schroedinger,
-                ...preset.renderingOverrides,
+                ...parentRenderingOverrides,
                 ...parentAbsorber,
                 tdse: { ...base, ...resized, potentialType, needsReset: true },
               },
             }
           })
           useDiagnosticsStore.getState().resetTdse()
+          if (
+            colorAlgorithm &&
+            canApplyPresetRequest(isLatestRequest, ctx.get().schroedinger.quantumMode, options)
+          )
+            useAppearanceStore.getState().setColorAlgorithm(colorAlgorithm)
         }
       )
     },

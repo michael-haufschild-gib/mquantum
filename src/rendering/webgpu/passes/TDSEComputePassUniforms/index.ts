@@ -122,6 +122,7 @@ const VIEW_MAP: Record<string, number> = {
   ctcLoopGain: 11,
   ctcDeutschEntropy: 12,
   ctcCausalShadow: 13,
+  bornEclipse: 14,
 }
 
 /** Enum maps for TDSE drive waveform types. */
