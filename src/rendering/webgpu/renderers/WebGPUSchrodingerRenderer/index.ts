@@ -68,7 +68,12 @@ export type { SchrodingerRendererConfig } from '../schrodingerRendererTypes'
 
 type CarpetSliceComputePassInstance =
   import('@/rendering/webgpu/passes/CarpetSliceComputePass').CarpetSliceComputePass
-type QuantumCarpetRuntime = typeof import('../quantumCarpetRuntime')
+type CarpetSliceComputePassConstructor =
+  typeof import('@/rendering/webgpu/passes/CarpetSliceComputePass').CarpetSliceComputePass
+type QuantumCarpetRuntime = {
+  CarpetSliceComputePass: CarpetSliceComputePassConstructor
+  useCarpetStore: typeof import('@/stores/diagnostics/carpetStore').useCarpetStore
+}
 
 /**
  * WebGPU renderer for quantum wavefunctions.
@@ -576,9 +581,15 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private loadQuantumCarpetRuntime(): void {
     if (this.carpetRuntime || this.carpetRuntimePromise) return
 
-    this.carpetRuntimePromise = import('../quantumCarpetRuntime')
-      .then((runtime) => {
-        this.carpetRuntime = runtime
+    this.carpetRuntimePromise = Promise.all([
+      import('@/rendering/webgpu/passes/CarpetSliceComputePass'),
+      import('@/stores/diagnostics/carpetStore'),
+    ])
+      .then(([passModule, storeModule]) => {
+        this.carpetRuntime = {
+          CarpetSliceComputePass: passModule.CarpetSliceComputePass,
+          useCarpetStore: storeModule.useCarpetStore,
+        }
       })
       .catch((error: unknown) => {
         this.carpetRuntimePromise = null
