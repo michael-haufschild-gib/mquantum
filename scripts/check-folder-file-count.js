@@ -8,6 +8,7 @@ const MAX_FILES_PER_FOLDER = 20
 const SOURCE_EXTENSIONS = new Set(['.css', '.js', '.jsx', '.mjs', '.ts', '.tsx'])
 const IGNORED_DIRS = new Set(['.git', '.claude', 'coverage', 'dist', 'node_modules'])
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const defaultSourceRoot = resolve(repoRoot, 'src')
 
 const roots = resolveScanRoots(process.argv.slice(2))
 const violations = roots.flatMap(scanRoot)
@@ -24,15 +25,24 @@ process.stdout.write(
 )
 
 function resolveScanRoots(args) {
-  if (args.length === 0) return [resolve(repoRoot, 'src')]
-  return args.map(resolvePath).map((path) => {
-    if (!existsSync(path)) return path
-    return statSync(path).isFile() ? dirname(path) : path
-  })
+  if (args.length === 0) return [defaultSourceRoot]
+  const roots = args
+    .map(resolvePath)
+    .filter(isInsideDefaultSourceRoot)
+    .map((path) => {
+      if (!existsSync(path)) return path
+      return statSync(path).isFile() ? dirname(path) : path
+    })
+  return [...new Set(roots)]
 }
 
 function resolvePath(arg) {
   return isAbsolute(arg) ? arg : resolve(process.cwd(), arg)
+}
+
+function isInsideDefaultSourceRoot(path) {
+  const rel = relative(defaultSourceRoot, path)
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
 }
 
 function scanRoot(root) {
