@@ -576,3 +576,77 @@ Verification:
 - `node scripts/check-wgsl-backticks.js` passed.
 - `PLAYWRIGHT_DEV_SERVER_PORT=3000 pnpm exec playwright test scripts/playwright/free-scalar-retrocausal-caustic.spec.ts --workers=1` passed: 1 passed, 0 skipped; GPU enforcement 100% execution.
 - Independent reviewer returned PASS.
+
+## Round PRD - Quantum-Walk Floquet CTC Fractal Carpet
+
+### Hypothesis
+
+A discrete-time quantum walk is already a tiny stroboscopic spacetime: one unitary coin/shift step is the clock tick. If a closed timelike loop is modeled as a return map on that stroboscopic lattice, the visually important quantity is not only probability density, but where the current phase/probability/current would self-close after repeated folded returns. Those self-closing corridors should form moving carpet/fractal structures because every step folds position, phase, and coin chirality back into the same display surface.
+
+This round must avoid TDSE. Implement it in the Quantum Walk write-grid path as a new renderer-visible field view, not a palette.
+
+Science anchors:
+- Discrete quantum walks are periodically driven systems whose one-period evolution is given directly by unitary step operators; time-glide quantum walks have discrete spacetime symmetry and topological phases: https://arxiv.org/abs/2004.09332
+- Quantum carpets arise from self-interference and fractional revivals, with self-similar structures in space-time and momentum-time probability patterns: https://arxiv.org/abs/1607.07496
+- Quantum CTC simulations model a quantum state interacting with an older version of itself and produce nonlinear causal behavior: https://www.nature.com/articles/ncomms5145
+- Floquet-engineered quantum walks show loop-line and loop-loop trajectories under time-dependent phases, supporting the idea that a driven walk can draw loop structures: https://pmc.ncbi.nlm.nih.gov/articles/PMC7567857/
+
+### Feature
+
+Add Quantum Walk field view `ctcFractalCarpet`.
+
+In `qwWriteGrid.wgsl.ts`, when `fieldView == ctcFractalCarpet`, compute a bounded scalar from the already-blended local walk quantities:
+
+1. `rho = blendedProb / max(maxDensity, eps)` with existing perpendicular falloff.
+2. `phase01 = phase / tau`, using the existing summed-coin phase.
+3. `chirality = blendedChirality / rhoRaw`, already computed for the coin-state view.
+4. `stepPhase = (walkSteps mod period) / period`, passed through the write-grid uniform by reusing one currently-padding word.
+5. Build a normalized 3-vector from nearest lattice coords: visible axes use coords in `[-1, 1]`; missing axes use `0`.
+6. Iterate a bounded folded return map six to eight times:
+   - `q = abs(fract(q * scale + offsets + phase01 + stepPhase) * 2 - 1)`
+   - add a closure score when `q` is near a loop shell and phase/chirality agree.
+7. Display `fieldValue = clamp(pow(rho, 0.35) * carpetClosure, 0, 1)`.
+
+The output must be written into the density texture scalar, so the raymarcher shows the fractal carpet directly. It must not rely on a new color algorithm alone.
+
+Add a CPU reference module for this return-map scalar so tests can verify the math independently of WebGPU.
+
+### Scenario Presets
+
+Add at least two Quantum Walk presets:
+
+1. `floquetCtcFractalCarpet`
+   - 3D-friendly preset, `fieldView: 'ctcFractalCarpet'`.
+   - DFT or Grover coin, moderate `stepsPerFrame`, no absorber, `autoScale: true`.
+   - Should render nested bright carpet shells from high coin entropy and phase mixing.
+
+2. `floquetCtcReturnWeb`
+   - Same field view but different coin type/bias/initial state and faster steps.
+   - Should render sharper web/ridge structures, nonblank and visually distinct from Carpet.
+
+If Quantum Walk presets do not currently support fixed dimensions, either keep both dimension-agnostic and test at 3D, or extend preset metadata conservatively without hiding existing presets.
+
+### User Sees
+
+Bright threads mean: "at this point, the walk's current phase and direction can be folded through the time-loop return map and come back compatible with itself." Dark regions mean the loop return would miss or disagree in phase. Over time, the threads crawl because each quantum-walk tick changes the phase boundary of the return map.
+
+### Correctness
+
+- `QuantumWalkFieldView`, runtime sanitization, UI field-view options, uniform packing, WGSL uniform comment, and write-grid shader agree on enum `5`.
+- Write-grid uniform carries live `stepCount` without increasing stale write-buffer races or breaking alignment. Reusing `_pad0` is preferred if alignment allows.
+- The fractal-return function is finite and bounded for zero probability, tiny max density, arbitrary phase, extreme chirality, edge coords, 2D, 3D, and 4D.
+- CPU reference math matches the WGSL formula closely enough to make invariants meaningful.
+- Presets are exposed through the scenario selector.
+- Playwright applies both presets through the real app on port 3000, requires WebGPU with no skip proof, asserts nonblank pixels for both, and proves the two presets are visually distinct.
+
+### Acceptance Bar
+
+- Numerical/unit tests prove:
+  - scalar is exactly `0` for zero probability;
+  - scalar stays within `[0, 1]` for edge coords, arbitrary phase/chirality, and 2D/3D/4D configs;
+  - step changes alter the scalar for representative points, proving the view evolves over time;
+  - phase/chirality changes alter closure bands;
+  - uniform packing maps `ctcFractalCarpet` to shader enum `5` and packs `walkSteps` into the expected write-grid word.
+- Scenario tests prove the two presets exist, use `fieldView: 'ctcFractalCarpet'`, differ in coin/bias/steps, and remain selectable in the ScenarioSelector at 3D.
+- Playwright e2e proves both presets apply through the app, render nonblank pixels, and differ visually. Skipped WebGPU does not count.
+- Run targeted Vitest, targeted ESLint on touched files, `pnpm exec tsc -b`, `pnpm test:shaders:fast`, `node scripts/check-wgsl-backticks.js`, independent review, and dedicated Playwright on existing port 3000.

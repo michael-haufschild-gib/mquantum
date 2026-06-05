@@ -36,6 +36,11 @@ describe('QuantumWalkControls', () => {
     expect(screen.getByRole('radio', { name: 'Ricci theta' })).toBeInTheDocument()
   })
 
+  it('exposes CTC carpet as a field view', () => {
+    render(<QuantumWalkControls />)
+    expect(screen.getByRole('radio', { name: 'CTC carpet' })).toBeInTheDocument()
+  })
+
   it('shows Grover coin selected by default', () => {
     render(<QuantumWalkControls />)
     const coinGroup = screen.getByLabelText('Coin operator type')
@@ -162,6 +167,21 @@ describe('QuantumWalkControls', () => {
     expect(setConfig).toHaveBeenCalledWith(
       expect.objectContaining({
         quantumWalk: expect.objectContaining({ fieldView: 'causalCurvature' }),
+      })
+    )
+  })
+
+  it('calls setSchroedingerConfig when CTC carpet field view is selected', () => {
+    const setConfig = vi.fn()
+    useExtendedObjectStore.setState((s) => ({
+      ...s,
+      setSchroedingerConfig: setConfig,
+    }))
+    render(<QuantumWalkControls />)
+    fireEvent.click(screen.getByRole('radio', { name: 'CTC carpet' }))
+    expect(setConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quantumWalk: expect.objectContaining({ fieldView: 'ctcFractalCarpet' }),
       })
     )
   })

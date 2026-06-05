@@ -23,6 +23,7 @@ export type QuantumWalkFieldView =
   | 'coinState'
   | 'coinEntropy'
   | 'causalCurvature'
+  | 'ctcFractalCarpet'
 
 /**
  * Configuration for discrete-time quantum walk simulation.
@@ -93,6 +94,7 @@ const QW_FIELD_VIEWS = new Set<QuantumWalkFieldView>([
   'coinState',
   'coinEntropy',
   'causalCurvature',
+  'ctcFractalCarpet',
 ])
 
 /**

@@ -27,7 +27,7 @@ struct QWWriteGridUniforms {
   latticeDim: u32,           // offset 0
   totalSites: u32,           // offset 4
   numCoinStates: u32,        // offset 8  (= 2 * latticeDim)
-  fieldView: u32,            // offset 12 (0=probability, 1=phase, 2=coinState, 3=coinEntropy, 4=causalCurvature)
+  fieldView: u32,            // offset 12 (0=probability, 1=phase, 2=coinState, 3=coinEntropy, 4=causalCurvature, 5=ctcFractalCarpet)
 
   // Per-dimension arrays (48 bytes each)
   gridSize: array<u32, 12>,  // offset 16
@@ -37,7 +37,7 @@ struct QWWriteGridUniforms {
   // Rendering parameters (16 bytes)
   boundingRadius: f32,       // offset 160
   maxDensity: f32,           // offset 164
-  _pad0: u32,                // offset 168
+  walkSteps: u32,            // offset 168
   _pad1: u32,                // offset 172
 
   // Basis vectors for N-D -> 3D projection (48 bytes each = 144 bytes)
@@ -215,6 +215,61 @@ fn causalCurvature(coords: ptr<function, array<u32, 12>>, rho: f32) -> f32 {
   return 1.0 - exp(-abs(theta / max(rho, 1e-20)));
 }
 
+fn normalizedVisibleCoord(coords: ptr<function, array<u32, 12>>, axis: u32) -> f32 {
+  if (axis >= params.latticeDim) {
+    return 0.0;
+  }
+  let grid = max(params.gridSize[axis], 2u);
+  let coord = clamp((*coords)[axis], 0u, grid - 1u);
+  return (f32(coord) / f32(grid - 1u)) * 2.0 - 1.0;
+}
+
+fn ctcLoopDistance01(value: f32) -> f32 {
+  let f = fract(value);
+  return min(f, 1.0 - f);
+}
+
+fn ctcFractalCarpet(coords: ptr<function, array<u32, 12>>, rho: f32, phase01: f32, chirality: f32) -> f32 {
+  if (rho <= 0.0) {
+    return 0.0;
+  }
+
+  const CTC_PERIOD: u32 = 512u;
+  let stepPhase = f32(params.walkSteps % CTC_PERIOD) / f32(CTC_PERIOD);
+  let phaseStep = phase01 * 0.35 + stepPhase * 0.18;
+  let chi = clamp(chirality, -1.0, 1.0);
+
+  var q = vec3f(
+    normalizedVisibleCoord(coords, 0u),
+    normalizedVisibleCoord(coords, 1u),
+    normalizedVisibleCoord(coords, 2u)
+  );
+  var closure: f32 = 0.0;
+
+  for (var i: u32 = 0u; i < 6u; i++) {
+    let iter = f32(i + 1u);
+    let scale = vec3f(1.72 + 0.11 * iter, 2.03 + 0.09 * iter, 2.37 + 0.07 * iter);
+    let offsets = vec3f(0.137 * iter + chi * 0.083, 0.311 * iter - chi * 0.047, 0.571 * iter + chi * 0.061);
+    q = abs(fract(q * scale + offsets + vec3f(phaseStep)) * 2.0 - vec3f(1.0));
+
+    let radial = length(q - vec3f(0.5));
+    let shell = 0.48 + 0.14 * cos(6.283185307179586 * (phaseStep * 0.5 + iter * 0.137));
+    let shellScore = 1.0 - smoothstep(0.014, 0.065, abs(radial - shell));
+
+    let winding = q.x - q.y + 0.5 * q.z;
+    let phaseScore = 1.0 - smoothstep(0.02, 0.18, ctcLoopDistance01(winding + phaseStep));
+    let chiralityScore = 1.0 - smoothstep(0.08, 0.65, abs(chi - clamp(winding, -1.0, 1.0)));
+    let threadScore = 1.0 - smoothstep(0.008, 0.055, min(abs(q.x - q.y), abs(q.y - q.z)));
+
+    closure = max(closure, shellScore * (0.18 + 0.82 * phaseScore) * (0.35 + 0.65 * chiralityScore));
+    closure = max(closure, threadScore * phaseScore * (0.28 + 0.72 * chiralityScore));
+  }
+
+  let rhoClamped = clamp(rho, 0.0, 1.0);
+  let densityEnvelope = pow(rhoClamped, 0.72) * smoothstep(0.018, 0.16, rhoClamped);
+  return clamp(densityEnvelope * closure * 7.0, 0.0, 1.0);
+}
+
 @compute @workgroup_size(4, 4, 4)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let texDims = textureDimensions(outputTex);
@@ -349,9 +404,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let localRho = sumCoinStates(nnSite).prob;
     let causalCurvatureValue = causalCurvature(&nnCoords, localRho);
     displayScalar = causalCurvatureValue * densityGate;
+  } else if (params.fieldView == 5u) {
+    // CTC fractal carpet: folded return-map closure bands over density and phase
+    var nnCoords = nearestLatticeCoords(&coordsLo, &coordsHi, &fracs);
+    let rhoWithFalloff = clamp(normDensityRaw * perpFalloff, 0.0, 1.0);
+    displayScalar = ctcFractalCarpet(&nnCoords, rhoWithFalloff, phase * QW_WG_INV_TAU, chirality);
   }
 
-  let normDensity = displayScalar * perpFalloff;
+  let normDensity = select(displayScalar * perpFalloff, displayScalar, params.fieldView == 5u);
   let logDensity = log(normDensity + 1e-10);
 
   textureStore(outputTex, gid, vec4f(normDensity, logDensity, phase, normDensityRaw * perpFalloff));

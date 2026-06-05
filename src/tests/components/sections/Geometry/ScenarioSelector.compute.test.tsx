@@ -242,6 +242,47 @@ describe('ScenarioSelector - compute mode presets', () => {
     expect(screen.getByRole('option', { name: 'Retrocausal Caustic Web' })).toBeInTheDocument()
   })
 
+  it('applies Floquet CTC quantum-walk presets through the 3D scenario selector', async () => {
+    const user = userEvent.setup()
+    const carpet = QUANTUM_WALK_PRESETS.find((preset) => preset.id === 'floquetCtcFractalCarpet')
+    const web = QUANTUM_WALK_PRESETS.find((preset) => preset.id === 'floquetCtcReturnWeb')
+    if (!carpet || !web) throw new Error('Floquet CTC quantum-walk presets missing')
+
+    expect(carpet.overrides.fieldView).toBe('ctcFractalCarpet')
+    expect(web.overrides.fieldView).toBe('ctcFractalCarpet')
+    expect(web.overrides.coinInitial).not.toBe(carpet.overrides.coinInitial)
+
+    enterScenarioMode('quantumWalk', 3)
+    render(<ScenarioSelector />)
+
+    const select = screen.getByRole('combobox', { name: /scenario/i })
+    expect(screen.getByRole('option', { name: carpet.name })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: web.name })).toBeInTheDocument()
+
+    await user.selectOptions(select, carpet.id)
+    await waitFor(() => {
+      const qw = useExtendedObjectStore.getState().schroedinger.quantumWalk
+      expect(select).toHaveValue(carpet.id)
+      expect(qw.latticeDim).toBe(3)
+      expect(qw.fieldView).toBe('ctcFractalCarpet')
+      expect(qw.coinType).toBe(carpet.overrides.coinType)
+      expect(qw.coinInitial).toBe(carpet.overrides.coinInitial)
+      expect(qw.stepsPerFrame).toBe(carpet.overrides.stepsPerFrame)
+    })
+
+    await user.selectOptions(select, web.id)
+    await waitFor(() => {
+      const qw = useExtendedObjectStore.getState().schroedinger.quantumWalk
+      expect(select).toHaveValue(web.id)
+      expect(qw.latticeDim).toBe(3)
+      expect(qw.fieldView).toBe('ctcFractalCarpet')
+      expect(qw.coinType).toBe(web.overrides.coinType)
+      expect(qw.coinBias).toBe(web.overrides.coinBias)
+      expect(qw.coinInitial).toBe(web.overrides.coinInitial)
+      expect(qw.stepsPerFrame).toBe(web.overrides.stepsPerFrame)
+    })
+  })
+
   it('hides fixed-dimensional TDSE physics presets above their valid dimension', () => {
     enterScenarioMode('tdseDynamics', 5)
 

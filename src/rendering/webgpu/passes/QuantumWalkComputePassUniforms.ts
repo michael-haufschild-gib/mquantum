@@ -19,6 +19,7 @@ const FIELD_VIEW_MAP: Record<string, number> = {
   coinState: 2,
   coinEntropy: 3,
   causalCurvature: 4,
+  ctcFractalCarpet: 5,
 }
 
 /**
@@ -32,6 +33,8 @@ const FIELD_VIEW_MAP: Record<string, number> = {
  * @param basisY - Camera Y basis vector (12 floats)
  * @param basisZ - Camera Z basis vector (12 floats)
  * @param boundingRadius - Bounding sphere radius for the lattice volume
+ * @param target - Existing uniform buffer storage to reuse when sized correctly
+ * @param walkSteps - Live walk step counter for stroboscopic field views
  * @returns Packed uniform buffer ready for GPU upload
  */
 export function packWriteGridUniforms(
@@ -43,7 +46,8 @@ export function packWriteGridUniforms(
   basisY: Float32Array | undefined,
   basisZ: Float32Array | undefined,
   boundingRadius: number,
-  target?: ArrayBuffer
+  target?: ArrayBuffer,
+  walkSteps = config.steps
 ): ArrayBuffer {
   const buf =
     target?.byteLength === QW_WRITE_GRID_UNIFORMS_SIZE
@@ -80,7 +84,7 @@ export function packWriteGridUniforms(
   f32[40] = boundingRadius
   // maxDensity from GPU atomicMax readback (1-frame lag)
   f32[41] = Math.max(gpuMaxDensity, 1e-8)
-  u32[42] = 0 // _pad0
+  u32[42] = Math.max(0, Math.floor(Number.isFinite(walkSteps) ? walkSteps : 0)) >>> 0
   u32[43] = 0 // _pad1
 
   // basisX (offset 176, 12 f32)
