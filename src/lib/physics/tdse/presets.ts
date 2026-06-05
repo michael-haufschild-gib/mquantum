@@ -1023,7 +1023,7 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
       packetWidth: 0.5,
       packetAmplitude: 1.0,
       potentialType: 'free',
-      absorberEnabled: true,
+      absorberEnabled: false,
       absorberWidth: 0.2,
       pmlTargetReflection: 1e-6,
       diagnosticsEnabled: true,
@@ -1032,7 +1032,7 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
       autoScale: true,
       autoLoop: false,
     },
-    renderingOverrides: { densityGain: 0.8, densityContrast: 1.4, autoScaleMaxGain: 12 },
+    renderingOverrides: { densityGain: 4.0, densityContrast: 4.0, autoScaleMaxGain: 100 },
   },
 ]
 

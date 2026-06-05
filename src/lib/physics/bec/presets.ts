@@ -293,7 +293,11 @@ export const BEC_SCENARIO_PRESETS: BecScenarioPreset[] = [
       absorberEnabled: false,
       fieldView: 'machNumber',
     },
-    renderingOverrides: { ...SONIC_HORIZON_BASE_RENDERING },
+    renderingOverrides: {
+      ...SONIC_HORIZON_BASE_RENDERING,
+      densityContrast: 4.0,
+      autoScaleMaxGain: 100,
+    },
   },
   {
     id: 'vortex4DSingle',
