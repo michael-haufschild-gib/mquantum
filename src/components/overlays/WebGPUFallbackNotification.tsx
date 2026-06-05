@@ -117,6 +117,7 @@ export const WebGPUFallbackNotification: React.FC = () => {
       </div>
 
       <Button
+        data-testid="components-overlays-web-gpufallback-notification-button-119-7"
         variant="ghost"
         size="sm"
         onClick={dismissNotification}

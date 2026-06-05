@@ -115,4 +115,43 @@ describe('generateDisorderPotential', () => {
       expect(Math.abs(pot[i]!)).toBe(0)
     }
   })
+
+  describe('input contracts', () => {
+    it('rejects invalid lattice dimensions before allocation', () => {
+      expect(() => generateDisorderPotential([8], 0, 1, 42, 'uniform')).toThrow(/latticeDim/)
+      expect(() => generateDisorderPotential([8], 2, 1, 42, 'uniform')).toThrow(/gridSize length/)
+    })
+
+    it('rejects invalid grid sizes before allocation', () => {
+      expect(() => generateDisorderPotential([8, 0], 2, 1, 42, 'uniform')).toThrow(/gridSize\[1\]/)
+      expect(() => generateDisorderPotential([8, 2.5], 2, 1, 42, 'uniform')).toThrow(
+        /gridSize\[1\]/
+      )
+    })
+
+    it('rejects site-count overflow before WASM or JS allocation', () => {
+      expect(() => generateDisorderPotential([65536, 65536], 2, 1, 42, 'uniform')).toThrow(
+        /grid product/
+      )
+      expect(() => generateDisorderPotential([2 ** 20, 2], 2, 1, 42, 'uniform')).toThrow(
+        /grid product/
+      )
+    })
+
+    it('rejects non-physical scalar inputs', () => {
+      expect(() => generateDisorderPotential([8], 1, Number.NaN, 42, 'uniform')).toThrow(
+        /disorderStrength/
+      )
+      expect(() => generateDisorderPotential([8], 1, -1, 42, 'uniform')).toThrow(/disorderStrength/)
+      expect(() =>
+        generateDisorderPotential([8], 1, 1, Number.POSITIVE_INFINITY, 'uniform')
+      ).toThrow(/seed/)
+    })
+
+    it('rejects unknown distribution tags at runtime', () => {
+      expect(() => generateDisorderPotential([8], 1, 1, 42, 'lorentzian' as never)).toThrow(
+        /unsupported/
+      )
+    })
+  })
 })

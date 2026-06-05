@@ -31,6 +31,24 @@ const EMOJI_RE =
   /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{231A}\u{231B}\u{23E9}-\u{23F3}\u{23F8}-\u{23FA}\u{25AA}\u{25AB}\u{25B6}\u{25C0}\u{25FB}-\u{25FE}\u{2934}\u{2935}\u{2B05}-\u{2B07}\u{2B1B}\u{2B1C}\u{2B50}\u{2B55}\u{3030}\u{303D}\u{3297}\u{3299}\u{200D}\u{FE0F}]/u
 
 const RAW_HTML_CONTROLS = new Set(['input', 'select', 'button', 'textarea'])
+const CLICKABLE_DOM_ELEMENTS = new Set(['button', 'summary'])
+const DATA_TESTID_PRIMITIVES = new Set([
+  'Button',
+  'Switch',
+  'Slider',
+  'ToggleButton',
+  'Select',
+  'Input',
+  'NumberInput',
+  'Knob',
+  'ToggleGroup',
+  'MultiToggleGroup',
+  'ColorPicker',
+  'TileButton',
+  'InlineEdit',
+  'ExportPresetCard',
+  'ControlGroup',
+])
 
 // Interactive UI primitives that must always carry a `tooltip` prop at every
 // call site. Each of these accepts `tooltip?: string` (see src/components/ui/*),
@@ -913,6 +931,84 @@ const projectRulesPlugin = {
       },
     },
 
+    // ---- require-clickable-data-testid ----
+    'require-clickable-data-testid': {
+      meta: {
+        type: 'problem',
+        docs: {
+          description: 'Require data-testid on every clickable JSX element',
+        },
+        messages: {
+          missingDataTestId:
+            '<{{ name }}> is clickable — add a data-testid so tests can use stable selectors.',
+        },
+        schema: [],
+      },
+      create(context) {
+        const fp = normalizePath(context.filename)
+        if (fp.includes('.test.') || fp.includes('.spec.') || fp.includes('__mocks__')) return {}
+
+        function getAttr(openingNode, attrName) {
+          for (const attr of openingNode.attributes) {
+            if (
+              attr.type === 'JSXAttribute' &&
+              attr.name &&
+              attr.name.type === 'JSXIdentifier' &&
+              attr.name.name === attrName
+            ) {
+              return attr
+            }
+          }
+          return null
+        }
+
+        function hasClickHandler(openingNode) {
+          return openingNode.attributes.some(
+            (attr) =>
+              attr.type === 'JSXAttribute' &&
+              attr.name &&
+              attr.name.type === 'JSXIdentifier' &&
+              CLICK_HANDLER_PROPS.has(attr.name.name)
+          )
+        }
+
+	        function isClickableDomElement(name, openingNode) {
+	          if (CLICKABLE_DOM_ELEMENTS.has(name)) return true
+	          if (name === 'a') return Boolean(getAttr(openingNode, 'href'))
+	          if (RAW_HTML_CONTROLS.has(name)) return true
+	          return false
+	        }
+
+	        function getJsxElementName(nameNode) {
+	          if (nameNode.type === 'JSXIdentifier') return nameNode.name
+	          if (nameNode.type === 'JSXMemberExpression') {
+	            return getJsxElementName(nameNode.property)
+	          }
+	          return null
+	        }
+
+	        return {
+	          JSXOpeningElement(node) {
+	            const name = getJsxElementName(node.name)
+	            if (!name) return
+
+	            const isDomElement = name[0] === name[0].toLowerCase()
+            const clickable =
+              DATA_TESTID_PRIMITIVES.has(name) ||
+              (isDomElement && (isClickableDomElement(name, node) || hasClickHandler(node)))
+            if (!clickable) return
+            if (getAttr(node, 'data-testid') || getAttr(node, 'aria-hidden')) return
+
+            context.report({
+              node,
+              messageId: 'missingDataTestId',
+              data: { name },
+            })
+          },
+        }
+      },
+    },
+
     // ---- require-interactive-tooltip ----
     // Every interactive primitive (Button, Switch, Slider, ToggleButton,
     // Select, Input, NumberInput, Knob, ToggleGroup, MultiToggleGroup,
@@ -1291,13 +1387,14 @@ export default [
       'project-rules/no-dom-node-access': 'error',
       'project-rules/no-behavioral-string-test': 'error',
       'project-rules/require-gpu-labels': 'error',
+      'project-rules/require-clickable-data-testid': 'error',
       'project-rules/require-interactive-tooltip': 'error',
     },
   },
 
   // Allow console.* in error boundaries (must log in production) and the logger itself
   {
-    files: ['src/lib/logger.ts', 'src/components/ui/ErrorBoundary.tsx'],
+    files: ['src/lib/logger.ts', 'src/components/ui/ErrorBoundary/index.tsx'],
     rules: {
       'no-console': 'off',
     },

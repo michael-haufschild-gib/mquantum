@@ -17,6 +17,11 @@ import {
 } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import { buildRadialDisplayGrid } from '@/lib/physics/freeScalar/kSpaceRadialSpectrum'
 
+import {
+  assertKSpaceDisplayGridShape,
+  getKSpaceDisplayVoxelCount,
+  sanitizeKSpaceDisplayGridSize,
+} from './kSpaceDisplayGrid'
 import { fftShiftDisplayIndexToRawIndex, mapRawKIndexToOutputCoord } from './kSpaceGridMapping'
 
 // ============================================================================
@@ -59,8 +64,8 @@ export function projectToDisplayGrid(
   config: KSpaceVizConfig,
   outputGridSize: number = OUTPUT_GRID_SIZE
 ): KSpaceDisplayGrid {
-  const G = outputGridSize
-  const outputTotal = G ** 3
+  const G = sanitizeKSpaceDisplayGridSize(outputGridSize)
+  const outputTotal = getKSpaceDisplayVoxelCount(G)
   const nk = new Float64Array(outputTotal)
   const kNorm = new Float64Array(outputTotal)
   const omegaNorm = new Float64Array(outputTotal)
@@ -221,7 +226,7 @@ function projectDirect3DResampled(
 ): void {
   const activeDims = raw.gridSize
   const shift = config.fftShiftEnabled
-  const outputTotal = G ** 3
+  const outputTotal = getKSpaceDisplayVoxelCount(G)
   const kMagWeightedSum = new Float64Array(outputTotal)
   const omegaWeightedSum = new Float64Array(outputTotal)
   const coords = new Array<number>(activeDims.length).fill(0)
@@ -276,11 +281,12 @@ function projectMarginalize(
 ): void {
   const activeDims = raw.gridSize
   const shift = config.fftShiftEnabled
+  const outputTotal = getKSpaceDisplayVoxelCount(G)
 
   // Occupation-weighted accumulation arrays for metadata and n*omega energy proxy.
   // This keeps collapsed voxels consistent with direct 3D mode semantics.
-  const kMagWeightedSum = new Float64Array(G ** 3)
-  const omegaWeightedSum = new Float64Array(G ** 3)
+  const kMagWeightedSum = new Float64Array(outputTotal)
+  const omegaWeightedSum = new Float64Array(outputTotal)
 
   // Pre-allocate reusable coordinate arrays (avoid per-iteration heap allocation)
   const coords = new Array<number>(activeDims.length).fill(0)
@@ -317,7 +323,7 @@ function projectMarginalize(
 
   // Compute occupancy-weighted averages for |k| and omega.
   const eps = 1e-20
-  for (let i = 0; i < G ** 3; i++) {
+  for (let i = 0; i < outputTotal; i++) {
     const n = nk[i]!
     if (n <= eps) {
       kNorm[i] = 0
@@ -468,7 +474,8 @@ export function applyBroadening(
 ): void {
   if (!config.broadeningEnabled) return
 
-  const G = outputGridSize
+  const G = sanitizeKSpaceDisplayGridSize(outputGridSize)
+  assertKSpaceDisplayGridShape(grid, G, 'applyBroadening')
   const radius = Math.min(5, Math.max(1, Math.round(config.broadeningRadius)))
   const sigma = Math.max(0.5, Math.min(3.0, config.broadeningSigma))
 
@@ -487,7 +494,7 @@ export function applyBroadening(
   }
 
   // Sum before blur for mass preservation
-  const total = G ** 3
+  const total = getKSpaceDisplayVoxelCount(G)
   let sumBefore = 0
   for (let i = 0; i < total; i++) {
     sumBefore += grid.nk[i]!
@@ -655,8 +662,9 @@ export function packDisplayTextures(
   nkOnly: boolean = false,
   outputGridSize: number = OUTPUT_GRID_SIZE
 ): { density: Uint16Array; analysis: Uint16Array } {
-  const G = outputGridSize
-  const outputTotal = G ** 3
+  const G = sanitizeKSpaceDisplayGridSize(outputGridSize)
+  assertKSpaceDisplayGridShape(grid, G, 'packDisplayTextures')
+  const outputTotal = getKSpaceDisplayVoxelCount(G)
   const density = new Uint16Array(outputTotal * 4)
   const analysis = new Uint16Array(outputTotal * 4)
 
@@ -710,15 +718,16 @@ export function buildKSpaceDisplayTextures(
   outputGridSize: number = OUTPUT_GRID_SIZE
 ): { density: Uint16Array; analysis: Uint16Array } {
   const safeConfig = sanitizeKSpaceVizConfig(config)
+  const G = sanitizeKSpaceDisplayGridSize(outputGridSize)
   let grid: KSpaceDisplayGrid
   if (safeConfig.displayMode === 'radial3d') {
-    grid = buildRadialDisplayGrid(raw, safeConfig, outputGridSize)
+    grid = buildRadialDisplayGrid(raw, safeConfig, G)
   } else {
-    grid = projectToDisplayGrid(raw, safeConfig, outputGridSize)
+    grid = projectToDisplayGrid(raw, safeConfig, G)
   }
 
   applyExposureTransfer(grid, safeConfig)
-  applyBroadening(grid, safeConfig, raw.latticeDim, nkOnly, outputGridSize)
+  applyBroadening(grid, safeConfig, raw.latticeDim, nkOnly, G)
 
-  return packDisplayTextures(grid, nkOnly, outputGridSize)
+  return packDisplayTextures(grid, nkOnly, G)
 }

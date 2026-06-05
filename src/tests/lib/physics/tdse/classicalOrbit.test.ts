@@ -284,6 +284,17 @@ describe('computeGradient', () => {
     expect(x[1]).toBe(xCopy[1])
     expect(x[2]).toBe(xCopy[2])
   })
+
+  it('uses a finite fallback step for invalid finite-difference h', () => {
+    const config = makeConfig({ potentialType: 'harmonicTrap', mass: 1, harmonicOmega: 1 })
+    const x = new Float64Array([1, 0, 0])
+    const grad = new Float64Array(3)
+
+    computeGradient(x, config, grad, Number.NaN)
+
+    expect(grad[0]).toBeCloseTo(1.0, 4)
+    expect(Number.isFinite(grad[0]!)).toBe(true)
+  })
 })
 
 describe('integrateOrbit', () => {
@@ -328,6 +339,46 @@ describe('integrateOrbit', () => {
 
     // Initial point + 100/10 = 10 sampled points = 11 total
     expect(trajectory.points.length).toBe(11)
+  })
+
+  it('sanitizes invalid dt and sample interval instead of emitting NaN points', () => {
+    const config = makeConfig({ potentialType: 'harmonicTrap', mass: 1, harmonicOmega: 1 })
+    const x0 = new Float64Array([1, 0, 0])
+    const p0 = new Float64Array([0, 0.5, 0])
+    const orbitCfg = {
+      ...DEFAULT_ORBIT_CONFIG,
+      steps: 3,
+      dt: Number.NaN,
+      sampleInterval: 0,
+    }
+
+    const trajectory = integrateOrbit(x0, p0, config, orbitCfg)
+
+    expect(trajectory.points.length).toBeGreaterThan(0)
+    for (const point of trajectory.points) {
+      expect(Array.from(point.x).every(Number.isFinite)).toBe(true)
+      expect(Array.from(point.p).every(Number.isFinite)).toBe(true)
+    }
+  })
+
+  it('returns an empty finite trajectory for invalid mass or vector shape', () => {
+    const invalidMass = integrateOrbit(
+      new Float64Array([1, 0]),
+      new Float64Array([0, 1]),
+      makeConfig({ mass: Number.NaN }),
+      { ...DEFAULT_ORBIT_CONFIG, steps: 3 }
+    )
+    const mismatchedVector = integrateOrbit(
+      new Float64Array([1, 0]),
+      new Float64Array([0]),
+      makeConfig({ mass: 1 }),
+      { ...DEFAULT_ORBIT_CONFIG, steps: 3 }
+    )
+
+    expect(invalidMass.points).toEqual([])
+    expect(invalidMass.energy).toBe(0)
+    expect(mismatchedVector.points).toEqual([])
+    expect(mismatchedVector.energyDrift).toBe(0)
   })
 
   // Energy conservation for additional potential types.
@@ -485,6 +536,36 @@ describe('generateOrbitsAtEnergy', () => {
     const orbitCfg = { ...DEFAULT_ORBIT_CONFIG, steps: 100, numOrbits: 4 }
     const orbits = generateOrbitsAtEnergy(1.0, config, orbitCfg)
     expect(orbits).toHaveLength(4)
+  })
+
+  it('rejects invalid target energy, dimension, and mass', () => {
+    const config = makeConfig({ potentialType: 'harmonicTrap', mass: 1, harmonicOmega: 1 })
+    const orbitCfg = { ...DEFAULT_ORBIT_CONFIG, steps: 2, numOrbits: 1 }
+
+    expect(generateOrbitsAtEnergy(Number.POSITIVE_INFINITY, config, orbitCfg)).toEqual([])
+    expect(generateOrbitsAtEnergy(1, makeConfig({ latticeDim: 0 }), orbitCfg)).toEqual([])
+    expect(generateOrbitsAtEnergy(1, makeConfig({ mass: 0 }), orbitCfg)).toEqual([])
+  })
+
+  it('bounds invalid orbit counts while preserving finite trajectories', () => {
+    const config = makeConfig({ potentialType: 'harmonicTrap', mass: 1, harmonicOmega: 1 })
+    const orbitCfg = {
+      ...DEFAULT_ORBIT_CONFIG,
+      steps: 2,
+      dt: Number.NaN,
+      sampleInterval: 0,
+      numOrbits: Number.POSITIVE_INFINITY,
+      seed: Number.NaN,
+    }
+
+    const orbits = generateOrbitsAtEnergy(1.0, config, orbitCfg)
+
+    expect(orbits).toHaveLength(DEFAULT_ORBIT_CONFIG.numOrbits)
+    for (const orbit of orbits) {
+      expect(orbit.points.length).toBeGreaterThan(0)
+      expect(Number.isFinite(orbit.energy)).toBe(true)
+      expect(Number.isFinite(orbit.energyDrift)).toBe(true)
+    }
   })
 
   it('orbits have approximately the target energy', () => {

@@ -1,0 +1,153 @@
+/**
+ * HarmonicOscillatorControls Component
+ *
+ * Controls for n-dimensional harmonic oscillator superposition states.
+ * Includes preset selection, seed, quantum parameters, and slice controls.
+ */
+
+import React from 'react'
+
+import { Button } from '@/components/ui/Button'
+import { ControlGroup } from '@/components/ui/ControlGroup'
+import { Slider } from '@/components/ui/Slider'
+
+import type { HarmonicOscillatorControlsProps } from '../types'
+
+/**
+ * HarmonicOscillatorControls component
+ *
+ * Provides controls for harmonic oscillator quantum states:
+ * - Preset selection
+ * - Seed randomization
+ * - Quantum parameters (term count, max n, frequency spread)
+ * - Field scale
+ * - Slice parameters for 4D+
+ */
+export const HarmonicOscillatorControls: React.FC<HarmonicOscillatorControlsProps> = React.memo(
+  ({ config, dimension, actions }) => {
+    const {
+      setSeed,
+      randomizeSeed,
+      setTermCount,
+      setMaxQuantumNumber,
+      setFrequencySpread,
+      setFieldScale,
+      setSchroedingerParameterValue,
+    } = actions
+
+    return (
+      <>
+        <ControlGroup title="Seed" collapsible defaultOpen data-testid="control-group-ho-seed">
+          <div className="flex items-center justify-between">
+            <label className="text-xs text-[var(--text-secondary)]">Seed: {config.seed}</label>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => randomizeSeed()}
+              tooltip="Draw a new random seed for HO superposition states"
+              data-testid="schroedinger-randomize-seed"
+            >
+              Randomize
+            </Button>
+          </div>
+          <Slider
+            label="Seed"
+            tooltip="Random seed for generating quantum number combinations. Different seeds produce different superposition states."
+            min={0}
+            max={999999}
+            step={1}
+            value={config.seed}
+            onChange={setSeed}
+            showValue={false}
+            data-testid="schroedinger-seed-slider"
+          />
+        </ControlGroup>
+
+        <ControlGroup
+          title="Quantum Parameters"
+          collapsible
+          defaultOpen
+          data-testid="control-group-ho-quantum-params"
+        >
+          <Slider
+            label="Superposition Terms"
+            tooltip="Number of energy eigenstates combined in the superposition. More terms create richer interference patterns."
+            min={1}
+            max={8}
+            step={1}
+            value={config.termCount}
+            onChange={setTermCount}
+            showValue
+            data-testid="schroedinger-term-count"
+          />
+
+          <Slider
+            label="Max Quantum Number (n)"
+            tooltip="Highest energy level included in the superposition. Higher n means more spatial nodes and finer structure."
+            min={2}
+            max={6}
+            step={1}
+            value={config.maxQuantumNumber}
+            onChange={setMaxQuantumNumber}
+            showValue
+            data-testid="schroedinger-max-quantum"
+          />
+
+          <Slider
+            label="Frequency Spread"
+            tooltip="Variation in oscillation frequency across dimensions. Zero means isotropic; higher values create anisotropic potentials."
+            min={0}
+            max={0.5}
+            step={0.0001}
+            value={config.frequencySpread}
+            onChange={setFrequencySpread}
+            showValue
+            data-testid="schroedinger-freq-spread"
+          />
+
+          <Slider
+            label="Field Scale"
+            tooltip="Scales the spatial extent of the wavefunction visualization. Increase to see further from the origin."
+            min={0.5}
+            max={2.0}
+            step={0.1}
+            value={config.fieldScale}
+            onChange={setFieldScale}
+            showValue
+            data-testid="schroedinger-field-scale"
+          />
+        </ControlGroup>
+
+        {/* Slice Parameters - shown for 4D+ */}
+        {dimension >= 4 && (
+          <ControlGroup
+            title={`Cross Section (${dimension - 3} dim${dimension > 4 ? 's' : ''})`}
+            collapsible
+            defaultOpen
+            data-testid="control-group-ho-cross-section"
+          >
+            {Array.from({ length: dimension - 3 }, (_, i) => (
+              <Slider
+                key={`slice-dim-${i + 3}`}
+                label={`Dim ${i + 3}`}
+                tooltip="Cross-section position for this extra dimension. Explore different slices of the higher-dimensional wavefunction."
+                min={-2.0}
+                max={2.0}
+                step={0.1}
+                value={config.parameterValues[i] ?? 0}
+                onChange={(v) => setSchroedingerParameterValue(i, v)}
+                showValue
+                data-testid={`schroedinger-slice-dim-${i + 3}`}
+              />
+            ))}
+            <p className="text-xs text-text-tertiary">
+              Explore different {dimension}D cross-sections
+            </p>
+          </ControlGroup>
+        )}
+      </>
+    )
+  }
+)
+
+HarmonicOscillatorControls.displayName = 'HarmonicOscillatorControls'

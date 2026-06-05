@@ -22,7 +22,11 @@
  * @module lib/physics/tdse/metrics/curvedIntegratorRef
  */
 
-import { applyCurvedKineticRef, type CurvedKineticParams } from './curvedKineticRef'
+import {
+  applyCurvedKineticRef,
+  type CurvedKineticParams,
+  MAX_CURVED_TDSE_SITES,
+} from './curvedKineticRef'
 import type { MetricConfig } from './types'
 
 /**
@@ -168,6 +172,11 @@ interface StepScratch {
 }
 
 function allocStepScratch(n: number): StepScratch {
+  if (!Number.isSafeInteger(n) || n < 0 || n > MAX_CURVED_TDSE_SITES) {
+    throw new Error(
+      `curved TDSE RK4 state length ${n} exceeds site budget ${MAX_CURVED_TDSE_SITES}`
+    )
+  }
   return {
     k1Re: new Float32Array(n),
     k1Im: new Float32Array(n),

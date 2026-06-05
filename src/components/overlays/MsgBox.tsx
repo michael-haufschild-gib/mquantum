@@ -128,6 +128,7 @@ export const MsgBox: React.FC = () => {
           <div className="flex justify-end gap-3">
             {actions.map((action, index) => (
               <Button
+                data-testid="components-overlays-msg-box-button-130-15"
                 key={index}
                 onClick={() => handleAction(action)}
                 variant={action.variant || 'secondary'}

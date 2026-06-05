@@ -124,10 +124,13 @@ describe('computeScarCorrelation', () => {
 
     const badSpacing = computeScarCorrelation(re, im, [orbit], [4, 4], [1, 0], 1.0)
     const badTube = computeScarCorrelation(re, im, [orbit], [4, 4], [1, 1], Number.NaN)
+    const overBudget = computeScarCorrelation(re, im, [orbit], [2 ** 20, 2], [1, 1], 1.0)
 
     expect(badSpacing.maxCorrelation).toBe(0)
     expect(badTube.maxCorrelation).toBe(0)
+    expect(overBudget.maxCorrelation).toBe(0)
     expect(badTube.orbitCorrelations).toEqual([0])
+    expect(overBudget.orbitCorrelations).toEqual([0])
   })
 
   it('ignores trailing spacing entries outside the active dimension', () => {

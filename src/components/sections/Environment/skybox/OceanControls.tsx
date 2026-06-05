@@ -28,6 +28,7 @@ export const OceanControls: React.FC<OceanControlsProps> = ({
       </span>
 
       <Slider
+        data-testid="components-sections-environment-skybox-ocean-controls-slider-30-7"
         label="Caustic Intensity"
         tooltip="Strength of underwater light caustic patterns projected on surfaces."
         value={proceduralSettings.ocean?.causticIntensity ?? 0.5}
@@ -42,6 +43,7 @@ export const OceanControls: React.FC<OceanControlsProps> = ({
       />
 
       <Slider
+        data-testid="components-sections-environment-skybox-ocean-controls-slider-44-7"
         label="Depth Gradient"
         tooltip="How pronounced the color darkening is with depth. Higher values create a stronger deep-ocean atmosphere."
         value={proceduralSettings.ocean?.depthGradient ?? 0.5}
@@ -56,6 +58,7 @@ export const OceanControls: React.FC<OceanControlsProps> = ({
       />
 
       <Slider
+        data-testid="components-sections-environment-skybox-ocean-controls-slider-58-7"
         label="Bubble Density"
         tooltip="Amount of rising bubble/particle effects in the underwater scene."
         value={proceduralSettings.ocean?.bubbleDensity ?? 0.3}
@@ -70,6 +73,7 @@ export const OceanControls: React.FC<OceanControlsProps> = ({
       />
 
       <Slider
+        data-testid="components-sections-environment-skybox-ocean-controls-slider-72-7"
         label="Surface Shimmer"
         tooltip="Intensity of the shimmering light effect near the water surface."
         value={proceduralSettings.ocean?.surfaceShimmer ?? 0.4}

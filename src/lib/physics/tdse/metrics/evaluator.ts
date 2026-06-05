@@ -28,6 +28,30 @@ const SCHWARZSCHILD_MIN_RADIUS = 0.01
 const ADS_MIN_Z = 0.05
 /** Sphere polar-angle buffer (θ clamped to [ε, π−ε]). */
 const SPHERE_POLE_EPSILON = 0.2
+const MAX_METRIC_DIM = 11
+const DE_SITTER_LOG_SCALE_LIMIT = 60
+
+function validateMetricDim(latticeDim: number): number {
+  if (!Number.isSafeInteger(latticeDim) || latticeDim < 1 || latticeDim > MAX_METRIC_DIM) {
+    throw new RangeError(
+      `latticeDim must be an integer in [1, ${MAX_METRIC_DIM}], got ${latticeDim}`
+    )
+  }
+  return latticeDim
+}
+
+function finiteAtLeast(value: number | undefined, min: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(value, min) : min
+}
+
+function finiteCoord(coords: readonly number[], index: number, fallback = 0): number {
+  const value = coords[index]
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function finiteTime(time: number): number {
+  return Number.isFinite(time) ? time : 0
+}
 
 // ── Morris–Thorne (reused by doubleThroat) ───────────────────────────────
 
@@ -88,11 +112,12 @@ export function sampleMetric(
   latticeDim: number,
   time: number = 0
 ): MetricSample {
+  const dim = validateMetricDim(latticeDim)
   const out: MetricSample = {
-    gInverseDiag: new Array<number>(latticeDim),
+    gInverseDiag: new Array<number>(dim),
     sqrtDet: 1,
   }
-  sampleMetricInto(cfg, coords, latticeDim, time, out)
+  sampleMetricInto(cfg, coords, dim, time, out)
   return out
 }
 
@@ -109,31 +134,35 @@ export function sampleMetricInto(
   time: number,
   out: MetricSample
 ): void {
+  const dim = validateMetricDim(latticeDim)
+  if (out.gInverseDiag.length < dim) {
+    throw new RangeError(`out.gInverseDiag length ${out.gInverseDiag.length} < latticeDim ${dim}`)
+  }
   switch (cfg.kind) {
     case 'morrisThorne':
-      sampleMorrisThorneInto(cfg, coords, latticeDim, out)
+      sampleMorrisThorneInto(cfg, coords, dim, out)
       return
     case 'schwarzschild':
-      sampleSchwarzschildInto(cfg, coords, latticeDim, out)
+      sampleSchwarzschildInto(cfg, coords, dim, out)
       return
     case 'deSitter':
-      sampleDeSitterInto(cfg, latticeDim, time, out)
+      sampleDeSitterInto(cfg, dim, time, out)
       return
     case 'antiDeSitter':
-      sampleAntiDeSitterInto(cfg, coords, latticeDim, out)
+      sampleAntiDeSitterInto(cfg, coords, dim, out)
       return
     case 'sphere2D':
-      sampleSphere2DInto(cfg, coords, latticeDim, out)
+      sampleSphere2DInto(cfg, coords, dim, out)
       return
     case 'torus':
-      flatSampleInto(latticeDim, out)
+      flatSampleInto(dim, out)
       return
     case 'doubleThroat':
-      sampleDoubleThroatInto(cfg, coords, latticeDim, out)
+      sampleDoubleThroatInto(cfg, coords, dim, out)
       return
     case 'flat':
     default:
-      flatSampleInto(latticeDim, out)
+      flatSampleInto(dim, out)
       return
   }
 }
@@ -159,8 +188,8 @@ function sampleMorrisThorneInto(
     flatSampleInto(latticeDim, out)
     return
   }
-  const b0 = Math.max(cfg.throatRadius ?? MIN_THROAT_RADIUS, MIN_THROAT_RADIUS)
-  const l = (coords[0] ?? 0) as number
+  const b0 = finiteAtLeast(cfg.throatRadius, MIN_THROAT_RADIUS)
+  const l = finiteCoord(coords, 0)
   const r = morrisThorneRadius(l, b0)
   const invR2 = 1 / (r * r)
   const g = out.gInverseDiag
@@ -182,10 +211,10 @@ function sampleSchwarzschildInto(
   latticeDim: number,
   out: MetricSample
 ): void {
-  const M = Math.max(cfg.schwarzschildMass ?? MIN_SCHWARZSCHILD_MASS, MIN_SCHWARZSCHILD_MASS)
+  const M = finiteAtLeast(cfg.schwarzschildMass, MIN_SCHWARZSCHILD_MASS)
   let r2 = 0
   for (let d = 0; d < latticeDim; d++) {
-    const c = (coords[d] ?? 0) as number
+    const c = finiteCoord(coords, d)
     r2 += c * c
   }
   const rMin = Math.max(M / 2, SCHWARZSCHILD_MIN_RADIUS)
@@ -213,8 +242,12 @@ function sampleDeSitterInto(
   time: number,
   out: MetricSample
 ): void {
-  const H = Math.max(cfg.hubbleRate ?? MIN_HUBBLE_RATE, MIN_HUBBLE_RATE)
-  const a = Math.exp(H * time)
+  const H = finiteAtLeast(cfg.hubbleRate, MIN_HUBBLE_RATE)
+  const logA = Math.max(
+    -DE_SITTER_LOG_SCALE_LIMIT,
+    Math.min(DE_SITTER_LOG_SCALE_LIMIT, H * finiteTime(time))
+  )
+  const a = Math.exp(logA)
   const invA2 = 1 / (a * a)
   const g = out.gInverseDiag
   for (let d = 0; d < latticeDim; d++) g[d] = invA2
@@ -235,8 +268,8 @@ function sampleAntiDeSitterInto(
   latticeDim: number,
   out: MetricSample
 ): void {
-  const L = Math.max(cfg.adsRadius ?? MIN_ADS_RADIUS, MIN_ADS_RADIUS)
-  const z = Math.max(Math.abs((coords[0] ?? ADS_MIN_Z) as number), ADS_MIN_Z)
+  const L = finiteAtLeast(cfg.adsRadius, MIN_ADS_RADIUS)
+  const z = Math.max(Math.abs(finiteCoord(coords, 0, ADS_MIN_Z)), ADS_MIN_Z)
   const zOverL = z / L
   const gInv = zOverL * zOverL
   const g = out.gInverseDiag
@@ -268,8 +301,8 @@ function sampleSphere2DInto(
     flatSampleInto(latticeDim, out)
     return
   }
-  const R = Math.max(cfg.sphereRadius ?? MIN_SPHERE_RADIUS, MIN_SPHERE_RADIUS)
-  const thetaRaw = (coords[1] ?? Math.PI / 2) as number
+  const R = finiteAtLeast(cfg.sphereRadius, MIN_SPHERE_RADIUS)
+  const thetaRaw = finiteCoord(coords, 1, Math.PI / 2)
   const theta = Math.min(Math.max(thetaRaw, SPHERE_POLE_EPSILON), Math.PI - SPHERE_POLE_EPSILON)
   const sinTheta = Math.sin(theta)
   const g = out.gInverseDiag
@@ -295,15 +328,9 @@ function sampleDoubleThroatInto(
     flatSampleInto(latticeDim, out)
     return
   }
-  const b0 = Math.max(
-    cfg.doubleThroatRadius ?? cfg.throatRadius ?? MIN_THROAT_RADIUS,
-    MIN_THROAT_RADIUS
-  )
-  const s = Math.max(
-    cfg.doubleThroatSeparation ?? MIN_DOUBLE_THROAT_SEPARATION,
-    MIN_DOUBLE_THROAT_SEPARATION
-  )
-  const l = (coords[0] ?? 0) as number
+  const b0 = finiteAtLeast(cfg.doubleThroatRadius ?? cfg.throatRadius, MIN_THROAT_RADIUS)
+  const s = finiteAtLeast(cfg.doubleThroatSeparation, MIN_DOUBLE_THROAT_SEPARATION)
+  const l = finiteCoord(coords, 0)
   const r = doubleThroatRadius(l, b0, s)
   const invR2 = 1 / (r * r)
   const g = out.gInverseDiag
@@ -342,6 +369,7 @@ export function ricciScalar(
   latticeDim: number,
   time: number = 0
 ): number {
+  const dim = validateMetricDim(latticeDim)
   void time // static curvature for all currently supported kinds
   switch (cfg.kind) {
     case 'flat':
@@ -349,35 +377,27 @@ export function ricciScalar(
     case 'schwarzschild':
       return 0
     case 'sphere2D': {
-      const R = Math.max(cfg.sphereRadius ?? MIN_SPHERE_RADIUS, MIN_SPHERE_RADIUS)
+      const R = finiteAtLeast(cfg.sphereRadius, MIN_SPHERE_RADIUS)
       return 2 / (R * R)
     }
     case 'deSitter':
       // g_ij = a(t)²δ_ij is conformally flat — spatial Ricci scalar is 0.
       return 0
     case 'antiDeSitter': {
-      const L = Math.max(cfg.adsRadius ?? MIN_ADS_RADIUS, MIN_ADS_RADIUS)
-      const n = latticeDim
+      const L = finiteAtLeast(cfg.adsRadius, MIN_ADS_RADIUS)
+      const n = dim
       return -(n * (n - 1)) / (L * L)
     }
     case 'morrisThorne': {
-      const b0 = Math.max(cfg.throatRadius ?? MIN_THROAT_RADIUS, MIN_THROAT_RADIUS)
-      const l = (coords[0] ?? 0) as number
-      return morrisThorneRicci(l, b0, latticeDim)
+      const b0 = finiteAtLeast(cfg.throatRadius, MIN_THROAT_RADIUS)
+      const l = finiteCoord(coords, 0)
+      return morrisThorneRicci(l, b0, dim)
     }
     case 'doubleThroat': {
-      const b0 = Math.max(
-        cfg.doubleThroatRadius ?? cfg.throatRadius ?? MIN_THROAT_RADIUS,
-        MIN_THROAT_RADIUS
-      )
-      const s = Math.max(
-        cfg.doubleThroatSeparation ?? MIN_DOUBLE_THROAT_SEPARATION,
-        MIN_DOUBLE_THROAT_SEPARATION
-      )
-      const l = (coords[0] ?? 0) as number
-      return (
-        morrisThorneRicci(l - s / 2, b0, latticeDim) + morrisThorneRicci(l + s / 2, b0, latticeDim)
-      )
+      const b0 = finiteAtLeast(cfg.doubleThroatRadius ?? cfg.throatRadius, MIN_THROAT_RADIUS)
+      const s = finiteAtLeast(cfg.doubleThroatSeparation, MIN_DOUBLE_THROAT_SEPARATION)
+      const l = finiteCoord(coords, 0)
+      return morrisThorneRicci(l - s / 2, b0, dim) + morrisThorneRicci(l + s / 2, b0, dim)
     }
   }
 }
@@ -408,10 +428,14 @@ export function kretschmannScalar(
   coords: readonly number[],
   latticeDim: number
 ): number {
+  const dim = validateMetricDim(latticeDim)
   if (cfg.kind !== 'schwarzschild') return 0
-  const M = Math.max(cfg.schwarzschildMass ?? MIN_SCHWARZSCHILD_MASS, MIN_SCHWARZSCHILD_MASS)
+  const M = finiteAtLeast(cfg.schwarzschildMass, MIN_SCHWARZSCHILD_MASS)
   let r2 = 0
-  for (let d = 0; d < latticeDim; d++) r2 += (coords[d] ?? 0) * (coords[d] ?? 0)
+  for (let d = 0; d < dim; d++) {
+    const c = finiteCoord(coords, d)
+    r2 += c * c
+  }
   const rMin = Math.max(M / 2, SCHWARZSCHILD_MIN_RADIUS)
   const rho = Math.max(Math.sqrt(r2), rMin)
   const psi = 1 + M / (2 * rho)

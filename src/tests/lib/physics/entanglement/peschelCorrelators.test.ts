@@ -124,6 +124,9 @@ describe('buildLatticeCorrelators1D', () => {
     expect(() => buildLatticeCorrelators1D({ gridSize: 32, spacing: 1, massSq: NaN })).toThrow(
       /massSq/
     )
+    expect(() => buildLatticeCorrelators1D({ gridSize: 1025, spacing: 1, massSq: 0 })).toThrow(
+      /matrix size/
+    )
   })
 
   it('handles N = 1 (degenerate single-site lattice)', () => {
@@ -250,6 +253,28 @@ describe('buildLatticeSliceCorrelators (N-D)', () => {
         massSq: 0,
       })
     ).toThrow(/spacing\[1\]/)
+  })
+
+  it('throws before allocating oversized transverse mode products', () => {
+    expect(() =>
+      buildLatticeSliceCorrelators({
+        gridSize: [4, 2048, 1024],
+        spacing: [1, 1, 1],
+        latticeDim: 3,
+        massSq: 0,
+      })
+    ).toThrow(/transverse mode count/)
+  })
+
+  it('throws on lattice-dispersion overflow from tiny spacing', () => {
+    expect(() =>
+      buildLatticeSliceCorrelators({
+        gridSize: [4],
+        spacing: [Number.MIN_VALUE],
+        latticeDim: 1,
+        massSq: 0,
+      })
+    ).toThrow(/lattice dispersion/)
   })
 
   it('regression: massless on a small lattice does not produce divergent X (IR floor active)', () => {

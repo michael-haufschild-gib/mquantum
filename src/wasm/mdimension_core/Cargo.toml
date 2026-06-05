@@ -22,10 +22,10 @@ console_error_panic_hook = "0.1.7"
 # never compile these bindings, so the public-facing wasm is unchanged.
 wdw-validator = []
 
-# Optimization profile for Release builds (MAXIMUM SPEED)
+# Optimization profile for Release builds.
 [profile.release]
 opt-level = 3           # Maximum optimization for speed
-lto = "fat"             # Full LTO for cross-crate optimization
+lto = "thin"            # Cross-crate gains without rust-lld memory spikes on cold wasm builds
 strip = true            # Strip debug symbols
 codegen-units = 1       # Single codegen unit for better optimization
 panic = "abort"         # Faster panic handling

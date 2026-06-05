@@ -22,6 +22,23 @@ const scratchMatrixA = new Map<number, Float64Array>()
 const scratchMatrixB = new Map<number, Float64Array>()
 const scratchVector = new Map<number, Float64Array>()
 
+const MAX_MATRIX_ELEMENTS = 1_048_576
+const MAX_DETERMINANT_DIMENSION = 8
+
+function assertPositiveInteger(value: number, name: string): void {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer`)
+  }
+}
+
+function assertSafeElementCount(rows: number, cols: number, caller: string): void {
+  assertPositiveInteger(rows, `${caller}: rows`)
+  assertPositiveInteger(cols, `${caller}: cols`)
+  if (rows > Math.floor(MAX_MATRIX_ELEMENTS / cols)) {
+    throw new Error(`${caller}: matrix size exceeds ${MAX_MATRIX_ELEMENTS} elements`)
+  }
+}
+
 /**
  * Get or create a scratch buffer from the specified pool.
  * @param pool - The pool to get from (A, B, or vector)
@@ -44,10 +61,14 @@ function getScratch(pool: Map<number, Float64Array>, size: number): Float64Array
  * @throws {Error} If length does not represent a square matrix
  */
 function squareDimensionFromLength(length: number): number {
+  if (!Number.isSafeInteger(length) || length <= 0) {
+    throw new Error('Matrix length must be a positive safe integer')
+  }
   const dim = Math.sqrt(length)
   if (!Number.isInteger(dim)) {
     throw new Error('Matrix must be square')
   }
+  assertSafeElementCount(dim, dim, 'Matrix')
   return dim
 }
 
@@ -59,9 +80,7 @@ function squareDimensionFromLength(length: number): number {
  * @throws {Error} If dimension is not a positive integer
  */
 export function createIdentityMatrix(dimension: number): MatrixND {
-  if (dimension <= 0 || !Number.isInteger(dimension)) {
-    throw new Error('Dimension must be a positive integer')
-  }
+  assertSafeElementCount(dimension, dimension, 'createIdentityMatrix')
 
   const matrix = new Float32Array(dimension * dimension)
   for (let i = 0; i < dimension; i++) {
@@ -78,9 +97,7 @@ export function createIdentityMatrix(dimension: number): MatrixND {
  * @throws {Error} If dimensions are not positive integers
  */
 export function createZeroMatrix(rows: number, cols: number): MatrixND {
-  if (rows <= 0 || cols <= 0 || !Number.isInteger(rows) || !Number.isInteger(cols)) {
-    throw new Error('Matrix dimensions must be positive integers')
-  }
+  assertSafeElementCount(rows, cols, 'createZeroMatrix')
 
   return new Float32Array(rows * cols)
 }
@@ -421,6 +438,11 @@ export function determinant(m: MatrixND): number {
   }
 
   const dim = squareDimensionFromLength(len)
+  if (dim > MAX_DETERMINANT_DIMENSION) {
+    throw new Error(
+      `determinant: dimension ${dim} exceeds recursive limit ${MAX_DETERMINANT_DIMENSION}`
+    )
+  }
 
   // Base cases
   if (dim === 1) {
@@ -451,7 +473,7 @@ export function determinant(m: MatrixND): number {
  */
 function getMinor(m: MatrixND, row: number, col: number): MatrixND {
   const len = m.length
-  const dim = Math.sqrt(len)
+  const dim = squareDimensionFromLength(len)
   const minorDim = dim - 1
   const minor = new Float32Array(minorDim * minorDim)
 

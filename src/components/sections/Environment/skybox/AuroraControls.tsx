@@ -22,6 +22,7 @@ export const AuroraControls: React.FC<AuroraControlsProps> = ({
       </span>
 
       <Slider
+        data-testid="components-sections-environment-skybox-aurora-controls-slider-24-7"
         label="Curtain Height"
         tooltip="Vertical extent of the aurora curtains. Higher values stretch the lights further across the sky."
         value={proceduralSettings.aurora?.curtainHeight ?? 0.5}
@@ -36,6 +37,7 @@ export const AuroraControls: React.FC<AuroraControlsProps> = ({
       />
 
       <Slider
+        data-testid="components-sections-environment-skybox-aurora-controls-slider-38-7"
         label="Wave Frequency"
         tooltip="Frequency of the undulating wave motion in the aurora curtains. Higher values create more rapid rippling."
         value={proceduralSettings.aurora?.waveFrequency ?? 1.0}

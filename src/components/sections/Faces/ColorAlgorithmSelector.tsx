@@ -197,6 +197,7 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
     return (
       <div className={className}>
         <Select
+          data-testid="components-sections-faces-color-algorithm-selector-select-199-9"
           label="Color Algorithm"
           tooltip={
             isBranchColored

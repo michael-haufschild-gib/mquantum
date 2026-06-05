@@ -69,6 +69,7 @@ export const LchPresetSelector: React.FC<LchPresetSelectorProps> = React.memo(
     return (
       <div className={className} data-testid="lch-preset-selector">
         <Select
+          data-testid="components-sections-faces-lch-preset-selector-select-71-9"
           label="LCH Preset"
           tooltip="Pre-configured lightness and chroma values for the perceptually uniform LCH color space."
           options={options}

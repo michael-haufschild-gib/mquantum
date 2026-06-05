@@ -294,6 +294,15 @@ describe('applyWormholeCoupling — input validation', () => {
     ).toThrow(/positive integer/)
   })
 
+  it('throws on over-budget grid sizes before stride or total-site overflow', () => {
+    expect(() => applyWormholeCoupling(new Float32Array(0), [2 ** 20 + 1], 0, 0.1, 1)).toThrow(
+      /site budget/
+    )
+    expect(() => applyWormholeCoupling(new Float32Array(0), [2 ** 20, 2], 0, 0.1, 1)).toThrow(
+      /site budget/
+    )
+  })
+
   it('throws on out-of-range axis', () => {
     expect(() =>
       applyWormholeCoupling(new Float32Array(16), [4, 2], 2 as 0 | 1 | 2, 0.1, 1)

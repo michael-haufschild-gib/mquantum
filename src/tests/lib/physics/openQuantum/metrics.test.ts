@@ -16,6 +16,18 @@ import {
 } from '@/lib/physics/openQuantum/metrics'
 
 describe('purity', () => {
+  it('rejects invalid density-matrix shape', () => {
+    expect(() => purity({ K: 2, elements: new Float64Array(7) })).toThrow(/too small/)
+    expect(() => purity({ K: 15, elements: new Float64Array(15 * 15 * 2) })).toThrow(/rho\.K/)
+  })
+
+  it('rejects non-finite density-matrix entries', () => {
+    const rho = createDensityMatrix(2)
+    rho.elements[0] = Number.NaN
+
+    expect(() => computeMetrics(rho)).toThrow(/must be finite/)
+  })
+
   it('returns 1 for a pure state', () => {
     const rho = densityMatrixFromCoefficients([1, 0], [0, 0], 2)
     expect(purity(rho)).toBeCloseTo(1.0, 10)
@@ -40,6 +52,13 @@ describe('purity', () => {
     const p = purity(rho)
     expect(p).toBeGreaterThanOrEqual(1 / K - 1e-10)
     expect(p).toBeLessThanOrEqual(1 + 1e-10)
+  })
+
+  it('throws when norm accumulation overflows finite range', () => {
+    const rho = createDensityMatrix(2)
+    rho.elements[0] = Number.MAX_VALUE / 2
+
+    expect(() => purity(rho)).toThrow(/overflowed/)
   })
 })
 
@@ -72,6 +91,17 @@ describe('coherenceMagnitude', () => {
     const c = 1 / Math.sqrt(2)
     const rho = densityMatrixFromCoefficients([c, c], [0, 0], 2)
     expect(coherenceMagnitude(rho)).toBeGreaterThan(0.4)
+  })
+
+  it('does not overflow merely from squaring large finite off-diagonal components', () => {
+    const rho = createDensityMatrix(2)
+    const huge = Number.MAX_VALUE / 4
+    rho.elements[2] = huge
+    rho.elements[3] = huge
+
+    const coherence = coherenceMagnitude(rho)
+    expect(coherence).toBeCloseTo(Math.hypot(huge, huge), 12)
+    expect(Number.isFinite(coherence)).toBe(true)
   })
 })
 

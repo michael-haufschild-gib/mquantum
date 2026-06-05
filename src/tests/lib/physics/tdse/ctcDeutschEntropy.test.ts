@@ -90,5 +90,16 @@ describe('computeCtcDeutschEntropySample', () => {
       maxDensity: 1,
     })
     expect(invalidAxis).toMatchObject({ balance: 0, displayScalar: 0, mirrorIndex: null })
+
+    const unsafeGrid = computeCtcDeutschEntropySample({
+      psi: new Float32Array([1, 0, 0, 0]),
+      gridSize: [2 ** 32],
+      axis: 0,
+      siteIndex: 0,
+      phase: 0,
+      ctcPostselectionStrength: 1,
+      maxDensity: 1,
+    })
+    expect(unsafeGrid).toMatchObject({ balance: 0, displayScalar: 0, mirrorIndex: null })
   })
 })

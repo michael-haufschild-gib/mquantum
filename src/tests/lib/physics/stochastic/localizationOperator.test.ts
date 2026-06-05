@@ -143,6 +143,25 @@ describe('applyLocalizationStep — single site 1D', () => {
     }
   })
 
+  it('ignores non-finite collapse center data instead of poisoning the wavefunction', () => {
+    const { psiRe, psiIm } = uniformPsi(8)
+    const origRe = Float64Array.from(psiRe)
+    const origIm = Float64Array.from(psiIm)
+    const centers = [
+      { position: [Number.NaN], noise: Number.NaN },
+      { position: [Number.POSITIVE_INFINITY], noise: Number.POSITIVE_INFINITY },
+    ]
+
+    applyLocalizationStep1D(psiRe, psiIm, 8, 0.25, centers, 1.0, 0.5, 0.01)
+
+    for (let i = 0; i < 8; i++) {
+      expect(psiRe[i]).toBeCloseTo(origRe[i]!, 12)
+      expect(psiIm[i]).toBeCloseTo(origIm[i]!, 12)
+      expect(Number.isFinite(psiRe[i])).toBe(true)
+      expect(Number.isFinite(psiIm[i])).toBe(true)
+    }
+  })
+
   it('uses voxel-centered coordinates in the N-D path', () => {
     const gridSize = [4, 4]
     const spacing = [1, 1]
@@ -156,6 +175,24 @@ describe('applyLocalizationStep — single site 1D', () => {
     expect(psiRe[idx(1, 1)]).toBeCloseTo(psiRe[idx(1, 2)]!, 12)
     expect(psiRe[idx(1, 1)]).toBeCloseTo(psiRe[idx(2, 1)]!, 12)
     expect(psiRe[idx(1, 1)]).toBeCloseTo(psiRe[idx(2, 2)]!, 12)
+  })
+
+  it('rejects invalid N-D grid geometry before stride or allocation math', () => {
+    const { psiRe, psiIm } = uniformPsi(4)
+    const centers = [{ position: [0, 0], noise: 1.0 }]
+
+    expect(() =>
+      applyLocalizationStepND(psiRe, psiIm, [2, 2], [1, 1], 0, centers, 1, 0.5, 0.01)
+    ).toThrow(/latticeDim/)
+    expect(() =>
+      applyLocalizationStepND(psiRe, psiIm, [2, 0], [1, 1], 2, centers, 1, 0.5, 0.01)
+    ).toThrow(/gridSize\[1\]/)
+    expect(() =>
+      applyLocalizationStepND(psiRe, psiIm, [2, 2], [1, Number.NaN], 2, centers, 1, 0.5, 0.01)
+    ).toThrow(/spacing\[1\]/)
+    expect(() =>
+      applyLocalizationStepND(psiRe, psiIm, [2 ** 20, 2], [1, 1], 2, centers, 1, 0.5, 0.01)
+    ).toThrow(/site budget/)
   })
 
   it('localization preserves phase structure', () => {
@@ -240,5 +277,42 @@ describe('applyLocalizationStep — single site 1D', () => {
     // significant — the pipeline renormalizes after each step to correct this.
     // We verify drift is bounded, not tiny.
     expect(Math.abs(normAfter - normBefore) / normBefore).toBeLessThan(0.5)
+  })
+})
+
+describe('localization diagnostics', () => {
+  it('renormalize handles huge finite amplitudes without zeroing the state', () => {
+    const huge = Number.MAX_VALUE / 4
+    const psiRe = new Float64Array([huge, huge])
+    const psiIm = new Float64Array([0, 0])
+
+    renormalize(psiRe, psiIm)
+
+    expect(psiRe[0]).toBeCloseTo(1 / Math.sqrt(2), 12)
+    expect(psiRe[1]).toBeCloseTo(1 / Math.sqrt(2), 12)
+    expect(computeNorm(psiRe, psiIm)).toBeCloseTo(1, 12)
+  })
+
+  it('computeParticipationRatio is finite for huge finite amplitudes', () => {
+    const huge = Number.MAX_VALUE / 4
+    const psiRe = new Float64Array([huge, huge, 0, 0])
+    const psiIm = new Float64Array(4)
+
+    expect(computeParticipationRatio(psiRe, psiIm)).toBeCloseTo(0.5, 12)
+  })
+
+  it('throws when wavefunction buffers are shorter than the grid', () => {
+    expect(() =>
+      applyLocalizationStep1D(
+        new Float64Array(3),
+        new Float64Array(3),
+        4,
+        1,
+        [{ position: [0], noise: 1 }],
+        1,
+        0.5,
+        0.01
+      )
+    ).toThrow(/too small/)
   })
 })

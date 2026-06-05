@@ -59,6 +59,7 @@ export const PostProcessingControls: React.FC = React.memo(() => {
         content: (
           <div className="space-y-4">
             <Switch
+              data-testid="components-sections-post-processing-post-processing-controls-switch-61-13"
               checked={cinematicEnabled}
               onCheckedChange={setCinematicEnabled}
               label="Enable Cinematic"
@@ -76,6 +77,7 @@ export const PostProcessingControls: React.FC = React.memo(() => {
         content: (
           <div className="space-y-4">
             <Switch
+              data-testid="components-sections-post-processing-post-processing-controls-switch-78-13"
               checked={paperEnabled}
               onCheckedChange={setPaperEnabled}
               label="Enable Paper Texture"

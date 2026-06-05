@@ -48,6 +48,7 @@ export const ExportAdvancedTab = () => {
       {/* Bitrate */}
       <div className="space-y-4">
         <Slider
+          data-testid="components-overlays-export-export-advanced-tab-slider-50-9"
           label="TARGET BITRATE"
           value={settings.bitrate}
           onChange={(val) => updateSettings({ bitrate: val })}
@@ -70,6 +71,7 @@ export const ExportAdvancedTab = () => {
           Video Codec
         </label>
         <ToggleGroup
+          data-testid="components-overlays-export-export-advanced-tab-toggle-group-72-9"
           options={[
             { value: 'avc', label: 'H.264 (AVC)', disabled: settings.format !== 'mp4' },
             {
@@ -92,6 +94,7 @@ export const ExportAdvancedTab = () => {
           Encoding Hardware
         </label>
         <ToggleGroup
+          data-testid="components-overlays-export-export-advanced-tab-toggle-group-94-9"
           options={[
             { value: 'prefer-software', label: 'Software (Quality)' },
             { value: 'prefer-hardware', label: 'Hardware (Speed)' },
@@ -110,6 +113,7 @@ export const ExportAdvancedTab = () => {
           Bitrate Mode
         </label>
         <ToggleGroup
+          data-testid="components-overlays-export-export-advanced-tab-toggle-group-112-9"
           options={[
             { value: 'constant', label: 'Constant (CBR)' },
             { value: 'variable', label: 'Variable (VBR)' },

@@ -25,6 +25,8 @@
 
 type MirrorAxis = 0 | 1 | 2
 
+const MAX_WORMHOLE_TOTAL_SITES = 2 ** 20
+
 /**
  * Compute row-major strides for a lattice of the given per-axis sizes.
  *
@@ -37,7 +39,13 @@ function computeStrides(gridSize: readonly number[]): number[] {
   if (D === 0) return strides
   strides[D - 1] = 1
   for (let d = D - 2; d >= 0; d--) {
-    strides[d] = strides[d + 1]! * gridSize[d + 1]!
+    const stride = strides[d + 1]! * gridSize[d + 1]!
+    if (!Number.isSafeInteger(stride) || stride > MAX_WORMHOLE_TOTAL_SITES) {
+      throw new Error(
+        `[wormholeCoupling] stride[${d}] exceeds site budget ${MAX_WORMHOLE_TOTAL_SITES}`
+      )
+    }
+    strides[d] = stride
   }
   return strides
 }
@@ -72,8 +80,10 @@ function decompose(
   // zero-iterate or throw index-out-of-range on ψ reads.
   for (let d = 0; d < gridSize.length; d++) {
     const n = gridSize[d]!
-    if (!Number.isInteger(n) || n < 1) {
-      throw new Error(`[wormholeCoupling] gridSize[${d}] must be a positive integer, got ${n}`)
+    if (!Number.isSafeInteger(n) || n < 1 || n > MAX_WORMHOLE_TOTAL_SITES) {
+      throw new Error(
+        `[wormholeCoupling] gridSize[${d}] must be a positive integer within site budget ${MAX_WORMHOLE_TOTAL_SITES}, got ${n}`
+      )
     }
   }
   const Na = gridSize[axis]!
@@ -84,9 +94,55 @@ function decompose(
   const strideA = strides[axis]!
   const halfA = Na / 2
   const blockSize = strideA * halfA
+  if (!Number.isSafeInteger(blockSize) || blockSize > MAX_WORMHOLE_TOTAL_SITES) {
+    throw new Error(
+      `[wormholeCoupling] blockSize exceeds site budget ${MAX_WORMHOLE_TOTAL_SITES}, got ${blockSize}`
+    )
+  }
   let totalSites = 1
-  for (const n of gridSize) totalSites *= n
+  for (const n of gridSize) {
+    totalSites *= n
+    if (!Number.isSafeInteger(totalSites) || totalSites > MAX_WORMHOLE_TOTAL_SITES) {
+      throw new Error(
+        `[wormholeCoupling] totalSites exceeds site budget ${MAX_WORMHOLE_TOTAL_SITES}, got ${totalSites}`
+      )
+    }
+  }
   return { strides, strideA, Na, halfA, blockSize, totalSites }
+}
+
+function resolveMirrorSampleGeometry(
+  gridSize: readonly number[],
+  axis: number,
+  siteIndex: number
+):
+  | (ReturnType<typeof decompose> & {
+      mirrorIndex: number
+      coord: number
+      mirrorCoord: number
+    })
+  | null {
+  if (!Number.isSafeInteger(axis) || axis < 0 || axis >= gridSize.length || axis >= 12) {
+    return null
+  }
+  if (!Number.isSafeInteger(siteIndex) || siteIndex < 0) {
+    return null
+  }
+
+  let geometry: ReturnType<typeof decompose>
+  try {
+    geometry = decompose(gridSize, axis as MirrorAxis)
+  } catch {
+    return null
+  }
+
+  if (siteIndex >= geometry.totalSites) return null
+  const coord = Math.floor(siteIndex / geometry.strideA) % geometry.Na
+  const mirrorCoord = geometry.Na - 1 - coord
+  const mirrorIndex = siteIndex + (mirrorCoord - coord) * geometry.strideA
+  if (mirrorIndex < 0 || mirrorIndex >= geometry.totalSites) return null
+
+  return { ...geometry, mirrorIndex, coord, mirrorCoord }
 }
 
 /**
@@ -495,37 +551,11 @@ export function computeCtcLoopResidualSample(
   params: CtcLoopResidualSampleParams
 ): CtcLoopResidualSample {
   const { psi, gridSize, axis, siteIndex } = params
-  if (!Number.isInteger(axis) || axis < 0 || axis >= gridSize.length || axis >= 12) {
-    return zeroCtcResidualSample()
-  }
-  if (!Number.isInteger(siteIndex) || siteIndex < 0) {
-    return zeroCtcResidualSample()
-  }
-  for (let d = 0; d < gridSize.length; d++) {
-    const n = gridSize[d]!
-    if (!Number.isInteger(n) || n < 1) return zeroCtcResidualSample()
-  }
-
-  const axisSize = gridSize[axis]!
-  if (axisSize < 2 || axisSize % 2 !== 0) {
-    return zeroCtcResidualSample()
-  }
-
-  const strides = computeStrides(gridSize)
-  const totalSites = gridSize.reduce((acc, n) => acc * n, 1)
-  if (siteIndex >= totalSites) {
-    return zeroCtcResidualSample()
-  }
+  const geometry = resolveMirrorSampleGeometry(gridSize, axis, siteIndex)
+  if (!geometry) return zeroCtcResidualSample()
+  const { mirrorIndex, totalSites } = geometry
   if (psi.length !== 2 * totalSites) {
     throw new Error(`[wormholeCoupling] psi length ${psi.length} != 2·totalSites ${2 * totalSites}`)
-  }
-
-  const strideA = strides[axis]!
-  const coord = Math.floor(siteIndex / strideA) % axisSize
-  const mirrorCoord = axisSize - 1 - coord
-  const mirrorIndex = siteIndex + (mirrorCoord - coord) * strideA
-  if (mirrorIndex < 0 || mirrorIndex >= totalSites) {
-    return zeroCtcResidualSample()
   }
 
   const re = psi[2 * siteIndex]!
@@ -542,7 +572,8 @@ export function computeCtcLoopResidualSample(
   const dRe = re - echoRe
   const dIm = im - echoIm
   const epsilon = params.epsilon
-  const eps = typeof epsilon === 'number' && Number.isFinite(epsilon) && epsilon > 0 ? epsilon : 1e-20
+  const eps =
+    typeof epsilon === 'number' && Number.isFinite(epsilon) && epsilon > 0 ? epsilon : 1e-20
   const rawResidue = (dRe * dRe + dIm * dIm) / (density + mirrorDensity + eps)
   const maxDensityInput = params.maxDensity
   const maxDensity =
@@ -566,37 +597,11 @@ export function computeCtcLoopResidualSample(
  */
 export function computeCtcLoopGainSample(params: CtcLoopGainSampleParams): CtcLoopGainSample {
   const { psi, gridSize, axis, siteIndex } = params
-  if (!Number.isInteger(axis) || axis < 0 || axis >= gridSize.length || axis >= 12) {
-    return zeroCtcLoopGainSample()
-  }
-  if (!Number.isInteger(siteIndex) || siteIndex < 0) {
-    return zeroCtcLoopGainSample()
-  }
-  for (let d = 0; d < gridSize.length; d++) {
-    const n = gridSize[d]!
-    if (!Number.isInteger(n) || n < 1) return zeroCtcLoopGainSample()
-  }
-
-  const axisSize = gridSize[axis]!
-  if (axisSize < 2 || axisSize % 2 !== 0) {
-    return zeroCtcLoopGainSample()
-  }
-
-  const strides = computeStrides(gridSize)
-  const totalSites = gridSize.reduce((acc, n) => acc * n, 1)
-  if (siteIndex >= totalSites) {
-    return zeroCtcLoopGainSample()
-  }
+  const geometry = resolveMirrorSampleGeometry(gridSize, axis, siteIndex)
+  if (!geometry) return zeroCtcLoopGainSample()
+  const { mirrorIndex, totalSites } = geometry
   if (psi.length !== 2 * totalSites) {
     throw new Error(`[wormholeCoupling] psi length ${psi.length} != 2·totalSites ${2 * totalSites}`)
-  }
-
-  const strideA = strides[axis]!
-  const coord = Math.floor(siteIndex / strideA) % axisSize
-  const mirrorCoord = axisSize - 1 - coord
-  const mirrorIndex = siteIndex + (mirrorCoord - coord) * strideA
-  if (mirrorIndex < 0 || mirrorIndex >= totalSites) {
-    return zeroCtcLoopGainSample()
   }
 
   const re = psi[2 * siteIndex]!
@@ -606,7 +611,8 @@ export function computeCtcLoopGainSample(params: CtcLoopGainSampleParams): CtcLo
   const density = re * re + im * im
   const mirrorDensity = mirrorRe * mirrorRe + mirrorIm * mirrorIm
   const epsilon = params.epsilon
-  const eps = typeof epsilon === 'number' && Number.isFinite(epsilon) && epsilon > 0 ? epsilon : 1e-20
+  const eps =
+    typeof epsilon === 'number' && Number.isFinite(epsilon) && epsilon > 0 ? epsilon : 1e-20
   if (density <= eps || mirrorDensity <= eps) {
     return { ...zeroCtcLoopGainSample(), density, mirrorDensity, mirrorIndex }
   }
@@ -653,37 +659,11 @@ export function computeCtcDeutschEntropySample(
   params: CtcDeutschEntropySampleParams
 ): CtcDeutschEntropySample {
   const { psi, gridSize, axis, siteIndex } = params
-  if (!Number.isInteger(axis) || axis < 0 || axis >= gridSize.length || axis >= 12) {
-    return zeroCtcDeutschEntropySample()
-  }
-  if (!Number.isInteger(siteIndex) || siteIndex < 0) {
-    return zeroCtcDeutschEntropySample()
-  }
-  for (let d = 0; d < gridSize.length; d++) {
-    const n = gridSize[d]!
-    if (!Number.isInteger(n) || n < 1) return zeroCtcDeutschEntropySample()
-  }
-
-  const axisSize = gridSize[axis]!
-  if (axisSize < 2 || axisSize % 2 !== 0) {
-    return zeroCtcDeutschEntropySample()
-  }
-
-  const strides = computeStrides(gridSize)
-  const totalSites = gridSize.reduce((acc, n) => acc * n, 1)
-  if (siteIndex >= totalSites) {
-    return zeroCtcDeutschEntropySample()
-  }
+  const geometry = resolveMirrorSampleGeometry(gridSize, axis, siteIndex)
+  if (!geometry) return zeroCtcDeutschEntropySample()
+  const { mirrorIndex, totalSites } = geometry
   if (psi.length !== 2 * totalSites) {
     throw new Error(`[wormholeCoupling] psi length ${psi.length} != 2·totalSites ${2 * totalSites}`)
-  }
-
-  const strideA = strides[axis]!
-  const coord = Math.floor(siteIndex / strideA) % axisSize
-  const mirrorCoord = axisSize - 1 - coord
-  const mirrorIndex = siteIndex + (mirrorCoord - coord) * strideA
-  if (mirrorIndex < 0 || mirrorIndex >= totalSites) {
-    return zeroCtcDeutschEntropySample()
   }
 
   const re = psi[2 * siteIndex]!
@@ -693,7 +673,8 @@ export function computeCtcDeutschEntropySample(
   const density = re * re + im * im
   const mirrorDensity = mirrorRe * mirrorRe + mirrorIm * mirrorIm
   const epsilon = params.epsilon
-  const eps = typeof epsilon === 'number' && Number.isFinite(epsilon) && epsilon > 0 ? epsilon : 1e-20
+  const eps =
+    typeof epsilon === 'number' && Number.isFinite(epsilon) && epsilon > 0 ? epsilon : 1e-20
   if (density <= eps || mirrorDensity <= eps) {
     return { ...zeroCtcDeutschEntropySample(), density, mirrorDensity, mirrorIndex }
   }
@@ -803,8 +784,7 @@ export function computeCtcCausalShadowFromCurrents(
   }
   const opposing = Math.max(0, Math.min(1, -dotJ / (localCurrentMag * mirrorCurrentMag + eps)))
   const balanceJ =
-    (2 * Math.min(localCurrentMag, mirrorCurrentMag)) /
-    (localCurrentMag + mirrorCurrentMag + eps)
+    (2 * Math.min(localCurrentMag, mirrorCurrentMag)) / (localCurrentMag + mirrorCurrentMag + eps)
   const densityGate =
     typeof params.densityGate === 'number' && Number.isFinite(params.densityGate)
       ? Math.max(0, Math.min(1, params.densityGate))
@@ -826,7 +806,11 @@ export function computeCtcCausalShadowFromCurrents(
   }
 }
 
-function linearToCoords(siteIndex: number, gridSize: readonly number[], strides: readonly number[]): number[] {
+function linearToCoords(
+  siteIndex: number,
+  gridSize: readonly number[],
+  strides: readonly number[]
+): number[] {
   const coords = new Array<number>(gridSize.length)
   for (let d = 0; d < gridSize.length; d++) {
     coords[d] = Math.floor(siteIndex / strides[d]!) % gridSize[d]!
@@ -904,37 +888,11 @@ export function computeCtcCausalShadowSample(
   params: CtcCausalShadowSampleParams
 ): CtcCausalShadowSample {
   const { psi, gridSize, axis, siteIndex } = params
-  if (!Number.isInteger(axis) || axis < 0 || axis >= gridSize.length || axis >= 12) {
-    return zeroCtcCausalShadowSample()
-  }
-  if (!Number.isInteger(siteIndex) || siteIndex < 0) {
-    return zeroCtcCausalShadowSample()
-  }
-  for (let d = 0; d < gridSize.length; d++) {
-    const n = gridSize[d]!
-    if (!Number.isInteger(n) || n < 1) return zeroCtcCausalShadowSample()
-  }
-
-  const axisSize = gridSize[axis]!
-  if (axisSize < 2 || axisSize % 2 !== 0) {
-    return zeroCtcCausalShadowSample()
-  }
-
-  const strides = computeStrides(gridSize)
-  const totalSites = gridSize.reduce((acc, n) => acc * n, 1)
-  if (siteIndex >= totalSites) {
-    return zeroCtcCausalShadowSample()
-  }
+  const geometry = resolveMirrorSampleGeometry(gridSize, axis, siteIndex)
+  if (!geometry) return zeroCtcCausalShadowSample()
+  const { strides, mirrorCoord, mirrorIndex, totalSites } = geometry
   if (psi.length !== 2 * totalSites) {
     throw new Error(`[wormholeCoupling] psi length ${psi.length} != 2·totalSites ${2 * totalSites}`)
-  }
-
-  const strideA = strides[axis]!
-  const coord = Math.floor(siteIndex / strideA) % axisSize
-  const mirrorCoord = axisSize - 1 - coord
-  const mirrorIndex = siteIndex + (mirrorCoord - coord) * strideA
-  if (mirrorIndex < 0 || mirrorIndex >= totalSites) {
-    return zeroCtcCausalShadowSample()
   }
 
   const re = psi[2 * siteIndex]!

@@ -1,0 +1,97 @@
+import iconLandscape from '@/assets/exporter/default.svg'
+import iconInsta from '@/assets/exporter/instagram.svg'
+import iconSquare from '@/assets/exporter/square.svg'
+import iconTiktok from '@/assets/exporter/tiktok.svg'
+import iconTwitter from '@/assets/exporter/twitter.svg'
+import iconYoutube from '@/assets/exporter/youtube.svg'
+import iconFilm from '@/assets/icons/film.svg'
+import iconSparkles from '@/assets/icons/sparkles.svg'
+import { soundManager } from '@/lib/audio/SoundManager'
+import type { ExportPresetId } from '@/stores/utils/exportPresetDefinitions'
+
+import { Icon } from '../Icon'
+import { TileButton } from '../TileButton'
+
+/** Supported export preset identifiers accepted by the card. */
+export type ExportPresetCardId = ExportPresetId
+
+const PRESET_ICON_BY_ID: Record<ExportPresetCardId, string> = {
+  'landscape-1080p': iconLandscape,
+  'landscape-720p': iconLandscape,
+  instagram: iconInsta,
+  tiktok: iconTiktok,
+  'youtube-shorts': iconYoutube,
+  'twitter-video': iconTwitter,
+  cinematic: iconFilm,
+  'square-60fps': iconSquare,
+  'high-q': iconSparkles,
+}
+
+/**
+ * Props for the export preset card primitive.
+ */
+export interface ExportPresetCardProps {
+  id: ExportPresetCardId
+  label: string
+  description: string
+  isActive: boolean
+  onClick: () => void
+  /** Tooltip surfaced on hover; defaults to `${label}: ${description}`. */
+  tooltip?: string
+  /** Stable selector for the preset card. */
+  'data-testid'?: string
+}
+
+/**
+ * Preset selection card used in export preset grids.
+ */
+export const ExportPresetCard = ({
+  id,
+  label,
+  description,
+  isActive,
+  onClick,
+  tooltip,
+  'data-testid': dataTestId = `export-preset-${id}`,
+}: ExportPresetCardProps) => {
+  const iconSrc = PRESET_ICON_BY_ID[id]
+  const iconMask = `url(${iconSrc}) center / contain no-repeat`
+  const resolvedTooltip = tooltip ?? `${label}: ${description}`
+
+  return (
+    <TileButton
+      ariaLabel={`${label}: ${description}`}
+      pressed={isActive}
+      onClick={onClick}
+      onMouseEnter={() => soundManager.playHover()}
+      data-testid={dataTestId}
+      title={resolvedTooltip}
+      className={`
+            relative flex items-center gap-2 text-left p-2 sm:p-3 lg:p-4 rounded-lg lg:rounded-xl border transition-colors duration-200 group
+            ${
+              isActive
+                ? 'bg-accent/10 border-accent glow-accent-sm'
+                : 'bg-[var(--bg-hover)] border-border-subtle hover:border-border-default hover:bg-[var(--bg-active)]'
+            }
+        `}
+    >
+      <div
+        className={`p-1.5 sm:p-2 rounded-md lg:rounded-lg shrink-0 ${isActive ? 'bg-accent text-text-inverse' : 'bg-[var(--bg-active)] text-text-secondary group-hover:text-text-primary'}`}
+      >
+        <span
+          className="block w-4 h-4 sm:w-5 sm:h-5 bg-current"
+          style={{ mask: iconMask, WebkitMask: iconMask }}
+          aria-hidden="true"
+          data-testid={`export-preset-icon-${id}`}
+        />
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="font-semibold text-xs sm:text-sm text-text-primary truncate">{label}</div>
+        <div className="hidden sm:block text-xs text-text-tertiary truncate">{description}</div>
+      </div>
+
+      {isActive && <Icon name="check" className="w-4 h-4 text-accent shrink-0" />}
+    </TileButton>
+  )
+}

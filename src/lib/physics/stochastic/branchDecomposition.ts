@@ -10,6 +10,9 @@
 
 import { computeStrides } from '@/lib/math/ndArray'
 
+const MAX_BRANCH_DIM = 11
+const MAX_BRANCH_SITES = 2 ** 20
+
 /** Result of a spatial branch partition computation. */
 export interface BranchPartition {
   /** Population fraction in branch A (left of partition) */
@@ -18,6 +21,56 @@ export interface BranchPartition {
   populationB: number
   /** Total norm of the wavefunction */
   totalNorm: number
+}
+
+function validateBranchGrid(
+  gridSize: readonly number[],
+  spacing: readonly number[],
+  latticeDim: number
+): { activeGrid: number[]; totalSites: number } {
+  if (!Number.isSafeInteger(latticeDim) || latticeDim < 1 || latticeDim > MAX_BRANCH_DIM) {
+    throw new Error(
+      `latticeDim must be a positive integer in [1, ${MAX_BRANCH_DIM}] (got ${latticeDim})`
+    )
+  }
+  if (gridSize.length < latticeDim || spacing.length < latticeDim) {
+    throw new Error(
+      `gridSize/spacing must have at least ${latticeDim} entries (got ${gridSize.length}/${spacing.length})`
+    )
+  }
+
+  let totalSites = 1
+  for (let d = 0; d < latticeDim; d++) {
+    const size = gridSize[d]
+    if (!Number.isSafeInteger(size) || size! < 1) {
+      throw new Error(`gridSize[${d}] must be a positive integer (got ${size})`)
+    }
+    const dx = spacing[d]
+    if (typeof dx !== 'number' || !Number.isFinite(dx) || dx <= 0) {
+      throw new Error(`spacing[${d}] must be a finite positive number (got ${dx})`)
+    }
+    if (totalSites > Math.floor(Number.MAX_SAFE_INTEGER / size!)) {
+      throw new Error(`totalSites overflows at axis ${d}`)
+    }
+    if (size! > MAX_BRANCH_SITES || totalSites > Math.floor(MAX_BRANCH_SITES / size!)) {
+      throw new Error(`totalSites exceeds branch site budget ${MAX_BRANCH_SITES} at axis ${d}`)
+    }
+    totalSites *= size!
+  }
+
+  return { activeGrid: gridSize.slice(0, latticeDim), totalSites }
+}
+
+function maxFiniteAmplitude(psiRe: Float64Array, psiIm: Float64Array, totalSites: number): number {
+  let maxAmp = 0
+  for (let idx = 0; idx < totalSites; idx++) {
+    const amp = Math.hypot(psiRe[idx]!, psiIm[idx]!)
+    if (!Number.isFinite(amp)) {
+      throw new Error(`non-finite wavefunction density at index ${idx}`)
+    }
+    if (amp > maxAmp) maxAmp = amp
+  }
+  return maxAmp
 }
 
 /**
@@ -39,29 +92,10 @@ export function spatialBranchPartition(
   latticeDim: number,
   planePosition: number = 0
 ): BranchPartition {
-  if (!Number.isInteger(latticeDim) || latticeDim < 1) {
-    throw new Error(`latticeDim must be a positive integer (got ${latticeDim})`)
-  }
-  if (gridSize.length < latticeDim || spacing.length < latticeDim) {
-    throw new Error(
-      `gridSize/spacing must have at least ${latticeDim} entries (got ${gridSize.length}/${spacing.length})`
-    )
-  }
   if (!Number.isFinite(planePosition)) {
     throw new Error(`planePosition must be finite (got ${planePosition})`)
   }
-  for (let d = 0; d < latticeDim; d++) {
-    const size = gridSize[d]
-    if (!Number.isInteger(size) || size! < 1) {
-      throw new Error(`gridSize[${d}] must be a positive integer (got ${size})`)
-    }
-    const dx = spacing[d]
-    if (typeof dx !== 'number' || !Number.isFinite(dx) || dx <= 0) {
-      throw new Error(`spacing[${d}] must be a finite positive number (got ${dx})`)
-    }
-  }
-
-  const totalSites = gridSize.slice(0, latticeDim).reduce((a, b) => a * b, 1)
+  const { activeGrid, totalSites } = validateBranchGrid(gridSize, spacing, latticeDim)
 
   if (psiRe.length < totalSites || psiIm.length < totalSites) {
     throw new Error(
@@ -69,7 +103,12 @@ export function spatialBranchPartition(
     )
   }
 
-  const strides = computeStrides(gridSize.slice(0, latticeDim))
+  const maxAmp = maxFiniteAmplitude(psiRe, psiIm, totalSites)
+  if (maxAmp === 0) {
+    return { populationA: 0.5, populationB: 0.5, totalNorm: 0 }
+  }
+
+  const strides = computeStrides(activeGrid)
 
   // Partition threshold along axis 0 (world coordinate)
   const halfExtent0 = gridSize[0]! * spacing[0]! * 0.5
@@ -83,10 +122,8 @@ export function spatialBranchPartition(
     const coord0 = Math.floor(idx / strides[0]!) % gridSize[0]!
     const x0 = (coord0 + 0.5) * spacing[0]! - halfExtent0
 
-    const density = psiRe[idx]! * psiRe[idx]! + psiIm[idx]! * psiIm[idx]!
-    if (!Number.isFinite(density)) {
-      throw new Error(`non-finite wavefunction density at index ${idx}`)
-    }
+    const amp = Math.hypot(psiRe[idx]!, psiIm[idx]!)
+    const density = (amp / maxAmp) ** 2
 
     if (x0 < threshold) {
       normA += density
@@ -95,11 +132,12 @@ export function spatialBranchPartition(
     }
   }
 
-  const totalNorm = normA + normB
+  const totalScaledNorm = normA + normB
+  const totalNorm = totalScaledNorm * maxAmp * maxAmp
   return {
-    populationA: totalNorm > 0 ? normA / totalNorm : 0.5,
-    populationB: totalNorm > 0 ? normB / totalNorm : 0.5,
-    totalNorm,
+    populationA: totalScaledNorm > 0 ? normA / totalScaledNorm : 0.5,
+    populationB: totalScaledNorm > 0 ? normB / totalScaledNorm : 0.5,
+    totalNorm: Number.isFinite(totalNorm) ? totalNorm : Infinity,
   }
 }
 
@@ -180,6 +218,7 @@ export function fitExponentialDecay(
 
   const slope = (n * sumTLogV - sumT * sumLogV) / denom
   const intercept = (sumLogV * sumT2 - sumT * sumTLogV) / denom
+  if (!Number.isFinite(slope) || !Number.isFinite(intercept)) return null
 
   // R² computation
   const meanLogV = sumLogV / n
@@ -192,10 +231,12 @@ export function fitExponentialDecay(
     ssTot += (logV - meanLogV) ** 2
   }
   const r2 = ssTot > 0 ? 1 - ssRes / ssTot : 0
+  const amplitude = Math.exp(intercept)
+  if (!Number.isFinite(r2) || !Number.isFinite(amplitude)) return null
 
   return {
     decayRate: -slope, // Positive = decaying
     r2,
-    amplitude: Math.exp(intercept),
+    amplitude,
   }
 }

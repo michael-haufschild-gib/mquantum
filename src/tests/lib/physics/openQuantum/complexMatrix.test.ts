@@ -35,6 +35,26 @@ function expectMatClose(A: ComplexMatrix, B: ComplexMatrix, N: number, tol = 1e-
   }
 }
 
+describe('complex matrix contracts', () => {
+  it('rejects invalid dimensions before allocating or indexing', () => {
+    expect(() => complexMatZero(-1)).toThrow(/dimension/)
+    expect(() => complexMatIdentity(1.5)).toThrow(/dimension/)
+
+    const Z = complexMatZero(0)
+    expect(() => matrixExponentialPade(Z, 0)).toThrow(/dimension/)
+  })
+
+  it('rejects buffers shorter than N*N', () => {
+    const short: ComplexMatrix = {
+      real: new Float64Array(3),
+      imag: new Float64Array(3),
+    }
+    const out = complexMatZero(2)
+
+    expect(() => complexMatMul(short, out, out, 2)).toThrow(/shorter/)
+  })
+})
+
 describe('complexMatIdentity', () => {
   it('has 1s on diagonal and 0s elsewhere for N=3', () => {
     // Bug caught: identity matrix has wrong diagonal values or non-zero off-diagonals.
@@ -224,6 +244,14 @@ describe('complexMatScale', () => {
     expect(out.real[3]).toBeCloseTo(2, 10)
     expect(out.imag[3]).toBeCloseTo(1, 10)
   })
+
+  it('rejects non-finite scalars', () => {
+    const A = complexMatIdentity(2)
+    const out = complexMatZero(2)
+
+    expect(() => complexMatScale(A, Number.NaN, 0, out, 2)).toThrow(/scalar/)
+    expect(() => complexMatScale(A, 1, Number.POSITIVE_INFINITY, out, 2)).toThrow(/scalar/)
+  })
 })
 
 describe('complexMatNorm1', () => {
@@ -258,6 +286,16 @@ describe('complexMatNorm1', () => {
       [2, 0],
     ])
     expect(complexMatNorm1(A, N)).toBeCloseTo(6, 10)
+  })
+
+  it('does not overflow merely from squaring large finite components', () => {
+    const N = 1
+    const A = complexMatZero(N)
+    A.real[0] = Number.MAX_VALUE / 4
+    A.imag[0] = Number.MAX_VALUE / 4
+
+    expect(complexMatNorm1(A, N)).toBeCloseTo(Math.hypot(A.real[0]!, A.imag[0]!), 12)
+    expect(Number.isFinite(complexMatNorm1(A, N))).toBe(true)
   })
 })
 
@@ -335,6 +373,13 @@ describe('matrixExponentialPade', () => {
     expect(result.real[1]).toBeCloseTo(1, 10) // (0,1)
     expect(result.real[2]).toBeCloseTo(0, 10) // (1,0)
     expect(result.real[3]).toBeCloseTo(1, 10) // (1,1)
+  })
+
+  it('rejects non-finite entries before Padé or WASM evaluation', () => {
+    const A = complexMatZero(2)
+    A.real[0] = Number.NaN
+
+    expect(() => matrixExponentialPade(A, 2)).toThrow(/non-finite/)
   })
 })
 
@@ -435,6 +480,32 @@ describe('solveLinearSystem', () => {
     expect(X.real[1]).toBeCloseTo(7, 10) // (0,1)
     expect(X.real[2]).toBeCloseTo(3, 10) // (1,0)
     expect(X.real[3]).toBeCloseTo(0, 10) // (1,1)
+  })
+
+  it('throws for singular systems instead of returning a partial zero solution', () => {
+    const N = 2
+    const Q = mat(N, [
+      [1, 0],
+      [2, 0],
+      [2, 0],
+      [4, 0],
+    ])
+    const P = complexMatIdentity(N)
+
+    expect(() => solveLinearSystem(Q, P, N)).toThrow(/singular matrix/)
+  })
+
+  it('rejects non-finite coefficient or RHS entries', () => {
+    const N = 2
+    const Q = complexMatIdentity(N)
+    const P = complexMatIdentity(N)
+    Q.imag[0] = Number.POSITIVE_INFINITY
+
+    expect(() => solveLinearSystem(Q, P, N)).toThrow(/non-finite/)
+
+    Q.imag[0] = 0
+    P.real[3] = Number.NaN
+    expect(() => solveLinearSystem(Q, P, N)).toThrow(/non-finite/)
   })
 })
 

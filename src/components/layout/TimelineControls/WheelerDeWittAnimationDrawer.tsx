@@ -129,6 +129,7 @@ export const WheelerDeWittAnimationDrawer: React.FC<WheelerDeWittAnimationDrawer
           testId="animation-panel-wdwPhaseRotation"
         >
           <Slider
+            data-testid="components-layout-timeline-controls-wheeler-de-witt-animation-drawer-slider-131-11"
             label="Speed"
             min={0}
             max={5}
@@ -150,6 +151,7 @@ export const WheelerDeWittAnimationDrawer: React.FC<WheelerDeWittAnimationDrawer
           testId="animation-panel-wdwWorldline"
         >
           <Slider
+            data-testid="components-layout-timeline-controls-wheeler-de-witt-animation-drawer-slider-152-11"
             label="Speed"
             min={0.1}
             max={3}
@@ -160,6 +162,7 @@ export const WheelerDeWittAnimationDrawer: React.FC<WheelerDeWittAnimationDrawer
             showValue
           />
           <Slider
+            data-testid="components-layout-timeline-controls-wheeler-de-witt-animation-drawer-slider-162-11"
             label="Pulse Width"
             min={0.02}
             max={0.3}

@@ -59,6 +59,7 @@ export const RotationAnimationDrawer: React.FC<RotationAnimationDrawerProps> = R
           headerActions={
             <>
               <Button
+                data-testid="components-layout-timeline-controls-rotation-animation-drawer-button-61-15"
                 variant="ghost"
                 size="sm"
                 onClick={() => animateAll(dimension)}
@@ -68,6 +69,7 @@ export const RotationAnimationDrawer: React.FC<RotationAnimationDrawerProps> = R
                 Select All
               </Button>
               <Button
+                data-testid="components-layout-timeline-controls-rotation-animation-drawer-button-70-15"
                 variant="ghost"
                 size="sm"
                 onClick={clearAllPlanes}
@@ -77,6 +79,7 @@ export const RotationAnimationDrawer: React.FC<RotationAnimationDrawerProps> = R
                 Deselect All
               </Button>
               <Button
+                data-testid="components-layout-timeline-controls-rotation-animation-drawer-button-79-15"
                 variant="ghost"
                 size="icon"
                 onClick={() => randomizePlanes(dimension)}
@@ -95,6 +98,7 @@ export const RotationAnimationDrawer: React.FC<RotationAnimationDrawerProps> = R
               const isActive = animatingPlanes.has(plane.name)
               return (
                 <ToggleButton
+                  data-testid="components-layout-timeline-controls-rotation-animation-drawer-toggle-button-97-17"
                   key={plane.name}
                   pressed={isActive}
                   onToggle={() => togglePlane(plane.name)}
@@ -110,6 +114,7 @@ export const RotationAnimationDrawer: React.FC<RotationAnimationDrawerProps> = R
 
           <div className="pt-3">
             <Slider
+              data-testid="components-layout-timeline-controls-rotation-animation-drawer-slider-112-13"
               label="PLANE SPEED BIAS"
               tooltip="Varies rotation speed per plane. At 0 all planes rotate uniformly; at 1 each plane gets a unique speed spread via the golden ratio."
               min={MIN_ANIMATION_BIAS}

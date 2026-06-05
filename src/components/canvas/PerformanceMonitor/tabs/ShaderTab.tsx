@@ -44,6 +44,7 @@ export const ShaderTabContent = React.memo(function ShaderTabContent() {
       <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-none">
         {shaderKeys.map((key) => (
           <Button
+            data-testid="components-canvas-performance-monitor-tabs-shader-tab-button-46-11"
             key={key}
             variant={selectedShaderKey === key ? 'primary' : 'ghost'}
             size="sm"

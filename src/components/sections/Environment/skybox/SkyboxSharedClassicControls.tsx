@@ -57,6 +57,7 @@ export const SkyboxSharedClassicControls: React.FC<SkyboxSharedClassicControlsPr
       />
 
       <Select
+        data-testid="components-sections-environment-skybox-skybox-shared-classic-controls-select-59-7"
         label="Animation"
         tooltip="Animate the skybox texture with various motion effects. Adds movement and atmosphere to the background."
         options={ANIMATION_MODES}
@@ -66,6 +67,7 @@ export const SkyboxSharedClassicControls: React.FC<SkyboxSharedClassicControlsPr
 
       {skyboxAnimationMode !== 'none' && (
         <Slider
+          data-testid="components-sections-environment-skybox-skybox-shared-classic-controls-slider-68-9"
           label="Animation Speed"
           tooltip="Rate of the skybox animation. Subtle values (0.01–0.03) create a gentle drift."
           value={skyboxAnimationSpeed}
@@ -82,6 +84,7 @@ export const SkyboxSharedClassicControls: React.FC<SkyboxSharedClassicControlsPr
           Color
         </span>
         <Slider
+          data-testid="components-sections-environment-skybox-skybox-shared-classic-controls-slider-84-9"
           label="Brightness"
           tooltip="Overall brightness of the skybox texture. Zero produces a black background."
           value={skyboxIntensity}
@@ -91,6 +94,7 @@ export const SkyboxSharedClassicControls: React.FC<SkyboxSharedClassicControlsPr
           onChange={setSkyboxIntensity}
         />
         <Slider
+          data-testid="components-sections-environment-skybox-skybox-shared-classic-controls-slider-93-9"
           label="Hue Shift"
           tooltip="Rotates the color hue of the entire skybox. Useful for recoloring a space texture without changing the scene."
           value={proceduralSettings.hue ?? 0}
@@ -100,6 +104,7 @@ export const SkyboxSharedClassicControls: React.FC<SkyboxSharedClassicControlsPr
           onChange={(v) => setProceduralSettings({ hue: v })}
         />
         <Slider
+          data-testid="components-sections-environment-skybox-skybox-shared-classic-controls-slider-102-9"
           label="Saturation"
           tooltip="Color saturation of the skybox. Zero is grayscale; values above 1 are hyper-saturated."
           value={proceduralSettings.saturation ?? 1}

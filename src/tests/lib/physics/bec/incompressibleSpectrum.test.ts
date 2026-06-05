@@ -117,6 +117,18 @@ describe('fftND', () => {
       expect(im[i]).toBeCloseTo(0.0, 10)
     }
   })
+
+  it('rejects unsafe grid dimensions before product math or FFT allocation', () => {
+    expect(() => fftND(new Float64Array(8), new Float64Array(8), [2 ** 32], false)).toThrow(
+      /gridSize/
+    )
+    expect(() =>
+      fftND(new Float64Array(16), new Float64Array(16), [2 ** 16, 2 ** 16], false)
+    ).toThrow(/gridSize/)
+    expect(() => fftND(new Float64Array(16), new Float64Array(16), [2 ** 20, 2], false)).toThrow(
+      /gridSize/
+    )
+  })
 })
 
 describe('computeIncompressibleSpectrum', () => {
@@ -287,6 +299,26 @@ describe('computeIncompressibleSpectrum', () => {
       expect(result.totalIncompressible).toBe(0)
       expect(result.totalCompressible).toBe(0)
       expect(result.spectrum.every((value) => value === 0)).toBe(true)
+    })
+  })
+
+  it('rejects unsafe power-of-two grid sizes before Uint32 wrapping or huge allocation', () => {
+    withSpectrumWasmDisabled(() => {
+      const psiRe = new Float32Array(16)
+      const psiIm = new Float32Array(16)
+
+      for (const gridSize of [[2 ** 32], [2 ** 16, 2 ** 16]]) {
+        const result = computeIncompressibleSpectrum(psiRe, psiIm, gridSize, [0.5, 0.5], 1, 1)
+
+        expect(result.totalIncompressible).toBe(0)
+        expect(result.totalCompressible).toBe(0)
+        expect(result.spectrum.every((value) => value === 0)).toBe(true)
+      }
+
+      const overBudget = computeIncompressibleSpectrum(psiRe, psiIm, [2 ** 20, 2], [0.5, 0.5], 1, 1)
+      expect(overBudget.totalIncompressible).toBe(0)
+      expect(overBudget.totalCompressible).toBe(0)
+      expect(overBudget.spectrum.every((value) => value === 0)).toBe(true)
     })
   })
 

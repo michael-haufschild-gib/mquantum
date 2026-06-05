@@ -521,17 +521,23 @@ export const useDiagnosticsStore = create<DiagnosticsState>((set, get) => ({
   pushQwDiagnostics: (totalNorm, stepCount, posSum, posSqSum) => {
     set((state) => {
       const ch = state.qw
-      const norm0 = ch.initialNorm < 0 ? totalNorm : ch.initialNorm
-      const mean = totalNorm > 0 ? posSum / totalNorm : 0
-      const variance = totalNorm > 0 ? posSqSum / totalNorm - mean * mean : 0
+      const safeTotalNorm = nonNegativeFiniteOr(totalNorm, 0)
+      const safeStepCount = countOr(stepCount, ch.stepCount)
+      const safePosSum = finiteOr(posSum, 0)
+      const safePosSqSum = finiteOr(posSqSum, 0)
+      const norm0 = ch.initialNorm < 0 ? safeTotalNorm : nonNegativeFiniteOr(ch.initialNorm, 0)
+      const mean = safeTotalNorm > 0 ? finiteOr(safePosSum / safeTotalNorm, 0) : 0
+      const rawVariance = safeTotalNorm > 0 ? safePosSqSum / safeTotalNorm - mean * mean : 0
+      const variance = nonNegativeFiniteOr(rawVariance, 0)
+      const normDrift = norm0 > 0 ? finiteOr((safeTotalNorm - norm0) / norm0, 0) : 0
       return {
         qw: {
           hasData: true,
-          totalNorm,
-          normDrift: norm0 > 0 ? (totalNorm - norm0) / norm0 : 0,
-          stepCount,
+          totalNorm: safeTotalNorm,
+          normDrift,
+          stepCount: safeStepCount,
           positionMean: mean,
-          positionVariance: Math.max(0, variance),
+          positionVariance: variance,
           initialNorm: norm0,
         },
       }

@@ -28,6 +28,7 @@ import {
 import {
   computeMassSquaredScale,
   integrateMathieu1D,
+  MAX_MATHIEU_STEPS,
   maxAbsPhi,
   measureGrowthRateFromEnergyEnvelope,
 } from '@/lib/physics/cosmology/preheating'
@@ -58,6 +59,21 @@ describe('computeMassSquaredScale', () => {
 })
 
 describe('integrateMathieu1D — drive off', () => {
+  it('rejects invalid or over-budget step counts before trajectory allocation', () => {
+    const baseParams = {
+      mass: 1,
+      k: 0,
+      dt: 0.01,
+      preheating: OFF,
+    }
+    for (const nSteps of [-1, 1.5, Number.NaN]) {
+      expect(() => integrateMathieu1D({ ...baseParams, nSteps })).toThrow(/nSteps/)
+    }
+    expect(() => integrateMathieu1D({ ...baseParams, nSteps: MAX_MATHIEU_STEPS + 1 })).toThrow(
+      /max supported steps/
+    )
+  })
+
   it('matches a staggered KG leapfrog bit-identically to 1e-12', () => {
     const mass = 1
     const k = 0

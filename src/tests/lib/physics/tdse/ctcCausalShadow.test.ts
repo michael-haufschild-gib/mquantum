@@ -151,5 +151,17 @@ describe('computeCtcCausalShadowSample', () => {
       maxDensity: 1,
     })
     expect(invalidAxis).toMatchObject({ balanceJ: 0, displayScalar: 0, mirrorIndex: null })
+
+    const unsafeGrid = computeCtcCausalShadowSample({
+      psi: new Float32Array([1, 0, 1, 0]),
+      gridSize: [2 ** 32],
+      spacing: [1],
+      axis: 0,
+      siteIndex: 0,
+      phase: 0,
+      ctcPostselectionStrength: 1,
+      maxDensity: 1,
+    })
+    expect(unsafeGrid).toMatchObject({ balanceJ: 0, displayScalar: 0, mirrorIndex: null })
   })
 })

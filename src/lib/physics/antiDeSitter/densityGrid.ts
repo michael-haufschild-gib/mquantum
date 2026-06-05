@@ -87,6 +87,23 @@ export interface AdsPackerScratch {
   hkllIm: Float32Array
 }
 
+const MAX_ADS_DENSITY_ELEMENTS = 4 * 256 ** 3
+
+function resolveAdsDensityGridSize(gridSize: number): { N: number; total: number } {
+  if (!Number.isSafeInteger(gridSize) || gridSize <= 0) {
+    throw new Error(
+      `AntiDeSitter density grid size must be a positive safe integer, got ${gridSize}`
+    )
+  }
+  const maxGridSize = Math.floor(Math.cbrt(Math.floor(MAX_ADS_DENSITY_ELEMENTS / 4)))
+  if (gridSize > maxGridSize) {
+    throw new Error(
+      `AntiDeSitter density grid size ${gridSize} exceeds max supported size ${maxGridSize}`
+    )
+  }
+  return { N: gridSize, total: gridSize * gridSize * gridSize }
+}
+
 /**
  * Allocate a fresh pool of scratch buffers sized for the given density
  * grid resolution and the max HKLL coarse grid. The pool is safe to
@@ -96,8 +113,7 @@ export interface AdsPackerScratch {
  * pool can be reused on the very next frame.
  */
 export function createAdsPackerScratch(gridSize: number = DENSITY_GRID_SIZE): AdsPackerScratch {
-  const N = gridSize
-  const total = N * N * N
+  const { total } = resolveAdsDensityGridSize(gridSize)
   const coarseMax = Math.max(HKLL_COARSE_SIZE_S1, HKLL_COARSE_SIZE_S2) ** 3
   return {
     density: new Uint16Array(total * 4),
@@ -197,18 +213,17 @@ export function packAntiDeSitterDensityGrid(
   scratch?: AdsPackerScratch,
   targetGridSize: number = DENSITY_GRID_SIZE
 ): AdsDensityUpload {
+  const { N, total } = resolveAdsDensityGridSize(targetGridSize)
   const safeConfig = sanitizeAdsPackerConfig(config)
   // HKLL takes precedence (Stage 2B). The UI setters also enforce mutex so
   // both flags should not be true simultaneously, but in case they are, the
   // HKLL reconstruction wins because it's the more specialised story.
   if (safeConfig.hkllEnabled) {
-    return packHkllReconstructedDensityGrid(safeConfig, scratch, targetGridSize)
+    return packHkllReconstructedDensityGrid(safeConfig, scratch, N)
   }
   if (safeConfig.btzEnabled && safeConfig.d === 3) {
-    return packBtzThermalDensityGrid(safeConfig, scratch, targetGridSize)
+    return packBtzThermalDensityGrid(safeConfig, scratch, N)
   }
-  const N = targetGridSize
-  const total = N * N * N
   const useScratch = !!scratch && isScratchCompatible(scratch, total)
   const density = useScratch ? scratch!.density : new Uint16Array(total * 4)
 
@@ -440,8 +455,7 @@ export function packBtzThermalDensityGrid(
   targetGridSize: number = DENSITY_GRID_SIZE
 ): AdsDensityUpload {
   const ads = sanitizeAdsPackerConfig(config)
-  const N = targetGridSize
-  const total = N * N * N
+  const { N, total } = resolveAdsDensityGridSize(targetGridSize)
   const useScratch = !!scratch && isScratchCompatible(scratch, total)
   const density = useScratch ? scratch!.density : new Uint16Array(total * 4)
   let bulk: Float32Array
@@ -581,8 +595,7 @@ export function packHkllReconstructedDensityGrid(
   targetGridSize: number = DENSITY_GRID_SIZE
 ): AdsDensityUpload {
   const ads = sanitizeAdsPackerConfig(config)
-  const N = targetGridSize
-  const total = N * N * N
+  const { N, total } = resolveAdsDensityGridSize(targetGridSize)
   const useScratch = !!scratch && scratch.density.length >= total * 4
   const density = useScratch ? scratch!.density : new Uint16Array(total * 4)
 

@@ -12,9 +12,11 @@
  *
  * Match rule: chunk file name `{key}-{hash}.js` matches budget key `{key}`.
  * The hash segment is the trailing `-<8+chars>.js` Rollup adds for cache
- * busting. A chunk with no matching budget key is an error: every chunk that
- * leaves the build must be governed by a budget so cumulative growth cannot
- * sneak in by spawning new chunks.
+ * busting. If Rollup emits several chunks with the same logical key, their
+ * gzipped sizes are summed against that one budget because browsers fetch them
+ * as separate compressed files. A chunk with no matching budget key is an
+ * error: every chunk that leaves the build must be governed by a budget so
+ * cumulative growth cannot sneak in by spawning new chunks.
  *
  * A budget key with no matching chunk is also an error — that means the build
  * graph stopped emitting that chunk and the budget is now stale.
@@ -116,11 +118,10 @@ function listEmittedChunks() {
     const key = match[1]
     const fullPath = join(DIST_ASSETS, filename)
     const stat = statSync(fullPath)
-    if (chunks.has(key)) {
-      console.error(`Duplicate chunk for key "${key}": already saw one, now ${filename}.`)
-      process.exit(1)
-    }
-    chunks.set(key, { filename, raw: stat.size, fullPath })
+    const chunk = chunks.get(key) ?? { files: [], raw: 0 }
+    chunk.files.push({ filename, fullPath, raw: stat.size })
+    chunk.raw += stat.size
+    chunks.set(key, chunk)
   }
   return chunks
 }
@@ -128,6 +129,10 @@ function listEmittedChunks() {
 function gzipSizeOf(fullPath) {
   const buf = readFileSync(fullPath)
   return gzipSync(buf, { level: 9 }).length
+}
+
+function gzipSizeOfFiles(files) {
+  return files.reduce((sum, file) => sum + gzipSizeOf(file.fullPath), 0)
 }
 
 function buildIfMissing() {
@@ -152,11 +157,17 @@ function main() {
   for (const [key, info] of chunks) {
     const budget = budgets[key]
     if (!budget) {
-      orphanChunks.push({ key, filename: info.filename })
+      orphanChunks.push({ key, filenames: info.files.map((file) => file.filename) })
       continue
     }
-    const gzip = gzipSizeOf(info.fullPath)
-    rows.push({ key, filename: info.filename, raw: info.raw, gzip, budget: budget.gzip })
+    const gzip = gzipSizeOfFiles(info.files)
+    rows.push({
+      key,
+      filenames: info.files.map((file) => file.filename),
+      raw: info.raw,
+      gzip,
+      budget: budget.gzip,
+    })
     if (gzip > budget.gzip) {
       violations.push({ key, gzip, budget: budget.gzip, over: gzip - budget.gzip })
     }
@@ -180,7 +191,7 @@ function main() {
   if (orphanChunks.length > 0) {
     failed = true
     console.error('\n✖ Chunks emitted with no matching budget (add to scripts/bundle-size-budgets.json):')
-    for (const o of orphanChunks) console.error(`  - ${o.key}  (${o.filename})`)
+    for (const o of orphanChunks) console.error(`  - ${o.key}  (${o.filenames.join(', ')})`)
   }
 
   if (staleBudgets.length > 0) {

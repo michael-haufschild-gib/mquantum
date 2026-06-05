@@ -319,6 +319,7 @@ export const TimelineControls: FC = () => {
               />
             )}
             <Button
+              data-testid="components-layout-timeline-controls-button-321-13"
               variant="primary"
               size="icon"
               onClick={handleReset}
@@ -336,6 +337,7 @@ export const TimelineControls: FC = () => {
           </div>
 
           <Button
+            data-testid="components-layout-timeline-controls-button-338-11"
             variant={isPlaying ? 'primary' : 'secondary'}
             size="icon"
             onClick={togglePlayPause}
@@ -357,6 +359,7 @@ export const TimelineControls: FC = () => {
         {/* Speed Slider */}
         <div className="w-[clamp(8rem,45vw,11rem)] pt-2.5 ps-2 border-s border-border-subtle shrink-0 sm:w-44 sm:ps-3">
           <Slider
+            data-testid="components-layout-timeline-controls-slider-359-11"
             label="SPEED"
             tooltip="Animation speed multiplier + controls how fast the wavefunction evolves in time."
             min={MIN_SPEED}
@@ -375,6 +378,7 @@ export const TimelineControls: FC = () => {
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
           {hasTimelineControls(objectType) && hasEffectsDrawerContent && (
             <ToggleButton
+              data-testid="components-layout-timeline-controls-toggle-button-377-13"
               pressed={showAnimDrawer}
               onToggle={() => toggleDrawer('anim')}
               sound="swish"
@@ -393,6 +397,7 @@ export const TimelineControls: FC = () => {
 
           {supportsOpenQuantumControls && (
             <ToggleButton
+              data-testid="components-layout-timeline-controls-toggle-button-395-13"
               pressed={activeDrawer === 'openQ'}
               onToggle={() => toggleDrawer('openQ')}
               sound="swish"
@@ -410,6 +415,7 @@ export const TimelineControls: FC = () => {
           )}
 
           <ToggleButton
+            data-testid="components-layout-timeline-controls-toggle-button-412-11"
             pressed={showRotationDrawer}
             onToggle={() => toggleDrawer('rotation')}
             sound="swish"

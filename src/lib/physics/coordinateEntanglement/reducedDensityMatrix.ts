@@ -106,6 +106,8 @@ export function computeJointReducedDensityMatrix(
   gridSize: number[],
   dims: number[]
 ): ReducedDensityMatrix | null {
+  if (!areStrictlyIncreasingDimensions(dims, gridSize.length)) return null
+
   let Mjoint = 1
   for (const d of dims) Mjoint *= gridSize[d]!
   if (Mjoint > MAX_BIPARTITION_RDM) return null
@@ -183,6 +185,18 @@ export function computeJointReducedDensityMatrix(
   }
 
   return { re: rhoRe, im: rhoIm, M: Mjoint }
+}
+
+function areStrictlyIncreasingDimensions(dims: number[], dimensionCount: number): boolean {
+  if (dims.length === 0) return false
+  let previous = -1
+  for (const dim of dims) {
+    if (!Number.isSafeInteger(dim) || dim < 0 || dim >= dimensionCount || dim <= previous) {
+      return false
+    }
+    previous = dim
+  }
+  return true
 }
 
 function accumulateHermitianOuterProduct(

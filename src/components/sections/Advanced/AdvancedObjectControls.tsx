@@ -137,6 +137,7 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
             <div className="flex items-center justify-between">
               <label className="text-xs text-[var(--text-secondary)]">SSS Tint</label>
               <ColorPicker
+                data-testid="components-sections-advanced-advanced-object-controls-color-picker-139-15"
                 value={sssColor}
                 onChange={setSssColor}
                 tooltip="Tint color for subsurface scattered light. Warm tones simulate organic materials; cool tones simulate crystalline media."

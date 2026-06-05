@@ -21,6 +21,22 @@ const LN_FACTORIAL_LUT: number[] = []
   }
 })()
 
+const LN_FACTORIAL_EXACT_SUM_LIMIT = 1024
+
+function stirlingLnFactorial(n: number): number {
+  const inv = 1 / n
+  const inv2 = inv * inv
+  const value =
+    n * Math.log(n) -
+    n +
+    0.5 * Math.log(2 * Math.PI * n) +
+    inv / 12 -
+    (inv * inv2) / 360 +
+    (inv * inv2 * inv2) / 1260 -
+    (inv * inv2 * inv2 * inv2) / 1680
+  return Number.isFinite(value) ? value : Infinity
+}
+
 /**
  * Log-factorial: ln(k!) via precomputed LUT.
  *
@@ -34,7 +50,7 @@ export function lnFactorial(k: number): number {
   const n = Math.floor(k)
   if (n < 0) return 0
   if (n <= 170) return LN_FACTORIAL_LUT[n]!
-  // Beyond LUT — iterative (unreachable for quantum numbers)
+  if (n > LN_FACTORIAL_EXACT_SUM_LIMIT) return stirlingLnFactorial(n)
   let sum = LN_FACTORIAL_LUT[170]!
   for (let i = 171; i <= n; i++) sum += Math.log(i)
   return sum

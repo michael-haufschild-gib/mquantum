@@ -166,17 +166,24 @@ pub fn compute_rdm(
 /// * `psi_re` - Real part of wavefunction (f32)
 /// * `psi_im` - Imaginary part of wavefunction (f32)
 /// * `grid_size` - Grid dimensions
-/// * `kept_dims` - Indices of dimensions to keep (sorted ascending)
+/// * `kept_dims` - Strictly increasing indices of dimensions to keep
 pub fn compute_joint_rdm(
     psi_re: &[f32],
     psi_im: &[f32],
     grid_size: &[u32],
     kept_dims: &[u32],
 ) -> Vec<f64> {
+    if !valid_kept_dims(grid_size, kept_dims) {
+        return Vec::new();
+    }
+
     // Compute joint dimension size
     let mut m_joint: usize = 1;
     for &d in kept_dims {
-        m_joint *= grid_size[d as usize] as usize;
+        m_joint = match m_joint.checked_mul(grid_size[d as usize] as usize) {
+            Some(v) => v,
+            None => return Vec::new(),
+        };
     }
     if m_joint > MAX_JOINT_RDM {
         return Vec::new();
@@ -278,6 +285,27 @@ pub fn compute_joint_rdm(
     result.extend_from_slice(&rho_re);
     result.extend_from_slice(&rho_im);
     result
+}
+
+fn valid_kept_dims(grid_size: &[u32], kept_dims: &[u32]) -> bool {
+    if kept_dims.is_empty() {
+        return false;
+    }
+
+    let mut previous: Option<u32> = None;
+    for &dim in kept_dims {
+        if dim as usize >= grid_size.len() {
+            return false;
+        }
+        if grid_size[dim as usize] == 0 {
+            return false;
+        }
+        if previous.is_some_and(|prev| dim <= prev) {
+            return false;
+        }
+        previous = Some(dim);
+    }
+    true
 }
 
 // ============================================================================
@@ -767,6 +795,19 @@ mod tests {
         // M_joint = 64*64 = 4096 > 1024
         let packed = compute_joint_rdm(&re, &im, &[m, m], &[0, 1]);
         assert!(packed.is_empty());
+    }
+
+    #[test]
+    fn test_joint_rdm_rejects_invalid_kept_dimensions() {
+        let re = vec![0.0f32; 4];
+        let im = vec![0.0f32; 4];
+        let grid = [2u32, 2u32];
+
+        assert!(compute_joint_rdm(&re, &im, &grid, &[]).is_empty());
+        assert!(compute_joint_rdm(&re, &im, &grid, &[0, 0]).is_empty());
+        assert!(compute_joint_rdm(&re, &im, &grid, &[1, 0]).is_empty());
+        assert!(compute_joint_rdm(&re, &im, &grid, &[0, 2]).is_empty());
+        assert!(compute_joint_rdm(&re, &im, &[2, 0], &[1]).is_empty());
     }
 
     // ── Eigenvalue tests ────────────────────────────────────────────────

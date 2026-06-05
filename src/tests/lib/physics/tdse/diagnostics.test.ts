@@ -123,6 +123,34 @@ describe('normDriftFromHistory', () => {
     ]
     expect(normDriftFromHistory(history)).toBe(0)
   })
+
+  it('returns 0 for non-finite history norms', () => {
+    const history: TdseDiagnosticsSnapshot[] = [
+      {
+        simTime: 0,
+        totalNorm: Number.POSITIVE_INFINITY,
+        maxDensity: 0,
+        normDrift: 0,
+        normLeft: 0,
+        normRight: 0,
+        R: 0,
+        T: 0,
+        ipr: 0,
+      },
+      {
+        simTime: 1,
+        totalNorm: 1,
+        maxDensity: 0,
+        normDrift: 0,
+        normLeft: 0,
+        normRight: 0,
+        R: 0,
+        T: 0,
+        ipr: 0,
+      },
+    ]
+    expect(normDriftFromHistory(history)).toBe(0)
+  })
 })
 
 describe('computeReflectionTransmission', () => {
@@ -156,6 +184,12 @@ describe('computeReflectionTransmission', () => {
     expect(R).toBeCloseTo(0.8)
     expect(T).toBeCloseTo(0.15)
     expect(R + T).toBeCloseTo(0.95) // 5% absorbed
+  })
+
+  it('returns finite coefficients for non-finite partition inputs', () => {
+    const { R, T } = computeReflectionTransmission(Number.POSITIVE_INFINITY, Number.NaN)
+    expect(R).toBe(0)
+    expect(T).toBe(0)
   })
 })
 

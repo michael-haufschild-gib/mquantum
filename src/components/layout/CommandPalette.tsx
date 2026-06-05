@@ -338,6 +338,7 @@ export const CommandPalette: React.FC = React.memo(() => {
           style={{ zIndex: Z_INDEX.MODAL }}
         >
           <m.div
+            data-testid="command-palette-backdrop"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -367,6 +368,7 @@ export const CommandPalette: React.FC = React.memo(() => {
                 </svg>
               </div>
               <Input
+                data-testid="components-layout-command-palette-input-369-15"
                 ref={inputRef}
                 type="text"
                 placeholder="Type a command or search..."
@@ -391,6 +393,7 @@ export const CommandPalette: React.FC = React.memo(() => {
                   {filteredCommands.map((cmd, index) => (
                     <li key={cmd.id}>
                       <Button
+                        data-testid="components-layout-command-palette-button-393-23"
                         onClick={() => {
                           cmd.action()
                           setIsOpen(false)

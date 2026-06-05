@@ -25,6 +25,7 @@ import { EPSILON } from './types'
 
 const scratchVectorA = new Map<number, Float64Array>()
 const scratchVectorB = new Map<number, Float64Array>()
+const SQRT_MAX_VALUE = Math.sqrt(Number.MAX_VALUE)
 
 /**
  * Get or create a scratch buffer from the specified pool.
@@ -51,6 +52,35 @@ function assertSameVectorLength(a: VectorND, b: VectorND): void {
   if (a.length !== b.length) {
     throw new Error(`Vector dimensions must match: ${a.length} !== ${b.length}`)
   }
+}
+
+function canUseSquaredNormFastPath(v: VectorND): boolean {
+  const limit = SQRT_MAX_VALUE / Math.sqrt(Math.max(1, v.length))
+  for (let i = 0; i < v.length; i++) {
+    const value = v[i]!
+    if (!Number.isFinite(value) || Math.abs(value) > limit) return false
+  }
+  return true
+}
+
+function stableMagnitude(v: VectorND): number {
+  let scale = 0
+  let sum = 1
+  for (let i = 0; i < v.length; i++) {
+    const abs = Math.abs(v[i]!)
+    if (Number.isNaN(abs)) return Number.NaN
+    if (abs === Infinity) return Infinity
+    if (abs === 0) continue
+    if (scale < abs) {
+      const ratio = scale / abs
+      sum = 1 + sum * ratio * ratio
+      scale = abs
+    } else {
+      const ratio = abs / scale
+      sum += ratio * ratio
+    }
+  }
+  return scale === 0 ? 0 : scale * Math.sqrt(sum)
 }
 
 /**
@@ -184,7 +214,7 @@ export function dotProduct(a: VectorND, b: VectorND): number {
  */
 export function magnitude(v: VectorND): number {
   // Try WASM path if available
-  if (isAnimationWasmReady()) {
+  if (isAnimationWasmReady() && canUseSquaredNormFastPath(v)) {
     const vF64 = getScratch(scratchVectorA, v.length)
     for (let i = 0; i < v.length; i++) vF64[i] = v[i]!
     const wasmResult = magnitudeWasm(vF64)
@@ -194,12 +224,7 @@ export function magnitude(v: VectorND): number {
     // WASM failed, fall through to JS implementation
   }
 
-  // JS fallback
-  let sumSquares = 0
-  for (let i = 0; i < v.length; i++) {
-    sumSquares += v[i]! * v[i]!
-  }
-  return Math.sqrt(sumSquares)
+  return stableMagnitude(v)
 }
 
 /**
@@ -215,7 +240,8 @@ export function magnitude(v: VectorND): number {
  */
 export function normalize(v: VectorND, out?: VectorND): VectorND {
   // Try WASM path if available (only when no out buffer, as WASM allocates)
-  if (isAnimationWasmReady() && !out) {
+  const wasmNormSafe = canUseSquaredNormFastPath(v)
+  if (isAnimationWasmReady() && !out && wasmNormSafe) {
     const vF64 = getScratch(scratchVectorA, v.length)
     let sumSquares = 0
     for (let i = 0; i < v.length; i++) {
@@ -236,6 +262,9 @@ export function normalize(v: VectorND, out?: VectorND): VectorND {
   // JS fallback
   const mag = magnitude(v)
 
+  if (!Number.isFinite(mag)) {
+    throw new Error('Cannot normalize non-finite vector')
+  }
   if (mag < EPSILON) {
     throw new Error('Cannot normalize zero vector')
   }

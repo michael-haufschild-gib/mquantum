@@ -136,6 +136,7 @@ export const CanvasContextMenuContent: React.FC<CanvasContextMenuContentProps> =
               }
               return (
                 <Button
+                  data-testid="components-layout-canvas-context-menu-content-button-138-17"
                   key={index}
                   role="menuitem"
                   ariaLabel={item.label}

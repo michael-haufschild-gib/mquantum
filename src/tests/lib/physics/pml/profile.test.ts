@@ -117,8 +117,24 @@ describe('computePMLSigmaMaxND — edge cases', () => {
     expect(computePMLSigmaMaxND(1e-6, 0.2, [64, 0], 0.005, 3, 2)).toBe(0)
   })
 
+  it('returns 0 for non-finite or fractional active grid dimensions', () => {
+    expect(computePMLSigmaMaxND(1e-6, 0.2, [Infinity, 32], 0.005, 3, 2)).toBe(0)
+    expect(computePMLSigmaMaxND(1e-6, 0.2, [64, 31.5], 0.005, 3, 2)).toBe(0)
+  })
+
   it('returns 0 for dims=0', () => {
     expect(computePMLSigmaMaxND(1e-6, 0.2, [64], 0.005, 3, 0)).toBe(0)
+  })
+
+  it('returns 0 for invalid latticeDim or missing active grid dimensions', () => {
+    expect(computePMLSigmaMaxND(1e-6, 0.2, [64, 64], 0.005, 3, 1.5)).toBe(0)
+    expect(computePMLSigmaMaxND(1e-6, 0.2, [64], 0.005, 3, 2)).toBe(0)
+  })
+
+  it('returns 0 for non-finite width or order', () => {
+    expect(computePMLSigmaMaxND(1e-6, NaN, [64], 0.005, 3, 1)).toBe(0)
+    expect(computePMLSigmaMaxND(1e-6, 0.2, [64], 0.005, Infinity, 1)).toBe(0)
+    expect(computePMLSigmaMaxND(1e-6, 0.2, [64], 0.005, NaN, 1)).toBe(0)
   })
 
   it('returns 0 for R_target >= 1', () => {
@@ -204,5 +220,10 @@ describe('sigmaMaxFromPmlConfig (compute-pass wrapper)', () => {
     const withDefault = sigmaMaxFromPmlConfig({ ...baseCfg, pmlTargetReflection: undefined })
     const explicit = sigmaMaxFromPmlConfig({ ...baseCfg, pmlTargetReflection: 1e-6 })
     expect(withDefault).toBe(explicit)
+  })
+
+  it('returns 0 when active config dimensions are invalid', () => {
+    expect(sigmaMaxFromPmlConfig({ ...baseCfg, gridSize: [64, Infinity, 64] })).toBe(0)
+    expect(sigmaMaxFromPmlConfig({ ...baseCfg, latticeDim: 4 })).toBe(0)
   })
 })

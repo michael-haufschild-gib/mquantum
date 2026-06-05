@@ -7,6 +7,55 @@
  * @module lib/physics/potentialGridEvaluator
  */
 
+const MAX_F32_ABS = 3.4028234663852886e38
+const MAX_POTENTIAL_GRID_SITES = 2 ** 20
+
+function validatePotentialGridShape(
+  gridSize: readonly number[],
+  spacing: readonly number[]
+): number {
+  const latticeDim = gridSize.length
+  if (!Number.isSafeInteger(latticeDim) || latticeDim < 1) {
+    throw new RangeError('evaluatePotentialGrid: gridSize must contain at least one axis')
+  }
+  if (spacing.length < latticeDim) {
+    throw new RangeError(
+      `evaluatePotentialGrid: spacing length ${spacing.length} is smaller than latticeDim ${latticeDim}`
+    )
+  }
+
+  let totalSites = 1
+  for (let d = 0; d < latticeDim; d++) {
+    const n = gridSize[d]!
+    const dx = spacing[d]!
+    if (!Number.isSafeInteger(n) || n < 1) {
+      throw new RangeError(`evaluatePotentialGrid: gridSize[${d}] must be a positive safe integer`)
+    }
+    if (!Number.isFinite(dx) || dx <= 0) {
+      throw new RangeError(`evaluatePotentialGrid: spacing[${d}] must be finite and positive`)
+    }
+    if (n > MAX_POTENTIAL_GRID_SITES) {
+      throw new RangeError(
+        `evaluatePotentialGrid: gridSize[${d}] exceeds site budget ${MAX_POTENTIAL_GRID_SITES}`
+      )
+    }
+    if (totalSites > Math.floor(Number.MAX_SAFE_INTEGER / n)) {
+      throw new RangeError(`evaluatePotentialGrid: total site count overflows at axis ${d}`)
+    }
+    if (totalSites > Math.floor(MAX_POTENTIAL_GRID_SITES / n)) {
+      throw new RangeError(
+        `evaluatePotentialGrid: total site count exceeds site budget ${MAX_POTENTIAL_GRID_SITES}`
+      )
+    }
+    totalSites *= n
+  }
+  return totalSites
+}
+
+function finiteF32OrZero(value: number): number {
+  return Number.isFinite(value) && Math.abs(value) <= MAX_F32_ABS ? value : 0
+}
+
 /**
  * Evaluate a potential function V(x₁,...,xₙ) on every site of the N-D lattice.
  *
@@ -33,10 +82,7 @@ export function evaluatePotentialGrid(
   spacing: number[]
 ): Float32Array<ArrayBuffer> {
   const latticeDim = gridSize.length
-  let totalSites = 1
-  for (let d = 0; d < latticeDim; d++) {
-    totalSites *= gridSize[d]!
-  }
+  const totalSites = validatePotentialGridShape(gridSize, spacing)
 
   const potential = new Float32Array(totalSites)
   const coords = new Array<number>(latticeDim)
@@ -58,7 +104,7 @@ export function evaluatePotentialGrid(
     }
 
     const value = evaluator(coords)
-    potential[idx] = Number.isFinite(value) ? value : 0
+    potential[idx] = finiteF32OrZero(value)
   }
 
   return potential

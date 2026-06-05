@@ -1316,10 +1316,7 @@ mod tests {
         // Dirichlet distinction does not affect this assertion.
         let dphi = (2.0 * input.phi_extent) / (nphi - 1) as f64;
         let inv_dphi2 = 1.0 / (dphi * dphi);
-        let (lap_re, lap_im) = phi_laplacian_at(&out.chi, 0, 1, 1, nphi, inv_dphi2);
         let inv_a0sq = 1.0 / (a0 * a0);
-        let ddot_re = inv_a0sq * lap_re + u0 * cre;
-        let ddot_im = inv_a0sq * lap_im + u0 * cim;
         // Manually rebuild BC derivative (HH).
         let mut _bc_chi = vec![0.0f64; complex_slab];
         let mut bc_deriv = vec![0.0f64; complex_slab];

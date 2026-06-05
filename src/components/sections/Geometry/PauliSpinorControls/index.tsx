@@ -115,6 +115,7 @@ export const PauliSpinorControls: React.FC = React.memo(() => {
           <p className="text-2xs text-text-tertiary uppercase tracking-wider font-bold">Center</p>
           {Array.from({ length: latticeDim }, (_, d) => (
             <Slider
+              data-testid="components-sections-geometry-pauli-spinor-controls-slider-117-13"
               key={`center-${d}`}
               label={`x${d}`}
               tooltip="Initial center position of the spinor wavepacket along this axis."
@@ -131,6 +132,7 @@ export const PauliSpinorControls: React.FC = React.memo(() => {
           </p>
           {Array.from({ length: latticeDim }, (_, d) => (
             <Slider
+              data-testid="components-sections-geometry-pauli-spinor-controls-slider-133-13"
               key={`momentum-${d}`}
               label={`p${d}`}
               tooltip="Initial momentum of the wavepacket along this axis. Determines propagation direction and speed."
@@ -158,6 +160,7 @@ export const PauliSpinorControls: React.FC = React.memo(() => {
               const d = i + 3
               return (
                 <Slider
+                  data-testid="components-sections-geometry-pauli-spinor-controls-slider-160-17"
                   key={`slice-${d}`}
                   label={`Dim ${d}`}
                   tooltip="Cross-section position for this extra dimension. Explore different slices of the higher-dimensional spinor field."

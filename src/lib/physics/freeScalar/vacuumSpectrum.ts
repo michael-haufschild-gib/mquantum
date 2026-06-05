@@ -23,6 +23,48 @@ import { gaussianPair, mulberry32 } from '@/lib/math/rng'
 
 /** Minimum mass used for zero-mode regularization when physical mass is zero. */
 export const M_FLOOR = 0.01
+const MAX_VACUUM_DIM = 11
+const MAX_VACUUM_TOTAL_SITES = 2 ** 20
+
+function validateDispersionGeometry(
+  nIndices: readonly number[],
+  gridSize: readonly number[],
+  spacing: readonly number[],
+  latticeDim: number
+): void {
+  if (!Number.isSafeInteger(latticeDim) || latticeDim < 1 || latticeDim > MAX_VACUUM_DIM) {
+    throw new RangeError(
+      `latticeDim must be an integer in [1, ${MAX_VACUUM_DIM}], got ${latticeDim}`
+    )
+  }
+  if (gridSize.length < latticeDim) {
+    throw new RangeError(
+      `gridSize must have at least ${latticeDim} entries, got ${gridSize.length}`
+    )
+  }
+  if (spacing.length < latticeDim) {
+    throw new RangeError(`spacing must have at least ${latticeDim} entries, got ${spacing.length}`)
+  }
+  if (nIndices.length < latticeDim) {
+    throw new RangeError(
+      `nIndices must have at least ${latticeDim} entries, got ${nIndices.length}`
+    )
+  }
+  for (let d = 0; d < latticeDim; d++) {
+    const n = gridSize[d]!
+    const a = spacing[d]!
+    const k = nIndices[d]!
+    if (!Number.isSafeInteger(n) || n < 1) {
+      throw new RangeError(`gridSize[${d}] must be a positive safe integer, got ${n}`)
+    }
+    if (!Number.isFinite(a) || a <= 0) {
+      throw new RangeError(`spacing[${d}] must be a finite positive value, got ${a}`)
+    }
+    if (!Number.isFinite(k)) {
+      throw new RangeError(`nIndices[${d}] must be finite, got ${k}`)
+    }
+  }
+}
 
 /**
  * Computes the lattice dispersion relation omega_k for a given mode.
@@ -50,6 +92,10 @@ export function computeOmegaK(
   mass: number,
   latticeDim: number
 ): number {
+  validateDispersionGeometry(nIndices, gridSize, spacing, latticeDim)
+  if (!Number.isFinite(mass)) {
+    throw new RangeError(`mass must be finite, got ${mass}`)
+  }
   const mEff = Math.max(mass, M_FLOOR)
   let omegaSq = mEff * mEff
 
@@ -92,6 +138,10 @@ export function computeOmegaKFromMassSq(
   massSq: number,
   latticeDim: number
 ): number {
+  validateDispersionGeometry(nIndices, gridSize, spacing, latticeDim)
+  if (!Number.isFinite(massSq)) {
+    throw new RangeError(`massSq must be finite, got ${massSq}`)
+  }
   let omegaSq = massSq
 
   for (let d = 0; d < latticeDim; d++) {
@@ -116,7 +166,7 @@ export function computeOmegaKFromMassSq(
  * @returns True if n is a power of 2 and >= 1
  */
 function isPowerOf2(n: number): boolean {
-  return Number.isInteger(n) && n >= 1 && (n & (n - 1)) === 0
+  return Number.isSafeInteger(n) && n >= 1 && Number.isInteger(Math.log2(n))
 }
 
 /**
@@ -137,6 +187,9 @@ function validateVacuumConfig(
   if (!Number.isInteger(latticeDim) || latticeDim < 1) {
     throw new Error(`latticeDim must be a positive integer, got ${latticeDim}`)
   }
+  if (latticeDim > MAX_VACUUM_DIM) {
+    throw new Error(`latticeDim must be <= ${MAX_VACUUM_DIM}, got ${latticeDim}`)
+  }
   if (latticeDim > gridSize.length) {
     throw new Error(`gridSize must have at least ${latticeDim} entries, got ${gridSize.length}`)
   }
@@ -147,6 +200,7 @@ function validateVacuumConfig(
     throw new Error(`mass must be finite, got ${mass}`)
   }
 
+  let totalSites = 1
   for (let d = 0; d < latticeDim; d++) {
     const n = gridSize[d]!
     if (!isPowerOf2(n)) {
@@ -158,6 +212,10 @@ function validateVacuumConfig(
     if (!Number.isFinite(a) || a <= 0) {
       throw new Error(`spacing[${d}] must be a finite positive value, got ${a}`)
     }
+    if (totalSites > Math.floor(MAX_VACUUM_TOTAL_SITES / n)) {
+      throw new Error(`Exact vacuum active grid exceeds site budget ${MAX_VACUUM_TOTAL_SITES}`)
+    }
+    totalSites *= n
   }
 }
 

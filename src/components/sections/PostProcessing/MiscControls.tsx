@@ -79,6 +79,7 @@ export const MiscControls: React.FC<MiscControlsProps> = React.memo(({ className
     <div className={`space-y-4 ${className}`}>
       {/* Anti-aliasing */}
       <ControlGroup
+        data-testid="components-sections-post-processing-misc-controls-control-group-81-7"
         title="Anti-aliasing"
         tooltip="Smooths jagged edges (aliasing) in the rendered image. FXAA is fast; SMAA is higher quality."
       >
@@ -94,6 +95,7 @@ export const MiscControls: React.FC<MiscControlsProps> = React.memo(({ className
 
       {/* Frame Blending */}
       <ControlGroup
+        data-testid="components-sections-post-processing-misc-controls-control-group-96-7"
         title="Frame Blending"
         tooltip="Temporal frame blending for smoother volumetric rendering and reduced noise."
       >

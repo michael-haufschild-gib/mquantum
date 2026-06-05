@@ -176,6 +176,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
               testId="openq-panel-hydrogen-basis"
             >
               <Select
+                data-testid="components-layout-timeline-controls-schroedinger-open-quantum-drawer-select-178-15"
                 label="Basis Size (n_max)"
                 options={BASIS_MAX_N_OPTIONS}
                 value={String(hydrogenBasisMaxN)}
@@ -186,6 +187,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
 
             <DrawerSection title="Thermal Bath" enabled={enabled} testId="openq-panel-thermal-bath">
               <Slider
+                data-testid="components-layout-timeline-controls-schroedinger-open-quantum-drawer-slider-188-15"
                 label="Temperature (K)"
                 min={0.1}
                 max={10000}
@@ -196,6 +198,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
                 tooltip="Bath temperature in kelvin (Lindblad equilibrium)"
               />
               <Slider
+                data-testid="components-layout-timeline-controls-schroedinger-open-quantum-drawer-slider-198-15"
                 label="Coupling"
                 min={0.01}
                 max={100}
@@ -213,6 +216,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
               testId="openq-panel-hydrogen-dephasing"
             >
               <Select
+                data-testid="components-layout-timeline-controls-schroedinger-open-quantum-drawer-select-215-15"
                 label="Model"
                 options={DEPHASING_MODEL_OPTIONS}
                 value={dephasingModel}
@@ -221,6 +225,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
               />
               {dephasingModel !== 'none' && (
                 <Slider
+                  data-testid="components-layout-timeline-controls-schroedinger-open-quantum-drawer-slider-223-17"
                   label={'\u03B3\u03C6'}
                   min={0}
                   max={5}
@@ -243,6 +248,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
               <div className="flex items-center justify-between">
                 <label className="text-xs text-text-secondary">Dephasing</label>
                 <ToggleButton
+                  data-testid="components-layout-timeline-controls-schroedinger-open-quantum-drawer-toggle-button-245-17"
                   pressed={dephasingEnabled}
                   onToggle={onDephasingToggle}
                   className="text-xs px-2 py-1 h-auto"
@@ -254,6 +260,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
               </div>
               {dephasingEnabled && (
                 <Slider
+                  data-testid="components-layout-timeline-controls-schroedinger-open-quantum-drawer-slider-256-17"
                   label={'\u03B3\u03C6'}
                   min={0}
                   max={5}
@@ -270,6 +277,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
               <div className="flex items-center justify-between">
                 <label className="text-xs text-text-secondary">Relaxation</label>
                 <ToggleButton
+                  data-testid="components-layout-timeline-controls-schroedinger-open-quantum-drawer-toggle-button-272-17"
                   pressed={relaxationEnabled}
                   onToggle={onRelaxationToggle}
                   className="text-xs px-2 py-1 h-auto"
@@ -281,6 +289,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
               </div>
               {relaxationEnabled && (
                 <Slider
+                  data-testid="components-layout-timeline-controls-schroedinger-open-quantum-drawer-slider-283-17"
                   label={'\u03B3\u2193'}
                   min={0}
                   max={5}
@@ -297,6 +306,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
               <div className="flex items-center justify-between">
                 <label className="text-xs text-text-secondary">Thermal Excitation</label>
                 <ToggleButton
+                  data-testid="components-layout-timeline-controls-schroedinger-open-quantum-drawer-toggle-button-299-17"
                   pressed={thermalEnabled}
                   onToggle={onThermalToggle}
                   className="text-xs px-2 py-1 h-auto"
@@ -308,6 +318,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
               </div>
               {thermalEnabled && (
                 <Slider
+                  data-testid="components-layout-timeline-controls-schroedinger-open-quantum-drawer-slider-310-17"
                   label={'\u03B3\u2191'}
                   min={0}
                   max={5}
@@ -324,6 +335,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
 
         <DrawerSection title="Integrator" enabled={enabled} testId="openq-panel-integrator">
           <Slider
+            data-testid="components-layout-timeline-controls-schroedinger-open-quantum-drawer-slider-326-11"
             label="dt"
             min={0.001}
             max={0.1}
@@ -334,6 +346,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
             tooltip="Lindblad integration time step (smaller = more accurate)"
           />
           <Slider
+            data-testid="components-layout-timeline-controls-schroedinger-open-quantum-drawer-slider-336-11"
             label="Substeps"
             min={1}
             max={10}

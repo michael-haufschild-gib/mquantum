@@ -57,6 +57,7 @@ export const BloomControls: React.FC<BloomControlsProps> = React.memo(({ classNa
   return (
     <div className={`space-y-4 ${className}`}>
       <Slider
+        data-testid="components-sections-post-processing-bloom-controls-slider-59-7"
         label="Gain"
         tooltip="Overall bloom intensity. Higher values create a stronger glow around bright regions."
         min={0}
@@ -68,6 +69,7 @@ export const BloomControls: React.FC<BloomControlsProps> = React.memo(({ classNa
       />
 
       <Slider
+        data-testid="components-sections-post-processing-bloom-controls-slider-70-7"
         label="Threshold"
         tooltip="Brightness threshold for bloom. Only pixels brighter than this value will glow."
         min={0}
@@ -79,6 +81,7 @@ export const BloomControls: React.FC<BloomControlsProps> = React.memo(({ classNa
       />
 
       <Slider
+        data-testid="components-sections-post-processing-bloom-controls-slider-81-7"
         label="Radius"
         tooltip="Spread radius of the bloom effect. Larger values create wider, softer glow."
         min={0.25}
@@ -90,6 +93,7 @@ export const BloomControls: React.FC<BloomControlsProps> = React.memo(({ classNa
       />
 
       <Slider
+        data-testid="components-sections-post-processing-bloom-controls-slider-92-7"
         label="Knee"
         tooltip="Softness of the threshold transition. Higher values create a smoother falloff between bloomed and non-bloomed regions."
         min={0}

@@ -68,6 +68,7 @@ export const AnimationDrawerContainer: React.FC<AnimationDrawerContainerProps> =
       {onClose && (
         <div className="absolute top-0 end-3 -translate-y-1/2 z-10">
           <Button
+            data-testid="components-layout-timeline-controls-animation-drawer-container-button-70-11"
             variant="ghost"
             size="icon"
             onClick={onClose}

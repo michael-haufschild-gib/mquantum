@@ -119,6 +119,7 @@ export const SceneManager: React.FC<SceneManagerProps> = React.memo(({ onClose }
     <div className="space-y-4">
       <div className="flex gap-2">
         <Button
+          data-testid="components-presets-scene-manager-button-121-9"
           variant="secondary"
           size="sm"
           onClick={openImportPicker}
@@ -129,6 +130,7 @@ export const SceneManager: React.FC<SceneManagerProps> = React.memo(({ onClose }
           Import JSON
         </Button>
         <Button
+          data-testid="components-presets-scene-manager-button-131-9"
           variant="secondary"
           size="sm"
           onClick={handleExport}
@@ -159,6 +161,7 @@ export const SceneManager: React.FC<SceneManagerProps> = React.memo(({ onClose }
                   className="group flex items-center justify-between p-3 bg-[var(--bg-hover)] rounded-md hover:bg-[var(--bg-active)] transition-colors border border-transparent hover:border-panel-border focus-within:border-panel-border"
                 >
                   <div
+                    data-testid="components-presets-scene-manager-div-161-19"
                     role="button"
                     tabIndex={isEditingThis ? -1 : 0}
                     className={`flex-1 text-left min-w-0 ${isEditingThis ? '' : 'cursor-pointer'}`}
@@ -182,6 +185,7 @@ export const SceneManager: React.FC<SceneManagerProps> = React.memo(({ onClose }
                   >
                     <div className="flex flex-col items-start min-w-0">
                       <InlineEdit
+                        data-testid="components-presets-scene-manager-inline-edit-184-23"
                         value={scene.name}
                         onSave={(newName) => {
                           handleRenameScene(scene.id, newName)
@@ -206,6 +210,7 @@ export const SceneManager: React.FC<SceneManagerProps> = React.memo(({ onClose }
 
                   <div className="flex items-center gap-1">
                     <Button
+                      data-testid="components-presets-scene-manager-button-208-21"
                       variant="ghost"
                       size="icon"
                       onClick={(e) => {

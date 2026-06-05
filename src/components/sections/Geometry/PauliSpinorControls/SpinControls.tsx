@@ -72,6 +72,7 @@ export const SpinControls: React.FC<SpinControlsProps> = React.memo(
     return (
       <div className="space-y-3">
         <Select
+          data-testid="components-sections-geometry-pauli-spinor-controls-spin-controls-select-74-9"
           label="Initial Condition"
           tooltip="Shape of the initial spinor wavepacket. Gaussian is localized; plane wave fills space uniformly."
           options={INITIAL_CONDITION_OPTIONS}
@@ -80,6 +81,7 @@ export const SpinControls: React.FC<SpinControlsProps> = React.memo(
         />
 
         <ToggleGroup
+          data-testid="components-sections-geometry-pauli-spinor-controls-spin-controls-toggle-group-82-9"
           options={[...SPIN_PRESETS]}
           value={currentPreset ?? ''}
           onChange={(v) => {
@@ -91,6 +93,7 @@ export const SpinControls: React.FC<SpinControlsProps> = React.memo(
         />
 
         <Slider
+          data-testid="components-sections-geometry-pauli-spinor-controls-spin-controls-slider-93-9"
           label="Spin θ (polar)"
           tooltip="Polar angle on the Bloch sphere. 0 = spin-up (↑), π = spin-down (↓), π/2 = equatorial superposition."
           value={initialSpinDirection[0]}
@@ -101,6 +104,7 @@ export const SpinControls: React.FC<SpinControlsProps> = React.memo(
         />
 
         <Slider
+          data-testid="components-sections-geometry-pauli-spinor-controls-spin-controls-slider-103-9"
           label="Spin φ (azimuthal)"
           tooltip="Azimuthal angle on the Bloch sphere. Controls the relative phase between spin-up and spin-down components."
           value={initialSpinDirection[1]}
@@ -111,6 +115,7 @@ export const SpinControls: React.FC<SpinControlsProps> = React.memo(
         />
 
         <Slider
+          data-testid="components-sections-geometry-pauli-spinor-controls-spin-controls-slider-113-9"
           label="Packet Width σ"
           tooltip="Spatial width of the initial Gaussian wavepacket. Narrower packets spread faster due to the uncertainty principle."
           value={packetWidth}

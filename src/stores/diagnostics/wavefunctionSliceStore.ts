@@ -66,6 +66,33 @@ interface WavefunctionSliceState {
   reset: () => void
 }
 
+function sanitizeSliceData(values: Float32Array): Float32Array {
+  let needsCopy = false
+  for (let i = 0; i < values.length; i++) {
+    const value = values[i] ?? 0
+    if (!Number.isFinite(value) || value < 0) {
+      needsCopy = true
+      break
+    }
+  }
+  if (!needsCopy) return values
+
+  const sanitized = new Float32Array(values.length)
+  for (let i = 0; i < values.length; i++) {
+    const value = values[i] ?? 0
+    sanitized[i] = Number.isFinite(value) && value >= 0 ? value : 0
+  }
+  return sanitized
+}
+
+function positiveIntOr(value: number, fallback: number): number {
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback
+}
+
+function positiveFiniteOr(value: number, fallback: number): number {
+  return Number.isFinite(value) && value > 0 ? value : fallback
+}
+
 /**
  * Zustand store for wavefunction slice capture requests and results.
  *
@@ -93,15 +120,17 @@ export const useWavefunctionSliceStore = create<WavefunctionSliceState>((set) =>
   requestCapture: (axis, sourceMode = null) =>
     set({ captureRequested: true, requestedAxis: axis, requestedSourceMode: sourceMode }),
 
-  fulfillCapture: (data) =>
+  fulfillCapture: (data) => {
+    const sliceData = sanitizeSliceData(data.sliceData)
     set({
-      sliceData: data.sliceData,
+      sliceData,
       sliceAxis: data.axis,
       sliceSourceMode: data.sourceMode ?? null,
-      sliceGridSize: data.gridSize,
-      sliceWorldBound: data.worldBound,
+      sliceGridSize: positiveIntOr(data.gridSize, sliceData.length),
+      sliceWorldBound: positiveFiniteOr(data.worldBound, 1),
       hasData: true,
-    }),
+    })
+  },
 
   clearRequest: () => set({ captureRequested: false }),
 

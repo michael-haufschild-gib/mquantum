@@ -157,6 +157,7 @@ function AppContent() {
             </p>
             <div className="flex justify-end pt-2">
               <Button
+                data-testid="app-button-159-15"
                 variant="primary"
                 onClick={handleSafariAcknowledge}
                 size="sm"

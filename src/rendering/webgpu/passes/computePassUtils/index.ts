@@ -1,0 +1,492 @@
+/**
+ * Shared utilities and constants for GPU compute passes
+ * (TDSE, Dirac, Pauli, QuantumWalk, FreeScalar).
+ */
+
+import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
+import { logger } from '@/lib/logger'
+import {
+  computeStrides as computeStridesBase,
+  nearestPow2 as nearestPow2Base,
+  reduceGridToFit as reduceGridToFitBase,
+  sanitizePowerOfTwoGridSizes,
+} from '@/lib/math/ndArray'
+
+/** 1D dispatch workgroup size — must match @workgroup_size in 1D compute shaders */
+export const LINEAR_WG = 64
+
+/**
+ * Maximum workgroups per dimension (WebGPU spec minimum guaranteed limit).
+ * All dispatches must stay within this bound.
+ */
+export const MAX_DISPATCH_PER_DIM = 65535
+
+/**
+ * Maximum total lattice sites that can be dispatched with a single linear dispatch.
+ * Exceeding this causes a GPU validation error.
+ */
+export const MAX_LINEAR_DISPATCH_SITES = MAX_DISPATCH_PER_DIM * LINEAR_WG
+
+const MAX_U32 = 0xffff_ffff
+
+/** 3D dispatch workgroup size for write-grid passes */
+export const GRID_WG = 4
+
+/** 3D dispatch workgroup size for site-based compute kernels at latticeDim ≤ 3. */
+export const SITE_3D_WG = 4
+
+/**
+ * Compute 3-D workgroup-count tuple for site-based kernels using a
+ * `@workgroup_size(SITE_3D_WG, SITE_3D_WG, SITE_3D_WG)` block dispatched
+ * directly over the lattice extent.
+ *
+ * For each axis `d < latticeDim`, returns `ceil(gridSize[d] / SITE_3D_WG)`.
+ * Axes `d >= latticeDim` are clamped to 1 so the dispatch shape stays
+ * 1×1 along unused axes regardless of stale values left in `gridSize`.
+ *
+ * Caller must guarantee `latticeDim <= 3` — at higher dims the kernel
+ * cannot encode the extra axes in `gid.xyz` and must keep using the 1-D
+ * dispatch path.
+ *
+ * @param gridSize - Per-axis grid dimensions
+ * @param latticeDim - Number of active lattice dimensions (must be ≤ 3)
+ * @returns Workgroup counts as `[xCount, yCount, zCount]`
+ */
+export function compute3DDispatchCounts(
+  gridSize: readonly number[],
+  latticeDim: number
+): [number, number, number] {
+  if (!Number.isSafeInteger(latticeDim) || latticeDim < 0 || latticeDim > 3) {
+    throw new Error(
+      `[compute] compute3DDispatchCounts: latticeDim=${latticeDim} is unsupported; expected integer 0..3`
+    )
+  }
+  // Reject malformed active-axis sizes up-front. Fractional / NaN values would
+  // slip past the per-dim max-dispatch guard below (NaN compares false), and
+  // an undefined slot would Math.ceil to NaN — both push the failure to a
+  // later dispatchWorkgroups() call instead of failing here.
+  for (let d = 0; d < latticeDim; d++) {
+    assertPositiveU32(gridSize[d], `[compute] compute3DDispatchCounts: gridSize[${d}]`)
+  }
+  const x = latticeDim >= 1 ? Math.max(1, Math.ceil(gridSize[0]! / SITE_3D_WG)) : 1
+  const y = latticeDim >= 2 ? Math.max(1, Math.ceil(gridSize[1]! / SITE_3D_WG)) : 1
+  const z = latticeDim >= 3 ? Math.max(1, Math.ceil(gridSize[2]! / SITE_3D_WG)) : 1
+  if (x > MAX_DISPATCH_PER_DIM || y > MAX_DISPATCH_PER_DIM || z > MAX_DISPATCH_PER_DIM) {
+    throw new Error(
+      `[compute] compute3DDispatchCounts: dispatch (${x}, ${y}, ${z}) exceeds WebGPU limit ${MAX_DISPATCH_PER_DIM} per dim`
+    )
+  }
+  return [x, y, z]
+}
+
+/** Result of {@link pickSiteDispatch}: dispatch extents + variant flag. */
+export interface SiteDispatch {
+  x: number
+  y: number
+  z: number
+  /**
+   * `true` when the 3-D kernel variant should be used (latticeDim===3).
+   * `false` when the legacy 1-D linear-WG kernel variant should be used.
+   */
+  use3D: boolean
+}
+
+/**
+ * Choose the dispatch shape for a TDSE-family per-site compute kernel.
+ *
+ * For `latticeDim === 3` the host dispatches a 3-D grid sized
+ * `ceil(gridSize[d] / SITE_3D_WG)` per axis. The matching kernel uses
+ * `@workgroup_size(4, 4, 4)` and reads `gid.xyz` directly, skipping
+ * `linearToND`'s shift/mask coord decomposition.
+ *
+ * For `latticeDim !== 3` (1, 2, or ≥4) the host falls back to the legacy
+ * 1-D dispatch with `LINEAR_WG`. 3-D dispatch is skipped at lower dims
+ * because workgroup_size(4,4,4) wastes 4× / 16× of its 64 threads when
+ * only one or two axes are active, and is skipped at higher dims because
+ * `gid.xyz` only addresses three lattice axes.
+ *
+ * @param latticeDim - Active lattice dimension count
+ * @param totalSites - Total lattice sites (used by the 1-D fallback)
+ * @param gridSize - Per-axis grid dimensions (only [0..2] consulted)
+ * @returns Dispatch shape and `use3D` flag
+ */
+export function pickSiteDispatch(
+  latticeDim: number,
+  totalSites: number,
+  gridSize: readonly number[]
+): SiteDispatch {
+  if (!Number.isSafeInteger(latticeDim) || latticeDim < 0) {
+    throw new Error(
+      `[compute] pickSiteDispatch: latticeDim=${latticeDim} is unsupported; expected integer >= 0`
+    )
+  }
+  assertPositiveU32(totalSites, '[compute] pickSiteDispatch: totalSites')
+  if (latticeDim === 3) {
+    const [x, y, z] = compute3DDispatchCounts(gridSize, 3)
+    return { x, y, z, use3D: true }
+  }
+  const x = Math.ceil(totalSites / LINEAR_WG)
+  if (x > MAX_DISPATCH_PER_DIM) {
+    throw new Error(
+      `[compute] pickSiteDispatch: linear dispatch ${x} exceeds WebGPU limit ${MAX_DISPATCH_PER_DIM} (totalSites=${totalSites})`
+    )
+  }
+  return {
+    x,
+    y: 1,
+    z: 1,
+    use3D: false,
+  }
+}
+
+// Re-export from shared constant for backward compatibility with existing importers
+export { DENSITY_GRID_SIZE }
+
+/** Maximum supported dimensions */
+export const MAX_DIM = 12
+
+/**
+ * Maximum number of slice-position entries safe to write from the store's
+ * 0-indexed `slicePositions` array into a uniform's 12-slot slicePositions
+ * region. The WGSL contract is `array<f32, 12>` with the shader reading
+ * `slicePositions[d]` only when `d >= 3`, and the TS writer maps store
+ * index `i` → WGSL index `(i + 3)`. That permits `i ∈ [0, 8]` before the
+ * write falls off the end of the 12-slot region and starts corrupting the
+ * next uniform field (basisX in every compute pass laid out this way).
+ *
+ * All compute-pass uniform writers must clamp their `slicePositions` loop
+ * to this constant: `const n = Math.min(config.slicePositions.length, MAX_SLICE_POSITIONS_WRITE_COUNT)`.
+ * In normal operation the store's array is bounded to `latticeDim - 3` by
+ * its dimension setters (max = 8), but preset migration, deserialization,
+ * and buggy defaults can deliver longer arrays — so the clamp is the
+ * authoritative defense against overflow corruption.
+ */
+export const MAX_SLICE_POSITIONS_WRITE_COUNT = 9
+
+/**
+ * Write `slicePositions` into a compute-pass uniform buffer's
+ * `array<f32, 12>` slot, honouring the extra-dim offset (store index
+ * `i` → WGSL index `i + 3`) and clamping to
+ * {@link MAX_SLICE_POSITIONS_WRITE_COUNT} to prevent overflow past the
+ * 12-slot region into the next uniform field.
+ *
+ * TDSE, Dirac, FSF, and QW uniform writers previously hand-rolled the
+ * same three-line loop with subtly different null-handling (`!` vs `??
+ * 0`). This helper standardizes on `?? 0` so a stray `undefined` at the
+ * boundary silently falls back to 0 rather than crashing a strict-mode
+ * consumer. Pauli's slice writer injects per-frame animation and stays
+ * in-file.
+ *
+ * @param f32 - Float32 view of the uniform ArrayBuffer
+ * @param wgslArrayIndex - f32 index of the first element of the
+ *   `array<f32, 12>` slot in the WGSL struct
+ * @param slicePositions - Store's extra-dim slice positions
+ *   (`[0] = dim 3, [1] = dim 4, …`)
+ */
+export function writeSlicePositionsToF32(
+  f32: Float32Array,
+  wgslArrayIndex: number,
+  slicePositions: readonly number[]
+): void {
+  const n = Math.min(slicePositions.length, MAX_SLICE_POSITIONS_WRITE_COUNT)
+  for (let i = 0; i < n; i++) {
+    f32[wgslArrayIndex + 3 + i] = slicePositions[i] ?? 0
+  }
+}
+
+/** FFTStageUniforms struct size (32 bytes) */
+export const FFT_UNIFORM_SIZE = 32
+
+/** Maximum axis dimension supported by shared-memory FFT kernels and twiddle table. */
+export const SHARED_MEM_FFT_MAX_AXIS = 128
+
+/** PackUniforms struct size (16 bytes) */
+export const PACK_UNIFORM_SIZE = 16
+
+/** Run diagnostics every N frames to minimize GPU overhead */
+export const DIAG_DECIMATION = 5
+
+/**
+ * Snap a value to the nearest power of 2 (minimum 2, maximum 128) for FFT compatibility.
+ * @param v - Input value
+ * @returns Nearest power of 2 in [2, 128]
+ */
+export function nearestPow2(v: number): number {
+  return nearestPow2Base(v)
+}
+
+/**
+ * Return `log2(axisDim)` as an integer, asserting `axisDim` is a power of
+ * two `>= 2`. Use in FFT dispatch/buffer paths — the Stockham butterfly
+ * kernels are only correct for power-of-two axis lengths, so silently
+ * rounding a stale/corrupted 12 into 4 stages would produce garbage
+ * instead of failing.
+ *
+ * @param axisDim - Axis length (must be a power of 2, `>= 2`)
+ * @returns `log2(axisDim)` as an integer
+ * @throws If `axisDim` is not a finite power of two `>= 2`
+ */
+export function assertPow2Log2(axisDim: number): number {
+  const log2N = Math.log2(axisDim)
+  if (
+    !Number.isSafeInteger(axisDim) ||
+    axisDim < 2 ||
+    axisDim > MAX_U32 ||
+    !Number.isInteger(log2N)
+  ) {
+    throw new Error(`[FFT] axisDim=${axisDim} must be a power of 2 in u32 range and >= 2`)
+  }
+  return log2N
+}
+
+/**
+ * Return log2(axisDim), asserting the shared-memory FFT kernel can represent
+ * the axis. The WGSL shared arrays and CPU twiddle table are sized for axes
+ * up to 128, so power-of-two validation alone is insufficient.
+ *
+ * @param axisDim - Axis length
+ * @param label - Error prefix identifying the caller
+ * @returns `log2(axisDim)` as an integer
+ */
+export function assertSharedMemoryFFTLog2(axisDim: number, label = 'FFT'): number {
+  const log2N = assertPow2Log2(axisDim)
+  if (axisDim > SHARED_MEM_FFT_MAX_AXIS) {
+    throw new Error(
+      `[${label}] axisDim=${axisDim} out of range for shared-memory FFT (must be power of 2, max ${SHARED_MEM_FFT_MAX_AXIS})`
+    )
+  }
+  return log2N
+}
+
+/**
+ * Reduce grid dimensions until total sites fit within the GPU dispatch limit.
+ * Halves the largest axis repeatedly until the product is within bounds.
+ *
+ * @param grid - Per-axis grid sizes (power-of-2 values). Input is NOT mutated.
+ * @param maxSites - Maximum allowed total sites (defaults to MAX_LINEAR_DISPATCH_SITES)
+ * @returns New grid sizes reduced to fit within the dispatch limit
+ */
+export function reduceGridToFit(grid: number[], maxSites = MAX_LINEAR_DISPATCH_SITES): number[] {
+  return reduceGridToFitBase([...grid], maxSites)
+}
+
+/**
+ * Compute row-major strides for an N-dimensional grid.
+ * Delegates to {@link @/lib/math/ndArray.computeStrides}.
+ * @param gridSize - Array of grid dimensions
+ * @returns Array of strides (one per dimension)
+ */
+export const computeStrides = computeStridesBase
+
+/**
+ * Compute row-major strides for a grid, padded to MAX_DIM with zeros.
+ * Used by TDSE/Dirac/Pauli compute passes that pass strides in a fixed-size uniform array.
+ * @param gridSize - Per-axis grid dimensions
+ * @param latticeDim - Number of active lattice dimensions
+ * @returns Stride array of length MAX_DIM
+ */
+export function computeStridesPadded(
+  gridSize: number[],
+  latticeDim: number,
+  target?: number[]
+): number[] {
+  if (!Number.isSafeInteger(latticeDim) || latticeDim < 0 || latticeDim > MAX_DIM) {
+    throw new Error(
+      `[compute] computeStridesPadded: latticeDim=${latticeDim} is unsupported; expected integer 0..${MAX_DIM}`
+    )
+  }
+  for (let d = 0; d < latticeDim; d++) {
+    assertPositiveU32(gridSize[d], `[compute] computeStridesPadded: gridSize[${d}]`)
+  }
+  const strides = target ?? new Array(MAX_DIM)
+  for (let d = 0; d < MAX_DIM; d++) strides[d] = 0
+  if (latticeDim > 0) {
+    strides[latticeDim - 1] = 1
+    for (let d = latticeDim - 2; d >= 0; d--) {
+      const stride = strides[d + 1]! * gridSize[d + 1]!
+      if (!Number.isSafeInteger(stride) || stride > MAX_U32) {
+        throw new Error(
+          `[compute] computeStridesPadded: stride[${d}]=${stride} is invalid; expected safe integer fitting u32`
+        )
+      }
+      strides[d] = stride
+    }
+  }
+  return strides
+}
+
+/**
+ * Sanitize grid sizes: snap to power-of-2, enforce dispatch limits.
+ * @param config - Config containing gridSize and latticeDim
+ * @returns Config with sanitized gridSize (may be the same reference if no change needed)
+ */
+export function sanitizeGridSizes<T extends { gridSize: number[]; latticeDim: number }>(
+  config: T
+): T {
+  const sanitized = sanitizePowerOfTwoGridSizes(config, {
+    maxTotalSites: MAX_LINEAR_DISPATCH_SITES,
+    maxDimensions: MAX_DIM,
+  })
+  if (sanitized === config) return config
+  logger.warn(`[compute] Grid sizes sanitized: ${config.gridSize} -> ${sanitized.gridSize}`)
+  return sanitized
+}
+
+/**
+ * Compute a hash string for config identity (grid topology).
+ * @param gridSize - Per-axis grid dimensions
+ * @param latticeDim - Number of active lattice dimensions
+ * @returns Hash string
+ */
+export function computeConfigHash(gridSize: number[], latticeDim: number): string {
+  return `${gridSize.join('x')}_d${latticeDim}`
+}
+
+/** Minimal config shape required by the FFT staging packers. */
+export interface FFTPackConfig {
+  gridSize: number[]
+  latticeDim: number
+}
+
+function assertFFTTotalSites(totalSites: number): number {
+  if (!Number.isSafeInteger(totalSites) || totalSites <= 0 || totalSites > MAX_U32) {
+    throw new Error(
+      `[FFT] totalSites=${totalSites} is invalid; expected positive safe integer fitting u32`
+    )
+  }
+  return totalSites
+}
+
+function assertPositiveU32(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1 || value > MAX_U32) {
+    throw new Error(`${label}=${value} is invalid; expected positive safe integer fitting u32`)
+  }
+  return value
+}
+
+function computeFFTStageCounts(config: FFTPackConfig): number[] {
+  if (
+    !Number.isSafeInteger(config.latticeDim) ||
+    config.latticeDim <= 0 ||
+    config.latticeDim > MAX_DIM
+  ) {
+    throw new Error(
+      `[FFT] latticeDim=${config.latticeDim} is unsupported; expected integer 1..${MAX_DIM}`
+    )
+  }
+  const stages = new Array<number>(config.latticeDim)
+  for (let d = 0; d < config.latticeDim; d++) {
+    const axisDim = config.gridSize[d]
+    if (typeof axisDim !== 'number') {
+      throw new Error(`[FFT] gridSize[${d}] is missing`)
+    }
+    stages[d] = assertPow2Log2(axisDim)
+  }
+  return stages
+}
+
+/**
+ * Pack per-stage FFT uniforms into a single staging buffer for the
+ * Stockham-butterfly FFT kernel.
+ *
+ * Layout matches the WGSL `FFTStageUniforms` struct (32 bytes):
+ *   axisDim: u32, stage: u32, direction: f32, totalElements: u32,
+ *   axisStride: u32, batchCount: u32, invN: f32, _pad0: u32.
+ *
+ * Slots are laid out in execution order — forward FFT axes (latticeDim-1
+ * down to 0), then inverse FFT axes — with log2(N) stages per axis in
+ * ascending order. The output ArrayBuffer is sized exactly
+ * `totalSlots * FFT_UNIFORM_SIZE`.
+ *
+ * Three compute passes (TDSE, Dirac, Pauli) previously hand-rolled this
+ * packer in byte-identical form — keeping one source of truth prevents
+ * silent drift in struct layout or stage ordering.
+ */
+export function packFFTStageUniforms(config: FFTPackConfig, totalSites: number): ArrayBuffer {
+  const safeTotalSites = assertFFTTotalSites(totalSites)
+  const stageCounts = computeFFTStageCounts(config)
+  let totalSlots = 0
+  for (const stageCount of stageCounts) totalSlots += stageCount
+  totalSlots *= 2 // forward + inverse
+
+  const data = new ArrayBuffer(totalSlots * FFT_UNIFORM_SIZE)
+  let slotIdx = 0
+
+  for (const direction of [1.0, -1.0]) {
+    let axisStride = 1
+    for (let d = config.latticeDim - 1; d >= 0; d--) {
+      const axisDim = config.gridSize[d]!
+      const stages = stageCounts[d]!
+
+      for (let s = 0; s < stages; s++) {
+        const offset = slotIdx * FFT_UNIFORM_SIZE
+        const view = new DataView(data, offset, FFT_UNIFORM_SIZE)
+        view.setUint32(0, axisDim, true)
+        view.setUint32(4, s, true)
+        view.setFloat32(8, direction, true)
+        view.setUint32(12, safeTotalSites, true)
+        view.setUint32(16, axisStride, true)
+        view.setUint32(20, safeTotalSites / axisDim, true)
+        view.setFloat32(24, 1.0 / axisDim, true)
+        view.setUint32(28, 0, true)
+        slotIdx++
+      }
+      axisStride *= axisDim
+    }
+  }
+
+  return data
+}
+
+/**
+ * Pack per-axis FFT uniforms for the shared-memory FFT kernel — one slot
+ * per (axis, direction) instead of per-stage.
+ *
+ * Layout matches the WGSL `FFTAxisUniforms` struct (32 bytes):
+ *   axisDim: u32, direction: f32, totalElements: u32, axisStride: u32,
+ *   log2N: u32, _pad0..2: u32.
+ *
+ * Slots are laid out in execution order — forward FFT axes (latticeDim-1
+ * down to 0), then inverse FFT axes. Used by TDSE and Dirac; previously
+ * had two byte-identical copies.
+ */
+export function packFFTAxisUniforms(config: FFTPackConfig, totalSites: number): ArrayBuffer {
+  const safeTotalSites = assertFFTTotalSites(totalSites)
+  const stageCounts = computeFFTStageCounts(config)
+  const slotCount = config.latticeDim * 2 // forward + inverse
+  const data = new ArrayBuffer(slotCount * FFT_UNIFORM_SIZE)
+  let slotIdx = 0
+
+  for (const direction of [1.0, -1.0]) {
+    let axisStride = 1
+    for (let d = config.latticeDim - 1; d >= 0; d--) {
+      const axisDim = config.gridSize[d]!
+      const log2N = stageCounts[d]!
+
+      const offset = slotIdx * FFT_UNIFORM_SIZE
+      const view = new DataView(data, offset, FFT_UNIFORM_SIZE)
+      view.setUint32(0, axisDim, true)
+      view.setFloat32(4, direction, true)
+      view.setUint32(8, safeTotalSites, true)
+      view.setUint32(12, axisStride, true)
+      view.setUint32(16, log2N, true)
+      view.setUint32(20, 0, true)
+      view.setUint32(24, 0, true)
+      view.setUint32(28, 0, true)
+      slotIdx++
+
+      axisStride *= axisDim
+    }
+  }
+
+  return data
+}
+
+// GPU texture helpers were extracted to `computePassTextures.ts` so the pure
+// logic in this file can be exercised by Vitest. They are re-exported here for
+// backward compatibility — existing callers keep importing the same path.
+export {
+  clearFsfDensityAndAnalysisTextures,
+  createDensityTexture,
+  createFsfDensityAndAnalysisTextures,
+} from '../computePassTextures'

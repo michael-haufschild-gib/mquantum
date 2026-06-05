@@ -53,6 +53,7 @@ export const BuffersTabContent = React.memo(function BuffersTabContent() {
       <div className="flex items-center justify-between">
         <SectionHeader icon={<Icons.Square />} label="Render Targets" />
         <Button
+          data-testid="components-canvas-performance-monitor-tabs-buffers-tab-button-55-9"
           variant="ghost"
           size="icon"
           onClick={refreshBufferStats}

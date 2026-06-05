@@ -35,6 +35,7 @@ const CollapsibleSection: React.FC<{
   return (
     <div className="border-t border-[var(--border-subtle)] mt-2 pt-2 first:mt-0 first:border-t-0 first:pt-0">
       <Button
+        data-testid="components-sections-post-processing-paper-controls-button-37-7"
         variant="ghost"
         size="sm"
         onClick={() => setIsOpen(!isOpen)}
@@ -140,6 +141,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
       <SectionHeader title="Texture" />
 
       <Slider
+        data-testid="components-sections-post-processing-paper-controls-slider-142-7"
         label="Intensity"
         tooltip="Overall strength of the paper texture overlay. 0 = invisible, 1 = fully opaque."
         min={0}
@@ -151,6 +153,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
       />
 
       <Slider
+        data-testid="components-sections-post-processing-paper-controls-slider-153-7"
         label="Contrast"
         tooltip="Contrast of the paper grain pattern. Higher values create more pronounced light/dark variation."
         min={0}
@@ -162,6 +165,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
       />
 
       <Slider
+        data-testid="components-sections-post-processing-paper-controls-slider-164-7"
         label="Roughness"
         tooltip="Surface roughness of the simulated paper. Higher values produce a coarser, more textured appearance."
         min={0}
@@ -173,6 +177,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
       />
 
       <Select
+        data-testid="components-sections-post-processing-paper-controls-select-175-7"
         label="Quality"
         tooltip="Noise resolution for the paper texture. Higher quality uses more texture samples for finer grain detail."
         value={paperQuality}
@@ -184,6 +189,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
       <SectionHeader title="Colors" />
 
       <ColorPicker
+        data-testid="components-sections-post-processing-paper-controls-color-picker-186-7"
         label="Front Color"
         tooltip="Primary paper color for the lighter, front-facing grain."
         value={paperColorFront}
@@ -192,6 +198,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
       />
 
       <ColorPicker
+        data-testid="components-sections-post-processing-paper-controls-color-picker-194-7"
         label="Back Color"
         tooltip="Secondary paper color for the darker, back-facing grain texture."
         value={paperColorBack}
@@ -203,6 +210,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
       <SectionHeader title="Fiber" />
 
       <Slider
+        data-testid="components-sections-post-processing-paper-controls-slider-205-7"
         label="Fiber Amount"
         tooltip="Visibility of individual fiber strands in the paper texture."
         min={0}
@@ -214,6 +222,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
       />
 
       <Slider
+        data-testid="components-sections-post-processing-paper-controls-slider-216-7"
         label="Size"
         tooltip="Scale of the fiber pattern. Larger values produce thicker, more visible fiber strands."
         min={0.1}
@@ -227,6 +236,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
       {/* --- Details Section (Collapsible) --- */}
       <CollapsibleSection title="Details" defaultOpen={false}>
         <Slider
+          data-testid="components-sections-post-processing-paper-controls-slider-229-9"
           label="Crumples"
           tooltip="Amount of crumple/wrinkle noise added to the paper surface."
           min={0}
@@ -238,6 +248,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
         />
 
         <Slider
+          data-testid="components-sections-post-processing-paper-controls-slider-240-9"
           label="Crumple Size"
           tooltip="Scale of the crumple wrinkles. Larger values produce broader, gentler wrinkles."
           min={0.1}
@@ -249,6 +260,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
         />
 
         <Slider
+          data-testid="components-sections-post-processing-paper-controls-slider-251-9"
           label="Folds"
           tooltip="Intensity of sharp fold/crease lines across the paper."
           min={0}
@@ -260,6 +272,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
         />
 
         <Slider
+          data-testid="components-sections-post-processing-paper-controls-slider-262-9"
           label="Fold Count"
           tooltip="Number of fold lines. More folds simulate a paper that has been folded many times."
           min={1}
@@ -271,6 +284,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
         />
 
         <Slider
+          data-testid="components-sections-post-processing-paper-controls-slider-273-9"
           label="Drops"
           tooltip="Amount of water drop stain marks on the paper surface."
           min={0}
@@ -282,6 +296,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
         />
 
         <Slider
+          data-testid="components-sections-post-processing-paper-controls-slider-284-9"
           label="Fade"
           tooltip="Edge-to-center fade effect simulating aged, yellowed paper edges."
           min={0}
@@ -293,6 +308,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
         />
 
         <Slider
+          data-testid="components-sections-post-processing-paper-controls-slider-295-9"
           label="Seed"
           tooltip="Random seed for the procedural paper pattern. Different seeds generate different fiber and crumple layouts."
           min={0}

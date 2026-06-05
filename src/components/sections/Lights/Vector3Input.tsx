@@ -127,6 +127,7 @@ export const Vector3Input: React.FC<Vector3InputProps> = memo(function Vector3In
               {axis}
             </span>
             <Input
+              data-testid="components-sections-lights-vector3-input-input-129-13"
               type="number"
               value={localValues[i]}
               onFocus={() => handleFocus(i)}

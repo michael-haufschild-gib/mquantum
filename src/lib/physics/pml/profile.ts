@@ -45,12 +45,12 @@ export const PML_GRADING_EXPONENT = 3
  * ```
  */
 export function computePMLSigmaMax(targetReflection: number, dt: number): number {
-  if (targetReflection <= 0 || targetReflection >= 1 || !isFinite(targetReflection)) return 0
-  if (dt <= 0 || !isFinite(dt)) return 0
+  if (targetReflection <= 0 || targetReflection >= 1 || !Number.isFinite(targetReflection)) return 0
+  if (dt <= 0 || !Number.isFinite(dt)) return 0
   // σ_max = -ln(R_target) / dt
   // At outer edge (ratio=1): exp(-σ_max · dt) = R_target per full step
   const result = -Math.log(targetReflection) / dt
-  return isFinite(result) ? result : 0
+  return Number.isFinite(result) ? result : 0
 }
 
 /**
@@ -79,27 +79,29 @@ export function computePMLSigmaMaxND(
   order: number = 3,
   latticeDim?: number
 ): number {
-  if (targetReflection <= 0 || targetReflection >= 1 || !isFinite(targetReflection)) return 0
-  if (dt <= 0 || !isFinite(dt)) return 0
-  if (pmlWidth <= 0 || pmlWidth > 0.5) return 0
+  if (targetReflection <= 0 || targetReflection >= 1 || !Number.isFinite(targetReflection)) return 0
+  if (dt <= 0 || !Number.isFinite(dt)) return 0
+  if (!Number.isFinite(pmlWidth) || pmlWidth <= 0 || pmlWidth > 0.5) return 0
+  if (!Number.isFinite(order)) return 0
 
   const dims = latticeDim ?? gridSizes.length
-  if (dims === 0 || gridSizes.length === 0) return 0
+  if (!Number.isInteger(dims) || dims <= 0 || gridSizes.length === 0 || gridSizes.length < dims)
+    return 0
 
   // Use the minimum PML width across active dimensions (weakest face)
   let minPMLPoints = Infinity
   for (let d = 0; d < dims; d++) {
-    const N = gridSizes[d]
-    if (N === undefined || N <= 0) return 0
+    const N = gridSizes[d]!
+    if (!Number.isSafeInteger(N) || N <= 0) return 0
     minPMLPoints = Math.min(minPMLPoints, pmlWidth * N)
   }
 
-  if (minPMLPoints <= 0 || !isFinite(minPMLPoints)) return 0
+  if (minPMLPoints <= 0 || !Number.isFinite(minPMLPoints)) return 0
 
   // Standard traversal formula: σ_max = (p+1) · (-ln R) / (2 · N_PML · dt)
   const p = Math.max(order, 1)
   const result = ((p + 1) * -Math.log(targetReflection)) / (2 * minPMLPoints * dt)
-  return isFinite(result) ? result : 0
+  return Number.isFinite(result) ? result : 0
 }
 
 /**

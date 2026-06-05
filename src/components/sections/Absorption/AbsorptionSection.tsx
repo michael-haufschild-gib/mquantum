@@ -126,6 +126,7 @@ const AbsorptionSectionInner: React.FC<{
   return (
     <Section title="Absorption" defaultOpen={defaultOpen} data-testid="absorption-section">
       <Switch
+        data-testid="components-sections-absorption-absorption-section-switch-128-7"
         label="PML Boundary"
         tooltip="Enable Perfectly Matched Layer absorbing boundaries. Prevents artificial reflections at domain edges by gradually damping outgoing waves."
         checked={enabled}

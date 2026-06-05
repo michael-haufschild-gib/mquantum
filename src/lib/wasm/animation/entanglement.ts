@@ -54,7 +54,7 @@ export function computeRdmWasm(
  * @param psiRe - Real part of wavefunction (Float32Array)
  * @param psiIm - Imaginary part of wavefunction (Float32Array)
  * @param gridSize - Grid dimensions as Uint32Array
- * @param keptDims - Indices of dimensions to keep (sorted ascending) as Uint32Array
+ * @param keptDims - Strictly increasing indices of dimensions to keep
  * @returns Packed Float64Array `[re_flat(M*M), im_flat(M*M)]`, or null/empty if WASM not ready or M > 1024
  */
 export function computeJointRdmWasm(

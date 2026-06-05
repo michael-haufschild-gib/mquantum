@@ -68,6 +68,7 @@ export const DomainColoringControls: React.FC = React.memo(() => {
   return (
     <div className="space-y-4">
       <Select
+        data-testid="components-sections-faces-domain-coloring-controls-select-70-7"
         label="Modulus Mapping"
         options={MODULUS_MODE_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
         value={domainColoring.modulusMode}
@@ -76,6 +77,7 @@ export const DomainColoringControls: React.FC = React.memo(() => {
       />
 
       <Switch
+        data-testid="components-sections-faces-domain-coloring-controls-switch-78-7"
         label="Modulus Contours"
         checked={domainColoring.contoursEnabled}
         onCheckedChange={handleContoursEnabled}
@@ -85,6 +87,7 @@ export const DomainColoringControls: React.FC = React.memo(() => {
       {domainColoring.contoursEnabled && (
         <>
           <Slider
+            data-testid="components-sections-faces-domain-coloring-controls-slider-87-11"
             label="Contour Density"
             min={1}
             max={32}
@@ -96,6 +99,7 @@ export const DomainColoringControls: React.FC = React.memo(() => {
           />
 
           <Slider
+            data-testid="components-sections-faces-domain-coloring-controls-slider-98-11"
             label="Contour Width"
             min={0.005}
             max={0.25}
@@ -107,6 +111,7 @@ export const DomainColoringControls: React.FC = React.memo(() => {
           />
 
           <Slider
+            data-testid="components-sections-faces-domain-coloring-controls-slider-109-11"
             label="Contour Strength"
             min={0}
             max={1}

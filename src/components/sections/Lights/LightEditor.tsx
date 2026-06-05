@@ -135,6 +135,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
         {/* Color picker */}
         <div className="flex items-center justify-between">
           <ColorPicker
+            data-testid="components-sections-lights-light-editor-color-picker-137-11"
             label="Color"
             tooltip="Tint of the ambient light that illuminates all surfaces equally."
             value={ambientColor}
@@ -147,6 +148,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
         <div className="flex items-center justify-between">
           <div className="flex-1">
             <Slider
+              data-testid="components-sections-lights-light-editor-slider-149-13"
               label="Intensity"
               min={0}
               max={1}
@@ -179,6 +181,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
       {/* Header with name and duplicate */}
       <div className="flex items-center gap-2">
         <Input
+          data-testid="components-sections-lights-light-editor-input-181-9"
           value={selectedLight.name}
           onChange={handleNameChange}
           aria-label="Light name"
@@ -186,6 +189,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
           containerClassName="flex-1"
         />
         <Button
+          data-testid="components-sections-lights-light-editor-button-188-9"
           variant="ghost"
           size="icon"
           onClick={handleDuplicate}
@@ -209,6 +213,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
       <div className="flex items-end gap-2">
         <div className="flex-1">
           <Select
+            data-testid="components-sections-lights-light-editor-select-211-11"
             label="Type"
             tooltip="Point emits in all directions, Directional is parallel (like sunlight), Spot emits in a cone."
             options={LIGHT_TYPE_OPTIONS}
@@ -220,6 +225,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
 
       {/* Color picker */}
       <ColorPicker
+        data-testid="components-sections-lights-light-editor-color-picker-222-7"
         label="Color"
         tooltip="Light emission color. Colored lights tint surfaces they illuminate."
         value={selectedLight.color}
@@ -229,6 +235,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
 
       {/* Intensity slider */}
       <Slider
+        data-testid="components-sections-lights-light-editor-slider-231-7"
         label="Intensity"
         tooltip="Brightness multiplier for the light source. Values above 1 create brighter-than-default illumination."
         min={0.1}
@@ -243,6 +250,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
       {(selectedLight.type === 'point' || selectedLight.type === 'spot') && (
         <>
           <Slider
+            data-testid="components-sections-lights-light-editor-slider-245-11"
             label="Range"
             tooltip="Maximum distance the light reaches. Beyond this range, the light has no effect on surfaces."
             min={0}
@@ -254,6 +262,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
           />
 
           <Slider
+            data-testid="components-sections-lights-light-editor-slider-256-11"
             label="Decay"
             tooltip="Rate of intensity falloff with distance. 0 = no falloff, 1 = linear, 2 = physically accurate inverse-square."
             min={0}
@@ -290,6 +299,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
       {showSpotSettings && (
         <>
           <Slider
+            data-testid="components-sections-lights-light-editor-slider-292-11"
             label="Cone Angle"
             tooltip="Half-angle of the spotlight cone in degrees. Wider angles illuminate a larger area."
             min={1}
@@ -302,6 +312,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
           />
 
           <Slider
+            data-testid="components-sections-lights-light-editor-slider-304-11"
             label="Penumbra"
             tooltip="Softness of the spotlight edge. 0 = hard edge, 1 = fully soft falloff from center to cone boundary."
             min={0}

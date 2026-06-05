@@ -181,6 +181,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
     <div className="relative h-screen supports-[height:100dvh]:h-[100dvh] w-full bg-background overflow-hidden selection:bg-accent selection:text-white font-sans text-text-primary group/app">
       {/* Skip Navigation */}
       <a
+        data-testid="components-layout-editor-layout-a-183-7"
         href="#inspector-panel"
         className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-2 focus:start-1/2 focus:-translate-x-1/2 focus:px-4 focus:py-2 focus:bg-accent focus:text-white focus:rounded-lg focus:text-sm focus:font-medium focus:shadow-lg pointer-events-auto"
       >
@@ -255,6 +256,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
           <AnimatePresence>
             {!isDesktop && !isCinematicMode && (showLeftPanel || !isCollapsed) && (
               <m.div
+                data-testid="editor-mobile-overlay-backdrop"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}

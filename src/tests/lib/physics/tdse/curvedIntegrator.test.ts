@@ -758,3 +758,23 @@ describe('advanceRK4 — chain-resume equals single call', () => {
     }
   )
 })
+
+describe('stepRK4 — allocation budget', () => {
+  it('rejects over-budget states before allocating RK4 scratch arrays', () => {
+    const state = {
+      psiRe: { length: 2 ** 20 + 1 } as Float32Array,
+      psiIm: { length: 2 ** 20 + 1 } as Float32Array,
+    }
+    const params: CurvedIntegratorParams = {
+      gridSize: [2 ** 20 + 1],
+      spacing: [1],
+      mass: 1,
+      hbar: 1,
+      latticeDim: 1,
+      metric: { kind: 'flat' },
+      dt: 0.01,
+    }
+
+    expect(() => stepRK4(state, params)).toThrow(/site budget/)
+  })
+})

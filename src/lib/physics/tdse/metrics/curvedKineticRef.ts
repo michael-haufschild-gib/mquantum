@@ -23,6 +23,7 @@ import { isMetricAxisPeriodic } from './types'
 
 /** Maximum supported spatial lattice dimension (1–3 at the moment). */
 const MAX_LATTICE_DIM = 3
+export const MAX_CURVED_TDSE_SITES = 2 ** 20
 
 /**
  * Allocate a reusable coordinates buffer of length `MAX_LATTICE_DIM`. The
@@ -78,7 +79,18 @@ function flatIndex(i: number, j: number, k: number, N: readonly number[], dim: n
 /** Total number of lattice sites for a given gridSize up to latticeDim. */
 function totalSites(gridSize: readonly number[], latticeDim: number): number {
   let n = 1
-  for (let d = 0; d < latticeDim; d++) n *= gridSize[d] as number
+  for (let d = 0; d < latticeDim; d++) {
+    const size = gridSize[d] as number
+    if (n > Math.floor(Number.MAX_SAFE_INTEGER / size)) {
+      throw new Error(`curved TDSE grid total sites overflow at axis ${d}`)
+    }
+    if (size > MAX_CURVED_TDSE_SITES || n > Math.floor(MAX_CURVED_TDSE_SITES / size)) {
+      throw new Error(
+        `curved TDSE grid total sites exceed site budget ${MAX_CURVED_TDSE_SITES} at axis ${d}`
+      )
+    }
+    n *= size
+  }
   return n
 }
 

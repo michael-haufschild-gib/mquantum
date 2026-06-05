@@ -1,0 +1,175 @@
+/**
+ * HydrogenNDControls Component
+ *
+ * Controls for n-dimensional hydrogen atom in 3D space.
+ * Extends 3D hydrogen orbitals with extra dimension quantum numbers.
+ */
+
+import React from 'react'
+
+import { Button } from '@/components/ui/Button'
+import { ControlGroup } from '@/components/ui/ControlGroup'
+import { Slider } from '@/components/ui/Slider'
+import {
+  maxAzimuthalForPrincipal,
+  orbitalShapeLetter,
+} from '@/lib/geometry/extended/schroedinger/hydrogenPresets'
+
+import type { HydrogenNDControlsProps } from '../types'
+
+/**
+ * HydrogenNDControls component
+ *
+ * Provides controls for n-dimensional hydrogen orbitals:
+ * - Preset selection by dimension
+ * - 3D quantum numbers (n, l, m)
+ * - Extra dimension quantum numbers
+ * - Real vs Complex representation
+ * - Bohr radius scale
+ */
+export const HydrogenNDControls: React.FC<HydrogenNDControlsProps> = React.memo(
+  ({ config, dimension, actions }) => {
+    const {
+      setPrincipalQuantumNumber,
+      setAzimuthalQuantumNumber,
+      setMagneticQuantumNumber,
+      setExtraDimQuantumNumber,
+      setExtraDimFrequencySpread,
+      setUseRealOrbitals,
+      setBohrRadiusScale,
+    } = actions
+
+    // Compute derived state for quantum number constraints
+    const maxL = maxAzimuthalForPrincipal(config.principalQuantumNumber)
+    const maxM = config.azimuthalQuantumNumber
+
+    return (
+      <>
+        <ControlGroup
+          title="Quantum Numbers"
+          collapsible
+          defaultOpen
+          data-testid="control-group-hydrogen-quantum-numbers"
+          rightElement={
+            <span className="text-xs text-text-tertiary">
+              {config.principalQuantumNumber}
+              {orbitalShapeLetter(config.azimuthalQuantumNumber)}
+              {config.azimuthalQuantumNumber > 0 ? ` (m=${config.magneticQuantumNumber})` : ''}
+            </span>
+          }
+        >
+          <Slider
+            label="n (Principal)"
+            tooltip="Principal quantum number — determines the energy level and orbital size. Higher n = larger, more energetic orbitals."
+            min={1}
+            max={7}
+            step={1}
+            value={config.principalQuantumNumber}
+            onChange={setPrincipalQuantumNumber}
+            showValue
+            data-testid="hydrogen-nd-n-slider"
+          />
+
+          <Slider
+            label={`l (Shape: ${orbitalShapeLetter(config.azimuthalQuantumNumber)})`}
+            tooltip="Angular momentum quantum number — determines orbital shape. l=0 (s) is spherical, l=1 (p) has lobes, l=2 (d) has clover shapes."
+            min={0}
+            max={maxL}
+            step={1}
+            value={config.azimuthalQuantumNumber}
+            onChange={setAzimuthalQuantumNumber}
+            showValue
+            data-testid="hydrogen-nd-l-slider"
+          />
+
+          {config.azimuthalQuantumNumber > 0 && (
+            <Slider
+              label="m (Orientation)"
+              tooltip="Magnetic quantum number — determines spatial orientation of the orbital. Ranges from −l to +l."
+              min={-maxM}
+              max={maxM}
+              step={1}
+              value={config.magneticQuantumNumber}
+              onChange={setMagneticQuantumNumber}
+              showValue
+              data-testid="hydrogen-nd-m-slider"
+            />
+          )}
+        </ControlGroup>
+
+        {/* Extra Dimension Quantum Numbers + Frequency Spread */}
+        {dimension >= 4 && (
+          <ControlGroup
+            title="Extra Dimensions"
+            collapsible
+            defaultOpen
+            data-testid="control-group-hydrogen-extra-dims"
+          >
+            {Array.from({ length: Math.min(dimension - 3, 8) }, (_, i) => (
+              <Slider
+                key={`extra-dim-n-${i}`}
+                label={`n${i + 4} (Dim ${i + 4})`}
+                tooltip="Harmonic oscillator quantum number for this extra dimension. Higher values add more nodes along this axis."
+                min={0}
+                max={6}
+                step={1}
+                value={config.extraDimQuantumNumbers?.[i] ?? 0}
+                onChange={(v) => setExtraDimQuantumNumber(i, v)}
+                showValue
+                data-testid={`hydrogen-nd-extra-n-${i}`}
+              />
+            ))}
+            <Slider
+              label="Extra Dim Frequency Spread"
+              tooltip="Variation in oscillation frequency across extra dimensions. Creates anisotropic confinement in dimensions 4+."
+              min={0}
+              max={0.5}
+              step={0.01}
+              value={config.extraDimFrequencySpread ?? 0}
+              onChange={setExtraDimFrequencySpread}
+              showValue
+              data-testid="hydrogen-nd-freq-spread"
+            />
+            <p className="text-xs text-text-tertiary">
+              Harmonic oscillator quantum numbers for dimensions 4+
+            </p>
+          </ControlGroup>
+        )}
+
+        <ControlGroup
+          title="Display"
+          collapsible
+          defaultOpen
+          data-testid="control-group-hydrogen-display"
+        >
+          <div className="flex items-center justify-between">
+            <label className="text-xs text-[var(--text-secondary)]">Orbital Representation</label>
+            <Button
+              variant={config.useRealOrbitals ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => setUseRealOrbitals(!config.useRealOrbitals)}
+              tooltip="Toggle between real orbitals (px, py, pz — linear combinations) and complex orbitals (eigenstates of L_z with quantum number m)."
+              className={config.useRealOrbitals ? 'bg-accent/20 text-accent' : ''}
+              data-testid="hydrogen-nd-real-toggle"
+            >
+              {config.useRealOrbitals ? 'Real (px, py, pz)' : 'Complex (m)'}
+            </Button>
+          </div>
+          <Slider
+            label="Bohr Radius Scale"
+            tooltip="Scales the Bohr radius (a₀ ≈ 0.529 Å), controlling how spread out the orbital appears. Larger values reveal outer orbital structure."
+            min={0.5}
+            max={3.0}
+            step={0.1}
+            value={config.bohrRadiusScale}
+            onChange={setBohrRadiusScale}
+            showValue
+            data-testid="hydrogen-nd-bohr-scale"
+          />
+        </ControlGroup>
+      </>
+    )
+  }
+)
+
+HydrogenNDControls.displayName = 'HydrogenNDControls'

@@ -26,6 +26,8 @@
 
 import { ifft } from '@/lib/math/fft'
 
+export const MAX_WIGNER_MATRIX_ENTRIES = 2 ** 20
+
 /** Result of Wigner function computation from an RDM. */
 export interface WignerResult {
   /**
@@ -83,7 +85,35 @@ function fillAntiDiagonalSlice(
 }
 
 function isPowerOfTwo(value: number): boolean {
-  return Number.isInteger(value) && value > 0 && (value & (value - 1)) === 0
+  return Number.isSafeInteger(value) && value > 0 && Number.isInteger(Math.log2(value))
+}
+
+function validateRdmInput(
+  rhoRe: Float64Array,
+  rhoIm: Float64Array,
+  M: number,
+  caller: string
+): number {
+  if (!Number.isSafeInteger(M) || M <= 0) {
+    throw new RangeError(`${caller}: M must be a positive safe integer, got ${M}`)
+  }
+  if (M > Math.floor(Math.sqrt(MAX_WIGNER_MATRIX_ENTRIES))) {
+    throw new RangeError(`${caller}: M*M exceeds ${MAX_WIGNER_MATRIX_ENTRIES} entries, got M=${M}`)
+  }
+
+  const size = M * M
+  if (rhoRe.length < size || rhoIm.length < size) {
+    throw new RangeError(
+      `${caller}: buffer too small (need ${size}, got re=${rhoRe.length}, im=${rhoIm.length})`
+    )
+  }
+
+  for (let i = 0; i < size; i++) {
+    if (!Number.isFinite(rhoRe[i]!) || !Number.isFinite(rhoIm[i]!)) {
+      throw new RangeError(`${caller}: RDM contains a non-finite entry at index ${i}`)
+    }
+  }
+  return size
 }
 
 /**
@@ -135,15 +165,7 @@ function inverseWignerPhaseTransform(
  * @returns Wigner function grid and total negativity
  */
 export function wignerFromRDM(rhoRe: Float64Array, rhoIm: Float64Array, M: number): WignerResult {
-  if (M <= 0 || !Number.isInteger(M)) {
-    throw new RangeError(`wignerFromRDM: M must be a positive integer, got ${M}`)
-  }
-  const size = M * M
-  if (rhoRe.length < size || rhoIm.length < size) {
-    throw new RangeError(
-      `wignerFromRDM: buffer too small (need ${size}, got re=${rhoRe.length}, im=${rhoIm.length})`
-    )
-  }
+  const size = validateRdmInput(rhoRe, rhoIm, M, 'wignerFromRDM')
   const W = new Float64Array(size)
   let negSum = 0
 
@@ -186,6 +208,8 @@ export function wignerNegativityFromRDM(
   rhoIm: Float64Array,
   M: number
 ): number {
+  validateRdmInput(rhoRe, rhoIm, M, 'wignerNegativityFromRDM')
+
   let negSum = 0
   const slice = new Float64Array(M * 2)
   const dftScratch = isPowerOfTwo(M) ? null : new Float64Array(M * 2)

@@ -46,6 +46,25 @@ export const R_DENOM_FLOOR = 1e-4
  */
 export const RHO_ZERO_CUTOFF = 1e-12
 
+const MAX_QUANTUM_POTENTIAL_SITES = 2 ** 20
+
+function resolveQuantumPotentialSiteCount(gridSize: number): number {
+  if (gridSize > Math.floor(Math.cbrt(MAX_QUANTUM_POTENTIAL_SITES))) {
+    throw new Error(
+      `computeQuantumPotentialCpu: gridSize³ exceeds ${MAX_QUANTUM_POTENTIAL_SITES} sites, got ${gridSize}`
+    )
+  }
+  return gridSize * gridSize * gridSize
+}
+
+function assertFiniteDensityGrid(densityGrid: Float32Array): void {
+  for (let idx = 0; idx < densityGrid.length; idx++) {
+    if (!Number.isFinite(densityGrid[idx]!)) {
+      throw new Error(`computeQuantumPotentialCpu: densityGrid[${idx}] must be finite`)
+    }
+  }
+}
+
 /**
  * Linear-index helper: voxel (i, j, k) → `i + size·(j + size·k)`.
  *
@@ -115,15 +134,19 @@ export function computeQuantumPotentialCpu(
       `computeQuantumPotentialCpu: boundingRadius must be a finite positive number, got ${boundingRadius}`
     )
   }
-  const expected = gridSize * gridSize * gridSize
+  const expected = resolveQuantumPotentialSiteCount(gridSize)
   if (densityGrid.length !== expected) {
     throw new Error(
       `computeQuantumPotentialCpu: densityGrid length ${densityGrid.length} != gridSize³ ${expected}`
     )
   }
+  assertFiniteDensityGrid(densityGrid)
 
   const h = (2 * boundingRadius) / gridSize
   const hSq = h * h
+  if (!Number.isFinite(h) || !Number.isFinite(hSq) || hSq <= 0) {
+    throw new Error(`computeQuantumPotentialCpu: grid step must be finite, got ${h}`)
+  }
   const out = new Float32Array(expected)
 
   for (let k = 0; k < gridSize; k++) {

@@ -32,6 +32,26 @@ const JACOBI_TOL = 1e-11
  * 200 leaves a large safety margin before the non-convergence throw fires.
  */
 const JACOBI_MAX_SWEEPS = 200
+const MAX_JACOBI_MATRIX_ENTRIES = 2 ** 20
+
+function resolveJacobiMatrixSize(caller: string, n: number): number {
+  if (!Number.isInteger(n) || n < 0) {
+    throw new RangeError(`${caller}: n must be a non-negative integer, got ${n}`)
+  }
+  if (n > Math.floor(Math.sqrt(MAX_JACOBI_MATRIX_ENTRIES))) {
+    throw new RangeError(`${caller}: n² exceeds ${MAX_JACOBI_MATRIX_ENTRIES} entries, got n=${n}`)
+  }
+  return n * n
+}
+
+function resolveJacobiMaxSweeps(caller: string, maxSweeps: number): number {
+  if (!Number.isSafeInteger(maxSweeps) || maxSweeps < 0) {
+    throw new RangeError(
+      `${caller}: maxSweeps must be a non-negative safe integer, got ${maxSweeps}`
+    )
+  }
+  return maxSweeps
+}
 
 /**
  * Compute the Frobenius norm of the off-diagonal part of a symmetric
@@ -42,19 +62,16 @@ const JACOBI_MAX_SWEEPS = 200
  * @returns `{ offDiagNorm, diagNorm }`.
  */
 function frobeniusSplit(M: Float64Array, n: number): { offDiagNorm: number; diagNorm: number } {
-  let offDiagSq = 0
-  let diagSq = 0
+  let offDiagNorm = 0
+  let diagNorm = 1
   for (let i = 0; i < n; i++) {
-    diagSq += M[i * n + i]! * M[i * n + i]!
+    diagNorm = Math.hypot(diagNorm, M[i * n + i]!)
     for (let j = i + 1; j < n; j++) {
       const v = M[i * n + j]!
-      offDiagSq += 2 * v * v
+      offDiagNorm = Math.hypot(offDiagNorm, Math.SQRT2 * v)
     }
   }
-  return {
-    offDiagNorm: Math.sqrt(offDiagSq),
-    diagNorm: Math.sqrt(Math.max(1, diagSq)),
-  }
+  return { offDiagNorm, diagNorm }
 }
 
 /**
@@ -83,9 +100,9 @@ function applyJacobiRotation(
 
   // Rutishauser form: compute t = tan(θ) of the rotation that zeros (p, q).
   const tau = (aqq - app) / (2 * apq)
-  const tauRoot = Math.sqrt(1 + tau * tau)
+  const tauRoot = Math.hypot(1, tau)
   const t = tau >= 0 ? 1 / (tau + tauRoot) : -1 / (-tau + tauRoot)
-  const c = 1 / Math.sqrt(1 + t * t)
+  const c = 1 / Math.hypot(1, t)
   const s = t * c
 
   // Diagonal updates
@@ -156,10 +173,11 @@ function jacobiDiagonalizeInPlace(
   M: Float64Array,
   n: number,
   V: Float64Array | null,
-  maxSweeps: number
+  maxSweeps: number,
+  matrixSize: number
 ): void {
   if (V !== null) {
-    for (let i = 0; i < n * n; i++) V[i] = 0
+    for (let i = 0; i < matrixSize; i++) V[i] = 0
     for (let i = 0; i < n; i++) V[i * n + i] = 1
   }
   if (n <= 1) return
@@ -204,8 +222,8 @@ function assertFiniteMatrix(A: Float64Array, size: number): void {
  * Averaging as `a / 2 + b / 2` avoids overflowing when two large finite
  * asymmetric entries have a finite mathematical mean.
  */
-function copySymmetrizedMatrix(A: Float64Array, n: number): Float64Array {
-  const M = new Float64Array(n * n)
+function copySymmetrizedMatrix(A: Float64Array, n: number, matrixSize: number): Float64Array {
+  const M = new Float64Array(matrixSize)
   for (let i = 0; i < n; i++) {
     M[i * n + i] = A[i * n + i]!
     for (let j = i + 1; j < n; j++) {
@@ -289,14 +307,13 @@ export function jacobiEigenvalues(
   n: number,
   maxSweeps: number = JACOBI_MAX_SWEEPS
 ): Float64Array {
-  if (!Number.isInteger(n) || n < 0) {
-    throw new RangeError(`jacobiEigenvalues: n must be a non-negative integer, got ${n}`)
-  }
+  const matrixSize = resolveJacobiMatrixSize('jacobiEigenvalues', n)
+  const sweeps = resolveJacobiMaxSweeps('jacobiEigenvalues', maxSweeps)
   if (n === 0) return new Float64Array(0)
-  if (A.length < n * n) {
-    throw new Error(`jacobiEigenvalues: buffer length ${A.length} < n² = ${n * n}`)
+  if (A.length < matrixSize) {
+    throw new Error(`jacobiEigenvalues: buffer length ${A.length} < n² = ${matrixSize}`)
   }
-  assertFiniteMatrix(A, n * n)
+  assertFiniteMatrix(A, matrixSize)
 
   if (n === 1) {
     const out = new Float64Array(1)
@@ -304,9 +321,9 @@ export function jacobiEigenvalues(
     return out
   }
 
-  const M = copySymmetrizedMatrix(A, n)
+  const M = copySymmetrizedMatrix(A, n, matrixSize)
 
-  jacobiDiagonalizeInPlace(M, n, null, maxSweeps)
+  jacobiDiagonalizeInPlace(M, n, null, sweeps, matrixSize)
 
   const values = new Float64Array(n)
   for (let i = 0; i < n; i++) values[i] = M[i * n + i]!
@@ -350,16 +367,15 @@ export function jacobiEigendecompose(
   n: number,
   maxSweeps: number = JACOBI_MAX_SWEEPS
 ): { values: Float64Array; vectors: Float64Array } {
-  if (!Number.isInteger(n) || n < 0) {
-    throw new RangeError(`jacobiEigendecompose: n must be a non-negative integer, got ${n}`)
-  }
+  const matrixSize = resolveJacobiMatrixSize('jacobiEigendecompose', n)
+  const sweeps = resolveJacobiMaxSweeps('jacobiEigendecompose', maxSweeps)
   if (n === 0) {
     return { values: new Float64Array(0), vectors: new Float64Array(0) }
   }
-  if (A.length < n * n) {
-    throw new Error(`jacobiEigendecompose: buffer length ${A.length} < n² = ${n * n}`)
+  if (A.length < matrixSize) {
+    throw new Error(`jacobiEigendecompose: buffer length ${A.length} < n² = ${matrixSize}`)
   }
-  assertFiniteMatrix(A, n * n)
+  assertFiniteMatrix(A, matrixSize)
 
   if (n === 1) {
     const values = new Float64Array(1)
@@ -369,10 +385,10 @@ export function jacobiEigendecompose(
     return { values, vectors }
   }
 
-  const M = copySymmetrizedMatrix(A, n)
-  const V = new Float64Array(n * n)
+  const M = copySymmetrizedMatrix(A, n, matrixSize)
+  const V = new Float64Array(matrixSize)
 
-  jacobiDiagonalizeInPlace(M, n, V, maxSweeps)
+  jacobiDiagonalizeInPlace(M, n, V, sweeps, matrixSize)
 
   const values = new Float64Array(n)
   for (let i = 0; i < n; i++) values[i] = M[i * n + i]!

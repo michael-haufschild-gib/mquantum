@@ -425,8 +425,6 @@ pub use crate::animation_vector_ops::{dot_product, magnitude, normalize_vector, 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::animation_projection::*;
-    use crate::animation_vector_ops::*;
 
     #[test]
     fn test_parse_plane_name() {

@@ -31,6 +31,8 @@
 
 import type { PreheatingConfig } from '@/lib/geometry/extended/freeScalar'
 
+export const MAX_MATHIEU_STEPS = 2 ** 20
+
 /**
  * Evaluate `massSquaredScale(η)` for the current preheating configuration.
  *
@@ -139,6 +141,17 @@ export interface MathieuTrajectory {
  */
 export function integrateMathieu1D(params: MathieuIntegratorParams): MathieuTrajectory {
   const { mass, k, dt, nSteps, preheating } = params
+  if (!Number.isSafeInteger(nSteps) || nSteps < 0) {
+    throw new RangeError(
+      `integrateMathieu1D: nSteps must be a non-negative safe integer, got ${nSteps}`
+    )
+  }
+  if (nSteps > MAX_MATHIEU_STEPS) {
+    throw new RangeError(
+      `integrateMathieu1D: nSteps ${nSteps} exceeds max supported steps ${MAX_MATHIEU_STEPS}`
+    )
+  }
+
   const refEta = params.refEta ?? 0
   const phi0 = params.phi0 ?? 1
   const pi0 = params.pi0 ?? 0

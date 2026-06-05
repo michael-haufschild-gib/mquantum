@@ -40,6 +40,7 @@ export function ExportCompletedView({
           <p className="text-text-secondary">Video saved directly to your device.</p>
         </div>
         <Button
+          data-testid="components-overlays-export-export-completed-view-button-42-9"
           onClick={onReset}
           variant="secondary"
           size="lg"
@@ -63,6 +64,7 @@ export function ExportCompletedView({
           </p>
         </div>
         <Button
+          data-testid="components-overlays-export-export-completed-view-button-65-9"
           onClick={onReset}
           variant="secondary"
           size="lg"
@@ -84,6 +86,7 @@ export function ExportCompletedView({
       </div>
       <div className="grid grid-cols-2 gap-4">
         <Button
+          data-testid="components-overlays-export-export-completed-view-button-86-9"
           onClick={onDownload}
           variant="primary"
           size="lg"
@@ -94,6 +97,7 @@ export function ExportCompletedView({
           <Icon name="download" className="w-5 h-5 me-2" /> Download
         </Button>
         <Button
+          data-testid="components-overlays-export-export-completed-view-button-96-9"
           onClick={onReset}
           variant="secondary"
           size="lg"

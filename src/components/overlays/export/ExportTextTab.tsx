@@ -71,6 +71,7 @@ export const ExportTextTab = () => {
           </span>
         </div>
         <Switch
+          data-testid="components-overlays-export-export-text-tab-switch-73-9"
           checked={textOverlay.enabled}
           onCheckedChange={(c) => update({ enabled: c })}
           ariaLabel="Enable text overlay"
@@ -105,6 +106,7 @@ export const ExportTextTab = () => {
               Text Content
             </label>
             <Input
+              data-testid="components-overlays-export-export-text-tab-input-107-13"
               value={textOverlay.text}
               onChange={(e) => update({ text: e.target.value })}
               placeholder="Enter text..."
@@ -119,6 +121,7 @@ export const ExportTextTab = () => {
                 Font Size
               </label>
               <NumberInput
+                data-testid="components-overlays-export-export-text-tab-number-input-121-15"
                 value={textOverlay.fontSize}
                 onChange={(val) => update({ fontSize: val })}
                 min={10}
@@ -131,6 +134,7 @@ export const ExportTextTab = () => {
                 Weight
               </label>
               <Select
+                data-testid="components-overlays-export-export-text-tab-select-133-15"
                 value={textOverlay.fontWeight.toString()}
                 onChange={(val) => update({ fontWeight: parseInt(val) })}
                 options={[
@@ -150,6 +154,7 @@ export const ExportTextTab = () => {
               Opacity
             </label>
             <Slider
+              data-testid="components-overlays-export-export-text-tab-slider-152-13"
               label="Opacity"
               tooltip="Transparency of the text overlay. 0 = invisible, 1 = fully opaque."
               value={textOverlay.opacity}
@@ -167,6 +172,7 @@ export const ExportTextTab = () => {
                   Text Color
                 </label>
                 <ColorPicker
+                  data-testid="components-overlays-export-export-text-tab-color-picker-169-17"
                   value={textOverlay.color}
                   onChange={(c) => update({ color: c })}
                   tooltip="Fill color of the overlay text."
@@ -177,6 +183,7 @@ export const ExportTextTab = () => {
                   Shadow Color
                 </label>
                 <ColorPicker
+                  data-testid="components-overlays-export-export-text-tab-color-picker-179-17"
                   value={textOverlay.shadowColor}
                   onChange={(c) => update({ shadowColor: c })}
                   tooltip="Color of the drop shadow behind the overlay text."
@@ -195,6 +202,7 @@ export const ExportTextTab = () => {
                   Vertical
                 </label>
                 <ToggleGroup
+                  data-testid="components-overlays-export-export-text-tab-toggle-group-197-17"
                   options={[
                     { value: 'top', label: 'Top' },
                     { value: 'center', label: 'Center' },
@@ -212,6 +220,7 @@ export const ExportTextTab = () => {
                   Horizontal
                 </label>
                 <ToggleGroup
+                  data-testid="components-overlays-export-export-text-tab-toggle-group-214-17"
                   options={[
                     { value: 'left', label: 'Left' },
                     { value: 'center', label: 'Center' },
@@ -226,6 +235,7 @@ export const ExportTextTab = () => {
               </div>
             </div>
             <Slider
+              data-testid="components-overlays-export-export-text-tab-slider-228-13"
               label="Padding"
               tooltip="Distance in pixels between the text and the frame edge."
               value={textOverlay.padding}

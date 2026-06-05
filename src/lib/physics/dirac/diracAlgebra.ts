@@ -176,6 +176,14 @@ function validateGammaPayload(
     )
   }
 
+  for (let i = 1; i < gammaData.length; i++) {
+    if (!Number.isFinite(gammaData[i]!)) {
+      return new Error(
+        `Dirac algebra worker returned invalid gamma matrix payload: non-finite gammaData[${i}]`
+      )
+    }
+  }
+
   const header = new Uint32Array(gammaData.buffer, gammaData.byteOffset, 1)[0]
   if (header !== expectedSpinorSize) {
     return new Error(

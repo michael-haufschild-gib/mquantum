@@ -52,6 +52,7 @@ export const ExportPresets = () => {
     <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 lg:gap-3">
       {presets.map((p) => (
         <ExportPresetCard
+          data-testid="components-overlays-export-export-presets-export-preset-card-54-9"
           key={p.id}
           id={p.id}
           label={p.label}

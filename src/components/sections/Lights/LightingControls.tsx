@@ -48,6 +48,7 @@ export const LightingControls: React.FC<LightingControlsProps> = React.memo(
                 Gizmos
               </span>
               <Switch
+                data-testid="components-sections-lights-lighting-controls-switch-50-15"
                 checked={showLightGizmos}
                 onCheckedChange={setShowLightGizmos}
                 ariaLabel="Show light gizmos"

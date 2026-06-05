@@ -21,6 +21,7 @@ import {
   morrisThorneRadius,
   ricciScalar,
   sampleMetric,
+  sampleMetricInto,
 } from '@/lib/physics/tdse/metrics/evaluator'
 import {
   describeMetric,
@@ -28,6 +29,7 @@ import {
   isMetricAvailableForLattice,
   isMetricAxisPeriodic,
   isTimeDependentMetric,
+  type MetricConfig,
   type MetricKind,
   metricPeriodicDimsMask,
   minLatticeDimForMetric,
@@ -57,6 +59,55 @@ describe('sampleMetric (flat)', () => {
     const s1 = sampleMetric({ kind: 'flat' }, [3.14], 1)
     expect(s1.gInverseDiag).toEqual([1])
     expect(s1.sqrtDet).toBe(1)
+  })
+})
+
+describe('sampleMetric input robustness', () => {
+  it('throws explicit dimension errors before allocating or writing invalid samples', () => {
+    expect(() => sampleMetric({ kind: 'flat' }, [0], Number.NaN)).toThrow(/latticeDim/)
+    expect(() => sampleMetric({ kind: 'flat' }, [0], 12)).toThrow(/latticeDim/)
+    expect(() =>
+      sampleMetricInto({ kind: 'flat' }, [0, 0, 0], 3, 0, { gInverseDiag: [0, 0], sqrtDet: 1 })
+    ).toThrow(/gInverseDiag/)
+  })
+
+  it('keeps every metric finite for non-finite optional params, coordinates, and time', () => {
+    const configs: MetricConfig[] = [
+      { kind: 'morrisThorne', throatRadius: Number.NaN },
+      { kind: 'schwarzschild', schwarzschildMass: Number.POSITIVE_INFINITY },
+      { kind: 'deSitter', hubbleRate: Number.POSITIVE_INFINITY },
+      { kind: 'antiDeSitter', adsRadius: Number.NaN },
+      { kind: 'sphere2D', sphereRadius: Number.NaN },
+      {
+        kind: 'doubleThroat',
+        doubleThroatRadius: Number.NaN,
+        doubleThroatSeparation: Number.POSITIVE_INFINITY,
+      },
+    ]
+
+    for (const cfg of configs) {
+      const sample = sampleMetric(
+        cfg,
+        [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY],
+        3,
+        Number.POSITIVE_INFINITY
+      )
+      expect(Number.isFinite(sample.sqrtDet)).toBe(true)
+      for (const g of sample.gInverseDiag) expect(Number.isFinite(g)).toBe(true)
+      expect(Number.isFinite(ricciScalar(cfg, [Number.NaN, Number.POSITIVE_INFINITY, 0], 3))).toBe(
+        true
+      )
+    }
+
+    expect(
+      Number.isFinite(
+        kretschmannScalar(
+          { kind: 'schwarzschild', schwarzschildMass: Number.NaN },
+          [Number.POSITIVE_INFINITY, 0, 0],
+          3
+        )
+      )
+    ).toBe(true)
   })
 })
 
