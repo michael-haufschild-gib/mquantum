@@ -38,6 +38,7 @@ export type FreeScalarFieldView =
  * - gaussianPacket: Gaussian wave packet A*exp(-|x-x0|^2/(2*sigma^2))*cos(k.x)
  * - kinkProfile: Domain wall kink phi = v*tanh((x-x0)/w) for self-interaction potential
  * - retrocausalCaustic: Bounded recursive advanced/retarded image caustic
+ * - rankDefectGenesis: zero-mean orthogonal rank-completion seed
  */
 export type FreeScalarInitialCondition =
   | 'vacuumNoise'
@@ -45,6 +46,7 @@ export type FreeScalarInitialCondition =
   | 'gaussianPacket'
   | 'kinkProfile'
   | 'retrocausalCaustic'
+  | 'rankDefectGenesis'
 
 /** Runtime list of valid free-scalar initial-condition enum values. */
 export const FREE_SCALAR_INITIAL_CONDITIONS = [
@@ -53,6 +55,7 @@ export const FREE_SCALAR_INITIAL_CONDITIONS = [
   'gaussianPacket',
   'kinkProfile',
   'retrocausalCaustic',
+  'rankDefectGenesis',
 ] as const satisfies readonly FreeScalarInitialCondition[]
 
 /** Return whether a runtime value is a supported free-scalar initial condition. */

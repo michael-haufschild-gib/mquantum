@@ -229,6 +229,7 @@ describe('ScenarioSelector - compute mode presets', () => {
     render(<ScenarioSelector />)
 
     expect(screen.queryByRole('option', { name: 'Bianchi-I Kasner Cigar (vacuum)' })).toBeNull()
+    expect(screen.queryByRole('option', { name: 'Rank-Defect Genesis' })).toBeNull()
     expect(screen.queryByRole('option', { name: 'Retrocausal Caustic Flower' })).toBeNull()
     expect(screen.queryByRole('option', { name: 'Retrocausal Caustic Web' })).toBeNull()
   })
@@ -238,6 +239,7 @@ describe('ScenarioSelector - compute mode presets', () => {
 
     render(<ScenarioSelector />)
 
+    expect(screen.getByRole('option', { name: 'Rank-Defect Genesis' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Retrocausal Caustic Flower' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Retrocausal Caustic Web' })).toBeInTheDocument()
   })

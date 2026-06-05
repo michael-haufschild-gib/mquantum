@@ -377,6 +377,21 @@ describe('writeFsfUniforms', () => {
     expect(new Uint32Array(uniformData)[40]).toBe(4)
   })
 
+  it('maps rankDefectGenesis initial condition to shader enum 5', () => {
+    const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
+      config: createConfig({ initialCondition: 'rankDefectGenesis' }),
+      totalSites: 32768,
+      maxFieldValue: 1.0,
+      simEta: 0,
+      preheatingTime: 0,
+      preheatingReferenceEta: 0,
+    })
+    expect(new Uint32Array(uniformData)[40]).toBe(5)
+  })
+
   it('maps field view string to correct shader enum', () => {
     const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
     const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice

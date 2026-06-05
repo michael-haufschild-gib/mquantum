@@ -32,4 +32,10 @@ describe('renderer temporal + free scalar interaction', () => {
     expect(freeScalarInitBlock).toContain('computeRetrocausalCaustic(worldPos)')
     expect(freeScalarInitBlock).toContain('piVal = caustic.y')
   })
+
+  it('contains rank-defect genesis shader enum 5 branch and orthogonal pi assignment', () => {
+    expect(freeScalarInitBlock).toContain('params.initCondition == 5u')
+    expect(freeScalarInitBlock).toContain('computeRankDefectGenesis(worldPos)')
+    expect(freeScalarInitBlock).toContain('piVal = completion.y')
+  })
 })
