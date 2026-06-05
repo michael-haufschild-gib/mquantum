@@ -107,4 +107,42 @@ describe('useSceneFrameLoop', () => {
     expect(advanceSceneStateByDelta).toHaveBeenCalledWith(0.016)
     expect(executeSceneFrame).toHaveBeenCalledWith(0.016)
   })
+
+  it('drops live-frame time while GPU backpressure is active', () => {
+    let now = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => now)
+
+    let pendingGpuWork = false
+    const advanceSceneStateByDelta = vi.fn()
+    const executeSceneFrame = vi.fn()
+    renderHook(() =>
+      useSceneFrameLoop(
+        createDeps({
+          maxFps: 60,
+          isFrameBackpressureActive: vi.fn(() => pendingGpuWork),
+          advanceSceneStateByDelta,
+          executeSceneFrame,
+        })
+      )
+    )
+
+    now = 17
+    raf.runNextFrame()
+    expect(advanceSceneStateByDelta).toHaveBeenCalledTimes(1)
+    expect(executeSceneFrame).toHaveBeenCalledTimes(1)
+
+    pendingGpuWork = true
+    now = 34
+    raf.runNextFrame()
+    expect(advanceSceneStateByDelta).toHaveBeenCalledTimes(1)
+    expect(executeSceneFrame).toHaveBeenCalledTimes(1)
+
+    pendingGpuWork = false
+    now = 51
+    raf.runNextFrame()
+    expect(advanceSceneStateByDelta).toHaveBeenCalledTimes(2)
+    expect(executeSceneFrame).toHaveBeenCalledTimes(2)
+    expect(advanceSceneStateByDelta).toHaveBeenLastCalledWith(0.017)
+    expect(executeSceneFrame).toHaveBeenLastCalledWith(0.017)
+  })
 })

@@ -41,6 +41,7 @@ const FIELD_VIEW_OPTIONS = [
   { value: 'coinState', label: 'Coin' },
   { value: 'coinEntropy', label: 'Entropy' },
   { value: 'causalCurvature', label: 'Ricci theta' },
+  { value: 'ctcFractalCarpet', label: 'CTC carpet' },
 ]
 
 const GRID_SIZE_OPTIONS = [
@@ -165,7 +166,7 @@ export const QuantumWalkControls: React.FC = React.memo(() => {
         value={qw.fieldView}
         onChange={(v) => updateQW({ fieldView: v as QuantumWalkFieldView })}
         ariaLabel="Field view"
-        tooltip="Displayed quantity: P(x) shows position probability, Phase shows complex phase, Coin shows directional bias, Entropy shows local coin-state spread, Ricci theta shows current focusing."
+        tooltip="Displayed quantity: P(x) shows position probability, Phase shows complex phase, Coin shows directional bias, Entropy shows local coin-state spread, Ricci theta shows current focusing, CTC carpet shows folded return-map closure bands."
         data-testid="qw-field-view"
       />
 

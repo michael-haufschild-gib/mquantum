@@ -73,6 +73,8 @@ export class WebGPURenderGraph {
 
   // Timing
   private timestampCollector = new WebGPUTimestampCollector()
+  private submittedFrameWorkPending = false
+  private submittedFrameWorkToken = 0
 
   // Frame context — pre-allocated to avoid per-frame GC pressure
   private frameContext: WebGPUFrameContext | null = null
@@ -562,6 +564,7 @@ export class WebGPURenderGraph {
 
     const commandBuffer = encoder.finish()
     device.queue.submit([commandBuffer])
+    this.trackSubmittedFrameWork(device.queue)
     this.timestampCollector.scheduleReadback(device, timestampIndex, timedPassIds, timedPassPhases)
 
     for (let i = 0; i < this.postFramePasses.length; i++) {
@@ -631,6 +634,36 @@ export class WebGPURenderGraph {
     return this.frameNumber
   }
 
+  isFrameBackpressureActive(): boolean {
+    return this.submittedFrameWorkPending
+  }
+
+  private trackSubmittedFrameWork(queue: GPUQueue): void {
+    if (typeof queue.onSubmittedWorkDone !== 'function') return
+
+    const token = ++this.submittedFrameWorkToken
+    this.submittedFrameWorkPending = true
+
+    try {
+      void queue.onSubmittedWorkDone().then(
+        () => {
+          if (this.submittedFrameWorkToken === token) {
+            this.submittedFrameWorkPending = false
+          }
+        },
+        () => {
+          if (this.submittedFrameWorkToken === token) {
+            this.submittedFrameWorkPending = false
+          }
+        }
+      )
+    } catch {
+      if (this.submittedFrameWorkToken === token) {
+        this.submittedFrameWorkPending = false
+      }
+    }
+  }
+
   getVRAMUsage(): number {
     return this.pool.getVRAMUsage()
   }
@@ -668,6 +701,8 @@ export class WebGPURenderGraph {
 
     this.pool.dispose()
     this.timestampCollector.dispose()
+    this.submittedFrameWorkToken++
+    this.submittedFrameWorkPending = false
 
     this.initialized = false
     this.compiled = false

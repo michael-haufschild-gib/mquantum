@@ -140,31 +140,35 @@ export interface TdseBindGroupInputs {
  *   - wormholeCouplingG:       f32 @ 804
  *   - wormholeMirrorAxis:      u32 @ 808
  *   - _padWormhole:            u32 @ 812 (16-byte align)
- *   - islandOverlayEnabled:    u32 @ 816 (analog-Hawking island overlay)
- *   - islandCenterX0:          f32 @ 820
- *   - islandRadiusWs:          f32 @ 824
- *   - islandBoost:             f32 @ 828
- *   - metricKind:              u32 @ 832 (curved-space TDSE v1 metric)
- *   - throatRadius:            f32 @ 836
- *   - _padMetric0..1:          u32 @ 840/844 (16-byte align)
- *   - schwarzschildMass:       f32 @ 848 (curved-space TDSE v2 metric block)
- *   - hubbleRate:              f32 @ 852
- *   - adsRadius:               f32 @ 856
- *   - sphereRadius:            f32 @ 860
- *   - doubleThroatSep:         f32 @ 864
- *   - doubleThroatRad:         f32 @ 868
- *   - _padV2a/b:               f32 @ 872/876
- *   - torusPeriod[0..2]:       f32 @ 880/884/888
- *   - _padV2c:                 f32 @ 892
- *   - stageTimeK1..K4:         f32 @ 896/900/904/908 (RK4 stage-time offsets)
- *   - showCurvatureOverlay:    u32 @ 912 (Wave 6: diagnostic Ricci overlay flag)
- *   - densityViewMode:         u32 @ 916 (Wave 6: 0=coordinate, 1=proper ×√|g|)
- *   - curvatureOverlayOpacity: f32 @ 920 (Wave 6: clamped [0, 1])
- *   - densityDisplayMax:       f32 @ 924 (density-view normalization scale)
- *   - invSpacing:              array<f32,12> @ 928 (host-precomputed 1/max(dx,1e-12))
- *   - invSpacing2:             array<f32,12> @ 976 (invSpacing^2; saves a mul per cell)
+ *   - ctcPostselectionEnabled: u32 @ 816 (P-CTC fixed-point filter)
+ *   - ctcPostselectionStrength:f32 @ 820
+ *   - ctcLoopPhase:            f32 @ 824
+ *   - _padCtcPostselection:    u32 @ 828 (16-byte align)
+ *   - islandOverlayEnabled:    u32 @ 832 (analog-Hawking island overlay)
+ *   - islandCenterX0:          f32 @ 836
+ *   - islandRadiusWs:          f32 @ 840
+ *   - islandBoost:             f32 @ 844
+ *   - metricKind:              u32 @ 848 (curved-space TDSE v1 metric)
+ *   - throatRadius:            f32 @ 852
+ *   - _padMetric0..1:          u32 @ 856/860 (16-byte align)
+ *   - schwarzschildMass:       f32 @ 864 (curved-space TDSE v2 metric block)
+ *   - hubbleRate:              f32 @ 868
+ *   - adsRadius:               f32 @ 872
+ *   - sphereRadius:            f32 @ 876
+ *   - doubleThroatSep:         f32 @ 880
+ *   - doubleThroatRad:         f32 @ 884
+ *   - _padV2a/b:               f32 @ 888/892
+ *   - torusPeriod[0..2]:       f32 @ 896/900/904
+ *   - _padV2c:                 f32 @ 908
+ *   - stageTimeK1..K4:         f32 @ 912/916/920/924 (RK4 stage-time offsets)
+ *   - showCurvatureOverlay:    u32 @ 928 (Wave 6: diagnostic Ricci overlay flag)
+ *   - densityViewMode:         u32 @ 932 (Wave 6: 0=coordinate, 1=proper ×√|g|)
+ *   - curvatureOverlayOpacity: f32 @ 936 (Wave 6: clamped [0, 1])
+ *   - densityDisplayMax:       f32 @ 940 (density-view normalization scale)
+ *   - invSpacing:              array<f32,12> @ 944 (host-precomputed 1/max(dx,1e-12))
+ *   - invSpacing2:             array<f32,12> @ 992 (invSpacing^2; saves a mul per cell)
  *
- * Total = 832 + 16 + 64 + 16 + 48 + 48 = 1024. The constants below are now
+ * Total = 816 + 16 + 16 + 16 + 64 + 16 + 48 + 48 = 1040. The constants below are now
  * derived from `TDSE_UNIFORMS_LAYOUT` (which mirrors the WGSL struct
  * field-by-field), so adding a field to the layout automatically updates
  * both `TDSE_UNIFORM_SIZE` and `TDSE_UNIFORM_OFFSET_STAGE_TIME_K1`.

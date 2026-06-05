@@ -57,6 +57,39 @@ const BASE_PARAMS: WaterfallParams = {
   lBox: BASE_LBOX,
 }
 
+function findPositiveMachCrossings(p: WaterfallParams, samples = 512): number[] {
+  const xMax = p.lBox / 2
+  const xStart = 1e-6 * xMax
+  const roots: number[] = []
+  let prevX = xStart
+  let prevM = waterfallSample(prevX, p).mach - 1
+
+  for (let i = 1; i <= samples; i++) {
+    const x = xStart + ((xMax - xStart) * i) / samples
+    const m = waterfallSample(x, p).mach - 1
+    if (prevM < 0 !== m < 0 && prevM !== m) {
+      let lo = prevX
+      let hi = x
+      let mLo = prevM
+      for (let k = 0; k < 48; k++) {
+        const mid = 0.5 * (lo + hi)
+        const mMid = waterfallSample(mid, p).mach - 1
+        if (mLo < 0 === mMid < 0) {
+          lo = mid
+          mLo = mMid
+        } else {
+          hi = mid
+        }
+      }
+      roots.push(0.5 * (lo + hi))
+    }
+    prevX = x
+    prevM = m
+  }
+
+  return roots
+}
+
 describe('sonicHorizon — detrended waterfall profile', () => {
   it('matches the detrended closed form v_s(x) = v_max·tanh(x/L_h) − v_max·(2x/L_box)·T', () => {
     const T = waterfallEdgeTanh(BASE_PARAMS)
@@ -346,6 +379,35 @@ describe('sonicHorizon — hasHorizon predicate (necessary AND sufficient)', () 
     expect(readout.horizonX0).toBeLessThan(lBox / 2)
     expect(readout.kappa).toBeGreaterThan(0)
     expect(readout.hawkingTemperature).toBeGreaterThan(0)
+  })
+
+  it('blackHoleLaser preset creates a bounded periodic supersonic cavity', () => {
+    const preset = BEC_SCENARIO_PRESETS.find((p) => p.id === 'blackHoleLaser')
+    expect(preset?.id).toBe('blackHoleLaser')
+    const ov = preset!.overrides
+    const g = ov.interactionStrength ?? 500
+    const mass = resolveBecMass({ mass: ov.mass })
+    const n0 = computeWaterfallBackgroundDensity({ interactionStrength: g })
+    const gridN = DEFAULT_BEC_CONFIG.gridSize[0] ?? 64
+    const spacing = DEFAULT_BEC_CONFIG.spacing[0] ?? 0.15
+    const lBox = gridN * spacing
+    const p: WaterfallParams = {
+      vMax: ov.hawkingVmax ?? 0,
+      lh: ov.hawkingLh ?? 0.6,
+      n0,
+      deltaN: ov.hawkingDeltaN ?? 0,
+      g,
+      mass,
+      lBox,
+    }
+
+    const crossings = findPositiveMachCrossings(p)
+    expect(crossings).toHaveLength(2)
+    expect(crossings[0]).toBeGreaterThan(0)
+    expect(crossings[1]).toBeLessThan(lBox / 2)
+    expect(waterfallSample(0.5 * (crossings[0]! + crossings[1]!), p).mach).toBeGreaterThan(1)
+    expect(waterfallSample(0.5 * crossings[0]!, p).mach).toBeLessThan(1)
+    expect(waterfallSample(0.5 * (crossings[1]! + lBox / 2), p).mach).toBeLessThan(1)
   })
 })
 

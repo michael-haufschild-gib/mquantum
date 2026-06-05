@@ -424,6 +424,57 @@ export function createTdseUiSetters(ctx: SetterContext) {
       }))
     },
     /**
+     * Toggle postselected CTC filtering. A transition of the flag resets ψ
+     * because it changes the nonlinear evolution operator. Idempotent writes
+     * do not flip `needsReset`, matching the wormhole coupling contract.
+     */
+    setTdseCtcPostselectionEnabled: (enabled: boolean) => {
+      if (!isBoolean(enabled)) return
+      ctx.setWithVersion((state) => {
+        const prev = state.schroedinger.tdse
+        const next = !!enabled
+        if (prev.ctcPostselectionEnabled === next) return state
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            tdse: {
+              ...prev,
+              ctcPostselectionEnabled: next,
+              needsReset: true,
+            },
+          },
+        }
+      })
+    },
+    /** Clamp postselection paradox-sector damping strength to `[0, 1]`. */
+    setTdseCtcPostselectionStrength: (strength: number) => {
+      if (!ctx.isFinite(strength)) {
+        ctx.warnNonFinite(`${D}.ctcPostselectionStrength`, strength)
+        return
+      }
+      const clamped = Math.max(0, Math.min(1, strength))
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, ctcPostselectionStrength: clamped },
+        },
+      }))
+    },
+    /** Clamp postselection loop phase holonomy to `[-π, π]`. */
+    setTdseCtcLoopPhase: (phase: number) => {
+      if (!ctx.isFinite(phase)) {
+        ctx.warnNonFinite(`${D}.ctcLoopPhase`, phase)
+        return
+      }
+      const clamped = Math.max(-Math.PI, Math.min(Math.PI, phase))
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, ctcLoopPhase: clamped },
+        },
+      }))
+    },
+    /**
      * Toggle the coherence HUD overlay. This is a pure UI flag — it does
      * not affect the wavefunction evolution, only whether the readback
      * path runs at the diagnostic cadence. Uses `set` rather than

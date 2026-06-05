@@ -549,7 +549,8 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
       basisY,
       basisZ,
       boundingRadius,
-      this.writeGridUniformData
+      this.writeGridUniformData,
+      this.stepCount
     )
     device.queue.writeBuffer(this.writeGridUniformBuffer!, 0, this.writeGridUniformData)
     if (this.writeGridPipeline && this.writeGridBG) {

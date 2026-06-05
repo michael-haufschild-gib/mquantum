@@ -191,6 +191,7 @@ const INIT_CONDITION_MAP: Record<string, number> = {
   singleMode: 1,
   gaussianPacket: 2,
   kinkProfile: 3,
+  retrocausalCaustic: 4,
 }
 
 /** Enum maps for field view → shader integer. */

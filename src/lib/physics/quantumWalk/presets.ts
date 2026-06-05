@@ -147,4 +147,34 @@ export const QUANTUM_WALK_PRESETS: QuantumWalkScenarioPreset[] = [
       absorberEnabled: false,
     },
   },
+  {
+    id: 'floquetCtcFractalCarpet',
+    name: 'Floquet CTC Fractal Carpet',
+    description:
+      'DFT walk in the folded return-map view — nested self-closing phase carpets crawl through the lattice',
+    overrides: {
+      coinType: 'dft',
+      coinBias: 0.5,
+      coinInitial: 'symmetric',
+      stepsPerFrame: 1,
+      fieldView: 'ctcFractalCarpet',
+      autoScale: true,
+      absorberEnabled: false,
+    },
+  },
+  {
+    id: 'floquetCtcReturnWeb',
+    name: 'Floquet CTC Return Web',
+    description:
+      'DFT walk with a real launch coin in the folded return-map view — loop-compatible ridges braid into a return web',
+    overrides: {
+      coinType: 'dft',
+      coinBias: 0.5,
+      coinInitial: 'real',
+      stepsPerFrame: 1,
+      fieldView: 'ctcFractalCarpet',
+      autoScale: true,
+      absorberEnabled: false,
+    },
+  },
 ]

@@ -5,6 +5,9 @@
  * within lint max-lines while preserving a single exported contract.
  */
 
+import { assembleShaderBlocks } from '../../shared/compose-helpers'
+import { wdwOverlayBlock } from './wdwOverlay.wgsl'
+
 /** Generate the simplified grid-only volume raymarching WGSL block. */
 export function generateVolumeRaymarchGridSimpleBlock(usePrecomputedNormals = false): string {
   const gradientFetchFn = usePrecomputedNormals
@@ -15,12 +18,10 @@ export function generateVolumeRaymarchGridSimpleBlock(usePrecomputedNormals = fa
   return computeGradientFromGrid(pos, uniforms);
 }`
 
-  return /* wgsl */ `
+  const raymarchBlock = /* wgsl */ `
 // ============================================
 // Grid-Based Volume Raymarching (Simplified — compute modes only)
 // ============================================
-
-${gradientFetchFn}
 
 // PERF: per-step grid-gradient cache. See volumeRaymarchGrid for rationale.
 fn ensureGridGradient(
@@ -325,7 +326,9 @@ fn volumeRaymarchGrid(
 
     let hasPotOverlay =
       FEATURE_NEGATIVE_ALPHA_POTENTIAL_OVERLAY && DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01;
-    let hasWdwOverlay = FEATURE_WDW_OVERLAY && DENSITY_GRID_HAS_PHASE && gridSample.a > 0.01;
+    let wdwOverlayAlpha = sharpenWdwOverlayAlpha(gridSample.a);
+    let hasWdwOverlay =
+      FEATURE_WDW_OVERLAY && DENSITY_GRID_HAS_PHASE && wdwOverlayAlpha > WDW_OVERLAY_VISIBLE_EPS;
 
     if (!PROFILING_STRIP_EMPTY_SKIP && rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay && !hasWdwOverlay) {
       let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(remaining, 0.0));
@@ -337,9 +340,13 @@ fn volumeRaymarchGrid(
         let farHasPot =
           FEATURE_NEGATIVE_ALPHA_POTENTIAL_OVERLAY && DENSITY_GRID_HAS_PHASE && probeFar.a < -0.01;
         let midHasWdwOverlay =
-          FEATURE_WDW_OVERLAY && DENSITY_GRID_HAS_PHASE && probeMid.a > 0.01;
+          FEATURE_WDW_OVERLAY
+          && DENSITY_GRID_HAS_PHASE
+          && sharpenWdwOverlayAlpha(probeMid.a) > WDW_OVERLAY_VISIBLE_EPS;
         let farHasWdwOverlay =
-          FEATURE_WDW_OVERLAY && DENSITY_GRID_HAS_PHASE && probeFar.a > 0.01;
+          FEATURE_WDW_OVERLAY
+          && DENSITY_GRID_HAS_PHASE
+          && sharpenWdwOverlayAlpha(probeFar.a) > WDW_OVERLAY_VISIBLE_EPS;
         let midTotal = gridSkipDensity(probeMid);
         let farTotal = gridSkipDensity(probeFar);
         if (
@@ -371,7 +378,7 @@ fn volumeRaymarchGrid(
 
     if (hasWdwOverlay) {
       let overlayColor = vec3f(0.96, 0.78, 0.28);
-      let overlayOpacity = clamp(gridSample.a * min(adaptiveStep * invStepLen, 2.0) * 0.5, 0.0, 0.35);
+      let overlayOpacity = clamp(wdwOverlayAlpha * min(adaptiveStep * invStepLen, 2.0) * 0.5, 0.0, 0.35);
       accColor += transmittance * overlayOpacity * overlayColor;
       transmittance *= (1.0 - overlayOpacity);
     }
@@ -439,4 +446,19 @@ fn volumeRaymarchGrid(
   return VolumeResult(accColor, finalAlpha, iterCount, primaryHitT);
 }
 `
+
+  return assembleShaderBlocks([
+    {
+      name: 'volumeRaymarchGridSimple.gradientFetch',
+      content: gradientFetchFn,
+    },
+    {
+      name: 'wdwOverlay',
+      content: wdwOverlayBlock,
+    },
+    {
+      name: 'volumeRaymarchGridSimple',
+      content: raymarchBlock,
+    },
+  ]).wgsl
 }

@@ -65,7 +65,17 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
     } = actions
 
     const isVacuum = fs.initialCondition === 'vacuumNoise'
+    const isRetrocausalCaustic = fs.initialCondition === 'retrocausalCaustic'
     const latticeDim = fs.latticeDim
+    const packetWidthTooltip = isRetrocausalCaustic
+      ? 'Initial image-map width in lattice units. Narrower widths sharpen recursive caustics and increase local phase curvature.'
+      : 'Initial Gaussian packet width in lattice units. Narrower widths localize the packet and increase local phase curvature.'
+    const packetCenterTooltip = isRetrocausalCaustic
+      ? 'Initial center position of the retrocausal caustic image map along this axis.'
+      : 'Initial center position of the Gaussian wave packet along this axis.'
+    const packetMomentumTooltip = isRetrocausalCaustic
+      ? 'Echo-map lattice momentum along this axis. Determines phase winding in the caustic return pattern.'
+      : "Central momentum of the wave packet along this axis. Determines the packet's group velocity."
 
     // Initial condition options
     const initConditionOptions = useMemo(() => {
@@ -73,6 +83,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
         { value: 'vacuumNoise', label: 'Exact Vacuum' },
         { value: 'singleMode', label: 'Single Mode' },
         { value: 'gaussianPacket', label: 'Gaussian Packet' },
+        { value: 'retrocausalCaustic', label: 'Retrocausal Caustic' },
       ]
       if (fs.selfInteractionEnabled) {
         opts.push({ value: 'kinkProfile', label: 'Kink (tanh)' })
@@ -400,11 +411,12 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
             </div>
           )}
 
-          {fs.initialCondition === 'gaussianPacket' && (
+          {(fs.initialCondition === 'gaussianPacket' ||
+            fs.initialCondition === 'retrocausalCaustic') && (
             <div className="space-y-2">
               <Slider
                 label="Packet Width (σ)"
-                tooltip="Gaussian envelope width in lattice units. Narrower packets have broader momentum spread (Heisenberg uncertainty)."
+                tooltip={packetWidthTooltip}
                 min={0.05}
                 max={2.0}
                 step={0.05}
@@ -416,7 +428,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
                 <Slider
                   key={`center-${d}`}
                   label={`Center ${AXIS_LABELS[d] ?? d}`}
-                  tooltip="Initial center position of the Gaussian wave packet along this axis."
+                  tooltip={packetCenterTooltip}
                   min={-5.0}
                   max={5.0}
                   step={0.1}
@@ -429,7 +441,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
                 <Slider
                   key={`modeK-${d}`}
                   label={`k_${AXIS_LABELS[d] ?? d}`}
-                  tooltip="Central momentum of the wave packet along this axis. Determines the packet's group velocity."
+                  tooltip={packetMomentumTooltip}
                   min={-8}
                   max={8}
                   step={1}

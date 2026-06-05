@@ -197,4 +197,13 @@ describe('sanitizeQuantumWalkConfig', () => {
     expect(cfg.pmlTargetReflection).toBe(DEFAULT_QUANTUM_WALK_CONFIG.pmlTargetReflection)
     expect(cfg.needsReset).toBe(false)
   })
+
+  it('accepts ctcFractalCarpet as a shader-backed field view', () => {
+    const cfg = sanitizeQuantumWalkConfig({
+      ...DEFAULT_QUANTUM_WALK_CONFIG,
+      fieldView: 'ctcFractalCarpet',
+    })
+
+    expect(cfg.fieldView).toBe('ctcFractalCarpet')
+  })
 })

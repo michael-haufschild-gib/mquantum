@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  applyCtcPostselection,
   applyWormholeCoupling,
   computeWormholeCoherence,
   isValidMirrorAxis,
@@ -223,6 +224,56 @@ describe('applyWormholeCoupling — visible teleportation at GPU cadence', () =>
       }
     }
     expect(rInt).toBeGreaterThanOrEqual(0.3)
+  })
+})
+
+describe('applyCtcPostselection — phase-twisted fixed-point projection', () => {
+  it('strength=1 projects each mirror pair onto ψ(v) = exp(-iφ)·ψ(M(v)) and preserves pair norm', () => {
+    const phi = Math.PI / 3
+    const psi = new Float32Array([1.2, -0.4, -0.3, 0.9])
+    const beforeNorm = totalNorm2(psi)
+
+    applyCtcPostselection(psi, [2], 0, 1, phi)
+
+    const afterNorm = totalNorm2(psi)
+    const left = { re: psi[0]!, im: psi[1]! }
+    const right = { re: psi[2]!, im: psi[3]! }
+    const twistedRight = {
+      re: Math.cos(phi) * right.re + Math.sin(phi) * right.im,
+      im: Math.cos(phi) * right.im - Math.sin(phi) * right.re,
+    }
+
+    expect(Math.abs(afterNorm - beforeNorm)).toBeLessThan(1e-6)
+    expect(left.re).toBeCloseTo(twistedRight.re, 6)
+    expect(left.im).toBeCloseTo(twistedRight.im, 6)
+  })
+
+  it('partial strength damps the paradox sector by exactly 1-strength before renormalization', () => {
+    const strength = 0.25
+    const psi = new Float32Array([1, 0, 0, 0])
+
+    applyCtcPostselection(psi, [2], 0, strength, 0)
+
+    const ratio = Math.abs((psi[0]! - psi[2]!) / (psi[0]! + psi[2]!))
+    expect(ratio).toBeCloseTo(1 - strength, 6)
+    expect(totalNorm2(psi)).toBeCloseTo(1, 6)
+  })
+
+  it('is a no-op for zero strength and composes with the unitary wormhole step without norm drift', () => {
+    const gridSize = [8, 4, 2] as const
+    const total = gridSize[0] * gridSize[1] * gridSize[2]
+    const psi = makeRandomPsi(total, 20260604)
+    const before = Float32Array.from(psi)
+
+    applyCtcPostselection(psi, gridSize, 0, 0, -Math.PI / 2)
+    expect(Array.from(psi)).toEqual(Array.from(before))
+
+    const initialNorm = totalNorm2(psi)
+    for (let i = 0; i < 200; i++) {
+      applyWormholeCoupling(psi, gridSize, 0, 0.005, 2)
+      applyCtcPostselection(psi, gridSize, 0, 0.6, Math.PI / 2)
+    }
+    expect(Math.abs(totalNorm2(psi) - initialNorm)).toBeLessThan(5e-5)
   })
 })
 

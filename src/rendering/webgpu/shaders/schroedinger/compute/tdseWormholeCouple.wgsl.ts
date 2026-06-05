@@ -1,8 +1,9 @@
 /**
  * TDSE — ER=EPR Double-trace Wormhole Coupling Shader.
  *
- * Implements `exp(-i·τ·g·P_M)` where `P_M` is the reflection operator across
- * the chosen mirror axis. Because `P_M` is a unitary involution (`P_M² = 1`),
+ * Implements mirror-pair ER=EPR coupling plus an optional postselected CTC
+ * fixed-point filter. The unitary part is `exp(-i·τ·g·P_M)` where `P_M` is
+ * the reflection operator across the chosen mirror axis. Because `P_M² = 1`,
  * the exponential reduces to the closed form
  *
  *   `exp(-i·τ·g·P_M) = cos(τg)·I − i·sin(τg)·P_M`
@@ -34,10 +35,18 @@ export const tdseWormholeCoupleBlock = /* wgsl */ `
 @group(0) @binding(0) var<storage, read> params: TDSEUniforms;
 @group(0) @binding(1) var<storage, read_write> psi: array<vec2f>;
 
+fn cMul(a: vec2f, b: vec2f) -> vec2f {
+  return vec2f(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
+}
+
+fn cNorm2(z: vec2f) -> f32 {
+  return dot(z, z);
+}
+
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let tid = gid.x;
-  if (params.wormholeCouplingEnabled == 0u) { return; }
+  if (params.wormholeCouplingEnabled == 0u && params.ctcPostselectionEnabled == 0u) { return; }
 
   let axis = params.wormholeMirrorAxis;
   // Guard against an axis outside the active lattice (would otherwise yield
@@ -90,21 +99,51 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // 2·coordA·strideA is just (coordAStride << 1).
   let mirrorIdx = idx + (Na - 1u) * strideA - (coordAStride << 1u);
 
-  // cos/sin of (0.5·dt·g) are dispatch-uniform; precomputed host-side.
-  let c = params.wormholeCosTau;
-  let s = params.wormholeSinTau;
-
   // Read both values BEFORE writing either — prevents races inside a pair.
   let zV  = psi[idx];
   let zVP = psi[mirrorIdx];
-  let reV  = zV.x;
-  let imV  = zV.y;
-  let reVP = zVP.x;
-  let imVP = zVP.y;
+  var outV = zV;
+  var outVP = zVP;
 
-  // (a − ib)·(x + iy) = (ax + by) + i(ay − bx). Here the coefficient acting on
-  // ψ(v') is (−i·s) → real part contribution = +s·im(ψ(v')), imag = −s·re(ψ(v')).
-  psi[idx]       = vec2f(c * reV  + s * imVP, c * imV  - s * reVP);
-  psi[mirrorIdx] = vec2f(c * reVP + s * imV,  c * imVP - s * reV);
+  if (params.wormholeCouplingEnabled != 0u) {
+    // cos/sin of (0.5·dt·g) are dispatch-uniform; precomputed host-side.
+    let c = params.wormholeCosTau;
+    let s = params.wormholeSinTau;
+    let reV  = zV.x;
+    let imV  = zV.y;
+    let reVP = zVP.x;
+    let imVP = zVP.y;
+
+    // (a − ib)·(x + iy) = (ax + by) + i(ay − bx). Here the coefficient acting
+    // on ψ(v') is (−i·s) → real part contribution = +s·im(ψ(v')), imag = −s·re(ψ(v')).
+    outV = vec2f(c * reV  + s * imVP, c * imV  - s * reVP);
+    outVP = vec2f(c * reVP + s * imV,  c * imVP - s * reV);
+  }
+
+  let ctcStrength = clamp(params.ctcPostselectionStrength, 0.0, 1.0);
+  if (params.ctcPostselectionEnabled != 0u && ctcStrength > 0.0) {
+    let pairNormBefore = cNorm2(outV) + cNorm2(outVP);
+    let phi = params.ctcLoopPhase;
+    let expMinusIphi = vec2f(cos(phi), -sin(phi));
+    let expPlusIphi = vec2f(cos(phi), sin(phi));
+    let twistedMirror = cMul(expMinusIphi, outVP);
+
+    // Phase-twisted projector: consistent/paradox sectors of
+    // (ψ(v), exp(-i phi)·ψ(M(v))).
+    let consistent = 0.5 * (outV + twistedMirror);
+    let paradox = 0.5 * (outV - twistedMirror);
+    let damp = 1.0 - ctcStrength;
+    let filteredV = consistent + damp * paradox;
+    let filteredTwistedMirror = consistent - damp * paradox;
+    let filteredVP = cMul(expPlusIphi, filteredTwistedMirror);
+
+    let pairNormAfter = cNorm2(filteredV) + cNorm2(filteredVP);
+    let renorm = sqrt(max(pairNormBefore, 0.0) / max(pairNormAfter, 1e-30));
+    outV = filteredV * renorm;
+    outVP = filteredVP * renorm;
+  }
+
+  psi[idx] = outV;
+  psi[mirrorIdx] = outVP;
 }
 `

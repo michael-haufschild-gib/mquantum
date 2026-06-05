@@ -309,12 +309,14 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     executeSceneFrame,
     exportRuntimeRef,
   })
+  const isFrameBackpressureActive = useCallback(() => graph.isFrameBackpressureActive(), [graph])
 
   // ── Frame loop ──
   useSceneFrameLoop({
     maxFps: performance_.maxFps,
     advanceSceneStateByDelta,
     executeSceneFrame,
+    isFrameBackpressureActive,
     tickExport,
     cleanupExport,
   })

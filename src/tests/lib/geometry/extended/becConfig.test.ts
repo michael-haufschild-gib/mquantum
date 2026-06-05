@@ -90,6 +90,8 @@ describe('Black Hole Laser preset', () => {
     expect(preset?.id).toBe('blackHoleLaser')
     expect(preset?.overrides.hawkingVmax).toBe(4.0)
     expect(preset?.overrides.absorberEnabled).toBe(false)
+    expect(preset?.renderingOverrides?.densityContrast).toBeCloseTo(4.0)
+    expect(preset?.renderingOverrides?.autoScaleMaxGain).toBe(100)
   })
 })
 

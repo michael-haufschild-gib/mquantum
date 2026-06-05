@@ -22,6 +22,10 @@ import type { DisorderDistribution, PmlAbsorberConfig } from './crossMode'
  * - potential: External potential V(x)
  * - quantumPressure: Madelung quantum pressure Q = -(hbar²/2m)∇²√ρ/√ρ
  * - vorticity: Quantized plaquette phase circulation two-form
+ * - ctcResidual: Postselected CTC loop-residue mismatch
+ * - ctcLoopGain: Chronology-horizon resonator gain from mirror-pair phase closure
+ * - ctcDeutschEntropy: Deutsch fixed-point paradox entropy from mirror-pair phase contradiction
+ * - ctcCausalShadow: Current-opposed coherent CTC echo shadow
  */
 export type TdseFieldView =
   | 'density'
@@ -34,6 +38,10 @@ export type TdseFieldView =
   | 'hawkingFlux'
   | 'quantumPressure'
   | 'vorticity'
+  | 'ctcResidual'
+  | 'ctcLoopGain'
+  | 'ctcDeutschEntropy'
+  | 'ctcCausalShadow'
 
 /**
  * Initial condition type for the TDSE wavepacket
@@ -113,6 +121,10 @@ export const TDSE_FIELD_VIEWS: readonly TdseFieldView[] = [
   'hawkingFlux',
   'quantumPressure',
   'vorticity',
+  'ctcResidual',
+  'ctcLoopGain',
+  'ctcDeutschEntropy',
+  'ctcCausalShadow',
 ]
 
 export const TDSE_INITIAL_CONDITIONS: readonly TdseInitialCondition[] = [
@@ -467,6 +479,12 @@ export interface TdseConfig extends PmlAbsorberConfig {
   wormholeCouplingG: number
   /** Mirror-plane axis index (0, 1, or 2). Grid size along the axis must be even. */
   wormholeMirrorAxis: 0 | 1 | 2
+  /** Enable nonlinear postselected CTC filtering across wormhole mirror pairs. */
+  ctcPostselectionEnabled: boolean
+  /** Paradox-sector damping strength in [0, 1]. */
+  ctcPostselectionStrength: number
+  /** Phase holonomy around the postselected loop in radians, clamped to [-π, π]. */
+  ctcLoopPhase: number
   /** Toggle for the WormholeCoherencePanel SVG HUD overlay. */
   wormholeCoherenceHudEnabled: boolean
 }
@@ -644,6 +662,9 @@ export const DEFAULT_TDSE_CONFIG: TdseConfig = {
   wormholeCouplingEnabled: false,
   wormholeCouplingG: 0.5,
   wormholeMirrorAxis: 0,
+  ctcPostselectionEnabled: false,
+  ctcPostselectionStrength: 0,
+  ctcLoopPhase: 0,
   wormholeCoherenceHudEnabled: false,
 
   metric: { kind: 'flat' },

@@ -345,16 +345,12 @@ export function runStrangEvolution(
   // the driver automatically, so correctness is unchanged.
   // Enable the batched path when the per-slot bind groups are populated.
   const fftAxesInPassAvailable = (bg.fftSharedMemBGs?.length ?? 0) >= config.latticeDim * 2
-  // ER=EPR wormhole coupling — Strang-split around the kinetic+potential
-  // block. Each dispatch applies exp(-i·(dt/2)·g·P_M); two dispatches per
-  // step reconstruct exp(-i·dt·g·P_M) to first order in the full Trotter
-  // factorization. Off-path: both branches skip when the uniform flag is
-  // zero, so the hot path stays bit-identical when disabled. We also gate
-  // dispatch here on the TS-side flag so the pipeline/bind-group isn't
-  // touched at all when the feature is off — preserves command-buffer
-  // identity with the pre-feature build.
+  // Mirror-pair wormhole/CTC operator — Strang-split around the
+  // kinetic+potential block. The unitary half-kick applies only when
+  // wormholeCouplingEnabled is true. The nonlinear P-CTC projector can run
+  // independently so users can isolate postselection physics.
   const wormholeActive =
-    config.wormholeCouplingEnabled === true &&
+    (config.wormholeCouplingEnabled === true || config.ctcPostselectionEnabled === true) &&
     res.wormholePipeline !== null &&
     res.wormholeBG !== null
   for (let step = 0; step < stepsThisFrame; step++) {

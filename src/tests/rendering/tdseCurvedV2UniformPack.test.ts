@@ -1,7 +1,7 @@
 /**
  * Structural unit test for the curved-space v2 metric block of the TDSE
  * uniform buffer. Drives {@link writeTdseUniforms} directly and inspects
- * the packed 1024-byte ArrayBuffer via named layout indices for:
+ * the packed 1040-byte ArrayBuffer via named layout indices for:
  *   - `metricKind` (u32) and `throatRadius` (f32) — v1 metric block
  *   - `schwarzschildMass` … `stageTimeK4` — v2 metric block
  *
@@ -90,7 +90,7 @@ describe('TDSE uniform pack — curved-space v2 metric block', () => {
   ] as const)('maps metric kind %s → numeric code %i at metricKind slot', (kind, code) => {
     const { u32, size } = packAndCapture({ kind } as MetricConfig)
     expect(u32[I.metricKind]).toBe(code)
-    expect(size).toBe(1024)
+    expect(size).toBe(TDSE_UNIFORM_SIZE)
   })
 
   // ── Schwarzschild mass at schwarzschildMass and nowhere else ──────────
