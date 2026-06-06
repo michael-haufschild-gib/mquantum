@@ -106,7 +106,7 @@ test.describe('Free Scalar Cauchy Loom Weave', () => {
     await waitForFrameAdvance(page, frame + 180, 45_000)
     await assertNonBlankPixels(page, 'Free Scalar Cauchy Loom', 25)
     await page.locator('[data-testid="webgpu-canvas"]').screenshot({
-      path: '/Users/Spare/Documents/code/mquantum/screenshots/free-scalar-cauchy-loom.png',
+      path: test.info().outputPath('free-scalar-cauchy-loom.png'),
     })
     const loom = await capturePixelSnapshot(page)
 
@@ -131,7 +131,7 @@ test.describe('Free Scalar Cauchy Loom Weave', () => {
     await waitForFrameAdvance(page, baselineFrame + 60, 30_000)
     await assertNonBlankPixels(page, 'Free Scalar Cauchy Loom energy baseline', 25)
     await page.locator('[data-testid="webgpu-canvas"]').screenshot({
-      path: '/Users/Spare/Documents/code/mquantum/screenshots/free-scalar-cauchy-loom-energy-baseline.png',
+      path: test.info().outputPath('free-scalar-cauchy-loom-energy-baseline.png'),
     })
     const energyDensity = await capturePixelSnapshot(page)
 

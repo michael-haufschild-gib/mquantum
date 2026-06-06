@@ -458,9 +458,11 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
         </ControlGroup>
       )}
 
-      {!btzActive && !hkllActive && <AntiDeSitterChordalSieveControls ads={ads} />}
+      {!btzActive && (!hkllActive || chordalActive) && (
+        <AntiDeSitterChordalSieveControls ads={ads} />
+      )}
 
-      {!btzActive && !chordalActive && (
+      {!btzActive && (!chordalActive || hkllActive) && (
         <ControlGroup
           data-testid="components-sections-geometry-schroedinger-controls-anti-de-sitter-controls-control-group-378-9"
           title="HKLL Bulk Reconstruction"

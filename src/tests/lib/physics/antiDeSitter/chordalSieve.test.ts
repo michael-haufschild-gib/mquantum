@@ -10,8 +10,8 @@ import { describe, expect, it } from 'vitest'
 import {
   boundaryAnchorForAds,
   busemannClock,
-  computeAdsChordalSieveScalar,
   type ChordalSievePoint,
+  computeAdsChordalSieveScalar,
 } from '@/lib/physics/antiDeSitter/chordalSieve'
 
 const TWO_PI_OVER_THREE = (2 * Math.PI) / 3

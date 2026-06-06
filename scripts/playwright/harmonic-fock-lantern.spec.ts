@@ -54,11 +54,9 @@ test.describe('Harmonic oscillator Fock Lantern Cathedral preset', () => {
     const lantern = await capturePixelSnapshot(page)
 
     await expect(page.getByText('This may take a moment')).toBeHidden({ timeout: 20_000 })
-    await page
-      .locator('[data-testid="webgpu-canvas"]')
-      .screenshot({
-        path: '/Users/Spare/Documents/code/mquantum/screenshots/harmonic-fock-lantern.png',
-      })
+    await page.locator('[data-testid="webgpu-canvas"]').screenshot({
+      path: test.info().outputPath('harmonic-fock-lantern.png'),
+    })
 
     expectSnapshotsDiffer(
       baseline,

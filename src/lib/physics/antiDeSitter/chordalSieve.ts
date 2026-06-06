@@ -1,6 +1,13 @@
 const CHORDAL_SIEVE_EPSILON = 1e-6
 const TWO_PI_OVER_THREE = (2 * Math.PI) / 3
 
+/**
+ * 3D point in the AdS embedding used by chordal-sieve scalar evaluation.
+ *
+ * @property x Embedding x coordinate.
+ * @property y Embedding y coordinate.
+ * @property z Embedding z coordinate.
+ */
 export type ChordalSievePoint = {
   x: number
   y: number

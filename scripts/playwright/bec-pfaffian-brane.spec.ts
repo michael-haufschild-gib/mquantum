@@ -54,7 +54,7 @@ async function applyPfaffianPresetAndCapture(
     await assertNonBlankPixels(page, `BEC ${presetId}`, minNonBlankPixels)
   }
   await page.locator('[data-testid="webgpu-canvas"]').screenshot({
-    path: `/Users/Spare/Documents/code/mquantum/screenshots/${screenshotName}`,
+    path: test.info().outputPath(screenshotName),
   })
   return capturePixelSnapshot(page)
 }

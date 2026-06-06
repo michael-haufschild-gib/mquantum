@@ -123,8 +123,8 @@ describe('ADS_PRESETS catalogue', () => {
   it('Chordal Sieve presets carry valid controls and avoid BTZ/HKLL CPU paths', () => {
     for (const p of ADS_PRESETS) {
       if (p.chordalSieveEnabled !== true) continue
-      expect(p.btzEnabled === true).toBe(false)
-      expect(p.hkllEnabled === true).toBe(false)
+      expect(p.btzEnabled).not.toBe(true)
+      expect(p.hkllEnabled).not.toBe(true)
       expect(p.chordalSieveFrequency).toBeGreaterThanOrEqual(0.25)
       expect(p.chordalSieveFrequency).toBeLessThanOrEqual(12)
       expect(p.chordalSieveTwist).toBeGreaterThanOrEqual(-4)

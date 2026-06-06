@@ -14,7 +14,7 @@ describe('tdseWriteGrid BEC Pfaffian brane view', () => {
     const end = tdseWriteGridBlock.indexOf('@compute', start)
     const helper = tdseWriteGridBlock.slice(start, end)
 
-    expect(start).toBeGreaterThan(0)
+    expect(start).toBeGreaterThanOrEqual(0)
     expect(end).toBeGreaterThan(start)
     expect(helper).toContain('params.latticeDim < 4u')
     expect(helper).toContain('var pfaffianAbs: f32 = 0.0;')
@@ -62,7 +62,7 @@ describe('tdseWriteGrid BEC Pfaffian brane view', () => {
     const potentialBranch = tdseWriteGridBlock.indexOf('params.fieldView == 3u')
     const branch = tdseWriteGridBlock.slice(branchStart, potentialBranch)
 
-    expect(branchStart).toBeGreaterThan(0)
+    expect(branchStart).toBeGreaterThanOrEqual(0)
     expect(potentialBranch).toBeGreaterThan(branchStart)
     expect(branch).toContain(
       'displayScalar = computeBranePfaffianScalar(idx, &nnCoords, density, phase, densityGate);'

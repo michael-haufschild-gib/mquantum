@@ -9,10 +9,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
+import { fileURLToPath } from 'node:url'
 
 import { chromium } from 'playwright'
 
-const ROOT = path.resolve(new URL('../..', import.meta.url).pathname)
+const ROOT = path.resolve(fileURLToPath(new URL('../..', import.meta.url)))
 const LOG_DIR = path.join(ROOT, 'logs')
 const DEFAULT_BASE_URL = 'http://localhost:3000'
 const EXPECTED_SCENARIO_COUNT = 184

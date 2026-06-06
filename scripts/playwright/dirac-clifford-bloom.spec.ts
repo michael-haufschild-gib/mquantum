@@ -58,7 +58,7 @@ async function applyPresetAndCapture(page: Page, presetId: string, screenshotNam
   await waitForFrameAdvance(page, frame + 180, 45_000)
   await assertNonBlankPixels(page, `Dirac ${presetId}`, 5)
   await page.locator('[data-testid="webgpu-canvas"]').screenshot({
-    path: `/Users/Spare/Documents/code/mquantum/screenshots/${screenshotName}`,
+    path: test.info().outputPath(screenshotName),
   })
   return capturePixelSnapshot(page)
 }

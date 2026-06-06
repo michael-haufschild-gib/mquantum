@@ -48,6 +48,14 @@ describe('hydrogen causal-diamond modular orbital math', () => {
     expect(sNear).toBeLessThan(sMid)
   })
 
+  it('keeps sech squared symmetric for signed modular time', () => {
+    const positive = sechSquaredFromTau(3.25)
+    const negative = sechSquaredFromTau(-3.25)
+
+    expect(negative).toBeCloseTo(positive, 12)
+    expect(negative).toBeLessThan(0.15)
+  })
+
   it('compresses positive-radius coordinates without producing non-finite values', () => {
     const source = [2.2, -1.1, 0.6]
     const warped = warpCausalDiamondCoordinate(source, params)

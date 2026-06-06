@@ -361,7 +361,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
         >
           <Select
             label="Initial Condition"
-            tooltip="Starting field configuration: vacuum fluctuations, a plane-wave mode, or a localized Gaussian wave packet."
+            tooltip="Starting field configuration: vacuum fluctuations, plane-wave modes, localized packets, retrocausal caustics, or Cauchy Loom weaves."
             options={initConditionOptions}
             value={fs.initialCondition}
             onChange={handleInitCondition}
@@ -496,8 +496,8 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
             ariaLabel="Field view"
             tooltip={
               fs.cosmology.enabled
-                ? `Displayed field quantity: δφ (perturbation), π (conjugate momentum), ε (proper energy density), Freeze (freeze-out strain), w(x) (equation of state)${fs.selfInteractionEnabled ? ', or V(φ) (potential density)' : ''}.`
-                : `Displayed field quantity: φ (field), π (conjugate momentum ∂φ/∂t), ε (energy density), Freeze (freeze-out strain), w(x) (equation of state)${fs.selfInteractionEnabled ? ', or V(φ) (potential density)' : ''}.`
+                ? `Displayed field quantity: δφ (perturbation), π (conjugate momentum), ε (proper energy density), Freeze (freeze-out strain), w(x) (equation of state), or Cauchy Loom${fs.selfInteractionEnabled ? ', plus V(φ) (potential density)' : ''}.`
+                : `Displayed field quantity: φ (field), π (conjugate momentum ∂φ/∂t), ε (energy density), Freeze (freeze-out strain), w(x) (equation of state), or Cauchy Loom${fs.selfInteractionEnabled ? ', plus V(φ) (potential density)' : ''}.`
             }
             data-testid="field-view-selector"
           />

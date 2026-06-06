@@ -34,7 +34,7 @@ export function modularClock(u: number, eps = DEFAULT_EPS): number {
 /** Numerically stable sech^2(tau), clamped to the physical visibility interval. */
 export function sechSquaredFromTau(tau: number): number {
   if (!Number.isFinite(tau)) return 0
-  const q = Math.exp(-Math.max(0, Math.min(8, tau)))
+  const q = Math.exp(-Math.min(8, Math.abs(tau)))
   const denom = 1 + q * q
   return Math.max(0, Math.min(1, (4 * q * q) / (denom * denom)))
 }
