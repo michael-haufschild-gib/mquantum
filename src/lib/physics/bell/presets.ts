@@ -12,8 +12,19 @@
 
 import type { BellPairConfig } from '@/lib/geometry/extended/bellPair'
 import { CANONICAL_CHSH_PHI, WERNER_VIOLATION_THRESHOLD } from '@/lib/physics/bell/analytic'
+import { DEFAULT_CHSH_CAUSTIC_CONTROLS } from '@/lib/physics/bell/chshCaustic'
 import { EBERHARD_THRESHOLD } from '@/lib/physics/bell/loopholes'
 import type { ScenarioPreset } from '@/lib/physics/presetTypes'
+
+const CHSH_CAUSTIC_DISABLED_OVERRIDES = Object.freeze({
+  chshCausticEnabled: false,
+  chshCausticStrength: DEFAULT_CHSH_CAUSTIC_CONTROLS.chshCausticStrength,
+  chshCausticFoldScale: DEFAULT_CHSH_CAUSTIC_CONTROLS.chshCausticFoldScale,
+  chshCausticPhase: DEFAULT_CHSH_CAUSTIC_CONTROLS.chshCausticPhase,
+} satisfies Pick<
+  BellPairConfig,
+  'chshCausticEnabled' | 'chshCausticStrength' | 'chshCausticFoldScale' | 'chshCausticPhase'
+>)
 
 /**
  * Curated Bell-pair scenarios. Each one isolates a single physics knob so
@@ -26,6 +37,52 @@ import type { ScenarioPreset } from '@/lib/physics/presetTypes'
  */
 export const BELL_SCENARIO_PRESETS: readonly ScenarioPreset<Partial<BellPairConfig>>[] =
   Object.freeze([
+    {
+      id: 'chshCausticTsirelsonLens',
+      name: 'CHSH caustic: Tsirelson lens',
+      description:
+        'Canonical singlet at |S| = 2√2 with CHSH slack rendered as a bright braided caustic lens between analyzers.',
+      overrides: {
+        aliceAxis: [Math.PI / 2, CANONICAL_CHSH_PHI.a],
+        aliceAxisPrime: [Math.PI / 2, CANONICAL_CHSH_PHI.aPrime],
+        bobAxis: [Math.PI / 2, CANONICAL_CHSH_PHI.b],
+        bobAxisPrime: [Math.PI / 2, CANONICAL_CHSH_PHI.bPrime],
+        visibility: 1,
+        detectionEfficiency: 1,
+        analysisMode: 'fairSampling',
+        fieldA: [0, 0, 0],
+        fieldB: [0, 0, 0],
+        chshCausticEnabled: true,
+        chshCausticStrength: 3.6,
+        chshCausticFoldScale: 10.5,
+        chshCausticPhase: 1.35,
+        samplerMode: 'qm',
+        lhvStrategyId: 'deterministicBell',
+      },
+    },
+    {
+      id: 'chshCausticWernerCusp',
+      name: 'CHSH caustic: Werner cusp',
+      description:
+        'Sub-threshold Werner state with zero positive CHSH slack; the density grid collapses into a blue cusp/shadow geometry.',
+      overrides: {
+        aliceAxis: [Math.PI / 2, CANONICAL_CHSH_PHI.a],
+        aliceAxisPrime: [Math.PI / 2, CANONICAL_CHSH_PHI.aPrime],
+        bobAxis: [Math.PI / 2, CANONICAL_CHSH_PHI.b],
+        bobAxisPrime: [Math.PI / 2, CANONICAL_CHSH_PHI.bPrime],
+        visibility: 0.55,
+        detectionEfficiency: 1,
+        analysisMode: 'fairSampling',
+        fieldA: [0, 0, 0],
+        fieldB: [0, 0, 0],
+        chshCausticEnabled: true,
+        chshCausticStrength: 1.45,
+        chshCausticFoldScale: 3.2,
+        chshCausticPhase: -1.1,
+        samplerMode: 'qm',
+        lhvStrategyId: 'deterministicBell',
+      },
+    },
     {
       id: 'chshSinglet',
       name: 'CHSH singlet (canonical)',
@@ -41,6 +98,7 @@ export const BELL_SCENARIO_PRESETS: readonly ScenarioPreset<Partial<BellPairConf
         analysisMode: 'fairSampling',
         fieldA: [0, 0, 0],
         fieldB: [0, 0, 0],
+        ...CHSH_CAUSTIC_DISABLED_OVERRIDES,
         samplerMode: 'qm',
         lhvStrategyId: 'deterministicBell',
       },
@@ -58,6 +116,7 @@ export const BELL_SCENARIO_PRESETS: readonly ScenarioPreset<Partial<BellPairConf
         visibility: Math.min(1, WERNER_VIOLATION_THRESHOLD + 0.015),
         detectionEfficiency: 1,
         analysisMode: 'fairSampling',
+        ...CHSH_CAUSTIC_DISABLED_OVERRIDES,
         samplerMode: 'qm',
       },
     },
@@ -74,6 +133,7 @@ export const BELL_SCENARIO_PRESETS: readonly ScenarioPreset<Partial<BellPairConf
         visibility: 0.55,
         detectionEfficiency: 1,
         analysisMode: 'fairSampling',
+        ...CHSH_CAUSTIC_DISABLED_OVERRIDES,
         samplerMode: 'qm',
       },
     },
@@ -90,6 +150,7 @@ export const BELL_SCENARIO_PRESETS: readonly ScenarioPreset<Partial<BellPairConf
         visibility: 1,
         detectionEfficiency: Math.min(1, EBERHARD_THRESHOLD + 0.02),
         analysisMode: 'fairSampling',
+        ...CHSH_CAUSTIC_DISABLED_OVERRIDES,
         samplerMode: 'qm',
       },
     },
@@ -106,6 +167,7 @@ export const BELL_SCENARIO_PRESETS: readonly ScenarioPreset<Partial<BellPairConf
         visibility: 1,
         detectionEfficiency: 0.6,
         analysisMode: 'fairSampling',
+        ...CHSH_CAUSTIC_DISABLED_OVERRIDES,
         samplerMode: 'lhv',
         lhvStrategyId: 'detectionLoophole_0.500',
       },
@@ -123,6 +185,7 @@ export const BELL_SCENARIO_PRESETS: readonly ScenarioPreset<Partial<BellPairConf
         visibility: 1,
         detectionEfficiency: 1,
         analysisMode: 'fairSampling',
+        ...CHSH_CAUSTIC_DISABLED_OVERRIDES,
         samplerMode: 'lhv',
         lhvStrategyId: 'deterministicBell',
       },
@@ -142,6 +205,7 @@ export const BELL_SCENARIO_PRESETS: readonly ScenarioPreset<Partial<BellPairConf
         analysisMode: 'fairSampling',
         fieldA: [0, 0, 0.5],
         fieldB: [0, 0.5, 0],
+        ...CHSH_CAUSTIC_DISABLED_OVERRIDES,
         samplerMode: 'qm',
       },
     },

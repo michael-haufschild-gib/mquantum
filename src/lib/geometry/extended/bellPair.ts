@@ -26,6 +26,10 @@
  */
 
 import { CANONICAL_CHSH_PHI } from '@/lib/physics/bell/analytic'
+import {
+  DEFAULT_CHSH_CAUSTIC_CONTROLS,
+  sanitizeChshCausticControls,
+} from '@/lib/physics/bell/chshCaustic'
 
 // ============================================================================
 // Bell-pair Types
@@ -104,6 +108,16 @@ export interface BellPairConfig {
   /** Effective field vector on Bob's qubit (γ_B · B_B, ℏ = 1 units). */
   fieldB: BellPairField
 
+  // === Renderer-visible CHSH caustic cosmograph ===
+  /** Whether CHSH slack/eikonal caustics modulate the apparatus density grid. */
+  chshCausticEnabled: boolean
+  /** Additive density strength for the CHSH caustic ridge/cusp. */
+  chshCausticStrength: number
+  /** Spatial fold frequency for the caustic eikonal. */
+  chshCausticFoldScale: number
+  /** Phase offset for the folded caustic ridge. */
+  chshCausticPhase: number
+
   // === Trial loop control ===
   /** Whether QM or a local hidden-variable model drives the sampler. */
   samplerMode: BellSamplerMode
@@ -156,6 +170,11 @@ export const DEFAULT_BELL_PAIR_CONFIG: BellPairConfig = {
   fieldA: [0, 0, 0],
   fieldB: [0, 0, 0],
 
+  chshCausticEnabled: DEFAULT_CHSH_CAUSTIC_CONTROLS.chshCausticEnabled,
+  chshCausticStrength: DEFAULT_CHSH_CAUSTIC_CONTROLS.chshCausticStrength,
+  chshCausticFoldScale: DEFAULT_CHSH_CAUSTIC_CONTROLS.chshCausticFoldScale,
+  chshCausticPhase: DEFAULT_CHSH_CAUSTIC_CONTROLS.chshCausticPhase,
+
   samplerMode: 'qm',
   lhvStrategyId: 'deterministicBell',
   targetTrials: 10_000,
@@ -198,7 +217,7 @@ function normalizeBellAxis(value: unknown, fallback: BellPairAxis): BellPairAxis
   if (!Array.isArray(value) || value.length !== 2) return [...fallback]
   const theta = clampNumber(value[0], 0, Math.PI, fallback[0])
   const phiRaw = finiteNumber(value[1], fallback[1])
-  const phi = ((phiRaw % TWO_PI) + TWO_PI) % TWO_PI
+  const phi = phiRaw >= 0 && phiRaw < TWO_PI ? phiRaw : ((phiRaw % TWO_PI) + TWO_PI) % TWO_PI
   return [theta, phi]
 }
 
@@ -249,6 +268,12 @@ export function sanitizeBellPairConfig(config: Partial<BellPairConfig>): BellPai
     typeof base.lhvStrategyId === 'string' && base.lhvStrategyId.length > 0
       ? base.lhvStrategyId.slice(0, 63)
       : fallback.lhvStrategyId
+  const caustic = sanitizeChshCausticControls({
+    chshCausticEnabled: base.chshCausticEnabled,
+    chshCausticStrength: base.chshCausticStrength,
+    chshCausticFoldScale: base.chshCausticFoldScale,
+    chshCausticPhase: base.chshCausticPhase,
+  })
 
   return {
     ...base,
@@ -268,6 +293,10 @@ export function sanitizeBellPairConfig(config: Partial<BellPairConfig>): BellPai
     analysisMode,
     fieldA: normalizeBellField(base.fieldA, fallback.fieldA),
     fieldB: normalizeBellField(base.fieldB, fallback.fieldB),
+    chshCausticEnabled: caustic.chshCausticEnabled,
+    chshCausticStrength: caustic.chshCausticStrength,
+    chshCausticFoldScale: caustic.chshCausticFoldScale,
+    chshCausticPhase: caustic.chshCausticPhase,
     samplerMode,
     lhvStrategyId,
     targetTrials: clampInteger(base.targetTrials, 4, 10_000_000, fallback.targetTrials),

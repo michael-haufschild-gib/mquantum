@@ -5,7 +5,8 @@
  * because the BellPairConfig was discarded before reaching the uniform
  * buffer. These tests assert that visibility, detection efficiency, and
  * the four Bloch-sphere axes round-trip into the byte layout the WGSL
- * struct expects.
+ * struct expects. The CHSH caustic tail is also checked because one bad
+ * offset there changes the shader-visible density field.
  */
 import { describe, expect, it } from 'vitest'
 
@@ -32,6 +33,10 @@ const F32_INDEX = {
   aliceAxisPrime0: 16,
   bobAxis0: 20,
   bobAxisPrime0: 24,
+  chshCausticEnabled: 28,
+  chshCausticStrength: 29,
+  chshCausticFoldScale: 30,
+  chshCausticPhase: 31,
 } as const
 
 function asViews(buf: ArrayBuffer) {
@@ -39,8 +44,8 @@ function asViews(buf: ArrayBuffer) {
 }
 
 describe('packBellApparatusUniforms', () => {
-  it('produces a buffer of the documented size (112 bytes, multiple of 16)', () => {
-    expect(BELL_APPARATUS_UNIFORM_BYTES).toBe(112)
+  it('produces a buffer of the documented size (128 bytes, multiple of 16)', () => {
+    expect(BELL_APPARATUS_UNIFORM_BYTES).toBe(128)
     expect(BELL_APPARATUS_UNIFORM_BYTES % 16).toBe(0)
     const buf = packBellApparatusUniforms(createDefaultBellPairConfig(), 64, 2, 0, 0, 0)
     expect(buf.byteLength).toBe(BELL_APPARATUS_UNIFORM_BYTES)
@@ -112,5 +117,28 @@ describe('packBellApparatusUniforms', () => {
     expect(f32[19]).toBe(0)
     expect(f32[23]).toBe(0)
     expect(f32[27]).toBe(0)
+  })
+
+  it('writes default caustic controls as a disabled 16-byte tail block', () => {
+    const { u32, f32 } = asViews(
+      packBellApparatusUniforms(createDefaultBellPairConfig(), 64, 2, 0, 0, 0)
+    )
+    expect(u32[F32_INDEX.chshCausticEnabled]).toBe(0)
+    expect(f32[F32_INDEX.chshCausticStrength]).toBeCloseTo(1, 5)
+    expect(f32[F32_INDEX.chshCausticFoldScale]).toBeCloseTo(7, 5)
+    expect(f32[F32_INDEX.chshCausticPhase]).toBeCloseTo(0, 5)
+  })
+
+  it('writes enabled caustic controls and clamps unsafe values', () => {
+    const cfg = createDefaultBellPairConfig()
+    cfg.chshCausticEnabled = true
+    cfg.chshCausticStrength = 99
+    cfg.chshCausticFoldScale = 0
+    cfg.chshCausticPhase = 99
+    const { u32, f32 } = asViews(packBellApparatusUniforms(cfg, 64, 2, 0, 0, 0))
+    expect(u32[F32_INDEX.chshCausticEnabled]).toBe(1)
+    expect(f32[F32_INDEX.chshCausticStrength]).toBeCloseTo(4, 5)
+    expect(f32[F32_INDEX.chshCausticFoldScale]).toBeCloseTo(0.25, 5)
+    expect(f32[F32_INDEX.chshCausticPhase]).toBeCloseTo(2 * Math.PI, 5)
   })
 })
