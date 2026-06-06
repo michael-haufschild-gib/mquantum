@@ -3,8 +3,8 @@
  *
  * Each preset overrides specific DiracConfig fields to set up a
  * physically interesting initial configuration. Presets are
- * dimension-agnostic — they do NOT set latticeDim or gridSize.
- * The user controls dimensions separately.
+ * dimension-agnostic unless they declare a requiredDimension gate.
+ * They do NOT set latticeDim or gridSize. The user controls dimensions separately.
  *
  * Spacing values are chosen to resolve the Compton wavelength
  * λ_C = ℏ/(mc) with at least 10 grid points, while keeping the
@@ -20,8 +20,10 @@ export type DiracRenderingOverrides = Partial<
   Pick<SchroedingerConfig, 'densityGain' | 'densityContrast' | 'autoScaleMaxGain'>
 >
 
-/** A curated Dirac equation scenario with dimension-agnostic config overrides. */
+/** A curated Dirac equation scenario with optional exact-dimension visibility. */
 export interface DiracScenarioPreset extends ScenarioPreset<Partial<DiracConfig>> {
+  /** Exact global dimension required to show/select this preset. Undefined means dimension-agnostic. */
+  requiredDimension?: number
   /** Parent-level rendering overrides applied alongside DiracConfig overrides. */
   renderingOverrides?: DiracRenderingOverrides
 }
@@ -112,6 +114,7 @@ export const DIRAC_SCENARIO_PRESETS: DiracScenarioPreset[] = [
     name: 'Hubble Lace Collider 3D',
     description:
       'Balanced particle/antiparticle spinor packets reveal braided helicity apertures on expanding Hubble-like lace shells',
+    requiredDimension: 3,
     overrides: {
       spacing: [0.095],
       mass: 0.85,
@@ -125,7 +128,7 @@ export const DIRAC_SCENARIO_PRESETS: DiracScenarioPreset[] = [
       fieldView: 'hubbleLace',
       autoScale: true,
       dt: 0.002,
-      stepsPerFrame: 8,
+      stepsPerFrame: 2,
     },
     renderingOverrides: {
       densityGain: 4.4,
@@ -138,6 +141,7 @@ export const DIRAC_SCENARIO_PRESETS: DiracScenarioPreset[] = [
     name: 'Hubble Lace Bulk 4D',
     description:
       'A fourth-coordinate slice phase modulates the same spin-current lace, exposing a distinct bulk aperture through 4D projection',
+    requiredDimension: 4,
     overrides: {
       spacing: [0.11],
       mass: 0.78,
@@ -151,7 +155,7 @@ export const DIRAC_SCENARIO_PRESETS: DiracScenarioPreset[] = [
       fieldView: 'hubbleLace',
       autoScale: true,
       dt: 0.002,
-      stepsPerFrame: 8,
+      stepsPerFrame: 2,
       slicePositions: [0.23],
     },
     renderingOverrides: {
@@ -231,4 +235,19 @@ export const DIRAC_SCENARIO_PRESETS: DiracScenarioPreset[] = [
 /** Look up a Dirac scenario preset by id. */
 export function getDiracPreset(id: string): DiracScenarioPreset | undefined {
   return DIRAC_SCENARIO_PRESETS.find((preset) => preset.id === id)
+}
+
+/** True when a Dirac preset is selectable for the active global dimension. */
+export function isDiracPresetCompatibleWithDimension(
+  preset: DiracScenarioPreset,
+  dimension: number
+): boolean {
+  return preset.requiredDimension === undefined || preset.requiredDimension === dimension
+}
+
+/** Dirac presets visible/selectable for the active global dimension. */
+export function getDiracPresetsForDimension(dimension: number): DiracScenarioPreset[] {
+  return DIRAC_SCENARIO_PRESETS.filter((preset) =>
+    isDiracPresetCompatibleWithDimension(preset, dimension)
+  )
 }

@@ -16,7 +16,7 @@ import type { SchroedingerConfig } from '@/lib/geometry/extended/schroedinger'
 import { DEFAULT_TDSE_CONFIG, type TdseConfig } from '@/lib/geometry/extended/tdse'
 import { BEC_SCENARIO_PRESETS } from '@/lib/physics/bec/presets'
 import { BELL_SCENARIO_PRESETS } from '@/lib/physics/bell/presets'
-import { DIRAC_SCENARIO_PRESETS } from '@/lib/physics/dirac/presets'
+import { getDiracPresetsForDimension } from '@/lib/physics/dirac/presets'
 import { FREE_SCALAR_PRESETS } from '@/lib/physics/freeScalar/presets'
 import { HYDROGEN_COUPLED_PRESETS } from '@/lib/physics/hydrogenCoupled/presets'
 import { PAULI_SCENARIO_PRESETS } from '@/lib/physics/pauli/presets'
@@ -209,7 +209,7 @@ export function findActiveScenarioPresetId(
     case 'becDynamics':
       return findBecPresetId(schroedinger.bec, dimension)
     case 'diracEquation':
-      return findScenarioPresetId(schroedinger.dirac, DIRAC_SCENARIO_PRESETS)
+      return findScenarioPresetId(schroedinger.dirac, getDiracPresetsForDimension(dimension))
     case 'freeScalarField':
       return findMostSpecificScenarioPresetId(
         schroedinger.freeScalar as FreeScalarConfig,

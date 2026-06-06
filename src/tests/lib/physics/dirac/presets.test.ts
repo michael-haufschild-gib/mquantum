@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { DIRAC_SCENARIO_PRESETS, getDiracPreset } from '@/lib/physics/dirac/presets'
+import {
+  DIRAC_SCENARIO_PRESETS,
+  getDiracPreset,
+  getDiracPresetsForDimension,
+} from '@/lib/physics/dirac/presets'
 
 describe('Dirac presets', () => {
   it('registers the Clifford Bloom Resonator as a zitterbewegung-sector visual mode', () => {
@@ -37,7 +41,9 @@ describe('Dirac presets', () => {
     expect(collider?.overrides.potentialType).toBe('none')
     expect(collider?.overrides.positiveEnergyFraction).toBe(0.5)
     expect(collider?.overrides.autoScale).toBe(true)
+    expect(collider?.overrides.stepsPerFrame).toBe(2)
     expect(collider?.overrides.packetMomentum?.slice(0, 3)).toEqual([3.6, -2.4, 1.7])
+    expect(collider?.requiredDimension).toBe(3)
     expect(collider?.overrides.latticeDim).toBeUndefined()
     expect(collider?.overrides.gridSize).toBeUndefined()
     expect(collider?.renderingOverrides?.densityGain).toBeCloseTo(4.4)
@@ -48,12 +54,28 @@ describe('Dirac presets', () => {
     expect(bulk?.overrides.fieldView).toBe('hubbleLace')
     expect(bulk?.overrides.potentialType).toBe('none')
     expect(bulk?.overrides.positiveEnergyFraction).toBe(0.5)
+    expect(bulk?.overrides.stepsPerFrame).toBe(2)
     expect(bulk?.overrides.packetMomentum?.slice(0, 4)).toEqual([2.9, 1.9, -2.2, 1.6])
     expect(bulk?.overrides.slicePositions).toEqual([0.23])
+    expect(bulk?.requiredDimension).toBe(4)
     expect(bulk?.overrides.latticeDim).toBeUndefined()
     expect(bulk?.overrides.gridSize).toBeUndefined()
     expect(bulk?.renderingOverrides?.densityGain).toBeCloseTo(5)
     expect(bulk?.renderingOverrides?.densityContrast).toBeCloseTo(3.8)
     expect(bulk?.renderingOverrides?.autoScaleMaxGain).toBe(54)
+  })
+
+  it('filters exact-dimensional Hubble Lace presets by active dimension', () => {
+    const ids3D = getDiracPresetsForDimension(3).map((preset) => preset.id)
+    const ids4D = getDiracPresetsForDimension(4).map((preset) => preset.id)
+    const ids5D = getDiracPresetsForDimension(5).map((preset) => preset.id)
+
+    expect(ids3D).toContain('hubbleLaceCollider3D')
+    expect(ids3D).not.toContain('hubbleLaceBulk4D')
+    expect(ids4D).toContain('hubbleLaceBulk4D')
+    expect(ids4D).not.toContain('hubbleLaceCollider3D')
+    expect(ids5D).not.toContain('hubbleLaceCollider3D')
+    expect(ids5D).not.toContain('hubbleLaceBulk4D')
+    expect(ids5D).toContain('cliffordBloomResonator')
   })
 })

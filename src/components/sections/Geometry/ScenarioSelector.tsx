@@ -22,7 +22,7 @@ import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger
 import { ADS_PRESETS } from '@/lib/physics/antiDeSitter/presets'
 import { BEC_SCENARIO_PRESETS } from '@/lib/physics/bec/presets'
 import { BELL_SCENARIO_PRESETS } from '@/lib/physics/bell/presets'
-import { DIRAC_SCENARIO_PRESETS } from '@/lib/physics/dirac/presets'
+import { DIRAC_SCENARIO_PRESETS, getDiracPresetsForDimension } from '@/lib/physics/dirac/presets'
 import { FREE_SCALAR_PRESETS } from '@/lib/physics/freeScalar/presets'
 import { HYDROGEN_COUPLED_PRESETS } from '@/lib/physics/hydrogenCoupled/presets'
 import { PAULI_SCENARIO_PRESETS } from '@/lib/physics/pauli/presets'
@@ -73,9 +73,11 @@ function getBecPresetOptions(dim: number) {
   }))
 }
 
-/* ── Dirac options ─────────────────────────────────────────── */
+/* ── Dirac options (dimension-filtered) ─────────────────────── */
 
-const DIRAC_PRESET_OPTIONS = DIRAC_SCENARIO_PRESETS.map((p) => ({ value: p.id, label: p.name }))
+function getDiracPresetOptions(dimension: number) {
+  return getDiracPresetsForDimension(dimension).map((p) => ({ value: p.id, label: p.name }))
+}
 
 /* ── Pauli options ─────────────────────────────────────────── */
 
@@ -282,7 +284,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       case 'becDynamics':
         return getBecPresetOptions(dimension)
       case 'diracEquation':
-        return DIRAC_PRESET_OPTIONS
+        return getDiracPresetOptions(dimension)
       case 'freeScalarField':
         return getFreeScalarPresetOptions(dimension)
       case 'quantumWalk':

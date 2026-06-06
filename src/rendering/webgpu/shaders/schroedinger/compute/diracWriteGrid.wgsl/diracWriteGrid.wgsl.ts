@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- single exported WGSL block is validated by shader tests. */
+
 /**
  * Dirac — Write to 3D Density Grid Compute Shader
  *
@@ -587,23 +589,18 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     phaseForColor = bloomHuePhase + DIRAC_WG_PI;
 
   } else if (params.fieldView == 9u) {
-    // hubbleLace: speculative spinor-cosmology aperture. It is bright only
-    // where density, upper/lower sector balance, current-spin helicity,
-    // deterministic Hubble shells, phase lace, and 4D slice phase align.
+    // hubbleLace: speculative spinor-cosmology aperture. It uses a low-rank
+    // sector-current orientation instead of exact gamma-product spin tensors,
+    // keeping the visual responsive while preserving density, sector balance,
+    // helicity, deterministic Hubble shells, phase lace, and 4D slice phase gates.
     let siteIdx = nnSiteIdx;
-    var psiSiteRe: array<f32, 64>;
-    var psiSiteIm: array<f32, 64>;
-    for (var c: u32 = 0u; c < S; c = c + 1u) {
-      let v = spinor[c * T + siteIdx];
-      psiSiteRe[c] = v.x;
-      psiSiteIm[c] = v.y;
-    }
 
     var totalDensity: f32 = 0.0;
     var upperDensity: f32 = 0.0;
     var lowerDensity: f32 = 0.0;
     for (var c: u32 = 0u; c < S; c = c + 1u) {
-      let d = psiSiteRe[c] * psiSiteRe[c] + psiSiteIm[c] * psiSiteIm[c];
+      let v = spinor[c * T + siteIdx];
+      let d = v.x * v.x + v.y * v.y;
       totalDensity += d;
       if (c < half) { upperDensity += d; } else { lowerDensity += d; }
     }
@@ -615,182 +612,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       0.0,
       1.0
     );
-
-    var currentVec = vec3f(0.0);
-    if (DIRAC_USE_SPARSE_GAMMA) {
-      for (var k: u32 = 0u; k < 3u; k = k + 1u) {
-        if (k < params.latticeDim) {
-          let tBase = k * DIRAC_SPARSE_S;
-          var expectRe: f32 = 0.0;
-          for (var row: u32 = 0u; row < S; row = row + 1u) {
-            let t = tBase + row;
-            let col = DIRAC_SPARSE_COL[t];
-            let gRe = DIRAC_SPARSE_RE[t];
-            let gIm = DIRAC_SPARSE_IM[t];
-            let psiRCol = psiSiteRe[col];
-            let psiICol = psiSiteIm[col];
-            let matPsiRe = gRe * psiRCol - gIm * psiICol;
-            let matPsiIm = gRe * psiICol + gIm * psiRCol;
-            expectRe += psiSiteRe[row] * matPsiRe + psiSiteIm[row] * matPsiIm;
-          }
-          currentVec[k] = params.speedOfLight * expectRe;
-        }
-      }
-    } else {
-      for (var k: u32 = 0u; k < 3u; k = k + 1u) {
-        if (k < params.latticeDim) {
-          let kBase = k * matStride;
-          var expectRe: f32 = 0.0;
-          for (var row: u32 = 0u; row < S; row = row + 1u) {
-            let psiRRow = psiSiteRe[row];
-            let psiIRow = psiSiteIm[row];
-            let rowBase = kBase + row * S * 2u;
-            for (var col: u32 = 0u; col < S; col = col + 1u) {
-              let psiRCol = psiSiteRe[col];
-              let psiICol = psiSiteIm[col];
-              let gRe = gammaMatrices[rowBase + col * 2u];
-              let gIm = gammaMatrices[rowBase + col * 2u + 1u];
-              let matPsiRe = gRe * psiRCol - gIm * psiICol;
-              let matPsiIm = gRe * psiICol + gIm * psiRCol;
-              expectRe += psiRRow * matPsiRe + psiIRow * matPsiIm;
-            }
-          }
-          currentVec[k] = params.speedOfLight * expectRe;
-        }
-      }
-    }
-
-    var spinVec = vec3f(0.0);
-    if (S <= 2u || params.latticeDim < 3u) {
-      if (DIRAC_USE_SPARSE_GAMMA) {
-        for (var k: u32 = 0u; k < 3u; k = k + 1u) {
-          if (k < params.latticeDim) {
-            let tBase = k * DIRAC_SPARSE_S;
-            var expectRe: f32 = 0.0;
-            for (var row: u32 = 0u; row < S; row = row + 1u) {
-              let t = tBase + row;
-              let col = DIRAC_SPARSE_COL[t];
-              let gRe = DIRAC_SPARSE_RE[t];
-              let gIm = DIRAC_SPARSE_IM[t];
-              let psiRCol = psiSiteRe[col];
-              let psiICol = psiSiteIm[col];
-              let matPsiRe = gRe * psiRCol - gIm * psiICol;
-              let matPsiIm = gRe * psiICol + gIm * psiRCol;
-              expectRe += psiSiteRe[row] * matPsiRe + psiSiteIm[row] * matPsiIm;
-            }
-            spinVec[k] = expectRe;
-          }
-        }
-      } else {
-        for (var k: u32 = 0u; k < 3u; k = k + 1u) {
-          if (k < params.latticeDim) {
-            let kBase = k * matStride;
-            var expectRe: f32 = 0.0;
-            for (var row: u32 = 0u; row < S; row = row + 1u) {
-              let psiRRow = psiSiteRe[row];
-              let psiIRow = psiSiteIm[row];
-              let rowBase = kBase + row * S * 2u;
-              for (var col: u32 = 0u; col < S; col = col + 1u) {
-                let psiRCol = psiSiteRe[col];
-                let psiICol = psiSiteIm[col];
-                let gRe = gammaMatrices[rowBase + col * 2u];
-                let gIm = gammaMatrices[rowBase + col * 2u + 1u];
-                let matPsiRe = gRe * psiRCol - gIm * psiICol;
-                let matPsiIm = gRe * psiICol + gIm * psiRCol;
-                expectRe += psiRRow * matPsiRe + psiIRow * matPsiIm;
-              }
-            }
-            spinVec[k] = expectRe;
-          }
-        }
-      }
-    } else {
-      if (DIRAC_USE_SPARSE_GAMMA) {
-        for (var k: u32 = 0u; k < 3u; k = k + 1u) {
-          let idxI = (k + 1u) % 3u;
-          let idxJ = (k + 2u) % 3u;
-          let tBaseJ = idxJ * DIRAC_SPARSE_S;
-          let tBaseI = idxI * DIRAC_SPARSE_S;
-
-          var tmpRe: array<f32, 64>;
-          var tmpIm: array<f32, 64>;
-          for (var row: u32 = 0u; row < S; row = row + 1u) {
-            let t = tBaseJ + row;
-            let col = DIRAC_SPARSE_COL[t];
-            let gRe = DIRAC_SPARSE_RE[t];
-            let gIm = DIRAC_SPARSE_IM[t];
-            let pR = psiSiteRe[col];
-            let pI = psiSiteIm[col];
-            tmpRe[row] = gRe * pR - gIm * pI;
-            tmpIm[row] = gRe * pI + gIm * pR;
-          }
-
-          var dotIm: f32 = 0.0;
-          for (var row: u32 = 0u; row < S; row = row + 1u) {
-            let t = tBaseI + row;
-            let col = DIRAC_SPARSE_COL[t];
-            let gRe = DIRAC_SPARSE_RE[t];
-            let gIm = DIRAC_SPARSE_IM[t];
-            let aRe = gRe * tmpRe[col] - gIm * tmpIm[col];
-            let aIm = gRe * tmpIm[col] + gIm * tmpRe[col];
-            dotIm += psiSiteRe[row] * aIm - psiSiteIm[row] * aRe;
-          }
-          spinVec[k] = dotIm;
-        }
-      } else {
-        for (var k: u32 = 0u; k < 3u; k = k + 1u) {
-          let idxI = (k + 1u) % 3u;
-          let idxJ = (k + 2u) % 3u;
-          let baseJ = idxJ * matStride;
-          let baseI = idxI * matStride;
-
-          var tmpRe: array<f32, 64>;
-          var tmpIm: array<f32, 64>;
-          for (var row: u32 = 0u; row < S; row = row + 1u) {
-            var aRe: f32 = 0.0;
-            var aIm: f32 = 0.0;
-            let rowBaseJ = baseJ + row * S * 2u;
-            for (var col: u32 = 0u; col < S; col = col + 1u) {
-              let pR = psiSiteRe[col];
-              let pI = psiSiteIm[col];
-              let gRe = gammaMatrices[rowBaseJ + col * 2u];
-              let gIm = gammaMatrices[rowBaseJ + col * 2u + 1u];
-              aRe += gRe * pR - gIm * pI;
-              aIm += gRe * pI + gIm * pR;
-            }
-            tmpRe[row] = aRe;
-            tmpIm[row] = aIm;
-          }
-
-          var dotIm: f32 = 0.0;
-          for (var row: u32 = 0u; row < S; row = row + 1u) {
-            let psiRRow = psiSiteRe[row];
-            let psiIRow = psiSiteIm[row];
-            var aRe: f32 = 0.0;
-            var aIm: f32 = 0.0;
-            let rowBaseI = baseI + row * S * 2u;
-            for (var col: u32 = 0u; col < S; col = col + 1u) {
-              let gRe = gammaMatrices[rowBaseI + col * 2u];
-              let gIm = gammaMatrices[rowBaseI + col * 2u + 1u];
-              aRe += gRe * tmpRe[col] - gIm * tmpIm[col];
-              aIm += gRe * tmpIm[col] + gIm * tmpRe[col];
-            }
-            dotIm += psiRRow * aIm - psiIRow * aRe;
-          }
-          spinVec[k] = dotIm;
-        }
-      }
-    }
-
-    let currentMag2 = dot(currentVec, currentVec);
-    let spinMag2 = dot(spinVec, spinVec);
-    let signedHelicity = select(
-      0.0,
-      dot(currentVec, spinVec) * inverseSqrt(currentMag2 * spinMag2),
-      currentMag2 > 1e-20 && spinMag2 > 1e-20
-    );
-    let helicityAlignment = pow(abs(signedHelicity), 0.65);
-
     let x = ndWorldPos[0];
     let y = select(0.0, ndWorldPos[1], params.latticeDim > 1u);
     let z = select(0.0, ndWorldPos[2], params.latticeDim > 2u);
@@ -798,6 +619,59 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let radiusNorm = radius / max(params.boundingRadius, 1e-6);
     let azimuth = atan2(y, x);
     let phaseCentered = phase - DIRAC_WG_PI;
+
+    let invSectorDenom = 1.0 / sectorDenom;
+    let upperPrimary = spinor[siteIdx];
+    let upperSecondaryComponent = select(0u, 1u, half > 1u);
+    let lowerPrimaryComponent = min(half, S - 1u);
+    let lowerSecondaryComponent = min(lowerPrimaryComponent + 1u, S - 1u);
+    let upperSecondary = spinor[upperSecondaryComponent * T + siteIdx];
+    let lowerPrimary = spinor[lowerPrimaryComponent * T + siteIdx];
+    let lowerSecondary = spinor[lowerSecondaryComponent * T + siteIdx];
+
+    let sectorMixRe = 2.0 * (
+      upperPrimary.x * lowerPrimary.x + upperPrimary.y * lowerPrimary.y
+    ) * invSectorDenom;
+    let sectorMixIm = 2.0 * (
+      upperPrimary.y * lowerPrimary.x - upperPrimary.x * lowerPrimary.y
+    ) * invSectorDenom;
+    let spinVec = vec3f(
+      (upperDensity - lowerDensity) * invSectorDenom,
+      sectorMixRe,
+      sectorMixIm
+    );
+
+    let currentX = 2.0 * (
+      upperPrimary.x * lowerSecondary.x + upperPrimary.y * lowerSecondary.y +
+      upperSecondary.x * lowerPrimary.x + upperSecondary.y * lowerPrimary.y
+    ) * invSectorDenom;
+    let currentY = 2.0 * (
+      upperPrimary.y * lowerSecondary.x - upperPrimary.x * lowerSecondary.y +
+      upperSecondary.y * lowerPrimary.x - upperSecondary.x * lowerPrimary.y
+    ) * invSectorDenom;
+    let currentZ = 2.0 * (
+      upperPrimary.x * lowerPrimary.x + upperPrimary.y * lowerPrimary.y -
+      upperSecondary.x * lowerSecondary.x - upperSecondary.y * lowerSecondary.y
+    ) * invSectorDenom;
+    let sectorCurrent = params.speedOfLight * vec3f(
+      currentX,
+      select(0.0, currentY, params.latticeDim > 1u),
+      select(0.0, currentZ, params.latticeDim > 2u)
+    );
+    let radialFlow = select(
+      vec3f(0.0, 0.0, 1.0),
+      vec3f(x, y, z) * inverseSqrt(max(radius * radius, 1e-12)),
+      radius > 1e-6
+    );
+    let currentVec = sectorCurrent + 0.12 * params.speedOfLight * pairBalance * radialFlow;
+    let currentMag2 = dot(currentVec, currentVec);
+    let spinMag2 = dot(spinVec, spinVec);
+    let signedHelicity = select(
+      0.0,
+      dot(currentVec, spinVec) * inverseSqrt(currentMag2 * spinMag2),
+      densityGate > 0.0001 && pairBalance > 0.0001 && currentMag2 > 1e-20 && spinMag2 > 1e-20
+    );
+    let helicityAlignment = pow(abs(signedHelicity), 0.65);
 
     let shellCarrier = 0.5 + 0.5 * cos(6.283185307179586 * (3.25 * radiusNorm - 0.18 * params.simTime));
     let radialShell2 = shellCarrier * shellCarrier;

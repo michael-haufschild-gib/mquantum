@@ -7,10 +7,13 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { ScenarioSelector } from '@/components/sections/Geometry/ScenarioSelector'
-import { findTdsePresetId } from '@/components/sections/Geometry/ScenarioSelector.matching'
+import {
+  findActiveScenarioPresetId,
+  findTdsePresetId,
+} from '@/components/sections/Geometry/ScenarioSelector.matching'
 import { DEFAULT_TDSE_CONFIG, type TdseConfig } from '@/lib/geometry/extended/types'
 import { BEC_SCENARIO_PRESETS } from '@/lib/physics/bec/presets'
-import { DIRAC_SCENARIO_PRESETS } from '@/lib/physics/dirac/presets'
+import { getDiracPreset, getDiracPresetsForDimension } from '@/lib/physics/dirac/presets'
 import { FREE_SCALAR_PRESETS } from '@/lib/physics/freeScalar/presets'
 import { QUANTUM_WALK_PRESETS } from '@/lib/physics/quantumWalk/presets'
 import {
@@ -94,7 +97,7 @@ const SCENARIO_MATRIX: {
   {
     mode: 'diracEquation',
     dimension: 5,
-    presetIds: DIRAC_SCENARIO_PRESETS.map((preset) => preset.id),
+    presetIds: getDiracPresetsForDimension(5).map((preset) => preset.id),
   },
   {
     mode: 'freeScalarField',
@@ -189,6 +192,37 @@ describe('ScenarioSelector - compute mode presets', () => {
     await waitFor(() => {
       expect(screen.getByRole('combobox', { name: /scenario/i })).toHaveValue('kleinParadox')
     })
+  })
+
+  it('filters exact-dimensional Dirac Hubble Lace presets and hidden active labels', () => {
+    enterScenarioMode('diracEquation', 3)
+    const { rerender } = render(<ScenarioSelector />)
+
+    expect(screen.getByRole('option', { name: 'Hubble Lace Collider 3D' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Hubble Lace Bulk 4D' })).toBeNull()
+
+    enterScenarioMode('diracEquation', 4)
+    rerender(<ScenarioSelector />)
+    expect(screen.queryByRole('option', { name: 'Hubble Lace Collider 3D' })).toBeNull()
+    expect(screen.getByRole('option', { name: 'Hubble Lace Bulk 4D' })).toBeInTheDocument()
+
+    enterScenarioMode('diracEquation', 5)
+    rerender(<ScenarioSelector />)
+    expect(screen.queryByRole('option', { name: 'Hubble Lace Collider 3D' })).toBeNull()
+    expect(screen.queryByRole('option', { name: 'Hubble Lace Bulk 4D' })).toBeNull()
+
+    const bulk = getDiracPreset('hubbleLaceBulk4D')
+    if (!bulk) throw new Error('hubbleLaceBulk4D preset missing')
+    useExtendedObjectStore.setState((state) => ({
+      schroedinger: {
+        ...state.schroedinger,
+        quantumMode: 'diracEquation',
+        dirac: { ...state.schroedinger.dirac, ...bulk.overrides, latticeDim: 3 },
+      },
+    }))
+    expect(
+      findActiveScenarioPresetId('diracEquation', useExtendedObjectStore.getState().schroedinger, 3)
+    ).toBeNull()
   })
 
   it('keeps de Sitter Bunch-Davies selected instead of the broader vacuum preset', async () => {
