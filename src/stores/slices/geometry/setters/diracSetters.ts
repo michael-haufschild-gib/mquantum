@@ -579,6 +579,7 @@ export function createDiracSetters(ctx: SetterContext): DiracSetters {
             return {
               schroedinger: {
                 ...state.schroedinger,
+                ...preset.renderingOverrides,
                 ...parentAbsorber,
                 dirac: merged,
               },

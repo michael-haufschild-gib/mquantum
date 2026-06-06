@@ -41,6 +41,7 @@ const FIELD_VIEW_OPTIONS: { value: DiracFieldView; label: string }[] = [
   { value: 'currentDensity', label: 'Current Density |j|' },
   { value: 'phase', label: 'Phase arg(ψ₀)' },
   { value: 'axialCharge', label: 'Axial |ψ†γ5ψ|' },
+  { value: 'cliffordBloom', label: 'Clifford Bloom Resonator' },
 ]
 
 // Field views that require ≥3 spatial dimensions. The 3+1D γ5 = -i α0α1α2 needs

@@ -1,7 +1,7 @@
 /**
  * Dirac Equation comprehensive e2e test suite.
  *
- * Verifies ALL 6 Dirac presets render at 3D, control changes produce
+ * Verifies all curated Dirac presets render at 3D, control changes produce
  * visual differences, preset-specific physics diagnostics match expected
  * invariants, and feature toggles work without GPU errors.
  *
@@ -115,10 +115,12 @@ async function enableIsosurface(page: Page): Promise<void> {
 const presets = [
   { id: 'kleinParadox', label: 'Klein Paradox' },
   { id: 'zitterbewegung', label: 'Zitterbewegung' },
+  { id: 'cliffordBloomResonator', label: 'Clifford Bloom Resonator' },
   { id: 'diracBarrierTunneling', label: 'Barrier Tunneling' },
   { id: 'relativisticHydrogen', label: 'Relativistic Hydrogen' },
   { id: 'diracOscillator', label: 'Dirac Oscillator' },
   { id: 'spinPrecession', label: 'Spin Precession' },
+  { id: 'axialChargeKlein', label: 'Axial Charge Klein' },
 ] as const
 
 test.describe('Dirac equation: preset rendering matrix', () => {
@@ -138,8 +140,8 @@ test.describe('Dirac equation: preset rendering matrix', () => {
       const fc = await getFrameCount(page)
       await waitForFrameAdvance(page, fc + 150)
 
-      // spinPrecession uses spinDensity view which can be faint
-      const minPx = id === 'spinPrecession' ? 1 : 5
+      // spinDensity and axial-charge views can be faint in headless WebGPU.
+      const minPx = id === 'spinPrecession' || id === 'axialChargeKlein' ? 1 : 5
       await assertPixels(page, `${label} 3D`, minPx)
     })
   }

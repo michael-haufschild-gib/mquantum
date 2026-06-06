@@ -59,6 +59,7 @@ const VIEW_MAP: Record<string, number> = {
   currentDensity: 5,
   phase: 6,
   axialCharge: 7,
+  cliffordBloom: 8,
 }
 
 /** Physics potential is disabled when the UI potential switch is off. */
