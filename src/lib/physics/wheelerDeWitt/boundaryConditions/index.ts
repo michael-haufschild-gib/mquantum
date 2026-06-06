@@ -26,6 +26,7 @@
 
 export { WDW_G_PREFACTOR, wdwPotential } from '../constants'
 import { hhLangerSeed, vilenkinLangerSeed } from '../hhLangerSeed'
+import type { WdwMinisuperspaceDimension } from '../solverTypes'
 
 /** Shared inputs for the boundary-condition generators. */
 export interface WdwBoundaryInputs {
@@ -46,13 +47,15 @@ export interface WdwBoundaryInputs {
    * consistent with the bulk evolution's anisotropic potential.
    */
   asymmetry?: number
+  /** Minisuperspace dimension. Defaults to 3. */
+  minisuperspaceDimension?: WdwMinisuperspaceDimension
 }
 
 /** Output buffers for the boundary condition: χ(a_min, φ) and ∂_a χ(a_min, φ). */
 export interface WdwBoundaryField {
-  /** χ(a_min,·) interleaved [re, im] × (Nphi*Nphi). */
+  /** χ(a_min,·) interleaved [re, im] × (Nphi² or Nphi³). */
   chi: Float32Array
-  /** ∂_a χ(a_min,·) interleaved [re, im] × (Nphi*Nphi). */
+  /** ∂_a χ(a_min,·) interleaved [re, im] × (Nphi² or Nphi³). */
   chiDeriv: Float32Array
 }
 
@@ -62,9 +65,9 @@ function setPair(out: Float32Array, idx: number, re: number, im: number): void {
   out[2 * idx + 1] = im
 }
 
-/** Zero-allocate helper that produces a Float32Array of (Nphi²) complex entries. */
-function allocComplexGrid(Nphi: number): Float32Array {
-  return new Float32Array(2 * Nphi * Nphi)
+/** Zero-allocate helper that produces a complex-entry Float32Array. */
+function allocComplexGrid(Nphi: number, phiDims: 2 | 3 = 2): Float32Array {
+  return new Float32Array(2 * Math.pow(Nphi, phiDims))
 }
 
 /**
@@ -100,17 +103,34 @@ function indexToPhi(i: number, Nphi: number, phiExtent: number): number {
 export function hartleHawkingBoundary(input: WdwBoundaryInputs): WdwBoundaryField {
   const { Nphi, phiExtent, aMin, mass, lambda } = input
   const asymmetry = input.asymmetry ?? 1
-  const chi = allocComplexGrid(Nphi)
-  const chiDeriv = allocComplexGrid(Nphi)
+  const dimension = input.minisuperspaceDimension ?? 3
+  const chi = allocComplexGrid(Nphi, dimension === 4 ? 3 : 2)
+  const chiDeriv = allocComplexGrid(Nphi, dimension === 4 ? 3 : 2)
 
-  for (let i1 = 0; i1 < Nphi; i1++) {
-    const phi1 = indexToPhi(i1, Nphi, phiExtent)
-    for (let i2 = 0; i2 < Nphi; i2++) {
-      const phi2 = indexToPhi(i2, Nphi, phiExtent)
-      const seed = hhLangerSeed({ a: aMin, phi1, phi2, m: mass, lambda, asymmetry })
-      const idx = i1 * Nphi + i2
-      setPair(chi, idx, seed.chi.re, seed.chi.im)
-      setPair(chiDeriv, idx, seed.dChi.re, seed.dChi.im)
+  if (dimension === 4) {
+    for (let i1 = 0; i1 < Nphi; i1++) {
+      const phi1 = indexToPhi(i1, Nphi, phiExtent)
+      for (let i2 = 0; i2 < Nphi; i2++) {
+        const phi2 = indexToPhi(i2, Nphi, phiExtent)
+        for (let i3 = 0; i3 < Nphi; i3++) {
+          const phi3 = indexToPhi(i3, Nphi, phiExtent)
+          const seed = hhLangerSeed({ a: aMin, phi1, phi2, phi3, m: mass, lambda, asymmetry })
+          const idx = (i1 * Nphi + i2) * Nphi + i3
+          setPair(chi, idx, seed.chi.re, seed.chi.im)
+          setPair(chiDeriv, idx, seed.dChi.re, seed.dChi.im)
+        }
+      }
+    }
+  } else {
+    for (let i1 = 0; i1 < Nphi; i1++) {
+      const phi1 = indexToPhi(i1, Nphi, phiExtent)
+      for (let i2 = 0; i2 < Nphi; i2++) {
+        const phi2 = indexToPhi(i2, Nphi, phiExtent)
+        const seed = hhLangerSeed({ a: aMin, phi1, phi2, m: mass, lambda, asymmetry })
+        const idx = i1 * Nphi + i2
+        setPair(chi, idx, seed.chi.re, seed.chi.im)
+        setPair(chiDeriv, idx, seed.dChi.re, seed.dChi.im)
+      }
     }
   }
   return { chi, chiDeriv }
@@ -146,17 +166,42 @@ export function hartleHawkingBoundary(input: WdwBoundaryInputs): WdwBoundaryFiel
 export function vilenkinBoundary(input: WdwBoundaryInputs): WdwBoundaryField {
   const { Nphi, phiExtent, aMin, mass, lambda } = input
   const asymmetry = input.asymmetry ?? 1
-  const chi = allocComplexGrid(Nphi)
-  const chiDeriv = allocComplexGrid(Nphi)
+  const dimension = input.minisuperspaceDimension ?? 3
+  const chi = allocComplexGrid(Nphi, dimension === 4 ? 3 : 2)
+  const chiDeriv = allocComplexGrid(Nphi, dimension === 4 ? 3 : 2)
 
-  for (let i1 = 0; i1 < Nphi; i1++) {
-    const phi1 = indexToPhi(i1, Nphi, phiExtent)
-    for (let i2 = 0; i2 < Nphi; i2++) {
-      const phi2 = indexToPhi(i2, Nphi, phiExtent)
-      const seed = vilenkinLangerSeed({ a: aMin, phi1, phi2, m: mass, lambda, asymmetry })
-      const idx = i1 * Nphi + i2
-      setPair(chi, idx, seed.chi.re, seed.chi.im)
-      setPair(chiDeriv, idx, seed.dChi.re, seed.dChi.im)
+  if (dimension === 4) {
+    for (let i1 = 0; i1 < Nphi; i1++) {
+      const phi1 = indexToPhi(i1, Nphi, phiExtent)
+      for (let i2 = 0; i2 < Nphi; i2++) {
+        const phi2 = indexToPhi(i2, Nphi, phiExtent)
+        for (let i3 = 0; i3 < Nphi; i3++) {
+          const phi3 = indexToPhi(i3, Nphi, phiExtent)
+          const seed = vilenkinLangerSeed({
+            a: aMin,
+            phi1,
+            phi2,
+            phi3,
+            m: mass,
+            lambda,
+            asymmetry,
+          })
+          const idx = (i1 * Nphi + i2) * Nphi + i3
+          setPair(chi, idx, seed.chi.re, seed.chi.im)
+          setPair(chiDeriv, idx, seed.dChi.re, seed.dChi.im)
+        }
+      }
+    }
+  } else {
+    for (let i1 = 0; i1 < Nphi; i1++) {
+      const phi1 = indexToPhi(i1, Nphi, phiExtent)
+      for (let i2 = 0; i2 < Nphi; i2++) {
+        const phi2 = indexToPhi(i2, Nphi, phiExtent)
+        const seed = vilenkinLangerSeed({ a: aMin, phi1, phi2, m: mass, lambda, asymmetry })
+        const idx = i1 * Nphi + i2
+        setPair(chi, idx, seed.chi.re, seed.chi.im)
+        setPair(chiDeriv, idx, seed.dChi.re, seed.dChi.im)
+      }
     }
   }
   return { chi, chiDeriv }
@@ -174,18 +219,36 @@ export function vilenkinBoundary(input: WdwBoundaryInputs): WdwBoundaryField {
  */
 export function deWittBoundary(input: WdwBoundaryInputs): WdwBoundaryField {
   const { Nphi, phiExtent, aMin } = input
-  const chi = allocComplexGrid(Nphi)
-  const chiDeriv = allocComplexGrid(Nphi)
-  for (let i1 = 0; i1 < Nphi; i1++) {
-    const phi1 = indexToPhi(i1, Nphi, phiExtent)
-    for (let i2 = 0; i2 < Nphi; i2++) {
-      const phi2 = indexToPhi(i2, Nphi, phiExtent)
-      const idx = i1 * Nphi + i2
-      const env = Math.exp(-0.5 * (phi1 * phi1 + phi2 * phi2))
-      const amp = aMin * env
-      setPair(chi, idx, amp, 0)
-      // χ starts from the a=0 node linearly: χ'(a_min) ≈ env (= χ(a_min)/a_min).
-      setPair(chiDeriv, idx, env, 0)
+  const dimension = input.minisuperspaceDimension ?? 3
+  const chi = allocComplexGrid(Nphi, dimension === 4 ? 3 : 2)
+  const chiDeriv = allocComplexGrid(Nphi, dimension === 4 ? 3 : 2)
+  if (dimension === 4) {
+    for (let i1 = 0; i1 < Nphi; i1++) {
+      const phi1 = indexToPhi(i1, Nphi, phiExtent)
+      for (let i2 = 0; i2 < Nphi; i2++) {
+        const phi2 = indexToPhi(i2, Nphi, phiExtent)
+        for (let i3 = 0; i3 < Nphi; i3++) {
+          const phi3 = indexToPhi(i3, Nphi, phiExtent)
+          const idx = (i1 * Nphi + i2) * Nphi + i3
+          const env = Math.exp(-0.5 * (phi1 * phi1 + phi2 * phi2 + phi3 * phi3))
+          const amp = aMin * env
+          setPair(chi, idx, amp, 0)
+          setPair(chiDeriv, idx, env, 0)
+        }
+      }
+    }
+  } else {
+    for (let i1 = 0; i1 < Nphi; i1++) {
+      const phi1 = indexToPhi(i1, Nphi, phiExtent)
+      for (let i2 = 0; i2 < Nphi; i2++) {
+        const phi2 = indexToPhi(i2, Nphi, phiExtent)
+        const idx = i1 * Nphi + i2
+        const env = Math.exp(-0.5 * (phi1 * phi1 + phi2 * phi2))
+        const amp = aMin * env
+        setPair(chi, idx, amp, 0)
+        // χ starts from the a=0 node linearly: χ'(a_min) ≈ env (= χ(a_min)/a_min).
+        setPair(chiDeriv, idx, env, 0)
+      }
     }
   }
   return { chi, chiDeriv }

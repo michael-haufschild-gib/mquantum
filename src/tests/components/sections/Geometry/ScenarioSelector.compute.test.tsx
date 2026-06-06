@@ -17,7 +17,10 @@ import {
   isTdsePresetCompatibleWithDimension,
   TDSE_SCENARIO_PRESETS,
 } from '@/lib/physics/tdse/presets'
-import { WDW_SCENARIO_PRESETS } from '@/lib/physics/wheelerDeWitt/presets'
+import {
+  getWdwPresetsForGeometryDimension,
+  WDW_SCENARIO_PRESETS,
+} from '@/lib/physics/wheelerDeWitt/presets'
 import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
@@ -107,8 +110,13 @@ const SCENARIO_MATRIX: {
   },
   {
     mode: 'wheelerDeWitt',
-    dimension: 5,
-    presetIds: WDW_SCENARIO_PRESETS.map((preset) => preset.id),
+    dimension: 3,
+    presetIds: getWdwPresetsForGeometryDimension(3).map((preset) => preset.id),
+  },
+  {
+    mode: 'wheelerDeWitt',
+    dimension: 4,
+    presetIds: getWdwPresetsForGeometryDimension(4).map((preset) => preset.id),
   },
 ]
 
@@ -246,6 +254,32 @@ describe('ScenarioSelector - compute mode presets', () => {
     expect(screen.getByRole('option', { name: 'Rank-Diffusion Reheating' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Retrocausal Caustic Flower' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Retrocausal Caustic Web' })).toBeInTheDocument()
+  })
+
+  it('filters Wheeler-DeWitt scenarios by global dimension', () => {
+    enterScenarioMode('wheelerDeWitt', 3)
+    const { rerender } = render(<ScenarioSelector />)
+
+    for (const preset of WDW_SCENARIO_PRESETS) {
+      const matcher = screen.queryByRole('option', { name: preset.name })
+      if ((preset.overrides.minisuperspaceDimension ?? 3) === 3) {
+        expect(matcher).toBeInTheDocument()
+      } else {
+        expect(matcher).toBeNull()
+      }
+    }
+
+    enterScenarioMode('wheelerDeWitt', 4)
+    rerender(<ScenarioSelector />)
+
+    for (const preset of WDW_SCENARIO_PRESETS) {
+      const matcher = screen.queryByRole('option', { name: preset.name })
+      if (preset.overrides.minisuperspaceDimension === 4) {
+        expect(matcher).toBeInTheDocument()
+      } else {
+        expect(matcher).toBeNull()
+      }
+    }
   })
 
   it('applies Floquet CTC quantum-walk presets through the 3D scenario selector', async () => {

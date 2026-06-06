@@ -24,7 +24,7 @@
  * with
  *
  *     U(a, φ) = −c_U·a²·(1 − (8πG/3)·a²·V(φ))
- *     V(φ)   = ½m²·φ₁² + ½(m·α)²·φ₂² + Λ
+ *     V(φ)   = ½m²·(φ₁² + φ₃²) + ½(m·α)²·φ₂² + Λ
  *     c_U    = 36 π²
  *
  * `α = inflatonMassAsymmetry` is the per-axis effective-mass ratio that
@@ -70,7 +70,7 @@ export const WDW_C_U = 36 * Math.PI * Math.PI
 /**
  * Inflaton potential
  *
- *   `V(φ₁, φ₂) = ½·m²·φ₁² + ½·(m·α)²·φ₂² + Λ`
+ *   `V(φ₁, φ₂, φ₃) = ½·m²·(φ₁² + φ₃²) + ½·(m·α)²·φ₂² + Λ`
  *
  * where `α = asymmetry` is the per-axis effective-mass ratio. `α = 1`
  * reduces to the symmetric form `V = ½m²(φ₁²+φ₂²) + Λ` bit-identically
@@ -83,6 +83,7 @@ export const WDW_C_U = 36 * Math.PI * Math.PI
  * @param lambda - Cosmological constant `Λ`.
  * @param asymmetry - Per-axis effective-mass ratio on the φ₂ axis
  *   (effective mass = `m·asymmetry`). Defaults to `1` (isotropic).
+ * @param phi3 - Optional third inflaton coordinate for 4D minisuperspace.
  * @returns Potential value in natural units.
  */
 export function wdwPotential(
@@ -90,11 +91,13 @@ export function wdwPotential(
   phi2: number,
   m: number,
   lambda: number,
-  asymmetry: number = 1
+  asymmetry: number = 1,
+  phi3: number = 0
 ): number {
   const massSqPhi1 = m * m
   const massSqPhi2 = m * m * asymmetry * asymmetry
-  return 0.5 * massSqPhi1 * phi1 * phi1 + 0.5 * massSqPhi2 * phi2 * phi2 + lambda
+  const base = 0.5 * massSqPhi1 * phi1 * phi1 + 0.5 * massSqPhi2 * phi2 * phi2 + lambda
+  return phi3 === 0 ? base : base + 0.5 * massSqPhi1 * phi3 * phi3
 }
 
 /**
@@ -113,6 +116,7 @@ export function wdwPotential(
  * @param asymmetry - Per-axis effective-mass ratio on the φ₂ axis
  *   (defaults to `1` — fully symmetric, matches pre-asymmetry behaviour
  *   bit-identically).
+ * @param phi3 - Optional third inflaton coordinate for 4D minisuperspace.
  * @returns `U(a, φ)` in natural units.
  */
 export function wdwU(
@@ -121,9 +125,10 @@ export function wdwU(
   phi2: number,
   m: number,
   lambda: number,
-  asymmetry: number = 1
+  asymmetry: number = 1,
+  phi3: number = 0
 ): number {
-  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry)
+  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry, phi3)
   const a2 = a * a
   return -WDW_C_U * a2 * (1 - WDW_G_PREFACTOR * a2 * V)
 }
@@ -148,9 +153,10 @@ export function wdwTurningA(
   phi2: number,
   m: number,
   lambda: number,
-  asymmetry: number = 1
+  asymmetry: number = 1,
+  phi3: number = 0
 ): number | null {
-  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry)
+  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry, phi3)
   if (V <= 0) return null
   return 1 / Math.sqrt(WDW_G_PREFACTOR * V)
 }
@@ -188,9 +194,10 @@ export function wdwEuclideanWkbAction(
   phi2: number,
   m: number,
   lambda: number,
-  asymmetry: number = 1
+  asymmetry: number = 1,
+  phi3: number = 0
 ): number {
-  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry)
+  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry, phi3)
   if (V <= 0) return 0
   const KVa2 = WDW_G_PREFACTOR * V * a * a
   if (KVa2 <= 1) return 0
@@ -236,9 +243,10 @@ export function wdwLorentzianWkbAction(
   phi2: number,
   m: number,
   lambda: number,
-  asymmetry: number = 1
+  asymmetry: number = 1,
+  phi3: number = 0
 ): number {
-  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry)
+  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry, phi3)
   if (V <= 0) return 0
   const KVa2 = WDW_G_PREFACTOR * V * a * a
   if (KVa2 >= 1) return 0
@@ -279,9 +287,10 @@ export function wdwLorentzianWkbPhase(
   phi2: number,
   m: number,
   lambda: number,
-  asymmetry: number = 1
+  asymmetry: number = 1,
+  phi3: number = 0
 ): number {
-  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry)
+  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry, phi3)
   if (V > 0) {
     const KVa2 = WDW_G_PREFACTOR * V * a * a
     if (KVa2 >= 1) return 3 / (4 * V)
@@ -327,9 +336,10 @@ export function wdwLangerVariable(
   phi2: number,
   m: number,
   lambda: number,
-  asymmetry: number = 1
+  asymmetry: number = 1,
+  phi3: number = 0
 ): number {
-  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry)
+  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry, phi3)
   if (V <= 0) return 0
   const KVa2 = WDW_G_PREFACTOR * V * a * a
   if (KVa2 >= 1) {

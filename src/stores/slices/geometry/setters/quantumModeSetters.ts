@@ -38,6 +38,7 @@ import type { ExtendedObjectSlice } from '../types'
 import { reconcileCosmologyInvariants } from './freeScalarCosmologySetters'
 import type { SetterContext } from './sliceSetterUtils'
 import { clampDtWithCfl } from './sliceSetterUtils'
+import { resizeWdwForGeometryDimension } from './wheelerDeWittSetters'
 
 // ---------------------------------------------------------------------------
 // Per-mode session cache for shared rendering settings
@@ -278,6 +279,10 @@ function buildModeResizeUpdate(
     becDynamics: resizeBec,
     diracEquation: resizeDirac,
     quantumWalk: (s, d) => resizeQWalk(s, d),
+    wheelerDeWitt: (s, d) => {
+      const update = resizeWdwForGeometryDimension(s.wheelerDeWitt, d)
+      return update ? { wheelerDeWitt: { ...s.wheelerDeWitt, ...update } } : {}
+    },
   }
   const handler = handlers[mode]
   return handler ? handler(state, dim, resizers) : {}

@@ -52,7 +52,7 @@ import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
 import { clamp01 } from '@/lib/math/clamp'
 import { packRGBA16F } from '@/lib/physics/freeScalar/halfFloatPacking'
 
-import type { WheelerDeWittSolverOutput } from '../solver'
+import type { WheelerDeWittAnySolverOutput } from '../solver'
 import type { StreamlineOverlay } from '../wkbStreamlines'
 
 export const MAX_WDW_DENSITY_GRID_SIZE = 256
@@ -240,7 +240,7 @@ export function clampWdwHeadroom(
  * @returns `maxRho_render` in the same units as `output.maxDensity`.
  */
 export function computeWdwRenderMaxRho(
-  output: WheelerDeWittSolverOutput,
+  output: WheelerDeWittAnySolverOutput,
   headroom: number = WDW_EUCLIDEAN_RENDER_HEADROOM
 ): number {
   const h = clampWdwHeadroom(headroom)
@@ -347,6 +347,49 @@ function sampleChiTrilinear(
 
   CHI_SAMPLE_OUT[0] = re0 + (re1 - re0) * w2
   CHI_SAMPLE_OUT[1] = im0 + (im1 - im0) * w2
+  return CHI_SAMPLE_OUT
+}
+
+function sampleChiQuadlinear(
+  chi: Float32Array,
+  slab: number,
+  Nphi: number,
+  ia0: number,
+  ia1: number,
+  i10: number,
+  i11: number,
+  i20: number,
+  i21: number,
+  i30: number,
+  i31: number,
+  wa: number,
+  w1: number,
+  w2: number,
+  w3: number
+): Float64Array {
+  let re = 0
+  let im = 0
+  for (let ba = 0; ba <= 1; ba++) {
+    const ia = ba === 0 ? ia0 : ia1
+    const waPart = ba === 0 ? 1 - wa : wa
+    for (let b1 = 0; b1 <= 1; b1++) {
+      const i1 = b1 === 0 ? i10 : i11
+      const w1Part = b1 === 0 ? 1 - w1 : w1
+      for (let b2 = 0; b2 <= 1; b2++) {
+        const i2 = b2 === 0 ? i20 : i21
+        const w2Part = b2 === 0 ? 1 - w2 : w2
+        for (let b3 = 0; b3 <= 1; b3++) {
+          const i3 = b3 === 0 ? i30 : i31
+          const w = waPart * w1Part * w2Part * (b3 === 0 ? 1 - w3 : w3)
+          const off = 2 * (ia * slab + (i1 * Nphi + i2) * Nphi + i3)
+          re += (chi[off] ?? 0) * w
+          im += (chi[off + 1] ?? 0) * w
+        }
+      }
+    }
+  }
+  CHI_SAMPLE_OUT[0] = re
+  CHI_SAMPLE_OUT[1] = im
   return CHI_SAMPLE_OUT
 }
 
@@ -513,6 +556,11 @@ export interface WdwPackScratch {
   baselineAlpha?: Float32Array
 }
 
+export interface WdwDensityPackOptions {
+  /** Fixed normalized `φ₃` slice used when packing 4D output. */
+  phi3SliceNormalized?: number
+}
+
 export {
   applyWdwPulseAlpha,
   applyWdwPulseAlphaRows,
@@ -547,12 +595,13 @@ export {
  * @returns Upload-ready `Uint16Array` + texture layout.
  */
 export function packWdwDensityGrid(
-  output: WheelerDeWittSolverOutput,
+  output: WheelerDeWittAnySolverOutput,
   overlay: StreamlineOverlay | null,
   srmtOverlay?: WdwSrmtOverlay,
   targetGridSize: number = DENSITY_GRID_SIZE,
   headroom: number = WDW_EUCLIDEAN_RENDER_HEADROOM,
-  scratch?: WdwPackScratch
+  scratch?: WdwPackScratch,
+  options?: WdwDensityPackOptions
 ): WdwDensityUpload {
   const N = resolveWdwDensityGridSize(targetGridSize)
   const total = N * N * N
@@ -564,7 +613,8 @@ export function packWdwDensityGrid(
     scratch?.baselineAlpha && scratch.baselineAlpha.length === total ? scratch.baselineAlpha : null
 
   const [Na, Nphi] = output.gridSize
-  const slab = Nphi * Nphi
+  const is4d = output.gridSize.length === 4
+  const slab = is4d ? Nphi * Nphi * Nphi : Nphi * Nphi
   // `maxRho` is the R-channel normalisation base — capped to
   // `headroom · max_Lorentzian` so Vilenkin's Airy Bi blowup at cube
   // corners cannot crush the Lorentzian interior into invisibility.
@@ -587,8 +637,12 @@ export function packWdwDensityGrid(
   const iPhiScale = Nphi > 1 ? Nphi - 1 : 0
 
   const chi = output.chi
-  const overlayIntensity = overlay?.intensity ?? null
-  const srmtState = buildSrmtState(srmtOverlay, N)
+  const overlayIntensity = !is4d ? (overlay?.intensity ?? null) : null
+  const srmtState = !is4d ? buildSrmtState(srmtOverlay, N) : null
+  const f3 = clamp01(options?.phi3SliceNormalized ?? 0.5) * iPhiScale
+  const i30 = Math.min(Nphi - 1, Math.max(0, Math.floor(f3)))
+  const i31 = Math.min(Nphi - 1, i30 + 1)
+  const w3 = f3 - i30
 
   for (let z = 0; z < N; z++) {
     const tz = (z + 0.5) / N
@@ -610,20 +664,38 @@ export function packWdwDensityGrid(
         const wa = fx - ia0
         const pixelIdx = (z * N + y) * N + x
 
-        const chiSample = sampleChiTrilinear(
-          chi,
-          slab,
-          Nphi,
-          ia0,
-          ia1,
-          i10,
-          i11,
-          i20,
-          i21,
-          wa,
-          w1,
-          w2
-        )
+        const chiSample = is4d
+          ? sampleChiQuadlinear(
+              chi,
+              slab,
+              Nphi,
+              ia0,
+              ia1,
+              i10,
+              i11,
+              i20,
+              i21,
+              i30,
+              i31,
+              wa,
+              w1,
+              w2,
+              w3
+            )
+          : sampleChiTrilinear(
+              chi,
+              slab,
+              Nphi,
+              ia0,
+              ia1,
+              i10,
+              i11,
+              i20,
+              i21,
+              wa,
+              w1,
+              w2
+            )
         const re = chiSample[0]!
         const im = chiSample[1]!
 

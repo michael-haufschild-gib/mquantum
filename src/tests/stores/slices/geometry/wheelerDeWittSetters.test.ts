@@ -11,6 +11,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 const getWdw = () => useExtendedObjectStore.getState().schroedinger.wheelerDeWitt
 
@@ -20,6 +21,7 @@ describe('wheelerDeWittSetters — render-only animation effects', () => {
     // observable as a transition from false → true (any render-only setter
     // must NOT flip it, so we expect false after calling each one).
     useExtendedObjectStore.getState().reset()
+    useGeometryStore.getState().setDimension(3)
     useExtendedObjectStore.getState().clearComputeNeedsReset('wheelerDeWitt')
     expect(getWdw().needsReset).toBe(false)
   })
@@ -168,6 +170,74 @@ describe('wheelerDeWittSetters — render-only animation effects', () => {
     })
   })
 
+  describe('4D minisuperspace setters', () => {
+    it('global dimension selector switches WDW to 4D defaults and disables unsupported overlays', () => {
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('wheelerDeWitt')
+      useExtendedObjectStore.getState().setWdwStreamlinesEnabled(true)
+      useExtendedObjectStore.getState().setWdwWorldlineEnabled(true)
+      useExtendedObjectStore.getState().setWdwSrmtEnabled(true)
+      useExtendedObjectStore.getState().clearComputeNeedsReset('wheelerDeWitt')
+
+      useGeometryStore.getState().setDimension(4)
+
+      expect(getWdw().minisuperspaceDimension).toBe(4)
+      expect(getWdw().gridNa).toBe(48)
+      expect(getWdw().gridNphi).toBe(12)
+      expect(getWdw().phi3SliceNormalized).toBe(0.5)
+      expect(getWdw().streamlinesEnabled).toBe(false)
+      expect(getWdw().worldlineEnabled).toBe(false)
+      expect(getWdw().srmtEnabled).toBe(false)
+      expect(getWdw().needsReset).toBe(true)
+    })
+
+    it('switches to 4D with conservative grid defaults and disables unsupported overlays', () => {
+      useExtendedObjectStore.getState().setWdwStreamlinesEnabled(true)
+      useExtendedObjectStore.getState().setWdwWorldlineEnabled(true)
+      useExtendedObjectStore.getState().setWdwSrmtEnabled(true)
+      useExtendedObjectStore.getState().clearComputeNeedsReset('wheelerDeWitt')
+
+      useExtendedObjectStore.getState().setWdwMinisuperspaceDimension(4)
+
+      expect(getWdw().minisuperspaceDimension).toBe(4)
+      expect(getWdw().gridNa).toBe(48)
+      expect(getWdw().gridNphi).toBe(12)
+      expect(getWdw().phi3SliceNormalized).toBe(0.5)
+      expect(getWdw().streamlinesEnabled).toBe(false)
+      expect(getWdw().worldlineEnabled).toBe(false)
+      expect(getWdw().srmtEnabled).toBe(false)
+      expect(getWdw().needsReset).toBe(true)
+    })
+
+    it('uses 4D grid presets and clamps custom 4D dimensions conservatively', () => {
+      useExtendedObjectStore.getState().setWdwMinisuperspaceDimension(4)
+      useExtendedObjectStore.getState().setWdwGridSize('medium')
+      expect(getWdw().gridNa).toBe(64)
+      expect(getWdw().gridNphi).toBe(16)
+
+      useExtendedObjectStore.getState().setWdwGridDimensions(999, 999)
+      expect(getWdw().gridNa).toBe(128)
+      expect(getWdw().gridNphi).toBe(24)
+    })
+
+    it('clamps φ3 slice without forcing a solver reset', () => {
+      useExtendedObjectStore.getState().setWdwMinisuperspaceDimension(4)
+      useExtendedObjectStore.getState().clearComputeNeedsReset('wheelerDeWitt')
+      useExtendedObjectStore.getState().setWdwPhi3SliceNormalized(2)
+      expect(getWdw().phi3SliceNormalized).toBe(1)
+      expect(getWdw().needsReset).toBe(false)
+    })
+
+    it('guards unsupported display toggles while in 4D', () => {
+      useExtendedObjectStore.getState().setWdwMinisuperspaceDimension(4)
+      useExtendedObjectStore.getState().setWdwStreamlinesEnabled(true)
+      useExtendedObjectStore.getState().setWdwWorldlineEnabled(true)
+      useExtendedObjectStore.getState().setWdwSrmtEnabled(true)
+      expect(getWdw().streamlinesEnabled).toBe(false)
+      expect(getWdw().worldlineEnabled).toBe(false)
+      expect(getWdw().srmtEnabled).toBe(false)
+    })
+  })
+
   describe('contrast: existing physics setters still flip needsReset', () => {
     it('setWdwInflatonMass (physics) flips needsReset — regression guard for the withReset split', () => {
       useExtendedObjectStore.getState().setWdwInflatonMass(0.5)
@@ -180,6 +250,7 @@ describe('wheelerDeWittSetters — render-only animation effects', () => {
 describe('wheelerDeWittSetters — applyWheelerDeWittPreset', () => {
   beforeEach(() => {
     useExtendedObjectStore.getState().reset()
+    useGeometryStore.getState().setDimension(3)
     useExtendedObjectStore.getState().clearComputeNeedsReset('wheelerDeWitt')
     expect(getWdw().needsReset).toBe(false)
   })
@@ -245,47 +316,69 @@ describe('wheelerDeWittSetters — applyWheelerDeWittPreset', () => {
     boundaryCondition: 'noBoundary' | 'tunneling' | 'deWitt'
     inflatonMass: number
     cosmologicalConstant: number
+    dimension: 3 | 4
   }> = [
     {
       id: 'noBoundaryBaseline',
       boundaryCondition: 'noBoundary',
       inflatonMass: 0.3,
       cosmologicalConstant: 0.0,
+      dimension: 3,
     },
     {
       id: 'vilenkinTunneling',
       boundaryCondition: 'tunneling',
       inflatonMass: 0.3,
       cosmologicalConstant: 0.3,
+      dimension: 3,
     },
     {
       id: 'deWittOrigin',
       boundaryCondition: 'deWitt',
       inflatonMass: 0.3,
       cosmologicalConstant: 0.0,
+      dimension: 3,
     },
     {
       id: 'inflationHighMass',
       boundaryCondition: 'noBoundary',
       inflatonMass: 0.8,
       cosmologicalConstant: 0.0,
+      dimension: 3,
     },
     {
       id: 'deSitterLargeLambda',
       boundaryCondition: 'noBoundary',
       inflatonMass: 0.3,
       cosmologicalConstant: 0.8,
+      dimension: 3,
     },
     {
       id: 'antiDeSitterContracting',
       boundaryCondition: 'noBoundary',
       inflatonMass: 0.5,
       cosmologicalConstant: -0.5,
+      dimension: 3,
+    },
+    {
+      id: 'fourDimensionalNoBoundarySlice',
+      boundaryCondition: 'noBoundary',
+      inflatonMass: 0.25,
+      cosmologicalConstant: 0.15,
+      dimension: 4,
+    },
+    {
+      id: 'fourDimensionalTunnelingRidge',
+      boundaryCondition: 'tunneling',
+      inflatonMass: 0.35,
+      cosmologicalConstant: 0.25,
+      dimension: 4,
     },
   ]
 
   for (const preset of CURATED_PRESET_EXPECTATIONS) {
     it(`applies preset '${preset.id}' to the three physics fields`, async () => {
+      useGeometryStore.getState().setDimension(preset.dimension)
       await useExtendedObjectStore.getState().applyWheelerDeWittPreset(preset.id)
       const after = getWdw()
       expect(after.boundaryCondition).toBe(preset.boundaryCondition)
@@ -294,4 +387,25 @@ describe('wheelerDeWittSetters — applyWheelerDeWittPreset', () => {
       expect(after.needsReset).toBe(true)
     })
   }
+
+  it('applies 4D presets with grid, slice, and unsupported overlays fixed', async () => {
+    useGeometryStore.getState().setDimension(4)
+    await useExtendedObjectStore.getState().applyWheelerDeWittPreset('fourDimensionalTunnelingRidge')
+    const after = getWdw()
+    expect(after.minisuperspaceDimension).toBe(4)
+    expect(after.gridNa).toBe(48)
+    expect(after.gridNphi).toBe(12)
+    expect(after.phi3SliceNormalized).toBe(0.65)
+    expect(after.streamlinesEnabled).toBe(false)
+    expect(after.worldlineEnabled).toBe(false)
+    expect(after.srmtEnabled).toBe(false)
+  })
+
+  it('does not apply a preset from the wrong global dimension', async () => {
+    await useExtendedObjectStore.getState().applyWheelerDeWittPreset('fourDimensionalTunnelingRidge')
+    expect(getWdw().boundaryCondition).toBe('noBoundary')
+    expect(getWdw().inflatonMass).toBeCloseTo(0.3)
+    expect(getWdw().cosmologicalConstant).toBeCloseTo(0)
+    expect(getWdw().needsReset).toBe(false)
+  })
 })

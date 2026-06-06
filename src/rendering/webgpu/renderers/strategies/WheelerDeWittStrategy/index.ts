@@ -26,6 +26,7 @@ import {
   WDW_EUCLIDEAN_RENDER_HEADROOM,
   type WdwPulseAlphaScratch,
 } from '@/lib/physics/wheelerDeWitt/densityGrid'
+import type { WheelerDeWittSolverOutput } from '@/lib/physics/wheelerDeWitt/solver'
 import {
   buildPulseOverlay,
   buildStaticOverlay,
@@ -117,6 +118,7 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
    * first packed frame primes it unconditionally.
    */
   private lastRenderDynamicRange = Number.NaN
+  private lastPhi3SliceNormalized = Number.NaN
 
   /**
    * Persistent scratch buffers that back the render hot path. Resized
@@ -196,26 +198,37 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     const extended = getStoreSnapshot<ExtendedStoreSnapshot>(ctx, 'extended')
     const wdw = extended?.schroedinger?.wheelerDeWitt as WheelerDeWittConfig | undefined
     if (!wdw) return
+    const is4d = (wdw.minisuperspaceDimension ?? 3) === 4
 
     const physicsTick = this.physics.update(wdw, () =>
       extended?.clearComputeNeedsReset?.('wheelerDeWitt')
     )
     if (!physicsTick.output) return
+    const output3d =
+      physicsTick.output.gridSize.length === 3
+        ? (physicsTick.output as WheelerDeWittSolverOutput)
+        : null
 
-    const srmtTick = this.srmt.update(wdw, physicsTick.output, physicsTick.solverDirty)
-    this.srmtSweep.update(wdw, physicsTick.solverDirty)
-    this.srmtSweep.maybeDispatchPending(wdw, physicsTick.output, physicsTick.solverDirty)
+    const srmtTick = is4d
+      ? { overlayDirty: false, overlay: null }
+      : this.srmt.update(wdw, output3d, physicsTick.solverDirty)
+    if (!is4d && output3d) {
+      this.srmtSweep.update(wdw, physicsTick.solverDirty)
+      this.srmtSweep.maybeDispatchPending(wdw, output3d, physicsTick.solverDirty)
+    }
 
     const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
     const isPlaying = animation?.isPlaying ?? false
     const pulseClock = animation?.accumulatedTime ?? 0
-    const worldlineEnabled = !!wdw.worldlineEnabled
+    const worldlineEnabled = !is4d && !!wdw.worldlineEnabled
     const worldlineVisible = worldlineEnabled && (physicsTick.trajectories?.length ?? 0) > 0
     const worldlineAnimating = worldlineVisible && isPlaying
     const worldlineToggled = worldlineEnabled !== this.lastWorldlineEnabled
 
     const headroom = clampWdwHeadroom(wdw.renderDynamicRange ?? WDW_EUCLIDEAN_RENDER_HEADROOM)
     const headroomChanged = headroom !== this.lastRenderDynamicRange
+    const phi3SliceNormalized = wdw.phi3SliceNormalized ?? 0.5
+    const phi3SliceChanged = is4d && phi3SliceNormalized !== this.lastPhi3SliceNormalized
 
     const N = this.densityTexture.width
     // A density-grid resolution change recreates the 3D texture in
@@ -242,6 +255,7 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
       worldlineToggled ||
       srmtTick.overlayDirty ||
       headroomChanged ||
+      phi3SliceChanged ||
       resolutionChanged ||
       this.baselineDensity === null
     const pulseUpdateDue =
@@ -262,11 +276,11 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
       // we omit the static overlay from baseline (pulse fills A via the
       // animation tick below).
       const staticOverlay =
-        !worldlineEnabled && wdw.streamlinesEnabled && physicsTick.trajectories
+        !is4d && !worldlineEnabled && wdw.streamlinesEnabled && physicsTick.trajectories
           ? buildStaticOverlay(
               physicsTick.trajectories,
               DEFAULT_STREAMLINE_INPUT.splatRadius,
-              physicsTick.output.gridSize
+              physicsTick.output.gridSize as [number, number, number]
             )
           : null
       packWdwDensityGrid(
@@ -275,7 +289,8 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
         srmtTick.overlay ?? undefined,
         N,
         headroom,
-        { density: this.workingDensity!, baselineAlpha: this.baselineAlpha! }
+        { density: this.workingDensity!, baselineAlpha: this.baselineAlpha! },
+        { phi3SliceNormalized }
       )
       // Snapshot baseline for subsequent animation-only ticks.
       this.baselineDensity!.set(this.workingDensity!)
@@ -287,7 +302,7 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
       const pulseOverlay = this.buildPulseOverlayScratch(
         wdw,
         physicsTick.trajectories!,
-        physicsTick.output.gridSize,
+        physicsTick.output.gridSize as [number, number, number],
         animation
       )
       if (pulseOverlay) {
@@ -295,7 +310,7 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
           this.baselineDensity!,
           this.baselineAlpha!,
           pulseOverlay,
-          physicsTick.output.gridSize,
+          physicsTick.output.gridSize as [number, number, number],
           N,
           this.workingDensity!,
           this.pulseAlphaScratch
@@ -322,6 +337,7 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
 
     this.lastWorldlineEnabled = worldlineEnabled
     this.lastRenderDynamicRange = headroom
+    this.lastPhi3SliceNormalized = phi3SliceNormalized
   }
 
   /**
@@ -329,7 +345,10 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
    * current density grid (`N³` voxels) and solver grid (`Na·Nphi²`
    * cells). Reallocates only when the grid size actually changes.
    */
-  private ensureScratchBuffers(N: number, solverGrid: [number, number, number]): void {
+  private ensureScratchBuffers(
+    N: number,
+    solverGrid: [number, number, number] | [number, number, number, number]
+  ): void {
     const totalDensity = N * N * N
     if (!this.workingDensity || this.workingDensity.length !== totalDensity * 4) {
       this.workingDensity = new Uint16Array(totalDensity * 4)
@@ -337,8 +356,8 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
       this.baselineAlpha = new Float32Array(totalDensity)
       this.baselineGridSize = N
     }
-    const solverKey = `${solverGrid[0]}x${solverGrid[1]}x${solverGrid[2]}`
-    const totalSolver = solverGrid[0] * solverGrid[1] * solverGrid[2]
+    const solverKey = solverGrid.join('x')
+    const totalSolver = solverGrid.reduce((acc, size) => acc * size, 1)
     if (!this.pulseIntensityScratch || this.pulseIntensityGridSig !== solverKey) {
       this.pulseIntensityScratch = new Float32Array(totalSolver)
       this.pulseIntensityGridSig = solverKey

@@ -13,6 +13,10 @@ const WDW_BOUNDARY_CONDITIONS: readonly WdwBoundaryCondition[] = [
 export const WDW_SOLVER_MAX_GRID_NA = 1024
 /** Maximum samples per inflaton axis accepted by the WdW solver before allocation. */
 export const WDW_SOLVER_MAX_GRID_NPHI = 128
+/** Maximum 4D `a`-axis samples accepted before allocation. */
+export const WDW_SOLVER_4D_MAX_GRID_NA = 128
+/** Maximum 4D samples per inflaton axis accepted before allocation. */
+export const WDW_SOLVER_4D_MAX_GRID_NPHI = 24
 /** Minimum inflaton mass accepted by public WdW solver inputs. */
 export const WDW_SOLVER_MIN_INFLATON_MASS = 0
 /** Maximum inflaton mass accepted by public WdW solver inputs. */
@@ -71,6 +75,10 @@ function assertIntegerInRange(name: string, value: number, min: number, max: num
  * directly; this is the last shared guardrail.
  */
 export function validateWheelerDeWittSolverInput(input: WheelerDeWittSolverInput): void {
+  const minisuperspaceDimension = input.minisuperspaceDimension ?? 3
+  if (minisuperspaceDimension !== 3 && minisuperspaceDimension !== 4) {
+    throw new Error('minisuperspaceDimension must be 3 or 4')
+  }
   if (!isWdwBoundaryCondition(input.boundaryCondition)) {
     throw new Error('boundaryCondition must be one of: noBoundary, tunneling, deWitt')
   }
@@ -106,8 +114,18 @@ export function validateWheelerDeWittSolverInput(input: WheelerDeWittSolverInput
   if (input.aMax - input.aMin < WDW_SOLVER_MIN_A_SPAN) {
     throw new Error(`aMax must exceed aMin by at least ${WDW_SOLVER_MIN_A_SPAN}`)
   }
-  assertIntegerInRange('gridNa', input.gridNa, 3, WDW_SOLVER_MAX_GRID_NA)
-  assertIntegerInRange('gridNphi', input.gridNphi, 3, WDW_SOLVER_MAX_GRID_NPHI)
+  assertIntegerInRange(
+    'gridNa',
+    input.gridNa,
+    3,
+    minisuperspaceDimension === 4 ? WDW_SOLVER_4D_MAX_GRID_NA : WDW_SOLVER_MAX_GRID_NA
+  )
+  assertIntegerInRange(
+    'gridNphi',
+    input.gridNphi,
+    3,
+    minisuperspaceDimension === 4 ? WDW_SOLVER_4D_MAX_GRID_NPHI : WDW_SOLVER_MAX_GRID_NPHI
+  )
   assertFiniteInRange(
     'phiExtent',
     input.phiExtent,
@@ -132,13 +150,13 @@ export function validateWdwCustomBoundary(
   if (customBoundary.chi.length !== expectedLength) {
     throw new Error(
       `customBoundary.chi length ${customBoundary.chi.length} does not match ` +
-        `expected 2·Nphi·Nphi = ${expectedLength}`
+        `expected length ${expectedLength}`
     )
   }
   if (customBoundary.chiDeriv.length !== expectedLength) {
     throw new Error(
       `customBoundary.chiDeriv length ${customBoundary.chiDeriv.length} does not match ` +
-        `expected 2·Nphi·Nphi = ${expectedLength}`
+        `expected length ${expectedLength}`
     )
   }
   assertFiniteBuffer('customBoundary.chi', customBoundary.chi)

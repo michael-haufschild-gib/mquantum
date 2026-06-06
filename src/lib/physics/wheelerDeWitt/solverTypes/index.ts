@@ -14,8 +14,13 @@ import type { WdwBoundaryCondition } from '@/lib/geometry/extended/wheelerDeWitt
 import type { ColumnAiryInfo } from '../airyConnection'
 import type { WdwBoundaryField } from '../boundaryConditions'
 
+export type WdwMinisuperspaceDimension = 3 | 4
+export type WheelerDeWittGridSize = [number, number, number] | [number, number, number, number]
+
 /** Solver inputs mirroring the WdW config fields. */
 export interface WheelerDeWittSolverInput {
+  /** Minisuperspace dimension. Defaults to 3 for legacy `(a, φ₁, φ₂)` solves. */
+  minisuperspaceDimension?: WdwMinisuperspaceDimension
   boundaryCondition: WdwBoundaryCondition
   inflatonMass: number
   /**
@@ -46,8 +51,10 @@ export interface WheelerDeWittSolverInput {
    *
    * Buffer layout MUST match the BC-generator output: each entry is an
    * interleaved `(re, im)` complex pair indexed by
-   * `i = i_phi1 * Nphi + i_phi2`. Total length per buffer:
-   * `2 · Nphi · Nphi`. Mismatched lengths throw.
+   * `i = i_phi1 * Nphi + i_phi2` for 3D, or
+   * `i = (i_phi1 * Nphi + i_phi2) * Nphi + i_phi3` for 4D. Total
+   * length per buffer is `2 · Nphi²` in 3D and `2 · Nphi³` in 4D.
+   * Mismatched lengths throw.
    *
    * **Caveat**: Stage-3 Airy/Langer overwrite still consults
    * `boundaryCondition` for the per-BC c1/c2 branch selection rule
@@ -69,8 +76,7 @@ export interface WheelerDeWittSolverInput {
   disableSponge?: boolean
 }
 
-/** Dense output of the Wheeler–DeWitt solver. */
-export interface WheelerDeWittSolverOutput {
+interface WheelerDeWittSolverOutputBase {
   /**
    * `χ(a, φ₁, φ₂)` as interleaved `(re, im)` pairs. Strides in units of
    * complex entries: `stride_a = Nphi·Nphi`, `stride_phi1 = Nphi`,
@@ -87,8 +93,6 @@ export interface WheelerDeWittSolverOutput {
    * Exposed so tests can validate band structure directly.
    */
   bandKind: Uint8Array
-  /** Grid dimensions `(Na, Nphi, Nphi)`. */
-  gridSize: [number, number, number]
   /** Physical grid extents (consumers read for coordinate mapping). */
   aMin: number
   aMax: number
@@ -105,6 +109,22 @@ export interface WheelerDeWittSolverOutput {
    */
   columnAiry: ColumnAiryInfo[]
 }
+
+/** Dense 3D output of the Wheeler–DeWitt solver. */
+export interface WheelerDeWittSolverOutput extends WheelerDeWittSolverOutputBase {
+  /** Grid dimensions `(Na, Nphi, Nphi)`. */
+  gridSize: [number, number, number]
+}
+
+/** Dense 4D output of the Wheeler–DeWitt solver. */
+export interface WheelerDeWittSolverOutput4D extends WheelerDeWittSolverOutputBase {
+  /** Grid dimensions `(Na, Nphi, Nphi, Nphi)`. */
+  gridSize: [number, number, number, number]
+}
+
+export type WheelerDeWittAnySolverOutput =
+  | WheelerDeWittSolverOutput
+  | WheelerDeWittSolverOutput4D
 
 /** Result of the per-cell φ-Laplacian stencil: `(Re, Im)` pair. */
 export interface ComplexPair {

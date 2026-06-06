@@ -15,9 +15,12 @@ import { Switch } from '@/components/ui/Switch'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import type { WdwBoundaryCondition } from '@/lib/geometry/extended/wheelerDeWitt'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 import {
   WDW_GRID_PRESETS,
+  WDW_GRID_PRESETS_4D,
   type WdwGridPreset,
+  type WdwGridPreset4D,
 } from '@/stores/slices/geometry/setters/wheelerDeWittSetters'
 
 const BOUNDARY_CONDITION_OPTIONS = [
@@ -32,9 +35,25 @@ const GRID_PRESET_OPTIONS = [
   { value: 'high', label: 'High' },
   { value: 'publication', label: 'Publication' },
 ]
+const GRID_PRESET_OPTIONS_4D = [
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+]
 
 /** Resolve the current `(gridNa, gridNphi)` pair to a preset label. */
-function gridPresetKey(gridNa: number, gridNphi: number): WdwGridPreset {
+function gridPresetKey(
+  dimension: 3 | 4,
+  gridNa: number,
+  gridNphi: number
+): WdwGridPreset {
+  if (dimension === 4) {
+    for (const key of ['low', 'medium', 'high'] as const) {
+      const p = WDW_GRID_PRESETS_4D[key]
+      if (p.gridNa === gridNa && p.gridNphi === gridNphi) return key
+    }
+    return 'low'
+  }
   for (const key of ['low', 'medium', 'high', 'publication'] as const) {
     const p = WDW_GRID_PRESETS[key]
     if (p.gridNa === gridNa && p.gridNphi === gridNphi) return key
@@ -49,8 +68,10 @@ function gridPresetKey(gridNa: number, gridNphi: number): WdwGridPreset {
  * @returns Wheeler–DeWitt configuration UI
  */
 export const WheelerDeWittControls: React.FC = React.memo(() => {
+  const geometryDimension = useGeometryStore((s) => s.dimension)
   const {
     wdw,
+    setWdwPhi3SliceNormalized,
     setWdwBoundaryCondition,
     setWdwInflatonMass,
     setWdwInflatonMassAsymmetry,
@@ -61,6 +82,7 @@ export const WheelerDeWittControls: React.FC = React.memo(() => {
   } = useExtendedObjectStore(
     useShallow((s) => ({
       wdw: s.schroedinger.wheelerDeWitt,
+      setWdwPhi3SliceNormalized: s.setWdwPhi3SliceNormalized,
       setWdwBoundaryCondition: s.setWdwBoundaryCondition,
       setWdwInflatonMass: s.setWdwInflatonMass,
       setWdwInflatonMassAsymmetry: s.setWdwInflatonMassAsymmetry,
@@ -71,7 +93,9 @@ export const WheelerDeWittControls: React.FC = React.memo(() => {
     }))
   )
 
-  const activePreset = gridPresetKey(wdw.gridNa, wdw.gridNphi)
+  const minisuperspaceDimension = geometryDimension === 4 ? 4 : 3
+  const is4d = minisuperspaceDimension === 4
+  const activePreset = gridPresetKey(minisuperspaceDimension, wdw.gridNa, wdw.gridNphi)
 
   return (
     <div className="space-y-3" data-testid="wheeler-dewitt-controls">
@@ -90,7 +114,7 @@ export const WheelerDeWittControls: React.FC = React.memo(() => {
       />
       <Slider
         label="Inflaton mass m"
-        tooltip="Mass in V(φ) = ½m²φ₁² + ½(m·α)²φ₂² + Λ. Drives the slow-roll vs eternal-inflation character."
+        tooltip="Mass in V(φ) = ½m²(φ₁² + φ₃²) + ½(m·α)²φ₂² + Λ. In 3D, φ₃ = 0."
         min={0}
         max={2}
         step={0.01}
@@ -101,7 +125,7 @@ export const WheelerDeWittControls: React.FC = React.memo(() => {
       />
       <Slider
         label="Mass asymmetry α"
-        tooltip="Effective-mass ratio on the φ₂ axis (m_eff = m·α). α = 1 is isotropic. α ≠ 1 breaks the φ₁↔φ₂ exchange symmetry so the SRMT diagnostic can distinguish the three clocks {a, φ₁, φ₂}."
+        tooltip="Effective-mass ratio on the φ₂ axis (m_eff = m·α). φ₁ and φ₃ use the base mass m."
         min={0.1}
         max={10}
         step={0.01}
@@ -111,14 +135,31 @@ export const WheelerDeWittControls: React.FC = React.memo(() => {
         data-testid="wdw-asymmetry-slider"
       />
       <ToggleGroup
-        options={GRID_PRESET_OPTIONS}
+        options={is4d ? GRID_PRESET_OPTIONS_4D : GRID_PRESET_OPTIONS}
         value={activePreset}
-        onChange={(v) => setWdwGridSize(v as WdwGridPreset)}
+        onChange={(v) => setWdwGridSize(v as WdwGridPreset | WdwGridPreset4D)}
         ariaLabel="Wheeler–DeWitt grid size"
-        tooltip={`Solver grid: Low ${WDW_GRID_PRESETS.low.gridNa}×${WDW_GRID_PRESETS.low.gridNphi}², Medium ${WDW_GRID_PRESETS.medium.gridNa}×${WDW_GRID_PRESETS.medium.gridNphi}² (default), High ${WDW_GRID_PRESETS.high.gridNa}×${WDW_GRID_PRESETS.high.gridNphi}², Publication ${WDW_GRID_PRESETS.publication.gridNa}×${WDW_GRID_PRESETS.publication.gridNphi}². Higher = finer classical-regime fringes, slower solve.`}
+        tooltip={
+          is4d
+            ? `Solver grid: Low ${WDW_GRID_PRESETS_4D.low.gridNa}×${WDW_GRID_PRESETS_4D.low.gridNphi}³, Medium ${WDW_GRID_PRESETS_4D.medium.gridNa}×${WDW_GRID_PRESETS_4D.medium.gridNphi}³, High ${WDW_GRID_PRESETS_4D.high.gridNa}×${WDW_GRID_PRESETS_4D.high.gridNphi}³. 4D uses conservative caps.`
+            : `Solver grid: Low ${WDW_GRID_PRESETS.low.gridNa}×${WDW_GRID_PRESETS.low.gridNphi}², Medium ${WDW_GRID_PRESETS.medium.gridNa}×${WDW_GRID_PRESETS.medium.gridNphi}² (default), High ${WDW_GRID_PRESETS.high.gridNa}×${WDW_GRID_PRESETS.high.gridNphi}², Publication ${WDW_GRID_PRESETS.publication.gridNa}×${WDW_GRID_PRESETS.publication.gridNphi}². Higher = finer classical-regime fringes, slower solve.`
+        }
         fullWidth
         data-testid="wdw-grid-size"
       />
+      {is4d && (
+        <Slider
+          label="φ₃ slice"
+          tooltip="Fixed normalized φ₃ slice rendered into the 3D density texture."
+          min={0}
+          max={1}
+          step={0.01}
+          value={wdw.phi3SliceNormalized}
+          onChange={setWdwPhi3SliceNormalized}
+          showValue
+          data-testid="wdw-phi3-slice"
+        />
+      )}
       <Slider
         label="Cosmological constant Λ"
         tooltip="Added to V(φ). Positive Λ produces a de-Sitter-like Lorentzian region for small φ; strongly negative Λ yields AdS-like unbounded oscillation. Large positive Λ can push columns above the Airy/Langer extraction ceiling, so Euclidean boundary-condition differences may be visually muted."
@@ -130,25 +171,29 @@ export const WheelerDeWittControls: React.FC = React.memo(() => {
         showValue
         data-testid="wdw-lambda-slider"
       />
-      <Switch
-        label="WKB streamlines"
-        checked={wdw.streamlinesEnabled}
-        onCheckedChange={setWdwStreamlinesEnabled}
-        tooltip="Overlay WKB-classical streamlines on the Wheeler-DeWitt PDE"
-        data-testid="wdw-streamlines-switch"
-      />
-      {wdw.streamlinesEnabled && (
-        <Slider
-          label="Streamline density"
-          tooltip="Seeds per axis in the Lorentzian region (total seeds ≈ density²)."
-          min={2}
-          max={16}
-          step={1}
-          value={wdw.streamlineDensity}
-          onChange={setWdwStreamlineDensity}
-          showValue
-          data-testid="wdw-streamline-density"
-        />
+      {!is4d && (
+        <>
+          <Switch
+            label="WKB streamlines"
+            checked={wdw.streamlinesEnabled}
+            onCheckedChange={setWdwStreamlinesEnabled}
+            tooltip="Overlay WKB-classical streamlines on the Wheeler-DeWitt PDE"
+            data-testid="wdw-streamlines-switch"
+          />
+          {wdw.streamlinesEnabled && (
+            <Slider
+              label="Streamline density"
+              tooltip="Seeds per axis in the Lorentzian region (total seeds ≈ density²)."
+              min={2}
+              max={16}
+              step={1}
+              value={wdw.streamlineDensity}
+              onChange={setWdwStreamlineDensity}
+              showValue
+              data-testid="wdw-streamline-density"
+            />
+          )}
+        </>
       )}
     </div>
   )

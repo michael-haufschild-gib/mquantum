@@ -60,6 +60,7 @@ const VIEW_MAP: Record<string, number> = {
   phase: 6,
   axialCharge: 7,
   cliffordBloom: 8,
+  hubbleLace: 9,
 }
 
 /** Physics potential is disabled when the UI potential switch is off. */

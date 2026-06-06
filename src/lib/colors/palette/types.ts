@@ -270,6 +270,7 @@ export const DIRAC_FIELD_VIEW_TO_COLOR_ALGO: Record<DiracFieldView, ColorAlgorit
   phase: 'phaseCyclicUniform',
   axialCharge: 'blackbody',
   cliffordBloom: 'phaseDensity',
+  hubbleLace: 'phaseDensity',
 }
 
 /**

@@ -38,6 +38,7 @@ import type { SrmtSweepKind } from '@/lib/physics/srmt/sweepTypes'
 import { WDW_SOLVER_VERSION } from '@/lib/physics/wheelerDeWitt/solver'
 import { useSrmtSweepStore } from '@/stores/diagnostics/srmtSweepStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 import {
   clampUiStateToPhiExtent,
@@ -77,12 +78,26 @@ function defaultUiStateFor(
 
 /** Main entry point: gated by quantum mode. */
 export function SrmtSweepSection(): React.ReactElement {
-  const quantumMode = useExtendedObjectStore((s) => s.schroedinger.quantumMode)
+  const dimension = useGeometryStore((s) => s.dimension)
+  const { quantumMode } = useExtendedObjectStore(
+    useShallow((s) => ({
+      quantumMode: s.schroedinger.quantumMode,
+    }))
+  )
   if (quantumMode !== 'wheelerDeWitt') {
     return (
       <UnavailableSection
         title={SECTION_TITLE}
         reason="Available in Wheeler–DeWitt mode"
+        data-testid="srmt-sweep-section-unavailable"
+      />
+    )
+  }
+  if (dimension === 4) {
+    return (
+      <UnavailableSection
+        title={SECTION_TITLE}
+        reason="Unavailable in 4D Wheeler–DeWitt"
         data-testid="srmt-sweep-section-unavailable"
       />
     )

@@ -232,6 +232,7 @@ interface ColumnContext {
   /** Inflaton coordinates of the column. */
   phi1: number
   phi2: number
+  phi3?: number
   /** Inflaton mass. */
   mass: number
   /** Cosmological constant. */
@@ -258,7 +259,8 @@ interface ColumnContext {
  */
 export function extractColumnAiry(ctx: ColumnContext, bc: WdwBoundaryCondition): ColumnAiryInfo {
   const asymmetry = ctx.asymmetry ?? 1
-  const aTurn = wdwTurningA(ctx.phi1, ctx.phi2, ctx.mass, ctx.lambda, asymmetry)
+  const phi3 = ctx.phi3 ?? 0
+  const aTurn = wdwTurningA(ctx.phi1, ctx.phi2, ctx.mass, ctx.lambda, asymmetry, phi3)
   if (aTurn === null) return emptyColumnAiry(null)
   const aMax = ctx.aMin + (ctx.Na - 1) * ctx.da
   if (aTurn <= ctx.aMin) return emptyColumnAiry(aTurn)
@@ -270,7 +272,7 @@ export function extractColumnAiry(ctx: ColumnContext, bc: WdwBoundaryCondition):
   for (let ia = 0; ia < ctx.Na; ia++) {
     const a = ctx.aMin + ia * ctx.da
     if (a >= aTurn) break
-    const zeta = wdwLangerVariable(a, ctx.phi1, ctx.phi2, ctx.mass, ctx.lambda, asymmetry)
+    const zeta = wdwLangerVariable(a, ctx.phi1, ctx.phi2, ctx.mass, ctx.lambda, asymmetry, phi3)
     if (Math.abs(zeta) >= AIRY_CONNECTION_LZETA_MIN) samplesIa.push(ia)
   }
   if (samplesIa.length < MIN_EXTRACTION_CELLS) return emptyColumnAiry(aTurn)
@@ -288,8 +290,16 @@ export function extractColumnAiry(ctx: ColumnContext, bc: WdwBoundaryCondition):
   let bsIm = 0
   for (const ia of samplesIa) {
     const a = ctx.aMin + ia * ctx.da
-    const SL = wdwLorentzianWkbAction(a, ctx.phi1, ctx.phi2, ctx.mass, ctx.lambda, asymmetry)
-    const U = wdwU(a, ctx.phi1, ctx.phi2, ctx.mass, ctx.lambda, asymmetry)
+    const SL = wdwLorentzianWkbAction(
+      a,
+      ctx.phi1,
+      ctx.phi2,
+      ctx.mass,
+      ctx.lambda,
+      asymmetry,
+      phi3
+    )
+    const U = wdwU(a, ctx.phi1, ctx.phi2, ctx.mass, ctx.lambda, asymmetry, phi3)
     const c = Math.cos(SL)
     const s = Math.sin(SL)
     const cellOff = 2 * (ia * ctx.slabSize + ctx.slabIndex)
@@ -458,10 +468,11 @@ export function langerEvaluate(
   phi2: number,
   mass: number,
   lambda: number,
-  asymmetry: number = 1
+  asymmetry: number = 1,
+  phi3: number = 0
 ): { re: number; im: number } {
-  const zeta = wdwLangerVariable(a, phi1, phi2, mass, lambda, asymmetry)
-  const U = wdwU(a, phi1, phi2, mass, lambda, asymmetry)
+  const zeta = wdwLangerVariable(a, phi1, phi2, mass, lambda, asymmetry, phi3)
+  const U = wdwU(a, phi1, phi2, mass, lambda, asymmetry, phi3)
   let prefactor: number
   if (Math.abs(U) < LANGER_PREFACTOR_FLOOR) {
     // Linearised limit: (ζ/U)^{1/4} → κ^{-1/6}.

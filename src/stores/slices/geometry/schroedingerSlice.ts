@@ -50,7 +50,10 @@ import {
 } from './setters/sliceSetterUtils'
 import { createTdseSetters, resizeTdseArrays } from './setters/tdseSetters'
 import { createVisualEffectSetters } from './setters/visualEffectSetters'
-import { createWheelerDeWittSetters } from './setters/wheelerDeWittSetters'
+import {
+  createWheelerDeWittSetters,
+  resizeWdwForGeometryDimension,
+} from './setters/wheelerDeWittSetters'
 import { ExtendedObjectSlice, SchroedingerSlice } from './types'
 
 // ============================================================================
@@ -63,6 +66,7 @@ interface ModeResizeUpdates {
   bec?: Partial<BecConfig>
   dirac?: Partial<DiracConfig>
   quantumWalk?: Partial<import('@/lib/geometry/extended/quantumWalk').QuantumWalkConfig>
+  wheelerDeWitt?: Partial<SchroedingerConfig['wheelerDeWitt']>
 }
 
 /** Derive hydrogen-specific adjustments when switching to 2D. */
@@ -154,6 +158,10 @@ const MODE_RESIZE_MAP: Record<
     const update = resizeSimpleModeForDim(state.quantumWalk, dim, resizeQuantumWalkArrays, false)
     return update ? { quantumWalk: update } : {}
   },
+  wheelerDeWitt: (state, dim) => {
+    const update = resizeWdwForGeometryDimension(state.wheelerDeWitt, dim)
+    return update ? { wheelerDeWitt: update } : {}
+  },
 }
 
 function isSchroedingerQualityPreset(value: unknown): value is SchroedingerQualityPreset {
@@ -198,6 +206,9 @@ function applyModeResizeUpdates(
   }
   if (updates.quantumWalk) {
     result.quantumWalk = { ...schroedinger.quantumWalk, ...updates.quantumWalk }
+  }
+  if (updates.wheelerDeWitt) {
+    result.wheelerDeWitt = { ...schroedinger.wheelerDeWitt, ...updates.wheelerDeWitt }
   }
   return result
 }

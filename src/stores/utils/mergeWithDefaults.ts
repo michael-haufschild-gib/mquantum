@@ -47,6 +47,8 @@ import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
 import { sanitizeOpenQuantumConfig } from '@/lib/physics/openQuantum/types'
 import {
+  WDW_SOLVER_4D_MAX_GRID_NA,
+  WDW_SOLVER_4D_MAX_GRID_NPHI,
   isWdwBoundaryCondition,
   WDW_SOLVER_MAX_A_MAX,
   WDW_SOLVER_MAX_A_MIN,
@@ -406,6 +408,11 @@ function normalizeWheelerDeWittConfig(
 
   const current = wdw as Record<string, unknown>
   const defaults = DEFAULT_WHEELER_DEWITT_CONFIG
+  const minisuperspaceDimension = current.minisuperspaceDimension === 4 ? 4 : 3
+  const maxGridNa =
+    minisuperspaceDimension === 4 ? WDW_SOLVER_4D_MAX_GRID_NA : WDW_SOLVER_MAX_GRID_NA
+  const maxGridNphi =
+    minisuperspaceDimension === 4 ? WDW_SOLVER_4D_MAX_GRID_NPHI : WDW_SOLVER_MAX_GRID_NPHI
   let aMin = clampFiniteNumber(
     current.aMin,
     defaults.aMin,
@@ -427,6 +434,7 @@ function normalizeWheelerDeWittConfig(
     ...normalized,
     wheelerDeWitt: {
       ...current,
+      minisuperspaceDimension,
       boundaryCondition: isWdwBoundaryCondition(current.boundaryCondition)
         ? current.boundaryCondition
         : defaults.boundaryCondition,
@@ -450,12 +458,12 @@ function normalizeWheelerDeWittConfig(
       ),
       aMin,
       aMax,
-      gridNa: clampFiniteInteger(current.gridNa, defaults.gridNa, 16, WDW_SOLVER_MAX_GRID_NA),
+      gridNa: clampFiniteInteger(current.gridNa, defaults.gridNa, 16, maxGridNa),
       gridNphi: clampFiniteInteger(
         current.gridNphi,
         defaults.gridNphi,
         8,
-        WDW_SOLVER_MAX_GRID_NPHI
+        maxGridNphi
       ),
       phiExtent: clampFiniteNumber(
         current.phiExtent,
@@ -463,6 +471,18 @@ function normalizeWheelerDeWittConfig(
         WDW_SOLVER_MIN_PHI_EXTENT,
         WDW_SOLVER_MAX_PHI_EXTENT
       ),
+      phi3SliceNormalized: clampFiniteNumber(
+        current.phi3SliceNormalized,
+        defaults.phi3SliceNormalized,
+        0,
+        1
+      ),
+      streamlinesEnabled:
+        minisuperspaceDimension === 4
+          ? false
+          : typeof current.streamlinesEnabled === 'boolean'
+            ? current.streamlinesEnabled
+            : defaults.streamlinesEnabled,
       streamlineDensity: clampFiniteInteger(
         current.streamlineDensity,
         defaults.streamlineDensity,
@@ -482,6 +502,12 @@ function normalizeWheelerDeWittConfig(
         0.02,
         0.3
       ),
+      worldlineEnabled:
+        minisuperspaceDimension === 4
+          ? false
+          : typeof current.worldlineEnabled === 'boolean'
+            ? current.worldlineEnabled
+            : defaults.worldlineEnabled,
       renderDynamicRange: clampFiniteNumber(
         current.renderDynamicRange,
         defaults.renderDynamicRange,
@@ -489,6 +515,12 @@ function normalizeWheelerDeWittConfig(
         10_000
       ),
       srmtClock: isWdwSrmtClock(current.srmtClock) ? current.srmtClock : defaults.srmtClock,
+      srmtEnabled:
+        minisuperspaceDimension === 4
+          ? false
+          : typeof current.srmtEnabled === 'boolean'
+            ? current.srmtEnabled
+            : defaults.srmtEnabled,
       srmtCutNormalized: clampFiniteNumber(
         current.srmtCutNormalized,
         defaults.srmtCutNormalized,

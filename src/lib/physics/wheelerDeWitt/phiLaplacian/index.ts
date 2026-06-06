@@ -81,3 +81,48 @@ export function phiLaplacianAt(
     im: (pim1 + nim1 - 2 * cim + pim2 + nim2 - 2 * cim) * invDphi2,
   }
 }
+
+/**
+ * Compute the 3-axis Neumann-ghost φ-Laplacian at grid point
+ * `(i1, i2, i3)` in a contiguous `Nphi³` slab.
+ *
+ * Layout: `idx = (i1 * Nphi + i2) * Nphi + i3`, interleaved complex.
+ */
+export function phiLaplacianAt3D(
+  slab: Float32Array,
+  slabBase: number,
+  i1: number,
+  i2: number,
+  i3: number,
+  Nphi: number,
+  invDphi2: number
+): ComplexPair {
+  const idx = (i1 * Nphi + i2) * Nphi + i3
+  const center = slabBase + 2 * idx
+  const cre = slab[center] ?? 0
+  const cim = slab[center + 1] ?? 0
+
+  const read = (j1: number, j2: number, j3: number): ComplexPair => {
+    if (j1 < 0 || j1 >= Nphi || j2 < 0 || j2 >= Nphi || j3 < 0 || j3 >= Nphi) {
+      return { re: cre, im: cim }
+    }
+    const off = slabBase + 2 * ((j1 * Nphi + j2) * Nphi + j3)
+    return { re: slab[off] ?? 0, im: slab[off + 1] ?? 0 }
+  }
+
+  const p1 = read(i1 - 1, i2, i3)
+  const n1 = read(i1 + 1, i2, i3)
+  const p2 = read(i1, i2 - 1, i3)
+  const n2 = read(i1, i2 + 1, i3)
+  const p3 = read(i1, i2, i3 - 1)
+  const n3 = read(i1, i2, i3 + 1)
+
+  return {
+    re:
+      (p1.re + n1.re - 2 * cre + p2.re + n2.re - 2 * cre + p3.re + n3.re - 2 * cre) *
+      invDphi2,
+    im:
+      (p1.im + n1.im - 2 * cim + p2.im + n2.im - 2 * cim + p3.im + n3.im - 2 * cim) *
+      invDphi2,
+  }
+}

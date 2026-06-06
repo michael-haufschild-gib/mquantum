@@ -65,6 +65,11 @@ describe('DiracControls', () => {
     expect(screen.getByText('Clifford Bloom Resonator')).toBeInTheDocument()
   })
 
+  it('exposes Hubble Lace Aperture as a field view', () => {
+    render(<DiracControls config={defaultConfig()} dimension={3} actions={createMockActions()} />)
+    expect(screen.getByText('Hubble Lace Aperture')).toBeInTheDocument()
+  })
+
   it('renders grid size selector after expanding numerics group', () => {
     render(<DiracControls config={defaultConfig()} dimension={3} actions={createMockActions()} />)
     const header = screen.getByTestId('control-group-dirac-numerics-header')

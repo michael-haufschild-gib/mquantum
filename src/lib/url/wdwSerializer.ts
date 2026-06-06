@@ -13,6 +13,8 @@
  */
 
 import {
+  WDW_SOLVER_4D_MAX_GRID_NA,
+  WDW_SOLVER_4D_MAX_GRID_NPHI,
   WDW_SOLVER_MAX_COSMOLOGICAL_CONSTANT,
   WDW_SOLVER_MAX_GRID_NA,
   WDW_SOLVER_MAX_GRID_NPHI,
@@ -31,6 +33,7 @@ export type UrlWdwBoundaryCondition = (typeof VALID_WDW_BOUNDARY_CONDITIONS)[num
 
 /** Subset of fields the Wheeler–DeWitt block reads/writes on the URL payload. */
 export interface WdwUrlState {
+  wdwMinisuperspaceDimension?: 3 | 4
   wdwBoundaryCondition?: UrlWdwBoundaryCondition
   wdwInflatonMass?: number
   wdwInflatonMassAsymmetry?: number
@@ -39,6 +42,8 @@ export interface WdwUrlState {
   wdwGridNa?: number
   /** Number of φ grid points per inflaton axis (8..128). */
   wdwGridNphi?: number
+  /** Fixed normalized φ₃ slice for 4D output rendering. */
+  wdwPhi3SliceNormalized?: number
   wdwStreamlinesEnabled?: boolean
   wdwStreamlineDensity?: number
   wdwPhaseRotationEnabled?: boolean
@@ -99,6 +104,7 @@ function setFloatParam(
  * baseline share links stay clean.
  */
 export function serializeWdw(params: URLSearchParams, state: WdwUrlState): void {
+  if (state.wdwMinisuperspaceDimension === 4) params.set('wdw_dim', '4')
   setStringParam(params, 'wdw_bc', state.wdwBoundaryCondition)
   // `wdwInflatonMass` and `wdwPhaseRotationSpeed` emit zero values — m=0
   // is the free-kinetic regime (physically distinct from the default
@@ -114,6 +120,13 @@ export function serializeWdw(params: URLSearchParams, state: WdwUrlState): void 
   // otherwise physics/render detail silently diverge across recipients.
   setIntParam(params, 'wdw_gn_a', state.wdwGridNa)
   setIntParam(params, 'wdw_gn_p', state.wdwGridNphi)
+  if (
+    state.wdwMinisuperspaceDimension === 4 &&
+    state.wdwPhi3SliceNormalized !== undefined &&
+    state.wdwPhi3SliceNormalized !== 0.5
+  ) {
+    setFloatParam(params, 'wdw_phi3', state.wdwPhi3SliceNormalized, false, 3)
+  }
   setBoolParam(params, 'wdw_sl', state.wdwStreamlinesEnabled)
   setIntParam(params, 'wdw_sld', state.wdwStreamlineDensity)
   setBoolParam(params, 'wdw_pr', state.wdwPhaseRotationEnabled)
@@ -131,6 +144,8 @@ export function serializeWdw(params: URLSearchParams, state: WdwUrlState): void 
 
 /** Parse Wheeler–DeWitt URL params into the shared state object. */
 export function deserializeWdw(params: URLSearchParams, state: WdwUrlState): void {
+  const rawDim = parseIntParam(params, 'wdw_dim', 3, 4)
+  state.wdwMinisuperspaceDimension = rawDim === 4 ? 4 : rawDim === 3 ? 3 : undefined
   state.wdwBoundaryCondition = parseEnumParam(params, 'wdw_bc', VALID_WDW_BOUNDARY_CONDITIONS)
   state.wdwInflatonMass = parseFloatParamSci(
     params,
@@ -156,8 +171,20 @@ export function deserializeWdw(params: URLSearchParams, state: WdwUrlState): voi
   // publication preset's max of (256, 48); we leave headroom above that
   // for power-user experiments while keeping the serializer cheap to
   // validate.
-  state.wdwGridNa = parseIntParam(params, 'wdw_gn_a', 16, WDW_SOLVER_MAX_GRID_NA)
-  state.wdwGridNphi = parseIntParam(params, 'wdw_gn_p', 8, WDW_SOLVER_MAX_GRID_NPHI)
+  const is4d = state.wdwMinisuperspaceDimension === 4
+  state.wdwGridNa = parseIntParam(
+    params,
+    'wdw_gn_a',
+    16,
+    is4d ? WDW_SOLVER_4D_MAX_GRID_NA : WDW_SOLVER_MAX_GRID_NA
+  )
+  state.wdwGridNphi = parseIntParam(
+    params,
+    'wdw_gn_p',
+    8,
+    is4d ? WDW_SOLVER_4D_MAX_GRID_NPHI : WDW_SOLVER_MAX_GRID_NPHI
+  )
+  state.wdwPhi3SliceNormalized = parseFloatParamSci(params, 'wdw_phi3', 0, 1)
   state.wdwStreamlinesEnabled = parseBoolParam(params, 'wdw_sl')
   state.wdwStreamlineDensity = parseIntParam(params, 'wdw_sld', 2, 16)
   state.wdwPhaseRotationEnabled = parseBoolParam(params, 'wdw_pr')

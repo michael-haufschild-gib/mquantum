@@ -187,9 +187,11 @@ describe('Dirac setters', () => {
     expect(getDirac().fieldView).toBe('spinDensity')
     s.setDiracFieldView('cliffordBloom')
     expect(getDirac().fieldView).toBe('cliffordBloom')
+    s.setDiracFieldView('hubbleLace')
+    expect(getDirac().fieldView).toBe('hubbleLace')
     // @ts-expect-error intentional invalid input
     s.setDiracFieldView('spin')
-    expect(getDirac().fieldView).toBe('cliffordBloom')
+    expect(getDirac().fieldView).toBe('hubbleLace')
   })
 
   it('sets autoScale boolean', () => {
@@ -367,6 +369,41 @@ describe('Dirac setters', () => {
     expect(useExtendedObjectStore.getState().schroedinger.densityGain).toBeCloseTo(2.8)
     expect(useExtendedObjectStore.getState().schroedinger.densityContrast).toBeCloseTo(2.7)
     expect(useExtendedObjectStore.getState().schroedinger.autoScaleMaxGain).toBe(30)
+  })
+
+  it('syncs Hubble Lace presets to phaseDensity and applies rendering overrides', async () => {
+    const { useAppearanceStore } = await import('@/stores/scene/appearanceStore')
+    useAppearanceStore.getState().setColorAlgorithm('blackbody')
+
+    await useExtendedObjectStore.getState().applyDiracPreset('hubbleLaceCollider3D')
+
+    expect(getDirac().initialCondition).toBe('zitterbewegung')
+    expect(getDirac().fieldView).toBe('hubbleLace')
+    expect(getDirac().potentialType).toBe('none')
+    expect(getDirac().showPotential).toBe(false)
+    expect(getDirac().positiveEnergyFraction).toBe(0.5)
+    expect(getDirac().autoScale).toBe(true)
+    expect(useAppearanceStore.getState().colorAlgorithm).toBe('phaseDensity')
+    expect(useExtendedObjectStore.getState().schroedinger.densityGain).toBeCloseTo(4.4)
+    expect(useExtendedObjectStore.getState().schroedinger.densityContrast).toBeCloseTo(3.4)
+    expect(useExtendedObjectStore.getState().schroedinger.autoScaleMaxGain).toBe(46)
+  })
+
+  it('applies the Hubble Lace bulk preset after entering d=4', async () => {
+    const { useGeometryStore } = await import('@/stores/scene/geometryStore')
+
+    useExtendedObjectStore.getState().setSchroedingerQuantumMode('diracEquation')
+    useGeometryStore.getState().setDimension(4)
+    await useExtendedObjectStore.getState().applyDiracPreset('hubbleLaceBulk4D')
+
+    expect(getDirac().latticeDim).toBe(4)
+    expect(getDirac().fieldView).toBe('hubbleLace')
+    expect(getDirac().potentialType).toBe('none')
+    expect(getDirac().packetMomentum).toEqual([2.9, 1.9, -2.2, 1.6])
+    expect(getDirac().slicePositions).toEqual([0.23])
+    expect(useExtendedObjectStore.getState().schroedinger.densityGain).toBeCloseTo(5)
+    expect(useExtendedObjectStore.getState().schroedinger.densityContrast).toBeCloseTo(3.8)
+    expect(useExtendedObjectStore.getState().schroedinger.autoScaleMaxGain).toBe(54)
   })
 
   it('re-clamps dt when speedOfLight rises above the new CFL ceiling', () => {

@@ -28,7 +28,10 @@ import { HYDROGEN_COUPLED_PRESETS } from '@/lib/physics/hydrogenCoupled/presets'
 import { PAULI_SCENARIO_PRESETS } from '@/lib/physics/pauli/presets'
 import { QUANTUM_WALK_PRESETS } from '@/lib/physics/quantumWalk/presets'
 import { TDSE_SCENARIO_PRESETS } from '@/lib/physics/tdse/presets'
-import { WDW_SCENARIO_PRESETS } from '@/lib/physics/wheelerDeWitt/presets'
+import {
+  getWdwPresetsForGeometryDimension,
+  WDW_SCENARIO_PRESETS,
+} from '@/lib/physics/wheelerDeWitt/presets'
 import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
@@ -102,10 +105,12 @@ const QUANTUM_WALK_PRESET_OPTIONS = QUANTUM_WALK_PRESETS.map((p) => ({
 
 /* ── Wheeler–DeWitt options ────────────────────────────────── */
 
-const WDW_PRESET_OPTIONS = WDW_SCENARIO_PRESETS.map((p) => ({
-  value: p.id,
-  label: p.name,
-}))
+function getWdwPresetOptions(dimension: number) {
+  return getWdwPresetsForGeometryDimension(dimension).map((p) => ({
+    value: p.id,
+    label: p.name,
+  }))
+}
 
 /* ── Anti-de Sitter options ─────────────────────────────────── */
 
@@ -283,7 +288,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       case 'quantumWalk':
         return QUANTUM_WALK_PRESET_OPTIONS
       case 'wheelerDeWitt':
-        return WDW_PRESET_OPTIONS
+        return getWdwPresetOptions(dimension)
       case 'pauliSpinor':
         return PAULI_PRESET_OPTIONS
       case 'bellPair':

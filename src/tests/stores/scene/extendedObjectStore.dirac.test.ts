@@ -67,6 +67,9 @@ describe('Dirac store slice', () => {
 
     store.setDiracFieldView('cliffordBloom')
     expect(useExtendedObjectStore.getState().schroedinger.dirac.fieldView).toBe('cliffordBloom')
+
+    store.setDiracFieldView('hubbleLace')
+    expect(useExtendedObjectStore.getState().schroedinger.dirac.fieldView).toBe('hubbleLace')
   })
 
   it('setDiracInitialCondition changes condition', () => {

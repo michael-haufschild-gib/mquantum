@@ -26,7 +26,7 @@ import {
   isTdsePresetCompatibleWithDimension,
   TDSE_SCENARIO_PRESETS,
 } from '@/lib/physics/tdse/presets'
-import { WDW_SCENARIO_PRESETS } from '@/lib/physics/wheelerDeWitt/presets'
+import { getWdwPresetsForGeometryDimension } from '@/lib/physics/wheelerDeWitt/presets'
 import { resizeBecArrays } from '@/stores/slices/geometry/setters/becResize'
 import { resizeTdseArrays } from '@/stores/slices/geometry/setters/tdseSetters'
 
@@ -218,7 +218,10 @@ export function findActiveScenarioPresetId(
     case 'quantumWalk':
       return findScenarioPresetId(schroedinger.quantumWalk, QUANTUM_WALK_PRESETS)
     case 'wheelerDeWitt':
-      return findScenarioPresetId(schroedinger.wheelerDeWitt, WDW_SCENARIO_PRESETS)
+      return findScenarioPresetId(
+        schroedinger.wheelerDeWitt,
+        getWdwPresetsForGeometryDimension(dimension)
+      )
     default:
       return null
   }

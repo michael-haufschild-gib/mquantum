@@ -9,8 +9,15 @@
  * @module stores/slices/geometry/setters/wheelerDeWittSetters
  */
 
-import type { WdwBoundaryCondition, WdwSrmtClock } from '@/lib/geometry/extended/wheelerDeWitt'
+import type {
+  WdwBoundaryCondition,
+  WdwMinisuperspaceDimension,
+  WheelerDeWittConfig,
+  WdwSrmtClock,
+} from '@/lib/geometry/extended/wheelerDeWitt'
 import {
+  WDW_SOLVER_4D_MAX_GRID_NA,
+  WDW_SOLVER_4D_MAX_GRID_NPHI,
   WDW_SOLVER_MAX_COSMOLOGICAL_CONSTANT,
   WDW_SOLVER_MAX_GRID_NA,
   WDW_SOLVER_MAX_GRID_NPHI,
@@ -26,6 +33,7 @@ import {
   loadPresetModule,
   type SchroedingerPresetApplyOptions,
 } from '@/stores/utils/dynamicPresetImport'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 import {
   nestedClampedSetter,
@@ -47,9 +55,58 @@ export const WDW_GRID_PRESETS: Record<WdwGridPreset, { gridNa: number; gridNphi:
   high: { gridNa: 192, gridNphi: 40 },
   publication: { gridNa: 256, gridNphi: 48 },
 }
+export type WdwGridPreset4D = Exclude<WdwGridPreset, 'publication'>
+export const WDW_GRID_PRESETS_4D: Record<WdwGridPreset4D, { gridNa: number; gridNphi: number }> = {
+  low: { gridNa: 48, gridNphi: 12 },
+  medium: { gridNa: 64, gridNphi: 16 },
+  high: { gridNa: 96, gridNphi: 20 },
+}
+
+/** WDW supports the global 3D and 4D dimension selector states. */
+export function resolveWdwDimensionFromGeometry(dimension: number): WdwMinisuperspaceDimension {
+  return dimension === 4 ? 4 : 3
+}
+
+/** Build the WDW config update implied by a global dimension change. */
+export function resizeWdwForGeometryDimension(
+  prev: WheelerDeWittConfig,
+  geometryDimension: number
+): Partial<WheelerDeWittConfig> | undefined {
+  const target = resolveWdwDimensionFromGeometry(geometryDimension)
+  const current = prev.minisuperspaceDimension ?? 3
+
+  if (target === 4) {
+    if (
+      current === 4 &&
+      prev.streamlinesEnabled === false &&
+      prev.worldlineEnabled === false &&
+      prev.srmtEnabled === false
+    ) {
+      return undefined
+    }
+    return {
+      minisuperspaceDimension: 4,
+      ...(current === 4 ? {} : WDW_GRID_PRESETS_4D.low),
+      phi3SliceNormalized: prev.phi3SliceNormalized ?? 0.5,
+      streamlinesEnabled: false,
+      worldlineEnabled: false,
+      srmtEnabled: false,
+      needsReset: current !== 4 ? true : prev.needsReset,
+    }
+  }
+
+  if (current === 3) return undefined
+  return {
+    minisuperspaceDimension: 3,
+    ...WDW_GRID_PRESETS.medium,
+    needsReset: true,
+  }
+}
 
 /** Actions exposed by the Wheeler–DeWitt setter bundle. */
 export interface WheelerDeWittSetters {
+  setWdwMinisuperspaceDimension: (dimension: WdwMinisuperspaceDimension) => void
+  setWdwPhi3SliceNormalized: (slice: number) => void
   setWdwBoundaryCondition: (bc: WdwBoundaryCondition) => void
   setWdwInflatonMass: (m: number) => void
   setWdwCosmologicalConstant: (lambda: number) => void
@@ -169,6 +226,53 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
   const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v))
 
   return {
+    setWdwMinisuperspaceDimension: (dimension) => {
+      if (dimension !== 3 && dimension !== 4) return
+      ctx.setWithVersion((state) => {
+        const prev = state.schroedinger.wheelerDeWitt
+        const next =
+          dimension === 4
+            ? {
+                ...prev,
+                minisuperspaceDimension: 4 as const,
+                gridNa: WDW_GRID_PRESETS_4D.low.gridNa,
+                gridNphi: WDW_GRID_PRESETS_4D.low.gridNphi,
+                phi3SliceNormalized: 0.5,
+                streamlinesEnabled: false,
+                worldlineEnabled: false,
+                srmtEnabled: false,
+                needsReset: true,
+              }
+            : {
+                ...prev,
+                minisuperspaceDimension: 3 as const,
+                gridNa: WDW_GRID_PRESETS.medium.gridNa,
+                gridNphi: WDW_GRID_PRESETS.medium.gridNphi,
+                needsReset: true,
+              }
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            wheelerDeWitt: next,
+          },
+        }
+      })
+    },
+    setWdwPhi3SliceNormalized: (slice) => {
+      if (!ctx.isFinite(slice)) {
+        ctx.warnNonFinite('wheelerDeWitt.phi3SliceNormalized', slice)
+        return
+      }
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          wheelerDeWitt: {
+            ...state.schroedinger.wheelerDeWitt,
+            phi3SliceNormalized: clamp(slice, 0, 1),
+          },
+        },
+      }))
+    },
     setWdwBoundaryCondition: (bc) => applyWithReset('boundaryCondition', bc),
     setWdwInflatonMass: (m) => {
       if (!ctx.isFinite(m)) {
@@ -201,7 +305,6 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
       )
     },
     setWdwGridSize: (preset) => {
-      const { gridNa, gridNphi } = WDW_GRID_PRESETS[preset]
       // Physics mutation: write both fields + needsReset in one transaction so
       // the strategy re-solves exactly once.
       ctx.setWithVersion((state) => ({
@@ -209,8 +312,9 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
           ...state.schroedinger,
           wheelerDeWitt: {
             ...state.schroedinger.wheelerDeWitt,
-            gridNa,
-            gridNphi,
+            ...(state.schroedinger.wheelerDeWitt.minisuperspaceDimension === 4
+              ? WDW_GRID_PRESETS_4D[(preset as WdwGridPreset4D) in WDW_GRID_PRESETS_4D ? (preset as WdwGridPreset4D) : 'low']
+              : WDW_GRID_PRESETS[preset]),
             needsReset: true,
           },
         },
@@ -225,8 +329,11 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
         ctx.warnNonFinite('wheelerDeWitt.gridNphi', gridNphi)
         return
       }
-      const clampedNa = clamp(Math.round(gridNa), 16, WDW_SOLVER_MAX_GRID_NA)
-      const clampedNphi = clamp(Math.round(gridNphi), 8, WDW_SOLVER_MAX_GRID_NPHI)
+      const currentDim = ctx.get().schroedinger.wheelerDeWitt.minisuperspaceDimension ?? 3
+      const maxNa = currentDim === 4 ? WDW_SOLVER_4D_MAX_GRID_NA : WDW_SOLVER_MAX_GRID_NA
+      const maxNphi = currentDim === 4 ? WDW_SOLVER_4D_MAX_GRID_NPHI : WDW_SOLVER_MAX_GRID_NPHI
+      const clampedNa = clamp(Math.round(gridNa), 16, maxNa)
+      const clampedNphi = clamp(Math.round(gridNphi), 8, maxNphi)
       ctx.setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
@@ -241,7 +348,10 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
     },
     // Display-only: no applyWithReset — solver output is unaffected, only the
     // WKB trajectory overlay is rebuilt on the next frame.
-    setWdwStreamlinesEnabled: setStreamlinesEnabled,
+    setWdwStreamlinesEnabled: (enabled) => {
+      const current = ctx.get().schroedinger.wheelerDeWitt
+      setStreamlinesEnabled(current.minisuperspaceDimension === 4 ? false : enabled)
+    },
     setWdwStreamlineDensity: (density) => {
       if (!ctx.isFinite(density)) {
         ctx.warnNonFinite('wheelerDeWitt.streamlineDensity', density)
@@ -261,12 +371,18 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
     // Render-only: no withReset — solver output is not affected.
     setWdwPhaseRotationEnabled: setPhaseRotationEnabled,
     setWdwPhaseRotationSpeed: setPhaseRotationSpeed,
-    setWdwWorldlineEnabled: setWorldlineEnabled,
+    setWdwWorldlineEnabled: (enabled) => {
+      const current = ctx.get().schroedinger.wheelerDeWitt
+      setWorldlineEnabled(current.minisuperspaceDimension === 4 ? false : enabled)
+    },
     setWdwWorldlineSpeed: setWorldlineSpeed,
     setWdwWorldlinePulseWidth: setWorldlinePulseWidth,
     setWdwRenderDynamicRange: setRenderDynamicRange,
     // SRMT diagnostic — display-only, no solver re-run.
-    setWdwSrmtEnabled: setSrmtEnabled,
+    setWdwSrmtEnabled: (enabled) => {
+      const current = ctx.get().schroedinger.wheelerDeWitt
+      setSrmtEnabled(current.minisuperspaceDimension === 4 ? false : enabled)
+    },
     setWdwSrmtClock: setSrmtClock,
     setWdwSrmtCutNormalized: setSrmtCutNormalized,
     setWdwSrmtRankCap: setSrmtRankCap,
@@ -282,6 +398,9 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
             return
           const preset = getWdwPreset(presetId)
           if (!preset) return
+          const presetDimension = preset.overrides.minisuperspaceDimension ?? 3
+          const activeDimension = resolveWdwDimensionFromGeometry(useGeometryStore.getState().dimension)
+          if (presetDimension !== activeDimension) return
           ctx.setWithVersion((state) => {
             const prev = state.schroedinger.wheelerDeWitt
             // Scope to physics fields only. Render-only overlay toggles
@@ -293,6 +412,19 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
               if (value !== undefined) {
                 ;(physics as Record<string, unknown>)[field] = value
               }
+            }
+            const targetDimension =
+              physics.minisuperspaceDimension ?? prev.minisuperspaceDimension ?? 3
+            if (targetDimension === 4) {
+              physics.gridNa = physics.gridNa ?? WDW_GRID_PRESETS_4D.low.gridNa
+              physics.gridNphi = physics.gridNphi ?? WDW_GRID_PRESETS_4D.low.gridNphi
+              physics.phi3SliceNormalized = physics.phi3SliceNormalized ?? 0.5
+              physics.streamlinesEnabled = false
+              physics.worldlineEnabled = false
+              physics.srmtEnabled = false
+            } else if ((prev.minisuperspaceDimension ?? 3) === 4) {
+              physics.gridNa = WDW_GRID_PRESETS.medium.gridNa
+              physics.gridNphi = WDW_GRID_PRESETS.medium.gridNphi
             }
             return {
               schroedinger: {
