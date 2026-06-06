@@ -13,6 +13,7 @@ import type { usePerformanceStore } from '@/stores/runtime/performanceStore'
 import type { useSimulationStateStore } from '@/stores/runtime/simulationStateStore'
 import type { useAnimationStore } from '@/stores/scene/animationStore'
 import type { useAppearanceStore } from '@/stores/scene/appearanceStore'
+import type { useCameraStore } from '@/stores/scene/cameraStore'
 import type { useEnvironmentStore } from '@/stores/scene/environmentStore'
 import type { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import type { useGeometryStore } from '@/stores/scene/geometryStore'
@@ -23,6 +24,7 @@ import type { useUIStore } from '@/stores/ui/uiStore'
 declare global {
   interface Window {
     __GEOMETRY_STORE__?: typeof useGeometryStore
+    __CAMERA_STORE__?: typeof useCameraStore
     __UI_STORE__?: typeof useUIStore
     __ENVIRONMENT_STORE__?: typeof useEnvironmentStore
     __APPEARANCE_STORE__?: typeof useAppearanceStore
