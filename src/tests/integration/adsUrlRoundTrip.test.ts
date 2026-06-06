@@ -276,6 +276,49 @@ describe('AdS URL round-trip', () => {
     })
   })
 
+  describe('Chordal Sieve (Stage 2C) URL params', () => {
+    it('parses the canonical Chordal Sieve URL and clears CPU-packed paths', () => {
+      applyUrl(
+        'qm=antiDeSitter&d=4&t=schroedinger&ads_d=4&ads_btz=1&ads_chordal=1&ads_chordal_k=6.25&ads_chordal_tw=-0.75'
+      )
+      const ads = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(ads.d).toBe(4)
+      expect(ads.chordalSieveEnabled).toBe(true)
+      expect(ads.chordalSieveFrequency).toBeCloseTo(6.25, 5)
+      expect(ads.chordalSieveTwist).toBeCloseTo(-0.75, 5)
+      expect(ads.btzEnabled).toBe(false)
+      expect(ads.hkllEnabled).toBe(false)
+    })
+
+    it('round-trips the full Chordal Sieve sub-block through serialize → deserialize', () => {
+      const serialized = serializeState({
+        dimension: 4,
+        objectType: 'schroedinger',
+        quantumMode: 'antiDeSitter',
+        adsDimension: 4,
+        adsChordalSieveEnabled: true,
+        adsChordalSieveFrequency: 7.75,
+        adsChordalSieveTwist: 1.25,
+      })
+      const parsed = deserializeState(serialized)
+      expect(parsed.adsChordalSieveEnabled).toBe(true)
+      expect(parsed.adsChordalSieveFrequency).toBeCloseTo(7.75, 3)
+      expect(parsed.adsChordalSieveTwist).toBeCloseTo(1.25, 3)
+    })
+
+    it('does NOT emit dormant ads_chordal=0 when Chordal Sieve is off', () => {
+      const serialized = serializeState({
+        dimension: 4,
+        objectType: 'schroedinger',
+        quantumMode: 'antiDeSitter',
+        adsChordalSieveEnabled: false,
+        adsChordalSieveFrequency: 7.75,
+      })
+      expect(serialized).not.toContain('ads_chordal=')
+      expect(serialized).not.toContain('ads_chordal_k=')
+    })
+  })
+
   describe('preset round-trip (ads_preset)', () => {
     it('emits ads_preset for a named preset and restores the label', () => {
       const serialized = serializeState({

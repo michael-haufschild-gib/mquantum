@@ -1111,6 +1111,9 @@ describe('mergeExtendedObjectStateForType — adversarial inputs', () => {
             hkllBoundarySource: 'bad-source',
             hkllSourceSigma: 99,
             hkllPlaneWaveM: 99,
+            chordalSieveEnabled: true,
+            chordalSieveFrequency: 99,
+            chordalSieveTwist: -99,
           },
         },
       },
@@ -1134,6 +1137,9 @@ describe('mergeExtendedObjectStateForType — adversarial inputs', () => {
     expect(ads.hkllBoundarySource).toBe(DEFAULT_SCHROEDINGER_CONFIG.antiDeSitter.hkllBoundarySource)
     expect(ads.hkllSourceSigma).toBe(1.5)
     expect(ads.hkllPlaneWaveM).toBe(8)
+    expect(ads.chordalSieveEnabled).toBe(false)
+    expect(ads.chordalSieveFrequency).toBe(12)
+    expect(ads.chordalSieveTwist).toBe(-4)
   })
 
   it('returns mutation-isolated default sub-configs for sparse schroedinger scenes', () => {

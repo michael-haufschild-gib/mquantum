@@ -32,6 +32,9 @@ const baseConfig: AntiDeSitterConfig = {
   hkllBoundarySource: 'eigenstate',
   hkllSourceSigma: 0.3,
   hkllPlaneWaveM: 0,
+  chordalSieveEnabled: false,
+  chordalSieveFrequency: 5.4,
+  chordalSieveTwist: 0.72,
 } as never
 
 describe('computeAdsConfigHash', () => {
@@ -57,6 +60,9 @@ describe('computeAdsConfigHash', () => {
     ['hkllBoundarySource', { hkllBoundarySource: 'localized' as const }],
     ['hkllSourceSigma', { hkllSourceSigma: 0.300001 }],
     ['hkllPlaneWaveM', { hkllPlaneWaveM: 5 }],
+    ['chordalSieveEnabled', { chordalSieveEnabled: true }],
+    ['chordalSieveFrequency', { chordalSieveFrequency: 5.400001 }],
+    ['chordalSieveTwist', { chordalSieveTwist: 0.720001 }],
   ])('changes when %s changes (so the dirty check sees the new config)', (_field, patch) => {
     const a = computeAdsConfigHash(baseConfig)
     const b = computeAdsConfigHash({ ...baseConfig, ...(patch as Partial<AntiDeSitterConfig>) })
@@ -87,6 +93,8 @@ describe('computeAdsConfigHash', () => {
       btzHorizonRadius: Number.POSITIVE_INFINITY,
       btzOmega: Number.NEGATIVE_INFINITY,
       hkllSourceSigma: Number.NaN,
+      chordalSieveFrequency: Number.NaN,
+      chordalSieveTwist: Number.POSITIVE_INFINITY,
     })
 
     expect(hash).toContain('invalid')

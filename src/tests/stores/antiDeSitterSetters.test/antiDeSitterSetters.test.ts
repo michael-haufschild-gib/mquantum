@@ -113,6 +113,7 @@ describe('anti-de Sitter setters', () => {
     expect(after.mL).toBeCloseTo(-1.1, 6)
     expect(after.branch).toBe('standard')
     expect(after.boundaryOverlay).toBe(false)
+    expect(after.chordalSieveEnabled).toBe(false)
     expect(after.needsReset).toBe(true)
   })
 
@@ -298,6 +299,7 @@ describe('anti-de Sitter setters', () => {
       const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
       expect(after.hkllEnabled).toBe(true)
       expect(after.btzEnabled).toBe(false)
+      expect(after.chordalSieveEnabled).toBe(false)
     })
 
     it('enabling BTZ forcibly clears hkllEnabled (mutex)', () => {
@@ -308,6 +310,7 @@ describe('anti-de Sitter setters', () => {
       const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
       expect(after.hkllEnabled).toBe(false)
       expect(after.btzEnabled).toBe(true)
+      expect(after.chordalSieveEnabled).toBe(false)
     })
 
     it('setAdsHkllSourceSigma clamps to [0.05, 1.5]', () => {
@@ -409,6 +412,111 @@ describe('anti-de Sitter setters', () => {
       store.setAdsPreset('adsFourGround')
       const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
       expect(after.hkllEnabled).toBe(false)
+    })
+  })
+
+  describe('Chordal Sieve (Stage 2C)', () => {
+    it('setAdsChordalSieveEnabled toggles the flag and flips needsReset', () => {
+      const store = useExtendedObjectStore.getState()
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.chordalSieveEnabled).toBe(
+        false
+      )
+      store.setAdsChordalSieveEnabled(true)
+      const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(after.chordalSieveEnabled).toBe(true)
+      expect(after.needsReset).toBe(true)
+      expect(after.preset).toBe('custom')
+    })
+
+    it('enabling Chordal Sieve forcibly clears BTZ and HKLL', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsBtzEnabled(true)
+      store.setAdsHkllEnabled(true)
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.hkllEnabled).toBe(true)
+      store.setAdsChordalSieveEnabled(true)
+      const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(after.chordalSieveEnabled).toBe(true)
+      expect(after.btzEnabled).toBe(false)
+      expect(after.hkllEnabled).toBe(false)
+    })
+
+    it('enabling BTZ or HKLL forcibly clears Chordal Sieve', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsChordalSieveEnabled(true)
+      store.setAdsBtzEnabled(true)
+      let after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(after.btzEnabled).toBe(true)
+      expect(after.chordalSieveEnabled).toBe(false)
+
+      store.setAdsChordalSieveEnabled(true)
+      store.setAdsHkllEnabled(true)
+      after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(after.hkllEnabled).toBe(true)
+      expect(after.chordalSieveEnabled).toBe(false)
+    })
+
+    it('Chordal frequency and twist setters clamp to documented ranges', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsChordalSieveFrequency(-99)
+      expect(
+        useExtendedObjectStore.getState().schroedinger.antiDeSitter.chordalSieveFrequency
+      ).toBe(0.25)
+      store.setAdsChordalSieveFrequency(99)
+      expect(
+        useExtendedObjectStore.getState().schroedinger.antiDeSitter.chordalSieveFrequency
+      ).toBe(12)
+      store.setAdsChordalSieveTwist(-99)
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.chordalSieveTwist).toBe(-4)
+      store.setAdsChordalSieveTwist(99)
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.chordalSieveTwist).toBe(4)
+    })
+
+    it('Chordal setters reject malformed runtime values', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsChordalSieveEnabled(true)
+      store.setAdsChordalSieveFrequency(3.3)
+      store.setAdsChordalSieveTwist(-0.8)
+      useExtendedObjectStore.getState().clearComputeNeedsReset('antiDeSitter')
+
+      store.setAdsChordalSieveEnabled('true' as never)
+      store.setAdsChordalSieveFrequency(Number.NaN)
+      store.setAdsChordalSieveTwist(Number.POSITIVE_INFINITY)
+
+      const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(after.chordalSieveEnabled).toBe(true)
+      expect(after.chordalSieveFrequency).toBe(3.3)
+      expect(after.chordalSieveTwist).toBe(-0.8)
+      expect(after.needsReset).toBe(false)
+    })
+
+    it('preset adsChordalSieve applies GPU Chordal config and clears CPU paths', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsPreset('btzHotSmall')
+      store.setAdsPreset('adsChordalSieve')
+      const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(after.preset).toBe('adsChordalSieve')
+      expect(after.d).toBe(4)
+      expect(after.n).toBe(2)
+      expect(after.l).toBe(3)
+      expect(after.m).toBe(2)
+      expect(after.chordalSieveEnabled).toBe(true)
+      expect(after.chordalSieveFrequency).toBeCloseTo(5.4, 6)
+      expect(after.chordalSieveTwist).toBeCloseTo(0.72, 6)
+      expect(after.btzEnabled).toBe(false)
+      expect(after.hkllEnabled).toBe(false)
+    })
+
+    it('switching from Chordal preset to a normal preset clears Chordal Sieve', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsPreset('adsChordalSieve')
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.chordalSieveEnabled).toBe(
+        true
+      )
+      store.setAdsPreset('adsFourGround')
+      const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(after.chordalSieveEnabled).toBe(false)
+      expect(after.chordalSieveFrequency).toBeCloseTo(5.4, 6)
+      expect(after.chordalSieveTwist).toBeCloseTo(0.72, 6)
     })
   })
 })

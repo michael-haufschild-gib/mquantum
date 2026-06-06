@@ -385,6 +385,12 @@ export const ScenarioSelector: React.FC = React.memo(() => {
         }
         case 'antiDeSitter':
           setAdsPreset(value as AdsPresetName)
+          {
+            const preset = ADS_PRESETS.find((p) => p.id === value)
+            if (preset?.colorAlgorithm) {
+              useAppearanceStore.getState().setColorAlgorithm(preset.colorAlgorithm)
+            }
+          }
           break
       }
     },

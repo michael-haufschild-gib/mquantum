@@ -316,6 +316,23 @@ function applyAdsStageTwoFields(
   if (urlState.adsHkllEnabled !== undefined) ext.setAdsHkllEnabled(urlState.adsHkllEnabled)
 }
 
+/** Apply the AdS Chordal Sieve URL fields. Sub-fields are applied before
+ * enable so the GPU pass sees a complete uniform payload on first render. */
+function applyAdsChordalSieveFields(
+  urlState: ParsedShareableState,
+  ext: ReturnType<typeof useExtendedObjectStore.getState>
+): void {
+  if (urlState.adsChordalSieveFrequency !== undefined) {
+    ext.setAdsChordalSieveFrequency(urlState.adsChordalSieveFrequency)
+  }
+  if (urlState.adsChordalSieveTwist !== undefined) {
+    ext.setAdsChordalSieveTwist(urlState.adsChordalSieveTwist)
+  }
+  if (urlState.adsChordalSieveEnabled !== undefined) {
+    ext.setAdsChordalSieveEnabled(urlState.adsChordalSieveEnabled)
+  }
+}
+
 /**
  * Apply Anti-de Sitter URL state params.
  *
@@ -332,6 +349,7 @@ function applyAdsParams(
   }
   applyAdsBoundStateFields(urlState, ext)
   applyAdsStageTwoFields(urlState, ext)
+  applyAdsChordalSieveFields(urlState, ext)
 }
 
 /** Apply Dirac-equation URL state params. */

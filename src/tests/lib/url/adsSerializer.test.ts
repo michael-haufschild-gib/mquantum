@@ -152,6 +152,32 @@ describe('serializeAds — HKLL gating', () => {
   })
 })
 
+describe('serializeAds — Chordal Sieve gating', () => {
+  it('omits Chordal Sieve block when disabled', () => {
+    const params = new URLSearchParams()
+    serializeAds(params, {
+      adsChordalSieveEnabled: false,
+      adsChordalSieveFrequency: 7.1,
+      adsChordalSieveTwist: -0.5,
+    })
+    expect(params.has('ads_chordal')).toBe(false)
+    expect(params.has('ads_chordal_k')).toBe(false)
+    expect(params.has('ads_chordal_tw')).toBe(false)
+  })
+
+  it('emits Chordal Sieve block with 3-decimal frequency and twist', () => {
+    const params = new URLSearchParams()
+    serializeAds(params, {
+      adsChordalSieveEnabled: true,
+      adsChordalSieveFrequency: 7.1234,
+      adsChordalSieveTwist: -0.5678,
+    })
+    expect(params.get('ads_chordal')).toBe('1')
+    expect(params.get('ads_chordal_k')).toBe('7.123')
+    expect(params.get('ads_chordal_tw')).toBe('-0.568')
+  })
+})
+
 describe('deserializeAds — clamping & rejection', () => {
   it('clamps ads_d into [3, 7]', () => {
     const out: AdsUrlState = {}
@@ -249,6 +275,18 @@ describe('deserializeAds — clamping & rejection', () => {
     expect(out.adsHkllPlaneWaveM).toBe(8)
   })
 
+  it('clamps Chordal Sieve fields: frequency in [0.25, 12], twist in [-4, 4]', () => {
+    const high: AdsUrlState = {}
+    deserializeAds(new URLSearchParams('ads_chordal_k=99&ads_chordal_tw=99'), high)
+    expect(high.adsChordalSieveFrequency).toBe(12)
+    expect(high.adsChordalSieveTwist).toBe(4)
+
+    const low: AdsUrlState = {}
+    deserializeAds(new URLSearchParams('ads_chordal_k=-99&ads_chordal_tw=-99'), low)
+    expect(low.adsChordalSieveFrequency).toBe(0.25)
+    expect(low.adsChordalSieveTwist).toBe(-4)
+  })
+
   it('rejects unknown ads_preset values', () => {
     const out: AdsUrlState = {}
     deserializeAds(new URLSearchParams('ads_preset=nonexistent'), out)
@@ -322,6 +360,24 @@ describe('round-trip', () => {
     expect(out.adsHkllBoundarySource).toBe('localized')
     expect(out.adsHkllSourceSigma).toBeCloseTo(0.42, 3)
     expect(out.adsHkllPlaneWaveM).toBe(4)
+  })
+
+  it('preserves the Chordal Sieve block when enabled, drops it when disabled', () => {
+    const enabled = roundTrip({
+      adsChordalSieveEnabled: true,
+      adsChordalSieveFrequency: 6.75,
+      adsChordalSieveTwist: -1.25,
+    })
+    expect(enabled.adsChordalSieveEnabled).toBe(true)
+    expect(enabled.adsChordalSieveFrequency).toBeCloseTo(6.75, 3)
+    expect(enabled.adsChordalSieveTwist).toBeCloseTo(-1.25, 3)
+
+    const disabled = roundTrip({
+      adsChordalSieveEnabled: false,
+      adsChordalSieveFrequency: 6.75,
+    })
+    expect(disabled.adsChordalSieveEnabled).toBeUndefined()
+    expect(disabled.adsChordalSieveFrequency).toBeUndefined()
   })
 
   it('round-trips boundary overlay flag in both states', () => {

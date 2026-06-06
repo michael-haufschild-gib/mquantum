@@ -23,7 +23,11 @@ import { Select, type SelectOption } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
-import type { AdsPresetName, AdsQuantizationBranch } from '@/lib/geometry/extended/antiDeSitter'
+import type {
+  AdsPresetName,
+  AdsQuantizationBranch,
+  AntiDeSitterConfig,
+} from '@/lib/geometry/extended/antiDeSitter'
 import {
   adsEnergy,
   isBelowBF,
@@ -192,6 +196,63 @@ function Chip({
   )
 }
 
+function AntiDeSitterChordalSieveControls({
+  ads,
+}: {
+  ads: AntiDeSitterConfig
+}): React.ReactElement {
+  const { setEnabled, setFrequency, setTwist } = useExtendedObjectStore(
+    useShallow((s) => ({
+      setEnabled: s.setAdsChordalSieveEnabled,
+      setFrequency: s.setAdsChordalSieveFrequency,
+      setTwist: s.setAdsChordalSieveTwist,
+    }))
+  )
+
+  return (
+    <ControlGroup
+      title="Chordal Sieve"
+      collapsible
+      defaultOpen={ads.chordalSieveEnabled}
+      data-testid="ads-chordal-sieve-group"
+    >
+      <Switch
+        label="Chordal Sieve"
+        checked={ads.chordalSieveEnabled}
+        onCheckedChange={setEnabled}
+        tooltip="Enable a two-boundary-anchor Busemann clock sieve that carves holographic ribs through the AdS ball."
+        data-testid="ads-chordal-sieve-toggle"
+      />
+      {ads.chordalSieveEnabled && (
+        <>
+          <Slider
+            label="Clock frequency"
+            tooltip="Multiplier on the A−B Busemann clock difference; higher values create denser nested ribs."
+            min={ADS_LIMITS.chordalFrequencyMin}
+            max={ADS_LIMITS.chordalFrequencyMax}
+            step={0.05}
+            value={ads.chordalSieveFrequency}
+            onChange={setFrequency}
+            showValue
+            data-testid="ads-chordal-frequency-slider"
+          />
+          <Slider
+            label="Clock twist"
+            tooltip="Multiplier on the A+B Busemann clock sum; positive and negative values shear the chordal sheets in opposite directions."
+            min={ADS_LIMITS.chordalTwistMin}
+            max={ADS_LIMITS.chordalTwistMax}
+            step={0.05}
+            value={ads.chordalSieveTwist}
+            onChange={setTwist}
+            showValue
+            data-testid="ads-chordal-twist-slider"
+          />
+        </>
+      )}
+    </ControlGroup>
+  )
+}
+
 /**
  * Top-level AdS controls. Mounted inside the Quantum State section when
  * `quantumMode === 'antiDeSitter'`.
@@ -223,7 +284,19 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
     }))
   )
 
-  const { d, n, l, m, mL, branch, boundaryOverlay, preset, btzEnabled, hkllEnabled } = ads
+  const {
+    d,
+    n,
+    l,
+    m,
+    mL,
+    branch,
+    boundaryOverlay,
+    preset,
+    btzEnabled,
+    hkllEnabled,
+    chordalSieveEnabled,
+  } = ads
   // Split the panel's visibility into per-control flags so the UI surfaces
   // every slider that still affects the render:
   //   - (n, ℓ, m) feed the bulk eigenstate packer and the HKLL eigenstate
@@ -238,6 +311,7 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
   //     under BTZ (thermal state) and non-eigenstate HKLL (source-defined).
   const btzActive = btzEnabled && d === 3
   const hkllActive = hkllEnabled
+  const chordalActive = chordalSieveEnabled
   const hkllEigenstate = hkllActive && ads.hkllBoundarySource === 'eigenstate'
 
   const showQuantumNumbers = !btzActive && (!hkllActive || hkllEigenstate)
@@ -384,7 +458,9 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
         </ControlGroup>
       )}
 
-      {!btzActive && (
+      {!btzActive && !hkllActive && <AntiDeSitterChordalSieveControls ads={ads} />}
+
+      {!btzActive && !chordalActive && (
         <ControlGroup
           data-testid="components-sections-geometry-schroedinger-controls-anti-de-sitter-controls-control-group-378-9"
           title="HKLL Bulk Reconstruction"
@@ -402,7 +478,7 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
         </ControlGroup>
       )}
 
-      {d === 3 && !hkllActive && <AntiDeSitterBtzControls ads={ads} />}
+      {d === 3 && !hkllActive && !chordalActive && <AntiDeSitterBtzControls ads={ads} />}
 
       {showReadout && (
         <AdsReadout
