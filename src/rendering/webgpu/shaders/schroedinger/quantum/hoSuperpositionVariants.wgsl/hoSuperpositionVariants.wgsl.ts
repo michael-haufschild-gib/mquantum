@@ -12,6 +12,81 @@
 
 import { sanitizeShaderTermCount } from '../../../shared/compose-helpers'
 
+const hermiteCocycleInflationHelpers = /* wgsl */ `
+fn isHermiteCocycleInflationActive(uniforms: SchroedingerUniforms) -> bool {
+  return uniforms.quantumMode == QUANTUM_MODE_HARMONIC &&
+    uniforms.hermiteCocycleInflationEnabled != 0u &&
+    uniforms.hermiteCocycleInflationStrength > 0.0 &&
+    uniforms.hermiteCocycleShellRadius > 0.0;
+}
+
+fn hermiteCocycleInflationPhase(
+  xND: array<f32, 11>,
+  termIdx: i32,
+  uniforms: SchroedingerUniforms
+) -> f32 {
+  if (!isHermiteCocycleInflationActive(uniforms)) {
+    return 0.0;
+  }
+
+  let strength = clamp(uniforms.hermiteCocycleInflationStrength, 0.0, 2.0);
+  let shellRadius = clamp(uniforms.hermiteCocycleShellRadius, 0.1, 2.0);
+  let twist = clamp(uniforms.hermiteCocycleInflationTwist, 0.0, 8.0);
+  let invRadius = 1.0 / shellRadius;
+  let x = xND[0];
+  let y = xND[1];
+  let z = select(0.0, xND[2], ACTUAL_DIM >= 3);
+  let w = select(0.0, xND[3], ACTUAL_DIM >= 4);
+  let px = x * invRadius;
+  let py = y * invRadius;
+  let pz = z * invRadius;
+  let pw = w * invRadius;
+  let r = sqrt(max(x * x + y * y + z * z, 1e-10));
+
+  let q0 = f32(getQuantumNumber(uniforms, termIdx, 0) + 1);
+  let q1 = f32(getQuantumNumber(uniforms, termIdx, 1) + 1);
+  let q2 = f32(getQuantumNumber(uniforms, termIdx, 2) + 1);
+  let q3 = f32(getQuantumNumber(uniforms, termIdx, 3) + 1);
+  let width = max(0.18 * shellRadius, 0.075);
+  let radial = (r - shellRadius) / width;
+  let originFade = smoothstep(0.12 * shellRadius, 0.55 * shellRadius, r);
+  let farFade = 1.0 - smoothstep(shellRadius + 2.0 * width, shellRadius + 4.0 * width, r);
+  let shellGate = clamp(exp(-(radial * radial)) * originFade * farFade, 0.0, 1.0);
+  if (shellGate <= 1e-8) {
+    return 0.0;
+  }
+
+  let branch = 0.173 * f32(termIdx + 1);
+  let a = sin(q0 * px + twist * (py - pz) + branch);
+  let b = sin(q1 * py + twist * (pz - px) + 0.37 * branch);
+  let c = sin(q2 * pz + twist * (px - py) + 0.61 * branch);
+  let projectedCocycle = a * b * c;
+  let cyclicParity = 0.5 * sin(
+    q0 * py * pz + q1 * pz * px + q2 * px * py + twist * (px + 0.5 * py - 0.25 * pz)
+  );
+  let bulkCocycle = select(
+    0.0,
+    0.6 * sin(q3 * pw + twist * (px + py - pz) + 0.5 * branch),
+    ACTUAL_DIM >= 4
+  );
+  let obstruction = clamp(tanh(1.45 * (projectedCocycle + cyclicParity + bulkCocycle)), -1.0, 1.0);
+  return clamp(strength * shellGate * obstruction, -strength, strength);
+}
+
+fn applyHermiteCocycleInflation(
+  term: vec2f,
+  xND: array<f32, 11>,
+  termIdx: i32,
+  uniforms: SchroedingerUniforms
+) -> vec2f {
+  let phase = hermiteCocycleInflationPhase(xND, termIdx, uniforms);
+  if (abs(phase) <= 1e-7) {
+    return term;
+  }
+  return cmul(term, cexp_i(phase));
+}
+`
+
 /**
  * Generate unrolled HO superposition evaluation for a specific term count.
  *
@@ -24,14 +99,14 @@ function generateHOSuperpositionBlock(termCount: number): string {
       return `
   // Term ${k}: term_k = c_k * exp(-i * E_k * t) is host-precomputed once per frame.
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
-  let term${k} = uniforms.precomputedTerm[${k}].xy;
+  let term${k} = applyHermiteCocycleInflation(uniforms.precomputedTerm[${k}].xy, xND, ${k}, uniforms);
   var psi = cscale(spatial${k}, term${k});`
     }
     return `
   if (${k} < uniforms.termCount) {
   // Term ${k}
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
-  let term${k} = uniforms.precomputedTerm[${k}].xy;
+  let term${k} = applyHermiteCocycleInflation(uniforms.precomputedTerm[${k}].xy, xND, ${k}, uniforms);
   psi += cscale(spatial${k}, term${k});
   }`
   }).join('\n')
@@ -40,6 +115,7 @@ function generateHOSuperpositionBlock(termCount: number): string {
   // is no longer used inside the unrolled body; the time dependence now lives
   // entirely inside uniforms.precomputedTerm. WGSL allows unused parameters.
   return `
+${hermiteCocycleInflationHelpers}
 // ============================================
 // HO Superposition - ${termCount} Term${termCount > 1 ? 's' : ''} (Unrolled)
 // ============================================
@@ -63,12 +139,14 @@ function generateHOSpatialBlock(termCount: number): string {
     if (k === 0) {
       return `
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
-  var psi = cscale(spatial${k}, getCoeff(uniforms, ${k}));`
+  let coeff${k} = applyHermiteCocycleInflation(getCoeff(uniforms, ${k}), xND, ${k}, uniforms);
+  var psi = cscale(spatial${k}, coeff${k});`
     }
     return `
   if (${k} < uniforms.termCount) {
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
-  psi += cscale(spatial${k}, getCoeff(uniforms, ${k}));
+  let coeff${k} = applyHermiteCocycleInflation(getCoeff(uniforms, ${k}), xND, ${k}, uniforms);
+  psi += cscale(spatial${k}, coeff${k});
   }`
   }).join('\n')
 
@@ -95,22 +173,22 @@ function generateHOCombinedBlock(termCount: number): string {
   // term_k = c_k * exp(-i * E_k * t) is host-precomputed; coeff${k} is still needed
   // for the spatial-only (t = 0) accumulator that drives the spatial reference phase.
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
-  let coeff${k} = getCoeff(uniforms, ${k});
+  let coeff${k} = applyHermiteCocycleInflation(getCoeff(uniforms, ${k}), xND, ${k}, uniforms);
 
   // Spatial-only accumulation
   var psiSpatial = cscale(spatial${k}, coeff${k});
 
   // Time-dependent accumulation (uses host-precomputed term)
-  let term${k} = uniforms.precomputedTerm[${k}].xy;
+  let term${k} = applyHermiteCocycleInflation(uniforms.precomputedTerm[${k}].xy, xND, ${k}, uniforms);
   var psiTime = cscale(spatial${k}, term${k});`
     }
     return `
   if (${k} < uniforms.termCount) {
   // Term ${k}
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
-  let coeff${k} = getCoeff(uniforms, ${k});
+  let coeff${k} = applyHermiteCocycleInflation(getCoeff(uniforms, ${k}), xND, ${k}, uniforms);
   psiSpatial += cscale(spatial${k}, coeff${k});
-  let term${k} = uniforms.precomputedTerm[${k}].xy;
+  let term${k} = applyHermiteCocycleInflation(uniforms.precomputedTerm[${k}].xy, xND, ${k}, uniforms);
   psiTime += cscale(spatial${k}, term${k});
   }`
   }).join('\n')

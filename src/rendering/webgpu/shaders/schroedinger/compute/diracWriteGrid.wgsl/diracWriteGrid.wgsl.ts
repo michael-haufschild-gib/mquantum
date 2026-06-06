@@ -29,8 +29,6 @@ export const diracWriteGridBlock = /* wgsl */ `
 @group(0) @binding(3) var<storage, read> gammaMatrices: array<f32>;
 @group(0) @binding(4) var outputTex: texture_storage_3d<rgba16float, write>;
 
-// Access gamma matrix element using precomputed base offset for the matrix.
-// Caller should compute matBase = matIdx * S * S * 2u once per matrix.
 fn gammaReAtBase(matBase: u32, row: u32, col: u32, S: u32) -> f32 {
   return gammaMatrices[matBase + row * S * 2u + col * 2u];
 }
@@ -39,7 +37,6 @@ fn gammaImAtBase(matBase: u32, row: u32, col: u32, S: u32) -> f32 {
   return gammaMatrices[matBase + row * S * 2u + col * 2u + 1u];
 }
 
-// Compute total spinor density Σ_c |ψ_c|² at a given site
 fn totalDensityAt(siteIdx: u32, S: u32, T: u32) -> f32 {
   var density: f32 = 0.0;
   for (var c: u32 = 0u; c < S; c++) {
@@ -49,7 +46,6 @@ fn totalDensityAt(siteIdx: u32, S: u32, T: u32) -> f32 {
   return density;
 }
 
-// Compute upper-spinor density Σ_{c<S/2} |ψ_c|² at a given site
 fn upperDensityAt(siteIdx: u32, S: u32, T: u32) -> f32 {
   let half = S / 2u;
   var density: f32 = 0.0;
@@ -60,7 +56,6 @@ fn upperDensityAt(siteIdx: u32, S: u32, T: u32) -> f32 {
   return density;
 }
 
-// Compute lower-spinor density Σ_{c>=S/2} |ψ_c|² at a given site
 fn lowerDensityAt(siteIdx: u32, S: u32, T: u32) -> f32 {
   let half = S >> 1u;
   var density: f32 = 0.0;
@@ -71,9 +66,6 @@ fn lowerDensityAt(siteIdx: u32, S: u32, T: u32) -> f32 {
   return density;
 }
 
-// Combined upper-and-lower density — one pass through the spinor buffers
-// instead of two. Used by fieldView=3 (particle/antiparticle split) so S
-// buffer reads are halved on each corner evaluation.
 fn upperLowerDensityAt(siteIdx: u32, S: u32, T: u32) -> vec2f {
   let half = S >> 1u;
   var upper: f32 = 0.0;
@@ -93,13 +85,11 @@ fn getDiracPotentialScale() -> f32 {
     let r = params.boundingRadius * 0.5;
     return max(0.5 * params.mass * params.harmonicOmega * params.harmonicOmega * r * r, 1.0);
   } else if (params.potentialType == 5u) {
-    // diracPotential.wgsl soft-clamps r to 0.05, so |V|max = Z / 0.05.
     return max(abs(params.coulombZ) / 0.05, 1.0);
   }
   return 1.0;
 }
 
-// Convert precomputed fractional lattice coordinates into interpolation corners.
 fn worldToLatticeInterp(
   coordFs: ptr<function, array<f32, 12>>,
   coordsLo: ptr<function, array<u32, 12>>,
@@ -111,22 +101,18 @@ fn worldToLatticeInterp(
     let coordF = (*coordFs)[d];
 
     if (d < interpDims) {
-      // Trilinear interpolation for visible dimensions
       let lo = floor(coordF);
       let hi = lo + 1.0;
       let f = coordF - lo;
       let loI = i32(lo);
       let hiI = i32(hi);
-      // Both lo and hi must be in valid range for interpolation
       if (loI < -1 || hiI > i32(params.gridSize[d])) {
         return false;
       }
-      // Clamp to valid range (handles edge voxels gracefully)
       (*coordsLo)[d] = u32(clamp(loI, 0, i32(params.gridSize[d]) - 1));
       (*coordsHi)[d] = u32(clamp(hiI, 0, i32(params.gridSize[d]) - 1));
       (*fracs)[d] = clamp(f, 0.0, 1.0);
     } else {
-      // Nearest-neighbor for slice dimensions (4+)
       let coordI = i32(round(coordF));
       if (coordI < 0 || coordI >= i32(params.gridSize[d])) {
         return false;
@@ -139,7 +125,6 @@ fn worldToLatticeInterp(
   return true;
 }
 
-// Compute trilinear weight for a corner based on fractional coords
 fn cornerWeight(fracs: ptr<function, array<f32, 12>>, corner: u32) -> f32 {
   var w: f32 = 1.0;
   let interpDims = min(params.latticeDim, 3u);
@@ -164,14 +149,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
 
-  // Map texture voxel to model-space position [-bound, +bound]³
   let modelPos = vec3f(
     (f32(gid.x) + 0.5) / f32(texDims.x) * 2.0 * bound - bound,
     (f32(gid.y) + 0.5) / f32(texDims.y) * 2.0 * bound - bound,
     (f32(gid.z) + 0.5) / f32(texDims.z) * 2.0 * bound - bound
   );
 
-  // Project model-space position into N-D lattice coordinates via basis vectors
   var ndWorldPos: array<f32, 12>;
   for (var d: u32 = 0u; d < params.latticeDim; d++) {
     ndWorldPos[d] = modelPos.x * params.basisX[d]
@@ -182,15 +165,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     }
   }
 
-  // Precompute fractional lattice coordinate per dim ONCE. Reused by the interp
-  // helper (lo/hi/frac) and the nearest-neighbor derivation below.
-  //
-  // The halfExtent/spacing factor is just (N·dx·½)/dx = N/2, so the original
-  //   coordF = (ndWorldPos + halfExtent) / dx − 0.5
-  // simplifies algebraically to
-  //   coordF = ndWorldPos · invSpacing + (N/2 − ½)
-  // — one less multiply and the spacing divide is folded into a multiply
-  // by precomputed invSpacing. Bit-identical for f32 within rounding.
   var coordF: array<f32, 12>;
   for (var d: u32 = 0u; d < params.latticeDim; d++) {
     let invSpacing = 1.0 / params.spacing[d];
@@ -198,7 +172,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     coordF[d] = ndWorldPos[d] * invSpacing + centerOffset;
   }
 
-  // Convert to lattice coordinates with trilinear interpolation support
   var coordsLo: array<u32, 12>;
   var coordsHi: array<u32, 12>;
   var fracs: array<f32, 12>;
@@ -209,7 +182,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
 
-  // Precompute base index and visible-axis stride deltas for corner lookup.
   let baseIdxLo = ndToLinear(coordsLo, params.strides, params.latticeDim);
   let interpDimsTri = min(params.latticeDim, 3u);
   var deltaIdx: array<u32, 3>;
@@ -220,7 +192,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     deltaIdx[d] = (coordsHi[d] - coordsLo[d]) * params.strides[d];
   }
 
-  // Perpendicular falloff for low-dimensional lattices (1D → tube, 2D → sheet)
   var perpFalloff: f32 = 1.0;
   if (params.latticeDim < 3u) {
     var projSq: f32 = 0.0;
@@ -257,15 +228,11 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let phase = atan2(im0, re0) + DIRAC_WG_PI;
   var phaseForColor: f32 = phase;
 
-  // Precompute 1/densityScale once (guard against 0): each field-view branch
-  // used select(x / scale, 0.0, scale <= 0), which always ran the divide —
-  // 11 redundant divides total. One reciprocal + 11 multiplies is ~10× cheaper.
   let invDensityScale = select(0.0, 1.0 / params.densityScale, params.densityScale > 0.0);
 
   var displayScalar: f32 = 0.0;
 
   if (params.fieldView == 0u) {
-    // totalDensity: trilinear interpolation of Σ_c |ψ_c|²
     var blended: f32 = 0.0;
     for (var corner: u32 = 0u; corner < numCorners; corner++) {
       let w = cornerWeight(&fracs, corner);
@@ -280,7 +247,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     displayScalar = (blended * invDensityScale);
 
   } else if (params.fieldView == 1u) {
-    // Upper spinor: trilinear interpolation
     var blended: f32 = 0.0;
     for (var corner: u32 = 0u; corner < numCorners; corner++) {
       let w = cornerWeight(&fracs, corner);
@@ -295,7 +261,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     displayScalar = (blended * invDensityScale);
 
   } else if (params.fieldView == 2u) {
-    // Lower spinor: trilinear interpolation
     var blended: f32 = 0.0;
     for (var corner: u32 = 0u; corner < numCorners; corner++) {
       let w = cornerWeight(&fracs, corner);
@@ -310,9 +275,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     displayScalar = (blended * invDensityScale);
 
   } else if (params.fieldView == 3u) {
-    // Upper/lower split: trilinear interpolation of both channels.
-    // Uses the fused upperLowerDensityAt helper so each corner reads the
-    // spinor buffers once instead of twice.
     var blendedP: f32 = 0.0;
     var blendedA: f32 = 0.0;
     for (var corner: u32 = 0u; corner < numCorners; corner = corner + 1u) {
@@ -338,7 +300,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
 
   } else if (params.fieldView == 4u) {
-    // spinDensity: nearest-neighbor gamma matrix work.
     let siteIdx = nnSiteIdx;
     var psiSiteRe: array<f32, 64>;
     var psiSiteIm: array<f32, 64>;
@@ -589,10 +550,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     phaseForColor = bloomHuePhase + DIRAC_WG_PI;
 
   } else if (params.fieldView == 9u) {
-    // hubbleLace: speculative spinor-cosmology aperture. It uses a low-rank
-    // sector-current orientation instead of exact gamma-product spin tensors,
-    // keeping the visual responsive while preserving density, sector balance,
-    // helicity, deterministic Hubble shells, phase lace, and 4D slice phase gates.
     let siteIdx = nnSiteIdx;
 
     var totalDensity: f32 = 0.0;
@@ -731,7 +688,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let normDisplay = clamp(displayScalar * perpFalloff, 0.0, 1.0);
   let logDensity = log(normDisplay + 1e-10);
 
-  // Alpha dual-encoding: raw density (>= 0) or -potOverlay (< 0)
   let rawTotalDensity = totalDensityAt(nnSiteIdx, S, T);
   let rawDensityNorm = clamp(
     (rawTotalDensity * invDensityScale) * perpFalloff,

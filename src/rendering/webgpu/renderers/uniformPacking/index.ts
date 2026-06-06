@@ -39,6 +39,7 @@ import {
   packBornNullWeave,
   packCausalDiamondModularOrbital,
   packEntropicTimeShear,
+  packHermiteCocycle,
   packQuantumBackreaction,
   packSpectralDimensionFlow,
   packVacuumBubbleLens,
@@ -408,6 +409,7 @@ function packVisualFields(
       p.quantumModeStr === 'wheelerDeWitt' ||
       p.quantumModeStr === 'antiDeSitter'
   )
+  packHermiteCocycle(floatView, intView, schroedinger, p.quantumModeStr === 'harmonicOscillator')
   packCausalDiamondModularOrbital(floatView, schroedinger, p.quantumModeStr === 'hydrogenND')
 }
 

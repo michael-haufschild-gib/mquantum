@@ -290,6 +290,12 @@ const SCHROEDINGER_FIELDS = [
   { name: 'bornNullWeaveStrength', type: 'f32' },
   { name: 'bornNullWeaveNodeWidth', type: 'f32' },
   { name: 'bornNullWeaveCirculation', type: 'f32' },
+
+  // --- Harmonic oscillator triple-cocycle branch inflation ---
+  { name: 'hermiteCocycleInflationEnabled', type: 'u32' },
+  { name: 'hermiteCocycleInflationStrength', type: 'f32' },
+  { name: 'hermiteCocycleShellRadius', type: 'f32' },
+  { name: 'hermiteCocycleInflationTwist', type: 'f32' },
 ] as const satisfies readonly StructFieldDef[]
 
 /** Computed struct layout for SchroedingerUniforms. */

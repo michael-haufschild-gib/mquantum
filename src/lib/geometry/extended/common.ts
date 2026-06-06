@@ -60,6 +60,8 @@ export type SchroedingerPresetName =
   | 'nodalStructure'
   | 'richSuperposition'
   | 'fockLanternCathedral'
+  | 'hermiteCocycleInflation3D'
+  | 'hermiteCocycleBulk4D'
   | 'custom'
 
 /**

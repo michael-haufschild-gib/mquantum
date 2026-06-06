@@ -135,14 +135,14 @@ export function createBoundingGeometry(
   ])
 
   const vertexBuffer = device.createBuffer({
-    label: 'schroedinger-vertices',
+    label: 'sch-verts',
     size: vertices.byteLength,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
   })
   device.queue.writeBuffer(vertexBuffer, 0, vertices)
 
   const indexBuffer = device.createBuffer({
-    label: 'schroedinger-indices',
+    label: 'sch-idx',
     size: indices.byteLength,
     usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
   })
@@ -186,7 +186,7 @@ export async function createSchrodingerPipeline(
       deps
     )
   } catch (err) {
-    logger.error('[SchrodingerRenderer] Pipeline creation failed, clearing all caches:', err)
+    logger.error('[Sch] pipe create failed:', err)
     pipelineCache.clear()
     pipelineDebugInfoCache.clear()
     DensityGridComputePass.clearPipelineCache()
@@ -214,13 +214,11 @@ async function createSchrodingerPipelineImpl(
   const cacheKey = computePipelineCacheKey(shaderConfig, rendererConfig)
   const cachedPipeline = pipelineCache.get(cacheKey)
 
-  logger.log(
-    `[SchrodingerRenderer] Pipeline ${cachedPipeline ? 'CACHE HIT' : 'CACHE MISS'} dim=${dim} key=${cacheKey}`
-  )
+  logger.log(`[Sch] pipe ${cachedPipeline ? 'hit' : 'miss'} d=${dim} k=${cacheKey}`)
 
   // Always create bind group layouts (cheap, needed for bind groups regardless of cache)
   const cameraBindGroupLayout = device.createBindGroupLayout({
-    label: 'schroedinger-camera-bgl',
+    label: 'sch-cam-bgl',
     entries: [
       {
         binding: 0,
@@ -231,7 +229,7 @@ async function createSchrodingerPipelineImpl(
   })
 
   const combinedBindGroupLayout = device.createBindGroupLayout({
-    label: 'schroedinger-combined-bgl',
+    label: 'sch-comb-bgl',
     entries: [
       { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } },
       { binding: 1, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } },
@@ -244,7 +242,7 @@ async function createSchrodingerPipelineImpl(
     ...modeSetup.additionalLayoutEntries,
   ]
   const objectBindGroupLayout = device.createBindGroupLayout({
-    label: 'schroedinger-object-bgl',
+    label: 'sch-obj-bgl',
     entries: objectBindGroupLayoutEntries,
   })
 
@@ -276,16 +274,16 @@ async function createSchrodingerPipelineImpl(
     pipelineCache.delete(cacheKey)
     pipelineCache.set(cacheKey, cachedPipeline)
   } else {
-    const vertexModule = deps.createShaderModule(device, vertexShader, 'schroedinger-vertex')
-    const fragmentModule = deps.createShaderModule(device, fragmentShader, 'schroedinger-fragment')
+    const vertexModule = deps.createShaderModule(device, vertexShader, 'sch-vert')
+    const fragmentModule = deps.createShaderModule(device, fragmentShader, 'sch-frag')
 
     const pipelineLayout = device.createPipelineLayout({
-      label: 'schroedinger-pipeline-layout',
+      label: 'sch-pipe-layout',
       bindGroupLayouts: [cameraBindGroupLayout, combinedBindGroupLayout, objectBindGroupLayout],
     })
 
     renderPipelinePromise = device.createRenderPipelineAsync({
-      label: 'schroedinger-pipeline',
+      label: 'sch-pipe',
       layout: pipelineLayout,
       vertex: {
         module: vertexModule,
@@ -397,51 +395,41 @@ async function createSchrodingerPipelineImpl(
   }
 
   if (!renderPipeline) {
-    throw new Error(
-      `[SchrodingerRenderer] Render pipeline is null after Phase 4 (dim=${dim}, cacheHit=${!!cachedPipeline})`
-    )
+    throw new Error(`[Sch] pipe null d=${dim} hit=${!!cachedPipeline}`)
   }
 
-  logger.log(`[SchrodingerRenderer] Phase 4 complete: pipeline=${!!renderPipeline}`)
+  logger.log('[Sch] pipe ready')
 
   // =====================================================================
   // Phase 5: Create uniform buffers, bind groups, geometry
   // =====================================================================
 
-  const cameraUniformBuffer = deps.createUniformBuffer(
-    device,
-    CAMERA_UNIFORMS_SIZE,
-    'schroedinger-camera'
-  )
+  const cameraUniformBuffer = deps.createUniformBuffer(device, CAMERA_UNIFORMS_SIZE, 'sch-camera')
   const lightingUniformBuffer = deps.createUniformBuffer(
     device,
     LIGHTING_UNIFORMS_SIZE,
-    'schroedinger-lighting'
+    'sch-lighting'
   )
   const materialUniformBuffer = deps.createUniformBuffer(
     device,
     MATERIAL_UNIFORMS_SIZE,
-    'schroedinger-material'
+    'sch-material'
   )
   const schroedingerUniformBuffer = deps.createUniformBuffer(
     device,
     SCHROEDINGER_UNIFORM_SIZE,
-    'schroedinger-uniforms'
+    'sch-uniforms'
   )
-  const basisUniformBuffer = deps.createUniformBuffer(
-    device,
-    BASIS_UNIFORMS_SIZE,
-    'schroedinger-basis'
-  )
+  const basisUniformBuffer = deps.createUniformBuffer(device, BASIS_UNIFORMS_SIZE, 'sch-basis')
 
   const cameraBindGroup = device.createBindGroup({
-    label: 'schroedinger-camera-bg',
+    label: 'sch-cam-bg',
     layout: cameraBindGroupLayout,
     entries: [{ binding: 0, resource: { buffer: cameraUniformBuffer } }],
   })
 
   const lightingBindGroup = device.createBindGroup({
-    label: 'schroedinger-combined-bg',
+    label: 'sch-comb-bg',
     layout: combinedBindGroupLayout,
     entries: [
       { binding: 0, resource: { buffer: lightingUniformBuffer } },
@@ -450,7 +438,7 @@ async function createSchrodingerPipelineImpl(
   })
 
   const objectBindGroup = device.createBindGroup({
-    label: 'schroedinger-object-bg',
+    label: 'sch-obj-bg',
     layout: objectBindGroupLayout,
     entries: [
       { binding: 0, resource: { buffer: schroedingerUniformBuffer } },

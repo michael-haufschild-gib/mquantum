@@ -74,6 +74,10 @@ type NamedPresetVisualOverrideKey =
   | 'interferenceFreq'
   | 'interferenceSpeed'
   | 'fockLanternEnabled'
+  | 'hermiteCocycleInflationEnabled'
+  | 'hermiteCocycleInflationStrength'
+  | 'hermiteCocycleShellRadius'
+  | 'hermiteCocycleInflationTwist'
 
 /** Rendering overrides applied when a named preset selects visual effect controls. */
 export type NamedPresetVisualOverrides = Partial<
@@ -394,6 +398,72 @@ export const SCHROEDINGER_NAMED_PRESETS: Record<string, NamedPresetConfig> = {
       interferenceFreq: 18.0,
       interferenceSpeed: 0.35,
       fockLanternEnabled: true,
+    },
+    colorAlgorithm: 'phaseDensity',
+  },
+  hermiteCocycleInflation3D: {
+    name: 'Hermite Cocycle Inflation',
+    description:
+      'Five Fock branches with shell-local triple-cocycle phase obstruction, forming braided inflation chambers',
+    seed: 909091,
+    termCount: 5,
+    maxN: 6,
+    frequencySpread: 0.0,
+    quantumNumbers: [
+      [6, 1, 4],
+      [1, 5, 2],
+      [4, 2, 6],
+      [3, 6, 1],
+      [5, 3, 5],
+    ],
+    visualOverrides: {
+      densityGain: 3.25,
+      densityContrast: 2.9,
+      autoScaleMaxGain: 72,
+      raymarchQuality: 'balanced',
+      phaseMaterialityEnabled: true,
+      phaseMaterialityStrength: 0.9,
+      interferenceEnabled: true,
+      interferenceAmp: 0.28,
+      interferenceFreq: 14.0,
+      interferenceSpeed: 0.32,
+      hermiteCocycleInflationEnabled: true,
+      hermiteCocycleInflationStrength: 1.15,
+      hermiteCocycleShellRadius: 0.72,
+      hermiteCocycleInflationTwist: 3.7,
+    },
+    colorAlgorithm: 'phaseDensity',
+  },
+  hermiteCocycleBulk4D: {
+    name: 'Hermite Cocycle Bulk 4D',
+    description:
+      'Fourth-coordinate branch obstruction braids oscillator lobes into a bulk inflation shell',
+    seed: 909104,
+    termCount: 5,
+    maxN: 6,
+    frequencySpread: 0.0,
+    quantumNumbers: [
+      [6, 0, 4, 2],
+      [0, 6, 2, 4],
+      [4, 2, 6, 6],
+      [2, 4, 0, 2],
+      [6, 6, 2, 4],
+    ],
+    visualOverrides: {
+      densityGain: 3.55,
+      densityContrast: 3.05,
+      autoScaleMaxGain: 76,
+      raymarchQuality: 'balanced',
+      phaseMaterialityEnabled: true,
+      phaseMaterialityStrength: 0.95,
+      interferenceEnabled: true,
+      interferenceAmp: 0.3,
+      interferenceFreq: 16.0,
+      interferenceSpeed: 0.28,
+      hermiteCocycleInflationEnabled: true,
+      hermiteCocycleInflationStrength: 1.3,
+      hermiteCocycleShellRadius: 0.82,
+      hermiteCocycleInflationTwist: 5.1,
     },
     colorAlgorithm: 'phaseDensity',
   },
