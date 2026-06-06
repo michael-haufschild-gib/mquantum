@@ -356,6 +356,8 @@ export interface SchroedingerQuantumEffectsConfig {
   bornNullWeaveNodeWidth: number
   /** Current-over-density circulation sensitivity (0.0-8.0) */
   bornNullWeaveCirculation: number
+  /** Enable harmonic-oscillator Fock Lantern parity-cell emission gate */
+  fockLanternEnabled: boolean
   /** Enable observer causal-diamond modular-flow warp for hydrogenND orbitals */
   causalDiamondEnabled: boolean
   /** Finite observer horizon radius R in hydrogenND chart units (0.5-20.0) */
@@ -786,6 +788,7 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   bornNullWeaveStrength: 0.9,
   bornNullWeaveNodeWidth: 0.025,
   bornNullWeaveCirculation: 2.0,
+  fockLanternEnabled: false,
   causalDiamondEnabled: false,
   causalDiamondHorizonRadius: 3.6,
   causalDiamondCompressionK: 0.85,

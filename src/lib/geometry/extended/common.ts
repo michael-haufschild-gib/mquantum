@@ -59,6 +59,7 @@ export type SchroedingerPresetName =
   | 'isotropic'
   | 'nodalStructure'
   | 'richSuperposition'
+  | 'fockLanternCathedral'
   | 'custom'
 
 /**

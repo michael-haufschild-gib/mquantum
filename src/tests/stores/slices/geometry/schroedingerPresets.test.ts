@@ -1,9 +1,16 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { APPEARANCE_INITIAL_STATE } from '@/stores/slices/appearanceSlice'
 
 describe('Schroedinger Store Presets', () => {
+  beforeEach(() => {
+    useExtendedObjectStore.setState(useExtendedObjectStore.getInitialState())
+    useAppearanceStore.setState(APPEARANCE_INITIAL_STATE)
+  })
+
   it('should update configuration parameters when preset is selected', () => {
     const store = useExtendedObjectStore.getState()
     const presetName = 'highEnergy'
@@ -75,5 +82,46 @@ describe('Schroedinger Store Presets', () => {
     // Try to set beyond max
     store.setSchroedingerFrequencySpread(0.6)
     expect(useExtendedObjectStore.getState().schroedinger.frequencySpread).toBe(0.5)
+  })
+
+  it('applies Fock Lantern Cathedral as an exact HO parity-lantern scenario', () => {
+    const presetConfig = SCHROEDINGER_NAMED_PRESETS.fockLanternCathedral
+    if (!presetConfig) throw new Error('fockLanternCathedral preset not found')
+
+    expect(presetConfig.name).toBe('Fock Lantern Cathedral')
+    expect(presetConfig.quantumNumbers).toEqual([
+      [6, 0, 0],
+      [0, 6, 0],
+      [0, 0, 6],
+      [4, 4, 0],
+      [4, 0, 4],
+      [0, 4, 4],
+    ])
+    expect(presetConfig.colorAlgorithm).toBe('phaseDensity')
+
+    useExtendedObjectStore.getState().setSchroedingerPresetName('fockLanternCathedral')
+    const config = useExtendedObjectStore.getState().schroedinger
+
+    expect(config.presetName).toBe('fockLanternCathedral')
+    expect(config.termCount).toBe(6)
+    expect(config.maxQuantumNumber).toBe(6)
+    expect(config.frequencySpread).toBe(0)
+    expect(config.fockLanternEnabled).toBe(true)
+    expect(config.densityGain).toBeCloseTo(3.6)
+    expect(config.densityContrast).toBeCloseTo(3.1)
+    expect(config.phaseMaterialityEnabled).toBe(true)
+    expect(config.interferenceEnabled).toBe(true)
+    expect(useAppearanceStore.getState().colorAlgorithm).toBe('phaseDensity')
+  })
+
+  it('resets Fock Lantern renderer gate when switching to a different named HO preset', () => {
+    useExtendedObjectStore.getState().setSchroedingerPresetName('fockLanternCathedral')
+    expect(useExtendedObjectStore.getState().schroedinger.fockLanternEnabled).toBe(true)
+
+    useExtendedObjectStore.getState().setSchroedingerPresetName('groundState')
+
+    const config = useExtendedObjectStore.getState().schroedinger
+    expect(config.presetName).toBe('groundState')
+    expect(config.fockLanternEnabled).toBe(false)
   })
 })

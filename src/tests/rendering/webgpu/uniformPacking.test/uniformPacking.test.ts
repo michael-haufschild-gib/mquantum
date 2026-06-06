@@ -459,6 +459,10 @@ function makeBaseParams(overrides: Partial<SchroedingerPackParams> = {}): Schroe
 }
 
 describe('packSchroedingerUniforms', () => {
+  const fockLanternIndex = {
+    enabled: SCHROEDINGER_LAYOUT.index._padEnergy,
+  }
+
   // The buffer must be large enough for the entire SchroedingerUniforms struct.
   // The struct extends to ~1600 bytes. Use 2000 to be safe.
   const BUFFER_SIZE = 2000
@@ -1121,6 +1125,47 @@ describe('packSchroedingerUniforms', () => {
       expect(floatView[index.bornNullWeaveNodeWidth]).toBe(0)
       expect(floatView[index.bornNullWeaveCirculation]).toBe(0)
     }
+  })
+
+  it('packs clamped Fock Lantern controls only for harmonic oscillator mode', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      quantumModeStr: 'harmonicOscillator',
+      schroedinger: {
+        fockLanternEnabled: true,
+      },
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    expect(intView[fockLanternIndex.enabled]).toBe(1)
+  })
+
+  it('zeroes Fock Lantern controls for disabled and non-HO modes', () => {
+    for (const quantumModeStr of ['hydrogenND', 'tdseDynamics', 'wheelerDeWitt']) {
+      const { floatView, intView } = createBuffer(BUFFER_SIZE)
+      const params = makeBaseParams({
+        quantumModeStr,
+        schroedinger: {
+          fockLanternEnabled: true,
+        },
+      })
+
+      packSchroedingerUniforms(floatView, intView, params)
+
+      expect(intView[fockLanternIndex.enabled], quantumModeStr).toBe(0)
+    }
+
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const disabled = makeBaseParams({
+      quantumModeStr: 'harmonicOscillator',
+      schroedinger: {
+        fockLanternEnabled: false,
+      },
+    })
+
+    packSchroedingerUniforms(floatView, intView, disabled)
+    expect(intView[fockLanternIndex.enabled]).toBe(0)
   })
 
   it('zeroes causal-diamond modular orbital uniforms when disabled', () => {

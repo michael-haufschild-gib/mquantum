@@ -149,7 +149,7 @@ struct SchroedingerUniforms {
   nodalColor: vec3f,             // Nodal surface color
   nodalStrength: f32,            // Nodal highlight strength
 
-  _padEnergy: u32,               // Unused (keeps byte offsets stable)
+  _padEnergy: u32,               // Reused by Fock Lantern gate
 
   // Uncertainty boundary
   uncertaintyBoundaryEnabled: u32,   // Enable confidence-boundary emphasis
@@ -380,9 +380,6 @@ struct SchroedingerUniforms {
   bornNullWeaveNodeWidth: f32,
   bornNullWeaveCirculation: f32,
 
-  // HydrogenND causal-diamond modular orbital warp. Disabled host packing
-  // writes all fields as zero; hydrogenND psi helpers then return identity
-  // coordinates and unit visibility gain.
 }
 
 // ============================================

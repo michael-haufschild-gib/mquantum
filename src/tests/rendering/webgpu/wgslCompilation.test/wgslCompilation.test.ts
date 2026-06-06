@@ -279,7 +279,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     expect(modules).not.toContain('Hydrogen Family Fallbacks')
     expect(modules).not.toContain('HO ND 7D')
     expect(modules).not.toContain('HO ND Dispatch')
-    expect(wgsl).toContain('return hydrogenNDOptimized(xND, t, uniforms);')
+    expect(wgsl).toContain('return hydrogenNDOptimized(warpedXND, t, uniforms)')
     expect(wgsl).not.toContain('fn evalHarmonicOscillatorPsi(')
   })
 
@@ -1238,7 +1238,7 @@ describe('WGSL Shader Compilation - Schroedinger Density Grid Compute', () => {
     expect(modules).toContain('Hydrogen ND Dispatch')
     expect(modules).not.toContain('HO ND 8D')
     expect(modules).not.toContain('HO ND Dispatch')
-    expect(wgsl).toContain('return hydrogenNDOptimized(xND, t, uniforms);')
+    expect(wgsl).toContain('return hydrogenNDOptimized(warpedXND, t, uniforms)')
     expect(wgsl).not.toContain('fn evalHarmonicOscillatorPsi(')
   })
 

@@ -61,9 +61,6 @@ const I = SCHROEDINGER_LAYOUT.index
 type AdSConfig = AntiDeSitterConfig | undefined
 type WdwPhaseConfig = { phaseRotationEnabled?: boolean; phaseRotationSpeed?: number }
 
-const isDensityGridOnlyMode = (mode: string): boolean =>
-  mode === 'wheelerDeWitt' || mode === 'antiDeSitter'
-
 const DEFAULT_BRANCH_COLOR_A: TdseBranchColor = [0, 1, 1]
 const DEFAULT_BRANCH_COLOR_B: TdseBranchColor = [1, 0, 1]
 const MIN_DIM = 2
@@ -407,7 +404,9 @@ function packVisualFields(
     floatView,
     intView,
     schroedinger,
-    p.isUniformComputeMode || isDensityGridOnlyMode(p.quantumModeStr)
+    p.isUniformComputeMode ||
+      p.quantumModeStr === 'wheelerDeWitt' ||
+      p.quantumModeStr === 'antiDeSitter'
   )
   packCausalDiamondModularOrbital(floatView, schroedinger, p.quantumModeStr === 'hydrogenND')
 }
@@ -503,6 +502,8 @@ function packOverlayControls(
 
   packPhaseAndInterference(floatView, intView, p.boundingRadius, isDensityMatrixMode, schroedinger)
   packNodalControls(floatView, intView, schroedinger)
+  intView[I._padEnergy] =
+    p.quantumModeStr === 'harmonicOscillator' && schroedinger?.fockLanternEnabled ? 1 : 0
 
   // Phase shimmer + uncertainty
   intView[I.phaseShimmerEnabled] = schroedinger?.phaseShimmerEnabled ? 1 : 0
