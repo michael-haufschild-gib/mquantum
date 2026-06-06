@@ -16,9 +16,16 @@ describe('Schroedinger Fock Lantern WGSL composition', () => {
     expect(active).toContain('uniforms.quantumMode == QUANTUM_MODE_HARMONIC')
     expect(active).toContain('uniforms._padEnergy != 0u')
 
-    const body = functionSlice(volumeIntegrationBlock, 'computeFockLantern')
+    const midGate = functionSlice(volumeIntegrationBlock, 'computeFockLanternMidGate')
+    expectOrdered(midGate, [
+      'let peakDensity =',
+      'let normalizedRho =',
+      'return smoothstep(0.015, 0.22, normalizedRho)',
+    ])
+
+    const body = functionSlice(volumeIntegrationBlock, 'computeFockLanternFromGate')
     expectOrdered(body, [
-      'let midGate =',
+      'if (midGate <= 1e-5)',
       'let cellScale = 5.4',
       'let parityBias = 0.72',
       'let strength = 1.35',
@@ -32,6 +39,9 @@ describe('Schroedinger Fock Lantern WGSL composition', () => {
       'let emissionGain =',
       'let opacityScale =',
     ])
+
+    const wrapper = functionSlice(volumeIntegrationBlock, 'computeFockLantern')
+    expect(wrapper).toContain('computeFockLanternMidGate(rho, uniforms)')
   })
 
   it('wires the lantern into HQ raymarch before effective density and emission', () => {
@@ -39,12 +49,13 @@ describe('Schroedinger Fock Lantern WGSL composition', () => {
 
     expectOrdered(body, [
       'let fockLanternActive = isFockLanternActive(uniforms)',
-      'if (fockLanternActive && rho >= EMPTY_SKIP_THRESHOLD)',
+      'USE_ANALYTICAL_GRADIENT && (nodalBandEnabled || fockLanternActive)',
+      'if (fockLanternActive && rho >= EMPTY_SKIP_THRESHOLD && alpha > 0.001)',
+      'let fockMidGate = computeFockLanternMidGate(rho, uniforms)',
+      'if (fockMidGate > 1e-5)',
       'let fockGradient = ensureGradient(samplePos, animTime, uniforms, &gradCache)',
-      'let fockLantern = computeFockLantern(samplePos, rho, phase, fockGradient, uniforms)',
-      'fockLanternOpacityScale',
-      'computeEffectiveDensity(',
-      'fockLanternOpacityScale',
+      'let fockLantern = computeFockLanternFromGate(',
+      'fockLantern.opacityScale',
       'computeEmissionLit(rho, sCenter, phase, samplePos',
       'fockLanternEmissionGain',
     ])

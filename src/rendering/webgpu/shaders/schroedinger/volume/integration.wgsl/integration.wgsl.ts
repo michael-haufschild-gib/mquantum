@@ -136,22 +136,20 @@ fn isFockLanternActive(uniforms: SchroedingerUniforms) -> bool {
     && uniforms._padEnergy != 0u;
 }
 
-fn computeFockLantern(
-  worldPosition: vec3f,
-  rho: f32,
-  phase: f32,
-  localGradient: vec3f,
-  uniforms: SchroedingerUniforms
-) -> FockLanternResult {
-  if (!isFockLanternActive(uniforms)) {
-    return FockLanternResult(1.0, 1.0, 0.0);
-  }
-
+fn computeFockLanternMidGate(rho: f32, uniforms: SchroedingerUniforms) -> f32 {
   let peakDensity = max(uniforms.peakDensity, 1e-8);
   let normalizedRho = clamp(rho / peakDensity, 0.0, 2.0);
-  let midGate =
-    smoothstep(0.015, 0.22, normalizedRho) *
+  return smoothstep(0.015, 0.22, normalizedRho) *
     (1.0 - smoothstep(1.12, 1.75, normalizedRho));
+}
+
+fn computeFockLanternFromGate(
+  worldPosition: vec3f,
+  phase: f32,
+  localGradient: vec3f,
+  uniforms: SchroedingerUniforms,
+  midGate: f32,
+) -> FockLanternResult {
   if (midGate <= 1e-5) {
     return FockLanternResult(1.0, 1.0, 0.0);
   }
@@ -174,6 +172,25 @@ fn computeFockLantern(
   let emissionGain = 1.0 + strength * lantern * 2.8;
   let opacityScale = clamp(1.0 - voidGate * strength * 0.45, 0.35, 1.0);
   return FockLanternResult(emissionGain, opacityScale, lantern);
+}
+
+fn computeFockLantern(
+  worldPosition: vec3f,
+  rho: f32,
+  phase: f32,
+  localGradient: vec3f,
+  uniforms: SchroedingerUniforms
+) -> FockLanternResult {
+  if (!isFockLanternActive(uniforms)) {
+    return FockLanternResult(1.0, 1.0, 0.0);
+  }
+  return computeFockLanternFromGate(
+    worldPosition,
+    phase,
+    localGradient,
+    uniforms,
+    computeFockLanternMidGate(rho, uniforms)
+  );
 }
 
 /**

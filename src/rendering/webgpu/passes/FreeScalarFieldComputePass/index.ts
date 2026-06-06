@@ -134,6 +134,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   private totalSites = 0
   private maxFieldValue = 1.0
   private maxPhiEstimate = 1.0
+  private maxFieldValueCacheKey = ''
   private pendingStagingBuffers: GPUBuffer[] = []
 
   /**
@@ -561,7 +562,11 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   ): void {
     if (!this.uniformBuffer) return
 
-    this.maxFieldValue = estimateFsfMaxFieldValue(config, this.maxPhiEstimate)
+    const maxFieldValueCacheKey = this.computeMaxFieldValueCacheKey(config)
+    if (maxFieldValueCacheKey !== this.maxFieldValueCacheKey) {
+      this.maxFieldValue = estimateFsfMaxFieldValue(config, this.maxPhiEstimate)
+      this.maxFieldValueCacheKey = maxFieldValueCacheKey
+    }
     writeFsfUniforms(device, this.uniformBuffer, this.uniformData, {
       config,
       totalSites: this.totalSites,
@@ -581,6 +586,20 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       preheatingReferenceEta: this.preheatingReferenceEta,
       strideScratch: this.strideScratch,
     })
+  }
+
+  private computeMaxFieldValueCacheKey(config: FreeScalarConfig): string {
+    const preheating = config.preheating.enabled
+      ? `${config.preheating.amplitude},${config.preheating.frequency}`
+      : 'off'
+    return [
+      computeFsfConfigHash(config),
+      computeFsfInitHash(config),
+      config.fieldView,
+      config.autoScale ? 1 : 0,
+      this.maxPhiEstimate,
+      preheating,
+    ].join('|')
   }
 
   /** Current simulation conformal time η — exposed for analysis readouts. */
