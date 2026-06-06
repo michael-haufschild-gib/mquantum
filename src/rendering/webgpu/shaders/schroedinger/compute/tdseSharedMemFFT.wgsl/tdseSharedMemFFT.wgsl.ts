@@ -172,7 +172,7 @@ fn main(
 /**
  * Multi-pencil fork of {@link tdseSharedMemFFTTwiddleBlock}. It is intended
  * for high-dimensional Dirac lattices where axes are often only 8-32 points:
- * one 64-thread workgroup per 8-point pencil leaves most lanes idle. This
+ * one workgroup per 8-point pencil leaves most lanes idle. This
  * variant packs several independent pencils into one workgroup while running
  * the same Stockham butterflies in the same per-pencil order.
  *
@@ -197,16 +197,7 @@ fn cmul_sm_tw(a: vec2f, b: vec2f) -> vec2f {
 }
 
 fn pencils_per_workgroup(N: u32) -> u32 {
-  if (N <= 8u) {
-    return 8u;
-  }
-  if (N <= 16u) {
-    return 4u;
-  }
-  if (N <= 32u) {
-    return 2u;
-  }
-  return 1u;
+  return max(1u, N_MAX_FFT_TWIDDLE / N);
 }
 
 fn pencil_base_offset(pencilId: u32, axisStride: u32, N: u32) -> u32 {

@@ -28,6 +28,7 @@ void initAnimationWasm()
 if (import.meta.env.DEV) {
   void Promise.all([
     import('@/stores/scene/geometryStore'),
+    import('@/stores/scene/cameraStore'),
     import('@/stores/ui/uiStore'),
     import('@/stores/scene/environmentStore'),
     import('@/stores/scene/appearanceStore'),
@@ -47,6 +48,7 @@ if (import.meta.env.DEV) {
     .then(
       ([
         geo,
+        camera,
         ui,
         env,
         app,
@@ -64,6 +66,7 @@ if (import.meta.env.DEV) {
         pauliPresets,
       ]) => {
         window.__GEOMETRY_STORE__ = geo.useGeometryStore
+        window.__CAMERA_STORE__ = camera.useCameraStore
         window.__UI_STORE__ = ui.useUIStore
         window.__ENVIRONMENT_STORE__ = env.useEnvironmentStore
         window.__APPEARANCE_STORE__ = app.useAppearanceStore

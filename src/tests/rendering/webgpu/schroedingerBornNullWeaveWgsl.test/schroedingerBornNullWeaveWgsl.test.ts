@@ -46,17 +46,20 @@ describe('Schroedinger Born-null weave WGSL composition', () => {
     const body = functionSlice(volumeRaymarchBlock, 'volumeRaymarch')
 
     // Same external-gate refactor for HQ. The post-warp density resample uses
-    // sampleDensityWithPhase (rho/log/phase only — gradient is produced lazily
-    // by ensureGradient at emission time and shared with upstream consumers).
+    // sampleDensityWithPhase, while the lighting gradient stays lazy and shared.
     expectOrdered(body, [
       'let vacuumBubble = applyVacuumBubbleLens(',
       'if (bornNullWeaveActive && quickRho >= EMPTY_SKIP_THRESHOLD)',
       'let bornGradient = ensureGradient(samplePos, animTime, uniforms, &gradCache)',
       'let bornNullWeave = applyBornNullWeave(',
+      'bornNullEmissionGain = bornNullWeave.emissionGain',
+      'bornNullOpacityScale = bornNullWeave.opacityScale',
       'samplePos = bornNullWeave.position',
-      'sampleDensityWithPhase(samplePos, animTime, uniforms)',
-      'computeEffectiveDensity(',
-      'rho * spectralOpacityScale * vacuumBubbleOpacityScale * bornNullOpacityScale',
+      'quickCheck = sampleDensityWithPhase(samplePos, animTime, uniforms)',
+      'quickRho = quickCheck.x',
+      'let nonFockOpacityScale = spectralOpacityScale * vacuumBubbleOpacityScale * bornNullOpacityScale',
+      'rho * nonFockOpacityScale',
+      'emissionGradient = ensureGradient(samplePos, animTime, uniforms, &gradCache)',
       'computeEmissionLit(rho, sCenter, phase, samplePos',
       'bornNullEmissionGain',
     ])

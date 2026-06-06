@@ -83,8 +83,8 @@ describe('Schroedinger spectral-dimension flow WGSL composition', () => {
   it('resamples HQ analytic volume before gradient and emission', () => {
     const body = functionSlice(volumeRaymarchBlock, 'volumeRaymarch')
 
-    // PERF: HQ now uses ensureGradient at the emission point (per-step cache
-    // shared with all spacetime effects) instead of sampleDensityWithAnalyticalGradient.
+    // PERF: HQ resamples density only after an actual warp, then defers the
+    // final lighting gradient to ensureGradient at the emission point.
     expectOrdered(body, [
       'let entropyShear = applyEntropicTimeShear(',
       'let spectralFlow = applySpectralDimensionFlow(',
@@ -92,9 +92,11 @@ describe('Schroedinger spectral-dimension flow WGSL composition', () => {
       'spectralEmissionGain = spectralFlow.emissionGain',
       'spectralOpacityScale = spectralFlow.opacityScale',
       'quickCheck = sampleDensityWithPhase(samplePos, animTime, uniforms)',
-      'gradient = ensureGradient(samplePos, animTime, uniforms, &gradCache)',
-      'computeEffectiveDensity(',
-      'rho * spectralOpacityScale',
+      'quickRho = quickCheck.x',
+      'let nonFockOpacityScale = spectralOpacityScale * vacuumBubbleOpacityScale * bornNullOpacityScale',
+      'let baseEffectiveRho = computeEffectiveDensity(',
+      'rho * nonFockOpacityScale',
+      'emissionGradient = ensureGradient(samplePos, animTime, uniforms, &gradCache)',
       'computeEmissionLit(rho, sCenter, phase, samplePos',
       'spectralEmissionGain',
     ])

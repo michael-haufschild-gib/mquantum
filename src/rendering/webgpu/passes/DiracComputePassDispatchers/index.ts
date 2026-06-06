@@ -36,10 +36,7 @@ import {
  * `diracSharedMemFFTMultiPencilTwiddleBlock`.
  */
 function diracSharedMemFFTPencilsPerWorkgroup(axisDim: number): number {
-  if (axisDim <= 8) return 8
-  if (axisDim <= 16) return 4
-  if (axisDim <= 32) return 2
-  return 1
+  return Math.max(1, Math.floor(SHARED_MEM_FFT_MAX_AXIS / axisDim))
 }
 
 /** Workgroups needed by Dirac's multi-pencil shared-memory FFT shader. */
