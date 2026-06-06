@@ -123,21 +123,21 @@ function makeDispatch(calls: string[]): DispatchComputeFn {
 const siteDispatch: SiteDispatch = { x: 5, y: 1, z: 1, use3D: false }
 
 describe('Dirac shared-memory FFT dispatch sizing', () => {
-  it('batches small axes into the same 64-thread workgroup contract as the shader', () => {
+  it('batches small axes into the same 128-element workgroup contract as the shader', () => {
     expect(diracSharedMemFFTWorkgroupCount(8 * 8, 8)).toBe(1)
-    expect(diracSharedMemFFTWorkgroupCount(9 * 8, 8)).toBe(2)
+    expect(diracSharedMemFFTWorkgroupCount(17 * 8, 8)).toBe(2)
     expect(diracSharedMemFFTWorkgroupCount(4 * 16, 16)).toBe(1)
-    expect(diracSharedMemFFTWorkgroupCount(5 * 16, 16)).toBe(2)
+    expect(diracSharedMemFFTWorkgroupCount(9 * 16, 16)).toBe(2)
     expect(diracSharedMemFFTWorkgroupCount(2 * 32, 32)).toBe(1)
-    expect(diracSharedMemFFTWorkgroupCount(3 * 32, 32)).toBe(2)
+    expect(diracSharedMemFFTWorkgroupCount(5 * 32, 32)).toBe(2)
     expect(diracSharedMemFFTWorkgroupCount(64, 64)).toBe(1)
-    expect(diracSharedMemFFTWorkgroupCount(2 * 64, 64)).toBe(2)
+    expect(diracSharedMemFFTWorkgroupCount(3 * 64, 64)).toBe(2)
   })
 
   it('rounds up partial multi-pencil workgroups', () => {
     expect(diracSharedMemFFTWorkgroupCount(16, 4)).toBe(1)
-    expect(diracSharedMemFFTWorkgroupCount(144, 16)).toBe(3)
-    expect(diracSharedMemFFTWorkgroupCount(256, 32)).toBe(4)
+    expect(diracSharedMemFFTWorkgroupCount(144, 16)).toBe(2)
+    expect(diracSharedMemFFTWorkgroupCount(256, 32)).toBe(2)
     expect(diracSharedMemFFTWorkgroupCount(512, 128)).toBe(4)
   })
 })
