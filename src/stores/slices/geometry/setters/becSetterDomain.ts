@@ -74,6 +74,7 @@ const BEC_FIELD_VIEWS: ReadonlySet<BecFieldView> = new Set([
   'machNumber',
   'hawkingFlux',
   'vorticity',
+  'branePfaffian',
 ])
 
 const BEC_DISORDER_DISTRIBUTIONS: ReadonlySet<TdseDisorderDistribution> = new Set([

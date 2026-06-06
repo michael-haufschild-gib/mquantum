@@ -162,6 +162,7 @@ describe('BECControls', () => {
     render(<BECControls config={defaultConfig()} dimension={3} actions={createMockActions()} />)
     expect(screen.queryByRole('option', { name: 'Hawking Flux κ/2π' })).not.toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Circulation Ω' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Brane Pfaffian Pf(W)' })).toBeInTheDocument()
   })
 
   describe('Hawking (Analog Horizon) controls', () => {

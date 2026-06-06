@@ -114,6 +114,11 @@ describe('BEC setters', () => {
       expect(bec().fieldView).toBe('phase')
     })
 
+    it('allows the Pfaffian brane field view outside analog-horizon gating', () => {
+      store().setBecFieldView('branePfaffian')
+      expect(bec().fieldView).toBe('branePfaffian')
+    })
+
     it('allows hawkingFlux only for blackHoleAnalog', () => {
       store().setBecFieldView('hawkingFlux')
       expect(bec().fieldView).toBe('density')

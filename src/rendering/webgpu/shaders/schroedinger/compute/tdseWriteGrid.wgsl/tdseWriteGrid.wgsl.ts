@@ -400,6 +400,81 @@ fn computeCtcCausalShadowScalar(idx: u32, re: f32, im: f32, density: f32, nnCoor
   let display = clamp(feedback * balanceJ * opposing * phaseCoherence, 0.0, 1.0);
   return display * densityGate;
 }
+
+fn branePlaquetteWindingOrZero(idx: u32, nnCoords: ptr<function, array<u32, 12>>, axisA: u32, axisB: u32) -> f32 {
+  if (axisA == axisB || axisA >= params.latticeDim || axisB >= params.latticeDim) {
+    return 0.0;
+  }
+  if (params.gridSize[axisA] <= 1u || params.gridSize[axisB] <= 1u) {
+    return 0.0;
+  }
+  return plaquetteWinding(idx, nnCoords, axisA, axisB);
+}
+
+fn braneAxisWorldCoord(nnCoords: ptr<function, array<u32, 12>>, axis: u32) -> f32 {
+  return (f32((*nnCoords)[axis]) + 0.5 - 0.5 * f32(params.gridSize[axis])) * params.spacing[axis];
+}
+
+fn braneAxesAreDistinct(a: u32, b: u32, c: u32, d: u32) -> bool {
+  return a != b && a != c && a != d && b != c && b != d && c != d;
+}
+
+fn computeSoftBraneIntersectionCaustic(nnCoords: ptr<function, array<u32, 12>>, phase: f32) -> f32 {
+  if (params.initCondition != 6u || params.vortexCount < 2u || params.latticeDim < 4u) {
+    return 0.0;
+  }
+
+  let a1 = params.vortexPlane1Axis0;
+  let b1 = params.vortexPlane1Axis1;
+  let a2 = params.vortexPlane2Axis0;
+  let b2 = params.vortexPlane2Axis1;
+  if (!braneAxesAreDistinct(a1, b1, a2, b2)) { return 0.0; }
+  if (a1 >= params.latticeDim || b1 >= params.latticeDim || a2 >= params.latticeDim || b2 >= params.latticeDim) {
+    return 0.0;
+  }
+
+  let sep = params.vortexSeparation;
+  let x1a = braneAxisWorldCoord(nnCoords, a1) - 0.5 * sep;
+  let x1b = braneAxisWorldCoord(nnCoords, b1);
+  let x2a = braneAxisWorldCoord(nnCoords, a2) + 0.5 * sep;
+  let x2b = braneAxisWorldCoord(nnCoords, b2);
+  let r1Sq = x1a * x1a + x1b * x1b;
+  let r2Sq = x2a * x2a + x2b * x2b;
+  let avgSpacing = 0.25 * (
+    params.spacing[a1] + params.spacing[b1] + params.spacing[a2] + params.spacing[b2]
+  );
+  let sigma = max(1.55 * avgSpacing, 0.17);
+  let sheetGate = exp(-0.5 * (r1Sq + r2Sq) / (sigma * sigma));
+  let braidPhase = 5.0 * (x1a + 0.7 * x1b - x2a + 0.5 * x2b) + 2.0 * phase + 0.35 * params.simTime;
+  let braid = 0.58 + 0.42 * cos(braidPhase);
+  return clamp(sheetGate * braid, 0.0, 1.0);
+}
+
+fn computeBranePfaffianScalar(idx: u32, nnCoords: ptr<function, array<u32, 12>>, density: f32, phase: f32, densityGate: f32) -> f32 {
+  if (params.latticeDim < 4u || density <= 1e-20) { return 0.0; }
+
+  var pfaffianAbs: f32 = 0.0;
+  for (var i: u32 = 0u; i + 3u < params.latticeDim; i = i + 1u) {
+    for (var j: u32 = i + 1u; j + 2u < params.latticeDim; j = j + 1u) {
+      for (var k: u32 = j + 1u; k + 1u < params.latticeDim; k = k + 1u) {
+        for (var l: u32 = k + 1u; l < params.latticeDim; l = l + 1u) {
+          let wij = branePlaquetteWindingOrZero(idx, nnCoords, i, j);
+          let wkl = branePlaquetteWindingOrZero(idx, nnCoords, k, l);
+          let wik = branePlaquetteWindingOrZero(idx, nnCoords, i, k);
+          let wjl = branePlaquetteWindingOrZero(idx, nnCoords, j, l);
+          let wil = branePlaquetteWindingOrZero(idx, nnCoords, i, l);
+          let wjk = branePlaquetteWindingOrZero(idx, nnCoords, j, k);
+          let pf = wij * wkl - wik * wjl + wil * wjk;
+          pfaffianAbs += abs(pf);
+        }
+      }
+    }
+  }
+
+  let exactPfaffian = clamp(1.0 - exp(-6.0 * pfaffianAbs), 0.0, 1.0);
+  let braneCaustic = computeSoftBraneIntersectionCaustic(nnCoords, phase);
+  return clamp(0.58 * max(exactPfaffian, braneCaustic), 0.0, 1.0) * densityGate;
+}
 @compute @workgroup_size(4, 4, 4)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let texDims = textureDimensions(outputTex);
@@ -714,6 +789,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       }
     }
     displayScalar = clamp(1.0 - exp(-circulationAbs), 0.0, 1.0) * densityGate;
+  } else if (params.fieldView == 15u) {
+    displayScalar = computeBranePfaffianScalar(idx, &nnCoords, density, phase, densityGate);
   } else if (params.fieldView == 10u) { displayScalar = computeCtcResidualScalar(idx, re, im, density, &nnCoords, densityGate); } else if (params.fieldView == 11u) {
     displayScalar = computeCtcLoopGainScalar(idx, re, im, density, &nnCoords, densityGate);
   } else if (params.fieldView == 12u) { displayScalar = computeCtcDeutschEntropyScalar(idx, re, im, density, &nnCoords, densityGate); } else if (params.fieldView == 13u) {

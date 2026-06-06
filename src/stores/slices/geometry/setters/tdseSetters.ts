@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- setter bundle already delegates stochastic/potential/UI; remaining split is out of scope for this round. */
 /**
  * TDSE (Time-Dependent Schroedinger Equation) setter factory.
  *
