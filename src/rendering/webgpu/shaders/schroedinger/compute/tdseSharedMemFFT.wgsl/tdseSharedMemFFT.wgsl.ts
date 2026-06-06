@@ -168,3 +168,152 @@ fn main(
   }
 }
 `
+
+/**
+ * Multi-pencil fork of {@link tdseSharedMemFFTTwiddleBlock}. It is intended
+ * for high-dimensional Dirac lattices where axes are often only 8-32 points:
+ * one 64-thread workgroup per 8-point pencil leaves most lanes idle. This
+ * variant packs several independent pencils into one workgroup while running
+ * the same Stockham butterflies in the same per-pencil order.
+ *
+ * Host dispatch must use:
+ *   ceil((totalElements / axisDim) / diracSharedMemFFTPencilsPerWorkgroup(axisDim))
+ *
+ * Kept separate from the TDSE/Pauli shader so existing dispatch contracts stay
+ * unchanged outside Dirac.
+ */
+export const diracSharedMemFFTMultiPencilTwiddleBlock = /* wgsl */ `
+@group(0) @binding(0) var<uniform> axisUni: FFTAxisUniforms;
+@group(0) @binding(1) var<storage, read_write> complexBuf: array<vec2f>;
+@group(0) @binding(2) var<storage, read> fftTwiddleTable: array<vec2f>;
+
+const N_MAX_FFT_TWIDDLE: u32 = 128u;
+const LOG2_N_MAX_FFT_TWIDDLE: u32 = 7u;
+
+var<workgroup> smem_tw: array<vec2f, 256>;
+
+fn cmul_sm_tw(a: vec2f, b: vec2f) -> vec2f {
+  return vec2f(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
+}
+
+fn pencils_per_workgroup(N: u32) -> u32 {
+  if (N <= 8u) {
+    return 8u;
+  }
+  if (N <= 16u) {
+    return 4u;
+  }
+  if (N <= 32u) {
+    return 2u;
+  }
+  return 1u;
+}
+
+fn pencil_base_offset(pencilId: u32, axisStride: u32, N: u32) -> u32 {
+  let log2Stride = firstTrailingBit(axisStride);
+  let strideMask = axisStride - 1u;
+  let batchInner = pencilId & strideMask;
+  let batchOuter = pencilId >> log2Stride;
+  let outerStride = axisStride * N;
+  return batchOuter * outerStride + batchInner;
+}
+
+@compute @workgroup_size(64)
+fn main(
+  @builtin(local_invocation_id) lid: vec3u,
+  @builtin(workgroup_id) wgid: vec3u
+) {
+  let tid = lid.x;
+  let N = axisUni.axisDim;
+  let halfN = N >> 1u;
+  let log2N = axisUni.log2N;
+  let axisStride = axisUni.axisStride;
+  let pencilCount = axisUni.totalElements / N;
+  let pencilsPerWG = pencils_per_workgroup(N);
+  let pencilStart = wgid.x * pencilsPerWG;
+  let packedElements = pencilsPerWG * N;
+
+  for (var i = tid; i < packedElements; i = i + 64u) {
+    let pencilLocal = i / N;
+    let k = i - pencilLocal * N;
+    let pencilId = pencilStart + pencilLocal;
+    if (pencilId < pencilCount) {
+      let gAddr = pencil_base_offset(pencilId, axisStride, N) + k * axisStride;
+      smem_tw[i] = complexBuf[gAddr];
+    } else {
+      smem_tw[i] = vec2f(0.0, 0.0);
+    }
+  }
+  workgroupBarrier();
+
+  let butterflyCount = pencilsPerWG * halfN;
+
+  if (log2N > 0u && tid < butterflyCount) {
+    let pencilLocal = tid / halfN;
+    let localTid = tid - pencilLocal * halfN;
+    let base = pencilLocal * N;
+    let val0 = smem_tw[base + localTid];
+    let val1 = smem_tw[base + localTid + halfN];
+    let outIdx0 = localTid << 1u;
+    smem_tw[128u + base + outIdx0] = val0 + val1;
+    smem_tw[128u + base + outIdx0 + 1u] = val0 - val1;
+  }
+  workgroupBarrier();
+
+  let dir = axisUni.direction;
+  if (log2N > 1u && tid < butterflyCount) {
+    let pencilLocal = tid / halfN;
+    let localTid = tid - pencilLocal * halfN;
+    let base = pencilLocal * N;
+    let j = localTid & 1u;
+    let outIdx0 = ((localTid & 0xFFFFFFFEu) << 1u) + j;
+    let val0 = smem_tw[128u + base + localTid];
+    let val1 = smem_tw[128u + base + localTid + halfN];
+    let rotated = vec2f(dir * val1.y, -dir * val1.x);
+    let twVal1 = select(val1, rotated, j == 1u);
+    smem_tw[base + outIdx0] = val0 + twVal1;
+    smem_tw[base + outIdx0 + 2u] = val0 - twVal1;
+  }
+  workgroupBarrier();
+
+  for (var s = 2u; s < log2N; s = s + 1u) {
+    let halfStage = 1u << s;
+    let hsMask = halfStage - 1u;
+    let srcHalfBase = (s & 1u) << 7u;
+    let dstHalfBase = ((s + 1u) & 1u) << 7u;
+    let twStride = 1u << (LOG2_N_MAX_FFT_TWIDDLE - s - 1u);
+
+    if (tid < butterflyCount) {
+      let pencilLocal = tid / halfN;
+      let localTid = tid - pencilLocal * halfN;
+      let base = pencilLocal * N;
+      let j = localTid & hsMask;
+      let outIdx0 = ((localTid & ~hsMask) << 1u) + j;
+
+      let val0 = smem_tw[srcHalfBase + base + localTid];
+      let val1 = smem_tw[srcHalfBase + base + localTid + halfN];
+
+      let twIdx = j * twStride;
+      let twFwd = fftTwiddleTable[twIdx];
+      let tw = vec2f(twFwd.x, dir * twFwd.y);
+      let twVal1 = cmul_sm_tw(tw, val1);
+
+      smem_tw[dstHalfBase + base + outIdx0] = val0 + twVal1;
+      smem_tw[dstHalfBase + base + outIdx0 + halfStage] = val0 - twVal1;
+    }
+
+    workgroupBarrier();
+  }
+
+  let finalBase = (log2N & 1u) << 7u;
+  for (var i = tid; i < packedElements; i = i + 64u) {
+    let pencilLocal = i / N;
+    let k = i - pencilLocal * N;
+    let pencilId = pencilStart + pencilLocal;
+    if (pencilId < pencilCount) {
+      let gAddr = pencil_base_offset(pencilId, axisStride, N) + k * axisStride;
+      complexBuf[gAddr] = smem_tw[finalBase + i];
+    }
+  }
+}
+`

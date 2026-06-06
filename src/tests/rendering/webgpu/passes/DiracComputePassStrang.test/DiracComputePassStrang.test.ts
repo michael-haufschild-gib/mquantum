@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_DIRAC_CONFIG, type DiracConfig } from '@/lib/geometry/extended/dirac'
 import type { WebGPURenderContext } from '@/rendering/webgpu/core/types'
 import type { SiteDispatch } from '@/rendering/webgpu/passes/computePassUtils'
+import { diracSharedMemFFTWorkgroupCount } from '@/rendering/webgpu/passes/DiracComputePassDispatchers'
 import type {
   DiracBindGroupResult,
   DiracPipelineResult,
@@ -45,12 +46,15 @@ function makePipelines(): DiracPipelineResult {
     potentialHalfPipeline: p('potentialHalfPipeline'),
     potentialHalfBGL: l('potentialHalfBGL'),
     absorberPipeline: p('absorberPipeline'),
+    absorberNormalizePipeline: p('absorberNormalizePipeline'),
     renormalizePipeline: p('renormalizePipeline'),
     renormalizeBGL: l('renormalizeBGL'),
     packPipeline: p('packPipeline'),
     packBGL: l('packBGL'),
     unpackPipeline: p('unpackPipeline'),
     unpackBGL: l('unpackBGL'),
+    spinorScalePipeline: p('spinorScalePipeline'),
+    spinorScaleBGL: l('spinorScaleBGL'),
     fftStagePipeline: p('fftStagePipeline'),
     fftStageBGL: l('fftStageBGL'),
     fftSharedMemPipeline: p('fftSharedMemPipeline'),
@@ -86,6 +90,10 @@ function makeBindGroups(componentCount = 2, fftSlots = 4): DiracBindGroupResult 
     cachedPackBGs: Array.from({ length: componentCount }, (_, i) => bg(`pack${i}`)),
     cachedUnpackBGs: Array.from({ length: componentCount }, (_, i) => bg(`unpack${i}`)),
     cachedUnpackBGsNoNorm: Array.from({ length: componentCount }, (_, i) => bg(`unpackNoNorm${i}`)),
+    cachedSpinorFFTBGs: Array.from({ length: componentCount }, (_, c) =>
+      Array.from({ length: fftSlots }, (_, i) => bg(`spinorFFT${c}[${i}]`))
+    ),
+    cachedSpinorScaleBGs: Array.from({ length: componentCount }, (_, i) => bg(`scale${i}`)),
   }
 }
 
@@ -114,6 +122,26 @@ function makeDispatch(calls: string[]): DispatchComputeFn {
 
 const siteDispatch: SiteDispatch = { x: 5, y: 1, z: 1, use3D: false }
 
+describe('Dirac shared-memory FFT dispatch sizing', () => {
+  it('batches small axes into the same 64-thread workgroup contract as the shader', () => {
+    expect(diracSharedMemFFTWorkgroupCount(8 * 8, 8)).toBe(1)
+    expect(diracSharedMemFFTWorkgroupCount(9 * 8, 8)).toBe(2)
+    expect(diracSharedMemFFTWorkgroupCount(4 * 16, 16)).toBe(1)
+    expect(diracSharedMemFFTWorkgroupCount(5 * 16, 16)).toBe(2)
+    expect(diracSharedMemFFTWorkgroupCount(2 * 32, 32)).toBe(1)
+    expect(diracSharedMemFFTWorkgroupCount(3 * 32, 32)).toBe(2)
+    expect(diracSharedMemFFTWorkgroupCount(64, 64)).toBe(1)
+    expect(diracSharedMemFFTWorkgroupCount(2 * 64, 64)).toBe(2)
+  })
+
+  it('rounds up partial multi-pencil workgroups', () => {
+    expect(diracSharedMemFFTWorkgroupCount(16, 4)).toBe(1)
+    expect(diracSharedMemFFTWorkgroupCount(144, 16)).toBe(3)
+    expect(diracSharedMemFFTWorkgroupCount(256, 32)).toBe(4)
+    expect(diracSharedMemFFTWorkgroupCount(512, 128)).toBe(4)
+  })
+})
+
 describe('DiracComputePassStrang', () => {
   it('dispatches every spinor component in batched Strang order', () => {
     const calls: string[] = []
@@ -137,33 +165,106 @@ describe('DiracComputePassStrang', () => {
       'compute:packPipeline:pack0:9::',
       'setPipeline:fftSharedMemPipeline',
       'setBindGroup:0:fftSharedMemBGs[0]',
-      'fftDispatch:4::',
+      'fftDispatch:1::',
       'setBindGroup:0:fftSharedMemBGs[1]',
-      'fftDispatch:4::',
+      'fftDispatch:1::',
       'compute:unpackPipeline:unpackNoNorm0:9::',
       'compute:packPipeline:pack1:9::',
       'setPipeline:fftSharedMemPipeline',
       'setBindGroup:0:fftSharedMemBGs[0]',
-      'fftDispatch:4::',
+      'fftDispatch:1::',
       'setBindGroup:0:fftSharedMemBGs[1]',
-      'fftDispatch:4::',
+      'fftDispatch:1::',
       'compute:unpackPipeline:unpackNoNorm1:9::',
       'compute:kineticPipeline:kineticBG:5:1:1',
       'compute:packPipeline:pack0:9::',
       'setPipeline:fftSharedMemPipeline',
       'setBindGroup:0:fftSharedMemBGs[2]',
-      'fftDispatch:4::',
+      'fftDispatch:1::',
       'setBindGroup:0:fftSharedMemBGs[3]',
-      'fftDispatch:4::',
+      'fftDispatch:1::',
       'compute:unpackPipeline:unpack0:9::',
       'compute:packPipeline:pack1:9::',
       'setPipeline:fftSharedMemPipeline',
       'setBindGroup:0:fftSharedMemBGs[2]',
-      'fftDispatch:4::',
+      'fftDispatch:1::',
       'setBindGroup:0:fftSharedMemBGs[3]',
-      'fftDispatch:4::',
+      'fftDispatch:1::',
       'compute:unpackPipeline:unpack1:9::',
       'compute:potentialHalfPipeline:potentialHalfBG:9::',
+      'end',
+    ])
+  })
+
+  it('uses in-place spinor FFT bind groups for direct batched Strang', () => {
+    const calls: string[] = []
+    runBatchedStrangStep({
+      ctx: makeContext(calls),
+      pl: makePipelines(),
+      bg: makeBindGroups(1),
+      config: makeConfig(),
+      step: 4,
+      S: 1,
+      linearWG: 9,
+      applyPotentialHalf: false,
+      siteDispatch,
+      dispatchCompute: makeDispatch(calls),
+      ifftSlotOffset: 2,
+      totalSites: 16,
+      useDirectSpinorFFT: true,
+    })
+
+    expect(calls).toEqual([
+      'begin:dirac-strang-4',
+      'setPipeline:fftSharedMemPipeline',
+      'setBindGroup:0:spinorFFT0[0]',
+      'fftDispatch:1::',
+      'setBindGroup:0:spinorFFT0[1]',
+      'fftDispatch:1::',
+      'compute:kineticPipeline:kineticBG:5:1:1',
+      'setPipeline:fftSharedMemPipeline',
+      'setBindGroup:0:spinorFFT0[2]',
+      'fftDispatch:1::',
+      'setBindGroup:0:spinorFFT0[3]',
+      'fftDispatch:1::',
+      'compute:spinorScalePipeline:scale0:9::',
+      'end',
+    ])
+  })
+
+  it('folds direct inverse-FFT normalization into the absorber pass when requested', () => {
+    const calls: string[] = []
+    runBatchedStrangStep({
+      ctx: makeContext(calls),
+      pl: makePipelines(),
+      bg: makeBindGroups(1),
+      config: makeConfig({ absorberEnabled: true }),
+      step: 5,
+      S: 1,
+      linearWG: 9,
+      applyPotentialHalf: false,
+      normalizeInAbsorber: true,
+      siteDispatch,
+      dispatchCompute: makeDispatch(calls),
+      ifftSlotOffset: 2,
+      totalSites: 16,
+      useDirectSpinorFFT: true,
+    })
+
+    expect(calls).toEqual([
+      'begin:dirac-strang-5',
+      'setPipeline:fftSharedMemPipeline',
+      'setBindGroup:0:spinorFFT0[0]',
+      'fftDispatch:1::',
+      'setBindGroup:0:spinorFFT0[1]',
+      'fftDispatch:1::',
+      'compute:kineticPipeline:kineticBG:5:1:1',
+      'setPipeline:fftSharedMemPipeline',
+      'setBindGroup:0:spinorFFT0[2]',
+      'fftDispatch:1::',
+      'setBindGroup:0:spinorFFT0[3]',
+      'fftDispatch:1::',
+      'compute:absorberNormalizePipeline:initBG:5:1:1',
       'end',
     ])
   })

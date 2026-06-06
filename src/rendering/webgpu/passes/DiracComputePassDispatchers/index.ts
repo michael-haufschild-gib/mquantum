@@ -30,6 +30,23 @@ import {
   smoothPositiveReadbackPeak,
 } from '../normalizationGuards'
 
+/**
+ * Number of independent FFT pencils packed into one Dirac shared-memory FFT
+ * workgroup. Mirrors `pencils_per_workgroup()` in
+ * `diracSharedMemFFTMultiPencilTwiddleBlock`.
+ */
+function diracSharedMemFFTPencilsPerWorkgroup(axisDim: number): number {
+  if (axisDim <= 8) return 8
+  if (axisDim <= 16) return 4
+  if (axisDim <= 32) return 2
+  return 1
+}
+
+/** Workgroups needed by Dirac's multi-pencil shared-memory FFT shader. */
+export function diracSharedMemFFTWorkgroupCount(totalSites: number, axisDim: number): number {
+  return Math.ceil(totalSites / axisDim / diracSharedMemFFTPencilsPerWorkgroup(axisDim))
+}
+
 /** DiracDiagUniforms struct size (16 bytes: totalSites, numWorkgroups, spinorSize, pad) */
 export const DIAG_UNIFORM_SIZE = 16
 /** Number of f32 values in diagnostic result buffer */
@@ -246,7 +263,7 @@ export function dispatchFFTAxisSharedMem(
     FFT_UNIFORM_SIZE
   )
 
-  const pencilCount = p.totalSites / axisDim
+  const pencilCount = diracSharedMemFFTWorkgroupCount(p.totalSites, axisDim)
   const pass = ctx.beginComputePass({ label: `dirac-fft-shared-mem-axis-${slotOffset}` })
   p.dispatchCompute(pass, p.pl.fftSharedMemPipeline, [p.bg.fftSharedMemBG!], pencilCount)
   pass.end()

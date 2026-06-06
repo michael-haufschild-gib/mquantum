@@ -124,12 +124,15 @@ export interface DiracPipelineResult {
   potentialHalfPipeline: GPUComputePipeline
   potentialHalfBGL: GPUBindGroupLayout
   absorberPipeline: GPUComputePipeline
+  absorberNormalizePipeline: GPUComputePipeline
   renormalizePipeline: GPUComputePipeline
   renormalizeBGL: GPUBindGroupLayout
   packPipeline: GPUComputePipeline
   packBGL: GPUBindGroupLayout
   unpackPipeline: GPUComputePipeline
   unpackBGL: GPUBindGroupLayout
+  spinorScalePipeline: GPUComputePipeline
+  spinorScaleBGL: GPUBindGroupLayout
   fftStagePipeline: GPUComputePipeline
   fftStageBGL: GPUBindGroupLayout
   fftSharedMemPipeline: GPUComputePipeline
@@ -177,6 +180,8 @@ export interface DiracBindGroupResult {
   cachedPackBGs: GPUBindGroup[]
   cachedUnpackBGs: GPUBindGroup[]
   cachedUnpackBGsNoNorm: GPUBindGroup[]
+  cachedSpinorFFTBGs: GPUBindGroup[][]
+  cachedSpinorScaleBGs: GPUBindGroup[]
 }
 
 /** Buffers and resources needed to create bind groups. */
