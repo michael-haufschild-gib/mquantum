@@ -20,6 +20,7 @@ export default defineConfig({
     '**/dirac-batch-ab.spec.ts',
     '**/shader-ab-profiling.spec.ts',
     '**/bec-raymarch-profile.spec.ts',
+    '**/scenario-presets-performance.spec.ts',
   ],
 
   use: {

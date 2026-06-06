@@ -19,6 +19,7 @@ export default defineConfig({
     '**/perf-benchmark.spec.ts',
     '**/compute-mode-profiling.spec.ts',
     '**/shader-ab-profiling.spec.ts',
+    '**/scenario-presets-performance.spec.ts',
   ],
 
   use: {
