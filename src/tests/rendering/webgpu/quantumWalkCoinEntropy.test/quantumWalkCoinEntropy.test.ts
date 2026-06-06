@@ -147,13 +147,13 @@ describe('QuantumWalk coin entropy field view', () => {
   })
 
   it('writes normalized local coin Shannon entropy in the QW write-grid shader', () => {
-    expect(qwWriteGridBlock).toContain('fn coinProbabilityAt')
     expect(qwWriteGridBlock).toContain(
       'for (var coinIdx: u32 = 0u; coinIdx < params.numCoinStates; coinIdx++)'
     )
-    expect(qwWriteGridBlock).toContain('var blendedCoinProb: f32 = 0.0')
-    expect(qwWriteGridBlock).toContain('blendedCoinProb += w * coinProbabilityAt(sIdx, coinIdx)')
-    expect(qwWriteGridBlock).toContain('let q = blendedCoinProb * invBlendedProb')
+    expect(qwWriteGridBlock).toContain('var blendedCoinProb: array<f32, 22>')
+    expect(qwWriteGridBlock).toContain('blendedCoinProb[d << 1u] += w * pPlus')
+    expect(qwWriteGridBlock).toContain('blendedCoinProb[(d << 1u) + 1u] += w * pMinus')
+    expect(qwWriteGridBlock).toContain('let q = blendedCoinProb[coinIdx] * invBlendedProb')
     expect(qwWriteGridBlock).toContain('entropySum += -q * log(max(q, 1e-20))')
     expect(qwWriteGridBlock).toContain('log(max(f32(params.numCoinStates), 2.0))')
     expect(qwWriteGridBlock).toContain('params.fieldView == 3u')

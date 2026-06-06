@@ -43,8 +43,8 @@ describe('Schroedinger vacuum bubble lens WGSL composition', () => {
   it('resamples HQ analytic volume before gradient and emission', () => {
     const body = functionSlice(volumeRaymarchBlock, 'volumeRaymarch')
 
-    // PERF: HQ now uses ensureGradient at the emission point (per-step cache
-    // shared with all spacetime effects) instead of sampleDensityWithAnalyticalGradient.
+    // PERF: HQ resamples density only after an actual warp, then defers the
+    // final lighting gradient to ensureGradient at the emission point.
     expectOrdered(body, [
       'let vacuumBubbleActive = isVacuumBubbleLensActive(uniforms)',
       'let spectralFlow = applySpectralDimensionFlow(',
@@ -53,8 +53,10 @@ describe('Schroedinger vacuum bubble lens WGSL composition', () => {
       'vacuumBubbleEmissionGain = vacuumBubble.emissionGain',
       'vacuumBubbleOpacityScale = vacuumBubble.opacityScale',
       'quickCheck = sampleDensityWithPhase(samplePos, animTime, uniforms)',
-      'gradient = ensureGradient(samplePos, animTime, uniforms, &gradCache)',
-      'rho * spectralOpacityScale * vacuumBubbleOpacityScale',
+      'quickRho = quickCheck.x',
+      'let nonFockOpacityScale = spectralOpacityScale * vacuumBubbleOpacityScale * bornNullOpacityScale',
+      'rho * nonFockOpacityScale',
+      'emissionGradient = ensureGradient(samplePos, animTime, uniforms, &gradCache)',
       'vacuumBubbleEmissionGain',
     ])
   })

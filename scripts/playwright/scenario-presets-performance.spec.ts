@@ -105,6 +105,7 @@ interface ScenarioPresetSample {
   vramMB: number
 }
 
+/** Parse the optional profiling-strip JSON used to disable selected renderer costs. */
 function parseProfilingStrip(value: string | undefined): Record<string, boolean> | null {
   if (!value) return null
   const parsed = JSON.parse(value) as unknown
@@ -121,6 +122,7 @@ function parseProfilingStrip(value: string | undefined): Record<string, boolean>
   )
 }
 
+/** Parse a documented dimension cell such as `3` or `3-6` into explicit dimensions. */
 function parseDimensions(value: string): number[] {
   const trimmed = value.trim()
   const range = /^(\d+)-(\d+)$/.exec(trimmed)
@@ -134,10 +136,12 @@ function parseDimensions(value: string): number[] {
   throw new Error(`Unsupported dimension range: ${value}`)
 }
 
+/** Select the highest documented dimension for benchmark stress coverage. */
 function pickDimension(dimensions: readonly number[]): number {
   return Math.max(...dimensions)
 }
 
+/** Extract benchmarkable scenario preset cases from the generated Markdown report. */
 function parseScenarioPresets(markdown: string): {
   declaredTotal: number | null
   scenarios: ScenarioPresetCase[]
@@ -181,6 +185,7 @@ function parseScenarioPresets(markdown: string): {
   return { declaredTotal, scenarios }
 }
 
+/** Build the active scenario list after applying environment filters and limits. */
 function activeScenarioSet(): ScenarioPresetCase[] {
   const markdown = fs.readFileSync(DOC_PATH, 'utf8')
   const parsed = parseScenarioPresets(markdown)
@@ -205,6 +210,7 @@ function activeScenarioSet(): ScenarioPresetCase[] {
 
 const SCENARIOS = activeScenarioSet()
 
+/** Convert a scenario case into the app URL that selects object type, mode, and dimension. */
 function scenarioUrl(scenario: ScenarioPresetCase): string {
   const params = new URLSearchParams({
     d: String(scenario.dimension),
@@ -214,10 +220,12 @@ function scenarioUrl(scenario: ScenarioPresetCase): string {
   return `/?${params.toString()}`
 }
 
+/** Convert unknown caught values into stable report strings. */
 function stringifyError(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+/** Compute the median value of a numeric sample set. */
 function median(values: readonly number[]): number {
   if (values.length === 0) return 0
   const sorted = [...values].sort((a, b) => a - b)
@@ -225,10 +233,12 @@ function median(values: readonly number[]): number {
   return sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) / 2 : sorted[mid]!
 }
 
+/** Compute median absolute deviation around the supplied or computed center. */
 function medianAbsoluteDeviation(values: readonly number[], center = median(values)): number {
   return median(values.map((value) => Math.abs(value - center)))
 }
 
+/** Classify FPS spread so noisy scenarios are easy to triage in the report. */
 function classifyNoise(fpsMad: number, fpsMedian: number): ScenarioPresetResult['noise'] {
   if (fpsMedian <= 0) return 'high'
   const relative = fpsMad / fpsMedian
@@ -237,6 +247,7 @@ function classifyNoise(fpsMad: number, fpsMedian: number): ScenarioPresetResult[
   return 'low'
 }
 
+/** Pick the sample closest to median FPS for representative non-FPS metrics. */
 function representativeSample(
   samples: readonly ScenarioPresetSample[],
   fpsMedian: number
@@ -245,6 +256,7 @@ function representativeSample(
   return [...samples].sort((a, b) => Math.abs(a.fps - fpsMedian) - Math.abs(b.fps - fpsMedian))[0]!
 }
 
+/** Aggregate repeated samples into one scenario result with median, range, and noise fields. */
 function aggregateScenarioResult(
   scenario: ScenarioPresetCase,
   samples: ScenarioPresetSample[]
@@ -267,6 +279,7 @@ function aggregateScenarioResult(
   }
 }
 
+/** Reset the app camera to a deterministic default and wait for a rendered frame. */
 async function resetCamera(page: Page): Promise<ScenarioPresetResult['camera']> {
   const camera = await page.evaluate(
     ({ distance, eps, position, target }) => {
@@ -311,6 +324,7 @@ async function resetCamera(page: Page): Promise<ScenarioPresetResult['camera']> 
   return camera
 }
 
+/** Enable uncapped playback and expanded performance metrics in the app stores. */
 async function configurePerfCollection(page: Page): Promise<void> {
   await page.evaluate(() => {
     const perfStore = window.__PERFORMANCE_STORE__
@@ -325,6 +339,7 @@ async function configurePerfCollection(page: Page): Promise<void> {
   })
 }
 
+/** Apply the scenario preset using the same mode-specific store actions as the UI. */
 async function applyScenarioPreset(page: Page, scenario: ScenarioPresetCase): Promise<void> {
   await page.evaluate(async (input) => {
     const extStore = window.__EXTENDED_OBJECT_STORE__
@@ -398,6 +413,7 @@ async function applyScenarioPreset(page: Page, scenario: ScenarioPresetCase): Pr
   }, scenario)
 }
 
+/** Wait until the performance metrics store has populated frame and pass timings. */
 async function waitForMetrics(page: Page): Promise<void> {
   await page.waitForFunction(
     () => {
@@ -415,6 +431,7 @@ async function waitForMetrics(page: Page): Promise<void> {
   )
 }
 
+/** Measure one warmed-up scenario sample from canvas frame-count deltas and perf store data. */
 async function measureScenario(page: Page, sample: number): Promise<ScenarioPresetSample> {
   const camera = await resetCamera(page)
   await configurePerfCollection(page)
@@ -483,6 +500,7 @@ async function measureScenario(page: Page, sample: number): Promise<ScenarioPres
   }
 }
 
+/** Navigate, initialize WebGPU, apply the preset, and settle shader compilation. */
 async function bootScenario(
   page: Page,
   scenario: ScenarioPresetCase,
@@ -500,6 +518,7 @@ async function bootScenario(
   await resetCamera(page)
 }
 
+/** Return the pass with highest GPU time for concise slow-case reporting. */
 function topBottleneck(result: ScenarioPresetResult): string {
   const timing = [...result.passTimings]
     .filter((p) => !p.skipped)
@@ -508,6 +527,7 @@ function topBottleneck(result: ScenarioPresetResult): string {
   return `${timing.passId} ${timing.gpuTimeMs.toFixed(3)}ms`
 }
 
+/** Write JSON, latest aliases, Markdown summary, and stdout payload for the sweep. */
 function writeResults(results: ScenarioPresetResult[]): void {
   fs.mkdirSync(OUT_DIR, { recursive: true })
   const stamp = new Date()
