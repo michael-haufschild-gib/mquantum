@@ -7,6 +7,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
 
@@ -120,6 +121,30 @@ describe('free scalar field setters', () => {
     expect(after.schroedinger.freeScalar.initialCondition).toBe('singleMode')
     expect(after.schroedinger.freeScalar.fieldView).toBe('pi')
     expect(after.schroedinger.freeScalar.needsReset).toBe(false)
+  })
+
+  it('accepts cauchy loom enum setters and applies the preset rendering overrides', async () => {
+    const s = useExtendedObjectStore.getState()
+
+    s.setFreeScalarInitialCondition('cauchyLoomWeave')
+    s.setFreeScalarFieldView('cauchyLoom')
+    expect(getFSF().initialCondition).toBe('cauchyLoomWeave')
+    expect(getFSF().fieldView).toBe('cauchyLoom')
+
+    await s.applyFreeScalarPreset('cauchyLoomWeave')
+    await vi.waitFor(() => {
+      expect(getFSF().initialCondition).toBe('cauchyLoomWeave')
+      expect(getFSF().fieldView).toBe('cauchyLoom')
+    })
+    const state = useExtendedObjectStore.getState()
+    expect(getFSF().latticeDim).toBe(3)
+    expect(getFSF().gridSize).toEqual([64, 64, 64])
+    expect(getFSF().modeK).toEqual([4, 5, 7])
+    expect(getFSF().selfInteractionEnabled).toBe(false)
+    expect(getFSF().absorberEnabled).toBe(false)
+    expect(state.schroedinger.densityGain).toBeCloseTo(2.6)
+    expect(state.schroedinger.densityContrast).toBeCloseTo(3.4)
+    expect(useAppearanceStore.getState().colorAlgorithm).toBe('phaseDensity')
   })
 
   it('rejects non-finite free-scalar init vectors before they reach WGSL uniforms', () => {

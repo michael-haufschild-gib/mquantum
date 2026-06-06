@@ -22,6 +22,7 @@ import type { PmlAbsorberConfig } from './crossMode'
  * - wallDensity: Self-interaction potential V(phi) — highlights domain walls (zero at vacua)
  * - freezeOutStrain: Bounded proxy for cosmological mode freeze-out / phase-space squeezing
  * - equationOfState: Local scalar-field pressure ratio w = p/rho from stress-energy trace
+ * - cauchyLoom: Canonical phase-space area density |dφ∧dπ| over local Cauchy cells
  */
 export type FreeScalarFieldView =
   | 'phi'
@@ -30,6 +31,7 @@ export type FreeScalarFieldView =
   | 'wallDensity'
   | 'freezeOutStrain'
   | 'equationOfState'
+  | 'cauchyLoom'
 
 /**
  * Initial condition type for the free scalar field
@@ -40,6 +42,7 @@ export type FreeScalarFieldView =
  * - retrocausalCaustic: Bounded recursive advanced/retarded image caustic
  * - rankDefectGenesis: zero-mean orthogonal rank-completion seed
  * - chronogenicShear: radially sheared rank-completion seed
+ * - cauchyLoomWeave: crossed canonical wave seed for |dφ∧dπ| loom filaments
  */
 export type FreeScalarInitialCondition =
   | 'vacuumNoise'
@@ -49,6 +52,7 @@ export type FreeScalarInitialCondition =
   | 'retrocausalCaustic'
   | 'rankDefectGenesis'
   | 'chronogenicShear'
+  | 'cauchyLoomWeave'
 
 /** Runtime list of valid free-scalar initial-condition enum values. */
 export const FREE_SCALAR_INITIAL_CONDITIONS = [
@@ -59,6 +63,7 @@ export const FREE_SCALAR_INITIAL_CONDITIONS = [
   'retrocausalCaustic',
   'rankDefectGenesis',
   'chronogenicShear',
+  'cauchyLoomWeave',
 ] as const satisfies readonly FreeScalarInitialCondition[]
 
 /** Return whether a runtime value is a supported free-scalar initial condition. */
@@ -77,6 +82,7 @@ export const FREE_SCALAR_FIELD_VIEWS = [
   'wallDensity',
   'freezeOutStrain',
   'equationOfState',
+  'cauchyLoom',
 ] as const satisfies readonly FreeScalarFieldView[]
 
 /** Return whether a runtime value is a supported free-scalar field view. */

@@ -558,7 +558,7 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
       })
 
     default:
-      logger.warn(`WebGPU: No renderer for object type '${objectType}'`)
+      logger.warn(`No renderer: ${objectType}`)
       return null
   }
 }

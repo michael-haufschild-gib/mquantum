@@ -252,6 +252,24 @@ describe('getAvailableColorAlgorithms — phase-dependent exclusion in DM mode',
     expect(algos).toContain('hamiltonianDecomposition')
     expect(algos).toContain('energyFlux')
   })
+
+  it('allows phaseDensity for the Cauchy Loom free-scalar initializer', () => {
+    const standard = getAvailableColorAlgorithms(
+      'freeScalarField',
+      false,
+      'schroedinger',
+      'gaussianPacket'
+    ).map((a) => a.value)
+    const cauchy = getAvailableColorAlgorithms(
+      'freeScalarField',
+      false,
+      'schroedinger',
+      'cauchyLoomWeave'
+    ).map((a) => a.value)
+
+    expect(standard).not.toContain('phaseDensity')
+    expect(cauchy).toContain('phaseDensity')
+  })
 })
 
 describe('getAvailableColorAlgorithms — Wheeler–DeWitt A-channel hazard', () => {

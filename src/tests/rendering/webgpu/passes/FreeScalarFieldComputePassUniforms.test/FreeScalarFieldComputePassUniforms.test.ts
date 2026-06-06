@@ -407,6 +407,21 @@ describe('writeFsfUniforms', () => {
     expect(new Uint32Array(uniformData)[40]).toBe(6)
   })
 
+  it('maps cauchyLoomWeave initial condition to shader enum 7', () => {
+    const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
+      config: createConfig({ initialCondition: 'cauchyLoomWeave' }),
+      totalSites: 32768,
+      maxFieldValue: 1.0,
+      simEta: 0,
+      preheatingTime: 0,
+      preheatingReferenceEta: 0,
+    })
+    expect(new Uint32Array(uniformData)[40]).toBe(7)
+  })
+
   it('maps field view string to correct shader enum', () => {
     const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
     const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
@@ -453,6 +468,22 @@ describe('writeFsfUniforms', () => {
     })
 
     expect(new Uint32Array(uniformData)[41]).toBe(5)
+  })
+
+  it('maps cauchyLoom field view to shader enum 6', () => {
+    const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
+      config: createConfig({ fieldView: 'cauchyLoom' }),
+      totalSites: 32768,
+      maxFieldValue: 1.0,
+      simEta: 0,
+      preheatingTime: 0,
+      preheatingReferenceEta: 0,
+    })
+
+    expect(new Uint32Array(uniformData)[41]).toBe(6)
   })
 
   it('uploads the buffer to the GPU via device.queue.writeBuffer', () => {
@@ -1107,5 +1138,15 @@ describe('computeFsfMaxPhiEstimate with self-interaction', () => {
     const rawPi = estimateVacuumMaxPi(piConfig, dispersion)
     const expectedPi = rawPi / Math.sqrt(coefs.aKinetic)
     expect(estimateFsfMaxFieldValue(piConfig, expectedPhi)).toBeCloseTo(expectedPi, 8)
+  })
+
+  it('uses a bounded max-field scale for the Cauchy Loom view', () => {
+    const config = createConfig({
+      initialCondition: 'cauchyLoomWeave',
+      fieldView: 'cauchyLoom',
+      autoScale: true,
+    })
+
+    expect(estimateFsfMaxFieldValue(config, 123)).toBe(1.0)
   })
 })

@@ -444,7 +444,9 @@ export function getAvailableColorAlgorithms(
   }
 
   if (quantumMode === 'freeScalarField') {
-    // Free scalar has sign-proxy phase (0 or π) — exclude continuous-phase algorithms.
+    // Free scalar usually has sign-proxy phase (0 or π) — exclude continuous-phase
+    // algorithms, except Cauchy Loom Weave, whose field view deliberately writes
+    // a continuous phase hue for canonical two-form filaments.
     // Also include educational analysis algorithms unique to this mode.
     //
     // Note: quantumPotential and vortexDensity are intentionally excluded here.
@@ -468,6 +470,9 @@ export function getAvailableColorAlgorithms(
       'energyFlux',
       'kSpaceOccupation',
     ])
+    if (freeScalarInitialCondition === 'cauchyLoomWeave') {
+      computeValidAlgos.add('phaseDensity')
+    }
     // Static exact vacuum has n_k = 0 for all modes (zero-point subtracted), so
     // the k-space occupation map is correctly but unhelpfully blank. Dynamic
     // cosmology / preheating starts from that vacuum but can create occupation.

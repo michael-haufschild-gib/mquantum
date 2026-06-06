@@ -321,12 +321,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Compute axis-weighted gradient stiffness (for energy density view and analysis modes)
   var gradEnergy: f32 = 0.0;
   var gradPhi: array<f32, 12>;
+  var gradPi: array<f32, 12>;
 
-  let needGrad = params.fieldView == 2u || params.fieldView == 4u || params.fieldView == 5u || hasAnalysis;
+  let needGrad = params.fieldView == 2u || params.fieldView == 4u || params.fieldView == 5u || params.fieldView == 6u || hasAnalysis;
   if (needGrad) {
     let hasPML = params.absorberEnabled != 0u;
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
       gradPhi[d] = 0.0;
+      gradPi[d] = 0.0;
       if (params.gridSize[d] <= 1u) { continue; }
 
       let stride = params.strides[d];
@@ -347,15 +349,24 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
         // Forward one-sided: (phi[i+1] - phi[i]) / a
         let fwdIdx = nnIdx + stride;
         gradPhi[d] = (phi[fwdIdx] - nnPhiVal) * invA;
+        if (params.fieldView == 6u) {
+          gradPi[d] = (pi[fwdIdx] - nnPiVal) * invA;
+        }
       } else if (hasPML && atHiBound) {
         // Backward one-sided: (phi[i] - phi[i-1]) / a
         let bwdIdx = nnIdx - stride;
         gradPhi[d] = (nnPhiVal - phi[bwdIdx]) * invA;
+        if (params.fieldView == 6u) {
+          gradPi[d] = (nnPiVal - pi[bwdIdx]) * invA;
+        }
       } else {
         // Interior or periodic: centered difference
         let fwdIdx = select(nnIdx + stride, nnIdx - stride * (Nd - 1u), atHiBound);
         let bwdIdx = select(nnIdx - stride, nnIdx + stride * (Nd - 1u), atLoBound);
         gradPhi[d] = (phi[fwdIdx] - phi[bwdIdx]) * (0.5 * invA);
+        if (params.fieldView == 6u) {
+          gradPi[d] = (pi[fwdIdx] - pi[bwdIdx]) * (0.5 * invA);
+        }
       }
 
       var axisPotential = params.aPotential;
@@ -412,70 +423,61 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let wLocal = clamp(pressure / localEnergy, -1.0, 1.0);
     fieldValue = wLocal;
   } else {
-    // Physical Hamiltonian energy density in the canonical δφ variables:
-    //   H_can(x) = ½ aKinetic π² + ½ aPotential (∇δφ)² + ½ mass²·aFull δφ²
-    //            + aFull · V(δφ)
-    // This is the integrand of the canonical Hamiltonian in conformal time,
-    // per unit comoving volume. It is NOT what a local physical observer
-    // would measure: the coordinate factors aKinetic = a^(-(n-2)),
-    // aPotential = a^(n-2), aFull = a^n are action-level weights tied
-    // to the sqrt(-g) volume form, and they artificially amplify the mass
-    // term as a -> infinity in de Sitter even while the physical field
-    // amplitude |δφ| is decaying. Displaying H_can directly produced the
-    // "reappearing bright cube" at late times in the de Sitter repro —
-    // visually alarming but physically meaningless.
-    //
-    // The proper energy density measured by a comoving observer with
-    // 4-velocity u^μ = (1/a, 0, ..., 0) is
-    //   ρ_proper = T_{μν} u^μ u^ν = T_00 / a²
-    //            = ½ (δφ')²/a² + ½ (∇δφ)²/a² + ½ mass² δφ²
-    // which, after substituting the canonical momentum π = a^(n-2)·δφ',
-    // reduces to the clean identity
-    //   ρ_proper = H_can / a^n = H_can / aFull
-    // Every term scales uniformly by 1/aFull, so the division commutes
-    // past the kinetic, gradient, mass, and self-interaction pieces — we
-    // build the canonical sum then divide once at the end. Under the
-    // Minkowski preset aFull = 1 and this degenerates bit-identically
-    // to the bare Klein-Gordon energy density; under cosmology it removes
-    // the coordinate-factor inflation and shows the physically meaningful
-    // quantity that actually decays as the de Sitter universe dilutes.
-    //
-    // Preheating: when enabled, the effective mass squared picked up by
-    // the Hamiltonian is m² · massSquaredScale(η), matching the force
-    // used by freeScalarUpdatePi. Without this factor the energyDensity
-    // view would show the bare-mass Hamiltonian while the actual
-    // evolution obeys the time-dependent one — producing a physically
-    // inconsistent picture even when the dynamics themselves are
-    // correct. With preheating disabled massSquaredScale = 1 and the
-    // expression is bit-identical to the prior form.
+    // Proper energy density: canonical Hamiltonian / aFull, with preheating mass scale.
     var canonicalH = 0.5 * (
       params.aKinetic * nnPiVal * nnPiVal
       + gradEnergy
       + drivenMassCoef * nnPhiVal * nnPhiVal
     );
-    // Self-interaction: canonical contribution is aFull · V(δφ) from the
-    // ∫ sqrt(-g) · V(φ) term in the action. Dividing by aFull below
-    // collapses this to the bare potential V(δφ) — the local observer's
-    // measurement.
     if (params.selfInteractionEnabled != 0u) {
       let siV2 = params.selfInteractionVev * params.selfInteractionVev;
       let siPhi2 = nnPhiVal * nnPhiVal;
       let siDiff = siPhi2 - siV2;
       canonicalH += params.aFull * params.selfInteractionLambda * siDiff * siDiff;
     }
-    // Convert canonical → proper. Guard against zero aFull from an identity
-    // fallback or a degenerate preset; in that case treat the output as
-    // already in its Minkowski form.
     fieldValue = select(canonicalH / params.aFull, canonicalH, params.aFull <= 0.0);
+  }
+
+  var phaseOverride: f32 = -1.0;
+  if (params.fieldView == 6u) {
+    let kgv = computeProperKgvEnergy(nnPhiVal, nnPiVal, gradEnergy, drivenMassCoef);
+    let e = max(kgv.e, 1e-9);
+    var q: f32 = 0.0;
+    for (var i: u32 = 0u; i + 1u < params.latticeDim; i = i + 1u) {
+      for (var j: u32 = i + 1u; j < params.latticeDim; j = j + 1u) {
+        let area = gradPhi[i] * gradPi[j] - gradPhi[j] * gradPi[i];
+        q += area * area;
+      }
+    }
+    let n = sqrt(max(q, 0.0)) / e;
+    let energyGate = smoothstep(0.0, 0.02, kgv.e / max(params.maxFieldValue, 1e-12));
+    let x = ndWorldPos[0];
+    let y = select(0.0, ndWorldPos[1], params.latticeDim > 1u);
+    let z = select(0.0, ndWorldPos[2], params.latticeDim > 2u);
+    let xy = atan2(y, x);
+    let xz = atan2(z, x);
+    let radius = sqrt(x * x + y * y + z * z);
+    let a = 0.5 + 0.5 * cos(3.0 * xy + 2.0 * xz + 0.35 * radius);
+    let b = 0.5 + 0.5 * cos(4.6 * radius);
+    let c = 0.5 + 0.5 * cos(5.0 * xy - 3.0 * xz + 0.65 * radius);
+    let t = n / (1.0 + n);
+    let m = max(pow(a, 6.0) * pow(b, 5.0), 0.55 * pow(c, 10.0) * pow(b, 2.0));
+    let spatialGate = 1.0 - smoothstep(2.3, 3.8, radius);
+    fieldValue = clamp(pow(t, 0.78) * m * spatialGate * energyGate * 1.26, 0.0, 1.0);
+    phaseOverride = atan2(
+      sin(2.0 * xy + xz + 0.45 * radius + n),
+      cos(2.0 * xy + xz + 0.45 * radius + n)
+    );
+    phaseOverride += 3.14159265358979323846;
   }
 
   let rho = abs(fieldValue);
   let normRho = select(rho / params.maxFieldValue, 0.0, params.maxFieldValue <= 0.0) * perpFalloff;
   let logRho = log(normRho + 1e-10);
-  const FSF_NEGATIVE_BRANCH_PHASE: f32 = 3.14159265358979323846;
-  let phase = select(0.0, FSF_NEGATIVE_BRANCH_PHASE, fieldValue < 0.0);
+  let phase = select(0.0, 3.14159265358979323846, fieldValue < 0.0);
+  let phaseForColor = select(phase, phaseOverride, phaseOverride >= 0.0);
 
-  textureStore(outputTex, gid, vec4f(normRho, logRho, phase, normRho));
+  textureStore(outputTex, gid, vec4f(normRho, logRho, phaseForColor, normRho));
 
   // Analysis texture output (educational color modes) — skip entirely when disabled
   if (params.analysisMode == 1u) {
