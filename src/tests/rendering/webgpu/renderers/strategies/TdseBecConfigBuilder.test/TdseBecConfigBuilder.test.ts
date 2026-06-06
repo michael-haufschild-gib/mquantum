@@ -174,6 +174,20 @@ describe('buildBecConfig — schroedinger overrides', () => {
     expect(config.fieldView).toBe('vorticity')
   })
 
+  it('passes branePfaffian field view through to the TDSE compute config', () => {
+    const { config } = buildBecConfig(
+      minimalBec({
+        latticeDim: 4,
+        gridSize: [8, 8, 8, 8],
+        spacing: [0.15, 0.15, 0.15, 0.15],
+        trapAnisotropy: [1, 1, 1, 1],
+        fieldView: 'branePfaffian',
+      }),
+      undefined
+    )
+    expect(config.fieldView).toBe('branePfaffian')
+  })
+
   it('passes hawkingFlux field view through for blackHoleAnalog BEC', () => {
     const { config } = buildBecConfig(
       minimalBec({ initialCondition: 'blackHoleAnalog', fieldView: 'hawkingFlux' }),

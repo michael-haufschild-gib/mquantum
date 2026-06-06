@@ -50,6 +50,7 @@ const FIELD_VIEW_OPTIONS = [
   { value: 'machNumber', label: 'Mach Number M = |v_s|/c_s' },
   { value: 'hawkingFlux', label: 'Hawking Flux κ/2π' },
   { value: 'vorticity', label: 'Circulation Ω' },
+  { value: 'branePfaffian', label: 'Brane Pfaffian Pf(W)' },
 ]
 
 /**
@@ -355,7 +356,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
           <Select
             data-testid="components-sections-geometry-schroedinger-controls-beccontrols-select-342-11"
             label="Field View"
-            tooltip="Which physical observable to visualize: condensate density, phase, probability current, or potential."
+            tooltip="Which physical observable to visualize: condensate density, phase, probability current, potential, flow diagnostics, or Brane Pfaffian Pf(W)."
             value={bec.fieldView}
             onChange={(v) => actions.setFieldView(v as BecFieldView)}
             options={fieldViewOptions}

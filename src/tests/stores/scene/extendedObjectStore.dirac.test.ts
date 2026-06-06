@@ -64,6 +64,9 @@ describe('Dirac store slice', () => {
 
     store.setDiracFieldView('axialCharge')
     expect(useExtendedObjectStore.getState().schroedinger.dirac.fieldView).toBe('axialCharge')
+
+    store.setDiracFieldView('cliffordBloom')
+    expect(useExtendedObjectStore.getState().schroedinger.dirac.fieldView).toBe('cliffordBloom')
   })
 
   it('setDiracInitialCondition changes condition', () => {

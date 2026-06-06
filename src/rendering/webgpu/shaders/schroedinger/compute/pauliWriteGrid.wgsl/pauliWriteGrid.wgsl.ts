@@ -17,11 +17,12 @@
  *   3 coherence:       R = |ψ_up* ψ_down|, G = log(coh), B = phase, A = coherence
  *   4 spinHelicity:    R = |S·curl(S)|, G = log(|H|), B = phase, A = total
  *   5 berryCurvature:  R = |Fij| pair-sum, G = signed two-form proxy, B = phase, A = total
+ *   6 zeemanAnamorph: R = |S×Bhat|·relative-phase shear, G = log(R), B = relative phase, A = total
  *
  * Output texture channels (rgba16float):
  *   R: primary display scalar
  *   G: secondary scalar (spin-down density, log-density, or σ_z⁻)
- *   B: phase of spin-up component arg(ψ_up) in [0, 2π]
+ *   B: phase payload, usually arg(ψ_up); Zeeman Anamorph uses relative spin phase
  *   A: total density (used for opacity/skip in raymarcher)
  *
  * Uses trilinear interpolation over the 3 visible lattice dimensions
@@ -113,6 +114,59 @@ fn spinTextureNeighbor(
     return siteIdx;
   }
   return siteIdx + stride * (Nd - 1u);
+}
+
+fn relPhase(siteIdx: u32, T: u32) -> f32 {
+  let up = spinor[siteIdx];
+  let down = spinor[T + siteIdx];
+  let cohRe = up.x * down.x + up.y * down.y;
+  let cohIm = up.x * down.y - up.y * down.x;
+  return atan2(cohIm, cohRe);
+}
+
+fn wrapPhase(delta: f32) -> f32 {
+  return atan2(sin(delta), cos(delta));
+}
+
+fn relShear(
+  siteIdx: u32,
+  nnCoords: ptr<function, array<u32, 12>>,
+  T: u32
+) -> f32 {
+  var gradSq: f32 = 0.0;
+  var minSpacing: f32 = 1e9;
+  for (var axis: u32 = 0u; axis < params.latticeDim; axis = axis + 1u) {
+    let plus = spinTextureNeighbor(siteIdx, nnCoords, axis, true);
+    let minus = spinTextureNeighbor(siteIdx, nnCoords, axis, false);
+    let spacing = max(params.spacing[axis], 1e-6);
+    minSpacing = min(minSpacing, spacing);
+    let dPhi = wrapPhase(relPhase(plus, T) - relPhase(minus, T));
+    let grad = dPhi / (2.0 * spacing);
+    gradSq += grad * grad;
+  }
+  return sqrt(gradSq) * max(minSpacing, 1e-6);
+}
+
+fn zField(ndWorldPos: ptr<function, array<f32, 12>>) -> vec3f {
+  let B0 = params.fieldStrength;
+  if (params.fieldType == 0u) {
+    return vec3f(params.fieldVecBx, params.fieldVecBy, params.fieldVecBz);
+  }
+  if (params.fieldType == 1u) {
+    let zCoord = select(0.0, (*ndWorldPos)[2u], params.latticeDim > 2u);
+    return vec3f(0.0, 0.0, B0 + params.gradientStrength * zCoord);
+  }
+  if (params.fieldType == 2u) {
+    let ang = params.rotatingFrequency * params.simTime;
+    return vec3f(B0 * cos(ang), B0 * sin(ang), 0.0);
+  }
+  if (params.fieldType == 3u) {
+    let xCoord = (*ndWorldPos)[0u];
+    let zCoord = select(0.0, (*ndWorldPos)[2u], params.latticeDim > 2u);
+    let g = params.gradientStrength;
+    return vec3f(g * zCoord, 0.0, g * xCoord);
+  }
+  return vec3f(0.0);
 }
 
 // Map precomputed fractional lattice coordinates to trilinear corners.
@@ -452,6 +506,27 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     } else {
       outR = 0.0;
       outG = 0.0;
+      outA = totalNorm;
+    }
+  } else if (params.fieldView == 6u) {
+    let total = totalDensityAt(nnSite, T);
+    let totalNorm = clamp(total * invScalePerp, 0.0, 1.0);
+    let B = zField(&ndWorldPos);
+    let Bmag = length(B);
+    if (total >= 1e-20 && Bmag > 1e-20) {
+      let spin = spinUnitAt(nnSite, T);
+      let bHat = B / Bmag;
+      let tr = length(cross(spin, bHat));
+      let sh = relShear(nnSite, &nnCoords, T);
+      let za = clamp(tr * (1.0 - exp(-sh)) * totalNorm, 0.0, 1.0);
+      let al = dot(spin, bHat);
+      outR = za;
+      outG = log(za + 1e-10);
+      outB = relPhase(nnSite, T) + PAULI_WG_PI + 1.2 * al;
+      outA = totalNorm;
+    } else {
+      outR = 0.0;
+      outG = log(1e-10);
       outA = totalNorm;
     }
   }

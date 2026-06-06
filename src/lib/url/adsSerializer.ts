@@ -56,6 +56,10 @@ export interface AdsUrlState {
   adsHkllBoundarySource?: UrlAdsHkllSource
   adsHkllSourceSigma?: number
   adsHkllPlaneWaveM?: number
+  // Stage 2C — Chordal Sieve boundary-clock sub-block. Gated like BTZ/HKLL.
+  adsChordalSieveEnabled?: boolean
+  adsChordalSieveFrequency?: number
+  adsChordalSieveTwist?: number
 }
 
 /** Wire-format integer → HKLL source string. */
@@ -82,6 +86,8 @@ const HKLL_SOURCE_TO_INT: Readonly<Record<UrlAdsHkllSource, number>> = {
  *     toggle itself is also emitted only when true (dormant `ads_btz=0`
  *     would otherwise pollute canonical bound-state links).
  *   - HKLL sub-fields follow the same rule keyed off `adsHkllEnabled`.
+ *   - Chordal Sieve sub-fields follow the same rule keyed off
+ *     `adsChordalSieveEnabled`.
  *
  * Float emit precision: every `setFloatParam` call here pins precision to 3
  * (`false, 3`) — the canonical helper defaults to 2 but the AdS wire format
@@ -116,6 +122,11 @@ export function serializeAds(params: URLSearchParams, state: AdsUrlState): void 
     setFloatParam(params, 'ads_hkll_sigma', state.adsHkllSourceSigma, false, 3)
     setIntParam(params, 'ads_hkll_mb', state.adsHkllPlaneWaveM)
   }
+  if (state.adsChordalSieveEnabled === true) {
+    params.set('ads_chordal', '1')
+    setFloatParam(params, 'ads_chordal_k', state.adsChordalSieveFrequency, false, 3)
+    setFloatParam(params, 'ads_chordal_tw', state.adsChordalSieveTwist, false, 3)
+  }
 }
 
 /**
@@ -149,4 +160,7 @@ export function deserializeAds(params: URLSearchParams, state: AdsUrlState): voi
   if (srcInt !== undefined) state.adsHkllBoundarySource = HKLL_SOURCE_BY_INT[srcInt]
   state.adsHkllSourceSigma = parseFloatParam(params, 'ads_hkll_sigma', 0.05, 1.5)
   state.adsHkllPlaneWaveM = parseIntParam(params, 'ads_hkll_mb', 0, 8)
+  state.adsChordalSieveEnabled = parseBoolParam(params, 'ads_chordal')
+  state.adsChordalSieveFrequency = parseFloatParam(params, 'ads_chordal_k', 0.25, 12.0)
+  state.adsChordalSieveTwist = parseFloatParam(params, 'ads_chordal_tw', -4.0, 4.0)
 }

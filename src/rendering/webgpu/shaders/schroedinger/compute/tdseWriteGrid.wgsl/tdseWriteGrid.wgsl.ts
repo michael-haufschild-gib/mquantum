@@ -246,6 +246,98 @@ fn computeProbabilityCurrentAtSite(idx: u32, z0: vec2f, coords: ptr<function, ar
   return current;
 }
 
+struct BornEclipseFlow {
+  currentMagSq: f32,
+  gradientMagSq: f32,
+  dotCurrentGradient: f32,
+  gradX: f32,
+  gradY: f32,
+}
+
+fn computeBornEclipseFlowAtSite(idx: u32, z0: vec2f, coords: ptr<function, array<u32, 12>>, invSpacings: ptr<function, array<f32, 12>>) -> BornEclipseFlow {
+  let hbarOverM = params.hbar / max(params.mass, 1e-6);
+  var currentMagSq: f32 = 0.0;
+  var gradientMagSq: f32 = 0.0;
+  var dotCurrentGradient: f32 = 0.0;
+  var gradX: f32 = 0.0;
+  var gradY: f32 = 0.0;
+
+  for (var d: u32 = 0u; d < params.latticeDim; d++) {
+    if (params.gridSize[d] <= 1u) { continue; }
+    let stride = params.strides[d];
+    let coord = (*coords)[d];
+    let Nd = params.gridSize[d];
+    let invSpacing = (*invSpacings)[d];
+    let invDx = 0.5 * invSpacing;
+    let atLo = coord == 0u;
+    let atHi = coord == Nd - 1u;
+    let pmlAxis = tdsePmlAxisActive(d);
+    var dRe: f32;
+    var dIm: f32;
+    if (pmlAxis && atLo) {
+      let fIdx = idx + stride;
+      let zF = psi[fIdx];
+      dRe = (zF.x - z0.x) * invSpacing;
+      dIm = (zF.y - z0.y) * invSpacing;
+    } else if (pmlAxis && atHi) {
+      let bIdx = idx - stride;
+      let zB = psi[bIdx];
+      dRe = (z0.x - zB.x) * invSpacing;
+      dIm = (z0.y - zB.y) * invSpacing;
+    } else {
+      let fwdIdx = select(idx + stride, idx - stride * (Nd - 1u), atHi);
+      let bwdIdx = select(idx - stride, idx + stride * (Nd - 1u), atLo);
+      let zF = psi[fwdIdx];
+      let zB = psi[bwdIdx];
+      dRe = (zF.x - zB.x) * invDx;
+      dIm = (zF.y - zB.y) * invDx;
+    }
+
+    let jd = hbarOverM * (z0.x * dIm - z0.y * dRe);
+    let gradRho = 2.0 * (z0.x * dRe + z0.y * dIm);
+    currentMagSq += jd * jd;
+    gradientMagSq += gradRho * gradRho;
+    dotCurrentGradient += jd * gradRho;
+    if (d == 0u) {
+      gradX = gradRho;
+    } else if (d == 1u) {
+      gradY = gradRho;
+    }
+  }
+
+  return BornEclipseFlow(currentMagSq, gradientMagSq, dotCurrentGradient, gradX, gradY);
+}
+
+fn computeBornEclipseScalar(idx: u32, z0: vec2f, density: f32, phase: f32, coords: ptr<function, array<u32, 12>>, invSpacings: ptr<function, array<f32, 12>>, densityGate: f32) -> f32 {
+  let eps = 1e-20;
+  if (density <= eps) { return 0.0; }
+
+  let flow = computeBornEclipseFlowAtSite(idx, z0, coords, invSpacings);
+  if (flow.currentMagSq <= eps || flow.gradientMagSq <= eps) { return 0.0; }
+
+  let currentMag = sqrt(flow.currentMagSq);
+  let gradientMag = sqrt(flow.gradientMagSq);
+  let opposition = clamp(
+    -flow.dotCurrentGradient / (currentMag * gradientMag + eps),
+    0.0,
+    1.0
+  );
+  if (opposition <= 0.0) { return 0.0; }
+
+  let densityScale = max(params.maxDensity, eps);
+  var spacingSum: f32 = 0.0;
+  for (var d: u32 = 0u; d < params.latticeDim; d++) {
+    spacingSum += params.spacing[d];
+  }
+  let averageSpacing = spacingSum / max(f32(params.latticeDim), 1.0);
+  let flowGate = 1.0 - exp(-currentMag / densityScale);
+  let gradientGate = 1.0 - exp(-8.0 * averageSpacing * gradientMag / densityScale);
+  let orientation = atan2(flow.gradY, flow.gradX);
+  let phaseBand = 0.55 + 0.45 * cos(phase + 2.0 * orientation - 0.7 * params.simTime);
+  let eclipse = opposition * flowGate * gradientGate * (0.65 + 0.35 * phaseBand);
+  return clamp(eclipse, 0.0, 1.0) * densityGate;
+}
+
 fn computeCtcResidualScalar(idx: u32, re: f32, im: f32, density: f32, nnCoords: ptr<function, array<u32, 12>>, densityGate: f32) -> f32 {
   let mirror = sampleCtcMirror(idx, nnCoords);
   if (!mirror.valid) { return 0.0; }
@@ -307,6 +399,81 @@ fn computeCtcCausalShadowScalar(idx: u32, re: f32, im: f32, density: f32, nnCoor
   let balanceJ = 2.0 * min(localMag, mirrorMag) / (localMag + mirrorMag + eps);
   let display = clamp(feedback * balanceJ * opposing * phaseCoherence, 0.0, 1.0);
   return display * densityGate;
+}
+
+fn branePlaquetteWindingOrZero(idx: u32, nnCoords: ptr<function, array<u32, 12>>, axisA: u32, axisB: u32) -> f32 {
+  if (axisA == axisB || axisA >= params.latticeDim || axisB >= params.latticeDim) {
+    return 0.0;
+  }
+  if (params.gridSize[axisA] <= 1u || params.gridSize[axisB] <= 1u) {
+    return 0.0;
+  }
+  return plaquetteWinding(idx, nnCoords, axisA, axisB);
+}
+
+fn braneAxisWorldCoord(nnCoords: ptr<function, array<u32, 12>>, axis: u32) -> f32 {
+  return (f32((*nnCoords)[axis]) + 0.5 - 0.5 * f32(params.gridSize[axis])) * params.spacing[axis];
+}
+
+fn braneAxesAreDistinct(a: u32, b: u32, c: u32, d: u32) -> bool {
+  return a != b && a != c && a != d && b != c && b != d && c != d;
+}
+
+fn computeSoftBraneIntersectionCaustic(nnCoords: ptr<function, array<u32, 12>>, phase: f32) -> f32 {
+  if (params.initCondition != 6u || params.vortexCount < 2u || params.latticeDim < 4u) {
+    return 0.0;
+  }
+
+  let a1 = params.vortexPlane1Axis0;
+  let b1 = params.vortexPlane1Axis1;
+  let a2 = params.vortexPlane2Axis0;
+  let b2 = params.vortexPlane2Axis1;
+  if (!braneAxesAreDistinct(a1, b1, a2, b2)) { return 0.0; }
+  if (a1 >= params.latticeDim || b1 >= params.latticeDim || a2 >= params.latticeDim || b2 >= params.latticeDim) {
+    return 0.0;
+  }
+
+  let sep = params.vortexSeparation;
+  let x1a = braneAxisWorldCoord(nnCoords, a1) - 0.5 * sep;
+  let x1b = braneAxisWorldCoord(nnCoords, b1);
+  let x2a = braneAxisWorldCoord(nnCoords, a2) + 0.5 * sep;
+  let x2b = braneAxisWorldCoord(nnCoords, b2);
+  let r1Sq = x1a * x1a + x1b * x1b;
+  let r2Sq = x2a * x2a + x2b * x2b;
+  let avgSpacing = 0.25 * (
+    params.spacing[a1] + params.spacing[b1] + params.spacing[a2] + params.spacing[b2]
+  );
+  let sigma = max(1.55 * avgSpacing, 0.17);
+  let sheetGate = exp(-0.5 * (r1Sq + r2Sq) / (sigma * sigma));
+  let braidPhase = 5.0 * (x1a + 0.7 * x1b - x2a + 0.5 * x2b) + 2.0 * phase + 0.35 * params.simTime;
+  let braid = 0.58 + 0.42 * cos(braidPhase);
+  return clamp(sheetGate * braid, 0.0, 1.0);
+}
+
+fn computeBranePfaffianScalar(idx: u32, nnCoords: ptr<function, array<u32, 12>>, density: f32, phase: f32, densityGate: f32) -> f32 {
+  if (params.latticeDim < 4u || density <= 1e-20) { return 0.0; }
+
+  var pfaffianAbs: f32 = 0.0;
+  for (var i: u32 = 0u; i + 3u < params.latticeDim; i = i + 1u) {
+    for (var j: u32 = i + 1u; j + 2u < params.latticeDim; j = j + 1u) {
+      for (var k: u32 = j + 1u; k + 1u < params.latticeDim; k = k + 1u) {
+        for (var l: u32 = k + 1u; l < params.latticeDim; l = l + 1u) {
+          let wij = branePlaquetteWindingOrZero(idx, nnCoords, i, j);
+          let wkl = branePlaquetteWindingOrZero(idx, nnCoords, k, l);
+          let wik = branePlaquetteWindingOrZero(idx, nnCoords, i, k);
+          let wjl = branePlaquetteWindingOrZero(idx, nnCoords, j, l);
+          let wil = branePlaquetteWindingOrZero(idx, nnCoords, i, l);
+          let wjk = branePlaquetteWindingOrZero(idx, nnCoords, j, k);
+          let pf = wij * wkl - wik * wjl + wil * wjk;
+          pfaffianAbs += abs(pf);
+        }
+      }
+    }
+  }
+
+  let exactPfaffian = clamp(1.0 - exp(-6.0 * pfaffianAbs), 0.0, 1.0);
+  let braneCaustic = computeSoftBraneIntersectionCaustic(nnCoords, phase);
+  return clamp(0.58 * max(exactPfaffian, braneCaustic), 0.0, 1.0) * densityGate;
 }
 @compute @workgroup_size(4, 4, 4)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
@@ -622,10 +789,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       }
     }
     displayScalar = clamp(1.0 - exp(-circulationAbs), 0.0, 1.0) * densityGate;
+  } else if (params.fieldView == 15u) {
+    displayScalar = computeBranePfaffianScalar(idx, &nnCoords, density, phase, densityGate);
   } else if (params.fieldView == 10u) { displayScalar = computeCtcResidualScalar(idx, re, im, density, &nnCoords, densityGate); } else if (params.fieldView == 11u) {
     displayScalar = computeCtcLoopGainScalar(idx, re, im, density, &nnCoords, densityGate);
   } else if (params.fieldView == 12u) { displayScalar = computeCtcDeutschEntropyScalar(idx, re, im, density, &nnCoords, densityGate); } else if (params.fieldView == 13u) {
     displayScalar = computeCtcCausalShadowScalar(idx, re, im, density, &nnCoords, &invSpacings, densityGate);
+  } else if (params.fieldView == 14u) {
+    displayScalar = computeBornEclipseScalar(idx, vec2f(re, im), density, phase, &nnCoords, &invSpacings, densityGate);
   } else if (params.fieldView == 3u) {
     // potential (NN)
     let potentialScale = getPotentialScale();

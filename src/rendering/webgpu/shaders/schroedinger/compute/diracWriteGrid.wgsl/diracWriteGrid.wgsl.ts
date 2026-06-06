@@ -253,6 +253,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   const DIRAC_WG_PI:  f32 = 3.14159265358979323846;
   const DIRAC_WG_INV_TAU: f32 = 0.15915494309189535;
   let phase = atan2(im0, re0) + DIRAC_WG_PI;
+  var phaseForColor: f32 = phase;
 
   // Precompute 1/densityScale once (guard against 0): each field-view branch
   // used select(x / scale, 0.0, scale <= 0), which always ran the divide —
@@ -547,6 +548,44 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let axialNorm = select(abs(axialCharge) / max(totalDensity, 1e-20), 0.0, totalDensity < 1e-30);
     displayScalar = clamp(axialNorm, 0.0, 1.0) * densityGate;
 
+  } else if (params.fieldView == 8u) {
+    // cliffordBloom: sector-balanced relative-phase petals from the visible
+    // Clifford representation split. Density gates visibility; upper/lower
+    // balance controls whether petals can bloom at all.
+    let totalDensity = totalDensityAt(nnSiteIdx, S, T);
+    let normDensityRaw = totalDensity * invDensityScale;
+    let densityGate = smoothstep(0.0, 0.02, normDensityRaw);
+    let split = upperLowerDensityAt(nnSiteIdx, S, T);
+    let sectorDenom = max(split.x + split.y, 1e-20);
+    let sectorBalance = clamp(4.0 * split.x * split.y / (sectorDenom * sectorDenom), 0.0, 1.0);
+
+    let upper0 = spinor[nnSiteIdx];
+    let lower0 = spinor[half * T + nnSiteIdx];
+    let upperPhase = atan2(upper0.y, upper0.x);
+    let lowerPhase = atan2(lower0.y, lower0.x);
+    let relativePhase = atan2(sin(upperPhase - lowerPhase), cos(upperPhase - lowerPhase));
+
+    let x = ndWorldPos[0];
+    let y = select(0.0, ndWorldPos[1], params.latticeDim > 1u);
+    let z = select(0.0, ndWorldPos[2], params.latticeDim > 2u);
+    let phiXY = atan2(y, x);
+    let phiXZ = atan2(z, x);
+    let radius = sqrt(x * x + y * y + z * z);
+    let carrierPhase = 4.0 * phiXY + 2.0 * phiXZ + 3.0 * relativePhase + 0.3 * radius - 0.8 * params.simTime;
+    let carrier = 0.5 + 0.5 * cos(carrierPhase);
+    let radialShellPhase = 5.5 * radius + 2.0 * relativePhase - 1.1 * params.simTime;
+    let radialShell = 0.5 + 0.5 * cos(radialShellPhase);
+    let angularPetal = carrier * carrier * carrier;
+    let shellFocus = radialShell * radialShell;
+    let phaseTension = 0.35 + 0.65 * abs(sin(relativePhase));
+    let bloom = sectorBalance * phaseTension * shellFocus * (0.04 + 0.96 * angularPetal);
+    displayScalar = clamp(1.0 - exp(-7.2 * bloom), 0.0, 1.0) * densityGate;
+    let bloomHuePhase = atan2(
+      sin(relativePhase + 2.0 * phiXY + phiXZ + 0.5 * radius),
+      cos(relativePhase + 2.0 * phiXY + phiXZ + 0.5 * radius)
+    );
+    phaseForColor = bloomHuePhase + DIRAC_WG_PI;
+
   } else if (params.fieldView == 6u) {
     // phase: trilinear-interpolated density for gating, NN for phase value.
     // Reuses baseIdxLo + deltaIdx from the precompute above — the ndToLinear
@@ -594,6 +633,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     }
   }
 
-  textureStore(outputTex, gid, vec4f(normDisplay, logDensity, phase, alphaChannel));
+  textureStore(outputTex, gid, vec4f(normDisplay, logDensity, phaseForColor, alphaChannel));
 }
 `

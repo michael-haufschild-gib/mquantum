@@ -20,6 +20,7 @@ import type { DiracConfig } from '@/lib/geometry/extended/types'
 
 import type { WebGPURenderContext } from '../../core/types'
 import type { SiteDispatch } from '../computePassUtils'
+import { diracSharedMemFFTWorkgroupCount } from '../DiracComputePassDispatchers'
 import type { DiracBindGroupResult, DiracPipelineResult } from '../DiracComputePassResources'
 
 /** Function shape matching WebGPUBasePass.dispatchCompute. */
@@ -48,6 +49,8 @@ export interface StrangStepCommon {
   step: number
   S: number
   linearWG: number
+  applyPotentialHalf?: boolean
+  normalizeInAbsorber?: boolean
   /**
    * Site-kernel dispatch shape — selects the 3-D variant when
    * `latticeDim === 3` (kinetic, absorber). When `use3D` is false, kinetic
@@ -62,6 +65,7 @@ export interface StrangStepCommon {
 export interface BatchedStrangStepParams extends StrangStepCommon {
   ifftSlotOffset: number
   totalSites: number
+  useDirectSpinorFFT?: boolean
 }
 
 /** Extra inputs for the legacy (per-dispatch-pass) Strang step. */
@@ -85,6 +89,20 @@ function validateComponentBindGroups(bg: DiracBindGroupResult, S: number): void 
   }
 }
 
+function validateDirectComponentBindGroups(
+  bg: DiracBindGroupResult,
+  config: DiracConfig,
+  S: number
+): void {
+  const slotCount = config.latticeDim * 2
+  for (let c = 0; c < S; c++) {
+    requireBindGroup(bg.cachedSpinorScaleBGs[c], `cachedSpinorScaleBGs[${c}]`)
+    for (let slot = 0; slot < slotCount; slot++) {
+      requireBindGroup(bg.cachedSpinorFFTBGs[c]?.[slot], `cachedSpinorFFTBGs[${c}][${slot}]`)
+    }
+  }
+}
+
 function validateCommonBindGroups(bg: DiracBindGroupResult, config: DiracConfig, S: number): void {
   requireBindGroup(bg.potentialHalfBG, 'potentialHalfBG')
   requireBindGroup(bg.kineticBG, 'kineticBG')
@@ -98,6 +116,17 @@ function validateBatchedBindGroups(bg: DiracBindGroupResult, config: DiracConfig
   for (let slot = 0; slot < slotCount; slot++) {
     requireBindGroup(bg.fftSharedMemBGs[slot], `fftSharedMemBGs[${slot}]`)
   }
+}
+
+function validateDirectBatchedBindGroups(
+  bg: DiracBindGroupResult,
+  config: DiracConfig,
+  S: number
+): void {
+  requireBindGroup(bg.potentialHalfBG, 'potentialHalfBG')
+  requireBindGroup(bg.kineticBG, 'kineticBG')
+  if (config.absorberEnabled) requireBindGroup(bg.initBG, 'initBG')
+  validateDirectComponentBindGroups(bg, config, S)
 }
 
 function validateLegacyBindGroups(bg: DiracBindGroupResult, config: DiracConfig, S: number): void {
@@ -127,29 +156,46 @@ export function runBatchedStrangStep(p: BatchedStrangStepParams): void {
     step,
     S,
     linearWG,
+    applyPotentialHalf = true,
+    normalizeInAbsorber = false,
     siteDispatch,
     dispatchCompute,
     ifftSlotOffset,
     totalSites,
+    useDirectSpinorFFT = false,
   } = p
-  validateBatchedBindGroups(bg, config, S)
+  if (useDirectSpinorFFT) {
+    validateDirectBatchedBindGroups(bg, config, S)
+  } else {
+    validateBatchedBindGroups(bg, config, S)
+  }
   const strangPass = ctx.beginComputePass({ label: `dirac-strang-${step}` })
 
   // 1. Half-step potential (per-component phase rotation) — always 1-D.
-  dispatchCompute(strangPass, pl.potentialHalfPipeline, [bg.potentialHalfBG!], linearWG)
+  if (applyPotentialHalf) {
+    dispatchCompute(strangPass, pl.potentialHalfPipeline, [bg.potentialHalfBG!], linearWG)
+  }
 
-  // 2. Forward FFT for each spinor component: pack → 3 axes → unpack (no-norm)
+  // 2. Forward FFT. Direct component mode runs in-place per component;
+  // fallback routes each component through scratch.
   for (let c = 0; c < S; c++) {
-    dispatchCompute(strangPass, pl.packPipeline, [bg.cachedPackBGs[c]!], linearWG)
+    if (!useDirectSpinorFFT) {
+      dispatchCompute(strangPass, pl.packPipeline, [bg.cachedPackBGs[c]!], linearWG)
+    }
     strangPass.setPipeline(pl.fftSharedMemPipeline)
     let fftSlot = 0
     for (let d = config.latticeDim - 1; d >= 0; d--) {
       const axisDim = config.gridSize[d]!
-      strangPass.setBindGroup(0, bg.fftSharedMemBGs[fftSlot]!)
-      strangPass.dispatchWorkgroups(totalSites / axisDim)
+      strangPass.setBindGroup(
+        0,
+        useDirectSpinorFFT ? bg.cachedSpinorFFTBGs[c]![fftSlot]! : bg.fftSharedMemBGs[fftSlot]!
+      )
+      strangPass.dispatchWorkgroups(diracSharedMemFFTWorkgroupCount(totalSites, axisDim))
       fftSlot++
     }
-    dispatchCompute(strangPass, pl.unpackPipeline, [bg.cachedUnpackBGsNoNorm[c]!], linearWG)
+    if (!useDirectSpinorFFT) {
+      dispatchCompute(strangPass, pl.unpackPipeline, [bg.cachedUnpackBGsNoNorm[c]!], linearWG)
+    }
   }
 
   // 3. Free Dirac propagator in k-space.
@@ -165,22 +211,37 @@ export function runBatchedStrangStep(p: BatchedStrangStepParams): void {
     siteDispatch.z
   )
 
-  // 4. Inverse FFT per component: pack → 3 axes → unpack (with 1/N norm)
+  // 4. Inverse FFT. Direct component mode keeps the result in the spinor
+  // buffer; fallback routes each component through scratch.
   for (let c = 0; c < S; c++) {
-    dispatchCompute(strangPass, pl.packPipeline, [bg.cachedPackBGs[c]!], linearWG)
+    if (!useDirectSpinorFFT) {
+      dispatchCompute(strangPass, pl.packPipeline, [bg.cachedPackBGs[c]!], linearWG)
+    }
     strangPass.setPipeline(pl.fftSharedMemPipeline)
     let fftSlot = ifftSlotOffset
     for (let d = config.latticeDim - 1; d >= 0; d--) {
       const axisDim = config.gridSize[d]!
-      strangPass.setBindGroup(0, bg.fftSharedMemBGs[fftSlot]!)
-      strangPass.dispatchWorkgroups(totalSites / axisDim)
+      strangPass.setBindGroup(
+        0,
+        useDirectSpinorFFT ? bg.cachedSpinorFFTBGs[c]![fftSlot]! : bg.fftSharedMemBGs[fftSlot]!
+      )
+      strangPass.dispatchWorkgroups(diracSharedMemFFTWorkgroupCount(totalSites, axisDim))
       fftSlot++
     }
-    dispatchCompute(strangPass, pl.unpackPipeline, [bg.cachedUnpackBGs[c]!], linearWG)
+    if (!(useDirectSpinorFFT && normalizeInAbsorber)) {
+      dispatchCompute(
+        strangPass,
+        useDirectSpinorFFT ? pl.spinorScalePipeline : pl.unpackPipeline,
+        [useDirectSpinorFFT ? bg.cachedSpinorScaleBGs[c]! : bg.cachedUnpackBGs[c]!],
+        linearWG
+      )
+    }
   }
 
   // 5. Second half-step potential
-  dispatchCompute(strangPass, pl.potentialHalfPipeline, [bg.potentialHalfBG!], linearWG)
+  if (applyPotentialHalf) {
+    dispatchCompute(strangPass, pl.potentialHalfPipeline, [bg.potentialHalfBG!], linearWG)
+  }
 
   // 6. Absorber — placed after the FFT kinetic step so the FFT doesn't see
   // the absorber's spatial modulation (which would scatter across k-space
@@ -189,7 +250,7 @@ export function runBatchedStrangStep(p: BatchedStrangStepParams): void {
   if (config.absorberEnabled) {
     dispatchCompute(
       strangPass,
-      pl.absorberPipeline,
+      normalizeInAbsorber ? pl.absorberNormalizePipeline : pl.absorberPipeline,
       [bg.initBG!],
       siteDispatch.x,
       siteDispatch.y,
@@ -220,6 +281,7 @@ export function runLegacyStrangStep(p: LegacyStrangStepParams): void {
     step,
     S,
     linearWG,
+    applyPotentialHalf = true,
     siteDispatch,
     dispatchCompute,
     fwdStageCount,
@@ -227,9 +289,11 @@ export function runLegacyStrangStep(p: LegacyStrangStepParams): void {
   } = p
 
   validateLegacyBindGroups(bg, config, S)
-  const vHalf = ctx.beginComputePass({ label: `dirac-V-half-1-${step}` })
-  dispatchCompute(vHalf, pl.potentialHalfPipeline, [bg.potentialHalfBG!], linearWG)
-  vHalf.end()
+  if (applyPotentialHalf) {
+    const vHalf = ctx.beginComputePass({ label: `dirac-V-half-1-${step}` })
+    dispatchCompute(vHalf, pl.potentialHalfPipeline, [bg.potentialHalfBG!], linearWG)
+    vHalf.end()
+  }
 
   for (let c = 0; c < S; c++) {
     const pass = ctx.beginComputePass({ label: `dirac-pack-c${c}-${step}` })
@@ -269,9 +333,11 @@ export function runLegacyStrangStep(p: LegacyStrangStepParams): void {
     unpackPass.end()
   }
 
-  const vHalf2 = ctx.beginComputePass({ label: `dirac-V-half-2-${step}` })
-  dispatchCompute(vHalf2, pl.potentialHalfPipeline, [bg.potentialHalfBG!], linearWG)
-  vHalf2.end()
+  if (applyPotentialHalf) {
+    const vHalf2 = ctx.beginComputePass({ label: `dirac-V-half-2-${step}` })
+    dispatchCompute(vHalf2, pl.potentialHalfPipeline, [bg.potentialHalfBG!], linearWG)
+    vHalf2.end()
+  }
 
   if (config.absorberEnabled) {
     const absPass = ctx.beginComputePass({ label: `dirac-absorber-${step}` })

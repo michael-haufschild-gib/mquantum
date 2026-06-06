@@ -170,6 +170,10 @@ struct AdsConfig {
   boundaryOverlay: u32,  // 1 = render boundary primary shell
   radialNorm: f32,       // CPU-precomputed N(n, l, delta, d) so per-voxel
                          // adsRadialNorm() skips its 3 lgamma + factorial chain.
+  chordalSieveEnabled: u32, // 1 = replace bound-state density with Chordal Sieve
+  chordalSieveFrequency: f32,
+  chordalSieveTwist: f32,
+  _pad0: f32,
 }
 `
 
@@ -208,6 +212,18 @@ export const adsBoundStateComputeBlock = /* wgsl */ `
 
 const ADS_BOUNDARY_SHELL_MIN: f32 = 0.975;
 const ADS_BOUNDARY_SHELL_MAX: f32 = 0.995;
+
+fn adsChordalAnchor(m: f32, offset: f32, zBias: f32) -> vec3f {
+  return normalize(vec3f(cos(m + offset), sin(m + offset), zBias));
+}
+
+fn adsBusemannClock(point: vec3f, anchor: vec3f) -> f32 {
+  let r2 = dot(point, point);
+  let numerator = max(1.0 - r2, 1e-6);
+  let delta = point - anchor;
+  let denominator = dot(delta, delta) + 1e-6;
+  return log(numerator / denominator);
+}
 
 @compute @workgroup_size(8, 8, 8)
 fn main(@builtin(global_invocation_id) global_id: vec3u) {
@@ -287,6 +303,34 @@ fn main(@builtin(global_invocation_id) global_id: vec3u) {
     boundary = normSq * bSin2l * jacobi * jacobi * Y * Y;
   }
 
-  textureStore(densityGrid, global_id, vec4f(rho2, logRho, phase, boundary));
+  var outR = rho2;
+  var outG = logRho;
+  var outB = phase;
+
+  if (adsConfig.chordalSieveEnabled != 0u) {
+    let anchorA = adsChordalAnchor(f32(m), 0.0, 0.35);
+    let anchorB = adsChordalAnchor(f32(m), 2.09439510, -0.25);
+    let clockA = adsBusemannClock(worldPos, anchorA);
+    let clockB = adsBusemannClock(worldPos, anchorB);
+    let clockDiff = clockA - clockB;
+    let clockSum = clockA + clockB;
+    let phi = atan2(worldPos.y, worldPos.x);
+    let k = max(adsConfig.chordalSieveFrequency, 0.0);
+    let sievePhase = k * clockDiff
+      + adsConfig.chordalSieveTwist * clockSum
+      + fl * phi
+      + f32(n) * rho;
+    let carrier = abs(sin(sievePhase));
+    let ribLattice = pow(0.35 + 0.65 * carrier, 2.0);
+    let anchorSeparation = 1.0 - exp(-abs(clockDiff));
+    let densityGate = 1.0 - exp(-10.0 * rho2);
+    let sieveDensity = clamp(densityGate * anchorSeparation * ribLattice, 0.0, 1.0);
+
+    outR = sieveDensity;
+    outG = log(sieveDensity + 1e-10);
+    outB = atan2(sin(sievePhase), cos(sievePhase)) + ADS_PI;
+  }
+
+  textureStore(densityGrid, global_id, vec4f(outR, outG, outB, boundary));
 }
 `

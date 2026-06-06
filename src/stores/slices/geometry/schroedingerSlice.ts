@@ -30,6 +30,7 @@ import { isHydrogenFamilyQuantumType } from '@/lib/geometry/registry'
 import { logger } from '@/lib/logger'
 import { sanitizePowerOfTwoGridSizes } from '@/lib/math/ndArray'
 import { normalizeHydrogenCoupledAngularChain } from '@/lib/physics/hydrogenCoupled/presets'
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 
 import { createAntiDeSitterSetters } from './setters/antiDeSitterSetters'
 import { resizeBecArrays } from './setters/becResize'
@@ -447,7 +448,11 @@ export const createSchroedingerSlice: StateCreator<
             termCount: presetControls.termCount,
             maxQuantumNumber: presetControls.maxQuantumNumber,
             frequencySpread: presetControls.frequencySpread,
+            fockLanternEnabled: false,
+            ...presetControls.visualOverrides,
           }
+          if (presetControls.colorAlgorithm)
+            useAppearanceStore.getState().setColorAlgorithm(presetControls.colorAlgorithm)
         }
       }
       setWithVersion((state) => ({

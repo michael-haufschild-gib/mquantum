@@ -152,4 +152,25 @@ export const PAULI_SCENARIO_PRESETS: PauliScenarioPreset[] = [
       stepsPerFrame: 4,
     },
   },
+  {
+    id: 'zeemanAnamorph',
+    name: 'Zeeman Anamorph',
+    description:
+      'Counter-warped Pauli spinor opened in a Zeeman Anamorph view — braided phase ribbons light where local spin is transverse to the magnetic-field compass',
+    overrides: {
+      fieldType: 'quadrupole',
+      fieldStrength: 2.0,
+      fieldDirection: [0, 0],
+      gradientStrength: 4.8,
+      initialSpinDirection: [Math.PI / 2, Math.PI / 3],
+      initialCondition: 'zeemanAnamorphSeed',
+      packetWidth: 1.35,
+      packetMomentum: [0.35, -0.2, 0.5],
+      potentialType: 'none',
+      fieldView: 'zeemanAnamorph',
+      autoScale: true,
+      dt: 0.0035,
+      stepsPerFrame: 5,
+    },
+  },
 ]

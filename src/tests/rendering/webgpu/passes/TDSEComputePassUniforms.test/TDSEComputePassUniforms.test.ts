@@ -476,6 +476,53 @@ describe('writeTdseUniforms', () => {
     expect(u32[I.fieldView]).toBe(13)
   })
 
+  it('maps bornEclipse fieldView to shader enum 14', () => {
+    const uniformData = new ArrayBuffer(UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({ config: createTdseConfig({ fieldView: 'bornEclipse' }) })
+    )
+
+    expect(u32[I.fieldView]).toBe(14)
+  })
+
+  it('maps branePfaffian fieldView to shader enum 15 without moving existing views', () => {
+    const uniformData = new ArrayBuffer(UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({ config: createTdseConfig({ fieldView: 'branePfaffian' }) })
+    )
+
+    expect(u32[I.fieldView]).toBe(15)
+
+    u32.fill(0)
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({ config: createTdseConfig({ fieldView: 'bornEclipse' }) })
+    )
+    expect(u32[I.fieldView]).toBe(14)
+  })
+
   it('packs blackHoleRingdown BH params at bhMass/bhMultipoleL/bhSpin (offsets 748/752/756)', () => {
     const uniformData = new ArrayBuffer(UNIFORM_SIZE)
     const u32 = new Uint32Array(uniformData)

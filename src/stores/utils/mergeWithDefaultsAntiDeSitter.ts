@@ -39,8 +39,13 @@ export function normalizeAntiDeSitterLoadedConfig(
   const m = rawM === 0 ? 0 : rawM
   const hkllEnabled =
     typeof current.hkllEnabled === 'boolean' ? current.hkllEnabled : defaults.hkllEnabled
+  const rawChordalEnabled =
+    typeof current.chordalSieveEnabled === 'boolean'
+      ? current.chordalSieveEnabled
+      : defaults.chordalSieveEnabled
+  const chordalSieveEnabled = hkllEnabled === true ? false : rawChordalEnabled
   const btzEnabled =
-    hkllEnabled === true
+    hkllEnabled === true || chordalSieveEnabled === true
       ? false
       : typeof current.btzEnabled === 'boolean'
         ? current.btzEnabled
@@ -96,6 +101,19 @@ export function normalizeAntiDeSitterLoadedConfig(
         defaults.hkllPlaneWaveM,
         0,
         8
+      ),
+      chordalSieveEnabled,
+      chordalSieveFrequency: clampFiniteNumber(
+        current.chordalSieveFrequency,
+        defaults.chordalSieveFrequency,
+        0.25,
+        12
+      ),
+      chordalSieveTwist: clampFiniteNumber(
+        current.chordalSieveTwist,
+        defaults.chordalSieveTwist,
+        -4,
+        4
       ),
     },
   }

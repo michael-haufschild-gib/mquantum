@@ -46,6 +46,24 @@ const diracAbsorberBody = /* wgsl */ `
 }
 `
 
+const diracAbsorberNormalizeBody = /* wgsl */ `
+  let sigma = computePMLSigma(coords, params.gridSize, params.latticeDim,
+                              params.absorberWidth, params.absorberStrength, 0u);
+
+  let dampFactor = select(1.0, exp(-sigma * params.dt), sigma > 0.0);
+  let invN = 1.0 / f32(params.totalSites);
+  let S = params.spinorSize;
+  let T = params.totalSites;
+  var bufIdx = idx;
+  for (var c: u32 = 0u; c < S; c++) {
+    let v = spinor[bufIdx];
+    let vNorm = vec2f(v.x * invN, v.y * invN);
+    spinor[bufIdx] = vNorm * dampFactor;
+    bufIdx += T;
+  }
+}
+`
+
 /** Legacy 1D dispatch. Workgroup size 64. */
 export const diracAbsorberBlock = /* wgsl */ `${diracAbsorberBindings}
 @compute @workgroup_size(64)
@@ -78,3 +96,36 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   let idx = ndToLinear(coords, params.strides, latDim);
 ${diracAbsorberBody}`
+
+/** 1D absorber variant that also applies inverse-FFT normalization. */
+export const diracAbsorberNormalizeBlock = /* wgsl */ `${diracAbsorberBindings}
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  let idx = gid.x;
+  if (idx >= params.totalSites) {
+    return;
+  }
+  if (params.absorberEnabled == 0u) {
+    return;
+  }
+
+  let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
+${diracAbsorberNormalizeBody}`
+
+/** 3D absorber variant that also applies inverse-FFT normalization. */
+export const diracAbsorberNormalizeBlock3D = /* wgsl */ `${diracAbsorberBindings}
+@compute @workgroup_size(4, 4, 4)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  let latDim = params.latticeDim;
+  if (gid.x >= params.gridSize[0]) { return; }
+  if (latDim > 1u && gid.y >= params.gridSize[1]) { return; }
+  if (latDim > 2u && gid.z >= params.gridSize[2]) { return; }
+  if (params.absorberEnabled == 0u) { return; }
+
+  var coords: array<u32, 12>;
+  coords[0] = gid.x;
+  if (latDim > 1u) { coords[1] = gid.y; }
+  if (latDim > 2u) { coords[2] = gid.z; }
+
+  let idx = ndToLinear(coords, params.strides, latDim);
+${diracAbsorberNormalizeBody}`

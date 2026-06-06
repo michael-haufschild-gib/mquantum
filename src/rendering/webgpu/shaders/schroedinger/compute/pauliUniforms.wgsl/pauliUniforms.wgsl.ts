@@ -97,7 +97,7 @@ struct PauliUniforms {
   spinPhi: f32,                     // [39]
 
   // Initial condition
-  initCondition: u32,               // [40]  0=gaussianSpinUp, 1=gaussianSpinDown, 2=gaussianSuperposition, 3=planeWaveSpinor
+  initCondition: u32,               // [40]  0=gaussianSpinUp, 1=gaussianSpinDown, 2=gaussianSuperposition, 3=planeWaveSpinor, 4=zeemanAnamorphSeed
   packetWidth: f32,                 // [41]
   packetCenter: array<f32, 12>,     // [42..53]
   packetMomentum: array<f32, 12>,   // [54..65]
@@ -117,7 +117,7 @@ struct PauliUniforms {
   _pad3: u32,                       // [75]
 
   // Display
-  fieldView: u32,                   // [76]  0=spinDensity, 1=totalDensity, 2=spinExpectation, 3=coherence, 4=spinHelicity, 5=berryCurvature
+  fieldView: u32,                   // [76]  0=spinDensity, 1=totalDensity, 2=spinExpectation, 3=coherence, 4=spinHelicity, 5=berryCurvature, 6=zeemanAnamorph
   autoScale: u32,                   // [77]
   spinUpR: f32,                     // [78]
   spinUpG: f32,                     // [79]

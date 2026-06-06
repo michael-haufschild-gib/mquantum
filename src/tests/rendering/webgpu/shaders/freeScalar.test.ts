@@ -44,4 +44,10 @@ describe('renderer temporal + free scalar interaction', () => {
     expect(freeScalarInitBlock).toContain('computeChronogenicShear(worldPos)')
     expect(freeScalarInitBlock).toContain('piVal = shear.y')
   })
+
+  it('contains cauchy loom weave shader enum 7 branch and canonical pi assignment', () => {
+    expect(freeScalarInitBlock).toContain('params.initCondition == 7u')
+    expect(freeScalarInitBlock).toContain('computeCauchyLoomWeave(worldPos)')
+    expect(freeScalarInitBlock).toContain('piVal = weave.y')
+  })
 })

@@ -125,6 +125,24 @@ describe('FreeScalarFieldControls', () => {
     expect(screen.getByText(/k_x/)).toBeInTheDocument()
   })
 
+  it('shows cauchy loom weave option with canonical wave controls', () => {
+    render(
+      <FreeScalarFieldControls
+        config={makeFsConfig({ initialCondition: 'cauchyLoomWeave', latticeDim: 3 })}
+        dimension={3}
+        actions={createMockActions()}
+      />
+    )
+
+    const select = screen.getByTestId('init-condition-select') as HTMLSelectElement
+    const options = Array.from(select.options).map((o) => o.value)
+    expect(options).toContain('cauchyLoomWeave')
+    expect(screen.getByTestId('amplitude-slider')).toBeInTheDocument()
+    expect(screen.getByText('Packet Width (σ)')).toBeInTheDocument()
+    expect(screen.getByText(/Center x/)).toBeInTheDocument()
+    expect(screen.getByText(/k_x/)).toBeInTheDocument()
+  })
+
   it('shows mode k sliders for singleMode condition', () => {
     render(
       <FreeScalarFieldControls
@@ -224,6 +242,17 @@ describe('FreeScalarFieldControls', () => {
       />
     )
     expect(screen.getByTestId('field-view-selector-equationOfState')).toBeInTheDocument()
+  })
+
+  it('cauchyLoom option is available without self-interaction', () => {
+    render(
+      <FreeScalarFieldControls
+        config={makeFsConfig({ selfInteractionEnabled: false })}
+        dimension={3}
+        actions={createMockActions()}
+      />
+    )
+    expect(screen.getByTestId('field-view-selector-cauchyLoom')).toBeInTheDocument()
   })
 
   it('does not show slice positions for 3D lattice', () => {

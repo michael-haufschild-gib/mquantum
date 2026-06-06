@@ -7,6 +7,7 @@
  * @module lib/physics/freeScalar/presets
  */
 
+import type { ColorAlgorithm } from '@/lib/colors/palette/types'
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import type { ScenarioPreset } from '@/lib/physics/presetTypes'
 
@@ -19,6 +20,7 @@ export type FreeScalarPresetOverride = Partial<
 export interface FreeScalarRenderingOverrides {
   densityGain?: number
   densityContrast?: number
+  colorAlgorithm?: ColorAlgorithm
 }
 
 /** A named free scalar field scenario preset with optional rendering hints. */
@@ -145,6 +147,32 @@ export const FREE_SCALAR_PRESETS: FreeScalarScenarioPreset[] = [
       },
     },
     renderingOverrides: { densityGain: 1.0, densityContrast: 2.4 },
+  },
+  {
+    id: 'cauchyLoomWeave',
+    name: 'Cauchy Loom Weave',
+    description:
+      'Crossed canonical waves opened in the |dφ∧dπ| Cauchy Loom view — braided filaments reveal where a spatial cell sweeps phase-space area',
+    overrides: {
+      latticeDim: 3,
+      gridSize: [64, 64, 64],
+      spacing: [0.12, 0.12, 0.12],
+      initialCondition: 'cauchyLoomWeave',
+      packetCenter: [0, 0, 0],
+      packetWidth: 0.82,
+      packetAmplitude: 1.0,
+      modeK: [4, 5, 7],
+      mass: 0.45,
+      dt: 0.005,
+      stepsPerFrame: 7,
+      selfInteractionEnabled: false,
+      absorberEnabled: false,
+      fieldView: 'cauchyLoom',
+      autoScale: true,
+      diagnosticsEnabled: true,
+      diagnosticsInterval: 10,
+    },
+    renderingOverrides: { densityGain: 2.6, densityContrast: 3.4, colorAlgorithm: 'phaseDensity' },
   },
   {
     id: 'singleMode',

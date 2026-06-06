@@ -148,13 +148,13 @@ export class WebGPUDevice {
     try {
       result.context.unconfigure()
     } catch (cleanupError) {
-      logger.warn('[WebGPU] Failed to unconfigure superseded context:', cleanupError)
+      logger.warn('WebGPU unconfigure failed:', cleanupError)
     }
 
     try {
       result.device.destroy()
     } catch (cleanupError) {
-      logger.warn('[WebGPU] Failed to destroy superseded device:', cleanupError)
+      logger.warn('WebGPU destroy failed:', cleanupError)
     }
   }
 
@@ -179,7 +179,7 @@ export class WebGPUDevice {
       this.handleDeviceLost(info.reason)
     })
 
-    logger.log('[WebGPU] Initialized:', {
+    logger.log('WebGPU init:', {
       adapter: result.capabilities.adapterInfo,
       format: result.format,
       timestampQuery: result.capabilities.timestampQuery,
@@ -238,7 +238,7 @@ export class WebGPUDevice {
       try {
         device.destroy()
       } catch (cleanupError) {
-        logger.warn('[WebGPU] Failed to destroy device after init failure:', cleanupError)
+        logger.warn('WebGPU init cleanup failed:', cleanupError)
       }
     }
 
@@ -422,13 +422,13 @@ export class WebGPUDevice {
     try {
       this.context?.unconfigure()
     } catch (cleanupError) {
-      logger.warn('[WebGPU] Failed to unconfigure context during destroy:', cleanupError)
+      logger.warn('WebGPU destroy unconfigure failed:', cleanupError)
     }
 
     try {
       this.device?.destroy()
     } catch (cleanupError) {
-      logger.warn('[WebGPU] Failed to destroy device during destroy:', cleanupError)
+      logger.warn('WebGPU destroy cleanup failed:', cleanupError)
     }
 
     this._adapter = null

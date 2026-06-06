@@ -17,7 +17,34 @@
  * correction captures the dominant dimension-dependent physics.
  */
 
-import { HydrogenNDPresetName } from '../types'
+import type { RaymarchQuality } from '../common'
+import type { HydrogenNDPresetName } from '../types'
+
+/** Causal-diamond modular-flow controls applied by selected hydrogenND scenarios. */
+export interface HydrogenNDCausalDiamondControls {
+  enabled: boolean
+  horizonRadius: number
+  compressionK: number
+  shellGain: number
+  shellCenter: number
+  shellWidth: number
+  holonomyStrength: number
+  holonomyMix: number
+}
+
+/** Render tuning controls bundled with visual scenario presets. */
+export interface HydrogenNDRenderingControls {
+  fieldScale: number
+  densityGain: number
+  densityContrast: number
+  powderScale: number
+  phaseAnimationEnabled: boolean
+  phaseShimmerEnabled: boolean
+  phaseShimmerStrength: number
+  phaseShimmerSpeed: number
+  raymarchQuality: RaymarchQuality
+  sampleCount: number
+}
 
 /**
  * Hydrogen ND preset configuration
@@ -43,6 +70,10 @@ export interface HydrogenNDPreset {
   extraDimN: number[]
   /** Frequencies for extra dimensions (dims 4-11), 8 values */
   extraDimOmega: number[]
+  /** Optional observer causal-diamond modular geometry controls */
+  causalDiamond?: HydrogenNDCausalDiamondControls
+  /** Optional render tuning for scenario-selector visual presets */
+  rendering?: HydrogenNDRenderingControls
 }
 
 /**
@@ -268,6 +299,76 @@ export const HYDROGEN_ND_PRESETS: Record<HydrogenNDPresetName, HydrogenNDPreset>
     extraDimN: [0, 0, 0, 0, 0, 0, 0, 0],
     extraDimOmega: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
   },
+  causalDiamondHydrogenShell: {
+    name: 'Causal Diamond Shell',
+    description:
+      '3D hydrogen orbital sampled through a finite observer causal diamond, with modular compression concentrating density into a bright horizon shell',
+    n: 3,
+    l: 2,
+    m: 0,
+    useReal: true,
+    bohrRadiusScale: 1.3,
+    dimension: 3,
+    extraDimN: [0, 0, 0, 0, 0, 0, 0, 0],
+    extraDimOmega: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+    causalDiamond: {
+      enabled: true,
+      horizonRadius: 4.6,
+      compressionK: 0.16,
+      shellGain: 6.0,
+      shellCenter: 0.7,
+      shellWidth: 0.06,
+      holonomyStrength: 0.0,
+      holonomyMix: 0.0,
+    },
+    rendering: {
+      fieldScale: 1.45,
+      densityGain: 1.8,
+      densityContrast: 3.6,
+      powderScale: 0.6,
+      phaseAnimationEnabled: true,
+      phaseShimmerEnabled: true,
+      phaseShimmerStrength: 0.18,
+      phaseShimmerSpeed: 0.35,
+      raymarchQuality: 'quality',
+      sampleCount: 64,
+    },
+  },
+  causalDiamondHydrogenHolonomy4D: {
+    name: 'Causal Diamond Holonomy 4D',
+    description:
+      '4D hydrogenND orbital whose modular clock braids visible lobes through transverse holonomy while the finite causal horizon gates visibility',
+    n: 3,
+    l: 2,
+    m: 0,
+    useReal: true,
+    bohrRadiusScale: 1.4,
+    dimension: 4,
+    extraDimN: [0, 0, 0, 0, 0, 0, 0, 0],
+    extraDimOmega: [0.7, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+    causalDiamond: {
+      enabled: true,
+      horizonRadius: 6.0,
+      compressionK: 0.08,
+      shellGain: 8.0,
+      shellCenter: 0.62,
+      shellWidth: 0.16,
+      holonomyStrength: 4.5,
+      holonomyMix: 1.0,
+    },
+    rendering: {
+      fieldScale: 1.35,
+      densityGain: 5.0,
+      densityContrast: 2.2,
+      powderScale: 1.2,
+      phaseAnimationEnabled: true,
+      phaseShimmerEnabled: true,
+      phaseShimmerStrength: 0.32,
+      phaseShimmerSpeed: 0.6,
+      raymarchQuality: 'quality',
+      sampleCount: 64,
+    },
+  },
 
   // ============================================
   // Custom - User-defined
@@ -289,6 +390,8 @@ export const HYDROGEN_ND_PRESETS: Record<HydrogenNDPresetName, HydrogenNDPreset>
 function freezeHydrogenNDPreset(preset: HydrogenNDPreset): void {
   Object.freeze(preset.extraDimN)
   Object.freeze(preset.extraDimOmega)
+  if (preset.causalDiamond) Object.freeze(preset.causalDiamond)
+  if (preset.rendering) Object.freeze(preset.rendering)
   Object.freeze(preset)
 }
 

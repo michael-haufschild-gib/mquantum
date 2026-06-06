@@ -13,6 +13,8 @@
 import {
   diracAbsorberBlock,
   diracAbsorberBlock3D,
+  diracAbsorberNormalizeBlock,
+  diracAbsorberNormalizeBlock3D,
 } from '../../shaders/schroedinger/compute/diracAbsorber.wgsl'
 import { diracAxialChargeBlock } from '../../shaders/schroedinger/compute/diracAxialCharge.wgsl'
 import {
@@ -36,6 +38,7 @@ import {
 } from '../../shaders/schroedinger/compute/diracSparseGammaVariants.wgsl'
 import {
   diracSpinorPackShaderBlock,
+  diracSpinorScaleShaderBlock,
   diracSpinorUnpackShaderBlock,
 } from '../../shaders/schroedinger/compute/diracSpinorPack.wgsl'
 import { diracUniformsBlock } from '../../shaders/schroedinger/compute/diracUniforms.wgsl'
@@ -44,8 +47,8 @@ import { freeScalarNDIndexBlock } from '../../shaders/schroedinger/compute/freeS
 import { pmlProfileBlock } from '../../shaders/schroedinger/compute/pmlProfile.wgsl'
 import { tdsePackUniformsShaderBlock } from '../../shaders/schroedinger/compute/tdseComplexPack.wgsl'
 import {
+  diracSharedMemFFTMultiPencilTwiddleBlock,
   fftAxisUniformsBlock,
-  tdseSharedMemFFTTwiddleBlock,
 } from '../../shaders/schroedinger/compute/tdseSharedMemFFT.wgsl'
 import {
   tdseFFTStageUniformsBlock,
@@ -146,6 +149,16 @@ export function composeDiracAbsorberShader3D(): string {
   return diracPrelude() + pmlProfileBlock + diracAbsorberBlock3D
 }
 
+/** Pure WGSL for the Dirac absorber plus inverse-FFT normalization (1-D dispatch). */
+export function composeDiracAbsorberNormalizeShader(): string {
+  return diracPrelude() + pmlProfileBlock + diracAbsorberNormalizeBlock
+}
+
+/** 3-D dispatch variant of {@link composeDiracAbsorberNormalizeShader}. */
+export function composeDiracAbsorberNormalizeShader3D(): string {
+  return diracPrelude() + pmlProfileBlock + diracAbsorberNormalizeBlock3D
+}
+
 /** Pure WGSL for the Dirac renormalization compute shader. */
 export function composeDiracRenormalizeShader(): string {
   return diracRenormalizeBlock
@@ -168,6 +181,11 @@ export function composeDiracUnpackShader(): string {
   return assembleShaderBlocks([tdsePackUniformsShaderBlock, diracSpinorUnpackShaderBlock]).wgsl
 }
 
+/** Pure WGSL for in-place inverse FFT normalization on one spinor component. */
+export function composeDiracSpinorScaleShader(): string {
+  return assembleShaderBlocks([tdsePackUniformsShaderBlock, diracSpinorScaleShaderBlock]).wgsl
+}
+
 /**
  * Pure WGSL for the Dirac Stockham FFT stage compute shader.
  *
@@ -187,7 +205,7 @@ export function composeDiracFftStageShader(): string {
  * Twiddle-table fork — stages s >= 2 use the table at binding 2.
  */
 export function composeDiracFftSharedMemShader(): string {
-  return fftAxisUniformsBlock + tdseSharedMemFFTTwiddleBlock
+  return fftAxisUniformsBlock + diracSharedMemFFTMultiPencilTwiddleBlock
 }
 
 /**
@@ -317,6 +335,7 @@ export async function buildDiracPipelines(
     'read-only-storage',
     'storage',
   ])
+  const spinorScaleBGL = createComputeBGL(device, 'dirac-spinor-scale-bgl', ['uniform', 'storage'])
   // FFT stage (reuses the TDSE twiddle-table fork). Binding 3 is the
   // CPU-precomputed twiddle table that replaces cos/sin at stages >= 2.
   // See FFTTwiddle.ts for the layout.
@@ -399,6 +418,12 @@ export async function buildDiracPipelines(
     ? composeDiracAbsorberShader3D()
     : composeDiracAbsorberShader()
   const absorberLabel = use3DSiteDispatch ? 'dirac-absorber-3d' : 'dirac-absorber'
+  const absorberNormalizeShader = use3DSiteDispatch
+    ? composeDiracAbsorberNormalizeShader3D()
+    : composeDiracAbsorberNormalizeShader()
+  const absorberNormalizeLabel = use3DSiteDispatch
+    ? 'dirac-absorber-normalize-3d'
+    : 'dirac-absorber-normalize'
   const kineticShader = use3DSiteDispatch
     ? composeDiracKineticShader3D(latticeDim)
     : composeDiracKineticShader(latticeDim)
@@ -410,9 +435,11 @@ export async function buildDiracPipelines(
     potentialPipeline,
     potentialHalfPipeline,
     absorberPipeline,
+    absorberNormalizePipeline,
     renormalizePipeline,
     packPipeline,
     unpackPipeline,
+    spinorScalePipeline,
     fftStagePipeline,
     fftSharedMemPipeline,
     kineticPipeline,
@@ -425,9 +452,11 @@ export async function buildDiracPipelines(
     issuePipeline('dirac-potential-half', composeDiracPotentialHalfShader(), [potentialHalfBGL]),
     // Absorber reuses initBGL layout.
     issuePipeline(absorberLabel, absorberShader, [initBGL]),
+    issuePipeline(absorberNormalizeLabel, absorberNormalizeShader, [initBGL]),
     issuePipeline('dirac-renormalize', composeDiracRenormalizeShader(), [renormalizeBGL]),
     issuePipeline('dirac-pack', composeDiracPackShader(), [packBGL]),
     issuePipeline('dirac-unpack', composeDiracUnpackShader(), [unpackBGL]),
+    issuePipeline('dirac-spinor-scale', composeDiracSpinorScaleShader(), [spinorScaleBGL]),
     issuePipeline('dirac-fft-stage', composeDiracFftStageShader(), [fftStageBGL]),
     issuePipeline('dirac-fft-shared-mem', composeDiracFftSharedMemShader(), [fftSharedMemBGL]),
     issuePipeline(kineticLabel, kineticShader, [kineticBGL]),
@@ -444,12 +473,15 @@ export async function buildDiracPipelines(
     potentialHalfPipeline,
     potentialHalfBGL,
     absorberPipeline,
+    absorberNormalizePipeline,
     renormalizePipeline,
     renormalizeBGL,
     packPipeline,
     packBGL,
     unpackPipeline,
     unpackBGL,
+    spinorScalePipeline,
+    spinorScaleBGL,
     fftStagePipeline,
     fftStageBGL,
     fftSharedMemPipeline,
@@ -665,6 +697,8 @@ export function rebuildDiracBindGroups(
   const cachedPackBGs: GPUBindGroup[] = []
   const cachedUnpackBGs: GPUBindGroup[] = []
   const cachedUnpackBGsNoNorm: GPUBindGroup[] = []
+  const cachedSpinorFFTBGs: GPUBindGroup[][] = []
+  const cachedSpinorScaleBGs: GPUBindGroup[] = []
   const S = currentSpinorSize
   for (let c = 0; c < S; c++) {
     const byteOffset = c * totalSites * 8
@@ -705,6 +739,31 @@ export function rebuildDiracBindGroups(
         ],
       })
     )
+
+    const fftBGsForComponent: GPUBindGroup[] = new Array(inputs.fftAxisUniformBuffers.length)
+    for (let slot = 0; slot < inputs.fftAxisUniformBuffers.length; slot++) {
+      fftBGsForComponent[slot] = device.createBindGroup({
+        label: `dirac-spinor-fft-c${c}-slot-${slot}`,
+        layout: pipelines.fftSharedMemBGL,
+        entries: [
+          { binding: 0, resource: { buffer: inputs.fftAxisUniformBuffers[slot]! } },
+          { binding: 1, resource: { buffer: spinorBuffer, offset: byteOffset, size: byteSize } },
+          { binding: 2, resource: { buffer: fftTwiddleBuffer } },
+        ],
+      })
+    }
+    cachedSpinorFFTBGs.push(fftBGsForComponent)
+
+    cachedSpinorScaleBGs.push(
+      device.createBindGroup({
+        label: `dirac-spinor-scale-c${c}`,
+        layout: pipelines.spinorScaleBGL,
+        entries: [
+          { binding: 0, resource: { buffer: packUniformBuffer } },
+          { binding: 1, resource: { buffer: spinorBuffer, offset: byteOffset, size: byteSize } },
+        ],
+      })
+    )
   }
 
   return {
@@ -724,5 +783,7 @@ export function rebuildDiracBindGroups(
     cachedPackBGs,
     cachedUnpackBGs,
     cachedUnpackBGsNoNorm,
+    cachedSpinorFFTBGs,
+    cachedSpinorScaleBGs,
   }
 }

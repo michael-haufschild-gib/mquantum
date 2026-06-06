@@ -118,11 +118,79 @@ struct VolumeResult {
   primaryHitT: f32,      // Model-space ray distance to first significant density hit (for temporal reprojection)
 }
 
+struct FockLanternResult {
+  emissionGain: f32,
+  opacityScale: f32,
+  lantern: f32,
+}
+
 /**
  * Compute time value for animation.
  */
 fn getVolumeTime(uniforms: SchroedingerUniforms) -> f32 {
   return uniforms.time * uniforms.timeScale;
+}
+
+fn isFockLanternActive(uniforms: SchroedingerUniforms) -> bool {
+  return uniforms.quantumMode == QUANTUM_MODE_HARMONIC
+    && uniforms._padEnergy != 0u;
+}
+
+fn computeFockLanternMidGate(rho: f32, uniforms: SchroedingerUniforms) -> f32 {
+  let peakDensity = max(uniforms.peakDensity, 1e-8);
+  let normalizedRho = clamp(rho / peakDensity, 0.0, 2.0);
+  return smoothstep(0.015, 0.22, normalizedRho) *
+    (1.0 - smoothstep(1.12, 1.75, normalizedRho));
+}
+
+fn computeFockLanternFromGate(
+  worldPosition: vec3f,
+  phase: f32,
+  localGradient: vec3f,
+  uniforms: SchroedingerUniforms,
+  midGate: f32,
+) -> FockLanternResult {
+  if (midGate <= 1e-5) {
+    return FockLanternResult(1.0, 1.0, 0.0);
+  }
+
+  let cellScale = 5.4;
+  let parityBias = 0.72;
+  let strength = 1.35;
+  let c = worldPosition * (cellScale / max(uniforms.boundingRadius, 1e-4));
+  let parityProduct = cos(PI * c.x) * cos(PI * c.y) * cos(PI * c.z);
+  let diagonalParity = cos(PI * (c.x + c.y + c.z + 0.17 * sin(0.61 * uniforms.time)));
+  let parityGate = pow(clamp(abs(parityProduct * diagonalParity), 0.0, 1.0), parityBias);
+
+  let gradN = normalize(localGradient + vec3f(1e-6, 0.0, 0.0));
+  let radialN = normalize(worldPosition + vec3f(0.0, 1e-6, 0.0));
+  let alignmentGate = 0.35 + 0.65 * abs(dot(gradN, radialN));
+  let phaseGate = 0.55 + 0.45 * cos(phase + 1.7 * diagonalParity + 0.31 * uniforms.time);
+  let lantern = clamp(midGate * parityGate * phaseGate * alignmentGate, 0.0, 1.0);
+  let voidGate = midGate * (1.0 - parityGate);
+
+  let emissionGain = 1.0 + strength * lantern * 2.8;
+  let opacityScale = clamp(1.0 - voidGate * strength * 0.45, 0.35, 1.0);
+  return FockLanternResult(emissionGain, opacityScale, lantern);
+}
+
+fn computeFockLantern(
+  worldPosition: vec3f,
+  rho: f32,
+  phase: f32,
+  localGradient: vec3f,
+  uniforms: SchroedingerUniforms
+) -> FockLanternResult {
+  if (!isFockLanternActive(uniforms)) {
+    return FockLanternResult(1.0, 1.0, 0.0);
+  }
+  return computeFockLanternFromGate(
+    worldPosition,
+    phase,
+    localGradient,
+    uniforms,
+    computeFockLanternMidGate(rho, uniforms)
+  );
 }
 
 /**

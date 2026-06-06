@@ -942,6 +942,22 @@ describe('mergeExtendedObjectStateForType — pauliSpinor', () => {
     expect(pauli.pmlTargetReflection).toBe(1e-12)
   })
 
+  it('preserves Zeeman Anamorph Pauli view and initializer from loaded scenes', () => {
+    const merged = mergeExtendedObjectStateForType(
+      {
+        pauliSpinor: {
+          fieldView: 'zeemanAnamorph',
+          initialCondition: 'zeemanAnamorphSeed',
+        },
+      },
+      'pauliSpinor'
+    )
+    const pauli = merged.pauliSpinor as typeof DEFAULT_PAULI_CONFIG
+
+    expect(pauli.fieldView).toBe('zeemanAnamorph')
+    expect(pauli.initialCondition).toBe('zeemanAnamorphSeed')
+  })
+
   it('does not touch schroedinger config when merging pauliSpinor', () => {
     const loaded = {
       pauliSpinor: { fieldStrength: 3.0 },
@@ -1095,6 +1111,9 @@ describe('mergeExtendedObjectStateForType — adversarial inputs', () => {
             hkllBoundarySource: 'bad-source',
             hkllSourceSigma: 99,
             hkllPlaneWaveM: 99,
+            chordalSieveEnabled: true,
+            chordalSieveFrequency: 99,
+            chordalSieveTwist: -99,
           },
         },
       },
@@ -1118,6 +1137,9 @@ describe('mergeExtendedObjectStateForType — adversarial inputs', () => {
     expect(ads.hkllBoundarySource).toBe(DEFAULT_SCHROEDINGER_CONFIG.antiDeSitter.hkllBoundarySource)
     expect(ads.hkllSourceSigma).toBe(1.5)
     expect(ads.hkllPlaneWaveM).toBe(8)
+    expect(ads.chordalSieveEnabled).toBe(false)
+    expect(ads.chordalSieveFrequency).toBe(12)
+    expect(ads.chordalSieveTwist).toBe(-4)
   })
 
   it('returns mutation-isolated default sub-configs for sparse schroedinger scenes', () => {

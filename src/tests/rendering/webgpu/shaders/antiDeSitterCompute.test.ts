@@ -49,7 +49,18 @@ describe('AdS compute shader composition', () => {
   it('includes AdsConfig uniform struct and binding', () => {
     const { wgsl } = composeAdsDensityComputeShader()
     expect(wgsl).toContain('struct AdsConfig')
+    expect(wgsl).toContain('chordalSieveEnabled: u32')
+    expect(wgsl).toContain('chordalSieveFrequency: f32')
+    expect(wgsl).toContain('chordalSieveTwist: f32')
     expect(wgsl).toContain('@group(0) @binding(4) var<uniform> adsConfig: AdsConfig')
+  })
+
+  it('includes the Chordal Sieve boundary-clock branch', () => {
+    const { wgsl } = composeAdsDensityComputeShader()
+    expect(wgsl).toContain('fn adsBusemannClock(')
+    expect(wgsl).toContain('fn adsChordalAnchor(')
+    expect(wgsl).toContain('adsConfig.chordalSieveEnabled != 0u')
+    expect(wgsl).toContain('sievePhase')
   })
 
   it('declares basis uniform binding for layout compatibility', () => {

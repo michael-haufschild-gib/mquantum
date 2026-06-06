@@ -50,6 +50,11 @@ export const ADS_LIMITS = {
   hkllSigmaMax: 1.5,
   hkllPlaneWaveMMin: 0,
   hkllPlaneWaveMMax: 8,
+  // Stage 2C Chordal Sieve bounds.
+  chordalFrequencyMin: 0.25,
+  chordalFrequencyMax: 12.0,
+  chordalTwistMin: -4.0,
+  chordalTwistMax: 4.0,
 } as const
 
 /** Actions exposed by the AdS setter bundle. */
@@ -70,6 +75,9 @@ export interface AntiDeSitterSetters {
   setAdsHkllBoundarySource: (source: AdsHkllSource) => void
   setAdsHkllSourceSigma: (sigma: number) => void
   setAdsHkllPlaneWaveM: (m: number) => void
+  setAdsChordalSieveEnabled: (enabled: boolean) => void
+  setAdsChordalSieveFrequency: (frequency: number) => void
+  setAdsChordalSieveTwist: (twist: number) => void
   triggerAdsRecompute: () => void
 }
 
@@ -138,6 +146,10 @@ export function createAntiDeSitterSetters(ctx: SetterContext): AntiDeSitterSette
     hkllSigmaMax,
     hkllPlaneWaveMMin,
     hkllPlaneWaveMMax,
+    chordalFrequencyMin,
+    chordalFrequencyMax,
+    chordalTwistMin,
+    chordalTwistMax,
   } = ADS_LIMITS
 
   return {
@@ -228,6 +240,10 @@ export function createAntiDeSitterSetters(ctx: SetterContext): AntiDeSitterSette
         hkllBoundarySource: preset.hkllBoundarySource ?? 'eigenstate',
         hkllSourceSigma: preset.hkllSourceSigma ?? 0.3,
         hkllPlaneWaveM: preset.hkllPlaneWaveM ?? 2,
+        // Chordal Sieve follows the same explicit-or-reset rule as BTZ/HKLL.
+        chordalSieveEnabled: preset.chordalSieveEnabled ?? false,
+        chordalSieveFrequency: preset.chordalSieveFrequency ?? 5.4,
+        chordalSieveTwist: preset.chordalSieveTwist ?? 0.72,
         preset: name,
       })
     },
@@ -238,7 +254,10 @@ export function createAntiDeSitterSetters(ctx: SetterContext): AntiDeSitterSette
       // `packAntiDeSitterDensityGrid` has no ambiguity to resolve.
       const nextEnabled = enabled === true
       const partial: Partial<AntiDeSitterConfig> = { btzEnabled: nextEnabled, preset: 'custom' }
-      if (nextEnabled) partial.hkllEnabled = false
+      if (nextEnabled) {
+        partial.hkllEnabled = false
+        partial.chordalSieveEnabled = false
+      }
       applyWithReset(ctx, partial)
     },
     setAdsBtzHorizonRadius: (r) => {
@@ -272,7 +291,10 @@ export function createAntiDeSitterSetters(ctx: SetterContext): AntiDeSitterSette
       // Mirror the BTZ mutex — turning on HKLL forcibly clears btzEnabled.
       const nextEnabled = enabled === true
       const partial: Partial<AntiDeSitterConfig> = { hkllEnabled: nextEnabled, preset: 'custom' }
-      if (nextEnabled) partial.btzEnabled = false
+      if (nextEnabled) {
+        partial.btzEnabled = false
+        partial.chordalSieveEnabled = false
+      }
       applyWithReset(ctx, partial)
     },
     setAdsHkllBoundarySource: (source) => {
@@ -296,6 +318,39 @@ export function createAntiDeSitterSetters(ctx: SetterContext): AntiDeSitterSette
       }
       const clampedM = clampInt(m, hkllPlaneWaveMMin, hkllPlaneWaveMMax)
       applyWithReset(ctx, { hkllPlaneWaveM: clampedM, preset: 'custom' })
+    },
+    setAdsChordalSieveEnabled: (enabled) => {
+      if (!isBoolean(enabled)) return
+      const nextEnabled = enabled === true
+      const partial: Partial<AntiDeSitterConfig> = {
+        chordalSieveEnabled: nextEnabled,
+        preset: 'custom',
+      }
+      if (nextEnabled) {
+        partial.btzEnabled = false
+        partial.hkllEnabled = false
+      }
+      applyWithReset(ctx, partial)
+    },
+    setAdsChordalSieveFrequency: (frequency) => {
+      if (!ctx.isFinite(frequency)) {
+        ctx.warnNonFinite('antiDeSitter.chordalSieveFrequency', frequency)
+        return
+      }
+      applyWithReset(ctx, {
+        chordalSieveFrequency: clamp(frequency, chordalFrequencyMin, chordalFrequencyMax),
+        preset: 'custom',
+      })
+    },
+    setAdsChordalSieveTwist: (twist) => {
+      if (!ctx.isFinite(twist)) {
+        ctx.warnNonFinite('antiDeSitter.chordalSieveTwist', twist)
+        return
+      }
+      applyWithReset(ctx, {
+        chordalSieveTwist: clamp(twist, chordalTwistMin, chordalTwistMax),
+        preset: 'custom',
+      })
     },
     triggerAdsRecompute: () => {
       ctx.setWithVersion((state) => ({

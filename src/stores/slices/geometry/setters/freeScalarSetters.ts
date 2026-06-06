@@ -19,6 +19,7 @@ import type {
   FreeScalarInitialCondition,
 } from '@/lib/geometry/extended/types'
 import { nearestPow2 } from '@/lib/math/ndArray'
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
 import {
   canApplyPresetRequest,
@@ -485,6 +486,7 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarSetters {
             return
           const preset = FREE_SCALAR_PRESETS.find((p) => p.id === presetId)
           if (!preset) return
+          const { colorAlgorithm, ...parentRenderingOverrides } = preset.renderingOverrides ?? {}
           setWithVersion((state) => {
             const globalDim = useGeometryStore.getState().dimension
             const base: FreeScalarConfig = {
@@ -523,12 +525,17 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarSetters {
             return {
               schroedinger: {
                 ...state.schroedinger,
-                ...preset.renderingOverrides,
+                ...parentRenderingOverrides,
                 ...parentAbsorber,
                 freeScalar: { ...staged, ...reconciled },
               },
             }
           })
+          if (
+            colorAlgorithm &&
+            canApplyPresetRequest(isLatestRequest, ctx.get().schroedinger.quantumMode, options)
+          )
+            useAppearanceStore.getState().setColorAlgorithm(colorAlgorithm)
         }
       )
     },

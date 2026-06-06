@@ -11,6 +11,7 @@
  *   - A heavy-primary and a cosine-node state for visual contrast.
  */
 
+import type { ColorAlgorithm } from '@/lib/colors/palette/types'
 import type {
   AdsHkllSource,
   AdsPresetName,
@@ -45,6 +46,11 @@ export interface AdsPresetDefinition {
   hkllBoundarySource?: AdsHkllSource
   hkllSourceSigma?: number
   hkllPlaneWaveM?: number
+  // Stage 2C — Chordal Sieve boundary-clock renderer.
+  chordalSieveEnabled?: boolean
+  chordalSieveFrequency?: number
+  chordalSieveTwist?: number
+  colorAlgorithm?: ColorAlgorithm
 }
 
 /**
@@ -230,6 +236,25 @@ export const ADS_PRESETS: readonly AdsPresetDefinition[] = [
     mL: 0,
     branch: 'standard',
     boundaryOverlay: false,
+  },
+  {
+    id: 'adsChordalSieve',
+    label: 'AdS Chordal Sieve',
+    description:
+      'Two boundary Busemann clocks carve holographic chord ribs through AdS₄; phase-density coloring exposes the clock interference.',
+    d: 4,
+    n: 2,
+    l: 3,
+    m: 2,
+    mL: 0.5,
+    branch: 'standard',
+    boundaryOverlay: false,
+    chordalSieveEnabled: true,
+    chordalSieveFrequency: 5.4,
+    chordalSieveTwist: 0.72,
+    btzEnabled: false,
+    hkllEnabled: false,
+    colorAlgorithm: 'phaseDensity',
   },
   {
     id: 'btzHotSmall',

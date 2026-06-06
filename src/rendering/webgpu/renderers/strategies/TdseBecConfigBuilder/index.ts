@@ -52,6 +52,7 @@ const BEC_FIELD_VIEWS = new Set<BecFieldView>([
   'machNumber',
   'hawkingFlux',
   'vorticity',
+  'branePfaffian',
 ])
 const BEC_TDSE_MAX_TOTAL_SITES = 262144
 

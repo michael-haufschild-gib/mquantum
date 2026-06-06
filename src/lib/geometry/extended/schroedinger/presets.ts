@@ -12,8 +12,11 @@ import {
   SCHROEDINGER_MAX_DIM as MAX_DIM,
   SCHROEDINGER_MAX_TERMS as MAX_TERMS,
 } from '@/constants/quantum'
+import type { ColorAlgorithm } from '@/lib/colors/palette/types'
 import { clampFinite, clampFiniteInteger } from '@/lib/math/clamp'
 import { mulberry32 } from '@/lib/math/rng'
+
+import type { SchroedingerConfig } from '../schroedinger'
 
 /**
  * Generated quantum state data
@@ -43,6 +46,10 @@ export interface NamedPresetConfig {
   frequencySpread: number
   /** Optional exact HO basis states for curated presets. Missing higher dims are padded with n=0. */
   quantumNumbers?: readonly (readonly number[])[]
+  /** Optional renderer/store overrides applied when this named preset is selected. */
+  visualOverrides?: NamedPresetVisualOverrides
+  /** Optional preferred palette algorithm applied when this named preset is selected. */
+  colorAlgorithm?: ColorAlgorithm
 }
 
 /** Store controls derived from a named Schroedinger preset. */
@@ -51,7 +58,27 @@ export interface NamedPresetStoreControls {
   termCount: number
   maxQuantumNumber: number
   frequencySpread: number
+  visualOverrides?: NamedPresetVisualOverrides
+  colorAlgorithm?: ColorAlgorithm
 }
+
+type NamedPresetVisualOverrideKey =
+  | 'densityGain'
+  | 'densityContrast'
+  | 'autoScaleMaxGain'
+  | 'raymarchQuality'
+  | 'phaseMaterialityEnabled'
+  | 'phaseMaterialityStrength'
+  | 'interferenceEnabled'
+  | 'interferenceAmp'
+  | 'interferenceFreq'
+  | 'interferenceSpeed'
+  | 'fockLanternEnabled'
+
+/** Rendering overrides applied when a named preset selects visual effect controls. */
+export type NamedPresetVisualOverrides = Partial<
+  Pick<SchroedingerConfig, NamedPresetVisualOverrideKey>
+>
 
 /**
  * Per-term RNG offset prime — used to create independent PRNG sequences
@@ -339,6 +366,37 @@ export const SCHROEDINGER_NAMED_PRESETS: Record<string, NamedPresetConfig> = {
     maxN: 6,
     frequencySpread: 0.02,
   },
+  fockLanternCathedral: {
+    name: 'Fock Lantern Cathedral',
+    description:
+      'Six high-order Fock rows gated by parity-cell lantern emission — stained-glass oscillator lobes with deterministic phase breathing',
+    seed: 424242,
+    termCount: 6,
+    maxN: 6,
+    frequencySpread: 0.0,
+    quantumNumbers: [
+      [6, 0, 0],
+      [0, 6, 0],
+      [0, 0, 6],
+      [4, 4, 0],
+      [4, 0, 4],
+      [0, 4, 4],
+    ],
+    visualOverrides: {
+      densityGain: 3.6,
+      densityContrast: 3.1,
+      autoScaleMaxGain: 80,
+      raymarchQuality: 'quality',
+      phaseMaterialityEnabled: true,
+      phaseMaterialityStrength: 0.85,
+      interferenceEnabled: true,
+      interferenceAmp: 0.32,
+      interferenceFreq: 18.0,
+      interferenceSpeed: 0.35,
+      fockLanternEnabled: true,
+    },
+    colorAlgorithm: 'phaseDensity',
+  },
 }
 
 function getNamedPresetTermCount(config: NamedPresetConfig): number {
@@ -359,6 +417,8 @@ export function getNamedPresetStoreControls(name: unknown): NamedPresetStoreCont
     termCount: getNamedPresetTermCount(config),
     maxQuantumNumber: config.maxN,
     frequencySpread: config.frequencySpread,
+    visualOverrides: config.visualOverrides,
+    colorAlgorithm: config.colorAlgorithm,
   }
 }
 

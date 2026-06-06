@@ -730,6 +730,7 @@ describe('pauliFieldViewForColorAlgorithm', () => {
     expect(pauliFieldViewForColorAlgorithm('pauliSpinDensity')).toBe('spinDensity')
     expect(pauliFieldViewForColorAlgorithm('pauliSpinExpectation')).toBe('spinExpectation')
     expect(pauliFieldViewForColorAlgorithm('pauliCoherence')).toBe('coherence')
+    expect(pauliFieldViewForColorAlgorithm('phaseDensity')).toBe('zeemanAnamorph')
   })
 
   it('defaults to totalDensity for unknown algorithms', () => {
@@ -740,6 +741,7 @@ describe('pauliFieldViewForColorAlgorithm', () => {
   it('preserves spinHelicity when its paired generic algorithm is active', () => {
     expect(pauliFieldViewForColorAlgorithm('blackbody', 'spinHelicity')).toBe('spinHelicity')
     expect(pauliFieldViewForColorAlgorithm('blackbody', 'berryCurvature')).toBe('berryCurvature')
+    expect(pauliFieldViewForColorAlgorithm('phaseDensity', 'zeemanAnamorph')).toBe('zeemanAnamorph')
     expect(pauliFieldViewForColorAlgorithm('blackbody', 'coherence')).toBe('totalDensity')
   })
 })

@@ -310,6 +310,8 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       this.bg.cachedPackBGs = []
       this.bg.cachedUnpackBGs = []
       this.bg.cachedUnpackBGsNoNorm = []
+      this.bg.cachedSpinorFFTBGs = []
+      this.bg.cachedSpinorScaleBGs = []
     }
 
     const result = rebuildDiracBuffers(
@@ -757,6 +759,12 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       }
       const batchedFFT =
         !batchDisabled && axesOk && (bg.fftSharedMemBGs?.length ?? 0) >= config.latticeDim * 2
+      const directSpinorFFT =
+        batchedFFT &&
+        (bg.cachedSpinorFFTBGs?.length ?? 0) >= S &&
+        (bg.cachedSpinorScaleBGs?.length ?? 0) >= S
+      const applyPotentialHalf = effectiveDiracPotentialType(config) !== 'none'
+      const normalizeInAbsorber = directSpinorFFT && config.absorberEnabled === true
       const ifftSlotOffset = config.latticeDim // forward = [0, D), inverse = [D, 2D)
 
       const dispatchCompute = this.dc
@@ -772,10 +780,13 @@ export class DiracComputePass extends WebGPUBaseComputePass {
             step,
             S,
             linearWG,
+            applyPotentialHalf,
+            normalizeInAbsorber,
             siteDispatch,
             dispatchCompute,
             ifftSlotOffset,
             totalSites: this.totalSites,
+            useDirectSpinorFFT: directSpinorFFT,
           })
         } else {
           runLegacyStrangStep({
@@ -786,6 +797,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
             step,
             S,
             linearWG,
+            applyPotentialHalf,
             siteDispatch,
             dispatchCompute,
             fwdStageCount: this.fwdStageCount,

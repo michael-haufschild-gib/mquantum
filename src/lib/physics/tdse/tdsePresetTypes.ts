@@ -9,6 +9,7 @@
  * @module lib/physics/tdse/tdsePresetTypes
  */
 
+import type { ColorAlgorithm } from '@/lib/colors/palette/types'
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 import type { ScenarioPreset } from '@/lib/physics/presetTypes'
 
@@ -20,6 +21,7 @@ export interface TdseRenderingOverrides {
   densityGain?: number
   densityContrast?: number
   autoScaleMaxGain?: number
+  colorAlgorithm?: ColorAlgorithm
 }
 
 /** A named TDSE scenario preset with config overrides applied on selection. */

@@ -36,6 +36,7 @@ export type DiracInitialCondition =
  * - currentDensity: magnitude of probability current |j| = |cψ†αψ|
  * - phase: phase of dominant spinor component
  * - axialCharge: normalized axial/chiral charge magnitude |ψ†γ5ψ|/ρ
+ * - cliffordBloom: upper/lower sector balance modulated by relative Clifford phase petals
  */
 export type DiracFieldView =
   | 'totalDensity'
@@ -46,6 +47,7 @@ export type DiracFieldView =
   | 'currentDensity'
   | 'phase'
   | 'axialCharge'
+  | 'cliffordBloom'
 
 /**
  * Potential type for the Dirac equation.
@@ -74,6 +76,7 @@ export const DIRAC_FIELD_VIEWS: readonly DiracFieldView[] = [
   'currentDensity',
   'phase',
   'axialCharge',
+  'cliffordBloom',
 ]
 
 export const DIRAC_POTENTIAL_TYPES: readonly DiracPotentialType[] = [

@@ -44,6 +44,13 @@ describe('Pauli spinor setters — extended', () => {
     expect(pauli().needsReset).toBe(true)
   })
 
+  it('setPauliInitialCondition accepts Zeeman Anamorph seed and triggers reset', () => {
+    store().clearComputeNeedsReset('pauliSpinor')
+    store().setPauliInitialCondition('zeemanAnamorphSeed')
+    expect(pauli().initialCondition).toBe('zeemanAnamorphSeed')
+    expect(pauli().needsReset).toBe(true)
+  })
+
   it('setPauliPacketCenter sets per-dim value clamped to [-10, 10]', () => {
     store().setPauliPacketCenter(0, 3.0)
     expect(pauli().packetCenter[0]).toBe(3.0)

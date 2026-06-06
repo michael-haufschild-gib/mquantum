@@ -74,6 +74,16 @@ export interface AntiDeSitterConfig {
    * frame when true. Cleared via `clearComputeNeedsReset('antiDeSitter')`. */
   needsReset: boolean
 
+  // ── Stage 2C: Chordal Sieve boundary-clock renderer ───────────────────
+  /** Replace the bound-state density channels with a two-anchor Busemann
+   * clock sieve. Mutually exclusive with BTZ and HKLL; uses the GPU
+   * bound-state density pass and writes continuous phase into channel B. */
+  chordalSieveEnabled: boolean
+  /** Frequency multiplier for the A−B boundary-clock phase. Float [0.25, 12]. */
+  chordalSieveFrequency: number
+  /** Twist multiplier for the A+B boundary-clock phase. Float [-4, 4]. */
+  chordalSieveTwist: number
+
   // ── Stage 2A: BTZ black-hole thermal state ─────────────────────────────
   /** Activate the BTZ thermal-state code path. Only honoured when `d === 3`;
    * silently ignored at other dimensions so the UI can remember the toggle
@@ -140,6 +150,7 @@ export type AdsPresetName =
   | 'hkllEigenstateCheck'
   | 'hkllBoundarySpot'
   | 'hkllBoundaryPlaneWave'
+  | 'adsChordalSieve'
   | 'custom'
 
 /**
@@ -157,6 +168,9 @@ export const DEFAULT_ANTI_DE_SITTER_CONFIG: AntiDeSitterConfig = {
   boundaryOverlay: false,
   preset: 'adsFourGround',
   needsReset: true,
+  chordalSieveEnabled: false,
+  chordalSieveFrequency: 5.4,
+  chordalSieveTwist: 0.72,
   btzEnabled: false,
   btzHorizonRadius: 0.3,
   btzOmega: 1.0,

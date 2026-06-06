@@ -332,16 +332,48 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   var blendedRe: f32 = 0.0;
   var blendedIm: f32 = 0.0;
   var blendedChirality: f32 = 0.0;
+  var blendedCoinProb: array<f32, 22>;
 
-  for (var corner: u32 = 0u; corner < numCorners; corner++) {
-    let w = cornerWeight(&fracs, corner);
-    if (w > 0.0) {
-      let sIdx = siteIndexForCorner(&coordsLo, &coordsHi, corner);
-      let coinData = sumCoinStates(sIdx);
-      blendedProb += w * coinData.prob;
-      blendedRe += w * coinData.sumRe;
-      blendedIm += w * coinData.sumIm;
-      blendedChirality += w * coinData.chirality;
+  if (params.fieldView == 3u) {
+    for (var corner: u32 = 0u; corner < numCorners; corner++) {
+      let w = cornerWeight(&fracs, corner);
+      if (w > 0.0) {
+        let sIdx = siteIndexForCorner(&coordsLo, &coordsHi, corner);
+        let baseIdx = sIdx * params.numCoinStates;
+        var cornerProb: f32 = 0.0;
+        var cornerRe: f32 = 0.0;
+        var cornerIm: f32 = 0.0;
+        var cornerChirality: f32 = 0.0;
+        for (var d: u32 = 0u; d < params.latticeDim; d = d + 1u) {
+          let b = baseIdx + (d << 1u);
+          let zPlus = coinState[b];
+          let zMinus = coinState[b + 1u];
+          let pPlus = dot(zPlus, zPlus);
+          let pMinus = dot(zMinus, zMinus);
+          cornerProb += pPlus + pMinus;
+          cornerRe += zPlus.x + zMinus.x;
+          cornerIm += zPlus.y + zMinus.y;
+          cornerChirality += pPlus - pMinus;
+          blendedCoinProb[d << 1u] += w * pPlus;
+          blendedCoinProb[(d << 1u) + 1u] += w * pMinus;
+        }
+        blendedProb += w * cornerProb;
+        blendedRe += w * cornerRe;
+        blendedIm += w * cornerIm;
+        blendedChirality += w * cornerChirality;
+      }
+    }
+  } else {
+    for (var corner: u32 = 0u; corner < numCorners; corner++) {
+      let w = cornerWeight(&fracs, corner);
+      if (w > 0.0) {
+        let sIdx = siteIndexForCorner(&coordsLo, &coordsHi, corner);
+        let coinData = sumCoinStates(sIdx);
+        blendedProb += w * coinData.prob;
+        blendedRe += w * coinData.sumRe;
+        blendedIm += w * coinData.sumIm;
+        blendedChirality += w * coinData.chirality;
+      }
     }
   }
 
@@ -357,15 +389,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let invBlendedProb = 1.0 / blendedProb;
     var entropySum: f32 = 0.0;
     for (var coinIdx: u32 = 0u; coinIdx < params.numCoinStates; coinIdx++) {
-      var blendedCoinProb: f32 = 0.0;
-      for (var corner: u32 = 0u; corner < numCorners; corner++) {
-        let w = cornerWeight(&fracs, corner);
-        if (w > 0.0) {
-          let sIdx = siteIndexForCorner(&coordsLo, &coordsHi, corner);
-          blendedCoinProb += w * coinProbabilityAt(sIdx, coinIdx);
-        }
-      }
-      let q = blendedCoinProb * invBlendedProb;
+      let q = blendedCoinProb[coinIdx] * invBlendedProb;
       entropySum += -q * log(max(q, 1e-20));
     }
     let coinEntropyDenom = max(log(max(f32(params.numCoinStates), 2.0)), 1e-6);

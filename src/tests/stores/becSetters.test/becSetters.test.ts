@@ -9,11 +9,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DEFAULT_BEC_CONFIG } from '@/lib/geometry/extended/bec'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 import { resizeBecArrays } from '@/stores/slices/geometry/setters/becResize'
 
 describe('BEC setters', () => {
   beforeEach(() => {
     useExtendedObjectStore.getState().reset()
+    useGeometryStore.setState({ dimension: 3 })
   })
 
   const getBec = () => useExtendedObjectStore.getState().schroedinger.bec
@@ -114,6 +116,8 @@ describe('BEC setters', () => {
     s.setBecFieldView('phase')
     s.setBecFieldView('bogus' as unknown as Parameters<typeof s.setBecFieldView>[0])
     expect(getBec().fieldView).toBe('phase')
+    s.setBecFieldView('branePfaffian')
+    expect(getBec().fieldView).toBe('branePfaffian')
 
     s.setBecDisorderDistribution('gaussian')
     s.setBecDisorderDistribution(
@@ -295,6 +299,26 @@ describe('BEC setters', () => {
         const sc = useExtendedObjectStore.getState().schroedinger
         expect(sc.densityGain).toBe(0.2)
         expect(sc.densityContrast).toBe(2.6)
+      })
+    })
+
+    it('applies the Pfaffian brane collision preset at 4D with rendering overrides', async () => {
+      useGeometryStore.setState({ dimension: 4 })
+      const s = useExtendedObjectStore.getState()
+
+      await s.applyBecPreset('pfaffianBraneCollision')
+
+      await vi.waitFor(() => {
+        const sc = useExtendedObjectStore.getState().schroedinger
+        expect(sc.bec.latticeDim).toBe(4)
+        expect(sc.bec.initialCondition).toBe('vortexReconnection')
+        expect(sc.bec.fieldView).toBe('branePfaffian')
+        expect(sc.bec.vortexPlane1).toEqual([0, 1])
+        expect(sc.bec.vortexPlane2).toEqual([2, 3])
+        expect(sc.bec.vortexPairCount).toBe(2)
+        expect(sc.densityGain).toBeCloseTo(1.6)
+        expect(sc.densityContrast).toBeCloseTo(2.4)
+        expect(sc.autoScaleMaxGain).toBe(12)
       })
     })
   })

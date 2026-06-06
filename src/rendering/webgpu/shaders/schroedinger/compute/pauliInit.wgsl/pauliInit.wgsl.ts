@@ -16,6 +16,7 @@
  *   1 (gaussianSpinDown):      ψ_up = 0, ψ_down = envelope·e^{ikx}
  *   2 (gaussianSuperposition): Bloch-sphere state χ = (cos(θ/2), sin(θ/2)·e^{iφ})
  *   3 (planeWaveSpinor):       Bloch-sphere state with flat envelope (no Gaussian)
+ *   4 (zeemanAnamorphSeed):    Gaussian with counter-warped up/down phases
  *
  * Buffer layout: merged spinor: array<vec2f> where
  *   spinor[c * totalSites + idx] = vec2f(re, im)  (c=0 up, c=1 down).
@@ -50,11 +51,17 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Compute physical position, Gaussian envelope, and plane-wave phase
   var r2: f32 = 0.0;
   var kdotx: f32 = 0.0;
+  var px: f32 = 0.0;
+  var py: f32 = 0.0;
+  var pz: f32 = 0.0;
   for (var d: u32 = 0u; d < params.latticeDim; d++) {
     let pos = (f32(coords[d]) - f32(params.gridSize[d]) * 0.5 + 0.5) * params.spacing[d];
     let dx = pos - params.packetCenter[d];
     r2 += dx * dx;
     kdotx += params.packetMomentum[d] * pos;
+    if (d == 0u) { px = dx; }
+    if (d == 1u) { py = dx; }
+    if (d == 2u) { pz = dx; }
   }
 
   let sigma = params.packetWidth;
@@ -73,6 +80,11 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let sinHalf = sin(params.spinTheta * 0.5);
   let phiCos = cos(params.spinPhi);
   let phiSin = sin(params.spinPhi);
+  let ss = max(params.packetWidth, 1e-4);
+  let az = atan2(pz, px + 1e-6);
+  let warp = 2.0 * az
+           + 1.35 * sin(1.7 * py / ss + 0.8 * cos(3.0 * az))
+           + 0.75 * sin(2.3 * (px - pz) / ss);
 
   if (params.initCondition == 0u) {
     // gaussianSpinUp: only spin-up component populated
@@ -104,6 +116,18 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let rotIm = sinP * phiCos + cosP * phiSin;
     spinor[idx] = vec2f(cosHalf * cosP, cosHalf * sinP);
     spinor[idx1] = vec2f(sinHalf * rotRe, sinHalf * rotIm);
+
+  } else if (params.initCondition == 4u) {
+    let shell = clamp(0.68 + 0.32 * cos(3.0 * az + 1.4 * py / ss), 0.22, 1.0);
+    let env = envelope * shell;
+    let up = phase + warp;
+    let dn = phase - warp + params.spinPhi;
+    let cu = cos(up);
+    let su = sin(up);
+    let cd = cos(dn);
+    let sd = sin(dn);
+    spinor[idx] = vec2f(cosHalf * env * cu, cosHalf * env * su);
+    spinor[idx1] = vec2f(sinHalf * env * cd, sinHalf * env * sd);
   }
 }
 `
@@ -139,11 +163,17 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Compute physical position, Gaussian envelope, and plane-wave phase
   var r2: f32 = 0.0;
   var kdotx: f32 = 0.0;
+  var px: f32 = 0.0;
+  var py: f32 = 0.0;
+  var pz: f32 = 0.0;
   for (var d: u32 = 0u; d < params.latticeDim; d++) {
     let pos = (f32(coords[d]) - f32(params.gridSize[d]) * 0.5 + 0.5) * params.spacing[d];
     let dx = pos - params.packetCenter[d];
     r2 += dx * dx;
     kdotx += params.packetMomentum[d] * pos;
+    if (d == 0u) { px = dx; }
+    if (d == 1u) { py = dx; }
+    if (d == 2u) { pz = dx; }
   }
 
   let sigma = params.packetWidth;
@@ -160,6 +190,11 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let sinHalf = sin(params.spinTheta * 0.5);
   let phiCos = cos(params.spinPhi);
   let phiSin = sin(params.spinPhi);
+  let ss = max(params.packetWidth, 1e-4);
+  let az = atan2(pz, px + 1e-6);
+  let warp = 2.0 * az
+           + 1.35 * sin(1.7 * py / ss + 0.8 * cos(3.0 * az))
+           + 0.75 * sin(2.3 * (px - pz) / ss);
 
   if (params.initCondition == 0u) {
     spinor[idx] = vec2f(envelope * cosP, envelope * sinP);
@@ -181,6 +216,18 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let rotIm = sinP * phiCos + cosP * phiSin;
     spinor[idx] = vec2f(cosHalf * cosP, cosHalf * sinP);
     spinor[idx1] = vec2f(sinHalf * rotRe, sinHalf * rotIm);
+
+  } else if (params.initCondition == 4u) {
+    let shell = clamp(0.68 + 0.32 * cos(3.0 * az + 1.4 * py / ss), 0.22, 1.0);
+    let env = envelope * shell;
+    let up = phase + warp;
+    let dn = phase - warp + params.spinPhi;
+    let cu = cos(up);
+    let su = sin(up);
+    let cd = cos(dn);
+    let sd = sin(dn);
+    spinor[idx] = vec2f(cosHalf * env * cu, cosHalf * env * su);
+    spinor[idx1] = vec2f(sinHalf * env * cd, sinHalf * env * sd);
   }
 }
 `

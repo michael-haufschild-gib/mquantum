@@ -110,6 +110,11 @@ describe('TDSE UI setters', () => {
       expect(getTdse().fieldView).toBe('ctcCausalShadow')
     })
 
+    it('sets field view to Born Eclipse', () => {
+      useExtendedObjectStore.getState().setTdseFieldView('bornEclipse')
+      expect(getTdse().fieldView).toBe('bornEclipse')
+    })
+
     it('rejects invalid field views', () => {
       useExtendedObjectStore.getState().setTdseFieldView('phase')
       // @ts-expect-error intentional invalid input

@@ -60,6 +60,11 @@ describe('DiracControls', () => {
     expect(screen.getByText('Axial |ψ†γ5ψ|')).toBeInTheDocument()
   })
 
+  it('exposes Clifford Bloom Resonator as a field view', () => {
+    render(<DiracControls config={defaultConfig()} dimension={3} actions={createMockActions()} />)
+    expect(screen.getByText('Clifford Bloom Resonator')).toBeInTheDocument()
+  })
+
   it('renders grid size selector after expanding numerics group', () => {
     render(<DiracControls config={defaultConfig()} dimension={3} actions={createMockActions()} />)
     const header = screen.getByTestId('control-group-dirac-numerics-header')
@@ -169,6 +174,14 @@ describe('DiracControls', () => {
     const select = screen.getByLabelText('Field View')
     fireEvent.change(select, { target: { value: 'axialCharge' } })
     expect(actions.setFieldView).toHaveBeenCalledWith('axialCharge')
+  })
+
+  it('calls setFieldView when Clifford Bloom is selected', () => {
+    const actions = createMockActions()
+    render(<DiracControls config={defaultConfig()} dimension={3} actions={actions} />)
+    const select = screen.getByLabelText('Field View')
+    fireEvent.change(select, { target: { value: 'cliffordBloom' } })
+    expect(actions.setFieldView).toHaveBeenCalledWith('cliffordBloom')
   })
 
   it('calls setGridSize with array of uniform size when grid size changes', () => {

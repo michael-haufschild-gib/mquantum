@@ -59,6 +59,9 @@ export function computeAdsConfigHash(config: AntiDeSitterConfig): string {
     config.hkllBoundarySource,
     hashFloat(config.hkllSourceSigma),
     config.hkllPlaneWaveM,
+    config.chordalSieveEnabled ? 1 : 0,
+    hashFloat(config.chordalSieveFrequency),
+    hashFloat(config.chordalSieveTwist),
   ].join('|')
 }
 

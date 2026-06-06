@@ -41,6 +41,7 @@ export type BecInitialCondition =
  * - machNumber: M = |v_s|/c_s (analog black-hole Mach-number field; horizon at M=1)
  * - hawkingFlux: horizon-local κ/2π proxy gated to M≈1 sonic-horizon voxels
  * - vorticity: Quantized plaquette phase circulation two-form
+ * - branePfaffian: 4D+ Pfaffian of phase-winding two-form; lights intersecting vortex sheets
  */
 export type BecFieldView =
   | 'density'
@@ -52,6 +53,7 @@ export type BecFieldView =
   | 'machNumber'
   | 'hawkingFlux'
   | 'vorticity'
+  | 'branePfaffian'
 
 // ============================================================================
 // BEC Config

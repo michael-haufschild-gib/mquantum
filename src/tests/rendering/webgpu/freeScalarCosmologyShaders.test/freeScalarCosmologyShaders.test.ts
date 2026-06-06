@@ -52,7 +52,7 @@ describe('free scalar canonical δφ integrator shader contracts', () => {
 
   it('writeGrid shader renders a bounded cosmological freeze-out strain field view', () => {
     expect(freeScalarWriteGridBlock).toContain(
-      'let needGrad = params.fieldView == 2u || params.fieldView == 4u || params.fieldView == 5u || hasAnalysis;'
+      'let needGrad = params.fieldView == 2u || params.fieldView == 4u || params.fieldView == 5u || params.fieldView == 6u || hasAnalysis;'
     )
     expect(freeScalarWriteGridBlock).toContain('} else if (params.fieldView == 4u) {')
     expect(freeScalarWriteGridBlock).toContain(
@@ -88,6 +88,19 @@ describe('free scalar canonical δφ integrator shader contracts', () => {
       'let wLocal = clamp(pressure / localEnergy, -1.0, 1.0);'
     )
     expect(freeScalarWriteGridBlock).toContain('fieldValue = wLocal;')
+  })
+
+  it('writeGrid shader renders the Cauchy Loom canonical two-form view', () => {
+    expect(freeScalarWriteGridBlock).toContain('if (params.fieldView == 6u) {')
+    expect(freeScalarWriteGridBlock).toContain('var gradPi: array<f32, 12>;')
+    expect(freeScalarWriteGridBlock).toContain(
+      'let area = gradPhi[i] * gradPi[j] - gradPhi[j] * gradPi[i];'
+    )
+    expect(freeScalarWriteGridBlock).toContain('let n = sqrt(max(q, 0.0)) / e;')
+    expect(freeScalarWriteGridBlock).toContain('let phaseForColor = select(')
+    expect(freeScalarWriteGridBlock).toContain(
+      'textureStore(outputTex, gid, vec4f(normRho, logRho, phaseForColor, normRho));'
+    )
   })
 
   it('init shader single-mode + gaussian-packet branches use the canonical oscillator', () => {

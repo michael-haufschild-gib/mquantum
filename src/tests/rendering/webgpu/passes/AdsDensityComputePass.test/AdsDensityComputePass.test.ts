@@ -26,7 +26,8 @@ describe('AdsDensityComputePass config packing', () => {
     const f32 = new Float32Array(data)
     const u32 = new Uint32Array(data)
 
-    expect(hash).toBe('4|1|2|-1|0.500000|standard|1')
+    expect(ADS_CONFIG_SIZE).toBe(48)
+    expect(hash).toBe('4|1|2|-1|0.500000|standard|1|0|5.400000|0.720000')
     expect(i32[0]).toBe(4)
     expect(i32[1]).toBe(1)
     expect(i32[2]).toBe(2)
@@ -35,6 +36,10 @@ describe('AdsDensityComputePass config packing', () => {
     expect(f32[5]).toBeGreaterThan(0)
     expect(u32[6]).toBe(1)
     expect(f32[7]).toBeGreaterThan(0)
+    expect(u32[8]).toBe(0)
+    expect(f32[9]).toBeCloseTo(5.4, 6)
+    expect(f32[10]).toBeCloseTo(0.72, 6)
+    expect(f32[11]).toBe(0)
   })
 
   it('sanitizes malformed restored state before hashing or writing uniforms', () => {
@@ -49,6 +54,9 @@ describe('AdsDensityComputePass config packing', () => {
         mL: Number.POSITIVE_INFINITY,
         branch: 'bad-branch' as never,
         boundaryOverlay: true,
+        chordalSieveEnabled: true,
+        chordalSieveFrequency: Number.NaN,
+        chordalSieveTwist: Number.NEGATIVE_INFINITY,
       })
     )
 
@@ -56,9 +64,9 @@ describe('AdsDensityComputePass config packing', () => {
     const f32 = new Float32Array(data)
     const u32 = new Uint32Array(data)
 
-    expect(hash).toBe('4|0|0|0|0.000000|standard|1')
+    expect(hash).toBe('4|0|0|0|0.000000|standard|1|1|5.400000|0.720000')
     expect(computeAdsDensityConfigHash(config({ mL: Number.NaN }))).toBe(
-      '4|0|0|0|0.000000|standard|0'
+      '4|0|0|0|0.000000|standard|0|0|5.400000|0.720000'
     )
     expect(i32[0]).toBe(4)
     expect(i32[1]).toBe(0)
@@ -66,9 +74,33 @@ describe('AdsDensityComputePass config packing', () => {
     expect(i32[3]).toBe(0)
     expect(u32[6]).toBe(1)
 
-    for (const slot of [4, 5, 7]) {
+    expect(u32[8]).toBe(1)
+    expect(f32[9]).toBeCloseTo(5.4, 6)
+    expect(f32[10]).toBeCloseTo(0.72, 6)
+
+    for (const slot of [4, 5, 7, 9, 10]) {
       expect(Number.isFinite(f32[slot])).toBe(true)
     }
+  })
+
+  it('hashes and packs Chordal Sieve controls into the extended uniform slots', () => {
+    const data = new ArrayBuffer(ADS_CONFIG_SIZE)
+    const hash = writeAdsDensityConfigData(
+      data,
+      config({
+        chordalSieveEnabled: true,
+        chordalSieveFrequency: 7.25,
+        chordalSieveTwist: -1.5,
+      })
+    )
+
+    const f32 = new Float32Array(data)
+    const u32 = new Uint32Array(data)
+
+    expect(hash).toBe('4|0|0|0|0.000000|standard|0|1|7.250000|-1.500000')
+    expect(u32[8]).toBe(1)
+    expect(f32[9]).toBeCloseTo(7.25, 6)
+    expect(f32[10]).toBeCloseTo(-1.5, 6)
   })
 
   it('rejects undersized uniform buffers instead of writing partial config', () => {

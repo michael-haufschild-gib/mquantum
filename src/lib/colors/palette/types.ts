@@ -256,6 +256,7 @@ export const PAULI_FIELD_VIEW_TO_COLOR_ALGO: Record<PauliFieldView, ColorAlgorit
   coherence: 'pauliCoherence',
   spinHelicity: 'blackbody',
   berryCurvature: 'blackbody',
+  zeemanAnamorph: 'phaseDensity',
 }
 
 /** Map Dirac field view to matching color algorithm for synchronized rendering. */
@@ -268,6 +269,7 @@ export const DIRAC_FIELD_VIEW_TO_COLOR_ALGO: Record<DiracFieldView, ColorAlgorit
   currentDensity: 'blackbody',
   phase: 'phaseCyclicUniform',
   axialCharge: 'blackbody',
+  cliffordBloom: 'phaseDensity',
 }
 
 /**
@@ -325,14 +327,15 @@ export function getAvailableColorAlgorithms(
   availabilityOptions?: ColorAlgorithmAvailabilityOptions
 ): readonly (typeof COLOR_ALGORITHM_OPTIONS)[number][] {
   // Pauli spinor: the density grid encodes spin-channel data differently per
-  // field view. Expose the Pauli-specific algorithms (which match the grid layout)
-  // plus standard density-only algorithms for the totalDensity field view.
+  // field view. Expose the Pauli-specific algorithms (which match the grid
+  // layout), phaseDensity for Zeeman Anamorph, plus standard density colormaps.
   if (objectType === 'pauliSpinor') {
     const pauliValidAlgos = new Set<string>([
       'pauliSpinDensity',
       'pauliSpinExpectation',
       'pauliCoherence',
       'blackbody',
+      'phaseDensity',
       'viridis',
       'inferno',
       'densityContours',
@@ -443,7 +446,9 @@ export function getAvailableColorAlgorithms(
   }
 
   if (quantumMode === 'freeScalarField') {
-    // Free scalar has sign-proxy phase (0 or π) — exclude continuous-phase algorithms.
+    // Free scalar usually has sign-proxy phase (0 or π) — exclude continuous-phase
+    // algorithms, except Cauchy Loom Weave, whose field view deliberately writes
+    // a continuous phase hue for canonical two-form filaments.
     // Also include educational analysis algorithms unique to this mode.
     //
     // Note: quantumPotential and vortexDensity are intentionally excluded here.
@@ -467,6 +472,9 @@ export function getAvailableColorAlgorithms(
       'energyFlux',
       'kSpaceOccupation',
     ])
+    if (freeScalarInitialCondition === 'cauchyLoomWeave') {
+      computeValidAlgos.add('phaseDensity')
+    }
     // Static exact vacuum has n_k = 0 for all modes (zero-point subtracted), so
     // the k-space occupation map is correctly but unhelpfully blank. Dynamic
     // cosmology / preheating starts from that vacuum but can create occupation.

@@ -21,8 +21,8 @@ import { GRID_PARAMS_SIZE, writeGridParams } from '../DensityGridComputePassReso
 
 const WORKGROUP_SIZE = 8
 
-/** Byte size of the AdsConfig WGSL struct (8 fields × 4 bytes = 32). */
-export const ADS_CONFIG_SIZE = 32
+/** Byte size of the AdsConfig WGSL struct (12 fields × 4 bytes = 48). */
+export const ADS_CONFIG_SIZE = 48
 
 /** Basis vectors buffer size: 4 arrays of 3×vec4f = 192 bytes.
  *  Required by the bind group layout even though the compute shader
@@ -37,6 +37,9 @@ interface SanitizedAdsConfig {
   mL: number
   branch: 'standard' | 'alternate'
   boundaryOverlay: boolean
+  chordalSieveEnabled: boolean
+  chordalSieveFrequency: number
+  chordalSieveTwist: number
 }
 
 function clampInt(value: number, min: number, max: number, fallback: number): number {
@@ -63,6 +66,9 @@ function sanitizeAdsConfig(ads: AntiDeSitterConfig): SanitizedAdsConfig {
     mL: clampFloat(ads.mL, -3, 3, 0),
     branch: ads.branch === 'alternate' ? 'alternate' : 'standard',
     boundaryOverlay: ads.boundaryOverlay === true,
+    chordalSieveEnabled: ads.chordalSieveEnabled === true,
+    chordalSieveFrequency: clampFloat(ads.chordalSieveFrequency, 0.25, 12, 5.4),
+    chordalSieveTwist: clampFloat(ads.chordalSieveTwist, -4, 4, 0.72),
   }
 }
 
@@ -77,6 +83,9 @@ export function computeAdsDensityConfigHash(ads: AntiDeSitterConfig): string {
     safe.mL.toFixed(6),
     safe.branch,
     safe.boundaryOverlay ? 1 : 0,
+    safe.chordalSieveEnabled ? 1 : 0,
+    safe.chordalSieveFrequency.toFixed(6),
+    safe.chordalSieveTwist.toFixed(6),
   ].join('|')
 }
 
@@ -107,6 +116,10 @@ export function writeAdsDensityConfigData(target: ArrayBuffer, ads: AntiDeSitter
   f32[5] = delta
   u32[6] = safe.boundaryOverlay ? 1 : 0
   f32[7] = Number.isFinite(norm) ? norm : 0
+  u32[8] = safe.chordalSieveEnabled ? 1 : 0
+  f32[9] = safe.chordalSieveFrequency
+  f32[10] = safe.chordalSieveTwist
+  f32[11] = 0
 
   return computeAdsDensityConfigHash(ads)
 }

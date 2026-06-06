@@ -35,6 +35,8 @@ describe('Hydrogen ND Presets', () => {
         '2pz_6d',
         '3dz2_6d',
         '4fz3_6d',
+        'causalDiamondHydrogenShell',
+        'causalDiamondHydrogenHolonomy4D',
         'custom',
       ])
     })
@@ -107,15 +109,91 @@ describe('Hydrogen ND Presets', () => {
       expect(HYDROGEN_ND_PRESETS['2pz_6d'].dimension).toBe(6)
       expect(HYDROGEN_ND_PRESETS['3dz2_6d'].dimension).toBe(6)
       expect(HYDROGEN_ND_PRESETS['4fz3_6d'].dimension).toBe(6)
+
+      // Causal-diamond observer presets
+      expect(HYDROGEN_ND_PRESETS.causalDiamondHydrogenShell.dimension).toBe(3)
+      expect(HYDROGEN_ND_PRESETS.causalDiamondHydrogenHolonomy4D.dimension).toBe(4)
+    })
+
+    it('defines deterministic causal-diamond modular controls for hydrogenND scenarios', () => {
+      const shell = HYDROGEN_ND_PRESETS.causalDiamondHydrogenShell
+      const holonomy = HYDROGEN_ND_PRESETS.causalDiamondHydrogenHolonomy4D
+
+      expect(shell.causalDiamond).toEqual({
+        enabled: true,
+        horizonRadius: 4.6,
+        compressionK: 0.16,
+        shellGain: 6,
+        shellCenter: 0.7,
+        shellWidth: 0.06,
+        holonomyStrength: 0,
+        holonomyMix: 0,
+      })
+      expect(holonomy.causalDiamond).toEqual({
+        enabled: true,
+        horizonRadius: 6,
+        compressionK: 0.08,
+        shellGain: 8,
+        shellCenter: 0.62,
+        shellWidth: 0.16,
+        holonomyStrength: 4.5,
+        holonomyMix: 1,
+      })
+      expect(shell.rendering).toMatchObject({
+        fieldScale: 1.45,
+        densityGain: 1.8,
+        densityContrast: 3.6,
+        raymarchQuality: 'quality',
+        sampleCount: 64,
+      })
+      expect(holonomy.rendering).toMatchObject({
+        fieldScale: 1.35,
+        densityGain: 5,
+        densityContrast: 2.2,
+        raymarchQuality: 'quality',
+        sampleCount: 64,
+      })
+    })
+
+    it('sets 3D causal shell as ordinary orbital plus finite horizon shell', () => {
+      const preset = HYDROGEN_ND_PRESETS.causalDiamondHydrogenShell
+
+      expect(preset.dimension).toBe(3)
+      expect(preset.n).toBe(3)
+      expect(preset.l).toBe(2)
+      expect(preset.m).toBe(0)
+      expect(preset.extraDimN.slice(0, 1)).toEqual([0])
+      expect(preset.causalDiamond?.enabled).toBe(true)
+      expect(preset.causalDiamond?.shellGain).toBeGreaterThan(4)
+      expect(preset.causalDiamond?.holonomyStrength).toBe(0)
+      expect(preset.rendering?.fieldScale).toBeGreaterThan(1)
+      expect(preset.rendering?.densityContrast).toBeGreaterThan(3)
+      expect(preset.rendering?.phaseShimmerEnabled).toBe(true)
+    })
+
+    it('sets 4D causal holonomy with dimension-compatible extra quantum row', () => {
+      const preset = HYDROGEN_ND_PRESETS.causalDiamondHydrogenHolonomy4D
+
+      expect(preset.dimension).toBe(4)
+      expect(preset.n).toBe(3)
+      expect(preset.l).toBe(2)
+      expect(preset.extraDimN).toHaveLength(8)
+      expect(preset.extraDimN).toEqual([0, 0, 0, 0, 0, 0, 0, 0])
+      expect(preset.extraDimOmega[0]).toBeCloseTo(0.7, 12)
+      expect(preset.causalDiamond?.enabled).toBe(true)
+      expect(preset.causalDiamond?.holonomyStrength).toBeGreaterThan(4)
+      expect(preset.causalDiamond?.holonomyMix).toBe(1)
     })
 
     it('freezes presets and nested arrays to prevent registry corruption', () => {
-      const preset = HYDROGEN_ND_PRESETS['2pz_4d']
+      const preset = HYDROGEN_ND_PRESETS.causalDiamondHydrogenHolonomy4D
 
       expect(Object.isFrozen(HYDROGEN_ND_PRESETS)).toBe(true)
       expect(Object.isFrozen(preset)).toBe(true)
       expect(Object.isFrozen(preset.extraDimN)).toBe(true)
       expect(Object.isFrozen(preset.extraDimOmega)).toBe(true)
+      expect(Object.isFrozen(preset.causalDiamond)).toBe(true)
+      expect(Object.isFrozen(preset.rendering)).toBe(true)
     })
 
     it('rejects runtime mutation through returned preset references', () => {
@@ -237,8 +315,13 @@ describe('Hydrogen ND Presets', () => {
         '3dz2_3d',
         '3dxy_3d',
         '4fz3_3d',
+        'causalDiamondHydrogenShell',
       ])
-      expect(groups[4]?.map(([key]) => key)).toEqual(['2pz_4d', '3dz2_4d'])
+      expect(groups[4]?.map(([key]) => key)).toEqual([
+        '2pz_4d',
+        '3dz2_4d',
+        'causalDiamondHydrogenHolonomy4D',
+      ])
       expect(groups[5]?.map(([key]) => key)).toEqual(['2pz_5d', '3dz2_5d'])
       expect(groups[6]?.map(([key]) => key)).toEqual(['2pz_6d', '3dz2_6d', '4fz3_6d'])
     })
@@ -293,6 +376,8 @@ describe('Hydrogen ND Presets', () => {
         '4fz³',
         '2pz + 4D Ground',
         '3dz² + 4D Ground',
+        'Causal Diamond Shell',
+        'Causal Diamond Holonomy 4D',
       ])
     })
 
@@ -300,7 +385,7 @@ describe('Hydrogen ND Presets', () => {
       const presets6d = getPresetsForDimension(6)
 
       expect(presets6d.map((p) => p.dimension)).toEqual([
-        2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 5, 5, 6, 6, 6,
+        2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 5, 5, 6, 6, 6, 3, 4,
       ])
     })
 

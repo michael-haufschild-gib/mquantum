@@ -459,6 +459,10 @@ function makeBaseParams(overrides: Partial<SchroedingerPackParams> = {}): Schroe
 }
 
 describe('packSchroedingerUniforms', () => {
+  const fockLanternIndex = {
+    enabled: SCHROEDINGER_LAYOUT.index._padEnergy,
+  }
+
   // The buffer must be large enough for the entire SchroedingerUniforms struct.
   // The struct extends to ~1600 bytes. Use 2000 to be safe.
   const BUFFER_SIZE = 2000
@@ -751,6 +755,9 @@ describe('packSchroedingerUniforms', () => {
   it('sanitizes non-finite quantum backreaction lensing controls before GPU upload', () => {
     const { floatView, intView } = createBuffer(BUFFER_SIZE)
     const params = makeBaseParams({
+      quantumModeInt: 1,
+      quantumModeStr: 'hydrogenND',
+      rendererQuantumMode: 'hydrogenND',
       schroedinger: {
         quantumBackreactionLensingEnabled: true,
         quantumBackreactionLensingStrength: Number.NaN,
@@ -771,6 +778,9 @@ describe('packSchroedingerUniforms', () => {
   it('uses default spacetime feature controls for non-finite enabled inputs', () => {
     const { floatView, intView } = createBuffer(BUFFER_SIZE)
     const params = makeBaseParams({
+      quantumModeInt: 1,
+      quantumModeStr: 'hydrogenND',
+      rendererQuantumMode: 'hydrogenND',
       schroedinger: {
         quantumBackreactionLensingEnabled: true,
         quantumBackreactionLensingStrength: Number.NaN,
@@ -798,6 +808,14 @@ describe('packSchroedingerUniforms', () => {
         bornNullWeaveStrength: Number.NaN,
         bornNullWeaveNodeWidth: Infinity,
         bornNullWeaveCirculation: Number.NaN,
+        causalDiamondEnabled: true,
+        causalDiamondHorizonRadius: Number.NaN,
+        causalDiamondCompressionK: Infinity,
+        causalDiamondShellGain: Number.NaN,
+        causalDiamondShellCenter: Infinity,
+        causalDiamondShellWidth: Number.NaN,
+        causalDiamondHolonomyStrength: Infinity,
+        causalDiamondHolonomyMix: Number.NaN,
       } as never,
     })
 
@@ -847,6 +865,13 @@ describe('packSchroedingerUniforms', () => {
     expect(floatView[index.bornNullWeaveStrength]).toBeCloseTo(defaults.bornNullWeaveStrength)
     expect(floatView[index.bornNullWeaveNodeWidth]).toBeCloseTo(defaults.bornNullWeaveNodeWidth)
     expect(floatView[index.bornNullWeaveCirculation]).toBeCloseTo(defaults.bornNullWeaveCirculation)
+    expect(floatView[index.cdR]).toBeCloseTo(defaults.causalDiamondHorizonRadius)
+    expect(floatView[index.cdK]).toBeCloseTo(defaults.causalDiamondCompressionK)
+    expect(floatView[index.cdGain]).toBeCloseTo(defaults.causalDiamondShellGain)
+    expect(floatView[index.cdCenter]).toBeCloseTo(defaults.causalDiamondShellCenter)
+    expect(floatView[index.cdWidth]).toBeCloseTo(defaults.causalDiamondShellWidth)
+    expect(floatView[index.cdHolonomy]).toBeCloseTo(defaults.causalDiamondHolonomyStrength)
+    expect(floatView[index.cdMix]).toBeCloseTo(defaults.causalDiamondHolonomyMix)
   })
 
   it('zeroes bilocal ER bridge uniforms when disabled', () => {
@@ -1100,6 +1125,104 @@ describe('packSchroedingerUniforms', () => {
       expect(floatView[index.bornNullWeaveNodeWidth]).toBe(0)
       expect(floatView[index.bornNullWeaveCirculation]).toBe(0)
     }
+  })
+
+  it('packs clamped Fock Lantern controls only for harmonic oscillator mode', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      quantumModeStr: 'harmonicOscillator',
+      schroedinger: {
+        fockLanternEnabled: true,
+      },
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    expect(intView[fockLanternIndex.enabled]).toBe(1)
+  })
+
+  it('zeroes Fock Lantern controls for disabled and non-HO modes', () => {
+    for (const quantumModeStr of ['hydrogenND', 'tdseDynamics', 'wheelerDeWitt']) {
+      const { floatView, intView } = createBuffer(BUFFER_SIZE)
+      const params = makeBaseParams({
+        quantumModeStr,
+        schroedinger: {
+          fockLanternEnabled: true,
+        },
+      })
+
+      packSchroedingerUniforms(floatView, intView, params)
+
+      expect(intView[fockLanternIndex.enabled], quantumModeStr).toBe(0)
+    }
+
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const disabled = makeBaseParams({
+      quantumModeStr: 'harmonicOscillator',
+      schroedinger: {
+        fockLanternEnabled: false,
+      },
+    })
+
+    packSchroedingerUniforms(floatView, intView, disabled)
+    expect(intView[fockLanternIndex.enabled]).toBe(0)
+  })
+
+  it('zeroes causal-diamond modular orbital uniforms when disabled', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      schroedinger: {
+        causalDiamondEnabled: false,
+        causalDiamondHorizonRadius: 6,
+        causalDiamondCompressionK: 1.2,
+        causalDiamondShellGain: 4,
+        causalDiamondShellCenter: 0.75,
+        causalDiamondShellWidth: 0.08,
+        causalDiamondHolonomyStrength: 3,
+        causalDiamondHolonomyMix: 1,
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    const index = SCHROEDINGER_LAYOUT.index
+    expect(floatView[index.cdR]).toBe(0)
+    expect(floatView[index.cdK]).toBe(0)
+    expect(floatView[index.cdGain]).toBe(0)
+    expect(floatView[index.cdCenter]).toBe(0)
+    expect(floatView[index.cdWidth]).toBe(0)
+    expect(floatView[index.cdHolonomy]).toBe(0)
+    expect(floatView[index.cdMix]).toBe(0)
+  })
+
+  it('packs clamped causal-diamond modular orbital controls when enabled', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      quantumModeInt: 1,
+      quantumModeStr: 'hydrogenND',
+      rendererQuantumMode: 'hydrogenND',
+      schroedinger: {
+        causalDiamondEnabled: true,
+        causalDiamondHorizonRadius: 0.1,
+        causalDiamondCompressionK: 9,
+        causalDiamondShellGain: 99,
+        causalDiamondShellCenter: 1.2,
+        causalDiamondShellWidth: 0.001,
+        causalDiamondHolonomyStrength: 99,
+        causalDiamondHolonomyMix: 2,
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    const index = SCHROEDINGER_LAYOUT.index
+    expect(floatView[index.cdR]).toBeCloseTo(0.5)
+    expect(floatView[index.cdK]).toBe(4)
+    expect(floatView[index.cdGain]).toBe(8)
+    expect(floatView[index.cdCenter]).toBeCloseTo(0.98)
+    expect(floatView[index.cdWidth]).toBeCloseTo(0.01)
+    expect(floatView[index.cdHolonomy]).toBe(8)
+    expect(floatView[index.cdMix]).toBe(1)
   })
 
   // Wheeler–DeWitt render-only phase rotation rate: 0 unless mode+enabled.

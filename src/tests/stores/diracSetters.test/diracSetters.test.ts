@@ -185,9 +185,11 @@ describe('Dirac setters', () => {
     const s = useExtendedObjectStore.getState()
     s.setDiracFieldView('spinDensity')
     expect(getDirac().fieldView).toBe('spinDensity')
+    s.setDiracFieldView('cliffordBloom')
+    expect(getDirac().fieldView).toBe('cliffordBloom')
     // @ts-expect-error intentional invalid input
     s.setDiracFieldView('spin')
-    expect(getDirac().fieldView).toBe('spinDensity')
+    expect(getDirac().fieldView).toBe('cliffordBloom')
   })
 
   it('sets autoScale boolean', () => {
@@ -350,6 +352,21 @@ describe('Dirac setters', () => {
 
     expect(getDirac().fieldView).toBe('totalDensity')
     expect(useAppearanceStore.getState().colorAlgorithm).toBe('blackbody')
+  })
+
+  it('syncs color algorithm to phaseDensity when preset uses Clifford Bloom fieldView', async () => {
+    const { useAppearanceStore } = await import('@/stores/scene/appearanceStore')
+    useAppearanceStore.getState().setColorAlgorithm('blackbody')
+    expect(useAppearanceStore.getState().colorAlgorithm).toBe('blackbody')
+
+    await useExtendedObjectStore.getState().applyDiracPreset('cliffordBloomResonator')
+
+    expect(getDirac().initialCondition).toBe('zitterbewegung')
+    expect(getDirac().fieldView).toBe('cliffordBloom')
+    expect(useAppearanceStore.getState().colorAlgorithm).toBe('phaseDensity')
+    expect(useExtendedObjectStore.getState().schroedinger.densityGain).toBeCloseTo(2.8)
+    expect(useExtendedObjectStore.getState().schroedinger.densityContrast).toBeCloseTo(2.7)
+    expect(useExtendedObjectStore.getState().schroedinger.autoScaleMaxGain).toBe(30)
   })
 
   it('re-clamps dt when speedOfLight rises above the new CFL ceiling', () => {

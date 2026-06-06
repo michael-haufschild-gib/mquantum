@@ -96,6 +96,23 @@ describe('DiracComputePassUniforms', () => {
     expect(u32[DIRAC_UNIFORMS_LAYOUT.index.showPotential]).toBe(0)
   })
 
+  it('maps cliffordBloom fieldView to append-only shader enum 8', () => {
+    const I = DIRAC_UNIFORMS_LAYOUT.index
+
+    expect(
+      writeConfig({
+        ...DEFAULT_DIRAC_CONFIG,
+        fieldView: 'cliffordBloom',
+      })[I.fieldView]
+    ).toBe(8)
+    expect(
+      writeConfig({
+        ...DEFAULT_DIRAC_CONFIG,
+        fieldView: 'axialCharge',
+      })[I.fieldView]
+    ).toBe(7)
+  })
+
   it('does not enable potential physics for non-boolean showPotential values', () => {
     expect(
       effectiveDiracPotentialType({

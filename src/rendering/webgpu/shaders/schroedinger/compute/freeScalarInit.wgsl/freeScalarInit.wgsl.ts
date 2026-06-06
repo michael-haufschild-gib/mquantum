@@ -7,6 +7,7 @@
  * - retrocausalCaustic (4u): bounded recursive advanced/retarded image caustic
  * - rankDefectGenesis (5u): zero-mean orthogonal rank-completion seed
  * - chronogenicShear (6u): sheared rank-completion seed
+ * - cauchyLoomWeave (7u): crossed canonical waves for Cauchy Loom field view
  *
  * Supports N-dimensional lattices (1-11D) via per-dimension arrays and stride tables.
  * vacuumNoise is handled CPU-side via exact vacuum spectrum sampling
@@ -38,7 +39,7 @@ struct FreeScalarUniforms {
 
   // Init/display scalars (32 bytes)
   initCondition: u32,        // offset 160
-  fieldView: u32,            // offset 164
+  fieldView: u32,            // offset 164 (0=phi, 1=pi, 2=energyDensity, 3=wallDensity, 4=freezeOutStrain, 5=equationOfState, 6=cauchyLoom)
   stepsPerFrame: u32,        // offset 168
   packetWidth: f32,          // offset 172
   packetAmplitude: f32,      // offset 176
@@ -262,6 +263,29 @@ fn computeChronogenicShear(worldPos: array<f32, 12>) -> vec2f {
   return vec2f(phiSeed, piSeed);
 }
 
+fn computeCauchyLoomWeave(worldPos: array<f32, 12>) -> vec2f {
+  let dim = max(params.latticeDim, 1u);
+  let s = max(abs(params.packetWidth), 1e-6);
+  var r2: f32 = 0.0;
+  for (var d: u32 = 0u; d < dim; d++) {
+    let u = (worldPos[d] - params.packetCenter[d]) / s;
+    r2 += u * u;
+  }
+
+  let e = params.packetAmplitude * exp(-0.5 * r2);
+  let x = (worldPos[0] - params.packetCenter[0]) / s;
+  let y = select(0.0, (worldPos[1] - params.packetCenter[1]) / s, dim > 1u);
+  let z = select(0.0, (worldPos[2] - params.packetCenter[2]) / s, dim > 2u);
+  let k0 = max(abs(f32(params.modeK[0])), 1.0);
+  let k1 = max(abs(f32(params.modeK[1])), 2.0);
+  let k2 = max(abs(f32(params.modeK[2])), 3.0);
+  let a = 0.5 * sin(k0 * x + 0.7 * y) + 0.5 * cos(k1 * y - 0.5 * z);
+  let b = 0.55 * cos(k1 * y + 0.8 * x) - 0.45 * sin(k2 * z - 0.6 * x);
+  let t = 0.32 * sin((k0 + k1 + k2) * 0.18 * r2 + atan2(y, x));
+  let w = sqrt(max(params.mass * params.mass + (k0 * k0 + k1 * k1 + k2 * k2) / (s * s), 0.0));
+  return vec2f(e * (a + t), e * w * (b - t));
+}
+
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let idx = gid.x;
@@ -370,6 +394,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let shear = computeChronogenicShear(worldPos);
     phiVal = shear.x;
     piVal = shear.y;
+  } else if (params.initCondition == 7u) {
+    let weave = computeCauchyLoomWeave(worldPos);
+    phiVal = weave.x;
+    piVal = weave.y;
   }
   // initCondition == 0u (vacuumNoise): no-op, data written by CPU
 

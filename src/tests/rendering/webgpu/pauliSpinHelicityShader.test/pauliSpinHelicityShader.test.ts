@@ -7,6 +7,11 @@ import {
   PAULI_FIELD_VIEW_U32_OFFSET,
   PAULI_UNIFORM_SIZE,
 } from '@/rendering/webgpu/passes/PauliComputePassBuffers'
+import { PAULI_UNIFORMS_LAYOUT } from '@/rendering/webgpu/passes/pauliUniformsLayout'
+import {
+  pauliInit3DBlock,
+  pauliInitBlock,
+} from '@/rendering/webgpu/shaders/schroedinger/compute/pauliInit.wgsl'
 import { pauliWriteGridBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/pauliWriteGrid.wgsl'
 import { generateMainBlockIsosurface } from '@/rendering/webgpu/shaders/schroedinger/mainIsosurface.wgsl'
 import { generateMainBlockIsosurfaceTemporal } from '@/rendering/webgpu/shaders/schroedinger/mainIsosurfaceTemporal.wgsl'
@@ -51,6 +56,29 @@ describe('Pauli spin helicity render view', () => {
     expect(u32[PAULI_FIELD_VIEW_U32_OFFSET]).toBe(PAULI_FIELD_VIEW_ENUM.berryCurvature)
   })
 
+  it('packs zeemanAnamorph and its seeded initializer to append-only enums', () => {
+    const uniformData = new ArrayBuffer(PAULI_UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+
+    packPauliUniforms(u32, f32, {
+      config: {
+        ...DEFAULT_PAULI_CONFIG,
+        fieldView: 'zeemanAnamorph',
+        initialCondition: 'zeemanAnamorphSeed',
+      },
+      totalSites: 64 * 64 * 64,
+      simTime: 0,
+      maxDensity: 1,
+      strides: [4096, 64, 1],
+      boundingRadius: 5,
+    })
+
+    expect(PAULI_FIELD_VIEW_ENUM.zeemanAnamorph).toBe(6)
+    expect(u32[PAULI_FIELD_VIEW_U32_OFFSET]).toBe(PAULI_FIELD_VIEW_ENUM.zeemanAnamorph)
+    expect(u32[PAULI_UNIFORMS_LAYOUT.index.initCondition]).toBe(4)
+  })
+
   it('adds shader math for normalized spin curl helicity', () => {
     const branchStart = pauliWriteGridBlock.indexOf('params.fieldView == 4u')
     const branchEndRaw = pauliWriteGridBlock.indexOf(
@@ -89,6 +117,36 @@ describe('Pauli spin helicity render view', () => {
     expect(branch).toContain('let dSj = spinGrad[j];')
     expect(branch).toContain('0.5 * dot(spin, cross(dSi, dSj))')
     expect(branch).toContain('1.0 - exp(-curvatureArea)')
+    expect(branch).toContain('outA = totalNorm')
+  })
+
+  it('adds initializer math for the counter-warped Zeeman Anamorph seed', () => {
+    for (const block of [pauliInitBlock, pauliInit3DBlock]) {
+      expect(block).toContain('params.initCondition == 4u')
+      expect(block).toContain('let warp = 2.0 * az')
+      expect(block).toContain('let up = phase + warp;')
+      expect(block).toContain('let dn = phase - warp + params.spinPhi;')
+    }
+  })
+
+  it('adds shader math for Zeeman Anamorph transverse spin/field phase shear', () => {
+    const branchStart = pauliWriteGridBlock.indexOf('params.fieldView == 6u')
+    const branchEndRaw = pauliWriteGridBlock.indexOf('// Potential overlay', branchStart)
+    const branchEnd = branchEndRaw === -1 ? pauliWriteGridBlock.length : branchEndRaw
+    const branch = pauliWriteGridBlock.slice(branchStart, branchEnd)
+
+    expect(branchStart).toBeGreaterThanOrEqual(0)
+    expect(branchEnd).toBeGreaterThan(branchStart)
+    expect(pauliWriteGridBlock).toContain('fn relPhase')
+    expect(pauliWriteGridBlock).toContain('fn wrapPhase')
+    expect(pauliWriteGridBlock).toContain('fn relShear')
+    expect(pauliWriteGridBlock).toContain('fn zField')
+    expect(branch).toContain('let spin = spinUnitAt(nnSite, T);')
+    expect(branch).toContain('let bHat = B / Bmag;')
+    expect(branch).toContain('let tr = length(cross(spin, bHat));')
+    expect(branch).toContain('let sh = relShear(nnSite, &nnCoords, T);')
+    expect(branch).toContain('tr * (1.0 - exp(-sh)) * totalNorm')
+    expect(branch).toContain('outB = relPhase(nnSite, T)')
     expect(branch).toContain('outA = totalNorm')
   })
 

@@ -9,7 +9,7 @@
  * ToggleGroup would show a stale fieldView that no longer matched the rendered grid.
  */
 
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
@@ -65,6 +65,44 @@ describe('ColorAlgorithmSelector — Pauli fieldView sync', () => {
     await user.selectOptions(select, 'pauliCoherence')
 
     expect(useExtendedObjectStore.getState().pauliSpinor.fieldView).toBe('coherence')
+  })
+
+  it('syncs pauli.fieldView to zeemanAnamorph when selecting phaseDensity', async () => {
+    const user = userEvent.setup()
+    useExtendedObjectStore.getState().setPauliFieldView('spinDensity')
+    useAppearanceStore.getState().setColorAlgorithm('pauliSpinDensity')
+
+    render(<ColorAlgorithmSelector />)
+
+    const select = screen.getByRole('combobox', { name: /color algorithm/i })
+    await user.selectOptions(select, 'phaseDensity')
+
+    expect(useAppearanceStore.getState().colorAlgorithm).toBe('phaseDensity')
+    expect(useExtendedObjectStore.getState().pauliSpinor.fieldView).toBe('zeemanAnamorph')
+  })
+
+  it('keeps zeemanAnamorph paired to phaseDensity when stale Pauli color is invalid', async () => {
+    useExtendedObjectStore.getState().setPauliFieldView('zeemanAnamorph')
+    useAppearanceStore.getState().setColorAlgorithm('radialDistance')
+
+    render(<ColorAlgorithmSelector />)
+
+    await waitFor(() => {
+      expect(useAppearanceStore.getState().colorAlgorithm).toBe('phaseDensity')
+    })
+    expect(useExtendedObjectStore.getState().pauliSpinor.fieldView).toBe('zeemanAnamorph')
+  })
+
+  it('keeps blackbody-paired Pauli fieldView when stale color is invalid', async () => {
+    useExtendedObjectStore.getState().setPauliFieldView('spinHelicity')
+    useAppearanceStore.getState().setColorAlgorithm('radialDistance')
+
+    render(<ColorAlgorithmSelector />)
+
+    await waitFor(() => {
+      expect(useAppearanceStore.getState().colorAlgorithm).toBe('blackbody')
+    })
+    expect(useExtendedObjectStore.getState().pauliSpinor.fieldView).toBe('spinHelicity')
   })
 })
 

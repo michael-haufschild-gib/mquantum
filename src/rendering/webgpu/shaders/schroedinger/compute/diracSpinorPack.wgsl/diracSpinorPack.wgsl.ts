@@ -80,6 +80,34 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 }
 `
 
+/**
+ * Scale: spinorSlice *= invN
+ *
+ * Direct-spinor FFT dispatches operate in-place on a component slice of the
+ * merged spinor buffer. The inverse transform still needs the same 1/N
+ * normalization that the old unpack shader applied while copying from FFT
+ * scratch back into the spinor.
+ *
+ * Bind group layout:
+ *   @group(0) @binding(0) packUni: PackUniforms
+ *   @group(0) @binding(1) spinorSlice: array<vec2f> (read_write, sub-ranged)
+ */
+export const diracSpinorScaleBlock = /* wgsl */ `
+@group(0) @binding(0) var<uniform> packUni: PackUniforms;
+@group(0) @binding(1) var<storage, read_write> spinorSlice: array<vec2f>;
+
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  let idx = gid.x;
+  if (idx >= packUni.totalElements) {
+    return;
+  }
+  let invN = packUni.invN;
+  let v = spinorSlice[idx];
+  spinorSlice[idx] = vec2f(v.x * invN, v.y * invN);
+}
+`
+
 /** Pack shader as a ShaderBlock. */
 export const diracSpinorPackShaderBlock: ShaderBlock = {
   name: 'dirac-spinor-pack',
@@ -90,4 +118,10 @@ export const diracSpinorPackShaderBlock: ShaderBlock = {
 export const diracSpinorUnpackShaderBlock: ShaderBlock = {
   name: 'dirac-spinor-unpack',
   content: diracSpinorUnpackBlock,
+}
+
+/** In-place inverse-FFT normalization shader as a ShaderBlock. */
+export const diracSpinorScaleShaderBlock: ShaderBlock = {
+  name: 'dirac-spinor-scale',
+  content: diracSpinorScaleBlock,
 }

@@ -7,11 +7,13 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 
+import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 describe('TDSE dynamics setters', () => {
   beforeEach(() => {
+    useAppearanceStore.getState().reset()
     useExtendedObjectStore.getState().reset()
     useGeometryStore.getState().reset()
   })
@@ -254,5 +256,16 @@ describe('TDSE dynamics setters', () => {
     expect(getTdse().potentialType).toBe('barrier')
     expect(getTdse().latticeDim).toBe(3)
     expect(getTdse().disorderStrength).not.toBe(15)
+  })
+
+  it('applies TDSE preset color algorithm overrides through appearance store', async () => {
+    const s = useExtendedObjectStore.getState()
+    useAppearanceStore.getState().setColorAlgorithm('blackbody')
+
+    await s.applyTdsePreset('bornEclipseCollider')
+
+    expect(getTdse().fieldView).toBe('bornEclipse')
+    expect(useExtendedObjectStore.getState().schroedinger).not.toHaveProperty('colorAlgorithm')
+    expect(useAppearanceStore.getState().colorAlgorithm).toBe('inferno')
   })
 })

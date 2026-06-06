@@ -66,16 +66,25 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
 
     const isVacuum = fs.initialCondition === 'vacuumNoise'
     const isRetrocausalCaustic = fs.initialCondition === 'retrocausalCaustic'
+    const isCauchyLoomWeave = fs.initialCondition === 'cauchyLoomWeave'
+    const usesPacketControls =
+      fs.initialCondition === 'gaussianPacket' || isRetrocausalCaustic || isCauchyLoomWeave
     const latticeDim = fs.latticeDim
-    const packetWidthTooltip = isRetrocausalCaustic
-      ? 'Initial image-map width in lattice units. Narrower widths sharpen recursive caustics and increase local phase curvature.'
-      : 'Initial Gaussian packet width in lattice units. Narrower widths localize the packet and increase local phase curvature.'
-    const packetCenterTooltip = isRetrocausalCaustic
-      ? 'Initial center position of the retrocausal caustic image map along this axis.'
-      : 'Initial center position of the Gaussian wave packet along this axis.'
-    const packetMomentumTooltip = isRetrocausalCaustic
-      ? 'Echo-map lattice momentum along this axis. Determines phase winding in the caustic return pattern.'
-      : "Central momentum of the wave packet along this axis. Determines the packet's group velocity."
+    const packetWidthTooltip = isCauchyLoomWeave
+      ? 'Envelope width for the crossed canonical wave weave. Narrower widths compress the loom into sharper filaments.'
+      : isRetrocausalCaustic
+        ? 'Initial image-map width in lattice units. Narrower widths sharpen recursive caustics and increase local phase curvature.'
+        : 'Initial Gaussian packet width in lattice units. Narrower widths localize the packet and increase local phase curvature.'
+    const packetCenterTooltip = isCauchyLoomWeave
+      ? 'Initial center position of the Cauchy Loom weave along this axis.'
+      : isRetrocausalCaustic
+        ? 'Initial center position of the retrocausal caustic image map along this axis.'
+        : 'Initial center position of the Gaussian wave packet along this axis.'
+    const packetMomentumTooltip = isCauchyLoomWeave
+      ? 'Integer braid winding along this axis. Different triples change the local dφ∧dπ filament crossings.'
+      : isRetrocausalCaustic
+        ? 'Echo-map lattice momentum along this axis. Determines phase winding in the caustic return pattern.'
+        : "Central momentum of the wave packet along this axis. Determines the packet's group velocity."
 
     // Initial condition options
     const initConditionOptions = useMemo(() => {
@@ -84,6 +93,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
         { value: 'singleMode', label: 'Single Mode' },
         { value: 'gaussianPacket', label: 'Gaussian Packet' },
         { value: 'retrocausalCaustic', label: 'Retrocausal Caustic' },
+        { value: 'cauchyLoomWeave', label: 'Cauchy Loom Weave' },
       ]
       if (fs.selfInteractionEnabled) {
         opts.push({ value: 'kinkProfile', label: 'Kink (tanh)' })
@@ -99,6 +109,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
         { value: 'energyDensity', label: 'ε' },
         { value: 'freezeOutStrain', label: 'Freeze' },
         { value: 'equationOfState', label: 'w(x)' },
+        { value: 'cauchyLoom', label: 'Cauchy Loom' },
       ]
       if (fs.selfInteractionEnabled) {
         opts.push({ value: 'wallDensity', label: 'V(φ)' })
@@ -350,7 +361,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
         >
           <Select
             label="Initial Condition"
-            tooltip="Starting field configuration: vacuum fluctuations, a plane-wave mode, or a localized Gaussian wave packet."
+            tooltip="Starting field configuration: vacuum fluctuations, plane-wave modes, localized packets, retrocausal caustics, or Cauchy Loom weaves."
             options={initConditionOptions}
             value={fs.initialCondition}
             onChange={handleInitCondition}
@@ -416,8 +427,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
             </div>
           )}
 
-          {(fs.initialCondition === 'gaussianPacket' ||
-            fs.initialCondition === 'retrocausalCaustic') && (
+          {usesPacketControls && (
             <div className="space-y-2">
               <Slider
                 data-testid="components-sections-geometry-schroedinger-controls-free-scalar-field-controls-slider-417-15"
@@ -486,8 +496,8 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
             ariaLabel="Field view"
             tooltip={
               fs.cosmology.enabled
-                ? `Displayed field quantity: δφ (perturbation), π (conjugate momentum), ε (proper energy density), Freeze (freeze-out strain), w(x) (equation of state)${fs.selfInteractionEnabled ? ', or V(φ) (potential density)' : ''}.`
-                : `Displayed field quantity: φ (field), π (conjugate momentum ∂φ/∂t), ε (energy density), Freeze (freeze-out strain), w(x) (equation of state)${fs.selfInteractionEnabled ? ', or V(φ) (potential density)' : ''}.`
+                ? `Displayed field quantity: δφ (perturbation), π (conjugate momentum), ε (proper energy density), Freeze (freeze-out strain), w(x) (equation of state), or Cauchy Loom${fs.selfInteractionEnabled ? ', plus V(φ) (potential density)' : ''}.`
+                : `Displayed field quantity: φ (field), π (conjugate momentum ∂φ/∂t), ε (energy density), Freeze (freeze-out strain), w(x) (equation of state), or Cauchy Loom${fs.selfInteractionEnabled ? ', plus V(φ) (potential density)' : ''}.`
             }
             data-testid="field-view-selector"
           />

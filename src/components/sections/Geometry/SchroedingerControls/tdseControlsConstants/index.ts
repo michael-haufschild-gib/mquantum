@@ -61,6 +61,7 @@ export const FIELD_VIEW_OPTIONS = [
   { value: 'ctcLoopGain', label: 'CTC Loop Gain G' },
   { value: 'ctcDeutschEntropy', label: 'Deutsch Entropy S' },
   { value: 'ctcCausalShadow', label: 'CTC Causal Shadow C' },
+  { value: 'bornEclipse', label: 'Born Eclipse E' },
 ]
 
 /**

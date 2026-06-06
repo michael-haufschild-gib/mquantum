@@ -11,11 +11,20 @@
  * physical domain large enough for the 20% PML absorber.
  */
 
+import type { SchroedingerConfig } from '@/lib/geometry/extended/schroedinger'
 import type { DiracConfig } from '@/lib/geometry/extended/types'
 import type { ScenarioPreset } from '@/lib/physics/presetTypes'
 
+/** Parent-level SchroedingerConfig rendering fields that a Dirac preset can override. */
+export type DiracRenderingOverrides = Partial<
+  Pick<SchroedingerConfig, 'densityGain' | 'densityContrast' | 'autoScaleMaxGain'>
+>
+
 /** A curated Dirac equation scenario with dimension-agnostic config overrides. */
-export type DiracScenarioPreset = ScenarioPreset<Partial<DiracConfig>>
+export interface DiracScenarioPreset extends ScenarioPreset<Partial<DiracConfig>> {
+  /** Parent-level rendering overrides applied alongside DiracConfig overrides. */
+  renderingOverrides?: DiracRenderingOverrides
+}
 
 export const DIRAC_SCENARIO_PRESETS: DiracScenarioPreset[] = [
   {
@@ -54,6 +63,32 @@ export const DIRAC_SCENARIO_PRESETS: DiracScenarioPreset[] = [
       fieldView: 'particleAntiparticleSplit',
       dt: 0.002,
       stepsPerFrame: 8,
+    },
+  },
+  {
+    id: 'cliffordBloomResonator',
+    name: 'Clifford Bloom Resonator',
+    description:
+      'Upper/lower spinor sectors phase-lock into volumetric Clifford petals — a resonant view of relativistic sector mixing',
+    overrides: {
+      spacing: [0.1],
+      mass: 1.0,
+      speedOfLight: 0.55,
+      potentialType: 'none',
+      initialCondition: 'zitterbewegung',
+      packetWidth: 0.72,
+      packetMomentum: [3.2, 1.8, 0.9, 0, 0, 0, 0, 0, 0, 0, 0],
+      spinDirection: [Math.PI / 3, Math.PI / 5],
+      positiveEnergyFraction: 0.5,
+      fieldView: 'cliffordBloom',
+      autoScale: true,
+      dt: 0.002,
+      stepsPerFrame: 8,
+    },
+    renderingOverrides: {
+      densityGain: 2.8,
+      densityContrast: 2.7,
+      autoScaleMaxGain: 30,
     },
   },
   {
@@ -139,3 +174,8 @@ export const DIRAC_SCENARIO_PRESETS: DiracScenarioPreset[] = [
     },
   },
 ]
+
+/** Look up a Dirac scenario preset by id. */
+export function getDiracPreset(id: string): DiracScenarioPreset | undefined {
+  return DIRAC_SCENARIO_PRESETS.find((preset) => preset.id === id)
+}

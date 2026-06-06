@@ -46,6 +46,7 @@ export const PAULI_FIELD_VIEW_ENUM: Readonly<Record<PauliConfig['fieldView'], nu
   coherence: 3,
   spinHelicity: 4,
   berryCurvature: 5,
+  zeemanAnamorph: 6,
 } as const
 
 /** Diagnostics workgroup size — must match @workgroup_size in pauliDiagnostics.wgsl.ts */
@@ -383,13 +384,17 @@ export function packPauliUniforms(
   f32[I.spinPhi] = config.initialSpinDirection[1]
 
   // Initial condition + packet (offsets 160..267)
-  const icMap: Record<string, number> = {
-    gaussianSpinUp: 0,
-    gaussianSpinDown: 1,
-    gaussianSuperposition: 2,
-    planeWaveSpinor: 3,
-  }
-  u32[I.initCondition] = icMap[config.initialCondition] ?? 0
+  const ic = config.initialCondition
+  u32[I.initCondition] =
+    ic === 'gaussianSpinDown'
+      ? 1
+      : ic === 'gaussianSuperposition'
+        ? 2
+        : ic === 'planeWaveSpinor'
+          ? 3
+          : ic === 'zeemanAnamorphSeed'
+            ? 4
+            : 0
   f32[I.packetWidth] = config.packetWidth
   for (let d = 0; d < MAX_DIM; d++) f32[I.packetCenter + d] = config.packetCenter[d] ?? 0
   for (let d = 0; d < MAX_DIM; d++) f32[I.packetMomentum + d] = config.packetMomentum[d] ?? 0

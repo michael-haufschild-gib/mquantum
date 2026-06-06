@@ -15,4 +15,10 @@ describe('PauliVisualizationControls', () => {
 
     expect(screen.getByRole('radio', { name: 'Berry Curvature' })).toBeInTheDocument()
   })
+
+  it('exposes Zeeman Anamorph as a field view', () => {
+    render(<PauliVisualizationControls fieldView="spinDensity" onFieldViewChange={vi.fn()} />)
+
+    expect(screen.getByRole('radio', { name: 'Zeeman Anamorph' })).toBeInTheDocument()
+  })
 })

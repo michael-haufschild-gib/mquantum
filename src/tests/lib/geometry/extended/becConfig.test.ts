@@ -55,12 +55,15 @@ describe('BecInitialCondition / BecFieldView — union members', () => {
     const mach: BecFieldView = 'machNumber'
     const flux: BecFieldView = 'hawkingFlux'
     const vorticity: BecFieldView = 'vorticity'
+    const branePfaffian: BecFieldView = 'branePfaffian'
     const machCfg: BecConfig = { ...DEFAULT_BEC_CONFIG, fieldView: mach }
     const fluxCfg: BecConfig = { ...DEFAULT_BEC_CONFIG, fieldView: flux }
     const vorticityCfg: BecConfig = { ...DEFAULT_BEC_CONFIG, fieldView: vorticity }
+    const braneCfg: BecConfig = { ...DEFAULT_BEC_CONFIG, fieldView: branePfaffian }
     expect(machCfg.fieldView).toBe('machNumber')
     expect(fluxCfg.fieldView).toBe('hawkingFlux')
     expect(vorticityCfg.fieldView).toBe('vorticity')
+    expect(braneCfg.fieldView).toBe('branePfaffian')
   })
 })
 

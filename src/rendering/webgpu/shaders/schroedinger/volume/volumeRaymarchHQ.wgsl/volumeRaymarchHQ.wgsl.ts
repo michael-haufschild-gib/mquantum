@@ -61,6 +61,7 @@ fn volumeRaymarch(
   let spectralFlowActive = isSpectralDimensionFlowActive(uniforms) && FEATURE_SPECTRAL_DIMENSION_FLOW;
   let vacuumBubbleActive = isVacuumBubbleLensActive(uniforms) && FEATURE_VACUUM_BUBBLE_LENS;
   let bornNullWeaveActive = isBornNullWeaveActive(uniforms);
+  let fockLanternActive = isFockLanternActive(uniforms);
   let volumeWarpEffectsActive =
     bilocalBridgeActive ||
     backreactionActive ||
@@ -73,7 +74,8 @@ fn volumeRaymarch(
     uniforms.nodalEnabled != 0u &&
     uniforms.nodalStrength > 0.0 &&
     activeNodalRenderMode(uniforms) == NODAL_RENDER_MODE_BAND;
-  let useAnalyticalDensitySample = USE_ANALYTICAL_GRADIENT && nodalBandEnabled;
+  let useAnalyticalDensitySample =
+    USE_ANALYTICAL_GRADIENT && (nodalBandEnabled || fockLanternActive);
 
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (i >= sampleCount) { break; }
@@ -452,13 +454,34 @@ fn volumeRaymarch(
       compositeOverlay(rProbOverlay, adaptiveStep, invStepLen, 0.5, &transmittance, &accColor);
     }
 
-    let effectiveRho = computeEffectiveDensity(
-      rho * spectralOpacityScale * vacuumBubbleOpacityScale * bornNullOpacityScale,
+    let nonFockOpacityScale = spectralOpacityScale * vacuumBubbleOpacityScale * bornNullOpacityScale;
+    let baseEffectiveRho = computeEffectiveDensity(
+      rho * nonFockOpacityScale,
       phase,
       transmittance,
       uniforms
     );
-    let alpha = computeAlpha(effectiveRho, adaptiveStep, uniforms.densityGain);
+    var alpha = computeAlpha(baseEffectiveRho, adaptiveStep, uniforms.densityGain);
+
+    var fockLanternEmissionGain = 1.0;
+    if (fockLanternActive && rho >= EMPTY_SKIP_THRESHOLD && alpha > 0.001) {
+      let fockMidGate = computeFockLanternMidGate(rho, uniforms);
+      if (fockMidGate > 1e-5) {
+        let fockGradient = ensureGradient(samplePos, animTime, uniforms, &gradCache);
+        let fockLantern = computeFockLanternFromGate(
+          samplePos, phase, fockGradient, uniforms, fockMidGate
+        );
+        fockLanternEmissionGain = fockLantern.emissionGain;
+        gradient = fockGradient;
+        let effectiveRho = computeEffectiveDensity(
+          rho * nonFockOpacityScale * fockLantern.opacityScale,
+          phase,
+          transmittance,
+          uniforms
+        );
+        alpha = computeAlpha(effectiveRho, adaptiveStep, uniforms.densityGain);
+      }
+    }
 
     if (alpha > 0.001) {
       // Track primary hit for temporal reprojection
@@ -473,7 +496,7 @@ fn volumeRaymarch(
       }
       let emission = computeEmissionLit(rho, sCenter, phase, samplePos, emissionGradient, viewDir, uniforms)
         * causticMultiplier * bridgeGain * spectralEmissionGain * vacuumBubbleEmissionGain
-        * bornNullEmissionGain;
+        * bornNullEmissionGain * fockLanternEmissionGain;
       let entropyEmissionGain =
         1.0 + uniforms.entropicTimeShearStrength * max(entropyGain, 0.0) * 0.35;
 

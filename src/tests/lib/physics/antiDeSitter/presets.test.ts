@@ -120,6 +120,19 @@ describe('ADS_PRESETS catalogue', () => {
     }
   })
 
+  it('Chordal Sieve presets carry valid controls and avoid BTZ/HKLL CPU paths', () => {
+    for (const p of ADS_PRESETS) {
+      if (p.chordalSieveEnabled !== true) continue
+      expect(p.btzEnabled).not.toBe(true)
+      expect(p.hkllEnabled).not.toBe(true)
+      expect(p.chordalSieveFrequency).toBeGreaterThanOrEqual(0.25)
+      expect(p.chordalSieveFrequency).toBeLessThanOrEqual(12)
+      expect(p.chordalSieveTwist).toBeGreaterThanOrEqual(-4)
+      expect(p.chordalSieveTwist).toBeLessThanOrEqual(4)
+      expect(p.colorAlgorithm).toBe('phaseDensity')
+    }
+  })
+
   it('alternate quantization branch presets sit inside the BF/Klebanov-Witten window (m²L² ∈ (-(d-1)²/4, -(d-1)²/4 + 1])', () => {
     // Alternate quantization is only well-defined inside the KW window.
     // mL is signed: negative encodes imaginary mass, so the physically
@@ -186,5 +199,19 @@ describe('ADS_PRESETS — known-good spot checks', () => {
       const p = ADS_PRESET_MAP[id]
       expect(p.hkllEnabled).toBe(true)
     }
+  })
+
+  it('adsChordalSieve is the documented two-anchor GPU phase-density preset', () => {
+    const p = ADS_PRESET_MAP.adsChordalSieve
+    expect(p.d).toBe(4)
+    expect(p.n).toBe(2)
+    expect(p.l).toBe(3)
+    expect(p.m).toBe(2)
+    expect(p.chordalSieveEnabled).toBe(true)
+    expect(p.btzEnabled).toBe(false)
+    expect(p.hkllEnabled).toBe(false)
+    expect(p.chordalSieveFrequency).toBeCloseTo(5.4, 6)
+    expect(p.chordalSieveTwist).toBeCloseTo(0.72, 6)
+    expect(p.colorAlgorithm).toBe('phaseDensity')
   })
 })

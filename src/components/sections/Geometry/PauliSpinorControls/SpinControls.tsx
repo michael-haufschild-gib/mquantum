@@ -37,6 +37,7 @@ const INITIAL_CONDITION_OPTIONS: { value: PauliInitialCondition; label: string }
   { value: 'gaussianSpinDown', label: 'Gaussian (Spin Down)' },
   { value: 'gaussianSuperposition', label: 'Gaussian (Superposition)' },
   { value: 'planeWaveSpinor', label: 'Plane Wave Spinor' },
+  { value: 'zeemanAnamorphSeed', label: 'Zeeman Anamorph Seed' },
 ]
 
 interface SpinControlsProps {
@@ -74,7 +75,7 @@ export const SpinControls: React.FC<SpinControlsProps> = React.memo(
         <Select
           data-testid="components-sections-geometry-pauli-spinor-controls-spin-controls-select-74-9"
           label="Initial Condition"
-          tooltip="Shape of the initial spinor wavepacket. Gaussian is localized; plane wave fills space uniformly."
+          tooltip="Shape of the initial spinor wavepacket. Gaussian is localized; plane wave fills space uniformly; Zeeman Anamorph seed counter-warps spin phases."
           options={INITIAL_CONDITION_OPTIONS}
           value={initialCondition}
           onChange={(v) => onInitialConditionChange(v as PauliInitialCondition)}

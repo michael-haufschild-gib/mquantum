@@ -9,6 +9,7 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { Select } from '@/components/ui/Select'
 import { type ColorAlgorithm, getAvailableColorAlgorithms } from '@/lib/colors/palette'
+import { PAULI_FIELD_VIEW_TO_COLOR_ALGO } from '@/lib/colors/palette/types'
 import type { DiracFieldView } from '@/lib/geometry/extended/dirac'
 import { freeScalarVacuumCanEvolveKSpaceOccupation } from '@/lib/geometry/extended/freeScalar'
 import type { PauliFieldView } from '@/lib/geometry/extended/pauli'
@@ -133,7 +134,20 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
       const isAvailable = availableOptions.some((opt) => opt.value === colorAlgorithm)
       if (!isAvailable) {
         if (objectType === 'pauliSpinor') {
-          setColorAlgorithm('pauliSpinDensity')
+          const extStore = useExtendedObjectStore.getState()
+          const pairedAlgorithm =
+            PAULI_FIELD_VIEW_TO_COLOR_ALGO[extStore.pauliSpinor.fieldView] ?? 'pauliSpinDensity'
+          const nextAlgorithm = availableOptions.some((opt) => opt.value === pairedAlgorithm)
+            ? pairedAlgorithm
+            : 'pauliSpinDensity'
+          setColorAlgorithm(nextAlgorithm)
+          const nextFieldView = pauliFieldViewForColorAlgorithm(
+            nextAlgorithm,
+            extStore.pauliSpinor.fieldView
+          ) as PauliFieldView
+          if (extStore.pauliSpinor.fieldView !== nextFieldView) {
+            extStore.setPauliFieldView(nextFieldView)
+          }
         } else if (objectType === 'bellPair') {
           // Bell allowlist is narrow (5 algos); 'radialDistance' is not in it,
           // so falling through to the compute/analytic default would leave the
