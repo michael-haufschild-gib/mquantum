@@ -81,6 +81,7 @@ describe('PauliConfig type constraints', () => {
       'coherence',
       'spinHelicity',
       'berryCurvature',
+      'zeemanAnamorph',
     ]
     expect(validViews).toContain(DEFAULT_PAULI_CONFIG.fieldView)
   })
@@ -91,6 +92,7 @@ describe('PauliConfig type constraints', () => {
       'gaussianSpinDown',
       'gaussianSuperposition',
       'planeWaveSpinor',
+      'zeemanAnamorphSeed',
     ]
     expect(validConditions).toContain(DEFAULT_PAULI_CONFIG.initialCondition)
   })

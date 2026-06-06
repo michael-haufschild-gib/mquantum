@@ -32,6 +32,7 @@ export type PauliFieldType = 'uniform' | 'gradient' | 'rotating' | 'quadrupole'
  * - coherence: Off-diagonal |ψ↑* ψ↓| density matrix element
  * - spinHelicity: Magnitude of local spin-texture helicity |S · curl(S)|
  * - berryCurvature: Magnitude of Berry two-form 0.5*S·(∂iS×∂jS)
+ * - zeemanAnamorph: Transverse spin/field mismatch weighted by relative-phase shear
  */
 export type PauliFieldView =
   | 'spinDensity'
@@ -40,6 +41,7 @@ export type PauliFieldView =
   | 'coherence'
   | 'spinHelicity'
   | 'berryCurvature'
+  | 'zeemanAnamorph'
 
 /**
  * Initial wavepacket type for the Pauli spinor
@@ -47,12 +49,14 @@ export type PauliFieldView =
  * - gaussianSpinDown: Gaussian packet with pure spin-down
  * - gaussianSuperposition: Gaussian packet with equal spin-up/down superposition
  * - planeWaveSpinor: Plane wave with specified spin polarization
+ * - zeemanAnamorphSeed: Gaussian spinor with counter-warped up/down phases
  */
 export type PauliInitialCondition =
   | 'gaussianSpinUp'
   | 'gaussianSpinDown'
   | 'gaussianSuperposition'
   | 'planeWaveSpinor'
+  | 'zeemanAnamorphSeed'
 
 /**
  * Scalar potential types available in Pauli mode.

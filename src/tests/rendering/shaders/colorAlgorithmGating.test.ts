@@ -208,6 +208,17 @@ describe('getAvailableColorAlgorithms — phase-dependent exclusion in DM mode',
     }
   })
 
+  it('Pauli exposes phaseDensity for Zeeman Anamorph rendering', () => {
+    const values = getAvailableColorAlgorithms('harmonicOscillator', false, 'pauliSpinor').map(
+      (a) => a.value
+    )
+
+    expect(values).toContain('phaseDensity')
+    expect(values).toContain('pauliSpinDensity')
+    expect(values).toContain('pauliSpinExpectation')
+    expect(values).toContain('pauliCoherence')
+  })
+
   it('excludes phase-dependent algorithms for hydrogenND in OQ mode', () => {
     const algos = getAvailableColorAlgorithms('hydrogenND', true)
     const values = algos.map((a) => a.value)

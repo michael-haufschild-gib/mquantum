@@ -188,16 +188,10 @@ export function pauliFieldViewForColorAlgorithm(algo: string, currentFieldView?:
     return currentFieldView
   }
 
-  switch (algo) {
-    case 'pauliSpinDensity':
-      return 'spinDensity'
-    case 'pauliSpinExpectation':
-      return 'spinExpectation'
-    case 'pauliCoherence':
-      return 'coherence'
-    default:
-      return 'totalDensity'
-  }
+  if (algo === 'pauliSpinDensity') return 'spinDensity'
+  if (algo === 'pauliSpinExpectation') return 'spinExpectation'
+  if (algo === 'pauliCoherence') return 'coherence'
+  return algo === 'phaseDensity' ? 'zeemanAnamorph' : 'totalDensity'
 }
 
 /**
@@ -211,22 +205,15 @@ export function pauliFieldViewForColorAlgorithm(algo: string, currentFieldView?:
 function colorAlgoForPauliFieldView(
   pauliFieldView: string | undefined
 ): PaletteColorAlgorithm | null {
-  switch (pauliFieldView) {
-    case 'spinDensity':
-      return 'pauliSpinDensity'
-    case 'spinExpectation':
-      return 'pauliSpinExpectation'
-    case 'coherence':
-      return 'pauliCoherence'
-    case 'spinHelicity':
-      return 'blackbody'
-    case 'berryCurvature':
-      return 'blackbody'
-    case 'totalDensity':
-      return 'blackbody'
-    default:
-      return null
-  }
+  if (pauliFieldView === 'spinDensity') return 'pauliSpinDensity'
+  if (pauliFieldView === 'spinExpectation') return 'pauliSpinExpectation'
+  if (pauliFieldView === 'coherence') return 'pauliCoherence'
+  if (pauliFieldView === 'zeemanAnamorph') return 'phaseDensity'
+  return pauliFieldView === 'spinHelicity' ||
+    pauliFieldView === 'berryCurvature' ||
+    pauliFieldView === 'totalDensity'
+    ? 'blackbody'
+    : null
 }
 
 /** @returns Color algorithm valid for the given quantum mode, falling back to a sensible default. */

@@ -49,6 +49,7 @@ describe('PAULI_SCENARIO_PRESETS', () => {
       'coherence',
       'spinHelicity',
       'berryCurvature',
+      'zeemanAnamorph',
     ])
     for (const preset of PAULI_SCENARIO_PRESETS) {
       if (preset.overrides.fieldView) {
@@ -75,6 +76,7 @@ describe('PAULI_SCENARIO_PRESETS', () => {
       'gaussianSpinDown',
       'gaussianSuperposition',
       'planeWaveSpinor',
+      'zeemanAnamorphSeed',
     ])
     for (const preset of PAULI_SCENARIO_PRESETS) {
       if (preset.overrides.initialCondition) {
@@ -163,5 +165,14 @@ describe('PAULI_SCENARIO_PRESETS', () => {
     const sc = PAULI_SCENARIO_PRESETS.find((p) => p.id === 'spinCoherence')!
     expect(sc.overrides.fieldType).toBe('quadrupole')
     expect(sc.overrides.gradientStrength).toBeGreaterThan(0)
+  })
+
+  it('zeemanAnamorph uses a nonzero quadrupole field and counter-warped seed', () => {
+    const za = PAULI_SCENARIO_PRESETS.find((p) => p.id === 'zeemanAnamorph')!
+    expect(za.overrides.fieldType).toBe('quadrupole')
+    expect(za.overrides.gradientStrength).toBeGreaterThan(0)
+    expect(za.overrides.initialCondition).toBe('zeemanAnamorphSeed')
+    expect(za.overrides.initialSpinDirection?.[0]).toBeCloseTo(Math.PI / 2, 12)
+    expect(za.overrides.fieldView).toBe('zeemanAnamorph')
   })
 })

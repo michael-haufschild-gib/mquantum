@@ -20,12 +20,14 @@ const FIELD_VIEWS: readonly PauliFieldView[] = [
   'coherence',
   'spinHelicity',
   'berryCurvature',
+  'zeemanAnamorph',
 ]
 const INITIAL_CONDITIONS: readonly PauliInitialCondition[] = [
   'gaussianSpinUp',
   'gaussianSpinDown',
   'gaussianSuperposition',
   'planeWaveSpinor',
+  'zeemanAnamorphSeed',
 ]
 const POTENTIAL_TYPES: readonly PauliPotentialType[] = [
   'none',

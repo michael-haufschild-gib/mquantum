@@ -256,6 +256,7 @@ export const PAULI_FIELD_VIEW_TO_COLOR_ALGO: Record<PauliFieldView, ColorAlgorit
   coherence: 'pauliCoherence',
   spinHelicity: 'blackbody',
   berryCurvature: 'blackbody',
+  zeemanAnamorph: 'phaseDensity',
 }
 
 /** Map Dirac field view to matching color algorithm for synchronized rendering. */
@@ -326,14 +327,15 @@ export function getAvailableColorAlgorithms(
   availabilityOptions?: ColorAlgorithmAvailabilityOptions
 ): readonly (typeof COLOR_ALGORITHM_OPTIONS)[number][] {
   // Pauli spinor: the density grid encodes spin-channel data differently per
-  // field view. Expose the Pauli-specific algorithms (which match the grid layout)
-  // plus standard density-only algorithms for the totalDensity field view.
+  // field view. Expose the Pauli-specific algorithms (which match the grid
+  // layout), phaseDensity for Zeeman Anamorph, plus standard density colormaps.
   if (objectType === 'pauliSpinor') {
     const pauliValidAlgos = new Set<string>([
       'pauliSpinDensity',
       'pauliSpinExpectation',
       'pauliCoherence',
       'blackbody',
+      'phaseDensity',
       'viridis',
       'inferno',
       'densityContours',

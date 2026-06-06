@@ -70,4 +70,18 @@ describe('ScenarioSelector - Pauli presets', () => {
     expect(useExtendedObjectStore.getState().pauliSpinor.fieldView).toBe('coherence')
     expect(useAppearanceStore.getState().colorAlgorithm).toBe('pauliCoherence')
   })
+
+  it('applies Zeeman Anamorph preset and matching phase-density algorithm', async () => {
+    const user = userEvent.setup()
+    render(<ScenarioSelector />)
+
+    await user.selectOptions(screen.getByRole('combobox', { name: /scenario/i }), 'zeemanAnamorph')
+
+    const pauli = useExtendedObjectStore.getState().pauliSpinor
+    expect(pauli.fieldType).toBe('quadrupole')
+    expect(pauli.initialCondition).toBe('zeemanAnamorphSeed')
+    expect(pauli.fieldView).toBe('zeemanAnamorph')
+    expect(pauli.needsReset).toBe(true)
+    expect(useAppearanceStore.getState().colorAlgorithm).toBe('phaseDensity')
+  })
 })

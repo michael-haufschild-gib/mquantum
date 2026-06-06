@@ -942,6 +942,22 @@ describe('mergeExtendedObjectStateForType — pauliSpinor', () => {
     expect(pauli.pmlTargetReflection).toBe(1e-12)
   })
 
+  it('preserves Zeeman Anamorph Pauli view and initializer from loaded scenes', () => {
+    const merged = mergeExtendedObjectStateForType(
+      {
+        pauliSpinor: {
+          fieldView: 'zeemanAnamorph',
+          initialCondition: 'zeemanAnamorphSeed',
+        },
+      },
+      'pauliSpinor'
+    )
+    const pauli = merged.pauliSpinor as typeof DEFAULT_PAULI_CONFIG
+
+    expect(pauli.fieldView).toBe('zeemanAnamorph')
+    expect(pauli.initialCondition).toBe('zeemanAnamorphSeed')
+  })
+
   it('does not touch schroedinger config when merging pauliSpinor', () => {
     const loaded = {
       pauliSpinor: { fieldStrength: 3.0 },

@@ -19,6 +19,7 @@ const FIELD_VIEW_OPTIONS: { value: PauliFieldView; label: string }[] = [
   { value: 'coherence', label: 'Coherence' },
   { value: 'spinHelicity', label: 'Spin Helicity' },
   { value: 'berryCurvature', label: 'Berry Curvature' },
+  { value: 'zeemanAnamorph', label: 'Zeeman Anamorph' },
 ]
 
 interface PauliVisualizationControlsProps {
@@ -42,7 +43,7 @@ export const PauliVisualizationControls: React.FC<PauliVisualizationControlsProp
           value={fieldView}
           onChange={(v) => onFieldViewChange(v as PauliFieldView)}
           ariaLabel="Field View"
-          tooltip="Which spinor observable to render: spin density, total probability, spin expectation, coherence, spin helicity, or Berry curvature."
+          tooltip="Which spinor observable to render: spin density, total probability, spin expectation, coherence, spin helicity, Berry curvature, or Zeeman Anamorph."
         />
       </div>
     )

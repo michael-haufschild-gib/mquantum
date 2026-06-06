@@ -33,7 +33,6 @@ import { usePostProcessingStore } from '@/stores/scene/postProcessingStore'
 import { createInitialExportRuntimeState, isExportRuntimeActive } from './sceneExportRuntime'
 import {
   type PassConfig,
-  pauliFieldViewForColorAlgorithm,
   updateScenePassBackgroundColor,
   updateToScreenPassSharpness,
 } from './scenePassConfig'
@@ -355,10 +354,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     renderResolutionScale,
     colorAlgorithm: appearance.colorAlgorithm,
     diracFieldView: schroedingerCompile.diracFieldView,
-    pauliFieldView:
-      objectType === 'pauliSpinor'
-        ? pauliFieldViewForColorAlgorithm(appearance.colorAlgorithm)
-        : schroedingerCompile.pauliFieldView,
+    pauliFieldView: schroedingerCompile.pauliFieldView,
     freeScalarInitialCondition: schroedingerCompile.freeScalarInitialCondition,
     freeScalarVacuumCanEvolveKSpaceOccupation:
       schroedingerCompile.freeScalarVacuumCanEvolveKSpaceOccupation,
