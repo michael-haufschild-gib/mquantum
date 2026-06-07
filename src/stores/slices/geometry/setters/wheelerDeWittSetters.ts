@@ -12,8 +12,8 @@
 import type {
   WdwBoundaryCondition,
   WdwMinisuperspaceDimension,
-  WheelerDeWittConfig,
   WdwSrmtClock,
+  WheelerDeWittConfig,
 } from '@/lib/geometry/extended/wheelerDeWitt'
 import {
   WDW_SOLVER_4D_MAX_GRID_NA,
@@ -27,13 +27,13 @@ import {
   WDW_SOLVER_MIN_INFLATON_MASS,
   WDW_SOLVER_MIN_INFLATON_MASS_ASYMMETRY,
 } from '@/lib/physics/wheelerDeWitt/solverInputValidation'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 import {
   canApplyPresetRequest,
   createLatestPresetRequestGuard,
   loadPresetModule,
   type SchroedingerPresetApplyOptions,
 } from '@/stores/utils/dynamicPresetImport'
-import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 import {
   nestedClampedSetter,
@@ -55,6 +55,11 @@ export const WDW_GRID_PRESETS: Record<WdwGridPreset, { gridNa: number; gridNphi:
   high: { gridNa: 192, gridNphi: 40 },
   publication: { gridNa: 256, gridNphi: 48 },
 }
+/**
+ * Grid presets selectable in 4D minisuperspace mode — a reduced ladder
+ * without the `publication` tier, since 4D φ-slabs scale as `Nφ³`
+ * (vs `Nφ²` in 3D) in both memory and solve cost.
+ */
 export type WdwGridPreset4D = Exclude<WdwGridPreset, 'publication'>
 export const WDW_GRID_PRESETS_4D: Record<WdwGridPreset4D, { gridNa: number; gridNphi: number }> = {
   low: { gridNa: 48, gridNphi: 12 },
@@ -313,7 +318,11 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
           wheelerDeWitt: {
             ...state.schroedinger.wheelerDeWitt,
             ...(state.schroedinger.wheelerDeWitt.minisuperspaceDimension === 4
-              ? WDW_GRID_PRESETS_4D[(preset as WdwGridPreset4D) in WDW_GRID_PRESETS_4D ? (preset as WdwGridPreset4D) : 'low']
+              ? WDW_GRID_PRESETS_4D[
+                  (preset as WdwGridPreset4D) in WDW_GRID_PRESETS_4D
+                    ? (preset as WdwGridPreset4D)
+                    : 'low'
+                ]
               : WDW_GRID_PRESETS[preset]),
             needsReset: true,
           },
@@ -399,7 +408,9 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
           const preset = getWdwPreset(presetId)
           if (!preset) return
           const presetDimension = preset.overrides.minisuperspaceDimension ?? 3
-          const activeDimension = resolveWdwDimensionFromGeometry(useGeometryStore.getState().dimension)
+          const activeDimension = resolveWdwDimensionFromGeometry(
+            useGeometryStore.getState().dimension
+          )
           if (presetDimension !== activeDimension) return
           ctx.setWithVersion((state) => {
             const prev = state.schroedinger.wheelerDeWitt

@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 import { WheelerDeWittControls } from '@/components/sections/Geometry/SchroedingerControls/WheelerDeWittControls'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'

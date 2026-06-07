@@ -556,6 +556,7 @@ export interface WdwPackScratch {
   baselineAlpha?: Float32Array
 }
 
+/** Optional knobs for the Wheeler–DeWitt density packer. */
 export interface WdwDensityPackOptions {
   /** Fixed normalized `φ₃` slice used when packing 4D output. */
   phi3SliceNormalized?: number
@@ -682,20 +683,7 @@ export function packWdwDensityGrid(
               w2,
               w3
             )
-          : sampleChiTrilinear(
-              chi,
-              slab,
-              Nphi,
-              ia0,
-              ia1,
-              i10,
-              i11,
-              i20,
-              i21,
-              wa,
-              w1,
-              w2
-            )
+          : sampleChiTrilinear(chi, slab, Nphi, ia0, ia1, i10, i11, i20, i21, wa, w1, w2)
         const re = chiSample[0]!
         const im = chiSample[1]!
 

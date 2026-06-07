@@ -22,6 +22,11 @@
  *  - `deWitt`      — DeWitt boundary condition χ(0,·)=0.
  */
 export type WdwBoundaryCondition = 'noBoundary' | 'tunneling' | 'deWitt'
+
+/**
+ * Minisuperspace dimensionality: `3` solves on `(a, φ₁, φ₂)`, `4` adds a
+ * third inflaton axis `φ₃` for the `(a, φ₁, φ₂, φ₃)` solver.
+ */
 export type WdwMinisuperspaceDimension = 3 | 4
 
 /**

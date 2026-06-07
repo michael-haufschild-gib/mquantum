@@ -9,12 +9,20 @@
  * @module lib/physics/wheelerDeWitt/solverTypes
  */
 
-import type { WdwBoundaryCondition } from '@/lib/geometry/extended/wheelerDeWitt'
+import type {
+  WdwBoundaryCondition,
+  WdwMinisuperspaceDimension,
+} from '@/lib/geometry/extended/wheelerDeWitt'
 
 import type { ColumnAiryInfo } from '../airyConnection'
 import type { WdwBoundaryField } from '../boundaryConditions'
 
-export type WdwMinisuperspaceDimension = 3 | 4
+export type { WdwMinisuperspaceDimension }
+
+/**
+ * Dense `χ` grid dimensions — `(Na, Nφ, Nφ)` for the 3D solver or
+ * `(Na, Nφ, Nφ, Nφ)` for the 4D solver.
+ */
 export type WheelerDeWittGridSize = [number, number, number] | [number, number, number, number]
 
 /** Solver inputs mirroring the WdW config fields. */
@@ -122,9 +130,11 @@ export interface WheelerDeWittSolverOutput4D extends WheelerDeWittSolverOutputBa
   gridSize: [number, number, number, number]
 }
 
-export type WheelerDeWittAnySolverOutput =
-  | WheelerDeWittSolverOutput
-  | WheelerDeWittSolverOutput4D
+/**
+ * Union of the 3D and 4D solver outputs. Discriminate via
+ * `gridSize.length` (3 vs 4).
+ */
+export type WheelerDeWittAnySolverOutput = WheelerDeWittSolverOutput | WheelerDeWittSolverOutput4D
 
 /** Result of the per-cell φ-Laplacian stencil: `(Re, Im)` pair. */
 export interface ComplexPair {

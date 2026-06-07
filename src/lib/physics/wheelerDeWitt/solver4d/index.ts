@@ -33,6 +33,15 @@ import {
   type WheelerDeWittSolverOutput4D,
 } from '../solverTypes'
 
+/**
+ * Run the leapfrog Wheeler–DeWitt solver on the 4D minisuperspace
+ * `(a, φ₁, φ₂, φ₃)`. Same staged pipeline as the 3D solver (boundary
+ * slab → leapfrog bulk → WKB tail → Airy/Langer overwrite) with `Nφ³`
+ * φ-slabs instead of `Nφ²`.
+ *
+ * @param input - Solver config; `minisuperspaceDimension` is forced to 4.
+ * @returns Dense 4D `χ` grid and auxiliary metadata.
+ */
 export function solveWheelerDeWitt4D(input: WheelerDeWittSolverInput): WheelerDeWittSolverOutput4D {
   validateWheelerDeWittSolverInput({ ...input, minisuperspaceDimension: 4 })
 
@@ -238,10 +247,8 @@ export function solveWheelerDeWitt4D(input: WheelerDeWittSolverInput): WheelerDe
           const prevRe = chi[prevSlabBase + 2 * idx] ?? 0
           const prevIm = chi[prevSlabBase + 2 * idx + 1] ?? 0
           const lapPrev = phiLaplacianAt3D(chi, prevSlabBase, i1, i2, i3, Nphi, invDphi2)
-          adiRhs[2 * idx] =
-            2 * curRe - prevRe + lapPrevScale * lapPrev.re + da2 * Ucur * curRe
-          adiRhs[2 * idx + 1] =
-            2 * curIm - prevIm + lapPrevScale * lapPrev.im + da2 * Ucur * curIm
+          adiRhs[2 * idx] = 2 * curRe - prevRe + lapPrevScale * lapPrev.re + da2 * Ucur * curRe
+          adiRhs[2 * idx + 1] = 2 * curIm - prevIm + lapPrevScale * lapPrev.im + da2 * Ucur * curIm
         }
       }
     }

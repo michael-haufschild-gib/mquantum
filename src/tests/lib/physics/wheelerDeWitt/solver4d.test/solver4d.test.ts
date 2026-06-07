@@ -7,11 +7,11 @@ import {
   allocImplicitBulkScratch3D,
   solveADILaplacianNeumann3D,
 } from '@/lib/physics/wheelerDeWitt/implicitBulk'
-import { phiLaplacianAt3D, solveWheelerDeWitt } from '@/lib/physics/wheelerDeWitt/solver'
 import type {
   WheelerDeWittSolverOutput,
   WheelerDeWittSolverOutput4D,
 } from '@/lib/physics/wheelerDeWitt/solver'
+import { phiLaplacianAt3D, solveWheelerDeWitt } from '@/lib/physics/wheelerDeWitt/solver'
 
 function expectFiniteArray(values: ArrayLike<number>): void {
   for (let i = 0; i < values.length; i++) {
