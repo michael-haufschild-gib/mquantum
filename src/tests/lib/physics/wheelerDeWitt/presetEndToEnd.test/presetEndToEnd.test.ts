@@ -1,7 +1,10 @@
 /**
- * Per-preset end-to-end verification for all six curated Wheeler–DeWitt
- * scenarios: `noBoundaryBaseline`, `vilenkinTunneling`, `deWittOrigin`,
- * `inflationHighMass`, `deSitterLargeLambda`, `antiDeSitterContracting`.
+ * Per-preset end-to-end verification for every curated Wheeler–DeWitt
+ * scenario in `WDW_SCENARIO_PRESETS` — the six 3D scenarios
+ * (`noBoundaryBaseline`, `vilenkinTunneling`, `deWittOrigin`,
+ * `inflationHighMass`, `deSitterLargeLambda`, `antiDeSitterContracting`)
+ * plus the 4D fixed-φ₃-slice scenarios, which run through the genuine
+ * `(a, φ₁, φ₂, φ₃)` solver.
  *
  * For each preset, we invoke the full solver + density-grid packer and
  * assert invariants that catch physics / wiring / overflow regressions:
@@ -70,7 +73,11 @@ describe('WDW preset end-to-end pipeline', () => {
   for (const preset of WDW_SCENARIO_PRESETS) {
     describe(`preset: ${preset.id}`, () => {
       const config = { ...DEFAULT_WHEELER_DEWITT_CONFIG, ...preset.overrides }
+      // `minisuperspaceDimension` MUST be forwarded — omitting it would
+      // silently solve the 4D presets through the 3D code path and this
+      // suite would no longer be end-to-end for them.
       const output = solveWheelerDeWitt({
+        minisuperspaceDimension: config.minisuperspaceDimension,
         boundaryCondition: config.boundaryCondition,
         inflatonMass: config.inflatonMass,
         inflatonMassAsymmetry: config.inflatonMassAsymmetry,
@@ -81,6 +88,14 @@ describe('WDW preset end-to-end pipeline', () => {
         gridNphi: config.gridNphi,
         phiExtent: config.phiExtent,
       })
+      // NOTE: derived from config (not `output.gridSize.length`) because the
+      // variable-dimension overload of `solveWheelerDeWitt` types its result
+      // as the 3D output even when the runtime result is 4D.
+      const is4d = config.minisuperspaceDimension === 4
+      const Na = output.gridSize[0]
+      const Nphi = output.gridSize[1]
+      // Cells per a-slab: `Nφ²` in 3D, `Nφ³` in 4D.
+      const slab = is4d ? Nphi * Nphi * Nphi : Nphi * Nphi
 
       it('produces finite, positive maxDensity', () => {
         expect(Number.isFinite(output.maxDensity)).toBe(true)
@@ -104,37 +119,45 @@ describe('WDW preset end-to-end pipeline', () => {
           // for 2·128·40² ≈ 410k elements. Inline the check.
           const v = output.chi[i]!
           if (!Number.isFinite(v)) {
-            // Surface the specific offset for rapid diagnosis.
+            // Surface the specific offset for rapid diagnosis. `slab` is
+            // dimension-aware (Nφ² vs Nφ³) so the a-slab index is correct
+            // for both 3D and 4D outputs.
             throw new Error(
-              `chi[${i}] = ${v} (not finite) — cell (${Math.floor(
-                i / (2 * config.gridNphi * config.gridNphi)
-              )}, ${Math.floor((i % (2 * config.gridNphi * config.gridNphi)) / (2 * config.gridNphi))}, ${Math.floor((i % (2 * config.gridNphi)) / 2)})`
+              `chi[${i}] = ${v} (not finite) — a-slab ${Math.floor(i / (2 * slab))}, ` +
+                `cell-in-slab ${Math.floor((i % (2 * slab)) / 2)}`
             )
           }
         }
       })
 
-      it('Lorentzian mask matches turning-surface prediction at origin', () => {
-        // V(0, 0) pins the origin column's turning radius.
-        const VOrigin = wdwPotential(
-          0,
-          0,
+      it('Lorentzian mask matches turning-surface prediction at the central column', () => {
+        // The most-central grid column pins the turning radius. With even
+        // Nφ there is NO exact φ = 0 grid point — index ⌊Nφ/2⌋ sits at
+        // φ_mid = −phiExtent + ⌊Nφ/2⌋·dφ > 0, and on coarse grids
+        // (e.g. the 4D presets' Nφ = 12, dφ ≈ 0.64) the V(φ_mid) shift
+        // moves a_turn by more than one a-step. Evaluate V at the
+        // column's ACTUAL coordinates so the prediction matches the
+        // solver's per-cell `U < 0` classification exactly.
+        const mid = Math.floor(Nphi / 2)
+        const dphi = (2 * config.phiExtent) / (Nphi - 1)
+        const phiMid = -config.phiExtent + mid * dphi
+        const VCol = wdwPotential(
+          phiMid,
+          phiMid,
           config.inflatonMass,
           config.cosmologicalConstant,
-          config.inflatonMassAsymmetry
+          config.inflatonMassAsymmetry,
+          is4d ? phiMid : 0
         )
-        const Na = output.gridSize[0]
-        const Nphi = output.gridSize[1]
-        const slab = Nphi * Nphi
-        const cIdx = Math.floor(Nphi / 2) * Nphi + Math.floor(Nphi / 2)
-        if (VOrigin <= 0) {
+        const cIdx = is4d ? (mid * Nphi + mid) * Nphi + mid : mid * Nphi + mid
+        if (VCol <= 0) {
           // All-Lorentzian column: the no-turning-surface regime.
           for (let ia = 0; ia < Na; ia++) {
             expect(output.lorentzianMask[ia * slab + cIdx]).toBe(1)
           }
         } else {
           const K = (8 * Math.PI) / 3
-          const aTurn = 1 / Math.sqrt(K * VOrigin)
+          const aTurn = 1 / Math.sqrt(K * VCol)
           const da = (config.aMax - config.aMin) / (Na - 1)
           for (let ia = 0; ia < Na; ia++) {
             const a = config.aMin + ia * da
@@ -262,22 +285,13 @@ describe('WDW preset end-to-end pipeline', () => {
         // small. The Stage-3 Airy overwrite injects a complex-valued
         // c₁_raw that can seed non-trivial imaginary parts in Euclidean
         // cells; restrict the assertion to the Lorentzian interior.
-        const Na = output.gridSize[0]
-        const Nphi = output.gridSize[1]
-        const slab = Nphi * Nphi
+        // Flat iteration over the mask is dimension-agnostic (3D + 4D).
         let reSum = 0
         let imSum = 0
-        for (let ia = 0; ia < Na; ia++) {
-          for (let i1 = 0; i1 < Nphi; i1++) {
-            for (let i2 = 0; i2 < Nphi; i2++) {
-              const idx = ia * slab + i1 * Nphi + i2
-              if (output.lorentzianMask[idx] !== 1) continue
-              const re = output.chi[2 * idx]!
-              const im = output.chi[2 * idx + 1]!
-              reSum += Math.abs(re)
-              imSum += Math.abs(im)
-            }
-          }
+        for (let idx = 0; idx < output.lorentzianMask.length; idx++) {
+          if (output.lorentzianMask[idx] !== 1) continue
+          reSum += Math.abs(output.chi[2 * idx]!)
+          imSum += Math.abs(output.chi[2 * idx + 1]!)
         }
         if (reSum > 0) {
           // HH/DeWitt BC seeds χ with im = 0 and evolves via a real
@@ -289,22 +303,13 @@ describe('WDW preset end-to-end pipeline', () => {
 
       it('Vilenkin preset keeps non-trivial imaginary part in the Lorentzian interior', () => {
         if (preset.overrides.boundaryCondition !== 'tunneling') return
-        const Na = output.gridSize[0]
-        const Nphi = output.gridSize[1]
-        const slab = Nphi * Nphi
+        // Flat iteration over the mask is dimension-agnostic (3D + 4D).
         let reSum = 0
         let imSum = 0
-        for (let ia = 0; ia < Na; ia++) {
-          for (let i1 = 0; i1 < Nphi; i1++) {
-            for (let i2 = 0; i2 < Nphi; i2++) {
-              const idx = ia * slab + i1 * Nphi + i2
-              if (output.lorentzianMask[idx] !== 1) continue
-              const re = output.chi[2 * idx]!
-              const im = output.chi[2 * idx + 1]!
-              reSum += Math.abs(re)
-              imSum += Math.abs(im)
-            }
-          }
+        for (let idx = 0; idx < output.lorentzianMask.length; idx++) {
+          if (output.lorentzianMask[idx] !== 1) continue
+          reSum += Math.abs(output.chi[2 * idx]!)
+          imSum += Math.abs(output.chi[2 * idx + 1]!)
         }
         // Vilenkin outgoing wave: `χ ∝ e^{+iS}/|U|^{1/4}` carries a
         // substantial imaginary part throughout the Lorentzian region.
@@ -350,9 +355,6 @@ describe('WDW preset end-to-end pipeline', () => {
           density: config.streamlineDensity,
         })
         expect(trajectories.length).toBeGreaterThan(0)
-        const Na = output.gridSize[0]
-        const Nphi = output.gridSize[1]
-        const slab = Nphi * Nphi
         for (const traj of trajectories) {
           for (const [ia, i1, i2] of traj.points) {
             const iaI = Math.round(ia)
@@ -447,6 +449,11 @@ describe('WDW preset end-to-end pipeline', () => {
         // output than the 0.35 threshold used in `solver.test.ts`'s
         // flagship assertion, because this test spans every preset
         // rather than a single default config.
+        //
+        // `wdwOperatorResidual` is a 3D-only diagnostic (Nφ² stencil
+        // strides) — running it on 4D output would index the wrong
+        // cells. 4D presets are excluded until a 4D residual exists.
+        if (is4d) return
         const residual = wdwOperatorResidual(output, {
           boundaryCondition: config.boundaryCondition,
           inflatonMass: config.inflatonMass,
