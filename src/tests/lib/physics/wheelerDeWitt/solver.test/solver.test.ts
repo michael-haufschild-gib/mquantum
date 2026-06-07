@@ -4,7 +4,8 @@ import { DEFAULT_WHEELER_DEWITT_CONFIG } from '@/lib/geometry/extended/wheelerDe
 import { vilenkinLangerSeed } from '@/lib/physics/wheelerDeWitt/hhLangerSeed'
 import {
   solveWheelerDeWitt,
-  type WheelerDeWittSolverInput,
+  type WheelerDeWittSolverInput3D,
+  type WheelerDeWittSolverOutput,
 } from '@/lib/physics/wheelerDeWitt/solver'
 import {
   countEuclideanDeepCells,
@@ -13,7 +14,7 @@ import {
 } from '@/lib/physics/wheelerDeWitt/solverDiagnostics'
 
 /** Project's runtime WdW config stripped of display-only fields. */
-const DEFAULT_SOLVER_INPUT: WheelerDeWittSolverInput = {
+const DEFAULT_SOLVER_INPUT: WheelerDeWittSolverInput3D = {
   boundaryCondition: DEFAULT_WHEELER_DEWITT_CONFIG.boundaryCondition,
   inflatonMass: DEFAULT_WHEELER_DEWITT_CONFIG.inflatonMass,
   cosmologicalConstant: DEFAULT_WHEELER_DEWITT_CONFIG.cosmologicalConstant,
@@ -27,7 +28,7 @@ const DEFAULT_SOLVER_INPUT: WheelerDeWittSolverInput = {
 // Leapfrog stability: da²·|U_max| < 2 ⇒ da < √(2/|U_max|). Here
 // |U_max| ≈ 36π²·aMax² ≈ 800 at aMax=1.5 ⇒ da < 0.05. With Na=96 and
 // aMax-aMin = 1.45 we get da ≈ 0.0153, comfortably inside the bound.
-const BASE_INPUT: WheelerDeWittSolverInput = {
+const BASE_INPUT: WheelerDeWittSolverInput3D = {
   boundaryCondition: 'noBoundary',
   inflatonMass: 0.3,
   cosmologicalConstant: 0.05,
@@ -39,7 +40,7 @@ const BASE_INPUT: WheelerDeWittSolverInput = {
 }
 
 /** Extract the integrated |χ|² on a given a-slab. */
-function slabDensity(out: ReturnType<typeof solveWheelerDeWitt>, ia: number): number {
+function slabDensity(out: WheelerDeWittSolverOutput, ia: number): number {
   const [, Nphi] = out.gridSize
   const slab = Nphi * Nphi
   let acc = 0
@@ -52,7 +53,7 @@ function slabDensity(out: ReturnType<typeof solveWheelerDeWitt>, ia: number): nu
 }
 
 /** Mean |arg(χ)| on the full grid (cells above a small density floor). */
-function meanAbsPhase(out: ReturnType<typeof solveWheelerDeWitt>): number {
+function meanAbsPhase(out: WheelerDeWittSolverOutput): number {
   let sum = 0
   let count = 0
   for (let i = 0; i < out.chi.length; i += 2) {

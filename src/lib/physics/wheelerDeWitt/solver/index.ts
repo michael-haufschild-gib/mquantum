@@ -126,6 +126,8 @@ import {
   BandKind,
   type WheelerDeWittAnySolverOutput,
   type WheelerDeWittSolverInput,
+  type WheelerDeWittSolverInput3D,
+  type WheelerDeWittSolverInput4D,
   type WheelerDeWittSolverOutput,
   type WheelerDeWittSolverOutput4D,
 } from '../solverTypes'
@@ -142,6 +144,8 @@ export {
   type ComplexPair,
   type WheelerDeWittAnySolverOutput,
   type WheelerDeWittSolverInput,
+  type WheelerDeWittSolverInput3D,
+  type WheelerDeWittSolverInput4D,
   type WheelerDeWittSolverOutput,
   type WheelerDeWittSolverOutput4D,
 } from '../solverTypes'
@@ -165,16 +169,10 @@ export const WDW_SOLVER_VERSION = '3.0.0'
  * @param input - Solver config.
  * @returns Dense `χ` grid and auxiliary metadata.
  */
-export function solveWheelerDeWitt(
-  input: WheelerDeWittSolverInput & { minisuperspaceDimension: 4 }
-): WheelerDeWittSolverOutput4D
-export function solveWheelerDeWitt(
-  input: WheelerDeWittSolverInput & { minisuperspaceDimension?: 3 }
-): WheelerDeWittSolverOutput
-export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWittSolverOutput
-export function solveWheelerDeWitt(
-  input: WheelerDeWittSolverInput
-): WheelerDeWittAnySolverOutput {
+export function solveWheelerDeWitt(input: WheelerDeWittSolverInput4D): WheelerDeWittSolverOutput4D
+export function solveWheelerDeWitt(input: WheelerDeWittSolverInput3D): WheelerDeWittSolverOutput
+export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWittAnySolverOutput
+export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWittAnySolverOutput {
   validateWheelerDeWittSolverInput(input)
   if ((input.minisuperspaceDimension ?? 3) === 4) {
     return solveWheelerDeWitt4D(input)

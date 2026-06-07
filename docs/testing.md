@@ -195,6 +195,7 @@ const dim = await page.evaluate(async () => {
 | Rule | Detail |
 |------|--------|
 | Workers | `--workers=1` recommended locally (GPU contention) |
+| Dev server | Playwright starts raw Vite with `pnpm run dev:app` on `PLAYWRIGHT_DEV_SERVER_PORT` (default `3100`); human dev uses `pnpm run dev` through Portless at `https://mquantum.localhost` |
 | GPU skip | Tests that need rendering skip when `navigator.gpu` unavailable or adapter request fails |
 | Tab clicks in animated panels | Use `{ force: true }` — Motion panel entrance animation causes element instability |
 | No `waitForTimeout` | Wait for conditions: `data-renderer-state="ready"`, `data-frame-count > 0`, `aria-expanded`, `toBeVisible` |

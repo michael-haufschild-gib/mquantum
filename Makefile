@@ -4,7 +4,7 @@
 setup:
 	pnpm install --frozen-lockfile
 
-## Start dev server (port 3000)
+## Start dev server through Portless
 dev:
 	pnpm run dev
 

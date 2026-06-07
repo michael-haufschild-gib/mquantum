@@ -26,6 +26,7 @@
 
 import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
 import type { BellPairConfig } from '@/lib/geometry/extended/bellPair'
+import { CHSH_CAUSTIC_LIMITS, DEFAULT_CHSH_CAUSTIC_CONTROLS } from '@/lib/physics/bell/chshCaustic'
 import { bellPairApparatusWgsl } from '@/rendering/webgpu/shaders/schroedinger/compute/bellPairApparatus.wgsl'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../../core/types'
@@ -137,9 +138,24 @@ export function packBellApparatusUniforms(
   f32[26] = bobAxisPrime[2]
   // Final 16-byte scalar block.
   u32[28] = config.chshCausticEnabled ? 1 : 0
-  f32[29] = finiteClamped(config.chshCausticStrength, 1, 0, 4)
-  f32[30] = finiteClamped(config.chshCausticFoldScale, 7, 0.25, 24)
-  f32[31] = finiteClamped(config.chshCausticPhase, 0, -2 * Math.PI, 2 * Math.PI)
+  f32[29] = finiteClamped(
+    config.chshCausticStrength,
+    DEFAULT_CHSH_CAUSTIC_CONTROLS.chshCausticStrength,
+    CHSH_CAUSTIC_LIMITS.strengthMin,
+    CHSH_CAUSTIC_LIMITS.strengthMax
+  )
+  f32[30] = finiteClamped(
+    config.chshCausticFoldScale,
+    DEFAULT_CHSH_CAUSTIC_CONTROLS.chshCausticFoldScale,
+    CHSH_CAUSTIC_LIMITS.foldScaleMin,
+    CHSH_CAUSTIC_LIMITS.foldScaleMax
+  )
+  f32[31] = finiteClamped(
+    config.chshCausticPhase,
+    DEFAULT_CHSH_CAUSTIC_CONTROLS.chshCausticPhase,
+    CHSH_CAUSTIC_LIMITS.phaseMin,
+    CHSH_CAUSTIC_LIMITS.phaseMax
+  )
   return buf
 }
 

@@ -26,10 +26,10 @@ import {
 } from '@/lib/physics/srmt'
 import {
   solveWheelerDeWitt,
-  type WheelerDeWittSolverInput,
+  type WheelerDeWittSolverInput3D,
 } from '@/lib/physics/wheelerDeWitt/solver'
 
-const BCS: WheelerDeWittSolverInput['boundaryCondition'][] = ['noBoundary', 'tunneling', 'deWitt']
+const BCS: WheelerDeWittSolverInput3D['boundaryCondition'][] = ['noBoundary', 'tunneling', 'deWitt']
 
 function linspace(min: number, max: number, n: number): number[] {
   if (n <= 1) return [min]
@@ -40,7 +40,7 @@ function linspace(min: number, max: number, n: number): number[] {
 }
 
 interface PointVerdict {
-  bc: WheelerDeWittSolverInput['boundaryCondition']
+  bc: WheelerDeWittSolverInput3D['boundaryCondition']
   m: number
   lambda: number
   rigidChamp: SrmtClock | null
@@ -64,7 +64,7 @@ describe('V2 PUBLICATION SWEEP — reduced 11 × 11 × 3 grid against v2 criteri
     for (const bc of BCS) {
       for (const m of MASSES) {
         for (const lambda of LAMBDAS) {
-          const wdw: WheelerDeWittSolverInput = {
+          const wdw: WheelerDeWittSolverInput3D = {
             boundaryCondition: bc,
             inflatonMass: m,
             cosmologicalConstant: lambda,

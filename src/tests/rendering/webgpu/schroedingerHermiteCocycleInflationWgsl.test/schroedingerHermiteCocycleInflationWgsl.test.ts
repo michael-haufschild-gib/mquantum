@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  getHOUnrolledBlocks,
+  hermiteCocycleInflationHelpersBlock,
   hoCombined5Block,
   hoSpatial5Block,
   hoSuperposition5Block,
@@ -53,7 +55,10 @@ describe('Schroedinger Hermite Cocycle Inflation WGSL composition', () => {
   })
 
   it('wires unrolled preset blocks through the same branch rotation helper', () => {
-    expect(hoSuperposition5Block).toContain('fn hermiteCocycleInflationPhase')
+    const unrolled = getHOUnrolledBlocks(5)
+
+    expect(unrolled.helpers).toBe(hermiteCocycleInflationHelpersBlock)
+    expect(hermiteCocycleInflationHelpersBlock).toContain('fn hermiteCocycleInflationPhase')
     expect(hoSuperposition5Block).toContain(
       'applyHermiteCocycleInflation(uniforms.precomputedTerm[0].xy, xND, 0, uniforms)'
     )

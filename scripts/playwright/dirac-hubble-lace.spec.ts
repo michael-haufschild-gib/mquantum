@@ -142,9 +142,10 @@ async function expectFpsAtLeast(page: Page, label: string, minFps: number) {
   const warmupFrame = await getFrameCount(page)
   await waitForFrameAdvance(page, warmupFrame + 45, 20_000)
   const startFrame = await getFrameCount(page)
-  const startTime = Date.now()
+  const startTimeMs = await page.evaluate(() => performance.now())
   const endFrame = await waitForFrameAdvance(page, startFrame + 90, 20_000)
-  const elapsedSeconds = (Date.now() - startTime) / 1000
+  const endTimeMs = await page.evaluate(() => performance.now())
+  const elapsedSeconds = Math.max((endTimeMs - startTimeMs) / 1000, 0.001)
   const fps = (endFrame - startFrame) / elapsedSeconds
 
   console.log(`[PERF] ${label}: ${fps.toFixed(1)} FPS over ${elapsedSeconds.toFixed(2)}s`)

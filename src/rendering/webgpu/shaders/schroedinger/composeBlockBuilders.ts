@@ -326,6 +326,7 @@ export function buildQuantumMathBlocks(opts: {
     if (opts.useCache) {
       const cached = getHOCachedUnrolledBlocks(tc)
       blocks.push(
+        { name: 'HO Hermite Cocycle Inflation Helpers', content: cached.helpers },
         { name: `HO Superposition Cached (${termLabel})`, content: cached.superposition },
         { name: `HO Spatial Cached (${termLabel})`, content: cached.spatial },
         { name: `HO Combined Cached (${termLabel})`, content: cached.combined },
@@ -334,6 +335,7 @@ export function buildQuantumMathBlocks(opts: {
     } else {
       const unrolled = getHOUnrolledBlocks(tc)
       blocks.push(
+        { name: 'HO Hermite Cocycle Inflation Helpers', content: unrolled.helpers },
         { name: `HO Superposition (${termLabel})`, content: unrolled.superposition },
         { name: `HO Spatial (${termLabel})`, content: unrolled.spatial },
         { name: `HO Combined (${termLabel})`, content: unrolled.combined },

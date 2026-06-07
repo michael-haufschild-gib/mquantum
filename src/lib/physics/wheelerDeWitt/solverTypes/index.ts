@@ -84,6 +84,16 @@ export interface WheelerDeWittSolverInput {
   disableSponge?: boolean
 }
 
+/** Solver input that is statically known to use the legacy 3D minisuperspace. */
+export type WheelerDeWittSolverInput3D = WheelerDeWittSolverInput & {
+  minisuperspaceDimension?: 3
+}
+
+/** Solver input that is statically known to use the 4D minisuperspace. */
+export type WheelerDeWittSolverInput4D = WheelerDeWittSolverInput & {
+  minisuperspaceDimension: 4
+}
+
 interface WheelerDeWittSolverOutputBase {
   /**
    * `χ(a, φ₁, φ₂)` as interleaved `(re, im)` pairs. Strides in units of

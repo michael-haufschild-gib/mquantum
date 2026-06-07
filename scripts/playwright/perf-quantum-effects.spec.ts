@@ -21,7 +21,7 @@
  * Output: a structured `[QFX-PERF]` log line per case suitable for parsing.
  *
  * Run:
- *   PLAYWRIGHT_DEV_SERVER_PORT=3000 \
+ *   PLAYWRIGHT_DEV_SERVER_PORT=3100 \
  *     pnpm exec playwright test scripts/playwright/perf-quantum-effects.spec.ts \
  *     --workers=1 --reporter=line
  *

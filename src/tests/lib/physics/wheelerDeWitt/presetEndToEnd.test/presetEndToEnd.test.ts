@@ -37,7 +37,11 @@ import { DEFAULT_WHEELER_DEWITT_CONFIG } from '@/lib/geometry/extended/wheelerDe
 import { wdwPotential } from '@/lib/physics/wheelerDeWitt/constants'
 import { computeWdwRenderMaxRho, packWdwDensityGrid } from '@/lib/physics/wheelerDeWitt/densityGrid'
 import { WDW_SCENARIO_PRESETS } from '@/lib/physics/wheelerDeWitt/presets'
-import { solveWheelerDeWitt } from '@/lib/physics/wheelerDeWitt/solver'
+import {
+  solveWheelerDeWitt,
+  type WheelerDeWittAnySolverOutput,
+  type WheelerDeWittSolverOutput,
+} from '@/lib/physics/wheelerDeWitt/solver'
 import { wdwOperatorResidual } from '@/lib/physics/wheelerDeWitt/solverDiagnostics'
 import {
   buildStaticOverlay,
@@ -67,6 +71,13 @@ function decodeFloat16(u16: number): number {
   }
   const mag = (1 + frac / 1024) * Math.pow(2, exp - 15)
   return sign ? -mag : mag
+}
+
+function as3dSolverOutput(output: WheelerDeWittAnySolverOutput): WheelerDeWittSolverOutput {
+  if (output.gridSize.length !== 3) {
+    throw new Error('Expected 3D Wheeler-DeWitt solver output')
+  }
+  return output as WheelerDeWittSolverOutput
 }
 
 describe('WDW preset end-to-end pipeline', () => {
@@ -321,17 +332,18 @@ describe('WDW preset end-to-end pipeline', () => {
       })
 
       it('streamline integration is deterministic across re-invocations', () => {
-        if (!config.streamlinesEnabled) return
+        if (is4d || !config.streamlinesEnabled) return
+        const output3d = as3dSolverOutput(output)
         // The RK4 integrator reads grid-cell `arg(χ)` values — no
         // hidden randomness. Rerunning on the same solver output
         // must produce bit-identical trajectory lists. A regression
         // that introduced `Math.random()` or non-deterministic Map
         // iteration order into the hot path would break this.
-        const a = integrateWkbTrajectories(output, {
+        const a = integrateWkbTrajectories(output3d, {
           ...DEFAULT_STREAMLINE_INPUT,
           density: config.streamlineDensity,
         })
-        const b = integrateWkbTrajectories(output, {
+        const b = integrateWkbTrajectories(output3d, {
           ...DEFAULT_STREAMLINE_INPUT,
           density: config.streamlineDensity,
         })
@@ -349,8 +361,9 @@ describe('WDW preset end-to-end pipeline', () => {
       })
 
       it('streamline trajectories stay within the Lorentzian region', () => {
-        if (!config.streamlinesEnabled) return
-        const trajectories = integrateWkbTrajectories(output, {
+        if (is4d || !config.streamlinesEnabled) return
+        const output3d = as3dSolverOutput(output)
+        const trajectories = integrateWkbTrajectories(output3d, {
           ...DEFAULT_STREAMLINE_INPUT,
           density: config.streamlineDensity,
         })
@@ -365,14 +378,15 @@ describe('WDW preset end-to-end pipeline', () => {
             if (i2I < 0 || i2I >= Nphi) continue
             // Streamlines must live inside the Lorentzian region
             // (WKB classical flow is only defined where U < 0).
-            expect(output.lorentzianMask[iaI * slab + i1I * Nphi + i2I]).toBe(1)
+            expect(output3d.lorentzianMask[iaI * slab + i1I * Nphi + i2I]).toBe(1)
           }
         }
       })
 
       it('streamline overlay maxIntensity is positive when trajectories exist', () => {
-        if (!config.streamlinesEnabled) return
-        const trajectories = integrateWkbTrajectories(output, {
+        if (is4d || !config.streamlinesEnabled) return
+        const output3d = as3dSolverOutput(output)
+        const trajectories = integrateWkbTrajectories(output3d, {
           ...DEFAULT_STREAMLINE_INPUT,
           density: config.streamlineDensity,
         })
@@ -380,7 +394,7 @@ describe('WDW preset end-to-end pipeline', () => {
         const overlay = buildStaticOverlay(
           trajectories,
           DEFAULT_STREAMLINE_INPUT.splatRadius,
-          output.gridSize
+          output3d.gridSize
         )
         expect(overlay.maxIntensity).toBeGreaterThan(0)
         expect(Number.isFinite(overlay.maxIntensity)).toBe(true)
@@ -454,7 +468,8 @@ describe('WDW preset end-to-end pipeline', () => {
         // strides) — running it on 4D output would index the wrong
         // cells. 4D presets are excluded until a 4D residual exists.
         if (is4d) return
-        const residual = wdwOperatorResidual(output, {
+        const output3d = as3dSolverOutput(output)
+        const residual = wdwOperatorResidual(output3d, {
           boundaryCondition: config.boundaryCondition,
           inflatonMass: config.inflatonMass,
           inflatonMassAsymmetry: config.inflatonMassAsymmetry,
@@ -481,8 +496,9 @@ describe('WDW preset end-to-end pipeline', () => {
       })
 
       it('density + streamline overlay blend stays in [0, 1]', () => {
-        if (!config.streamlinesEnabled) return
-        const trajectories = integrateWkbTrajectories(output, {
+        if (is4d || !config.streamlinesEnabled) return
+        const output3d = as3dSolverOutput(output)
+        const trajectories = integrateWkbTrajectories(output3d, {
           ...DEFAULT_STREAMLINE_INPUT,
           density: config.streamlineDensity,
         })
@@ -490,9 +506,9 @@ describe('WDW preset end-to-end pipeline', () => {
         const overlay = buildStaticOverlay(
           trajectories,
           DEFAULT_STREAMLINE_INPUT.splatRadius,
-          output.gridSize
+          output3d.gridSize
         )
-        const packed = packWdwDensityGrid(output, overlay, undefined, 32)
+        const packed = packWdwDensityGrid(output3d, overlay, undefined, 32)
         for (let i = 0; i < packed.density.length; i += 4) {
           const R = decodeFloat16(packed.density[i]!)
           const A = decodeFloat16(packed.density[i + 3]!)

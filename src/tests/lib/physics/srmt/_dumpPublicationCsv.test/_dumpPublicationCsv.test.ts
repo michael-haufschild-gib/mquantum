@@ -24,12 +24,12 @@ import type { SrmtSweepConfig } from '@/lib/physics/srmt/sweepTypes'
 import {
   solveWheelerDeWitt,
   WDW_SOLVER_VERSION,
-  type WheelerDeWittSolverInput,
+  type WheelerDeWittSolverInput3D,
 } from '@/lib/physics/wheelerDeWitt/solver'
 
 describe('publication CSV artifact', () => {
   it('writes a v2-compliant 57-column CSV to artifacts/', () => {
-    const wdw: WheelerDeWittSolverInput = {
+    const wdw: WheelerDeWittSolverInput3D = {
       boundaryCondition: 'noBoundary',
       inflatonMass: 0.3,
       cosmologicalConstant: 0.1,

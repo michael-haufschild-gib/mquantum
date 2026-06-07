@@ -17,12 +17,12 @@ import { runCutSweep } from '@/lib/physics/srmt/sweepDriver'
 import type { SrmtSweepConfig } from '@/lib/physics/srmt/sweepTypes'
 import {
   solveWheelerDeWitt,
-  type WheelerDeWittSolverInput,
+  type WheelerDeWittSolverInput3D,
 } from '@/lib/physics/wheelerDeWitt/solver'
 
 describe('LIVE SWEEP — falsification CSV end-to-end', () => {
   it('runs a 5-point cut sweep and prints the per-point falsification columns', () => {
-    const wdw: WheelerDeWittSolverInput = {
+    const wdw: WheelerDeWittSolverInput3D = {
       boundaryCondition: 'noBoundary',
       inflatonMass: 0.3,
       cosmologicalConstant: 0.1,

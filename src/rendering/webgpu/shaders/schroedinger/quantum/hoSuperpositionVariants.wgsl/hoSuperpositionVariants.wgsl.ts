@@ -12,7 +12,7 @@
 
 import { sanitizeShaderTermCount } from '../../../shared/compose-helpers'
 
-const hermiteCocycleInflationHelpers = /* wgsl */ `
+export const hermiteCocycleInflationHelpersBlock = /* wgsl */ `
 fn isHermiteCocycleInflationActive(uniforms: SchroedingerUniforms) -> bool {
   return uniforms.quantumMode == QUANTUM_MODE_HARMONIC &&
     uniforms.hermiteCocycleInflationEnabled != 0u &&
@@ -115,7 +115,6 @@ function generateHOSuperpositionBlock(termCount: number): string {
   // is no longer used inside the unrolled body; the time dependence now lives
   // entirely inside uniforms.precomputedTerm. WGSL allows unused parameters.
   return `
-${hermiteCocycleInflationHelpers}
 // ============================================
 // HO Superposition - ${termCount} Term${termCount > 1 ? 's' : ''} (Unrolled)
 // ============================================
@@ -247,6 +246,7 @@ export const hoCombined8Block = generateHOCombinedBlock(8)
  * @param termCount
  */
 export function getHOUnrolledBlocks(termCount: number): {
+  helpers: string
   superposition: string
   spatial: string
   combined: string
@@ -283,6 +283,7 @@ export function getHOUnrolledBlocks(termCount: number): {
     hoCombined8Block,
   ]
   return {
+    helpers: hermiteCocycleInflationHelpersBlock,
     superposition: superpositionBlocks[tc - 1]!,
     spatial: spatialBlocks[tc - 1]!,
     combined: combinedBlocks[tc - 1]!,

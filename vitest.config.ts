@@ -201,12 +201,11 @@ export default defineConfig({
       // denominator changes (new files, exclusion list changes) — document why.
       // The companion `scripts/check-coverage-ratchet.js` rejects thresholds
       // that drift > 1% below actual, so missed ratchet-ups break CI.
-      // Last measured 2026-06-05 (PR #100): stmts 87.23%, branches 78.71%,
-      // funcs 85.49%, lines 88.45%. Ratchet bumps branches to stay within
-      // the 1% ratchet window after index-layout coverage exclusions were
-      // restored.
+      // Last measured 2026-06-07 (PR #103): stmts 87.52%, branches 78.77%,
+      // funcs 85.86%, lines 88.76%. Ratchet bumps statements to stay within
+      // the 1% ratchet window after the PR #103 coverage run.
       thresholds: {
-        statements: 86.5,
+        statements: 87.5,
         branches: 78.5,
         functions: 85,
         lines: 88,
