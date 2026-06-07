@@ -1260,7 +1260,7 @@ describe('WGSL Shader Compilation - Schroedinger Density Grid Compute', () => {
     const termCounts = [1, 2, 3, 4, 5, 6, 7, 8] as const
 
     for (const termCount of termCounts) {
-      const { wgsl, features } = composeDensityGridComputeShader({
+      const { wgsl, features, modules } = composeDensityGridComputeShader({
         dimension: 4,
         quantumMode: 'harmonicOscillator',
         termCount,
@@ -1268,6 +1268,11 @@ describe('WGSL Shader Compilation - Schroedinger Density Grid Compute', () => {
 
       verifyWgslCompute(wgsl)
       expect(features).toContain(`HO ${termCount}-term unrolled`)
+      expect(modules).toContain('HO Hermite Cocycle Inflation Helpers')
+      expect(wgsl.match(/\bfn\s+applyHermiteCocycleInflation\s*\(/g)).toHaveLength(1)
+      expect(wgsl.indexOf('fn applyHermiteCocycleInflation(')).toBeLessThan(
+        wgsl.indexOf('let term0 = applyHermiteCocycleInflation(')
+      )
     }
   })
 })
