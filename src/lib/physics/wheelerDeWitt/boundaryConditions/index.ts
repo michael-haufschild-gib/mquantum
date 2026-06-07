@@ -26,7 +26,9 @@
 
 export { WDW_G_PREFACTOR, wdwPotential } from '../constants'
 import { hhLangerSeed, vilenkinLangerSeed } from '../hhLangerSeed'
-import type { WdwMinisuperspaceDimension } from '../solverTypes'
+import type { WdwBoundaryField, WdwMinisuperspaceDimension } from '../solverTypes'
+
+export type { WdwBoundaryField } from '../solverTypes'
 
 /** Shared inputs for the boundary-condition generators. */
 export interface WdwBoundaryInputs {
@@ -49,14 +51,6 @@ export interface WdwBoundaryInputs {
   asymmetry?: number
   /** Minisuperspace dimension. Defaults to 3. */
   minisuperspaceDimension?: WdwMinisuperspaceDimension
-}
-
-/** Output buffers for the boundary condition: χ(a_min, φ) and ∂_a χ(a_min, φ). */
-export interface WdwBoundaryField {
-  /** χ(a_min,·) interleaved [re, im] × (Nphi² or Nphi³). */
-  chi: Float32Array
-  /** ∂_a χ(a_min,·) interleaved [re, im] × (Nphi² or Nphi³). */
-  chiDeriv: Float32Array
 }
 
 /** Interleaved-index helper — (re, im) packed: 2 floats per grid point. */

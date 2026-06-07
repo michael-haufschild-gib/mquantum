@@ -15,7 +15,6 @@ import type {
 } from '@/lib/geometry/extended/wheelerDeWitt'
 
 import type { ColumnAiryInfo } from '../airyConnection'
-import type { WdwBoundaryField } from '../boundaryConditions'
 
 export type { WdwMinisuperspaceDimension }
 
@@ -24,6 +23,14 @@ export type { WdwMinisuperspaceDimension }
  * `(Na, Nφ, Nφ, Nφ)` for the 4D solver.
  */
 export type WheelerDeWittGridSize = [number, number, number] | [number, number, number, number]
+
+/** Output buffers for the boundary condition: χ(a_min, φ) and ∂_a χ(a_min, φ). */
+export interface WdwBoundaryField {
+  /** χ(a_min,·) interleaved [re, im] × (Nphi² or Nphi³). */
+  chi: Float32Array
+  /** ∂_a χ(a_min,·) interleaved [re, im] × (Nphi² or Nphi³). */
+  chiDeriv: Float32Array
+}
 
 /** Solver inputs mirroring the WdW config fields. */
 export interface WheelerDeWittSolverInput {
