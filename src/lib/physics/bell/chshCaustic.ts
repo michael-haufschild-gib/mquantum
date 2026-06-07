@@ -9,7 +9,7 @@
  * @module lib/physics/bell/chshCaustic
  */
 
-import type { BellPairAxis, BellPairConfig } from '@/lib/geometry/extended/bellPair'
+import type { BellPairAxis } from '@/lib/geometry/extended/bellPair'
 import { CLASSICAL_BOUND, TSIRELSON_BOUND } from '@/lib/physics/bell/chsh'
 
 /** Normalized 3D point/vector used by the Bell apparatus density grid. */
@@ -292,25 +292,4 @@ export function applyChshCausticToDensity(
     b: finiteNonNegative(base.b + lens * (0.95 - 0.4 * slack) + shadow * 0.45),
     a: finiteNonNegative(base.a + lens * 0.75 + shadow * 0.25),
   }
-}
-
-/** Extract the caustic-relevant subset from a full BellPairConfig. */
-export function evaluateBellConfigCaustic(
-  config: BellPairConfig,
-  point: Vec3,
-  armOffset = 0.6
-): ChshCausticSample {
-  return evaluateChshCaustic({
-    aliceAxis: config.aliceAxis,
-    aliceAxisPrime: config.aliceAxisPrime,
-    bobAxis: config.bobAxis,
-    bobAxisPrime: config.bobAxisPrime,
-    visibility: config.visibility,
-    chshCausticEnabled: config.chshCausticEnabled,
-    chshCausticStrength: config.chshCausticStrength,
-    chshCausticFoldScale: config.chshCausticFoldScale,
-    chshCausticPhase: config.chshCausticPhase,
-    point,
-    armOffset,
-  })
 }
