@@ -372,24 +372,29 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
 
     // HO Superposition - unrolled variants when termCount is known
     ...(useUnrolledHO && termCount
-      ? [
-          {
-            name: `HO Superposition (${termCount} term${termCount > 1 ? 's' : ''})`,
-            content: getHOUnrolledBlocks(termCount).superposition,
-          },
-          {
-            name: `HO Spatial (${termCount} term${termCount > 1 ? 's' : ''})`,
-            content: getHOUnrolledBlocks(termCount).spatial,
-          },
-          {
-            name: `HO Combined (${termCount} term${termCount > 1 ? 's' : ''})`,
-            content: getHOUnrolledBlocks(termCount).combined,
-          },
-          {
-            name: 'HO Dispatch (Unrolled)',
-            content: generateHODispatchBlock(termCount),
-          },
-        ]
+      ? (() => {
+          const unrolled = getHOUnrolledBlocks(termCount)
+          const termLabel = `${termCount} term${termCount > 1 ? 's' : ''}`
+          return [
+            { name: 'HO Hermite Cocycle Inflation Helpers', content: unrolled.helpers },
+            {
+              name: `HO Superposition (${termLabel})`,
+              content: unrolled.superposition,
+            },
+            {
+              name: `HO Spatial (${termLabel})`,
+              content: unrolled.spatial,
+            },
+            {
+              name: `HO Combined (${termLabel})`,
+              content: unrolled.combined,
+            },
+            {
+              name: 'HO Dispatch (Unrolled)',
+              content: generateHODispatchBlock(termCount),
+            },
+          ]
+        })()
       : []),
 
     // Unified wavefunction evaluation
