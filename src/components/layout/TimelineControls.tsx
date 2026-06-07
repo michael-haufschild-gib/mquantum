@@ -84,7 +84,12 @@ const countActiveAnimations = (
 }
 
 export const TimelineControls: FC = () => {
-  const objectType = useGeometryStore((state: GeometryState) => state.objectType)
+  const { objectType, dimension } = useGeometryStore(
+    useShallow((state: GeometryState) => ({
+      objectType: state.objectType,
+      dimension: state.dimension,
+    }))
+  )
 
   const { isPlaying, speed, animatingPlanes, togglePlayPause, setSpeed } = useAnimationStore(
     useShallow((state: AnimationState) => ({
@@ -112,7 +117,10 @@ export const TimelineControls: FC = () => {
       // Wheeler–DeWitt render-only effects. Defensive reads — tests may omit
       // the wheelerDeWitt sub-state when they mock schroedinger partially.
       wdwPhaseRotationEnabled: state.schroedinger.wheelerDeWitt?.phaseRotationEnabled ?? false,
-      wdwWorldlineEnabled: state.schroedinger.wheelerDeWitt?.worldlineEnabled ?? false,
+      wdwWorldlineEnabled:
+        dimension === 4
+          ? false
+          : (state.schroedinger.wheelerDeWitt?.worldlineEnabled ?? false),
       // TDSE Auto-Loop is the only effect surfaced in the TDSE drawer aside from
       // the shared dimensional sweeps. Defensive `?` for partial test mocks.
       tdseAutoLoopEnabled: state.schroedinger.tdse?.autoLoop ?? false,

@@ -113,6 +113,23 @@ describe('DiracComputePassUniforms', () => {
     ).toBe(7)
   })
 
+  it('maps hubbleLace fieldView to append-only shader enum 9', () => {
+    const I = DIRAC_UNIFORMS_LAYOUT.index
+
+    expect(
+      writeConfig({
+        ...DEFAULT_DIRAC_CONFIG,
+        fieldView: 'hubbleLace',
+      })[I.fieldView]
+    ).toBe(9)
+    expect(
+      writeConfig({
+        ...DEFAULT_DIRAC_CONFIG,
+        fieldView: 'cliffordBloom',
+      })[I.fieldView]
+    ).toBe(8)
+  })
+
   it('does not enable potential physics for non-boolean showPotential values', () => {
     expect(
       effectiveDiracPotentialType({

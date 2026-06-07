@@ -22,7 +22,10 @@ import {
   packWdwDensityGrid,
   type WdwSrmtOverlay,
 } from '@/lib/physics/wheelerDeWitt/densityGrid'
-import type { WheelerDeWittSolverOutput } from '@/lib/physics/wheelerDeWitt/solver'
+import type {
+  WheelerDeWittSolverInput3D,
+  WheelerDeWittSolverOutput,
+} from '@/lib/physics/wheelerDeWitt/solver'
 import { solveWheelerDeWitt } from '@/lib/physics/wheelerDeWitt/solver'
 import {
   buildStaticOverlay,
@@ -31,7 +34,7 @@ import {
 } from '@/lib/physics/wheelerDeWitt/wkbStreamlines'
 
 /** Solve the default noBoundary HH preset at a small grid. */
-function solveSmall(overrides: Partial<Parameters<typeof solveWheelerDeWitt>[0]> = {}) {
+function solveSmall(overrides: Partial<WheelerDeWittSolverInput3D> = {}) {
   return solveWheelerDeWitt({
     boundaryCondition: 'noBoundary',
     inflatonMass: 0.3,

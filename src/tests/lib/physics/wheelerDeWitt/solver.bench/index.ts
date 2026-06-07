@@ -26,7 +26,7 @@ import {
 } from '@/lib/physics/wheelerDeWitt/densityGrid'
 import {
   solveWheelerDeWitt,
-  type WheelerDeWittSolverInput,
+  type WheelerDeWittSolverInput3D,
 } from '@/lib/physics/wheelerDeWitt/solver'
 import { wdwOperatorResidual } from '@/lib/physics/wheelerDeWitt/solverDiagnostics'
 import {
@@ -37,7 +37,7 @@ import {
 } from '@/lib/physics/wheelerDeWitt/wkbStreamlines'
 
 /** Default Wheeler–DeWitt config — mirrors `DEFAULT_WHEELER_DEWITT_CONFIG`. */
-const DEFAULT_INPUT: WheelerDeWittSolverInput = {
+const DEFAULT_INPUT: WheelerDeWittSolverInput3D = {
   boundaryCondition: 'noBoundary',
   inflatonMass: 0.3,
   cosmologicalConstant: 0.0,
@@ -48,8 +48,8 @@ const DEFAULT_INPUT: WheelerDeWittSolverInput = {
   phiExtent: 2.0,
 }
 
-const LOW_GRID_INPUT: WheelerDeWittSolverInput = { ...DEFAULT_INPUT, gridNa: 64, gridNphi: 16 }
-const HIGH_GRID_INPUT: WheelerDeWittSolverInput = { ...DEFAULT_INPUT, gridNa: 192, gridNphi: 32 }
+const LOW_GRID_INPUT: WheelerDeWittSolverInput3D = { ...DEFAULT_INPUT, gridNa: 64, gridNphi: 16 }
+const HIGH_GRID_INPUT: WheelerDeWittSolverInput3D = { ...DEFAULT_INPUT, gridNa: 192, gridNphi: 32 }
 
 describe('Wheeler–DeWitt solver — default grid (Na=128, Nphi=32)', () => {
   bench(

@@ -79,7 +79,7 @@ describe('WebGPUDevice.initialize() error contract', () => {
     expect(result.success).toBe(false)
     if (result.success) return
     expect(result.code).toBe('NO_NAVIGATOR_GPU')
-    expect(result.error).toContain('WebGPU is not supported')
+    expect(result.error).toContain('WebGPU unsupported')
     // The catch boundary attaches the original WebGPUInitError as `cause`.
     expect(result.cause).toBeInstanceOf(Error)
   })
@@ -98,7 +98,7 @@ describe('WebGPUDevice.initialize() error contract', () => {
     expect(result.success).toBe(false)
     if (result.success) return
     expect(result.code).toBe('NO_NAVIGATOR_GPU')
-    expect(result.error).toContain('WebGPU is not supported')
+    expect(result.error).toContain('WebGPU unsupported')
   })
 
   it('caches the same failure result across repeated calls with the same canvas', async () => {

@@ -46,6 +46,7 @@ const FIRST_PRESET_IDS = {
   quantumWalk: 'groverSearch',
   pauliSpinor: 'larmorPrecession',
   wheelerDeWitt: 'noBoundaryBaseline',
+  wheelerDeWitt4D: 'fourDimensionalNoBoundarySlice',
   antiDeSitterDefault: 'adsFourGround',
   antiDeSitter3D: 'adsThreeGround',
   bellTest: 'canonicalCHSH',
@@ -68,6 +69,10 @@ function resolveAntiDeSitter(dimension: number): string {
   return FIRST_PRESET_IDS.antiDeSitterDefault
 }
 
+function resolveWheelerDeWitt(dimension: number): string {
+  return dimension === 4 ? FIRST_PRESET_IDS.wheelerDeWitt4D : FIRST_PRESET_IDS.wheelerDeWitt
+}
+
 /**
  * Per-mode resolvers. Each one is the dimension-filter idiom for that mode's
  * preset catalog. Adding a new mode means adding one lightweight resolver
@@ -83,7 +88,7 @@ const PRESET_RESOLVERS: Readonly<Record<QuantumTypeKey, FirstPresetResolver>> = 
   freeScalarField: () => FIRST_PRESET_IDS.freeScalarField,
   quantumWalk: () => FIRST_PRESET_IDS.quantumWalk,
   pauliSpinor: () => FIRST_PRESET_IDS.pauliSpinor,
-  wheelerDeWitt: () => FIRST_PRESET_IDS.wheelerDeWitt,
+  wheelerDeWitt: resolveWheelerDeWitt,
   antiDeSitter: resolveAntiDeSitter,
   bellTest: () => FIRST_PRESET_IDS.bellTest,
 }

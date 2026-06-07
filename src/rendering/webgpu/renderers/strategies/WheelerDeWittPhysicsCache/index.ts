@@ -26,6 +26,7 @@
 import type { WheelerDeWittConfig } from '@/lib/geometry/extended/wheelerDeWitt'
 import {
   solveWheelerDeWitt,
+  type WheelerDeWittAnySolverOutput,
   type WheelerDeWittSolverOutput,
 } from '@/lib/physics/wheelerDeWitt/solver'
 import {
@@ -55,6 +56,7 @@ import {
  */
 export function computeWdwConfigHash(config: WheelerDeWittConfig): string {
   return [
+    config.minisuperspaceDimension ?? 3,
     config.boundaryCondition,
     config.inflatonMass.toFixed(6),
     // `inflatonMassAsymmetry ?? 1` makes the default elision in the URL
@@ -88,6 +90,7 @@ export function computeWdwConfigHash(config: WheelerDeWittConfig): string {
  */
 export function computeWdwTrajectoryHash(config: WheelerDeWittConfig): string {
   return [
+    config.minisuperspaceDimension ?? 3,
     config.streamlinesEnabled ? 1 : 0,
     config.streamlineDensity,
     config.worldlineEnabled ? 1 : 0,
@@ -101,7 +104,7 @@ export interface WdwCacheTick {
   /** True on the frame trajectories actually rebuilt. */
   trajectoryDirty: boolean
   /** Current solver output, or `null` if nothing has been solved yet. */
-  output: WheelerDeWittSolverOutput | null
+  output: WheelerDeWittAnySolverOutput | null
   /** Current trajectory list, or `null` if streamlines are disabled. */
   trajectories: WkbTrajectory[] | null
 }
@@ -114,7 +117,7 @@ export interface WdwCacheTick {
 export class WheelerDeWittPhysicsCache {
   private lastConfigHash: string | null = null
   private lastTrajectoryHash: string | null = null
-  private lastSolverOutput: WheelerDeWittSolverOutput | null = null
+  private lastSolverOutput: WheelerDeWittAnySolverOutput | null = null
   private lastTrajectories: WkbTrajectory[] | null = null
 
   /**
@@ -137,6 +140,7 @@ export class WheelerDeWittPhysicsCache {
 
     if (solverDirty) {
       this.lastSolverOutput = solveWheelerDeWitt({
+        minisuperspaceDimension: config.minisuperspaceDimension ?? 3,
         boundaryCondition: config.boundaryCondition,
         inflatonMass: config.inflatonMass,
         inflatonMassAsymmetry: config.inflatonMassAsymmetry,
@@ -157,9 +161,16 @@ export class WheelerDeWittPhysicsCache {
       // (`buildPulseOverlay`). Rebuild them whenever either consumer
       // is enabled — gating only on `streamlinesEnabled` left the
       // pulse invisible when a user toggled it on alone.
-      const trajectoriesNeeded = config.streamlinesEnabled || config.worldlineEnabled
+      const solverOutput3d =
+        this.lastSolverOutput.gridSize.length === 3
+          ? (this.lastSolverOutput as WheelerDeWittSolverOutput)
+          : null
+      const trajectoriesNeeded =
+        !!solverOutput3d &&
+        (config.minisuperspaceDimension ?? 3) === 3 &&
+        (config.streamlinesEnabled || config.worldlineEnabled)
       this.lastTrajectories = trajectoriesNeeded
-        ? integrateWkbTrajectories(this.lastSolverOutput, {
+        ? integrateWkbTrajectories(solverOutput3d, {
             ...DEFAULT_STREAMLINE_INPUT,
             density: config.streamlineDensity,
           })
@@ -185,7 +196,7 @@ export class WheelerDeWittPhysicsCache {
   }
 
   /** Current solver output (or `null` if never solved). */
-  getOutput(): WheelerDeWittSolverOutput | null {
+  getOutput(): WheelerDeWittAnySolverOutput | null {
     return this.lastSolverOutput
   }
 

@@ -289,8 +289,7 @@ export default defineConfig((_env) => ({
     ],
   },
   server: {
-    port: 3000,
-    open: true,
+    open: process.env.PORTLESS_URL ?? true,
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',

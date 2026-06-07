@@ -32,7 +32,7 @@ import { buildSrmtSweepManifest } from '@/lib/physics/srmt/sweepManifest'
 import type { SrmtSweepConfig, SrmtSweepPoint } from '@/lib/physics/srmt/sweepTypes'
 import {
   solveWheelerDeWitt,
-  type WheelerDeWittSolverInput,
+  type WheelerDeWittSolverInput3D,
 } from '@/lib/physics/wheelerDeWitt/solver'
 
 /**
@@ -114,7 +114,7 @@ describe('SRMT cut-sweep determinism', () => {
    * picked so the solver runs quickly while still exercising the full
    * Schmidt + Lanczos + affine-fit pipeline.
    */
-  const WDW_INPUT: WheelerDeWittSolverInput = {
+  const WDW_INPUT: WheelerDeWittSolverInput3D = {
     boundaryCondition: 'noBoundary',
     inflatonMass: 0.3,
     cosmologicalConstant: 0.1,

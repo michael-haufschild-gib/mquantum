@@ -396,7 +396,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         key: 'wheelerDeWitt',
         name: 'Wheeler–DeWitt',
         description:
-          'Wavefunction of the universe in 3D minisuperspace: Hartle–Hawking vs Vilenkin vs DeWitt.',
+          'Wavefunction of the universe in 3D or fixed-slice 4D minisuperspace: Hartle–Hawking vs Vilenkin vs DeWitt.',
         category: 'compute',
         runtime: {
           dataPath: 'densityGrid',
@@ -408,9 +408,10 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         },
         dimensions: {
           min: 3,
-          max: 3,
+          max: 4,
           recommended: 3,
-          recommendedReason: 'Minisuperspace is (a, φ₁, φ₂) — 3D by construction',
+          recommendedReason:
+            '3D is the default; 4D solves χ(a, φ₁, φ₂, φ₃) and renders a fixed φ₃ slice',
         },
         rendering: SHARED_RENDERING,
         animation: {

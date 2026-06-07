@@ -9,13 +9,45 @@
  * @module lib/physics/wheelerDeWitt/solverTypes
  */
 
-import type { WdwBoundaryCondition } from '@/lib/geometry/extended/wheelerDeWitt'
+import type {
+  WdwBoundaryCondition,
+  WdwMinisuperspaceDimension,
+} from '@/lib/geometry/extended/wheelerDeWitt'
 
 import type { ColumnAiryInfo } from '../airyConnection'
-import type { WdwBoundaryField } from '../boundaryConditions'
+
+export type { WdwMinisuperspaceDimension }
+
+/**
+ * Dense `χ` grid dimensions — `(Na, Nφ, Nφ)` for the 3D solver or
+ * `(Na, Nφ, Nφ, Nφ)` for the 4D solver.
+ */
+export type WheelerDeWittGridSize = [number, number, number] | [number, number, number, number]
+
+interface WdwBoundaryFieldBase {
+  /** χ(a_min,·) interleaved [re, im] × (Nphi² or Nphi³). */
+  chi: Float32Array
+  /** ∂_a χ(a_min,·) interleaved [re, im] × (Nphi² or Nphi³). */
+  chiDeriv: Float32Array
+}
+
+/** 3D boundary buffers for `(a, φ₁, φ₂)` minisuperspace. */
+export interface WdwBoundaryField3D extends WdwBoundaryFieldBase {
+  minisuperspaceDimension: 3
+}
+
+/** 4D boundary buffers for `(a, φ₁, φ₂, φ₃)` minisuperspace. */
+export interface WdwBoundaryField4D extends WdwBoundaryFieldBase {
+  minisuperspaceDimension: 4
+}
+
+/** Output buffers for the boundary condition: χ(a_min, φ) and ∂_a χ(a_min, φ). */
+export type WdwBoundaryField = WdwBoundaryField3D | WdwBoundaryField4D
 
 /** Solver inputs mirroring the WdW config fields. */
 export interface WheelerDeWittSolverInput {
+  /** Minisuperspace dimension. Defaults to 3 for legacy `(a, φ₁, φ₂)` solves. */
+  minisuperspaceDimension?: WdwMinisuperspaceDimension
   boundaryCondition: WdwBoundaryCondition
   inflatonMass: number
   /**
@@ -46,8 +78,10 @@ export interface WheelerDeWittSolverInput {
    *
    * Buffer layout MUST match the BC-generator output: each entry is an
    * interleaved `(re, im)` complex pair indexed by
-   * `i = i_phi1 * Nphi + i_phi2`. Total length per buffer:
-   * `2 · Nphi · Nphi`. Mismatched lengths throw.
+   * `i = i_phi1 * Nphi + i_phi2` for 3D, or
+   * `i = (i_phi1 * Nphi + i_phi2) * Nphi + i_phi3` for 4D. Total
+   * length per buffer is `2 · Nphi²` in 3D and `2 · Nphi³` in 4D.
+   * Mismatched lengths throw.
    *
    * **Caveat**: Stage-3 Airy/Langer overwrite still consults
    * `boundaryCondition` for the per-BC c1/c2 branch selection rule
@@ -69,8 +103,25 @@ export interface WheelerDeWittSolverInput {
   disableSponge?: boolean
 }
 
-/** Dense output of the Wheeler–DeWitt solver. */
-export interface WheelerDeWittSolverOutput {
+/** Solver input that is statically known to use the legacy 3D minisuperspace. */
+export type WheelerDeWittSolverInput3D = Omit<
+  WheelerDeWittSolverInput,
+  'customBoundary' | 'minisuperspaceDimension'
+> & {
+  minisuperspaceDimension?: 3
+  customBoundary?: WdwBoundaryField3D
+}
+
+/** Solver input that is statically known to use the 4D minisuperspace. */
+export type WheelerDeWittSolverInput4D = Omit<
+  WheelerDeWittSolverInput,
+  'customBoundary' | 'minisuperspaceDimension'
+> & {
+  minisuperspaceDimension: 4
+  customBoundary?: WdwBoundaryField4D
+}
+
+interface WheelerDeWittSolverOutputBase {
   /**
    * `χ(a, φ₁, φ₂)` as interleaved `(re, im)` pairs. Strides in units of
    * complex entries: `stride_a = Nphi·Nphi`, `stride_phi1 = Nphi`,
@@ -87,8 +138,6 @@ export interface WheelerDeWittSolverOutput {
    * Exposed so tests can validate band structure directly.
    */
   bandKind: Uint8Array
-  /** Grid dimensions `(Na, Nphi, Nphi)`. */
-  gridSize: [number, number, number]
   /** Physical grid extents (consumers read for coordinate mapping). */
   aMin: number
   aMax: number
@@ -105,6 +154,24 @@ export interface WheelerDeWittSolverOutput {
    */
   columnAiry: ColumnAiryInfo[]
 }
+
+/** Dense 3D output of the Wheeler–DeWitt solver. */
+export interface WheelerDeWittSolverOutput extends WheelerDeWittSolverOutputBase {
+  /** Grid dimensions `(Na, Nphi, Nphi)`. */
+  gridSize: [number, number, number]
+}
+
+/** Dense 4D output of the Wheeler–DeWitt solver. */
+export interface WheelerDeWittSolverOutput4D extends WheelerDeWittSolverOutputBase {
+  /** Grid dimensions `(Na, Nphi, Nphi, Nphi)`. */
+  gridSize: [number, number, number, number]
+}
+
+/**
+ * Union of the 3D and 4D solver outputs. Discriminate via
+ * `gridSize.length` (3 vs 4).
+ */
+export type WheelerDeWittAnySolverOutput = WheelerDeWittSolverOutput | WheelerDeWittSolverOutput4D
 
 /** Result of the per-cell φ-Laplacian stencil: `(Re, Im)` pair. */
 export interface ComplexPair {

@@ -23,6 +23,7 @@ import {
   type ExtendedObjectState,
   useExtendedObjectStore,
 } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 import { AnimationDrawerContainer } from './AnimationDrawerContainer'
 import { DrawerSection } from './DrawerSection'
@@ -102,6 +103,7 @@ export const WheelerDeWittAnimationDrawer: React.FC<WheelerDeWittAnimationDrawer
         setColorAlgorithm: s.setColorAlgorithm,
       }))
     )
+    const is4d = useGeometryStore((s) => s.dimension === 4)
 
     // Phase rotation only modulates the phase channel. When the active color
     // algorithm doesn't consume phase, the effect is invisible — auto-switch
@@ -141,38 +143,40 @@ export const WheelerDeWittAnimationDrawer: React.FC<WheelerDeWittAnimationDrawer
           />
         </DrawerSection>
 
-        <DrawerSection
-          title="Semiclassical Worldline"
-          enabled={wdw.worldlineEnabled}
-          onToggle={setWorldlineEnabled}
-          toggleTooltip="Animates a Gaussian pulse along each WKB streamline — a 'test universe' sliding along its classical FRW+inflaton trajectory. Replaces the static streamline ridge while enabled."
-          toggleAriaLabel="Toggle worldline pulse"
-          description="A Gaussian bump travels along each WKB streamline, tracing classical cosmological trajectories in the Lorentzian region."
-          testId="animation-panel-wdwWorldline"
-        >
-          <Slider
-            data-testid="components-layout-timeline-controls-wheeler-de-witt-animation-drawer-slider-152-11"
-            label="Speed"
-            min={0.1}
-            max={3}
-            step={0.1}
-            tooltip="Pulse cycles per unit time. 1.0 = one full sweep along the trajectory per unit of animation time."
-            value={wdw.worldlineSpeed}
-            onChange={setWorldlineSpeed}
-            showValue
-          />
-          <Slider
-            data-testid="components-layout-timeline-controls-wheeler-de-witt-animation-drawer-slider-162-11"
-            label="Pulse Width"
-            min={0.02}
-            max={0.3}
-            step={0.01}
-            tooltip="Gaussian width of the pulse in normalized trajectory-progress units. Narrower = a tighter, brighter ball; wider = a longer glowing smear along the path."
-            value={wdw.worldlinePulseWidth}
-            onChange={setWorldlinePulseWidth}
-            showValue
-          />
-        </DrawerSection>
+        {!is4d && (
+          <DrawerSection
+            title="Semiclassical Worldline"
+            enabled={wdw.worldlineEnabled}
+            onToggle={setWorldlineEnabled}
+            toggleTooltip="Animates a Gaussian pulse along each WKB streamline — a 'test universe' sliding along its classical FRW+inflaton trajectory. Replaces the static streamline ridge while enabled."
+            toggleAriaLabel="Toggle worldline pulse"
+            description="A Gaussian bump travels along each WKB streamline, tracing classical cosmological trajectories in the Lorentzian region."
+            testId="animation-panel-wdwWorldline"
+          >
+            <Slider
+              data-testid="components-layout-timeline-controls-wheeler-de-witt-animation-drawer-slider-152-11"
+              label="Speed"
+              min={0.1}
+              max={3}
+              step={0.1}
+              tooltip="Pulse cycles per unit time. 1.0 = one full sweep along the trajectory per unit of animation time."
+              value={wdw.worldlineSpeed}
+              onChange={setWorldlineSpeed}
+              showValue
+            />
+            <Slider
+              data-testid="components-layout-timeline-controls-wheeler-de-witt-animation-drawer-slider-162-11"
+              label="Pulse Width"
+              min={0.02}
+              max={0.3}
+              step={0.01}
+              tooltip="Gaussian width of the pulse in normalized trajectory-progress units. Narrower = a tighter, brighter ball; wider = a longer glowing smear along the path."
+              value={wdw.worldlinePulseWidth}
+              onChange={setWorldlinePulseWidth}
+              showValue
+            />
+          </DrawerSection>
+        )}
       </AnimationDrawerContainer>
     )
   }

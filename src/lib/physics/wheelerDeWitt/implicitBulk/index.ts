@@ -260,3 +260,77 @@ export function solveADILaplacianNeumann2D(
     }
   }
 }
+
+/** Scratch buffers for the 3-axis ADI bulk propagator on `Nphi³`. */
+export interface ImplicitBulkScratch3D extends ImplicitBulkScratch {
+  /** Intermediate state after the second sweep (Re component). */
+  inter2Re: Float64Array
+  /** Intermediate state after the second sweep (Im component). */
+  inter2Im: Float64Array
+}
+
+/** Allocate 3-axis ADI scratch for a cubic `Nphi × Nphi × Nphi` φ-grid. */
+export function allocImplicitBulkScratch3D(Nphi: number): ImplicitBulkScratch3D {
+  const volume = Nphi * Nphi * Nphi
+  return {
+    interRe: new Float64Array(volume),
+    interIm: new Float64Array(volume),
+    inter2Re: new Float64Array(volume),
+    inter2Im: new Float64Array(volume),
+    rowIn: new Float64Array(Nphi),
+    rowOut: new Float64Array(Nphi),
+    cPrime: new Float64Array(Nphi),
+    work: new Float64Array(Nphi),
+  }
+}
+
+/**
+ * 3-axis ADI solve
+ * `(I − κ̂·D₁)(I − κ̂·D₂)(I − κ̂·D₃)·χ = RHS` on an `Nphi³` slab.
+ */
+export function solveADILaplacianNeumann3D(
+  rhs: Float32Array,
+  out: Float32Array,
+  Nphi: number,
+  kappa: number,
+  scratch: ImplicitBulkScratch3D
+): void {
+  const { interRe, interIm, inter2Re, inter2Im, rowIn, rowOut, cPrime, work } = scratch
+  const idx3 = (i1: number, i2: number, i3: number): number => (i1 * Nphi + i2) * Nphi + i3
+
+  for (let i2 = 0; i2 < Nphi; i2++) {
+    for (let i3 = 0; i3 < Nphi; i3++) {
+      for (let i1 = 0; i1 < Nphi; i1++) rowIn[i1] = rhs[2 * idx3(i1, i2, i3)] ?? 0
+      solveNeumannTridiag1D(rowIn, rowOut, Nphi, kappa, cPrime, work)
+      for (let i1 = 0; i1 < Nphi; i1++) interRe[idx3(i1, i2, i3)] = rowOut[i1] ?? 0
+
+      for (let i1 = 0; i1 < Nphi; i1++) rowIn[i1] = rhs[2 * idx3(i1, i2, i3) + 1] ?? 0
+      solveNeumannTridiag1D(rowIn, rowOut, Nphi, kappa, cPrime, work)
+      for (let i1 = 0; i1 < Nphi; i1++) interIm[idx3(i1, i2, i3)] = rowOut[i1] ?? 0
+    }
+  }
+
+  for (let i1 = 0; i1 < Nphi; i1++) {
+    for (let i3 = 0; i3 < Nphi; i3++) {
+      for (let i2 = 0; i2 < Nphi; i2++) rowIn[i2] = interRe[idx3(i1, i2, i3)] ?? 0
+      solveNeumannTridiag1D(rowIn, rowOut, Nphi, kappa, cPrime, work)
+      for (let i2 = 0; i2 < Nphi; i2++) inter2Re[idx3(i1, i2, i3)] = rowOut[i2] ?? 0
+
+      for (let i2 = 0; i2 < Nphi; i2++) rowIn[i2] = interIm[idx3(i1, i2, i3)] ?? 0
+      solveNeumannTridiag1D(rowIn, rowOut, Nphi, kappa, cPrime, work)
+      for (let i2 = 0; i2 < Nphi; i2++) inter2Im[idx3(i1, i2, i3)] = rowOut[i2] ?? 0
+    }
+  }
+
+  for (let i1 = 0; i1 < Nphi; i1++) {
+    for (let i2 = 0; i2 < Nphi; i2++) {
+      for (let i3 = 0; i3 < Nphi; i3++) rowIn[i3] = inter2Re[idx3(i1, i2, i3)] ?? 0
+      solveNeumannTridiag1D(rowIn, rowOut, Nphi, kappa, cPrime, work)
+      for (let i3 = 0; i3 < Nphi; i3++) out[2 * idx3(i1, i2, i3)] = rowOut[i3] ?? 0
+
+      for (let i3 = 0; i3 < Nphi; i3++) rowIn[i3] = inter2Im[idx3(i1, i2, i3)] ?? 0
+      solveNeumannTridiag1D(rowIn, rowOut, Nphi, kappa, cPrime, work)
+      for (let i3 = 0; i3 < Nphi; i3++) out[2 * idx3(i1, i2, i3) + 1] = rowOut[i3] ?? 0
+    }
+  }
+}

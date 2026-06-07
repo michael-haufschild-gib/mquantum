@@ -12,6 +12,9 @@
  *     θ/φ sliders rotates the lobes.
  *   - The G (green) channel pulses with the live |S| as in the previous
  *     version.
+ *   - Optional CHSH caustic cosmograph: when enabled, the four analyzer
+ *     axes and Werner visibility form a signed CHSH eikonal whose fold
+ *     caustics add braided lens/cusp density to the actual R/G/B/A grid.
  *
  * Channel layout preserved from the previous shader so the default
  * `pauliSpinDensity` color algorithm continues to work:
@@ -52,6 +55,11 @@ struct BellApparatusUniforms {
   aliceAxisPrime: vec3<f32>, // 64
   bobAxis: vec3<f32>,        // 80
   bobAxisPrime: vec3<f32>,   // 96
+  _bobAxisPrimePad: f32,     // 108
+  chshCausticEnabled: u32,   // 112
+  chshCausticStrength: f32,  // 116
+  chshCausticFoldScale: f32, // 120
+  chshCausticPhase: f32,     // 124
 }
 
 @group(0) @binding(0) var<uniform> bell: BellApparatusUniforms;
@@ -61,6 +69,18 @@ fn gauss3(p: vec3f, center: vec3f, sigma: f32) -> f32 {
   let d = p - center;
   let inv2s2 = 1.0 / (2.0 * sigma * sigma);
   return exp(-dot(d, d) * inv2s2);
+}
+
+fn wernerCorrelation(a: vec3f, b: vec3f, visibility: f32) -> f32 {
+  return -visibility * clamp(dot(a, b), -1.0, 1.0);
+}
+
+fn wernerChshSigned(visibility: f32) -> f32 {
+  let eAB = wernerCorrelation(bell.aliceAxis, bell.bobAxis, visibility);
+  let eABp = wernerCorrelation(bell.aliceAxis, bell.bobAxisPrime, visibility);
+  let eApB = wernerCorrelation(bell.aliceAxisPrime, bell.bobAxis, visibility);
+  let eApBp = wernerCorrelation(bell.aliceAxisPrime, bell.bobAxisPrime, visibility);
+  return eAB - eABp + eApB + eApBp;
 }
 
 @compute @workgroup_size(4, 4, 4)
@@ -115,7 +135,43 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let b = bobTotal;
   let g = source * chsh_glow + (aliceCore + bobCore) * 0.4 * lhv_glow;
   let a = source + 0.5 * (aliceTotal + bobTotal);
+  var outColor = vec4f(r, g, b, a);
 
-  textureStore(densityGrid, vec3i(i32(gid.x), i32(gid.y), i32(gid.z)), vec4f(r, g, b, a));
+  if (bell.chshCausticEnabled != 0u) {
+    let causticStrength = clamp(bell.chshCausticStrength, 0.0, 4.0);
+    if (causticStrength > 0.0) {
+      let causticFoldScale = clamp(bell.chshCausticFoldScale, 0.25, 24.0);
+      let causticPhase = clamp(bell.chshCausticPhase, -6.28318530718, 6.28318530718);
+      let signedS = wernerChshSigned(clamp(bell.visibility, 0.0, 1.0));
+      let positiveSlack = clamp((abs(signedS) - 2.0) / 0.8284271247461903, 0.0, 1.0);
+
+      let pa = p - aliceCenter;
+      let pb = p - bobCenter;
+      let da = length(pa);
+      let db = length(pb);
+      let aliceFold = dot(pa, bell.aliceAxis) - dot(pa, bell.aliceAxisPrime);
+      let bobFold = dot(pb, bell.bobAxis) - dot(pb, bell.bobAxisPrime);
+      let eikonal = da + db + 0.22 * (aliceFold - bobFold);
+      let folded = cos(causticFoldScale * eikonal + causticPhase);
+      let balanceDelta = da - db;
+      let balance = exp(-(balanceDelta * balanceDelta) / (2.0 * 0.42 * 0.42));
+      let envelope = exp(-dot(p, p) / (2.0 * 0.9 * 0.9));
+      let ridgeCore = exp(-abs(folded) * (1.2 + 2.0 * positiveSlack));
+      let ridge = (0.18 + 0.82 * ridgeCore) * balance * envelope;
+      let cuspSigma = 0.14 + 0.22 / sqrt(causticFoldScale);
+      let cusp = exp(-dot(p, p) / (2.0 * cuspSigma * cuspSigma)) * (1.0 - positiveSlack);
+      let lens = causticStrength * (0.18 + 0.82 * positiveSlack) * ridge;
+      let shadow = causticStrength * cusp;
+
+      outColor = vec4f(
+        max(0.0, r + lens * (0.45 + 0.35 * positiveSlack) - shadow * 0.08),
+        max(0.0, g + lens * (0.25 + 1.15 * positiveSlack) - shadow * 0.18),
+        max(0.0, b + lens * (0.95 - 0.4 * positiveSlack) + shadow * 0.45),
+        max(0.0, a + lens * 0.75 + shadow * 0.25)
+      );
+    }
+  }
+
+  textureStore(densityGrid, vec3i(i32(gid.x), i32(gid.y), i32(gid.z)), outColor);
 }
 `

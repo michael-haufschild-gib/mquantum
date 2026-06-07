@@ -3,8 +3,11 @@
 ## Development
 
 ```bash
-# Start dev server on port 3000
+# Start dev server through Portless at https://mquantum.localhost
 pnpm run dev
+
+# Raw Vite target for automation (Playwright config uses this with explicit port)
+pnpm run dev:app
 
 # Build for production (includes WASM build)
 pnpm run build

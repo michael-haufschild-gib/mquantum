@@ -455,7 +455,7 @@ function applyWdwParams(
     (get: (s: ParsedShareableState) => unknown, run: Apply): Apply =>
     (s, e) => {
       if (get(s) !== undefined) run(s, e)
-    }
+  }
   const steps: Apply[] = [
     apply(
       (s) => s.wdwBoundaryCondition,
@@ -483,6 +483,10 @@ function applyWdwParams(
         e.setWdwGridDimensions(s.wdwGridNa ?? current.gridNa, s.wdwGridNphi ?? current.gridNphi)
       }
     },
+    apply(
+      (s) => s.wdwPhi3SliceNormalized,
+      (s, e) => e.setWdwPhi3SliceNormalized(s.wdwPhi3SliceNormalized!)
+    ),
     apply(
       (s) => s.wdwStreamlinesEnabled,
       (s, e) => e.setWdwStreamlinesEnabled(s.wdwStreamlinesEnabled!)
@@ -548,6 +552,7 @@ function applyWdwParams(
  */
 function applySrmtSweepParams(urlState: ParsedShareableState, effectiveQuantumMode: string): void {
   if (effectiveQuantumMode !== 'wheelerDeWitt') return
+  if (useGeometryStore.getState().dimension === 4) return
   if (!urlState.srmtSweepKind) return
   void import('@/stores/diagnostics/srmtSweepStore').then(({ useSrmtSweepStore }) => {
     useSrmtSweepStore.getState().setPendingSweep({
@@ -590,7 +595,10 @@ function applyCoreIdentityAndInit(urlState: ParsedShareableState): void {
   const geo = useGeometryStore.getState()
   const ext = useExtendedObjectStore.getState()
 
-  if (urlState.dimension !== undefined) geo.setDimension(urlState.dimension)
+  const legacyWdwDimension =
+    urlState.quantumMode === 'wheelerDeWitt' ? urlState.wdwMinisuperspaceDimension : undefined
+  const initialDimension = urlState.dimension ?? legacyWdwDimension
+  if (initialDimension !== undefined) geo.setDimension(initialDimension)
   if (urlState.objectType !== undefined) geo.setObjectType(urlState.objectType)
   if (urlState.quantumMode !== undefined) ext.setSchroedingerQuantumMode(urlState.quantumMode)
 

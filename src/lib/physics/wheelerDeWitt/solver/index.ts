@@ -116,6 +116,7 @@ import {
 } from '../implicitBulk'
 import { phiLaplacianAt } from '../phiLaplacian'
 import { buildPhiSpongeDamping, isConstantInPhiSlab } from '../phiSponge'
+import { solveWheelerDeWitt4D } from '../solver4d'
 import { WDW_CFL_BUDGET, WDW_CFL_WARN_BUDGET } from '../solverConstants'
 import {
   validateWdwCustomBoundary,
@@ -123,22 +124,32 @@ import {
 } from '../solverInputValidation'
 import {
   BandKind,
+  type WheelerDeWittAnySolverOutput,
   type WheelerDeWittSolverInput,
+  type WheelerDeWittSolverInput3D,
+  type WheelerDeWittSolverInput4D,
   type WheelerDeWittSolverOutput,
+  type WheelerDeWittSolverOutput4D,
 } from '../solverTypes'
 
 // Re-export the public surface so existing consumers keep their
 // `from '@/lib/physics/wheelerDeWitt/solver'` imports working.
 export { wdwU } from '../constants'
-export { phiLaplacianAt } from '../phiLaplacian'
+export { phiLaplacianAt, phiLaplacianAt3D } from '../phiLaplacian'
 export { effectiveSpongeWidth } from '../phiSponge'
 export { resetCflWarningBudget } from '../solverConstants'
 export {
   BandKind,
   type ColumnWkbState,
   type ComplexPair,
+  type WdwBoundaryField3D,
+  type WdwBoundaryField4D,
+  type WheelerDeWittAnySolverOutput,
   type WheelerDeWittSolverInput,
+  type WheelerDeWittSolverInput3D,
+  type WheelerDeWittSolverInput4D,
   type WheelerDeWittSolverOutput,
+  type WheelerDeWittSolverOutput4D,
 } from '../solverTypes'
 
 /**
@@ -160,8 +171,14 @@ export const WDW_SOLVER_VERSION = '3.0.0'
  * @param input - Solver config.
  * @returns Dense `χ` grid and auxiliary metadata.
  */
-export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWittSolverOutput {
+export function solveWheelerDeWitt(input: WheelerDeWittSolverInput4D): WheelerDeWittSolverOutput4D
+export function solveWheelerDeWitt(input: WheelerDeWittSolverInput3D): WheelerDeWittSolverOutput
+export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWittAnySolverOutput
+export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWittAnySolverOutput {
   validateWheelerDeWittSolverInput(input)
+  if ((input.minisuperspaceDimension ?? 3) === 4) {
+    return solveWheelerDeWitt4D(input)
+  }
 
   const {
     boundaryCondition,

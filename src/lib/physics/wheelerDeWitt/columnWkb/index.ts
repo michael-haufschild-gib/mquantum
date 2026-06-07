@@ -113,6 +113,39 @@ export function initColumnWkbStates(
   return states
 }
 
+/** Allocate per-column Stage-2 state for a cubic 4D φ-grid. */
+export function initColumnWkbStates4D(
+  Nphi: number,
+  phiExtent: number,
+  m: number,
+  lambda: number,
+  asymmetry: number = 1
+): ColumnWkbState[] {
+  const states: ColumnWkbState[] = new Array(Nphi * Nphi * Nphi)
+  const dphi = Nphi > 1 ? (2 * phiExtent) / (Nphi - 1) : 0
+  for (let i1 = 0; i1 < Nphi; i1++) {
+    const phi1 = -phiExtent + i1 * dphi
+    for (let i2 = 0; i2 < Nphi; i2++) {
+      const phi2 = -phiExtent + i2 * dphi
+      for (let i3 = 0; i3 < Nphi; i3++) {
+        const phi3 = -phiExtent + i3 * dphi
+        const aTurn = wdwTurningA(phi1, phi2, m, lambda, asymmetry, phi3)
+        const alpha = aTurn !== null ? 2 * WDW_C_U * aTurn : null
+        states[(i1 * Nphi + i2) * Nphi + i3] = {
+          aTurn,
+          alpha,
+          matched: false,
+          sEucAtMatch: 0,
+          uPrefactorAtMatch: 0,
+          chiReAtMatch: 0,
+          chiImAtMatch: 0,
+        }
+      }
+    }
+  }
+  return states
+}
+
 /**
  * Classify a single cell's band without mutating state. Pure read.
  * Wrapped as a named function so the call-site inside the leapfrog loop
@@ -143,11 +176,12 @@ export function captureMatch(
   asymmetry: number,
   U: number,
   chiRe: number,
-  chiIm: number
+  chiIm: number,
+  phi3: number = 0
 ): void {
   if (state.matched) return
   if (!Number.isFinite(U) || U <= 0 || !Number.isFinite(chiRe) || !Number.isFinite(chiIm)) return
-  const sEucAtMatch = wdwEuclideanWkbAction(a, phi1, phi2, m, lambda, asymmetry)
+  const sEucAtMatch = wdwEuclideanWkbAction(a, phi1, phi2, m, lambda, asymmetry, phi3)
   const uPrefactorAtMatch = Math.pow(Math.abs(U), 0.25)
   if (!Number.isFinite(sEucAtMatch) || !Number.isFinite(uPrefactorAtMatch)) return
   state.matched = true

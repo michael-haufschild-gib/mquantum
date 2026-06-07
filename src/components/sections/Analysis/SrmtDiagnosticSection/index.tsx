@@ -21,6 +21,7 @@ import { Switch } from '@/components/ui/Switch'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import type { WdwSrmtClock } from '@/lib/geometry/extended/wheelerDeWitt'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 const SECTION_TITLE = 'SRMT Diagnostic'
 
@@ -66,6 +67,7 @@ function formatCutCoordinate(params: {
  * @returns The SRMT diagnostic section, or an unavailable placeholder.
  */
 export function SrmtDiagnosticSection() {
+  const dimension = useGeometryStore((s) => s.dimension)
   const quantumMode = useExtendedObjectStore((s) => s.schroedinger.quantumMode)
 
   if (quantumMode !== 'wheelerDeWitt') {
@@ -73,6 +75,15 @@ export function SrmtDiagnosticSection() {
       <UnavailableSection
         title={SECTION_TITLE}
         reason="Available in Wheeler–DeWitt mode"
+        data-testid="srmt-diagnostic-section-unavailable"
+      />
+    )
+  }
+  if (dimension === 4) {
+    return (
+      <UnavailableSection
+        title={SECTION_TITLE}
+        reason="Unavailable in 4D Wheeler–DeWitt"
         data-testid="srmt-diagnostic-section-unavailable"
       />
     )

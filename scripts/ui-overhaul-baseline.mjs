@@ -12,6 +12,7 @@ import { resolve } from 'node:path'
 
 const outDir = resolve(process.argv[2] || 'screenshots/ui-overhaul-baseline')
 await mkdir(outDir, { recursive: true })
+const baseURL = process.env.BASE_URL ?? process.env.PORTLESS_URL ?? 'https://mquantum.localhost'
 
 const browser = await chromium.launch({ headless: true, args: ['--enable-unsafe-webgpu'] })
 const ctx = await browser.newContext({
@@ -58,7 +59,7 @@ async function step(name, fn) {
 console.log(`Saving to ${outDir}`)
 
 await step('01-default-load', async () => {
-  await page.goto('http://localhost:3000/', { waitUntil: 'domcontentloaded' })
+  await page.goto(baseURL, { waitUntil: 'domcontentloaded' })
   await waitRendererReady()
   await shot('01-default-load.png')
 })

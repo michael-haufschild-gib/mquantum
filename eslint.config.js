@@ -1267,6 +1267,10 @@ export default [
       'simple-import-sort/exports': 'error',
 
       // @typescript-eslint
+      // Base no-redeclare false-positives on TS function overloads; the
+      // @typescript-eslint variant understands overloads + declaration merging.
+      'no-redeclare': 'off',
+      '@typescript-eslint/no-redeclare': 'error',
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-floating-promises': ['error', { ignoreVoid: true }],
       '@typescript-eslint/explicit-function-return-type': 'off',

@@ -50,7 +50,10 @@ import {
 } from './setters/sliceSetterUtils'
 import { createTdseSetters, resizeTdseArrays } from './setters/tdseSetters'
 import { createVisualEffectSetters } from './setters/visualEffectSetters'
-import { createWheelerDeWittSetters } from './setters/wheelerDeWittSetters'
+import {
+  createWheelerDeWittSetters,
+  resizeWdwForGeometryDimension,
+} from './setters/wheelerDeWittSetters'
 import { ExtendedObjectSlice, SchroedingerSlice } from './types'
 
 // ============================================================================
@@ -63,6 +66,7 @@ interface ModeResizeUpdates {
   bec?: Partial<BecConfig>
   dirac?: Partial<DiracConfig>
   quantumWalk?: Partial<import('@/lib/geometry/extended/quantumWalk').QuantumWalkConfig>
+  wheelerDeWitt?: Partial<SchroedingerConfig['wheelerDeWitt']>
 }
 
 /** Derive hydrogen-specific adjustments when switching to 2D. */
@@ -154,6 +158,10 @@ const MODE_RESIZE_MAP: Record<
     const update = resizeSimpleModeForDim(state.quantumWalk, dim, resizeQuantumWalkArrays, false)
     return update ? { quantumWalk: update } : {}
   },
+  wheelerDeWitt: (state, dim) => {
+    const update = resizeWdwForGeometryDimension(state.wheelerDeWitt, dim)
+    return update ? { wheelerDeWitt: update } : {}
+  },
 }
 
 function isSchroedingerQualityPreset(value: unknown): value is SchroedingerQualityPreset {
@@ -198,6 +206,9 @@ function applyModeResizeUpdates(
   }
   if (updates.quantumWalk) {
     result.quantumWalk = { ...schroedinger.quantumWalk, ...updates.quantumWalk }
+  }
+  if (updates.wheelerDeWitt) {
+    result.wheelerDeWitt = { ...schroedinger.wheelerDeWitt, ...updates.wheelerDeWitt }
   }
   return result
 }
@@ -283,16 +294,7 @@ export const createSchroedingerSlice: StateCreator<
     schroedinger: createDefaultSchroedingerConfig(),
 
     // === Geometry Settings ===
-    setSchroedingerScale: (scale) => {
-      if (!isFiniteSchroedingerInput(scale)) {
-        logger.warn('[schroedingerSlice] Ignoring non-finite scale:', scale)
-        return
-      }
-      const clampedScale = Math.max(0.1, Math.min(2.0, scale))
-      setWithVersion((state) => ({
-        schroedinger: { ...state.schroedinger, scale: clampedScale },
-      }))
-    },
+    setSchroedingerScale: clampedSetter('scale', 0.1, 2.0),
 
     // === Quality Settings ===
     setSchroedingerQualityPreset: (preset) => {
@@ -325,11 +327,7 @@ export const createSchroedingerSlice: StateCreator<
     },
 
     // === Visualization Axes ===
-    setSchroedingerVisualizationAxes: (axes) => {
-      setWithVersion((state) => ({
-        schroedinger: { ...state.schroedinger, visualizationAxes: axes },
-      }))
-    },
+    setSchroedingerVisualizationAxes: valueSetter('visualizationAxes'),
 
     setSchroedingerVisualizationAxis: (index, dimIndex) => {
       if (!isFiniteSchroedingerInput(dimIndex)) {
@@ -389,22 +387,9 @@ export const createSchroedingerSlice: StateCreator<
     },
 
     // === Navigation ===
-    setSchroedingerCenter: (center) => {
-      setWithVersion((state) => ({
-        schroedinger: { ...state.schroedinger, center },
-      }))
-    },
+    setSchroedingerCenter: valueSetter('center'),
 
-    setSchroedingerExtent: (extent) => {
-      if (!isFiniteSchroedingerInput(extent)) {
-        warnNonFiniteSchroedingerInput('extent', extent)
-        return
-      }
-      const clampedExtent = Math.max(0.001, Math.min(10.0, extent))
-      setWithVersion((state) => ({
-        schroedinger: { ...state.schroedinger, extent: clampedExtent },
-      }))
-    },
+    setSchroedingerExtent: clampedSetter('extent', 0.001, 10.0),
 
     fitSchroedingerToView: () => {
       const centerLen = get().schroedinger.center.length
@@ -449,6 +434,7 @@ export const createSchroedingerSlice: StateCreator<
             maxQuantumNumber: presetControls.maxQuantumNumber,
             frequencySpread: presetControls.frequencySpread,
             fockLanternEnabled: false,
+            hermiteCocycleInflationEnabled: false,
             ...presetControls.visualOverrides,
           }
           if (presetControls.colorAlgorithm)

@@ -22,13 +22,16 @@ import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger
 import { ADS_PRESETS } from '@/lib/physics/antiDeSitter/presets'
 import { BEC_SCENARIO_PRESETS } from '@/lib/physics/bec/presets'
 import { BELL_SCENARIO_PRESETS } from '@/lib/physics/bell/presets'
-import { DIRAC_SCENARIO_PRESETS } from '@/lib/physics/dirac/presets'
+import { DIRAC_SCENARIO_PRESETS, getDiracPresetsForDimension } from '@/lib/physics/dirac/presets'
 import { FREE_SCALAR_PRESETS } from '@/lib/physics/freeScalar/presets'
 import { HYDROGEN_COUPLED_PRESETS } from '@/lib/physics/hydrogenCoupled/presets'
 import { PAULI_SCENARIO_PRESETS } from '@/lib/physics/pauli/presets'
 import { QUANTUM_WALK_PRESETS } from '@/lib/physics/quantumWalk/presets'
 import { TDSE_SCENARIO_PRESETS } from '@/lib/physics/tdse/presets'
-import { WDW_SCENARIO_PRESETS } from '@/lib/physics/wheelerDeWitt/presets'
+import {
+  getWdwPresetsForGeometryDimension,
+  WDW_SCENARIO_PRESETS,
+} from '@/lib/physics/wheelerDeWitt/presets'
 import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
@@ -70,9 +73,11 @@ function getBecPresetOptions(dim: number) {
   }))
 }
 
-/* ── Dirac options ─────────────────────────────────────────── */
+/* ── Dirac options (dimension-filtered) ─────────────────────── */
 
-const DIRAC_PRESET_OPTIONS = DIRAC_SCENARIO_PRESETS.map((p) => ({ value: p.id, label: p.name }))
+function getDiracPresetOptions(dimension: number) {
+  return getDiracPresetsForDimension(dimension).map((p) => ({ value: p.id, label: p.name }))
+}
 
 /* ── Pauli options ─────────────────────────────────────────── */
 
@@ -102,10 +107,12 @@ const QUANTUM_WALK_PRESET_OPTIONS = QUANTUM_WALK_PRESETS.map((p) => ({
 
 /* ── Wheeler–DeWitt options ────────────────────────────────── */
 
-const WDW_PRESET_OPTIONS = WDW_SCENARIO_PRESETS.map((p) => ({
-  value: p.id,
-  label: p.name,
-}))
+function getWdwPresetOptions(dimension: number) {
+  return getWdwPresetsForGeometryDimension(dimension).map((p) => ({
+    value: p.id,
+    label: p.name,
+  }))
+}
 
 /* ── Anti-de Sitter options ─────────────────────────────────── */
 
@@ -277,13 +284,13 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       case 'becDynamics':
         return getBecPresetOptions(dimension)
       case 'diracEquation':
-        return DIRAC_PRESET_OPTIONS
+        return getDiracPresetOptions(dimension)
       case 'freeScalarField':
         return getFreeScalarPresetOptions(dimension)
       case 'quantumWalk':
         return QUANTUM_WALK_PRESET_OPTIONS
       case 'wheelerDeWitt':
-        return WDW_PRESET_OPTIONS
+        return getWdwPresetOptions(dimension)
       case 'pauliSpinor':
         return PAULI_PRESET_OPTIONS
       case 'bellPair':

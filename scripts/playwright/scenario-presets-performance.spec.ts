@@ -6,7 +6,7 @@
  * not a correctness spec: sub-target FPS is logged for optimization work.
  *
  * Run against the already-running dev server:
- *   PLAYWRIGHT_DEV_SERVER_PORT=3000 pnpm exec playwright test \
+ *   PLAYWRIGHT_DEV_SERVER_PORT=3100 pnpm exec playwright test \
  *     --config playwright.benchmark.config.ts \
  *     scripts/playwright/scenario-presets-performance.spec.ts --workers=1
  */

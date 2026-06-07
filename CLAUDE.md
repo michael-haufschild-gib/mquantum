@@ -26,7 +26,8 @@ These docs are auto-loaded via `@import` — refer to them for details:
 
 | Command | Purpose |
 |---------|---------|
-| `pnpm run dev` | Dev server (already running — do NOT start) |
+| `pnpm run dev` | Portless dev URL: `https://mquantum.localhost` (already running — do NOT start) |
+| `pnpm run dev:app` | Raw Vite target for Playwright automation only |
 | `pnpm run build` | Full build: wasm:build -> tsc -b -> vite build |
 | `pnpm exec vitest run` | Unit tests |
 | `pnpm exec vite build` | Vite-only build (skips tsc) |

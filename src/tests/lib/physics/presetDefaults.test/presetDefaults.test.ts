@@ -69,6 +69,11 @@ describe('getFirstPresetId — dimension-filtered modes', () => {
     // d=2 — no preset has d=2. Source uses `?? ADS_PRESETS[0]` fallback.
     expect(getFirstPresetId('antiDeSitter', 2)).toBe(ADS_PRESETS[0]?.id)
   })
+
+  it('wheelerDeWitt picks a preset matching the global dimension selector', () => {
+    expect(getFirstPresetId('wheelerDeWitt', 3)).toBe('noBoundaryBaseline')
+    expect(getFirstPresetId('wheelerDeWitt', 4)).toBe('fourDimensionalNoBoundarySlice')
+  })
 })
 
 describe('getFirstPresetId — coverage of all enumerated modes', () => {

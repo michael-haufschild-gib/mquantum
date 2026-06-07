@@ -15,12 +15,12 @@ import { chromium } from 'playwright'
 
 const ROOT = path.resolve(fileURLToPath(new URL('../..', import.meta.url)))
 const LOG_DIR = path.join(ROOT, 'logs')
-const DEFAULT_BASE_URL = 'http://localhost:3000'
+const DEFAULT_BASE_URL = 'https://mquantum.localhost'
 const EXPECTED_SCENARIO_COUNT = 184
 const TARGET_FPS = 45
 
 const args = parseArgs(process.argv.slice(2))
-const baseURL = args.baseUrl ?? process.env.BASE_URL ?? DEFAULT_BASE_URL
+const baseURL = args.baseUrl ?? process.env.BASE_URL ?? process.env.PORTLESS_URL ?? DEFAULT_BASE_URL
 const warmupFrames = numberArg(args.warmupFrames, 'WARMUP_FRAMES', 90)
 const measureFrames = numberArg(args.measureFrames, 'MEASURE_FRAMES', 180)
 const listOnly = args.listOnly === true

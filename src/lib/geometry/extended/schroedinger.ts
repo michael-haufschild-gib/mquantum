@@ -358,6 +358,14 @@ export interface SchroedingerQuantumEffectsConfig {
   bornNullWeaveCirculation: number
   /** Enable harmonic-oscillator Fock Lantern parity-cell emission gate */
   fockLanternEnabled: boolean
+  /** Enable harmonic-oscillator triple-cocycle branch-phase inflation */
+  hermiteCocycleInflationEnabled: boolean
+  /** Local branch-phase obstruction strength (0.0-2.0) */
+  hermiteCocycleInflationStrength: number
+  /** Shell radius where the cocycle obstruction peaks (0.1-2.0) */
+  hermiteCocycleShellRadius: number
+  /** Triple-cocycle twist frequency (0.0-8.0) */
+  hermiteCocycleInflationTwist: number
   /** Enable observer causal-diamond modular-flow warp for hydrogenND orbitals */
   causalDiamondEnabled: boolean
   /** Finite observer horizon radius R in hydrogenND chart units (0.5-20.0) */
@@ -789,6 +797,10 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   bornNullWeaveNodeWidth: 0.025,
   bornNullWeaveCirculation: 2.0,
   fockLanternEnabled: false,
+  hermiteCocycleInflationEnabled: false,
+  hermiteCocycleInflationStrength: 0.9,
+  hermiteCocycleShellRadius: 0.72,
+  hermiteCocycleInflationTwist: 3.5,
   causalDiamondEnabled: false,
   causalDiamondHorizonRadius: 3.6,
   causalDiamondCompressionK: 0.85,

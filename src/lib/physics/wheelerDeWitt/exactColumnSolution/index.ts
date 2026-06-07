@@ -76,6 +76,7 @@ export interface ColumnArgs {
   a: number
   phi1: number
   phi2: number
+  phi3?: number
   m: number
   lambda: number
   /** `α` multiplier on the φ₂ component of V. Default 1 (isotropic). */
@@ -99,12 +100,13 @@ function dZetaDaAnalytic(
   a: number,
   phi1: number,
   phi2: number,
+  phi3: number,
   m: number,
   lambda: number,
   asymmetry: number
 ): number {
-  const U = wdwU(a, phi1, phi2, m, lambda, asymmetry)
-  const zeta = wdwLangerVariable(a, phi1, phi2, m, lambda, asymmetry)
+  const U = wdwU(a, phi1, phi2, m, lambda, asymmetry, phi3)
+  const zeta = wdwLangerVariable(a, phi1, phi2, m, lambda, asymmetry, phi3)
   const absZeta = Math.max(Math.abs(zeta), 1e-30)
   return Math.sqrt(Math.abs(U)) / Math.sqrt(absZeta)
 }
@@ -135,14 +137,15 @@ function langerChiReal(
   a: number,
   phi1: number,
   phi2: number,
+  phi3: number,
   m: number,
   lambda: number,
   asymmetry: number,
   c1: number,
   c2: number
 ): number {
-  const zeta = wdwLangerVariable(a, phi1, phi2, m, lambda, asymmetry)
-  const U = wdwU(a, phi1, phi2, m, lambda, asymmetry)
+  const zeta = wdwLangerVariable(a, phi1, phi2, m, lambda, asymmetry, phi3)
+  const U = wdwU(a, phi1, phi2, m, lambda, asymmetry, phi3)
   const pref = langerPrefactor(zeta, U)
   const { ai, bi } = airyAll(zeta)
   return pref * combineAiryBasis(c1, c2, ai, bi)
@@ -167,17 +170,18 @@ function langerChiReal(
  */
 export function columnSolutionPositiveV(input: ColumnArgs, c1: number, c2: number): ColumnSample {
   const { a, phi1, phi2, m, lambda } = input
+  const phi3 = input.phi3 ?? 0
   const asymmetry = input.asymmetry ?? 1
-  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry)
+  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry, phi3)
   if (V <= 0) {
     throw new RangeError(
-      `columnSolutionPositiveV requires V(φ) > 0; got V=${V} at (φ₁=${phi1}, φ₂=${phi2}, m=${m}, Λ=${lambda}).`
+      `columnSolutionPositiveV requires V(φ) > 0; got V=${V} at (φ₁=${phi1}, φ₂=${phi2}, φ₃=${phi3}, m=${m}, Λ=${lambda}).`
     )
   }
   if (a <= 0) throw new RangeError(`columnSolutionPositiveV requires a > 0, got ${a}`)
 
-  const zeta = wdwLangerVariable(a, phi1, phi2, m, lambda, asymmetry)
-  const U = wdwU(a, phi1, phi2, m, lambda, asymmetry)
+  const zeta = wdwLangerVariable(a, phi1, phi2, m, lambda, asymmetry, phi3)
+  const U = wdwU(a, phi1, phi2, m, lambda, asymmetry, phi3)
   const pref = langerPrefactor(zeta, U)
   const { ai, bi, aiPrime, biPrime } = airyAll(zeta)
   const chiReal = pref * combineAiryBasis(c1, c2, ai, bi)
@@ -192,13 +196,13 @@ export function columnSolutionPositiveV(input: ColumnArgs, c1: number, c2: numbe
   const absZeta = Math.abs(zeta)
   let dChiReal: number
   if (absZeta < 1e-3) {
-    const aTurn = wdwTurningA(phi1, phi2, m, lambda, asymmetry) ?? a
+    const aTurn = wdwTurningA(phi1, phi2, m, lambda, asymmetry, phi3) ?? a
     const h = Math.max(1e-6 * aTurn, 1e-8)
-    const plus = langerChiReal(a + h, phi1, phi2, m, lambda, asymmetry, c1, c2)
-    const minus = langerChiReal(a - h, phi1, phi2, m, lambda, asymmetry, c1, c2)
+    const plus = langerChiReal(a + h, phi1, phi2, phi3, m, lambda, asymmetry, c1, c2)
+    const minus = langerChiReal(a - h, phi1, phi2, phi3, m, lambda, asymmetry, c1, c2)
     dChiReal = (plus - minus) / (2 * h)
   } else {
-    const zetaPrime = dZetaDaAnalytic(a, phi1, phi2, m, lambda, asymmetry)
+    const zetaPrime = dZetaDaAnalytic(a, phi1, phi2, phi3, m, lambda, asymmetry)
     const Uprime = dUdaAnalytic(a, V)
     const Wmix = combineAiryBasis(c1, c2, ai, bi)
     const WmixPrime = combineAiryBasis(c1, c2, aiPrime, biPrime)
@@ -270,16 +274,17 @@ export function columnSolutionNegativeV(
   B: ComplexPair
 ): ColumnSample {
   const { a, phi1, phi2, m, lambda } = input
+  const phi3 = input.phi3 ?? 0
   const asymmetry = input.asymmetry ?? 1
-  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry)
+  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry, phi3)
   if (V >= 0) {
     throw new RangeError(
-      `columnSolutionNegativeV requires V(φ) < 0; got V=${V} at (φ₁=${phi1}, φ₂=${phi2}, m=${m}, Λ=${lambda}).`
+      `columnSolutionNegativeV requires V(φ) < 0; got V=${V} at (φ₁=${phi1}, φ₂=${phi2}, φ₃=${phi3}, m=${m}, Λ=${lambda}).`
     )
   }
   if (a <= 0) throw new RangeError(`columnSolutionNegativeV requires a > 0, got ${a}`)
 
-  const U = wdwU(a, phi1, phi2, m, lambda, asymmetry)
+  const U = wdwU(a, phi1, phi2, m, lambda, asymmetry, phi3)
   if (U >= 0) {
     // U can in principle go positive for V<0 at extreme a if K·V·a² > 1,
     // but V<0 makes (1 − K·V·a²) > 1, so U = −c·a²·(positive) < 0 always.
@@ -288,7 +293,7 @@ export function columnSolutionNegativeV(
   }
   const absU = -U
   const pref = Math.pow(absU, -0.25)
-  const phase = wdwLorentzianWkbPhase(a, phi1, phi2, m, lambda, asymmetry)
+  const phase = wdwLorentzianWkbPhase(a, phi1, phi2, m, lambda, asymmetry, phi3)
   const c = Math.cos(phase)
   const s = Math.sin(phase)
 
@@ -365,7 +370,8 @@ export function rk4ColumnTrajectory(
   m: number,
   lambda: number,
   asymmetry: number = 1,
-  substepsPerInterval: number = 20
+  substepsPerInterval: number = 20,
+  phi3: number = 0
 ): ColumnSample[] {
   const N = aGrid.length
   if (N === 0) return []
@@ -405,7 +411,7 @@ export function rk4ColumnTrajectory(
 
     for (let step = 0; step < substepsPerInterval; step++) {
       // k1: slope at (a, y)
-      const Ua = wdwU(a, phi1, phi2, m, lambda, asymmetry)
+      const Ua = wdwU(a, phi1, phi2, m, lambda, asymmetry, phi3)
       const k1yR = dyRe
       const k1yI = dyIm
       const k1dR = Ua * yRe
@@ -413,7 +419,7 @@ export function rk4ColumnTrajectory(
 
       // k2: slope at (a + h/2, y + h/2·k1)
       const aMid = a + 0.5 * h
-      const Umid = wdwU(aMid, phi1, phi2, m, lambda, asymmetry)
+      const Umid = wdwU(aMid, phi1, phi2, m, lambda, asymmetry, phi3)
       const y2R = yRe + 0.5 * h * k1yR
       const y2I = yIm + 0.5 * h * k1yI
       const d2R = dyRe + 0.5 * h * k1dR
@@ -435,7 +441,7 @@ export function rk4ColumnTrajectory(
 
       // k4: slope at (a + h, y + h·k3)
       const aEnd = a + h
-      const Uend = wdwU(aEnd, phi1, phi2, m, lambda, asymmetry)
+      const Uend = wdwU(aEnd, phi1, phi2, m, lambda, asymmetry, phi3)
       const y4R = yRe + h * k3yR
       const y4I = yIm + h * k3yI
       const d4R = dyRe + h * k3dR
@@ -492,14 +498,21 @@ export function columnSolution(
     | { kind: 'zero'; A: ComplexPair; B: ComplexPair }
     | { kind: 'negative'; A: ComplexPair; B: ComplexPair }
 ): ColumnSample {
-  const V = wdwPotential(input.phi1, input.phi2, input.m, input.lambda, input.asymmetry ?? 1)
+  const V = wdwPotential(
+    input.phi1,
+    input.phi2,
+    input.m,
+    input.lambda,
+    input.asymmetry ?? 1,
+    input.phi3 ?? 0
+  )
   const V_ZERO_TOL = 1e-12
   const actualKind: 'positive' | 'zero' | 'negative' =
     Math.abs(V) < V_ZERO_TOL ? 'zero' : V > 0 ? 'positive' : 'negative'
   if (coeffs.kind !== actualKind) {
     throw new RangeError(
       `columnSolution: coeffs.kind='${coeffs.kind}' disagrees with sign(V(φ))='${actualKind}' ` +
-        `(V=${V} at φ₁=${input.phi1}, φ₂=${input.phi2}, m=${input.m}, Λ=${input.lambda}).`
+        `(V=${V} at φ₁=${input.phi1}, φ₂=${input.phi2}, φ₃=${input.phi3 ?? 0}, m=${input.m}, Λ=${input.lambda}).`
     )
   }
   switch (coeffs.kind) {

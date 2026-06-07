@@ -151,6 +151,8 @@ export interface ShareableObjectState
   // Cosmological background inherited from `CosmologySerializableState`.
 
   // ── Wheeler–DeWitt Minisuperspace ───────────────────────────────────────
+  /** Wheeler–DeWitt minisuperspace dimension */
+  wdwMinisuperspaceDimension?: 3 | 4
   /** Wheeler–DeWitt boundary condition proposal */
   wdwBoundaryCondition?: UrlWdwBoundaryCondition
   /** Wheeler–DeWitt inflaton mass m */
@@ -167,6 +169,8 @@ export interface ShareableObjectState
   wdwGridNa?: number
   /** Wheeler–DeWitt solver grid size — `Nphi` φ-axis points (8..128). */
   wdwGridNphi?: number
+  /** Wheeler–DeWitt 4D fixed φ₃ slice in [0, 1]. */
+  wdwPhi3SliceNormalized?: number
   /** Wheeler–DeWitt WKB streamline overlay toggle */
   wdwStreamlinesEnabled?: boolean
   /** Wheeler–DeWitt streamline seed density (2-16) */

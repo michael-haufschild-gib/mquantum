@@ -26,6 +26,7 @@
 
 import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
 import type { BellPairConfig } from '@/lib/geometry/extended/bellPair'
+import { CHSH_CAUSTIC_LIMITS, DEFAULT_CHSH_CAUSTIC_CONTROLS } from '@/lib/physics/bell/chshCaustic'
 import { bellPairApparatusWgsl } from '@/rendering/webgpu/shaders/schroedinger/compute/bellPairApparatus.wgsl'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../../core/types'
@@ -44,9 +45,12 @@ import { createDensityTexture, GRID_WG } from '../computePassUtils'
  *   48..63   vec3<f32> aliceAxis      (12 used + 4 pad)
  *   64..79   vec3<f32> aliceAxisPrime
  *   80..95   vec3<f32> bobAxis
- *   96..111  vec3<f32> bobAxisPrime
+ *   96..111  vec3<f32> bobAxisPrime  (12 used + 4 explicit WGSL pad)
+ *   112..127 u32/f32 caustic block:
+ *            chshCausticEnabled, chshCausticStrength,
+ *            chshCausticFoldScale, chshCausticPhase
  */
-export const BELL_APPARATUS_UNIFORM_BYTES = 112
+export const BELL_APPARATUS_UNIFORM_BYTES = 128
 const UNIFORM_BYTES = BELL_APPARATUS_UNIFORM_BYTES
 const UNIFORM_F32_COUNT = UNIFORM_BYTES / 4
 
@@ -64,6 +68,11 @@ const APPARATUS_GEOMETRY = Object.freeze({
   lobeOffset: 0.3,
   primedLobeScale: 0.55,
 })
+
+function finiteClamped(value: unknown, fallback: number, min: number, max: number): number {
+  const finite = typeof value === 'number' && Number.isFinite(value) ? value : fallback
+  return Math.max(min, Math.min(max, finite))
+}
 
 /**
  * Pack a {@link BellPairConfig} plus live-stats into the binary layout
@@ -127,6 +136,26 @@ export function packBellApparatusUniforms(
   f32[24] = bobAxisPrime[0]
   f32[25] = bobAxisPrime[1]
   f32[26] = bobAxisPrime[2]
+  // Final 16-byte scalar block.
+  u32[28] = config.chshCausticEnabled ? 1 : 0
+  f32[29] = finiteClamped(
+    config.chshCausticStrength,
+    DEFAULT_CHSH_CAUSTIC_CONTROLS.chshCausticStrength,
+    CHSH_CAUSTIC_LIMITS.strengthMin,
+    CHSH_CAUSTIC_LIMITS.strengthMax
+  )
+  f32[30] = finiteClamped(
+    config.chshCausticFoldScale,
+    DEFAULT_CHSH_CAUSTIC_CONTROLS.chshCausticFoldScale,
+    CHSH_CAUSTIC_LIMITS.foldScaleMin,
+    CHSH_CAUSTIC_LIMITS.foldScaleMax
+  )
+  f32[31] = finiteClamped(
+    config.chshCausticPhase,
+    DEFAULT_CHSH_CAUSTIC_CONTROLS.chshCausticPhase,
+    CHSH_CAUSTIC_LIMITS.phaseMin,
+    CHSH_CAUSTIC_LIMITS.phaseMax
+  )
   return buf
 }
 
@@ -149,7 +178,7 @@ export class BellPairComputePass extends WebGPUBaseComputePass {
 
   constructor(densityGridSize: number = DENSITY_GRID_SIZE) {
     super({
-      id: 'bell-pair-apparatus-compute',
+      id: 'bell-app',
       inputs: [],
       outputs: [],
       isCompute: true,
@@ -166,9 +195,9 @@ export class BellPairComputePass extends WebGPUBaseComputePass {
    */
   initializeDensityTexture(device: GPUDevice): void {
     if (this.densityTexture) return
-    this.densityTexture = createDensityTexture(device, 'bell-pair', 0, this.densityGridSize)
+    this.densityTexture = createDensityTexture(device, 'bell', 0, this.densityGridSize)
     this.densityTextureView = this.densityTexture.createView({
-      label: 'bell-pair-density-view',
+      label: 'bell-density',
       dimension: '3d',
     })
   }
@@ -211,13 +240,13 @@ export class BellPairComputePass extends WebGPUBaseComputePass {
     if (this.initialized) return
 
     this.uniformBuffer = device.createBuffer({
-      label: 'bell-apparatus-uniforms',
+      label: 'bell-u',
       size: UNIFORM_BYTES,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     })
 
     const bindGroupLayout = device.createBindGroupLayout({
-      label: 'bell-apparatus-bgl',
+      label: 'bell-bgl',
       entries: [
         {
           binding: 0,
@@ -238,7 +267,7 @@ export class BellPairComputePass extends WebGPUBaseComputePass {
     this.bindGroupLayout = bindGroupLayout
 
     const shaderModule = device.createShaderModule({
-      label: 'bell-apparatus-shader',
+      label: 'bell-sh',
       code: bellPairApparatusWgsl,
     })
 
@@ -246,14 +275,14 @@ export class BellPairComputePass extends WebGPUBaseComputePass {
       device,
       shaderModule,
       [bindGroupLayout],
-      'bell-apparatus-pipeline'
+      'bell-pipe'
     )
 
     if (!this.densityTextureView) {
       this.initializeDensityTexture(device)
     }
     this.bindGroup = device.createBindGroup({
-      label: 'bell-apparatus-bg',
+      label: 'bell-bg',
       layout: bindGroupLayout,
       entries: [
         { binding: 0, resource: { buffer: this.uniformBuffer } },
@@ -325,7 +354,7 @@ export class BellPairComputePass extends WebGPUBaseComputePass {
 
     // Dispatch a 3D grid covering the apparatus texture.
     const passEncoder = ctx.encoder.beginComputePass({
-      label: 'bell-apparatus-pass',
+      label: 'bell-pass',
     })
     passEncoder.setPipeline(this.computePipeline)
     passEncoder.setBindGroup(0, this.bindGroup)

@@ -462,6 +462,12 @@ describe('packSchroedingerUniforms', () => {
   const fockLanternIndex = {
     enabled: SCHROEDINGER_LAYOUT.index._padEnergy,
   }
+  const hermiteCocycleIndex = {
+    enabled: SCHROEDINGER_LAYOUT.index.hermiteCocycleInflationEnabled,
+    strength: SCHROEDINGER_LAYOUT.index.hermiteCocycleInflationStrength,
+    shellRadius: SCHROEDINGER_LAYOUT.index.hermiteCocycleShellRadius,
+    twist: SCHROEDINGER_LAYOUT.index.hermiteCocycleInflationTwist,
+  }
 
   // The buffer must be large enough for the entire SchroedingerUniforms struct.
   // The struct extends to ~1600 bytes. Use 2000 to be safe.
@@ -1166,6 +1172,65 @@ describe('packSchroedingerUniforms', () => {
 
     packSchroedingerUniforms(floatView, intView, disabled)
     expect(intView[fockLanternIndex.enabled]).toBe(0)
+  })
+
+  it('packs clamped Hermite Cocycle Inflation controls only for harmonic oscillator mode', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      quantumModeStr: 'harmonicOscillator',
+      schroedinger: {
+        hermiteCocycleInflationEnabled: true,
+        hermiteCocycleInflationStrength: 99,
+        hermiteCocycleShellRadius: 0.01,
+        hermiteCocycleInflationTwist: 99,
+      },
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    expect(intView[hermiteCocycleIndex.enabled]).toBe(1)
+    expect(floatView[hermiteCocycleIndex.strength]).toBe(2)
+    expect(floatView[hermiteCocycleIndex.shellRadius]).toBeCloseTo(0.1)
+    expect(floatView[hermiteCocycleIndex.twist]).toBe(8)
+  })
+
+  it('zeroes Hermite Cocycle Inflation controls for disabled and non-HO modes', () => {
+    for (const quantumModeStr of ['hydrogenND', 'tdseDynamics', 'wheelerDeWitt']) {
+      const { floatView, intView } = createBuffer(BUFFER_SIZE)
+      const params = makeBaseParams({
+        quantumModeStr,
+        schroedinger: {
+          hermiteCocycleInflationEnabled: true,
+          hermiteCocycleInflationStrength: 1.2,
+          hermiteCocycleShellRadius: 0.8,
+          hermiteCocycleInflationTwist: 4,
+        },
+      })
+
+      packSchroedingerUniforms(floatView, intView, params)
+
+      expect(intView[hermiteCocycleIndex.enabled], quantumModeStr).toBe(0)
+      expect(floatView[hermiteCocycleIndex.strength], quantumModeStr).toBe(0)
+      expect(floatView[hermiteCocycleIndex.shellRadius], quantumModeStr).toBe(0)
+      expect(floatView[hermiteCocycleIndex.twist], quantumModeStr).toBe(0)
+    }
+
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const disabled = makeBaseParams({
+      quantumModeStr: 'harmonicOscillator',
+      schroedinger: {
+        hermiteCocycleInflationEnabled: false,
+        hermiteCocycleInflationStrength: 1.2,
+        hermiteCocycleShellRadius: 0.8,
+        hermiteCocycleInflationTwist: 4,
+      },
+    })
+
+    packSchroedingerUniforms(floatView, intView, disabled)
+    expect(intView[hermiteCocycleIndex.enabled]).toBe(0)
+    expect(floatView[hermiteCocycleIndex.strength]).toBe(0)
+    expect(floatView[hermiteCocycleIndex.shellRadius]).toBe(0)
+    expect(floatView[hermiteCocycleIndex.twist]).toBe(0)
   })
 
   it('zeroes causal-diamond modular orbital uniforms when disabled', () => {

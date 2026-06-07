@@ -181,7 +181,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     GPURenderPassColorAttachment,
   ] = [this.primaryColorAttachment, this.secondaryColorAttachment]
   private readonly renderPassDescriptor: GPURenderPassDescriptor = {
-    label: 'schroedinger-render',
+    label: 'sch-render',
     colorAttachments: this.singleColorAttachments,
   }
   private readonly renderResources: SchrodingerRenderResources = {
@@ -204,7 +204,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private readonly rebuildObjectBindGroup = (additionalEntries: GPUBindGroupEntry[]): void => {
     if (this.objectBindGroupLayout && this.schroedingerUniformBuffer && this.basisUniformBuffer) {
       this.objectBindGroup = this.device!.createBindGroup({
-        label: 'schroedinger-object-bg',
+        label: 'sch-obj-bg',
         layout: this.objectBindGroupLayout,
         entries: [
           { binding: 0, resource: { buffer: this.schroedingerUniformBuffer } },
@@ -277,7 +277,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       this.strategy = await createModeStrategy(this.rendererConfig)
     } catch (error) {
       logger.error(
-        `[WebGPUSchrodingerRenderer] Failed to create mode strategy for quantumMode="${this.rendererConfig.quantumMode}" isPauli=${this.rendererConfig.isPauli}:`,
+        `[Sch] strategy fail mode=${this.rendererConfig.quantumMode} pauli=${this.rendererConfig.isPauli}:`,
         error
       )
       this.strategy = createInitialModeStrategy()
@@ -443,7 +443,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       if (!this.executeNullGuardWarned) {
         this.executeNullGuardWarned = true
         logger.warn(
-          `[SchrodingerRenderer] execute() skipped — null resources:`,
+          `[SchrodingerRenderer] execute skipped:`,
           `device=${!!this.device} pipeline=${!!this.renderPipeline}`,
           `camera=${!!this.cameraBindGroup} lighting=${!!this.lightingBindGroup}`,
           `object=${!!this.objectBindGroup}`
@@ -593,7 +593,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       })
       .catch((error: unknown) => {
         this.carpetRuntimePromise = null
-        logger.error('[WebGPUSchrodingerRenderer] quantum carpet runtime load failed:', error)
+        logger.error('[WebGPUSchrodingerRenderer] carpet load failed:', error)
       })
   }
 
@@ -620,9 +620,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     if (predecessor.rendererConfig.quantumMode !== this.rendererConfig.quantumMode) return
     // Dispose any previously stashed predecessor to avoid leaking its compute state.
     if (this.predecessorStrategy) {
-      logger.warn(
-        '[SchrodingerRenderer] adoptFrom called again before createPipeline — disposing previous predecessor'
-      )
+      logger.warn('[Sch] adoptFrom duplicate')
       this.predecessorStrategy.dispose()
     }
     this.predecessorStrategy = predecessor.strategy

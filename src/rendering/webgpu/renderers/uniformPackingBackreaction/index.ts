@@ -177,6 +177,46 @@ export function packBornNullWeave(
 }
 
 /**
+ * Pack harmonic-oscillator Hermite triple-cocycle inflation controls. Disabled
+ * state zeroes all fields so WGSL term rotation is exact identity.
+ */
+export function packHermiteCocycle(
+  floatView: Float32Array,
+  intView: Int32Array,
+  schroedinger: Partial<SchroedingerConfig> | undefined,
+  isHarmonicOscillatorMode: boolean
+): void {
+  const enabled =
+    isHarmonicOscillatorMode && (schroedinger?.hermiteCocycleInflationEnabled ?? false)
+  intView[I.hermiteCocycleInflationEnabled] = enabled ? 1 : 0
+  if (!enabled) {
+    floatView[I.hermiteCocycleInflationStrength] =
+      floatView[I.hermiteCocycleShellRadius] =
+      floatView[I.hermiteCocycleInflationTwist] =
+        0.0
+    return
+  }
+  floatView[I.hermiteCocycleInflationStrength] = finiteClamped(
+    schroedinger?.hermiteCocycleInflationStrength,
+    0.9,
+    0.0,
+    2.0
+  )
+  floatView[I.hermiteCocycleShellRadius] = finiteClamped(
+    schroedinger?.hermiteCocycleShellRadius,
+    0.72,
+    0.1,
+    2.0
+  )
+  floatView[I.hermiteCocycleInflationTwist] = finiteClamped(
+    schroedinger?.hermiteCocycleInflationTwist,
+    3.5,
+    0.0,
+    8.0
+  )
+}
+
+/**
  * Pack HydrogenND causal-diamond modular orbital controls. The effect is
  * analytic hydrogenND-only in WGSL; disabled state zeroes every field so the
  * psi helper returns identity coordinates and unit horizon gain. Horizon

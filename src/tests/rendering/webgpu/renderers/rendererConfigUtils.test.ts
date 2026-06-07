@@ -163,7 +163,7 @@ describe('applyModeOverrides', () => {
       dimension: 11,
       quantumMode: 'wheelerDeWitt',
     } as never)
-    expect(wdw.dimension).toBe(3)
+    expect(wdw.dimension).toBe(4)
 
     const ads = applyModeOverrides({
       dimension: 11,

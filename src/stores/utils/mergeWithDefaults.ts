@@ -39,35 +39,15 @@ import {
   RAYMARCH_QUALITY_TO_SAMPLES,
   SCHROEDINGER_QUALITY_PRESETS,
 } from '@/lib/geometry/extended/types'
-import {
-  DEFAULT_WHEELER_DEWITT_CONFIG,
-  type WdwSrmtClock,
-} from '@/lib/geometry/extended/wheelerDeWitt'
 import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
 import { sanitizeOpenQuantumConfig } from '@/lib/physics/openQuantum/types'
-import {
-  isWdwBoundaryCondition,
-  WDW_SOLVER_MAX_A_MAX,
-  WDW_SOLVER_MAX_A_MIN,
-  WDW_SOLVER_MAX_COSMOLOGICAL_CONSTANT,
-  WDW_SOLVER_MAX_GRID_NA,
-  WDW_SOLVER_MAX_GRID_NPHI,
-  WDW_SOLVER_MAX_INFLATON_MASS,
-  WDW_SOLVER_MAX_INFLATON_MASS_ASYMMETRY,
-  WDW_SOLVER_MAX_PHI_EXTENT,
-  WDW_SOLVER_MIN_A_MIN,
-  WDW_SOLVER_MIN_A_SPAN,
-  WDW_SOLVER_MIN_COSMOLOGICAL_CONSTANT,
-  WDW_SOLVER_MIN_INFLATON_MASS,
-  WDW_SOLVER_MIN_INFLATON_MASS_ASYMMETRY,
-  WDW_SOLVER_MIN_PHI_EXTENT,
-} from '@/lib/physics/wheelerDeWitt/solverInputValidation'
 
 import { normalizeAntiDeSitterLoadedConfig } from './mergeWithDefaultsAntiDeSitter'
 import { normalizeFreeScalarLoadedConfig } from './mergeWithDefaultsFreeScalar'
 import { normalizePauliLoadedConfig } from './mergeWithDefaultsPauli'
 import { normalizeSchroedingerNumericScalars } from './mergeWithDefaultsSchroedingerScalars'
+import { normalizeWheelerDeWittConfig } from './mergeWithDefaultsWheelerDeWitt'
 import { normalizeBecLoadedConfig } from './normalizeBecLoadedConfig'
 import { OBJECT_TYPE_TO_CONFIG_KEY } from './presetSerialization'
 
@@ -357,7 +337,6 @@ const TDSE_ENUM_FIELD_RULES: readonly EnumFieldRule[] = [
   { field: 'disorderDistribution', isValid: isTdseDisorderDistribution },
   { field: 'densityView', isValid: isTdseDensityView },
 ] as const
-const WDW_SRMT_CLOCK_SET = new Set<WdwSrmtClock>(['a', 'phi1', 'phi2'])
 
 function normalizeEnumFields(
   record: Record<string, unknown>,
@@ -382,128 +361,6 @@ function normalizeTdseEnums(normalized: Record<string, unknown>): Record<string,
   const next = normalizeEnumFields(tdseRecord, defaults, TDSE_ENUM_FIELD_RULES)
 
   return next === tdseRecord ? normalized : { ...normalized, tdse: next }
-}
-
-function isWdwSrmtClock(value: unknown): value is WdwSrmtClock {
-  return typeof value === 'string' && WDW_SRMT_CLOCK_SET.has(value as WdwSrmtClock)
-}
-
-function clampFiniteNumber(value: unknown, fallback: number, min: number, max: number): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
-  return Math.max(min, Math.min(max, value))
-}
-
-function clampFiniteInteger(value: unknown, fallback: number, min: number, max: number): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
-  return Math.max(min, Math.min(max, Math.round(value)))
-}
-
-function normalizeWheelerDeWittConfig(
-  normalized: Record<string, unknown>
-): Record<string, unknown> {
-  const wdw = normalized.wheelerDeWitt
-  if (!wdw || typeof wdw !== 'object' || Array.isArray(wdw)) return normalized
-
-  const current = wdw as Record<string, unknown>
-  const defaults = DEFAULT_WHEELER_DEWITT_CONFIG
-  let aMin = clampFiniteNumber(
-    current.aMin,
-    defaults.aMin,
-    WDW_SOLVER_MIN_A_MIN,
-    WDW_SOLVER_MAX_A_MIN
-  )
-  let aMax = clampFiniteNumber(
-    current.aMax,
-    defaults.aMax,
-    WDW_SOLVER_MIN_A_MIN + WDW_SOLVER_MIN_A_SPAN,
-    WDW_SOLVER_MAX_A_MAX
-  )
-  if (!(aMax > aMin)) {
-    aMin = defaults.aMin
-    aMax = defaults.aMax
-  }
-
-  return {
-    ...normalized,
-    wheelerDeWitt: {
-      ...current,
-      boundaryCondition: isWdwBoundaryCondition(current.boundaryCondition)
-        ? current.boundaryCondition
-        : defaults.boundaryCondition,
-      inflatonMass: clampFiniteNumber(
-        current.inflatonMass,
-        defaults.inflatonMass,
-        WDW_SOLVER_MIN_INFLATON_MASS,
-        WDW_SOLVER_MAX_INFLATON_MASS
-      ),
-      inflatonMassAsymmetry: clampFiniteNumber(
-        current.inflatonMassAsymmetry,
-        defaults.inflatonMassAsymmetry,
-        WDW_SOLVER_MIN_INFLATON_MASS_ASYMMETRY,
-        WDW_SOLVER_MAX_INFLATON_MASS_ASYMMETRY
-      ),
-      cosmologicalConstant: clampFiniteNumber(
-        current.cosmologicalConstant,
-        defaults.cosmologicalConstant,
-        WDW_SOLVER_MIN_COSMOLOGICAL_CONSTANT,
-        WDW_SOLVER_MAX_COSMOLOGICAL_CONSTANT
-      ),
-      aMin,
-      aMax,
-      gridNa: clampFiniteInteger(current.gridNa, defaults.gridNa, 16, WDW_SOLVER_MAX_GRID_NA),
-      gridNphi: clampFiniteInteger(
-        current.gridNphi,
-        defaults.gridNphi,
-        8,
-        WDW_SOLVER_MAX_GRID_NPHI
-      ),
-      phiExtent: clampFiniteNumber(
-        current.phiExtent,
-        defaults.phiExtent,
-        WDW_SOLVER_MIN_PHI_EXTENT,
-        WDW_SOLVER_MAX_PHI_EXTENT
-      ),
-      streamlineDensity: clampFiniteInteger(
-        current.streamlineDensity,
-        defaults.streamlineDensity,
-        2,
-        16
-      ),
-      phaseRotationSpeed: clampFiniteNumber(
-        current.phaseRotationSpeed,
-        defaults.phaseRotationSpeed,
-        0,
-        5
-      ),
-      worldlineSpeed: clampFiniteNumber(current.worldlineSpeed, defaults.worldlineSpeed, 0.1, 3),
-      worldlinePulseWidth: clampFiniteNumber(
-        current.worldlinePulseWidth,
-        defaults.worldlinePulseWidth,
-        0.02,
-        0.3
-      ),
-      renderDynamicRange: clampFiniteNumber(
-        current.renderDynamicRange,
-        defaults.renderDynamicRange,
-        1,
-        10_000
-      ),
-      srmtClock: isWdwSrmtClock(current.srmtClock) ? current.srmtClock : defaults.srmtClock,
-      srmtCutNormalized: clampFiniteNumber(
-        current.srmtCutNormalized,
-        defaults.srmtCutNormalized,
-        0.1,
-        0.9
-      ),
-      srmtRankCap: clampFiniteInteger(current.srmtRankCap, defaults.srmtRankCap, 8, 256),
-      srmtHeatmapIntensity: clampFiniteNumber(
-        current.srmtHeatmapIntensity,
-        defaults.srmtHeatmapIntensity,
-        0,
-        1
-      ),
-    },
-  }
 }
 
 function normalizeSchroedingerQualityEnums(

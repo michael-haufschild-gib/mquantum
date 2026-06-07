@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { solveWheelerDeWitt } from '@/lib/physics/wheelerDeWitt/solver'
+import {
+  solveWheelerDeWitt,
+  type WheelerDeWittSolverInput3D,
+  type WheelerDeWittSolverOutput,
+} from '@/lib/physics/wheelerDeWitt/solver'
 import {
   buildPulseOverlay,
   buildStaticOverlay,
@@ -128,7 +132,7 @@ describe('WKB streamlines', () => {
 
       // Convert index-space trajectory point to physical (a, φ₁, φ₂).
       const toPhysical = (
-        out: ReturnType<typeof solveWheelerDeWitt>,
+        out: WheelerDeWittSolverOutput,
         pt: [number, number, number]
       ): [number, number, number] => {
         const [Na, Nphi] = out.gridSize
@@ -139,7 +143,7 @@ describe('WKB streamlines', () => {
 
       // Mean physical path length per trajectory (Euclidean distance in (a,φ,φ)).
       const meanPathLength = (
-        out: ReturnType<typeof solveWheelerDeWitt>,
+        out: WheelerDeWittSolverOutput,
         trajs: ReturnType<typeof integrateWkbTrajectories>
       ): number => {
         if (trajs.length === 0) return 0
@@ -187,7 +191,7 @@ describe('WKB streamlines', () => {
   })
 
   describe('split integrator (integrateWkbTrajectories + buildStaticOverlay + buildPulseOverlay)', () => {
-    const solverParams = {
+    const solverParams: WheelerDeWittSolverInput3D = {
       boundaryCondition: 'tunneling' as const,
       inflatonMass: 0.3,
       cosmologicalConstant: 0.2,
@@ -213,7 +217,7 @@ describe('WKB streamlines', () => {
         aMin: 0.5,
         aMax: 2,
         phiExtent: 2,
-      } as unknown as ReturnType<typeof solveWheelerDeWitt>
+      } as unknown as WheelerDeWittSolverOutput
 
       expect(() => integrateWkbTrajectories(output, integratorInput)).toThrow(
         /chi buffer too small/

@@ -111,10 +111,7 @@ export class WebGPUDevice {
       .then((result) => {
         if (!this.isCurrentInitialization(canvas, generation)) {
           this.destroyInitializationResult(result)
-          throw new WebGPUInitError(
-            'INTERNAL_ERROR',
-            'WebGPU initialization was superseded by a newer canvas'
-          )
+          throw new WebGPUInitError('INTERNAL_ERROR', 'WebGPU init superseded')
         }
 
         this.publishInitialization(canvas, result, generation)
@@ -148,13 +145,13 @@ export class WebGPUDevice {
     try {
       result.context.unconfigure()
     } catch (cleanupError) {
-      logger.warn('WebGPU unconfigure failed:', cleanupError)
+      logger.warn('WebGPU unconfigure:', cleanupError)
     }
 
     try {
       result.device.destroy()
     } catch (cleanupError) {
-      logger.warn('WebGPU destroy failed:', cleanupError)
+      logger.warn('WebGPU destroy:', cleanupError)
     }
   }
 
@@ -175,11 +172,11 @@ export class WebGPUDevice {
       if (!this.isCurrentInitialization(canvas, generation) || this.device !== result.device) {
         return
       }
-      logger.error('WebGPU device lost:', info.message, 'reason:', info.reason)
+      logger.error('WebGPU lost:', info.message, 'reason:', info.reason)
       this.handleDeviceLost(info.reason)
     })
 
-    logger.log('WebGPU init:', {
+    logger.log('WebGPU:', {
       adapter: result.capabilities.adapterInfo,
       format: result.format,
       timestampQuery: result.capabilities.timestampQuery,
@@ -188,7 +185,7 @@ export class WebGPUDevice {
 
   private async doInitialize(canvas: HTMLCanvasElement): Promise<WebGPUInitData> {
     if (!isWebGPUSupported()) {
-      throw new WebGPUInitError('NO_NAVIGATOR_GPU', 'WebGPU is not supported in this browser')
+      throw new WebGPUInitError('NO_NAVIGATOR_GPU', 'WebGPU unsupported')
     }
 
     // Request adapter with high-performance preference
@@ -198,18 +195,11 @@ export class WebGPUDevice {
         powerPreference: 'high-performance',
       })
     } catch (cause) {
-      throw new WebGPUInitError(
-        'ADAPTER_REQUEST_FAILED',
-        'navigator.gpu.requestAdapter() threw',
-        cause
-      )
+      throw new WebGPUInitError('ADAPTER_REQUEST_FAILED', 'requestAdapter threw', cause)
     }
 
     if (!adapter) {
-      throw new WebGPUInitError(
-        'ADAPTER_REQUEST_FAILED',
-        'Failed to get WebGPU adapter (requestAdapter returned null)'
-      )
+      throw new WebGPUInitError('ADAPTER_REQUEST_FAILED', 'requestAdapter returned null')
     }
 
     // Query adapter capabilities (use synchronous .info property - requestAdapterInfo() was removed)
@@ -217,7 +207,7 @@ export class WebGPUDevice {
     const adapterInfoString =
       [adapterInfo?.vendor, adapterInfo?.architecture, adapterInfo?.device]
         .filter((value): value is string => typeof value === 'string' && value.length > 0)
-        .join(' ') || 'Unknown GPU Adapter'
+        .join(' ') || 'Unknown GPU'
     const deviceDescriptor = buildWebGPUDeviceDescriptor(adapter)
 
     // Request maximum limits
@@ -228,8 +218,8 @@ export class WebGPUDevice {
       throw new WebGPUInitError(
         'DEVICE_REQUEST_FAILED',
         cause instanceof Error
-          ? `adapter.requestDevice() rejected: ${cause.message}`
-          : 'adapter.requestDevice() rejected',
+          ? `requestDevice rejected: ${cause.message}`
+          : 'requestDevice rejected',
         cause
       )
     }
@@ -238,7 +228,7 @@ export class WebGPUDevice {
       try {
         device.destroy()
       } catch (cleanupError) {
-        logger.warn('WebGPU init cleanup failed:', cleanupError)
+        logger.warn('WebGPU cleanup:', cleanupError)
       }
     }
 
@@ -250,19 +240,14 @@ export class WebGPUDevice {
       destroyDeviceAfterInitFailure()
       throw new WebGPUInitError(
         'CONTEXT_CONFIGURE_FAILED',
-        cause instanceof Error
-          ? `canvas.getContext("webgpu") threw: ${cause.message}`
-          : 'canvas.getContext("webgpu") threw',
+        cause instanceof Error ? `getContext threw: ${cause.message}` : 'getContext threw',
         cause
       )
     }
 
     if (!context) {
       destroyDeviceAfterInitFailure()
-      throw new WebGPUInitError(
-        'CONTEXT_CONFIGURE_FAILED',
-        'canvas.getContext("webgpu") returned null'
-      )
+      throw new WebGPUInitError('CONTEXT_CONFIGURE_FAILED', 'getContext returned null')
     }
 
     // Use preferred format (usually bgra8unorm on most platforms)
@@ -286,9 +271,7 @@ export class WebGPUDevice {
       destroyDeviceAfterInitFailure()
       throw new WebGPUInitError(
         'CONTEXT_CONFIGURE_FAILED',
-        cause instanceof Error
-          ? `GPUCanvasContext.configure() threw: ${cause.message}`
-          : 'GPUCanvasContext.configure() threw',
+        cause instanceof Error ? `configure threw: ${cause.message}` : 'configure threw',
         cause
       )
     }

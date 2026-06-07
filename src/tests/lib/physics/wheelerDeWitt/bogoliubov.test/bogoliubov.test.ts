@@ -24,11 +24,11 @@ import { describe, expect, it } from 'vitest'
 import { extractBogoliubov } from '@/lib/physics/wheelerDeWitt/bogoliubov'
 import {
   solveWheelerDeWitt,
-  type WheelerDeWittSolverInput,
+  type WheelerDeWittSolverInput3D,
 } from '@/lib/physics/wheelerDeWitt/solver'
 
 /** Configuration with positive Λ so most columns have a turning surface. */
-const BC_INPUT: WheelerDeWittSolverInput = {
+const BC_INPUT: WheelerDeWittSolverInput3D = {
   boundaryCondition: 'noBoundary',
   inflatonMass: 0.3,
   cosmologicalConstant: 0.5,

@@ -24,6 +24,12 @@
 export type WdwBoundaryCondition = 'noBoundary' | 'tunneling' | 'deWitt'
 
 /**
+ * Minisuperspace dimensionality: `3` solves on `(a, φ₁, φ₂)`, `4` adds a
+ * third inflaton axis `φ₃` for the `(a, φ₁, φ₂, φ₃)` solver.
+ */
+export type WdwMinisuperspaceDimension = 3 | 4
+
+/**
  * SRMT (Superspace-Relational Modular Time) clock identifier — matches
  * {@link import('@/lib/physics/srmt/types').SrmtClock}. Selects which
  * minisuperspace axis the modular-time diagnostic partitions the `χ`
@@ -44,6 +50,8 @@ export type WdwSrmtClock = 'a' | 'phi1' | 'phi2'
  * consumed by shaders or post-solve overlay builders.
  */
 export interface WheelerDeWittConfig {
+  /** Minisuperspace dimension: 3D `(a, φ₁, φ₂)` or 4D `(a, φ₁, φ₂, φ₃)` (physics) */
+  minisuperspaceDimension: WdwMinisuperspaceDimension
   /** Selected boundary condition proposal (physics) */
   boundaryCondition: WdwBoundaryCondition
   /** Inflaton mass m for V(φ) = ½m²φ₁² + ½(m·α)²φ₂² + Λ (physics) */
@@ -70,6 +78,8 @@ export interface WheelerDeWittConfig {
   gridNphi: number
   /** Half-range of φ-grid: φ ∈ [-phiExtent, phiExtent] (physics) */
   phiExtent: number
+  /** Fixed normalized `φ₃` slice for rendering 4D output into the 3D density texture. */
+  phi3SliceNormalized: number
   /** Whether WKB classical-cosmology streamlines are overlaid (display) */
   streamlinesEnabled: boolean
   /** Streamline seed density — number of seeds per axis (display) */
@@ -146,6 +156,7 @@ export interface WheelerDeWittConfig {
  * stability budget.
  */
 export const DEFAULT_WHEELER_DEWITT_CONFIG: WheelerDeWittConfig = {
+  minisuperspaceDimension: 3,
   boundaryCondition: 'noBoundary',
   inflatonMass: 0.3,
   inflatonMassAsymmetry: 1.0,
@@ -155,6 +166,7 @@ export const DEFAULT_WHEELER_DEWITT_CONFIG: WheelerDeWittConfig = {
   gridNa: 128,
   gridNphi: 40,
   phiExtent: 3.5,
+  phi3SliceNormalized: 0.5,
   streamlinesEnabled: true,
   streamlineDensity: 6,
   phaseRotationEnabled: false,

@@ -29,7 +29,7 @@ describe('WebGPUDevice initialization errors', () => {
 
       expect(result.success).toBe(false)
       if (!result.success) {
-        expect(result.error).toContain('not supported')
+        expect(result.error).toContain('WebGPU unsupported')
       }
     } finally {
       if (gpuDescriptor) {
@@ -67,7 +67,7 @@ describe('WebGPUDevice initialization errors', () => {
 
       expect(result.success).toBe(false)
       if (!result.success) {
-        expect(result.error).toContain('adapter')
+        expect(result.error).toContain('requestAdapter returned null')
       }
     } finally {
       Object.defineProperty(navigator, 'gpu', {

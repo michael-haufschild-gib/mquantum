@@ -70,9 +70,10 @@ import {
  */
 const WDW_LANGER_V_ZERO_THRESHOLD = 1e-12
 
-/** Fixed Gaussian-in-φ envelope factor `exp(-½(φ₁² + φ₂²))` (gauge). */
-function gaussianEnvelope(phi1: number, phi2: number): number {
-  return Math.exp(-0.5 * (phi1 * phi1 + phi2 * phi2))
+/** Fixed Gaussian-in-φ envelope factor `exp(-½(φ₁² + φ₂² + φ₃²))` (gauge). */
+function gaussianEnvelope(phi1: number, phi2: number, phi3: number = 0): number {
+  const base = phi1 * phi1 + phi2 * phi2
+  return Math.exp(-0.5 * (phi3 === 0 ? base : base + phi3 * phi3))
 }
 
 /**
@@ -98,8 +99,9 @@ function gaussianEnvelope(phi1: number, phi2: number): number {
  */
 export function hhLangerSeed(args: ColumnArgs): ColumnSample {
   const { a, phi1, phi2, m, lambda } = args
+  const phi3 = args.phi3 ?? 0
   const asymmetry = args.asymmetry ?? 1
-  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry)
+  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry, phi3)
 
   if (V > WDW_LANGER_V_ZERO_THRESHOLD) {
     // V > 0: pure Ai branch (c1 = 1, c2 = 0). Ai's Euclidean decay
@@ -110,12 +112,12 @@ export function hhLangerSeed(args: ColumnArgs): ColumnSample {
 
   if (V < -WDW_LANGER_V_ZERO_THRESHOLD) {
     // V < 0 (AdS cell): env · |U|^{-1/4} · cos(Φ_L). Standing wave gauge.
-    const env = gaussianEnvelope(phi1, phi2)
+    const env = gaussianEnvelope(phi1, phi2, phi3)
     return columnSolutionNegativeV(args, { re: env, im: 0 }, { re: 0, im: 0 })
   }
 
   // V = 0 (exactly): env · √a · J_{1/4}(3π·a²). Pure real Bessel gauge.
-  const env = gaussianEnvelope(phi1, phi2)
+  const env = gaussianEnvelope(phi1, phi2, phi3)
   return columnSolutionZeroV(a, { re: env, im: 0 }, { re: 0, im: 0 })
 }
 
@@ -147,8 +149,9 @@ export function hhLangerSeed(args: ColumnArgs): ColumnSample {
  */
 export function vilenkinLangerSeed(args: ColumnArgs): ColumnSample {
   const { a, phi1, phi2, m, lambda } = args
+  const phi3 = args.phi3 ?? 0
   const asymmetry = args.asymmetry ?? 1
-  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry)
+  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry, phi3)
 
   if (V > WDW_LANGER_V_ZERO_THRESHOLD) {
     // V > 0: Ai + i·Bi Langer combination.
@@ -163,7 +166,7 @@ export function vilenkinLangerSeed(args: ColumnArgs): ColumnSample {
     }
   }
 
-  const env = gaussianEnvelope(phi1, phi2)
+  const env = gaussianEnvelope(phi1, phi2, phi3)
   if (V < -WDW_LANGER_V_ZERO_THRESHOLD) {
     // V < 0: env · |U|^{-1/4} · exp(+i·Φ_L) = A·cos + B·sin with
     // A = env, B = i·env.

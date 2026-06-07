@@ -34,7 +34,8 @@ import {
 } from '@/lib/physics/srmt'
 import {
   solveWheelerDeWitt,
-  type WheelerDeWittSolverInput,
+  type WheelerDeWittSolverInput3D,
+  type WheelerDeWittSolverOutput,
 } from '@/lib/physics/wheelerDeWitt/solver'
 
 const CLOCKS: SrmtClock[] = ['a', 'phi1', 'phi2']
@@ -55,11 +56,11 @@ interface ClockReport {
 }
 
 function reportClock(
-  output: ReturnType<typeof solveWheelerDeWitt>,
+  output: WheelerDeWittSolverOutput,
   clock: SrmtClock,
   cutIndex: number,
   rankCap: number,
-  wdw: WheelerDeWittSolverInput
+  wdw: WheelerDeWittSolverInput3D
 ): ClockReport {
   const result = computeSrmtDiagnostic(
     output,
@@ -119,7 +120,7 @@ function reportRow(r: ClockReport): string {
 
 describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', () => {
   it('reports per-clock falsification scores at canonical (m=0.3, Λ=0.1, noBoundary, 128x32 publication grid)', () => {
-    const wdw: WheelerDeWittSolverInput = {
+    const wdw: WheelerDeWittSolverInput3D = {
       boundaryCondition: 'noBoundary',
       inflatonMass: 0.3,
       cosmologicalConstant: 0.1,
@@ -234,14 +235,14 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
 
   it('scans mass × BC, prints champion stability + rigid-metric ratio table', () => {
     const masses = [0.1, 0.3, 0.6, 1.0, 1.5]
-    const bcs: WheelerDeWittSolverInput['boundaryCondition'][] = [
+    const bcs: WheelerDeWittSolverInput3D['boundaryCondition'][] = [
       'noBoundary',
       'tunneling',
       'deWitt',
     ]
     interface ScanRow {
       m: number
-      bc: WheelerDeWittSolverInput['boundaryCondition']
+      bc: WheelerDeWittSolverInput3D['boundaryCondition']
       championL2: SrmtClock | null
       championRigid: SrmtClock | null
       championLInf: SrmtClock | null
@@ -256,7 +257,7 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
     const rows: ScanRow[] = []
     for (const bc of bcs) {
       for (const m of masses) {
-        const wdw: WheelerDeWittSolverInput = {
+        const wdw: WheelerDeWittSolverInput3D = {
           boundaryCondition: bc,
           inflatonMass: m,
           cosmologicalConstant: 0.1,
@@ -367,7 +368,7 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
     }
     const rows: LambdaRow[] = []
     for (const lambda of lambdas) {
-      const wdw: WheelerDeWittSolverInput = {
+      const wdw: WheelerDeWittSolverInput3D = {
         boundaryCondition: 'noBoundary',
         inflatonMass: 0.3,
         cosmologicalConstant: lambda,
@@ -443,7 +444,7 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
     }
     const rows: GridRow[] = []
     for (const { Na: NaCfg, Nphi: NphiCfg } of grids) {
-      const wdw: WheelerDeWittSolverInput = {
+      const wdw: WheelerDeWittSolverInput3D = {
         boundaryCondition: 'noBoundary',
         inflatonMass: 0.3,
         cosmologicalConstant: 0.1,
@@ -509,7 +510,7 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
   it('WKB cross-diagnostic: does the WKB-natural clock agree with the rigid champion?', () => {
     const cases: Array<{
       label: string
-      wdw: WheelerDeWittSolverInput
+      wdw: WheelerDeWittSolverInput3D
     }> = [
       {
         label: 'm=0.3 Λ=+0.1 noBoundary',
@@ -633,7 +634,7 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
   it('Page-Wootters cross-diagnostic: does the PW-natural clock agree with rigid-q?', () => {
     const cases: Array<{
       label: string
-      wdw: WheelerDeWittSolverInput
+      wdw: WheelerDeWittSolverInput3D
     }> = [
       {
         label: 'm=0.3 Λ=+0.1 noBoundary',
@@ -750,7 +751,7 @@ describe('LIVE INVESTIGATION — SRMT falsification readout against real WdW', (
   it('FOUR-DIAGNOSTIC CONSENSUS: rigid vs WKB vs PW vs cut-stability', () => {
     const cases: Array<{
       label: string
-      wdw: WheelerDeWittSolverInput
+      wdw: WheelerDeWittSolverInput3D
     }> = [
       {
         label: 'm=0.3 Λ=+0.1 noBoundary',

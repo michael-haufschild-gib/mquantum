@@ -52,6 +52,59 @@ describe('ScenarioSelector - Bell presets', () => {
     expect(screen.getByRole('combobox', { name: /scenario/i })).toHaveValue('chshSinglet')
   })
 
+  it('matches caustic Tsirelson preset ahead of broad chshSinglet', () => {
+    const preset = BELL_SCENARIO_PRESETS.find((p) => p.id === 'chshCausticTsirelsonLens')!
+    act(() => {
+      useExtendedObjectStore.getState().setBellPairConfig({ ...preset.overrides, needsReset: true })
+    })
+    render(<ScenarioSelector />)
+    expect(screen.getByRole('combobox', { name: /scenario/i })).toHaveValue(
+      'chshCausticTsirelsonLens'
+    )
+  })
+
+  it('applying chshCausticTsirelsonLens enables bright folded caustics in the store', async () => {
+    const user = userEvent.setup()
+    render(<ScenarioSelector />)
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: /scenario/i }),
+      'chshCausticTsirelsonLens'
+    )
+    const cfg = useExtendedObjectStore.getState().bellPair
+    expect(cfg.chshCausticEnabled).toBe(true)
+    expect(cfg.chshCausticStrength).toBeGreaterThan(1)
+    expect(cfg.chshCausticFoldScale).toBeGreaterThan(8)
+    expect(cfg.visibility).toBe(1)
+    expect(cfg.needsReset).toBe(true)
+  })
+
+  it('applying chshCausticWernerCusp writes a sub-threshold caustic config', async () => {
+    const user = userEvent.setup()
+    render(<ScenarioSelector />)
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: /scenario/i }),
+      'chshCausticWernerCusp'
+    )
+    const cfg = useExtendedObjectStore.getState().bellPair
+    expect(cfg.chshCausticEnabled).toBe(true)
+    expect(cfg.visibility).toBeLessThan(WERNER_VIOLATION_THRESHOLD)
+    expect(cfg.chshCausticFoldScale).toBeLessThan(5)
+    expect(cfg.chshCausticPhase).toBeLessThan(0)
+  })
+
+  it('applying chshSinglet after a caustic preset disables sticky caustic fields', async () => {
+    const user = userEvent.setup()
+    render(<ScenarioSelector />)
+    const select = screen.getByRole('combobox', { name: /scenario/i })
+    await user.selectOptions(select, 'chshCausticTsirelsonLens')
+    expect(useExtendedObjectStore.getState().bellPair.chshCausticEnabled).toBe(true)
+
+    await user.selectOptions(select, 'chshSinglet')
+    const cfg = useExtendedObjectStore.getState().bellPair
+    expect(cfg.chshCausticEnabled).toBe(false)
+    expect(cfg.visibility).toBe(1)
+  })
+
   it('applying wernerBelowThreshold writes a sub-threshold visibility to the store', async () => {
     const user = userEvent.setup()
     render(<ScenarioSelector />)

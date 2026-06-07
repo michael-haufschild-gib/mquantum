@@ -380,6 +380,13 @@ struct SchroedingerUniforms {
   bornNullWeaveNodeWidth: f32,
   bornNullWeaveCirculation: f32,
 
+  // Harmonic oscillator triple-cocycle branch inflation. Disabled host packing
+  // writes all fields as zero, making the wavefunction term rotation identity.
+  hermiteCocycleInflationEnabled: u32,
+  hermiteCocycleInflationStrength: f32,
+  hermiteCocycleShellRadius: f32,
+  hermiteCocycleInflationTwist: f32,
+
 }
 
 // ============================================

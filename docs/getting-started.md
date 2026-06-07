@@ -17,10 +17,10 @@ Safari is not supported (WGSL compiler hangs on deep nested loops).
 
 ```bash
 pnpm install --frozen-lockfile   # Install dependencies (uses lockfile)
-pnpm run dev                     # Starts Vite dev server on http://localhost:3000
+pnpm run dev                     # Starts Vite through Portless
 ```
 
-The app opens in your default browser. You should see a rotating 3D quantum wavefunction.
+The app opens at `https://mquantum.localhost`. Portless assigns Vite an internal free port, so concurrent project dev servers do not collide. First run may prompt for local CA trust because Portless serves HTTPS by default.
 
 ## Project Layout
 
@@ -48,6 +48,8 @@ pnpm exec vitest run src/tests/stores/        # Tests for a specific directory
 pnpm exec vitest run -t "hermite"             # Tests matching a pattern
 pnpm exec playwright test                     # E2E tests (needs GPU)
 ```
+
+Playwright starts raw Vite via `pnpm run dev:app` on `PLAYWRIGHT_DEV_SERVER_PORT` (default `3100`) so test automation does not depend on Portless trust prompts.
 
 ### Check code quality
 

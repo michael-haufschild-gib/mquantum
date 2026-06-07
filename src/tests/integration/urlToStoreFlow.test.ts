@@ -38,6 +38,22 @@ describe('URL params -> store state integration', () => {
     expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('tdseDynamics')
   })
 
+  it('drives Wheeler-DeWitt 4D from the global dimension URL param', () => {
+    applyUrlStateToStores('d=4&t=schroedinger&qm=wheelerDeWitt&wdw_phi3=0.65')
+    const wdw = useExtendedObjectStore.getState().schroedinger.wheelerDeWitt
+    expect(useGeometryStore.getState().dimension).toBe(4)
+    expect(wdw.minisuperspaceDimension).toBe(4)
+    expect(wdw.gridNa).toBe(48)
+    expect(wdw.gridNphi).toBe(12)
+    expect(wdw.phi3SliceNormalized).toBeCloseTo(0.65)
+  })
+
+  it('uses wdw_dim=4 only as a legacy fallback when d is absent', () => {
+    applyUrlStateToStores('t=schroedinger&qm=wheelerDeWitt&wdw_dim=4')
+    expect(useGeometryStore.getState().dimension).toBe(4)
+    expect(useExtendedObjectStore.getState().schroedinger.wheelerDeWitt.minisuperspaceDimension).toBe(4)
+  })
+
   it('applies hydrogen quantum numbers from URL', () => {
     applyUrlStateToStores('d=3&t=schroedinger&qm=hydrogenND&hyd_n=4&hyd_l=2&hyd_m=-1')
     const sch = useExtendedObjectStore.getState().schroedinger

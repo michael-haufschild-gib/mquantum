@@ -37,6 +37,7 @@ export type DiracInitialCondition =
  * - phase: phase of dominant spinor component
  * - axialCharge: normalized axial/chiral charge magnitude |ψ†γ5ψ|/ρ
  * - cliffordBloom: upper/lower sector balance modulated by relative Clifford phase petals
+ * - hubbleLace: spin-current helicity aperture gated by sector balance and Hubble-like shells
  */
 export type DiracFieldView =
   | 'totalDensity'
@@ -48,6 +49,7 @@ export type DiracFieldView =
   | 'phase'
   | 'axialCharge'
   | 'cliffordBloom'
+  | 'hubbleLace'
 
 /**
  * Potential type for the Dirac equation.
@@ -77,6 +79,7 @@ export const DIRAC_FIELD_VIEWS: readonly DiracFieldView[] = [
   'phase',
   'axialCharge',
   'cliffordBloom',
+  'hubbleLace',
 ]
 
 export const DIRAC_POTENTIAL_TYPES: readonly DiracPotentialType[] = [

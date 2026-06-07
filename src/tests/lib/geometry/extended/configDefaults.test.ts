@@ -278,6 +278,16 @@ describe('DEFAULT_SCHROEDINGER_CONFIG structural invariants', () => {
     expect(cfg.spectralDimensionFlowDiffusionScale).toBeLessThanOrEqual(2)
   })
 
+  it('Hermite cocycle inflation defaults are in shader control ranges', () => {
+    expect(cfg.hermiteCocycleInflationEnabled).toBe(false)
+    expect(cfg.hermiteCocycleInflationStrength).toBeGreaterThanOrEqual(0)
+    expect(cfg.hermiteCocycleInflationStrength).toBeLessThanOrEqual(2)
+    expect(cfg.hermiteCocycleShellRadius).toBeGreaterThanOrEqual(0.1)
+    expect(cfg.hermiteCocycleShellRadius).toBeLessThanOrEqual(2)
+    expect(cfg.hermiteCocycleInflationTwist).toBeGreaterThanOrEqual(0)
+    expect(cfg.hermiteCocycleInflationTwist).toBeLessThanOrEqual(8)
+  })
+
   it('vacuum bubble lens defaults are in shader control ranges', () => {
     expect(cfg.vacuumBubbleLensEnabled).toBe(false)
     expect(cfg.vacuumBubbleLensStrength).toBeGreaterThanOrEqual(0)

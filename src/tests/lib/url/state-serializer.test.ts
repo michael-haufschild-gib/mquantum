@@ -1207,6 +1207,26 @@ describe('state-serializer', () => {
       expect(round.wdwGridNphi).toBe(48)
     })
 
+    it('round-trips 4D WDW dimension and φ3 slice params', () => {
+      const state: ShareableState = {
+        dimension: 4,
+        objectType: 'schroedinger',
+        quantumMode: 'wheelerDeWitt',
+        wdwMinisuperspaceDimension: 4,
+        wdwGridNa: 48,
+        wdwGridNphi: 12,
+        wdwPhi3SliceNormalized: 0.625,
+      }
+      const serialized = serializeState(state)
+      expect(serialized).toContain('wdw_dim=4')
+      expect(serialized).toContain('wdw_phi3=0.625')
+      const round = deserializeState(serialized)
+      expect(round.wdwMinisuperspaceDimension).toBe(4)
+      expect(round.wdwGridNa).toBe(48)
+      expect(round.wdwGridNphi).toBe(12)
+      expect(round.wdwPhi3SliceNormalized).toBeCloseTo(0.625, 3)
+    })
+
     it('clamps wdw_gn_a / wdw_gn_p on deserialize to solver-safe ranges', () => {
       const lo = deserializeState('wdw_gn_a=4&wdw_gn_p=2')
       const hi = deserializeState('wdw_gn_a=99999&wdw_gn_p=99999')

@@ -44,18 +44,18 @@ If you are evaluating this for research use, read the validation-status doc firs
 # Install dependencies
 pnpm install --frozen-lockfile
 
-# Start dev server on port 3000
+# Start dev server through Portless
 pnpm run dev
 ```
 
-Opens at `http://localhost:3000`.
+Opens at `https://mquantum.localhost`. Portless assigns Vite an internal free port, so multiple projects can run without port guessing. First run may prompt to trust the local Portless CA.
 
 ## Commands
 
 | Command | Purpose |
 |---------|---------|
 | `make setup` | Install dependencies |
-| `make dev` | Start dev server |
+| `make dev` | Start dev server at `https://mquantum.localhost` |
 | `make build` | Full build (WASM + TypeScript + Vite) |
 | `make build-web` | Web-only build (TypeScript + Vite) |
 | `make test` | Run unit tests |
@@ -67,7 +67,8 @@ Opens at `http://localhost:3000`.
 Or use pnpm directly:
 
 ```bash
-pnpm run dev          # Dev server
+pnpm run dev          # Dev server via Portless
+pnpm run dev:app      # Raw Vite server, mostly for automation
 pnpm run build        # Full build (wasm + tsc + vite)
 pnpm run build:web    # Web-only build (tsc + vite)
 pnpm exec vitest run  # Unit tests

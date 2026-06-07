@@ -9,7 +9,7 @@
  * NOT a correctness test — produces JSON for before/after comparison.
  *
  * Run:
- *   PLAYWRIGHT_DEV_SERVER_PORT=3000 pnpm exec playwright test \
+ *   PLAYWRIGHT_DEV_SERVER_PORT=3100 pnpm exec playwright test \
  *     scripts/playwright/audit-tdse-pauli.spec.ts --workers=1
  */
 

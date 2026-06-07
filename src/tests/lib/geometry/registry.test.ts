@@ -130,6 +130,14 @@ describe('Object Type Registry', () => {
     it('getRecommendedDimension returns value for schroedinger', () => {
       expect(getRecommendedDimension('schroedinger')).toBe(4)
     })
+
+    it('Wheeler-DeWitt is available through the global 4D selector', () => {
+      expect(getQuantumTypeEntry('wheelerDeWitt')?.dimensions).toMatchObject({
+        min: 3,
+        max: 4,
+        recommended: 3,
+      })
+    })
   })
 
   describe('UI Components', () => {

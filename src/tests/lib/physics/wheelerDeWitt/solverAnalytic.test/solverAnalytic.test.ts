@@ -405,7 +405,7 @@ function constantPhiSlab(
   cim: number,
   dre: number,
   dim: number
-): { chi: Float32Array; chiDeriv: Float32Array } {
+): { chi: Float32Array; chiDeriv: Float32Array; minisuperspaceDimension: 3 } {
   const N = Nphi * Nphi
   const chi = new Float32Array(2 * N)
   const chiDeriv = new Float32Array(2 * N)
@@ -415,7 +415,7 @@ function constantPhiSlab(
     chiDeriv[2 * i] = dre
     chiDeriv[2 * i + 1] = dim
   }
-  return { chi, chiDeriv }
+  return { chi, chiDeriv, minisuperspaceDimension: 3 }
 }
 
 /** Read χ(a, central) for a constant-in-φ slab (any `(i1, i2)` works
@@ -565,7 +565,7 @@ describe('Wheeler–DeWitt solver vs published analytic fixtures (1D-isolated)',
     m: number,
     lambda: number
   ): {
-    boundary: { chi: Float32Array; chiDeriv: Float32Array }
+    boundary: { chi: Float32Array; chiDeriv: Float32Array; minisuperspaceDimension: 3 }
     phaseAtMin: number
   } {
     const phaseAtMin = wdwLorentzianWkbPhase(aMin, 0, 0, m, lambda)

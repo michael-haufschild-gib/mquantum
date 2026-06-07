@@ -86,7 +86,11 @@ const SIGMA = 0.8 * PARAMS.phiExtent
  * phase). Returns interleaved `(re, im)` buffers for the slab shape
  * the solver expects.
  */
-function buildGaussianBoundary(): { chi: Float32Array; chiDeriv: Float32Array } {
+function buildGaussianBoundary(): {
+  chi: Float32Array
+  chiDeriv: Float32Array
+  minisuperspaceDimension: 3
+} {
   const Nphi = PARAMS.gridNphi
   const dphi = (2 * PARAMS.phiExtent) / (Nphi - 1)
   const inv2Sq = 1 / (2 * SIGMA * SIGMA)
@@ -101,7 +105,7 @@ function buildGaussianBoundary(): { chi: Float32Array; chiDeriv: Float32Array } 
       // chiDeriv ≡ 0 — probes the φ-Laplacian in isolation.
     }
   }
-  return { chi, chiDeriv }
+  return { chi, chiDeriv, minisuperspaceDimension: 3 }
 }
 
 /** Squared Frobenius norm of the full (complex) χ on slab `ia`. */
@@ -242,12 +246,16 @@ function referenceLeapfrog(
  * domain; under Neumann the discrete stencil preserves the property
  * at every cell, under Dirichlet it does not.
  */
-function buildConstantBoundary(c: number): { chi: Float32Array; chiDeriv: Float32Array } {
+function buildConstantBoundary(c: number): {
+  chi: Float32Array
+  chiDeriv: Float32Array
+  minisuperspaceDimension: 3
+} {
   const Nphi = PARAMS.gridNphi
   const chi = new Float32Array(2 * Nphi * Nphi)
   const chiDeriv = new Float32Array(2 * Nphi * Nphi)
   for (let i = 0; i < Nphi * Nphi; i++) chi[2 * i] = c
-  return { chi, chiDeriv }
+  return { chi, chiDeriv, minisuperspaceDimension: 3 }
 }
 
 describe('Wheeler–DeWitt φ-boundary treatment (Neumann vs Dirichlet)', () => {
@@ -351,7 +359,7 @@ describe('Wheeler–DeWitt φ-boundary treatment (Neumann vs Dirichlet)', () => 
       gridNa: PARAMS.gridNa,
       gridNphi: PARAMS.gridNphi,
       phiExtent: PARAMS.phiExtent,
-      customBoundary: { chi: seedChi, chiDeriv: seedDeriv },
+      customBoundary: { chi: seedChi, chiDeriv: seedDeriv, minisuperspaceDimension: 3 },
     })
     const Nphi = PARAMS.gridNphi
     const iaLast = PARAMS.gridNa - 1

@@ -48,17 +48,18 @@ export function effectiveSpongeWidth(Nphi: number): number {
  * @returns `true` iff every cell agrees with the centre cell within
  *   tolerance.
  */
-export function isConstantInPhiSlab(chi: Float32Array, Nphi: number): boolean {
+export function isConstantInPhiSlab(chi: Float32Array, Nphi: number, phiDims: 2 | 3 = 2): boolean {
   if (Nphi < 2) return true
   const center = Math.floor(Nphi / 2)
-  const centerOff = 2 * (center * Nphi + center)
+  const centerIdx = phiDims === 3 ? (center * Nphi + center) * Nphi + center : center * Nphi + center
+  const centerOff = 2 * centerIdx
   const refRe = chi[centerOff] ?? 0
   const refIm = chi[centerOff + 1] ?? 0
   const refMag = Math.hypot(refRe, refIm)
   const absTol = 1e-10
   const relTol = 1e-6
   const tol = Math.max(absTol, relTol * refMag)
-  const N = Nphi * Nphi
+  const N = Math.pow(Nphi, phiDims)
   for (let idx = 0; idx < N; idx++) {
     const re = chi[2 * idx] ?? 0
     const im = chi[2 * idx + 1] ?? 0
@@ -81,9 +82,25 @@ export function isConstantInPhiSlab(chi: Float32Array, Nphi: number): boolean {
  *
  * @returns Float32Array of length `Nphi²`, indexed `i1 * Nphi + i2`.
  */
-export function buildPhiSpongeDamping(Nphi: number): Float32Array {
-  const sponge = new Float32Array(Nphi * Nphi)
+export function buildPhiSpongeDamping(Nphi: number, phiDims: 2 | 3 = 2): Float32Array {
+  const sponge = new Float32Array(Math.pow(Nphi, phiDims))
   const W = effectiveSpongeWidth(Nphi)
+  if (phiDims === 3) {
+    for (let i1 = 0; i1 < Nphi; i1++) {
+      const d1 = Math.min(i1, Nphi - 1 - i1)
+      const s1 = d1 < W ? Math.exp(-WDW_PHI_SPONGE_GAMMA * Math.pow(1 - d1 / W, 2)) : 1
+      for (let i2 = 0; i2 < Nphi; i2++) {
+        const d2 = Math.min(i2, Nphi - 1 - i2)
+        const s2 = d2 < W ? Math.exp(-WDW_PHI_SPONGE_GAMMA * Math.pow(1 - d2 / W, 2)) : 1
+        for (let i3 = 0; i3 < Nphi; i3++) {
+          const d3 = Math.min(i3, Nphi - 1 - i3)
+          const s3 = d3 < W ? Math.exp(-WDW_PHI_SPONGE_GAMMA * Math.pow(1 - d3 / W, 2)) : 1
+          sponge[(i1 * Nphi + i2) * Nphi + i3] = s1 * s2 * s3
+        }
+      }
+    }
+    return sponge
+  }
   for (let i1 = 0; i1 < Nphi; i1++) {
     const d1 = Math.min(i1, Nphi - 1 - i1)
     const s1 = d1 < W ? Math.exp(-WDW_PHI_SPONGE_GAMMA * Math.pow(1 - d1 / W, 2)) : 1

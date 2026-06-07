@@ -97,6 +97,25 @@ describe('serializeWdw — wire format', () => {
     expect(params.get('wdw_sld')).toBe('8')
   })
 
+  it('emits wdw_dim=4 and elides the default 4D φ3 slice', () => {
+    const params = new URLSearchParams()
+    serializeWdw(params, {
+      wdwMinisuperspaceDimension: 4,
+      wdwPhi3SliceNormalized: 0.5,
+    })
+    expect(params.get('wdw_dim')).toBe('4')
+    expect(params.has('wdw_phi3')).toBe(false)
+  })
+
+  it('emits non-default 4D φ3 slice', () => {
+    const params = new URLSearchParams()
+    serializeWdw(params, {
+      wdwMinisuperspaceDimension: 4,
+      wdwPhi3SliceNormalized: 0.625,
+    })
+    expect(params.get('wdw_phi3')).toBe('0.625')
+  })
+
   it('emits all booleans as 1/0', () => {
     const params = new URLSearchParams()
     serializeWdw(params, {
@@ -185,6 +204,15 @@ describe('deserializeWdw — validation', () => {
     expect(out.wdwGridNphi).toBe(128)
   })
 
+  it('parses 4D dimension, clamps 4D grid limits, and clamps φ3 slice', () => {
+    const out: WdwUrlState = {}
+    deserializeWdw(new URLSearchParams('wdw_dim=4&wdw_gn_a=999&wdw_gn_p=999&wdw_phi3=2'), out)
+    expect(out.wdwMinisuperspaceDimension).toBe(4)
+    expect(out.wdwGridNa).toBe(128)
+    expect(out.wdwGridNphi).toBe(24)
+    expect(out.wdwPhi3SliceNormalized).toBe(1)
+  })
+
   it('clamps streamline density into [2, 16]', () => {
     const out: WdwUrlState = {}
     deserializeWdw(new URLSearchParams('wdw_sld=1'), out)
@@ -254,6 +282,19 @@ describe('round-trip — full state', () => {
     expect(out.wdwWorldlineSpeed).toBeCloseTo(1.2, 2)
     expect(out.wdwWorldlinePulseWidth).toBeCloseTo(0.15, 4)
     expect(out.wdwRenderDynamicRange).toBeCloseTo(500, 3)
+  })
+
+  it('round-trips 4D dimension, conservative grid, and φ3 slice', () => {
+    const out = roundTrip({
+      wdwMinisuperspaceDimension: 4,
+      wdwGridNa: 96,
+      wdwGridNphi: 20,
+      wdwPhi3SliceNormalized: 0.625,
+    })
+    expect(out.wdwMinisuperspaceDimension).toBe(4)
+    expect(out.wdwGridNa).toBe(96)
+    expect(out.wdwGridNphi).toBe(20)
+    expect(out.wdwPhi3SliceNormalized).toBeCloseTo(0.625, 3)
   })
 
   it('m=0 round-trips as 0 (regression: previously absorbed into default m=0.3)', () => {

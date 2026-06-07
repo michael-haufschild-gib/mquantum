@@ -34,7 +34,7 @@ function flatSlab(Nphi: number): WdwBoundaryField {
     chi[2 * i] = 1.0
     chi[2 * i + 1] = 0.0
   }
-  return { chi, chiDeriv }
+  return { chi, chiDeriv, minisuperspaceDimension: 3 }
 }
 
 describe('WDW Neumann ghost φ-stencil — corner cells', () => {
