@@ -119,7 +119,7 @@ function buildExactBoundary(
     phi1: number,
     phi2: number
   ) => { chi: { re: number; im: number }; dChi: { re: number; im: number } }
-): { chi: Float32Array; chiDeriv: Float32Array } {
+): { chi: Float32Array; chiDeriv: Float32Array; minisuperspaceDimension: 3 } {
   const N = Nphi * Nphi
   const chi = new Float32Array(2 * N)
   const chiDeriv = new Float32Array(2 * N)
@@ -139,7 +139,7 @@ function buildExactBoundary(
   // in the signature for call-site readability but intentionally unused
   // here (sample takes phi only — it already knows aMin).
   void aMin
-  return { chi, chiDeriv }
+  return { chi, chiDeriv, minisuperspaceDimension: 3 }
 }
 
 /**

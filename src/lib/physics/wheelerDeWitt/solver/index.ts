@@ -142,6 +142,8 @@ export {
   BandKind,
   type ColumnWkbState,
   type ComplexPair,
+  type WdwBoundaryField3D,
+  type WdwBoundaryField4D,
   type WheelerDeWittAnySolverOutput,
   type WheelerDeWittSolverInput,
   type WheelerDeWittSolverInput3D,

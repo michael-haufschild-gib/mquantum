@@ -24,13 +24,25 @@ export type { WdwMinisuperspaceDimension }
  */
 export type WheelerDeWittGridSize = [number, number, number] | [number, number, number, number]
 
-/** Output buffers for the boundary condition: χ(a_min, φ) and ∂_a χ(a_min, φ). */
-export interface WdwBoundaryField {
+interface WdwBoundaryFieldBase {
   /** χ(a_min,·) interleaved [re, im] × (Nphi² or Nphi³). */
   chi: Float32Array
   /** ∂_a χ(a_min,·) interleaved [re, im] × (Nphi² or Nphi³). */
   chiDeriv: Float32Array
 }
+
+/** 3D boundary buffers for `(a, φ₁, φ₂)` minisuperspace. */
+export interface WdwBoundaryField3D extends WdwBoundaryFieldBase {
+  minisuperspaceDimension: 3
+}
+
+/** 4D boundary buffers for `(a, φ₁, φ₂, φ₃)` minisuperspace. */
+export interface WdwBoundaryField4D extends WdwBoundaryFieldBase {
+  minisuperspaceDimension: 4
+}
+
+/** Output buffers for the boundary condition: χ(a_min, φ) and ∂_a χ(a_min, φ). */
+export type WdwBoundaryField = WdwBoundaryField3D | WdwBoundaryField4D
 
 /** Solver inputs mirroring the WdW config fields. */
 export interface WheelerDeWittSolverInput {
@@ -92,13 +104,21 @@ export interface WheelerDeWittSolverInput {
 }
 
 /** Solver input that is statically known to use the legacy 3D minisuperspace. */
-export type WheelerDeWittSolverInput3D = WheelerDeWittSolverInput & {
+export type WheelerDeWittSolverInput3D = Omit<
+  WheelerDeWittSolverInput,
+  'customBoundary' | 'minisuperspaceDimension'
+> & {
   minisuperspaceDimension?: 3
+  customBoundary?: WdwBoundaryField3D
 }
 
 /** Solver input that is statically known to use the 4D minisuperspace. */
-export type WheelerDeWittSolverInput4D = WheelerDeWittSolverInput & {
+export type WheelerDeWittSolverInput4D = Omit<
+  WheelerDeWittSolverInput,
+  'customBoundary' | 'minisuperspaceDimension'
+> & {
   minisuperspaceDimension: 4
+  customBoundary?: WdwBoundaryField4D
 }
 
 interface WheelerDeWittSolverOutputBase {

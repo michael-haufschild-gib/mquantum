@@ -182,7 +182,7 @@ describe('WDW solver — extreme parameter corners', () => {
     expect(() =>
       solveWheelerDeWitt({
         ...VALID_INPUT,
-        customBoundary: { chi, chiDeriv },
+        customBoundary: { chi, chiDeriv, minisuperspaceDimension: 3 },
       })
     ).toThrow(/customBoundary\.chi\[3\] must be finite/)
   })

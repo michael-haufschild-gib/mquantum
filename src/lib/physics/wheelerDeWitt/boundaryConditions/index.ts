@@ -28,7 +28,7 @@ export { WDW_G_PREFACTOR, wdwPotential } from '../constants'
 import { hhLangerSeed, vilenkinLangerSeed } from '../hhLangerSeed'
 import type { WdwBoundaryField, WdwMinisuperspaceDimension } from '../solverTypes'
 
-export type { WdwBoundaryField } from '../solverTypes'
+export type { WdwBoundaryField, WdwBoundaryField3D, WdwBoundaryField4D } from '../solverTypes'
 
 /** Shared inputs for the boundary-condition generators. */
 export interface WdwBoundaryInputs {
@@ -127,7 +127,7 @@ export function hartleHawkingBoundary(input: WdwBoundaryInputs): WdwBoundaryFiel
       }
     }
   }
-  return { chi, chiDeriv }
+  return { chi, chiDeriv, minisuperspaceDimension: dimension }
 }
 
 /**
@@ -198,7 +198,7 @@ export function vilenkinBoundary(input: WdwBoundaryInputs): WdwBoundaryField {
       }
     }
   }
-  return { chi, chiDeriv }
+  return { chi, chiDeriv, minisuperspaceDimension: dimension }
 }
 
 /**
@@ -245,7 +245,7 @@ export function deWittBoundary(input: WdwBoundaryInputs): WdwBoundaryField {
       }
     }
   }
-  return { chi, chiDeriv }
+  return { chi, chiDeriv, minisuperspaceDimension: dimension }
 }
 
 /**

@@ -102,7 +102,7 @@ function constantPhiSlab(
   Nphi: number,
   chi0: ComplexPair,
   dChi0: ComplexPair
-): { chi: Float32Array; chiDeriv: Float32Array } {
+): { chi: Float32Array; chiDeriv: Float32Array; minisuperspaceDimension: 3 } {
   const N = Nphi * Nphi
   const chi = new Float32Array(2 * N)
   const chiDeriv = new Float32Array(2 * N)
@@ -112,7 +112,7 @@ function constantPhiSlab(
     chiDeriv[2 * i] = dChi0.re
     chiDeriv[2 * i + 1] = dChi0.im
   }
-  return { chi, chiDeriv }
+  return { chi, chiDeriv, minisuperspaceDimension: 3 }
 }
 
 /**
