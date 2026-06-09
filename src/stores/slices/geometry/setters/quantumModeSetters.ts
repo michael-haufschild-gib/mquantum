@@ -185,6 +185,12 @@ function buildRepresentationOverrides(
     overrides.representation = 'position'
   }
 
+  // Coherence Horizon renders exclusively through its position-space geodesic
+  // main block — momentum/Wigner representations have no pipeline for it.
+  if (mode === 'coherenceHorizon' && currentRepr !== 'position') {
+    overrides.representation = 'position'
+  }
+
   return overrides
 }
 
@@ -333,6 +339,11 @@ function applyFirstPreset(
     case 'antiDeSitter':
       store.setAdsPreset(presetId as import('@/lib/geometry/extended/antiDeSitter').AdsPresetName)
       break
+    case 'coherenceHorizon':
+      store.setCoherenceHorizonPreset(
+        presetId as import('@/lib/geometry/extended/coherenceHorizon').CoherenceHorizonPresetName
+      )
+      break
   }
 }
 
@@ -412,6 +423,8 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
         if (dim === 2 && isHydrogenFamilyQuantumType(qm)) return
         // Block momentum for coupled hydrogen ND (shader is position-only)
         if (value === 'momentum' && qm === 'hydrogenNDCoupled') return
+        // Block non-position for Coherence Horizon (geodesic block is position-only)
+        if (qm === 'coherenceHorizon') return
       }
       setWithVersion((state) => ({
         schroedinger: {

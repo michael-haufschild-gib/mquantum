@@ -86,6 +86,14 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
     return null
   }
 
+  // Coherence Horizon renders through its dedicated geodesic main block,
+  // which implements none of these shared-pipeline effects (SSS, emission
+  // post-processing, powder/anisotropy). Hide the section instead of showing
+  // controls that would silently do nothing.
+  if (objectType === 'schroedinger' && quantumMode === 'coherenceHorizon') {
+    return null
+  }
+
   const isPauli = objectType === 'pauliSpinor'
   const isBellPair = objectType === 'bellPair'
   const isSchroedinger = objectType === 'schroedinger'

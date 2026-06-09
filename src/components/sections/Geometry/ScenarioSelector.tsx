@@ -14,6 +14,11 @@ import { Icon } from '@/components/ui/Icon'
 import { Select } from '@/components/ui/Select'
 import { PAULI_FIELD_VIEW_TO_COLOR_ALGO } from '@/lib/colors/palette/types'
 import type { AdsPresetName, AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
+import type {
+  CoherenceHorizonConfig,
+  CoherenceHorizonPresetName,
+} from '@/lib/geometry/extended/coherenceHorizon'
+import { COHERENCE_HORIZON_SCENARIOS } from '@/lib/geometry/extended/coherenceHorizon'
 import type { SchroedingerPresetName } from '@/lib/geometry/extended/common'
 import type { PauliConfig } from '@/lib/geometry/extended/pauli'
 import type { HydrogenNDPresetName, SchroedingerConfig } from '@/lib/geometry/extended/schroedinger'
@@ -129,6 +134,13 @@ const ADS_PRESET_OPTIONS = ADS_PRESETS.map((p) => ({
   label: p.label,
 }))
 
+/* ── Coherence Horizon options ──────────────────────────────── */
+
+const COHERENCE_HORIZON_PRESET_OPTIONS = COHERENCE_HORIZON_SCENARIOS.map((p) => ({
+  value: p.id,
+  label: p.label,
+}))
+
 /* ── HydrogenND options (dimension-grouped, flattened) ─────── */
 
 function getHydrogenNDOptions(dimension: number) {
@@ -182,7 +194,8 @@ function findActiveDescription(
   activeValue: string,
   ho: string,
   hyd: string,
-  ads: string | undefined
+  ads: string | undefined,
+  coherenceHorizon: string | undefined
 ): string | null {
   if (mode === 'harmonicOscillator') {
     return ho ? (SCHROEDINGER_NAMED_PRESETS[ho]?.description ?? null) : null
@@ -193,6 +206,10 @@ function findActiveDescription(
   if (mode === 'antiDeSitter') {
     if (!ads || ads === 'custom') return null
     return ADS_PRESETS.find((p) => p.id === ads)?.description ?? null
+  }
+  if (mode === 'coherenceHorizon') {
+    if (!coherenceHorizon || coherenceHorizon === 'custom') return null
+    return COHERENCE_HORIZON_SCENARIOS.find((p) => p.id === coherenceHorizon)?.description ?? null
   }
   const table = ID_PRESET_TABLES[mode]
   if (!table || !activeValue) return null
@@ -216,6 +233,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
     presetName,
     hydrogenNDPreset,
     adsPreset,
+    coherenceHorizonPreset,
     pauliSpinor,
     bellPair,
   } = useExtendedObjectStore(
@@ -225,6 +243,9 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       presetName: s.schroedinger.presetName,
       hydrogenNDPreset: s.schroedinger.hydrogenNDPreset,
       adsPreset: (s.schroedinger.antiDeSitter as AntiDeSitterConfig | undefined)?.preset,
+      coherenceHorizonPreset: (
+        s.schroedinger.coherenceHorizon as CoherenceHorizonConfig | undefined
+      )?.preset,
       pauliSpinor: s.pauliSpinor,
       bellPair: s.bellPair,
     }))
@@ -243,6 +264,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
     applyWheelerDeWittPreset,
     setPauliConfig,
     setAdsPreset,
+    setCoherenceHorizonPreset,
     setBellPairConfig,
   } = useExtendedObjectStore(
     useShallow((s) => ({
@@ -257,6 +279,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       applyWheelerDeWittPreset: s.applyWheelerDeWittPreset,
       setPauliConfig: s.setPauliConfig,
       setAdsPreset: s.setAdsPreset,
+      setCoherenceHorizonPreset: s.setCoherenceHorizonPreset,
       setBellPairConfig: s.setBellPairConfig,
     }))
   )
@@ -297,6 +320,8 @@ export const ScenarioSelector: React.FC = React.memo(() => {
         return BELL_PRESET_OPTIONS
       case 'antiDeSitter':
         return ADS_PRESET_OPTIONS
+      case 'coherenceHorizon':
+        return COHERENCE_HORIZON_PRESET_OPTIONS
       default:
         return null
     }
@@ -311,6 +336,10 @@ export const ScenarioSelector: React.FC = React.memo(() => {
         return hydrogenNDPreset === 'custom' ? '' : (hydrogenNDPreset ?? '')
       case 'antiDeSitter':
         return adsPreset === 'custom' || adsPreset === undefined ? '' : adsPreset
+      case 'coherenceHorizon':
+        return coherenceHorizonPreset === 'custom' || coherenceHorizonPreset === undefined
+          ? ''
+          : coherenceHorizonPreset
       case 'pauliSpinor':
         return findPauliPresetId(pauliSpinor) ?? ''
       case 'bellPair':
@@ -329,6 +358,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
     presetName,
     hydrogenNDPreset,
     adsPreset,
+    coherenceHorizonPreset,
     pauliSpinor,
     bellPair,
     schroedinger,
@@ -342,8 +372,15 @@ export const ScenarioSelector: React.FC = React.memo(() => {
 
   const activeDescription = useMemo(
     () =>
-      findActiveDescription(mode, activeValue, presetName ?? '', hydrogenNDPreset ?? '', adsPreset),
-    [mode, activeValue, presetName, hydrogenNDPreset, adsPreset]
+      findActiveDescription(
+        mode,
+        activeValue,
+        presetName ?? '',
+        hydrogenNDPreset ?? '',
+        adsPreset,
+        coherenceHorizonPreset
+      ),
+    [mode, activeValue, presetName, hydrogenNDPreset, adsPreset, coherenceHorizonPreset]
   )
 
   // Dispatch change to the correct store action
@@ -399,6 +436,9 @@ export const ScenarioSelector: React.FC = React.memo(() => {
             }
           }
           break
+        case 'coherenceHorizon':
+          setCoherenceHorizonPreset(value as CoherenceHorizonPresetName)
+          break
       }
     },
     [
@@ -414,6 +454,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       applyWheelerDeWittPreset,
       setPauliConfig,
       setAdsPreset,
+      setCoherenceHorizonPreset,
       setBellPairConfig,
     ]
   )

@@ -1,4 +1,6 @@
+import { COHERENCE_HORIZON_RANGES } from '@/lib/geometry/extended/coherenceHorizon'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
+import { tangherliniHorizonRadius } from '@/lib/physics/coherenceHorizon'
 
 import { SCHROEDINGER_LAYOUT } from '../schroedingerLayout'
 
@@ -214,6 +216,68 @@ export function packHermiteCocycle(
     0.0,
     8.0
   )
+}
+
+/**
+ * Pack Coherence Horizon (coherence-sourced gravity) uniforms. Only the
+ * coherenceHorizon mode reads these fields (its dedicated geodesic main
+ * block); every other mode gets all-zero fields so the buffer region is
+ * deterministic. The Tangherlini horizon radius r_h and the metric exponent
+ * (d−2) are CPU-precomputed here so the shader never derives them per frame.
+ */
+export function packCoherenceHorizon(
+  floatView: Float32Array,
+  schroedinger: Partial<SchroedingerConfig> | undefined,
+  isCoherenceHorizonMode: boolean,
+  dimension: number
+): void {
+  if (!isCoherenceHorizonMode) {
+    floatView[I.coherenceHorizonDecoherence] =
+      floatView[I.coherenceHorizonSeparation] =
+      floatView[I.coherenceHorizonWidth] =
+      floatView[I.coherenceHorizonWaveNumber] =
+      floatView[I.coherenceHorizonRadius] =
+      floatView[I.coherenceHorizonMetricExponent] =
+      floatView[I.coherenceHorizonRingGain] =
+      floatView[I.coherenceHorizonGlow] =
+        0.0
+    return
+  }
+
+  const config = schroedinger?.coherenceHorizon
+  const R = COHERENCE_HORIZON_RANGES
+  const decoherence = finiteClamped(config?.decoherence, 0, R.decoherence.min, R.decoherence.max)
+  const horizonScale = finiteClamped(
+    config?.horizonScale,
+    0.5,
+    R.horizonScale.min,
+    R.horizonScale.max
+  )
+  const d = Math.max(3, Math.min(11, Math.floor(Number.isFinite(dimension) ? dimension : 3)))
+
+  floatView[I.coherenceHorizonDecoherence] = decoherence
+  floatView[I.coherenceHorizonSeparation] = finiteClamped(
+    config?.separation,
+    1.6,
+    R.separation.min,
+    R.separation.max
+  )
+  floatView[I.coherenceHorizonWidth] = finiteClamped(config?.width, 0.45, R.width.min, R.width.max)
+  floatView[I.coherenceHorizonWaveNumber] = finiteClamped(
+    config?.waveNumber,
+    5,
+    R.waveNumber.min,
+    R.waveNumber.max
+  )
+  floatView[I.coherenceHorizonRadius] = tangherliniHorizonRadius(decoherence, horizonScale, d)
+  floatView[I.coherenceHorizonMetricExponent] = d - 2
+  floatView[I.coherenceHorizonRingGain] = finiteClamped(
+    config?.ringGain,
+    2.2,
+    R.ringGain.min,
+    R.ringGain.max
+  )
+  floatView[I.coherenceHorizonGlow] = finiteClamped(config?.glow, 1.2, R.glow.min, R.glow.max)
 }
 
 /**

@@ -352,6 +352,38 @@ function applyAdsParams(
   applyAdsChordalSieveFields(urlState, ext)
 }
 
+/**
+ * Apply Coherence Horizon URL state params.
+ *
+ * Preset first, then raw fields — raw fields cascade `preset` into `custom`
+ * via the individual setters, mirroring the AdS apply order.
+ */
+function applyCoherenceHorizonParams(
+  urlState: ParsedShareableState,
+  ext: ReturnType<typeof useExtendedObjectStore.getState>
+): void {
+  if (
+    urlState.coherenceHorizonPreset !== undefined &&
+    urlState.coherenceHorizonPreset !== 'custom'
+  ) {
+    ext.setCoherenceHorizonPreset(urlState.coherenceHorizonPreset)
+  }
+  if (urlState.coherenceHorizonDecoherence !== undefined)
+    ext.setCoherenceHorizonDecoherence(urlState.coherenceHorizonDecoherence)
+  if (urlState.coherenceHorizonSeparation !== undefined)
+    ext.setCoherenceHorizonSeparation(urlState.coherenceHorizonSeparation)
+  if (urlState.coherenceHorizonWidth !== undefined)
+    ext.setCoherenceHorizonWidth(urlState.coherenceHorizonWidth)
+  if (urlState.coherenceHorizonWaveNumber !== undefined)
+    ext.setCoherenceHorizonWaveNumber(urlState.coherenceHorizonWaveNumber)
+  if (urlState.coherenceHorizonScale !== undefined)
+    ext.setCoherenceHorizonScale(urlState.coherenceHorizonScale)
+  if (urlState.coherenceHorizonRingGain !== undefined)
+    ext.setCoherenceHorizonRingGain(urlState.coherenceHorizonRingGain)
+  if (urlState.coherenceHorizonGlow !== undefined)
+    ext.setCoherenceHorizonGlow(urlState.coherenceHorizonGlow)
+}
+
 /** Apply Dirac-equation URL state params. */
 function applyDiracParams(urlState: ParsedShareableState, ext: ExtendedObjectState): void {
   applyIfDefined(urlState.diracGridSize, (value) => ext.setDiracGridSize(value))
@@ -455,7 +487,7 @@ function applyWdwParams(
     (get: (s: ParsedShareableState) => unknown, run: Apply): Apply =>
     (s, e) => {
       if (get(s) !== undefined) run(s, e)
-  }
+    }
   const steps: Apply[] = [
     apply(
       (s) => s.wdwBoundaryCondition,
@@ -717,6 +749,7 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
     applyDiracParams(urlState, ext)
     applyWdwParams(urlState, ext)
     applyAdsParams(urlState, ext)
+    applyCoherenceHorizonParams(urlState, ext)
     applyBellParams(urlState, ext)
     applySrmtSweepParams(urlState, ext.schroedinger.quantumMode)
   } catch (error) {

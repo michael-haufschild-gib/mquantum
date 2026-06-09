@@ -296,6 +296,17 @@ const SCHROEDINGER_FIELDS = [
   { name: 'hermiteCocycleInflationStrength', type: 'f32' },
   { name: 'hermiteCocycleShellRadius', type: 'f32' },
   { name: 'hermiteCocycleInflationTwist', type: 'f32' },
+
+  // --- Coherence Horizon (coherence-sourced gravity) ---
+  // Zeroed for all modes except coherenceHorizon; r_h precomputed on CPU.
+  { name: 'coherenceHorizonDecoherence', type: 'f32' },
+  { name: 'coherenceHorizonSeparation', type: 'f32' },
+  { name: 'coherenceHorizonWidth', type: 'f32' },
+  { name: 'coherenceHorizonWaveNumber', type: 'f32' },
+  { name: 'coherenceHorizonRadius', type: 'f32' },
+  { name: 'coherenceHorizonMetricExponent', type: 'f32' },
+  { name: 'coherenceHorizonRingGain', type: 'f32' },
+  { name: 'coherenceHorizonGlow', type: 'f32' },
 ] as const satisfies readonly StructFieldDef[]
 
 /** Computed struct layout for SchroedingerUniforms. */

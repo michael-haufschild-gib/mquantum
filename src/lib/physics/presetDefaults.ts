@@ -49,6 +49,7 @@ const FIRST_PRESET_IDS = {
   wheelerDeWitt4D: 'fourDimensionalNoBoundarySlice',
   antiDeSitterDefault: 'adsFourGround',
   antiDeSitter3D: 'adsThreeGround',
+  coherenceHorizon: 'coherentCat',
   bellTest: 'canonicalCHSH',
 } as const
 
@@ -90,6 +91,7 @@ const PRESET_RESOLVERS: Readonly<Record<QuantumTypeKey, FirstPresetResolver>> = 
   pauliSpinor: () => FIRST_PRESET_IDS.pauliSpinor,
   wheelerDeWitt: resolveWheelerDeWitt,
   antiDeSitter: resolveAntiDeSitter,
+  coherenceHorizon: (dimension) => (dimension >= 3 ? FIRST_PRESET_IDS.coherenceHorizon : undefined),
   bellTest: () => FIRST_PRESET_IDS.bellTest,
 }
 

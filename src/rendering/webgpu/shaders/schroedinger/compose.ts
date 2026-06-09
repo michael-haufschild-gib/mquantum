@@ -84,6 +84,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   const isQuantumWalk = sanitizeShaderBoolean(config.isQuantumWalk, false)
   const isPauli = sanitizeShaderBoolean(config.isPauli, false)
   const isAds = sanitizeShaderBoolean(config.isAds, false)
+  const isCoherenceHorizon = sanitizeShaderBoolean(config.isCoherenceHorizon, false)
   const freeScalarAnalysis = sanitizeShaderBoolean(config.freeScalarAnalysis, false)
   const useDensityMatrix = sanitizeShaderBoolean(config.useDensityMatrix, false)
   const crossSectionEnabled = sanitizeShaderBoolean(config.crossSectionEnabled, true)
@@ -147,6 +148,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     isQuantumWalk,
     isPauli,
     isAds,
+    isCoherenceHorizon,
     useWignerCache,
     crossSectionEnabled,
     probabilityCurrentEnabled,
@@ -174,6 +176,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   }
 
   const selectedMainBlock = selectMainBlock(
+    isCoherenceHorizon,
     isWigner,
     is2D,
     isosurface,
@@ -218,21 +221,25 @@ struct VertexOutput {
       }),
     },
 
-    // Quantum math modules (excluded in grid-only mode — compute shader handles wavefunction evaluation)
-    ...buildQuantumMathBlocks({
-      actualDim,
-      includeHarmonic,
-      includeHydrogen,
-      includeHydrogenND,
-      hydrogenNDDimension,
-      isHydrogenFamily,
-      isHydrogenCoupled,
-      useCache,
-      useUnrolledHO,
-      termCount: shaderTermCount,
-      isWigner,
-      gridOnly,
-    }),
+    // Quantum math modules (excluded in grid-only mode — compute shader handles
+    // wavefunction evaluation — and in Coherence Horizon mode, whose geodesic
+    // main block evaluates its cat state inline and references nothing here)
+    ...(isCoherenceHorizon
+      ? []
+      : buildQuantumMathBlocks({
+          actualDim,
+          includeHarmonic,
+          includeHydrogen,
+          includeHydrogenND,
+          hydrogenNDDimension,
+          isHydrogenFamily,
+          isHydrogenCoupled,
+          useCache,
+          useUnrolledHO,
+          termCount: shaderTermCount,
+          isWigner,
+          gridOnly,
+        })),
 
     // Color system
     { name: 'Color (HSL)', content: hslBlock },
@@ -243,22 +250,25 @@ struct VertexOutput {
     { name: 'GGX PBR', content: ggxBlock, condition: isosurface && !is2D },
     { name: 'Multi-Light System', content: multiLightBlock, condition: isosurface && !is2D },
 
-    // Volume rendering (inline raymarch excluded in grid-only mode)
-    ...buildVolumeBlocks({
-      is2D,
-      colorAlgorithm,
-      includeHydrogen,
-      useCache,
-      actualDim,
-      termCount: shaderTermCount,
-      useDensityGrid,
-      usePrecomputedNormals,
-      freeScalarAnalysis,
-      nodal,
-      crossSectionEnabled,
-      probabilityCurrentEnabled,
-      gridOnly,
-    }),
+    // Volume rendering (inline raymarch excluded in grid-only mode; entirely
+    // absent for Coherence Horizon — its main block owns the geodesic march)
+    ...(isCoherenceHorizon
+      ? []
+      : buildVolumeBlocks({
+          is2D,
+          colorAlgorithm,
+          includeHydrogen,
+          useCache,
+          actualDim,
+          termCount: shaderTermCount,
+          useDensityGrid,
+          usePrecomputedNormals,
+          freeScalarAnalysis,
+          nodal,
+          crossSectionEnabled,
+          probabilityCurrentEnabled,
+          gridOnly,
+        })),
 
     // Geometry
     { name: 'Sphere Intersection', content: sphereIntersectBlock, condition: !is2D },

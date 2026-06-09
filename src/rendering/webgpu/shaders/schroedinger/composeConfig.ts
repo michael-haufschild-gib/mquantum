@@ -29,6 +29,7 @@ import {
   PHASE_COLOR_ALGS,
 } from './main.wgsl'
 import { generateMainBlock2D, generateMainBlock2DIsolines } from './main2D.wgsl'
+import { generateMainBlockCoherenceHorizon } from './mainCoherenceHorizon.wgsl'
 import { generateMainBlockWigner2D } from './mainWigner2D.wgsl'
 import { NODAL_DEFINITION_MAP, NODAL_FAMILY_MAP, NODAL_RENDER_MODE_MAP } from './temporalJitter'
 import { COLOR_ALGORITHM_INDICES } from './volume/emissionConstants'
@@ -135,6 +136,14 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
    * algorithm 9). Leave `false` for every non-AdS mode.
    */
   isAds?: boolean
+  /**
+   * Coherence Horizon mode (coherence-sourced gravity). Selects the dedicated
+   * null-geodesic main block and excludes the quantum-math and volume blocks
+   * entirely — the mode's shader is self-contained (uniforms + basis + HSL +
+   * sphere intersection only). The top-level `quantumMode` is narrowed to
+   * `'harmonicOscillator'` like AdS. Leave `false` for every other mode.
+   */
+  isCoherenceHorizon?: boolean
   /** Include analysis texture bindings for free-scalar educational color modes. */
   freeScalarAnalysis?: boolean
   /** Density matrix mode (open quantum) — disables inline wavefunction fallback. */
@@ -328,6 +337,7 @@ export function buildShaderDefinesAndFeatures(flags: {
   isPauli: boolean
   isBellPair?: boolean
   isAds: boolean
+  isCoherenceHorizon?: boolean
   useWignerCache: boolean
   crossSectionEnabled: boolean
   probabilityCurrentEnabled: boolean
@@ -373,6 +383,7 @@ export function buildShaderDefinesAndFeatures(flags: {
   const isQuantumWalk = sanitizeShaderBoolean(flags.isQuantumWalk, false)
   const isPauli = sanitizeShaderBoolean(flags.isPauli, false)
   const isAds = sanitizeShaderBoolean(flags.isAds, false)
+  const isCoherenceHorizon = sanitizeShaderBoolean(flags.isCoherenceHorizon, false)
   const useWignerCache = sanitizeShaderBoolean(flags.useWignerCache, false)
   const crossSectionEnabled = sanitizeShaderBoolean(flags.crossSectionEnabled, true)
   const probabilityCurrentEnabled = sanitizeShaderBoolean(flags.probabilityCurrentEnabled, true)
@@ -512,6 +523,7 @@ export function buildShaderDefinesAndFeatures(flags: {
   // `atan2(im, re)` phase and must NOT be classified binary.
   const hasBinarySignPhase = isFreeScalarField || isWigner || isAds
   defines.push(`const IS_ADS: bool = ${isAds};`)
+  defines.push(`const IS_COHERENCE_HORIZON: bool = ${isCoherenceHorizon};`)
   defines.push(`const HAS_BINARY_SIGN_PHASE: bool = ${hasBinarySignPhase};`)
   // Pre-computed gradient normals: enabled for density-grid analytic modes (HO/hydrogen)
   // and any compute mode that explicitly provides a normal grid (e.g. FSF).
@@ -541,6 +553,7 @@ export function buildShaderDefinesAndFeatures(flags: {
 
   defines.push(`const SAMPLE_SPACE_ROTATION: bool = ${sampleSpaceRotation};`)
 
+  if (isCoherenceHorizon) features.push('Coherence Horizon Geodesics')
   if (useDensityGrid) features.push('Density Grid Raymarching')
   if (isWigner && useWignerCache) features.push('Wigner Cache')
   if (sampleSpaceRotation) features.push('Sample-Space Rotation')
@@ -569,6 +582,7 @@ export function removeDefaultNodalSpecializationOverrides(wgsl: string): string 
 
 /**
  * Select the main entry-point shader block based on rendering mode.
+ * @param isCoherenceHorizon - Coherence Horizon geodesic mode (owns its main block)
  * @param isWigner - Wigner phase-space mode
  * @param is2D - 2D rendering mode
  * @param isosurface - Isosurface mode
@@ -579,6 +593,7 @@ export function removeDefaultNodalSpecializationOverrides(wgsl: string): string 
  * @param gridOnly - Grid-only mode (no inline raymarch)
  */
 export function selectMainBlock(
+  isCoherenceHorizon: boolean,
   isWigner: boolean,
   is2D: boolean,
   isosurface: boolean,
@@ -588,6 +603,7 @@ export function selectMainBlock(
   useWignerCache: boolean,
   gridOnly: boolean
 ): string {
+  if (isCoherenceHorizon) return generateMainBlockCoherenceHorizon()
   if (isWigner) return generateMainBlockWigner2D(useWignerCache)
   if (is2D) return isosurface ? generateMainBlock2DIsolines() : generateMainBlock2D()
   if (isosurface) {

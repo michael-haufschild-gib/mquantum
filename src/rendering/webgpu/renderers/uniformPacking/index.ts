@@ -38,6 +38,7 @@ import {
   packBilocalERBridge,
   packBornNullWeave,
   packCausalDiamondModularOrbital,
+  packCoherenceHorizon,
   packEntropicTimeShear,
   packHermiteCocycle,
   packQuantumBackreaction,
@@ -411,6 +412,12 @@ function packVisualFields(
   )
   packHermiteCocycle(floatView, intView, schroedinger, p.quantumModeStr === 'harmonicOscillator')
   packCausalDiamondModularOrbital(floatView, schroedinger, p.quantumModeStr === 'hydrogenND')
+  packCoherenceHorizon(
+    floatView,
+    schroedinger,
+    p.quantumModeStr === 'coherenceHorizon',
+    p.dimension
+  )
 }
 
 /** Pack nodal fields, color algorithm, and cosine palette. */

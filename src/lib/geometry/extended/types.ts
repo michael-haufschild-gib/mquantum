@@ -8,6 +8,7 @@
 export * from './antiDeSitter'
 export * from './bec'
 export * from './bellPair'
+export * from './coherenceHorizon'
 export * from './common'
 export * from './crossMode'
 export * from './dirac'

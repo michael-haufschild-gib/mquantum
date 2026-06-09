@@ -31,6 +31,11 @@ import type { MetricKind } from '@/lib/physics/tdse/metrics/types'
 import { type AdsUrlState, deserializeAds, serializeAds } from './adsSerializer'
 import { type BellUrlState, deserializeBell, serializeBell } from './bellSerializer'
 import {
+  type CoherenceHorizonUrlState,
+  deserializeCoherenceHorizon,
+  serializeCoherenceHorizon,
+} from './coherenceHorizonSerializer'
+import {
   type CosmologySerializableState,
   deserializeCosmology,
   serializeCosmology,
@@ -78,6 +83,7 @@ export const VALID_QUANTUM_MODES: SchroedingerQuantumMode[] = [
   'quantumWalk',
   'wheelerDeWitt',
   'antiDeSitter',
+  'coherenceHorizon',
 ]
 
 const VALID_REPRESENTATIONS: SchroedingerRepresentation[] = ['position', 'momentum', 'wigner']
@@ -98,6 +104,7 @@ export interface ShareableObjectState
   extends
     AdsUrlState,
     BellUrlState,
+    CoherenceHorizonUrlState,
     DiracUrlState,
     SrmtUrlState,
     SrmtSweepUrlState,
@@ -290,6 +297,12 @@ export function serializeState(state: ShareableState): string {
     serializeAds(params, state)
   }
 
+  // Coherence Horizon (coherence-sourced gravity). Same dormant-field rule
+  // as AdS: only emitted while the mode is active.
+  if (state.quantumMode === 'coherenceHorizon') {
+    serializeCoherenceHorizon(params, state)
+  }
+
   // Bell-pair / CHSH experiment. Bell uses its own ObjectType, so guard on
   // that instead of quantumMode (which is undefined for the bellPair object).
   if (state.objectType === 'bellPair') {
@@ -365,6 +378,9 @@ export function deserializeState(searchParams: string): ParsedShareableState {
 
   // Anti-de Sitter (Stage 1).
   deserializeAds(params, state)
+
+  // Coherence Horizon (coherence-sourced gravity).
+  deserializeCoherenceHorizon(params, state)
 
   // Bell-pair / CHSH experiment. Always attempted — the parser keeps
   // every present field regardless of objectType so links with `t=bellPair`

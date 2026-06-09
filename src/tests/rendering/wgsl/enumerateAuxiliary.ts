@@ -10,6 +10,8 @@
 
 import { createHash } from 'node:crypto'
 
+import { buildShaderConfig } from '@/rendering/webgpu/renderers/rendererConfigUtils'
+import { composeSchroedingerShader } from '@/rendering/webgpu/shaders/schroedinger/compose'
 import {
   composeDensityGridComputeShader,
   type ComputeQuantumMode,
@@ -97,6 +99,24 @@ export function* enumerateSkybox(): Generator<ShaderRecord> {
 export function* enumerateAds(): Generator<ShaderRecord> {
   const { wgsl } = composeAdsDensityComputeShader()
   yield record('ads-density-compute', wgsl, 'ads-density', 'ads')
+}
+
+/**
+ * Coherence Horizon geodesic fragment shader at every supported dimension.
+ * Uses the production `buildShaderConfig` derivation so the exact shader the
+ * renderer compiles is what gets validated.
+ */
+export function* enumerateCoherenceHorizon(): Generator<ShaderRecord> {
+  for (let dimension = 3; dimension <= 11; dimension++) {
+    const config = buildShaderConfig({ quantumMode: 'coherenceHorizon', dimension })
+    const { wgsl } = composeSchroedingerShader(config)
+    yield record(
+      `coherence-horizon_d${dimension}`,
+      wgsl,
+      `coherence-horizon:${dimension}`,
+      'coherence-horizon'
+    )
+  }
 }
 
 const COMPUTE_MODES: readonly ComputeQuantumMode[] = [

@@ -25,6 +25,7 @@
 
 import {
   enumerateAds,
+  enumerateCoherenceHorizon,
   enumerateDensityGridEigenCache,
   enumerateSkybox,
   enumerateWigner,
@@ -55,6 +56,7 @@ const VALID_SURFACES: ReadonlySet<SurfaceName> = new Set([
   'profiling-strip',
   'skybox',
   'ads',
+  'coherence-horizon',
   'wigner',
   'passes',
 ])
@@ -142,6 +144,9 @@ export function* enumerateAll(opts: EnumerateAllOptions = {}): Generator<ShaderR
     }
     if (isEnabled('ads')) {
       yield* enumerateAds()
+    }
+    if (isEnabled('coherence-horizon')) {
+      yield* enumerateCoherenceHorizon()
     }
     if (isEnabled('wigner')) {
       yield* enumerateWigner()

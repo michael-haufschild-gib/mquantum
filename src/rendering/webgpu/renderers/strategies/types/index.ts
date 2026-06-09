@@ -113,6 +113,17 @@ export interface SchroedingerSnapshot {
     needsReset?: boolean
     [key: string]: unknown
   }
+  coherenceHorizon?: {
+    decoherence?: number
+    separation?: number
+    width?: number
+    waveNumber?: number
+    horizonScale?: number
+    ringGain?: number
+    glow?: number
+    preset?: string
+    [key: string]: unknown
+  }
   absorberEnabled?: boolean
   absorberWidth?: number
   pmlTargetReflection?: number

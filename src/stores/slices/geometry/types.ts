@@ -21,6 +21,7 @@ import {
 import type { OpenQuantumVisualizationMode } from '@/lib/physics/openQuantum/types'
 import type { AntiDeSitterSetters } from '@/stores/slices/geometry/setters/antiDeSitterSetters'
 import type { BecSetters } from '@/stores/slices/geometry/setters/becSetterDomain'
+import type { CoherenceHorizonSetters } from '@/stores/slices/geometry/setters/coherenceHorizonSetters'
 import type { DiracSetters } from '@/stores/slices/geometry/setters/diracSetters'
 import type { FreeScalarSetters } from '@/stores/slices/geometry/setters/freeScalarSetters'
 import type { QuantumWalkSetters } from '@/stores/slices/geometry/setters/quantumWalkSetters'
@@ -41,6 +42,7 @@ export interface SchroedingerSliceActions
   extends
     WheelerDeWittSetters,
     AntiDeSitterSetters,
+    CoherenceHorizonSetters,
     BecSetters,
     DiracSetters,
     FreeScalarSetters,

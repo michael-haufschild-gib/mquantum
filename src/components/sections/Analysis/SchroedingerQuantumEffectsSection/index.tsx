@@ -140,6 +140,16 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
     if (objectType !== 'schroedinger') {
       return null
     }
+    if (config.quantumMode === 'coherenceHorizon') {
+      // The dedicated geodesic main block composes none of these effects —
+      // every toggle here would be a silent no-op for this mode.
+      return (
+        <UnavailableSection
+          title="Quantum Effects"
+          reason="Not available in Coherence Horizon mode — the geodesic renderer drives all visuals via the Geometry-tab controls"
+        />
+      )
+    }
     const isHydrogenMode =
       config.quantumMode === 'hydrogenND' || config.quantumMode === 'hydrogenNDCoupled'
     const isComputeMode = isComputeQuantumType(config.quantumMode)

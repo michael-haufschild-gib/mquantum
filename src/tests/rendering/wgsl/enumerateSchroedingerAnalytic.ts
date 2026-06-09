@@ -43,6 +43,7 @@ export type ShaderSurface =
   | 'profiling-strip'
   | 'skybox'
   | 'ads'
+  | 'coherence-horizon'
   | 'wigner'
   | 'passes'
 

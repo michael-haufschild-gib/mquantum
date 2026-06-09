@@ -49,6 +49,7 @@ describe('quantum mode state machine transitions', () => {
         'quantumWalk',
         'wheelerDeWitt',
         'antiDeSitter',
+        'coherenceHorizon',
       ])
       expect(COMPUTE_MODES).toEqual([
         'freeScalarField',

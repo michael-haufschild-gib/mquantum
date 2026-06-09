@@ -35,6 +35,7 @@ import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 import { createAntiDeSitterSetters } from './setters/antiDeSitterSetters'
 import { resizeBecArrays } from './setters/becResize'
 import { createBecSetters } from './setters/becSetters'
+import { createCoherenceHorizonSetters } from './setters/coherenceHorizonSetters'
 import { createDiracSetters, resizeDiracArrays } from './setters/diracSetters'
 import { reconcileCosmologyInvariants } from './setters/freeScalarCosmologySetters'
 import { createFreeScalarSetters, resizeFreeScalarArrays } from './setters/freeScalarSetters'
@@ -524,6 +525,7 @@ export const createSchroedingerSlice: StateCreator<
     ...createOpenQuantumSetters(ctx),
     ...createWheelerDeWittSetters(ctx),
     ...createAntiDeSitterSetters(ctx),
+    ...createCoherenceHorizonSetters(ctx),
 
     // === Quantum Walk ===
     ...createQuantumWalkSetters(ctx),

@@ -13,6 +13,8 @@ import type { AntiDeSitterConfig } from './antiDeSitter'
 import { DEFAULT_ANTI_DE_SITTER_CONFIG } from './antiDeSitter'
 import type { BecConfig } from './bec'
 import { DEFAULT_BEC_CONFIG } from './bec'
+import type { CoherenceHorizonConfig } from './coherenceHorizon'
+import { DEFAULT_COHERENCE_HORIZON_CONFIG } from './coherenceHorizon'
 import type {
   RaymarchQuality,
   SchroedingerColorMode,
@@ -631,6 +633,10 @@ export interface SchroedingerConfig
   /** Closed-form bound-state configuration for AdS_d scalar fields. */
   antiDeSitter: AntiDeSitterConfig
 
+  // === Coherence Horizon Configuration (when quantumMode === 'coherenceHorizon') ===
+  /** Coherence-sourced Tangherlini horizon (CSG) configuration. */
+  coherenceHorizon: CoherenceHorizonConfig
+
   // === N-D Basis Vectors (for free scalar field and TDSE) ===
   /** Basis vector for X axis in N-dimensional space */
   basisX: Float32Array
@@ -902,6 +908,9 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
 
   // Anti-de Sitter bound-state (Stage 1)
   antiDeSitter: DEFAULT_ANTI_DE_SITTER_CONFIG,
+
+  // Coherence Horizon (coherence-sourced gravity)
+  coherenceHorizon: DEFAULT_COHERENCE_HORIZON_CONFIG,
 
   // N-D Basis Vectors
   basisX: new Float32Array([1, 0, 0]),

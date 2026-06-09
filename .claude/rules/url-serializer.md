@@ -87,6 +87,14 @@ The URL state serializer (`src/lib/url/state-serializer.ts`) provides shareable 
 | `bell_n` | int 4..10_000_000 | Bell — target trial count for one Run. |
 | `bell_tpf` | int 1..5000 | Bell — trials drawn per UI frame when running. |
 | `bell_seed` | int 0..2^32-1 | Bell — PRNG seed for reproducibility. Emit only on explicit "share with seed". |
+| `ch_preset` | string | Coherence Horizon — named preset id (emitted when a non-`custom` preset is active). |
+| `ch_dec` | float 0..1 | Coherence Horizon — decoherence δ. Damps only the cat-state cross term; r_h = horizonScale·(1−δ)^(1/(d−2)) evaporates to 0 at δ=1. |
+| `ch_sep` | float 0.5..3 | Coherence Horizon — branch separation s (lobes at ±s along axis 0). |
+| `ch_w` | float 0.15..1.2 | Coherence Horizon — Gaussian branch width w. |
+| `ch_k` | float 0..12 | Coherence Horizon — interference fringe wavenumber k. |
+| `ch_hs` | float 0..1.2 | Coherence Horizon — horizon scale (Tangherlini r_h at full coherence). |
+| `ch_rg` | float 0..4 | Coherence Horizon — photon-ring emission gain. |
+| `ch_glow` | float 0.2..4 | Coherence Horizon — cloud emission gain. |
 
 ## Rules
 
@@ -96,6 +104,7 @@ The URL state serializer (`src/lib/url/state-serializer.ts`) provides shareable 
 - `wdw_*` params are only applied when `qm=wheelerDeWitt` (this includes `wdw_ma`, which triggers a Wheeler–DeWitt solver re-run when its value changes because the asymmetry enters the PDE potential)
 - `srmt*` params (`srmt`, `srmt_c`, `srmt_x`, `srmt_r`, `srmt_h`) are Wheeler–DeWitt SRMT-scoped — only emitted when `qm=wheelerDeWitt`, and accepted on parse regardless but only wired into `schroedinger.wheelerDeWitt.*` by `applyWdwParams`. They are display-only: toggling them does not re-run the Wheeler–DeWitt solver.
 - `ads_*` params are only emitted when `qm=antiDeSitter` (but are accepted on parse regardless)
+- `ch_*` params are only emitted when `qm=coherenceHorizon` (but are accepted on parse regardless); floats use 3-decimal precision like `ads_*`
 - `ads_hkll` and `ads_btz` are mutually exclusive at the store level — setting one clears the other. The URL parser accepts both; the store applies them in order, so the last-applied setter wins.
 - `sw*` params are only emitted when `qm=wheelerDeWitt`. On parse they populate a `pendingSweep` slot on the SRMT sweep store; the sweep section claims it via `consumePendingSweep` exactly once after the Wheeler–DeWitt solver has mounted and produced a solver output.
 - `bell_*` params are only emitted when `t=bellPair` (top-level ObjectType, not a `qm`). On parse they are accepted regardless of `t`, so the orchestrator can fold them into the parsed state for the URL state hook to apply via `setBell*` setters in M5. Float fields use 4-decimal precision (~6 m° angular resolution) to preserve CHSH-sweep fidelity.

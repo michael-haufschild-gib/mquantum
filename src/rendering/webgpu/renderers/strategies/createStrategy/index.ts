@@ -66,6 +66,10 @@ export async function createModeStrategy(
       const { AntiDeSitterStrategy } = await import('../AntiDeSitterStrategy')
       return new AntiDeSitterStrategy()
     }
+    case 'coherenceHorizon': {
+      const { CoherenceHorizonStrategy } = await import('../CoherenceHorizonStrategy')
+      return new CoherenceHorizonStrategy()
+    }
     case 'analytic':
     default:
       return new AnalyticModeStrategy()

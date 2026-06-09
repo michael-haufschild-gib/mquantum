@@ -20,6 +20,7 @@ describe('QUANTUM_TYPE_REGISTRY', () => {
       'quantumWalk',
       'wheelerDeWitt',
       'antiDeSitter',
+      'coherenceHorizon',
       'pauliSpinor',
       'bellTest',
     ]
@@ -79,6 +80,7 @@ describe('QUANTUM_TYPE_REGISTRY', () => {
       quantumWalk: 'quantumWalk',
       wheelerDeWitt: 'wheelerDeWitt',
       antiDeSitter: 'antiDeSitter',
+      coherenceHorizon: 'schroedingerAnalytic',
       pauliSpinor: 'pauli',
       bellTest: 'bellPair',
     })
@@ -108,6 +110,7 @@ describe('QUANTUM_TYPE_REGISTRY', () => {
       quantumWalk: [],
       wheelerDeWitt: [],
       antiDeSitter: [],
+      coherenceHorizon: [],
       pauliSpinor: [],
       bellTest: [],
     })

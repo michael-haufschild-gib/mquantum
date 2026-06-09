@@ -387,6 +387,20 @@ struct SchroedingerUniforms {
   hermiteCocycleShellRadius: f32,
   hermiteCocycleInflationTwist: f32,
 
+  // Coherence Horizon (coherence-sourced gravity). Read only by the dedicated
+  // geodesic main block (quantumMode === coherenceHorizon); the host packer
+  // zeroes every field for all other modes. coherenceHorizonRadius is the
+  // CPU-precomputed Tangherlini r_h = horizonScale * (1-delta)^(1/(d-2));
+  // coherenceHorizonMetricExponent carries (d-2) as f32.
+  coherenceHorizonDecoherence: f32,
+  coherenceHorizonSeparation: f32,
+  coherenceHorizonWidth: f32,
+  coherenceHorizonWaveNumber: f32,
+  coherenceHorizonRadius: f32,
+  coherenceHorizonMetricExponent: f32,
+  coherenceHorizonRingGain: f32,
+  coherenceHorizonGlow: f32,
+
 }
 
 // ============================================
