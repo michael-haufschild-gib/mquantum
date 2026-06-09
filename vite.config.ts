@@ -30,6 +30,17 @@ function resolveGitSha(): string {
 }
 const GIT_SHA = resolveGitSha()
 
+function parseDevServerPort(rawPort: string | undefined): number | undefined {
+  const trimmed = rawPort?.trim()
+  if (!trimmed || !/^\d+$/.test(trimmed)) return undefined
+
+  const port = Number(trimmed)
+  return Number.isSafeInteger(port) && port >= 1 && port <= 65535 ? port : undefined
+}
+
+const PORTLESS_DEV_PORT = parseDevServerPort(process.env.PORT)
+const PORTLESS_DEV_HOST = process.env.HOST?.trim() || undefined
+
 // Favicon and meta image files to copy to dist root
 const faviconFiles = [
   'favicon.ico',
@@ -289,6 +300,8 @@ export default defineConfig((_env) => ({
     ],
   },
   server: {
+    ...(PORTLESS_DEV_HOST ? { host: PORTLESS_DEV_HOST } : {}),
+    ...(PORTLESS_DEV_PORT ? { port: PORTLESS_DEV_PORT, strictPort: true } : {}),
     open: process.env.PORTLESS_URL ?? true,
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',

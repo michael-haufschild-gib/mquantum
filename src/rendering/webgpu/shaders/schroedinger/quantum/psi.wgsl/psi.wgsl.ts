@@ -18,93 +18,27 @@
  * @module rendering/webgpu/shaders/schroedinger/quantum/psi.wgsl
  */
 
+import { hermiteCocycleInflationHelpersBlock } from '../hoSuperpositionVariants.wgsl/hoSuperpositionVariants.wgsl'
+
 /**
  * Harmonic-oscillator-only psi block with dynamic HO superposition loop.
  * Does not reference hydrogen symbols, enabling family-specific shader composition.
  * HO momentum is handled by CPU uniform transformation (1/ω, coefficient phase rotation),
  * so the shader always runs the position-mode path.
+ *
+ * The Hermite cocycle helpers are interpolated from the single exported source
+ * (hoSuperpositionVariants.wgsl) — the rolled and unrolled paths are mutually
+ * exclusive in composition, so the functions are defined exactly once per shader.
  */
 export const psiBlockHarmonic = /* wgsl */ `
 // ============================================
 // Wavefunction Evaluation (Harmonic Oscillator)
 // ============================================
-
-fn isHermiteCocycleInflationActive(uniforms: SchroedingerUniforms) -> bool {
-  return uniforms.quantumMode == QUANTUM_MODE_HARMONIC &&
-    uniforms.hermiteCocycleInflationEnabled != 0u &&
-    uniforms.hermiteCocycleInflationStrength > 0.0 &&
-    uniforms.hermiteCocycleShellRadius > 0.0;
-}
-
-fn hermiteCocycleInflationPhase(
-  xND: array<f32, 11>,
-  termIdx: i32,
-  uniforms: SchroedingerUniforms
-) -> f32 {
-  if (!isHermiteCocycleInflationActive(uniforms)) {
-    return 0.0;
-  }
-
-  let strength = clamp(uniforms.hermiteCocycleInflationStrength, 0.0, 2.0);
-  let shellRadius = clamp(uniforms.hermiteCocycleShellRadius, 0.1, 2.0);
-  let twist = clamp(uniforms.hermiteCocycleInflationTwist, 0.0, 8.0);
-  let invRadius = 1.0 / shellRadius;
-  let x = xND[0];
-  let y = xND[1];
-  let z = select(0.0, xND[2], ACTUAL_DIM >= 3);
-  let w = select(0.0, xND[3], ACTUAL_DIM >= 4);
-  let px = x * invRadius;
-  let py = y * invRadius;
-  let pz = z * invRadius;
-  let pw = w * invRadius;
-  let r = sqrt(max(x * x + y * y + z * z, 1e-10));
-
-  let q0 = f32(getQuantumNumber(uniforms, termIdx, 0) + 1);
-  let q1 = f32(getQuantumNumber(uniforms, termIdx, 1) + 1);
-  let q2 = f32(getQuantumNumber(uniforms, termIdx, 2) + 1);
-  let q3 = f32(getQuantumNumber(uniforms, termIdx, 3) + 1);
-  let width = max(0.18 * shellRadius, 0.075);
-  let radial = (r - shellRadius) / width;
-  let originFade = smoothstep(0.12 * shellRadius, 0.55 * shellRadius, r);
-  let farFade = 1.0 - smoothstep(shellRadius + 2.0 * width, shellRadius + 4.0 * width, r);
-  let shellGate = clamp(exp(-(radial * radial)) * originFade * farFade, 0.0, 1.0);
-  if (shellGate <= 1e-8) {
-    return 0.0;
-  }
-
-  let branch = 0.173 * f32(termIdx + 1);
-  let a = sin(q0 * px + twist * (py - pz) + branch);
-  let b = sin(q1 * py + twist * (pz - px) + 0.37 * branch);
-  let c = sin(q2 * pz + twist * (px - py) + 0.61 * branch);
-  let projectedCocycle = a * b * c;
-  let cyclicParity = 0.5 * sin(
-    q0 * py * pz + q1 * pz * px + q2 * px * py + twist * (px + 0.5 * py - 0.25 * pz)
-  );
-  let bulkCocycle = select(
-    0.0,
-    0.6 * sin(q3 * pw + twist * (px + py - pz) + 0.5 * branch),
-    ACTUAL_DIM >= 4
-  );
-  let obstruction = clamp(tanh(1.45 * (projectedCocycle + cyclicParity + bulkCocycle)), -1.0, 1.0);
-  return clamp(strength * shellGate * obstruction, -strength, strength);
-}
-
-fn applyHermiteCocycleInflation(
-  term: vec2f,
-  xND: array<f32, 11>,
-  termIdx: i32,
-  uniforms: SchroedingerUniforms
-) -> vec2f {
-  let phase = hermiteCocycleInflationPhase(xND, termIdx, uniforms);
-  if (abs(phase) <= 1e-7) {
-    return term;
-  }
-  return cmul(term, cexp_i(phase));
-}
-
+${hermiteCocycleInflationHelpersBlock}
 // Evaluate harmonic oscillator wavefunction with runtime term count
 fn evalHarmonicOscillatorPsi(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
   var psi = vec2f(0.0, 0.0);
+  let cocycleGate = hermiteCocycleGateEval(xND, uniforms);
 
   for (var k = 0; k < 8; k++) {
     if (k >= uniforms.termCount) { break; }
@@ -117,7 +51,7 @@ fn evalHarmonicOscillatorPsi(xND: array<f32, 11>, t: f32, uniforms: Schroedinger
     let coeff = getCoeff(uniforms, k);
 
     // Combined: c_k · e^{-iE_k t}
-    let term = applyHermiteCocycleInflation(cmul(coeff, timeFactor), xND, k, uniforms);
+    let term = applyHermiteCocycleInflation(cmul(coeff, timeFactor), cocycleGate, k, uniforms);
 
     // Spatial eigenfunction Φ_k(x)
     let spatial = hoNDOptimized(xND, k, uniforms);
@@ -144,11 +78,12 @@ fn evalPsiWithPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms)
 // Evaluate spatial-only phase (t=0) for stable coloring.
 fn evalSpatialPhase(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> f32 {
   var psi = vec2f(0.0, 0.0);
+  let cocycleGate = hermiteCocycleGateEval(xND, uniforms);
 
   for (var k = 0; k < 8; k++) {
     if (k >= uniforms.termCount) { break; }
 
-    let coeff = applyHermiteCocycleInflation(getCoeff(uniforms, k), xND, k, uniforms);
+    let coeff = applyHermiteCocycleInflation(getCoeff(uniforms, k), cocycleGate, k, uniforms);
     let spatial = hoNDOptimized(xND, k, uniforms);
     psi += cscale(spatial, coeff);
   }
@@ -161,19 +96,23 @@ fn evalSpatialPhase(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> f32 
 fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec4f {
   var psiTime = vec2f(0.0, 0.0);
   var psiSpatial = vec2f(0.0, 0.0);
+  let cocycleGate = hermiteCocycleGateEval(xND, uniforms);
 
   for (var k = 0; k < 8; k++) {
     if (k >= uniforms.termCount) { break; }
 
     let spatial = hoNDOptimized(xND, k, uniforms);
-    let coeff = applyHermiteCocycleInflation(getCoeff(uniforms, k), xND, k, uniforms);
-
-    psiSpatial += cscale(spatial, coeff);
+    let coeff = getCoeff(uniforms, k);
 
     let phase = -getEnergy(uniforms, k) * t;
     let timeFactor = cexp_i(phase);
-    let term = applyHermiteCocycleInflation(cmul(getCoeff(uniforms, k), timeFactor), xND, k, uniforms);
-    psiTime += cscale(spatial, term);
+    // One cocycle rotation per term, shared by the spatial-reference (xy)
+    // and time-dependent (zw) accumulators.
+    let pair = applyHermiteCocycleInflationPair(
+      vec4f(coeff, cmul(coeff, timeFactor)), cocycleGate, k, uniforms);
+
+    psiSpatial += cscale(spatial, pair.xy);
+    psiTime += cscale(spatial, pair.zw);
   }
 
   let spatialPhase = atan2(psiSpatial.y, psiSpatial.x);
