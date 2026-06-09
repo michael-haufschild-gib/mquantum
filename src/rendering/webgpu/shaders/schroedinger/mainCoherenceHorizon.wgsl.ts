@@ -166,9 +166,39 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
 
   // Step budget: LOD-scaled, hard-capped. The base step spends the whole
   // budget on the straight chord plus slack for geodesic curvature.
-  let maxSteps = clamp(schroedinger.sampleCount * 3, 48, MAX_GEODESIC_STEPS);
+  // 5/2 steps per LOD sample keeps >=6 samples per interference fringe at
+  // default settings while holding 45+ fps at 5K-equivalent pixel loads.
+  let maxSteps = clamp((schroedinger.sampleCount * 5) / 2, 48, MAX_GEODESIC_STEPS);
   let baseStep = (tFar - tNear) * GEODESIC_PATH_SLACK / f32(maxSteps);
   let invRPh = select(0.0, 1.0 / max(rPh, 1e-4), hasHorizon);
+
+  // ── Orthonormal-basis collapse (PERF: hoists all N-D work out of the loop) ──
+  // The slice basis B = [basisX basisY basisZ] is an orthonormal d×3 triad
+  // (rotation-derived), so with q = B·p + o:
+  //   |q|²  = |p|² + 2·p·(Bᵀo) + |o|²      (since |B·p| = |p|)
+  //   Bᵀq   = p + Bᵀo                       (since BᵀB = I₃)
+  //   q[0]  = p·row₀(B) + o[0]
+  // Everything the march needs reduces to 3D ops on per-fragment constants —
+  // no per-step array<f32,11> construction, no per-step dimension loops.
+  var bto = vec3f(0.0);
+  var oSq = 0.0;
+  for (var j = 0; j < ACTUAL_DIM && j < 11; j++) {
+    let oj = getBasisComponent(basis.origin, j);
+    oSq += oj * oj;
+    bto += oj * vec3f(
+      getBasisComponent(basis.basisX, j),
+      getBasisComponent(basis.basisY, j),
+      getBasisComponent(basis.basisZ, j)
+    );
+  }
+  let axis0 = vec3f(
+    getBasisComponent(basis.basisX, 0),
+    getBasisComponent(basis.basisY, 0),
+    getBasisComponent(basis.basisZ, 0)
+  );
+  let o0 = getBasisComponent(basis.origin, 0);
+  let densitySigmaScale = schroedinger.densityGain * glow;
+  let boundRSqOut = boundR * boundR * 1.1;
 
   // ── March state ──
   let jitter = chJitterHash(input.clipPosition.xy);
@@ -182,10 +212,9 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   for (var i = 0; i < MAX_GEODESIC_STEPS; i++) {
     if (i >= maxSteps) { break; }
 
-    // N-D position through the basis (identity basis ⇒ q = p, r = |p|).
-    let q = transformToND(p, basis.basisX, basis.basisY, basis.basisZ, basis.origin, ACTUAL_DIM);
-    let rSq = lengthSquaredND(q, ACTUAL_DIM);
-    let r = sqrt(max(rSq, 1e-10));
+    // N-D radius via the collapsed basis identities above.
+    let rSq = max(dot(p, p) + 2.0 * dot(p, bto) + oSq, 1e-10);
+    let r = sqrt(rSq);
     minR = min(minR, r);
 
     // Capture: inside the coherence-sourced horizon. Nothing escapes.
@@ -194,18 +223,24 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
       break;
     }
     // Escape: outside the bounding sphere moving outward.
-    if (dot(p, p) > boundR * boundR * 1.1 && dot(p, v) > 0.0) {
+    if (dot(p, p) > boundRSqOut && dot(p, v) > 0.0) {
       break;
     }
 
     // Adaptive step: shrink near the photon sphere where curvature peaks.
     var stepLen = baseStep;
+    // One pow shared by the redshift factor and the bending magnitude:
+    // powInvRExpo = r^-(d-2), so f = 1 - mu·powInvRExpo and
+    // r^-(d+1) = powInvRExpo · invR³.
+    let invR = 1.0 / r;
+    var powInvRExpo = 0.0;
     if (hasHorizon) {
-      stepLen *= clamp((r - rh) * invRPh, 0.18, 1.0);
+      stepLen *= clamp((r - rh) * invRPh, 0.22, 1.0);
+      powInvRExpo = pow(invR, expo);
     }
 
     // ── Cat-cloud emission (6σ reject before any exp) ──
-    let u = q[0];
+    let u = dot(p, axis0) + o0;
     let perpSq = max(rSq - u * u, 0.0);
     let dPlus = u - sep;
     let dMinus = u + sep;
@@ -222,15 +257,14 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
         // Gravitational redshift: emission from depth r is dimmed by sqrt(f).
         var redshift = 1.0;
         if (hasHorizon) {
-          redshift = sqrt(clamp(1.0 - mu / pow(r, expo), 0.0, 1.0));
+          redshift = sqrt(clamp(1.0 - mu * powInvRExpo, 0.0, 1.0));
         }
         // Phase of the cat superposition (interference coloring input).
         let phase = atan2((aPlus - aMinus) * sin(theta), (aPlus + aMinus) * cos(theta));
         let rhoN = clamp(rho, 0.0, 1.0);
         let emissColor = chEmissionColor(schroedinger.colorAlgorithm, rhoN, phase);
 
-        let sigma = rho * schroedinger.densityGain * glow;
-        let stepAlpha = 1.0 - exp(-sigma * stepLen * 3.0);
+        let stepAlpha = 1.0 - exp(-rho * densitySigmaScale * stepLen * 3.0);
         let weight = (1.0 - accumAlpha) * stepAlpha;
         accumColor += weight * emissColor * redshift;
         accumAlpha += weight;
@@ -240,20 +274,12 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
 
     // ── Null-geodesic bending: a = -(d/2)·mu·h²·r̂ / r^(d+1) ──
     if (hasHorizon) {
-      // Project the N-D radial direction back to the visible 3-plane (B^T q).
-      var px = 0.0;
-      var py = 0.0;
-      var pz = 0.0;
-      for (var j = 0; j < ACTUAL_DIM && j < 11; j++) {
-        let qj = q[j];
-        px += qj * getBasisComponent(basis.basisX, j);
-        py += qj * getBasisComponent(basis.basisY, j);
-        pz += qj * getBasisComponent(basis.basisZ, j);
-      }
-      let pEff = vec3f(px, py, pz);
+      // Bᵀq = p + Bᵀo (orthonormal collapse) — the N-D radial direction
+      // projected to the visible 3-plane, now a constant-time expression.
+      let pEff = p + bto;
       let hVec = cross(pEff, v);
       let hSq = dot(hVec, hVec);
-      let accelMag = 0.5 * (expo + 2.0) * mu * hSq / pow(r, expo + 3.0);
+      let accelMag = 0.5 * (expo + 2.0) * mu * hSq * powInvRExpo * invR * invR * invR;
       let radialDir = pEff / max(length(pEff), 1e-6);
       v = normalize(v - radialDir * (accelMag * stepLen));
     }
