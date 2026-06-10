@@ -31,7 +31,7 @@ function rePsiQuarter(r: number): number {
   let re = 0.25
   let im = r / 2
   let accRe = 0
-  while (re < 12) {
+  while (re < 16) {
     const d = re * re + im * im
     accRe -= re / d
     re += 1
@@ -54,8 +54,17 @@ const DX = 5e-5
 const X_MAX = Math.log(N_MAX) + DX
 const NBINS = Math.ceil(X_MAX / DX)
 
-function buildPrimeBins(): Float64Array {
-  const bins = new Float64Array(NBINS)
+interface PrimeBins {
+  a0: Float64Array
+  a1: Float64Array
+}
+
+function buildPrimeBins(): PrimeBins {
+  // zeroth and first moments per bin: a0 = Σ w, a1 = Σ w·(x − x_bin), so the
+  // per-u sum can use f(x) ≈ f(x_bin) + f′(x_bin)(x − x_bin) — kills the
+  // phase error u·Δx that limited run 1 to ~1e-4.
+  const a0 = new Float64Array(NBINS)
+  const a1 = new Float64Array(NBINS)
   const sieve = new Uint8Array(N_MAX + 1) // 0 = prime
   sieve[0] = sieve[1] = 1
   for (let p = 2; p * p <= N_MAX; p++) {
@@ -66,11 +75,15 @@ function buildPrimeBins(): Float64Array {
     if (sieve[p]) continue
     const lp = Math.log(p)
     for (let q = p; q <= N_MAX; q *= p) {
-      bins[Math.floor(Math.log(q) / DX)] += lp / Math.sqrt(q)
+      const x = Math.log(q)
+      const b = Math.floor(x / DX)
+      const w = lp / Math.sqrt(q)
+      a0[b] += w
+      a1[b] += w * (x - (b + 0.5) * DX)
       if (q > N_MAX / p) break
     }
   }
-  return bins
+  return { a0, a1 }
 }
 
 // ---------- explicit-formula evaluation of Σ_γ h(γ), h = Gaussian pair ----------
@@ -82,14 +95,14 @@ interface EfParts {
   tailBound: number
 }
 
-function efGaussianPair(u: number, sigma: number, bins: Float64Array): EfParts {
+function efGaussianPair(u: number, sigma: number, bins: PrimeBins): EfParts {
   const s2 = sigma * sigma
   // pole term h(i/2) + h(−i/2) = 4 e^{(1/4−u²)/2σ²} cos(u/2σ²)
   const pole = 4 * Math.exp((0.25 - u * u) / (2 * s2)) * Math.cos(u / (2 * s2))
   // archimedean: (1/π)∫_0^∞ h(r)[Re ψ(1/4+ir/2) − log π] dr  (integrand even)
   const lo = 0
   const hi = u + 14 * sigma + 2
-  const nStep = Math.max(2000, Math.ceil((hi - lo) / (sigma / 24)))
+  const nStep = 2 * Math.max(1000, Math.ceil((hi - lo) / (sigma / 24)))
   const dr = (hi - lo) / nStep
   let arch = 0
   for (let i = 0; i <= nStep; i++) {
@@ -103,10 +116,14 @@ function efGaussianPair(u: number, sigma: number, bins: Float64Array): EfParts {
   // prime sum: 2 Σ Λ(n) n^{−1/2} g(log n), g(x) = (σ/√2π) e^{−σ²x²/2} 2cos(ux)
   let primes = 0
   for (let b = 0; b < NBINS; b++) {
-    const a = bins[b]!
+    const a = bins.a0[b]!
     if (a === 0) continue
     const x = (b + 0.5) * DX
-    primes += a * Math.exp(-0.5 * s2 * x * x) * Math.cos(u * x)
+    const env = Math.exp(-0.5 * s2 * x * x)
+    const c = Math.cos(u * x)
+    const s = Math.sin(u * x)
+    // f(x) = env·cos(ux); first-order in-bin correction via f′
+    primes += a * env * c + bins.a1[b]! * env * (-s2 * x * c - u * s)
   }
   primes *= (4 * sigma) / SQRT_2PI
   // truncation tail bound: ∫_{X}^∞ e^{x/2 − σ²x²/2} dx · (4σ/√2π), ψ(t)≈t density
