@@ -241,31 +241,37 @@ for (const [u, sigma] of [
   )
 }
 
-console.log('\nPART B — prime-side Gram positivity scan (λ_min < 0 ⇒ RH false)')
-const coarse: number[] = []
-for (let u = 2; u <= 60; u += 2.5) coarse.push(u)
-const fine: number[] = []
-for (let u = 10; u <= 40; u += 1) fine.push(u)
-const sigmas = [1.5, 1.0, 0.75, 0.5, 0.4, 0.35]
-console.log('   σ    grid    n     λ_min(prime)    λ_min(zero)     λ_max     margin λmin/λmax')
+console.log('\nPART B — prime-side Gram positivity scan (λ_min < 0 beyond error ⇒ RH false)')
+// Rank constraint (run-1 lesson): rank(M) ≤ #zeros in the spectral window, so the
+// grid must have FEWER points than reachable zeros for λ_min to carry a genuine
+// margin. G1: 10 pts over [15,60] (~15 zeros < 65); G2: 11 pts over [10,90]
+// (~23 zeros < 95).
+const g1: number[] = []
+for (let u = 15; u <= 60; u += 5) g1.push(u)
+const g2: number[] = []
+for (let u = 10; u <= 90; u += 8) g2.push(u)
+const sigmas = [1.0, 0.75, 0.5, 0.4]
+console.log('   σ    grid  n     λ_min(prime)    λ_min(zero)     λ_max     margin    |Δλmin|')
 const marginBySigma: Array<{ sigma: number; margin: number; minVec: Float64Array; us: number[] }> =
   []
+function w1PrimeFactory(sigma: number): (m: number) => number {
+  const cache = new Map<number, number>()
+  return (m: number): number => {
+    const key = Math.round(m * 1e6)
+    let v = cache.get(key)
+    if (v === undefined) {
+      v = efGaussianPair(m, sigma, bins).total / 2
+      cache.set(key, v)
+    }
+    return v
+  }
+}
 for (const sigma of sigmas) {
   for (const [label, us] of [
-    ['coarse', coarse],
-    ['fine', fine],
+    ['G1', g1],
+    ['G2', g2],
   ] as const) {
-    if (label === 'fine' && sigma > 0.76) continue // fine grid only matters near-critical
-    const cache = new Map<number, number>()
-    const w1Prime = (m: number): number => {
-      const key = Math.round(m * 1e6)
-      let v = cache.get(key)
-      if (v === undefined) {
-        v = efGaussianPair(m, sigma, bins).total / 2
-        cache.set(key, v)
-      }
-      return v
-    }
+    const w1Prime = w1PrimeFactory(sigma)
     const w1Zero = (m: number): number => zeroSidePair(m, sigma) / 2
     const MP = buildGram(us, sigma, w1Prime)
     const MZ = buildGram(us, sigma, w1Zero)
@@ -275,15 +281,15 @@ for (const sigma of sigmas) {
     const lmaxP = ep.vals[ep.vals.length - 1]!
     const margin = lminP / lmaxP
     console.log(
-      `  ${sigma.toFixed(2)}  ${label.padEnd(6)} ${String(us.length).padStart(3)}  ${lminP
+      `  ${sigma.toFixed(2)}  ${label}   ${String(us.length).padStart(3)}  ${lminP
         .toExponential(4)
         .padStart(13)}  ${ez.vals[0]!.toExponential(4).padStart(13)}  ${lmaxP
         .toExponential(3)
-        .padStart(9)}  ${margin.toExponential(3).padStart(11)}`
+        .padStart(9)}  ${margin.toExponential(2).padStart(9)}  ${Math.abs(lminP - ez.vals[0]!)
+        .toExponential(1)
+        .padStart(8)}`
     )
-    if (label === 'fine' || sigma > 0.76) {
-      marginBySigma.push({ sigma, margin, minVec: ep.minVec, us })
-    }
+    if (label === 'G1') marginBySigma.push({ sigma, margin, minVec: ep.minVec, us })
   }
 }
 
@@ -307,4 +313,35 @@ for (const rec of marginBySigma) {
       iPeak
     ]!.toFixed(1)}  participation=${(pr * 100).toFixed(0)}%`
   )
+}
+
+console.log('\nPART D — detector calibration: injected off-line doublet at γ₀ = 30.42')
+// A hypothetical zero pair ρ = 1/2 ± δ + iγ₀ (with its 1−ρ̄ partners) replaces
+// the on-line zero there. Its W1 contribution becomes
+//   2 e^{−((γ₀−m)² − δ²)/2σ²} cos((γ₀−m)δ/σ²)   (+ the −γ₀ mirror),
+// no longer a positive measure → λ_min of the zero-side Gram must dip negative.
+// |λ_min| vs the prime-side error floor |Δλmin| from PART B states exactly what
+// off-line displacement δ this instrument would have detected.
+const GAMMA0 = 30.424876
+for (const sigma of [0.5, 0.4]) {
+  const w1Zero = (m: number): number => zeroSidePair(m, sigma) / 2
+  for (const delta of [0, 0.02, 0.05, 0.1, 0.2]) {
+    const s2 = sigma * sigma
+    const w1Mod = (m: number): number => {
+      let v = w1Zero(m)
+      for (const g0 of [GAMMA0, -GAMMA0]) {
+        const d2 = (g0 - m) * (g0 - m)
+        v -= Math.exp(-d2 / (2 * s2))
+        v += Math.exp(-(d2 - delta * delta) / (2 * s2)) * Math.cos(((g0 - m) * delta) / s2)
+      }
+      return v
+    }
+    const M = buildGram(g1, sigma, delta === 0 ? w1Zero : w1Mod)
+    const e = jacobiEig(M, g1.length)
+    console.log(
+      `  σ=${sigma.toFixed(2)}  δ=${delta.toFixed(2)}  λ_min=${e.vals[0]!.toExponential(4).padStart(
+        12
+      )}  λ_min/λ_max=${(e.vals[0]! / e.vals[e.vals.length - 1]!).toExponential(2)}`
+    )
+  }
 }
