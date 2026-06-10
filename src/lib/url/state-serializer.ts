@@ -31,11 +31,21 @@ import type { MetricKind } from '@/lib/physics/tdse/metrics/types'
 import { type AdsUrlState, deserializeAds, serializeAds } from './adsSerializer'
 import { type BellUrlState, deserializeBell, serializeBell } from './bellSerializer'
 import {
+  type CoherenceHorizonUrlState,
+  deserializeCoherenceHorizon,
+  serializeCoherenceHorizon,
+} from './coherenceHorizonSerializer'
+import {
   type CosmologySerializableState,
   deserializeCosmology,
   serializeCosmology,
 } from './cosmologySerializer'
 import { deserializeDirac, type DiracUrlState, serializeDirac } from './diracSerializer'
+import {
+  deserializeHilbertPolya,
+  type HilbertPolyaUrlState,
+  serializeHilbertPolya,
+} from './hilbertPolyaSerializer'
 import {
   parseBoolParam,
   parseEnumParam,
@@ -46,6 +56,11 @@ import {
   setIntParam,
   setStringParam,
 } from './paramHelpers'
+import {
+  deserializeRiemannZeta,
+  type RiemannZetaUrlState,
+  serializeRiemannZeta,
+} from './riemannZetaSerializer'
 import type { SrmtUrlState } from './srmtSerializer'
 import {
   deserializeSrmtAndSweep,
@@ -78,6 +93,9 @@ export const VALID_QUANTUM_MODES: SchroedingerQuantumMode[] = [
   'quantumWalk',
   'wheelerDeWitt',
   'antiDeSitter',
+  'coherenceHorizon',
+  'riemannZeta',
+  'hilbertPolya',
 ]
 
 const VALID_REPRESENTATIONS: SchroedingerRepresentation[] = ['position', 'momentum', 'wigner']
@@ -98,7 +116,10 @@ export interface ShareableObjectState
   extends
     AdsUrlState,
     BellUrlState,
+    CoherenceHorizonUrlState,
     DiracUrlState,
+    HilbertPolyaUrlState,
+    RiemannZetaUrlState,
     SrmtUrlState,
     SrmtSweepUrlState,
     TdseSerializableState,
@@ -290,6 +311,24 @@ export function serializeState(state: ShareableState): string {
     serializeAds(params, state)
   }
 
+  // Coherence Horizon (coherence-sourced gravity). Same dormant-field rule
+  // as AdS: only emitted while the mode is active.
+  if (state.quantumMode === 'coherenceHorizon') {
+    serializeCoherenceHorizon(params, state)
+  }
+
+  // Riemann Zeta (Arithmetic Horizon). Same dormant-field rule as AdS and
+  // Coherence Horizon: only emitted while the mode is active.
+  if (state.quantumMode === 'riemannZeta') {
+    serializeRiemannZeta(params, state)
+  }
+
+  // Hilbert–Pólya Spectrum. Same dormant-field rule as the other horizon
+  // modes: only emitted while the mode is active.
+  if (state.quantumMode === 'hilbertPolya') {
+    serializeHilbertPolya(params, state)
+  }
+
   // Bell-pair / CHSH experiment. Bell uses its own ObjectType, so guard on
   // that instead of quantumMode (which is undefined for the bellPair object).
   if (state.objectType === 'bellPair') {
@@ -365,6 +404,15 @@ export function deserializeState(searchParams: string): ParsedShareableState {
 
   // Anti-de Sitter (Stage 1).
   deserializeAds(params, state)
+
+  // Coherence Horizon (coherence-sourced gravity).
+  deserializeCoherenceHorizon(params, state)
+
+  // Riemann Zeta (Arithmetic Horizon).
+  deserializeRiemannZeta(params, state)
+
+  // Hilbert–Pólya Spectrum.
+  deserializeHilbertPolya(params, state)
 
   // Bell-pair / CHSH experiment. Always attempted — the parser keeps
   // every present field regardless of objectType so links with `t=bellPair`

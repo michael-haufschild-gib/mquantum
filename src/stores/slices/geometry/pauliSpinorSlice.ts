@@ -44,14 +44,17 @@ export const createPauliSpinorSlice: StateCreator<ExtendedObjectSlice, [], [], P
     setPauliField(key, Math.max(min, Math.min(max, value)) as never)
   }
 
+  const setPauliIntClamped = (key: keyof PauliConfig, value: number, min: number, max: number) => {
+    if (!isFinite(value)) return
+    setPauliField(key, Math.max(min, Math.min(max, Math.round(value))) as never)
+  }
+
   return {
     pauliSpinor: createDefaultPauliConfig(),
 
     // === Physics ===
     setPauliDt: (dt) => setPauliClamped('dt', dt, 0.0001, 0.1),
-    setPauliStepsPerFrame: (steps) => {
-      setPauliField('stepsPerFrame', Math.max(1, Math.min(16, Math.round(steps))))
-    },
+    setPauliStepsPerFrame: (steps) => setPauliIntClamped('stepsPerFrame', steps, 1, 16),
     setPauliHbar: (hbar) => setPauliClamped('hbar', hbar, 0.01, 10),
     setPauliMass: (mass) => setPauliClamped('mass', mass, 0.01, 10),
 
@@ -164,9 +167,8 @@ export const createPauliSpinorSlice: StateCreator<ExtendedObjectSlice, [], [], P
 
     // === Diagnostics ===
     setPauliDiagnosticsEnabled: (enabled) => setPauliField('diagnosticsEnabled', enabled),
-    setPauliDiagnosticsInterval: (interval) => {
-      setPauliField('diagnosticsInterval', Math.max(1, Math.min(100, Math.round(interval))))
-    },
+    setPauliDiagnosticsInterval: (interval) =>
+      setPauliIntClamped('diagnosticsInterval', interval, 1, 100),
 
     // === Slice Animation ===
     setPauliSliceAnimationEnabled: (enabled) => setPauliField('sliceAnimationEnabled', enabled),

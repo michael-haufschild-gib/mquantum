@@ -9,6 +9,7 @@
 
 import { logger } from '@/lib/logger'
 
+import { hasFloat64ArrayLength } from './helpers'
 import { getWasmRuntime } from './runtime'
 
 /**
@@ -37,8 +38,14 @@ export function multiplyMatricesWasm(
     return null
   }
 
+  const multiplyFn = module.multiply_matrices_wasm
+  if (typeof multiplyFn !== 'function') {
+    return null
+  }
+
   try {
-    return module.multiply_matrices_wasm(a, b, dimension)
+    const result = multiplyFn(a, b, dimension)
+    return hasFloat64ArrayLength(result, expectedSize) ? result : null
   } catch (err) {
     logger.warn('[AnimationWASM] multiply_matrices_wasm failed:', err)
     return null
@@ -61,8 +68,14 @@ export function dotProductWasm(a: Float64Array, b: Float64Array): number | null 
     return null
   }
 
+  const dotFn = module.dot_product_wasm
+  if (typeof dotFn !== 'function') {
+    return null
+  }
+
   try {
-    return module.dot_product_wasm(a, b)
+    const result = dotFn(a, b)
+    return typeof result === 'number' ? result : null
   } catch (err) {
     logger.warn('[AnimationWASM] dot_product_wasm failed:', err)
     return null
@@ -81,8 +94,14 @@ export function magnitudeWasm(v: Float64Array): number | null {
     return null
   }
 
+  const magnitudeFn = module.magnitude_wasm
+  if (typeof magnitudeFn !== 'function') {
+    return null
+  }
+
   try {
-    return module.magnitude_wasm(v)
+    const result = magnitudeFn(v)
+    return typeof result === 'number' ? result : null
   } catch (err) {
     logger.warn('[AnimationWASM] magnitude_wasm failed:', err)
     return null
@@ -101,8 +120,14 @@ export function normalizeVectorWasm(v: Float64Array): Float64Array | null {
     return null
   }
 
+  const normalizeFn = module.normalize_vector_wasm
+  if (typeof normalizeFn !== 'function') {
+    return null
+  }
+
   try {
-    return module.normalize_vector_wasm(v)
+    const result = normalizeFn(v)
+    return hasFloat64ArrayLength(result, v.length) ? result : null
   } catch (err) {
     logger.warn('[AnimationWASM] normalize_vector_wasm failed:', err)
     return null
@@ -125,8 +150,14 @@ export function subtractVectorsWasm(a: Float64Array, b: Float64Array): Float64Ar
     return null
   }
 
+  const subtractFn = module.subtract_vectors_wasm
+  if (typeof subtractFn !== 'function') {
+    return null
+  }
+
   try {
-    return module.subtract_vectors_wasm(a, b)
+    const result = subtractFn(a, b)
+    return hasFloat64ArrayLength(result, a.length) ? result : null
   } catch (err) {
     logger.warn('[AnimationWASM] subtract_vectors_wasm failed:', err)
     return null

@@ -5,8 +5,10 @@
  * for the real scalar field lattice simulation.
  */
 
+import { sanitizePowerOfTwoGridSizes } from '@/lib/math/ndArray'
 import type { KasnerExponents } from '@/lib/physics/cosmology/bianchiKasner'
-import type { CosmologyPreset } from '@/lib/physics/cosmology/presets'
+import { type CosmologyPreset, isCosmologyPreset } from '@/lib/physics/cosmology/presets'
+import { clampDtWithCfl } from '@/lib/physics/latticeCfl'
 
 import type { PmlAbsorberConfig } from './crossMode'
 
@@ -577,4 +579,186 @@ export const DEFAULT_FREE_SCALAR_CONFIG: FreeScalarConfig = {
       : undefined,
   },
   preheating: { ...DEFAULT_PREHEATING_CONFIG },
+}
+
+function clampInteger(value: unknown, fallback: number, min: number, max: number): number {
+  const finite = finiteOrDefault(value, fallback)
+  return Math.max(min, Math.min(max, Math.floor(finite)))
+}
+
+function clampFinite(value: unknown, fallback: number, min: number, max: number): number {
+  return clampNumber(finiteOrDefault(value, fallback), min, max)
+}
+
+function finiteVector(
+  values: unknown,
+  fallback: readonly number[],
+  length: number,
+  transform: (value: number) => number = (value) => value
+): number[] {
+  const source = Array.isArray(values) ? values : []
+  return Array.from({ length }, (_, i) => {
+    const candidate = source[i]
+    if (typeof candidate === 'number' && Number.isFinite(candidate)) return transform(candidate)
+    const fallbackValue = fallback[i]
+    return transform(
+      typeof fallbackValue === 'number' && Number.isFinite(fallbackValue) ? fallbackValue : 0
+    )
+  })
+}
+
+function sanitizeBoolean(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback
+}
+
+function sanitizeCosmologyConfig(
+  input: unknown,
+  fallback: CosmologyConfig = DEFAULT_COSMOLOGY_CONFIG
+): CosmologyConfig {
+  const source = input && typeof input === 'object' ? (input as Partial<CosmologyConfig>) : fallback
+  const fallbackKasner = fallback.kasnerExponents ?? DEFAULT_COSMOLOGY_CONFIG.kasnerExponents!
+  const rawKasner =
+    source.kasnerExponents && typeof source.kasnerExponents === 'object'
+      ? source.kasnerExponents
+      : fallbackKasner
+
+  return {
+    enabled: sanitizeBoolean(source.enabled, fallback.enabled),
+    preset: isCosmologyPreset(source.preset) ? source.preset : fallback.preset,
+    steepness: clampFinite(source.steepness, fallback.steepness, 0.1, 100),
+    hubble: clampFinite(source.hubble, fallback.hubble, 0.01, 100),
+    eta0:
+      typeof source.eta0 === 'number' && Number.isFinite(source.eta0) && source.eta0 !== 0
+        ? source.eta0
+        : fallback.eta0,
+    kasnerExponents: {
+      p1: finiteOrDefault(rawKasner.p1, fallbackKasner.p1),
+      p2: finiteOrDefault(rawKasner.p2, fallbackKasner.p2),
+      p3: finiteOrDefault(rawKasner.p3, fallbackKasner.p3),
+    },
+    lqcRhoCritical: clampFinite(
+      source.lqcRhoCritical,
+      fallback.lqcRhoCritical ?? DEFAULT_COSMOLOGY_CONFIG.lqcRhoCritical!,
+      0.001,
+      1000
+    ),
+    lqcEquationOfState: clampFinite(
+      source.lqcEquationOfState,
+      fallback.lqcEquationOfState ?? DEFAULT_COSMOLOGY_CONFIG.lqcEquationOfState!,
+      0,
+      1
+    ),
+    lqcInitialRhoRatio: clampFinite(
+      source.lqcInitialRhoRatio,
+      fallback.lqcInitialRhoRatio ?? DEFAULT_COSMOLOGY_CONFIG.lqcInitialRhoRatio!,
+      0.000001,
+      0.999999
+    ),
+  }
+}
+
+function sanitizePreheatingConfig(
+  input: unknown,
+  fallback: PreheatingConfig = DEFAULT_PREHEATING_CONFIG
+): PreheatingConfig {
+  const source =
+    input && typeof input === 'object' ? (input as Partial<PreheatingConfig>) : fallback
+  return {
+    enabled: sanitizeBoolean(source.enabled, fallback.enabled),
+    amplitude: clampFinite(source.amplitude, fallback.amplitude, 0, 1),
+    frequency: clampFinite(source.frequency, fallback.frequency, 0.1, 10),
+  }
+}
+
+/**
+ * Sanitize a complete free-scalar config after bulk scene/preset imports.
+ *
+ * Individual Zustand setters already reject malformed values. Bulk config
+ * loading bypasses those setters, so this function enforces the same GPU-facing
+ * invariants before WGSL uniform packing, field initialization, or k-space
+ * readback can consume the state.
+ */
+export function sanitizeFreeScalarConfig(
+  input: Partial<FreeScalarConfig>,
+  fallback: FreeScalarConfig = DEFAULT_FREE_SCALAR_CONFIG
+): FreeScalarConfig {
+  const requestedDim =
+    typeof input.latticeDim === 'number' && Number.isFinite(input.latticeDim)
+      ? input.latticeDim
+      : fallback.latticeDim
+  const latticeDim = clampInteger(requestedDim, fallback.latticeDim, 1, 11)
+  const sizedGrid = sanitizePowerOfTwoGridSizes(
+    {
+      latticeDim,
+      gridSize: Array.isArray(input.gridSize) ? input.gridSize : fallback.gridSize,
+    },
+    { maxTotalSites: FREE_SCALAR_MAX_TOTAL_SITES, maxDimensions: 11 }
+  ).gridSize.slice(0, latticeDim)
+  const spacing = finiteVector(input.spacing, fallback.spacing, latticeDim, (value) =>
+    clampNumber(value, 0.01, 1.0)
+  )
+  const mass = clampFinite(input.mass, fallback.mass, 0, 10)
+  const dt = clampDtWithCfl(finiteOrDefault(input.dt, fallback.dt), spacing, latticeDim, mass)
+  const initialCondition = isFreeScalarInitialCondition(input.initialCondition)
+    ? input.initialCondition
+    : fallback.initialCondition
+  const fieldView = isFreeScalarFieldView(input.fieldView) ? input.fieldView : fallback.fieldView
+
+  return {
+    ...fallback,
+    latticeDim,
+    gridSize: sizedGrid,
+    spacing,
+    mass,
+    dt,
+    stepsPerFrame: clampInteger(input.stepsPerFrame, fallback.stepsPerFrame, 1, 16),
+    initialCondition,
+    packetCenter: finiteVector(input.packetCenter, fallback.packetCenter, latticeDim),
+    packetWidth: clampFinite(input.packetWidth, fallback.packetWidth, 0.01, 5.0),
+    packetAmplitude: clampFinite(input.packetAmplitude, fallback.packetAmplitude, 0.01, 10.0),
+    modeK: finiteVector(input.modeK, fallback.modeK, latticeDim, Math.round),
+    vacuumSeed: Math.round(finiteOrDefault(input.vacuumSeed, fallback.vacuumSeed)),
+    fieldView,
+    autoScale: sanitizeBoolean(input.autoScale, fallback.autoScale),
+    needsReset: sanitizeBoolean(input.needsReset, fallback.needsReset),
+    slicePositions: finiteVector(
+      input.slicePositions,
+      fallback.slicePositions,
+      Math.max(0, latticeDim - 3)
+    ),
+    kSpaceViz: sanitizeKSpaceVizConfig(input.kSpaceViz ?? fallback.kSpaceViz),
+    selfInteractionEnabled: sanitizeBoolean(
+      input.selfInteractionEnabled,
+      fallback.selfInteractionEnabled
+    ),
+    selfInteractionLambda: clampFinite(
+      input.selfInteractionLambda,
+      fallback.selfInteractionLambda,
+      0.01,
+      10.0
+    ),
+    selfInteractionVev: clampFinite(
+      input.selfInteractionVev,
+      fallback.selfInteractionVev,
+      0.1,
+      5.0
+    ),
+    absorberEnabled: sanitizeBoolean(input.absorberEnabled, fallback.absorberEnabled),
+    absorberWidth: clampFinite(input.absorberWidth, fallback.absorberWidth, 0.05, 0.5),
+    pmlTargetReflection: clampFinite(
+      input.pmlTargetReflection,
+      fallback.pmlTargetReflection,
+      1e-12,
+      0.999
+    ),
+    diagnosticsEnabled: sanitizeBoolean(input.diagnosticsEnabled, fallback.diagnosticsEnabled),
+    diagnosticsInterval: clampInteger(
+      input.diagnosticsInterval,
+      fallback.diagnosticsInterval,
+      1,
+      120
+    ),
+    cosmology: sanitizeCosmologyConfig(input.cosmology, fallback.cosmology),
+    preheating: sanitizePreheatingConfig(input.preheating, fallback.preheating),
+  }
 }

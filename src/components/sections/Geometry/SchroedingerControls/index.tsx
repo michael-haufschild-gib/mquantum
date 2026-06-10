@@ -18,13 +18,16 @@ import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 import { AntiDeSitterControls } from './AntiDeSitterControls'
 import { BECControls } from './BECControls'
+import { CoherenceHorizonControls } from './CoherenceHorizonControls'
 import { DiracControls } from './DiracControls'
 import { FreeScalarFieldControls } from './FreeScalarFieldControls'
 import { HarmonicOscillatorControls } from './HarmonicOscillatorControls'
+import { HilbertPolyaControls } from './HilbertPolyaControls'
 import { HydrogenNDControls } from './HydrogenNDControls'
 import { HydrogenNDCoupledControls } from './HydrogenNDCoupledControls'
 import { KKCompactificationSection } from './KKCompactificationSection'
 import { QuantumWalkControls } from './QuantumWalkControls'
+import { RiemannZetaControls } from './RiemannZetaControls'
 import { TDSEControls } from './TDSEControls'
 import type {
   BecActions,
@@ -72,6 +75,12 @@ function renderModeControls(p: ModeControlsProps): React.ReactNode {
       )
     case 'antiDeSitter':
       return <AntiDeSitterControls />
+    case 'coherenceHorizon':
+      return <CoherenceHorizonControls />
+    case 'riemannZeta':
+      return <RiemannZetaControls />
+    case 'hilbertPolya':
+      return <HilbertPolyaControls />
     case 'wheelerDeWitt':
       return <WheelerDeWittControls />
     case 'quantumWalk':
@@ -172,17 +181,24 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
     const isQuantumWalk = mode === 'quantumWalk'
     const isWheelerDeWitt = mode === 'wheelerDeWitt'
     const isAntiDeSitter = mode === 'antiDeSitter'
+    const isCoherenceHorizon = mode === 'coherenceHorizon'
+    const isRiemannZeta = mode === 'riemannZeta'
+    const isHilbertPolya = mode === 'hilbertPolya'
 
     return (
       <div className={className} data-testid="schroedinger-controls">
-        {/* Representation Selection — hidden for compute modes */}
+        {/* Representation Selection — hidden for compute modes and the
+            position-only Coherence Horizon geodesic mode */}
         {!isFreeScalarField &&
           !isTdseDynamics &&
           !isBecDynamics &&
           !isDiracEquation &&
           !isQuantumWalk &&
           !isWheelerDeWitt &&
-          !isAntiDeSitter && (
+          !isAntiDeSitter &&
+          !isCoherenceHorizon &&
+          !isRiemannZeta &&
+          !isHilbertPolya && (
             <Section title="Representation" defaultOpen={true}>
               <div className="space-y-3">
                 <ToggleGroup

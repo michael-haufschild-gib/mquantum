@@ -101,16 +101,58 @@ describe('WebGPUDevice.initialize() error contract', () => {
     expect(result.error).toContain('WebGPU unsupported')
   })
 
-  it('caches the same failure result across repeated calls with the same canvas', async () => {
+  it('retries initialization after a same-canvas failure instead of caching failure forever', async () => {
     uninstallWebGPUMock()
 
     const device = WebGPUDevice.getInstance()
     const canvas = document.createElement('canvas')
 
-    const a = await device.initialize(canvas)
-    const b = await device.initialize(canvas)
+    const first = await device.initialize(canvas)
+    expect(first.success).toBe(false)
 
-    expect(a).toBe(b)
+    const fakeLimits = {
+      maxStorageBufferBindingSize: 134217728,
+      maxUniformBufferBindingSize: 65536,
+      maxComputeWorkgroupSizeX: 256,
+      maxComputeWorkgroupSizeY: 256,
+      maxComputeWorkgroupSizeZ: 64,
+      maxComputeInvocationsPerWorkgroup: 256,
+      maxComputeWorkgroupStorageSize: 16384,
+      maxBindGroups: 4,
+      maxTextureDimension2D: 8192,
+    }
+    const fakeDevice = {
+      lost: new Promise(() => {}),
+      limits: fakeLimits,
+      features: new Set<GPUFeatureName>(),
+      queue: { writeBuffer: vi.fn() },
+      destroy: vi.fn(),
+    }
+    const fakeAdapter = {
+      features: new Set<GPUFeatureName>(),
+      limits: fakeLimits,
+      info: { vendor: 'retry', architecture: 'mock', device: 'gpu' },
+      isFallbackAdapter: false,
+      requestDevice: vi.fn(async () => fakeDevice),
+    }
+    const fakeContext = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(),
+    } as unknown as GPUCanvasContext
+
+    installFakeGpu(() => fakeAdapter)
+    Object.defineProperty(canvas, 'getContext', {
+      configurable: true,
+      value: vi.fn((contextId: string) => (contextId === 'webgpu' ? fakeContext : null)),
+    })
+
+    const second = await device.initialize(canvas)
+
+    expect(second.success).toBe(true)
+    expect(fakeAdapter.requestDevice).toHaveBeenCalledTimes(1)
+    expect(device.getDevice()).toBe(fakeDevice)
+    expect(device.getContext()).toBe(fakeContext)
   })
 
   it('does not let a superseded canvas initialization publish over the current canvas', async () => {
@@ -194,6 +236,70 @@ describe('WebGPUDevice.initialize() error contract', () => {
     expect(firstDestroy).toHaveBeenCalledTimes(1)
     expect(secondContext.unconfigure).not.toHaveBeenCalled()
     expect(secondDestroy).not.toHaveBeenCalled()
+  })
+
+  it('treats device loss as terminal instead of auto-reinitializing hidden GPU resources', async () => {
+    const fakeLimits = {
+      maxStorageBufferBindingSize: 134217728,
+      maxUniformBufferBindingSize: 65536,
+      maxComputeWorkgroupSizeX: 256,
+      maxComputeWorkgroupSizeY: 256,
+      maxComputeWorkgroupSizeZ: 64,
+      maxComputeInvocationsPerWorkgroup: 256,
+      maxComputeWorkgroupStorageSize: 16384,
+      maxBindGroups: 4,
+      maxTextureDimension2D: 8192,
+    }
+    let resolveLost!: (info: GPUDeviceLostInfo) => void
+    const lost = new Promise<GPUDeviceLostInfo>((resolve) => {
+      resolveLost = resolve
+    })
+    const fakeDevice = {
+      lost,
+      limits: fakeLimits,
+      features: new Set<GPUFeatureName>(),
+      queue: { writeBuffer: vi.fn() },
+      destroy: vi.fn(),
+    }
+    const fakeAdapter = {
+      features: new Set<GPUFeatureName>(),
+      limits: fakeLimits,
+      info: { vendor: 'fake', architecture: 'mock', device: 'lost-gpu' },
+      isFallbackAdapter: false,
+      requestDevice: vi.fn(async () => fakeDevice),
+    }
+    installFakeGpu(() => fakeAdapter)
+    const requestAdapter = navigator.gpu.requestAdapter as unknown as ReturnType<typeof vi.fn>
+
+    const fakeContext = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(),
+    } as unknown as GPUCanvasContext
+    const canvas = document.createElement('canvas')
+    Object.defineProperty(canvas, 'getContext', {
+      configurable: true,
+      value: vi.fn((contextId: string) => (contextId === 'webgpu' ? fakeContext : null)),
+    })
+
+    const device = WebGPUDevice.getInstance()
+    const onDeviceLost = vi.fn()
+    device.onDeviceLost(onDeviceLost)
+    const result = await device.initialize(canvas)
+
+    expect(result.success).toBe(true)
+    expect(requestAdapter).toHaveBeenCalledTimes(1)
+
+    resolveLost({ reason: 'unknown', message: 'mock device loss' } as GPUDeviceLostInfo)
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(onDeviceLost).toHaveBeenCalledWith('unknown')
+    expect(requestAdapter).toHaveBeenCalledTimes(1)
+    expect(device.isReady()).toBe(false)
+    expect(device.getCapabilities()).toBeNull()
+    expect(() => device.getDevice()).toThrow('WebGPU device not initialized')
+    expect(() => device.getContext()).toThrow('WebGPU context not initialized')
   })
 
   it('reports a stable error string suitable for the data-renderer-error DOM attribute', async () => {

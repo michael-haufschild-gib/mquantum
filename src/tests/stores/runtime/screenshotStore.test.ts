@@ -22,6 +22,15 @@ describe('screenshotStore', () => {
     const state = useScreenshotStore.getState()
     expect(state.isOpen).toBe(true)
     expect(state.imageSrc).toBe('data:image/png;base64,abc123')
+    expect(state.filename).toBeNull()
+  })
+
+  it('openModal stores optional download filename', () => {
+    useScreenshotStore.getState().openModal('data:image/png;base64,abc123', 'custom-shot')
+    const state = useScreenshotStore.getState()
+    expect(state.isOpen).toBe(true)
+    expect(state.imageSrc).toBe('data:image/png;base64,abc123')
+    expect(state.filename).toBe('custom-shot')
   })
 
   it('closeModal clears isOpen and imageSrc', () => {
@@ -31,6 +40,7 @@ describe('screenshotStore', () => {
     const state = useScreenshotStore.getState()
     expect(state.isOpen).toBe(false)
     expect(state.imageSrc).toBeNull()
+    expect(state.filename).toBeNull()
   })
 
   it('closeModal triggers screenshotCaptureStore.reset (cross-store cleanup)', () => {
@@ -54,6 +64,7 @@ describe('screenshotStore', () => {
 
     expect(useScreenshotStore.getState().isOpen).toBe(false)
     expect(useScreenshotStore.getState().imageSrc).toBeNull()
+    expect(useScreenshotStore.getState().filename).toBeNull()
     expect(useScreenshotCaptureStore.getState().capturedImage).toBeNull()
   })
 

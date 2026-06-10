@@ -66,6 +66,18 @@ export async function createModeStrategy(
       const { AntiDeSitterStrategy } = await import('../AntiDeSitterStrategy')
       return new AntiDeSitterStrategy()
     }
+    case 'coherenceHorizon': {
+      const { CoherenceHorizonStrategy } = await import('../CoherenceHorizonStrategy')
+      return new CoherenceHorizonStrategy()
+    }
+    case 'riemannZeta': {
+      const { RiemannZetaStrategy } = await import('../RiemannZetaStrategy')
+      return new RiemannZetaStrategy()
+    }
+    case 'hilbertPolya': {
+      const { HilbertPolyaStrategy } = await import('../HilbertPolyaStrategy')
+      return new HilbertPolyaStrategy()
+    }
     case 'analytic':
     default:
       return new AnalyticModeStrategy()

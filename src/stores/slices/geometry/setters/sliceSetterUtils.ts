@@ -14,6 +14,7 @@ import { defaultDiracGridPerDim, DIRAC_MAX_TOTAL_SITES } from '@/lib/geometry/ex
 import { FREE_SCALAR_MAX_TOTAL_SITES } from '@/lib/geometry/extended/freeScalar'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { computeDefaultPow2GridPerDim } from '@/lib/math/ndArray'
+export { clampDtWithCfl, computeCflLimit } from '@/lib/physics/latticeCfl'
 
 import type { ExtendedObjectSlice } from '../types'
 
@@ -37,49 +38,6 @@ export interface SetterContext {
   hasOnlyFinite: (values: number[]) => boolean
   /** Logs a non-finite input warning (dev mode only) */
   warnNonFinite: (name: string, value: unknown) => void
-}
-
-/**
- * CFL stability limit for the lattice Klein-Gordon field.
- *
- * For a leapfrog integrator the maximum eigenfrequency is:
- *   omega_max^2 = m^2 + sum_i (2/a_i)^2
- * and the stability condition is dt * omega_max < 2, giving:
- *   dt_max = 2 / sqrt(m^2 + sum_i (2/a_i)^2)
- *
- * @param spacing - Lattice spacing per dimension
- * @param latticeDim - Active spatial dimensions
- * @param mass - Klein-Gordon mass parameter
- */
-export const computeCflLimit = (spacing: number[], latticeDim: number, mass: number): number => {
-  let sumInvA2 = 0
-  for (let i = 0; i < latticeDim; i++) {
-    const a = spacing[i]!
-    const twoOverA = 2 / a
-    sumInvA2 += twoOverA * twoOverA
-  }
-  const omegaMax = Math.sqrt(mass * mass + sumInvA2)
-  return 2 / omegaMax
-}
-
-/**
- * Clamp dt to be within [0.001, min(0.1, CFL limit * safety factor)].
- * Uses a 0.9 safety factor to stay well within the stable region.
- *
- * @param dt - Requested time step
- * @param spacing - Lattice spacing
- * @param latticeDim - Active dimensions
- * @param mass - Klein-Gordon mass parameter
- */
-export const clampDtWithCfl = (
-  dt: number,
-  spacing: number[],
-  latticeDim: number,
-  mass: number
-): number => {
-  const cflLimit = computeCflLimit(spacing, latticeDim, mass)
-  const maxDt = Math.min(0.1, cflLimit * 0.9)
-  return Math.max(0.001, Math.min(maxDt, dt))
 }
 
 /** Maximum total TDSE/BEC lattice sites — FFT needs power-of-2 per axis */

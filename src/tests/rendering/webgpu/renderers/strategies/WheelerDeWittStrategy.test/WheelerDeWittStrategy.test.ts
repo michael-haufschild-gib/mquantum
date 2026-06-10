@@ -266,6 +266,24 @@ describe('WheelerDeWittStrategy.executeFrame', () => {
     expect(writeTexture.mock.calls.length).toBe(settledWrites)
   })
 
+  it('re-packs a paused worldline when pulse render parameters change', () => {
+    const wdw = smallWdwConfig({ worldlineEnabled: true, worldlineSpeed: 0.5 })
+    const { render } = setup(wdw, /* isPlaying */ false)
+
+    render({ accumulatedTime: 0.4 })
+    const settledWrites = writeTexture.mock.calls.length
+    expect(settledWrites).toBeGreaterThanOrEqual(1)
+
+    wdw.worldlinePulseWidth = 0.2
+    render({ accumulatedTime: 0.4 })
+    const widthWrites = writeTexture.mock.calls.length
+    expect(widthWrites).toBeGreaterThan(settledWrites)
+
+    wdw.worldlineSpeed = 2.0
+    render({ accumulatedTime: 0.4 })
+    expect(writeTexture.mock.calls.length).toBeGreaterThan(widthWrites)
+  })
+
   it('re-packs when solver is dirty regardless of worldline state', () => {
     const wdw = smallWdwConfig({ worldlineEnabled: false })
     const { render } = setup(wdw, /* isPlaying */ true)

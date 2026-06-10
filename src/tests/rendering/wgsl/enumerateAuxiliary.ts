@@ -10,6 +10,8 @@
 
 import { createHash } from 'node:crypto'
 
+import { buildShaderConfig } from '@/rendering/webgpu/renderers/rendererConfigUtils'
+import { composeSchroedingerShader } from '@/rendering/webgpu/shaders/schroedinger/compose'
 import {
   composeDensityGridComputeShader,
   type ComputeQuantumMode,
@@ -97,6 +99,48 @@ export function* enumerateSkybox(): Generator<ShaderRecord> {
 export function* enumerateAds(): Generator<ShaderRecord> {
   const { wgsl } = composeAdsDensityComputeShader()
   yield record('ads-density-compute', wgsl, 'ads-density', 'ads')
+}
+
+/**
+ * Coherence Horizon geodesic fragment shader at every supported dimension.
+ * Uses the production `buildShaderConfig` derivation so the exact shader the
+ * renderer compiles is what gets validated.
+ */
+export function* enumerateCoherenceHorizon(): Generator<ShaderRecord> {
+  for (let dimension = 3; dimension <= 11; dimension++) {
+    const config = buildShaderConfig({ quantumMode: 'coherenceHorizon', dimension })
+    const { wgsl } = composeSchroedingerShader(config)
+    yield record(
+      `coherence-horizon_d${dimension}`,
+      wgsl,
+      `coherence-horizon:${dimension}`,
+      'coherence-horizon'
+    )
+  }
+}
+
+/**
+ * Arithmetic Horizon (Riemann ζ) volumetric fragment shader at every supported
+ * dimension. Uses the production `buildShaderConfig` derivation so the exact
+ * shader the renderer compiles is what gets validated.
+ */
+export function* enumerateRiemannZeta(): Generator<ShaderRecord> {
+  for (let dimension = 3; dimension <= 11; dimension++) {
+    const config = buildShaderConfig({ quantumMode: 'riemannZeta', dimension })
+    const { wgsl } = composeSchroedingerShader(config)
+    yield record(`riemann-zeta_d${dimension}`, wgsl, `riemann-zeta:${dimension}`, 'riemann-zeta')
+  }
+}
+
+/**
+ * Hilbert–Pólya Spectrum volumetric fragment shader. The mode is 3D-only
+ * (registry min = max = 3). Uses the production `buildShaderConfig`
+ * derivation so the exact shader the renderer compiles is what gets validated.
+ */
+export function* enumerateHilbertPolya(): Generator<ShaderRecord> {
+  const config = buildShaderConfig({ quantumMode: 'hilbertPolya', dimension: 3 })
+  const { wgsl } = composeSchroedingerShader(config)
+  yield record('hilbert-polya_d3', wgsl, 'hilbert-polya:3', 'hilbert-polya')
 }
 
 const COMPUTE_MODES: readonly ComputeQuantumMode[] = [

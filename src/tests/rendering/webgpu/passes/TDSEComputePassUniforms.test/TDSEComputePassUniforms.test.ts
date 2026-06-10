@@ -651,6 +651,31 @@ describe('writeTdseUniforms', () => {
     expect(u32[I.wormholeMirrorAxis]).toBe(1)
   })
 
+  it('clamps wormhole coupling to the UI-supported range before GPU upload', () => {
+    const uniformData = new ArrayBuffer(UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({
+        config: createTdseConfig({
+          wormholeCouplingEnabled: true,
+          wormholeCouplingG: 99,
+        }),
+      })
+    )
+
+    expect(f32[I.wormholeCouplingG]).toBe(5)
+    expect(f32[I.wormholeCosTau]).toBeCloseTo(Math.cos(0.5 * DEFAULT_TDSE_CONFIG.dt * 5), 6)
+    expect(f32[I.wormholeSinTau]).toBeCloseTo(Math.sin(0.5 * DEFAULT_TDSE_CONFIG.dt * 5), 6)
+  })
+
   it('writes clamped P-CTC postselection slots before GPU upload', () => {
     const uniformData = new ArrayBuffer(UNIFORM_SIZE)
     const u32 = new Uint32Array(uniformData)

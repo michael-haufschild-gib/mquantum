@@ -16,6 +16,34 @@ import { computeTdseEffectiveSpacing } from '@/lib/physics/tdse/effectiveSpacing
 
 import { computeTdseDisorderScaling } from '../TDSEDisorderScaling'
 
+const MAX_CUSTOM_POTENTIAL_GRID_SITES = 2 ** 20
+
+function potentialSiteCount(config: TdseConfig): number | null {
+  const latticeDim = config.latticeDim
+  if (!Number.isSafeInteger(latticeDim) || latticeDim < 1) return null
+  if (config.gridSize.length < latticeDim) return null
+  let totalSites = 1
+  for (let d = 0; d < latticeDim; d++) {
+    const size = config.gridSize[d]!
+    if (!Number.isSafeInteger(size) || size <= 0) return null
+    if (size > MAX_CUSTOM_POTENTIAL_GRID_SITES) return null
+    if (totalSites > Math.floor(Number.MAX_SAFE_INTEGER / size)) return null
+    if (totalSites > Math.floor(MAX_CUSTOM_POTENTIAL_GRID_SITES / size)) return null
+    totalSites *= size
+  }
+  return totalSites
+}
+
+function uploadZeroPotentialBuffer(
+  device: GPUDevice,
+  potentialBuffer: GPUBuffer,
+  config: TdseConfig
+): void {
+  const totalSites = potentialSiteCount(config)
+  if (totalSites === null) return
+  device.queue.writeBuffer(potentialBuffer, 0, new Float32Array(totalSites))
+}
+
 /**
  * Compute a hash string for potential dirty-tracking.
  * Returns a unique string when any parameter affecting V(x) changes.
@@ -115,12 +143,20 @@ export function uploadCustomPotentialBuffer(
   const result = parseExpression(expr)
   if (!result.success) {
     logger.warn(`[TDSE] Custom potential parse error: ${result.error}`)
+    uploadZeroPotentialBuffer(device, potentialBuffer, config)
     return 0
   }
 
   const gridSize = config.gridSize.slice(0, config.latticeDim)
   const spacing = computeTdseEffectiveSpacing(config)
-  const potential = evaluatePotentialGrid(result.evaluate, gridSize, spacing)
+  let potential: Float32Array<ArrayBuffer>
+  try {
+    potential = evaluatePotentialGrid(result.evaluate, gridSize, spacing)
+  } catch (err) {
+    logger.warn(`[TDSE] Custom potential evaluation error: ${String(err)}`)
+    uploadZeroPotentialBuffer(device, potentialBuffer, config)
+    return 0
+  }
 
   device.queue.writeBuffer(potentialBuffer, 0, potential)
 

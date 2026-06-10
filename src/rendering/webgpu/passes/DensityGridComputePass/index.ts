@@ -27,9 +27,11 @@ import type {
 } from '../DensityGridComputePassResources'
 import {
   createDensityGridResources,
+  DEFAULT_DENSITY_GRID_WORLD_BOUND,
   disposeDensityGridResources,
   GRID_PARAMS_SIZE,
   refreshDensityDistribution,
+  sanitizeDensityGridWorldBound,
   selectGridTextureFormat,
   startPendingReadback,
   writeGridParams,
@@ -38,9 +40,6 @@ import { createGradientPipeline } from '../DensityGridGradientSetup'
 
 // Default grid size (64^3 = 262,144 voxels)
 const DEFAULT_GRID_SIZE = 64
-
-// Default world space bounds (matches original BOUND_R = 2.0)
-const DEFAULT_WORLD_BOUND = 2.0
 
 // Workgroup size (must match shader @workgroup_size)
 const WORKGROUP_SIZE = 8
@@ -120,7 +119,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
   private gridParamsF32View = new Float32Array(this.gridParamsData)
 
   // Dynamic world bound (matches renderer's boundingRadius)
-  private worldBound = DEFAULT_WORLD_BOUND
+  private worldBound = DEFAULT_DENSITY_GRID_WORLD_BOUND
 
   // Dirty tracking
   private needsRecompute = true
@@ -502,8 +501,9 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
    * Call when quantum state changes (per preset regeneration, not per frame).
    */
   updateWorldBound(device: GPUDevice, boundingRadius: number): void {
-    if (Math.abs(boundingRadius - this.worldBound) < 0.01) return
-    this.worldBound = boundingRadius
+    const safeWorldBound = sanitizeDensityGridWorldBound(boundingRadius)
+    if (Math.abs(safeWorldBound - this.worldBound) < 0.01) return
+    this.worldBound = safeWorldBound
     this.updateGridParams(device)
     this.needsRecompute = true
     this.shouldRefreshDistribution = true

@@ -5,7 +5,7 @@
 
 import { create } from 'zustand'
 
-import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
+import { DEFAULT_DIMENSION, MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
 import { logger } from '@/lib/logger'
 import { createScaleMatrix } from '@/lib/math'
 import type { MatrixND } from '@/lib/math/types'
@@ -89,9 +89,9 @@ function createDefaultScales(dimension: number): number[] {
 export const useTransformStore = create<TransformState>((set, get) => ({
   // Initial state
   uniformScale: DEFAULT_SCALE,
-  perAxisScale: createDefaultScales(4),
+  perAxisScale: createDefaultScales(DEFAULT_DIMENSION),
   scaleLocked: true,
-  dimension: 4,
+  dimension: DEFAULT_DIMENSION,
 
   // Scale actions
   setUniformScale: (value: number) => {

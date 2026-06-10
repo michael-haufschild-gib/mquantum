@@ -32,6 +32,46 @@ describe('presetManagerStore (invariants)', () => {
     useRotationStore.getState().reset()
   })
 
+  describe('invariant: persisted preset state is sanitized on rehydrate', () => {
+    it('drops malformed persisted entries before menus and URL lookup can read them', async () => {
+      localStorage.setItem(
+        'mquantum-preset-manager',
+        JSON.stringify({
+          state: {
+            savedStyles: [
+              {
+                id: 'valid-style',
+                name: '  Valid Style  ',
+                timestamp: 7,
+                data: {
+                  appearance: { edgeColor: '#123456', appearanceVersion: 99 },
+                  lighting: {},
+                  postProcessing: {},
+                  environment: {},
+                  pbr: {},
+                },
+              },
+              { id: 42, name: 'Bad Style', timestamp: 1, data: {} },
+              { id: 'blank-style', name: '   ', timestamp: 1, data: {} },
+              'not-an-object',
+            ],
+            savedScenes: { not: 'an-array' },
+          },
+          version: 0,
+        })
+      )
+
+      await usePresetManagerStore.persist.rehydrate()
+
+      const state = usePresetManagerStore.getState()
+      expect(state.savedStyles).toHaveLength(1)
+      expect(state.savedStyles[0]!.id).toBe('valid-style')
+      expect(state.savedStyles[0]!.name).toBe('Valid Style')
+      expect(state.savedStyles[0]!.data.appearance.appearanceVersion).toBeUndefined()
+      expect(state.savedScenes).toEqual([])
+    })
+  })
+
   describe('invariant: style save/load round-trips and normalizes imported data', () => {
     it('should save and load a style', () => {
       // Setup initial state
@@ -649,7 +689,7 @@ describe('presetManagerStore (invariants)', () => {
       expect(appearance.sssThickness).toBe(0.1)
       expect(appearance.sssJitter).toBe(0)
 
-      expect(appearance.cosineCoefficients.a).toEqual([0, 2, 0.5])
+      expect(appearance.cosineCoefficients.a).toEqual([-1, 2, 0.5])
     })
 
     it('drops unknown imported style environment fields on load', () => {

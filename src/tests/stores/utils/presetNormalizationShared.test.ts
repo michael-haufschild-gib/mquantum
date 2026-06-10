@@ -28,28 +28,36 @@ describe('clampFiniteOrFallback', () => {
 })
 
 describe('normalizeCosineVector', () => {
-  it('clamps elements to [0, 2]', () => {
-    const result = normalizeCosineVector([-1, 3, 1], [0.5, 0.5, 0.5])
-    expect(result).toEqual([0, 2, 1])
+  it('clamps elements to coefficient-specific ranges', () => {
+    expect(normalizeCosineVector([-2, 3, 1], [0.5, 0.5, 0.5], 'a')).toEqual([-1, 2, 1])
+    expect(normalizeCosineVector([-3, 3, 1], [0.5, 0.5, 0.5], 'b')).toEqual([-2, 2, 1])
+    expect(normalizeCosineVector([-2, 6, 1], [0.5, 0.5, 0.5], 'c')).toEqual([-1, 5, 1])
+    expect(normalizeCosineVector([-2, 3, 1], [0.5, 0.5, 0.5], 'd')).toEqual([-1, 2, 1])
   })
 
   it('returns fallback for non-array input', () => {
     const fallback: [number, number, number] = [0.1, 0.2, 0.3]
-    expect(normalizeCosineVector('not an array', fallback)).toEqual(fallback)
-    expect(normalizeCosineVector(42, fallback)).toEqual(fallback)
-    expect(normalizeCosineVector(null, fallback)).toEqual(fallback)
+    const result = normalizeCosineVector('not an array', fallback, 'a')
+
+    expect(result).toEqual(fallback)
+    expect(result).not.toBe(fallback)
+    expect(normalizeCosineVector(42, fallback, 'a')).toEqual(fallback)
+    expect(normalizeCosineVector(null, fallback, 'a')).toEqual(fallback)
   })
 
   it('returns fallback for array of wrong length', () => {
     const fallback: [number, number, number] = [0.1, 0.2, 0.3]
-    expect(normalizeCosineVector([1, 2], fallback)).toEqual(fallback)
-    expect(normalizeCosineVector([1, 2, 3, 4], fallback)).toEqual(fallback)
-    expect(normalizeCosineVector([], fallback)).toEqual(fallback)
+    const result = normalizeCosineVector([1, 2], fallback, 'a')
+
+    expect(result).toEqual(fallback)
+    expect(result).not.toBe(fallback)
+    expect(normalizeCosineVector([1, 2, 3, 4], fallback, 'a')).toEqual(fallback)
+    expect(normalizeCosineVector([], fallback, 'a')).toEqual(fallback)
   })
 
   it('uses element-level fallback for non-finite elements', () => {
     const fallback: [number, number, number] = [0.1, 0.2, 0.3]
-    const result = normalizeCosineVector([NaN, 1.0, 'x'], fallback)
+    const result = normalizeCosineVector([NaN, 1.0, 'x'], fallback, 'b')
     expect(result).toEqual([0.1, 1.0, 0.3])
   })
 })

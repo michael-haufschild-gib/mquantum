@@ -417,6 +417,12 @@ describe('Vector Operations', () => {
       expect(vectorsEqual(a, b, 0.1)).toBe(true)
       expect(vectorsEqual(a, b, 0.01)).toBe(false)
     })
+
+    it('returns false when either vector contains NaN', () => {
+      expect(vectorsEqual([Number.NaN, 1], [Number.NaN, 1])).toBe(false)
+      expect(vectorsEqual([Number.NaN, 1], [2, 1])).toBe(false)
+      expect(vectorsEqual([2, 1], [Number.NaN, 1])).toBe(false)
+    })
   })
 
   describe('copyVector', () => {
@@ -520,6 +526,24 @@ describe('Vector Operations', () => {
 
       expect(result).toBe(out)
       expect(out).toEqual([0, 0, 1])
+    })
+
+    it('supports writing into the first input vector', () => {
+      const a = [1, 2, 3]
+      const b = [4, 5, 6]
+      const result = crossProduct3D(a, b, a)
+
+      expect(result).toBe(a)
+      expect(a).toEqual([-3, 6, -3])
+    })
+
+    it('supports writing into the second input vector', () => {
+      const a = [1, 2, 3]
+      const b = [4, 5, 6]
+      const result = crossProduct3D(a, b, b)
+
+      expect(result).toBe(b)
+      expect(b).toEqual([-3, 6, -3])
     })
 
     it('truncates oversized out arrays to 3D', () => {

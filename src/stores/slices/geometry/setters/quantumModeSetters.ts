@@ -185,6 +185,15 @@ function buildRepresentationOverrides(
     overrides.representation = 'position'
   }
 
+  // Horizon-family modes (Coherence Horizon geodesic block, Arithmetic
+  // Horizon and Hilbert–Pólya volumetric blocks) render exclusively through
+  // position-space main blocks — momentum/Wigner have no pipeline for them.
+  const isPositionOnlyHorizonMode =
+    mode === 'coherenceHorizon' || mode === 'riemannZeta' || mode === 'hilbertPolya'
+  if (isPositionOnlyHorizonMode && currentRepr !== 'position') {
+    overrides.representation = 'position'
+  }
+
   return overrides
 }
 
@@ -333,6 +342,21 @@ function applyFirstPreset(
     case 'antiDeSitter':
       store.setAdsPreset(presetId as import('@/lib/geometry/extended/antiDeSitter').AdsPresetName)
       break
+    case 'coherenceHorizon':
+      store.setCoherenceHorizonPreset(
+        presetId as import('@/lib/geometry/extended/coherenceHorizon').CoherenceHorizonPresetName
+      )
+      break
+    case 'riemannZeta':
+      store.setRiemannZetaPreset(
+        presetId as import('@/lib/geometry/extended/riemannZeta').RiemannZetaPresetName
+      )
+      break
+    case 'hilbertPolya':
+      store.setHilbertPolyaPreset(
+        presetId as import('@/lib/geometry/extended/hilbertPolya').HilbertPolyaPresetName
+      )
+      break
   }
 }
 
@@ -412,6 +436,12 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
         if (dim === 2 && isHydrogenFamilyQuantumType(qm)) return
         // Block momentum for coupled hydrogen ND (shader is position-only)
         if (value === 'momentum' && qm === 'hydrogenNDCoupled') return
+        // Block non-position for Coherence Horizon (geodesic block is position-only)
+        if (qm === 'coherenceHorizon') return
+        // Block non-position for Arithmetic Horizon (volumetric block is position-only)
+        if (qm === 'riemannZeta') return
+        // Block non-position for Hilbert–Pólya (volumetric block is position-only)
+        if (qm === 'hilbertPolya') return
       }
       setWithVersion((state) => ({
         schroedinger: {

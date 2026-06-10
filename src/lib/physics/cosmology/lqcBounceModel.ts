@@ -203,9 +203,9 @@ export function lqcHubbleMagnitude(spacetimeDim: number, rhoCritical: number, rh
  */
 export function validateLqcBounceParams(params: LqcBounceParams): void {
   const { spacetimeDim, rhoCritical, equationOfState = 1, initialRhoRatio } = params
-  if (!Number.isFinite(spacetimeDim) || spacetimeDim < 3) {
+  if (!Number.isInteger(spacetimeDim) || spacetimeDim < 3) {
     throw new RangeError(
-      `LqcBounceParams.spacetimeDim must be a finite number >= 3, got ${spacetimeDim}`
+      `LqcBounceParams.spacetimeDim must be an integer >= 3, got ${spacetimeDim}`
     )
   }
   if (!Number.isFinite(rhoCritical) || rhoCritical <= 0) {

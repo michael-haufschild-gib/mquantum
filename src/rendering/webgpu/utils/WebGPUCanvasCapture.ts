@@ -201,37 +201,53 @@ export class WebGPUCanvasCapture {
     const readbackBytesPerRow = this.readbackBytesPerRow
     const readbackBufferSize = this.readbackBufferSize
 
-    this.device.queue
-      .onSubmittedWorkDone()
-      .then(async () => {
-        if (this.disposed || this.readbackBuffer !== readbackBuffer || !readbackBuffer) {
-          onError('Screenshot capture canceled.', requestId)
-          return
-        }
+    const finishCapture = () => {
+      this.inFlight = false
+      this.inFlightRequestId = null
+    }
 
-        await readbackBuffer.mapAsync(GPUMapMode.READ, 0, readbackBufferSize)
-        try {
-          const mapped = readbackBuffer.getMappedRange(0, readbackBufferSize)
-          const bytes = new Uint8Array(mapped)
-          const pixels = this.decodePixels(bytes, width, height, readbackBytesPerRow, format)
-          const dataUrl = this.pixelsToDataUrl(pixels, width, height)
-          onSuccess(dataUrl, requestId)
-        } finally {
-          readbackBuffer.unmap()
-        }
-      })
-      .catch((error) => {
-        const message = this.disposed
-          ? 'Screenshot capture canceled.'
-          : error instanceof Error
-            ? error.message
-            : 'Screenshot readback failed'
-        onError(message, requestId)
-      })
-      .finally(() => {
-        this.inFlight = false
-        this.inFlightRequestId = null
-      })
+    // This helper is called from a render-graph before-submit hook. Defer the
+    // map request so the graph can finish and submit the command buffer first;
+    // mapAsync itself waits for the copy into the readback buffer.
+    queueMicrotask(() => {
+      if (this.disposed || this.readbackBuffer !== readbackBuffer || !readbackBuffer) {
+        onError('Screenshot capture canceled.', requestId)
+        finishCapture()
+        return
+      }
+
+      readbackBuffer
+        .mapAsync(GPUMapMode.READ, 0, readbackBufferSize)
+        .then(() => {
+          try {
+            if (this.disposed || this.readbackBuffer !== readbackBuffer) {
+              onError('Screenshot capture canceled.', requestId)
+              return
+            }
+
+            const mapped = readbackBuffer.getMappedRange(0, readbackBufferSize)
+            const bytes = new Uint8Array(mapped)
+            const pixels = this.decodePixels(bytes, width, height, readbackBytesPerRow, format)
+            const dataUrl = this.pixelsToDataUrl(pixels, width, height)
+            onSuccess(dataUrl, requestId)
+          } finally {
+            try {
+              readbackBuffer.unmap()
+            } catch {
+              /* buffer may already be destroyed during cancellation */
+            }
+          }
+        })
+        .catch((error) => {
+          const message = this.disposed
+            ? 'Screenshot capture canceled.'
+            : error instanceof Error
+              ? error.message
+              : 'Screenshot readback failed'
+          onError(message, requestId)
+        })
+        .finally(finishCapture)
+    })
   }
 
   dispose(): void {

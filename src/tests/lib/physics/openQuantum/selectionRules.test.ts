@@ -118,6 +118,11 @@ describe('isAllowedE1', () => {
       expect(isAllowedE1(state(1, 0, 0, [0, 0]), state(2, 1, 0, [1, 1]))).toBe(false)
     })
 
+    it('states with different extra-dimension arity are forbidden', () => {
+      expect(isAllowedE1(state(1, 0, 0, []), state(2, 1, 0, [0]))).toBe(false)
+      expect(isAllowedE1(state(1, 0, 0, [0]), state(2, 1, 0, [0, 0]))).toBe(false)
+    })
+
     it('3D states (empty extraDimN) bypass extra-dim check', () => {
       // Both have empty arrays — no extra dims to compare
       expect(isAllowedE1(state(1, 0, 0, []), state(2, 1, 0, []))).toBe(true)

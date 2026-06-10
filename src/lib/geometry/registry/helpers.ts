@@ -488,6 +488,15 @@ export function supportsSchroedingerSurfaceMode(
   if (options.objectType !== 'schroedinger' && options.objectType !== 'pauliSpinor') return false
   if (options.dimension < 2) return false
   if (options.representation === 'wigner') return false
+  // Coherence Horizon owns a dedicated geodesic main block: the isosurface
+  // pipeline never composes for it, so the surface toggle is meaningless.
+  if (options.quantumMode === 'coherenceHorizon') return false
+  // Arithmetic Horizon (riemannZeta) likewise owns a dedicated volumetric main
+  // block — no isosurface pipeline composes for it.
+  if (options.quantumMode === 'riemannZeta') return false
+  // Hilbert–Pólya Spectrum likewise owns a dedicated volumetric main block —
+  // no isosurface pipeline composes for it.
+  if (options.quantumMode === 'hilbertPolya') return false
 
   return true
 }

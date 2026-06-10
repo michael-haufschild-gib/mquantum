@@ -68,12 +68,14 @@ export function createOpenQuantumSetters(ctx: SetterContext): OpenQuantumActions
     setOpenQuantumDt: nestedClampedSetter(ctx, D, 'dt', 0.001, 0.1),
     setOpenQuantumSubsteps: nestedIntSetter(ctx, D, 'substeps', 1, 10, 'floor'),
     setOpenQuantumChannelEnabled: (channel, enabled) => {
-      const keyMap = {
+      if (typeof enabled !== 'boolean') return
+      const keyMap: Record<string, 'dephasingEnabled' | 'relaxationEnabled' | 'thermalEnabled'> = {
         dephasing: 'dephasingEnabled',
         relaxation: 'relaxationEnabled',
         thermal: 'thermalEnabled',
-      } as const
+      }
       const key = keyMap[channel]
+      if (!key) return
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,

@@ -296,6 +296,43 @@ const SCHROEDINGER_FIELDS = [
   { name: 'hermiteCocycleInflationStrength', type: 'f32' },
   { name: 'hermiteCocycleShellRadius', type: 'f32' },
   { name: 'hermiteCocycleInflationTwist', type: 'f32' },
+
+  // --- Coherence Horizon (coherence-sourced gravity) ---
+  // Zeroed for all modes except coherenceHorizon; r_h precomputed on CPU.
+  { name: 'coherenceHorizonDecoherence', type: 'f32' },
+  { name: 'coherenceHorizonSeparation', type: 'f32' },
+  { name: 'coherenceHorizonWidth', type: 'f32' },
+  { name: 'coherenceHorizonWaveNumber', type: 'f32' },
+  { name: 'coherenceHorizonRadius', type: 'f32' },
+  { name: 'coherenceHorizonMetricExponent', type: 'f32' },
+  { name: 'coherenceHorizonRingGain', type: 'f32' },
+  { name: 'coherenceHorizonGlow', type: 'f32' },
+
+  // --- Riemann Zeta ("Arithmetic Horizon") ---
+  // Zeroed for all modes except riemannZeta. The radial LUT is a separate
+  // group-2 storage buffer (RiemannZetaStrategy), not part of this struct.
+  // riemannMetricExponent carries (d-2).
+  { name: 'riemannUMin', type: 'f32' },
+  { name: 'riemannUMax', type: 'f32' },
+  { name: 'riemannPartitionGain', type: 'f32' },
+  { name: 'riemannGlow', type: 'f32' },
+  { name: 'riemannHorizonRadius', type: 'f32' },
+  { name: 'riemannMetricExponent', type: 'f32' },
+  { name: 'riemannFlowRate', type: 'f32' },
+  { name: 'riemannAngularL', type: 'f32' },
+  { name: 'riemannAngularM', type: 'f32' },
+  { name: 'riemannCutaway', type: 'f32' },
+  { name: '_padRiemann1', type: 'f32' },
+  { name: '_padRiemann2', type: 'f32' },
+
+  // --- Hilbert–Pólya Spectrum ---
+  // Zeroed for all modes except hilbertPolya. The (Re z, Im z, θ) volume LUT
+  // is a separate group-2 storage buffer (HilbertPolyaStrategy), not part of
+  // this struct.
+  { name: 'hpGlow', type: 'f32' },
+  { name: 'hpFogGain', type: 'f32' },
+  { name: 'hpPlaneMarker', type: 'f32' },
+  { name: 'hpFilamentWidth', type: 'f32' },
 ] as const satisfies readonly StructFieldDef[]
 
 /** Computed struct layout for SchroedingerUniforms. */

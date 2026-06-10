@@ -13,6 +13,11 @@ import { useEffect, useRef } from 'react'
 
 import { logger } from '@/lib/logger'
 import { applySceneExample, findSceneByName } from '@/lib/sceneExamples'
+import {
+  applyCoherenceHorizonParams,
+  applyHilbertPolyaParams,
+  applyRiemannZetaParams,
+} from '@/lib/url/applyHorizonModeParams'
 import { parseCurrentUrl, type ParsedShareableState } from '@/lib/url/state-serializer'
 import { usePerformanceStore } from '@/stores/runtime/performanceStore'
 import { usePresetManagerStore } from '@/stores/runtime/presetManagerStore'
@@ -352,6 +357,10 @@ function applyAdsParams(
   applyAdsChordalSieveFields(urlState, ext)
 }
 
+/* applyCoherenceHorizonParams / applyRiemannZetaParams / applyHilbertPolyaParams
+   extracted to @/lib/url/applyHorizonModeParams (same preset-cascade contract
+   as AdS). */
+
 /** Apply Dirac-equation URL state params. */
 function applyDiracParams(urlState: ParsedShareableState, ext: ExtendedObjectState): void {
   applyIfDefined(urlState.diracGridSize, (value) => ext.setDiracGridSize(value))
@@ -455,7 +464,7 @@ function applyWdwParams(
     (get: (s: ParsedShareableState) => unknown, run: Apply): Apply =>
     (s, e) => {
       if (get(s) !== undefined) run(s, e)
-  }
+    }
   const steps: Apply[] = [
     apply(
       (s) => s.wdwBoundaryCondition,
@@ -690,6 +699,8 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
   try {
     applyCoreIdentityAndInit(urlState)
     const ext = useExtendedObjectStore.getState()
+    const effectiveQuantumMode = ext.schroedinger.quantumMode
+    const effectiveObjectType = useGeometryStore.getState().objectType
 
     // ── Rendering ────────────────────────────────────────────────────────────
     applySchroedingerRenderingParams(urlState, ext)
@@ -714,11 +725,14 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
     applyWormholeParams(urlState, ext)
     applyEntanglementParams(urlState)
     applyCosmologyParams(urlState, ext)
-    applyDiracParams(urlState, ext)
-    applyWdwParams(urlState, ext)
-    applyAdsParams(urlState, ext)
-    applyBellParams(urlState, ext)
-    applySrmtSweepParams(urlState, ext.schroedinger.quantumMode)
+    if (effectiveQuantumMode === 'diracEquation') applyDiracParams(urlState, ext)
+    if (effectiveQuantumMode === 'wheelerDeWitt') applyWdwParams(urlState, ext)
+    if (effectiveQuantumMode === 'antiDeSitter') applyAdsParams(urlState, ext)
+    if (effectiveQuantumMode === 'coherenceHorizon') applyCoherenceHorizonParams(urlState, ext)
+    if (effectiveQuantumMode === 'riemannZeta') applyRiemannZetaParams(urlState, ext)
+    if (effectiveQuantumMode === 'hilbertPolya') applyHilbertPolyaParams(urlState, ext)
+    if (effectiveObjectType === 'bellPair') applyBellParams(urlState, ext)
+    applySrmtSweepParams(urlState, effectiveQuantumMode)
   } catch (error) {
     logger.warn('[useUrlState] Failed to apply URL state:', error)
   } finally {

@@ -38,6 +38,16 @@ describe('image export', () => {
   })
 
   describe('exportSceneToPNG', () => {
+    it('opens screenshot modal with captured image and requested filename', async () => {
+      vi.mocked(captureScreenshotAsync).mockResolvedValue('data:image/png;base64,ok')
+
+      const result = await exportSceneToPNG({ filename: 'ndimensional-shot' })
+
+      expect(result).toBe(true)
+      expect(openModalMock).toHaveBeenCalledWith('data:image/png;base64,ok', 'ndimensional-shot')
+      expect(showMsgBoxMock).not.toHaveBeenCalled()
+    })
+
     it('returns false when async screenshot capture fails', async () => {
       vi.mocked(captureScreenshotAsync).mockRejectedValue(new Error('capture failed'))
 

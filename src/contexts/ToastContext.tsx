@@ -18,17 +18,26 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [])
 
-  const addToast = useCallback((message: string, type: ToastType = 'info') => {
-    const id = Math.random().toString(36).slice(2, 11)
-    setToasts((prev) => [...prev, { id, message, type }])
-
-    const timer = window.setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id))
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id))
+    const timer = timerMapRef.current.get(id)
+    if (timer !== undefined) {
+      clearTimeout(timer)
       timerMapRef.current.delete(id)
-    }, 3000)
-
-    timerMapRef.current.set(id, timer)
+    }
   }, [])
+
+  const addToast = useCallback(
+    (message: string, type: ToastType = 'info') => {
+      const id = Math.random().toString(36).slice(2, 11)
+      setToasts((prev) => [...prev, { id, message, type }])
+
+      const timer = window.setTimeout(() => removeToast(id), 3000)
+
+      timerMapRef.current.set(id, timer)
+    },
+    [removeToast]
+  )
 
   const contextValue = useMemo(() => ({ addToast }), [addToast])
 
@@ -53,7 +62,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               dragElastic={0.1}
               onDragEnd={(_, info) => {
                 if (info.offset.x > 100) {
-                  setToasts((prev) => prev.filter((t) => t.id !== toast.id))
+                  removeToast(toast.id)
                 }
               }}
               data-testid="toast-message"

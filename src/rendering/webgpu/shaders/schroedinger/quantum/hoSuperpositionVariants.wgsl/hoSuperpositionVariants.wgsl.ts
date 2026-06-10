@@ -20,70 +20,116 @@ fn isHermiteCocycleInflationActive(uniforms: SchroedingerUniforms) -> bool {
     uniforms.hermiteCocycleShellRadius > 0.0;
 }
 
-fn hermiteCocycleInflationPhase(
+// Term-independent part of the cocycle phase, hoisted out of the per-term
+// evaluation. The shell windowing (sqrt + exp + two smoothsteps) depends only
+// on the sample position, so an N-term superposition pays it once per sample
+// instead of once per term application. gateScale premultiplies
+// strength * shellGate; 0.0 means "no rotation at this sample" (feature
+// disabled, wrong quantum mode, or outside the shell band) and every per-term
+// helper below short-circuits on it.
+struct HermiteCocycleGate {
+  gateScale: f32,
+  twist: f32,
+  px: f32,
+  py: f32,
+  pz: f32,
+  pw: f32,
+}
+
+fn hermiteCocycleGateEval(
   xND: array<f32, 11>,
-  termIdx: i32,
   uniforms: SchroedingerUniforms
-) -> f32 {
+) -> HermiteCocycleGate {
+  var gate = HermiteCocycleGate(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
   if (!isHermiteCocycleInflationActive(uniforms)) {
-    return 0.0;
+    return gate;
   }
 
   let strength = clamp(uniforms.hermiteCocycleInflationStrength, 0.0, 2.0);
   let shellRadius = clamp(uniforms.hermiteCocycleShellRadius, 0.1, 2.0);
-  let twist = clamp(uniforms.hermiteCocycleInflationTwist, 0.0, 8.0);
-  let invRadius = 1.0 / shellRadius;
   let x = xND[0];
   let y = xND[1];
   let z = select(0.0, xND[2], ACTUAL_DIM >= 3);
   let w = select(0.0, xND[3], ACTUAL_DIM >= 4);
-  let px = x * invRadius;
-  let py = y * invRadius;
-  let pz = z * invRadius;
-  let pw = w * invRadius;
   let r = sqrt(max(x * x + y * y + z * z, 1e-10));
 
-  let q0 = f32(getQuantumNumber(uniforms, termIdx, 0) + 1);
-  let q1 = f32(getQuantumNumber(uniforms, termIdx, 1) + 1);
-  let q2 = f32(getQuantumNumber(uniforms, termIdx, 2) + 1);
-  let q3 = f32(getQuantumNumber(uniforms, termIdx, 3) + 1);
   let width = max(0.18 * shellRadius, 0.075);
   let radial = (r - shellRadius) / width;
   let originFade = smoothstep(0.12 * shellRadius, 0.55 * shellRadius, r);
   let farFade = 1.0 - smoothstep(shellRadius + 2.0 * width, shellRadius + 4.0 * width, r);
   let shellGate = clamp(exp(-(radial * radial)) * originFade * farFade, 0.0, 1.0);
   if (shellGate <= 1e-8) {
-    return 0.0;
+    return gate;
   }
 
+  let invRadius = 1.0 / shellRadius;
+  gate.gateScale = strength * shellGate;
+  gate.twist = clamp(uniforms.hermiteCocycleInflationTwist, 0.0, 8.0);
+  gate.px = x * invRadius;
+  gate.py = y * invRadius;
+  gate.pz = z * invRadius;
+  gate.pw = w * invRadius;
+  return gate;
+}
+
+// Per-term braid phase on the shell. Callers must gate on gateScale > 0.0.
+// The obstruction is explicitly clamped to [-1, 1] and gateScale <= strength,
+// so the result stays within [-strength, strength] without an outer clamp.
+fn hermiteCocycleInflationPhase(
+  gate: HermiteCocycleGate,
+  termIdx: i32,
+  uniforms: SchroedingerUniforms
+) -> f32 {
+  let q0 = f32(getQuantumNumber(uniforms, termIdx, 0) + 1);
+  let q1 = f32(getQuantumNumber(uniforms, termIdx, 1) + 1);
+  let q2 = f32(getQuantumNumber(uniforms, termIdx, 2) + 1);
+  let q3 = f32(getQuantumNumber(uniforms, termIdx, 3) + 1);
   let branch = 0.173 * f32(termIdx + 1);
-  let a = sin(q0 * px + twist * (py - pz) + branch);
-  let b = sin(q1 * py + twist * (pz - px) + 0.37 * branch);
-  let c = sin(q2 * pz + twist * (px - py) + 0.61 * branch);
+  let a = sin(q0 * gate.px + gate.twist * (gate.py - gate.pz) + branch);
+  let b = sin(q1 * gate.py + gate.twist * (gate.pz - gate.px) + 0.37 * branch);
+  let c = sin(q2 * gate.pz + gate.twist * (gate.px - gate.py) + 0.61 * branch);
   let projectedCocycle = a * b * c;
   let cyclicParity = 0.5 * sin(
-    q0 * py * pz + q1 * pz * px + q2 * px * py + twist * (px + 0.5 * py - 0.25 * pz)
+    q0 * gate.py * gate.pz + q1 * gate.pz * gate.px + q2 * gate.px * gate.py
+      + gate.twist * (gate.px + 0.5 * gate.py - 0.25 * gate.pz)
   );
   let bulkCocycle = select(
     0.0,
-    0.6 * sin(q3 * pw + twist * (px + py - pz) + 0.5 * branch),
+    0.6 * sin(q3 * gate.pw + gate.twist * (gate.px + gate.py - gate.pz) + 0.5 * branch),
     ACTUAL_DIM >= 4
   );
   let obstruction = clamp(tanh(1.45 * (projectedCocycle + cyclicParity + bulkCocycle)), -1.0, 1.0);
-  return clamp(strength * shellGate * obstruction, -strength, strength);
+  return gate.gateScale * obstruction;
 }
 
 fn applyHermiteCocycleInflation(
   term: vec2f,
-  xND: array<f32, 11>,
+  gate: HermiteCocycleGate,
   termIdx: i32,
   uniforms: SchroedingerUniforms
 ) -> vec2f {
-  let phase = hermiteCocycleInflationPhase(xND, termIdx, uniforms);
-  if (abs(phase) <= 1e-7) {
+  if (gate.gateScale <= 0.0) {
     return term;
   }
-  return cmul(term, cexp_i(phase));
+  return cmul(term, cexp_i(hermiteCocycleInflationPhase(gate, termIdx, uniforms)));
+}
+
+// Rotate the spatial-reference coefficient (xy) and the time-evolved term (zw)
+// by the SAME per-term branch rotation, computing the phase once. The combined
+// evaluator previously evaluated the full phase twice per term — once for each
+// accumulator — doubling the dominant transcendental cost in the density-grid
+// compute and raymarch hot paths.
+fn applyHermiteCocycleInflationPair(
+  pair: vec4f,
+  gate: HermiteCocycleGate,
+  termIdx: i32,
+  uniforms: SchroedingerUniforms
+) -> vec4f {
+  if (gate.gateScale <= 0.0) {
+    return pair;
+  }
+  let rot = cexp_i(hermiteCocycleInflationPhase(gate, termIdx, uniforms));
+  return vec4f(cmul(pair.xy, rot), cmul(pair.zw, rot));
 }
 `
 
@@ -99,14 +145,14 @@ function generateHOSuperpositionBlock(termCount: number): string {
       return `
   // Term ${k}: term_k = c_k * exp(-i * E_k * t) is host-precomputed once per frame.
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
-  let term${k} = applyHermiteCocycleInflation(uniforms.precomputedTerm[${k}].xy, xND, ${k}, uniforms);
+  let term${k} = applyHermiteCocycleInflation(uniforms.precomputedTerm[${k}].xy, cocycleGate, ${k}, uniforms);
   var psi = cscale(spatial${k}, term${k});`
     }
     return `
   if (${k} < uniforms.termCount) {
   // Term ${k}
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
-  let term${k} = applyHermiteCocycleInflation(uniforms.precomputedTerm[${k}].xy, xND, ${k}, uniforms);
+  let term${k} = applyHermiteCocycleInflation(uniforms.precomputedTerm[${k}].xy, cocycleGate, ${k}, uniforms);
   psi += cscale(spatial${k}, term${k});
   }`
   }).join('\n')
@@ -120,7 +166,8 @@ function generateHOSuperpositionBlock(termCount: number): string {
 // ============================================
 
 fn evalHOSuperposition${termCount}(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
-  let _t_unused = t; // suppress unused-parameter warnings on strict toolchains${terms}
+  let _t_unused = t; // suppress unused-parameter warnings on strict toolchains
+  let cocycleGate = hermiteCocycleGateEval(xND, uniforms);${terms}
 
   return psi;
 }
@@ -138,20 +185,21 @@ function generateHOSpatialBlock(termCount: number): string {
     if (k === 0) {
       return `
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
-  let coeff${k} = applyHermiteCocycleInflation(getCoeff(uniforms, ${k}), xND, ${k}, uniforms);
+  let coeff${k} = applyHermiteCocycleInflation(getCoeff(uniforms, ${k}), cocycleGate, ${k}, uniforms);
   var psi = cscale(spatial${k}, coeff${k});`
     }
     return `
   if (${k} < uniforms.termCount) {
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
-  let coeff${k} = applyHermiteCocycleInflation(getCoeff(uniforms, ${k}), xND, ${k}, uniforms);
+  let coeff${k} = applyHermiteCocycleInflation(getCoeff(uniforms, ${k}), cocycleGate, ${k}, uniforms);
   psi += cscale(spatial${k}, coeff${k});
   }`
   }).join('\n')
 
   return `
 // Spatial-only evaluation for ${termCount} term${termCount > 1 ? 's' : ''}
-fn evalHOSpatial${termCount}(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> vec2f {${terms}
+fn evalHOSpatial${termCount}(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> vec2f {
+  let cocycleGate = hermiteCocycleGateEval(xND, uniforms);${terms}
 
   return psi;
 }
@@ -169,26 +217,27 @@ function generateHOCombinedBlock(termCount: number): string {
     if (k === 0) {
       return `
   // Term ${k}: compute spatial ONCE, use for both spatial-only and time-dependent paths.
-  // term_k = c_k * exp(-i * E_k * t) is host-precomputed; coeff${k} is still needed
-  // for the spatial-only (t = 0) accumulator that drives the spatial reference phase.
+  // term_k = c_k * exp(-i * E_k * t) is host-precomputed; the coefficient is still
+  // needed for the spatial-only (t = 0) accumulator that drives the spatial
+  // reference phase. Both share one cocycle rotation (pair${k}.xy / pair${k}.zw).
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
-  let coeff${k} = applyHermiteCocycleInflation(getCoeff(uniforms, ${k}), xND, ${k}, uniforms);
+  let pair${k} = applyHermiteCocycleInflationPair(
+    vec4f(getCoeff(uniforms, ${k}), uniforms.precomputedTerm[${k}].xy), cocycleGate, ${k}, uniforms);
 
   // Spatial-only accumulation
-  var psiSpatial = cscale(spatial${k}, coeff${k});
+  var psiSpatial = cscale(spatial${k}, pair${k}.xy);
 
   // Time-dependent accumulation (uses host-precomputed term)
-  let term${k} = applyHermiteCocycleInflation(uniforms.precomputedTerm[${k}].xy, xND, ${k}, uniforms);
-  var psiTime = cscale(spatial${k}, term${k});`
+  var psiTime = cscale(spatial${k}, pair${k}.zw);`
     }
     return `
   if (${k} < uniforms.termCount) {
   // Term ${k}
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
-  let coeff${k} = applyHermiteCocycleInflation(getCoeff(uniforms, ${k}), xND, ${k}, uniforms);
-  psiSpatial += cscale(spatial${k}, coeff${k});
-  let term${k} = applyHermiteCocycleInflation(uniforms.precomputedTerm[${k}].xy, xND, ${k}, uniforms);
-  psiTime += cscale(spatial${k}, term${k});
+  let pair${k} = applyHermiteCocycleInflationPair(
+    vec4f(getCoeff(uniforms, ${k}), uniforms.precomputedTerm[${k}].xy), cocycleGate, ${k}, uniforms);
+  psiSpatial += cscale(spatial${k}, pair${k}.xy);
+  psiTime += cscale(spatial${k}, pair${k}.zw);
   }`
   }).join('\n')
 
@@ -197,7 +246,8 @@ function generateHOCombinedBlock(termCount: number): string {
   return `
 // Combined time + spatial for ${termCount} term${termCount > 1 ? 's' : ''}
 fn evalHOCombined${termCount}(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec4f {
-  let _t_unused = t; // suppress unused-parameter warnings on strict toolchains${terms}
+  let _t_unused = t; // suppress unused-parameter warnings on strict toolchains
+  let cocycleGate = hermiteCocycleGateEval(xND, uniforms);${terms}
 
   let spatialPhase = atan2(psiSpatial.y, psiSpatial.x);
   let refNorm2 = dot(psiSpatial, psiSpatial);

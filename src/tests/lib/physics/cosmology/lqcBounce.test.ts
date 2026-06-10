@@ -331,6 +331,20 @@ describe('computeCosmologyAt dispatch — lqcBounce', () => {
     expect(snap.aKinetic).toBeCloseTo(1 / snap.aPotential, 9)
   })
 
+  it('rejects spacetime dimensions outside the app cosmology contract', () => {
+    for (const spacetimeDim of [2, 3.5, 8, Number.NaN]) {
+      expect(() =>
+        computeCosmologyAt(11, {
+          preset: 'lqcBounce',
+          spacetimeDim,
+          lqcRhoCritical: 1.0,
+          lqcEquationOfState: 1.0,
+          lqcInitialRhoRatio: 0.01,
+        })
+      ).toThrow(RangeError)
+    }
+  })
+
   it('throws a RangeError when lqcBounce params are missing', () => {
     expect(() =>
       computeCosmologyAt(11, {

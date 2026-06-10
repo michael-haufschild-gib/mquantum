@@ -53,6 +53,17 @@ describe('sweepDriverHelpers.normalisePointCount', () => {
     expect(normalisePointCount('rankCap', Number.NaN)).toBe(1)
     expect(normalisePointCount('rankCap', Number.POSITIVE_INFINITY)).toBe(1)
   })
+
+  it('keeps coupled grid convergence sweeps at three or more work items', () => {
+    expect(normalisePointCount('gridNphiCoupled', 1)).toBe(3)
+    expect(normalisePointCount('gridNphiCoupled', 0)).toBe(3)
+    expect(normalisePointCount('gridNphiCoupled', Number.NaN)).toBe(3)
+    expect(
+      predictGridNphiCoupledSweepCount(
+        configFor('gridNphiCoupled', { points: 1, sweepMin: 32, sweepMax: 64 })
+      )
+    ).toBe(3)
+  })
 })
 
 describe('sweepDriverHelpers cut mapping', () => {

@@ -37,6 +37,15 @@ export function isComputeQuantumMode(config: SchrodingerRendererConfig): boolean
 
 /** Whether the pipeline uses a 2D fullscreen-triangle path (no vertex/index buffers). */
 export function isPipeline2D(config: SchrodingerRendererConfig): boolean {
+  // Coherence Horizon always renders through its 3D geodesic main block,
+  // even if a stale 'wigner' representation lingers in the config.
+  if (config.quantumMode === 'coherenceHorizon') return false
+  // Arithmetic Horizon (riemannZeta) likewise always renders through its
+  // dedicated 3D volumetric main block — never the 2D / Wigner pipeline.
+  if (config.quantumMode === 'riemannZeta') return false
+  // Hilbert–Pólya likewise always renders through its dedicated 3D
+  // volumetric main block — never the 2D / Wigner pipeline.
+  if (config.quantumMode === 'hilbertPolya') return false
   return (
     !isComputeQuantumMode(config) &&
     ((config.dimension ?? 3) === 2 || config.representation === 'wigner')
@@ -88,6 +97,33 @@ export function applyModeOverrides(config?: SchrodingerRendererConfig): Schrodin
   }
 
   if (isPipeline2D(result)) {
+    result.temporal = false
+    result.eigenfunctionCacheEnabled = false
+    result.analyticalGradientEnabled = false
+    result.fastEigenInterpolationEnabled = false
+  }
+
+  if (result.quantumMode === 'coherenceHorizon') {
+    // The geodesic main block renders full-res single-output and evaluates its
+    // cat state inline — temporal MRT and the eigenfunction cache never apply.
+    result.temporal = false
+    result.eigenfunctionCacheEnabled = false
+    result.analyticalGradientEnabled = false
+    result.fastEigenInterpolationEnabled = false
+  }
+
+  if (result.quantumMode === 'riemannZeta') {
+    // The volumetric main block renders full-res single-output and samples the
+    // radial LUT inline — temporal MRT and the eigenfunction cache never apply.
+    result.temporal = false
+    result.eigenfunctionCacheEnabled = false
+    result.analyticalGradientEnabled = false
+    result.fastEigenInterpolationEnabled = false
+  }
+
+  if (result.quantumMode === 'hilbertPolya') {
+    // The volumetric main block renders full-res single-output and samples the
+    // volume LUT inline — temporal MRT and the eigenfunction cache never apply.
     result.temporal = false
     result.eigenfunctionCacheEnabled = false
     result.analyticalGradientEnabled = false
@@ -152,6 +188,79 @@ function computeDensityGridConfig(
 }
 
 /**
+ * Shared shader config for the horizon-family modes (Coherence Horizon,
+ * Arithmetic Horizon, Hilbert–Pólya). Each composes a dedicated,
+ * self-contained main block: no density grid, no eigencache, no temporal
+ * MRT, and none of the shared-path overlay features. Every excluded flag
+ * keeps the bind group layout in lockstep with the owning strategy's
+ * `setup()`, which declares at most a single binding-2 LUT entry.
+ */
+function buildDedicatedMainBlockConfig(
+  rendererConfig: SchrodingerRendererConfig,
+  densityGridSize: number,
+  flags: Pick<
+    SchroedingerWGSLShaderConfig,
+    'isCoherenceHorizon' | 'isRiemannZeta' | 'isHilbertPolya'
+  >
+): SchroedingerWGSLShaderConfig {
+  return {
+    dimension: rendererConfig.dimension!,
+    isosurface: false,
+    quantumMode: 'harmonicOscillator',
+    termCount: 1,
+    nodal: false,
+    nodalSpecializationEnabled: false,
+    nodalDefinition: 'psiAbs',
+    nodalRenderMode: 'band',
+    nodalFamilyFilter: 'all',
+    colorAlgorithm: rendererConfig.colorAlgorithm,
+    temporalAccumulation: false,
+    phaseMateriality: false,
+    interference: false,
+    uncertaintyBoundary: false,
+    useEigenfunctionCache: false,
+    useAnalyticalGradient: false,
+    useRobustEigenInterpolation: false,
+    useDensityGrid: false,
+    densityGridSize,
+    densityGridHasPhase: undefined,
+    isWigner: false,
+    useWignerCache: false,
+    isFreeScalar: false,
+    isFreeScalarField: false,
+    hasPrecomputedNormals: false,
+    isQuantumWalk: false,
+    isPauli: false,
+    isAds: false,
+    isCoherenceHorizon: false,
+    isRiemannZeta: false,
+    isHilbertPolya: false,
+    freeScalarAnalysis: false,
+    useDensityMatrix: false,
+    crossSectionEnabled: false,
+    probabilityCurrentEnabled: false,
+    radialProbabilityEnabled: false,
+    bornNullWeaveEnabled: false,
+    phaseShimmerEnabled: false,
+    phaseAnimationEnabled: false,
+    fastGridEmission: false,
+    quantumBackreactionLensing: false,
+    bilocalERBridge: false,
+    entropicTimeShear: false,
+    spectralDimensionFlow: false,
+    vacuumBubbleLens: false,
+    negativeAlphaPotentialOverlay: false,
+    wdwOverlay: false,
+    tdseBranchColor: false,
+    adsAmplitude: false,
+    gridPhaseOffset: false,
+    sampleSpaceRotation: false,
+    profilingStrip: undefined,
+    ...flags,
+  }
+}
+
+/**
  * Derive the compile-time shader configuration from the renderer config.
  * This determines which shader blocks are included (nodal, phase materiality, etc.)
  * and controls cache/grid sizing.
@@ -166,6 +275,9 @@ export function buildShaderConfig(
   const runtime = modeKey ? getQuantumTypeRuntime(modeKey) : undefined
   const strategyKind = runtime?.strategy
   const isFreeScalarField = strategyKind === 'freeScalarField'
+  const isCoherenceHorizon = strategyKind === 'coherenceHorizon'
+  const isRiemannZeta = strategyKind === 'riemannZeta'
+  const isHilbertPolya = strategyKind === 'hilbertPolya'
   const computeMode = isComputeQuantumMode(rendererConfig)
   const isWigner = rendererConfig.representation === 'wigner'
   const pipelineIs2D = !computeMode && (dim === 2 || isWigner)
@@ -216,6 +328,30 @@ export function buildShaderConfig(
   const shaderQuantumMode: QuantumModeForShader = computeMode
     ? 'harmonicOscillator'
     : (rendererConfig.quantumMode as QuantumModeForShader)
+
+  if (isCoherenceHorizon) {
+    // Coherence Horizon: dedicated geodesic main block; the strategy declares
+    // no additional layout entries.
+    return buildDedicatedMainBlockConfig(rendererConfig, densityGridSize, {
+      isCoherenceHorizon: true,
+    })
+  }
+
+  if (isRiemannZeta) {
+    // Arithmetic Horizon: dedicated volumetric main block sampling the
+    // group-2 radial LUT (RiemannZetaStrategy adds only the binding-2 entry).
+    return buildDedicatedMainBlockConfig(rendererConfig, densityGridSize, {
+      isRiemannZeta: true,
+    })
+  }
+
+  if (isHilbertPolya) {
+    // Hilbert–Pólya: dedicated volumetric main block sampling the group-2
+    // volume LUT (HilbertPolyaStrategy adds only the binding-2 entry).
+    return buildDedicatedMainBlockConfig(rendererConfig, densityGridSize, {
+      isHilbertPolya: true,
+    })
+  }
 
   return {
     dimension: rendererConfig.dimension!,
@@ -304,7 +440,12 @@ export function buildPipelineOutputs(
 ): { resourceId: string; access: 'write'; binding: number }[] {
   const cfg = config ?? {}
   const computeMode = isComputeQuantumMode(cfg)
-  const isTemporal = (cfg.temporal ?? false) && !computeMode
+  const isTemporal =
+    (cfg.temporal ?? false) &&
+    !computeMode &&
+    cfg.quantumMode !== 'coherenceHorizon' &&
+    cfg.quantumMode !== 'riemannZeta' &&
+    cfg.quantumMode !== 'hilbertPolya'
   const pipelineIs2D = isPipeline2D(cfg)
 
   if (pipelineIs2D) {
@@ -385,5 +526,8 @@ export function computePipelineCacheKey(
     config.isPauli ? 1 : 0,
     config.isBellPair ? 1 : 0,
     config.sampleSpaceRotation ? 1 : 0,
+    config.isCoherenceHorizon ? 1 : 0,
+    config.isRiemannZeta ? 1 : 0,
+    config.isHilbertPolya ? 1 : 0,
   ].join(':')
 }

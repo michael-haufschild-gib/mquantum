@@ -154,11 +154,27 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
           // Select with a value the dropdown can't render. Pin to the Bell
           // registry default instead.
           setColorAlgorithm('pauliSpinDensity')
+        } else if (
+          quantumMode === 'coherenceHorizon' ||
+          quantumMode === 'riemannZeta' ||
+          quantumMode === 'hilbertPolya'
+        ) {
+          // CH / Arithmetic Horizon / Hilbert–Pólya allowlists exclude both
+          // compute and analytic defaults; pin to the registry default so the
+          // fallback cannot loop.
+          setColorAlgorithm('mixed')
         } else {
           setColorAlgorithm(isComputeMode ? 'blackbody' : 'radialDistance')
         }
       }
-    }, [availableOptions, colorAlgorithm, setColorAlgorithm, isComputeMode, objectType])
+    }, [
+      availableOptions,
+      colorAlgorithm,
+      setColorAlgorithm,
+      isComputeMode,
+      objectType,
+      quantumMode,
+    ])
 
     const handleChange = useCallback(
       (v: string) => {

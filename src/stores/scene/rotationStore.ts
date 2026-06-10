@@ -5,7 +5,7 @@
 
 import { create } from 'zustand'
 
-import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
+import { DEFAULT_DIMENSION, MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
 import { logger } from '@/lib/logger'
 import { getRotationPlanes } from '@/lib/math/rotation'
 
@@ -14,14 +14,13 @@ import { getRotationPlanes } from '@/lib/math/rotation'
  * Avoids recreating Set on every setRotation/updateRotations call.
  */
 const validPlanesCache = new Map<number, Set<string>>()
-const DEFAULT_ROTATION_DIMENSION = 4
 
 function isValidRotationDimension(dimension: number): boolean {
   return Number.isInteger(dimension) && dimension >= MIN_DIMENSION && dimension <= MAX_DIMENSION
 }
 
 function sanitizeRotationDimension(dimension: number): number {
-  return isValidRotationDimension(dimension) ? dimension : DEFAULT_ROTATION_DIMENSION
+  return isValidRotationDimension(dimension) ? dimension : DEFAULT_DIMENSION
 }
 
 /**
@@ -160,7 +159,7 @@ function applyRotationUpdates(
 
 export const useRotationStore = create<RotationState>((set) => ({
   rotations: new Map(),
-  dimension: 4,
+  dimension: DEFAULT_DIMENSION,
   version: 0,
 
   setRotation: (plane: string, angle: number) => {

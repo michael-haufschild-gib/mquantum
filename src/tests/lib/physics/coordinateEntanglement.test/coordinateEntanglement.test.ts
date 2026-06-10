@@ -343,6 +343,28 @@ describe('computeCoordinateEntanglement', () => {
     expect(result.spectrum).toEqual([])
   })
 
+  it('mismatched readback shape is reported as not computed, not numeric NaN entropy', () => {
+    const result = computeCoordinateEntanglement(
+      new Float32Array([1, 0, 0]),
+      new Float32Array(3),
+      [2, 2],
+      {
+        computePairwiseMI: true,
+        computeBipartitions: true,
+        computeWignerNegativity: true,
+      }
+    )
+
+    expect(result.entropies).toEqual([null, null])
+    expect(result.maxEntropies).toEqual([null, null])
+    expect(result.wignerNegativities).toEqual([null, null])
+    expect(result.bipartitionEntropies).toEqual([null])
+    expect(result.mutualInfo).toBeNull()
+    expect(Number.isNaN(result.averageEntropy)).toBe(true)
+    expect(Number.isNaN(result.normalizedEntropy)).toBe(true)
+    expect(Number.isNaN(result.averageWignerNegativity)).toBe(true)
+  })
+
   it('returns a non-finite aggregate when every dimension exceeds the RDM cap', () => {
     const M = MAX_RDM_SIZE + 1
     const re = new Float32Array(M * M)

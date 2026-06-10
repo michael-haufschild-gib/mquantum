@@ -6,6 +6,7 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useUrlState } from '@/hooks/useUrlState'
+import { RIEMANN_ZETA_PRESETS } from '@/lib/geometry/extended/riemannZeta'
 import { applySceneExample, findSceneByName } from '@/lib/sceneExamples'
 import type { ShareableState } from '@/lib/url/state-serializer'
 import { parseCurrentUrl } from '@/lib/url/state-serializer'
@@ -327,6 +328,95 @@ describe('useUrlState', () => {
       expect(dirac.diagnosticsEnabled).toBe(false)
       expect(dirac.diagnosticsInterval).toBe(11)
       expect(dirac.slicePositions).toEqual([0.25])
+    })
+  })
+
+  it('ignores URL namespaces for inactive modes', async () => {
+    const initial = useExtendedObjectStore.getState()
+    const initialWdw = initial.schroedinger.wheelerDeWitt
+    const initialDirac = initial.schroedinger.dirac
+    const initialAds = initial.schroedinger.antiDeSitter
+    const initialCoherence = initial.schroedinger.coherenceHorizon
+    const initialRiemann = initial.schroedinger.riemannZeta
+    const initialBell = initial.bellPair
+
+    mockedParseCurrentUrl.mockReturnValue({
+      objectType: 'schroedinger',
+      dimension: 3,
+      quantumMode: 'tdseDynamics',
+      wdwInflatonMass: 1.5,
+      wdwWorldlineEnabled: true,
+      diracMass: 4,
+      diracInitialCondition: 'zitterbewegung',
+      adsDimension: 6,
+      adsBtzEnabled: true,
+      coherenceHorizonDecoherence: 0.9,
+      riemannZetaBeta: 2.5,
+      bellVisibility: 0.25,
+      bellTargetTrials: 500,
+    })
+
+    renderHook(() => useUrlState())
+
+    await waitFor(() => {
+      expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('tdseDynamics')
+    })
+
+    const current = useExtendedObjectStore.getState()
+    expect(current.schroedinger.wheelerDeWitt.inflatonMass).toBe(initialWdw.inflatonMass)
+    expect(current.schroedinger.wheelerDeWitt.worldlineEnabled).toBe(initialWdw.worldlineEnabled)
+    expect(current.schroedinger.dirac.mass).toBe(initialDirac.mass)
+    expect(current.schroedinger.dirac.initialCondition).toBe(initialDirac.initialCondition)
+    expect(current.schroedinger.antiDeSitter.d).toBe(initialAds.d)
+    expect(current.schroedinger.antiDeSitter.btzEnabled).toBe(initialAds.btzEnabled)
+    expect(current.schroedinger.coherenceHorizon.decoherence).toBe(initialCoherence.decoherence)
+    expect(current.schroedinger.riemannZeta.beta).toBe(initialRiemann.beta)
+    expect(current.bellPair.visibility).toBe(initialBell.visibility)
+    expect(current.bellPair.targetTrials).toBe(initialBell.targetTrials)
+  })
+
+  it('applies a riemannZeta preset from rz_preset when qm=riemannZeta', async () => {
+    mockedParseCurrentUrl.mockReturnValue({
+      objectType: 'schroedinger',
+      dimension: 3,
+      quantumMode: 'riemannZeta',
+      riemannZetaPreset: 'arithmeticChaos',
+    })
+
+    renderHook(() => useUrlState())
+
+    await waitFor(() => {
+      const rz = useExtendedObjectStore.getState().schroedinger.riemannZeta
+      expect(rz.preset).toBe('arithmeticChaos')
+      expect(rz.numZeros).toBe(RIEMANN_ZETA_PRESETS.arithmeticChaos.numZeros)
+      expect(rz.horizonRadius).toBe(RIEMANN_ZETA_PRESETS.arithmeticChaos.horizonRadius)
+      expect(rz.angularL).toBe(RIEMANN_ZETA_PRESETS.arithmeticChaos.angularL)
+      expect(rz.angularM).toBe(RIEMANN_ZETA_PRESETS.arithmeticChaos.angularM)
+    })
+  })
+
+  it('applies individual rz fields after the preset so explicit fields override it', async () => {
+    mockedParseCurrentUrl.mockReturnValue({
+      objectType: 'schroedinger',
+      dimension: 3,
+      quantumMode: 'riemannZeta',
+      riemannZetaPreset: 'berryKeatingHorizon',
+      riemannZetaSource: 'primes',
+      riemannZetaBeta: 2,
+    })
+
+    renderHook(() => useUrlState())
+
+    await waitFor(() => {
+      const rz = useExtendedObjectStore.getState().schroedinger.riemannZeta
+      // Explicit fields override the preset values…
+      expect(rz.source).toBe('primes')
+      expect(rz.beta).toBe(2)
+      // …flipping the tag to custom, while untouched preset fields survive.
+      expect(rz.preset).toBe('custom')
+      expect(rz.numZeros).toBe(RIEMANN_ZETA_PRESETS.berryKeatingHorizon.numZeros)
+      expect(rz.horizonRadius).toBe(RIEMANN_ZETA_PRESETS.berryKeatingHorizon.horizonRadius)
+      expect(rz.flowRate).toBe(RIEMANN_ZETA_PRESETS.berryKeatingHorizon.flowRate)
     })
   })
 

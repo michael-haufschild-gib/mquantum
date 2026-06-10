@@ -117,14 +117,18 @@ describe('runGridNphiCoupledSweep', () => {
       // that coupling is linear in (Nφ − 1) and not saturated.
       // ceil(1 + 2.8284·31) = ceil(88.68) = 89
       expect(coupledGridNaFor(32, wdw)).toBe(89)
+      // ceil(1 + 2.8284·39) = ceil(111.31) = 112
+      expect(coupledGridNaFor(40, wdw)).toBe(112)
       // ceil(1 + 2.8284·47) = ceil(133.93) = 134
       expect(coupledGridNaFor(48, wdw)).toBe(134)
-      // 2 points across [32, 48] → {32, 48}, both unique integers.
+      // Caller-provided 2 points is normalized to the documented coupled
+      // minimum of 3, so [32, 48] materializes as {32, 40, 48}.
       const result = runGridNphiCoupledSweep({
         wdwConfig: wdw,
         config: baseCoupledConfig({ sweepMin: 32, sweepMax: 48, points: 2 }),
       })
-      expect(result.map((p) => p.sweepValue)).toEqual([32, 48])
+      expect(result.map((p) => p.sweepValue)).toEqual([32, 40, 48])
+      expect(result.map((p) => p.coupledGridNa)).toEqual([89, 112, 134])
       for (const p of result) {
         expect(Number.isFinite(p.quality.a!)).toBe(true)
       }

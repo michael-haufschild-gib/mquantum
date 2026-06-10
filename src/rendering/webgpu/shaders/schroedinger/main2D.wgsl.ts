@@ -41,10 +41,12 @@ function generate2DCommonBody(): string {
   // Get animation time
   let animTime = schroedinger.time * schroedinger.timeScale;
 
-  // Evaluate wavefunction with spatial phase
+  // Evaluate wavefunction with spatial + relative phase channels.
   let psiResult = evalPsiWithSpatialPhase(xND, animTime, schroedinger);
   let psi = psiResult.xy;
   let spatialPhase = psiResult.z;
+  let relativePhase = psiResult.w;
+  let phaseForColor = select(spatialPhase, relativePhase, COLOR_ALGORITHM == 10);
 
   // Cache |psi|^2 before rho is mutated — shimmer branch reuses it (saves a dot).
   let psiMag2 = rhoFromPsi(psi);
@@ -90,11 +92,11 @@ function generate2DCommonBody(): string {
   let s = sFromRho(rho);
 
   // Compute base color using existing color system
-  var baseColor = computeBaseColor(rho, s, spatialPhase, pos, schroedinger);
+  var baseColor = computeBaseColor(rho, s, phaseForColor, pos, schroedinger);
 
   // Phase materiality (shared helper)
   if (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) {
-    baseColor = applyPhaseMateriality(baseColor, spatialPhase, s, schroedinger);
+    baseColor = applyPhaseMateriality(baseColor, phaseForColor, s, schroedinger);
   }
 
   // Apply emission intensity (ambient-only for 2D — no volumetric lighting)

@@ -7,7 +7,7 @@
 
 import { create } from 'zustand'
 
-import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
+import { DEFAULT_DIMENSION, MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
 import {
   getDimensionConstraints,
   getQuantumTypeEntry,
@@ -75,8 +75,7 @@ function scheduleTransitionComplete(): void {
   })
 }
 
-/** Default dimension (3D) */
-export const DEFAULT_DIMENSION = 3
+export { DEFAULT_DIMENSION }
 
 /** Default object type */
 export const DEFAULT_OBJECT_TYPE: ObjectType = 'schroedinger'

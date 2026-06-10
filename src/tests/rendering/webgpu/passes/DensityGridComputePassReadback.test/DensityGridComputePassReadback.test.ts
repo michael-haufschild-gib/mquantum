@@ -16,11 +16,16 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import type { DensityDistributionAnalyzer } from '@/rendering/webgpu/passes/DensityDistributionAnalysis'
-import { sanitizeDensityGridSize } from '@/rendering/webgpu/passes/DensityGridComputePass'
+import {
+  DensityGridComputePass,
+  sanitizeDensityGridSize,
+} from '@/rendering/webgpu/passes/DensityGridComputePass'
 import type { DensityReadbackState } from '@/rendering/webgpu/passes/DensityGridComputePassResources'
 import {
+  GRID_PARAMS_SIZE,
   selectGridTextureFormat,
   startPendingReadback,
+  writeGridParams,
 } from '@/rendering/webgpu/passes/DensityGridComputePassResources'
 
 function createMockState(): DensityReadbackState {
@@ -120,6 +125,43 @@ describe('density grid resource config sanitization', () => {
     expect(sanitizeDensityGridSize(Number.NaN, 512)).toBe(64)
     expect(sanitizeDensityGridSize(Number.NaN, 32)).toBe(32)
     expect(sanitizeDensityGridSize(undefined, 0.5)).toBe(1)
+  })
+
+  it('sanitizes invalid world bounds before writing density-grid params', () => {
+    const writeBuffer = vi.fn()
+    const device = { queue: { writeBuffer } } as unknown as GPUDevice
+    const buffer = {} as GPUBuffer
+    const data = new ArrayBuffer(GRID_PARAMS_SIZE)
+    const u32View = new Uint32Array(data)
+    const f32View = new Float32Array(data)
+
+    writeGridParams(device, buffer, 64, Number.NaN, data, u32View, f32View)
+
+    expect(f32View[4]).toBe(-2)
+    expect(f32View[5]).toBe(-2)
+    expect(f32View[6]).toBe(-2)
+    expect(f32View[8]).toBe(2)
+    expect(f32View[9]).toBe(2)
+    expect(f32View[10]).toBe(2)
+
+    writeGridParams(device, buffer, 64, -3, data, u32View, f32View)
+
+    expect(f32View[4]).toBe(-2)
+    expect(f32View[8]).toBe(2)
+  })
+
+  it('keeps public world bounds finite when update receives invalid radii', () => {
+    const pass = new DensityGridComputePass({ dimension: 3 })
+    const device = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    pass.updateWorldBound(device, 4)
+    expect(pass.getWorldBounds()).toEqual({ min: -4, max: 4 })
+
+    pass.updateWorldBound(device, Number.NaN)
+    expect(pass.getWorldBounds()).toEqual({ min: -2, max: 2 })
+
+    pass.updateWorldBound(device, -3)
+    expect(pass.getWorldBounds()).toEqual({ min: -2, max: 2 })
   })
 
   it('treats non-boolean density-grid resource flags as disabled', async () => {

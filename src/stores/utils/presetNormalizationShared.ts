@@ -7,7 +7,12 @@
  * @module stores/utils/presetNormalizationShared
  */
 
-import { COLOR_ALGORITHM_OPTIONS, type ColorAlgorithm } from '@/lib/colors/palette'
+import {
+  COLOR_ALGORITHM_OPTIONS,
+  type ColorAlgorithm,
+  COSINE_COEFFICIENT_RANGES,
+  type CosineCoefficients,
+} from '@/lib/colors/palette'
 import { clampFiniteUnknown } from '@/lib/math/clamp'
 
 import {
@@ -155,14 +160,16 @@ export function clampFiniteOrFallback(
 /** Validate a cosine palette vector, returning fallback if invalid. */
 export function normalizeCosineVector(
   value: unknown,
-  fallback: [number, number, number]
+  fallback: [number, number, number],
+  key: keyof CosineCoefficients
 ): [number, number, number] {
   if (!Array.isArray(value) || value.length !== 3) {
-    return fallback
+    return [fallback[0], fallback[1], fallback[2]]
   }
+  const range = COSINE_COEFFICIENT_RANGES[key]
   return [
-    clampFiniteOrFallback(value[0], 0, 2, fallback[0]),
-    clampFiniteOrFallback(value[1], 0, 2, fallback[1]),
-    clampFiniteOrFallback(value[2], 0, 2, fallback[2]),
+    clampFiniteOrFallback(value[0], range.min, range.max, fallback[0]),
+    clampFiniteOrFallback(value[1], range.min, range.max, fallback[1]),
+    clampFiniteOrFallback(value[2], range.min, range.max, fallback[2]),
   ]
 }

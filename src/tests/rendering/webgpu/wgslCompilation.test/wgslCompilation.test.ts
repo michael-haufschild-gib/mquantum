@@ -1009,6 +1009,27 @@ describe('WGSL Color Algorithm Specialization', () => {
     expect(wgsl).toContain('select(gridColor.b, gridColor.a, useRelPhase)')
   })
 
+  it('uses relative phase, not spatial phase, for native 2D colorAlgorithm=10', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 2,
+      temporal: false,
+      quantumMode: 'harmonicOscillator',
+      colorAlgorithm: 10,
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(wgsl).toContain('let relativePhase = psiResult.w;')
+    expect(wgsl).toContain(
+      'let phaseForColor = select(spatialPhase, relativePhase, COLOR_ALGORITHM == 10);'
+    )
+    expect(wgsl).toContain(
+      'var baseColor = computeBaseColor(rho, s, phaseForColor, pos, schroedinger);'
+    )
+    expect(wgsl).not.toContain(
+      'var baseColor = computeBaseColor(rho, s, spatialPhase, pos, schroedinger);'
+    )
+  })
+
   it('does not emit derivative ops in domainColoringPsi emission path', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 4,

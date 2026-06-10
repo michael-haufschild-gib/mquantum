@@ -88,7 +88,7 @@ export const WignerControls: React.FC<WignerControlsProps> = React.memo(
             <Slider
               label="X Range"
               tooltip="Half-width of the position axis in the Wigner plot. Increase to see wider spatial extent."
-              min={0.5}
+              min={1.0}
               max={30.0}
               step={0.5}
               value={config.wignerXRange}
@@ -99,7 +99,7 @@ export const WignerControls: React.FC<WignerControlsProps> = React.memo(
             <Slider
               label="P Range"
               tooltip="Half-width of the momentum axis in the Wigner plot. Increase to see higher momentum components."
-              min={0.5}
+              min={1.0}
               max={30.0}
               step={0.5}
               value={config.wignerPRange}
@@ -137,17 +137,15 @@ export const WignerControls: React.FC<WignerControlsProps> = React.memo(
         )}
 
         {/* Cache resolution */}
-        <Select
+        <Slider
           label="Cache Resolution"
           tooltip="Resolution of the cached Wigner function texture. Higher values show finer phase-space detail but use more GPU memory."
-          options={[
-            { value: '128', label: '128' },
-            { value: '256', label: '256' },
-            { value: '512', label: '512' },
-            { value: '1024', label: '1024' },
-          ]}
-          value={String(config.wignerCacheResolution)}
-          onChange={(v) => actions.setCacheResolution(Number(v))}
+          min={128}
+          max={1024}
+          step={1}
+          value={config.wignerCacheResolution}
+          onChange={actions.setCacheResolution}
+          showValue
           data-testid="wigner-cache-resolution"
         />
       </div>

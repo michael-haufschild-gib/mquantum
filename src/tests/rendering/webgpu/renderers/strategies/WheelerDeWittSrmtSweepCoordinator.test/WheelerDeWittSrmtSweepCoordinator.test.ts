@@ -550,6 +550,10 @@ describe('materialiseSweepConfig — lambda defaults', () => {
       materialiseSweepConfig({ kind: 'gridNphiCoupled', points: 64 }, DEFAULT_WHEELER_DEWITT_CONFIG)
         .points
     ).toBe(7)
+    expect(
+      materialiseSweepConfig({ kind: 'gridNphiCoupled', points: 1 }, DEFAULT_WHEELER_DEWITT_CONFIG)
+        .points
+    ).toBe(3)
   })
 
   it('uses the same bare-URL grid defaults as the sweep panel', () => {

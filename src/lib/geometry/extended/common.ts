@@ -110,3 +110,6 @@ export type SchroedingerQuantumMode =
   | 'quantumWalk'
   | 'wheelerDeWitt'
   | 'antiDeSitter'
+  | 'coherenceHorizon'
+  | 'riemannZeta'
+  | 'hilbertPolya'

@@ -113,6 +113,29 @@ export interface SchroedingerSnapshot {
     needsReset?: boolean
     [key: string]: unknown
   }
+  coherenceHorizon?: {
+    decoherence?: number
+    separation?: number
+    width?: number
+    waveNumber?: number
+    horizonScale?: number
+    ringGain?: number
+    glow?: number
+    preset?: string
+    [key: string]: unknown
+  }
+  riemannZeta?: {
+    source?: string
+    numZeros?: number
+    beta?: number
+    horizonRadius?: number
+    angularL?: number
+    angularM?: number
+    flowRate?: number
+    glow?: number
+    preset?: string
+    [key: string]: unknown
+  }
   absorberEnabled?: boolean
   absorberWidth?: number
   pmlTargetReflection?: number

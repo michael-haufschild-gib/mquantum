@@ -50,7 +50,25 @@ describe('packHydrogenBasisForGPU', () => {
     const u32View = new Uint32Array(buffer, 688, 4)
 
     expect(u32View[0]).toBe(1)
-    expect(Array.from(i32View.slice(0, 5))).toEqual([0, 0, 0, 0, 2])
+    expect(Array.from(i32View.slice(0, 5))).toEqual([1, 0, 0, 0, 2])
     expect(f32View[0]).toBe(0)
+  })
+
+  it('clamps finite public quantum numbers to shader-supported ranges', () => {
+    const buffer = packHydrogenBasisForGPU(
+      [
+        basisState(0, {
+          n: -3,
+          l: 999,
+          m: -999,
+          extraDimN: [-5, 99],
+          energy: 1,
+        }),
+      ],
+      5
+    )
+    const i32View = new Int32Array(buffer, 0, 156)
+
+    expect(Array.from(i32View.slice(0, 5))).toEqual([1, 0, 0, 0, 6])
   })
 })

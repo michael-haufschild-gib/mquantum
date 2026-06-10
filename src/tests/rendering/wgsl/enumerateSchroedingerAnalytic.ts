@@ -43,6 +43,9 @@ export type ShaderSurface =
   | 'profiling-strip'
   | 'skybox'
   | 'ads'
+  | 'coherence-horizon'
+  | 'riemann-zeta'
+  | 'hilbert-polya'
   | 'wigner'
   | 'passes'
 

@@ -30,7 +30,8 @@ function generateHoNDBlock(dimension: number): string {
   let alpha_${i} = sqrt(omega_${i});
   let alphaNorm_${i} = sqrt(alpha_${i} * SQRT_INV_PI);
   let u_${i} = alpha_${i} * xND[${i}];
-  let gauss_${i} = exp(-0.5 * min(u_${i} * u_${i}, 40.0));`
+  let u2_${i} = u_${i} * u_${i};
+  let gauss_${i} = select(exp(-0.5 * u2_${i}), 0.0, u2_${i} > 80.0);`
   ).join('\n')
 
   // Generate ho1DFastPreGauss product chain using precomputed u/gauss/alphaNorm

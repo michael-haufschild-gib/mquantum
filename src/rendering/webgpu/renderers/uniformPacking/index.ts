@@ -12,12 +12,9 @@
 
 import { DEFAULT_COSINE_COEFFICIENTS } from '@/lib/colors/palette'
 import type { AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
+import { sanitizeHydrogenQuantumState } from '@/lib/geometry/extended/schroedinger/hydrogenStateSanitize'
 import { sanitizeTdseBranchColor, type TdseBranchColor } from '@/lib/geometry/extended/tdse'
-import {
-  DEFAULT_SCHROEDINGER_CONFIG,
-  sanitizeHydrogenQuantumState,
-  type SchroedingerConfig,
-} from '@/lib/geometry/extended/types'
+import { DEFAULT_SCHROEDINGER_CONFIG, type SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { normalizeHydrogenCoupledAngularChain } from '@/lib/physics/hydrogenCoupled/presets'
 import { normalizeHydrogenExtraDimOmega } from '@/lib/physics/openQuantum/hydrogenBasis'
 
@@ -38,9 +35,12 @@ import {
   packBilocalERBridge,
   packBornNullWeave,
   packCausalDiamondModularOrbital,
+  packCoherenceHorizon,
   packEntropicTimeShear,
   packHermiteCocycle,
+  packHilbertPolya,
   packQuantumBackreaction,
+  packRiemannZeta,
   packSpectralDimensionFlow,
   packVacuumBubbleLens,
 } from '../uniformPackingBackreaction'
@@ -411,6 +411,20 @@ function packVisualFields(
   )
   packHermiteCocycle(floatView, intView, schroedinger, p.quantumModeStr === 'harmonicOscillator')
   packCausalDiamondModularOrbital(floatView, schroedinger, p.quantumModeStr === 'hydrogenND')
+  packCoherenceHorizon(
+    floatView,
+    schroedinger,
+    p.quantumModeStr === 'coherenceHorizon',
+    p.dimension
+  )
+  packRiemannZeta(
+    floatView,
+    schroedinger,
+    p.dimension,
+    p.boundingRadius,
+    p.quantumModeStr === 'riemannZeta'
+  )
+  packHilbertPolya(floatView, schroedinger, p.quantumModeStr === 'hilbertPolya')
 }
 
 /** Pack nodal fields, color algorithm, and cosine palette. */
@@ -547,23 +561,43 @@ function packCrossSectionSlice(
   const outNz = degenerate ? 1.0 : nz * invNLen
 
   intView[I.crossSectionEnabled] =
-    !isUniformComputeMode && schroedinger?.crossSectionEnabled ? 1 : 0
+    !isUniformComputeMode && schroedinger?.crossSectionEnabled === true ? 1 : 0
   intView[I.crossSectionCompositeMode] =
     CROSS_SECTION_COMPOSITE_MODE_MAP[schroedinger?.crossSectionCompositeMode ?? 'overlay'] ?? 0
   intView[I.crossSectionScalar] =
     CROSS_SECTION_SCALAR_MAP[schroedinger?.crossSectionScalar ?? 'density'] ?? 0
-  intView[I.crossSectionAutoWindow] = schroedinger?.crossSectionAutoWindow ? 1 : 0
+  intView[I.crossSectionAutoWindow] = schroedinger?.crossSectionAutoWindow === true ? 1 : 0
 
   floatView[I.crossSectionPlane] = outNx
   floatView[I.crossSectionPlane + 1] = outNy
   floatView[I.crossSectionPlane + 2] = outNz
   // .w is the plane offset scalar — never normalized.
-  floatView[I.crossSectionPlane + 3] = schroedinger?.crossSectionPlaneOffset ?? 0.0
+  floatView[I.crossSectionPlane + 3] = finiteClamped(
+    schroedinger?.crossSectionPlaneOffset,
+    0.0,
+    -1.0,
+    1.0
+  )
 
-  floatView[I.crossSectionWindow] = schroedinger?.crossSectionWindowMin ?? 0.0
-  floatView[I.crossSectionWindow + 1] = schroedinger?.crossSectionWindowMax ?? 1.0
-  floatView[I.crossSectionWindow + 2] = schroedinger?.crossSectionOpacity ?? 0.75
-  floatView[I.crossSectionWindow + 3] = schroedinger?.crossSectionThickness ?? 0.02
+  floatView[I.crossSectionWindow] = finiteClamped(schroedinger?.crossSectionWindowMin, 0.0, -10, 10)
+  floatView[I.crossSectionWindow + 1] = finiteClamped(
+    schroedinger?.crossSectionWindowMax,
+    1.0,
+    -10,
+    10
+  )
+  floatView[I.crossSectionWindow + 2] = finiteClamped(
+    schroedinger?.crossSectionOpacity,
+    0.75,
+    0.0,
+    1.0
+  )
+  floatView[I.crossSectionWindow + 3] = finiteClamped(
+    schroedinger?.crossSectionThickness,
+    0.02,
+    0.0,
+    0.2
+  )
 
   packColorRgba(
     floatView,

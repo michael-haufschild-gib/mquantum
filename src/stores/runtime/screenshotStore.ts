@@ -14,9 +14,10 @@ import { useScreenshotCaptureStore } from './screenshotCaptureStore'
 interface ScreenshotStore {
   isOpen: boolean
   imageSrc: string | null
+  filename: string | null
 
   // Actions
-  openModal: (imageSrc: string) => void
+  openModal: (imageSrc: string, filename?: string) => void
   closeModal: () => void
   reset: () => void
 }
@@ -24,14 +25,15 @@ interface ScreenshotStore {
 export const useScreenshotStore = create<ScreenshotStore>((set) => ({
   isOpen: false,
   imageSrc: null,
+  filename: null,
 
-  openModal: (imageSrc) => set({ isOpen: true, imageSrc }),
+  openModal: (imageSrc, filename) => set({ isOpen: true, imageSrc, filename: filename ?? null }),
   closeModal: () => {
-    set({ isOpen: false, imageSrc: null })
+    set({ isOpen: false, imageSrc: null, filename: null })
     useScreenshotCaptureStore.getState().reset()
   },
   reset: () => {
-    set({ isOpen: false, imageSrc: null })
+    set({ isOpen: false, imageSrc: null, filename: null })
     // Clean up the screenshot capture store to free memory from data URL
     useScreenshotCaptureStore.getState().reset()
   },

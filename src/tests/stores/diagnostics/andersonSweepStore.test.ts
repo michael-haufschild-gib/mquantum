@@ -29,6 +29,27 @@ describe('andersonSweepStore', () => {
       expect(state.currentStep).toBe(0)
       expect(state.results).toEqual([])
     })
+
+    it('rejects invalid sweep timing config before entering running state', () => {
+      expect(() =>
+        useAndersonSweepStore.getState().startSweep({ ...testConfig, steps: 0 })
+      ).toThrow(/steps/)
+      expect(() =>
+        useAndersonSweepStore.getState().startSweep({ ...testConfig, steps: 1.5 })
+      ).toThrow(/steps/)
+      expect(() =>
+        useAndersonSweepStore.getState().startSweep({ ...testConfig, timePerStep: 0 })
+      ).toThrow(/timePerStep/)
+      expect(() =>
+        useAndersonSweepStore
+          .getState()
+          .startSweep({ ...testConfig, timePerStep: Number.POSITIVE_INFINITY })
+      ).toThrow(/timePerStep/)
+
+      const state = useAndersonSweepStore.getState()
+      expect(state.status).toBe('idle')
+      expect(state.results).toEqual([])
+    })
   })
 
   describe('tick progression', () => {

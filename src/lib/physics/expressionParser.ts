@@ -128,7 +128,11 @@ function tokenize(input: string): Token[] {
     // Number
     const numMatch = NUMBER_RE.exec(input.slice(i))
     if (numMatch) {
-      tokens.push({ type: 'number', value: parseFloat(numMatch[0]), pos: i })
+      const value = parseFloat(numMatch[0])
+      if (!Number.isFinite(value)) {
+        throw new ParseError('Numeric literal must be finite', i)
+      }
+      tokens.push({ type: 'number', value, pos: i })
       i += numMatch[0].length
       continue
     }

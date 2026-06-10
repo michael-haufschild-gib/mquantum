@@ -186,6 +186,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
   // K-space and diagnostics readback (delegated to FsfKSpaceManager)
   private readonly kSpace = new FsfKSpaceManager()
+  private lastDiagnosticsEnabled: boolean | null = null
 
   private readonly densityGridSize: number
 
@@ -664,6 +665,15 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     this.flushKSpaceData(device)
 
     this.maybeRebuild(device, config)
+
+    const diagnosticsEnabled = config.diagnosticsEnabled === true
+    if (
+      this.lastDiagnosticsEnabled !== null &&
+      diagnosticsEnabled !== this.lastDiagnosticsEnabled
+    ) {
+      this.kSpace.invalidateDiagnosticsReadbacks()
+    }
+    this.lastDiagnosticsEnabled = diagnosticsEnabled
 
     // Recompute maxPhiEstimate when autoScale transitions off→on
     const autoScaleTransition = config.autoScale && !this.lastAutoScale

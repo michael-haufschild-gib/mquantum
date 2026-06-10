@@ -1002,6 +1002,7 @@ describe('runGridNphiCoupledSweep', () => {
       // above the baseline floor. Δa=1, phiExt=0.5, aMin=0.5 ⇒
       // coefficient 1/(√2·0.5·0.5) = 2.8284…
       //   Nφ=32 → ceil(1 + 2.8284·31) = 89
+      //   Nφ=40 → ceil(1 + 2.8284·39) = 112
       //   Nφ=48 → ceil(1 + 2.8284·47) = 134
       const wdwConfig = {
         ...DEFAULT_WHEELER_DEWITT_CONFIG,
@@ -1016,8 +1017,10 @@ describe('runGridNphiCoupledSweep', () => {
       // (Δa, aMin, phiExtent). Load-bearing assertion: ratio of `Na − 1`
       // tracks `(Nφ − 1)/(Nφ₀ − 1)` up to integer-ceil rounding.
       const gridNaLo = coupledGridNaFor(32, wdwConfig)
+      const gridNaMid = coupledGridNaFor(40, wdwConfig)
       const gridNaHi = coupledGridNaFor(48, wdwConfig)
       expect(gridNaLo).toBe(89)
+      expect(gridNaMid).toBe(112)
       expect(gridNaHi).toBe(134)
       expect((gridNaHi - 1) / (gridNaLo - 1)).toBeCloseTo((48 - 1) / (32 - 1), 2)
 
@@ -1035,9 +1038,10 @@ describe('runGridNphiCoupledSweep', () => {
         },
         onSolveStart: (i) => solveStarts.push(i),
       })
-      expect(result.length).toBe(2)
-      expect(result.map((p) => p.sweepValue)).toEqual([32, 48])
-      expect(solveStarts).toEqual([0, 1])
+      expect(result.length).toBe(3)
+      expect(result.map((p) => p.sweepValue)).toEqual([32, 40, 48])
+      expect(result.map((p) => p.coupledGridNa)).toEqual([89, 112, 134])
+      expect(solveStarts).toEqual([0, 1, 2])
       for (const point of result) {
         expect(Number.isInteger(point.sweepValue)).toBe(true)
         expect(Number.isFinite(point.quality.a!)).toBe(true)

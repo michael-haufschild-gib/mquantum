@@ -13,6 +13,9 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { DEFAULT_DIRAC_CONFIG } from '@/lib/geometry/extended/dirac'
+import { DEFAULT_TDSE_CONFIG } from '@/lib/geometry/extended/tdse'
+import { DEFAULT_PAULI_CONFIG, DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
 import {
   type PendingLoadData,
   useSimulationStateStore,
@@ -373,6 +376,93 @@ describe('simulationStateStore', () => {
       expect(pushed.tdse.needsReset).toBe(true)
     })
 
+    it('sanitizes TDSE .mqstate potential and drive scalars before applying store config', async () => {
+      deserializeMock.mockImplementationOnce(async () => ({
+        quantumMode: 'tdseDynamics' as const,
+        latticeDim: 3,
+        componentCount: 1,
+        gridSize: [32, 32, 32],
+        totalSites: 32768,
+        config: {
+          quantumMode: 'tdseDynamics',
+          tdse: {
+            barrierHeight: Number.POSITIVE_INFINITY,
+            barrierWidth: Number.NaN,
+            harmonicOmega: Number.POSITIVE_INFINITY,
+            driveFrequency: Number.NaN,
+            driveAmplitude: Number.POSITIVE_INFINITY,
+            needsReset: false,
+          },
+        },
+        psiRe: new Float32Array(32768),
+        psiIm: new Float32Array(32768),
+      }))
+
+      const file = new File([new ArrayBuffer(128)], 'tdse_bad_potential.mqstate', {
+        type: 'application/octet-stream',
+      })
+      useSimulationStateStore.getState().loadFromFile(file)
+      await vi.waitFor(() => {
+        expect(setSchroedingerConfigSpy).toHaveBeenCalledTimes(1)
+      })
+
+      const pushed = setSchroedingerConfigSpy.mock.calls[0]![0] as {
+        tdse: typeof DEFAULT_TDSE_CONFIG
+      }
+      expect(pushed.tdse.barrierHeight).toBe(DEFAULT_TDSE_CONFIG.barrierHeight)
+      expect(pushed.tdse.barrierWidth).toBe(DEFAULT_TDSE_CONFIG.barrierWidth)
+      expect(pushed.tdse.harmonicOmega).toBe(DEFAULT_TDSE_CONFIG.harmonicOmega)
+      expect(pushed.tdse.driveFrequency).toBe(DEFAULT_TDSE_CONFIG.driveFrequency)
+      expect(pushed.tdse.driveAmplitude).toBe(DEFAULT_TDSE_CONFIG.driveAmplitude)
+      expect(pushed.tdse.needsReset).toBe(true)
+    })
+
+    it('sanitizes top-level Schroedinger .mqstate booleans before applying store config', async () => {
+      deserializeMock.mockImplementationOnce(async () => ({
+        quantumMode: 'harmonicOscillator' as const,
+        latticeDim: 3,
+        componentCount: 1,
+        gridSize: [32, 32, 32],
+        totalSites: 32768,
+        config: {
+          quantumMode: 'harmonicOscillator',
+          entropicTimeShearEnabled: 'false',
+          quantumBackreactionLensingEnabled: 'true',
+          absorberEnabled: 'false',
+          crossSectionAutoWindow: 'false',
+          invertColors: 'true',
+          sliceAnimationEnabled: 'true',
+          needsReset: false,
+        },
+        psiRe: new Float32Array(32768),
+        psiIm: new Float32Array(32768),
+      }))
+
+      const file = new File([new ArrayBuffer(128)], 'schroedinger_bad_booleans.mqstate', {
+        type: 'application/octet-stream',
+      })
+      useSimulationStateStore.getState().loadFromFile(file)
+      await vi.waitFor(() => {
+        expect(setSchroedingerConfigSpy).toHaveBeenCalledTimes(1)
+      })
+
+      const pushed = setSchroedingerConfigSpy.mock
+        .calls[0]![0] as typeof DEFAULT_SCHROEDINGER_CONFIG & {
+        needsReset: boolean
+      }
+      expect(pushed.entropicTimeShearEnabled).toBe(
+        DEFAULT_SCHROEDINGER_CONFIG.entropicTimeShearEnabled
+      )
+      expect(pushed.quantumBackreactionLensingEnabled).toBe(
+        DEFAULT_SCHROEDINGER_CONFIG.quantumBackreactionLensingEnabled
+      )
+      expect(pushed.absorberEnabled).toBe(DEFAULT_SCHROEDINGER_CONFIG.absorberEnabled)
+      expect(pushed.crossSectionAutoWindow).toBe(DEFAULT_SCHROEDINGER_CONFIG.crossSectionAutoWindow)
+      expect(pushed.invertColors).toBe(DEFAULT_SCHROEDINGER_CONFIG.invertColors)
+      expect(pushed.sliceAnimationEnabled).toBe(DEFAULT_SCHROEDINGER_CONFIG.sliceAnimationEnabled)
+      expect(pushed.needsReset).toBe(true)
+    })
+
     it.each([
       ['wheelerDeWitt', 'wheelerDeWitt'],
       ['antiDeSitter', 'antiDeSitter'],
@@ -449,22 +539,108 @@ describe('simulationStateStore', () => {
       expect(loadingOnOrder).toBeLessThan(setObjectTypeSpy.mock.invocationCallOrder[0]!)
       expect(loadingOnOrder).toBeLessThan(setPauliConfigSpy.mock.invocationCallOrder[0]!)
       expect(setObjectTypeSpy).toHaveBeenCalledWith('pauliSpinor')
+      const pushedPauli = setPauliConfigSpy.mock.calls[0]![0] as Record<string, unknown>
       expect(setPauliConfigSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           fieldType: 'quadrupole',
           fieldView: 'coherence',
           gridSize: [16, 16, 16],
           spacing: [0.2, 0.2, 0.2],
-          packetCenter: [1, 2, 3],
-          packetMomentum: [4, 5, 6],
           needsReset: true,
         })
       )
+      expect((pushedPauli.packetCenter as number[]).slice(0, 3)).toEqual([1, 2, 3])
+      expect((pushedPauli.packetMomentum as number[]).slice(0, 3)).toEqual([4, 5, 6])
 
       await vi.waitFor(() => {
         expect(setIsLoadingSceneSpy).toHaveBeenLastCalledWith(false)
       })
       expect(performanceState.isLoadingScene).toBe(false)
+    })
+
+    it('sanitizes Pauli .mqstate booleans before applying store config', async () => {
+      deserializeMock.mockImplementationOnce(async () => ({
+        quantumMode: 'pauliSpinor' as const,
+        latticeDim: 3,
+        componentCount: 2,
+        gridSize: [16, 16, 16],
+        totalSites: 4096,
+        config: {
+          pauli: {
+            showPotential: 'yes',
+            autoScale: 'false',
+            absorberEnabled: 'false',
+            diagnosticsEnabled: 'yes',
+            sliceAnimationEnabled: 'true',
+          },
+        },
+        psiRe: new Float32Array(8192),
+        psiIm: new Float32Array(8192),
+      }))
+
+      const file = new File([new ArrayBuffer(128)], 'pauli.mqstate', {
+        type: 'application/octet-stream',
+      })
+      useSimulationStateStore.getState().loadFromFile(file)
+
+      await vi.waitFor(() => {
+        expect(setPauliConfigSpy).toHaveBeenCalledTimes(1)
+      })
+
+      expect(setPauliConfigSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          showPotential: DEFAULT_PAULI_CONFIG.showPotential,
+          autoScale: DEFAULT_PAULI_CONFIG.autoScale,
+          absorberEnabled: DEFAULT_PAULI_CONFIG.absorberEnabled,
+          diagnosticsEnabled: DEFAULT_PAULI_CONFIG.diagnosticsEnabled,
+          sliceAnimationEnabled: DEFAULT_PAULI_CONFIG.sliceAnimationEnabled,
+          needsReset: true,
+        })
+      )
+    })
+
+    it('sanitizes Dirac .mqstate runtime values before applying store config', async () => {
+      deserializeMock.mockImplementationOnce(async () => ({
+        quantumMode: 'diracEquation' as const,
+        latticeDim: 3,
+        componentCount: 4,
+        gridSize: [64, 64, 64],
+        totalSites: 262144,
+        config: {
+          quantumMode: 'diracEquation',
+          dirac: {
+            spacing: [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY],
+            stepsPerFrame: Number.NaN,
+            diagnosticsInterval: Number.NaN,
+            dt: Number.NaN,
+            mass: Number.POSITIVE_INFINITY,
+            potentialCenter: Number.NEGATIVE_INFINITY,
+            needsReset: false,
+          },
+        },
+        psiRe: new Float32Array(262144 * 4),
+        psiIm: new Float32Array(262144 * 4),
+      }))
+
+      const file = new File([new ArrayBuffer(128)], 'dirac.mqstate', {
+        type: 'application/octet-stream',
+      })
+      useSimulationStateStore.getState().loadFromFile(file)
+
+      await vi.waitFor(() => {
+        expect(setSchroedingerConfigSpy).toHaveBeenCalledTimes(1)
+      })
+
+      const pushed = setSchroedingerConfigSpy.mock.calls[0]![0] as {
+        dirac: typeof DEFAULT_DIRAC_CONFIG
+      }
+      expect(pushed.dirac.spacing).toEqual(DEFAULT_DIRAC_CONFIG.spacing)
+      expect(pushed.dirac.stepsPerFrame).toBe(DEFAULT_DIRAC_CONFIG.stepsPerFrame)
+      expect(pushed.dirac.diagnosticsInterval).toBe(DEFAULT_DIRAC_CONFIG.diagnosticsInterval)
+      expect(pushed.dirac.dt).toBe(DEFAULT_DIRAC_CONFIG.dt)
+      expect(pushed.dirac.mass).toBe(DEFAULT_DIRAC_CONFIG.mass)
+      expect(pushed.dirac.potentialCenter).toBe(DEFAULT_DIRAC_CONFIG.potentialCenter)
+      expect(pushed.dirac.needsReset).toBe(true)
     })
 
     it('setLoadError transitions to error and clears pendingLoadData', () => {

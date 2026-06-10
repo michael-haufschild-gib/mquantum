@@ -19,6 +19,12 @@ import {
 
 const STRIDE = 7
 
+function expectAllFinite(data: Float32Array): void {
+  for (const value of data) {
+    expect(Number.isFinite(value)).toBe(true)
+  }
+}
+
 describe('generateIcosahedronWireframe', () => {
   it('produces correct vertex count for 30 edges', () => {
     const result = generateIcosahedronWireframe('#ffffff', 1.0)
@@ -116,6 +122,14 @@ describe('generateArrow', () => {
     expect(result[5]).toBeCloseTo(0, 3) // b
     expect(result[6]).toBeCloseTo(0.7, 3) // a
   })
+
+  it('sanitizes non-finite alpha and length', () => {
+    const result = generateArrow('#ffffff', Number.NaN, Number.NaN)
+    expect(result.length).toBe(5 * 2 * STRIDE)
+    expect(result[STRIDE + 1]).toBeCloseTo(-2.0)
+    expect(result[6]).toBeCloseTo(1)
+    expectAllFinite(result)
+  })
 })
 
 describe('generateConeWireframe', () => {
@@ -157,6 +171,14 @@ describe('generateConeWireframe', () => {
     // First vertex of base circle
     expect(result[1]).toBeCloseTo(-3.0) // y = -height
   })
+
+  it('sanitizes angle, alpha, segments, and height before generating vertices', () => {
+    const result = generateConeWireframe(Number.NaN, '#ffffff', Number.NaN, -8, Number.NaN)
+    // Invalid finite segment counts clamp to the minimum 3, plus 4 ribs.
+    expect(result.length).toBe(7 * 2 * STRIDE)
+    expect(result[6]).toBeCloseTo(1)
+    expectAllFinite(result)
+  })
 })
 
 describe('generateSphereWireframe', () => {
@@ -184,6 +206,14 @@ describe('generateSphereWireframe', () => {
     expect(result[4]).toBeCloseTo(1, 3) // g
     expect(result[5]).toBeCloseTo(1, 3) // b
     expect(result[6]).toBeCloseTo(0.9, 3) // a
+  })
+
+  it('sanitizes non-finite alpha/radius and invalid segments', () => {
+    const result = generateSphereWireframe('#ffffff', Number.NaN, Number.NaN, -4)
+    // Invalid finite segment counts clamp to the minimum 3.
+    expect(result.length).toBe(3 * 3 * 2 * STRIDE)
+    expect(result[6]).toBeCloseTo(1)
+    expectAllFinite(result)
   })
 })
 
@@ -234,5 +264,12 @@ describe('generateSelectionRing', () => {
     for (let i = 0; i < vertCount; i++) {
       expect(result[i * STRIDE + 2]).toBeCloseTo(0, 10)
     }
+  })
+
+  it('sanitizes invalid radii and segment counts', () => {
+    const result = generateSelectionRing(Number.NaN, Infinity, -4)
+    // 3 inner + 3 outer + 1 spoke at the minimum segment count.
+    expect(result.length).toBe(7 * 2 * STRIDE)
+    expectAllFinite(result)
   })
 })

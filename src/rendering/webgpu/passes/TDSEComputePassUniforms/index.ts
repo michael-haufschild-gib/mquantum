@@ -428,7 +428,7 @@ export function packTdseUniformData(
   // Clamp through clampFinite so a transient NaN/Infinity in either field
   // (e.g. malformed saved state) cannot leak into the trig and contaminate
   // the wormhole kernel. Default to (0, 0) → cos=1, sin=0 (no coupling).
-  const wormholeG = clampFinite(config.wormholeCouplingG, 0, 0, Number.POSITIVE_INFINITY)
+  const wormholeG = clampFinite(config.wormholeCouplingG, 0, 0, 5)
   const wormholeTau = 0.5 * clampFinite(config.dt, 0, 0, Number.POSITIVE_INFINITY)
   f32[I.wormholeCosTau] = Math.cos(wormholeTau * wormholeG)
   f32[I.wormholeSinTau] = Math.sin(wormholeTau * wormholeG)

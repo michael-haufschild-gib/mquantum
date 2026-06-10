@@ -18,8 +18,10 @@ import { BECAnalysisContent } from '@/components/sections/Analysis/BECAnalysisSe
 import { BellExperimentContent } from '@/components/sections/Analysis/BellExperimentSection'
 import { DiracAnalysisContent } from '@/components/sections/Analysis/DiracAnalysisSection'
 import { FSFAnalysisContent } from '@/components/sections/Analysis/FSFAnalysisSection'
+import { HilbertPolyaAnalysisContent } from '@/components/sections/Analysis/HilbertPolyaAnalysisSection'
 import { MeasurementControls } from '@/components/sections/Analysis/MeasurementControls'
 import { PauliAnalysisContent } from '@/components/sections/Analysis/PauliAnalysisSection'
+import { RiemannZetaAnalysisContent } from '@/components/sections/Analysis/RiemannZetaAnalysisSection'
 import { CrossSectionAnalysisContent } from '@/components/sections/Analysis/SchroedingerCrossSectionSection'
 import { TDSEAnalysisContent } from '@/components/sections/Analysis/TDSEAnalysisSection'
 import { Section } from '@/components/sections/Section'
@@ -31,6 +33,7 @@ import {
   downloadFile,
   exportAtlasSweepCSV,
   exportBecDiagnosticsCSV,
+  exportBellDiagnosticsCSV,
   exportDiagnosticsJSON,
   exportDiracDiagnosticsCSV,
   exportEntanglementCSV,
@@ -73,6 +76,8 @@ const MODE_LABELS: Record<string, string> = {
   becDynamics: 'BEC',
   diracEquation: 'Dirac',
   quantumWalk: 'Quantum Walk',
+  riemannZeta: 'Riemann Zeta',
+  hilbertPolya: 'Hilbert–Pólya',
 }
 
 /**
@@ -146,12 +151,12 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
     const isPauli = objectType === 'pauliSpinor'
     const isBellPair = objectType === 'bellPair'
 
-    // Bell-pair has its own analysis path (CHSH panel, no shared cross-section /
-    // export controls; exports are panel-internal).
+    // Bell-pair has its own CHSH analysis path and shared data-export controls.
     if (isBellPair) {
       return (
         <Section title="Bell Test" defaultOpen={defaultOpen} data-testid="analysis-section">
           <BellExperimentContent />
+          <DataExportButtons quantumMode="bellTest" saveLoadEnabled={false} />
         </Section>
       )
     }
@@ -186,11 +191,19 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
         onOpenChange={handleOpenChange}
         data-testid="analysis-section"
       >
-        {isAnalytic && <CrossSectionAnalysisContent />}
+        {/* The riemannZeta volumetric block has its own cutaway wedge and the
+            hilbertPolya block renders a dedicated Evans-landscape volume; the
+            generic cross-section / second-quantization controls target the
+            HO/hydrogen analytic pipeline and are not wired for either. */}
+        {isAnalytic && quantumMode !== 'riemannZeta' && quantumMode !== 'hilbertPolya' && (
+          <CrossSectionAnalysisContent />
+        )}
         {quantumMode === 'freeScalarField' && <FSFAnalysisContent />}
         {quantumMode === 'tdseDynamics' && <TDSEAnalysisContent />}
         {quantumMode === 'becDynamics' && <BECAnalysisContent />}
         {quantumMode === 'diracEquation' && <DiracAnalysisContent />}
+        {quantumMode === 'riemannZeta' && <RiemannZetaAnalysisContent />}
+        {quantumMode === 'hilbertPolya' && <HilbertPolyaAnalysisContent />}
         {dimension >= 3 && (
           <ControlGroup
             data-testid="analysis-quantum-carpet"
@@ -274,6 +287,7 @@ const CSV_EXPORTERS: Record<string, { fn: () => string; prefix: string }> = {
   freeScalarField: { fn: exportFsfDiagnosticsCSV, prefix: 'mdim-fsf' },
   diracEquation: { fn: exportDiracDiagnosticsCSV, prefix: 'mdim-dirac' },
   pauliSpinor: { fn: exportPauliDiagnosticsCSV, prefix: 'mdim-pauli' },
+  bellTest: { fn: exportBellDiagnosticsCSV, prefix: 'mdim-bell' },
 }
 
 /**
@@ -284,9 +298,11 @@ const CSV_EXPORTERS: Record<string, { fn: () => string; prefix: string }> = {
 const DataExportButtons: React.FC<{
   quantumMode: QuantumTypeKey
   observablesHasData?: boolean
-}> = React.memo(({ quantumMode, observablesHasData }) => {
+  saveLoadEnabled?: boolean
+}> = React.memo(({ quantumMode, observablesHasData, saveLoadEnabled = true }) => {
   const isAnalytic = isAnalyticQuantumType(quantumMode)
-  const hasSaveLoad = isComputeQuantumType(quantumMode) || quantumMode === 'pauliSpinor'
+  const hasSaveLoad =
+    saveLoadEnabled && (isComputeQuantumType(quantumMode) || quantumMode === 'pauliSpinor')
 
   // Wavefunction slice availability
   const densitySliceAvailable = useDiagnosticsStore(

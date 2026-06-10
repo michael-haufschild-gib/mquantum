@@ -90,6 +90,27 @@ describe('QuantumWalkComputePassUniforms', () => {
     expect(new Uint32Array(second)[42]).toBe(3)
   })
 
+  it('sanitizes non-finite render mapping uniforms before shader upload', () => {
+    const buf = packWriteGridUniforms(
+      { ...config('probability'), slicePositions: [Number.NaN, Number.POSITIVE_INFINITY, -2] },
+      16 * 16 * 16,
+      Number.NaN,
+      [16 * 16, 16, 1],
+      new Float32Array([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]),
+      new Float32Array([1, Number.NaN]),
+      new Float32Array([Number.POSITIVE_INFINITY, 2, Number.NaN]),
+      Number.NaN
+    )
+    const f32 = new Float32Array(buf)
+
+    expect(f32[40]).toBe(2)
+    expect(f32[41]).toBe(1)
+    expect(Array.from(f32.slice(44, 47))).toEqual([1, 0, 0])
+    expect(Array.from(f32.slice(56, 59))).toEqual([1, 1, 0])
+    expect(Array.from(f32.slice(68, 71))).toEqual([0, 2, 1])
+    expect(Array.from(f32.slice(83, 86))).toEqual([0, 0, -2])
+  })
+
   it('documents and consumes walkSteps for fieldView enum 5 in the write-grid shader', () => {
     expect(qwWriteGridUniformsBlock).toContain('5=ctcFractalCarpet')
     expect(qwWriteGridUniformsBlock).toContain('walkSteps: u32')

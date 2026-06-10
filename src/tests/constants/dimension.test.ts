@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest'
 import {
   ALL_GRID_SIZE_OPTIONS,
   AXIS_LABELS,
+  DEFAULT_DIMENSION,
   MAX_DIMENSION,
   MIN_DIMENSION,
 } from '@/constants/dimension'
@@ -35,6 +36,12 @@ describe('dimension constant invariants', () => {
     expect(Number.isInteger(MAX_DIMENSION)).toBe(true)
     expect(MIN_DIMENSION).toBeGreaterThan(0)
     expect(MAX_DIMENSION).toBeGreaterThan(0)
+  })
+
+  it('default dimension is a supported integer in the global range', () => {
+    expect(Number.isInteger(DEFAULT_DIMENSION)).toBe(true)
+    expect(DEFAULT_DIMENSION).toBeGreaterThanOrEqual(MIN_DIMENSION)
+    expect(DEFAULT_DIMENSION).toBeLessThanOrEqual(MAX_DIMENSION)
   })
 
   it('rotation plane count formula n*(n-1)/2 yields valid counts at boundaries', () => {

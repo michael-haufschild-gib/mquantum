@@ -387,6 +387,48 @@ struct SchroedingerUniforms {
   hermiteCocycleShellRadius: f32,
   hermiteCocycleInflationTwist: f32,
 
+  // Coherence Horizon (coherence-sourced gravity). Read only by the dedicated
+  // geodesic main block (quantumMode === coherenceHorizon); the host packer
+  // zeroes every field for all other modes. coherenceHorizonRadius is the
+  // CPU-precomputed Tangherlini r_h = horizonScale * (1-delta)^(1/(d-2));
+  // coherenceHorizonMetricExponent carries (d-2) as f32.
+  coherenceHorizonDecoherence: f32,
+  coherenceHorizonSeparation: f32,
+  coherenceHorizonWidth: f32,
+  coherenceHorizonWaveNumber: f32,
+  coherenceHorizonRadius: f32,
+  coherenceHorizonMetricExponent: f32,
+  coherenceHorizonRingGain: f32,
+  coherenceHorizonGlow: f32,
+
+  // Riemann Zeta ("Arithmetic Horizon"). Read only by the dedicated main block
+  // (quantumMode === riemannZeta); the host packer zeroes these for all other
+  // modes. The radial LUT itself (rho, dRho/du, psiRe, psiIm) is a separate
+  // group-2 storage buffer owned by RiemannZetaStrategy — NOT in this struct —
+  // so the shared per-object uniform stays small. riemannMetricExponent carries
+  // (d-2); riemannPartitionGain is the Hagedorn gain log(1+Z(β))/log(1+Z(β_ref)).
+  riemannUMin: f32,
+  riemannUMax: f32,
+  riemannPartitionGain: f32,
+  riemannGlow: f32,
+  riemannHorizonRadius: f32,
+  riemannMetricExponent: f32,
+  riemannFlowRate: f32,
+  riemannAngularL: f32,
+  riemannAngularM: f32,
+  riemannCutaway: f32,
+  _padRiemann1: f32,
+  _padRiemann2: f32,
+
+  // Hilbert–Pólya Spectrum. Read only by the dedicated volumetric main block
+  // (quantumMode === hilbertPolya); the host packer zeroes these for all other
+  // modes. The (Re z, Im z, θ) volume LUT itself is a separate group-2 storage
+  // buffer owned by HilbertPolyaStrategy — NOT in this struct.
+  hpGlow: f32,
+  hpFogGain: f32,
+  hpPlaneMarker: f32,
+  hpFilamentWidth: f32,
+
 }
 
 // ============================================

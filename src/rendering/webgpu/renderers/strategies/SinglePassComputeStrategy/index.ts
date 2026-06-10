@@ -261,8 +261,8 @@ export abstract class SinglePassComputeStrategy<
     const other = source as SinglePassComputeStrategy<TPass, TConfig>
     const otherPass = other.pass
     if (!otherPass) return false
-    const nextN = nextConfig?.densityGridResolution
-    if (nextN && otherPass.getDensityGridSize() !== nextN) return false
+    const nextN = nextConfig?.densityGridResolution ?? DENSITY_GRID_SIZE
+    if (otherPass.getDensityGridSize() !== nextN) return false
     this.pass?.dispose()
     this.pass = otherPass
     other.pass = null

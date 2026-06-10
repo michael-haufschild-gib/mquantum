@@ -13,6 +13,8 @@ import type { AntiDeSitterConfig } from './antiDeSitter'
 import { DEFAULT_ANTI_DE_SITTER_CONFIG } from './antiDeSitter'
 import type { BecConfig } from './bec'
 import { DEFAULT_BEC_CONFIG } from './bec'
+import type { CoherenceHorizonConfig } from './coherenceHorizon'
+import { DEFAULT_COHERENCE_HORIZON_CONFIG } from './coherenceHorizon'
 import type {
   RaymarchQuality,
   SchroedingerColorMode,
@@ -27,8 +29,12 @@ import type { DiracConfig } from './dirac'
 import { DEFAULT_DIRAC_CONFIG } from './dirac'
 import type { FreeScalarConfig } from './freeScalar'
 import { DEFAULT_FREE_SCALAR_CONFIG } from './freeScalar'
+import type { HilbertPolyaConfig } from './hilbertPolya'
+import { DEFAULT_HILBERT_POLYA_CONFIG } from './hilbertPolya'
 import type { QuantumWalkConfig } from './quantumWalk'
 import { DEFAULT_QUANTUM_WALK_CONFIG } from './quantumWalk'
+import type { RiemannZetaConfig } from './riemannZeta'
+import { DEFAULT_RIEMANN_ZETA_CONFIG } from './riemannZeta'
 import type { TdseConfig } from './tdse'
 import { DEFAULT_TDSE_CONFIG } from './tdse'
 import type { WheelerDeWittConfig } from './wheelerDeWitt'
@@ -631,6 +637,18 @@ export interface SchroedingerConfig
   /** Closed-form bound-state configuration for AdS_d scalar fields. */
   antiDeSitter: AntiDeSitterConfig
 
+  // === Coherence Horizon Configuration (when quantumMode === 'coherenceHorizon') ===
+  /** Coherence-sourced Tangherlini horizon (CSG) configuration. */
+  coherenceHorizon: CoherenceHorizonConfig
+
+  // === Riemann Zeta Configuration (when quantumMode === 'riemannZeta') ===
+  /** Arithmetic Horizon: prime ⇄ ζ-zero spectral synthesis configuration. */
+  riemannZeta: RiemannZetaConfig
+
+  // === Hilbert-Polya Configuration (when quantumMode === 'hilbertPolya') ===
+  /** Evans-landscape spectral filament volume configuration. */
+  hilbertPolya: HilbertPolyaConfig
+
   // === N-D Basis Vectors (for free scalar field and TDSE) ===
   /** Basis vector for X axis in N-dimensional space */
   basisX: Float32Array
@@ -903,6 +921,11 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   // Anti-de Sitter bound-state (Stage 1)
   antiDeSitter: DEFAULT_ANTI_DE_SITTER_CONFIG,
 
+  // Coherence Horizon (coherence-sourced gravity)
+  coherenceHorizon: DEFAULT_COHERENCE_HORIZON_CONFIG,
+  riemannZeta: DEFAULT_RIEMANN_ZETA_CONFIG,
+  hilbertPolya: DEFAULT_HILBERT_POLYA_CONFIG,
+
   // N-D Basis Vectors
   basisX: new Float32Array([1, 0, 0]),
   basisY: new Float32Array([0, 1, 0]),
@@ -913,77 +936,8 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   openQuantum: DEFAULT_OPEN_QUANTUM_CONFIG,
 }
 
-/** Sanitized hydrogen quantum fields safe for store state and GPU uniforms. */
-export interface SanitizedHydrogenQuantumState {
-  principalQuantumNumber: number
-  azimuthalQuantumNumber: number
-  magneticQuantumNumber: number
-  bohrRadiusScale: number
-}
-
-type HydrogenQuantumStateInput = Partial<SanitizedHydrogenQuantumState>
-
-function finiteOrFallback(
-  value: number | undefined,
-  fallback: number,
-  defaultValue: number
-): number {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (Number.isFinite(fallback)) return fallback
-  return defaultValue
-}
-
-function clampFloored(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, Math.floor(value)))
-}
-
-/**
- * Normalize hydrogen quantum fields shared by store bulk updates and GPU packing.
- *
- * Direct UI setters reject non-finite values; bulk scene/preset loads and tests
- * can bypass those setters, so callers use previous state as fallback.
- */
-export function sanitizeHydrogenQuantumState(
-  input: HydrogenQuantumStateInput | null | undefined,
-  fallback: HydrogenQuantumStateInput = DEFAULT_SCHROEDINGER_CONFIG
-): SanitizedHydrogenQuantumState {
-  const defaultState = DEFAULT_SCHROEDINGER_CONFIG
-  const rawN = finiteOrFallback(
-    input?.principalQuantumNumber,
-    fallback.principalQuantumNumber ?? defaultState.principalQuantumNumber,
-    defaultState.principalQuantumNumber
-  )
-  const principalQuantumNumber = clampFloored(rawN, 1, 7)
-
-  const rawL = finiteOrFallback(
-    input?.azimuthalQuantumNumber,
-    fallback.azimuthalQuantumNumber ?? defaultState.azimuthalQuantumNumber,
-    defaultState.azimuthalQuantumNumber
-  )
-  const azimuthalQuantumNumber = clampFloored(rawL, 0, principalQuantumNumber - 1)
-
-  const rawM = finiteOrFallback(
-    input?.magneticQuantumNumber,
-    fallback.magneticQuantumNumber ?? defaultState.magneticQuantumNumber,
-    defaultState.magneticQuantumNumber
-  )
-  const magneticQuantumNumber =
-    Math.max(-azimuthalQuantumNumber, Math.min(azimuthalQuantumNumber, Math.floor(rawM))) || 0
-
-  const rawBohrRadius = finiteOrFallback(
-    input?.bohrRadiusScale,
-    fallback.bohrRadiusScale ?? defaultState.bohrRadiusScale,
-    defaultState.bohrRadiusScale
-  )
-  const bohrRadiusScale = Math.max(0.5, Math.min(3.0, rawBohrRadius))
-
-  return {
-    principalQuantumNumber,
-    azimuthalQuantumNumber,
-    magneticQuantumNumber,
-    bohrRadiusScale,
-  }
-}
+// Hydrogen quantum-state sanitization lives in
+// `./schroedinger/hydrogenStateSanitize` (extracted for the file-size budget).
 
 /**
  * Create a fresh copy of the default Schroedinger config.

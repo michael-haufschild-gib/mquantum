@@ -743,6 +743,53 @@ describe('mergeExtendedObjectStateForType — compute-mode lattice arrays', () =
 })
 
 describe('mergeExtendedObjectStateForType — Dirac enum invariants', () => {
+  it('normalizes non-finite loaded Dirac runtime values before compute pass reads them', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'diracEquation',
+        dirac: {
+          spacing: [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY],
+          mass: Number.NaN,
+          speedOfLight: Number.POSITIVE_INFINITY,
+          hbar: Number.NaN,
+          dt: Number.NaN,
+          stepsPerFrame: Number.NaN,
+          potentialStrength: Number.POSITIVE_INFINITY,
+          potentialWidth: Number.NaN,
+          potentialCenter: Number.POSITIVE_INFINITY,
+          harmonicOmega: Number.NaN,
+          coulombZ: Number.NEGATIVE_INFINITY,
+          packetWidth: Number.NaN,
+          positiveEnergyFraction: Number.POSITIVE_INFINITY,
+          absorberWidth: Number.NaN,
+          pmlTargetReflection: Number.NaN,
+          diagnosticsInterval: Number.NaN,
+        },
+      },
+    }
+
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const dirac = (merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG).dirac
+    const defaults = DEFAULT_SCHROEDINGER_CONFIG.dirac
+
+    expect(dirac.spacing).toEqual(defaults.spacing)
+    expect(dirac.mass).toBe(defaults.mass)
+    expect(dirac.speedOfLight).toBe(defaults.speedOfLight)
+    expect(dirac.hbar).toBe(defaults.hbar)
+    expect(dirac.dt).toBe(defaults.dt)
+    expect(dirac.stepsPerFrame).toBe(defaults.stepsPerFrame)
+    expect(dirac.potentialStrength).toBe(defaults.potentialStrength)
+    expect(dirac.potentialWidth).toBe(defaults.potentialWidth)
+    expect(dirac.potentialCenter).toBe(defaults.potentialCenter)
+    expect(dirac.harmonicOmega).toBe(defaults.harmonicOmega)
+    expect(dirac.coulombZ).toBe(defaults.coulombZ)
+    expect(dirac.packetWidth).toBe(defaults.packetWidth)
+    expect(dirac.positiveEnergyFraction).toBe(defaults.positiveEnergyFraction)
+    expect(dirac.absorberWidth).toBe(defaults.absorberWidth)
+    expect(dirac.pmlTargetReflection).toBe(defaults.pmlTargetReflection)
+    expect(dirac.diagnosticsInterval).toBe(defaults.diagnosticsInterval)
+  })
+
   it('normalizes invalid loaded Dirac enums before shader packing can remap them', () => {
     const loaded = {
       schroedinger: {
@@ -823,6 +870,108 @@ describe('mergeExtendedObjectStateForType — Dirac enum invariants', () => {
 })
 
 describe('mergeExtendedObjectStateForType — TDSE enum invariants', () => {
+  it('normalizes non-finite loaded TDSE potential and drive scalars before uniform packing', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'tdseDynamics',
+        tdse: {
+          barrierHeight: Number.POSITIVE_INFINITY,
+          barrierWidth: Number.NaN,
+          barrierCenter: Number.NEGATIVE_INFINITY,
+          wellDepth: Number.NaN,
+          wellWidth: Number.POSITIVE_INFINITY,
+          harmonicOmega: Number.NaN,
+          stepHeight: Number.POSITIVE_INFINITY,
+          slitSeparation: Number.NaN,
+          slitWidth: Number.NEGATIVE_INFINITY,
+          wallThickness: Number.NaN,
+          wallHeight: Number.POSITIVE_INFINITY,
+          latticeDepth: Number.NaN,
+          latticePeriod: Number.POSITIVE_INFINITY,
+          doubleWellLambda: Number.NaN,
+          doubleWellSeparation: Number.NEGATIVE_INFINITY,
+          doubleWellAsymmetry: Number.POSITIVE_INFINITY,
+          radialWellInner: Number.NaN,
+          radialWellOuter: Number.POSITIVE_INFINITY,
+          radialWellDepth: Number.NaN,
+          radialWellTilt: Number.POSITIVE_INFINITY,
+          anharmonicLambda: Number.NaN,
+          driveFrequency: Number.POSITIVE_INFINITY,
+          driveAmplitude: Number.NaN,
+        },
+      },
+    }
+
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const tdse = (merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG).tdse
+    const defaults = DEFAULT_SCHROEDINGER_CONFIG.tdse
+
+    expect(tdse.barrierHeight).toBe(defaults.barrierHeight)
+    expect(tdse.barrierWidth).toBe(defaults.barrierWidth)
+    expect(tdse.barrierCenter).toBe(defaults.barrierCenter)
+    expect(tdse.wellDepth).toBe(defaults.wellDepth)
+    expect(tdse.wellWidth).toBe(defaults.wellWidth)
+    expect(tdse.harmonicOmega).toBe(defaults.harmonicOmega)
+    expect(tdse.stepHeight).toBe(defaults.stepHeight)
+    expect(tdse.slitSeparation).toBe(defaults.slitSeparation)
+    expect(tdse.slitWidth).toBe(defaults.slitWidth)
+    expect(tdse.wallThickness).toBe(defaults.wallThickness)
+    expect(tdse.wallHeight).toBe(defaults.wallHeight)
+    expect(tdse.latticeDepth).toBe(defaults.latticeDepth)
+    expect(tdse.latticePeriod).toBe(defaults.latticePeriod)
+    expect(tdse.doubleWellLambda).toBe(defaults.doubleWellLambda)
+    expect(tdse.doubleWellSeparation).toBe(defaults.doubleWellSeparation)
+    expect(tdse.doubleWellAsymmetry).toBe(defaults.doubleWellAsymmetry)
+    expect(tdse.radialWellInner).toBe(defaults.radialWellInner)
+    expect(tdse.radialWellOuter).toBe(defaults.radialWellOuter)
+    expect(tdse.radialWellDepth).toBe(defaults.radialWellDepth)
+    expect(tdse.radialWellTilt).toBe(defaults.radialWellTilt)
+    expect(tdse.anharmonicLambda).toBe(defaults.anharmonicLambda)
+    expect(tdse.driveFrequency).toBe(defaults.driveFrequency)
+    expect(tdse.driveAmplitude).toBe(defaults.driveAmplitude)
+  })
+
+  it('normalizes loaded TDSE wormhole and CTC scalars that bypass UI setters', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'tdseDynamics',
+        tdse: {
+          wormholeCouplingG: 99,
+          ctcPostselectionStrength: -2,
+          ctcLoopPhase: 10,
+        },
+      },
+    }
+
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const tdse = (merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG).tdse
+
+    expect(tdse.wormholeCouplingG).toBe(5)
+    expect(tdse.ctcPostselectionStrength).toBe(0)
+    expect(tdse.ctcLoopPhase).toBe(Math.PI)
+  })
+
+  it('clears loaded TDSE stochastic and branching flags under black-hole ringdown', () => {
+    const merged = mergeExtendedObjectStateForType(
+      {
+        schroedinger: {
+          quantumMode: 'tdseDynamics',
+          tdse: {
+            potentialType: 'blackHoleRingdown',
+            stochasticEnabled: true,
+            branchingEnabled: true,
+          },
+        },
+      },
+      'schroedinger'
+    )
+    const tdse = (merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG).tdse
+
+    expect(tdse.potentialType).toBe('blackHoleRingdown')
+    expect(tdse.stochasticEnabled).toBe(false)
+    expect(tdse.branchingEnabled).toBe(false)
+  })
+
   it('normalizes invalid loaded TDSE enums before store setters are bypassed', () => {
     const loaded = {
       schroedinger: {
@@ -940,6 +1089,28 @@ describe('mergeExtendedObjectStateForType — pauliSpinor', () => {
     expect(pauli.wellWidth).toBe(DEFAULT_PAULI_CONFIG.wellWidth)
     expect(pauli.mass).toBe(DEFAULT_PAULI_CONFIG.mass)
     expect(pauli.pmlTargetReflection).toBe(1e-12)
+  })
+
+  it('sanitizes loaded Pauli boolean toggles instead of preserving truthy strings', () => {
+    const merged = mergeExtendedObjectStateForType(
+      {
+        pauliSpinor: {
+          showPotential: 'yes',
+          autoScale: 'false',
+          absorberEnabled: 'false',
+          diagnosticsEnabled: 'yes',
+          sliceAnimationEnabled: 'true',
+        },
+      },
+      'pauliSpinor'
+    )
+    const pauli = merged.pauliSpinor as typeof DEFAULT_PAULI_CONFIG
+
+    expect(pauli.showPotential).toBe(DEFAULT_PAULI_CONFIG.showPotential)
+    expect(pauli.autoScale).toBe(DEFAULT_PAULI_CONFIG.autoScale)
+    expect(pauli.absorberEnabled).toBe(DEFAULT_PAULI_CONFIG.absorberEnabled)
+    expect(pauli.diagnosticsEnabled).toBe(DEFAULT_PAULI_CONFIG.diagnosticsEnabled)
+    expect(pauli.sliceAnimationEnabled).toBe(DEFAULT_PAULI_CONFIG.sliceAnimationEnabled)
   })
 
   it('preserves Zeeman Anamorph Pauli view and initializer from loaded scenes', () => {
@@ -1133,13 +1304,33 @@ describe('mergeExtendedObjectStateForType — adversarial inputs', () => {
     expect(ads.btzHorizonRadius).toBe(2)
     expect(ads.btzOmega).toBe(0.1)
     expect(ads.btzAngularM).toBe(5)
-    expect(ads.hkllEnabled).toBe(true)
+    expect(ads.hkllEnabled).toBe(false)
     expect(ads.hkllBoundarySource).toBe(DEFAULT_SCHROEDINGER_CONFIG.antiDeSitter.hkllBoundarySource)
     expect(ads.hkllSourceSigma).toBe(1.5)
     expect(ads.hkllPlaneWaveM).toBe(8)
-    expect(ads.chordalSieveEnabled).toBe(false)
+    expect(ads.chordalSieveEnabled).toBe(true)
     expect(ads.chordalSieveFrequency).toBe(12)
     expect(ads.chordalSieveTwist).toBe(-4)
+  })
+
+  it('normalizes loaded anti-de Sitter mutexes with the same priority as URL setters', () => {
+    const merged = mergeExtendedObjectStateForType(
+      {
+        schroedinger: {
+          antiDeSitter: {
+            btzEnabled: true,
+            hkllEnabled: true,
+            chordalSieveEnabled: false,
+          },
+        },
+      },
+      'schroedinger'
+    )
+    const ads = (merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG).antiDeSitter
+
+    expect(ads.hkllEnabled).toBe(true)
+    expect(ads.btzEnabled).toBe(false)
+    expect(ads.chordalSieveEnabled).toBe(false)
   })
 
   it('returns mutation-isolated default sub-configs for sparse schroedinger scenes', () => {

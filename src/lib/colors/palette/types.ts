@@ -149,6 +149,16 @@ export interface CosineCoefficients {
   d: [number, number, number]
 }
 
+export const COSINE_COEFFICIENT_RANGES: Record<
+  keyof CosineCoefficients,
+  { min: number; max: number }
+> = {
+  a: { min: -1, max: 2 },
+  b: { min: -2, max: 2 },
+  c: { min: -1, max: 5 },
+  d: { min: -1, max: 2 },
+}
+
 /**
  * Distribution controls for remapping the input value (t).
  * Applied before palette lookup to shape color distribution.
@@ -363,6 +373,28 @@ export function getAvailableColorAlgorithms(
       'densityContours',
     ])
     return COLOR_ALGORITHM_OPTIONS.filter((opt) => bellValidAlgos.has(opt.value))
+  }
+
+  // Horizon family (Coherence Horizon geodesic block, Arithmetic Horizon
+  // volumetric block): each dedicated main block implements its own compact
+  // color families — phase-hue (mixed/phase), thermal (blackbody), and
+  // density ramps (viridis/densityContours). Every other algorithm reads
+  // emission-system state that never composes for these modes and would
+  // render as a silent no-op, so hard-allowlist the implemented set.
+  if (
+    objectType === 'schroedinger' &&
+    (quantumMode === 'coherenceHorizon' ||
+      quantumMode === 'riemannZeta' ||
+      quantumMode === 'hilbertPolya')
+  ) {
+    const horizonValidAlgos = new Set<string>([
+      'mixed',
+      'phase',
+      'blackbody',
+      'viridis',
+      'densityContours',
+    ])
+    return COLOR_ALGORITHM_OPTIONS.filter((opt) => horizonValidAlgos.has(opt.value))
   }
 
   // Educational analysis algorithms — only available for free scalar field

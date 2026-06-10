@@ -14,13 +14,6 @@ import {
   createDefaultBellPairConfig,
   sanitizeBellPairConfig,
 } from '@/lib/geometry/extended/bellPair'
-import {
-  type DiracConfig,
-  isDiracFieldView,
-  isDiracInitialCondition,
-  isDiracPotentialType,
-  sanitizeDiracLatticeConfig,
-} from '@/lib/geometry/extended/dirac'
 import { createDefaultPauliConfig, type PauliConfig } from '@/lib/geometry/extended/pauli'
 import { sanitizeQuantumWalkConfig } from '@/lib/geometry/extended/quantumWalk'
 import { sanitizeHarmonicOscillatorScalars } from '@/lib/geometry/extended/schroedinger/configSanitization'
@@ -31,7 +24,7 @@ import {
   isTdseFieldView,
   isTdseInitialCondition,
   isTdsePotentialType,
-  normalizeTdseBlackHoleParams,
+  sanitizeTdseLoadedFields,
 } from '@/lib/geometry/extended/tdse'
 import {
   createDefaultSchroedingerConfig,
@@ -43,11 +36,12 @@ import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
 import { sanitizeOpenQuantumConfig } from '@/lib/physics/openQuantum/types'
 
-import { normalizeAntiDeSitterLoadedConfig } from './mergeWithDefaultsAntiDeSitter'
-import { normalizeFreeScalarLoadedConfig } from './mergeWithDefaultsFreeScalar'
-import { normalizePauliLoadedConfig } from './mergeWithDefaultsPauli'
-import { normalizeSchroedingerNumericScalars } from './mergeWithDefaultsSchroedingerScalars'
-import { normalizeWheelerDeWittConfig } from './mergeWithDefaultsWheelerDeWitt'
+import { normalizeAntiDeSitterLoadedConfig } from './mergeDefaults/mergeWithDefaultsAntiDeSitter'
+import { normalizeDiracLoadedConfig } from './mergeDefaults/mergeWithDefaultsDirac'
+import { normalizeFreeScalarLoadedConfig } from './mergeDefaults/mergeWithDefaultsFreeScalar'
+import { normalizePauliLoadedConfig } from './mergeDefaults/mergeWithDefaultsPauli'
+import { normalizeSchroedingerNumericScalars } from './mergeDefaults/mergeWithDefaultsSchroedingerScalars'
+import { normalizeWheelerDeWittConfig } from './mergeDefaults/mergeWithDefaultsWheelerDeWitt'
 import { normalizeBecLoadedConfig } from './normalizeBecLoadedConfig'
 import { OBJECT_TYPE_TO_CONFIG_KEY } from './presetSerialization'
 
@@ -282,45 +276,29 @@ function migrateLegacyShimmerFields<T>(loaded: T): T {
   return migrated as T
 }
 
-function normalizeTdseBhParams(normalized: Record<string, unknown>): Record<string, unknown> {
+function normalizeTdseLoadedFieldsForMerge(
+  normalized: Record<string, unknown>
+): Record<string, unknown> {
   const tdse = normalized.tdse
-  if (!tdse || typeof tdse !== 'object') return normalized
+  if (!tdse || typeof tdse !== 'object' || Array.isArray(tdse)) return normalized
   const tdseRecord = tdse as Record<string, unknown>
-  const bh = normalizeTdseBlackHoleParams(tdseRecord)
-  if (
-    bh.bhMass !== tdseRecord.bhMass ||
-    bh.bhSpin !== tdseRecord.bhSpin ||
-    bh.bhMultipoleL !== tdseRecord.bhMultipoleL
-  ) {
-    return { ...normalized, tdse: { ...tdseRecord, ...bh } }
-  }
-  return normalized
+  const next = sanitizeTdseLoadedFields(
+    { ...DEFAULT_SCHROEDINGER_CONFIG.tdse, ...tdseRecord },
+    DEFAULT_SCHROEDINGER_CONFIG.tdse
+  ) as unknown as Record<string, unknown>
+
+  return next === tdseRecord ? normalized : { ...normalized, tdse: next }
 }
 
-function normalizeDiracEnums(normalized: Record<string, unknown>): Record<string, unknown> {
+function normalizeDiracConfig(normalized: Record<string, unknown>): Record<string, unknown> {
   const dirac = normalized.dirac
   if (!dirac || typeof dirac !== 'object' || Array.isArray(dirac)) return normalized
 
   const diracRecord = dirac as Record<string, unknown>
-  const defaults = DEFAULT_SCHROEDINGER_CONFIG.dirac
-  let next = diracRecord
-
-  if (!isDiracPotentialType(diracRecord.potentialType)) {
-    next = next === diracRecord ? { ...diracRecord } : next
-    next.potentialType = defaults.potentialType
-  }
-  if (!isDiracInitialCondition(diracRecord.initialCondition)) {
-    next = next === diracRecord ? { ...diracRecord } : next
-    next.initialCondition = defaults.initialCondition
-  }
-  if (!isDiracFieldView(diracRecord.fieldView)) {
-    next = next === diracRecord ? { ...diracRecord } : next
-    next.fieldView = defaults.fieldView
-  }
-
-  const sanitized = sanitizeDiracLatticeConfig(next as unknown as DiracConfig)
-  if (sanitized !== (next as unknown)) next = sanitized as unknown as Record<string, unknown>
-
+  const next = normalizeDiracLoadedConfig(
+    { ...DEFAULT_SCHROEDINGER_CONFIG.dirac, ...diracRecord },
+    diracRecord
+  ) as unknown as Record<string, unknown>
   return next === diracRecord ? normalized : { ...normalized, dirac: next }
 }
 
@@ -424,7 +402,7 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged
   normalized = sanitizeHarmonicOscillatorScalars(normalized, DEFAULT_SCHROEDINGER_CONFIG)
   normalized = normalizeSchroedingerNumericScalars(normalized)
   normalized = sanitizeComputeLatticeDims(normalized)
-  normalized = normalizeDiracEnums(normalized)
+  normalized = normalizeDiracConfig(normalized)
 
   const qw = normalized.quantumWalk
   if (qw && typeof qw === 'object' && !Array.isArray(qw)) {
@@ -434,12 +412,7 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged
     }
   }
 
-  // Enforce the ℓ ≥ s physical invariant on TDSE black-hole parameters for
-  // legacy scenes. The BH setters promote ℓ whenever the user raises s, but
-  // scene loading writes `tdse` directly via setState and bypasses the setter
-  // path — so a pre-constraint scene with (bhSpin=2, bhMultipoleL=0) would slip
-  // through. Clamp here so the invariant always holds in memory.
-  normalized = normalizeTdseBhParams(normalized)
+  normalized = normalizeTdseLoadedFieldsForMerge(normalized)
   normalized = normalizeTdseEnums(normalized)
   normalized = normalizeBecLoadedConfig(normalized)
   normalized = normalizeAntiDeSitterLoadedConfig(normalized)

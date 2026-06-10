@@ -43,6 +43,10 @@ const DEFAULT_COMPENSATION_BOUNDING_RADIUS = 2.0
 /** Parse hex color to linear RGB, defaulting to white on failure. */
 const parseColor = (hex: string): Rgb => parseHexColorToLinearRgb(hex)
 
+function finiteNumber(value: number | undefined, fallback: number, min = -Infinity): number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= min ? value : fallback
+}
+
 // =========================================================================
 // HO momentum transform
 // =========================================================================
@@ -162,21 +166,27 @@ export function packCameraUniforms(
   if (is2D) {
     const camPos = camera.position ?? { x: 0, y: 0, z: 8 }
     const camTarget = camera.target ?? { x: 0, y: 0, z: 0 }
-    const dx = camPos.x - (camTarget.x ?? 0)
-    const dy = camPos.y - (camTarget.y ?? 0)
-    const dz = camPos.z - (camTarget.z ?? 0)
+    const camX = finiteNumber(camPos.x, 0)
+    const camY = finiteNumber(camPos.y, 0)
+    const camZ = finiteNumber(camPos.z, 8)
+    const targetX = finiteNumber(camTarget.x, 0)
+    const targetY = finiteNumber(camTarget.y, 0)
+    const targetZ = finiteNumber(camTarget.z, 0)
+    const dx = camX - targetX
+    const dy = camY - targetY
+    const dz = camZ - targetZ
     const distance = Math.sqrt(dx * dx + dy * dy + dz * dz)
     const defaultDistance = 8.0
     scale = distance > 0 ? distance / defaultDistance : 1.0
-    posX = camTarget.x ?? 0
-    posY = camTarget.y ?? 0
+    posX = targetX
+    posY = targetY
     posZ = 0
   } else {
-    scale = transform?.uniformScale ?? 1.0
+    scale = finiteNumber(transform?.uniformScale, 1.0, 1e-6)
     const position = transform?.position ?? [0, 0, 0]
-    posX = position[0] ?? 0
-    posY = position[1] ?? 0
-    posZ = position[2] ?? 0
+    posX = finiteNumber(position[0], 0)
+    posY = finiteNumber(position[1], 0)
+    posZ = finiteNumber(position[2], 0)
   }
 
   // modelMatrix (column-major). Float index = CL.modelMatrix + col*4 + row.
@@ -227,13 +237,13 @@ export function packCameraUniforms(
   data[cp + 1] = 0
   data[cp + 2] = 0
   if (camera.position) {
-    data[cp + 0] = camera.position.x
-    data[cp + 1] = camera.position.y
-    data[cp + 2] = camera.position.z
+    data[cp + 0] = finiteNumber(camera.position.x, 0)
+    data[cp + 1] = finiteNumber(camera.position.y, 0)
+    data[cp + 2] = finiteNumber(camera.position.z, 0)
   }
-  data[CL.cameraNear] = camera.near || 0.1
-  data[CL.cameraFar] = camera.far || 10000
-  data[CL.fov] = ((camera.fov || 50) * Math.PI) / 180 // radians
+  data[CL.cameraNear] = finiteNumber(camera.near, 0.1, 1e-6)
+  data[CL.cameraFar] = finiteNumber(camera.far, 10000, 1e-6)
+  data[CL.fov] = (finiteNumber(camera.fov, 50, 1e-6) * Math.PI) / 180 // radians
   const safeWidth = sanitizePixelExtent(size.width)
   const safeHeight = sanitizePixelExtent(size.height)
   const safeAspect = safeWidth / safeHeight
@@ -251,12 +261,13 @@ export function packCameraUniforms(
     }
   }
 
-  data[CL.time] = animationTime
-  data[CL.deltaTime] = frameDelta
-  dataView.setUint32(CAMERA_UNIFORMS_LAYOUT.byteOffset.frameNumber, frameNumber, true)
+  data[CL.time] = finiteNumber(animationTime, 0)
+  data[CL.deltaTime] = finiteNumber(frameDelta, 0)
+  const safeFrameNumber = Math.max(0, Math.floor(finiteNumber(frameNumber, 0)))
+  dataView.setUint32(CAMERA_UNIFORMS_LAYOUT.byteOffset.frameNumber, safeFrameNumber, true)
 
-  data[CL.bayerOffset + 0] = bayerOffset[0]
-  data[CL.bayerOffset + 1] = bayerOffset[1]
+  data[CL.bayerOffset + 0] = finiteNumber(bayerOffset[0], 0)
+  data[CL.bayerOffset + 1] = finiteNumber(bayerOffset[1], 0)
   data[CL._padding + 0] = 0
   data[CL._padding + 1] = 0
 

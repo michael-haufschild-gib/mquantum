@@ -23,17 +23,17 @@ export interface WasmModule {
     angles: Float64Array,
     rotation_count: number
   ) => Float64Array
-  multiply_matrix_vector_wasm: (
+  multiply_matrix_vector_wasm?: (
     matrix: Float64Array,
     vector: Float64Array,
     dimension: number
   ) => Float64Array
   // Phase 2: Matrix and vector operations
-  multiply_matrices_wasm: (a: Float64Array, b: Float64Array, dimension: number) => Float64Array
-  dot_product_wasm: (a: Float64Array, b: Float64Array) => number
-  magnitude_wasm: (v: Float64Array) => number
-  normalize_vector_wasm: (v: Float64Array) => Float64Array
-  subtract_vectors_wasm: (a: Float64Array, b: Float64Array) => Float64Array
+  multiply_matrices_wasm?: (a: Float64Array, b: Float64Array, dimension: number) => Float64Array
+  dot_product_wasm?: (a: Float64Array, b: Float64Array) => number
+  magnitude_wasm?: (v: Float64Array) => number
+  normalize_vector_wasm?: (v: Float64Array) => Float64Array
+  subtract_vectors_wasm?: (a: Float64Array, b: Float64Array) => Float64Array
   // Phase 4: FFT operations
   fft_1d_wasm: (data: Float64Array, n: number) => Float64Array
   ifft_1d_wasm: (data: Float64Array, n: number) => Float64Array

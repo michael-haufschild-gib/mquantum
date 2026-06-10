@@ -41,6 +41,8 @@ export interface DensityGridComputeConfig {
 /** Size in bytes of the GridParams WGSL struct (vec3u + pad + vec3f + pad + vec3f + pad = 48). */
 export const GRID_PARAMS_SIZE = 48
 
+export const DEFAULT_DENSITY_GRID_WORLD_BOUND = 2.0
+
 /** Result of creating all density grid GPU resources. */
 export interface DensityGridResources {
   densityTexture: GPUTexture
@@ -62,6 +64,15 @@ export interface DensityGridResources {
 
 function isStrictTrue(value: unknown): boolean {
   return value === true
+}
+
+/**
+ *
+ */
+export function sanitizeDensityGridWorldBound(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? Math.max(1e-3, value)
+    : DEFAULT_DENSITY_GRID_WORLD_BOUND
 }
 
 /**
@@ -327,6 +338,8 @@ export function writeGridParams(
   u32View: Uint32Array,
   f32View: Float32Array
 ): void {
+  const safeWorldBound = sanitizeDensityGridWorldBound(worldBound)
+
   // GridParams layout:
   // vec3u gridSize (offset 0, 12 bytes)
   u32View[0] = gridSize
@@ -336,16 +349,16 @@ export function writeGridParams(
   u32View[3] = 0
 
   // vec3f worldMin (offset 16, 12 bytes)
-  f32View[4] = -worldBound
-  f32View[5] = -worldBound
-  f32View[6] = -worldBound
+  f32View[4] = -safeWorldBound
+  f32View[5] = -safeWorldBound
+  f32View[6] = -safeWorldBound
   // f32 _pad1 (offset 28, 4 bytes)
   f32View[7] = 0
 
   // vec3f worldMax (offset 32, 12 bytes)
-  f32View[8] = worldBound
-  f32View[9] = worldBound
-  f32View[10] = worldBound
+  f32View[8] = safeWorldBound
+  f32View[9] = safeWorldBound
+  f32View[10] = safeWorldBound
   // f32 _pad2 (offset 44, 4 bytes)
   f32View[11] = 0
 

@@ -13,6 +13,7 @@ import {
   kleinThreshold,
   zitterbewegungFrequency,
 } from '@/lib/physics/dirac/scales'
+import { useBellExperimentStore } from '@/stores/diagnostics/bellExperimentStore'
 import { useCoordinateEntanglementStore } from '@/stores/diagnostics/coordinateEntanglementStore'
 import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 import type { AtlasPoint } from '@/stores/diagnostics/quantumnessAtlasStore'
@@ -30,7 +31,7 @@ import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
  * @returns Array of values in chronological order (oldest first)
  */
 export function readRingBuffer(
-  buffer: Float32Array | Float64Array,
+  buffer: Float32Array | Float64Array | Uint32Array,
   head: number,
   count: number
 ): number[] {
@@ -54,7 +55,7 @@ export function readRingBuffer(
  */
 interface RingBufferColumn {
   name: string
-  buffer: Float32Array | Float64Array
+  buffer: Float32Array | Float64Array | Uint32Array
 }
 
 /**
@@ -213,6 +214,27 @@ export function exportPauliDiagnosticsCSV(): string {
     { name: 'spinUpFraction', buffer: s.historySpinUpFrac },
     { name: 'spinExpectationZ', buffer: s.historySpinExpZ },
   ])
+}
+
+/**
+ * Export Bell/CHSH diagnostics time-series as CSV.
+ *
+ * @returns CSV string with columns: sample, trials, qmAbsS, lhvAbsS
+ */
+export function exportBellDiagnosticsCSV(): string {
+  const s = useBellExperimentStore.getState()
+  const { historyHead: head, historyCount: count } = s
+  if (count === 0) return ''
+
+  const trials = readRingBuffer(s.historyTrialCount, head, count)
+  const qmAbsS = readRingBuffer(s.historyQmS, head, count)
+  const lhvAbsS = readRingBuffer(s.historyLhvS, head, count)
+
+  const lines = ['sample,trials,qmAbsS,lhvAbsS']
+  for (let i = 0; i < count; i++) {
+    lines.push(`${i},${trials[i]},${qmAbsS[i]},${lhvAbsS[i]}`)
+  }
+  return lines.join('\n')
 }
 
 /**
@@ -477,6 +499,52 @@ function buildPauliPayload(): Record<string, unknown> | null {
   }
 }
 
+function readBellRecentOutcomes(): Record<string, number>[] {
+  const s = useBellExperimentStore.getState()
+  const stride = 4
+  const capacity = Math.floor(s.recentOutcomes.length / stride)
+  if (capacity === 0 || s.recentCount === 0) return []
+  const start = (s.recentHead - s.recentCount + capacity) % capacity
+  return Array.from({ length: s.recentCount }, (_, i) => {
+    const idx = ((start + i) % capacity) * stride
+    return {
+      settingA: s.recentOutcomes[idx]!,
+      settingB: s.recentOutcomes[idx + 1]!,
+      outcomeA: s.recentOutcomes[idx + 2]!,
+      outcomeB: s.recentOutcomes[idx + 3]!,
+    }
+  })
+}
+
+function buildBellPayload(): Record<string, unknown> | null {
+  const s = useBellExperimentStore.getState()
+  if (s.historyCount === 0 && s.sweepResults.length === 0) return null
+  return {
+    current: {
+      totalTrials: s.totalTrials,
+      seed: s.seed,
+      qmHasViolated: s.qmHasViolated,
+      lhvStrategyId: s.lhvStrategyId,
+      qm: s.qm,
+      lhv: s.lhv,
+    },
+    timeSeries: {
+      trials: readRingBuffer(s.historyTrialCount, s.historyHead, s.historyCount),
+      qmAbsS: readRingBuffer(s.historyQmS, s.historyHead, s.historyCount),
+      lhvAbsS: readRingBuffer(s.historyLhvS, s.historyHead, s.historyCount),
+    },
+    recentOutcomes: readBellRecentOutcomes(),
+    sweep: {
+      status: s.sweepStatus,
+      progress: s.sweepProgress,
+      currentStep: s.sweepCurrentStep,
+      config: s.sweepConfig,
+      activeGrid: s.activeSweepGrid,
+      results: s.sweepResults,
+    },
+  }
+}
+
 function buildOpenQuantumPayload(): Record<string, unknown> | null {
   const s = useDiagnosticsStore.getState().openQuantum
   if (s.historyCount === 0) return null
@@ -552,6 +620,7 @@ const MODE_PAYLOAD_BUILDERS: Record<
   freeScalarField: [{ key: 'fsf', build: buildFsfPayload }],
   diracEquation: [{ key: 'dirac', build: buildDiracPayload }],
   pauliSpinor: [{ key: 'pauli', build: buildPauliPayload }],
+  bellTest: [{ key: 'bell', build: buildBellPayload }],
   harmonicOscillator: [{ key: 'openQuantum', build: buildOpenQuantumPayload }],
   hydrogenND: [{ key: 'openQuantum', build: buildOpenQuantumPayload }],
   hydrogenNDCoupled: [{ key: 'openQuantum', build: buildOpenQuantumPayload }],

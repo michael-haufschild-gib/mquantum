@@ -1,4 +1,19 @@
+import { COHERENCE_HORIZON_RANGES } from '@/lib/geometry/extended/coherenceHorizon'
+import {
+  DEFAULT_HILBERT_POLYA_CONFIG,
+  HILBERT_POLYA_RANGES,
+} from '@/lib/geometry/extended/hilbertPolya'
+import {
+  DEFAULT_RIEMANN_ZETA_CONFIG,
+  RIEMANN_ZETA_RANGES,
+} from '@/lib/geometry/extended/riemannZeta'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
+import { tangherliniHorizonRadius } from '@/lib/physics/coherenceHorizon'
+import {
+  hagedornPartitionGain,
+  RIEMANN_DEFAULT_RADIAL,
+  RIEMANN_WORLD_SCALE,
+} from '@/lib/physics/riemannZeta'
 
 import { SCHROEDINGER_LAYOUT } from '../schroedingerLayout'
 
@@ -213,6 +228,178 @@ export function packHermiteCocycle(
     3.5,
     0.0,
     8.0
+  )
+}
+
+/**
+ * Pack Coherence Horizon (coherence-sourced gravity) uniforms. Only the
+ * coherenceHorizon mode reads these fields (its dedicated geodesic main
+ * block); every other mode gets all-zero fields so the buffer region is
+ * deterministic. The Tangherlini horizon radius r_h and the metric exponent
+ * (d−2) are CPU-precomputed here so the shader never derives them per frame.
+ */
+export function packCoherenceHorizon(
+  floatView: Float32Array,
+  schroedinger: Partial<SchroedingerConfig> | undefined,
+  isCoherenceHorizonMode: boolean,
+  dimension: number
+): void {
+  if (!isCoherenceHorizonMode) {
+    floatView[I.coherenceHorizonDecoherence] =
+      floatView[I.coherenceHorizonSeparation] =
+      floatView[I.coherenceHorizonWidth] =
+      floatView[I.coherenceHorizonWaveNumber] =
+      floatView[I.coherenceHorizonRadius] =
+      floatView[I.coherenceHorizonMetricExponent] =
+      floatView[I.coherenceHorizonRingGain] =
+      floatView[I.coherenceHorizonGlow] =
+        0.0
+    return
+  }
+
+  const config = schroedinger?.coherenceHorizon
+  const R = COHERENCE_HORIZON_RANGES
+  const decoherence = finiteClamped(config?.decoherence, 0, R.decoherence.min, R.decoherence.max)
+  const horizonScale = finiteClamped(
+    config?.horizonScale,
+    0.5,
+    R.horizonScale.min,
+    R.horizonScale.max
+  )
+  const d = Math.max(3, Math.min(11, Math.floor(Number.isFinite(dimension) ? dimension : 3)))
+
+  floatView[I.coherenceHorizonDecoherence] = decoherence
+  floatView[I.coherenceHorizonSeparation] = finiteClamped(
+    config?.separation,
+    1.6,
+    R.separation.min,
+    R.separation.max
+  )
+  floatView[I.coherenceHorizonWidth] = finiteClamped(config?.width, 0.45, R.width.min, R.width.max)
+  floatView[I.coherenceHorizonWaveNumber] = finiteClamped(
+    config?.waveNumber,
+    5,
+    R.waveNumber.min,
+    R.waveNumber.max
+  )
+  floatView[I.coherenceHorizonRadius] = tangherliniHorizonRadius(decoherence, horizonScale, d)
+  floatView[I.coherenceHorizonMetricExponent] = d - 2
+  floatView[I.coherenceHorizonRingGain] = finiteClamped(
+    config?.ringGain,
+    2.2,
+    R.ringGain.min,
+    R.ringGain.max
+  )
+  floatView[I.coherenceHorizonGlow] = finiteClamped(config?.glow, 1.2, R.glow.min, R.glow.max)
+}
+
+/**
+ * Pack Arithmetic Horizon (Riemann ζ) uniforms. Only the riemannZeta mode reads
+ * these fields (its dedicated volumetric main block); every other mode gets
+ * all-zero fields so the buffer region is deterministic. The radial LUT itself
+ * is a separate group-2 storage buffer owned by RiemannZetaStrategy — not part
+ * of this struct. The Hagedorn partition gain, the world-space horizon radius,
+ * and the metric exponent (d−2) are CPU-precomputed here so the shader never
+ * derives them per frame.
+ */
+export function packRiemannZeta(
+  floatView: Float32Array,
+  schroedinger: Partial<SchroedingerConfig> | undefined,
+  dimension: number,
+  boundingRadius: number,
+  isRiemannZetaMode: boolean
+): void {
+  if (!isRiemannZetaMode) {
+    floatView[I.riemannUMin] =
+      floatView[I.riemannUMax] =
+      floatView[I.riemannPartitionGain] =
+      floatView[I.riemannGlow] =
+      floatView[I.riemannHorizonRadius] =
+      floatView[I.riemannMetricExponent] =
+      floatView[I.riemannFlowRate] =
+      floatView[I.riemannAngularL] =
+      floatView[I.riemannAngularM] =
+      floatView[I.riemannCutaway] =
+        0.0
+    return
+  }
+
+  const cfg = schroedinger?.riemannZeta
+  const defaults = DEFAULT_RIEMANN_ZETA_CONFIG
+  const R = RIEMANN_ZETA_RANGES
+  const d = Math.max(3, Math.min(11, Math.floor(Number.isFinite(dimension) ? dimension : 3)))
+  const safeBound = Number.isFinite(boundingRadius) && boundingRadius > 0 ? boundingRadius : 2.0
+
+  const beta = finiteClamped(cfg?.beta, defaults.beta, R.beta.min, R.beta.max)
+  const angularL = finiteClamped(cfg?.angularL, defaults.angularL, R.angularL.min, R.angularL.max)
+  const angularM = finiteClamped(cfg?.angularM, defaults.angularM, -angularL, angularL)
+  const horizonRadius = finiteClamped(
+    cfg?.horizonRadius,
+    defaults.horizonRadius,
+    R.horizonRadius.min,
+    R.horizonRadius.max
+  )
+
+  // The LUT lives in pure u = ln(p^k) coordinates; world space is scaled by
+  // RIEMANN_WORLD_SCALE (shells at r = s·p^k). Shifting the uniform u-range by
+  // ln(s) makes the shader's u = ln(r_world) land on the right LUT samples
+  // without touching the LUT or adding a division per march step.
+  const logScale = Math.log(RIEMANN_WORLD_SCALE)
+  floatView[I.riemannUMin] = RIEMANN_DEFAULT_RADIAL.uMin + logScale
+  floatView[I.riemannUMax] = RIEMANN_DEFAULT_RADIAL.uMax + logScale
+  floatView[I.riemannPartitionGain] = hagedornPartitionGain(beta)
+  floatView[I.riemannGlow] = finiteClamped(cfg?.glow, defaults.glow, R.glow.min, R.glow.max)
+  floatView[I.riemannHorizonRadius] = horizonRadius * 0.6 * safeBound
+  floatView[I.riemannMetricExponent] = d - 2
+  floatView[I.riemannFlowRate] = finiteClamped(
+    cfg?.flowRate,
+    defaults.flowRate,
+    R.flowRate.min,
+    R.flowRate.max
+  )
+  floatView[I.riemannAngularL] = angularL
+  floatView[I.riemannAngularM] = angularM
+  floatView[I.riemannCutaway] = (cfg?.cutaway ?? defaults.cutaway) ? 1.0 : 0.0
+}
+
+/**
+ * Pack Hilbert–Pólya Spectrum uniforms. Only the hilbertPolya mode reads these
+ * fields (its dedicated volumetric main block); every other mode gets all-zero
+ * fields so the buffer region is deterministic. The (Re z, Im z, θ) volume LUT
+ * itself is a separate group-2 storage buffer owned by HilbertPolyaStrategy —
+ * not part of this struct. The LUT-shaping fields (zMax / yExtent) are
+ * consumed by the strategy's worker job, not packed here.
+ */
+export function packHilbertPolya(
+  floatView: Float32Array,
+  schroedinger: Partial<SchroedingerConfig> | undefined,
+  isHilbertPolyaMode: boolean
+): void {
+  if (!isHilbertPolyaMode) {
+    floatView[I.hpGlow] = floatView[I.hpFogGain] = floatView[I.hpPlaneMarker] = 0.0
+    floatView[I.hpFilamentWidth] = 0.0
+    return
+  }
+
+  const cfg = schroedinger?.hilbertPolya
+  const defaults = DEFAULT_HILBERT_POLYA_CONFIG
+  const R = HILBERT_POLYA_RANGES
+
+  floatView[I.hpGlow] = finiteClamped(cfg?.glow, defaults.glow, R.glow.min, R.glow.max)
+  floatView[I.hpFogGain] = finiteClamped(
+    cfg?.fogGain,
+    defaults.fogGain,
+    R.fogGain.min,
+    R.fogGain.max
+  )
+  floatView[I.hpPlaneMarker] = (cfg?.planeMarker ?? defaults.planeMarker) ? 1.0 : 0.0
+  // The filament Gaussian profile is applied in the shader against the LUT's
+  // distance channel — width changes are uniform-only (no worker recompute).
+  floatView[I.hpFilamentWidth] = finiteClamped(
+    cfg?.filamentWidth,
+    defaults.filamentWidth,
+    R.filamentWidth.min,
+    R.filamentWidth.max
   )
 }
 

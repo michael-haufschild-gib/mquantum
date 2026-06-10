@@ -84,6 +84,9 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   const isQuantumWalk = sanitizeShaderBoolean(config.isQuantumWalk, false)
   const isPauli = sanitizeShaderBoolean(config.isPauli, false)
   const isAds = sanitizeShaderBoolean(config.isAds, false)
+  const isCoherenceHorizon = sanitizeShaderBoolean(config.isCoherenceHorizon, false)
+  const isRiemannZeta = sanitizeShaderBoolean(config.isRiemannZeta, false)
+  const isHilbertPolya = sanitizeShaderBoolean(config.isHilbertPolya, false)
   const freeScalarAnalysis = sanitizeShaderBoolean(config.freeScalarAnalysis, false)
   const useDensityMatrix = sanitizeShaderBoolean(config.useDensityMatrix, false)
   const crossSectionEnabled = sanitizeShaderBoolean(config.crossSectionEnabled, true)
@@ -147,6 +150,9 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     isQuantumWalk,
     isPauli,
     isAds,
+    isCoherenceHorizon,
+    isRiemannZeta,
+    isHilbertPolya,
     useWignerCache,
     crossSectionEnabled,
     probabilityCurrentEnabled,
@@ -174,6 +180,9 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   }
 
   const selectedMainBlock = selectMainBlock(
+    isCoherenceHorizon,
+    isRiemannZeta,
+    isHilbertPolya,
     isWigner,
     is2D,
     isosurface,
@@ -215,24 +224,31 @@ struct VertexOutput {
         useDensityGrid,
         usePrecomputedNormals,
         freeScalarAnalysis,
+        isRiemannZeta,
+        isHilbertPolya,
       }),
     },
 
-    // Quantum math modules (excluded in grid-only mode — compute shader handles wavefunction evaluation)
-    ...buildQuantumMathBlocks({
-      actualDim,
-      includeHarmonic,
-      includeHydrogen,
-      includeHydrogenND,
-      hydrogenNDDimension,
-      isHydrogenFamily,
-      isHydrogenCoupled,
-      useCache,
-      useUnrolledHO,
-      termCount: shaderTermCount,
-      isWigner,
-      gridOnly,
-    }),
+    // Quantum math modules (excluded in grid-only mode — compute shader handles
+    // wavefunction evaluation — and in Coherence Horizon / Arithmetic Horizon /
+    // Hilbert–Pólya modes, whose dedicated main blocks evaluate their fields
+    // inline / via their LUTs and reference nothing here)
+    ...(isCoherenceHorizon || isRiemannZeta || isHilbertPolya
+      ? []
+      : buildQuantumMathBlocks({
+          actualDim,
+          includeHarmonic,
+          includeHydrogen,
+          includeHydrogenND,
+          hydrogenNDDimension,
+          isHydrogenFamily,
+          isHydrogenCoupled,
+          useCache,
+          useUnrolledHO,
+          termCount: shaderTermCount,
+          isWigner,
+          gridOnly,
+        })),
 
     // Color system
     { name: 'Color (HSL)', content: hslBlock },
@@ -243,22 +259,26 @@ struct VertexOutput {
     { name: 'GGX PBR', content: ggxBlock, condition: isosurface && !is2D },
     { name: 'Multi-Light System', content: multiLightBlock, condition: isosurface && !is2D },
 
-    // Volume rendering (inline raymarch excluded in grid-only mode)
-    ...buildVolumeBlocks({
-      is2D,
-      colorAlgorithm,
-      includeHydrogen,
-      useCache,
-      actualDim,
-      termCount: shaderTermCount,
-      useDensityGrid,
-      usePrecomputedNormals,
-      freeScalarAnalysis,
-      nodal,
-      crossSectionEnabled,
-      probabilityCurrentEnabled,
-      gridOnly,
-    }),
+    // Volume rendering (inline raymarch excluded in grid-only mode; entirely
+    // absent for Coherence Horizon, Arithmetic Horizon, and Hilbert–Pólya —
+    // their main blocks own the geodesic / LUT volumetric march)
+    ...(isCoherenceHorizon || isRiemannZeta || isHilbertPolya
+      ? []
+      : buildVolumeBlocks({
+          is2D,
+          colorAlgorithm,
+          includeHydrogen,
+          useCache,
+          actualDim,
+          termCount: shaderTermCount,
+          useDensityGrid,
+          usePrecomputedNormals,
+          freeScalarAnalysis,
+          nodal,
+          crossSectionEnabled,
+          probabilityCurrentEnabled,
+          gridOnly,
+        })),
 
     // Geometry
     { name: 'Sphere Intersection', content: sphereIntersectBlock, condition: !is2D },

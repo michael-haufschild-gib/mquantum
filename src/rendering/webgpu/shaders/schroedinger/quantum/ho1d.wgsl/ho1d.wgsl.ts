@@ -44,9 +44,11 @@ fn ho1D(n: i32, x: f32, omega: f32) -> f32 {
   let alpha = sqrt(omegaClamped);
   let u = alpha * x;
 
-  // Gaussian envelope: e^{-½u²}
-  // Clamp u² to prevent underflow
-  let u2 = min(u * u, 40.0);
+  // Gaussian envelope: e^{-½u²}. Once u² is this large, all supported
+  // n<=6 states are visually/numerically negligible; return before Hermite
+  // growth can turn a tiny Gaussian tail into polynomial regrowth.
+  let u2 = u * u;
+  if (u2 > 80.0) { return 0.0; }
   let gauss = exp(-0.5 * u2);
 
   // Hermite polynomial
@@ -68,7 +70,8 @@ fn ho1DFast(n: i32, x: f32, alpha: f32, alphaNorm: f32) -> f32 {
   if (n < 0 || n > 6) { return 0.0; }
 
   let u = alpha * x;
-  let u2 = min(u * u, 40.0);
+  let u2 = u * u;
+  if (u2 > 80.0) { return 0.0; }
   let gauss = exp(-0.5 * u2);
   let H = hermite(n, u);
   let norm = HO_NORM[n];
@@ -82,6 +85,7 @@ fn ho1DFast(n: i32, x: f32, alpha: f32, alphaNorm: f32) -> f32 {
 // Eliminates redundant exp() calls: 1 per dimension instead of 1 per term×dimension.
 fn ho1DFastPreGauss(n: i32, u: f32, gauss: f32, alphaNorm: f32) -> f32 {
   if (n < 0 || n > 6) { return 0.0; }
+  if (gauss == 0.0) { return 0.0; }
   let H = hermite(n, u);
   let norm = HO_NORM[n];
   return alphaNorm * norm * H * gauss;
@@ -91,7 +95,9 @@ fn ho1DFastPreGauss(n: i32, u: f32, gauss: f32, alphaNorm: f32) -> f32 {
 // and norm lookup: φ_0(x, ω) = (ω/π)^{1/4} * exp(-½ωx²).
 // Used by hydrogen ND extra dimensions when quantum numbers are 0 (common default).
 fn ho1DGroundState(x: f32, alpha: f32, alphaNorm: f32) -> f32 {
-  let u2 = min(alpha * alpha * x * x, 40.0);
+  let u = alpha * x;
+  let u2 = u * u;
+  if (u2 > 80.0) { return 0.0; }
   return alphaNorm * exp(-0.5 * u2);
 }
 

@@ -6,6 +6,7 @@ import { ObjectTypeExplorer } from '@/components/sections/ObjectTypes/ObjectType
 import { ToastProvider } from '@/contexts/ToastContext'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { useRotationStore } from '@/stores/scene/rotationStore'
 
 describe('ObjectTypeExplorer quantum mode entries', () => {
   beforeEach(() => {
@@ -13,6 +14,7 @@ describe('ObjectTypeExplorer quantum mode entries', () => {
     useGeometryStore.getState().setObjectType('schroedinger')
     useGeometryStore.getState().setDimension(4)
     useExtendedObjectStore.getState().reset()
+    useRotationStore.setState(useRotationStore.getInitialState())
   })
 
   it('shows Harmonic Oscillator and Hydrogen Orbitals and switches to hydrogenND', () => {
@@ -61,6 +63,23 @@ describe('ObjectTypeExplorer quantum mode entries', () => {
 
     fireEvent.click(screen.getByTestId('object-type-pauliSpinor'))
     expect(useGeometryStore.getState().objectType).toBe('pauliSpinor')
+  })
+
+  it('resets stale rotations when switching object type through a card', () => {
+    useGeometryStore.getState().setDimension(3)
+    useRotationStore.getState().setDimension(3)
+    useRotationStore.getState().setRotation('XY', 1.25)
+
+    render(
+      <ToastProvider>
+        <ObjectTypeExplorer />
+      </ToastProvider>
+    )
+
+    fireEvent.click(screen.getByTestId('object-type-pauliSpinor'))
+
+    expect(useGeometryStore.getState().objectType).toBe('pauliSpinor')
+    expect(useRotationStore.getState().rotations.size).toBe(0)
   })
 
   it('returns objectType to schroedinger when selecting a quantum mode after Pauli', () => {

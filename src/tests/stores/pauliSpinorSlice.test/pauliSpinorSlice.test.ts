@@ -55,6 +55,10 @@ describe('pauliSpinorSlice', () => {
     expect(useExtendedObjectStore.getState().pauliSpinor.stepsPerFrame).toBe(16)
     setPauliStepsPerFrame(8)
     expect(useExtendedObjectStore.getState().pauliSpinor.stepsPerFrame).toBe(8)
+    setPauliStepsPerFrame(Number.NaN)
+    expect(useExtendedObjectStore.getState().pauliSpinor.stepsPerFrame).toBe(8)
+    setPauliStepsPerFrame(Number.POSITIVE_INFINITY)
+    expect(useExtendedObjectStore.getState().pauliSpinor.stepsPerFrame).toBe(8)
   })
 
   it('setPauliHbar clamps to [0.01, 10]', () => {

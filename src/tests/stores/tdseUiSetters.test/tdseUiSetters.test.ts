@@ -228,6 +228,27 @@ describe('TDSE UI setters', () => {
     })
   })
 
+  describe('setSchroedingerConfig TDSE disorder sanitization', () => {
+    it('sanitizes disorder fields that bypass individual setters', () => {
+      useExtendedObjectStore.getState().setTdseDisorderStrength(7)
+      useExtendedObjectStore.getState().setTdseDisorderSeed(123)
+      useExtendedObjectStore.getState().setTdseDisorderDistribution('gaussian')
+
+      useExtendedObjectStore.getState().setSchroedingerConfig({
+        tdse: {
+          ...getTdse(),
+          disorderStrength: Number.POSITIVE_INFINITY,
+          disorderSeed: -5,
+          disorderDistribution: 'lorentzian' as never,
+        },
+      })
+
+      expect(getTdse().disorderStrength).toBe(7)
+      expect(getTdse().disorderSeed).toBe(0)
+      expect(getTdse().disorderDistribution).toBe('gaussian')
+    })
+  })
+
   describe('setTdseCustomPotentialExpression', () => {
     it('sets custom potential expression', () => {
       useExtendedObjectStore.getState().setTdseCustomPotentialExpression('x^2 + y^2')

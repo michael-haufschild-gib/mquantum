@@ -156,5 +156,63 @@ describe('animation-wasm helpers', () => {
       expect(subtractVectorsWasm(new Float64Array([1, 2, 3]), new Float64Array([4, 5]))).toBeNull()
       expect(subtract).not.toHaveBeenCalled()
     })
+
+    it('rejects wrong-length matrix-vector WASM results', () => {
+      const multiply = vi.fn(() => new Float64Array([1, 2]))
+      const runtime = getWasmRuntime() as {
+        ready: boolean
+        module: ReturnType<typeof getWasmRuntime>['module']
+      }
+      runtime.ready = true
+      runtime.module = { multiply_matrix_vector_wasm: multiply } as unknown as ReturnType<
+        typeof getWasmRuntime
+      >['module']
+
+      expect(multiplyMatrixVectorWasm(new Float64Array(9), new Float64Array(3), 3)).toBeNull()
+    })
+
+    it('rejects wrong-length matrix-multiply WASM results', () => {
+      const multiply = vi.fn(() => new Float64Array(8))
+      const runtime = getWasmRuntime() as {
+        ready: boolean
+        module: ReturnType<typeof getWasmRuntime>['module']
+      }
+      runtime.ready = true
+      runtime.module = { multiply_matrices_wasm: multiply } as unknown as ReturnType<
+        typeof getWasmRuntime
+      >['module']
+
+      expect(multiplyMatricesWasm(new Float64Array(9), new Float64Array(9), 3)).toBeNull()
+    })
+
+    it('rejects wrong-length normalize WASM results', () => {
+      const normalize = vi.fn(() => new Float64Array([1, 0]))
+      const runtime = getWasmRuntime() as {
+        ready: boolean
+        module: ReturnType<typeof getWasmRuntime>['module']
+      }
+      runtime.ready = true
+      runtime.module = { normalize_vector_wasm: normalize } as unknown as ReturnType<
+        typeof getWasmRuntime
+      >['module']
+
+      expect(normalizeVectorWasm(new Float64Array([3, 4, 0]))).toBeNull()
+    })
+
+    it('rejects wrong-length subtraction WASM results', () => {
+      const subtract = vi.fn(() => new Float64Array([1, -1]))
+      const runtime = getWasmRuntime() as {
+        ready: boolean
+        module: ReturnType<typeof getWasmRuntime>['module']
+      }
+      runtime.ready = true
+      runtime.module = { subtract_vectors_wasm: subtract } as unknown as ReturnType<
+        typeof getWasmRuntime
+      >['module']
+
+      expect(
+        subtractVectorsWasm(new Float64Array([1, 2, 3]), new Float64Array([4, 5, 6]))
+      ).toBeNull()
+    })
   })
 })

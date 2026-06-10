@@ -68,6 +68,8 @@ export class FsfKSpaceManager {
   private readonly K_SPACE_UPDATE_INTERVAL = 5
   /** Monotonic epoch used to invalidate stale async readback jobs after rebuild/dispose. */
   private kSpaceReadbackEpoch = 0
+  /** Monotonic epoch used to invalidate stale diagnostics jobs after panel/toggle changes. */
+  private diagnosticsReadbackEpoch = 0
   /** Pending k-space texture data computed async, uploaded synchronously next frame. */
   private pendingKSpaceData: PendingKSpaceData | null = null
   /** Web Worker for offloading FFT + k-space CPU work from the main thread. */
@@ -119,12 +121,19 @@ export class FsfKSpaceManager {
    */
   invalidateReadbacks(): void {
     this.kSpaceReadbackEpoch++
+    this.diagnosticsReadbackEpoch++
     this.pendingKSpaceData = null
+  }
+
+  /** Invalidate in-flight diagnostics readbacks without dropping pending k-space textures. */
+  invalidateDiagnosticsReadbacks(): void {
+    this.diagnosticsReadbackEpoch++
   }
 
   /** Destroy staging buffers and invalidate in-flight jobs. */
   destroyBuffers(): void {
     this.kSpaceReadbackEpoch++
+    this.diagnosticsReadbackEpoch++
     this.pendingKSpaceData = null
     // Cancel any pending mapAsync before destroying staging buffers.
     if (this.diagMappingInFlight) {
@@ -396,7 +405,8 @@ export class FsfKSpaceManager {
     if (!phiBuf || !piBuf) return
 
     this.diagMappingInFlight = true
-    const epoch = this.kSpaceReadbackEpoch
+    const fieldEpoch = this.kSpaceReadbackEpoch
+    const diagnosticsEpoch = this.diagnosticsReadbackEpoch
     let phiMapped = false
     let piMapped = false
 
@@ -406,7 +416,10 @@ export class FsfKSpaceManager {
       await new Promise<void>((r) => queueMicrotask(r))
       await phiBuf.mapAsync(GPUMapMode.READ)
       phiMapped = true
-      if (epoch !== this.kSpaceReadbackEpoch) {
+      if (
+        fieldEpoch !== this.kSpaceReadbackEpoch ||
+        diagnosticsEpoch !== this.diagnosticsReadbackEpoch
+      ) {
         phiBuf.unmap()
         this.diagMappingInFlight = false
         return
@@ -417,7 +430,10 @@ export class FsfKSpaceManager {
       // Post-map epoch re-check: a reset can land while mapAsync is awaiting,
       // which invalidates these mapped ranges logically even though WebGPU
       // lets us read them. Bail out before computing a stale snapshot.
-      if (epoch !== this.kSpaceReadbackEpoch) {
+      if (
+        fieldEpoch !== this.kSpaceReadbackEpoch ||
+        diagnosticsEpoch !== this.diagnosticsReadbackEpoch
+      ) {
         phiBuf.unmap()
         piBuf.unmap()
         this.diagMappingInFlight = false
@@ -436,7 +452,10 @@ export class FsfKSpaceManager {
       // Final epoch check just before pushing so a reset that lands between
       // the compute above and this store write cannot repopulate a
       // freshly-cleared diagnostics store with stale field data.
-      if (epoch !== this.kSpaceReadbackEpoch) {
+      if (
+        fieldEpoch !== this.kSpaceReadbackEpoch ||
+        diagnosticsEpoch !== this.diagnosticsReadbackEpoch
+      ) {
         this.diagMappingInFlight = false
         return
       }

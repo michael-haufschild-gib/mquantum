@@ -154,6 +154,10 @@ describe('Pauli spinor setters — extended', () => {
     expect(pauli().diagnosticsInterval).toBe(10)
     store().setPauliDiagnosticsInterval(0)
     expect(pauli().diagnosticsInterval).toBe(1)
+    store().setPauliDiagnosticsInterval(Number.NaN)
+    expect(pauli().diagnosticsInterval).toBe(1)
+    store().setPauliDiagnosticsInterval(Number.POSITIVE_INFINITY)
+    expect(pauli().diagnosticsInterval).toBe(1)
   })
 
   it('setPauliSliceAnimationEnabled / setPauliSliceSpeed / setPauliSliceAmplitude', () => {

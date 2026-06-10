@@ -13,6 +13,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 
+import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
 import { DiracStrategy } from '@/rendering/webgpu/renderers/strategies/DiracStrategy'
 import { FreeScalarFieldStrategy } from '@/rendering/webgpu/renderers/strategies/FreeScalarFieldStrategy'
 import { PauliStrategy } from '@/rendering/webgpu/renderers/strategies/PauliStrategy'
@@ -21,14 +22,18 @@ import { TdseBecStrategy } from '@/rendering/webgpu/renderers/strategies/TdseBec
 
 interface FakeComputePass {
   id: string
+  densityGridSize: number
   disposed: boolean
+  getDensityGridSize: () => number
   dispose: () => void
 }
 
-function makeFakePass(id: string): FakeComputePass {
+function makeFakePass(id: string, densityGridSize = DENSITY_GRID_SIZE): FakeComputePass {
   const pass: FakeComputePass = {
     id,
+    densityGridSize,
     disposed: false,
+    getDensityGridSize: () => densityGridSize,
     dispose: () => {
       pass.disposed = true
     },
@@ -106,6 +111,17 @@ describe('TdseBecStrategy.adoptComputeState', () => {
     expect((source as unknown as { tdsePass: unknown }).tdsePass).toBe(fake)
     target.dispose()
     expect(fake.disposed).toBe(false)
+  })
+
+  it('refuses a non-default pass when successor config omits densityGridResolution', () => {
+    const source = new TdseBecStrategy()
+    const target = new TdseBecStrategy()
+    const fake = makeFakePass('tdse-large', DENSITY_GRID_SIZE * 2)
+    ;(source as unknown as { tdsePass: FakeComputePass }).tdsePass = fake
+
+    expect(target.adoptComputeState(source, {} as never)).toBe(false)
+    expect((source as unknown as { tdsePass: unknown }).tdsePass).toBe(fake)
+    expect((target as unknown as { tdsePass: unknown }).tdsePass).toBeNull()
   })
 })
 

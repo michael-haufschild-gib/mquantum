@@ -86,6 +86,26 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
     return null
   }
 
+  // Coherence Horizon renders through its dedicated geodesic main block,
+  // which implements none of these shared-pipeline effects (SSS, emission
+  // post-processing, powder/anisotropy). Hide the section instead of showing
+  // controls that would silently do nothing.
+  if (objectType === 'schroedinger' && quantumMode === 'coherenceHorizon') {
+    return null
+  }
+
+  // Arithmetic Horizon (riemannZeta) likewise owns a dedicated volumetric
+  // main block that composes none of the shared-pipeline effects.
+  if (objectType === 'schroedinger' && quantumMode === 'riemannZeta') {
+    return null
+  }
+
+  // Hilbert–Pólya Spectrum likewise owns a dedicated volumetric main block
+  // that composes none of the shared-pipeline effects.
+  if (objectType === 'schroedinger' && quantumMode === 'hilbertPolya') {
+    return null
+  }
+
   const isPauli = objectType === 'pauliSpinor'
   const isBellPair = objectType === 'bellPair'
   const isSchroedinger = objectType === 'schroedinger'

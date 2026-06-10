@@ -164,6 +164,18 @@ function maxAbsFiniteEntry(M: ComplexMatrix): number {
   return maxAbs
 }
 
+function resolveEntryScaling(maxAbs: number): { entryScale: number; outputScale: number } {
+  const inverseScale = 1 / maxAbs
+  if (Number.isFinite(inverseScale)) {
+    return { entryScale: inverseScale, outputScale: maxAbs }
+  }
+
+  // `maxAbs` is a positive subnormal so tiny that `1 / maxAbs` overflows.
+  // Scale by the largest finite value instead of skipping scaling; otherwise
+  // Gram entries underflow to zero and non-zero Schmidt values disappear.
+  return { entryScale: Number.MAX_VALUE, outputScale: 1 / Number.MAX_VALUE }
+}
+
 /**
  * Embed a complex Hermitian matrix `H = A + iB` (with `A` symmetric,
  * `B` skew-symmetric) into a real symmetric `2k × 2k` block matrix
@@ -259,9 +271,7 @@ export function complexSvdSingularValues(M: ComplexMatrix): Float64Array {
 
   const maxAbs = maxAbsFiniteEntry(M)
   if (maxAbs === 0) return new Float64Array(kExpected)
-  const inverseScale = 1 / maxAbs
-  const entryScale = Number.isFinite(inverseScale) ? inverseScale : 1
-  const outputScale = Number.isFinite(inverseScale) ? maxAbs : 1
+  const { entryScale, outputScale } = resolveEntryScaling(maxAbs)
 
   const wide = m < n
   const { k, gRe, gIm } = hermitianGram(M, wide, entryScale)

@@ -13,13 +13,29 @@
 import { create } from 'zustand'
 
 import type { SaveableQuantumMode } from '@/lib/export/simulationState'
+import { DEFAULT_DIRAC_CONFIG, type DiracConfig } from '@/lib/geometry/extended/dirac'
 import { FREE_SCALAR_MAX_TOTAL_SITES } from '@/lib/geometry/extended/freeScalar'
-import type { PauliConfig } from '@/lib/geometry/extended/types'
+import {
+  sanitizeSchroedingerBooleanScalars,
+  sanitizeSchroedingerNumericScalars,
+} from '@/lib/geometry/extended/schroedinger/configSanitization'
+import {
+  DEFAULT_TDSE_CONFIG,
+  sanitizeTdseLoadedFields,
+  type TdseConfig,
+} from '@/lib/geometry/extended/tdse'
+import {
+  createDefaultPauliConfig,
+  DEFAULT_SCHROEDINGER_CONFIG,
+  type PauliConfig,
+} from '@/lib/geometry/extended/types'
 import { getQuantumTypeConfigSubKey } from '@/lib/geometry/registry'
 import { sanitizePowerOfTwoGridSizes } from '@/lib/math/ndArray'
 import { usePerformanceStore } from '@/stores/runtime/performanceStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { normalizeDiracLoadedConfig } from '@/stores/utils/mergeDefaults/mergeWithDefaultsDirac'
+import { normalizePauliLoadedConfig } from '@/stores/utils/mergeDefaults/mergeWithDefaultsPauli'
 
 /** Status of save/load operations */
 export type SimulationStateStatus = 'idle' | 'saving' | 'loading' | 'done' | 'error'
@@ -146,6 +162,45 @@ function normalizeLoadedFreeScalarSubConfig(
   )
 }
 
+function normalizeLoadedDiracSubConfig(subConfig: Record<string, unknown>): DiracConfig {
+  return normalizeDiracLoadedConfig(
+    { ...DEFAULT_DIRAC_CONFIG, ...subConfig } as DiracConfig,
+    subConfig
+  )
+}
+
+function normalizeLoadedTdseSubConfig(subConfig: Record<string, unknown>): TdseConfig {
+  return sanitizeTdseLoadedFields({ ...DEFAULT_TDSE_CONFIG, ...subConfig } as TdseConfig, {
+    ...DEFAULT_TDSE_CONFIG,
+    needsReset: true,
+  })
+}
+
+function normalizeLoadedTopLevelSchroedingerConfig(
+  config: Record<string, unknown>
+): Record<string, unknown> {
+  return sanitizeSchroedingerBooleanScalars(
+    sanitizeSchroedingerNumericScalars(config, DEFAULT_SCHROEDINGER_CONFIG),
+    DEFAULT_SCHROEDINGER_CONFIG
+  )
+}
+
+function normalizeLoadedSchroedingerSubConfig(
+  quantumMode: SaveableQuantumMode,
+  loadedSubConfig: Record<string, unknown>
+): Record<string, unknown> | DiracConfig | TdseConfig {
+  if (quantumMode === 'freeScalarField') {
+    return normalizeLoadedFreeScalarSubConfig(loadedSubConfig)
+  }
+  if (quantumMode === 'diracEquation') {
+    return normalizeLoadedDiracSubConfig(loadedSubConfig)
+  }
+  if (quantumMode === 'tdseDynamics') {
+    return normalizeLoadedTdseSubConfig(loadedSubConfig)
+  }
+  return loadedSubConfig
+}
+
 /**
  * Build the `setSchroedingerConfig` payload for a non-Pauli compute-mode
  * load, forcing `needsReset: true` into the correct sub-config so the
@@ -162,16 +217,15 @@ function buildSchroedingerPushedConfig(
     subKey && typeof restConfig[subKey] === 'object' && restConfig[subKey] !== null
       ? { ...(restConfig[subKey] as Record<string, unknown>), needsReset: true }
       : undefined
-  const subConfig =
-    quantumMode === 'freeScalarField' && loadedSubConfig
-      ? normalizeLoadedFreeScalarSubConfig(loadedSubConfig)
-      : loadedSubConfig
-  return {
+  const subConfig = loadedSubConfig
+    ? normalizeLoadedSchroedingerSubConfig(quantumMode, loadedSubConfig)
+    : undefined
+  const topLevelConfig = normalizeLoadedTopLevelSchroedingerConfig({
     ...restConfig,
     quantumMode,
     needsReset: true,
-    ...(subKey && subConfig ? { [subKey]: subConfig } : {}),
-  }
+  })
+  return subKey && subConfig ? { ...topLevelConfig, [subKey]: subConfig } : topLevelConfig
 }
 
 /**
@@ -186,7 +240,11 @@ function applyLoadedQuantumMode(
   if (quantumMode === 'pauliSpinor') {
     useGeometryStore.getState().setObjectType('pauliSpinor')
     const pauliConfig = (restConfig.pauli ?? restConfig) as Partial<PauliConfig>
-    useExtendedObjectStore.getState().setPauliConfig({ ...pauliConfig, needsReset: true })
+    const normalizedPauliConfig = normalizePauliLoadedConfig(
+      { ...createDefaultPauliConfig(), ...pauliConfig } as PauliConfig,
+      pauliConfig
+    )
+    useExtendedObjectStore.getState().setPauliConfig({ ...normalizedPauliConfig, needsReset: true })
     return
   }
   useExtendedObjectStore

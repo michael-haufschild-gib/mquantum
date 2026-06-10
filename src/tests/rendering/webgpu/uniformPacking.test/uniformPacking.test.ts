@@ -274,6 +274,34 @@ describe('packCameraUniforms', () => {
     })
     expect(data[130]).toBeCloseTo(2.0)
   })
+
+  it('keeps model-space camera uniforms finite when transform snapshot is corrupt', () => {
+    const buffer = new ArrayBuffer(528)
+    const data = new Float32Array(buffer)
+    const dataView = new DataView(buffer)
+
+    packCameraUniforms(data, dataView, {
+      camera: mockCamera,
+      animationTime: 0,
+      is2D: false,
+      transform: {
+        uniformScale: Number.NaN,
+        position: [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY],
+      },
+      bayerOffset: [0, 0],
+      size: { width: 100, height: 100 },
+      frameDelta: 0.016,
+      frameNumber: 0,
+    })
+
+    for (const index of [80, 85, 90, 92, 93, 94, 96, 101, 106, 108, 109, 110, 128, 129, 130]) {
+      expect(Number.isFinite(data[index]), `camera uniform float index ${index}`).toBe(true)
+    }
+    expect(data[80]).toBe(1)
+    expect(data[92]).toBe(0)
+    expect(data[128]).toBe(0)
+    expect(data[130]).toBe(8)
+  })
 })
 
 describe('applyHOMomentumTransform', () => {
