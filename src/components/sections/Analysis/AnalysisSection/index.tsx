@@ -20,6 +20,7 @@ import { DiracAnalysisContent } from '@/components/sections/Analysis/DiracAnalys
 import { FSFAnalysisContent } from '@/components/sections/Analysis/FSFAnalysisSection'
 import { MeasurementControls } from '@/components/sections/Analysis/MeasurementControls'
 import { PauliAnalysisContent } from '@/components/sections/Analysis/PauliAnalysisSection'
+import { RiemannZetaAnalysisContent } from '@/components/sections/Analysis/RiemannZetaAnalysisSection'
 import { CrossSectionAnalysisContent } from '@/components/sections/Analysis/SchroedingerCrossSectionSection'
 import { TDSEAnalysisContent } from '@/components/sections/Analysis/TDSEAnalysisSection'
 import { Section } from '@/components/sections/Section'
@@ -74,6 +75,7 @@ const MODE_LABELS: Record<string, string> = {
   becDynamics: 'BEC',
   diracEquation: 'Dirac',
   quantumWalk: 'Quantum Walk',
+  riemannZeta: 'Riemann Zeta',
 }
 
 /**
@@ -187,11 +189,15 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
         onOpenChange={handleOpenChange}
         data-testid="analysis-section"
       >
-        {isAnalytic && <CrossSectionAnalysisContent />}
+        {/* The riemannZeta volumetric block has its own cutaway wedge; the
+            generic cross-section / second-quantization controls target the
+            HO/hydrogen analytic pipeline and are not wired for it. */}
+        {isAnalytic && quantumMode !== 'riemannZeta' && <CrossSectionAnalysisContent />}
         {quantumMode === 'freeScalarField' && <FSFAnalysisContent />}
         {quantumMode === 'tdseDynamics' && <TDSEAnalysisContent />}
         {quantumMode === 'becDynamics' && <BECAnalysisContent />}
         {quantumMode === 'diracEquation' && <DiracAnalysisContent />}
+        {quantumMode === 'riemannZeta' && <RiemannZetaAnalysisContent />}
         {dimension >= 3 && (
           <ControlGroup
             data-testid="analysis-quantum-carpet"

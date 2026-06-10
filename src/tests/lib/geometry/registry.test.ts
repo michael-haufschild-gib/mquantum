@@ -209,6 +209,7 @@ describe('Quantum Type Registry (Flat Model)', () => {
         'hydrogenNDCoupled',
         'pauliSpinor',
         'quantumWalk',
+        'riemannZeta',
         'tdseDynamics',
         'wheelerDeWitt',
       ])

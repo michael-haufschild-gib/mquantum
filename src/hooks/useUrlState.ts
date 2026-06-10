@@ -13,6 +13,10 @@ import { useEffect, useRef } from 'react'
 
 import { logger } from '@/lib/logger'
 import { applySceneExample, findSceneByName } from '@/lib/sceneExamples'
+import {
+  applyCoherenceHorizonParams,
+  applyRiemannZetaParams,
+} from '@/lib/url/applyHorizonModeParams'
 import { parseCurrentUrl, type ParsedShareableState } from '@/lib/url/state-serializer'
 import { usePerformanceStore } from '@/stores/runtime/performanceStore'
 import { usePresetManagerStore } from '@/stores/runtime/presetManagerStore'
@@ -352,37 +356,8 @@ function applyAdsParams(
   applyAdsChordalSieveFields(urlState, ext)
 }
 
-/**
- * Apply Coherence Horizon URL state params.
- *
- * Preset first, then raw fields — raw fields cascade `preset` into `custom`
- * via the individual setters, mirroring the AdS apply order.
- */
-function applyCoherenceHorizonParams(
-  urlState: ParsedShareableState,
-  ext: ReturnType<typeof useExtendedObjectStore.getState>
-): void {
-  if (
-    urlState.coherenceHorizonPreset !== undefined &&
-    urlState.coherenceHorizonPreset !== 'custom'
-  ) {
-    ext.setCoherenceHorizonPreset(urlState.coherenceHorizonPreset)
-  }
-  if (urlState.coherenceHorizonDecoherence !== undefined)
-    ext.setCoherenceHorizonDecoherence(urlState.coherenceHorizonDecoherence)
-  if (urlState.coherenceHorizonSeparation !== undefined)
-    ext.setCoherenceHorizonSeparation(urlState.coherenceHorizonSeparation)
-  if (urlState.coherenceHorizonWidth !== undefined)
-    ext.setCoherenceHorizonWidth(urlState.coherenceHorizonWidth)
-  if (urlState.coherenceHorizonWaveNumber !== undefined)
-    ext.setCoherenceHorizonWaveNumber(urlState.coherenceHorizonWaveNumber)
-  if (urlState.coherenceHorizonScale !== undefined)
-    ext.setCoherenceHorizonScale(urlState.coherenceHorizonScale)
-  if (urlState.coherenceHorizonRingGain !== undefined)
-    ext.setCoherenceHorizonRingGain(urlState.coherenceHorizonRingGain)
-  if (urlState.coherenceHorizonGlow !== undefined)
-    ext.setCoherenceHorizonGlow(urlState.coherenceHorizonGlow)
-}
+/* applyCoherenceHorizonParams / applyRiemannZetaParams extracted to
+   @/lib/url/applyHorizonModeParams (same preset-cascade contract as AdS). */
 
 /** Apply Dirac-equation URL state params. */
 function applyDiracParams(urlState: ParsedShareableState, ext: ExtendedObjectState): void {
@@ -752,6 +727,7 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
     if (effectiveQuantumMode === 'wheelerDeWitt') applyWdwParams(urlState, ext)
     if (effectiveQuantumMode === 'antiDeSitter') applyAdsParams(urlState, ext)
     if (effectiveQuantumMode === 'coherenceHorizon') applyCoherenceHorizonParams(urlState, ext)
+    if (effectiveQuantumMode === 'riemannZeta') applyRiemannZetaParams(urlState, ext)
     if (effectiveObjectType === 'bellPair') applyBellParams(urlState, ext)
     applySrmtSweepParams(urlState, effectiveQuantumMode)
   } catch (error) {

@@ -21,7 +21,7 @@ import {
   COHERENCE_HORIZON_RANGES,
 } from '@/lib/geometry/extended/coherenceHorizon'
 
-import type { SetterContext } from './sliceSetterUtils'
+import type { SetterContext } from '../sliceSetterUtils'
 
 /** Actions exposed by the Coherence Horizon setter bundle. */
 export interface CoherenceHorizonSetters {

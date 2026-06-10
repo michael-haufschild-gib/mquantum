@@ -13,8 +13,8 @@ import {
   kleinThreshold,
   zitterbewegungFrequency,
 } from '@/lib/physics/dirac/scales'
-import { useCoordinateEntanglementStore } from '@/stores/diagnostics/coordinateEntanglementStore'
 import { useBellExperimentStore } from '@/stores/diagnostics/bellExperimentStore'
+import { useCoordinateEntanglementStore } from '@/stores/diagnostics/coordinateEntanglementStore'
 import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 import type { AtlasPoint } from '@/stores/diagnostics/quantumnessAtlasStore'
 import { useWavefunctionSliceStore } from '@/stores/diagnostics/wavefunctionSliceStore'

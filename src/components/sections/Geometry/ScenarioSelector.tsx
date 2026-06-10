@@ -21,6 +21,8 @@ import type {
 import { COHERENCE_HORIZON_SCENARIOS } from '@/lib/geometry/extended/coherenceHorizon'
 import type { SchroedingerPresetName } from '@/lib/geometry/extended/common'
 import type { PauliConfig } from '@/lib/geometry/extended/pauli'
+import type { RiemannZetaConfig, RiemannZetaPresetName } from '@/lib/geometry/extended/riemannZeta'
+import { RIEMANN_ZETA_SCENARIOS } from '@/lib/geometry/extended/riemannZeta'
 import type { HydrogenNDPresetName, SchroedingerConfig } from '@/lib/geometry/extended/schroedinger'
 import { getHydrogenNDPresetsWithKeysByDimension } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
@@ -141,6 +143,13 @@ const COHERENCE_HORIZON_PRESET_OPTIONS = COHERENCE_HORIZON_SCENARIOS.map((p) => 
   label: p.label,
 }))
 
+/* ── Riemann Zeta (Arithmetic Horizon) options ──────────────── */
+
+const RIEMANN_ZETA_PRESET_OPTIONS = RIEMANN_ZETA_SCENARIOS.map((p) => ({
+  value: p.id,
+  label: p.label,
+}))
+
 /* ── HydrogenND options (dimension-grouped, flattened) ─────── */
 
 function getHydrogenNDOptions(dimension: number) {
@@ -189,13 +198,24 @@ const ID_PRESET_TABLES: Record<string, readonly { id: string; description: strin
   bellPair: BELL_SCENARIO_PRESETS,
 }
 
+/** Description for preset-tagged scenario modes (AdS / horizon family):
+ * `custom` or missing ids have no description. */
+function findTaggedScenarioDescription(
+  presets: readonly { id: string; description: string }[],
+  id: string | undefined
+): string | null {
+  if (!id || id === 'custom') return null
+  return presets.find((p) => p.id === id)?.description ?? null
+}
+
 function findActiveDescription(
   mode: string,
   activeValue: string,
   ho: string,
   hyd: string,
   ads: string | undefined,
-  coherenceHorizon: string | undefined
+  coherenceHorizon: string | undefined,
+  riemannZeta: string | undefined
 ): string | null {
   if (mode === 'harmonicOscillator') {
     return ho ? (SCHROEDINGER_NAMED_PRESETS[ho]?.description ?? null) : null
@@ -204,12 +224,13 @@ function findActiveDescription(
     return hyd ? findHydrogenNDDescription(hyd) : null
   }
   if (mode === 'antiDeSitter') {
-    if (!ads || ads === 'custom') return null
-    return ADS_PRESETS.find((p) => p.id === ads)?.description ?? null
+    return findTaggedScenarioDescription(ADS_PRESETS, ads)
   }
   if (mode === 'coherenceHorizon') {
-    if (!coherenceHorizon || coherenceHorizon === 'custom') return null
-    return COHERENCE_HORIZON_SCENARIOS.find((p) => p.id === coherenceHorizon)?.description ?? null
+    return findTaggedScenarioDescription(COHERENCE_HORIZON_SCENARIOS, coherenceHorizon)
+  }
+  if (mode === 'riemannZeta') {
+    return findTaggedScenarioDescription(RIEMANN_ZETA_SCENARIOS, riemannZeta)
   }
   const table = ID_PRESET_TABLES[mode]
   if (!table || !activeValue) return null
@@ -234,6 +255,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
     hydrogenNDPreset,
     adsPreset,
     coherenceHorizonPreset,
+    riemannZetaPreset,
     pauliSpinor,
     bellPair,
   } = useExtendedObjectStore(
@@ -246,6 +268,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       coherenceHorizonPreset: (
         s.schroedinger.coherenceHorizon as CoherenceHorizonConfig | undefined
       )?.preset,
+      riemannZetaPreset: (s.schroedinger.riemannZeta as RiemannZetaConfig | undefined)?.preset,
       pauliSpinor: s.pauliSpinor,
       bellPair: s.bellPair,
     }))
@@ -265,6 +288,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
     setPauliConfig,
     setAdsPreset,
     setCoherenceHorizonPreset,
+    setRiemannZetaPreset,
     setBellPairConfig,
   } = useExtendedObjectStore(
     useShallow((s) => ({
@@ -280,6 +304,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       setPauliConfig: s.setPauliConfig,
       setAdsPreset: s.setAdsPreset,
       setCoherenceHorizonPreset: s.setCoherenceHorizonPreset,
+      setRiemannZetaPreset: s.setRiemannZetaPreset,
       setBellPairConfig: s.setBellPairConfig,
     }))
   )
@@ -322,6 +347,8 @@ export const ScenarioSelector: React.FC = React.memo(() => {
         return ADS_PRESET_OPTIONS
       case 'coherenceHorizon':
         return COHERENCE_HORIZON_PRESET_OPTIONS
+      case 'riemannZeta':
+        return RIEMANN_ZETA_PRESET_OPTIONS
       default:
         return null
     }
@@ -340,6 +367,10 @@ export const ScenarioSelector: React.FC = React.memo(() => {
         return coherenceHorizonPreset === 'custom' || coherenceHorizonPreset === undefined
           ? ''
           : coherenceHorizonPreset
+      case 'riemannZeta':
+        return riemannZetaPreset === 'custom' || riemannZetaPreset === undefined
+          ? ''
+          : riemannZetaPreset
       case 'pauliSpinor':
         return findPauliPresetId(pauliSpinor) ?? ''
       case 'bellPair':
@@ -359,6 +390,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
     hydrogenNDPreset,
     adsPreset,
     coherenceHorizonPreset,
+    riemannZetaPreset,
     pauliSpinor,
     bellPair,
     schroedinger,
@@ -378,9 +410,18 @@ export const ScenarioSelector: React.FC = React.memo(() => {
         presetName ?? '',
         hydrogenNDPreset ?? '',
         adsPreset,
-        coherenceHorizonPreset
+        coherenceHorizonPreset,
+        riemannZetaPreset
       ),
-    [mode, activeValue, presetName, hydrogenNDPreset, adsPreset, coherenceHorizonPreset]
+    [
+      mode,
+      activeValue,
+      presetName,
+      hydrogenNDPreset,
+      adsPreset,
+      coherenceHorizonPreset,
+      riemannZetaPreset,
+    ]
   )
 
   // Dispatch change to the correct store action
@@ -439,6 +480,9 @@ export const ScenarioSelector: React.FC = React.memo(() => {
         case 'coherenceHorizon':
           setCoherenceHorizonPreset(value as CoherenceHorizonPresetName)
           break
+        case 'riemannZeta':
+          setRiemannZetaPreset(value as RiemannZetaPresetName)
+          break
       }
     },
     [
@@ -455,6 +499,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       setPauliConfig,
       setAdsPreset,
       setCoherenceHorizonPreset,
+      setRiemannZetaPreset,
       setBellPairConfig,
     ]
   )

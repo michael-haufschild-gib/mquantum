@@ -119,6 +119,19 @@ export function* enumerateCoherenceHorizon(): Generator<ShaderRecord> {
   }
 }
 
+/**
+ * Arithmetic Horizon (Riemann ζ) volumetric fragment shader at every supported
+ * dimension. Uses the production `buildShaderConfig` derivation so the exact
+ * shader the renderer compiles is what gets validated.
+ */
+export function* enumerateRiemannZeta(): Generator<ShaderRecord> {
+  for (let dimension = 3; dimension <= 11; dimension++) {
+    const config = buildShaderConfig({ quantumMode: 'riemannZeta', dimension })
+    const { wgsl } = composeSchroedingerShader(config)
+    yield record(`riemann-zeta_d${dimension}`, wgsl, `riemann-zeta:${dimension}`, 'riemann-zeta')
+  }
+}
+
 const COMPUTE_MODES: readonly ComputeQuantumMode[] = [
   'harmonicOscillator',
   'hydrogenND',

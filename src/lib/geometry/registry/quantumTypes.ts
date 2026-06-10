@@ -16,6 +16,7 @@ import {
   SHARED_RENDERING,
   SLICE_ANIMATION,
 } from './quantumTypeShared'
+import { HORIZON_QUANTUM_TYPE_ENTRIES } from './quantumTypesHorizons'
 import type { QuantumTypeEntry, QuantumTypeKey, QuantumTypeRegistry } from './types'
 
 /** The flat Quantum Type Registry — single source of truth for all type metadata. */
@@ -481,54 +482,10 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
       },
     ],
 
-    [
-      'coherenceHorizon',
-      {
-        key: 'coherenceHorizon',
-        name: 'Coherence Horizon',
-        description:
-          'Coherence-sourced gravity: a cat-state superposition whose quantum coherence sources a Tangherlini black hole — null-geodesic lensing, photon ring, and a horizon that evaporates under decoherence.',
-        category: 'analytic',
-        runtime: {
-          dataPath: 'analyticWavefunction',
-          strategy: 'coherenceHorizon',
-          evolutionReset: 'schroedingerAnalytic',
-          shaderUniformId: 10,
-          stateSaveId: 12,
-          // The geodesic main block implements only mixed/phase/blackbody/
-          // viridis/densityContours; the analytic default is not among them.
-          defaultColorAlgorithm: 'mixed',
-          supportsOpenQuantum: false,
-        },
-        dimensions: {
-          min: 3,
-          max: 11,
-          recommended: 3,
-          recommendedReason:
-            '3D shows the classic shadow + photon ring; higher dimensions sharpen the lensing wall via the (d−2) Tangherlini exponent',
-        },
-        rendering: SHARED_RENDERING,
-        animation: {
-          hasTypeSpecificAnimations: false,
-          systems: {},
-        },
-        urlSerialization: {
-          typeKey: 'coherenceHorizon',
-          serializableParams: ['ch_dec', 'ch_sep', 'ch_w', 'ch_k', 'ch_hs', 'ch_rg', 'ch_glow'],
-        },
-        ui: {
-          controlsComponentKey: 'SchroedingerControls',
-          hasTimelineControls: true,
-          qualityPresets: QUALITY_PRESETS,
-        },
-        internal: {
-          objectType: 'schroedinger',
-          quantumMode: 'coherenceHorizon',
-          configStoreKey: 'schroedinger',
-          configSubKey: 'coherenceHorizon',
-        },
-      },
-    ],
+    // ─── Coherence Horizon + Riemann Zeta (Tangherlini-horizon analytic modes) ─
+    // Entries live in ./quantumTypesHorizons.ts; spread here preserves the
+    // original map iteration order (after antiDeSitter, before pauliSpinor).
+    ...HORIZON_QUANTUM_TYPE_ENTRIES,
 
     // ─── Pauli Spinor ──────────────────────────────────────────────────────────
 

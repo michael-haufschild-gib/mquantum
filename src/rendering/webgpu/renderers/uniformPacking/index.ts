@@ -12,12 +12,9 @@
 
 import { DEFAULT_COSINE_COEFFICIENTS } from '@/lib/colors/palette'
 import type { AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
+import { sanitizeHydrogenQuantumState } from '@/lib/geometry/extended/schroedinger/hydrogenStateSanitize'
 import { sanitizeTdseBranchColor, type TdseBranchColor } from '@/lib/geometry/extended/tdse'
-import {
-  DEFAULT_SCHROEDINGER_CONFIG,
-  sanitizeHydrogenQuantumState,
-  type SchroedingerConfig,
-} from '@/lib/geometry/extended/types'
+import { DEFAULT_SCHROEDINGER_CONFIG, type SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { normalizeHydrogenCoupledAngularChain } from '@/lib/physics/hydrogenCoupled/presets'
 import { normalizeHydrogenExtraDimOmega } from '@/lib/physics/openQuantum/hydrogenBasis'
 
@@ -42,6 +39,7 @@ import {
   packEntropicTimeShear,
   packHermiteCocycle,
   packQuantumBackreaction,
+  packRiemannZeta,
   packSpectralDimensionFlow,
   packVacuumBubbleLens,
 } from '../uniformPackingBackreaction'
@@ -417,6 +415,13 @@ function packVisualFields(
     schroedinger,
     p.quantumModeStr === 'coherenceHorizon',
     p.dimension
+  )
+  packRiemannZeta(
+    floatView,
+    schroedinger,
+    p.dimension,
+    p.boundingRadius,
+    p.quantumModeStr === 'riemannZeta'
   )
 }
 

@@ -9,8 +9,8 @@
 
 import {
   COLOR_ALGORITHM_OPTIONS,
-  COSINE_COEFFICIENT_RANGES,
   type ColorAlgorithm,
+  COSINE_COEFFICIENT_RANGES,
   type CosineCoefficients,
 } from '@/lib/colors/palette'
 import { clampFiniteUnknown } from '@/lib/math/clamp'

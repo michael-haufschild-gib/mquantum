@@ -15,6 +15,7 @@ Three object types: `ObjectType = 'schroedinger' | 'pauliSpinor' | 'bellPair'`. 
 | Anti-de Sitter         | `antiDeSitter`       | 3D-7D      | Jacobi P_n^{(α,β)} + Y_ℓm on Poincaré ball         | `d`, `n`, `l`, `m`, `mL`; Δ_± = (d−1)/2 ± √((d−1)²/4 + m²L²); BF + Klebanov-Witten window; boundary overlay |
 | AdS — BTZ variant      | `antiDeSitter` (d=3) | 3D         | Hartle-Hawking thermal correlator on BTZ AdS₃ BH   | `btzEnabled`, `btzHorizonRadius` r₊ ∈ [0.05, 2.0], `btzOmega` ω ∈ [0.1, 10], `btzAngularM` m_A ∈ [−5, 5]; T_H = r₊/(2πL²); S_BH = π r₊/(2 G_N); M = r₊²/(8 G_N L²); horizon rendered as opaque disc/cylinder at fixed world radius |
 | AdS — HKLL variant     | `antiDeSitter`       | 3D-7D      | Hamilton-Kabat-Lifschytz-Lowe boundary smearing     | `hkllEnabled`, `hkllBoundarySource` ∈ {`eigenstate`, `localized`, `planeWave`}, `hkllSourceSigma` ∈ [0.05, 1.5] (localized), `hkllPlaneWaveM` ∈ [0, 8] (planeWave); bulk φ(t, ρ, Ω) computed by numerical convolution of boundary O(t, Ω') against K_Δ = (max(−σ, ε))^{Δ−d}·Θ(−σ > 0) with σ = −cos(Δt)·sec(ρ) + cos(Ω·Ω')·tan(ρ); evaluated on 32³ coarse grid, trilinearly upsampled to 96³; mutually exclusive with BTZ |
+| Riemann Zeta (Arithmetic Horizon) | `riemannZeta` | 3D-11D | ζ-zero spectral synthesis ⇄ primon gas on a log-radial LUT (explicit formula) | source (zeros/primes), Nz, β (Hagedorn at β=1), horizon r_h, ℓ, m, dilation flow, glow, cutaway; GUE spacing panel in Analysis tab |
 
 ### Compute Modes (GPU lattice simulation, 3D+ only)
 

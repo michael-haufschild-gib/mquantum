@@ -50,8 +50,8 @@ vi.mock('@/lib/physics/freeScalar/vacuumDispersion', () => ({
   computeFsfCosmologyCoefs: computeFsfCosmologyCoefsMock,
 }))
 
-import { FsfKSpaceManager } from '@/rendering/webgpu/passes/FreeScalarFieldKSpace'
 import { FSF_IDENTITY_HAMILTONIAN_COEFS } from '@/rendering/webgpu/passes/FreeScalarFieldComputePassUniforms'
+import { FsfKSpaceManager } from '@/rendering/webgpu/passes/FreeScalarFieldKSpace'
 
 function ensureGPUMapMode(): void {
   if (!('GPUMapMode' in globalThis)) {

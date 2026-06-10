@@ -111,3 +111,4 @@ export type SchroedingerQuantumMode =
   | 'wheelerDeWitt'
   | 'antiDeSitter'
   | 'coherenceHorizon'
+  | 'riemannZeta'

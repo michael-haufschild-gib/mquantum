@@ -401,6 +401,25 @@ struct SchroedingerUniforms {
   coherenceHorizonRingGain: f32,
   coherenceHorizonGlow: f32,
 
+  // Riemann Zeta ("Arithmetic Horizon"). Read only by the dedicated main block
+  // (quantumMode === riemannZeta); the host packer zeroes these for all other
+  // modes. The radial LUT itself (rho, dRho/du, psiRe, psiIm) is a separate
+  // group-2 storage buffer owned by RiemannZetaStrategy — NOT in this struct —
+  // so the shared per-object uniform stays small. riemannMetricExponent carries
+  // (d-2); riemannPartitionGain is the Hagedorn gain log(1+Z(β))/log(1+Z(β_ref)).
+  riemannUMin: f32,
+  riemannUMax: f32,
+  riemannPartitionGain: f32,
+  riemannGlow: f32,
+  riemannHorizonRadius: f32,
+  riemannMetricExponent: f32,
+  riemannFlowRate: f32,
+  riemannAngularL: f32,
+  riemannAngularM: f32,
+  riemannCutaway: f32,
+  _padRiemann1: f32,
+  _padRiemann2: f32,
+
 }
 
 // ============================================

@@ -66,6 +66,9 @@ function isStrictTrue(value: unknown): boolean {
   return value === true
 }
 
+/**
+ *
+ */
 export function sanitizeDensityGridWorldBound(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0
     ? Math.max(1e-3, value)

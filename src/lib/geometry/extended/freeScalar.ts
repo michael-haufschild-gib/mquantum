@@ -5,9 +5,9 @@
  * for the real scalar field lattice simulation.
  */
 
-import type { KasnerExponents } from '@/lib/physics/cosmology/bianchiKasner'
-import { isCosmologyPreset, type CosmologyPreset } from '@/lib/physics/cosmology/presets'
 import { sanitizePowerOfTwoGridSizes } from '@/lib/math/ndArray'
+import type { KasnerExponents } from '@/lib/physics/cosmology/bianchiKasner'
+import { type CosmologyPreset, isCosmologyPreset } from '@/lib/physics/cosmology/presets'
 import { clampDtWithCfl } from '@/lib/physics/latticeCfl'
 
 import type { PmlAbsorberConfig } from './crossMode'

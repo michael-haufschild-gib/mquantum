@@ -5,9 +5,9 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { SettingsSection } from '@/components/sections/Settings/SettingsSection'
 import { ToastProvider } from '@/contexts/ToastContext'
 import {
-  usePresetManagerStore,
   type SavedScene,
   type SavedStyle,
+  usePresetManagerStore,
 } from '@/stores/runtime/presetManagerStore'
 
 const styleData: SavedStyle['data'] = {

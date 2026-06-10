@@ -70,6 +70,10 @@ export async function createModeStrategy(
       const { CoherenceHorizonStrategy } = await import('../CoherenceHorizonStrategy')
       return new CoherenceHorizonStrategy()
     }
+    case 'riemannZeta': {
+      const { RiemannZetaStrategy } = await import('../RiemannZetaStrategy')
+      return new RiemannZetaStrategy()
+    }
     case 'analytic':
     default:
       return new AnalyticModeStrategy()

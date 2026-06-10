@@ -34,8 +34,8 @@ import { sanitizePowerOfTwoGridSizes } from '@/lib/math/ndArray'
 import { usePerformanceStore } from '@/stores/runtime/performanceStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
-import { normalizeDiracLoadedConfig } from '@/stores/utils/mergeWithDefaultsDirac'
-import { normalizePauliLoadedConfig } from '@/stores/utils/mergeWithDefaultsPauli'
+import { normalizeDiracLoadedConfig } from '@/stores/utils/mergeDefaults/mergeWithDefaultsDirac'
+import { normalizePauliLoadedConfig } from '@/stores/utils/mergeDefaults/mergeWithDefaultsPauli'
 
 /** Status of save/load operations */
 export type SimulationStateStatus = 'idle' | 'saving' | 'loading' | 'done' | 'error'

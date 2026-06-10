@@ -1,6 +1,15 @@
 import { COHERENCE_HORIZON_RANGES } from '@/lib/geometry/extended/coherenceHorizon'
+import {
+  DEFAULT_RIEMANN_ZETA_CONFIG,
+  RIEMANN_ZETA_RANGES,
+} from '@/lib/geometry/extended/riemannZeta'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { tangherliniHorizonRadius } from '@/lib/physics/coherenceHorizon'
+import {
+  hagedornPartitionGain,
+  RIEMANN_DEFAULT_RADIAL,
+  RIEMANN_WORLD_SCALE,
+} from '@/lib/physics/riemannZeta'
 
 import { SCHROEDINGER_LAYOUT } from '../schroedingerLayout'
 
@@ -278,6 +287,75 @@ export function packCoherenceHorizon(
     R.ringGain.max
   )
   floatView[I.coherenceHorizonGlow] = finiteClamped(config?.glow, 1.2, R.glow.min, R.glow.max)
+}
+
+/**
+ * Pack Arithmetic Horizon (Riemann ζ) uniforms. Only the riemannZeta mode reads
+ * these fields (its dedicated volumetric main block); every other mode gets
+ * all-zero fields so the buffer region is deterministic. The radial LUT itself
+ * is a separate group-2 storage buffer owned by RiemannZetaStrategy — not part
+ * of this struct. The Hagedorn partition gain, the world-space horizon radius,
+ * and the metric exponent (d−2) are CPU-precomputed here so the shader never
+ * derives them per frame.
+ */
+export function packRiemannZeta(
+  floatView: Float32Array,
+  schroedinger: Partial<SchroedingerConfig> | undefined,
+  dimension: number,
+  boundingRadius: number,
+  isRiemannZetaMode: boolean
+): void {
+  if (!isRiemannZetaMode) {
+    floatView[I.riemannUMin] =
+      floatView[I.riemannUMax] =
+      floatView[I.riemannPartitionGain] =
+      floatView[I.riemannGlow] =
+      floatView[I.riemannHorizonRadius] =
+      floatView[I.riemannMetricExponent] =
+      floatView[I.riemannFlowRate] =
+      floatView[I.riemannAngularL] =
+      floatView[I.riemannAngularM] =
+      floatView[I.riemannCutaway] =
+        0.0
+    return
+  }
+
+  const cfg = schroedinger?.riemannZeta
+  const defaults = DEFAULT_RIEMANN_ZETA_CONFIG
+  const R = RIEMANN_ZETA_RANGES
+  const d = Math.max(3, Math.min(11, Math.floor(Number.isFinite(dimension) ? dimension : 3)))
+  const safeBound = Number.isFinite(boundingRadius) && boundingRadius > 0 ? boundingRadius : 2.0
+
+  const beta = finiteClamped(cfg?.beta, defaults.beta, R.beta.min, R.beta.max)
+  const angularL = finiteClamped(cfg?.angularL, defaults.angularL, R.angularL.min, R.angularL.max)
+  const angularM = finiteClamped(cfg?.angularM, defaults.angularM, -angularL, angularL)
+  const horizonRadius = finiteClamped(
+    cfg?.horizonRadius,
+    defaults.horizonRadius,
+    R.horizonRadius.min,
+    R.horizonRadius.max
+  )
+
+  // The LUT lives in pure u = ln(p^k) coordinates; world space is scaled by
+  // RIEMANN_WORLD_SCALE (shells at r = s·p^k). Shifting the uniform u-range by
+  // ln(s) makes the shader's u = ln(r_world) land on the right LUT samples
+  // without touching the LUT or adding a division per march step.
+  const logScale = Math.log(RIEMANN_WORLD_SCALE)
+  floatView[I.riemannUMin] = RIEMANN_DEFAULT_RADIAL.uMin + logScale
+  floatView[I.riemannUMax] = RIEMANN_DEFAULT_RADIAL.uMax + logScale
+  floatView[I.riemannPartitionGain] = hagedornPartitionGain(beta)
+  floatView[I.riemannGlow] = finiteClamped(cfg?.glow, defaults.glow, R.glow.min, R.glow.max)
+  floatView[I.riemannHorizonRadius] = horizonRadius * 0.6 * safeBound
+  floatView[I.riemannMetricExponent] = d - 2
+  floatView[I.riemannFlowRate] = finiteClamped(
+    cfg?.flowRate,
+    defaults.flowRate,
+    R.flowRate.min,
+    R.flowRate.max
+  )
+  floatView[I.riemannAngularL] = angularL
+  floatView[I.riemannAngularM] = angularM
+  floatView[I.riemannCutaway] = (cfg?.cutaway ?? defaults.cutaway) ? 1.0 : 0.0
 }
 
 /**

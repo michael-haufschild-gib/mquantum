@@ -191,6 +191,12 @@ function buildRepresentationOverrides(
     overrides.representation = 'position'
   }
 
+  // Arithmetic Horizon (riemannZeta) likewise owns a position-only volumetric
+  // main block.
+  if (mode === 'riemannZeta' && currentRepr !== 'position') {
+    overrides.representation = 'position'
+  }
+
   return overrides
 }
 
@@ -344,6 +350,11 @@ function applyFirstPreset(
         presetId as import('@/lib/geometry/extended/coherenceHorizon').CoherenceHorizonPresetName
       )
       break
+    case 'riemannZeta':
+      store.setRiemannZetaPreset(
+        presetId as import('@/lib/geometry/extended/riemannZeta').RiemannZetaPresetName
+      )
+      break
   }
 }
 
@@ -425,6 +436,8 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
         if (value === 'momentum' && qm === 'hydrogenNDCoupled') return
         // Block non-position for Coherence Horizon (geodesic block is position-only)
         if (qm === 'coherenceHorizon') return
+        // Block non-position for Arithmetic Horizon (volumetric block is position-only)
+        if (qm === 'riemannZeta') return
       }
       setWithVersion((state) => ({
         schroedinger: {

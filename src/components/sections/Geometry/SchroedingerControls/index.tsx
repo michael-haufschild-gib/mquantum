@@ -26,6 +26,7 @@ import { HydrogenNDControls } from './HydrogenNDControls'
 import { HydrogenNDCoupledControls } from './HydrogenNDCoupledControls'
 import { KKCompactificationSection } from './KKCompactificationSection'
 import { QuantumWalkControls } from './QuantumWalkControls'
+import { RiemannZetaControls } from './RiemannZetaControls'
 import { TDSEControls } from './TDSEControls'
 import type {
   BecActions,
@@ -75,6 +76,8 @@ function renderModeControls(p: ModeControlsProps): React.ReactNode {
       return <AntiDeSitterControls />
     case 'coherenceHorizon':
       return <CoherenceHorizonControls />
+    case 'riemannZeta':
+      return <RiemannZetaControls />
     case 'wheelerDeWitt':
       return <WheelerDeWittControls />
     case 'quantumWalk':
@@ -176,6 +179,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
     const isWheelerDeWitt = mode === 'wheelerDeWitt'
     const isAntiDeSitter = mode === 'antiDeSitter'
     const isCoherenceHorizon = mode === 'coherenceHorizon'
+    const isRiemannZeta = mode === 'riemannZeta'
 
     return (
       <div className={className} data-testid="schroedinger-controls">
@@ -188,7 +192,8 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
           !isQuantumWalk &&
           !isWheelerDeWitt &&
           !isAntiDeSitter &&
-          !isCoherenceHorizon && (
+          !isCoherenceHorizon &&
+          !isRiemannZeta && (
             <Section title="Representation" defaultOpen={true}>
               <div className="space-y-3">
                 <ToggleGroup

@@ -50,6 +50,7 @@ const FIRST_PRESET_IDS = {
   antiDeSitterDefault: 'adsFourGround',
   antiDeSitter3D: 'adsThreeGround',
   coherenceHorizon: 'coherentCat',
+  riemannZeta: 'hilbertPolyaShells',
   bellTest: 'canonicalCHSH',
 } as const
 
@@ -92,6 +93,7 @@ const PRESET_RESOLVERS: Readonly<Record<QuantumTypeKey, FirstPresetResolver>> = 
   wheelerDeWitt: resolveWheelerDeWitt,
   antiDeSitter: resolveAntiDeSitter,
   coherenceHorizon: (dimension) => (dimension >= 3 ? FIRST_PRESET_IDS.coherenceHorizon : undefined),
+  riemannZeta: (dimension) => (dimension >= 3 ? FIRST_PRESET_IDS.riemannZeta : undefined),
   bellTest: () => FIRST_PRESET_IDS.bellTest,
 }
 

@@ -94,6 +94,12 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
     return null
   }
 
+  // Arithmetic Horizon (riemannZeta) likewise owns a dedicated volumetric
+  // main block that composes none of the shared-pipeline effects.
+  if (objectType === 'schroedinger' && quantumMode === 'riemannZeta') {
+    return null
+  }
+
   const isPauli = objectType === 'pauliSpinor'
   const isBellPair = objectType === 'bellPair'
   const isSchroedinger = objectType === 'schroedinger'

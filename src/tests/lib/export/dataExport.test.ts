@@ -16,8 +16,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   atlasResultsToCSV,
   atlasResultsToJSON,
-  exportBellDiagnosticsCSV,
   exportBecDiagnosticsCSV,
+  exportBellDiagnosticsCSV,
   exportDiagnosticsJSON,
   exportDiracDiagnosticsCSV,
   exportFilename,

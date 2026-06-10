@@ -124,6 +124,18 @@ export interface SchroedingerSnapshot {
     preset?: string
     [key: string]: unknown
   }
+  riemannZeta?: {
+    source?: string
+    numZeros?: number
+    beta?: number
+    horizonRadius?: number
+    angularL?: number
+    angularM?: number
+    flowRate?: number
+    glow?: number
+    preset?: string
+    [key: string]: unknown
+  }
   absorberEnabled?: boolean
   absorberWidth?: number
   pmlTargetReflection?: number

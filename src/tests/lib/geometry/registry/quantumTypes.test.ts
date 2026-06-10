@@ -21,6 +21,7 @@ describe('QUANTUM_TYPE_REGISTRY', () => {
       'wheelerDeWitt',
       'antiDeSitter',
       'coherenceHorizon',
+      'riemannZeta',
       'pauliSpinor',
       'bellTest',
     ]
@@ -81,6 +82,7 @@ describe('QUANTUM_TYPE_REGISTRY', () => {
       wheelerDeWitt: 'wheelerDeWitt',
       antiDeSitter: 'antiDeSitter',
       coherenceHorizon: 'schroedingerAnalytic',
+      riemannZeta: 'schroedingerAnalytic',
       pauliSpinor: 'pauli',
       bellTest: 'bellPair',
     })
@@ -111,6 +113,7 @@ describe('QUANTUM_TYPE_REGISTRY', () => {
       wheelerDeWitt: [],
       antiDeSitter: [],
       coherenceHorizon: [],
+      riemannZeta: [],
       pauliSpinor: [],
       bellTest: [],
     })

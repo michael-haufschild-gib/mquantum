@@ -85,7 +85,7 @@ describe('open quantum setters', () => {
 
     const afterState = useExtendedObjectStore.getState()
     expect(getOQ()).toEqual(beforeConfig)
-    expect('undefined' in getOQ()).toBe(false)
+    expect(getOQ()).not.toHaveProperty('undefined')
     expect(afterState.schroedingerVersion).toBe(beforeState.schroedingerVersion)
   })
 

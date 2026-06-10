@@ -491,6 +491,9 @@ export function supportsSchroedingerSurfaceMode(
   // Coherence Horizon owns a dedicated geodesic main block: the isosurface
   // pipeline never composes for it, so the surface toggle is meaningless.
   if (options.quantumMode === 'coherenceHorizon') return false
+  // Arithmetic Horizon (riemannZeta) likewise owns a dedicated volumetric main
+  // block — no isosurface pipeline composes for it.
+  if (options.quantumMode === 'riemannZeta') return false
 
   return true
 }

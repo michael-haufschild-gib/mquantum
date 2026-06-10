@@ -85,6 +85,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   const isPauli = sanitizeShaderBoolean(config.isPauli, false)
   const isAds = sanitizeShaderBoolean(config.isAds, false)
   const isCoherenceHorizon = sanitizeShaderBoolean(config.isCoherenceHorizon, false)
+  const isRiemannZeta = sanitizeShaderBoolean(config.isRiemannZeta, false)
   const freeScalarAnalysis = sanitizeShaderBoolean(config.freeScalarAnalysis, false)
   const useDensityMatrix = sanitizeShaderBoolean(config.useDensityMatrix, false)
   const crossSectionEnabled = sanitizeShaderBoolean(config.crossSectionEnabled, true)
@@ -149,6 +150,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     isPauli,
     isAds,
     isCoherenceHorizon,
+    isRiemannZeta,
     useWignerCache,
     crossSectionEnabled,
     probabilityCurrentEnabled,
@@ -177,6 +179,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
 
   const selectedMainBlock = selectMainBlock(
     isCoherenceHorizon,
+    isRiemannZeta,
     isWigner,
     is2D,
     isosurface,
@@ -218,13 +221,15 @@ struct VertexOutput {
         useDensityGrid,
         usePrecomputedNormals,
         freeScalarAnalysis,
+        isRiemannZeta,
       }),
     },
 
     // Quantum math modules (excluded in grid-only mode — compute shader handles
-    // wavefunction evaluation — and in Coherence Horizon mode, whose geodesic
-    // main block evaluates its cat state inline and references nothing here)
-    ...(isCoherenceHorizon
+    // wavefunction evaluation — and in Coherence Horizon / Arithmetic Horizon
+    // modes, whose dedicated main blocks evaluate their fields inline / via the
+    // radial LUT and reference nothing here)
+    ...(isCoherenceHorizon || isRiemannZeta
       ? []
       : buildQuantumMathBlocks({
           actualDim,
@@ -251,8 +256,9 @@ struct VertexOutput {
     { name: 'Multi-Light System', content: multiLightBlock, condition: isosurface && !is2D },
 
     // Volume rendering (inline raymarch excluded in grid-only mode; entirely
-    // absent for Coherence Horizon — its main block owns the geodesic march)
-    ...(isCoherenceHorizon
+    // absent for Coherence Horizon and Arithmetic Horizon — their main blocks
+    // own the geodesic / LUT volumetric march)
+    ...(isCoherenceHorizon || isRiemannZeta
       ? []
       : buildVolumeBlocks({
           is2D,

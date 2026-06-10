@@ -44,6 +44,7 @@ export type ShaderSurface =
   | 'skybox'
   | 'ads'
   | 'coherence-horizon'
+  | 'riemann-zeta'
   | 'wigner'
   | 'passes'
 

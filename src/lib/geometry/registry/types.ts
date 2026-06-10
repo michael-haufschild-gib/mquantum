@@ -58,6 +58,7 @@ export type QuantumTypeStrategyKind =
   | 'wheelerDeWitt'
   | 'antiDeSitter'
   | 'coherenceHorizon'
+  | 'riemannZeta'
   | 'pauli'
   | 'bellPair'
 

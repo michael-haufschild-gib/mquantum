@@ -3,8 +3,8 @@ import type { StateCreator } from 'zustand'
 import { normalizeOpaqueHexColor } from '@/lib/colors/colorUtils'
 import {
   COLOR_ALGORITHM_TO_INT,
-  COSINE_COEFFICIENT_RANGES,
   type ColorAlgorithm,
+  COSINE_COEFFICIENT_RANGES,
   type CosineCoefficients,
   type DistributionSettings,
   type DivergingPsiSettings,

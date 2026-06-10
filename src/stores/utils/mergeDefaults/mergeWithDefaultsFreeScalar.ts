@@ -9,8 +9,8 @@ import {
 import { type FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { sanitizePowerOfTwoGridSizes } from '@/lib/math/ndArray'
 
-import { reconcileCosmologyInvariants } from '../slices/geometry/setters/freeScalarCosmologySetters'
-import { clampDtWithCfl } from '../slices/geometry/setters/sliceSetterUtils'
+import { reconcileCosmologyInvariants } from '../../slices/geometry/setters/freeScalarCosmologySetters'
+import { clampDtWithCfl } from '../../slices/geometry/setters/sliceSetterUtils'
 
 function clampFiniteNumber(value: unknown, fallback: number, min: number, max: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback

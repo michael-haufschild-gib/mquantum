@@ -375,20 +375,24 @@ export function getAvailableColorAlgorithms(
     return COLOR_ALGORITHM_OPTIONS.filter((opt) => bellValidAlgos.has(opt.value))
   }
 
-  // Coherence Horizon: the dedicated geodesic main block implements its own
-  // compact color families — phase-hue (mixed/phase), thermal (blackbody),
-  // and density ramps (viridis/densityContours). Every other algorithm reads
-  // emission-system state that never composes for this mode and would render
-  // as a silent no-op, so hard-allowlist the implemented set.
-  if (objectType === 'schroedinger' && quantumMode === 'coherenceHorizon') {
-    const coherenceHorizonValidAlgos = new Set<string>([
+  // Horizon family (Coherence Horizon geodesic block, Arithmetic Horizon
+  // volumetric block): each dedicated main block implements its own compact
+  // color families — phase-hue (mixed/phase), thermal (blackbody), and
+  // density ramps (viridis/densityContours). Every other algorithm reads
+  // emission-system state that never composes for these modes and would
+  // render as a silent no-op, so hard-allowlist the implemented set.
+  if (
+    objectType === 'schroedinger' &&
+    (quantumMode === 'coherenceHorizon' || quantumMode === 'riemannZeta')
+  ) {
+    const horizonValidAlgos = new Set<string>([
       'mixed',
       'phase',
       'blackbody',
       'viridis',
       'densityContours',
     ])
-    return COLOR_ALGORITHM_OPTIONS.filter((opt) => coherenceHorizonValidAlgos.has(opt.value))
+    return COLOR_ALGORITHM_OPTIONS.filter((opt) => horizonValidAlgos.has(opt.value))
   }
 
   // Educational analysis algorithms — only available for free scalar field

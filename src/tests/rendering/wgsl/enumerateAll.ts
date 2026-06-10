@@ -27,6 +27,7 @@ import {
   enumerateAds,
   enumerateCoherenceHorizon,
   enumerateDensityGridEigenCache,
+  enumerateRiemannZeta,
   enumerateSkybox,
   enumerateWigner,
 } from './enumerateAuxiliary'
@@ -57,6 +58,7 @@ const VALID_SURFACES: ReadonlySet<SurfaceName> = new Set([
   'skybox',
   'ads',
   'coherence-horizon',
+  'riemann-zeta',
   'wigner',
   'passes',
 ])
@@ -147,6 +149,9 @@ export function* enumerateAll(opts: EnumerateAllOptions = {}): Generator<ShaderR
     }
     if (isEnabled('coherence-horizon')) {
       yield* enumerateCoherenceHorizon()
+    }
+    if (isEnabled('riemann-zeta')) {
+      yield* enumerateRiemannZeta()
     }
     if (isEnabled('wigner')) {
       yield* enumerateWigner()
