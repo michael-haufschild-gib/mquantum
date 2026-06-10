@@ -165,6 +165,84 @@ describe('extendedObjectStore — free scalar field actions', () => {
     expect(viz.radialBinCount).toBe(128)
   })
 
+  it('sanitizes bulk-loaded free scalar physics fields before uniforms can consume them', () => {
+    const store = useExtendedObjectStore.getState()
+
+    store.setSchroedingerConfig({
+      freeScalar: {
+        latticeDim: 4,
+        gridSize: [500, Number.NaN, 33, 8],
+        spacing: [Number.NaN, 2, 0, 0.2],
+        mass: Number.POSITIVE_INFINITY,
+        dt: Number.POSITIVE_INFINITY,
+        stepsPerFrame: Number.NaN,
+        initialCondition: 'bogus',
+        fieldView: 'bad-view',
+        packetCenter: [1, Number.NaN, 3, Number.POSITIVE_INFINITY],
+        modeK: [1.4, Number.NaN, -2.6, Number.POSITIVE_INFINITY],
+        packetWidth: -5,
+        packetAmplitude: -2,
+        vacuumSeed: Number.NaN,
+        selfInteractionLambda: Number.POSITIVE_INFINITY,
+        selfInteractionVev: -1,
+        absorberEnabled: 'yes',
+        absorberWidth: Number.NaN,
+        pmlTargetReflection: -1,
+        diagnosticsInterval: Number.POSITIVE_INFINITY,
+        preheating: {
+          enabled: true,
+          amplitude: 2,
+          frequency: Number.NaN,
+        },
+        cosmology: {
+          enabled: true,
+          preset: 'invalid',
+          steepness: Number.NaN,
+          hubble: 0,
+          eta0: 0,
+          kasnerExponents: { p1: Number.NaN, p2: 2 / 3, p3: Number.POSITIVE_INFINITY },
+          lqcRhoCritical: Number.NaN,
+          lqcEquationOfState: 5,
+          lqcInitialRhoRatio: Number.NaN,
+        },
+      },
+    } as never)
+
+    const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
+    expect(fs.latticeDim).toBe(4)
+    expect(fs.gridSize).toHaveLength(4)
+    expect(fs.gridSize.every((v) => Number.isFinite(v) && v > 0 && Math.log2(v) % 1 === 0)).toBe(
+      true
+    )
+    expect(fs.spacing).toEqual([0.1, 1, 0.01, 0.2])
+    expect(fs.mass).toBe(1)
+    expect(fs.dt).toBeGreaterThanOrEqual(0.001)
+    expect(fs.dt).toBeLessThanOrEqual(0.1)
+    expect(fs.stepsPerFrame).toBe(4)
+    expect(fs.initialCondition).toBe('gaussianPacket')
+    expect(fs.fieldView).toBe('phi')
+    expect(fs.packetCenter).toEqual([1, 0, 3, 0])
+    expect(fs.modeK).toEqual([1, 0, -3, 0])
+    expect(fs.packetWidth).toBe(0.01)
+    expect(fs.packetAmplitude).toBe(0.01)
+    expect(fs.vacuumSeed).toBe(42)
+    expect(fs.selfInteractionLambda).toBe(0.5)
+    expect(fs.selfInteractionVev).toBe(0.1)
+    expect(fs.absorberEnabled).toBe(true)
+    expect(fs.absorberWidth).toBe(0.2)
+    expect(fs.pmlTargetReflection).toBe(1e-12)
+    expect(fs.diagnosticsInterval).toBe(10)
+    expect(fs.preheating).toEqual({ enabled: true, amplitude: 1, frequency: 2 })
+    expect(fs.cosmology.enabled).toBe(true)
+    expect(fs.cosmology.preset).toBe('deSitter')
+    expect(fs.cosmology.hubble).toBe(0.01)
+    expect(fs.cosmology.eta0).not.toBe(0)
+    expect(Object.values(fs.cosmology.kasnerExponents ?? {}).every(Number.isFinite)).toBe(true)
+    expect(fs.cosmology.lqcRhoCritical).toBe(1)
+    expect(fs.cosmology.lqcEquationOfState).toBe(1)
+    expect(fs.cosmology.lqcInitialRhoRatio).toBe(0.01)
+  })
+
   it('setFreeScalarInitialCondition updates condition and triggers reset', () => {
     useExtendedObjectStore.getState().setFreeScalarInitialCondition('singleMode')
     const fs = useExtendedObjectStore.getState().schroedinger.freeScalar

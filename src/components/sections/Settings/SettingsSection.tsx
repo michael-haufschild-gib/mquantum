@@ -10,6 +10,7 @@ import { Section } from '@/components/sections/Section'
 import { Button } from '@/components/ui/Button'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { useToast } from '@/hooks/useToast'
+import { usePresetManagerStore } from '@/stores/runtime/presetManagerStore'
 import { useDismissedDialogsStore } from '@/stores/ui/dismissedDialogsStore'
 
 /** Props for the application settings section. */
@@ -40,11 +41,15 @@ export const SettingsSection: React.FC<SettingsSectionProps> = React.memo(
     const handleClearLocalStorage = useCallback(() => {
       try {
         localStorage.clear()
+        usePresetManagerStore.setState({ savedStyles: [], savedScenes: [] })
+        usePresetManagerStore.persist.clearStorage()
+        resetAllDismissed()
+        useDismissedDialogsStore.persist.clearStorage()
         addToast('localStorage cleared', 'success')
       } catch {
         addToast('Failed to clear localStorage', 'error')
       }
-    }, [addToast])
+    }, [addToast, resetAllDismissed])
 
     const handleRestoreDismissedHints = useCallback(() => {
       resetAllDismissed()

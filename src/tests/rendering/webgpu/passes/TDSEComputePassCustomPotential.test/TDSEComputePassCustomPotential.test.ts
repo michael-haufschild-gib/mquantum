@@ -35,11 +35,15 @@
  * @module tests/rendering/webgpu/passes/TDSEComputePassCustomPotential
  */
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { DEFAULT_TDSE_CONFIG } from '@/lib/geometry/extended/tdse'
 import type { TdseConfig } from '@/lib/geometry/extended/types'
-import { computePotentialHash } from '@/rendering/webgpu/passes/TDSEComputePassCustomPotential'
+import { logger } from '@/lib/logger'
+import {
+  computePotentialHash,
+  uploadCustomPotentialBuffer,
+} from '@/rendering/webgpu/passes/TDSEComputePassCustomPotential'
 
 /** Frozen `simTime` value — mimics a paused simulation. */
 const FROZEN = 1.2345
@@ -47,6 +51,26 @@ const FROZEN = 1.2345
 function cfg(overrides: Partial<TdseConfig> = {}): TdseConfig {
   return { ...DEFAULT_TDSE_CONFIG, ...overrides }
 }
+
+function capturePotentialWrites(): {
+  device: GPUDevice
+  buffer: GPUBuffer
+  writes: Float32Array[]
+} {
+  const writes: Float32Array[] = []
+  const device = {
+    queue: {
+      writeBuffer: (_buffer: GPUBuffer, _offset: number, data: Float32Array) => {
+        writes.push(new Float32Array(data))
+      },
+    },
+  } as unknown as GPUDevice
+  return { device, buffer: {} as GPUBuffer, writes }
+}
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 describe('computePotentialHash — identity and basic determinism', () => {
   it('produces the same hash for two calls with the same config and simTime', () => {
@@ -267,6 +291,49 @@ describe('computePotentialHash — custom expression', () => {
       FROZEN
     )
     expect(hA).toBe(hB)
+  })
+})
+
+describe('uploadCustomPotentialBuffer', () => {
+  it('uploads evaluated custom potential values and returns max absolute value', () => {
+    const { device, buffer, writes } = capturePotentialWrites()
+
+    const maxAbs = uploadCustomPotentialBuffer(
+      device,
+      buffer,
+      cfg({
+        potentialType: 'custom',
+        latticeDim: 2,
+        gridSize: [2, 2],
+        spacing: [1, 1],
+        customPotentialExpression: 'x + 2*y',
+      })
+    )
+
+    expect(maxAbs).toBeCloseTo(1.5)
+    expect(writes).toHaveLength(1)
+    expect(Array.from(writes[0]!)).toEqual([-1.5, 0.5, -0.5, 1.5])
+  })
+
+  it('clears the potential buffer when custom expression parsing fails', () => {
+    vi.spyOn(logger, 'warn').mockImplementation(() => undefined)
+    const { device, buffer, writes } = capturePotentialWrites()
+
+    const maxAbs = uploadCustomPotentialBuffer(
+      device,
+      buffer,
+      cfg({
+        potentialType: 'custom',
+        latticeDim: 2,
+        gridSize: [2, 3],
+        spacing: [1, 1],
+        customPotentialExpression: 'x + @',
+      })
+    )
+
+    expect(maxAbs).toBe(0)
+    expect(writes).toHaveLength(1)
+    expect(Array.from(writes[0]!)).toEqual([0, 0, 0, 0, 0, 0])
   })
 })
 

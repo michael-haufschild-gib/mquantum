@@ -25,13 +25,13 @@ export interface ExportOptions {
  * Uses the on-demand screenshot capture system which works without
  * preserveDrawingBuffer being enabled.
  *
- * @param _options - Export options (filename ignored in favor of modal flow)
+ * @param options - Export options
  * @returns Promise resolving to true on success, false on failure
  */
-export async function exportSceneToPNG(_options: ExportOptions = {}): Promise<boolean> {
+export async function exportSceneToPNG(options: ExportOptions = {}): Promise<boolean> {
   try {
     const dataUrl = await captureScreenshotAsync()
-    useScreenshotStore.getState().openModal(dataUrl)
+    useScreenshotStore.getState().openModal(dataUrl, options.filename)
     return true
   } catch (error) {
     // Handle specific error cases with helpful messages

@@ -8,7 +8,11 @@ import {
   type StructFieldDef,
   zeroReservedFields,
 } from '@/rendering/webgpu/utils/structLayout'
-import { parseStructFields, typesEqual } from '@/tests/rendering/webgpu/utils/wgslStructParser'
+import {
+  parseStructFields,
+  parseWGSLType,
+  typesEqual,
+} from '@/tests/rendering/webgpu/utils/wgslStructParser'
 
 // ---------------------------------------------------------------------------
 // Unit tests for the layout engine
@@ -180,6 +184,18 @@ describe('zeroReservedFields', () => {
     const buf = new Float32Array(4)
 
     expect(() => zeroReservedFields(buf, layout)).toThrow(/requires 32 bytes, got 16/)
+  })
+})
+
+describe('parseWGSLType', () => {
+  it('normalizes only supported square matrix types', () => {
+    expect(parseWGSLType('mat4x4f')).toEqual(arr('vec4f', 4))
+    expect(parseWGSLType('mat3x3<f32>')).toEqual(arr('vec4f', 3))
+  })
+
+  it('rejects rectangular matrices instead of hiding WGSL type drift', () => {
+    expect(() => parseWGSLType('mat3x4f')).toThrow(/Unsupported matrix shape/)
+    expect(() => parseWGSLType('mat4x3<f32>')).toThrow(/Unsupported matrix shape/)
   })
 })
 

@@ -292,6 +292,25 @@ describe('visualEffectSetters — compound logic', () => {
       expect(getSchroedinger().bornNullWeaveNodeWidth).toBe(0.05)
       expect(getSchroedinger().bornNullWeaveCirculation).toBe(3.5)
     })
+
+    it('sanitizes bulk-loaded numeric controls with setter ranges', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerBornNullWeaveStrength(1.25)
+      store.setSchroedingerBornNullWeaveNodeWidth(0.05)
+      store.setSchroedingerBornNullWeaveCirculation(3.5)
+
+      store.setSchroedingerConfig({
+        bornNullWeaveEnabled: true,
+        bornNullWeaveStrength: 99,
+        bornNullWeaveNodeWidth: -1,
+        bornNullWeaveCirculation: Number.NaN,
+      })
+
+      expect(getSchroedinger().bornNullWeaveEnabled).toBe(true)
+      expect(getSchroedinger().bornNullWeaveStrength).toBe(2)
+      expect(getSchroedinger().bornNullWeaveNodeWidth).toBeCloseTo(0.0001, 6)
+      expect(getSchroedinger().bornNullWeaveCirculation).toBe(3.5)
+    })
   })
 
   describe('cross-section plane normal normalization', () => {

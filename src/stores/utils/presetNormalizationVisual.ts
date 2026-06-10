@@ -141,10 +141,10 @@ function normalizeAppearanceObjects(
   fallback: typeof APPEARANCE_INITIAL_STATE
 ): void {
   normalizeObjectField(appearance, 'cosineCoefficients', (coefficients) => ({
-    a: normalizeCosineVector(coefficients.a, fallback.cosineCoefficients.a),
-    b: normalizeCosineVector(coefficients.b, fallback.cosineCoefficients.b),
-    c: normalizeCosineVector(coefficients.c, fallback.cosineCoefficients.c),
-    d: normalizeCosineVector(coefficients.d, fallback.cosineCoefficients.d),
+    a: normalizeCosineVector(coefficients.a, fallback.cosineCoefficients.a, 'a'),
+    b: normalizeCosineVector(coefficients.b, fallback.cosineCoefficients.b, 'b'),
+    c: normalizeCosineVector(coefficients.c, fallback.cosineCoefficients.c, 'c'),
+    d: normalizeCosineVector(coefficients.d, fallback.cosineCoefficients.d, 'd'),
   }))
 
   normalizeObjectField(appearance, 'distribution', (d) => ({

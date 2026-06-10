@@ -231,6 +231,40 @@ describe('parseAndValidateImport', () => {
       expect(result.error).toContain('corrupted or incompatible')
     })
 
+    it('rejects style imports whose required data sections are not objects', () => {
+      for (const badSection of ['bad', 42, true, []]) {
+        const corrupt = makeValidStyle('Bad Section')
+        ;(corrupt.data as Record<string, unknown>).appearance = badSection
+
+        const result = parseAndValidateImport(
+          JSON.stringify([corrupt]),
+          new Set<string>(),
+          STYLE_IMPORT_KEYS,
+          identitySanitize,
+          'styles'
+        )
+
+        expect(result.success).toBe(false)
+      }
+    })
+
+    it('rejects scene imports whose required data sections are not objects', () => {
+      for (const badSection of ['bad', 42, true, []]) {
+        const corrupt = makeValidScene('Bad Section')
+        ;(corrupt.data as Record<string, unknown>).geometry = badSection
+
+        const result = parseAndValidateImport(
+          JSON.stringify([corrupt]),
+          new Set<string>(),
+          SCENE_IMPORT_KEYS,
+          identitySanitize,
+          'scenes'
+        )
+
+        expect(result.success).toBe(false)
+      }
+    })
+
     it('rejects items missing the name field', () => {
       const noName = {
         id: 'x',

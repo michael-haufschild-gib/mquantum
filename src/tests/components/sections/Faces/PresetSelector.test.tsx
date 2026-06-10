@@ -57,6 +57,18 @@ describe('PresetSelector', () => {
     expect(state.cosineCoefficients.b).toEqual(firstPreset.coefficients.b)
   })
 
+  it('preserves negative-amplitude built-in presets when selected', async () => {
+    const user = userEvent.setup()
+    render(<PresetSelector />)
+
+    const select = screen.getByRole('combobox')
+    const ghostwave = COSINE_PRESET_OPTIONS.find((preset) => preset.value === 'ghostwave')!
+
+    await user.selectOptions(select, ghostwave.value)
+
+    expect(useAppearanceStore.getState().cosineCoefficients.b).toEqual(ghostwave.coefficients.b)
+  })
+
   it('matches the first preset name when its coefficients are active', () => {
     const firstPreset = COSINE_PRESET_OPTIONS[0]!
     useAppearanceStore.getState().setCosineCoefficients(firstPreset.coefficients)

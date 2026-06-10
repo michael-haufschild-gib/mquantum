@@ -80,7 +80,8 @@ fn computeHo1DPhiDeriv(n: i32, x: f32, omega: f32) -> vec2f {
   let omegaClamped = max(omega, 0.01);
   let sqrtOmega = sqrt(omegaClamped);
   let u = sqrtOmega * x;
-  let u2 = min(u * u, 40.0);
+  let u2 = u * u;
+  if (u2 > 80.0) { return vec2f(0.0, 0.0); }
   let gauss = exp(-0.5 * u2);
   let alphaNorm = sqrt(sqrt(omegaClamped * INV_PI));
   let gaussNorm = alphaNorm * gauss;

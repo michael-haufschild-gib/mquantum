@@ -4,6 +4,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 
+import { DEFAULT_DIMENSION } from '@/constants/dimension'
 import {
   DEFAULT_SCALE,
   MAX_SCALE,
@@ -15,6 +16,14 @@ describe('transformStore', () => {
   beforeEach(() => {
     useTransformStore.getState().resetAll()
     useTransformStore.getState().setDimension(4)
+  })
+
+  it('uses the global default scene dimension at cold start', () => {
+    const initial = useTransformStore.getInitialState()
+
+    expect(initial.dimension).toBe(DEFAULT_DIMENSION)
+    expect(initial.perAxisScale).toHaveLength(DEFAULT_DIMENSION)
+    expect(initial.perAxisScale.every((scale) => scale === DEFAULT_SCALE)).toBe(true)
   })
 
   it('clamps uniformScale and updates perAxisScale when locked', () => {

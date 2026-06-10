@@ -295,6 +295,79 @@ export interface PresetManagerState {
 
 type PresetManagerPersistedState = Pick<PresetManagerState, 'savedStyles' | 'savedScenes'>
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function toNonEmptyTrimmedString(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+function toFiniteTimestamp(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
+function hasPresetDataSections(data: Record<string, unknown>, keys: readonly string[]): boolean {
+  return keys.every((key) => Object.prototype.hasOwnProperty.call(data, key) && isRecord(data[key]))
+}
+
+function normalizePersistedStyle(value: unknown): SavedStyle | null {
+  if (!isRecord(value)) return null
+
+  const id = toNonEmptyTrimmedString(value.id)
+  const name = toNonEmptyTrimmedString(value.name)
+  const data = value.data
+  if (!id || !name || !isRecord(data) || !hasPresetDataSections(data, STYLE_IMPORT_KEYS)) {
+    return null
+  }
+
+  return {
+    id,
+    name,
+    timestamp: toFiniteTimestamp(value.timestamp),
+    data: sanitizeStyleData(data as SavedStyle['data']),
+  }
+}
+
+function normalizePersistedScene(value: unknown): SavedScene | null {
+  if (!isRecord(value)) return null
+
+  const id = toNonEmptyTrimmedString(value.id)
+  const name = toNonEmptyTrimmedString(value.name)
+  const data = value.data
+  if (!id || !name || !isRecord(data) || !hasPresetDataSections(data, SCENE_IMPORT_KEYS)) {
+    return null
+  }
+
+  return {
+    id,
+    name,
+    timestamp: toFiniteTimestamp(value.timestamp),
+    data: sanitizeSceneData(data as SavedScene['data']),
+  }
+}
+
+function normalizePersistedArray<T>(value: unknown, normalize: (entry: unknown) => T | null): T[] {
+  if (!Array.isArray(value)) return []
+
+  const normalized: T[] = []
+  for (const entry of value) {
+    const item = normalize(entry)
+    if (item) normalized.push(item)
+  }
+  return normalized
+}
+
+function normalizePresetManagerPersistedState(value: unknown): PresetManagerPersistedState {
+  const persisted = isRecord(value) ? value : {}
+  return {
+    savedStyles: normalizePersistedArray(persisted.savedStyles, normalizePersistedStyle),
+    savedScenes: normalizePersistedArray(persisted.savedScenes, normalizePersistedScene),
+  }
+}
+
 export const usePresetManagerStore = create<PresetManagerState>()(
   persist(
     (set, get) => ({
@@ -575,8 +648,14 @@ export const usePresetManagerStore = create<PresetManagerState>()(
       name: 'mquantum-preset-manager',
       storage: createBestEffortJSONStorage<PresetManagerPersistedState>('presetManagerStore'),
       partialize: (state): PresetManagerPersistedState => ({
-        savedStyles: state.savedStyles,
-        savedScenes: state.savedScenes,
+        ...normalizePresetManagerPersistedState({
+          savedStyles: state.savedStyles,
+          savedScenes: state.savedScenes,
+        }),
+      }),
+      merge: (persisted, current) => ({
+        ...current,
+        ...normalizePresetManagerPersistedState(persisted),
       }),
     }
   )

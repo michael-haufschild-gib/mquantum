@@ -129,6 +129,22 @@ describe('Wheeler-DeWitt 4D solver and density packing', () => {
     })
     expect(Array.from(a.density)).toEqual(Array.from(b.density))
   })
+
+  it('falls back to the center φ3 slice for non-finite 4D packer input', () => {
+    const output = makeSynthetic4dOutput()
+    const baseline = packWdwDensityGrid(output, null, undefined, 4, 100, undefined, {
+      phi3SliceNormalized: 0.5,
+    })
+    const nanSlice = packWdwDensityGrid(output, null, undefined, 4, 100, undefined, {
+      phi3SliceNormalized: Number.NaN,
+    })
+    const infiniteSlice = packWdwDensityGrid(output, null, undefined, 4, 100, undefined, {
+      phi3SliceNormalized: Number.POSITIVE_INFINITY,
+    })
+
+    expect(Array.from(nanSlice.density)).toEqual(Array.from(baseline.density))
+    expect(Array.from(infiniteSlice.density)).toEqual(Array.from(baseline.density))
+  })
 })
 
 function makeSynthetic4dOutput(): WheelerDeWittSolverOutput4D {

@@ -5,6 +5,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 
+import { DEFAULT_DIMENSION } from '@/constants/dimension'
 import { useRotationStore } from '@/stores/scene/rotationStore'
 
 describe('rotationStore', () => {
@@ -14,6 +15,15 @@ describe('rotationStore', () => {
       rotations: new Map(),
       dimension: 4,
       version: 0,
+    })
+  })
+
+  describe('initial state', () => {
+    it('uses the global default scene dimension at cold start', () => {
+      const initial = useRotationStore.getInitialState()
+
+      expect(initial.dimension).toBe(DEFAULT_DIMENSION)
+      expect(initial.rotations.size).toBe(0)
     })
   })
 
@@ -93,7 +103,7 @@ describe('rotationStore', () => {
       useRotationStore.getState().setRotation('XZ', Math.PI / 2)
 
       const { dimension, rotations } = useRotationStore.getState()
-      expect(dimension).toBe(4)
+      expect(dimension).toBe(DEFAULT_DIMENSION)
       expect(rotations.has('XY')).toBe(false)
       expect(rotations.has('INVALID')).toBe(false)
       expect(rotations.get('XZ')).toBeCloseTo(Math.PI / 2)
@@ -179,7 +189,7 @@ describe('rotationStore', () => {
       )
 
       const { dimension, rotations } = useRotationStore.getState()
-      expect(dimension).toBe(4)
+      expect(dimension).toBe(DEFAULT_DIMENSION)
       expect(rotations.get('XY')).toBeCloseTo(0.25)
       expect(rotations.has('ZW')).toBe(false)
       expect(rotations.has('XV')).toBe(false)

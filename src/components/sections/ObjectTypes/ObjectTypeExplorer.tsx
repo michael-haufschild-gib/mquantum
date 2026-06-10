@@ -19,6 +19,7 @@ import {
   useExtendedObjectStore,
 } from '@/stores/scene/extendedObjectStore'
 import { type GeometryState, useGeometryStore } from '@/stores/scene/geometryStore'
+import { useRotationStore } from '@/stores/scene/rotationStore'
 
 const SWITCH_HINT_CLASSES = {
   dimension: 'border-warning-border bg-warning-bg text-warning',
@@ -90,6 +91,7 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
       setQuantumMode: state.setSchroedingerQuantumMode,
     }))
   )
+  const resetAllRotations = useRotationStore((state) => state.resetAllRotations)
 
   useObjectTypeInitialization(objectType, dimension)
 
@@ -113,17 +115,23 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
       useQuantumnessAtlasStore.getState().abortSweep()
 
       const prevDim = useGeometryStore.getState().dimension
+      const setObjectTypeWithRotationReset = (nextType: GeometryState['objectType']) => {
+        if (useGeometryStore.getState().objectType !== nextType) {
+          resetAllRotations()
+        }
+        setObjectType(nextType)
+      }
 
       if (entry.key === 'pauliSpinor') {
         // Pauli uses a different ObjectType
-        setObjectType('pauliSpinor')
+        setObjectTypeWithRotationReset('pauliSpinor')
       } else if (entry.key === 'bellTest') {
         // Bell Pair has its own ObjectType — two-qubit spin Hilbert space
-        setObjectType('bellPair')
+        setObjectTypeWithRotationReset('bellPair')
       } else {
         // All other modes use the schroedinger ObjectType
         if (useGeometryStore.getState().objectType !== 'schroedinger') {
-          setObjectType('schroedinger')
+          setObjectTypeWithRotationReset('schroedinger')
         }
         setQuantumMode(entry.key)
       }
@@ -137,7 +145,7 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
         addToast(`${entry.name}: ${changes.join(', ')}`, 'info')
       }
     },
-    [setObjectType, setQuantumMode, addToast]
+    [resetAllRotations, setObjectType, setQuantumMode, addToast]
   )
 
   const containerVariants = {

@@ -341,6 +341,24 @@ describe('Hydrogen ND Store Actions', () => {
       expect(after.schroedinger.extraDimOmega).toEqual(before.schroedinger.extraDimOmega)
       expect(after.schroedingerVersion).toBe(before.schroedingerVersion)
     })
+
+    it('sanitizes bulk-loaded extra-dimension arrays and frequency spread', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerExtraDimQuantumNumbers([1, 2, 3, 4, 5, 6, 0, 1])
+      store.setSchroedingerExtraDimOmegaAll([1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8])
+      store.setSchroedingerExtraDimFrequencySpread(0.25)
+
+      store.setSchroedingerConfig({
+        extraDimQuantumNumbers: [6, Number.NaN, 99, -2] as never,
+        extraDimOmega: [0.01, Number.POSITIVE_INFINITY, 3, -1] as never,
+        extraDimFrequencySpread: Number.POSITIVE_INFINITY,
+      })
+
+      const config = useExtendedObjectStore.getState().schroedinger
+      expect(config.extraDimQuantumNumbers).toEqual([6, 2, 6, 0, 5, 6, 0, 1])
+      expect(config.extraDimOmega).toEqual([0.1, 1.2, 2, 0.1, 1.5, 1.6, 1.7, 1.8])
+      expect(config.extraDimFrequencySpread).toBe(0.25)
+    })
   })
 
   describe('Edge Cases', () => {

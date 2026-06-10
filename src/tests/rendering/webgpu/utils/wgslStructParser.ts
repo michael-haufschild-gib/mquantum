@@ -83,11 +83,8 @@ export function parseWGSLType(typeStr: string): WGSLFieldType {
   if (matMatch) {
     const cols = parseInt(matMatch[1]!, 10)
     const rows = parseInt(matMatch[2]!, 10)
-    if (rows !== 4 && rows !== 3) {
-      throw new Error(`Unsupported matrix row count: ${t}`)
-    }
-    if (cols !== 4 && cols !== 3) {
-      throw new Error(`Unsupported matrix column count: ${t}`)
+    if (!((cols === 4 && rows === 4) || (cols === 3 && rows === 3))) {
+      throw new Error(`Unsupported matrix shape: ${t}`)
     }
     return arr('vec4f', cols)
   }

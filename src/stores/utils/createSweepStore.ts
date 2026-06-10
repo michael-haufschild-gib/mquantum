@@ -177,6 +177,7 @@ export function createSweepStore<
       ...buildInitialState(defaultConfig),
 
       startSweep: (config: Config) => {
+        assertValidSweepConfig(config)
         set({
           status: 'running',
           config,
@@ -294,6 +295,17 @@ export function createSweepStore<
       },
     }
   })
+}
+
+function assertValidSweepConfig(config: SweepConfigBase): void {
+  if (!Number.isInteger(config.steps) || config.steps < 1) {
+    throw new RangeError(`Sweep config steps must be a positive integer, got ${config.steps}`)
+  }
+  if (!Number.isFinite(config.timePerStep) || config.timePerStep <= 0) {
+    throw new RangeError(
+      `Sweep config timePerStep must be a positive finite number, got ${config.timePerStep}`
+    )
+  }
 }
 
 /**

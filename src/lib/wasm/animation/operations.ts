@@ -12,6 +12,7 @@
 
 import { logger } from '@/lib/logger'
 
+import { hasFloat64ArrayLength } from './helpers'
 import { getWasmRuntime } from './runtime'
 
 /**
@@ -51,7 +52,8 @@ export function composeRotationsIndexedWasm(
   }
 
   try {
-    return indexedFn(dimension, planeIndices, angles, rotationCount)
+    const result = indexedFn(dimension, planeIndices, angles, rotationCount)
+    return hasFloat64ArrayLength(result, dimension * dimension) ? result : null
   } catch (err) {
     logger.warn('[AnimationWASM] compose_rotations_indexed_wasm failed:', err)
     return null
@@ -86,8 +88,14 @@ export function multiplyMatrixVectorWasm(
     return null
   }
 
+  const multiplyFn = module.multiply_matrix_vector_wasm
+  if (typeof multiplyFn !== 'function') {
+    return null
+  }
+
   try {
-    return module.multiply_matrix_vector_wasm(matrix, vector, dimension)
+    const result = multiplyFn(matrix, vector, dimension)
+    return hasFloat64ArrayLength(result, dimension) ? result : null
   } catch (err) {
     logger.warn('[AnimationWASM] multiply_matrix_vector_wasm failed:', err)
     return null

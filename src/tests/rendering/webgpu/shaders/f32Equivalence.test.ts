@@ -101,14 +101,12 @@ const HO_NORM_F64 = [
   0.016137430609245714, 0.004658474953115118,
 ]
 
-/** 1D HO eigenfunction — f64 precision, mirrors WGSL ho1D() logic */
+/** 1D HO eigenfunction — f64 precision, canonical reference */
 function ho1D_f64(n: number, x: number, omega: number): number {
   if (n < 0 || n > 6) return 0
   const omegaClamped = Math.max(omega, 0.01)
   const alpha = Math.sqrt(omegaClamped)
   const u = alpha * x
-  // Note: WGSL clamps u² to 40.0 — we do NOT clamp in f64 reference
-  // to measure the full precision difference
   const gauss = Math.exp(-0.5 * u * u)
   const H = hermite_f64(n, u)
   const alphaNorm = Math.sqrt(Math.sqrt(omegaClamped * INV_PI))
@@ -286,8 +284,8 @@ function ho1D_f32(n: number, x: number, omega: number): number {
   const alpha = f(Math.sqrt(omegaClamped))
   const u = f(alpha * f(x))
 
-  // WGSL clamps u² to 40.0
-  const u2 = f(Math.min(f(u * u), f(40)))
+  const u2 = f(u * u)
+  if (u2 > f(80)) return f(0)
   const gauss = f(Math.exp(f(f(-0.5) * u2)))
 
   const H = hermite_f32(n, u)
@@ -529,12 +527,9 @@ describe('f32 equivalence — 1D harmonic oscillator', () => {
     }
   }
 
-  it('ho1D at u²=40 boundary: f32 clamp matches f64 negligibility', () => {
-    // At u²=40 (|u|≈6.32), WGSL clamps and returns exp(-20)≈2e-9.
-    // f64 reference returns the true (even smaller) value. Both are sub-pixel.
-    // For high n, H_n(6.5) can be large (~1000 for n=5), so
-    // |ψ| ≈ 1000 * norm * exp(-20) ≈ 1e-5. Still far below any
-    // density threshold that produces visible alpha per step.
+  it('ho1D at u²=40 boundary remains sub-pixel', () => {
+    // At u²=40 (|u|≈6.32), e^-20 is already tiny. Values near this boundary
+    // must remain below any density threshold that produces visible alpha per step.
     for (let n = 0; n <= 6; n++) {
       const f32Val = Math.abs(ho1D_f32(n, 6.5, 1.0))
       const f64Val = Math.abs(ho1D_f64(n, 6.5, 1.0))
@@ -543,6 +538,14 @@ describe('f32 equivalence — 1D harmonic oscillator', () => {
       expect(f32Val).toBeLessThan(1e-4)
       expect(f64Val).toBeLessThan(1e-4)
     }
+  })
+
+  it('ho1D tail keeps decaying past u²=40 instead of polynomial regrowth', () => {
+    const boundaryTail = Math.abs(ho1D_f32(6, Math.sqrt(40), 1.0))
+    const farTail = Math.abs(ho1D_f32(6, 8.0, 1.0))
+
+    expect(farTail).toBeLessThan(boundaryTail)
+    expect(farTail).toBeLessThan(1e-8)
   })
 })
 

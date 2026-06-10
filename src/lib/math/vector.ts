@@ -284,7 +284,15 @@ export function vectorsEqual(a: VectorND, b: VectorND, epsilon = EPSILON): boole
     return false
   }
   for (let i = 0; i < a.length; i++) {
-    if (Math.abs(a[i]! - b[i]!) >= epsilon) {
+    const ai = a[i]!
+    const bi = b[i]!
+    if (Number.isNaN(ai) || Number.isNaN(bi)) {
+      return false
+    }
+    if (ai === bi) {
+      continue
+    }
+    if (Math.abs(ai - bi) >= epsilon) {
       return false
     }
   }
@@ -320,9 +328,15 @@ export function crossProduct3D(a: VectorND, b: VectorND, out?: VectorND): Vector
     throw new Error(`Cross product requires 3D vectors: got ${a.length}D and ${b.length}D`)
   }
 
+  const ax = a[0]!
+  const ay = a[1]!
+  const az = a[2]!
+  const bx = b[0]!
+  const by = b[1]!
+  const bz = b[2]!
   const result = vectorResult(3, out)
-  result[0] = a[1]! * b[2]! - a[2]! * b[1]!
-  result[1] = a[2]! * b[0]! - a[0]! * b[2]!
-  result[2] = a[0]! * b[1]! - a[1]! * b[0]!
+  result[0] = ay * bz - az * by
+  result[1] = az * bx - ax * bz
+  result[2] = ax * by - ay * bx
   return result
 }

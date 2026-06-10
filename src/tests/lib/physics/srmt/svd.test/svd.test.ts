@@ -138,6 +138,21 @@ describe('complexSvdSingularValues', () => {
     expect(sv[2]!).toBeCloseTo(1e200, 12)
   })
 
+  it('handles tiny finite amplitudes without underflowing the Gram matrix to zero', () => {
+    const re = new Float64Array(9)
+    const im = new Float64Array(9)
+    re[0] = 3e-320
+    re[4] = 2e-320
+    re[8] = 1e-320
+
+    const sv = complexSvdSingularValues({ rows: 3, cols: 3, re, im })
+
+    expect(sv[0]!).toBeGreaterThan(0)
+    expect(sv[0]!).toBeCloseTo(3e-320, 12)
+    expect(sv[1]!).toBeCloseTo(2e-320, 12)
+    expect(sv[2]!).toBeCloseTo(1e-320, 12)
+  })
+
   it('rejects non-finite matrix entries before Gram construction', () => {
     const re = new Float64Array([1, Number.POSITIVE_INFINITY, 0, 1])
     const im = new Float64Array(4)

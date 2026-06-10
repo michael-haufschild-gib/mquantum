@@ -37,13 +37,14 @@ export function normalizeAntiDeSitterLoadedConfig(
   const l = clampFiniteFloorInteger(current.l, defaults.l, 0, 3)
   const rawM = clampFiniteFloorInteger(current.m, defaults.m, -l, l)
   const m = rawM === 0 ? 0 : rawM
-  const hkllEnabled =
-    typeof current.hkllEnabled === 'boolean' ? current.hkllEnabled : defaults.hkllEnabled
   const rawChordalEnabled =
     typeof current.chordalSieveEnabled === 'boolean'
       ? current.chordalSieveEnabled
       : defaults.chordalSieveEnabled
-  const chordalSieveEnabled = hkllEnabled === true ? false : rawChordalEnabled
+  const chordalSieveEnabled = rawChordalEnabled === true
+  const rawHkllEnabled =
+    typeof current.hkllEnabled === 'boolean' ? current.hkllEnabled : defaults.hkllEnabled
+  const hkllEnabled = chordalSieveEnabled === true ? false : rawHkllEnabled === true
   const btzEnabled =
     hkllEnabled === true || chordalSieveEnabled === true
       ? false
@@ -55,7 +56,9 @@ export function normalizeAntiDeSitterLoadedConfig(
       ? current.branch
       : defaults.branch
   const hkllBoundarySource =
-    current.hkllBoundarySource === 'localized' || current.hkllBoundarySource === 'planeWave'
+    current.hkllBoundarySource === 'eigenstate' ||
+    current.hkllBoundarySource === 'localized' ||
+    current.hkllBoundarySource === 'planeWave'
       ? current.hkllBoundarySource
       : defaults.hkllBoundarySource
   const preset =

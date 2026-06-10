@@ -4,6 +4,7 @@ import React from 'react'
 import { describe, expect, it } from 'vitest'
 
 import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
 import { Z_INDEX } from '@/constants/zIndex'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { useToast } from '@/hooks/useToast'
@@ -25,6 +26,23 @@ describe('ToastProvider', () => {
     await user.click(screen.getByRole('button', { name: /show toast/i }))
 
     expect(screen.getByTestId('toast-message')).toHaveTextContent('Export failed')
+    expect(screen.getByTestId('toast-container')).toHaveStyle({ zIndex: Z_INDEX.TOOLTIP })
+  })
+
+  it('renders toasts above app modal layer', async () => {
+    const user = userEvent.setup()
+    render(
+      <ToastProvider>
+        <Modal isOpen={true} onClose={() => {}} title="Export Failed" data-testid="test-modal">
+          <ToastButton />
+        </Modal>
+      </ToastProvider>
+    )
+
+    await user.click(screen.getByRole('button', { name: /show toast/i }))
+
+    expect(screen.getByTestId('toast-message')).toHaveTextContent('Export failed')
+    expect(screen.getByTestId('test-modal')).toHaveStyle({ zIndex: Z_INDEX.MODAL })
     expect(screen.getByTestId('toast-container')).toHaveStyle({ zIndex: Z_INDEX.TOOLTIP })
   })
 })

@@ -17,3 +17,7 @@ import type { VectorND } from '@/lib/math/types'
 export function float64ToVector(vector: Float64Array): VectorND {
   return Array.from(vector)
 }
+
+export function hasFloat64ArrayLength(value: unknown, length: number): value is Float64Array {
+  return value instanceof Float64Array && value.length === length
+}

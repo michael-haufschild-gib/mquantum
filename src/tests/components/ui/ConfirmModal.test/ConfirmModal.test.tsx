@@ -37,13 +37,7 @@ describe('ConfirmModal', () => {
       />
     )
 
-    // Native dialog element exists in DOM but its content should be excluded
-    // from the normal accessibility tree. The button is only reachable with
-    // `{ hidden: true }`, which proves the dialog never called `showModal()`.
-    const confirmBtn = screen.getByRole('button', { name: 'Confirm', hidden: true })
-    expect(confirmBtn).toBeInTheDocument()
-    // Normal (non-hidden) a11y query must NOT find the button — a regression
-    // that accidentally opened the dialog when isOpen=false would surface here.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Confirm' })).not.toBeInTheDocument()
   })
 

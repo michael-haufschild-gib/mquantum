@@ -10,7 +10,11 @@
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { getQuantumTypeShaderUniformIdMap } from '@/lib/geometry/registry'
-import type { HydrogenBasisState } from '@/lib/physics/openQuantum/hydrogenBasis'
+import {
+  normalizeHydrogenBasisDimension,
+  normalizeHydrogenBasisMaxN,
+  type HydrogenBasisState,
+} from '@/lib/physics/openQuantum/hydrogenBasis'
 import type { AnimationState } from '@/stores/scene/animationStore'
 import type { AppearanceStoreState } from '@/stores/scene/appearanceStore'
 import type { GeometryState } from '@/stores/scene/geometryStore'
@@ -36,6 +40,7 @@ export {
 export { SCHROEDINGER_UNIFORM_SIZE } from '../schroedingerLayout'
 
 const PACKED_HYDROGEN_BASIS_CAPACITY = 14
+const PACKED_HYDROGEN_EXTRA_DIM_MAX_N = 6
 
 // ---------------------------------------------------------------------------
 // String → integer enum maps for GPU uniform packing
@@ -101,6 +106,11 @@ export function isFreeScalarAnalysisAlgorithm(algo: number | undefined): boolean
     algo >= COLOR_ALGORITHM_MAP.hamiltonianDecomposition! &&
     algo <= COLOR_ALGORITHM_MAP.kSpaceOccupation!
   )
+}
+
+function clampInteger(value: number, fallback: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return fallback
+  return Math.max(min, Math.min(max, Math.floor(value)))
 }
 
 /** Maps cross-section composite mode names to shader integer constants */
@@ -279,23 +289,23 @@ export function packHydrogenBasisForGPU(
 
   const maxDims = 11
   const basisCount = Math.min(PACKED_HYDROGEN_BASIS_CAPACITY, basis.length)
-  const safeDimension =
-    typeof dimension === 'number' && Number.isFinite(dimension)
-      ? Math.min(maxDims, Math.max(2, Math.floor(dimension)))
-      : 3
+  const safeDimension = normalizeHydrogenBasisDimension(dimension)
 
   for (let k = 0; k < basisCount; k++) {
     const state = basis[k]!
     // dim 0=n, 1=l, 2=m, 3+=extraDimN[i]
     const flatBase = k * maxDims
-    i32View[flatBase + 0] = Number.isFinite(state.n) ? Math.floor(state.n) : 0
-    i32View[flatBase + 1] = Number.isFinite(state.l) ? Math.floor(state.l) : 0
-    i32View[flatBase + 2] = Number.isFinite(state.m) ? Math.floor(state.m) : 0
+    const packedN = Number.isFinite(state.n) ? normalizeHydrogenBasisMaxN(state.n) : 1
+    const packedL = clampInteger(state.l, 0, 0, packedN - 1)
+    const packedM = clampInteger(state.m, 0, -packedL, packedL)
+    i32View[flatBase + 0] = packedN
+    i32View[flatBase + 1] = packedL
+    i32View[flatBase + 2] = packedM
     const extraDimN = Array.isArray(state.extraDimN) ? state.extraDimN : []
     const extraCount = Math.min(Math.max(0, safeDimension - 3), extraDimN.length)
     for (let d = 0; d < extraCount; d++) {
       const extraN = extraDimN[d]!
-      i32View[flatBase + 3 + d] = Number.isFinite(extraN) ? Math.floor(extraN) : 0
+      i32View[flatBase + 3 + d] = clampInteger(extraN, 0, 0, PACKED_HYDROGEN_EXTRA_DIM_MAX_N)
     }
 
     // Energy

@@ -72,6 +72,26 @@ function emptyCoordinateEntanglementResult(
   }
 }
 
+function expectedCoordinateSiteCount(gridSize: readonly number[]): number | null {
+  if (gridSize.length === 0) return null
+  let totalSites = 1
+  for (const size of gridSize) {
+    if (!Number.isSafeInteger(size) || size <= 0) return null
+    totalSites *= size
+    if (!Number.isSafeInteger(totalSites)) return null
+  }
+  return totalSites
+}
+
+function hasValidCoordinateReadbackShape(
+  psiRe: Float32Array,
+  psiIm: Float32Array,
+  gridSize: readonly number[]
+): boolean {
+  const expectedSites = expectedCoordinateSiteCount(gridSize)
+  return expectedSites !== null && psiRe.length === expectedSites && psiIm.length === expectedSites
+}
+
 // ─── Full Coordinate Entanglement Pipeline ──────────────────────────────────
 
 /**
@@ -98,6 +118,9 @@ export function computeCoordinateEntanglement(
   options: EntanglementOptions
 ): CoordinateEntanglementResult {
   const N = gridSize.length
+  if (!hasValidCoordinateReadbackShape(psiRe, psiIm, gridSize)) {
+    return emptyCoordinateEntanglementResult(N, options)
+  }
 
   // ── Normalize wavefunction ────────────────────────────────────────────
   // GPU wavefunctions are stored on a spatial grid without volume-element

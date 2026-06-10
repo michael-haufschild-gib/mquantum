@@ -176,6 +176,28 @@ describe('packSchroedingerUniforms — defaults', () => {
     expect(floatView[I.radialProbabilityOpacity]).toBe(1)
   })
 
+  it('sanitizes cross-section scalar controls before GPU upload', () => {
+    const { floatView, intView } = makeBuffer()
+    packSchroedingerUniforms(floatView, intView, {
+      ...baseParams,
+      schroedinger: {
+        crossSectionEnabled: true,
+        crossSectionPlaneOffset: Number.NaN,
+        crossSectionWindowMin: Number.POSITIVE_INFINITY,
+        crossSectionWindowMax: Number.NEGATIVE_INFINITY,
+        crossSectionOpacity: Number.NaN,
+        crossSectionThickness: Number.POSITIVE_INFINITY,
+      } as never,
+    })
+
+    expect(intView[I.crossSectionEnabled]).toBe(1)
+    expect(floatView[I.crossSectionPlane + 3]).toBe(0)
+    expect(floatView[I.crossSectionWindow]).toBe(0)
+    expect(floatView[I.crossSectionWindow + 1]).toBe(1)
+    expect(floatView[I.crossSectionWindow + 2]).toBeCloseTo(0.75)
+    expect(floatView[I.crossSectionWindow + 3]).toBeCloseTo(0.02)
+  })
+
   it('writes hydrogenBoost = 50·n²·3^l for the default configuration (n=2, l=1)', () => {
     const { floatView, intView } = makeBuffer()
     packSchroedingerUniforms(floatView, intView, { ...baseParams })

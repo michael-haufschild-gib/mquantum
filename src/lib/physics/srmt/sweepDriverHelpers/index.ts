@@ -113,8 +113,8 @@ export function clampPhiExtent(phiExtent: number): number {
 /**
  * Clamp + integerise a caller-supplied `points` count to the per-kind
  * range the sweep drivers expect. Mirrors `totalPointsFor` in the worker
- * so a malformed URL/programmatic config cannot allocate far more linspace
- * samples than the UI and worker will advertise.
+ * so a malformed URL/programmatic config cannot allocate a different number
+ * of linspace samples than the UI and worker will advertise.
  */
 export function normalisePointCount(kind: SrmtSweepConfig['kind'], rawPoints: number): number {
   const points = Number.isFinite(rawPoints) ? Math.floor(rawPoints) : 1
@@ -133,7 +133,7 @@ export function normalisePointCount(kind: SrmtSweepConfig['kind'], rawPoints: nu
     case 'gridNphi':
       return Math.max(1, Math.min(9, points))
     case 'gridNphiCoupled':
-      return Math.max(1, Math.min(7, points))
+      return Math.max(3, Math.min(7, points))
     case 'bc':
       return 3
   }

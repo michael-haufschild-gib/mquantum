@@ -47,6 +47,10 @@ class FakePass implements SinglePassComputePass, StateSaveLoadPass {
 class FakeStrategy extends SinglePassComputeStrategy<FakePass, { needsReset?: boolean }> {
   createdSizes: number[] = []
 
+  getPassForTest(): FakePass | null {
+    return this.pass
+  }
+
   protected createPass(densityGridResolution: number): FakePass {
     this.createdSizes.push(densityGridResolution)
     return new FakePass(densityGridResolution)
@@ -115,5 +119,17 @@ describe('SinglePassComputeStrategy density grid setup', () => {
     setup(strategy, {} as SchrodingerRendererConfig)
 
     expect(strategy.createdSizes).toEqual([DENSITY_GRID_SIZE])
+  })
+
+  it('refuses to adopt a non-default pass when successor config omits densityGridResolution', () => {
+    const source = new FakeStrategy()
+    const target = new FakeStrategy()
+
+    setup(source, { densityGridResolution: DENSITY_GRID_SIZE * 2 } as SchrodingerRendererConfig)
+    const sourcePass = source.getPassForTest()
+
+    expect(target.adoptComputeState(source, {} as SchrodingerRendererConfig)).toBe(false)
+    expect(source.getPassForTest()).toBe(sourcePass)
+    expect(target.getPassForTest()).toBeNull()
   })
 })

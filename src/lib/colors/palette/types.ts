@@ -149,6 +149,16 @@ export interface CosineCoefficients {
   d: [number, number, number]
 }
 
+export const COSINE_COEFFICIENT_RANGES: Record<
+  keyof CosineCoefficients,
+  { min: number; max: number }
+> = {
+  a: { min: -1, max: 2 },
+  b: { min: -2, max: 2 },
+  c: { min: -1, max: 5 },
+  d: { min: -1, max: 2 },
+}
+
 /**
  * Distribution controls for remapping the input value (t).
  * Applied before palette lookup to shape color distribution.

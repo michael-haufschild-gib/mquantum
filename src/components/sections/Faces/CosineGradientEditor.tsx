@@ -10,7 +10,7 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { Button } from '@/components/ui/Button'
 import { Slider } from '@/components/ui/Slider'
-import { DEFAULT_COSINE_COEFFICIENTS } from '@/lib/colors/palette'
+import { COSINE_COEFFICIENT_RANGES, DEFAULT_COSINE_COEFFICIENTS } from '@/lib/colors/palette'
 import { type AppearanceSlice, useAppearanceStore } from '@/stores/scene/appearanceStore'
 
 /** Props for the cosine gradient coefficient editor. */
@@ -106,8 +106,8 @@ export const CosineGradientEditor: React.FC<CosineGradientEditorProps> = React.m
                       <Slider
                         data-testid="components-sections-faces-cosine-gradient-editor-slider-104-23"
                         label={channel}
-                        min={0}
-                        max={2}
+                        min={COSINE_COEFFICIENT_RANGES[key].min}
+                        max={COSINE_COEFFICIENT_RANGES[key].max}
                         step={0.01}
                         value={cosineCoefficients[key][index] ?? 0}
                         onChange={(value) => setCosineCoefficient(key, index, value)}

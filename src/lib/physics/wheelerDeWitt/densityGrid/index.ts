@@ -49,7 +49,7 @@
  */
 
 import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
-import { clamp01 } from '@/lib/math/clamp'
+import { clamp01, clampFinite } from '@/lib/math/clamp'
 import { packRGBA16F } from '@/lib/physics/freeScalar/halfFloatPacking'
 
 import type { WheelerDeWittAnySolverOutput } from '../solver'
@@ -640,7 +640,7 @@ export function packWdwDensityGrid(
   const chi = output.chi
   const overlayIntensity = !is4d ? (overlay?.intensity ?? null) : null
   const srmtState = !is4d ? buildSrmtState(srmtOverlay, N) : null
-  const f3 = clamp01(options?.phi3SliceNormalized ?? 0.5) * iPhiScale
+  const f3 = clampFinite(options?.phi3SliceNormalized, 0.5, 0, 1) * iPhiScale
   const i30 = Math.min(Nphi - 1, Math.max(0, Math.floor(f3)))
   const i31 = Math.min(Nphi - 1, i30 + 1)
   const w3 = f3 - i30

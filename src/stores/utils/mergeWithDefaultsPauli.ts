@@ -52,6 +52,10 @@ function enumValue<T extends string>(value: unknown, values: readonly T[], fallb
   return typeof value === 'string' && values.includes(value as T) ? (value as T) : fallback
 }
 
+function booleanValue(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback
+}
+
 function recordOrEmpty(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -198,6 +202,7 @@ export function normalizePauliLoadedConfig(merged: PauliConfig, loaded: unknown)
     harmonicOmega: clampFinite(merged.harmonicOmega, DEFAULT_PAULI_CONFIG.harmonicOmega, 0.01, 10),
     wellDepth: clampFinite(merged.wellDepth, DEFAULT_PAULI_CONFIG.wellDepth, 0, 100),
     wellWidth: clampFinite(merged.wellWidth, DEFAULT_PAULI_CONFIG.wellWidth, 0.01, 10),
+    showPotential: booleanValue(merged.showPotential, DEFAULT_PAULI_CONFIG.showPotential),
     fieldView: enumValue(merged.fieldView, FIELD_VIEWS, DEFAULT_PAULI_CONFIG.fieldView),
     spinUpColor: normalizeRgb(
       sourceArray(source, merged, 'spinUpColor'),
@@ -207,6 +212,8 @@ export function normalizePauliLoadedConfig(merged: PauliConfig, loaded: unknown)
       sourceArray(source, merged, 'spinDownColor'),
       DEFAULT_PAULI_CONFIG.spinDownColor
     ),
+    autoScale: booleanValue(merged.autoScale, DEFAULT_PAULI_CONFIG.autoScale),
+    absorberEnabled: booleanValue(merged.absorberEnabled, DEFAULT_PAULI_CONFIG.absorberEnabled),
     absorberWidth: clampFinite(merged.absorberWidth, DEFAULT_PAULI_CONFIG.absorberWidth, 0.05, 0.5),
     pmlTargetReflection: clampFinite(
       merged.pmlTargetReflection,
@@ -214,11 +221,19 @@ export function normalizePauliLoadedConfig(merged: PauliConfig, loaded: unknown)
       1e-12,
       0.999
     ),
+    diagnosticsEnabled: booleanValue(
+      merged.diagnosticsEnabled,
+      DEFAULT_PAULI_CONFIG.diagnosticsEnabled
+    ),
     diagnosticsInterval: clampFiniteInteger(
       merged.diagnosticsInterval,
       DEFAULT_PAULI_CONFIG.diagnosticsInterval,
       1,
       100
+    ),
+    sliceAnimationEnabled: booleanValue(
+      merged.sliceAnimationEnabled,
+      DEFAULT_PAULI_CONFIG.sliceAnimationEnabled
     ),
     sliceSpeed: clampFinite(merged.sliceSpeed, DEFAULT_PAULI_CONFIG.sliceSpeed, 0.01, 0.1),
     sliceAmplitude: clampFinite(

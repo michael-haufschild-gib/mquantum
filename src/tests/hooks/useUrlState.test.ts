@@ -330,6 +330,51 @@ describe('useUrlState', () => {
     })
   })
 
+  it('ignores URL namespaces for inactive modes', async () => {
+    const initial = useExtendedObjectStore.getState()
+    const initialWdw = initial.schroedinger.wheelerDeWitt
+    const initialDirac = initial.schroedinger.dirac
+    const initialAds = initial.schroedinger.antiDeSitter
+    const initialCoherence = initial.schroedinger.coherenceHorizon
+    const initialBell = initial.bellPair
+
+    mockedParseCurrentUrl.mockReturnValue({
+      objectType: 'schroedinger',
+      dimension: 3,
+      quantumMode: 'tdseDynamics',
+      wdwInflatonMass: 1.5,
+      wdwWorldlineEnabled: true,
+      diracMass: 4,
+      diracInitialCondition: 'zitterbewegung',
+      adsDimension: 6,
+      adsBtzEnabled: true,
+      coherenceHorizonDecoherence: 0.9,
+      bellVisibility: 0.25,
+      bellTargetTrials: 500,
+    })
+
+    renderHook(() => useUrlState())
+
+    await waitFor(() => {
+      expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('tdseDynamics')
+    })
+
+    const current = useExtendedObjectStore.getState()
+    expect(current.schroedinger.wheelerDeWitt.inflatonMass).toBe(initialWdw.inflatonMass)
+    expect(current.schroedinger.wheelerDeWitt.worldlineEnabled).toBe(
+      initialWdw.worldlineEnabled
+    )
+    expect(current.schroedinger.dirac.mass).toBe(initialDirac.mass)
+    expect(current.schroedinger.dirac.initialCondition).toBe(initialDirac.initialCondition)
+    expect(current.schroedinger.antiDeSitter.d).toBe(initialAds.d)
+    expect(current.schroedinger.antiDeSitter.btzEnabled).toBe(initialAds.btzEnabled)
+    expect(current.schroedinger.coherenceHorizon.decoherence).toBe(
+      initialCoherence.decoherence
+    )
+    expect(current.bellPair.visibility).toBe(initialBell.visibility)
+    expect(current.bellPair.targetTrials).toBe(initialBell.targetTrials)
+  })
+
   it('loads scene examples when scene parameter is present', async () => {
     const hasHydratedSpy = vi
       .spyOn(usePresetManagerStore.persist, 'hasHydrated')

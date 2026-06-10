@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useId, useRef } from 'react'
 
 import { Button } from '@/components/ui/Button'
+import { Z_INDEX } from '@/constants/zIndex'
 
 /** Props for Modal component */
 interface ModalProps {
@@ -19,60 +20,101 @@ interface ModalProps {
 }
 
 /**
- * Accessible modal dialog component using native HTML dialog element.
- * Provides built-in focus trapping, Escape key handling, and backdrop.
+ * Accessible modal dialog component.
+ * Provides focus trapping, Escape key handling, and backdrop.
  * Manages body scroll prevention and focus restoration.
  */
 export const Modal: React.FC<ModalProps> = React.memo(
   ({ isOpen, onClose, title, children, width = 'max-w-md', 'data-testid': dataTestId }) => {
-    const dialogRef = useRef<HTMLDialogElement>(null)
+    const panelRef = useRef<HTMLDivElement>(null)
     const previousActiveElement = useRef<HTMLElement | null>(null)
-    /** Tracks programmatic closes so the native 'close' event doesn't re-fire onClose. */
-    const closingProgrammatically = useRef(false)
     const titleId = useId()
 
-    // Sync dialog open state with isOpen prop
+    const getFocusableElements = useCallback((): HTMLElement[] => {
+      const panel = panelRef.current
+      if (!panel) return []
+      const selector = [
+        'a[href]',
+        'button:not([disabled])',
+        'textarea:not([disabled])',
+        'input:not([disabled])',
+        'select:not([disabled])',
+        '[tabindex]:not([tabindex="-1"])',
+      ].join(',')
+
+      return Array.from(panel.querySelectorAll<HTMLElement>(selector)).filter(
+        (element) => element.offsetParent !== null || element === document.activeElement
+      )
+    }, [])
+
+    // Capture and restore focus around modal visibility.
     useEffect(() => {
-      const dialog = dialogRef.current
-      if (!dialog) return
+      if (!isOpen) return
 
-      if (isOpen && !dialog.open) {
-        previousActiveElement.current = document.activeElement as HTMLElement
-        dialog.showModal()
-      } else if (!isOpen && dialog.open) {
-        // Mark this close as programmatic so the 'close' event handler skips onClose
-        closingProgrammatically.current = true
-        dialog.close()
-      }
-    }, [isOpen])
+      previousActiveElement.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null
 
-    // Handle native dialog close event (Escape key, form submission)
-    useEffect(() => {
-      const dialog = dialogRef.current
-      if (!dialog) return
+      const focusFrame = window.requestAnimationFrame(() => {
+        const firstFocusable = getFocusableElements()[0]
+        ;(firstFocusable ?? panelRef.current)?.focus()
+      })
 
-      const handleClose = () => {
-        // Restore focus to previous element
+      return () => {
+        window.cancelAnimationFrame(focusFrame)
         previousActiveElement.current?.focus()
+      }
+    }, [getFocusableElements, isOpen])
 
-        // Only fire onClose for user-initiated closes (Escape key, form submission).
-        // Programmatic closes (parent set isOpen=false) already handled state upstream.
-        if (closingProgrammatically.current) {
-          closingProgrammatically.current = false
+    // Handle Escape and keep Tab navigation inside the modal panel.
+    useEffect(() => {
+      if (!isOpen) return
+
+      const handleKeyDown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          onClose()
           return
         }
-        onClose()
+
+        if (event.key !== 'Tab') return
+
+        const panel = panelRef.current
+        if (!panel) return
+
+        const focusable = getFocusableElements()
+        if (focusable.length === 0) {
+          event.preventDefault()
+          panel.focus()
+          return
+        }
+
+        const first = focusable[0]!
+        const last = focusable[focusable.length - 1]!
+        const active = document.activeElement
+
+        if (event.shiftKey) {
+          if (active === first || !(active instanceof Node && panel.contains(active))) {
+            event.preventDefault()
+            last.focus()
+          }
+          return
+        }
+
+        if (active === last) {
+          event.preventDefault()
+          first.focus()
+        }
       }
 
-      dialog.addEventListener('close', handleClose)
-      return () => dialog.removeEventListener('close', handleClose)
-    }, [onClose])
+      window.addEventListener('keydown', handleKeyDown)
+      return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [getFocusableElements, isOpen, onClose])
 
     // Handle backdrop click
     const handleBackdropClick = useCallback(
       (e: React.MouseEvent) => {
-        // Only close if clicking directly on the dialog backdrop (not content)
-        if (e.target === dialogRef.current) {
+        // Only close if clicking directly on the backdrop (not content)
+        if (e.target === e.currentTarget) {
           onClose()
         }
       },
@@ -91,16 +133,23 @@ export const Modal: React.FC<ModalProps> = React.memo(
       }
     }, [isOpen])
 
+    if (!isOpen) return null
+
     return (
-      <dialog
-        ref={dialogRef}
+      <div
+        role="dialog"
+        aria-modal="true"
         aria-labelledby={titleId}
         onClick={handleBackdropClick}
-        className={`${width} w-full p-0 bg-transparent border-none rounded-lg backdrop:bg-[var(--bg-app)]/80 open:animate-in open:zoom-in-95 open:fade-in duration-200`}
-        style={{ margin: 'auto' }}
+        className="fixed inset-0 flex items-center justify-center bg-[var(--bg-app)]/80 p-4 animate-in zoom-in-95 fade-in duration-200"
+        style={{ zIndex: Z_INDEX.MODAL }}
         data-testid={dataTestId}
       >
-        <div className="bg-panel border border-panel-border rounded-lg shadow-2xl overflow-hidden pointer-events-auto">
+        <div
+          ref={panelRef}
+          tabIndex={-1}
+          className={`${width} w-full bg-panel border border-panel-border rounded-lg shadow-2xl overflow-hidden pointer-events-auto focus:outline-none`}
+        >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-panel-border bg-panel-header/50">
             <div className="flex items-center gap-2 min-w-0">
@@ -143,7 +192,7 @@ export const Modal: React.FC<ModalProps> = React.memo(
           {/* Body */}
           <div className="p-4 max-h-[80vh] overflow-y-auto custom-scrollbar">{children}</div>
         </div>
-      </dialog>
+      </div>
     )
   }
 )

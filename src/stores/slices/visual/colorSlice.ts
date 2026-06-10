@@ -3,6 +3,7 @@ import type { StateCreator } from 'zustand'
 import { normalizeOpaqueHexColor } from '@/lib/colors/colorUtils'
 import {
   COLOR_ALGORITHM_TO_INT,
+  COSINE_COEFFICIENT_RANGES,
   type ColorAlgorithm,
   type CosineCoefficients,
   type DistributionSettings,
@@ -78,10 +79,11 @@ function mergeCosineVector(
     logger.warn(`[colorSlice] Ignoring invalid cosine coefficient vector ${key}:`, incoming)
     return current
   }
+  const range = COSINE_COEFFICIENT_RANGES[key]
   return [
-    mergeNumeric(current[0], incoming[0], 0, 2),
-    mergeNumeric(current[1], incoming[1], 0, 2),
-    mergeNumeric(current[2], incoming[2], 0, 2),
+    mergeNumeric(current[0], incoming[0], range.min, range.max),
+    mergeNumeric(current[1], incoming[1], range.min, range.max),
+    mergeNumeric(current[2], incoming[2], range.min, range.max),
   ]
 }
 
@@ -189,7 +191,8 @@ export const createColorSlice: StateCreator<AppearanceSlice, [], [], ColorSlice>
         }
         const newCoefficients = { ...state.cosineCoefficients }
         const arr = [...newCoefficients[key]] as [number, number, number]
-        arr[index] = Math.max(0, Math.min(2, value))
+        const range = COSINE_COEFFICIENT_RANGES[key]
+        arr[index] = Math.max(range.min, Math.min(range.max, value))
         newCoefficients[key] = arr
         return { cosineCoefficients: newCoefficients }
       }),

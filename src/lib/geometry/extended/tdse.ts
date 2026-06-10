@@ -538,33 +538,153 @@ function sanitizeIntegerRange(value: number, min: number, max: number, fallback:
   return Number.isFinite(value) ? Math.floor(clampRange(value, min, max)) : fallback
 }
 
-/** Sanitize TDSE stochastic/decoherence fields for bulk config loads. */
-export function sanitizeTdseStochasticFields(config: TdseConfig, fallback: TdseConfig): TdseConfig {
+type NumericTdseScalarKey = {
+  [K in keyof TdseConfig]: TdseConfig[K] extends number ? K : never
+}[keyof TdseConfig]
+type RequiredNumericTdseScalarKey = Exclude<NumericTdseScalarKey, undefined>
+
+interface TdseNumericScalarSpec {
+  key: RequiredNumericTdseScalarKey
+  min: number
+  max: number
+}
+
+const TDSE_LOADED_NUMERIC_SCALAR_SPECS: readonly TdseNumericScalarSpec[] = [
+  { key: 'barrierHeight', min: 0, max: 100 },
+  { key: 'barrierWidth', min: 0.01, max: 5 },
+  { key: 'barrierCenter', min: -5, max: 5 },
+  { key: 'wellDepth', min: 0, max: 100 },
+  { key: 'wellWidth', min: 0.01, max: 5 },
+  { key: 'harmonicOmega', min: 0.01, max: 50 },
+  { key: 'stepHeight', min: -100, max: 100 },
+  { key: 'slitSeparation', min: 0.01, max: 5 },
+  { key: 'slitWidth', min: 0.001, max: 2 },
+  { key: 'wallThickness', min: 0.005, max: 2 },
+  { key: 'wallHeight', min: 0, max: 200 },
+  { key: 'latticeDepth', min: 0, max: 100 },
+  { key: 'latticePeriod', min: 0.01, max: 5 },
+  { key: 'doubleWellLambda', min: 0, max: 200 },
+  { key: 'doubleWellSeparation', min: 0.1, max: 5 },
+  { key: 'doubleWellAsymmetry', min: -50, max: 50 },
+  { key: 'radialWellInner', min: 0, max: 5 },
+  { key: 'radialWellOuter', min: 0.1, max: 10 },
+  { key: 'radialWellDepth', min: 0, max: 200 },
+  { key: 'radialWellTilt', min: -2, max: 2 },
+  { key: 'anharmonicLambda', min: 0, max: 100 },
+  { key: 'driveFrequency', min: 0, max: 50 },
+  { key: 'driveAmplitude', min: 0, max: 100 },
+  { key: 'wormholeCouplingG', min: 0, max: 5 },
+  { key: 'ctcPostselectionStrength', min: 0, max: 1 },
+  { key: 'ctcLoopPhase', min: -Math.PI, max: Math.PI },
+]
+
+function sanitizeTdseNumericScalars(config: TdseConfig, fallback: TdseConfig): TdseConfig {
+  let next = config
+  for (const spec of TDSE_LOADED_NUMERIC_SCALAR_SPECS) {
+    const raw = config[spec.key]
+    const fallbackValue = fallback[spec.key]
+    const safeFallback =
+      typeof fallbackValue === 'number' && Number.isFinite(fallbackValue) ? fallbackValue : spec.min
+    const sanitized = sanitizeFiniteRange(raw, spec.min, spec.max, safeFallback)
+    if (raw !== sanitized) {
+      next = next === config ? { ...config } : next
+      ;(next as unknown as Record<string, unknown>)[spec.key] = sanitized
+    }
+  }
+  return next
+}
+
+function sanitizeBoolean(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback
+}
+
+/**
+ * Sanitize TDSE fields that bypass dedicated UI setters during scene,
+ * preset, and .mqstate loads.
+ */
+export function sanitizeTdseLoadedFields(config: TdseConfig, fallback: TdseConfig): TdseConfig {
+  const numeric = sanitizeTdseNumericScalars(config, fallback)
+  const bh = normalizeTdseBlackHoleParams(numeric)
+  const blackHoleRingdownActive = numeric.potentialType === 'blackHoleRingdown'
   return {
-    ...config,
-    stochasticGamma: sanitizeFiniteRange(config.stochasticGamma, 0, 10, fallback.stochasticGamma),
+    ...numeric,
+    ...bh,
+    driveEnabled: sanitizeBoolean(numeric.driveEnabled, fallback.driveEnabled),
+    absorberEnabled: sanitizeBoolean(numeric.absorberEnabled, fallback.absorberEnabled),
+    autoScale: sanitizeBoolean(numeric.autoScale, fallback.autoScale),
+    showPotential: sanitizeBoolean(numeric.showPotential, fallback.showPotential),
+    autoLoop: sanitizeBoolean(numeric.autoLoop, fallback.autoLoop),
+    diagnosticsEnabled: sanitizeBoolean(numeric.diagnosticsEnabled, fallback.diagnosticsEnabled),
+    observablesEnabled: sanitizeBoolean(numeric.observablesEnabled, fallback.observablesEnabled),
+    imaginaryTimeEnabled: sanitizeBoolean(
+      numeric.imaginaryTimeEnabled,
+      fallback.imaginaryTimeEnabled
+    ),
+    stochasticEnabled: blackHoleRingdownActive
+      ? false
+      : sanitizeBoolean(numeric.stochasticEnabled, fallback.stochasticEnabled),
+    branchingEnabled: blackHoleRingdownActive
+      ? false
+      : sanitizeBoolean(numeric.branchingEnabled, fallback.branchingEnabled),
+    hawkingPairInjection: sanitizeBoolean(
+      numeric.hawkingPairInjection,
+      fallback.hawkingPairInjection ?? DEFAULT_TDSE_CONFIG.hawkingPairInjection ?? false
+    ),
+    wormholeCouplingEnabled: sanitizeBoolean(
+      numeric.wormholeCouplingEnabled,
+      fallback.wormholeCouplingEnabled
+    ),
+    ctcPostselectionEnabled: sanitizeBoolean(
+      numeric.ctcPostselectionEnabled,
+      fallback.ctcPostselectionEnabled
+    ),
+    wormholeCoherenceHudEnabled: sanitizeBoolean(
+      numeric.wormholeCoherenceHudEnabled,
+      fallback.wormholeCoherenceHudEnabled
+    ),
+    stochasticGamma: sanitizeFiniteRange(numeric.stochasticGamma, 0, 10, fallback.stochasticGamma),
     stochasticSigma: sanitizeFiniteRange(
-      config.stochasticSigma,
+      numeric.stochasticSigma,
       0.5,
       5.0,
       fallback.stochasticSigma
     ),
     stochasticNumSites: sanitizeIntegerRange(
-      config.stochasticNumSites,
+      numeric.stochasticNumSites,
       1,
       MAX_STOCHASTIC_SITES,
       fallback.stochasticNumSites
     ),
-    stochasticSeed: sanitizeIntegerRange(config.stochasticSeed, 0, 999999, fallback.stochasticSeed),
+    stochasticSeed: sanitizeIntegerRange(
+      numeric.stochasticSeed,
+      0,
+      999999,
+      fallback.stochasticSeed
+    ),
     branchPlanePosition: sanitizeFiniteRange(
-      config.branchPlanePosition,
+      numeric.branchPlanePosition,
       -1.0,
       1.0,
       fallback.branchPlanePosition
     ),
-    branchColorA: sanitizeTdseBranchColor(config.branchColorA, fallback.branchColorA),
-    branchColorB: sanitizeTdseBranchColor(config.branchColorB, fallback.branchColorB),
+    branchColorA: sanitizeTdseBranchColor(numeric.branchColorA, fallback.branchColorA),
+    branchColorB: sanitizeTdseBranchColor(numeric.branchColorB, fallback.branchColorB),
+    disorderStrength: sanitizeFiniteRange(
+      numeric.disorderStrength,
+      0,
+      100,
+      fallback.disorderStrength
+    ),
+    disorderSeed: sanitizeIntegerRange(numeric.disorderSeed, 0, 0xffffffff, fallback.disorderSeed),
+    disorderDistribution: isTdseDisorderDistribution(numeric.disorderDistribution)
+      ? numeric.disorderDistribution
+      : fallback.disorderDistribution,
   }
+}
+
+/** @deprecated Use sanitizeTdseLoadedFields. */
+export function sanitizeTdseStochasticFields(config: TdseConfig, fallback: TdseConfig): TdseConfig {
+  return sanitizeTdseLoadedFields(config, fallback)
 }
 
 /**

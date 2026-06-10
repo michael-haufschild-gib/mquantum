@@ -1,23 +1,26 @@
 import { StateCreator } from 'zustand'
 
 import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
-import { sanitizeKSpaceVizConfig } from '@/lib/geometry/extended/freeScalar'
+import { sanitizeFreeScalarConfig } from '@/lib/geometry/extended/freeScalar'
 import {
   resizeQuantumWalkArrays,
   sanitizeQuantumWalkConfig,
 } from '@/lib/geometry/extended/quantumWalk'
-import { sanitizeHarmonicOscillatorScalars } from '@/lib/geometry/extended/schroedinger/configSanitization'
+import {
+  sanitizeSchroedingerBooleanScalars,
+  sanitizeSchroedingerNumericScalars,
+} from '@/lib/geometry/extended/schroedinger/configSanitization'
 import { normalizeHydrogenNDPresetName } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import { SCHROEDINGER_PALETTE_DEFINITIONS } from '@/lib/geometry/extended/schroedinger/palettes'
 import { getNamedPresetStoreControls } from '@/lib/geometry/extended/schroedinger/presets'
-import { sanitizeTdseStochasticFields } from '@/lib/geometry/extended/tdse'
+import { sanitizeTdseLoadedFields } from '@/lib/geometry/extended/tdse'
 import {
   type BecConfig,
   createDefaultSchroedingerConfig,
   DEFAULT_SCHROEDINGER_CONFIG,
   type DiracConfig,
-  FREE_SCALAR_MAX_TOTAL_SITES,
   type FreeScalarConfig,
+  sanitizeHydrogenExtraDimState,
   sanitizeHydrogenQuantumState,
   SCHROEDINGER_QUALITY_PRESETS,
   SchroedingerColorMode,
@@ -28,7 +31,6 @@ import {
 } from '@/lib/geometry/extended/types'
 import { isHydrogenFamilyQuantumType } from '@/lib/geometry/registry'
 import { logger } from '@/lib/logger'
-import { sanitizePowerOfTwoGridSizes } from '@/lib/math/ndArray'
 import { normalizeHydrogenCoupledAngularChain } from '@/lib/physics/hydrogenCoupled/presets'
 import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 
@@ -563,13 +565,17 @@ export const createSchroedingerSlice: StateCreator<
     // === Config Operations ===
     setSchroedingerConfig: (config) => {
       setWithVersion((state) => {
-        const sanitizedConfig = sanitizeHarmonicOscillatorScalars(config, state.schroedinger)
+        const sanitizedConfig = sanitizeSchroedingerBooleanScalars(
+          sanitizeSchroedingerNumericScalars(config, state.schroedinger),
+          state.schroedinger
+        )
         const hasHydrogenPreset = Object.prototype.hasOwnProperty.call(
           sanitizedConfig,
           'hydrogenNDPreset'
         )
         const schroedinger = { ...state.schroedinger, ...sanitizedConfig }
         Object.assign(schroedinger, sanitizeHydrogenQuantumState(schroedinger, state.schroedinger))
+        Object.assign(schroedinger, sanitizeHydrogenExtraDimState(schroedinger, state.schroedinger))
         if (hasHydrogenPreset) {
           schroedinger.hydrogenNDPreset = normalizeHydrogenNDPresetName(
             sanitizedConfig.hydrogenNDPreset,
@@ -577,29 +583,36 @@ export const createSchroedingerSlice: StateCreator<
           )
         }
         if (sanitizedConfig.freeScalar) {
-          let mergedFreeScalar = {
+          const freeScalarPatch = sanitizedConfig.freeScalar
+          const mergedFreeScalar = {
             ...state.schroedinger.freeScalar,
-            ...sanitizedConfig.freeScalar,
+            ...freeScalarPatch,
+            kSpaceViz: {
+              ...state.schroedinger.freeScalar.kSpaceViz,
+              ...(freeScalarPatch.kSpaceViz ?? {}),
+            },
+            cosmology: {
+              ...state.schroedinger.freeScalar.cosmology,
+              ...(freeScalarPatch.cosmology ?? {}),
+            },
+            preheating: {
+              ...state.schroedinger.freeScalar.preheating,
+              ...(freeScalarPatch.preheating ?? {}),
+            },
           }
-          if (mergedFreeScalar.latticeDim !== state.schroedinger.freeScalar.latticeDim) {
-            mergedFreeScalar = {
-              ...mergedFreeScalar,
-              ...resizeFreeScalarArrays(mergedFreeScalar, mergedFreeScalar.latticeDim),
-            }
-          }
-          const sizedFreeScalar = sanitizePowerOfTwoGridSizes(mergedFreeScalar, {
-            maxTotalSites: FREE_SCALAR_MAX_TOTAL_SITES,
-          })
+          const sizedFreeScalar = sanitizeFreeScalarConfig(
+            mergedFreeScalar,
+            state.schroedinger.freeScalar
+          )
           const reconciled = reconcileCosmologyInvariants(sizedFreeScalar)
           schroedinger.freeScalar = {
             ...sizedFreeScalar,
             ...reconciled,
-            kSpaceViz: sanitizeKSpaceVizConfig(sizedFreeScalar.kSpaceViz),
           }
         }
         if (sanitizedConfig.tdse) {
           const mergedTdse = { ...state.schroedinger.tdse, ...sanitizedConfig.tdse }
-          schroedinger.tdse = sanitizeTdseStochasticFields(mergedTdse, state.schroedinger.tdse)
+          schroedinger.tdse = sanitizeTdseLoadedFields(mergedTdse, state.schroedinger.tdse)
         }
         if (sanitizedConfig.quantumWalk) {
           const mergedQuantumWalk = {

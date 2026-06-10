@@ -67,4 +67,43 @@ describe('WignerControls', () => {
 
     expect(screen.getByTestId('wigner-dimension-select')).toHaveValue('0')
   })
+
+  it('uses the same minimum Wigner range as store/url normalization', () => {
+    render(
+      <WignerControls
+        config={{
+          ...DEFAULT_SCHROEDINGER_CONFIG,
+          quantumMode: 'harmonicOscillator',
+          representation: 'wigner',
+          wignerAutoRange: false,
+        }}
+        dimension={3}
+        actions={makeActions()}
+      />
+    )
+
+    expect(screen.getByTestId('wigner-x-range-slider-range')).toHaveAttribute('min', '1')
+    expect(screen.getByTestId('wigner-p-range-slider-range')).toHaveAttribute('min', '1')
+  })
+
+  it('represents arbitrary normalized cache resolutions accepted by store/url state', () => {
+    render(
+      <WignerControls
+        config={{
+          ...DEFAULT_SCHROEDINGER_CONFIG,
+          quantumMode: 'harmonicOscillator',
+          representation: 'wigner',
+          wignerCacheResolution: 257,
+        }}
+        dimension={3}
+        actions={makeActions()}
+      />
+    )
+
+    const range = screen.getByTestId('wigner-cache-resolution-range')
+    expect(range).toHaveAttribute('min', '128')
+    expect(range).toHaveAttribute('max', '1024')
+    expect(range).toHaveAttribute('step', '1')
+    expect(range).toHaveValue('257')
+  })
 })

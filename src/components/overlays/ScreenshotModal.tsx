@@ -14,8 +14,13 @@ import { CropBox, CropValues } from './CropBox'
 import { resolveCropPixels } from './screenshotCrop'
 
 export const ScreenshotModal = () => {
-  const { isOpen, imageSrc, closeModal } = useScreenshotStore(
-    useShallow((s) => ({ isOpen: s.isOpen, imageSrc: s.imageSrc, closeModal: s.closeModal }))
+  const { isOpen, imageSrc, filename, closeModal } = useScreenshotStore(
+    useShallow((s) => ({
+      isOpen: s.isOpen,
+      imageSrc: s.imageSrc,
+      filename: s.filename,
+      closeModal: s.closeModal,
+    }))
   )
   const { addToast } = useToast()
   const [isSaving, setIsSaving] = useState(false)
@@ -100,7 +105,11 @@ export const ScreenshotModal = () => {
       const blob = await generateOutput()
       if (!blob) throw new Error('Failed to process image')
 
-      downloadFile(blob, `mquantum-${Date.now()}.png`, 'image/png')
+      const baseFilename = filename?.trim() || `mquantum-${Date.now()}`
+      const outputFilename = baseFilename.toLowerCase().endsWith('.png')
+        ? baseFilename
+        : `${baseFilename}.png`
+      downloadFile(blob, outputFilename, 'image/png')
 
       addToast('Screenshot downloaded!', 'success')
       soundManager.playSuccess()

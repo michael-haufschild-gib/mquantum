@@ -45,7 +45,7 @@
 import { computeBianchiKasnerCoefs } from './bianchiKasner'
 import { evaluateLqcBounceCoefs, getOrComputeLqcBounceTable } from './lqcBounce'
 import type { CosmologyPreset, CosmologyPresetParams } from './presets'
-import { qExponent, sCritical } from './presets'
+import { qExponent, sCritical, validateSpacetimeDim } from './presets'
 
 // ───────────────────────────────────────────────────────────────────────────
 // Background ODE (paper eq. 1.16) — Figure 1 phase portrait
@@ -290,6 +290,7 @@ export function computeCosmologyAt(eta: number, params: CosmologyPresetParams): 
   }
 
   if (params.preset === 'lqcBounce') {
+    validateSpacetimeDim(params.spacetimeDim)
     const rhoC = params.lqcRhoCritical
     const w = params.lqcEquationOfState
     const r0 = params.lqcInitialRhoRatio

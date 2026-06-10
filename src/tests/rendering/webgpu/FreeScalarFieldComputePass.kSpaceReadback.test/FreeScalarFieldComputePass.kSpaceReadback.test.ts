@@ -5,6 +5,7 @@ import {
   DEFAULT_PREHEATING_CONFIG,
 } from '@/lib/geometry/extended/freeScalar'
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
+import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
 const {
   computeRawKSpaceDataMock,
@@ -50,6 +51,7 @@ vi.mock('@/lib/physics/freeScalar/vacuumDispersion', () => ({
 }))
 
 import { FsfKSpaceManager } from '@/rendering/webgpu/passes/FreeScalarFieldKSpace'
+import { FSF_IDENTITY_HAMILTONIAN_COEFS } from '@/rendering/webgpu/passes/FreeScalarFieldComputePassUniforms'
 
 function ensureGPUMapMode(): void {
   if (!('GPUMapMode' in globalThis)) {
@@ -122,6 +124,7 @@ describe('FsfKSpaceManager readback', () => {
   beforeEach(() => {
     ensureGPUMapMode()
     vi.clearAllMocks()
+    useDiagnosticsStore.getState().resetFsf()
   })
 
   it('uses readback buffer references captured when readback starts', async () => {
@@ -282,5 +285,41 @@ describe('FsfKSpaceManager readback', () => {
     expect(mgr.pendingKSpaceData).toBeNull()
     // And the epoch is bumped so any in-flight async resolution is dropped.
     expect(mgr.kSpaceReadbackEpoch).toBe(1)
+  })
+
+  it('drops diagnostics snapshots invalidated while readback is in flight', async () => {
+    const mgr = new FsfKSpaceManager() as unknown as {
+      diagnosticsReadbackEpoch: number
+      diagMappingInFlight: boolean
+      diagPhiReadbackBuffer: ReturnType<typeof makeReadbackBuffer> | null
+      diagPiReadbackBuffer: ReturnType<typeof makeReadbackBuffer> | null
+      invalidateDiagnosticsReadbacks(): void
+      readbackDiagnostics: (
+        device: { queue?: { onSubmittedWorkDone: () => Promise<void> } },
+        config: FreeScalarConfig,
+        coefs: typeof FSF_IDENTITY_HAMILTONIAN_COEFS
+      ) => Promise<void>
+    }
+
+    const phiGate = makeDeferred<void>()
+    const phi = makeReadbackBuffer([1, 2, 3, 4])
+    phi.mapAsync = vi.fn(() => phiGate.promise)
+
+    mgr.diagnosticsReadbackEpoch = 0
+    mgr.diagMappingInFlight = false
+    mgr.diagPhiReadbackBuffer = phi
+    mgr.diagPiReadbackBuffer = makeReadbackBuffer([0.5, 0.25, 0.125, 0])
+
+    const task = mgr.readbackDiagnostics({}, makeConfig(), FSF_IDENTITY_HAMILTONIAN_COEFS)
+    await Promise.resolve()
+
+    mgr.invalidateDiagnosticsReadbacks()
+    phiGate.resolve()
+    await task
+
+    expect(useDiagnosticsStore.getState().fsf.hasData).toBe(false)
+    expect(useDiagnosticsStore.getState().fsf.readbackGeneration).toBe(0)
+    expect(phi.unmap).toHaveBeenCalledTimes(1)
+    expect(mgr.diagMappingInFlight).toBe(false)
   })
 })

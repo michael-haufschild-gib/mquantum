@@ -4,6 +4,9 @@ export const MIN_DIMENSION = 2
 /** Maximum supported dimension for quantum visualization. */
 export const MAX_DIMENSION = 11
 
+/** Default scene dimension for cold-start stores. */
+export const DEFAULT_DIMENSION = 3
+
 /**
  * Human-readable axis labels for dimension indices.
  * Length must match MAX_DIMENSION so parsers and UI do not expose unsupported axes.

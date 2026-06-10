@@ -31,6 +31,7 @@ import {
   downloadFile,
   exportAtlasSweepCSV,
   exportBecDiagnosticsCSV,
+  exportBellDiagnosticsCSV,
   exportDiagnosticsJSON,
   exportDiracDiagnosticsCSV,
   exportEntanglementCSV,
@@ -146,12 +147,12 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
     const isPauli = objectType === 'pauliSpinor'
     const isBellPair = objectType === 'bellPair'
 
-    // Bell-pair has its own analysis path (CHSH panel, no shared cross-section /
-    // export controls; exports are panel-internal).
+    // Bell-pair has its own CHSH analysis path and shared data-export controls.
     if (isBellPair) {
       return (
         <Section title="Bell Test" defaultOpen={defaultOpen} data-testid="analysis-section">
           <BellExperimentContent />
+          <DataExportButtons quantumMode="bellTest" saveLoadEnabled={false} />
         </Section>
       )
     }
@@ -274,6 +275,7 @@ const CSV_EXPORTERS: Record<string, { fn: () => string; prefix: string }> = {
   freeScalarField: { fn: exportFsfDiagnosticsCSV, prefix: 'mdim-fsf' },
   diracEquation: { fn: exportDiracDiagnosticsCSV, prefix: 'mdim-dirac' },
   pauliSpinor: { fn: exportPauliDiagnosticsCSV, prefix: 'mdim-pauli' },
+  bellTest: { fn: exportBellDiagnosticsCSV, prefix: 'mdim-bell' },
 }
 
 /**
@@ -284,9 +286,11 @@ const CSV_EXPORTERS: Record<string, { fn: () => string; prefix: string }> = {
 const DataExportButtons: React.FC<{
   quantumMode: QuantumTypeKey
   observablesHasData?: boolean
-}> = React.memo(({ quantumMode, observablesHasData }) => {
+  saveLoadEnabled?: boolean
+}> = React.memo(({ quantumMode, observablesHasData, saveLoadEnabled = true }) => {
   const isAnalytic = isAnalyticQuantumType(quantumMode)
-  const hasSaveLoad = isComputeQuantumType(quantumMode) || quantumMode === 'pauliSpinor'
+  const hasSaveLoad =
+    saveLoadEnabled && (isComputeQuantumType(quantumMode) || quantumMode === 'pauliSpinor')
 
   // Wavefunction slice availability
   const densitySliceAvailable = useDiagnosticsStore(

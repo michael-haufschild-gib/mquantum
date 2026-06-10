@@ -22,6 +22,18 @@ const FIELD_VIEW_MAP: Record<string, number> = {
   ctcFractalCarpet: 5,
 }
 
+function finiteNumber(value: number | undefined, fallback: number, min = -Infinity): number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= min ? value : fallback
+}
+
+function finiteBasisValue(
+  basis: Float32Array | undefined,
+  index: number,
+  fallback: number
+): number {
+  return finiteNumber(basis?.[index], fallback)
+}
+
 /**
  * Pack QW write-grid uniforms into an ArrayBuffer matching the WGSL struct layout.
  *
@@ -81,29 +93,33 @@ export function packWriteGridUniforms(
   }
 
   // Rendering parameters (offset 160)
-  f32[40] = boundingRadius
+  f32[40] = finiteNumber(boundingRadius, 2.0, 1e-6)
   // maxDensity from GPU atomicMax readback (1-frame lag)
-  f32[41] = Math.max(gpuMaxDensity, 1e-8)
+  f32[41] = Math.max(finiteNumber(gpuMaxDensity, 1.0, 0), 1e-8)
   u32[42] = Math.max(0, Math.floor(Number.isFinite(walkSteps) ? walkSteps : 0)) >>> 0
   u32[43] = 0 // _pad1
 
   // basisX (offset 176, 12 f32)
   for (let d = 0; d < 12; d++) {
-    f32[44 + d] = basisX?.[d] ?? (d === 0 ? 1 : 0)
+    f32[44 + d] = finiteBasisValue(basisX, d, d === 0 ? 1 : 0)
   }
 
   // basisY (offset 224, 12 f32)
   for (let d = 0; d < 12; d++) {
-    f32[56 + d] = basisY?.[d] ?? (d === 1 ? 1 : 0)
+    f32[56 + d] = finiteBasisValue(basisY, d, d === 1 ? 1 : 0)
   }
 
   // basisZ (offset 272, 12 f32)
   for (let d = 0; d < 12; d++) {
-    f32[68 + d] = basisZ?.[d] ?? (d === 2 ? 1 : 0)
+    f32[68 + d] = finiteBasisValue(basisZ, d, d === 2 ? 1 : 0)
   }
 
   // slicePositions (offset 320, WGSL array<f32, 12>).
-  writeSlicePositionsToF32(f32, 80, config.slicePositions)
+  writeSlicePositionsToF32(
+    f32,
+    80,
+    config.slicePositions.map((value) => finiteNumber(value, 0))
+  )
 
   return buf
 }

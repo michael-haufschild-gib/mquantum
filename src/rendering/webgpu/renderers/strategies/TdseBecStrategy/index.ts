@@ -7,6 +7,7 @@
  * @module rendering/webgpu/renderers/strategies/TdseBecStrategy
  */
 
+import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
 import type { BecConfig } from '@/lib/geometry/extended/bec'
 import type { TdseConfig } from '@/lib/geometry/extended/tdse'
 import { logger } from '@/lib/logger'
@@ -603,8 +604,8 @@ export class TdseBecStrategy implements QuantumModeStrategy {
 
   adoptComputeState(source: QuantumModeStrategy, nextConfig?: SchrodingerRendererConfig): boolean {
     if (!(source instanceof TdseBecStrategy) || !source.tdsePass) return false
-    const nextN = nextConfig?.densityGridResolution
-    if (nextN && source.tdsePass.densityGridSize !== nextN) return false
+    const nextN = nextConfig?.densityGridResolution ?? DENSITY_GRID_SIZE
+    if (source.tdsePass.densityGridSize !== nextN) return false
     this.tdsePass?.dispose()
     this.tdsePass = source.tdsePass
     source.tdsePass = null

@@ -5,7 +5,7 @@
  * when open, download creates blob URL and triggers download, copy uses clipboard API,
  * crop dimensions update from image natural size.
  */
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -13,7 +13,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resolveCropPixels } from '@/components/overlays/screenshotCrop'
 import { ScreenshotModal } from '@/components/overlays/ScreenshotModal'
 import { ToastProvider } from '@/contexts/ToastContext'
+import { downloadFile } from '@/lib/export/dataExport'
 import { useScreenshotStore } from '@/stores/runtime/screenshotStore'
+
+vi.mock('@/lib/export/dataExport', () => ({
+  downloadFile: vi.fn(),
+}))
 
 function renderWithProviders(ui: React.ReactElement) {
   return render(<ToastProvider>{ui}</ToastProvider>)
@@ -52,6 +57,7 @@ describe('ScreenshotModal', () => {
 
   beforeEach(() => {
     useScreenshotStore.setState(useScreenshotStore.getInitialState())
+    vi.mocked(downloadFile).mockClear()
     OriginalImage = globalThis.Image
 
     globalThis.Image = class MockImage {
@@ -111,6 +117,46 @@ describe('ScreenshotModal', () => {
     // attribute comes from `Button`'s `disabled={disabled || loading}`
     // branch when loading=true.
     expect(saveBtn).toBeDisabled()
+  })
+
+  it('uses requested export filename when saving the screenshot', async () => {
+    globalThis.Image = class MockLoadedImage {
+      onload: (() => void) | null = null
+      onerror: (() => void) | null = null
+      naturalWidth = 2
+      naturalHeight = 2
+      set src(_: string) {
+        queueMicrotask(() => this.onload?.())
+      }
+    } as unknown as typeof globalThis.Image
+
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage: vi.fn(),
+    } as never)
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (
+      callback: BlobCallback
+    ) {
+      callback(new Blob(['png'], { type: 'image/png' }))
+    })
+
+    useScreenshotStore.setState({
+      isOpen: true,
+      imageSrc: TINY_PNG,
+      filename: 'custom-export-name',
+    })
+    const user = userEvent.setup()
+
+    renderWithProviders(<ScreenshotModal />)
+
+    await user.click(screen.getByTestId('screenshot-save-button'))
+
+    await waitFor(() => {
+      expect(downloadFile).toHaveBeenCalledWith(
+        expect.any(Blob),
+        'custom-export-name.png',
+        'image/png'
+      )
+    })
   })
 
   it('closes modal when the Modal header close button is clicked', async () => {

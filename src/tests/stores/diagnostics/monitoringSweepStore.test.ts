@@ -66,6 +66,34 @@ describe('useMonitoringSweepStore', () => {
       expect(state.currentStep).toBe(0)
       expect(state.results).toEqual([])
     })
+
+    it('rejects invalid sweep timing config before entering running state', () => {
+      const config: MonitoringSweepConfig = {
+        gammaMin: 0.1,
+        gammaMax: 2.0,
+        steps: 5,
+        timePerStep: 0.5,
+      }
+
+      expect(() => useMonitoringSweepStore.getState().startSweep({ ...config, steps: 0 })).toThrow(
+        /steps/
+      )
+      expect(() =>
+        useMonitoringSweepStore.getState().startSweep({ ...config, steps: 2.5 })
+      ).toThrow(/steps/)
+      expect(() =>
+        useMonitoringSweepStore.getState().startSweep({ ...config, timePerStep: -1 })
+      ).toThrow(/timePerStep/)
+      expect(() =>
+        useMonitoringSweepStore.getState().startSweep({ ...config, timePerStep: Number.NaN })
+      ).toThrow(/timePerStep/)
+
+      const state = useMonitoringSweepStore.getState()
+      expect(state.status).toBe('idle')
+      expect(state.results).toEqual([])
+      expect(state.iprAccumulator).toEqual([])
+      expect(state.normDriftAccumulator).toEqual([])
+    })
   })
 
   describe('tick', () => {

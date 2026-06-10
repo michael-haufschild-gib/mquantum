@@ -133,6 +133,31 @@ describe('normalizeAppearanceLoadData', () => {
     expect(result.distribution?.offset).toBe(0.5)
   })
 
+  it('preserves valid extended cosine coefficient ranges', () => {
+    const result = normalizeAppearanceLoadData({
+      cosineCoefficients: {
+        a: [-0.5, 0.5, 1.5],
+        b: [-0.3, -0.2, -0.1],
+        c: [0.4, 3.0, 5.0],
+        d: [-0.25, 0.1, 1.5],
+      },
+    }) as {
+      cosineCoefficients?: {
+        a: [number, number, number]
+        b: [number, number, number]
+        c: [number, number, number]
+        d: [number, number, number]
+      }
+    }
+
+    expect(result.cosineCoefficients).toEqual({
+      a: [-0.5, 0.5, 1.5],
+      b: [-0.3, -0.2, -0.1],
+      c: [0.4, 3.0, 5.0],
+      d: [-0.25, 0.1, 1.5],
+    })
+  })
+
   it('deletes non-object nested fields', () => {
     const result = normalizeAppearanceLoadData({
       distribution: 'invalid',

@@ -2,8 +2,8 @@
  * WebGPU Device Manager
  *
  * Handles WebGPU adapter/device initialization, capability detection,
- * and context management. Provides a singleton-like interface for
- * accessing the GPU device across the application.
+ * context management, and terminal device-loss notification. Provides a
+ * singleton-like interface for accessing the GPU device across the application.
  *
  * @module rendering/webgpu/core/WebGPUDevice
  */
@@ -40,14 +40,14 @@ function isWebGPUSupported(): boolean {
 /**
  * WebGPU device manager singleton.
  *
- * Handles device initialization, loss recovery, and capability queries.
+ * Handles device initialization, device-loss notification, and capability queries.
  *
  * WHY singleton:
  * A browser page has exactly one GPU adapter and one `GPUDevice`. Creating
  * multiple devices wastes VRAM, risks hitting adapter limits, and complicates
- * device-loss recovery (all passes must reference the same device). The singleton
- * enforces this 1:1 relationship. `resetForTesting()` provides test isolation
- * without the complexity of a factory or DI container.
+ * device loss (all passes must reference the same device). The singleton enforces
+ * this 1:1 relationship. `resetForTesting()` provides test isolation without the
+ * complexity of a factory or DI container.
  *
  * This was evaluated against alternatives:
  * - React Context: would couple the GPU layer to React, but render passes
@@ -121,6 +121,10 @@ export class WebGPUDevice {
         }
       })
       .catch((error) => {
+        if (this.isCurrentInitialization(canvas, generation)) {
+          this.initPromise = null
+          this.canvas = null
+        }
         // `WebGPUInitError` carries an explicit failure code from the
         // throw site so the boundary doesn't have to string-match. Any
         // other thrown error collapses to `INTERNAL_ERROR`.
@@ -294,9 +298,12 @@ export class WebGPUDevice {
   }
 
   private handleDeviceLost(reason: string): void {
+    this.initGeneration += 1
+    this._adapter = null
     this.device = null
     this.context = null
     this.initPromise = null
+    this.capabilities = null
 
     // Notify all registered callbacks
     this.deviceLostCallbacks.forEach((callback) => {
@@ -306,21 +313,6 @@ export class WebGPUDevice {
         logger.error('Error in device lost callback:', e)
       }
     })
-
-    // Attempt automatic recovery
-    if (this.canvas && reason !== 'destroyed') {
-      logger.log('[WebGPU] Attempting device recovery...')
-      void this.initialize(this.canvas).then(
-        (result) => {
-          if (!result.success) {
-            logger.error('[WebGPU] Recovery failed:', result.error)
-          }
-        },
-        (err) => {
-          logger.error('[WebGPU] Recovery failed:', err)
-        }
-      )
-    }
   }
 
   /**

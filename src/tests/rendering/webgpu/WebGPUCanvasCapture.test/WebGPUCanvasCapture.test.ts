@@ -14,7 +14,7 @@ describe('WebGPUCanvasCapture', () => {
   it('reports a new request immediately when a previous readback is still in flight', () => {
     const gate = makeDeferred<void>()
     const readbackBuffer = {
-      mapAsync: vi.fn(async () => {}),
+      mapAsync: vi.fn(() => gate.promise),
       getMappedRange: vi.fn(() => new Uint8Array(16).buffer),
       unmap: vi.fn(),
       destroy: vi.fn(),
@@ -22,7 +22,7 @@ describe('WebGPUCanvasCapture', () => {
     const device = {
       createBuffer: vi.fn(() => readbackBuffer),
       queue: {
-        onSubmittedWorkDone: vi.fn(() => gate.promise),
+        onSubmittedWorkDone: vi.fn(),
       },
     } as unknown as GPUDevice
 
@@ -55,12 +55,12 @@ describe('WebGPUCanvasCapture', () => {
     })
 
     expect(encoder.copyTextureToBuffer).toHaveBeenCalledOnce()
+    expect(device.queue.onSubmittedWorkDone).not.toHaveBeenCalled()
     expect(onSuccess).not.toHaveBeenCalled()
     expect(onError).toHaveBeenCalledWith('Screenshot capture already in progress.', 2)
   })
 
   it('reports cancellation when disposed before in-flight readback completes', async () => {
-    const gate = makeDeferred<void>()
     const readbackBuffer = {
       mapAsync: vi.fn(async () => {}),
       getMappedRange: vi.fn(() => new Uint8Array(16).buffer),
@@ -70,7 +70,7 @@ describe('WebGPUCanvasCapture', () => {
     const device = {
       createBuffer: vi.fn(() => readbackBuffer),
       queue: {
-        onSubmittedWorkDone: vi.fn(() => gate.promise),
+        onSubmittedWorkDone: vi.fn(),
       },
     } as unknown as GPUDevice
 
@@ -94,10 +94,10 @@ describe('WebGPUCanvasCapture', () => {
     })
 
     capture.dispose()
-    gate.resolve()
-    await Promise.resolve()
     await Promise.resolve()
 
+    expect(device.queue.onSubmittedWorkDone).not.toHaveBeenCalled()
+    expect(readbackBuffer.mapAsync).not.toHaveBeenCalled()
     expect(onSuccess).not.toHaveBeenCalled()
     expect(onError).toHaveBeenCalledWith('Screenshot capture canceled.', 7)
   })

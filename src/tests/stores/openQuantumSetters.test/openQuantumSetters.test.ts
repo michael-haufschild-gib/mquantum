@@ -75,6 +75,20 @@ describe('open quantum setters', () => {
     expect(getOQ().thermalEnabled).toBe(false)
   })
 
+  it('ignores invalid channel toggle inputs without mutating config', () => {
+    const s = useExtendedObjectStore.getState()
+    const beforeState = useExtendedObjectStore.getState()
+    const beforeConfig = getOQ()
+
+    s.setOpenQuantumChannelEnabled('cooling' as never, false)
+    s.setOpenQuantumChannelEnabled('dephasing', 'nope' as never)
+
+    const afterState = useExtendedObjectStore.getState()
+    expect(getOQ()).toEqual(beforeConfig)
+    expect('undefined' in getOQ()).toBe(false)
+    expect(afterState.schroedingerVersion).toBe(beforeState.schroedingerVersion)
+  })
+
   it('increments resetToken on state reset request', () => {
     const s = useExtendedObjectStore.getState()
     const before = getOQ().resetToken ?? 0

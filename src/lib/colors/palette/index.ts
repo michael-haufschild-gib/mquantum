@@ -24,6 +24,7 @@ export { applyDistributionTS, calculateCosineColor, getCosinePaletteColorTS } fr
 export {
   COLOR_ALGORITHM_OPTIONS,
   COLOR_ALGORITHM_TO_INT,
+  COSINE_COEFFICIENT_RANGES,
   // Color algorithm types
   type ColorAlgorithm,
   // Cosine palette types

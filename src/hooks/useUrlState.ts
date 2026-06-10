@@ -722,6 +722,8 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
   try {
     applyCoreIdentityAndInit(urlState)
     const ext = useExtendedObjectStore.getState()
+    const effectiveQuantumMode = ext.schroedinger.quantumMode
+    const effectiveObjectType = useGeometryStore.getState().objectType
 
     // ── Rendering ────────────────────────────────────────────────────────────
     applySchroedingerRenderingParams(urlState, ext)
@@ -746,12 +748,12 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
     applyWormholeParams(urlState, ext)
     applyEntanglementParams(urlState)
     applyCosmologyParams(urlState, ext)
-    applyDiracParams(urlState, ext)
-    applyWdwParams(urlState, ext)
-    applyAdsParams(urlState, ext)
-    applyCoherenceHorizonParams(urlState, ext)
-    applyBellParams(urlState, ext)
-    applySrmtSweepParams(urlState, ext.schroedinger.quantumMode)
+    if (effectiveQuantumMode === 'diracEquation') applyDiracParams(urlState, ext)
+    if (effectiveQuantumMode === 'wheelerDeWitt') applyWdwParams(urlState, ext)
+    if (effectiveQuantumMode === 'antiDeSitter') applyAdsParams(urlState, ext)
+    if (effectiveQuantumMode === 'coherenceHorizon') applyCoherenceHorizonParams(urlState, ext)
+    if (effectiveObjectType === 'bellPair') applyBellParams(urlState, ext)
+    applySrmtSweepParams(urlState, effectiveQuantumMode)
   } catch (error) {
     logger.warn('[useUrlState] Failed to apply URL state:', error)
   } finally {

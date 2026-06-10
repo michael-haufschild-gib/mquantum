@@ -16,6 +16,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   atlasResultsToCSV,
   atlasResultsToJSON,
+  exportBellDiagnosticsCSV,
   exportBecDiagnosticsCSV,
   exportDiagnosticsJSON,
   exportDiracDiagnosticsCSV,
@@ -28,12 +29,14 @@ import {
   exportWavefunctionSliceCSV,
   readRingBuffer,
 } from '@/lib/export/dataExport'
+import { useBellExperimentStore } from '@/stores/diagnostics/bellExperimentStore'
 import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 import type { AtlasPoint } from '@/stores/diagnostics/quantumnessAtlasStore'
 import { useWavefunctionSliceStore } from '@/stores/diagnostics/wavefunctionSliceStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 beforeEach(() => {
+  useBellExperimentStore.getState().reset()
   useDiagnosticsStore.getState().resetTdse()
   useDiagnosticsStore.getState().resetBec()
   useDiagnosticsStore.getState().resetFsf()
@@ -394,6 +397,30 @@ describe('exportPauliDiagnosticsCSV', () => {
   })
 })
 
+describe('exportBellDiagnosticsCSV', () => {
+  it('returns empty string when no Bell trial history exists', () => {
+    expect(exportBellDiagnosticsCSV()).toBe('')
+  })
+
+  it('exports Bell CHSH history with trial counts and QM/LHV |S| traces', () => {
+    const cfg = useExtendedObjectStore.getState().bellPair
+    useBellExperimentStore.getState().processTrialBatch(cfg, 5_000)
+    useBellExperimentStore.getState().processTrialBatch(cfg, 5_000)
+
+    const csv = exportBellDiagnosticsCSV()
+    const lines = csv.split('\n')
+    expect(lines[0]).toBe('sample,trials,qmAbsS,lhvAbsS')
+    expect(lines).toHaveLength(3)
+
+    const row1 = lines[1]!.split(',').map(Number)
+    const row2 = lines[2]!.split(',').map(Number)
+    expect(row1[1]).toBe(5_000)
+    expect(row2[1]).toBe(10_000)
+    expect(Number.isFinite(row2[2])).toBe(true)
+    expect(Number.isFinite(row2[3])).toBe(true)
+  })
+})
+
 describe('exportWavefunctionSliceCSV', () => {
   it('returns empty string when no density slice data exists', () => {
     expect(exportWavefunctionSliceCSV('density', 'x')).toBe('')
@@ -596,6 +623,24 @@ describe('exportDiagnosticsJSON', () => {
     expect(ts.norm).toHaveLength(1)
     expect(ts.spinUpFraction).toHaveLength(1)
     expect(ts.spinExpectationZ).toHaveLength(1)
+  })
+
+  it('includes Bell CHSH data for bellTest mode', () => {
+    const cfg = useExtendedObjectStore.getState().bellPair
+    useBellExperimentStore.getState().processTrialBatch(cfg, 5_000)
+
+    const json = exportDiagnosticsJSON('bellTest')
+    const parsed = JSON.parse(json) as Record<string, unknown>
+    expect(parsed).toHaveProperty('bell')
+    const bell = parsed.bell as Record<string, unknown>
+    const current = bell.current as Record<string, unknown>
+    expect(current.totalTrials).toBe(5_000)
+    expect(current.qmHasViolated).toBeTypeOf('boolean')
+
+    const ts = bell.timeSeries as Record<string, number[]>
+    expect(ts.trials).toEqual([5_000])
+    expect(ts.qmAbsS).toHaveLength(1)
+    expect(ts.lhvAbsS).toHaveLength(1)
   })
 
   it('includes wavefunction slice data when available', () => {

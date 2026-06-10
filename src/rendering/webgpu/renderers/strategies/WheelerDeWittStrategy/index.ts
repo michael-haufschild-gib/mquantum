@@ -110,6 +110,8 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
    * snapshot from the texture).
    */
   private lastWorldlineEnabled = false
+  private lastWorldlineSpeed = Number.NaN
+  private lastWorldlinePulseWidth = Number.NaN
 
   /**
    * Tracks the last-packed `renderDynamicRange` (headroom) value so a
@@ -224,6 +226,10 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     const worldlineVisible = worldlineEnabled && (physicsTick.trajectories?.length ?? 0) > 0
     const worldlineAnimating = worldlineVisible && isPlaying
     const worldlineToggled = worldlineEnabled !== this.lastWorldlineEnabled
+    const worldlinePulseParamsChanged =
+      worldlineEnabled &&
+      (wdw.worldlineSpeed !== this.lastWorldlineSpeed ||
+        wdw.worldlinePulseWidth !== this.lastWorldlinePulseWidth)
 
     const headroom = clampWdwHeadroom(wdw.renderDynamicRange ?? WDW_EUCLIDEAN_RENDER_HEADROOM)
     const headroomChanged = headroom !== this.lastRenderDynamicRange
@@ -253,6 +259,7 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
       physicsTick.solverDirty ||
       physicsTick.trajectoryDirty ||
       worldlineToggled ||
+      worldlinePulseParamsChanged ||
       srmtTick.overlayDirty ||
       headroomChanged ||
       phi3SliceChanged ||
@@ -336,6 +343,8 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     }
 
     this.lastWorldlineEnabled = worldlineEnabled
+    this.lastWorldlineSpeed = wdw.worldlineSpeed
+    this.lastWorldlinePulseWidth = wdw.worldlinePulseWidth
     this.lastRenderDynamicRange = headroom
     this.lastPhi3SliceNormalized = phi3SliceNormalized
   }
@@ -436,6 +445,8 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     this.srmt.adoptFrom(source.srmt)
     this.srmtSweep.adoptFrom(source.srmtSweep)
     this.lastWorldlineEnabled = source.lastWorldlineEnabled
+    this.lastWorldlineSpeed = source.lastWorldlineSpeed
+    this.lastWorldlinePulseWidth = source.lastWorldlinePulseWidth
     this.lastRenderDynamicRange = source.lastRenderDynamicRange
     this.workingDensity = source.workingDensity
     this.baselineDensity = source.baselineDensity
@@ -453,6 +464,8 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     source.pulseActiveScratch = []
     source.pulseAlphaScratch = {}
     source.lastPulseUpdateTime = Number.NEGATIVE_INFINITY
+    source.lastWorldlineSpeed = Number.NaN
+    source.lastWorldlinePulseWidth = Number.NaN
     source.densityTexture = null
     source.densityTextureView = null
     source.transferredOut = true
@@ -471,6 +484,8 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     this.srmt.dispose()
     this.srmtSweep.dispose()
     this.lastWorldlineEnabled = false
+    this.lastWorldlineSpeed = Number.NaN
+    this.lastWorldlinePulseWidth = Number.NaN
     this.workingDensity = null
     this.baselineDensity = null
     this.baselineAlpha = null

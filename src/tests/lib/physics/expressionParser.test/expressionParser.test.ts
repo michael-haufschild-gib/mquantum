@@ -155,6 +155,12 @@ describe('parseExpression', () => {
       expect(parseExpression('__proto__').success).toBe(false)
       expect(parseExpression('prototype').success).toBe(false)
     })
+
+    it('rejects numeric literal overflow instead of compiling a non-finite constant', () => {
+      const result = parseExpression('1e309')
+      expect(result.success).toBe(false)
+      if (!result.success) expect(result.error).toContain('finite')
+    })
   })
 
   describe('edge cases', () => {

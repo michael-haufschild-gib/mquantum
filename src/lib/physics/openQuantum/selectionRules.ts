@@ -31,8 +31,8 @@ export function isAllowedE1(stateI: HydrogenBasisState, stateJ: HydrogenBasisSta
   // Extra dimensions: no coupling (Δn_extra = 0 for all extra dims)
   const extraI = stateI.extraDimN
   const extraJ = stateJ.extraDimN
-  const numExtra = Math.min(extraI.length, extraJ.length)
-  for (let d = 0; d < numExtra; d++) {
+  if (extraI.length !== extraJ.length) return false
+  for (let d = 0; d < extraI.length; d++) {
     if (extraI[d] !== extraJ[d]) return false
   }
 
