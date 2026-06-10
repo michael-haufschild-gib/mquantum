@@ -323,6 +323,12 @@ console.log('\nPART D — detector calibration: injected off-line doublet at γ�
 // |λ_min| vs the prime-side error floor |Δλmin| from PART B states exactly what
 // off-line displacement δ this instrument would have detected.
 const GAMMA0 = 30.424876
+// Detection needs the cos((γ₀−m)δ/σ²) oscillation RESOLVED by the test family:
+// a dense local grid (spacing ≈ σ ≪ zero spacing) centered on γ₀. With true
+// zeros such a grid is rank-deficient (λ_min ≈ 0⁻, the control row); a doublet
+// makes the underlying measure signed, so λ_min goes genuinely negative.
+const gd: number[] = []
+for (let u = 26; u <= 35; u += 1) gd.push(u)
 for (const sigma of [0.5, 0.4]) {
   const w1Zero = (m: number): number => zeroSidePair(m, sigma) / 2
   for (const delta of [0, 0.02, 0.05, 0.1, 0.2]) {
@@ -336,8 +342,8 @@ for (const sigma of [0.5, 0.4]) {
       }
       return v
     }
-    const M = buildGram(g1, sigma, delta === 0 ? w1Zero : w1Mod)
-    const e = jacobiEig(M, g1.length)
+    const M = buildGram(gd, sigma, delta === 0 ? w1Zero : w1Mod)
+    const e = jacobiEig(M, gd.length)
     console.log(
       `  σ=${sigma.toFixed(2)}  δ=${delta.toFixed(2)}  λ_min=${e.vals[0]!.toExponential(4).padStart(
         12
