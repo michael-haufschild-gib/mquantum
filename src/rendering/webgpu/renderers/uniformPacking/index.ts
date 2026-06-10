@@ -38,6 +38,7 @@ import {
   packCoherenceHorizon,
   packEntropicTimeShear,
   packHermiteCocycle,
+  packHilbertPolya,
   packQuantumBackreaction,
   packRiemannZeta,
   packSpectralDimensionFlow,
@@ -423,6 +424,7 @@ function packVisualFields(
     p.boundingRadius,
     p.quantumModeStr === 'riemannZeta'
   )
+  packHilbertPolya(floatView, schroedinger, p.quantumModeStr === 'hilbertPolya')
 }
 
 /** Pack nodal fields, color algorithm, and cosine palette. */

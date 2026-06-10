@@ -22,6 +22,7 @@ import { CoherenceHorizonControls } from './CoherenceHorizonControls'
 import { DiracControls } from './DiracControls'
 import { FreeScalarFieldControls } from './FreeScalarFieldControls'
 import { HarmonicOscillatorControls } from './HarmonicOscillatorControls'
+import { HilbertPolyaControls } from './HilbertPolyaControls'
 import { HydrogenNDControls } from './HydrogenNDControls'
 import { HydrogenNDCoupledControls } from './HydrogenNDCoupledControls'
 import { KKCompactificationSection } from './KKCompactificationSection'
@@ -78,6 +79,8 @@ function renderModeControls(p: ModeControlsProps): React.ReactNode {
       return <CoherenceHorizonControls />
     case 'riemannZeta':
       return <RiemannZetaControls />
+    case 'hilbertPolya':
+      return <HilbertPolyaControls />
     case 'wheelerDeWitt':
       return <WheelerDeWittControls />
     case 'quantumWalk':
@@ -180,6 +183,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
     const isAntiDeSitter = mode === 'antiDeSitter'
     const isCoherenceHorizon = mode === 'coherenceHorizon'
     const isRiemannZeta = mode === 'riemannZeta'
+    const isHilbertPolya = mode === 'hilbertPolya'
 
     return (
       <div className={className} data-testid="schroedinger-controls">
@@ -193,7 +197,8 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
           !isWheelerDeWitt &&
           !isAntiDeSitter &&
           !isCoherenceHorizon &&
-          !isRiemannZeta && (
+          !isRiemannZeta &&
+          !isHilbertPolya && (
             <Section title="Representation" defaultOpen={true}>
               <div className="space-y-3">
                 <ToggleGroup

@@ -40,6 +40,7 @@ import { createDiracSetters, resizeDiracArrays } from './setters/diracSetters'
 import { reconcileCosmologyInvariants } from './setters/freeScalarCosmologySetters'
 import { createFreeScalarSetters, resizeFreeScalarArrays } from './setters/freeScalarSetters'
 import { createCoherenceHorizonSetters } from './setters/horizonModes/coherenceHorizonSetters'
+import { createHilbertPolyaSetters } from './setters/horizonModes/hilbertPolyaSetters'
 import { createRiemannZetaSetters } from './setters/horizonModes/riemannZetaSetters'
 import { createOpenQuantumSetters } from './setters/openQuantumSetters'
 import { createQuantumModeSetters } from './setters/quantumModeSetters'
@@ -375,6 +376,7 @@ export const createSchroedingerSlice: StateCreator<
     ...createAntiDeSitterSetters(ctx),
     ...createCoherenceHorizonSetters(ctx),
     ...createRiemannZetaSetters(ctx),
+    ...createHilbertPolyaSetters(ctx),
 
     // === Quantum Walk ===
     ...createQuantumWalkSetters(ctx),

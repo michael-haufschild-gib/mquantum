@@ -205,6 +205,7 @@ describe('Quantum Type Registry (Flat Model)', () => {
         'diracEquation',
         'freeScalarField',
         'harmonicOscillator',
+        'hilbertPolya',
         'hydrogenND',
         'hydrogenNDCoupled',
         'pauliSpinor',

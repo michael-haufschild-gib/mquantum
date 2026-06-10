@@ -420,6 +420,15 @@ struct SchroedingerUniforms {
   _padRiemann1: f32,
   _padRiemann2: f32,
 
+  // Hilbert–Pólya Spectrum. Read only by the dedicated volumetric main block
+  // (quantumMode === hilbertPolya); the host packer zeroes these for all other
+  // modes. The (Re z, Im z, θ) volume LUT itself is a separate group-2 storage
+  // buffer owned by HilbertPolyaStrategy — NOT in this struct.
+  hpGlow: f32,
+  hpFogGain: f32,
+  hpPlaneMarker: f32,
+  hpFilamentWidth: f32,
+
 }
 
 // ============================================

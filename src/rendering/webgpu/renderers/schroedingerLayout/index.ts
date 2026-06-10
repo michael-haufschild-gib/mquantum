@@ -324,6 +324,15 @@ const SCHROEDINGER_FIELDS = [
   { name: 'riemannCutaway', type: 'f32' },
   { name: '_padRiemann1', type: 'f32' },
   { name: '_padRiemann2', type: 'f32' },
+
+  // --- Hilbert–Pólya Spectrum ---
+  // Zeroed for all modes except hilbertPolya. The (Re z, Im z, θ) volume LUT
+  // is a separate group-2 storage buffer (HilbertPolyaStrategy), not part of
+  // this struct.
+  { name: 'hpGlow', type: 'f32' },
+  { name: 'hpFogGain', type: 'f32' },
+  { name: 'hpPlaneMarker', type: 'f32' },
+  { name: 'hpFilamentWidth', type: 'f32' },
 ] as const satisfies readonly StructFieldDef[]
 
 /** Computed struct layout for SchroedingerUniforms. */

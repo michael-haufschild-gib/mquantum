@@ -383,7 +383,9 @@ export function getAvailableColorAlgorithms(
   // render as a silent no-op, so hard-allowlist the implemented set.
   if (
     objectType === 'schroedinger' &&
-    (quantumMode === 'coherenceHorizon' || quantumMode === 'riemannZeta')
+    (quantumMode === 'coherenceHorizon' ||
+      quantumMode === 'riemannZeta' ||
+      quantumMode === 'hilbertPolya')
   ) {
     const horizonValidAlgos = new Set<string>([
       'mixed',

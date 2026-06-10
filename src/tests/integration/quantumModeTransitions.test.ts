@@ -51,6 +51,7 @@ describe('quantum mode state machine transitions', () => {
         'antiDeSitter',
         'coherenceHorizon',
         'riemannZeta',
+        'hilbertPolya',
       ])
       expect(COMPUTE_MODES).toEqual([
         'freeScalarField',

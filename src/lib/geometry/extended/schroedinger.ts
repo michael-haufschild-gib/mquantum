@@ -29,6 +29,8 @@ import type { DiracConfig } from './dirac'
 import { DEFAULT_DIRAC_CONFIG } from './dirac'
 import type { FreeScalarConfig } from './freeScalar'
 import { DEFAULT_FREE_SCALAR_CONFIG } from './freeScalar'
+import type { HilbertPolyaConfig } from './hilbertPolya'
+import { DEFAULT_HILBERT_POLYA_CONFIG } from './hilbertPolya'
 import type { QuantumWalkConfig } from './quantumWalk'
 import { DEFAULT_QUANTUM_WALK_CONFIG } from './quantumWalk'
 import type { RiemannZetaConfig } from './riemannZeta'
@@ -643,6 +645,10 @@ export interface SchroedingerConfig
   /** Arithmetic Horizon: prime ⇄ ζ-zero spectral synthesis configuration. */
   riemannZeta: RiemannZetaConfig
 
+  // === Hilbert-Polya Configuration (when quantumMode === 'hilbertPolya') ===
+  /** Evans-landscape spectral filament volume configuration. */
+  hilbertPolya: HilbertPolyaConfig
+
   // === N-D Basis Vectors (for free scalar field and TDSE) ===
   /** Basis vector for X axis in N-dimensional space */
   basisX: Float32Array
@@ -918,6 +924,7 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   // Coherence Horizon (coherence-sourced gravity)
   coherenceHorizon: DEFAULT_COHERENCE_HORIZON_CONFIG,
   riemannZeta: DEFAULT_RIEMANN_ZETA_CONFIG,
+  hilbertPolya: DEFAULT_HILBERT_POLYA_CONFIG,
 
   // N-D Basis Vectors
   basisX: new Float32Array([1, 0, 0]),

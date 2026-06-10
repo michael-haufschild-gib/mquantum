@@ -482,7 +482,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
       },
     ],
 
-    // ─── Coherence Horizon + Riemann Zeta (Tangherlini-horizon analytic modes) ─
+    // ─── Coherence Horizon + Riemann Zeta + Hilbert–Pólya (horizon-family analytic modes) ─
     // Entries live in ./quantumTypesHorizons.ts; spread here preserves the
     // original map iteration order (after antiDeSitter, before pauliSpinor).
     ...HORIZON_QUANTUM_TYPE_ENTRIES,

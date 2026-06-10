@@ -1,5 +1,9 @@
 import { COHERENCE_HORIZON_RANGES } from '@/lib/geometry/extended/coherenceHorizon'
 import {
+  DEFAULT_HILBERT_POLYA_CONFIG,
+  HILBERT_POLYA_RANGES,
+} from '@/lib/geometry/extended/hilbertPolya'
+import {
   DEFAULT_RIEMANN_ZETA_CONFIG,
   RIEMANN_ZETA_RANGES,
 } from '@/lib/geometry/extended/riemannZeta'
@@ -356,6 +360,47 @@ export function packRiemannZeta(
   floatView[I.riemannAngularL] = angularL
   floatView[I.riemannAngularM] = angularM
   floatView[I.riemannCutaway] = (cfg?.cutaway ?? defaults.cutaway) ? 1.0 : 0.0
+}
+
+/**
+ * Pack Hilbert–Pólya Spectrum uniforms. Only the hilbertPolya mode reads these
+ * fields (its dedicated volumetric main block); every other mode gets all-zero
+ * fields so the buffer region is deterministic. The (Re z, Im z, θ) volume LUT
+ * itself is a separate group-2 storage buffer owned by HilbertPolyaStrategy —
+ * not part of this struct. The LUT-shaping fields (zMax / yExtent) are
+ * consumed by the strategy's worker job, not packed here.
+ */
+export function packHilbertPolya(
+  floatView: Float32Array,
+  schroedinger: Partial<SchroedingerConfig> | undefined,
+  isHilbertPolyaMode: boolean
+): void {
+  if (!isHilbertPolyaMode) {
+    floatView[I.hpGlow] = floatView[I.hpFogGain] = floatView[I.hpPlaneMarker] = 0.0
+    floatView[I.hpFilamentWidth] = 0.0
+    return
+  }
+
+  const cfg = schroedinger?.hilbertPolya
+  const defaults = DEFAULT_HILBERT_POLYA_CONFIG
+  const R = HILBERT_POLYA_RANGES
+
+  floatView[I.hpGlow] = finiteClamped(cfg?.glow, defaults.glow, R.glow.min, R.glow.max)
+  floatView[I.hpFogGain] = finiteClamped(
+    cfg?.fogGain,
+    defaults.fogGain,
+    R.fogGain.min,
+    R.fogGain.max
+  )
+  floatView[I.hpPlaneMarker] = (cfg?.planeMarker ?? defaults.planeMarker) ? 1.0 : 0.0
+  // The filament Gaussian profile is applied in the shader against the LUT's
+  // distance channel — width changes are uniform-only (no worker recompute).
+  floatView[I.hpFilamentWidth] = finiteClamped(
+    cfg?.filamentWidth,
+    defaults.filamentWidth,
+    R.filamentWidth.min,
+    R.filamentWidth.max
+  )
 }
 
 /**

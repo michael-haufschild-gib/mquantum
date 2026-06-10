@@ -27,6 +27,7 @@ import {
   enumerateAds,
   enumerateCoherenceHorizon,
   enumerateDensityGridEigenCache,
+  enumerateHilbertPolya,
   enumerateRiemannZeta,
   enumerateSkybox,
   enumerateWigner,
@@ -59,6 +60,7 @@ const VALID_SURFACES: ReadonlySet<SurfaceName> = new Set([
   'ads',
   'coherence-horizon',
   'riemann-zeta',
+  'hilbert-polya',
   'wigner',
   'passes',
 ])
@@ -152,6 +154,9 @@ export function* enumerateAll(opts: EnumerateAllOptions = {}): Generator<ShaderR
     }
     if (isEnabled('riemann-zeta')) {
       yield* enumerateRiemannZeta()
+    }
+    if (isEnabled('hilbert-polya')) {
+      yield* enumerateHilbertPolya()
     }
     if (isEnabled('wigner')) {
       yield* enumerateWigner()

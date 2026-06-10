@@ -24,6 +24,7 @@ import type { BecSetters } from '@/stores/slices/geometry/setters/becSetterDomai
 import type { DiracSetters } from '@/stores/slices/geometry/setters/diracSetters'
 import type { FreeScalarSetters } from '@/stores/slices/geometry/setters/freeScalarSetters'
 import type { CoherenceHorizonSetters } from '@/stores/slices/geometry/setters/horizonModes/coherenceHorizonSetters'
+import type { HilbertPolyaSetters } from '@/stores/slices/geometry/setters/horizonModes/hilbertPolyaSetters'
 import type { RiemannZetaSetters } from '@/stores/slices/geometry/setters/horizonModes/riemannZetaSetters'
 import type { QuantumWalkSetters } from '@/stores/slices/geometry/setters/quantumWalkSetters'
 import type { TdseSetters } from '@/stores/slices/geometry/setters/tdseSetters'
@@ -45,6 +46,7 @@ export interface SchroedingerSliceActions
     AntiDeSitterSetters,
     CoherenceHorizonSetters,
     RiemannZetaSetters,
+    HilbertPolyaSetters,
     BecSetters,
     DiracSetters,
     FreeScalarSetters,

@@ -116,6 +116,13 @@ export function buildBindGroupBlock(opts: {
    * binding 2/3) — riemannZeta forces Wigner off, so the two never collide.
    */
   isRiemannZeta?: boolean
+  /**
+   * Hilbert–Pólya volume LUT storage buffer at group 2, binding 2. Mutually
+   * exclusive with the Wigner cache and the riemannZeta LUT (all binding 2) —
+   * hilbertPolya forces Wigner off and is a distinct quantum mode, so the
+   * declarations never collide.
+   */
+  isHilbertPolya?: boolean
 }): string {
   return (
     schroedingerUniformsBlock +
@@ -137,6 +144,13 @@ export function buildBindGroupBlock(opts: {
 // Arithmetic Horizon radial LUT: interleaved [rho, dRho/du, psiRe, psiIm] per
 // log-radius sample, generated on the CPU by RiemannZetaStrategy.
 @group(2) @binding(2) var<storage, read> riemannLut: array<vec4f>;`
+      : '') +
+    (opts.isHilbertPolya
+      ? '\n' +
+        /* wgsl */ `
+// Hilbert–Pólya volume LUT: [filament, veil, nearest-dip distance, arg E] per voxel,
+// index ((k*48 + j)*160 + i), computed in a Web Worker by HilbertPolyaStrategy.
+@group(2) @binding(2) var<storage, read> hilbertPolyaVolume: array<vec4f>;`
       : '') +
     (opts.useDensityGrid ? '\n' + generateDensityGridFragmentBindings(4) : '') +
     (opts.freeScalarAnalysis ? '\n' + generateAnalysisTextureBindings(6) : '') +

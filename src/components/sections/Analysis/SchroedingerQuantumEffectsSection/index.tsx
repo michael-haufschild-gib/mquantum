@@ -160,6 +160,16 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
         />
       )
     }
+    if (config.quantumMode === 'hilbertPolya') {
+      // The dedicated volumetric main block composes none of these effects —
+      // every toggle here would be a silent no-op for this mode.
+      return (
+        <UnavailableSection
+          title="Quantum Effects"
+          reason="Not available in Hilbert–Pólya mode — the spectral renderer drives all visuals via the Geometry-tab controls"
+        />
+      )
+    }
     const isHydrogenMode =
       config.quantumMode === 'hydrogenND' || config.quantumMode === 'hydrogenNDCoupled'
     const isComputeMode = isComputeQuantumType(config.quantumMode)

@@ -45,6 +45,7 @@ export type ShaderSurface =
   | 'ads'
   | 'coherence-horizon'
   | 'riemann-zeta'
+  | 'hilbert-polya'
   | 'wigner'
   | 'passes'
 

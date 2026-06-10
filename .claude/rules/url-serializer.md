@@ -105,6 +105,13 @@ The URL state serializer (`src/lib/url/state-serializer.ts`) provides shareable 
 | `rz_flow` | float 0..1.5 | Riemann Zeta — self-similar dilation flow rate (render-only). |
 | `rz_glow` | float 0.2..4 | Riemann Zeta — cloud emission gain. |
 | `rz_cut` | 0/1 | Riemann Zeta — cutaway wedge toggle (render-only). |
+| `hp_preset` | string | Hilbert–Pólya — named preset id (emitted when a non-`custom` preset is active). |
+| `hp_zmax` | int 40..240 | Hilbert–Pólya — upper Re z bound of the spectral window (rounded to an integer on emit). |
+| `hp_y` | float 0.6..1.2 | Hilbert–Pólya — half-extent of the Im z axis. |
+| `hp_fw` | float 0.05..0.5 | Hilbert–Pólya — Gaussian filament half-width in Re z units. |
+| `hp_glow` | float 0.2..4 | Hilbert–Pólya — filament emission gain. |
+| `hp_fog` | float 0..2 | Hilbert–Pólya — veil (cancellation-noise fog) emission gain. |
+| `hp_plane` | 0/1 | Hilbert–Pólya — critical-plane marker at Im z = 0 (render-only). |
 
 ## Rules
 
@@ -116,6 +123,7 @@ The URL state serializer (`src/lib/url/state-serializer.ts`) provides shareable 
 - `ads_*` params are only emitted when `qm=antiDeSitter` (but are accepted on parse regardless)
 - `ch_*` params are only emitted when `qm=coherenceHorizon` (but are accepted on parse regardless); floats use 3-decimal precision like `ads_*`
 - `rz_*` params are only emitted when `qm=riemannZeta` (accepted on parse regardless); floats use 3-decimal precision
+- `hp_*` params are only emitted when `qm=hilbertPolya` (accepted on parse regardless); floats use 3-decimal precision
 - `ads_hkll` and `ads_btz` are mutually exclusive at the store level — setting one clears the other. The URL parser accepts both; the store applies them in order, so the last-applied setter wins.
 - `sw*` params are only emitted when `qm=wheelerDeWitt`. On parse they populate a `pendingSweep` slot on the SRMT sweep store; the sweep section claims it via `consumePendingSweep` exactly once after the Wheeler–DeWitt solver has mounted and produced a solver output.
 - `bell_*` params are only emitted when `t=bellPair` (top-level ObjectType, not a `qm`). On parse they are accepted regardless of `t`, so the orchestrator can fold them into the parsed state for the URL state hook to apply via `setBell*` setters in M5. Float fields use 4-decimal precision (~6 m° angular resolution) to preserve CHSH-sweep fidelity.

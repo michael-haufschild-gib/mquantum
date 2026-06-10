@@ -1,13 +1,15 @@
 /**
- * Horizon-mode Quantum Type entries — Coherence Horizon and Riemann Zeta.
+ * Horizon-mode Quantum Type entries — Coherence Horizon, Riemann Zeta, and
+ * Hilbert–Pólya Spectrum.
  *
- * Both are analytic, uniform/LUT-driven Tangherlini-horizon modes sharing the
- * same runtime shape (dedicated volumetric main block, `mixed` default color
- * algorithm, 3D–11D with a (d−2)-exponent horizon wall). Split from
- * `quantumTypes.ts` to keep the main registry file within the line budget;
- * the entries are spread back into `QUANTUM_TYPE_REGISTRY` at the exact
- * position they previously occupied (after `antiDeSitter`, before
- * `pauliSpinor`) so map iteration order is unchanged.
+ * All are analytic, uniform/LUT-driven modes sharing the same runtime shape
+ * (dedicated volumetric main block, `mixed` default color algorithm). The
+ * first two are Tangherlini-horizon modes (3D–11D with a (d−2)-exponent
+ * horizon wall); Hilbert–Pólya is the 3D-only Evans-landscape filament
+ * volume. Split from `quantumTypes.ts` to keep the main registry file within
+ * the line budget; the entries are spread back into `QUANTUM_TYPE_REGISTRY`
+ * at the exact position they previously occupied (after `antiDeSitter`,
+ * before `pauliSpinor`) so map iteration order is unchanged.
  *
  * @module lib/geometry/registry/quantumTypesHorizons
  */
@@ -15,7 +17,7 @@
 import { QUALITY_PRESETS, SHARED_RENDERING } from './quantumTypeShared'
 import type { QuantumTypeEntry, QuantumTypeKey } from './types'
 
-/** Registry entries for the two Tangherlini-horizon analytic modes. */
+/** Registry entries for the horizon-family analytic modes. */
 export const HORIZON_QUANTUM_TYPE_ENTRIES: readonly (readonly [
   QuantumTypeKey,
   QuantumTypeEntry,
@@ -124,6 +126,63 @@ export const HORIZON_QUANTUM_TYPE_ENTRIES: readonly (readonly [
         quantumMode: 'riemannZeta',
         configStoreKey: 'schroedinger',
         configSubKey: 'riemannZeta',
+      },
+    },
+  ],
+
+  [
+    'hilbertPolya',
+    {
+      key: 'hilbertPolya',
+      name: 'Hilbert–Pólya Spectrum',
+      description:
+        'Spectral filaments of the Riemann operator: every zero pinned to the critical plane Im z = 0, with the Matsubara cancellation veil lifting along the θ contour-rotation axis.',
+      category: 'analytic',
+      runtime: {
+        dataPath: 'analyticWavefunction',
+        strategy: 'hilbertPolya',
+        evolutionReset: 'schroedingerAnalytic',
+        shaderUniformId: 12,
+        stateSaveId: 14,
+        // The dedicated volumetric main block implements only mixed/phase/
+        // blackbody/viridis/densityContours; the analytic default is not among them.
+        defaultColorAlgorithm: 'mixed',
+        supportsOpenQuantum: false,
+      },
+      dimensions: {
+        min: 3,
+        max: 3,
+        recommended: 3,
+        recommendedReason:
+          'The Evans landscape is intrinsically a 3D box volume (Re z, Im z, θ) — there is no higher-dimensional extension',
+      },
+      rendering: SHARED_RENDERING,
+      animation: {
+        hasTypeSpecificAnimations: false,
+        systems: {},
+      },
+      urlSerialization: {
+        typeKey: 'hilbertPolya',
+        serializableParams: [
+          'hp_zmax',
+          'hp_y',
+          'hp_fw',
+          'hp_glow',
+          'hp_fog',
+          'hp_plane',
+          'hp_preset',
+        ],
+      },
+      ui: {
+        controlsComponentKey: 'SchroedingerControls',
+        hasTimelineControls: true,
+        qualityPresets: QUALITY_PRESETS,
+      },
+      internal: {
+        objectType: 'schroedinger',
+        quantumMode: 'hilbertPolya',
+        configStoreKey: 'schroedinger',
+        configSubKey: 'hilbertPolya',
       },
     },
   ],

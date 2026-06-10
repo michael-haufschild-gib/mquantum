@@ -15,6 +15,7 @@ import { logger } from '@/lib/logger'
 import { applySceneExample, findSceneByName } from '@/lib/sceneExamples'
 import {
   applyCoherenceHorizonParams,
+  applyHilbertPolyaParams,
   applyRiemannZetaParams,
 } from '@/lib/url/applyHorizonModeParams'
 import { parseCurrentUrl, type ParsedShareableState } from '@/lib/url/state-serializer'
@@ -356,8 +357,9 @@ function applyAdsParams(
   applyAdsChordalSieveFields(urlState, ext)
 }
 
-/* applyCoherenceHorizonParams / applyRiemannZetaParams extracted to
-   @/lib/url/applyHorizonModeParams (same preset-cascade contract as AdS). */
+/* applyCoherenceHorizonParams / applyRiemannZetaParams / applyHilbertPolyaParams
+   extracted to @/lib/url/applyHorizonModeParams (same preset-cascade contract
+   as AdS). */
 
 /** Apply Dirac-equation URL state params. */
 function applyDiracParams(urlState: ParsedShareableState, ext: ExtendedObjectState): void {
@@ -728,6 +730,7 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
     if (effectiveQuantumMode === 'antiDeSitter') applyAdsParams(urlState, ext)
     if (effectiveQuantumMode === 'coherenceHorizon') applyCoherenceHorizonParams(urlState, ext)
     if (effectiveQuantumMode === 'riemannZeta') applyRiemannZetaParams(urlState, ext)
+    if (effectiveQuantumMode === 'hilbertPolya') applyHilbertPolyaParams(urlState, ext)
     if (effectiveObjectType === 'bellPair') applyBellParams(urlState, ext)
     applySrmtSweepParams(urlState, effectiveQuantumMode)
   } catch (error) {

@@ -14,8 +14,9 @@
  * coordinate of the Berry–Keating dilation Hamiltonian H = xp), Riemann's
  * explicit formula reconstructs Gaussian bumps of weight Λ(n) = log p at
  * u = k·log p — the prime powers — purely from the zeros. A self-similar
- * dilation flow u → u − flow·t streams the shells across an optional dark
- * horizon core at r_h, with emission dimmed by the Tangherlini redshift
+ * dilation flow u → u − flow·t (cyclic on the LUT window, so shells stream
+ * outward and re-enter at the inner rim) streams the shells across an optional
+ * dark horizon core at r_h, with emission dimmed by the Tangherlini redshift
  * √f = √(1 − (r_h/r)^(d−2)).
  *
  * Visual phenomena produced:
@@ -262,15 +263,25 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
       break;
     }
 
-    // Self-similar dilation flow in the log-radius coordinate (render-only).
-    let u = log(r) - flow * schroedinger.time;
-
-    // Outside the LUT u-range the density is exactly zero — edge-clamping
+    // Outside the LUT u-window the density is exactly zero — edge-clamping
     // would smear the boundary samples over the whole inner core / outer
     // margin as uniform fog (must stay in sync with sampleRiemannDensity).
-    if (u < uMin || u > uMax) {
+    let uGeom = log(r);
+    if (uGeom < uMin || uGeom > uMax) {
       p += rd * baseStep;
       continue;
+    }
+
+    // Self-similar dilation flow in the log-radius coordinate (render-only):
+    // the Berry–Keating H = xp evolution is a translation in u, applied
+    // CYCLICALLY on the LUT window — shells stream outward and re-enter at
+    // the inner rim. An unwrapped shift walks the whole pattern off the
+    // window after t > (uMax − uMin)/flow and the mode fades to black.
+    var u = uGeom;
+    let uShift = flow * schroedinger.time;
+    if (uShift != 0.0) {
+      let uRange = uMax - uMin;
+      u = uMin + fract((uGeom - uShift - uMin) / uRange) * uRange;
     }
 
     // First-3 ND coords for the angular direction factor.

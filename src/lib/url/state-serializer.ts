@@ -42,6 +42,11 @@ import {
 } from './cosmologySerializer'
 import { deserializeDirac, type DiracUrlState, serializeDirac } from './diracSerializer'
 import {
+  deserializeHilbertPolya,
+  type HilbertPolyaUrlState,
+  serializeHilbertPolya,
+} from './hilbertPolyaSerializer'
+import {
   parseBoolParam,
   parseEnumParam,
   parseFloatParam,
@@ -90,6 +95,7 @@ export const VALID_QUANTUM_MODES: SchroedingerQuantumMode[] = [
   'antiDeSitter',
   'coherenceHorizon',
   'riemannZeta',
+  'hilbertPolya',
 ]
 
 const VALID_REPRESENTATIONS: SchroedingerRepresentation[] = ['position', 'momentum', 'wigner']
@@ -112,6 +118,7 @@ export interface ShareableObjectState
     BellUrlState,
     CoherenceHorizonUrlState,
     DiracUrlState,
+    HilbertPolyaUrlState,
     RiemannZetaUrlState,
     SrmtUrlState,
     SrmtSweepUrlState,
@@ -316,6 +323,12 @@ export function serializeState(state: ShareableState): string {
     serializeRiemannZeta(params, state)
   }
 
+  // Hilbert–Pólya Spectrum. Same dormant-field rule as the other horizon
+  // modes: only emitted while the mode is active.
+  if (state.quantumMode === 'hilbertPolya') {
+    serializeHilbertPolya(params, state)
+  }
+
   // Bell-pair / CHSH experiment. Bell uses its own ObjectType, so guard on
   // that instead of quantumMode (which is undefined for the bellPair object).
   if (state.objectType === 'bellPair') {
@@ -397,6 +410,9 @@ export function deserializeState(searchParams: string): ParsedShareableState {
 
   // Riemann Zeta (Arithmetic Horizon).
   deserializeRiemannZeta(params, state)
+
+  // Hilbert–Pólya Spectrum.
+  deserializeHilbertPolya(params, state)
 
   // Bell-pair / CHSH experiment. Always attempted — the parser keeps
   // every present field regardless of objectType so links with `t=bellPair`

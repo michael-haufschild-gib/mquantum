@@ -74,6 +74,10 @@ export async function createModeStrategy(
       const { RiemannZetaStrategy } = await import('../RiemannZetaStrategy')
       return new RiemannZetaStrategy()
     }
+    case 'hilbertPolya': {
+      const { HilbertPolyaStrategy } = await import('../HilbertPolyaStrategy')
+      return new HilbertPolyaStrategy()
+    }
     case 'analytic':
     default:
       return new AnalyticModeStrategy()

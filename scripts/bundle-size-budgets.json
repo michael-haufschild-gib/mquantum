@@ -45,6 +45,7 @@
     "analytics": { "gzip": 2300 },
     "simulationState": { "gzip": 1800 },
     "diracAlgebraWorker": { "gzip": 1800 },
+    "volume.worker": { "gzip": 2000 },
     "rendering-skybox-codec": { "gzip": 4500 },
     "image": { "gzip": 800 },
     "core-utils": { "gzip": 800 }

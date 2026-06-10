@@ -494,6 +494,9 @@ export function supportsSchroedingerSurfaceMode(
   // Arithmetic Horizon (riemannZeta) likewise owns a dedicated volumetric main
   // block — no isosurface pipeline composes for it.
   if (options.quantumMode === 'riemannZeta') return false
+  // Hilbert–Pólya Spectrum likewise owns a dedicated volumetric main block —
+  // no isosurface pipeline composes for it.
+  if (options.quantumMode === 'hilbertPolya') return false
 
   return true
 }

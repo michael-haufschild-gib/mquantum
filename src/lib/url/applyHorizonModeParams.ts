@@ -1,6 +1,6 @@
 /**
- * URL-param appliers for the two Tangherlini-horizon analytic modes
- * (Coherence Horizon `ch_*`, Riemann Zeta `rz_*`).
+ * URL-param appliers for the dedicated-renderer analytic modes
+ * (Coherence Horizon `ch_*`, Riemann Zeta `rz_*`, Hilbert–Pólya `hp_*`).
  *
  * Both follow the same preset-cascade contract as AdS: the named preset is
  * applied first, then raw fields — each raw-field setter flips `preset` to
@@ -77,4 +77,29 @@ export function applyRiemannZetaParams(
   if (urlState.riemannZetaGlow !== undefined) ext.setRiemannZetaGlow(urlState.riemannZetaGlow)
   if (urlState.riemannZetaCutaway !== undefined)
     ext.setRiemannZetaCutaway(urlState.riemannZetaCutaway)
+}
+
+/**
+ * Apply Hilbert–Pólya Spectrum URL state params.
+ *
+ * Preset first, then raw fields — raw fields cascade `preset` into `custom`
+ * via the individual setters, mirroring the Riemann Zeta apply order.
+ */
+export function applyHilbertPolyaParams(
+  urlState: ParsedShareableState,
+  ext: ExtendedObjectState
+): void {
+  if (urlState.hilbertPolyaPreset !== undefined && urlState.hilbertPolyaPreset !== 'custom') {
+    ext.setHilbertPolyaPreset(urlState.hilbertPolyaPreset)
+  }
+  if (urlState.hilbertPolyaZMax !== undefined) ext.setHilbertPolyaZMax(urlState.hilbertPolyaZMax)
+  if (urlState.hilbertPolyaYExtent !== undefined)
+    ext.setHilbertPolyaYExtent(urlState.hilbertPolyaYExtent)
+  if (urlState.hilbertPolyaFilamentWidth !== undefined)
+    ext.setHilbertPolyaFilamentWidth(urlState.hilbertPolyaFilamentWidth)
+  if (urlState.hilbertPolyaGlow !== undefined) ext.setHilbertPolyaGlow(urlState.hilbertPolyaGlow)
+  if (urlState.hilbertPolyaFogGain !== undefined)
+    ext.setHilbertPolyaFogGain(urlState.hilbertPolyaFogGain)
+  if (urlState.hilbertPolyaPlaneMarker !== undefined)
+    ext.setHilbertPolyaPlaneMarker(urlState.hilbertPolyaPlaneMarker)
 }

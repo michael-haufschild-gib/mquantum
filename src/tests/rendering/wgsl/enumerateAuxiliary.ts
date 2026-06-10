@@ -132,6 +132,17 @@ export function* enumerateRiemannZeta(): Generator<ShaderRecord> {
   }
 }
 
+/**
+ * Hilbert–Pólya Spectrum volumetric fragment shader. The mode is 3D-only
+ * (registry min = max = 3). Uses the production `buildShaderConfig`
+ * derivation so the exact shader the renderer compiles is what gets validated.
+ */
+export function* enumerateHilbertPolya(): Generator<ShaderRecord> {
+  const config = buildShaderConfig({ quantumMode: 'hilbertPolya', dimension: 3 })
+  const { wgsl } = composeSchroedingerShader(config)
+  yield record('hilbert-polya_d3', wgsl, 'hilbert-polya:3', 'hilbert-polya')
+}
+
 const COMPUTE_MODES: readonly ComputeQuantumMode[] = [
   'harmonicOscillator',
   'hydrogenND',
