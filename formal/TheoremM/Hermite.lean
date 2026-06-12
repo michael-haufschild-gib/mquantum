@@ -303,6 +303,57 @@ lemma Cpoly_coeff_even_succ (d k : ℕ) (hd : 1 ≤ d) (hk : k < d) :
   field_simp
   ring
 
+/-- The coefficient-side normalized Hermite polynomial has the same even
+coefficients as `Cpoly d` through degree `2d`. -/
+lemma hermiteCpoly_coeff_even_eq_Cpoly (d k : ℕ) (hd : 1 ≤ d) (hk : k ≤ d) :
+    (HermiteCpoly d).coeff (2 * k) = (Cpoly d).coeff (2 * k) := by
+  induction k with
+  | zero =>
+      rw [show 2 * 0 = (0 : ℕ) by omega]
+      rw [hermiteCpoly_coeff_zero]
+      rw [show (0 : ℕ) = 2 * 0 by omega, Cpoly_coeff_even]
+      simp
+  | succ k ih =>
+      have hklt : k < d := Nat.succ_le_iff.mp hk
+      have hkle : k ≤ d := le_of_lt hklt
+      have ih' := ih hkle
+      have hH := hermiteCpoly_coeff_even_succ d k hd hklt
+      have hC := Cpoly_coeff_even_succ d k hd hklt
+      let A : ℝ := ((2 * k + 1 : ℕ) : ℝ) * ((2 * k + 2 : ℕ) : ℝ) *
+        (((2 * d : ℕ) : ℝ))
+      have hA : A ≠ 0 := by
+        have h1 : (0 : ℝ) < ((2 * k + 1 : ℕ) : ℝ) := by positivity
+        have h2 : (0 : ℝ) < ((2 * k + 2 : ℕ) : ℝ) := by positivity
+        have h3 : (0 : ℝ) < ((2 * d : ℕ) : ℝ) := by exact_mod_cast (by omega)
+        exact (mul_pos (mul_pos h1 h2) h3).ne'
+      apply mul_left_cancel₀ hA
+      calc A * (HermiteCpoly d).coeff (2 * (k + 1))
+          = (((2 * k : ℕ) : ℝ) - ((2 * d : ℕ) : ℝ)) *
+              (HermiteCpoly d).coeff (2 * k) := by
+              simpa [A, mul_assoc] using hH
+        _ = (((2 * k : ℕ) : ℝ) - ((2 * d : ℕ) : ℝ)) *
+              (Cpoly d).coeff (2 * k) := by
+              rw [ih']
+        _ = A * (Cpoly d).coeff (2 * (k + 1)) := by
+              simpa [A, mul_assoc] using hC.symm
+
+/-- Coefficient-side statement of the exact probabilists'-Hermite rescaling:
+`C_d(w) = H_{2d}(w/sqrt(2d)) / H_{2d}(0)`. -/
+lemma HermiteCpoly_eq_Cpoly (d : ℕ) (hd : 1 ≤ d) : HermiteCpoly d = Cpoly d := by
+  ext m
+  rcases Nat.even_or_odd m with he | ho
+  · obtain ⟨k, hk⟩ := he
+    subst hk
+    rw [show k + k = 2 * k by omega]
+    by_cases hkd : k ≤ d
+    · exact hermiteCpoly_coeff_even_eq_Cpoly d k hd hkd
+    · have hdk : d < k := lt_of_not_ge hkd
+      rw [hermiteCpoly_coeff_even_gt d k hdk]
+      rw [Cpoly_coeff_even]
+      rw [Nat.descFactorial_of_lt hdk]
+      simp
+  · rw [hermiteCpoly_coeff_odd d m ho, Cpoly_coeff_odd d m ho]
+
 /-- Gaussian derivative representation of the even Hermite polynomial. -/
 lemma hermiteEven_gaussian_factor (d : ℕ) (x : ℝ) :
     aeval x (HermiteEven d) =
