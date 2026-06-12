@@ -35,6 +35,7 @@ import TheoremM.MomentsLimit
 namespace TheoremM
 
 open Real MeasureTheory Set Filter
+open scoped ENNReal
 
 /-! ## The elementary domination inequality -/
 
@@ -350,5 +351,226 @@ lemma levyMeasure_univ :
 /-- The Lévy measure is finite. -/
 instance : IsFiniteMeasure levyMeasure :=
   ⟨by rw [levyMeasure_univ]; exact ENNReal.ofReal_lt_top⟩
+
+/-! ## Convolution powers -/
+
+/-- The `n`-fold additive convolution power: `convPow μ 0 = δ₀`,
+`convPow μ (n+1) = convPow μ n ∗ μ`. -/
+noncomputable def convPow (μ : Measure ℝ) : ℕ → Measure ℝ
+  | 0 => Measure.dirac 0
+  | n + 1 => (convPow μ n) ∗ μ
+
+@[simp] lemma convPow_zero (μ : Measure ℝ) :
+    convPow μ 0 = Measure.dirac 0 := rfl
+
+@[simp] lemma convPow_succ (μ : Measure ℝ) (n : ℕ) :
+    convPow μ (n + 1) = (convPow μ n) ∗ μ := rfl
+
+instance convPow_sfinite (μ : Measure ℝ) [SFinite μ] (n : ℕ) :
+    SFinite (convPow μ n) := by
+  induction n with
+  | zero => rw [convPow_zero]; infer_instance
+  | succ n ih =>
+    haveI := ih
+    rw [convPow_succ]
+    infer_instance
+
+instance convPow_isFiniteMeasure (μ : Measure ℝ) [IsFiniteMeasure μ]
+    (n : ℕ) : IsFiniteMeasure (convPow μ n) := by
+  induction n with
+  | zero => rw [convPow_zero]; infer_instance
+  | succ n ih =>
+    haveI := ih
+    rw [convPow_succ]
+    infer_instance
+
+/-! ## Concentration on the half-line -/
+
+/-- Convolution preserves vanishing on the negative half-line.
+(Hand-rolled: mathlib has no support lemma for `Measure.conv`.) -/
+lemma conv_Iio_zero_eq_zero {μ ν : Measure ℝ} [SFinite ν]
+    (hμ : μ (Iio 0) = 0) (hν : ν (Iio 0) = 0) :
+    (μ ∗ ν) (Iio 0) = 0 := by
+  have hind : Measurable ((Iio (0 : ℝ)).indicator (1 : ℝ → ℝ≥0∞)) :=
+    measurable_one.indicator measurableSet_Iio
+  rw [← lintegral_indicator_one measurableSet_Iio,
+    Measure.lintegral_conv hind]
+  have hae : ∀ᵐ x ∂μ, ¬ x < 0 := by
+    rw [ae_iff]
+    simp only [not_not]
+    exact hμ
+  have hzero : ∀ᵐ x ∂μ,
+      (∫⁻ y, (Iio (0 : ℝ)).indicator (1 : ℝ → ℝ≥0∞) (x + y) ∂ν)
+        = 0 := by
+    filter_upwards [hae] with x hx
+    refine le_antisymm ?_ zero_le'
+    calc ∫⁻ y, (Iio (0 : ℝ)).indicator (1 : ℝ → ℝ≥0∞) (x + y) ∂ν
+        ≤ ∫⁻ y, (Iio (0 : ℝ)).indicator (1 : ℝ → ℝ≥0∞) y ∂ν := by
+          apply lintegral_mono
+          intro y
+          simp only [Set.indicator_apply, mem_Iio, Pi.one_apply]
+          split_ifs with h1 h2
+          · exact le_rfl
+          · exact absurd (by linarith [not_lt.mp hx] : y < 0) h2
+          · exact zero_le'
+          · exact zero_le'
+      _ = ν (Iio 0) := lintegral_indicator_one measurableSet_Iio
+      _ = 0 := hν
+  rw [lintegral_congr_ae hzero, lintegral_zero]
+
+/-- The Lévy measure vanishes on the negative half-line. -/
+lemma levyMeasure_Iio_zero : levyMeasure (Iio 0) = 0 := by
+  unfold levyMeasure
+  rw [withDensity_apply _ measurableSet_Iio,
+    Measure.restrict_restrict measurableSet_Iio]
+  have hdisj : Iio (0 : ℝ) ∩ Ioi 0 = ∅ := by
+    ext x
+    simp only [mem_inter_iff, mem_Iio, mem_Ioi, mem_empty_iff_false,
+      iff_false, not_and]
+    intro h
+    linarith
+  rw [hdisj]
+  simp
+
+/-- All convolution powers of the Lévy measure vanish on the negative
+half-line. -/
+lemma convPow_levyMeasure_Iio_zero (n : ℕ) :
+    convPow levyMeasure n (Iio 0) = 0 := by
+  induction n with
+  | zero =>
+    rw [convPow_zero, Measure.dirac_apply' _ measurableSet_Iio]
+    simp
+  | succ n ih =>
+    rw [convPow_succ]
+    exact conv_Iio_zero_eq_zero ih levyMeasure_Iio_zero
+
+/-! ## Exponential moments of the convolution powers -/
+
+/-- Exponential moments of the Lévy measure:
+`∫⁻ e^{−kt} dλ = log(M k) − log pAtom` — the complement of the weighted
+lintegral against the total mass. -/
+lemma lintegral_exp_levyMeasure (k : ℕ) :
+    ∫⁻ t, ENNReal.ofReal (Real.exp (-((k : ℝ) * t))) ∂levyMeasure
+      = ENNReal.ofReal (Real.log (M k) - Real.log pAtom) := by
+  have hae : ∀ᵐ t ∂levyMeasure, t ∈ Ioi (0 : ℝ) :=
+    (withDensity_absolutelyContinuous _ _).ae_le
+      (ae_restrict_mem measurableSet_Ioi)
+  have hsplit : (∫⁻ t, ENNReal.ofReal (Real.exp (-((k : ℝ) * t)))
+        ∂levyMeasure)
+      + ∫⁻ t, ENNReal.ofReal (1 - Real.exp (-((k : ℝ) * t))) ∂levyMeasure
+      = ENNReal.ofReal (-Real.log pAtom) := by
+    rw [← lintegral_add_left (by fun_prop), ← levyMeasure_univ,
+      ← lintegral_one]
+    apply lintegral_congr_ae
+    filter_upwards [hae] with t ht
+    have ht0 : (0 : ℝ) < t := mem_Ioi.mp ht
+    have hk1 : Real.exp (-((k : ℝ) * t)) ≤ 1 := by
+      rw [Real.exp_le_one_iff, neg_nonpos]
+      positivity
+    rw [← ENNReal.ofReal_add (Real.exp_pos _).le (by linarith),
+      ← ENNReal.ofReal_one]
+    congr 1
+    ring
+  rw [lintegral_weight_levyMeasure k] at hsplit
+  have hM1 : M k ≤ 1 := by
+    rcases Nat.eq_zero_or_pos k with hk | hk
+    · rw [hk, M_zero]
+    · rw [← M_zero]
+      exact (M_strictAnti hk).le
+  have hMp : pAtom < M k := M_gt_pAtom k
+  have hlogM : Real.log (M k) ≤ 0 := Real.log_nonpos (M_pos k).le hM1
+  have hlogp : Real.log pAtom < Real.log (M k) :=
+    Real.log_lt_log pAtom_pos hMp
+  have hrhs : ENNReal.ofReal (-Real.log pAtom)
+      = ENNReal.ofReal (Real.log (M k) - Real.log pAtom)
+        + ENNReal.ofReal (-Real.log (M k)) := by
+    rw [← ENNReal.ofReal_add (by linarith) (by linarith)]
+    congr 1
+    ring
+  rw [hrhs] at hsplit
+  exact (ENNReal.add_left_inj ENNReal.ofReal_ne_top).mp hsplit
+
+/-- Exponential moments of the convolution powers:
+`∫⁻ e^{−ks} d(λ^{∗n}) = (log(M k) − log pAtom)^n`. -/
+lemma lintegral_exp_convPow (k n : ℕ) :
+    ∫⁻ s, ENNReal.ofReal (Real.exp (-((k : ℝ) * s)))
+        ∂(convPow levyMeasure n)
+      = ENNReal.ofReal (Real.log (M k) - Real.log pAtom) ^ n := by
+  induction n with
+  | zero =>
+    rw [convPow_zero, lintegral_dirac' _ (by fun_prop)]
+    simp
+  | succ n ih =>
+    rw [convPow_succ, Measure.lintegral_conv (by fun_prop)]
+    have hsplit : ∀ x y : ℝ,
+        ENNReal.ofReal (Real.exp (-((k : ℝ) * (x + y))))
+          = ENNReal.ofReal (Real.exp (-((k : ℝ) * x)))
+            * ENNReal.ofReal (Real.exp (-((k : ℝ) * y))) := by
+      intro x y
+      rw [← ENNReal.ofReal_mul (Real.exp_pos _).le, ← Real.exp_add]
+      ring_nf
+    simp_rw [hsplit,
+      lintegral_const_mul' _ _ ENNReal.ofReal_ne_top,
+      lintegral_exp_levyMeasure k,
+      lintegral_mul_const' _ _ ENNReal.ofReal_ne_top, ih]
+    ring
+
+/-! ## The compound-Poisson measure -/
+
+/-- The compound-Poisson measure of draft §1.4a:
+`pAtom · ∑_n (1/n!) λ^{∗n}` — the normalisation is `e^{−Λ} = pAtom`
+since the total Lévy mass is `Λ = −log pAtom` (`levyMeasure_univ`). -/
+noncomputable def cpMeasure : Measure ℝ :=
+  ENNReal.ofReal pAtom
+    • Measure.sum fun n => (n.factorial : ℝ≥0∞)⁻¹ • convPow levyMeasure n
+
+/-- The `ℝ≥0∞` exponential series at a nonnegative real. -/
+lemma tsum_inv_factorial_mul_ofReal_pow {x : ℝ} (hx : 0 ≤ x) :
+    ∑' n : ℕ, (n.factorial : ℝ≥0∞)⁻¹ * ENNReal.ofReal x ^ n
+      = ENNReal.ofReal (Real.exp x) := by
+  have hterm : ∀ n : ℕ, (n.factorial : ℝ≥0∞)⁻¹ * ENNReal.ofReal x ^ n
+      = ENNReal.ofReal (x ^ n / n.factorial) := by
+    intro n
+    rw [ENNReal.ofReal_div_of_pos (Nat.cast_pos.mpr n.factorial_pos),
+      ENNReal.ofReal_pow hx, ENNReal.ofReal_natCast, div_eq_mul_inv,
+      mul_comm]
+  simp_rw [hterm]
+  rw [← ENNReal.ofReal_tsum_of_nonneg (fun n => by positivity)
+    (Real.summable_pow_div_factorial x)]
+  congr 1
+  rw [Real.exp_eq_exp_ℝ]
+  exact (congrFun NormedSpace.exp_eq_tsum_div x).symm
+
+/-- **The moments of the compound-Poisson measure are the M sequence**:
+`∫⁻ e^{−ks} d(cpMeasure) = M k`.  At `k = 0` this is the probability
+normalisation `cpMeasure(ℝ) = 1`. -/
+lemma lintegral_exp_cpMeasure (k : ℕ) :
+    ∫⁻ s, ENNReal.ofReal (Real.exp (-((k : ℝ) * s))) ∂cpMeasure
+      = ENNReal.ofReal (M k) := by
+  have hL : 0 ≤ Real.log (M k) - Real.log pAtom := by
+    have := Real.log_lt_log pAtom_pos (M_gt_pAtom k)
+    linarith
+  unfold cpMeasure
+  rw [lintegral_smul_measure, lintegral_sum_measure]
+  simp_rw [lintegral_smul_measure, lintegral_exp_convPow, smul_eq_mul]
+  rw [tsum_inv_factorial_mul_ofReal_pow hL,
+    ← ENNReal.ofReal_mul pAtom_pos.le]
+  congr 1
+  rw [Real.exp_sub, Real.exp_log (M_pos k), Real.exp_log pAtom_pos]
+  rw [mul_comm]
+  exact div_mul_cancel₀ _ pAtom_pos.ne'
+
+/-- The compound-Poisson measure is a probability measure
+(the `k = 0` moment). -/
+instance : IsProbabilityMeasure cpMeasure := by
+  constructor
+  have h := lintegral_exp_cpMeasure 0
+  simpa using h
+
+/-- The compound-Poisson measure vanishes on the negative half-line. -/
+lemma cpMeasure_Iio_zero : cpMeasure (Iio 0) = 0 := by
+  unfold cpMeasure
+  rw [Measure.smul_apply, Measure.sum_apply _ measurableSet_Iio]
+  simp [Measure.smul_apply, convPow_levyMeasure_Iio_zero]
 
 end TheoremM
