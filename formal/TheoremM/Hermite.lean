@@ -646,6 +646,20 @@ lemma sortedLT_sort_le_of_nodup (s : Multiset ℝ) (hnd : s.Nodup) :
     rw [Multiset.sort_eq]
     exact hnd
 
+/-- Direct sorted-multiset outside-gap bridge for adjacent indices in
+`s.sort (· ≤ ·)`. -/
+lemma sortedLT_sort_le_erase_erase_outside_adjacent
+    (s : Multiset ℝ) (hnd : s.Nodup) {i : ℕ}
+    (hi : i + 1 < (s.sort (fun x y : ℝ => x ≤ y)).length) :
+    ∀ c ∈
+        (s.erase ((s.sort (fun x y : ℝ => x ≤ y))[i]'(by omega))).erase
+          ((s.sort (fun x y : ℝ => x ≤ y))[i + 1]'hi),
+      c < (s.sort (fun x y : ℝ => x ≤ y))[i]'(by omega) ∨
+        (s.sort (fun x y : ℝ => x ≤ y))[i + 1]'hi < c :=
+  sortedLT_erase_erase_outside_adjacent_of_mem_iff
+    (sortedLT_sort_le_of_nodup s hnd) hnd
+    (fun c => by simpa [Multiset.mem_sort]) hi
+
 /-- The same outside-gap bridge for a strictly sorted view of a multiset. -/
 lemma sortedLT_sort_mem_outside_adjacent
     (s : Multiset ℝ) (hs : (s.sort (fun x y : ℝ => x ≤ y)).SortedLT) {i : ℕ}
