@@ -337,4 +337,79 @@ lemma hermiteR_odd_eval_zero (d : ℕ) (hd : 1 ≤ d) :
   have h := (Cpoly_critical_iff d hd 0).mp (derivative_Cpoly_eval_zero d)
   rwa [zero_div] at h
 
+/-! ## The sorted-roots pin (C2b, part 2)
+
+No counting combinatorics: the sorted list of a negation-symmetric
+nodup multiset equals the reverse of its own negation (sort
+uniqueness), so the middle entry is its own negative — zero. -/
+
+/-- The sorted root list of `H_n` has length `n`. -/
+lemma hermiteRRootsSorted_length_eq (n : ℕ) :
+    (HermiteRRootsSorted n).length = n := by
+  rw [hermiteRRootsSorted_length]
+  exact hermiteR_card_roots n
+
+/-- Strict monotonicity of the sorted root list at distinct indices. -/
+lemma hermiteRRootsSorted_strictMono (n : ℕ) {i j : ℕ}
+    (hij : i < j) (hj : j < (HermiteRRootsSorted n).length) :
+    (HermiteRRootsSorted n)[i]'(by omega)
+      < (HermiteRRootsSorted n)[j]'hj :=
+  (hermiteRRootsSorted_sortedLT n
+    (hermiteR_roots_nodup n)).getElem_lt_getElem_of_lt hij
+
+/-- The root multiset of `H_{2d−1}` is negation-symmetric. -/
+lemma hermiteR_odd_roots_map_neg (d : ℕ) (hd : 1 ≤ d) :
+    (HermiteR (2 * d - 1)).roots.map (fun r => -r)
+      = (HermiteR (2 * d - 1)).roots := by
+  have hnd := hermiteR_roots_nodup (2 * d - 1)
+  have hndm : ((HermiteR (2 * d - 1)).roots.map (fun r => -r)).Nodup :=
+    hnd.map neg_injective
+  rw [Multiset.Nodup.ext hndm hnd]
+  intro a
+  simp only [Multiset.mem_map]
+  constructor
+  · rintro ⟨b, hb, rfl⟩
+    rw [Polynomial.mem_roots (hermiteR_ne_zero _)] at hb ⊢
+    exact (hermiteR_odd_isRoot_neg_iff d hd b).mpr hb
+  · intro ha
+    refine ⟨-a, ?_, by simp⟩
+    rw [Polynomial.mem_roots (hermiteR_ne_zero _)] at ha ⊢
+    exact (hermiteR_odd_isRoot_neg_iff d hd a).mpr ha
+
+/-- **The reversal identity**: the sorted root list of `H_{2d−1}` is
+the reverse of its own negation. -/
+lemma hermiteR_odd_sorted_eq_reverse (d : ℕ) (hd : 1 ≤ d) :
+    HermiteRRootsSorted (2 * d - 1)
+      = ((HermiteRRootsSorted (2 * d - 1)).map (fun r => -r)).reverse := by
+  apply List.Perm.eq_reverse_of_sortedLE_of_sortedGE
+  · rw [← Multiset.coe_eq_coe, ← Multiset.map_coe, Multiset.sort_eq]
+    exact (hermiteR_odd_roots_map_neg d hd).symm
+  · exact (Multiset.pairwise_sort (s := (HermiteR (2 * d - 1)).roots)
+      (r := fun x y : ℝ => x ≤ y)).sortedLE
+  · apply List.Pairwise.sortedGE
+    exact List.Pairwise.map _ (fun a b hab => by linarith)
+      (Multiset.pairwise_sort (s := (HermiteR (2 * d - 1)).roots)
+        (r := fun x y : ℝ => x ≤ y))
+
+/-- **The middle entry of the sorted root list of `H_{2d−1}` is `0`.** -/
+lemma hermiteR_odd_sorted_middle (d : ℕ) (hd : 1 ≤ d) :
+    (HermiteRRootsSorted (2 * d - 1))[d - 1]'(by
+      rw [hermiteRRootsSorted_length_eq]; omega) = 0 := by
+  have hlen := hermiteRRootsSorted_length_eq (2 * d - 1)
+  have hidx : d - 1 < (HermiteRRootsSorted (2 * d - 1)).length := by
+    omega
+  have h := congrArg (fun l : List ℝ => l[d - 1]?)
+    (hermiteR_odd_sorted_eq_reverse d hd)
+  simp only [List.getElem?_reverse (by
+      rw [List.length_map]
+      omega : d - 1 < ((HermiteRRootsSorted (2 * d - 1)).map
+        (fun r => -r)).length),
+    List.getElem?_map, List.length_map] at h
+  rw [show (HermiteRRootsSorted (2 * d - 1)).length - 1 - (d - 1)
+      = d - 1 by omega] at h
+  rw [List.getElem?_eq_getElem hidx] at h
+  simp only [Option.map_some] at h
+  have := Option.some.inj h
+  linarith
+
 end TheoremM
