@@ -1,10 +1,9 @@
 /-
 Theorem M P6.2 Hermite route scaffold.
 
-This file is intentionally disjoint from `Structure.lean`: it packages
+This file is intentionally disjoint from Fable-owned proof files: it packages
 mathlib's probabilists' Hermite facts needed for the later `C_d` rescaling and
-Rolle/Gaussian real-rootedness route, without importing this file from the root
-module yet.
+Rolle/Gaussian real-rootedness route.
 -/
 import TheoremM.Defs
 import Mathlib.RingTheory.Polynomial.Hermite.Gaussian
@@ -44,6 +43,36 @@ lemma derivative_hermite_succ (n : ℕ) :
               simp [Nat.cast_add, add_mul, one_mul]
               abel
 
+/-- Probabilists' Hermite ODE: `Hₙ'' - X Hₙ' + n Hₙ = 0`. -/
+lemma hermite_ode (n : ℕ) :
+    derivative (derivative (Polynomial.hermite n))
+      - X * derivative (Polynomial.hermite n)
+      + Polynomial.C (((n : ℕ) : ℤ)) * Polynomial.hermite n = 0 := by
+  have h := derivative_hermite_succ n
+  rw [Polynomial.hermite_succ] at h
+  rw [derivative_sub, derivative_mul, derivative_X] at h
+  have hC : Polynomial.C (((n + 1 : ℕ) : ℤ)) =
+      (1 : Polynomial ℤ) + Polynomial.C (((n : ℕ) : ℤ)) := by
+    ext m
+    cases m <;> simp [Nat.cast_add, add_comm]
+  rw [hC, add_mul, one_mul] at h
+  have h1 : X * derivative (Polynomial.hermite n)
+      - derivative (derivative (Polynomial.hermite n)) =
+        Polynomial.C (((n : ℕ) : ℤ)) * Polynomial.hermite n := by
+    simpa [sub_eq_add_neg, add_assoc, add_comm, add_left_comm] using h
+  rw [← h1]
+  simp [sub_eq_add_neg, add_assoc, add_comm, add_left_comm]
+
+/-- Real-coefficient version of the probabilists' Hermite ODE. -/
+lemma hermite_odeR (n : ℕ) :
+    derivative (derivative ((Polynomial.hermite n).map (Int.castRingHom ℝ)))
+      - X * derivative ((Polynomial.hermite n).map (Int.castRingHom ℝ))
+      + Polynomial.C (((n : ℕ) : ℝ)) *
+          ((Polynomial.hermite n).map (Int.castRingHom ℝ)) = 0 := by
+  have h := congrArg (fun p : Polynomial ℤ => p.map (Int.castRingHom ℝ))
+    (hermite_ode n)
+  simpa [Polynomial.map_add, Polynomial.map_sub, Polynomial.map_mul, derivative_map] using h
+
 /-- The even probabilists' Hermite polynomial that will be rescaled to `C_d`. -/
 abbrev HermiteEven (d : ℕ) : Polynomial ℤ :=
   Polynomial.hermite (2 * d)
@@ -79,6 +108,44 @@ lemma derivative_hermiteEvenR (d : ℕ) (hd : 1 ≤ d) :
   rw [Polynomial.map_mul]
   rw [map_C]
   norm_num
+
+/-- Even-coefficient recurrence for `H_{2d}` over `ℝ`.
+
+After dividing by the constant coefficient and by `(2d)^k`, this is exactly
+the coefficient recurrence of `C_d`. -/
+lemma hermiteEvenR_coeff_even_succ (d k : ℕ) :
+    ((2 * k + 1 : ℕ) : ℝ) * ((2 * k + 2 : ℕ) : ℝ) *
+        (HermiteEvenR d).coeff (2 * (k + 1)) =
+      (((2 * k : ℕ) : ℝ) - ((2 * d : ℕ) : ℝ)) *
+        (HermiteEvenR d).coeff (2 * k) := by
+  let H : ℝ[X] := HermiteEvenR d
+  have hode : derivative (derivative H) - X * derivative H
+      + Polynomial.C (((2 * d : ℕ) : ℝ)) * H = 0 := by
+    simpa [H, HermiteEvenR] using hermite_odeR (2 * d)
+  have hcoeff := congrArg (fun p : ℝ[X] => p.coeff (2 * k)) hode
+  change (derivative (derivative H) - X * derivative H
+      + Polynomial.C (((2 * d : ℕ) : ℝ)) * H).coeff (2 * k) =
+    (0 : ℝ[X]).coeff (2 * k) at hcoeff
+  have hD2 : (derivative (derivative H)).coeff (2 * k) =
+      H.coeff (2 * (k + 1)) *
+        (((2 * k + 1 : ℕ) : ℝ) * ((2 * k + 2 : ℕ) : ℝ)) := by
+    rw [coeff_derivative, coeff_derivative]
+    rw [show 2 * k + 1 + 1 = 2 * (k + 1) by omega]
+    push_cast
+    ring
+  have hXC : (X * derivative H).coeff (2 * k) =
+      ((2 * k : ℕ) : ℝ) * H.coeff (2 * k) := by
+    cases k with
+    | zero => simp
+    | succ n =>
+        rw [show 2 * (n + 1) = (2 * n + 1) + 1 by ring]
+        rw [coeff_X_mul, coeff_derivative]
+        rw [show 2 * n + 1 + 1 = 2 * (n + 1) by omega]
+        push_cast
+        ring
+  rw [coeff_add, coeff_sub, hD2, hXC, coeff_C_mul, coeff_zero] at hcoeff
+  simp only [H] at hcoeff
+  linarith
 
 /-- No odd powers occur in `H_{2d}`. -/
 lemma hermiteEven_coeff_odd (d k : ℕ) : (HermiteEven d).coeff (2 * k + 1) = 0 := by
