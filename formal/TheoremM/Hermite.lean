@@ -68,6 +68,18 @@ lemma derivative_hermiteEven (d : ℕ) (hd : 1 ≤ d) :
   rw [show 2 * d - 1 + 1 = 2 * d by omega] at h
   simpa [HermiteEven] using h
 
+/-- Real-coefficient version of `derivative_hermiteEven`. -/
+lemma derivative_hermiteEvenR (d : ℕ) (hd : 1 ≤ d) :
+    derivative (HermiteEvenR d) =
+      Polynomial.C (((2 * d : ℕ) : ℝ)) *
+        (Polynomial.hermite (2 * d - 1)).map (Int.castRingHom ℝ) := by
+  unfold HermiteEvenR
+  rw [derivative_map]
+  rw [derivative_hermiteEven d hd]
+  rw [Polynomial.map_mul]
+  rw [map_C]
+  norm_num
+
 /-- No odd powers occur in `H_{2d}`. -/
 lemma hermiteEven_coeff_odd (d k : ℕ) : (HermiteEven d).coeff (2 * k + 1) = 0 := by
   have hodd : Odd (2 * d + (2 * k + 1)) := by
