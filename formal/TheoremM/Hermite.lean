@@ -5,14 +5,14 @@ This file is intentionally disjoint from Fable-owned proof files: it packages
 mathlib's probabilists' Hermite facts needed for the later `C_d` rescaling and
 Rolle/Gaussian real-rootedness route.
 -/
-import TheoremM.Defs
+import TheoremM.Structure
 import Mathlib.RingTheory.Polynomial.Hermite.Gaussian
 
 noncomputable section
 
 namespace TheoremM
 
-open Polynomial
+open Polynomial Finset
 open scoped Nat
 
 /-- Derivative-lowering identity for mathlib's probabilists' Hermite polynomials. -/
@@ -202,6 +202,106 @@ lemma hermiteEvenR_coeff_zero_ne_zero (d : ℕ) : (HermiteEvenR d).coeff 0 ≠ 0
   have hdf : ((2 * d - 1)‼ : ℤ) ≠ 0 := by
     exact_mod_cast (ne_of_gt (Nat.doubleFactorial_pos (2 * d - 1)))
   exact mul_ne_zero (by simp) hdf
+
+/-- Coefficient-side normalization of `H_{2d}(w/sqrt(2d)) / H_{2d}(0)`.
+
+This avoids choosing square roots while proving the exact coefficient bridge to
+`Cpoly d`: the factor `(2d)^k` is the contribution of `(sqrt(2d))^(2k)`. -/
+noncomputable def HermiteCpoly (d : ℕ) : ℝ[X] :=
+  ∑ k ∈ range (d + 1),
+    Polynomial.C ((HermiteEvenR d).coeff (2 * k) /
+      ((HermiteEvenR d).coeff 0 * (((2 * d : ℕ) : ℝ) ^ k))) * X ^ (2 * k)
+
+/-- Even coefficients of the coefficient-side normalized Hermite polynomial. -/
+lemma hermiteCpoly_coeff_even_of_le (d k : ℕ) (hk : k ≤ d) :
+    (HermiteCpoly d).coeff (2 * k) =
+      (HermiteEvenR d).coeff (2 * k) /
+        ((HermiteEvenR d).coeff 0 * (((2 * d : ℕ) : ℝ) ^ k)) := by
+  unfold HermiteCpoly
+  rw [finsetSum_coeff]
+  rw [Finset.sum_eq_single k]
+  · simp [coeff_C_mul, coeff_X_pow]
+  · intro j _ hj
+    have : (2 * k) ≠ 2 * j := by omega
+    simp [coeff_C_mul, coeff_X_pow, this]
+  · intro h
+    exact False.elim (h (Finset.mem_range.mpr (Nat.lt_succ_of_le hk)))
+
+/-- Even coefficients above the top degree of the coefficient-side normalized
+Hermite polynomial vanish. -/
+lemma hermiteCpoly_coeff_even_gt (d k : ℕ) (hk : d < k) :
+    (HermiteCpoly d).coeff (2 * k) = 0 := by
+  unfold HermiteCpoly
+  rw [finsetSum_coeff]
+  apply Finset.sum_eq_zero
+  intro j hj
+  have : (2 * k) ≠ 2 * j := by
+    have hjd : j ≤ d := Nat.lt_succ_iff.mp (Finset.mem_range.mp hj)
+    omega
+  simp [coeff_C_mul, coeff_X_pow, this]
+
+/-- Odd coefficients of the coefficient-side normalized Hermite polynomial vanish. -/
+lemma hermiteCpoly_coeff_odd (d m : ℕ) (hm : Odd m) :
+    (HermiteCpoly d).coeff m = 0 := by
+  unfold HermiteCpoly
+  rw [finsetSum_coeff]
+  apply Finset.sum_eq_zero
+  intro k _
+  have hne : m ≠ 2 * k := by
+    intro h
+    rw [h] at hm
+    exact (Nat.not_even_iff_odd.mpr hm) (even_two_mul k)
+  simp [coeff_C_mul, coeff_X_pow, hne]
+
+/-- The coefficient-side normalized Hermite polynomial has constant coefficient `1`. -/
+lemma hermiteCpoly_coeff_zero (d : ℕ) : (HermiteCpoly d).coeff 0 = 1 := by
+  rw [show (0 : ℕ) = 2 * 0 by omega]
+  rw [hermiteCpoly_coeff_even_of_le d 0 (Nat.zero_le d)]
+  rw [show 2 * 0 = (0 : ℕ) by omega]
+  simpa using div_self (hermiteEvenR_coeff_zero_ne_zero d)
+
+/-- The normalized Hermite coefficients satisfy the same first-order recurrence
+as `Cpoly d`. -/
+lemma hermiteCpoly_coeff_even_succ (d k : ℕ) (hd : 1 ≤ d) (hk : k < d) :
+    ((2 * k + 1 : ℕ) : ℝ) * ((2 * k + 2 : ℕ) : ℝ) *
+        (((2 * d : ℕ) : ℝ)) * (HermiteCpoly d).coeff (2 * (k + 1)) =
+      (((2 * k : ℕ) : ℝ) - ((2 * d : ℕ) : ℝ)) *
+        (HermiteCpoly d).coeff (2 * k) := by
+  rw [hermiteCpoly_coeff_even_of_le d (k + 1) (Nat.succ_le_of_lt hk),
+    hermiteCpoly_coeff_even_of_le d k (le_of_lt hk)]
+  have hraw := hermiteEvenR_coeff_even_succ d k
+  have h0 : (HermiteEvenR d).coeff 0 ≠ 0 := hermiteEvenR_coeff_zero_ne_zero d
+  have hd2 : (((2 * d : ℕ) : ℝ)) ≠ 0 := by
+    have : (0 : ℝ) < ((2 * d : ℕ) : ℝ) := by exact_mod_cast (by omega)
+    exact this.ne'
+  have hpow : (((2 * d : ℕ) : ℝ)) ^ k ≠ 0 := pow_ne_zero _ hd2
+  rw [pow_succ]
+  field_simp [h0, hd2, hpow]
+  nlinarith [hraw]
+
+/-- The `Cpoly d` coefficients in the same recurrence form as
+`HermiteCpoly d`. -/
+lemma Cpoly_coeff_even_succ (d k : ℕ) (hd : 1 ≤ d) (hk : k < d) :
+    ((2 * k + 1 : ℕ) : ℝ) * ((2 * k + 2 : ℕ) : ℝ) *
+        (((2 * d : ℕ) : ℝ)) * (Cpoly d).coeff (2 * (k + 1)) =
+      (((2 * k : ℕ) : ℝ) - ((2 * d : ℕ) : ℝ)) *
+        (Cpoly d).coeff (2 * k) := by
+  rw [Cpoly_coeff_even, Cpoly_coeff_even]
+  rw [Nat.descFactorial_succ]
+  have hcast : ((d - k : ℕ) : ℝ) = (d : ℝ) - k := Nat.cast_sub (le_of_lt hk)
+  have hdne : (d : ℝ) ≠ 0 := by
+    have : (0 : ℝ) < d := by exact_mod_cast hd
+    exact this.ne'
+  have hfacrec : ((2 * (k + 1)).factorial : ℝ)
+      = (2 * k + 2) * ((2 * k + 1) * (2 * k).factorial) := by
+    have h : 2 * (k + 1) = (2 * k + 1) + 1 := by ring
+    rw [h, Nat.factorial_succ, Nat.factorial_succ]
+    push_cast
+    ring
+  rw [hfacrec, pow_succ]
+  push_cast [hcast]
+  field_simp
+  ring
 
 /-- Gaussian derivative representation of the even Hermite polynomial. -/
 lemma hermiteEven_gaussian_factor (d : ℕ) (x : ℝ) :
