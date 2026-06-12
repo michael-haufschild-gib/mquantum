@@ -7,3 +7,4 @@ import TheoremM.MuBridge
 import TheoremM.Moments
 import TheoremM.MomentsLimit
 import TheoremM.Frullani
+import TheoremM.Binet

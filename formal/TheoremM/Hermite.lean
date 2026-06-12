@@ -7,6 +7,7 @@ Rolle/Gaussian real-rootedness route.
 -/
 import TheoremM.Structure
 import Mathlib.RingTheory.Polynomial.Hermite.Gaussian
+import Mathlib.Topology.Order.IntermediateValue
 
 noncomputable section
 
@@ -353,6 +354,110 @@ lemma HermiteCpoly_eq_Cpoly (d : ℕ) (hd : 1 ≤ d) : HermiteCpoly d = Cpoly d 
       rw [Nat.descFactorial_of_lt hdk]
       simp
   · rw [hermiteCpoly_coeff_odd d m ho, Cpoly_coeff_odd d m ho]
+
+/-! ## Degree facts for the Hermite root route -/
+
+/-- The model polynomial has constant coefficient `1`. -/
+lemma Cpoly_coeff_zero (d : ℕ) : (Cpoly d).coeff 0 = 1 := by
+  rw [show (0 : ℕ) = 2 * 0 by omega, Cpoly_coeff_even]
+  simp
+
+/-- The top coefficient of `Cpoly d` is nonzero. -/
+lemma Cpoly_coeff_top_ne_zero (d : ℕ) (hd : 1 ≤ d) :
+    (Cpoly d).coeff (2 * d) ≠ 0 := by
+  rw [Cpoly_coeff_even, Nat.descFactorial_self]
+  have hnum : (-1 : ℝ) ^ d * (d.factorial : ℝ) ≠ 0 := by
+    exact mul_ne_zero (pow_ne_zero _ (by norm_num)) (ne_of_gt (by positivity))
+  have hden : (d : ℝ) ^ d * ((2 * d).factorial : ℝ) ≠ 0 := by
+    exact ne_of_gt (by positivity)
+  exact div_ne_zero hnum hden
+
+/-- Coefficients of `Cpoly d` vanish above degree `2d`. -/
+lemma Cpoly_coeff_gt_two_mul (d m : ℕ) (hm : 2 * d < m) :
+    (Cpoly d).coeff m = 0 := by
+  rcases Nat.even_or_odd m with he | ho
+  · obtain ⟨k, hk⟩ := he
+    subst hk
+    rw [show k + k = 2 * k by omega, Cpoly_coeff_even]
+    rw [Nat.descFactorial_of_lt (by omega : d < k)]
+    simp
+  · exact Cpoly_coeff_odd d m ho
+
+/-- The model polynomial has degree exactly `2d`. -/
+lemma Cpoly_natDegree (d : ℕ) (hd : 1 ≤ d) : (Cpoly d).natDegree = 2 * d := by
+  apply le_antisymm
+  · apply natDegree_le_iff_coeff_eq_zero.mpr
+    intro m hm
+    exact Cpoly_coeff_gt_two_mul d m hm
+  · exact le_natDegree_of_ne_zero (Cpoly_coeff_top_ne_zero d hd)
+
+/-- `Cpoly d` is nonzero. -/
+lemma Cpoly_ne_zero (d : ℕ) : Cpoly d ≠ 0 := by
+  intro h
+  have h0 := Cpoly_coeff_zero d
+  rw [h, coeff_zero] at h0
+  norm_num at h0
+
+/-- The derivative of `Cpoly d` has degree exactly `2d - 1`. -/
+lemma Cpoly_derivative_natDegree (d : ℕ) (hd : 1 ≤ d) :
+    (derivative (Cpoly d)).natDegree = 2 * d - 1 := by
+  have hpos : 0 < (Cpoly d).natDegree := by
+    rw [Cpoly_natDegree d hd]
+    omega
+  have hdeg := degree_derivative_eq (Cpoly d) hpos
+  rw [Cpoly_natDegree d hd] at hdeg
+  exact natDegree_eq_of_degree_eq_some (by simpa using hdeg)
+
+/-- The derivative of `Cpoly d` is nonzero for positive `d`. -/
+lemma Cpoly_derivative_ne_zero (d : ℕ) (hd : 1 ≤ d) :
+    derivative (Cpoly d) ≠ 0 := by
+  intro h
+  have hdeg := Cpoly_derivative_natDegree d hd
+  rw [h, natDegree_zero] at hdeg
+  omega
+
+/-! ## Root-insertion kernels for `L(p) = X*p - p'` -/
+
+/-- If a real polynomial has opposite signs at two endpoints, it has a real root
+strictly between them. -/
+lemma exists_root_between_of_eval_mul_neg (p : ℝ[X]) {a b : ℝ} (hab : a < b)
+    (hneg : p.eval a * p.eval b < 0) :
+    ∃ x, a < x ∧ x < b ∧ p.eval x = 0 := by
+  have hcont : ContinuousOn (fun x => p.eval x) (Set.Icc a b) :=
+    p.continuous_aeval.continuousOn
+  have hane : p.eval a ≠ 0 := by
+    intro h
+    rw [h, zero_mul] at hneg
+    linarith
+  rcases lt_or_gt_of_ne hane with ha | ha
+  · have hb : 0 < p.eval b := by nlinarith [hneg, ha]
+    have hmem : (0 : ℝ) ∈ Set.Ioo (p.eval a) (p.eval b) := ⟨ha, hb⟩
+    obtain ⟨x, hx, hfx⟩ :=
+      (intermediate_value_Ioo (le_of_lt hab) hcont) hmem
+    exact ⟨x, hx.1, hx.2, hfx⟩
+  · have hb : p.eval b < 0 := by nlinarith [hneg, ha]
+    have hmem : (0 : ℝ) ∈ Set.Ioo (p.eval b) (p.eval a) := ⟨hb, ha⟩
+    obtain ⟨x, hx, hfx⟩ :=
+      (intermediate_value_Ioo' (le_of_lt hab) hcont) hmem
+    exact ⟨x, hx.1, hx.2, hfx⟩
+
+/-- Gap insertion for the Hermite recurrence operator `L(p)=X*p-p'`.
+
+At roots `a,b` of `p`, the endpoint values of `L(p)` are `-p'(a)` and
+`-p'(b)`. Opposite derivative signs therefore force a root of `L(p)` in
+the gap. -/
+lemma exists_root_X_mul_sub_derivative_between_of_derivative_mul_neg
+    (p : ℝ[X]) {a b : ℝ} (hab : a < b)
+    (ha : p.eval a = 0) (hb : p.eval b = 0)
+    (hneg : (derivative p).eval a * (derivative p).eval b < 0) :
+    ∃ x, a < x ∧ x < b ∧ (X * p - derivative p).eval x = 0 := by
+  apply exists_root_between_of_eval_mul_neg (X * p - derivative p) hab
+  have hLa : (X * p - derivative p).eval a = - (derivative p).eval a := by
+    simp [ha]
+  have hLb : (X * p - derivative p).eval b = - (derivative p).eval b := by
+    simp [hb]
+  rw [hLa, hLb]
+  simpa using hneg
 
 /-- Gaussian derivative representation of the even Hermite polynomial. -/
 lemma hermiteEven_gaussian_factor (d : ℕ) (x : ℝ) :
