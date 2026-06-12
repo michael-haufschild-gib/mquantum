@@ -3782,6 +3782,117 @@ monotonicity theorem for `M_d` up to each critical square. The higher
 coefficients should be treated as a hierarchy of even normal Sonin jets, not
 as unrelated Krawtchouk sums.
 
+### C36: First Transverse Jet Closed in All Degrees
+
+The weighted Sonin test in C35 can be proved for every degree. Writing
+
+```text
+M_d'(x)=A P_d(x)^2-BP_d(x)P_d'(x)+C P_d'(x)^2,
+```
+
+where
+
+```text
+A=1+x/(4d),  B=3x/(2d)+x^2/(4d^2),  C=4x+x^2/d,
+```
+
+the quadratic-form discriminant is
+
+```text
+B^2-4AC=x N_d(x)/(16d^4),
+N_d=x^3+(12d-16d^2)x^2+(36d^2-128d^3)x-256d^4.
+```
+
+For `d>=2`, `N_d` has exactly one positive root by Descartes' rule, and
+
+```text
+N_d(4d(4d-1))=-16d^3(12d+1)<0.
+```
+
+Hence `M_d'(x)>0` for `0<x<=4d(4d-1)`. The critical squares are
+
+```text
+r_j=4d xi_j,
+```
+
+where `xi_j` are zeros of `L_{d-1}^{1/2}`. The Jacobi-matrix row-sum bound for
+Laguerre zeros gives `xi_j<4d-1`, so `r_j<4d(4d-1)`. Thus `M_d` is increasing
+on every interval `[0,r_j]`, and
+
+```text
+B_{d,1}(s;r_j)>=0
+```
+
+for all `d`, all critical walls, and all `0<=s<=1`. Lemma B's transverse cone
+is now open only for `m>=2`.
+
+### C37: Real-Axis Lemma A Closed by Sonin Energy
+
+The `q^0` term in the F56 split has a direct energy proof. For
+
+```text
+4xP_d''+(2-x/d)P_d'+P_d=0,
+```
+
+define
+
+```text
+S_d(x)=P_d(x)^2+4xP_d'(x)^2.
+```
+
+Then
+
+```text
+S_d'(x)=2P_dP_d'+4P_d'^2+8xP_d'P_d''
+       =(2x/d)P_d'(x)^2>=0.
+```
+
+Since `S_d(0)=1` and `S_d(r)=P_d(r)^2` at a critical square `r`,
+
+```text
+P_d(sr)^2 <= S_d(sr) <= S_d(r)=P_d(r)^2,   0<=s<=1.
+```
+
+Thus
+
+```text
+D_d(s,0;r)=P_d(r)^2-P_d(sr)^2>=0
+```
+
+for every degree and every critical wall. The full finite-lift gap is now only
+the higher transverse cone `B_{d,m}` for `m>=2`.
+
+### C38: Degree-9 Transverse Cone Certified
+
+The allowed GPT Runpod completed exact transverse certification for `d=9`.
+The critical polynomial is
+
+```text
+H_9(r)=
+-r^8 + 2448r^7 - 2313360r^6 + 1082652480r^5
+-267956488800r^4 + 34727160948480r^3
+-2187811139754240r^2 + 56258000736537600r
+-379741504971628800.
+```
+
+The eight critical squares are approximately
+
+```text
+10.17481133219757, 41.03545685693809, 93.65489436261706,
+170.0681233510005, 273.7892267723381, 411.0185547556499,
+593.9787887156094, 854.2801438536495.
+```
+
+With `Q` degrees `(q,s,r)=(18,17,7)`, exact `CRootOf/Sturm` root counts passed
+for every positive `q` coefficient on every wall:
+
+```text
+8 walls x 18 transverse coefficients, all PASS.
+```
+
+Combining this with C37 for `q^0` gives Lemma B with factor `1` for `d=9`.
+Together with the previous certificates, Lemma B is exact through `d<=9`.
+
 ## Non-Computational Tests for Fable and GPT
 
 1. **Degree-3 local test:** before solving roots, evaluate
@@ -3927,6 +4038,81 @@ as unrelated Krawtchouk sums.
     `M_d=x[P_d^2-(x/d)P_dP_d'+4x(P_d')^2]`. The first positive wall jet is
     `[q]D=(M_d(r)-M_d(sr))/r`; monotonicity of `M_d` on `[0,r]` certifies
     `B_{d,1}` without full Krawtchouk/Sturm machinery.
+36. **Closed first-jet test:** certify `B_{d,1}` by checking the positive
+    definiteness threshold `x<=4d(4d-1)` for `M_d'` and the Laguerre critical
+    square bound `r_j=4d xi_j<4d(4d-1)`. Higher wall jets start at `m=2`.
+37. **Real-axis Sonin-energy test:** certify Lemma A with
+    `S_d=P_d^2+4x(P_d')^2`; the ODE gives `S_d'=(2x/d)(P_d')^2>=0`, hence
+    `P_d(sr)^2<=P_d(r)^2` at every critical square `r`.
+38. **Degree-9 transverse-certificate test:** for `d=9`, `H_9` has eight
+    critical roots and `Q` degrees `(18,17,7)`; every `m=1..18` transverse
+    coefficient passes exact CRootOf/Sturm certification on every wall.
+39. **True-xi running-Bessel test:** for the actual xi head, F205 gives
+    `c_j=(1/j)(1-2/(W(2j/pi)+1)+O(W^-2))`. Therefore the fixed critical
+    model exponent `S_0(k)` is shifted by
+    `S_xi(k)-S_0(k)=-2k log W(2k/pi)+O(k)`. This is a non-summable
+    curvature deficit, so the head limit is not a small perturbation of
+    `Phi_{1,1}`. The WDW lesson is that finite curvature jets can heal local
+    sections while the infinite head tower still feels the integrated
+    curvature drift. Xi-head zeros, if real, should be tested against a
+    running phase `N(w)~wL(w)/pi`, `L(w)~W(2w/pi)`, rather than the fixed
+    Bessel ruler.
+40. **Direct-Hausdorff obstruction test:** if the raw xi-head coefficients
+    `b_k=exp[-S_xi(k)]` form a Hausdorff moment sequence, then
+    `Phi_xi(s)=sum(-1)^k b_k s^k/k!` is a positive Laplace transform
+    `int e^{-us}dmu(u)` on `s>0` and has no positive real zeros. That is the
+    wrong object for F211. The valid atom-Rouche mechanism requires a moment
+    sequence after factoring out an oscillatory Bessel kernel. F205 shows no
+    fixed Bessel kernel can work asymptotically, because
+    `-log(exp[-S_xi(k)]/k!)=2k log k-2k log W(2k/pi)+O(k)`: order `1/2`,
+    infinite type, and central index `nu(w)=wW(w)exp[O(1)]`.
+41. **Fixed-shift Hurwitz test:** the normalized finite Jensen sections
+    satisfy
+    `F_{d,n}(s)=sum_{k<=d}(-1)^k((d)_k/d^k)exp[-S_n(k)]s^k/k! ->
+    Phi_{xi,n}(s)` locally uniformly. Thus a genuine simple nonreal zero of
+    `Phi_{xi,0}` would force nonreal zeros in sufficiently large fixed-shift
+    finite sections. Hyperbolicity verified only to finite `d` does not make
+    the fixed head the wrong object. Decisive audit: take one reported nonreal
+    limit zero and use the argument principle on the corresponding disk for
+    increasing `F_{d,0}`. This distinguishes normalization/truncation error
+    from a real RH-falsification route.
+42. **Finite-head cutoff test:** finite Jensen sections differ from the
+    fixed head by `((d)_k/d^k)=exp[-binom(k,2)/d+O(k^3/d^2)]`. This safe
+    Gaussian is large at central index `nu` unless `d>>nu^2`. Thus finite
+    checks through `d≈96` only probe fixed-head zeros with central index well
+    below `10`; far-out nonreal zeros of `Phi_{xi,0}` can be hidden until
+    much larger degree. Test a reported nonreal zero by setting
+    `d=C nu(|z0|)^2` and increasing `C`, using the argument principle rather
+    than full root finding.
+43. **Moving xi hard-edge scale test:** for the true xi profile, set
+    `C(k)=sum_{r<=k}c_r`. The finite coefficient-ratio scale is
+    `tau_{d,k}=k exp(C(k-1))/(d-k+1)`, so the active hard-head index solves
+    `kappa_d exp(C(kappa_d))~=d`. F205 gives
+    `C(k)=log k-2log W(2k/pi)+O(1)`, hence
+    `kappa_d=Theta(sqrt(d)W(sqrt(d)))`, not just `sqrt(d)`. Around that
+    moving layer,
+    `tau_{d,floor(y kappa_d)}/tau_{d,kappa_d}
+     =y^2[W(2kappa_d/pi)/W(2y kappa_d/pi)]^2(1+o(1))`,
+    so the finite xi edge is a logarithmically slow perturbation of the
+    critical Laguerre hard head. For a fixed-head zero with central index
+    `nu`, distinguish the moving race scale
+    `d_move~=nu^2/W(2nu/pi)^2` from the Hurwitz-transfer scale
+    `d_H~=nu^2`; their ratio is `W(2nu/pi)^2`. Hyperbolicity at the first
+    scale does not dismiss a genuine fixed-head nonreal zero at the second.
+44. **Renormalized critical-edge test:** define the exact drift normalizer
+    `L(k)=exp((H(k)-C(k))/2)`. If
+    `tau_xi(d,k)=k exp(C(k-1))/(d-k+1)` and
+    `tau_crit(D,k)=k exp(H(k-1))/(D-k+1)`, then with
+    `D=dL(kappa-1)^2`,
+    `tau_xi(d,k)/tau_crit(D,k)
+     =[L(kappa-1)/L(k-1)]^2[1-(k-1)/D]/[1-(k-1)/d]` exactly. On a
+    root-forming window `|k-kappa|<=A sqrt(kappa)`, F205 smoothness gives
+    log-ratio error
+    `O_A(1/(sqrt(kappa)W(kappa))+kappa/d)`. Thus the true xi moving edge is
+    microlocally a vanishing diagonal perturbation of the critical Laguerre
+    edge at effective degree `D=dL(kappa)^2`. The proof obligation becomes a
+    critical-cell stability margin bound strong enough to dominate this
+    perturbation.
 
 ## Consequence for the RH Quest
 

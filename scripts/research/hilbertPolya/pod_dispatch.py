@@ -29,16 +29,27 @@ PODS = {
 
 def ssh(pod, cmd, timeout=60):
     p = PODS[pod]
-    r = subprocess.run(
-        ["ssh", "-p", p["port"], "-i", KEY, "-o", "ConnectTimeout=20",
-         "-o", "StrictHostKeyChecking=accept-new", f"root@{p['host']}", cmd],
-        capture_output=True, text=True, timeout=timeout)
-    return r.stdout
+    try:
+        r = subprocess.run(
+            ["ssh", "-p", p["port"], "-i", KEY, "-o", "ConnectTimeout=20",
+             "-o", "StrictHostKeyChecking=accept-new", f"root@{p['host']}", cmd],
+            capture_output=True, text=True, timeout=timeout)
+        return r.stdout
+    except subprocess.TimeoutExpired:
+        return ""
 
 
 def running_scripts(pod):
-    out = ssh(pod, "ps aux | grep 'python3.13 fable_' | grep -v grep || true")
-    return {ln.split()[-1] for ln in out.strip().splitlines() if ln.strip()}
+    # Count only the real interpreter processes (args start with "python3.13
+    # fable_"), NOT the `bash -c ... nohup python3.13 ...` launcher wrappers,
+    # which would otherwise double-count and falsely report pods as full.
+    out = ssh(pod, "ps -eo args= | grep -E '^python3.13 fable_' || true")
+    scripts = set()
+    for ln in out.strip().splitlines():
+        parts = ln.split()
+        if len(parts) >= 2 and parts[0] == "python3.13":
+            scripts.add(parts[1])
+    return scripts
 
 
 def launch(pod, script):
@@ -49,7 +60,10 @@ def launch(pod, script):
          script, f"root@{p['host']}:/root/{base}"],
         check=True, timeout=120)
     log = base.replace(".py", ".log")
-    ssh(pod, f"cd /root && setsid nohup python3.13 {base} > {log} 2>&1 < /dev/null &")
+    # The trailing `echo` gives the remote shell a foreground statement so it
+    # exits and ssh returns promptly; setsid+redirects keep the job detached.
+    ssh(pod, f"bash -lc 'cd /root && setsid nohup python3.13 {base} "
+             f"> {log} 2>&1 < /dev/null & echo LAUNCHED_{base}'", timeout=40)
     return log
 
 

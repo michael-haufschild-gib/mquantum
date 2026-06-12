@@ -1,4 +1,4 @@
-# RH edge-Appell frontier (updated after GPT-F56, 2026-06-12)
+# RH edge-Appell frontier (updated after GPT-F66/R70, 2026-06-12)
 
 Active route: WDW/Jensen curvature flow -> adjacent-section Sturm ladder -> Cauchy/Stieltjes/Mellin kernel positivity -> shadow-polynomial integral cancellation -> hard-head Bessel/dilation/Pólya finite-core theory. Fixed-degree edge is useful but not identical to Fable's all-degree alpha_c boundary.
 
@@ -18,6 +18,7 @@ Fable Round 252/F210: proposed Pólya monotone-kernel reduction; one-jump thresh
 Fable Round 253/F211: claimed Phi_{1,1} in LP via atom-dominated Rouche using GPT-F39; GPT audit accepts x=1 proof, but not yet all real x>=1 Bessel extension.
 Fable Round 254/F212: accepted GPT F211 audit, proposed effective head lift certifying ~log(d)/pi real head zeros; GPT audit accepts head-strip theorem but not full disk-wide zero exclusion without taller contours.
 Fable Round 255: proposed full finite lift by cell-Rouche on critical walls of C_d; proved vertical wall minimum and large-y closure; reduced y=0 to Lemma A (critical-value envelope) and assigned GPT Lemma B (moderate-y radial dominance).
+Fable Round 257: proved Lemma A by Sonin-Pólya modulo endpoint `M_1>=1`, audited GPT F53-F56, and flagged same-IP shared-host coordination between Fable pod-2 and GPT pod.
 ```
 
 Hard-head entire limit:
@@ -652,6 +653,194 @@ M_d'=(1+x/(4d))P_d^2
 Interpret higher transverse coefficients as a hierarchy of even normal Sonin
 jets of the Laguerre ODE.
 
+F57 all-degree first transverse wall jet:
+
+```text
+B_{d,1}(s;r_j)>=0 for every d>=2, every critical square r_j, and 0<=s<=1.
+```
+
+Proof uses F56 plus monotonicity of `M_d` up to critical squares. With
+
+```text
+M_d'=A P_d^2-BP_dP_d'+C(P_d')^2,
+A=1+x/(4d), B=3x/(2d)+x^2/(4d^2), C=4x+x^2/d,
+```
+
+the discriminant is
+
+```text
+B^2-4AC=x N_d(x)/(16d^4),
+N_d=x^3+(12d-16d^2)x^2+(36d^2-128d^3)x-256d^4.
+```
+
+For `d>=2`, `N_d` has exactly one positive root and
+`N_d(4d(4d-1))=-16d^3(12d+1)<0`, so `M_d'>0` on
+`0<x<=4d(4d-1)`. Critical squares are `r_j=4d xi_j` with `xi_j` zeros of
+`L_{d-1}^{1/2}`; the Jacobi row-sum bound gives `xi_j<4d-1`, hence
+`r_j<4d(4d-1)`. Therefore `M_d(r_j)>=M_d(sr_j)` and `B_{d,1}>=0`.
+Remaining transverse cone begins at `m>=2`.
+
+F58 real-axis Lemma A direct energy closure:
+
+```text
+S_d(x)=P_d(x)^2+4xP_d'(x)^2,
+S_d'(x)=2P_dP_d'+4P_d'^2+8xP_d'P_d''=(2x/d)P_d'^2>=0.
+```
+
+Since `S_d(0)=1` and `S_d(r)=P_d(r)^2` at every critical square `r`,
+
+```text
+P_d(sr)^2<=S_d(sr)<=S_d(r)=P_d(r)^2, 0<=s<=1.
+```
+
+Thus `D_d(s,0;r)=P_d(r)^2-P_d(sr)^2>=0` for all degrees and critical walls.
+Fable's residual `M_1>=1` needs no numeric check. Current finite-lift gap:
+only transverse `B_{d,m}` for `m>=2`.
+
+F59 exact degree-9 transverse certificate:
+
+```text
+H_9=-r^8+2448r^7-2313360r^6+1082652480r^5-267956488800r^4
+    +34727160948480r^3-2187811139754240r^2
+    +56258000736537600r-379741504971628800.
+critical squares:
+10.17481133219757, 41.03545685693809, 93.65489436261706,
+170.0681233510005, 273.7892267723381, 411.0185547556499,
+593.9787887156094, 854.2801438536495.
+Q_degrees q=18 s=17 r=7.
+```
+
+Exact CRootOf/Sturm transverse certification passed for all eight walls and
+all `q^1..q^18` coefficients. Combining with F58 `q^0` gives Lemma B with
+factor `1` for every critical wall through `d<=9`. Remaining all-degree gap:
+`B_{d,m}(s;r_j)>=0` for arbitrary `d` and `m>=2`.
+
+F60 true-xi head pivot:
+
+```text
+Fable pivoted from alpha/(j+b) model to actual xi head limit
+Phi_{xi,n}(s)=sum_k (-1)^k exp[-S_n(k)]s^k/k!,
+S_n(k)=sum_{r=1}^{k-1}(k-r)c_{n+r}.
+GPT answer: no washout. The d->infinity head limit retains all future
+curvatures c_{n+r}; it is not exactly Phi_{1,1}.
+Using F205 c_j=(1/j)(1-2/(W(2j/pi)+1)+O(W^-2)),
+S_xi(k)=S_0(k)-2k log W(2k/pi)+O(k), so
+exp[-S_xi(k)]=exp[-S_0(k)]W(2k/pi)^(2k)exp[O(k)].
+Therefore xi head is not a Hurwitz-small fixed-Bessel perturbation.
+Fixed F211 compact cosine-atom transfer cannot be verbatim: required moments
+A^k exp[-S_xi(k)](2k)!/k! eventually exceed bounded [0,1] moments for every
+fixed A>0. Complete monotonicity of exp[-S(k)] alone gives an exponential
+mixture E exp(-Us), not the cosine/Bessel representation needed for F211.
+New target: running-Bessel LP/WKB theorem with
+L(k)=exp[(S_0(k)-S_xi(k))/(2k)]~W(2k/pi) and zero-count prediction
+N(w)~wL(w)/pi, equivalently s_m L(sqrt(s_m))^2/m^2 -> constant.
+```
+
+F61 xi-head diagnostic correction:
+
+```text
+Raw Hausdorff complete monotonicity of b_k=exp[-S_xi(k)] is the wrong F211
+criterion. If b_k=int u^k dmu(u), then Phi_xi(s)=sum(-1)^k b_k s^k/k!
+=int e^{-us}dmu(u)>0 for s>0, so it cannot explain the desired positive
+hard-head zeros. F39/F211 moment-ness applies only after factoring out an
+oscillatory Bessel kernel B in Phi=E B(Us).
+F205 plus Stirling gives a_k=exp[-S_xi(k)]/k! with
+-log a_k=2k log k-2k log W(2k/pi)+O(k): order 1/2 but infinite type.
+Every fixed Bessel/cosine kernel has finite type -log a_k=2k log k+O(k), so
+fixed-kernel residuals grow like W(2k/pi)^(2k)exp[O(k)] and cannot be compact
+moment sequences under any fixed scaling. Correct xihead diagnostics: raw CM
+failure is expected; plot zero/central-index scale against wW(w), specifically
+N(w)/(wW(w)), not the fixed Phi_{1,1} ruler.
+```
+
+F62 fixed-shift Hurwitz audit:
+
+```text
+Fable reports Phi_{xi,0} has nonreal zeros and concludes frozen head is wrong.
+GPT pushback: normalized fixed-shift finite sections have exact coefficient
+form F_{d,n}(s)=sum_{k<=d}(-1)^k((d)_k/d^k)exp[-S_n(k)]s^k/k!, so
+F_{d,n}->Phi_{xi,n} locally uniformly. If Phi_{xi,0} has a genuine simple
+nonreal zero z0, then by Hurwitz/argument principle sufficiently large
+F_{d,0} has a nonreal zero: possible RH falsification route. Finite
+hyperbolicity through d~96 does not refute this. Live alternatives:
+normalization/sign/factorial/indexing bug, truncation/precision artifact, or
+genuine eventual fixed-shift Jensen nonhyperbolicity. Highest-priority audit:
+post one nonreal z0 and count zeros of F_{d,0} on a small circle around z0 for
+increasing d; this is higher priority than shifted Phi_{xi,n} scans.
+```
+
+F63 finite-section cutoff delay:
+
+```text
+Finite sections differ from the fixed head by ((d)_k/d^k)=
+exp[-binom(k,2)/d+O(k^3/d^2)]. A fixed-head zero with central index nu is
+hidden until d>>nu^2. Regimes: d<<nu^2 safe binomial Gaussian dominates;
+d~nu^2 is F27/F28 boundary-layer race; d>>nu^2 gives Hurwitz transfer to the
+fixed head. Thus d~96 only tests fixed-head zeros with nu well below 10.
+Correct audit: stabilize nonreal z0 of Phi_{xi,0}, estimate nu(|z0|), then
+count zeros of F_{d,0} around z0 for d=C nu^2 with C=1,2,4,8,16,...
+```
+
+F64 true-xi two-scale moving edge:
+
+```text
+For true xi, set C(k)=sum_{r<=k}c_r. The exact finite-section adjacent ratio is
+tau_{d,k}=k exp(C(k-1))/(d-k+1), so the active hard-head index kappa_d solves
+kappa_d exp(C(kappa_d))~d. F205 gives C(k)=log k-2log W(2k/pi)+O(1), hence
+kappa_d=Theta(sqrt(d)W(sqrt(d))). Around this moving layer,
+tau(y kappa_d)/tau(kappa_d)=y^2[W(2kappa_d/pi)/W(2y kappa_d/pi)]^2(1+o(1))
+=y^2(1-2log y/W+O(W^-2)+o(1)), so the finite xi edge is a log-slow
+perturbation of the critical Laguerre hard head.
+
+For a fixed-head zero with central index nu, distinguish
+d_move(nu)~nu exp(C(nu))~nu^2/W(2nu/pi)^2 from the Hurwitz scale d_H(nu)~nu^2.
+At d_move the binomial cutoff is still exp[-W^2/2] and can hide fixed-head
+zeros; at d_H it is negligible and a genuine simple Phi_{xi,0} nonreal zero
+must transfer. Therefore Fable's drift picture is valid for the moving layer,
+but cannot dismiss fixed-shift Hurwitz. Audit both scales for any posted z0.
+```
+
+F65 exact renormalized critical-edge comparison:
+
+```text
+Define C(k)=sum_{r<=k}c_r, H(k)=sum_{r<=k}1/r, L(k)=exp((H(k)-C(k))/2).
+For true xi finite ratios tau_xi(d,k)=k exp(C(k-1))/(d-k+1), and critical
+ratios tau_crit(D,k)=k exp(H(k-1))/(D-k+1). With D=d L(kappa-1)^2,
+
+tau_xi(d,k)/tau_crit(D,k)= [L(kappa-1)/L(k-1)]^2 * [1-(k-1)/D]/[1-(k-1)/d]
+
+exactly. On |k-kappa|<=A sqrt(kappa), F205 gives log-ratio error
+O_A(1/(sqrt(kappa)W(kappa))+kappa/d). Thus the moving xi edge is microlocally
+a vanishing diagonal perturbation of the critical Laguerre edge. Remaining
+proof obligation: critical-cell stability margin beats this perturbation.
+```
+
+F66/Fable F213 accepted and trust-radius rule:
+
+```text
+Fable retracts the 'wrong fixed head' claim and provides exact xihead normalization.
+Fable warns the 18/40 result straddles a Szego/Turan/Jenkins-McLaughlin trust boundary: far complex roots are likely section artifacts; onset roots require winding persistence and tail certification.
+Exact xi-head ladder:
+Phi'_{xi,n}(s)=-Phi_{xi,n+1}(e^{-c_{n+1}}s).
+Proof: S_n(m+1)=m c_{n+1}+S_{n+1}(m). Consequences: LP is upward-closed in shift n; trusted nonreal counts cannot increase with n at polynomial-section level; scans violating this are artifacts. Under RH all heads LP, so a trusted nonreal Phi_{xi,0} zero remains an RH-falsification candidate.
+```
+
+GPT Runpod computation R69/R70:
+
+```text
+Dedicated endpoint only: ssh root@157.157.221.30 -p 12784 -i ~/.ssh/id_ed25519
+Script: scripts/research/hilbertPolya/gpt_xihead_audit.py copied to
+/workspace/gpt_rh/xihead_audit/gpt_xihead_audit.py.
+Live workdir: /workspace/gpt_rh/xihead_audit/run_20260612_123309
+Main PID: 4248, workers: 4.
+Command: --jmax 170 --degree 90 --dps 320 --workers 4 --shifts 0,16,64 --samples 768.
+Goal: independent xi moment/curvature computation; roots of truncated Phi_{xi,n}; if nonreal n=0 zero appears, central-index estimate and finite-section argument-principle counts at d_move and C nu^2.
+Checkpoints: xihead_audit_events.jsonl and xi_log_moments.json.
+Progress after F66 read: 110/171 moments at elapsed ~6:44; four workers at ~100% CPU, no stderr.
+Important: current run is pilot only. Classify roots by central index/trust radius. Next pass should match Fable endpoint u<=4.5, extend K=140/240/360 as needed, use winding counts, and enforce F213 monotonicity in n.
+Normalization note: GPT script Phi kernel is exactly half of Fable's; this adds a constant to log moments and cancels in c_j, so curvatures are equivalent.
+```
+
 Current requested Fable referee checks:
 
 ```text
@@ -677,6 +866,12 @@ sign-regularity of this transform after critical reduction.
 transverse split: F56 separates Fable's real-axis Lemma A from GPT's
 `m>=1` transverse cone; first transverse coefficient is the weighted Sonin
 functional `M_d`.
+first transverse closure: F57 proves `B_{d,1}>=0` for all degrees, so GPT's
+remaining transverse cone is `m>=2`.
+real-axis closure: F58 proves Lemma A directly with `S_d=P_d^2+4x(P_d')^2`,
+so the only finite-lift gap is transverse `m>=2`.
+d=9 certificate: F59 extends exact Lemma B verification through `d<=9` by
+transverse CRootOf/Sturm passes on all eight walls.
 ```
 
 Verification this update:
@@ -699,11 +894,80 @@ Verification this update:
 - F56 split Lemma B into Fable's real-axis envelope and GPT's `m>=1`
   transverse cone, and derived the first transverse coefficient as a weighted
   Sonin monotonicity functional.
+- F57 proved the first transverse wall coefficient `B_{d,1}` is nonnegative
+  for all degrees using a positive-definite `M_d'` threshold and Laguerre
+  Jacobi zero bound.
+- F58 proved the real-axis Lemma A term directly via the monotone Sonin energy
+  `S_d=P_d^2+4x(P_d')^2`, closing Fable's endpoint residual.
+- F59 extended exact Lemma B verification through `d<=9` by combining F58
+  real-axis closure with d=9 transverse CRootOf/Sturm passes on all eight
+  critical walls.
+- F60 answered Fable's true-xi head pivot: the head limit retains true
+  curvature and is not a fixed-Bessel perturbation; F205 gives the running
+  scale `L(k)~W(2k/pi)` and the replacement zero test
+  `s_m L(sqrt(s_m))^2/m^2 -> constant`.
+- F61 corrected the xi-head diagnostic: raw Hausdorff monotonicity of
+  `exp[-S_xi(k)]` gives a positive Laplace transform on `s>0`, not the
+  F211 Bessel atom representation; F205 also gives order `1/2` infinite
+  type, excluding any fixed compact Bessel-dilation model.
+- F62 challenged Fable's self-refutation: `Phi_{xi,0}` is the locally uniform
+  limit of fixed-shift normalized Jensen sections. A genuine simple nonreal
+  zero is a possible eventual Jensen counterexample; finite checks to `d~96`
+  do not prove the fixed head is the wrong object.
+- F63 reconciled finite checks with F62: finite sections include
+  `((d)_k/d^k)=exp[-binom(k,2)/d+O(k^3/d^2)]`, so a fixed-head zero with
+  central index `nu` is hidden until `d>>nu^2`; `d~96` only tests
+  `nu<<10`.
 
 Latest documented files:
-- docs/rh/gpt_wdw_curvature_jets.md: WDW conjectures/tests through C35/test 35.
-- docs/rh/gpt_sturm_ladder_comparison.md: GPT-F20 through GPT-F56.
-- logs/rh_proof_quest_20260610_204044_gpt.md: GPT Rounds through 59.
-- logs/rh_agent_coordination.md: mailbox through F56 response.
+- docs/rh/gpt_wdw_curvature_jets.md: WDW conjectures/tests through C42/test 42.
+- docs/rh/gpt_sturm_ladder_comparison.md: GPT-F20 through GPT-F63.
+- logs/rh_proof_quest_20260610_204044_gpt.md: GPT Rounds through 66.
+- logs/rh_agent_coordination.md: mailbox through F63 response.
 
-GPT dedicated Runpod state: `/workspace/gpt_rh` on `157.157.221.30:12784`, venv with SymPy 1.14.0/mpmath 1.3.0. Full exact d=9 certifier PID `693`: wall 1 passed after 741s, now on wall 2. Transverse-only d=9 certifier PID `820`: wall 1 `q^1` through `q^5` passed, now on `q^6`; progress log `walljet_d9_transverse.log`.
+GPT dedicated Runpod state: `/workspace/gpt_rh` on `157.157.221.30:12784`, venv with SymPy 1.14.0/mpmath 1.3.0. Per user instruction, use only this SSH endpoint. After F59, all GPT `rh_walljet_certifier` workers were stopped to reduce shared-host load; no active GPT pod computations remain.
+
+
+Update after Fable F67-F69 / GPT R72 (2026-06-12):
+
+```text
+F213-b accepted: N(Phi_xi,n+1) <= N(Phi_xi,n) by Rolle/Hurwitz. Degree-90 pilot violates trusted monotonicity (real counts shift 0/16/64 = 10/6/0 of 90), so pilot roots are artifact calibration unless F216-certified.
+F216 tail certificate: for log-concave head terms, |Phi-P_K| <= T_{K+1}(R)/(1-q), q=T_{K+2}/T_{K+1}. Applied to first K=90 shift-0 pilot zero z=60.8026350265991+1.82197907697443i, rho=0.879889173219223: min_C |P_K|=1.63339207425803e-14, tail=9.85134462573248e-14, tail/min=6.03121857941394. Candidate fails certificate; escalate K.
+Corrected true-xi cosine-mixture Hankel test: m_k=exp(-S(k))(2k)!/(4^k k!). Cached moments give ordinary and shifted Hankel minors positive for all r<=20; supports but does not prove cosine-mixture route.
+K-escalation audit running on dedicated GPT pod PID 4623: Xi(0)=0.49712077818831; z*(100)=393.297, z*(140)=658.775, z*(240)=1530.94, z*(360)=2923.36; K=140 root solve still running, no stderr.
+F217 accepted as joint step-2 target: F65 gives epsilon_d->0 on root windows; F216 must provide uniform finite-window truncation; remaining theorem is uniform Lipschitz of Lemma-B wall functional controlled by endpoint margin, not raw degree.
+```
+
+
+Update after Fable F70-F71 / GPT R73-R74 (2026-06-12):
+
+```text
+F70 accepted: naive F217 value-comparison is dead beyond near cells. Coefficient majorants are cosh-scale while wall values are cos-scale, so value/Rouche routes reach only O(log d) cells. Far moving windows need F218 Prüfer/WKB phase transport.
+F71 accepted: K=90 pilot zero/circle was a near-real cluster circle, not a clean F62 candidate; old d=2916.. winding table must not be used as evidence. Need adaptive recentering after K-escalation resolves clusters.
+Corrected cosine-moment top support diagnostic: m_k=exp(-S(k))(2k)!/(4^k k!), with exact ratio m_{k+1}/m_k=((2k+1)/2)exp(-C(k)). F65/F205 implies ratio grows like const*W(2k/pi)^2, so if the Stieltjes/cosine representation exists, support is unbounded (tau=infinity) and no finite top atom exists. Data: r_160=31.5822853, W^2=11.5590315, ratio=2.7322605, drifting toward e. F211 compact atom transfer cannot apply to true xi; replacement is unbounded saddle x_k~e W(2k/pi)^2 / F218 phase transport.
+KM applicability audit: F65 gives diagonal coefficient multiplier a_k^xi=a_k^crit exp(-E_k), not an orthogonality-preserving varying-weight Laguerre polynomial. Needed bridge: Laguerre Plancherel-Rotach/Prüfer phase stability under slow log-amplitude multipliers with osc(E_k)=o(1) and unit-step variation o(kappa^-1/2). KM supplies unperturbed critical phase/Airy model; F65 supplies slow perturbation.
+K-escalation audit still running on dedicated GPT pod PID 4623 at elapsed ~19 min, no stderr, latest output unchanged after trust radii.
+```
+
+
+Update after Fable F72-F73 / GPT R75 (2026-06-12):
+
+```text
+F72/G5 smoothness quantified from cached moments. For model c_j~(1/j)(1-2/(W(2j/pi)+1)), residual finite differences decay: window 80-128 max|res|=1.97e-4, max|d1|=4.66e-6, max|d2|=1.65e-7, max|d3|=7.70e-9; window 120-166 max|res|=9.00e-5, max|d1|=1.44e-6, max|d2|=3.43e-8, max|d3|=1.09e-9. Phase-window sums remain below rough pi/W budget on cached range.
+Corrected true-xi cosine-moment Hankel tests extended to cache limit: ordinary det[m_{i+j}] and shifted det[m_{i+j+1}] positive for all r=0..80. At r=80 after positive scaling, log10|det| ordinary=-3219.7807007003, shifted=-3251.4729191866.
+F218-L audit: the draft is right shape but must separate local ratio perturbation delta_k from cumulative coefficient multiplier E_k=sum_{r<=k}delta_r. The operator factor should be exp(-E(theta_E)) after subtracting affine drift absorbed by F65 rescaling. F65 supplies centered osc_window(E_k)=O_A(1/(sqrt(kappa)W(kappa))+kappa/d). With this correction, mode concentration -> scalar drift absorption -> Prüfer residual o(1) is coherent.
+F73 audit accepted: F9/F12/F13/F18 verified by Fable. Added F9 sigma h^2 correction cancellation note to docs: 3aw-12aw+9aw=0, so B-A h^4 branch equation is independent of w. F12/F13 conditionality discharged in shared ledger.
+K-escalation audit still running on dedicated GPT pod PID 4623, elapsed ~26 min, no stderr; latest output remains Xi(0) gate and z* radii.
+```
+
+
+Update after GPT R76-R77 / Fable F74 (2026-06-12):
+
+```text
+SRMT/WDW project audit: WDW Airy/Langer transfer supplies the right analogy for F218: raw value matching fails across turning surfaces; phase/action coordinates plus uniform Airy connection are stable. SRMT adds the affine-gauge warning: free affine slope can hide physics. For F218, constant cumulative multiplier is amplitude gauge, linear multiplier is variable-rescaling gauge, and only the F65-centered residual R_k is physical.
+F218-SRMT lemma drafted: if Q_E has coefficients a_k exp(-E_k), and E_k=B+A(k-kappa)+R_k on a saddle packet, the affine part gives exp(-B)exp(Akappa)Q(exp(-A)z); real-root count is unchanged by this gauge. For normalized critical Laguerre packet v_z, BO-style residual infidelity is <= Var(R)+O(||R||^3) <= osc(R)^2/4+O(osc(R)^3). With F65 osc(R)=O_A(1/(sqrt(kappa)W)+kappa/d)=o(1), Prüfer phase drift should be O(osc R) once Laguerre packet phase gap is proved.
+Fable F74 read. K-escalation: K=140 re-root done after 2026s; many K=140 roots have central-index faithfulness, but first tested windings around those roots collapse at K=240 and K=360 (K=140 count=1, K=240/360 count~0), so preliminary interpretation is Szego/Turan artifacts. Job PID 4623 still running on GPT dedicated pod, no stderr.
+F220 strengthened: q-damped detector Phi_q=sum(-1)^k exp[-S(k)]q^(k^2)s^k/k! is valid for every 0<q<=1, not only q<=0.309, because GPT-F1 heat-line theorem proves gamma_k=q^(k^2)=exp(-Ck^2/2) is a Polya-Schur multiplier sequence in exponential-generating normalization. Contrapositive: certified nonreal zero of Phi_q for any q implies Phi not LP. Scan q upward (0.5,0.7,0.85,0.93,0.97,...) with direct Gaussian tail certificates.
+F221 downgraded/watch only: cosine transform of a measure is not generally canonical-system A-function; inverse spectral map is nonlinear, and true xi mixing support is unbounded. Useful as Hilbert-Polya vocabulary/model experiment only.
+F222 accepted: Hermite criterion converts finite section hyperbolicity to PSD of Hankel matrix of Newton power sums. Interval moments -> interval c_j -> interval coefficients -> interval Newton sums -> interval Hermite PSD can make low-k arithmetic census theorem-grade without root finding.
+```

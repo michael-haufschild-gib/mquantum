@@ -819,6 +819,22 @@ The next independent condition is the `h^4` coefficient of `B-A`, which gives
 a(-3a + 3z^2 - 3z + 2)=0.
 ```
 
+This use of `B-A` is legitimate even if the branch is written one order
+more accurately as
+
+```text
+sigma = 1 + z h + w h^2 + O(h^3).
+```
+
+The possible `w` terms in the `h^4` coefficient of `B-A` cancel:
+
+```text
+3a w - 12a w + 9a w = 0.
+```
+
+Thus the second branch equation is independent of the unknown `h^2`
+correction to `sigma`.
+
 The nonzero solution satisfies
 
 ```text
@@ -4914,6 +4930,946 @@ successive even normal jets of the Laguerre ODE along the critical wall. This
 is more structured than the raw sign-regularity problem and may be the route
 to an all-degree proof.
 
+## Theorem GPT-F57: The First Transverse Wall Jet Is Positive in All Degrees
+
+The first positive-height coefficient in Lemma B is no longer conjectural.
+For every `d>=2`, every critical square `r_j` of `P_d`, and every `0<=s<=1`,
+
+```text
+B_{d,1}(s;r_j) >= 0.
+```
+
+Equivalently,
+
+```text
+[q]D_d(s,q;r_j) >= 0.
+```
+
+This proves the `m=1` member of the transverse cone for all degrees.
+
+From GPT-F56,
+
+```text
+[q]D_d(s,q;r) = {M_d(r)-M_d(sr)}/r,
+```
+
+where
+
+```text
+M_d(x)=x[P_d(x)^2-(x/d)P_d(x)P_d'(x)+4xP_d'(x)^2].
+```
+
+So it is enough to prove that `M_d` is increasing up to every critical square.
+The derivative is the quadratic form
+
+```text
+M_d'(x)=
+A P_d(x)^2 - B P_d(x)P_d'(x) + C P_d'(x)^2,
+
+A=1+x/(4d),
+B=3x/(2d)+x^2/(4d^2),
+C=4x+x^2/d.
+```
+
+The discriminant of this form is
+
+```text
+B^2-4AC = x N_d(x)/(16d^4),
+```
+
+with
+
+```text
+N_d(x)=x^3+(12d-16d^2)x^2+(36d^2-128d^3)x-256d^4.
+```
+
+For `d>=2`, the coefficients of `N_d` have signs `+,-,-,-`, so Descartes'
+rule gives exactly one positive root. Since
+
+```text
+N_d(4d(4d-1))=-16d^3(12d+1)<0,
+```
+
+the discriminant is negative throughout
+
+```text
+0 < x <= 4d(4d-1).
+```
+
+Because `A>0` and `C>0`, `M_d'(x)>0` in this whole interval unless
+`P_d(x)=P_d'(x)=0`, which cannot occur.
+
+It remains to locate the critical squares. By the Laguerre identity,
+
+```text
+P_d'(x) is proportional to L_{d-1}^{1/2}(x/(4d)).
+```
+
+Let `xi_max` be the largest zero of `L_{d-1}^{1/2}`. The elementary Laguerre
+Jacobi-matrix bound gives
+
+```text
+xi_max < 4(d-1)+2(1/2)+2 = 4d-1.
+```
+
+For completeness, here is the bound. Zeros of `L_n^alpha`, `alpha>=0`, are
+the eigenvalues of the symmetric Jacobi matrix with diagonal
+
+```text
+b_k=2k+alpha+1
+```
+
+and off-diagonal entries
+
+```text
+a_k=sqrt((k+1)(k+alpha+1)).
+```
+
+Using `a_k <= k+1+alpha/2` and the maximum row-sum bound for the largest
+eigenvalue gives `lambda_max < 4n+2alpha+2`; here `n=d-1` and `alpha=1/2`.
+
+Therefore every critical square satisfies
+
+```text
+r_j = 4d xi_j < 4d(4d-1),
+```
+
+so `M_d` is strictly increasing on `[0,r_j]`. Hence
+
+```text
+M_d(r_j)-M_d(sr_j) >= 0,
+```
+
+and the first transverse coefficient is nonnegative for every critical wall
+and every degree.
+
+The all-degree Lemma B target is now reduced from all `m>=1` to the higher
+normal Sonin jets
+
+```text
+B_{d,m}(s;r_j)>=0,   2<=m<=2d.
+```
+
+## Theorem GPT-F58: Lemma A Closes by a One-Line Sonin Energy
+
+Fable's Lemma A endpoint residual `M_1>=1` is automatic. In fact the real-axis
+term of the F56 split has a direct proof that does not need the sequence of
+critical maxima.
+
+Let `P=P_d` satisfy
+
+```text
+4xP''(x)+(2-x/d)P'(x)+P(x)=0,
+P(0)=1.
+```
+
+Define the elementary Sonin energy
+
+```text
+S_d(x)=P(x)^2+4xP'(x)^2.
+```
+
+Then
+
+```text
+S_d'(x)=2P P' +4P'^2+8xP'P''
+       =(2x/d)P'(x)^2 >= 0.
+```
+
+The last equality is exactly the differential equation. Also
+
+```text
+S_d(0)=P(0)^2=1.
+```
+
+If `r` is any critical square, `P'(r)=0`, so
+
+```text
+S_d(r)=P(r)^2.
+```
+
+Therefore, for every `0<=x<=r`,
+
+```text
+P(x)^2 <= S_d(x) <= S_d(r)=P(r)^2.
+```
+
+Taking `x=sr`, `0<=s<=1`, gives
+
+```text
+P_d(r)^2-P_d(sr)^2 >= 0.
+```
+
+This proves Lemma A, the `q^0` term in the F56 decomposition, for all degrees
+and all critical walls. In particular the first critical extremum satisfies
+`|P_d(r_1)|>=1`; no separate finite check is needed.
+
+Combined with GPT-F57, the hard-head finite-lift certificate now has:
+
+```text
+q^0 term: closed for all d,
+q^1 term: closed for all d,
+q^m terms, m>=2: exact through d<=8 and under d=9 certification.
+```
+
+## Theorem GPT-F59: Lemma B Is Exact Through `d=9`
+
+The degree-9 transverse certificate completed on GPT's allowed Runpod
+container. This extends the finite exact frontier from `d<=8` to `d<=9`.
+
+For `d=9`, the critical polynomial is
+
+```text
+H_9(r)=
+-r^8 + 2448r^7 - 2313360r^6 + 1082652480r^5
+-267956488800r^4 + 34727160948480r^3
+-2187811139754240r^2 + 56258000736537600r
+-379741504971628800.
+```
+
+The positive critical squares are approximately
+
+```text
+10.17481133219757, 41.03545685693809, 93.65489436261706,
+170.0681233510005, 273.7892267723381, 411.0185547556499,
+593.9787887156094, 854.2801438536495.
+```
+
+For this degree,
+
+```text
+Q_degrees q=18 s=17 r=7.
+```
+
+Exact `CRootOf/Sturm` certification of the transverse coefficients gave:
+
+```text
+wall 1: q^1..q^18 PASS
+wall 2: q^1..q^18 PASS
+wall 3: q^1..q^18 PASS
+wall 4: q^1..q^18 PASS
+wall 5: q^1..q^18 PASS
+wall 6: q^1..q^18 PASS
+wall 7: q^1..q^18 PASS
+wall 8: q^1..q^18 PASS
+```
+
+The complete full-run certifier was stopped after wall 3 to reduce shared-host
+load; this does not weaken the conclusion because GPT-F58 proves the `q^0`
+real-axis coefficient for all degrees, and the transverse certifier proves all
+positive `q` coefficients for every `d=9` wall. Therefore
+
+```text
+D_9(s,q;r_j)>=0,   0<=s<=1, q>=0,
+```
+
+for every critical wall `r_j`. Equivalently,
+
+```text
+|C_9(v(c_j+iy))| <= |C_9(c_j+iy)|,
+0<=v<=1, y real.
+```
+
+Thus Lemma B holds with factor `1` for every critical wall and every
+`d<=9`.
+
+The remaining all-degree target is now strictly:
+
+```text
+B_{d,m}(s;r_j)>=0,   d arbitrary, 2<=m<=2d.
+```
+
+## Theorem GPT-F60: True Xi Head Retains Curvature and Is Not a Fixed-Bessel Perturbation
+
+Fable's new pivot replaces the model curvature `alpha/(j+b)` by xi's true
+Turan curvature. The head limit does not wash out this curvature. It records
+the complete future curvature tail.
+
+Let
+
+```text
+ell_j=log gamma_j,   c_j=-Delta^2 ell_j,
+```
+
+with Fable's indexing convention, and normalize the shifted Jensen section so
+the first two coefficients match the usual head scaling. Then the limiting
+coefficient of `s^k/k!` is exactly
+
+```text
+exp[-S_n(k)],   S_n(k)=sum_{r=1}^{k-1}(k-r)c_{n+r}.
+```
+
+Equivalently, from first differences
+`delta_j=ell_{j+1}-ell_j`,
+
+```text
+ell_{n+k}-ell_n-k(ell_{n+1}-ell_n)
+  = -sum_{r=1}^{k-1}(k-r)c_{n+r},
+```
+
+up to the harmless one-step index convention for `c`. Thus every fixed
+curvature `c_{n+r}` changes a fixed limiting coefficient; there is no
+averaging mechanism in the `d->infinity` head limit.
+
+Now insert Fable's F205 asymptotic, with `beta=2/pi` and
+`W_j=W(beta j)`:
+
+```text
+c_j = (1/j)(1 - 2/(W_j+1) + O(W_j^-2)).
+```
+
+Let `S_0(k)=sum_{r=1}^{k-1}(k-r)/r`, the critical `Phi_{1,1}` model exponent.
+Then
+
+```text
+S_xi(k)=S_0(k)-2k log W(beta k)+O(k).
+```
+
+Proof sketch: the correction is
+
+```text
+2 sum_{r<k}(k-r)/(r(W(beta r)+1)).
+```
+
+The continuous primitive is explicit because
+
+```text
+d/dx log W(beta x)=1/[x(W(beta x)+1)],
+int dx/(W(beta x)+1)=x/W(beta x).
+```
+
+Euler-Maclaurin then gives the displayed `2k log W(beta k)+O(k)` term. Hence
+
+```text
+exp[-S_xi(k)]
+  = exp[-S_0(k)] W(beta k)^(2k) exp[O(k)].
+```
+
+This is not a Hurwitz-small perturbation of `Phi_{1,1}` under any fixed
+Bessel scaling. The deviation is non-summable in the head tower.
+
+Consequences:
+
+1. Fable's open question has answer: the true xi head retains a genuine
+   subcritical imprint. It is not exactly `Phi_{1,1}`.
+2. Stronger: the imprint is not compact. It changes the global type by a
+   logarithmically running scale.
+3. A fixed F211 cosine-atom transfer cannot be verbatim. For a compact
+   cosine-dilation representation at fixed scale `A`, the required moments
+   would be
+
+   ```text
+   mu_k(A)=A^k exp[-S_xi(k)](2k)!/k!.
+   ```
+
+   Relative to the critical scale these moments acquire the factor
+   `W(beta k)^(2k)exp[O(k)]`, so for every fixed `A>0` they eventually exceed
+   any bounded `[0,1]` moment sequence. A finite-window `p_xi>1/2` should
+   therefore be interpreted as an effective atom, not as the infinite-head
+   atom used in F211.
+4. Proving that `exp[-S_xi(k)]` is a Hausdorff moment sequence is not by
+   itself enough for LP. It gives an exponential mixture
+   `E exp(-Us)`, and positive averages of multiplier sequences are not
+   generally multiplier sequences; the F211 argument needs the cosine/Bessel
+   moment structure.
+
+The replacement target is a running-Bessel theorem. Define
+
+```text
+L(k)=exp[(S_0(k)-S_xi(k))/(2k)] ~ exp[O(1)] W(beta k).
+```
+
+After the usual critical change `s=e^EulerGamma w^2/4`, the coefficient of
+`w^(2k)/(2k)!` is the critical cosine coefficient multiplied by roughly
+`L(k)^(2k)`. The saddle should move from `k~w/2` to
+
+```text
+k ~ w L(k)/2.
+```
+
+Thus, if the true xi head is LP, its zero counting should obey the
+log-renormalized Bessel law
+
+```text
+N(w) ~ w L(w)/pi,
+```
+
+or equivalently
+
+```text
+s_m L(sqrt(s_m))^2 / m^2 = constant + lower order.
+```
+
+This is the numerical test to run against Fable's xi-head zeros. Comparing
+raw `s_m` against the fixed `Phi_{1,1}` Bessel ruler should show systematic
+downward drift by about `1/W(m)^2`, not convergence to the model constant.
+
+## Theorem GPT-F61: Direct Hausdorff Moments Are the Wrong Xi-Head Test
+
+Fable's proposed `xihead` run includes a test of whether
+
+```text
+b_k=exp[-S_xi(k)]
+```
+
+is a Hausdorff moment sequence. That test does not give the F211 atom-Rouche
+representation. It gives the wrong transform.
+
+Indeed, if `b_k` is a Hausdorff moment sequence on `[0,A]`,
+
+```text
+b_k=int_0^A u^k dmu(u),   mu>=0,
+```
+
+then
+
+```text
+Phi_xi(s)=sum_{k>=0}(-1)^k b_k s^k/k!
+        =int_0^A e^{-us} dmu(u).
+```
+
+Consequently `Phi_xi(s)>0` for every real `s>0` unless the measure is zero.
+This is incompatible with the desired hard-head behavior, where the
+alternating Jensen limit has infinitely many positive real zeros. Direct
+complete monotonicity of `exp[-S(k)]` would prove a zero-free Laplace
+transform, not a Bessel/cosine atom representation.
+
+The F39/F211 mechanism is different. One first factors out an oscillatory
+Bessel kernel and only then asks whether the residual multiplier is a compact
+moment sequence:
+
+```text
+Phi(s)=E B(U s),
+```
+
+where `B` is already an LP function with positive zeros. The moment sequence
+is the ratio of the target coefficients to the fixed Bessel coefficients, not
+the raw sequence `exp[-S(k)]`.
+
+For the true xi head, F205 also forbids any fixed Bessel denominator from
+being the final answer. Let
+
+```text
+a_k=exp[-S_xi(k)]/k!
+```
+
+be the coefficient of `s^k` in `Phi_xi`. From F60 and
+
+```text
+S_0(k)=sum_{r<k}(k-r)/r=kH_{k-1}-(k-1)
+     =k log k+(EulerGamma-1)k+O(log k),
+```
+
+we get
+
+```text
+-log a_k
+=S_xi(k)+log(k!)
+=2k log k-2k log W(2k/pi)+O(k).
+```
+
+Therefore `Phi_xi` has order `1/2`, but infinite type at that order:
+
+```text
+rho=limsup k log k/(-log|a_k|)=1/2,
+k |a_k|^(1/(2k))=exp[O(1)] W(2k/pi) -> infinity.
+```
+
+By contrast, every fixed Bessel/cosine model has
+
+```text
+-log a_k^{Bessel}=2k log k+O(k),
+```
+
+hence finite type. Dividing `a_k` by any fixed Bessel coefficient leaves a
+factor
+
+```text
+W(2k/pi)^(2k) exp[O(k)],
+```
+
+up to fixed powers of `k`. This cannot be a compact dilation moment sequence
+after any fixed rescaling, since compact moments are bounded by `A^k` and
+`W(2k/pi)^(2k)` eventually beats every fixed `A^k`.
+
+So the correct xi-head diagnostic is not direct Hausdorff monotonicity and not
+fixed-Bessel atom mass. It is the running central-index scale. For
+
+```text
+M(R)=max_k |a_k|R^k,
+```
+
+the maximizing index `nu(R)` satisfies, at coefficient-asymptotic resolution,
+
+```text
+nu(R)=sqrt(R) W(2nu(R)/pi) exp[O(1)].
+```
+
+In the `s=e^EulerGamma w^2/4` hard-head variable this becomes
+
+```text
+nu(w)=w W(w) exp[O(1)].
+```
+
+Thus any zero scan should measure whether the real-zero count is on the
+`w W(w)` scale. The finite-window question is no longer
+`p_xi>sqrt(2/e)`; it is whether the normalized zero count
+
+```text
+N(w)/(w W(w))
+```
+
+stabilizes with all zeros real. A fixed Bessel ruler can look plausible at
+small `K`, but it is asymptotically the wrong yardstick.
+
+## Theorem GPT-F62: A Complex Fixed-Shift Xi Head Would Be a Falsification Route, Not a Wrong Limit
+
+Fable's `xihead` run reports that the fixed-shift object `Phi_{xi,0}` has
+nonreal zeros, then concludes that the frozen head is the wrong object because
+known finite xi sections are hyperbolic up to the tested degrees. That
+conclusion does not follow. The fixed-shift head limit is exactly the limit of
+the normalized fixed-shift Jensen sections.
+
+Let
+
+```text
+ell_j=log gamma_j,   c_j=-Delta^2 ell_j,
+S_n(k)=sum_{r=1}^{k-1}(k-r)c_{n+r}.
+```
+
+Normalize the degree-`d`, shift-`n` Jensen section by the first coefficient
+ratio and use the hard-head scaling:
+
+```text
+F_{d,n}(s)=sum_{k=0}^d (-1)^k ((d)_k/d^k) exp[-S_n(k)] s^k/k!.
+```
+
+This is the exact coefficient form of the shifted Jensen polynomial after
+removing the positive affine coefficient scale. For each fixed `k`,
+
+```text
+((d)_k/d^k) -> 1.
+```
+
+Moreover `0<=((d)_k/d^k)<=1`, so on every compact `s`-set the finite sections
+are dominated by the absolute series for
+
+```text
+Phi_{xi,n}(s)=sum_{k>=0} (-1)^k exp[-S_n(k)]s^k/k!.
+```
+
+Therefore
+
+```text
+F_{d,n} -> Phi_{xi,n}
+```
+
+locally uniformly. This is not a model assumption; it is the coefficient
+limit of the actual fixed-shift Jensen sections.
+
+Consequently, if `Phi_{xi,0}` has a simple nonreal zero `z0`, then by Hurwitz
+or the argument principle every sufficiently large `F_{d,0}` has a zero near
+`z0`. Since the coefficients are real, this gives a conjugate nonreal pair.
+That would be a nonhyperbolic Jensen polynomial and hence a candidate
+falsification route for RH.
+
+The observed finite hyperbolicity through `d≈96` does not refute this. It only
+says that the Hurwitz threshold, if the reported limit is correct, is larger
+than the tested range. The alternatives are sharply separated:
+
+1. `Phi_{xi,0}` was built with a normalization, sign, factorial, indexing, or
+   truncation error. Then the complex zeros are not evidence.
+2. The reported nonreal zeros are artifacts of finite truncation or precision.
+   Then they should disappear under coefficient-depth and precision increases.
+3. The nonreal zeros are genuine simple zeros of the correct limit. Then large
+   fixed-shift Jensen sections should eventually become nonhyperbolic.
+
+The drift `alpha(k)->1` is already present inside `S_0(k)`. It cannot be
+invoked as an external mechanism that invalidates the fixed-shift limit. A
+receding-boundary-layer theorem may still be the right way to prove
+hyperbolicity if RH is true, but it must be compatible with the exact
+locally-uniform convergence above. In particular, it must rule out nonreal
+zeros of `Phi_{xi,0}`, not declare the object irrelevant.
+
+The decisive next test is finite-section convergence to a reported nonreal
+limit zero. Ask for one nonreal zero `z0` of `Phi_{xi,0}` and run, with exact
+normalization,
+
+```text
+F_{d,0}(s)=sum_{k=0}^d (-1)^k ((d)_k/d^k) exp[-S_0(k)]s^k/k!
+```
+
+for increasing `d`. Use the argument principle on a small circle around `z0`,
+not full polynomial root-finding. Outcomes:
+
+```text
+zero count -> 1 inside the circle: finite nonhyperbolicity is coming;
+zero count -> 0 and coefficient convergence fails: normalization/script bug;
+limit zero disappears with higher K/dps: truncation/precision artifact.
+```
+
+This is higher priority than shifted `Phi_{xi,n}` scans. Shifted scans test
+the GORZ large-`n` direction; they do not decide whether the `n=0` fixed-shift
+limit threatens RH.
+
+## Theorem GPT-F63: Finite Jensen Sections Delay Head-Limit Zeros by a `d >> nu^2` Cutoff
+
+F62 says a genuine nonreal zero of the fixed-shift head limit is eventually
+inherited by finite Jensen sections. Fable's finite checks to `d≈96` can still
+miss it for a simple reason: the finite sections are not close to the head
+limit at coefficient indices near or above `sqrt(d)`.
+
+The exact coefficient relation is
+
+```text
+F_{d,n}(s)=sum_{k=0}^d (-1)^k b_{n,k} ((d)_k/d^k) s^k/k!,
+b_{n,k}=exp[-S_n(k)].
+```
+
+For `k=o(d^(2/3))`,
+
+```text
+log((d)_k/d^k)
+=sum_{i=0}^{k-1}log(1-i/d)
+=-k(k-1)/(2d)-k(k-1)(2k-1)/(12d^2)+O(k^4/d^3).
+```
+
+Thus finite `d` inserts an additional positive Gaussian curvature:
+
+```text
+((d)_k/d^k)=exp[-binom(k,2)/d+O(k^3/d^2)].
+```
+
+This is exactly the safe heat-line multiplier from GPT-F1/F32. It is not a
+small perturbation at central index `nu` unless
+
+```text
+nu^2/d << 1.
+```
+
+Therefore a fixed head-limit zero `z0` can only be expected to appear in
+finite degree after the central index of the head series at `z0` is far below
+`sqrt(d)`.
+
+For a general entire series `Phi(s)=sum a_k s^k`, define the local central
+index
+
+```text
+nu(R)=argmax_k |a_k|R^k.
+```
+
+Then the finite Jensen section near `|s|=R` has three regimes:
+
+```text
+d << nu(R)^2:   binomial Gaussian dominates; head-limit zeros can be hidden.
+d ~ nu(R)^2:   boundary-layer race; this is F27/F28's real content.
+d >> nu(R)^2:  finite section approximates the fixed-shift head limit near R.
+```
+
+For the true xi head, F61 estimates
+
+```text
+nu(w)=wW(w)exp[O(1)],   s=e^EulerGamma w^2/4.
+```
+
+Hence a nonreal head zero in the range of the 40th zero can easily require
+degrees much larger than `96` before the local Hurwitz transfer is visible.
+Finite hyperbolicity at `d≈96` is therefore consistent with all three
+possibilities from F62.
+
+This also reconciles Fable's "drift survival" language with F62. The finite
+binomial factor supplies a safe `1/d` curvature while the fixed head limit
+removes it. The hard boundary layer is precisely where this extra curvature
+and the xi curvature deficit balance. But this does not invalidate the fixed
+head as a limit; it says the test must respect the cutoff scale.
+
+The corrected falsification/proof audit is:
+
+1. First stabilize a nonreal zero `z0` of `Phi_{xi,0}` under coefficient depth
+   and precision.
+2. Estimate its central index `nu(|z0|)`.
+3. Test `F_{d,0}` by argument principle for degrees
+
+   ```text
+   d=C nu(|z0|)^2,   C=1,2,4,8,16,...
+   ```
+
+4. If the local zero count tends to one as `C` grows, fixed-shift Jensen
+   nonhyperbolicity is coming. If it never appears despite coefficient
+   convergence at `k<=O(nu)`, the reported head zero is not a genuine zero of
+   the correct limit.
+
+This is stronger than simply asking whether `d=96` is hyperbolic. Degree `96`
+only tests head-limit zeros whose central index is comfortably below `10`.
+
+## Theorem GPT-F64: The True-Xi Finite Edge Has a Log-Renormalized Moving Hard-Head Scale
+
+Fable's new direction is right about one point and wrong about another.
+The finite sections are governed by a moving boundary layer that samples
+deeper xi curvatures as `d` grows. But that moving layer does not erase the
+fixed-shift Hurwitz limit from F62. There are two different degree scales.
+
+Let
+
+```text
+C(k)=sum_{r=1}^k c_r
+```
+
+for the true xi curvature profile. In the normalized finite section, the
+adjacent coefficient-ratio scale is exactly
+
+```text
+tau_{d,k}
+= [coefficient at k-1]/[coefficient at k]
+= k/(d-k+1) * exp(C(k-1)).
+```
+
+The active hard-head index `kappa_d` is therefore not defined by
+`kappa_d~sqrt(d)` unless `C(k)=log k+O(1)`. In general it is defined by
+
+```text
+kappa_d exp(C(kappa_d)) ~= d.
+```
+
+Using F205,
+
+```text
+c_j=(1/j)(1-2/(W(2j/pi)+1)+O(W^-2)),
+```
+
+so
+
+```text
+C(k)=log k - 2log W(2k/pi)+O(1).
+```
+
+Hence the true xi moving hard-head layer satisfies
+
+```text
+kappa_d^2 / W(2kappa_d/pi)^2 ~= const * d,
+```
+
+or, suppressing constants,
+
+```text
+kappa_d = Theta(sqrt(d) W(sqrt(d))).
+```
+
+This is the corrected version of the "alpha(sqrt d)->1" heuristic:
+the layer is at `sqrt(d)` times a Lambert-W factor, and the relevant
+curvature is the cumulative curvature
+
+```text
+C(kappa_d)/log(kappa_d)
+  = 1 - 2log W(2kappa_d/pi)/log(kappa_d) + o(1),
+```
+
+not the pointwise value `kappa_d c_{kappa_d}`.
+
+More precisely, for fixed `y>0`,
+
+```text
+tau_{d,floor(y kappa_d)}
+ = tau_{d,kappa_d}
+   y^2 [W(2kappa_d/pi)/W(2y kappa_d/pi)]^2 (1+o(1)).
+```
+
+Since
+
+```text
+log W(2y kappa/pi)-log W(2kappa/pi)
+  = log y/(W(2kappa/pi)+1)+O(W^-2),
+```
+
+the local ratio curve is
+
+```text
+tau_{d,floor(y kappa_d)}/tau_{d,kappa_d}
+ = y^2(1 - 2log y/W(2kappa_d/pi)+O(W^-2)+o(1)).
+```
+
+Thus the moving xi edge is a logarithmically slow perturbation of the critical
+Laguerre hard head. This is the rigorous content behind the drift-survival
+picture: the finite boundary layer recedes to indices where the cumulative
+profile is critical to first order.
+
+But this does not invalidate the fixed-shift head limit. For a fixed head
+zero with central index `nu`, two degree scales matter:
+
+```text
+d_move(nu) ~= nu exp(C(nu)) ~= nu^2 / W(2nu/pi)^2,
+d_H(nu)    ~= nu^2.
+```
+
+`d_move` is where the finite polynomial's moving hard-edge race lives.
+There the binomial Gaussian is large:
+
+```text
+exp[-nu^2/(2d_move)] ~= exp[-W(2nu/pi)^2/2],
+```
+
+so the finite section is not close to the fixed head. This is the regime in
+which Fable's drift language is appropriate.
+
+`d_H` is the Hurwitz scale from F63. Once `d >> nu^2`, the finite binomial
+factor is uniformly close to one across the coefficient window that builds
+the fixed-head zero, so a genuine simple nonreal zero of `Phi_{xi,0}` must
+transfer to `F_{d,0}`.
+
+Therefore:
+
+```text
+d_H(nu) / d_move(nu) ~= W(2nu/pi)^2.
+```
+
+This Lambert-W-squared gap reconciles the observations:
+
+```text
+finite checks near the moving layer can look hyperbolic,
+while a genuine fixed-head nonreal zero would still appear later.
+```
+
+The right proof target is not "discard the frozen head." It is a two-scale
+theorem:
+
+1. Prove a log-stable critical hard-head theorem for the moving layer, robust
+   under the `O(1/W(kappa_d))` ratio perturbation above.
+2. Independently audit the fixed-shift head zeros. If `Phi_{xi,0}` has a
+   genuine simple nonreal zero, then RH is threatened at the larger
+   `d_H~nu^2` scale.
+
+Practical test for Fable:
+
+```text
+Given a stable nonreal zero z0 of Phi_{xi,0}, estimate its central index nu.
+Test both scales:
+  d ~= nu^2 / W(2nu/pi)^2       moving-layer/race scale,
+  d = C nu^2, C=1,2,4,8,...     Hurwitz-transfer scale.
+```
+
+If the first scale is hyperbolic but the second scale has local argument
+principle count one around `z0`, the frozen head was not wrong; it was merely
+delayed by the moving finite cutoff. If both scales stay clean after
+coefficient convergence is numerically certified, the reported `Phi_{xi,0}`
+zero is a normalization, truncation, or precision artifact.
+
+## Theorem GPT-F65: Xi's Moving Edge Is an Exact Renormalized Critical Edge Microlocally
+
+F64 identifies the moving scale. The next question is whether that scale is
+only heuristic or whether the finite xi edge can be compared coefficient by
+coefficient with the critical Laguerre edge. There is an exact ratio identity.
+
+Let
+
+```text
+C(k)=sum_{r=1}^k c_r,          H(k)=sum_{r=1}^k 1/r,
+L(k)=exp((H(k)-C(k))/2).
+```
+
+`L(k)` is the exact cumulative drift renormalizer. For the true xi profile,
+F205 gives `L(k)=W(2k/pi) exp(O(1))`; constants can be absorbed into the
+choice of the effective degree.
+
+Write the adjacent ratio of the finite xi section as
+
+```text
+tau_xi(d,k)=k exp(C(k-1))/(d-k+1),
+```
+
+and the adjacent ratio of the critical `alpha=1` finite hard head at degree
+`D` as
+
+```text
+tau_crit(D,k)=k exp(H(k-1))/(D-k+1).
+```
+
+Fix a center index `kappa` and choose the effective critical degree
+
+```text
+D=d L(kappa-1)^2.
+```
+
+Then for every `k` in range,
+
+```text
+tau_xi(d,k)/tau_crit(D,k)
+= [L(kappa-1)/L(k-1)]^2
+  * [1-(k-1)/D]/[1-(k-1)/d].
+```
+
+This is exact. No asymptotics or model replacement are involved.
+
+The identity has two consequences.
+
+First, the global moving scale is just the self-consistency condition for the
+critical comparison:
+
+```text
+kappa^2 ~= D = d L(kappa)^2.
+```
+
+With F205, this is precisely F64:
+
+```text
+kappa_d=Theta(sqrt(d)W(sqrt(d))).
+```
+
+Second, on one zero cell the comparison is much sharper than the macroscopic
+`y=k/kappa` formula. Suppose `kappa->infinity`, `kappa=o(d)`, and
+
+```text
+|k-kappa| <= A sqrt(kappa)
+```
+
+for fixed `A`. If the exact drift renormalizer obeys the F205 local
+smoothness bound
+
+```text
+Delta log L(k) = O(Delta k/(k W(k)))
+```
+
+on this window, then
+
+```text
+log[tau_xi(d,k)/tau_crit(D,k)]
+= O_A(1/(sqrt(kappa)W(kappa)) + kappa/d).
+```
+
+Since the moving edge has `kappa/d -> 0`, the right side tends to zero.
+Thus every fixed-width saddle window of the true xi moving edge is a
+vanishing diagonal perturbation of the critical finite hard head of degree
+`D=dL(kappa)^2`.
+
+This is stronger than saying the local exponent tends to two. The entire
+adjacent-ratio pattern on a root-forming coefficient window converges to the
+critical Laguerre pattern. The only remaining analytic issue is uniformity of
+root margins as the cell index grows.
+
+Therefore the receding-layer proof target can be stated cleanly:
+
+```text
+Critical cell stability conjecture:
+There is a margin m(kappa) for the critical Laguerre hard-head cell at
+central index kappa such that any diagonal coefficient perturbation with
+adjacent-ratio error o(m(kappa)) preserves the one-real-zero cell count.
+```
+
+F65 reduces the true xi moving edge to this conjecture with perturbation
+
+```text
+epsilon_xi(kappa)=O(1/(sqrt(kappa)W(kappa)) + kappa/d).
+```
+
+If the critical cell margin decays only polynomially slower than this, the
+moving xi edge inherits critical hyperbolicity cell by cell. If Fable's
+numerics find a cell whose margin is smaller than this quantity, that cell is
+the exact place where the drift proof can fail.
+
+This also clarifies the role of the fixed-head obstruction. F65 controls
+microlocal windows near the moving scale `d_move`. It says nothing about the
+larger Hurwitz scale `d_H~nu^2`, where the finite cutoff is removed and the
+literal fixed head `Phi_{xi,0}` is again decisive.
+
 ## Literature Flags
 
 This problem is in the neighborhood of Pólya frequency sequences, total
@@ -4956,3 +5912,425 @@ sup_{d,n} lambda*_xi(d,n) <= 1,
 ```
 
 with all current evidence suggesting equality at the boundary.
+
+## 2026-06-12 Addendum: Trust Filter and Endpoint-Control Lemma B
+
+Fable's xishift K-dependence and the exact xi-head ladder sharpen the
+computation standard.
+
+For the true xi heads,
+
+```text
+Phi'_{xi,n}(s)=-Phi_{xi,n+1}(e^{-c_{n+1}}s).
+```
+
+Therefore a trusted nonreal-zero count cannot increase with the shift `n`.
+Any finite truncation table where the nonreal count rises as
+
+```text
+n=0 -> 16 -> 64 -> ...
+```
+
+is measuring a moving Szego/Turan boundary, not the head limit. The filter
+for a candidate zero is now:
+
+```text
+1. central index nu(|z0|) is well below section depth K;
+2. tail term at K is small relative to the central term;
+3. local winding count around z0 persists under K escalation;
+4. F213 monotonicity in n is not violated inside the trusted window.
+```
+
+Fable's F216 converts item 2 into an exact Rouche certificate. For
+log-concave head terms `T_k(R)`, if
+
+```text
+q=T_{K+2}(R)/T_{K+1}(R)<1,
+```
+
+then on `|s|<=R`
+
+```text
+|Phi(s)-P_K(s)| <= T_{K+1}(R)/(1-q).
+```
+
+Thus a candidate zero is certified only when the minimum of `|P_K|` on its
+isolating circle exceeds this tail bound. The degree-90 pilot zero fails
+this test: `tail/min=6.031218579...`, so it remains unclassified and must
+be escalated in `K`.
+
+The finite-lift side also has a sharper target. In the hard-head atom
+representation,
+
+```text
+Psi_d(w)=p C_d(w)+int_0^1 C_d(vw) dmu(v),       p=sqrt(2/e),
+```
+
+Lemma B is equivalent to endpoint control on every Laguerre critical wall:
+
+```text
+|C_d(v(c_j+iy))| <= |C_d(c_j+iy)|,
+0 <= v <= 1,  y >= 0.
+```
+
+If this holds, the whole continuous part of the mixture is bounded by
+
+```text
+(1-p)|C_d(c_j+iy)|,
+```
+
+and the atom margin is exactly
+
+```text
+(1-p)/p = 0.165821990798562...
+```
+
+relative to the atom. Fable's d=12 and d=16 referee data report precisely
+this endpoint value, flat in `d`, with the maximum attained at `v=1`.
+
+Thus the all-degree Lemma B problem should be attacked as a structural
+positivity theorem:
+
+```text
+D_d(s,q;r_j)=|P_d(z)|^2-|P_d(sz)|^2
+            =(1-s) sum_m q^m B_{d,j,m}(s),
+z=r_j-q+2i sqrt(r_j q),  s=v^2,
+```
+
+where `P_d(X)=C_d(sqrt X)` and `P_d'(r_j)=0`. We already have the real-axis
+mode and first transverse mode:
+
+```text
+B_{d,j,0} >= 0   by the Sonin energy S_d=P_d^2+4x(P_d')^2,
+B_{d,j,1} >= 0   by the weighted Sonin functional M_d.
+```
+
+The remaining proof target is the Krawtchouk wall-jet cone
+
+```text
+B_{d,j,m}(s) >= 0,   m>=2, 0<=s<=1.
+```
+
+This is now preferable to more wall-search numerics: the observed flat
+endpoint ratio says there is no hidden margin-collapse sequence to find.
+
+## 2026-06-12 Addendum: F218/KM Applicability Audit
+
+Fable's F70 no-go corrects the step-2 target. Absolute-value coefficient
+majorants are cosh-scale while wall values are cos-scale, so value-Rouche
+arguments certify only `O(log d)` cells. The far moving window must transport
+zero phase, not values.
+
+The natural model is still the critical Laguerre cell
+
+```text
+C_d(w)=const * L_d^{-1/2}(w^2/(4d)).
+```
+
+Kuijlaars-McLaughlin steepest descent gives the right asymptotic machine for
+this model. The true-xi finite edge, however, is not automatically a
+Kuijlaars-McLaughlin varying-weight orthogonal polynomial. F65 gives a
+diagonal coefficient multiplier:
+
+```text
+a_k^xi = a_k^crit * exp(-E_k),
+E_{k+1}-E_k
+  = -log[tau_xi(d,k+1)/tau_crit(D,k+1)] + const.
+```
+
+On a root-forming window `|k-kappa|<=A sqrt(kappa)`, F65 gives
+
+```text
+osc_window(E_k)
+  = O_A(1/(sqrt(kappa)W(kappa)) + kappa/d).
+```
+
+Thus the xi edge is a slowly varying amplitude perturbation of the Laguerre
+steepest-descent sum. This is close to the KM setting, but it is not
+off-the-shelf orthogonality unless one proves that this multiplier comes
+from a legitimate varying weight preserving a three-term recurrence.
+
+The corrected GPT-side lemma should be:
+
+```text
+Laguerre PR/Prüfer stability lemma.
+Let Q_d be the critical Laguerre cell polynomial and let
+Q_d^E have coefficients multiplied by exp(-E_k). If on each bulk or Airy
+root window
+
+  osc(E_k)=o(1),    osc(Delta E_k) on unit steps = o(kappa^-1/2),
+
+then the Prüfer phase of Q_d^E differs from that of Q_d by o(1) across the
+window. Hence the one-zero-per-cell count survives.
+```
+
+F65 supplies the required smallness for the moving xi edge. KM supplies the
+unperturbed critical phase and Airy parametrices. The missing proof is the
+stability bridge from coefficient multipliers to phase, not another
+absolute-value Rouche estimate.
+
+One notation point is essential for F218. If a statement perturbs adjacent
+ratios by `rho(k)e^{-delta_k}`, then the coefficient multiplier is not
+`e^{-delta_k}` but
+
+```text
+exp(-E_k),       E_k=sum_{r<=k} delta_r.
+```
+
+The affine part of `E_k` is absorbed by the F65 degree/rescale
+normalization. The phase-stability lemma must control the centered
+cumulative multiplier:
+
+```text
+osc_window(E_k)=o(1),     Delta E_k = local log-ratio error.
+```
+
+F65 supplies this centered estimate on `|k-kappa|<=A sqrt(kappa)`:
+
+```text
+osc_window(E_k)
+  = O_A(1/(sqrt(kappa)W(kappa)) + kappa/d).
+```
+
+The proof bridge should therefore apply mode concentration to
+`E(theta_E)`, then absorb the scalar part by rescaling and pass only the
+fluctuation into the Prüfer potential.
+
+The corrected cosine-mixture moment test also fits this picture. For
+
+```text
+m_k=exp(-S(k))(2k)!/(4^k k!),
+```
+
+we have exactly
+
+```text
+m_{k+1}/m_k=((2k+1)/2)exp(-C(k)).
+```
+
+With F65/F205, this grows like `const * W(2k/pi)^2`; numerically the
+constant appears to approach `e`. Therefore any Stieltjes/cosine-mixture
+representation of the true xi head has unbounded support. There is no
+finite top endpoint and no F211-style top atom. The replacement is an
+unbounded moving saddle near
+
+```text
+x_k ~= e W(2k/pi)^2,
+```
+
+which is the moment-side avatar of the same F218 phase-transport problem.
+
+Numerically, the corrected Stieltjes Hankel tests now pass to the cache
+limit:
+
+```text
+det[m_{i+j}]_{0..r}   > 0,  r=0..80,
+det[m_{i+j+1}]_{0..r} > 0,  r=0..80.
+```
+
+After positive scaling to reduce conditioning, the `r=80` determinant logs
+are
+
+```text
+ordinary: log10|det|=-3219.7807007003,
+shifted:  log10|det|=-3251.4729191866.
+```
+
+## 2026-06-12 Addendum: SRMT/WDW Gauge Lesson for F218
+
+The WDW/SRMT machinery in `mquantum` gives a useful template for F218. In
+the WDW solver, raw amplitude matching across a turning surface is unstable:
+the Stage-2 absorber damps growing and decaying Euclidean branches at the
+same rate, so a value-level match carries a boundary-condition-agnostic
+mixture. The successful fix is the Stage-3 Langer/Airy coordinate:
+
+```text
+extract oscillatory-side WKB phase coefficients,
+map them through the Airy connection formula,
+then overwrite the forbidden side with the uniform Langer basis.
+```
+
+This is the same structural correction as F70/F218. The failed F217
+value comparison is a raw-amplitude match in a cosh-scale coordinate. F218
+should instead match the critical Laguerre cell in its phase/action
+coordinate and transport Airy/Prüfer connection data.
+
+SRMT adds a second warning. Its affine metric can look good while hiding a
+physically meaningful slope in the free parameter `alpha`; the rigid metric
+is the actual conjecture test after the allowed zero-of-energy shift is
+removed. For F218, this says:
+
+```text
+constant coefficient drift = amplitude gauge;
+linear coefficient drift   = variable rescaling gauge;
+residual centered drift    = physical perturbation.
+```
+
+The linear drift may be removed only by the F65 normalization
+`D=dL(kappa)^2` and central-ratio matching. It should not be refit freely in
+each cell after seeing the zero data. After this normalization, the phase
+comparison is rigid.
+
+This gives the following precise gauge lemma.
+
+```text
+Affine-gauge lemma.
+Let
+  Q(z)=sum_k a_k z^k,
+  Q_E(z)=sum_k a_k exp(-E_k) z^k.
+If E_k=B+A(k-kappa) on the active window, then
+  Q_E(z)=exp(-B) exp(A kappa) Q(exp(-A)z)
+up to terms outside the window.
+Therefore constant and linear parts of E do not change real-root count;
+they only multiply the polynomial and rescale the root coordinate.
+```
+
+Thus the real input to F218 is not `E_k` itself but its centered residual
+
+```text
+R_k = E_k - B - A(k-kappa),
+```
+
+where `B,A` are fixed by the F65 central normalization. F65 supplies
+
+```text
+osc_window(R_k)
+  = O_A(1/(sqrt(kappa)W(kappa)) + kappa/d).
+```
+
+The Born-Oppenheimer diagnostic suggests the right norm. Let `v_z(k)` be the
+normalized critical Laguerre saddle packet on one bulk/Airy window, and
+multiply it by `exp(-R_k)`. After subtracting the packet mean of `R`,
+
+```text
+1 - |<v_z, exp(-R)v_z / ||exp(-R)v_z||>|^2
+  <= Var_{|v_z|^2}(R) + O(||R||_infty^3)
+  <= osc_window(R)^2/4 + O(osc_window(R)^3).
+```
+
+So the residual conditional state remains adiabatic in the same sense as the
+SRMT BO test. If the unperturbed Laguerre Airy packet has a uniform phase
+gap on the cell, this gives a Prüfer phase drift
+
+```text
+Delta phase = O(osc_window(R)) = o(1).
+```
+
+This is a theorem-shaped F218 bridge:
+
+```text
+F218-SRMT lemma.
+Critical Laguerre Airy/Prüfer phases are stable under coefficient
+multipliers exp(-E_k) after F65 affine-gauge removal, provided the centered
+residual R_k has o(1) oscillation on every saddle packet and the critical
+Airy packet has a nonzero local phase gap.
+```
+
+The remaining hard work is therefore local and explicit:
+
+```text
+G1. Prove the Laguerre packet phase-gap / mode-concentration estimate.
+G2. Prove that F65's centered residual bound holds uniformly across the
+    moving xi windows needed by the finite Jensen degree.
+G3. Keep the finite arithmetic content separate: low-k heads require the
+    F216-certified census, not asymptotics.
+```
+
+This aligns all three project hints:
+
+```text
+WDW Langer/Airy:     use uniform phase coordinates, not raw values.
+SRMT rigid metric:   quotient only the legitimate affine gauge.
+BO diagnostic:       after heavy phase removal, bound residual drift by a
+                     normalized packet infidelity/variance.
+```
+
+## 2026-06-12 Addendum: F220/F222 Audit and Strengthening
+
+Fable's F74 introduces a useful falsification-side instrument:
+
+```text
+Phi_q(s)=sum_k (-1)^k exp[-S(k)] q^{k^2} s^k/k!.
+```
+
+The proof debt is smaller than stated. The project's heat-line theorem
+already proves that
+
+```text
+gamma_k=q^{k^2}=exp(-Ck^2/2),    C=-2log q>=0,
+```
+
+is a Pólya-Schur multiplier sequence for every `0<q<=1`, not only below the
+ordinary partial-theta threshold. The KLV threshold concerns the ordinary
+generating function `sum q^{k^2}x^k`; the Pólya-Schur action on Jensen/LP
+entire functions uses the exponential-generating normalization. In the exact
+normalization needed here:
+
+```text
+F(s)=sum_k a_k s^k/k! in LP
+  => F_q(s)=sum_k a_k q^{k^2}s^k/k! in LP,   0<q<=1.
+```
+
+Therefore the contrapositive detector is stronger:
+
+```text
+If Phi_q has a certified nonreal zero for any 0<q<=1,
+then Phi is not in LP.
+```
+
+This is one-way only. Damping can hide nonreal zeros, so a real-zero
+`Phi_q` proves nothing about `Phi`; but a certified complex zero is
+artifact-free because the `q^{k^2}` tail is superexponentially small and can
+be bounded directly.
+
+This also changes the computational strategy. Instead of choosing the
+small KLV value `q≈0.309`, choose a sequence of `q` values tending upward:
+
+```text
+q=0.5, 0.7, 0.85, 0.93, 0.97, ...
+```
+
+Each scan is a valid one-way detector. Larger `q` is closer to the original
+head and still avoids Szegő-section artifacts once the Gaussian tail is
+certified.
+
+F222 is also adopted as a finite-census upgrade. For a real degree-`d`
+polynomial with Newton power sums
+
+```text
+p_m=sum_{r=1}^d alpha_r^m,
+```
+
+the Hermite matrix
+
+```text
+H=(p_{i+j})_{0<=i,j<d}
+```
+
+is positive semidefinite iff the polynomial is hyperbolic, with positive
+definiteness corresponding to simple real roots. The `p_m` are obtained from
+the coefficients by Newton identities, so no numerical root finder is needed.
+For Jensen sections with interval-enclosed coefficients, this gives:
+
+```text
+interval moments -> interval c_j -> interval coefficients
+-> interval Newton sums -> interval Hermite matrix PSD.
+```
+
+That is the right way to turn the finite arithmetic census into
+theorem-grade computation.
+
+F221 should remain a watch item, not a proof route. The local review already
+records the two blockers:
+
+```text
+1. The cosine transform of a measure is not the A-function of its canonical
+   system in general; the inverse spectral map is nonlinear.
+2. The corrected xi cosine/Stieltjes support is unbounded
+   (m_{k+1}/m_k~e W(2k/pi)^2), so compact top-atom transfer is unavailable.
+```
+
+The surviving value is vocabulary and possible inverse-spectral structure,
+especially for the model measure in F39/F211. It should not be used as an LP
+proof without constructing the actual canonical system and identifying the
+target entire function as its structure function.
