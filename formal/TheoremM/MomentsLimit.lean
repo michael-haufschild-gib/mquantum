@@ -328,4 +328,179 @@ lemma USeq_tendsto : Tendsto USeq atTop (nhds (1 / 2)) := by
   · filter_upwards [eventually_ge_atTop 2] with k hk
     exact USeq_upper k hk
 
+/-! ## Part 2: the Stirling form and the limit -/
+
+lemma stirlingSeq_pos {n : ℕ} (hn : 1 ≤ n) : 0 < stirlingSeq n := by
+  unfold stirlingSeq
+  have hn0 : (0 : ℝ) < n := by exact_mod_cast hn
+  have hfac : (0 : ℝ) < (n ! : ℝ) := by exact_mod_cast n.factorial_pos
+  apply div_pos hfac
+  apply mul_pos
+  · apply Real.sqrt_pos.mpr
+    positivity
+  · apply pow_pos
+    positivity
+
+/-- The factorial in logs, via the Stirling sequence. -/
+lemma log_factorial_eq {n : ℕ} (hn : 1 ≤ n) :
+    Real.log (n ! : ℝ) = Real.log (stirlingSeq n)
+      + (1 / 2) * Real.log (2 * n) + n * (Real.log n - 1) := by
+  have hn0 : (0 : ℝ) < n := by exact_mod_cast hn
+  have hs := stirlingSeq_pos hn
+  have hsqrt : (0 : ℝ) < Real.sqrt (2 * n) := by
+    apply Real.sqrt_pos.mpr
+    positivity
+  have hpow : (0 : ℝ) < ((n : ℝ) / Real.exp 1) ^ n := by
+    apply pow_pos
+    positivity
+  have hfac : (n ! : ℝ) = stirlingSeq n * (Real.sqrt (2 * n)
+      * ((n : ℝ) / Real.exp 1) ^ n) := by
+    unfold stirlingSeq
+    field_simp
+  rw [hfac, Real.log_mul hs.ne' (by positivity),
+    Real.log_mul hsqrt.ne' hpow.ne', Real.log_sqrt (by positivity),
+    Real.log_pow, Real.log_div hn0.ne' (Real.exp_pos 1).ne', Real.log_exp]
+  push_cast
+  ring
+
+/-- `S₁(k) = k(H_k − 1)` for `k ≥ 1`. -/
+lemma S1_eq_succ (j : ℕ) :
+    S1 (j + 1) = ((j : ℝ) + 1) * ((harmonic (j + 1) : ℝ) - 1) := by
+  show ((j : ℕ) + 1 : ℕ) * (harmonic j : ℝ) - (j : ℝ)
+      = ((j : ℝ) + 1) * ((harmonic (j + 1) : ℝ) - 1)
+  rw [harmonic_succ]
+  push_cast
+  have hj1 : ((j : ℝ) + 1) ≠ 0 := by positivity
+  field_simp
+  ring
+
+/-- The log-linear Stirling form of the moments. -/
+lemma M_log_form (j : ℕ) :
+    Real.log (M (j + 1)) = Real.log (stirlingSeq (2 * (j + 1)))
+      - Real.log (stirlingSeq (j + 1)) + (1 / 2) * Real.log 2
+      - USeq (j + 1) := by
+  set k : ℕ := j + 1 with hk
+  have hk1 : 1 ≤ k := by omega
+  have hk0 : (0 : ℝ) < k := by exact_mod_cast hk1
+  have hMpos := M_pos k
+  -- log M = log((2k)!) − k log 4 − log(k!) + (γk − S1 k)
+  have hfac2 : (0 : ℝ) < ((2 * k)! : ℝ) := by
+    exact_mod_cast (2 * k).factorial_pos
+  have hfac1 : (0 : ℝ) < (k ! : ℝ) := by exact_mod_cast k.factorial_pos
+  have hlogM : Real.log (M k) = Real.log ((2 * k)! : ℝ)
+      + (Real.eulerMascheroniConstant * k - S1 k)
+      - ((k : ℝ) * Real.log 4 + Real.log (k ! : ℝ)) := by
+    unfold M
+    rw [Real.log_div (by positivity) (by positivity),
+      Real.log_mul hfac2.ne' (Real.exp_pos _).ne', Real.log_exp,
+      Real.log_mul (by positivity) hfac1.ne', Real.log_pow]
+    push_cast
+    ring
+  have hL2 := log_factorial_eq (show 1 ≤ 2 * k by omega)
+  have hL1 := log_factorial_eq hk1
+  have hS1 : S1 k = (k : ℝ) * ((harmonic k : ℝ) - 1) := by
+    rw [hk]
+    exact S1_eq_succ j
+  have hU : USeq k = k * ((harmonic k : ℝ)
+      - Real.eulerMascheroniConstant - Real.log k) := rfl
+  -- log-arithmetic side identities
+  have hlog4 : Real.log (4 : ℝ) = 2 * Real.log 2 := by
+    rw [show (4 : ℝ) = 2 ^ 2 by norm_num, Real.log_pow]
+    push_cast
+    ring
+  have hlog4k : Real.log (2 * (2 * k : ℕ) : ℝ)
+      = 2 * Real.log 2 + Real.log k := by
+    push_cast
+    rw [show (2 : ℝ) * (2 * k) = 2 ^ 2 * k by ring,
+      Real.log_mul (by positivity) hk0.ne', Real.log_pow]
+    push_cast
+    ring
+  have hlog2k : Real.log (2 * (k : ℕ) : ℝ) = Real.log 2 + Real.log k := by
+    push_cast
+    rw [Real.log_mul (by norm_num) hk0.ne']
+  have hcast2k : ((2 * k : ℕ) : ℝ) = 2 * (k : ℝ) := by push_cast; ring
+  have hlog2k' : Real.log ((2 * k : ℕ) : ℝ) = Real.log 2 + Real.log k := by
+    rw [hcast2k, Real.log_mul (by norm_num) hk0.ne']
+  rw [hlogM, hL2, hL1]
+  rw [hlog4k, hlog2k, hlog4, hS1, hU, hlog2k', hcast2k]
+  ring
+
+/-- The Stirling form of the moments. -/
+lemma M_eq_form (j : ℕ) :
+    M (j + 1) = stirlingSeq (2 * (j + 1)) / stirlingSeq (j + 1)
+      * Real.sqrt 2 * Real.exp (-USeq (j + 1)) := by
+  set k : ℕ := j + 1 with hk
+  have hk1 : 1 ≤ k := by omega
+  have hs2 := stirlingSeq_pos (show 1 ≤ 2 * k by omega)
+  have hs1 := stirlingSeq_pos hk1
+  have hMpos := M_pos k
+  have hRpos : 0 < stirlingSeq (2 * k) / stirlingSeq k
+      * Real.sqrt 2 * Real.exp (-USeq k) := by
+    have h2 : (0 : ℝ) < Real.sqrt 2 := by
+      apply Real.sqrt_pos.mpr; norm_num
+    positivity
+  apply Real.log_injOn_pos (Set.mem_Ioi.mpr hMpos) (Set.mem_Ioi.mpr hRpos)
+  rw [hk] at *
+  rw [M_log_form j]
+  rw [Real.log_mul (by positivity) (Real.exp_pos _).ne',
+    Real.log_mul (div_pos hs2 hs1).ne' (by
+      apply (Real.sqrt_pos.mpr _).ne'
+      norm_num),
+    Real.log_div hs2.ne' hs1.ne', Real.log_exp,
+    Real.log_sqrt (by norm_num)]
+  ring
+
+/-- `√2·e^{−1/2} = pAtom`. -/
+lemma pAtom_eq_sqrt_two_exp :
+    pAtom = Real.sqrt 2 * Real.exp (-(1 / 2 : ℝ)) := by
+  unfold pAtom
+  have hy : (0 : ℝ) ≤ Real.exp (-(1 / 2 : ℝ)) := (Real.exp_pos _).le
+  have hsq : Real.exp (-(1 / 2 : ℝ)) ^ 2 = 1 / Real.exp 1 := by
+    rw [show Real.exp (-(1 / 2 : ℝ)) ^ 2
+        = Real.exp (-(1 / 2 : ℝ)) * Real.exp (-(1 / 2 : ℝ)) by ring,
+      ← Real.exp_add]
+    rw [show -(1 / 2 : ℝ) + -(1 / 2) = -1 by norm_num, Real.exp_neg]
+    simp
+  have harg : 2 / Real.exp 1 = 2 * Real.exp (-(1 / 2 : ℝ)) ^ 2 := by
+    rw [hsq]
+    ring
+  rw [harg, Real.sqrt_mul (by norm_num), Real.sqrt_sq hy]
+
+/-- The doubling map tends to infinity. -/
+private lemma tendsto_two_mul_atTop :
+    Tendsto (fun k : ℕ => 2 * k) atTop atTop := by
+  apply Filter.tendsto_atTop_atTop.mpr
+  intro b
+  exact ⟨b, fun a ha => by omega⟩
+
+/-- **The Stirling limit: `M → pAtom`.** Closes the hypothesis of
+`M_gt_pAtom_of_tendsto`. -/
+theorem M_tendsto : Tendsto M atTop (nhds pAtom) := by
+  have hpi : Real.sqrt Real.pi ≠ 0 := by
+    apply (Real.sqrt_pos.mpr Real.pi_pos).ne'
+  have h2k : Tendsto (fun k : ℕ => stirlingSeq (2 * k)) atTop
+      (nhds (Real.sqrt Real.pi)) :=
+    tendsto_stirlingSeq_sqrt_pi.comp tendsto_two_mul_atTop
+  have hratio : Tendsto (fun k : ℕ => stirlingSeq (2 * k) / stirlingSeq k)
+      atTop (nhds 1) := by
+    have h := h2k.div tendsto_stirlingSeq_sqrt_pi hpi
+    rwa [div_self hpi] at h
+  have hexp : Tendsto (fun k : ℕ => Real.exp (-USeq k)) atTop
+      (nhds (Real.exp (-(1 / 2 : ℝ)))) := by
+    have h := USeq_tendsto.neg
+    exact (Real.continuous_exp.tendsto _).comp h
+  have hprod : Tendsto (fun k : ℕ => stirlingSeq (2 * k) / stirlingSeq k
+      * Real.sqrt 2 * Real.exp (-USeq k)) atTop
+      (nhds (1 * Real.sqrt 2 * Real.exp (-(1 / 2 : ℝ)))) :=
+    (hratio.mul_const _).mul hexp
+  rw [one_mul, ← pAtom_eq_sqrt_two_exp] at hprod
+  apply hprod.congr'
+  filter_upwards [eventually_ge_atTop 1] with k hk
+  obtain ⟨j, rfl⟩ : ∃ j, k = j + 1 := ⟨k - 1, by omega⟩
+  exact (M_eq_form j).symm
+
+/-- **Unconditional residual-moment positivity**: `pAtom < M k`. -/
+theorem M_gt_pAtom (k : ℕ) : pAtom < M k :=
+  M_gt_pAtom_of_tendsto M_tendsto k
+
 end TheoremM
