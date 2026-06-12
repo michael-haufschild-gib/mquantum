@@ -956,6 +956,170 @@ T_A = O(exp(-cA^2)/A),
 so fixed `A` can make the tail arbitrarily small, and moving `A` is governed
 only by the local-error condition `eps A^2 -> 0` from (BETA).
 
+## 5i. Boundary-Weight Derivative Formula
+
+The first task in §5h is not mysterious: for each fixed boundary point it is
+an exact Stieltjes-transform estimate.
+
+Write the critical atom polynomial as
+
+```text
+C_d(z)=prod_{m=1}^d (1-z^2/rho_m^2),
+psi_d(z)=C_d'(z)/C_d(z),
+```
+
+and fix a Theorem-M boundary point `w` that is not on a zero. For
+`z=e^theta w`, define
+
+```text
+b_w(theta)=log |C_d(e^theta w)|.
+```
+
+Then
+
+```text
+b_w'(theta)
+ = Re[z psi_d(z)]
+ = Re sum_m 2z^2/(z^2-rho_m^2),                     (BW1)
+
+b_w''(theta)
+ = Re[z psi_d(z)+z^2 psi_d'(z)]
+ = Re sum_m -4 rho_m^2 z^2/(z^2-rho_m^2)^2.          (BW2)
+```
+
+Equivalently, with `X=z^2` and `G_d(X)=sum_m 1/(X-rho_m^2)`,
+
+```text
+b_w'(theta)  = Re[2X G_d(X)],
+b_w''(theta) = Re[4X G_d(X)+4X^2 G_d'(X)].           (BW3)
+```
+
+Proof: differentiate `log |C_d(z)|` along the dilation vector
+`d/dtheta=z d/dz`, then use the product formula for `C_d`.
+
+Thus the boundary-weight curvature needed in §5h is controlled by a second
+Stieltjes transform of the Laguerre-zero measure. This is a sharper target
+than the existing W2' bound, which controls first-transform size. A direct
+route to `(T)` is therefore:
+
+```text
+W2'' target:
+  for every relevant wall/cap boundary point w and weighted-saddle theta,
+  Re sum_m -4 rho_m^2 z^2/(z^2-rho_m^2)^2
+  <= beta/sigma^2,
+  with beta strictly below the positive-kernel curvature lambda.
+```
+
+There is one extra issue: `B_{d,H}(theta)=sup_w b_w(theta)` may be
+nonsmooth. A sufficient supremum criterion is local near-active stability:
+for every `w` with
+
+```text
+b_w(theta_0) >= B_{d,H}(theta_0)-O(1),
+```
+
+the slope and curvature bounds
+
+```text
+|b_w'(theta_0)-p| <= L_A/sigma,
+b_w''(theta) <= beta/sigma^2
+```
+
+hold on the same normalized packet, for some common subgradient `p` of the
+upper envelope. Then
+
+```text
+B_{d,H}(theta_0+sigma x)-B_{d,H}(theta_0)-p sigma x
+ <= L_A |x| + (beta/2)x^2 + O(1),
+```
+
+and the linear term is absorbed by the weighted saddle equation. If the
+near-active slope spread is `O(eps/sigma)`, it becomes part of the local
+`Q` residual already tracked in §5g.
+
+So the tail program splits cleanly:
+
+```text
+1. prove BW2/BW3 curvature bounds for fixed boundary points;
+2. prove near-active slope stability for the boundary supremum;
+3. compare the resulting beta with the kernel action curvature lambda.
+```
+
+This is where Theorem-M's wall/cap Stieltjes technology should re-enter
+Lane B. The old W2' spacing/PV estimates are first-derivative input; the new
+missing estimate is the second-transform curvature bound in (BW2).
+
+## 5j. WDW/SRMT Gauge Rule for Lane B
+
+The Wheeler-DeWitt curvature-jet note and the SRMT rigid-vs-affine diagnostic
+give one useful rule for this proof: affine agreement is not physical unless
+the affine action has been explicitly removed as a gauge.
+
+For a local section
+
+```text
+Q(t)=sum_k c_k t^k,
+```
+
+multiplying the coefficients by an affine exponential gives
+
+```text
+Q_{A,B,kappa}(t)
+ = sum_k c_k exp(B+A(k-kappa)) t^k
+ = exp(B-Akappa) Q(exp(A)t).                         (GA0)
+```
+
+Thus the constant coefficient jet changes only amplitude, and the linear jet
+changes only the positive variable scale. Neither can change real-rootedness
+or the cell zero count. In the F65 notation
+
+```text
+E_k = B + A(k-kappa) + R_k,
+```
+
+only the centered residual `R_k` is physical. This is exactly the SRMT warning:
+an unconstrained affine fit can make two spectra look equivalent while hiding
+a scale error. The Lane-B analogue of a rigid diagnostic is therefore not
+least-squares agreement of raw `E_k`, but small normalized residual jets
+
+```text
+|R^(r)(k)| sigma_k^r,       r>=2,
+```
+
+after the affine projection has been fixed.
+
+The WDW/Airy-Langer lesson is similar for contour estimates. Matching values
+across a turning surface is weak; matching the normal-form action is stable.
+For Lane B this gives the following rule.
+
+**Normal-form contour rule.** If the reference saddle is uniformly strict
+(`A_0''>=m>0`), use the Gaussian/Bromwich normal form in §5e. If the saddle
+approaches an Airy or higher turning regime, replace the Gaussian coordinate
+by the appropriate normal-form coordinate `s` and prove, on the corresponding
+steepest contour,
+
+```text
+R(k_0+Delta k(s))-R(k_0)-R'(k_0)Delta k(s)
+  = O(eps)
+```
+
+together with the same dominated-contour envelope. The deterministic
+log-Lipschitz proof in §5e then goes through with the Gaussian expectation
+replaced by the normal-form contour integral, provided the denominator stays
+bounded away from zero.
+
+This is not an additional proof assumption. It is a routing rule:
+
+```text
+strict saddle    -> Gaussian cumulants, §5e-§5f;
+turning saddle   -> Airy/Langer normal form, same affine-gauge residual;
+all regimes      -> affine terms are gauge, centered residual jets are data.
+```
+
+So WDW/SRMT does not supply RH evidence by analogy. It supplies a discipline
+for the remaining estimates: never close `(D)` or `(C)` with an affine fit, and
+do not use raw value matching where the saddle normal form changes.
+
 ## 6. Why This Is Not Yet a Proof
 
 G2 is a coefficient-window theorem. It controls the centered cumulative
