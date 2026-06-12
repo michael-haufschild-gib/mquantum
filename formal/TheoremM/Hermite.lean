@@ -80,9 +80,86 @@ lemma hermite_odeR (n : ℕ) :
 abbrev HermiteR (n : ℕ) : Polynomial ℝ :=
   (Polynomial.hermite n).map (Int.castRingHom ℝ)
 
+/-- Hermite roots sorted increasingly. This is the ordered root list used by
+the real-rootedness induction. -/
+abbrev HermiteRRootsSorted (n : ℕ) : List ℝ :=
+  (HermiteR n).roots.sort (fun x y : ℝ => x ≤ y)
+
 /-- Real-coefficient Hermite polynomials are monic. -/
 lemma hermiteR_monic (n : ℕ) : (HermiteR n).Monic := by
   exact (Polynomial.hermite_monic n).map (Int.castRingHom ℝ)
+
+/-- Real Hermite polynomials have degree `n`. -/
+lemma hermiteR_natDegree (n : ℕ) : (HermiteR n).natDegree = n := by
+  unfold HermiteR
+  rw [(Polynomial.hermite_monic n).natDegree_map (Int.castRingHom ℝ)]
+  simp
+
+/-- Real Hermite polynomials are nonzero. -/
+lemma hermiteR_ne_zero (n : ℕ) : HermiteR n ≠ 0 :=
+  (hermiteR_monic n).ne_zero
+
+/-- Root count is bounded by the Hermite degree. -/
+lemma hermiteR_roots_card_le (n : ℕ) : (HermiteR n).roots.card ≤ n := by
+  simpa [hermiteR_natDegree n] using Polynomial.card_roots' (HermiteR n)
+
+/-- Length of the sorted Hermite-root list. -/
+lemma hermiteRRootsSorted_length (n : ℕ) :
+    (HermiteRRootsSorted n).length = (HermiteR n).roots.card := by
+  simp [HermiteRRootsSorted]
+
+/-- Membership in the sorted Hermite-root list is membership in the root
+multiset. -/
+lemma mem_hermiteRRootsSorted_iff (n : ℕ) {x : ℝ} :
+    x ∈ HermiteRRootsSorted n ↔ x ∈ (HermiteR n).roots := by
+  simp [HermiteRRootsSorted]
+
+/-- An indexed element of the sorted Hermite-root list is a root. -/
+lemma hermiteRRootsSorted_get_mem_roots (n : ℕ) {i : ℕ}
+    (hi : i < (HermiteRRootsSorted n).length) :
+    (HermiteRRootsSorted n)[i]'hi ∈ (HermiteR n).roots := by
+  rw [← mem_hermiteRRootsSorted_iff n]
+  exact List.getElem_mem _
+
+/-- For real Hermite, splitting is equivalent to having the full number of
+roots counted with multiplicity. -/
+lemma hermiteR_splits_iff_card_roots (n : ℕ) :
+    (HermiteR n).Splits ↔ (HermiteR n).roots.card = n := by
+  rw [Polynomial.splits_iff_card_roots, hermiteR_natDegree]
+
+/-- Base polynomial `H_0 = 1`. -/
+lemma hermiteR_zero : HermiteR 0 = 1 := by
+  simp [HermiteR]
+
+/-- Base polynomial `H_1 = X`. -/
+lemma hermiteR_one : HermiteR 1 = X := by
+  simp [HermiteR]
+
+/-- `H_0` splits. -/
+lemma hermiteR_splits_zero : (HermiteR 0).Splits := by
+  rw [hermiteR_zero]
+  exact Polynomial.Splits.one
+
+/-- `H_1` splits. -/
+lemma hermiteR_splits_one : (HermiteR 1).Splits := by
+  rw [hermiteR_one]
+  exact Polynomial.Splits.X
+
+/-- `H_0` has no roots. -/
+lemma hermiteR_card_roots_zero : (HermiteR 0).roots.card = 0 := by
+  rw [← hermiteR_splits_zero.natDegree_eq_card_roots, hermiteR_natDegree]
+
+/-- `H_1` has one root. -/
+lemma hermiteR_card_roots_one : (HermiteR 1).roots.card = 1 := by
+  rw [← hermiteR_splits_one.natDegree_eq_card_roots, hermiteR_natDegree]
+
+/-- `H_0` has no repeated roots. -/
+lemma hermiteR_roots_nodup_zero : (HermiteR 0).roots.Nodup := by
+  simp [hermiteR_zero]
+
+/-- `H_1` has no repeated roots. -/
+lemma hermiteR_roots_nodup_one : (HermiteR 1).roots.Nodup := by
+  simp [hermiteR_one]
 
 /-- The Hermite recurrence over real coefficients:
 `H_{n+1}=X*H_n-H_n'`. -/
@@ -636,6 +713,57 @@ lemma sortedLT_mem_left_of_last
   have hout := hs.getElem_lt_getElem_of_lt (i := j) (j := i) (hi := hj) (hj := hi) hlt
   simpa [hjc] using hout
 
+/-- A point left of the first element of a sorted list lies left of every
+point between an adjacent pair. -/
+lemma sortedLT_left_tail_lt_between
+    {l : List ℝ} (hs : l.SortedLT) (h0 : 0 < l.length) {i : ℕ}
+    (hi : i + 1 < l.length) {x y : ℝ}
+    (hx : x < l[0]) (hy : l[i] < y ∧ y < l[i + 1]) :
+    x < y := by
+  have h0i : l[0] ≤ l[i] :=
+    hs.sortedLE.getElem_le_getElem_of_le (i := 0) (j := i)
+      (hi := h0) (hj := by omega) (by omega)
+  linarith
+
+/-- A point between an earlier adjacent pair of a sorted list lies left of a
+point between a later adjacent pair. -/
+lemma sortedLT_between_lt_between_of_index_lt
+    {l : List ℝ} (hs : l.SortedLT) {i j : ℕ}
+    (hi : i + 1 < l.length) (hj : j + 1 < l.length) (hij : i < j)
+    {x y : ℝ}
+    (hx : l[i] < x ∧ x < l[i + 1])
+    (hy : l[j] < y ∧ y < l[j + 1]) :
+    x < y := by
+  have hbridge : l[i + 1] ≤ l[j] :=
+    hs.sortedLE.getElem_le_getElem_of_le (i := i + 1) (j := j)
+      (hi := hi) (hj := by omega) (by omega)
+  linarith
+
+/-- A point between an adjacent pair of a sorted list lies left of every point
+right of the last element. -/
+lemma sortedLT_between_lt_right_tail
+    {l : List ℝ} (hs : l.SortedLT) {i last : ℕ}
+    (hi : i + 1 < l.length) (hlast : last < l.length)
+    (hlast_eq : last + 1 = l.length) {x y : ℝ}
+    (hx : l[i] < x ∧ x < l[i + 1]) (hy : l[last] < y) :
+    x < y := by
+  have hbridge : l[i + 1] ≤ l[last] :=
+    hs.sortedLE.getElem_le_getElem_of_le (i := i + 1) (j := last)
+      (hi := hi) (hj := hlast) (by omega)
+  linarith
+
+/-- A point left of the first element lies left of every point right of the
+last element of a nonempty sorted list. -/
+lemma sortedLT_left_tail_lt_right_tail
+    {l : List ℝ} (hs : l.SortedLT) (h0 : 0 < l.length) {last : ℕ}
+    (hlast : last < l.length) (hlast_eq : last + 1 = l.length)
+    {x y : ℝ} (hx : x < l[0]) (hy : l[last] < y) :
+    x < y := by
+  have hbridge : l[0] ≤ l[last] :=
+    hs.sortedLE.getElem_le_getElem_of_le (i := 0) (j := last)
+      (hi := h0) (hj := hlast) (by omega)
+  linarith
+
 /-- Sorting a nodup multiset by `≤` gives a strictly sorted list. This is the
 simple-root bridge from multiset roots to ordered root lists. -/
 lemma sortedLT_sort_le_of_nodup (s : Multiset ℝ) (hnd : s.Nodup) :
@@ -645,6 +773,12 @@ lemma sortedLT_sort_le_of_nodup (s : Multiset ℝ) (hnd : s.Nodup) :
   · rw [← Multiset.coe_nodup]
     rw [Multiset.sort_eq]
     exact hnd
+
+/-- If the Hermite roots are nodup, their sorted list is strictly increasing. -/
+lemma hermiteRRootsSorted_sortedLT (n : ℕ)
+    (hnd : (HermiteR n).roots.Nodup) :
+    (HermiteRRootsSorted n).SortedLT := by
+  simpa [HermiteRRootsSorted] using sortedLT_sort_le_of_nodup (HermiteR n).roots hnd
 
 /-- Direct sorted-multiset outside-gap bridge for adjacent indices in
 `s.sort (· ≤ ·)`. -/
@@ -658,7 +792,7 @@ lemma sortedLT_sort_le_erase_erase_outside_adjacent
         (s.sort (fun x y : ℝ => x ≤ y))[i + 1]'hi < c :=
   sortedLT_erase_erase_outside_adjacent_of_mem_iff
     (sortedLT_sort_le_of_nodup s hnd) hnd
-    (fun c => by simpa [Multiset.mem_sort]) hi
+    (fun c => by simp [Multiset.mem_sort]) hi
 
 /-- The same outside-gap bridge for a strictly sorted view of a multiset. -/
 lemma sortedLT_sort_mem_outside_adjacent
@@ -926,6 +1060,598 @@ lemma exists_root_left_hermiteR_succ_of_leftmost_root
     exists_root_left_X_mul_sub_derivative_of_monic_splits_leftmost_root
       (hermiteR_monic n) hsplits ha hleft hcard
   exact ⟨x, hxa, by simpa [hermiteR_succ] using hxroot⟩
+
+/-- Indexed adjacent-root insertion for the sorted Hermite roots. If
+`H_n` splits with nodup roots, then each adjacent pair in the sorted root list
+brackets a root of `H_{n+1}`. -/
+lemma exists_root_between_hermiteR_succ_of_sorted_adjacent
+    (n : ℕ) (hsplits : (HermiteR n).Splits)
+    (hnd : (HermiteR n).roots.Nodup) {i : ℕ}
+    (hi : i + 1 < (HermiteRRootsSorted n).length) :
+    ∃ x, (HermiteRRootsSorted n)[i]'(by omega) < x ∧
+      x < (HermiteRRootsSorted n)[i + 1]'hi ∧
+      (HermiteR (n + 1)).eval x = 0 := by
+  have hsorted := hermiteRRootsSorted_sortedLT n hnd
+  have hab :
+      (HermiteRRootsSorted n)[i]'(by omega) <
+        (HermiteRRootsSorted n)[i + 1]'hi :=
+    hsorted.getElem_lt_getElem_of_lt (i := i) (j := i + 1)
+      (hi := by omega) (hj := hi) (by omega)
+  have ha :
+      (HermiteRRootsSorted n)[i]'(by omega) ∈ (HermiteR n).roots :=
+    hermiteRRootsSorted_get_mem_roots n (i := i) (by omega)
+  have hbroot :
+      (HermiteRRootsSorted n)[i + 1]'hi ∈ (HermiteR n).roots :=
+    hermiteRRootsSorted_get_mem_roots n (i := i + 1) hi
+  have hb :
+      (HermiteRRootsSorted n)[i + 1]'hi ∈
+        (HermiteR n).roots.erase ((HermiteRRootsSorted n)[i]'(by omega)) := by
+    rw [Multiset.mem_erase_of_ne (ne_of_gt hab)]
+    exact hbroot
+  have hgap :
+      ∀ c ∈
+          ((HermiteR n).roots.erase ((HermiteRRootsSorted n)[i]'(by omega))).erase
+            ((HermiteRRootsSorted n)[i + 1]'hi),
+        c < (HermiteRRootsSorted n)[i]'(by omega) ∨
+          (HermiteRRootsSorted n)[i + 1]'hi < c := by
+    simpa [HermiteRRootsSorted] using
+      sortedLT_sort_le_erase_erase_outside_adjacent (HermiteR n).roots hnd
+        (i := i) (by simpa [HermiteRRootsSorted] using hi)
+  exact exists_root_between_hermiteR_succ_of_adjacent_roots
+    n hsplits hab ha hb hgap
+
+/-- Left-tail insertion for the first element of the sorted Hermite root list. -/
+lemma exists_root_left_hermiteR_succ_of_sorted_first
+    (n : ℕ) (hsplits : (HermiteR n).Splits)
+    (hnd : (HermiteR n).roots.Nodup)
+    (h0 : 0 < (HermiteRRootsSorted n).length) :
+    ∃ x, x < (HermiteRRootsSorted n)[0]'h0 ∧
+      (HermiteR (n + 1)).eval x = 0 := by
+  have hsorted := hermiteRRootsSorted_sortedLT n hnd
+  have ha :
+      (HermiteRRootsSorted n)[0]'h0 ∈ (HermiteR n).roots :=
+    hermiteRRootsSorted_get_mem_roots n (i := 0) h0
+  have hleft :
+      ∀ b ∈ (HermiteR n).roots.erase ((HermiteRRootsSorted n)[0]'h0),
+        (HermiteRRootsSorted n)[0]'h0 < b := by
+    intro b hb
+    have hbroot : b ∈ (HermiteR n).roots := Multiset.mem_of_mem_erase hb
+    have hbne : b ≠ (HermiteRRootsSorted n)[0]'h0 := (hnd.mem_erase_iff.mp hb).1
+    exact sortedLT_mem_right_of_first hsorted h0
+      ((mem_hermiteRRootsSorted_iff n).mpr hbroot) hbne
+  have hcard :
+      ((HermiteR n).roots.erase ((HermiteRRootsSorted n)[0]'h0)).card + 1 =
+        (HermiteR n).natDegree := by
+    have h := Multiset.card_erase_add_one ha
+    rwa [← hsplits.natDegree_eq_card_roots] at h
+  exact exists_root_left_hermiteR_succ_of_leftmost_root n hsplits ha hleft hcard
+
+/-- Right-tail insertion for the last element of the sorted Hermite root list. -/
+lemma exists_root_right_hermiteR_succ_of_sorted_last
+    (n : ℕ) (hsplits : (HermiteR n).Splits)
+    (hnd : (HermiteR n).roots.Nodup) {i : ℕ}
+    (hi : i < (HermiteRRootsSorted n).length)
+    (hlast : i + 1 = (HermiteRRootsSorted n).length) :
+    ∃ x, (HermiteRRootsSorted n)[i]'hi < x ∧
+      (HermiteR (n + 1)).eval x = 0 := by
+  have hsorted := hermiteRRootsSorted_sortedLT n hnd
+  have ha :
+      (HermiteRRootsSorted n)[i]'hi ∈ (HermiteR n).roots :=
+    hermiteRRootsSorted_get_mem_roots n (i := i) hi
+  have hright :
+      ∀ b ∈ (HermiteR n).roots.erase ((HermiteRRootsSorted n)[i]'hi),
+        b < (HermiteRRootsSorted n)[i]'hi := by
+    intro b hb
+    have hbroot : b ∈ (HermiteR n).roots := Multiset.mem_of_mem_erase hb
+    have hbne : b ≠ (HermiteRRootsSorted n)[i]'hi := (hnd.mem_erase_iff.mp hb).1
+    exact sortedLT_mem_left_of_last hsorted hi hlast
+      ((mem_hermiteRRootsSorted_iff n).mpr hbroot) hbne
+  exact exists_root_right_hermiteR_succ_of_rightmost_root n hsplits ha hright
+
+/-- The sorted left/gap/right construction gives `length + 1` distinct roots
+of the next Hermite polynomial. This is the finite-count object needed to
+turn the insertion lemmas into the real-rootedness induction. -/
+lemma exists_finset_roots_hermiteR_succ_card
+    (n : ℕ) (hsplits : (HermiteR n).Splits)
+    (hnd : (HermiteR n).roots.Nodup)
+    (h0 : 0 < (HermiteRRootsSorted n).length) :
+    ∃ S : Finset ℝ,
+      S.card = (HermiteRRootsSorted n).length + 1 ∧
+      ∀ x ∈ S, (HermiteR (n + 1)).eval x = 0 := by
+  classical
+  let m : ℕ := (HermiteRRootsSorted n).length
+  have hm0 : 0 < m := by simpa [m] using h0
+  have hsorted := hermiteRRootsSorted_sortedLT n hnd
+  let leftExists := exists_root_left_hermiteR_succ_of_sorted_first n hsplits hnd h0
+  let left : ℝ := Classical.choose leftExists
+  have leftSpec : left < (HermiteRRootsSorted n)[0]'h0 ∧
+      (HermiteR (n + 1)).eval left = 0 :=
+    Classical.choose_spec leftExists
+  have hlast_idx : m - 1 < (HermiteRRootsSorted n).length := by
+    dsimp [m]
+    omega
+  have hlast_eq : (m - 1) + 1 = (HermiteRRootsSorted n).length := by
+    dsimp [m]
+    omega
+  let rightExists :=
+    exists_root_right_hermiteR_succ_of_sorted_last n hsplits hnd
+      (i := m - 1) hlast_idx hlast_eq
+  let right : ℝ := Classical.choose rightExists
+  have rightSpec : (HermiteRRootsSorted n)[m - 1]'hlast_idx < right ∧
+      (HermiteR (n + 1)).eval right = 0 :=
+    Classical.choose_spec rightExists
+  have hgapIndex (k : Fin (m - 1)) :
+      k.1 + 1 < (HermiteRRootsSorted n).length := by
+    dsimp [m] at k
+    omega
+  let gapExists (k : Fin (m - 1)) :=
+    exists_root_between_hermiteR_succ_of_sorted_adjacent n hsplits hnd
+      (i := k.1) (hgapIndex k)
+  let gap (k : Fin (m - 1)) : ℝ := Classical.choose (gapExists k)
+  have gapSpec (k : Fin (m - 1)) :
+      (HermiteRRootsSorted n)[k.1]'(by omega) < gap k ∧
+        gap k < (HermiteRRootsSorted n)[k.1 + 1]'(hgapIndex k) ∧
+        (HermiteR (n + 1)).eval (gap k) = 0 :=
+    Classical.choose_spec (gapExists k)
+  have hgap_inj : Function.Injective gap := by
+    intro a b hab
+    by_cases hlt : a.1 < b.1
+    · have hlt_gap : gap a < gap b :=
+        sortedLT_between_lt_between_of_index_lt hsorted
+          (hgapIndex a) (hgapIndex b) hlt
+          ⟨(gapSpec a).1, (gapSpec a).2.1⟩
+          ⟨(gapSpec b).1, (gapSpec b).2.1⟩
+      linarith
+    · by_cases hgt : b.1 < a.1
+      · have hlt_gap : gap b < gap a :=
+          sortedLT_between_lt_between_of_index_lt hsorted
+            (hgapIndex b) (hgapIndex a) hgt
+            ⟨(gapSpec b).1, (gapSpec b).2.1⟩
+            ⟨(gapSpec a).1, (gapSpec a).2.1⟩
+        linarith
+      · apply Fin.ext
+        omega
+  let gapSet : Finset ℝ := Finset.univ.image gap
+  have hgapcard : gapSet.card = m - 1 := by
+    calc
+      gapSet.card = (Finset.univ : Finset (Fin (m - 1))).card := by
+        dsimp [gapSet]
+        exact Finset.card_image_of_injective _ hgap_inj
+      _ = m - 1 := by simp
+  have hleft_lt_gap (k : Fin (m - 1)) : left < gap k := by
+    exact sortedLT_left_tail_lt_between hsorted h0 (hgapIndex k)
+      leftSpec.1 ⟨(gapSpec k).1, (gapSpec k).2.1⟩
+  have hgap_lt_right (k : Fin (m - 1)) : gap k < right := by
+    exact sortedLT_between_lt_right_tail hsorted (hgapIndex k)
+      hlast_idx hlast_eq ⟨(gapSpec k).1, (gapSpec k).2.1⟩ rightSpec.1
+  have hleft_lt_right : left < right := by
+    exact sortedLT_left_tail_lt_right_tail hsorted h0 hlast_idx hlast_eq
+      leftSpec.1 rightSpec.1
+  have hleft_not_gap : left ∉ gapSet := by
+    intro hmem
+    rcases Finset.mem_image.mp hmem with ⟨k, _hk, hk⟩
+    have hlt := hleft_lt_gap k
+    linarith
+  have hright_not_gap : right ∉ gapSet := by
+    intro hmem
+    rcases Finset.mem_image.mp hmem with ⟨k, _hk, hk⟩
+    have hlt := hgap_lt_right k
+    linarith
+  have hleft_ne_right : left ≠ right := ne_of_lt hleft_lt_right
+  let S : Finset ℝ := insert left (insert right gapSet)
+  refine ⟨S, ?_, ?_⟩
+  · have hleft_not : left ∉ insert right gapSet := by
+      simp [hleft_ne_right, hleft_not_gap]
+    calc
+      S.card = (insert right gapSet).card + 1 := by
+        dsimp [S]
+        exact Finset.card_insert_of_notMem hleft_not
+      _ = gapSet.card + 2 := by
+        rw [Finset.card_insert_of_notMem hright_not_gap]
+      _ = (HermiteRRootsSorted n).length + 1 := by
+        rw [hgapcard]
+        dsimp [m]
+        omega
+  · intro x hx
+    dsimp [S] at hx
+    rw [Finset.mem_insert] at hx
+    rcases hx with rfl | hx
+    · exact leftSpec.2
+    rw [Finset.mem_insert] at hx
+    rcases hx with rfl | hx
+    · exact rightSpec.2
+    rcases Finset.mem_image.mp hx with ⟨k, _hk, hkx⟩
+    rw [← hkx]
+    exact (gapSpec k).2.2
+
+/-- The sorted left/gap/right construction also counts exactly the successor
+roots above any selected old root. This is the filter-card shape consumed by
+the sign-count engine. -/
+lemma exists_finset_roots_hermiteR_succ_card_count_above
+    (n : ℕ) (hsplits : (HermiteR n).Splits)
+    (hnd : (HermiteR n).roots.Nodup)
+    (h0 : 0 < (HermiteRRootsSorted n).length) {i : ℕ}
+    (hi : i < (HermiteRRootsSorted n).length) :
+    ∃ S : Finset ℝ,
+      S.card = (HermiteRRootsSorted n).length + 1 ∧
+      (∀ x ∈ S, (HermiteR (n + 1)).eval x = 0) ∧
+      (S.filter (fun r => (HermiteRRootsSorted n)[i]'hi < r)).card =
+        (HermiteRRootsSorted n).length - i := by
+  classical
+  let m : ℕ := (HermiteRRootsSorted n).length
+  have hm0 : 0 < m := by simpa [m] using h0
+  have hi_m : i < m := by simpa [m] using hi
+  have hsorted := hermiteRRootsSorted_sortedLT n hnd
+  let leftExists := exists_root_left_hermiteR_succ_of_sorted_first n hsplits hnd h0
+  let left : ℝ := Classical.choose leftExists
+  have leftSpec : left < (HermiteRRootsSorted n)[0]'h0 ∧
+      (HermiteR (n + 1)).eval left = 0 :=
+    Classical.choose_spec leftExists
+  have hlast_idx : m - 1 < (HermiteRRootsSorted n).length := by
+    dsimp [m]
+    omega
+  have hlast_eq : (m - 1) + 1 = (HermiteRRootsSorted n).length := by
+    dsimp [m]
+    omega
+  let rightExists :=
+    exists_root_right_hermiteR_succ_of_sorted_last n hsplits hnd
+      (i := m - 1) hlast_idx hlast_eq
+  let right : ℝ := Classical.choose rightExists
+  have rightSpec : (HermiteRRootsSorted n)[m - 1]'hlast_idx < right ∧
+      (HermiteR (n + 1)).eval right = 0 :=
+    Classical.choose_spec rightExists
+  have hgapIndex (k : Fin (m - 1)) :
+      k.1 + 1 < (HermiteRRootsSorted n).length := by
+    dsimp [m] at k
+    omega
+  let gapExists (k : Fin (m - 1)) :=
+    exists_root_between_hermiteR_succ_of_sorted_adjacent n hsplits hnd
+      (i := k.1) (hgapIndex k)
+  let gap (k : Fin (m - 1)) : ℝ := Classical.choose (gapExists k)
+  have gapSpec (k : Fin (m - 1)) :
+      (HermiteRRootsSorted n)[k.1]'(by omega) < gap k ∧
+        gap k < (HermiteRRootsSorted n)[k.1 + 1]'(hgapIndex k) ∧
+        (HermiteR (n + 1)).eval (gap k) = 0 :=
+    Classical.choose_spec (gapExists k)
+  have hgap_inj : Function.Injective gap := by
+    intro a b hab
+    by_cases hlt : a.1 < b.1
+    · have hlt_gap : gap a < gap b :=
+        sortedLT_between_lt_between_of_index_lt hsorted
+          (hgapIndex a) (hgapIndex b) hlt
+          ⟨(gapSpec a).1, (gapSpec a).2.1⟩
+          ⟨(gapSpec b).1, (gapSpec b).2.1⟩
+      linarith
+    · by_cases hgt : b.1 < a.1
+      · have hlt_gap : gap b < gap a :=
+          sortedLT_between_lt_between_of_index_lt hsorted
+            (hgapIndex b) (hgapIndex a) hgt
+            ⟨(gapSpec b).1, (gapSpec b).2.1⟩
+            ⟨(gapSpec a).1, (gapSpec a).2.1⟩
+        linarith
+      · apply Fin.ext
+        omega
+  let gapSet : Finset ℝ := Finset.univ.image gap
+  have hgapcard : gapSet.card = m - 1 := by
+    calc
+      gapSet.card = (Finset.univ : Finset (Fin (m - 1))).card := by
+        dsimp [gapSet]
+        exact Finset.card_image_of_injective _ hgap_inj
+      _ = m - 1 := by simp
+  have hleft_lt_gap (k : Fin (m - 1)) : left < gap k := by
+    exact sortedLT_left_tail_lt_between hsorted h0 (hgapIndex k)
+      leftSpec.1 ⟨(gapSpec k).1, (gapSpec k).2.1⟩
+  have hgap_lt_right (k : Fin (m - 1)) : gap k < right := by
+    exact sortedLT_between_lt_right_tail hsorted (hgapIndex k)
+      hlast_idx hlast_eq ⟨(gapSpec k).1, (gapSpec k).2.1⟩ rightSpec.1
+  have hleft_lt_right : left < right := by
+    exact sortedLT_left_tail_lt_right_tail hsorted h0 hlast_idx hlast_eq
+      leftSpec.1 rightSpec.1
+  have hleft_not_gap : left ∉ gapSet := by
+    intro hmem
+    rcases Finset.mem_image.mp hmem with ⟨k, _hk, hk⟩
+    have hlt := hleft_lt_gap k
+    linarith
+  have hright_not_gap : right ∉ gapSet := by
+    intro hmem
+    rcases Finset.mem_image.mp hmem with ⟨k, _hk, hk⟩
+    have hlt := hgap_lt_right k
+    linarith
+  have hleft_ne_right : left ≠ right := ne_of_lt hleft_lt_right
+  let aboveGap (t : Fin (m - 1 - i)) : ℝ :=
+    gap ⟨i + t.1, by
+      dsimp [m] at t ⊢
+      omega⟩
+  have haboveGap_inj : Function.Injective aboveGap := by
+    intro a b hab
+    dsimp [aboveGap] at hab
+    have hfin := hgap_inj hab
+    have hval := congrArg Fin.val hfin
+    dsimp at hval
+    apply Fin.ext
+    omega
+  let gapAboveSet : Finset ℝ := Finset.univ.image aboveGap
+  have hgapAboveCard : gapAboveSet.card = m - 1 - i := by
+    calc
+      gapAboveSet.card = (Finset.univ : Finset (Fin (m - 1 - i))).card := by
+        dsimp [gapAboveSet]
+        exact Finset.card_image_of_injective _ haboveGap_inj
+      _ = m - 1 - i := by simp
+  have hgap_above (k : Fin (m - 1)) (hik : i ≤ k.1) :
+      (HermiteRRootsSorted n)[i]'hi < gap k := by
+    by_cases hEq : i = k.1
+    · subst i
+      simpa using (gapSpec k).1
+    · have hiklt : i < k.1 := lt_of_le_of_ne hik hEq
+      have hk_len : k.1 < (HermiteRRootsSorted n).length := by
+        dsimp [m] at k
+        omega
+      have h_lt :
+          (HermiteRRootsSorted n)[i]'hi <
+            (HermiteRRootsSorted n)[k.1]'hk_len :=
+        hsorted.getElem_lt_getElem_of_lt (i := i) (j := k.1)
+          (hi := hi) (hj := hk_len) hiklt
+      have hkgap := (gapSpec k).1
+      linarith
+  have hgap_not_above (k : Fin (m - 1)) (hki : k.1 < i) :
+      ¬ (HermiteRRootsSorted n)[i]'hi < gap k := by
+    have hgap_lt_next := (gapSpec k).2.1
+    have hnext_le_i :
+        (HermiteRRootsSorted n)[k.1 + 1]'(hgapIndex k) ≤
+          (HermiteRRootsSorted n)[i]'hi := by
+      by_cases hEq : k.1 + 1 = i
+      · subst i
+        exact le_rfl
+      · have hlt : k.1 + 1 < i := by omega
+        exact le_of_lt <|
+          hsorted.getElem_lt_getElem_of_lt (i := k.1 + 1) (j := i)
+            (hi := hgapIndex k) (hj := hi) hlt
+    intro hbad
+    linarith
+  have hgapFilter :
+      gapSet.filter (fun r => (HermiteRRootsSorted n)[i]'hi < r) = gapAboveSet := by
+    ext x
+    constructor
+    · intro hx
+      have hxgap := (Finset.mem_filter.mp hx).1
+      have hxabove := (Finset.mem_filter.mp hx).2
+      rcases Finset.mem_image.mp hxgap with ⟨k, _hk, hkx⟩
+      rw [← hkx] at hxabove ⊢
+      have hik : i ≤ k.1 := by
+        by_contra hnot
+        exact hgap_not_above k (Nat.lt_of_not_ge hnot) hxabove
+      let t : Fin (m - 1 - i) := ⟨k.1 - i, by
+        have ht : k.1 < m - 1 := k.2
+        have hi_lt : i < m := hi_m
+        omega⟩
+      refine Finset.mem_image.mpr ⟨t, Finset.mem_univ _, ?_⟩
+      dsimp [aboveGap, t]
+      have hval_eq : i + (k.1 - i) = k.1 := Nat.add_sub_of_le hik
+      exact congrArg gap (Fin.ext hval_eq)
+    · intro hx
+      rcases Finset.mem_image.mp hx with ⟨t, _ht, htx⟩
+      rw [← htx]
+      refine Finset.mem_filter.mpr ⟨?_, ?_⟩
+      · exact Finset.mem_image.mpr
+          ⟨⟨i + t.1, by
+              have ht : t.1 < m - 1 - i := t.2
+              have hi_lt : i < m := hi_m
+              omega⟩, Finset.mem_univ _, rfl⟩
+      · let kt : Fin (m - 1) := ⟨i + t.1, by
+            have ht : t.1 < m - 1 - i := t.2
+            have hi_lt : i < m := hi_m
+            omega⟩
+        have hikt : i ≤ kt.1 := by
+          dsimp [kt]
+          exact Nat.le_add_right i t.1
+        exact hgap_above kt hikt
+  have hleft_not_above :
+      ¬ (HermiteRRootsSorted n)[i]'hi < left := by
+    have hleft_lt_i : left < (HermiteRRootsSorted n)[i]'hi := by
+      by_cases hi0 : i = 0
+      · subst i
+        simpa using leftSpec.1
+      · have h0i : 0 < i := Nat.pos_of_ne_zero hi0
+        have h0_lt_i :
+            (HermiteRRootsSorted n)[0]'h0 < (HermiteRRootsSorted n)[i]'hi :=
+          hsorted.getElem_lt_getElem_of_lt (i := 0) (j := i)
+            (hi := h0) (hj := hi) h0i
+        linarith
+    linarith
+  have hright_above :
+      (HermiteRRootsSorted n)[i]'hi < right := by
+    have hi_le_last :
+        (HermiteRRootsSorted n)[i]'hi ≤
+          (HermiteRRootsSorted n)[m - 1]'hlast_idx := by
+      by_cases hEq : i = m - 1
+      · subst i
+        exact le_rfl
+      · have hlt : i < m - 1 := by omega
+        exact le_of_lt <|
+          hsorted.getElem_lt_getElem_of_lt (i := i) (j := m - 1)
+            (hi := hi) (hj := hlast_idx) hlt
+    linarith
+  have hright_not_gapAbove : right ∉ gapAboveSet := by
+    intro hmem
+    rcases Finset.mem_image.mp hmem with ⟨t, _ht, ht⟩
+    have hlt := hgap_lt_right
+      ⟨i + t.1, by
+        dsimp [m] at t ⊢
+        omega⟩
+    dsimp [aboveGap] at ht
+    linarith
+  let S : Finset ℝ := insert left (insert right gapSet)
+  refine ⟨S, ?_, ?_, ?_⟩
+  · have hleft_not : left ∉ insert right gapSet := by
+      simp [hleft_ne_right, hleft_not_gap]
+    calc
+      S.card = (insert right gapSet).card + 1 := by
+        dsimp [S]
+        exact Finset.card_insert_of_notMem hleft_not
+      _ = gapSet.card + 2 := by
+        rw [Finset.card_insert_of_notMem hright_not_gap]
+      _ = (HermiteRRootsSorted n).length + 1 := by
+        rw [hgapcard]
+        dsimp [m]
+        omega
+  · intro x hx
+    dsimp [S] at hx
+    rw [Finset.mem_insert] at hx
+    rcases hx with rfl | hx
+    · exact leftSpec.2
+    rw [Finset.mem_insert] at hx
+    rcases hx with rfl | hx
+    · exact rightSpec.2
+    rcases Finset.mem_image.mp hx with ⟨k, _hk, hkx⟩
+    rw [← hkx]
+    exact (gapSpec k).2.2
+  · have hfilter :
+        S.filter (fun r => (HermiteRRootsSorted n)[i]'hi < r) =
+          insert right gapAboveSet := by
+      dsimp [S]
+      rw [Finset.filter_insert, if_neg hleft_not_above]
+      rw [Finset.filter_insert, if_pos hright_above]
+      rw [hgapFilter]
+    rw [hfilter]
+    rw [Finset.card_insert_of_notMem hright_not_gapAbove, hgapAboveCard]
+    omega
+
+/-- If `H_n` splits, the sorted root-list length is `n`. -/
+lemma hermiteRRootsSorted_length_eq_of_splits
+    (n : ℕ) (hsplits : (HermiteR n).Splits) :
+    (HermiteRRootsSorted n).length = n := by
+  rw [hermiteRRootsSorted_length, ← hsplits.natDegree_eq_card_roots, hermiteR_natDegree]
+
+/-- Successor root-count step for Hermite: split/nodup roots of `H_n`, with
+`n>0`, give the full root count for `H_{n+1}`. -/
+lemma hermiteR_succ_card_roots_of_splits_nodup_pos
+    (n : ℕ) (hn : 0 < n) (hsplits : (HermiteR n).Splits)
+    (hnd : (HermiteR n).roots.Nodup) :
+    (HermiteR (n + 1)).roots.card = n + 1 := by
+  have hlen := hermiteRRootsSorted_length_eq_of_splits n hsplits
+  have h0 : 0 < (HermiteRRootsSorted n).length := by omega
+  obtain ⟨S, hScard, hSroot⟩ :=
+    exists_finset_roots_hermiteR_succ_card n hsplits hnd h0
+  have hroots :
+      (HermiteR (n + 1)).roots = S.val := by
+    apply Polynomial.roots_eq_of_natDegree_le_card_of_ne_zero
+    · exact hSroot
+    · rw [hermiteR_natDegree, hScard, hlen]
+    · exact hermiteR_ne_zero (n + 1)
+  have hcard := congrArg Multiset.card hroots
+  simpa [hScard, hlen] using hcard
+
+/-- Successor nodup step for Hermite roots. -/
+lemma hermiteR_succ_roots_nodup_of_splits_nodup_pos
+    (n : ℕ) (hn : 0 < n) (hsplits : (HermiteR n).Splits)
+    (hnd : (HermiteR n).roots.Nodup) :
+    (HermiteR (n + 1)).roots.Nodup := by
+  have hlen := hermiteRRootsSorted_length_eq_of_splits n hsplits
+  have h0 : 0 < (HermiteRRootsSorted n).length := by omega
+  obtain ⟨S, hScard, hSroot⟩ :=
+    exists_finset_roots_hermiteR_succ_card n hsplits hnd h0
+  have hroots :
+      (HermiteR (n + 1)).roots = S.val := by
+    apply Polynomial.roots_eq_of_natDegree_le_card_of_ne_zero
+    · exact hSroot
+    · rw [hermiteR_natDegree, hScard, hlen]
+    · exact hermiteR_ne_zero (n + 1)
+  rw [hroots]
+  exact S.nodup
+
+/-- Successor splitting step for Hermite roots. -/
+lemma hermiteR_succ_splits_of_splits_nodup_pos
+    (n : ℕ) (hn : 0 < n) (hsplits : (HermiteR n).Splits)
+    (hnd : (HermiteR n).roots.Nodup) :
+    (HermiteR (n + 1)).Splits := by
+  rw [hermiteR_splits_iff_card_roots]
+  exact hermiteR_succ_card_roots_of_splits_nodup_pos n hn hsplits hnd
+
+/-- Main Hermite real-rootedness package: `H_n` splits over `ℝ`, has no
+repeated roots, and has exactly `n` roots. -/
+theorem hermiteR_splits_roots_nodup_card (n : ℕ) :
+    (HermiteR n).Splits ∧
+      (HermiteR n).roots.Nodup ∧
+      (HermiteR n).roots.card = n := by
+  induction n using Nat.twoStepInduction with
+  | zero =>
+      exact ⟨hermiteR_splits_zero, hermiteR_roots_nodup_zero, hermiteR_card_roots_zero⟩
+  | one =>
+      exact ⟨hermiteR_splits_one, hermiteR_roots_nodup_one, hermiteR_card_roots_one⟩
+  | more n _ ih =>
+      have hnpos : 0 < n + 1 := Nat.succ_pos n
+      have hsplits : (HermiteR (n + 1 + 1)).Splits :=
+        hermiteR_succ_splits_of_splits_nodup_pos (n + 1) hnpos ih.1 ih.2.1
+      have hnd : (HermiteR (n + 1 + 1)).roots.Nodup :=
+        hermiteR_succ_roots_nodup_of_splits_nodup_pos (n + 1) hnpos ih.1 ih.2.1
+      have hcard : (HermiteR (n + 1 + 1)).roots.card = n + 1 + 1 :=
+        hermiteR_succ_card_roots_of_splits_nodup_pos (n + 1) hnpos ih.1 ih.2.1
+      simpa [Nat.add_assoc] using And.intro hsplits (And.intro hnd hcard)
+
+/-- Every real Hermite polynomial splits over `ℝ`. -/
+theorem hermiteR_splits (n : ℕ) : (HermiteR n).Splits :=
+  (hermiteR_splits_roots_nodup_card n).1
+
+/-- Real Hermite roots are simple. -/
+theorem hermiteR_roots_nodup (n : ℕ) : (HermiteR n).roots.Nodup :=
+  (hermiteR_splits_roots_nodup_card n).2.1
+
+/-- Real Hermite has exactly `n` roots, counted with multiplicity. -/
+theorem hermiteR_card_roots (n : ℕ) : (HermiteR n).roots.card = n :=
+  (hermiteR_splits_roots_nodup_card n).2.2
+
+/-- Count roots of `H_{n+1}` strictly above a selected sorted root of `H_n`.
+There is one successor root in each higher adjacent gap and one in the right
+tail. -/
+theorem hermiteR_succ_count_roots_above (n : ℕ) {i : ℕ}
+    (hi : i < (HermiteRRootsSorted n).length) :
+    ((HermiteR (n + 1)).roots.filter
+        (fun r => (HermiteRRootsSorted n)[i]'hi < r)).card =
+      (HermiteRRootsSorted n).length - i := by
+  classical
+  have hsplits : (HermiteR n).Splits := hermiteR_splits n
+  have hnd : (HermiteR n).roots.Nodup := hermiteR_roots_nodup n
+  have h0 : 0 < (HermiteRRootsSorted n).length := by omega
+  obtain ⟨S, hScard, hSroot, hSabove⟩ :=
+    exists_finset_roots_hermiteR_succ_card_count_above n hsplits hnd h0 hi
+  have hlen := hermiteRRootsSorted_length_eq_of_splits n hsplits
+  have hroots :
+      (HermiteR (n + 1)).roots = S.val := by
+    apply Polynomial.roots_eq_of_natDegree_le_card_of_ne_zero
+    · exact hSroot
+    · rw [hermiteR_natDegree, hScard, hlen]
+    · exact hermiteR_ne_zero (n + 1)
+  rw [hroots]
+  simpa [Finset.filter_val] using hSabove
+
+/-- Unconditional adjacent-gap interlacing witness for consecutive sorted
+roots of `H_n`. -/
+theorem hermiteR_succ_root_between_sorted_adjacent
+    (n : ℕ) {i : ℕ}
+    (hi : i + 1 < (HermiteRRootsSorted n).length) :
+    ∃ x, (HermiteRRootsSorted n)[i]'(by omega) < x ∧
+      x < (HermiteRRootsSorted n)[i + 1]'hi ∧
+      (HermiteR (n + 1)).eval x = 0 :=
+  exists_root_between_hermiteR_succ_of_sorted_adjacent n
+    (hermiteR_splits n) (hermiteR_roots_nodup n) hi
+
+/-- Unconditional left-tail interlacing witness for `H_{n+1}`. -/
+theorem hermiteR_succ_root_left_sorted_first
+    (n : ℕ) (h0 : 0 < (HermiteRRootsSorted n).length) :
+    ∃ x, x < (HermiteRRootsSorted n)[0]'h0 ∧
+      (HermiteR (n + 1)).eval x = 0 :=
+  exists_root_left_hermiteR_succ_of_sorted_first n
+    (hermiteR_splits n) (hermiteR_roots_nodup n) h0
+
+/-- Unconditional right-tail interlacing witness for `H_{n+1}`. -/
+theorem hermiteR_succ_root_right_sorted_last
+    (n : ℕ) {i : ℕ}
+    (hi : i < (HermiteRRootsSorted n).length)
+    (hlast : i + 1 = (HermiteRRootsSorted n).length) :
+    ∃ x, (HermiteRRootsSorted n)[i]'hi < x ∧
+      (HermiteR (n + 1)).eval x = 0 :=
+  exists_root_right_hermiteR_succ_of_sorted_last n
+    (hermiteR_splits n) (hermiteR_roots_nodup n) hi hlast
 
 /-- Gaussian derivative representation of the even Hermite polynomial. -/
 lemma hermiteEven_gaussian_factor (d : ℕ) (x : ℝ) :

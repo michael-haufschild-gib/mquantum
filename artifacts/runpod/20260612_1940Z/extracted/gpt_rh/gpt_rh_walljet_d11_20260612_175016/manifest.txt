@@ -1,0 +1,18 @@
+Python 3.12.11
+sympy 1.14.0
+hostname 576c883b8605
+workdir /workspace/gpt_rh/gpt_rh_walljet_d11_20260612_175016
+script_sha256 d9ab34be3595dfce90c43feecf14988248080a8d3f78cdca817f078c48cd76ba
+target d=11 transverse-only walls 1..10
+launched_utc 2026-06-12T15:51:23.538330Z
+started_pids
+wall_01.pid 7113
+wall_02.pid 7115
+wall_03.pid 7118
+wall_04.pid 7120
+wall_05.pid 7124
+wall_06.pid 7129
+wall_07.pid 7133
+wall_08.pid 7138
+wall_09.pid 7142
+wall_10.pid 7148

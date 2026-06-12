@@ -1,0 +1,43 @@
+{"args": {"degree": 1, "dps": 300, "jmax": 360, "nmax": 50, "samples": 64, "shifts": "", "workdir": "run_20260612_114257", "workers": 4}, "event": "start", "ts": 1781264577.9811378}
+{"dps": 300, "event": "moments_start", "jmax": 360, "missing": 190, "ts": 1781264577.9813762}
+{"done": 5, "event": "moments_progress", "latest_j": 175, "missing": 190, "ts": 1781264611.6619549}
+{"done": 10, "event": "moments_progress", "latest_j": 180, "missing": 190, "ts": 1781264630.7969666}
+{"done": 15, "event": "moments_progress", "latest_j": 185, "missing": 190, "ts": 1781264648.3625476}
+{"done": 20, "event": "moments_progress", "latest_j": 190, "missing": 190, "ts": 1781264669.7631972}
+{"done": 25, "event": "moments_progress", "latest_j": 195, "missing": 190, "ts": 1781264693.8624618}
+{"done": 30, "event": "moments_progress", "latest_j": 200, "missing": 190, "ts": 1781264716.998578}
+{"done": 35, "event": "moments_progress", "latest_j": 205, "missing": 190, "ts": 1781264736.9111583}
+{"done": 40, "event": "moments_progress", "latest_j": 210, "missing": 190, "ts": 1781264759.3242626}
+{"done": 45, "event": "moments_progress", "latest_j": 215, "missing": 190, "ts": 1781264778.2781243}
+{"done": 50, "event": "moments_progress", "latest_j": 220, "missing": 190, "ts": 1781264807.9276538}
+{"done": 55, "event": "moments_progress", "latest_j": 225, "missing": 190, "ts": 1781264826.636432}
+{"done": 60, "event": "moments_progress", "latest_j": 230, "missing": 190, "ts": 1781264845.8384514}
+{"done": 65, "event": "moments_progress", "latest_j": 235, "missing": 190, "ts": 1781264866.8225486}
+{"done": 70, "event": "moments_progress", "latest_j": 241, "missing": 190, "ts": 1781264897.6121857}
+{"done": 75, "event": "moments_progress", "latest_j": 245, "missing": 190, "ts": 1781264916.5877538}
+{"done": 80, "event": "moments_progress", "latest_j": 250, "missing": 190, "ts": 1781264937.96688}
+{"done": 85, "event": "moments_progress", "latest_j": 255, "missing": 190, "ts": 1781264961.393725}
+{"done": 90, "event": "moments_progress", "latest_j": 260, "missing": 190, "ts": 1781264984.365588}
+{"done": 95, "event": "moments_progress", "latest_j": 265, "missing": 190, "ts": 1781265009.9353862}
+{"done": 100, "event": "moments_progress", "latest_j": 270, "missing": 190, "ts": 1781265028.9364758}
+{"done": 105, "event": "moments_progress", "latest_j": 275, "missing": 190, "ts": 1781265050.0522833}
+{"done": 110, "event": "moments_progress", "latest_j": 280, "missing": 190, "ts": 1781265070.7421103}
+{"done": 115, "event": "moments_progress", "latest_j": 285, "missing": 190, "ts": 1781265099.8310294}
+{"done": 120, "event": "moments_progress", "latest_j": 290, "missing": 190, "ts": 1781265120.247864}
+{"done": 125, "event": "moments_progress", "latest_j": 295, "missing": 190, "ts": 1781265140.5134306}
+{"done": 130, "event": "moments_progress", "latest_j": 300, "missing": 190, "ts": 1781265164.96685}
+{"done": 135, "event": "moments_progress", "latest_j": 305, "missing": 190, "ts": 1781265184.6069784}
+{"done": 140, "event": "moments_progress", "latest_j": 310, "missing": 190, "ts": 1781265211.1928864}
+{"done": 145, "event": "moments_progress", "latest_j": 316, "missing": 190, "ts": 1781265235.2994504}
+{"done": 150, "event": "moments_progress", "latest_j": 320, "missing": 190, "ts": 1781265253.601026}
+{"done": 155, "event": "moments_progress", "latest_j": 325, "missing": 190, "ts": 1781265279.201028}
+{"done": 160, "event": "moments_progress", "latest_j": 330, "missing": 190, "ts": 1781265302.4557695}
+{"done": 165, "event": "moments_progress", "latest_j": 335, "missing": 190, "ts": 1781265321.3718045}
+{"done": 170, "event": "moments_progress", "latest_j": 340, "missing": 190, "ts": 1781265352.217458}
+{"done": 175, "event": "moments_progress", "latest_j": 345, "missing": 190, "ts": 1781265387.8651538}
+{"done": 180, "event": "moments_progress", "latest_j": 349, "missing": 190, "ts": 1781265414.144894}
+{"done": 185, "event": "moments_progress", "latest_j": 355, "missing": 190, "ts": 1781265455.3441892}
+{"done": 190, "event": "moments_progress", "latest_j": 360, "missing": 190, "ts": 1781265498.7247312}
+{"count": 361, "event": "moments_done", "ts": 1781265498.7337856}
+{"event": "alpha_pt", "ts": 1781265498.7667181, "values": {"1": "0.0721754812742143655456991651989", "128": "0.537183729873833356819078470885", "16": "0.341553554973699230003976911064", "2": "0.121707856970029946233029710362", "32": "0.414809735819289296629834104703", "4": "0.187727006550246868795101972179", "64": "0.480326842119608647371146811157", "8": "0.263775856117192385222973073546", "96": "0.514632470813092444860161077304"}}
+{"event": "done", "ts": 1781265498.7667675}
