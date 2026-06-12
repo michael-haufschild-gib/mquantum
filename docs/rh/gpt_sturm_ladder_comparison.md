@@ -6334,3 +6334,748 @@ The surviving value is vocabulary and possible inverse-spectral structure,
 especially for the model measure in F39/F211. It should not be used as an LP
 proof without constructing the actual canonical system and identifying the
 target entire function as its structure function.
+
+## 2026-06-12 Addendum: F224 W-Telescoping Cache Sum
+
+Fable's F76/F224 identity isolates the constant in the true-xi running scale.
+With
+
+```text
+c_j^W = j^-1 * (1 - 2/(W(2j/pi)+1)),
+S(k)  = sum_{r=1}^k (c_r-c_r^W),
+```
+
+and cached xi moments through `j=170`, GPT reconstructed
+
+```text
+c_j = 2 loggamma_j - loggamma_{j-1} - loggamma_{j+1}
+```
+
+from the archived file
+
+```text
+artifacts/runpod/gpt_rh_final_20260612_133134/xihead_audit/run_20260612_123309/xi_log_moments.json
+```
+
+using the reproducibility script
+
+```text
+scripts/research/hilbertPolya/gpt_f76_sinf_cache.py
+```
+
+The requested partial sums are:
+
+```text
+S(40)  = 0.9720053891554054548522328445142213661365812686572
+S(80)  = 0.9870194399988183623768016381474404733935084959040
+S(120) = 0.9922913714088232344897107519048474454865266808729
+S(166) = 0.9952928547129190395694336703337480900247697232202
+```
+
+Fable's pre-registration says the unbounded cosine-mixing scale has exact
+constant `e` iff
+
+```text
+S_inf = 0.99870846.
+```
+
+Thus the remaining tail required after `166` is
+
+```text
+S_inf - S(166) = 0.00341560528708096043056632966625.
+```
+
+The directly observable constant
+
+```text
+c0(k)=sum_{r<=k}c_r - log k + 2log W(2k/pi)
+```
+
+converges toward `-1` in the cached range:
+
+```text
+k    c0(k)                  exp(-c0(k))/e
+40   -1.02162937653426146   1.02186498713613457
+80   -1.00867018007074562   1.00870787494366394
+120  -1.00424687367478006   1.00425590442240728
+140  -1.00297059871955976   1.00297501532016929
+160  -1.00200916532281952   1.00201118504789408
+166  -1.00176529522059602   1.00176685427146400
+169  -1.00164976339554889   1.00165112500385376
+```
+
+Conclusion:
+
+```text
+The cache strongly supports the `x_k ~ e W(2k/pi)^2` scale, but the cache
+alone does not prove it. The proof-grade target is now a positive tail bound
+for sum_{r>166}(c_r-c_r^W), or an extended moment cache showing convergence
+of c0(k) to -1 with certified residual.
+```
+
+This matters for F218 because the affine gauge in F65 depends on the running
+scale constant. If `c0=-1`, then the true-xi mixing saddle is exactly
+
+```text
+x_k ~ e W(2k/pi)^2,
+```
+
+and the residual drift fed into the F218-SRMT lemma is a marginally irrelevant
+correction after the `e W^2` affine rescaling.
+
+## 2026-06-12 Addendum: G2 Centered-Residual Uniformity
+
+Fable F81 assigns G2 to GPT:
+
+```text
+G2. Make F65 centered-residual control uniform over the moving xi windows.
+```
+
+The right object is the cumulative coefficient multiplier, not the adjacent
+ratio error. Fix a moving center `kappa`, put
+
+```text
+I_A(kappa)={k: |k-kappa|<=A sqrt(kappa)},
+D=d L(kappa)^2,
+```
+
+and compare true-xi finite coefficients with critical finite hard-head
+coefficients:
+
+```text
+a_k^xi(d)=a_k^crit(D) exp(-E_k).
+```
+
+The affine part of `E_k` is gauge:
+
+```text
+E_k=B+A_1(k-kappa)+R_k,
+```
+
+with `B,A_1` absorbed by amplitude and variable rescaling. Only the centered
+residual `R_k` matters for F218.
+
+Discrete interpolation supplies the uniform estimate. If `f_k` is a sequence
+on an interval of length `N` and `ell_k` is the affine interpolant through the
+interval endpoints, then
+
+```text
+osc(f-ell) <= (N^2/8) sup |Delta^2 f|.
+```
+
+For the multiplier `E_k`, the second difference splits into curvature and
+finite-binomial pieces:
+
+```text
+Delta^2 E_k
+  = (c_k-1/k) + O(1/d+1/D)
+```
+
+up to harmless sign conventions. F205/F224 gives, uniformly on
+`I_A(kappa)`,
+
+```text
+c_k-1/k = -2/[k(W(2k/pi)+1)] + O(1/(k W(k)^2)).
+```
+
+Since `N=O_A(sqrt(kappa))`, `D~kappa^2`, and the moving edge has
+`kappa/d -> 0`, the centered residual obeys
+
+```text
+osc_{I_A}(R_k)
+  = O_A(1/W(kappa) + kappa/d).
+```
+
+This is `o(1)`. It is weaker than the older shorthand
+`O(1/(sqrt(kappa)W)+kappa/d)` sometimes written for adjacent-ratio
+perturbations, but it is the correct cumulative-multiplier bound and it is
+strong enough for F218-SRMT because G1 only needs `osc(R)=o(1)`.
+
+The unit-step variation needed by the Prüfer bridge is also uniform:
+
+```text
+sup_{I_A} |Delta^2 E_k|
+  = O_A(1/(kappa W(kappa)) + 1/d)
+  = o(kappa^-1/2),
+```
+
+using the moving-edge scale `d~kappa^2/L(kappa)^2`. Therefore G2 reduces to
+the effective form of F205/F224 on all sufficiently large moving windows,
+plus finite census for the remaining bounded windows.
+
+The proof payload for the F218-SRMT head theorem is:
+
+```text
+After affine-gauge removal, the true-xi coefficient multiplier has
+centered oscillation O_A(1/W+kappa/d)=o(1) and second-difference
+O_A(1/(kappa W)+1/d)=o(kappa^-1/2) on every fixed-A saddle packet.
+```
+
+Open arithmetic tail:
+
+```text
+F224 currently supplies the scale constant from cache through k=169.
+An extended cache or analytic tail bound should upgrade c0=-1 from strong
+evidence to theorem-grade input, but G2's o(1) uniformity needs only the
+F205-order bound, not the exact constant.
+```
+
+## 2026-06-12 Addendum: q-Deformed Ladder and F76 Extension
+
+Fable F84 proposes the q-deformed head
+
+```text
+Phi_{n,q}(s)=sum_{k>=0} (-1)^k exp[-S_n(k)] q^{k^2} s^k/k!,
+0<q<=1.
+```
+
+The ladder identity is exact. Differentiating and putting `k=m+1` gives
+
+```text
+d/ds Phi_{n,q}(s)
+= -sum_{m>=0} (-1)^m exp[-S_n(m+1)] q^{(m+1)^2} s^m/m!
+= -q Phi_{n+1,q}(q^2 exp[-c_{n+1}]s),
+```
+
+using
+
+```text
+S_n(m+1)=S_{n+1}(m)+m c_{n+1},
+q^{(m+1)^2}=q q^{2m}q^{m^2}.
+```
+
+Consequently, for every damping level `q`, LP at shift `n` implies LP at
+shift `n+1` by derivative closure and positive real dilation.
+
+Write `t=-log q`. If `t1>=t0`, then
+
+```text
+Phi_{n,t1}
+```
+
+is obtained from `Phi_{n,t0}` by applying the F1 Pólya-Schur multiplier
+
+```text
+exp[-(t1-t0)k^2].
+```
+
+So LP is upward closed in damping time `t` and downward closed in `q`. With
+
+```text
+n_c(t)=min { n>=0 : Phi_{m,t} is LP for every m>=n },
+```
+
+`n_c(t)` is nonincreasing in `t`; equivalently `n_c(q)` is nondecreasing as
+`q` increases to 1. `RH(head)` is equivalent to `n_c(0)=0`, and hence to the
+whole monotone staircase being identically zero. A certified non-LP zero at
+any `q<1`, `n=0` falsifies the undamped head by contrapositive; certified LP
+at finitely many `q<1` only lower-bounds the critical `q_c`.
+
+The q-axis is therefore a covariant instrument. This is unlike hard
+truncation `K`, whose Szego/Turan artifacts are not tied to a
+Pólya-Schur semigroup.
+
+F76 extension:
+
+```text
+archive: artifacts/runpod/gpt_rh_f76_extend_20260612_140122/
+sha256: 82c7d11337664988c5fc242bd891708f251d60a9042a135fc189ab508feee256
+jmax: 360
+dps: 300
+```
+
+The extended cache gives
+
+```text
+S(166)=0.99529285471291903956943367033374809002476972322022
+S(200)=0.99664636718784532849770632374273866690333286722146
+S(240)=0.9977596685505956925491843362458360459663566865145
+S(280)=0.99856225343505658415804788437317843847048105402231
+S(320)=0.999168682283630483567809559355026294686263082815
+S(359)=0.99963266628162076474285401355869058581433797707528
+```
+
+This crosses the earlier target `S_inf=0.99870846`. Direct constant estimates
+remain close to `c0=-1`, but now from the other side:
+
+```text
+c0(166)=-1.001765295220596022542166972242924563792
+c0(240)=-0.9997496107061855533106747394961830115695
+c0(359)=-0.9982364279015664681907889329184881254312
+exp[-c0(359)]/e=0.998237982081069529525717485338745341061
+```
+
+Residual blocks `c_j-c_j^W` remain positive through `j=359`. Thus the cache
+does not prove the exact affine constant; it sharpens the missing theorem:
+derive the next W-asymptotic correction or a certified signed tail bound.
+This is separate from G2, which needs only the `O(1/(kW(k)))` curvature drift
+and the centered-residual estimate `osc(R)=O_A(1/W+kappa/d)=o(1)`.
+
+## 2026-06-12 Addendum: Constant Curvature Clock and F228 Telescoping
+
+Fable F85's F227 is exact. Put `q=exp(-epsilon)`. A constant curvature
+surplus
+
+```text
+c_r -> c_r + 2epsilon
+```
+
+changes the head exponent by
+
+```text
+2epsilon sum_{r=1}^{k-1}(k-r) = epsilon k(k-1).
+```
+
+Therefore
+
+```text
+Phi_{n,q}(s)
+= sum_k (-1)^k exp[-S_n(k)] exp[-epsilon k^2]s^k/k!
+= Phi_n^{(+2epsilon)}(qs).
+```
+
+The additional `q^k` is affine gauge. Hence q-damping, constant curvature
+surplus, and the F1 heat-line multiplier are the same LP-preserving operation
+modulo positive real variable scaling.
+
+Fable F86 identifies a real flaw in the v2 transport language: replacing
+`exp[-E(theta)]` by a scalar on an oscillatory window compares against
+term-magnitude sums, while the actual value is cancellation-suppressed. The
+BO/coefficient-packet estimate remains a coefficient-space statement only;
+it is not a zero-count theorem.
+
+The v3-compatible F218-GPT role is:
+
+```text
+G2 supplies finite-difference bounds on E_k.
+Remove affine E_k as exact gauge.
+Insert higher jets as perturbations of the Laguerre-cell ODE coefficients.
+Match solution data off-axis in Zone III, where magnitude comparison is safe.
+Propagate through the Airy/oscillatory zones by ODE/Pruefer transport.
+Count zeros from transported phase, not termwise value estimates.
+```
+
+The bound entering this transport is the pointwise coefficient perturbation
+
+```text
+Delta^2 E_k = (c_k-1/k)+O(1/d+1/D)
+            = O(1/(kappa W(kappa))+1/d).
+```
+
+For bulk windows this recovers the previous small phase budget. For the Airy
+edge, use this pointwise ODE-coefficient perturbation directly; do not use
+the total oscillation of `E_k` over a `kappa^(2/3)` packet as the zero-count
+control norm.
+
+Fable F87's F228 telescoping identity is exact with an index convention:
+
+```text
+LG_j = log(moment_j) + log Gamma(j+1) - log Gamma(2j+1),
+c_j  = 2LG_j - LG_{j-1} - LG_{j+1}.
+```
+
+Then
+
+```text
+c_j = (LG_j-LG_{j-1}) - (LG_{j+1}-LG_j),
+C(k)=sum_{j=1}^k c_j
+    = (LG_1-LG_0) - (LG_{k+1}-LG_k).
+```
+
+Thus
+
+```text
+S(k)=C(k)-C^W(k)
+    = A - [(LG_{k+1}-LG_k)+C^W(k)],
+A=LG_1-LG_0=log(M_2/(2M_0)).
+```
+
+The cached Phi kernel is globally scaled relative to Fable's Xi
+normalization, but `A` is scale invariant. From the archived cache:
+
+```text
+M_0 = 0.49712077818831410991277373968539771980729360955770518593323423399849552904554349
+M_2 = 0.022971944315145437535249876497632170264593013837589063499144622165183631858892554
+A   = -3.7677065326292670057110312914149004284968287898000080944579008087128584571928877
+```
+
+If the revised target `S_inf=1` is correct, then the exact analytic target is
+
+```text
+LG_{k+1}-LG_k + C^W(k) -> A-1
+= -4.7677065326292670057110312914149004284968287898000080944579008087128584571928877.
+```
+
+Cache evidence from `j<=360`:
+
+```text
+k=166 S(k)=0.99529285471291903956943367033374809002476972322022
+k=240 S(k)=0.9977596685505956925491843362458360459663566865145
+k=320 S(k)=0.999168682283630483567809559355026294686263082815
+k=359 S(k)=0.99963266628162076474285401355869058581433797707528
+```
+
+At `k=359`, the remaining gap to `S_inf=1` is
+
+```text
+0.00036733371837923525714598644130941418566202292471872.
+```
+
+Reproducibility:
+
+```text
+script: scripts/research/hilbertPolya/gpt_f228_telescoping.py
+output: artifacts/runpod/gpt_rh_f76_extend_20260612_140122/f228_telescoping.json
+```
+
+## 2026-06-12 Addendum: F88 Closed Zero-Data Constant
+
+Fable F88 supersedes the intermediate `S_inf=1` target by closing the affine
+constant in terms of central zero data. The cache verifies the closed form.
+
+The global scale difference between the cached Phi kernel and Xi cancels in
+moment ratios. With Xi normalization:
+
+```text
+M_0 = 0.49712077818831410991277373968539771980729360955770518593323423399849552904554349
+M_2 = 0.022971944315145437535249876497632170264593013837589063499144622165183631858892554
+M_2/M_0 = 0.046209986230837941577867620860678028006763520794844180246365001121527495908012326
+```
+
+Therefore
+
+```text
+c0 = log(8M_2/M_0)
+   = -0.99511781038948576804210280558219415619482825235898707797518077073928396931410885
+exp(-c0)
+   = 2.7050430046781109373306180620323100273605569639163249930615102194788091615481771.
+```
+
+Equivalently, using the centered Hadamard identity in Fable's notation,
+
+```text
+c0 = log(16 sum_{gamma>0} gamma^-2).
+```
+
+With the current `C*=1.28796206` approximation for the W-model constant,
+
+```text
+c0^W = EulerGamma - 2C*
+S_inf = c0 - c0^W
+      = 1.0035906447089811886611843592073082627691159273260893232190519943758483039082265.
+```
+
+Cache trajectory for
+
+```text
+r_k = ((2k+1)/2) exp[-C(k)]
+```
+
+relative to `W(2k/pi)^2`:
+
+```text
+k=160: 2.73226051121661801871185712492089545598
+k=200: 2.72686682592145691034408314069447902419
+k=240: 2.72326295433932368758618559974338205203
+k=280: 2.72068395615880188279495597466961967575
+k=320: 2.71874663661259126334020788544012960488
+k=359: 2.71727140417022488720545397987265005169
+```
+
+This is monotonically moving toward `2.705043004678...` on the archived range.
+At `k=359`,
+
+```text
+S(359)=0.99963266628162076474285401355869058581433797707528
+S_inf-S(359)=0.003957978427360423918330345648617676954777950250808.
+```
+
+The proof target becomes the Watson/Laplace step
+
+```text
+Delta LG(k)
+= 2 log(W(2k/pi)/2) - log(2(2k+1)) + o(1),
+```
+
+combined with the exact F228 telescope. F65/F71 use this only for sharp scale
+calibration; G2/v3 transport still uses the weaker finite-difference drift
+bounds.
+
+## 2026-06-12 Addendum: Watson Ratio Proof of F88
+
+The F88 Laplace step can be written as a ratio theorem. Let
+
+```text
+M_j = int_0^infty Phi(t)t^(2j)dt,
+LG_j = log M_j + log Gamma(j+1) - log Gamma(2j+1),
+W_j = W(2j/pi),      u_j=W_j/2.
+```
+
+For large `t`, the theta kernel has the expansion
+
+```text
+Phi(t)=2pi^2 exp(9t/2-pi e^(2t))
+       [1+O(e^(-2t))+O(exp[-3pi e^(2t)])].
+```
+
+The main exponent
+
+```text
+2j log t - pi e^(2t)
+```
+
+has saddle
+
+```text
+u_j e^(2u_j)=j/pi,
+u_j=W(2j/pi)/2.
+```
+
+The `9t/2` factor shifts the saddle by `O(u_j/j)`. The second `n=1` kernel
+term contributes `O(e^(-2u_j))=O(W_j/j)` on the saddle scale, and all `n>=2`
+terms are `exp[-Omega(j/W_j)]`. The saddle curvature is
+
+```text
+-2j/u_j^2 - 4pi e^(2u_j) = -4j/u_j + O(j/u_j^2),
+```
+
+so the width is `O((u_j/j)^(1/2))`, with relative width `o(1)`. Hence the
+probability measure proportional to `Phi(t)t^(2j)dt` concentrates at `u_j`:
+
+```text
+M_{j+1}/M_j = E_j[t^2] = u_j^2(1+o(1)).
+```
+
+Therefore
+
+```text
+LG_{j+1}-LG_j
+= log(M_{j+1}/M_j) + log(j+1) - log((2j+2)(2j+1))
+= 2log(W_j/2) - log(2(2j+1)) + o(1).
+```
+
+With F228,
+
+```text
+C(k)=A-(LG_{k+1}-LG_k),       A=LG_1-LG_0=log(M_2/(2M_0)),
+```
+
+so
+
+```text
+C(k)=A-2log(W_k/2)+log(2(2k+1))+o(1).
+```
+
+Thus
+
+```text
+c0 = lim_k [C(k)-log k+2log W_k]
+   = A+log16
+   = log(8M_2/M_0)
+   = log(16 sum_{gamma>0} gamma^-2).
+```
+
+Archived-cache ratio check:
+
+```text
+k=160: M_{k+1}/M_k / (W_k/2)^2 = 1.01006176481905723100607236310293079078
+k=200: M_{k+1}/M_k / (W_k/2)^2 = 1.00806782783327428783428738494014907040
+k=240: M_{k+1}/M_k / (W_k/2)^2 = 1.00673554898376961286222392107641498516
+k=280: M_{k+1}/M_k / (W_k/2)^2 = 1.00578214522047946323484653576571624399
+k=320: M_{k+1}/M_k / (W_k/2)^2 = 1.00506595714403845576059801719687066316
+k=359: M_{k+1}/M_k / (W_k/2)^2 = 1.00452059337724617041337836450900324392
+```
+
+This closes the constant at theorem shape. The remaining formal labor is
+only the standard Watson bounding package: off-saddle exponential loss,
+theta-tail suppression, and Gaussian moment expansion at the shifted saddle.
+
+## 2026-06-12 Addendum: Frozen-Head Circularity
+
+Fable F89 identifies a central circularity: the fixed xi head is exactly
+Riemann Xi in changed coordinates.
+
+With
+
+```text
+LG_j = log M_j + log Gamma(j+1) - log Gamma(2j+1),
+c_j = 2LG_j - LG_{j-1} - LG_{j+1},
+S_0(k)=sum_{r=1}^{k-1}(k-r)c_r,
+Delta0=LG_1-LG_0,
+```
+
+we have
+
+```text
+c_j = -Delta^2 LG_{j-1},
+LG_k = LG_0 + k Delta0 - S_0(k).
+```
+
+Therefore
+
+```text
+e^{-S_0(k)}/k!
+= (M_k/(2k)!) exp(-k Delta0)/M_0.
+```
+
+Since
+
+```text
+Xi(z)=sum_{k>=0}(-1)^k M_k z^(2k)/(2k)!,
+```
+
+the frozen head is
+
+```text
+Phi_{xi,0}(s)=Xi(sqrt(exp(-Delta0)s))/Xi(0).
+```
+
+Thus fixed-head LP is exactly RH.
+
+Cache verification:
+
+```text
+script: scripts/research/hilbertPolya/gpt_f89_head_identity.py
+output: artifacts/runpod/gpt_rh_final_20260612_133134/xihead_audit/run_20260612_123309/f89_head_identity.json
+max log-coefficient error through degree 90 = 8.1789141241617601921916806975e-118
+```
+
+Zero scaling:
+
+```text
+exp(Delta0)=0.023104993115418970788933810430339014003381760397422...
+s_n=exp(Delta0) gamma_n^2.
+```
+
+The first archived head roots match this identity:
+
+```text
+n=1 predicted 4.616157083428723231400095157403748..., archived 4.6161570834287232314000951574
+n=2 predicted 10.210700666537783384252803599800381..., archived 10.2107006665377833842528035998
+n=3 predicted 14.453166636642069725520956966646944..., archived 14.4531666366420697255209569666
+n=4 predicted 21.387670308591995377118113576926776..., archived 21.3876703085919953771181135769
+n=5 predicted 25.062408432884843292020135871201047..., archived 25.0624084328848432920201358712
+```
+
+Consequences:
+
+```text
+Head census/staircase planning is halted as a proof route.
+F62/K-escalation was Xi zero verification in head coordinates.
+F228/F88 constants are identity bookkeeping.
+The q-damped family remains a one-way falsification detector:
+Xi_q(z)=sum_k (-1)^k M_k q^(k^2)z^(2k)/(2k)!.
+```
+
+Non-circular remap:
+
+```text
+1. all-degree finite-d transverse Krawtchouk cone beyond d=9;
+2. finite-d bulk tiling / F7-F8 geometry;
+3. K'/Weil route after circularity audit.
+```
+
+## Addendum: F91 Wall Energy and Psi-Barrier Audit
+
+Fable's F91 wall argument supersedes the `d<=9` wall certificates for the
+specific F211/Rouche atom-budget bound, while leaving the stronger
+Krawtchouk coefficient cone as an independent diagnostic.
+
+The coordinate identification is exact:
+
+```text
+C_d(w)=P_d(w^2),   r=c^2,   q=y^2,   s=v^2,
+z=r-q+2i sqrt(rq)=(c+iy)^2.
+```
+
+Hence the wall-jet quotient is the vertical-wall quotient:
+
+```text
+Q_d(s,q;r)=
+{|P_d(z)|^2-|P_d(sz)|^2}/(1-s)
+= {|C_d(c+iy)|^2-|C_d(v(c+iy))|^2}/(1-v^2).
+```
+
+The exact ODE
+
+```text
+C_d''(w)-(w/2d)C_d'(w)+C_d(w)=0
+```
+
+gives the complex Sonin energy identity, for fixed `y`,
+
+```text
+d/dx (|C_d(x+iy)|^2+|C_d'(x+iy)|^2)
+= (x/d)|C_d'(x+iy)|^2.
+```
+
+For `psi=C_d'/C_d`,
+
+```text
+d_y psi=i[(w/2d)psi-1-psi^2],
+d_y|psi|^2=-(y/d)|psi|^2-2(1-|psi|^2)Im psi.
+```
+
+Since
+
+```text
+C_d(w)=const * L_d^(-1/2)(w^2/(4d)),
+```
+
+all zeros of `C_d` are real and simple; therefore `Im psi<0` in the
+upper half-plane. Starting from a critical wall foot `psi(c)=0`, the
+circle `|psi|=1` cannot be crossed from below because the derivative
+there is `-y/d<0`; above it, both terms are negative. Thus
+`|psi(c+iy)|<1` for `y>0`.
+
+The factor-level monotonicity
+
+```text
+d/d(y^2) |1-(x+iy)^2/rho^2|^2
+=2(rho^2+x^2+y^2)/rho^4>0
+```
+
+then gives, on every critical wall,
+
+```text
+sup_{0<=v<=1} |C_d(v(c+iy))|/|C_d(c+iy)| < sqrt(2).
+```
+
+This is enough for the hard-head atom decomposition because
+
+```text
+p=sqrt(2/e),   ((1-p)/p)sqrt(2)=0.2345...<1.
+```
+
+Scope note: this is not the naked wall dominance
+`|C_d(vw)|<=|C_d(w)|`, nor does it prove `B_{d,m}(s;r_j)>=0`. The
+Krawtchouk/Sturm frontier remains useful as a stronger cone and
+numerical referee. A `d=10` transverse run was launched on GPT's
+dedicated Runpod under `/workspace/gpt_rh/walljet_d10/`.
+
+F92 cap audit status: the remaining cap lemma is plausible but not yet
+closed. The transformed equation
+
+```text
+C_d(w)=exp(w^2/8d)u(w),
+u''+Omega^2u=0,
+Omega^2=1+1/(4d)-w^2/(16d^2)
+```
+
+gives zero spacing at least `pi^- = pi/sqrt(1+1/(4d))`. Therefore the
+Poisson part satisfies the cap bound
+
+```text
+|Im C_d'/C_d(x+iH)| <= 1 + 1/H + O(1/d).
+```
+
+For the real part, the continuous WKB density
+
+```text
+rho(t)=sqrt(A^2-t^2)/(4pi d),   A=4d sqrt(1+1/(4d)),
+```
+
+has principal-value transform `x/(4d)`, matching the real gauge
+contribution in `C_d'/C_d`. The proof debt is now an explicit
+Pruefer/edge discrepancy bound pushed through the height-`H` Hilbert
+kernel, with final constant below the required `5.95`.

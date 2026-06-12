@@ -1,0 +1,27 @@
+remote_utc=2026-06-12T12:02:08+00:00
+host=576c883b8605
+kernel=Linux 576c883b8605 6.8.0-51-generic #52~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Mon Dec  9 15:00:52 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
+workdir=/workspace/gpt_rh/f76_extend
+latest_run=run_20260612_114257
+python=Python 3.13.5
+mpmath=1.3.0
+sympy=1.14.0
+processes=
+files=
+./gpt_f76_sinf_cache.py 3244 bytes
+./gpt_xihead_audit.py 13604 bytes
+./latest.err 0 bytes
+./latest.out 0 bytes
+./latest.pid 5 bytes
+./run_20260612_114257/f76_sinf_extended.json 2776 bytes
+./run_20260612_114257/xi_log_moments.json 116695 bytes
+./run_20260612_114257/xihead_audit_events.jsonl 4665 bytes
+sha256=
+4205d9ca2dd70b744cb214d377a9e91080a156dd0f5837b958248704b378c802  gpt_f76_sinf_cache.py
+4b1c61b4b65e1a5b49bc6342e07423840a7277e057cd98316434e6ca9471fdea  gpt_xihead_audit.py
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  latest.err
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  latest.out
+41b04c23471a9b815f03142b3952b3073fec40a0a1f5b133ac2cb2053ca3a8e6  latest.pid
+ea379bf0cbc4d713edecb33ae94c2fd7adde1aaa75ca8f5e0709982e567708e1  run_20260612_114257/f76_sinf_extended.json
+c951546f10d40d4ed38762d3f5c69e01f548e4cc6273bcc0abef0d8f86048448  run_20260612_114257/xi_log_moments.json
+4dcdcaf92452e4105d1604f7dd68cdda32a4eb11a186378c2802a088db8fe709  run_20260612_114257/xihead_audit_events.jsonl

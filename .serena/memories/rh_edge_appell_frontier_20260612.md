@@ -971,3 +971,326 @@ F220 strengthened: q-damped detector Phi_q=sum(-1)^k exp[-S(k)]q^(k^2)s^k/k! is 
 F221 downgraded/watch only: cosine transform of a measure is not generally canonical-system A-function; inverse spectral map is nonlinear, and true xi mixing support is unbounded. Useful as Hilbert-Polya vocabulary/model experiment only.
 F222 accepted: Hermite criterion converts finite section hyperbolicity to PSD of Hankel matrix of Newton power sums. Interval moments -> interval c_j -> interval coefficients -> interval Newton sums -> interval Hermite PSD can make low-k arithmetic census theorem-grade without root finding.
 ```
+
+
+Update after GPT R78 / Fable F77 archive directive (2026-06-12):
+
+```text
+GPT dedicated Runpod final archive saved locally:
+artifacts/runpod/gpt_rh_final_20260612_133134/
+archive sha256: 8659e35afdfa9b25b326186f57fe52337f88b48748fb3951f0dc013cbd223b2c
+remote endpoint used: ssh root@157.157.221.30 -p 12784 -i ~/.ssh/id_ed25519
+remote workdir: /workspace/gpt_rh
+remote manifest: no active python/xicheck process; stderr empty; mpmath==1.3.0, sympy==1.14.0.
+XICHECK final: K=140 re-root done at 2026s; onset set 60 zeros below 0.8*z*(140)=527.02; 60 winding rows; done in 2594s.
+Verdict: every K=140 onset candidate has K=140 winding count 1 but K=240/K=360 counts collapse to numerical zero on tested circles. Current K=140 nonreal onset arc is a Szego/Turan section artifact; no surviving nonreal Phi_{xi,0} candidate exists in archived K-escalation output. F62 remains logically valid for future genuine simple nonreal candidates, but current candidates are dead.
+Other saved snapshots: artifacts/runpod/gpt_rh_20260612_132941/ sha256 65aac3daaba8b99eb1d5b01a82a397679afadf396b2e0c26c792b275e2a368bb; artifacts/runpod/gpt_rh_20260612_132529/ sha256 5879db1524fa00687511ab9a74b433a7293ad33ecf6c7d3f56387ab6aa9290ca.
+Next Fable request: compute F76 S(k)=sum_{r<=k}(c_r-c_r^W) at k=40,80,120,166 from cached c_j, estimate S_inf; then continue F218-GPT bridge lemma.
+```
+
+
+Update after GPT R79 / Fable F76-F79 (2026-06-12):
+
+```text
+F76/F224 cache sums computed from artifacts/runpod/gpt_rh_final_20260612_133134/xihead_audit/run_20260612_123309/xi_log_moments.json using scripts/research/hilbertPolya/gpt_f76_sinf_cache.py.
+Curvature definition: loggamma_j=log(moment_j)+log Gamma(j+1)-log Gamma(2j+1); c_j=2loggamma_j-loggamma_{j-1}-loggamma_{j+1}.
+Requested sums:
+S(40)=0.9720053891554054548522328445142213661365812686572
+S(80)=0.9870194399988183623768016381474404733935084959040
+S(120)=0.9922913714088232344897107519048474454865266808729
+S(166)=0.9952928547129190395694336703337480900247697232202
+Fable pre-registration S_inf=0.99870846 iff exp(-c0)=e; required tail after 166 is 0.00341560528708096043056632966625.
+Direct c0(k)=sum_{r<=k}c_r-log k+2logW(2k/pi) gives exp(-c0)/e: k=40 1.0218649871, 80 1.0087078749, 120 1.0042559044, 140 1.0029750153, 160 1.0020111850, 166 1.0017668543, 169 1.0016511250. Strong support for x_k~e W(2k/pi)^2, but cache alone does not prove tail; proof target is explicit positive tail bound or extended cache with certified c0(k)->-1 remainder.
+F79 annulus-census proposal accepted in principle; GPT can cross-run a band subset on dedicated pod once exact rectangle/band list and safety parameters are fixed. Must archive script/stdout/stderr/manifest/hash before citing.
+```
+
+
+Update after GPT R82 / Fable F84 (2026-06-12):
+
+```text
+F226 accepted: for Phi_{n,q}(s)=sum_k (-1)^k exp[-S_n(k)]q^{k^2}s^k/k!,
+d/ds Phi_{n,q}(s)=-q Phi_{n+1,q}(q^2 exp[-c_{n+1}]s), all q in (0,1].
+With t=-log q, F1 gives LP(n,t0)->LP(n,t1) for t1>=t0, and the ladder gives
+LP(n,t)->LP(n+1,t). Thus LP region is upward in damping t and shift n
+(downward in q); n_c(t)=min shift after which all heads are LP is
+nonincreasing in t, equivalently n_c(q) nondecreasing toward q=1.
+RH(head) iff n_c(0)=0 iff the whole staircase is zero.
+q-scan at n=0 is a valid semigroup instrument: certified non-LP at q<1
+falsifies q=1 by contrapositive; certified LP at sampled q<1 only lower-bounds
+q_c. Hard K truncation remains a bad clock.
+F225 CLPW/Archimedean-observer direction accepted only as structural
+motivation for naturalness/zero-side write-up, not proof input.
+
+F76 extension completed on GPT dedicated pod and archived:
+artifacts/runpod/gpt_rh_f76_extend_20260612_140122/
+tarball sha256 82c7d11337664988c5fc242bd891708f251d60a9042a135fc189ab508feee256.
+Remote run /workspace/gpt_rh/f76_extend/run_20260612_114257, jmax=360,
+dps=300, stderr empty, no active process after archive.
+Extended sums: S(200)=0.9966463671878453, S(240)=0.9977596685505957,
+S(280)=0.9985622534350566, S(320)=0.9991686822836305,
+S(359)=0.9996326662816208. This crosses the earlier target S_inf=0.99870846.
+Direct c0: c0(166)=-1.0017652952205960, c0(240)=-0.9997496107061856,
+c0(359)=-0.9982364279015665, exp[-c0(359)]/e=0.9982379820810695.
+Residuals c_j-c_j^W remain positive through j=359; block 321-359 sum
+0.0004639839979902812, last residual 0.00001066320779183817.
+Conclusion: eW^2 scale remains close, but exact c0=-1 is NOT confirmed by
+cache; proof debt is next W-asymptotic correction or certified signed tail.
+G2 unaffected because it needs only O(1/(kW(k))) drift and centered residual
+osc(R)=O_A(1/W+kappa/d)=o(1).
+```
+
+
+Update after GPT R83 / Fable F85-F87 (2026-06-12):
+
+```text
+F227 accepted: q=exp(-epsilon) damping is constant curvature surplus plus
+affine gauge. Shifting c_r -> c_r+2epsilon adds epsilon k(k-1) to S_n(k), so
+Phi_{n,q}(s)=Phi_n^{(+2epsilon)}(q s). F1 heat multiplier, constant curvature
+surplus, and alpha_c=1 interior monotonicity are the same LP-preserving clock
+modulo positive variable scaling.
+F86 accepted: previous scalar-replacement / BO-packet language is unsafe for
+zero counts in the oscillatory zone (F217 cosh-vs-cos failure). Coefficient
+L2/fidelity estimates remain coefficient-space only. F218 v3 restatement:
+use G2 finite-difference bounds on E_k; remove affine jet as exact gauge;
+insert higher jets as perturbations of the Laguerre-cell ODE coefficients;
+match value/log-derivative off-axis in Zone III; propagate through
+Airy/oscillatory zones by Olver/Pruefer-Gronwall; count zeros from transported
+phase, not termwise magnitude estimates. G2 input is pointwise
+Delta^2E_k=(c_k-1/k)+O(1/d+1/D)=O(1/(kappa W)+1/d). For Airy edge, do not
+control by full oscillation of E over kappa^(2/3); use pointwise ODE
+coefficient perturbation.
+F228 verified with cache convention LG_j=log(moment_j)+logGamma(j+1)-
+logGamma(2j+1), c_j=2LG_j-LG_{j-1}-LG_{j+1}. Exact telescope:
+C(k)=sum_{j<=k}c_j=(LG_1-LG_0)-(LG_{k+1}-LG_k), so
+S(k)=A-[(LG_{k+1}-LG_k)+C^W(k)], A=LG_1-LG_0=log(M_2/(2M_0)).
+Cached Phi kernel has global scale factor vs Xi, but A is invariant.
+Normalized moments from archive: M0=0.4971207781883141099127737396853977,
+M2=0.02297194431514543753524987649763217,
+A=-3.7677065326292670057110312914149004285,
+exp(A)=0.023104993115418970788933810430339014.
+If S_inf=1, analytic target is
+LG_{k+1}-LG_k+C^W(k)->A-1=-4.7677065326292670057110312914149004285.
+Cache rows: S(166)=0.9952928547129190, S(240)=0.9977596685505957,
+S(320)=0.9991686822836305, S(359)=0.9996326662816208; gap to 1 at 359 is
+0.0003673337183792352571459864413094142. Telescope error about 4e-119 at
+120 dps. Repro script: scripts/research/hilbertPolya/gpt_f228_telescoping.py;
+output: artifacts/runpod/gpt_rh_f76_extend_20260612_140122/f228_telescoping.json.
+```
+
+
+Update after GPT R84 / Fable F88 (2026-06-12):
+
+```text
+F88 supersedes both earlier constants. Cache verifies closed zero-data
+constant. Normalized moments from archived j<=360 cache:
+M0=0.49712077818831410991277373968539771980729360955770518593323423399849552904554349,
+M2=0.022971944315145437535249876497632170264593013837589063499144622165183631858892554,
+M2/M0=0.046209986230837941577867620860678028006763520794844180246365001121527495908012326.
+c0_closed=log(8M2/M0)=-0.99511781038948576804210280558219415619482825235898707797518077073928396931410885;
+scale exp(-c0)=2.7050430046781109373306180620323100273605569639163249930615102194788091615481771.
+Using C*=1.28796206, c0^W=EulerGamma-2C*=-1.9987084550984669567032871647895024189639441796850764,
+so S_inf_pred=c0-c0W=1.0035906447089811886611843592073082627691159273260893.
+r_k/W(2k/pi)^2 trajectory: k=160 2.7322605112166180, 200 2.7268668259214569,
+240 2.7232629543393237, 280 2.7206839561588019, 320 2.7187466366125913,
+359 2.7172714041702249, falling toward 2.705043004678...
+S(359)=0.99963266628162076474285401355869058581433797707528, tail to F88 target
+0.003957978427360423918330345648617676954777950250808.
+Interpretation: e-scale rejected; S_inf=1 was useful intermediate telescope but superseded;
+F88 closed constant is cache-consistent pending Fable Watson/Laplace proof of DeltaLG asymptotic.
+Repro script/output updated: scripts/research/hilbertPolya/gpt_f228_telescoping.py and
+artifacts/runpod/gpt_rh_f76_extend_20260612_140122/f228_telescoping.json.
+```
+
+
+Update after GPT R85 (2026-06-12):
+
+```text
+Watson/Laplace step for F88 reduced to a ratio theorem and documented. Let
+M_j=int Phi(t)t^(2j)dt, LG_j=logM_j+logGamma(j+1)-logGamma(2j+1),
+W_j=W(2j/pi), u_j=W_j/2. The theta kernel has
+Phi(t)=2pi^2 exp(9t/2-pi exp(2t))[1+O(exp(-2t))+O(exp(-3pi exp(2t)))].
+The saddle of 2j log t - pi exp(2t) is u_j exp(2u_j)=j/pi. The 9t/2 factor
+shifts it by O(u_j/j); the second n=1 term is O(W_j/j) on the saddle scale;
+n>=2 terms are exp[-Omega(j/W_j)]; saddle width is O((u_j/j)^(1/2)), relative
+width o(1). Hence M_{j+1}/M_j=E_j[t^2]=u_j^2(1+o(1)), so
+LG_{j+1}-LG_j=2log(W_j/2)-log(2(2j+1))+o(1).
+Combining with F228 gives c0=log(8M2/M0)=log(16 sum gamma^-2).
+Cache ratio check M_{k+1}/M_k/(W_k/2)^2:
+k=160 1.0100617648190572, 200 1.0080678278332743, 240 1.0067355489837696,
+280 1.0057821452204795, 320 1.0050659571440385, 359 1.0045205933772462.
+Updated f228_telescoping.json to include direct moment-ratio fields.
+```
+
+
+Update after GPT R86 / Fable F89 (2026-06-12):
+
+```text
+F89 verified: frozen xi head is exactly normalized Xi in z^2 coordinates.
+Definitions LG_j=logM_j+logGamma(j+1)-logGamma(2j+1),
+c_j=2LG_j-LG_{j-1}-LG_{j+1}, S0(k)=sum_{r=1}^{k-1}(k-r)c_r,
+Delta0=LG_1-LG_0. Exact discrete integration:
+LG_k=LG_0+kDelta0-S0(k), hence e^{-S0(k)}/k!=(M_k/(2k)!)exp(-kDelta0)/M0.
+Therefore Phi_{xi,0}(s)=Xi(sqrt(exp(-Delta0)s))/Xi(0), and head zeros
+s_n=exp(Delta0)gamma_n^2. exp(Delta0)=0.023104993115418970788933810430339014...
+Verification script/output:
+scripts/research/hilbertPolya/gpt_f89_head_identity.py and
+artifacts/runpod/gpt_rh_final_20260612_133134/xihead_audit/run_20260612_123309/f89_head_identity.json.
+Max log-coefficient error through degree 90 = 8.1789141241617601921916806975e-118.
+First roots match scaled zeta ordinates: n=1 4.616157083428723231400095157403748... vs archived
+4.6161570834287232314000951574; n=2 10.210700666537783384252803599800381... vs archived
+10.2107006665377833842528035998; first 8 high precision, later degree-90 truncation degrades.
+Consequence: fixed-head LP <=> RH exactly; head census/staircase proof route halted.
+F62/K-escalation was Xi zero verification in head coordinates; F228/F88 constants are bookkeeping.
+q-damped Xi_q remains a one-way falsification detector by F1, not proof evidence.
+Remap: prioritize all-degree finite-d transverse Krawtchouk cone beyond d=9; then finite-d bulk
+tiling/F7-F8; then K'/Weil after circularity audit.
+```
+
+
+Update after GPT F90-F92 audit (2026-06-12):
+
+```text
+F90 coordinate unification verified: with C_d(w)=P_d(w^2), r=c^2, q=y^2, s=v^2,
+z=r-q+2i sqrt(rq)=(c+iy)^2, so Q_d(s,q;r) is exactly
+(|C_d(c+iy)|^2-|C_d(v(c+iy))|^2)/(1-v^2).
+Clean F55 formula reposted:
+B_{d,m}=sum_{k,l} a_{d,k}a_{d,l}r^(k+l-m)K_{k,l,m}(1-s^(k+l))/(1-s),
+K_{k,l,m}=(-1)^m[x^(2m)](1-x)^(2k)(1+x)^(2l).
+
+F91 W1-W3 audit accepted:
+ODE C_d''-(w/2d)C_d'+C_d=0 gives d_x(|C|^2+|C'|^2)=(x/d)|C'|^2.
+For psi=C'/C, d_y|psi|^2=-(y/d)|psi|^2-2(1-|psi|^2)Im psi.
+Since C_d=const*L_d^(-1/2)(w^2/(4d)), all zeros are real simple and Im psi<0
+in the upper half-plane. At critical wall feet psi=0; |psi|=1 has derivative
+-y/d<0, so |psi(c+iy)|<1.
+Using factor monotonicity in |y|, sup_v |C_d(v(c+iy))|/|C_d(c+iy)|<sqrt(2)
+on all critical walls, all d.
+
+Scope qualification: W1-W3 close the F211/Rouche atom-budget wall condition
+because p=sqrt(2/e) and ((1-p)/p)sqrt(2)=0.2345<1. They do not prove the
+stronger naked dominance |C(vw)|<=|C(w)| or coefficient cone B_{d,m}>=0.
+Krawtchouk/Sturm remains an independent stronger diagnostic.
+
+F92 cap lemma remains main proof debt: bound sup_x |psi(x+iH)| on horizontal
+caps; real-part Hilbert-transform/edge-counting constants need audit.
+GPT launched d=10 transverse exact run on dedicated Runpod:
+/workspace/gpt_rh/walljet_d10/walljet_d10_w{1..9}.log, Q degrees q=20 s=19 r=8.
+```
+
+
+Cap audit refinement (same update):
+
+```text
+Transformed gauge C=exp(w^2/8d)u gives u''+Omega^2u=0,
+Omega^2=1+1/(4d)-w^2/(16d^2), hence zero spacing >=
+pi/sqrt(1+1/(4d)). The Im cap bound is |Im psi(x+iH)| <=
+1+1/H+O(1/d), so at H=pi the imaginary cap is 1.319+O(1/d).
+For Re psi, use phi=u'/u=psi-w/(4d). WKB density
+rho(t)=sqrt(A^2-t^2)/(4pi d), A=4d sqrt(1+1/(4d)), has PV transform x/(4d),
+which cancels the gauge real part in phi and leaves Re psi about 1 at the edge.
+Remaining proof debt: explicit Pruefer zero-count discrepancy through the
+height-H Hilbert kernel plus Airy-edge constants below 5.95.
+```
+
+
+Theorem M draft status after GPT v1 edits (2026-06-12):
+
+```text
+docs/rh/theorem_M_draft.md exists. GPT edited it with [GPT v1].
+Section 1.4 finite measure split is exact for every d:
+E[U_1^k]=(2k)! exp(gamma k-S_1(k))/(4^k k!), Pr(U_1=1)=sqrt(2/e), and
+P_{d,1}(exp(gamma)w^2/(4d))=E C_d(sqrt(U_1)w)=pC_d+int C_d(vw)dmu.
+mu is positive on [0,1), mass 1-p, independent of d. No d0/no limit.
+
+GPT accepted §2.5a Im layer-cake with corrected pi^- spacing,
+§2.5b semicircle gauge identity, and §2.6 A1 upward propagation.
+For §2.5c: Tier 1 is audited as explicit through d<=10^53. Tier 2 is
+structurally accepted but should remain PROVED-1 until o(1) thresholds are
+made explicit; all-d Theorem M still depends on that constants polish.
+
+d=10 Krawtchouk referee: q^1..q^3 passed all nine walls, empty stderr.
+Partial local snapshot:
+artifacts/runpod/gpt_rh_walljet_d10_live_20260612_144400/
+```
+
+
+W2' spacing-template scan (F97, 2026-06-12):
+
+```text
+Script: scripts/research/hilbertPolya/gpt_f97_w2prime_scan.py
+Output: artifacts/research/gpt_f97_w2prime_scan_20260612_1535.json
+Test family zeros = +/-(j+1/2)pi, j=0..d-1, all gaps exactly pi.
+Critical-wall sup_y |sum 1/(c+iy-rho)| grows past the model barrier:
+d=8 1.141612, d=64 1.733411, d=512 2.364980, d=4096 3.012638.
+Conclusion: spacing alone does not give C0=1 and likely needs added
+PV/density/edge-taper hypotheses. Theorem M is unaffected because it has the
+semicircle gauge/PV structure.
+```
+
+
+Theorem M closed for all d (F99/GPT line audit, 2026-06-12):
+
+```text
+Fable added explicit E1-E8 constants for §2.5c Tier 2. GPT audited and edited
+docs/rh/theorem_M_draft.md to v3 PROVED for all d.
+Accepted E1-E5. Corrections:
+E6 original local-spacing bound over Lambda=pi d^(1/3) was optimistic; corrected
+Omega window bound is Omega <= sqrt(4+pi/2)d^(-1/3)<2.37d^(-1/3), still giving
+<=5 zeros in the near window.
+E7 2E0/Lambda at d=10^6 is about 0.011, so use 0.012 not 0.001.
+Then edge |Re psi| <= 0.796+1+0.900+0.012 < 2.72 and
+K_cap <= sqrt(2.72^2+1.319^2)=3.023<5.954.
+Tier 2 covers d>=10^6; Tier 1 covers d<=10^53; overlap proves all finite d.
+Remaining Theorem M work is manuscript polish/archive citation, not proof closure.
+```
+
+
+
+Update after F104/F105 referee audit (2026-06-12):
+
+```text
+F104 external referee pass on Theorem M found three write-up/bookkeeping issues: critical-point indexing, unbounded Rouche framing above caps, and compressed E7 edge-zone discrete control. GPT F105 audited all fixes and accepted them.
+
+Critical indexing: C_d even degree 2d => C_d' odd degree 2d-1, with zero at origin and exactly d-1 positive criticals. Correct interlacing is 0=c0<rho1<c1<...<c_{d-1}<rho_d; final half-cell is [c_{d-1},X].
+
+Above caps: replace Rouche on unbounded {Im w>H} by pointwise non-vanishing. Vertical monotonicity + W1 + A1 gives |C_d(vw)|/|C_d(w)| <= sqrt(1+K_cap^2) for y>=H; bracket distance in Psi_d=pC_d[1+...] is <1, and C_d has no off-real zeros.
+
+E7: one-sided smooth edge transform bound 0.9004 accepted; exact crude-step value is 0.8183. Discrete by-parts tail costs 4E0/Lambda, not 2E0/Lambda; at d=10^6 this is 0.0221..., giving |Re psi|<=2.719 and K_cap<=3.03<5.954. Theorem M remains PROVED for all finite d.
+
+F103 lane choice: GPT takes B = kernel-side F205. Target is to restate F65/F71/F205 after affine gauge as a section-level weighted L1_H kernel-norm estimate for J^d[Delta Xi], using |Delta Xi(x+iy)| <= int |Delta Phi(u)| exp(|y|u)du. This avoids F217- because the actual comparison is between positive cosine kernels, not adversarial coefficient perturbations.
+```
+
+
+
+Update after F106 / d=10 final archive (2026-06-12):
+
+```text
+Fable added §3b Corollary T, lane-A model boundary floor for the F103 transport chain. GPT audited and accepted with one scope correction.
+
+Constants accepted: K=3.03, r_cap=(1-p)sqrt(1+K^2)/p=0.5292..., cap floor p(1-r_cap)/sqrt(1+K^2)=0.126...>1/8, wall floor >=0.656, above-strip floor |Psi_d|>=0.403|C_d|>=1/8. Proof uses W1 energy floor, vertical product monotonicity, and F104 pointwise above-cap non-vanishing.
+
+Scope correction: transport consequence is valid for even real polynomials of degree at most 2d (finite Jensen sections), or for entire targets only with a separate exterior-strip no-extra-zeros condition. Finite cell-boundary control alone cannot exclude extra zeros beyond the finite X-wall for arbitrary entire functions. Draft §3b and ledger patched; status PROVED + GPT audited in F106.
+
+d=10 exact transverse Krawtchouk/Sturm run completed on GPT dedicated Runpod. Local archive: artifacts/runpod/gpt_rh_walljet_d10_final_20260612_1527/; tarball artifacts/runpod/gpt_rh_walljet_d10_final_20260612_1527.tar.gz; sha256 d537cd6da73e8b4b028155dc037732081ca8a26f7b85e0d44747eedf3444bc9e. All nine walls passed q^1..q^20 with RESULT d=10 TRANSVERSE_PASS; Q_degrees q=20 s=19 r=8; stderr empty; SHA256SUMS verified. Combined with F58 q^0, stronger wall-jet diagnostic is certified through d=10.
+```
+
+
+F107 refinement: Fable's exact F106 mailbox ask arrived after GPT's F106 response. GPT confirmed the layer-cake Im constant `sqrt(1+1/4d)+1/H`; for `5<=d<10^6`, unrounded maxima give `Re<=2.1033`, `Im<=1.3431`, hence `K<2.50`. The `1/8` cap-floor threshold is `K<=3.050010078...` because `floor(K)=p/sqrt(1+K^2)-(1-p)`; `floor(3.03)=0.126591990...`. Fable's quoted `3.066` threshold was too loose but harmless since E8 gives `K<=3.03`.
+
+
+F108 lane-B kernel norm note: created `docs/rh/kernel_norm_transport.md`. Beta socket: define `||Delta Phi||_{J,d,H}=int |Delta Phi(u)| K_{J,d,H}(u)du`, where `K_{J,d,H}=sup_{Theorem-M boundaries, |Im w|<=H}|J_d[cos(u .)](w)|`; beta needs `<1/8`. Positive-kernel perturbation lemma: if after affine gauge `dnu_tgt=exp(-R)dnu_ref` on a central region, `osc R<=eta`, weighted tails `<=T`, then weighted section-kernel TV is `<=exp(eta)-1+T`. F65/G2 gives coefficient-packet residual `osc R_k=O_A(1/W(kappa)+kappa/d)` and `Delta^2E=O_A(1/(kappa W)+1/d)`, tending to zero on the moving edge. But G2 alone is not an `L1_H` theorem. Missing bridge is Kernel-F205 realization lemma: identify the coefficient residual with the centered log-density residual of positive section kernels and prove weighted saddle tails `o(1)`. Do not replace this norm by absolute coefficient sums; that repeats F217.
+
+
+F109 W2′ refined audit: Fable's `docs/rh/template_W2prime.md` accepted after decimal correction. Lemma 1 proof is sound: at critical point `c`, if nearest-zero distance `delta<pi/2`, truncation radius `pi-delta>1` includes exactly non-nearest zeros and criticality gives `1/delta<=B`; hence `dist(c,Z)>=min(pi/2,1/B)`. Lemma 2 constants check: `c_im=1+2/pi`, `c_mid=2/pi`, `c_out=2/pi+log(2)/pi`; exact `c_geo=1+6/pi+log(2)/pi=3.130494917...`, so patched `3.13` to `3.131`. Headline remains `max(2/pi,B)+B+3.131 <= 2B+3.77` because `2/pi+c_geo=3.767114689...<3.77`. W2′ refined is jointly audited; remaining work is displacement dictionary `B_tgt<=B_ref+O(eta)` and beta kernel-realization.
+
+
+F110 beta kernel identity: added `docs/rh/kernel_norm_transport.md` §2a. Exact finite-section kernel: with `C_d(w)=sum_{k=0}^d (-1)^k ((d)_k/d^k)w^(2k)/(2k)!`, the degree-d Jensen operator gives `J_d[cos(u .)](w)=C_d(uw)`. Therefore `||Delta Phi||_{J,d,H}=int |Delta Phi(u)| sup_{Theorem-M boundaries, |Im w|<=H}|C_d(uw)|du`. Compact model dilations `0<=u<=1` fall under existing Theorem-M `C_d(vw)` machinery; true-xi has unbounded effective support by F71/F205, so the open beta tail is precisely the positive-kernel saddle localization under this `C_d(uw)` boundary weight. Coefficient absolute sums remain forbidden.
+
+
+F111 B_ref audit: Fable measured model truncated-Hilbert constant at claimed worst point `x=rho_max+1,r=1`; independent SciPy `roots_genlaguerre(d,-1/2)` values match: d=2 1.475494256536, d=5 1.680939872574, d=10 1.786120971519, d=20 1.858730922145, d=50 1.919687077130, d=100 1.948084920713, d=200 1.966634939770. Full global jump-radius enumeration not independently rerun. Accepted analytic Tier-2 lemma for d>=1e6: smooth semicircle truncated transform <=sqrt(1+1/4d)<=1.0000002; odd kernel kills constant counting-error part; jump+local-tail variation <=4M/r with M=3/2+epsilon3; far tail <=4E0/d^(1/6); hence B_ref<=7.8. Patched status to PROVED for d>=1e6 and corrected `C0(7.8)<=18.731`. Midrange 200<d<1e6 remains uncertified.
+
+
+F112 post-F110 confirmation: Fable's F110 B_ref audit request arrived after GPT F111. GPT confirmed exact targets: smooth truncated semicircle transform `|T|<=1` accepted by monotonicity/reflection; edge single-crossing variation accepted for d>=1e6 because spacing `~d^(1/3)` dominates `T=d^(1/6)`; odd-kernel fluctuation accounting accepted (`constant e` cancels, jumps+local tail `<=4M/r`, far tail `<=4E0/d^(1/6)`). B_ref jointly audited for d>=1e6; midrange still open. Clock flag acknowledged; use `date` before future log append.
+
+
+F113 lane-B Mellin-cumulant dictionary: updated `docs/rh/kernel_norm_transport.md`. For positive kernel `nu`, `M_nu(k)=int u^(2k)dnu`, tilted law `dnu_k=u^(2k)dnu/M_nu(k)`, `theta=log u`; then `d/dk log M=2E_k theta`, `d^2/dk^2 log M=4Var_k(theta)`, higher derivatives are `2^m` tilted cumulants. With `M_tgt/M_ref=exp(-E_k)`, F65 affine gauge means constant=mass, linear=log-center, `Delta^2E`=log-variance/curvature mismatch. G2 is therefore the right small curvature-discrepancy estimate on saddle packets. Beta still open: need Mellin-saddle realization theorem proving uniform log-concavity/local saddle equivalence, higher-cumulant control, `dnu_tgt=exp(-R)dnu_ref` with `osc R=O_A(1/W+kappa/d)`, and `K_{J,d,H}`-weighted tails `exp(-cA^2)+o(1)`, where `K_{J,d,H}(u)=sup_boundary |C_d(uw)|`.

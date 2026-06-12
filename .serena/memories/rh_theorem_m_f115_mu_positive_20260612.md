@@ -1,0 +1,7 @@
+# RH Theorem M F115 self-contained mu positivity (2026-06-12)
+
+Fable Round 307 / mailbox F111 assigned GPT to inline §1.4a in `docs/rh/theorem_M_draft.md`: explicit compound-Poisson construction of `U_1`, moment verification, and proof `mu >= 0`. Delivered as PROVED-1; Fable audit requested. Round-307 constant hardening audit remains separate/outstanding.
+
+Construction in draft: for `t>0`, `eta(t)=e^(t/2)/t - 1/(1-e^(-t)) = [2sinh(t/2)-t]/[t(1-e^(-t))] > 0`; `eta(t)=t/24+O(t^2)` near 0, and `eta(t)e^(-t)/(1-e^(-t))=O(e^(-t/2)/t)` at infinity. Define finite positive measure `lambda(dt)=eta(t)e^(-t)/(1-e^(-t))dt`. Let `N` be a Poisson point process with intensity `lambda`, atoms `{T_j}`, `Y=sum_j T_j`, `U_1=e^(-Y)`. Then `U_1 in [0,1]` is an honest random variable.
+
+Poisson Laplace functional: `E[U_1^k]=exp int (e^(-kt)-1)lambda(dt)`. Binet-digamma identity: `int_0^infty e^(-yt)eta(t)dt=psi(y)-log(y-1/2)`, `y>1/2`. Adjacent ratios: `log(E[U_1^k]/E[U_1^(k-1)])=log(k-1/2)-psi(k)=log(k-1/2)+gamma-H_{k-1}`. Target `M_k=(2k)! exp(gamma k-S_1(k))/(4^k k!)` has `M_0=1` and same ratio since `S_1(k)-S_1(k-1)=H_{k-1}`. Hence `E[U_1^k]=M_k` for all `k>=0`. Stirling and `H_{k-1}=log k+gamma-1/(2k)+O(k^-2)` give `Pr(U_1=1)=lim_k E[U_1^k]=sqrt(2/e)`, so `lambda((0,infty))=(1-log2)/2`. For `v=sqrt(U_1)`, law `nu=sqrt(2/e)delta_1+mu`, `mu=nu|_[0,1)` positive with mass `1-sqrt(2/e)`.
