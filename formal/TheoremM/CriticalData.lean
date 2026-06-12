@@ -146,4 +146,195 @@ lemma neg_one_pow_roots_above_mul_leadingCoeff_mul_eval_pos
                 (fun r => x - r)).prod)) := by
       ring
 
+/-! ## The eval-scaling bridge (C2a)
+
+`C_d(x)·H_{2d}(0) = H_{2d}(x/√(2d))`, its derivative, and the
+criticality correspondence: criticals of `C_d` are the `√(2d)`-scaled
+roots of `H_{2d−1}`. -/
+
+/-- `H_{2d}` as its even-coefficient sum (odd coefficients vanish and
+the degree is `2d`). -/
+lemma hermiteEvenR_eq_even_sum (d : ℕ) :
+    HermiteEvenR d = ∑ k ∈ Finset.range (d + 1),
+      Polynomial.C ((HermiteEvenR d).coeff (2 * k)) * X ^ (2 * k) := by
+  ext m
+  rw [finsetSum_coeff]
+  rcases Nat.even_or_odd m with he | ho
+  · obtain ⟨j, hj⟩ := he
+    rcases Nat.lt_or_ge j (d + 1) with hjd | hjd
+    · rw [Finset.sum_eq_single j]
+      · simp only [coeff_C_mul, coeff_X_pow]
+        rw [if_pos (by omega)]
+        rw [show m = 2 * j by omega]
+        ring
+      · intro k _ hkj
+        simp only [coeff_C_mul, coeff_X_pow]
+        rw [if_neg (by omega)]
+        ring
+      · intro hj'
+        exact absurd (Finset.mem_range.mpr hjd) hj'
+    · have hdeg : (HermiteEvenR d).natDegree < m := by
+        have hnd : (HermiteEvenR d).natDegree = 2 * d :=
+          hermiteR_natDegree (2 * d)
+        omega
+      rw [coeff_eq_zero_of_natDegree_lt hdeg]
+      apply (Finset.sum_eq_zero fun k hk => ?_).symm
+      simp only [coeff_C_mul, coeff_X_pow]
+      rw [if_neg (by
+        have := Finset.mem_range.mp hk
+        omega)]
+      ring
+  · obtain ⟨j, hj⟩ := ho
+    rw [hj, hermiteEvenR_coeff_odd d j]
+    apply (Finset.sum_eq_zero fun k _ => ?_).symm
+    simp only [coeff_C_mul, coeff_X_pow]
+    rw [if_neg (by omega)]
+    ring
+
+/-- **The scaling bridge** (the manuscript's
+`C_d(w) = H_{2d}(w/√(2d))/H_{2d}(0)`, denominator-cleared):
+`C_d(x)·H_{2d}(0) = H_{2d}(x/√(2d))`. -/
+lemma Cpoly_eval_mul_coeff_zero (d : ℕ) (hd : 1 ≤ d) (x : ℝ) :
+    (Cpoly d).eval x * (HermiteEvenR d).coeff 0
+      = (HermiteEvenR d).eval (x / Real.sqrt (((2 * d : ℕ) : ℝ))) := by
+  have h2d : (0 : ℝ) < ((2 * d : ℕ) : ℝ) := by
+    have : 0 < 2 * d := by omega
+    exact_mod_cast this
+  have hs : (0 : ℝ) < Real.sqrt (((2 * d : ℕ) : ℝ)) := Real.sqrt_pos.mpr h2d
+  have hH0 := hermiteEvenR_coeff_zero_ne_zero d
+  rw [← HermiteCpoly_eq_Cpoly d hd]
+  conv_rhs => rw [hermiteEvenR_eq_even_sum d]
+  unfold HermiteCpoly
+  rw [eval_finsetSum, eval_finsetSum, Finset.sum_mul]
+  refine Finset.sum_congr rfl fun k _ => ?_
+  simp only [eval_mul, eval_C, eval_pow, eval_X]
+  have hpow : (x / Real.sqrt (((2 * d : ℕ) : ℝ))) ^ (2 * k)
+      = x ^ (2 * k) / ((2 * d : ℕ) : ℝ) ^ k := by
+    rw [div_pow, pow_mul, pow_mul, Real.sq_sqrt h2d.le]
+  rw [hpow]
+  have h2dk : ((2 * d : ℕ) : ℝ) ^ k ≠ 0 := by positivity
+  field_simp
+
+/-- Derivative of the bridge, by uniqueness of the real derivative:
+`C_d′(x)·H_{2d}(0) = (2d/√(2d))·H_{2d−1}(x/√(2d))`. -/
+lemma derivative_Cpoly_eval_mul_coeff_zero (d : ℕ) (hd : 1 ≤ d) (x : ℝ) :
+    (derivative (Cpoly d)).eval x * (HermiteEvenR d).coeff 0
+      = ((2 * d : ℕ) : ℝ) / Real.sqrt (((2 * d : ℕ) : ℝ))
+        * (HermiteR (2 * d - 1)).eval
+            (x / Real.sqrt (((2 * d : ℕ) : ℝ))) := by
+  set s := Real.sqrt (((2 * d : ℕ) : ℝ)) with hs_def
+  have h2d : (0 : ℝ) < ((2 * d : ℕ) : ℝ) := by
+    have : 0 < 2 * d := by omega
+    exact_mod_cast this
+  have hs : (0 : ℝ) < s := Real.sqrt_pos.mpr h2d
+  have hFG : (fun y : ℝ => (Cpoly d).eval y * (HermiteEvenR d).coeff 0)
+      = fun y : ℝ => (HermiteEvenR d).eval (y / s) :=
+    funext fun y => Cpoly_eval_mul_coeff_zero d hd y
+  have hF : HasDerivAt
+      (fun y : ℝ => (Cpoly d).eval y * (HermiteEvenR d).coeff 0)
+      ((derivative (Cpoly d)).eval x * (HermiteEvenR d).coeff 0) x :=
+    (Polynomial.hasDerivAt (Cpoly d) x).mul_const _
+  have hG : HasDerivAt (fun y : ℝ => (HermiteEvenR d).eval (y / s))
+      ((derivative (HermiteEvenR d)).eval (x / s) * (1 / s)) x := by
+    have hinner : HasDerivAt (fun y : ℝ => y / s) (1 / s) x := by
+      simpa using (hasDerivAt_id x).div_const s
+    exact (Polynomial.hasDerivAt (HermiteEvenR d) (x / s)).comp x hinner
+  rw [hFG] at hF
+  have huniq := hF.unique hG
+  rw [huniq, derivative_hermiteEvenR d hd]
+  simp only [eval_mul, eval_C]
+  field_simp
+
+/-- **Criticality correspondence**: `x` is a critical point of `C_d`
+iff `x/√(2d)` is a root of `H_{2d−1}`. -/
+lemma Cpoly_critical_iff (d : ℕ) (hd : 1 ≤ d) (x : ℝ) :
+    (derivative (Cpoly d)).eval x = 0
+      ↔ (HermiteR (2 * d - 1)).eval
+          (x / Real.sqrt (((2 * d : ℕ) : ℝ))) = 0 := by
+  have h := derivative_Cpoly_eval_mul_coeff_zero d hd x
+  have hH0 := hermiteEvenR_coeff_zero_ne_zero d
+  have h2d : (0 : ℝ) < ((2 * d : ℕ) : ℝ) := by
+    have : 0 < 2 * d := by omega
+    exact_mod_cast this
+  have hs : (0 : ℝ) < Real.sqrt (((2 * d : ℕ) : ℝ)) := Real.sqrt_pos.mpr h2d
+  have hc : ((2 * d : ℕ) : ℝ) / Real.sqrt (((2 * d : ℕ) : ℝ)) ≠ 0 := by
+    positivity
+  constructor
+  · intro h0
+    rw [h0, zero_mul] at h
+    rcases mul_eq_zero.mp h.symm with hl | hr
+    · exact absurd hl hc
+    · exact hr
+  · intro h0
+    rw [h0, mul_zero] at h
+    exact (mul_eq_zero.mp h).resolve_right hH0
+
+/-- The sign of `H_{2d}(0)`: `0 < (−1)^d · H_{2d}(0)`. -/
+lemma coeff_zero_hermiteEvenR_sign (d : ℕ) :
+    0 < (-1 : ℝ) ^ d * (HermiteEvenR d).coeff 0 := by
+  rw [hermiteEvenR_coeff_zero]
+  push_cast
+  have hsq : (-1 : ℝ) ^ d * (-1 : ℝ) ^ d = 1 := by
+    rcases Nat.even_or_odd d with he | ho
+    · rw [he.neg_one_pow]; norm_num
+    · rw [ho.neg_one_pow]; norm_num
+  have hdf : (0 : ℝ) < ((2 * d - 1).doubleFactorial : ℝ) :=
+    Nat.cast_pos.mpr (Nat.doubleFactorial_pos _)
+  rw [← mul_assoc, hsq, one_mul]
+  exact hdf
+
+/-! ## Root symmetry of `H_{2d−1}` through the bridge (C2b, part 1)
+
+The derivative of the even `C_d` is odd; through the criticality
+correspondence this transfers negation symmetry to the roots of
+`H_{2d−1}`, with `0` among them. -/
+
+/-- The derivative of `C_d` is odd: `C_d′(−x) = −C_d′(x)` (even-index
+coefficients of the derivative come from odd coefficients of `C_d`
+and vanish). -/
+lemma derivative_Cpoly_eval_neg (d : ℕ) (x : ℝ) :
+    (derivative (Cpoly d)).eval (-x)
+      = -((derivative (Cpoly d)).eval x) := by
+  rw [eval_eq_sum_range, eval_eq_sum_range, ← Finset.sum_neg_distrib]
+  apply Finset.sum_congr rfl
+  intro k _
+  rcases Nat.even_or_odd k with he | ho
+  · rw [coeff_derivative, Cpoly_coeff_odd d (k + 1) he.add_one]
+    ring
+  · rw [ho.neg_pow]
+    ring
+
+/-- Roots of `H_{2d−1}` in bridge coordinates: `z` is a root iff
+`√(2d)·z` is a critical point of `C_d`. -/
+lemma hermiteR_odd_root_iff_critical (d : ℕ) (hd : 1 ≤ d) (z : ℝ) :
+    (HermiteR (2 * d - 1)).eval z = 0
+      ↔ (derivative (Cpoly d)).eval
+          (Real.sqrt (((2 * d : ℕ) : ℝ)) * z) = 0 := by
+  have h2d : (0 : ℝ) < ((2 * d : ℕ) : ℝ) := by
+    have : 0 < 2 * d := by omega
+    exact_mod_cast this
+  have hs0 : Real.sqrt (((2 * d : ℕ) : ℝ)) ≠ 0 :=
+    (Real.sqrt_pos.mpr h2d).ne'
+  have h := Cpoly_critical_iff d hd
+    (Real.sqrt (((2 * d : ℕ) : ℝ)) * z)
+  rw [mul_div_cancel_left₀ z hs0] at h
+  exact h.symm
+
+/-- Root symmetry of `H_{2d−1}`: `−y` is a root iff `y` is. -/
+lemma hermiteR_odd_isRoot_neg_iff (d : ℕ) (hd : 1 ≤ d) (y : ℝ) :
+    (HermiteR (2 * d - 1)).eval (-y) = 0
+      ↔ (HermiteR (2 * d - 1)).eval y = 0 := by
+  rw [hermiteR_odd_root_iff_critical d hd, hermiteR_odd_root_iff_critical d hd,
+    show Real.sqrt (((2 * d : ℕ) : ℝ)) * (-y)
+      = -(Real.sqrt (((2 * d : ℕ) : ℝ)) * y) by ring,
+    derivative_Cpoly_eval_neg]
+  exact neg_eq_zero
+
+/-- `0` is a root of `H_{2d−1}` (the bridge image of the critical
+point of `C_d` at the origin). -/
+lemma hermiteR_odd_eval_zero (d : ℕ) (hd : 1 ≤ d) :
+    (HermiteR (2 * d - 1)).eval 0 = 0 := by
+  have h := (Cpoly_critical_iff d hd 0).mp (derivative_Cpoly_eval_zero d)
+  rwa [zero_div] at h
+
 end TheoremM
