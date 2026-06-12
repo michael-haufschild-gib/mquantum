@@ -50,8 +50,12 @@ relevant only if we later formalize the transport interface).
    signs alternate; IVT inserts a root of `L(p)` in every gap and both
    tails; degree count gives simplicity + interlacing. mathlib's
    `hermite (n+1) = X·hermite n − derivative (hermite n)` carries the
-   induction. Then `C_d(w) ∝ H_{2d}(w/√(4d))` transfers to `C_d` —
-   no Laguerre, no orthogonality, no Gaussian tails.
+   induction. Transfer (CONVENTION NOTE, round 319): mathlib's
+   `hermite` is the PROBABILISTS' family — the identity is
+   `C_d(w) = He_{2d}(w/√(2d))/He_{2d}(0)`, `He_{2d}(0) = (−1)^d(2d−1)!!`
+   (verified in exact rationals d ≤ 8, all k; the paper's physicists'
+   √(4d) form is equivalent). No Laguerre, no orthogonality, no
+   Gaussian tails.
 
 ## mathlib inventory (v4.30.0, verified by grep round 311)
 
