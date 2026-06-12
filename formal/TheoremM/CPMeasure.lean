@@ -38,9 +38,9 @@ open Real MeasureTheory Set Filter
 
 /-! ## The elementary domination inequality -/
 
-/-- `e^{−t/2} − e^{−3t/2} ≤ t` for `t > 0`: with `u = e^{−t/2}` this is
+/-- `e^{−t/2} − e^{−3t/2} ≤ t` (unconditionally): with `u = e^{−t/2}` this is
 `u − u³ ≤ −2 log u`, from `log u ≤ u − 1` and `(u−1)²(u+2) ≥ 0`. -/
-lemma exp_diff_le_self {t : ℝ} (ht : 0 < t) :
+lemma exp_diff_le_self (t : ℝ) :
     Real.exp (-(t / 2)) - Real.exp (-(3 * t / 2)) ≤ t := by
   set u := Real.exp (-(t / 2)) with hu
   have hu0 : 0 < u := Real.exp_pos _
@@ -55,10 +55,10 @@ lemma exp_diff_le_self {t : ℝ} (ht : 0 < t) :
   rw [hcube]
   nlinarith [hfac, h1, hlog]
 
-/-- `2 sinh(t/2) e^{−t} ≤ t` for `t > 0`. -/
-lemma two_sinh_mul_exp_le {t : ℝ} (ht : 0 < t) :
+/-- `2 sinh(t/2) e^{−t} ≤ t` (unconditionally). -/
+lemma two_sinh_mul_exp_le (t : ℝ) :
     2 * Real.sinh (t / 2) * Real.exp (-t) ≤ t := by
-  have h := exp_diff_le_self ht
+  have h := exp_diff_le_self t
   rw [Real.sinh_eq]
   have e1 : Real.exp (t / 2) * Real.exp (-t) = Real.exp (-(t / 2)) := by
     rw [← Real.exp_add]
@@ -78,7 +78,7 @@ lemma eta_le_two_sinh_div {t : ℝ} (ht : 0 < t) :
     linarith
   have h1 : (0 : ℝ) < 1 - Real.exp (-t) := by linarith
   rw [eta_eq_sinh_form ht, div_le_div_iff₀ (mul_pos ht h1) ht]
-  nlinarith [mul_le_mul_of_nonneg_left (two_sinh_mul_exp_le ht) ht.le]
+  nlinarith [mul_le_mul_of_nonneg_left (two_sinh_mul_exp_le t) ht.le]
 
 /-! ## Integrability of the Binet integrand -/
 
@@ -114,7 +114,6 @@ lemma integrableOn_exp_mul_eta (k : ℕ) :
         ring_nf
       rw [e1, e2, Real.sinh_eq]
       field_simp
-      ring
     rw [hfact]
     exact mul_le_mul_of_nonneg_left (eta_le_two_sinh_div ht0)
       (Real.exp_pos _).le
@@ -156,11 +155,10 @@ lemma weight_mul_levyDensity_eq_sum {k : ℕ} {t : ℝ} (ht : 0 < t) :
       = (∑ m ∈ Finset.range k, Real.exp (-t) ^ m) * (1 - Real.exp (-t)) := by
     have h := geom_sum_mul (Real.exp (-t)) k
     rw [← hpow]
-    linear_combination -h
+    linear_combination h
   have hld : (1 - Real.exp (-t)) * levyDensity t = Real.exp (-t) * eta t := by
     unfold levyDensity
     field_simp
-    ring
   calc (1 - Real.exp (-((k : ℝ) * t))) * levyDensity t
       = (∑ m ∈ Finset.range k, Real.exp (-t) ^ m)
           * ((1 - Real.exp (-t)) * levyDensity t) := by
@@ -185,7 +183,7 @@ lemma integrableOn_weight_mul_levyDensity (k : ℕ) :
   have hsum : IntegrableOn
       (fun t : ℝ => ∑ m ∈ Finset.range k,
         Real.exp (-(((m : ℝ) + 1) * t)) * eta t) (Ioi 0) :=
-    integrable_finset_sum _ fun m _ => integrableOn_exp_mul_eta m
+    integrable_finsetSum _ fun m _ => integrableOn_exp_mul_eta m
   apply hsum.congr
   filter_upwards [ae_restrict_mem measurableSet_Ioi] with t ht
   exact (weight_mul_levyDensity_eq_sum (mem_Ioi.mp ht)).symm
@@ -199,7 +197,7 @@ lemma integral_weight_mul_levyDensity (k : ℕ) :
       = ∑ m ∈ Finset.range k, (bSeq m - Real.eulerMascheroniConstant) := by
   rw [setIntegral_congr_fun measurableSet_Ioi
     (fun t ht => weight_mul_levyDensity_eq_sum (mem_Ioi.mp ht))]
-  rw [integral_finset_sum _ fun m _ => integrableOn_exp_mul_eta m]
+  rw [integral_finsetSum _ fun m _ => integrableOn_exp_mul_eta m]
   exact Finset.sum_congr rfl fun m _ => binet_integer_bSeq m
 
 /-- **The moment sequence is the Laplace exponent of the Lévy data**:
