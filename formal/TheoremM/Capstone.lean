@@ -12,8 +12,9 @@ are here DISCHARGED by the constructed compound-Poisson pushforward
 
 What remains as hypothesis in `theorem_M_of_critical_data_measure` is
 exactly the P6.2 critical data of `C_d` — the interlacing critical
-points with alternating critical-value signs.  Once P6.2 lands, the
-sole `sorry` (`theorem_M` in `Defs.lean`) instantiates from this file.
+points with alternating critical-value signs — delivered by
+`CriticalData.lean`, where `theorem_M` is stated and proven from this
+capstone.
 
 The finite-quadrature interface in `MuBridge.lean` remains intact as
 the special case (F140/F141 agreement); both routes share the generic
@@ -109,21 +110,5 @@ theorem theorem_M_of_critical_data_measure (d : ℕ) (hd : 1 ≤ d)
   exact Psi_sign_of_budget d
     (Psi_budget_at_critical_measure d hd hcm (hcrit m hm))
     ((-1 : ℝ) ^ m) (hCsign m hm) hs1
-
-/-- **Skeptic-proof form of Theorem M** (review finding F-1): the
-statement free of multiset conventions.  `theorem_M`'s root-multiset
-phrasing is non-vacuous because `Ψ_d ≠ 0` maps injectively into `ℂ[X]`
-— this corollary makes that explicit: ANY complex number annihilating
-`Ψ_d` has imaginary part zero.  Derived from `theorem_M`, so it
-inherits the sole `sorry` until P6.2 lands, after which both are
-axiom-clean simultaneously. -/
-theorem theorem_M_aeval (d : ℕ) (hd : 1 ≤ d) (z : ℂ)
-    (hz : Polynomial.aeval z (Psi d) = 0) : z.im = 0 := by
-  apply theorem_M d hd z
-  rw [Polynomial.mem_roots']
-  refine ⟨(Polynomial.map_ne_zero_iff (algebraMap ℝ ℂ).injective).mpr
-    (Psi_ne_zero d), ?_⟩
-  rw [Polynomial.IsRoot, Polynomial.eval_map, ← Polynomial.aeval_def]
-  exact hz
 
 end TheoremM

@@ -129,26 +129,15 @@ lemma Psi_coeff_odd (d : ℕ) (m : ℕ) (hm : Odd m) : (Psi d).coeff m = 0 := by
     omega
   simp [coeff_C_mul, coeff_X_pow, hne]
 
-/-! ## The statement -/
+/-! ## The statement
 
-/-- **Theorem M** (draft `docs/rh/theorem_M_draft.md`, jointly audited
-rounds 295–313): for every `d ≥ 1`, all complex zeros of `Ψ_d` are real.
-
-Formalized via the §3c second proof (real-variable sign alternation):
-the energy bound W1 (`Energy.lean`) controls `C_d` on `[0, c]` by its
-value at any critical point `c`; the compound-Poisson measure of §1.4a
-(`CPMeasure.lean`) yields the decomposition
-`Ψ_d = pAtom·C_d + ∫ C_d(v·) dμ(v)` with budget `1 − pAtom < pAtom`
-(`Capstone.lean`), so `Ψ_d` inherits the alternating signs of `C_d` at
-its critical points; `d` sign changes on `(0, ∞)`, evenness, and the
-degree-`2d` root-count pin force every complex root real
-(`SignCount.lean`).  Remaining input: the P6.2 critical data of `C_d`
-(`Hermite.lean` + `CriticalData.lean`), after which this `sorry` is
-discharged by `theorem_M_of_critical_data_measure`.
-
-Multiset-convention-free companion: `theorem_M_aeval` (`Capstone.lean`). -/
-theorem theorem_M (d : ℕ) (hd : 1 ≤ d) :
-    ∀ z ∈ ((Psi d).map (algebraMap ℝ ℂ)).roots, z.im = 0 := by
-  sorry
+**Theorem M** — for every `d ≥ 1`, all complex zeros of `Ψ_d` are real
+— is STATED AND PROVEN in `TheoremM/CriticalData.lean` (`theorem_M`,
+with the multiset-convention-free companion `theorem_M_aeval`), at the
+top of the import tree: the proof consumes the Hermite interlacing
+induction (P6.2, `Hermite.lean`), the scaling bridge and critical data
+(`CriticalData.lean`), and the compound-Poisson measure capstone
+(P6.4b, `CPMeasure.lean` + `Capstone.lean`).  Axioms:
+`[propext, Classical.choice, Quot.sound]` — no `sorry`. -/
 
 end TheoremM

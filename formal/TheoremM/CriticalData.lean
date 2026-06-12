@@ -600,9 +600,8 @@ lemma criticalSeq_sign (d : ℕ) (hd : 1 ≤ d) :
 of `Ψ_d` are real.  The critical data comes from the Hermite
 interlacing induction (P6.2, `Hermite.lean` + this file); the measure
 side is the compound-Poisson construction (P6.4b, `CPMeasure.lean` +
-`Capstone.lean`).  This is the statement of `theorem_M` (`Defs.lean`),
-proven without `sorry`. -/
-theorem theorem_M_proven (d : ℕ) (hd : 1 ≤ d) :
+`Capstone.lean`).  Axioms: `[propext, Classical.choice, Quot.sound]`. -/
+theorem theorem_M (d : ℕ) (hd : 1 ≤ d) :
     ∀ z ∈ ((Psi d).map (algebraMap ℝ ℂ)).roots, z.im = 0 :=
   theorem_M_of_critical_data_measure d hd (criticalSeq d)
     (le_of_eq (criticalSeq_zero d hd).symm)
@@ -610,10 +609,11 @@ theorem theorem_M_proven (d : ℕ) (hd : 1 ≤ d) :
     (criticalSeq_crit d hd)
     (criticalSeq_sign d hd)
 
-/-- The multiset-convention-free form, now sorry-free. -/
-theorem theorem_M_aeval_proven (d : ℕ) (hd : 1 ≤ d) (z : ℂ)
+/-- The multiset-convention-free form of Theorem M: any complex number
+annihilating `Ψ_d` has imaginary part zero. -/
+theorem theorem_M_aeval (d : ℕ) (hd : 1 ≤ d) (z : ℂ)
     (hz : Polynomial.aeval z (Psi d) = 0) : z.im = 0 := by
-  apply theorem_M_proven d hd z
+  apply theorem_M d hd z
   rw [Polynomial.mem_roots']
   refine ⟨(Polynomial.map_ne_zero_iff
     (algebraMap ℝ ℂ).injective).mpr (Psi_ne_zero d), ?_⟩
