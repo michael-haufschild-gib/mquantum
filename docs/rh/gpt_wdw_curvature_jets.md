@@ -3127,6 +3127,661 @@ T(q)>=0          all-shift Cauchy healing,
 P(q)>=0          Laguerre-to-critical monotonicity.
 ```
 
+### C18: Shadow-Polynomial Reduction of the Kernel
+
+The Mellin polynomial is exactly the wall polynomial viewed from the common
+root. With
+
+```text
+tilde S(s)=tilde A(s)-s tilde B(s),
+tilde S(sigma)=tilde S_s(sigma)=0,
+```
+
+and
+
+```text
+G(q)=sum_{r=1}^d K_r q^{n+r-1},
+```
+
+GPT-F34 gives
+
+```text
+G(q)
+  =
+  -q^n tilde S(q sigma)/(1-q)^2.
+```
+
+The apparent pole at `q=1` is removable because `sigma` is a double root.
+The endpoint value is
+
+```text
+G(1)
+  =
+  (d+1)sigma^2 tilde B_s(sigma)/2.
+```
+
+After the Sturm sign normalization,
+
+```text
+G_i(1)>0.
+```
+
+This explains why pointwise `G_i(q)>=0` is too strong at bulk collisions:
+`tilde S(q sigma)` changes sign at roots before `sigma`. The real theorem is
+an integral cancellation theorem for the shadow of `tilde S`, not a pointwise
+kernel-positivity theorem.
+
+### C19: Endpoint Dominance and the Deep-Window Margin Law
+
+For a fixed common-root event, the signed Cauchy transform satisfies
+
+```text
+Phi_i(b)
+  =
+  int_0^1 q^b G_i(q)dq
+  =
+  [(d+1)sigma^2 |tilde B_s(sigma)|/2]/(b+1)
+  + O(1/b^2).
+```
+
+Since `G_i(q)=q^n H_i(q)`, the same endpoint law can be written in the
+combined-depth variable:
+
+```text
+Phi_i(b)=int_0^1 q^{n+b}H_i(q)dq
+        = H_i(1)/(n+b+1)+O((n+b)^-2).
+```
+
+Therefore every fixed event heals for all sufficiently large Cauchy offset.
+This gives a theoretical source for Fable's measured deep-window margin decay
+`~1/(n+b)`: large offsets concentrate the Mellin weight near `q=1`, where the
+shadow polynomial has the correct sign forced by the double-root geometry.
+
+### C20: Variation-Diminishing Offset Bound
+
+At a regular hyperbolic wall, suppose `tilde S` has exactly `i-1` roots before
+the double root `sigma`. GPT-F34 implies that the signed shadow
+
+```text
+G_i(q)=(-1)^{i+1}q^n tilde S(q sigma)/(1-q)^2
+```
+
+has exactly `i-1` sign changes on `(0,1)`. The signed offset transform is
+
+```text
+Phi_i(b)
+  =
+  int_0^infinity e^{-(b+1)t}G_i(e^{-t})dt
+```
+
+after `q=e^{-t}`. Since the exponential kernel is strictly totally positive,
+the transform is variation-diminishing: `Phi_i(b)` has at most `i-1` zeros
+as a function of `b>=0`.
+
+Together with endpoint dominance, a fixed event can anti-heal only over
+finite-offset ranges. It cannot generate indefinitely repeated late failures
+as `b` grows.
+
+### C21: Critical Hard-Head Bessel Anchor
+
+For the critical hard-head function
+
+```text
+Phi_{1,x}(s)=sum_k (-1)^k exp(-S_x(k))s^k/k!,
+```
+
+set
+
+```text
+C_x=exp(psi(x)),
+nu_x=x-3/2.
+```
+
+Then the coefficients satisfy
+
+```text
+exp(-S_x(k))/k!
+  ~
+  L_x C_x^k/[k! Gamma(k+nu_x+1)],
+L_x=sqrt(2pi)exp((x-1)psi(x)-x+1/2).
+```
+
+Thus the critical hard head has Bessel anchor
+
+```text
+L_x(C_xs)^(-nu_x/2)J_{nu_x}(2sqrt(C_xs)).
+```
+
+The anchor is compatible with the exact shift-derivative ladder because
+
+```text
+C_{x+1}e^{-1/x}=C_x,
+nu_{x+1}=nu_x+1,
+L_{x+1}/L_x=exp(psi(x)).
+```
+
+For Fable's hard-head scan:
+
+```text
+zeros(Phi_{1,1}) ~ e^EulerGamma ((m-1/2)pi)^2/4,
+e*zeros(Phi_{1,2}) ~ e^EulerGamma (m pi)^2/4.
+```
+
+So the tail behavior is the cosine/sine Bessel interlacing model. Any nonreal
+zero of `Phi_{1,1}` should be a finite-core defect, not an asymptotic-tail
+defect.
+
+### C22: Hard-Head Poisson Endpoint and Universal Zero Shift
+
+The Bessel anchor has an exact dilation refinement. At `alpha=1`,
+
+```text
+Phi_{1,x}(s)=E B_x(U_xs),
+B_x(s)=Gamma(x-1/2)(C_xs)^(-nu_x/2)J_{nu_x}(2sqrt(C_xs)),
+C_x=exp(psi(x)),  nu_x=x-3/2,
+```
+
+where `U_x=exp(-L_x)` and `L_x` is compound-Poisson with Levy density
+
+```text
+rho_x(t)=eta(t)e^{-xt}/(1-e^{-t}),
+eta(t)=e^{t/2}/t - 1/(1-e^{-t}).
+```
+
+The small-jump expansion is universal:
+
+```text
+eta(t)=t/24+O(t^2),
+rho_x(t)=1/24+O(t).
+```
+
+This `1/24` is the hard-head endpoint form of the same Bernoulli/WDW
+curvature correction that appears in the finite-difference jet calculus. It
+implies a concrete zero-shift law for Fable's hard-head scan:
+
+```text
+4e^{-EulerGamma}s_m(Phi_{1,1}) - ((m-1/2)pi)^2 -> 1/6,
+4e^{-EulerGamma}e s_m(Phi_{1,2}) - (m pi)^2 -> 1/6.
+```
+
+Equivalently, after the exact F30 scaling, both adjacent hard-head ladders
+have the same additive `e^EulerGamma/24` correction to the leading Bessel
+zero ruler.
+
+The dilation laws also express the derivative ladder probabilistically:
+
+```text
+rho_{x+1}(t)=e^{-t}rho_x(t),
+Law(U_{x+1}) = Law(U_x size-biased by U_x).
+```
+
+Thus the WDW hard-head problem is no longer just an asymptotic comparison to
+Bessel. It is a real-zero preservation problem for a specific
+multiplicative compound-Poisson dilation law whose endpoint jet is fixed by
+`1/24`.
+
+### C23: Corrected Clearance Gate and Bessel-Forced Tail
+
+Fable's F207 correction changes the macroscopic wall gate. The derived
+effective offset is
+
+```text
+b_eff(d)=(2/3)d/L^2(1+O(1/L)),
+1-alpha_eff(d)~2/L.
+```
+
+Therefore a wall law
+
+```text
+d*(alpha,b)~(1-alpha)^(-p)b^theta
+```
+
+gives
+
+```text
+C(d)=d*(alpha_eff,b_eff)/d
+    ~ const * d^(theta-1)L^(p-2theta).
+```
+
+The corrected asymptotic survival gate is
+
+```text
+theta>1, or theta=1 with p>=2.
+```
+
+The Airy layer is therefore viable; only `theta<1` kills the effective-profile
+mechanism.
+
+On the microscopic side, the hard-head tail is now locked. For
+
+```text
+F_x(t)=Phi_{1,x}(t^2/(4C_x)),
+```
+
+the exact dilation law gives
+
+```text
+F_x(t)=E[Gamma(x-1/2)(sqrt(U_x)t/2)^(-nu_x)
+        J_{nu_x}(sqrt(U_x)t)].
+```
+
+The atom at `U_x=1` contributes the Bessel term. The continuous endpoint
+contribution is one integration-by-parts order smaller, so in horizontal
+strips
+
+```text
+F_x(t)
+ =
+ p_x Gamma(x-1/2)(t/2)^(-nu_x)J_{nu_x}(t)
+ + O(t^(-nu_x-3/2)).
+```
+
+Consequently the large hard-head zeros are Bessel-forced: there is one
+simple real zero near each large zero of `J_{nu_x}`. The RH-critical LP work
+is now concentrated in finite-core defects and in proving that the
+compound-Poisson size-bias ladder introduces no exceptional off-axis zeros.
+
+### C24: Pólya Endpoint Obstruction and Anti-Derivative Core
+
+Fable's F210 Pólya reduction is a valid route, but the endpoint threshold
+must include the full compound-Poisson law, not just the one-jump Levy
+kernel.
+
+With
+
+```text
+q_x(y)=e^{y/2}rho_x(y)
+      =eta(y)e^{-(x-1/2)y}/(1-e^{-y}),
+```
+
+we have
+
+```text
+q_x(y)=1/24 + ((3/2-x)/24)y + O(y^2).
+```
+
+For the continuous compound-Poisson density of `Y_x=-log U_x`,
+
+```text
+g_x(y)=e^{y/2}f_x(y)
+      =e^{-nu_x((0,infinity))}
+       [q_x(y)+(q_x*q_x)(y)/2!+...].
+```
+
+Since `(q_x*q_x)(y)=y/24^2+O(y^2)`, the endpoint derivative is
+
+```text
+g_x'(0+)
+ =
+ e^{-nu_x((0,infinity))}
+ [(3/2-x)/24+1/1152].
+```
+
+The density of `R_x=sqrt(U_x)` is increasing at the endpoint only if
+`g_x'(0+)<=0`, hence the Pólya monotone-kernel route cannot begin before
+
+```text
+x >= 73/48.
+```
+
+Thus `x=2` remains plausible for Pólya, but `x=3/2` is not covered by endpoint
+monotonicity. The `n>=2` convolution terms create a real obstruction rather
+than automatically inheriting monotonicity.
+
+The remaining bridge from `x=2` to `x=1` is an anti-derivative finite-core
+criterion. Since
+
+```text
+partial_s Phi_{1,1}(s)=-Phi_{1,2}(e^{-1}s),
+```
+
+the critical points of `Phi_{1,1}` are `e` times the zeros of `Phi_{1,2}`.
+If `Phi_{1,2}` is LP and the critical values of `Phi_{1,1}` alternate signs,
+then `Phi_{1,1}` has one real zero in every critical interval. F42 supplies
+the tail sign pattern, so only finitely many critical values remain.
+
+This is the current finite-core target:
+
+```text
+Pólya prove Phi_{1,2} in LP;
+F42 locks Phi_{1,1} tail;
+F33/F34-style certificates prove finite critical-value signs.
+```
+
+### C25: Majority-Atom Hard-Head Theorem and Finite Lift
+
+Fable's F211 atom-dominated Rouché proof is valid at the critical hard head
+`x=1`, and it supersedes the Pólya/anti-derivative route for `Phi_{1,1}`.
+
+The abstract theorem is:
+
+```text
+Psi(z)=p cos(az)+int_[0,a) cos(tz)dmu(t),   p>mu([0,a)).
+```
+
+Then `Psi` has one simple real zero in each cosine strip. The proof is
+Rouché on rectangles: the outer atom has size `cosh(a Im z)` on vertical
+walls and at least `sinh(aH)` on horizontal edges, while every inner
+frequency is bounded by `cosh(a Im z)` or `cosh(aH)`.
+
+For the F39 law,
+
+```text
+Phi_{1,1}(e^EulerGamma w^2/4)
+ =
+p_1 cos w+int_[0,1) cos(vw)dmu(v).
+```
+
+The atom mass is exact:
+
+```text
+p_x=sqrt(2pi) exp((x-1)psi(x)-x+1/2)/Gamma(x-1/2),
+p_1=sqrt(2/e)>1/2.
+```
+
+Hence `Phi_{1,1}` is Laguerre-Polya. By the hard-head derivative ladder,
+`Phi_{1,n}` is Laguerre-Polya for every integer `n>=1`. The extension to
+every real `x>=1` still requires the Bessel contour argument; the critical
+case and integer ladder are already theorem-level.
+
+The finite-section lift has an exact form. With
+
+```text
+Psi_d(w)=P_{d,1}(e^EulerGamma w^2/(4d)),
+C_d(w)=sum_{k=0}^d (-1)^k [(d)_k/d^k] w^{2k}/(2k)!,
+```
+
+F39 gives
+
+```text
+Psi_d(w)=E C_d(sqrt(U_1)w).
+```
+
+Equivalently,
+
+```text
+Psi_d(w)=p_1C_d(w)+int_[0,1)C_d(vw)dmu(v).
+```
+
+The polynomial `C_d` is the scaled Jensen polynomial of `cos sqrt(z)` and is
+real-rooted. Thus the finite-section obstruction has been compressed to a
+deterministic contour problem:
+
+```text
+prove |C_d(vz)|<|C_d(z)| for 0<=v<1
+on zero-separating contours around the zeros of C_d.
+```
+
+If this radial-dominance condition holds for all positive zero cells, the
+same majority-atom Rouché proof lifts the critical hard-head theorem from the
+limit to the finite section.
+
+The deformed cosine is classical:
+
+```text
+C_d(w)=_1F_1(-d;1/2;w^2/(4d))
+      =d!/(1/2)_d L_d^{-1/2}(w^2/(4d)).
+```
+
+Thus the finite lift is an average of Laguerre dilations
+`L_d^{-1/2}(U_1 z)`. If `xi_{j,d}` are the zeros of `L_d^{-1/2}`, then
+`L_d^{-1/2}(uz)` interlaces the atom polynomial whenever
+
+```text
+u > max_j xi_{j,d}/xi_{j+1,d}.
+```
+
+The remaining finite-section proof can be divided into a near-atom
+Obreschkoff/interlacing part and a far-dilation atom-margin contour part.
+
+### C26: Endpoint Density Audit
+
+Fable's F211 addendum flagged a possible discrepancy with GPT-F40:
+moment inversion gave a small value near `h_1(0.99)`, while F40 predicts
+`h_1(1-)=p_1/12`. The endpoint constant is fixed by a local
+compound-Poisson theorem.
+
+If `Y` has a finite compound-Poisson law with atom `p` at zero and Lévy
+density
+
+```text
+rho(y)=rho_0+rho_1y+O(y^2),
+```
+
+then its continuous density satisfies
+
+```text
+f(0+)=p rho_0,
+f'(0+)=p(rho_1+rho_0^2/2).
+```
+
+For the hard-head law,
+
+```text
+rho_x(y)=eta(y)e^{-xy}/(1-e^{-y})=1/24+O(y).
+```
+
+Passing from `Y_x` to `R_x=e^{-Y_x/2}` doubles the endpoint density:
+
+```text
+h_x(1-)=p_x/12.
+```
+
+More precisely,
+
+```text
+h_x(r)
+ =
+p_x/12+p_x[(3/2-x)/6+1/288](1-r)+O((1-r)^2).
+```
+
+At `x=1`, this gives
+
+```text
+h_1(1-)=sqrt(2/e)/12=0.071480323...
+h_1(0.99)=0.0722...+O(10^-4).
+```
+
+Thus `h(0.99)~0.010` is not compatible with the local endpoint expansion and
+should be treated as a low-order moment-inversion artifact. The F40 zero
+residual remains
+
+```text
+4e^{-EulerGamma}s_m(Phi_{1,1})-((m-1/2)pi)^2 -> 1/6.
+```
+
+### C27: Effective Head Lift and Bulk Localization
+
+Fable's F212 effective head lift is correct in its coefficient and margin
+estimates, with one scope correction.
+
+For
+
+```text
+Psi_d(w)=P_{d,1}(e^EulerGamma w^2/(4d)),
+psi(w)=Phi_{1,1}(e^EulerGamma w^2/4),
+```
+
+the finite coefficient factor is `(d)_k/d^k`, and
+
+```text
+0<=1-(d)_k/d^k<=k(k-1)/(2d).
+```
+
+Since the limit coefficients are bounded by `1/(2k)!`,
+
+```text
+|Psi_d(w)-psi(w)| <= (R^2/(2d))e^R,   |w|<=R.
+```
+
+The F211 strip boundary margin is
+
+```text
+M=sqrt(8/e)-1.
+```
+
+Hence `(R^2/2)e^R < Md` proves one real zero in each controlled head strip,
+giving `~(log d)/pi` certified real head zeros. The disk-wide claim that all
+zeros in `|w|<=R` are real needs taller contour bookkeeping; a sufficient
+repair is a stronger `sqrt(2)R`-radius error bound. The important conclusion
+survives: the finite lift is not a head problem. The remaining obstruction is
+in bulk cells, matching the F27 tropical map and F13 certificate targets.
+
+### C28: Exact Finite Tropical Monotonicity
+
+The F27 tropical map has no hidden subleading reversal. Its finite adjacent
+coefficient ratios are exactly monotone:
+
+```text
+tau_{d,x,k}
+ =
+k/(d-k+1) * exp(alpha[psi(x+k-1)-psi(x)]),
+```
+
+and
+
+```text
+log(tau_{d,x,k+1}/tau_{d,x,k})
+ =
+log(1+1/k)+log(1+1/(d-k))+alpha/(x+k-1)>0.
+```
+
+Thus the bulk finite-section problem is not a coefficient-ratio caustic. The
+remaining possible obstruction is the displacement of actual roots inside
+their already ordered tropical cells. This points back to the F13/F34
+Sturm-kernel certificates as the correct bulk mechanism.
+
+### C29: Lemma B Wall-Stieltjes Form
+
+Fable's Lemma B radial dominance can be written as an explicit Stieltjes
+inequality. If
+
+```text
+C_d(w)=prod_m(1-w^2/w_m^2),   lambda_m=w_m^2,
+z=(c+iy)^2,
+```
+
+where `c` is a critical point of `C_d`, then for `s=v^2`
+
+```text
+partial_s log |C_d(sqrt(s)(c+iy))|^2
+ =
+-2 Re[z sum_m 1/(lambda_m-sz)].
+```
+
+Writing `z=A+iB`, this becomes
+
+```text
+2 sum_m [s|z|^2-A lambda_m]/|lambda_m-sz|^2.
+```
+
+The critical-point condition is exactly
+
+```text
+sum_m 1/(lambda_m-c^2)=0.
+```
+
+Thus the moderate-`y` radial dominance problem is a finite Stieltjes transform
+bound over the Laguerre zero squares. A strong sufficient condition is
+nonnegativity of this derivative on `0<=s<=1`; the exact needed condition is
+the weaker integrated bound with slack `p/(1-p)=6.031...`.
+
+### C30: First Lemma B Certificate
+
+For `d=2`, Lemma B closes exactly. With
+
+```text
+C_2(w)=1-w^2/2+w^4/48,
+c=2sqrt(3),  s=v^2,  q=y^2,
+```
+
+one has
+
+```text
+|C_2(c+iy)|^2-|C_2(sqrt(s)(c+iy))|^2
+ =
+(1-s)P(s,q)/2304,
+```
+
+where all coefficients of `P` are nonnegative on `0<=s<=1`. Therefore
+
+```text
+|C_2(v(c+iy))| <= |C_2(c+iy)|
+```
+
+on the whole critical wall. At the same time, the derivative shortcut from
+C29 is false: the wall ratio has a real moderate-height bump for
+`0.109795318...<s<0.378375006...`. The correct Lemma B proof style is
+therefore denominator-clearing positivity of the integrated ratio, not
+pointwise radial derivative monotonicity.
+
+### C34: Lemma B Transverse Split
+
+The radial dominance inequality splits into the real-axis envelope and the
+positive transverse wall jets. For a critical square `r=c_j^2`, set
+
+```text
+P_d(X)=C_d(sqrt(X)),  z=r-q+2i sqrt(rq),  s=v^2,  q=y^2.
+```
+
+Then
+
+```text
+D_d(s,q;r)=|P_d(z)|^2-|P_d(sz)|^2
+          =D_d(s,0;r)
+           +(1-s)sum_{m=1}^{2d}q^m B_{d,m}(s;r),
+```
+
+with
+
+```text
+D_d(s,0;r)=P_d(r)^2-P_d(sr)^2.
+```
+
+Thus Fable's Lemma A supplies the `q^0` term, while GPT's independent target
+is only the transverse cone
+
+```text
+B_{d,m}(s;r_j)>=0,   0<=s<=1,   1<=m<=2d.
+```
+
+This matters because the exact finite certificates through `d<=8` certify a
+larger object than is needed for the division of labor.
+
+### C35: First Transverse Jet as a Sonin Functional
+
+The first positive `q` coefficient has an exact ODE form. Since
+
+```text
+4xP_d''(x)+(2-x/d)P_d'(x)+P_d(x)=0,
+```
+
+define
+
+```text
+M_d(x)=x[P_d(x)^2-(x/d)P_d(x)P_d'(x)+4xP_d'(x)^2].
+```
+
+For every critical square `r`,
+
+```text
+[q]D_d(s,q;r)=(M_d(r)-M_d(sr))/r.
+```
+
+The derivative is
+
+```text
+M_d'(x)=
+(1+x/(4d))P_d(x)^2
+-(3x/(2d)+x^2/(4d^2))P_d(x)P_d'(x)
++(4x+x^2/d)P_d'(x)^2.
+```
+
+Therefore the first transverse jet follows from a weighted Sonin
+monotonicity theorem for `M_d` up to each critical square. The higher
+coefficients should be treated as a hierarchy of even normal Sonin jets, not
+as unrelated Krawtchouk sums.
+
 ## Non-Computational Tests for Fable and GPT
 
 1. **Degree-3 local test:** before solving roots, evaluate
@@ -3171,6 +3826,107 @@ P(q)>=0          Laguerre-to-critical monotonicity.
     integral `int_q^1 G_i`, and its prefix integral `int_0^q G_i` on `[0,1]`.
     Tail positivity certifies all Cauchy shifts; prefix positivity certifies
     the Laguerre-to-critical comparison.
+14. **Shadow-polynomial test:** verify
+    `G(q)=-q^n tilde S(q sigma)/(1-q)^2` after removable-endpoint extension.
+    This catches sign or indexing errors in `K_r` immediately.
+15. **Endpoint-dominance test:** for fixed event, check that
+    `(b+1)Phi_i(b)` tends to `(d+1)sigma^2|tilde B_s(sigma)|/2` as `b`
+    grows. This should reproduce the observed `1/(n+b)` weak-margin law.
+16. **Variation-diminishing test:** count roots of `tilde S` before `sigma`.
+    The signed offset transform `Phi_i(b)` should have no more zeros in
+    `b>=0` than that count, and must be positive for all sufficiently large
+    `b`.
+17. **Hard-head Bessel ruler:** compare Fable's first hard-head zeros against
+    `e^EulerGamma((m-1/2)pi)^2/4` for `Phi_{1,1}` and against
+    `e^(EulerGamma-1)(m pi)^2/4` for `Phi_{1,2}`. Tail agreement supports the
+    LP question being finite-core.
+18. **Hard-head endpoint-shift test:** in the same zero scan, check the
+    sharper limits
+    `4e^{-EulerGamma}s_m(Phi_{1,1})-((m-1/2)pi)^2 -> 1/6` and
+    `4e^{-EulerGamma}e s_m(Phi_{1,2})-(m pi)^2 -> 1/6`.
+19. **Corrected clearance-gate test:** use `b_eff~(2/3)d/L^2`, not a
+    finite-range `d^0.60` fit. The macroscopic wall survives iff
+    `theta>1`, or `theta=1` with `p>=2`.
+20. **Bessel-forced tail test:** after transforming
+    `s=t^2/(4C_x)`, large hard-head zeros must track the corresponding
+    `J_{x-3/2}` zeros with `O(1/t)` displacement. Nonreal zeros found in
+    the K=400 scan should therefore be finite-core defects, not tail-lattice
+    replacements.
+21. **Pólya endpoint test:** for the density of `R_x=sqrt(U_x)`, full
+    compound-Poisson endpoint monotonicity begins no earlier than `x=73/48`,
+    not `x=3/2`. Any Pólya proof must account for the two-jump derivative
+    term `+1/1152`.
+22. **Anti-derivative core test:** if `Phi_{1,2}` is certified LP, evaluate
+    `Phi_{1,1}(e tau_m)` at zeros `tau_m` of `Phi_{1,2}`. Alternating signs,
+    plus the F42 tail, certify `Phi_{1,1}` by Rolle and the intermediate
+    value theorem.
+23. **Majority-atom test:** for any hard-head cosine-transform representation,
+    compute the no-jump atom. If the outer atom mass exceeds the continuum
+    mass, Rouché on cosine strips proves real zeros without density
+    monotonicity. For `Phi_{1,1}`, the exact mass is `sqrt(2/e)`.
+24. **Finite deformed-cosine test:** form
+    `C_d(w)=sum (-1)^k[(d)_k/d^k]w^(2k)/(2k)!`. The finite hard-head section is
+    `E C_d(sqrt(U_1)w)`. Prove or test radial dominance
+    `|C_d(vz)|<|C_d(z)|` on zero-separating contours; this is the finite
+    analogue of the `q^2` separation theorem.
+25. **Laguerre lift test:** use
+    `C_d(w)=d!/(1/2)_d L_d^{-1/2}(w^2/(4d))`. Split the dilation law by the
+    threshold `u>max_j xi_j/xi_{j+1}` where Laguerre zero interlacing handles
+    near-atom dilations; use atom-margin contours for the remaining tail.
+26. **Endpoint-density audit:** reconstructing `h_x` from moments must satisfy
+    `h_x(1-)=p_x/12` and the local slope
+    `p_x[(3/2-x)/6+1/288]`. For `x=1`, values near `r=0.99` should be near
+    `0.072`, not `0.010`; otherwise the reconstruction is losing the
+    endpoint atom.
+27. **Effective-head-lift audit:** F212's coefficient estimate certifies
+    `~(log d)/pi` real head-strip zeros under
+    `(R^2/2)e^R<(sqrt(8/e)-1)d`. A claim about all zeros in the disk must use
+    taller contours or a stronger `sqrt(2)R` radius bound.
+28. **Finite tropical monotonicity test:** for every Cauchy-profile finite
+    section, check
+    `log(tau_{k+1}/tau_k)=log(1+1/k)+log(1+1/(d-k))+alpha/(x+k-1)>0`.
+    Any claimed bulk obstruction must therefore appear in Sturm/interlacing
+    certificates, not in adjacent coefficient-ratio ordering.
+29. **Lemma B Stieltjes-wall test:** on each critical wall, evaluate
+    `-2 Re[z sum_m 1/(lambda_m-sz)]` for `z=(c+iy)^2`, `s=v^2`. Its
+    integrated negative part controls the radial-dominance ratio; the proof
+    budget is `p/(1-p)=6.031...`.
+30. **First Lemma B certificate:** for `d=2`, the exact difference
+    `|C_2(c+iy)|^2-|C_2(v(c+iy))|^2` factors as `(1-v^2)` times a polynomial
+    nonnegative in `v^2` and `y^2`. Higher-degree certificates should imitate
+    this denominator-clearing positive-polynomial form.
+31. **Wall-jet cone test:** for each critical wall of
+    `C_d(w)=_1F_1(-d;1/2;w^2/(4d))`, form
+    `D_{d,j}(s,q)=|C_d(c_j+iy)|^2-|C_d(sqrt(s)(c_j+iy))|^2`, with
+    `s=v^2` and `q=y^2`. Since `D_{d,j}(1,q)=0`, divide by `(1-s)` and expand
+    `Q_{d,j}(s,q)=sum_m q^m B_{d,j,m}(s)`. The `d=2` and `d=3` certificates
+    show that the useful WDW-like object is the transverse jet cone
+    `B_{d,j,m}(s)>=0` on `[0,1]`, not raw coefficient positivity in `(s,q)`
+    and not pointwise radial derivative monotonicity.
+32. **Finite wall-jet certifier:** for `d=4,5,6,7`, reduce
+    `Q_{d,j}(s,q)` modulo the exact critical-square polynomial
+    `H_d(r)=P_d'(r)`, substitute each algebraic critical root by `CRootOf`,
+    and run Sturm root counts for every `q`-coefficient polynomial in `s`.
+    The `q^0` coefficient has the expected extra `(1-s)` endpoint factor.
+    After dividing that factor, all coefficient polynomials have positive
+    endpoints and zero roots in `(0,1)`. Thus the wall-jet cone is certified
+    exactly for every critical wall through `d=7`.
+33. **Krawtchouk wall-jet formula:** with
+    `P_d(X)=sum_k a_{d,k}X^k`, the coefficient of `q^m` in
+    `{|P_d(z)|^2-|P_d(sz)|^2}/(1-s)`, `z=r-q+2i sqrt(rq)`, is
+    `sum_{k,l} a_{d,k}a_{d,l}r^(k+l-m)K_{k,l,m}(1-s^(k+l))/(1-s)`, where
+    `K_{k,l,m}=(-1)^m[x^(2m)](1-x)^(2k)(1+x)^(2l)`. This formula reproduces
+    the direct expansions and extends the exact CRootOf/Sturm certificate to
+    `d=8` on all seven critical walls. The all-degree proof target becomes a
+    sign-regularity, recurrence, or SOS statement for this even Krawtchouk
+    transform after reducing by `H_d(r)=0`.
+34. **Lemma B transverse split:** separate
+    `D_d(s,q;r)=D_d(s,0;r)+(1-s)sum_{m>=1}q^mB_{d,m}`. Fable's Lemma A
+    handles `D_d(s,0;r)>=0`; GPT only needs `B_{d,m}(s;r)>=0` for `m>=1`.
+35. **First transverse Sonin test:** compute
+    `M_d=x[P_d^2-(x/d)P_dP_d'+4x(P_d')^2]`. The first positive wall jet is
+    `[q]D=(M_d(r)-M_d(sr))/r`; monotonicity of `M_d` on `[0,r]` certifies
+    `B_{d,1}` without full Krawtchouk/Sturm machinery.
 
 ## Consequence for the RH Quest
 
@@ -3184,5 +3940,9 @@ the birth obstruction is the highest nonzero curvature jet;
 the cure is positive curvature thickness plus slow variation.
 ```
 
-The next proof target is no longer vague. Lift the degree-3 single-wall theorem
-to the adjacent-shift Sturm ladder using Theorem GPT-F2.
+The next proof target is no longer vague. For the adjacent-shift ladder, lift
+the degree-3 single-wall theorem using Theorem GPT-F2. For the finite hard-head
+lift, prove the all-degree wall-jet cone
+`B_{d,j,m}(s)>=0` for the Laguerre critical walls. Finite exact certificates
+now cover `d<=8`; the next theoretical task is to prove sign-regularity of
+the even Krawtchouk wall-jet transform after critical reduction.
