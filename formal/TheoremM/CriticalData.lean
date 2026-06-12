@@ -412,4 +412,212 @@ lemma hermiteR_odd_sorted_middle (d : ℕ) (hd : 1 ≤ d) :
   have := Option.some.inj h
   linarith
 
+/-! ## The sign alternation (C2c)
+
+The sign engine runs on the monic `H_{2d}` at the sorted roots of
+`H_{2d−1}` (which are never roots of `H_{2d}`), the count above the
+`i`-th root is `(2d−1)−i` (GPT's interface), and the bridge transfers
+the alternation to `C_d` at its scaled criticals. -/
+
+/-- The two spellings of the even Hermite polynomial agree. -/
+lemma hermiteEvenR_eq_hermiteR (d : ℕ) :
+    HermiteEvenR d = HermiteR (2 * d) := rfl
+
+/-- A root of `H_{2d−1}` is never a root of `H_{2d}`: a common root
+would be a multiple root of `H_{2d}` (its derivative is a multiple of
+`H_{2d−1}`), contradicting root simplicity. -/
+lemma hermiteR_even_ne_zero_of_odd_root (d : ℕ) (hd : 1 ≤ d) {y : ℝ}
+    (hy : (HermiteR (2 * d - 1)).eval y = 0) :
+    (HermiteR (2 * d)).eval y ≠ 0 := by
+  intro h0
+  have hder : (derivative (HermiteR (2 * d))).eval y = 0 := by
+    rw [← hermiteEvenR_eq_hermiteR, derivative_hermiteEvenR d hd]
+    rw [eval_mul, eval_C]
+    rw [show ((Polynomial.hermite (2 * d - 1)).map
+        (Int.castRingHom ℝ)) = HermiteR (2 * d - 1) from rfl, hy]
+    ring
+  obtain ⟨q, hq⟩ := (Polynomial.dvd_iff_isRoot).mpr h0
+  have hqy : q.eval y = 0 := by
+    have hd2 := congrArg (fun p : ℝ[X] => (derivative p).eval y) hq
+    simp only [derivative_mul, derivative_sub, derivative_X,
+      derivative_C, sub_zero, one_mul, eval_add, eval_mul, eval_sub,
+      eval_X, eval_C, sub_self, zero_mul, add_zero] at hd2
+    rw [hder] at hd2
+    linarith [hd2]
+  obtain ⟨r, hr⟩ := (Polynomial.dvd_iff_isRoot).mpr hqy
+  have hsq : (X - Polynomial.C y) ^ 2 ∣ HermiteR (2 * d) := by
+    exact ⟨r, by rw [hq, hr]; ring⟩
+  have hmul : 2 ≤ (HermiteR (2 * d)).rootMultiplicity y :=
+    (Polynomial.le_rootMultiplicity_iff (hermiteR_ne_zero (2 * d))).mpr hsq
+  have hcount : (HermiteR (2 * d)).roots.count y
+      = (HermiteR (2 * d)).rootMultiplicity y :=
+    Polynomial.count_roots _
+  have hone := Multiset.nodup_iff_count_le_one.mp
+    (hermiteR_roots_nodup (2 * d)) y
+  omega
+
+/-- **Sign of `H_{2d}` at the `i`-th sorted root of `H_{2d−1}`**:
+`0 < (−1)^{(2d−1)−i} · H_{2d}(y_i)` — the engine on the monic split
+`H_{2d}`, with the count above `y_i` from the interlacing interface. -/
+lemma hermiteR_even_sign_at_sorted_root (d : ℕ) (hd : 1 ≤ d) {i : ℕ}
+    (hi : i < (HermiteRRootsSorted (2 * d - 1)).length) :
+    0 < (-1 : ℝ) ^ (2 * d - 1 - i)
+        * (HermiteR (2 * d)).eval
+            ((HermiteRRootsSorted (2 * d - 1))[i]'hi) := by
+  have hyroot : (HermiteR (2 * d - 1)).eval
+      ((HermiteRRootsSorted (2 * d - 1))[i]'hi) = 0 := by
+    have := hermiteRRootsSorted_get_mem_roots (2 * d - 1) hi
+    rwa [Polynomial.mem_roots (hermiteR_ne_zero _)] at this
+  have hnotroot : ∀ r ∈ (HermiteR (2 * d)).roots,
+      (HermiteRRootsSorted (2 * d - 1))[i]'hi ≠ r := by
+    intro r hr hyr
+    rw [Polynomial.mem_roots (hermiteR_ne_zero (2 * d))] at hr
+    exact hermiteR_even_ne_zero_of_odd_root d hd hyroot (hyr ▸ hr)
+  have hengine := neg_one_pow_roots_above_mul_leadingCoeff_mul_eval_pos
+    (hermiteR_ne_zero (2 * d)) (hermiteR_splits (2 * d)) hnotroot
+  have hcount := hermiteR_succ_count_roots_above (n := 2 * d - 1)
+    (i := i) hi
+  rw [show 2 * d - 1 + 1 = 2 * d by omega, hermiteRRootsSorted_length]
+    at hcount
+  rw [hcount, hermiteR_card_roots, (hermiteR_monic (2 * d)).leadingCoeff,
+    mul_one] at hengine
+  exact hengine
+
+/-- **Sign alternation of `C_d` at its scaled criticals** (the
+quadruple's `hCsign`): for `m < d` and
+`c_m = √(2d)·y_{(d−1)+m}`, `0 < (−1)^m · C_d(c_m)`. -/
+lemma Cpoly_sign_at_scaled_root (d : ℕ) (hd : 1 ≤ d) {m : ℕ}
+    (hm : m < d) :
+    0 < (-1 : ℝ) ^ m * (Cpoly d).eval
+      (Real.sqrt (((2 * d : ℕ) : ℝ))
+        * ((HermiteRRootsSorted (2 * d - 1))[d - 1 + m]'(by
+            rw [hermiteRRootsSorted_length_eq]; omega))) := by
+  have h2d : (0 : ℝ) < ((2 * d : ℕ) : ℝ) := by
+    have : 0 < 2 * d := by omega
+    exact_mod_cast this
+  have hs0 : Real.sqrt (((2 * d : ℕ) : ℝ)) ≠ 0 :=
+    (Real.sqrt_pos.mpr h2d).ne'
+  set y := (HermiteRRootsSorted (2 * d - 1))[d - 1 + m]'(by
+    rw [hermiteRRootsSorted_length_eq]; omega) with hy_def
+  have hbridge := Cpoly_eval_mul_coeff_zero d hd
+    (Real.sqrt (((2 * d : ℕ) : ℝ)) * y)
+  rw [mul_div_cancel_left₀ y hs0, hermiteEvenR_eq_hermiteR] at hbridge
+  have hsign := hermiteR_even_sign_at_sorted_root d hd
+    (i := d - 1 + m) (by rw [hermiteRRootsSorted_length_eq]; omega)
+  rw [show 2 * d - 1 - (d - 1 + m) = d - m by omega] at hsign
+  have hH0sign := coeff_zero_hermiteEvenR_sign d
+  have hH0 := hermiteEvenR_coeff_zero_ne_zero d
+  have hH0sq : (0 : ℝ) < ((HermiteEvenR d).coeff 0) ^ 2 :=
+    pow_two_pos_of_ne_zero hH0
+  have hCm2 : (-1 : ℝ) ^ m * (-1 : ℝ) ^ m = 1 := by
+    rw [← pow_add, ← two_mul, pow_mul]
+    norm_num
+  have hkey : (-1 : ℝ) ^ (d - m) * (-1 : ℝ) ^ d * (-1 : ℝ) ^ m = 1 := by
+    rw [← pow_add, ← pow_add, show d - m + d + m = 2 * d by omega,
+      pow_mul]
+    norm_num
+  have hAB : (-1 : ℝ) ^ (d - m) * (-1 : ℝ) ^ d = (-1 : ℝ) ^ m := by
+    linear_combination (-1 : ℝ) ^ m * hkey
+      - ((-1 : ℝ) ^ (d - m) * (-1 : ℝ) ^ d) * hCm2
+  have hP : 0 < ((-1 : ℝ) ^ (d - m)
+        * (HermiteR (2 * d)).eval y)
+      * ((-1 : ℝ) ^ d * (HermiteEvenR d).coeff 0) :=
+    mul_pos hsign hH0sign
+  have hP2 : ((-1 : ℝ) ^ (d - m) * (HermiteR (2 * d)).eval y)
+      * ((-1 : ℝ) ^ d * (HermiteEvenR d).coeff 0)
+      = ((-1 : ℝ) ^ m * (Cpoly d).eval
+          (Real.sqrt (((2 * d : ℕ) : ℝ)) * y))
+        * ((HermiteEvenR d).coeff 0) ^ 2 := by
+    rw [← hbridge, ← hAB]
+    ring
+  rw [hP2] at hP
+  exact (mul_pos_iff_of_pos_right hH0sq).mp hP
+
+/-! ## The quadruple and the theorem (C2d)
+
+Everything assembles: the critical sequence `c_m = √(2d)·y_{(d−1)+m}`
+satisfies the four hypotheses of the measure capstone, and Theorem M
+follows. -/
+
+/-- The critical sequence of `C_d`: the middle-and-upper sorted roots
+of `H_{2d−1}`, scaled by `√(2d)` (total function via `getD`). -/
+noncomputable def criticalSeq (d : ℕ) : ℕ → ℝ :=
+  fun m => Real.sqrt (((2 * d : ℕ) : ℝ))
+    * ((HermiteRRootsSorted (2 * d - 1)).getD (d - 1 + m) 0)
+
+/-- `criticalSeq` at a valid index, as a `getElem`. -/
+lemma criticalSeq_eq (d : ℕ) {m : ℕ} (hm : m < d) :
+    criticalSeq d m = Real.sqrt (((2 * d : ℕ) : ℝ))
+      * ((HermiteRRootsSorted (2 * d - 1))[d - 1 + m]'(by
+          rw [hermiteRRootsSorted_length_eq]; omega)) := by
+  unfold criticalSeq
+  rw [List.getD_eq_getElem _ _ (by
+    rw [hermiteRRootsSorted_length_eq]; omega)]
+
+/-- The first critical point is the origin. -/
+lemma criticalSeq_zero (d : ℕ) (hd : 1 ≤ d) : criticalSeq d 0 = 0 := by
+  rw [criticalSeq_eq d (by omega)]
+  simp only [Nat.add_zero]
+  rw [hermiteR_odd_sorted_middle d hd, mul_zero]
+
+/-- Strict monotonicity of the critical sequence. -/
+lemma criticalSeq_mono (d : ℕ) (hd : 1 ≤ d) :
+    ∀ m n', m < n' → n' < d → criticalSeq d m < criticalSeq d n' := by
+  intro m n' hmn hn'
+  have h2d : (0 : ℝ) < ((2 * d : ℕ) : ℝ) := by
+    have : 0 < 2 * d := by omega
+    exact_mod_cast this
+  rw [criticalSeq_eq d (by omega), criticalSeq_eq d hn']
+  exact mul_lt_mul_of_pos_left
+    (hermiteRRootsSorted_strictMono _ (by omega) _)
+    (Real.sqrt_pos.mpr h2d)
+
+/-- Every `criticalSeq` point is critical for `C_d`. -/
+lemma criticalSeq_crit (d : ℕ) (hd : 1 ≤ d) :
+    ∀ m, m < d →
+      (derivative (Cpoly d)).eval (criticalSeq d m) = 0 := by
+  intro m hm
+  have h2d : (0 : ℝ) < ((2 * d : ℕ) : ℝ) := by
+    have : 0 < 2 * d := by omega
+    exact_mod_cast this
+  have hs0 : Real.sqrt (((2 * d : ℕ) : ℝ)) ≠ 0 :=
+    (Real.sqrt_pos.mpr h2d).ne'
+  rw [criticalSeq_eq d hm, Cpoly_critical_iff d hd,
+    mul_div_cancel_left₀ _ hs0]
+  have := hermiteRRootsSorted_get_mem_roots (2 * d - 1)
+    (i := d - 1 + m) (by rw [hermiteRRootsSorted_length_eq]; omega)
+  rwa [Polynomial.mem_roots (hermiteR_ne_zero _)] at this
+
+/-- The sign alternation along the critical sequence. -/
+lemma criticalSeq_sign (d : ℕ) (hd : 1 ≤ d) :
+    ∀ m, m < d →
+      0 < (-1 : ℝ) ^ m * (Cpoly d).eval (criticalSeq d m) := by
+  intro m hm
+  rw [criticalSeq_eq d hm]
+  exact Cpoly_sign_at_scaled_root d hd hm
+
+/-- **THEOREM M, fully proven**: for every `d ≥ 1`, all complex zeros
+of `Ψ_d` are real.  The critical data comes from the Hermite
+interlacing induction (P6.2, `Hermite.lean` + this file); the measure
+side is the compound-Poisson construction (P6.4b, `CPMeasure.lean` +
+`Capstone.lean`).  This is the statement of `theorem_M` (`Defs.lean`),
+proven without `sorry`. -/
+theorem theorem_M_proven (d : ℕ) (hd : 1 ≤ d) :
+    ∀ z ∈ ((Psi d).map (algebraMap ℝ ℂ)).roots, z.im = 0 :=
+  theorem_M_of_critical_data_measure d hd (criticalSeq d)
+    (le_of_eq (criticalSeq_zero d hd).symm)
+    (criticalSeq_mono d hd)
+    (criticalSeq_crit d hd)
+    (criticalSeq_sign d hd)
+
+/-- The multiset-convention-free form, now sorry-free. -/
+theorem theorem_M_aeval_proven (d : ℕ) (hd : 1 ≤ d) (z : ℂ)
+    (hz : Polynomial.aeval z (Psi d) = 0) : z.im = 0 := by
+  apply theorem_M_proven d hd z
+  rw [Polynomial.mem_roots']
+  refine ⟨(Polynomial.map_ne_zero_iff
+    (algebraMap ℝ ℂ).injective).mpr (Psi_ne_zero d), ?_⟩
+  rw [Polynomial.IsRoot, Polynomial.eval_map, ← Polynomial.aeval_def]
+  exact hz
+
 end TheoremM
