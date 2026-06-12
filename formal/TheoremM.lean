@@ -10,3 +10,4 @@ import TheoremM.Frullani
 import TheoremM.Binet
 import TheoremM.CPMeasure
 import TheoremM.Capstone
+import TheoremM.CriticalData
