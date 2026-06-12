@@ -9,6 +9,7 @@ import TheoremM.Structure
 import Mathlib.RingTheory.Polynomial.Hermite.Gaussian
 import Mathlib.Topology.Order.IntermediateValue
 import Mathlib.Analysis.Polynomial.Basic
+import Mathlib.Data.Multiset.Sort
 
 noncomputable section
 
@@ -74,6 +75,21 @@ lemma hermite_odeR (n : ℕ) :
   have h := congrArg (fun p : Polynomial ℤ => p.map (Int.castRingHom ℝ))
     (hermite_ode n)
   simpa [Polynomial.map_add, Polynomial.map_sub, Polynomial.map_mul, derivative_map] using h
+
+/-- Real-coefficient probabilists' Hermite polynomial. -/
+abbrev HermiteR (n : ℕ) : Polynomial ℝ :=
+  (Polynomial.hermite n).map (Int.castRingHom ℝ)
+
+/-- Real-coefficient Hermite polynomials are monic. -/
+lemma hermiteR_monic (n : ℕ) : (HermiteR n).Monic := by
+  exact (Polynomial.hermite_monic n).map (Int.castRingHom ℝ)
+
+/-- The Hermite recurrence over real coefficients:
+`H_{n+1}=X*H_n-H_n'`. -/
+lemma hermiteR_succ (n : ℕ) :
+    HermiteR (n + 1) = X * HermiteR n - derivative (HermiteR n) := by
+  simp [HermiteR, Polynomial.hermite_succ, Polynomial.map_mul, Polynomial.map_sub,
+    derivative_map]
 
 /-- The even probabilists' Hermite polynomial that will be rescaled to `C_d`. -/
 abbrev HermiteEven (d : ℕ) : Polynomial ℤ :=
@@ -460,6 +476,238 @@ lemma exists_root_X_mul_sub_derivative_between_of_derivative_mul_neg
   rw [hLa, hLb]
   simpa using hneg
 
+/-- If `a` is the rightmost root of a monic split real polynomial, then the
+derivative is positive at `a`. This is the product formula for `p'` at a
+root, with every erased-root factor `a-b` positive. -/
+lemma derivative_eval_pos_of_monic_splits_rightmost_root
+    {p : ℝ[X]} (hp : p.Monic) (hsplits : p.Splits) {a : ℝ}
+    (ha : a ∈ p.roots)
+    (hright : ∀ b ∈ p.roots.erase a, b < a) :
+    0 < (derivative p).eval a := by
+  rw [hsplits.eval_root_derivative hp ha]
+  refine Multiset.prod_pos ?_
+  intro x hx
+  obtain ⟨b, hb, rfl⟩ := Multiset.mem_map.mp hx
+  linarith [hright b hb]
+
+/-- Moving the left-root signs into the explicit factor `(-1)^card` turns
+all factors `a-b` into positive factors `b-a`. -/
+lemma neg_one_pow_card_mul_prod_left_sub_eq_prod_sub_left
+    (s : Multiset ℝ) (a : ℝ) :
+    (-1 : ℝ) ^ s.card * (s.map (fun b => a - b)).prod =
+      (s.map (fun b => b - a)).prod := by
+  induction s using Multiset.induction_on with
+  | empty =>
+      simp
+  | cons b s ih =>
+      simp [pow_succ]
+      rw [← ih]
+      ring
+
+/-- If `a` is the leftmost root of a monic split real polynomial, then the
+derivative has the left-tail parity sign at `a`. -/
+lemma neg_one_pow_card_erase_mul_derivative_eval_pos_of_monic_splits_leftmost_root
+    {p : ℝ[X]} (hp : p.Monic) (hsplits : p.Splits) {a : ℝ}
+    (ha : a ∈ p.roots)
+    (hleft : ∀ b ∈ p.roots.erase a, a < b) :
+    0 < (-1 : ℝ) ^ (p.roots.erase a).card * (derivative p).eval a := by
+  rw [hsplits.eval_root_derivative hp ha]
+  rw [neg_one_pow_card_mul_prod_left_sub_eq_prod_sub_left]
+  refine Multiset.prod_pos ?_
+  intro x hx
+  obtain ⟨b, hb, rfl⟩ := Multiset.mem_map.mp hx
+  linarith [hleft b hb]
+
+/-- If every element of a multiset lies outside the open gap `(a,b)`, then
+the paired factors `(a-c)(b-c)` have positive product. -/
+lemma prod_mul_sub_pos_of_forall_outside_gap
+    (s : Multiset ℝ) {a b : ℝ} (hab : a < b)
+    (hout : ∀ c ∈ s, c < a ∨ b < c) :
+    0 < (s.map (fun c => (a - c) * (b - c))).prod := by
+  refine Multiset.prod_pos ?_
+  intro x hx
+  obtain ⟨c, hc, rfl⟩ := Multiset.mem_map.mp hx
+  rcases hout c hc with hca | hbc
+  · nlinarith
+  · nlinarith
+
+/-- In a strictly sorted list, any element whose index is not one of an
+adjacent pair lies outside the open interval between that pair. -/
+lemma sortedLT_getElem_outside_adjacent
+    {l : List ℝ} (hs : l.SortedLT) {i j : ℕ}
+    (hi : i + 1 < l.length) (hj : j < l.length)
+    (hji : j ≠ i) (hjs : j ≠ i + 1) :
+    l[j] < l[i] ∨ l[i + 1] < l[j] := by
+  have hi0 : i < l.length := by omega
+  by_cases hlt : j < i
+  · left
+    exact hs.getElem_lt_getElem_of_lt (i := j) (j := i) hlt
+  · right
+    have hsij : i + 1 < j := by omega
+    exact hs.getElem_lt_getElem_of_lt (i := i + 1) (j := j) hsij
+
+/-- Membership form of `sortedLT_getElem_outside_adjacent`. This is the
+ordered-root-list bridge used to feed the adjacent-gap Hermite insertion
+lemma. -/
+lemma sortedLT_mem_outside_adjacent
+    {l : List ℝ} (hs : l.SortedLT) {i : ℕ}
+    (hi : i + 1 < l.length) {c : ℝ} (hc : c ∈ l)
+    (hci : c ≠ l[i]) (hcs : c ≠ l[i + 1]) :
+    c < l[i] ∨ l[i + 1] < c := by
+  have hmem : ∃ x ∈ l, x = c := ⟨c, hc, rfl⟩
+  rw [List.exists_mem_iff_getElem] at hmem
+  obtain ⟨j, hj, hjc⟩ := hmem
+  have hji : j ≠ i := by
+    intro h
+    subst j
+    exact hci hjc.symm
+  have hjs : j ≠ i + 1 := by
+    intro h
+    subst j
+    exact hcs hjc.symm
+  rcases sortedLT_getElem_outside_adjacent hs hi hj hji hjs with hleft | hright
+  · left
+    simpa [hjc] using hleft
+  · right
+    simpa [hjc] using hright
+
+/-- Quantified outside-gap form for a sub-multiset whose elements are drawn
+from a strictly sorted list and are not the adjacent endpoints. -/
+lemma sortedLT_forall_mem_outside_adjacent
+    {l : List ℝ} (hs : l.SortedLT) {i : ℕ}
+    (hi : i + 1 < l.length) {s : Multiset ℝ}
+    (hsub : ∀ c ∈ s, c ∈ l)
+    (hne_i : ∀ c ∈ s, c ≠ l[i])
+    (hne_succ : ∀ c ∈ s, c ≠ l[i + 1]) :
+    ∀ c ∈ s, c < l[i] ∨ l[i + 1] < c := by
+  intro c hc
+  exact sortedLT_mem_outside_adjacent hs hi (hsub c hc) (hne_i c hc) (hne_succ c hc)
+
+/-- If a nodup multiset has the same elements as a strictly sorted list, then
+erasing an adjacent pair from the multiset produces only elements outside the
+open interval between that pair. -/
+lemma sortedLT_erase_erase_outside_adjacent_of_mem_iff
+    {l : List ℝ} (hs : l.SortedLT) {s : Multiset ℝ} (hnd : s.Nodup)
+    (hmem : ∀ c : ℝ, c ∈ s ↔ c ∈ l) {i : ℕ}
+    (hi : i + 1 < l.length) :
+    ∀ c ∈ (s.erase (l[i]'(by omega))).erase (l[i + 1]'hi),
+      c < l[i]'(by omega) ∨ l[i + 1]'hi < c := by
+  intro c hc
+  have hcEraseLeft : c ∈ s.erase (l[i]'(by omega)) := Multiset.mem_of_mem_erase hc
+  have hcs : c ∈ s := Multiset.mem_of_mem_erase hcEraseLeft
+  have hci : c ≠ l[i]'(by omega) := (hnd.mem_erase_iff.mp hcEraseLeft).1
+  have hndEraseLeft : (s.erase (l[i]'(by omega))).Nodup :=
+    hnd.erase (l[i]'(by omega))
+  have hcsucc : c ≠ l[i + 1]'hi := (hndEraseLeft.mem_erase_iff.mp hc).1
+  exact sortedLT_mem_outside_adjacent hs hi ((hmem c).mp hcs) hci hcsucc
+
+/-- Every non-first member of a strictly sorted list lies to the right of the
+first member. -/
+lemma sortedLT_mem_right_of_first
+    {l : List ℝ} (hs : l.SortedLT) (h0 : 0 < l.length)
+    {c : ℝ} (hc : c ∈ l) (hc0 : c ≠ l[0]) :
+    l[0] < c := by
+  have hmem : ∃ x ∈ l, x = c := ⟨c, hc, rfl⟩
+  rw [List.exists_mem_iff_getElem] at hmem
+  obtain ⟨j, hj, hjc⟩ := hmem
+  have hj0 : j ≠ 0 := by
+    intro h
+    subst j
+    exact hc0 hjc.symm
+  have h0j : 0 < j := by omega
+  have hlt := hs.getElem_lt_getElem_of_lt (i := 0) (j := j) (hi := h0) (hj := hj) h0j
+  simpa [hjc] using hlt
+
+/-- Every non-last member of a strictly sorted list lies to the left of the
+last member. -/
+lemma sortedLT_mem_left_of_last
+    {l : List ℝ} (hs : l.SortedLT) {i : ℕ}
+    (hi : i < l.length) (hlast : i + 1 = l.length)
+    {c : ℝ} (hc : c ∈ l) (hci : c ≠ l[i]) :
+    c < l[i] := by
+  have hmem : ∃ x ∈ l, x = c := ⟨c, hc, rfl⟩
+  rw [List.exists_mem_iff_getElem] at hmem
+  obtain ⟨j, hj, hjc⟩ := hmem
+  have hji : j ≠ i := by
+    intro h
+    subst j
+    exact hci hjc.symm
+  have hlt : j < i := by omega
+  have hout := hs.getElem_lt_getElem_of_lt (i := j) (j := i) (hi := hj) (hj := hi) hlt
+  simpa [hjc] using hout
+
+/-- Sorting a nodup multiset by `≤` gives a strictly sorted list. This is the
+simple-root bridge from multiset roots to ordered root lists. -/
+lemma sortedLT_sort_le_of_nodup (s : Multiset ℝ) (hnd : s.Nodup) :
+    (s.sort (fun x y : ℝ => x ≤ y)).SortedLT := by
+  apply List.SortedLE.sortedLT_of_nodup
+  · exact (Multiset.pairwise_sort (s := s) (r := fun x y : ℝ => x ≤ y)).sortedLE
+  · rw [← Multiset.coe_nodup]
+    rw [Multiset.sort_eq]
+    exact hnd
+
+/-- The same outside-gap bridge for a strictly sorted view of a multiset. -/
+lemma sortedLT_sort_mem_outside_adjacent
+    (s : Multiset ℝ) (hs : (s.sort (fun x y : ℝ => x ≤ y)).SortedLT) {i : ℕ}
+    (hi : i + 1 < (s.sort (fun x y : ℝ => x ≤ y)).length) {c : ℝ} (hc : c ∈ s)
+    (hci : c ≠ (s.sort (fun x y : ℝ => x ≤ y))[i]'(by omega))
+    (hcs : c ≠ (s.sort (fun x y : ℝ => x ≤ y))[i + 1]'hi) :
+    c < (s.sort (fun x y : ℝ => x ≤ y))[i]'(by omega) ∨
+      (s.sort (fun x y : ℝ => x ≤ y))[i + 1]'hi < c :=
+  sortedLT_mem_outside_adjacent hs hi (by simpa [Multiset.mem_sort] using hc) hci hcs
+
+/-- Consecutive-root sign alternation for a monic split real polynomial.
+The hypothesis says that, after erasing `a` and `b`, all remaining roots lie
+outside the open gap `(a,b)`. Then the derivative signs at `a` and `b` are
+opposite. -/
+lemma derivative_eval_mul_neg_of_monic_splits_adjacent_roots
+    {p : ℝ[X]} (hp : p.Monic) (hsplits : p.Splits) {a b : ℝ}
+    (hab : a < b) (ha : a ∈ p.roots) (hb : b ∈ p.roots.erase a)
+    (hgap : ∀ c ∈ (p.roots.erase a).erase b, c < a ∨ b < c) :
+    (derivative p).eval a * (derivative p).eval b < 0 := by
+  let s : Multiset ℝ := (p.roots.erase a).erase b
+  have hbroot : b ∈ p.roots := Multiset.mem_of_mem_erase hb
+  have hane : a ≠ b := ne_of_lt hab
+  have haEraseB : a ∈ p.roots.erase b := by
+    rw [Multiset.mem_erase_of_ne hane]
+    exact ha
+  rw [hsplits.eval_root_derivative hp ha,
+    hsplits.eval_root_derivative hp hbroot]
+  have hA :
+      ((p.roots.erase a).map (fun c => a - c)).prod =
+        (a - b) * (s.map (fun c => a - c)).prod := by
+    rw [← Multiset.cons_erase hb, Multiset.map_cons, Multiset.prod_cons]
+  have hB :
+      ((p.roots.erase b).map (fun c => b - c)).prod =
+        (b - a) * (s.map (fun c => b - c)).prod := by
+    rw [← Multiset.cons_erase haEraseB, Multiset.map_cons, Multiset.prod_cons]
+    rw [← Multiset.erase_comm p.roots a b]
+  rw [hA, hB]
+  have hpaired :
+      0 < (s.map (fun c => a - c)).prod * (s.map (fun c => b - c)).prod := by
+    rw [← Multiset.prod_map_mul]
+    exact prod_mul_sub_pos_of_forall_outside_gap s hab (by simpa [s] using hgap)
+  have hfirst : (a - b) * (b - a) < 0 := by
+    nlinarith
+  nlinarith
+
+/-- Adjacent-root gap insertion for the Hermite recurrence operator. If
+`a < b` are adjacent roots of a monic split `p` (encoded by the erased-roots
+outside-gap condition), then `L(p)=X*p-p'` has a root strictly inside
+`(a,b)`. -/
+lemma exists_root_X_mul_sub_derivative_between_of_monic_splits_adjacent_roots
+    {p : ℝ[X]} (hp : p.Monic) (hsplits : p.Splits) {a b : ℝ}
+    (hab : a < b) (ha : a ∈ p.roots) (hb : b ∈ p.roots.erase a)
+    (hgap : ∀ c ∈ (p.roots.erase a).erase b, c < a ∨ b < c) :
+    ∃ x, a < x ∧ x < b ∧ (X * p - derivative p).eval x = 0 := by
+  have hbroot : b ∈ p.roots := Multiset.mem_of_mem_erase hb
+  have haeval : p.eval a = 0 := by
+    simpa [Polynomial.IsRoot] using Polynomial.isRoot_of_mem_roots ha
+  have hbeval : p.eval b = 0 := by
+    simpa [Polynomial.IsRoot] using Polynomial.isRoot_of_mem_roots hbroot
+  exact exists_root_X_mul_sub_derivative_between_of_derivative_mul_neg p hab haeval hbeval
+    (derivative_eval_mul_neg_of_monic_splits_adjacent_roots hp hsplits hab ha hb hgap)
+
 /-- Right-tail insertion: a polynomial with positive leading coefficient and
 positive degree crosses to the right of any point where its value is negative. -/
 lemma exists_root_right_of_eval_neg_of_leadingCoeff_pos (p : ℝ[X]) {a : ℝ}
@@ -517,6 +765,153 @@ lemma exists_root_right_X_mul_sub_derivative_of_monic_of_derivative_pos
     simp [L, ha]
     nlinarith
   exact exists_root_right_of_eval_neg_of_leadingCoeff_pos L hdeg hlc hLa
+
+/-- Right-tail insertion stated in terms of the rightmost root in the roots
+multiset of a monic split polynomial. -/
+lemma exists_root_right_X_mul_sub_derivative_of_monic_splits_rightmost_root
+    {p : ℝ[X]} (hp : p.Monic) (hsplits : p.Splits) {a : ℝ}
+    (ha : a ∈ p.roots)
+    (hright : ∀ b ∈ p.roots.erase a, b < a) :
+    ∃ x, a < x ∧ (X * p - derivative p).eval x = 0 := by
+  have haeval : p.eval a = 0 := by
+    simpa [Polynomial.IsRoot] using Polynomial.isRoot_of_mem_roots ha
+  exact exists_root_right_X_mul_sub_derivative_of_monic_of_derivative_pos hp haeval
+    (derivative_eval_pos_of_monic_splits_rightmost_root hp hsplits ha hright)
+
+/-- Left-tail insertion: a polynomial with positive leading coefficient and
+positive degree crosses to the left of any point whose value has opposite sign
+to the left tail. -/
+lemma exists_root_left_of_neg_one_pow_mul_eval_neg_of_leadingCoeff_pos
+    (p : ℝ[X]) {a : ℝ} (hdeg : 0 < p.degree)
+    (hlc : 0 < p.leadingCoeff)
+    (ha : (-1 : ℝ) ^ p.natDegree * p.eval a < 0) :
+    ∃ x, x < a ∧ p.eval x = 0 := by
+  let s : ℝ := (-1 : ℝ) ^ p.natDegree
+  let q : ℝ[X] := Polynomial.C s * p.comp (-X)
+  have hs : s ≠ 0 := pow_ne_zero _ (by norm_num)
+  have hsu : IsUnit s := by
+    dsimp [s]
+    rcases Nat.even_or_odd p.natDegree with he | ho
+    · rw [he.neg_one_pow]
+      exact isUnit_one
+    · rw [ho.neg_one_pow]
+      exact (isUnit_one).neg
+  have hs2 : s * s = 1 := by
+    dsimp [s]
+    rw [← pow_two, ← pow_mul]
+    norm_num
+  have hqnat : q.natDegree = p.natDegree := by
+    change (Polynomial.C s * p.comp (-X)).natDegree = p.natDegree
+    rw [natDegree_C_mul hs, natDegree_comp]
+    simp
+  have hqdeg : 0 < q.degree := by
+    apply natDegree_pos_iff_degree_pos.mp
+    rw [hqnat]
+    exact natDegree_pos_iff_degree_pos.mpr hdeg
+  have hqlc : 0 < q.leadingCoeff := by
+    change 0 < (Polynomial.C s * p.comp (-X)).leadingCoeff
+    rw [leadingCoeff_C_mul_of_isUnit hsu]
+    rw [comp_neg_X_leadingCoeff_eq]
+    change 0 < s * (s * p.leadingCoeff)
+    rw [← mul_assoc, hs2, one_mul]
+    exact hlc
+  have hqa : q.eval (-a) < 0 := by
+    simpa [q, s] using ha
+  obtain ⟨y, hy, hyroot⟩ :=
+    exists_root_right_of_eval_neg_of_leadingCoeff_pos q hqdeg hqlc hqa
+  refine ⟨-y, by linarith, ?_⟩
+  have hyroot' : s * p.eval (-y) = 0 := by
+    simpa [q, s] using hyroot
+  exact (mul_eq_zero.mp hyroot').resolve_left hs
+
+/-- Left-tail insertion for the Hermite recurrence operator. The sign
+condition is written in the natural left-tail form for `L(p)`. -/
+lemma exists_root_left_X_mul_sub_derivative_of_monic
+    {p : ℝ[X]} (hp : p.Monic) {a : ℝ}
+    (hleft : (-1 : ℝ) ^ (X * p - derivative p).natDegree *
+        (X * p - derivative p).eval a < 0) :
+    ∃ x, x < a ∧ (X * p - derivative p).eval x = 0 := by
+  let L : ℝ[X] := X * p - derivative p
+  have hdeg_nat : 0 < L.natDegree := by
+    rw [show L = X * p - derivative p by rfl]
+    rw [natDegree_X_mul_sub_derivative_of_monic hp]
+    exact Nat.succ_pos _
+  have hdeg : 0 < L.degree := natDegree_pos_iff_degree_pos.mp hdeg_nat
+  have hlc : 0 < L.leadingCoeff := by
+    rw [show L = X * p - derivative p by rfl]
+    rw [leadingCoeff_X_mul_sub_derivative_of_monic hp]
+    norm_num
+  exact exists_root_left_of_neg_one_pow_mul_eval_neg_of_leadingCoeff_pos
+    L hdeg hlc (by simpa [L] using hleft)
+
+/-- Left-tail insertion stated in terms of the leftmost root in the roots
+multiset of a monic split polynomial. The card hypothesis is the simple-root
+accounting needed to identify the erased-root parity with `p.natDegree - 1`. -/
+lemma exists_root_left_X_mul_sub_derivative_of_monic_splits_leftmost_root
+    {p : ℝ[X]} (hp : p.Monic) (hsplits : p.Splits) {a : ℝ}
+    (ha : a ∈ p.roots)
+    (hleft : ∀ b ∈ p.roots.erase a, a < b)
+    (hcard : (p.roots.erase a).card + 1 = p.natDegree) :
+    ∃ x, x < a ∧ (X * p - derivative p).eval x = 0 := by
+  have haeval : p.eval a = 0 := by
+    simpa [Polynomial.IsRoot] using Polynomial.isRoot_of_mem_roots ha
+  have hsgn :
+      0 < (-1 : ℝ) ^ (p.roots.erase a).card * (derivative p).eval a :=
+    neg_one_pow_card_erase_mul_derivative_eval_pos_of_monic_splits_leftmost_root
+      hp hsplits ha hleft
+  apply exists_root_left_X_mul_sub_derivative_of_monic hp
+  have hnat :
+      (X * p - derivative p).natDegree = (p.roots.erase a).card + 2 := by
+    rw [natDegree_X_mul_sub_derivative_of_monic hp]
+    omega
+  have hpow :
+      (-1 : ℝ) ^ ((p.roots.erase a).card + 2) =
+        (-1 : ℝ) ^ (p.roots.erase a).card := by
+    rw [pow_add]
+    norm_num
+  have hLa :
+      (X * p - derivative p).eval a = - (derivative p).eval a := by
+    simp [haeval]
+  rw [hnat, hpow, hLa]
+  nlinarith
+
+/-- Hermite recurrence gap insertion, stated directly for `HermiteR (n+1)`.
+This packages the generic adjacent-root insertion with `H_{n+1}=XH_n-H_n'`. -/
+lemma exists_root_between_hermiteR_succ_of_adjacent_roots
+    (n : ℕ) (hsplits : (HermiteR n).Splits) {a b : ℝ}
+    (hab : a < b) (ha : a ∈ (HermiteR n).roots)
+    (hb : b ∈ (HermiteR n).roots.erase a)
+    (hgap : ∀ c ∈ ((HermiteR n).roots.erase a).erase b, c < a ∨ b < c) :
+    ∃ x, a < x ∧ x < b ∧ (HermiteR (n + 1)).eval x = 0 := by
+  obtain ⟨x, hax, hxb, hxroot⟩ :=
+    exists_root_X_mul_sub_derivative_between_of_monic_splits_adjacent_roots
+      (hermiteR_monic n) hsplits hab ha hb hgap
+  exact ⟨x, hax, hxb, by simpa [hermiteR_succ] using hxroot⟩
+
+/-- Hermite recurrence right-tail insertion, stated directly for
+`HermiteR (n+1)`. -/
+lemma exists_root_right_hermiteR_succ_of_rightmost_root
+    (n : ℕ) (hsplits : (HermiteR n).Splits) {a : ℝ}
+    (ha : a ∈ (HermiteR n).roots)
+    (hright : ∀ b ∈ (HermiteR n).roots.erase a, b < a) :
+    ∃ x, a < x ∧ (HermiteR (n + 1)).eval x = 0 := by
+  obtain ⟨x, hax, hxroot⟩ :=
+    exists_root_right_X_mul_sub_derivative_of_monic_splits_rightmost_root
+      (hermiteR_monic n) hsplits ha hright
+  exact ⟨x, hax, by simpa [hermiteR_succ] using hxroot⟩
+
+/-- Hermite recurrence left-tail insertion, stated directly for
+`HermiteR (n+1)`. -/
+lemma exists_root_left_hermiteR_succ_of_leftmost_root
+    (n : ℕ) (hsplits : (HermiteR n).Splits) {a : ℝ}
+    (ha : a ∈ (HermiteR n).roots)
+    (hleft : ∀ b ∈ (HermiteR n).roots.erase a, a < b)
+    (hcard : ((HermiteR n).roots.erase a).card + 1 = (HermiteR n).natDegree) :
+    ∃ x, x < a ∧ (HermiteR (n + 1)).eval x = 0 := by
+  obtain ⟨x, hxa, hxroot⟩ :=
+    exists_root_left_X_mul_sub_derivative_of_monic_splits_leftmost_root
+      (hermiteR_monic n) hsplits ha hleft hcard
+  exact ⟨x, hxa, by simpa [hermiteR_succ] using hxroot⟩
 
 /-- Gaussian derivative representation of the even Hermite polynomial. -/
 lemma hermiteEven_gaussian_factor (d : ℕ) (x : ℝ) :

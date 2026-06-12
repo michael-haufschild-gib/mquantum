@@ -573,4 +573,201 @@ lemma cpMeasure_Iio_zero : cpMeasure (Iio 0) = 0 := by
   rw [Measure.smul_apply, Measure.sum_apply _ measurableSet_Iio]
   simp [Measure.smul_apply, convPow_levyMeasure_Iio_zero]
 
+/-! ## The residual CP measure and its pushforward -/
+
+/-- The shifted `ℝ≥0∞` exponential series, in subtraction-free form:
+`1 + ∑_n x^{n+1}/(n+1)! = e^x`. -/
+lemma one_add_tsum_shifted_ofReal_pow {x : ℝ} (hx : 0 ≤ x) :
+    1 + ∑' n : ℕ, ((n + 1).factorial : ℝ≥0∞)⁻¹
+        * ENNReal.ofReal x ^ (n + 1)
+      = ENNReal.ofReal (Real.exp x) := by
+  rw [← tsum_inv_factorial_mul_ofReal_pow hx]
+  conv_rhs => rw [tsum_eq_zero_add' ENNReal.summable]
+  simp
+
+/-- The residual compound-Poisson measure: the CP sum with its `n = 0`
+dirac atom removed (index-shifted, subtraction-free). -/
+noncomputable def cpResidual : Measure ℝ :=
+  ENNReal.ofReal pAtom
+    • Measure.sum fun n =>
+        ((n + 1).factorial : ℝ≥0∞)⁻¹ • convPow levyMeasure (n + 1)
+
+/-- **Moments of the residual CP measure are the residual moments**:
+`∫⁻ e^{−ks} d(cpResidual) = M k − pAtom`. -/
+lemma lintegral_exp_cpResidual (k : ℕ) :
+    ∫⁻ s, ENNReal.ofReal (Real.exp (-((k : ℝ) * s))) ∂cpResidual
+      = ENNReal.ofReal (M k - pAtom) := by
+  have hL : 0 ≤ Real.log (M k) - Real.log pAtom := by
+    have := Real.log_lt_log pAtom_pos (M_gt_pAtom k)
+    linarith
+  have hMp : pAtom ≤ M k := (M_gt_pAtom k).le
+  unfold cpResidual
+  rw [lintegral_smul_measure, lintegral_sum_measure]
+  simp_rw [lintegral_smul_measure, lintegral_exp_convPow, smul_eq_mul]
+  have key : ENNReal.ofReal pAtom
+        * (∑' n : ℕ, ((n + 1).factorial : ℝ≥0∞)⁻¹
+            * ENNReal.ofReal (Real.log (M k) - Real.log pAtom) ^ (n + 1))
+        + ENNReal.ofReal pAtom
+      = ENNReal.ofReal (M k - pAtom) + ENNReal.ofReal pAtom := by
+    calc ENNReal.ofReal pAtom
+          * (∑' n : ℕ, ((n + 1).factorial : ℝ≥0∞)⁻¹
+              * ENNReal.ofReal (Real.log (M k) - Real.log pAtom) ^ (n + 1))
+          + ENNReal.ofReal pAtom
+        = ENNReal.ofReal pAtom
+            * (1 + ∑' n : ℕ, ((n + 1).factorial : ℝ≥0∞)⁻¹
+                * ENNReal.ofReal (Real.log (M k) - Real.log pAtom)
+                  ^ (n + 1)) := by
+          ring
+      _ = ENNReal.ofReal pAtom
+            * ENNReal.ofReal (Real.exp (Real.log (M k) - Real.log pAtom)) := by
+          rw [one_add_tsum_shifted_ofReal_pow hL]
+      _ = ENNReal.ofReal (M k) := by
+          rw [← ENNReal.ofReal_mul pAtom_pos.le]
+          congr 1
+          rw [Real.exp_sub, Real.exp_log (M_pos k), Real.exp_log pAtom_pos,
+            mul_comm]
+          exact div_mul_cancel₀ _ pAtom_pos.ne'
+      _ = ENNReal.ofReal (M k - pAtom) + ENNReal.ofReal pAtom := by
+          rw [← ENNReal.ofReal_add (by linarith) pAtom_pos.le]
+          congr 1
+          ring
+  exact (ENNReal.add_left_inj ENNReal.ofReal_ne_top).mp key
+
+/-- The residual CP measure vanishes on the negative half-line. -/
+lemma cpResidual_Iio_zero : cpResidual (Iio 0) = 0 := by
+  unfold cpResidual
+  rw [Measure.smul_apply, Measure.sum_apply _ measurableSet_Iio]
+  have hterm : ∀ n : ℕ,
+      (((n + 1).factorial : ℝ≥0∞)⁻¹ • convPow levyMeasure (n + 1))
+        (Iio 0) = 0 := by
+    intro n
+    rw [Measure.smul_apply, convPow_levyMeasure_Iio_zero (n + 1), smul_zero]
+  simp_rw [hterm]
+  simp
+
+/-- The residual CP measure is finite (total mass `1 − pAtom`,
+the `k = 0` moment). -/
+instance : IsFiniteMeasure cpResidual := by
+  constructor
+  have h := lintegral_exp_cpResidual 0
+  simp only [Nat.cast_zero, zero_mul, neg_zero, Real.exp_zero,
+    ENNReal.ofReal_one, lintegral_one, M_zero] at h
+  rw [h]
+  exact ENNReal.ofReal_lt_top
+
+/-- The Theorem-M measure: pushforward of the residual CP measure under
+`t ↦ e^{−t/2}`.  Its even moments are the residual moments `M_j − p`
+(`lintegral_pow_muMeasure`), and it is concentrated on `(0, 1]`
+(`ae_muMeasure_mem_Ioc`). -/
+noncomputable def muMeasure : Measure ℝ :=
+  Measure.map (fun t : ℝ => Real.exp (-(t / 2))) cpResidual
+
+/-- Change of variables for the pushforward. -/
+lemma lintegral_muMeasure {f : ℝ → ℝ≥0∞} (hf : Measurable f) :
+    ∫⁻ v, f v ∂muMeasure
+      = ∫⁻ t, f (Real.exp (-(t / 2))) ∂cpResidual := by
+  unfold muMeasure
+  rw [lintegral_map hf (by fun_prop)]
+
+/-- The Theorem-M measure is finite. -/
+instance : IsFiniteMeasure muMeasure := by
+  constructor
+  have h : muMeasure Set.univ = cpResidual Set.univ := by
+    unfold muMeasure
+    rw [Measure.map_apply (by fun_prop) MeasurableSet.univ, preimage_univ]
+  rw [h]
+  exact measure_lt_top _ _
+
+/-- **Even moments of the Theorem-M measure are the residual moments**:
+`∫⁻ v^{2j} dμ = M j − pAtom`. -/
+lemma lintegral_pow_muMeasure (j : ℕ) :
+    ∫⁻ v, ENNReal.ofReal (v ^ (2 * j)) ∂muMeasure
+      = ENNReal.ofReal (M j - pAtom) := by
+  rw [lintegral_muMeasure (by fun_prop)]
+  have hpt : ∀ t : ℝ, ENNReal.ofReal (Real.exp (-(t / 2)) ^ (2 * j))
+      = ENNReal.ofReal (Real.exp (-((j : ℝ) * t))) := by
+    intro t
+    congr 1
+    rw [← Real.exp_nat_mul]
+    congr 1
+    push_cast
+    ring
+  simp_rw [hpt]
+  exact lintegral_exp_cpResidual j
+
+/-- The Theorem-M measure is concentrated on `(0, 1]`. -/
+lemma muMeasure_compl_Ioc : muMeasure (Ioc (0 : ℝ) 1)ᶜ = 0 := by
+  unfold muMeasure
+  rw [Measure.map_apply (by fun_prop) measurableSet_Ioc.compl]
+  have hpre : (fun t : ℝ => Real.exp (-(t / 2))) ⁻¹' (Ioc (0 : ℝ) 1)ᶜ
+      = Iio 0 := by
+    ext t
+    simp only [mem_preimage, mem_compl_iff, mem_Ioc, mem_Iio, not_and,
+      not_le]
+    constructor
+    · intro h
+      have h1 : (1 : ℝ) < Real.exp (-(t / 2)) := h (Real.exp_pos _)
+      rw [Real.one_lt_exp_iff] at h1
+      linarith
+    · intro ht _
+      rw [Real.one_lt_exp_iff]
+      linarith
+  rw [hpre]
+  exact cpResidual_Iio_zero
+
+/-- A.e. form of the concentration: almost every `v` lies in `(0, 1]`. -/
+lemma ae_muMeasure_mem_Ioc : ∀ᵐ v ∂muMeasure, v ∈ Ioc (0 : ℝ) 1 := by
+  rw [ae_iff]
+  have : {v : ℝ | ¬ v ∈ Ioc (0 : ℝ) 1} = (Ioc (0 : ℝ) 1)ᶜ := rfl
+  rw [this]
+  exact muMeasure_compl_Ioc
+
+/-! ## Bochner bridge -/
+
+/-- Total mass of the Theorem-M measure: `1 − pAtom` (the `j = 0`
+moment). -/
+lemma muMeasure_univ :
+    muMeasure Set.univ = ENNReal.ofReal (1 - pAtom) := by
+  have h := lintegral_pow_muMeasure 0
+  simp only [Nat.mul_zero, pow_zero, ENNReal.ofReal_one, lintegral_one,
+    M_zero] at h
+  exact h
+
+/-- Every monomial is `muMeasure`-integrable (`|v^k| ≤ 1` a.e. on the
+support `(0,1]`). -/
+lemma integrable_pow_muMeasure (k : ℕ) :
+    Integrable (fun v : ℝ => v ^ k) muMeasure := by
+  apply Integrable.mono' (integrable_const (1 : ℝ))
+  · exact (by fun_prop : Measurable fun v : ℝ => v ^ k).aestronglyMeasurable
+  · filter_upwards [ae_muMeasure_mem_Ioc] with v hv
+    rw [norm_eq_abs, abs_pow]
+    apply pow_le_one₀ (abs_nonneg v)
+    rw [abs_of_pos hv.1]
+    exact hv.2
+
+/-- Bochner form of the even moments: `∫ v^{2j} dμ = M j − pAtom`. -/
+lemma integral_pow_muMeasure (j : ℕ) :
+    ∫ v, v ^ (2 * j) ∂muMeasure = M j - pAtom := by
+  have hnn : 0 ≤ᵐ[muMeasure] fun v : ℝ => v ^ (2 * j) := by
+    filter_upwards [ae_muMeasure_mem_Ioc] with v hv
+    exact pow_nonneg hv.1.le _
+  rw [integral_eq_lintegral_of_nonneg_ae hnn
+      ((by fun_prop : Measurable fun v : ℝ =>
+        v ^ (2 * j)).aestronglyMeasurable),
+    lintegral_pow_muMeasure j,
+    ENNReal.toReal_ofReal (by linarith [M_gt_pAtom j])]
+
+/-- Polynomial evaluations along rays are `muMeasure`-integrable. -/
+lemma integrable_polyEval_muMeasure (p : Polynomial ℝ) (x : ℝ) :
+    Integrable (fun v : ℝ => p.eval (v * x)) muMeasure := by
+  have heval : ∀ v : ℝ, p.eval (v * x)
+      = ∑ i ∈ Finset.range (p.natDegree + 1),
+          p.coeff i * x ^ i * v ^ i := by
+    intro v
+    rw [Polynomial.eval_eq_sum_range]
+    exact Finset.sum_congr rfl fun i _ => by ring
+  simp_rw [heval]
+  exact integrable_finsetSum _ fun i _ =>
+    (integrable_pow_muMeasure i).const_mul _
+
 end TheoremM

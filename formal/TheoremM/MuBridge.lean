@@ -137,19 +137,16 @@ lemma Psi_budget_at_critical (d : ℕ) (hd : 1 ≤ d)
     _ = (1 - pAtom) * |(Cpoly d).eval c| := by
         rw [← Finset.sum_mul, hmass]
 
-/-- **Sign transfer.** Under the quadrature hypotheses, `Ψ_d` has the
-same (strict) sign as `C_d` at every nonnegative critical point. -/
-lemma Psi_sign_at_critical (d : ℕ) (hd : 1 ≤ d)
-    (n : ℕ) (w v : Fin n → ℝ)
-    (hw : ∀ i, 0 ≤ w i)
-    (hv : ∀ i, 0 ≤ v i ∧ v i ≤ 1)
-    (hmass : ∑ i, w i = 1 - pAtom)
-    (hmom : ∀ k, k ≤ d → ∑ i, w i * (v i) ^ (2 * k) = M k - pAtom)
-    {c : ℝ} (hc : 0 ≤ c)
-    (hcrit : (derivative (Cpoly d)).eval c = 0)
+/-- **Sign transfer from a budget bound.** If
+`|Ψ_d(c) − pAtom·C_d(c)| ≤ (1 − pAtom)·|C_d(c)|`, then `Ψ_d` has the
+same strict sign as `C_d` at `c` — only `pAtom > 1/2` is used.  This is
+the generic core consumed by both the finite-quadrature interface
+below and the measure-variant capstone (`Capstone.lean`). -/
+lemma Psi_sign_of_budget (d : ℕ) {c : ℝ}
+    (hbudget : |(Psi d).eval c - pAtom * (Cpoly d).eval c|
+      ≤ (1 - pAtom) * |(Cpoly d).eval c|)
     (s : ℝ) (hs : 0 < s * (Cpoly d).eval c) (hs1 : |s| = 1) :
     0 < s * (Psi d).eval c := by
-  have hbudget := Psi_budget_at_critical d hd n w v hw hv hmass hmom hc hcrit
   have hsor : s = 1 ∨ s = -1 := by
     rcases abs_cases s with ⟨h1, _⟩ | ⟨h1, _⟩
     · left; rw [← h1, hs1]
@@ -183,11 +180,25 @@ lemma Psi_sign_at_critical (d : ℕ) (hd : 1 ≤ d)
         - (1 - pAtom) * |(Cpoly d).eval c| := by rw [habs]
     _ ≤ pAtom * (s * (Cpoly d).eval c)
         - |(Psi d).eval c - pAtom * (Cpoly d).eval c| := by
-        have := hbudget
-        linarith
+        linarith [hbudget]
     _ ≤ s * (Psi d).eval c := by
         rw [← h2]
         linarith [h1]
+
+/-- **Sign transfer.** Under the quadrature hypotheses, `Ψ_d` has the
+same (strict) sign as `C_d` at every nonnegative critical point. -/
+lemma Psi_sign_at_critical (d : ℕ) (hd : 1 ≤ d)
+    (n : ℕ) (w v : Fin n → ℝ)
+    (hw : ∀ i, 0 ≤ w i)
+    (hv : ∀ i, 0 ≤ v i ∧ v i ≤ 1)
+    (hmass : ∑ i, w i = 1 - pAtom)
+    (hmom : ∀ k, k ≤ d → ∑ i, w i * (v i) ^ (2 * k) = M k - pAtom)
+    {c : ℝ} (hc : 0 ≤ c)
+    (hcrit : (derivative (Cpoly d)).eval c = 0)
+    (s : ℝ) (hs : 0 < s * (Cpoly d).eval c) (hs1 : |s| = 1) :
+    0 < s * (Psi d).eval c :=
+  Psi_sign_of_budget d
+    (Psi_budget_at_critical d hd n w v hw hv hmass hmom hc hcrit) s hs hs1
 
 /-! ## The capstone -/
 
