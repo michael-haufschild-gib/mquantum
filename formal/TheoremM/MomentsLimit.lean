@@ -333,7 +333,7 @@ lemma USeq_tendsto : Tendsto USeq atTop (nhds (1 / 2)) := by
 lemma stirlingSeq_pos {n : ℕ} (hn : 1 ≤ n) : 0 < stirlingSeq n := by
   unfold stirlingSeq
   have hn0 : (0 : ℝ) < n := by exact_mod_cast hn
-  have hfac : (0 : ℝ) < (n ! : ℝ) := by exact_mod_cast n.factorial_pos
+  have hfac : (0 : ℝ) < (n.factorial : ℝ) := by exact_mod_cast n.factorial_pos
   apply div_pos hfac
   apply mul_pos
   · apply Real.sqrt_pos.mpr
@@ -343,7 +343,7 @@ lemma stirlingSeq_pos {n : ℕ} (hn : 1 ≤ n) : 0 < stirlingSeq n := by
 
 /-- The factorial in logs, via the Stirling sequence. -/
 lemma log_factorial_eq {n : ℕ} (hn : 1 ≤ n) :
-    Real.log (n ! : ℝ) = Real.log (stirlingSeq n)
+    Real.log (n.factorial : ℝ) = Real.log (stirlingSeq n)
       + (1 / 2) * Real.log (2 * n) + n * (Real.log n - 1) := by
   have hn0 : (0 : ℝ) < n := by exact_mod_cast hn
   have hs := stirlingSeq_pos hn
@@ -353,7 +353,7 @@ lemma log_factorial_eq {n : ℕ} (hn : 1 ≤ n) :
   have hpow : (0 : ℝ) < ((n : ℝ) / Real.exp 1) ^ n := by
     apply pow_pos
     positivity
-  have hfac : (n ! : ℝ) = stirlingSeq n * (Real.sqrt (2 * n)
+  have hfac : (n.factorial : ℝ) = stirlingSeq n * (Real.sqrt (2 * n)
       * ((n : ℝ) / Real.exp 1) ^ n) := by
     unfold stirlingSeq
     field_simp
@@ -366,11 +366,10 @@ lemma log_factorial_eq {n : ℕ} (hn : 1 ≤ n) :
 /-- `S₁(k) = k(H_k − 1)` for `k ≥ 1`. -/
 lemma S1_eq_succ (j : ℕ) :
     S1 (j + 1) = ((j : ℝ) + 1) * ((harmonic (j + 1) : ℝ) - 1) := by
-  show ((j : ℕ) + 1 : ℕ) * (harmonic j : ℝ) - (j : ℝ)
-      = ((j : ℝ) + 1) * ((harmonic (j + 1) : ℝ) - 1)
+  simp only [S1]
   rw [harmonic_succ]
-  push_cast
   have hj1 : ((j : ℝ) + 1) ≠ 0 := by positivity
+  push_cast
   field_simp
   ring
 
@@ -384,22 +383,21 @@ lemma M_log_form (j : ℕ) :
   have hk0 : (0 : ℝ) < k := by exact_mod_cast hk1
   have hMpos := M_pos k
   -- log M = log((2k)!) − k log 4 − log(k!) + (γk − S1 k)
-  have hfac2 : (0 : ℝ) < ((2 * k)! : ℝ) := by
+  have hfac2 : (0 : ℝ) < ((2 * k).factorial : ℝ) := by
     exact_mod_cast (2 * k).factorial_pos
-  have hfac1 : (0 : ℝ) < (k ! : ℝ) := by exact_mod_cast k.factorial_pos
-  have hlogM : Real.log (M k) = Real.log ((2 * k)! : ℝ)
+  have hfac1 : (0 : ℝ) < (k.factorial : ℝ) := by exact_mod_cast k.factorial_pos
+  have hlogM : Real.log (M k) = Real.log ((2 * k).factorial : ℝ)
       + (Real.eulerMascheroniConstant * k - S1 k)
-      - ((k : ℝ) * Real.log 4 + Real.log (k ! : ℝ)) := by
+      - ((k : ℝ) * Real.log 4 + Real.log (k.factorial : ℝ)) := by
     unfold M
     rw [Real.log_div (by positivity) (by positivity),
       Real.log_mul hfac2.ne' (Real.exp_pos _).ne', Real.log_exp,
       Real.log_mul (by positivity) hfac1.ne', Real.log_pow]
-    push_cast
-    ring
   have hL2 := log_factorial_eq (show 1 ≤ 2 * k by omega)
   have hL1 := log_factorial_eq hk1
   have hS1 : S1 k = (k : ℝ) * ((harmonic k : ℝ) - 1) := by
     rw [hk]
+    push_cast
     exact S1_eq_succ j
   have hU : USeq k = k * ((harmonic k : ℝ)
       - Real.eulerMascheroniConstant - Real.log k) := rfl
