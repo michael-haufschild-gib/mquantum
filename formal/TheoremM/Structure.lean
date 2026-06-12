@@ -213,6 +213,12 @@ theorem Cpoly_ode (d : ℕ) (hd : 1 ≤ d) :
         -- n even ⟹ n + 1 odd is m itself… we need coeff at n + 1 = m: odd ✓
         rw [Cpoly_coeff_odd d (n + 1) this]
         ring
-    simp [coeff_C_mul, hC, hC2, hXC']
+    have e1 : (Polynomial.C ((2 * d : ℕ) : ℝ)
+        * derivative (derivative (Cpoly d))).coeff m = 0 := by
+      rw [coeff_C_mul, hC2, mul_zero]
+    have e2 : (Polynomial.C ((2 * d : ℕ) : ℝ) * Cpoly d).coeff m = 0 := by
+      rw [coeff_C_mul, hC, mul_zero]
+    rw [coeff_add, coeff_sub, e1, e2, hXC', coeff_zero]
+    ring
 
 end TheoremM
