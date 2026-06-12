@@ -548,6 +548,68 @@ the classical context above. The template direction (W2′: spacing-driven
 barrier, F97) compounds the novelty question and should be checked
 together with it.
 
+## §3c SECOND PROOF — real-variable sign alternation [PROVED — GPT audit F131; formal counterparts in progress (P6.2/P6.4)]
+
+_Found during the Lean-formalization recon (round 313): examining what
+the Rouché replacement actually requires exposed that Theorem M itself
+needs NO complex analysis. The complex apparatus (§2 caps/Cap Lemma,
+§3 cells/Rouché, Corollary T) remains necessary for the TRANSPORT
+program — the (γ)-interface lives on complex cell boundaries — but the
+standalone theorem has the following elementary proof, which is also
+the one being formalized (it removes Rouché and E1–E8 from the Lean
+critical path entirely)._
+
+**Inputs:** 1.2 (C_d real simple zeros), 1.1 (the ODE), §1.4 + §1.4a
+(decomposition with μ ≥ 0, mass 1−p), deg Ψ_d = 2d. Nothing else.
+
+**Proof.** Write c_0 = 0 < c_1 < … < c_{d−1} for the nonnegative
+critical points of C_d (§3.1: Rolle count). Since the zeros of C_d are
+real and simple and interlace the criticals, the critical values are
+nonzero with alternating signs: sign C_d(c_m) = (−1)^m, and
+|C_d(c_m)| ≥ 1 by real W1 (E := C_d² + C_d′² has E′ = (x/d)C_d′² ≥ 0
+on x ≥ 0, E(0) = 1, E(c_m) = C_d(c_m)²).
+
+(i) _Pointwise domination at criticals._ For every v ∈ [0,1]:
+|C_d(v c_m)|² ≤ E(v c_m) ≤ E(c_m) = C_d(c_m)², i.e.
+
+    sup_{v∈[0,1]} |C_d(v c_m)| ≤ |C_d(c_m)|
+
+— the y = 0 wall dominance with constant 1 (not √2; the √2 of W3 is
+the price of leaving the real axis, which this proof never does).
+
+(ii) _Signs of Ψ_d at criticals._ By §1.4/§1.4a,
+Ψ_d(x) = p·C_d(x) + ∫_{[0,1)} C_d(vx) dμ(v) with μ ≥ 0 of mass 1−p, so
+
+    |Ψ_d(c_m) − p·C_d(c_m)| ≤ (1−p)·sup_v |C_d(v c_m)|
+                            ≤ (1−p)·|C_d(c_m)| < p·|C_d(c_m)|,
+
+using only p = √(2/e) > 1/2 (i.e. 8 > e). Hence
+sign Ψ_d(c_m) = sign C_d(c_m) = (−1)^m for m = 0, …, d−1.
+
+(iii) _Tail._ The leading coefficient of Ψ_d is exactly
+(−1)^d·d!·M_d/(d^d·(2d)!) with M_d > 0 (GPT audit F131 display
+correction), so sign Ψ_d(x) = (−1)^d for all large x.
+
+(iv) _Count._ The values Ψ_d(c_0), …, Ψ_d(c_{d−1}), Ψ_d(+∞) alternate
+through d sign changes ⟹ Ψ_d has ≥ d distinct zeros in (0, ∞).
+Evenness mirrors them into (−∞, 0); Ψ_d(0) = 1 ≠ 0. That is ≥ 2d
+distinct real zeros of a degree-2d polynomial: exactly 2d, all real,
+all simple. ∎
+
+**Numerical confirmation** (d = 1…300, exact criticals by bisection):
+sign alternation and the tail sign hold at every tested d; the worst
+ratio |Ψ_d(c_m) − pC_d(c_m)|/(p|C_d(c_m)|) is 0.165822 = (1−p)/p at
+EVERY d — the endpoint (v → 1) bound is sharp and d-independent,
+strictly inside the budget with 6× room.
+
+**Remark (why two proofs).** The first proof's machinery is not
+redundant: Corollary T's complex-boundary floors are exactly what the
+transport program's (γ)-interface consumes, and the Cap Lemma bounds
+are reused by the W2′/B_ref template results. The second proof is what
+makes the STANDALONE theorem elementary, simple-zeros-strong, and
+cheaply formalizable. It also strengthens the conclusion: all zeros of
+Ψ_d are real AND SIMPLE.
+
 ## §3b Corollary T — transport-ready boundary floor (lane A) [PROVED — GPT F106 audit, with degree/exterior-scope qualification]
 
 Step (α) of the F103 transport chain, extracted entirely from the

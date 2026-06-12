@@ -11,15 +11,26 @@ exactly the standard the publication-hardening campaign aims at.
 
 ## Status
 
+**ROUND-313 RESTRUCTURE — the critical path collapsed.** The Rouché-(b)
+recon found a SECOND PROOF of Theorem M (draft §3c): real-variable sign
+alternation at the critical points of C_d. It needs NO complex
+analysis: real W1 gives sup_v |C_d(vc)| ≤ |C_d(c)| at criticals
+(constant 1), the μ-budget (1−p) < p preserves the alternating signs,
+and d sign changes + evenness + degree count finish. Rouché (old
+P6.4), the Cap Lemma chain (old P6.5), and the complex W2/W3 (old
+P6.3) are REMOVED from the formalization's critical path (they remain
+relevant only if we later formalize the transport interface).
+
 | Phase | Content | Status |
 |-------|---------|--------|
-| P6.0 | Scaffold; defs (`S1`, `M`, `Cpoly`, `Psi`); the precise formal statement `theorem_M`; §1.4a moment algebra (`S1_succ_sub`, `M_zero`, `M_pos`, `M_ratio`); structural lemmas (`Psi_coeff_zero`, `Psi_coeff_odd`) | **DONE — builds green, single `sorry` = the main theorem** |
-| P6.1 | Ψ_d structure: `natDegree = 2d`, leading coefficient ≠ 0, evenness as `Polynomial` symmetry; the ODE identity `2d·C″ − X·C′ + 2d·C = 0` (coefficient-level binomial identity); the Ψ/C moment relation | next |
-| P6.2 | Real-rootedness + simplicity of `C_d`'s zeros; critical-point count d−1 + interlacing (Rolle) | open |
-| P6.3 | W1 energy identity, W2 Riccati identity, A1, W3 chain (complex `deriv` computations) | open |
-| P6.4 | Rouché infrastructure (mathlib gap — see below) | open |
-| P6.5 | Quantitative chain: Cap Lemma E1–E8, Corollary T floors, Szegő-replacement | open (heaviest) |
-| P6.6 | Assembly: cells, Rouché per cell, conjugation finisher, count | open |
+| P6.0 | Scaffold; defs; formal statement; §1.4a moment algebra | **DONE** |
+| P6.1 | Coefficient closed forms; `Psi_natDegree = 2d`; the ODE `2d·C″ − X·C′ + 2d·C = 0` (`Cpoly_ode`) | **DONE — kernel-checked** |
+| P6.2 | Real-rootedness + simplicity of `C_d`; interlacing; critical points c_0 < … < c_{d−1} with alternating critical-value signs (Hermite/Gaussian + iterated Rolle) | IN PROGRESS — GPT's `Hermite.lean` scaffold green (7 lemmas, F131) |
+| P6.3 | REAL W1: `energy_monotoneOn`, `energy_zero`, `abs_Cpoly_le_of_critical` (`Energy.lean`) | **DONE — kernel-checked (round 314)** |
+| P6.4a | The μ-bridge (`MuBridge.lean`): `pAtom = √(2/e)` with `pAtom > 1/2` (from `e < 8`); `Psi_eval_decomp` (quadrature ⟹ the decomposition at every point); `Psi_budget_at_critical`; `Psi_sign_at_critical` (strict sign transfer); capstone `theorem_M_of_critical_data` reducing theorem_M to (P6.2 critical data) + (P6.4b quadrature data) | **DONE — kernel-checked (round 317)** |
+| P6.4b | Existence of the quadrature data: truncated Hausdorff / Hankel-PSD for the residual moments `(M_k − p)` (from the CP transform; mathlib HAS digamma for (B) if needed). Isolated as a named `mu_step` theorem; the rest of the tree does not block on it | open — the one hard analytic item, OFF the critical path of everything else |
+| P6.5 | Sign-change count assembly: `psi_roots_real_of_alternation` (`SignCount.lean`) — alternation hypotheses ⟹ every complex root real, via IVT roots in each gap + tail sign from `Psi_leadingCoeff_sign` + evenness mirror (`Psi_eval_neg`) + the 2d-cardinality pin against `card_roots'` | **DONE — kernel-checked (round 316)** |
+| P6.6 | (post-theorem, optional) transport-interface formalization: Corollary T floors, Rouché-(b) homotopy | parked |
 
 ## Design decisions
 
@@ -32,13 +43,15 @@ exactly the standard the publication-hardening campaign aims at.
    which at polynomial level is a finite positive combination).
 2. **Real polynomials, complex roots.** `Psi d : ℝ[X]`; the statement
    quantifies over `((Psi d).map (algebraMap ℝ ℂ)).roots`.
-3. **Hermite route for P6.2.** mathlib has `Polynomial.hermite` AND
-   `hermite_eq_deriv_gaussian` (H_n as Gaussian derivative). Iterated
-   Rolle (mathlib: `exists_deriv_eq_zero`) on x ↦ dⁿ/dxⁿ e^{−x²} gives
-   real-rootedness of H_n — the classical argument, fully
-   mathlib-supported. Then `C_d(w) ∝ H_{2d}(w/√(4d))` is an algebraic
-   identity (binomial), giving C_d's 2d real simple zeros WITHOUT
-   formalizing Laguerre polynomials or orthogonality.
+3. **Hermite route for P6.2 (REFINED, GPT F132).** Instead of
+   Gaussian/Rolle with endpoint-at-infinity bookkeeping: the recurrence
+   root-insertion induction. For monic `p` with simple ordered real
+   roots, `L(p) = X·p − p′` satisfies `L(p)(x_i) = −p′(x_i)`, whose
+   signs alternate; IVT inserts a root of `L(p)` in every gap and both
+   tails; degree count gives simplicity + interlacing. mathlib's
+   `hermite (n+1) = X·hermite n − derivative (hermite n)` carries the
+   induction. Then `C_d(w) ∝ H_{2d}(w/√(4d))` transfers to `C_d` —
+   no Laguerre, no orthogonality, no Gaussian tails.
 
 ## mathlib inventory (v4.30.0, verified by grep round 311)
 
@@ -80,10 +93,10 @@ GAPS (must build or route around):
 
 - Fable: P6.1 (structure + ODE identity), P6.4 recon (route (b)
   prototype).
-- GPT: P6.2 (Hermite real-rootedness via Gaussian/Rolle — fully
-  self-contained, mathlib-supported); review of the formal STATEMENT
-  for faithfulness to the draft (the most important audit of all:
-  does `theorem_M` say what the paper claims?).
+- GPT: P6.2 (Hermite real-rootedness — scaffold green, F131);
+  STATEMENT-FAITHFULNESS AUDIT: **PASS** (F130 — formulas match
+  §1.4/§1.4a, statement = "all complex roots real", numeric cross-eval
+  vs theoremM_verify.py at d = 7: max abs difference 0.0 at 100 dps).
 - Both: P6.5 split by lemma ownership as in the paper.
 
 ## Faithfulness invariant
