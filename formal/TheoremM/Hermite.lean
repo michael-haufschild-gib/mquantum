@@ -8,6 +8,7 @@ Rolle/Gaussian real-rootedness route.
 import TheoremM.Structure
 import Mathlib.RingTheory.Polynomial.Hermite.Gaussian
 import Mathlib.Topology.Order.IntermediateValue
+import Mathlib.Analysis.Polynomial.Basic
 
 noncomputable section
 
@@ -458,6 +459,64 @@ lemma exists_root_X_mul_sub_derivative_between_of_derivative_mul_neg
     simp [hb]
   rw [hLa, hLb]
   simpa using hneg
+
+/-- Right-tail insertion: a polynomial with positive leading coefficient and
+positive degree crosses to the right of any point where its value is negative. -/
+lemma exists_root_right_of_eval_neg_of_leadingCoeff_pos (p : ℝ[X]) {a : ℝ}
+    (hdeg : 0 < p.degree) (hlc : 0 < p.leadingCoeff) (ha : p.eval a < 0) :
+    ∃ x, a < x ∧ p.eval x = 0 := by
+  have htend := p.tendsto_atTop_of_leadingCoeff_nonneg hdeg hlc.le
+  obtain ⟨b, hb⟩ := (htend.eventually_gt_atTop 0).exists_forall_of_atTop
+  let B := max b (a + 1)
+  have hBpos : 0 < p.eval B := hb B (le_max_left _ _)
+  have haB : a < B := lt_of_lt_of_le (by linarith) (le_max_right _ _)
+  obtain ⟨x, hax, _hxB, hx0⟩ := exists_root_between_of_eval_mul_neg p haB (by
+    nlinarith [ha, hBpos])
+  exact ⟨x, hax, hx0⟩
+
+/-- For monic `p`, the Hermite recurrence operator `X*p-p'` has degree
+one larger than `p`. -/
+lemma natDegree_X_mul_sub_derivative_of_monic {p : ℝ[X]} (hp : p.Monic) :
+    (X * p - derivative p).natDegree = p.natDegree + 1 := by
+  have hpne : p ≠ 0 := hp.ne_zero
+  have hlt : (derivative p).natDegree < (X * p).natDegree := by
+    rw [natDegree_X_mul hpne]
+    exact lt_of_le_of_lt (natDegree_derivative_le p) (by omega)
+  rw [natDegree_sub_eq_left_of_natDegree_lt hlt]
+  exact natDegree_X_mul hpne
+
+/-- For monic `p`, the Hermite recurrence operator `X*p-p'` is monic. -/
+lemma leadingCoeff_X_mul_sub_derivative_of_monic {p : ℝ[X]} (hp : p.Monic) :
+    (X * p - derivative p).leadingCoeff = 1 := by
+  have hpne : p ≠ 0 := hp.ne_zero
+  have hlt_nat : (derivative p).natDegree < (X * p).natDegree := by
+    rw [natDegree_X_mul hpne]
+    exact lt_of_le_of_lt (natDegree_derivative_le p) (by omega)
+  have hlt : (derivative p).degree < (X * p).degree := degree_lt_degree hlt_nat
+  rw [leadingCoeff_sub_of_degree_lt hlt]
+  exact (monic_X.mul hp).leadingCoeff
+
+/-- Right-tail insertion for the Hermite recurrence operator at a root whose
+derivative is positive. This is the largest-root tail case in the ordered-root
+induction. -/
+lemma exists_root_right_X_mul_sub_derivative_of_monic_of_derivative_pos
+    {p : ℝ[X]} (hp : p.Monic) {a : ℝ}
+    (ha : p.eval a = 0) (hder : 0 < (derivative p).eval a) :
+    ∃ x, a < x ∧ (X * p - derivative p).eval x = 0 := by
+  let L : ℝ[X] := X * p - derivative p
+  have hdeg_nat : 0 < L.natDegree := by
+    rw [show L = X * p - derivative p by rfl]
+    rw [natDegree_X_mul_sub_derivative_of_monic hp]
+    exact Nat.succ_pos _
+  have hdeg : 0 < L.degree := natDegree_pos_iff_degree_pos.mp hdeg_nat
+  have hlc : 0 < L.leadingCoeff := by
+    rw [show L = X * p - derivative p by rfl]
+    rw [leadingCoeff_X_mul_sub_derivative_of_monic hp]
+    norm_num
+  have hLa : L.eval a < 0 := by
+    simp [L, ha]
+    nlinarith
+  exact exists_root_right_of_eval_neg_of_leadingCoeff_pos L hdeg hlc hLa
 
 /-- Gaussian derivative representation of the even Hermite polynomial. -/
 lemma hermiteEven_gaussian_factor (d : ℕ) (x : ℝ) :
