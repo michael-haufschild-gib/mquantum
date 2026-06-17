@@ -32,6 +32,7 @@ import {
 } from '../schrodingerRendererTypes'
 import { SCHROEDINGER_LAYOUT } from '../schroedingerLayout'
 import {
+  packBifurcationHorizon,
   packBilocalERBridge,
   packBornNullWeave,
   packCausalDiamondModularOrbital,
@@ -425,6 +426,13 @@ function packVisualFields(
     p.quantumModeStr === 'riemannZeta'
   )
   packHilbertPolya(floatView, schroedinger, p.quantumModeStr === 'hilbertPolya')
+  packBifurcationHorizon(
+    floatView,
+    schroedinger,
+    p.dimension,
+    p.boundingRadius,
+    p.quantumModeStr === 'bifurcationHorizon'
+  )
 }
 
 /** Pack nodal fields, color algorithm, and cosine palette. */

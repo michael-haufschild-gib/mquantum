@@ -385,7 +385,8 @@ export function getAvailableColorAlgorithms(
     objectType === 'schroedinger' &&
     (quantumMode === 'coherenceHorizon' ||
       quantumMode === 'riemannZeta' ||
-      quantumMode === 'hilbertPolya')
+      quantumMode === 'hilbertPolya' ||
+      quantumMode === 'bifurcationHorizon')
   ) {
     const horizonValidAlgos = new Set<string>([
       'mixed',

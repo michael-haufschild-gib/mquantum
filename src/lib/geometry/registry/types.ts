@@ -60,6 +60,7 @@ export type QuantumTypeStrategyKind =
   | 'coherenceHorizon'
   | 'riemannZeta'
   | 'hilbertPolya'
+  | 'bifurcationHorizon'
   | 'pauli'
   | 'bellPair'
 

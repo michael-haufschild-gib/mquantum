@@ -113,3 +113,4 @@ export type SchroedingerQuantumMode =
   | 'coherenceHorizon'
   | 'riemannZeta'
   | 'hilbertPolya'
+  | 'bifurcationHorizon'

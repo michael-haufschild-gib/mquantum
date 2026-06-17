@@ -15,6 +15,11 @@ import { Select } from '@/components/ui/Select'
 import { PAULI_FIELD_VIEW_TO_COLOR_ALGO } from '@/lib/colors/palette/types'
 import type { AdsPresetName, AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
 import type {
+  BifurcationHorizonConfig,
+  BifurcationHorizonPresetName,
+} from '@/lib/geometry/extended/bifurcationHorizon'
+import { BIFURCATION_HORIZON_SCENARIOS } from '@/lib/geometry/extended/bifurcationHorizon'
+import type {
   CoherenceHorizonConfig,
   CoherenceHorizonPresetName,
 } from '@/lib/geometry/extended/coherenceHorizon'
@@ -162,6 +167,13 @@ const HILBERT_POLYA_PRESET_OPTIONS = HILBERT_POLYA_SCENARIOS.map((p) => ({
   label: p.label,
 }))
 
+/* ── Bifurcation Horizon options ────────────────────────────── */
+
+const BIFURCATION_HORIZON_PRESET_OPTIONS = BIFURCATION_HORIZON_SCENARIOS.map((p) => ({
+  value: p.id,
+  label: p.label,
+}))
+
 /* ── HydrogenND options (dimension-grouped, flattened) ─────── */
 
 function getHydrogenNDOptions(dimension: number) {
@@ -228,7 +240,8 @@ function findActiveDescription(
   ads: string | undefined,
   coherenceHorizon: string | undefined,
   riemannZeta: string | undefined,
-  hilbertPolya: string | undefined
+  hilbertPolya: string | undefined,
+  bifurcationHorizon: string | undefined
 ): string | null {
   if (mode === 'harmonicOscillator') {
     return ho ? (SCHROEDINGER_NAMED_PRESETS[ho]?.description ?? null) : null
@@ -247,6 +260,9 @@ function findActiveDescription(
   }
   if (mode === 'hilbertPolya') {
     return findTaggedScenarioDescription(HILBERT_POLYA_SCENARIOS, hilbertPolya)
+  }
+  if (mode === 'bifurcationHorizon') {
+    return findTaggedScenarioDescription(BIFURCATION_HORIZON_SCENARIOS, bifurcationHorizon)
   }
   const table = ID_PRESET_TABLES[mode]
   if (!table || !activeValue) return null
@@ -273,6 +289,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
     coherenceHorizonPreset,
     riemannZetaPreset,
     hilbertPolyaPreset,
+    bifurcationHorizonPreset,
     pauliSpinor,
     bellPair,
   } = useExtendedObjectStore(
@@ -287,6 +304,9 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       )?.preset,
       riemannZetaPreset: (s.schroedinger.riemannZeta as RiemannZetaConfig | undefined)?.preset,
       hilbertPolyaPreset: (s.schroedinger.hilbertPolya as HilbertPolyaConfig | undefined)?.preset,
+      bifurcationHorizonPreset: (
+        s.schroedinger.bifurcationHorizon as BifurcationHorizonConfig | undefined
+      )?.preset,
       pauliSpinor: s.pauliSpinor,
       bellPair: s.bellPair,
     }))
@@ -308,6 +328,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
     setCoherenceHorizonPreset,
     setRiemannZetaPreset,
     setHilbertPolyaPreset,
+    setBifurcationHorizonPreset,
     setBellPairConfig,
   } = useExtendedObjectStore(
     useShallow((s) => ({
@@ -325,6 +346,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       setCoherenceHorizonPreset: s.setCoherenceHorizonPreset,
       setRiemannZetaPreset: s.setRiemannZetaPreset,
       setHilbertPolyaPreset: s.setHilbertPolyaPreset,
+      setBifurcationHorizonPreset: s.setBifurcationHorizonPreset,
       setBellPairConfig: s.setBellPairConfig,
     }))
   )
@@ -371,6 +393,8 @@ export const ScenarioSelector: React.FC = React.memo(() => {
         return RIEMANN_ZETA_PRESET_OPTIONS
       case 'hilbertPolya':
         return HILBERT_POLYA_PRESET_OPTIONS
+      case 'bifurcationHorizon':
+        return BIFURCATION_HORIZON_PRESET_OPTIONS
       default:
         return null
     }
@@ -397,6 +421,10 @@ export const ScenarioSelector: React.FC = React.memo(() => {
         return hilbertPolyaPreset === 'custom' || hilbertPolyaPreset === undefined
           ? ''
           : hilbertPolyaPreset
+      case 'bifurcationHorizon':
+        return bifurcationHorizonPreset === 'custom' || bifurcationHorizonPreset === undefined
+          ? ''
+          : bifurcationHorizonPreset
       case 'pauliSpinor':
         return findPauliPresetId(pauliSpinor) ?? ''
       case 'bellPair':
@@ -418,6 +446,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
     coherenceHorizonPreset,
     riemannZetaPreset,
     hilbertPolyaPreset,
+    bifurcationHorizonPreset,
     pauliSpinor,
     bellPair,
     schroedinger,
@@ -439,7 +468,8 @@ export const ScenarioSelector: React.FC = React.memo(() => {
         adsPreset,
         coherenceHorizonPreset,
         riemannZetaPreset,
-        hilbertPolyaPreset
+        hilbertPolyaPreset,
+        bifurcationHorizonPreset
       ),
     [
       mode,
@@ -450,6 +480,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       coherenceHorizonPreset,
       riemannZetaPreset,
       hilbertPolyaPreset,
+      bifurcationHorizonPreset,
     ]
   )
 
@@ -515,6 +546,9 @@ export const ScenarioSelector: React.FC = React.memo(() => {
         case 'hilbertPolya':
           setHilbertPolyaPreset(value as HilbertPolyaPresetName)
           break
+        case 'bifurcationHorizon':
+          setBifurcationHorizonPreset(value as BifurcationHorizonPresetName)
+          break
       }
     },
     [
@@ -533,6 +567,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       setCoherenceHorizonPreset,
       setRiemannZetaPreset,
       setHilbertPolyaPreset,
+      setBifurcationHorizonPreset,
       setBellPairConfig,
     ]
   )

@@ -23,6 +23,7 @@ import type { AntiDeSitterSetters } from '@/stores/slices/geometry/setters/antiD
 import type { BecSetters } from '@/stores/slices/geometry/setters/becSetterDomain'
 import type { DiracSetters } from '@/stores/slices/geometry/setters/diracSetters'
 import type { FreeScalarSetters } from '@/stores/slices/geometry/setters/freeScalarSetters'
+import type { BifurcationHorizonSetters } from '@/stores/slices/geometry/setters/horizonModes/bifurcationHorizonSetters'
 import type { CoherenceHorizonSetters } from '@/stores/slices/geometry/setters/horizonModes/coherenceHorizonSetters'
 import type { HilbertPolyaSetters } from '@/stores/slices/geometry/setters/horizonModes/hilbertPolyaSetters'
 import type { RiemannZetaSetters } from '@/stores/slices/geometry/setters/horizonModes/riemannZetaSetters'
@@ -47,6 +48,7 @@ export interface SchroedingerSliceActions
     CoherenceHorizonSetters,
     RiemannZetaSetters,
     HilbertPolyaSetters,
+    BifurcationHorizonSetters,
     BecSetters,
     DiracSetters,
     FreeScalarSetters,

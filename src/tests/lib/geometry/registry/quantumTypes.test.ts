@@ -23,6 +23,7 @@ describe('QUANTUM_TYPE_REGISTRY', () => {
       'coherenceHorizon',
       'riemannZeta',
       'hilbertPolya',
+      'bifurcationHorizon',
       'pauliSpinor',
       'bellTest',
     ]
@@ -85,6 +86,7 @@ describe('QUANTUM_TYPE_REGISTRY', () => {
       coherenceHorizon: 'schroedingerAnalytic',
       riemannZeta: 'schroedingerAnalytic',
       hilbertPolya: 'schroedingerAnalytic',
+      bifurcationHorizon: 'schroedingerAnalytic',
       pauliSpinor: 'pauli',
       bellTest: 'bellPair',
     })
@@ -117,6 +119,7 @@ describe('QUANTUM_TYPE_REGISTRY', () => {
       coherenceHorizon: [],
       riemannZeta: [],
       hilbertPolya: [],
+      bifurcationHorizon: [],
       pauliSpinor: [],
       bellTest: [],
     })

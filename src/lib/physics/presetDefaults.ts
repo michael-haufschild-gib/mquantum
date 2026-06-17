@@ -52,6 +52,7 @@ const FIRST_PRESET_IDS = {
   coherenceHorizon: 'coherentCat',
   riemannZeta: 'hilbertPolyaShells',
   hilbertPolya: 'criticalPlane',
+  bifurcationHorizon: 'eternalThroat',
   bellTest: 'canonicalCHSH',
 } as const
 
@@ -96,6 +97,8 @@ const PRESET_RESOLVERS: Readonly<Record<QuantumTypeKey, FirstPresetResolver>> = 
   coherenceHorizon: (dimension) => (dimension >= 3 ? FIRST_PRESET_IDS.coherenceHorizon : undefined),
   riemannZeta: (dimension) => (dimension >= 3 ? FIRST_PRESET_IDS.riemannZeta : undefined),
   hilbertPolya: (dimension) => (dimension >= 3 ? FIRST_PRESET_IDS.hilbertPolya : undefined),
+  bifurcationHorizon: (dimension) =>
+    dimension >= 3 ? FIRST_PRESET_IDS.bifurcationHorizon : undefined,
   bellTest: () => FIRST_PRESET_IDS.bellTest,
 }
 

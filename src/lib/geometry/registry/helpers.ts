@@ -497,6 +497,9 @@ export function supportsSchroedingerSurfaceMode(
   // Hilbert–Pólya Spectrum likewise owns a dedicated volumetric main block —
   // no isosurface pipeline composes for it.
   if (options.quantumMode === 'hilbertPolya') return false
+  // Bifurcation Horizon likewise owns a dedicated volumetric main block — no
+  // isosurface pipeline composes for it, so the surface toggle is meaningless.
+  if (options.quantumMode === 'bifurcationHorizon') return false
 
   return true
 }

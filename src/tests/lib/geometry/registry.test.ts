@@ -201,6 +201,7 @@ describe('Quantum Type Registry (Flat Model)', () => {
         'antiDeSitter',
         'becDynamics',
         'bellTest',
+        'bifurcationHorizon',
         'coherenceHorizon',
         'diracEquation',
         'freeScalarField',

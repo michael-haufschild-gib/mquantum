@@ -123,6 +123,13 @@ export function buildBindGroupBlock(opts: {
    * declarations never collide.
    */
   isHilbertPolya?: boolean
+  /**
+   * Bifurcation Horizon 2D (t, u) LUT storage buffer at group 2, binding 2.
+   * Mutually exclusive with the Wigner cache and the other horizon LUTs (all
+   * binding 2) — bifurcationHorizon forces Wigner off and is a distinct
+   * quantum mode, so the declarations never collide.
+   */
+  isBifurcationHorizon?: boolean
 }): string {
   return (
     schroedingerUniformsBlock +
@@ -151,6 +158,14 @@ export function buildBindGroupBlock(opts: {
 // Hilbert–Pólya volume LUT: [filament, veil, nearest-dip distance, arg E] per voxel,
 // index ((k*48 + j)*160 + i), computed in a Web Worker by HilbertPolyaStrategy.
 @group(2) @binding(2) var<storage, read> hilbertPolyaVolume: array<vec4f>;`
+      : '') +
+    (opts.isBifurcationHorizon
+      ? '\n' +
+        /* wgsl */ `
+// Bifurcation Horizon 2D (t, u) LUT: [density, edge(dDensity/du), psiRe, psiIm]
+// per cell, index (it*BH_NU + iu) (row-major in t, column u fastest), generated
+// on the CPU by BifurcationHorizonStrategy.
+@group(2) @binding(2) var<storage, read> bifurcationLut: array<vec4f>;`
       : '') +
     (opts.useDensityGrid ? '\n' + generateDensityGridFragmentBindings(4) : '') +
     (opts.freeScalarAnalysis ? '\n' + generateAnalysisTextureBindings(6) : '') +

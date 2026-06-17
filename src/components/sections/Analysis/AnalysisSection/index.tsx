@@ -16,6 +16,7 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { BECAnalysisContent } from '@/components/sections/Analysis/BECAnalysisSection'
 import { BellExperimentContent } from '@/components/sections/Analysis/BellExperimentSection'
+import { BifurcationHorizonAnalysisContent } from '@/components/sections/Analysis/BifurcationHorizonAnalysisSection'
 import { DiracAnalysisContent } from '@/components/sections/Analysis/DiracAnalysisSection'
 import { FSFAnalysisContent } from '@/components/sections/Analysis/FSFAnalysisSection'
 import { HilbertPolyaAnalysisContent } from '@/components/sections/Analysis/HilbertPolyaAnalysisSection'
@@ -78,6 +79,7 @@ const MODE_LABELS: Record<string, string> = {
   quantumWalk: 'Quantum Walk',
   riemannZeta: 'Riemann Zeta',
   hilbertPolya: 'Hilbert–Pólya',
+  bifurcationHorizon: 'Bifurcation Horizon',
 }
 
 /**
@@ -191,19 +193,23 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
         onOpenChange={handleOpenChange}
         data-testid="analysis-section"
       >
-        {/* The riemannZeta volumetric block has its own cutaway wedge and the
-            hilbertPolya block renders a dedicated Evans-landscape volume; the
-            generic cross-section / second-quantization controls target the
-            HO/hydrogen analytic pipeline and are not wired for either. */}
-        {isAnalytic && quantumMode !== 'riemannZeta' && quantumMode !== 'hilbertPolya' && (
-          <CrossSectionAnalysisContent />
-        )}
+        {/* The riemannZeta volumetric block has its own cutaway wedge, the
+            hilbertPolya block renders a dedicated Evans-landscape volume, and
+            the bifurcationHorizon block renders a dedicated Kruskal-throat
+            volume; the generic cross-section / second-quantization controls
+            target the HO/hydrogen analytic pipeline and are not wired for any
+            of them. */}
+        {isAnalytic &&
+          quantumMode !== 'riemannZeta' &&
+          quantumMode !== 'hilbertPolya' &&
+          quantumMode !== 'bifurcationHorizon' && <CrossSectionAnalysisContent />}
         {quantumMode === 'freeScalarField' && <FSFAnalysisContent />}
         {quantumMode === 'tdseDynamics' && <TDSEAnalysisContent />}
         {quantumMode === 'becDynamics' && <BECAnalysisContent />}
         {quantumMode === 'diracEquation' && <DiracAnalysisContent />}
         {quantumMode === 'riemannZeta' && <RiemannZetaAnalysisContent />}
         {quantumMode === 'hilbertPolya' && <HilbertPolyaAnalysisContent />}
+        {quantumMode === 'bifurcationHorizon' && <BifurcationHorizonAnalysisContent />}
         {dimension >= 3 && (
           <ControlGroup
             data-testid="analysis-quantum-carpet"

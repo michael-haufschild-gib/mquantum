@@ -18,6 +18,7 @@ import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 import { AntiDeSitterControls } from './AntiDeSitterControls'
 import { BECControls } from './BECControls'
+import { BifurcationHorizonControls } from './BifurcationHorizonControls'
 import { CoherenceHorizonControls } from './CoherenceHorizonControls'
 import { DiracControls } from './DiracControls'
 import { FreeScalarFieldControls } from './FreeScalarFieldControls'
@@ -81,6 +82,8 @@ function renderModeControls(p: ModeControlsProps): React.ReactNode {
       return <RiemannZetaControls />
     case 'hilbertPolya':
       return <HilbertPolyaControls />
+    case 'bifurcationHorizon':
+      return <BifurcationHorizonControls />
     case 'wheelerDeWitt':
       return <WheelerDeWittControls />
     case 'quantumWalk':
@@ -184,6 +187,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
     const isCoherenceHorizon = mode === 'coherenceHorizon'
     const isRiemannZeta = mode === 'riemannZeta'
     const isHilbertPolya = mode === 'hilbertPolya'
+    const isBifurcationHorizon = mode === 'bifurcationHorizon'
 
     return (
       <div className={className} data-testid="schroedinger-controls">
@@ -198,7 +202,8 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
           !isAntiDeSitter &&
           !isCoherenceHorizon &&
           !isRiemannZeta &&
-          !isHilbertPolya && (
+          !isHilbertPolya &&
+          !isBifurcationHorizon && (
             <Section title="Representation" defaultOpen={true}>
               <div className="space-y-3">
                 <ToggleGroup

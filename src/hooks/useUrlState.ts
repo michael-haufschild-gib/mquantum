@@ -14,6 +14,7 @@ import { useEffect, useRef } from 'react'
 import { logger } from '@/lib/logger'
 import { applySceneExample, findSceneByName } from '@/lib/sceneExamples'
 import {
+  applyBifurcationHorizonParams,
   applyCoherenceHorizonParams,
   applyHilbertPolyaParams,
   applyRiemannZetaParams,
@@ -731,6 +732,7 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
     if (effectiveQuantumMode === 'coherenceHorizon') applyCoherenceHorizonParams(urlState, ext)
     if (effectiveQuantumMode === 'riemannZeta') applyRiemannZetaParams(urlState, ext)
     if (effectiveQuantumMode === 'hilbertPolya') applyHilbertPolyaParams(urlState, ext)
+    if (effectiveQuantumMode === 'bifurcationHorizon') applyBifurcationHorizonParams(urlState, ext)
     if (effectiveObjectType === 'bellPair') applyBellParams(urlState, ext)
     applySrmtSweepParams(urlState, effectiveQuantumMode)
   } catch (error) {

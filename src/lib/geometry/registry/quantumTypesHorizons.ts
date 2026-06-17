@@ -186,4 +186,63 @@ export const HORIZON_QUANTUM_TYPE_ENTRIES: readonly (readonly [
       },
     },
   ],
+
+  [
+    'bifurcationHorizon',
+    {
+      key: 'bifurcationHorizon',
+      name: 'Bifurcation Horizon',
+      description:
+        'The Riemann critical strip as the maximally-extended (Kruskal) eternal black hole: the critical line Re s = ½ is the Einstein–Rosen-bridge throat, the functional-equation involution s ↦ 1 − s̄ is the Tomita modular conjugation J (the wedge reflection), and the ζ-zeros are GUE-spaced rings pinned to the throat.',
+      category: 'analytic',
+      runtime: {
+        dataPath: 'analyticWavefunction',
+        strategy: 'bifurcationHorizon',
+        evolutionReset: 'schroedingerAnalytic',
+        shaderUniformId: 13,
+        stateSaveId: 15,
+        // The dedicated volumetric main block implements only mixed/phase/
+        // blackbody/viridis/densityContours; the analytic default is not among them.
+        defaultColorAlgorithm: 'mixed',
+        supportsOpenQuantum: false,
+      },
+      dimensions: {
+        min: 3,
+        max: 11,
+        recommended: 3,
+        recommendedReason:
+          '3D shows the vertical throat with stacked zero-rings and two flaring wedges; higher dimensions fold into the perpendicular radius and sharpen the extremal redshift wall via the (d−2) Tangherlini exponent',
+      },
+      rendering: SHARED_RENDERING,
+      animation: {
+        hasTypeSpecificAnimations: false,
+        systems: {},
+      },
+      urlSerialization: {
+        typeKey: 'bifurcationHorizon',
+        serializableParams: [
+          'bh_neck',
+          'bh_throat',
+          'bh_glow',
+          'bh_flow',
+          'bh_swirl',
+          'bh_rs',
+          'bh_off',
+          'bh_wind',
+          'bh_therm',
+        ],
+      },
+      ui: {
+        controlsComponentKey: 'SchroedingerControls',
+        hasTimelineControls: true,
+        qualityPresets: QUALITY_PRESETS,
+      },
+      internal: {
+        objectType: 'schroedinger',
+        quantumMode: 'bifurcationHorizon',
+        configStoreKey: 'schroedinger',
+        configSubKey: 'bifurcationHorizon',
+      },
+    },
+  ],
 ]

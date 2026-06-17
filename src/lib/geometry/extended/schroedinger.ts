@@ -13,6 +13,8 @@ import type { AntiDeSitterConfig } from './antiDeSitter'
 import { DEFAULT_ANTI_DE_SITTER_CONFIG } from './antiDeSitter'
 import type { BecConfig } from './bec'
 import { DEFAULT_BEC_CONFIG } from './bec'
+import type { BifurcationHorizonConfig } from './bifurcationHorizon'
+import { DEFAULT_BIFURCATION_HORIZON_CONFIG } from './bifurcationHorizon'
 import type { CoherenceHorizonConfig } from './coherenceHorizon'
 import { DEFAULT_COHERENCE_HORIZON_CONFIG } from './coherenceHorizon'
 import type {
@@ -649,6 +651,10 @@ export interface SchroedingerConfig
   /** Evans-landscape spectral filament volume configuration. */
   hilbertPolya: HilbertPolyaConfig
 
+  // === Bifurcation Horizon Configuration (when quantumMode === 'bifurcationHorizon') ===
+  /** Kruskal eternal-black-hole / ERB-throat configuration for the critical strip. */
+  bifurcationHorizon: BifurcationHorizonConfig
+
   // === N-D Basis Vectors (for free scalar field and TDSE) ===
   /** Basis vector for X axis in N-dimensional space */
   basisX: Float32Array
@@ -925,6 +931,7 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   coherenceHorizon: DEFAULT_COHERENCE_HORIZON_CONFIG,
   riemannZeta: DEFAULT_RIEMANN_ZETA_CONFIG,
   hilbertPolya: DEFAULT_HILBERT_POLYA_CONFIG,
+  bifurcationHorizon: DEFAULT_BIFURCATION_HORIZON_CONFIG,
 
   // N-D Basis Vectors
   basisX: new Float32Array([1, 0, 0]),

@@ -143,6 +143,24 @@ export function* enumerateHilbertPolya(): Generator<ShaderRecord> {
   yield record('hilbert-polya_d3', wgsl, 'hilbert-polya:3', 'hilbert-polya')
 }
 
+/**
+ * Bifurcation Horizon (Kruskal eternal black hole) volumetric fragment shader
+ * at every supported dimension. Uses the production `buildShaderConfig`
+ * derivation so the exact shader the renderer compiles is what gets validated.
+ */
+export function* enumerateBifurcationHorizon(): Generator<ShaderRecord> {
+  for (let dimension = 3; dimension <= 11; dimension++) {
+    const config = buildShaderConfig({ quantumMode: 'bifurcationHorizon', dimension })
+    const { wgsl } = composeSchroedingerShader(config)
+    yield record(
+      `bifurcation-horizon_d${dimension}`,
+      wgsl,
+      `bifurcation-horizon:${dimension}`,
+      'bifurcation-horizon'
+    )
+  }
+}
+
 const COMPUTE_MODES: readonly ComputeQuantumMode[] = [
   'harmonicOscillator',
   'hydrogenND',

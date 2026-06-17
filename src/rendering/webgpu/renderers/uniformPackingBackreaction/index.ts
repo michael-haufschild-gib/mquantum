@@ -1,3 +1,7 @@
+import {
+  BIFURCATION_HORIZON_RANGES,
+  DEFAULT_BIFURCATION_HORIZON_CONFIG,
+} from '@/lib/geometry/extended/bifurcationHorizon'
 import { COHERENCE_HORIZON_RANGES } from '@/lib/geometry/extended/coherenceHorizon'
 import {
   DEFAULT_HILBERT_POLYA_CONFIG,
@@ -8,6 +12,7 @@ import {
   RIEMANN_ZETA_RANGES,
 } from '@/lib/geometry/extended/riemannZeta'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
+import { BIFURCATION_T_MAX, BIFURCATION_U_HALF } from '@/lib/physics/bifurcationHorizon'
 import { tangherliniHorizonRadius } from '@/lib/physics/coherenceHorizon'
 import {
   hagedornPartitionGain,
@@ -400,6 +405,95 @@ export function packHilbertPolya(
     defaults.filamentWidth,
     R.filamentWidth.min,
     R.filamentWidth.max
+  )
+}
+
+/**
+ * Pack Bifurcation Horizon uniforms (Kruskal eternal black hole on the Riemann
+ * critical strip). Only the bifurcationHorizon mode reads these fields (its
+ * dedicated volumetric main block); every other mode gets all-zero fields so
+ * the buffer region is deterministic. The 2D (t, u) LUT itself is a separate
+ * group-2 storage buffer owned by BifurcationHorizonStrategy — not part of this
+ * struct. The world-space neck radius r₀ = neckRadius·R_bound, the extremal
+ * redshift radius r_h = redshiftRadius·R_bound, the metric exponent (d−2), and
+ * the LUT window constants (uHalf / tMax) are CPU-precomputed here so the shader
+ * never derives them per frame.
+ */
+export function packBifurcationHorizon(
+  floatView: Float32Array,
+  schroedinger: Partial<SchroedingerConfig> | undefined,
+  dimension: number,
+  boundingRadius: number,
+  isBifurcationHorizonMode: boolean
+): void {
+  if (!isBifurcationHorizonMode) {
+    floatView[I.bhNeckRadius] =
+      floatView[I.bhUHalf] =
+      floatView[I.bhTMax] =
+      floatView[I.bhGlow] =
+      floatView[I.bhFlowRate] =
+      floatView[I.bhSwirl] =
+      floatView[I.bhRedshiftRadius] =
+      floatView[I.bhMetricExponent] =
+      floatView[I.bhWinding] =
+      floatView[I.bhThermalGain] =
+      floatView[I.bhOffLine] =
+        0.0
+    return
+  }
+
+  const cfg = schroedinger?.bifurcationHorizon
+  const defaults = DEFAULT_BIFURCATION_HORIZON_CONFIG
+  const R = BIFURCATION_HORIZON_RANGES
+  const d = Math.max(3, Math.min(11, Math.floor(Number.isFinite(dimension) ? dimension : 3)))
+  const safeBound = Number.isFinite(boundingRadius) && boundingRadius > 0 ? boundingRadius : 2.0
+
+  const neckRadius = finiteClamped(
+    cfg?.neckRadius,
+    defaults.neckRadius,
+    R.neckRadius.min,
+    R.neckRadius.max
+  )
+  const redshiftRadius = finiteClamped(
+    cfg?.redshiftRadius,
+    defaults.redshiftRadius,
+    R.redshiftRadius.min,
+    R.redshiftRadius.max
+  )
+
+  floatView[I.bhNeckRadius] = neckRadius * safeBound
+  floatView[I.bhUHalf] = BIFURCATION_U_HALF
+  floatView[I.bhTMax] = BIFURCATION_T_MAX
+  floatView[I.bhGlow] = finiteClamped(cfg?.glow, defaults.glow, R.glow.min, R.glow.max)
+  floatView[I.bhFlowRate] = finiteClamped(
+    cfg?.flowRate,
+    defaults.flowRate,
+    R.flowRate.min,
+    R.flowRate.max
+  )
+  floatView[I.bhSwirl] = finiteClamped(cfg?.swirl, defaults.swirl, R.swirl.min, R.swirl.max)
+  // Extremal dark-core radius in world space, as a fraction of the neck radius
+  // r₀ = neckRadius·R_bound so the captured core stays INSIDE the throat
+  // (rPerp < r_h ≤ r₀) instead of swallowing it; 0 disables the core.
+  floatView[I.bhRedshiftRadius] = redshiftRadius > 0 ? redshiftRadius * neckRadius * safeBound : 0
+  floatView[I.bhMetricExponent] = d - 2
+  floatView[I.bhWinding] = finiteClamped(
+    cfg?.winding,
+    defaults.winding,
+    R.winding.min,
+    R.winding.max
+  )
+  floatView[I.bhThermalGain] = finiteClamped(
+    cfg?.thermalGain,
+    defaults.thermalGain,
+    R.thermalGain.min,
+    R.thermalGain.max
+  )
+  floatView[I.bhOffLine] = finiteClamped(
+    cfg?.offLine,
+    defaults.offLine,
+    R.offLine.min,
+    R.offLine.max
   )
 }
 

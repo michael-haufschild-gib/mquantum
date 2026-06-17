@@ -31,6 +31,11 @@ import type { MetricKind } from '@/lib/physics/tdse/metrics/types'
 import { type AdsUrlState, deserializeAds, serializeAds } from './adsSerializer'
 import { type BellUrlState, deserializeBell, serializeBell } from './bellSerializer'
 import {
+  type BifurcationHorizonUrlState,
+  deserializeBifurcationHorizon,
+  serializeBifurcationHorizon,
+} from './bifurcationHorizonSerializer'
+import {
   type CoherenceHorizonUrlState,
   deserializeCoherenceHorizon,
   serializeCoherenceHorizon,
@@ -96,6 +101,7 @@ export const VALID_QUANTUM_MODES: SchroedingerQuantumMode[] = [
   'coherenceHorizon',
   'riemannZeta',
   'hilbertPolya',
+  'bifurcationHorizon',
 ]
 
 const VALID_REPRESENTATIONS: SchroedingerRepresentation[] = ['position', 'momentum', 'wigner']
@@ -116,6 +122,7 @@ export interface ShareableObjectState
   extends
     AdsUrlState,
     BellUrlState,
+    BifurcationHorizonUrlState,
     CoherenceHorizonUrlState,
     DiracUrlState,
     HilbertPolyaUrlState,
@@ -329,6 +336,12 @@ export function serializeState(state: ShareableState): string {
     serializeHilbertPolya(params, state)
   }
 
+  // Bifurcation Horizon. Same dormant-field rule as the other horizon
+  // modes: only emitted while the mode is active.
+  if (state.quantumMode === 'bifurcationHorizon') {
+    serializeBifurcationHorizon(params, state)
+  }
+
   // Bell-pair / CHSH experiment. Bell uses its own ObjectType, so guard on
   // that instead of quantumMode (which is undefined for the bellPair object).
   if (state.objectType === 'bellPair') {
@@ -413,6 +426,9 @@ export function deserializeState(searchParams: string): ParsedShareableState {
 
   // Hilbert–Pólya Spectrum.
   deserializeHilbertPolya(params, state)
+
+  // Bifurcation Horizon.
+  deserializeBifurcationHorizon(params, state)
 
   // Bell-pair / CHSH experiment. Always attempted — the parser keeps
   // every present field regardless of objectType so links with `t=bellPair`

@@ -333,6 +333,24 @@ const SCHROEDINGER_FIELDS = [
   { name: 'hpFogGain', type: 'f32' },
   { name: 'hpPlaneMarker', type: 'f32' },
   { name: 'hpFilamentWidth', type: 'f32' },
+
+  // --- Bifurcation Horizon (Kruskal eternal black hole on the critical strip) ---
+  // Zeroed for all modes except bifurcationHorizon. The (t, u) 2D LUT is a
+  // separate group-2 storage buffer (BifurcationHorizonStrategy), not part of
+  // this struct. bhMetricExponent carries (d−2). Order MUST match the WGSL
+  // SchroedingerUniforms struct exactly.
+  { name: 'bhNeckRadius', type: 'f32' },
+  { name: 'bhUHalf', type: 'f32' },
+  { name: 'bhTMax', type: 'f32' },
+  { name: 'bhGlow', type: 'f32' },
+  { name: 'bhFlowRate', type: 'f32' },
+  { name: 'bhSwirl', type: 'f32' },
+  { name: 'bhRedshiftRadius', type: 'f32' },
+  { name: 'bhMetricExponent', type: 'f32' },
+  { name: 'bhWinding', type: 'f32' },
+  { name: 'bhThermalGain', type: 'f32' },
+  { name: 'bhOffLine', type: 'f32' },
+  { name: '_padBh1', type: 'f32' },
 ] as const satisfies readonly StructFieldDef[]
 
 /** Computed struct layout for SchroedingerUniforms. */

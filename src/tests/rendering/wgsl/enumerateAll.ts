@@ -25,6 +25,7 @@
 
 import {
   enumerateAds,
+  enumerateBifurcationHorizon,
   enumerateCoherenceHorizon,
   enumerateDensityGridEigenCache,
   enumerateHilbertPolya,
@@ -61,6 +62,7 @@ const VALID_SURFACES: ReadonlySet<SurfaceName> = new Set([
   'coherence-horizon',
   'riemann-zeta',
   'hilbert-polya',
+  'bifurcation-horizon',
   'wigner',
   'passes',
 ])
@@ -157,6 +159,9 @@ export function* enumerateAll(opts: EnumerateAllOptions = {}): Generator<ShaderR
     }
     if (isEnabled('hilbert-polya')) {
       yield* enumerateHilbertPolya()
+    }
+    if (isEnabled('bifurcation-horizon')) {
+      yield* enumerateBifurcationHorizon()
     }
     if (isEnabled('wigner')) {
       yield* enumerateWigner()

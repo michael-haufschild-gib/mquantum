@@ -429,6 +429,27 @@ struct SchroedingerUniforms {
   hpPlaneMarker: f32,
   hpFilamentWidth: f32,
 
+  // Bifurcation Horizon (Kruskal eternal black hole on the critical strip).
+  // Read only by the dedicated volumetric main block (quantumMode ===
+  // bifurcationHorizon); the host packer zeroes these for all other modes. The
+  // 2D (t, u) LUT itself (density, edge, psiRe, psiIm) is a separate group-2
+  // storage buffer owned by BifurcationHorizonStrategy — NOT in this struct.
+  // bhMetricExponent carries (d−2); bhRedshiftRadius is world-space (config ×
+  // boundingRadius). u = log(rPerp / bhNeckRadius); the LUT window is
+  // u ∈ [−bhUHalf, bhUHalf], t ∈ [0, bhTMax].
+  bhNeckRadius: f32,
+  bhUHalf: f32,
+  bhTMax: f32,
+  bhGlow: f32,
+  bhFlowRate: f32,
+  bhSwirl: f32,
+  bhRedshiftRadius: f32,
+  bhMetricExponent: f32,
+  bhWinding: f32,
+  bhThermalGain: f32,
+  bhOffLine: f32,
+  _padBh1: f32,
+
 }
 
 // ============================================

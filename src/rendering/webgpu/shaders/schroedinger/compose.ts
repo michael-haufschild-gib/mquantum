@@ -87,6 +87,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   const isCoherenceHorizon = sanitizeShaderBoolean(config.isCoherenceHorizon, false)
   const isRiemannZeta = sanitizeShaderBoolean(config.isRiemannZeta, false)
   const isHilbertPolya = sanitizeShaderBoolean(config.isHilbertPolya, false)
+  const isBifurcationHorizon = sanitizeShaderBoolean(config.isBifurcationHorizon, false)
   const freeScalarAnalysis = sanitizeShaderBoolean(config.freeScalarAnalysis, false)
   const useDensityMatrix = sanitizeShaderBoolean(config.useDensityMatrix, false)
   const crossSectionEnabled = sanitizeShaderBoolean(config.crossSectionEnabled, true)
@@ -153,6 +154,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     isCoherenceHorizon,
     isRiemannZeta,
     isHilbertPolya,
+    isBifurcationHorizon,
     useWignerCache,
     crossSectionEnabled,
     probabilityCurrentEnabled,
@@ -183,6 +185,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     isCoherenceHorizon,
     isRiemannZeta,
     isHilbertPolya,
+    isBifurcationHorizon,
     isWigner,
     is2D,
     isosurface,
@@ -226,6 +229,7 @@ struct VertexOutput {
         freeScalarAnalysis,
         isRiemannZeta,
         isHilbertPolya,
+        isBifurcationHorizon,
       }),
     },
 
@@ -233,7 +237,7 @@ struct VertexOutput {
     // wavefunction evaluation — and in Coherence Horizon / Arithmetic Horizon /
     // Hilbert–Pólya modes, whose dedicated main blocks evaluate their fields
     // inline / via their LUTs and reference nothing here)
-    ...(isCoherenceHorizon || isRiemannZeta || isHilbertPolya
+    ...(isCoherenceHorizon || isRiemannZeta || isHilbertPolya || isBifurcationHorizon
       ? []
       : buildQuantumMathBlocks({
           actualDim,
@@ -262,7 +266,7 @@ struct VertexOutput {
     // Volume rendering (inline raymarch excluded in grid-only mode; entirely
     // absent for Coherence Horizon, Arithmetic Horizon, and Hilbert–Pólya —
     // their main blocks own the geodesic / LUT volumetric march)
-    ...(isCoherenceHorizon || isRiemannZeta || isHilbertPolya
+    ...(isCoherenceHorizon || isRiemannZeta || isHilbertPolya || isBifurcationHorizon
       ? []
       : buildVolumeBlocks({
           is2D,

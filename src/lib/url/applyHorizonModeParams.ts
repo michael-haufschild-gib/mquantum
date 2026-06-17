@@ -103,3 +103,39 @@ export function applyHilbertPolyaParams(
   if (urlState.hilbertPolyaPlaneMarker !== undefined)
     ext.setHilbertPolyaPlaneMarker(urlState.hilbertPolyaPlaneMarker)
 }
+
+/**
+ * Apply Bifurcation Horizon URL state params.
+ *
+ * Preset first, then raw fields — raw fields cascade `preset` into `custom`
+ * via the individual setters, mirroring the Riemann Zeta apply order.
+ */
+export function applyBifurcationHorizonParams(
+  urlState: ParsedShareableState,
+  ext: ExtendedObjectState
+): void {
+  if (
+    urlState.bifurcationHorizonPreset !== undefined &&
+    urlState.bifurcationHorizonPreset !== 'custom'
+  ) {
+    ext.setBifurcationHorizonPreset(urlState.bifurcationHorizonPreset)
+  }
+  if (urlState.bifurcationHorizonNeckRadius !== undefined)
+    ext.setBifurcationHorizonNeckRadius(urlState.bifurcationHorizonNeckRadius)
+  if (urlState.bifurcationHorizonThroatWidth !== undefined)
+    ext.setBifurcationHorizonThroatWidth(urlState.bifurcationHorizonThroatWidth)
+  if (urlState.bifurcationHorizonGlow !== undefined)
+    ext.setBifurcationHorizonGlow(urlState.bifurcationHorizonGlow)
+  if (urlState.bifurcationHorizonFlowRate !== undefined)
+    ext.setBifurcationHorizonFlowRate(urlState.bifurcationHorizonFlowRate)
+  if (urlState.bifurcationHorizonSwirl !== undefined)
+    ext.setBifurcationHorizonSwirl(urlState.bifurcationHorizonSwirl)
+  if (urlState.bifurcationHorizonRedshiftRadius !== undefined)
+    ext.setBifurcationHorizonRedshiftRadius(urlState.bifurcationHorizonRedshiftRadius)
+  if (urlState.bifurcationHorizonOffLine !== undefined)
+    ext.setBifurcationHorizonOffLine(urlState.bifurcationHorizonOffLine)
+  if (urlState.bifurcationHorizonWinding !== undefined)
+    ext.setBifurcationHorizonWinding(urlState.bifurcationHorizonWinding)
+  if (urlState.bifurcationHorizonThermalGain !== undefined)
+    ext.setBifurcationHorizonThermalGain(urlState.bifurcationHorizonThermalGain)
+}

@@ -52,6 +52,7 @@ describe('quantum mode state machine transitions', () => {
         'coherenceHorizon',
         'riemannZeta',
         'hilbertPolya',
+        'bifurcationHorizon',
       ])
       expect(COMPUTE_MODES).toEqual([
         'freeScalarField',

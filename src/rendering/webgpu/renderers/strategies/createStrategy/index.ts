@@ -78,6 +78,10 @@ export async function createModeStrategy(
       const { HilbertPolyaStrategy } = await import('../HilbertPolyaStrategy')
       return new HilbertPolyaStrategy()
     }
+    case 'bifurcationHorizon': {
+      const { BifurcationHorizonStrategy } = await import('../BifurcationHorizonStrategy')
+      return new BifurcationHorizonStrategy()
+    }
     case 'analytic':
     default:
       return new AnalyticModeStrategy()
