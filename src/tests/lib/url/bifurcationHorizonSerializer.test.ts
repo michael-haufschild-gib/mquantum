@@ -98,6 +98,70 @@ describe('bifurcationHorizonSerializer', () => {
     expect(state.bifurcationHorizonPreset).toBeUndefined()
     expect(state.bifurcationHorizonOffLine).toBeUndefined()
   })
+
+  it('round-trips the living-log-gas dynamics fields (enum as int)', () => {
+    const params = new URLSearchParams()
+    serializeBifurcationHorizon(params, {
+      bifurcationHorizonSpectralDynamics: 'softMode',
+      bifurcationHorizonDynamicsAmplitude: 0.5,
+      bifurcationHorizonDynamicsRate: 2.25,
+      bifurcationHorizonStiffnessTint: 0.6,
+    })
+    expect(params.get('bh_dyn')).toBe('1')
+    expect(params.get('bh_dynA')).toBe('0.500')
+    expect(params.get('bh_dynR')).toBe('2.250')
+    expect(params.get('bh_stiff')).toBe('0.600')
+
+    const state: BifurcationHorizonUrlState = {}
+    deserializeBifurcationHorizon(params, state)
+    expect(state.bifurcationHorizonSpectralDynamics).toBe('softMode')
+    expect(state.bifurcationHorizonDynamicsAmplitude).toBeCloseTo(0.5, 3)
+    expect(state.bifurcationHorizonDynamicsRate).toBeCloseTo(2.25, 3)
+    expect(state.bifurcationHorizonStiffnessTint).toBeCloseTo(0.6, 3)
+  })
+
+  it('maps the bh_dyn enum int → mode for every value', () => {
+    const cases: [string, string][] = [
+      ['0', 'static'],
+      ['1', 'softMode'],
+      ['2', 'dyson'],
+    ]
+    for (const [raw, mode] of cases) {
+      const state: BifurcationHorizonUrlState = {}
+      deserializeBifurcationHorizon(new URLSearchParams(`bh_dyn=${raw}`), state)
+      expect(state.bifurcationHorizonSpectralDynamics).toBe(mode)
+    }
+  })
+
+  it('omits default dynamics fields from the wire', () => {
+    // Defaults: static / 0.4 / 1 / 0.4 — none should be emitted.
+    const params = new URLSearchParams()
+    serializeBifurcationHorizon(params, {
+      bifurcationHorizonSpectralDynamics: 'static',
+      bifurcationHorizonDynamicsAmplitude: 0.4,
+      bifurcationHorizonDynamicsRate: 1,
+      bifurcationHorizonStiffnessTint: 0.4,
+    })
+    expect(params.has('bh_dyn')).toBe(false)
+    expect(params.has('bh_dynA')).toBe(false)
+    expect(params.has('bh_dynR')).toBe(false)
+    expect(params.has('bh_stiff')).toBe(false)
+  })
+
+  it('clamps out-of-range dynamics fields on parse', () => {
+    const state: BifurcationHorizonUrlState = {}
+    deserializeBifurcationHorizon(new URLSearchParams('bh_dynA=9&bh_dynR=99&bh_stiff=9'), state)
+    expect(state.bifurcationHorizonDynamicsAmplitude).toBeCloseTo(1, 6)
+    expect(state.bifurcationHorizonDynamicsRate).toBeCloseTo(3, 6)
+    expect(state.bifurcationHorizonStiffnessTint).toBeCloseTo(1, 6)
+  })
+
+  it('drops an out-of-range bh_dyn enum index', () => {
+    const state: BifurcationHorizonUrlState = {}
+    // parseIntParam clamps to [0,2], so 5 → 2 (dyson). A non-numeric is dropped.
+    deserializeBifurcationHorizon(new URLSearchParams('bh_dyn=nope'), state)
+    expect(state.bifurcationHorizonSpectralDynamics).toBeUndefined()
+  })
 })
 
 describe('state-serializer — bifurcationHorizon integration', () => {
@@ -163,5 +227,33 @@ describe('state-serializer — bifurcationHorizon integration', () => {
     expect(parsed.bifurcationHorizonOffLine).toBeCloseTo(0.35, 3)
     expect(parsed.bifurcationHorizonWinding).toBeCloseTo(1.2, 3)
     expect(parsed.bifurcationHorizonThermalGain).toBeCloseTo(0.5, 3)
+  })
+
+  it('full URL round-trip preserves the living-log-gas dynamics state', () => {
+    const serialized = serializeState({
+      dimension: 3,
+      objectType: 'schroedinger',
+      quantumMode: 'bifurcationHorizon',
+      bifurcationHorizonSpectralDynamics: 'dyson',
+      bifurcationHorizonDynamicsAmplitude: 0.7,
+      bifurcationHorizonDynamicsRate: 2,
+      bifurcationHorizonStiffnessTint: 0.8,
+    })
+    expect(serialized).toContain('bh_dyn=2')
+    const parsed = deserializeState(serialized)
+    expect(parsed.bifurcationHorizonSpectralDynamics).toBe('dyson')
+    expect(parsed.bifurcationHorizonDynamicsAmplitude).toBeCloseTo(0.7, 3)
+    expect(parsed.bifurcationHorizonDynamicsRate).toBeCloseTo(2, 3)
+    expect(parsed.bifurcationHorizonStiffnessTint).toBeCloseTo(0.8, 3)
+  })
+
+  it('does not emit bh_dyn* when qm is not bifurcationHorizon', () => {
+    const otherMode = serializeState({
+      dimension: 3,
+      objectType: 'schroedinger',
+      quantumMode: 'harmonicOscillator',
+      bifurcationHorizonSpectralDynamics: 'dyson',
+    })
+    expect(otherMode).not.toContain('bh_dyn')
   })
 })

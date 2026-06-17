@@ -138,4 +138,12 @@ export function applyBifurcationHorizonParams(
     ext.setBifurcationHorizonWinding(urlState.bifurcationHorizonWinding)
   if (urlState.bifurcationHorizonThermalGain !== undefined)
     ext.setBifurcationHorizonThermalGain(urlState.bifurcationHorizonThermalGain)
+  if (urlState.bifurcationHorizonSpectralDynamics !== undefined)
+    ext.setBifurcationHorizonSpectralDynamics(urlState.bifurcationHorizonSpectralDynamics)
+  if (urlState.bifurcationHorizonDynamicsAmplitude !== undefined)
+    ext.setBifurcationHorizonDynamicsAmplitude(urlState.bifurcationHorizonDynamicsAmplitude)
+  if (urlState.bifurcationHorizonDynamicsRate !== undefined)
+    ext.setBifurcationHorizonDynamicsRate(urlState.bifurcationHorizonDynamicsRate)
+  if (urlState.bifurcationHorizonStiffnessTint !== undefined)
+    ext.setBifurcationHorizonStiffnessTint(urlState.bifurcationHorizonStiffnessTint)
 }

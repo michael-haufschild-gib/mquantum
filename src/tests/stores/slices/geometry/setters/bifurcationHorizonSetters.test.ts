@@ -125,4 +125,47 @@ describe('bifurcationHorizonSetters', () => {
     useExtendedObjectStore.getState().setBifurcationHorizonOffLine(0.4)
     expect(useExtendedObjectStore.getState().schroedingerVersion).toBeGreaterThan(before)
   })
+
+  it('sets the spectral-dynamics mode and flips preset to custom', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setBifurcationHorizonPreset('modularFlow')
+    s.setBifurcationHorizonSpectralDynamics('softMode')
+    expect(getConfig().spectralDynamics).toBe('softMode')
+    expect(getConfig().preset).toBe('custom')
+    // Sibling fields from the prior preset survive the enum edit.
+    expect(getConfig().flowRate).toBe(BIFURCATION_HORIZON_PRESETS.modularFlow.flowRate)
+  })
+
+  it('clamps the dynamics numeric fields and flips preset to custom', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setBifurcationHorizonDynamicsAmplitude(9)
+    expect(getConfig().dynamicsAmplitude).toBe(1)
+    expect(getConfig().preset).toBe('custom')
+
+    s.setBifurcationHorizonDynamicsAmplitude(-1)
+    expect(getConfig().dynamicsAmplitude).toBe(0)
+
+    s.setBifurcationHorizonDynamicsRate(99)
+    expect(getConfig().dynamicsRate).toBe(3)
+
+    s.setBifurcationHorizonStiffnessTint(9)
+    expect(getConfig().stiffnessTint).toBe(1)
+  })
+
+  it('the spectralRigidity preset enables the soft-mode breathing', () => {
+    useExtendedObjectStore.getState().setBifurcationHorizonPreset('spectralRigidity')
+    const config = getConfig()
+    expect(config.preset).toBe('spectralRigidity')
+    expect(config.spectralDynamics).toBe('softMode')
+    expect(config.dynamicsAmplitude).toBe(
+      BIFURCATION_HORIZON_PRESETS.spectralRigidity.dynamicsAmplitude
+    )
+    expect(config.stiffnessTint).toBe(BIFURCATION_HORIZON_PRESETS.spectralRigidity.stiffnessTint)
+  })
+
+  it('rejects a non-finite dynamics value without mutating state', () => {
+    const before = getConfig()
+    useExtendedObjectStore.getState().setBifurcationHorizonDynamicsRate(Number.NaN)
+    expect(getConfig()).toEqual(before)
+  })
 })

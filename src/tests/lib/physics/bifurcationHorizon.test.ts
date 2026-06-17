@@ -9,8 +9,12 @@ import {
   BIFURCATION_U_HALF,
   bifurcationHorizonBoundingRadius,
   bifurcationRingHeight,
+  bifurcationSoftMode,
+  buildLogGasLaplacian,
   generateBifurcationLut,
+  jacobiEigenSymmetric,
   sampleBifurcationDensity,
+  unfoldZeros,
 } from '@/lib/physics/bifurcationHorizon'
 import { RIEMANN_ZEROS } from '@/lib/physics/riemannZeta'
 
@@ -129,5 +133,139 @@ describe('bifurcationHorizonBoundingRadius', () => {
 
   it('caps very large throat heights at 14', () => {
     expect(bifurcationHorizonBoundingRadius({ tMax: 100 }, 3)).toBe(14)
+  })
+})
+
+/* ────────────────────────────────────────────────────────────── */
+/*  Living log-gas: soft-mode / type-II₁ gaplessness               */
+/* ────────────────────────────────────────────────────────────── */
+
+describe('unfoldZeros', () => {
+  it('applies the smooth Riemann–von Mangoldt count (mean spacing → 1)', () => {
+    const x = unfoldZeros(RIEMANN_ZEROS.slice(0, 40))
+    // Strictly increasing and unit mean spacing by construction.
+    for (let i = 1; i < x.length; i++) expect(x[i]!).toBeGreaterThan(x[i - 1]!)
+    const meanSpacing = (x[x.length - 1]! - x[0]!) / (x.length - 1)
+    expect(meanSpacing).toBeCloseTo(1, 1)
+  })
+})
+
+describe('buildLogGasLaplacian', () => {
+  const unfolded = unfoldZeros(RIEMANN_ZEROS.slice(0, 40))
+  const n = unfolded.length
+  const M = buildLogGasLaplacian(unfolded)
+
+  it('is symmetric: M_ik === M_ki', () => {
+    for (let i = 0; i < n; i++) {
+      for (let k = i + 1; k < n; k++) {
+        expect(M[i * n + k]!).toBe(M[k * n + i]!)
+      }
+    }
+  })
+
+  it('has zero row-sums (uniform vector is the λ=0 rigid-shift mode)', () => {
+    let maxAbsEntry = 0
+    for (let i = 0; i < M.length; i++) maxAbsEntry = Math.max(maxAbsEntry, Math.abs(M[i]!))
+    for (let i = 0; i < n; i++) {
+      let sum = 0
+      for (let k = 0; k < n; k++) sum += M[i * n + k]!
+      expect(Math.abs(sum)).toBeLessThan(1e-6 * maxAbsEntry)
+    }
+  })
+
+  it('has strictly positive diagonal stiffness K_i', () => {
+    for (let i = 0; i < n; i++) expect(M[i * n + i]!).toBeGreaterThan(0)
+  })
+})
+
+describe('jacobiEigenSymmetric', () => {
+  it('diagonalises a known 2×2 symmetric matrix (deterministic, sorted)', () => {
+    // [[2,1],[1,2]] has eigenvalues 1 and 3.
+    const M = new Float64Array([2, 1, 1, 2])
+    const { values } = jacobiEigenSymmetric(M, 2)
+    expect(values[0]!).toBeCloseTo(1, 9)
+    expect(values[1]!).toBeCloseTo(3, 9)
+    // Reproducible: a second call returns bit-identical eigenvalues.
+    const again = jacobiEigenSymmetric(new Float64Array([2, 1, 1, 2]), 2)
+    expect(again.values).toEqual(values)
+  })
+
+  it('returns unit-norm eigenvectors as columns satisfying M·v = λ·v', () => {
+    const M = new Float64Array([2, 1, 1, 2])
+    const { values, vectors } = jacobiEigenSymmetric(M, 2)
+    for (let j = 0; j < 2; j++) {
+      const v0 = vectors[0]![j]!
+      const v1 = vectors[1]![j]!
+      // Unit norm.
+      expect(Math.hypot(v0, v1)).toBeCloseTo(1, 9)
+      // Eigen relation M·v = λ·v.
+      const mv0 = M[0]! * v0 + M[1]! * v1
+      const mv1 = M[2]! * v0 + M[3]! * v1
+      expect(mv0).toBeCloseTo(values[j]! * v0, 9)
+      expect(mv1).toBeCloseTo(values[j]! * v1, 9)
+    }
+  })
+})
+
+describe('bifurcationSoftMode — type-II₁ gaplessness', () => {
+  const sm = bifurcationSoftMode(RIEMANN_ZEROS, 40)
+
+  it('full spectrum is PSD (every eigenvalue ≥ −1e-9)', () => {
+    for (const lambda of sm.lambdas) expect(lambda).toBeGreaterThanOrEqual(-1e-9)
+  })
+
+  it('the soft mode is ⟂ the uniform mode (≈ zero mean)', () => {
+    const mean = sm.mode.reduce((a, b) => a + b, 0) / sm.mode.length
+    expect(Math.abs(mean)).toBeLessThan(1e-9)
+  })
+
+  it('the soft mode is unit-normalised', () => {
+    const norm2 = sm.mode.reduce((a, b) => a + b * b, 0)
+    expect(norm2).toBeCloseTo(1, 9)
+  })
+
+  it('every per-ring stiffness K_i is positive', () => {
+    for (const k of sm.stiffness) expect(k).toBeGreaterThan(0)
+  })
+
+  it('λ₁ deepens with N: λ₁(40) < λ₁(20) (gaplessness ~ N⁻¹)', () => {
+    const lambda20 = bifurcationSoftMode(RIEMANN_ZEROS, 20).lambda1
+    const lambda40 = bifurcationSoftMode(RIEMANN_ZEROS, 40).lambda1
+    expect(lambda40).toBeGreaterThan(0)
+    expect(lambda40).toBeLessThan(lambda20)
+  })
+
+  it('memoises on count (returns the same object for the default zeros)', () => {
+    expect(bifurcationSoftMode(RIEMANN_ZEROS, 40)).toBe(bifurcationSoftMode(RIEMANN_ZEROS, 40))
+  })
+})
+
+describe('generateBifurcationLut — living log-gas offsets', () => {
+  it('ringOffsets shift a ring along the throat (density follows the offset)', () => {
+    const t0 = bifurcationRingHeight(RIEMANN_ZEROS[0]!)
+    const offsets = new Array<number>(BIFURCATION_RING_COUNT).fill(0)
+    const shift = 0.5
+    offsets[0] = shift
+    const shifted = generateBifurcationLut({ ...BIFURCATION_DEFAULT_LUT, ringOffsets: offsets })
+    // The shifted ring is denser at t0 + shift than the static LUT there.
+    const atShiftedStatic = sampleBifurcationDensity(lut, t0 + shift, 0)
+    const atShiftedMoved = sampleBifurcationDensity(shifted, t0 + shift, 0)
+    expect(atShiftedMoved).toBeGreaterThan(atShiftedStatic)
+  })
+
+  it('ringAmpScale of 0 removes ring 0 (but keeps the membrane)', () => {
+    const amp = new Array<number>(BIFURCATION_RING_COUNT).fill(1)
+    amp[0] = 0
+    const dimmed = generateBifurcationLut({ ...BIFURCATION_DEFAULT_LUT, ringAmpScale: amp })
+    const t0 = bifurcationRingHeight(RIEMANN_ZEROS[0]!)
+    // With ring 0 removed, the on-throat density at t0 drops vs the full LUT.
+    expect(sampleBifurcationDensity(dimmed, t0, 0)).toBeLessThan(
+      sampleBifurcationDensity(lut, t0, 0)
+    )
+  })
+
+  it('absent offsets/ampScale reproduce the legacy LUT exactly', () => {
+    const baseline = generateBifurcationLut(BIFURCATION_DEFAULT_LUT)
+    expect(baseline).toEqual(lut)
   })
 })

@@ -16,6 +16,7 @@
 import type {
   BifurcationHorizonConfig,
   BifurcationHorizonPresetName,
+  BifurcationSpectralDynamics,
 } from '@/lib/geometry/extended/bifurcationHorizon'
 import {
   BIFURCATION_HORIZON_PRESETS,
@@ -35,6 +36,10 @@ export interface BifurcationHorizonSetters {
   setBifurcationHorizonOffLine: (u: number) => void
   setBifurcationHorizonWinding: (w: number) => void
   setBifurcationHorizonThermalGain: (gain: number) => void
+  setBifurcationHorizonSpectralDynamics: (mode: BifurcationSpectralDynamics) => void
+  setBifurcationHorizonDynamicsAmplitude: (a: number) => void
+  setBifurcationHorizonDynamicsRate: (r: number) => void
+  setBifurcationHorizonStiffnessTint: (t: number) => void
   setBifurcationHorizonPreset: (name: BifurcationHorizonPresetName) => void
 }
 
@@ -89,6 +94,12 @@ export function createBifurcationHorizonSetters(ctx: SetterContext): Bifurcation
     setBifurcationHorizonOffLine: numericSetter(ctx, 'offLine'),
     setBifurcationHorizonWinding: numericSetter(ctx, 'winding'),
     setBifurcationHorizonThermalGain: numericSetter(ctx, 'thermalGain'),
+    setBifurcationHorizonDynamicsAmplitude: numericSetter(ctx, 'dynamicsAmplitude'),
+    setBifurcationHorizonDynamicsRate: numericSetter(ctx, 'dynamicsRate'),
+    setBifurcationHorizonStiffnessTint: numericSetter(ctx, 'stiffnessTint'),
+    setBifurcationHorizonSpectralDynamics: (mode) => {
+      applyPartial(ctx, { spectralDynamics: mode, preset: 'custom' })
+    },
     setBifurcationHorizonPreset: (name) => {
       if (name === 'custom') {
         applyPartial(ctx, { preset: 'custom' })

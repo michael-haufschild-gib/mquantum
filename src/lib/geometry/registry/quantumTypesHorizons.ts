@@ -230,6 +230,10 @@ export const HORIZON_QUANTUM_TYPE_ENTRIES: readonly (readonly [
           'bh_off',
           'bh_wind',
           'bh_therm',
+          'bh_dyn',
+          'bh_dynA',
+          'bh_dynR',
+          'bh_stiff',
         ],
       },
       ui: {

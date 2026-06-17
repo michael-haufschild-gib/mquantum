@@ -19,6 +19,7 @@
 import React from 'react'
 
 import { ControlGroup } from '@/components/ui/ControlGroup'
+import { bifurcationSoftMode } from '@/lib/physics/bifurcationHorizon'
 import {
   gueWignerSurmise,
   poissonSpacing,
@@ -28,7 +29,7 @@ import {
 } from '@/lib/physics/riemannZeta'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
-import { MetricRow } from '../AnalysisPrimitives'
+import { MetricRow, SparklineRow } from '../AnalysisPrimitives'
 
 /* ────────────────────────────────────────────────────────────── */
 /*  Static chart geometry (the ζ zeros never change)             */
@@ -115,6 +116,19 @@ function buildSpacingChart(): SpacingChart {
 }
 
 const SPACING_CHART = buildSpacingChart()
+
+/* ────────────────────────────────────────────────────────────── */
+/*  Static soft-mode analysis (the ζ zeros never change)          */
+/* ────────────────────────────────────────────────────────────── */
+
+/**
+ * The living-log-gas soft mode of the throat-pinned spectrum. Computed once at
+ * module load (the ζ-zeros are fixed). `lambda1` is the type-II₁ gaplessness
+ * λ₁(M); `modeData` is the soft-mode profile across rings packed into a
+ * Float32Array for the Sparkline.
+ */
+const SOFT_MODE = bifurcationSoftMode()
+const SOFT_MODE_DATA = Float32Array.from(SOFT_MODE.mode)
 
 /* ────────────────────────────────────────────────────────────── */
 /*  Legend                                                        */
@@ -228,6 +242,23 @@ export const BifurcationHorizonAnalysisContent: React.FC = React.memo(() => {
         {onLine
           ? 'On-line (RH): spectrum pinned to the bifurcation surface'
           : `Off-line displacement δu = ${offLine.toFixed(3)}: mirror symmetry broken (¬RH)`}
+      </div>
+
+      <div className="mt-2 border-t border-[var(--border-subtle)] pt-2" data-testid="bh-soft-mode">
+        <p className="text-xs text-text-secondary mb-1">Spectral rigidity (type-II₁ no-margin)</p>
+        <MetricRow label="λ₁(M) gaplessness" value={SOFT_MODE.lambda1} digits={5} />
+        <SparklineRow
+          label="Soft-mode profile (rings)"
+          data={SOFT_MODE_DATA}
+          head={0}
+          count={SOFT_MODE_DATA.length}
+        />
+        <p className="text-2xs text-text-tertiary italic leading-snug mt-1.5">
+          The smallest nonzero eigenvalue of the log-gas transverse-rigidity Laplacian M is the
+          marginal 1/r² hydrodynamic mode: λ₁ → 0 ~ N⁻¹. This vanishing gap is the type-II₁
+          gaplessness Object X must carry — a no-margin property invisible in the naked list of
+          zeros, revealed only when the rings breathe in this soft mode.
+        </p>
       </div>
     </ControlGroup>
   )

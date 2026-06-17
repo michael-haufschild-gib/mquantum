@@ -18,10 +18,19 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
+import { ToggleGroup } from '@/components/ui/ToggleGroup'
+import type { BifurcationSpectralDynamics } from '@/lib/geometry/extended/bifurcationHorizon'
 import { BIFURCATION_HORIZON_RANGES } from '@/lib/geometry/extended/bifurcationHorizon'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
 const R = BIFURCATION_HORIZON_RANGES
+
+/** Spectral-dynamics selector options (the living ζ-zero log-gas modes). */
+const DYNAMICS_OPTIONS: { value: BifurcationSpectralDynamics; label: string }[] = [
+  { value: 'static', label: 'Static' },
+  { value: 'softMode', label: 'Soft mode' },
+  { value: 'dyson', label: 'Dyson' },
+]
 
 /** On-line displacement below which the spectrum is pinned to the throat. */
 const ON_LINE_EPS = 1e-6
@@ -43,6 +52,10 @@ export function BifurcationHorizonControls(): React.ReactElement {
     setOffLine,
     setWinding,
     setThermalGain,
+    setSpectralDynamics,
+    setDynamicsAmplitude,
+    setDynamicsRate,
+    setStiffnessTint,
   } = useExtendedObjectStore(
     useShallow((s) => ({
       setNeckRadius: s.setBifurcationHorizonNeckRadius,
@@ -54,6 +67,10 @@ export function BifurcationHorizonControls(): React.ReactElement {
       setOffLine: s.setBifurcationHorizonOffLine,
       setWinding: s.setBifurcationHorizonWinding,
       setThermalGain: s.setBifurcationHorizonThermalGain,
+      setSpectralDynamics: s.setBifurcationHorizonSpectralDynamics,
+      setDynamicsAmplitude: s.setBifurcationHorizonDynamicsAmplitude,
+      setDynamicsRate: s.setBifurcationHorizonDynamicsRate,
+      setStiffnessTint: s.setBifurcationHorizonStiffnessTint,
     }))
   )
 
@@ -159,6 +176,55 @@ export function BifurcationHorizonControls(): React.ReactElement {
           step={0.01}
           data-testid="bh-off-slider"
         />
+      </ControlGroup>
+
+      <ControlGroup title="Spectral Dynamics (type-II₁)" data-testid="bh-dynamics-group">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-secondary">Spectral dynamics</span>
+          <ToggleGroup
+            options={DYNAMICS_OPTIONS}
+            value={config.spectralDynamics}
+            onChange={setSpectralDynamics}
+            ariaLabel="Spectral dynamics"
+            tooltip="Bring the ζ-zero rings alive as a Coulomb log-gas: Soft mode breathes in the marginal soft mode of the transverse-rigidity Laplacian (the type-II₁ no-margin gaplessness, λ₁ → 0 ~ N⁻¹); Dyson relaxes the gas with 1/r level-repulsion that never lets rings cross."
+            fullWidth
+            data-testid="bh-dynamics-toggle"
+          />
+        </div>
+        {config.spectralDynamics !== 'static' && (
+          <>
+            <Slider
+              label="Breathing amplitude"
+              tooltip="Per-ring displacement scale of the living log-gas: how far the rings breathe in the marginal soft mode (or how hard the Dyson gas is kicked)."
+              value={config.dynamicsAmplitude}
+              onChange={setDynamicsAmplitude}
+              min={R.dynamicsAmplitude.min}
+              max={R.dynamicsAmplitude.max}
+              step={0.01}
+              data-testid="bh-dyn-amp-slider"
+            />
+            <Slider
+              label="Breathing rate"
+              tooltip="Soft-mode breathing frequency (×√λ₁(M)) or Dyson relaxation rate. λ₁ → 0 ~ N⁻¹ keeps the soft mode nearly free — the type-II₁ no-margin signature."
+              value={config.dynamicsRate}
+              onChange={setDynamicsRate}
+              min={R.dynamicsRate.min}
+              max={R.dynamicsRate.max}
+              step={0.01}
+              data-testid="bh-dyn-rate-slider"
+            />
+            <Slider
+              label="Stiffness tint"
+              tooltip="Mixes each ring's brightness toward its normalised transverse stiffness K_i so transverse-stiffer rings glow brighter (0 = uniform, 1 = full tint)."
+              value={config.stiffnessTint}
+              onChange={setStiffnessTint}
+              min={R.stiffnessTint.min}
+              max={R.stiffnessTint.max}
+              step={0.01}
+              data-testid="bh-stiff-slider"
+            />
+          </>
+        )}
       </ControlGroup>
 
       <div className="text-xs text-secondary flex flex-col gap-0.5" data-testid="bh-readout">

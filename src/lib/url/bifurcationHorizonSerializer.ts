@@ -13,13 +13,17 @@
  * @module lib/url/bifurcationHorizonSerializer
  */
 
-import type { BifurcationHorizonPresetName } from '@/lib/geometry/extended/bifurcationHorizon'
+import type {
+  BifurcationHorizonPresetName,
+  BifurcationSpectralDynamics,
+} from '@/lib/geometry/extended/bifurcationHorizon'
 import {
   BIFURCATION_HORIZON_PRESETS,
   BIFURCATION_HORIZON_RANGES,
+  DEFAULT_BIFURCATION_HORIZON_CONFIG,
 } from '@/lib/geometry/extended/bifurcationHorizon'
 
-import { parseFloatParam, setFloatParam } from './paramHelpers'
+import { parseFloatParam, parseIntParam, setFloatParam } from './paramHelpers'
 
 /** Shareable Bifurcation Horizon fields folded into the parent state type. */
 export interface BifurcationHorizonUrlState {
@@ -43,7 +47,22 @@ export interface BifurcationHorizonUrlState {
   bifurcationHorizonWinding?: number
   /** KMS thermal-wedge haze gain ∈ [0, 2]. */
   bifurcationHorizonThermalGain?: number
+  /** Living-log-gas dynamics mode (`static` | `softMode` | `dyson`). */
+  bifurcationHorizonSpectralDynamics?: BifurcationSpectralDynamics
+  /** Breathing/relaxation amplitude ∈ [0, 1]. */
+  bifurcationHorizonDynamicsAmplitude?: number
+  /** Breathing/relaxation rate ∈ [0, 3]. */
+  bifurcationHorizonDynamicsRate?: number
+  /** Stiffness tint ∈ [0, 1] (stiffer rings glow brighter). */
+  bifurcationHorizonStiffnessTint?: number
 }
+
+/** Ordered `bh_dyn` enum encoding: 0 = static, 1 = softMode, 2 = dyson. */
+const SPECTRAL_DYNAMICS_BY_INDEX: readonly BifurcationSpectralDynamics[] = [
+  'static',
+  'softMode',
+  'dyson',
+]
 
 /**
  * Emit the `bh_*` sub-block. Callers gate on
@@ -67,6 +86,32 @@ export function serializeBifurcationHorizon(
   setFloatParam(params, 'bh_off', state.bifurcationHorizonOffLine, false, 3)
   setFloatParam(params, 'bh_wind', state.bifurcationHorizonWinding, false, 3)
   setFloatParam(params, 'bh_therm', state.bifurcationHorizonThermalGain, false, 3)
+
+  // Living-log-gas dynamics — defaults elided to keep the wire compact.
+  const dyn = state.bifurcationHorizonSpectralDynamics
+  if (dyn !== undefined && dyn !== DEFAULT_BIFURCATION_HORIZON_CONFIG.spectralDynamics) {
+    const idx = SPECTRAL_DYNAMICS_BY_INDEX.indexOf(dyn)
+    if (idx >= 0) params.set('bh_dyn', String(idx))
+  }
+  if (
+    state.bifurcationHorizonDynamicsAmplitude !== undefined &&
+    state.bifurcationHorizonDynamicsAmplitude !==
+      DEFAULT_BIFURCATION_HORIZON_CONFIG.dynamicsAmplitude
+  ) {
+    setFloatParam(params, 'bh_dynA', state.bifurcationHorizonDynamicsAmplitude, false, 3)
+  }
+  if (
+    state.bifurcationHorizonDynamicsRate !== undefined &&
+    state.bifurcationHorizonDynamicsRate !== DEFAULT_BIFURCATION_HORIZON_CONFIG.dynamicsRate
+  ) {
+    setFloatParam(params, 'bh_dynR', state.bifurcationHorizonDynamicsRate, false, 3)
+  }
+  if (
+    state.bifurcationHorizonStiffnessTint !== undefined &&
+    state.bifurcationHorizonStiffnessTint !== DEFAULT_BIFURCATION_HORIZON_CONFIG.stiffnessTint
+  ) {
+    setFloatParam(params, 'bh_stiff', state.bifurcationHorizonStiffnessTint, false, 3)
+  }
 }
 
 /**
@@ -117,5 +162,29 @@ export function deserializeBifurcationHorizon(
     'bh_therm',
     R.thermalGain.min,
     R.thermalGain.max
+  )
+
+  // Living-log-gas dynamics — bh_dyn is an int enum (0/1/2); the rest are floats.
+  const dynIdx = parseIntParam(params, 'bh_dyn', 0, SPECTRAL_DYNAMICS_BY_INDEX.length - 1)
+  if (dynIdx !== undefined) {
+    state.bifurcationHorizonSpectralDynamics = SPECTRAL_DYNAMICS_BY_INDEX[dynIdx]
+  }
+  state.bifurcationHorizonDynamicsAmplitude = parseFloatParam(
+    params,
+    'bh_dynA',
+    R.dynamicsAmplitude.min,
+    R.dynamicsAmplitude.max
+  )
+  state.bifurcationHorizonDynamicsRate = parseFloatParam(
+    params,
+    'bh_dynR',
+    R.dynamicsRate.min,
+    R.dynamicsRate.max
+  )
+  state.bifurcationHorizonStiffnessTint = parseFloatParam(
+    params,
+    'bh_stiff',
+    R.stiffnessTint.min,
+    R.stiffnessTint.max
   )
 }

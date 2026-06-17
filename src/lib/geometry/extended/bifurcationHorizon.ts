@@ -19,7 +19,23 @@ export type BifurcationHorizonPresetName =
   | 'modularFlow'
   | 'nearExtremal'
   | 'wedgeMirror'
+  | 'spectralRigidity'
   | 'custom'
+
+/**
+ * Spectral-dynamics mode for the living ζ-zero log-gas.
+ *
+ *  - `static`   — rings frozen at their γ_n heights (the legacy LUT; zero
+ *                 per-frame work). The default, so opting out costs nothing.
+ *  - `softMode`  — the rings breathe in the marginal soft mode of the
+ *                 transverse-rigidity Laplacian M: ringOffsets[n] ∝ mode[n]·sin(ωt)
+ *                 with ω set by √λ₁(M). λ₁ → 0 ~ N⁻¹ ⇒ the breathing is nearly
+ *                 free — the type-II₁ no-margin gaplessness made visible.
+ *  - `dyson`     — a damped Dyson Coulomb-gas relaxation: rings repel via the
+ *                 1/r force and relax toward equilibrium without ever crossing
+ *                 (level repulsion / reality-from-Hermiticity).
+ */
+export type BifurcationSpectralDynamics = 'static' | 'softMode' | 'dyson'
 
 /**
  * Serializable Bifurcation Horizon configuration. Stored on
@@ -44,6 +60,15 @@ export interface BifurcationHorizonConfig {
   winding: number
   /** KMS thermal-wedge haze gain ∈ [0, 2] (faint atmosphere filling the wedges). */
   thermalGain: number
+  /** Living-log-gas dynamics mode (the ζ-zero rings as a breathing Coulomb gas). */
+  spectralDynamics: BifurcationSpectralDynamics
+  /** Breathing/relaxation amplitude ∈ [0, 1] (per-ring Δt scale in t-units). */
+  dynamicsAmplitude: number
+  /** Breathing/relaxation rate ∈ [0, 3] (×√λ₁(M) for softMode; ×force for dyson). */
+  dynamicsRate: number
+  /** Stiffness tint ∈ [0, 1]: mixes ring amplitude toward normalised K_i so
+   *  transverse-stiffer rings glow brighter (0 = uniform, 1 = full tint). */
+  stiffnessTint: number
   /** Preset identifier for the UI dropdown. `custom` = user-edited state. */
   preset: BifurcationHorizonPresetName
 }
@@ -59,6 +84,9 @@ export const BIFURCATION_HORIZON_RANGES = {
   offLine: { min: 0, max: 0.6 },
   winding: { min: 0, max: 4 },
   thermalGain: { min: 0, max: 2 },
+  dynamicsAmplitude: { min: 0, max: 1 },
+  dynamicsRate: { min: 0, max: 3 },
+  stiffnessTint: { min: 0, max: 1 },
 } as const
 
 /**
@@ -76,6 +104,10 @@ export const DEFAULT_BIFURCATION_HORIZON_CONFIG: BifurcationHorizonConfig = {
   offLine: 0,
   winding: 0.5,
   thermalGain: 0.35,
+  spectralDynamics: 'static',
+  dynamicsAmplitude: 0.4,
+  dynamicsRate: 1,
+  stiffnessTint: 0.4,
   preset: 'eternalThroat',
 }
 
@@ -101,6 +133,10 @@ export const BIFURCATION_HORIZON_PRESETS: Readonly<
     offLine: 0,
     winding: 0.5,
     thermalGain: 0.35,
+    spectralDynamics: 'static',
+    dynamicsAmplitude: 0.4,
+    dynamicsRate: 1,
+    stiffnessTint: 0.4,
   },
   /** Tomita modular flow: the wedge dilation streams the rings along the throat. */
   modularFlow: {
@@ -113,6 +149,10 @@ export const BIFURCATION_HORIZON_PRESETS: Readonly<
     offLine: 0,
     winding: 1.0,
     thermalGain: 0.45,
+    spectralDynamics: 'static',
+    dynamicsAmplitude: 0.4,
+    dynamicsRate: 1,
+    stiffnessTint: 0.4,
   },
   /** Near-extremal: a dark captured core at r_h with √f-redshifted wedges. */
   nearExtremal: {
@@ -125,6 +165,10 @@ export const BIFURCATION_HORIZON_PRESETS: Readonly<
     offLine: 0,
     winding: 0.8,
     thermalGain: 0.6,
+    spectralDynamics: 'static',
+    dynamicsAmplitude: 0.4,
+    dynamicsRate: 1,
+    stiffnessTint: 0.4,
   },
   /** Wedge mirror: rings displaced off the throat — the broken-symmetry (¬RH) view. */
   wedgeMirror: {
@@ -137,6 +181,31 @@ export const BIFURCATION_HORIZON_PRESETS: Readonly<
     offLine: 0.35,
     winding: 1.2,
     thermalGain: 0.5,
+    spectralDynamics: 'static',
+    dynamicsAmplitude: 0.4,
+    dynamicsRate: 1,
+    stiffnessTint: 0.4,
+  },
+  /**
+   * Spectral rigidity: the rings come alive and breathe in the marginal soft
+   * mode of the log-gas transverse-rigidity Laplacian M. Because λ₁(M) → 0 ~
+   * N⁻¹, the breathing is slow and nearly free — the type-II₁ "no-margin"
+   * gaplessness that Object X must carry, invisible in the naked list of zeros.
+   */
+  spectralRigidity: {
+    neckRadius: 0.22,
+    throatWidth: 0.18,
+    glow: 1.5,
+    flowRate: 0,
+    swirl: 0,
+    redshiftRadius: 0,
+    offLine: 0,
+    winding: 0.5,
+    thermalGain: 0.35,
+    spectralDynamics: 'softMode',
+    dynamicsAmplitude: 0.5,
+    dynamicsRate: 1,
+    stiffnessTint: 0.6,
   },
 }
 
@@ -172,5 +241,11 @@ export const BIFURCATION_HORIZON_SCENARIOS: readonly BifurcationHorizonScenario[
     label: 'Wedge Mirror (¬RH)',
     description:
       'The functional-equation involution s ↦ 1 − s̄ is the Tomita modular conjugation J — the wedge reflection u ↦ −u. Displacing the rings off the throat breaks the mirror symmetry: the off-line (Riemann-hypothesis-violating) view.',
+  },
+  {
+    id: 'spectralRigidity',
+    label: 'Spectral Rigidity (type-II₁)',
+    description:
+      'The static rings come alive as a Coulomb log-gas and breathe in the marginal soft mode of the transverse-rigidity Laplacian M. Its smallest nonzero eigenvalue λ₁(M) → 0 ~ N⁻¹ is the marginal 1/r² hydrodynamic mode — the type-II₁ "no-margin" gaplessness Object X must possess, a property invisible in the naked list of zeros.',
   },
 ]
