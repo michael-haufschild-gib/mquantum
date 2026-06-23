@@ -584,8 +584,12 @@ export { COLOR_ALG_NAMES } from '../emissionConstants'
  * Emits only that algorithm's branch (no if/else chain) for compile-time specialization.
  */
 export function generateComputeBaseColor(colorAlgorithm: number): string {
+  // Suite-only algorithms (29+) are rendered by the WDW ⊗ ζ main block, not this
+  // generic specialization; fall back to Mixed (4) so the generic shader stays
+  // valid for any value rather than throwing.
+  const effective = ALGO_BRANCH[colorAlgorithm] ? colorAlgorithm : 4
   // Only algorithms 3 (Phase) and 4 (Mixed) use baseHSL from material color
-  const needsBaseHSL = colorAlgorithm === 3 || colorAlgorithm === 4
+  const needsBaseHSL = effective === 3 || effective === 4
   const header = /* wgsl */ `
 // Compute base surface color (no lighting applied)
 // PERF: accepts pre-computed log-density s to avoid redundant log() call
@@ -596,7 +600,7 @@ ${needsBaseHSL ? "\n  // Get base color from material's base color\n  var baseHS
   var col = vec3f(0.0);
 `
 
-  const branch = ALGO_BRANCH[colorAlgorithm]
+  const branch = ALGO_BRANCH[effective]
   if (!branch) {
     throw new Error(`Unknown colorAlgorithm: ${colorAlgorithm}`)
   }

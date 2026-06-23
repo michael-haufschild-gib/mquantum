@@ -82,6 +82,14 @@ export async function createModeStrategy(
       const { BifurcationHorizonStrategy } = await import('../BifurcationHorizonStrategy')
       return new BifurcationHorizonStrategy()
     }
+    case 'modularKnot': {
+      const { ModularKnotStrategy } = await import('../ModularKnotStrategy')
+      return new ModularKnotStrategy()
+    }
+    case 'wdwZetaVolume': {
+      const { WdwZetaVolumeStrategy } = await import('../WdwZetaVolumeStrategy')
+      return new WdwZetaVolumeStrategy()
+    }
     case 'analytic':
     default:
       return new AnalyticModeStrategy()

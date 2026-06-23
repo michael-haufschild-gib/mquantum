@@ -8,6 +8,10 @@ import {
   HILBERT_POLYA_RANGES,
 } from '@/lib/geometry/extended/hilbertPolya'
 import {
+  DEFAULT_MODULAR_KNOT_CONFIG,
+  MODULAR_KNOT_RANGES,
+} from '@/lib/geometry/extended/modularKnot'
+import {
   DEFAULT_RIEMANN_ZETA_CONFIG,
   RIEMANN_ZETA_RANGES,
 } from '@/lib/geometry/extended/riemannZeta'
@@ -19,6 +23,7 @@ import {
   RIEMANN_DEFAULT_RADIAL,
   RIEMANN_WORLD_SCALE,
 } from '@/lib/physics/riemannZeta'
+import { getWdwZetaSpec } from '@/lib/physics/wdwZeta/registry'
 
 import { SCHROEDINGER_LAYOUT } from '../schroedingerLayout'
 
@@ -495,6 +500,56 @@ export function packBifurcationHorizon(
     R.offLine.min,
     R.offLine.max
   )
+}
+
+/**
+ * Pack Modular Knot ("Rademacher Horizon") uniforms. Only the modularKnot mode
+ * reads these fields (its dedicated 3D-texture volumetric main block); every
+ * other mode gets all-zero fields so the buffer region is deterministic. The
+ * baked RGBA volume itself is a separate group-2 3D texture + sampler owned by
+ * ModularKnotStrategy — not part of this struct. Only the render-only glow and
+ * auto-rotation flow rate live here (mkMetric is reserved and stays zero).
+ */
+export function packModularKnot(
+  floatView: Float32Array,
+  schroedinger: Partial<SchroedingerConfig> | undefined,
+  isModularKnotMode: boolean
+): void {
+  if (!isModularKnotMode) {
+    floatView[I.mkGlow] = floatView[I.mkFlow] = floatView[I.mkMetric] = 0.0
+    return
+  }
+
+  const cfg = schroedinger?.modularKnot
+  const defaults = DEFAULT_MODULAR_KNOT_CONFIG
+  const R = MODULAR_KNOT_RANGES
+
+  floatView[I.mkGlow] = finiteClamped(cfg?.glow, defaults.glow, R.glow.min, R.glow.max)
+  floatView[I.mkFlow] = finiteClamped(cfg?.flow, defaults.flow, R.flow.min, R.flow.max)
+  // Reserved for a future horizon term; held at zero for now.
+  floatView[I.mkMetric] = 0.0
+}
+
+/**
+ * Pack WDW ⊗ ζ suite uniforms. The ten suite modes share one shader; the only
+ * per-mode uniform is `wzModeId` (from the bake registry), which the shared main
+ * block can use for a per-mode emission flourish. `wzParamA`/`wzParamB` are
+ * reserved generic render knobs. Non-suite modes get all-zero fields so the
+ * buffer region is deterministic. Emission/glow is the shared `emissionIntensity`
+ * field (appearanceStore.faceEmission) — NOT packed here.
+ *
+ * @param floatView - Float view over the SchroedingerUniforms buffer.
+ * @param quantumMode - The active quantum mode string.
+ */
+export function packWdwZetaVolume(floatView: Float32Array, quantumMode: string | undefined): void {
+  const spec = getWdwZetaSpec(quantumMode)
+  if (!spec) {
+    floatView[I.wzModeId] = floatView[I.wzParamA] = floatView[I.wzParamB] = 0.0
+    return
+  }
+  floatView[I.wzModeId] = spec.modeId
+  floatView[I.wzParamA] = 0.0
+  floatView[I.wzParamB] = 0.0
 }
 
 /**

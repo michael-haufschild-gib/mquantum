@@ -21,10 +21,12 @@ import { DiracAnalysisContent } from '@/components/sections/Analysis/DiracAnalys
 import { FSFAnalysisContent } from '@/components/sections/Analysis/FSFAnalysisSection'
 import { HilbertPolyaAnalysisContent } from '@/components/sections/Analysis/HilbertPolyaAnalysisSection'
 import { MeasurementControls } from '@/components/sections/Analysis/MeasurementControls'
+import { ModularKnotAnalysisContent } from '@/components/sections/Analysis/ModularKnotAnalysisSection'
 import { PauliAnalysisContent } from '@/components/sections/Analysis/PauliAnalysisSection'
 import { RiemannZetaAnalysisContent } from '@/components/sections/Analysis/RiemannZetaAnalysisSection'
 import { CrossSectionAnalysisContent } from '@/components/sections/Analysis/SchroedingerCrossSectionSection'
 import { TDSEAnalysisContent } from '@/components/sections/Analysis/TDSEAnalysisSection'
+import { WdwZetaAnalysisContent } from '@/components/sections/Analysis/WdwZetaAnalysisSection'
 import { Section } from '@/components/sections/Section'
 import { Button } from '@/components/ui/Button'
 import { ControlGroup } from '@/components/ui/ControlGroup'
@@ -46,6 +48,7 @@ import {
   exportTdseDiagnosticsCSV,
   exportWavefunctionSliceCSV,
 } from '@/lib/export/dataExport'
+import { isWdwZetaMode } from '@/lib/geometry/extended/wdwZeta/shared'
 import {
   isAnalyticQuantumType,
   isComputeQuantumType,
@@ -80,6 +83,17 @@ const MODE_LABELS: Record<string, string> = {
   riemannZeta: 'Riemann Zeta',
   hilbertPolya: 'Hilbert–Pólya',
   bifurcationHorizon: 'Bifurcation Horizon',
+  modularKnot: 'Modular Knot',
+  constraintSeam: 'Constraint Seam',
+  moebiusNoBoundary: 'Möbius No-Boundary',
+  forcedCell: 'Forced Cell',
+  turningSurface: 'Turning Surface',
+  primonMultiverse: 'Third-Quantized Multiverse',
+  frobeniusWheel: 'Frobenius Wheel',
+  dewittCone: 'DeWitt Null Cone',
+  selbergSpectrum: 'Selberg Spectrum',
+  adelicWavefunction: 'Adelic Wavefunction',
+  weilPositivity: 'Ghost Sector',
 }
 
 /**
@@ -202,7 +216,9 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
         {isAnalytic &&
           quantumMode !== 'riemannZeta' &&
           quantumMode !== 'hilbertPolya' &&
-          quantumMode !== 'bifurcationHorizon' && <CrossSectionAnalysisContent />}
+          quantumMode !== 'bifurcationHorizon' &&
+          quantumMode !== 'modularKnot' &&
+          !isWdwZetaMode(quantumMode) && <CrossSectionAnalysisContent />}
         {quantumMode === 'freeScalarField' && <FSFAnalysisContent />}
         {quantumMode === 'tdseDynamics' && <TDSEAnalysisContent />}
         {quantumMode === 'becDynamics' && <BECAnalysisContent />}
@@ -210,6 +226,8 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
         {quantumMode === 'riemannZeta' && <RiemannZetaAnalysisContent />}
         {quantumMode === 'hilbertPolya' && <HilbertPolyaAnalysisContent />}
         {quantumMode === 'bifurcationHorizon' && <BifurcationHorizonAnalysisContent />}
+        {quantumMode === 'modularKnot' && <ModularKnotAnalysisContent />}
+        {isWdwZetaMode(quantumMode) && <WdwZetaAnalysisContent />}
         {dimension >= 3 && (
           <ControlGroup
             data-testid="analysis-quantum-carpet"

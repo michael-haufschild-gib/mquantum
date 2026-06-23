@@ -10,6 +10,7 @@
  */
 
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
+import { isWdwZetaMode } from '@/lib/geometry/extended/wdwZeta/shared'
 
 import type { ObjectType } from '../types'
 import { QUANTUM_TYPE_REGISTRY } from './quantumTypes'
@@ -500,6 +501,14 @@ export function supportsSchroedingerSurfaceMode(
   // Bifurcation Horizon likewise owns a dedicated volumetric main block — no
   // isosurface pipeline composes for it, so the surface toggle is meaningless.
   if (options.quantumMode === 'bifurcationHorizon') return false
+  // Modular Knot likewise owns a dedicated 3D-texture volumetric main block —
+  // no isosurface pipeline composes for it, so the surface toggle is meaningless.
+  if (options.quantumMode === 'modularKnot') return false
+  // The WDW ⊗ ζ suite renders through its shared 3D-texture volumetric main
+  // block (which already presents each mode as a glowing surface/relief); the
+  // shared density-grid isosurface pipeline never composes for it, so the
+  // surface toggle is meaningless for all ten suite modes.
+  if (isWdwZetaMode(options.quantumMode)) return false
 
   return true
 }

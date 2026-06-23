@@ -47,6 +47,8 @@ export type ShaderSurface =
   | 'riemann-zeta'
   | 'hilbert-polya'
   | 'bifurcation-horizon'
+  | 'modular-knot'
+  | 'wdw-zeta'
   | 'wigner'
   | 'passes'
 

@@ -11,13 +11,16 @@
 
 import { useEffect, useRef } from 'react'
 
+import { isWdwZetaMode } from '@/lib/geometry/extended/wdwZeta/shared'
 import { logger } from '@/lib/logger'
 import { applySceneExample, findSceneByName } from '@/lib/sceneExamples'
 import {
   applyBifurcationHorizonParams,
   applyCoherenceHorizonParams,
   applyHilbertPolyaParams,
+  applyModularKnotParams,
   applyRiemannZetaParams,
+  applyWdwZetaParams,
 } from '@/lib/url/applyHorizonModeParams'
 import { parseCurrentUrl, type ParsedShareableState } from '@/lib/url/state-serializer'
 import { usePerformanceStore } from '@/stores/runtime/performanceStore'
@@ -733,6 +736,8 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
     if (effectiveQuantumMode === 'riemannZeta') applyRiemannZetaParams(urlState, ext)
     if (effectiveQuantumMode === 'hilbertPolya') applyHilbertPolyaParams(urlState, ext)
     if (effectiveQuantumMode === 'bifurcationHorizon') applyBifurcationHorizonParams(urlState, ext)
+    if (effectiveQuantumMode === 'modularKnot') applyModularKnotParams(urlState, ext)
+    if (isWdwZetaMode(effectiveQuantumMode)) applyWdwZetaParams(urlState, ext)
     if (effectiveObjectType === 'bellPair') applyBellParams(urlState, ext)
     applySrmtSweepParams(urlState, effectiveQuantumMode)
   } catch (error) {

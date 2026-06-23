@@ -29,8 +29,10 @@ import {
   enumerateCoherenceHorizon,
   enumerateDensityGridEigenCache,
   enumerateHilbertPolya,
+  enumerateModularKnot,
   enumerateRiemannZeta,
   enumerateSkybox,
+  enumerateWdwZetaSuite,
   enumerateWigner,
 } from './enumerateAuxiliary'
 import { enumerateProfilingStrip } from './enumerateProfilingStrip'
@@ -63,6 +65,8 @@ const VALID_SURFACES: ReadonlySet<SurfaceName> = new Set([
   'riemann-zeta',
   'hilbert-polya',
   'bifurcation-horizon',
+  'modular-knot',
+  'wdw-zeta',
   'wigner',
   'passes',
 ])
@@ -162,6 +166,12 @@ export function* enumerateAll(opts: EnumerateAllOptions = {}): Generator<ShaderR
     }
     if (isEnabled('bifurcation-horizon')) {
       yield* enumerateBifurcationHorizon()
+    }
+    if (isEnabled('modular-knot')) {
+      yield* enumerateModularKnot()
+    }
+    if (isEnabled('wdw-zeta')) {
+      yield* enumerateWdwZetaSuite()
     }
     if (isEnabled('wigner')) {
       yield* enumerateWigner()

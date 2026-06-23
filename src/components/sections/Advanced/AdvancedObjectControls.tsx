@@ -6,6 +6,8 @@ import { ColorPicker } from '@/components/ui/ColorPicker'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
+import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
+import { isWdwZetaMode } from '@/lib/geometry/extended/wdwZeta/shared'
 import { supportsSchroedingerSurfaceMode } from '@/lib/geometry/registry'
 import { type AppearanceSlice, useAppearanceStore } from '@/stores/scene/appearanceStore'
 import {
@@ -13,6 +15,20 @@ import {
   useExtendedObjectStore,
 } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
+
+/**
+ * Schroedinger quantum modes that render through a dedicated volumetric main
+ * block and compose none of the shared advanced-rendering effects (SSS,
+ * emission post-processing, powder/anisotropy). The Advanced Rendering section
+ * is hidden for these modes.
+ */
+const DEDICATED_BLOCK_MODES = new Set<SchroedingerQuantumMode>([
+  'coherenceHorizon',
+  'riemannZeta',
+  'hilbertPolya',
+  'bifurcationHorizon',
+  'modularKnot',
+])
 
 /** Advanced rendering controls: SSS, emission & rim, and volume effects. */
 export const AdvancedObjectControls: React.FC = React.memo(() => {
@@ -86,29 +102,13 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
     return null
   }
 
-  // Coherence Horizon renders through its dedicated geodesic main block,
-  // which implements none of these shared-pipeline effects (SSS, emission
-  // post-processing, powder/anisotropy). Hide the section instead of showing
-  // controls that would silently do nothing.
-  if (objectType === 'schroedinger' && quantumMode === 'coherenceHorizon') {
-    return null
-  }
-
-  // Arithmetic Horizon (riemannZeta) likewise owns a dedicated volumetric
-  // main block that composes none of the shared-pipeline effects.
-  if (objectType === 'schroedinger' && quantumMode === 'riemannZeta') {
-    return null
-  }
-
-  // Hilbert–Pólya Spectrum likewise owns a dedicated volumetric main block
-  // that composes none of the shared-pipeline effects.
-  if (objectType === 'schroedinger' && quantumMode === 'hilbertPolya') {
-    return null
-  }
-
-  // Bifurcation Horizon likewise owns a dedicated volumetric main block
-  // that composes none of the shared-pipeline effects.
-  if (objectType === 'schroedinger' && quantumMode === 'bifurcationHorizon') {
+  // The horizon-family analytic modes (Coherence Horizon's geodesic block,
+  // Arithmetic Horizon, Hilbert–Pólya, Bifurcation Horizon, and the Modular
+  // Knot 3D-texture block) each render through a dedicated volumetric main
+  // block that composes none of these shared-pipeline effects (SSS, emission
+  // post-processing, powder/anisotropy). Hide the section for them instead of
+  // showing controls that would silently do nothing.
+  if (objectType === 'schroedinger' && DEDICATED_BLOCK_MODES.has(quantumMode)) {
     return null
   }
 
@@ -123,10 +123,17 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
       dimension,
       representation,
     })
+  // The WDW ⊗ ζ suite renders through its shared dedicated volumetric main
+  // block: it owns NO subsurface-scattering or powder/anisotropy state, but it
+  // DOES read the shared emission (Emission & Rim drives its glow). So keep the
+  // Advanced section visible (not in DEDICATED_BLOCK_MODES) but hide the
+  // volumetric SSS / Volume-Effects groups, leaving only Emission & Rim.
+  const isWdwZeta = isSchroedinger && isWdwZetaMode(quantumMode)
   // Bell-pair is always volumetric (isosurface not supported). Pauli and
   // Schrödinger hide volumetric controls when isosurface is active.
   const showVolumetric =
     !effectiveIsoEnabled &&
+    !isWdwZeta &&
     (isPauli || isBellPair || (dimension > 2 && representation !== 'wigner'))
 
   return (

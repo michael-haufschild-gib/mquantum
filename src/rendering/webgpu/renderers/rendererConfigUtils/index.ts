@@ -7,6 +7,7 @@
  * @module rendering/webgpu/renderers/rendererConfigUtils
  */
 
+import { isWdwZetaMode } from '@/lib/geometry/extended/wdwZeta/shared'
 import {
   getQuantumTypeEntry,
   getQuantumTypeRuntime,
@@ -49,6 +50,12 @@ export function isPipeline2D(config: SchrodingerRendererConfig): boolean {
   // Bifurcation Horizon likewise always renders through its dedicated 3D
   // volumetric main block — never the 2D / Wigner pipeline.
   if (config.quantumMode === 'bifurcationHorizon') return false
+  // Modular Knot likewise always renders through its dedicated 3D-texture
+  // volumetric main block — never the 2D / Wigner pipeline.
+  if (config.quantumMode === 'modularKnot') return false
+  // The WDW ⊗ ζ suite always renders through its shared 3D-texture volumetric
+  // main block — never the 2D / Wigner pipeline.
+  if (isWdwZetaMode(config.quantumMode)) return false
   return (
     !isComputeQuantumMode(config) &&
     ((config.dimension ?? 3) === 2 || config.representation === 'wigner')
@@ -142,6 +149,26 @@ export function applyModeOverrides(config?: SchrodingerRendererConfig): Schrodin
     result.fastEigenInterpolationEnabled = false
   }
 
+  if (result.quantumMode === 'modularKnot') {
+    // The 3D-texture volumetric main block renders full-res single-output and
+    // samples the baked RGBA volume inline — temporal MRT and the eigenfunction
+    // cache never apply.
+    result.temporal = false
+    result.eigenfunctionCacheEnabled = false
+    result.analyticalGradientEnabled = false
+    result.fastEigenInterpolationEnabled = false
+  }
+
+  if (isWdwZetaMode(result.quantumMode)) {
+    // The WDW ⊗ ζ suite shares one 3D-texture volumetric main block: full-res
+    // single-output sampling the baked RGBA volume inline — temporal MRT, the
+    // eigenfunction cache, and analytical gradients never apply.
+    result.temporal = false
+    result.eigenfunctionCacheEnabled = false
+    result.analyticalGradientEnabled = false
+    result.fastEigenInterpolationEnabled = false
+  }
+
   if (isComputeQuantumMode(result)) {
     result.temporal = false
     // Clamp to the mode's minimum dimension from the quantum type registry.
@@ -212,7 +239,12 @@ function buildDedicatedMainBlockConfig(
   densityGridSize: number,
   flags: Pick<
     SchroedingerWGSLShaderConfig,
-    'isCoherenceHorizon' | 'isRiemannZeta' | 'isHilbertPolya' | 'isBifurcationHorizon'
+    | 'isCoherenceHorizon'
+    | 'isRiemannZeta'
+    | 'isHilbertPolya'
+    | 'isBifurcationHorizon'
+    | 'isModularKnot'
+    | 'isWdwZetaVolume'
   >
 ): SchroedingerWGSLShaderConfig {
   return {
@@ -248,6 +280,8 @@ function buildDedicatedMainBlockConfig(
     isRiemannZeta: false,
     isHilbertPolya: false,
     isBifurcationHorizon: false,
+    isModularKnot: false,
+    isWdwZetaVolume: false,
     freeScalarAnalysis: false,
     useDensityMatrix: false,
     crossSectionEnabled: false,
@@ -292,6 +326,8 @@ export function buildShaderConfig(
   const isRiemannZeta = strategyKind === 'riemannZeta'
   const isHilbertPolya = strategyKind === 'hilbertPolya'
   const isBifurcationHorizon = strategyKind === 'bifurcationHorizon'
+  const isModularKnot = strategyKind === 'modularKnot'
+  const isWdwZetaVolume = strategyKind === 'wdwZetaVolume'
   const computeMode = isComputeQuantumMode(rendererConfig)
   const isWigner = rendererConfig.representation === 'wigner'
   const pipelineIs2D = !computeMode && (dim === 2 || isWigner)
@@ -372,6 +408,24 @@ export function buildShaderConfig(
     // 2D (t, u) LUT (BifurcationHorizonStrategy adds only the binding-2 entry).
     return buildDedicatedMainBlockConfig(rendererConfig, densityGridSize, {
       isBifurcationHorizon: true,
+    })
+  }
+
+  if (isModularKnot) {
+    // Modular Knot: dedicated 3D-texture volumetric main block sampling the
+    // group-2 baked RGBA volume (ModularKnotStrategy adds the binding-2 texture
+    // and the binding-3 sampler).
+    return buildDedicatedMainBlockConfig(rendererConfig, densityGridSize, {
+      isModularKnot: true,
+    })
+  }
+
+  if (isWdwZetaVolume) {
+    // WDW ⊗ ζ suite: one shared 3D-texture volumetric main block sampling the
+    // group-2 baked RGBA volume (WdwZetaVolumeStrategy adds the binding-2 texture
+    // and the binding-3 sampler). All ten suite modes share this config + shader.
+    return buildDedicatedMainBlockConfig(rendererConfig, densityGridSize, {
+      isWdwZetaVolume: true,
     })
   }
 
@@ -468,7 +522,9 @@ export function buildPipelineOutputs(
     cfg.quantumMode !== 'coherenceHorizon' &&
     cfg.quantumMode !== 'riemannZeta' &&
     cfg.quantumMode !== 'hilbertPolya' &&
-    cfg.quantumMode !== 'bifurcationHorizon'
+    cfg.quantumMode !== 'bifurcationHorizon' &&
+    cfg.quantumMode !== 'modularKnot' &&
+    !isWdwZetaMode(cfg.quantumMode)
   const pipelineIs2D = isPipeline2D(cfg)
 
   if (pipelineIs2D) {
@@ -553,5 +609,7 @@ export function computePipelineCacheKey(
     config.isRiemannZeta ? 1 : 0,
     config.isHilbertPolya ? 1 : 0,
     config.isBifurcationHorizon ? 1 : 0,
+    config.isModularKnot ? 1 : 0,
+    config.isWdwZetaVolume ? 1 : 0,
   ].join(':')
 }

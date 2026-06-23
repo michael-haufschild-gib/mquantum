@@ -19,6 +19,7 @@ import {
   type HydrogenNDPresetName,
   type SchroedingerConfig,
 } from '@/lib/geometry/extended/types'
+import { isWdwZetaMode } from '@/lib/geometry/extended/wdwZeta/shared'
 import {
   getQuantumTypeEntry,
   isComputeQuantumType,
@@ -158,6 +159,18 @@ const POSITION_ONLY_HORIZON_MODES = new Set<SchroedingerConfig['quantumMode']>([
   'riemannZeta',
   'hilbertPolya',
   'bifurcationHorizon',
+  'modularKnot',
+  // WDW ⊗ ζ suite (all position-only volumetric modes)
+  'constraintSeam',
+  'moebiusNoBoundary',
+  'forcedCell',
+  'turningSurface',
+  'primonMultiverse',
+  'frobeniusWheel',
+  'dewittCone',
+  'selbergSpectrum',
+  'adelicWavefunction',
+  'weilPositivity',
 ])
 
 /** Enforce dimension constraints when switching quantum mode. */
@@ -321,6 +334,11 @@ function applyFirstPreset(
   get: () => ExtendedObjectSlice
 ): void {
   const store = get()
+  // The WDW ⊗ ζ suite shares one generic preset dispatch for all ten modes.
+  if (isWdwZetaMode(mode)) {
+    store.setWdwZetaPreset(mode, presetId)
+    return
+  }
   switch (mode) {
     case 'harmonicOscillator':
       store.setSchroedingerPresetName(presetId as SchroedingerPresetName)
@@ -372,6 +390,11 @@ function applyFirstPreset(
     case 'bifurcationHorizon':
       store.setBifurcationHorizonPreset(
         presetId as import('@/lib/geometry/extended/bifurcationHorizon').BifurcationHorizonPresetName
+      )
+      break
+    case 'modularKnot':
+      store.setModularKnotPreset(
+        presetId as import('@/lib/geometry/extended/modularKnot').ModularKnotPresetName
       )
       break
   }

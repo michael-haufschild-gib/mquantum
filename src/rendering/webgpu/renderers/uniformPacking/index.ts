@@ -40,10 +40,12 @@ import {
   packEntropicTimeShear,
   packHermiteCocycle,
   packHilbertPolya,
+  packModularKnot,
   packQuantumBackreaction,
   packRiemannZeta,
   packSpectralDimensionFlow,
   packVacuumBubbleLens,
+  packWdwZetaVolume,
 } from '../uniformPackingBackreaction'
 import {
   packColorRgba,
@@ -433,6 +435,8 @@ function packVisualFields(
     p.boundingRadius,
     p.quantumModeStr === 'bifurcationHorizon'
   )
+  packModularKnot(floatView, schroedinger, p.quantumModeStr === 'modularKnot')
+  packWdwZetaVolume(floatView, p.quantumModeStr)
 }
 
 /** Pack nodal fields, color algorithm, and cosine palette. */

@@ -13,6 +13,7 @@
  * @module lib/url/applyHorizonModeParams
  */
 
+import { isWdwZetaMode } from '@/lib/geometry/extended/wdwZeta/shared'
 import type { ExtendedObjectState } from '@/stores/scene/extendedObjectStore'
 
 import type { ParsedShareableState } from './state-serializer'
@@ -146,4 +147,49 @@ export function applyBifurcationHorizonParams(
     ext.setBifurcationHorizonDynamicsRate(urlState.bifurcationHorizonDynamicsRate)
   if (urlState.bifurcationHorizonStiffnessTint !== undefined)
     ext.setBifurcationHorizonStiffnessTint(urlState.bifurcationHorizonStiffnessTint)
+}
+
+/**
+ * Apply Modular Knot URL state params.
+ *
+ * Preset first, then raw fields — raw fields cascade `preset` into `custom`
+ * via the individual setters, mirroring the Bifurcation Horizon apply order.
+ */
+export function applyModularKnotParams(
+  urlState: ParsedShareableState,
+  ext: ExtendedObjectState
+): void {
+  if (urlState.modularKnotPreset !== undefined && urlState.modularKnotPreset !== 'custom') {
+    ext.setModularKnotPreset(urlState.modularKnotPreset)
+  }
+  if (urlState.modularKnotGlow !== undefined) ext.setModularKnotGlow(urlState.modularKnotGlow)
+  if (urlState.modularKnotFlow !== undefined) ext.setModularKnotFlow(urlState.modularKnotFlow)
+  if (urlState.modularKnotMaxLen !== undefined) ext.setModularKnotMaxLen(urlState.modularKnotMaxLen)
+  if (urlState.modularKnotGeodesicCount !== undefined)
+    ext.setModularKnotGeodesicCount(urlState.modularKnotGeodesicCount)
+  if (urlState.modularKnotTubeWidth !== undefined)
+    ext.setModularKnotTubeWidth(urlState.modularKnotTubeWidth)
+}
+
+/**
+ * Apply WDW ⊗ ζ suite URL state params for the active suite mode. A non-`custom`
+ * preset wins; otherwise each parsed field value is applied via the generic
+ * `setWdwZetaField` action.
+ *
+ * @param urlState - Parsed shareable state.
+ * @param ext - Extended object store actions.
+ */
+export function applyWdwZetaParams(urlState: ParsedShareableState, ext: ExtendedObjectState): void {
+  const mode = urlState.quantumMode
+  if (!isWdwZetaMode(mode)) return
+  const preset = urlState.wdwZetaPreset?.[mode]
+  if (preset !== undefined && preset !== 'custom') {
+    ext.setWdwZetaPreset(mode, preset)
+    return
+  }
+  const fields = urlState.wdwZeta?.[mode]
+  if (!fields) return
+  for (const [key, value] of Object.entries(fields)) {
+    ext.setWdwZetaField(mode, key, value)
+  }
 }

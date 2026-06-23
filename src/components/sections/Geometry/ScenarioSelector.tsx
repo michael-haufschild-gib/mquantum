@@ -12,30 +12,28 @@ import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
 import { Select } from '@/components/ui/Select'
-import { PAULI_FIELD_VIEW_TO_COLOR_ALGO } from '@/lib/colors/palette/types'
-import type { AdsPresetName, AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
-import type {
-  BifurcationHorizonConfig,
-  BifurcationHorizonPresetName,
-} from '@/lib/geometry/extended/bifurcationHorizon'
+import type { AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
+import type { BifurcationHorizonConfig } from '@/lib/geometry/extended/bifurcationHorizon'
 import { BIFURCATION_HORIZON_SCENARIOS } from '@/lib/geometry/extended/bifurcationHorizon'
-import type {
-  CoherenceHorizonConfig,
-  CoherenceHorizonPresetName,
-} from '@/lib/geometry/extended/coherenceHorizon'
+import type { CoherenceHorizonConfig } from '@/lib/geometry/extended/coherenceHorizon'
 import { COHERENCE_HORIZON_SCENARIOS } from '@/lib/geometry/extended/coherenceHorizon'
-import type { SchroedingerPresetName } from '@/lib/geometry/extended/common'
-import type {
-  HilbertPolyaConfig,
-  HilbertPolyaPresetName,
-} from '@/lib/geometry/extended/hilbertPolya'
+import type { HilbertPolyaConfig } from '@/lib/geometry/extended/hilbertPolya'
 import { HILBERT_POLYA_SCENARIOS } from '@/lib/geometry/extended/hilbertPolya'
-import type { PauliConfig } from '@/lib/geometry/extended/pauli'
-import type { RiemannZetaConfig, RiemannZetaPresetName } from '@/lib/geometry/extended/riemannZeta'
+import type { ModularKnotConfig } from '@/lib/geometry/extended/modularKnot'
+import { MODULAR_KNOT_SCENARIOS } from '@/lib/geometry/extended/modularKnot'
+import type { RiemannZetaConfig } from '@/lib/geometry/extended/riemannZeta'
 import { RIEMANN_ZETA_SCENARIOS } from '@/lib/geometry/extended/riemannZeta'
-import type { HydrogenNDPresetName, SchroedingerConfig } from '@/lib/geometry/extended/schroedinger'
+import type { SchroedingerConfig } from '@/lib/geometry/extended/schroedinger'
 import { getHydrogenNDPresetsWithKeysByDimension } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
+import { isWdwZetaMode } from '@/lib/geometry/extended/wdwZeta/shared'
+import {
+  wdwZetaActiveDescription,
+  wdwZetaActivePreset,
+  wdwZetaPresetOptions,
+} from '@/lib/geometry/extended/wdwZeta/uiRegistry'
+import { getQuantumTypeGroupForKey } from '@/lib/geometry/registry'
+import type { QuantumTypeKey } from '@/lib/geometry/registry/types'
 import { ADS_PRESETS } from '@/lib/physics/antiDeSitter/presets'
 import { BEC_SCENARIO_PRESETS } from '@/lib/physics/bec/presets'
 import { BELL_SCENARIO_PRESETS } from '@/lib/physics/bell/presets'
@@ -49,30 +47,21 @@ import {
   getWdwPresetsForGeometryDimension,
   WDW_SCENARIO_PRESETS,
 } from '@/lib/physics/wheelerDeWitt/presets'
-import { useAppearanceStore } from '@/stores/scene/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
 
+import { dispatchScenarioChange, type ScenarioDispatchActions } from './ScenarioSelector.dispatch'
 import {
   findActiveScenarioPresetId,
   findBellPresetId,
   findPauliPresetId,
 } from './ScenarioSelector.matching'
+import {
+  parseZetaGroupValue,
+  zetaGroupActiveValue,
+  zetaGroupScenarioOptions,
+} from './ScenarioSelector.zetaGroup'
 import { getScenarioPresetOptions as getTdsePresetOptions } from './SchroedingerControls/tdseControlsConstants'
-
-/** Apply a Pauli preset by ID, setting config and color algorithm. */
-function applyPauliPresetById(
-  presetId: string,
-  setPauliConfig: (config: Partial<PauliConfig>) => void
-): void {
-  const preset = PAULI_SCENARIO_PRESETS.find((p) => p.id === presetId)
-  if (!preset) return
-  setPauliConfig({ ...preset.overrides, needsReset: true })
-  const algo = preset.overrides.fieldView
-    ? PAULI_FIELD_VIEW_TO_COLOR_ALGO[preset.overrides.fieldView]
-    : undefined
-  if (algo) useAppearanceStore.getState().setColorAlgorithm(algo)
-}
 
 /* ── Harmonic Oscillator options ───────────────────────────── */
 
@@ -174,6 +163,13 @@ const BIFURCATION_HORIZON_PRESET_OPTIONS = BIFURCATION_HORIZON_SCENARIOS.map((p)
   label: p.label,
 }))
 
+/* ── Modular Knot options ───────────────────────────────────── */
+
+const MODULAR_KNOT_PRESET_OPTIONS = MODULAR_KNOT_SCENARIOS.map((p) => ({
+  value: p.id,
+  label: p.label,
+}))
+
 /* ── HydrogenND options (dimension-grouped, flattened) ─────── */
 
 function getHydrogenNDOptions(dimension: number) {
@@ -241,7 +237,8 @@ function findActiveDescription(
   coherenceHorizon: string | undefined,
   riemannZeta: string | undefined,
   hilbertPolya: string | undefined,
-  bifurcationHorizon: string | undefined
+  bifurcationHorizon: string | undefined,
+  modularKnot: string | undefined
 ): string | null {
   if (mode === 'harmonicOscillator') {
     return ho ? (SCHROEDINGER_NAMED_PRESETS[ho]?.description ?? null) : null
@@ -263,6 +260,9 @@ function findActiveDescription(
   }
   if (mode === 'bifurcationHorizon') {
     return findTaggedScenarioDescription(BIFURCATION_HORIZON_SCENARIOS, bifurcationHorizon)
+  }
+  if (mode === 'modularKnot') {
+    return findTaggedScenarioDescription(MODULAR_KNOT_SCENARIOS, modularKnot)
   }
   const table = ID_PRESET_TABLES[mode]
   if (!table || !activeValue) return null
@@ -290,6 +290,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
     riemannZetaPreset,
     hilbertPolyaPreset,
     bifurcationHorizonPreset,
+    modularKnotPreset,
     pauliSpinor,
     bellPair,
   } = useExtendedObjectStore(
@@ -307,30 +308,16 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       bifurcationHorizonPreset: (
         s.schroedinger.bifurcationHorizon as BifurcationHorizonConfig | undefined
       )?.preset,
+      modularKnotPreset: (s.schroedinger.modularKnot as ModularKnotConfig | undefined)?.preset,
       pauliSpinor: s.pauliSpinor,
       bellPair: s.bellPair,
     }))
   )
 
-  // Store actions (stable references — single batched selector)
-  const {
-    setPresetName,
-    setHydrogenNDPreset,
-    setSchroedingerConfig,
-    applyTdsePreset,
-    applyBecPreset,
-    applyDiracPreset,
-    applyFreeScalarPreset,
-    applyQuantumWalkPreset,
-    applyWheelerDeWittPreset,
-    setPauliConfig,
-    setAdsPreset,
-    setCoherenceHorizonPreset,
-    setRiemannZetaPreset,
-    setHilbertPolyaPreset,
-    setBifurcationHorizonPreset,
-    setBellPairConfig,
-  } = useExtendedObjectStore(
+  // Store actions (stable references — single batched selector). Bundled as
+  // one object that satisfies ScenarioDispatchActions so the per-mode change
+  // dispatch lives in the extracted ScenarioSelector.dispatch module.
+  const actions: ScenarioDispatchActions = useExtendedObjectStore(
     useShallow((s) => ({
       setPresetName: s.setSchroedingerPresetName,
       setHydrogenNDPreset: s.setSchroedingerHydrogenNDPreset,
@@ -347,6 +334,8 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       setRiemannZetaPreset: s.setRiemannZetaPreset,
       setHilbertPolyaPreset: s.setHilbertPolyaPreset,
       setBifurcationHorizonPreset: s.setBifurcationHorizonPreset,
+      setModularKnotPreset: s.setModularKnotPreset,
+      setWdwZetaPreset: s.setWdwZetaPreset,
       setBellPairConfig: s.setBellPairConfig,
     }))
   )
@@ -359,9 +348,15 @@ export const ScenarioSelector: React.FC = React.memo(() => {
   const isPauli = objectType === 'pauliSpinor'
   const isBellPair = objectType === 'bellPair'
   const mode: string = isBellPair ? 'bellPair' : isPauli ? 'pauliSpinor' : quantumMode
+  // When the active mode belongs to a collapsed Types-tab family (Zeta / Prime),
+  // the Scenario dropdown lists EVERY member's presets (a stable whole-type menu)
+  // and selecting one switches sub-type + applies the preset.
+  const group = getQuantumTypeGroupForKey(mode as QuantumTypeKey)
 
   // Build options
   const options = useMemo(() => {
+    if (group) return zetaGroupScenarioOptions(group)
+    if (isWdwZetaMode(mode)) return wdwZetaPresetOptions(mode)
     switch (mode) {
       case 'harmonicOscillator':
         return HO_PRESET_OPTIONS
@@ -395,36 +390,34 @@ export const ScenarioSelector: React.FC = React.memo(() => {
         return HILBERT_POLYA_PRESET_OPTIONS
       case 'bifurcationHorizon':
         return BIFURCATION_HORIZON_PRESET_OPTIONS
+      case 'modularKnot':
+        return MODULAR_KNOT_PRESET_OPTIONS
       default:
         return null
     }
-  }, [mode, dimension])
+  }, [mode, dimension, group])
 
-  // Derive the active preset value from store state.
-  const activeValue = useMemo(() => {
+  // Derive the active preset value from store state (per active sub-mode).
+  const perModeActiveValue = useMemo(() => {
+    if (isWdwZetaMode(mode)) return wdwZetaActivePreset(schroedinger, mode)
+    // Tagged-preset modes all normalize the same way (custom/undefined → '').
+    const tagged: Partial<Record<string, string | undefined>> = {
+      antiDeSitter: adsPreset,
+      coherenceHorizon: coherenceHorizonPreset,
+      riemannZeta: riemannZetaPreset,
+      hilbertPolya: hilbertPolyaPreset,
+      bifurcationHorizon: bifurcationHorizonPreset,
+      modularKnot: modularKnotPreset,
+    }
+    if (mode in tagged) {
+      const v = tagged[mode]
+      return v === undefined || v === 'custom' ? '' : v
+    }
     switch (mode) {
       case 'harmonicOscillator':
         return presetName === 'custom' ? '' : (presetName ?? '')
       case 'hydrogenND':
         return hydrogenNDPreset === 'custom' ? '' : (hydrogenNDPreset ?? '')
-      case 'antiDeSitter':
-        return adsPreset === 'custom' || adsPreset === undefined ? '' : adsPreset
-      case 'coherenceHorizon':
-        return coherenceHorizonPreset === 'custom' || coherenceHorizonPreset === undefined
-          ? ''
-          : coherenceHorizonPreset
-      case 'riemannZeta':
-        return riemannZetaPreset === 'custom' || riemannZetaPreset === undefined
-          ? ''
-          : riemannZetaPreset
-      case 'hilbertPolya':
-        return hilbertPolyaPreset === 'custom' || hilbertPolyaPreset === undefined
-          ? ''
-          : hilbertPolyaPreset
-      case 'bifurcationHorizon':
-        return bifurcationHorizonPreset === 'custom' || bifurcationHorizonPreset === undefined
-          ? ''
-          : bifurcationHorizonPreset
       case 'pauliSpinor':
         return findPauliPresetId(pauliSpinor) ?? ''
       case 'bellPair':
@@ -447,11 +440,15 @@ export const ScenarioSelector: React.FC = React.memo(() => {
     riemannZetaPreset,
     hilbertPolyaPreset,
     bifurcationHorizonPreset,
+    modularKnotPreset,
     pauliSpinor,
     bellPair,
     schroedinger,
     dimension,
   ])
+
+  // For a grouped type the dropdown value encodes `subMode::presetId`.
+  const activeValue = group ? zetaGroupActiveValue(mode, perModeActiveValue) : perModeActiveValue
 
   const selectOptions = useMemo(() => {
     if (!options || activeValue !== '') return options
@@ -460,20 +457,23 @@ export const ScenarioSelector: React.FC = React.memo(() => {
 
   const activeDescription = useMemo(
     () =>
-      findActiveDescription(
-        mode,
-        activeValue,
-        presetName ?? '',
-        hydrogenNDPreset ?? '',
-        adsPreset,
-        coherenceHorizonPreset,
-        riemannZetaPreset,
-        hilbertPolyaPreset,
-        bifurcationHorizonPreset
-      ),
+      isWdwZetaMode(mode)
+        ? wdwZetaActiveDescription(schroedinger, mode)
+        : findActiveDescription(
+            mode,
+            perModeActiveValue,
+            presetName ?? '',
+            hydrogenNDPreset ?? '',
+            adsPreset,
+            coherenceHorizonPreset,
+            riemannZetaPreset,
+            hilbertPolyaPreset,
+            bifurcationHorizonPreset,
+            modularKnotPreset
+          ),
     [
       mode,
-      activeValue,
+      perModeActiveValue,
       presetName,
       hydrogenNDPreset,
       adsPreset,
@@ -481,95 +481,31 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       riemannZetaPreset,
       hilbertPolyaPreset,
       bifurcationHorizonPreset,
+      modularKnotPreset,
+      schroedinger,
     ]
   )
 
-  // Dispatch change to the correct store action
+  // Dispatch change to the correct store action (logic lives in the extracted
+  // ScenarioSelector.dispatch module to keep this file within the line budget).
   const handleChange = useCallback(
     (value: string) => {
       if (!value) return
-      switch (mode) {
-        case 'harmonicOscillator':
-          setPresetName(value as SchroedingerPresetName)
-          break
-        case 'hydrogenND':
-          setHydrogenNDPreset(value as HydrogenNDPresetName)
-          break
-        case 'hydrogenNDCoupled': {
-          const preset = HYDROGEN_COUPLED_PRESETS.find((p) => p.id === value)
-          if (preset) setSchroedingerConfig(preset.overrides)
-          break
+      if (group) {
+        const sel = parseZetaGroupValue(value)
+        if (!sel) return
+        // Trigger the owning sub-type, then apply its preset (both synchronous).
+        if (sel.memberKey !== quantumMode) {
+          useExtendedObjectStore
+            .getState()
+            .setSchroedingerQuantumMode(sel.memberKey as SchroedingerConfig['quantumMode'])
         }
-        case 'tdseDynamics':
-          void applyTdsePreset(value, { expectedQuantumMode: mode })
-          break
-        case 'becDynamics':
-          void applyBecPreset(value, { expectedQuantumMode: mode })
-          break
-        case 'diracEquation':
-          // applyDiracPreset internally syncs color algorithm for fieldViews like
-          // 'particleAntiparticleSplit' that require a specific color algo.
-          void applyDiracPreset(value, { expectedQuantumMode: mode })
-          break
-        case 'freeScalarField':
-          void applyFreeScalarPreset(value, { expectedQuantumMode: mode })
-          break
-        case 'quantumWalk':
-          void applyQuantumWalkPreset(value, { expectedQuantumMode: mode })
-          break
-        case 'wheelerDeWitt':
-          void applyWheelerDeWittPreset(value, { expectedQuantumMode: mode })
-          break
-        case 'pauliSpinor':
-          applyPauliPresetById(value, setPauliConfig)
-          break
-        case 'bellPair': {
-          const preset = BELL_SCENARIO_PRESETS.find((p) => p.id === value)
-          if (preset) setBellPairConfig({ ...preset.overrides, needsReset: true })
-          break
-        }
-        case 'antiDeSitter':
-          setAdsPreset(value as AdsPresetName)
-          {
-            const preset = ADS_PRESETS.find((p) => p.id === value)
-            if (preset?.colorAlgorithm) {
-              useAppearanceStore.getState().setColorAlgorithm(preset.colorAlgorithm)
-            }
-          }
-          break
-        case 'coherenceHorizon':
-          setCoherenceHorizonPreset(value as CoherenceHorizonPresetName)
-          break
-        case 'riemannZeta':
-          setRiemannZetaPreset(value as RiemannZetaPresetName)
-          break
-        case 'hilbertPolya':
-          setHilbertPolyaPreset(value as HilbertPolyaPresetName)
-          break
-        case 'bifurcationHorizon':
-          setBifurcationHorizonPreset(value as BifurcationHorizonPresetName)
-          break
+        dispatchScenarioChange(sel.memberKey, sel.presetId, actions)
+        return
       }
+      dispatchScenarioChange(mode, value, actions)
     },
-    [
-      mode,
-      setPresetName,
-      setHydrogenNDPreset,
-      setSchroedingerConfig,
-      applyTdsePreset,
-      applyBecPreset,
-      applyDiracPreset,
-      applyFreeScalarPreset,
-      applyQuantumWalkPreset,
-      applyWheelerDeWittPreset,
-      setPauliConfig,
-      setAdsPreset,
-      setCoherenceHorizonPreset,
-      setRiemannZetaPreset,
-      setHilbertPolyaPreset,
-      setBifurcationHorizonPreset,
-      setBellPairConfig,
-    ]
+    [group, mode, quantumMode, actions]
   )
 
   // No presets for this mode

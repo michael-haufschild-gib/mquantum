@@ -53,6 +53,18 @@ const FIRST_PRESET_IDS = {
   riemannZeta: 'hilbertPolyaShells',
   hilbertPolya: 'criticalPlane',
   bifurcationHorizon: 'eternalThroat',
+  modularKnot: 'rademacherTangle',
+  constraintSeam: 'completedState',
+  moebiusNoBoundary: 'modularMandala',
+  forcedCell: 'berryKeating',
+  turningSurface: 'airyFold',
+  primonMultiverse: 'coldGas',
+  frobeniusWheel: 'ellipticCurve',
+  dewittCone: 'nullCone',
+  selbergSpectrum: 'lengthSpectrum',
+  adelicWavefunction: 'fullForest',
+  weilPositivity: 'positiveBasin',
+  fieldOneElement: 'cyclotomicTower',
   bellTest: 'canonicalCHSH',
 } as const
 
@@ -99,6 +111,18 @@ const PRESET_RESOLVERS: Readonly<Record<QuantumTypeKey, FirstPresetResolver>> = 
   hilbertPolya: (dimension) => (dimension >= 3 ? FIRST_PRESET_IDS.hilbertPolya : undefined),
   bifurcationHorizon: (dimension) =>
     dimension >= 3 ? FIRST_PRESET_IDS.bifurcationHorizon : undefined,
+  modularKnot: (dimension) => (dimension >= 3 ? FIRST_PRESET_IDS.modularKnot : undefined),
+  constraintSeam: (dimension) => (dimension >= 3 ? FIRST_PRESET_IDS.constraintSeam : undefined),
+  moebiusNoBoundary: (d) => (d >= 3 ? FIRST_PRESET_IDS.moebiusNoBoundary : undefined),
+  forcedCell: (d) => (d >= 3 ? FIRST_PRESET_IDS.forcedCell : undefined),
+  turningSurface: (d) => (d >= 3 ? FIRST_PRESET_IDS.turningSurface : undefined),
+  primonMultiverse: (d) => (d >= 3 ? FIRST_PRESET_IDS.primonMultiverse : undefined),
+  frobeniusWheel: (d) => (d >= 3 ? FIRST_PRESET_IDS.frobeniusWheel : undefined),
+  dewittCone: (d) => (d >= 3 ? FIRST_PRESET_IDS.dewittCone : undefined),
+  selbergSpectrum: (d) => (d >= 3 ? FIRST_PRESET_IDS.selbergSpectrum : undefined),
+  adelicWavefunction: (d) => (d >= 3 ? FIRST_PRESET_IDS.adelicWavefunction : undefined),
+  weilPositivity: (d) => (d >= 3 ? FIRST_PRESET_IDS.weilPositivity : undefined),
+  fieldOneElement: (d) => (d >= 3 ? FIRST_PRESET_IDS.fieldOneElement : undefined),
   bellTest: () => FIRST_PRESET_IDS.bellTest,
 }
 

@@ -12,7 +12,8 @@ import { Section } from '@/components/sections/Section'
 import { Slider } from '@/components/ui/Slider'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
-import { supportsSchroedingerSurfaceMode } from '@/lib/geometry/registry'
+import { isWdwZetaMode } from '@/lib/geometry/extended/wdwZeta/shared'
+import { isGroupedQuantumType, supportsSchroedingerSurfaceMode } from '@/lib/geometry/registry'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
 
@@ -27,6 +28,7 @@ import { HilbertPolyaControls } from './HilbertPolyaControls'
 import { HydrogenNDControls } from './HydrogenNDControls'
 import { HydrogenNDCoupledControls } from './HydrogenNDCoupledControls'
 import { KKCompactificationSection } from './KKCompactificationSection'
+import { ModularKnotControls } from './ModularKnotControls'
 import { QuantumWalkControls } from './QuantumWalkControls'
 import { RiemannZetaControls } from './RiemannZetaControls'
 import { TDSEControls } from './TDSEControls'
@@ -40,8 +42,10 @@ import type {
   TdseActions,
 } from './types'
 import { useSchroedingerActions } from './useSchroedingerActions'
+import { WdwZetaControls } from './WdwZetaControls'
 import { WheelerDeWittControls } from './WheelerDeWittControls'
 import { WignerControls } from './WignerControls'
+import { ZetaModeSelector } from './ZetaModeSelector'
 
 /**
  * Props for the SchroedingerControls component.
@@ -65,6 +69,8 @@ interface ModeControlsProps {
 
 /** Dispatch the per-mode controls block by quantum mode. */
 function renderModeControls(p: ModeControlsProps): React.ReactNode {
+  // The WDW ⊗ ζ suite shares one controls dispatcher for all ten modes.
+  if (isWdwZetaMode(p.config.quantumMode)) return <WdwZetaControls />
   switch (p.config.quantumMode) {
     case 'harmonicOscillator':
       return (
@@ -84,6 +90,8 @@ function renderModeControls(p: ModeControlsProps): React.ReactNode {
       return <HilbertPolyaControls />
     case 'bifurcationHorizon':
       return <BifurcationHorizonControls />
+    case 'modularKnot':
+      return <ModularKnotControls />
     case 'wheelerDeWitt':
       return <WheelerDeWittControls />
     case 'quantumWalk':
@@ -188,6 +196,11 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
     const isRiemannZeta = mode === 'riemannZeta'
     const isHilbertPolya = mode === 'hilbertPolya'
     const isBifurcationHorizon = mode === 'bifurcationHorizon'
+    const isModularKnot = mode === 'modularKnot'
+    const isWdwZeta = isWdwZetaMode(mode)
+    // Members of a collapsed Types-tab family (Zeta / Prime) show a sub-mode
+    // toggle row at the top of their quantum-state controls.
+    const isGrouped = isGroupedQuantumType(mode)
 
     return (
       <div className={className} data-testid="schroedinger-controls">
@@ -203,7 +216,9 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
           !isCoherenceHorizon &&
           !isRiemannZeta &&
           !isHilbertPolya &&
-          !isBifurcationHorizon && (
+          !isBifurcationHorizon &&
+          !isModularKnot &&
+          !isWdwZeta && (
             <Section title="Representation" defaultOpen={true}>
               <div className="space-y-3">
                 <ToggleGroup
@@ -290,6 +305,11 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
           }
           defaultOpen={true}
         >
+          {isGrouped && (
+            <div className="mb-3">
+              <ZetaModeSelector />
+            </div>
+          )}
           {renderModeControls({
             config,
             dimension,

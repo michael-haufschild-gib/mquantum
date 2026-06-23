@@ -130,6 +130,23 @@ export function buildBindGroupBlock(opts: {
    * quantum mode, so the declarations never collide.
    */
   isBifurcationHorizon?: boolean
+  /**
+   * Modular Knot 3D RGBA volume texture (binding 2) + linear sampler
+   * (binding 3) at group 2. Unlike the other horizon modes (which bind a
+   * storage buffer at binding 2), this mode binds a 3D texture + sampler.
+   * Mutually exclusive with the Wigner cache (which uses binding 2/3) and the
+   * horizon LUT storage buffers — modularKnot forces Wigner off and is a
+   * distinct quantum mode, so the declarations never collide.
+   */
+  isModularKnot?: boolean
+  /**
+   * WDW ⊗ ζ suite CPU-baked RGBA volume (binding 2) + linear sampler (binding 3)
+   * at group 2 — the same 3D-texture layout as Modular Knot, shared by all ten
+   * suite modes. Mutually exclusive with the Wigner cache and the horizon LUT
+   * storage buffers (the suite forces Wigner off and is a distinct quantum mode,
+   * so the declarations never collide).
+   */
+  isWdwZetaVolume?: boolean
 }): string {
   return (
     schroedingerUniformsBlock +
@@ -166,6 +183,27 @@ export function buildBindGroupBlock(opts: {
 // per cell, index (it*BH_NU + iu) (row-major in t, column u fastest), generated
 // on the CPU by BifurcationHorizonStrategy.
 @group(2) @binding(2) var<storage, read> bifurcationLut: array<vec4f>;`
+      : '') +
+    (opts.isModularKnot
+      ? '\n' +
+        /* wgsl */ `
+// Modular Knot CPU-baked RGBA volume (RGB = diverging Rademacher-Φ color,
+// A = density) + linear sampler, owned by ModularKnotStrategy. Unlike the other
+// horizon modes this is a 3D texture + sampler (bindings 2 & 3), not a storage
+// buffer.
+@group(2) @binding(2) var modularKnotVolume: texture_3d<f32>;
+@group(2) @binding(3) var modularKnotSampler: sampler;`
+      : '') +
+    (opts.isWdwZetaVolume
+      ? '\n' +
+        /* wgsl */ `
+// WDW ⊗ ζ suite ζ-LUT: a compact read-only storage buffer (group 2, binding 2)
+// owned by WdwZetaVolumeStrategy and shared by all ten suite modes. Entry 0 is a
+// per-mode scalar header (item counts + physics knobs); entries 1.. carry the
+// irreducible precomputed math (ζ-zero ordinates, primon occupations, WKB action
+// samples …). The shader synthesizes the lit 3D form LIVE from this LUT — there
+// is no baked image. Layout contract: see mainWdwZetaVolume / wdwZetaLib.
+@group(2) @binding(2) var<storage, read> wdwZetaLut: array<vec4f>;`
       : '') +
     (opts.useDensityGrid ? '\n' + generateDensityGridFragmentBindings(4) : '') +
     (opts.freeScalarAnalysis ? '\n' + generateAnalysisTextureBindings(6) : '') +

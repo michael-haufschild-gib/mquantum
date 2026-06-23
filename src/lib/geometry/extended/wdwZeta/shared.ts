@@ -1,0 +1,56 @@
+/**
+ * Shared scaffolding for the WDW ⊗ ζ visualization-suite mode configs.
+ *
+ * The ten suite modes (`constraintSeam`, `moebiusNoBoundary`, `forcedCell`,
+ * `turningSurface`, `primonMultiverse`, `frobeniusWheel`, `dewittCone`,
+ * `selbergSpectrum`, `adelicWavefunction`, `weilPositivity`) each own a lean
+ * config (most render knobs — emission, rotation — are shared and live in the
+ * Advanced ▸ "Emission & Rim" control and the animation turntable, NOT here).
+ * This module holds the small types every mode reuses.
+ *
+ * @module lib/geometry/extended/wdwZeta/shared
+ */
+
+/** The eleven quantum-mode keys of the WDW ⊗ ζ suite. */
+export type WdwZetaModeKey =
+  | 'constraintSeam'
+  | 'moebiusNoBoundary'
+  | 'forcedCell'
+  | 'turningSurface'
+  | 'primonMultiverse'
+  | 'frobeniusWheel'
+  | 'dewittCone'
+  | 'selbergSpectrum'
+  | 'adelicWavefunction'
+  | 'weilPositivity'
+  | 'fieldOneElement'
+
+/** The set of suite mode keys (for cross-cutting gating: color/iso/analysis). */
+export const WDW_ZETA_MODES: ReadonlySet<WdwZetaModeKey> = new Set([
+  'constraintSeam',
+  'moebiusNoBoundary',
+  'forcedCell',
+  'turningSurface',
+  'primonMultiverse',
+  'frobeniusWheel',
+  'dewittCone',
+  'selbergSpectrum',
+  'adelicWavefunction',
+  'weilPositivity',
+  'fieldOneElement',
+])
+
+/** True when `mode` is one of the WDW ⊗ ζ suite modes. */
+export function isWdwZetaMode(mode: string | undefined): mode is WdwZetaModeKey {
+  return mode !== undefined && WDW_ZETA_MODES.has(mode as WdwZetaModeKey)
+}
+
+/** One scenario preset shown in the shared ScenarioSelector dropdown. */
+export interface WdwZetaScenario<Id extends string = string> {
+  /** Preset id (matches a key in the mode's PRESETS map). */
+  id: Id
+  /** Human-readable label. */
+  label: string
+  /** One-paragraph description shown beneath the dropdown. */
+  description: string
+}

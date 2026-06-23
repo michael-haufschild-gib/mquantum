@@ -42,7 +42,9 @@ import { createFreeScalarSetters, resizeFreeScalarArrays } from './setters/freeS
 import { createBifurcationHorizonSetters } from './setters/horizonModes/bifurcationHorizonSetters'
 import { createCoherenceHorizonSetters } from './setters/horizonModes/coherenceHorizonSetters'
 import { createHilbertPolyaSetters } from './setters/horizonModes/hilbertPolyaSetters'
+import { createModularKnotSetters } from './setters/horizonModes/modularKnotSetters'
 import { createRiemannZetaSetters } from './setters/horizonModes/riemannZetaSetters'
+import { createWdwZetaSetters } from './setters/horizonModes/wdwZetaSetters'
 import { createOpenQuantumSetters } from './setters/openQuantumSetters'
 import { createQuantumModeSetters } from './setters/quantumModeSetters'
 import { createQuantumWalkSetters } from './setters/quantumWalkSetters'
@@ -379,6 +381,8 @@ export const createSchroedingerSlice: StateCreator<
     ...createRiemannZetaSetters(ctx),
     ...createHilbertPolyaSetters(ctx),
     ...createBifurcationHorizonSetters(ctx),
+    ...createModularKnotSetters(ctx),
+    ...createWdwZetaSetters(ctx),
 
     // === Quantum Walk ===
     ...createQuantumWalkSetters(ctx),

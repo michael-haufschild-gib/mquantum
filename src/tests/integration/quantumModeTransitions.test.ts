@@ -53,6 +53,18 @@ describe('quantum mode state machine transitions', () => {
         'riemannZeta',
         'hilbertPolya',
         'bifurcationHorizon',
+        'modularKnot',
+        'constraintSeam',
+        'moebiusNoBoundary',
+        'forcedCell',
+        'turningSurface',
+        'primonMultiverse',
+        'frobeniusWheel',
+        'dewittCone',
+        'selbergSpectrum',
+        'adelicWavefunction',
+        'weilPositivity',
+        'fieldOneElement',
       ])
       expect(COMPUTE_MODES).toEqual([
         'freeScalarField',

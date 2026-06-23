@@ -33,12 +33,36 @@ import type { FreeScalarConfig } from './freeScalar'
 import { DEFAULT_FREE_SCALAR_CONFIG } from './freeScalar'
 import type { HilbertPolyaConfig } from './hilbertPolya'
 import { DEFAULT_HILBERT_POLYA_CONFIG } from './hilbertPolya'
+import type { ModularKnotConfig } from './modularKnot'
+import { DEFAULT_MODULAR_KNOT_CONFIG } from './modularKnot'
 import type { QuantumWalkConfig } from './quantumWalk'
 import { DEFAULT_QUANTUM_WALK_CONFIG } from './quantumWalk'
 import type { RiemannZetaConfig } from './riemannZeta'
 import { DEFAULT_RIEMANN_ZETA_CONFIG } from './riemannZeta'
 import type { TdseConfig } from './tdse'
 import { DEFAULT_TDSE_CONFIG } from './tdse'
+import type { AdelicWavefunctionConfig } from './wdwZeta/adelicWavefunction'
+import { DEFAULT_ADELIC_WAVEFUNCTION_CONFIG } from './wdwZeta/adelicWavefunction'
+import type { ConstraintSeamConfig } from './wdwZeta/constraintSeam'
+import { DEFAULT_CONSTRAINT_SEAM_CONFIG } from './wdwZeta/constraintSeam'
+import type { DewittConeConfig } from './wdwZeta/dewittCone'
+import { DEFAULT_DEWITT_CONE_CONFIG } from './wdwZeta/dewittCone'
+import type { FieldOneElementConfig } from './wdwZeta/fieldOneElement'
+import { DEFAULT_FIELD_ONE_ELEMENT_CONFIG } from './wdwZeta/fieldOneElement'
+import type { ForcedCellConfig } from './wdwZeta/forcedCell'
+import { DEFAULT_FORCED_CELL_CONFIG } from './wdwZeta/forcedCell'
+import type { FrobeniusWheelConfig } from './wdwZeta/frobeniusWheel'
+import { DEFAULT_FROBENIUS_WHEEL_CONFIG } from './wdwZeta/frobeniusWheel'
+import type { MoebiusNoBoundaryConfig } from './wdwZeta/moebiusNoBoundary'
+import { DEFAULT_MOEBIUS_NO_BOUNDARY_CONFIG } from './wdwZeta/moebiusNoBoundary'
+import type { PrimonMultiverseConfig } from './wdwZeta/primonMultiverse'
+import { DEFAULT_PRIMON_MULTIVERSE_CONFIG } from './wdwZeta/primonMultiverse'
+import type { SelbergSpectrumConfig } from './wdwZeta/selbergSpectrum'
+import { DEFAULT_SELBERG_SPECTRUM_CONFIG } from './wdwZeta/selbergSpectrum'
+import type { TurningSurfaceConfig } from './wdwZeta/turningSurface'
+import { DEFAULT_TURNING_SURFACE_CONFIG } from './wdwZeta/turningSurface'
+import type { WeilPositivityConfig } from './wdwZeta/weilPositivity'
+import { DEFAULT_WEIL_POSITIVITY_CONFIG } from './wdwZeta/weilPositivity'
 import type { WheelerDeWittConfig } from './wheelerDeWitt'
 import { DEFAULT_WHEELER_DEWITT_CONFIG } from './wheelerDeWitt'
 
@@ -655,6 +679,34 @@ export interface SchroedingerConfig
   /** Kruskal eternal-black-hole / ERB-throat configuration for the critical strip. */
   bifurcationHorizon: BifurcationHorizonConfig
 
+  // === Modular Knot Configuration (when quantumMode === 'modularKnot') ===
+  /** Modular geodesics knotted around the trefoil, colored by Rademacher Φ. */
+  modularKnot: ModularKnotConfig
+
+  // === WDW ⊗ ζ suite configs (one per suite mode) ===
+  /** The Constraint Seam — completed ξ folded about Re s=½, zeros pinned. */
+  constraintSeam: ConstraintSeamConfig
+  /** The Möbius No-Boundary Sum — Hartle–Hawking modular tessellation. */
+  moebiusNoBoundary: MoebiusNoBoundaryConfig
+  /** The Forced Cell — Berry–Keating xp Planck-cell lattice. */
+  forcedCell: ForcedCellConfig
+  /** The Turning Surface — minisuperspace Airy caustic + explicit formula. */
+  turningSurface: TurningSurfaceConfig
+  /** The Third-Quantized Multiverse — primon gas at the Hagedorn point. */
+  primonMultiverse: PrimonMultiverseConfig
+  /** The Frobenius Wheel — Deligne purity weight-shells. */
+  frobeniusWheel: FrobeniusWheelConfig
+  /** The DeWitt Null Cone — supermetric mass-shell + ζ-zero rings. */
+  dewittCone: DewittConeConfig
+  /** The Selberg Length Spectrum — hyperbolic surface + closed geodesics. */
+  selbergSpectrum: SelbergSpectrumConfig
+  /** The Adelic Wavefunction — p-adic Bruhat–Tits tree forest. */
+  adelicWavefunction: AdelicWavefunctionConfig
+  /** The Ghost Sector — Weil positivity Q_W, κ₋. */
+  weilPositivity: WeilPositivityConfig
+  /** The Field With One Element 𝔽₁ — cyclotomic spire of roots of unity. */
+  fieldOneElement: FieldOneElementConfig
+
   // === N-D Basis Vectors (for free scalar field and TDSE) ===
   /** Basis vector for X axis in N-dimensional space */
   basisX: Float32Array
@@ -932,6 +984,18 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   riemannZeta: DEFAULT_RIEMANN_ZETA_CONFIG,
   hilbertPolya: DEFAULT_HILBERT_POLYA_CONFIG,
   bifurcationHorizon: DEFAULT_BIFURCATION_HORIZON_CONFIG,
+  modularKnot: DEFAULT_MODULAR_KNOT_CONFIG,
+  constraintSeam: DEFAULT_CONSTRAINT_SEAM_CONFIG,
+  moebiusNoBoundary: DEFAULT_MOEBIUS_NO_BOUNDARY_CONFIG,
+  forcedCell: DEFAULT_FORCED_CELL_CONFIG,
+  turningSurface: DEFAULT_TURNING_SURFACE_CONFIG,
+  primonMultiverse: DEFAULT_PRIMON_MULTIVERSE_CONFIG,
+  frobeniusWheel: DEFAULT_FROBENIUS_WHEEL_CONFIG,
+  dewittCone: DEFAULT_DEWITT_CONE_CONFIG,
+  selbergSpectrum: DEFAULT_SELBERG_SPECTRUM_CONFIG,
+  adelicWavefunction: DEFAULT_ADELIC_WAVEFUNCTION_CONFIG,
+  weilPositivity: DEFAULT_WEIL_POSITIVITY_CONFIG,
+  fieldOneElement: DEFAULT_FIELD_ONE_ELEMENT_CONFIG,
 
   // N-D Basis Vectors
   basisX: new Float32Array([1, 0, 0]),

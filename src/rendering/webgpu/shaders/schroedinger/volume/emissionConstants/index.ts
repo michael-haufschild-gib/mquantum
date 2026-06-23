@@ -37,6 +37,23 @@ export const COLOR_ALG_NAMES: Record<number, string> = {
   26: 'Pauli Coherence',
   27: 'Quantum Potential Q(x) (Bohmian)',
   28: 'Vortex Density (topological charge)',
+  // WDW ⊗ ζ suite — 4 shared measure-based algorithms (number-theoretic)
+  29: 'ζ-Zero Count N(t)',
+  30: 'Chebyshev ψ(x)',
+  31: 'Mertens M(x)',
+  32: 'Explicit-Formula Wave',
+  // WDW ⊗ ζ suite — 10 mode-specific algorithms
+  33: 'ξ Phase Carpet',
+  34: 'Möbius Triad (μ)',
+  35: 'Dilation xp Flow',
+  36: 'WKB Action Fringes',
+  37: 'Bose Occupation Heat',
+  38: 'Purity Shells q^{w/2}',
+  39: 'Causal Redshift',
+  40: 'Geodesic Length Spectrum',
+  41: 'p-adic Valuation',
+  42: 'Li Positivity Sign',
+  43: 'Cyclotomic φ(n)',
 }
 
 /** Numeric shader color algorithm indices, sorted for validation walkers. */
