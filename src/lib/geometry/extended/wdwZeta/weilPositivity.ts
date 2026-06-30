@@ -29,6 +29,7 @@ export type WeilPositivityPresetName =
   | 'vacuumCore'
   | 'steepForm'
   | 'denseSpectrum'
+  | 'positivityBall4D'
   | 'custom'
 
 /**
@@ -135,6 +136,16 @@ export const WEIL_POSITIVITY_PRESETS: Readonly<
     ringGain: 0.5,
     kahlerMix: 0,
   },
+  /** 4D positivity ball (dimension 4): the positive basin as a 4D paraboloid, no ghost. */
+  positivityBall4D: {
+    zeroCount: 16,
+    primeWeight: 0.45,
+    offLineZero: false,
+    offLineOffset: 0.45,
+    bowlCurve: 0.42,
+    ringGain: 0.4,
+    kahlerMix: 0,
+  },
 }
 
 /** Ordered scenario list for the shared ScenarioSelector. */
@@ -170,5 +181,13 @@ export const WEIL_POSITIVITY_SCENARIOS: readonly WdwZetaScenario<
     label: 'Dense Spectrum',
     description:
       'Thirty-two zeros summed into the oscillation term corrugate the positive basin into a finely rippled bowl. Even with the densest spectrum the floor never dips below zero — the positivity is rigid, not coincidental. The prime term carves the deepest warm troughs without ever breaking through.',
+  },
+  {
+    id: 'positivityBall4D',
+    label: '4D Positivity Ball',
+    description:
+      "Weil's positivity in four dimensions. The quadratic form Q_W is radial — the Li coefficients λ_n indexed by distance from the centre — so in 4D it becomes a paraboloid over a full 3-ball, its λ_n positivity contours nested 2-spheres. RH ⟺ Q_W ⪰ 0 now reads across an entire 4-dimensional basin: rotating the Z–W plane sweeps the slice through the bowl, and (were an off-line zero injected) the violet ghost well would carve a hole on a sphere rather than a ring. Opens at dimension 4.",
+    dimension: 4,
+    rotation: { ZW: 0.6 },
   },
 ]

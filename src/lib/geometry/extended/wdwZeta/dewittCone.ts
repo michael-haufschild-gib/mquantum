@@ -27,6 +27,7 @@ export type DewittConePresetName =
   | 'btzThroat'
   | 'lightconeFan'
   | 'helicalBranches'
+  | 'lightCone4D'
   | 'custom'
 
 /**
@@ -133,6 +134,15 @@ export const DEWITT_CONE_PRESETS: Readonly<
     fanCount: 1,
     warp: 0.85,
   },
+  /** 4D light-cone (dimension 4): the double null cone opened to a second spacelike axis. */
+  lightCone4D: {
+    coneSlope: 0.8,
+    ringCount: 12,
+    branchTint: 0.85,
+    horizon: 0,
+    fanCount: 1,
+    warp: 0,
+  },
 }
 
 /** Ordered scenario list for the shared ScenarioSelector. */
@@ -174,5 +184,13 @@ export const DEWITT_CONE_SCENARIOS: readonly WdwZetaScenario<
     label: 'Helical Branches',
     description:
       'The latitude rings twisted into standing helices: the ζ-zero standing wave given an azimuthal warp so each ring winds as it climbs the cone. A faint horizon glimmers at the throat. The spectrum is unchanged — the heights are still the Riemann ordinates — but the wave now spirals around the timelike axis.',
+  },
+  {
+    id: 'lightCone4D',
+    label: '4D Light-Cone',
+    description:
+      'The indefinite DeWitt supermetric is Lorentzian — its cone is a genuine light-cone of superspace. In 3D the spatial spread is one radius; in 4D a second spacelike axis joins it, so the double null cone becomes a true 4D light-cone whose 3-slices are nested hyperboloids of expansion and contraction. Rotating the Z–W plane sweeps the visible slice through the cone — the causal structure of the wavefunction of the universe read across the fourth dimension. Opens at dimension 4.',
+    dimension: 4,
+    rotation: { ZW: 0.6 },
   },
 ]

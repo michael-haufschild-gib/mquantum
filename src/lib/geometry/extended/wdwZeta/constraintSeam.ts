@@ -23,6 +23,7 @@ export type ConstraintSeamPresetName =
   | 'quantumCarpet'
   | 'ghostSector'
   | 'deepStrip'
+  | 'hyperSeam4D'
   | 'custom'
 
 /**
@@ -127,6 +128,20 @@ export const CONSTRAINT_SEAM_PRESETS: Readonly<
     carpetGain: 0,
     domainShade: true,
   },
+  /**
+   * 4D hyper-seam (dimension 4). A wide σ-band so the off-line |ξ| walls read,
+   * and the phase portrait on, so as the slice tilts into W the mirror canyon is
+   * seen to be a rotationally-symmetric well in the (σ, W) plane.
+   */
+  hyperSeam4D: {
+    heightWindow: 55,
+    reliefHeight: 0.62,
+    ghostSector: false,
+    ghostOffset: 0.2,
+    stripBand: 0.34,
+    carpetGain: 0,
+    domainShade: true,
+  },
 }
 
 /** Ordered scenario list for the shared ScenarioSelector. */
@@ -162,5 +177,13 @@ export const CONSTRAINT_SEAM_SCENARIOS: readonly WdwZetaScenario<
     label: 'Deep Strip',
     description:
       'A tall window of the critical strip (ordinate up to ≈ 78): the rigid ladder of the first ~25 zeros climbing the seam, each a pinned pit. The mirror symmetry holds at every height — the relief has no freedom to be otherwise.',
+  },
+  {
+    id: 'hyperSeam4D',
+    label: 'Zero Colonnade (4D)',
+    description:
+      'At dimension 4 the seam relief erupts into a colonnade of light. Each glowing column is a non-trivial Riemann zero, pinned to the seam σ = ½ where the phase arg ξ winds once around it; the columns lean and twist along the fourth axis w. One pillar per zero and none off the line — the Riemann Hypothesis rendered as a forced cathedral, the relief beneath domain-coloured by arg ξ. Rotate an X–W or Z–W plane to sweep the colonnade through the fourth dimension. Opens at dimension 4.',
+    dimension: 4,
+    rotation: { XW: 0.7 },
   },
 ]

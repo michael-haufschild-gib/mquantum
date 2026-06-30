@@ -29,6 +29,7 @@ export type MoebiusNoBoundaryPresetName =
   | 'tunnelingSpike'
   | 'deepCusp'
   | 'flatSlab'
+  | 'modularBall4D'
   | 'custom'
 
 /**
@@ -110,6 +111,18 @@ export const MOEBIUS_NO_BOUNDARY_PRESETS: Readonly<
     curvature: 0.8,
     tunnelMix: 0,
   },
+  /**
+   * 4D Poincaré ball (dimension 4). A gentle dome and deep cutoff so, as the
+   * slice tilts into W, the disk is seen to be the equator of a hyperbolic
+   * 3-ball filled with the modular tiling.
+   */
+  modularBall4D: {
+    maxDepth: 48,
+    moebiusCutoff: 80,
+    domeHeight: 0.3,
+    curvature: 1.2,
+    tunnelMix: 0,
+  },
 }
 
 /** Ordered scenario list for the shared ScenarioSelector. */
@@ -139,5 +152,13 @@ export const MOEBIUS_NO_BOUNDARY_SCENARIOS: readonly WdwZetaScenario<
     label: 'Flat Slab',
     description:
       'The disk rendered as a thin flat slab with no dome lift — the modular tessellation read straight-on as a planar Möbius lacework. The fundamental-domain tiles and their μ(n) colours are seen without perspective, the dark squarefree voids punching clean holes in the warm/cool weave.',
+  },
+  {
+    id: 'modularBall4D',
+    label: '4D Poincaré Ball',
+    description:
+      'The Poincaré disk opened into a fourth dimension. The Hartle–Hawking no-boundary amplitude tiles not a disk but a hyperbolic 3-ball, its radius measured as length(x, z, W); the visible disk is the equatorial slice. Rotating the Z–W plane sweeps the slice through the ball, revealing the SL(2,ℤ) modular tiling and its μ(n) lacework filling a solid hyperbolic volume. Opens at dimension 4.',
+    dimension: 4,
+    rotation: { ZW: 0.7 },
   },
 ]

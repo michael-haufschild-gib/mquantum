@@ -30,6 +30,7 @@ export type SelbergSpectrumPresetName =
   | 'pairOfPants'
   | 'primitiveBands'
   | 'bareFunnel'
+  | 'hyperFunnel4D'
   | 'custom'
 
 /**
@@ -118,6 +119,14 @@ export const SELBERG_SPECTRUM_PRESETS: Readonly<
     funnelMode: 0,
     windingGain: 2.2,
   },
+  /** 4D hyper-funnel (dimension 4): the pseudosphere revolved through a 3-space. */
+  hyperFunnel4D: {
+    geodesicCount: 14,
+    lengthCutoff: 9,
+    surfaceOpacity: 0.26,
+    funnelMode: 0,
+    windingGain: 1.2,
+  },
 }
 
 /** Ordered scenario list for the shared ScenarioSelector. */
@@ -153,5 +162,13 @@ export const SELBERG_SPECTRUM_SCENARIOS: readonly WdwZetaScenario<
     label: 'Bare Funnel',
     description:
       'The pseudosphere shell faded almost to nothing, threaded with a dense spectrum of geodesics: spiraling light hanging in space in the constant-negative-curvature shape of the funnel. The eye reads the hyperbolic geometry purely from how the closed orbits wind — the length spectrum drawn without its surface.',
+  },
+  {
+    id: 'hyperFunnel4D',
+    label: 'Geodesic Torus-Knot (4D)',
+    description:
+      'The closed geodesics of ℍ/Γ lift to the unit tangent bundle — a 3-manifold — and in 4D the hyperbolic funnel curls into a horn torus threaded by a (2,3) torus-knot of glowing geodesic light. The Selberg length spectrum, drawn not as bands on a funnel but as a single knotted thread winding the torus the way a closed geodesic winds the surface. Rotate the Z–W plane to wind the knot. Opens at dimension 4.',
+    dimension: 4,
+    rotation: { ZW: 0.65 },
   },
 ]

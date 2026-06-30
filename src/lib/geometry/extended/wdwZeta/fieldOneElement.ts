@@ -31,6 +31,7 @@ export type FieldOneElementPresetName =
   | 'qDegeneration'
   | 'primeSpectrum'
   | 'spiralClosure'
+  | 'cyclotomicHelix4D'
   | 'custom'
 
 /**
@@ -111,6 +112,14 @@ export const FIELD_ONE_ELEMENT_PRESETS: Readonly<
     primeGlow: 0.7,
     vertexSize: 0.026,
   },
+  /** 4D cyclotomic helix (dimension 4): the spire whose twist winds through the 4th axis. */
+  cyclotomicHelix4D: {
+    maxOrder: 18,
+    qDeform: 1,
+    towerTwist: 0.35,
+    primeGlow: 0.6,
+    vertexSize: 0.03,
+  },
 }
 
 /** Ordered scenario list for the shared ScenarioSelector. */
@@ -140,5 +149,13 @@ export const FIELD_ONE_ELEMENT_SCENARIOS: readonly WdwZetaScenario<
     label: 'Spiral Closure',
     description:
       'A golden-angle twist winds the cyclotomic tower into a spiral as it climbs toward the archimedean apex, where the high-order polygon becomes a smooth circle — the compactification point ∞. The roots of unity spiral up the curve like a strand of arithmetic DNA, μ_∞ wound into a single helix.',
+  },
+  {
+    id: 'cyclotomicHelix4D',
+    label: '4D Cyclotomic Helix',
+    description:
+      'The spire of roots of unity μ_∞ = 𝔽̄₁ wound through a fourth dimension. Each cyclotomic ring carries a per-height twist that, in 4D, winds with the W coordinate — so rotating the X–W plane spirals the whole tower of n-gons toward the archimedean apex ∞ that compactifies Spec ℤ. The closed points (the prime-order rings) climb the curve like a strand of arithmetic DNA lifted off its plane into the 4th axis. Opens at dimension 4.',
+    dimension: 4,
+    rotation: { XW: 0.6 },
   },
 ]

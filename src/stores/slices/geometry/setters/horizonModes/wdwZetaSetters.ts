@@ -11,8 +11,10 @@
  * @module stores/slices/geometry/setters/horizonModes/wdwZetaSetters
  */
 
-import { getWdwZetaUi } from '@/lib/geometry/extended/wdwZeta/configRegistry'
+import { getWdwZetaUi, type WdwZetaModeUi } from '@/lib/geometry/extended/wdwZeta/configRegistry'
 import type { WdwZetaModeKey } from '@/lib/geometry/extended/wdwZeta/shared'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { useRotationStore } from '@/stores/scene/rotationStore'
 
 import type { SetterContext } from '../sliceSetterUtils'
 
@@ -25,6 +27,27 @@ export interface WdwZetaSetters {
 }
 
 const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v)
+
+/**
+ * Apply a suite scenario's dimension guard: snap the global dimension to the
+ * scenario's target (3D scenarios → 3D, the 4D scenario → 4D, clamped to the
+ * mode's registry bounds) and apply any authored initial N-D rotation so a 4D
+ * scenario tilts the visible slice into the 4th axis at rest. Dimension is set
+ * first because `rotationStore.setDimension` resets all rotation angles, so the
+ * scenario rotation must be applied afterward.
+ *
+ * @param ui - The mode's UI descriptor (carries the scenario list).
+ * @param name - The selected scenario id.
+ */
+function applyScenarioDimensionGuard(ui: WdwZetaModeUi, name: string): void {
+  const scenario = ui.scenarios.find((s) => s.id === name)
+  if (!scenario) return
+  useGeometryStore.getState().setDimension(scenario.dimension ?? 3)
+  if (scenario.rotation) {
+    const setRotation = useRotationStore.getState().setRotation
+    for (const [plane, angle] of Object.entries(scenario.rotation)) setRotation(plane, angle)
+  }
+}
 
 /**
  * Build the WDW ⊗ ζ suite setter bundle.
@@ -76,6 +99,7 @@ export function createWdwZetaSetters(ctx: SetterContext): WdwZetaSetters {
       const preset = ui.presets[name]
       if (!preset) return
       writePartial(mode, { ...preset, preset: name })
+      applyScenarioDimensionGuard(ui, name)
     },
   }
 }

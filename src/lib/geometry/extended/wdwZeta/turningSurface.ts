@@ -30,6 +30,7 @@ export type TurningSurfacePresetName =
   | 'vacuumFoam'
   | 'deSitterWall'
   | 'massiveInflaton'
+  | 'twoFieldFold4D'
   | 'custom'
 
 /**
@@ -128,6 +129,15 @@ export const TURNING_SURFACE_PRESETS: Readonly<
     asymmetry: 1.0,
     vacuumGain: 0,
   },
+  /** 4D two-field fold (dimension 4): the balanced Airy fold, opened to a second inflaton. */
+  twoFieldFold4D: {
+    inflatonMass: 1.0,
+    lambda: 0.4,
+    fringeCount: 8,
+    termCount: 6,
+    asymmetry: 1.0,
+    vacuumGain: 0,
+  },
 }
 
 /** Ordered scenario list for the shared ScenarioSelector. */
@@ -163,5 +173,13 @@ export const TURNING_SURFACE_SCENARIOS: readonly WdwZetaScenario<
     label: 'Massive Inflaton',
     description:
       'A heavy inflaton (large m) makes the φ-direction barrier steep: the allowed lens pinches into a narrow vertical fold and the fringe density rises. The prime-power ridges at a = log(p^k) score the fringes — the arithmetic skeleton inside the cosmological caustic.',
+  },
+  {
+    id: 'twoFieldFold4D',
+    label: 'Swallowtail Caustic (4D)',
+    description:
+      'The Airy fold is a fold catastrophe; add a second inflaton field and it blooms into a SWALLOWTAIL — the next catastrophe in the hierarchy. The classically-allowed lens crumples into self-folding luminous pleats, cusp-ridges where the WKB fringes pile up, the edge of cosmological existence pleated through field space. Rotate the Z–W plane to drift the folds. Opens at dimension 4.',
+    dimension: 4,
+    rotation: { ZW: 0.65 },
   },
 ]

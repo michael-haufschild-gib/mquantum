@@ -16,7 +16,13 @@
  */
 
 import type { ModularKnotConfig, ModularKnotPresetName } from '@/lib/geometry/extended/modularKnot'
-import { MODULAR_KNOT_PRESETS, MODULAR_KNOT_RANGES } from '@/lib/geometry/extended/modularKnot'
+import {
+  MODULAR_KNOT_PRESETS,
+  MODULAR_KNOT_RANGES,
+  MODULAR_KNOT_SCENARIOS,
+} from '@/lib/geometry/extended/modularKnot'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { useRotationStore } from '@/stores/scene/rotationStore'
 
 import type { SetterContext } from '../sliceSetterUtils'
 
@@ -93,6 +99,16 @@ export function createModularKnotSetters(ctx: SetterContext): ModularKnotSetters
       const preset = MODULAR_KNOT_PRESETS[name]
       if (!preset) return
       applyPartial(ctx, { ...preset, preset: name })
+      // Dimension guard: snap to the scenario's target dimension and apply its
+      // initial W-tilt (dimension first — rotationStore.setDimension resets angles).
+      const scenario = MODULAR_KNOT_SCENARIOS.find((s) => s.id === name)
+      if (scenario) {
+        useGeometryStore.getState().setDimension(scenario.dimension ?? 3)
+        if (scenario.rotation) {
+          const setRotation = useRotationStore.getState().setRotation
+          for (const [plane, angle] of Object.entries(scenario.rotation)) setRotation(plane, angle)
+        }
+      }
     },
   }
 }

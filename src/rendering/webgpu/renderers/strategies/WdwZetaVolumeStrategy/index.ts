@@ -105,11 +105,12 @@ export class WdwZetaVolumeStrategy implements QuantumModeStrategy {
 
     const extended = getStoreSnapshot<ExtendedStoreSnapshot>(ctx, 'extended')
     const host = (extended?.schroedinger ?? {}) as WdwZetaConfigHost
+    const dimension = shared.rendererConfig.dimension ?? 3
 
-    const hash = `${mode}|${s.lutHash(host)}`
+    const hash = `${mode}|${s.lutHash(host, dimension)}`
     if (hash === this.lastLutHash) return
 
-    const lut = s.buildLut(host)
+    const lut = s.buildLut(host, dimension)
     shared.device.queue.writeBuffer(buffer, 0, lut as Float32Array<ArrayBuffer>)
     this.lastLutHash = hash
   }

@@ -41,10 +41,17 @@ const WZ_FIELD_OFF: i32 = 128;
 // .x = N(t) zero-count staircase, .y = Chebyshev ψ(x), .z = Mertens M(x), .w = explicit-formula osc.
 const WZ_MEAS_OFF: i32 = 6272; // = WZ_FIELD_OFF + WZ_FIELD_NX*WZ_FIELD_NY
 const WZ_MEAS_N: i32 = 128;
+// Shared dimension slot (matches WDW_ZETA_DIM_OFFSET in lut.ts): (dim, fourthDimT, _, _).
+const WZ_DIM_OFF: i32 = 6400; // = WZ_MEAS_OFF + WZ_MEAS_N
 
 // ── LUT readers ──
 fn wzHeadA() -> vec4f { return wdwZetaLut[0]; }
 fn wzHeadB() -> vec4f { return wdwZetaLut[1]; }
+// Spatial dimension (3 or 4) baked into the LUT.
+fn wzDim() -> f32 { return wdwZetaLut[WZ_DIM_OFF].x; }
+// 4D engagement ramp ∈ [0,1] (= clamp(dim−3)): 0 in 3D, 1 in 4D — the master gate
+// that switches each mode's wild fourth-dimensional form ON.
+fn wzFourth() -> f32 { return wdwZetaLut[WZ_DIM_OFF].y; }
 fn wzZero(i: i32) -> f32 { return wdwZetaLut[WZ_ZEROS_OFF + clamp(i, 0, WZ_ZEROS_N - 1)].x; }
 fn wzAux(i: i32) -> vec4f { return wdwZetaLut[WZ_AUX_OFF + clamp(i, 0, 110)]; }
 
@@ -255,7 +262,7 @@ fn wzNgon(q: vec2f, r: f32, an: f32) -> f32 {
 // unity μ_n as glowing vertex beads; the polygon gains sides climbing to a circle
 // at the apex (the archimedean place ∞). q→1 morphs the sharp 𝔽₁ polygons toward
 // the rounded 𝔽_q Frobenius circles. (mat 12.0 = WZ_EMIT_GOLD, the bead glow.)
-fn wzMap10(p: vec3f, t: f32) -> vec2f {
+fn wzMap10(p: vec3f, w: f32, t: f32) -> vec2f {
   let H = wzHeadA();             // (maxOrder, qDeform, towerTwist, primeGlow)
   let N = max(2.0, H.x);
   // nearest cyclotomic ring (order n) by height, rings n=1..N over y ∈ [−1,1]
@@ -266,7 +273,13 @@ fn wzMap10(p: vec3f, t: f32) -> vec2f {
   let R = 0.62 - 0.16 * (ni / (N - 1.0));          // circumradius, tapering up (a spire)
   let an = WZ_PI / max(n, 2.0);                     // π/n
   let apothem = R * cos(an);                        // inradius
-  let tw = H.z * n * 0.9;                           // golden-angle twist per ring
+  // ── WILD 4D: CYCLOTOMIC SPIRAL-ROSE ──
+  // golden-angle twist per ring; in 4D a strong per-height winding (wzFourth, plus
+  // a w-driven sweep) spirals the whole tower of n-gons into a rose climbing to the
+  // archimedean apex ∞ — the roots of unity μ_∞ wound up a Clifford helix, the
+  // spiral closure of Spec ℤ lifted into the 4th axis. At dim 3 the twist is the
+  // original gentle one.
+  let tw = H.z * n * 0.9 + w * 0.7 * n + wzFourth() * 1.5 * n;
   let cw = cos(tw);
   let sw = sin(tw);
   let q = vec2f(cw * p.x - sw * p.z, sw * p.x + cw * p.z);

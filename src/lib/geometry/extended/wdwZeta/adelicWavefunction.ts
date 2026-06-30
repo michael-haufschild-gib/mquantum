@@ -29,6 +29,7 @@ export type AdelicWavefunctionPresetName =
   | 'archimedeanBloom'
   | 'dyadicTree'
   | 'deepStrands'
+  | 'placeProduct4D'
   | 'custom'
 
 /**
@@ -109,6 +110,14 @@ export const ADELIC_WAVEFUNCTION_PRESETS: Readonly<
     foldExponent: 2.15,
     archCore: 0.2,
   },
+  /** 4D place product (dimension 4): the full forest, its product over places wound by W. */
+  placeProduct4D: {
+    treeDepth: 3,
+    primeCount: 4,
+    branchSpread: 0.6,
+    foldExponent: 1.9,
+    archCore: 0.55,
+  },
 }
 
 /** Ordered scenario list for the shared ScenarioSelector. */
@@ -138,5 +147,13 @@ export const ADELIC_WAVEFUNCTION_SCENARIOS: readonly WdwZetaScenario<
     label: 'Deep Strands',
     description:
       'Three prime trees with tight cones and maximal depth: long, narrow p-adic strands reaching toward the box edge. Brightness fades with tree depth, so the eye follows each strand from the bright Archimedean core out to the dim p-adic boundary at infinity.',
+  },
+  {
+    id: 'placeProduct4D',
+    label: '4D Place Product',
+    description:
+      'The adelic wavefunction ψ = ψ_∞·Π_p ψ_p revealed as a product over places spread through a fourth dimension. The Archimedean core is a 4-ball; the per-iteration fold of the Bruhat–Tits forest winds with the W coordinate, so rotating the X–W plane swings the trees of different prime places forward in turn — the infinite Euler product over the primes laid out along the 4th axis, each place a different slice of the same forced branching. Opens at dimension 4.',
+    dimension: 4,
+    rotation: { XW: 0.7 },
   },
 ]

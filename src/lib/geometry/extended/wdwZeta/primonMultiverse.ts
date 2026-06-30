@@ -32,6 +32,7 @@ export type PrimonMultiversePresetName =
   | 'adsMultiverse'
   | 'momentumShells'
   | 'pairedVacuum'
+  | 'antiverse4D'
   | 'custom'
 
 /**
@@ -128,6 +129,17 @@ export const PRIMON_MULTIVERSE_PRESETS: Readonly<
     linkGain: 0.85,
     occScale: 1.0,
   },
+  /** 4D Hopf multiverse (dimension 4): the prime constellation mangled onto the
+   *  Hopf fibration of S³ — beads winding the interlinked Villarceau circles, the
+   *  fiber thread fusing them into rings. Gentle ignition so it reads in colour. */
+  antiverse4D: {
+    beta: 1.5,
+    primeCount: 64,
+    pairLinks: true,
+    latticeMode: 0,
+    linkGain: 0.5,
+    occScale: 0.95,
+  },
 }
 
 /** Ordered scenario list for the shared ScenarioSelector. */
@@ -163,5 +175,13 @@ export const PRIMON_MULTIVERSE_SCENARIOS: readonly WdwZetaScenario<
     label: 'Paired Vacuum',
     description:
       'The third-quantized vacuum with universe–antiuniverse links switched on: each primon-node is joined by a faint tube to its antipode −p, the partner produced with it from the no-boundary vacuum. The pairing is the creation/annihilation structure of the cosmological field operator, drawn as a web of conjugate worlds.',
+  },
+  {
+    id: 'antiverse4D',
+    label: 'Hopf Multiverse (4D)',
+    description:
+      'The third-quantized gas laid on the Hopf fibration of the 3-sphere: three mutually interlinked rings thread the prime constellation, each prime-universe a quantum riding a Hopf circle. The Fock gas ζ(β) forces into thermal equilibrium is revealed as a genuinely four-dimensional weave — the universe-quanta are no longer a loose scatter but links of a single Hopf bundle. Rotate the X–W plane to spin the fibration. Opens at dimension 4.',
+    dimension: 4,
+    rotation: { XW: 0.7 },
   },
 ]

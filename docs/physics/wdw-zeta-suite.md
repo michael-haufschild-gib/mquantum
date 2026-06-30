@@ -112,3 +112,43 @@ purity shells), #7 number of spectral rings, #8 genus / geodesic-length cutoff,
 1. Mode #1 end-to-end + e2e verify (validates the whole pipeline).
 2–10. Remaining modes, reusing the foundation.
 Final: e2e suite — every mode renders pixels AND holds > 40 fps.
+
+## 4D extension (the wild fourth degree of freedom)
+
+Every 3D-only ζ/prime mode (the 11 suite modes + Hilbert–Pólya + Modular Knot)
+now supports **dimension 4** (registry `dimensions.max = 4`). The 4th degree of
+freedom is the genuine W axis of the N-D slice basis: the shared shader extracts
+`w` from basis row 3 (`fragmentMain`), and a baked dimension signal (`wzDim()` /
+`wzFourth()`, a one-vec4 LUT slot at `WDW_ZETA_DIM_OFFSET`) tells each `wzMapN`
+it is at dim 4 so its **wild form shows at rest**, with `w` adding real 4D motion
+under an XW/YW/ZW rotation. At dim 3 the W-row is null and `wzFourth()=0`, so the
+3D render is byte-identical (the 4D code is gated off). Per-mode wild forms:
+
+| Mode | 4D form |
+|---|---|
+| constraintSeam | vortex-pillar colonnade (one lit column per pinned zero) |
+| moebiusNoBoundary | hyperbolic 3-ball Fabergé shells (μ-void lacework) |
+| forcedCell | phase-cell basket-weave (conjugate ±Eₙ hyperbola looms) |
+| turningSurface | swallowtail-pleated caustic |
+| primonMultiverse | Hopf-fibered multiverse (3 interlinked rings) |
+| frobeniusWheel | Hopf-linked Clifford tori |
+| dewittCone | de Sitter hyperboloid hourglass |
+| selbergSpectrum | knotted geodesic horn-torus |
+| adelicWavefunction | wound 4D hyper-fractal |
+| weilPositivity | rippled positivity hyper-bowl + ghost wormhole |
+| fieldOneElement | cyclotomic spiral-rose |
+| hilbertPolya | Matsubara veil-lift (θ shifted by ω = w) |
+| modularKnot | Rademacher screw (w winds the tangle; auto-spin removed, basis rotation) |
+
+**Shader file split**: `mainWdwZetaVolume.wgsl.ts` exceeded the 600-line cap after
+the wild forms, so the SDF builders (`wzMap0`–`wzMap10` + dispatch + normal/AO)
+moved to `mainWdwZetaSdf.wgsl.ts`, composed between `wdwZetaLib` and the main
+fragment block. `mainWdwZetaVolume` keeps colour + `fragmentMain`.
+
+**Scenarios are dimension-guarded**: each mode gets one 4D-only scenario (`*4D`
+id) carrying `dimension: 4` + an initial W-rotation; the suite/HP/Knot setters
+apply that dimension+rotation, and `ScenarioSelector.zetaGroup` filters the menu
+by the current dimension (3D scenarios at dim 3, 4D scenarios at dim 4; modes
+with no 4D scenario — riemannZeta, bifurcationHorizon — stay unfiltered).
+Lighting lesson: large-area emissive blooms to white; the 4D forms use LIT
+surfaces for area and thin emissive only for accents (tubes/beads/rings).

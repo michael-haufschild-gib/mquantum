@@ -55,10 +55,10 @@ function makeWdwZetaEntry(opts: {
         },
         dimensions: {
           min: 3,
-          max: 3,
+          max: 4,
           recommended: 3,
           recommendedReason:
-            'A WDW ⊗ ζ suite volume — the structure is intrinsically 3D, with no higher-dimensional extension.',
+            'A WDW ⊗ ζ suite constraint volume. 3D shows the canonical form; 4D lifts it into a genuine 4th axis — rotating an XW/YW/ZW plane sweeps the visible slice through the locked tesseract-class structure.',
         },
         rendering: SHARED_RENDERING,
         animation: { hasTypeSpecificAnimations: false, systems: {} },
@@ -216,10 +216,10 @@ export const HORIZON_QUANTUM_TYPE_ENTRIES: readonly (readonly [
       },
       dimensions: {
         min: 3,
-        max: 3,
+        max: 4,
         recommended: 3,
         recommendedReason:
-          'The Evans landscape is intrinsically a 3D box volume (Re z, Im z, θ) — there is no higher-dimensional extension',
+          'The Evans landscape is a 3D box (Re z, Im z, θ); in 4D a 4th Matsubara-frequency axis ω lifts the spectral filaments into a stacked sheaf, swept by rotating the W plane',
       },
       rendering: SHARED_RENDERING,
       animation: {
@@ -337,10 +337,10 @@ export const HORIZON_QUANTUM_TYPE_ENTRIES: readonly (readonly [
       },
       dimensions: {
         min: 3,
-        max: 3,
+        max: 4,
         recommended: 3,
         recommendedReason:
-          'The trefoil complement lives in the projected S³ — the knotted modular geodesics are intrinsically a 3D volume, with no higher-dimensional extension',
+          'The trefoil complement lives in the projected S³; in 4D the knot is lifted off the projection into a genuine 4th axis, so rotating the W plane unfolds the self-crossings into clean linked loops',
       },
       rendering: SHARED_RENDERING,
       animation: {
@@ -390,10 +390,10 @@ export const HORIZON_QUANTUM_TYPE_ENTRIES: readonly (readonly [
       },
       dimensions: {
         min: 3,
-        max: 3,
+        max: 4,
         recommended: 3,
         recommendedReason:
-          'The (σ, t) critical strip lifted into a 3D relief is intrinsically a 3D volume; the functional-equation mirror lives in the σ ↔ 1−σ plane.',
+          'The (σ, t) critical strip lifted into a 3D relief; in 4D the seam canyon becomes a 4th-axis mirror sheet, the functional-equation involution σ ↔ 1−σ doubled into the W direction.',
       },
       rendering: SHARED_RENDERING,
       animation: {

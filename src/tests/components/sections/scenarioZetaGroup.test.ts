@@ -8,7 +8,7 @@ import {
 import { ZETA_PRIME_GROUP } from '@/lib/geometry/registry'
 
 describe('Zeta / Prime group scenario options', () => {
-  const options = zetaGroupScenarioOptions(ZETA_PRIME_GROUP)
+  const options = zetaGroupScenarioOptions(ZETA_PRIME_GROUP, 3)
   const presetRows = options.filter((o) => !o.disabled)
 
   it('lists scenarios from EVERY member mode (not just the active one)', () => {
@@ -46,8 +46,24 @@ describe('Zeta / Prime group scenario options', () => {
   })
 
   it('rejects header rows and an empty active value', () => {
-    const header = zetaGroupScenarioOptions(ZETA_PRIME_GROUP).find((o) => o.disabled)!
+    const header = zetaGroupScenarioOptions(ZETA_PRIME_GROUP, 3).find((o) => o.disabled)!
     expect(parseZetaGroupValue(header.value)).toBeNull()
     expect(zetaGroupActiveValue('constraintSeam', '')).toBe('')
+  })
+
+  it('dimension-filters: a suite mode shows its 3D scenarios at dim 3 but its 4D scenario at dim 4', () => {
+    const at3 = zetaGroupScenarioOptions(ZETA_PRIME_GROUP, 3).filter((o) => !o.disabled)
+    const at4 = zetaGroupScenarioOptions(ZETA_PRIME_GROUP, 4).filter((o) => !o.disabled)
+    // constraintSeam's 4D-only colonnade preset must be hidden at dim 3, shown at dim 4.
+    expect(at3.some((o) => o.value === 'constraintSeam::hyperSeam4D')).toBe(false)
+    expect(at4.some((o) => o.value === 'constraintSeam::hyperSeam4D')).toBe(true)
+    // its 3D preset is the converse.
+    expect(at3.some((o) => o.value === 'constraintSeam::completedState')).toBe(true)
+    expect(at4.some((o) => o.value === 'constraintSeam::completedState')).toBe(false)
+    // riemannZeta has no 4D scenario → dimension-agnostic: same scenarios at both dims.
+    const rzAt3 = at3.filter((o) => o.value.startsWith('riemannZeta::')).length
+    const rzAt4 = at4.filter((o) => o.value.startsWith('riemannZeta::')).length
+    expect(rzAt3).toBeGreaterThan(0)
+    expect(rzAt4).toBe(rzAt3)
   })
 })

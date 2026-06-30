@@ -75,8 +75,16 @@ export const WDW_ZETA_MEASURES_COUNT = 128
 /** Spectral window [t_min, t_max] the measures table spans. */
 export const WDW_ZETA_MEASURES_TMIN = 2
 export const WDW_ZETA_MEASURES_TMAX = 60
-/** vec4f entries in the LUT storage buffer (header + zeros + aux + 2D field + measures). */
-export const WDW_ZETA_LUT_VEC4 = WDW_ZETA_MEASURES_OFFSET + WDW_ZETA_MEASURES_COUNT
+/**
+ * Shared "dimension" slot — one vec4 carrying (dimension, fourthDimT, _, _).
+ * `fourthDimT = clamp(dimension − 3, 0, 1)` is the 4D engagement ramp the shader
+ * reads via `wzDim()` to gate each mode's WILD 4th-dimensional form ON. Every mode
+ * bakes this (it is dimension- not config-driven), so the LUT re-uploads whenever
+ * the dimension crosses 3 → 4.
+ */
+export const WDW_ZETA_DIM_OFFSET = WDW_ZETA_MEASURES_OFFSET + WDW_ZETA_MEASURES_COUNT
+/** vec4f entries in the LUT storage buffer (header + zeros + aux + 2D field + measures + dim). */
+export const WDW_ZETA_LUT_VEC4 = WDW_ZETA_DIM_OFFSET + 1
 
 /** Allocate a zeroed LUT float view (length WDW_ZETA_LUT_VEC4 × 4). */
 function allocLut(): Float32Array {
@@ -601,11 +609,19 @@ const LUT_BUILDERS: Record<number, LutBuilder> = {
  * @param host - Suite sub-config host.
  * @returns A fresh `Float32Array` of length WDW_ZETA_LUT_VEC4 × 4.
  */
-export function buildWdwZetaLut(modeId: number, host: WdwZetaConfigHostLut): Float32Array {
+export function buildWdwZetaLut(
+  modeId: number,
+  host: WdwZetaConfigHostLut,
+  dimension = 3
+): Float32Array {
   const lut = allocLut()
   LUT_BUILDERS[modeId]?.build(lut, host)
   // Shared arithmetic-measures table (every mode) — feeds the 4 shared color algos.
   bakeSharedMeasures(lut)
+  // Shared dimension slot: (dimension, fourthDimT, …). fourthDimT ramps 0→1 as the
+  // dimension crosses 3→4, switching each mode's wild 4D form ON in the shader.
+  const fourthDimT = Math.max(0, Math.min(1, dimension - 3))
+  setVec4(lut, WDW_ZETA_DIM_OFFSET, dimension, fourthDimT)
   return lut
 }
 
@@ -617,6 +633,6 @@ export function buildWdwZetaLut(modeId: number, host: WdwZetaConfigHostLut): Flo
  * @param host - Suite sub-config host.
  * @returns A stable string that changes iff the LUT contents would.
  */
-export function wdwZetaLutHash(modeId: number, host: WdwZetaConfigHostLut): string {
-  return LUT_BUILDERS[modeId]?.hash(host) ?? ''
+export function wdwZetaLutHash(modeId: number, host: WdwZetaConfigHostLut, dimension = 3): string {
+  return `${LUT_BUILDERS[modeId]?.hash(host) ?? ''}|d${dimension}`
 }

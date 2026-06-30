@@ -36,10 +36,10 @@ export interface WdwZetaModeSpec {
   modeId: number
   /** Model-space bounding radius framing the live form. */
   boundingRadius: number
-  /** Build the compact ζ-LUT for this mode from a config host. */
-  buildLut: (host: WdwZetaConfigHost) => Float32Array
+  /** Build the compact ζ-LUT for this mode from a config host + spatial dimension. */
+  buildLut: (host: WdwZetaConfigHost, dimension: number) => Float32Array
   /** Re-upload hash; the strategy re-builds only when this string changes. */
-  lutHash: (host: WdwZetaConfigHost) => string
+  lutHash: (host: WdwZetaConfigHost, dimension: number) => string
 }
 
 /** Fill in defaults for the active mode's sub-config so builders never see undefined. */
@@ -64,8 +64,8 @@ function spec(modeId: number, boundingRadius: number): WdwZetaModeSpec {
   return {
     modeId,
     boundingRadius,
-    buildLut: (h) => buildWdwZetaLut(modeId, withDefaults(h)),
-    lutHash: (h) => wdwZetaLutHash(modeId, withDefaults(h)),
+    buildLut: (h, dimension) => buildWdwZetaLut(modeId, withDefaults(h), dimension),
+    lutHash: (h, dimension) => wdwZetaLutHash(modeId, withDefaults(h), dimension),
   }
 }
 

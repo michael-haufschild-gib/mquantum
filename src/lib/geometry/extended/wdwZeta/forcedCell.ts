@@ -24,6 +24,7 @@ export type ForcedCellPresetName =
   | 'squeezedVacuum'
   | 'denseLoom'
   | 'wideStrip'
+  | 'conjugateCell4D'
   | 'custom'
 
 /**
@@ -112,6 +113,14 @@ export const FORCED_CELL_PRESETS: Readonly<
     squeeze: 0,
     wallHeight: 0,
   },
+  /** 4D conjugate loom (dimension 4): the canonical loom, opened to its second phase pair. */
+  conjugateCell4D: {
+    levelCount: 16,
+    cellDensity: 12,
+    xExtent: 1.1,
+    squeeze: 0,
+    wallHeight: 0,
+  },
 }
 
 /** Ordered scenario list for the shared ScenarioSelector. */
@@ -147,5 +156,13 @@ export const FORCED_CELL_SCENARIOS: readonly WdwZetaScenario<
     label: 'Wide Strip',
     description:
       'A broad-window loom: only the first 10 levels, but a wide (x, p) extent so each hyperbola sweeps the full box. The Planck lattice is coarse, every cell plainly visible — the quantization grain you cannot subdivide below 2πℏ.',
+  },
+  {
+    id: 'conjugateCell4D',
+    label: '4D Conjugate Loom',
+    description:
+      'The forced cell in four dimensions. Quantizing a 4D phase space needs TWO area quanta of 2πℏ — the Planck 4-cell — so the dilation loom acquires a second family of hyperbolae x·p₂ = Eₙ in the conjugate (x, W) plane, the same ζ-zero spectrum woven a second time. At rest the original loom is unchanged; rotating the X–W plane materializes the cool conjugate loom, the two families crossing into the rigid 4-cell tiling the spectrum has no freedom to refuse. Opens at dimension 4.',
+    dimension: 4,
+    rotation: { XW: 0.6 },
   },
 ]

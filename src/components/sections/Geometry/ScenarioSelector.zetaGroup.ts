@@ -17,26 +17,57 @@ import { BIFURCATION_HORIZON_SCENARIOS } from '@/lib/geometry/extended/bifurcati
 import { HILBERT_POLYA_SCENARIOS } from '@/lib/geometry/extended/hilbertPolya'
 import { MODULAR_KNOT_SCENARIOS } from '@/lib/geometry/extended/modularKnot'
 import { RIEMANN_ZETA_SCENARIOS } from '@/lib/geometry/extended/riemannZeta'
+import { getWdwZetaUi } from '@/lib/geometry/extended/wdwZeta/configRegistry'
 import { isWdwZetaMode } from '@/lib/geometry/extended/wdwZeta/shared'
-import { wdwZetaPresetOptions } from '@/lib/geometry/extended/wdwZeta/uiRegistry'
 import { getQuantumTypeName, type QuantumTypeGroup } from '@/lib/geometry/registry'
 import type { QuantumTypeKey } from '@/lib/geometry/registry/types'
 
 const HEADER_PREFIX = '__hdr:'
 const SEP = '::'
 
-/** `{value,label}` scenario options for a single group member, any mode family. */
-function memberScenarioOptions(memberKey: QuantumTypeKey): { value: string; label: string }[] {
-  if (isWdwZetaMode(memberKey)) return wdwZetaPresetOptions(memberKey)
+/** A scenario carries an optional target dimension; default 3 (a 3D scenario). */
+interface DimScenario {
+  id: string
+  label: string
+  dimension?: number
+}
+
+/**
+ * Keep only the scenarios that make sense at the current spatial dimension. A
+ * mode that defines any 4D scenario (`dimension ≥ 4`) is dimension-split: at
+ * dim ≥ 4 only its 4D scenarios show, at dim 3 only its 3D ones. A mode with no
+ * 4D scenarios (riemannZeta, bifurcationHorizon — N-D via the Tangherlini
+ * exponent) is dimension-agnostic and shows all of its scenarios at every dim.
+ */
+function filterByDim<T extends DimScenario>(scenarios: readonly T[], dim: number): T[] {
+  const has4D = scenarios.some((s) => (s.dimension ?? 3) >= 4)
+  if (!has4D) return [...scenarios]
+  const want4D = dim >= 4
+  return scenarios.filter((s) => (s.dimension ?? 3) >= 4 === want4D)
+}
+
+/** `{value,label}` scenario options for a single group member, filtered by dimension. */
+function memberScenarioOptions(
+  memberKey: QuantumTypeKey,
+  dim: number
+): { value: string; label: string }[] {
+  const toOpt = (s: DimScenario): { value: string; label: string } => ({
+    value: s.id,
+    label: s.label,
+  })
+  if (isWdwZetaMode(memberKey)) {
+    const ui = getWdwZetaUi(memberKey)
+    return ui ? filterByDim(ui.scenarios as readonly DimScenario[], dim).map(toOpt) : []
+  }
   switch (memberKey) {
     case 'riemannZeta':
-      return RIEMANN_ZETA_SCENARIOS.map((s) => ({ value: s.id, label: s.label }))
+      return filterByDim(RIEMANN_ZETA_SCENARIOS, dim).map(toOpt)
     case 'hilbertPolya':
-      return HILBERT_POLYA_SCENARIOS.map((s) => ({ value: s.id, label: s.label }))
+      return filterByDim(HILBERT_POLYA_SCENARIOS, dim).map(toOpt)
     case 'bifurcationHorizon':
-      return BIFURCATION_HORIZON_SCENARIOS.map((s) => ({ value: s.id, label: s.label }))
+      return filterByDim(BIFURCATION_HORIZON_SCENARIOS, dim).map(toOpt)
     case 'modularKnot':
-      return MODULAR_KNOT_SCENARIOS.map((s) => ({ value: s.id, label: s.label }))
+      return filterByDim(MODULAR_KNOT_SCENARIOS, dim).map(toOpt)
     default:
       return []
   }
@@ -44,15 +75,16 @@ function memberScenarioOptions(memberKey: QuantumTypeKey): { value: string; labe
 
 /**
  * The full, stable scenario list for a collapsed group: every member's presets
- * under a disabled per-mode header. Independent of which sub-type is active.
+ * (dimension-filtered) under a disabled per-mode header.
  *
  * @param group - The collapsed quantum-type group.
+ * @param dim - Current spatial dimension (3 or 4), used to filter scenarios.
  * @returns Flat `SelectOption[]` (headers + `memberKey::presetId` rows).
  */
-export function zetaGroupScenarioOptions(group: QuantumTypeGroup): SelectOption[] {
+export function zetaGroupScenarioOptions(group: QuantumTypeGroup, dim: number): SelectOption[] {
   const out: SelectOption[] = []
   for (const m of group.members) {
-    const presets = memberScenarioOptions(m)
+    const presets = memberScenarioOptions(m, dim)
     if (presets.length === 0) continue
     out.push({
       value: `${HEADER_PREFIX}${m}`,

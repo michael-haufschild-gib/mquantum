@@ -46,6 +46,7 @@ import {
   selectMainBlock,
 } from './composeConfig'
 import { temporalMRTOutputBlock } from './main.wgsl'
+import { generateWdwZetaSdfBlock } from './mainWdwZetaSdf.wgsl'
 import { COLOR_ALG_NAMES } from './volume/emission.wgsl'
 import { generateWdwZetaLib } from './wdwZetaLib.wgsl'
 
@@ -321,6 +322,7 @@ struct VertexOutput {
     // WDW ⊗ ζ suite shared lib (SDF + lighting + domain color), used by the
     // live sphere-tracing main block.
     { name: 'WDW⊗ζ Lib', content: generateWdwZetaLib(), condition: isWdwZetaVolume },
+    { name: 'WDW⊗ζ SDF', content: generateWdwZetaSdfBlock(), condition: isWdwZetaVolume },
 
     // Main shader
     { name: 'Main', content: selectedMainBlock },

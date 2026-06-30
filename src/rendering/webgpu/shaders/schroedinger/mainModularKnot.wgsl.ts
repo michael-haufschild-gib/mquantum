@@ -43,6 +43,11 @@ export function generateMainBlockModularKnot(): string {
 const MK_MAX_STEPS: i32 = 256;
 // Path-length budget multiplier (matches the straight-chord march reserve).
 const MK_PATH_SLACK: f32 = 1.05;
+// 4D winding strength: at dimension 4 the W axis winds the knot by an angle
+// proportional to the 4th coordinate — the Rademacher invariant Φ (the linking
+// number with the trefoil core) realized as a literal 4D screw. The self-crossings
+// of the projected knot shear apart along W. 0 at dimension 3 (basis W-row is null).
+const MK_W_WIND: f32 = 2.2;
 
 /** Cheap per-pixel hash for march-offset jitter (banding suppression). */
 fn mkJitterHash(p: vec2f) -> f32 {
@@ -115,10 +120,26 @@ fn mkEmissionColor(algo: i32, baked: vec3f, dens: f32) -> vec3f {
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
-  // Ray setup in model space (matches the shared volumetric main blocks).
-  let ro = camera.cameraPositionModel;
+  // Ray in model space, then rotated into the N-D slice basis B = [basisX basisY
+  // basisZ] so the TimelineControls rotation panel turns the knot — exactly as the
+  // riemannZeta / hilbertPolya / wdwZeta modes do. There is NO bespoke auto-spin
+  // (the old mkFlow·time turntable is removed; all rotation goes through the panel).
+  let roM = camera.cameraPositionModel;
   let worldRayDir = normalize(input.vPosition - camera.cameraPosition);
-  let rd = normalize((camera.inverseModelMatrix * vec4f(worldRayDir, 0.0)).xyz);
+  let rdM = normalize((camera.inverseModelMatrix * vec4f(worldRayDir, 0.0)).xyz);
+
+  let axRow = vec3f(getBasisComponent(basis.basisX, 0), getBasisComponent(basis.basisY, 0), getBasisComponent(basis.basisZ, 0));
+  let ayRow = vec3f(getBasisComponent(basis.basisX, 1), getBasisComponent(basis.basisY, 1), getBasisComponent(basis.basisZ, 1));
+  let azRow = vec3f(getBasisComponent(basis.basisX, 2), getBasisComponent(basis.basisY, 2), getBasisComponent(basis.basisZ, 2));
+  let o3 = vec3f(getBasisComponent(basis.origin, 0), getBasisComponent(basis.origin, 1), getBasisComponent(basis.origin, 2));
+  let ro = vec3f(dot(axRow, roM), dot(ayRow, roM), dot(azRow, roM)) + o3;
+  let rd3u = vec3f(dot(axRow, rdM), dot(ayRow, rdM), dot(azRow, rdM));
+  let len3 = max(length(rd3u), 1e-5);
+  let rd = rd3u / len3;
+  // 4th-axis (W) projection — the Rademacher screw. Null at dim 3 (wHere ≡ 0).
+  let awRow = vec3f(getBasisComponent(basis.basisX, 3), getBasisComponent(basis.basisY, 3), getBasisComponent(basis.basisZ, 3));
+  let roW = dot(awRow, roM) + getBasisComponent(basis.origin, 3);
+  let rdW = dot(awRow, rdM) / len3;
 
   let boundR = schroedinger.boundingRadius;
   let tSphere = intersectSphere(ro, rd, boundR);
@@ -128,15 +149,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   let tNear = max(0.0, tSphere.x);
   let tFar = tSphere.y;
 
-  // ── Per-fragment scalar constants (uniform-derived) ──
   let glow = schroedinger.mkGlow;
-  let flow = schroedinger.mkFlow;
-  // Slow auto-rotation angle: turns the knot about the vertical (y) axis so the
-  // 3D linking structure reads instead of projecting flat. Applied to p.xz
-  // BEFORE mapping to volume UVW (render-only).
-  let rotAngle = flow * schroedinger.time;
-  let cosA = cos(rotAngle);
-  let sinA = sin(rotAngle);
 
   // Step budget: LOD-scaled, hard-capped. 5/2 steps per LOD sample keeps several
   // samples per tube at default settings while holding 45+ fps at high pixel loads.
@@ -146,15 +159,24 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
 
   // ── March state ──
   let jitter = mkJitterHash(input.clipPosition.xy);
-  var p = ro + rd * (tNear + jitter * baseStep);
+  let t0 = tNear + jitter * baseStep;
+  var p = ro + rd * t0;
   var accumColor = vec3f(0.0);
   var accumAlpha = 0.0;
 
   for (var i = 0; i < MK_MAX_STEPS; i++) {
     if (i >= maxSteps) { break; }
 
-    // Optional slow auto-rotation of the sampling point about the y axis.
-    let pr = vec3f(cosA * p.x - sinA * p.z, p.y, sinA * p.x + cosA * p.z);
+    // ── WILD 4D: RADEMACHER SCREW ──
+    // The 4th coordinate w (= roW + rdW·t along the ray) winds the knot about y by
+    // MK_W_WIND·w, so the projected self-crossings shear apart into clean linked
+    // loops — the Rademacher invariant Φ (the linking number with the trefoil core)
+    // made literal as a 4D screw. At dim 3, w ≡ 0 → no winding (panel rotation only).
+    let wHere = roW + rdW * (t0 + f32(i) * baseStep);
+    let ang = wHere * MK_W_WIND;
+    let ca = cos(ang);
+    let sa = sin(ang);
+    let pr = vec3f(ca * p.x - sa * p.z, p.y, sa * p.x + ca * p.z);
 
     // Map model-space point to volume UVW. The baked volume spans world [-R, R]³
     // (the splat baked into [-1,1]³, framed by boundingRadius ≈ 4); skip samples

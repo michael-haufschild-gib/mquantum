@@ -22,6 +22,7 @@ export type ModularKnotPresetName =
   | 'rademacherTangle'
   | 'primeGeodesics'
   | 'deepSpectrum'
+  | 'unknot4D'
   | 'custom'
 
 /**
@@ -106,6 +107,14 @@ export const MODULAR_KNOT_PRESETS: Readonly<
     geodesicCount: 56,
     tubeWidth: 1.2,
   },
+  /** 4D Rademacher screw (dimension 4): the tangle wound through the 4th axis. */
+  unknot4D: {
+    glow: 0.5,
+    flow: 0,
+    maxLen: 8,
+    geodesicCount: 24,
+    tubeWidth: 1.6,
+  },
 }
 
 /** Scenario metadata for the unified preset selector. */
@@ -113,6 +122,10 @@ export interface ModularKnotScenario {
   id: Exclude<ModularKnotPresetName, 'custom'>
   label: string
   description: string
+  /** Target spatial dimension (applying the scenario snaps the dimension to it; default 3). */
+  dimension?: number
+  /** Initial N-D rotation (plane → radians) so a 4D scenario winds into W at rest. */
+  rotation?: Readonly<Record<string, number>>
 }
 
 /** Ordered scenario list shown in the Scenario dropdown. */
@@ -134,5 +147,13 @@ export const MODULAR_KNOT_SCENARIOS: readonly ModularKnotScenario[] = [
     label: 'Deep Spectrum',
     description:
       'The long-word, high-|Φ| tail (max word length 10, 56 geodesics): a dense knotted thicket whose diverging Φ colormap (cool Φ < 0 / white 0 / warm Φ > 0) exposes the spread of the Rademacher quasimorphism over the modular surface.',
+  },
+  {
+    id: 'unknot4D',
+    label: 'Rademacher Screw (4D)',
+    description:
+      'In four dimensions a knot can be untied. The fourth axis w winds the whole tangle about its spine — the Rademacher invariant Φ (the linking number with the trefoil core) made literal as a 4D screw — so the projected self-crossings shear apart into clean linked loops. Rotate the X–W plane to drive the winding. The global topological number S(T) = arg ζ(½ + iT) realizes, seen as an actual screw motion. Opens at dimension 4.',
+    dimension: 4,
+    rotation: { XW: 0.8 },
   },
 ]

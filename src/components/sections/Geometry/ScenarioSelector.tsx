@@ -355,7 +355,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
 
   // Build options
   const options = useMemo(() => {
-    if (group) return zetaGroupScenarioOptions(group)
+    if (group) return zetaGroupScenarioOptions(group, dimension)
     if (isWdwZetaMode(mode)) return wdwZetaPresetOptions(mode)
     switch (mode) {
       case 'harmonicOscillator':

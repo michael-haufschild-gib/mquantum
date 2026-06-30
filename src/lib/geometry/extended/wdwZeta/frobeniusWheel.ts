@@ -25,6 +25,7 @@ export type FrobeniusWheelPresetName =
   | 'highWeight'
   | 'weightSpindle'
   | 'zetaTinted'
+  | 'puritySpheres4D'
   | 'custom'
 
 /**
@@ -121,6 +122,15 @@ export const FROBENIUS_WHEEL_PRESETS: Readonly<
     coneSpindle: false,
     zetaTint: 0.85,
   },
+  /** 4D purity spheres (dimension 4): the weight tower with rings opened into shells. */
+  puritySpheres4D: {
+    baseQ: 3,
+    maxWeight: 4,
+    genus: 2,
+    spread: 0.3,
+    coneSpindle: false,
+    zetaTint: 0.3,
+  },
 }
 
 /** Ordered scenario list for the shared ScenarioSelector. */
@@ -156,5 +166,13 @@ export const FROBENIUS_WHEEL_SCENARIOS: readonly WdwZetaScenario<
     label: 'ζ-Tinted Wheel',
     description:
       'Deligne purity over F₃ with the analytic Riemann zeros bleeding in: each weight ring is tinted by the local ζ-zero density, the finite-field RH (a theorem) coloured by the archimedean RH (a conjecture). The two faces of the Riemann Hypothesis painted onto one wheel — the proven and the hoped-for sharing a radius.',
+  },
+  {
+    id: 'puritySpheres4D',
+    label: 'Clifford Tori (4D)',
+    description:
+      "Deligne purity on the flat 4D torus. In 3D the Frobenius eigenvalues are forced onto a CIRCLE |α| = q^{w/2}; in 4D that circle opens into the Clifford torus S¹×S¹ — and the purity radius appears as TWO interlinked glowing tori (a Hopf link), with the eigenvalue beads pinned to the link. The cleanest 'no other option' in mathematics rendered as the most iconic shape in four dimensions. Rotate the Z–W plane to spin the linked tori. Opens at dimension 4.",
+    dimension: 4,
+    rotation: { ZW: 0.7 },
   },
 ]
