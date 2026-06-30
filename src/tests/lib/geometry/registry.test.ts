@@ -198,20 +198,33 @@ describe('Quantum Type Registry (Flat Model)', () => {
     it('contains all expected quantum type entries', () => {
       const keys = Array.from(QUANTUM_TYPE_REGISTRY.keys()).sort()
       expect(keys).toEqual([
+        'adelicWavefunction',
         'antiDeSitter',
         'becDynamics',
         'bellTest',
+        'bifurcationHorizon',
         'coherenceHorizon',
+        'constraintSeam',
+        'dewittCone',
         'diracEquation',
+        'fieldOneElement',
+        'forcedCell',
         'freeScalarField',
+        'frobeniusWheel',
         'harmonicOscillator',
         'hilbertPolya',
         'hydrogenND',
         'hydrogenNDCoupled',
+        'modularKnot',
+        'moebiusNoBoundary',
         'pauliSpinor',
+        'primonMultiverse',
         'quantumWalk',
         'riemannZeta',
+        'selbergSpectrum',
         'tdseDynamics',
+        'turningSurface',
+        'weilPositivity',
         'wheelerDeWitt',
       ])
     })

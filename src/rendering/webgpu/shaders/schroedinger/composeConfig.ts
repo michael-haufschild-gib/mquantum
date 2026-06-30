@@ -29,19 +29,29 @@ import {
   PHASE_COLOR_ALGS,
 } from './main.wgsl'
 import { generateMainBlock2D, generateMainBlock2DIsolines } from './main2D.wgsl'
+import { generateMainBlockBifurcationHorizon } from './mainBifurcationHorizon.wgsl'
 import { generateMainBlockCoherenceHorizon } from './mainCoherenceHorizon.wgsl'
 import { generateMainBlockHilbertPolya } from './mainHilbertPolya.wgsl'
+import { generateMainBlockModularKnot } from './mainModularKnot.wgsl'
 import { generateMainBlockRiemannZeta } from './mainRiemannZeta.wgsl'
+import { generateMainBlockWdwZetaVolume } from './mainWdwZetaVolume.wgsl'
 import { generateMainBlockWigner2D } from './mainWigner2D.wgsl'
 import { NODAL_DEFINITION_MAP, NODAL_FAMILY_MAP, NODAL_RENDER_MODE_MAP } from './temporalJitter'
-import { COLOR_ALGORITHM_INDICES } from './volume/emissionConstants'
+import { ALGO_BRANCH } from './volume/emission.wgsl/emission.wgsl'
 
 /** Quantum physics mode for Schrödinger visualization */
 export type QuantumModeForShader = 'harmonicOscillator' | 'hydrogenND' | 'hydrogenNDCoupled'
 
 const DEFAULT_COLOR_ALGORITHM = 4
 const DEFAULT_DENSITY_GRID_SIZE = 64
-const COLOR_ALGORITHM_SET = new Set<number>(COLOR_ALGORITHM_INDICES)
+/**
+ * Algorithms the GENERIC Schrödinger color specialization implements (exactly
+ * the `ALGO_BRANCH` keys, 0-28). The WDW ⊗ ζ suite's own algorithms (29+) are
+ * rendered by the suite main block from the runtime `colorAlgorithm` uniform,
+ * not this compile-time specialization, so they are clamped to the default here
+ * — the generic shader stays valid for any uniform value (and never throws).
+ */
+const COLOR_ALGORITHM_SET = new Set<number>(Object.keys(ALGO_BRANCH).map(Number))
 
 /** Restrict shader quantum mode selection to supported analytical modes. */
 export function sanitizeQuantumModeForShader(mode: unknown): QuantumModeForShader {
@@ -165,6 +175,36 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
    * other mode.
    */
   isHilbertPolya?: boolean
+  /**
+   * Bifurcation Horizon mode (Kruskal eternal black hole on the Riemann
+   * critical strip). Selects the dedicated volumetric main block and excludes
+   * the quantum-math and volume blocks entirely — the mode's shader is
+   * self-contained (uniforms + basis + HSL + sphere intersection + a group-2
+   * 2D (t, u) LUT storage buffer). The top-level `quantumMode` is narrowed to
+   * `'harmonicOscillator'` like the other horizon modes. Leave `false` for
+   * every other mode.
+   */
+  isBifurcationHorizon?: boolean
+  /**
+   * Modular Knot mode (modular geodesics knotted around the trefoil, colored by
+   * the Rademacher invariant Φ). Selects the dedicated 3D-texture volumetric
+   * main block and excludes the quantum-math and volume blocks entirely — the
+   * mode's shader is self-contained (uniforms + basis + HSL + sphere
+   * intersection + a group-2 3D texture & sampler holding a CPU-baked RGBA
+   * volume). The top-level `quantumMode` is narrowed to `'harmonicOscillator'`
+   * like the other horizon modes. Leave `false` for every other mode.
+   */
+  isModularKnot?: boolean
+  /**
+   * WDW ⊗ ζ suite mode (any of the ten `WDW_ZETA_MODES`). All ten share this one
+   * flag, the dedicated 3D-texture volumetric main block (`mainWdwZetaVolume`),
+   * and one compiled pipeline; the per-mode `wzModeId` uniform distinguishes
+   * them at runtime. Excludes the quantum-math and volume blocks entirely — the
+   * shader is self-contained (uniforms + basis + sphere intersection + a group-2
+   * 3D texture & sampler holding the CPU-baked RGBA volume). Leave `false` for
+   * every non-suite mode.
+   */
+  isWdwZetaVolume?: boolean
   /** Include analysis texture bindings for free-scalar educational color modes. */
   freeScalarAnalysis?: boolean
   /** Density matrix mode (open quantum) — disables inline wavefunction fallback. */
@@ -361,6 +401,9 @@ export function buildShaderDefinesAndFeatures(flags: {
   isCoherenceHorizon?: boolean
   isRiemannZeta?: boolean
   isHilbertPolya?: boolean
+  isBifurcationHorizon?: boolean
+  isModularKnot?: boolean
+  isWdwZetaVolume?: boolean
   useWignerCache: boolean
   crossSectionEnabled: boolean
   probabilityCurrentEnabled: boolean
@@ -409,6 +452,9 @@ export function buildShaderDefinesAndFeatures(flags: {
   const isCoherenceHorizon = sanitizeShaderBoolean(flags.isCoherenceHorizon, false)
   const isRiemannZeta = sanitizeShaderBoolean(flags.isRiemannZeta, false)
   const isHilbertPolya = sanitizeShaderBoolean(flags.isHilbertPolya, false)
+  const isBifurcationHorizon = sanitizeShaderBoolean(flags.isBifurcationHorizon, false)
+  const isModularKnot = sanitizeShaderBoolean(flags.isModularKnot, false)
+  const isWdwZetaVolume = sanitizeShaderBoolean(flags.isWdwZetaVolume, false)
   const useWignerCache = sanitizeShaderBoolean(flags.useWignerCache, false)
   const crossSectionEnabled = sanitizeShaderBoolean(flags.crossSectionEnabled, true)
   const probabilityCurrentEnabled = sanitizeShaderBoolean(flags.probabilityCurrentEnabled, true)
@@ -551,6 +597,9 @@ export function buildShaderDefinesAndFeatures(flags: {
   defines.push(`const IS_COHERENCE_HORIZON: bool = ${isCoherenceHorizon};`)
   defines.push(`const IS_RIEMANN_ZETA: bool = ${isRiemannZeta};`)
   defines.push(`const IS_HILBERT_POLYA: bool = ${isHilbertPolya};`)
+  defines.push(`const IS_BIFURCATION_HORIZON: bool = ${isBifurcationHorizon};`)
+  defines.push(`const IS_MODULAR_KNOT: bool = ${isModularKnot};`)
+  defines.push(`const IS_WDW_ZETA_VOLUME: bool = ${isWdwZetaVolume};`)
   defines.push(`const HAS_BINARY_SIGN_PHASE: bool = ${hasBinarySignPhase};`)
   // Pre-computed gradient normals: enabled for density-grid analytic modes (HO/hydrogen)
   // and any compute mode that explicitly provides a normal grid (e.g. FSF).
@@ -583,6 +632,9 @@ export function buildShaderDefinesAndFeatures(flags: {
   if (isCoherenceHorizon) features.push('Coherence Horizon Geodesics')
   if (isRiemannZeta) features.push('Arithmetic Horizon (Riemann ζ)')
   if (isHilbertPolya) features.push('Hilbert–Pólya Spectrum')
+  if (isBifurcationHorizon) features.push('Bifurcation Horizon (Kruskal ERB)')
+  if (isModularKnot) features.push('Modular Knot (Rademacher Horizon)')
+  if (isWdwZetaVolume) features.push('WDW ⊗ ζ Suite')
   if (useDensityGrid) features.push('Density Grid Raymarching')
   if (isWigner && useWignerCache) features.push('Wigner Cache')
   if (sampleSpaceRotation) features.push('Sample-Space Rotation')
@@ -614,6 +666,8 @@ export function removeDefaultNodalSpecializationOverrides(wgsl: string): string 
  * @param isCoherenceHorizon - Coherence Horizon geodesic mode (owns its main block)
  * @param isRiemannZeta - Arithmetic Horizon mode (owns its volumetric main block)
  * @param isHilbertPolya - Hilbert–Pólya Spectrum mode (owns its volumetric main block)
+ * @param isBifurcationHorizon - Bifurcation Horizon mode (owns its volumetric main block)
+ * @param isModularKnot - Modular Knot mode (owns its 3D-texture volumetric main block)
  * @param isWigner - Wigner phase-space mode
  * @param is2D - 2D rendering mode
  * @param isosurface - Isosurface mode
@@ -627,6 +681,9 @@ export function selectMainBlock(
   isCoherenceHorizon: boolean,
   isRiemannZeta: boolean,
   isHilbertPolya: boolean,
+  isBifurcationHorizon: boolean,
+  isModularKnot: boolean,
+  isWdwZetaVolume: boolean,
   isWigner: boolean,
   is2D: boolean,
   isosurface: boolean,
@@ -639,6 +696,9 @@ export function selectMainBlock(
   if (isCoherenceHorizon) return generateMainBlockCoherenceHorizon()
   if (isRiemannZeta) return generateMainBlockRiemannZeta()
   if (isHilbertPolya) return generateMainBlockHilbertPolya()
+  if (isBifurcationHorizon) return generateMainBlockBifurcationHorizon()
+  if (isModularKnot) return generateMainBlockModularKnot()
+  if (isWdwZetaVolume) return generateMainBlockWdwZetaVolume()
   if (isWigner) return generateMainBlockWigner2D(useWignerCache)
   if (is2D) return isosurface ? generateMainBlock2DIsolines() : generateMainBlock2D()
   if (isosurface) {

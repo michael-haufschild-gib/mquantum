@@ -46,7 +46,9 @@ import {
   selectMainBlock,
 } from './composeConfig'
 import { temporalMRTOutputBlock } from './main.wgsl'
+import { generateWdwZetaSdfBlock } from './mainWdwZetaSdf.wgsl'
 import { COLOR_ALG_NAMES } from './volume/emission.wgsl'
+import { generateWdwZetaLib } from './wdwZetaLib.wgsl'
 
 // Re-export types for consumers
 export type { QuantumModeForShader, SchroedingerWGSLShaderConfig } from './composeConfig'
@@ -87,6 +89,9 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   const isCoherenceHorizon = sanitizeShaderBoolean(config.isCoherenceHorizon, false)
   const isRiemannZeta = sanitizeShaderBoolean(config.isRiemannZeta, false)
   const isHilbertPolya = sanitizeShaderBoolean(config.isHilbertPolya, false)
+  const isBifurcationHorizon = sanitizeShaderBoolean(config.isBifurcationHorizon, false)
+  const isModularKnot = sanitizeShaderBoolean(config.isModularKnot, false)
+  const isWdwZetaVolume = sanitizeShaderBoolean(config.isWdwZetaVolume, false)
   const freeScalarAnalysis = sanitizeShaderBoolean(config.freeScalarAnalysis, false)
   const useDensityMatrix = sanitizeShaderBoolean(config.useDensityMatrix, false)
   const crossSectionEnabled = sanitizeShaderBoolean(config.crossSectionEnabled, true)
@@ -153,6 +158,9 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     isCoherenceHorizon,
     isRiemannZeta,
     isHilbertPolya,
+    isBifurcationHorizon,
+    isModularKnot,
+    isWdwZetaVolume,
     useWignerCache,
     crossSectionEnabled,
     probabilityCurrentEnabled,
@@ -183,6 +191,9 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     isCoherenceHorizon,
     isRiemannZeta,
     isHilbertPolya,
+    isBifurcationHorizon,
+    isModularKnot,
+    isWdwZetaVolume,
     isWigner,
     is2D,
     isosurface,
@@ -226,6 +237,9 @@ struct VertexOutput {
         freeScalarAnalysis,
         isRiemannZeta,
         isHilbertPolya,
+        isBifurcationHorizon,
+        isModularKnot,
+        isWdwZetaVolume,
       }),
     },
 
@@ -233,7 +247,12 @@ struct VertexOutput {
     // wavefunction evaluation — and in Coherence Horizon / Arithmetic Horizon /
     // Hilbert–Pólya modes, whose dedicated main blocks evaluate their fields
     // inline / via their LUTs and reference nothing here)
-    ...(isCoherenceHorizon || isRiemannZeta || isHilbertPolya
+    ...(isCoherenceHorizon ||
+    isRiemannZeta ||
+    isHilbertPolya ||
+    isBifurcationHorizon ||
+    isModularKnot ||
+    isWdwZetaVolume
       ? []
       : buildQuantumMathBlocks({
           actualDim,
@@ -262,7 +281,12 @@ struct VertexOutput {
     // Volume rendering (inline raymarch excluded in grid-only mode; entirely
     // absent for Coherence Horizon, Arithmetic Horizon, and Hilbert–Pólya —
     // their main blocks own the geodesic / LUT volumetric march)
-    ...(isCoherenceHorizon || isRiemannZeta || isHilbertPolya
+    ...(isCoherenceHorizon ||
+    isRiemannZeta ||
+    isHilbertPolya ||
+    isBifurcationHorizon ||
+    isModularKnot ||
+    isWdwZetaVolume
       ? []
       : buildVolumeBlocks({
           is2D,
@@ -294,6 +318,11 @@ struct VertexOutput {
       content: temporalMRTOutputBlock,
       condition: enableTemporal && !is2D,
     },
+
+    // WDW ⊗ ζ suite shared lib (SDF + lighting + domain color), used by the
+    // live sphere-tracing main block.
+    { name: 'WDW⊗ζ Lib', content: generateWdwZetaLib(), condition: isWdwZetaVolume },
+    { name: 'WDW⊗ζ SDF', content: generateWdwZetaSdfBlock(), condition: isWdwZetaVolume },
 
     // Main shader
     { name: 'Main', content: selectedMainBlock },

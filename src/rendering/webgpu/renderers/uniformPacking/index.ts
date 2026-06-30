@@ -32,6 +32,7 @@ import {
 } from '../schrodingerRendererTypes'
 import { SCHROEDINGER_LAYOUT } from '../schroedingerLayout'
 import {
+  packBifurcationHorizon,
   packBilocalERBridge,
   packBornNullWeave,
   packCausalDiamondModularOrbital,
@@ -39,10 +40,12 @@ import {
   packEntropicTimeShear,
   packHermiteCocycle,
   packHilbertPolya,
+  packModularKnot,
   packQuantumBackreaction,
   packRiemannZeta,
   packSpectralDimensionFlow,
   packVacuumBubbleLens,
+  packWdwZetaVolume,
 } from '../uniformPackingBackreaction'
 import {
   packColorRgba,
@@ -425,6 +428,15 @@ function packVisualFields(
     p.quantumModeStr === 'riemannZeta'
   )
   packHilbertPolya(floatView, schroedinger, p.quantumModeStr === 'hilbertPolya')
+  packBifurcationHorizon(
+    floatView,
+    schroedinger,
+    p.dimension,
+    p.boundingRadius,
+    p.quantumModeStr === 'bifurcationHorizon'
+  )
+  packModularKnot(floatView, schroedinger, p.quantumModeStr === 'modularKnot')
+  packWdwZetaVolume(floatView, p.quantumModeStr)
 }
 
 /** Pack nodal fields, color algorithm, and cosine palette. */

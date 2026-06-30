@@ -19,6 +19,7 @@ import {
   type HydrogenNDPresetName,
   type SchroedingerConfig,
 } from '@/lib/geometry/extended/types'
+import { isWdwZetaMode } from '@/lib/geometry/extended/wdwZeta/shared'
 import {
   getQuantumTypeEntry,
   isComputeQuantumType,
@@ -147,6 +148,31 @@ interface ModeResizers {
   ) => Partial<SchroedingerConfig['dirac']>
 }
 
+/**
+ * Horizon-family modes that render exclusively through a position-space main
+ * block — momentum / Wigner representations have no pipeline for them, so
+ * representation switches are blocked and representation overrides forced to
+ * `position`.
+ */
+const POSITION_ONLY_HORIZON_MODES = new Set<SchroedingerConfig['quantumMode']>([
+  'coherenceHorizon',
+  'riemannZeta',
+  'hilbertPolya',
+  'bifurcationHorizon',
+  'modularKnot',
+  // WDW ⊗ ζ suite (all position-only volumetric modes)
+  'constraintSeam',
+  'moebiusNoBoundary',
+  'forcedCell',
+  'turningSurface',
+  'primonMultiverse',
+  'frobeniusWheel',
+  'dewittCone',
+  'selbergSpectrum',
+  'adelicWavefunction',
+  'weilPositivity',
+])
+
 /** Enforce dimension constraints when switching quantum mode. */
 function enforceDimensionConstraints(mode: SchroedingerConfig['quantumMode']): void {
   const geo = useGeometryStore.getState()
@@ -186,11 +212,10 @@ function buildRepresentationOverrides(
   }
 
   // Horizon-family modes (Coherence Horizon geodesic block, Arithmetic
-  // Horizon and Hilbert–Pólya volumetric blocks) render exclusively through
-  // position-space main blocks — momentum/Wigner have no pipeline for them.
-  const isPositionOnlyHorizonMode =
-    mode === 'coherenceHorizon' || mode === 'riemannZeta' || mode === 'hilbertPolya'
-  if (isPositionOnlyHorizonMode && currentRepr !== 'position') {
+  // Horizon, Hilbert–Pólya and Bifurcation Horizon volumetric blocks) render
+  // exclusively through position-space main blocks — momentum/Wigner have no
+  // pipeline for them.
+  if (POSITION_ONLY_HORIZON_MODES.has(mode) && currentRepr !== 'position') {
     overrides.representation = 'position'
   }
 
@@ -309,6 +334,11 @@ function applyFirstPreset(
   get: () => ExtendedObjectSlice
 ): void {
   const store = get()
+  // The WDW ⊗ ζ suite shares one generic preset dispatch for all ten modes.
+  if (isWdwZetaMode(mode)) {
+    store.setWdwZetaPreset(mode, presetId)
+    return
+  }
   switch (mode) {
     case 'harmonicOscillator':
       store.setSchroedingerPresetName(presetId as SchroedingerPresetName)
@@ -355,6 +385,16 @@ function applyFirstPreset(
     case 'hilbertPolya':
       store.setHilbertPolyaPreset(
         presetId as import('@/lib/geometry/extended/hilbertPolya').HilbertPolyaPresetName
+      )
+      break
+    case 'bifurcationHorizon':
+      store.setBifurcationHorizonPreset(
+        presetId as import('@/lib/geometry/extended/bifurcationHorizon').BifurcationHorizonPresetName
+      )
+      break
+    case 'modularKnot':
+      store.setModularKnotPreset(
+        presetId as import('@/lib/geometry/extended/modularKnot').ModularKnotPresetName
       )
       break
   }
@@ -436,12 +476,11 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
         if (dim === 2 && isHydrogenFamilyQuantumType(qm)) return
         // Block momentum for coupled hydrogen ND (shader is position-only)
         if (value === 'momentum' && qm === 'hydrogenNDCoupled') return
-        // Block non-position for Coherence Horizon (geodesic block is position-only)
-        if (qm === 'coherenceHorizon') return
-        // Block non-position for Arithmetic Horizon (volumetric block is position-only)
-        if (qm === 'riemannZeta') return
-        // Block non-position for Hilbert–Pólya (volumetric block is position-only)
-        if (qm === 'hilbertPolya') return
+        // Block non-position for the position-only horizon-family modes
+        // (Coherence Horizon geodesic block; Arithmetic Horizon, Hilbert–Pólya
+        // and Bifurcation Horizon volumetric blocks) — momentum/Wigner have no
+        // pipeline for any of them.
+        if (POSITION_ONLY_HORIZON_MODES.has(qm)) return
       }
       setWithVersion((state) => ({
         schroedinger: {

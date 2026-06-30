@@ -16,6 +16,7 @@ export type HilbertPolyaPresetName =
   | 'matsubaraVeil'
   | 'etaComb'
   | 'doublePrecisionHorizon'
+  | 'matsubaraTower4D'
   | 'custom'
 
 /**
@@ -102,6 +103,15 @@ export const HILBERT_POLYA_PRESETS: Readonly<
     fogGain: 1,
     planeMarker: true,
   },
+  /** 4D Matsubara tower (dimension 4): the spectral window with the veil lifting along W. */
+  matsubaraTower4D: {
+    zMax: 120,
+    yExtent: 1,
+    filamentWidth: 0.22,
+    glow: 1.7,
+    fogGain: 0.5,
+    planeMarker: true,
+  },
 }
 
 /** Scenario metadata for the unified preset selector. */
@@ -109,6 +119,10 @@ export interface HilbertPolyaScenario {
   id: Exclude<HilbertPolyaPresetName, 'custom'>
   label: string
   description: string
+  /** Target spatial dimension (applying the scenario snaps the dimension to it; default 3). */
+  dimension?: number
+  /** Initial N-D rotation (plane → radians) applied so a 4D scenario tilts into W at rest. */
+  rotation?: Readonly<Record<string, number>>
 }
 
 /** Ordered scenario list shown in the Scenario dropdown. */
@@ -136,5 +150,13 @@ export const HILBERT_POLYA_SCENARIOS: readonly HilbertPolyaScenario[] = [
     label: 'Double-Precision Horizon',
     description:
       'The visibility line (π/2−θ)·z ≈ 36 — where IEEE double precision runs out of bits against the Gamma envelope — slices diagonally through the volume: numerics as a horizon.',
+  },
+  {
+    id: 'matsubaraTower4D',
+    label: '4D Matsubara Tower',
+    description:
+      'The Evans landscape (Re z, Im z, θ) gains a fourth axis: a Matsubara frequency ω. The contour-rotation θ — which lifts the cancellation veil — is shifted by ω, so rotating the slice into W makes the veil lift as a spatial gradient and the spectral filaments crystallize along a diagonal sweep instead of all at once. The whole tower of Matsubara frequencies seen in one frame; every zero still pinned to Im z = 0. Opens at dimension 4.',
+    dimension: 4,
+    rotation: { XW: 0.6 },
   },
 ]

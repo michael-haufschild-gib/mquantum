@@ -143,6 +143,62 @@ export function* enumerateHilbertPolya(): Generator<ShaderRecord> {
   yield record('hilbert-polya_d3', wgsl, 'hilbert-polya:3', 'hilbert-polya')
 }
 
+/**
+ * Bifurcation Horizon (Kruskal eternal black hole) volumetric fragment shader
+ * at every supported dimension. Uses the production `buildShaderConfig`
+ * derivation so the exact shader the renderer compiles is what gets validated.
+ */
+export function* enumerateBifurcationHorizon(): Generator<ShaderRecord> {
+  for (let dimension = 3; dimension <= 11; dimension++) {
+    const config = buildShaderConfig({ quantumMode: 'bifurcationHorizon', dimension })
+    const { wgsl } = composeSchroedingerShader(config)
+    yield record(
+      `bifurcation-horizon_d${dimension}`,
+      wgsl,
+      `bifurcation-horizon:${dimension}`,
+      'bifurcation-horizon'
+    )
+  }
+}
+
+/**
+ * Modular Knot ("Rademacher Horizon") 3D-texture volumetric fragment shader. The
+ * mode is 3D-only (registry min = max = 3). Uses the production `buildShaderConfig`
+ * derivation so the exact shader the renderer compiles is what gets validated.
+ */
+export function* enumerateModularKnot(): Generator<ShaderRecord> {
+  const config = buildShaderConfig({ quantumMode: 'modularKnot', dimension: 3 })
+  const { wgsl } = composeSchroedingerShader(config)
+  yield record('modular-knot_d3', wgsl, 'modular-knot:3', 'modular-knot')
+}
+
+/**
+ * WDW ⊗ ζ suite shared live sphere-tracing fragment shader. All suite modes are
+ * 3D-only and share one shader (one compiled pipeline) that synthesizes each
+ * mode's lit form from the ζ-LUT storage buffer; each built mode is enumerated
+ * so `buildShaderConfig` is exercised for it. Uses the production derivation so
+ * the exact shader the renderer compiles is validated.
+ */
+export function* enumerateWdwZetaSuite(): Generator<ShaderRecord> {
+  const builtModes = [
+    'constraintSeam',
+    'moebiusNoBoundary',
+    'forcedCell',
+    'turningSurface',
+    'primonMultiverse',
+    'frobeniusWheel',
+    'dewittCone',
+    'selbergSpectrum',
+    'adelicWavefunction',
+    'weilPositivity',
+  ] as const
+  for (const mode of builtModes) {
+    const config = buildShaderConfig({ quantumMode: mode, dimension: 3 })
+    const { wgsl } = composeSchroedingerShader(config)
+    yield record(`wdw-zeta_${mode}_d3`, wgsl, `wdw-zeta:${mode}:3`, 'wdw-zeta')
+  }
+}
+
 const COMPUTE_MODES: readonly ComputeQuantumMode[] = [
   'harmonicOscillator',
   'hydrogenND',

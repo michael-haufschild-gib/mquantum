@@ -429,6 +429,51 @@ struct SchroedingerUniforms {
   hpPlaneMarker: f32,
   hpFilamentWidth: f32,
 
+  // Bifurcation Horizon (Kruskal eternal black hole on the critical strip).
+  // Read only by the dedicated volumetric main block (quantumMode ===
+  // bifurcationHorizon); the host packer zeroes these for all other modes. The
+  // 2D (t, u) LUT itself (density, edge, psiRe, psiIm) is a separate group-2
+  // storage buffer owned by BifurcationHorizonStrategy — NOT in this struct.
+  // bhMetricExponent carries (d−2); bhRedshiftRadius is world-space (config ×
+  // boundingRadius). u = log(rPerp / bhNeckRadius); the LUT window is
+  // u ∈ [−bhUHalf, bhUHalf], t ∈ [0, bhTMax].
+  bhNeckRadius: f32,
+  bhUHalf: f32,
+  bhTMax: f32,
+  bhGlow: f32,
+  bhFlowRate: f32,
+  bhSwirl: f32,
+  bhRedshiftRadius: f32,
+  bhMetricExponent: f32,
+  bhWinding: f32,
+  bhThermalGain: f32,
+  bhOffLine: f32,
+  _padBh1: f32,
+
+  // Modular Knot ("Rademacher Horizon"). Read only by the dedicated 3D-texture
+  // volumetric main block (quantumMode === modularKnot); the host packer zeroes
+  // these for all other modes. The baked RGBA volume itself is a separate
+  // group-2 3D texture + sampler owned by ModularKnotStrategy — NOT in this
+  // struct. mkGlow scales cloud emission; mkFlow is the render-only auto-rotation
+  // rate; mkMetric is reserved for a future horizon term; _padMk1 keeps the
+  // 16-byte (vec4f) alignment of this trailing block.
+  mkGlow: f32,
+  mkFlow: f32,
+  mkMetric: f32,
+  _padMk1: f32,
+
+  // WDW ⊗ ζ suite (any of the ten WDW_ZETA_MODES). Read only by the shared
+  // 3D-texture volumetric main block; the host packer zeroes these for every
+  // other mode. wzModeId selects the per-mode emission style; wzParamA/wzParamB
+  // are generic render-time knobs (reserved); _padWz keeps the 16-byte (vec4f)
+  // alignment of this trailing block. The baked RGBA volume itself is a separate
+  // group-2 3D texture + sampler owned by WdwZetaVolumeStrategy — NOT in this
+  // struct. Emission/glow comes from the shared emissionIntensity field.
+  wzModeId: f32,
+  wzParamA: f32,
+  wzParamB: f32,
+  _padWz: f32,
+
 }
 
 // ============================================

@@ -1,19 +1,29 @@
+import {
+  BIFURCATION_HORIZON_RANGES,
+  DEFAULT_BIFURCATION_HORIZON_CONFIG,
+} from '@/lib/geometry/extended/bifurcationHorizon'
 import { COHERENCE_HORIZON_RANGES } from '@/lib/geometry/extended/coherenceHorizon'
 import {
   DEFAULT_HILBERT_POLYA_CONFIG,
   HILBERT_POLYA_RANGES,
 } from '@/lib/geometry/extended/hilbertPolya'
 import {
+  DEFAULT_MODULAR_KNOT_CONFIG,
+  MODULAR_KNOT_RANGES,
+} from '@/lib/geometry/extended/modularKnot'
+import {
   DEFAULT_RIEMANN_ZETA_CONFIG,
   RIEMANN_ZETA_RANGES,
 } from '@/lib/geometry/extended/riemannZeta'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
+import { BIFURCATION_T_MAX, BIFURCATION_U_HALF } from '@/lib/physics/bifurcationHorizon'
 import { tangherliniHorizonRadius } from '@/lib/physics/coherenceHorizon'
 import {
   hagedornPartitionGain,
   RIEMANN_DEFAULT_RADIAL,
   RIEMANN_WORLD_SCALE,
 } from '@/lib/physics/riemannZeta'
+import { getWdwZetaSpec } from '@/lib/physics/wdwZeta/registry'
 
 import { SCHROEDINGER_LAYOUT } from '../schroedingerLayout'
 
@@ -401,6 +411,145 @@ export function packHilbertPolya(
     R.filamentWidth.min,
     R.filamentWidth.max
   )
+}
+
+/**
+ * Pack Bifurcation Horizon uniforms (Kruskal eternal black hole on the Riemann
+ * critical strip). Only the bifurcationHorizon mode reads these fields (its
+ * dedicated volumetric main block); every other mode gets all-zero fields so
+ * the buffer region is deterministic. The 2D (t, u) LUT itself is a separate
+ * group-2 storage buffer owned by BifurcationHorizonStrategy — not part of this
+ * struct. The world-space neck radius r₀ = neckRadius·R_bound, the extremal
+ * redshift radius r_h = redshiftRadius·R_bound, the metric exponent (d−2), and
+ * the LUT window constants (uHalf / tMax) are CPU-precomputed here so the shader
+ * never derives them per frame.
+ */
+export function packBifurcationHorizon(
+  floatView: Float32Array,
+  schroedinger: Partial<SchroedingerConfig> | undefined,
+  dimension: number,
+  boundingRadius: number,
+  isBifurcationHorizonMode: boolean
+): void {
+  if (!isBifurcationHorizonMode) {
+    floatView[I.bhNeckRadius] =
+      floatView[I.bhUHalf] =
+      floatView[I.bhTMax] =
+      floatView[I.bhGlow] =
+      floatView[I.bhFlowRate] =
+      floatView[I.bhSwirl] =
+      floatView[I.bhRedshiftRadius] =
+      floatView[I.bhMetricExponent] =
+      floatView[I.bhWinding] =
+      floatView[I.bhThermalGain] =
+      floatView[I.bhOffLine] =
+        0.0
+    return
+  }
+
+  const cfg = schroedinger?.bifurcationHorizon
+  const defaults = DEFAULT_BIFURCATION_HORIZON_CONFIG
+  const R = BIFURCATION_HORIZON_RANGES
+  const d = Math.max(3, Math.min(11, Math.floor(Number.isFinite(dimension) ? dimension : 3)))
+  const safeBound = Number.isFinite(boundingRadius) && boundingRadius > 0 ? boundingRadius : 2.0
+
+  const neckRadius = finiteClamped(
+    cfg?.neckRadius,
+    defaults.neckRadius,
+    R.neckRadius.min,
+    R.neckRadius.max
+  )
+  const redshiftRadius = finiteClamped(
+    cfg?.redshiftRadius,
+    defaults.redshiftRadius,
+    R.redshiftRadius.min,
+    R.redshiftRadius.max
+  )
+
+  floatView[I.bhNeckRadius] = neckRadius * safeBound
+  floatView[I.bhUHalf] = BIFURCATION_U_HALF
+  floatView[I.bhTMax] = BIFURCATION_T_MAX
+  floatView[I.bhGlow] = finiteClamped(cfg?.glow, defaults.glow, R.glow.min, R.glow.max)
+  floatView[I.bhFlowRate] = finiteClamped(
+    cfg?.flowRate,
+    defaults.flowRate,
+    R.flowRate.min,
+    R.flowRate.max
+  )
+  floatView[I.bhSwirl] = finiteClamped(cfg?.swirl, defaults.swirl, R.swirl.min, R.swirl.max)
+  // Extremal dark-core radius in world space, as a fraction of the neck radius
+  // r₀ = neckRadius·R_bound so the captured core stays INSIDE the throat
+  // (rPerp < r_h ≤ r₀) instead of swallowing it; 0 disables the core.
+  floatView[I.bhRedshiftRadius] = redshiftRadius > 0 ? redshiftRadius * neckRadius * safeBound : 0
+  floatView[I.bhMetricExponent] = d - 2
+  floatView[I.bhWinding] = finiteClamped(
+    cfg?.winding,
+    defaults.winding,
+    R.winding.min,
+    R.winding.max
+  )
+  floatView[I.bhThermalGain] = finiteClamped(
+    cfg?.thermalGain,
+    defaults.thermalGain,
+    R.thermalGain.min,
+    R.thermalGain.max
+  )
+  floatView[I.bhOffLine] = finiteClamped(
+    cfg?.offLine,
+    defaults.offLine,
+    R.offLine.min,
+    R.offLine.max
+  )
+}
+
+/**
+ * Pack Modular Knot ("Rademacher Horizon") uniforms. Only the modularKnot mode
+ * reads these fields (its dedicated 3D-texture volumetric main block); every
+ * other mode gets all-zero fields so the buffer region is deterministic. The
+ * baked RGBA volume itself is a separate group-2 3D texture + sampler owned by
+ * ModularKnotStrategy — not part of this struct. Only the render-only glow and
+ * auto-rotation flow rate live here (mkMetric is reserved and stays zero).
+ */
+export function packModularKnot(
+  floatView: Float32Array,
+  schroedinger: Partial<SchroedingerConfig> | undefined,
+  isModularKnotMode: boolean
+): void {
+  if (!isModularKnotMode) {
+    floatView[I.mkGlow] = floatView[I.mkFlow] = floatView[I.mkMetric] = 0.0
+    return
+  }
+
+  const cfg = schroedinger?.modularKnot
+  const defaults = DEFAULT_MODULAR_KNOT_CONFIG
+  const R = MODULAR_KNOT_RANGES
+
+  floatView[I.mkGlow] = finiteClamped(cfg?.glow, defaults.glow, R.glow.min, R.glow.max)
+  floatView[I.mkFlow] = finiteClamped(cfg?.flow, defaults.flow, R.flow.min, R.flow.max)
+  // Reserved for a future horizon term; held at zero for now.
+  floatView[I.mkMetric] = 0.0
+}
+
+/**
+ * Pack WDW ⊗ ζ suite uniforms. The ten suite modes share one shader; the only
+ * per-mode uniform is `wzModeId` (from the bake registry), which the shared main
+ * block can use for a per-mode emission flourish. `wzParamA`/`wzParamB` are
+ * reserved generic render knobs. Non-suite modes get all-zero fields so the
+ * buffer region is deterministic. Emission/glow is the shared `emissionIntensity`
+ * field (appearanceStore.faceEmission) — NOT packed here.
+ *
+ * @param floatView - Float view over the SchroedingerUniforms buffer.
+ * @param quantumMode - The active quantum mode string.
+ */
+export function packWdwZetaVolume(floatView: Float32Array, quantumMode: string | undefined): void {
+  const spec = getWdwZetaSpec(quantumMode)
+  if (!spec) {
+    floatView[I.wzModeId] = floatView[I.wzParamA] = floatView[I.wzParamB] = 0.0
+    return
+  }
+  floatView[I.wzModeId] = spec.modeId
+  floatView[I.wzParamA] = 0.0
+  floatView[I.wzParamB] = 0.0
 }
 
 /**

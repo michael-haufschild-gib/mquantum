@@ -27,6 +27,15 @@ export type {
 // Registries
 export { QUANTUM_TYPE_REGISTRY } from './quantumTypes'
 
+// UI groups — collapse related modes into one Types-tab card
+export type { QuantumTypeGroup, QuantumTypeGroupSection } from './quantumTypeGroups'
+export {
+  getQuantumTypeGroupForKey,
+  isGroupedQuantumType,
+  QUANTUM_TYPE_GROUPS,
+  ZETA_PRIME_GROUP,
+} from './quantumTypeGroups'
+
 // Helpers — flat quantum-type API
 export {
   getAvailableQuantumTypes,

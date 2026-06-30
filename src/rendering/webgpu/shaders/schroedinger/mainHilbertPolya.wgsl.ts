@@ -51,6 +51,11 @@ const HP_NTHETA: i32 = 40;
 const HP_HALF_EXT: vec3f = vec3f(3.2, 1.2, 2.0);
 // Path-length budget multiplier (matches the straight-chord march reserve).
 const HP_PATH_SLACK: f32 = 1.05;
+// 4D Matsubara-frequency coupling: at dimension 4 the W axis is read as an extra
+// Matsubara frequency ω that shifts the contour-rotation θ. The shift sweeps the
+// veil-lift across the image so the spectral filaments crystallize along a
+// diagonal as the slice tilts into W. 0 at dimension 3 (the basis W-row is null).
+const HP_W_OMEGA: f32 = 1.6;
 
 /** Cheap per-pixel hash for march-offset jitter (banding suppression). */
 fn hpJitterHash(p: vec2f) -> f32 {
@@ -196,6 +201,14 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     getBasisComponent(basis.origin, 1),
     getBasisComponent(basis.origin, 2)
   );
+  // 4th-axis (W) row of the N-D basis — the Matsubara frequency ω. Null at
+  // dimension 3, so wq ≡ 0 and the box sampling is byte-identical to the 3D mode.
+  let awRow = vec3f(
+    getBasisComponent(basis.basisX, 3),
+    getBasisComponent(basis.basisY, 3),
+    getBasisComponent(basis.basisZ, 3)
+  );
+  let awOrigin = getBasisComponent(basis.origin, 3);
 
   let jitter = hpJitterHash(input.clipPosition.xy);
   var p = ro + rd * (tNear + jitter * baseStep);
@@ -209,7 +222,12 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     // Rotated-frame coordinates, then normalized box coordinates; samples
     // outside the box contribute nothing.
     let q = boxOrigin + vec3f(dot(p, axRow), dot(p, ayRow), dot(p, azRow));
-    let n = (q + HP_HALF_EXT) / (2.0 * HP_HALF_EXT);
+    // 4D: the Matsubara frequency ω = (W-projection of p) shifts the θ
+    // contour-rotation axis, so the veil-lift becomes a spatial gradient. At
+    // dimension 3, wq ≡ 0 and qz = q.z (the box sampling is unchanged).
+    let wq = dot(p, awRow) + awOrigin;
+    let qz = q.z + wq * HP_W_OMEGA;
+    let n = (vec3f(q.x, q.y, qz) + HP_HALF_EXT) / (2.0 * HP_HALF_EXT);
     if (any(n < vec3f(0.0)) || any(n > vec3f(1.0))) {
       p += rd * baseStep;
       continue;

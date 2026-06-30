@@ -14,7 +14,13 @@ import type {
   HilbertPolyaConfig,
   HilbertPolyaPresetName,
 } from '@/lib/geometry/extended/hilbertPolya'
-import { HILBERT_POLYA_PRESETS, HILBERT_POLYA_RANGES } from '@/lib/geometry/extended/hilbertPolya'
+import {
+  HILBERT_POLYA_PRESETS,
+  HILBERT_POLYA_RANGES,
+  HILBERT_POLYA_SCENARIOS,
+} from '@/lib/geometry/extended/hilbertPolya'
+import { useGeometryStore } from '@/stores/scene/geometryStore'
+import { useRotationStore } from '@/stores/scene/rotationStore'
 
 import type { SetterContext } from '../sliceSetterUtils'
 
@@ -87,6 +93,17 @@ export function createHilbertPolyaSetters(ctx: SetterContext): HilbertPolyaSette
       const preset = HILBERT_POLYA_PRESETS[name]
       if (!preset) return
       applyPartial(ctx, { ...preset, preset: name })
+      // Dimension guard: snap to the scenario's target dimension (3D scenarios → 3D,
+      // the 4D scenario → 4D) and apply its initial W-tilt. Dimension first, because
+      // rotationStore.setDimension resets rotation angles on a dimension change.
+      const scenario = HILBERT_POLYA_SCENARIOS.find((s) => s.id === name)
+      if (scenario) {
+        useGeometryStore.getState().setDimension(scenario.dimension ?? 3)
+        if (scenario.rotation) {
+          const setRotation = useRotationStore.getState().setRotation
+          for (const [plane, angle] of Object.entries(scenario.rotation)) setRotation(plane, angle)
+        }
+      }
     },
   }
 }

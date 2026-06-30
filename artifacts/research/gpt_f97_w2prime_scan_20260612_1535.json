@@ -1,0 +1,196 @@
+{
+  "conclusion": "Spacing alone does not give the model C0=1 barrier; finite pi-lattice blocks already exceed 1 and grow slowly near edge critical walls.",
+  "results": [
+    {
+      "critical_x": -3.512407365520363,
+      "degree_pairs": 2,
+      "family": "pi_lattice",
+      "max_abs_psi": 0.7933548158961865,
+      "y": 1.705
+    },
+    {
+      "critical_x": 5.0302842715187275,
+      "degree_pairs": 2,
+      "family": "random_pi_separated",
+      "max_abs_psi": 0.7045914980313238,
+      "y": 1.675
+    },
+    {
+      "critical_x": -3.512407365520363,
+      "degree_pairs": 2,
+      "family": "clustered_pi_separated",
+      "max_abs_psi": 0.7933548158961865,
+      "y": 1.705
+    },
+    {
+      "critical_x": -6.796667714825992,
+      "degree_pairs": 3,
+      "family": "pi_lattice",
+      "max_abs_psi": 0.8900267370638448,
+      "y": 1.72
+    },
+    {
+      "critical_x": -8.068630382602436,
+      "degree_pairs": 3,
+      "family": "random_pi_separated",
+      "max_abs_psi": 0.7394117702205375,
+      "y": 2.1
+    },
+    {
+      "critical_x": -6.796667714825992,
+      "degree_pairs": 3,
+      "family": "clustered_pi_separated",
+      "max_abs_psi": 0.8900267370638448,
+      "y": 1.72
+    },
+    {
+      "critical_x": -10.020815847117444,
+      "degree_pairs": 4,
+      "family": "pi_lattice",
+      "max_abs_psi": 0.9613287176320089,
+      "y": 1.7249055473032355
+    },
+    {
+      "critical_x": -13.521233941902745,
+      "degree_pairs": 4,
+      "family": "random_pi_separated",
+      "max_abs_psi": 0.7606811258770896,
+      "y": 2.13
+    },
+    {
+      "critical_x": -10.020815847117444,
+      "degree_pairs": 4,
+      "family": "clustered_pi_separated",
+      "max_abs_psi": 0.9613287176320089,
+      "y": 1.7249055473032355
+    },
+    {
+      "critical_x": -22.74322248283242,
+      "degree_pairs": 8,
+      "family": "pi_lattice",
+      "max_abs_psi": 1.1416119153532194,
+      "y": 1.705
+    },
+    {
+      "critical_x": 32.30815233665108,
+      "degree_pairs": 8,
+      "family": "random_pi_separated",
+      "max_abs_psi": 0.8562934287952119,
+      "y": 1.9466469919084783
+    },
+    {
+      "critical_x": 24.098722357373262,
+      "degree_pairs": 8,
+      "family": "clustered_pi_separated",
+      "max_abs_psi": 1.1154979370918896,
+      "y": 1.705
+    },
+    {
+      "critical_x": -47.990985740233356,
+      "degree_pairs": 16,
+      "family": "pi_lattice",
+      "max_abs_psi": 1.3319100824535282,
+      "y": 1.675
+    },
+    {
+      "critical_x": -50.70564798988045,
+      "degree_pairs": 16,
+      "family": "random_pi_separated",
+      "max_abs_psi": 0.9771548573385258,
+      "y": 1.935
+    },
+    {
+      "critical_x": -56.04993415175698,
+      "degree_pairs": 16,
+      "family": "clustered_pi_separated",
+      "max_abs_psi": 1.21222187903728,
+      "y": 1.69
+    },
+    {
+      "critical_x": 98.34461222052853,
+      "degree_pairs": 32,
+      "family": "pi_lattice",
+      "max_abs_psi": 1.5298325663733452,
+      "y": 1.645
+    },
+    {
+      "critical_x": -173.9789523413239,
+      "degree_pairs": 32,
+      "family": "random_pi_separated",
+      "max_abs_psi": 1.1015355423487685,
+      "y": 1.72
+    },
+    {
+      "critical_x": -141.69581364000544,
+      "degree_pairs": 32,
+      "family": "clustered_pi_separated",
+      "max_abs_psi": 1.325434638175417,
+      "y": 1.6791666073142681
+    },
+    {
+      "critical_x": -198.9450581971618,
+      "degree_pairs": 64,
+      "family": "pi_lattice",
+      "max_abs_psi": 1.7334110598281405,
+      "y": 1.6128222060774975
+    },
+    {
+      "critical_x": -385.8640087976202,
+      "degree_pairs": 64,
+      "family": "random_pi_separated",
+      "max_abs_psi": 1.2344502225118734,
+      "y": 1.815
+    },
+    {
+      "critical_x": -269.05998322054853,
+      "degree_pairs": 64,
+      "family": "clustered_pi_separated",
+      "max_abs_psi": 1.5547802046617765,
+      "y": 1.635
+    },
+    {
+      "critical_x": -400.0629944215462,
+      "degree_pairs": 128,
+      "family": "pi_lattice",
+      "max_abs_psi": 1.9411464692577236,
+      "y": 1.58063955936639
+    },
+    {
+      "critical_x": -802.2328417042245,
+      "degree_pairs": 256,
+      "family": "pi_lattice",
+      "max_abs_psi": 2.151935282548636,
+      "y": 1.555
+    },
+    {
+      "critical_x": -1606.5189204976107,
+      "degree_pairs": 512,
+      "family": "pi_lattice",
+      "max_abs_psi": 2.3649799628186052,
+      "y": 1.5250000000000001
+    },
+    {
+      "critical_x": -3215.046793132498,
+      "degree_pairs": 1024,
+      "family": "pi_lattice",
+      "max_abs_psi": 2.5797030182276477,
+      "y": 1.5
+    },
+    {
+      "critical_x": 6432.065420989252,
+      "degree_pairs": 2048,
+      "family": "pi_lattice",
+      "max_abs_psi": 2.795689913770902,
+      "y": 1.475
+    },
+    {
+      "critical_x": 12866.071167475237,
+      "degree_pairs": 4096,
+      "family": "pi_lattice",
+      "max_abs_psi": 3.0126383022047585,
+      "y": 1.45
+    }
+  ],
+  "seed": 12345,
+  "spacing": "all consecutive real-zero gaps >= pi"
+}

@@ -7,6 +7,7 @@
  * @module rendering/webgpu/renderers/schrodingerRendererTypes
  */
 
+import { COLOR_ALGORITHM_TO_INT } from '@/lib/colors/palette/types'
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { getQuantumTypeShaderUniformIdMap } from '@/lib/geometry/registry'
@@ -63,38 +64,14 @@ const PACKED_HYDROGEN_EXTRA_DIM_MAX_N = 6
  */
 export const QUANTUM_MODE_MAP: Record<string, number> = getQuantumTypeShaderUniformIdMap()
 
-/** Maps color algorithm names to shader integer constants */
-export const COLOR_ALGORITHM_MAP: Record<string, number> = {
-  lch: 0,
-  multiSource: 1,
-  radial: 2,
-  phase: 3,
-  mixed: 4,
-  blackbody: 5,
-  phaseCyclicUniform: 6,
-  phaseDiverging: 7,
-  domainColoringPsi: 8,
-  diverging: 9,
-  relativePhase: 10,
-  radialDistance: 11,
-  hamiltonianDecomposition: 12,
-  modeCharacter: 13,
-  energyFlux: 14,
-  kSpaceOccupation: 15,
-  purityMap: 16,
-  entropyMap: 17,
-  coherenceMap: 18,
-  viridis: 19,
-  inferno: 20,
-  densityContours: 21,
-  phaseDensity: 22,
-  particleAntiparticle: 23,
-  pauliSpinDensity: 24,
-  pauliSpinExpectation: 25,
-  pauliCoherence: 26,
-  quantumPotential: 27,
-  vortexDensity: 28,
-}
+/**
+ * Maps color algorithm names to shader integer constants. Derived from the
+ * single source of truth `COLOR_ALGORITHM_TO_INT` (which the parity test pins to
+ * the shader's `COLOR_ALGORITHM_INDICES`) so this per-frame lookup can never
+ * drift out of range — a stale literal here silently collapsed every new
+ * algorithm to the `?? 11` fallback before.
+ */
+export const COLOR_ALGORITHM_MAP: Record<string, number> = { ...COLOR_ALGORITHM_TO_INT }
 
 /**
  * Check whether a color algorithm integer is in the free scalar field analysis range

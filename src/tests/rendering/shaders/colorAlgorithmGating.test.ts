@@ -3,7 +3,13 @@
  */
 import { describe, expect, it } from 'vitest'
 
-import { COLOR_ALGORITHM_TO_INT, getAvailableColorAlgorithms } from '@/lib/colors/palette/types'
+import {
+  COLOR_ALGORITHM_TO_INT,
+  getAvailableColorAlgorithms,
+  WDW_ZETA_MODE_COLOR,
+  WDW_ZETA_SHARED_COLORS,
+} from '@/lib/colors/palette/types'
+import { WDW_ZETA_MODES } from '@/lib/geometry/extended/wdwZeta/shared'
 import { COLOR_ALGORITHM_INDICES } from '@/rendering/webgpu/shaders/schroedinger/volume/emissionConstants'
 
 describe('color algorithm shader/runtime id parity', () => {
@@ -505,5 +511,54 @@ describe('getAvailableColorAlgorithms — bellPair allowlist', () => {
     ).map((a) => a.value)
     expect(withOq).toEqual(baseline)
     expect(withOpts).toEqual(baseline)
+  })
+})
+
+describe('getAvailableColorAlgorithms — WDW ⊗ ζ suite color families', () => {
+  const BASE = ['mixed', 'phase', 'blackbody', 'viridis', 'densityContours']
+
+  it('every suite mode keeps the base live-lit families', () => {
+    for (const mode of WDW_ZETA_MODES) {
+      const values = getAvailableColorAlgorithms(mode).map((a) => a.value)
+      for (const base of BASE) {
+        expect(values, `${mode} should keep ${base}`).toContain(base)
+      }
+    }
+  })
+
+  it('each suite mode exposes its OWN mode-specific algorithm and no other mode-specific one', () => {
+    for (const mode of WDW_ZETA_MODES) {
+      const values = getAvailableColorAlgorithms(mode).map((a) => a.value)
+      expect(values, `${mode} should expose ${WDW_ZETA_MODE_COLOR[mode]}`).toContain(
+        WDW_ZETA_MODE_COLOR[mode]
+      )
+      for (const other of WDW_ZETA_MODES) {
+        if (other === mode) continue
+        expect(
+          values,
+          `${mode} must not leak ${other}'s ${WDW_ZETA_MODE_COLOR[other]}`
+        ).not.toContain(WDW_ZETA_MODE_COLOR[other])
+      }
+    }
+  })
+
+  it('lit suite modes expose the 4 shared algorithms; the all-emissive primon omits them', () => {
+    const seam = getAvailableColorAlgorithms('constraintSeam').map((a) => a.value)
+    for (const shared of WDW_ZETA_SHARED_COLORS) {
+      expect(seam, `constraintSeam should expose shared ${shared}`).toContain(shared)
+    }
+    const primon = getAvailableColorAlgorithms('primonMultiverse').map((a) => a.value)
+    for (const shared of WDW_ZETA_SHARED_COLORS) {
+      expect(primon, `primon (all-emissive) should omit shared ${shared}`).not.toContain(shared)
+    }
+    // ...but primon still gets its own mode-specific emissive algorithm.
+    expect(primon).toContain('boseOccupation')
+  })
+
+  it('spectral horizon modes stay on the 5 base families (no suite colors leak in)', () => {
+    const rz = getAvailableColorAlgorithms('riemannZeta').map((a) => a.value)
+    expect(rz.slice().sort()).toEqual(BASE.slice().sort())
+    expect(rz).not.toContain('zetaZeroCount')
+    expect(rz).not.toContain('xiPhaseCarpet')
   })
 })

@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { SchroedingerControls } from '@/components/sections/Geometry/SchroedingerControls'
+import { ZetaModeSelector } from '@/components/sections/Geometry/SchroedingerControls/ZetaModeSelector'
 import { ObjectTypeExplorer } from '@/components/sections/ObjectTypes/ObjectTypeExplorer'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
@@ -114,5 +115,105 @@ describe('ObjectTypeExplorer quantum mode entries', () => {
     render(<SchroedingerControls />)
 
     expect(screen.getByText('Rendering: Isosurface (Marching Cubes)')).toBeInTheDocument()
+  })
+})
+
+describe('ObjectTypeExplorer — Zeta / Prime family collapse', () => {
+  beforeEach(() => {
+    useGeometryStore.getState().reset()
+    useGeometryStore.getState().setObjectType('schroedinger')
+    useGeometryStore.getState().setDimension(4)
+    useExtendedObjectStore.getState().reset()
+    useRotationStore.setState(useRotationStore.getInitialState())
+  })
+
+  it('shows one Zeta / Prime card and hides the individual ζ-mode cards', () => {
+    render(
+      <ToastProvider>
+        <ObjectTypeExplorer />
+      </ToastProvider>
+    )
+
+    expect(screen.getByTestId('object-type-group-zetaPrime')).toBeInTheDocument()
+    // None of the fourteen members appear as their own top-level card.
+    for (const key of [
+      'riemannZeta',
+      'hilbertPolya',
+      'modularKnot',
+      'constraintSeam',
+      'weilPositivity',
+    ]) {
+      expect(screen.queryByTestId(`object-type-${key}`)).not.toBeInTheDocument()
+    }
+  })
+
+  it('lands on the default member (riemannZeta) when the group card is clicked', () => {
+    render(
+      <ToastProvider>
+        <ObjectTypeExplorer />
+      </ToastProvider>
+    )
+
+    fireEvent.click(screen.getByTestId('object-type-group-zetaPrime'))
+    expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('riemannZeta')
+    // Default member is 3D–11D, so dim 4 is preserved (no forced downshift).
+    expect(useGeometryStore.getState().dimension).toBe(4)
+  })
+
+  it('marks the group card selected while any member is active', () => {
+    useExtendedObjectStore.setState((state) => ({
+      schroedinger: { ...state.schroedinger, quantumMode: 'constraintSeam' },
+    }))
+    useGeometryStore.getState().setDimension(3)
+
+    render(
+      <ToastProvider>
+        <ObjectTypeExplorer />
+      </ToastProvider>
+    )
+
+    expect(screen.getByTestId('object-type-group-zetaPrime')).toHaveAttribute(
+      'data-selected',
+      'true'
+    )
+  })
+})
+
+describe('ZetaModeSelector — geometry-tab sub-mode toggle row', () => {
+  beforeEach(() => {
+    useGeometryStore.getState().reset()
+    useGeometryStore.getState().setObjectType('schroedinger')
+    useGeometryStore.getState().setDimension(3)
+    useExtendedObjectStore.getState().reset()
+  })
+
+  it('renders nothing for a non-grouped mode', () => {
+    useExtendedObjectStore.setState((state) => ({
+      schroedinger: { ...state.schroedinger, quantumMode: 'harmonicOscillator' },
+    }))
+    const { container } = render(<ZetaModeSelector />)
+    expect(container).toBeEmptyDOMElement()
+  })
+
+  it('switches the quantum mode when a sub-mode toggle is pressed', () => {
+    useExtendedObjectStore.setState((state) => ({
+      schroedinger: { ...state.schroedinger, quantumMode: 'riemannZeta' },
+    }))
+
+    render(<ZetaModeSelector />)
+
+    // Active member's toggle reflects pressed state.
+    expect(screen.getByTestId('zeta-mode-riemannZeta')).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.click(screen.getByTestId('zeta-mode-constraintSeam'))
+    expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('constraintSeam')
+  })
+
+  it('appears inside the Schrödinger geometry controls for a ζ mode', () => {
+    useExtendedObjectStore.setState((state) => ({
+      schroedinger: { ...state.schroedinger, quantumMode: 'riemannZeta' },
+    }))
+    render(<SchroedingerControls />)
+    expect(screen.getByTestId('zeta-mode-selector')).toBeInTheDocument()
   })
 })

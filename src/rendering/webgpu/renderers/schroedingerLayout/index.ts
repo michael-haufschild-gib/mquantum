@@ -333,6 +333,45 @@ const SCHROEDINGER_FIELDS = [
   { name: 'hpFogGain', type: 'f32' },
   { name: 'hpPlaneMarker', type: 'f32' },
   { name: 'hpFilamentWidth', type: 'f32' },
+
+  // --- Bifurcation Horizon (Kruskal eternal black hole on the critical strip) ---
+  // Zeroed for all modes except bifurcationHorizon. The (t, u) 2D LUT is a
+  // separate group-2 storage buffer (BifurcationHorizonStrategy), not part of
+  // this struct. bhMetricExponent carries (d−2). Order MUST match the WGSL
+  // SchroedingerUniforms struct exactly.
+  { name: 'bhNeckRadius', type: 'f32' },
+  { name: 'bhUHalf', type: 'f32' },
+  { name: 'bhTMax', type: 'f32' },
+  { name: 'bhGlow', type: 'f32' },
+  { name: 'bhFlowRate', type: 'f32' },
+  { name: 'bhSwirl', type: 'f32' },
+  { name: 'bhRedshiftRadius', type: 'f32' },
+  { name: 'bhMetricExponent', type: 'f32' },
+  { name: 'bhWinding', type: 'f32' },
+  { name: 'bhThermalGain', type: 'f32' },
+  { name: 'bhOffLine', type: 'f32' },
+  { name: '_padBh1', type: 'f32' },
+
+  // --- Modular Knot ("Rademacher Horizon") ---
+  // Zeroed for all modes except modularKnot. The baked RGBA volume is a
+  // separate group-2 3D texture + sampler (ModularKnotStrategy), not part of
+  // this struct. mkMetric is reserved; _padMk1 keeps vec4f (16-byte) alignment.
+  // Order MUST match the WGSL SchroedingerUniforms struct exactly.
+  { name: 'mkGlow', type: 'f32' },
+  { name: 'mkFlow', type: 'f32' },
+  { name: 'mkMetric', type: 'f32' },
+  { name: '_padMk1', type: 'f32' },
+
+  // --- WDW ⊗ ζ suite (shared by all ten WDW_ZETA_MODES) ---
+  // Zeroed for every non-suite mode. The baked RGBA volume is a separate
+  // group-2 3D texture + sampler (WdwZetaVolumeStrategy), not part of this
+  // struct. wzModeId selects per-mode shader emission; wzParamA/B are reserved
+  // render knobs; _padWz keeps vec4f (16-byte) alignment. Order MUST match the
+  // WGSL SchroedingerUniforms struct exactly.
+  { name: 'wzModeId', type: 'f32' },
+  { name: 'wzParamA', type: 'f32' },
+  { name: 'wzParamB', type: 'f32' },
+  { name: '_padWz', type: 'f32' },
 ] as const satisfies readonly StructFieldDef[]
 
 /** Computed struct layout for SchroedingerUniforms. */

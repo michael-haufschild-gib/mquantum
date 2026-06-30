@@ -1,0 +1,44 @@
+snapshot_remote_utc=2026-06-12T11:31:36+00:00
+host=576c883b8605
+
+ps
+
+pip_freeze
+mpmath==1.3.0
+packaging==26.2
+setuptools==82.0.1
+sympy==1.14.0
+wheel==0.47.0
+
+file_manifest
+6234 2026-06-12T10:47:32.9844313050 /workspace/gpt_rh/fable_xicheck/gpt_fable_xicheck.py
+0 2026-06-12T10:47:34.0414198940 /workspace/gpt_rh/fable_xicheck/latest.err
+14862 2026-06-12T11:30:48.7507087430 /workspace/gpt_rh/fable_xicheck/latest.out
+5 2026-06-12T10:47:34.0414198940 /workspace/gpt_rh/fable_xicheck/latest.pid
+6264 2026-06-12T09:05:36.4522081270 /workspace/gpt_rh/rh_walljet_certifier.py
+564 2026-06-12T09:32:38.0318332810 /workspace/gpt_rh/walljet_d9.log
+3 2026-06-12T08:57:07.7538083210 /workspace/gpt_rh/walljet_d9.pid
+5807 2026-06-12T09:33:56.7450330790 /workspace/gpt_rh/walljet_d9_transverse.log
+4 2026-06-12T09:07:28.2389774790 /workspace/gpt_rh/walljet_d9_transverse.pid
+2846 2026-06-12T09:32:54.0276706680 /workspace/gpt_rh/walljet_d9_transverse_w3.log
+5 2026-06-12T09:20:35.5445530230 /workspace/gpt_rh/walljet_d9_transverse_w3.pid
+2843 2026-06-12T09:32:59.2746173270 /workspace/gpt_rh/walljet_d9_transverse_w4.log
+5 2026-06-12T09:20:35.6945514340 /workspace/gpt_rh/walljet_d9_transverse_w4.pid
+2836 2026-06-12T09:33:06.6595422510 /workspace/gpt_rh/walljet_d9_transverse_w5.log
+5 2026-06-12T09:20:35.6975514030 /workspace/gpt_rh/walljet_d9_transverse_w5.pid
+2828 2026-06-12T09:33:09.9645086530 /workspace/gpt_rh/walljet_d9_transverse_w6.log
+5 2026-06-12T09:20:35.6965514130 /workspace/gpt_rh/walljet_d9_transverse_w6.pid
+2825 2026-06-12T09:33:10.0815074640 /workspace/gpt_rh/walljet_d9_transverse_w7.log
+5 2026-06-12T09:20:35.6165522600 /workspace/gpt_rh/walljet_d9_transverse_w7.pid
+2820 2026-06-12T09:33:06.5115437560 /workspace/gpt_rh/walljet_d9_transverse_w8.log
+5 2026-06-12T09:20:35.7625507140 /workspace/gpt_rh/walljet_d9_transverse_w8.pid
+13604 2026-06-12T10:46:46.9279285490 /workspace/gpt_rh/xihead_audit/gpt_xihead_audit.py
+0 2026-06-12T10:46:48.0539163930 /workspace/gpt_rh/xihead_audit/latest.err
+0 2026-06-12T10:46:48.0539163930 /workspace/gpt_rh/xihead_audit/latest.out
+5 2026-06-12T10:46:48.0539163930 /workspace/gpt_rh/xihead_audit/latest.pid
+50 2026-06-12T10:34:54.1516405310 /workspace/gpt_rh/xihead_audit/latest_run
+2999 2026-06-12T10:47:39.2853632780 /workspace/gpt_rh/xihead_audit/run_20260612_123309/xi_head_shift_0_roots.json
+3119 2026-06-12T10:48:28.5378315280 /workspace/gpt_rh/xihead_audit/run_20260612_123309/xi_head_shift_16_roots.json
+3292 2026-06-12T10:49:13.2173491500 /workspace/gpt_rh/xihead_audit/run_20260612_123309/xi_head_shift_64_roots.json
+57054 2026-06-12T10:44:13.0615929190 /workspace/gpt_rh/xihead_audit/run_20260612_123309/xi_log_moments.json
+15718 2026-06-12T10:49:13.2173491500 /workspace/gpt_rh/xihead_audit/run_20260612_123309/xihead_audit_events.jsonl

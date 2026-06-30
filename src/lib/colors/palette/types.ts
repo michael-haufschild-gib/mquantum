@@ -10,6 +10,7 @@ import type { DiracFieldView } from '@/lib/geometry/extended/dirac'
 import type { FreeScalarInitialCondition } from '@/lib/geometry/extended/freeScalar'
 import type { PauliFieldView } from '@/lib/geometry/extended/pauli'
 import type { SchroedingerRepresentation } from '@/lib/geometry/extended/schroedinger'
+import { isWdwZetaMode, type WdwZetaModeKey } from '@/lib/geometry/extended/wdwZeta/shared'
 import type { ObjectType } from '@/lib/geometry/types'
 
 // ============================================================================
@@ -61,6 +62,23 @@ export type ColorAlgorithm =
   | 'pauliCoherence'
   | 'quantumPotential'
   | 'vortexDensity'
+  // ── WDW ⊗ ζ suite — 4 shared measure-based algorithms (number-theoretic) ──
+  | 'zetaZeroCount'
+  | 'chebyshevPsi'
+  | 'mertens'
+  | 'explicitFormula'
+  // ── WDW ⊗ ζ suite — 10 mode-specific algorithms (one per suite mode) ──
+  | 'xiPhaseCarpet'
+  | 'moebiusTriad'
+  | 'dilationFlow'
+  | 'wkbAction'
+  | 'boseOccupation'
+  | 'purityShells'
+  | 'causalRedshift'
+  | 'lengthSpectrum'
+  | 'padicValuation'
+  | 'liPositivity'
+  | 'cyclotomicTotient'
 
 /**
  * Options for the Color Algorithm dropdown in the UI.
@@ -95,6 +113,23 @@ export const COLOR_ALGORITHM_OPTIONS = [
   { value: 'pauliCoherence' as const, label: 'Spinor Coherence' },
   { value: 'quantumPotential' as const, label: 'Quantum Potential Q(x) (Bohmian)' },
   { value: 'vortexDensity' as const, label: 'Vortex Density (topological charge)' },
+  // WDW ⊗ ζ shared — number-theoretic measures
+  { value: 'zetaZeroCount' as const, label: 'ζ-Zero Count N(t)' },
+  { value: 'chebyshevPsi' as const, label: 'Chebyshev ψ(x)' },
+  { value: 'mertens' as const, label: 'Mertens M(x)' },
+  { value: 'explicitFormula' as const, label: 'Explicit-Formula Wave' },
+  // WDW ⊗ ζ mode-specific
+  { value: 'xiPhaseCarpet' as const, label: 'ξ Phase Carpet' },
+  { value: 'moebiusTriad' as const, label: 'Möbius Triad (μ)' },
+  { value: 'dilationFlow' as const, label: 'Dilation xp Flow' },
+  { value: 'wkbAction' as const, label: 'WKB Action Fringes' },
+  { value: 'boseOccupation' as const, label: 'Bose Occupation Heat' },
+  { value: 'purityShells' as const, label: 'Purity Shells q^{w/2}' },
+  { value: 'causalRedshift' as const, label: 'Causal Redshift' },
+  { value: 'lengthSpectrum' as const, label: 'Geodesic Length Spectrum' },
+  { value: 'padicValuation' as const, label: 'p-adic Valuation' },
+  { value: 'liPositivity' as const, label: 'Li Positivity Sign' },
+  { value: 'cyclotomicTotient' as const, label: 'Cyclotomic φ(n)' },
 ] as const
 
 /**
@@ -130,7 +165,49 @@ export const COLOR_ALGORITHM_TO_INT: Record<ColorAlgorithm, number> = {
   pauliCoherence: 26,
   quantumPotential: 27,
   vortexDensity: 28,
+  zetaZeroCount: 29,
+  chebyshevPsi: 30,
+  mertens: 31,
+  explicitFormula: 32,
+  xiPhaseCarpet: 33,
+  moebiusTriad: 34,
+  dilationFlow: 35,
+  wkbAction: 36,
+  boseOccupation: 37,
+  purityShells: 38,
+  causalRedshift: 39,
+  lengthSpectrum: 40,
+  padicValuation: 41,
+  liPositivity: 42,
+  cyclotomicTotient: 43,
 }
+
+/**
+ * The single mode-specific color algorithm for each WDW ⊗ ζ suite mode — each
+ * only renders meaningfully for its own visualization (it reads that mode's
+ * baked LUT data), so the dropdown exposes it only while that mode is active.
+ */
+export const WDW_ZETA_MODE_COLOR: Record<WdwZetaModeKey, ColorAlgorithm> = {
+  constraintSeam: 'xiPhaseCarpet',
+  moebiusNoBoundary: 'moebiusTriad',
+  forcedCell: 'dilationFlow',
+  turningSurface: 'wkbAction',
+  primonMultiverse: 'boseOccupation',
+  frobeniusWheel: 'purityShells',
+  dewittCone: 'causalRedshift',
+  selbergSpectrum: 'lengthSpectrum',
+  adelicWavefunction: 'padicValuation',
+  weilPositivity: 'liPositivity',
+  fieldOneElement: 'cyclotomicTotient',
+}
+
+/** The 4 shared WDW ⊗ ζ measure-based color algorithms (number-theoretic). */
+export const WDW_ZETA_SHARED_COLORS: readonly ColorAlgorithm[] = [
+  'zetaZeroCount',
+  'chebyshevPsi',
+  'mertens',
+  'explicitFormula',
+]
 
 /**
  * Cosine palette coefficients for the Inigo Quilez technique.
@@ -320,6 +397,62 @@ export interface ColorAlgorithmAvailabilityOptions {
 }
 
 /**
+ * Spectral horizon modes — each owns a dedicated main block (not the suite's
+ * `wzAlbedo`), so it exposes only the base live-lit color families.
+ */
+const SPECTRAL_HORIZON_MODES: ReadonlySet<string> = new Set([
+  'coherenceHorizon',
+  'riemannZeta',
+  'hilbertPolya',
+  'bifurcationHorizon',
+  'modularKnot',
+])
+
+/**
+ * Color-algorithm dropdown options for a WDW ⊗ ζ suite mode: the five live-lit
+ * families, the four shared lit-surface algorithms (omitted for the all-emissive
+ * primon constellation, where they would be no-ops), and the one mode-specific
+ * algorithm keyed to this mode's baked LUT data.
+ *
+ * @param quantumMode - The active suite mode key.
+ * @returns Filtered color-algorithm options for the suite mode.
+ */
+function wdwZetaSuiteColorOptions(
+  quantumMode: string
+): readonly (typeof COLOR_ALGORITHM_OPTIONS)[number][] {
+  const allow = new Set<string>(['mixed', 'phase', 'blackbody', 'viridis', 'densityContours'])
+  const specific = WDW_ZETA_MODE_COLOR[quantumMode as WdwZetaModeKey]
+  if (specific) allow.add(specific)
+  if (quantumMode !== 'primonMultiverse') {
+    for (const shared of WDW_ZETA_SHARED_COLORS) allow.add(shared)
+  }
+  return COLOR_ALGORITHM_OPTIONS.filter((opt) => allow.has(opt.value))
+}
+
+/**
+ * Color-algorithm options for the horizon family (the spectral modes and the
+ * WDW ⊗ ζ suite), or `null` when `quantumMode` is not a horizon-family mode.
+ * Spectral modes get the five base live-lit families; suite modes additionally
+ * get the shared and mode-specific algorithms via `wdwZetaSuiteColorOptions`.
+ *
+ * @param objectType - Active object type (horizon modes are `schroedinger`).
+ * @param quantumMode - Active quantum mode key.
+ * @returns Filtered options, or null if not a horizon-family mode.
+ */
+function horizonGroupColorOptions(
+  objectType: ObjectType,
+  quantumMode: string
+): readonly (typeof COLOR_ALGORITHM_OPTIONS)[number][] | null {
+  if (objectType !== 'schroedinger') return null
+  if (isWdwZetaMode(quantumMode)) return wdwZetaSuiteColorOptions(quantumMode)
+  if (SPECTRAL_HORIZON_MODES.has(quantumMode)) {
+    const base = new Set<string>(['mixed', 'phase', 'blackbody', 'viridis', 'densityContours'])
+    return COLOR_ALGORITHM_OPTIONS.filter((opt) => base.has(opt.value))
+  }
+  return null
+}
+
+/**
  * Returns the color algorithm options available for the given quantum mode.
  *
  * The 'relativePhase' algorithm requires a reference wavefunction
@@ -381,21 +514,9 @@ export function getAvailableColorAlgorithms(
   // density ramps (viridis/densityContours). Every other algorithm reads
   // emission-system state that never composes for these modes and would
   // render as a silent no-op, so hard-allowlist the implemented set.
-  if (
-    objectType === 'schroedinger' &&
-    (quantumMode === 'coherenceHorizon' ||
-      quantumMode === 'riemannZeta' ||
-      quantumMode === 'hilbertPolya')
-  ) {
-    const horizonValidAlgos = new Set<string>([
-      'mixed',
-      'phase',
-      'blackbody',
-      'viridis',
-      'densityContours',
-    ])
-    return COLOR_ALGORITHM_OPTIONS.filter((opt) => horizonValidAlgos.has(opt.value))
-  }
+  // Horizon family (spectral modes + WDW ⊗ ζ suite) — handled in one helper.
+  const horizonGroupOptions = horizonGroupColorOptions(objectType, quantumMode)
+  if (horizonGroupOptions) return horizonGroupOptions
 
   // Educational analysis algorithms — only available for free scalar field
   const educationalAlgos = new Set<string>([
