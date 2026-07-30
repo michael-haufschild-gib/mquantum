@@ -91,7 +91,7 @@
     "ts-prune": "^0.10.3",
     "ttf2woff2": "^8.0.0",
     "typescript": "^5.9.3",
-    "vite": "^7.3.2",
+    "vite": "^7.3.5",
     "vite-plugin-static-copy": "^3.1.4",
     "vite-plugin-svgr": "^4.5.0",
     "vite-plugin-wasm": "^3.5.0",
