@@ -136,14 +136,17 @@ export function coherenceMagnitude(rho: DensityMatrix): number {
 }
 
 /**
- * Re(ρ_{00}) — ground state population.
+ * Re(ρ_{gg}) — ground state population.
  *
  * @param rho - Density matrix
+ * @param groundIndex - Lowest-energy basis state g (0 for energy-sorted bases)
  * @returns Ground state probability ∈ [0, 1]
  */
-export function groundPopulation(rho: DensityMatrix): number {
+export function groundPopulation(rho: DensityMatrix, groundIndex: number = 0): number {
   assertDensityMatrix('groundPopulation', rho)
-  return rho.elements[0]!
+  const g =
+    Number.isInteger(groundIndex) && groundIndex >= 0 && groundIndex < rho.K ? groundIndex : 0
+  return rho.elements[2 * (g * rho.K + g)]!
 }
 
 /**
@@ -155,12 +158,14 @@ export function groundPopulation(rho: DensityMatrix): number {
  * @param rho - Density matrix
  * @param includeVonNeumann - Whether to compute von Neumann entropy (set false for reduced cadence)
  * @param previousVonNeumann - Previous von Neumann value to reuse when skipping computation
+ * @param groundIndex - Lowest-energy basis state g for the ground population
  * @returns Complete metrics snapshot
  */
 export function computeMetrics(
   rho: DensityMatrix,
   includeVonNeumann: boolean = true,
-  previousVonNeumann: number = 0
+  previousVonNeumann: number = 0,
+  groundIndex: number = 0
 ): OpenQuantumMetrics {
   const p = purity(rho)
   return {
@@ -168,7 +173,7 @@ export function computeMetrics(
     linearEntropy: 1 - p,
     vonNeumannEntropy: includeVonNeumann ? vonNeumannEntropy(rho) : previousVonNeumann,
     coherenceMagnitude: coherenceMagnitude(rho),
-    groundPopulation: groundPopulation(rho),
+    groundPopulation: groundPopulation(rho, groundIndex),
     trace: trace(rho),
   }
 }

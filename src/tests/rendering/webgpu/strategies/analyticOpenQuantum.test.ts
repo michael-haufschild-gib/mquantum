@@ -13,12 +13,16 @@ import type {
 } from '@/rendering/webgpu/renderers/strategies/types'
 import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
-function makePreset(seed: number, coefficients: [number, number][]): CachedPresetData {
+function makePreset(
+  seed: number,
+  coefficients: [number, number][],
+  energies: number[] = coefficients.map((_, i) => i)
+): CachedPresetData {
   return {
     preset: {
       termCount: coefficients.length,
       coefficients,
-      energies: coefficients.map((_, i) => i),
+      energies,
       quantumNumbers: coefficients.map((_, i) => [i]),
       omega: [1],
     },
@@ -244,5 +248,38 @@ describe('AnalyticOpenQuantumExecutor — HO state/cache ordering', () => {
 
     expect(throttledGround).toBeCloseTo(normalCadenceGround, 6)
     expect(throttledGround).toBeGreaterThan(0.35)
+  })
+})
+
+// Regression: HO relaxation decayed into preset term 0 whatever its energy.
+// Seeded presets order terms randomly, so the channel could drive population
+// from the true ground term up into an excited one.
+describe('AnalyticOpenQuantumExecutor — HO ground state is the lowest-energy term', () => {
+  beforeEach(() => {
+    useDiagnosticsStore.getState().resetOpenQuantum()
+  })
+
+  it('relaxes into the lowest-energy term and reports its population as ground', () => {
+    const executor = new AnalyticOpenQuantumExecutor()
+    const gridPass = makeGridPass()
+    // Term 0 is the highest level (E = 3.5), term 1 the lowest (E = 1.5).
+    const preset = makePreset(
+      3,
+      [
+        [1, 0],
+        [0, 0],
+        [0, 0],
+      ],
+      [3.5, 1.5, 2.5]
+    )
+    const relaxing = { relaxationEnabled: true, relaxationRate: 5, dt: 0.1, substeps: 10 }
+
+    executor.execute(makeContext(relaxing), makeShared(preset), gridPass, 1, undefined)
+    executor.execute(makeContext(relaxing), makeShared(preset), gridPass, 1, undefined)
+
+    const oq = useDiagnosticsStore.getState().openQuantum
+    expect(oq.populations[1]).toBeGreaterThan(0.9)
+    expect(oq.populations[0]).toBeLessThan(0.1)
+    expect(oq.groundPopulation).toBeCloseTo(oq.populations[1]!, 6)
   })
 })

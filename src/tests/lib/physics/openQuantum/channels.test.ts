@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildLindbladChannels } from '@/lib/physics/openQuantum/channels'
+import { buildLindbladChannels, lowestEnergyIndex } from '@/lib/physics/openQuantum/channels'
 import type { OpenQuantumConfig } from '@/lib/physics/openQuantum/types'
 import { DEFAULT_OPEN_QUANTUM_CONFIG } from '@/lib/physics/openQuantum/types'
 
@@ -237,5 +237,44 @@ describe('buildLindbladChannels', () => {
       const cfg = configWith({ dephasingEnabled: true, dephasingRate: Number.POSITIVE_INFINITY })
       expect(buildLindbladChannels(cfg, 2)).toEqual([])
     })
+  })
+})
+
+// Regression: relaxation always targeted basis index 0 and thermal excitation
+// always left it. The HO basis follows the preset's random term order, so
+// index 0 is often an excited level and "spontaneous decay" pumped energy in.
+describe('ground-state index', () => {
+  const relaxAndThermal = configWith({
+    relaxationEnabled: true,
+    relaxationRate: 1,
+    thermalEnabled: true,
+    thermalUpRate: 0.5,
+  })
+
+  it('relaxes every other level into the given ground state and excites out of it', () => {
+    const channels = buildLindbladChannels(relaxAndThermal, 4, 2)
+    const down = channels.filter((c) => c.amplitudeRe === 1)
+    const up = channels.filter((c) => c.amplitudeRe === Math.sqrt(0.5))
+    expect(down.map((c) => [c.row, c.col])).toEqual([
+      [2, 0],
+      [2, 1],
+      [2, 3],
+    ])
+    expect(up.map((c) => [c.row, c.col])).toEqual([
+      [0, 2],
+      [1, 2],
+      [3, 2],
+    ])
+  })
+
+  it('falls back to index 0 for an out-of-range ground index', () => {
+    const channels = buildLindbladChannels(relaxAndThermal, 3, 7)
+    expect(channels.filter((c) => c.amplitudeRe === 1).every((c) => c.row === 0)).toBe(true)
+  })
+
+  it('lowestEnergyIndex picks the first minimum and ignores non-finite energies', () => {
+    expect(lowestEnergyIndex([3.5, 1.5, 2.5, 1.5])).toBe(1)
+    expect(lowestEnergyIndex([Number.NaN, 4, 2])).toBe(2)
+    expect(lowestEnergyIndex([])).toBe(0)
   })
 })

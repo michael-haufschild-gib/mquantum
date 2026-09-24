@@ -15,7 +15,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { Section } from '@/components/sections/Section'
 import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { Button } from '@/components/ui/Button'
-import { isAnalyticQuantumType } from '@/lib/geometry/registry'
+import { supportsOpenQuantumForQuantumType } from '@/lib/geometry/registry'
 import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 
@@ -29,7 +29,7 @@ import { MetricRow, SparklineRow } from '../AnalysisPrimitives'
  * - Linear Entropy: 1 - Tr(rho^2)
  * - von Neumann Entropy: -Tr(rho ln rho)
  * - Coherence: sum of off-diagonal magnitudes
- * - Ground Population: rho_{00}
+ * - Ground Population: rho_{gg} (g = lowest-energy basis state)
  *
  * Plus rolling sparkline charts for purity, entropy, and coherence,
  * and a collapsible formula help section.
@@ -41,7 +41,11 @@ export const OpenQuantumDiagnosticsSection: React.FC = React.memo(() => {
     const oq = s.schroedinger.openQuantum?.enabled ?? false
     const mode = s.schroedinger.quantumMode
     const repr = s.schroedinger.representation
-    return oq && isAnalyticQuantumType(mode) && repr !== 'wigner'
+    // Same gate as the renderer (WebGPUScene.isOpenQuantumSupported) and the
+    // timeline drawer: only HO / hydrogen run the Lindblad executor. Gating on
+    // every analytic mode showed the last HO session's purity/entropy as live
+    // metrics after switching to e.g. riemannZeta (openQuantum.enabled persists).
+    return oq && supportsOpenQuantumForQuantumType(mode) && repr !== 'wigner'
   })
 
   const metrics = useDiagnosticsStore(
@@ -79,7 +83,7 @@ export const OpenQuantumDiagnosticsSection: React.FC = React.memo(() => {
     return (
       <UnavailableSection
         title="Open Quantum Diagnostics"
-        reason="Enable open quantum in analytic mode (non-Wigner)"
+        reason="Enable open quantum in the harmonic-oscillator or hydrogen modes (non-Wigner)"
       />
     )
   }
@@ -162,7 +166,7 @@ export const OpenQuantumDiagnosticsSection: React.FC = React.memo(() => {
               Coherence = Σ<sub>k≠l</sub> |ρ<sub>kl</sub>|
             </p>
             <p>
-              Ground Pop. = Re(ρ<sub>00</sub>)
+              Ground Pop. = Re(ρ<sub>gg</sub>), g = lowest-energy state
             </p>
           </div>
         )}
