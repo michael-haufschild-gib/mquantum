@@ -324,7 +324,7 @@ fn eigenvalues_2x2(re: &[f64], im: &[f64]) -> Vec<f64> {
     let trace = a + d;
     let diff = a - d;
     let disc = (diff * diff + 4.0 * (b_re * b_re + b_im * b_im)).sqrt();
-    let l1 = (trace + disc) * 0.5;
+    let l1 = trace.midpoint(disc);
     let l2 = (trace - disc) * 0.5;
     if l1 >= l2 {
         vec![l1, l2]
