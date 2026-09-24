@@ -219,7 +219,11 @@ export interface DiracConfig extends PmlAbsorberConfig {
   antiparticleColor: [number, number, number]
   /** Auto-scale density normalization */
   autoScale: boolean
-  /** Show potential V(x) as a faint overlay in the 3D volume */
+  /**
+   * "Enable Potential": applies V(x) in the Dirac evolution (see
+   * `effectiveDiracPotentialType`) and shows it as a faint overlay. When
+   * false the spinor evolves as a free particle whatever `potentialType` is.
+   */
   showPotential: boolean
 
   // === Diagnostics ===

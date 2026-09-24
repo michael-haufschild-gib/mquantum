@@ -188,7 +188,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
               <Slider
                 data-testid="components-sections-geometry-schroedinger-controls-dirac-controls-slider-182-15"
                 label="Potential Strength V₀"
-                tooltip="Height of the potential in units of mc². Above 2mc² the Klein paradox regime begins."
+                tooltip="Height V₀ of the potential in energy units (the same units as mc², not multiples of it). The Klein-paradox regime begins at V₀ > 2mc² — V₀ > 2 only at the default m = c = 1."
                 value={dirac.potentialStrength}
                 onChange={actions.setPotentialStrength}
                 min={0}
@@ -236,7 +236,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
               <Slider
                 data-testid="components-sections-geometry-schroedinger-controls-dirac-controls-slider-226-15"
                 label="Charge Z"
-                tooltip="Nuclear charge for the Coulomb potential V = -Z/r. Above Z ≈ 137 the Dirac equation becomes supercritical."
+                tooltip="Nuclear charge for the Coulomb potential V = -Z/r (lattice units, soft-core regularized). The coupling is Z/(ħc): the point-Coulomb Dirac spectrum breaks down above Z/(ħc) = 1 — the analogue of Zα > 1 (Z ≈ 137) for real atoms — so at the default ħ = c = 1 every Z ≥ 1 sits at or beyond that limit."
                 value={dirac.coulombZ}
                 onChange={actions.setCoulombZ}
                 min={1}
