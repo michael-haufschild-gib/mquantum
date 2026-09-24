@@ -149,8 +149,17 @@ export function scheduleNormReadback(
         }
 
         if (recordHistory) {
+          // Reference = the norm captured at (re)initialisation, like the
+          // Pauli/Dirac readouts. The rolling history evicts its oldest entry
+          // after 300 samples, so using history[0] silently turned "drift from
+          // t=0" and the R/T denominator into a ~25 s sliding window — an
+          // absorbing run's R + T crept back toward 1.
           const norm0 =
-            s.diagHistory.length > 0 ? s.diagHistory.getHistory()[0]!.totalNorm : safeTotalNorm
+            s.initialNorm > 0
+              ? s.initialNorm
+              : s.diagHistory.length > 0
+                ? s.diagHistory.getHistory()[0]!.totalNorm
+                : safeTotalNorm
           const safeNorm0 = finiteNonNegativeReadbackOrZero(norm0)
           const { R, T } = computeReflectionTransmission(safeNormLeft, safeNormRight, safeNorm0)
           const snapshot: TdseDiagnosticsSnapshot = {

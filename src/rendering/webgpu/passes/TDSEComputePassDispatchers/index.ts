@@ -1,6 +1,7 @@
 /** TDSE Compute Pass — FFT & Diagnostics Dispatch Helpers */
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
+import { computeTdseEffectiveSpacing } from '@/lib/physics/tdse/effectiveSpacing'
 
 import type { WebGPURenderContext } from '../../core/types'
 import {
@@ -185,6 +186,51 @@ export interface DiagDispatchParams {
 }
 
 /**
+ * Pack the DiagReduceUniforms for the R/T partition along axis 0.
+ *
+ * `spacing0` is the EFFECTIVE axis-0 spacing (compactification / torus
+ * metric), the same one the potential and observables uniforms use: the
+ * shader places site i at (i − N/2 + ½)·spacing0 and compares it with
+ * `barrierCenter`, a physical coordinate. The raw slider spacing put the
+ * partition at the wrong site whenever axis 0 was compactified or had a
+ * torus period (the branch-plane partition is spacing-invariant).
+ *
+ * @param config - TDSE configuration
+ * @param totalSites - Lattice site count
+ * @param numWorkgroups - Reduce-pass workgroup count
+ * @param strides - Row-major lattice strides
+ * @returns 32-byte uniform payload
+ */
+export function buildTdseDiagUniforms(
+  config: TdseConfig,
+  totalSites: number,
+  numWorkgroups: number,
+  strides: readonly number[]
+): ArrayBuffer {
+  const diagData = new ArrayBuffer(DIAG_UNIFORM_SIZE)
+  const dU32 = new Uint32Array(diagData)
+  const dF32 = new Float32Array(diagData)
+  dU32[0] = totalSites
+  dU32[1] = numWorkgroups
+  // When branch visualization is active, partition at the branch plane position
+  // instead of the barrier center so diagnostics match the visual coloring.
+  const gridSize0 = config.gridSize[0] ?? 64
+  const effSpacing0 = computeTdseEffectiveSpacing(config)[0]
+  const spacing0 =
+    effSpacing0 !== undefined && Number.isFinite(effSpacing0) && effSpacing0 > 0
+      ? effSpacing0
+      : (config.spacing[0] ?? 0.1)
+  const partitionCenter = config.branchingEnabled
+    ? (config.branchPlanePosition ?? 0) * gridSize0 * spacing0 * 0.5
+    : config.barrierCenter
+  dF32[2] = partitionCenter
+  dU32[3] = gridSize0
+  dF32[4] = spacing0
+  dU32[5] = strides[0] ?? 1
+  return diagData
+}
+
+/**
  * Dispatch GPU norm reduction and schedule async readback.
  * @param recordHistory - When true, push to diagHistory for the diagnostics panel.
  *   When false, only update maxDensity for display normalization.
@@ -198,22 +244,7 @@ export function dispatchDiagnostics(
   const { device, encoder } = ctx
 
   const strides = p.computeStrides(config)
-  const diagData = new ArrayBuffer(DIAG_UNIFORM_SIZE)
-  const dU32 = new Uint32Array(diagData)
-  const dF32 = new Float32Array(diagData)
-  dU32[0] = p.totalSites
-  dU32[1] = p.diagNumWorkgroups
-  // When branch visualization is active, partition at the branch plane position
-  // instead of the barrier center so diagnostics match the visual coloring.
-  const gridSize0 = config.gridSize[0] ?? 64
-  const spacing0 = config.spacing[0] ?? 0.1
-  const partitionCenter = config.branchingEnabled
-    ? (config.branchPlanePosition ?? 0) * gridSize0 * spacing0 * 0.5
-    : config.barrierCenter
-  dF32[2] = partitionCenter
-  dU32[3] = gridSize0
-  dF32[4] = spacing0
-  dU32[5] = strides[0] ?? 1
+  const diagData = buildTdseDiagUniforms(config, p.totalSites, p.diagNumWorkgroups, strides)
   device.queue.writeBuffer(p.diagUniformBuffer, 0, diagData)
 
   const rP = ctx.beginComputePass({ label: 'tdse-diag-reduce' })
