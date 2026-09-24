@@ -16,6 +16,7 @@ import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { ALL_GRID_SIZE_OPTIONS, AXIS_LABELS } from '@/constants/dimension'
+import { normalizeBecVortexPlane } from '@/lib/geometry/extended/bec'
 import type {
   BecFieldView,
   BecInitialCondition,
@@ -107,6 +108,13 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
       [showAnalogHorizonControls]
     )
 
+    // The planes the simulation actually seeds (TdseBecConfigBuilder applies the
+    // same normalisation): a stored plane naming an axis this lattice lacks —
+    // e.g. the 4D zw default on a 3D lattice — shows as its per-dimension
+    // default instead of a value that is not among the options.
+    const effectivePlane1 = normalizeBecVortexPlane(bec.vortexPlane1, 1, activeDims)
+    const effectivePlane2 = normalizeBecVortexPlane(bec.vortexPlane2, 2, activeDims)
+
     // Build axis pair options for vortex plane selectors
     const axisPairOptions = useMemo(() => {
       const opts: { value: string; label: string }[] = []
@@ -170,7 +178,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
               <Slider
                 data-testid="components-sections-geometry-schroedinger-controls-beccontrols-slider-166-15"
                 label="Soliton Depth"
-                tooltip="Density notch depth of the dark soliton. 1.0 = fully dark (stationary), lower = grey soliton."
+                tooltip="Density notch depth of the dark soliton (used when Soliton Velocity is 0). 1.0 = fully dark (stationary); a grey soliton of depth D moves at √(1 − D)·c_s."
                 value={bec.solitonDepth}
                 onChange={actions.setSolitonDepth}
                 min={0}
@@ -180,7 +188,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
               <Slider
                 data-testid="components-sections-geometry-schroedinger-controls-beccontrols-slider-175-15"
                 label="Soliton Velocity"
-                tooltip="Initial velocity of the dark soliton in units of the speed of sound. Sign sets propagation direction."
+                tooltip="Initial velocity of the dark soliton in units of the speed of sound. Sign sets propagation direction; a non-zero velocity fixes the notch depth at 1 − v²/c_s² (overriding Soliton Depth)."
                 value={bec.solitonVelocity}
                 onChange={actions.setSolitonVelocity}
                 min={-1}
@@ -206,7 +214,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
                 data-testid="components-sections-geometry-schroedinger-controls-beccontrols-select-198-15"
                 label="Vortex 1 Plane"
                 tooltip="2D plane for the first vortex's phase winding. In D=4, a vortex in plane xy is a 2-surface spanning zw."
-                value={`${bec.vortexPlane1[0]},${bec.vortexPlane1[1]}`}
+                value={effectivePlane1.join(',')}
                 onChange={(v) => {
                   const [a, b] = v.split(',').map(Number) as [number, number]
                   actions.setVortexPlane1([a, b])
@@ -217,7 +225,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
                 data-testid="components-sections-geometry-schroedinger-controls-beccontrols-select-208-15"
                 label="Vortex 2 Plane"
                 tooltip="2D plane for the second vortex. Orthogonal planes (e.g. xy+zw) produce reconnection; same plane produces parallel vortices."
-                value={`${bec.vortexPlane2[0]},${bec.vortexPlane2[1]}`}
+                value={effectivePlane2.join(',')}
                 onChange={(v) => {
                   const [a, b] = v.split(',').map(Number) as [number, number]
                   actions.setVortexPlane2([a, b])
@@ -290,7 +298,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
               {bec.hawkingPairInjection && (
                 <Slider
                   label="Inject rate"
-                  tooltip="Strength of the horizon phase kick per substep. Kept small (≤ 0.5 rad) to stay in the small-angle regime and preserve norm."
+                  tooltip="Strength of the horizon phase kick applied once per speed-1 frame (every Steps/Frame substeps); slower or faster playback rescales it so the noise per simulated step stays the same. Kept small (≤ 0.5 rad) to stay in the small-angle regime."
                   value={bec.hawkingInjectRate}
                   onChange={actions.setHawkingInjectRate}
                   min={0}

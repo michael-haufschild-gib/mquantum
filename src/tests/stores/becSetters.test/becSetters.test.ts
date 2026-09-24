@@ -375,3 +375,49 @@ describe('BEC setters', () => {
     })
   })
 })
+
+// Regression: grid / spacing / compact-dimension / resize paths re-clamped BEC
+// dt through the free-scalar CFL clamp, whose 1e-3 floor silently raised the
+// sonic-horizon presets' tuned dt = 5e-4 (setBecDt itself accepts 1e-4).
+describe('BEC dt keeps its sub-1e-3 range through re-clamping paths', () => {
+  beforeEach(() => {
+    useExtendedObjectStore.getState().reset()
+    useGeometryStore.setState({ dimension: 3 })
+  })
+
+  it('applyBecPreset keeps the sonic-horizon dt = 5e-4', async () => {
+    const s = useExtendedObjectStore.getState()
+    s.setSchroedingerQuantumMode('becDynamics')
+    await s.applyBecPreset('blackHoleAnalog')
+    expect(useExtendedObjectStore.getState().schroedinger.bec.dt).toBe(0.0005)
+  })
+
+  it('toggling a compact dimension keeps a valid sub-1e-3 dt', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setBecDt(0.0004)
+    expect(useExtendedObjectStore.getState().schroedinger.bec.dt).toBe(0.0004)
+    s.setBecCompactDim(0, true)
+    expect(useExtendedObjectStore.getState().schroedinger.bec.dt).toBeLessThanOrEqual(0.0004)
+    expect(useExtendedObjectStore.getState().schroedinger.bec.dt).toBeGreaterThanOrEqual(0.0001)
+  })
+})
+
+describe('resizeBecArrays vortex planes', () => {
+  it('replaces planes naming an axis the smaller lattice lacks', () => {
+    const prev = {
+      ...DEFAULT_BEC_CONFIG,
+      latticeDim: 4,
+      gridSize: [16, 16, 16, 16],
+      spacing: [0.15, 0.15, 0.15, 0.15],
+      trapAnisotropy: [1, 1, 1, 1],
+      compactDims: [false, false, false, false],
+      compactRadii: [0.15, 0.15, 0.15, 0.15],
+      slicePositions: [0],
+      vortexPlane1: [0, 2] as [number, number],
+      vortexPlane2: [1, 3] as [number, number],
+    }
+    const resized = resizeBecArrays(prev, 3)
+    expect(resized.vortexPlane1).toEqual([0, 2])
+    expect(resized.vortexPlane2).toEqual([1, 2])
+  })
+})

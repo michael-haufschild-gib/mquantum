@@ -28,7 +28,7 @@ struct VortexDetectUniforms {
   totalSites: u32,
   numWorkgroups: u32,
   latticeDim: u32,
-  densityThreshold: f32,  // fraction of maxDensity below which to check for vortices
+  densityThreshold: f32,  // vacuum floor as a fraction of maxDensity (see main)
   maxDensity: f32,
   _pad0: u32,
   _pad1: u32,
@@ -84,8 +84,16 @@ fn main(
 
     // Check plaquettes in all C(D,2) dimension pairs for N-D vortex detection.
     // Plaquette winding is topological; do not gate it on an arbitrary corner
-    // density, or off-grid / multi-charge cores can be missed.
+    // density, or off-grid / multi-charge cores can be missed. The only cut is
+    // the vacuum: a plaquette whose FOUR corners all sit at or below
+    // densityThreshold·maxDensity (host: 1e-3, i.e. ~3 % amplitude) carries
+    // round-off / halo phases, and counting their random ± windings reported
+    // ~10⁴ "vortices" around a vortex-free Thomas-Fermi ground state. A real
+    // core always has corners at a sizable fraction of the local density
+    // (≥ 0.2·n for ξ ≳ dx), so cores are kept out to r ≈ 0.999·R_TF.
     let totalDims = tParams.latticeDim;
+    let vacuumFloor = vdParams.densityThreshold * max(vdParams.maxDensity, 0.0);
+    let rho00 = re0 * re0 + im0 * im0;
 
     // PERF: phi at idx (the (0,0) corner of every plaquette) is invariant
     // across all (da, db) iterations. Hoist the atan2 once instead of
@@ -101,10 +109,12 @@ fn main(
     // wrap across coordinate seams so periodic/compact vortices are counted
     // topologically instead of disappearing at the last lattice cell.
     var phiDim: array<f32, VORTEX_MAX_LATTICE_DIM>;
+    var rhoDim: array<f32, VORTEX_MAX_LATTICE_DIM>;
     for (var d: u32 = 0u; d < totalDims; d++) {
       if (tParams.gridSize[d] >= 2u) {
         let zd = psi[vortexPlusOneIndex(idx, coords[d], d)];
         phiDim[d] = atan2(zd.y, zd.x);
+        rhoDim[d] = zd.x * zd.x + zd.y * zd.y;
       }
     }
 
@@ -122,6 +132,10 @@ fn main(
         let idxA = vortexPlusOneIndex(idx, coords[da], da);
         let idx11 = vortexPlusOneIndex(idxA, coords[db], db);
         let z11 = psi[idx11];
+        let rho11 = z11.x * z11.x + z11.y * z11.y;
+        if (max(max(rho00, rho11), max(rhoDim[da], rhoDim[db])) <= vacuumFloor) {
+          continue;
+        }
         let phi10 = phiDim[da];
         let phi11 = atan2(z11.y, z11.x);
         let phi01 = phiDim[db];

@@ -4,12 +4,13 @@
  * @module stores/slices/geometry/setters/becResize
  */
 
+import { normalizeBecVortexPlane } from '@/lib/geometry/extended/bec'
 import { type BecConfig } from '@/lib/geometry/extended/types'
 import { thomasFermiMuND, thomasFermiRadius } from '@/lib/physics/bec/chemicalPotential'
 import { resolveBecMass } from '@/lib/physics/bec/waterfallParams'
 import { clampKKState } from '@/lib/physics/compactification'
 
-import { clampDtWithCfl, defaultTdseGridPerDim } from './sliceSetterUtils'
+import { clampSchrodingerLatticeDt, defaultTdseGridPerDim } from './sliceSetterUtils'
 
 /**
  * Resize BEC arrays to match a new latticeDim, computing TF-aware spacing.
@@ -55,7 +56,7 @@ export const resizeBecArrays = (prev: BecConfig, newDim: number): Partial<BecCon
     rawRadii,
     newDim,
     mass,
-    clampDtWithCfl
+    clampSchrodingerLatticeDt
   )
   return {
     latticeDim: newDim,
@@ -66,5 +67,10 @@ export const resizeBecArrays = (prev: BecConfig, newDim: number): Partial<BecCon
     compactDims,
     compactRadii: kk.compactRadii,
     dt: kk.dt,
+    // Planes naming an axis the new lattice lacks (e.g. the 4D zw default in
+    // 3D) take the per-dimension default so the UI selects stay on a valid
+    // option and the builder seeds the same geometry.
+    vortexPlane1: normalizeBecVortexPlane(prev.vortexPlane1, 1, newDim),
+    vortexPlane2: normalizeBecVortexPlane(prev.vortexPlane2, 2, newDim),
   }
 }

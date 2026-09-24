@@ -87,6 +87,21 @@ describe('buildBecConfig — initial conditions', () => {
     expect(config.initialCondition).toBe('gaussianPacket')
   })
 
+  // Regression: g = 0 kept the Thomas-Fermi init, whose n = (μ − V)/max(|g|, 1e-10)
+  // seeded a ~1e9-norm state (GPU-observed totalNorm 1.5e9 on 64³).
+  it.each(['thomasFermi', 'vortexImprint', 'darkSoliton', 'blackHoleAnalog'] as const)(
+    'forces a normalized gaussianPacket for the ideal gas (g = 0) with %s',
+    (initialCondition) => {
+      const { config } = buildBecConfig(
+        minimalBec({ interactionStrength: 0, initialCondition }),
+        undefined
+      )
+      expect(config.initialCondition).toBe('gaussianPacket')
+      // Unit-norm Gaussian amplitude (2π)^{-D/4}, not a TF chemical potential.
+      expect(config.packetAmplitude).toBeCloseTo(Math.pow(1 / (2 * Math.PI), 3 / 4), 12)
+    }
+  )
+
   it('keeps gaussianPacket as-is for attractive BEC', () => {
     const { config } = buildBecConfig(
       minimalBec({ interactionStrength: -100, initialCondition: 'gaussianPacket' }),
@@ -483,5 +498,44 @@ describe('buildBecConfig — blackHoleAnalog μ agrees with the shared helper', 
     )
     const nBg = computeWaterfallBackgroundDensity({ interactionStrength: g })
     expect(config.packetAmplitude).toBeCloseTo(nBg * g, 12)
+  })
+})
+
+// Regression: on a 3D lattice the default plane 2 (zw = [2, 3]) was clamped to
+// [2, 2] and then collapsed onto plane 1, so 'Vortex Reconnection' seeded two
+// parallel lines. Out-of-range planes now take the per-dimension default.
+describe('buildBecConfig — vortex planes follow the lattice dimension', () => {
+  it('3D reconnection seeds perpendicular lines (xy, yz) from the zw default', () => {
+    const { config } = buildBecConfig(
+      minimalBec({
+        initialCondition: 'vortexReconnection',
+        vortexPlane1: [0, 1],
+        vortexPlane2: [2, 3],
+      }),
+      undefined
+    )
+    expect(config.vortexPlane1).toEqual([0, 1])
+    expect(config.vortexPlane2).toEqual([1, 2])
+  })
+
+  it('keeps valid planes, including a deliberate same-plane (parallel) pair', () => {
+    const parallel = buildBecConfig(
+      minimalBec({ vortexPlane1: [0, 1], vortexPlane2: [0, 1] }),
+      undefined
+    ).config
+    expect(parallel.vortexPlane2).toEqual([0, 1])
+    const fourD = buildBecConfig(
+      minimalBec({
+        latticeDim: 4,
+        gridSize: [8, 8, 8, 8],
+        spacing: [0.15, 0.15, 0.15, 0.15],
+        trapAnisotropy: [1, 1, 1, 1],
+        vortexPlane1: [0, 2],
+        vortexPlane2: [1, 3],
+      }),
+      undefined
+    ).config
+    expect(fourD.vortexPlane1).toEqual([0, 2])
+    expect(fourD.vortexPlane2).toEqual([1, 3])
   })
 })
