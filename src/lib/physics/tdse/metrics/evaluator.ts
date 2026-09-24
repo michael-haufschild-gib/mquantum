@@ -353,10 +353,10 @@ function sampleDoubleThroatInto(
  * - de Sitter → n(n−1)·H² with n = latticeDim.
  *   (Carroll §8.1. Matches 6H² for n=3.)
  * - AdS → −n(n−1)/L² with n = latticeDim.
- * - Morris–Thorne → 2(1−r'²)/r² − 2·r''/r evaluated at coords[0].
- *   r = √(b²+l²), r' = l/r, r'' = b²/r³. (Embedding of dl² + r(l)² dΩ².)
- * - doubleThroat → sum of two MT-like contributions using shifted throats
- *   at ±s/2 (superposition approximation; plan explicitly permits this).
+ * - Morris–Thorne / doubleThroat → scalar curvature of the lattice slice
+ *   ds² = dl² + r(l)² δ_ab dx^a dx^b that the kinetic operator discretizes
+ *   (axis 0 = l, transverse axes Cartesian and scaled by r(l)):
+ *   R = −2(d−1)·r''/r − (d−1)(d−2)·r'²/r², with the exact r(l) of each kind.
  *
  * @param cfg - Metric configuration.
  * @param coords - Length-`latticeDim` world coordinates.
@@ -397,22 +397,45 @@ export function ricciScalar(
       const b0 = finiteAtLeast(cfg.doubleThroatRadius ?? cfg.throatRadius, MIN_THROAT_RADIUS)
       const s = finiteAtLeast(cfg.doubleThroatSeparation, MIN_DOUBLE_THROAT_SEPARATION)
       const l = finiteCoord(coords, 0)
-      return morrisThorneRicci(l - s / 2, b0, dim) + morrisThorneRicci(l + s / 2, b0, dim)
+      return doubleThroatRicci(l, b0, s, dim)
     }
   }
 }
 
 /**
- * Ricci scalar of the d-dimensional Morris–Thorne spatial slice
- * ds² = dl² + r(l)² dΩ²_{d-1} at proper distance l with throat radius b₀.
- * Formula: R = (d-1)(d-2)(1 − r'²)/r² − 2(d-1)·r''/r.
+ * Scalar curvature of the warped slice ds² = dl² + r(l)² δ_ab dx^a dx^b with
+ * a flat (d−1)-dimensional cross-section — the geometry the curved kinetic
+ * operator actually evolves on (transverse lattice axes are Cartesian, v1
+ * design): R = −2(d−1)·r''/r − (d−1)(d−2)·r'²/r².
+ *
+ * The textbook throat dl² + r² dΩ²_{d−1} adds the unit-sphere term
+ * (d−1)(d−2)/r²; using it here showed the overlay a different geometry from
+ * the simulated one (for d = 5, +4/b² at the throat instead of −8/b²).
  */
+function warpedSliceRicci(r: number, rPrime: number, rDoublePrime: number, dim: number): number {
+  const d1 = dim - 1
+  return (-2 * d1 * rDoublePrime) / r - (d1 * (dim - 2) * rPrime * rPrime) / (r * r)
+}
+
+/** Ricci scalar of the Morris–Thorne slice, r = √(b₀² + l²). */
 function morrisThorneRicci(l: number, b0: number, dim: number): number {
   const r = Math.sqrt(b0 * b0 + l * l)
-  const rPrime = l / r
-  const rDoublePrime = (b0 * b0) / (r * r * r)
-  const d1 = dim - 1
-  return (d1 * (dim - 2) * (1 - rPrime * rPrime)) / (r * r) - (2 * d1 * rDoublePrime) / r
+  return warpedSliceRicci(r, l / r, (b0 * b0) / (r * r * r), dim)
+}
+
+/**
+ * Ricci scalar of the double-throat slice with the exact r(l) of
+ * {@link doubleThroatRadius}: with h = s/2, A = √(h² + (l−h)²),
+ * B = √(h² + (l+h)²): r' = ½((l−h)/A + (l+h)/B), r'' = ½(h²/A³ + h²/B³).
+ */
+function doubleThroatRicci(l: number, b0: number, s: number, dim: number): number {
+  const h = 0.5 * s
+  const a = Math.sqrt(h * h + (l - h) * (l - h))
+  const b = Math.sqrt(h * h + (l + h) * (l + h))
+  const r = doubleThroatRadius(l, b0, s)
+  const rPrime = 0.5 * ((l - h) / a + (l + h) / b)
+  const rDoublePrime = 0.5 * ((h * h) / (a * a * a) + (h * h) / (b * b * b))
+  return warpedSliceRicci(r, rPrime, rDoublePrime, dim)
 }
 
 /**

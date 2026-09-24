@@ -457,53 +457,57 @@ describe('ricciScalar', () => {
     )
   })
 
-  it('MT at l=0, d=3: R = −2/b² (maximum negative curvature at throat)', () => {
+  // The simulated slice is dl² + r(l)²·δ_ab dx^a dx^b (Cartesian transverse
+  // axes, flat cross-section): R = −2(d−1)·r''/r − (d−1)(d−2)·r'²/r².
+  // Regression: the overlay used the unit-sphere cross-section formula
+  // (extra +(d−1)(d−2)/r²), a different geometry from the one simulated.
+  it("MT at l=0, d=3: R = −4/b² (r' = 0, r'' = 1/b)", () => {
     const b = 0.5
-    const expected = -2 / (b * b)
     expect(ricciScalar({ kind: 'morrisThorne', throatRadius: b }, [0, 0, 0], 3)).toBeCloseTo(
-      expected,
+      -4 / (b * b),
       10
     )
   })
 
-  it('MT at l=b, d=3: R = closed form with dim-dependent coefficients', () => {
+  it("MT at l=b, d=3: R = −4r''/r − 2r'²/r²", () => {
     const b = 0.5
-    const dim = 3
     const l = b
     const r = Math.sqrt(b * b + l * l)
     const rP = l / r
     const rPP = (b * b) / (r * r * r)
-    const d1 = dim - 1
-    const expected = (d1 * (dim - 2) * (1 - rP * rP)) / (r * r) - (2 * d1 * rPP) / r
-    expect(ricciScalar({ kind: 'morrisThorne', throatRadius: b }, [l, 0, 0], dim)).toBeCloseTo(
+    const expected = (-4 * rPP) / r - (2 * rP * rP) / (r * r)
+    expect(ricciScalar({ kind: 'morrisThorne', throatRadius: b }, [l, 0, 0], 3)).toBeCloseTo(
       expected,
       10
     )
   })
 
-  it('MT at l=0, d=5: R = (d-1)(d-4)/b² = 4/b²', () => {
+  it('MT at l=0, d=5: R = −2(d−1)/b² = −8/b² (still negative at the throat)', () => {
     const b = 0.5
-    const dim = 5
-    const expected = ((dim - 1) * (dim - 4)) / (b * b)
-    expect(
-      ricciScalar({ kind: 'morrisThorne', throatRadius: b }, [0, 0, 0, 0, 0], dim)
-    ).toBeCloseTo(expected, 10)
+    expect(ricciScalar({ kind: 'morrisThorne', throatRadius: b }, [0, 0, 0, 0, 0], 5)).toBeCloseTo(
+      -8 / (b * b),
+      10
+    )
   })
 
-  it('doubleThroat Ricci is sum of two shifted MT contributions', () => {
+  it('doubleThroat Ricci matches the warped-slice formula for the sampled r(l)', () => {
     const b = 0.4
     const s = 1.0
-    const l = 0.2
-    const expected =
-      ricciScalar({ kind: 'morrisThorne', throatRadius: b }, [l - s / 2, 0, 0], 3) +
-      ricciScalar({ kind: 'morrisThorne', throatRadius: b }, [l + s / 2, 0, 0], 3)
-    expect(
-      ricciScalar(
-        { kind: 'doubleThroat', doubleThroatRadius: b, doubleThroatSeparation: s },
-        [l, 0, 0],
-        3
-      )
-    ).toBeCloseTo(expected, 10)
+    const cfg: MetricConfig = {
+      kind: 'doubleThroat',
+      doubleThroatRadius: b,
+      doubleThroatSeparation: s,
+    }
+    // r(l) recovered from the kinetic metric itself: √|g| = r^(d−1).
+    const radius = (l: number) => sampleMetric(cfg, [l, 0, 0], 3).sqrtDet ** 0.5
+    const h = 1e-3
+    for (const l of [-1.3, -0.5, 0, 0.2, 0.9]) {
+      const r = radius(l)
+      const rP = (radius(l + h) - radius(l - h)) / (2 * h)
+      const rPP = (radius(l + h) - 2 * r + radius(l - h)) / (h * h)
+      const expected = (-4 * rPP) / r - (2 * rP * rP) / (r * r)
+      expect(ricciScalar(cfg, [l, 0, 0], 3)).toBeCloseTo(expected, 4)
+    }
   })
 })
 

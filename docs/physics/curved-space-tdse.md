@@ -51,13 +51,13 @@ use this measure.
 | kind | Params | Line element / inverse metric | Ricci scalar | Integrator | Valid domain / clamps |
 |---|---|---|---|---|---|
 | `flat` | — | ds² = δ_ij dxⁱ dxʲ; g^μμ = 1 | 0 | Split-step FFT | All dimensions |
-| `morrisThorne` | `throatRadius b₀` | ds² = dl² + r(l)² dΩ²; r(l)=√(b₀²+l²); axis 0 = l | (n−1)(n−2)(1−r'²)/r² − 2(n−1)r''/r | RK4 + FD | b₀ ∈ [0.1, 5.0]; latticeDim ≥ 2 (Morris & Thorne, *Am. J. Phys.* 56, 395, 1988) |
+| `morrisThorne` | `throatRadius b₀` | ds² = dl² + r(l)² δ_ab dxᵃdxᵇ (transverse axes Cartesian, flat cross-section); r(l)=√(b₀²+l²); axis 0 = l | −2(n−1)r''/r − (n−1)(n−2)r'²/r² (the textbook dΩ² throat would add (n−1)(n−2)/r²) | RK4 + FD | b₀ ∈ [0.1, 5.0]; latticeDim ≥ 2 (Morris & Thorne, *Am. J. Phys.* 56, 395, 1988) |
 | `schwarzschild` | `schwarzschildMass M` | g_ij = ψ⁴δ_ij; ψ = 1 + M/(2r); isotropic | 0 (vacuum); Kretschmann K = 48M²/r⁶ | RK4 + FD | M ∈ [0.01, 10.0]; r clamped to max(M/2, 0.01) (Wald §6.1) |
 | `deSitter` | `hubbleRate H` | g_ij = a(t)² δ_ij; a(t)=exp(H·t) | 0 (conformally flat spatial slice) | RK4 + FD, stage-time sampled | H ∈ [0, 5]; time-dependent (Carroll §8) |
 | `antiDeSitter` | `adsRadius L` | g_ij = (L/z)² δ_ij; axis 0 = z > 0 | −n(n−1)/L² | RK4 + FD | L ∈ [0.1, 10]; z clamped to ≥ 0.05 (Carroll §8) |
 | `sphere2D` | `sphereRadius R` | ds² = R² (dθ² + sin²θ dφ²); axes (θ,φ) = (1,2) | 2/R² | RK4 + FD | R ∈ [0.1, 10]; latticeDim ≥ 3; θ clamped to [ε, π−ε], ε = 0.05 (Carroll §3.7) |
 | `torus` | `torusPeriod [L₀,L₁,L₂]` | flat δ_ij with xⁱ ≡ xⁱ + Lⁱ | 0 | Split-step FFT (periodic) | Lⁱ ∈ [0.5, 20] |
-| `doubleThroat` | `doubleThroatSeparation s`, `doubleThroatRadius b₀` | ds² = dl² + r(l)² dΩ²; r(l) smoothed Morris–Thorne with shoulders at ±s/2 | Sum of two MT Ricci contributions at l ∓ s/2 | RK4 + FD | s ∈ [0.2, 20]; b₀ ∈ [0.1, 5.0]; latticeDim ≥ 2 |
+| `doubleThroat` | `doubleThroatSeparation s`, `doubleThroatRadius b₀` | ds² = dl² + r(l)² δ_ab dxᵃdxᵇ; r(l) smoothed Morris–Thorne with shoulders at ±s/2 | −2(n−1)r''/r − (n−1)(n−2)r'²/r² with the exact r(l) | RK4 + FD | s ∈ [0.2, 20]; b₀ ∈ [0.1, 5.0]; latticeDim ≥ 2 |
 
 ## Integrator Selection
 

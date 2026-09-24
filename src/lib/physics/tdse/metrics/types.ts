@@ -251,7 +251,7 @@ export function describeMetric(cfg: MetricConfig): { label: string; formula: str
     case 'morrisThorne':
       return {
         label: 'Morris–Thorne Wormhole',
-        formula: 'ds² = dl² + r(l)² dΩ²,  r(l) = √(b₀² + l²)',
+        formula: 'ds² = dl² + r(l)² δ_ab dxᵃ dxᵇ,  r(l) = √(b₀² + l²)',
       }
     case 'schwarzschild':
       return {
@@ -281,7 +281,7 @@ export function describeMetric(cfg: MetricConfig): { label: string; formula: str
     case 'doubleThroat':
       return {
         label: 'Double-Throat Wormhole',
-        formula: 'ds² = dl² + r(l)² dΩ²,  two throats at ±s/2',
+        formula: 'ds² = dl² + r(l)² δ_ab dxᵃ dxᵇ,  two throats at ±s/2',
       }
   }
 }

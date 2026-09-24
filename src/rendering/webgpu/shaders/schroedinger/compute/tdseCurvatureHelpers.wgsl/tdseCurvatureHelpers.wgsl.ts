@@ -37,6 +37,12 @@ fn tdseCurvatureExpClamped(exponent: f32) -> f32 {
   return exp(clamp(exponent, -TDSE_CURV_EXP_LIMIT, TDSE_CURV_EXP_LIMIT));
 }
 
+fn tdseCurvatureWarpedRicci(r: f32, rPrime: f32, rDoublePrime: f32, dim: u32) -> f32 {
+  let d1 = f32(dim - 1u);
+  let d2 = f32(dim) - 2.0;
+  return -2.0 * d1 * rDoublePrime / r - d1 * d2 * rPrime * rPrime / (r * r);
+}
+
 /**
  * Ricci-scalar R(x, t) for the active metric kind. Returns 0 on flat /
  * torus / Schwarzschild (vacuum Ricci) so the overlay self-disables on
@@ -58,30 +64,26 @@ fn tdseCurvatureRicci(coords: array<f32, 12>, dim: u32, time: f32) -> f32 {
     let n = f32(dim);
     return -(n * (n - 1.0)) / (L * L);
   }
+  // Morris–Thorne / double throat: scalar curvature of the simulated slice
+  // dl² + r(l)²·δ_ab dx^a dx^b (Cartesian transverse axes, flat cross-section),
+  // R = −2(d−1)·r''/r − (d−1)(d−2)·r'²/r². Mirrors evaluator.ts.
   if (kind == 1u) {
     let b0 = max(params.throatRadius, 0.1);
     let l = coords[0];
     let r = sqrt(b0 * b0 + l * l);
-    let rPrime = l / r;
-    let rDoublePrime = (b0 * b0) / (r * r * r);
-    let d1 = f32(dim - 1u);
-    let d2 = f32(dim - 2u);
-    return d1 * d2 * (1.0 - rPrime * rPrime) / (r * r) - 2.0 * d1 * rDoublePrime / r;
+    return tdseCurvatureWarpedRicci(r, l / r, (b0 * b0) / (r * r * r), dim);
   }
   if (kind == 7u) {
     let b0 = max(params.doubleThroatRad, 0.1);
     let s = max(params.doubleThroatSep, 0.2);
-    let d1 = f32(dim - 1u);
-    let d2 = f32(dim - 2u);
-    let lLeft = coords[0] - 0.5 * s;
-    let lRight = coords[0] + 0.5 * s;
-    let rL = sqrt(b0 * b0 + lLeft * lLeft);
-    let rR = sqrt(b0 * b0 + lRight * lRight);
-    let rpL = lLeft / rL; let rppL = (b0 * b0) / (rL * rL * rL);
-    let rpR = lRight / rR; let rppR = (b0 * b0) / (rR * rR * rR);
-    let ricciL = d1 * d2 * (1.0 - rpL * rpL) / (rL * rL) - 2.0 * d1 * rppL / rL;
-    let ricciR = d1 * d2 * (1.0 - rpR * rpR) / (rR * rR) - 2.0 * d1 * rppR / rR;
-    return ricciL + ricciR;
+    let l = coords[0];
+    let h = 0.5 * s;
+    let a = sqrt(h * h + (l - h) * (l - h));
+    let b = sqrt(h * h + (l + h) * (l + h));
+    let r = b0 + 0.5 * (a + b - s);
+    let rPrime = 0.5 * ((l - h) / a + (l + h) / b);
+    let rDoublePrime = 0.5 * (h * h / (a * a * a) + h * h / (b * b * b));
+    return tdseCurvatureWarpedRicci(r, rPrime, rDoublePrime, dim);
   }
   return 0.0;
 }

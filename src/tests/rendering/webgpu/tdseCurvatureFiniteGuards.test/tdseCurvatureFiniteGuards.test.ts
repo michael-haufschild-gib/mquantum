@@ -39,3 +39,22 @@ describe('TDSE curvature WGSL finite guards', () => {
     expect(tdseWriteGridBlock).toContain('displayScalar = normDensityDisplay;')
   })
 })
+
+// Regression: the throat Ricci overlay used the unit-sphere cross-section
+// term (1 − r'²); the simulated slice has flat (Cartesian) transverse axes.
+describe('TDSE throat Ricci matches the simulated warped slice', () => {
+  it('uses R = −2(d−1)r″/r − (d−1)(d−2)r′²/r² in both WGSL copies', () => {
+    const copies: [string, string][] = [
+      [tdseCurvatureHelpersBlock, 'tdseCurvatureWarpedRicci'],
+      [tdseCurvedKineticBlock, 'curvedWarpedRicci'],
+    ]
+    for (const [wgsl, fn] of copies) {
+      expect(wgsl).toContain(
+        'return -2.0 * d1 * rDoublePrime / r - d1 * d2 * rPrime * rPrime / (r * r);'
+      )
+      expect(wgsl).toContain(`return ${fn}(r, l / r, (b0 * b0) / (r * r * r), dim);`)
+      expect(wgsl).not.toContain('(1.0 - rPrime * rPrime)')
+      expect(wgsl).not.toContain('ricciL + ricciR')
+    }
+  })
+})
