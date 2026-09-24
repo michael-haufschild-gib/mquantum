@@ -142,8 +142,8 @@ export function getPackedF32(view: Float32Array, baseFloatIdx: number, k: number
  * Compute phased cross-pair coefficients for Wigner reconstruction.
  *
  * For each cross pair (j, k):
- *   phasedRe = 2 * Re(c_j* c_k * e^{-i*(E_j - E_k)*t})
- *   phasedIm = 2 * Im(c_j* c_k * e^{-i*(E_j - E_k)*t})
+ *   phasedRe = 2 * Re(c_j* c_k * e^{+i*(E_j - E_k)*t})
+ *   phasedIm = 2 * Im(c_j* c_k * e^{+i*(E_j - E_k)*t})
  *
  * The factor of 2 is baked in so the GPU shader just does multiply-accumulate.
  */
@@ -196,7 +196,10 @@ export function computeReconstructCoefficients(
     const prodRe = cjRe * ckRe + cjIm * ckIm
     const prodIm = cjRe * ckIm - cjIm * ckRe
 
-    const phaseAngle = -(Ej - Ek) * t
+    // e^{+i(E_j − E_k)t}: W_{j,k} (wignerHO.wgsl) is the transform of |k⟩⟨j|,
+    // so c_j* c_k pairs with this sign (the former minus sign reversed the
+    // phase-space rotation). Must match the legacy single-pass shader.
+    const phaseAngle = (Ej - Ek) * t
     const timeCos = Math.cos(phaseAngle)
     const timeSin = Math.sin(phaseAngle)
 

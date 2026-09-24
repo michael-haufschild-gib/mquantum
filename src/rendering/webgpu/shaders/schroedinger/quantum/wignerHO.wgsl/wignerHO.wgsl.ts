@@ -15,7 +15,13 @@
  * Marginal rule: cross terms only contribute when all quantum numbers
  * on non-selected dimensions match between the two terms.
  *
- * Time evolution: cross terms acquire phase exp(-i*(E_m - E_n)*t).
+ * Time evolution: with ψ(t) = Σ c_k e^{-iE_k t} φ_k and the standard
+ * W(x,p) = (1/π)∫ψ*(x+y)ψ(x−y)e^{2ipy}dy, W_{m,n} above (ζ = √ω x + i p/√ω)
+ * is the transform of |n⟩⟨m|, so the (j, k) pair contributes
+ *   2·Re[c_j* c_k · e^{+i(E_j − E_k)t} · W_{j,k}].
+ * (A former e^{−i(E_j − E_k)t} ran the phase-space rotation backwards — the
+ * HO Wigner function turned counter-clockwise while ⟨p⟩(t) and the momentum
+ * representation turn clockwise.)
  *
  * Requires: laguerre.wgsl.ts (for laguerre() function)
  *
@@ -220,15 +226,15 @@ fn evaluateWignerMarginalHO(x: f32, p: f32, dimIdx: i32, time: f32, uniforms: Sc
         let Wcross = wignerCrossShared(nj, nk, u2, expU2, szetaRe, szetaIm);
         let WcrossIm = select(Wcross.y, -Wcross.y, nj < nk);
 
-        // Time-dependent phase: e^{-i*(E_j - E_k)*t}
+        // Time-dependent phase: e^{+i*(E_j - E_k)*t} (see header derivation)
         let Ej = getEnergy(uniforms, j);
         let Ek = getEnergy(uniforms, k);
         let dE = Ej - Ek;
-        let phaseAngle = -dE * time;
+        let phaseAngle = dE * time;
         let timeCos = cos(phaseAngle);
         let timeSin = sin(phaseAngle);
 
-        // Complex product: c_j* c_k * e^{-i*dE*t}
+        // Complex product: c_j* c_k * e^{+i*dE*t}
         let cj = getCoeff(uniforms, j);
         let ck = getCoeff(uniforms, k);
         // c_j* = (cj.x, -cj.y)
