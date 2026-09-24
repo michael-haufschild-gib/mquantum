@@ -112,7 +112,7 @@ export const CinematicControls: React.FC<CinematicControlsProps> = React.memo(
         <Select
           data-testid="components-sections-post-processing-cinematic-controls-select-109-9"
           label="Algorithm"
-          tooltip="Tone mapping maps HDR values to display range. ACES is cinematic, Reinhard is softer, Uncharted 2 preserves highlights."
+          tooltip="Tone mapping maps HDR values to display range. ACES is cinematic, Reinhard is softer, Cineon is a film-print curve, AgX rolls bright saturated highlights off gracefully, and Neutral keeps base colors close to their original values."
           value={toneMappingAlgorithm}
           options={toneMappingOptions}
           onChange={(value) => setToneMappingAlgorithm(value as ToneMappingAlgorithm)}
