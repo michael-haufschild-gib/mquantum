@@ -164,4 +164,28 @@ describe('pageCurveStore', () => {
     expect(tPage ?? -1).toBeGreaterThan(0)
     expect(tPage ?? 999).toBeLessThan(0.1)
   })
+
+  it('keeps reporting the Page time after the crossing scrolls out of the ring buffer', () => {
+    // Regression: pageTime() only searched the buffer window, so after
+    // `capacity` more samples the HUD showed "t_Page: —" for a saturated curve.
+    usePageCurveStore.getState().setBufferSize(16)
+    const push = (i: number) =>
+      usePageCurveStore.getState().pushSample({
+        t: i * 0.1,
+        tH: 2.0,
+        areaH: 1.0,
+        cs0: 1.0,
+        supersonicExtent: 3,
+      })
+    push(0)
+    push(1)
+    const inWindow = usePageCurveStore.getState().getPageTime()
+    expect(inWindow ?? -1).toBeGreaterThan(0)
+    for (let i = 2; i < 200; i++) push(i)
+
+    expect(usePageCurveStore.getState().getPageTime()).toBeCloseTo(inWindow!, 12)
+
+    usePageCurveStore.getState().clear()
+    expect(usePageCurveStore.getState().getPageTime()).toBeNull()
+  })
 })

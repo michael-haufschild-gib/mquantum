@@ -16,12 +16,34 @@ import {
   lambdaForStep,
   useCoordinateEntanglementStore,
 } from '@/stores/diagnostics/coordinateEntanglementStore'
+import { useAnimationStore } from '@/stores/scene/animationStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
 
 const SWEEP_EVOLVE_ENTRIES = 20
 const SWEEP_MEASURE_ENTRIES = 10
 const SWEEP_POLL_MS = 500
+/**
+ * Polls without a new finite entanglement sample before a step is closed as
+ * stalled (60 × 500 ms = 30 s). Non-finite results (e.g. a diverging
+ * high-λ point) never advance `longTimeN`, so without this the sweep waited
+ * forever; the step is instead recorded with whatever finite samples it has
+ * (NaN → rendered as "no finite samples") and the sweep moves on.
+ */
+const SWEEP_STALL_POLL_LIMIT = 60
+
+/**
+ * Entanglement samples are only produced while the simulation is playing in
+ * a visible tab (TDSE runs on requestAnimationFrame and skips entanglement
+ * readback when paused). Stall polls are counted only then, so pausing or
+ * backgrounding pauses the sweep instead of closing its steps as NaN.
+ */
+function isEntanglementSamplingActive(): boolean {
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return false
+  return useAnimationStore.getState().isPlaying
+}
+
+type EntanglementStoreState = ReturnType<typeof useCoordinateEntanglementStore.getState>
 
 interface PreSweepSnapshot {
   potentialType: TdsePotentialType
@@ -37,6 +59,8 @@ export function useSweepController(): {
   const sweepTickRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const stepStartNRef = useRef(0)
   const lastRecordedNRef = useRef(0)
+  const stallSeenNRef = useRef(0)
+  const stallPollsRef = useRef(0)
   const preSweepRef = useRef<PreSweepSnapshot | null>(null)
 
   const sweepStatus = useCoordinateEntanglementStore((s) => s.sweepStatus)
@@ -84,6 +108,8 @@ export function useSweepController(): {
     entStore.startSweep(config)
     stepStartNRef.current = 0
     lastRecordedNRef.current = 0
+    stallSeenNRef.current = 0
+    stallPollsRef.current = 0
 
     const firstLambda = lambdaForStep(config, 0)
     ext.setTdsePotentialType('coupledAnharmonic')
@@ -106,6 +132,44 @@ export function useSweepController(): {
       return
     }
 
+    // Count polls without a new finite sample; true once the step is stalled.
+    const pollStalled = (longTimeN: number): boolean => {
+      if (longTimeN === stallSeenNRef.current) {
+        if (isEntanglementSamplingActive()) stallPollsRef.current++
+      } else {
+        stallSeenNRef.current = longTimeN
+        stallPollsRef.current = 0
+      }
+      return stallPollsRef.current >= SWEEP_STALL_POLL_LIMIT
+    }
+
+    // Close the current step, then start the next one or finish the sweep.
+    const closeStep = (entStore: EntanglementStoreState, stalled: boolean): void => {
+      if (stalled) {
+        logger.warn(
+          `[SweepController] no finite entanglement sample for ${SWEEP_STALL_POLL_LIMIT} polls — closing step`
+        )
+      }
+      stallPollsRef.current = 0
+      entStore.completeSweepStep()
+      const next = entStore.advanceSweepStep()
+
+      if (!next) {
+        entStore.completeSweep()
+        restorePreSweepState()
+        return
+      }
+      stepStartNRef.current = entStore.longTimeN
+      lastRecordedNRef.current = entStore.longTimeN
+      const ext = useExtendedObjectStore.getState()
+      ext.setTdseAnharmonicLambda(next.lambda)
+      const currentDim = useGeometryStore.getState().dimension
+      if (currentDim !== next.dim) {
+        useGeometryStore.getState().setDimension(next.dim)
+      }
+      ext.resetTdseField()
+    }
+
     sweepTickRef.current = setInterval(() => {
       try {
         const entStore = useCoordinateEntanglementStore.getState()
@@ -113,6 +177,7 @@ export function useSweepController(): {
 
         const samplesSinceStart = entStore.longTimeN - stepStartNRef.current
         const totalNeeded = SWEEP_EVOLVE_ENTRIES + SWEEP_MEASURE_ENTRIES
+        const stalled = pollStalled(entStore.longTimeN)
 
         if (
           samplesSinceStart >= SWEEP_EVOLVE_ENTRIES &&
@@ -122,24 +187,8 @@ export function useSweepController(): {
           lastRecordedNRef.current = entStore.longTimeN
         }
 
-        if (samplesSinceStart >= totalNeeded) {
-          entStore.completeSweepStep()
-          const next = entStore.advanceSweepStep()
-
-          if (next) {
-            stepStartNRef.current = entStore.longTimeN
-            lastRecordedNRef.current = entStore.longTimeN
-            const ext = useExtendedObjectStore.getState()
-            ext.setTdseAnharmonicLambda(next.lambda)
-            const currentDim = useGeometryStore.getState().dimension
-            if (currentDim !== next.dim) {
-              useGeometryStore.getState().setDimension(next.dim)
-            }
-            ext.resetTdseField()
-          } else {
-            entStore.completeSweep()
-            restorePreSweepState()
-          }
+        if (samplesSinceStart >= totalNeeded || stalled) {
+          closeStep(entStore, stalled)
         }
       } catch (err) {
         logger.error('[SweepController] poll error, aborting sweep:', err)

@@ -251,9 +251,16 @@ function entropyDesc(frac: number): string {
   return 'Approaching a fully mixed reduced state — maximum quantum correlation between dimensions.'
 }
 
+/**
+ * Sweep entropies are already normalized (S̄/S_max ∈ [0, 1], recorded from
+ * `currentNormalizedEntropy`), so the S_max that the insight's "% of S_max"
+ * refers to is exactly 1 — not the largest value the sweep happened to reach.
+ */
+const NORMALIZED_ENTROPY_MAX = 1
+
 function atlasInsight(
   results: { lambda: number; dim: number; entropy: number }[],
-  maxE: number
+  sMax: number
 ): string {
   const finiteResults = results.filter((r) => Number.isFinite(r.entropy))
   if (finiteResults.length < 2) {
@@ -262,7 +269,7 @@ function atlasInsight(
   const sorted = [...finiteResults].sort((a, b) => a.entropy - b.entropy)
   const lo = sorted[0]!,
     hi = sorted[sorted.length - 1]!
-  const rangePct = maxE > 0 ? (((hi.entropy - lo.entropy) / maxE) * 100).toFixed(0) : '0'
+  const rangePct = sMax > 0 ? (((hi.entropy - lo.entropy) / sMax) * 100).toFixed(0) : '0'
 
   const byDim = new Map<number, { lambda: number; entropy: number }[]>()
   for (const r of finiteResults) {
@@ -318,7 +325,7 @@ export const AtlasHeatmap: React.FC<{
   const cellH = ATLAS_PH / dims.length
   const maxTicks = 7
   const tickStep = Math.max(1, Math.ceil(lambdas.length / maxTicks))
-  const insight = atlasInsight(results, maxEntropy)
+  const insight = atlasInsight(results, NORMALIZED_ENTROPY_MAX)
 
   return (
     <div className="mt-1 relative">

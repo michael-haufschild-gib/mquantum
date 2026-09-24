@@ -212,6 +212,20 @@ describe('AtlasHeatmap', () => {
     expect(screen.queryByText(/S̄\/S_max =/)).toBeNull()
   })
 
+  it('reports the insight range as a share of S_max, not of the sweep maximum', () => {
+    // Sweep entropies are already S̄/S_max. A 0.10 → 0.20 span is 10% of
+    // S_max; dividing by the sweep maximum (0.20) wrongly reported 50%.
+    render(
+      <AtlasHeatmap
+        results={[
+          { lambda: 0.1, dim: 3, entropy: 0.1 },
+          { lambda: 1.0, dim: 3, entropy: 0.2 },
+        ]}
+      />
+    )
+    expect(screen.getByText(/Range: 10% of S_max/)).toBeInTheDocument()
+  })
+
   it('renders "Collecting data" insight with a single result point', () => {
     render(<AtlasHeatmap results={[{ lambda: 1, dim: 3, entropy: 0.5 }]} />)
     expect(screen.getByText(/Collecting data/)).toBeInTheDocument()

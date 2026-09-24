@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useSweepController } from '@/components/sections/Analysis/useSweepController'
 import { useCoordinateEntanglementStore } from '@/stores/diagnostics/coordinateEntanglementStore'
+import { useAnimationStore } from '@/stores/scene/animationStore'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
 import { useGeometryStore } from '@/stores/scene/geometryStore'
 
@@ -253,6 +254,62 @@ describe('useSweepController — poll interval', () => {
     const sweepResults = getEnt().sweepResults
     expect(sweepResults).toHaveLength(1)
     expect(Number.isNaN(sweepResults[0]!.entropy)).toBe(true)
+  })
+})
+
+describe('useSweepController — stalled step', () => {
+  beforeEach(() => {
+    useExtendedObjectStore.getState().reset()
+    useCoordinateEntanglementStore.getState().abortSweep()
+    useGeometryStore.setState(useGeometryStore.getInitialState())
+    setupPhysicsState()
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('closes a step that stops producing finite samples instead of hanging', () => {
+    // Regression: a diverging point never advances longTimeN (non-finite
+    // entropy is not counted), so the sweep waited forever for 30 samples.
+    const { result } = renderHook(() => useSweepController())
+    act(() => {
+      result.current.handleStartSweep()
+    })
+    act(() => {
+      useCoordinateEntanglementStore.setState({ longTimeN: 5 })
+      vi.advanceTimersByTime(500)
+    })
+    expect(getEnt().sweepResults).toHaveLength(0)
+
+    act(() => {
+      vi.advanceTimersByTime(500 * 61)
+    })
+
+    const sweepResults = getEnt().sweepResults
+    expect(sweepResults).toHaveLength(1)
+    expect(Number.isNaN(sweepResults[0]!.entropy)).toBe(true)
+    expect(getEnt().sweepStatus).toBe('running')
+    expect(getEnt().sweepCurrentStep).toBe(1)
+  })
+
+  it('does not close steps while the simulation is paused', () => {
+    // Entanglement readback is skipped while paused, so a paused sweep must
+    // wait rather than record the step as a stall.
+    const { result } = renderHook(() => useSweepController())
+    act(() => {
+      result.current.handleStartSweep()
+    })
+    act(() => {
+      useAnimationStore.getState().pause()
+      vi.advanceTimersByTime(500 * 120)
+    })
+    expect(getEnt().sweepResults).toHaveLength(0)
+    expect(getEnt().sweepCurrentStep).toBe(0)
+    act(() => {
+      useAnimationStore.getState().play()
+    })
   })
 })
 

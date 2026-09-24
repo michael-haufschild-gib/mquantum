@@ -143,6 +143,12 @@ export const usePageCurveStore = create<PageCurveState>((set, get) => {
   // Mutable-state guard: track last-seen t and rate to support trapezoid
   // integration without exposing them in the public state.
   const integrator = { lastT: Number.NaN, lastRate: 0 }
+  // The ring buffer only spans the most recent `capacity` samples, so once
+  // the S_therm = S_BH crossing scrolls out, `pageTime(buffer)` finds nothing
+  // and the HUD reported "t_Page: —" for a curve that is visibly saturated.
+  // Latch the crossing when it happens, keyed by the S_BH it was measured
+  // against (a changed G_eff / horizon area invalidates it automatically).
+  const pageTimeLatch = { t: null as number | null, sBH: 0 }
   return {
     buffer,
     gEff: PAGE_CURVE_DEFAULTS.gEff,
@@ -191,6 +197,17 @@ export const usePageCurveStore = create<PageCurveState>((set, get) => {
         sPage,
         islandRadius: isl,
       })
+      if (
+        sBH > 0 &&
+        Number.isFinite(integrator.lastT) &&
+        state.lastSTherm < sBH &&
+        sTherm >= sBH &&
+        sTherm > state.lastSTherm
+      ) {
+        const frac = (sBH - state.lastSTherm) / (sTherm - state.lastSTherm)
+        pageTimeLatch.t = integrator.lastT + frac * (inputs.t - integrator.lastT)
+        pageTimeLatch.sBH = sBH
+      }
       integrator.lastT = inputs.t
       integrator.lastRate = rate
       set({
@@ -206,6 +223,7 @@ export const usePageCurveStore = create<PageCurveState>((set, get) => {
       resetPageCurveBuffer(get().buffer)
       integrator.lastT = Number.NaN
       integrator.lastRate = 0
+      pageTimeLatch.t = null
       set({
         lastSBH: 0,
         lastRate: 0,
@@ -220,6 +238,7 @@ export const usePageCurveStore = create<PageCurveState>((set, get) => {
       const fresh = createPageCurveBuffer(cap)
       integrator.lastT = Number.NaN
       integrator.lastRate = 0
+      pageTimeLatch.t = null
       // Replace the buffer reference — readers observe via `version`.
       set({
         buffer: fresh,
@@ -252,7 +271,13 @@ export const usePageCurveStore = create<PageCurveState>((set, get) => {
 
     getPageTime: () => {
       const state = get()
-      return computePageTime(state.buffer, state.lastSBH)
+      const inWindow = computePageTime(state.buffer, state.lastSBH)
+      if (inWindow !== null) return inWindow
+      const latched =
+        pageTimeLatch.t !== null &&
+        pageTimeLatch.sBH === state.lastSBH &&
+        state.lastSTherm >= state.lastSBH
+      return latched ? pageTimeLatch.t : null
     },
   }
 })
