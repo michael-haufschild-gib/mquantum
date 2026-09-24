@@ -15,7 +15,9 @@
  * - Interpolating: passes through data points exactly (w1(0)=1, w2(1)=1)
  * - C1 continuous: first derivative is continuous across knots
  * - Partition of unity: w0+w1+w2+w3 = 1 for all t
- * - Reproduces cubics: exactly interpolates polynomials up to degree 3
+ * - Quadratic precision: reproduces polynomials up to degree 2 exactly (cubics
+ *   only at knot midpoints t = ½, where the weights equal the 4-point Lagrange
+ *   stencil −1/16, 9/16, 9/16, −1/16)
  *
  * Each writeGrid shader inlines the 4^D stencil loop (D = min(latticeDim, 3))
  * using mode-specific buffer reads. This block provides only the weight function.
