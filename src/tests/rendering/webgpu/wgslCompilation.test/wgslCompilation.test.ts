@@ -50,10 +50,13 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
   for (const dimension of dimensions) {
     it(`composes WGSL fragment shader for dimension ${dimension}`, () => {
+      // `temporalAccumulation` is the flag composeSchroedingerShader reads; the
+      // inherited `temporal` key is ignored by this composer, so passing it
+      // here never exercised the temporal MRT output path.
       const { wgsl, features } = composeSchroedingerShader({
         dimension,
 
-        temporal: true,
+        temporalAccumulation: true,
 
         quantumMode: 'hydrogenND',
       })
@@ -62,6 +65,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
       verifyNoGlslLeakage(wgsl)
       expect(features).toContain(`${dimension}D Quantum`)
       expect(features).toContain('Hydrogen ND')
+      expect(features).toContain('Temporal Accumulation')
     })
   }
 

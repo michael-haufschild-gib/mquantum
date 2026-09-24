@@ -4,7 +4,7 @@
  * Measures the CPU-side cost of composing WGSL shader strings.
  * This runs every time a mode/config changes.
  *
- * Run: pnpm exec vitest bench src/tests/rendering/webgpu/shaderCompositionPerf.bench.ts
+ * Run: pnpm exec vitest bench --run src/tests/rendering/webgpu/shaderCompositionPerf.bench
  */
 
 import { bench, describe } from 'vitest'

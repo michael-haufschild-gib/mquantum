@@ -13,18 +13,42 @@ import { vi } from 'vitest'
 // Standalone mock factories — importable by any test file
 // =============================================================================
 
-/** Create a mock GPUBuffer with all required methods. */
+/**
+ * Create a mock GPUBuffer with all required methods.
+ *
+ * `getMappedRange(offset, size)` returns a view-sized slice of a backing
+ * store that matches the buffer's `size` (assigned by `createBuffer`) and
+ * persists across calls, so code that fills a `mappedAtCreation` range or
+ * reads a mapped readback sees real bytes. It used to return a fresh
+ * 0-byte ArrayBuffer: typed-array `.set()` into it threw a RangeError and
+ * readback reads yielded `undefined`, so tests could not observe either.
+ */
 export function createMockBuffer(label?: string): GPUBuffer {
-  return {
+  let backing: ArrayBuffer | null = null
+  const buffer = {
     size: 0,
     usage: 0,
     mapState: 'unmapped' as GPUBufferMapState,
     label: label ?? '',
-    getMappedRange: vi.fn(() => new ArrayBuffer(0)),
-    unmap: vi.fn(),
+    getMappedRange: vi.fn((offset = 0, size?: number) => {
+      const total = Math.max(0, Number(buffer.size) || 0)
+      if (!backing || backing.byteLength !== total) backing = new ArrayBuffer(total)
+      const end = size === undefined ? total : Math.min(total, offset + size)
+      // Whole range: the persistent store itself, so writes stick. Sub-range:
+      // a copy (JS cannot alias an ArrayBuffer window the way WebGPU does).
+      return offset === 0 && end === total ? backing : backing.slice(offset, end)
+    }),
+    // mapState follows the real lifecycle: production readbacks bail unless
+    // it reads 'mapped' after mapAsync resolves.
+    unmap: vi.fn(() => {
+      buffer.mapState = 'unmapped'
+    }),
     destroy: vi.fn(),
-    mapAsync: vi.fn().mockResolvedValue(undefined),
-  } as unknown as GPUBuffer
+    mapAsync: vi.fn(async () => {
+      buffer.mapState = 'mapped'
+    }),
+  }
+  return buffer as unknown as GPUBuffer
 }
 
 /** Create a mock GPUTexture with createView and destroy. */
@@ -292,7 +316,11 @@ function createWebGPUMock() {
     lost: new Promise(() => {}),
     createBuffer: vi.fn((desc) => {
       const b = trackedCreateBuffer()
-      Object.assign(b, { size: desc.size, usage: desc.usage })
+      Object.assign(b, {
+        size: desc.size,
+        usage: desc.usage,
+        mapState: desc.mappedAtCreation ? 'mapped' : 'unmapped',
+      })
       return b
     }),
     createTexture: vi.fn((desc) => {

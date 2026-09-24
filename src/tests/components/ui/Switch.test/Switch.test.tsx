@@ -129,9 +129,11 @@ describe('Switch', () => {
     expect(ref).toHaveBeenCalledWith(screen.getByRole('switch', { name: 'Focusable' }))
   })
 
+  // Parses every .tsx file under src/: ~0.8 s alone, but it exceeded the 5 s
+  // default under full-suite worker contention, so it gets an explicit budget.
   it('keeps every project Switch instance accessible by name', () => {
     const findings = listTsxFiles(SOURCE_ROOT).flatMap(findSwitchesMissingAccessibleName)
 
     expect(findings).toEqual([])
-  })
+  }, 30_000)
 })
