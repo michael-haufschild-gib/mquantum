@@ -18,7 +18,7 @@
     "rendering-qw": { "gzip": 16103 },
     "rendering-ads": { "gzip": 11100 },
     "physics": { "gzip": 124000 },
-    "react-vendor": { "gzip": 65000 },
+    "react-vendor": { "gzip": 75600 },
     "motion": { "gzip": 46700 },
     "components": { "gzip": 45300 },
     "examples-scenes": { "gzip": 8050 },

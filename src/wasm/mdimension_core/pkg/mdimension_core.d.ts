@@ -407,61 +407,61 @@ export function von_neumann_entropy_wasm(eigenvalues: Float64Array): number;
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
-  readonly memory: WebAssembly.Memory;
-  readonly complex_mat_mul_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
-  readonly compose_rotations_indexed_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
-  readonly compose_rotations_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-  readonly compute_full_collapse_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
-  readonly compute_incompressible_spectrum_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => void;
-  readonly compute_joint_rdm_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void;
-  readonly compute_level_spacing_wasm: (a: number, b: number, c: number) => void;
-  readonly compute_partial_collapse_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number) => void;
-  readonly compute_rdm_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
-  readonly compute_scar_correlation_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number) => void;
-  readonly dirac_spinor_size_wasm: (a: number) => number;
-  readonly dot_product_wasm: (a: number, b: number, c: number, d: number) => number;
-  readonly fft_1d_wasm: (a: number, b: number, c: number, d: number) => void;
-  readonly fft_nd_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
-  readonly generate_dirac_matrices_wasm: (a: number, b: number) => void;
-  readonly generate_disorder_noise_wasm: (a: number, b: number, c: number) => void;
-  readonly generate_disorder_potential_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
-  readonly hermitian_eigenvalues_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-  readonly ifft_1d_wasm: (a: number, b: number, c: number, d: number) => void;
-  readonly ifft_nd_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
-  readonly magnitude_wasm: (a: number, b: number) => number;
-  readonly matrix_exponential_pade_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-  readonly multiply_matrices_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-  readonly multiply_matrix_vector_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-  readonly normalize_vector_wasm: (a: number, b: number, c: number) => void;
-  readonly project_vertices_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
-  readonly subtract_vectors_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
-  readonly von_neumann_entropy_wasm: (a: number, b: number) => number;
-  readonly start: () => void;
-  readonly __wbindgen_export: (a: number, b: number) => number;
-  readonly __wbindgen_export2: (a: number, b: number, c: number, d: number) => number;
-  readonly __wbindgen_export3: (a: number, b: number, c: number) => void;
-  readonly __wbindgen_add_to_stack_pointer: (a: number) => number;
-  readonly __wbindgen_start: () => void;
+    readonly memory: WebAssembly.Memory;
+    readonly complex_mat_mul_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
+    readonly compose_rotations_indexed_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+    readonly compose_rotations_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+    readonly compute_full_collapse_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
+    readonly compute_incompressible_spectrum_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => void;
+    readonly compute_joint_rdm_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void;
+    readonly compute_level_spacing_wasm: (a: number, b: number, c: number) => void;
+    readonly compute_partial_collapse_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number) => void;
+    readonly compute_rdm_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
+    readonly compute_scar_correlation_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number) => void;
+    readonly dirac_spinor_size_wasm: (a: number) => number;
+    readonly dot_product_wasm: (a: number, b: number, c: number, d: number) => number;
+    readonly fft_1d_wasm: (a: number, b: number, c: number, d: number) => void;
+    readonly fft_nd_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
+    readonly generate_dirac_matrices_wasm: (a: number, b: number) => void;
+    readonly generate_disorder_noise_wasm: (a: number, b: number, c: number) => void;
+    readonly generate_disorder_potential_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
+    readonly hermitian_eigenvalues_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+    readonly ifft_1d_wasm: (a: number, b: number, c: number, d: number) => void;
+    readonly ifft_nd_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
+    readonly magnitude_wasm: (a: number, b: number) => number;
+    readonly matrix_exponential_pade_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+    readonly multiply_matrices_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+    readonly multiply_matrix_vector_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+    readonly normalize_vector_wasm: (a: number, b: number, c: number) => void;
+    readonly project_vertices_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
+    readonly start: () => void;
+    readonly subtract_vectors_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
+    readonly von_neumann_entropy_wasm: (a: number, b: number) => number;
+    readonly __wbindgen_export: (a: number, b: number) => number;
+    readonly __wbindgen_export2: (a: number, b: number, c: number, d: number) => number;
+    readonly __wbindgen_export3: (a: number, b: number, c: number) => void;
+    readonly __wbindgen_add_to_stack_pointer: (a: number) => number;
+    readonly __wbindgen_start: () => void;
 }
 
 export type SyncInitInput = BufferSource | WebAssembly.Module;
 
 /**
-* Instantiates the given `module`, which can either be bytes or
-* a precompiled `WebAssembly.Module`.
-*
-* @param {{ module: SyncInitInput }} module - Passing `SyncInitInput` directly is deprecated.
-*
-* @returns {InitOutput}
-*/
+ * Instantiates the given `module`, which can either be bytes or
+ * a precompiled `WebAssembly.Module`.
+ *
+ * @param {{ module: SyncInitInput }} module - Passing `SyncInitInput` directly is deprecated.
+ *
+ * @returns {InitOutput}
+ */
 export function initSync(module: { module: SyncInitInput } | SyncInitInput): InitOutput;
 
 /**
-* If `module_or_path` is {RequestInfo} or {URL}, makes a request and
-* for everything else, calls `WebAssembly.instantiate` directly.
-*
-* @param {{ module_or_path: InitInput | Promise<InitInput> }} module_or_path - Passing `InitInput` directly is deprecated.
-*
-* @returns {Promise<InitOutput>}
-*/
+ * If `module_or_path` is {RequestInfo} or {URL}, makes a request and
+ * for everything else, calls `WebAssembly.instantiate` directly.
+ *
+ * @param {{ module_or_path: InitInput | Promise<InitInput> }} module_or_path - Passing `InitInput` directly is deprecated.
+ *
+ * @returns {Promise<InitOutput>}
+ */
 export default function __wbg_init (module_or_path?: { module_or_path: InitInput | Promise<InitInput> } | InitInput | Promise<InitInput>): Promise<InitOutput>;
