@@ -301,3 +301,38 @@ describe('SHORTCUTS', () => {
     expect(lookAtOrigin).toBeUndefined()
   })
 })
+
+// Regression: the arrow shortcuts only checked the global [MIN, MAX] range, so
+// ArrowUp on a 3D-only Bell pair (or a 6D Pauli spinor) made setDimension fall
+// back to the Schrödinger object type — a single keypress abandoned the
+// experiment even though the Dimension selector disables those options.
+describe('useKeyboardShortcuts — per-type dimension range', () => {
+  beforeEach(() => {
+    useGeometryStore.getState().reset()
+  })
+
+  it('keeps a Bell pair at 3D on ArrowUp / ArrowDown', () => {
+    useGeometryStore.getState().loadGeometry(3, 'bellPair')
+    renderHook(() => useKeyboardShortcuts({ enabled: true }))
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp' }))
+    expect(useGeometryStore.getState().objectType).toBe('bellPair')
+    expect(useGeometryStore.getState().dimension).toBe(3)
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }))
+    expect(useGeometryStore.getState().objectType).toBe('bellPair')
+    expect(useGeometryStore.getState().dimension).toBe(3)
+  })
+
+  it('stops a Pauli spinor at its 6D maximum instead of switching object type', () => {
+    useGeometryStore.getState().loadGeometry(6, 'pauliSpinor')
+    renderHook(() => useKeyboardShortcuts({ enabled: true }))
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp' }))
+    expect(useGeometryStore.getState().objectType).toBe('pauliSpinor')
+    expect(useGeometryStore.getState().dimension).toBe(6)
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }))
+    expect(useGeometryStore.getState().dimension).toBe(5)
+  })
+})

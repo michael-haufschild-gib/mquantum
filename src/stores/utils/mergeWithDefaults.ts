@@ -32,6 +32,7 @@ import {
   RAYMARCH_QUALITY_TO_SAMPLES,
   SCHROEDINGER_QUALITY_PRESETS,
 } from '@/lib/geometry/extended/types'
+import { resolveQuantumTypeKey } from '@/lib/geometry/registry/helpers'
 import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
 import { sanitizeOpenQuantumConfig } from '@/lib/physics/openQuantum/types'
@@ -397,6 +398,19 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged
   let normalized = merged as unknown as Record<string, unknown>
   if (normalized.quantumMode === 'hydrogenOrbital') {
     normalized = { ...normalized, quantumMode: 'hydrogenND' }
+  }
+  // An unknown mode (removed/renamed in an old scene, or a hand-edited file)
+  // survived the merge verbatim, and SchroedingerControls then threw
+  // `Unhandled quantum mode` during render. Fall back to the default mode.
+  const loadedMode = normalized.quantumMode as typeof DEFAULT_SCHROEDINGER_CONFIG.quantumMode
+  if (resolveQuantumTypeKey('schroedinger', loadedMode) === undefined) {
+    // Describe non-strings by type: String() throws on null-prototype objects.
+    const shown = typeof loadedMode === 'string' ? loadedMode : `<${typeof loadedMode}>`
+    logger.warn(
+      `[mergeWithDefaults] Unknown quantumMode ${shown}; ` +
+        `falling back to ${DEFAULT_SCHROEDINGER_CONFIG.quantumMode}`
+    )
+    normalized = { ...normalized, quantumMode: DEFAULT_SCHROEDINGER_CONFIG.quantumMode }
   }
   normalized = normalizeSchroedingerQualityEnums(normalized)
   normalized = sanitizeHarmonicOscillatorScalars(normalized, DEFAULT_SCHROEDINGER_CONFIG)

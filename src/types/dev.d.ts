@@ -1,6 +1,7 @@
 /**
  * Window extensions for debugging Zustand stores from the browser console.
- * Set in DEV mode always, and in production when ?_bench URL param is present.
+ * Set in DEV builds only (main.tsx `import.meta.env.DEV` bridge); production
+ * builds never install them.
  */
 
 import type { PAULI_SCENARIO_PRESETS } from '@/lib/physics/pauli/presets'

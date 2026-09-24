@@ -255,3 +255,32 @@ describe('useDeviceCapabilities', () => {
     expect(detectDeviceCapabilities).toHaveBeenCalledTimes(1)
   })
 })
+
+// Regression: the constrained defaults were applied through the persisting
+// setters, so the auto-choice was saved as a user preference — a single
+// conservative detection pinned later (capable) sessions to half resolution.
+describe('useDeviceCapabilities constrained defaults are not persisted', () => {
+  it('applies the mobile defaults in memory without writing localStorage', async () => {
+    localStorage.removeItem('mdim_render_resolution_scale')
+    localStorage.removeItem('mdim_max_fps')
+    vi.mocked(detectDeviceCapabilities).mockResolvedValue({
+      gpuTier: 1,
+      isMobileGPU: false,
+      gpuName: 'fallback',
+      detectionType: 'FALLBACK',
+      estimatedFps: 0,
+    })
+
+    renderHook(() => useDeviceCapabilities())
+
+    await waitFor(() => {
+      expect(usePerformanceStore.getState().deviceCapabilitiesDetected).toBe(true)
+    })
+    expect(usePerformanceStore.getState().renderResolutionScale).toBe(
+      MOBILE_DEFAULT_RESOLUTION_SCALE
+    )
+    expect(usePerformanceStore.getState().maxFps).toBe(MOBILE_DEFAULT_MAX_FPS)
+    expect(localStorage.getItem('mdim_render_resolution_scale')).toBeNull()
+    expect(localStorage.getItem('mdim_max_fps')).toBeNull()
+  })
+})

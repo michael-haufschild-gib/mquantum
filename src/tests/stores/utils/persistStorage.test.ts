@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
 import { useExportStore } from '@/stores/runtime/exportStore'
 import { type SavedStyle, usePresetManagerStore } from '@/stores/runtime/presetManagerStore'
@@ -94,5 +96,52 @@ describe('persisted stores with blocked localStorage writes', () => {
 
     expect(useExportStore.getState().settings.fps).toBe(30)
     expect(usePresetManagerStore.getState().savedStyles).toEqual([])
+  })
+})
+
+// Regression: when the `window.localStorage` accessor itself throws (site data
+// blocked, sandboxed iframe), zustand's createJSONStorage returned undefined and
+// the persist middleware then skipped attaching `store.persist`, so
+// `persist.hasHydrated()` in useUrlState / showConditionalMsgBox threw a
+// TypeError. The storage now falls back to an in-memory Map.
+describe('createBestEffortJSONStorage with an inaccessible localStorage', () => {
+  let original: PropertyDescriptor | undefined
+
+  beforeEach(() => {
+    original = Object.getOwnPropertyDescriptor(window, 'localStorage')
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      get() {
+        throw new DOMException('Access is denied for this document.', 'SecurityError')
+      },
+    })
+  })
+
+  afterEach(() => {
+    if (original) Object.defineProperty(window, 'localStorage', original)
+    else Reflect.deleteProperty(window, 'localStorage')
+  })
+
+  it('still returns a working (in-memory) storage', () => {
+    // Guard: the override must really make the accessor throw.
+    expect(() => window.localStorage).toThrow('Access is denied')
+    const storage = createBestEffortJSONStorage<{ value: number }>('blockedStore')
+    if (!storage) throw new Error('Expected an in-memory fallback storage')
+    storage.setItem('k', { state: { value: 7 }, version: 0 })
+    expect(storage.getItem('k')).toEqual({ state: { value: 7 }, version: 0 })
+    storage.removeItem('k')
+    expect(storage.getItem('k')).toBeNull()
+  })
+
+  it('keeps the persist API on stores so hydration checks do not throw', () => {
+    const useBlocked = create<{ n: number }>()(
+      persist(() => ({ n: 1 }), {
+        name: 'blocked-persist-test',
+        storage: createBestEffortJSONStorage<{ n: number }>('blockedPersistTest'),
+      })
+    )
+    expect(useBlocked.persist.hasHydrated()).toBe(true)
+    useBlocked.setState({ n: 2 })
+    expect(useBlocked.getState().n).toBe(2)
   })
 })
