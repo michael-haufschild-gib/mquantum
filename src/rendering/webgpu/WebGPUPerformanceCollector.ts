@@ -348,9 +348,12 @@ export class WebGPUStatsCollector {
         programs: 0, // Pipelines count would go here
         heap: heapMB,
       },
+      // The pool estimate is render-target TEXTURE memory (texels × bytes/px ×
+      // layers × samples); publishing it as `geometries` made the System tab
+      // attribute 100 % of VRAM to geometry and 0 % to textures.
       vram: {
-        geometries: vramBytes,
-        textures: 0,
+        geometries: 0,
+        textures: vramBytes,
         total: vramBytes,
       },
       viewport: {

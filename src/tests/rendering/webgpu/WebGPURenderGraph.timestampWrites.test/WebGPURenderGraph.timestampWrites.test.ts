@@ -604,3 +604,63 @@ describe('WebGPURenderGraph timestampWrites wiring', () => {
     nowSpy.mockRestore()
   })
 })
+
+// Regression: the graph attached timestampWrites at `timestampIndex * 4` for
+// every enabled pass with no cap, but the query set holds 32 passes × 4 slots.
+// A 33rd timed pass would request endOfPassWriteIndex 131 ≥ 128 — a validation
+// error that invalidates the whole frame's command encoder while the perf
+// monitor is expanded.
+describe('WebGPURenderGraph timestampWrites capacity', () => {
+  it('instruments at most getMaxTimedPasses() passes and leaves the rest untimed', async () => {
+    const makePass = (id: string): WebGPURenderPass => ({
+      id,
+      config: createRenderPassConfig(id, [{ resourceId: 'out', access: 'write', binding: 0 }]),
+      initialize: vi.fn().mockResolvedValue(undefined),
+      execute: (ctx) => {
+        const passEncoder = ctx.beginRenderPass({
+          label: id,
+          colorAttachments: [
+            {
+              view: ctx.getWriteTarget('out')!,
+              loadOp: 'clear',
+              storeOp: 'store',
+              clearValue: { r: 0, g: 0, b: 0, a: 1 },
+            },
+          ],
+        })
+        passEncoder.end()
+      },
+      dispose: vi.fn(),
+    })
+
+    const passes = Array.from({ length: 34 }, (_, i) => makePass(`pass-${i}`))
+    const harness = await createGraphHarness(passes[0]!)
+    const internals = harness.graph as unknown as {
+      passes: Map<string, WebGPURenderPass>
+      passOrder: string[]
+      timestampCollector: { getMaxTimedPasses: () => number }
+    }
+    internals.passes = new Map(passes.map((p) => [p.id, p]))
+    internals.passOrder = passes.map((p) => p.id)
+    const maxTimed = internals.timestampCollector.getMaxTimedPasses()
+    const queryCount = maxTimed * 4
+
+    harness.graph.execute(1 / 60)
+
+    const descriptors = harness.beginRenderPass.mock.calls.map((call) => call[0]!)
+    expect(descriptors).toHaveLength(34)
+    const timed = descriptors.filter((d) => d.timestampWrites !== undefined)
+    expect(timed).toHaveLength(maxTimed)
+    for (const d of timed) {
+      expect(d.timestampWrites!.endOfPassWriteIndex!).toBeLessThan(queryCount)
+    }
+    expect(descriptors.slice(maxTimed).every((d) => d.timestampWrites === undefined)).toBe(true)
+    // The resolve covers exactly the instrumented slots.
+    const [, firstQuery, resolvedCount] = harness.resolveQuerySet.mock.calls[0]! as [
+      unknown,
+      number,
+      number,
+    ]
+    expect(firstQuery + resolvedCount).toBeLessThanOrEqual(queryCount)
+  })
+})

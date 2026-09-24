@@ -180,7 +180,9 @@ describe('WebGPUStatsCollector', () => {
     // the sole consumer and a unit conversion here would silently mislabel
     // 1 GB of textures as "1.0 KB" on the System tab.
     expect(metrics.vram.total).toBe(10 * 1024 * 1024)
-    expect(metrics.vram.geometries).toBe(10 * 1024 * 1024)
+    // The pool estimate is render-target texture memory, not geometry.
+    expect(metrics.vram.textures).toBe(10 * 1024 * 1024)
+    expect(metrics.vram.geometries).toBe(0)
     expect(metrics.gpuTimingSupported).toBe(true)
 
     nowSpy.mockRestore()

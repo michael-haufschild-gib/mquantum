@@ -16,6 +16,9 @@ export interface PassGPUTiming {
   render: number
 }
 
+/** Render-graph passes the timestamp query set can instrument per frame (4 slots each). */
+const MAX_TIMED_PASSES = 32
+
 /**
  * Collects GPU timestamp queries across render passes and extracts timing data
  * via async readback.
@@ -41,8 +44,7 @@ export class WebGPUTimestampCollector {
    */
   initialize(device: GPUDevice): void {
     // 4 timestamp slots per pass: [computeBegin, computeEnd, renderBegin, renderEnd]
-    const maxPasses = 32
-    const queryCount = maxPasses * 4
+    const queryCount = MAX_TIMED_PASSES * 4
 
     this.querySet = device.createQuerySet({
       type: 'timestamp',
@@ -85,6 +87,16 @@ export class WebGPUTimestampCollector {
 
   getQuerySet(): GPUQuerySet | null {
     return this.querySet
+  }
+
+  /**
+   * Number of render-graph passes the query set can instrument per frame.
+   * Callers must stop attaching timestampWrites past this count — an
+   * out-of-range write index is a validation error that invalidates the
+   * whole frame's command encoder.
+   */
+  getMaxTimedPasses(): number {
+    return MAX_TIMED_PASSES
   }
 
   getLastTimings(): ReadonlyMap<string, PassGPUTiming> {
