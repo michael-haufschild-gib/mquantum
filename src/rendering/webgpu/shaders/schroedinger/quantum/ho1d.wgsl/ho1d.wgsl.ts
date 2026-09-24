@@ -10,6 +10,19 @@
  * @module rendering/webgpu/shaders/schroedinger/quantum/ho1d.wgsl
  */
 
+/**
+ * Lower guard on the HO frequency the eigenfunction evaluators accept. It only
+ * keeps √ω and (ω/π)^{1/4} finite for ω ≤ 0: the momentum representation packs
+ * ω_k = s²/(ħ²ω) into the same uniform slot (`applyHOMomentumTransform`), and
+ * that legitimately reaches ~5e-5 (momentum scale 0.1, ħ = 10 in p-space). A
+ * larger floor would render those states as a narrower Gaussian than the
+ * physics — and the momentum bounding radius — call for.
+ */
+export const HO_OMEGA_FLOOR = 1e-6
+
+/** {@link HO_OMEGA_FLOOR} as a WGSL float literal. */
+export const HO_OMEGA_FLOOR_WGSL = HO_OMEGA_FLOOR.toFixed(6)
+
 export const ho1dBlock = /* wgsl */ `
 // ============================================
 // 1D Harmonic Oscillator Eigenfunction
@@ -40,7 +53,7 @@ fn ho1D(n: i32, x: f32, omega: f32) -> f32 {
   if (n < 0 || n > 6) { return 0.0; }
 
   // α = √ω (in dimensionless units with ℏ=m=1)
-  let omegaClamped = max(omega, 0.01);
+  let omegaClamped = max(omega, ${HO_OMEGA_FLOOR_WGSL});
   let alpha = sqrt(omegaClamped);
   let u = alpha * x;
 

@@ -10,6 +10,7 @@
  */
 
 import { sanitizeShaderDimension } from '../../../shared/compose-helpers'
+import { HO_OMEGA_FLOOR_WGSL } from '../ho1d.wgsl'
 
 /**
  * Generate a dimension-specific hoND function for WGSL.
@@ -26,7 +27,7 @@ function generateHoNDBlock(dimension: number): string {
   // one sqrt per dim by reusing the alpha = sqrt(ω) we already computed.
   const precomp = Array.from(
     { length: dimension },
-    (_, i) => `  let omega_${i} = max(getOmega(uniforms, ${i}), 0.01);
+    (_, i) => `  let omega_${i} = max(getOmega(uniforms, ${i}), ${HO_OMEGA_FLOOR_WGSL});
   let alpha_${i} = sqrt(omega_${i});
   let alphaNorm_${i} = sqrt(alpha_${i} * SQRT_INV_PI);
   let u_${i} = alpha_${i} * xND[${i}];

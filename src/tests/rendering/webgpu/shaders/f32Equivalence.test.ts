@@ -59,6 +59,8 @@
 
 import { describe, expect, it } from 'vitest'
 
+import { HO_OMEGA_FLOOR } from '@/rendering/webgpu/shaders/schroedinger/quantum/ho1d.wgsl'
+
 // ============================================================================
 // f32 emulation helper
 // ============================================================================
@@ -104,7 +106,7 @@ const HO_NORM_F64 = [
 /** 1D HO eigenfunction — f64 precision, canonical reference */
 function ho1D_f64(n: number, x: number, omega: number): number {
   if (n < 0 || n > 6) return 0
-  const omegaClamped = Math.max(omega, 0.01)
+  const omegaClamped = Math.max(omega, HO_OMEGA_FLOOR)
   const alpha = Math.sqrt(omegaClamped)
   const u = alpha * x
   const gauss = Math.exp(-0.5 * u * u)
@@ -280,7 +282,7 @@ function hermite_f32(n: number, u: number): number {
 function ho1D_f32(n: number, x: number, omega: number): number {
   if (n < 0 || n > 6) return f(0)
 
-  const omegaClamped = f(Math.max(f(omega), f(0.01)))
+  const omegaClamped = f(Math.max(f(omega), f(HO_OMEGA_FLOOR)))
   const alpha = f(Math.sqrt(omegaClamped))
   const u = f(alpha * f(x))
 

@@ -691,6 +691,7 @@ export {
   type BasisPackParams,
   type CameraPackParams,
   computeCanonicalCompensation,
+  hoMomentumOmega,
   type MaterialPackParams,
   packBasisVectors,
   packCameraUniforms,
