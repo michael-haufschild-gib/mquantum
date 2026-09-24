@@ -157,4 +157,36 @@ test.describe('TDSE Heller Wavepacket Spectrometer', () => {
     })
     await expect(page.getByTestId('heller-spectrum-plot')).toHaveCount(0)
   })
+
+  // Regression: a ψ re-initialisation outside the panel (timeline Reset,
+  // initial-condition edits, auto-loop) left the capture's ψ(0) and time base
+  // in place. simTime restarted at 0, so every sample was dropped (count
+  // frozen) until the new run passed the old last time, then the new run
+  // was stitched onto the old trace.
+  test('a wavefunction reset outside the panel restarts the capture', async ({ page }) => {
+    await gotoModeWithParams(page, 'tdseDynamics', 3, { pot: 'harmonicTrap' })
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    await waitForFirstFrame(page)
+    const HELLER = '/src/stores/diagnostics/hellerSpectrometerStore.ts'
+    const readCount = () =>
+      page.evaluate(async (path) => {
+        const mod = await import(/* @vite-ignore */ path)
+        return mod.useHellerSpectrometerStore.getState().sampleCount as number
+      }, HELLER)
+
+    await page.evaluate(async (path) => {
+      const mod = await import(/* @vite-ignore */ path)
+      window.__EXTENDED_OBJECT_STORE__!.getState().resetTdseField()
+      mod.useHellerSpectrometerStore.getState().setEnabled(true)
+    }, HELLER)
+    await expect.poll(readCount, { timeout: 60_000 }).toBeGreaterThanOrEqual(40)
+    const before = await readCount()
+
+    await page.evaluate(() => window.__EXTENDED_OBJECT_STORE__!.getState().resetTdseField())
+    // The capture restarts from zero instead of freezing at `before`…
+    await expect.poll(readCount, { timeout: 10_000, intervals: [16] }).toBeLessThan(before)
+    // …and resumes sampling from the fresh ψ(0).
+    await expect.poll(readCount, { timeout: 30_000 }).toBeGreaterThanOrEqual(5)
+  })
 })

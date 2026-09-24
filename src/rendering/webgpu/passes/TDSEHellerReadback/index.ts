@@ -197,7 +197,49 @@ function computeStaticHFingerprint(config: TdseConfig): string {
     config.pmlTargetReflection,
     config.compactDims.map((b) => (b ? '1' : '0')).join(''),
     config.compactRadii.join(','),
+    // Kinetic operator (Laplace–Beltrami metric), GPE nonlinearity, and the
+    // non-unitary evolution switches all change the propagator, so a ψ(0)
+    // captured before the change does not belong to the new dynamics.
+    JSON.stringify(config.metric ?? null),
+    config.interactionStrength ?? 0,
+    config.imaginaryTimeEnabled ? 1 : 0,
+    config.stochasticEnabled ? 1 : 0,
+    config.stochasticGamma,
+    config.stochasticSigma,
+    config.stochasticNumSites,
   ].join('|')
+}
+
+/**
+ * Does the TDSE Hamiltonian depend on time? Heller's theorem needs a
+ * stationary H. An armed drive modulates V(x, t); the de Sitter metric
+ * with H > 0 scales the kinetic operator by a(t)⁻² = exp(−2H·t).
+ *
+ * @param config - The current TDSE config
+ * @returns True when the capture must be suspended
+ */
+export function isHellerHamiltonianTimeDependent(config: TdseConfig): boolean {
+  if (config.potentialType === 'driven' && config.driveEnabled === true) return true
+  const metric = config.metric
+  return metric?.kind === 'deSitter' && (metric.hubbleRate ?? 0) > 0
+}
+
+/**
+ * Reset an in-progress capture (cached ψ(0) or samples present) and tell
+ * the UI to drop any displayed spectrum. Used when ψ is rewritten outside
+ * the unitary evolution — a re-initialisation restarts simTime at 0 against
+ * the old time base (samples were dropped until the new run passed the old
+ * last time, then stitched on), and a measurement collapse is a
+ * non-unitary jump the autocorrelation must not straddle.
+ *
+ * @param state - Readback state
+ * @returns True when a capture was reset
+ */
+export function invalidateHellerCaptureIfActive(state: HellerReadbackState): boolean {
+  if (state.psi0Re === null && state.buffer.count === 0) return false
+  resetHellerCapture(state)
+  useHellerSpectrometerStore.getState().bumpResetVersion()
+  return true
 }
 
 /**
@@ -472,10 +514,11 @@ function submitHellerCopy(
  * driven potential (`potentialType === 'driven'` with `driveEnabled`)
  * modulates V(x,t) — the resulting autocorrelation is NOT a pure sum
  * of eigenfrequencies, so feeding it into the FFT would yield drive
- * sidebands that look like eigenvalues but aren't. We publish the
+ * sidebands that look like eigenvalues but aren't; the de Sitter metric
+ * (H > 0) likewise rescales the kinetic term in time. We publish the
  * time-dependence flag on the store (UI uses it to disable controls
- * with an explanatory banner) and hold `state.enabled` to false for
- * the duration.
+ * with an explanatory banner), hold `state.enabled` to false for the
+ * duration, and drop any capture taken before it.
  *
  * @param state - Mutable readback state (updated in place)
  * @param config - Active TDSE config (used only to detect driven H(t))
@@ -490,11 +533,15 @@ export function prepareHellerFrame(
   lastHandledResetToken: number
 ): number {
   const hellerStore = useHellerSpectrometerStore.getState()
-  const hamiltonianIsTimeDependent =
-    config.potentialType === 'driven' && config.driveEnabled === true
+  const hamiltonianIsTimeDependent = isHellerHamiltonianTimeDependent(config)
   if (hellerStore.hamiltonianTimeDependent !== hamiltonianIsTimeDependent) {
     hellerStore.setHamiltonianTimeDependent(hamiltonianIsTimeDependent)
   }
+  // Drop the capture while H(t) is active: ψ keeps evolving under the
+  // time-dependent H, and on resume the gap-filling interpolation in
+  // computeHellerSpectrum would stitch those samples onto the stationary
+  // trace — a silently wrong spectrum. The next capture re-anchors ψ(0).
+  if (hamiltonianIsTimeDependent) invalidateHellerCaptureIfActive(state)
   let nextToken = lastHandledResetToken
 
   // Static-H fingerprint guard. A change to any Hamiltonian-defining

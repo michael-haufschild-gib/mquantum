@@ -125,6 +125,7 @@ import {
 import {
   createHellerReadbackState,
   type HellerReadbackState,
+  invalidateHellerCaptureIfActive,
   prepareHellerFrame,
   resetHellerCapture,
 } from '../TDSEHellerReadback'
@@ -754,6 +755,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       this._diagState.maxDensity = 1.0
       this._diagState.properMaxDensity = 1.0
       this._diagState.diagGeneration++
+      invalidateHellerCaptureIfActive(this._hellerState)
       return
     }
 
@@ -855,6 +857,9 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     this._diagState.pendingAutoReset = false
     this._diagState.diagGeneration++
     this.initialized = true
+    // simTime restarted at 0: a running Heller capture's ψ(0) and time base
+    // belong to the previous run (see invalidateHellerCaptureIfActive).
+    invalidateHellerCaptureIfActive(this._hellerState)
 
     // Seed targetNorm for imaginary-time renormalization
     if (config.imaginaryTimeEnabled && this.bg?.renormalizeUniformBuffer) {

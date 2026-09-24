@@ -163,7 +163,8 @@ export function deriveStatusMessage(inputs: StatusInputs): StatusMessage {
   if (hamiltonianTimeDependent) {
     return {
       label: 'Paused — time-dependent Hamiltonian',
-      detail: 'Heller\u2019s theorem needs a stationary H. Disarm the drive to resume.',
+      detail:
+        'Heller\u2019s theorem needs a stationary H. Disarm the drive (or set the de Sitter Hubble rate to 0) to resume.',
       dotClass: 'bg-text-tertiary',
     }
   }
@@ -286,11 +287,16 @@ export function buildHarmonicOverlay(
 ): HarmonicOverlay | null {
   if (potentialType !== 'harmonicTrap' && potentialType !== 'becTrap') return null
   if (!(omega > 0) || !Number.isFinite(omega)) return null
-  if (trapAnisotropy && trapAnisotropy.length > 0) {
+  // Only the becTrap potential scales ω per axis (tdsePotential type 9); the
+  // plain harmonicTrap (type 4) ignores trapAnisotropy, so a leftover array
+  // must neither hide nor rescale its ladder. Axes beyond the lattice
+  // dimension are unused by the shader and must not break the isotropy test.
+  const axes = potentialType === 'becTrap' ? (trapAnisotropy?.slice(0, dim) ?? []) : []
+  if (axes.length > 0) {
     // Isotropic check: all entries within 0.1% of each other.
-    const first = trapAnisotropy[0]!
-    for (let i = 0; i < trapAnisotropy.length; i++) {
-      if (Math.abs(trapAnisotropy[i]! - first) > 1e-3) return null
+    const first = axes[0]!
+    for (let i = 0; i < axes.length; i++) {
+      if (Math.abs(axes[i]! - first) > 1e-3) return null
     }
     // A uniform non-unit anisotropy is still isotropic (same ω on all
     // axes) — fall through with the scaled frequency.
@@ -367,12 +373,15 @@ export function buildPlotData(
 
   const nyquist = omega[omega.length - 1] ?? 0
   const omegaMax = pickOmegaMax(peaks, overlay, nyquist)
+  // The spectrum is two-sided; open the window below 0 only when a peak
+  // sits there (negative eigenenergies, e.g. finite-well bound states).
+  const omegaMin = pickOmegaMin(peaks, omega[0] ?? 0)
 
-  const proj = makeProjection(maxP, omegaMax, geom)
-  const polyline = buildPolyline(omega, power, omegaMax, proj)
+  const proj = makeProjection(maxP, omegaMin, omegaMax, geom)
+  const polyline = buildPolyline(omega, power, omegaMin, omegaMax, proj)
 
   const peakMarkers = peaks
-    .filter((p) => p.omega <= omegaMax)
+    .filter((p) => p.omega >= omegaMin && p.omega <= omegaMax)
     .map((p) => ({ x: proj.toX(p.omega), y: proj.toY(p.power) }))
 
   const overlayLines =
@@ -382,10 +391,10 @@ export function buildPlotData(
         omega: w,
         label: `n=${overlay.labels[i]}`,
       }))
-      .filter((line) => line.omega <= omegaMax)
+      .filter((line) => line.omega >= omegaMin && line.omega <= omegaMax)
       .map(({ x, label }) => ({ x, label })) ?? []
 
-  const xTicks = buildNiceTicks(0, omegaMax, 5).map((v) => ({
+  const xTicks = buildNiceTicks(omegaMin, omegaMax, 5).map((v) => ({
     x: proj.toX(v),
     label: formatTickLabel(v),
   }))
@@ -443,6 +452,10 @@ function pickOmegaMax(
     }
     if (maxPeakOmega > 0) {
       omegaMax = Math.min(omegaMax, Math.max(omegaMax * 0.1, 2 * maxPeakOmega))
+    } else {
+      // Only negative-energy peaks: keep a short positive margin instead
+      // of the full band, which would squeeze them against the left edge.
+      omegaMax *= 0.1
     }
   }
   if (overlay && overlay.omegas.length > 0) {
@@ -457,20 +470,46 @@ function pickOmegaMax(
 }
 
 /**
+ * Choose the X-axis lower bound: 0 unless a peak lies at negative ω, in
+ * which case twice the most negative peak (mirroring {@link pickOmegaMax}),
+ * never below the spectrum's lowest bin.
+ *
+ * @param peaks - Extracted top peaks from the spectrum
+ * @param spectrumMin - Lowest ω bin of the two-sided spectrum
+ * @returns Chosen lower ω bound (≤ 0)
+ */
+function pickOmegaMin(peaks: { omega: number }[], spectrumMin: number): number {
+  let minPeakOmega = 0
+  for (const p of peaks) {
+    if (p.omega < minPeakOmega) minPeakOmega = p.omega
+  }
+  if (!(minPeakOmega < 0)) return 0
+  const lo = Math.max(spectrumMin, 2 * minPeakOmega)
+  return Number.isFinite(lo) && lo < 0 ? lo : 0
+}
+
+/**
  * Construct the ω → x and power → y projection functions for the plot.
  *
  * @param maxP - Max power value (for log normalization)
+ * @param omegaMin - Chosen X-axis lower bound (≤ 0)
  * @param omegaMax - Chosen X-axis upper bound
  * @param geom - SVG plot geometry
  * @returns `{toX, toY}` — pixel-space projectors
  */
-function makeProjection(maxP: number, omegaMax: number, geom: PlotGeometry): Projection {
+function makeProjection(
+  maxP: number,
+  omegaMin: number,
+  omegaMax: number,
+  geom: PlotGeometry
+): Projection {
   const floor = maxP * 1e-4
   const logMax = Math.log10(maxP)
   const logMin = Math.log10(floor)
   const logRange = logMax - logMin || 1
+  const span = omegaMax - omegaMin
   return {
-    toX: (w) => geom.padL + Math.min(1, Math.max(0, w / omegaMax)) * geom.areaW,
+    toX: (w) => geom.padL + Math.min(1, Math.max(0, (w - omegaMin) / span)) * geom.areaW,
     toY: (p) => {
       const pClamped = Math.max(p, floor)
       return geom.padT + (1 - (Math.log10(pClamped) - logMin) / logRange) * geom.areaH
@@ -480,10 +519,11 @@ function makeProjection(maxP: number, omegaMax: number, geom: PlotGeometry): Pro
 
 /**
  * Build the SVG polyline string for the spectrum, clipped to the zoom
- * window [0, omegaMax].
+ * window [omegaMin, omegaMax].
  *
- * @param omega - Angular-frequency bins
+ * @param omega - Angular-frequency bins (ascending)
  * @param power - Power values at each bin
+ * @param omegaMin - Lower bound of the zoom window
  * @param omegaMax - Upper bound of the zoom window
  * @param proj - ω → x / power → y projectors
  * @returns Space-separated `x,y` points
@@ -491,11 +531,13 @@ function makeProjection(maxP: number, omegaMax: number, geom: PlotGeometry): Pro
 function buildPolyline(
   omega: Float64Array,
   power: Float64Array,
+  omegaMin: number,
   omegaMax: number,
   proj: Projection
 ): string {
   const points: string[] = []
   for (let k = 0; k < power.length; k++) {
+    if (omega[k]! < omegaMin) continue
     if (omega[k]! > omegaMax) break
     points.push(`${proj.toX(omega[k]!).toFixed(1)},${proj.toY(power[k]!).toFixed(1)}`)
   }

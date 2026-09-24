@@ -199,13 +199,17 @@ export interface HellerSpectrumPeak {
 
 /** Result of a Heller spectrum computation. */
 export interface HellerSpectrum {
-  /** Positive angular frequencies ω_k = 2π·k/(N·dt), k = 0..N/2. */
+  /**
+   * Angular frequencies ω_k = 2π·k/(N·dt), ascending over the full band
+   * k = −(N/2 − 1) … N/2 (the last entry is the Nyquist ω = π/dt). Negative
+   * ω carry negative eigenenergies (e.g. finite-well bound states).
+   */
   omega: Float64Array
   /** Power values `|P(ω_k)|²`. Same length as `omega`. */
   power: Float64Array
   /** Sampling interval used for the transform (0 if unavailable). */
   dt: number
-  /** Top peaks extracted from the positive-frequency half. */
+  /** Top peaks extracted from the full two-sided band. */
   peaks: HellerSpectrumPeak[]
   /**
    * Number of grid points fed to the FFT (post-interpolation, pre-pad).
@@ -368,17 +372,23 @@ export function computeHellerSpectrum(
 
   fft(fftBuf, nFft)
 
-  // Positive-frequency half (k = 0..N/2 inclusive).
+  // Full two-sided band, ascending: k = −(N/2 − 1) … N/2. Keeping only
+  // k = 0..N/2 discarded every negative eigenenergy — a finite-well bound
+  // state (E < 0) aliased into the dropped upper half and never appeared.
+  // nFft ≥ 2 here (totalSpan > 0 needs two samples).
   const half = nFft / 2
-  const omega = new Float64Array(half + 1)
-  const power = new Float64Array(half + 1)
+  const kMin = 1 - half
+  const omega = new Float64Array(nFft)
+  const power = new Float64Array(nFft)
   const invN = 1 / nFft
   const twoPiOverNdt = (2 * Math.PI) / (nFft * dt)
-  for (let k = 0; k <= half; k++) {
-    const re = fftBuf[2 * k]!
-    const im = fftBuf[2 * k + 1]!
-    omega[k] = twoPiOverNdt * k
-    power[k] = (re * re + im * im) * invN
+  for (let j = 0; j < nFft; j++) {
+    const k = kMin + j
+    const src = (k + nFft) % nFft
+    const re = fftBuf[2 * src]!
+    const im = fftBuf[2 * src + 1]!
+    omega[j] = twoPiOverNdt * k
+    power[j] = (re * re + im * im) * invN
   }
 
   const peaks = extractSpectrumPeaks(omega, power, DEFAULT_TOP_N, DEFAULT_NOISE_FLOOR)

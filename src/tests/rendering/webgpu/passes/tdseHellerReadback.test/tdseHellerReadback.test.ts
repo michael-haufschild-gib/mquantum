@@ -33,6 +33,9 @@ import {
   createHellerReadbackState,
   disposeHellerStagingBuffers,
   type HellerReadbackState,
+  invalidateHellerCaptureIfActive,
+  isHellerHamiltonianTimeDependent,
+  prepareHellerFrame,
   resetHellerCapture,
   scheduleHellerReadback,
   tickHellerStep,
@@ -582,5 +585,86 @@ describe('Heller readback static-H fingerprint reset', () => {
     applyOneFrame(state, device, { ...DEFAULT_TDSE_CONFIG, potentialType: 'harmonicTrap' }, 0.0, 0)
     applyOneFrame(state, device, { ...DEFAULT_TDSE_CONFIG, potentialType: 'barrier' }, 0.1, 0)
     expect(useHellerSpectrometerStore.getState().resetVersion).toBe(versionBefore)
+  })
+})
+
+// Regression: only the armed drive counted as time-dependent, the fingerprint
+// missed the metric / nonlinearity / non-unitary switches, and a drive episode
+// or ψ re-initialisation left the old capture in place (post-episode samples
+// were gap-interpolated onto the stationary trace).
+describe('Heller capture validity guards', () => {
+  beforeEach(() => {
+    useHellerSpectrometerStore.setState({
+      enabled: true,
+      sampleCount: 0,
+      resetVersion: 0,
+      pendingResetToken: 0,
+      hamiltonianTimeDependent: false,
+    })
+  })
+
+  function withCapture(): HellerReadbackState {
+    const state = createHellerReadbackState()
+    state.psi0Re = new Float32Array(4)
+    state.psi0Im = new Float32Array(4)
+    state.buffer.count = 12
+    return state
+  }
+
+  it('treats an expanding de Sitter metric as time-dependent', () => {
+    const base = { ...DEFAULT_TDSE_CONFIG }
+    expect(isHellerHamiltonianTimeDependent(base)).toBe(false)
+    expect(
+      isHellerHamiltonianTimeDependent({ ...base, metric: { kind: 'deSitter', hubbleRate: 0.3 } })
+    ).toBe(true)
+    expect(
+      isHellerHamiltonianTimeDependent({ ...base, metric: { kind: 'deSitter', hubbleRate: 0 } })
+    ).toBe(false)
+    expect(
+      isHellerHamiltonianTimeDependent({ ...base, potentialType: 'driven', driveEnabled: true })
+    ).toBe(true)
+  })
+
+  it('drops the capture and suspends sampling when H becomes time-dependent', () => {
+    const state = withCapture()
+    prepareHellerFrame(state, { ...DEFAULT_TDSE_CONFIG }, 0)
+    expect(state.buffer.count).toBe(12)
+    prepareHellerFrame(
+      state,
+      { ...DEFAULT_TDSE_CONFIG, potentialType: 'driven', driveEnabled: true },
+      0
+    )
+    expect(state.psi0Re).toBeNull()
+    expect(state.buffer.count).toBe(0)
+    expect(state.enabled).toBe(false)
+    expect(useHellerSpectrometerStore.getState().hamiltonianTimeDependent).toBe(true)
+    expect(useHellerSpectrometerStore.getState().resetVersion).toBe(1)
+  })
+
+  it.each([
+    ['metric', { metric: { kind: 'sphere2D', sphereRadius: 2 } }],
+    ['interactionStrength', { interactionStrength: 50 }],
+    ['imaginaryTimeEnabled', { imaginaryTimeEnabled: true }],
+    ['stochasticEnabled', { stochasticEnabled: true }],
+    ['stochasticGamma', { stochasticGamma: 7 }],
+  ] as const)('resets the capture when %s changes', (_name, patch) => {
+    const state = withCapture()
+    prepareHellerFrame(state, { ...DEFAULT_TDSE_CONFIG }, 0)
+    prepareHellerFrame(state, { ...DEFAULT_TDSE_CONFIG, ...patch } as TdseConfig, 0)
+    expect(state.psi0Re).toBeNull()
+    expect(state.buffer.count).toBe(0)
+  })
+
+  it('invalidateHellerCaptureIfActive resets only an active capture', () => {
+    const idle = createHellerReadbackState()
+    expect(invalidateHellerCaptureIfActive(idle)).toBe(false)
+    expect(useHellerSpectrometerStore.getState().resetVersion).toBe(0)
+    const active = withCapture()
+    const gen = active.generation
+    expect(invalidateHellerCaptureIfActive(active)).toBe(true)
+    expect(active.psi0Re).toBeNull()
+    expect(active.buffer.count).toBe(0)
+    expect(active.generation).toBe(gen + 1)
+    expect(useHellerSpectrometerStore.getState().resetVersion).toBe(1)
   })
 })

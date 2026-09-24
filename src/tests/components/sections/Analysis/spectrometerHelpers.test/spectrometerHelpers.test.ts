@@ -23,6 +23,11 @@ import {
   isHellerCompatiblePotential,
 } from '@/components/sections/Analysis/spectrometerHelpers'
 import type { TdseConfig } from '@/lib/geometry/extended/types'
+import {
+  computeHellerSpectrum,
+  createHellerBuffer,
+  pushAutocorrelationSample,
+} from '@/lib/physics/tdse/heller'
 
 describe('isHellerCompatiblePotential', () => {
   it('returns true for the documented compatible set (bound-state potentials)', () => {
@@ -249,20 +254,39 @@ describe('buildHarmonicOverlay', () => {
     expect(overlay.omegas[0]).toBeCloseTo(1 * 1.5, 12)
   })
 
-  it('returns null when trapAnisotropy is non-uniform (anisotropic trap has no single ladder)', () => {
-    expect(buildHarmonicOverlay('harmonicTrap', 1, 3, [1.0, 1.5])).toBeNull()
-    expect(buildHarmonicOverlay('harmonicTrap', 1, 3, [1.0, 1.0, 0.5])).toBeNull()
+  it('returns null when a becTrap anisotropy is non-uniform (no single ladder)', () => {
+    expect(buildHarmonicOverlay('becTrap', 1, 3, [1.0, 1.5])).toBeNull()
+    expect(buildHarmonicOverlay('becTrap', 1, 3, [1.0, 1.0, 0.5])).toBeNull()
   })
 
-  it('treats uniform anisotropy as isotropic and scales the effective frequency', () => {
+  it('treats uniform becTrap anisotropy as isotropic and scales the effective frequency', () => {
     // Uniform 2× anisotropy → effective omega = 2.0 → first level at 2.0 * (0 + 1.5) = 3.0
-    const overlay = buildHarmonicOverlay('harmonicTrap', 1, 3, [2.0, 2.0, 2.0])!
+    const overlay = buildHarmonicOverlay('becTrap', 1, 3, [2.0, 2.0, 2.0])!
     expect(overlay.omegas[0]).toBeCloseTo(3.0, 12)
+  })
+
+  // Regression: tdsePotential's harmonicTrap (type 4) ignores trapAnisotropy,
+  // yet the overlay hid (non-uniform) or rescaled (uniform) its ladder.
+  it('ignores trapAnisotropy for the plain harmonicTrap, like the potential does', () => {
+    expect(buildHarmonicOverlay('harmonicTrap', 1, 3, [1.0, 1.0, 0.5])!.omegas[0]).toBeCloseTo(
+      1.5,
+      12
+    )
+    expect(buildHarmonicOverlay('harmonicTrap', 1, 3, [2.0, 2.0, 2.0])!.omegas[0]).toBeCloseTo(
+      1.5,
+      12
+    )
+  })
+
+  it('checks isotropy only over the lattice axes', () => {
+    // 2D lattice: the unused third entry must not suppress the ladder.
+    const overlay = buildHarmonicOverlay('becTrap', 1, 2, [1.0, 1.0, 3.0])!
+    expect(overlay.omegas[0]).toBeCloseTo(1.0, 12)
   })
 
   it('treats anisotropy within 0.1% of uniform as still isotropic', () => {
     // 1.0001 vs 1.0 — within 1e-3 tolerance per source.
-    const overlay = buildHarmonicOverlay('harmonicTrap', 1, 3, [1.0, 1.0001])!
+    const overlay = buildHarmonicOverlay('becTrap', 1, 3, [1.0, 1.0001])!
     expect(overlay.omegas).toHaveLength(HARMONIC_OVERLAY_LEVELS)
     expect(overlay.omegas[0]).toBeCloseTo(1 * 1.5, 6)
   })
@@ -340,5 +364,44 @@ describe('buildPlotData', () => {
     )!
     // The 100 overlay line should be clipped.
     expect(result.overlayLines.length).toBeLessThan(overlay.omegas.length)
+  })
+})
+
+// Regression: the spectrum kept only k = 0..N/2, so negative eigenenergies
+// (finite-well bound states, V = −V₀ inside the well) vanished entirely; the
+// plot window was pinned to [0, ω_max].
+describe('negative-energy spectra', () => {
+  const geom = { padL: 10, padT: 10, areaW: 200, areaH: 100 }
+
+  function toneSpectrum(E: number) {
+    const buf = createHellerBuffer(512)
+    for (let i = 0; i < 512; i++) {
+      const t = i * 0.05
+      pushAutocorrelationSample(buf, Math.cos(-E * t), Math.sin(-E * t), t)
+    }
+    return computeHellerSpectrum(buf)
+  }
+
+  it('recovers a negative eigenenergy as a peak at negative ω', () => {
+    const spectrum = toneSpectrum(-1.5)
+    expect(spectrum.peaks.length).toBeGreaterThanOrEqual(1)
+    expect(Math.abs(spectrum.peaks[0]!.omega - -1.5)).toBeLessThan((2 * Math.PI) / (512 * 0.05))
+    // Ascending two-sided axis ending at Nyquist π/dt.
+    expect(spectrum.omega[0]!).toBeLessThan(0)
+    expect(spectrum.omega[spectrum.omega.length - 1]!).toBeCloseTo(Math.PI / 0.05, 9)
+  })
+
+  it('opens the plot window below zero so the negative peak is drawn inside it', () => {
+    const plot = buildPlotData(toneSpectrum(-1.5), null, geom)!
+    expect(plot.peakMarkers).toHaveLength(1)
+    const x = plot.peakMarkers[0]!.x
+    expect(x).toBeGreaterThan(geom.padL + 0.1 * geom.areaW)
+    expect(x).toBeLessThan(geom.padL + 0.9 * geom.areaW)
+    expect(plot.xTicks[0]!.label.startsWith('-')).toBe(true)
+  })
+
+  it('keeps the positive-only window starting at 0', () => {
+    const plot = buildPlotData(toneSpectrum(1.5), null, geom)!
+    expect(plot.xTicks[0]!.label).toBe('0')
   })
 })
