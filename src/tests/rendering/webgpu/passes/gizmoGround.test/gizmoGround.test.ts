@@ -11,6 +11,7 @@ import {
   calculateGroundIntersection,
   calculateSphereGroundIntersection,
   generateDashedLine,
+  generateGroundEllipse,
 } from '@/rendering/webgpu/passes/gizmoGround'
 
 describe('calculateGroundIntersection', () => {
@@ -112,5 +113,29 @@ describe('generateDashedLine', () => {
     expect(result[4]).toBeCloseTo(0) // green
     expect(result[5]).toBeCloseTo(0) // blue
     expect(result[6]).toBeCloseTo(0.5) // alpha
+  })
+})
+
+// Regression: the ellipse's local major axis was rotated onto (−d_x, d_z),
+// so a diagonal spotlight's ground footprint was elongated across the beam.
+describe('generateGroundEllipse orientation', () => {
+  it('elongates the footprint along the projected beam direction', () => {
+    const position: [number, number, number] = [0, 4, 0]
+    const direction: [number, number, number] = [0.5, -Math.SQRT1_2, 0.5]
+    const hit = calculateGroundIntersection(position, direction)
+    if (!hit) throw new Error('expected the spot to hit the ground')
+
+    const verts = generateGroundEllipse(position, direction, 20, hit, '#ffffff', 1)
+    let farthest = { dist: 0, x: 0, z: 0 }
+    for (let i = 0; i < verts.length; i += 7) {
+      const x = verts[i]! - hit[0]
+      const z = verts[i + 2]! - hit[2]
+      const dist = Math.hypot(x, z)
+      if (dist > farthest.dist) farthest = { dist, x, z }
+    }
+    // Unit projected beam direction is (1, 1)/√2; the farthest rim point
+    // lies on the major axis, i.e. parallel (|cos| ≈ 1) to it.
+    const cos = (farthest.x + farthest.z) / (Math.SQRT2 * farthest.dist)
+    expect(Math.abs(cos)).toBeGreaterThan(0.99)
   })
 })
