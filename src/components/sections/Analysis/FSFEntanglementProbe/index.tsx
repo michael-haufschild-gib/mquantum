@@ -313,6 +313,10 @@ export const FSFEntanglementProbe: React.FC = React.memo(() => {
                 spacetimeDim: latticeDim + 1,
                 hubble: fsf.cosmology.hubble,
                 steepness: fsf.cosmology.steepness,
+                // Required by the bianchiKasner preset: without it
+                // isValidPreset rejects the params and the worker returns an
+                // empty trajectory, silently hiding the chart.
+                kasnerExponents: fsf.cosmology.kasnerExponents,
                 lqcRhoCritical: fsf.cosmology.lqcRhoCritical,
                 lqcEquationOfState: fsf.cosmology.lqcEquationOfState,
                 lqcInitialRhoRatio: fsf.cosmology.lqcInitialRhoRatio,

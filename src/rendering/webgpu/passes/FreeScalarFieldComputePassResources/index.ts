@@ -10,10 +10,11 @@
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
-import { sampleAdiabaticVacuum } from '@/lib/physics/cosmology/adiabaticVacuum'
 import { computeMassSquaredScale } from '@/lib/physics/cosmology/preheating'
-import { computeFsfCosmologyCoefs } from '@/lib/physics/freeScalar/vacuumDispersion'
-import { sampleVacuumSpectrum } from '@/lib/physics/freeScalar/vacuumSpectrum'
+import {
+  computeFsfCosmologyCoefs,
+  sampleFsfInitialVacuum,
+} from '@/lib/physics/freeScalar/vacuumDispersion'
 import { useDiagnosticsStore } from '@/stores/diagnostics/diagnosticsStore'
 
 import type { WebGPURenderContext } from '../../core/types'
@@ -325,24 +326,9 @@ export function initializeFsfField(
     injectedFromSave = true
     logger.log(`[FSF] Injected loaded field state (${ic.totalSites} sites)`)
   } else if (config.initialCondition === 'vacuumNoise') {
-    // Sample the adiabatic vacuum or Minkowski vacuum spectrum
-    const { phi, pi } = config.cosmology.enabled
-      ? sampleAdiabaticVacuum(
-          config,
-          {
-            preset: config.cosmology.preset,
-            spacetimeDim: config.latticeDim + 1,
-            steepness: config.cosmology.steepness,
-            hubble: config.cosmology.hubble,
-            kasnerExponents: config.cosmology.kasnerExponents,
-            lqcRhoCritical: config.cosmology.lqcRhoCritical,
-            lqcEquationOfState: config.cosmology.lqcEquationOfState,
-            lqcInitialRhoRatio: config.cosmology.lqcInitialRhoRatio,
-          },
-          ic.simEta,
-          config.vacuumSeed
-        )
-      : sampleVacuumSpectrum(config, config.vacuumSeed, 'kgFloor')
+    // Sample the adiabatic vacuum or Minkowski vacuum spectrum (invalid
+    // cosmology params fall back to Minkowski instead of throwing per frame).
+    const { phi, pi } = sampleFsfInitialVacuum(config, ic.simEta, config.vacuumSeed)
     device.queue.writeBuffer(ic.phiBuffer!, 0, phi as Float32Array<ArrayBuffer>)
     device.queue.writeBuffer(ic.piBuffer!, 0, pi as Float32Array<ArrayBuffer>)
   } else if (ic.pl && ic.bg) {

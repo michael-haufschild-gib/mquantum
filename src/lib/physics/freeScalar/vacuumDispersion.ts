@@ -41,9 +41,11 @@
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
+import { sampleAdiabaticVacuum } from '@/lib/physics/cosmology/adiabaticVacuum'
 import type { CosmologyCoefs, CosmologySnapshot } from '@/lib/physics/cosmology/background'
 import { computeCosmologyAt, computeCosmologyCoefs } from '@/lib/physics/cosmology/background'
 import type { VacuumDispersion } from '@/lib/physics/freeScalar/vacuumSpectrum'
+import { sampleVacuumSpectrum } from '@/lib/physics/freeScalar/vacuumSpectrum'
 
 /**
  * Identity coefficients `(1, 1, 1)` returned under Minkowski and fallback
@@ -159,6 +161,36 @@ export function computeFsfCosmologyCoefs(config: FreeScalarConfig, simEta: numbe
     logCosmologyFallback(config, simEta, e, 'computeFsfCosmologyCoefs')
     return FSF_IDENTITY_COSMO_COEFS
   }
+}
+
+/**
+ * Sample the FSF reset vacuum `(φ, π)`: the adiabatic vacuum at `simEta`
+ * under cosmology, else the Minkowski `'kgFloor'` vacuum. Invalid cosmology
+ * params (e.g. a Bianchi-I triple with Σp > n − 1, which the exponent
+ * sliders reach) fall back to the Minkowski vacuum with the same
+ * deduplicated warning as {@link computeFsfCosmologyCoefs}, whose identity
+ * coefs then drive the evolution. Throwing instead repeated on every frame:
+ * the pass never marked itself initialized and `needsReset` was never
+ * cleared.
+ *
+ * @param config - Free scalar field configuration
+ * @param simEta - Conformal time of the reset (the projected η₀)
+ * @param seed - Vacuum RNG seed
+ * @returns Canonical field and momentum arrays
+ */
+export function sampleFsfInitialVacuum(
+  config: FreeScalarConfig,
+  simEta: number,
+  seed: number
+): { phi: Float32Array; pi: Float32Array } {
+  if (config.cosmology.enabled) {
+    try {
+      return sampleAdiabaticVacuum(config, asCosmologyParams(config), simEta, seed)
+    } catch (e) {
+      logCosmologyFallback(config, simEta, e, 'sampleFsfInitialVacuum')
+    }
+  }
+  return sampleVacuumSpectrum(config, seed, 'kgFloor')
 }
 
 /**

@@ -24,9 +24,11 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { FSFEntanglementProbe } from '@/components/sections/Analysis/FSFEntanglementProbe'
-import type {
-  PeschelWorkerRequest,
-  PeschelWorkerResponse,
+import {
+  type PeschelWorkerRequest,
+  type PeschelWorkerResponse,
+  resetPeschelCacheForTests,
+  runPeschelCompute,
 } from '@/lib/physics/entanglement/peschelWorker'
 import { buildCosmoEtaSweep } from '@/lib/physics/freeScalar/cosmoEtaSweep'
 import { useExtendedObjectStore } from '@/stores/scene/extendedObjectStore'
@@ -530,5 +532,76 @@ describe('buildCosmoEtaSweep — sign preservation', () => {
     expect(buildCosmoEtaSweep(Number.NaN)).toEqual([])
     expect(buildCosmoEtaSweep(Number.POSITIVE_INFINITY)).toEqual([])
     expect(buildCosmoEtaSweep(Number.NEGATIVE_INFINITY)).toEqual([])
+  })
+})
+
+// ─── Cosmology request payload — Bianchi-Kasner exponents ────────────────
+//
+// Regression: the probe rebuilt the worker's `CosmologyPresetParams` by
+// hand and omitted `kasnerExponents`. `isValidPreset` rejects a
+// bianchiKasner preset without its exponent triple, so the worker returned
+// an empty trajectory and the S(L_A, η) chart was silently hidden for every
+// Bianchi-I scene (no degraded-cosmology warning either, because the
+// panel's own snapshot check reads the full store config).
+
+describe('FSFEntanglementProbe — cosmology request payload', () => {
+  beforeEach(() => {
+    workerInstances.length = 0
+    recordedMessages.length = 0
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.stubGlobal('Worker', MockWorker)
+    resetPeschelCacheForTests()
+    useExtendedObjectStore.setState(useExtendedObjectStore.getInitialState())
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+  })
+
+  it('sends a Bianchi-Kasner request the worker can turn into a full trajectory', async () => {
+    useExtendedObjectStore.setState((state) => {
+      const fs = state.schroedinger.freeScalar
+      return {
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: {
+            ...fs,
+            gridSize: [16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16],
+            spacing: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            latticeDim: 3,
+            mass: 1,
+            cosmology: {
+              ...fs.cosmology,
+              enabled: true,
+              preset: 'bianchiKasner',
+              eta0: 1.5,
+              kasnerExponents: { p1: -1 / 3, p2: 2 / 3, p3: 2 / 3 },
+            },
+          },
+        },
+      }
+    })
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<FSFEntanglementProbe />)
+    await user.click(screen.getByTestId('entanglement-probe-toggle'))
+    await vi.advanceTimersByTimeAsync(200)
+
+    const calls = latestWorker().postMessage.mock.calls
+    expect(calls.length).toBe(1)
+    const req = calls[0]![0] as PeschelWorkerRequest
+    expect(req.cosmology?.params.kasnerExponents).toEqual({ p1: -1 / 3, p2: 2 / 3, p3: 2 / 3 })
+
+    // Drive the real worker compute with the exact payload the panel posted.
+    const res = runPeschelCompute(req)
+    expect(res.trajectoryError).toBeNull()
+    expect(res.trajectory?.etas.length).toBe(25)
+    // The midpoint is η₀ = 1.5 where every Kasner scale factor is 1, so the
+    // trajectory must reproduce the live sweep's S(L_A) at that η.
+    const mid = res.trajectory!.etas.indexOf(1.5)
+    expect(mid).toBe(12)
+    const liveIdx = res.lengths.indexOf(req.subsystemLength)
+    expect(res.trajectory!.entropies[mid]).toBeCloseTo(res.entropies[liveIdx]!, 12)
   })
 })

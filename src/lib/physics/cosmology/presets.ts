@@ -239,8 +239,11 @@ export function qExponent(params: CosmologyPresetParams): number {
  *
  * Sign intuition:
  *
- * - `β(β − 1) > 0` → oscillatory, spectrum blue
- * - `β(β − 1) < 0` → tachyonic super-horizon growth (de Sitter, mild Kasner)
+ * - `β(β − 1) > 0` → the −β(β−1)/η² term lowers M²_eff: tachyonic
+ *   super-horizon growth (de Sitter: q = −1, β = −1 at n = 4 ⇒ β(β−1) = 2,
+ *   the familiar z''/z = 2/η²)
+ * - `β(β − 1) < 0` → the term raises M²_eff: modes stay oscillatory
+ *   (e.g. Kasner at n = 4: q = ½, β = ½ ⇒ β(β−1) = −¼)
  *
  * @param params - Preset parameters
  * @returns `β·(β − 1)` for the chosen preset

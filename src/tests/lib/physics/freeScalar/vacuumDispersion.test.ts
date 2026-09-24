@@ -22,13 +22,16 @@ import {
 } from '@/lib/geometry/extended/freeScalar'
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
+import { sampleAdiabaticVacuum } from '@/lib/physics/cosmology/adiabaticVacuum'
 import {
   __resetFsfCosmologyWarnDedupForTests,
   computeFsfCosmologyCoefs,
   computeFsfCosmologySnapshot,
   computeFsfVacuumDispersion,
   FSF_IDENTITY_COSMO_COEFS,
+  sampleFsfInitialVacuum,
 } from '@/lib/physics/freeScalar/vacuumDispersion'
+import { sampleVacuumSpectrum } from '@/lib/physics/freeScalar/vacuumSpectrum'
 
 /** Deterministic FSF config factory — avoids touching stores. */
 function makeConfig(overrides: Partial<FreeScalarConfig> = {}): FreeScalarConfig {
@@ -345,5 +348,57 @@ describe('dedup channel is shared across the three helpers', () => {
     computeFsfCosmologyCoefs(badHubbleZero, -10)
     computeFsfCosmologyCoefs(badHubbleNeg, -10)
     expect(warnSpy).toHaveBeenCalledTimes(2)
+  })
+})
+
+// Regression: the FSF reset called sampleAdiabaticVacuum directly. A Bianchi-I
+// triple with Σp > n − 1 (reachable with the ±2 exponent sliders) made it
+// throw; the pass then never marked itself initialized nor cleared
+// needsReset, so the reset threw again on every frame while the hot path
+// silently ran identity coefs.
+describe('sampleFsfInitialVacuum', () => {
+  beforeEach(() => __resetFsfCosmologyWarnDedupForTests())
+  afterEach(() => vi.restoreAllMocks())
+
+  const bianchi = (p1: number, p2: number, p3: number) =>
+    makeConfig({
+      cosmology: {
+        ...DEFAULT_COSMOLOGY_CONFIG,
+        enabled: true,
+        preset: 'bianchiKasner',
+        eta0: 2,
+        kasnerExponents: { p1, p2, p3 },
+      },
+    })
+
+  it('falls back to the Minkowski vacuum (with one warning) for Σp > n − 1', () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {})
+    const cfg = bianchi(2, 2, 2 / 3)
+    const a = sampleFsfInitialVacuum(cfg, 2, 7)
+    const b = sampleFsfInitialVacuum(cfg, 2, 7)
+    const ref = sampleVacuumSpectrum(cfg, 7, 'kgFloor')
+    expect(Array.from(a.phi)).toEqual(Array.from(ref.phi))
+    expect(Array.from(b.pi)).toEqual(Array.from(ref.pi))
+    expect(warn).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns the adiabatic vacuum for a valid Bianchi-I triple', () => {
+    const cfg = bianchi(-1 / 3, 2 / 3, 2 / 3)
+    const got = sampleFsfInitialVacuum(cfg, 6, 3)
+    const ref = sampleAdiabaticVacuum(
+      cfg,
+      {
+        preset: 'bianchiKasner',
+        spacetimeDim: 4,
+        steepness: cfg.cosmology.steepness,
+        hubble: cfg.cosmology.hubble,
+        kasnerExponents: cfg.cosmology.kasnerExponents,
+      },
+      6,
+      3
+    )
+    expect(Array.from(got.phi)).toEqual(Array.from(ref.phi))
+    // η = 6 is anisotropic (ratios 1/64), so this is not the Minkowski draw.
+    expect(Array.from(got.phi)).not.toEqual(Array.from(sampleVacuumSpectrum(cfg, 3, 'kgFloor').phi))
   })
 })

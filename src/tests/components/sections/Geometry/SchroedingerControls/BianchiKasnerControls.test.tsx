@@ -127,3 +127,29 @@ describe('BianchiKasnerControls', () => {
     expect(screen.getByTestId('bianchi-p1-slider')).toBeInTheDocument()
   })
 })
+
+// Regression: a triple with Σp > 3 (reachable with the ±2 sliders) silently ran
+// flat Minkowski coefficients while the panel only showed "[fail]".
+describe('BianchiKasnerControls gauge warning', () => {
+  it('warns when Σp exceeds n − 1 = 3', () => {
+    render(
+      <BianchiKasnerControls
+        kasnerExponents={{ p1: 2, p2: 2, p3: 2 / 3 }}
+        latticeDim={3}
+        setBianchiExponents={makeSetter()}
+      />
+    )
+    expect(screen.getByTestId('bianchi-gauge-warning')).toHaveTextContent(/Minkowski/)
+  })
+
+  it('stays silent for non-vacuum triples inside the gauge (Σp ≤ 3)', () => {
+    render(
+      <BianchiKasnerControls
+        kasnerExponents={{ p1: 1, p2: 1, p3: 1 }}
+        latticeDim={3}
+        setBianchiExponents={makeSetter()}
+      />
+    )
+    expect(screen.queryByTestId('bianchi-gauge-warning')).toBeNull()
+  })
+})

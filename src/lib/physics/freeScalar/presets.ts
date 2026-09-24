@@ -225,7 +225,10 @@ export const FREE_SCALAR_PRESETS: FreeScalarScenarioPreset[] = [
       dt: 0.005,
       stepsPerFrame: 4,
       selfInteractionEnabled: true,
-      selfInteractionLambda: 0.5,
+      // The seeded kink is the static wall of width w = 1/(v·√(2λ)); λ = 3.125
+      // keeps the intended w = 0.4 inside the 3.2-wide box (λ = 0.5 would give
+      // w = 1, a wall spanning the whole lattice).
+      selfInteractionLambda: 3.125,
       selfInteractionVev: 1.0,
       absorberEnabled: true,
       absorberWidth: 0.15,
