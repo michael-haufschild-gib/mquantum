@@ -266,7 +266,7 @@ const SrmtSweepContent: React.FC = React.memo(() => {
         {showError && errorMessage && (
           <div
             className="text-2xs font-mono"
-            style={{ color: 'var(--danger)' }}
+            style={{ color: 'var(--color-danger)' }}
             data-testid="srmt-sweep-error"
           >
             {errorMessage}
