@@ -20,6 +20,9 @@ import { SrmtQualityChip } from '../SrmtQualityChip'
 
 const PENDING_TOOLTIP =
   'This clock is queued or computing. Its quality appears once the worker reply arrives.'
+/** Batch over without a finite result (worker error/cancel, or a degenerate fit). */
+const UNAVAILABLE_TOOLTIP =
+  'No result for this clock: the batch ended without a finite fit (worker error, cancellation, or a degenerate spectrum).'
 
 /** Presentation label for each clock axis. */
 const CLOCK_LABEL: Record<SrmtClock, string> = {
@@ -33,6 +36,8 @@ interface ClockRowProps {
   quality: number
   isSelected: boolean
   isChampion: boolean
+  /** Whether a worker batch is still running (NaN then means "pending"). */
+  computing: boolean
 }
 
 /**
@@ -41,8 +46,19 @@ interface ClockRowProps {
  * champion row (when one exists) wears a compact glyph + bold weight
  * so the SRMT signal is skimmable.
  */
-const ClockRow: React.FC<ClockRowProps> = ({ clock, quality, isSelected, isChampion }) => {
+const ClockRow: React.FC<ClockRowProps> = ({
+  clock,
+  quality,
+  isSelected,
+  isChampion,
+  computing,
+}) => {
   const tier = qualityTier(quality)
+  // The dispatcher aborts the queue on a worker error and flips `computing`
+  // off, leaving the undrained clocks NaN; calling those "queued or
+  // computing" after the batch ended sent the user waiting for a reply that
+  // never comes.
+  const unavailable = tier === 'pending' && !computing
   return (
     <div
       className="flex items-center justify-between gap-2 py-1 text-xs"
@@ -73,7 +89,10 @@ const ClockRow: React.FC<ClockRowProps> = ({ clock, quality, isSelected, isChamp
       <SrmtQualityChip
         value={quality}
         testId={`wdw-srmt-clock-row-${clock}-chip`}
-        tooltipWhenPending={tier === 'pending' ? PENDING_TOOLTIP : undefined}
+        tooltipWhenPending={
+          tier === 'pending' ? (unavailable ? UNAVAILABLE_TOOLTIP : PENDING_TOOLTIP) : undefined
+        }
+        pendingLabel={unavailable ? 'n/a' : 'pending'}
       />
     </div>
   )
@@ -83,12 +102,18 @@ const ClockRow: React.FC<ClockRowProps> = ({ clock, quality, isSelected, isChamp
 export interface SrmtClockTableProps {
   quality: SrmtClockQuality
   selectedClock: SrmtClock
+  /** Whether a worker batch is in flight (default `true`: NaN = pending). */
+  computing?: boolean
 }
 
 /**
  * Three-row per-clock quality table with champion highlighting.
  */
-export const SrmtClockTable: React.FC<SrmtClockTableProps> = ({ quality, selectedClock }) => {
+export const SrmtClockTable: React.FC<SrmtClockTableProps> = ({
+  quality,
+  selectedClock,
+  computing = true,
+}) => {
   const completedClocks = countCompletedClocks(quality)
   const champion = completedClocks === 3 ? selectChampionClock(quality) : null
   return (
@@ -103,18 +128,21 @@ export const SrmtClockTable: React.FC<SrmtClockTableProps> = ({ quality, selecte
         quality={quality.a}
         isSelected={selectedClock === 'a'}
         isChampion={champion === 'a'}
+        computing={computing}
       />
       <ClockRow
         clock="phi1"
         quality={quality.phi1}
         isSelected={selectedClock === 'phi1'}
         isChampion={champion === 'phi1'}
+        computing={computing}
       />
       <ClockRow
         clock="phi2"
         quality={quality.phi2}
         isSelected={selectedClock === 'phi2'}
         isChampion={champion === 'phi2'}
+        computing={computing}
       />
     </div>
   )

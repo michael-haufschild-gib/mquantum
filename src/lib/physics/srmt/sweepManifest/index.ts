@@ -7,7 +7,8 @@
  * `#`-prefixed comment lines that pins:
  *
  *   - the Wheeler–DeWitt physics config at sweep start
- *     (`# wdw: boundaryCondition=… inflatonMass=… …`)
+ *     (`# wdw: boundaryCondition=… inflatonMass=… …`; the φ₂ mass asymmetry
+ *     appears only when it is not the isotropic default 1)
  *   - the SRMT sweep config snapshot
  *     (`# srmt: kind=… points=… clocks=… rankCap=… …`)
  *   - the derived grid info (`# grid: Na=… Nphi=… da=… dphi=…`)
@@ -82,16 +83,27 @@ function formatGeneratedLine(value: Date | string | null | undefined): string | 
 }
 
 function formatWdwConfig(w: WheelerDeWittConfig): string {
-  return [
+  const fields = [
     `boundaryCondition=${sanitise(w.boundaryCondition)}`,
     `inflatonMass=${formatNumeric(w.inflatonMass)}`,
+  ]
+  // The φ₂-axis mass asymmetry enters the solver's potential (every sweep
+  // point passes it through), so a non-isotropic run must be pinned. Elided
+  // at the isotropic default α = 1 — like the `wdw_ma` URL param — so
+  // archived isotropic manifests stay byte-exact.
+  const asymmetry = w.inflatonMassAsymmetry ?? 1
+  if (asymmetry !== 1) {
+    fields.push(`inflatonMassAsymmetry=${formatNumeric(asymmetry)}`)
+  }
+  fields.push(
     `cosmologicalConstant=${formatNumeric(w.cosmologicalConstant)}`,
     `aMin=${formatNumeric(w.aMin)}`,
     `aMax=${formatNumeric(w.aMax)}`,
     `gridNa=${formatInteger(w.gridNa)}`,
     `gridNphi=${formatInteger(w.gridNphi)}`,
-    `phiExtent=${formatNumeric(w.phiExtent)}`,
-  ].join(' ')
+    `phiExtent=${formatNumeric(w.phiExtent)}`
+  )
+  return fields.join(' ')
 }
 
 function formatSrmtConfig(c: SrmtSweepConfig): string {

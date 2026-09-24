@@ -238,3 +238,34 @@ describe('buildSrmtSweepManifest', () => {
     )
   })
 })
+
+// Regression: every sweep point passes inflatonMassAsymmetry into the solver,
+// but the manifest never recorded it — an α ≠ 1 sweep's CSV claimed isotropic
+// physics by omission.
+describe('buildSrmtSweepManifest — φ₂ mass asymmetry provenance', () => {
+  const base = {
+    srmtConfig: SWEEP,
+    gitSha: 'abc1234',
+    wdwSolverVersion: '1.0.0',
+    srmtDiagnosticVersion: '1.0.0',
+    generatedAt: null,
+  } as const
+
+  it('pins a non-isotropic asymmetry right after inflatonMass', () => {
+    const lines = buildSrmtSweepManifest({
+      ...base,
+      wdwConfig: { ...WDW, inflatonMassAsymmetry: 1.75 },
+    })
+    expect(findLine(lines, '# wdw: ')).toContain(
+      'inflatonMass=0.420000 inflatonMassAsymmetry=1.75000 cosmologicalConstant='
+    )
+  })
+
+  it('elides the isotropic default so archived manifests stay byte-exact', () => {
+    const lines = buildSrmtSweepManifest({
+      ...base,
+      wdwConfig: { ...WDW, inflatonMassAsymmetry: 1 },
+    })
+    expect(findLine(lines, '# wdw: ')).not.toContain('inflatonMassAsymmetry')
+  })
+})

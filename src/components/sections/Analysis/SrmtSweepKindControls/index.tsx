@@ -191,7 +191,7 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
             label="φref min"
             tooltip="Lower bound for φref. q is invariant under φref by construction; the plot's read is that q stays flat while the landmark slides."
             min={-phiExtent}
-            max={phiExtent}
+            max={phiExtent - 0.05}
             step={0.01}
             value={ui.sweepMin}
             onChange={(v) =>
@@ -207,7 +207,7 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
           />
           <Slider
             label="φref max"
-            min={-phiExtent}
+            min={-phiExtent + 0.05}
             max={phiExtent}
             step={0.01}
             value={ui.sweepMax}

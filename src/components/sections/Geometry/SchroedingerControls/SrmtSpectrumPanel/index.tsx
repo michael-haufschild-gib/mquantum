@@ -92,7 +92,7 @@ const PopulatedPanel: React.FC<{
         <SrmtSpectrumChart snapshot={snapshot} />
         <SrmtSpectrumLegend />
         <SrmtNullBaselineStrip snapshot={snapshot} />
-        <SrmtClockTable quality={quality} selectedClock={highlightedClock} />
+        <SrmtClockTable quality={quality} selectedClock={highlightedClock} computing={computing} />
       </div>
     </div>
   )

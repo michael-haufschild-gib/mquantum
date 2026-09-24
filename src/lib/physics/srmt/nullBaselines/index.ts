@@ -161,10 +161,11 @@ function reversedCopy(K: Float64Array, count: number): Float64Array {
  * order-by-order correspondence with `E` is random.
  *
  * Edge case: when the original `K` has zero variance, the synthetic
- * spectrum is the constant mean. The downstream affine fit will then
- * return `NaN` (zero-variance `K` with non-zero residual), which is the
- * correct outcome — the synthetic baseline is unmeaningful in that
- * regime.
+ * spectrum is the constant mean. The affine fit then returns `q = 0`
+ * (α = 0, β = mean — a constant is fitted exactly), exactly like the real
+ * fit on that constant `K` and every other baseline, so
+ * {@link bestBaselineRatio} reports the tie value 1 — never a win. The
+ * rigid fit ties the same way (all baselines equal the real `q_rigid`).
  */
 function syntheticCopy(K: Float64Array, count: number, rng: () => number): Float64Array {
   let sum = 0
