@@ -21,6 +21,7 @@ import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { clamp } from '@/lib/math/clamp'
 import { gaussianPair, mulberry32 } from '@/lib/math/rng'
 import { MAX_STOCHASTIC_SITES } from '@/lib/physics/stochastic/localizationKernel'
+import { computeTdseEffectiveSpacing } from '@/lib/physics/tdse/effectiveSpacing'
 
 import type { WebGPURenderContext } from '../../core/types'
 import { freeScalarNDIndexBlock } from '../../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
@@ -385,8 +386,21 @@ export function rebuildExpectationBindGroups(
   })
 }
 
-/** Pack collapse centers and noise into the stochastic uniform buffer. */
-function packStochasticUniforms(
+/**
+ * Pack collapse centers and noise into the stochastic uniform buffer.
+ * Centers are drawn over the EFFECTIVE lattice half-extent N·dx_eff/2 — the
+ * collapse shader places sites with the effective (compact / torus) spacing,
+ * so the raw slider spacing confined collapses to a sub-box (or pushed them
+ * off-lattice) whenever an axis was compactified or torus-overridden.
+ * Exported for tests.
+ *
+ * @param config - TDSE configuration (per-substep γ already applied)
+ * @param state - Stochastic localisation state (seeded RNG)
+ * @param batchCount - Collapse centers in this dispatch
+ * @param placementRadius - Upper bound on |center| per axis
+ * @returns Uniform payload
+ */
+export function packStochasticUniforms(
   config: TdseConfig,
   state: StochasticLocState,
   batchCount: number,
@@ -412,13 +426,14 @@ function packStochasticUniforms(
 
   const rng = state.rng
   const latticeDim = config.latticeDim
+  const effSpacing = computeTdseEffectiveSpacing(config)
 
   for (let k = 0; k < MAX_CENTERS_PER_DISPATCH; k++) {
     const baseIdx = 8 + k * 12
     if (k < batchCount) {
       for (let d = 0; d < 11; d++) {
         if (d < latticeDim) {
-          const dimHalfExtent = config.gridSize[d]! * config.spacing[d]! * 0.5
+          const dimHalfExtent = config.gridSize[d]! * (effSpacing[d] ?? config.spacing[d]!) * 0.5
           const halfExtent = Math.min(placementRadius, dimHalfExtent)
           f32[baseIdx + d] = rng() * 2 * halfExtent - halfExtent
         } else {
