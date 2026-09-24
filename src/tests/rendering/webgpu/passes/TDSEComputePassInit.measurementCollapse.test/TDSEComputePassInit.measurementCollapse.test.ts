@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import type { TdseConfig } from '@/lib/geometry/extended/tdse'
+import { DEFAULT_TDSE_CONFIG, type TdseConfig } from '@/lib/geometry/extended/tdse'
 import { TDSEComputePass } from '@/rendering/webgpu/passes/TDSEComputePass'
 import type { TdseBindGroupResult } from '@/rendering/webgpu/passes/TDSEComputePassSetup'
 import type { DiagReadbackState } from '@/rendering/webgpu/passes/TDSEDiagnosticsReadback'
@@ -116,5 +116,74 @@ describe('TDSE save-state injection', () => {
     expect(writeBuffer).toHaveBeenCalledWith(psiBuffer, 0, expect.any(Float32Array))
     const interleaved = writeBuffer.mock.calls[0]?.[2] as Float32Array
     expect(Array.from(interleaved)).toEqual([1, 5, 2, 6, 3, 7, 4, 8])
+  })
+})
+
+// Regression: a normal (re)initialization reset the CPU `initialNorm` but left
+// the GPU renormalize target at the previous run's norm. With the absorber off
+// the per-frame renorm pass then rescaled the fresh ψ to that stale norm before
+// the first diagnostics readback — which captured the rescaled value — so an
+// amplitude change was undone and a new BEC state kept the old particle number.
+describe('TDSE reinitialization renormalize target', () => {
+  function runInit(config: Partial<TdseConfig>) {
+    const writeBuffer = vi.fn()
+    const renormBuffer = { label: 'renorm' } as unknown as GPUBuffer
+    const device = { queue: { writeBuffer } } as unknown as GPUDevice
+    const passEncoder = {
+      setPipeline: vi.fn(),
+      setBindGroup: vi.fn(),
+      dispatchWorkgroups: vi.fn(),
+      end: vi.fn(),
+    }
+    const ctx = {
+      device,
+      encoder: { copyBufferToBuffer: vi.fn() },
+      beginComputePass: vi.fn(() => passEncoder),
+    }
+
+    const pass = new TDSEComputePass()
+    const internals = pass as unknown as PassInternals & { pl: unknown }
+    internals.pl = {
+      initPipeline: {},
+      initPipeline3D: {},
+      potentialPipeline: {},
+      potentialPipeline3D: {},
+    }
+    internals.bg = {
+      initBG: {},
+      potentialBG: {},
+      renormalizeUniformBuffer: renormBuffer,
+    } as unknown as TdseBindGroupResult
+    internals.initialized = true
+    internals.totalSites = 8
+    internals._diagState.initialNorm = 7
+
+    pass.maybeInitialize(
+      ctx as never,
+      {
+        ...DEFAULT_TDSE_CONFIG,
+        latticeDim: 1,
+        gridSize: [8],
+        spacing: [0.1],
+        needsReset: true,
+        ...config,
+      } as TdseConfig
+    )
+
+    const renormWrites = writeBuffer.mock.calls
+      .filter((call: unknown[]) => call[0] === renormBuffer)
+      .map((call: unknown[]) => ({ offset: call[1], value: (call[2] as Float32Array)[0] }))
+    return { internals, renormWrites }
+  }
+
+  it('clears the GPU target so the first readback captures the fresh norm', () => {
+    const { internals, renormWrites } = runInit({ imaginaryTimeEnabled: false })
+    expect(internals._diagState.initialNorm).toBe(-1)
+    expect(renormWrites).toEqual([{ offset: 4, value: 0 }])
+  })
+
+  it('still seeds the unit target last for imaginary-time propagation', () => {
+    const { renormWrites } = runInit({ imaginaryTimeEnabled: true })
+    expect(renormWrites.at(-1)).toEqual({ offset: 4, value: 1 })
   })
 })

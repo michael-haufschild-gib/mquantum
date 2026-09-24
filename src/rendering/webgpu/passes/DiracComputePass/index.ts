@@ -538,6 +538,42 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   }
 
   /** Initialize spinor wavepacket and potential if needed. */
+  /** Absorber state seen on the previous frame (null before the first frame). */
+  private lastAbsorberEnabled: boolean | null = null
+
+  /**
+   * Re-seed the renormalization target when the PML absorber is switched off
+   * mid-run. The target is the norm latched after init; once the PML has
+   * removed probability, the per-frame drift renorm (absorber off only)
+   * rescaled the surviving spinor back up to it — absorbed probability
+   * "reappeared". Copying the current norm on the GPU (reduce → finalize →
+   * diagResult[0] → targetNorm) makes unitary evolution resume at the
+   * absorbed level; the CPU baseline keeps the original norm, so normDrift
+   * still reports the absorbed fraction. A CPU sentinel reset would race the
+   * in-flight readback, which restores the norm captured at dispatch.
+   */
+  private syncRenormTargetWithAbsorber(ctx: WebGPURenderContext, config: DiracConfig): void {
+    const absorberOn = config.absorberEnabled === true
+    const turnedOff = this.lastAbsorberEnabled === true && !absorberOn
+    this.lastAbsorberEnabled = absorberOn
+    const { pl, bg } = this
+    const renorm = bg?.renormalizeUniformBuffer
+    if (!turnedOff || !this.initialized || !pl || !bg || !renorm) return
+    if (!this.diagUniformBuffer || !this.diagResultBuffer || this.diagNumWorkgroups <= 0) return
+    const diagData = new Uint32Array(4)
+    diagData[0] = this.totalSites
+    diagData[1] = this.diagNumWorkgroups
+    diagData[2] = this.currentSpinorSize
+    ctx.device.queue.writeBuffer(this.diagUniformBuffer, 0, diagData)
+    const rPass = ctx.beginComputePass({ label: 'dirac-absorber-off-norm-reduce' })
+    this.dc(rPass, pl.diagReducePipeline, [bg.diagReduceBG!], this.diagNumWorkgroups)
+    rPass.end()
+    const fPass = ctx.beginComputePass({ label: 'dirac-absorber-off-norm-finalize' })
+    this.dc(fPass, pl.diagFinalizePipeline, [bg.diagFinalizeBG!], 1)
+    fPass.end()
+    ctx.encoder.copyBufferToBuffer(this.diagResultBuffer, 0, renorm, 4, 4)
+  }
+
   private maybeInitialize(ctx: WebGPURenderContext, config: DiracConfig): boolean {
     if (this.initialized && !config.needsReset) return false
     const { device } = ctx
@@ -601,6 +637,12 @@ export class DiracComputePass extends WebGPUBaseComputePass {
 
     this.maxDensity = 1.0
     this.initialNorm = -1.0
+    // Clear the GPU renormalize target with the CPU baseline. Left at the
+    // previous run's norm, the per-frame renorm pass rescaled the fresh state
+    // to it before the first readback, which then locked the stale value in.
+    if (this.bg?.renormalizeUniformBuffer) {
+      device.queue.writeBuffer(this.bg.renormalizeUniformBuffer, 4, new Float32Array([0]))
+    }
     this.simTime = 0
     this.stepAccumulator = 0
     this.initialized = true
@@ -714,6 +756,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
 
     const { pl, bg } = this
     if (!pl || !bg) return
+    this.syncRenormTargetWithAbsorber(ctx, config)
 
     const linearWG = Math.ceil(this.totalSites / LINEAR_WG)
     // Kinetic + absorber use the 3-D dispatch variant when latticeDim===3.

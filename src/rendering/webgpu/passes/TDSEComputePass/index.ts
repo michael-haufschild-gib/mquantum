@@ -58,6 +58,7 @@ import {
   maybeDispatchDisorder,
 } from '../TDSEComputePassDisorder'
 import {
+  buildTdseDiagUniforms,
   dispatchFFTAxisSharedMem,
   estimateInitialDensity,
   type FFTAxisSharedMemParams,
@@ -147,6 +148,7 @@ import {
   resetStochasticLocState,
   type StochasticLocState,
 } from '../TDSEStochasticLocalization'
+import { TDSE_UNIFORMS_LAYOUT } from '../tdseUniformsLayout'
 import {
   createVortexDetectState,
   rebuildVortexDetect,
@@ -786,7 +788,13 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       const buf = new Float32Array(1)
       buf[0] = config.harmonicOmega
       device.queue.writeBuffer(this.omegaStagingBuffer, 0, buf)
-      encoder.copyBufferToBuffer(this.omegaStagingBuffer, 0, this.uniformBuffer, 308, 4)
+      encoder.copyBufferToBuffer(
+        this.omegaStagingBuffer,
+        0,
+        this.uniformBuffer,
+        TDSE_UNIFORMS_LAYOUT.byteOffset.harmonicOmega,
+        4
+      )
     }
 
     // Fill potential buffer
@@ -828,6 +836,15 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     this._diagState.maxDensity = estimateInitialDensity(config)
     this._diagState.properMaxDensity = this._diagState.maxDensity
     this._diagState.initialNorm = -1.0
+    // Clear the GPU renormalize target with the CPU baseline. Left at the
+    // previous run's norm, the per-frame renorm pass rescaled the fresh state
+    // to it before the first readback, which then locked the stale value in
+    // (amplitude edits were undone; a new BEC state kept the old particle
+    // number). Imaginary time re-seeds 1.0 below.
+    if (this.bg?.renormalizeUniformBuffer) {
+      device.queue.writeBuffer(this.bg.renormalizeUniformBuffer, 4, new Float32Array([0]))
+    }
+    if (!config.imaginaryTimeEnabled) this.seedRenormTargetFromPsi(ctx, config)
     this._diagState.initialMaxDensity = 1.0
     this._diagState.initialProperMaxDensity = 1.0
     this._diagState.prevNorm = 0
@@ -845,6 +862,59 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     }
     this._diagState.diagHistory.clear()
     useDiagnosticsStore.getState().resetTdse()
+  }
+
+  /** Absorber state seen on the previous frame (null before the first frame). */
+  private lastAbsorberEnabled: boolean | null = null
+
+  /**
+   * Re-seed the renormalization target when the PML absorber is switched off
+   * mid-run. The target is the norm latched at init; once the PML has removed
+   * probability, the per-frame drift renorm (which runs only with the absorber
+   * off) rescaled the surviving wave back up to it — absorbed probability
+   * "reappeared". Seeding from the current ψ makes unitary evolution resume
+   * at the absorbed norm; the CPU drift baseline keeps the original norm, so
+   * normDrift still reports the absorbed fraction.
+   */
+  private syncRenormTargetWithAbsorber(ctx: WebGPURenderContext, config: TdseConfig): void {
+    const absorberOn = config.absorberEnabled === true
+    if (
+      this.lastAbsorberEnabled === true &&
+      !absorberOn &&
+      this.initialized &&
+      !config.imaginaryTimeEnabled
+    ) {
+      this.seedRenormTargetFromPsi(ctx, config)
+    }
+    this.lastAbsorberEnabled = absorberOn
+  }
+
+  /**
+   * Seed the renormalization target from the freshly initialised ψ on the GPU
+   * (diag reduce → finalize → copy diagResult[0] into targetNorm). Latching it
+   * from the first async readback, several frames later, let non-unitary steps
+   * (CSL kicks) run un-renormalised meanwhile and made their drifted norm the
+   * target (+2.4 % at γ = 10). The first readback then re-latches ≈ the same
+   * value. Measurement-collapse injection keeps its explicit target.
+   */
+  private seedRenormTargetFromPsi(ctx: WebGPURenderContext, config: TdseConfig): void {
+    const diagResult = this._diagState.diagResultBuffer
+    const renorm = this.bg?.renormalizeUniformBuffer
+    if (!this.pl || !this.bg || !this.diagUniformBuffer || !diagResult || !renorm) return
+    if (this.diagNumWorkgroups <= 0) return
+    const strides = computeStridesPadded(config.gridSize, config.latticeDim, this.strideScratch)
+    ctx.device.queue.writeBuffer(
+      this.diagUniformBuffer,
+      0,
+      buildTdseDiagUniforms(config, this.totalSites, this.diagNumWorkgroups, strides)
+    )
+    const rPass = ctx.beginComputePass({ label: 'tdse-init-norm-reduce' })
+    this.dc(rPass, this.pl.diagReducePipeline, [this.bg.diagReduceBG], this.diagNumWorkgroups)
+    rPass.end()
+    const fPass = ctx.beginComputePass({ label: 'tdse-init-norm-finalize' })
+    this.dc(fPass, this.pl.diagFinalizePipeline, [this.bg.diagFinalizeBG], 1)
+    fPass.end()
+    ctx.encoder.copyBufferToBuffer(diagResult, 0, renorm, 4, 4)
   }
 
   /**
@@ -957,6 +1027,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     }
 
     this.maybeInitialize(ctx, config)
+    this.syncRenormTargetWithAbsorber(ctx, config)
 
     // Strang splitting time steps (only when playing)
     const linearWG = Math.ceil(this.totalSites / LINEAR_WG)

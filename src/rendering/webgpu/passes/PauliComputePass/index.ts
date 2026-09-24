@@ -379,6 +379,29 @@ export class PauliComputePass extends WebGPUBaseComputePass {
 
   // ============================================================================
   /** Initialize spinor state if not yet initialized or reset requested. */
+  /** Absorber state seen on the previous frame (null before the first frame). */
+  private lastAbsorberEnabled: boolean | null = null
+
+  /**
+   * Re-latch the renormalization target when the PML absorber is switched off
+   * mid-run. The target is the norm latched after init; once the PML has
+   * removed probability, the per-frame drift renorm (absorber off only)
+   * rescaled the surviving spinor back up to it — absorbed probability
+   * "reappeared". Clearing it makes the next diagnostics readback latch the
+   * current (absorbed) norm; until then the renorm is skipped, which is
+   * harmless for the unitary Pauli step.
+   */
+  private syncRenormTargetWithAbsorber(ctx: WebGPURenderContext, config: PauliConfig): void {
+    const absorberOn = config.absorberEnabled === true
+    if (this.lastAbsorberEnabled === true && !absorberOn && this.initialized) {
+      this.initialNorm = 0
+      if (this.bg?.renormalizeUniformBuffer) {
+        ctx.device.queue.writeBuffer(this.bg.renormalizeUniformBuffer, 4, new Float32Array([0]))
+      }
+    }
+    this.lastAbsorberEnabled = absorberOn
+  }
+
   private maybeInitialize(ctx: WebGPURenderContext, config: PauliConfig): void {
     if (this.initialized && !config.needsReset) return
     if (!this.buf) return
@@ -427,6 +450,12 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     this.simTime = 0
     this.stepAccumulator = 0
     this.initialNorm = 0
+    // Clear the GPU renormalize target with the CPU baseline. Left at the
+    // previous run's norm, the per-frame renorm pass rescaled the fresh state
+    // to it before the first readback, which then locked the stale value in.
+    if (this.bg?.renormalizeUniformBuffer) {
+      ctx.device.queue.writeBuffer(this.bg.renormalizeUniformBuffer, 4, new Float32Array([0]))
+    }
     this.initialized = true
     // Invalidate in-flight readbacks before resetting diagnostics store
     this.diagGeneration++
@@ -570,6 +599,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
 
     this.updateUniforms(device, config, basisX, basisY, basisZ, boundingRadius)
     this.maybeInitialize(ctx, config)
+    this.syncRenormTargetWithAbsorber(ctx, config)
 
     if (!this.pl || !this.bg || !this.buf) return
     const linearWG = Math.ceil(this.buf.totalSites / LINEAR_WG)
