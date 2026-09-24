@@ -8,6 +8,7 @@ import {
   assertSharedMemoryFFTLog2,
   FFT_UNIFORM_SIZE,
   LINEAR_WG,
+  sharedMemFFTWorkgroupCount,
 } from '../computePassUtils'
 import type { TdseBindGroupResult, TdsePipelineResult } from '../TDSEComputePassSetup'
 import type { DiagReadbackState } from '../TDSEDiagnosticsReadback'
@@ -146,10 +147,11 @@ export function dispatchFFTAxisSharedMem(
     FFT_UNIFORM_SIZE
   )
 
-  // One dispatch: totalSites/axisDim pencils, one workgroup per pencil
-  const pencilCount = p.totalSites / axisDim
+  // One dispatch: totalSites/axisDim pencils, max(1, 128/axisDim) per workgroup
+  // (one per workgroup exceeded the 65535 dispatch limit at 9D 4⁹ grids).
+  const workgroups = sharedMemFFTWorkgroupCount(p.totalSites, axisDim)
   const pass = ctx.beginComputePass({ label: `tdse-fft-shared-mem-axis-${slotOffset}` })
-  p.dispatchCompute(pass, p.pl.fftSharedMemPipeline, [p.bg.fftSharedMemBG], pencilCount)
+  p.dispatchCompute(pass, p.pl.fftSharedMemPipeline, [p.bg.fftSharedMemBG], workgroups)
   pass.end()
 
   return slotOffset + 1

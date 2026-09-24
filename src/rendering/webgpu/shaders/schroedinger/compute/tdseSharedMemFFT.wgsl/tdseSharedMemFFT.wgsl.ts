@@ -179,8 +179,11 @@ fn main(
  * Host dispatch must use:
  *   ceil((totalElements / axisDim) / diracSharedMemFFTPencilsPerWorkgroup(axisDim))
  *
- * Kept separate from the TDSE/Pauli shader so existing dispatch contracts stay
- * unchanged outside Dirac.
+ * TDSE, BEC and Pauli use it too (as {@link sharedMemFFTMultiPencilTwiddleBlock}):
+ * one pencil per workgroup needs totalSites/axisDim workgroups, which passes
+ * the 65535-per-dimension dispatch limit at default high-D grids (TDSE/BEC 9D
+ * 4⁹ → 65536, Pauli 7D 8⁷ → 262144); packing max(1, 128/N) pencils caps it at
+ * ceil(totalSites/128).
  */
 export const diracSharedMemFFTMultiPencilTwiddleBlock = /* wgsl */ `
 @group(0) @binding(0) var<uniform> axisUni: FFTAxisUniforms;
@@ -308,3 +311,10 @@ fn main(
   }
 }
 `
+
+/**
+ * Mode-neutral name for {@link diracSharedMemFFTMultiPencilTwiddleBlock}, the
+ * shared-memory FFT kernel the TDSE / BEC and Pauli passes compose. Dispatch
+ * with `sharedMemFFTWorkgroupCount(totalSites, axisDim)` workgroups.
+ */
+export const sharedMemFFTMultiPencilTwiddleBlock = diracSharedMemFFTMultiPencilTwiddleBlock

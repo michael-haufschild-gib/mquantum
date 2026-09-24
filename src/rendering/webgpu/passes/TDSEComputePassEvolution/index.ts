@@ -24,6 +24,7 @@ import {
   DIAG_DECIMATION,
   GRID_WG,
   LINEAR_WG,
+  sharedMemFFTWorkgroupCount,
   type SiteDispatch,
 } from '../computePassUtils'
 import { dispatchDiagnostics as extDispatchDiagnostics } from '../TDSEComputePassDispatchers'
@@ -377,7 +378,7 @@ export function runStrangEvolution(
       for (let d = config.latticeDim - 1; d >= 0; d--) {
         const axisDim = config.gridSize[d]!
         strangPass.setBindGroup(0, bg.fftSharedMemBGs[fftSlot]!)
-        strangPass.dispatchWorkgroups(res.totalSites / axisDim)
+        strangPass.dispatchWorkgroups(sharedMemFFTWorkgroupCount(res.totalSites, axisDim))
         fftSlot++
       }
       // 4. Kinetic propagator in k-space.
@@ -399,7 +400,7 @@ export function runStrangEvolution(
       for (let d = config.latticeDim - 1; d >= 0; d--) {
         const axisDim = config.gridSize[d]!
         strangPass.setBindGroup(0, bg.fftSharedMemBGs[fftSlot]!)
-        strangPass.dispatchWorkgroups(res.totalSites / axisDim)
+        strangPass.dispatchWorkgroups(sharedMemFFTWorkgroupCount(res.totalSites, axisDim))
         fftSlot++
       }
       // 6+7. Fused unpack + second half-step potential (reads density for BEC nonlinearity)

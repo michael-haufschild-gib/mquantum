@@ -43,6 +43,7 @@ import {
   MAX_DIM,
   pickSiteDispatch,
   sanitizeGridSizes,
+  sharedMemFFTWorkgroupCount,
   type SiteDispatch,
 } from '../computePassUtils'
 import {
@@ -875,7 +876,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     const bgs = this.bg?.fftSharedMemBGs
     if (!bgs || slot >= bgs.length) return
     passEncoder.setBindGroup(0, bgs[slot]!)
-    passEncoder.dispatchWorkgroups(this.totalSites / axisDim)
+    passEncoder.dispatchWorkgroups(sharedMemFFTWorkgroupCount(this.totalSites, axisDim))
   }
 
   /**

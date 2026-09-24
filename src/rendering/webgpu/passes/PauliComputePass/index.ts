@@ -45,6 +45,7 @@ import {
   MAX_DIM,
   pickSiteDispatch,
   sanitizeGridSizes,
+  sharedMemFFTWorkgroupCount,
 } from '../computePassUtils'
 import {
   finiteNonNegativeReadbackOrZero,
@@ -469,10 +470,10 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   /**
    * Dispatch one shared-memory FFT axis inside an already-open compute pass.
    *
-   * The shared-memory kernel performs all log2(N) butterfly stages for one
-   * pencil inside a single workgroup using workgroup-local shared memory.
-   * One workgroup is dispatched per pencil (`totalSites / axisDim`); the
-   * caller has already set the pipeline on the encoder.
+   * The shared-memory kernel performs all log2(N) butterfly stages for
+   * max(1, 128/axisDim) pencils per workgroup using workgroup-local shared
+   * memory, so `sharedMemFFTWorkgroupCount(totalSites, axisDim)` workgroups are
+   * dispatched; the caller has already set the pipeline on the encoder.
    *
    * @param passEncoder - Active compute pass encoder.
    * @param axisDim - Per-axis grid dimension (power of two, [8, 128]).
@@ -487,7 +488,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     const bg = this.bg.fftSharedMemBGs[slot]
     if (!bg) return
     passEncoder.setBindGroup(0, bg)
-    passEncoder.dispatchWorkgroups(this.buf.totalSites / axisDim)
+    passEncoder.dispatchWorkgroups(sharedMemFFTWorkgroupCount(this.buf.totalSites, axisDim))
   }
 
   // ============================================================================
