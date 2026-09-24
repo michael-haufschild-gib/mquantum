@@ -553,13 +553,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
         V = params.wellDepth;
       }
     } else if (params.potentialType == 3u) {
-      // Double well: V = D (1 - exp(-|x|²/W²))
-      var r2pot: f32 = 0.0;
-      for (var d: u32 = 0u; d < params.latticeDim; d++) {
-        r2pot += ndWorldPos[d] * ndWorldPos[d];
-      }
-      let W2 = max(params.wellWidth * params.wellWidth, 1e-12);
-      V = params.wellDepth * (1.0 - exp(-r2pot / W2));
+      // Double well along the first dimension (mirrors pauliPotential.wgsl):
+      // V = V0 ((x0² − a²)/a²)², a = wellWidth/2.
+      let x0 = ndWorldPos[0u];
+      let aDw = max(params.wellWidth * 0.5, 1e-6);
+      let a2Dw = aDw * aDw;
+      let qDw = (x0 * x0 - a2Dw) / a2Dw;
+      V = params.wellDepth * qDw * qDw;
     }
     // Normalize to [0, 1] using wellDepth or harmonicOmega as characteristic scale
     let vMax = max(params.wellDepth, 0.5 * params.mass * params.harmonicOmega * params.harmonicOmega * params.boundingRadius * params.boundingRadius);

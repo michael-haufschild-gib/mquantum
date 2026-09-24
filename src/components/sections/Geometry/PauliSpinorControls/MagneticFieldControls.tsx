@@ -66,7 +66,7 @@ export const MagneticFieldControls: React.FC<MagneticFieldControlsProps> = React
         <Slider
           data-testid="components-sections-geometry-pauli-spinor-controls-magnetic-field-controls-slider-65-9"
           label="Field Strength B₀"
-          tooltip="Magnitude of the effective Zeeman coupling. Higher values increase the Larmor precession frequency ω_L = 2B₀/ℏ in this convention."
+          tooltip="Magnitude of the effective Zeeman coupling (uniform, gradient offset, and rotating fields; the quadrupole uses g instead). Higher values increase the Larmor precession frequency ω_L = 2B₀/ℏ in this convention."
           value={fieldStrength}
           onChange={onFieldStrengthChange}
           min={0}
@@ -77,7 +77,7 @@ export const MagneticFieldControls: React.FC<MagneticFieldControlsProps> = React
         <Slider
           data-testid="components-sections-geometry-pauli-spinor-controls-magnetic-field-controls-slider-75-9"
           label="Field θ (polar)"
-          tooltip="Polar angle of the magnetic field direction. 0 = along +z (standard quantization axis)."
+          tooltip="Polar angle of the uniform field's direction (the gradient, rotating, and quadrupole profiles have fixed axes). 0 = along +z (standard quantization axis)."
           value={fieldDirection[0]}
           onChange={(v) => onFieldDirectionChange([v, fieldDirection[1]])}
           min={0}
@@ -88,7 +88,7 @@ export const MagneticFieldControls: React.FC<MagneticFieldControlsProps> = React
         <Slider
           data-testid="components-sections-geometry-pauli-spinor-controls-magnetic-field-controls-slider-85-9"
           label="Field φ (azimuthal)"
-          tooltip="Azimuthal angle of the magnetic field direction in the x-y plane."
+          tooltip="Azimuthal angle of the uniform field's direction in the x-y plane (other field profiles have fixed axes)."
           value={fieldDirection[1]}
           onChange={(v) => onFieldDirectionChange([fieldDirection[0], v])}
           min={0}
@@ -117,7 +117,7 @@ export const MagneticFieldControls: React.FC<MagneticFieldControlsProps> = React
           <Slider
             data-testid="components-sections-geometry-pauli-spinor-controls-magnetic-field-controls-slider-112-11"
             label="Rotation Frequency ω"
-            tooltip="Angular frequency of the rotating magnetic field component. Resonance occurs when ω matches the Larmor frequency."
+            tooltip="Angular frequency ω of the transverse field B₀(cos ωt, sin ωt, 0). There is no static field, so in the co-rotating frame the spin precesses about (B₀, 0, −ℏω/2): the maximum ↑→↓ flip probability is B₀²/(B₀² + (ℏω/2)²), complete only at ω = 0."
             value={rotatingFrequency}
             onChange={onRotatingFrequencyChange}
             min={0}
