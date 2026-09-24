@@ -7,10 +7,10 @@ import type { SinglePassFrameArgs } from '@/rendering/webgpu/renderers/strategie
 import { useBellExperimentStore } from '@/stores/diagnostics/bellExperimentStore'
 
 class TestBellPairStrategy extends BellPairStrategy {
-  runForTest(config: ReturnType<typeof createDefaultBellPairConfig>): void {
+  runForTest(config: ReturnType<typeof createDefaultBellPairConfig>, isPlaying = false): void {
     const pass = { executeBellPair: vi.fn() }
     this.executePass(pass as never, {} as WebGPURenderContext, config, {
-      isPlaying: false,
+      isPlaying,
       speed: 1,
       boundingRadius: 2,
     } as SinglePassFrameArgs)
@@ -31,5 +31,22 @@ describe('BellPairStrategy', () => {
     expect(s.totalTrials).toBe(0)
     expect(s.historyCount).toBe(0)
     expect(s.qm.S).toBeNaN()
+  })
+
+  // Regression: targetTrials was never consumed, so the loop ran until paused.
+  it('stops the trial loop at targetTrials, clamping the last batch', () => {
+    const cfg = {
+      ...createDefaultBellPairConfig(),
+      needsReset: false,
+      targetTrials: 2500,
+      trialsPerFrame: 1000,
+    }
+    useBellExperimentStore.getState().reset(7)
+    useBellExperimentStore.getState().setIsRunning(true)
+    const strategy = new TestBellPairStrategy()
+    for (let f = 0; f < 5; f++) strategy.runForTest(cfg, true)
+    const s = useBellExperimentStore.getState()
+    expect(s.totalTrials).toBe(2500)
+    expect(s.isRunning).toBe(false)
   })
 })

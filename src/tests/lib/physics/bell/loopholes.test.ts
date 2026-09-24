@@ -9,6 +9,7 @@ import {
   countNonDetections,
   EBERHARD_THRESHOLD,
   hasNonDetection,
+  maxChshForWernerGivenEta,
   maxChshGivenEta,
   maxChshUnderAssignNonDetection,
   maxChshUnderFairSampling,
@@ -16,7 +17,7 @@ import {
 } from '@/lib/physics/bell/loopholes'
 import { PCG32 } from '@/lib/physics/bell/pcg32'
 import { azimuthalVec, jointOutcomeProbabilities } from '@/lib/physics/bell/projectors'
-import { bellState, pureDensityMatrix } from '@/lib/physics/bell/state'
+import { bellState, pureDensityMatrix, wernerDensityMatrix } from '@/lib/physics/bell/state'
 import type { Vec3 } from '@/lib/physics/bell/types'
 
 describe('Eberhard threshold constant', () => {
@@ -253,5 +254,66 @@ describe('maxChshGivenEta dispatch', () => {
   it('forwards to assign-non-detection formula', () => {
     expect(maxChshGivenEta(0.5, 'assignNonDetection')).toBeCloseTo(0.5 * Math.SQRT2 + 0.5, 12)
     expect(maxChshGivenEta(1, 'assignNonDetection')).toBeCloseTo(TSIRELSON_BOUND, 12)
+  })
+})
+
+describe('maxChshForWernerGivenEta — joint (v, η) ceiling', () => {
+  it('matches the Werner ceiling under fair sampling', () => {
+    expect(maxChshForWernerGivenEta(0.8, 0.5, 'fairSampling')).toBeCloseTo(0.8 * 2 * Math.SQRT2, 12)
+    expect(maxChshForWernerGivenEta(0.8, 0, 'fairSampling')).toBe(0)
+  })
+
+  it('combines v and η multiplicatively when misses are assigned', () => {
+    // Regression: the panel used min(2√2·v, η²·2√2 + 2(1−η)²) = 2.263 here,
+    // claiming a violation was possible; the true joint maximum is 1.853.
+    const s = maxChshForWernerGivenEta(0.8, 0.9, 'assignNonDetection')
+    expect(s).toBeCloseTo(0.81 * 0.8 * 2 * Math.SQRT2 + 2 * 0.01, 12)
+    expect(s).toBeLessThan(2)
+    expect(
+      Math.min(0.8 * 2 * Math.SQRT2, maxChshGivenEta(0.9, 'assignNonDetection'))
+    ).toBeGreaterThan(2)
+  })
+
+  it('reduces to the η-only ceiling at v = 1 and to the constant term at η = 0', () => {
+    for (const eta of [0, 0.5, 0.83, 1]) {
+      expect(maxChshForWernerGivenEta(1, eta, 'assignNonDetection')).toBeCloseTo(
+        maxChshGivenEta(eta, 'assignNonDetection'),
+        12
+      )
+    }
+    expect(maxChshForWernerGivenEta(0.3, 0, 'assignNonDetection')).toBeCloseTo(2, 12)
+  })
+})
+
+describe('maxChshForWernerGivenEta — Monte Carlo agreement', () => {
+  it('matches a sampled Werner + detection-loss experiment at the maximizing settings', () => {
+    const v = 0.8
+    const eta = 0.9
+    const rho = wernerDensityMatrix(v)
+    const rng = new PCG32(20260923)
+    const acc = new ChshAccumulator()
+    // Bob's axes rotated by π turn S_QM positive so the (1−η)² assignment term adds.
+    const alice = [azimuthalVec(CANONICAL_CHSH_PHI.a), azimuthalVec(CANONICAL_CHSH_PHI.aPrime)]
+    const bob = [
+      azimuthalVec(CANONICAL_CHSH_PHI.b + Math.PI),
+      azimuthalVec(CANONICAL_CHSH_PHI.bPrime + Math.PI),
+    ]
+    const settings: Array<[0 | 1, 0 | 1]> = [
+      [0, 0],
+      [0, 1],
+      [1, 0],
+      [1, 1],
+    ]
+    for (const [sa, sb] of settings) {
+      const probs = jointOutcomeProbabilities(rho, alice[sa]!, bob[sb]!)
+      for (let k = 0; k < 60_000; k++) {
+        const raw = sampleJointOutcome(probs, rng)
+        const detected = applyDetectionEfficiency(raw, { etaA: eta, etaB: eta }, rng)
+        const [a, b] = postSelectOutcome(detected, 'assignNonDetection')!
+        acc.recordTrial(sa, sb, a, b)
+      }
+    }
+    expect(acc.getS()).toBeCloseTo(maxChshForWernerGivenEta(v, eta, 'assignNonDetection'), 1)
+    expect(Math.abs(acc.getS())).toBeLessThan(CLASSICAL_BOUND)
   })
 })

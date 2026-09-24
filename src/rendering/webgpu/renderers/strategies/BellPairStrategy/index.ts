@@ -86,11 +86,20 @@ export class BellPairStrategy extends SinglePassComputeStrategy<
       store.reset(config.seed)
     }
     // Trial loop runs when both the global animation is playing AND the
-    // Bell panel's Run button is active (isRunning).
+    // Bell panel's Run button is active (isRunning), and stops at the
+    // configured target: the last batch is clamped to the remaining trials.
+    // (The Target-trials control was previously never consumed, so the loop
+    // ran until paused.)
+    const remaining = Math.max(0, config.targetTrials - store.totalTrials)
     const trials =
-      args.isPlaying && store.isRunning && config.trialsPerFrame > 0 ? config.trialsPerFrame : 0
+      args.isPlaying && store.isRunning && config.trialsPerFrame > 0
+        ? Math.min(config.trialsPerFrame, remaining)
+        : 0
     if (trials > 0) {
       store.processTrialBatch(config, trials)
+    }
+    if (store.isRunning && useBellExperimentStore.getState().totalTrials >= config.targetTrials) {
+      store.setIsRunning(false)
     }
 
     // Forward the post-batch CHSH state to the apparatus shader (so the

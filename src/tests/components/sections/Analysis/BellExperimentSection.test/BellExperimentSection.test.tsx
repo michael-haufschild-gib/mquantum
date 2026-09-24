@@ -31,6 +31,19 @@ describe('BellExperimentSection — smoke', () => {
     expect(screen.getByTestId('bell-werner-status')).toHaveTextContent('forbids')
   })
 
+  it('loophole budget reports the joint (v, η) ceiling, not min() of the parts', () => {
+    // v = 0.8 and η = 0.9 each clear their own threshold, but with misses
+    // assigned the joint maximum is η²·v·2√2 + 2(1−η)² = 1.853 — the old
+    // min() of the separate ceilings showed 2.263 (a violation "allowed").
+    const store = useExtendedObjectStore.getState()
+    store.setBellVisibility(0.8)
+    store.setBellDetectionEfficiency(0.9)
+    store.setBellAnalysisMode('assignNonDetection')
+    render(<BellExperimentSection />)
+    expect(screen.getByText('1.853')).toHaveClass('font-mono')
+    expect(screen.queryByText('2.263')).not.toBeInTheDocument()
+  })
+
   it('Run button toggles isRunning in the diag store', async () => {
     const user = userEvent.setup()
     render(<BellExperimentSection />)
@@ -90,5 +103,31 @@ describe('BellExperimentSection — smoke', () => {
     const select = screen.getByTestId('bell-lhv-strategy') as HTMLSelectElement
     await user.selectOptions(select, 'noisyClassical')
     expect(useExtendedObjectStore.getState().bellPair.lhvStrategyId).toBe('noisyClassical')
+  })
+})
+
+// Regression: the Target-trials control was never consumed. The strategy now
+// stops at the target; pressing Run after a completed pass starts a fresh
+// pass instead of stopping again on its first frame.
+describe('BellExperimentSection — Run after a completed pass', () => {
+  it('resets the statistics when the target has already been reached', async () => {
+    const user = userEvent.setup()
+    const cfg = useExtendedObjectStore.getState().bellPair
+    useBellExperimentStore.getState().processTrialBatch(cfg, cfg.targetTrials)
+    expect(useBellExperimentStore.getState().totalTrials).toBe(cfg.targetTrials)
+    render(<BellExperimentSection />)
+    await user.click(screen.getByTestId('bell-run-toggle'))
+    expect(useBellExperimentStore.getState().totalTrials).toBe(0)
+    expect(useBellExperimentStore.getState().isRunning).toBe(true)
+  })
+
+  it('keeps accumulated trials when resuming below the target', async () => {
+    const user = userEvent.setup()
+    const cfg = useExtendedObjectStore.getState().bellPair
+    useBellExperimentStore.getState().processTrialBatch(cfg, 500)
+    render(<BellExperimentSection />)
+    await user.click(screen.getByTestId('bell-run-toggle'))
+    expect(useBellExperimentStore.getState().totalTrials).toBe(500)
+    expect(useBellExperimentStore.getState().isRunning).toBe(true)
   })
 })
