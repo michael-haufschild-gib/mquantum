@@ -25,6 +25,7 @@ import {
   gotoMode,
   requireWebGPU,
   waitForModeReady,
+  waitForPageCondition,
   waitForShaderCompilation,
   waitForSimulationFrames,
 } from './helpers/app-helpers'
@@ -63,7 +64,8 @@ test.describe('Page curve HUD', () => {
     // diagnostic cadence is `diagnosticsInterval` frames (default 5); at 60 fps
     // that's ≈ 12 ticks per second.
     await waitForSimulationFrames(page, 240)
-    await page.waitForFunction(
+    await waitForPageCondition(
+      page,
       async () => {
         const m = await import('/src/stores/diagnostics/diagnosticsStore.ts')
         const gen =
@@ -94,7 +96,10 @@ test.describe('Page curve HUD', () => {
     expect(snapshot.lastRate).toBeGreaterThan(0)
     expect(snapshot.lastSBH).toBeGreaterThan(0)
 
-    // Assert rendered SVG is showing a non-flat curve.
+    // Assert rendered SVG is showing a non-flat curve. The panel is a
+    // React.lazy chunk behind the store flag, so wait for it to mount before
+    // reading it (the read raced the chunk load).
+    await expect(page.locator('svg[data-island-overlay]')).toBeVisible({ timeout: 15_000 })
     const traceStats = await page.evaluate(() => {
       const svg = document.querySelector('svg[data-island-overlay]')
       if (!svg) return null
@@ -116,11 +121,13 @@ test.describe('Page curve HUD', () => {
     })
     if (!traceStats) throw new Error('page-curve SVG not rendered')
     // Baseline flat path (the broken state we're preventing regression of)
-    // produces span ≈ 0 because all y-coords collapse to the axis floor.
-    // A working curve spans several SVG px once S_therm has integrated a
-    // few readback ticks — 2 px is enough to distinguish broken-flat from
-    // rising; a real run over 10+ ticks spans ~40+ px.
-    expect(traceStats.maxSpan).toBeGreaterThan(2)
+    // produces span ≈ 0 because all y-coords collapse to the axis floor. The
+    // y-axis is scaled to S_BH (≈ 22 here) while S_therm has integrated only
+    // ≈ 0.4 by this point at the preset's tuned dt = 5e-4, so a working
+    // curve rises ≈ 2 px (GPU-measured 1.99): the former 2 px threshold was
+    // tuned to the silently doubled dt (see the BEC dt floor fix). 0.5 px
+    // still separates a rising trace from the collapsed one.
+    expect(traceStats.maxSpan).toBeGreaterThan(0.5)
     expect(traceStats.segmentCount).toBeGreaterThan(2)
 
     // Island overlay toggle: flips the data-island-overlay attribute.
@@ -166,7 +173,8 @@ test.describe('Page curve HUD', () => {
     }, gEffBefore * 10)
     // Wait for ≥ 3 BEC diagnostic ticks after the slider change so the
     // panel's sample-push effect has observed the new gEff.
-    await page.waitForFunction(
+    await waitForPageCondition(
+      page,
       async (prevGen: number) => {
         const m = await import('/src/stores/diagnostics/diagnosticsStore.ts')
         const d = m.useDiagnosticsStore.getState() as {
@@ -222,8 +230,9 @@ test.describe('Page curve HUD', () => {
       const pcMod = await import('/src/stores/diagnostics/pageCurveStore.ts')
       const extMod = await import('/src/stores/scene/extendedObjectStore.ts')
       const bhMod = await import('/src/lib/physics/bec/sonicHorizon.ts')
-      const bcMod =
-        await import('/src/rendering/webgpu/renderers/strategies/TdseBecConfigBuilder.ts')
+      // computeWaterfallBackgroundDensity moved out of the (since folderised)
+      // TdseBecConfigBuilder module; the old path 404'd.
+      const bcMod = await import('/src/lib/physics/bec/waterfallParams.ts')
       // Synthetic sample with T_H·area·dt big enough that S_therm > S_BH →
       // island radius becomes strictly positive on the very next push.
       const pc = pcMod.usePageCurveStore.getState()

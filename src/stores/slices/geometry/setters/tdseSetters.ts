@@ -34,7 +34,7 @@ import {
 } from '@/stores/utils/dynamicPresetImport'
 
 import {
-  clampDtWithCfl,
+  clampSchrodingerLatticeDt,
   computeCflLimit,
   defaultTdseGridPerDim,
   nestedClampedSetter,
@@ -178,7 +178,7 @@ export const resizeTdseArrays = (prev: TdseConfig, newDim: number): Partial<Tdse
     rawRadii,
     newDim,
     prev.mass,
-    clampDtWithCfl
+    clampSchrodingerLatticeDt
   )
   return {
     latticeDim: newDim,
@@ -277,7 +277,7 @@ export function createTdseSetters(ctx: SetterContext): TdseSetters {
           td.compactRadii,
           latticeDim,
           td.mass,
-          clampDtWithCfl
+          clampSchrodingerLatticeDt
         )
         return {
           schroedinger: {
@@ -305,7 +305,7 @@ export function createTdseSetters(ctx: SetterContext): TdseSetters {
           td.compactRadii,
           td.latticeDim,
           td.mass,
-          clampDtWithCfl
+          clampSchrodingerLatticeDt
         )
         return {
           schroedinger: {
@@ -331,7 +331,7 @@ export function createTdseSetters(ctx: SetterContext): TdseSetters {
           td.compactRadii,
           td.latticeDim,
           clamped,
-          clampDtWithCfl
+          clampSchrodingerLatticeDt
         )
         return {
           schroedinger: {
@@ -550,7 +550,7 @@ export function createTdseSetters(ctx: SetterContext): TdseSetters {
           td.compactRadii,
           td.latticeDim,
           td.mass,
-          clampDtWithCfl
+          clampSchrodingerLatticeDt
         )
         return {
           schroedinger: {
@@ -579,7 +579,7 @@ export function createTdseSetters(ctx: SetterContext): TdseSetters {
           rawRadii,
           td.latticeDim,
           td.mass,
-          clampDtWithCfl
+          clampSchrodingerLatticeDt
         )
         return {
           schroedinger: {

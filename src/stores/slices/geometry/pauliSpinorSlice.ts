@@ -1,12 +1,15 @@
 import { StateCreator } from 'zustand'
 
 import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
+import { minDiracGridPerDim } from '@/lib/geometry/extended/dirac'
 import {
   createDefaultPauliConfig,
   DEFAULT_PAULI_CONFIG,
   type PauliConfig,
 } from '@/lib/geometry/extended/pauli'
+import { reduceGridToFit } from '@/lib/math/ndArray'
 
+import { TDSE_MAX_TOTAL_SITES } from './setters/sliceSetterUtils'
 import { ExtendedObjectSlice, PauliSpinorSlice } from './types'
 
 export const createPauliSpinorSlice: StateCreator<ExtendedObjectSlice, [], [], PauliSpinorSlice> = (
@@ -42,6 +45,18 @@ export const createPauliSpinorSlice: StateCreator<ExtendedObjectSlice, [], [], P
   const setPauliClamped = (key: keyof PauliConfig, value: number, min: number, max: number) => {
     if (!isFinite(value)) return
     setPauliField(key, Math.max(min, Math.min(max, value)) as never)
+  }
+
+  /** Helper: write a PML field to both the Pauli config and the shared schroedinger override. */
+  const setPauliSharedPml = <K extends 'absorberEnabled' | 'absorberWidth' | 'pmlTargetReflection'>(
+    key: K,
+    value: PauliConfig[K]
+  ) => {
+    setWithVersion((state) => ({
+      pauliSpinor: { ...state.pauliSpinor, [key]: value },
+      schroedinger: { ...state.schroedinger, [key]: value },
+      schroedingerVersion: state.schroedingerVersion + 1,
+    }))
   }
 
   const setPauliIntClamped = (key: keyof PauliConfig, value: number, min: number, max: number) => {
@@ -134,15 +149,23 @@ export const createPauliSpinorSlice: StateCreator<ExtendedObjectSlice, [], [], P
     // === Grid ===
     setPauliGridSize: (size) => {
       if (!size.every(isFinite)) return
-      const clamped = size.map((s) => {
-        const n = Math.round(s)
-        // Round to nearest power of 2 for FFT
-        const pow2 = Math.pow(2, Math.round(Math.log2(Math.max(8, Math.min(256, n)))))
-        return pow2
+      // Same contract as setTdseGridSize / setDiracGridSize: a power of two per
+      // axis inside the shared-memory FFT range [2, 128], then fit the site
+      // budget the grid selector advertises. The old [8, 256] admitted a 256
+      // axis the FFT kernel cannot represent, and its floor of 8 silently
+      // rounded the selector's 2 / 4 options back up to 8 (no effect at 5–6D).
+      // The per-dimension floor keeps ≥ 64 sites: the spin-down component is
+      // bound at byte offset totalSites·8, which must be 256-byte aligned
+      // (same constraint and helper as Dirac's per-component slices).
+      setWithVersion((state) => {
+        const minGrid = minDiracGridPerDim(state.pauliSpinor.latticeDim)
+        const snapped = size.map((s) => {
+          const n = Math.max(minGrid, Math.min(128, Math.round(s)))
+          return Math.max(minGrid, Math.min(128, 2 ** Math.round(Math.log2(n))))
+        })
+        const gridSize = reduceGridToFit(snapped, TDSE_MAX_TOTAL_SITES, minGrid)
+        return { pauliSpinor: { ...state.pauliSpinor, gridSize, needsReset: true } }
       })
-      setWithVersion((state) => ({
-        pauliSpinor: { ...state.pauliSpinor, gridSize: clamped, needsReset: true },
-      }))
     },
     setPauliSpacing: (spacing) => {
       if (!spacing.every(isFinite)) return
@@ -161,9 +184,19 @@ export const createPauliSpinorSlice: StateCreator<ExtendedObjectSlice, [], [], P
     },
 
     // === Absorber ===
-    setPauliAbsorberEnabled: (enabled) => setPauliField('absorberEnabled', enabled),
-    setPauliAbsorberWidth: (width) => setPauliClamped('absorberWidth', width, 0.05, 0.5),
-    setPauliPmlTargetReflection: (r) => setPauliClamped('pmlTargetReflection', r, 1e-12, 0.999),
+    // The renderer resolves PML settings as `schroedinger.* ?? pauliSpinor.*`
+    // (applySharedPml), and the shared fields always hold a value, so a
+    // per-mode-only write was a silent no-op. Mirror into the shared fields
+    // like the TDSE / Dirac per-mode setters do.
+    setPauliAbsorberEnabled: (enabled) => setPauliSharedPml('absorberEnabled', enabled),
+    setPauliAbsorberWidth: (width) => {
+      if (!isFinite(width)) return
+      setPauliSharedPml('absorberWidth', Math.max(0.05, Math.min(0.5, width)))
+    },
+    setPauliPmlTargetReflection: (r) => {
+      if (!isFinite(r)) return
+      setPauliSharedPml('pmlTargetReflection', Math.max(1e-12, Math.min(0.999, r)))
+    },
 
     // === Diagnostics ===
     setPauliDiagnosticsEnabled: (enabled) => setPauliField('diagnosticsEnabled', enabled),
